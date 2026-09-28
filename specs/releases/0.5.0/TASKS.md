@@ -29,7 +29,7 @@ tests. `Δ` = prod/test lines; PLAN §2.7 ceilings stop a task, never rise.
 ### W2 — consolidations (FR3)
 
 - [x] **T-050-49 — `release.py check` (30).** `W:` `f/specs/`, `core/` · `blocked by:` T-050-45, T-050-58 · `delivers:` one live release; one release-id grammar (`sa-release-id-has-three-grammars`) · `RED:` PLAN §2 WP-30 · Δ −105/−100.
-- [-] **T-050-50 — Certify walks the workspace (31).** `W:` `f/{certification,reconcile}/`, recipe · `blocked by:` T-050-40, T-050-70..74 · `delivers:` AC3.2; certify children fenced (`sa-certify-children-resolve-the-live-workspace`); one finding shape (`sa-doctor-finding-has-four-shapes`) · `RED:` PLAN §2 WP-31 · Δ −126/+116.
+- [x] **T-050-50 — Certify walks the workspace (31).** `W:` `f/{certification,reconcile}/`, recipe · `blocked by:` T-050-40, T-050-70..74 · `delivers:` AC3.2; certify children fenced (`sa-certify-children-resolve-the-live-workspace`); one finding shape (`sa-doctor-finding-has-four-shapes`) · `RED:` PLAN §2 WP-31 · Δ −126/+116.
 - [x] **T-050-52 — Subjects in the doctor (35).** `W:` backlog `scripts/`, `f/backlog/`, `core/models/backlog.py` · `blocked by:` T-050-44 · `delivers:` no circular RESOLVED · `RED:` PLAN §2 WP-35 · Δ −25/+39.
 
 ### W3 — design debt (FR4)
@@ -58,10 +58,10 @@ Lanes: PLAN §2 FR10; files and lines: `AGGREGATE.md` §6.
 - [x] **T-050-78 — L2.12 core.** `W:` `core/` · `blocked by:` T-050-41, -44, -52 · `delivers:` `sa-json-schema-validated-by-two-engines`, `sa-agent-model-resolved-by-two-modules` · Δ −620.
 - [x] **T-050-79 — L2.13 cli-features.** `W:` `f/{spec_context,chokepoints,ci_preflight}/`, `cli/commands/context.py` · `blocked by:` T-050-41, -44, -52 · `delivers:` §6 W2c · Δ −420.
 - [x] **T-050-80 — L2.14 hooks.** `W:` `hooks/ctx_inject.py` · `blocked by:` T-050-41, -44, -52 · `delivers:` §6 W2c · Δ −50.
-- [ ] **T-050-81 — L3.1 table merges.** `W:` `tests/*/infrastructure/**`, git trio · `blocked by:` T-050-75..80 · `delivers:` §6 W3 · Δ 0/−2301.
-- [ ] **T-050-82 — L3.2 table merges.** `W:` `tests/unit/core/**`, `tests/unit/test_*.py` · `blocked by:` T-050-75..80 · `delivers:` §6 W3 · Δ 0/−1798.
+- [x] **T-050-81 — L3.1 table merges.** `W:` `tests/*/infrastructure/**`, git trio · `blocked by:` T-050-75..80 · `delivers:` §6 W3 · Δ 0/−2301.
+- [x] **T-050-82 — L3.2 table merges.** `W:` `tests/unit/core/**`, `tests/unit/test_*.py` · `blocked by:` T-050-75..80 · `delivers:` §6 W3 · Δ 0/−1798.
 - [ ] **T-050-83 — L3.3 table merges.** `W:` `tests/unit/features/{specs,backlog}/**` · `blocked by:` T-050-75..80 · `delivers:` §6 W3 · Δ 0/−1097.
-- [ ] **T-050-84 — L3.4 table merges.** `W:` `tests/unit/{hooks,skills,public}/**` · `blocked by:` T-050-75..80 · `delivers:` §6 W3 · Δ 0/−1086.
+- [x] **T-050-84 — L3.4 table merges.** `W:` `tests/unit/{hooks,skills,public}/**` · `blocked by:` T-050-75..80 · `delivers:` §6 W3 · Δ 0/−1086.
 - [ ] **T-050-85 — L3.5 table merges.** `W:` other `tests/unit/**` · `blocked by:` T-050-75..80 · `delivers:` §6 W3 · Δ 0/−3325.
 - [ ] **T-050-86 — L3.6 table merges.** `W:` `tests/contract/**` · `blocked by:` T-050-75..80 · `delivers:` §6 W3 · Δ 0/−4190.
 - [ ] **T-050-87 — L3.7 table merges.** `W:` `tests/{integration,e2e}/**` · `blocked by:` T-050-75..80 · `delivers:` §6 W3 · Δ 0/−3940.
