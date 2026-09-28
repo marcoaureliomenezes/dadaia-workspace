@@ -56,7 +56,6 @@ from dadaia_workspace.infrastructure.public_assets_common import (
     _COPY_DIRS,
     _entry_digest,
     _json_dump,
-    is_ignored_public_asset,
     iter_public_files,
 )
 from dadaia_workspace.infrastructure.workspace_guardrail import _is_source_repo_root
@@ -179,21 +178,11 @@ class FileSystemPublicAssetManager:
 
         staged: list[str] = []
         for name in _COPY_DIRS:
-            src = self._public_dir / name
-            if not src.exists():
-                continue
-            dst = agentic_dir / name
-            if src.is_dir():
-                shutil.copytree(
-                    src,
-                    dst,
-                    ignore=lambda d, names: [
-                        n for n in names if is_ignored_public_asset(Path(d) / n)
-                    ],
-                )
-            else:
+            for src in iter_public_files(self._public_dir / name):
+                dst = agentic_dir / src.relative_to(self._public_dir)
+                dst.parent.mkdir(parents=True, exist_ok=True)
                 shutil.copy2(src, dst)
-            staged.append(f"[stage] {dst}")
+            staged.append(f"[stage] {agentic_dir / name}")
 
         for schema_rel, scripts_rel in _SKILL_SCRIPT_SCHEMAS:
             schema_src = self._public_dir / schema_rel
@@ -537,6 +526,4 @@ class FileSystemPublicAssetManager:
 
     def _check_public_privacy(self) -> list[DoctorLine]:
         """Fail doctor if public distributed assets contain known private identifiers."""
-        return _check_public_privacy_fn(
-            self._public_dir, iter_public_files, is_ignored_public_asset
-        )
+        return _check_public_privacy_fn(self._public_dir, iter_public_files)

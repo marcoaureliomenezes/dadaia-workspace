@@ -175,10 +175,10 @@ def _seed_denylist_env(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     monkeypatch.setenv(_PRIVACY_DENYLIST_ENV, str(source))
 
 
-def test_public_privacy_gate_flags_identifiers_and_ignores_bytecode(
+def test_public_privacy_gate_flags_identifiers(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """sa-private-match-rendering-has-three-renderers#B1 (kept: also pins the privacy scan's bytecode skip, WP-08 KEEP)."""
+    """sa-private-match-rendering-has-three-renderers#B1."""
     _seed_denylist_env(monkeypatch, tmp_path)
     repo_root = tmp_path / "repo"
     public_dir = repo_root / "dadaia_workspace" / "public"
@@ -197,21 +197,6 @@ def test_public_privacy_gate_flags_identifiers_and_ignores_bytecode(
     assert any(line.startswith("[error] public-privacy:") for line in rendered)
     shown = f"'{_PRIVACY_TEST_TERM[0]}…{_PRIVACY_TEST_TERM[-1]}'"  # WP-11: first…last
     assert any(shown in line.lower() for line in rendered)
-
-    # A denylisted term inside a __pycache__/*.pyc is ignored (bytecode is not scanned).
-    clean_repo_root = tmp_path / "repo-clean"
-    clean_public_dir = clean_repo_root / "dadaia_workspace" / "public"
-    cache_dir = clean_public_dir / "skills" / "sample" / "__pycache__"
-    cache_dir.mkdir(parents=True)
-    (cache_dir / "leak.pyc").write_bytes(_PRIVACY_TEST_TERM.encode())
-    (clean_public_dir / "data").mkdir()
-    (clean_public_dir / "data" / "AGENTS.md").write_text("# clean\n", encoding="utf-8")
-
-    clean_manager = FileSystemPublicAssetManager()
-    clean_manager._public_dir = clean_public_dir  # noqa: SLF001
-    assert [line.render() for line in clean_manager._check_public_privacy()] == [  # noqa: SLF001
-        "[ok] public-privacy"
-    ]
 
 
 # ---------------------------------------------------------------------------

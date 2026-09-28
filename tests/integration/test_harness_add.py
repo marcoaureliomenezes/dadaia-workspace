@@ -4,7 +4,8 @@ Intent: CONTRACT — 0.4.7 AC2.1 (T-047-72); size: MEDIUM (integration).
 
 A Claude-only workspace is scaffolded through the real `dadaia init` CLI (the
 conftest autouse fixture fakes venv creation, so no real venv is built), then
-`harness add codex` must project the `.codex/` set, register `codex` in
+`harness add codex` — run, as in a real workspace, by a CLI installed inside
+`<ws>/.dadaia/.venv` — must project the `.codex/` set, register `codex` in
 `.dadaia/states/harness_profile.json`, keep `public doctor` at exit 0, and be a
 no-op on re-add.
 """
@@ -17,7 +18,9 @@ from pathlib import Path
 import pytest
 from typer.testing import CliRunner
 
+import dadaia_workspace
 from dadaia_workspace.cli.main import app as cli_app
+from dadaia_workspace.infrastructure import public_assets
 
 _runner = CliRunner()
 
@@ -38,6 +41,11 @@ def _claude_only_workspace(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> P
     assert result.exit_code == 0, result.output
     assert not (ws / ".codex").exists(), "fixture must start Claude-only"
     monkeypatch.chdir(ws)
+    # harness-add-crashes-staging-shared-skill-scripts: the package lives under a `.venv`.
+    site = ws / ".dadaia" / ".venv" / "site" / "dadaia_workspace"
+    site.parent.mkdir(parents=True)
+    site.symlink_to(Path(dadaia_workspace.__file__).parent, target_is_directory=True)
+    monkeypatch.setattr(public_assets, "__file__", str(site / "infrastructure" / "x.py"))
     return ws
 
 

@@ -22,21 +22,18 @@ _COPY_DIRS = ("skills", "agents", "schemas", "data")
 _CLAUDE_DIRS = ("skills", "agents")
 
 
-def is_ignored_public_asset(path: Path) -> bool:
-    """True iff *path* is a build/cache artifact excluded from every public-asset walk."""
-    return path.suffix in _PUBLIC_ASSET_IGNORED_SUFFIXES or bool(
-        _PUBLIC_ASSET_IGNORED_DIRS.intersection(path.parts)
-    )
-
-
 def iter_public_files(root: Path) -> Iterable[Path]:
-    """Every non-ignored file under *root*, sorted — the ONE public-asset walk."""
+    """Every file under *root*, sorted — the ONE public-asset walk; build/cache artifacts
+    are judged by their path below *root* only, never by where the package is installed
+    (a CLI inside ``<ws>/.dadaia/.venv`` walks the same set as a source checkout)."""
     if not root.exists():
         return ()
     return (
         path
         for path in sorted(root.rglob("*"))
-        if path.is_file() and not is_ignored_public_asset(path)
+        if path.is_file()
+        and path.suffix not in _PUBLIC_ASSET_IGNORED_SUFFIXES
+        and not _PUBLIC_ASSET_IGNORED_DIRS.intersection(path.relative_to(root).parts)
     )
 
 

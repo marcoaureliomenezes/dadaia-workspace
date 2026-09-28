@@ -245,7 +245,6 @@ def _check_baseline_exclude_rationale(
 def check_public_privacy(
     public_dir: Path,
     iter_files_fn: Callable[[Path], Iterable[Path]],
-    is_ignored_fn: Callable[[Path], bool],
 ) -> list[DoctorLine]:
     """Fail doctor if public distributed assets contain private identifiers.
 
@@ -273,8 +272,6 @@ def check_public_privacy(
     for root in roots:
         files: list[Path] = [root] if root.is_file() else list(iter_files_fn(root))
         for path in files:
-            if is_ignored_fn(path):
-                continue
             if path.suffix.lower() not in _PUBLIC_PRIVACY_TEXT_SUFFIXES:
                 continue
             try:

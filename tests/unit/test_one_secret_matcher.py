@@ -162,5 +162,5 @@ def test_pre_push_and_publish_preflight_agree(
         public = tmp_path / "lib" / "dadaia_workspace" / "public"
         public.mkdir(parents=True)
         (public / name).write_text(content)
-        lines = check_public_privacy(public, lambda d: d.iterdir(), lambda _p: False)
+        lines = check_public_privacy(public, lambda d: d.iterdir())
         assert any(line.status is DoctorStatus.ERROR for line in lines) is refused, case
