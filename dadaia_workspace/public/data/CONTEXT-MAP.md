@@ -46,7 +46,7 @@ path or entity as it appears in an installed workspace.
 | `specs/releases/AGENTS.md` | candidates, phases, task markers, promote | release procedure and commit shapes | 4096 | 3354 |
 | `specs/backlog/AGENTS.md` | the operator's demand queue and its exits | `BACKLOG.json` shape, intake gate, dispositions | 4096 | 3915 |
 | `specs/bugs/AGENTS.md` | what a bug is and how it is proposed, recorded, resolved | bug procedure and the redaction rule | 4096 | 3643 |
-| `specs/memory/AGENTS.md` | current product truth and who writes it | atoms, ownership | 4096 | 3760 |
+| `specs/memory/AGENTS.md` | current product truth and who writes it | atoms, ownership | 4096 | 3938 |
 | `specs/ADRs/AGENTS.md` | the decision record | `decisions.jsonl` shape, acceptance | 4096 | 3386 |
 | `specs/audits/AGENTS.md` | the periodic three-pillar review | audit procedure, findings, closure | 4096 | 1813 |
 | `.dadaia/AGENTS.md` | the runtime tree: zones, doctor, reprojection, context | zone registry rules, chokepoints | 4096 | 4000 |
