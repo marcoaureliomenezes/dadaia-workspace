@@ -1,11 +1,6 @@
 """Complexity ratchet for `specs upgrade` and the one `dadaia doctor` (T-050-05, A1.4).
 
-Intent: CONTRACT — A1.4 (the `#doctor`/`#upgrade` CC ratchet, permanent). The
-`features/migrate/upgrade.py` zero-diff proof below is
-Intent: SCAFFOLD — T-050-05 — expires: 0.6.0 (S1 FR23 firing amendment A7,
-`specs/releases/0.5.0/reviews/S1-FR23-firing.md` §3 LOW finding: a hand-kept SHA-256
-pin with no expiry is the `shipped-hashes.json` shape the forensic's P1/P4 condemn —
-legitimate as a one-release zero-diff proof, not as a permanent guard).
+Intent: CONTRACT — A1.4 (the `#doctor`/`#upgrade` CC ratchet, permanent).
 
 0.4.7 T-047-02 deleted `dadaia specs doctor`; its `#doctor` half of this ratchet follows
 the surface to `cli/commands/doctor.py#doctor` — the ONE doctor command — and ratchets
@@ -31,7 +26,6 @@ the test-tier level; V28 turns an unrenewed expiry RED at that release's closure
 
 from __future__ import annotations
 
-import hashlib
 from pathlib import Path
 
 import pytest
@@ -44,7 +38,6 @@ pytestmark = pytest.mark.contract
 _REPO_ROOT = Path(__file__).resolve().parents[2]
 _SPECS_CLI = _REPO_ROOT / "dadaia_workspace" / "cli" / "commands" / "specs.py"
 _DOCTOR_CLI = _REPO_ROOT / "dadaia_workspace" / "cli" / "commands" / "doctor.py"
-_UPGRADE_MODULE = _REPO_ROOT / "dadaia_workspace" / "features" / "migrate" / "upgrade.py"
 
 # Recorded ceilings (ratchet, T-050-03 baseline; `_DOCTOR_CEILING` re-pinned at the
 # measured HEAD value by the S1 FR23 firing, A8 — "a ratchet that does not ratchet
@@ -52,40 +45,6 @@ _UPGRADE_MODULE = _REPO_ROOT / "dadaia_workspace" / "features" / "migrate" / "up
 # same-commit justification.
 _UPGRADE_CEILING = 8
 _DOCTOR_CEILING = 6
-
-# Pinned at T-050-05 (before that task touched anything else in the tree) — proved
-# `features/migrate/upgrade.py` was untouched by FR1's scaffold/doctor/--recipe work.
-# Re-pinned at v0.5.1 T-051-16 (K10): the retired migration-chain deletion legitimately
-# rewrote this module (backup-first/chain-walk/re-stamp collapsed to the registry's
-# "stamp v6 or refuse" rule) — same-commit justification per this test's own error
-# message; the SCAFFOLD's 0.6.0 expiry (A7) is unaffected, this is a same-generation
-# re-pin, not a renewal.
-# Re-pinned at 0.4.7 T-047-58 (FR4): the English control vocabulary gives `specs upgrade`
-# its status-token rewrite lane — an authorized, task-declared change to this module
-# (same-commit justification per this test's own error message), not a renewal of the
-# SCAFFOLD's 0.6.0 expiry.
-# Re-pinned at 0.4.7 c11 T-047-101 (FR1): memory canon v7 retires `memory/TECHSTACK.md`,
-# and a consumer tree stamped 6 reaches 7 only if something folds its body into
-# ARCHITECTURE.md's `## Tech Stack` section — the 6 -> 7 hop this module now carries
-# (`fold_tech_stack`), plus the re-stamp that hop requires. An authorized, task-declared
-# change (P-20's same-commit justification), not a renewal of the SCAFFOLD's 0.6.0 expiry.
-# Re-pinned at 0.4.8 T-048-05 (AC4.3, R6): a v6 tree must end v7 with its fixed law
-# sections, so the hop restores them (`restore_fixed_sections`) and a re-stamp is no
-# longer reported as a no-op — the S3 dead end. Authorized, task-declared change.
-# Re-pinned at 0.5.0 T-050-11 (AC6.2): the stamp call moves to the one merge-writer
-# (`merge_frontmatter`); `write_pattern_version` is deleted. Call-site migration only.
-# Re-pinned at T-050-22 (AC11.2, review 7 N7): `merge_frontmatter` moved to core/gitflow;
-# the call site imports it from there. Import migration only.
-# Re-pinned at 0.5.0 T-050-31 (WP-14, AC1.2): the fixed-section writer leaves this module
-# (the doctor's repair is the one writer) and the three remaining writes go through the
-# symlink-refusing `core.atomic_write`. Authorized, task-declared deletion.
-# Re-pinned at 0.5.0 T-050-31 completion (WP-14 #B4): upgrade's placeholder writer is
-# deleted (the doctor's repair set owns it); the field left is ideas_removed. Deletion only.
-# Re-pinned at 0.5.0 T-050-60 (WP-47, ADR 0082): `target` is deleted (the one target is
-# CANONICAL_SPECS_VERSION) and a two-tier tree is refused before any write. Authorized.
-# Re-pinned at T-050-60 drain: the hop's deletes go through the injected one deleter
-# (sweep.remove) and the trio name list is gone. Authorized, task-declared change.
-_UPGRADE_MODULE_SHA256 = "9bcb9fb49d1d455d36af17e17c9b5ae5eb0594057593576296f5ebb1cd4daacc"
 
 
 def _complexity_by_name(path: Path) -> dict[str, int]:
@@ -108,18 +67,4 @@ def test_upgrade_and_doctor_complexity_stay_at_or_below_baseline() -> None:
         f"#doctor CC {scores['doctor']} exceeds the {_DOCTOR_CEILING} ratchet — keep "
         "each rendering (json/quiet/human) in its own function so the one doctor command "
         "stays a composition, not a branch tree (T-047-02)."
-    )
-
-
-def test_migrate_upgrade_module_is_untouched_by_fr1() -> None:
-    """A1.4: `features/migrate/upgrade.py` stays byte-identical under T-050-05 — the
-    rename automation this module carries is explicitly cut from FR1's scope.
-    Re-pinned at 0.4.7 c5 T-047-49: the module gained the `_ideas/` removal lane.
-
-    Intent: SCAFFOLD — T-050-05 — expires: 0.6.0 (S1 FR23 firing amendment A7)."""
-    digest = hashlib.sha256(_UPGRADE_MODULE.read_bytes()).hexdigest()
-    assert digest == _UPGRADE_MODULE_SHA256, (
-        "features/migrate/upgrade.py changed — T-050-05 (FR1) explicitly does not grow "
-        "`specs upgrade`; if this file legitimately changed for another FR/task, update "
-        "this pinned hash in the same commit with that task's justification."
     )
