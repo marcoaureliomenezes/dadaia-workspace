@@ -1,41 +1,7 @@
 """Intent: CONTRACT — tests/fixtures/harness_env discipline (no DADAIA_* fiction, no in-process hook stdin)
 
-Harness-env contract tests (WS-R5 / FR-R5-01 / AC-R5-01, release v0.1.10).
-
-Two HARD-FAIL contracts protect the harness-env fixture discipline introduced in
-``tests/fixtures/harness_env.py``. Both formerly carried per-file *baselines* of pre-existing
-violations and failed only on growth; the rc-2 amendment burned those baselines to **zero**,
-so each contract now fails on the *first* violation — there is no residual cap.
-
-1. :class:`TestDadaiaEnvSetenvContract` — scans the whole ``tests/`` tree for any write of
-   a ``DADAIA_*`` environment variable (``monkeypatch.setenv``, ``os.environ[...] = ...``,
-   ``os.environ.setdefault``/``update``, ``setenv(...)``) outside the fixture module. The
-   only permitted ``DADAIA_*`` writes are the allowlist in
-   ``tests/fixtures/harness_env.ALLOWLISTED_DADAIA_ENV`` — each entry an operator-shell input
-   or operator override that production code reads from the environment *by design* (so
-   setting it in a unit test exercises a real production env-read path, not harness-fiction).
-   Every other ``DADAIA_*`` setenv (``DADAIA_SESSION_ID`` planted as if the harness supplied
-   it, persona/mode fiction, the harness-control output-contract vars) is a violation: it
-   certifies a mechanism no harness delivers, exactly the audit defect
-   (``specs/audits/2026-06-10T010550Z/qa-engineer.md`` §6.1) this contract closes. The
-   burn-down (T-010-11 + the rc-2 amendment) rewrote the genuine-fiction sites to the
-   subprocess fixture and allowlisted only the by-design env-reads, driving the count to 0.
-
-2. :class:`TestHookBehaviorChannelContract` — flags the harness-**stdin-simulation** pattern:
-   a test module that imports a hook *behavior* module (``sdd_gate``/``sdd_post_gate``/
-   ``ctx_inject``/``root_whitelist``) **and** patches ``sys.stdin`` in-process to drive its
-   ``main()``. Feeding a hook a hand-built stdin payload in-process re-opens the simulated-env
-   evasion this fixture exists to kill; harness-real behavior must flow through
-   ``run_hook_subprocess`` (which spawns ``python -m dadaia_workspace.hooks.<name>`` with a
-   real stdin pipe and a pinned :func:`claude_hook_env`). White-box unit tests that import a
-   hook module to call a *pure helper* (``sdd_gate._resolve_mode``) or to fault-inject a
-   production internal (``monkeypatch.setattr`` on a module symbol) — and never simulate
-   ``sys.stdin`` — are legitimately in-process and are NOT flagged. This replaces the former
-   blanket file-level baseline (every importing file) with a precise behavior definition, so
-   the contract carries NO file baseline.
-
-Both ratchets are now zero-tolerance: the baseline data structures and over-count guards are
-gone, and any new violation fails immediately.
+Zero tolerance across tests/: no non-allowlisted DADAIA_* env write outside the fixture module, and no
+module that imports a hook behavior module while patching ``sys.stdin`` (use ``run_hook_subprocess``).
 """
 
 from __future__ import annotations
@@ -52,213 +18,108 @@ from tests.helpers.suite_files import tracked_test_files
 pytestmark = pytest.mark.contract
 
 _TESTS_ROOT = Path(__file__).resolve().parent.parent
-_FIXTURE_REL = "fixtures/harness_env.py"
-
-# monkeypatch.<attr>(...) calls that *set* an env var (first arg = var name). Removals
-# (``delenv``/``os.environ.pop``) are correct hygiene, not violations, so they are excluded.
-_SETENV_CALLS: frozenset[str] = frozenset({"setenv"})
-# os.environ.<attr>(...) mutators that *set* an env var (first string arg = var name).
-_ENVIRON_METHOD_CALLS: frozenset[str] = frozenset({"setdefault"})
 
 
-def _iter_test_files() -> list[Path]:
-    files: list[Path] = []
-    for path in tracked_test_files(_TESTS_ROOT.parent):
-        rel = path.relative_to(_TESTS_ROOT).as_posix()
-        if rel == _FIXTURE_REL:
-            continue  # the fixture module is the one sanctioned home
-        if "__pycache__" in path.parts or "node_modules" in path.parts:
-            continue
-        files.append(path)
-    # v0.4.5 FR5 (scan-test-vacuity-guard): a mis-rooted _TESTS_ROOT would degrade this
-    # walk to an empty list, under which both _scan_env_violations() and
-    # _scan_hook_behavior_violations() below return {} and their `== {}` assertions pass
-    # VACUOUSLY GREEN. This file is itself a tests/** module, so it is its own sentinel.
+def _trees() -> dict[str, ast.Module]:
+    files = [
+        p
+        for p in tracked_test_files(_TESTS_ROOT.parent)
+        if p.relative_to(_TESTS_ROOT).as_posix() != "fixtures/harness_env.py"
+    ]
     assert_populated(files, sentinel=Path(__file__))
-    return files
+    return {
+        p.relative_to(_TESTS_ROOT).as_posix(): ast.parse(p.read_text(encoding="utf-8"))
+        for p in files
+    }
 
 
-def _string_arg(node: ast.AST) -> str | None:
-    """Return the literal-string value of an AST node, else ``None``."""
-    if isinstance(node, ast.Constant) and isinstance(node.value, str):
-        return node.value
-    return None
+def _str(node: ast.AST) -> str | None:
+    return node.value if isinstance(node, ast.Constant) and isinstance(node.value, str) else None
 
 
-def _is_environ_subscript(node: ast.expr) -> bool:
-    """True for ``os.environ`` / ``environ`` subscript/attr targets."""
-    if isinstance(node, ast.Attribute):
-        return node.attr == "environ"
-    if isinstance(node, ast.Name):
-        return node.id == "environ"
-    return False
+def _is_environ(node: ast.AST) -> bool:
+    return (isinstance(node, ast.Attribute) and node.attr == "environ") or (
+        isinstance(node, ast.Name) and node.id == "environ"
+    )
 
 
-class _EnvVarWriteVisitor(ast.NodeVisitor):
-    """Collect the DADAIA_* env var names a test module *writes*."""
-
-    def __init__(self) -> None:
-        self.written: list[str] = []
-
-    def _record(self, name: str | None) -> None:
-        if name and name.startswith("DADAIA_"):
-            self.written.append(name)
-
-    def visit_Assign(self, node: ast.Assign) -> None:
-        for target in node.targets:
-            if isinstance(target, ast.Subscript) and _is_environ_subscript(target.value):
-                self._record(_string_arg(target.slice))
-        self.generic_visit(node)
-
-    def visit_Call(self, node: ast.Call) -> None:
-        func = node.func
-        if isinstance(func, ast.Attribute) and node.args:
-            arg0 = _string_arg(node.args[0])
-            # monkeypatch.setenv("DADAIA_X", ...) / monkeypatch.setitem(os.environ, "DADAIA_X")
-            sets_via_first_arg = func.attr in _SETENV_CALLS or (
-                # os.environ.setdefault("DADAIA_X", ...)
-                func.attr in _ENVIRON_METHOD_CALLS and _is_environ_subscript(func.value)
-            )
-            if sets_via_first_arg:
-                self._record(arg0)
-            elif (
-                func.attr == "setitem"
-                and len(node.args) >= 2
-                and _is_environ_subscript(node.args[0])
-            ):
-                # monkeypatch.setitem(os.environ, "DADAIA_X", ...) — the os.environ escape
-                # hatch that bypasses setenv; treated identically to a setenv.
-                self._record(_string_arg(node.args[1]))
-            # os.environ.update({"DADAIA_X": ...})
-            elif func.attr == "update" and _is_environ_subscript(func.value):
-                self._record_update(node)
-        self.generic_visit(node)
-
-    def _record_update(self, node: ast.Call) -> None:
-        if node.args and isinstance(node.args[0], ast.Dict):
-            for key in node.args[0].keys:
-                if key is not None:
-                    self._record(_string_arg(key))
-
-
-def _scan_env_violations() -> dict[str, int]:
-    """Map ``tests/``-relative path → count of non-allowlisted DADAIA_* env writes."""
-    violations: dict[str, int] = {}
-    for path in _iter_test_files():
-        try:
-            tree = ast.parse(path.read_text(encoding="utf-8"))
-        except (OSError, SyntaxError):  # pragma: no cover - defensive
-            continue
-        visitor = _EnvVarWriteVisitor()
-        visitor.visit(tree)
-        offending = [v for v in visitor.written if v not in ALLOWLISTED_DADAIA_ENV]
-        if offending:
-            violations[path.relative_to(_TESTS_ROOT).as_posix()] = len(offending)
-    return violations
-
-
-def _imports_hook_module(tree: ast.Module) -> set[str]:
-    """Return hook *behavior* modules imported in a parsed test module.
-
-    Matches ``from dadaia_workspace.hooks import sdd_gate`` and
-    ``import dadaia_workspace.hooks.sdd_gate``. ``_common`` is excluded (shared-primitives
-    library, legitimate to unit-test directly).
-    """
-    found: set[str] = set()
+def _env_writes(tree: ast.Module) -> list[str | None]:
+    """Names written by environ[...] =, setenv, environ.setdefault, setitem(environ, ...), environ.update({...})."""
+    out: list[str | None] = []
     for node in ast.walk(tree):
-        if isinstance(node, ast.ImportFrom):
-            if node.module == "dadaia_workspace.hooks":
-                for alias in node.names:
-                    if alias.name in HOOK_MODULES:
-                        found.add(alias.name)
-        elif isinstance(node, ast.Import):
-            for alias in node.names:
-                prefix = "dadaia_workspace.hooks."
-                if alias.name.startswith(prefix):
-                    mod = alias.name[len(prefix) :].split(".")[0]
-                    if mod in HOOK_MODULES:
-                        found.add(mod)
-    return found
+        if isinstance(node, ast.Assign):
+            out += [
+                _str(t.slice)
+                for t in node.targets
+                if isinstance(t, ast.Subscript) and _is_environ(t.value)
+            ]
+        elif isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute) and node.args:
+            attr, recv, args = node.func.attr, node.func.value, node.args
+            if attr == "setenv" or (attr == "setdefault" and _is_environ(recv)):
+                out.append(_str(args[0]))
+            elif attr == "setitem" and len(args) >= 2 and _is_environ(args[0]):
+                out.append(_str(args[1]))
+            elif attr == "update" and _is_environ(recv) and isinstance(args[0], ast.Dict):
+                out += [_str(k) for k in args[0].keys if k is not None]
+    return out
 
 
-def _patches_sys_stdin(tree: ast.Module) -> bool:
-    """True if the module patches ``sys.stdin`` in-process (the harness-stdin simulation).
-
-    Detects ``monkeypatch.setattr("sys.stdin", ...)`` and
-    ``monkeypatch.setattr(sys, "stdin", ...)`` — the only sanctioned way to feed a hook a
-    hand-built stdin payload in-process. That pattern, combined with a hook-module import,
-    *is* the in-process behavior-simulation the subprocess runner replaces.
-    """
-    for node in ast.walk(tree):
-        if not (isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute)):
-            continue
-        if node.func.attr != "setattr" or not node.args:
-            continue
-        # Form 1: setattr("sys.stdin", ...)
-        first = _string_arg(node.args[0])
-        if first == "sys.stdin":
-            return True
-        # Form 2: setattr(sys, "stdin", ...)
+def _simulates_hook_stdin(tree: ast.Module) -> bool:
+    hooks = {
+        a.name
+        for n in ast.walk(tree)
+        if isinstance(n, ast.ImportFrom) and n.module == "dadaia_workspace.hooks"
+        for a in n.names
+    }
+    hooks |= {
+        a.name.split(".")[2]
+        for n in ast.walk(tree)
+        if isinstance(n, ast.Import)
+        for a in n.names
+        if a.name.startswith("dadaia_workspace.hooks.")
+    }
+    if not hooks & set(HOOK_MODULES):
+        return False
+    for n in ast.walk(tree):
         if (
-            isinstance(node.args[0], ast.Name)
-            and node.args[0].id == "sys"
-            and len(node.args) >= 2
-            and _string_arg(node.args[1]) == "stdin"
+            isinstance(n, ast.Call)
+            and isinstance(n.func, ast.Attribute)
+            and n.func.attr == "setattr"
+            and n.args
         ):
-            return True
+            a = n.args
+            if _str(a[0]) == "sys.stdin" or (
+                isinstance(a[0], ast.Name)
+                and a[0].id == "sys"
+                and len(a) >= 2
+                and _str(a[1]) == "stdin"
+            ):
+                return True
     return False
 
 
-def _scan_hook_behavior_violations() -> dict[str, set[str]]:
-    """Map test file → imported hook modules, for files that ALSO simulate ``sys.stdin``.
-
-    Scope is the whole ``tests/`` tree (not just hooks/gate dirs): the simulated-stdin
-    evasion is the same wherever it lives. A file is a violation iff it imports a hook
-    behavior module AND patches ``sys.stdin`` in-process — i.e. it drives ``main()`` through
-    a hand-built stdin rather than ``run_hook_subprocess``.
-    """
-    violations: dict[str, set[str]] = {}
-    for path in _iter_test_files():
-        try:
-            tree = ast.parse(path.read_text(encoding="utf-8"))
-        except (OSError, SyntaxError):  # pragma: no cover - defensive
-            continue
-        mods = _imports_hook_module(tree)
-        if mods and _patches_sys_stdin(tree):
-            violations[path.relative_to(_TESTS_ROOT).as_posix()] = mods
-    return violations
-
-
-class TestDadaiaEnvSetenvContract:
-    """Zero out-of-fixture, non-allowlisted DADAIA_* env writes (hard-fail, no baseline)."""
-
-    def test_no_file_writes_non_allowlisted_dadaia_env(self) -> None:
-        current = _scan_env_violations()
-        assert current == {}, (
-            "Test file(s) write a non-allowlisted DADAIA_* env var outside "
-            "tests/fixtures/harness_env.py. Either the var is read from the environment by "
-            "production BY DESIGN (add it to ALLOWLISTED_DADAIA_ENV with a one-line "
-            "justification naming the production reader), or it is harness-fiction "
-            "(DADAIA_SESSION_ID planted as harness-supplied, persona/mode vars, the "
-            "DADAIA_HOOK_OUTPUT/EVENT output contract): rewrite the test to "
-            "claude_hook_env()/codex_hook_env() + run_hook_subprocess(), or to explicit "
-            f"function params / a monkeypatched reader. Offending file -> count: {current}"
+def test_no_file_writes_non_allowlisted_dadaia_env() -> None:
+    """No test writes a DADAIA_* var that production does not read by design (the allowlist)."""
+    offenders = {
+        rel: bad
+        for rel, tree in _trees().items()
+        if (
+            bad := [
+                v
+                for v in _env_writes(tree)
+                if v and v.startswith("DADAIA_") and v not in ALLOWLISTED_DADAIA_ENV
+            ]
         )
-        assert "DADAIA_CONTEXT" in ALLOWLISTED_DADAIA_ENV
+    }
+    assert offenders == {}, (
+        f"harness-fiction DADAIA_* writes; use claude_hook_env()+run_hook_subprocess(): {offenders}"
+    )
+    assert "DADAIA_CONTEXT" in ALLOWLISTED_DADAIA_ENV
 
 
-class TestHookBehaviorChannelContract:
-    """No in-process harness-stdin simulation of a hook (hard-fail, no baseline)."""
-
-    def test_no_file_simulates_hook_stdin_in_process(self) -> None:
-        current = _scan_hook_behavior_violations()
-        assert current == {}, (
-            "Test file(s) import a hook behavior module AND patch sys.stdin in-process to "
-            "drive its main() — the simulated-env evasion run_hook_subprocess() exists to "
-            "kill. Invoke the hook via run_hook_subprocess() with claude_hook_env()/"
-            "codex_hook_env() instead. (Pure-helper unit tests like sdd_gate._resolve_mode, "
-            "and fault-injection tests that monkeypatch a production internal without "
-            "simulating sys.stdin, are legitimately in-process and are not flagged.) "
-            f"Offending file -> imported hook modules: "
-            f"{ {k: sorted(v) for k, v in current.items()} }"
-        )
+def test_no_file_simulates_hook_stdin_in_process() -> None:
+    """No test imports a hook behavior module and drives it through a patched sys.stdin."""
+    offenders = sorted(rel for rel, tree in _trees().items() if _simulates_hook_stdin(tree))
+    assert offenders == [], (
+        f"in-process hook stdin simulation; use run_hook_subprocess(): {offenders}"
+    )

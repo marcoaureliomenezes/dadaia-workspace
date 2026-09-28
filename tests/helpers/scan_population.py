@@ -39,7 +39,7 @@ Tree-/package-walking population scans (the convention applies at the call site 
 
 * ``tests/contract/test_frozen_clock_aging_ratchet.py`` ::
   test_no_file_combines_a_frozen_datetime_constant_with_a_real_clock_call
-* ``tests/contract/test_harness_env_contract.py`` :: ``_iter_test_files()``
+* ``tests/contract/test_harness_env_contract.py`` :: ``_trees()``
 * ``tests/contract/test_core_file_io_purity.py`` ::
   test_core_file_io_purity_ratchet_and_authorized_set_grounded
 * ``tests/contract/test_release_semver_canon.py`` :: ``_find_semver_compile_sites()``
