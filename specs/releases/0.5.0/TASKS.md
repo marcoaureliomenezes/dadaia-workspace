@@ -89,6 +89,11 @@ tests. `Δ` = prod/test lines; PLAN §2.7 ceilings stop a task, never rise.
 - [x] **T-050-60 — Handoff v1.2; upgrade target (46, 47).** `W:` `pub/schemas/`, `core/handoff_index.py`, `cli/commands/specs.py`, `f/migrate/` · `blocked by:` T-050-31 · `delivers:` AC4.3 · `RED:` PLAN §2 WP-46, WP-47 · Δ −24/+15.
 - [x] **T-050-61 — Restated rules; consumer law (49, FR-8).** `W:` `pub/{data,scaffold,schemas}/`, gitflow skill, `f/specs/canon.py`, `setup.cfg`, `CONTEXT.md` · `blocked by:` T-050-35 · `delivers:` AC4.3, AC4.4 · `RED:` PLAN §2 WP-49, FR-8 · Δ −60/+125.
 
+### FR10 — reduction (operator-approved deletions)
+
+- [x] **T-050-63 — Public scripts and recipe (FR10).** Delete `lint-dadaia-cli-reachability.py`, `lint-memory-atoms.py`, `certify-dadaia-workspace.sh` and their tests; rebuild `CONSUMER_VALIDATION_RECIPE.md` to ≤ 80 lines.
+  `W:` `pub/{scripts,data}/`, `f/specs/{memory_lint,doctor_memory}.py`, tests · `blocked by:` none · `delivers:` FR10 · `RED:` n/a · Δ −765/−292.
+
 ### C — closure evidence (FR7, FR8, FR9)
 
 - [ ] **T-050-62 — Prune and measure.** Execute the QA-lens pruning verdict (≥ 522 test lines, AC9.9); AC8.1 deltas, allowance subset, mutmut, AC9.11 counts, fenced rubric.
