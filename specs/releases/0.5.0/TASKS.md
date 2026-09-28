@@ -47,7 +47,7 @@ Lanes: PLAN §2 FR10; files and lines: `AGGREGATE.md` §6.
 - [x] **T-050-67 — L0.4 w0-hooks.** `W:` `hooks/pre_gate.py`, tests · `blocked by:` none · `delivers:` §6 W0 · Δ −11/−412.
 - [x] **T-050-68 — L0.5 w0-clitests.** `W:` tests · `blocked by:` none · `delivers:` §6 W0 · Δ 0/−506.
 - [x] **T-050-69 — L0.6 w0-ctests.** `W:` tests · `blocked by:` none · `delivers:` §6 W0 · Δ 0/−560.
-- [ ] **T-050-70 — L1.1 core folds.** `W:` `core/`, `i/ledger_scripts.py`, `container.py`, tests · `blocked by:` T-050-65 · `delivers:` `sa-ledger-script-paths-in-two-tables`, `sa-session-liveness-has-two-rules` · Δ −93/−141.
+- [x] **T-050-70 — L1.1 core folds.** `W:` `core/`, `i/ledger_scripts.py`, `container.py`, tests · `blocked by:` T-050-65 · `delivers:` `sa-ledger-script-paths-in-two-tables`, `sa-session-liveness-has-two-rules` · Δ −93/−141.
 - [x] **T-050-71 — L1.3 infra items (§4a 1–11).** `W:` `i/`, tests · `blocked by:` T-050-64 · `delivers:` `sa-privacy-match-has-two-matchers`, `sa-denylist-file-has-three-shapes` · Δ −343/−100.
 - [x] **T-050-72 — L1.4 specs items (§4a 14–17).** `W:` `f/specs/`, tests · `blocked by:` T-050-66 · `delivers:` SPEC-DOC-046/028/037/007 gone · Δ −141/−135.
 - [x] **T-050-73 — L1.5 cli/core items (§4a 12, 13, 18–20).** `W:` `cli/commands/migrate.py`, `f/{migrate,chokepoints,reconcile}/`, `core/session_store.py`, tests · `blocked by:` T-050-70 · `delivers:` `sa-path-segment-judged-by-two-matchers` · Δ −351/−238.
