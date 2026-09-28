@@ -58,7 +58,7 @@ tests. `Δ` = prod/test lines; PLAN §2.7 ceilings stop a task, never rise.
 
 - [x] **T-050-39 — One bind (16 †).** `W:` `core/invocation.py`, `f/workspace/`, `hooks/`, `f/spec_context/`, `cli/`, `pub/data/`
   `blocked by:` T-050-38 · `delivers:` four readers agree · `RED:` PLAN §2 WP-16 · Δ −5/+115.
-- [ ] **T-050-40 — Fix lines, one printer, unfixable fixes (17–19 †).** Three commits. `W:` `core/`, `hooks/`, `f/chokepoints/`, `f/spec_context/`, `cli/`
+- [-] **T-050-40 — Fix lines, one printer, unfixable fixes (17–19 †).** Three commits. `W:` `core/`, `hooks/`, `f/chokepoints/`, `f/spec_context/`, `cli/`
   `blocked by:` T-050-39 · `delivers:` AC2.2, AC2.3 · `RED:` PLAN §2 WP-17, WP-18, WP-19 · Δ −48/+315.
 - [ ] **T-050-41 — TREE-8 alone (20).** `W:` `f/specs/` · `blocked by:` T-050-40 · `delivers:` one finding per stray path · `RED:` PLAN §2 WP-20 · Δ −115/−40.
 - [ ] **T-050-42 — One registry-version grammar (21 †).** `W:` `i/json_context_store.py`, `f/migrate/`, `core/`, `cli/commands/`, `f/spec_context/` · `blocked by:` T-050-40 · `delivers:` readable ⇔ no migration · `RED:` PLAN §2 WP-21 · Δ −18/+100.
