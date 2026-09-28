@@ -1,18 +1,6 @@
-"""Shared primitives for the Python governance hooks (Windows-safe).
-
-Every concern that the shell hooks implemented with ad-hoc inline Python (stdin-JSON
-parsing, the ``{"decision":"block",...}`` / allow envelope, python-bin resolution,
-UTF-8 encoding, session-id sanitization, atomic file renewal) lives here once so the five
-hook entrypoints stay thin and the behavior is identical across all of them.
-
-Cross-platform notes:
-- All file reads/writes use ``encoding="utf-8"`` explicitly (Windows defaults to the
-  locale code page otherwise, corrupting non-ASCII payloads).
-- Session ids are stripped to ``[A-Za-z0-9_-]`` before use as a filename component so a
-  ``/`` or ``..`` can never escape the temp dir (CWE-22; mirrors the shell strip).
-- Atomic renewal uses ``os.replace`` (atomic on POSIX *and* Windows), never ``os.rename``
-  (which is not atomic-over-existing on Windows).
-"""
+"""Shared primitives of the Python governance hooks: stdin JSON, payload normalization,
+write-target extraction, session id and the block/allow envelopes. Every file read or
+write passes ``encoding="utf-8"`` (Windows defaults to the locale code page)."""
 
 from __future__ import annotations
 
@@ -24,49 +12,27 @@ from typing import Any
 
 from dadaia_workspace.core import invocation
 
-#: Write-like tool names intercepted by the PreToolUse gates (Claude / Codex).
-WRITE_TOOLS: frozenset[str] = frozenset(
-    {
-        "Write",
-        "write_file",
-        "Edit",
-        "edit_file",
-        "MultiEdit",
-        "NotebookEdit",
-        "apply_patch",
-    }
-)
-
-#: Codex ``apply_patch`` file-header prefixes (the touched file follows the prefix).
-_PATCH_PREFIXES: tuple[str, ...] = (
-    "*** Update File: ",
-    "*** Add File: ",
-    "*** Delete File: ",
-)
+WRITE_TOOLS = frozenset({"Write", "write_file", "Edit", "edit_file", "MultiEdit", "NotebookEdit"})
+WRITE_TOOLS |= {"apply_patch"}
+_PATCH_PREFIXES = ("*** Update File: ", "*** Add File: ", "*** Delete File: ")
 
 
 def read_stdin_json() -> dict[str, Any]:
-    """Parse the hook JSON envelope from stdin. Returns ``{}`` on any failure (fail-open)."""
+    """The hook JSON envelope from stdin; ``{}`` on any failure (fail-open)."""
     try:
-        raw = sys.stdin.read()
+        data = json.loads(sys.stdin.read())
     except Exception:  # noqa: BLE001 — fail-open: a stdin read error must never crash a hook
-        return {}
-    if not raw.strip():
-        return {}
-    try:
-        data = json.loads(raw)
-    except (json.JSONDecodeError, ValueError):
         return {}
     return data if isinstance(data, dict) else {}
 
 
-#: Native tool names (lower-cased) -> the Claude name every policy reads (ADR 0054).
+#: Native tool names (lower-cased) -> the Claude name every policy reads.
 _TOOL_ALIASES = {"bash": "Bash", "exec": "Bash", "shell": "Bash", "edit": "Edit"}
 _TOOL_ALIASES |= {"write": "Write", "create": "Write"}
 
 
 def claude_payload(payload: dict[str, Any]) -> dict[str, Any]:
-    """Every harness's pre-tool payload in Claude form, before any policy runs (ADR 0054)."""
+    """Every harness's pre-tool payload in Claude form, before any policy runs."""
     name = payload.get("tool_name") or payload.get("toolName") or payload.get("tool")
     args: Any = payload.get("toolArgs")
     with contextlib.suppress(ValueError, TypeError):
@@ -82,112 +48,41 @@ def is_write_tool(name: str) -> bool:
 
 
 def target_paths(payload: dict[str, Any]) -> list[str]:
-    """Extract ALL write-target paths from a hook payload.
-
-    Handles direct keys (``file_path``/``path``/``notebook_path`` — always a single
-    path) and Codex ``apply_patch`` commands (EVERY ``*** Add/Update/Delete File:``
-    header, in source order). Returns ``[]`` when no path can be parsed (caller fails
-    open).
-
-    FR-W4-04 (T-014-02): a multi-file ``apply_patch`` must surface every file header so
-    the gate can classify each path and let the most-restrictive verdict win (one
-    or PROTECTED header blocks the whole patch). Closes
-    ``sdd-gate-apply-patch-multi-file-first-header-only``.
-    """
+    """Every write target: the direct path key, else EVERY ``apply_patch`` file header in
+    order (the gate judges each); ``[]`` when none parses."""
     inp = payload.get("tool_input")
     src: dict[str, Any] = inp if isinstance(inp, dict) else payload
     direct = src.get("file_path") or src.get("path") or src.get("notebook_path") or ""
     if direct:
         return [str(direct)]
     command = src.get("command") or ""
-    paths: list[str] = []
-    if isinstance(command, str):
-        for line in command.splitlines():
-            for prefix in _PATCH_PREFIXES:
-                if line.startswith(prefix):
-                    paths.append(line[len(prefix) :].strip())
-                    break
-    return paths
+    lines = command.splitlines() if isinstance(command, str) else []
+    return [line.split(": ", 1)[1].strip() for line in lines if line.startswith(_PATCH_PREFIXES)]
 
 
 def target_path(payload: dict[str, Any]) -> str:
-    """Extract the FIRST write-target path from a hook payload (single-value back-compat).
-
-    Direct keys (``file_path``/``path``/``notebook_path``) or the FIRST Codex
-    ``apply_patch`` file header. Returns ``""`` when no path can be parsed (caller fails
-    open). Retained for callers not yet migrated to :func:`target_paths`; the multi-file
-    bug fix (FR-W4-04) lives in callers switching to :func:`target_paths`.
-    """
-    paths = target_paths(payload)
-    return paths[0] if paths else ""
+    """The first of :func:`target_paths`, or ``""``."""
+    return next(iter(target_paths(payload)), "")
 
 
 def resolve_session_id(payload: dict[str, Any], *, default: str = "") -> str:
-    """Resolve the harness-native session id, sanitized — a thin call onto the ONE
-    session-id rule (:func:`dadaia_workspace.core.invocation.resolve_session_id`).
-
-    Order (v0.1.50 FR1): explicit ``DADAIA_SESSION_ID`` override (eval-flow contract,
-    always first), then the stdin ``session_id`` payload field (the harness's live
-    truth for THIS session), then the per-harness env vars (which may be INHERITED
-    from a parent shell and stale — the audit F-1 rotated-sid self-block source),
-    then ``default``. Shared seam: the gate, the PostToolUse heartbeat, ctx-inject, and
-    :func:`dadaia_workspace.core.invocation.resolve` all resolve through the SAME rule,
-    staying sid-consistent by construction — a CLI-minted ``sess_*`` id is never a
-    member of it (release K1: minting a fresh id when nothing resolves is a distinct,
-    write-side concern the bind CLI owns for itself).
-    """
+    """The sanitized session id by the one rule (:func:`invocation.resolve_session_id`)."""
     return invocation.resolve_session_id(payload, os.environ, default=default)
 
 
 def emit_block(reason: str) -> None:
-    """Print the merged block envelope: legacy + documented Claude Code contract.
-
-    Bug claude-pre-gate-envelope-contract: the documented Claude Code PreToolUse verdict
-    is ``hookSpecificOutput.permissionDecision: "deny"`` — the top-level
-    ``"decision": "block"`` only rides an undocumented legacy fallback there. Both are
-    carried in ONE envelope because each has its own consumer:
-
-    - ``decision``/``reason`` — codex hooks and the kimi pre-gate shim. Key placement is
-      part of the contract: the shim greps the literal ``"decision": "block"`` and its
-      sed reason extraction (``.*"reason": "\\(.*\\)".*``) captures cleanly only while
-      the top-level ``reason`` stays the LAST key.
-    - ``hookSpecificOutput`` — Claude Code's documented PreToolUse decision control.
-    """
-    print(
-        json.dumps(
-            {
-                "decision": "block",
-                "hookSpecificOutput": {
-                    "hookEventName": "PreToolUse",
-                    "permissionDecision": "deny",
-                    "permissionDecisionReason": reason,
-                },
-                "reason": reason,
-            }
-        )
-    )
+    """The block envelope: Claude Code's ``permissionDecision: "deny"`` plus the top-level
+    ``decision``/``reason`` the codex hooks and kimi shim grep — ``reason`` stays the LAST
+    key, the shim's sed extraction depends on it."""
+    deny = {
+        "hookEventName": "PreToolUse",
+        "permissionDecision": "deny",
+        "permissionDecisionReason": reason,
+    }
+    print(json.dumps({"decision": "block", "hookSpecificOutput": deny, "reason": reason}))
 
 
 def emit_allow() -> None:
-    """Print the explicit allow envelope (observable AND Claude-Code schema-valid).
-
-    Bug projected-pre-gate-silent-allow: allow used to be silence + exit 0, so external
-    automation could not distinguish an explicit allow from a hook that never ran — the
-    envelope must stay non-empty. Bug pre-gate-allow-envelope-fails-claude-schema: it
-    must also carry NO permission verdict, because Claude Code's PreToolUse output
-    schema rejects everything else this gate could say:
-
-    - top-level ``decision`` enum is ``["approve", "block"]`` — ``"allow"`` fails
-      validation of the WHOLE envelope on every allowed call, and ``"approve"`` would
-      BYPASS the user's permission prompts;
-    - ``permissionDecision: "defer"`` is print-mode only — interactive sessions warn
-      and ignore it (and ``"allow"`` there also bypasses prompts).
-
-    So the gate steps aside with only schema-neutral fields. Codex hooks and the kimi
-    shim treat any envelope without the literal ``"decision": "block"`` as allow.
-    """
-    envelope: dict[str, object] = {
-        "continue": True,
-        "hookSpecificOutput": {"hookEventName": "PreToolUse"},
-    }
-    print(json.dumps(envelope))
+    """The explicit, non-empty allow envelope with NO permission verdict: Claude Code's schema
+    rejects ``decision: "allow"``, and ``approve``/``allow`` verdicts bypass the user's prompts."""
+    print(json.dumps({"continue": True, "hookSpecificOutput": {"hookEventName": "PreToolUse"}}))
