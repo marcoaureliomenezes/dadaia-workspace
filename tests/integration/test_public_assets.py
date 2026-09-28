@@ -1,21 +1,6 @@
-"""Integration tests for public asset staging and runtime projections.
-
-Merged per plan-integration.md (39 -> ~8):
-  - Keep: install-refuses-dadaia-workspace-source-root (safety), public-privacy gate
-    (flags identifiers + ignores bytecode, merged -> 1).
-  - Merge: stage (manifest + codex adapters) -> 1; install-all -> 1;
-    overwrite-stale/skip-canonical/force -> 1; codex projection (config omits/emits +
-    legacy workflow cleanup + native-rules-only) -> 1; model-governance
-    overlay (no-overlay lockstep + overlay-change lockstep + invalid-overlay-loud +
-    doctor rerender-drift/invalid-vs-missing) -> 2.
-  - Delete -> unit (already covered by tests/unit/infrastructure/test_public_assets_*.py,
-    T-2's per-concern split): quoting/escaping,
-    ``_parse_agent_frontmatter`` param cases, ``_render_codex_agent_toml`` field/tier
-    cases, command-policy prefix rules, and the
-    skill-frontmatter static-lint fn (moved to unit/features/public).
-
-Privacy gate is CRITICAL (public-boundary). Renderer fns keep coverage as unit tests —
-no fs/subprocess needed there.
+"""Intent: CONTRACT — v0.4.5 A4.1-4.3: the authority for public stage, install and drift
+(rosters, the source-root refusal, hash-compare overwrite/skip/force, the privacy gate,
+model-policy rendering, single-place skill rename). Size: MEDIUM — real projection I/O.
 """
 
 from __future__ import annotations
@@ -51,12 +36,7 @@ def _rendered(result: object) -> list[str]:
 pytestmark = [pytest.mark.integration, pytest.mark.slow]
 
 _runner = CliRunner()
-
-
-# ---------------------------------------------------------------------------
-# stage() — manifest + codex runtime adapters, plus
-# install() full-projection block
-# ---------------------------------------------------------------------------
+_AGENTS = {"dd-code-reviewer", "dd-product-engineer", "dd-software-engineer"}
 
 
 def test_stage_manifest_and_install_all(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -65,16 +45,26 @@ def test_stage_manifest_and_install_all(tmp_path: Path, monkeypatch: pytest.Monk
 
     stage_manager.stage(stage_workspace)
 
-    manifest_path = stage_workspace / ".dadaia" / "agentic" / "manifest.json"
-    assert manifest_path.exists()
-    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    agentic = stage_workspace / ".dadaia" / "agentic"
+    # sa-staged-assets-without-consumers#44.2: only families a reader of
+    # .dadaia/agentic/ consumes are staged (no `rules`, no 0.4.7 FR3 `runtime/`).
+    assert sorted(p.name for p in agentic.iterdir()) == [
+        "agents", "data", "manifest.json", "schemas", "skills",
+    ]  # fmt: skip
+    manifest = json.loads((agentic / "manifest.json").read_text(encoding="utf-8"))
     assert manifest["schema_version"] == "1"
     assert any(asset["path"] == "data/AGENTS.md" for asset in manifest["assets"])
-
-    # 0.4.7 FR3: the Codex-only runtime-adapter family is retired — Codex reads the
-    # shared `.agents/skills` tree natively, so nothing stages under runtime/.
-    assert not (stage_workspace / ".dadaia" / "agentic" / "runtime").exists()
-    assert not any(asset["path"].startswith("runtime/") for asset in manifest["assets"])
+    assert all({"path", "sha256", "type"} <= set(asset) for asset in manifest["assets"])
+    staged_agents = {
+        Path(a["path"]).stem
+        for a in manifest["assets"]
+        if a["type"] == "agents" and a["path"].endswith(".md")
+    }
+    assert staged_agents == _AGENTS
+    oracle_skills = skill_names()
+    # v0.4.5 FR5 (scan-test-vacuity-guard): an empty oracle would make every roster vacuous.
+    assert_populated(oracle_skills, sentinel="dd-cli-library")
+    assert {p.name for p in (agentic / "skills").iterdir() if p.is_dir()} == oracle_skills
 
     workspace = tmp_path / "ws"
     manager = FileSystemPublicAssetManager()
@@ -86,17 +76,9 @@ def test_stage_manifest_and_install_all(tmp_path: Path, monkeypatch: pytest.Monk
     assert (workspace / ".dadaia" / "AGENTS.md").exists()
     assert (workspace / ".dadaia" / "tmp" / "AGENTS.md").exists()
     assert (workspace / ".dadaia" / "states" / "AGENTS.md").exists()
-    # Every skill installed carries its SKILL.md — derived from the one shared
-    # oracle (v0.4.5 FR4), never one hand-picked skill name.
-    oracle_skills = skill_names()
-    # v0.4.5 FR5 (scan-test-vacuity-guard): a mis-rooted oracle scan would degrade
-    # `oracle_skills` to empty, under which this loop asserts nothing at all.
-    assert_populated(oracle_skills, sentinel="dd-cli-library")
-    for skill in oracle_skills:
-        assert (workspace / ".agents" / "skills" / skill / "SKILL.md").exists(), (
-            f".agents/skills/{skill}/SKILL.md not installed"
-        )
-    assert (workspace / ".claude" / "agents" / "dd-code-reviewer.md").exists()
+    installed = {p.parent.name for p in (workspace / ".agents" / "skills").glob("*/SKILL.md")}
+    assert installed == oracle_skills
+    assert {p.stem for p in (workspace / ".claude" / "agents").glob("*.md")} == _AGENTS
     assert (workspace / ".codex" / "hooks.json").exists()
     assert (workspace / ".codex" / "config.toml").exists()
     # Codex receives Starlark .rules for command policy. Markdown behavioral
@@ -104,11 +86,6 @@ def test_stage_manifest_and_install_all(tmp_path: Path, monkeypatch: pytest.Monk
     assert not (workspace / ".codex" / "rules" / "game-agents-coordination.md").exists()
     assert not (workspace / ".codex" / "rules" / "game-developer-scope.md").exists()
     assert (workspace / ".codex" / "rules" / "dadaia-command-policy.rules").exists()
-
-
-# ---------------------------------------------------------------------------
-# Safety — never touch the dadaia-workspace source root itself.
-# ---------------------------------------------------------------------------
 
 
 # ---------------------------------------------------------------------------

@@ -32,29 +32,6 @@ def _build_minimal_agentic_dir(tmp_path: Path) -> tuple[Path, Path]:
     return agentic_dir, workspace_root
 
 
-def _make_manager(public_dir: Path) -> FileSystemPublicAssetManager:
-    manager = FileSystemPublicAssetManager()
-    manager._public_dir = public_dir  # noqa: SLF001
-    return manager
-
-
-def _make_minimal_agentic(workspace_root: Path) -> Path:
-    agentic_dir = workspace_root / ".dadaia" / "agentic"
-    # sa-staged-assets-without-consumers#44.3, #44.4: no dead `rules` family; the
-    # persona authors its own model (no retired default).
-    (agentic_dir / "agents").mkdir(parents=True)
-    (agentic_dir / "skills").mkdir(parents=True)
-    (agentic_dir / "workflows").mkdir(parents=True)
-    (agentic_dir / "commands").mkdir(parents=True)
-    (agentic_dir / "agents" / "my-agent.md").write_text(
-        "---\nname: my-agent\nmodel: claude-opus-4-7\n---\n# body\n",
-        encoding="utf-8",
-    )
-    manifest = {"schema_version": "1", "package_version": "0.0.1"}
-    (agentic_dir / "manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
-    return agentic_dir
-
-
 def test_invalid_target_raises(tmp_path: Path) -> None:
     _, workspace_root = _build_minimal_agentic_dir(tmp_path)
     with pytest.raises(PublicAssetError, match="Unsupported"):

@@ -91,26 +91,11 @@ def test_no_ledger_bootstrap_prunes_nothing(tmp_path: Path) -> None:
     assert not any("[prune]" in line and "operator-own-skill" in line for line in installed)
 
 
-def test_scoped_install_never_prunes_other_scopes(tmp_path: Path) -> None:
-    """sa-scoped-public-install-prunes-the-gate-wiring#L2,
-    sa-public-install-unlinks-operator-files-outside-its-ledger#D3: a per-harness install must
-    not treat other harnesses' entries as stale."""
-    ws = tmp_path / "ws"
-    ws.mkdir()
-    mgr = _install_all(ws)
-    codex_agents = ws / ".codex" / "agents"
-    assert any(codex_agents.glob("*.toml"))
-
-    mgr.install(ws, harness="claude")
-
-    assert any(codex_agents.glob("*.toml")), (
-        "a claude-scoped install must never prune codex projections via the ledger"
-    )
-
-
 def test_every_install_keeps_every_ledgered_path_the_library_still_ships(tmp_path: Path) -> None:
-    """sa-scoped-public-install-prunes-the-gate-wiring#L2: after any completed install
-    every path of the previous ledger is still on disk (nothing shipped is pruned)."""
+    """sa-scoped-public-install-prunes-the-gate-wiring#L2,
+    sa-public-install-unlinks-operator-files-outside-its-ledger#D3: after any completed
+    install — whole, forced, or scoped to claude — every path of the previous ledger is
+    still on disk (a scoped install never prunes another harness's projections)."""
     from dadaia_workspace.infrastructure.json_install_ledger_store import JsonInstallLedgerStore
 
     ws = tmp_path / "ws"
