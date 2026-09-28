@@ -13,8 +13,10 @@ import json
 from dataclasses import dataclass
 from pathlib import Path
 
+from jsonschema import Draft202012Validator
+
 from dadaia_workspace.core.doctor_rules import Rule, SectionFinding
-from dadaia_workspace.core.models.backlog import INTENTS_EXEMPT_STATUS, Intent, parse_intents
+from dadaia_workspace.core.models.backlog import INTENTS_EXEMPT_STATUS, Intent
 from dadaia_workspace.features.backlog.subject_registry import BindStatus, Registry, build_registry
 
 __all__ = ["RULES", "DoctorContext", "build_context"]
@@ -72,17 +74,21 @@ RULES: tuple[LedgerRule, ...] = (
 )
 
 
+_SCHEMA = Path(__file__).resolve().parents[2] / "public" / "schemas" / "backlog" / "backlog-v1.schema.json"  # fmt: skip
+_ITEM = Draft202012Validator({"$defs": json.loads(_SCHEMA.read_text(encoding="utf-8"))["$defs"], "$ref": "#/$defs/activeItem"})  # fmt: skip
+
+
 def _live_intents(specs_dir: Path) -> dict[str, list[Intent]]:
-    """Each live entry past ``idea`` and its intents; a document `backlog.py check`
-    refuses binds nothing here."""
+    """Each live entry past ``idea`` the backlog-v1 schema accepts, and its intents; every
+    other entry is `backlog.py check`'s finding and binds nothing here."""
     try:
         active = json.loads((specs_dir / "backlog" / "BACKLOG.json").read_text(encoding="utf-8"))["active"]  # fmt: skip
         return {
-            str(e["id"]): parse_intents(e.get("intents"))
+            e["id"]: [Intent.of(i) for i in e.get("intents", [])]
             for e in active
-            if e.get("status") != INTENTS_EXEMPT_STATUS
+            if _ITEM.is_valid(e) and e["status"] != INTENTS_EXEMPT_STATUS
         }
-    except (OSError, ValueError, KeyError, TypeError, AttributeError):
+    except (OSError, ValueError, KeyError, TypeError):
         return {}
 
 

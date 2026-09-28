@@ -1,6 +1,8 @@
 """Intent: CONTRACT — sa-backlog-status-has-no-single-authority#B1, #B2, #B3, #B8: the
 `ledgers` section judges a live entry through `backlog.py check` alone (it carries no
 status list); the doctor keeps only anchor resolution (BL-SCHEMA) and BL-CONFLICT.
+sa-backlog-intents-have-two-grammars: the schema is the one intents grammar; the doctor
+binds only the entries it accepts, never dropping the document for one bad entry.
 Size: MEDIUM — the real section, each ledger script a child process.
 """
 
@@ -27,13 +29,16 @@ def _active_entry(
     ref: str | None = None,
     change: str | None = None,
     kind: str = "code",
+    extra: dict[str, str] | None = None,
 ) -> dict[str, object]:
     entry: dict[str, object] = {
         "id": slug, "title": title, "opened": "2026-08-10", "status": status,
         "description": f"{slug} needs a change.", "provenance": "operator request",
     }  # fmt: skip
     if ref is not None:
-        entry["intents"] = [{"subject": {"kind": kind, "ref": ref}, "change": change}]
+        entry["intents"] = [
+            {"subject": {"kind": kind, "ref": ref}, "change": change, **(extra or {})}
+        ]
     return entry
 
 
@@ -49,6 +54,18 @@ _ROWS = {  # the live entries (status, ref, change) -> the backlog findings the 
     "cli-ref-bare": ([("candidate", "cli:context bind", "x")], []),
     "self-bound-invariant": ([("candidate", "invariant:INV-DOES-NOT-EXIST", "x")], ["BL-SCHEMA"]),
     "api-without-alias": ([("candidate", "api:GET /v1/x", "x")], ["BL-SCHEMA"]),
+    "absolute-code-ref-refused-conflict-kept": (
+        [
+            ("candidate", "pkg/m.py#Widget", "a"),
+            ("candidate", "pkg/m.py#Widget", "b"),
+            ("candidate", "/abs/m.py#W", "c"),
+        ],
+        ["BL-CONFLICT", _LEDGER],
+    ),  # fmt: skip
+    "extra-intent-key-binds-nothing": (
+        [("candidate", "pkg/m.py#Widget", "a"), ("candidate", "pkg/m.py#Widget", "b", {"x": "y"})],
+        [_LEDGER],
+    ),
 }
 
 
@@ -60,7 +77,9 @@ def test_the_doctor_judges_a_live_entry_as_backlog_py_check_does(row: str, tmp_p
     stays in the doctor.
     sa-subjects-resolve-is-circular#B1: 'cli:dadaia context bind' resolves; sa-subjects-resolve-is-circular#B2: the bare
     'cli:context bind' gets B1's verdict; sa-subjects-resolve-is-circular#B3: a self-bound invariant is unresolved; sa-subjects-resolve-is-circular#B5: an
-    api subject with no alias is refused with the alias-only message."""
+    api subject with no alias is refused with the alias-only message.
+    sa-backlog-intents-have-two-grammars: an absolute code ref fails check and the real
+    BL-CONFLICT beside it survives; an intent with an extra key fails check and binds nothing."""
     entries, expected = _ROWS[row]
     specs = tmp_path / "specs"
     (specs / "backlog").mkdir(parents=True)
@@ -74,8 +93,9 @@ def test_the_doctor_judges_a_live_entry_as_backlog_py_check_does(row: str, tmp_p
             ref=r.split(":", 1)[-1],
             change=c,
             kind=r.split(":", 1)[0] if ":" in r else "code",
+            extra=x[0] if x else None,
         )  # fmt: skip
-        for n, (s, r, c) in enumerate(entries)
+        for n, (s, r, c, *x) in enumerate(entries)
     ]
     (specs / "backlog" / "BACKLOG.json").write_text(
         json.dumps({"schema": "backlog-v1", "active": active}), encoding="utf-8"

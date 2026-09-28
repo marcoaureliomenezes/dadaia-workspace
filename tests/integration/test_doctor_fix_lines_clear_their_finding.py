@@ -384,11 +384,11 @@ OPERATOR_ACTION: dict[str, Callable[[Path], None]] = {
         _append(r / "specs/memory/QUALITY.md", "\nADR: 0001\n"),
     ),
     "BL-SCHEMA": lambda r: _write(r / "specs/backlog/BACKLOG.json", json.dumps({"schema": "backlog-v1", "active": [
-        _active_entry("x", "x", "candidate", ref="pkg/m.py#Ghost", change="x")]})),
+        _active_entry("xx", "x", "candidate", ref="pkg/m.py#Ghost", change="x")]})),
     "BL-CONFLICT": lambda r: (
         _write(r / "pkg/m.py", _SOURCE),
         _write(r / "specs/backlog/BACKLOG.json", json.dumps({"schema": "backlog-v1", "active": [
-            _active_entry(t, t, "candidate", ref="pkg/m.py#Widget", change=t) for t in ("d", "e")]})),
+            _active_entry(t, t, "candidate", ref="pkg/m.py#Widget", change=t) for t in ("dd", "ee")]})),
     ),
 }  # fmt: skip
 

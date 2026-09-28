@@ -35,9 +35,10 @@ def load_schema(name: str) -> dict[str, Any]:
 
 def validate(value: object, spec: dict[str, Any], root: dict[str, Any], where: str) -> Any:
     """The JSON-Schema subset the ledgers use: ``$ref`` into ``$defs``, type, const, enum,
-    pattern, min/maxLength, minItems, items, required, ``additionalProperties: false``."""
-    if "$ref" in spec:
-        spec = root["$defs"][spec["$ref"].rsplit("/", 1)[-1]]
+    pattern, min/maxLength, minItems, items, required, ``additionalProperties: false``, if/then."""
+    spec = root["$defs"][spec["$ref"].rsplit("/", 1)[-1]] if "$ref" in spec else spec
+    if "if" in spec and not any(validate(value, spec["if"], root, where)):
+        yield from validate(value, spec["then"], root, where)
     declared = spec.get("type")
     allowed = declared if isinstance(declared, list) else [declared] if declared else []
     if allowed and not any(isinstance(value, JSON_TYPES[name]) for name in allowed):

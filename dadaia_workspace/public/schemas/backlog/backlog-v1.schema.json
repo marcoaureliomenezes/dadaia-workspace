@@ -64,6 +64,11 @@
       "type": "object",
       "additionalProperties": false,
       "required": ["subject", "change"],
+      "if": { "properties": { "subject": { "properties": { "kind": { "const": "code" } } } } },
+      "then": { "properties": { "subject": { "properties": { "ref": {
+        "pattern": "^(?!\\s*[/~]|\\s*[A-Za-z]:[\\\\/])(?!(?:[^#]*/)?\\.\\.[/#])[^#]*[^#\\s][^#]*#[^#]*[^#\\s][^#]*$",
+        "description": "kind=code: module-relative 'path#symbol' — never absolute, '~', a drive or a '..' segment (a committed backlog carries no operator-local path)."
+      } } } } },
       "properties": {
         "subject": {
           "type": "object",
@@ -77,8 +82,8 @@
             },
             "ref": {
               "type": "string",
-              "minLength": 1,
-              "description": "The typed reference itself — 'path/to/module.py#Symbol' for kind=code (module-relative only; an absolute/operator-local path is refused at construction), a 'dadaia <command>' id for kind=cli, a catalog.json feature slug for kind=catalog, a SPEC-DOC id or memory heading anchor for kind=doc, an INV-* id for kind=invariant."
+              "pattern": "\\S",
+              "description": "The typed reference itself — 'path/to/module.py#Symbol' for kind=code (module-relative only, the 'then' rule above), a 'dadaia <command>' id for kind=cli, a catalog.json feature slug for kind=catalog, a SPEC-DOC id or memory heading anchor for kind=doc, an INV-* id for kind=invariant."
             },
             "surface": {
               "type": "string",
@@ -90,7 +95,7 @@
         },
         "change": {
           "type": "string",
-          "minLength": 1,
+          "pattern": "\\S",
           "description": "Human-readable delta this item proposes for the bound subject."
         }
       }
