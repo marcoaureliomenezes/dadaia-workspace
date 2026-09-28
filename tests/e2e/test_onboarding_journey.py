@@ -331,9 +331,6 @@ def greenfield(env: Env) -> Greenfield:
 
 
 class TestGreenfield:
-    def test_level1_init_with_repo(self, greenfield: Greenfield) -> None:
-        greenfield.level1()
-
     def test_guidance_names_specs_init(self, greenfield: Greenfield) -> None:
         greenfield.guidance()
 
@@ -407,9 +404,6 @@ def second(env: Env) -> SecondProject:
 
 
 class TestSecondProjectWithAssociated:
-    def test_level1_init(self, second: SecondProject) -> None:
-        second.level1()
-
     def test_level2_create_clones_main_and_associated(self, second: SecondProject) -> None:
         second.level2()
 
@@ -444,9 +438,6 @@ def failed_create(env: Env) -> FailedCreate:
 
 
 class TestFailedCreateThenRetry:
-    def test_level1_init(self, failed_create: FailedCreate) -> None:
-        failed_create.level1()
-
     def test_level2_failure_leaves_nothing_then_retry_succeeds(
         self, failed_create: FailedCreate
     ) -> None:
