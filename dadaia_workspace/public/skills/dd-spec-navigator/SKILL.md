@@ -31,7 +31,7 @@ read or any output written.
 
 1. Read `<specs-dir>/releases/<release-id>/_RELEASE.json` — its `phase` field is the resolver; the live candidate's trio is always flat at the release root.
 2. No state-document-carrying release directory: stop before implementation and inform the operator.
-3. Read the SPEC; add the PLAN when planning or implementing, the TASKS when implementing; read `_RELEASE.json`'s `log` when `phase` is `CLOSURE`/`ARCHIVED`.
+3. Read the SPEC; add the PLAN when planning or implementing, the TASKS when implementing; read `_RELEASE.json`'s `log` when `phase` is `CLOSURE`.
 4. Verify every loaded SPEC/PLAN/TASKS carries `**Status:** Approved` before any implementation; stop and name the unapproved artifact otherwise.
 
 ## Done when

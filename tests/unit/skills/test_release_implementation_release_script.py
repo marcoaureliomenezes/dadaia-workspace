@@ -172,7 +172,7 @@ def test_new_births_the_stacked_candidate_on_a_closed_live_release(
 
 
 def test_new_refuses_the_same_id_while_its_candidate_is_open(script: Path, tmp_path: Path) -> None:
-    """A candidate is stacked only on a CLOSURE state: mid-IMPLEMENTATION the live trio
+    """sa-promote-has-no-verb#B25-8: a candidate is stacked only on a CLOSURE state: mid-IMPLEMENTATION the live trio
     is still being worked, and the refusal names the phase verb that unblocks it."""
     specs = _specs(tmp_path)
     _release(specs, "0.5.0", phase="IMPLEMENTATION")
@@ -214,49 +214,6 @@ def test_phase_closure_stamps_the_implemented_milestone(script: Path, tmp_path: 
     assert state["implemented"] == {"sha": "beef123", "ts": state["implemented"]["ts"]}
 
 
-def test_phase_closure_records_the_merged_release_pr(script: Path, tmp_path: Path) -> None:
-    """T-047-90: the number `archive --pr <n>` carried moves to the one living verb.
-    Promote leaves a number in the log, not a moved directory."""
-    specs = _specs(tmp_path)
-    _release(specs, "0.5.0", phase="IMPLEMENTATION")
-    result = _run(
-        script, "phase", "CLOSURE", "--sha", "beef123", "--pr", "261", "--specs", str(specs)
-    )
-    assert result.returncode == 0, result.stderr
-    state = _read(specs / "releases" / "0.5.0" / "_RELEASE.json")
-    notes = [entry["text"] for entry in state["log"] if entry["kind"] == "note"]
-    assert any("#261" in text for text in notes), notes
-
-
-def test_phase_closure_without_a_pr_is_still_accepted(script: Path, tmp_path: Path) -> None:
-    """`--pr` is optional: a candidate that closes without promoting names no PR."""
-    specs = _specs(tmp_path)
-    _release(specs, "0.5.0", phase="IMPLEMENTATION")
-    result = _run(script, "phase", "CLOSURE", "--sha", "beef123", "--specs", str(specs))
-    assert result.returncode == 0, result.stderr
-    state = _read(specs / "releases" / "0.5.0" / "_RELEASE.json")
-    notes = [entry["text"] for entry in state["log"] if entry["kind"] == "note"]
-    assert not any("#" in text for text in notes), notes
-
-
-def test_phase_refuses_a_non_numeric_pr(script: Path, tmp_path: Path) -> None:
-    specs = _specs(tmp_path)
-    _release(specs, "0.5.0", phase="IMPLEMENTATION")
-    result = _run(
-        script, "phase", "CLOSURE", "--sha", "beef123", "--pr", "zero", "--specs", str(specs)
-    )
-    assert result.returncode != 0
-
-
-def test_phase_refuses_an_out_of_order_transition(script: Path, tmp_path: Path) -> None:
-    specs = _specs(tmp_path)
-    _release(specs, "0.5.0")
-    result = _run(script, "phase", "CLOSURE", "--sha", "abc1234", "--specs", str(specs))
-    assert result.returncode == 1
-    assert "fix: " in result.stderr
-    assert _read(specs / "releases" / "0.5.0" / "_RELEASE.json")["phase"] == "DEFINITION"
-
-
 def test_phase_implementation_refuses_an_unapproved_trio(script: Path, tmp_path: Path) -> None:
     specs = _specs(tmp_path)
     release_dir = _release(specs, "0.5.0")
@@ -266,9 +223,11 @@ def test_phase_implementation_refuses_an_unapproved_trio(script: Path, tmp_path:
     assert "PLAN.md" in result.stderr
 
 
-def test_phase_closure_refuses_an_open_task(script: Path, tmp_path: Path) -> None:
+@pytest.mark.parametrize("marker", ["- [ ]", "* [ ]", "+ [-]", "[ ]"])
+def test_phase_closure_refuses_an_open_task(script: Path, tmp_path: Path, marker: str) -> None:
+    """sa-promote-has-no-verb#B25-5: an open marker in any bullet form refuses CLOSURE."""
     specs = _specs(tmp_path)
-    _release(specs, "0.5.0", phase="IMPLEMENTATION", tasks="- [ ] T-1 — open\n")
+    _release(specs, "0.5.0", phase="IMPLEMENTATION", tasks=f"{marker} T-1 — open\n")
     result = _run(script, "phase", "CLOSURE", "--sha", "abc1234", "--specs", str(specs))
     assert result.returncode == 1
     assert "T-1" in result.stderr
@@ -291,16 +250,6 @@ def test_check_is_clean_on_a_valid_tree(script: Path, tmp_path: Path) -> None:
     _release(specs, "0.5.0", phase="IMPLEMENTATION")
     result = _run(script, "check", "--specs", str(specs))
     assert result.returncode == 0, result.stdout
-
-
-def test_check_reports_a_live_directory_carrying_the_archived_phase(
-    script: Path, tmp_path: Path
-) -> None:
-    specs = _specs(tmp_path)
-    _release(specs, "0.5.0", phase="ARCHIVED")
-    result = _run(script, "check", "--specs", str(specs))
-    assert result.returncode == 1
-    assert "LEDGER-RELEASE-SCHEMA error" in result.stdout
 
 
 def test_check_reports_a_schema_violation_and_emits_json(script: Path, tmp_path: Path) -> None:
@@ -351,26 +300,65 @@ def test_check_finds_the_specs_tree_by_walking_up_from_cwd(script: Path, tmp_pat
 
 
 @pytest.mark.parametrize(
-    ("name", "argv"),
+    ("phase", "argv"),
     [
-        ("bad-sha", ("phase", "IMPLEMENTATION", "--sha", "nope")),
-        ("out-of-order", ("phase", "CLOSURE", "--sha", "abc1234")),
-        ("unknown-phase", ("phase", "DEFINITION", "--sha", "abc1234")),
-        ("second-live", ("new", "0.6.0")),
+        ("DEFINITION", ("phase", "IMPLEMENTATION", "--sha", "nope")),
+        ("DEFINITION", ("phase", "CLOSURE", "--sha", "abc1234")),
+        ("IMPLEMENTATION", ("phase", "IMPLEMENTATION", "--sha", "abc1234")),
+        ("CLOSURE", ("phase", "DEFINITION", "--sha", "abc1234")),
+        ("CLOSURE", ("phase", "ARCHIVED", "--sha", "abc1234")),
+        ("IMPLEMENTATION", ("ship", "--sha", "abc1234", "--pr", "7")),
+        ("CLOSURE", ("ship", "--sha", "abc1234", "--pr", "zero")),
     ],
 )
-def test_every_refusal_carries_exactly_one_runnable_fix(
-    script: Path, tmp_path: Path, name: str, argv: tuple[str, ...]
+def test_every_refusal_carries_one_fix_that_is_not_itself_refused(
+    script: Path, tmp_path: Path, phase: str, argv: tuple[str, ...]
 ) -> None:
-    """The block contract the retired CLI verbs used to carry (`test_every_block_carries
-    _a_fix.py`): one `fix:` line, naming one executable command, on every refusal."""
+    """sa-promote-has-no-verb#B25-7 and sa-promote-has-no-verb#B25-3: a refusal exits 1, writes nothing, prints
+    one `fix:` — and that fix, run in the same state, is not refused."""
     specs = _specs(tmp_path)
-    _release(specs, "0.5.0", phase="DEFINITION")
+    _release(specs, "0.5.0", phase=phase, tasks="- [x] T-1 — done\n")
+    before = _tree_hash(specs)
     result = _run(script, *argv, "--specs", str(specs))
     assert result.returncode == 1, result.stdout
-    fixes = [line for line in result.stderr.splitlines() if line.startswith("fix: ")]
-    assert len(fixes) == 1, f"{name}: {result.stderr}"
-    assert fixes[0].removeprefix("fix: ").strip(), name
+    assert _tree_hash(specs) == before
+    fixes = [
+        line.removeprefix("fix: ")
+        for line in result.stderr.splitlines()
+        if line.startswith("fix: ")
+    ]
+    assert len(fixes) == 1, result.stderr
+    command = fixes[0].replace("$(git rev-parse --short HEAD)", "abc1234").replace("<n>", "7")
+    command += "" if "--specs" in command else f" --specs {specs}"
+    done = subprocess.run(
+        [sys.executable, *command.split()], capture_output=True, text=True, check=False
+    )
+    assert done.returncode == 0, (command, done.stderr)
+
+
+def test_ship_records_the_promote_and_new_births_the_next(script: Path, tmp_path: Path) -> None:
+    """sa-promote-has-no-verb#B25-1, sa-promote-has-no-verb#B25-2, sa-promote-has-no-verb#B25-4: new -> IMPLEMENTATION -> CLOSURE ->
+    ship -> new by verbs alone; the phases are exactly three and `ship` leaves the
+    promote in the ledger and git, not in a directory."""
+    specs = _specs(tmp_path)
+    _release(specs, "0.5.0", phase="IMPLEMENTATION")
+    assert (
+        _run(script, "phase", "CLOSURE", "--sha", "beef123", "--specs", str(specs)).returncode == 0
+    )
+    state = specs / "releases" / "0.5.0" / "_RELEASE.json"
+    result = _run(script, "ship", "--sha", "beef123", "--pr", "261", "--specs", str(specs))
+    assert result.returncode == 0, result.stderr
+    assert not state.parent.exists()
+    records = [
+        json.loads(x)
+        for x in (specs / "releases/_archive/releases_histo.jsonl").read_text("utf-8").splitlines()
+    ]
+    assert [(r["id"], r["disposition"]) for r in records] == [("0.5.0", "delivered")]
+    assert "beef123" in records[0]["summary"] and "#261" in records[0]["summary"]
+    assert _run(script, "new", "0.5.1", "--specs", str(specs)).returncode == 0
+    assert _run(script, "check", "--specs", str(specs)).returncode == 0
+    schema = json.loads(_SCHEMAS[0].read_text("utf-8"))
+    assert schema["properties"]["phase"]["enum"] == ["DEFINITION", "IMPLEMENTATION", "CLOSURE"]
 
 
 # ── memory ────────────────────────────────────────────────────────────────────

@@ -35,8 +35,6 @@ PLAN_MAX_LINES = 300
 # excluded — this grandfathers the frozen pre-cutoff archived releases.
 RELEASE_SEMVER_CUTOFF = date(2026, 6, 1)  # WARNING starts here
 
-# SPEC-DOC-024: phase ↔ markers coherence.
-_TASK_MARKER_RE = re.compile(r"^\s*[-*]?\s*\[([ \-xX])\]", re.MULTILINE)
 # SPEC-DOC-047: a task block runs from its marker line to the next marker line; a
 # ``Write set:`` naming the ``specs/memory`` tree inside it schedules memory as
 # implementation work. Both patterns are anchored: the block indent is HORIZONTAL space
@@ -241,15 +239,6 @@ class ReleaseValidator:
             )
         return issues
 
-    def _active_tasks_markers(self, release: str) -> list[str] | None:
-        """Return the list of task marker chars (' ', '-', 'x') for the active release's
-        TASKS.md, or None when TASKS.md is absent/unreadable."""
-        tasks = self.specs_dir / "releases" / release / "TASKS.md"
-        if not tasks.exists():
-            return None
-        text = tasks.read_text(encoding="utf-8")
-        return [m.group(1).lower() for m in _TASK_MARKER_RE.finditer(text)]
-
     def check_no_memory_task(self) -> list[SpecsDoctorIssue]:
         """SPEC-DOC-047: memory is closure procedure, never a task. ``specs/memory/AGENTS.md`` lets
         ``specs/memory/**`` be written only in DEFINITION/CLOSURE (the gate's RULE A
@@ -289,94 +278,21 @@ class ReleaseValidator:
         return issues
 
     def check_phase_markers_coherence(self) -> list[SpecsDoctorIssue]:
-        """SPEC-DOC-024 (v0.5.x, successor to the RELEASE.jsonl fold; v0.5.0
-        FR4/T-050-21A): the active release's ``RELEASE.json`` phase must be coherent
-        with its TASKS.md markers (constitution §7 lifecycle).
-
-        Mechanical rules (minimal):
-        - phase ∈ {SPEC, DEFINITION}: the active TASKS must NOT already be an
-          ``[x]``-majority (work claimed complete before implementation began —
-          the live audit incident where phase=SPEC but 19/19 tasks were ``[x]``).
-        - phase == IMPLEMENTATION: TASKS.md must exist and carry ``**Status:** Approved``.
-        - phase == CLOSURE: every non-CLOSURE task must be ``[x]`` (no ``[ ]``/``[-]``).
-        Other phases are not constrained here.
-        """
-        issues: list[SpecsDoctorIssue] = []
-        active_path = self.specs_dir / "releases"
-        active = self.tree.active_release
-        release, phase = active.release, active.phase
-        if not release or phase is None:
-            return issues
-        rdir = self.specs_dir / "releases" / release
-        if not rdir.exists():
-            return issues  # release dir issues already reported by SPEC-DOC-004
-
-        markers = self._active_tasks_markers(release)
-
-        if phase in ("SPEC", "DEFINITION"):
-            if markers:
-                done = sum(1 for m in markers if m == "x")
-                if done * 2 > len(markers):  # strict [x]-majority
-                    issues.append(
-                        SpecsDoctorIssue(
-                            code="SPEC-DOC-024",
-                            severity=Severity.ERROR,
-                            description=(
-                                f"Active release phase='{phase}' but the active "
-                                f"release '{release}' has an [x]-majority TASKS.md "
-                                f"({done}/{len(markers)} done). The phase was never "
-                                "advanced through IMPLEMENTATION — update `phase` in "
-                                "RELEASE.json or correct the markers "
-                                "(constitution §7)."
-                            ),
-                            path=str(active_path),
-                        )
-                    )
-        elif phase == "IMPLEMENTATION":
-            tasks = rdir / "TASKS.md"
-            if not tasks.exists():
-                issues.append(
-                    SpecsDoctorIssue(
-                        code="SPEC-DOC-024",
-                        severity=Severity.ERROR,
-                        description=(
-                            f"Active release phase='IMPLEMENTATION' but release "
-                            f"'{release}' has no TASKS.md."
-                        ),
-                        path=str(tasks),
-                    )
-                )
-            elif _extract_status(tasks) != APPROVED:
-                issues.append(
-                    SpecsDoctorIssue(
-                        code="SPEC-DOC-024",
-                        severity=Severity.ERROR,
-                        description=(
-                            f"Active release phase='IMPLEMENTATION' but TASKS.md of "
-                            f"release '{release}' is not '**Status:** {APPROVED}' "
-                            f"(found '{_extract_status(tasks)}'). Implementation phase "
-                            "requires an approved TASKS.md (constitution §7)."
-                        ),
-                        path=str(tasks),
-                    )
-                )
-        elif phase == "CLOSURE" and markers is not None:
-            unfinished = sum(1 for m in markers if m != "x")
-            if unfinished:
-                issues.append(
-                    SpecsDoctorIssue(
-                        code="SPEC-DOC-024",
-                        severity=Severity.ERROR,
-                        description=(
-                            f"Active release phase='CLOSURE' but release '{release}' "
-                            f"has {unfinished} unfinished task marker(s) "
-                            "(expected every task '[x]' before closure; "
-                            "constitution §7)."
-                        ),
-                        path=str(active_path),
-                    )
-                )
-        return issues
+        """SPEC-DOC-024: a live release in IMPLEMENTATION carries an approved TASKS.md.
+        Whether a task is still open is `release.py phase CLOSURE`'s one refusal
+        (`_release_schema.UNFINISHED_RE`) — the doctor keeps no task-marker regex."""
+        release, phase = self.tree.active_release.release, self.tree.active_release.phase
+        if not release or phase != "IMPLEMENTATION":
+            return []
+        tasks = self.specs_dir / "releases" / release / "TASKS.md"
+        status = _extract_status(tasks) if tasks.exists() else None
+        if status == APPROVED:
+            return []
+        description = (
+            f"Active release phase='IMPLEMENTATION' but TASKS.md of release '{release}' is "
+            f"not '**Status:** {APPROVED}' (found {status!r})."
+        )
+        return [SpecsDoctorIssue("SPEC-DOC-024", Severity.ERROR, description, str(tasks))]
 
     def check_unique_release_ids(self) -> list[SpecsDoctorIssue]:
         """SPEC-DOC-026: release ids (dir basenames) must be unique across

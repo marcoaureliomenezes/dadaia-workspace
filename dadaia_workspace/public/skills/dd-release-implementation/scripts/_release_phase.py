@@ -95,31 +95,26 @@ def _refuse_missing_as_is_table(plan: str) -> None:
                           f"authorities: `{first}` and `{authority}` — keep one", AS_IS_FIX)  # fmt: skip
 
 
-def set_phase(specs: Path, phase: str, sha: str, pr: int | None = None) -> tuple[str, str]:
-    """Move the live release to *phase*, stamp its milestone; *pr* (CLOSURE) enters the note."""
+#: The one verb that moves each phase forward — every refusal's fix names it, so a fix
+#: never names a verb that refuses in the same state.
+NEXT = {"DEFINITION": "phase IMPLEMENTATION", "IMPLEMENTATION": "phase CLOSURE",
+        "CLOSURE": "ship --pr <n>"}  # fmt: skip
+
+
+def set_phase(specs: Path, phase: str, sha: str) -> tuple[str, str]:
+    """Move the live release to *phase* and stamp its milestone."""
     if not SHA_RE.match(sha):
         raise Refusal(
             f"--sha {sha!r} is not a 7-40 character lowercase hex commit sha",
             f"{SCRIPT} phase {phase} --sha $(git rev-parse --short HEAD)",
         )
-    if pr is not None and phase != "CLOSURE":
-        raise Refusal(
-            f"--pr names the merged release PR and belongs to CLOSURE, not {phase}",
-            f"{SCRIPT} phase {phase} --sha {sha}",
-        )
-    if phase not in PREDECESSOR:
-        raise Refusal(
-            f"{phase!r} is not a phase this verb writes: DEFINITION belongs to `new` "
-            "and ARCHIVED is never written by a verb",
-            f"{SCRIPT} phase IMPLEMENTATION --sha {sha}",
-        )
     live = live_release(specs)
-    current, expected = live.state.get("phase"), PREDECESSOR[phase]
-    if current != expected:
+    current = str(live.state.get("phase"))
+    if PREDECESSOR.get(phase) != current:
         raise Refusal(
-            f"release {live.release_id} is in phase {current!r} — {phase} follows "
-            f"{expected} exactly once",
-            f"{SCRIPT} phase {expected} --sha {sha}",
+            f"release {live.release_id} is in phase {current!r} — `phase` writes "
+            "IMPLEMENTATION after DEFINITION and CLOSURE after IMPLEMENTATION, once each",
+            f"{SCRIPT} {NEXT.get(current, 'check')} --sha {sha}",
         )
     ts = utc_now()
     if phase == "IMPLEMENTATION":
@@ -138,8 +133,7 @@ def set_phase(specs: Path, phase: str, sha: str, pr: int | None = None) -> tuple
             note(state, ts, f"Candidate defined at {sha}; phase IMPLEMENTATION.")
         else:
             state["implemented"] = {"sha": sha, "ts": ts}
-            promoted = f" Release PR #{pr} merged." if pr is not None else ""
-            note(state, ts, f"Candidate implemented at {sha}; phase CLOSURE.{promoted}")
+            note(state, ts, f"Candidate implemented at {sha}; phase CLOSURE.")
         state["phase"] = phase
         return state
 

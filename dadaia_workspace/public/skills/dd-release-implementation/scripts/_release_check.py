@@ -26,17 +26,10 @@ from _release_schema import (  # noqa: E402
     CODE,
     DELIVERED,
     HISTO,
-    PHASES,
 )
 
 #: One `check --json` record of this ledger: `_ledger.finding` bound to CODE.
 finding = functools.partial(_finding, CODE)
-
-
-def _phase_errors(document: dict[str, Any]) -> list[str]:
-    """What the schema alone cannot state: a live release is never ARCHIVED."""
-    phase = document.get("phase")
-    return [] if phase in PHASES and phase != "ARCHIVED" else [f"phase {phase!r} is not live"]
 
 
 def _log_errors(document: dict[str, Any]) -> list[str]:
@@ -58,7 +51,7 @@ def state_findings(text: str, rel: str) -> list[dict[str, Any]]:
     schema = load_schema("release-state-v1")
     if messages := list(validate(document, schema, schema, "state")):
         return [finding(rel, 1, message) for message in messages]
-    return [finding(rel, 1, m) for m in _phase_errors(document) + _log_errors(document)]
+    return [finding(rel, 1, m) for m in _log_errors(document)]
 
 
 def histo_findings(text: str) -> list[dict[str, Any]]:

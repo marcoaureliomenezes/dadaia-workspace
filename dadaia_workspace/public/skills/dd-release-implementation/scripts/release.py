@@ -1,33 +1,29 @@
 #!/usr/bin/env python3
-"""The release ledger's ONE writer and validator — `specs/releases/<id>/_RELEASE.json`,
-the candidate trio and the append-only ship ledger, stdlib only.
-
-``release.py <verb> --specs <path>``. Every write builds the new state bytes, runs
-`check` over them, and only then replaces the file atomically — so this script's writer
-and its validator cannot disagree about what a valid release state is.
-
-Promotion is the operator merging the release PR — no verb archives anything.
+"""The release ledger's ONE writer and validator — `_RELEASE.json`, the candidate trio and
+the ship ledger, stdlib only. Every write is validated by `check` before an atomic
+replace; `ship` records the merged promote PR (git is the archive).
 """
 
 from __future__ import annotations
 
 import argparse
 import json
+import shutil
 import sys
 from pathlib import Path
 
-# A projected skill folder is not a package dir to litter: the sibling modules below
-# import without leaving a `__pycache__` beside them.
+# No `__pycache__` beside a projected skill; `_ledger.py` is staged beside this script
+# (the source tree keeps it in dd-bug-resolution).
 sys.dont_write_bytecode = True
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-# `_ledger.py` is staged beside this script; the source tree keeps it in dd-bug-resolution.
 sys.path.append(str(Path(__file__).resolve().parents[2] / "dd-bug-resolution" / "scripts"))
 
 from _ledger import find_specs  # noqa: E402
+from _release_check import histo_findings  # noqa: E402
 from _release_new import new_release  # noqa: E402
 from _release_phase import set_phase  # noqa: E402
-from _release_schema import CODE, STATE, utc_now  # noqa: E402
-from _release_store import Refusal, State, commit, live_release, window_start  # noqa: E402
+from _release_schema import CODE, HISTO, SHA_RE, STATE, utc_now  # noqa: E402
+from _release_store import Refusal, commit, live_release, window_start  # noqa: E402
 from _release_tree import check, drift, memory_errors  # noqa: E402
 
 _HELP = {
@@ -35,6 +31,7 @@ _HELP = {
     "phase": "move the live release to IMPLEMENTATION or CLOSURE, stamping its milestone",
     "drift": "the closure worklist over the live release's memory window (memory.py drift)",
     "memory": "append the closure's one structured `kind: memory` entry to the live log",
+    "ship": "record the merged promote PR: shipped, a delivered histo line, the dir removed",
     "check": "validate every _RELEASE.json under releases/ and the ship ledger",
 }
 
@@ -51,9 +48,10 @@ def _parser() -> argparse.ArgumentParser:
                                  help="operator-demand | backlog:<id>[,..] | bugs:<id>[,..]")  # fmt: skip
         if verb == "phase":
             command.add_argument("phase", help="IMPLEMENTATION or CLOSURE")
+        if verb in ("phase", "ship"):
             command.add_argument("--sha", required=True, help="the commit the milestone names")
-            command.add_argument("--pr", type=int, default=None,
-                                 help="CLOSURE only: the merged release PR number")  # fmt: skip
+        if verb == "ship":
+            command.add_argument("--pr", required=True, help="the merged promote PR number")
         if verb == "memory":
             for name in ("--reviewed", "--changed"):
                 command.add_argument(name, default="", help="comma-separated worklist entries")
@@ -64,13 +62,12 @@ def _parser() -> argparse.ArgumentParser:
 
 def _new(args: argparse.Namespace, specs: Path) -> int:
     release_dir = new_release(specs, args.release_id, utc_now()[:10], args.origin)
-    print(f"[ok] created: {release_dir / 'SPEC.md'}")
-    print(f"[ok] created: {release_dir / STATE}")
+    print(f"[ok] created: {release_dir / 'SPEC.md'}\n[ok] created: {release_dir / STATE}")
     return 0
 
 
 def _phase(args: argparse.Namespace, specs: Path) -> int:
-    release_id, ts = set_phase(specs, args.phase.upper(), args.sha, args.pr)
+    release_id, ts = set_phase(specs, args.phase.upper(), args.sha)
     print(f"[ok] release {release_id} -> phase {args.phase.upper()} ({ts})")
     return 0
 
@@ -98,17 +95,37 @@ def _memory(args: argparse.Namespace, specs: Path) -> int:
         raise Refusal(str(refusal), refusal.fix) from refusal
     if errors:
         raise Refusal(errors[0], f"{Path(__file__).name} memory --help")
-
-    def apply(state: State) -> State:
-        state.setdefault("log", []).append(entry)
-        return state
-
-    commit(live.release_dir / STATE, f"releases/{live.release_id}/{STATE}", apply)
+    commit(live.release_dir / STATE, f"releases/{live.release_id}/{STATE}",
+           lambda state: {**state, "log": [*(state.get("log") or []), entry]})  # fmt: skip
     print(f"[ok] release {live.release_id} log <- kind memory {since}..{until[:12]} ({ts})")
     return 0
 
 
-_VERBS = {"new": _new, "phase": _phase, "drift": _drift, "memory": _memory}
+def _ship(args: argparse.Namespace, specs: Path) -> int:
+    """CLOSURE -> shipped {sha, pr, ts}, one `delivered` histo line, the directory gone."""
+    live, ts, fix = live_release(specs), utc_now(), f"{Path(__file__)} check --specs {specs}"
+    if not (SHA_RE.match(args.sha) and args.pr.isdigit() and int(args.pr) > 0):
+        raise Refusal(f"--sha {args.sha!r} / --pr {args.pr!r}: a hex sha and a PR number",
+                      f"{Path(__file__)} ship --sha $(git rev-parse --short HEAD) --pr <n>")  # fmt: skip
+    if live.state.get("phase") != "CLOSURE":
+        raise Refusal(f"release {live.release_id} is in phase {live.state.get('phase')!r} — "
+                      "only a CLOSURE release ships", fix)  # fmt: skip
+    line = json.dumps({"id": live.release_id, "ts": ts, "disposition": "delivered",
+                       "release": live.release_id, "reason": None, "entry": None,
+                       "summary": f"shipped {args.sha} PR #{args.pr}"}) + "\n"  # fmt: skip
+    histo = specs / HISTO
+    if errors := histo_findings((histo.read_text("utf-8") if histo.is_file() else "") + line):
+        raise Refusal(f"the ship ledger would not pass check: {errors[-1]['message']}", fix)
+    commit(live.release_dir / STATE, f"releases/{live.release_id}/{STATE}",
+           lambda s: {**s, "shipped": {"sha": args.sha, "pr": int(args.pr), "ts": ts}})  # fmt: skip
+    with histo.open("a", encoding="utf-8") as ledger:
+        ledger.write(line)
+    shutil.rmtree(live.release_dir)
+    print(f"[ok] release {live.release_id} shipped at {args.sha} (PR #{args.pr})")
+    return 0
+
+
+_VERBS = {"new": _new, "phase": _phase, "drift": _drift, "memory": _memory, "ship": _ship}
 
 
 def main(argv: list[str] | None = None) -> int:

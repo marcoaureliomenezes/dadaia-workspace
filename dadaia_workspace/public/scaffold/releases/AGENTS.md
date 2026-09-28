@@ -31,7 +31,7 @@ Scope: this file governs only `specs/releases/`.
 - Reserve before writing: flip `[ ] -> [-]`; one `[-]` at a time unless TASKS declares disjoint write sets.
 - Complete the work inside the task's declared write set; a completed task group is one commit.
 - Flip `[-] -> [x]` and commit as `conventional-commit(task-id): description`.
-- `phase` and the `defined`/`implemented` milestones move only by `RELEASE_PY phase`; `ARCHIVED` is written by no verb.
+- `phase` and the `defined`/`implemented` milestones move only by `RELEASE_PY phase`; `shipped` only by `RELEASE_PY ship`.
 
 ## 4. _RELEASE.json
 
@@ -40,5 +40,5 @@ Scope: this file governs only `specs/releases/`.
 
 ## 5. Promote
 
-- Promote is merging the PR into the principal branch (the constitution's `gitflow:`); `RELEASE_PY phase CLOSURE --sha <sha> --pr <n>` records it in the candidate's note.
+- Promote is merging the PR into the principal branch (the constitution's `gitflow:`); `RELEASE_PY ship --sha <sha> --pr <n>` records it: `shipped`, one `delivered` histo line, the release directory removed (git is the archive).
 - Version, CHANGELOG and tag belong to the project's own release pipeline; no verb and no agent mints a version.

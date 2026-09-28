@@ -15,8 +15,9 @@ HISTO = "releases/_archive/releases_histo.jsonl"
 TRIO = ("SPEC.md", "PLAN.md", "TASKS.md")
 #: Every artifact `new` refuses to mint over (CWE-73): a release directory is one unit.
 ARTIFACTS = (*TRIO, STATE)
-#: The four canonical lifecycle phases — pinned equal to the schema's enum by `check`.
-PHASES = ("DEFINITION", "IMPLEMENTATION", "CLOSURE", "ARCHIVED")
+#: The three lifecycle phases — pinned equal to the schema's enum; a shipped release
+#: leaves the tree (its histo line + git are the archive).
+PHASES = ("DEFINITION", "IMPLEMENTATION", "CLOSURE")
 #: The phases in which the trio is REQUIRED at the release root; DEFINITION sits
 #: between candidates, when the next trio is still being authored.
 TRIO_PHASES = frozenset({"IMPLEMENTATION", "CLOSURE"})
@@ -26,8 +27,9 @@ APPROVED = "Approved"
 SEMVER_RE = re.compile(r"^\d+\.\d+\.\d+$")
 #: A shipped commit sha as a human pastes it from a merge: short (7) to full (40).
 SHA_RE = re.compile(r"^[0-9a-f]{7,40}$")
-#: Task markers that mean the candidate is NOT closed: open ``[ ]`` or reserved ``[-]``.
-UNFINISHED_RE = re.compile(r"^\s*-\s\[( |-)\]\s.*$", re.MULTILINE)
+#: Task markers that mean the candidate is NOT closed: open ``[ ]`` or reserved ``[-]``,
+#: under any Markdown bullet (``-``, ``*``, ``+``) or none — the ONE task-marker rule.
+UNFINISHED_RE = re.compile(r"^\s*(?:[-*+]\s+)?\[( |-)\]\s.*$", re.MULTILINE)
 _STATUS_RE = re.compile(r"^\*\*Status:\*\*\s*(.+?)\s*$", re.MULTILINE)
 
 

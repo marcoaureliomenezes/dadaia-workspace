@@ -3,7 +3,7 @@
 Release v0.1.10 / T-010-14 (R6b). Ledger invariants, each with an ERROR/WARNING code
 following the SPEC-DOC-NNN convention:
 
-- SPEC-DOC-024 — phase<->markers coherence (ACTIVE.md phase vs TASKS markers).
+- SPEC-DOC-024 — IMPLEMENTATION carries an approved TASKS.md.
 - SPEC-DOC-006 (extended) — CLOSURE-before-archive, recursive into nested archive dirs.
 - SPEC-DOC-026 — unique release ids across releases/ u releases/_archive/ (recursive).
 - SPEC-DOC-027 — the ONE release-dir naming canon (bare MAJOR.MINOR.PATCH), legacy WARN,
@@ -221,17 +221,18 @@ def _seed_lock_record(
 def test_sad_matrix(tmp_path: Path) -> None:
     """sa-spec-doc-033-duplicates-bugs-check#B8: archive-overdue stays one WARNING with
     fix `bugs.py archive`."""
-    # DOC-024: phase=SPEC but TASKS are an [x]-majority (the live audit incident).
+    # DOC-024: phase=IMPLEMENTATION but TASKS.md is not Approved.
     specs_a = _make_clean_specs_tree(tmp_path)
-    _set_active(specs_a, "0.1.10", "SPEC")
-    _write_tasks(specs_a, "0.1.10", "- [x] T1 done\n- [x] T2 done\n- [ ] T3 open\n")
+    tasks = specs_a / "releases" / "0.1.10" / "TASKS.md"
+    tasks.write_text(tasks.read_text("utf-8").replace("Approved", "Draft"), encoding="utf-8")
     assert "SPEC-DOC-024" in _codes(SpecsDoctor(specs_a).check())
 
-    # DOC-024: phase=CLOSURE but a non-[x] task remains.
+    # sa-promote-has-no-verb#B25-6: an open task in CLOSURE is release.py's one refusal
+    # (`phase CLOSURE`); the doctor keeps no task-marker rule of its own.
     specs_b = _make_clean_specs_tree(tmp_path.parent / (tmp_path.name + "-024b"))
     _set_active(specs_b, "0.1.10", "CLOSURE")
-    _write_tasks(specs_b, "0.1.10", "- [x] T1 done\n- [-] T2 in-progress\n")
-    assert "SPEC-DOC-024" in _codes(SpecsDoctor(specs_b).check())
+    _write_tasks(specs_b, "0.1.10", "- [x] T1 done\n* [-] T2 in-progress\n")
+    assert "SPEC-DOC-024" not in _codes(SpecsDoctor(specs_b).check())
 
     # DOC-006 RETIRED (v0.5.0 T-050-25A, A4.4): check_archive_closures deleted along
     # with CLOSURE.md itself -- a checker that parses a file which no longer exists is
@@ -277,10 +278,6 @@ def test_silent_matrix(tmp_path: Path) -> None:
     # DOC-024: coherent phase/markers.
     specs_a = _make_clean_specs_tree(tmp_path)
     assert "SPEC-DOC-024" not in _codes(SpecsDoctor(specs_a).check())
-    specs_a2 = _make_clean_specs_tree(tmp_path.parent / (tmp_path.name + "-024ok"))
-    _set_active(specs_a2, "0.1.10", "CLOSURE")
-    _write_tasks(specs_a2, "0.1.10", "- [x] T1 done\n- [x] T2 done\n")
-    assert "SPEC-DOC-024" not in _codes(SpecsDoctor(specs_a2).check())
 
     # DOC-006 RETIRED (v0.5.0 T-050-25A, A4.4): see test_sad_matrix's own note above.
 
