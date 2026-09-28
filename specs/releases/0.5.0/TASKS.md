@@ -11,90 +11,68 @@ tests. `Δ` = prod/test lines; PLAN §2.7 ceilings stop a task, never rise.
 
 ## Candidate 4 — systemic ambiguity remediation
 
-### W0 — data loss, leaks, gate holes (FR1)
-
-- [x] **T-050-23 — Reaper keeps its holds + `release-as`.** `W:` `f/spec_context/{sweep,doctor}.py`, `cli/commands/doctor.py`, `pub/skills/dd-cli-library/SKILL.md`, `release-please-config.json`
-  `blocked by:` none · `delivers:` two same-second reaps leave two intact holds (AC1.2, AC1.6) · `RED:` PLAN §2 WP-02 · Δ −4/+40.
-- [x] **T-050-24 — Install ledger owns harness dirs (04, 06).** `W:` `i/`, `f/spec_context/doctor.py`
-  `blocked by:` T-050-23 · `delivers:` operator files survive install and `doctor --fix` · `RED:` PLAN §2 WP-04, WP-06 · Δ −131/+7.
-- [x] **T-050-25 — `workspace_layout.verdict` (05).** Move, switch, delete. `W:` `core/workspace_layout.py`, `hooks/`, `f/spec_context/`, `pub/data/`
-  `blocked by:` T-050-23 · `delivers:` gate ALLOW ⇔ doctor not SLOP · `RED:` PLAN §2 WP-05 · Δ −30/+75.
-- [x] **T-050-26 — One `InstallPlan` (08).** `W:` `cli/commands/public.py`, `i/{projection_rules,public_assets}.py`
-  `blocked by:` T-050-24 · `delivers:` a scoped install is impossible · `RED:` PLAN §2 WP-08 · Δ −40/+14.
-- [x] **T-050-27 — Repo law only via `specs init` (07 †).** `W:` `i/`, `cli/commands/public.py`, `f/specs/canon.py`, `f/spec_context/service.py`
-  `blocked by:` T-050-26 · `delivers:` install-first leaves the repo template; edits survive · `RED:` PLAN §2 WP-07 · Δ −230/−119.
-- [x] **T-050-28 — Ledger pair checked first (09).** `W:` ledger `scripts/`
-  `blocked by:` none · `delivers:` a refusal leaves both files byte-intact · `RED:` PLAN §2 WP-09 · Δ −10/+80.
-- [x] **T-050-29 — One mask, one redactor (11 †).** `W:` `core/redaction.py`, `cli/`, `f/chokepoints/`, `i/privacy_check.py`
-  `blocked by:` none · `delivers:` `z…x` from every surface · `RED:` PLAN §2 WP-11 · Δ −30/+25.
-- [x] **T-050-30 — Gate judges every harness; Codex read-only (12, 13).** `W:` `i/runtime_*`, `hooks/`, `core/invocation.py`, `pub/entities/`
-  `blocked by:` none · `delivers:` AC1.4, AC1.5 · `RED:` PLAN §2 WP-12, WP-13 · Δ +7/+97.
-- [x] **T-050-31 — One symlink-refusing writer (14).** `W:` `f/migrate/`, `core/atomic_write.py`, `f/specs/`, `cli/commands/specs.py`
-  `blocked by:` none · `delivers:` a symlink target is never written · `RED:` PLAN §2 WP-14 · Δ −30/+65.
-- [x] **T-050-32 — Gate where git runs it; required checks (hooksPath, 32).** Two commits.
-  `W:` `f/spec_context/{service,doctor}.py`, `core/workspace_layout.py`, `.github/`, required-checks file, `f/ci_preflight/`
-  `blocked by:` none · `delivers:` AC1.3, AC1.7 · `RED:` PLAN §2 hooksPath, WP-32 · Δ −70/+141.
-- [x] **T-050-33 — `context dead` holds (03 †).** `W:` `f/spec_context/`, `i/git_subprocess.py`
-  `blocked by:` T-050-23, T-050-28 · `delivers:` unpushed branch/worktree refused, else held · `RED:` PLAN §2 WP-03 · Δ +3/+78.
-
-### M — never-again mechanism (FR5, FR6)
-
-- [x] **T-050-34 — Authorities refusal + skills (FR5).** AUTHORING; re-project.
-  `W:` `dd-release-impl/{_release_phase,_release_new}.py`, `pub/skills/{dd-release-definition,dd-code-review,dd-audit-project,dd-spec-navigator}/**`, `CONTEXT.md`
-  `blocked by:` T-050-23..33 · `delivers:` a two-authority PLAN refused, one fix line (AC5.1–5.8) · `RED:` fixture PLAN pair.
-- [x] **T-050-35 — V37–V39, zone widening, `shutil` contract (FR6).** `W:` `tests/contract/{test_slop_ratchets,test_zone_registry,test_required_evidence_has_one_home}.py`, `setup.cfg`
-  `blocked by:` T-050-34 · `delivers:` AC6.1–6.8 · `RED:` one fixture per ratchet.
-
-### H — test harness (FR9)
-
-- [x] **T-050-36 — Real-git fixture; fakes out (AC9.4).** `W:` `tests/fakes.py`, `tests/fixtures/**`, 22 user files
-  `blocked by:` T-050-35 · `delivers:` git questions tested against git · `RED:` `FakeContextStore` parity test · Δ 0/−500.
-- [x] **T-050-37 — `DADAIA_FENCED_ROOTS`: declared feature, no dadaia process acts on a fenced root (0088).** `W:` `core/workspace_resolver.py`, `tests/conftest.py`, `tests/unit/cli/test_workspace_not_found_error.py`, `pub/data/dadaia-AGENTS.md`
-  `blocked by:` T-050-36 · `delivers:` PLAN §2 FR9 fence · `RED:` `sa-seven-workspace-root-rules#S11` (AC9.12, 0088) · Δ +3/+10.
-- [x] **T-050-38 — Hooks spawn as production; `WORKSPACE_ROOT` gone (15 †, AC9.5).** `W:` `tests/fixtures/harness_env.py`, `core/`, `cli/commands/`, `f/migrate/`, `f/specs/memory_lint.py`, `registry.py`
-  `blocked by:` T-050-37 · `delivers:` one root rule, honest hook tests · `RED:` PLAN §2 WP-15 · Δ −25/+108.
+- [x] **T-050-23..39, -42, -51, -53..56, -59..61, -63 — done.** The trace: their `chore(tasks)` and shape-3 commits, the `BUGS.jsonl` resolve records.
 
 ### W1 — stalls, loops, unclearing fixes (FR2)
 
-- [x] **T-050-39 — One bind (16 †).** `W:` `core/invocation.py`, `f/workspace/`, `hooks/`, `f/spec_context/`, `cli/`, `pub/data/`
-  `blocked by:` T-050-38 · `delivers:` four readers agree · `RED:` PLAN §2 WP-16 · Δ −5/+115.
 - [-] **T-050-40 — Fix lines, one printer, unfixable fixes (17–19 †).** Three commits. `W:` `core/`, `hooks/`, `f/chokepoints/`, `f/spec_context/`, `cli/`
   `blocked by:` T-050-39 · `delivers:` AC2.2, AC2.3 · `RED:` PLAN §2 WP-17, WP-18, WP-19 · Δ −48/+315.
-- [ ] **T-050-41 — TREE-8 alone (20).** `W:` `f/specs/` · `blocked by:` T-050-40 · `delivers:` one finding per stray path · `RED:` PLAN §2 WP-20 · Δ −115/−40.
-- [x] **T-050-42 — One registry-version grammar (21 †).** `W:` `i/json_context_store.py`, `f/migrate/`, `core/`, `cli/commands/`, `f/spec_context/` · `blocked by:` T-050-40 · `delivers:` readable ⇔ no migration · `RED:` PLAN §2 WP-21 · Δ −18/+100.
+- [ ] **T-050-41 — TREE-8 alone (20).** `W:` `f/specs/` · `blocked by:` T-050-40, T-050-43, T-050-48 · `delivers:` one finding per stray path · `RED:` PLAN §2 WP-20 · Δ −115/−40.
 - [ ] **T-050-43 — Scripts own bug records and the seam (22, 23).** `W:` `core/`, `container.py`, `f/specs/`, `pub/skills/_shared/_privacy.py`, ledger `scripts/`, `pub/schemas/bugs/`, `i/public_assets.py`
-  `blocked by:` T-050-28, T-050-40 · `delivers:` doctor = `bugs.py check`; seam ⇔ push · `RED:` PLAN §2 WP-22, WP-23 · Δ −700/−660.
-- [ ] **T-050-44 — Backlog status and pick (24).** `W:` `f/backlog/`, backlog `scripts/`, `_release_new.py`, law · `blocked by:` T-050-43 · `delivers:` exit without hand edit · `RED:` PLAN §2 WP-24 · Δ −80/−40.
-- [ ] **T-050-45 — `release.py ship` (25).** `W:` `dd-release-impl/scripts/`, `f/specs/`, releases law, RC-FLOW, gitflow · `blocked by:` T-050-44 · `delivers:` AC2.5 · `RED:` PLAN §2 WP-25 · Δ −40/−70.
-- [ ] **T-050-46 — Status line; `measured_by` (26, 27).** `W:` `core/spec_status.py`, `f/specs/`, `pub/schemas/ADRs/`, `pub/scaffold/ADRs/` · `blocked by:` T-050-40 · `delivers:` one status token · `RED:` PLAN §2 WP-26, WP-27 · Δ −20/+50.
-- [ ] **T-050-47 — `specs_version.state` (28 †).** `W:` `core/specs_version.py`, `cli/commands/ci.py`, `f/{specs,migrate,workspace,chokepoints}/` · `blocked by:` T-050-40 · `delivers:` pre-push judges the pushed commit · `RED:` PLAN §2 WP-28 · Δ −34/+145.
-- [ ] **T-050-48 — One atom grammar (29).** `W:` navigator `scripts/`, `f/specs/`, `i/ledger_scripts.py`, `pub/scaffold/memory/` · `blocked by:` T-050-40 · `delivers:` one verdict per atom · `RED:` PLAN §2 WP-29 · Δ −155/−10.
+  `blocked by:` T-050-40, T-050-70..74 · `delivers:` doctor = `bugs.py check`; seam ⇔ push · `RED:` PLAN §2 WP-22, WP-23 · Δ −700/−660.
+- [ ] **T-050-44 — Backlog status and pick (24).** `W:` `f/backlog/`, backlog `scripts/`, `_release_new.py`, law · `blocked by:` T-050-43, T-050-48, T-050-58 · `delivers:` exit without hand edit · `RED:` PLAN §2 WP-24 · Δ −80/−40.
+- [ ] **T-050-45 — `release.py ship` (25).** `W:` `dd-release-impl/scripts/`, `f/specs/`, releases law, RC-FLOW, gitflow · `blocked by:` T-050-70..74 · `delivers:` AC2.5 · `RED:` PLAN §2 WP-25 · Δ −40/−70.
+- [ ] **T-050-46 — Status line; `measured_by` (26, 27).** `W:` `core/spec_status.py`, `f/specs/`, `pub/schemas/ADRs/`, `pub/scaffold/ADRs/` · `blocked by:` T-050-40, T-050-70..74 · `delivers:` one status token · `RED:` PLAN §2 WP-26, WP-27 · Δ −20/+50.
+- [ ] **T-050-47 — `specs_version.state` (28 †).** `W:` `core/specs_version.py`, `cli/commands/ci.py`, `f/{specs,migrate,workspace,chokepoints}/` · `blocked by:` T-050-40, T-050-70..74 · `delivers:` pre-push judges the pushed commit · `RED:` PLAN §2 WP-28 · Δ −34/+145.
+- [ ] **T-050-48 — One atom grammar (29).** `W:` navigator `scripts/`, `f/specs/`, `i/ledger_scripts.py`, `pub/scaffold/memory/` · `blocked by:` T-050-40, T-050-70..74 · `delivers:` one verdict per atom · `RED:` PLAN §2 WP-29 · Δ −155/−10.
 
 ### W2 — consolidations (FR3)
 
-- [ ] **T-050-49 — `release.py check` (30).** `W:` `f/specs/`, `core/` · `blocked by:` T-050-45 · `delivers:` one live release · `RED:` PLAN §2 WP-30 · Δ −105/−100.
-- [ ] **T-050-50 — Certify walks the workspace (31).** `W:` `f/{certification,reconcile}/`, recipe · `blocked by:` T-050-40 · `delivers:` AC3.2 · `RED:` PLAN §2 WP-31 · Δ −126/+116.
-- [x] **T-050-51 — Context repos; running version (33, 34).** `W:` `core/`, `i/`, `cli/`, `f/{capabilities,reconcile}/` · `blocked by:` T-050-39 · `delivers:` no name fallback; editable reports source · `RED:` PLAN §2 WP-33, WP-34 · Δ −18/+192.
+- [ ] **T-050-49 — `release.py check` (30).** `W:` `f/specs/`, `core/` · `blocked by:` T-050-45, T-050-58 · `delivers:` one live release; one release-id grammar (`sa-release-id-has-three-grammars`) · `RED:` PLAN §2 WP-30 · Δ −105/−100.
+- [ ] **T-050-50 — Certify walks the workspace (31).** `W:` `f/{certification,reconcile}/`, recipe · `blocked by:` T-050-40, T-050-70..74 · `delivers:` AC3.2; certify children fenced (`sa-certify-children-resolve-the-live-workspace`); one finding shape (`sa-doctor-finding-has-four-shapes`) · `RED:` PLAN §2 WP-31 · Δ −126/+116.
 - [ ] **T-050-52 — Subjects in the doctor (35).** `W:` backlog `scripts/`, `f/backlog/`, `core/models/backlog.py` · `blocked by:` T-050-44 · `delivers:` no circular RESOLVED · `RED:` PLAN §2 WP-35 · Δ −25/+39.
-- [x] **T-050-53 — Hook interpreter; reviewer persona (36, 37).** `W:` `i/`, `pub/agents/`, `pub/entities/` · `blocked by:` T-050-30 · `delivers:` AC3.3 · `RED:` PLAN §2 WP-36, WP-37 · Δ −27/+195.
-- [x] **T-050-54 — Rendered canon law (38).** `W:` `i/public_assets.py`, `core/workspace_layout.py`, `f/specs/`, `pub/templates/` · `blocked by:` T-050-27 · `delivers:` rendered tables · `RED:` PLAN §2 WP-38 · Δ +4/+33.
 
 ### W3 — design debt (FR4)
 
-- [x] **T-050-55 — One path classifier (39).** `W:` `f/spec_context/gate_policy.py`, `core/workspace_layout.py`, `f/specs/`, law · `blocked by:` T-050-25 · `delivers:` law = gate · `RED:` PLAN §2 WP-39 · Δ +5/−5.
-- [x] **T-050-56 — Caches in `.dadaia/tmp`; one TTL (40, 45).** `W:` `pyproject.toml`, `i/runtime_config.py`, `f/spec_context/markers.py`, `core/`, law · `blocked by:` T-050-23 · `delivers:` one clock · `RED:` PLAN §2 WP-40, WP-45 · Δ −67/+40.
 - [ ] **T-050-57 — Work and principal branch (41, 42 †).** `W:` `f/spec_context/service.py`, `cli/commands/`, `f/specs/canon.py`, gitflow skill, repo `AGENTS.md` · `blocked by:` T-050-45 · `delivers:` AC4.2 · `RED:` PLAN §2 WP-41, WP-42 · Δ −1/+81.
 - [ ] **T-050-58 — Audit close; script vocabulary + atomic write (43, 48).** `W:` `f/specs/`, `i/jsonl_record_store.py`, `core/models/`, ledger `scripts/`, `registry.py` · `blocked by:` T-050-43 · `delivers:` no invalid archive, no `.tmp` leak · `RED:` PLAN §2 WP-43, WP-48 · Δ −187/−295.
-- [x] **T-050-59 — Unconsumed assets leave (44).** `W:` `i/` · `blocked by:` T-050-26 · `delivers:` clean without the index · `RED:` PLAN §2 WP-44 · Δ −151/−100.
-- [x] **T-050-60 — Handoff v1.2; upgrade target (46, 47).** `W:` `pub/schemas/`, `core/handoff_index.py`, `cli/commands/specs.py`, `f/migrate/` · `blocked by:` T-050-31 · `delivers:` AC4.3 · `RED:` PLAN §2 WP-46, WP-47 · Δ −24/+15.
-- [x] **T-050-61 — Restated rules; consumer law (49, FR-8).** `W:` `pub/{data,scaffold,schemas}/`, gitflow skill, `f/specs/canon.py`, `setup.cfg`, `CONTEXT.md` · `blocked by:` T-050-35 · `delivers:` AC4.3, AC4.4 · `RED:` PLAN §2 WP-49, FR-8 · Δ −60/+125.
 
 ### FR10 — reduction (operator-approved deletions)
 
-- [x] **T-050-63 — Public scripts and recipe (FR10).** Delete `lint-dadaia-cli-reachability.py`, `lint-memory-atoms.py`, `certify-dadaia-workspace.sh` and their tests; rebuild `CONSUMER_VALIDATION_RECIPE.md` to ≤ 80 lines.
-  `W:` `pub/{scripts,data}/`, `f/specs/{memory_lint,doctor_memory}.py`, tests · `blocked by:` none · `delivers:` FR10 · `RED:` n/a · Δ −765/−292.
+Lanes: PLAN §2 FR10; files and lines: `AGGREGATE.md` §6.
+
+- [ ] **T-050-64 — L0.1 w0-infra.** `W:` `i/public_assets.py`, tests · `blocked by:` none · `delivers:` §6 W0 · Δ −35/−36.
+- [ ] **T-050-65 — L0.2 w0-core.** `W:` `core/`, tests · `blocked by:` none · `delivers:` §6 W0 · Δ −40/−65.
+- [ ] **T-050-66 — L0.3 w0-specs.** `W:` `f/{backlog,specs}/`, `cli/anchors.py`, tests; TREE-3 kept · `blocked by:` none · `delivers:` `sa-command-tree-walked-twice` · Δ −330/−391.
+- [ ] **T-050-67 — L0.4 w0-hooks.** `W:` `hooks/pre_gate.py`, tests · `blocked by:` none · `delivers:` §6 W0 · Δ −11/−412.
+- [ ] **T-050-68 — L0.5 w0-clitests.** `W:` tests · `blocked by:` none · `delivers:` §6 W0 · Δ 0/−506.
+- [ ] **T-050-69 — L0.6 w0-ctests.** `W:` tests · `blocked by:` none · `delivers:` §6 W0 · Δ 0/−560.
+- [ ] **T-050-70 — L1.1 core folds.** `W:` `core/`, `i/ledger_scripts.py`, `container.py`, tests · `blocked by:` T-050-65 · `delivers:` `sa-ledger-script-paths-in-two-tables`, `sa-session-liveness-has-two-rules` · Δ −93/−141.
+- [ ] **T-050-71 — L1.3 infra items (§4a 1–11).** `W:` `i/`, tests · `blocked by:` T-050-64 · `delivers:` `sa-privacy-match-has-two-matchers`, `sa-denylist-file-has-three-shapes` · Δ −343/−100.
+- [ ] **T-050-72 — L1.4 specs items (§4a 14–17).** `W:` `f/specs/`, tests · `blocked by:` T-050-66 · `delivers:` SPEC-DOC-046/028/037/007 gone · Δ −141/−135.
+- [ ] **T-050-73 — L1.5 cli/core items (§4a 12, 13, 18–20).** `W:` `cli/commands/migrate.py`, `f/{migrate,chokepoints,reconcile}/`, `core/session_store.py`, tests · `blocked by:` T-050-70 · `delivers:` `sa-path-segment-judged-by-two-matchers` · Δ −351/−238.
+- [ ] **T-050-74 — L1.6 test-only items (§4a 21–29; `TestAutopilot` kept).** `W:` tests · `blocked by:` T-050-69 · `delivers:` §6 W1 · Δ 0/−540.
+- [ ] **T-050-75 — L2.9 hook dialects, one verifier.** `W:` `i/` · `blocked by:` T-050-41, -44, -52 · `delivers:` `sa-hook-files-written-by-table-and-by-hand`, `sa-projected-file-judged-by-four-verifiers` · Δ −360.
+- [ ] **T-050-76 — L2.10 codex fold.** `W:` `i/`, `f/public/` · `blocked by:` T-050-41, -44, -52 · `delivers:` `sa-codex-effort-set-by-policy-and-by-tier`, `sa-frontmatter-split-five-ways` · Δ −160.
+- [ ] **T-050-77 — L2.11 infra small.** `W:` `i/` · `blocked by:` T-050-41, -44, -52 · `delivers:` §6 W2c · Δ −235.
+- [ ] **T-050-78 — L2.12 core.** `W:` `core/` · `blocked by:` T-050-41, -44, -52 · `delivers:` `sa-json-schema-validated-by-two-engines`, `sa-agent-model-resolved-by-two-modules` · Δ −620.
+- [ ] **T-050-79 — L2.13 cli-features.** `W:` `f/{spec_context,chokepoints,ci_preflight}/`, `cli/commands/context.py` · `blocked by:` T-050-41, -44, -52 · `delivers:` §6 W2c · Δ −420.
+- [ ] **T-050-80 — L2.14 hooks.** `W:` `hooks/ctx_inject.py` · `blocked by:` T-050-41, -44, -52 · `delivers:` §6 W2c · Δ −50.
+- [ ] **T-050-81 — L3.1 table merges.** `W:` `tests/*/infrastructure/**`, git trio · `blocked by:` T-050-75..80 · `delivers:` §6 W3 · Δ 0/−2301.
+- [ ] **T-050-82 — L3.2 table merges.** `W:` `tests/unit/core/**`, `tests/unit/test_*.py` · `blocked by:` T-050-75..80 · `delivers:` §6 W3 · Δ 0/−1798.
+- [ ] **T-050-83 — L3.3 table merges.** `W:` `tests/unit/features/{specs,backlog}/**` · `blocked by:` T-050-75..80 · `delivers:` §6 W3 · Δ 0/−1097.
+- [ ] **T-050-84 — L3.4 table merges.** `W:` `tests/unit/{hooks,skills,public}/**` · `blocked by:` T-050-75..80 · `delivers:` §6 W3 · Δ 0/−1086.
+- [ ] **T-050-85 — L3.5 table merges.** `W:` other `tests/unit/**` · `blocked by:` T-050-75..80 · `delivers:` §6 W3 · Δ 0/−3325.
+- [ ] **T-050-86 — L3.6 table merges.** `W:` `tests/contract/**` · `blocked by:` T-050-75..80 · `delivers:` §6 W3 · Δ 0/−4190.
+- [ ] **T-050-87 — L3.7 table merges.** `W:` `tests/{integration,e2e}/**` · `blocked by:` T-050-75..80 · `delivers:` §6 W3 · Δ 0/−3940.
+- [ ] **T-050-88 — L4.1 trim.** `W:` `i/` · `blocked by:` T-050-81..87 · `delivers:` §6 W4 · Δ −1697/0.
+- [ ] **T-050-89 — L4.2 trim.** `W:` `core/`, top-level modules · `blocked by:` T-050-81..87 · `delivers:` §6 W4 · Δ −1070/0.
+- [ ] **T-050-90 — L4.3 trim.** `W:` `f/{specs,backlog}/` · `blocked by:` T-050-81..87 · `delivers:` §6 W4 · Δ −1011/0.
+- [ ] **T-050-91 — L4.4 trim.** `W:` `pub/**/*.py`, `hooks/` · `blocked by:` T-050-81..87 · `delivers:` §6 W4 · Δ −511/0.
+- [ ] **T-050-92 — L4.5 trim.** `W:` `cli/`, other `f/` · `blocked by:` T-050-81..87 · `delivers:` §6 W4 · Δ −1256/0.
+- [ ] **T-050-93 — L4.6–L4.12 test narration.** `W:` tests, one commit per W3 lane · `blocked by:` T-050-88..92 · `delivers:` §6 W4 · Δ 0/−2527.
 
 ### C — closure evidence (FR7, FR8, FR9)
 
 - [ ] **T-050-62 — Prune and measure.** Execute the QA-lens pruning verdict (≥ 522 test lines, AC9.9); AC8.1 deltas, allowance subset, mutmut, AC9.11 counts, fenced rubric.
-  `W:` tests, handoff · `blocked by:` T-050-23..61 · `delivers:` AC7.1–7.3, AC8.1, AC9.9–9.11 · `RED:` n/a.
+  `W:` tests, handoff · `blocked by:` T-050-23..93 · `delivers:` AC7.1–7.3, AC8.1, AC9.9–9.11 · `RED:` n/a.

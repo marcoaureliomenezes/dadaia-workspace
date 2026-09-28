@@ -135,6 +135,22 @@ the task that resolves the row's bug. The table is the input the architecture le
 | how a test runs a hook | the rendered wrapper spawned as production | every hook test | `WORKSPACE_ROOT` injection, `_POLICY_DRIVER` |
 | how a test gets git | the real-git tmp fixture | service/push tests | `FakeGitClient`, 4 `ObjectSource` fakes |
 | which roots may a dadaia process act on | `core/workspace_resolver` fence (`DADAIA_FENCED_ROOTS`; 0088) | the suite, every mutating probe, `.dadaia/AGENTS.md` law line | — |
+| how a harness's hook file is written | `HOOK_DIALECTS` | every harness render | hand-built `claude_settings`, `codex_hooks`, `kimi_hook_shims` |
+| is a projected file correct | `doctor_rules` (+ exec-bit mode check) | `public doctor` | `_HOOK_CHECKS`, D-CX-9 diff, SYMLINK-TARGET-1 |
+| which Codex effort a persona gets | `resolve_codex_agent_model` | `codex_assets` | `_codex_reasoning_effort_for_model` |
+| what a frontmatter block is | `agent_transcodes._split_frontmatter` | persona readers | 4 other splitters |
+| is a text a structural privacy match | the pre-push matcher (`denylist_scan`) | `privacy_check` baseline scan | `_scan_text_for_baseline` |
+| the operator denylist file shape | the dict; others refused with `fix:` | `privacy_check` loader | list-of-pairs, list-of-str |
+| where the ledger scripts live | `i/ledger_scripts.LEDGER_SCRIPTS` | `core/cli_line` | `kernel_tunables.*_SCRIPT` |
+| which engine validates a JSON Schema | `jsonschema` | `handoff_index`, specs schemas | the stdlib walker |
+| what a doctor finding is | `core/doctor_rules.SectionFinding` | every rule | `DoctorLine`, `SpecsDoctorIssue`, `Finding`/`DoctorIssue` + adapters |
+| is a session record live | `session_store.is_live` | gate, doctor | `core/record_liveness` |
+| which model an agent gets | one module (templates + operator overlay) | install, codex | the second of `model_registry` / `agent_model_policy` |
+| the release-id grammar | `_release_schema.SEMVER_RE` (bare M.m.p; `_archive/` exempt by location) | `specs_version`, `doctor_release` | `RELEASE_SEMVER_RE`, `is_release_semver`, the `v` exemption |
+| does a top-level memory file exist | TREE-3 | SPEC-DOC-002 (skips it) | SPEC-DOC-002's missing-file finding |
+| the command tree | `cli/help_digest.command_paths` | subject registry, doctor | `cli/anchors.py` |
+| is a path segment offending | `denylist_scan._first_match` | `PathMasker` (keeps masking) | `_segment_is_offending` |
+| what root a certify child acts on | its disposable sandbox (`DADAIA_FENCED_ROOTS` / explicit root) | `certify`, reconcile | inherited live-workspace resolution |
 
 ## 2. Strategy per FR
 
@@ -206,6 +222,33 @@ Statement ids (RED cites them; `EV/c4/tests-audit-*.json`):
 - WP-42: `sa-principal-branch-defaults-to-main-and-cut-point-diverges#B42-1..B42-6`
 - WP-43: `sa-audit-close-archives-without-validating#B43-1..B43-6`
 - WP-48: `sa-ledger-vocabulary-and-atomic-write-duplicated-in-scripts#48.1..48.6`
+
+### FR10 — reduction waves (`AGGREGATE.md` §6; baseline `9cd5fbf4`)
+
+Source: the main thread's survey `AGGREGATE.md` (§6 waves, files, lines; §4a operator rulings: every
+recommendation, except item 29 — `TestAutopilot` KEPT, the only proof over the published wheel). Lanes
+inside a wave are disjoint and parallel; waves run DELETE → REBUILD → UPDATE → ADD. The FR10 W0–W4 axis
+is not the FR1–FR4 wave headings of TASKS.
+
+| wave · lane | task | closes |
+|---|---|---|
+| W0 L0.1–L0.6 | T-050-64..69 | L0.3: `sa-command-tree-walked-twice`; L0.3 keeps TREE-3 (the N13 authority) |
+| W1 L1.1 core folds | T-050-70 | `sa-ledger-script-paths-in-two-tables`, `sa-session-liveness-has-two-rules` |
+| W1 L1.2 public (b) | T-050-63 `[x]` | — |
+| W1 L1.3 infra items | T-050-71 | `sa-privacy-match-has-two-matchers`, `sa-denylist-file-has-three-shapes` |
+| W1 L1.4 specs items | T-050-72 | — |
+| W1 L1.5 cli/core items | T-050-73 | `sa-path-segment-judged-by-two-matchers` |
+| W1 L1.6 test-only items | T-050-74 | — |
+| W2a L2.1 release state | T-050-45, -46, -47, -49, -57 (WP-41) | WP-25/26/27/28/30/41; `sa-release-id-has-three-grammars` in T-050-49 |
+| W2a L2.2 principal | T-050-57 (WP-42) | WP-42 |
+| W2a L2.3 ledgers | T-050-43, -58 | WP-22/23/43/48 |
+| W2a L2.4 memory | T-050-48 | WP-29 |
+| W2a L2.5 registry | T-050-42 `[x]` | WP-21 (resolved) |
+| W2a L2.6 doctor/certify | T-050-40 (WP-19), -50 | WP-19, WP-31, `sa-missing-memory-file-reported-twice`, `sa-doctor-finding-has-four-shapes`, `sa-certify-children-resolve-the-live-workspace` (CRITICAL) |
+| W2b L2.7 backlog · L2.8 placement | T-050-44, -52 · T-050-41 | WP-24, WP-35 · WP-20 (+TREE-2) |
+| W2c L2.9–L2.14 | T-050-75..80 | L2.9 hook-files + projected-file; L2.10 codex-effort + frontmatter; L2.12 json-schema + agent-model |
+| W3 L3.1–L3.7 table merges | T-050-81..87 | — (tests only) |
+| W4 L4.1–L4.12 trim | T-050-88..93 | — |
 
 ### FR7, FR8, FR9 AC9.9–9.11 — gate, shrink, test budget
 
