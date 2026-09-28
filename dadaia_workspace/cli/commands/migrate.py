@@ -19,7 +19,7 @@ import typer
 
 from dadaia_workspace.cli._fail import fail
 from dadaia_workspace.cli._specs_resolution import resolve_specs_dir_for_cli
-from dadaia_workspace.core.exceptions import WorkspaceNotInitializedError
+from dadaia_workspace.core.exceptions import SchemaVersionError, WorkspaceNotInitializedError
 from dadaia_workspace.core.workspace_resolver import resolve_workspace_root
 from dadaia_workspace.features.migrate.state_v2 import (
     MigrationPlan,
@@ -46,10 +46,6 @@ def _resolve_specs_dir(specs_dir: str | None) -> Path:
 
 def _print_plan(plan: MigrationPlan) -> None:
     """Print a human-readable diff-like summary of what the migration will do."""
-    if plan.already_v2:
-        typer.echo("[ok] spec_contexts.json is already at schema_version 2 — nothing to do.")
-        return
-
     typer.echo(f"[migrate] spec_contexts.json schema_version: {plan.schema_version_before!r} → '2'")
     typer.echo("")
     if plan.contexts_to_migrate:
@@ -97,11 +93,11 @@ def migrate_state(
         workspace_root = resolve_workspace_root()
         states_dir = workspace_root / ".dadaia" / "states"
         plan = plan_migration(states_dir)
-    except (ValueError, WorkspaceNotInitializedError) as exc:
+    except (ValueError, SchemaVersionError, WorkspaceNotInitializedError) as exc:
         fail(exc)
 
     if plan.already_v2:
-        typer.echo("[ok] spec_contexts.json is already at schema_version 2 — nothing to do.")
+        typer.echo("[ok] spec_contexts.json is current — nothing to do.")
         sys.exit(0)
 
     # --dry-run: show plan and exit
@@ -119,9 +115,6 @@ def migrate_state(
             sys.exit(0)
 
     # Execute
-    try:
-        execute_migration(states_dir, workspace_root)
-    except ValueError as exc:
-        fail(exc)
+    execute_migration(states_dir, workspace_root)
 
     typer.echo("[ok] Migration complete. spec_contexts.json is now at schema_version 2.")

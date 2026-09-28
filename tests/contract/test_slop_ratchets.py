@@ -515,7 +515,8 @@ _V38_BIRTH = 16
 _V38_ALLOWANCE: dict[str, str] = {
     "core/atomic_write.py:atomic_write": "sa-ledger-vocabulary-and-atomic-write-duplicated-in-scripts",
     "features/certification/service.py:certify": "sa-reconcile-certify-skip-the-workspace-walk",
-    "features/migrate/state_v2.py:execute_migration": "sa-registry-schema-version-has-three-grammars",
+    # the v1 hop drops the retired primary_context.json — pinned by the B7 transform test
+    "features/migrate/state_v2.py:execute_migration": "parity:tests/unit/features/migrate/test_state_v2.py",
     "features/reconcile/service.py:_restore_state": "sa-reconcile-certify-skip-the-workspace-walk",
     "features/reconcile/service.py:reconcile_workspace": "sa-reconcile-certify-skip-the-workspace-walk",
     "features/specs/doctor_memory.py:fix_placeholder_atom": "sa-memory-atom-has-two-grammars",

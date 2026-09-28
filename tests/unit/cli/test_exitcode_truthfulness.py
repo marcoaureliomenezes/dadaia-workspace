@@ -20,7 +20,7 @@ _runner = CliRunner()
 class _Issue:
     code = "ROOT-4"
     description = "Unknown top-level subdirectory/ies inside .dadaia/: 'nonsense'."
-    fixable = False
+    fixable, fix = False, ""
 
 
 class _StubDoctor:

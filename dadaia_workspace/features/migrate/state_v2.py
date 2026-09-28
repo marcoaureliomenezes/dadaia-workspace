@@ -3,7 +3,8 @@
 This module implements the v1-to-v2 context-record migration.
 It is called by ``dadaia migrate [--dry-run] [--yes]``.
 
-A registry at or above schema 2 is a no-op; a non-numeric version raises ValueError.
+Which registry needs it is ``json_context_store.parse_schema_version``'s answer (below 2);
+only the v1 (``ativo``/``inativo``) rows are rewritten, every other row is kept verbatim.
 """
 
 from __future__ import annotations
@@ -14,6 +15,7 @@ from pathlib import Path
 
 from dadaia_workspace.core.atomic_write import atomic_write
 from dadaia_workspace.core.workspace_resolver import not_initialized
+from dadaia_workspace.infrastructure.json_context_store import LEGACY_STATES, parse_schema_version
 
 
 @dataclass
@@ -27,29 +29,6 @@ class MigrationPlan:
     already_v2: bool = False
 
 
-def _detect_schema_version(data: dict) -> str:  # type: ignore[type-arg]
-    """Return the schema version string from the data dict.
-
-    Returns "1" for a v1 registry, "2" for any registry at or above the target
-    (the context store itself writes newer schemas), or raises ValueError on a
-    non-numeric version.
-    """
-    # Support both "schema_version" (v2 key) and "version" (v1 key)
-    ver = data.get("schema_version") or data.get("version")
-    if ver is None:
-        # Infer from context state values
-        for ctx in data.get("contexts", []):
-            if ctx.get("state") in ("ativo", "inativo"):
-                return "1"
-        # No recognisable markers — treat as v2
-        return "2"
-    if not str(ver).isdigit():
-        raise ValueError(
-            f"Unknown schema_version '{ver}' in spec_contexts.json. Manual intervention required."
-        )
-    return "1" if int(str(ver)) < 2 else "2"
-
-
 def plan_migration(states_dir: Path) -> MigrationPlan:
     """Read spec_contexts.json and compute the migration plan without writing."""
     ctx_file = states_dir / "spec_contexts.json"
@@ -59,9 +38,7 @@ def plan_migration(states_dir: Path) -> MigrationPlan:
         raise ValueError(str(not_initialized(states_dir.parent.parent)))
 
     raw = json.loads(ctx_file.read_text(encoding="utf-8"))
-    schema_ver = _detect_schema_version(raw)
-
-    if schema_ver == "2":
+    if parse_schema_version(raw, ctx_file) >= 2:
         return MigrationPlan(
             schema_version_before="2",
             contexts_to_migrate=[],
@@ -73,6 +50,8 @@ def plan_migration(states_dir: Path) -> MigrationPlan:
     contexts_to_migrate = []
     for ctx in raw.get("contexts", []):
         old_state = ctx.get("state", "")
+        if old_state not in LEGACY_STATES:
+            continue
         new_state = "alive" if old_state == "ativo" else "dead"
         entry = {
             "name": ctx.get("name"),
@@ -118,16 +97,15 @@ def execute_migration(states_dir: Path, workspace_root: Path) -> None:
         return
 
     raw = json.loads(ctx_file.read_text(encoding="utf-8"))
-    schema_ver = _detect_schema_version(raw)
-
-    if schema_ver == "2":
-        # Idempotent: nothing to do for the JSON file, but ensure dirs exist
+    if parse_schema_version(raw, ctx_file) >= 2:
         _create_dirs(workspace_root)
         return
 
-    # Transform context rows
     new_contexts = []
     for ctx in raw.get("contexts", []):
+        if ctx.get("state") not in LEGACY_STATES:
+            new_contexts.append(ctx)
+            continue
         old_state = ctx.get("state", "")
         new_state = "alive" if old_state == "ativo" else "dead"
 

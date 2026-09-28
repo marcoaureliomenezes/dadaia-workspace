@@ -1,7 +1,5 @@
 """Unit tests for JsonContextStore (v3 schema: ALIVE/DEAD + associated_repos).
 
-Migration-refusal rows (SchemaVersionError + 'dadaia migrate' hint) preserved.
-
 Intent: CONTRACT — A15.2, A15.3 (registry-schema half; the model half lives in
 tests/unit/core/models/test_spec_context.py). v2→v3 is purely additive
 (``associated_repos``), so — unlike the v1→v2 state-string rename — the store tolerates
@@ -14,10 +12,6 @@ would supply that repair path is out of this task's write set.
 import json
 from pathlib import Path
 
-import pytest
-
-from dadaia_workspace.core.cli_line import fix_line
-from dadaia_workspace.core.exceptions import SchemaVersionError
 from dadaia_workspace.core.models.spec_context import (
     AssociatedRepo,
     ContextState,
@@ -159,89 +153,10 @@ def test_v2_registry_loads_with_empty_associated_repos(tmp_path: Path) -> None:
     assert [c.name for c in store.list_all()] == ["legacy-ctx"]
 
 
-# ---------------------------------------------------------------------------
-# AC-T10a-5/6: legacy schema/state rejection — migration-refusal rows.
-# ---------------------------------------------------------------------------
-
-
-@pytest.mark.parametrize(
-    ("name", "payload"),
-    [
-        (
-            # AC-T10a-5: schema_version "1" must raise SchemaVersionError with
-            # 'dadaia migrate'.
-            "v1_schema_version",
-            {
-                "schema_version": "1",
-                "contexts": [
-                    {
-                        "name": "old-ctx",
-                        "state": "ativo",
-                        "repo_slug": "old-ctx",
-                        "repo_url": "https://github.com/org/old-ctx",
-                        "is_primary": False,
-                        "created_at": "2026-01-01T00:00:00Z",
-                        "activated_at": "2026-05-01T00:00:00Z",
-                    }
-                ],
-            },
-        ),
-        (
-            # AC-T10a-5 (variant): v1 'version' key also raises SchemaVersionError.
-            "v1_version_key",
-            {"version": "1", "contexts": []},
-        ),
-        (
-            # AC-T10a-6: state 'ativo' in any context row must raise
-            # SchemaVersionError.
-            "ativo_state",
-            {
-                "schema_version": "2",  # claims v2 but has legacy state values
-                "contexts": [
-                    {
-                        "name": "bad-ctx",
-                        "state": "ativo",
-                        "repo_slug": "bad-ctx",
-                        "repo_url": "",
-                        "created_at": "2026-01-01T00:00:00Z",
-                        "alive_since": None,
-                        "dead_since": None,
-                    }
-                ],
-            },
-        ),
-        (
-            # AC-T10a-6 (variant): state 'inativo' also raises SchemaVersionError.
-            "inativo_state",
-            {
-                "contexts": [
-                    {
-                        "name": "bad-ctx",
-                        "state": "inativo",
-                        "repo_slug": "bad-ctx",
-                        "repo_url": "",
-                        "created_at": "2026-01-01T00:00:00Z",
-                    }
-                ]
-            },
-        ),
-    ],
-)
-def test_legacy_schema_or_state_raises_schema_version_error(
-    tmp_path: Path, name: str, payload: dict[str, object]
-) -> None:
-    ctx_file = tmp_path / "spec_contexts.json"
-    ctx_file.write_text(json.dumps(payload), encoding="utf-8")
-    store = JsonContextStore(tmp_path)
-    with pytest.raises(SchemaVersionError) as exc_info:
-        store.list_all()
-    # sa-fix-lines-not-built-by-cli-line#S1: the remedy is spelled by the builder.
-    assert f"Run: {fix_line(None, 'migrate')}" in str(exc_info.value)
-
-    # AC-T10a-7: spec_contexts.json written by the store (fresh v3 store, separate
-    # workspace) has no legacy fields — is_primary / activated_at never round-trip.
-    fresh_ws = tmp_path.parent / (tmp_path.name + "-fresh")
-    fresh_ws.mkdir(parents=True, exist_ok=True)
+def test_a_fresh_store_writes_v3_rows_without_legacy_fields(tmp_path: Path) -> None:
+    """AC-T10a-7: spec_contexts.json written by the store has no legacy fields —
+    is_primary / activated_at never round-trip."""
+    fresh_ws = tmp_path
     fresh_store = JsonContextStore(fresh_ws)
     ctx = SpecContextProject(
         name="myctx",

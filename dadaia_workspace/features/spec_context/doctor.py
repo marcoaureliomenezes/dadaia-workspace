@@ -24,6 +24,7 @@ from pathlib import Path
 from dadaia_workspace.core import session_store, workspace_layout
 from dadaia_workspace.core.cli_line import fix_line, git_line
 from dadaia_workspace.core.doctor_rules import Rule, SectionFinding
+from dadaia_workspace.core.exceptions import SchemaVersionError
 from dadaia_workspace.core.harness_registry import (
     HARNESS_PROJECTION_DIRS,
 )
@@ -205,7 +206,10 @@ class DoctorService:
 
     def check(self) -> list[DoctorIssue]:
         issues: list[DoctorIssue] = []
-        contexts = self._store.list_all()
+        try:
+            contexts = self._store.list_all()
+        except SchemaVersionError as refused:  # the registry's one grammar refused it
+            return [DoctorIssue("REG-SCHEMA", refused.problem, False, refused.fix)]
 
         # INV-4 (v2): ALIVE context must have repo on disk
         for ctx in contexts:
@@ -309,7 +313,7 @@ class DoctorService:
         act on a half-parsed registry)."""
         try:
             return list(self._store.list_all())
-        except (KeyError, OSError, TypeError, ValueError):
+        except (KeyError, OSError, SchemaVersionError, TypeError, ValueError):
             return []
 
     def _alive_repo_tops(self, context: str | None = None) -> list[Path]:
@@ -634,6 +638,7 @@ def workspace_rules(
                 message=issue.description,
                 canonical=False,
                 error=True,
+                fix=issue.fix,
             )
             for issue in service.check()
         ]
