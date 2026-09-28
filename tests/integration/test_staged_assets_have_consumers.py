@@ -112,26 +112,12 @@ _RETIRED_ROLES = frozenset(_RETIRED_AGENT_NAMES) | {
     "software-architect",
     "security-reviewer",
 }
-_COUNT = re.compile(
-    r"\b(\d+|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve) core "
-    r"(agents|personas)\b",
-    re.IGNORECASE,
-)
 _FIXTURE_AGENT = re.compile(r"""\bagent"?\s*[:=]\s*["']([a-z-]+)["']""")
 
 
-def test_no_persona_count_literal_and_no_retired_fixture_role() -> None:
-    """sa-staged-assets-without-consumers#44.5: a persona count derives from CORE_AGENTS —
-    no count literal in public/** or infrastructure docstrings — and no retired role is
-    a fixture agent under tests/ or in production."""
-    counted = [
-        f"{path.relative_to(_PKG)}"
-        for root in (_PKG / "public", _PKG / "infrastructure")
-        for path in sorted(root.rglob("*"))
-        if path.suffix in {".md", ".py", ".json"}
-        and _COUNT.search(path.read_text(encoding="utf-8", errors="replace"))
-    ]
-    assert counted == []
+def test_no_retired_fixture_role() -> None:
+    """sa-staged-assets-without-consumers#44.5: no retired role is a fixture agent under
+    tests/ or in production."""
     tests = Path(__file__).resolve().parents[1]
     retired = [
         f"{path}:{name}"

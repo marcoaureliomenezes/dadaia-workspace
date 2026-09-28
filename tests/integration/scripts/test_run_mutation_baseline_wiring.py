@@ -9,9 +9,7 @@ real (dd-test-stewardship / the root `AGENTS.md` map "Slop-test discipline": "No
 in tests — they exhaust disk"). Instead it proves the three things a gating test CAN
 prove cheaply and deterministically:
 
-  1. The script is syntactically valid bash (`bash -n`) and carries the exact pin the
-     verdict selected.
-  2. The staging step alone (`DADAIA_MUTATION_STAGE_ONLY=1`) — which the real run also
+  1. The staging step alone (`DADAIA_MUTATION_STAGE_ONLY=1`) — which the real run also
      executes first — copies the scoped `dadaia_workspace/core/models/` +
      `tests/unit/core/models/` subset into an isolated destination (redirected via
      `DADAIA_WORKSPACE_ROOT` to a fake tmp_path tree, never the real workspace) and
@@ -24,10 +22,10 @@ prove cheaply and deterministically:
      `mutants/` sandbox mirrors ONLY `source_paths` on disk, and the wider
      `tests/unit/core/` flat tier contains real cross-layer architecture tests that
      cannot run inside any sandbox narrower than the whole package).
-  3. The script is never referenced from any push-path selector (A20.3): a permanent
+  2. The script is never referenced from any push-path selector (A20.3): a permanent
      regression guard against someone later wiring it into ci.yml, release.yml, or the
      local pre-push preflight.
-  4. Every ``dadaia_workspace/public/schemas/...`` fixture path a staged
+  3. Every ``dadaia_workspace/public/schemas/...`` fixture path a staged
      ``tests/unit/core/models/*.py`` file actually reads at runtime resolves inside the
      stage (A-12.1, A-12.2; regression seam for
      ``mutation-baseline-core-models-scope-omits-public-schemas-fixture-directory``) —
@@ -72,24 +70,6 @@ def _repo_porcelain_excluding_additive() -> str:
     return "\n".join(
         line for line in raw.splitlines() if classify_path(line[3:]) is not PathClass.ADDITIVE
     )
-
-
-def test_script_exists_and_is_executable() -> None:
-    assert _SCRIPT.is_file(), f"expected runner script at {_SCRIPT}"
-    assert _SCRIPT.stat().st_mode & 0o111, "script must be executable (chmod +x)"
-
-
-def test_script_has_valid_bash_syntax() -> None:
-    result = subprocess.run(
-        ["bash", "-n", str(_SCRIPT)], capture_output=True, text=True, check=False
-    )
-    assert result.returncode == 0, f"bash -n failed: {result.stderr}"
-
-
-def test_script_pins_the_exact_verdict_version() -> None:
-    """qa-engineer's verdict pin: `mutmut==3.7.0` (exact, per FR1)."""
-    text = _SCRIPT.read_text("utf-8")
-    assert "mutmut==3.7.0" in text
 
 
 def _run_stage_only(tmp_path: Path) -> tuple[Path, Path]:

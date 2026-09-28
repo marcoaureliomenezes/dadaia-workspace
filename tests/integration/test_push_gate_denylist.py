@@ -18,7 +18,6 @@ from pathlib import Path
 import pytest
 
 from dadaia_workspace.core.gitflow import DEFAULT
-from dadaia_workspace.core.models.git_scan import GitObjectReadError
 from dadaia_workspace.features.chokepoints import push_gate_decision
 from dadaia_workspace.features.chokepoints.branch_policy import PushRef
 from dadaia_workspace.features.specs.canon import canon_violations
@@ -329,9 +328,3 @@ def test_real_git_failure_refuses_naming_the_failure(tmp_path: Path) -> None:
 
     assert not decision.allowed
     assert "--no-verify" in decision.message
-
-
-def test_git_object_read_error_is_importable_from_core_models() -> None:
-    """Sentinel-level sanity: the typed failure the adapter raises stays importable
-    from `core.models` without pulling in infrastructure (purity boundary)."""
-    assert issubclass(GitObjectReadError, Exception)

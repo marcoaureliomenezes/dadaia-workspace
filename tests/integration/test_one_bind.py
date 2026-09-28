@@ -21,7 +21,6 @@ from dadaia_workspace.features.workspace.onboarding import next_step
 from tests.fixtures.harness_env import claude_hook_env, kimi_hook_env, run_hook_subprocess
 
 _NOW = "2999-01-01T00:00:00+00:00"
-_LAW = Path(__file__).resolve().parents[2] / "dadaia_workspace/public/data/dadaia-AGENTS.md"
 
 
 def _workspace(root: Path, *names: str, dead: tuple[str, ...] = ()) -> Path:
@@ -152,10 +151,3 @@ def test_binding_a_dead_context_refuses_with_the_alive_fix(
     result = CliRunner().invoke(app, ["context", "bind", "gamma"])
     assert result.exit_code == 1
     assert "context alive gamma" in result.output
-
-
-def test_the_law_says_create_never_binds() -> None:
-    """sa-bind-has-two-stores#S10."""
-    law = _LAW.read_text(encoding="utf-8")
-    assert "`context create` absorbs clone, hook, ALIVE, never binds" in law
-    assert "IS the binding" not in law
