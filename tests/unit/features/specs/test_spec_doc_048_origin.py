@@ -44,19 +44,16 @@ def _issues(specs: Path) -> list[str]:
     return [i.message for i in _by_code(doctor.check(), "SPEC-DOC-048")]
 
 
-def _write_backlog(specs: Path, ids: list[str]) -> None:
-    (specs / "backlog").mkdir(parents=True, exist_ok=True)
-    (specs / "backlog" / "BACKLOG.json").write_text(
-        json.dumps({"schema": "backlog-v1", "active": [{"id": i} for i in ids]}),
-        encoding="utf-8",
-    )
-
-
-def _write_bugs(specs: Path, records: list[dict[str, object]]) -> None:
+def _seed(specs: Path) -> None:
+    (specs / "backlog" / "_archive").mkdir(parents=True, exist_ok=True)
+    active = {"schema": "backlog-v1", "active": [{"id": "a-real-entry"}]}
+    (specs / "backlog" / "BACKLOG.json").write_text(json.dumps(active), encoding="utf-8")
+    shipped = {"id": "a-shipped-entry", "disposition": "delivered"}
+    (specs / "backlog" / "_archive" / "backlog_histo.jsonl").write_text(json.dumps(shipped) + "\n")
+    malformed = {**_bug("half-written", "open"), "context": "", "severity": "BLOCKER"}
+    records = [_bug("still-broken", "open"), _bug("already-fixed", "resolved"), malformed]
     (specs / "bugs").mkdir(parents=True, exist_ok=True)
-    (specs / "bugs" / "BUGS.jsonl").write_text(
-        "".join(json.dumps(r) + "\n" for r in records), encoding="utf-8"
-    )
+    (specs / "bugs" / "BUGS.jsonl").write_text("".join(json.dumps(r) + "\n" for r in records))
 
 
 def _bug(bug_id: str, status: str) -> dict[str, object]:
@@ -76,76 +73,52 @@ def _bug(bug_id: str, status: str) -> dict[str, object]:
         "status": status,
     }
     if status != "open":
-        record["closed_at"] = "2026-09-02T00:00:00Z"
-        record["cause"] = "the cause"
-        record["solution"] = "the fix"
+        record |= {"closed_at": "2026-09-02T00:00:00Z", "cause": "c", "solution": "s"}
     return record
 
 
-def test_a_spec_without_an_origin_line_is_an_error(tmp_path: Path) -> None:
+@pytest.mark.parametrize(
+    ("origin", "needle", "absent"),
+    [
+        pytest.param("", "Origin", None, id="no-origin-line"),
+        pytest.param(
+            "**Origin:** backlog:a-real-entry,a-ghost",
+            "a-ghost",
+            "a-real-entry",
+            id="unknown-backlog-id",
+        ),
+        pytest.param(
+            "**Origin:** backlog:a-shipped-entry", None, None, id="backlog-id-in-histo-only"
+        ),
+        pytest.param(
+            "**Origin:** bugs:still-broken,already-fixed,half-written",
+            None,
+            None,
+            id="B4-bug-id-any-status-or-schema",
+        ),
+        pytest.param(
+            "**Origin:** bugs:still-broken,a-ghost", "a-ghost", "still-broken", id="unknown-bug-id"
+        ),
+        pytest.param(
+            "**Origin:** because I felt like it", "not canonical", None, id="non-canonical-value"
+        ),
+    ],
+)
+def test_spec_origin(tmp_path: Path, origin: str, needle: str | None, absent: str | None) -> None:
+    """sa-spec-doc-033-duplicates-bugs-check#B4: SPEC-DOC-048 reads raw ids — a bug id
+    resolves whatever its status, and an id whose record fails the schema still exists.
+    An error names only the unresolved ids."""
     specs = _make_clean_specs_tree(tmp_path, _RELEASE)
-    _write_spec(specs, "")
+    _seed(specs)
+    _write_spec(specs, origin)
 
     issues = _issues(specs)
 
-    assert len(issues) == 1
-    assert "Origin" in issues[0]
-
-
-def test_an_unknown_backlog_id_is_an_error(tmp_path: Path) -> None:
-    specs = _make_clean_specs_tree(tmp_path, _RELEASE)
-    _write_backlog(specs, ["a-real-entry"])
-    _write_spec(specs, "**Origin:** backlog:a-real-entry,a-ghost")
-
-    issues = _issues(specs)
-
-    assert len(issues) == 1
-    assert "a-ghost" in issues[0]
-    assert "a-real-entry" not in issues[0]
-
-
-def test_a_backlog_id_resolving_only_in_the_histo_passes(tmp_path: Path) -> None:
-    specs = _make_clean_specs_tree(tmp_path, _RELEASE)
-    _write_backlog(specs, [])
-    (specs / "backlog" / "_archive").mkdir(parents=True, exist_ok=True)
-    (specs / "backlog" / "_archive" / "backlog_histo.jsonl").write_text(
-        json.dumps({"id": "a-shipped-entry", "disposition": "delivered"}) + "\n",
-        encoding="utf-8",
-    )
-    _write_spec(specs, "**Origin:** backlog:a-shipped-entry")
-
-    assert _issues(specs) == []
-
-
-def test_a_bug_id_passes_whatever_its_status_and_an_unknown_one_errors(tmp_path: Path) -> None:
-    """Resolving the cited bug is the flow's purpose — it must not turn the SPEC
-    that fixed it into a permanent doctor ERROR. Membership in the ledger is the
-    judgement, exactly as `backlog:` judges membership in BACKLOG.json or the histo.
-    sa-spec-doc-033-duplicates-bugs-check#B4: SPEC-DOC-048 reads raw ids — an id whose
-    record fails the schema still exists.
-    """
-    specs = _make_clean_specs_tree(tmp_path, _RELEASE)
-    malformed = {**_bug("half-written", "open"), "context": "", "severity": "BLOCKER"}
-    _write_bugs(specs, [_bug("still-broken", "open"), _bug("already-fixed", "resolved"), malformed])
-
-    _write_spec(specs, "**Origin:** bugs:still-broken,already-fixed,half-written")
-    assert _issues(specs) == []
-
-    _write_spec(specs, "**Origin:** bugs:still-broken,a-ghost")
-    issues = _issues(specs)
-    assert len(issues) == 1
-    assert "a-ghost" in issues[0]
-    assert "still-broken" not in issues[0]
-
-
-def test_a_non_canonical_origin_value_is_an_error(tmp_path: Path) -> None:
-    specs = _make_clean_specs_tree(tmp_path, _RELEASE)
-    _write_spec(specs, "**Origin:** because I felt like it")
-
-    issues = _issues(specs)
-
-    assert len(issues) == 1
-    assert "not canonical" in issues[0]
+    if needle is None:
+        assert issues == []
+    else:
+        [issue] = issues
+        assert needle in issue and (absent is None or absent not in issue)
 
 
 def test_a_candidate_folder_is_not_ranked_and_is_off_canon(tmp_path: Path) -> None:
