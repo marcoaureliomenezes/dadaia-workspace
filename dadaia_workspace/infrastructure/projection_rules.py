@@ -34,7 +34,6 @@ from dadaia_workspace.core.models.agent_model_policy import ResolvedAgentModel
 from dadaia_workspace.core.models.doctor_report import DoctorLine, DoctorStatus
 from dadaia_workspace.infrastructure.agent_transcodes import AGENT_RULE_BUILDERS, no_rules
 from dadaia_workspace.infrastructure.codex_doctor import (
-    codex_trust_boundary_info,
     dcx7_codex_skill_refs,
     dcx8_codex_rules_shape,
     dcx9_codex_hook_shape,
@@ -276,15 +275,11 @@ def _hook_files_rules(record: HarnessRecord, plan: InstallPlan) -> tuple[Project
 
 
 def _hooks_json_checks(record: HarnessRecord, workspace_root: Path) -> list[DoctorLine]:
-    """D-CX-6/7/8/9 plus the version-qualified trust-boundary INFO line — all gated on the
-    harness being in profile. ``check_codex_rule_corpus_reachable`` stays a top-level,
-    UNCONDITIONAL doctor() attestation (never gated): the ``rule-corpus`` id in
-    ``ATTESTING_CHECK_IDS`` must never vanish for an out-of-profile harness."""
+    """D-CX-7/8/9 — gated on the harness being in profile."""
     out: list[DoctorLine] = []
     out.extend(dcx7_codex_skill_refs(workspace_root))
     out.extend(dcx8_codex_rules_shape(workspace_root / str(record.directory)))
     out.extend(dcx9_codex_hook_shape(workspace_root))
-    out.extend(codex_trust_boundary_info())
     return out
 
 

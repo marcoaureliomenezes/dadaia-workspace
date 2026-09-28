@@ -18,10 +18,6 @@ failures after two local-green runs):
    marker while a fresh CI checkout emits the ``(baseline structural scan, no operator
    denylist)`` variant. → :func:`norm_path_line` canonicalizes both to the bare marker;
    :func:`is_env_doctor_line` excludes live source-repo ``git-dirty`` lines entirely.
-   ``codex_trust_boundary_info`` (v0.4.3 A22.3) probes the REAL installed ``codex``
-   binary's version at runtime, so its whole line is host-state too — a dev sandbox
-   with Codex installed reports a different line than a CI runner without it. →
-   :func:`canon_env_line` canonicalizes the whole line to one fixed marker.
 2. **iteration-order** — directory-iteration order differs across OSes (Windows yielded
    ``pi/extensions/*`` before ``pi/SYSTEM.md`` where Linux sorted the reverse) and is
    not a product contract. → :func:`sort_line_lists` locks the exact MULTISET of lines
@@ -55,7 +51,6 @@ import pytest
 
 __all__ = [
     "assert_golden",
-    "canon_env_line",
     "is_env_doctor_line",
     "norm_path_line",
     "norm_stderr",
@@ -64,16 +59,6 @@ __all__ = [
 
 # Any ISO-8601 timestamp (with or without fractional seconds / offset / Z).
 _TS_RE = re.compile(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})?")
-
-# codex_trust_boundary_info (A22.3, v0.4.3 T-043-34) probes the REAL installed `codex`
-# binary's version at runtime — host-state, leak class 1 (whether/which Codex CLI is on
-# PATH varies host to host, e.g. a dev sandbox with Codex installed vs a CI runner
-# without it). Canonicalize the whole line to one fixed marker regardless of which of
-# the three branches (absent / certified-version-match / uncertified-version) the
-# capturing host produced — a doctor golden's job is to prove a trust-boundary line
-# still appears at all, not to pin its host-dependent wording; the exact per-branch wording is unit-tested directly against
-# an injected fake probe in test_codex_rule_corpus_reachable.py.
-_CODEX_TRUST_BOUNDARY_RE = re.compile(r"^\[info\] codex:trust-boundary — .*\(WS-CDX-HYGIENE\)$")
 
 # ANSI colour escapes emitted by Rich when it detects (or is forced into) a colour tty.
 _ANSI_RE = re.compile(r"\x1b\[[0-9;]*m")
@@ -119,25 +104,15 @@ def is_env_doctor_line(line: object) -> bool:
     return "git-dirty" in _as_text(line)
 
 
-def canon_env_line(line: object) -> str:
-    """Canonicalize the host-dependent Codex trust-boundary line (leak class 1)."""
-    return _CODEX_TRUST_BOUNDARY_RE.sub(
-        "[info] codex:trust-boundary — <host-dependent live Codex CLI version "
-        "observation> (WS-CDX-HYGIENE)",
-        _as_text(line),
-    )
-
-
 def sort_line_lists(obj: object) -> object:
     """Sort every list-of-strings in the captured object (leak class 2 — dir order).
 
     Directory-iteration order differs across OSes and is not a product contract. The
     golden locks the exact MULTISET of lines per key — order-insensitive,
-    count-preserving. String lines are additionally canonicalized for OS-dependent
-    probe text (:func:`canon_env_line`).
+    count-preserving.
     """
     if isinstance(obj, list) and all(isinstance(x, str) or hasattr(x, "render") for x in obj):
-        return sorted(canon_env_line(x) for x in obj)
+        return sorted(_as_text(x) for x in obj)
     if isinstance(obj, dict):
         return {k: sort_line_lists(v) for k, v in obj.items()}
     return obj

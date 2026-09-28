@@ -490,12 +490,8 @@ class FileSystemPublicAssetManager:
             if name not in active and any((workspace_root / d).exists() for d in rel_dirs):
                 reports.append(_out_of_profile_warn(name))
 
-        # Harness-independent checks stay unconditional. The rule-corpus check
-        # early-returns on an absent .codex/agents; skill/memory/privacy checks read the
-        # package public dir, not a runtime projection. `rule-corpus` stays a TOP-LEVEL,
-        # unconditional attestation (never gated on codex-in-profile — ATTESTING_CHECK_IDS
-        # must never vanish silently for a codex-absent profile); `trust-boundary` stays
-        # gated (the codex-hooks record check above, matching the historical guard).
+        # Harness-independent checks stay unconditional: they read the package public
+        # dir, not a runtime projection.
         reports.extend(check_agent_skill_refs(self._public_dir))
         reports.extend(check_memory_phase_single_source(self._public_dir))
         reports.extend(attest("symlink-target", self._check_symlink_targets(workspace_root)))

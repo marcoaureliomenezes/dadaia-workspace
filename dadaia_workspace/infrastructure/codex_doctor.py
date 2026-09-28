@@ -10,13 +10,9 @@ from __future__ import annotations
 import json
 import os
 import re
-import shutil
-import subprocess
 import tomllib
-from collections.abc import Callable
 from pathlib import Path
 
-from dadaia_workspace.core.cli_line import fix_line
 from dadaia_workspace.core.harness_registry import HARNESS_RECORDS
 from dadaia_workspace.core.models.doctor_report import DoctorLine, DoctorStatus
 from dadaia_workspace.infrastructure.runtime_transforms.codex_assets import (
@@ -30,20 +26,6 @@ from dadaia_workspace.infrastructure.runtime_transforms.hook_wrappers import (
 # ---------------------------------------------------------------------------
 # Dispatcher
 # ---------------------------------------------------------------------------
-
-
-#: The ATTESTING checks of the public-doctor surface: each emits a positive claim
-#: (``[ok] …``) when its universe is non-empty, so each is wrapped in
-#: :func:`dadaia_workspace.core.models.doctor_report.attest` at the assembly point —
-#: an empty universe yields an explicit ``[not-applicable] check:<id>`` line instead of
-#: silence. Pinned by ``tests/unit/infrastructure/test_attesting_checks.py``: removing
-#: an entry is a reviewed decision, never an accidental vanishing.
-ATTESTING_CHECK_IDS: tuple[str, ...] = (
-    "trust-boundary",
-    "public-privacy",
-    "symlink-target",
-    "entities-derivation",
-)
 
 
 # ---------------------------------------------------------------------------
@@ -189,96 +171,3 @@ def _codex_hook_commands(value: object) -> list[str]:
         for item in value:
             commands.extend(_codex_hook_commands(item))
     return commands
-
-
-# The exact codex-cli version for which "projected command hooks fire and block in
-# BOTH the interactive TUI and headless `codex exec`" was live-verified (executed-path
-# probe, cited in the `ai-harness-codex` skill §9 and the T-043-32 scoping note). A
-# stale, unqualified claim carried forward by assumption past a CLI upgrade is exactly
-# what FR22c (A22.3) fixes: `codex_trust_boundary_info` asserts this positive fact
-# ONLY when the runtime-probed version matches this constant exactly; any other
-# observed version — or no observed version at all — degrades honestly instead.
-# Update this constant only after a fresh, reviewed live probe (`dadaia certify`'s
-# codex-live-probe check, A22.4) reconfirms the fact for a newer version.
-_CODEX_HOOKS_LIVE_CERTIFIED_VERSION = "codex-cli 0.144.4"
-
-
-def _probe_installed_codex_version(timeout: float = 5.0) -> str | None:
-    """Best-effort ``codex --version`` runtime probe (A22.3).
-
-    Returns the raw stdout (stripped) of an installed ``codex`` binary reachable on
-    ``PATH``, or ``None`` when the binary is absent, fails to launch, exits non-zero,
-    or does not answer within *timeout* seconds. Never raises — a probe failure IS the
-    "codex absent" observation, not a doctor crash (same discipline as the D-CX-9 hook
-    wrapper probe above).
-    """
-    codex_bin = shutil.which("codex")
-    if codex_bin is None:
-        return None
-    try:
-        proc = subprocess.run(  # noqa: S603
-            [codex_bin, "--version"],
-            capture_output=True,
-            text=True,
-            timeout=timeout,
-            check=False,
-        )
-    except (OSError, subprocess.SubprocessError):
-        return None
-    if proc.returncode != 0:
-        return None
-    version = proc.stdout.strip()
-    return version or None
-
-
-def codex_trust_boundary_info(
-    *, version_probe: Callable[[], str | None] = _probe_installed_codex_version
-) -> list[DoctorLine]:
-    """WS-CDX-HYGIENE (A7/A22.3): version-qualified Codex hook-fire trust boundary.
-
-    This reports EFFECTIVE PROMPT VISIBILITY — does an actually-running Codex session
-    honor the projected hooks at all — a different claim from
-    ``check_codex_rule_corpus_reachable``'s STATIC reference integrity (do the cited
-    files merely exist on disk). The reported text is always version-qualified against
-    a runtime ``codex --version`` probe (``version_probe``, injectable for tests;
-    production wiring always uses ``_probe_installed_codex_version``) and never
-    asserts hook-fire behavior for a version this probe did not itself observe: absent
-    Codex, and any version other than ``_CODEX_HOOKS_LIVE_CERTIFIED_VERSION``, both
-    degrade to an explicit UNVERIFIED line pointing at `dadaia certify`'s live probe
-    (A22.4) instead of guessing.
-    """
-    raw_version = version_probe()
-    if raw_version is None:
-        return [
-            DoctorLine(
-                DoctorStatus.INFO,
-                "codex:trust-boundary — no installed Codex CLI observed on PATH "
-                "('codex --version' unreachable); the interactive-vs-headless "
-                "hook-fire boundary is UNVERIFIED for this environment (the git "
-                "chokepoints — the pre-push CI/branch "
-                "gate + the PR security-verdict gate — remain independent "
-                "defense-in-depth regardless). (WS-CDX-HYGIENE)",
-            )
-        ]
-    if raw_version == _CODEX_HOOKS_LIVE_CERTIFIED_VERSION:
-        return [
-            DoctorLine(
-                DoctorStatus.INFO,
-                f"codex:trust-boundary — installed {raw_version} matches the last "
-                "live-certified version: projected command hooks fire and block in "
-                "BOTH the interactive TUI and headless `codex exec` (the git "
-                "chokepoints remain independent defense-in-depth). (WS-CDX-HYGIENE)",
-            )
-        ]
-    return [
-        DoctorLine(
-            DoctorStatus.INFO,
-            f"codex:trust-boundary — installed {raw_version} has not been "
-            "live-certified for hook-fire behavior (last certified: "
-            f"{_CODEX_HOOKS_LIVE_CERTIFIED_VERSION}); the interactive-vs-headless "
-            f"claim is UNVERIFIED for this version — rerun `{fix_line(None, 'certify')}`'s "
-            "codex-live-probe check to reconfirm before relying on it (the git "
-            "chokepoints remain independent defense-in-depth regardless). "
-            "(WS-CDX-HYGIENE)",
-        )
-    ]

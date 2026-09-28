@@ -205,7 +205,7 @@ prefix_rule(
 - From the payload fact: a gate's header parser must classify every `*** Add/Update/Delete File:` header.
 - Multi-file patch classification is most-restrictive-verdict-wins.
 - Whether hooks fire in interactive `codex` TUI vs headless `codex exec` is a version-qualified fact.
-- Consult the installed workspace's live probe (`.dadaia/.venv/bin/dadaia public doctor`'s `codex:trust-boundary` line) instead of assuming.
+- Consult the live probe (`.dadaia/.venv/bin/dadaia certify --json`'s `codex-live-probe` check) instead of assuming.
 - Rerun the live contract after any Codex CLI upgrade.
 - The git chokepoints remain independent regardless of hook enforcement (pre-commit, pre-push).
 - Inject full context once per session on `SessionStart` (matcher `startup|resume`), keyed on `session_id`.
