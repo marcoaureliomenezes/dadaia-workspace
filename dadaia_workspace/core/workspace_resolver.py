@@ -33,33 +33,18 @@ def _fenced() -> frozenset[Path]:
     )
 
 
+def fenced_env(sandbox: Path) -> dict[str, str]:
+    """This environment with every root above *sandbox* fenced: a child started with it
+    acts on *sandbox* only, never on the workspace owning its venv or enclosing it."""
+    fence = [os.environ.get(FENCE_ENV, ""), *map(str, sandbox.resolve().parents)]
+    return {**os.environ, FENCE_ENV: os.pathsep.join(p for p in fence if p)}
+
+
 def resolve_workspace_root(cwd: Path | None = None) -> Path:
-    """Walk up from *cwd* to find the first directory containing ``.dadaia/states/spec_contexts.json``.
-
-    Parameters
-    ----------
-    cwd:
-        Starting directory. Defaults to ``Path.cwd()`` when *None*.
-
-    Returns
-    -------
-    Path
-        Absolute path to the workspace root.
-
-    Raises
-    ------
-    WorkspaceNotInitializedError
-        If no qualifying directory is found before reaching the filesystem
-        root. The error message names the starting *cwd* that was inspected
-        and every directory that was skipped because it contained ``.dadaia/``
-        without ``states/spec_contexts.json``.
-
-    Notes
-    -----
-    **Sub-repo behaviour:** sub-repos that ship ``.dadaia/`` for public
-    asset projections are deliberately ignored. Only a directory that also
-    has ``states/spec_contexts.json`` is accepted as a workspace root.
-    """
+    """The workspace owning the running venv (only when *cwd* is None), else the first of
+    *cwd* (default: the process cwd) and its ancestors holding ``.dadaia/states/
+    spec_contexts.json`` — a sub-repo's bare ``.dadaia/`` is skipped. A fenced root is
+    never returned; none found raises :class:`WorkspaceNotInitializedError`."""
     own = own_workspace_root() if cwd is None else None
     if own is not None:
         return own

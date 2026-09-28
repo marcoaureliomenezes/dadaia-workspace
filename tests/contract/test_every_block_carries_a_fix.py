@@ -30,7 +30,6 @@ import pytest
 from dadaia_workspace.core import doctor_rules
 from dadaia_workspace.core.cli_line import fix_line
 from dadaia_workspace.core.gitflow import DEFAULT
-from dadaia_workspace.core.platform import PLATFORM
 from dadaia_workspace.features.chokepoints import push_gate_decision
 from dadaia_workspace.features.chokepoints.branch_policy import PushRef, parse_push_stdin
 from dadaia_workspace.features.specs.canon import canon_violations
@@ -38,6 +37,7 @@ from dadaia_workspace.hooks import pre_gate
 from dadaia_workspace.infrastructure.git_objects import GitSubprocessObjectReader
 from tests.fakes import gate_fixes
 from tests.fixtures.real_git import PushRepo
+from tests.fixtures.stores import own_venv_python, own_venv_workspace
 
 _FIX_LINE_RE = re.compile(r"^fix: (\S.*)$", re.MULTILINE)
 
@@ -78,23 +78,6 @@ def assert_block_carries_a_runnable_fix(message: str) -> None:
 # ── the real `dadaia doctor` output (undo of b50f0c97: the printer is exercised) ──
 
 
-def _isolated_workspace(tmp_path: Path) -> Path:
-    """A workspace at a >=61-char root whose OWN venv runs the CLI: a pyvenv.cfg and a
-    symlinked base interpreter (no install), so the doctor never resolves another root."""
-    ws = tmp_path / ("w" * max(1, 61 - len(str(tmp_path))))
-    venv = ws / ".dadaia" / ".venv"
-    tools = venv / PLATFORM.venv_scripts_dir  # the layout the doctor prints: bin/ or Scripts/*.exe
-    tools.mkdir(parents=True)
-    base = Path(sys.executable).resolve()
-    (tools / f"python{PLATFORM.venv_exe_suffix}").symlink_to(base)
-    (tools / f"dadaia{PLATFORM.venv_exe_suffix}").write_text("#!/bin/sh\n", encoding="utf-8")
-    (tools / f"dadaia{PLATFORM.venv_exe_suffix}").chmod(0o755)
-    (venv / "pyvenv.cfg").write_text(f"home = {base.parent}\n", encoding="utf-8")
-    (ws / ".dadaia" / "states").mkdir()
-    (ws / ".dadaia" / "states" / "spec_contexts.json").write_text('{"contexts": []}')
-    return ws
-
-
 def test_the_real_doctor_prints_every_fix_as_one_whole_runnable_line(tmp_path: Path) -> None:
     """The printer, not a synthetic render: a workspace finding (an expired tmp entry), an
     error-class specs finding (FIXED-1 on a symlinked QUALITY.md) and a ledger finding
@@ -106,7 +89,7 @@ def test_the_real_doctor_prints_every_fix_as_one_whole_runnable_line(tmp_path: P
 
     from dadaia_workspace.features.specs import canon
 
-    ws = _isolated_workspace(tmp_path)
+    ws = own_venv_workspace(tmp_path / ("w" * max(1, 61 - len(str(tmp_path)))))  # 61-char root
     expired = ws / ".dadaia" / "tmp" / "agent" / "20200101"
     expired.mkdir(parents=True)
     os.utime(expired, (0, 0))
@@ -124,13 +107,7 @@ def test_the_real_doctor_prints_every_fix_as_one_whole_runnable_line(tmp_path: P
 
     run = subprocess.run(
         [
-            str(
-                ws
-                / ".dadaia"
-                / ".venv"
-                / PLATFORM.venv_scripts_dir
-                / f"python{PLATFORM.venv_exe_suffix}"
-            ),
+            str(own_venv_python(ws)),
             "-m",
             "dadaia_workspace",
             "doctor",
