@@ -1,8 +1,6 @@
 """Intent: CONTRACT — SpecsDoctor structural checks: one row per code (fires or silent).
 
-Bugs: release-new-rejects-semver-but-doctor-requires-it (F004: the SPEC-DOC-027 remedy
-names the bare mintable axis), doctor-016-errors-archived-legacy-release-027-tolerates
-(F005: one naming defect, one code — SPEC-DOC-027, no ``date.today()`` gating).
+A release dir's name is TREE-8's (sa-release-dir-placement-judged-by-tree8-and-spec-doc-027).
 """
 
 from __future__ import annotations
@@ -14,7 +12,7 @@ import pytest
 
 from dadaia_workspace.core.doctor_rules import SectionFinding
 from dadaia_workspace.core.workspace_layout import render_registry_tables
-from dadaia_workspace.features.specs import Severity, SpecsDoctor
+from dadaia_workspace.features.specs import SpecsDoctor
 from dadaia_workspace.features.specs.doctor_types import finding_path
 from dadaia_workspace.features.specs.memory_canon import (
     FIXED_SECTIONS,
@@ -268,35 +266,6 @@ def test_doc005_oversized_plan_warns_whatever_the_spec_creation_date(
     )
     doc5 = _by_code(SpecsDoctor(specs).check(), "SPEC-DOC-005")
     assert doc5 and doc5[0].verdict == "warning"
-
-
-@pytest.mark.parametrize(
-    ("release_id", "created", "expect"),
-    [
-        pytest.param("1.2.3", "2026-06-01", None, id="semver-name-ok"),
-        pytest.param("v1.2.3", "2026-06-01", "error", id="v-name-errors"),
-        pytest.param("v0.1.4.6", "2026-06-09", "error", id="four-part-errors"),
-        pytest.param(
-            "sdd-release-lifecycle-v1", "2026-05-01", "warning", id="pre-cutoff-legacy-warns"
-        ),
-        pytest.param("bad-name", "2026-06-01", "error", id="on-cutoff-errors"),
-        pytest.param("my-feature-v1", "2026-08-01", "error", id="post-cutoff-errors"),
-    ],
-)
-def test_doc027_release_naming_boundary(
-    tmp_path: Path, release_id: str, created: str, expect: Severity | None
-) -> None:
-    """F004 + F005: a non-conforming live name is ONE SPEC-DOC-027 finding (never 016)
-    whose remedy names the bare ``<MAJOR>.<MINOR>.<PATCH>`` axis, never ``v<MAJOR``."""
-    specs = _make_clean_specs_tree(tmp_path, release_id=release_id)
-    spec = f"# Spec\n\n**Status:** Approved\n> **Created:** {created}\n\nContent.\n"
-    _write(f"releases/{release_id}/SPEC.md", spec)(specs)
-    issues = SpecsDoctor(specs).check()
-    doc27 = _by_code(issues, "SPEC-DOC-027")
-    assert "SPEC-DOC-016" not in _codes(issues)
-    assert [i.verdict for i in doc27] == ([expect] if expect else [])
-    for issue in doc27:
-        assert "<MAJOR>.<MINOR>.<PATCH>" in issue.message and "v<MAJOR" not in issue.message
 
 
 def test_one_defect_one_code_missing_active_artifact(tmp_path: Path) -> None:

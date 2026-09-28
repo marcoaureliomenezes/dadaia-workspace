@@ -5,7 +5,7 @@ governance) plus ``doctor_structural`` (a fourth). Holds no sibling-VALIDATOR
 import (no ``ReleaseValidator``/``StructuralValidator`` class ever imported here or from
 here) — the release-dir discovery helpers were instance methods on ``SpecsDoctor``; they
 are re-homed here as free functions taking ``specs_dir`` explicitly so no family owns
-them (they were cross-validator all along — SPEC-DOC-006/026/027/031).
+them (they were cross-validator all along — SPEC-DOC-006/026/031).
 
 ``resolve_active_release`` reads which release is live and its phase; whether its state
 document is valid is `release.py check`'s answer (the doctor's LEDGER-RELEASE-SCHEMA).

@@ -1,10 +1,8 @@
-"""Intent: CONTRACT — the specs doctor's ledger invariants SPEC-DOC-024/026/027/030/041.
+"""Intent: CONTRACT — the specs doctor's ledger invariants SPEC-DOC-024/026/030/041.
 
 Bugs: spec-doc-030-audit-dir-rule-contradicts-dadaia-6-8-canon (audit dirs are
 ``<YYYYMMDD>-<slug>``), doctor-reads-phantom-specs-archive-releases-root (archived
-releases live under ``specs/releases/_archive/``), 0.4.7 c8 review MEDIUM-2/LOW-1
-(SPEC-DOC-027 scores the live root only; its live-name rows are
-test_doctor.py::test_doc027_release_naming_boundary), sa-promote-has-no-verb#B25-6 (an open task in
+releases live under ``specs/releases/_archive/``), sa-promote-has-no-verb#B25-6 (an open task in
 CLOSURE is release.py's refusal, never a doctor code),
 sa-spec-doc-033-duplicates-bugs-check#B8 (archive-overdue is one WARNING, fix
 ``bugs.py archive``).
@@ -94,22 +92,6 @@ _CASES = [
     ),
     pytest.param(
         "0.1.10", "IMPLEMENTATION", _archive("v0.1.9"), "SPEC-DOC-026", None, id="026-distinct-ids"
-    ),
-    pytest.param(
-        "0.1.10",
-        "IMPLEMENTATION",
-        _archive("v0.1.9"),
-        "SPEC-DOC-027",
-        None,
-        id="027-archived-v-prefix",
-    ),
-    pytest.param(
-        "0.1.10",
-        "IMPLEMENTATION",
-        _archive("some-unlisted-legacy-name-v1"),
-        "SPEC-DOC-027",
-        None,
-        id="027-archived-legacy-is-tree8-not-027",
     ),
     pytest.param(
         "0.1.10",

@@ -136,11 +136,6 @@ RULES: tuple[SpecsRule, ...] = (
         fix_help="Operator action: rename one of the duplicated dirs under <specs>/releases, then commit.",
     ),
     _rule(
-        ("SPEC-DOC-027",),
-        lambda d: d._release.check_release_naming_canon(),
-        fix_help="Operator action: rename the release dir under <specs>/releases to its M.m.p id, then commit.",
-    ),
-    _rule(
         ("SPEC-DOC-030",),
         lambda d: d._closure_audit.check_audits_naming_canon(),
     ),

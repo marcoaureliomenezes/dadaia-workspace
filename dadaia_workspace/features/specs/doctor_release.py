@@ -2,8 +2,8 @@
 
 Single-responsibility sibling of the SpecsDoctor coordinator. Owns the active-release
 lifecycle checks (SPEC-DOC-004/005), the release ledger invariants (phase<->markers
-SPEC-DOC-024, unique ids SPEC-DOC-026, naming canon SPEC-DOC-027), plus the family-local
-status/created-date extractors.
+SPEC-DOC-024, unique ids SPEC-DOC-026), plus the family-local status extractor.
+A release dir's name and placement are TREE-8's alone.
 Leaf-only: imports the shared leaves + core, never a sibling validator.
 
 The active release and its phase are read by :func:`resolve_active_release`; whether the
@@ -15,11 +15,9 @@ from __future__ import annotations
 import json
 import re
 from collections.abc import Callable, Collection
-from datetime import date
 from pathlib import Path
 
 from dadaia_workspace.core.doctor_rules import SectionFinding
-from dadaia_workspace.core.release_state import RELEASE_ID_RE
 from dadaia_workspace.core.spec_status import APPROVED, extract_status
 from dadaia_workspace.core.spec_status import CANONICAL_STATUS as _CANONICAL_STATUS
 from dadaia_workspace.features.specs.doctor_common import RELEASE_ARTIFACTS, iter_all_release_dirs
@@ -30,11 +28,6 @@ from dadaia_workspace.features.specs.specs_tree import SpecsTree
 # because doctor_release has been the documented import site for both.
 CANONICAL_STATUS = _CANONICAL_STATUS
 PLAN_MAX_LINES = 300
-
-# Release-id canon cutoff: a live release whose SPEC.md Created: is on/after this date
-# must carry a canon-conformant directory name (SPEC-DOC-027). Vintage releases are
-# excluded — this grandfathers the frozen pre-cutoff archived releases.
-RELEASE_SEMVER_CUTOFF = date(2026, 6, 1)  # WARNING starts here
 
 # SPEC-DOC-047: a task block runs from its marker line to the next marker line; a
 # ``Write set:`` naming the ``specs/memory`` tree inside it schedules memory as
@@ -92,22 +85,8 @@ def _known_backlog_ids(specs_dir: Path) -> frozenset[str]:
     )
 
 
-def _extract_created_date(md_path: Path) -> date | None:
-    if not md_path.exists():
-        return None
-    for line in md_path.read_text(encoding="utf-8").splitlines()[:30]:
-        m = re.search(r"\*\*Created:\*\*\s*(\d{4}-\d{2}-\d{2})", line)
-        if m:
-            try:
-                y, mo, d = (int(x) for x in m.group(1).split("-"))
-                return date(y, mo, d)
-            except ValueError:
-                return None
-    return None
-
-
 class ReleaseValidator:
-    """Active-release lifecycle, SemVer naming, and release-ledger invariants."""
+    """Active-release lifecycle and release-ledger invariants."""
 
     def __init__(self, specs_dir: Path) -> None:
         self.specs_dir = specs_dir
@@ -317,53 +296,6 @@ class ReleaseValidator:
                         f"releases/_archive/: {paths}."
                     ),
                     path=str(self.specs_dir / "releases"),
-                )
-            )
-        return issues
-
-    def check_release_naming_canon(self) -> list[SectionFinding]:
-        """SPEC-DOC-027: release dir names should match the release-id canon
-        (``RELEASE_ID_RE``; mintable ids are bare ``MAJOR.MINOR.PATCH``).
-
-        The ONE naming rule (F005, 20260830 audit — SPEC-DOC-016 retired as a second
-        implementation of this same rule; no ``date.today()`` gating survives):
-        - A non-conforming dir in the live ``releases/`` tree whose SPEC.md
-          ``Created:`` date is on/after the canon cutoff (``RELEASE_SEMVER_CUTOFF``)
-          is an ERROR — a release born after the canon must be SemVer-clean.
-        - A non-conforming LIVE dir with a pre-cutoff or undeterminable ``Created:``
-          date is a WARNING — a legacy name predates the canon and is preserved until
-          renamed.
-
-        The archive is not this rule's unit (0.4.7 c8 review MEDIUM-2). ADR-9's
-        rationale is that frozen history is never renamed — renaming an archived dir
-        breaks every historical pointer into it — so an archived name is scored once, by
-        the canon (TREE-8), and a second opinion here only multiplied one fact into
-        several findings (ledger precedent
-        ``doctor-016-errors-archived-legacy-release-027-tolerates``).
-        """
-        issues: list[SectionFinding] = []
-        live_root = self.specs_dir / "releases"
-        for d, root in iter_all_release_dirs(self.specs_dir):
-            if root != live_root or RELEASE_ID_RE.match(d.name):
-                continue
-            spec_path = d / "SPEC.md"
-            created = _extract_created_date(spec_path) if spec_path.exists() else None
-            born_after_canon = created is not None and created >= RELEASE_SEMVER_CUTOFF
-            severity = Severity.ERROR if born_after_canon else Severity.WARNING
-            issues.append(
-                specs_finding(
-                    code="SPEC-DOC-027",
-                    severity=severity,
-                    description=(
-                        f"Release dir '{d.relative_to(self.specs_dir).as_posix()}' does "
-                        "not follow the release-id canon (bare <MAJOR>.<MINOR>.<PATCH>) "
-                        + (
-                            "— rename it (SPEC-DOC-027)."
-                            if severity == Severity.ERROR
-                            else "— legacy name (WARNING, preserved until renamed)."
-                        )
-                    ),
-                    path=str(d),
                 )
             )
         return issues

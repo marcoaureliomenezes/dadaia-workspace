@@ -60,8 +60,7 @@ class ClosureAuditValidator:
         audits ``CanonEntry`` pattern uses, never a second, independently hand-kept
         regex; bug spec-doc-030-audit-dir-rule-contradicts-dadaia-6-8-canon fixed a
         stale ``<YYYYMMDDTHHMMSSZ>-<session_id_8chars>`` shape that predated the v6
-        canon). WARN-only (legacy names are preserved, never auto-renamed), mirroring
-        the SPEC-DOC-027 legacy policy.
+        canon). WARN-only (legacy names are preserved, never auto-renamed).
 
         Exempt: the four grandfathered dirs from the old pre-canon amendment
         (:data:`_AUDIT_DIR_GRANDFATHER`) and ``specs/audits/_archive/``. Silent when the
