@@ -28,7 +28,7 @@ from dadaia_workspace.core.models.agent_model_policy import (
 )
 from dadaia_workspace.core.models.doctor_report import DoctorLine, DoctorStatus, attest
 from dadaia_workspace.core.models.install_ledger import InstallLedger, LedgerEntry
-from dadaia_workspace.core.workspace_layout import HARNESS_DIRS, render_registry_tables
+from dadaia_workspace.core.workspace_layout import render_registry_tables
 from dadaia_workspace.infrastructure.entity_doctor import (
     check_agent_skill_refs,
     check_entities_derivation,
@@ -494,16 +494,6 @@ class FileSystemPublicAssetManager:
         reports.extend(check_memory_phase_single_source(self._public_dir))
         reports.extend(attest("public-privacy", self._check_public_privacy()))
         reports.extend(attest("entities-derivation", check_entities_derivation(self._public_dir)))
-
-        for harness_dir in sorted(HARNESS_DIRS):
-            legacy_dir = workspace_root / harness_dir / "workflows"
-            for legacy in sorted(legacy_dir.glob("*.workflow.md")):
-                reports.append(
-                    DoctorLine(
-                        DoctorStatus.EXTRA,
-                        f"retired-workflow-projection:{legacy.relative_to(workspace_root)}",
-                    )
-                )
 
         return reports
 
