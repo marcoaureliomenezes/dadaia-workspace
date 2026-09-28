@@ -1,9 +1,6 @@
-"""`dadaia context create` is one transactional step (0.4.8 FR3, T-048-03).
+"""`dadaia context create` is one transactional step, proved against real bare remotes.
 
 Intent: CONTRACT — AC3.1, AC3.2, AC3.3, AC3.4, AC3.5, AC3.6, AC3.8.
-
-MEDIUM tier: real `git` against local bare remotes — the clone, the rollback and the
-adoption are the behaviour under test, so no fake stands in for git.
 """
 
 from __future__ import annotations
@@ -53,7 +50,6 @@ def _git(*args: str, cwd: Path | None = None) -> str:
 
 
 def _remote(parent: Path, name: str) -> Path:
-    """A bare remote at *parent/name* carrying one commit on `main`."""
     bare = parent / name
     _git("init", "-q", "--bare", "-b", "main", str(bare))
     seed = parent / f"seed-{name}"
@@ -106,8 +102,7 @@ def test_one_slug_rule(url: str, slug: str) -> None:
 
 
 def test_create_clones_hooks_alives_and_leaves_the_repo_untouched(ws: Path, tmp_path: Path) -> None:
-    """AC3.1 + AC3.6: name defaults to the slug; porcelain clean; HEAD equals the
-    remote's. Doctor's 0 errors needs a real venv — the onboarding journey pins it."""
+    """AC3.1 + AC3.6 — the name defaults to the slug; porcelain clean; HEAD equals the remote's."""
     main = _remote(tmp_path, "my.app.git")
     assoc = _remote(tmp_path, "lib.git")
 
@@ -129,8 +124,7 @@ def test_create_clones_hooks_alives_and_leaves_the_repo_untouched(ws: Path, tmp_
 def test_a_failed_clone_leaves_nothing_and_the_same_command_then_succeeds(
     ws: Path, tmp_path: Path
 ) -> None:
-    """AC3.4 + AC3.5 (RV1): rollback of every created dir, no record, a fix line that
-    carries every --associated-repo (the failed one a placeholder), and a clean retry (R3)."""
+    """AC3.4 + AC3.5 — rollback leaves no dir or record; the fix line keeps every repo; the retry succeeds."""
     main = _remote(tmp_path, "core.git")
     ok_assoc = _remote(tmp_path, "one.git")
     missing = tmp_path / "two.git"
@@ -153,47 +147,32 @@ def test_a_failed_clone_leaves_nothing_and_the_same_command_then_succeeds(
     assert sorted(p.name for p in (ws / "repos").iterdir()) == ["core", "one", "two"]
 
 
-def test_an_existing_checkout_of_the_url_is_adopted_any_other_occupant_refused(
-    ws: Path, tmp_path: Path
-) -> None:
-    """AC3.3."""
+def test_only_a_checkout_of_the_url_is_adopted(ws: Path, tmp_path: Path) -> None:
+    """AC3.3 — a checkout of the URL is adopted; a plain dir or another origin is refused untouched."""
     main = _remote(tmp_path, "adopt.git")
     _git("clone", "-q", str(main), str(ws / "repos" / "adopt"))
     (ws / "repos" / "squat").mkdir()
-    squat = _remote(tmp_path, "squat.git")
+    other = _remote(tmp_path, "other")
+    _git("clone", "-q", str(other), str(ws / "repos" / "app"))
+    wanted = _remote(tmp_path, "app.git")
 
-    code, out = _create("--main-repo", str(squat))
+    assert _create("--main-repo", str(_remote(tmp_path, "squat.git")))[0] == 1
+    code, out = _create("--main-repo", str(wanted))
     assert code == 1
-    assert "squat" not in _names(ws)
-    assert (ws / "repos" / "squat").is_dir(), "a dir this call did not create survives"
+    assert f"repos/app exists but is not a checkout of {wanted}" in out.replace("\n", "")
+    assert "fix: " in out
+    assert _names(ws) == []
+    assert (ws / "repos" / "squat").is_dir()
+    assert _git("remote", "get-url", "origin", cwd=ws / "repos" / "app") == str(other)
+    assert not (ws / "repos" / "app" / ".git" / "hooks" / "pre-push").exists()
 
     code, out = _create("--main-repo", str(main))
     assert code == 0, out
     assert (ws / "repos" / "adopt" / ".git" / "hooks" / "pre-push").is_file()
 
 
-def test_a_checkout_of_another_origin_under_the_slug_is_refused_not_adopted(
-    ws: Path, tmp_path: Path
-) -> None:
-    """AC3.3: a git root whose origin is NOT the URL is an occupant, never an adoption."""
-    other = _remote(tmp_path, "other")
-    _git("clone", "-q", str(other), str(ws / "repos" / "app"))
-    wanted = _remote(tmp_path, "app.git")
-
-    code, out = _create("--main-repo", str(wanted))
-
-    assert code == 1
-    assert f"repos/app exists but is not a checkout of {wanted}" in out.replace("\n", "")
-    assert "fix: " in out
-    assert _names(ws) == []
-    assert _git("remote", "get-url", "origin", cwd=ws / "repos" / "app") == str(other)
-    assert not (ws / "repos" / "app" / ".git" / "hooks" / "pre-push").exists()
-
-
 def test_refusal_fix_lines_never_repeat_the_failing_command(ws: Path, tmp_path: Path) -> None:
-    """Live audit G3/G4: a bad URL points at a clone-URL placeholder, an owned slug at
-    the list that names its owner — neither echoes the command that just failed (G6: the
-    empty list names the runnable create)."""
+    """G3/G4/G6 — a bad URL fixes to a clone-URL placeholder, an owned slug to `context list`."""
     listed = _runner.invoke(app, ["context", "list"]).output
     assert "context create '<name>' --main-repo '<clone-url>'" in listed
     code, out = _create("bad", "--main-repo", str(tmp_path / "nothere.git"))
@@ -210,8 +189,7 @@ def test_refusal_fix_lines_never_repeat_the_failing_command(ws: Path, tmp_path: 
 def test_the_created_line_is_one_line_and_the_next_step_is_the_new_contexts(
     ws: Path, tmp_path: Path
 ) -> None:
-    """Live audit G1 + G5: the new context's own next step, not another context's; the
-    success line never wraps at 80 columns."""
+    """G1 + G5 — the success line is one line and names the new context's own next step."""
     assert _create("--main-repo", str(_remote(tmp_path, "second.git")))[0] == 0
     code, out = _create("--main-repo", str(_remote(tmp_path, "a-rather-long-repo-name.git")))
     assert code == 0, out
