@@ -33,11 +33,6 @@ Measured by: `lint-imports --config setup.cfg --no-cache` — contract `infrastr
 ADR: none
 Rationale: an adapter that knows a use case is no longer an adapter.
 
-### P-06 · We keep `core.kernel_tunables` a pure-constant leaf that imports no upper layer.
-Measured by: `lint-imports --config setup.cfg --no-cache` — contract `kernel-tunables-is-a-leaf`.
-ADR: none
-Rationale: hooks import it on the write hot path; one upper edge drags in the composition graph.
-
 ### P-07 · We keep features mutually independent: they compose through the container, never through sibling imports; a helper two features need lives in each.
 Measured by: `lint-imports --config setup.cfg --no-cache` — contract `features-no-cross-feature`, whose `modules =` list is asserted equal to the on-disk `features/*/__init__.py` package set by `pytest tests/contract/test_import_linter_ignore_cap.py`.
 ADR: none
