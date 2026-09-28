@@ -55,7 +55,7 @@
         },
         "intents": {
           "type": "array",
-          "description": "Optional typed intents[] — the retired fenced ```yaml **Intents:** code span, now native JSON. Every subject binds one change to one canonical subject anchor (dadaia_workspace.core.models.backlog.parse_intents is the one parser/validator, shared by both the pre-migration Markdown reader's old fenced block and this native array). Required once 'status' matures past 'idea' (dd-backlog-definition SS2, BL-SCHEMA); absent or empty is doctor-clean at 'idea'.",
+          "description": "Optional typed intents[]: each binds one change to one canonical subject anchor. Required once 'status' is past 'idea' (backlog.py check, LEDGER-BACKLOG-SCHEMA); absent or empty is valid at 'idea'.",
           "items": { "$ref": "#/$defs/intent" }
         }
       }
