@@ -26,21 +26,20 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from dadaia_workspace.core.agent_model_templates import (
-    CORE_AGENTS,
-    FABLE_FORBIDDEN_AGENT,
-    resolve_agent_model,
-    template_by_id,
-)
 from dadaia_workspace.core.atomic_write import atomic_write
-from dadaia_workspace.core.model_registry import is_fable_model, registry_by_claude_id
-from dadaia_workspace.core.models.agent_model_policy import (
+from dadaia_workspace.core.model_registry import (
     _SCHEMA_VERSION,
     CLAUDE_EFFORTS,
+    CORE_AGENTS,
+    FABLE_FORBIDDEN_AGENT,
     AgentModelOverride,
     AgentModelPolicyOverlay,
     AgentModelPolicyStoreError,
     ClaudeEffort,
+    is_fable_model,
+    registry_by_claude_id,
+    resolve_agent_model,
+    template_by_id,
 )
 
 _FILENAME = "agent_model_policy.json"

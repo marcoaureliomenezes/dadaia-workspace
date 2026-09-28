@@ -14,7 +14,7 @@ from pathlib import Path
 
 import pytest
 
-from dadaia_workspace.core.agent_model_templates import CORE_AGENTS
+from dadaia_workspace.core.model_registry import CORE_AGENTS
 
 pytestmark = pytest.mark.contract
 

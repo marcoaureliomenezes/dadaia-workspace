@@ -3,7 +3,7 @@
 from collections.abc import Callable
 from pathlib import Path
 
-from dadaia_workspace.core.models.agent_model_policy import (
+from dadaia_workspace.core.model_registry import (
     AgentModelPolicyOverlay,
     AgentModelPolicyStoreError,
 )

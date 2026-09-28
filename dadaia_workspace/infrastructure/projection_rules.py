@@ -30,7 +30,7 @@ from dadaia_workspace.core.harness_registry import (
     HarnessRecord,
     HookFormat,
 )
-from dadaia_workspace.core.models.agent_model_policy import ResolvedAgentModel
+from dadaia_workspace.core.model_registry import ResolvedAgentModel
 from dadaia_workspace.core.models.doctor_report import DoctorLine, DoctorStatus
 from dadaia_workspace.infrastructure.agent_transcodes import AGENT_RULE_BUILDERS, no_rules
 from dadaia_workspace.infrastructure.codex_doctor import (

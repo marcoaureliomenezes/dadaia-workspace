@@ -11,7 +11,7 @@ from pathlib import Path
 
 import pytest
 
-from dadaia_workspace.core.models.agent_model_policy import ResolvedAgentModel
+from dadaia_workspace.core.model_registry import ResolvedAgentModel
 from dadaia_workspace.infrastructure.agent_transcodes import codex_agent_toml_bytes
 from dadaia_workspace.infrastructure.install_helpers import render_claude_agent
 

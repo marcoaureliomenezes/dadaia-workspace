@@ -33,11 +33,12 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-from dadaia_workspace.core.agent_model_templates import CORE_AGENTS, resolve_agent_model
-from dadaia_workspace.core.model_registry import REGISTRY
-from dadaia_workspace.core.models.agent_model_policy import (
+from dadaia_workspace.core.model_registry import (
     CLAUDE_EFFORTS,
+    CORE_AGENTS,
+    REGISTRY,
     AgentModelPolicyOverlay,
+    resolve_agent_model,
 )
 from dadaia_workspace.core.models.doctor_report import DoctorLine, DoctorStatus
 from dadaia_workspace.infrastructure.runtime_transforms.model_mapping import MODEL_MAP

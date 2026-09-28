@@ -11,7 +11,7 @@ from collections.abc import Callable, Iterable, Mapping
 from pathlib import Path
 
 from dadaia_workspace.core.exceptions import PublicAssetError
-from dadaia_workspace.core.models.agent_model_policy import (
+from dadaia_workspace.core.model_registry import (
     ResolvedAgentModel,
     codex_effort_for_claude_effort,
 )

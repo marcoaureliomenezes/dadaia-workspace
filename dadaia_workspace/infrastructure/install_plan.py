@@ -10,7 +10,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 
-from dadaia_workspace.core.models.agent_model_policy import (
+from dadaia_workspace.core.model_registry import (
     AgentModelPolicyOverlay,
     ResolvedAgentModel,
 )

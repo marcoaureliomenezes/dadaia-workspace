@@ -349,7 +349,7 @@ def test_model_policy_overlay_lockstep_rendering_invalid_fails_loud_and_doctor_r
 
     # NFR-4: invalid overlay -> loud typed error, never a silent fallback; the
     # projection tree is not touched.
-    from dadaia_workspace.core.models.agent_model_policy import (
+    from dadaia_workspace.core.model_registry import (
         AgentModelPolicyStoreError,
     )
 

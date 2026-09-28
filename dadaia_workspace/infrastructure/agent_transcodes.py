@@ -14,7 +14,7 @@ from pathlib import Path
 
 from dadaia_workspace.core.exceptions import PublicAssetError
 from dadaia_workspace.core.harness_registry import AgentTranscode, HarnessRecord
-from dadaia_workspace.core.models.agent_model_policy import ResolvedAgentModel
+from dadaia_workspace.core.model_registry import ResolvedAgentModel
 from dadaia_workspace.infrastructure.install_helpers import (
     persona_read_only,
     resolve_codex_agent_model,

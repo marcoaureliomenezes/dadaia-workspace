@@ -33,7 +33,7 @@ from pathlib import Path
 import pytest
 
 from dadaia_workspace.core.exceptions import PublicAssetError
-from dadaia_workspace.core.models.agent_model_policy import ResolvedAgentModel
+from dadaia_workspace.core.model_registry import ResolvedAgentModel
 from dadaia_workspace.infrastructure.agent_transcodes import codex_agent_toml_bytes
 from dadaia_workspace.infrastructure.install_helpers import (
     render_claude_agent,
@@ -101,7 +101,7 @@ def test_render_claude_agent_seam(case: str) -> None:
         assert render_claude_agent(_GENERIC_BODY, resolved) == rendered
 
     elif case == "omits-effort-entirely-when-unresolved-f6":
-        resolved = ResolvedAgentModel(model="claude-sonnet-5", effort=None, source="pack")
+        resolved = ResolvedAgentModel(model="claude-sonnet-5", effort=None, source="default")
         rendered = render_claude_agent(_PACK_BODY, resolved)
         assert "effort" not in rendered
         fm = rendered.split("---\n", 2)[1]

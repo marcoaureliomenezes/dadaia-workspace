@@ -13,7 +13,6 @@ import os
 from collections.abc import Iterable
 from pathlib import Path
 
-from dadaia_workspace.core.agent_model_templates import CORE_AGENTS, resolve_agent_model
 from dadaia_workspace.core.atomic_write import atomic_write
 from dadaia_workspace.core.exceptions import PublicAssetError
 from dadaia_workspace.core.harness_registry import (
@@ -21,10 +20,12 @@ from dadaia_workspace.core.harness_registry import (
     HARNESS_RECORDS,
     L1_ENTRY_HARNESSES,
 )
-from dadaia_workspace.core.models.agent_model_policy import (
+from dadaia_workspace.core.model_registry import (
+    CORE_AGENTS,
     AgentModelPolicyOverlay,
     AgentModelPolicyStoreError,
     ResolvedAgentModel,
+    resolve_agent_model,
 )
 from dadaia_workspace.core.models.doctor_report import DoctorLine, DoctorStatus, attest
 from dadaia_workspace.core.models.install_ledger import InstallLedger, LedgerEntry

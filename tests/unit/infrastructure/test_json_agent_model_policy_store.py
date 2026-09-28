@@ -20,7 +20,7 @@ from pathlib import Path
 
 import pytest
 
-from dadaia_workspace.core.models.agent_model_policy import (
+from dadaia_workspace.core.model_registry import (
     AgentModelOverride,
     AgentModelPolicyOverlay,
     AgentModelPolicyStoreError,

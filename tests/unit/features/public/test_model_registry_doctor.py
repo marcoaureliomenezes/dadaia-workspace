@@ -90,7 +90,7 @@ def test_unknown_model_variants(
 ) -> None:
     """Unknown model ids surface as ERROR across every source: agent frontmatter,
     and resolved overlay (FR7 T-65-09)."""
-    from dadaia_workspace.core.models.agent_model_policy import (
+    from dadaia_workspace.core.model_registry import (
         AgentModelOverride,
         AgentModelPolicyOverlay,
     )
