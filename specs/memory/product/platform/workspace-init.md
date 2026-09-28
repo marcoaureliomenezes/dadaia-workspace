@@ -21,10 +21,10 @@ sources:
 ## Bootstrap
 
 - `uvx dadaia-workspace init [DIR] [--harness <name>] [--repo <url> [--associated-repo <url>]...] [--skip-assets]` is the only verb that works on an empty directory; every later command runs through the workspace's own `.dadaia/.venv/bin/dadaia`.
-- Flags and prompts fill ONE plan: on a TTY a missing DIR or harness is asked (a bare name becomes `./<name>`), then the main-repo URL (blank = none) and associated URLs until a blank line; with no TTY a missing DIR or harness exits 2 with `fix: uvx dadaia-workspace init <dir> --harness <h>`; a missing `--repo` is never an error.
+- Flags and prompts fill ONE plan: on a TTY a missing DIR or harness is asked (a bare name becomes `./<name>`), then the main-repo URL (blank = none) and associated URLs until a blank line; with no TTY a missing DIR or harness exits 1 with `fix: uvx dadaia-workspace init <dir> --harness <h>`; a missing `--repo` is never an error.
 - Every refusal's `fix:` line is rendered from the plan itself, so it repeats the invocation's `--repo` and every `--associated-repo`.
 - `--harness` names one registered harness (`claude`, `codex`, `kimi-code`, `cursor`, `devin`, `copilot`); on an existing workspace it defaults to the persisted profile's first harness.
-- DIR is created if absent and never resolved from the cwd; a non-directory or a non-empty directory without `.dadaia/` is refused, exit 2, with a sibling `<dir>-workspace` in the `fix:` line; every refusal happens before any write.
+- DIR is created if absent and never resolved from the cwd; a non-directory or a non-empty directory without `.dadaia/` is refused, exit 1, with a sibling `<dir>-workspace` in the `fix:` line; every refusal happens before any write.
 - It provisions `.dadaia/.venv` (stdlib venv plus pip, the package's dependencies resolved from PyPI), every `.dadaia/` zone whose creator is init or install, and `.agents/skills`; the harness's own directory comes from its projection. An absent zone is [[workspace-doctor]]'s `WS-<zone>-missing`.
 - The venv mirrors the running distribution: editable from a source checkout, else its re-packed wheel written to a system temp directory deleted after the install; `DADAIA_BOOTSTRAP_PACKAGE=<wheel>` names another wheel. A base Python without `ensurepip` is reported as missing `ensurepip`/`venv`; any other venv creation failure names a `noexec` target as its likely cause.
 - A failed dependency install says the venv resolves its dependencies from PyPI (network required) and quotes the installer's last whole lines, never a mid-line cut.

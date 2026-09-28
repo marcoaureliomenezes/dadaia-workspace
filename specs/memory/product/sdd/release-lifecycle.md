@@ -60,7 +60,7 @@ sources:
 ## Promote
 
 - Promote is merging the integration branch into the principal, then merging the release PR release-please opens there; that PR owns the version, the CHANGELOG section and the tag, and the publish jobs run on it ([[pypi-distribution]]).
-- Release ids are bare SemVer; a context's live version is the first release id when its repo has no tag, else the last tag plus one patch, minted at birth, and moves only at an operator-approved deploy; a repo's own `AGENTS.md` may override the rule (`dd-gitflow-default`).
+- Release ids are bare SemVer; a context's live version moves only at an operator-approved deploy; a repo's own `AGENTS.md` may override the rule (`dd-gitflow-default`).
 
 ## Runtime state
 

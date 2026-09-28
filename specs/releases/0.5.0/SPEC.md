@@ -4,7 +4,7 @@
 **Release ID:** 0.5.0
 **Owner:** dd-product-engineer
 **Opened:** 2026-09-27
-**Origin:** bugs:sa-reaper-destroys-its-own-hold-before-ttl,sa-context-dead-removes-repos-outside-the-reaper,sa-public-install-unlinks-operator-files-outside-its-ledger,sa-gate-allows-root-entries-the-reaper-moves,sa-doctor-reaps-harness-owned-entries,sa-public-install-writes-the-root-map-into-product-repos,sa-scoped-public-install-prunes-the-gate-wiring,sa-ledger-verbs-append-histo-before-validating-the-pair,sa-private-match-rendering-has-three-renderers,sa-gate-blind-on-cursor-copilot-devin,sa-codex-policy-allows-write-capable-commands,sa-specs-upgrade-writes-through-symlinks,pre-push-gate-never-runs-under-core-hookspath,sa-seven-workspace-root-rules,sa-bind-has-two-stores,sa-fix-lines-not-built-by-cli-line,sa-rich-printer-wraps-fix-lines,sa-unfixable-doctor-findings-say-doctor-fix,sa-placement-rules-contradict-tree8,sa-registry-schema-version-has-three-grammars,sa-spec-doc-033-duplicates-bugs-check,sa-ledger-write-seam-redacts-less-than-push-refuses,sa-backlog-status-has-no-single-authority,sa-promote-has-no-verb,sa-status-line-has-two-parsers,sa-adr-measured-by-pattern-refuses-real-checks,sa-specs-tree-state-read-five-ways,sa-memory-atom-has-two-grammars,sa-release-json-validated-three-times,sa-reconcile-certify-skip-the-workspace-walk,sa-doctor-job-not-a-required-check,sa-context-repo-mapping-falls-back-to-the-name,sa-editable-install-reports-a-frozen-version,sa-subjects-resolve-is-circular,sa-hook-parity-claims-false-and-interpreter-rules-diverge,sa-reviewer-persona-body-contradicts-its-tools,sa-specs-init-writes-unrendered-law,sa-gate-path-classes-diverge-from-the-law,sa-tool-caches-land-outside-the-cache-zone,sa-live-work-branch-named-three-ways,sa-principal-branch-defaults-to-main-and-cut-point-diverges,sa-audit-close-archives-without-validating,sa-staged-assets-without-consumers,sa-expiry-has-two-clocks,sa-handoff-self-pull-requirement-diverges,sa-specs-upgrade-stamps-any-target-and-memory-vocabulary-diverges,sa-ledger-vocabulary-and-atomic-write-duplicated-in-scripts,sa-text-restates-rules-the-code-contradicts,sa-consumer-law-carries-library-facts,sa-implementation-adds-before-it-deletes
+**Origin:** bugs:sa-reaper-destroys-its-own-hold-before-ttl,sa-context-dead-removes-repos-outside-the-reaper,sa-public-install-unlinks-operator-files-outside-its-ledger,sa-gate-allows-root-entries-the-reaper-moves,sa-doctor-reaps-harness-owned-entries,sa-public-install-writes-the-root-map-into-product-repos,sa-scoped-public-install-prunes-the-gate-wiring,sa-ledger-verbs-append-histo-before-validating-the-pair,sa-private-match-rendering-has-three-renderers,sa-gate-blind-on-cursor-copilot-devin,sa-codex-policy-allows-write-capable-commands,sa-specs-upgrade-writes-through-symlinks,pre-push-gate-never-runs-under-core-hookspath,sa-seven-workspace-root-rules,sa-bind-has-two-stores,sa-fix-lines-not-built-by-cli-line,sa-rich-printer-wraps-fix-lines,sa-unfixable-doctor-findings-say-doctor-fix,sa-placement-rules-contradict-tree8,sa-registry-schema-version-has-three-grammars,sa-spec-doc-033-duplicates-bugs-check,sa-ledger-write-seam-redacts-less-than-push-refuses,sa-backlog-status-has-no-single-authority,sa-promote-has-no-verb,sa-status-line-has-two-parsers,sa-adr-measured-by-pattern-refuses-real-checks,sa-specs-tree-state-read-five-ways,sa-memory-atom-has-two-grammars,sa-release-json-validated-three-times,sa-reconcile-certify-skip-the-workspace-walk,sa-doctor-job-not-a-required-check,sa-context-repo-mapping-falls-back-to-the-name,sa-editable-install-reports-a-frozen-version,sa-subjects-resolve-is-circular,sa-hook-parity-claims-false-and-interpreter-rules-diverge,sa-reviewer-persona-body-contradicts-its-tools,sa-specs-init-writes-unrendered-law,sa-gate-path-classes-diverge-from-the-law,sa-tool-caches-land-outside-the-cache-zone,sa-live-work-branch-named-three-ways,sa-principal-branch-defaults-to-main-and-cut-point-diverges,sa-audit-close-archives-without-validating,sa-staged-assets-without-consumers,sa-expiry-has-two-clocks,sa-handoff-self-pull-requirement-diverges,sa-specs-upgrade-stamps-any-target-and-memory-vocabulary-diverges,sa-ledger-vocabulary-and-atomic-write-duplicated-in-scripts,sa-text-restates-rules-the-code-contradicts,sa-consumer-law-carries-library-facts,sa-implementation-adds-before-it-deletes,sa-hook-files-written-by-table-and-by-hand,sa-projected-file-judged-by-four-verifiers,sa-codex-effort-set-by-policy-and-by-tier,sa-frontmatter-split-five-ways,sa-privacy-match-has-two-matchers,sa-denylist-file-has-three-shapes,sa-ledger-script-paths-in-two-tables,sa-json-schema-validated-by-two-engines,sa-doctor-finding-has-four-shapes,sa-session-liveness-has-two-rules,sa-agent-model-resolved-by-two-modules,sa-release-id-has-three-grammars,sa-missing-memory-file-reported-twice,sa-command-tree-walked-twice,sa-path-segment-judged-by-two-matchers,sa-certify-children-resolve-the-live-workspace
 - Operator demand, 2026-09-28 (FR10), verbatim: "SE ESTAMOS RESOLVENDO AMBIGUIDADES, QUER DIZER QUE HAVIA
   REPETIÇÕES. COMO QUE AUMENTOU O NUMERO DE LINHAS DE CODIGO E NUMERO DE TESTES???? ISSO EU NÃO ACEITO." /
   "VC VIOLOU A REGRA FUNDAMENTAL DE DELEÇÃO -> ATUALIZAÇÃO / REFAZER / RECONSTRUIR E SOMENTE DEPOIS
@@ -27,13 +27,13 @@
 Operator, 2026-09-26: "não adicione fix em cima do que ta quebrado ... agora so aceito 80% pra mais com
 o restante permanecendo mapeados". 2026-09-27: "se não resolvermos os testes é impossível resolver o problema na raiz".
 
-- Origin: 50 ids — the 49 open at definition (22 C, 11 H, 11 M, 5 L: 48 packages from 142 verified
-  findings plus the hooks-path bug `2c1faf65`) and the work-order bug (`11fe60bb`).
+- Origin: 66 ids — the 49 open at definition (22 C, 11 H, 11 M, 5 L: 48 packages from 142 verified
+  findings plus the hooks-path bug `2c1faf65`), the work-order bug (`11fe60bb`) and FR10's survey (`c3f48ab8`).
 - 0.4.7's first-run rubric D1–D10: **44/100** (Claude 50, non-Claude 40); 3 stalls.
 
 ## Objective
 
-Each question the 50 bugs name gets one authority, behavior row and public seam; every other mechanism,
+Each question an Origin bug names gets one authority, behavior row and public seam; every other mechanism,
 tests and fakes included, consults it or goes; definition, review, CI and closure refuse a second
 authority or an uncited assertion; code and tests shrink; 0.5.0 publishes per FR7.
 
@@ -44,8 +44,8 @@ authority or an uncited assertion; code and tests shrink; 0.5.0 publishes per FR
 ## Decisions
 
 A parenthesized `00NN` is an ADR: 0050–0088 hold the operator-accepted decisions, appended at
-definition (handoffs in `reports/main-thread/20260927-050-c4-evidence/`); per-bug ones sit in the
-table. Over the as-is, the grill wins.
+definition (handoffs in `reports/main-thread/20260927-050-c4-evidence/`); per-bug ones name their
+bug. Over the as-is, the grill wins.
 
 - 0.5.0 is CRITICAL, Flow 2 plus a never-again mechanism: FR5 generic, FR6 library (0050, 0052).
 - DEC-1..13: 0058–0069; DEC-11 deferred (0053).
@@ -54,66 +54,7 @@ table. Over the as-is, the grill wins.
 
 ## Bugs, their question and the one authority
 
-WP = plan package (HP: hooks-path bug).
-
-| WP | bug id | question | the one authority |
-|---|---|---|---|
-| | **Wave 0 — data loss, leaks, gate holes (14)** | | |
-| 02 | sa-reaper-destroys-its-own-hold-before-ttl | may a hold die before its TTL | `sweep.move` (0074) |
-| 03 | sa-context-dead-removes-repos-outside-the-reaper | how a dead repo leaves disk | `_reap_dead_repo` over `all_repos()`; unpublished = any branch |
-| 04 | sa-public-install-unlinks-operator-files-outside-its-ledger | who deletes in harness dirs | `_reconcile_install_ledger` |
-| 05 | sa-gate-allows-root-entries-the-reaper-moves | may a root entry exist | `workspace_layout.verdict` (0058) |
-| 06 | sa-doctor-reaps-harness-owned-entries | who judges harness dirs | the install ledger (0059) |
-| 07 | sa-public-install-writes-the-root-map-into-product-repos | who writes a repo `AGENTS.md` | `canon.REPO_LAW` via `specs init` |
-| 08 | sa-scoped-public-install-prunes-the-gate-wiring | what a whole install is | one `InstallPlan` |
-| 09 | sa-ledger-verbs-append-histo-before-validating-the-pair | did a refusal write | the script checks both files, then writes the pair |
-| 11 | sa-private-match-rendering-has-three-renderers | how a match is shown | `redaction.mask` (0086) |
-| 12 | sa-gate-blind-on-cursor-copilot-devin | is every tool call judged | `pre_gate` + `HOOK_DIALECTS` (0054) |
-| 13 | sa-codex-policy-allows-write-capable-commands | unprompted Codex commands | the rendered `.rules`: `rg ls cat`, `sed -n` |
-| 14 | sa-specs-upgrade-writes-through-symlinks | how a fixed section is written | one symlink-refusing writer |
-| 32 | sa-doctor-job-not-a-required-check | which checks gate | `ci.yml`; `checks_for()` (0078) |
-| HP | pre-push-gate-never-runs-under-core-hookspath | where git runs the gate | `git rev-parse --git-path hooks` (0057, 0085) |
-| | **Wave 1 — stalls, loops, fixes that never clear (15)** | | |
-| 15 | sa-seven-workspace-root-rules | the workspace root | `resolve_workspace_root` |
-| 15 | (fence) | which roots may a dadaia process act on | `core/workspace_resolver` fence (0088) |
-| 16 | sa-bind-has-two-stores | is the session bound | `resolve_bind` (0060, 0072) |
-| 17 | sa-fix-lines-not-built-by-cli-line | how a fix line is written | `core/cli_line` |
-| 18 | sa-rich-printer-wraps-fix-lines | who prints a refusal | `cli/_fail.fail` (0073) |
-| 19 | sa-unfixable-doctor-findings-say-doctor-fix | fix of an unfixable finding | the finding's own `fix_line` |
-| 20 | sa-placement-rules-contradict-tree8 | where a stray specs file goes | TREE-8 |
-| 21 | sa-registry-schema-version-has-three-grammars | readable registry versions | `parse_schema_version` |
-| 22 | sa-spec-doc-033-duplicates-bugs-check | is a bug record valid | `bugs.py check` + schema |
-| 23 | sa-ledger-write-seam-redacts-less-than-push-refuses | what a ledger may store | the pre-push matcher, refusing at the write seam |
-| 24 | sa-backlog-status-has-no-single-authority | live status; the pick | `backlog.py`; SPEC `Origin` (0062, 0063, 0076) |
-| 25 | sa-promote-has-no-verb | how a promote is recorded | `release.py ship` (0064) |
-| 26 | sa-status-line-has-two-parsers | which `**Status:**` counts | `extract_status` (0075) |
-| 27 | sa-adr-measured-by-pattern-refuses-real-checks | what `measured_by` names | free text; `doctor_adr` (0065) |
-| 28 | sa-specs-tree-state-read-five-ways | the specs tree state | `specs_version.state()` |
-| 29 | sa-memory-atom-has-two-grammars | atom valid; catalog fresh | `_memory_schema.parse` |
-| | **Wave 2 — consolidations (8)** | | |
-| 30 | sa-release-json-validated-three-times | valid state; live release | `release.py check` (0077) |
-| 31 | sa-reconcile-certify-skip-the-workspace-walk | is an upgrade clean | doctor; `certify` (0069) |
-| 33 | sa-context-repo-mapping-falls-back-to-the-name | a context's repo | the context registry |
-| 34 | sa-editable-install-reports-a-frozen-version | the running version | `provider_version()`, rebuilt in place |
-| 35 | sa-subjects-resolve-is-circular | does a subject ref resolve | doctor `SubjectRegistry` |
-| 36 | sa-hook-parity-claims-false-and-interpreter-rules-diverge | hooks; interpreter | `HOOK_DIALECTS`; the wrapper (0066, 0067, 0079) |
-| 37 | sa-reviewer-persona-body-contradicts-its-tools | may the reviewer write | persona `tools`, `read_only` |
-| 38 | sa-specs-init-writes-unrendered-law | the canon table text | `render_registry_tables` |
-| | **Wave 3 — design debt (12)** | | |
-| 39 | sa-gate-path-classes-diverge-from-the-law | PROTECTED/ADDITIVE paths | one classifier (0055) |
-| 40 | sa-tool-caches-land-outside-the-cache-zone | where caches live | `.dadaia/tmp/<tool>-cache` (0080) |
-| 41 | sa-live-work-branch-named-three-ways | version; work branch | release-please; `<work><live id>` (0068) |
-| 42 | sa-principal-branch-defaults-to-main-and-cut-point-diverges | an undeclared principal | the `specs init` detector |
-| 43 | sa-audit-close-archives-without-validating | is an audit closable | `audit.py` (0081) |
-| 44 | sa-staged-assets-without-consumers | consumed assets | the real consumer |
-| 45 | sa-expiry-has-two-clocks | has a marker expired | zone TTL via `sweep` |
-| 46 | sa-handoff-self-pull-requirement-diverges | is `self_pull` required | handoff schema v1.2 |
-| 47 | sa-specs-upgrade-stamps-any-target-and-memory-vocabulary-diverges | the upgrade target | `CANONICAL_SPECS_VERSION` (0082) |
-| 48 | sa-ledger-vocabulary-and-atomic-write-duplicated-in-scripts | ledger vocabulary | the stdlib scripts; the doctor compares exactly (0083) |
-| 49 | sa-text-restates-rules-the-code-contradicts | a restated rule | the code or its test |
-| — | sa-consumer-law-carries-library-facts | projected law | the consumer's tree (0084) |
-| | **FR10 — the work order (1)** | | |
-| — | sa-implementation-adds-before-it-deletes | what comes first in a change | ONE root-map §1 bullet (AC10.5) |
+PLAN §1.1 gives each Origin bug's question its one authority; PLAN §2 its wave and WP.
 
 ## Functional requirements
 
