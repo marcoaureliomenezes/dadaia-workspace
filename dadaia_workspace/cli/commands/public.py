@@ -6,21 +6,9 @@ import typer
 from rich.console import Console
 
 from dadaia_workspace import container
+from dadaia_workspace.core.cli_line import fix_line
 from dadaia_workspace.core.models.doctor_report import DoctorLine, DoctorStatus
 from dadaia_workspace.core.workspace_resolver import resolve_workspace_root
-
-#: Display styles by status. Rendering only — the verdict NEVER depends on this map:
-#: an unmapped status prints unstyled and still blocks if its status blocks.
-_STYLE_BY_STATUS: dict[DoctorStatus, str] = {
-    DoctorStatus.OK: "green",
-    DoctorStatus.MISSING: "yellow",
-    DoctorStatus.DRIFT: "yellow",
-    DoctorStatus.ERROR: "red",
-    DoctorStatus.LEAK: "red",
-    DoctorStatus.EXTRA: "yellow",
-    DoctorStatus.NOT_APPLICABLE: "cyan",
-    DoctorStatus.UNSUPPORTED: "cyan",
-}
 
 app = typer.Typer(help="Manage distributed public agent assets.")
 console = Console()
@@ -87,12 +75,19 @@ def doctor() -> None:
     harnesses registered in the profile.
     """
     workspace_root = resolve_workspace_root()
-    report = container.build_public_service().doctor(workspace_root)
-    lines: list[DoctorLine] = list(report.lines)
+    lines, fix = projection_verdict(workspace_root)
     for line in lines:
         print(line.render())  # plain: a fix line is never wrapped at the terminal width
-    # The verdict is the typed report's — fail-closed: EVERY blocking status exits 1,
-    # including ones this CLI never special-cased (bug public-doctor-exits-zero-
-    # despite-error: [error] used to fall into a decorative else and exit 0).
-    if any(line.status.blocking for line in lines):
+    if fix:
+        print(f"fix: {fix}")
         raise typer.Exit(1)
+
+
+def projection_verdict(workspace_root: Path) -> tuple[list[DoctorLine], str]:
+    """The ONE answer to "is the projection healthy": every doctor line, and the one
+    remedy when any line blocks (``""`` when none does) — `public doctor` prints it and
+    `dadaia doctor` carries it, so the two never disagree. The verdict is the typed
+    report's, fail-closed: every blocking status fails (public-doctor-exits-zero-despite-error)."""
+    lines = list(container.build_public_service().doctor(workspace_root).lines)
+    blocking = any(line.status.blocking for line in lines)
+    return lines, fix_line(workspace_root, "public", "install") if blocking else ""

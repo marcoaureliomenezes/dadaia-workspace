@@ -73,3 +73,16 @@ def test_doctor_detects_and_holds_a_dead_contexts_stale_repo(workspace: Path) ->
     assert not stale_repo.exists()
     held = list(workspace.glob(".dadaia/reaped/*/repos/stale-ctx/work.txt"))
     assert [p.read_text() for p in held] == ["keep\n"]
+
+
+@pytest.mark.parametrize("disarmed", [".claude/settings.json", ".dadaia/hooks/claude-pre-gate"])
+def test_both_doctors_give_one_answer_on_a_disarmed_gate(workspace: Path, disarmed: str) -> None:
+    """sa-instance-health-judged-by-two-doctors: a deleted gate wire fails `doctor` AND
+    `public doctor`, each with the one fix `<ws venv>/dadaia public install`."""
+    (workspace / disarmed).unlink()
+    for argv in (["doctor"], ["public", "doctor"]):
+        result = _runner.invoke(app, argv)
+        assert result.exit_code == 1, result.output
+        fixes = [ln for ln in result.output.splitlines() if ln.endswith(" public install")]
+        assert len(fixes) == 1, result.output
+        assert fixes[0].startswith(f"fix: {workspace.as_posix()}/.dadaia/.venv/"), fixes

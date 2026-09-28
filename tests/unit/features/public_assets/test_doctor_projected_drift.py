@@ -8,21 +8,18 @@ Verifies that `dadaia public doctor` (via FileSystemPublicAssetManager.doctor):
 
 Doctor drift detection gates agent dispatch, so both failure modes ([drift] and
 [missing]) are kept as named tests; the clean/[ok] path (incl. the scripts
-staging↔projected facet) and the CLI exit-code propagation are each merged into
-one parametrized test.
+staging↔projected facet) is merged into one parametrized test; the CLI exit code is
+pinned by tests/integration/cli/test_doctor_exit_verdict.py.
 """
 
 from __future__ import annotations
 
 import os
 from pathlib import Path
-from unittest.mock import MagicMock, patch
 
 import pytest
 
 from dadaia_workspace.core.models.doctor_report import (
-    DoctorLine,
-    DoctorReport,
     DoctorStatus,
 )
 from dadaia_workspace.infrastructure.projection import doctor_rules, tree_bytes_rules
@@ -110,68 +107,3 @@ def test_an_executable_rule_that_lost_its_exec_bit_is_drift(tmp_path: Path) -> N
     assert [line.render() for line in doctor_rules(rules)] == ["[drift] s/hook.sh (not executable)"]
     dst.chmod(0o755)
     assert [line.status for line in doctor_rules(rules)] == [DoctorStatus.OK]
-
-
-@pytest.mark.parametrize(
-    ("reports", "expect_zero"),
-    [
-        pytest.param(
-            DoctorReport(
-                lines=(
-                    DoctorLine(DoctorStatus.OK, "stage:foo.md"),
-                    DoctorLine(DoctorStatus.OK, "claude:rules/bar.md"),
-                )
-            ),
-            True,
-            id="all-ok-exits-0",
-        ),
-        pytest.param(
-            DoctorReport(
-                lines=(
-                    DoctorLine(DoctorStatus.OK, "stage:foo.md"),
-                    DoctorLine(DoctorStatus.DRIFT, "stage:scripts/hook.sh"),
-                )
-            ),
-            False,
-            id="drift-exits-nonzero",
-        ),
-        pytest.param(
-            DoctorReport(
-                lines=(
-                    DoctorLine(DoctorStatus.OK, "stage:foo.md"),
-                    DoctorLine(DoctorStatus.MISSING, "claude:rules/bar.md"),
-                )
-            ),
-            False,
-            id="missing-exits-nonzero",
-        ),
-    ],
-)
-def test_cli_exit_code_propagation(
-    tmp_path: Path, reports: DoctorReport, expect_zero: bool
-) -> None:
-    """The CLI doctor command must propagate [drift]/[missing] to a non-zero exit."""
-    from typer.testing import CliRunner
-
-    from dadaia_workspace.cli.commands.public import app
-
-    with patch("dadaia_workspace.cli.commands.public.container") as mock_container:
-        mock_svc = MagicMock()
-        mock_svc.doctor.return_value = reports
-        mock_container.build_public_service.return_value = mock_svc
-
-        with patch(
-            "dadaia_workspace.cli.commands.public.resolve_workspace_root",
-            return_value=tmp_path,
-        ):
-            runner = CliRunner()
-            result = runner.invoke(app, ["doctor"])
-
-    if expect_zero:
-        assert result.exit_code == 0, (
-            f"Expected exit code 0, got {result.exit_code}. Output: {result.output}"
-        )
-    else:
-        assert result.exit_code != 0, (
-            f"Expected non-zero exit code, got {result.exit_code}. Output: {result.output}"
-        )
