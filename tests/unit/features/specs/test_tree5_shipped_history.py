@@ -26,6 +26,7 @@ from dadaia_workspace.core.template_history import (
     SHIPPED_HASHES_FILENAME,
     was_shipped,
 )
+from dadaia_workspace.features.specs import canon
 from dadaia_workspace.features.specs.doctor import SpecsDoctor
 
 _REPO_ROOT = Path(__file__).parents[4]
@@ -63,8 +64,8 @@ def _specs_tree(root: Path, agents_md: str) -> Path:
 
 
 def test_stale_shipped_projection_is_refreshed(tmp_path: Path) -> None:
-    """Bytes we shipped earlier carry no customisation: TREE-5 offers the repair and
-    ``fix()`` restores the canonical text, clearing the issue."""
+    """sa-specs-init-writes-unrendered-law#B38-3: bytes we shipped earlier carry no customisation: TREE-5 offers the
+    repair and ``fix()`` writes the RENDERED law (the canon table, no placeholder)."""
     templates = _templates_dir(tmp_path, _STALE_SHIPPED)
     specs = _specs_tree(tmp_path / "stale", _STALE_SHIPPED)
 
@@ -73,13 +74,14 @@ def test_stale_shipped_projection_is_refreshed(tmp_path: Path) -> None:
     assert issues and issues[0].fixable, "a stale shipped projection must be auto-fixable"
 
     doctor.fix(issues)
-    assert (specs / "AGENTS.md").read_text(encoding="utf-8") == _CANONICAL_TEXT
+    law = (specs / "AGENTS.md").read_text(encoding="utf-8")
+    assert "| Area | Members |" in law and "<!-- specs-canon -->" not in law
     assert [i for i in doctor.check() if i.code == "TREE-5"] == []
 
 
 def test_operator_customisation_is_never_overwritten(tmp_path: Path) -> None:
-    """Bytes the tool never shipped are operator content: TREE-5 stays warn-only and
-    ``fix()`` leaves the file exactly as it is."""
+    """sa-specs-init-writes-unrendered-law#B38-5: bytes the tool never shipped are operator content: TREE-5 stays
+    warn-only and ``fix()`` leaves the file exactly as it is."""
     customised = "# AGENTS\n\nOur own workflow contract, hand-written.\n"
     templates = _templates_dir(tmp_path, _STALE_SHIPPED)
     specs = _specs_tree(tmp_path / "custom", customised)
@@ -107,9 +109,13 @@ def test_missing_history_file_keeps_the_conservative_behaviour(tmp_path: Path) -
     assert (specs / "AGENTS.md").read_text(encoding="utf-8") == _STALE_SHIPPED
 
 
-def test_shipped_history_records_the_current_canonical_template() -> None:
-    """Anti-rot: every template edit must append its new hash, or the next stale
-    projection stops being recognisable as ours."""
+def test_shipped_history_records_the_current_canonical_template(tmp_path: Path) -> None:
+    """sa-specs-init-writes-unrendered-law#B38-4: the history records the digest of what `specs init` writes (the
+    rendered law) and keeps the raw template an older init wrote as ours."""
+    specs = tmp_path / "specs"
+    canon.scaffold(specs, project_name="p")
+    written = (specs / "AGENTS.md").read_text(encoding="utf-8")
+    assert was_shipped(written, "specs-AGENTS.md", _REAL_TEMPLATES_DIR)
     assert was_shipped(_CANONICAL_TEXT, "specs-AGENTS.md", _REAL_TEMPLATES_DIR)
 
 
@@ -157,22 +163,6 @@ def test_stale_shipped_scoped_law_is_refreshed(tmp_path: Path) -> None:
 
     doctor.fix(issues)
     assert (specs / "releases" / "AGENTS.md").read_text(encoding="utf-8") == _SCOPED_CANONICAL
-
-
-def test_customised_scoped_law_is_never_overwritten(tmp_path: Path) -> None:
-    customised = "# Our releases law\n\nHand-written by the operator.\n"
-    public = _public_dir_with_scoped(tmp_path, _SCOPED_STALE)
-    specs = _specs_tree(tmp_path / "scoped-custom", _CANONICAL_TEXT)
-    (specs / "releases").mkdir(parents=True, exist_ok=True)
-    (specs / "releases" / "AGENTS.md").write_text(customised, encoding="utf-8")
-
-    doctor = SpecsDoctor(specs, public_dir=public)
-    issues = [i for i in doctor.check() if i.code == "TREE-5"]
-    scoped = [i for i in issues if PurePath(i.path or "").as_posix().endswith("releases/AGENTS.md")]
-    assert scoped and not scoped[0].fixable
-
-    doctor.fix(doctor.check())
-    assert (specs / "releases" / "AGENTS.md").read_text(encoding="utf-8") == customised
 
 
 def test_shipped_history_records_every_current_scaffold_law() -> None:

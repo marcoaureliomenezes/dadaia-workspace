@@ -934,7 +934,7 @@ def _projected_specs_agents_relpath(repo_root: Path) -> str | None:
     locally-instantiated workspace carries it as an untracked lib-projection leftover.
 
     Runs ``scaffold()`` against a throwaway scratch directory and confirms the produced
-    ``AGENTS.md`` is byte-identical to the real source template — proof by generating
+    ``AGENTS.md`` is the real source template through the one renderer — proof by generating
     asset, never by checkout presence. Returns ``None`` (never special-cased) when the
     source template itself is absent under *repo_root*."""
     templates_dir = repo_root / "dadaia_workspace" / "public" / "templates"
@@ -942,6 +942,7 @@ def _projected_specs_agents_relpath(repo_root: Path) -> str | None:
     if not source.exists():
         return None
 
+    from dadaia_workspace.core.workspace_layout import render_registry_tables
     from dadaia_workspace.features.specs.canon import scaffold
 
     with tempfile.TemporaryDirectory() as scratch:
@@ -955,7 +956,8 @@ def _projected_specs_agents_relpath(repo_root: Path) -> str | None:
         target = scratch_specs_dir / _PROJECTED_SPECS_TARGET_RELPATH
         if target not in created:
             return None
-        if target.read_text(encoding="utf-8") != source.read_text(encoding="utf-8"):
+        rendered = render_registry_tables(source.read_text(encoding="utf-8"))  # WP-38
+        if target.read_text(encoding="utf-8") != rendered:
             return None
     return _PROJECTED_SPECS_TARGET_RELPATH
 

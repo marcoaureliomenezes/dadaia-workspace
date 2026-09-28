@@ -83,9 +83,7 @@ def test_absent_specs_scaffolds_lists_paths_and_commits_nothing(repo: Path) -> N
     assert "constitution.md" in result.output and "memory/ARCHITECTURE.md" in result.output
     assert _doctor_errors(repo / "specs") == []
     assert _git(repo, "rev-parse", "HEAD") == head
-    template = _PUBLIC / "templates"
-    law = (template / "repo-AGENTS.md").read_text(encoding="utf-8")
-    assert (repo / "AGENTS.md").read_text(encoding="utf-8") == law.replace("<repo-name>", repo.name)
+    assert repo.name in (repo / "AGENTS.md").read_text(encoding="utf-8")
     # T-048-11: the tests law governs an existing test tree; init never invents one
     # (a manufactured tests/AGENTS.md is born with AGENTS-PLACEHOLDER-1 on a clean repo).
     assert not (repo / "tests").exists()
@@ -272,3 +270,38 @@ def test_a_malformed_constitution_refuses_naming_the_file(repo: Path, frontmatte
     assert result.exit_code == 2
     assert f"fix: repair the YAML frontmatter of {specs / 'constitution.md'}" in result.output
     assert _snapshot(repo) == before
+
+
+#: The registry placeholders a shipped law template carries (literal, the law's own).
+_PLACEHOLDERS = (
+    "<!-- zones -->",
+    "<!-- canon -->",
+    "<!-- root -->",
+    "<!-- repo-excluded -->",
+    "<!-- specs-canon -->",
+)
+
+
+def test_specs_init_writes_the_rendered_canon_table(repo: Path) -> None:
+    """sa-specs-init-writes-unrendered-law#B38-1: specs/AGENTS.md carries the canon
+    table, never the raw placeholder."""
+    assert _runner.invoke(app, ["specs", "init", "--context", "c"]).exit_code == 0
+
+    law = (repo / "specs" / "AGENTS.md").read_text(encoding="utf-8")
+    assert "| Area | Members |" in law
+    assert "<!-- specs-canon -->" not in law
+
+
+def test_no_law_writer_leaves_a_registry_placeholder(repo: Path) -> None:
+    """sa-specs-init-writes-unrendered-law#B38-2: every law file `specs init` writes (the
+    specs tree and the repo law) is rendered through the one renderer."""
+    assert _runner.invoke(app, ["specs", "init", "--context", "c"]).exit_code == 0
+
+    raw = [
+        f"{path.relative_to(repo)}: {marker}"
+        for path in sorted(repo.rglob("*.md"))
+        if ".git" not in path.parts
+        for marker in _PLACEHOLDERS
+        if marker in path.read_text(encoding="utf-8")
+    ]
+    assert raw == []

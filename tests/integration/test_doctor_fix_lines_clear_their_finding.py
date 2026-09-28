@@ -398,6 +398,42 @@ def _doctor_json(specs: Path, *flags: str) -> list[dict[str, str]]:
     return findings
 
 
+#: Literal lines of the rendered canon table and the registry placeholders (the law's own).
+_AREA_HEADER = "| Area | Members |"
+_ROOT_ROW = "| root | `AGENTS.md constitution.md memory/ releases/ backlog/ bugs/ audits/ ADRs/` |"
+_PLACEHOLDERS = (
+    "<!-- zones -->",
+    "<!-- canon -->",
+    "<!-- root -->",
+    "<!-- repo-excluded -->",
+    "<!-- specs-canon -->",
+)
+
+
+def test_doctor_fix_renders_a_raw_law_copy_and_clears_its_finding(tmp_path: Path) -> None:
+    """sa-specs-init-writes-unrendered-law#B38-3: a raw specs/AGENTS.md (the template an
+    older `specs init` copied) is flagged by `dadaia doctor` as refreshable; `dadaia
+    doctor --fix` renders it and the TREE-5 finding is gone."""
+    specs = _repo(tmp_path) / "specs"
+    public = Path(__file__).resolve().parents[2] / "dadaia_workspace" / "public"
+    law = specs / "AGENTS.md"
+    law.write_bytes((public / "templates" / "specs-AGENTS.md").read_bytes())
+
+    def root_law_findings() -> list[str]:
+        messages = [f["message"] for f in _doctor_json(specs) if f["code"] == "TREE-5"]
+        return [m for m in messages if m.startswith("specs/AGENTS.md ")]
+
+    before = root_law_findings()
+    assert len(before) == 1 and "refreshed losslessly" in before[0], before
+
+    _doctor_json(specs, "--fix")
+
+    text = law.read_text(encoding="utf-8")
+    assert _AREA_HEADER in text and _ROOT_ROW in text
+    assert not [p for p in _PLACEHOLDERS if p in text]
+    assert root_law_findings() == []
+
+
 def test_doctor_fix_writes_a_missing_law_file_and_clears_its_finding(tmp_path: Path) -> None:
     """A missing ``specs/AGENTS.md`` or ``specs/<area>/AGENTS.md`` is lossless to write:
     ``doctor --fix`` writes the shipped template and the TREE-5 finding is gone."""
@@ -410,9 +446,9 @@ def test_doctor_fix_writes_a_missing_law_file_and_clears_its_finding(tmp_path: P
     _doctor_json(specs, "--fix")
 
     public = Path(__file__).resolve().parents[2] / "dadaia_workspace" / "public"
-    assert (specs / "AGENTS.md").read_bytes() == (
-        public / "templates" / "specs-AGENTS.md"
-    ).read_bytes()
+    law = (specs / "AGENTS.md").read_text(encoding="utf-8")
+    assert _AREA_HEADER in law and _ROOT_ROW in law  # the rendered canon table (WP-38)
+    assert not [p for p in _PLACEHOLDERS if p in law]
     assert (specs / "bugs" / "AGENTS.md").read_bytes() == (
         public / "scaffold" / "bugs" / "AGENTS.md"
     ).read_bytes()

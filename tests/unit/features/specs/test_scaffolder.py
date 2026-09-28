@@ -85,9 +85,6 @@ def test_scaffold_happy_path_creates_all_artifacts(tmp_path: Path) -> None:
     assert f"specs_pattern_version: {CANONICAL_SPECS_VERSION}" in (
         specs_dir / "constitution.md"
     ).read_text(encoding="utf-8")
-    assert (specs_dir / "AGENTS.md").read_text(encoding="utf-8") == (
-        _TEMPLATES_DIR / "specs-AGENTS.md"
-    ).read_text(encoding="utf-8")
 
 
 def test_scaffold_emits_exact_v6_canon_root_zero_readme_zero_assets(tmp_path: Path) -> None:

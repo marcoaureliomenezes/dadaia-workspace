@@ -16,7 +16,7 @@ from pathlib import Path
 from dadaia_workspace.core.atomic_write import atomic_write
 from dadaia_workspace.core.kernel_tunables import MEMORY_SCRIPT
 from dadaia_workspace.core.template_history import was_shipped
-from dadaia_workspace.core.workspace_layout import SCOPED_LAW_AREAS
+from dadaia_workspace.core.workspace_layout import SCOPED_LAW_AREAS, render_registry_tables
 from dadaia_workspace.features.specs import memory_canon
 from dadaia_workspace.features.specs.canon import (
     CANON_ROOT_MEMBERS,
@@ -277,7 +277,7 @@ class StructuralValidator:
     ) -> list[SpecsDoctorIssue]:
         """ONE comparison rule for every TREE-5 target (root and scoped alike)."""
         assert self._templates_dir is not None
-        canonical_text = canonical_path.read_text(encoding="utf-8")
+        canonical_text = render_registry_tables(canonical_path.read_text(encoding="utf-8"))
         current_text = dst.read_text(encoding="utf-8")
         canonical_hash = hashlib.sha256(canonical_text.encode("utf-8")).hexdigest()
         current_hash = hashlib.sha256(current_text.encode("utf-8")).hexdigest()
@@ -362,7 +362,8 @@ class StructuralValidator:
             ):
                 continue
             dst.parent.mkdir(parents=True, exist_ok=True)
-            atomic_write(dst, canonical_path.read_text(encoding="utf-8"), preserve_mode=True)
+            law = render_registry_tables(canonical_path.read_text(encoding="utf-8"))
+            atomic_write(dst, law, preserve_mode=True)
             return
 
     def check_tree7_bug_session_id(self) -> list[SpecsDoctorIssue]:

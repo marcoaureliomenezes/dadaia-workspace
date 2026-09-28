@@ -14,6 +14,7 @@ from pathlib import Path
 
 import pytest
 
+from dadaia_workspace.core.workspace_layout import render_registry_tables
 from dadaia_workspace.features.specs import Severity, SpecsDoctor, SpecsDoctorIssue
 from dadaia_workspace.features.specs.memory_canon import (
     FIXED_SECTIONS,
@@ -540,7 +541,8 @@ def test_tree4_creates_missing_dirs_others_have_no_autofix(tmp_path: Path) -> No
     # T-050-09 (AC2.4): writing the shipped template is lossless, so --fix writes it.
     assert tree5_missing[0].fixable
     doctor_missing.fix(tree5_missing)
-    assert agents_md.read_bytes() == (_TEMPLATES_DIR / "specs-AGENTS.md").read_bytes()
+    written = agents_md.read_text(encoding="utf-8")  # the rendered law (WP-38)
+    assert "| Area | Members |" in written and "<!-- specs-canon -->" not in written
 
     specs_drift = _make_clean_specs_tree(tmp_path.parent / (tmp_path.name + "-tree5-drift"))
     (specs_drift / "AGENTS.md").write_text(
@@ -553,7 +555,7 @@ def test_tree4_creates_missing_dirs_others_have_no_autofix(tmp_path: Path) -> No
     assert "drift" in tree5_drift[0].description.lower()
 
     specs_ok = _make_clean_specs_tree(tmp_path.parent / (tmp_path.name + "-tree5-ok"))
-    canonical = (_TEMPLATES_DIR / "specs-AGENTS.md").read_text(encoding="utf-8")
+    canonical = render_registry_tables((_TEMPLATES_DIR / "specs-AGENTS.md").read_text("utf-8"))
     (specs_ok / "AGENTS.md").write_text(canonical, encoding="utf-8")
     doctor_ok = SpecsDoctor(specs_ok, templates_dir=_TEMPLATES_DIR)
     root_law = str(specs_ok / "AGENTS.md")  # the scoped law files are not planted here

@@ -77,6 +77,7 @@ from dadaia_workspace.core.workspace_layout import (
     REQUIRED_ROOT_DIRS,
     SPECS_CANON,
     CanonEntry,
+    render_registry_tables,
 )
 from dadaia_workspace.features.specs.memory_canon import (
     FIXED_SECTION_BY_PATH,
@@ -227,7 +228,7 @@ def _today() -> str:
 def _render(entry: CanonEntry, *, public_dir: Path, context: dict[str, str]) -> str:
     kind, template = TEMPLATES[entry.shape]
     if kind == "copy":
-        text = (public_dir / template).read_text(encoding="utf-8")
+        text = render_registry_tables((public_dir / template).read_text(encoding="utf-8"))
     elif kind == "static":
         text = template
     else:
@@ -295,7 +296,9 @@ def scaffold_repo_law(
 
 
 def _fill_repo_name(template: Path, project_name: str) -> str:
-    return template.read_text(encoding="utf-8").replace("<repo-name>", project_name)
+    return render_registry_tables(template.read_text(encoding="utf-8")).replace(
+        "<repo-name>", project_name
+    )
 
 
 def _write_absent(root: Path, writes: list[tuple[Path, Callable[[], str], bool]]) -> list[Path]:

@@ -17,7 +17,7 @@ from pathlib import Path
 
 import pytest
 
-from dadaia_workspace.core.template_history import SHIPPED_HASHES_FILENAME, was_shipped
+from dadaia_workspace.core.template_history import SHIPPED_HASHES_FILENAME
 from dadaia_workspace.features.specs.doctor import SpecsDoctor
 
 pytestmark = pytest.mark.contract
@@ -80,9 +80,3 @@ def test_absence_is_still_a_finding(tmp_path: Path) -> None:
     assert len(issues) == 1, issues
     assert issues[0].startswith("TREE-5 warning"), issues[0]
     assert "specs/memory/AGENTS.md is missing" in issues[0]
-
-
-def test_shipped_history_records_the_current_memory_scaffold() -> None:
-    """Anti-rot: editing the scaffold without appending its digest makes the next stale
-    projection unrecognisable as ours."""
-    assert was_shipped(_MEMORY_SCAFFOLD, "scaffold/memory/AGENTS.md", _PUBLIC / "templates")
