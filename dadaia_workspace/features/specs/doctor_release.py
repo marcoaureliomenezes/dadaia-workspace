@@ -18,9 +18,9 @@ from collections.abc import Callable, Collection
 from datetime import date
 from pathlib import Path
 
+from dadaia_workspace.core.release_state import RELEASE_ID_RE
 from dadaia_workspace.core.spec_status import APPROVED, extract_status
 from dadaia_workspace.core.spec_status import CANONICAL_STATUS as _CANONICAL_STATUS
-from dadaia_workspace.core.specs_version import RELEASE_SEMVER_RE
 from dadaia_workspace.features.specs.doctor_common import RELEASE_ARTIFACTS, iter_all_release_dirs
 from dadaia_workspace.features.specs.doctor_types import Severity, SpecsDoctorIssue
 from dadaia_workspace.features.specs.specs_tree import SpecsTree
@@ -322,7 +322,7 @@ class ReleaseValidator:
 
     def check_release_naming_canon(self) -> list[SpecsDoctorIssue]:
         """SPEC-DOC-027: release dir names should match the release-id canon
-        (``RELEASE_SEMVER_RE``; mintable ids are bare ``MAJOR.MINOR.PATCH``).
+        (``RELEASE_ID_RE``; mintable ids are bare ``MAJOR.MINOR.PATCH``).
 
         The ONE naming rule (F005, 20260830 audit — SPEC-DOC-016 retired as a second
         implementation of this same rule; no ``date.today()`` gating survives):
@@ -343,7 +343,7 @@ class ReleaseValidator:
         issues: list[SpecsDoctorIssue] = []
         live_root = self.specs_dir / "releases"
         for d, root in iter_all_release_dirs(self.specs_dir):
-            if root != live_root or RELEASE_SEMVER_RE.match(d.name):
+            if root != live_root or RELEASE_ID_RE.match(d.name):
                 continue
             spec_path = d / "SPEC.md"
             created = _extract_created_date(spec_path) if spec_path.exists() else None

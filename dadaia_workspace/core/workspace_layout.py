@@ -28,7 +28,7 @@ from pathlib import Path
 from typing import Literal
 
 from dadaia_workspace.core.harness_registry import HARNESS_PROJECTION_DIRS
-from dadaia_workspace.core.specs_version import RELEASE_ID_FRAGMENT
+from dadaia_workspace.core.release_state import RELEASE_ID_RE
 
 __all__ = [
     "render_registry_tables",
@@ -420,7 +420,7 @@ SpecsArea = Literal[
 #: :func:`specs_canon_table_rows` derives the rendered table from the same string —
 #: never a hand-kept regex beside a hand-kept prose spelling of the same path.
 _SHAPE_TOKENS: tuple[tuple[str, str], ...] = (
-    ("<M.m.p>", RELEASE_ID_FRAGMENT),
+    ("<M.m.p>", RELEASE_ID_RE.pattern[1:-1]),
     ("<40hex>", r"[0-9a-f]{40}"),
     ("<YYYYMMDD-slug>", AUDIT_DIR_NAME_PATTERN),
     ("<area>", r"[a-z][a-z0-9_-]*"),

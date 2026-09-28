@@ -435,8 +435,9 @@ def test_doc012_retired_never_fires_on_a_planted_candidates_md(tmp_path: Path) -
 @pytest.mark.parametrize(
     ("release_id", "created", "expect"),
     [
-        # Conforming names are silent (the retired v axis still resolves read-only).
-        pytest.param("v1.2.3", "2026-06-01", None, id="semver-name-ok"),
+        # Conforming names are silent; a `v` name is not conforming (one grammar).
+        pytest.param("1.2.3", "2026-06-01", None, id="semver-name-ok"),
+        pytest.param("v1.2.3", "2026-06-01", Severity.ERROR, id="v-name-errors"),
         # Live legacy name born BEFORE the canon cutoff: preserved, WARNING only.
         pytest.param("sdd-release-lifecycle-v1", "2026-05-01", Severity.WARNING, id="legacy-warns"),
         # Born ON the canon cutoff day: the canon applies — ERROR.

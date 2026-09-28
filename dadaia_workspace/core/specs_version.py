@@ -14,7 +14,6 @@ layout that predates the tree-v2 migration. Doctor warns and recommends
 
 from __future__ import annotations
 
-import re
 from pathlib import Path
 from typing import Literal
 
@@ -26,7 +25,7 @@ from dadaia_workspace.core.gitflow import constitution_error, constitution_text,
 #: v3 = agent-tier-frontmatter (v0.1.72 FR1); v4 = bugs-single-file (v0.1.73 FR1 —
 #: the operator's ONE-append-only-ledger contract); v5 = specs-canon-v6's tree shape
 #: (T-050-05); v6 = this stamp, T-050-06A — the version number itself, deferred by
-#: T-050-05 because RELEASE_SEMVER_RE's axis flip (below) is this task's write set;
+#: T-050-05 because the release-id axis flip was this task's write set;
 #: v7 = memory canon v7 — ``memory/TECHSTACK.md`` left the canon and its body became
 #: ``ARCHITECTURE.md``'s ``## Tech Stack`` section, which ``features/migrate`` folds.
 CANONICAL_SPECS_VERSION = 7
@@ -37,50 +36,6 @@ OLDEST_UPGRADABLE_VERSION = 6
 
 #: Version assigned to a tree with no stamp (pre-framework flat layout).
 UNSTAMPED_VERSION = 0
-
-#: Single source of truth for the release-directory SemVer form (v0.1.53 FR3, flipped
-#: to canon v6 / two-axis form at T-050-06A, SPEC FR1 boundary 2a / AS-13). This is the
-#: ONE compiled home for the pattern — previously triplicated in
-#: ``features/specs/scaffolder.py``, ``features/specs/doctor.py``, and the retired
-#: ``features/spec_artifacts/new_artifacts.py`` (its ``release_new`` now lives in
-#: ``features/specs/canon.py``, v0.5.1 K4). Every consumer imports THIS object; the
-#: agreement contract ``tests/contract/test_release_semver_canon.py`` locks the identity
-#: (same compiled object everywhere) and forbids any re-introduced ``re.compile`` copy.
-#:
-#: Two axes, ONE compiled object (AS-13): the current, LIVE axis is bare
-#: ``MAJOR.MINOR.PATCH`` (canon v6 moved live/archived release ids off the ``v`` prefix);
-#: the retired axis (every id shipped before v0.5.0's canon move) is ``vMAJOR.MINOR.PATCH``
-#: and stays matched here ONLY so an existing archived directory still resolves for
-#: read-only lookups (doctor naming checks). The ``v``
-#: prefix is therefore OPTIONAL in this object, but ``is_release_semver()`` below narrows
-#: to the bare, current-axis form ONLY — nothing may *mint* a new ``v``-prefixed id. Both
-#: axes keep the optional ``-suffix`` segment (rc/canary/hotfix flows are legitimate
-#: release identities on either axis).
-RELEASE_SEMVER_RE = re.compile(r"^v?\d+\.\d+\.\d+(-[0-9A-Za-z][0-9A-Za-z.]*)?$")
-
-#: The bare release-id pattern FRAGMENT (no anchors, no ``v`` prefix), mechanically
-#: derived from :data:`RELEASE_SEMVER_RE` — never a second hand-typed copy (F004,
-#: 20260830 audit). The one composable source for path regexes embedding a release id
-#: (``features/specs/canon.py``'s TREE-8 canon entries).
-#: The suffix group stays CAPTURING in the compiled pattern but is neutralized here so
-#: embedding the fragment never shifts a consumer regex's group indices.
-RELEASE_ID_FRAGMENT: str = (
-    RELEASE_SEMVER_RE.pattern.removeprefix("^v?").removesuffix("$").replace("(-", "(?:-")
-)
-
-
-def is_release_semver(value: str) -> bool:
-    """Return ``True`` when ``value`` is the CURRENT-axis release id: bare
-    ``MAJOR.MINOR.PATCH`` (optional ``-suffix``), no ``v`` prefix.
-
-    The single MINT predicate (AS-13/A1.10, T-050-06A): "is this string a value a NEW
-    release/segment may be created under?" A ``v``-prefixed id matches the broader
-    :data:`RELEASE_SEMVER_RE` (it must still resolve for archived-directory lookups) but
-    is refused here — the retired axis is read-only, never mintable again. Used by
-    ``release.py new``. Callers that also accept the
-    legacy slug form compose this with their own slug check.
-    """
-    return RELEASE_SEMVER_RE.match(value) is not None and not value.startswith("v")
 
 
 def read_pattern_version(specs_dir: Path) -> int:

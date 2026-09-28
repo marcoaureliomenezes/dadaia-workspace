@@ -15,7 +15,9 @@ __all__ = ["RELEASE_ID_RE", "RELEASE_STATE_FILENAME", "read_phase"]
 #: The one release-state filename (ADR 0090): no legacy name is read.
 RELEASE_STATE_FILENAME = "_RELEASE.json"
 
-#: A live release directory's name: bare ``M.m.p`` (`_release_schema.SEMVER_RE`).
+#: The ONE release-id grammar: bare ``M.m.p`` — `_release_schema.SEMVER_RE`'s pattern,
+#: pinned equal by ``tests/contract/test_release_semver_canon.py``. No ``v``, no suffix;
+#: an archived directory is exempt by its location (``_archive/``), never by its name.
 RELEASE_ID_RE = re.compile(r"^\d+\.\d+\.\d+$")
 
 
