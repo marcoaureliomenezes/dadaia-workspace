@@ -16,9 +16,7 @@ published baseline's amnesty because there is only one way to compute it.
 from __future__ import annotations
 
 import contextlib
-import queue
 import subprocess
-import threading
 from collections.abc import Iterator
 from pathlib import Path
 
@@ -708,32 +706,9 @@ def _read_blob_chunk(
 
 
 def _read_oversized_blob_prefix(repo: Path, sha: str) -> bytes:
-    """Read at most :data:`_MAX_BLOB_BYTES` of *sha*'s content through a SEPARATE,
-    bounded per-object stream, then close it early (SPEC v0.11.0 FR4/ADR D2-a).
-
-    This call deliberately does NOT go through :func:`_run`: closing the pipe before
-    git has finished writing makes a non-zero exit / broken-pipe outcome EXPECTED on
-    THIS call only, and ``_run``'s contract is to convert every subprocess failure into
-    :class:`GitObjectReadError` — which would misreport this intentional early close as
-    a git failure. git genuinely never produces the remainder once the pipe is closed,
-    so v0.9.0's R3 "never fetched" property holds for the truncated tail exactly as
-    before; only the DECISION of what to do with the (now non-empty) prefix changed.
-
-    A missing ``git`` executable, or the read exceeding :data:`_TIMEOUT_S` with no
-    prefix delivered, still raises :class:`GitObjectReadError` — the bound is on the
-    NORMAL, expected-success path only, not on genuine git/environment failure.
-
-    SPEC v0.4.2 FR8(1)/GRILL P11/A8.1-A8.2: *after* the early-close ``wait()``, the
-    process's own exit status is inspected — a nonexistent oid or a non-blob object
-    (e.g. a tree sha) makes ``git cat-file blob`` fail immediately and deliver ZERO
-    bytes on stdout; pre-fix, that 0-byte outcome was indistinguishable from "genuinely
-    empty content" and was reported as a successfully (if trivially) scanned prefix. A
-    process that FAILED (``returncode not in (0,)``) and delivered FEWER than the cap's
-    worth of bytes now raises. A full-cap read keeps swallowing the terminate/EPIPE
-    outcome unconditionally (A8.2) — our own early close intentionally makes git exit
-    non-zero on the SUCCESS path too, so a full cap's worth of bytes never triggers
-    this check regardless of the exit status.
-    """
+    """At most :data:`_MAX_BLOB_BYTES` of *sha*'s content (SPEC v0.11.0 FR4): leaving the
+    ``with`` closes the pipe early, git dies on SIGPIPE and the tail is never fetched. A
+    short read from a failed git (unknown oid, a tree) raises (v0.4.2 FR8(1)/A8.1-A8.2)."""
     try:
         proc = subprocess.Popen(  # noqa: S603 — fixed argv, no shell
             ["git", "cat-file", "blob", sha],
@@ -743,49 +718,14 @@ def _read_oversized_blob_prefix(repo: Path, sha: str) -> bytes:
         )
     except OSError as exc:  # same conversion as ``_run``
         raise GitObjectReadError(f"git could not run in {repo}: {exc}") from exc
-
-    result_q: queue.Queue[bytes | Exception] = queue.Queue(maxsize=1)
-
-    def _reader() -> None:
-        try:
-            assert proc.stdout is not None
-            result_q.put(proc.stdout.read(_MAX_BLOB_BYTES))
-        except Exception as exc:  # noqa: BLE001 — surfaced via the queue, never re-raised bare
-            result_q.put(exc)
-
-    reader_thread = threading.Thread(target=_reader, daemon=True)
-    reader_thread.start()
-    try:
-        outcome: bytes | Exception | None
-        try:
-            outcome = result_q.get(timeout=_TIMEOUT_S)
-        except queue.Empty:
-            outcome = None
-    finally:
-        # Close the read end and terminate now — this is the deliberate EARLY CLOSE:
-        # git will see EPIPE/SIGPIPE on its next write and exit non-zero, which is
-        # EXPECTED here and is never inspected or converted into an error.
-        if proc.stdout is not None:
-            proc.stdout.close()
-        proc.terminate()
-        try:
-            proc.wait(timeout=_TIMEOUT_S)
-        except subprocess.TimeoutExpired:
-            proc.kill()
-            proc.wait()
-
-    if outcome is None:
-        raise GitObjectReadError(f"git cat-file blob timed out reading oversized object {sha}")
-    if isinstance(outcome, Exception):
-        raise GitObjectReadError(
-            f"git cat-file blob failed reading oversized object {sha}: {outcome}"
-        ) from outcome
-    if len(outcome) < _MAX_BLOB_BYTES and proc.returncode not in (0,):
+    with proc:
+        prefix = proc.stdout.read(_MAX_BLOB_BYTES) if proc.stdout else b""
+    if len(prefix) < _MAX_BLOB_BYTES and proc.returncode != 0:
         raise GitObjectReadError(
             f"git cat-file blob failed reading oversized object {sha} "
-            f"(exit {proc.returncode}, {len(outcome)} byte(s) delivered before failure)"
+            f"(exit {proc.returncode}, {len(prefix)} byte(s) delivered before failure)"
         )
-    return outcome
+    return prefix
 
 
 def _read_oversized_blob(repo: Path, sha: str, path: str, size: int) -> ScannedObject:
