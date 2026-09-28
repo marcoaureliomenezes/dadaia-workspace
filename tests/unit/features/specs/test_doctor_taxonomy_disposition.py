@@ -9,10 +9,12 @@ from pathlib import Path
 
 import pytest
 
-from dadaia_workspace.features.specs import Severity, SpecsDoctor, SpecsDoctorIssue
+from dadaia_workspace.core.doctor_rules import SectionFinding
+from dadaia_workspace.features.specs import Severity, SpecsDoctor
+from dadaia_workspace.features.specs.doctor_types import finding_path
 
 
-def _codes(specs: Path, code: str) -> list[SpecsDoctorIssue]:
+def _codes(specs: Path, code: str) -> list[SectionFinding]:
     return [i for i in SpecsDoctor(specs).check() if i.code == code]
 
 
@@ -40,7 +42,7 @@ def _setup_doc034(specs) -> None:  # type: ignore[no-untyped-def]
             _setup_doc034,
             1,
             "backlog",
-            Severity.WARNING,
+            "warning",
             id="doc034-missing-archive-dir",
         ),
     ],
@@ -57,15 +59,14 @@ def test_sad_path_matrix(  # type: ignore[no-untyped-def]
     setup(specs)
     warns = _codes(specs, code)
     assert len(warns) == expect_count
-    assert all(w.severity is expect_severity for w in warns)
+    assert all(w.verdict == expect_severity for w in warns)
     if expect_substring is not None:
-        assert expect_substring in warns[0].description
+        assert expect_substring in warns[0].message
 
     if code == "SPEC-DOC-034":
         # Auto-fix behavior: fixable, and fix() clears the residual issue.
         assert warns[0].fixable is True
-        assert warns[0].path is not None
-        assert Path(warns[0].path).parts[-2:] == ("backlog", "_archive")
+        assert Path(str(finding_path(warns[0]))).parts[-2:] == ("backlog", "_archive")
         doctor = SpecsDoctor(specs)
         fixed = doctor.fix()
         assert any(i.code == "SPEC-DOC-034" for i in fixed)

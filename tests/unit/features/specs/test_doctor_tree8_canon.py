@@ -17,8 +17,9 @@ from pathlib import Path
 
 import pytest
 
-from dadaia_workspace.features.specs import Severity, SpecsDoctor
+from dadaia_workspace.features.specs import SpecsDoctor
 from dadaia_workspace.features.specs.canon import scaffold
+from dadaia_workspace.features.specs.doctor_types import finding_path
 
 _REPO_ROOT = Path(__file__).parent.parent.parent.parent.parent
 _TEMPLATES_DIR = _REPO_ROOT / "dadaia_workspace" / "public" / "templates"
@@ -77,12 +78,12 @@ def test_tree8_reports_a_non_canon_path_and_fix_never_deletes_it(tmp_path: Path,
 
     doctor = SpecsDoctor(specs_dir)
     issues = doctor.check()
-    on_path = [i for i in issues if i.path == str(flagged)]
-    assert [(i.code, i.severity, i.fixable) for i in on_path] == [("TREE-8", Severity.ERROR, False)]
+    on_path = [i for i in issues if finding_path(i) == str(flagged)]
+    assert [(i.code, i.verdict, i.fixable) for i in on_path] == [("TREE-8", "error", False)]
 
     doctor.fix(issues)
     assert stray.read_text(encoding="utf-8") == "operator content\n"
-    assert [i.code for i in doctor.check() if i.path == str(flagged)] == ["TREE-8"]
+    assert [i.code for i in doctor.check() if finding_path(i) == str(flagged)] == ["TREE-8"]
 
     flagged.rename(tmp_path / "moved-out")
     assert doctor.check() == []

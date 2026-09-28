@@ -12,9 +12,8 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import TYPE_CHECKING
 
-from dadaia_workspace.core.doctor_rules import Rule
+from dadaia_workspace.core.doctor_rules import Rule, SectionFinding
 from dadaia_workspace.features.specs import doctor_adr
-from dadaia_workspace.features.specs.doctor_types import SpecsDoctorIssue
 from dadaia_workspace.infrastructure.ledger_scripts import (
     BUGS_SCRIPT,
 )
@@ -25,16 +24,16 @@ if TYPE_CHECKING:
 __all__ = ["FIX_BY_CODE", "RULES", "SpecsRule", "render_fix_help"]
 
 #: This section's binding of the one record: rules run over the ``SpecsDoctor``
-#: coordinator and emit ``SpecsDoctorIssue``.
-type SpecsRule = Rule[SpecsDoctor, SpecsDoctorIssue]
+#: coordinator and emit ``SectionFinding``.
+type SpecsRule = Rule[SpecsDoctor]
 
 SECTION = "specs"
 
 
 def _rule(
     codes: tuple[str, ...],
-    run: Callable[[SpecsDoctor], list[SpecsDoctorIssue]],
-    fix: Callable[[SpecsDoctor, SpecsDoctorIssue], None] | None = None,
+    run: Callable[[SpecsDoctor], list[SectionFinding]],
+    fix: Callable[[SpecsDoctor, SectionFinding], None] | None = None,
     fix_help: str | tuple[str, ...] | None = None,
 ) -> SpecsRule:
     """Bind ``section="specs"`` once instead of on every row."""

@@ -215,7 +215,7 @@ def test_a_bad_bug_line_is_one_finding_and_the_doctor_says_what_the_script_says(
     checked = json.loads(_run(script, "check", "--specs", str(specs), "--json").stdout)
     expected = [f"{f['path']}:{f['line']} {f['message']}" for f in checked]
 
-    own = [i.code for i in SpecsDoctor(specs).check() if i.path == str(ledger)]
+    own = [i.code for i in SpecsDoctor(specs).check() if i.message.endswith(f"({ledger})")]
     bugs = [f for f in script_findings(specs) if f.code == "LEDGER-BUGS-SCHEMA"]
 
     assert len(expected) == 1 and own == []

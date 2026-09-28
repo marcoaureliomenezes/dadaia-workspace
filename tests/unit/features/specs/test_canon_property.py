@@ -48,10 +48,8 @@ def _assert_canon_and_doctor_clean(specs_dir: Path) -> None:
     assert violations == [], f"canon.check_tree found violations: {violations}"
 
     issues = SpecsDoctor(specs_dir, public_dir=_PUBLIC_DIR, templates_dir=_TEMPLATES_DIR).check()
-    errors = [i for i in issues if i.severity.value == "error"]
-    assert errors == [], (
-        f"SpecsDoctor reported {len(errors)} error(s): {[e.to_dict() for e in errors]}"
-    )
+    errors = [i for i in issues if i.verdict == "error"]
+    assert errors == [], f"SpecsDoctor reported {len(errors)} error(s): {[e for e in errors]}"
 
 
 def _fresh_root_specs(tmp_path: Path) -> Path:

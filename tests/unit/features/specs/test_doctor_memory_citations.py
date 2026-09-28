@@ -19,7 +19,6 @@ from dadaia_workspace.features.specs.citations import (
     memory_citation_violations,
 )
 from dadaia_workspace.features.specs.doctor_memory import MemoryValidator
-from dadaia_workspace.features.specs.doctor_types import Severity
 
 _TREE: frozenset[tuple[str, ...]] = frozenset({(), ("doctor",), ("context",), ("context", "bind")})
 
@@ -45,10 +44,10 @@ def test_dead_verb_in_an_atom_is_one_warning_naming_file_and_line(tmp_path: Path
     issues = _check(specs, repo_root)
 
     assert [i.code for i in issues] == ["MEM-DRIFT-2"]
-    assert issues[0].severity == Severity.WARNING
+    assert issues[0].verdict == "warning"
     assert issues[0].fixable is False
-    assert "specs/memory/product/thing.md:3" in issues[0].description
-    assert "dadaia fixture-verb" in issues[0].description
+    assert "specs/memory/product/thing.md:3" in issues[0].message
+    assert "dadaia fixture-verb" in issues[0].message
 
 
 def test_dead_repo_path_in_an_atom_is_a_warning(tmp_path: Path) -> None:
@@ -59,7 +58,7 @@ def test_dead_repo_path_in_an_atom_is_a_warning(tmp_path: Path) -> None:
     issues = _check(specs, repo_root)
 
     assert [i.code for i in issues] == ["MEM-DRIFT-2"]
-    assert "dadaia_workspace/features/gone.py" in issues[0].description
+    assert "dadaia_workspace/features/gone.py" in issues[0].message
 
 
 def test_live_verbs_and_real_paths_produce_nothing(tmp_path: Path) -> None:

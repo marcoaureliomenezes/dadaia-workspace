@@ -21,12 +21,14 @@ from dadaia_workspace.cli._specs_resolution import (
 from dadaia_workspace.core import gitflow, specs_version
 from dadaia_workspace.core.atomic_write import SymlinkRefusedError
 from dadaia_workspace.core.cli_line import fix_line, materialize_line
+from dadaia_workspace.core.doctor_rules import SectionFinding
 from dadaia_workspace.core.gitflow import DEFAULT, Gitflow, from_mapping
 from dadaia_workspace.core.workspace_resolver import resolve_workspace_root
 from dadaia_workspace.features.migrate import upgrade as upgrade_feature
 from dadaia_workspace.features.migrate.upgrade import UpgradeRefused, UpgradeResult
 from dadaia_workspace.features.spec_context import sweep
-from dadaia_workspace.features.specs import Severity, SpecsDoctor, SpecsDoctorIssue, canon
+from dadaia_workspace.features.specs import SpecsDoctor, canon
+from dadaia_workspace.features.specs.doctor_types import finding_path
 from dadaia_workspace.infrastructure.ledger_scripts import script_repairs
 
 app = typer.Typer(help="SDD release-lifecycle structural checks and helpers.")
@@ -59,7 +61,7 @@ def _refuse_symlink(exc: SymlinkRefusedError) -> NoReturn:
     fail(f"{exc}\nfix: {materialize_line(exc.path, exc.path.resolve())}")
 
 
-def _repair(specs: Path, *, dry_run: bool) -> tuple[list[SpecsDoctorIssue], list[SpecsDoctorIssue]]:
+def _repair(specs: Path, *, dry_run: bool) -> tuple[list[SectionFinding], list[SectionFinding]]:
     """The doctor's one repair set: `specs upgrade` keeps no second writer of its own.
     Returns what it repaired and every error left (the promise: clean)."""
     public = canon.default_public_dir()
@@ -68,7 +70,7 @@ def _repair(specs: Path, *, dry_run: bool) -> tuple[list[SpecsDoctorIssue], list
     if dry_run:
         return fixable, []
     fixed = doctor.fix(fixable)
-    return fixed, [i for i in doctor.check() if i.severity is Severity.ERROR]
+    return fixed, [i for i in doctor.check() if i.error]
 
 
 def _deleter(specs: Path) -> Callable[[Path], object]:
@@ -87,9 +89,11 @@ def _echo_upgrade(specs: Path, result: UpgradeResult) -> bool:
         typer.echo(f"[tech-stack] {will}fold {path} into memory/ARCHITECTURE.md")
     fixed, refused = _repair(specs, dry_run=result.dry_run)
     for issue in fixed:
-        typer.echo(f"[repair] {will}fix {issue.code} {issue.path}")
+        typer.echo(f"[repair] {will}fix {issue.code} {finding_path(issue)}")
     for issue in refused:
-        typer.echo(f"[refused] {issue.code} {issue.path}: {issue.description}\nfix: {issue.fix}")
+        typer.echo(
+            f"[refused] {issue.code} {finding_path(issue)}: {issue.message}\nfix: {issue.fix}"
+        )
     for action in [] if result.dry_run else script_repairs(specs):
         typer.echo(f"[repair] {action}")
     if result.from_version < result.to_version:

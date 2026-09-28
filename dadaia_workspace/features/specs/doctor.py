@@ -4,7 +4,7 @@ v0.1.55 FR1 decomposed the former 2,830-line god module into a thin ``SpecsDocto
 coordinator (this file) that **owns check()/fix() ORDER** and delegates all LOGIC to six
 single-responsibility validator siblings plus two shared leaf modules:
 
-  * ``doctor_types``     — ``Severity`` / ``SpecsDoctorIssue``
+  * ``doctor_types``     — ``Severity`` / ``SectionFinding``
   * ``doctor_common``    — cross-validator pure helpers (``resolve_active_release`` + release-dir discovery)
   * ``doctor_structural``   — TREE-3..8 spec-tree invariants; ``fix_tree4``,
                               ``fix_tree5``
@@ -31,13 +31,13 @@ from __future__ import annotations
 from collections.abc import Collection
 from pathlib import Path
 
+from dadaia_workspace.core.doctor_rules import SectionFinding
 from dadaia_workspace.features.specs.doctor_closure_audit import ClosureAuditValidator
 from dadaia_workspace.features.specs.doctor_coherence import CoherenceValidator
 from dadaia_workspace.features.specs.doctor_governance import GovernanceValidator
 from dadaia_workspace.features.specs.doctor_memory import MemoryValidator
 from dadaia_workspace.features.specs.doctor_release import ReleaseValidator
 from dadaia_workspace.features.specs.doctor_structural import StructuralValidator
-from dadaia_workspace.features.specs.doctor_types import SpecsDoctorIssue
 from dadaia_workspace.features.specs.rules import FIX_BY_CODE, RULES
 from dadaia_workspace.features.specs.specs_tree import SpecsTree
 
@@ -113,18 +113,18 @@ class SpecsDoctor:
             self.public_dir,
         )
 
-    def check(self) -> list[SpecsDoctorIssue]:
+    def check(self) -> list[SectionFinding]:
         """Run every rule in the ONE ordered registry (F012) over a FRESH SpecsTree
         snapshot (F010) — shared facts are parsed once per run, the registry owns
         order, and the golden lock pins the rendered output byte-identically."""
         tree = SpecsTree(self.specs_dir)
         self._release.tree = tree
-        issues: list[SpecsDoctorIssue] = []
+        issues: list[SectionFinding] = []
         for rule in RULES:
             issues.extend(rule.run(self))
         return issues
 
-    def fix(self, issues: list[SpecsDoctorIssue] | None = None) -> list[SpecsDoctorIssue]:
+    def fix(self, issues: list[SectionFinding] | None = None) -> list[SectionFinding]:
         """Apply auto-fixes for all fixable issues.
 
         Dispatch derives from the registry (:data:`~dadaia_workspace.features.specs
@@ -133,7 +133,7 @@ class SpecsDoctor:
         """
         if issues is None:
             issues = self.check()
-        fixed: list[SpecsDoctorIssue] = []
+        fixed: list[SectionFinding] = []
         for issue in issues:
             if not issue.fixable:
                 continue

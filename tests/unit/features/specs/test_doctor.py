@@ -12,8 +12,10 @@ from pathlib import Path
 
 import pytest
 
+from dadaia_workspace.core.doctor_rules import SectionFinding
 from dadaia_workspace.core.workspace_layout import render_registry_tables
-from dadaia_workspace.features.specs import Severity, SpecsDoctor, SpecsDoctorIssue
+from dadaia_workspace.features.specs import Severity, SpecsDoctor
+from dadaia_workspace.features.specs.doctor_types import finding_path
 from dadaia_workspace.features.specs.memory_canon import (
     FIXED_SECTIONS,
     read_fixed_fragment,
@@ -150,14 +152,14 @@ def _make_clean_specs_tree(root: Path, release_id: str = "1.2.3") -> Path:
     return specs
 
 
-def _codes(issues: list[SpecsDoctorIssue]) -> set[str]:
+def _codes(issues: list[SectionFinding]) -> set[str]:
     return {i.code for i in issues}
 
 
 def test_clean_tree_has_no_errors(tmp_path: Path) -> None:
     specs = _make_clean_specs_tree(tmp_path)
     issues = SpecsDoctor(specs).check()
-    errors = [i for i in issues if i.severity == Severity.ERROR]
+    errors = [i for i in issues if i.error]
     assert errors == [], errors
 
 
@@ -246,11 +248,6 @@ def test_sad_matrix(tmp_path: Path, case: str, mutate, expected_code: str) -> No
     mutate(specs)
     issues = SpecsDoctor(specs).check()
     assert expected_code in _codes(issues), f"{case}: expected {expected_code} in {_codes(issues)}"
-    if case == "missing-constitution":
-        # to_dict() shape check, folded onto this row's issue payload.
-        matching = next(i for i in issues if i.code == "SPEC-DOC-001")
-        payload = matching.to_dict()
-        assert set(payload.keys()) == {"code", "severity", "description", "path"}
 
 
 # ---------------------------------------------------------------------------
@@ -283,7 +280,7 @@ def test_silent_matrix(tmp_path: Path, case: str, mutate, code: str) -> None:  #
     mutate(specs)
     issues = SpecsDoctor(specs).check()
     matching = [i for i in issues if i.code == code]
-    assert matching == [], f"{case}: unexpected {code}: {[m.description for m in matching]}"
+    assert matching == [], f"{case}: unexpected {code}: {[m.message for m in matching]}"
 
 
 # ---------------------------------------------------------------------------
@@ -303,14 +300,14 @@ def test_tree5_drift_is_never_auto_repaired(tmp_path: Path) -> None:
     doctor_drift = SpecsDoctor(specs_drift, templates_dir=_TEMPLATES_DIR)
     tree5_drift = [i for i in doctor_drift.check() if i.code == "TREE-5"]
     assert tree5_drift and not tree5_drift[0].fixable
-    assert "drift" in tree5_drift[0].description.lower()
+    assert "drift" in tree5_drift[0].message.lower()
 
     specs_ok = _make_clean_specs_tree(tmp_path.parent / (tmp_path.name + "-tree5-ok"))
     canonical = render_registry_tables((_TEMPLATES_DIR / "specs-AGENTS.md").read_text("utf-8"))
     (specs_ok / "AGENTS.md").write_text(canonical, encoding="utf-8")
     doctor_ok = SpecsDoctor(specs_ok, templates_dir=_TEMPLATES_DIR)
     root_law = str(specs_ok / "AGENTS.md")  # the scoped law files are not planted here
-    tree5_ok = [i for i in doctor_ok.check() if i.code == "TREE-5" and i.path == root_law]
+    tree5_ok = [i for i in doctor_ok.check() if i.code == "TREE-5" and finding_path(i) == root_law]
     assert tree5_ok == []
 
 
@@ -334,7 +331,7 @@ def test_doc005_oversized_plan_warns_whatever_the_spec_creation_date(
     )
     issues = SpecsDoctor(specs).check()
     doc5 = [i for i in issues if i.code == "SPEC-DOC-005"]
-    assert doc5 and doc5[0].severity is Severity.WARNING
+    assert doc5 and doc5[0].verdict == "warning"
 
 
 @pytest.mark.parametrize(
@@ -342,14 +339,14 @@ def test_doc005_oversized_plan_warns_whatever_the_spec_creation_date(
     [
         # Conforming names are silent; a `v` name is not conforming (one grammar).
         pytest.param("1.2.3", "2026-06-01", None, id="semver-name-ok"),
-        pytest.param("v1.2.3", "2026-06-01", Severity.ERROR, id="v-name-errors"),
+        pytest.param("v1.2.3", "2026-06-01", "error", id="v-name-errors"),
         # Live legacy name born BEFORE the canon cutoff: preserved, WARNING only.
-        pytest.param("sdd-release-lifecycle-v1", "2026-05-01", Severity.WARNING, id="legacy-warns"),
+        pytest.param("sdd-release-lifecycle-v1", "2026-05-01", "warning", id="legacy-warns"),
         # Born ON the canon cutoff day: the canon applies — ERROR.
-        pytest.param("bad-name", "2026-06-01", Severity.ERROR, id="on-cutoff-errors"),
+        pytest.param("bad-name", "2026-06-01", "error", id="on-cutoff-errors"),
         # Born after the cutoff: ERROR. No date.today() gating (F005: the mocked-clock
         # time-bomb class died with SPEC-DOC-016).
-        pytest.param("my-feature-v1", "2026-06-10", Severity.ERROR, id="post-cutoff-errors"),
+        pytest.param("my-feature-v1", "2026-06-10", "error", id="post-cutoff-errors"),
     ],
 )
 def test_doc027_release_naming_boundary(
@@ -366,10 +363,10 @@ def test_doc027_release_naming_boundary(
     issues = SpecsDoctor(specs).check()
     doc27 = [i for i in issues if i.code == "SPEC-DOC-027"]
     if expect is None:
-        assert doc27 == [], [i.to_dict() for i in doc27]
+        assert doc27 == [], [i for i in doc27]
     else:
         assert doc27, "Expected SPEC-DOC-027 for non-conforming folder name"
-        assert doc27[0].severity == expect
+        assert doc27[0].verdict == expect
 
 
 def test_doc016_and_doc027_remedies_name_the_mintable_bare_axis(tmp_path: Path) -> None:
@@ -386,9 +383,9 @@ def test_doc016_and_doc027_remedies_name_the_mintable_bare_axis(tmp_path: Path) 
     naming = [i for i in issues if i.code in ("SPEC-DOC-016", "SPEC-DOC-027")]
     assert naming, "Expected naming issues for a non-SemVer release dir"
     for issue in naming:
-        assert "v<MAJOR" not in issue.description, issue.description
-        assert "^v\\d" not in issue.description, issue.description
-    assert any("<MAJOR>.<MINOR>.<PATCH>" in i.description for i in naming)
+        assert "v<MAJOR" not in issue.message, issue.message
+        assert "^v\\d" not in issue.message, issue.message
+    assert any("<MAJOR>.<MINOR>.<PATCH>" in i.message for i in naming)
 
 
 def test_one_defect_one_code_missing_active_artifact(tmp_path: Path) -> None:
@@ -400,7 +397,7 @@ def test_one_defect_one_code_missing_active_artifact(tmp_path: Path) -> None:
     plan.unlink()
     doctor = SpecsDoctor(specs, templates_dir=_TEMPLATES_DIR)
     issues = doctor.check()
-    assert not [i for i in issues if "PLAN.md" in i.description], issues
+    assert not [i for i in issues if "PLAN.md" in i.message], issues
     doctor.fix(issues)
     assert not plan.exists(), "a missing SDD artifact must never be auto-created"
 
@@ -418,5 +415,5 @@ def test_one_defect_one_code_nonconforming_release_name(tmp_path: Path) -> None:
     )
     issues = SpecsDoctor(specs).check()
     doc027 = [i for i in issues if i.code == "SPEC-DOC-027"]
-    assert doc027 and doc027[0].severity == Severity.ERROR
+    assert doc027 and doc027[0].error
     assert "SPEC-DOC-016" not in _codes(issues)

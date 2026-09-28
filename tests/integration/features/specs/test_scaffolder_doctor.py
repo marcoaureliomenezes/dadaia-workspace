@@ -29,4 +29,4 @@ def test_fresh_scaffold_passes_specs_doctor(tmp_path: Path) -> None:
     )
 
     issues = SpecsDoctor(specs_dir).check()
-    assert issues == [], [i.to_dict() for i in issues]  # sa-placement-rules-contradict-tree8#B5
+    assert issues == [], [i for i in issues]  # sa-placement-rules-contradict-tree8#B5

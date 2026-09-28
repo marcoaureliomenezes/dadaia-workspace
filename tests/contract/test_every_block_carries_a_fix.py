@@ -295,13 +295,13 @@ def test_push_gate_git_read_failure_carries_a_runnable_fix(pushed: tuple[PushRep
 # ── dadaia doctor (exit 1) ──────────────────────────────────────────────────────
 
 
-def _every_doctor_rule() -> list[tuple[str, doctor_rules.Rule[Any, Any]]]:
+def _every_doctor_rule() -> list[tuple[str, doctor_rules.Rule[Any]]]:
     from dadaia_workspace.features.backlog.doctor import RULES as BACKLOG_RULES
     from dadaia_workspace.features.spec_context.doctor import workspace_rules
     from dadaia_workspace.features.specs.doctor_adr import LEDGER_RULES as ADR_LEDGER_RULES
     from dadaia_workspace.features.specs.rules import RULES as SPECS_RULES
 
-    rules: list[tuple[str, doctor_rules.Rule[Any, Any]]] = []
+    rules: list[tuple[str, doctor_rules.Rule[Any]]] = []
     for rule in (
         *workspace_rules(expired_only=False),
         *SPECS_RULES,

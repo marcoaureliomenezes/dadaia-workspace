@@ -52,7 +52,7 @@ def test_a_v6_tree_ends_v7_with_fixed_sections_and_a_clean_doctor(tmp_path: Path
         assert f"fix FIXED-1 {specs / rel}" in result.output
     issues = SpecsDoctor(specs, public_dir=_PUBLIC, templates_dir=_PUBLIC / "templates").check()
     assert [i.code for i in issues if i.code == "TREE-5" or i.code.startswith("FIXED")] == []
-    assert [i.to_dict() for i in issues if i.severity.value == "error"] == []
+    assert [i for i in issues if i.verdict == "error"] == []
 
 
 def test_dry_run_plans_the_fixed_sections_and_writes_nothing(tmp_path: Path) -> None:

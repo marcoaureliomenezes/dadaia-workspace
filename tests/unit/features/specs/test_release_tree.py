@@ -108,4 +108,4 @@ def test_a_legacy_next_dir_is_not_live_and_new_refuses(tmp_path: Path) -> None:
     assert any(f["path"] == "releases/next" for f in _check(specs))
     assert resolve_active_release(specs) == (None, None)
     doctor = SpecsDoctor(specs).check()
-    assert "next" in {Path(str(i.path)).parent.name for i in doctor if i.code == "TREE-8"}
+    assert any("/next/" in i.message for i in doctor if i.code == "TREE-8")

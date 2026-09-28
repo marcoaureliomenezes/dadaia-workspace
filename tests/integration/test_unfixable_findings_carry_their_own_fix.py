@@ -57,7 +57,7 @@ def _workspace(tmp_path: Path) -> Path:
 
 def _findings(ws: Path) -> dict[str, list[tuple[str, str]]]:
     service = DoctorService(context_store(ws / ".dadaia" / "states"), GitSubprocessClient(), ws)
-    report = run_section(SECTION, workspace_rules(), service, lambda _r, f: f, ws)
+    report = run_section(SECTION, workspace_rules(), service, ws)
     out: dict[str, list[tuple[str, str]]] = {}
     for finding in report.findings:
         out.setdefault(finding.code, []).append((finding.message, finding.fix))

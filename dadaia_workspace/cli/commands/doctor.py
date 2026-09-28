@@ -36,7 +36,6 @@ from dadaia_workspace.cli.help_digest import command_paths
 from dadaia_workspace.cli.redact import build_context_redactor
 from dadaia_workspace.core.cli_line import fix_line
 from dadaia_workspace.core.doctor_rules import (
-    Rule,
     SectionFinding,
     SectionReport,
     merge_sections,
@@ -51,8 +50,8 @@ from dadaia_workspace.core.exceptions import (
 from dadaia_workspace.core.workspace_resolver import resolve_workspace_root
 from dadaia_workspace.features.backlog import doctor as backlog_doctor
 from dadaia_workspace.features.spec_context.doctor import DoctorService, workspace_rules
-from dadaia_workspace.features.specs import Severity, SpecsDoctor, doctor_adr
-from dadaia_workspace.features.specs.doctor_types import SpecsDoctorIssue
+from dadaia_workspace.features.specs import SpecsDoctor, doctor_adr
+from dadaia_workspace.features.specs.doctor_types import finding_path
 from dadaia_workspace.features.specs.rules import RULES as SPECS_RULES
 from dadaia_workspace.features.specs.rules import render_fix_help
 from dadaia_workspace.features.workspace import onboarding
@@ -79,27 +78,7 @@ def _workspace_section(
         "workspace",
         workspace_rules(expired_only=expired_only, context=scope),
         service,
-        _as_is,
         root,
-    )
-
-
-def _as_is[C](_rule: Rule[C, SectionFinding], finding: SectionFinding) -> SectionFinding:
-    """A rule that emits a :class:`SectionFinding` needs no translation at the seam."""
-    return finding
-
-
-def _specs_render[C](rule: Rule[C, SpecsDoctorIssue], issue: SpecsDoctorIssue) -> SectionFinding:
-    """Render one specs-doctor issue as a section finding."""
-    location = f" ({issue.path})" if issue.path else ""
-    return SectionFinding(
-        code=issue.code,
-        verdict=issue.severity.value,
-        message=f"{issue.description}{location}",
-        canonical=False,
-        error=issue.severity is Severity.ERROR,
-        fix=issue.fix,
-        fixable=issue.fixable,
     )
 
 
@@ -115,7 +94,6 @@ def _specs_section(doctor: SpecsDoctor | None, root: Path | None) -> SectionRepo
         "specs",
         SPECS_RULES,
         doctor,
-        _specs_render,
         root,
         doctor.specs_dir,
     )
@@ -150,12 +128,11 @@ def _ledgers_section(
     )
     return merge_sections(
         [
-            run_section("ledgers", backlog_doctor.RULES, context, _as_is, root, specs_dir),
+            run_section("ledgers", backlog_doctor.RULES, context, root, specs_dir),
             run_section(
                 "ledgers",
                 doctor_adr.LEDGER_RULES,
                 specs_dir,
-                _specs_render,
                 root,
             ),
             SectionReport(name="ledgers", findings=tuple(script_findings(specs_dir))),
@@ -391,7 +368,7 @@ def _apply_fixes(
         return []
     fixed = list(service.fix()) if service is not None else []
     if not expired_only and specs_doctor is not None:
-        fixed.extend(f"[specs] {issue.code}: {issue.path}" for issue in specs_doctor.fix())
+        fixed.extend(f"[specs] {issue.code}: {finding_path(issue)}" for issue in specs_doctor.fix())
     return fixed
 
 

@@ -41,7 +41,7 @@ def _write_spec(specs: Path, origin_line: str) -> Path:
 
 def _issues(specs: Path) -> list[str]:
     doctor = SpecsDoctor(specs)
-    return [i.description for i in _by_code(doctor.check(), "SPEC-DOC-048")]
+    return [i.message for i in _by_code(doctor.check(), "SPEC-DOC-048")]
 
 
 def _write_backlog(specs: Path, ids: list[str]) -> None:
@@ -159,7 +159,7 @@ def test_a_candidate_folder_is_not_ranked_and_is_off_canon(tmp_path: Path) -> No
 
     assert _issues(specs) == []
     tree8 = [i for i in SpecsDoctor(specs).check() if i.code == "TREE-8"]
-    assert any("rc-1/SPEC.md" in Path(str(i.path)).as_posix() for i in tree8), tree8
+    assert any("rc-1/SPEC.md" in i.message for i in tree8), tree8
 
 
 def test_this_repos_live_and_candidate_specs_all_pass() -> None:

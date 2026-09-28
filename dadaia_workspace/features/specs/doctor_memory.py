@@ -17,9 +17,10 @@ from pathlib import Path
 
 from dadaia_workspace.core.atomic_write import atomic_write
 from dadaia_workspace.core.cli_line import materialize_line, shell_line
+from dadaia_workspace.core.doctor_rules import SectionFinding
 from dadaia_workspace.features.specs import citations, memory_canon, memory_lint
 from dadaia_workspace.features.specs.canon import default_public_dir, is_canon_path
-from dadaia_workspace.features.specs.doctor_types import Severity, SpecsDoctorIssue
+from dadaia_workspace.features.specs.doctor_types import Severity, finding_path, specs_finding
 
 # ONE home for memory-canon facts (F011): features.specs.memory_canon.
 TOPLEVEL_MEMORY_FILES = memory_canon.MEMORY_TOPLEVEL_FILES
@@ -127,7 +128,7 @@ class MemoryValidator:
     def __init__(self, specs_dir: Path) -> None:
         self.specs_dir = specs_dir
 
-    def check_placeholder_atoms(self) -> list[SpecsDoctorIssue]:
+    def check_placeholder_atoms(self) -> list[SectionFinding]:
         """MEM-PLACEHOLDER-1: unfilled placeholder atoms under ``specs/memory/**``.
 
         Old scaffolds shipped a raw ``feature.md`` template (``SLUG_PLACEHOLDER`` and
@@ -136,14 +137,14 @@ class MemoryValidator:
         ``fixable=True``: the fix removes the template artifact — never real content
         (exact-token detection).
         """
-        issues: list[SpecsDoctorIssue] = []
+        issues: list[SectionFinding] = []
         mem_dir = self.specs_dir / "memory"
         if not mem_dir.is_dir():
             return issues
         for path in sorted(mem_dir.rglob("*.md")):
             if is_placeholder_atom(path):
                 issues.append(
-                    SpecsDoctorIssue(
+                    specs_finding(
                         code="MEM-PLACEHOLDER-1",
                         severity=Severity.ERROR,
                         description=(
@@ -157,7 +158,7 @@ class MemoryValidator:
                 )
         return issues
 
-    def check_tests_agents_placeholder(self) -> list[SpecsDoctorIssue]:
+    def check_tests_agents_placeholder(self) -> list[SectionFinding]:
         """AGENTS-PLACEHOLDER-1: an installed ``tests/AGENTS.md`` still carries an
         unfilled ``<TOKEN>`` placeholder (FR8, idea
         ``tests-agents-md-placeholder-doctor-warning``).
@@ -177,7 +178,7 @@ class MemoryValidator:
         if not has_unfilled_angle_placeholders(installed):
             return []
         return [
-            SpecsDoctorIssue(
+            specs_finding(
                 code="AGENTS-PLACEHOLDER-1",
                 severity=Severity.WARNING,
                 description=(
@@ -189,18 +190,19 @@ class MemoryValidator:
             )
         ]
 
-    def fix_placeholder_atom(self, issue: SpecsDoctorIssue) -> None:
+    def fix_placeholder_atom(self, issue: SectionFinding) -> None:
         """Remove an unfilled placeholder atom — re-verified before any delete."""
-        if not issue.path:
+        named = finding_path(issue)
+        if not named:
             return
-        path = Path(issue.path)
+        path = Path(named)
         if is_placeholder_atom(path):
             path.unlink()
 
-    def check_fixed_sections(self, public_dir: Path | None) -> list[SpecsDoctorIssue]:
+    def check_fixed_sections(self, public_dir: Path | None) -> list[SectionFinding]:
         """FIXED-1: a fixed law block is missing; FIXED-2: its body is not the fragment."""
         fragments_dir = public_dir if public_dir is not None else default_public_dir()
-        issues: list[SpecsDoctorIssue] = []
+        issues: list[SectionFinding] = []
         for rel, section_id in memory_canon.FIXED_SECTIONS:
             path = self.specs_dir / rel
             if not path.is_file():
@@ -209,7 +211,7 @@ class MemoryValidator:
                 fragment = memory_canon.read_fixed_fragment(fragments_dir, section_id)
             except FileNotFoundError:
                 issues.append(
-                    SpecsDoctorIssue(
+                    specs_finding(
                         code="FIXED-1",
                         severity=Severity.ERROR,
                         description=(
@@ -226,7 +228,7 @@ class MemoryValidator:
                 continue
             state = "is missing" if body is None else "differs from the library fragment"
             issues.append(
-                SpecsDoctorIssue(
+                specs_finding(
                     code="FIXED-1" if body is None else "FIXED-2",
                     severity=Severity.ERROR,
                     description=(f"{rel}: fixed law section `{section_id}` {state}"),
@@ -239,12 +241,13 @@ class MemoryValidator:
             )
         return issues
 
-    def fix_fixed_section(self, issue: SpecsDoctorIssue, public_dir: Path | None) -> None:
+    def fix_fixed_section(self, issue: SectionFinding, public_dir: Path | None) -> None:
         """Insert or refresh the fixed law block of the file named by *issue*."""
-        if not issue.path:
+        named = finding_path(issue)
+        if not named:
             return
         fragments_dir = public_dir if public_dir is not None else default_public_dir()
-        path = Path(issue.path)
+        path = Path(named)
         section_id = memory_canon.FIXED_SECTION_BY_PATH[path.relative_to(self.specs_dir).as_posix()]
         fragment = memory_canon.read_fixed_fragment(fragments_dir, section_id)
         rendered = memory_canon.render_fixed_section(
@@ -252,11 +255,11 @@ class MemoryValidator:
         )
         atomic_write(path, rendered)
 
-    def check_memory_files(self) -> list[SpecsDoctorIssue]:
+    def check_memory_files(self) -> list[SectionFinding]:
         """Check #2: required memory .md atoms exist with non-empty heading.
 
         A stray or legacy file is TREE-8's."""
-        issues: list[SpecsDoctorIssue] = []
+        issues: list[SectionFinding] = []
         mem_dir = self.specs_dir / "memory"
 
         required: list[tuple[str, Path]] = [
@@ -280,7 +283,7 @@ class MemoryValidator:
                 has_heading = _has_heading(p)
             except Exception as e:
                 issues.append(
-                    SpecsDoctorIssue(
+                    specs_finding(
                         code="SPEC-DOC-002",
                         severity=Severity.ERROR,
                         description=f"memory/{rel} is not parseable: {e}",
@@ -291,7 +294,7 @@ class MemoryValidator:
                 continue
             if not has_heading:
                 issues.append(
-                    SpecsDoctorIssue(
+                    specs_finding(
                         code="SPEC-DOC-002",
                         severity=Severity.ERROR,
                         description=f"memory/{rel} has no non-empty heading",
@@ -302,7 +305,7 @@ class MemoryValidator:
 
         return issues
 
-    def check_lint1_memory_atoms(self) -> list[SpecsDoctorIssue]:
+    def check_lint1_memory_atoms(self) -> list[SectionFinding]:
         """LINT-1: lint every memory atom under specs/memory/ via ``memory_lint``.
 
         ERROR on frontmatter/schema violations, forbidden (changelog/history)
@@ -317,7 +320,7 @@ class MemoryValidator:
             schema = memory_lint.load_frontmatter_schema()
         except FileNotFoundError as exc:
             return [
-                SpecsDoctorIssue(
+                specs_finding(
                     code="LINT-1",
                     severity=Severity.WARNING,
                     description=f"LINT-1: {exc}",
@@ -327,7 +330,7 @@ class MemoryValidator:
 
         # One issue per error, naming its atom: the doctor prints one line per finding.
         return [
-            SpecsDoctorIssue(
+            specs_finding(
                 code="LINT-1",
                 severity=Severity.ERROR,
                 description=err,
@@ -344,7 +347,7 @@ class MemoryValidator:
         *,
         repo_root: Path | None,
         command_paths: Collection[tuple[str, ...]] | None,
-    ) -> list[SpecsDoctorIssue]:
+    ) -> list[SectionFinding]:
         """MEM-DRIFT-2: every ``dadaia <verb>`` and repo path a memory atom cites still
         exists — the SAME finders (``features.specs.citations``) the ``public/**``
         citation contract tests use, never a second rule. WARNING and unfixable, like
@@ -353,7 +356,7 @@ class MemoryValidator:
         from the CLI root.
         """
         return [
-            SpecsDoctorIssue(
+            specs_finding(
                 code="MEM-DRIFT-2",
                 severity=Severity.WARNING,
                 description=(
@@ -367,7 +370,7 @@ class MemoryValidator:
             )
         ]
 
-    def check_mem_drift1_features_package_map(self) -> list[SpecsDoctorIssue]:
+    def check_mem_drift1_features_package_map(self) -> list[SectionFinding]:
         """MEM-DRIFT-1: the features package-map mermaid diagram matches the live tree.
 
         One WARNING per stale node (a package the diagram names that no longer exists)
@@ -398,10 +401,10 @@ class MemoryValidator:
         declared = {tok.strip() for tok in pkgs_match.group(1).split("·") if tok.strip()}
         live = _live_feature_package_names()
 
-        issues: list[SpecsDoctorIssue] = []
+        issues: list[SectionFinding] = []
         for stale in sorted(declared - live):
             issues.append(
-                SpecsDoctorIssue(
+                specs_finding(
                     code="MEM-DRIFT-1",
                     severity=Severity.WARNING,
                     description=(
@@ -414,7 +417,7 @@ class MemoryValidator:
             )
         for missing in sorted(live - declared):
             issues.append(
-                SpecsDoctorIssue(
+                specs_finding(
                     code="MEM-DRIFT-1",
                     severity=Severity.WARNING,
                     description=(

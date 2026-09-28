@@ -4,7 +4,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from dadaia_workspace.features.specs.doctor_types import Severity, SpecsDoctorIssue
+from dadaia_workspace.core.doctor_rules import SectionFinding
+from dadaia_workspace.features.specs.doctor_types import Severity, specs_finding
 
 
 class CoherenceValidator:
@@ -18,11 +19,11 @@ class CoherenceValidator:
         self.specs_dir = specs_dir
         self.public_dir = public_dir
 
-    def check_constitution(self) -> list[SpecsDoctorIssue]:
+    def check_constitution(self) -> list[SectionFinding]:
         path = self.specs_dir / "constitution.md"
         if not path.exists():
             return [
-                SpecsDoctorIssue(
+                specs_finding(
                     code="SPEC-DOC-001",
                     severity=Severity.ERROR,
                     description="specs/constitution.md is missing",
@@ -31,7 +32,7 @@ class CoherenceValidator:
             ]
         return []
 
-    def check_gitflow(self) -> list[SpecsDoctorIssue]:
+    def check_gitflow(self) -> list[SectionFinding]:
         """GITFLOW-1, WARN-only (ADR 0037): the constitution's ``gitflow:`` block is absent
         or malformed, so the pre-push gate falls back to the default."""
         from dadaia_workspace.core.gitflow import read_gitflow
@@ -41,7 +42,7 @@ class CoherenceValidator:
         if warning is None or not constitution.is_file():
             return []
         return [
-            SpecsDoctorIssue(
+            specs_finding(
                 code="GITFLOW-1",
                 severity=Severity.WARNING,
                 description=warning,

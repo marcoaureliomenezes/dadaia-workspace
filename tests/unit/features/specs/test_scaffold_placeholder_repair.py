@@ -20,6 +20,7 @@ from dadaia_workspace.features.spec_context import sweep
 from dadaia_workspace.features.specs.canon import scaffold
 from dadaia_workspace.features.specs.doctor import SpecsDoctor
 from dadaia_workspace.features.specs.doctor_memory import is_placeholder_atom
+from dadaia_workspace.features.specs.doctor_types import finding_path
 
 pytestmark = pytest.mark.unit
 
@@ -62,8 +63,8 @@ def test_fresh_scaffold_is_doctor_clean_without_feature_placeholder(tmp_path: Pa
     specs = _fresh_specs(tmp_path)
     assert not (specs / "memory" / "product" / "feature.md").exists()
     issues = _doctor(specs).check()
-    errors = [i for i in issues if i.severity.value == "error"]
-    assert errors == [], [f"{i.code}: {i.description}" for i in errors]
+    errors = [i for i in issues if i.verdict == "error"]
+    assert errors == [], [f"{i.code}: {i.message}" for i in errors]
 
 
 def test_doctor_flags_placeholder_atom_as_fixable(tmp_path: Path) -> None:
@@ -75,7 +76,7 @@ def test_doctor_flags_placeholder_atom_as_fixable(tmp_path: Path) -> None:
     flagged = [i for i in issues if i.code == "MEM-PLACEHOLDER-1"]
     assert len(flagged) == 1
     assert flagged[0].fixable is True
-    assert flagged[0].severity.value == "error"
+    assert flagged[0].verdict == "error"
 
 
 def test_fix_removes_placeholder_and_tree_is_clean(tmp_path: Path) -> None:
@@ -90,8 +91,8 @@ def test_fix_removes_placeholder_and_tree_is_clean(tmp_path: Path) -> None:
 
     residual = _doctor(specs).check()
     assert [i for i in residual if i.code == "MEM-PLACEHOLDER-1"] == []
-    errors = [i for i in residual if i.severity.value == "error"]
-    assert errors == [], [f"{i.code}: {i.description}" for i in errors]
+    errors = [i for i in residual if i.verdict == "error"]
+    assert errors == [], [f"{i.code}: {i.message}" for i in errors]
 
 
 def test_filled_atom_is_never_flagged_or_removed(tmp_path: Path) -> None:
@@ -162,9 +163,9 @@ def test_agents_placeholder1_warns_on_unfilled_installed_tests_agents_md(tmp_pat
     )
     issues = _doctor(specs).check()
     flagged = [i for i in issues if i.code == "AGENTS-PLACEHOLDER-1"]
-    assert len(flagged) == 1, [i.to_dict() for i in issues]
-    assert flagged[0].severity.value == "warning"
-    assert str(specs.parent / "tests" / "AGENTS.md") == flagged[0].path
+    assert len(flagged) == 1, [i for i in issues]
+    assert flagged[0].verdict == "warning"
+    assert str(specs.parent / "tests" / "AGENTS.md") == finding_path(flagged[0])
 
 
 def test_agents_placeholder1_silent_on_filled_installed_tests_agents_md(tmp_path: Path) -> None:

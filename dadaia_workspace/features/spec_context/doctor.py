@@ -590,7 +590,7 @@ ERROR_VERDICTS = frozenset({FindingVerdict.SLOP, FindingVerdict.EXPIRED, Finding
 
 def workspace_rules(
     *, expired_only: bool = False, context: str | None = None
-) -> tuple[Rule[DoctorService, SectionFinding], ...]:
+) -> tuple[Rule[DoctorService], ...]:
     """This section's contribution to the ONE rule registry.
 
     Two rules, the service's two existing reads: the context invariants (`check()`,

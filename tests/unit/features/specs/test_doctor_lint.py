@@ -11,8 +11,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from dadaia_workspace.features.specs import Severity
 from dadaia_workspace.features.specs.doctor_memory import MemoryValidator
+from dadaia_workspace.features.specs.doctor_types import finding_path
 
 _VALID_FRONTMATTER = """---
 slug: {slug}
@@ -54,9 +54,9 @@ def test_lint1_forbidden_heading_maps_to_error(tmp_path: Path) -> None:
 
     assert len(issues) == 1
     assert issues[0].code == "LINT-1"
-    assert issues[0].severity == Severity.ERROR
-    assert "Forbidden heading" in issues[0].description
-    assert "Changelog" in issues[0].description
+    assert issues[0].error
+    assert "Forbidden heading" in issues[0].message
+    assert "Changelog" in issues[0].message
 
 
 def test_lint1_unknown_heading_produces_no_issue(tmp_path: Path) -> None:
@@ -93,7 +93,7 @@ def test_lint1_error_atom_and_clean_atom_coexist_only_the_error_surfaces(tmp_pat
     issues = MemoryValidator(specs).check_lint1_memory_atoms()
 
     assert len(issues) == 1
-    assert issues[0].severity == Severity.ERROR
+    assert issues[0].error
 
 
 def test_lint1_no_memory_dir_is_a_noop(tmp_path: Path) -> None:
@@ -130,9 +130,9 @@ def test_lint1_emits_one_single_line_issue_per_atom_error(tmp_path: Path) -> Non
 
     issues = MemoryValidator(specs).check_lint1_memory_atoms()
 
-    assert [(issue.code, issue.path) for issue in issues] == [
+    assert [(issue.code, finding_path(issue)) for issue in issues] == [
         ("LINT-1", str(architecture)),
         ("LINT-1", str(architecture)),
         ("LINT-1", str(quality)),
     ]
-    assert all("\n" not in issue.description for issue in issues)
+    assert all("\n" not in issue.message for issue in issues)

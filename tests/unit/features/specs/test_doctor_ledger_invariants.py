@@ -25,7 +25,8 @@ from pathlib import Path
 
 import pytest
 
-from dadaia_workspace.features.specs import Severity, SpecsDoctor, SpecsDoctorIssue
+from dadaia_workspace.core.doctor_rules import SectionFinding
+from dadaia_workspace.features.specs import SpecsDoctor
 from dadaia_workspace.features.specs.rules import RULES
 
 MINIMAL_MEMORY_PRODUCT_INDEX_MD = """\
@@ -158,11 +159,11 @@ def _write_tasks(specs: Path, release_id: str, body: str) -> None:
     )
 
 
-def _codes(issues: list[SpecsDoctorIssue]) -> set[str]:
+def _codes(issues: list[SectionFinding]) -> set[str]:
     return {i.code for i in issues}
 
 
-def _by_code(issues: list[SpecsDoctorIssue], code: str) -> list[SpecsDoctorIssue]:
+def _by_code(issues: list[SectionFinding], code: str) -> list[SectionFinding]:
     return [i for i in issues if i.code == code]
 
 
@@ -244,20 +245,20 @@ def test_sad_matrix(tmp_path: Path) -> None:
     dup = specs_d / "releases" / "_archive" / "0.1.10"
     _write_minimal_spec(dup)
     doc026 = _by_code(SpecsDoctor(specs_d).check(), "SPEC-DOC-026")
-    assert any(i.severity == Severity.ERROR for i in doc026)
+    assert any(i.error for i in doc026)
 
     # DOC-027: non-SemVer active release dir -> ERROR.
     specs_e = _make_clean_specs_tree(
         tmp_path.parent / (tmp_path.name + "-027"), release_id="my-feature-v1"
     )
     doc027 = _by_code(SpecsDoctor(specs_e).check(), "SPEC-DOC-027")
-    assert any(i.severity == Severity.ERROR for i in doc027)
+    assert any(i.error for i in doc027)
 
     # DOC-030: non-conforming new audit dir -> WARNING.
     specs_g = _make_clean_specs_tree(tmp_path.parent / (tmp_path.name + "-030"))
     (specs_g / "audits" / "2026-07-01T000000Z").mkdir(parents=True)
     doc030 = _by_code(SpecsDoctor(specs_g).check(), "SPEC-DOC-030")
-    assert doc030 and all(i.severity == Severity.WARNING for i in doc030)
+    assert doc030 and all(i.verdict == "warning" for i in doc030)
 
     # DOC-041: a record closed past the threshold, beside a malformed line -> one WARNING.
     specs_h = _make_clean_specs_tree(tmp_path.parent / (tmp_path.name + "-041"))
@@ -266,7 +267,7 @@ def test_sad_matrix(tmp_path: Path) -> None:
     (specs_h / "bugs" / "BUGS.jsonl").write_text(json.dumps(closed) + "\nnot json {\n")
     [doc041] = _by_code(SpecsDoctor(specs_h).check(), "SPEC-DOC-041")
     [rule] = [r for r in RULES if "SPEC-DOC-041" in r.codes]
-    assert doc041.severity == Severity.WARNING and "bugs.py archive" in str(rule.fix_help)
+    assert doc041.verdict == "warning" and "bugs.py archive" in str(rule.fix_help)
 
 
 # ---------------------------------------------------------------------------
@@ -349,7 +350,7 @@ def test_doc027_scores_the_live_root_only(tmp_path: Path) -> None:
 
     specs_live = _make_clean_specs_tree(tmp_path / "027live", release_id="v0.1.4.6")
     doc027_live = _by_code(SpecsDoctor(specs_live).check(), "SPEC-DOC-027")
-    assert any(i.severity == Severity.ERROR for i in doc027_live)
+    assert any(i.error for i in doc027_live)
 
 
 # ---------------------------------------------------------------------------

@@ -22,7 +22,6 @@ import pytest
 
 from dadaia_workspace.features.specs import doctor_memory
 from dadaia_workspace.features.specs.doctor_memory import MemoryValidator
-from dadaia_workspace.features.specs.doctor_types import Severity
 
 _HEADING = "### `dadaia_workspace/features` — package map ({n} packages)"
 
@@ -97,10 +96,10 @@ def test_mem_drift1_table(
     assert [i.code for i in issues] == expected_codes, case_id
     if expected_codes:
         assert len(issues) == 1, case_id
-        assert issues[0].severity == Severity.WARNING, case_id
+        assert issues[0].verdict == "warning", case_id
         assert issues[0].fixable is False, case_id
         assert expected_needle is not None
-        assert expected_needle in issues[0].description, case_id
+        assert expected_needle in issues[0].message, case_id
 
 
 def test_mem_drift1_no_architecture_md_produces_nothing(

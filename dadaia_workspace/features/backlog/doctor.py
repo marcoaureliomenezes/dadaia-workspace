@@ -52,7 +52,7 @@ def _check_conflict(ctx: DoctorContext) -> list[SectionFinding]:
     return findings
 
 
-type LedgerRule = Rule[DoctorContext, SectionFinding]
+type LedgerRule = Rule[DoctorContext]
 
 SECTION = "ledgers"
 

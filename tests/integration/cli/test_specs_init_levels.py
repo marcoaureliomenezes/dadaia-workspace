@@ -56,7 +56,7 @@ def repo(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
 
 def _doctor_errors(specs: Path) -> list[dict[str, object]]:
     issues = SpecsDoctor(specs, public_dir=_PUBLIC, templates_dir=_PUBLIC / "templates").check()
-    return [i.to_dict() for i in issues if i.severity.value == "error"]
+    return [i for i in issues if i.verdict == "error"]
 
 
 def _snapshot(root: Path) -> dict[str, bytes]:

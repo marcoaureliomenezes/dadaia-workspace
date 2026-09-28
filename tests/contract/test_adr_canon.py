@@ -110,11 +110,11 @@ def test_accepted_status_with_measured_by_is_green() -> None:
     [
         (
             ["0001", "0003"],
-            ["ADRs/decisions.jsonl:2 id '0003' breaks 0001..N: expected 0002"],
+            ["id '0003' breaks 0001..N: expected 0002 (ADRs/decisions.jsonl:2)"],
         ),
         (
             ["0002", "0003"],
-            ["ADRs/decisions.jsonl:1 id '0002' breaks 0001..N: expected 0001"],
+            ["id '0002' breaks 0001..N: expected 0001 (ADRs/decisions.jsonl:1)"],
         ),
         (["0001", "0002"], []),
         ([], []),
@@ -126,7 +126,7 @@ def test_the_doctor_rule_flags_the_first_id_breaking_0001_to_n(
     """sa-adr-measured-by-pattern-refuses-real-checks#B27-3: a gap or a sequence not
     starting at 0001 is a LEDGER-ADR-SCHEMA finding of the consumer's own doctor."""
     issues = adr_record_issues(_ledger(tmp_path, ids))
-    assert [f"{i.path} {i.description}" for i in issues] == expected
+    assert [i.message for i in issues] == expected
 
 
 def test_doctor_admits_any_named_check_and_flags_a_duplicate_id(

@@ -17,7 +17,8 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
-from dadaia_workspace.features.specs.doctor_types import Severity, SpecsDoctorIssue
+from dadaia_workspace.core.doctor_rules import SectionFinding
+from dadaia_workspace.features.specs.doctor_types import Severity, specs_finding
 
 #: `bugs.py archive`'s own default ``--threshold-days``.
 _ARCHIVE_THRESHOLD_DAYS = 90
@@ -57,17 +58,17 @@ class GovernanceValidator:
         membership in the ledger, never liveness."""
         return frozenset(str(r["id"]) for r in self._bug_lines() if "id" in r)
 
-    def check_bug_archive_overdue(self, *, now: datetime | None = None) -> list[SpecsDoctorIssue]:
+    def check_bug_archive_overdue(self, *, now: datetime | None = None) -> list[SectionFinding]:
         """SPEC-DOC-041 — WARN when a record closed (``closed_at``, never the filing date
         ``ts``) longer ago than the archive threshold is still live. Never a block."""
         cutoff = (now or datetime.now(tz=UTC)) - timedelta(days=_ARCHIVE_THRESHOLD_DAYS)
-        issues: list[SpecsDoctorIssue] = []
+        issues: list[SectionFinding] = []
         for record in self._bug_lines():
             closed_at = record.get("closed_at")
             moment = _parse_ts(closed_at) if isinstance(closed_at, str) else None
             if moment is not None and moment < cutoff:
                 issues.append(
-                    SpecsDoctorIssue(
+                    specs_finding(
                         code="SPEC-DOC-041",
                         severity=Severity.WARNING,
                         description=(

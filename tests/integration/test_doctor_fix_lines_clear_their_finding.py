@@ -42,15 +42,13 @@ import pytest
 from dadaia_workspace.cli.commands.doctor import (
     _build_specs_doctor,
     _ledgers_section,
-    _specs_render,
     _specs_section,
 )
 from dadaia_workspace.cli.help_digest import command_paths
-from dadaia_workspace.core.doctor_rules import Rule, rule_fix, run_section
+from dadaia_workspace.core.doctor_rules import Rule, SectionFinding, rule_fix, run_section
 from dadaia_workspace.core.specs_version import CANONICAL_SPECS_VERSION
 from dadaia_workspace.features.specs.citations import dead_verb_citations
 from dadaia_workspace.features.specs.doctor import SpecsDoctor
-from dadaia_workspace.features.specs.doctor_types import Severity, SpecsDoctorIssue
 from dadaia_workspace.features.specs.rules import RULES as SPECS_RULES
 from tests.fixtures.harness_env import session_home
 
@@ -238,7 +236,7 @@ def _doctor(root: Path) -> SpecsDoctor:
     return doctor
 
 
-def _run_rule(root: Path, rule: Rule[SpecsDoctor, SpecsDoctorIssue]) -> list[SpecsDoctorIssue]:
+def _run_rule(root: Path, rule: Rule[SpecsDoctor]) -> list[SectionFinding]:
     return rule.run(_doctor(root))
 
 
@@ -250,14 +248,14 @@ def _resolve(fix: str, plant: Plant) -> str:
     return command
 
 
-_PLANTED_RULES: list[tuple[str, Rule[SpecsDoctor, SpecsDoctorIssue]]] = [
+_PLANTED_RULES: list[tuple[str, Rule[SpecsDoctor]]] = [
     (code, rule) for rule in SPECS_RULES for code in rule.codes if code in PLANTS
 ]
 
 
 @pytest.mark.parametrize(("code", "rule"), _PLANTED_RULES, ids=[code for code, _ in _PLANTED_RULES])
 def test_the_fix_line_clears_the_finding_it_was_stamped_on(
-    code: str, rule: Rule[SpecsDoctor, SpecsDoctorIssue], tmp_path: Path
+    code: str, rule: Rule[SpecsDoctor], tmp_path: Path
 ) -> None:
     """Plant the finding, run the rule's OWN fix line, and the rule falls silent."""
     root = _repo(tmp_path)
@@ -274,24 +272,22 @@ def test_the_fix_line_clears_the_finding_it_was_stamped_on(
     dead = [
         v
         for issue in before
-        for line in issue.description.splitlines()
+        for line in issue.message.splitlines()
         for v in dead_verb_citations(f"`{line}`", rel=code, command_paths=command_paths())
     ]
     assert not dead, f"{code}: the finding cites a verb that does not exist: {dead}"
 
     if rule.fix_help is None:
-        assert all(issue.severity is Severity.WARNING for issue in before), (
+        assert all(issue.verdict == "warning" for issue in before), (
             f"{code} carries no fix line, so it must never exit 1 — "
-            f"got {[i.severity for i in before]}"
+            f"got {[i.verdict for i in before]}"
         )
         return
 
     # sa-unfixable-doctor-findings-say-doctor-fix#S2: run the fix PRINTED on the finding
     # (its own, or the rule's default stamped by the doctor), never the rule default blind.
     # The fixture is no workspace: the fix names the CLI of the venv running this suite.
-    (printed, *_) = run_section(
-        "specs", [rule], _doctor(root), _specs_render, None, root / "specs"
-    ).findings
+    (printed, *_) = run_section("specs", [rule], _doctor(root), None, root / "specs").findings
     # sa-unfixable-doctor-findings-say-doctor-fix#S1: no `<…>` survives into a printed fix.
     assert not re.search(r"<[^<>]+>", printed.fix), f"{code}: placeholder in {printed.fix}"
     command = _resolve(printed.fix, plant)

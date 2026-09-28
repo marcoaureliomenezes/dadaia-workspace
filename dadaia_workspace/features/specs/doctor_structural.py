@@ -14,6 +14,7 @@ from pathlib import Path
 
 from dadaia_workspace.core.atomic_write import atomic_write
 from dadaia_workspace.core.cli_line import mkdir_line
+from dadaia_workspace.core.doctor_rules import SectionFinding
 from dadaia_workspace.core.template_history import was_shipped
 from dadaia_workspace.core.workspace_layout import SCOPED_LAW_AREAS, render_registry_tables
 from dadaia_workspace.features.specs import memory_canon
@@ -23,7 +24,7 @@ from dadaia_workspace.features.specs.canon import (
     is_canon_path,
     scaffold_entry,
 )
-from dadaia_workspace.features.specs.doctor_types import Severity, SpecsDoctorIssue
+from dadaia_workspace.features.specs.doctor_types import Severity, finding_path, specs_finding
 
 # TREE-3: memory .md files that must exist.  No Jinja templates — .md is canonical source.
 # v7 canon: the top-level pair is ARCHITECTURE.md and QUALITY.md. A tree still carrying
@@ -72,7 +73,7 @@ class StructuralValidator:
         self._scaffold_dir = scaffold_dir
         self._templates_dir = templates_dir
 
-    def check_tree3_memory_md(self) -> list[SpecsDoctorIssue]:
+    def check_tree3_memory_md(self) -> list[SectionFinding]:
         """TREE-3: required memory .md atom files must exist.
 
         Checks: memory/ARCHITECTURE.md, memory/QUALITY.md,
@@ -81,14 +82,14 @@ class StructuralValidator:
         .md is the canonical source (memory-markdown-source-v1 / D-4). ``doctor --fix``
         seeds a missing one from its canon template (then the operator authors it).
         """
-        issues: list[SpecsDoctorIssue] = []
+        issues: list[SectionFinding] = []
         mem_dir = self.specs_dir / "memory"
         for rel_path in _TREE3_MEMORY_FILES:
             target = mem_dir / rel_path
             if target.exists():
                 continue
             issues.append(
-                SpecsDoctorIssue(
+                specs_finding(
                     code="TREE-3",
                     severity=Severity.ERROR,
                     description=f"memory/{rel_path} is missing — required memory .md atom.",
@@ -98,10 +99,12 @@ class StructuralValidator:
             )
         return issues
 
-    def fix_tree3(self, issue: SpecsDoctorIssue) -> None:
-        scaffold_entry(self.specs_dir, Path(str(issue.path)).relative_to(self.specs_dir).as_posix())
+    def fix_tree3(self, issue: SectionFinding) -> None:
+        scaffold_entry(
+            self.specs_dir, Path(str(finding_path(issue))).relative_to(self.specs_dir).as_posix()
+        )
 
-    def check_tree4_required_dirs(self) -> list[SpecsDoctorIssue]:
+    def check_tree4_required_dirs(self) -> list[SectionFinding]:
         """TREE-4: every area in ``REQUIRED_ROOT_DIRS`` (audits/, backlog/, bugs/,
         releases/ today) must exist under specs/ — folded over the canon table
         (v0.5.1 K4), not a second hand-kept tuple.
@@ -112,7 +115,7 @@ class StructuralValidator:
         the exact output of ``scaffold()``. A directory is kept by its AGENTS.md;
         no separate .gitkeep placeholder is written.
         """
-        issues: list[SpecsDoctorIssue] = []
+        issues: list[SectionFinding] = []
         for dirname in _TREE4_REQUIRED_DIRS:
             target = self.specs_dir / dirname
             if target.exists():
@@ -122,7 +125,7 @@ class StructuralValidator:
                 and (self._scaffold_dir / dirname / "AGENTS.md").exists()
             )
             issues.append(
-                SpecsDoctorIssue(
+                specs_finding(
                     code="TREE-4",
                     severity=Severity.WARNING,
                     description=(
@@ -140,11 +143,11 @@ class StructuralValidator:
             )
         return issues
 
-    def fix_tree4(self, issue: SpecsDoctorIssue) -> None:
+    def fix_tree4(self, issue: SectionFinding) -> None:
         """Create the missing directory with AGENTS.md — a directory is kept by its
         AGENTS.md, no separate .gitkeep placeholder."""
         assert issue.code == "TREE-4"
-        target = Path(issue.path)  # type: ignore[arg-type]
+        target = Path(str(finding_path(issue)))
         dirname = target.name
         target.mkdir(parents=True, exist_ok=True)
         # AGENTS.md — copy from scaffold source (v6 canon, FR1: README.md retired)
@@ -157,7 +160,7 @@ class StructuralValidator:
         if not agents_md.exists():
             atomic_write(agents_md, agents_content)
 
-    def check_tree5_agents_md(self) -> list[SpecsDoctorIssue]:
+    def check_tree5_agents_md(self) -> list[SectionFinding]:
         """TREE-5: projected law files must match their canonical source.
 
         Root: ``specs/AGENTS.md`` vs ``templates/specs-AGENTS.md``. Scoped (T-053-15):
@@ -168,12 +171,12 @@ class StructuralValidator:
         bytes equal a version this project shipped (``was_shipped``) and the file is
         not a symlink — anything else may hold operator content and stays warn-only.
         """
-        issues: list[SpecsDoctorIssue] = []
+        issues: list[SectionFinding] = []
         issues.extend(self._tree5_root_issues())
         issues.extend(self._tree5_scoped_issues())
         return issues
 
-    def _tree5_root_issues(self) -> list[SpecsDoctorIssue]:
+    def _tree5_root_issues(self) -> list[SectionFinding]:
         agents_md = self.specs_dir / "AGENTS.md"
         templates = self._templates_dir
         canonical_path = templates / "specs-AGENTS.md" if templates else None
@@ -189,11 +192,11 @@ class StructuralValidator:
             label="specs/AGENTS.md",
         )
 
-    def _tree5_scoped_issues(self) -> list[SpecsDoctorIssue]:
+    def _tree5_scoped_issues(self) -> list[SectionFinding]:
         """Scoped scaffold law files (T-053-15) — same shipped-history discipline."""
         if self._templates_dir is None or self._scaffold_dir is None:
             return []
-        issues: list[SpecsDoctorIssue] = []
+        issues: list[SectionFinding] = []
         for area in _TREE5_SCOPED_LAW_AREAS:
             dst = self.specs_dir / area / "AGENTS.md"
             canonical_path = self._scaffold_dir / area / "AGENTS.md"
@@ -212,10 +215,10 @@ class StructuralValidator:
             )
         return issues
 
-    def _tree5_missing(self, dst: Path, label: str, fixable: bool) -> SpecsDoctorIssue:
+    def _tree5_missing(self, dst: Path, label: str, fixable: bool) -> SectionFinding:
         """A law file that is not there at all: writing the shipped template loses
         nothing, so ``doctor --fix`` writes it whenever the template is at hand (T-050-09)."""
-        return SpecsDoctorIssue(
+        return specs_finding(
             code="TREE-5",
             severity=Severity.WARNING,
             description=f"{label} is missing — expected the shipped law contract.",
@@ -225,7 +228,7 @@ class StructuralValidator:
 
     def _tree5_compare(
         self, *, dst: Path, canonical_path: Path, asset_name: str, label: str
-    ) -> list[SpecsDoctorIssue]:
+    ) -> list[SectionFinding]:
         """ONE comparison rule for every TREE-5 target (root and scoped alike)."""
         assert self._templates_dir is not None
         canonical_text = render_registry_tables(canonical_path.read_text(encoding="utf-8"))
@@ -242,7 +245,7 @@ class StructuralValidator:
         # advertised as fixable either (CWE-393).
         if was_shipped(current_text, asset_name, self._templates_dir) and not dst.is_symlink():
             return [
-                SpecsDoctorIssue(
+                specs_finding(
                     code="TREE-5",
                     severity=Severity.WARNING,
                     description=(
@@ -257,7 +260,7 @@ class StructuralValidator:
                 )
             ]
         return [
-            SpecsDoctorIssue(
+            specs_finding(
                 code="TREE-5",
                 severity=Severity.WARNING,
                 description=(
@@ -274,7 +277,7 @@ class StructuralValidator:
             )
         ]
 
-    def fix_tree5(self, issue: SpecsDoctorIssue) -> None:
+    def fix_tree5(self, issue: SectionFinding) -> None:
         """Write a missing law file, or refresh a superseded one, from its canonical source.
 
         Only ever reached for issues this validator marked ``fixable``. The repair
@@ -301,7 +304,8 @@ class StructuralValidator:
                 )
                 for area in _TREE5_SCOPED_LAW_AREAS
             )
-        issue_path = Path(issue.path).resolve() if issue.path else None
+        named = finding_path(issue)
+        issue_path = Path(named).resolve() if named else None
         for dst, canonical_path, asset_name in targets:
             if issue_path is not None and dst.resolve() != issue_path:
                 continue
@@ -317,7 +321,7 @@ class StructuralValidator:
             atomic_write(dst, law, preserve_mode=True)
             return
 
-    def check_tree8_canon_root(self) -> list[SpecsDoctorIssue]:
+    def check_tree8_canon_root(self) -> list[SectionFinding]:
         """TREE-8: every path under specs/ must be v6-canon-conformant (FR1, v0.5.0
         specs-canon closure, operator ruling 2026-08-28) — driven by the ONE shared
         predicate in ``features.specs.canon``, the SAME module the pre-push
@@ -342,7 +346,7 @@ class StructuralValidator:
         """
         if not self.specs_dir.is_dir():
             return []
-        issues: list[SpecsDoctorIssue] = []
+        issues: list[SectionFinding] = []
         for entry in sorted(self.specs_dir.iterdir()):
             if entry.name in _TREE8_CANON_ROOT:
                 continue
@@ -358,9 +362,9 @@ class StructuralValidator:
                 issues.append(self._tree8_issue(entry))
         return issues
 
-    def _tree8_issue(self, entry: Path) -> SpecsDoctorIssue:
+    def _tree8_issue(self, entry: Path) -> SectionFinding:
         rel = entry.relative_to(self.specs_dir).as_posix()
-        return SpecsDoctorIssue(
+        return specs_finding(
             code="TREE-8",
             severity=Severity.ERROR,
             description=(

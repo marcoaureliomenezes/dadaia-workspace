@@ -60,9 +60,9 @@ def test_a_source_file_named_memory_is_not_a_memory_write_set(tmp_path: Path) ->
 
     issues = _by_code(SpecsDoctor(specs).check(), "SPEC-DOC-047")
 
-    assert len(issues) == 1, [issue.description for issue in issues]
-    assert "T-999-02" in issues[0].description
-    assert "T-999-01" not in issues[0].description
+    assert len(issues) == 1, [issue.message for issue in issues]
+    assert "T-999-02" in issues[0].message
+    assert "T-999-01" not in issues[0].message
 
 
 def test_a_block_after_a_blank_line_still_names_its_task(tmp_path: Path) -> None:
@@ -81,4 +81,4 @@ def test_a_block_after_a_blank_line_still_names_its_task(tmp_path: Path) -> None
     issues = _by_code(SpecsDoctor(specs).check(), "SPEC-DOC-047")
 
     assert len(issues) == 1
-    assert "T-999-02" in issues[0].description
+    assert "T-999-02" in issues[0].message

@@ -18,11 +18,12 @@ from collections.abc import Callable, Collection
 from datetime import date
 from pathlib import Path
 
+from dadaia_workspace.core.doctor_rules import SectionFinding
 from dadaia_workspace.core.release_state import RELEASE_ID_RE
 from dadaia_workspace.core.spec_status import APPROVED, extract_status
 from dadaia_workspace.core.spec_status import CANONICAL_STATUS as _CANONICAL_STATUS
 from dadaia_workspace.features.specs.doctor_common import RELEASE_ARTIFACTS, iter_all_release_dirs
-from dadaia_workspace.features.specs.doctor_types import Severity, SpecsDoctorIssue
+from dadaia_workspace.features.specs.doctor_types import Severity, specs_finding
 from dadaia_workspace.features.specs.specs_tree import SpecsTree
 
 # Vocabulary + parser live in core.spec_status (single definition); re-exported here
@@ -116,7 +117,7 @@ class ReleaseValidator:
 
     def check_spec_origin(
         self, known_bug_ids: Callable[[], Collection[str]]
-    ) -> list[SpecsDoctorIssue]:
+    ) -> list[SectionFinding]:
         """SPEC-DOC-048: the live SPEC names where the work came from — the header is the
         flow's only machine-read input. A closed candidate is history in git, never ranked.
 
@@ -132,7 +133,7 @@ class ReleaseValidator:
             return []
         fix = f"Operator action: name the work's origin under **Opened:** in {path}"
         description = f"{path.relative_to(self.specs_dir)} {problem}"
-        return [SpecsDoctorIssue("SPEC-DOC-048", Severity.ERROR, description, str(path), fix=fix)]
+        return [specs_finding("SPEC-DOC-048", Severity.ERROR, description, str(path), fix=fix)]
 
     def _origin_problem(self, path: Path, known_bug_ids: Callable[[], Collection[str]]) -> str:
         """One SPEC header judged — presence, vocabulary, then the cited ids; "" is clean."""
@@ -162,8 +163,8 @@ class ReleaseValidator:
             )
         return f"Origin {value!r} is not canonical. Valid: {_ORIGIN_VOCABULARY}"
 
-    def check_active_release_artifacts(self) -> list[SpecsDoctorIssue]:
-        issues: list[SpecsDoctorIssue] = []
+    def check_active_release_artifacts(self) -> list[SectionFinding]:
+        issues: list[SectionFinding] = []
         active = self.tree.active_release
         release, phase = active.release, active.phase
         if not release:
@@ -180,7 +181,7 @@ class ReleaseValidator:
             status = _extract_status(fpath)
             if status is None:
                 issues.append(
-                    SpecsDoctorIssue(
+                    specs_finding(
                         code="SPEC-DOC-004",
                         severity=Severity.ERROR,
                         description=f"{fname} has no `**Status:**` line",
@@ -190,7 +191,7 @@ class ReleaseValidator:
                 )
             elif status not in CANONICAL_STATUS:
                 issues.append(
-                    SpecsDoctorIssue(
+                    specs_finding(
                         code="SPEC-DOC-004",
                         severity=Severity.ERROR,
                         description=(
@@ -207,7 +208,7 @@ class ReleaseValidator:
                 # scaffolder emits exactly that. Only implementation-bound phases
                 # expect approved artifacts.
                 issues.append(
-                    SpecsDoctorIssue(
+                    specs_finding(
                         code="SPEC-DOC-004",
                         severity=Severity.WARNING,
                         description=(
@@ -220,14 +221,14 @@ class ReleaseValidator:
                 )
         return issues
 
-    def check_plan_line_limit(self) -> list[SpecsDoctorIssue]:
-        issues: list[SpecsDoctorIssue] = []
+    def check_plan_line_limit(self) -> list[SectionFinding]:
+        issues: list[SectionFinding] = []
         for plan in self.specs_dir.glob("releases/*/PLAN.md"):
             n_lines = sum(1 for _ in plan.read_text(encoding="utf-8").splitlines())
             if n_lines <= PLAN_MAX_LINES:
                 continue
             issues.append(
-                SpecsDoctorIssue(
+                specs_finding(
                     code="SPEC-DOC-005",
                     # WARNING, always: the remedy is splitting the PLAN — judgment, with
                     # no command to hand back. An exit-1 whose only runnable "fix" was
@@ -239,7 +240,7 @@ class ReleaseValidator:
             )
         return issues
 
-    def check_no_memory_task(self) -> list[SpecsDoctorIssue]:
+    def check_no_memory_task(self) -> list[SectionFinding]:
         """SPEC-DOC-047: memory is closure procedure, never a task. ``specs/memory/AGENTS.md`` lets
         ``specs/memory/**`` be written only in DEFINITION/CLOSURE (the gate's RULE A
         reads no SDD artifact), and §6.7 orders memory update -> closure narrative ->
@@ -256,13 +257,13 @@ class ReleaseValidator:
         if not tasks.exists():
             return []
         text = tasks.read_text(encoding="utf-8")
-        issues: list[SpecsDoctorIssue] = []
+        issues: list[SectionFinding] = []
         for block in _TASK_BLOCK_RE.finditer(text):
             if _MEMORY_WRITE_SET_RE.search(block.group(0)) is None:
                 continue
             task_line = block.group(0).splitlines()[0].strip()
             issues.append(
-                SpecsDoctorIssue(
+                specs_finding(
                     code="SPEC-DOC-047",
                     severity=Severity.ERROR,
                     description=(
@@ -277,7 +278,7 @@ class ReleaseValidator:
             )
         return issues
 
-    def check_phase_markers_coherence(self) -> list[SpecsDoctorIssue]:
+    def check_phase_markers_coherence(self) -> list[SectionFinding]:
         """SPEC-DOC-024: a live release in IMPLEMENTATION carries an approved TASKS.md.
         Whether a task is still open is `release.py phase CLOSURE`'s one refusal
         (`_release_schema.UNFINISHED_RE`) — the doctor keeps no task-marker regex."""
@@ -292,13 +293,13 @@ class ReleaseValidator:
             f"Active release phase='IMPLEMENTATION' but TASKS.md of release '{release}' is "
             f"not '**Status:** {APPROVED}' (found {status!r})."
         )
-        return [SpecsDoctorIssue("SPEC-DOC-024", Severity.ERROR, description, str(tasks))]
+        return [specs_finding("SPEC-DOC-024", Severity.ERROR, description, str(tasks))]
 
-    def check_unique_release_ids(self) -> list[SpecsDoctorIssue]:
+    def check_unique_release_ids(self) -> list[SectionFinding]:
         """SPEC-DOC-026: release ids (dir basenames) must be unique across
         ``releases/`` ∪ ``releases/_archive/`` (recursive). A collision is an ERROR.
         """
-        issues: list[SpecsDoctorIssue] = []
+        issues: list[SectionFinding] = []
         by_name: dict[str, list[Path]] = {}
         for d, _root in iter_all_release_dirs(self.specs_dir):
             by_name.setdefault(d.name, []).append(d)
@@ -308,7 +309,7 @@ class ReleaseValidator:
                 continue
             paths = ", ".join(d.relative_to(self.specs_dir).as_posix() for d in sorted(entries))
             issues.append(
-                SpecsDoctorIssue(
+                specs_finding(
                     code="SPEC-DOC-026",
                     severity=Severity.ERROR,
                     description=(
@@ -320,7 +321,7 @@ class ReleaseValidator:
             )
         return issues
 
-    def check_release_naming_canon(self) -> list[SpecsDoctorIssue]:
+    def check_release_naming_canon(self) -> list[SectionFinding]:
         """SPEC-DOC-027: release dir names should match the release-id canon
         (``RELEASE_ID_RE``; mintable ids are bare ``MAJOR.MINOR.PATCH``).
 
@@ -340,7 +341,7 @@ class ReleaseValidator:
         several findings (ledger precedent
         ``doctor-016-errors-archived-legacy-release-027-tolerates``).
         """
-        issues: list[SpecsDoctorIssue] = []
+        issues: list[SectionFinding] = []
         live_root = self.specs_dir / "releases"
         for d, root in iter_all_release_dirs(self.specs_dir):
             if root != live_root or RELEASE_ID_RE.match(d.name):
@@ -350,7 +351,7 @@ class ReleaseValidator:
             born_after_canon = created is not None and created >= RELEASE_SEMVER_CUTOFF
             severity = Severity.ERROR if born_after_canon else Severity.WARNING
             issues.append(
-                SpecsDoctorIssue(
+                specs_finding(
                     code="SPEC-DOC-027",
                     severity=severity,
                     description=(

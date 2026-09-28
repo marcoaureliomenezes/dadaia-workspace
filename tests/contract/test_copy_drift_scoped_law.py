@@ -58,9 +58,9 @@ def _memory_issues(tmp_path: Path, content: str | None) -> list[str]:
     specs = _specs_tree(tmp_path / "tree", content)
     doctor = SpecsDoctor(specs, public_dir=public)
     return [
-        f"{i.code} {i.severity.value} {i.description}"
+        f"{i.code} {i.verdict} {i.message}"
         for i in doctor.check()
-        if Path(i.path).as_posix().endswith("memory/AGENTS.md")
+        if i.message.endswith("memory/AGENTS.md)")
     ]
 
 
