@@ -120,7 +120,7 @@ a TTL expired.
 
 ## Run the first candidate
 
-<!-- derived-from: release-lifecycle sha256:16af688b63c6 -->
+<!-- derived-from: release-lifecycle sha256:daf0f07a01d3 -->
 <!-- derived-from: backlog-ledger sha256:46382434daf2 -->
 <!-- derived-from: bug-ledger sha256:9392c1f406a4 -->
 

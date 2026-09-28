@@ -95,7 +95,7 @@ and deletes only what a TTL expired.
 
 <!-- derived-from: agentic-entities sha256:6add03805476 -->
 <!-- derived-from: sdd-gate-v3 sha256:8cc77479943b -->
-<!-- derived-from: release-lifecycle sha256:16af688b63c6 -->
+<!-- derived-from: release-lifecycle sha256:daf0f07a01d3 -->
 <!-- derived-from: bug-ledger sha256:9392c1f406a4 -->
 <!-- derived-from: harness-claude-code sha256:4d0f86f6e93f -->
 <!-- derived-from: harness-codex sha256:3419ecb0e1aa -->

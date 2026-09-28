@@ -10,7 +10,6 @@ sources:
   - dadaia_workspace/public/skills/dd-spec-navigator/scripts/**
   - dadaia_workspace/public/schemas/releases/**
   - dadaia_workspace/core/release_state.py
-  - dadaia_workspace/features/specs/release_tree.py
   - dadaia_workspace/features/specs/doctor_release.py
 ---
 

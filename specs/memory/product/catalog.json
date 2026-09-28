@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-09-28T18:20:51Z",
+  "generated_at": "2026-09-28T18:26:31Z",
   "features": [
     {
       "rank": 1,
@@ -820,7 +820,6 @@
         "dadaia_workspace/public/skills/dd-spec-navigator/scripts/**",
         "dadaia_workspace/public/schemas/releases/**",
         "dadaia_workspace/core/release_state.py",
-        "dadaia_workspace/features/specs/release_tree.py",
         "dadaia_workspace/features/specs/doctor_release.py"
       ]
     },
