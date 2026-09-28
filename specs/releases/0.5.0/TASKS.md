@@ -72,6 +72,8 @@ Lanes: PLAN §2 FR10; files and lines: `AGGREGATE.md` §6.
 - [x] **T-050-92 — L4.5 trim.** `W:` `cli/`, other `f/` · `blocked by:` T-050-81..87 · `delivers:` §6 W4 · nothing landed, stopped by the 2026-09-28 relaxation (SPEC Origin).
 - [x] **T-050-93 — L4.6–L4.12 test narration.** `W:` tests, one commit per W3 lane · `blocked by:` T-050-88..92 · `delivers:` §6 W4 · Δ 0/partial (inside -86/-87), stopped by the 2026-09-28 relaxation (SPEC Origin).
 
+- [ ] **T-050-94 — AC5.7 + AC9.2, the test-citation lens.** The closure review found them undelivered (T-050-34 shipped AC5.1–5.6, 5.8). `W:` `pub/skills/dd-code-review/`, `tests/contract/`, the statement source · `blocked by:` — · `delivers:` AC5.7, AC9.2 · `RED:` the contract test on a planted unknown `<bug-id>#<id>`.
+
 ### C — closure evidence (FR7, FR8, FR9)
 
 - [-] **T-050-62 — Measure.** AC8.1 deltas reported (AC10.7), allowance subset, AC9.11 counts, fenced rubric (AC7.1); mutmut is review evidence (AC9.10).
