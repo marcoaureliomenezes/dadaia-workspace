@@ -59,20 +59,18 @@ class Gitflow:
 DEFAULT = Gitflow(principal="main", integration="develop", work_prefix="feature/")
 
 
-def resolve_live_release_id(specs_dir: Path) -> tuple[str | None, str | None]:
-    """The one bare ``releases/<M.m.p>/`` holding ``_RELEASE.json``; none ``(None, None)``,
-    several ``(None, error)``."""
+def resolve_live_release_id(specs_dir: Path) -> str | None:
+    """The one bare ``releases/<M.m.p>/`` holding ``_RELEASE.json`` — `release.py`'s `live_ids`
+    rule; none or several is ``None`` (`release.py check` reports several)."""
     root = specs_dir / "releases"
-    live = [d.name for d in sorted(root.iterdir()) if RELEASE_ID_RE.match(d.name)
+    live = [d.name for d in root.iterdir() if RELEASE_ID_RE.match(d.name)
             and (d / RELEASE_STATE_FILENAME).is_file()] if root.is_dir() else []  # fmt: skip
-    if len(live) > 1:
-        return None, "multiple live release directories carry _RELEASE.json: " + ", ".join(live)
-    return (live[0] if live else None), None
+    return live[0] if len(live) == 1 else None
 
 
 def work_branch(specs_dir: Path, flow: Gitflow) -> str:
     """``<work><live release id>``, else ``<work>0.1.0``."""
-    return f"{flow.work_prefix}{resolve_live_release_id(specs_dir)[0] or '0.1.0'}"
+    return f"{flow.work_prefix}{resolve_live_release_id(specs_dir) or '0.1.0'}"
 
 
 def from_mapping(block: object) -> Gitflow:

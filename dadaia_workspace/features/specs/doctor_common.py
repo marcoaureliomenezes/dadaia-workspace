@@ -37,7 +37,7 @@ def resolve_active_release(specs_dir: Path) -> tuple[str | None, str | None]:
     """``(release_id, phase)`` of the ONE live release (core.gitflow's reader, `release.py`'s
     `live_ids` rule), or ``(None, None)`` when there is none, several, or no readable
     phase: `release.py check` reports those defects, so no rule here judges them twice."""
-    if (release_id := resolve_live_release_id(specs_dir)[0]) is None:
+    if (release_id := resolve_live_release_id(specs_dir)) is None:
         return None, None
     try:
         phase = read_phase(

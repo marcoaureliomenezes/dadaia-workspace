@@ -38,5 +38,4 @@ def test_a_legacy_state_file_makes_no_release_live(tmp_path: Path) -> None:
     )
     (tmp_path / "releases" / "3.0.0").mkdir()
     (tmp_path / "releases" / "3.0.0" / "_RELEASE.json").write_text(_DOC, encoding="utf-8")
-    rid, err = resolve_live_release_id(tmp_path)
-    assert rid is None and err is not None and "1.0.0" in err and "3.0.0" in err
+    assert (resolve_live_release_id(tmp_path), len(_release_store.live_ids(tmp_path))) == (None, 2)
