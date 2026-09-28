@@ -22,9 +22,8 @@ from _release_schema import (  # noqa: E402
     unfinished_tasks,
     utc_now,
 )
-from _release_store import Live, Refusal, State, commit, live_release  # noqa: E402
+from _release_store import SCRIPT, Live, Refusal, State, commit, live_release  # noqa: E402
 
-SCRIPT = Path(__file__).parent / "release.py"
 #: DEFINITION is `new`'s; each later phase has one predecessor (out-of-order = re-run).
 PREDECESSOR = {"IMPLEMENTATION": "DEFINITION", "CLOSURE": "IMPLEMENTATION"}
 #: PLAN §1 — structure only (ADR 0041): any level-2 heading naming the As-is review.

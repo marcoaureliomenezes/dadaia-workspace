@@ -42,9 +42,6 @@ _PACKAGE_ROOT = _REPO_ROOT / "dadaia_workspace"
 _EXPECTED_DEFINITIONS = [
     "dadaia_workspace/core/atomic_write.py:atomic_write",
     "dadaia_workspace/public/skills/dd-bug-resolution/scripts/_ledger.py:replace",
-    # Leaves when lane w2-release switches `_release_store` to `_ledger.replace`
-    # (sa-release-json-validated-three-times).
-    "dadaia_workspace/public/skills/dd-release-implementation/scripts/_release_store.py:replace",
 ]
 
 

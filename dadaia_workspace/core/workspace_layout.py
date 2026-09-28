@@ -425,7 +425,6 @@ _SHAPE_TOKENS: tuple[tuple[str, str], ...] = (
     ("<YYYYMMDD-slug>", AUDIT_DIR_NAME_PATTERN),
     ("<area>", r"[a-z][a-z0-9_-]*"),
     ("<slug>", r"[a-z][a-z0-9_-]*"),
-    ("rc-N", r"rc-\d+"),
     ("**", r".+"),
 )
 
@@ -487,16 +486,9 @@ SPECS_CANON: tuple[CanonEntry, ...] = (
     CanonEntry("releases/_archive/releases_histo.jsonl", "releases", True),
     CanonEntry("releases/_archive/<M.m.p>/**", "releases"),
     CanonEntry("releases/<M.m.p>/_RELEASE.json", "releases"),
-    # Legacy state-file name (pre-0.4.6): core.release_state still reads it (ADR 0007).
-    CanonEntry("releases/<M.m.p>/RELEASE.json", "releases"),
     CanonEntry("releases/<M.m.p>/SPEC.md", "releases"),
     CanonEntry("releases/<M.m.p>/PLAN.md", "releases"),
     CanonEntry("releases/<M.m.p>/TASKS.md", "releases"),
-    # An archived candidate's trio (ADR 0006): rc-N is ONLY an archive, opened on
-    # demand by ``release.py rc-archive``, never required at birth.
-    CanonEntry("releases/<M.m.p>/rc-N/SPEC.md", "releases"),
-    CanonEntry("releases/<M.m.p>/rc-N/PLAN.md", "releases"),
-    CanonEntry("releases/<M.m.p>/rc-N/TASKS.md", "releases"),
     CanonEntry("backlog/AGENTS.md", "backlog", True),
     CanonEntry("backlog/BACKLOG.json", "backlog", True),
     CanonEntry("backlog/_archive/backlog_histo.jsonl", "backlog", True),

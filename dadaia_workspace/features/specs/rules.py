@@ -15,14 +15,9 @@ from typing import TYPE_CHECKING
 from dadaia_workspace.core.doctor_rules import Rule
 from dadaia_workspace.features.specs import doctor_adr
 from dadaia_workspace.features.specs.doctor_types import SpecsDoctorIssue
-from dadaia_workspace.features.specs.release_tree import (
-    release_memory_issues,
-    release_tree_issues,
-)
 from dadaia_workspace.infrastructure.ledger_scripts import (
     BACKLOG_SCRIPT,
     BUGS_SCRIPT,
-    RELEASE_SCRIPT,
 )
 
 if TYPE_CHECKING:
@@ -68,11 +63,6 @@ RULES: tuple[SpecsRule, ...] = (
         lambda d: d._memory.check_tests_agents_placeholder(),
         # No fix line: filling a project's own test rules is judgment, and `>` would
         # overwrite the operator's file. WARNING-only, so the run never exits 1 on it.
-    ),
-    _rule(
-        ("SPEC-DOC-003",),
-        lambda d: d._release.check_active_md(),
-        fix_help="Operator action: correct the live _RELEASE.json under <specs>/releases, then commit.",
     ),
     _rule(
         ("SPEC-DOC-004",),
@@ -198,24 +188,6 @@ RULES: tuple[SpecsRule, ...] = (
     _rule(
         ("SPEC-DOC-048",),
         lambda d: d._release.check_spec_origin(d._governance.known_bug_ids),
-    ),
-    _rule(
-        (
-            "RELEASE-TREE-SCHEMA",
-            "RELEASE-TREE-PARSE",
-            "RELEASE-TREE-TS-ORDER",
-            "RELEASE-TREE-PHASE",
-            "RELEASE-TREE-ARCHIVED",
-            "RELEASE-TREE-TRIO",
-            "RELEASE-TREE-STATE-MISSING",
-        ),
-        lambda d: release_tree_issues(d.specs_dir),
-        fix_help="sed -i 's|<invalid value>|<canonical value>|' specs/releases/<id>/_RELEASE.json",
-    ),
-    _rule(
-        ("RELEASE-TREE-MEMORY",),
-        lambda d: release_memory_issues(d.specs_dir),
-        fix_help=(f"{RELEASE_SCRIPT.invocation} memory --reviewed <slugs> --changed <slugs>"),
     ),
 )
 

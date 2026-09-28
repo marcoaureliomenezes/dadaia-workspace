@@ -9,7 +9,6 @@ by the file's own (size, mtime) and re-applied once — a race surfaces and retr
 from __future__ import annotations
 
 import json
-import os
 import sys
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -17,7 +16,9 @@ from pathlib import Path
 from typing import Any
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+sys.path.append(str(Path(__file__).resolve().parents[2] / "dd-bug-resolution" / "scripts"))
 
+from _ledger import replace, stamp  # noqa: E402
 from _release_check import state_findings  # noqa: E402
 from _release_schema import SEMVER_RE, STATE  # noqa: E402
 
@@ -102,9 +103,9 @@ def serialize(state: State) -> str:
     return json.dumps(state, indent=2, ensure_ascii=False) + "\n"
 
 
-def validated(state: State, rel: str, *, archived: bool = False) -> str:
+def validated(state: State, rel: str) -> str:
     text = serialize(state)
-    findings = state_findings(text, rel, archived=archived)
+    findings = state_findings(text, rel)
     if findings:
         detail = "; ".join(str(f["message"]) for f in findings[:5])
         raise Refusal(
@@ -114,34 +115,20 @@ def validated(state: State, rel: str, *, archived: bool = False) -> str:
     return text
 
 
-def replace(path: Path, text: str) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    tmp = path.with_name(f".{path.name}.{os.getpid()}.tmp")
-    tmp.write_text(text, encoding="utf-8")
-    os.replace(tmp, path)
-
-
-def _stamp(path: Path) -> tuple[int, int] | None:
-    info = path.stat() if path.is_file() else None
-    return (info.st_size, info.st_mtime_ns) if info else None
-
-
-def commit(
-    path: Path, rel: str, apply: Callable[[State], State], *, archived: bool = False
-) -> State:
+def commit(path: Path, rel: str, apply: Callable[[State], State]) -> State:
     """Apply *apply* to *path*'s state and replace the document atomically.
 
     Validated BEFORE the replace, so a refused write leaves the file byte-identical; a file
     changed under the computation is re-applied ONCE, a second race refuses.
     """
-    before = _stamp(path)
+    before = stamp(path)
     written = apply(read_state(path))
-    text = validated(written, rel, archived=archived)
-    if _stamp(path) != before:
-        before = _stamp(path)
+    text = validated(written, rel)
+    if stamp(path) != before:
+        before = stamp(path)
         written = apply(read_state(path))
-        text = validated(written, rel, archived=archived)
-        if _stamp(path) != before:
+        text = validated(written, rel)
+        if stamp(path) != before:
             raise Refusal(
                 f"{path.name} changed twice under this write — nothing was written",
                 "re-run this command",

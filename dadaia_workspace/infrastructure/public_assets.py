@@ -101,6 +101,7 @@ _SKILL_SCRIPT_SHARED: tuple[tuple[str, str], ...] = tuple(
         "dd-audit-project",
         "dd-cli-library",
         "dd-spec-navigator",
+        "dd-release-implementation",
     )
     for src, name in (
         ("core/redaction.py", "_privacy.py"),

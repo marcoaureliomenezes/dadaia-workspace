@@ -103,7 +103,7 @@ def _write_release_jsonl(specs: Path, release_id: str, phase: str) -> None:
         "shipped": None,
         "log": [],
     }
-    (rdir / "RELEASE.json").write_text(_json.dumps(state) + "\n", encoding="utf-8")
+    (rdir / "_RELEASE.json").write_text(_json.dumps(state) + "\n", encoding="utf-8")
 
 
 def _make_clean_specs_tree(root: Path, release_id: str = "1.2.3") -> Path:
@@ -165,10 +165,10 @@ def test_release_phase_flip_still_warns_on_draft_in_implementation(tmp_path: Pat
     """A Draft artifact is unmistakably no longer freshly-scaffolded once the release's
     phase moves to IMPLEMENTATION — SPEC-DOC-004 must still fire then (segment lane
     retired at 0.4.6, ADR 0006: the trio always sits flat at the release root)."""
-    specs = _make_clean_specs_tree(tmp_path, "v0.1.0")
-    spec = specs / "releases" / "v0.1.0" / "SPEC.md"
+    specs = _make_clean_specs_tree(tmp_path, "0.1.0")
+    spec = specs / "releases" / "0.1.0" / "SPEC.md"
     spec.write_text(spec.read_text(encoding="utf-8").replace("Approved", "Draft"), encoding="utf-8")
-    _write_release_jsonl(specs, "v0.1.0", "IMPLEMENTATION")
+    _write_release_jsonl(specs, "0.1.0", "IMPLEMENTATION")
 
     issues = SpecsDoctor(specs).check()
     assert any(i.code == "SPEC-DOC-004" for i in issues)
@@ -243,35 +243,6 @@ def test_scaffold_copytree_source_tree_carries_agents_md_per_area(tmp_path: Path
             id="doc002l-legacy-html",
         ),
         pytest.param(
-            "non-canonical-phase",
-            lambda specs: _write_release_jsonl(specs, "1.2.3", "WORKING"),
-            "SPEC-DOC-003",
-            id="doc003-non-canonical-phase",
-        ),
-        pytest.param(
-            "ambiguous-two-live-releases",
-            lambda specs: _write_release_jsonl(specs, "r2", "IMPLEMENTATION"),
-            "SPEC-DOC-003",
-            id="doc003-ambiguous-two-live-releases",
-        ),
-        pytest.param(
-            "release-jsonl-carries-no-phase-record",
-            lambda specs: (specs / "releases" / "1.2.3" / "RELEASE.json").write_text(
-                '{"schema":"release-state-v1","release":"1.2.3","phase":"",'
-                '"defined":null,"implemented":null,"shipped":null,'
-                '"log":[]}\n',
-                encoding="utf-8",
-            ),
-            "SPEC-DOC-003",
-            id="doc003-empty-phase-value",
-        ),
-        pytest.param(
-            "missing-plan-in-active-release",
-            lambda specs: (specs / "releases" / "1.2.3" / "PLAN.md").unlink(),
-            "RELEASE-TREE-TRIO",
-            id="trio-missing-plan",
-        ),
-        pytest.param(
             "non-canonical-status",
             lambda specs: (specs / "releases" / "1.2.3" / "SPEC.md").write_text(
                 "# Spec\n\n> **Status:** Accepted\n", encoding="utf-8"
@@ -284,13 +255,6 @@ def test_scaffold_copytree_source_tree_carries_agents_md_per_area(tmp_path: Path
         # parses a file which no longer exists is dead code behind a dead artifact.
         # Verdict: criterion (a) feature removed, dadaia_workspace/features/specs/
         # doctor_closure_audit.py (this task's commit deletes check_archive_closures).
-        # doc009-release-id-without-dir RETIRED (v0.5.0 T-050-21A): SPEC-DOC-009 fired
-        # when ACTIVE.md's `release:` field named a directory that did not exist.
-        # `resolve_active_release`/`resolve_live_release_id` only ever return a
-        # release_id they found BY LOCATING that exact directory (RELEASE.json
-        # inside it) — this scenario is now structurally unreachable; the ERROR
-        # branch in `check_active_md` is a defensive assertion, kept but untestable
-        # through the public API.
     ],
 )
 def test_sad_matrix(tmp_path: Path, case: str, mutate, expected_code: str) -> None:  # type: ignore[no-untyped-def]
@@ -397,7 +361,7 @@ def test_tree5_drift_and_tree7_are_never_auto_repaired(tmp_path: Path) -> None:
     assert tree5_ok == []
 
     # TREE-6 retired (0.5.3 T-053-04, F005): missing-artifact coverage lives in
-    # RELEASE-TREE-TRIO — see test_one_defect_one_code_missing_active_artifact.
+    # `release.py check` — see test_one_defect_one_code_missing_active_artifact.
 
     # TREE-7: bug missing session_id is never auto-repaired; session_id: null passes.
     specs7 = _make_clean_specs_tree(tmp_path.parent / (tmp_path.name + "-tree7"))
@@ -502,28 +466,6 @@ def test_doc027_release_naming_boundary(
         assert doc27[0].severity == expect
 
 
-# ---------------------------------------------------------------------------
-# (e) Segmented release pair (ADR-5) — 1 pair
-# ---------------------------------------------------------------------------
-
-
-# ---------------------------------------------------------------------------
-# Segment lane retired at 0.4.6 (ADR 0006) — the AB.1-AB.3 segment-router tests
-# died with the routing they pinned; AB.4 survives as a comment-honesty pin.
-def test_stale_check_9_comment_no_longer_claims_coverage_it_does_not_provide() -> None:
-    """AB.4: the stale 'already reported by check 9' comment (SPEC-DOC-009 only
-    validates the RELEASE directory, never the segment subdirectory) is corrected
-    or deleted from both source files."""
-    import inspect
-
-    from dadaia_workspace.features.specs import doctor_release, doctor_structural
-
-    release_src = inspect.getsource(doctor_release)
-    structural_src = inspect.getsource(doctor_structural)
-    assert "already reported by check 9" not in release_src
-    assert "already reported by SPEC-DOC-009" not in structural_src
-
-
 def test_doc016_and_doc027_remedies_name_the_mintable_bare_axis(tmp_path: Path) -> None:
     """F004 (20260830 audit, bug release-new-rejects-semver-but-doctor-requires-it):
     SPEC-DOC-016/027 used to instruct a ``v<MAJOR>.<MINOR>.<PATCH>`` rename that
@@ -544,23 +486,15 @@ def test_doc016_and_doc027_remedies_name_the_mintable_bare_axis(tmp_path: Path) 
 
 
 def test_one_defect_one_code_missing_active_artifact(tmp_path: Path) -> None:
-    """F005 (20260830 audit): TREE-6 and SPEC-DOC-004 were ONE rule kept as two
-    implementations (the segment-router-silent-skip bug had to be fixed twice, one
-    ~20-line block per file). 0.4.7 T-047-07 found the SAME duplication a third time —
-    SPEC-DOC-004 re-reported the trio presence RELEASE-TREE-TRIO already owns, and that
-    duplicate is what forced the between-candidates phase carve-out the doctor carried.
-    One defect now yields ONE code: RELEASE-TREE-TRIO. Intent: contract; size: unit."""
+    """F005: trio presence has ONE home, `release.py check` (the ledgers section); the
+    specs section reports nothing for a missing PLAN.md and never creates it.
+    Intent: contract; size: unit."""
     specs = _make_clean_specs_tree(tmp_path)
     plan = specs / "releases" / "1.2.3" / "PLAN.md"
     plan.unlink()
     doctor = SpecsDoctor(specs, templates_dir=_TEMPLATES_DIR)
     issues = doctor.check()
-    trio = [i for i in issues if i.code == "RELEASE-TREE-TRIO" and "PLAN.md" in i.description]
-    assert trio and trio[0].severity == Severity.ERROR
-    assert "TREE-6" not in _codes(issues)
-    assert not [i for i in issues if i.code == "SPEC-DOC-004"], (
-        "trio presence has ONE home; SPEC-DOC-004 judges the `**Status:**` line only"
-    )
+    assert not [i for i in issues if "PLAN.md" in i.description], issues
     doctor.fix(issues)
     assert not plan.exists(), "a missing SDD artifact must never be auto-created"
 

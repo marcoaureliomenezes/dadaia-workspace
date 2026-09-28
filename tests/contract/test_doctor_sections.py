@@ -1,12 +1,9 @@
 """One `dadaia doctor`: three sections over one rule registry (0.4.7 FR5 / T-047-02).
 
 Intent: CONTRACT — T-047-02: `dadaia doctor` renders `workspace`, `specs` and
-`ledgers` in that order, one line `<CODE> <verdict> <message>` per finding, a
-`compliance(<section>)` line per section and one `compliance(total)` line; the
-`specs` section carries the release-tree rule (bug
-`archived-release-state-invalid-and-unparseable-doctor-silent`), so a tree holding
-the pre-Wave-0 0.4.6 document scores below 100 % and exits 1; and the two commands
-this one replaces (`specs doctor`, `backlog doctor`) no longer exist.
+`ledgers` in that order, one line `<CODE> <verdict> <message>` per finding; a release
+state defect is release.py check's one finding (ADR 0077); and the two commands this one
+replaces (`specs doctor`, `backlog doctor`) no longer exist.
 Size: SMALL — Typer CliRunner over tmp_path trees plus one in-process run over this
 repo's own specs/; no subprocess, no network.
 """
@@ -15,6 +12,8 @@ from __future__ import annotations
 
 import json
 import re
+import subprocess
+import sys
 from pathlib import Path
 from typing import Any
 
@@ -59,46 +58,69 @@ def test_json_carries_every_section() -> None:
     assert "fixed" in payload
 
 
-def _pre_wave0_046_document() -> dict[str, Any]:
-    """The 0.4.6 archived state as committed before Wave 0 — `shipped` without `pr`
-    (`git show 7db9553c^:specs/releases/_archive/0.4.6/_RELEASE.json`)."""
-    return {
-        "schema": "release-state-v1",
-        "release": "0.4.6",
-        "phase": "ARCHIVED",
-        "defined": {"sha": "a" * 40, "ts": "2026-09-01T00:00:00Z"},
-        "implemented": {"sha": "b" * 40, "ts": "2026-09-05T00:00:00Z"},
-        "shipped": {"sha": "c" * 40, "ts": "2026-09-06T15:05:36Z"},
-        "log": [
-            {
-                "ts": "2026-09-01T00:00:00Z",
-                "agent": "dd-product-engineer",
-                "kind": "note",
-                "text": "x",
-            }
-        ],
-    }
+def _live_release(specs: Path, **over: Any) -> Path:
+    """A live 0.5.0 in DEFINITION, one field broken by the caller."""
+    release_dir = specs / "releases" / "0.5.0"
+    release_dir.mkdir(parents=True)
+    state = {"schema": "release-state-v1", "release": "0.5.0", "phase": "DEFINITION",
+             "defined": None, "implemented": None, "shipped": None, "log": [], **over}  # fmt: skip
+    (release_dir / "_RELEASE.json").write_text(json.dumps(state, indent=2) + "\n", "utf-8")
+    return release_dir / "_RELEASE.json"
 
 
-def test_pre_wave0_release_document_makes_the_specs_section_non_compliant(
-    tmp_path: Path,
-) -> None:
-    """(b) the invalid archived document every doctor was silent about is a
-    RELEASE-TREE-* error and the run exits 1."""
-    specs = tmp_path / "specs"
-    archived = specs / "releases" / "_archive" / "0.4.6"
-    archived.mkdir(parents=True)
-    (archived / "_RELEASE.json").write_text(
-        json.dumps(_pre_wave0_046_document(), indent=2) + "\n", encoding="utf-8"
+def _release_findings(specs: Path) -> tuple[list[dict[str, Any]], list[str]]:
+    """(the doctor's findings naming the release state, every specs-section code)."""
+    payload = json.loads(
+        _run("--specs-dir", str(specs), "--source-root", str(_REPO_ROOT), "--json").stdout
     )
+    sections = payload["sections"]
+    named = [f for s in sections.values() for f in s["findings"] if "_RELEASE.json" in f["message"]]
+    return named, [f["code"] for f in sections["specs"]["findings"]]
 
-    result = _run("--specs-dir", str(specs), "--source-root", str(_REPO_ROOT), "--json")
-    payload = json.loads(result.stdout)
-    specs_section = payload["sections"]["specs"]
 
-    codes = [f["code"] for f in specs_section["findings"]]
-    assert any(c.startswith("RELEASE-TREE-") for c in codes), codes
-    assert result.exit_code == 1
+def test_a_mis_cased_phase_is_one_finding_whose_fix_clears_it(tmp_path: Path) -> None:
+    """sa-release-json-validated-three-times#B1: phase 'closure' yields exactly one
+    finding, and its fix line, executed, changes the tree and clears it."""
+    state = _live_release(tmp_path / "specs", phase="closure")
+    named, _ = _release_findings(tmp_path / "specs")
+    assert len(named) == 1 and named[0]["code"] == "LEDGER-RELEASE-SCHEMA", named
+    subprocess.run(["bash", "-c", named[0]["fix"]], cwd=tmp_path, check=True)
+    assert json.loads(state.read_text("utf-8"))["phase"] == "CLOSURE"
+    assert not [f for f in _release_findings(tmp_path / "specs")[0] if "'closure'" in f["message"]]
+
+
+@pytest.mark.parametrize(
+    "over",
+    [
+        {"release": 5},
+        {"extra": 1},
+        {"phase": "WORKING"},
+        {"defined": {"sha": "x"}},
+        {
+            "log": [
+                {"ts": "2", "agent": "a", "kind": "note", "text": "t"},
+                {"ts": "1", "agent": "a", "kind": "note", "text": "t"},
+            ]
+        },
+    ],  # fmt: skip
+)
+def test_doctor_release_findings_are_the_scripts(tmp_path: Path, over: dict[str, Any]) -> None:
+    """sa-release-json-validated-three-times#B2: the doctor's release findings are
+    release.py check's (LEDGER-RELEASE-SCHEMA); no RELEASE-TREE-* or SPEC-DOC-003/009."""
+    _live_release(tmp_path / "specs", **over)
+    named, specs_codes = _release_findings(tmp_path / "specs")
+    script = subprocess.run(
+        [sys.executable, str(_REPO_ROOT / "dadaia_workspace/public/skills/dd-release-implementation"
+                             "/scripts/release.py"), "check", "--specs", str(tmp_path / "specs"),
+         "--json"], capture_output=True, text=True, check=False)  # fmt: skip
+    expected = [f"{f['path']}:{f['line']} {f['message']}" for f in json.loads(script.stdout)]
+    assert expected and [f["message"] for f in named] == expected
+    assert {f["code"] for f in named} == {"LEDGER-RELEASE-SCHEMA"}
+    assert not [
+        c
+        for c in specs_codes
+        if c.startswith("RELEASE-TREE") or c in ("SPEC-DOC-003", "SPEC-DOC-009")
+    ]
 
 
 def test_specs_doctor_and_backlog_doctor_commands_are_gone() -> None:

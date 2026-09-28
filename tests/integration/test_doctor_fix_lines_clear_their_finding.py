@@ -54,7 +54,7 @@ from dadaia_workspace.features.specs.doctor_types import Severity, SpecsDoctorIs
 from dadaia_workspace.features.specs.rules import RULES as SPECS_RULES
 from tests.fixtures.harness_env import session_home
 
-from ..unit.features.specs.test_doctor import _make_clean_specs_tree, _write_release_jsonl
+from ..unit.features.specs.test_doctor import _make_clean_specs_tree
 from .test_backlog_doctor import _SOURCE, _active_entry
 
 _RELEASE = "1.2.3"
@@ -78,8 +78,7 @@ def _plant_headingless_memory_document(root: Path) -> None:
 
 
 def _plant_nothing(root: Path) -> None:
-    """The fixture already carries it (no audits/, bugs/ dirs; no backlog/_archive/;
-    the legacy RELEASE.json name)."""
+    """The fixture already carries it (no audits/, bugs/ dirs; no backlog/_archive/)."""
 
 
 def _plant_placeholder_atom(root: Path) -> None:
@@ -391,7 +390,6 @@ OPERATOR_ACTION: dict[str, Callable[[Path], None]] = {
     "TREE-8": _plant_stray_dotfile,
     "LINT-1": lambda r: _write(r / "specs" / "memory" / "product" / "testarea" / "x.md", "# X\n"),
     "SPEC-DOC-001": lambda r: (r / "specs" / "constitution.md").unlink(),
-    "SPEC-DOC-003": lambda r: _write_release_jsonl(r / "specs", _RELEASE, "BOGUS"),
     "SPEC-DOC-024": lambda r: _write(r / f"specs/releases/{_RELEASE}/TASKS.md", "# Tasks\n\n> **Status:** Draft\n"),
     "SPEC-DOC-026": lambda r: _write(r / f"specs/releases/_archive/{_RELEASE}/SPEC.md", "# S\n"),
     "SPEC-DOC-027": lambda r: _write(r / "specs/releases/bad-name/SPEC.md", "# S\n"),

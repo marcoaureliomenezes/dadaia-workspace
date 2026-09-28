@@ -1,7 +1,7 @@
 """CLI command: ``dadaia doctor`` — the ONE compliance surface (0.4.7 FR5, T-047-02).
 
 Three sections in fixed order — ``workspace`` (zones, root, harness dirs), ``specs``
-(the SPEC-DOC + RELEASE-TREE rules), ``ledgers`` (BL-SCHEMA/CONFLICT/STALE) — collected
+(the SPEC-DOC rules), ``ledgers`` (BL-SCHEMA/CONFLICT/STALE) — collected
 from one rule registry (:mod:`dadaia_workspace.core.doctor_rules`), rendered by one
 grammar, exited by one rule. ``dadaia specs doctor`` and
 ``dadaia backlog doctor`` are DELETED, not aliased: three commands with three finding

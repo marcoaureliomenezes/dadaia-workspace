@@ -99,7 +99,7 @@ def _skip_memory_lint_subprocess(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(MemoryValidator, "check_lint1_memory_atoms", lambda self: [])
 
 
-def _make_clean_specs_tree(root: Path, release_id: str = "v0.1.10") -> Path:
+def _make_clean_specs_tree(root: Path, release_id: str = "0.1.10") -> Path:
     """A minimal but ledger-valid specs/ tree."""
     specs = root / "specs"
     (specs / "memory" / "product").mkdir(parents=True)
@@ -149,7 +149,7 @@ def _set_active(specs: Path, release_id: str, phase: str) -> None:
         "shipped": None,
         "log": [],
     }
-    (rdir / "RELEASE.json").write_text(_json.dumps(state) + "\n", encoding="utf-8")
+    (rdir / "_RELEASE.json").write_text(_json.dumps(state) + "\n", encoding="utf-8")
 
 
 def _write_tasks(specs: Path, release_id: str, body: str) -> None:
@@ -223,14 +223,14 @@ def test_sad_matrix(tmp_path: Path) -> None:
     fix `bugs.py archive`."""
     # DOC-024: phase=SPEC but TASKS are an [x]-majority (the live audit incident).
     specs_a = _make_clean_specs_tree(tmp_path)
-    _set_active(specs_a, "v0.1.10", "SPEC")
-    _write_tasks(specs_a, "v0.1.10", "- [x] T1 done\n- [x] T2 done\n- [ ] T3 open\n")
+    _set_active(specs_a, "0.1.10", "SPEC")
+    _write_tasks(specs_a, "0.1.10", "- [x] T1 done\n- [x] T2 done\n- [ ] T3 open\n")
     assert "SPEC-DOC-024" in _codes(SpecsDoctor(specs_a).check())
 
     # DOC-024: phase=CLOSURE but a non-[x] task remains.
     specs_b = _make_clean_specs_tree(tmp_path.parent / (tmp_path.name + "-024b"))
-    _set_active(specs_b, "v0.1.10", "CLOSURE")
-    _write_tasks(specs_b, "v0.1.10", "- [x] T1 done\n- [-] T2 in-progress\n")
+    _set_active(specs_b, "0.1.10", "CLOSURE")
+    _write_tasks(specs_b, "0.1.10", "- [x] T1 done\n- [-] T2 in-progress\n")
     assert "SPEC-DOC-024" in _codes(SpecsDoctor(specs_b).check())
 
     # DOC-006 RETIRED (v0.5.0 T-050-25A, A4.4): check_archive_closures deleted along
@@ -240,7 +240,7 @@ def test_sad_matrix(tmp_path: Path) -> None:
 
     # DOC-026: duplicate release id across releases/ and releases/_archive/ -> ERROR.
     specs_d = _make_clean_specs_tree(tmp_path.parent / (tmp_path.name + "-026"))
-    dup = specs_d / "releases" / "_archive" / "v0.1.10"
+    dup = specs_d / "releases" / "_archive" / "0.1.10"
     _write_minimal_spec(dup)
     doc026 = _by_code(SpecsDoctor(specs_d).check(), "SPEC-DOC-026")
     assert any(i.severity == Severity.ERROR for i in doc026)
@@ -278,8 +278,8 @@ def test_silent_matrix(tmp_path: Path) -> None:
     specs_a = _make_clean_specs_tree(tmp_path)
     assert "SPEC-DOC-024" not in _codes(SpecsDoctor(specs_a).check())
     specs_a2 = _make_clean_specs_tree(tmp_path.parent / (tmp_path.name + "-024ok"))
-    _set_active(specs_a2, "v0.1.10", "CLOSURE")
-    _write_tasks(specs_a2, "v0.1.10", "- [x] T1 done\n- [x] T2 done\n")
+    _set_active(specs_a2, "0.1.10", "CLOSURE")
+    _write_tasks(specs_a2, "0.1.10", "- [x] T1 done\n- [x] T2 done\n")
     assert "SPEC-DOC-024" not in _codes(SpecsDoctor(specs_a2).check())
 
     # DOC-006 RETIRED (v0.5.0 T-050-25A, A4.4): see test_sad_matrix's own note above.

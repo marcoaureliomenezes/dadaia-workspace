@@ -39,4 +39,4 @@ def write_release_phase(specs_dir: Path, release_id: str, phase: str) -> None:
         "shipped": None,
         "log": [],
     }
-    (rdir / "RELEASE.json").write_text(json.dumps(state, indent=2) + "\n", encoding="utf-8")
+    (rdir / "_RELEASE.json").write_text(json.dumps(state, indent=2) + "\n", encoding="utf-8")

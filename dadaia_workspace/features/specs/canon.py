@@ -40,8 +40,7 @@ The canon (operator, 2026-08-28) — the ONLY members permitted under ``specs/``
     AGENTS.md constitution.md memory/ releases/ backlog/ bugs/ audits/ ADRs/
 
     releases/{AGENTS.md, _archive/{releases_histo.jsonl, <M.m.p>/**},
-              <M.m.p>/{_RELEASE.json, SPEC.md, PLAN.md, TASKS.md, rc-N/{SPEC,PLAN,TASKS}.md,
-                       <alpha|rc>-N/{SPEC.md, PLAN.md, TASKS.md}}}
+              <M.m.p>/{_RELEASE.json, SPEC.md, PLAN.md, TASKS.md}}
     backlog/{AGENTS.md, BACKLOG.json, _archive/backlog_histo.jsonl}
     bugs/{AGENTS.md, BUGS.jsonl, _archive/bugs_histo.jsonl}
     audits/{AGENTS.md, _archive/audits_histo.jsonl,

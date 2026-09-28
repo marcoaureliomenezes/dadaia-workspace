@@ -10,19 +10,19 @@ from __future__ import annotations
 
 import json
 import re
-import shutil
 import subprocess
 import sys
 from pathlib import Path
 
 import pytest
 
+from tests.helpers.skill_scripts import stage_skill_scripts
+
 pytestmark = pytest.mark.contract
 
 _PUBLIC = Path(__file__).resolve().parents[2] / "dadaia_workspace" / "public"
 _SKILL = _PUBLIC / "skills" / "dd-release-definition" / "SKILL.md"
 _SCRIPTS = _PUBLIC / "skills" / "dd-release-implementation" / "scripts"
-_SCHEMA = _PUBLIC / "schemas" / "releases" / "release-state-v1.schema.json"
 _HEADER = "| unit | today | bugs | verdict | why |\n|---|---|---|---|---|\n"
 _ROW = "| `core/x.py` `run` | does x | 0 | {verdict} | reason |\n"
 _AUTH_HEADER = "| question | authority | consults | deleted |\n|---|---|---|---|\n"
@@ -37,14 +37,14 @@ _GOOD = (
 
 @pytest.fixture
 def script(tmp_path: Path) -> Path:
-    staged = tmp_path / "skills" / "dd-release-implementation" / "scripts"
-    (staged / "schemas").mkdir(parents=True)
-    shutil.copytree(_PUBLIC / "skills" / "dd-spec-navigator" / "scripts",
-                    tmp_path / "skills" / "dd-spec-navigator" / "scripts")  # fmt: skip
-    for module in _SCRIPTS.glob("*.py"):
-        shutil.copy2(module, staged / module.name)
-    shutil.copy2(_SCHEMA, staged / "schemas" / _SCHEMA.name)
-    return staged / "release.py"
+    stage_skill_scripts("dd-spec-navigator", tmp_path / "skills" / "dd-spec-navigator" / "scripts")
+    return (
+        stage_skill_scripts(
+            "dd-release-implementation",
+            tmp_path / "skills" / "dd-release-implementation" / "scripts",
+        )
+        / "release.py"
+    )
 
 
 def _specs(tmp_path: Path, plan: str, *, plan_status: str = "Approved") -> Path:

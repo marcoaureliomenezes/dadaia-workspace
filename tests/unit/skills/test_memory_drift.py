@@ -9,7 +9,6 @@ patch. Every case below is a property of the window, never of this repo's atom c
 from __future__ import annotations
 
 import json
-import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -181,8 +180,9 @@ def test_drift_requires_since_and_resolves_no_window_itself(script: Path, repo: 
 def _release_drift(script: Path, repo: Path, state: dict[str, object]) -> dict[str, object]:
     """`release.py drift` over a live release carrying *state*: the release skill is
     projected beside the navigator, as `public install` lays it out."""
-    release = script.parents[2] / "dd-release-implementation" / "scripts"
-    shutil.copytree(_SCRIPTS.parents[1] / "dd-release-implementation" / "scripts", release)
+    release = stage_skill_scripts(
+        "dd-release-implementation", script.parents[2] / "dd-release-implementation" / "scripts"
+    )
     (repo / "specs" / "releases" / "9.9.9").mkdir(parents=True)
     (repo / "specs" / "releases" / "9.9.9" / "_RELEASE.json").write_text(json.dumps(state))
     result = subprocess.run(

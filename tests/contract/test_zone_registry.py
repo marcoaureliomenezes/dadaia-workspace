@@ -24,6 +24,7 @@ from __future__ import annotations
 
 import ast
 import importlib
+import json
 import re
 import typing
 from pathlib import Path
@@ -32,7 +33,6 @@ import pytest
 
 from dadaia_workspace.core.gitflow import Role
 from dadaia_workspace.core.models.histo import TERMINAL_DISPOSITIONS
-from dadaia_workspace.core.release_state import PHASES
 from dadaia_workspace.core.workspace_layout import (
     CANON_ROOT_MEMBERS,
     DADAIA_ZONES,
@@ -57,6 +57,7 @@ from tests.helpers.scan_population import assert_populated
 pytestmark = pytest.mark.contract
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
+_SCHEMAS = _REPO_ROOT / "dadaia_workspace" / "public" / "schemas"
 _PACKAGE = _REPO_ROOT / "dadaia_workspace"
 
 #: Zone names retired by 0.4.6 candidate 4 (SPEC FR1/FR9, architect C). A string literal
@@ -95,7 +96,11 @@ _CANONICAL_SETS: dict[str, frozenset[str]] = {
     "root": ROOT_ALLOWED_DIRS | ROOT_ALLOWED_FILES,
     "specs-canon": CANON_ROOT_MEMBERS,
     "repo-excluded": frozenset(REPO_TREE_EXCLUDED),
-    "phase": frozenset(PHASES),
+    "phase": frozenset(
+        json.loads((_SCHEMAS / "releases/release-state-v1.schema.json").read_text("utf-8"))[
+            "properties"
+        ]["phase"]["enum"]
+    ),
     "ledger-disposition": frozenset(TERMINAL_DISPOSITIONS),
     "trio": frozenset(RELEASE_ARTIFACTS),
     "gitflow-role": frozenset(typing.get_args(Role)),
@@ -103,7 +108,7 @@ _CANONICAL_SETS: dict[str, frozenset[str]] = {
 
 #: Each set's own defining module — the one place its names are spelled in bulk.
 _SET_HOME: dict[str, str] = {
-    "phase": "dadaia_workspace/core/release_state.py",
+    "phase": "dadaia_workspace/public/skills/dd-release-implementation/scripts/_release_schema.py",
     "ledger-disposition": "dadaia_workspace/core/models/histo.py",
     "trio": "dadaia_workspace/features/specs/doctor_common.py",
     "gitflow-role": "dadaia_workspace/core/gitflow.py",
@@ -114,12 +119,12 @@ _SET_HOME: dict[str, str] = {
 _SECOND_LIST_BIRTH = 8
 _SECOND_LIST_ALLOWANCE: dict[str, str] = {
     "dadaia_workspace/features/backlog/doctor.py": "sa-backlog-status-has-no-single-authority",
-    "dadaia_workspace/features/specs/doctor_release.py": "sa-release-json-validated-three-times",
     "dadaia_workspace/public/skills/dd-audit-project/scripts/_audit_check.py": _PARITY,
     "dadaia_workspace/public/skills/dd-backlog-definition/scripts/_backlog_schema.py": _PARITY,
     "dadaia_workspace/public/skills/dd-bug-resolution/scripts/_bugs_check.py": _PARITY,
+    # the stdlib script cannot import the package: its TRIO is proven by the trio row
     "dadaia_workspace/public/skills/dd-release-implementation/scripts/_release_schema.py": (
-        "sa-release-json-validated-three-times"
+        "parity:tests/unit/features/specs/test_release_tree.py"
     ),
 }
 

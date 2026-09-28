@@ -10,7 +10,6 @@ from __future__ import annotations
 
 import hashlib
 import json
-import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -39,14 +38,14 @@ _PLAN_AS_IS = (
 def script(tmp_path: Path) -> Path:
     """The staged shape: release.py with both schema copies beside it, and the spec
     navigator's scripts projected as its sibling skill (the drift decider it imports)."""
-    staged = tmp_path / "skills" / "dd-release-implementation" / "scripts"
-    (staged / "schemas").mkdir(parents=True)
     stage_skill_scripts("dd-spec-navigator", tmp_path / "skills" / "dd-spec-navigator" / "scripts")
-    for module in sorted(_SCRIPTS.glob("*.py")):
-        shutil.copy2(module, staged / module.name)
-    for schema in _SCHEMAS:
-        shutil.copy2(schema, staged / "schemas" / schema.name)
-    return staged / "release.py"
+    return (
+        stage_skill_scripts(
+            "dd-release-implementation",
+            tmp_path / "skills" / "dd-release-implementation" / "scripts",
+        )
+        / "release.py"
+    )
 
 
 def _run(script: Path, *argv: str, cwd: Path | None = None) -> subprocess.CompletedProcess[str]:

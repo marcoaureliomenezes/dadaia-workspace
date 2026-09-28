@@ -1,8 +1,7 @@
 """The ONE loader for every packaged public JSON schema (0.4.7 FR6, T-047-03).
 
 Each schema consumer used to carry its own two lines of "resolve the package root,
-read the file, cast the JSON" — ``release_tree`` (release-state-v1),
-``memory_lint`` (memory-frontmatter-v1) — and every ledger this task validates would
+read the file, cast the JSON" — ``memory_lint`` (memory-frontmatter-v1) — and every ledger this task validates would
 have added another. One loader, one cache, one name space: a schema is addressed by
 its path under ``dadaia_workspace/public/schemas/`` without the ``.schema.json``
 suffix (``"ADRs/decision-record-v1"``).

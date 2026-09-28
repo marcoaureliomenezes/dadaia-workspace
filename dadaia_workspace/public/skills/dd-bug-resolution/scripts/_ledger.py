@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
-"""What every ledger script shares; `public stage` copies this file beside each one:
-the one atomic write (`replace`), schema read and validation, and `private_refusal`,
-which runs the push gate's own matcher (`_privacy.py`, a staged `core/redaction.py`)."""
+"""What every ledger script shares, staged beside each one: the atomic write, schema read,
+validation, the `check` record, and `private_refusal` (the push gate's own matcher)."""
 
 from __future__ import annotations
 
@@ -22,10 +21,8 @@ _privacy = ModuleType("_privacy")  # executed from source: no loader, no bytecod
 exec(compile(_SOURCE.read_text(encoding="utf-8"), _SOURCE, "exec"), _privacy.__dict__)
 
 
-JSON_TYPES: dict[str, Any] = {
-    "string": str, "object": dict, "array": list, "boolean": bool,
-    "null": type(None), "integer": int, "number": (int, float),
-}  # fmt: skip
+JSON_TYPES: dict[str, Any] = {"string": str, "object": dict, "array": list, "boolean": bool,
+                              "null": type(None), "integer": int, "number": (int, float)}  # fmt: skip
 
 
 def load_schema(name: str) -> dict[str, Any]:
@@ -72,6 +69,10 @@ def validate(value: object, spec: dict[str, Any], root: dict[str, Any], where: s
         for key, child in value.items():
             if key in properties:
                 yield from validate(child, properties[key], root, f"{where}.{key}")
+
+
+def finding(code: str, path: str, line: int, message: str) -> dict[str, Any]:
+    return {"code": code, "verdict": "error", "path": path, "line": line, "message": message}
 
 
 def find_specs(start: Path) -> Path:
@@ -139,8 +140,7 @@ def _terms() -> list[tuple[str, str]]:
 
 
 def private_refusal(record: dict[str, Any]) -> tuple[str, str] | None:
-    """The refusal ``(message, fix)`` for the first field of *record* the push would
-    refuse, or ``None`` — the caller raises it before anything is written."""
+    """``(message, fix)`` for the first field of *record* the push refuses, else ``None``."""
     if (hit := _privacy.first_private(record, _terms(), _baseline())) is None:
         return None
     return (

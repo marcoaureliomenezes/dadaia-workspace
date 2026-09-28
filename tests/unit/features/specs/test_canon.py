@@ -26,7 +26,7 @@ _CANON_PATHS: tuple[str, ...] = (
     "releases/_archive/releases_histo.jsonl",
     "releases/_archive/0.4.0/SPEC.md",
     "releases/_archive/0.4.0/nested/anything.txt",
-    "releases/0.5.0/RELEASE.json",
+    "releases/0.5.0/_RELEASE.json",
     "releases/0.5.0/SPEC.md",
     "releases/0.5.0/PLAN.md",
     "releases/0.5.0/TASKS.md",

@@ -1,14 +1,13 @@
 """Release validator: the active release, its artifacts, SemVer + ledger invariants.
 
 Single-responsibility sibling of the SpecsDoctor coordinator. Owns the active-release
-lifecycle checks (SPEC-DOC-003/004/005), the release ledger invariants (phase<->markers
+lifecycle checks (SPEC-DOC-004/005), the release ledger invariants (phase<->markers
 SPEC-DOC-024, unique ids SPEC-DOC-026, naming canon SPEC-DOC-027), plus the family-local
 status/created-date extractors.
 Leaf-only: imports the shared leaves + core, never a sibling validator.
 
-The active release and its phase are read directly off ``RELEASE.json``
-(:func:`resolve_active_release`) — no fallback branch: a workspace with zero live release
-directories resolves cleanly to "no active release".
+The active release and its phase are read by :func:`resolve_active_release`; whether the
+state document is valid is `release.py check`'s answer (LEDGER-RELEASE-SCHEMA).
 """
 
 from __future__ import annotations
@@ -19,21 +18,16 @@ from collections.abc import Callable, Collection
 from datetime import date
 from pathlib import Path
 
-from dadaia_workspace.core.release_state import PHASES as _PHASES
 from dadaia_workspace.core.spec_status import APPROVED, extract_status
 from dadaia_workspace.core.spec_status import CANONICAL_STATUS as _CANONICAL_STATUS
 from dadaia_workspace.core.specs_version import RELEASE_SEMVER_RE
-from dadaia_workspace.features.specs.doctor_common import (
-    _read_and_parse_release_json,
-    iter_all_release_dirs,
-)
+from dadaia_workspace.features.specs.doctor_common import RELEASE_ARTIFACTS, iter_all_release_dirs
 from dadaia_workspace.features.specs.doctor_types import Severity, SpecsDoctorIssue
 from dadaia_workspace.features.specs.specs_tree import SpecsTree
 
 # Vocabulary + parser live in core.spec_status (single definition); re-exported here
 # because doctor_release has been the documented import site for both.
 CANONICAL_STATUS = _CANONICAL_STATUS
-CANONICAL_PHASES = _PHASES
 PLAN_MAX_LINES = 300
 
 # Release-id canon cutoff: a live release whose SPEC.md Created: is on/after this date
@@ -54,27 +48,6 @@ _TASK_BLOCK_RE = re.compile(
     re.MULTILINE,
 )
 _MEMORY_WRITE_SET_RE = re.compile(r"Write set:[^\n]*\bspecs/memory\b")
-
-
-def read_release_phase(specs_dir: Path, release_id: str) -> str | None:
-    """The narrow ``RELEASE.json`` phase reader, given an ALREADY-KNOWN ``release_id``
-    — a thin wrapper over :func:`doctor_common._read_and_parse_release_json`, the ONE
-    tri-state disk read; it does not re-implement it. The hook reads directly through
-    ``core.release_state`` instead, so a one-shot process never pays for importing the
-    whole ``SpecsDoctor`` decomposition.
-
-    ``str`` when the document's ``phase`` field is readable (possibly ``""`` when it
-    carries an empty phase value), ``""`` when
-    ``specs_dir/releases/<release_id>/RELEASE.json`` does not exist, ``None`` when it
-    exists but could not be read or parsed (genuine I/O failure or a malformed
-    document) — callers must treat ``None`` as UNKNOWN, never as "no phase".
-    """
-    state, exists = _read_and_parse_release_json(specs_dir, release_id)
-    if not exists:
-        return ""
-    if state is None:
-        return None
-    return state.phase
 
 
 def _extract_status(md_path: Path) -> str | None:
@@ -143,48 +116,11 @@ class ReleaseValidator:
         #: snapshot every active-release read goes through; never survives a fix pass.
         self.tree: SpecsTree = SpecsTree(specs_dir)
 
-    def check_active_md(self) -> list[SpecsDoctorIssue]:
-        """SPEC-DOC-003 (v0.5.0 FR4/T-050-21A): the active release, resolved by reading
-        ``RELEASE.json`` directly (:func:`resolve_active_release`).
-        """
-        issues: list[SpecsDoctorIssue] = []
-        path = self.specs_dir / "releases"
-        active = self.tree.active_release
-        release, phase, err = (active.release, active.phase, active.error)
-        if err:
-            issues.append(
-                SpecsDoctorIssue(
-                    code="SPEC-DOC-003",
-                    severity=Severity.ERROR,
-                    description=err,
-                    path=str(path),
-                )
-            )
-            return issues
-        if release is None:
-            # No live release: there is no phase to judge. The retired "none" phase
-            # sentinel used to make this case indistinguishable from a real phase.
-            return issues
-        if phase not in CANONICAL_PHASES:
-            issues.append(
-                SpecsDoctorIssue(
-                    code="SPEC-DOC-003",
-                    severity=Severity.ERROR,
-                    description=(
-                        f"Active release phase '{phase}' is not canonical. "
-                        f"Valid: {sorted(CANONICAL_PHASES)}"
-                    ),
-                    path=str(path),
-                )
-            )
-        return issues
-
     def check_spec_origin(
         self, known_bug_ids: Callable[[], Collection[str]]
     ) -> list[SpecsDoctorIssue]:
-        """SPEC-DOC-048: the live SPEC and every candidate SPEC archived under it name
-        where the work came from — the header is the flow's only machine-read input.
-        Releases under ``_archive/`` are frozen history and out of scope.
+        """SPEC-DOC-048: the live SPEC names where the work came from — the header is the
+        flow's only machine-read input. A closed candidate is history in git, never ranked.
 
         ``known_bug_ids`` is read lazily: a tree citing no bug never touches the bug
         ledger, so this rule borrows the governance family's ONE bug reader without
@@ -193,23 +129,12 @@ class ReleaseValidator:
         release = self.tree.active_release.release
         if not release:
             return []
-        rdir = self.specs_dir / "releases" / release
-        issues: list[SpecsDoctorIssue] = []
-        for path in (rdir / "SPEC.md", *sorted(rdir.glob("rc-*/SPEC.md"))):
-            if not path.exists():
-                continue
-            problem = self._origin_problem(path, known_bug_ids)
-            if problem:
-                issues.append(
-                    SpecsDoctorIssue(
-                        code="SPEC-DOC-048",
-                        severity=Severity.ERROR,
-                        description=f"{path.relative_to(self.specs_dir)} {problem}",
-                        path=str(path),
-                        fix=f"Operator action: name the work's origin under **Opened:** in {path}",
-                    )
-                )
-        return issues
+        path = self.specs_dir / "releases" / release / "SPEC.md"
+        if not path.exists() or not (problem := self._origin_problem(path, known_bug_ids)):
+            return []
+        fix = f"Operator action: name the work's origin under **Opened:** in {path}"
+        description = f"{path.relative_to(self.specs_dir)} {problem}"
+        return [SpecsDoctorIssue("SPEC-DOC-048", Severity.ERROR, description, str(path), fix=fix)]
 
     def _origin_problem(self, path: Path, known_bug_ids: Callable[[], Collection[str]]) -> str:
         """One SPEC header judged — presence, vocabulary, then the cited ids; "" is clean."""
@@ -242,18 +167,14 @@ class ReleaseValidator:
     def check_active_release_artifacts(self) -> list[SpecsDoctorIssue]:
         issues: list[SpecsDoctorIssue] = []
         active = self.tree.active_release
-        release, phase, err = (active.release, active.phase, active.error)
-        if err or not release:
+        release, phase = active.release, active.phase
+        if not release:
             return issues
-        # Segment routing retired (release 0.4.6, ADR 0006): the live candidate trio
-        # always sits flat at the release root; rc-N/ subfolders are archives owned by
-        # `release rc-archive`, never routed to.
         rdir = self.specs_dir / "releases" / release
-        for fname in ("SPEC.md", "PLAN.md", "TASKS.md"):
+        for fname in RELEASE_ARTIFACTS:
             fpath = rdir / fname
             if not fpath.exists():
-                # Presence is RELEASE-TREE-TRIO's rule, in ONE home
-                # (features/specs/release_tree.py). This rule judges the `**Status:**`
+                # Presence is `release.py check`'s rule, in ONE home. This rule judges the `**Status:**`
                 # line of the trio documents that exist — a second "missing" finding
                 # here was the same fact reported twice, and it was what forced the
                 # deleted between-candidates DISCOVERY carve-out.
@@ -340,7 +261,7 @@ class ReleaseValidator:
         the contradiction is refused at definition, where it is born.
         """
         active = self.tree.active_release
-        if active.error or not active.release:
+        if not active.release:
             return []
         tasks = self.specs_dir / "releases" / active.release / "TASKS.md"
         if not tasks.exists():
@@ -383,8 +304,8 @@ class ReleaseValidator:
         issues: list[SpecsDoctorIssue] = []
         active_path = self.specs_dir / "releases"
         active = self.tree.active_release
-        release, phase, err = (active.release, active.phase, active.error)
-        if err or not release or phase is None:
+        release, phase = active.release, active.phase
+        if not release or phase is None:
             return issues
         rdir = self.specs_dir / "releases" / release
         if not rdir.exists():

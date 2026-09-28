@@ -7,16 +7,8 @@ here) — the release-dir discovery helpers were instance methods on ``SpecsDoct
 are re-homed here as free functions taking ``specs_dir`` explicitly so no family owns
 them (they were cross-validator all along — SPEC-DOC-006/026/027/031).
 
-``resolve_live_release_id`` + ``resolve_active_release`` (v0.5.x, successor to the
-RELEASE.jsonl fold; v0.5.0 FR4/T-050-21A, A4.1) replace the former
-``read_active_md``/``ACTIVE.md`` pair — that file is retired, no replacement scaffolded
-in its place. Both ``doctor_release`` and ``doctor_structural`` need the resolved
-(release, segment, phase) triple, so it lives here rather than in either — the same
-shared-leaf shape ``read_active_md`` had. The one tri-state disk read + parse of a
-release's ``RELEASE.json`` (S1 FR23 amendment A6, "ONE reader") lives in
-``_read_and_parse_release_json``, below; ``features.specs.doctor_release
-.read_release_phase`` is a thin wrapper over it for a caller that already knows the
-release_id, never a second read implementation.
+``resolve_active_release`` reads which release is live and its phase; whether its state
+document is valid is `release.py check`'s answer (the doctor's LEDGER-RELEASE-SCHEMA).
 """
 
 from __future__ import annotations
@@ -25,15 +17,9 @@ import re
 from pathlib import Path
 
 from dadaia_workspace.core.gitflow import resolve_live_release_id
-from dadaia_workspace.core.release_state import (
-    ReleaseState,
-    parse_release_state,
-    release_state_file,
-)
+from dadaia_workspace.core.release_state import RELEASE_STATE_FILENAME, read_phase
 
 # A dir counts as a "release dir" iff it carries at least one SDD release artifact.
-# Public name (v0.1.81 FR2): reused by ``release_tree`` so both surfaces share one
-# canonical artifact-filename set.
 #
 # v0.5.0 T-050-25A (A4.4): ``CLOSURE.md`` dropped — FR4/T-050-21A retired it as a
 # going-forward artifact, so a lone CLOSURE.md with no SPEC/PLAN/TASKS is now an
@@ -47,75 +33,19 @@ _RELEASE_ARTIFACTS = RELEASE_ARTIFACTS
 _SEGMENT_NAME_RE = re.compile(r"^(?:alpha|rc)-\d+$|^integration$")
 
 
-def _read_and_parse_release_json(
-    specs_dir: Path, release_id: str
-) -> tuple[ReleaseState | None, bool]:
-    """The ONE tri-state disk read + parse of a release's ``RELEASE.json`` (v0.5.x,
-    successor to the RELEASE.jsonl fold's ONE reader, S1 FR23 firing amendment A6,
-    ``specs/releases/0.5.0/reviews/S1-FR23-firing.md`` §3). ``core.release_state``
-    itself never does file I/O (core file-I/O purity ratchet, architect A9); every
-    reader of these bytes goes through this one function — :func:`resolve_active_release`
-    (below) and ``features.specs.doctor_release.read_release_phase`` are its only two
-    (thin) callers, so the tri-state disk read is never duplicated.
-
-    Returns ``(state, exists)``: ``exists=False`` means
-    ``specs_dir/releases/<release_id>/RELEASE.json`` does not exist at all
-    (``state=None``, the honest "nothing to read" case); ``exists=True`` with
-    ``state=None`` means the file IS present but failed to read (OSError) or parse
-    (a malformed ``release-state-v1`` document) — callers must treat that as UNKNOWN,
-    never as "no state". (This corrects a found/exists conflation the retired
-    ``_read_and_parse_release_jsonl`` carried: its two-state ``found`` flag collapsed
-    "absent" and "present but unreadable" into the same ``False``, silently
-    contradicting ``read_release_phase``'s own docstring contract.)
-    """
-    path = release_state_file(specs_dir / "releases" / release_id)
-    if path is None:
-        return None, False
+def resolve_active_release(specs_dir: Path) -> tuple[str | None, str | None]:
+    """``(release_id, phase)`` of the ONE live release (core.gitflow's reader, `release.py`'s
+    `live_ids` rule), or ``(None, None)`` when there is none, several, or no readable
+    phase: `release.py check` reports those defects, so no rule here judges them twice."""
+    if (release_id := resolve_live_release_id(specs_dir)[0]) is None:
+        return None, None
     try:
-        text = path.read_text(encoding="utf-8")
-    except OSError:
-        return None, True
-    try:
-        return parse_release_state(text), True
-    except ValueError:
-        return None, True
-
-
-def resolve_active_release(specs_dir: Path) -> tuple[str | None, str | None, str | None]:
-    """Resolve ``(release_id, phase, error)`` straight from the live state document
-    (v0.5.x reader; segment dropped at release 0.4.6 with the scaffolded segment
-    lane, ADR 0006). Downstream consumers (``doctor_release``, ``doctor_structural``)
-    keep their existing branching (``if err: ...``, ``if release is None: ...``).
-
-    core.gitflow's :func:`resolve_live_release_id` answers "which directory" (pure stdlib);
-    this function answers the content question — the phase, read straight off disk by
-    :func:`_read_and_parse_release_json`. There is no fold anymore: the document
-    already IS the current phase.
-
-    No live release directory: ``(None, None, None)`` — success, not an error. The
-    retired ``"none"`` sentinel this used to return was a release id and a phase name
-    wearing each other's clothes (0.4.7 FR4 deleted ``"none"`` from
-    :data:`~dadaia_workspace.core.release_state.PHASES`): absence is ``None``, and
-    every caller already branches on falsiness.
-    Ambiguous (two+ live release dirs) or an unreadable/malformed/phase-less
-    ``RELEASE.json``: ``error`` carries the reason and ``phase`` is ``None`` — the
-    same "treat as UNKNOWN" contract the narrow phase reader already has.
-    """
-    release_id, disc_err = resolve_live_release_id(specs_dir)
-    if disc_err:
-        return None, None, disc_err
-    if release_id is None:
-        return None, None, None
-    state, exists = _read_and_parse_release_json(specs_dir, release_id)
-    if not exists or state is None:
-        return release_id, None, f"state document for {release_id!r} could not be read"
-    if not state.phase:
-        return (
-            release_id,
-            None,
-            f"state document for {release_id!r} carries no 'phase' value",
+        phase = read_phase(
+            (specs_dir / "releases" / release_id / RELEASE_STATE_FILENAME).read_text("utf-8")
         )
-    return release_id, state.phase, None
+    except OSError:
+        phase = None
+    return (release_id, phase) if phase else (None, None)
 
 
 def is_release_dir(d: Path) -> bool:

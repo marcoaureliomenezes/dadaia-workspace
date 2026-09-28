@@ -411,17 +411,8 @@ _V37_BIRTH = 65
 _V37_ALLOWANCE: dict[str, str] = {
     "cli/commands/migrate.py:_resolve_specs_dir": "sa-specs-tree-state-read-five-ways",
     "cli/commands/specs.py:_resolve_specs_dir": "sa-specs-tree-state-read-five-ways",
-    "core/release_state.py:PHASES": "sa-release-json-validated-three-times",
     "features/backlog/document.py:_SLUG_RE": "sa-backlog-status-has-no-single-authority",
-    "public/skills/dd-backlog-definition/scripts/_backlog_check.py:finding": "sa-backlog-status-has-no-single-authority",
     "public/skills/dd-backlog-definition/scripts/_backlog_write.py:_SLUG_RE": "sa-backlog-status-has-no-single-authority",
-    "public/skills/dd-bug-resolution/scripts/_ledger.py:find_specs": "sa-release-json-validated-three-times",
-    "public/skills/dd-release-implementation/scripts/_release_check.py:finding": "sa-release-json-validated-three-times",
-    "public/skills/dd-release-implementation/scripts/_release_new.py:SCRIPT": "sa-release-json-validated-three-times",
-    "public/skills/dd-release-implementation/scripts/_release_phase.py:SCRIPT": "sa-release-json-validated-three-times",
-    "public/skills/dd-release-implementation/scripts/_release_schema.py:PHASES": "sa-release-json-validated-three-times",
-    "public/skills/dd-release-implementation/scripts/_release_schema.py:find_specs": "sa-release-json-validated-three-times",
-    "public/skills/dd-release-implementation/scripts/_release_store.py:SCRIPT": "sa-release-json-validated-three-times",
 }
 
 
@@ -487,7 +478,8 @@ _V38_ALLOWANCE: dict[str, str] = {
     "infrastructure/public_assets.py:_prune_empty_dirs": "parity:tests/integration/test_install_ledger_reconciliation.py",
     "infrastructure/public_assets.py:_reconcile_install_ledger": "parity:tests/integration/test_install_ledger_reconciliation.py",
     "infrastructure/public_assets.py:stage": "parity:tests/integration/test_staged_assets_have_consumers.py",
-    "public/skills/dd-release-implementation/scripts/_release_new.py:new_release": "sa-release-json-validated-three-times",
+    # `new` is all-or-nothing and drops a closed candidate's PLAN/TASKS (stacked-candidate law)
+    "public/skills/dd-release-implementation/scripts/_release_new.py:new_release": "parity:tests/unit/skills/test_release_implementation_release_script.py",
 }
 
 
@@ -550,14 +542,6 @@ def _doctor_codes() -> set[str]:
 _V39_BIRTH = 52
 _V39_ALLOWANCE: dict[str, str] = {
     "ONBOARDING": "parity:tests/integration/test_onboarding_steps_property.py",
-    "RELEASE-TREE-ARCHIVED": "sa-release-json-validated-three-times",
-    "RELEASE-TREE-MEMORY": "sa-release-json-validated-three-times",
-    "RELEASE-TREE-PARSE": "sa-release-json-validated-three-times",
-    "RELEASE-TREE-PHASE": "sa-release-json-validated-three-times",
-    "RELEASE-TREE-SCHEMA": "sa-release-json-validated-three-times",
-    "RELEASE-TREE-STATE-MISSING": "sa-release-json-validated-three-times",
-    "RELEASE-TREE-TRIO": "sa-release-json-validated-three-times",
-    "RELEASE-TREE-TS-ORDER": "sa-release-json-validated-three-times",
     "SPEC-DOC-002L": "sa-placement-rules-contradict-tree8",
     "SPEC-DOC-035": "sa-placement-rules-contradict-tree8",
     "TREE-7": "sa-placement-rules-contradict-tree8",
