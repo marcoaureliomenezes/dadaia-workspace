@@ -422,3 +422,42 @@ def test_any_area_histo_is_allowed_foreign_repo_included(tmp_path: Path, rel: st
     another-context case is test_gate_policy's foreign-repo test."""
     ws = _mk_workspace(tmp_path, "a", "b")
     assert _write(ws, rel) is None
+
+
+def test_a_truncated_registry_is_no_context_at_the_gate_and_in_context_show(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """sa-context-repo-mapping-falls-back-to-the-name#B4 (the gate and `context show
+    --json` legs; alive_context_names is test_invocation's): with a truncated
+    spec_contexts.json and DADAIA_CONTEXT naming a context, the real hook neither crashes
+    nor scope-blocks (no context is registered), and `context show --json` answers
+    `{"context": null}`, exit 0."""
+    from typer.testing import CliRunner
+
+    from dadaia_workspace.cli.main import app
+
+    ws = _mk_workspace(tmp_path, "proj", "other")
+    (ws / ".dadaia" / "states" / "spec_contexts.json").write_text('{"contexts": [{"na')
+    env = claude_hook_env(ws, session_id="s")
+    env.pop("CLAUDE_CODE_SESSION_ID", None)
+    env["DADAIA_CONTEXT"] = "proj"
+    payload = {"tool_name": "Write", "tool_input": {"file_path": str(ws / "repos/other/x.py")}}
+
+    gate = run_hook_subprocess("sdd_gate", payload, env)
+
+    assert gate.returncode == 0, gate.stderr
+    assert gate.block_envelope() is None
+
+    monkeypatch.chdir(ws)
+    monkeypatch.setenv("DADAIA_CONTEXT", "proj")
+    for var in (
+        "CLAUDE_CODE_SESSION_ID",
+        "CODEX_SESSION_ID",
+        "CODEX_THREAD_ID",
+        "DADAIA_SESSION_ID",
+    ):
+        monkeypatch.delenv(var, raising=False)
+    shown = CliRunner().invoke(app, ["context", "show", "--json"])
+
+    assert shown.exit_code == 0, shown.output
+    assert json.loads(shown.output) == {"context": None}

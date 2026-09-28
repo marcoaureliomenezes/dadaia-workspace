@@ -245,7 +245,12 @@ def _resolve_run(
     target = resolve_context_specs_dir_for_cli(workspace_root, name)
     # The ONE place a context's tree is resolved: a tree `specs init` has not stamped yet
     # is onboarding level 2 — nothing for the specs/ledgers sections to judge (AC3.1).
-    return workspace_root, service, name, target if onboarding.specs_ready(target) else None
+    return (
+        workspace_root,
+        service,
+        name,
+        target if target and onboarding.specs_ready(target) else None,
+    )
 
 
 def _bound_context() -> str | None:

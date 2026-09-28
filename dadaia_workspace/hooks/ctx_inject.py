@@ -302,7 +302,8 @@ def _emit_bootstrap(workspace: Path, context: str) -> None:
     """Emit the bound context's bootstrap: the header and next step (:func:`_head`) + the
     lean memory prefix."""
     sections = _head(workspace, f"[{context}]", context, True)
-    memory = _build_memory(invocation.resolve_context_specs_dir(workspace, context))
+    specs = invocation.resolve_context_specs_dir(workspace, context)
+    memory = _build_memory(specs) if specs else ""
     if memory:
         sections.append(memory)
     digest = _read_help_digest(workspace)

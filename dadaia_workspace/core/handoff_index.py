@@ -38,6 +38,7 @@ from pathlib import Path
 from typing import Any
 
 from dadaia_workspace.core.exceptions import HandoffSchemaError, HandoffValidationError
+from dadaia_workspace.core.invocation import repo_slug_for_context
 
 __all__ = [
     "Finding",
@@ -513,8 +514,9 @@ class Handoff:
         candidates: list[tuple[Path, Path]] = []  # (candidate, boundary root)
         if reviewed_root is not None:
             candidates.append((reviewed_root / ref, reviewed_root))
-        if context:
-            candidates.append((workspace_root / "repos" / context / ref, workspace_root))
+        slug = repo_slug_for_context(workspace_root, context) if context else None
+        if slug:  # refs are relative to the context's main repo, found via the registry
+            candidates.append((workspace_root / "repos" / slug / ref, workspace_root))
         candidates.append((workspace_root / ref, workspace_root))
         for candidate, boundary in candidates:
             resolved = _within_root(candidate, boundary)

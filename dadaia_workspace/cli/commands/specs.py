@@ -159,7 +159,14 @@ def init(
         except ValueError as exc:
             typer.echo(f"[error] {exc}\n{_init_fix('--context', '<name>')}", err=True)
             raise typer.Exit(2) from exc
-        specs_dir = str(resolve_context_specs_dir_for_cli(resolve_workspace_root(), ctx))
+        tree = resolve_context_specs_dir_for_cli(workspace := resolve_workspace_root(), ctx)
+        if tree is None:  # a name the registry does not know owns no tree to write
+            typer.echo(
+                f"[error] no registered context {ctx!r}\nfix: {fix_line(workspace, 'context', 'list')}",
+                err=True,
+            )
+            raise typer.Exit(1)
+        specs_dir = str(tree)
         rerun = ("--context", ctx)
     target = resolve_specs_dir_for_cli(specs_dir)
     kind = specs_version.classify(target)

@@ -380,8 +380,15 @@ def _v12_doc_with_refs(refs: list[str]) -> dict[str, object]:
 
 
 def test_self_pull_ref_existence_and_missing_ref_named(tmp_path: Path) -> None:
-    (tmp_path / "repos" / "dadaia-workspace" / "specs" / "memory").mkdir(parents=True)
-    (tmp_path / "repos" / "dadaia-workspace" / "specs" / "memory" / "TECHSTACK.md").write_text("x")
+    """sa-context-repo-mapping-falls-back-to-the-name#B3: refs resolve in the context's
+    registered repo — the context NAME (dadaia-workspace) differs from its repo slug."""
+    states = tmp_path / ".dadaia" / "states"
+    states.mkdir(parents=True)
+    (states / "spec_contexts.json").write_text(
+        json.dumps({"contexts": [{"name": "dadaia-workspace", "repo_slug": "alphamain"}]})
+    )
+    (tmp_path / "repos" / "alphamain" / "specs" / "memory").mkdir(parents=True)
+    (tmp_path / "repos" / "alphamain" / "specs" / "memory" / "TECHSTACK.md").write_text("x")
 
     handoff = Handoff.load(
         _write(
@@ -393,9 +400,8 @@ def test_self_pull_ref_existence_and_missing_ref_named(tmp_path: Path) -> None:
     result = handoff.validate(workspace_root=tmp_path, schema=_SCHEMA)
 
     assert result.valid is False
-    assert any(
-        "self_pull.refs[1]" in e.field_path and "MISSING.md" in e.message for e in result.errors
-    )
+    assert [e.field_path for e in result.errors] == ["self_pull.refs[1]"]
+    assert "MISSING.md" in result.errors[0].message
 
 
 def test_self_pull_resolves_against_reviewed_root_before_workspace(tmp_path: Path) -> None:
@@ -404,6 +410,10 @@ def test_self_pull_resolves_against_reviewed_root_before_workspace(tmp_path: Pat
     but absent/different from whatever ``repos/<context>`` currently has checked out on
     disk must resolve — reviewed_root wins."""
     workspace = tmp_path / "workspace"
+    (workspace / ".dadaia" / "states").mkdir(parents=True)
+    (workspace / ".dadaia" / "states" / "spec_contexts.json").write_text(
+        json.dumps({"contexts": [{"name": "dadaia-workspace", "repo_slug": "dadaia-workspace"}]})
+    )
     (workspace / "repos" / "dadaia-workspace" / "specs" / "memory").mkdir(parents=True)
     (workspace / "repos" / "dadaia-workspace" / "specs" / "memory" / "TECHSTACK.md").write_text(
         "checked-out-branch version"
@@ -436,6 +446,10 @@ def test_self_pull_falls_back_to_workspace_when_reviewed_root_lacks_the_ref(tmp_
     """reviewed_root is tried FIRST, not exclusively — a ref absent there but present
     under the ordinary repos/<context>/<ref> candidate still resolves."""
     workspace = tmp_path / "workspace"
+    (workspace / ".dadaia" / "states").mkdir(parents=True)
+    (workspace / ".dadaia" / "states" / "spec_contexts.json").write_text(
+        json.dumps({"contexts": [{"name": "dadaia-workspace", "repo_slug": "dadaia-workspace"}]})
+    )
     (workspace / "repos" / "dadaia-workspace" / "specs" / "memory").mkdir(parents=True)
     (workspace / "repos" / "dadaia-workspace" / "specs" / "memory" / "TECHSTACK.md").write_text("x")
 

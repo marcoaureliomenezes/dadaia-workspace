@@ -202,39 +202,27 @@ def alive_context_names(workspace_root: Path) -> list[str]:
 
 
 def _context_registered(workspace_root: Path, name: str) -> bool:
-    """True while *name* is registered (missing registry -> ``False``; unreadable fails
-    OPEN -> ``True``, so a transient FS hiccup never invalidates every live bind)."""
-    registry = workspace_root / ".dadaia" / "states" / "spec_contexts.json"
-    if not registry.is_file():
-        return False
-    try:
-        data = json.loads(registry.read_text(encoding="utf-8"))
-    except (json.JSONDecodeError, OSError, ValueError):
-        return True
-    contexts = data.get("contexts", []) if isinstance(data, dict) else []
-    if not isinstance(contexts, list):
-        return True
+    """True while *name* is registered; an unreadable registry registers nothing."""
     return any(
-        isinstance(entry, dict) and (entry.get("name") == name or entry.get("repo_slug") == name)
-        for entry in contexts
+        e.get("name") == name or e.get("repo_slug") == name
+        for e in _registry_contexts(workspace_root)
     )
 
 
-def repo_slug_for_context(workspace_root: Path, name: str) -> str:
-    """The ``repos/<slug>`` dir a context NAME lives in; falls back to *name* unchanged."""
+def repo_slug_for_context(workspace_root: Path, name: str) -> str | None:
+    """The ``repos/<slug>`` dir a context NAME lives in, or ``None`` when unregistered."""
     for entry in _registry_contexts(workspace_root):
-        if entry.get("name") == name:
-            slug = entry.get("repo_slug") or entry.get("repo")
-            return slug if isinstance(slug, str) and slug else name
-    return name
+        slug = entry.get("repo_slug") or entry.get("repo")
+        if entry.get("name") == name and isinstance(slug, str) and slug:
+            return slug
+    return None
 
 
-def context_name_for_repo_slug(workspace_root: Path, slug: str) -> str:
-    """Inverse of :func:`repo_slug_for_context`: the NAME whose repo is *slug*, else
-    *slug* itself. *slug* also matches an **associated** repo's slug (A16.4) — the walk
-    lands on the owning context, never on a second context of its own."""
+def context_name_for_repo_slug(workspace_root: Path, slug: str) -> str | None:
+    """Inverse of :func:`repo_slug_for_context`: the NAME whose main or associated repo
+    is *slug* (A16.4), or ``None`` when no registered context owns it."""
     owner = _owning_entry(workspace_root, slug)
-    return owner[0] if owner else slug
+    return owner[0] if owner else None
 
 
 def repo_owner(workspace_root: Path, path: Path) -> tuple[str, str, str] | None:
@@ -396,9 +384,8 @@ def resolve(
         context_name, rung = explicit, "explicit"
     elif workspace_root is not None and target_path is not None:
         slug = repo_slug_under_repos(workspace_root, target_path)
-        if slug:
-            context_name = context_name_for_repo_slug(workspace_root, slug)
-            rung = "target_path"
+        context_name = context_name_for_repo_slug(workspace_root, slug) if slug else None
+        rung = "target_path" if context_name else rung
 
     bind = resolve_bind(workspace_root, session_id, env)
     if context_name is None and bind.context_name:
@@ -406,15 +393,16 @@ def resolve(
 
     if context_name is None and workspace_root is not None:
         slug = repo_slug_under_repos(workspace_root, cwd)
-        if slug:
-            context_name = context_name_for_repo_slug(workspace_root, slug)
-            rung = "cwd"
+        context_name = context_name_for_repo_slug(workspace_root, slug) if slug else None
+        rung = "cwd" if context_name else rung
 
     repo_slug: str | None = None
     specs_dir: Path | None = None
     if workspace_root is not None and context_name:
         repo_slug = repo_slug_for_context(workspace_root, context_name)
-        specs_dir = (workspace_root / "repos" / repo_slug / "specs").resolve()
+        specs_dir = (
+            (workspace_root / "repos" / repo_slug / "specs").resolve() if repo_slug else None
+        )
 
     return Invocation(
         workspace_root=workspace_root,
@@ -466,17 +454,17 @@ def resolve_specs_dir(specs_dir: str | None) -> Path:
     )
 
 
-def resolve_context_specs_dir(workspace_root: Path, context: str) -> Path:
-    """A context's ``specs/`` tree: ``workspace_root/repos/<slug>/specs``, whether or not
-    it exists yet — a context with no tree is onboarding level 2, never a silent redirect
-    to another tree (0.4.8 R4). Derives from ``workspace_root``, never cwd."""
-    return workspace_root / "repos" / repo_slug_for_context(workspace_root, context) / "specs"
+def resolve_context_specs_dir(workspace_root: Path, context: str) -> Path | None:
+    """A registered context's ``specs/`` tree, whether or not it exists yet (0.4.8 R4);
+    ``None`` for a name the registry does not know — never a tree named after it."""
+    slug = repo_slug_for_context(workspace_root, context)
+    return workspace_root / "repos" / slug / "specs" if slug else None
 
 
 def alive_context_trees(workspace_root: Path) -> dict[str, Path]:
     """Every ALIVE context NAME -> its ``specs/`` tree, in registry order — the
     onboarding derivation's input (0.4.8 FR6)."""
-    return {
-        name: resolve_context_specs_dir(workspace_root, name)
-        for name in alive_context_names(workspace_root)
+    trees = {
+        n: resolve_context_specs_dir(workspace_root, n) for n in alive_context_names(workspace_root)
     }
+    return {name: tree for name, tree in trees.items() if tree is not None}

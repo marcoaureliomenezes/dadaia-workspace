@@ -23,7 +23,6 @@ from dadaia_workspace.core.invocation import (
 )
 from dadaia_workspace.core.invocation import alive_context_trees as _alive_context_trees
 from dadaia_workspace.core.invocation import repo_owner as _repo_owner
-from dadaia_workspace.core.invocation import repo_slug_for_context as _core_repo_slug
 from dadaia_workspace.core.invocation import resolve as _resolve_invocation
 from dadaia_workspace.core.invocation import (
     resolve_context_specs_dir as _core_resolve_context_specs_dir,
@@ -39,16 +38,6 @@ HARNESS_SESSION_ID_ENV_VARS = _HARNESS_SESSION_ID_ENV_VARS
 resolve_session_id = _resolve_session_id
 alive_context_trees = _alive_context_trees
 repo_owner = _repo_owner
-
-
-def repo_slug_for_context(workspace_root: Path, name: str) -> str:
-    """The on-disk ``repos/<slug>`` directory for a context NAME (registry-backed).
-
-    A context's NAME and its repo SLUG are two identities; deriving the directory from
-    the name is the defect class fixed in the 0.4.2 arc. Verbs call this seam so the one
-    registry-backed resolution stays the single source of truth.
-    """
-    return _core_repo_slug(workspace_root, name)
 
 
 def resolve_context_for_cli(explicit: str | None) -> str:
@@ -82,7 +71,7 @@ def own_bind_for_cli() -> tuple[str | None, str | None]:
     return inv.bind.context_name, inv.session_id
 
 
-def resolve_context_specs_dir_for_cli(workspace_root: Path, context: str) -> Path:
+def resolve_context_specs_dir_for_cli(workspace_root: Path, context: str) -> Path | None:
     """Seam wrapper over the ONE context->specs resolver (T-053-01/F003): registry
     ``repo_slug`` mapping, no fallback tree (0.4.8 R4). CLI verbs import THIS, never
     ``core.invocation`` directly (bind-resolution-seam-is-a-single-home)."""

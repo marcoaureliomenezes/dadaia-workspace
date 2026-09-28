@@ -430,24 +430,28 @@ def test_context_name_for_repo_slug_matches_an_associated_repo(tmp_path: Path) -
     assert invocation.context_name_for_repo_slug(ws, "assoc-repo") == "other"
 
 
-def test_context_name_for_repo_slug_falls_back_to_slug_when_unmatched(tmp_path: Path) -> None:
+def test_an_unowned_repo_resolves_no_context(tmp_path: Path) -> None:
+    """sa-context-repo-mapping-falls-back-to-the-name#B1: repos/foo on disk, owned by no
+    registered context: the mapping answers None and resolve() from repos/foo binds no
+    context named after the directory (DELETE-LOSER: the three name-fallback tests)."""
     ws = _mk_ws(tmp_path, slug="proj")
-    assert invocation.context_name_for_repo_slug(ws, "no-such-slug") == "no-such-slug"
+    (ws / "repos" / "foo").mkdir()
+    assert invocation.context_name_for_repo_slug(ws, "foo") is None
+    assert invocation.repo_slug_for_context(ws, "foo") is None
+    inv = invocation.resolve(env={}, cwd=ws / "repos" / "foo")
+    assert inv.context_name is None and inv.specs_dir is None
 
 
-def test_context_name_for_repo_slug_falls_back_to_slug_when_registry_missing(
-    tmp_path: Path,
-) -> None:
-    assert invocation.context_name_for_repo_slug(tmp_path, "proj") == "proj"
-
-
-def test_context_name_for_repo_slug_falls_back_to_slug_when_registry_corrupt(
-    tmp_path: Path,
-) -> None:
-    states = tmp_path / ".dadaia" / "states"
-    states.mkdir(parents=True)
-    (states / "spec_contexts.json").write_text("{not json", encoding="utf-8")
-    assert invocation.context_name_for_repo_slug(tmp_path, "proj") == "proj"
+def test_a_truncated_registry_answers_no_context(tmp_path: Path) -> None:
+    """sa-context-repo-mapping-falls-back-to-the-name#B4 (the alive_context_names leg,
+    plus the slug mapping and the bind; the gate and `context show --json` legs are
+    test_sdd_gate's): an unreadable registry answers "no context", never fail-open."""
+    ws = _mk_ws(tmp_path, slug="proj")
+    (ws / ".dadaia" / "states" / "spec_contexts.json").write_text('{"contexts": [{"na', "utf-8")
+    assert invocation.alive_context_names(ws) == []
+    assert invocation.context_name_for_repo_slug(ws, "proj") is None
+    bind = invocation.resolve_bind(ws, None, {"DADAIA_CONTEXT": "proj"})
+    assert bind.context_name is None
 
 
 def test_context_name_for_repo_slug_accepts_legacy_repo_field(tmp_path: Path) -> None:

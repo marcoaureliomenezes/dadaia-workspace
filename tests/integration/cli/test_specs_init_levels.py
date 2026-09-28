@@ -305,3 +305,15 @@ def test_no_law_writer_leaves_a_registry_placeholder(repo: Path) -> None:
         if marker in path.read_text(encoding="utf-8")
     ]
     assert raw == []
+
+
+def test_specs_init_refuses_an_unregistered_context_and_writes_nothing(repo: Path) -> None:
+    """sa-context-repo-mapping-falls-back-to-the-name#B2: `specs init --context alpah` (a
+    typo, no such context) exits non-zero with a `context list` fix and creates no
+    repos/alpah/ — the name never becomes a directory."""
+    workspace = repo.parents[1]
+    result = _runner.invoke(app, ["specs", "init", "--context", "alpah"])
+
+    assert result.exit_code != 0, result.output
+    assert "context list" in result.output
+    assert not (workspace / "repos" / "alpah").exists()
