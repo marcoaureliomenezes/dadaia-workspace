@@ -308,7 +308,7 @@ A violation a ratchet tolerates: `file:symbol` → the open bug id deleting it, 
 _Avoid_: baseline
 
 **Resolution contract**:
-A RED at the question's seam failing at definition; GREEN; the losers gone with their tests and fakes; `bugs.py resolve` with the evidence triple, net-negative unless an AC excepts it; commit shape 3.
+A RED at the question's seam failing at definition; GREEN; the losers gone with their tests and fakes; `bugs.py resolve` with the evidence triple; net ≤ 0 in production and tests, except the production ceilings a SPEC's ACs grant; commit shape 3.
 _Avoid_: fix (bare)
 
 **Wave**:

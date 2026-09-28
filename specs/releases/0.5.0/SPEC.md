@@ -4,7 +4,21 @@
 **Release ID:** 0.5.0
 **Owner:** dd-product-engineer
 **Opened:** 2026-09-27
-**Origin:** bugs:sa-reaper-destroys-its-own-hold-before-ttl,sa-context-dead-removes-repos-outside-the-reaper,sa-public-install-unlinks-operator-files-outside-its-ledger,sa-gate-allows-root-entries-the-reaper-moves,sa-doctor-reaps-harness-owned-entries,sa-public-install-writes-the-root-map-into-product-repos,sa-scoped-public-install-prunes-the-gate-wiring,sa-ledger-verbs-append-histo-before-validating-the-pair,sa-private-match-rendering-has-three-renderers,sa-gate-blind-on-cursor-copilot-devin,sa-codex-policy-allows-write-capable-commands,sa-specs-upgrade-writes-through-symlinks,pre-push-gate-never-runs-under-core-hookspath,sa-seven-workspace-root-rules,sa-bind-has-two-stores,sa-fix-lines-not-built-by-cli-line,sa-rich-printer-wraps-fix-lines,sa-unfixable-doctor-findings-say-doctor-fix,sa-placement-rules-contradict-tree8,sa-registry-schema-version-has-three-grammars,sa-spec-doc-033-duplicates-bugs-check,sa-ledger-write-seam-redacts-less-than-push-refuses,sa-backlog-status-has-no-single-authority,sa-promote-has-no-verb,sa-status-line-has-two-parsers,sa-adr-measured-by-pattern-refuses-real-checks,sa-specs-tree-state-read-five-ways,sa-memory-atom-has-two-grammars,sa-release-json-validated-three-times,sa-reconcile-certify-skip-the-workspace-walk,sa-doctor-job-not-a-required-check,sa-context-repo-mapping-falls-back-to-the-name,sa-editable-install-reports-a-frozen-version,sa-subjects-resolve-is-circular,sa-hook-parity-claims-false-and-interpreter-rules-diverge,sa-reviewer-persona-body-contradicts-its-tools,sa-specs-init-writes-unrendered-law,sa-gate-path-classes-diverge-from-the-law,sa-tool-caches-land-outside-the-cache-zone,sa-live-work-branch-named-three-ways,sa-principal-branch-defaults-to-main-and-cut-point-diverges,sa-audit-close-archives-without-validating,sa-staged-assets-without-consumers,sa-expiry-has-two-clocks,sa-handoff-self-pull-requirement-diverges,sa-specs-upgrade-stamps-any-target-and-memory-vocabulary-diverges,sa-ledger-vocabulary-and-atomic-write-duplicated-in-scripts,sa-text-restates-rules-the-code-contradicts,sa-consumer-law-carries-library-facts
+**Origin:** bugs:sa-reaper-destroys-its-own-hold-before-ttl,sa-context-dead-removes-repos-outside-the-reaper,sa-public-install-unlinks-operator-files-outside-its-ledger,sa-gate-allows-root-entries-the-reaper-moves,sa-doctor-reaps-harness-owned-entries,sa-public-install-writes-the-root-map-into-product-repos,sa-scoped-public-install-prunes-the-gate-wiring,sa-ledger-verbs-append-histo-before-validating-the-pair,sa-private-match-rendering-has-three-renderers,sa-gate-blind-on-cursor-copilot-devin,sa-codex-policy-allows-write-capable-commands,sa-specs-upgrade-writes-through-symlinks,pre-push-gate-never-runs-under-core-hookspath,sa-seven-workspace-root-rules,sa-bind-has-two-stores,sa-fix-lines-not-built-by-cli-line,sa-rich-printer-wraps-fix-lines,sa-unfixable-doctor-findings-say-doctor-fix,sa-placement-rules-contradict-tree8,sa-registry-schema-version-has-three-grammars,sa-spec-doc-033-duplicates-bugs-check,sa-ledger-write-seam-redacts-less-than-push-refuses,sa-backlog-status-has-no-single-authority,sa-promote-has-no-verb,sa-status-line-has-two-parsers,sa-adr-measured-by-pattern-refuses-real-checks,sa-specs-tree-state-read-five-ways,sa-memory-atom-has-two-grammars,sa-release-json-validated-three-times,sa-reconcile-certify-skip-the-workspace-walk,sa-doctor-job-not-a-required-check,sa-context-repo-mapping-falls-back-to-the-name,sa-editable-install-reports-a-frozen-version,sa-subjects-resolve-is-circular,sa-hook-parity-claims-false-and-interpreter-rules-diverge,sa-reviewer-persona-body-contradicts-its-tools,sa-specs-init-writes-unrendered-law,sa-gate-path-classes-diverge-from-the-law,sa-tool-caches-land-outside-the-cache-zone,sa-live-work-branch-named-three-ways,sa-principal-branch-defaults-to-main-and-cut-point-diverges,sa-audit-close-archives-without-validating,sa-staged-assets-without-consumers,sa-expiry-has-two-clocks,sa-handoff-self-pull-requirement-diverges,sa-specs-upgrade-stamps-any-target-and-memory-vocabulary-diverges,sa-ledger-vocabulary-and-atomic-write-duplicated-in-scripts,sa-text-restates-rules-the-code-contradicts,sa-consumer-law-carries-library-facts,sa-implementation-adds-before-it-deletes
+- Operator demand, 2026-09-28 (FR10), verbatim: "SE ESTAMOS RESOLVENDO AMBIGUIDADES, QUER DIZER QUE HAVIA
+  REPETIÇÕES. COMO QUE AUMENTOU O NUMERO DE LINHAS DE CODIGO E NUMERO DE TESTES???? ISSO EU NÃO ACEITO." /
+  "VC VIOLOU A REGRA FUNDAMENTAL DE DELEÇÃO -> ATUALIZAÇÃO / REFAZER / RECONSTRUIR E SOMENTE DEPOIS
+  ADICIONAR. ISSO É FUNDAMENTAL DO DADAIA-WORKSPACE. REGISTRE, SIGA, OBEDEÇA" / "TESTES DEVEM DIMINUIR PELO
+  MENOS EM 40% E MELHORAR A QUALIDADE E MEDIÇÃO DE COMPORTAMENTOS" / "NÃO ACEITO MENOS QUE 40% DOS TESTES E
+  EM RELAÇÃO A IMPLEMENTAÇÃO REDUÇÃO DE PELO MENOS 40% DAS LINHAS DE CODIGO COM TODAS AS FUNCIONALIDADES
+  ESPECIFICADAS FUNCIONANDO E SEM AMBIGUIDADE SISTEMICA. REGISTRE ISSO, AO FINAL VC DEVE PRESTAR CONTAS"
+- Operator demand, 2026-09-28 (FR10 refinement), verbatim: "VOCÊ DEVE REDUZIR AS LINHAS DE CÓDIGO ENTRE 30
+  E 40% SEM QUEBRAR AS FUNCIONALIDADES. SE VOCÊ QUEBRAR UMA FUNCIONALIDADE OU FEATURE OU COMPORTAMENTO
+  ESPERADO E JÁ DEFINIDO VOCÊ ESTÁ ERRADO. NÃO VÁ APAGAR COISAS INDEVIDAS"
+- Operator demand, 2026-09-28, verbatim: "devemos sempre, sempre, sempre minimizar as linhas de código,
+  minimizar os testes, mantendo qualidade, requisitos, features especificadas e documentadas funcionando,
+  sem ambiguidade e contradições sistêmicas... Sou contra algo verboso que poderia ser feito de forma
+  menos verbosa."
 
 ---
 
@@ -13,31 +27,19 @@
 Operator, 2026-09-26: "não adicione fix em cima do que ta quebrado ... agora so aceito 80% pra mais com
 o restante permanecendo mapeados". 2026-09-27: "se não resolvermos os testes é impossível resolver o problema na raiz".
 
-- Ledger: 49 open (22 C, 11 H, 11 M, 5 L), exactly the Origin: 48 packages from 142 verified findings
-  plus the hooks-path bug (`2c1faf65`).
+- Origin: 50 ids — the 49 open at definition (22 C, 11 H, 11 M, 5 L: 48 packages from 142 verified
+  findings plus the hooks-path bug `2c1faf65`) and the work-order bug (`11fe60bb`).
 - 0.4.7's first-run rubric D1–D10: **44/100** (Claude 50, non-Claude 40); 3 stalls.
-- As-is (PLAN §1): every authority unit carries ≥ 2 prior bugs, so REBUILD; net about −2569 lines.
-- Tests: 65k lines against 31k production; candidate 3 moved +4241/−3111 for +318; fakes and the hook
-  harness hard-code 5 questions.
 
 ## Objective
 
-Each question the 49 bugs name gets one authority, behavior row and public seam; every other mechanism,
+Each question the 50 bugs name gets one authority, behavior row and public seam; every other mechanism,
 tests and fakes included, consults it or goes; definition, review, CI and closure refuse a second
 authority or an uncited assertion; code and tests shrink; 0.5.0 publishes per FR7.
 
-## Terms (enter `CONTEXT.md`, AC5.6)
+## Terms
 
-- **Authority** — the one symbol, command or file answering a question; others **consult** (call) it.
-- **Systemic ambiguity** — two mechanisms (code, or law an agent executes) answering one question with
-  divergent rules. _Avoid_: drift, duplication.
-- **Behavior row** — a Given/When/Then statement `<bug-id>#<id>` naming its authority and seam.
-- **Cross-check test** — one input set fed to two live readers, asserting one verdict.
-- **Ratchet allowance** — violations a ratchet tolerates: `file:symbol` → the open bug id deleting it,
-  or `parity:<test>`. _Avoid_: baseline.
-- **Resolution contract** — a RED at the question's seam failing at definition; GREEN; losers gone with
-  their tests and fakes; `bugs.py resolve` with the evidence triple, net-negative unless an AC excepts it;
-  commit shape 3.
+`CONTEXT.md` §Authorities holds them (AC5.6).
 
 ## Decisions
 
@@ -45,75 +47,73 @@ A parenthesized `00NN` is an ADR: 0050–0088 hold the operator-accepted decisio
 definition (handoffs in `reports/main-thread/20260927-050-c4-evidence/`); per-bug ones sit in the
 table. Over the as-is, the grill wins.
 
-- 0.5.0 is CRITICAL (`_RELEASE.json` log 2026-09-26T23:02:09Z); every verified package is a bug; Flow 2
-  plus a never-again mechanism (0050): FR5 generic, FR6 library (0052).
-- DEC-1..13 as recommended, one ADR each (0058–0069 in order): 1a 2a 3b 4a 5a 6a 7a 8a 9b (+a on
-  Devin) 10a 12a 13a; DEC-11 deferred (0053).
-- Publish gate: FR7, overriding "0 open bugs before publish" for 0.5.0 only (0051).
-- Behavior first: the single behavior is stated before any test is touched; a failing old test is a
-  question, never an order (0070). Test strategy: FR9 (0071).
+- 0.5.0 is CRITICAL, Flow 2 plus a never-again mechanism: FR5 generic, FR6 library (0050, 0052).
+- DEC-1..13: 0058–0069; DEC-11 deferred (0053).
+- Publish gate: FR7 (0089).
+- Behavior first (0070); test strategy FR9 (0071).
 
 ## Bugs, their question and the one authority
 
-WP = plan package (HP: hooks-path bug); † = candidate-3 files; tests = audit net test lines before
-FR9's pruning; mirr = mirrored (each side pinned by its own tests) / all findings.
+WP = plan package (HP: hooks-path bug).
 
-| WP | bug id | question | the one authority | tests | mirr |
-|---|---|---|---|---|---|
-| | **Wave 0 — data loss, leaks, gate holes (14)** | | forced-pass 8 | +503 | 17/37 |
-| 02 | sa-reaper-destroys-its-own-hold-before-ttl | may a hold die before its TTL | `sweep.move`; N moves = N holds; "one hold per origin per day" void (0074) | +40 | 1/2 |
-| 03 | sa-context-dead-removes-repos-outside-the-reaper † | how a dead repo leaves disk | `_reap_dead_repo` over `all_repos()`; unpublished = any branch | +78 | 2/3 |
-| 04 | sa-public-install-unlinks-operator-files-outside-its-ledger | who deletes in harness dirs | `_reconcile_install_ledger` | +5 | 1/1 |
-| 05 | sa-gate-allows-root-entries-the-reaper-moves | may a root entry exist | `workspace_layout.verdict` (0058) | +75 | 3/5 |
-| 06 | sa-doctor-reaps-harness-owned-entries | who judges harness dirs | the install ledger (0059) | +2 | 0/2 |
-| 07 | sa-public-install-writes-the-root-map-into-product-repos † | who writes a repo `AGENTS.md` | `canon.REPO_LAW` via `specs init` | -119 | 2/3 |
-| 08 | sa-scoped-public-install-prunes-the-gate-wiring | what a whole install is | one `InstallPlan` | +14 | 1/2 |
-| 09 | sa-ledger-verbs-append-histo-before-validating-the-pair | did a refusal write | the script checks both files, then writes the pair | +80 | 0/2 |
-| 11 | sa-private-match-rendering-has-three-renderers † | how a match is shown | `redaction.mask` everywhere, `privacy_check.py:318` too (0086) | +25 | 2/4 |
-| 12 | sa-gate-blind-on-cursor-copilot-devin | is every tool call judged | `pre_gate` + `HOOK_DIALECTS`; no blocking contract = "gate not enforced" (0054) | +60 | 2/6 |
-| 13 | sa-codex-policy-allows-write-capable-commands | unprompted Codex commands | the rendered `.rules`: `rg ls cat`, `sed -n` | +37 | 0/1 |
-| 14 | sa-specs-upgrade-writes-through-symlinks | how a fixed section is written | one symlink-refusing writer | +65 | 1/2 |
-| 32 | sa-doctor-job-not-a-required-check | which checks gate | `ci.yml`; `checks_for()`; an in-repo required-checks file (0078) | +71 | 1/3 |
-| HP | pre-push-gate-never-runs-under-core-hookspath | where git runs the gate | `git rev-parse --git-path hooks` for install and doctor; a foreign `pre-push` refused with its one line (0057, 0085) | +70 | 1/1 |
-| | **Wave 1 — stalls, loops, fixes that never clear (15)** | | forced-pass 20 | +13 | 27/49 |
-| 15 | sa-seven-workspace-root-rules † | the workspace root | `resolve_workspace_root` | +108 | 1/3 |
-| 15 | (fence) | which roots may a dadaia process act on | `core/workspace_resolver` fence (0088) | +10 | — |
-| 16 | sa-bind-has-two-stores † | is the session bound | `resolve_bind` (0060); a native id, no bind: `repos/<slug>/` writes refused, fix `context bind <owner>` (0072) | +115 | 1/3 |
-| 17 | sa-fix-lines-not-built-by-cli-line † | how a fix line is written | `core/cli_line` | +140 | 3/7 |
-| 18 | sa-rich-printer-wraps-fix-lines † | who prints a refusal | `cli/_fail.fail`, exit 1; Click usage errors keep 2 (0073) | +75 | 3/4 |
-| 19 | sa-unfixable-doctor-findings-say-doctor-fix | fix of an unfixable finding | the finding's own `fix_line` | +100 | 1/1 |
-| 20 | sa-placement-rules-contradict-tree8 | where a stray specs file goes | TREE-8 | -40 | 1/3 |
-| 21 | sa-registry-schema-version-has-three-grammars † | readable registry versions | `parse_schema_version` | +100 | 3/3 |
-| 22 | sa-spec-doc-033-duplicates-bugs-check | is a bug record valid | `bugs.py check` + schema | -670 | 3/4 |
-| 23 | sa-ledger-write-seam-redacts-less-than-push-refuses | what a ledger may store | the pre-push matcher, refusing at the write seam | +10 | 2/2 |
-| 24 | sa-backlog-status-has-no-single-authority | live status; the pick | `backlog.py`; SPEC `Origin` (0062, 0063); `deferred` is live (0076) | -40 | 3/4 |
-| 25 | sa-promote-has-no-verb | how a promote is recorded | `release.py ship` (0064) | -70 | 2/3 |
-| 26 | sa-status-line-has-two-parsers | which `**Status:**` counts | `extract_status` at line start; no blockquote form (0075) | +60 | 0/1 |
-| 27 | sa-adr-measured-by-pattern-refuses-real-checks | what `measured_by` names | free text; `doctor_adr` (0065) | -10 | 0/2 |
-| 28 | sa-specs-tree-state-read-five-ways † | the specs tree state | `specs_version.state()` | +145 | 2/4 |
-| 29 | sa-memory-atom-has-two-grammars | atom valid; catalog fresh | `_memory_schema.parse` | -10 | 2/5 |
-| | **Wave 2 — consolidations (8)** | | forced-pass 2 | +475 | 11/17 |
-| 30 | sa-release-json-validated-three-times | valid state; live release | `release.py check`; legacy `next/` not live; `new` refuses while `check` is red (0077) | -100 | 3/5 |
-| 31 | sa-reconcile-certify-skip-the-workspace-walk | is an upgrade clean | doctor; `certify` (0069) | +116 | 1/2 |
-| 33 | sa-context-repo-mapping-falls-back-to-the-name | a context's repo | the context registry | +101 | 1/2 |
-| 34 | sa-editable-install-reports-a-frozen-version | the running version | `provider_version()`, rebuilt in place | +91 | 0/1 |
-| 35 | sa-subjects-resolve-is-circular | does a subject ref resolve | doctor `SubjectRegistry` | +39 | 2/3 |
-| 36 | sa-hook-parity-claims-false-and-interpreter-rules-diverge | hooks; interpreter | `HOOK_DIALECTS`; the wrapper (0066, 0067); Devin gets `ctx_inject`, `pre_gate`, the reaper (0079) | +147 | 2/2 |
-| 37 | sa-reviewer-persona-body-contradicts-its-tools | may the reviewer write | persona `tools`, `read_only` | +48 | 1/1 |
-| 38 | sa-specs-init-writes-unrendered-law | the canon table text | `render_registry_tables` | +33 | 1/1 |
-| | **Wave 3 — design debt (12)** | | forced-pass 5 | -139 | 14/30 |
-| 39 | sa-gate-path-classes-diverge-from-the-law | PROTECTED/ADDITIVE paths | one classifier; the literal hook-wiring floor, never the manifest (0055) | -5 | 2/5 |
-| 40 | sa-tool-caches-land-outside-the-cache-zone | where caches live | absolute `.dadaia/tmp/<tool>-cache`; `.dadaia/.cache/` deleted (0080) | +30 | 1/1 |
-| 41 | sa-live-work-branch-named-three-ways † | version; work branch | release-please; `<work><live id>` from `_RELEASE.json` (0068) | +37 | 0/2 |
-| 42 | sa-principal-branch-defaults-to-main-and-cut-point-diverges † | an undeclared principal | the `specs init` detector | +44 | 1/2 |
-| 43 | sa-audit-close-archives-without-validating | is an audit closable | `audit.py`; mixed deferred/rejected closes `deferred`, none `none` (0081) | -340 | 2/3 |
-| 44 | sa-staged-assets-without-consumers | consumed assets | the real consumer | -100 | 2/3 |
-| 45 | sa-expiry-has-two-clocks | has a marker expired | zone TTL via `sweep` | +10 | 2/2 |
-| 46 | sa-handoff-self-pull-requirement-diverges | is `self_pull` required | handoff schema v1.2 | +5 | 1/1 |
-| 47 | sa-specs-upgrade-stamps-any-target-and-memory-vocabulary-diverges | the upgrade target | `CANONICAL_SPECS_VERSION`; a two-tier tree refused unstamped (0082) | +10 | 1/2 |
-| 48 | sa-ledger-vocabulary-and-atomic-write-duplicated-in-scripts | ledger vocabulary | the stdlib scripts; the doctor compares exactly (0083) | +45 | 1/3 |
-| 49 | sa-text-restates-rules-the-code-contradicts | a restated rule | the code or its test | +80 | 1/5 |
-| — | sa-consumer-law-carries-library-facts | projected law | the consumer's tree; free-text surfaces, only `unknown` refused (0084) | +45 | 0/1 |
+| WP | bug id | question | the one authority |
+|---|---|---|---|
+| | **Wave 0 — data loss, leaks, gate holes (14)** | | |
+| 02 | sa-reaper-destroys-its-own-hold-before-ttl | may a hold die before its TTL | `sweep.move` (0074) |
+| 03 | sa-context-dead-removes-repos-outside-the-reaper | how a dead repo leaves disk | `_reap_dead_repo` over `all_repos()`; unpublished = any branch |
+| 04 | sa-public-install-unlinks-operator-files-outside-its-ledger | who deletes in harness dirs | `_reconcile_install_ledger` |
+| 05 | sa-gate-allows-root-entries-the-reaper-moves | may a root entry exist | `workspace_layout.verdict` (0058) |
+| 06 | sa-doctor-reaps-harness-owned-entries | who judges harness dirs | the install ledger (0059) |
+| 07 | sa-public-install-writes-the-root-map-into-product-repos | who writes a repo `AGENTS.md` | `canon.REPO_LAW` via `specs init` |
+| 08 | sa-scoped-public-install-prunes-the-gate-wiring | what a whole install is | one `InstallPlan` |
+| 09 | sa-ledger-verbs-append-histo-before-validating-the-pair | did a refusal write | the script checks both files, then writes the pair |
+| 11 | sa-private-match-rendering-has-three-renderers | how a match is shown | `redaction.mask` (0086) |
+| 12 | sa-gate-blind-on-cursor-copilot-devin | is every tool call judged | `pre_gate` + `HOOK_DIALECTS` (0054) |
+| 13 | sa-codex-policy-allows-write-capable-commands | unprompted Codex commands | the rendered `.rules`: `rg ls cat`, `sed -n` |
+| 14 | sa-specs-upgrade-writes-through-symlinks | how a fixed section is written | one symlink-refusing writer |
+| 32 | sa-doctor-job-not-a-required-check | which checks gate | `ci.yml`; `checks_for()` (0078) |
+| HP | pre-push-gate-never-runs-under-core-hookspath | where git runs the gate | `git rev-parse --git-path hooks` (0057, 0085) |
+| | **Wave 1 — stalls, loops, fixes that never clear (15)** | | |
+| 15 | sa-seven-workspace-root-rules | the workspace root | `resolve_workspace_root` |
+| 15 | (fence) | which roots may a dadaia process act on | `core/workspace_resolver` fence (0088) |
+| 16 | sa-bind-has-two-stores | is the session bound | `resolve_bind` (0060, 0072) |
+| 17 | sa-fix-lines-not-built-by-cli-line | how a fix line is written | `core/cli_line` |
+| 18 | sa-rich-printer-wraps-fix-lines | who prints a refusal | `cli/_fail.fail` (0073) |
+| 19 | sa-unfixable-doctor-findings-say-doctor-fix | fix of an unfixable finding | the finding's own `fix_line` |
+| 20 | sa-placement-rules-contradict-tree8 | where a stray specs file goes | TREE-8 |
+| 21 | sa-registry-schema-version-has-three-grammars | readable registry versions | `parse_schema_version` |
+| 22 | sa-spec-doc-033-duplicates-bugs-check | is a bug record valid | `bugs.py check` + schema |
+| 23 | sa-ledger-write-seam-redacts-less-than-push-refuses | what a ledger may store | the pre-push matcher, refusing at the write seam |
+| 24 | sa-backlog-status-has-no-single-authority | live status; the pick | `backlog.py`; SPEC `Origin` (0062, 0063, 0076) |
+| 25 | sa-promote-has-no-verb | how a promote is recorded | `release.py ship` (0064) |
+| 26 | sa-status-line-has-two-parsers | which `**Status:**` counts | `extract_status` (0075) |
+| 27 | sa-adr-measured-by-pattern-refuses-real-checks | what `measured_by` names | free text; `doctor_adr` (0065) |
+| 28 | sa-specs-tree-state-read-five-ways | the specs tree state | `specs_version.state()` |
+| 29 | sa-memory-atom-has-two-grammars | atom valid; catalog fresh | `_memory_schema.parse` |
+| | **Wave 2 — consolidations (8)** | | |
+| 30 | sa-release-json-validated-three-times | valid state; live release | `release.py check` (0077) |
+| 31 | sa-reconcile-certify-skip-the-workspace-walk | is an upgrade clean | doctor; `certify` (0069) |
+| 33 | sa-context-repo-mapping-falls-back-to-the-name | a context's repo | the context registry |
+| 34 | sa-editable-install-reports-a-frozen-version | the running version | `provider_version()`, rebuilt in place |
+| 35 | sa-subjects-resolve-is-circular | does a subject ref resolve | doctor `SubjectRegistry` |
+| 36 | sa-hook-parity-claims-false-and-interpreter-rules-diverge | hooks; interpreter | `HOOK_DIALECTS`; the wrapper (0066, 0067, 0079) |
+| 37 | sa-reviewer-persona-body-contradicts-its-tools | may the reviewer write | persona `tools`, `read_only` |
+| 38 | sa-specs-init-writes-unrendered-law | the canon table text | `render_registry_tables` |
+| | **Wave 3 — design debt (12)** | | |
+| 39 | sa-gate-path-classes-diverge-from-the-law | PROTECTED/ADDITIVE paths | one classifier (0055) |
+| 40 | sa-tool-caches-land-outside-the-cache-zone | where caches live | `.dadaia/tmp/<tool>-cache` (0080) |
+| 41 | sa-live-work-branch-named-three-ways | version; work branch | release-please; `<work><live id>` (0068) |
+| 42 | sa-principal-branch-defaults-to-main-and-cut-point-diverges | an undeclared principal | the `specs init` detector |
+| 43 | sa-audit-close-archives-without-validating | is an audit closable | `audit.py` (0081) |
+| 44 | sa-staged-assets-without-consumers | consumed assets | the real consumer |
+| 45 | sa-expiry-has-two-clocks | has a marker expired | zone TTL via `sweep` |
+| 46 | sa-handoff-self-pull-requirement-diverges | is `self_pull` required | handoff schema v1.2 |
+| 47 | sa-specs-upgrade-stamps-any-target-and-memory-vocabulary-diverges | the upgrade target | `CANONICAL_SPECS_VERSION` (0082) |
+| 48 | sa-ledger-vocabulary-and-atomic-write-duplicated-in-scripts | ledger vocabulary | the stdlib scripts; the doctor compares exactly (0083) |
+| 49 | sa-text-restates-rules-the-code-contradicts | a restated rule | the code or its test |
+| — | sa-consumer-law-carries-library-facts | projected law | the consumer's tree (0084) |
+| | **FR10 — the work order (1)** | | |
+| — | sa-implementation-adds-before-it-deletes | what comes first in a change | ONE root-map §1 bullet (AC10.5) |
 
 ## Functional requirements
 
@@ -174,7 +174,7 @@ FR9's pruning; mirr = mirrored (each side pinned by its own tests) / all finding
 - AC5.4 SLOP S10 is "second authority", HIGH; Axis 3 says "increased" for a diff adding one or an
   allowance key; the architecture lens checks `deleted` gone, `consults` calling.
 - AC5.5 `dd-audit-project` pillar 2 gains a fixed hunt for restatements and second authorities.
-- AC5.6 `CONTEXT.md` carries the Terms above and `wave`, a harm-ordered group of a candidate's bugs.
+- AC5.6 `CONTEXT.md` carries the Terms and `wave`, a harm-ordered group of a candidate's bugs.
 - AC5.7 `dd-code-review`'s test lens: a test touching a question cites its statement id and no assertion
   changes without one; a miss is HIGH and the verdict REJECTED.
 - AC5.8 V35 (2,863 skill lines, down-only) stays green: FR5's skill growth is paid by skill-text cuts.
@@ -197,29 +197,25 @@ FR9's pruning; mirr = mirrored (each side pinned by its own tests) / all finding
 
 - AC7.1 The rubric D1–D10, run fenced on the wheel built from the promote head, scores ≥ 80/100 on the
   first run; the three scores enter the closure log.
-- AC7.2 Of the 49 bug ids in this SPEC's **Origin** (the ledger's open set at definition), at least 40 (80%)
-  are `resolved`, all 14 wave-0 ids among them.
-- AC7.3 Every unresolved Origin id stays `open`, in the closure `dispositions` log entry with its reason
-  and next vehicle; the entry states the 0.5.0-only override of "0 open bugs before publish".
+- AC7.2 Superseded by AC10.4.
+- AC7.3 Superseded by AC10.4.
 
 ### FR8 — Shrink mandate
 
-- AC8.1 The candidate nets negative over `dadaia_workspace/**` minus tests (about −2569) and over
-  production Python outside `public/`; both logged at closure.
+- AC8.1 Production and test lines meet AC10.1–AC10.2; both logged at closure.
 - AC8.2 New units are the three as-is ADD rows: `workspace_layout.verdict` (a move), a stdlib
   `_shared/_privacy.py` pinned by byte parity, `release.py ship`; WP-34's `provider_version()` is an
   existing reader rebuilt in place. No new doctor code, state file or schema; flags only leave.
 
 ### FR9 — Test strategy
 
-Baseline (the evidence's `c4/tests-audit-*.json`): 69/133 findings mirrored, 130/133 with no cross-check, 35
-forced-pass commits; 261 KEEP, 157 REWRITE, 152 DELETE-LOSER, 24 DELETE-DUP, 27 DELETE-HOLLOW, 239 MISSING.
+Baseline (the evidence's `c4/tests-audit-*.json`): 69/133 findings mirrored, 130/133 with no cross-check.
 
 - AC9.1 Statements are the audits' `<bug-id>#<id>` rows, from the authority, the law or a decision, never
   a test. The closure memory pass adds each resolved bug's rows to `QUALITY.md` `## Test architecture` →
   `### Behavior rows` (0071; the law has no "Part 2").
-- AC9.2 Every test module touching a question declares `Intent: CONTRACT — <bug-id>#<id>`; a contract
-  test fails on an id found in neither the audits nor the rows.
+- AC9.2 A test touching a question declares its `<bug-id>#<id>` per AC10.3; a contract test fails on an
+  id found in neither the audits nor the rows.
 - AC9.3 Each question has one public seam, a CLI verb subprocess or `pre_gate` via the rendered wrapper; an
   in-process test asserts only the authority function.
 - AC9.4 `FakeGitClient` and the four `ObjectSource` fakes give way to one real-git tmp fixture;
@@ -231,15 +227,48 @@ forced-pass commits; 261 KEEP, 157 REWRITE, 152 DELETE-LOSER, 24 DELETE-DUP, 27 
 - AC9.7 A deleted path's golden rows leave with it; a surviving row never changes in a commit touching
   `dadaia_workspace/**`; no expected value comes from the code under test (`rule_fix(rule)`).
 - AC9.8 An assertion changed in the window cites a statement id; the review REJECTS one that does not.
-- AC9.9 Net test lines are ≤ 0 at closure: the audits sum +852 (about +530 after FR6, AC9.4–9.5), so a
-  suite-wide pruning pass removes DELETE-HOLLOW, DELETE-DUP, text pins outside law-file canon and the
-  `WORKSPACE_ROOT`-rung tests. A positive net is a HIGH review finding.
+- AC9.9 Superseded by AC10.2.
 - AC9.10 mutmut runs on each row's authority function: review evidence, never a push gate.
 - AC9.11 Closure re-measures the mirrored and cross-checked counts of resolved packages against the
   baseline, logging both; a resolved package has 0 mirrored findings and 0 live cross-checks.
 - AC9.12 `sa-seven-workspace-root-rules#S11` (0088; excepts S1's env clause): no dadaia process, nor
   a child inheriting it, acts on a root listed in `DADAIA_FENCED_ROOTS`; the suite and every mutating
   probe set it; one `.dadaia/AGENTS.md` line states it; seam `test_suite_cannot_reach_the_instance.py`.
+
+### FR10 — Reduction and the work order
+
+Baseline `9cd5fbf4`. Lines: `git grep -h '' <sha> -- '<pathspec>' | wc -l`; test functions: the sum of
+`git grep -c 'def test_' <sha> -- 'tests/*.py'`.
+
+- AC10.1 Production `dadaia_workspace/**/*.py` ≤ 23,480 lines (−30%, the floor), aiming at ≤ 20,125
+  (−40%); baseline 33,543, pathspec `'dadaia_workspace/*.py'`.
+- AC10.2 Tests `tests/**/*.py` ≤ 39,773 lines (baseline 66,289) and ≤ 1,237 test functions (baseline
+  2,063); both −40%, pathspec `'tests/*.py'`.
+- AC10.3 Every specified feature works. First, no documented feature, functionality or expected behavior
+  breaks: every documented behavior (memory product atoms, `ARCHITECTURE.md`/`QUALITY.md`, Approved FRs,
+  enforced law) maps to a test proving it, and that inventory stays green after every deletion batch.
+  Then: the full suite is green on the three CI OSes; the fenced first-run rubric scores ≥ 80/100
+  (AC7.1); each surviving test declares the ONE behavior it measures (a memory atom statement, an AC id
+  or `<bug-id>#<id>`): its module's `Intent:` when every test in the module measures that behavior, else
+  the first line of its own docstring; a table row carries its behavior id in the parametrize id; every
+  behavior statement of every resolved 0.5.0 bug is cited by a test asserting its Then.
+- AC10.4 Zero systemic ambiguity: every Origin bug id is `resolved`, replacing 0051's 80% floor (0089);
+  the whole-library as-is survey finds no question answered by two authorities.
+- AC10.5 The root map §1 (`public/data/AGENTS.md`) carries ONE bullet, binding production and tests at
+  definition and implementation: "Every change minimizes code and tests: DELETE → REBUILD → UPDATE →
+  KEEP → ADD last; verbose code, comments or tests that could be shorter are defects; every documented
+  behavior keeps working."
+  - A DELETE proves one of: no documented behavior; a duplicate whose one authority keeps the behavior;
+    dead code.
+  - A bug fix nets ≤ 0 in production and tests; the only exceptions are the production ceilings of
+    AC1.1, AC2.1, AC3.1, AC4.1; tests have none.
+  - The RED proof is a rewritten existing test when one exists.
+  - `dd-bug-resolution` Phase 5/6 and `dd-test-stewardship` admission comply without restating it;
+    this resolves `sa-implementation-adds-before-it-deletes`.
+- AC10.6 A CI ratchet records the production-line, test-line and test-function ceilings and fails when
+  any is exceeded; ceilings only go down.
+- AC10.7 Closure publishes an accountability report of AC10.1–AC10.4, measured before (`9cd5fbf4`) and
+  after: production lines, test lines, test functions, ambiguities resolved.
 
 ## Replaces
 
@@ -268,13 +297,12 @@ forced-pass commits; 261 KEEP, 157 REWRITE, 152 DELETE-LOSER, 24 DELETE-DUP, 27 
   family, the persona model fallback, `activity_class`, the `.dadaia/.cache/` zone.
 - Tests as a third mechanism: `FakeGitClient`, the `ObjectSource` fakes, `_POLICY_DRIVER`, the injected
   `WORKSPACE_ROOT`, `test_required_evidence_has_one_home.py`, re-pinned goldens, the DELETE-* tests.
+- Add-first fixes: the RED test written as an ADD before the fix (`dd-bug-resolution` Phase 5); the net
+  rule measured on the feature's production only (Phase 6, `evidence_diff`).
 
 ## Candidate 3
 
-- It resolved `sa-pre-push-and-publish-scan-disagree-on-secret-shapes` (`eb4f4b02`).
-- Its cuts (f) associated-repo publish and (h) uncommitted-work refusal are taken; (g) dead's work-branch
-  refusal stays (0056). Its AC6.1 matches role names exactly, case-sensitively (0087).
-- `ffb30aa0` answered WP-41 with the losing side (`work_name` = last tag + 1); AC4.2 corrects it.
+Closed and merged (PR #273); its trio is in git at its CLOSURE commit, its decisions in 0056, 0087.
 
 ## Out of scope and deferred
 
@@ -286,10 +314,6 @@ forced-pass commits; 261 KEEP, 157 REWRITE, 152 DELETE-LOSER, 24 DELETE-DUP, 27 
 
 ## Dependencies, order and risks
 
-- Order: wave 0 (WP-32 and `release-as` in it; the hold fix before other deleters); then FR5, FR6 (allowance born
-  at today's counts, keyed to these bugs) and FR9's fakes and hook harness, on which every later
-  wave's tests rest; then waves 1, 2, 3.
-- Candidate 3 overlaps WP-03, 07, 11, 15, 16, 17, 18, 21, 28, 41, 42: each starts after it closes.
-- Risk: AC9.5 turns about 60 hook tests red on the real root rung.
-- Decided (0088): the fence is a feature, not a test rung (AC9.12).
+- Order: FR10 DELETE batches first, then REBUILD/UPDATE (the open bug WPs), then ADD; the ratchets
+  exist (T-050-35 done).
 - Risk: "gate not enforced" caps D8/D9; AC6.7 blocks merges only once protection lists the job.
