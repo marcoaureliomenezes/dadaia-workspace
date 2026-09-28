@@ -11,6 +11,7 @@ assert the marker THIS very suite's conftest applied to them.
 
 from __future__ import annotations
 
+import json
 import re
 from pathlib import Path
 
@@ -197,3 +198,19 @@ def test_tier_ceiling_is_platform_calibrated_once_in_conftest() -> None:
     # 30s-ceiling unit test measured 32.3s under --cov); same function, one more input.
     assert conftest.tier_timeout_seconds("unit", platform="linux", coverage=True) == 20
     assert conftest.tier_timeout_seconds("unit", platform="win32", coverage=True) == 60
+
+
+_CITATION = re.compile(r"\b[a-z0-9]+(?:-[a-z0-9]+)+#[A-Za-z]*\d+(?:[.-]\d+)?")
+
+
+def test_every_cited_statement_id_exists() -> None:
+    """AC9.2 (0.5.0): a cited `<bug-id>#<id>` is found in the audits' statement ids
+    (`statement_ids.json`, the tracked form of the c4 TESTS-AUDIT) or QUALITY.md's rows;
+    a planted unknown id turns it red."""
+    ids = json.loads((Path(__file__).with_name("statement_ids.json")).read_text("utf-8"))
+    known = {f"{bug}#{sid}" for bug, sids in ids.items() for sid in sids}
+    known |= set(_CITATION.findall((_REPO_ROOT / "specs/memory/QUALITY.md").read_text("utf-8")))
+    texts = [p.read_text("utf-8") for p in (_REPO_ROOT / "tests").rglob("*.py")]
+    planted = "sa-no-such-bug" + "#S99"  # composed, so this file cites nothing unknown
+    unknown = [sorted(set(_CITATION.findall(t)) - known) for t in [*texts, planted]]
+    assert len(known) > 280 and [u for u in unknown if u] == [[planted]]
