@@ -115,10 +115,9 @@ def test_marker_set_is_pinned_across_pyproject_and_conftest() -> None:
 
 
 def test_preflight_pytest_excludes_quarantine_and_drops_dead_ignore() -> None:
-    from dadaia_workspace.features.ci_preflight.service import _pytest_check
+    from dadaia_workspace.features.ci_preflight.service import checks_for
 
-    check = _pytest_check(quick=True, python_executable=None, dadaia_bin=None)
-    command = tuple(check.argv)
+    command = checks_for(quick=True)[-1].argv
     assert "--ignore=tests/performance" not in command, (
         "dead ignore: tests/performance no longer exists"
     )
