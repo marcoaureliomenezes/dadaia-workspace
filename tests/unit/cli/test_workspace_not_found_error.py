@@ -28,26 +28,25 @@ def _workspace(root: Path) -> Path:
     return root
 
 
-def test_inside_another_workspace_the_cli_resolves_its_own(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+@pytest.mark.parametrize(
+    "fenced",
+    [
+        pytest.param(False, id="S1-own-wins-over-cwd"),
+        pytest.param(True, id="S11-fenced-own-falls-back-to-cwd"),
+    ],
+)
+def test_the_cli_resolves_its_own_workspace_unless_fenced(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, fenced: bool
 ) -> None:
-    """sa-seven-workspace-root-rules#S1: the CLI's own workspace wins over the cwd."""
+    """sa-seven-workspace-root-rules#S1: the CLI's own workspace wins over the cwd;
+    #S11: a fenced root is never the CLI's own workspace; an explicit start always walks."""
     own, other = _workspace(tmp_path / "a"), _workspace(tmp_path / "b")
     monkeypatch.setattr(sys, "prefix", str(own / ".dadaia" / ".venv"))
+    if fenced:
+        monkeypatch.setenv(FENCE_ENV, str(own))
     monkeypatch.chdir(other)
-    assert resolve_workspace_root() == own.resolve()
-    assert resolve_workspace_root(other) == other.resolve()  # an explicit start walks
-
-
-def test_a_fenced_own_workspace_falls_back_to_the_cwd_walk(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """sa-seven-workspace-root-rules#S11: a fenced root is never the CLI's own workspace."""
-    own, other = _workspace(tmp_path / "a"), _workspace(tmp_path / "b")
-    monkeypatch.setattr(sys, "prefix", str(own / ".dadaia" / ".venv"))
-    monkeypatch.setenv(FENCE_ENV, str(own))
-    monkeypatch.chdir(other)
-    assert resolve_workspace_root() == other.resolve()
+    assert resolve_workspace_root() == (other if fenced else own).resolve()
+    assert resolve_workspace_root(other) == other.resolve()
 
 
 def test_fix_bootstraps_when_the_cli_has_no_workspace(
