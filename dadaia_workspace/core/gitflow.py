@@ -1,10 +1,5 @@
-"""The project gitflow (ADRs 0037, 0046): three fixed roles, free names.
-
-The constitution frontmatter holds it: :func:`read_gitflow` reads it back and
-:func:`merge_frontmatter` is the one frontmatter writer; the pre-push gate and ``specs init``
-consume it. This is the one place a branch name is
-mapped to a role; no other module matches branch names.
-"""
+"""The project gitflow: three fixed roles, free names, held in the constitution frontmatter.
+The one place a branch name is mapped to a role, and the one frontmatter writer."""
 
 from __future__ import annotations
 
@@ -65,8 +60,8 @@ DEFAULT = Gitflow(principal="main", integration="develop", work_prefix="feature/
 
 
 def resolve_live_release_id(specs_dir: Path) -> tuple[str | None, str | None]:
-    """The ONE live-release reader (`release.py` `live_ids`' rule): the one bare ``M.m.p``
-    ``releases/<id>/`` holding ``_RELEASE.json``; none ``(None, None)``, several ``(None, error)``."""
+    """The one bare ``releases/<M.m.p>/`` holding ``_RELEASE.json``; none ``(None, None)``,
+    several ``(None, error)``."""
     root = specs_dir / "releases"
     live = [d.name for d in sorted(root.iterdir()) if RELEASE_ID_RE.match(d.name)
             and (d / RELEASE_STATE_FILENAME).is_file()] if root.is_dir() else []  # fmt: skip
@@ -76,7 +71,7 @@ def resolve_live_release_id(specs_dir: Path) -> tuple[str | None, str | None]:
 
 
 def work_branch(specs_dir: Path, flow: Gitflow) -> str:
-    """The ONE live work branch (gate, baseline): ``<work><live release id>``, else ``0.1.0``."""
+    """``<work><live release id>``, else ``<work>0.1.0``."""
     return f"{flow.work_prefix}{resolve_live_release_id(specs_dir)[0] or '0.1.0'}"
 
 
@@ -125,16 +120,14 @@ def _gitflow_block(text: str) -> tuple[Gitflow | None, str | None]:
 
 
 def constitution_error(specs_dir: Path, text: str | None = None) -> str | None:
-    """Why an existing constitution's frontmatter (of *text* when given) cannot be trusted
-    (ADR 0047): its YAML does not parse, or its ``gitflow:`` block does not validate."""
+    """Why the constitution's frontmatter (of *text* when given) cannot be trusted."""
     reason = _gitflow_block(constitution_text(specs_dir) if text is None else text)[1]
     return reason and f"{constitution_path(specs_dir)}: {reason}"
 
 
 def read_gitflow(specs_dir: Path, text: str | None = None) -> tuple[Gitflow, str | None]:
-    """The constitution's ``gitflow:`` block — of *text* when given (a committed copy,
-    ADR 0048), else of the file; absent or malformed ⇒ ``DEFAULT`` plus the warning to
-    show (ADR 0037: never a block)."""
+    """The ``gitflow:`` block of *text* (else the file); absent or malformed ⇒ ``DEFAULT``
+    plus the warning to show, never a block."""
     flow, reason = _gitflow_block(constitution_text(specs_dir) if text is None else text)
     if flow is not None:
         return flow, None
@@ -151,13 +144,8 @@ def merge_frontmatter(
     specs_pattern_version: int | None = None,
     gitflow: Gitflow | None = None,
 ) -> None:
-    """Write the given keys into the constitution frontmatter, one line each.
-
-    The one writer for both keys: a written key's top-level line (and its indented or
-    ``-`` continuation lines) is replaced in place, a new key is appended to the block,
-    and every other line — plus the body — stays byte-identical. No block ⇒ one is
-    prepended.
-    """
+    """Write the given keys into the constitution frontmatter (replaced in place, else
+    appended; no block ⇒ one prepended); every other byte stays identical."""
     names = gitflow and (gitflow.principal, gitflow.integration, gitflow.work_prefix)
     values = {
         "specs_pattern_version": specs_pattern_version,
