@@ -11,6 +11,7 @@ import re
 from pathlib import Path
 
 from dadaia_workspace.core.exceptions import PublicAssetError
+from dadaia_workspace.core.model_registry import REGISTRY
 from dadaia_workspace.infrastructure.public_assets_common import _toml_escape
 
 # ---------------------------------------------------------------------------
@@ -38,6 +39,27 @@ _AGENT_FM_TOOLS_ITEM_RE = re.compile(r"^  - (.+)$", re.MULTILINE)
 _AGENT_FM_SIMPLE_RE = re.compile(r"^([A-Za-z_][A-Za-z0-9_]*): (.+)$", re.MULTILINE)
 # Matches a folded/literal scalar intro: `key: >` or `key: |`
 _AGENT_FM_BLOCK_SCALAR_RE = re.compile(r"^([A-Za-z_][A-Za-z0-9_]*): [>|]$", re.MULTILINE)
+
+#: Claude model id -> Codex model id; a Codex view never carries a ``claude-*`` model.
+_CODEX_MODELS: dict[str, str] = {entry.claude_id: entry.codex_id for entry in REGISTRY}
+_CLAUDE_MODEL_RE = re.compile(
+    "|".join(map(re.escape, sorted(_CODEX_MODELS, key=len, reverse=True)))
+)
+
+
+def transform_for_codex(text: str) -> str:
+    """*text* with known Claude model ids mapped and the Anthropic tier phrase renamed
+    (T-013-12); every other ``claude-*`` token (skill names) is kept."""
+    text = text.replace("Opus / Sonnet / Haiku", "deep / dispatch / fast registry tiers")
+    return _CLAUDE_MODEL_RE.sub(lambda m: _CODEX_MODELS[m.group(0)], text)
+
+
+def codex_model(claude_id: str) -> str:
+    """The Codex model for *claude_id*; ``ValueError`` names an unmapped id."""
+    if claude_id not in _CODEX_MODELS:
+        raise ValueError(f"No Codex mapping for model: {claude_id!r}")
+    return _CODEX_MODELS[claude_id]
+
 
 # ---------------------------------------------------------------------------
 # FR22 / A22.1 — Codex persona compaction (shared-law de-duplication)
@@ -113,7 +135,7 @@ def _compact_codex_developer_instructions(body: str) -> str:
     """Strip shared-law / cross-role boilerplate from a Codex persona body (A22.1).
 
     *body* is the already Codex-transformed persona body (post
-    :func:`~dadaia_workspace.infrastructure.runtime_transforms.codex.transform_for_codex`,
+    :func:`transform_for_codex`,
     frontmatter already stripped). Every pattern in :data:`_CODEX_COMPACT_PATTERNS`
     targets content that restates law or protocol Codex already delivers
     elsewhere in the effective context — never role identity, role-specific

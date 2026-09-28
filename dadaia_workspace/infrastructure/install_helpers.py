@@ -1,9 +1,4 @@
-"""Installation helper functions for the public-asset pipeline.
-
-Extracted from ``FileSystemPublicAssetManager`` in ``public_assets.py`` to keep
-that module under 600 lines.  These are thin free functions (or callables) that
-the class delegates to; they take explicit Path arguments instead of ``self``.
-"""
+"""Pure install helpers: the staging manifest and the persona renders."""
 
 from __future__ import annotations
 
@@ -43,11 +38,6 @@ def persona_read_only(frontmatter: Mapping[str, object]) -> bool:
     return declared == "true"
 
 
-# ---------------------------------------------------------------------------
-# Stage helpers (moved from FileSystemPublicAssetManager internal methods)
-# ---------------------------------------------------------------------------
-
-
 def build_manifest(
     agentic_dir: Path,
     iter_files_fn: Callable[[Path], Iterable[Path]],
@@ -64,11 +54,6 @@ def build_manifest(
         "package_version": _package_version(),
         "assets": assets,
     }
-
-
-# ---------------------------------------------------------------------------
-# Render-at-install seam (v0.1.65 FR5/D-6)
-# ---------------------------------------------------------------------------
 
 
 def render_claude_agent(staged_text: str, resolved: ResolvedAgentModel) -> str:

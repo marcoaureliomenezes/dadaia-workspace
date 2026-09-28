@@ -1,9 +1,7 @@
 """Which model an agent gets — the one module: the model registry, the built-in
 agent-model templates (ADR 0022) and the operator overlay's resolution.
 
-``MODEL_MAP`` (``infrastructure/runtime_transforms/model_mapping.py``, Claude id ->
-Codex id, so Codex TOML never contains a ``claude-*`` string — ADR-5) derives from
-:data:`REGISTRY`. Pure data + pure functions, stdlib only (``core-no-os-primitives``).
+The Codex model map (``codex_assets.codex_model``, ADR-5) derives from :data:`REGISTRY`. Pure data + pure functions, stdlib only (``core-no-os-primitives``).
 """
 
 from __future__ import annotations

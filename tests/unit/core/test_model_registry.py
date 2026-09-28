@@ -2,7 +2,7 @@
 agent gets (sa-agent-model-resolved-by-two-modules): the registry, the D-3 effort clamp
 and the ``resolve_agent_model`` precedence (FR4): override > applied template >
 ``balanced`` default. The ADR 0022 table and G-1 are pinned in
-``tests/contract/test_agent_tier_taxonomy.py``; MODEL_MAP in ``test_model_mapping.py``.
+``tests/contract/test_agent_tier_taxonomy.py``.
 """
 
 from __future__ import annotations

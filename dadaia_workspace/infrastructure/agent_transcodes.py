@@ -30,14 +30,14 @@ from dadaia_workspace.infrastructure.public_assets_common import (
     iter_public_files,
 )
 from dadaia_workspace.infrastructure.runtime_config import codex_config
-from dadaia_workspace.infrastructure.runtime_transforms.codex import transform_for_codex
 from dadaia_workspace.infrastructure.runtime_transforms.codex_assets import (
     _parse_agent_frontmatter,
     _render_codex_agent_toml,
     _render_codex_command_policy_rules,
     _split_frontmatter,
+    codex_model,
+    transform_for_codex,
 )
-from dadaia_workspace.infrastructure.runtime_transforms.model_mapping import map_model
 
 
 def no_rules(record: HarnessRecord, plan: InstallPlan) -> tuple[ProjectionRule, ...]:
@@ -162,19 +162,17 @@ def codex_agent_toml_bytes(
     through the :class:`ProjectionRule` seam.
     """
     text = md_path.read_text(encoding="utf-8")
-    body = transform_for_codex(_split_frontmatter(text)[1], agent_name)
+    body = transform_for_codex(_split_frontmatter(text)[1])
     fm = _parse_agent_frontmatter(text)
     claude_model, reasoning_effort = resolve_codex_agent_model(
         agent_name, fm.get("model") if fm else None, resolved
     )
-    codex_model = map_model(claude_model)
     description = fm.get("description") if fm else None
-    codex_description = transform_for_codex(str(description), agent_name) if description else None
     toml_content = _render_codex_agent_toml(
         agent_name,
-        codex_model,
+        codex_model(claude_model),
         body,
-        description=codex_description,
+        description=transform_for_codex(str(description)) if description else None,
         reasoning_effort=reasoning_effort,
         read_only=persona_read_only(fm),
     )

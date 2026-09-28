@@ -1,25 +1,14 @@
 """Public-doctor model-resolution check (R8b, T-010-24).
 
-This is the doctor half of the
-``model-catalog-modelmap-pricing-drift-no-registry`` fix. T-010-23 made
-``core/model_registry.py`` the single source of truth and turned ``MODEL_MAP``
-into a derived view. This check is the standing guard that keeps
-the fleet honest against future hand-edits:
+The doctor half of ``model-catalog-modelmap-pricing-drift-no-registry``:
+``core/model_registry.py`` is the single source of truth.
 
 1. **Agent-frontmatter resolution.** Every ``model:`` value declared in a canonical
    ``public/agents/*.md`` frontmatter must resolve to a ``claude_id`` registered in
    :data:`dadaia_workspace.core.model_registry.REGISTRY`. An unknown id would crash
    ``dadaia harness add codex`` (no Codex mapping) — so it is an ERROR.
 
-2. **Key-set coherence.** ``MODEL_MAP`` keys and the ``REGISTRY`` claude-id set must
-   be identical. The derived view is generated from the registry today, but this defends against a future hand-edit (or a partial
-   refactor) that reintroduces the original silent desync.
-
-Layering: this lives in ``features/public/`` and imports ``core.model_registry``
-(the single source of truth) plus the ``MODEL_MAP`` derived view from
-``infrastructure`` (a documented ignore-edge — the infra view is a separate
-module that must be guarded against a hand-edit). ``features -> core`` is
-permitted (``core`` is the bottom layer).
+Layering: ``features -> core`` only.
 
 ERROR lines use the ``[drift]`` prefix — the same prefix ``check_agent_skill_refs``
 uses for hard failures — because the
@@ -41,7 +30,6 @@ from dadaia_workspace.core.model_registry import (
     resolve_agent_model,
 )
 from dadaia_workspace.core.models.doctor_report import DoctorLine, DoctorStatus
-from dadaia_workspace.infrastructure.runtime_transforms.model_mapping import MODEL_MAP
 
 # Matches a frontmatter ``model:`` line (first match wins).
 _MODEL_FRONTMATTER_RE = re.compile(r"^model:\s*(\S+)\s*$", re.MULTILINE)
@@ -92,8 +80,7 @@ def check_model_resolution(
 
     Returns:
         A list of doctor lines. Emits ``[drift]`` ERROR lines on any unknown agent
-        ``model:`` id, an unresolvable core-agent policy resolution, or any key-set
-        desync, and a single ``[ok] model-resolution`` line when every invariant
+        ``model:`` id or an unresolvable core-agent policy resolution, and a single ``[ok] model-resolution`` line when every invariant
         holds.
     """
     out: list[DoctorLine] = []
@@ -126,19 +113,6 @@ def check_model_resolution(
                     f"({', '.join(CLAUDE_EFFORTS)})",
                 )
             )
-
-    # 2. Key-set coherence: the MODEL_MAP infra view lives in a SEPARATE module, so a
-    # hand-edit that desyncs it from the registry is caught here.
-    model_map_keys = set(MODEL_MAP)
-    if model_map_keys != registry_ids:
-        out.append(
-            DoctorLine(
-                DoctorStatus.DRIFT,
-                "model-resolution ERROR: key-set desync — "
-                f"MODEL_MAP={sorted(model_map_keys)} "
-                f"REGISTRY={sorted(registry_ids)}",
-            )
-        )
 
     if not out:
         out.append(DoctorLine(DoctorStatus.OK, "model-resolution"))

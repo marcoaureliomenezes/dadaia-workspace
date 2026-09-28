@@ -2,16 +2,13 @@
 
 Closes the `model-catalog-modelmap-pricing-drift-no-registry` bug's doctor half:
 every ``model:`` frontmatter value across canonical ``public/agents/*.md`` must
-resolve in ``core.model_registry.REGISTRY``, and ``MODEL_MAP`` keys must equal the
-``REGISTRY`` claude ids. Any breach is an ERROR line that makes ``dadaia public doctor`` exit
+resolve in ``core.model_registry.REGISTRY``. Any breach is an ERROR line that makes ``dadaia public doctor`` exit
 nonzero (emitted with the ``[drift]`` prefix the CLI already treats as failing).
 """
 
 from __future__ import annotations
 
 from pathlib import Path
-
-import pytest
 
 from dadaia_workspace.features.public.model_resolution import check_model_resolution
 
@@ -37,31 +34,6 @@ def _write_agent(agents_dir: Path, name: str, model: str) -> None:
 def _has_error(reports: list[str]) -> bool:
     """An ERROR line is any [drift]/[error]/[fail] line — all exit-nonzero in the CLI."""
     return any(line.startswith(("[drift]", "[error]", "[fail]")) for line in reports)
-
-
-# ---------------------------------------------------------------------------
-# Keyset desync — the drift bug this check exists to close
-# ---------------------------------------------------------------------------
-
-
-def test_keyset_desync_modelmap_vs_pricing_errors(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """A hand-edited MODEL_MAP that drops a key the others keep ⇒ ERROR."""
-    import dadaia_workspace.features.public.model_resolution as mod
-
-    desynced = {"claude-fable-5": "gpt-5.5"}  # missing every other registered id
-    monkeypatch.setattr(mod, "MODEL_MAP", desynced)
-
-    public_dir = tmp_path / "public"
-    public_dir.mkdir()
-
-    reports = _rendered(check_model_resolution(public_dir))
-
-    assert _has_error(reports)
-    desync_lines = [r for r in reports if "key-set" in r.lower() or "desync" in r.lower()]
-    assert desync_lines, reports
-    assert "[ok] model-resolution" not in reports
 
 
 # ---------------------------------------------------------------------------
