@@ -41,18 +41,6 @@ def _installed(tmp_path: Path) -> Path:
     return ws
 
 
-def test_public_doctor_neither_needs_nor_names_an_agents_index(tmp_path: Path) -> None:
-    """sa-staged-assets-without-consumers#44.1."""
-    ws = _installed(tmp_path)
-    (ws / ".dadaia" / "agentic" / "agents.index.json").unlink(missing_ok=True)
-
-    with patch("dadaia_workspace.cli.commands.public.resolve_workspace_root", return_value=ws):
-        result = CliRunner().invoke(app, ["public", "doctor"])
-
-    assert "agents.index" not in result.output
-    assert result.exit_code == 0, result.output
-
-
 def test_every_staged_family_has_a_registered_production_reader(tmp_path: Path) -> None:
     """sa-staged-assets-without-consumers#44.2."""
     ws = tmp_path / "ws"
@@ -65,13 +53,16 @@ def test_every_staged_family_has_a_registered_production_reader(tmp_path: Path) 
 
 
 def test_rules_is_no_claude_family_and_only_the_codex_policy(tmp_path: Path) -> None:
-    """sa-staged-assets-without-consumers#44.3."""
+    """sa-staged-assets-without-consumers#44.3; sa-staged-assets-without-consumers#44.1:
+    the public doctor neither needs nor names an agents index."""
     ws = _installed(tmp_path)
+    (ws / ".dadaia" / "agentic" / "agents.index.json").unlink(missing_ok=True)
     with patch("dadaia_workspace.cli.commands.public.resolve_workspace_root", return_value=ws):
         result = CliRunner().invoke(app, ["public", "doctor"])
 
+    assert result.exit_code == 0, result.output
+    assert "agents.index" not in result.output and "rule-corpus" not in result.output
     assert not (ws / ".claude" / "rules").exists()
-    assert "rule-corpus" not in result.output
     assert sorted(p.name for p in (ws / ".codex" / "rules").iterdir()) == [
         "dadaia-command-policy.rules"
     ]
