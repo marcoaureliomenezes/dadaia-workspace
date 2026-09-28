@@ -23,9 +23,9 @@ LEGACY_STATES: frozenset[str] = frozenset({"ativo", "inativo"})
 
 
 def parse_schema_version(data: dict, path: Path) -> int:  # type: ignore[type-arg]
-    """THE registry-version grammar (the store, ``migrate``, the doctor): 1 while any row
-    is v1 or the stamp (int or digit string; absent = current) is below 2, else the stamp.
-    A stamp no dadaia verb can migrate — non-numeric or newer — raises."""
+    """THE registry version: 1 while any row is v1 or the stamp is below 2, else the stamp.
+
+    A non-numeric or newer stamp raises."""
     raw = data.get("schema_version", data.get("version"))
     text = str(_VERSION if raw is None else raw)
     if isinstance(raw, bool) or not text.isdigit():
@@ -96,15 +96,12 @@ class JsonContextStore:
         atomic_write(self._path, json.dumps(data, indent=2))
 
     def get(self, name: str) -> SpecContextProject | None:
-        data = _load(self._path)
-        for c in data["contexts"]:
-            if c["name"] == name:
-                return _from_dict(c)
-        return None
+        return next(
+            (_from_dict(c) for c in _load(self._path)["contexts"] if c["name"] == name), None
+        )
 
     def list_all(self) -> list[SpecContextProject]:
-        data = _load(self._path)
-        return [_from_dict(c) for c in data["contexts"]]
+        return [_from_dict(c) for c in _load(self._path)["contexts"]]
 
     def delete(self, name: str) -> None:
         data = _load(self._path)
