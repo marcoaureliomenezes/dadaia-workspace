@@ -37,13 +37,6 @@ def test_the_gate_and_the_doctor_ask_the_one_verdict(module: str) -> None:
     assert (attrs | names) & _NAME_SETS == set()
 
 
-def test_gate_law_sets_are_the_same_objects() -> None:
-    from dadaia_workspace.core import workspace_layout
-    from dadaia_workspace.features.spec_context import gate_policy
-
-    assert gate_policy._LAW_BASENAMES is workspace_layout.LAW_BASENAMES
-
-
 def test_harness_dirs_derive_from_the_one_harness_registry() -> None:
     """0.4.7 FR3: "which root directory a harness owns" lives once, in
     ``core.harness_registry.HARNESS_PROJECTION_DIRS``. ``HARNESS_DIRS`` is the shared
@@ -67,3 +60,4 @@ def test_gate_additive_prefixes_are_the_registry_view() -> None:
     from dadaia_workspace.features.spec_context import gate_policy
 
     assert workspace_layout.additive_prefixes() == gate_policy._ADDITIVE_DADAIA_PREFIXES
+    assert not hasattr(gate_policy, "_SPECS_ADDITIVE_PREFIXES")  # specs: SPECS_ADDITIVE_GLOBS

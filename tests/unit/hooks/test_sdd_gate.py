@@ -356,3 +356,70 @@ def test_no_repo_write_resolves_via_rung3_cwd_repo(tmp_path: Path) -> None:
     )
     assert result.returncode == 0, result.stderr
     assert result.block_envelope() is None
+
+
+# --------------------------------------------------------------------------- #
+# sa-gate-path-classes-diverge-from-the-law: the install ledger decides PROTECTED.
+# --------------------------------------------------------------------------- #
+
+_LEDGERED = (
+    ".claude/settings.json", ".codex/hooks.json", ".dadaia/hooks/codex-pre-gate",
+    ".agents/skills/dd-x/SKILL.md", "AGENTS.md", ".dadaia/AGENTS.md", ".dadaia/tmp/AGENTS.md",
+)  # fmt: skip
+
+
+def _ledgered_workspace(tmp_path: Path) -> Path:
+    ws = _mk_workspace(tmp_path, "a")
+    entries = [{"relpath": p, "sha256": "0" * 64, "family": "x", "kind": "file"} for p in _LEDGERED]
+    (ws / ".dadaia" / "states" / "install_ledger.json").write_text(
+        json.dumps({"schema_version": "1", "entries": entries}), encoding="utf-8"
+    )
+    return ws
+
+
+def _write(ws: Path, rel: str) -> dict[str, Any] | None:
+    return _run(ws, {"tool_name": "Write", "tool_input": {"file_path": str(ws / rel)}})
+
+
+@pytest.mark.parametrize("rel", [".claude/settings.json", ".codex/hooks.json",
+                                 ".dadaia/hooks/codex-pre-gate"])  # fmt: skip
+def test_hook_wiring_the_ledger_records_is_blocked(tmp_path: Path, rel: str) -> None:
+    """sa-gate-path-classes-diverge-from-the-law#B39-1: hook wiring (.claude/settings.json,
+    .codex/hooks.json, .dadaia/hooks/*) BLOCKs in every harness, with a re-project fix."""
+    block = _write(_ledgered_workspace(tmp_path), rel)
+    assert block is not None and "public install" in block["reason"]
+
+
+@pytest.mark.parametrize(
+    "rel", [".agents/skills/dd-x/SKILL.md", ".dadaia/states/install_ledger.json"]
+)
+def test_a_ledgered_projection_and_the_ledger_itself_are_blocked(tmp_path: Path, rel: str) -> None:
+    """sa-gate-path-classes-diverge-from-the-law#B39-2: every ledgered projection, and the
+    ledger file, BLOCK; sa-gate-path-classes-diverge-from-the-law#B39-7: the root and
+    .dadaia law BLOCK by the same ledger (below)."""
+    assert _write(_ledgered_workspace(tmp_path), rel) is not None
+
+
+@pytest.mark.parametrize("rel", ["AGENTS.md", ".dadaia/AGENTS.md", ".dadaia/tmp/AGENTS.md"])
+def test_root_and_dadaia_law_block_via_the_ledger(tmp_path: Path, rel: str) -> None:
+    """sa-gate-path-classes-diverge-from-the-law#B39-7: root/.dadaia law BLOCK via the
+    ledger — with no ledger entry the same name is an ordinary write."""
+    assert _write(_ledgered_workspace(tmp_path), rel) is not None
+    assert _write(_mk_workspace(tmp_path / "bare", "a"), rel) is None
+
+
+def test_a_tmp_probe_agents_md_is_allowed(tmp_path: Path) -> None:
+    """sa-gate-path-classes-diverge-from-the-law#B39-3: .dadaia/tmp/.../AGENTS.md is an
+    ADDITIVE scratch write — the basename rule is deleted."""
+    assert _write(_ledgered_workspace(tmp_path), ".dadaia/tmp/probe/20260927/AGENTS.md") is None
+
+
+@pytest.mark.parametrize(
+    "rel", ["specs/releases/_archive/releases_histo.jsonl",
+            "repos/b/specs/releases/_archive/releases_histo.jsonl"],
+)  # fmt: skip
+def test_any_area_histo_is_allowed_foreign_repo_included(tmp_path: Path, rel: str) -> None:
+    """sa-gate-path-classes-diverge-from-the-law#B39-4 through the hook; the bound-to-
+    another-context case is test_gate_policy's foreign-repo test."""
+    ws = _mk_workspace(tmp_path, "a", "b")
+    assert _write(ws, rel) is None

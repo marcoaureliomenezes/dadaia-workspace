@@ -180,7 +180,10 @@ def test_pre_gate_shim_blocks_with_reason_on_stderr(tmp_path: Path) -> None:
     (workspace / ".dadaia" / "states" / "spec_contexts.json").write_text('{"contexts": []}')
     shim = tmp_path / "pre-gate.sh"
     shim.write_text(kimi_hook_shims()["dadaia-kimi-pre-gate.sh"], encoding="utf-8")
-    payload = {"tool_name": "Write", "tool_input": {"file_path": str(workspace / "AGENTS.md")}}
+    payload = {
+        "tool_name": "Write",
+        "tool_input": {"file_path": str(workspace / ".dadaia/states/install_ledger.json")},
+    }
     env = {"PATH": os.environ["PATH"], "PYTHONPATH": os.environ.get("PYTHONPATH", "")}
     env.update({k: os.environ[k] for k in ("SYSTEMROOT",) if k in os.environ})  # Windows
 

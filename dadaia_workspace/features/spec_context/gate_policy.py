@@ -21,6 +21,7 @@ documented way out was a bind flag that no longer exists.
 from __future__ import annotations
 
 from enum import Enum
+from fnmatch import fnmatch
 from pathlib import PurePath
 
 from dadaia_workspace.core import workspace_layout
@@ -28,27 +29,8 @@ from dadaia_workspace.core.cli_line import fix_line
 
 __all__ = ["Decision", "PathClass", "classify_path", "evaluate"]
 
-#: Ordered ADDITIVE prefixes — always allowed.
-#: Parallel audit sessions use collision-safe directories, named per the single home
-#: ``core.workspace_layout.AUDIT_DIR_NAME_RE`` (v0.5.0 T-050-25A — this comment used to
-#: repeat that shape in prose; one fact, one place now).
-#:
-#: WS-R1 split (FR-R1-01/05): the ``specs/`` ADDITIVE classes apply both at the
-#: workspace root *and* relative to a context root (``repos/<slug>/``). The ``.dadaia/``
-#: classes are workspace-root-only — ``.dadaia/`` is forbidden inside any repo working
-#: tree (root AGENTS.md repo-cleanliness law), so there is no in-repo ``.dadaia/``
-#: ADDITIVE class to honor.
-_SPECS_ADDITIVE_PREFIXES: tuple[str, ...] = (
-    "specs/backlog/",
-    "specs/bugs/",
-    "specs/audits/",
-)
 # Derived from the zone registry (OUTPUT + EPHEMERAL zones) — never a second literal.
 _ADDITIVE_DADAIA_PREFIXES: tuple[str, ...] = workspace_layout.additive_prefixes()
-#: A path under ``repos/<slug>/`` whose context-relative remainder matches one of these
-#: ``specs/`` class prefixes is classified by that class. Every other in-repo remainder —
-#: production source AND unlisted ``specs/<other>`` files (e.g. ``specs/constitution.md``)
-#: — is MUTATING (FR-R1-04): a ``ctx_rel`` matching no class NEVER falls through to UNGATED.
 #: .dadaia/sessions/ holds protected, caller-owned bind records. Agents must not write
 #: these via file tools; only the CLI/bootstrap may write them.
 _PROTECTED_PREFIX = ".dadaia/sessions/"
@@ -59,15 +41,11 @@ _PROTECTED_MESSAGE = (
     "here via file tools. Blocked to preserve caller session identity integrity "
     "(SEC-01 / CWE-284).\n"
 )
-#: Projected LAW files. The root ``AGENTS.md`` map is the workspace system prompt and
-#: the sole always-on rule file the library ships; the ``.dadaia/**`` family is its
-#: scoped counterpart. In an INSTANTIATED workspace these are human-only: an agent
-#: changes the law by editing ``dadaia_workspace/public/`` and re-projecting, never by
-#: writing the projection.
-_LAW_BASENAMES: frozenset[str] = workspace_layout.LAW_BASENAMES
+#: PROTECTED also holds every path the install ledger records (the caller passes that
+#: set as *projected*): the ledger, not a basename, decides what is projected law.
 _LAW_MESSAGE = (
-    "[GATE] '{path}' is a projected law file (the workspace system prompt / scoped "
-    "AGENTS.md). In an instantiated workspace only a human operator edits it by hand; "
+    "[GATE] '{path}' is a projected file (the install ledger records it). In an "
+    "instantiated workspace only a human operator edits it by hand; "
     "an agent changes the law at its source and re-projects.\n"
     "The source is dadaia_workspace/public/; this re-projects it:\n"
 )
@@ -97,7 +75,7 @@ class Decision(Enum):
 
 def _is_specs_additive(spec_rel: str) -> bool:
     """True when a root- or context-relative ``specs/`` path is ADDITIVE."""
-    return any(spec_rel.startswith(prefix) for prefix in _SPECS_ADDITIVE_PREFIXES)
+    return any(fnmatch(spec_rel, glob) for glob in workspace_layout.SPECS_ADDITIVE_GLOBS)
 
 
 def _context_relative(p: str) -> str | None:
@@ -115,34 +93,17 @@ def _context_relative(p: str) -> str | None:
     return rest[slash + 1 :]
 
 
-def _is_law_path(rel_path: str) -> bool:
-    """True when *rel_path* sits at a structurally fixed projected-law origin — a
-    PROTECTED path (0.4.7 FR1 folded the LAW class into PROTECTED; the two share one
-    verdict and differ only in the message that names the way out).
-
-    Static, ORIGIN-only floor (v0.4.5 FR1, since collapsed): the projected
-    ``AGENTS.md`` set — the root map and the ``.dadaia/**`` family. ``repos/<slug>/``
-    never matches either shape, so a repo's own AGENTS.md is never LAW (closes
-    sdd-gate-blocks-fresh-repo-root-agents-md + repo-agents-md-law-gate-contradicts-
-    template) — and the floor never reads the manifest (CWE-284).
-    """
-    parts = rel_path.split("/")
-    if parts[-1] not in _LAW_BASENAMES:
-        return False
-    return len(parts) == 1 or parts[0] == ".dadaia"
-
-
-def classify_path(rel_path: str) -> PathClass:
+def classify_path(rel_path: str, projected: frozenset[str] = frozenset()) -> PathClass:
     """Classify a workspace-relative path into one of THREE classes; first match wins.
 
     A path under ``repos/<slug>/`` is classified by its **context-relative** remainder
     using the same ``specs/`` ADDITIVE prefixes that govern workspace-root paths; every
     other remainder is MUTATING. A workspace-root path is PROTECTED (session records,
-    projected law), ADDITIVE (the zone-registry prefixes), or MUTATING —
+    paths in *projected*, the install ledger's), ADDITIVE (the zone-registry prefixes), or MUTATING —
     there is no UNGATED fall-through, so nothing at the root escapes classification.
     """
     p = rel_path.lstrip("/")
-    if _is_law_path(p) or p.startswith(_PROTECTED_PREFIX):
+    if p in projected or p.startswith(_PROTECTED_PREFIX):
         return PathClass.PROTECTED
 
     ctx_rel = _context_relative(p)
@@ -189,6 +150,7 @@ def evaluate(
     rel_path: str,
     *,
     root: PurePath,
+    projected: frozenset[str] = frozenset(),
     bound_context: str | None = None,
     bound_repos: frozenset[str] = frozenset(),
     target_slug: str | None = None,
@@ -210,11 +172,11 @@ def evaluate(
     the gate cannot attribute them, and fail-open is the posture. A MUTATING write is
     never blocked on another session: races surface through git.
     """
-    cls = classify_path(rel_path)
+    cls = classify_path(rel_path, projected)
 
     # PROTECTED is the sole fail-closed path and is evaluated before fail-open branches.
     if cls == PathClass.PROTECTED:
-        if _is_law_path(rel_path.lstrip("/")):
+        if not rel_path.lstrip("/").startswith(_PROTECTED_PREFIX):
             restage = " && ".join(
                 (fix_line(root, "public", "stage"), fix_line(root, "public", "install"))
             )

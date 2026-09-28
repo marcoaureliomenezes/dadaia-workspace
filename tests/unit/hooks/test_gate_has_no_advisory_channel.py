@@ -19,6 +19,7 @@ def test_evaluate_takes_only_the_target_and_the_scope() -> None:
     assert params == [
         "rel_path",
         "root",
+        "projected",
         "bound_context",
         "bound_repos",
         "target_slug",

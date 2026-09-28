@@ -37,7 +37,7 @@ __all__ = [
     "DADAIA_ZONES",
     "HARNESS_DIRS",
     "INSTANCE_EXCEPTIONS",
-    "LAW_BASENAMES",
+    "SPECS_ADDITIVE_GLOBS",
     "MEMORY_TOPLEVEL_FILES",
     "REPO_LAW",
     "REPO_TREE_ARTIFACTS",
@@ -342,10 +342,11 @@ def public_scripts_dir() -> Path:
     return Path(__file__).resolve().parents[1] / "public" / "scripts"
 
 
-#: Basename of the projected LAW file — human-only in an instantiated workspace. One
-#: authored set, one basename: the Claude bridge and the DADAIA.md mirrors
-#: are retired, so the projected law is ``AGENTS.md`` at the root and under ``.dadaia/``.
-LAW_BASENAMES: frozenset[str] = frozenset({"AGENTS.md"})
+#: The ``specs/`` paths the law's path classes call ADDITIVE (``specs/AGENTS.md``): the
+#: append-only ledger areas and every area's ``_archive/*_histo.jsonl`` (``fnmatch``).
+SPECS_ADDITIVE_GLOBS: tuple[str, ...] = (
+    "specs/backlog/*", "specs/bugs/*", "specs/audits/*", "specs/*/_archive/*_histo.jsonl",
+)  # fmt: skip
 
 #: Every projection directory at the workspace root: the shared ``.agents`` tree plus
 #: the directory each entry harness owns (:data:`HARNESS_PROJECTION_DIRS` is the one

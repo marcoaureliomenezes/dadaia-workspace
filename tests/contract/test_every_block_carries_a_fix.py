@@ -136,7 +136,7 @@ def _write(path: Path) -> dict[str, Any]:
 
 _GATE_BLOCKS: tuple[tuple[str, str], ...] = (
     ("protected-sessions", ".dadaia/sessions/some-session.json"),
-    ("protected-law", "AGENTS.md"),
+    ("protected-projected", ".dadaia/states/install_ledger.json"),  # ledger-decided law
 )
 
 

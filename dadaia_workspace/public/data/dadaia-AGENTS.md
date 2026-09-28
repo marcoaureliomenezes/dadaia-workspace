@@ -28,7 +28,7 @@
 ## 4. Projections and law files
 
 - Files in `agentic/manifest.json` are lib-originated projections; change them at the source under `dadaia_workspace/public/`, never in place.
-- `AGENTS.md` law files are projected read-only and PROTECTED; only a human hand-edits a projected copy.
+- Every projected file (the install ledger records it) is PROTECTED; only a human hand-edits a projected copy.
 - Re-project: `.dadaia/.venv/bin/dadaia public stage`, then `public install`, then `public doctor` shows `[ok] public-privacy`.
 
 ## 5. Doctor — the one scan and reaper

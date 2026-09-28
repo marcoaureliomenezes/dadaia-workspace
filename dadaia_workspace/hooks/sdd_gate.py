@@ -32,6 +32,7 @@ from pathlib import Path
 from dadaia_workspace.core import invocation
 from dadaia_workspace.features.spec_context import gate_policy
 from dadaia_workspace.hooks import _common
+from dadaia_workspace.infrastructure.json_install_ledger_store import JsonInstallLedgerStore
 
 
 def _target_slug(workspace: Path, fpath: Path) -> str | None:
@@ -76,11 +77,15 @@ def _evaluate_target(
     except (ValueError, OSError):
         rel_path = fpath.as_posix()
 
-    cls = gate_policy.classify_path(rel_path)
+    states = effective_workspace / ".dadaia" / "states"  # the install ledger is the law set
+    ledger = JsonInstallLedgerStore().read(states)
+    projected = frozenset(e.relpath for e in ledger.entries) if ledger else frozenset()
+    projected |= {JsonInstallLedgerStore.path(states).relative_to(effective_workspace).as_posix()}
+    cls = gate_policy.classify_path(rel_path, projected)
 
     # PROTECTED short-circuit (sole fail-CLOSED path): no context work needed.
     if cls == gate_policy.PathClass.PROTECTED:
-        return gate_policy.evaluate(rel_path, root=effective_workspace)
+        return gate_policy.evaluate(rel_path, root=effective_workspace, projected=projected)
 
     ctx = inv.context_name or ""
 

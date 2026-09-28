@@ -2,13 +2,11 @@
 
 from __future__ import annotations
 
-import json
 from pathlib import Path
 
 import pytest
 
 from dadaia_workspace.core.cli_line import fix_line
-from dadaia_workspace.core.workspace_layout import LAW_BASENAMES
 from dadaia_workspace.features.spec_context.gate_policy import (
     Decision,
     PathClass,
@@ -34,6 +32,7 @@ _SPEC_RELATIVE_CASES: tuple[tuple[str, str, PathClass], ...] = (
     ("additive_bugs", "specs/bugs/concurrency-warning.md", PathClass.ADDITIVE),
     ("additive_backlog", "specs/backlog/epic.md", PathClass.ADDITIVE),
     ("additive_audits", "specs/audits/2026-01-01T000000Z-abc12345/index.md", PathClass.ADDITIVE),
+    ("additive_releases_histo", "specs/releases/_archive/releases_histo.jsonl", PathClass.ADDITIVE),
     ("memory_atom", "specs/memory/architecture.md", PathClass.MUTATING),
     ("memory_product", "specs/memory/product/catalog.md", PathClass.MUTATING),
     ("archived_release", "specs/releases/_archive/v0.1.9/SPEC.md", PathClass.MUTATING),
@@ -168,6 +167,12 @@ def test_first_match_wins_ordering_in_repo() -> None:
             id="allows-append-into-area-histo",
         ),
         pytest.param(
+            "specs/releases/_archive/releases_histo.jsonl",
+            Decision.ALLOW,
+            None,
+            id="allows-append-into-releases-histo",
+        ),
+        pytest.param(
             "specs/bugs/20260701T00Z-00.jsonl",
             Decision.ALLOW,
             None,
@@ -200,26 +205,6 @@ def test_evaluate_area_histo_and_live_bugs_allow(
 # ═════════════════════════════════════════════════════════════════════════════════
 
 
-def test_fresh_repo_agents_md_classifies_mutating_not_law() -> None:
-    """Intent: CONTRACT — v0.4.5 A1.1.
-
-    A brand-new repo with no prior projection, no manifest entry, nothing on disk
-    yet: repos/<fresh-slug>/AGENTS.md must classify MUTATING, never LAW. Before the
-    fix this asserted PathClass.PROTECTED and failed (the false positive
-    `sdd-gate-blocks-fresh-repo-root-agents-md` reports).
-    """
-    fresh_slug = "brand-new-repo-never-scaffolded-yet"
-    assert classify_path(_in_repo(fresh_slug, "AGENTS.md")) == PathClass.MUTATING
-
-
-def test_fresh_repo_agents_md_write_is_allowed_on_the_executed_path(tmp_path: Path) -> None:
-    """Intent: CONTRACT — v0.4.5 A1.1 (evaluate()/Write envelope, not just classify_path)."""
-    fresh_slug = "brand-new-repo-never-scaffolded-yet"
-    decision, message = evaluate(_in_repo(fresh_slug, "AGENTS.md"), root=_ROOT)
-    assert decision == Decision.ALLOW
-    assert "[GATE]" not in message
-
-
 def test_existing_nonmanifest_repo_agents_md_edit_is_allowed(tmp_path: Path) -> None:
     """Intent: CONTRACT — v0.4.5 A1.2.
 
@@ -242,93 +227,6 @@ def test_existing_nonmanifest_repo_agents_md_edit_is_allowed(tmp_path: Path) -> 
     decision, message = evaluate(_in_repo(slug, "AGENTS.md"), root=_ROOT)
     assert decision == Decision.ALLOW
     assert "[GATE]" not in message
-
-
-# Known source -> installed TARGET mapping for every LAW-basename asset the real
-# .dadaia/agentic/manifest.json ships today (v0.4.5 A1.3 fixture — this table is
-# derived from infrastructure/workspace_guardrail.py + install_helpers.py's actual
-# projection targets, NEVER from reading the operator's live manifest file).
-# `templates/repo-AGENTS.md` is deliberately absent from this table: its installed
-# target (repos/<slug>/AGENTS.md) is a provenance-gated CONSUMER projection (FOREIGN
-# once it carries repo-specific content — see workspace_guardrail._write_consumer_agents),
-# never a floor path; A1.1/A1.2 above pin it MUTATING.
-_LAW_ASSET_TARGETS: dict[str, tuple[str, ...]] = {
-    "data/AGENTS.md": ("AGENTS.md",),
-    "data/dadaia-AGENTS.md": (".dadaia/AGENTS.md",),
-}
-
-#: A fixture manifest — mirrors .dadaia/agentic/manifest.json's real shape
-#: (assets: [{path, sha256, type}]) but is NEVER loaded from the operator's live
-#: workspace file (A1.3 explicitly forbids that dependency).
-_FIXTURE_MANIFEST: dict[str, object] = {
-    "package_version": "0.0.0-test",
-    "schema_version": 1,
-    "assets": [
-        {"path": "agents/dd-software-engineer.md", "sha256": "a" * 64, "type": "agents"},
-        {"path": "data/AGENTS.md", "sha256": "b" * 64, "type": "data"},
-        {"path": "data/dadaia-AGENTS.md", "sha256": "d" * 64, "type": "data"},
-        {"path": "templates/repo-AGENTS.md", "sha256": "e" * 64, "type": "templates"},
-    ],
-}
-
-
-def test_manifest_tracked_law_projections_stay_law() -> None:
-    """Intent: CONTRACT — v0.4.5 A1.3.
-
-    Enumerates the fixture manifest (never the operator's live file) and pins that
-    every LAW-basename asset's installed TARGET still classifies LAW after the fix.
-    The static floor (the projected AGENTS.md set) already covers every
-    lib-originated law projection this release's manifest ships — the additive
-    manifest arm has nothing left to extend today, and nothing regresses.
-    """
-    law_assets = [
-        asset
-        for asset in _FIXTURE_MANIFEST["assets"]  # type: ignore[union-attr]
-        if Path(asset["path"]).name.endswith("AGENTS.md")
-    ]
-    assert law_assets, "fixture manifest must carry at least one LAW-basename asset"
-    checked_any = False
-    for asset in law_assets:
-        targets = _LAW_ASSET_TARGETS.get(asset["path"])
-        if targets is None:
-            # repo-scoped template projections (e.g. templates/repo-AGENTS.md) are
-            # asserted MUTATING by A1.1/A1.2 above, never LAW.
-            continue
-        for target in targets:
-            assert classify_path(target) == PathClass.PROTECTED, target
-            checked_any = True
-    assert checked_any, "fixture manifest carried no known floor-mapped LAW asset"
-
-
-def test_manifest_removal_never_demotes_a_statically_floored_law_path(tmp_path: Path) -> None:
-    """Intent: CONTRACT — v0.4.5 A1.7 (security, CWE-284).
-
-    classify_path() takes only a path string — no workspace/manifest argument — and
-    performs zero I/O, so the static floor can never be demoted by editing or
-    deleting .dadaia/agentic/manifest.json: the floor never reads it. Prove the
-    attack directly — write a manifest with every LAW asset stripped, then delete it
-    outright — and confirm every statically-floored path is LAW regardless.
-    """
-    manifest_dir = tmp_path / ".dadaia" / "agentic"
-    manifest_dir.mkdir(parents=True)
-    manifest_path = manifest_dir / "manifest.json"
-    stripped_manifest = {"assets": [], "package_version": "0.0.0", "schema_version": 1}
-    manifest_path.write_text(json.dumps(stripped_manifest), encoding="utf-8")
-
-    floor_paths = (
-        "AGENTS.md",
-        ".dadaia/AGENTS.md",
-        ".dadaia/handoff/AGENTS.md",
-        ".dadaia/tmp/AGENTS.md",
-        ".dadaia/states/AGENTS.md",
-    )
-    for floor_path in floor_paths:
-        assert classify_path(floor_path) == PathClass.PROTECTED, floor_path
-
-    manifest_path.unlink()
-    assert not manifest_path.exists()
-    for floor_path in floor_paths:
-        assert classify_path(floor_path) == PathClass.PROTECTED, floor_path
 
 
 # ═════════════════════════════════════════════════════════════════════════════════
@@ -383,10 +281,15 @@ def test_a_slug_no_context_registers_is_never_scope_blocked(tmp_path: Path) -> N
     assert decision == Decision.ALLOW
 
 
-def test_an_additive_path_in_a_foreign_repo_stays_writable(tmp_path: Path) -> None:
+@pytest.mark.parametrize(
+    "ctx_rel", ["specs/bugs/BUGS.jsonl", "specs/releases/_archive/releases_histo.jsonl"]
+)
+def test_an_additive_path_in_a_foreign_repo_stays_writable(tmp_path: Path, ctx_rel: str) -> None:
+    """sa-gate-path-classes-diverge-from-the-law#B39-4: any area's `_archive/*_histo.jsonl`
+    (and the ledger areas) ALLOW, a foreign repo's included — the bind never scopes them."""
     decision, _ = _evaluate_scope(
         tmp_path,
-        "repos/ctx-b/specs/bugs/BUGS.jsonl",
+        f"repos/ctx-b/{ctx_rel}",
         **_BOUND_A,
         target_slug="ctx-b",
         target_owner="ctx-b",
@@ -420,16 +323,12 @@ def test_root_claude_md_is_no_longer_a_protected_law_path() -> None:
     Nothing projects a root ``CLAUDE.md`` any more; the gate must not hold a path the
     library never writes. It classifies MUTATING, like any other root file.
     """
-    assert frozenset({"AGENTS.md"}) == LAW_BASENAMES
     assert classify_path("CLAUDE.md") == PathClass.MUTATING
 
 
 def test_retired_harness_law_mirrors_are_no_longer_protected() -> None:
-    """Intent: CONTRACT — 0.4.7 AC3.1 (T-047-55).
-
-    The harness-dir law row died with the files it guarded: no ``.codex/DADAIA.md``,
-    no ``.kimi-code/`` tree, no ``.claude/rules/AGENTS.md`` projection.
-    """
+    """Intent: CONTRACT — 0.4.7 AC3.1 (T-047-55). A path the install ledger does not
+    record (a retired mirror no install writes any more) is MUTATING, whatever its name."""
     for retired in (
         ".codex/AGENTS.md",
         ".kimi-code/AGENTS.md",
@@ -437,16 +336,3 @@ def test_retired_harness_law_mirrors_are_no_longer_protected() -> None:
         ".claude/rules/AGENTS.md",
     ):
         assert classify_path(retired) == PathClass.MUTATING, retired
-
-
-def test_the_projected_agents_md_set_stays_protected() -> None:
-    """Intent: CONTRACT — 0.4.7 FR3 (T-047-55). The root map and every ``.dadaia/**``
-    scoped AGENTS.md the installer projects stay human-only."""
-    for projected in (
-        "AGENTS.md",
-        ".dadaia/AGENTS.md",
-        ".dadaia/handoff/AGENTS.md",
-        ".dadaia/tmp/AGENTS.md",
-        ".dadaia/states/AGENTS.md",
-    ):
-        assert classify_path(projected) == PathClass.PROTECTED, projected

@@ -44,6 +44,10 @@ def ws(tmp_path: Path) -> Path:
     (tmp_path / ".dadaia" / "states" / "spec_contexts.json").write_text(
         '{"schema_version": "2", "contexts": []}'
     )
+    ledger = {"relpath": "AGENTS.md", "sha256": "0" * 64, "family": "root", "kind": "file"}
+    (tmp_path / ".dadaia" / "states" / "install_ledger.json").write_text(  # projects AGENTS.md
+        json.dumps({"schema_version": "1", "entries": [ledger]})
+    )
     (tmp_path / ".dadaia" / "hooks").mkdir()
     (tmp_path / "repos").mkdir()
     return tmp_path

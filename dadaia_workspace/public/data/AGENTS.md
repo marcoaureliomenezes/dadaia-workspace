@@ -35,7 +35,7 @@
 ## 3. What is enforced
 
 - One PreToolUse gate blocks exactly three things: a new workspace-root entry (§4), a command whose first token is `dadaia`, `pip`/`pip3` or `python -m dadaia_workspace` outside `.dadaia/.venv/bin/`, a PROTECTED or out-of-scope write.
-- Path classes: ADDITIVE (the append-only governance areas of `specs/AGENTS.md` and the runtime scratch zones of `.dadaia/AGENTS.md`) always writable; PROTECTED (session state, the projected law files) blocked; everything else MUTATING, scope-judged under `repos/<slug>/`.
+- Path classes: ADDITIVE (the append-only governance areas of `specs/AGENTS.md` and the runtime scratch zones of `.dadaia/AGENTS.md`) always writable; PROTECTED (session state, every path the install ledger records) blocked; everything else MUTATING, scope-judged under `repos/<slug>/`.
 - Every BLOCK carries exactly one `fix: <command>` line; a BLOCK whose fix is itself blocked is a Stall, CRITICAL.
 - Git chokepoints (branch names: `specs/constitution.md` `gitflow:`): pre-push allows only the work branch and refuses a non-canon `specs/` path or a denylisted secret; both PRs need CI green and a `dd-code-reviewer` APPROVED verdict; no CI job calls a model API. Mechanics: `dd-gitflow-default`, `.dadaia/AGENTS.md`.
 - Races surface, never block; context binding: `.dadaia/.venv/bin/dadaia context show --json`, `.dadaia/.venv/bin/dadaia context bind <ctx>`.
