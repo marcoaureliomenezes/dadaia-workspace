@@ -62,17 +62,17 @@ Lanes: PLAN §2 FR10; files and lines: `AGGREGATE.md` §6.
 - [x] **T-050-82 — L3.2 table merges.** `W:` `tests/unit/core/**`, `tests/unit/test_*.py` · `blocked by:` T-050-75..80 · `delivers:` §6 W3 · Δ 0/−1798.
 - [x] **T-050-83 — L3.3 table merges.** `W:` `tests/unit/features/{specs,backlog}/**` · `blocked by:` T-050-75..80 · `delivers:` §6 W3 · Δ 0/−1097.
 - [x] **T-050-84 — L3.4 table merges.** `W:` `tests/unit/{hooks,skills,public}/**` · `blocked by:` T-050-75..80 · `delivers:` §6 W3 · Δ 0/−1086.
-- [ ] **T-050-85 — L3.5 table merges.** `W:` other `tests/unit/**` · `blocked by:` T-050-75..80 · `delivers:` §6 W3 · Δ 0/−3325.
-- [ ] **T-050-86 — L3.6 table merges.** `W:` `tests/contract/**` · `blocked by:` T-050-75..80 · `delivers:` §6 W3 · Δ 0/−4190.
-- [ ] **T-050-87 — L3.7 table merges.** `W:` `tests/{integration,e2e}/**` · `blocked by:` T-050-75..80 · `delivers:` §6 W3 · Δ 0/−3940.
-- [ ] **T-050-88 — L4.1 trim.** `W:` `i/` · `blocked by:` T-050-81..87 · `delivers:` §6 W4 · Δ −1697/0.
-- [ ] **T-050-89 — L4.2 trim.** `W:` `core/`, top-level modules · `blocked by:` T-050-81..87 · `delivers:` §6 W4 · Δ −1070/0.
-- [ ] **T-050-90 — L4.3 trim.** `W:` `f/{specs,backlog}/` · `blocked by:` T-050-81..87 · `delivers:` §6 W4 · Δ −1011/0.
-- [ ] **T-050-91 — L4.4 trim.** `W:` `pub/**/*.py`, `hooks/` · `blocked by:` T-050-81..87 · `delivers:` §6 W4 · Δ −511/0.
-- [ ] **T-050-92 — L4.5 trim.** `W:` `cli/`, other `f/` · `blocked by:` T-050-81..87 · `delivers:` §6 W4 · Δ −1256/0.
-- [ ] **T-050-93 — L4.6–L4.12 test narration.** `W:` tests, one commit per W3 lane · `blocked by:` T-050-88..92 · `delivers:` §6 W4 · Δ 0/−2527.
+- [x] **T-050-85 — L3.5 table merges.** `W:` other `tests/unit/**` · `blocked by:` T-050-75..80 · `delivers:` §6 W3 · Δ 0/partial, stopped by the 2026-09-28 relaxation (SPEC Origin).
+- [x] **T-050-86 — L3.6 table merges.** `W:` `tests/contract/**` · `blocked by:` T-050-75..80 · `delivers:` §6 W3 · Δ 0/−3085, stopped by the 2026-09-28 relaxation (SPEC Origin).
+- [x] **T-050-87 — L3.7 table merges.** `W:` `tests/{integration,e2e}/**` · `blocked by:` T-050-75..80 · `delivers:` §6 W3 · Δ 0/partial, stopped by the 2026-09-28 relaxation (SPEC Origin).
+- [x] **T-050-88 — L4.1 trim.** `W:` `i/` · `blocked by:` T-050-81..87 · `delivers:` §6 W4 · Δ −161/0, stopped by the 2026-09-28 relaxation (SPEC Origin).
+- [x] **T-050-89 — L4.2 trim.** `W:` `core/`, top-level modules · `blocked by:` T-050-81..87 · `delivers:` §6 W4 · Δ −499/0, stopped by the 2026-09-28 relaxation (SPEC Origin).
+- [x] **T-050-90 — L4.3 trim.** `W:` `f/{specs,backlog}/` · `blocked by:` T-050-81..87 · `delivers:` §6 W4 · Δ −449/0, stopped by the 2026-09-28 relaxation (SPEC Origin).
+- [x] **T-050-91 — L4.4 trim.** `W:` `pub/**/*.py`, `hooks/` · `blocked by:` T-050-81..87 · `delivers:` §6 W4 · Δ −434/0, stopped by the 2026-09-28 relaxation (SPEC Origin).
+- [x] **T-050-92 — L4.5 trim.** `W:` `cli/`, other `f/` · `blocked by:` T-050-81..87 · `delivers:` §6 W4 · nothing landed, stopped by the 2026-09-28 relaxation (SPEC Origin).
+- [x] **T-050-93 — L4.6–L4.12 test narration.** `W:` tests, one commit per W3 lane · `blocked by:` T-050-88..92 · `delivers:` §6 W4 · Δ 0/partial (inside -86/-87), stopped by the 2026-09-28 relaxation (SPEC Origin).
 
 ### C — closure evidence (FR7, FR8, FR9)
 
-- [ ] **T-050-62 — Prune and measure.** Execute the QA-lens pruning verdict (≥ 522 test lines, AC9.9); AC8.1 deltas, allowance subset, mutmut, AC9.11 counts, fenced rubric.
+- [-] **T-050-62 — Measure.** AC8.1 deltas reported (AC10.7), allowance subset, AC9.11 counts, fenced rubric (AC7.1); mutmut is review evidence (AC9.10).
   `W:` tests, handoff · `blocked by:` T-050-23..93 · `delivers:` AC7.1–7.3, AC8.1, AC9.9–9.11 · `RED:` n/a.

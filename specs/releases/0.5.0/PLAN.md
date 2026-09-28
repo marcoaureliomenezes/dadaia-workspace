@@ -258,9 +258,8 @@ is not the FR1–FR4 wave headings of TASKS.
   promote head. Dispositions and the 0.5.0-only override are the product engineer's closure log.
 - **Projection, production + law:** waves −2587, mechanism +18, `DADAIA_FENCED_ROOTS` +3 → **−2566**.
 - **Projection, tests:** audits +852, fakes and driver −500, mechanism +160, `DADAIA_FENCED_ROOTS` +10 → **+522**
-  before pruning. AC9.9 requires ≤ 0 at closure, so the suite-wide pruning pass (DELETE-HOLLOW,
-  DELETE-DUP, text pins outside law-file canon, the `WORKSPACE_ROOT`-rung tests) must remove ≥ 522
-  lines, run as a reviewer QA-lens verdict the engineer executes; a positive net is a HIGH finding.
+  before pruning; W3 pruned it. AC10.2 is a recommendation since the 2026-09-28 relaxation (SPEC Origin):
+  measured and reported at closure, never forced.
 
 ## 3. Seams
 
@@ -282,7 +281,6 @@ is not the FR1–FR4 wave headings of TASKS.
 - **Gate-not-enforced harnesses** cap D8/D9; the ≥ 80 score is measured, not assumed.
 - **V35 skill-corpus ceiling (2863 lines, down-only).** FR5 grows four skills; the growth is paid by the
   skill-text deletions of WP-02, WP-24, WP-25, WP-49 and FR-8 within the candidate, else V35 fails.
-- **Test budget** (AC9.9): +522 before pruning; the pruning pass is sized in §2 and measured at closure.
 
 ## 5. Contradictions routed to the main thread (planned as stated here)
 
