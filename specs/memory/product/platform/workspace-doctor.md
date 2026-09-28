@@ -52,7 +52,7 @@ sources:
 
 ## The `ledgers` section
 
-- `BL-SCHEMA`, `BL-CONFLICT`, `BL-STALE` over `BACKLOG.json` (`dadaia_workspace/features/backlog/doctor.py`); `LEDGER-ADR-SCHEMA` over `decisions.jsonl`.
+- `BL-SCHEMA`, `BL-CONFLICT` over `BACKLOG.json` (`dadaia_workspace/features/backlog/doctor.py`); `LEDGER-ADR-SCHEMA` over `decisions.jsonl`.
 - Each ledger script (`bugs.py`, `backlog.py`, `release.py`, `audit.py`, `memory.py`) runs its own `check --specs <dir> --json`; each line re-emits as `LEDGER-<NAME>-SCHEMA` with a `fix:` naming the script. A script that cannot run is a finding whose fix is `<cli> public install`. The doctor keeps no ledger schema of its own and repairs no ledger.
 
 ## The reaper

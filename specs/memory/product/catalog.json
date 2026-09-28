@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-09-28T19:50:45Z",
+  "generated_at": "2026-09-28T19:55:15Z",
   "features": [
     {
       "rank": 1,
@@ -637,7 +637,7 @@
         "compliance",
         "privacy"
       ],
-      "token_estimate": 1696,
+      "token_estimate": 1694,
       "depends_on": [
         "public-asset-distribution",
         "sdd-gate-v3",
@@ -744,7 +744,7 @@
         "ledger",
         "governance"
       ],
-      "token_estimate": 541,
+      "token_estimate": 504,
       "depends_on": [
         "agent-orchestration",
         "release-lifecycle",
@@ -755,8 +755,7 @@
         "dadaia_workspace/public/schemas/backlog/**",
         "dadaia_workspace/public/schemas/histo/**",
         "dadaia_workspace/features/backlog/**",
-        "dadaia_workspace/core/models/backlog.py",
-        "dadaia_workspace/core/models/histo.py"
+        "dadaia_workspace/core/models/backlog.py"
       ]
     },
     {

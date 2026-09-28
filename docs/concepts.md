@@ -77,7 +77,7 @@ gate — a refusal whose fix is itself refused (a Stall) cannot ship.
 ## Memory
 
 <!-- derived-from: context-management sha256:44be26055b2d -->
-<!-- derived-from: workspace-doctor sha256:ef3665bc1f1c -->
+<!-- derived-from: workspace-doctor sha256:c26995369f02 -->
 <!-- derived-from: release-lifecycle sha256:57d8b542e879 -->
 <!-- derived-from: audits-canon sha256:55ce6e25db49 -->
 
@@ -96,7 +96,7 @@ the warnings `MEM-DRIFT-1` (features package map vs the live tree) and `MEM-DRIF
 ## Bugs and backlog
 
 <!-- derived-from: bug-ledger sha256:9392c1f406a4 -->
-<!-- derived-from: backlog-ledger sha256:46382434daf2 -->
+<!-- derived-from: backlog-ledger sha256:721ed11c7220 -->
 
 Both are records with one shape and one writer script. `specs/bugs/BUGS.jsonl` holds
 one record per bug, appended once and keyed by `id`, carrying no git-derived fact;
@@ -104,7 +104,7 @@ one record per bug, appended once and keyed by `id`, carrying no git-derived fac
 reached only through its transition, and registration is ask-first: the agent proposes
 and `bugs.py append` runs only after the operator confirms. `specs/backlog/BACKLOG.json`'s
 `active[]` is the operator's demand queue: an entry is born `idea` by `backlog.py new`,
-moves through `candidate` and `picked`, and exits exactly once, at the closure
+is picked when a SPEC's `**Origin:** backlog:` line names it, and exits exactly once, at the closure
 disposition sweep, by `backlog.py exit`, which appends one histo record carrying the
 removed entry. One terminal vocabulary serves every histo: `delivered resolved
 superseded deferred rejected`.

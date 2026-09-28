@@ -82,7 +82,7 @@ record, never the cwd: sitting inside a repository is not a binding.
 
 ## 4. Compliance
 
-<!-- derived-from: workspace-doctor sha256:ef3665bc1f1c -->
+<!-- derived-from: workspace-doctor sha256:c26995369f02 -->
 
 `doctor` is the one instance validator; three sections run in fixed order —
 `workspace`, `specs`, `ledgers`. Every finding prints as one `<CODE> <verdict>
@@ -92,7 +92,7 @@ run. `--fix` moves slop to `.dadaia/reaped/` and deletes only what a TTL expired
 
 ## 5. The first backlog entry
 
-<!-- derived-from: backlog-ledger sha256:46382434daf2 -->
+<!-- derived-from: backlog-ledger sha256:721ed11c7220 -->
 
 `backlog.py new` appends one entry, born `idea`, to `specs/backlog/BACKLOG.json`'s
 `active[]` — the operator's demand queue; from the workspace root `--specs` names the

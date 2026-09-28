@@ -94,7 +94,7 @@ branches; a re-run is a no-op.
 
 ## Check compliance — `doctor`
 
-<!-- derived-from: workspace-doctor sha256:ef3665bc1f1c -->
+<!-- derived-from: workspace-doctor sha256:c26995369f02 -->
 
 ```bash
 .dadaia/.venv/bin/dadaia doctor --context <ctx> [--json] [--fix] [--redact]
@@ -121,7 +121,7 @@ a TTL expired.
 ## Run the first candidate
 
 <!-- derived-from: release-lifecycle sha256:57d8b542e879 -->
-<!-- derived-from: backlog-ledger sha256:46382434daf2 -->
+<!-- derived-from: backlog-ledger sha256:721ed11c7220 -->
 <!-- derived-from: bug-ledger sha256:9392c1f406a4 -->
 
 A candidate is one closed-scope cycle inside the live release. Nothing drives it: the
@@ -130,8 +130,7 @@ documents are the state, the ledger scripts move the records, and the markers in
 
 1. **Demand enters the backlog.** Only the operator creates demand;
    `python3 .agents/skills/dd-backlog-definition/scripts/backlog.py new <slug>` appends
-   one `active[]` entry born `idea`, and every later status (`candidate`, `picked`)
-   binds `intents[]` that resolve to a code, doc or CLI anchor.
+   one `active[]` entry born `idea`, and every later status binds `intents[]` that resolve to a code, doc or CLI anchor.
 2. **Birth the release.**
    `python3 .agents/skills/dd-release-implementation/scripts/release.py new <M.m.p>`
    writes a `SPEC.md` stub and `_RELEASE.json` in `DEFINITION` under
