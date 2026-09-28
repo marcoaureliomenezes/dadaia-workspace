@@ -8,7 +8,7 @@ is `dadaia_workspace/public/data/AGENTS.md`, and the walkthrough is
 ## Context
 
 <!-- derived-from: spec-context-project sha256:47c11b26b98f -->
-<!-- derived-from: context-management sha256:dc1a239f4970 -->
+<!-- derived-from: context-management sha256:bc3b4f2b4d9a -->
 
 A *context* — a Spec Context Project — is one canonical `specs/` tree owned by one
 main repository, the unit for memory, backlog, bugs, releases, reports and handoffs.
@@ -28,7 +28,7 @@ memory injection into the session.
 
 ## Release and candidate
 
-<!-- derived-from: release-lifecycle sha256:a31b50804ef1 -->
+<!-- derived-from: release-lifecycle sha256:16af688b63c6 -->
 
 Exactly one *release* is live, `specs/releases/<M.m.p>/`, with open scope; it grows by
 *candidates*, each a closed-scope cycle whose `SPEC.md`, `PLAN.md` and `TASKS.md` sit
@@ -37,11 +37,11 @@ staying in git. `_RELEASE.json` is the one mutable state document: `phase` is
 `DEFINITION`, `IMPLEMENTATION`, `CLOSURE` or `ARCHIVED`, the `phase` verbs stamp the
 `defined` and `implemented` milestones, and `log` is the append-only closure narrative.
 Every SPEC carries an `**Origin:**` line. Release ids are bare SemVer; the live version
-is the last published one plus one patch and moves only at an operator-approved deploy.
+moves only at an operator-approved deploy.
 
 ## The flow
 
-<!-- derived-from: release-lifecycle sha256:a31b50804ef1 -->
+<!-- derived-from: release-lifecycle sha256:16af688b63c6 -->
 <!-- derived-from: bug-ledger sha256:eeebe84481a4 -->
 <!-- derived-from: audits-canon sha256:87599de34ac0 -->
 
@@ -59,7 +59,7 @@ carry the ordered work, and the ledger scripts move the records.
 
 ## The gate
 
-<!-- derived-from: sdd-gate-v3 sha256:f870acc7c776 -->
+<!-- derived-from: sdd-gate-v3 sha256:8cc77479943b -->
 
 The *gate* is one PreToolUse pre-gate evaluating root whitelist, venv guard and SDD
 gate in that order — first block wins, and a policy that raises is ALLOW. It blocks
@@ -76,9 +76,9 @@ gate — a refusal whose fix is itself refused (a Stall) cannot ship.
 
 ## Memory
 
-<!-- derived-from: context-management sha256:dc1a239f4970 -->
-<!-- derived-from: workspace-doctor sha256:8e52123b79e7 -->
-<!-- derived-from: release-lifecycle sha256:a31b50804ef1 -->
+<!-- derived-from: context-management sha256:bc3b4f2b4d9a -->
+<!-- derived-from: workspace-doctor sha256:eb7b1e19b277 -->
+<!-- derived-from: release-lifecycle sha256:16af688b63c6 -->
 <!-- derived-from: audits-canon sha256:87599de34ac0 -->
 
 *Memory* is current product truth: the atoms under `specs/memory/product/**`, plus

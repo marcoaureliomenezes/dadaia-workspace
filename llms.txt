@@ -11,7 +11,7 @@
 ## Install
 
 <!-- derived-from: pypi-distribution sha256:618098346ed6 -->
-<!-- derived-from: workspace-init sha256:bc2612c3f80d -->
+<!-- derived-from: workspace-init sha256:acb8bc28e783 -->
 
 - [PyPI project](https://pypi.org/project/dadaia-workspace/): three levels — `uvx dadaia-workspace init <dir> --harness <name> --repo <url>` (workspace + project: cloned and ALIVE; only `.dadaia/.venv/bin/dadaia context bind <slug>` binds a session), then `.dadaia/.venv/bin/dadaia specs init --context <slug>` (specs on the canon) and `.dadaia/.venv/bin/dadaia doctor`; every later command runs through `.dadaia/.venv/bin/dadaia`; re-running the `uvx` init line upgrades the workspace, then `.dadaia/.venv/bin/dadaia specs init --context <ctx>` refreshes each project's specs law.
 - [Changelog](CHANGELOG.md): written by release-please, one section per released version.
@@ -19,7 +19,7 @@
 ## The law
 
 <!-- derived-from: agentic-entities sha256:6add03805476 -->
-<!-- derived-from: sdd-gate-v3 sha256:f870acc7c776 -->
+<!-- derived-from: sdd-gate-v3 sha256:8cc77479943b -->
 
 - [AGENTS.md](dadaia_workspace/public/data/AGENTS.md): the always-on root map — flow, roles, gate invariants, where things live, the index of every scoped `AGENTS.md` and skill; projected once to the workspace root.
 

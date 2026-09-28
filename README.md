@@ -45,9 +45,9 @@ memory atom under its content hash.
 ## A human installs and uses it
 
 <!-- derived-from: pypi-distribution sha256:618098346ed6 -->
-<!-- derived-from: workspace-init sha256:bc2612c3f80d -->
-<!-- derived-from: context-management sha256:dc1a239f4970 -->
-<!-- derived-from: workspace-doctor sha256:8e52123b79e7 -->
+<!-- derived-from: workspace-init sha256:acb8bc28e783 -->
+<!-- derived-from: context-management sha256:bc3b4f2b4d9a -->
+<!-- derived-from: workspace-doctor sha256:eb7b1e19b277 -->
 
 ```bash
 uvx dadaia-workspace init demo --harness claude --repo <clone url>   # level 1 + 2
@@ -94,8 +94,8 @@ and deletes only what a TTL expired.
 ## An agent reads AGENTS.md and uses it
 
 <!-- derived-from: agentic-entities sha256:6add03805476 -->
-<!-- derived-from: sdd-gate-v3 sha256:f870acc7c776 -->
-<!-- derived-from: release-lifecycle sha256:a31b50804ef1 -->
+<!-- derived-from: sdd-gate-v3 sha256:8cc77479943b -->
+<!-- derived-from: release-lifecycle sha256:16af688b63c6 -->
 <!-- derived-from: bug-ledger sha256:eeebe84481a4 -->
 <!-- derived-from: harness-claude-code sha256:55ba15667a89 -->
 <!-- derived-from: harness-codex sha256:b907c260a862 -->
@@ -135,7 +135,7 @@ with a RED test. Completed work leaves as a `handoff-v1` record, validated by
 ## Documentation
 
 <!-- derived-from: pypi-distribution sha256:618098346ed6 -->
-<!-- derived-from: public-asset-distribution sha256:7e9eddf68214 -->
+<!-- derived-from: public-asset-distribution sha256:70f6745b96cd -->
 
 The documentation is the repository's [docs folder](https://github.com/marcoaureliomenezes/dadaia-workspace/tree/main/docs):
 

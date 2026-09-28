@@ -6,7 +6,7 @@ the terms are defined in [concepts](concepts.md) and in [`CONTEXT.md`](../CONTEX
 ## Install
 
 <!-- derived-from: pypi-distribution sha256:618098346ed6 -->
-<!-- derived-from: workspace-init sha256:bc2612c3f80d -->
+<!-- derived-from: workspace-init sha256:acb8bc28e783 -->
 
 ```bash
 uvx dadaia-workspace init <dir> --harness claude --repo <url>
@@ -27,7 +27,7 @@ refreshes each project's specs law.
 
 ## Level 1 — the workspace
 
-<!-- derived-from: workspace-init sha256:bc2612c3f80d -->
+<!-- derived-from: workspace-init sha256:acb8bc28e783 -->
 
 `uvx dadaia-workspace init <dir> --harness claude|codex|kimi-code|cursor|devin|copilot
 [--repo <url>] [--associated-repo <url>]… [--skip-assets]` is the only verb that works
@@ -52,7 +52,7 @@ harness later and `.dadaia/.venv/bin/dadaia harness list` reads the roster.
 ## Level 2 — the project
 
 <!-- derived-from: spec-context-project sha256:47c11b26b98f -->
-<!-- derived-from: context-management sha256:dc1a239f4970 -->
+<!-- derived-from: context-management sha256:bc3b4f2b4d9a -->
 
 A context — a Spec Context Project — is the unit of work: one canonical `specs/` tree
 owned by one main repository, optionally spanning associated repositories that live and
@@ -94,7 +94,7 @@ branches; a re-run is a no-op.
 
 ## Check compliance — `doctor`
 
-<!-- derived-from: workspace-doctor sha256:8e52123b79e7 -->
+<!-- derived-from: workspace-doctor sha256:eb7b1e19b277 -->
 
 ```bash
 .dadaia/.venv/bin/dadaia doctor --context <ctx> [--json] [--fix] [--redact]
@@ -120,7 +120,7 @@ a TTL expired.
 
 ## Run the first candidate
 
-<!-- derived-from: release-lifecycle sha256:a31b50804ef1 -->
+<!-- derived-from: release-lifecycle sha256:16af688b63c6 -->
 <!-- derived-from: backlog-ledger sha256:46382434daf2 -->
 <!-- derived-from: bug-ledger sha256:eeebe84481a4 -->
 
