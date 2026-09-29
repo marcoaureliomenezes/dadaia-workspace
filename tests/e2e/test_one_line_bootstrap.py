@@ -1,6 +1,7 @@
 """``dadaia init <dir> --harness claude --repo <url>`` end to end, through the console script.
 
-Intent: CONTRACT — 0.4.7 FR1 / AC1.1 (T-047-79); 0.4.8 AC1.1/AC1.4 closing (T-048-04).
+Intent: CONTRACT — 0.4.7 FR1 / AC1.1 (T-047-79); 0.4.8 AC1.1/AC1.4 closing (T-048-04);
+0.4.8 AC3.6/AC8.2 (bug test-suite-wall-clock-doubled-past-its-frozen-budget).
 
 Size: LARGE, justified — AC1.1 is a statement about the *installed* distribution, not
 about any in-process wiring: an operator types one line and the workspace that appears
@@ -82,8 +83,9 @@ def _dadaia(
     )
 
 
-def _git(*args: str, cwd: Path, home: Path) -> None:
-    subprocess.run(["git", *args], cwd=cwd, check=True, capture_output=True, env=_child_env(home))
+def _git(*args: str, cwd: Path, home: Path) -> bytes:
+    env = _child_env(home)
+    return subprocess.run(["git", *args], cwd=cwd, check=True, capture_output=True, env=env).stdout
 
 
 def _seed_venv_entrypoint(workspace: Path) -> None:
@@ -131,7 +133,8 @@ def origin(tmp_path: Path, home: Path) -> Path:
 def test_one_line_bootstrap_yields_a_doctor_clean_workspace(
     tmp_path: Path, home: Path, origin: Path
 ) -> None:
-    """AC1.1: one line, then ``doctor`` exit 0 and the repo ALIVE as ``main_repo``."""
+    """AC1.1: one line, then ``doctor`` exit 0 and the repo ALIVE as ``main_repo``;
+    AC3.6/AC8.2: the user repo is untouched."""
     workspace = tmp_path / "demo"
     workspace.mkdir()
     _seed_venv_entrypoint(workspace)
@@ -140,6 +143,12 @@ def test_one_line_bootstrap_yields_a_doctor_clean_workspace(
         "init", "demo", "--harness", "claude", "--repo", str(origin), cwd=tmp_path, home=home
     )
     assert init.returncode == 0, f"init failed:\n{init.stdout}\n{init.stderr}"
+    # AC3.6 / AC8.2: `init --repo` commits nothing into the user repo — clean tree, HEAD at origin.
+    repo = workspace / "repos" / "demo-project"
+    assert _git("status", "--porcelain", cwd=repo, home=home) == b""
+    assert _git("rev-parse", "HEAD", cwd=repo, home=home) == _git(
+        "rev-parse", "main", cwd=origin, home=home
+    )
 
     # 0.4.8 AC1.1/AC1.4: a short closing naming the CLI by its absolute venv path, no bare verb.
     assert len(init.stdout.splitlines()) <= 12, init.stdout
