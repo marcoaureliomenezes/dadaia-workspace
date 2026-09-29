@@ -29,10 +29,7 @@ def _run(*argv: str) -> subprocess.CompletedProcess[str]:
 
 
 def _check(specs: Path) -> list[dict[str, Any]]:
-    findings: list[dict[str, Any]] = json.loads(
-        _run("check", "--specs", str(specs), "--json").stdout
-    )
-    return findings
+    return list(json.loads(_run("check", "--specs", str(specs), "--json").stdout))
 
 
 def _entry(ts: str, **over: object) -> dict[str, object]:
@@ -107,7 +104,8 @@ def test_a_legacy_next_dir_is_not_live_and_new_refuses(tmp_path: Path) -> None:
     result = _run("new", "0.6.0", "--specs", str(specs))
     assert result.returncode == 1 and "next" in result.stderr
     assert not (specs / "releases" / "0.6.0").exists()
-    assert any(f["path"] == "releases/next" for f in _check(specs))
+    [fix] = [f["fix"] for f in _check(specs) if f["path"] == "releases/next"]  # tree8-and-027
+    move = f"{(specs / 'releases/next').resolve()} into its canon shape (a bare M.m.p id)"
+    assert fix == f"Operator action: move {move}, or out of specs/"
     assert resolve_active_release(specs) == (None, None)
-    doctor = SpecsDoctor(specs).check()
-    assert any("/next/" in i.message for i in doctor if i.code == "TREE-8")
+    assert any("/next/" in i.message for i in SpecsDoctor(specs).check() if i.code == "TREE-8")

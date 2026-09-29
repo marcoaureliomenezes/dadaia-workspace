@@ -120,8 +120,10 @@ def tree_findings(specs: Path) -> list[dict[str, Any]]:
         if SEMVER_RE.match(d.name):
             findings += _directory_findings(d, specs)
         elif d.name != "_archive" and (d / STATE).is_file():
-            findings.append(finding(f"releases/{d.name}", 1, f"{d.name!r} is not a bare M.m.p "
-                                    "release id, so it is not a live release"))  # fmt: skip
+            move = f"{d.resolve()} into its canon shape (a bare M.m.p id), or out of specs/"
+            findings.append({**finding(f"releases/{d.name}", 1, f"{d.name!r} is not a bare M.m.p "
+                             "release id, so it is not a live release"),
+                             "fix": f"Operator action: move {move}"})  # fmt: skip
     if len(ids := live_ids(specs)) > 1:
         findings.append(finding("releases", 1, f"multiple live release directories carry "
                                 f"{STATE}: {', '.join(ids)} — exactly one is allowed"))  # fmt: skip
