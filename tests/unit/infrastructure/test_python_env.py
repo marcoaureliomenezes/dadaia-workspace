@@ -86,9 +86,8 @@ def test_fresh_bootstrap_creates_venv_and_installs_package(
     mgr = VenvPythonEnvironmentManager()
     assert mgr.ensure_workspace_venv(str(tmp_path)) == _venv(tmp_path)
 
-    create, uninstall, install, toolchain = recorder.commands
+    create, install, toolchain = recorder.commands
     assert create[:3] == ["fake-interpreter", "-m", "venv"] and create[-1] == _venv(tmp_path)
-    assert uninstall[1:2] + uninstall[-1:] == ["uninstall", "dadaia-workspace"]
     assert install[:2] == [mgr.pip_executable(str(tmp_path)), "install"]
     assert "--editable" in install and (Path(install[-1]) / "pyproject.toml").is_file()
     assert toolchain[-1] == "pytest"
@@ -98,7 +97,7 @@ def test_existing_bare_venv_is_repaired_not_skipped(tmp_path: Path, recorder: _R
     """The VENV-1 state: venv dir present, entrypoint missing -> install, no re-create."""
     (Path(_venv(tmp_path)) / PLATFORM.venv_scripts_dir).mkdir(parents=True)
     VenvPythonEnvironmentManager().ensure_workspace_venv(str(tmp_path))
-    assert (recorder.venv_created, len(recorder.commands)) == ([], 3)
+    assert (recorder.venv_created, len(recorder.commands)) == ([], 2)
 
 
 def test_healthy_venv_is_a_noop(tmp_path: Path, recorder: _Recorder) -> None:
@@ -135,7 +134,7 @@ def test_reinit_reinstalls_only_an_older_venv(
     recorder.installed = installed if " " in installed else f"{installed} {build_digest(None)}"
     VenvPythonEnvironmentManager().ensure_workspace_venv(str(tmp_path))
     pip = VenvPythonEnvironmentManager().pip_executable(str(tmp_path))
-    assert [c[:3] for c in recorder.commands[1:2]] == (
+    assert [c[:3] for c in recorder.commands[:1]] == (
         [[pip, "install", "--quiet"]] if installs else []
     )
 
@@ -188,8 +187,8 @@ def test_local_candidate_wheel_overrides_index_pin_without_editable(
     wheel.write_bytes(b"candidate")
     monkeypatch.setenv("DADAIA_BOOTSTRAP_PACKAGE", str(wheel))
     VenvPythonEnvironmentManager().ensure_workspace_venv(str(tmp_path / "workspace"))
-    assert recorder.commands[2][-1] == str(wheel)
-    assert "--editable" not in recorder.commands[2]
+    assert recorder.commands[1][-1] == str(wheel)
+    assert "--editable" not in recorder.commands[1]
 
 
 def test_bootstrap_installs_the_repacked_running_distribution(
@@ -210,7 +209,7 @@ def test_bootstrap_installs_the_repacked_running_distribution(
     ws = tmp_path / "ws"
     VenvPythonEnvironmentManager().ensure_workspace_venv(str(ws))
 
-    assert [c[-1] for c in recorder.commands[2:]] == [str(written[0]), "pytest"]
+    assert [c[-1] for c in recorder.commands[1:]] == [str(written[0]), "pytest"]
     assert not any("==" in token for call in recorder.commands for token in call)
     assert not written[0].exists() and not (ws / ".dadaia" / "tmp").exists()
 
@@ -258,24 +257,33 @@ def test_repack_returns_none_for_editable_install(tmp_path: Path) -> None:
     assert repack_installed_wheel(tmp_path / "out", dist=Distribution.at(dist_info)) is None
 
 
-def test_the_install_stream_is_captured_and_its_failure_narrated(
+def test_a_failed_reinstall_is_narrated_and_keeps_the_old_build(
     tmp_path: Path, recorder: _Recorder, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Bug init-succeeds-after-provider-bootstrap-failure: pip's raw stream never reaches
-    the operator; its failure is one error carrying pip's line."""
+    """Bugs init-succeeds-after-provider-bootstrap-failure and
+    reinit-with-unchanged-version-label-mixes-venv-and-projection: pip's raw stream never
+    reaches the operator, and a failed reinstall of a same-label build is ONE pip
+    transaction (``--force-reinstall``), so pip's rollback leaves the old ``dadaia`` in
+    place — never a venv without it. The fake models pip: ``uninstall`` removes the build."""
+    _healthy(tmp_path)
+    recorder.installed = "0.0.1 old-build"
     mgr = VenvPythonEnvironmentManager()
     monkeypatch.setattr(mgr, "_install_spec", lambda workspace_root: "/tmp/w.whl")
-    seen: list[dict[str, object]] = []
+    entry = Path(_venv(tmp_path)) / PLATFORM.venv_scripts_dir / f"dadaia{PLATFORM.venv_exe_suffix}"
+    seen: list[list[str]] = []
 
-    def failing(cmd: list[str], check: bool = False, **kwargs: object) -> None:
-        seen.append(kwargs)
-        if cmd[-1] == "/tmp/w.whl":
+    def failing_pip(cmd: list[str], check: bool = False, **kwargs: object) -> None:
+        seen.append(list(cmd))
+        assert kwargs.get("capture_output")
+        if "uninstall" in cmd:
+            entry.unlink()
+        elif cmd[-1] == "/tmp/w.whl":
             raise subprocess.CalledProcessError(1, cmd, output="", stderr="ERROR: no dist")
 
-    monkeypatch.setattr(python_env_module.subprocess, "run", failing)
+    monkeypatch.setattr(python_env_module.subprocess, "run", failing_pip)
     with pytest.raises(python_env_module.WorkspaceVenvBootstrapError, match="ERROR: no dist"):
         mgr.ensure_workspace_venv(str(tmp_path))
-    assert seen and all(k.get("capture_output") for k in seen)
+    assert entry.exists() and "--force-reinstall" in seen[-1]
 
 
 def test_verification_failure_fails_the_bootstrap(

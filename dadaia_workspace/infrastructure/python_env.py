@@ -435,7 +435,9 @@ class VenvPythonEnvironmentManager:
             pip = self.pip_executable(workspace_root)
             with tempfile.TemporaryDirectory(prefix="dadaia-wheel-") as scratch:
                 spec = self._install_spec(scratch)
-                install_cmd = [pip, "install", "--quiet"]
+                # ONE pip transaction replaces any installed build (same label or not)
+                # with its dependencies; on failure pip rolls back to the old build.
+                install_cmd = [pip, "install", "--quiet", "--force-reinstall"]
                 editable = Path(spec).is_dir()
                 if editable:
                     install_cmd.append("--editable")
@@ -444,12 +446,8 @@ class VenvPythonEnvironmentManager:
                 # CAPTURED — a failure must not leak a raw "ERROR: Could not find a
                 # version..." into init's output, where it reads as a masked broken
                 # bootstrap.
-                # pip keeps an installed distribution of the same version, so the venv's
-                # build leaves first (a no-op on a fresh venv).
-                uninstall_cmd = [pip, "uninstall", "--quiet", "--yes", "dadaia-workspace"]
                 try:
-                    for cmd in (uninstall_cmd, install_cmd):
-                        subprocess.run(cmd, check=True, capture_output=True, text=True)
+                    subprocess.run(install_cmd, check=True, capture_output=True, text=True)
                 except subprocess.CalledProcessError as exc:
                     raise WorkspaceVenvBootstrapError(
                         f"workspace venv bootstrap failed installing '{spec}'. The "
