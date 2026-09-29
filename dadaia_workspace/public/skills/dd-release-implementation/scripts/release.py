@@ -18,13 +18,13 @@ sys.dont_write_bytecode = True
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 sys.path.append(str(Path(__file__).resolve().parents[2] / "dd-bug-resolution" / "scripts"))
 
-from _ledger import find_specs  # noqa: E402
 from _release_check import histo_findings  # noqa: E402
 from _release_new import new_release  # noqa: E402
 from _release_phase import set_phase  # noqa: E402
 from _release_schema import CODE, HISTO, SHA_RE, STATE, utc_now  # noqa: E402
 from _release_store import Refusal, commit, live_release, window_start  # noqa: E402
 from _release_tree import check, drift, memory_errors  # noqa: E402
+from _specs import find_specs, refuse  # noqa: E402
 
 _HELP = {
     "new": "mint the one live release: its SPEC.md stub and _RELEASE.json, in one act",
@@ -94,7 +94,7 @@ def _memory(args: argparse.Namespace, specs: Path) -> int:
     except drift.Refusal as refusal:
         raise Refusal(str(refusal), refusal.fix) from refusal
     if errors:
-        raise Refusal(errors[0], f"{Path(__file__).name} memory --help")
+        raise Refusal(errors[0], f"{Path(__file__)} memory --help")
     commit(live.release_dir / STATE, f"releases/{live.release_id}/{STATE}",
            lambda state: {**state, "log": [*(state.get("log") or []), entry]})  # fmt: skip
     print(f"[ok] release {live.release_id} log <- kind memory {since}..{until[:12]} ({ts})")
@@ -103,7 +103,7 @@ def _memory(args: argparse.Namespace, specs: Path) -> int:
 
 def _ship(args: argparse.Namespace, specs: Path) -> int:
     """CLOSURE -> shipped {sha, pr, ts}, one `delivered` histo line, the directory gone."""
-    live, ts, fix = live_release(specs), utc_now(), f"{Path(__file__)} check --specs {specs}"
+    live, ts, fix = live_release(specs), utc_now(), f"{Path(__file__)} check"
     if not (SHA_RE.match(args.sha) and args.pr.isdigit() and int(args.pr) > 0):
         raise Refusal(f"--sha {args.sha!r} / --pr {args.pr!r}: a hex sha and a PR number",
                       f"{Path(__file__)} ship --sha $(git rev-parse --short HEAD) --pr <n>")  # fmt: skip
@@ -130,7 +130,7 @@ _VERBS = {"new": _new, "phase": _phase, "drift": _drift, "memory": _memory, "shi
 
 def main(argv: list[str] | None = None) -> int:
     args = _parser().parse_args(argv)
-    specs = args.specs if args.specs is not None else find_specs(Path.cwd())
+    specs = find_specs(args.specs)
     if args.verb == "check":
         findings = check(specs)
         print(json.dumps(findings, indent=2)) if args.json else [
@@ -140,9 +140,7 @@ def main(argv: list[str] | None = None) -> int:
     try:
         return _VERBS[args.verb](args, specs)
     except (Refusal, drift.Refusal) as refusal:
-        print(f"[error] {refusal}", file=sys.stderr)
-        print(f"fix: {refusal.fix}", file=sys.stderr)
-        return 1
+        return refuse(refusal, specs)
 
 
 if __name__ == "__main__":

@@ -22,9 +22,9 @@ sys.path.append(str(Path(__file__).resolve().parents[2] / "dd-bug-resolution" / 
 
 import _memory_catalog as cat  # noqa: E402
 import _memory_drift as dft  # noqa: E402
-from _ledger import find_specs  # noqa: E402
 from _memory_check import check  # noqa: E402
 from _memory_schema import CATALOG, INDEX  # noqa: E402
+from _specs import find_specs, refuse  # noqa: E402
 
 
 def _parser() -> argparse.ArgumentParser:
@@ -62,7 +62,7 @@ def _drift(args: argparse.Namespace, specs: Path) -> int:
 
 def main(argv: list[str] | None = None) -> int:
     args = _parser().parse_args(argv)
-    specs = args.specs.resolve() if args.specs is not None else find_specs(Path.cwd())
+    specs = find_specs(args.specs)
     if args.verb == "check":
         findings = check(specs)
         if args.json:
@@ -77,9 +77,7 @@ def main(argv: list[str] | None = None) -> int:
             return _drift(args, specs)
         print(_generate(specs))
     except (cat.Refusal, dft.Refusal) as refusal:
-        print(f"[error] {refusal}", file=sys.stderr)
-        print(f"fix: {refusal.fix}", file=sys.stderr)
-        return 1
+        return refuse(refusal, specs)
     return 0
 
 

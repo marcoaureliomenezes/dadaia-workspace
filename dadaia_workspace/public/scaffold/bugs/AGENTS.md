@@ -5,7 +5,8 @@ Scope: this file governs only `specs/bugs/`.
 - This directory holds the bug ledger: `BUGS.jsonl`, one JSON record per bug, appended once.
 - No event stream, no fold. Schema: `bug-record-v1` (`schemas/bugs/bug-record-v1.schema.json`).
 - There is no per-bug Markdown file and no session-lock gate on filing.
-- The ledger's ONE writer and validator — `bugs.py` below — is `python3 .agents/skills/dd-bug-resolution/scripts/bugs.py <verb> --specs specs`.
+- The ledger's ONE writer and validator — `bugs.py` below — is `python3 .agents/skills/dd-bug-resolution/scripts/bugs.py <verb> --specs repos/<context>/specs` from the workspace root.
+- `bugs.py` never creates a specs tree: a `--specs` that does not exist refuses, and its `fix:` names the bound context's tree.
 
 ## 1. What a bug is
 

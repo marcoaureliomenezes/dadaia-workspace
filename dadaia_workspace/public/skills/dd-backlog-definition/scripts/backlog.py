@@ -25,12 +25,11 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 sys.path.append(str(Path(__file__).resolve().parents[2] / "dd-bug-resolution" / "scripts"))
 
 import _backlog_exit as ex  # noqa: E402
-import _backlog_subjects as sj  # noqa: E402
 import _backlog_write as wr  # noqa: E402
 from _backlog_check import check  # noqa: E402
 from _backlog_schema import CODE, DISPOSITIONS, HISTO, LEDGER  # noqa: E402
 from _backlog_store import Refusal, commit, read_active  # noqa: E402
-from _ledger import find_specs  # noqa: E402
+from _specs import find_specs, refuse  # noqa: E402
 
 _HELP = {
     "new": "append one brand-new active[] entry, born at status 'idea'",
@@ -89,9 +88,20 @@ def _exit(args: argparse.Namespace, specs: Path) -> int:
     return 0
 
 
+def _subjects(args: argparse.Namespace, specs: Path) -> int:
+    """List the alias map's anchors, optionally one kind; resolving a ref is the doctor's."""
+    alias_map = args.alias_map if args.alias_map is not None else specs.parent / _ALIAS_DEFAULT
+    text = alias_map.read_text(encoding="utf-8") if alias_map.is_file() else ""
+    anchors = sorted({line.split("->", 1)[1].strip() for line in text.splitlines()
+                      if "->" in line and not line.lstrip().startswith("#")})  # fmt: skip
+    listed = [a for a in anchors if args.kind is None or a.startswith(f"{args.kind}:")]
+    print(*listed, f"\n[ok] {len(listed)} anchor(s).", sep="\n")
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     args = _parser().parse_args(argv)
-    specs = args.specs if args.specs is not None else find_specs(Path.cwd())
+    specs = find_specs(args.specs)
     if args.verb == "check":
         findings = check(specs)
         print(json.dumps(findings, indent=2)) if args.json else [
@@ -100,12 +110,10 @@ def main(argv: list[str] | None = None) -> int:
         return 1 if findings else 0
     try:
         if args.verb == "subjects":
-            return sj.subjects(args, specs, _ALIAS_DEFAULT)
+            return _subjects(args, specs)
         return _new(args, specs) if args.verb == "new" else _exit(args, specs)
     except Refusal as refusal:
-        print(f"[error] {refusal}", file=sys.stderr)
-        print(f"fix: {refusal.fix}", file=sys.stderr)
-        return 1
+        return refuse(refusal, specs)
 
 
 if __name__ == "__main__":

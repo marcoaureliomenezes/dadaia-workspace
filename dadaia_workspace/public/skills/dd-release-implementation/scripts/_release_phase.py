@@ -48,7 +48,7 @@ def _refuse_unapproved_trio(live: Live) -> None:
         if not document.is_file():
             raise Refusal(
                 f"release {live.release_id} has no {name} at root",
-                f"{SCRIPT} new {live.release_id} --specs <specs>",
+                f"{SCRIPT} new {live.release_id}",
             )
         status = extract_status(document.read_text(encoding="utf-8"))
         if status != APPROVED:

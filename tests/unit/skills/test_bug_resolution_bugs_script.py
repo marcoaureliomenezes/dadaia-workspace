@@ -142,16 +142,19 @@ def test_json_output_carries_one_object_per_finding(script: Path, tmp_path: Path
     assert payload[0]["line"] == 1
 
 
-def test_missing_specs_above_cwd_is_refused_with_one_fix_line(script: Path, tmp_path: Path) -> None:
-    """No `specs/` at or above cwd whose parent holds `.git` — the default resolution
-    refuses rather than guessing, and says exactly how to proceed."""
-    lonely = tmp_path / "nowhere"
-    lonely.mkdir()
-    done = _run(script, "check", cwd=lonely)
-    assert done.returncode == 1
-    fixes = [ln for ln in (done.stdout + done.stderr).splitlines() if ln.startswith("fix:")]
-    assert len(fixes) == 1
-    assert "--specs" in fixes[0]
+@pytest.mark.skipif(sys.platform == "win32", reason="the fake workspace CLI is a shebang script")
+def test_a_missing_specs_tree_is_refused_never_created(script: Path, tmp_path: Path) -> None:
+    """bug-law-spelling-registers-into-a-reaped-root-specs-tree: the fix names the bound tree."""
+    (cli := tmp_path / ".dadaia/.venv/bin/dadaia").parent.mkdir(parents=True)
+    cli.write_text(f'#!{sys.executable}\nprint(\'{{"main_repo": "demo"}}\')\n', "utf-8")
+    cli.chmod(0o755)
+    (tmp_path / ".git").mkdir()
+    argv = ["append", "--bug-id", "x", "--title", "t", "--severity", "LOW", "--surface", "cli",
+            "--component", "c", "--context", "c", "--symptom", "s", "--repro", "r", "--expected", "e"]  # fmt: skip
+    done = _run(script, *argv, "--specs", "specs", cwd=tmp_path)
+    assert done.returncode == 1 and not (tmp_path / "specs").exists()
+    fix = f"fix: {script} {' '.join(argv)} --specs {tmp_path}/repos/demo/specs"
+    assert [ln for ln in done.stderr.splitlines() if ln.startswith("fix:")] == [fix]
 
 
 def test_specs_default_resolves_the_nearest_git_rooted_specs_tree(
@@ -370,6 +373,8 @@ def test_resolve_refuses_an_unknown_caused_by(script: Path, tmp_path: Path) -> N
     done = _run(script, *_resolve_argv(caused_by="never-filed"), "--specs", str(specs))
     assert done.returncode == 1
     assert "not a record of this bug ledger" in done.stderr
+    # ledger-fix-lines-drop-specs: the fix runs as printed, from any cwd
+    assert f"fix: {script} resolve a-bug --caused-by none --specs {specs.resolve()}" in done.stderr
     assert _records(specs)[0]["status"] == "open"
 
 

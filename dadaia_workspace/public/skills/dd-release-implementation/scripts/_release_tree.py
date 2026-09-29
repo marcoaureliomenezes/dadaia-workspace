@@ -22,6 +22,7 @@ import _memory_drift as drift  # noqa: E402
 from _release_check import finding, histo_findings, state_findings  # noqa: E402
 from _release_schema import HISTO, SEMVER_RE, STATE, TRIO, TRIO_PHASES  # noqa: E402
 from _release_store import SCRIPT, Refusal, live_ids, live_release, window_start  # noqa: E402
+from _specs import with_specs  # noqa: E402
 
 __all__ = ["check", "drift", "memory_errors", "tree_findings"]
 
@@ -98,7 +99,7 @@ def _window_findings(specs: Path) -> list[dict[str, Any]]:
         return []
     rel = f"releases/{live.release_id}/{STATE}"
     if message := _memory_record_error(live.state):
-        fix = f"{SCRIPT} memory --reviewed <slugs> --changed <slugs>"
+        fix = with_specs(f"{SCRIPT} memory --reviewed <slugs> --changed <slugs>", specs)
         return [{**finding(rel, 1, message), "fix": fix}]
     entry = [e for e in live.state["log"] if isinstance(e, dict) and e.get("kind") == "memory"][-1]
     until = str(entry["until"])

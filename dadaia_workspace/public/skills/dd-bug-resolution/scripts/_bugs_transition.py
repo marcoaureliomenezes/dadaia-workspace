@@ -51,7 +51,7 @@ def transition(records: Records, bug_id: str, verb: str, values: dict[str, Any],
         if values["caused_by"] != "none" and values["caused_by"] not in known_ids:
             raise Refusal(
                 f"caused_by {values['caused_by']!r} is not a record of this bug ledger",
-                f"{_SCRIPT} resolve {bug_id} --caused-by none --specs <specs>",
+                f"{_SCRIPT} resolve {bug_id} --caused-by none",
             )
         for key in REQUIRED_BY_VERB["resolve"]:
             _set(updated, key, values[key])

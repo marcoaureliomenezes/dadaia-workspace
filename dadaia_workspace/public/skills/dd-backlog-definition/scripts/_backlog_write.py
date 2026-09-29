@@ -30,7 +30,7 @@ def parse_intents(raw: list[str] | None) -> list[dict[str, Any]]:
         if match is None or match.group("kind") not in _KINDS:
             raise Refusal(
                 f"intent {item!r} is not '<kind>:<ref>=<change>' with kind in {list(_KINDS)}",
-                f"{SCRIPT} subjects --specs <specs>",
+                f"{SCRIPT} subjects",
             )
         intents.append(
             {
@@ -49,13 +49,13 @@ def new_entry(active: Items, slug: str, values: dict[str, Any]) -> Items:
         raise Refusal(
             f"invalid slug {slug!r}: must match ^[a-z][a-z0-9-]+$ (lowercase letters, "
             "digits and hyphens, starting with a letter)",
-            f"{SCRIPT} new <a-valid-slug> --specs <specs>",
+            f"{SCRIPT} new <a-valid-slug>",
         )
     if any(item.get("id") == slug for item in active):
         raise Refusal(
             f"backlog slug {slug!r} is already a live active[] entry — an item is retained "
             "forever, so a second entry under this id would be a second identity for it",
-            f"{SCRIPT} new <another-slug> --specs <specs>",
+            f"{SCRIPT} new <another-slug>",
         )
     intents = parse_intents(values.get("intent"))
     entry: dict[str, Any] = {

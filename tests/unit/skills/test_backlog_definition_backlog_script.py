@@ -97,15 +97,6 @@ def test_absent_document_is_not_a_finding(script: Path, tmp_path: Path) -> None:
     assert _run(script, "check", "--specs", str(specs)).returncode == 0
 
 
-def test_missing_specs_above_cwd_is_refused_with_one_fix_line(script: Path, tmp_path: Path) -> None:
-    lonely = tmp_path / "nowhere"
-    lonely.mkdir()
-    done = _run(script, "check", cwd=lonely)
-    assert done.returncode == 1
-    assert len(_fix_lines(done)) == 1
-    assert "--specs" in _fix_lines(done)[0]
-
-
 # --- new ----------------------------------------------------------------------------
 
 

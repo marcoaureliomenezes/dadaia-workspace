@@ -63,10 +63,10 @@ def read_state(path: Path) -> State:
     except (OSError, json.JSONDecodeError) as exc:
         raise Refusal(
             f"{path.name} is not a readable release-state-v1 document ({exc})",
-            f"{SCRIPT} check --specs <specs>",
+            f"{SCRIPT} check",
         ) from exc
     if not isinstance(document, dict):
-        raise Refusal(f"{path.name} is not a JSON object", f"{SCRIPT} check --specs <specs>")
+        raise Refusal(f"{path.name} is not a JSON object", f"{SCRIPT} check")
     return document
 
 
@@ -76,13 +76,13 @@ def live_release(specs: Path) -> Live:
     if not ids:
         raise Refusal(
             "no live release under specs/releases/ — nothing to operate on",
-            f"{SCRIPT} new <M.m.p> --specs {specs}",
+            f"{SCRIPT} new <M.m.p>",
         )
     if len(ids) > 1:
         raise Refusal(
             f"multiple live release directories carry {STATE}: {', '.join(ids)} — the "
             "release-candidates model allows exactly one",
-            f"{SCRIPT} check --specs {specs}",
+            f"{SCRIPT} check",
         )
     release_dir = specs / "releases" / ids[0]
     return Live(ids[0], release_dir, read_state(release_dir / STATE))
@@ -110,7 +110,7 @@ def validated(state: State, rel: str) -> str:
         detail = "; ".join(str(f["message"]) for f in findings[:5])
         raise Refusal(
             f"the resulting {rel} would not pass check — nothing was written ({detail})",
-            f"{SCRIPT} check --specs <specs>",
+            f"{SCRIPT} check",
         )
     return text
 

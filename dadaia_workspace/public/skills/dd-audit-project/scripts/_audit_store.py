@@ -68,7 +68,7 @@ def read_findings(directory: Path) -> list[dict[str, Any]]:
         raise Refusal(
             f"specs/{AUDITS}/{directory.name}/{FINDINGS} line {problems[0]['line']} does not "
             f"pass check ({problems[0]['message']}) — nothing was written",
-            f"{SCRIPT} check --specs <specs>",
+            f"{SCRIPT} check",
         )
     return [json.loads(line) for line in text.split("\n") if line.strip()]
 
@@ -85,7 +85,7 @@ def write_findings(directory: Path, records: list[dict[str, Any]]) -> None:
         raise Refusal(
             f"the resulting {FINDINGS} would not pass check — nothing was written "
             f"({problems[0]['message']})",
-            f"{SCRIPT} check --specs <specs>",
+            f"{SCRIPT} check",
         )
     replace(directory / FINDINGS, text)
 
@@ -100,7 +100,7 @@ def append_histo(specs: Path, record: dict[str, Any]) -> None:
         raise Refusal(
             f"the {HISTO} record this close would write does not pass check — nothing "
             f"was written ({problems[0]['message']})",
-            f"{SCRIPT} check --specs <specs>",
+            f"{SCRIPT} check",
         )
     path = specs / HISTO
     existing = path.read_text(encoding="utf-8") if path.is_file() else ""

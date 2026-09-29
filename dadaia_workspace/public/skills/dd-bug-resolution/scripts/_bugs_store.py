@@ -70,7 +70,7 @@ def _validated(records: Records, rel: str, before: Records) -> str:
         detail = "; ".join(f"line {f['line']}: {f['message']}" for f in findings[:5])
         raise Refusal(
             f"the resulting {rel} would not pass check — nothing was written ({detail})",
-            f"{Path(__file__).parent / 'bugs.py'} check --specs <specs>",
+            f"{Path(__file__).parent / 'bugs.py'} check",
         )
     return text
 
@@ -112,5 +112,5 @@ def by_id(records: Records, bug_id: str) -> dict[str, Any]:
             return record
     raise Refusal(
         f"no bug record with id {bug_id!r} in this ledger",
-        f"{Path(__file__).parent / 'bugs.py'} status --all --specs <specs>",
+        f"{Path(__file__).parent / 'bugs.py'} status --all",
     )

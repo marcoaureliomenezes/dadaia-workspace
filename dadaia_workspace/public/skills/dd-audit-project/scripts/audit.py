@@ -26,7 +26,7 @@ sys.path.append(str(Path(__file__).resolve().parents[2] / "dd-bug-resolution" / 
 import _audit_verbs as vb  # noqa: E402
 from _audit_check import DISPOSITIONS, check  # noqa: E402
 from _audit_store import Refusal  # noqa: E402
-from _ledger import find_specs  # noqa: E402
+from _specs import find_specs, refuse  # noqa: E402
 
 _HELP = {
     "disposition": "rewrite one finding's disposition, release and reason, in place",
@@ -58,7 +58,7 @@ def _parser() -> argparse.ArgumentParser:
 
 def main(argv: list[str] | None = None) -> int:
     args = _parser().parse_args(argv)
-    specs = args.specs if args.specs is not None else find_specs(Path.cwd())
+    specs = find_specs(args.specs)
     if args.verb == "check":
         findings = check(specs)
         if args.json:
@@ -75,9 +75,7 @@ def main(argv: list[str] | None = None) -> int:
         else:
             print(vb.close(specs, args.audit, args.sha))
     except Refusal as refusal:
-        print(f"[error] {refusal}", file=sys.stderr)
-        print(f"fix: {refusal.fix}", file=sys.stderr)
-        return 1
+        return refuse(refusal, specs)
     return 0
 
 

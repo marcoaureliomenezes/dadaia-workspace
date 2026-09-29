@@ -8,7 +8,6 @@ import contextlib
 import json
 import os
 import re
-import sys
 import time
 from pathlib import Path
 from types import ModuleType, SimpleNamespace
@@ -74,16 +73,6 @@ def validate(value: object, spec: dict[str, Any], root: dict[str, Any], where: s
 
 def finding(code: str, path: str, line: int, message: str) -> dict[str, Any]:
     return {"code": code, "verdict": "error", "path": path, "line": line, "message": message}
-
-
-def find_specs(start: Path) -> Path:
-    """The nearest ``specs/`` at or above *start* whose parent holds ``.git``."""
-    for candidate in (start, *start.parents):
-        if (candidate / "specs").is_dir() and (candidate / ".git").exists():
-            return candidate / "specs"
-    print(f"error: no git-rooted specs/ at or above {start}", file=sys.stderr)
-    print("fix: run this script again with --specs <path-to-specs>", file=sys.stderr)
-    raise SystemExit(1)
 
 
 def stamp(path: Path) -> tuple[int, int] | None:

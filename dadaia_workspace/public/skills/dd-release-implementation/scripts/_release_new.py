@@ -92,7 +92,7 @@ def refuse_unfree(specs: Path, release_id: str) -> State | None:
     if not SEMVER_RE.match(release_id):
         raise Refusal(
             f"{release_id!r} is not a bare SemVer release id (M.m.p)",
-            f"{SCRIPT} new 0.1.23 --specs {specs}",
+            f"{SCRIPT} new 0.1.23",
         )
     releases, live = specs / "releases", live_ids(specs)
     release_dir = releases / release_id
@@ -104,15 +104,13 @@ def refuse_unfree(specs: Path, release_id: str) -> State | None:
             )
     if findings := tree_findings(specs):
         first = f"{findings[0]['path']} {findings[0]['message']}"
-        raise Refusal(
-            f"a release opens only on a clean tree: {first}", f"{SCRIPT} check --specs {specs}"
-        )
+        raise Refusal(f"a release opens only on a clean tree: {first}", f"{SCRIPT} check")
     others = [other for other in live if other != release_id]
     if others:
         raise Refusal(
             f"a live release already exists ({', '.join(others)}) — exactly one is allowed: "
             f"stack the next candidate on it, or ship {others[0]} first",
-            f"{SCRIPT} check --specs {specs}",
+            f"{SCRIPT} check",
         )
     if release_id not in live:
         return None
@@ -121,7 +119,7 @@ def refuse_unfree(specs: Path, release_id: str) -> State | None:
         raise Refusal(
             f"release {release_id} is live in phase {prior.get('phase')!r} — the next "
             "candidate is stacked only on a closed one",
-            f"{SCRIPT} phase CLOSURE --sha $(git rev-parse --short HEAD) --specs {specs}",
+            f"{SCRIPT} phase CLOSURE --sha $(git rev-parse --short HEAD)",
         )
     return prior
 

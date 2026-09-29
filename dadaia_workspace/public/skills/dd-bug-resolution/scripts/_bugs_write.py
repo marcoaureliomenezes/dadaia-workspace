@@ -43,12 +43,12 @@ def append(records: Records, values: dict[str, Any]) -> Records:
         raise Refusal(
             f"bug id {bug_id!r} already exists — a reopen is a NEW record declaring "
             "'caused_by: <prior-id>' at resolve, never a second record under this id",
-            f"{_SCRIPT} append --bug-id <new-id> --specs <specs>",
+            f"{_SCRIPT} append --bug-id <new-id>",
         )
     if values.get("surface") == "unknown":
         raise Refusal(
             "surface 'unknown' is a legacy sentinel, valid only on records that already carry it",
-            f"{_SCRIPT} append --surface <the-unit-that-broke> --specs <specs>",
+            f"{_SCRIPT} append --surface <the-unit-that-broke>",
         )
     record = {key: values.get(key) for key in CORE}
     record.update({key: None for key in GOVERNANCE})
@@ -61,12 +61,12 @@ def _set(record: dict[str, Any], key: str, value: Any) -> None:
         raise Refusal(
             f"bug-record field {key!r} is write-once and already set — a second write "
             "with a different value is refused",
-            f"{_SCRIPT} status --all --specs <specs>",
+            f"{_SCRIPT} status --all",
         )
     if key in CORE and record.get(key) != value:
         raise Refusal(
             f"bug-record field {key!r} is immutable-core and cannot be changed",
-            f"{_SCRIPT} append --bug-id <new-id> --specs <specs>",
+            f"{_SCRIPT} append --bug-id <new-id>",
         )
     record[key] = value
 
@@ -79,7 +79,7 @@ def apply_update(records: Records, bug_id: str, changes: dict[str, str]) -> Reco
             verb, option = _VERB_OWNED[key]
             raise Refusal(
                 f"bug-record field {key!r} is written only by {verb}",
-                f"{_SCRIPT} {verb} {bug_id} {option}--specs <specs>",
+                f"{_SCRIPT} {verb} {bug_id} {option}".rstrip(),
             )
         if key not in _MUTABILITY:
             raise Refusal(f"unknown bug-record field {key!r}", f"{_SCRIPT} update --help")

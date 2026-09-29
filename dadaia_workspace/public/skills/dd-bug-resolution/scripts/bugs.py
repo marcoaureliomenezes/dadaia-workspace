@@ -25,7 +25,7 @@ import _bugs_transition as tr  # noqa: E402
 import _bugs_write as wr  # noqa: E402
 from _bugs_check import CODE, HISTO, LEDGER, check  # noqa: E402
 from _bugs_store import Refusal, commit, read_records  # noqa: E402
-from _ledger import find_specs  # noqa: E402
+from _specs import find_specs, refuse  # noqa: E402
 
 _OPTIONS: dict[str, tuple[str, ...]] = {
     "append": ("--bug-id", "--reported-by", "--ts", "--title", "--severity", "--surface",
@@ -128,7 +128,7 @@ def _write(args: argparse.Namespace, specs: Path) -> int:
 
 def main(argv: list[str] | None = None) -> int:
     args = _parser().parse_args(argv)
-    specs = args.specs if args.specs is not None else find_specs(Path.cwd())
+    specs = find_specs(args.specs)
     if args.verb == "check":
         findings = check(specs)
         print(json.dumps(findings, indent=2)) if args.json else [
@@ -140,9 +140,7 @@ def main(argv: list[str] | None = None) -> int:
             return _read(args, specs)
         return _archive(args, specs) if args.verb == "archive" else _write(args, specs)
     except Refusal as refusal:
-        print(f"[error] {refusal}", file=sys.stderr)
-        print(f"fix: {refusal.fix}", file=sys.stderr)
-        return 1
+        return refuse(refusal, specs)
 
 
 if __name__ == "__main__":

@@ -56,7 +56,7 @@ def feature(path: Path, specs: Path, rank: int) -> dict[str, Any]:
     """One catalog entry built from *path*'s frontmatter and body."""
     data, body, error = parse(path.read_text(encoding="utf-8"))
     if error is not None or data is None:
-        fix = f"python3 {Path(__file__).parent / 'memory.py'} check --specs {specs}"
+        fix = f"python3 {Path(__file__).parent / 'memory.py'} check"
         raise Refusal(f"{path}: {error}", fix)
     sources = [str(item) for item in data.get("sources") or []]
     return {

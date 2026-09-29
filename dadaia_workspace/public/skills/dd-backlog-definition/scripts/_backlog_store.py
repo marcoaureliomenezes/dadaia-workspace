@@ -46,13 +46,13 @@ def read_active(path: Path) -> Items:
         raise Refusal(
             f"{path.name} is not valid JSON ({exc.msg}) — refusing to rewrite a document "
             "this script cannot read in full",
-            f"{SCRIPT} check --specs <specs>",
+            f"{SCRIPT} check",
         ) from exc
     active = document.get("active") if isinstance(document, dict) else None
     if not isinstance(active, list):
         raise Refusal(
             f"{path.name} carries no 'active' array — it is not a backlog-v1 document",
-            f"{SCRIPT} check --specs <specs>",
+            f"{SCRIPT} check",
         )
     return active
 
@@ -73,7 +73,7 @@ def _validated(active: Items, histo: str, before: Items, record: dict[str, Any] 
         raise Refusal(
             f"the resulting {LEDGER} + {HISTO} would not pass check — nothing was written "
             f"({detail})",
-            f"{SCRIPT} check --specs <specs>",
+            f"{SCRIPT} check",
         )
     return text
 
