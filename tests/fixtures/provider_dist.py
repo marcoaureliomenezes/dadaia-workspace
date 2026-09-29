@@ -11,6 +11,8 @@ import pytest
 
 
 class _Dist:
+    files = None  # no RECORD payload: build_digest of nothing
+
     def __init__(self, version: str, direct_url: dict[str, object] | None) -> None:
         self.version = version
         self._direct = json.dumps(direct_url) if direct_url else None

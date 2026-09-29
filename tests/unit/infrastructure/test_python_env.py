@@ -23,6 +23,7 @@ from dadaia_workspace.core.exceptions import DadaiaError
 from dadaia_workspace.core.platform import PLATFORM, Capabilities
 from dadaia_workspace.infrastructure.python_env import (
     VenvPythonEnvironmentManager,
+    build_digest,
     repack_installed_wheel,
 )
 from tests.fixtures.provider_dist import install_fake_dist
@@ -34,7 +35,7 @@ class _Recorder:
     def __init__(self) -> None:
         self.venv_created: list[str] = []
         self.commands: list[list[str]] = []
-        self.installed: str | None = None  # the fake venv's reported version
+        self.installed: str | None = None  # the fake venv's reported "<version> <build>"
 
 
 @pytest.fixture()
@@ -54,7 +55,7 @@ def recorder(monkeypatch: pytest.MonkeyPatch) -> _Recorder:
     monkeypatch.setattr(cls, "_resolve_child_venv_interpreter", lambda self: "fake-interpreter")
     monkeypatch.setattr(cls, "_assert_child_interpreter_version", lambda self, ws: None)
     monkeypatch.setattr(cls, "_verify_venv_provider", lambda self, ws, expected=None: None)
-    monkeypatch.setattr(cls, "installed_version", lambda self, ws: rec.installed)
+    monkeypatch.setattr(cls, "installed_build", lambda self, ws: rec.installed)
     monkeypatch.setattr(cls, "ensure_workspace_venv", _REAL_ENSURE)
     return rec
 
@@ -85,8 +86,9 @@ def test_fresh_bootstrap_creates_venv_and_installs_package(
     mgr = VenvPythonEnvironmentManager()
     assert mgr.ensure_workspace_venv(str(tmp_path)) == _venv(tmp_path)
 
-    create, install, toolchain = recorder.commands
+    create, uninstall, install, toolchain = recorder.commands
     assert create[:3] == ["fake-interpreter", "-m", "venv"] and create[-1] == _venv(tmp_path)
+    assert uninstall[1:2] + uninstall[-1:] == ["uninstall", "dadaia-workspace"]
     assert install[:2] == [mgr.pip_executable(str(tmp_path)), "install"]
     assert "--editable" in install and (Path(install[-1]) / "pyproject.toml").is_file()
     assert toolchain[-1] == "pytest"
@@ -96,7 +98,7 @@ def test_existing_bare_venv_is_repaired_not_skipped(tmp_path: Path, recorder: _R
     """The VENV-1 state: venv dir present, entrypoint missing -> install, no re-create."""
     (Path(_venv(tmp_path)) / PLATFORM.venv_scripts_dir).mkdir(parents=True)
     VenvPythonEnvironmentManager().ensure_workspace_venv(str(tmp_path))
-    assert (recorder.venv_created, len(recorder.commands)) == ([], 2)
+    assert (recorder.venv_created, len(recorder.commands)) == ([], 3)
 
 
 def test_healthy_venv_is_a_noop(tmp_path: Path, recorder: _Recorder) -> None:
@@ -110,6 +112,7 @@ def test_healthy_venv_is_a_noop(tmp_path: Path, recorder: _Recorder) -> None:
     [
         ("0.4.7", "1.0.0", True),
         ("1.0.0", "1.0.0", False),
+        ("1.0.0 another-build", "1.0.0", True),  # same label, other code
         ("1.0.0rc1", "1.0.0", True),
         ("0.9.9+e2e", "1.0.0", True),
         ("0.4.7", "0.5.0rc1", True),  # PEP 440: a pre-release outranks the prior final
@@ -124,14 +127,15 @@ def test_reinit_reinstalls_only_an_older_venv(
     running: str,
     installs: bool,
 ) -> None:
-    """0.4.8 AC2.1/AC2.2, bug upgrade-refuses-a-prerelease-label-as-a-downgrade: PEP 440
-    order; an older venv takes the one install path, an equal one is untouched."""
+    """0.4.8 AC2.1/AC2.2, bugs upgrade-refuses-a-prerelease-label-as-a-downgrade and
+    reinit-with-unchanged-version-label-mixes-venv-and-projection: PEP 440 order; any other
+    build takes the one install path, only the running build itself is untouched."""
     install_fake_dist(monkeypatch, running)
     _healthy(tmp_path)
-    recorder.installed = installed
+    recorder.installed = installed if " " in installed else f"{installed} {build_digest(None)}"
     VenvPythonEnvironmentManager().ensure_workspace_venv(str(tmp_path))
     pip = VenvPythonEnvironmentManager().pip_executable(str(tmp_path))
-    assert [c[:3] for c in recorder.commands[:1]] == (
+    assert [c[:3] for c in recorder.commands[1:2]] == (
         [[pip, "install", "--quiet"]] if installs else []
     )
 
@@ -147,7 +151,7 @@ def test_reinit_refuses_a_newer_venv_before_any_write(
     """0.4.8 AC2.3: never downgrade; name the version."""
     install_fake_dist(monkeypatch, running)
     _healthy(tmp_path)
-    recorder.installed = installed
+    recorder.installed = f"{installed} {build_digest(None)}"
     with pytest.raises(python_env_module.WorkspaceVenvNewerError) as exc:
         VenvPythonEnvironmentManager().ensure_workspace_venv(str(tmp_path))
     assert exc.value.installed == installed
@@ -184,8 +188,8 @@ def test_local_candidate_wheel_overrides_index_pin_without_editable(
     wheel.write_bytes(b"candidate")
     monkeypatch.setenv("DADAIA_BOOTSTRAP_PACKAGE", str(wheel))
     VenvPythonEnvironmentManager().ensure_workspace_venv(str(tmp_path / "workspace"))
-    assert recorder.commands[1][-1] == str(wheel)
-    assert "--editable" not in recorder.commands[1]
+    assert recorder.commands[2][-1] == str(wheel)
+    assert "--editable" not in recorder.commands[2]
 
 
 def test_bootstrap_installs_the_repacked_running_distribution(
@@ -206,7 +210,7 @@ def test_bootstrap_installs_the_repacked_running_distribution(
     ws = tmp_path / "ws"
     VenvPythonEnvironmentManager().ensure_workspace_venv(str(ws))
 
-    assert [c[-1] for c in recorder.commands[1:]] == [str(written[0]), "pytest"]
+    assert [c[-1] for c in recorder.commands[2:]] == [str(written[0]), "pytest"]
     assert not any("==" in token for call in recorder.commands for token in call)
     assert not written[0].exists() and not (ws / ".dadaia" / "tmp").exists()
 

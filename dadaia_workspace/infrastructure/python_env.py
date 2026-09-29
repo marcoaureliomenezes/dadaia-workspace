@@ -7,6 +7,7 @@ Executable paths are constructed using ``PLATFORM.venv_scripts_dir`` and
 
 import base64
 import hashlib
+import inspect
 import ntpath
 import os
 import re
@@ -15,6 +16,7 @@ import subprocess
 import sys
 import tempfile
 import zipfile
+from collections.abc import Iterable
 from importlib import metadata
 from pathlib import Path
 
@@ -118,6 +120,23 @@ def repack_installed_wheel(
 _REQUIRES_PYTHON_CLAUSE_RE = re.compile(r"(>=|<=|==|!=|>|<)\s*([0-9]+(?:\.[0-9]+){0,2})")
 _REQUIRES_PYTHON_FLOOR_RE = re.compile(r">=\s*3\.(\d+)")
 _DEFAULT_FLOOR_MINOR = 12  # dadaia-workspace's floor today (pyproject.toml: python = "^3.12")
+
+
+def build_digest(files: "Iterable[metadata.PackagePath] | None") -> str:
+    """The payload's RECORD hashes digested — the build a version label cannot name; the
+    venv probe runs this same source, so both sides hash alike."""
+    import hashlib
+
+    rows = sorted(
+        f"{f}={f.hash.value}" for f in files or () if f.hash and f.parts[0] == "dadaia_workspace"
+    )
+    return hashlib.sha256("\n".join(rows).encode()).hexdigest()[:16]
+
+
+def provider_build() -> str | None:
+    """``"<version> <build digest>"`` of the running distribution, or ``None``."""
+    version = provider_version()
+    return version and f"{version} {build_digest(metadata.distribution('dadaia-workspace').files)}"
 
 
 def _tail_lines(exc: subprocess.CalledProcessError, count: int = 5) -> str:
@@ -425,8 +444,12 @@ class VenvPythonEnvironmentManager:
                 # CAPTURED — a failure must not leak a raw "ERROR: Could not find a
                 # version..." into init's output, where it reads as a masked broken
                 # bootstrap.
+                # pip keeps an installed distribution of the same version, so the venv's
+                # build leaves first (a no-op on a fresh venv).
+                uninstall_cmd = [pip, "uninstall", "--quiet", "--yes", "dadaia-workspace"]
                 try:
-                    subprocess.run(install_cmd, check=True, capture_output=True, text=True)
+                    for cmd in (uninstall_cmd, install_cmd):
+                        subprocess.run(cmd, check=True, capture_output=True, text=True)
                 except subprocess.CalledProcessError as exc:
                     raise WorkspaceVenvBootstrapError(
                         f"workspace venv bootstrap failed installing '{spec}'. The "
@@ -442,31 +465,32 @@ class VenvPythonEnvironmentManager:
             expected = (
                 None
                 if editable or os.environ.get("DADAIA_BOOTSTRAP_PACKAGE", "").strip()
-                else self._running_version()
+                else provider_build()
             )
             self._verify_venv_provider(workspace_root, expected=expected)
         return str(venv_dir)
 
     def version_change(self, workspace_root: str) -> tuple[str | None, str | None, str]:
-        """The ONE decider of "did the version change": ``(before, after, action)``.
+        """The ONE decider of which distribution the workspace runs: ``(before, after, action)``.
 
-        ``action`` is ``install`` (no entrypoint), ``upgrade`` (the venv is OLDER than the
-        running distribution — D3: re-init is the upgrade) or ``same``; a NEWER venv is
-        refused before any write (AC2.3).
+        ``action`` is ``install`` (no entrypoint), ``upgrade`` (the venv's build differs
+        from the running distribution's — same label or not; D3: re-init is the upgrade)
+        or ``same``; a venv with a NEWER version is refused before any write (AC2.3).
         """
-        running = self._running_version()
+        running = provider_build()
+        after = running.split()[0] if running else None
         if not self._dadaia_entrypoint(workspace_root).exists():
-            return None, running, "install"
-        installed = self.installed_version(workspace_root)
-        if installed is None or running is None:
-            return installed, running, "same"
-        if Version(installed) > Version(running):
-            raise WorkspaceVenvNewerError(installed, running)
-        action = "upgrade" if Version(installed) < Version(running) else "same"
-        return installed, running, action
+            return None, after, "install"
+        installed = self.installed_build(workspace_root)
+        before = installed.split()[0] if installed else None
+        if before is None or after is None:
+            return before, after, "same"
+        if Version(before) > Version(after):
+            raise WorkspaceVenvNewerError(before, after)
+        return before, after, "same" if installed == running else "upgrade"
 
-    def installed_version(self, workspace_root: str) -> str | None:
-        """The dadaia-workspace version the venv's own python reports, or ``None``."""
+    def installed_build(self, workspace_root: str) -> str | None:
+        """``"<version> <build digest>"`` the venv's own python reports, or ``None``."""
         if not self._dadaia_entrypoint(workspace_root).exists():
             return None
         try:
@@ -476,13 +500,15 @@ class VenvPythonEnvironmentManager:
         return (proc.stdout or "").strip() or None if proc.returncode == 0 else None
 
     def _probe_provider(self, workspace_root: str) -> "subprocess.CompletedProcess[str]":
-        """Ask the venv's own python, under a CLEAN env, which dadaia-workspace it imports."""
+        """Ask the venv's own python, under a CLEAN env, which dadaia-workspace build it imports."""
         return subprocess.run(
             [
                 self.python_executable(workspace_root),
                 "-c",
-                "import dadaia_workspace, importlib.metadata as m; "
-                "print(m.version('dadaia-workspace'))",
+                f"{inspect.getsource(build_digest)}"
+                "import dadaia_workspace, importlib.metadata as m\n"
+                "d = m.distribution('dadaia-workspace')\n"
+                "print(d.version, build_digest(d.files))",
             ],
             capture_output=True,
             text=True,
@@ -564,7 +590,7 @@ class VenvPythonEnvironmentManager:
         """
         required = self._running_requires_python()
         if required is None:
-            return  # nothing to check against — fail open, matching _running_version()
+            return  # nothing to check against — fail open, matching provider_version()
         version = _interpreter_version(self.python_executable(workspace_root))
         if version is None:
             return  # could not introspect — pip install remains the final authority
@@ -601,8 +627,6 @@ class VenvPythonEnvironmentManager:
                 "[bootstrap] warning: could not install pytest into the workspace venv; "
                 "test validation (ci preflight, closure gate) will report it missing"
             )
-
-    _running_version = staticmethod(provider_version)
 
     @staticmethod
     def _running_requires_python() -> str | None:
