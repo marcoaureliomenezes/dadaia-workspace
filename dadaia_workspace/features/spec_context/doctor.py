@@ -460,7 +460,7 @@ class DoctorService:
     # ------------------------------------------------------------------
 
     def fix(self) -> list[str]:
-        """The ONE reaper lane: marker reap -> session reap -> migrate -> seed missing ->
+        """The ONE reaper lane: session reap -> migrate -> seed missing ->
         MOVE slop to ``reaped/`` -> reap dead contexts' repos (INV-5) -> delete expired.
 
         There is no second, smaller lane. ``--expired-only`` used to buy one by stopping
