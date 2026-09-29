@@ -71,9 +71,9 @@ defaults to the main repo's slug. `bind` writes exactly one record,
 nothing; `.dadaia/.venv/bin/dadaia context bind <ctx> --print-env` emits
 `DADAIA_CONTEXT` and `DADAIA_SESSION_ID` for an `eval $(…)` shell, and a session
 without a harness-native id carries the binding in `DADAIA_CONTEXT`. The bind's scope
-is the context's main repo plus its associated repos; a bound session's MUTATING write
-into a repo another context owns is refused with the bind that would allow it. After a
-bind, the ctx-inject hook injects the context header, `ARCHITECTURE.md`'s
+is the context's main repo plus its associated repos; a bound session's MUTATING
+file-tool write into a repo another context owns is refused with the bind that would
+allow it. After a bind, the ctx-inject hook injects the context header, `ARCHITECTURE.md`'s
 `## Tech Stack` section and the memory catalog digest once.
 
 ## Level 3 — the specs

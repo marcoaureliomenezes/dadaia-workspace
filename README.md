@@ -115,9 +115,10 @@ behaviour.
 
 The gate is one PreToolUse pre-gate: root whitelist, venv guard, SDD gate, in that
 order, first block wins; a policy that raises is ALLOW. It blocks exactly three things:
-a new workspace-root entry, a `dadaia`/`pip`/`python -m dadaia_workspace` run outside
-`.dadaia/.venv/bin/`, and a PROTECTED write or a bound session's MUTATING write into a
-`repos/<slug>/` outside its scope. Path classes: ADDITIVE (always writable), MUTATING
+a file-tool write creating a new workspace-root entry, a `dadaia`/`pip`/`python -m
+dadaia_workspace` run outside `.dadaia/.venv/bin/`, and a file-tool write that is PROTECTED
+or a bound session's MUTATING one into a `repos/<slug>/` outside its scope; a Bash write
+is never judged. Path classes: ADDITIVE (always writable), MUTATING
 (everything else, scope-judged), PROTECTED (session records and the projected law).
 Every BLOCK carries exactly one `fix:` line, and a contract test feeds each fix back
 through the gate asserting ALLOW. No lease, lock or wait path exists; the gate reads no
