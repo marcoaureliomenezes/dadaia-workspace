@@ -537,8 +537,8 @@ def test_every_script_fix_line_names_its_folders_entry_script(module: Path) -> N
 
 # ── the law never names a verb the tooling dropped ──────────────────────────────
 
-#: Retired release verbs and their `rc-N/` folder: a closed trio is overwritten; git archives.
-_DEAD_RELEASE_VOCABULARY = re.compile(r"rc-archive|release\.py fold|release\.py archive|rc-N")
+#: Dead law words: retired release verbs, rc-N, bug-resolve-law-names-flags-the-script-does-not-have
+_DEAD_RELEASE_VOCABULARY = re.compile(r"rc-archive|release\.py (fold|archive)|rc-N|resolve` carrying")  # fmt: skip
 
 #: The law: the shipped surface, product memory and the glossary; history keeps its words.
 _LAW_ROOTS = (

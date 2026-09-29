@@ -19,7 +19,7 @@ Scope: this file governs only `specs/bugs/`.
 
 ## 2. Resolution
 
-- Close in the same session as the fix: `bugs.py resolve` carrying the red-loop command, the regression-test seam and the diff direction.
+- Close in the same session as the fix: `bugs.py resolve`, with the flags `dd-bug-resolution` Phase 6 names.
 - Check prior resolutions on the same component first; declare `caused_by: <bug_id>|none`.
 - Commit exactly what the fix touched, never a blanket `-A`; a net-positive diff passes the architecture lens first.
 
