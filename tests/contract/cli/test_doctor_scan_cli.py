@@ -16,7 +16,6 @@ import pytest
 from typer.testing import CliRunner
 
 from dadaia_workspace import container
-from dadaia_workspace.cli.commands import doctor as doctor_cmd
 from dadaia_workspace.cli.main import app
 from dadaia_workspace.core.cli_line import fix_line
 from dadaia_workspace.core.harness_registry import HARNESS_PROJECTION_DIRS, L1_ENTRY_HARNESSES
@@ -66,7 +65,6 @@ def workspace(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
             context_store(root / ".dadaia" / "states"), GitSubprocessClient(), root
         ),
     )
-    monkeypatch.setattr(doctor_cmd, "projection_verdict", lambda root: ([], ""))  # no projection
     return tmp_path
 
 

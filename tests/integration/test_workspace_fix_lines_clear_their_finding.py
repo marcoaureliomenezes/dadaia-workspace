@@ -142,17 +142,23 @@ def _plant_drifted_hook(ws: Path) -> str:
     return "HOOKS-DRIFT-1"
 
 
+def _plant_disarmed_gate(ws: Path) -> str:
+    (ws / ".claude" / "settings.json").unlink()
+    return "PROJECTION"
+
+
 #: Every code this module proves: cleared by its printed fix, or an operator action (V39).
 WORKSPACE_PLANTS = {
     **_SPECS_PLANTS,
     **dict.fromkeys(code for code, _, _ in _LEDGER_ROWS),
     "WS-ENTRY": _plant_root_slop,  # the fixable sub-rule (S5)
     "HOOKS-DRIFT-1": _plant_drifted_hook,
+    "PROJECTION": _plant_disarmed_gate,
 }
 
 
 @pytest.mark.skipif(sys.platform == "win32", reason="the stub CLI is a POSIX shell script")
-@pytest.mark.parametrize("plant", [_plant_root_slop, _plant_drifted_hook])
+@pytest.mark.parametrize("plant", [_plant_root_slop, _plant_drifted_hook, _plant_disarmed_gate])
 def test_a_workspace_finding_is_cleared_by_its_printed_fix(tmp_path: Path, plant: object) -> None:
     """Intent: sa-unfixable-doctor-findings-say-doctor-fix#S2 — in an initialized tmp
     workspace the printed fix, run from repos/alpha, clears the workspace finding."""

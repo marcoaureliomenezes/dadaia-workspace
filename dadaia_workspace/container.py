@@ -141,6 +141,7 @@ def build_doctor_service(workspace_root: Path) -> DoctorService:
         context_store=JsonContextStore(states),
         git_client=GitSubprocessClient(),
         workspace_root=workspace_root,
+        projection=build_public_service().verdict,
     )
 
 

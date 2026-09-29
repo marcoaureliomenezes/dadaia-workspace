@@ -15,6 +15,7 @@ allow set, TTL and canon is a view of the registry.
 
 import os
 import time
+from collections.abc import Callable
 from dataclasses import dataclass, replace
 from datetime import timedelta
 from enum import StrEnum
@@ -28,6 +29,7 @@ from dadaia_workspace.core.exceptions import SchemaVersionError
 from dadaia_workspace.core.harness_registry import (
     HARNESS_PROJECTION_DIRS,
 )
+from dadaia_workspace.core.models.doctor_report import DoctorLine
 from dadaia_workspace.core.models.harness_profile import HarnessProfile
 from dadaia_workspace.core.models.spec_context import ContextState, SpecContextProject
 from dadaia_workspace.core.platform import PLATFORM
@@ -107,7 +109,9 @@ class DoctorService:
         context_store: JsonContextStore,
         git_client: GitSubprocessClient,
         workspace_root: Path,
+        projection: Callable[[Path], tuple[list[DoctorLine], str]] | None = None,
     ) -> None:
+        self._projection = projection
         self._store = context_store
         self._git = git_client
         self._workspace_root = workspace_root
@@ -120,6 +124,12 @@ class DoctorService:
     # ------------------------------------------------------------------
     # check() — the context invariants (unchanged by the zone walk)
     # ------------------------------------------------------------------
+
+    def check_projection(self) -> list[SectionFinding]:
+        """PROJECTION: `public doctor`'s own verdict — one error naming every blocking line."""
+        lines, fix = self._projection(self._workspace_root) if self._projection else ([], "")
+        message = "; ".join(line.render() for line in lines if line.status.blocking)
+        return [SectionFinding("PROJECTION", "drift", message, False, True, fix)] if fix else []
 
     def check_installed_hooks(self, context: str | None = None) -> list[SectionFinding]:
         """HOOKS-DRIFT-1: an ALIVE repo's hook where git runs hooks is not byte-for-byte the
@@ -640,6 +650,12 @@ def workspace_rules(
             SECTION,
             installed_hooks,
             fix_help=("ci", "install-hook", "--force", "--repo", "<repo>"),
+        ),
+        Rule(
+            ("PROJECTION",),
+            SECTION,
+            lambda service: [] if expired_only else service.check_projection(),
+            fix_help=("public", "install"),
         ),
         Rule(
             ("WS-ENTRY",),

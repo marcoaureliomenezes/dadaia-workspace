@@ -30,6 +30,8 @@ class _StubDoctor:
     def check_installed_hooks(self, context=None):
         return []
 
+    check_projection = check_installed_hooks
+
     def scan(self):
         return ()
 

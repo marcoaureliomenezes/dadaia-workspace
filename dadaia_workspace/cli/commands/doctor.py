@@ -32,7 +32,6 @@ from dadaia_workspace.cli._specs_resolution import (
     resolve_context_specs_dir_for_cli,
     resolve_specs_dir_for_cli,
 )
-from dadaia_workspace.cli.commands.public import projection_verdict
 from dadaia_workspace.cli.help_digest import command_paths
 from dadaia_workspace.cli.redact import build_context_redactor
 from dadaia_workspace.core.cli_line import fix_line
@@ -81,17 +80,6 @@ def _workspace_section(
         service,
         root,
     )
-
-
-def _projection_section(root: Path | None, *, expired_only: bool) -> SectionReport:
-    """`workspace`: the projection verdict — `public doctor`'s own, one error finding
-    naming every blocking line, with its one fix. Off the SessionStart TTL lane."""
-    if root is None or expired_only:
-        return _empty_section("workspace")
-    lines, fix = projection_verdict(root)
-    message = "; ".join(line.render() for line in lines if line.status.blocking)
-    finding = SectionFinding("PROJECTION", "drift", message, False, True, fix)
-    return SectionReport(name="workspace", findings=(finding,) if fix else ())
 
 
 def _empty_section(name: str) -> SectionReport:
@@ -332,7 +320,6 @@ def doctor(
         merge_sections(
             [
                 _workspace_section(service, workspace_root, scope, expired_only=expired_only),
-                _projection_section(workspace_root, expired_only=expired_only),
                 _onboarding_section(workspace_root, scope, expired_only=expired_only),
             ]
         ),

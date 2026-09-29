@@ -3,11 +3,12 @@
 from collections.abc import Callable
 from pathlib import Path
 
+from dadaia_workspace.core.cli_line import fix_line
 from dadaia_workspace.core.model_registry import (
     AgentModelPolicyOverlay,
     AgentModelPolicyStoreError,
 )
-from dadaia_workspace.core.models.doctor_report import DoctorReport
+from dadaia_workspace.core.models.doctor_report import DoctorLine, DoctorReport
 from dadaia_workspace.features.public.model_resolution import check_model_resolution
 from dadaia_workspace.infrastructure.public_assets import FileSystemPublicAssetManager
 
@@ -58,3 +59,12 @@ class PublicAssetService:
                 overlay = None
         reports.extend(check_model_resolution(public_dir, overlay=overlay))
         return DoctorReport(lines=tuple(reports))
+
+    def verdict(self, workspace_root: Path) -> tuple[list[DoctorLine], str]:
+        """The ONE answer to "is the projection healthy": every doctor line, and the one
+        remedy when any line blocks (``""`` when none does) — `public doctor` prints it and
+        `dadaia doctor` carries it, so the two never disagree. The verdict is the typed
+        report's, fail-closed: every blocking status fails (public-doctor-exits-zero-despite-error)."""
+        lines = list(self.doctor(workspace_root).lines)
+        blocking = any(line.status.blocking for line in lines)
+        return lines, fix_line(workspace_root, "public", "install") if blocking else ""

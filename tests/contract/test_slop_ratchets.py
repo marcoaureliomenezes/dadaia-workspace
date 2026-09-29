@@ -558,6 +558,9 @@ def test_v39_every_doctor_code_has_a_fix_clears_case_or_a_key() -> None:
 
     # A code is covered by its fix-clears plant, or by the proof test of its table.
     covered = set(PLANTS) | set(REPORT_ONLY) | set(OPERATOR_ACTION) | set(WORKSPACE_PLANTS)
+    assert covered <= _doctor_codes(), (
+        "sa-instance-health-judged-by-two-doctors: a code no rule table declares"
+    )
     problems = _allowance_violations(
         _uncovered(_doctor_codes(), covered),
         _V39_ALLOWANCE,

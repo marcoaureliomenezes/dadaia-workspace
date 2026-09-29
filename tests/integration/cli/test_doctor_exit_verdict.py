@@ -16,6 +16,7 @@ from typer.testing import CliRunner
 
 from dadaia_workspace.cli.main import app
 from dadaia_workspace.core.models.doctor_report import DoctorLine, DoctorReport, DoctorStatus
+from dadaia_workspace.features.public.service import PublicAssetService
 
 _runner = CliRunner()
 
@@ -25,6 +26,8 @@ def _run_doctor_with(monkeypatch, tmp_path: Path, lines: tuple[DoctorLine, ...])
     import dadaia_workspace.cli.commands.public as public_cmd
 
     class _FakeService:
+        verdict = PublicAssetService.verdict
+
         def doctor(self, workspace_root: Path) -> DoctorReport:
             return DoctorReport(lines=lines)
 
