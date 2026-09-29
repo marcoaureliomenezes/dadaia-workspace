@@ -153,7 +153,7 @@ def test_a_missing_specs_tree_is_refused_never_created(script: Path, tmp_path: P
             "--component", "c", "--context", "c", "--symptom", "s", "--repro", "r", "--expected", "e"]  # fmt: skip
     done = _run(script, *argv, "--specs", "specs", cwd=tmp_path)
     assert done.returncode == 1 and not (tmp_path / "specs").exists()
-    fix = f"fix: {script} {' '.join(argv)} --specs {tmp_path}/repos/demo/specs"
+    fix = f"fix: {sys.executable} {script} {' '.join(argv)} --specs {tmp_path}/repos/demo/specs"
     assert [ln for ln in done.stderr.splitlines() if ln.startswith("fix:")] == [fix]
 
 
@@ -374,7 +374,8 @@ def test_resolve_refuses_an_unknown_caused_by(script: Path, tmp_path: Path) -> N
     assert done.returncode == 1
     assert "not a record of this bug ledger" in done.stderr
     # ledger-fix-lines-drop-specs: the fix runs as printed, from any cwd
-    assert f"fix: {script} resolve a-bug --caused-by none --specs {specs.resolve()}" in done.stderr
+    fix = f"fix: {sys.executable} {script} resolve a-bug --caused-by none --specs {specs.resolve()}"
+    assert fix.replace("\\", "/") in done.stderr.replace("\\", "/")
     assert _records(specs)[0]["status"] == "open"
 
 

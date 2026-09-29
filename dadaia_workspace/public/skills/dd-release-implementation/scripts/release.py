@@ -22,7 +22,7 @@ from _release_check import histo_findings  # noqa: E402
 from _release_new import new_release  # noqa: E402
 from _release_phase import set_phase  # noqa: E402
 from _release_schema import CODE, HISTO, SHA_RE, STATE, utc_now  # noqa: E402
-from _release_store import Refusal, commit, live_release, window_start  # noqa: E402
+from _release_store import SCRIPT, Refusal, commit, live_release, window_start  # noqa: E402
 from _release_tree import check, drift, memory_errors  # noqa: E402
 from _specs import find_specs, refuse  # noqa: E402
 
@@ -94,7 +94,7 @@ def _memory(args: argparse.Namespace, specs: Path) -> int:
     except drift.Refusal as refusal:
         raise Refusal(str(refusal), refusal.fix) from refusal
     if errors:
-        raise Refusal(errors[0], f"{Path(__file__)} memory --help")
+        raise Refusal(errors[0], f"{SCRIPT} memory --help")
     commit(live.release_dir / STATE, f"releases/{live.release_id}/{STATE}",
            lambda state: {**state, "log": [*(state.get("log") or []), entry]})  # fmt: skip
     print(f"[ok] release {live.release_id} log <- kind memory {since}..{until[:12]} ({ts})")
@@ -103,10 +103,10 @@ def _memory(args: argparse.Namespace, specs: Path) -> int:
 
 def _ship(args: argparse.Namespace, specs: Path) -> int:
     """CLOSURE -> shipped {sha, pr, ts}, one `delivered` histo line, the directory gone."""
-    live, ts, fix = live_release(specs), utc_now(), f"{Path(__file__)} check"
+    live, ts, fix = live_release(specs), utc_now(), f"{SCRIPT} check"
     if not (SHA_RE.match(args.sha) and args.pr.isdigit() and int(args.pr) > 0):
         raise Refusal(f"--sha {args.sha!r} / --pr {args.pr!r}: a hex sha and a PR number",
-                      f"{Path(__file__)} ship --sha $(git rev-parse --short HEAD) --pr <n>")  # fmt: skip
+                      f"{SCRIPT} ship --sha $(git rev-parse --short HEAD) --pr <n>")  # fmt: skip
     if live.state.get("phase") != "CLOSURE":
         raise Refusal(f"release {live.release_id} is in phase {live.state.get('phase')!r} — "
                       "only a CLOSURE release ships", fix)  # fmt: skip

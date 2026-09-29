@@ -21,9 +21,10 @@ sys.path.append(str(Path(__file__).resolve().parents[2] / "dd-bug-resolution" / 
 from _ledger import replace, stamp  # noqa: E402
 from _release_check import state_findings  # noqa: E402
 from _release_schema import SEMVER_RE, STATE  # noqa: E402
+from _specs import script  # noqa: E402
 
 State = dict[str, Any]
-SCRIPT = Path(__file__).parent / "release.py"
+SCRIPT = script(Path(__file__).parent / "release.py")
 
 
 class Refusal(Exception):

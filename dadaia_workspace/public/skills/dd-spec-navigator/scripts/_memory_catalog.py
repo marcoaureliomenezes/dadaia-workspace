@@ -22,8 +22,10 @@ from pathlib import Path
 from typing import Any
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+sys.path.append(str(Path(__file__).resolve().parents[2] / "dd-bug-resolution" / "scripts"))
 
 from _memory_schema import CATALOG, INDEX, PRODUCT, WIKILINK_RE, parse  # noqa: E402
+from _specs import script  # noqa: E402
 
 Catalog = dict[str, Any]
 
@@ -56,7 +58,7 @@ def feature(path: Path, specs: Path, rank: int) -> dict[str, Any]:
     """One catalog entry built from *path*'s frontmatter and body."""
     data, body, error = parse(path.read_text(encoding="utf-8"))
     if error is not None or data is None:
-        fix = f"python3 {Path(__file__).parent / 'memory.py'} check"
+        fix = f"{script(Path(__file__).with_name('memory.py'))} check"
         raise Refusal(f"{path}: {error}", fix)
     sources = [str(item) for item in data.get("sources") or []]
     return {

@@ -23,7 +23,8 @@ def find_specs(given: Path | None) -> Path:
     )
     if tree := next((t for t in trees if t.is_dir()), None):
         return tree.resolve()
-    rerun = shlex.join(w for i, w in enumerate(argv) if "--specs" not in (w, argv[i - 1]))
+    rest = (w for i, w in enumerate(argv) if i and "--specs" not in (w, argv[i - 1]))
+    rerun = " ".join((script(Path(argv[0])), *map(quote, rest)))
     print(f"error: no specs tree at {given or f'or above {here}'} — nothing was written",
           f"fix: {with_specs(rerun, _bound_tree(here))}", sep="\n", file=sys.stderr)  # fmt: skip
     raise SystemExit(1)
@@ -40,10 +41,24 @@ def _bound_tree(here: Path) -> Path | str:
     return "repos/<context>/specs"
 
 
+def quote(word: str) -> str:
+    """One shell word as `core/cli_line.shell_line` spells it: ``shlex`` on POSIX; on
+    Windows forward slashes, double quotes only around a blank."""
+    if os.name != "nt":
+        return shlex.quote(word)
+    word = word.replace("\\", "/")
+    return word if word and not any(c in word for c in ' \t"') else f'"{word}"'
+
+
+def script(path: Path) -> str:
+    """The ONE script-command prefix: this interpreter + *path*, absolute and quoted."""
+    return f"{quote(sys.executable)} {quote(str(path.resolve()))}"
+
+
 def with_specs(fix: str, specs: Path | str) -> str:
-    """The ONE ledger fix-line builder: a ``.py`` script command gains ``--specs``."""
-    named = any(word.endswith(".py") for word in fix.split(" ")[:2])
-    return f"{fix} --specs {specs}" if named else fix
+    """The ONE ledger fix-line builder: a :func:`script` command gains ``--specs``."""
+    named = fix.startswith(f"{quote(sys.executable)} ")
+    return f"{fix} --specs {quote(str(specs))}" if named else fix
 
 
 def refuse(refusal: Exception, specs: Path) -> int:

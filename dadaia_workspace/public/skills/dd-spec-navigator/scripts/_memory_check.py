@@ -9,7 +9,6 @@ its own result against it, so the renderer and the checker cannot disagree.
 from __future__ import annotations
 
 import json
-import shlex
 import sys
 from pathlib import Path
 from typing import Any
@@ -18,9 +17,9 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import _memory_catalog as cat  # noqa: E402
 from _memory_schema import CATALOG, CODE, INDEX  # noqa: E402
+from _specs import script, with_specs  # noqa: E402
 
 Finding = dict[str, Any]
-FIX_PREFIX = f"{Path(sys.executable).as_posix()} {Path(__file__).resolve().with_name('memory.py')}"
 
 
 def check(specs: Path) -> list[Finding]:
@@ -39,7 +38,9 @@ def check(specs: Path) -> list[Finding]:
                 "path": name, "line": 0,
                 "message": f"{path.name} does not match the atoms it is generated from",
             })  # fmt: skip
-    fix = f"{FIX_PREFIX} catalog generate --specs {shlex.quote(str(specs.resolve()))}"
+    fix = with_specs(
+        f"{script(Path(__file__).with_name('memory.py'))} catalog generate", specs.resolve()
+    )
     for finding in out:  # the pair is regenerated, never hand-fixed: the fix line clears it
         finding |= {"code": CODE, "fix": fix}
     return out

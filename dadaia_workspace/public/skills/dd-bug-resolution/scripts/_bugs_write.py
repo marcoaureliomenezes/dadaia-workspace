@@ -18,6 +18,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from _bugs_check import TERMINAL, load_schema  # noqa: E402
 from _bugs_store import Records, Refusal, by_id  # noqa: E402
+from _specs import script  # noqa: E402
 
 _MUTABILITY = {k: v["x-mutability"] for k, v in load_schema()["properties"].items()}
 CORE = tuple(k for k, v in _MUTABILITY.items() if v == "immutable-core")
@@ -28,7 +29,7 @@ _TRANSITIONS = ("resolve|supersede|defer|reject", "")
 _VERB_OWNED = {"status": _TRANSITIONS, "closed_at": _TRANSITIONS,
                "caused_by": ("resolve", "--caused-by <bug-id|none> "),
                "superseded_by": ("supersede", "--by <slug> ")}  # fmt: skip
-_SCRIPT = Path(__file__).parent / "bugs.py"
+_SCRIPT = script(Path(__file__).parent / "bugs.py")
 
 
 def now_iso() -> str:

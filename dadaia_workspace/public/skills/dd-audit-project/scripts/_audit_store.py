@@ -23,8 +23,9 @@ from _audit_check import (  # noqa: E402
     histo_findings,
 )
 from _ledger import replace  # noqa: E402
+from _specs import script  # noqa: E402
 
-SCRIPT = Path(__file__).parent / "audit.py"
+SCRIPT = script(Path(__file__).parent / "audit.py")
 
 
 class Refusal(Exception):

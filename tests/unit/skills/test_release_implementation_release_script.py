@@ -315,8 +315,9 @@ def test_every_refusal_carries_one_fix_that_is_not_itself_refused(
     script: Path, tmp_path: Path, phase: str, argv: tuple[str, ...]
 ) -> None:
     """sa-promote-has-no-verb#B25-7 and sa-promote-has-no-verb#B25-3: a refusal exits 1, writes nothing, prints
-    one `fix:` — and that fix, run in the same state, is not refused."""
-    specs = _specs(tmp_path)
+    one `fix:` — and that fix, run as printed in the same state, is not refused;
+    ledger-fix-lines-drop-specs: under a spaced specs path too."""
+    specs = _specs(tmp_path / "a b")
     _release(specs, "0.5.0", phase=phase, tasks="- [x] T-1 — done\n")
     before = _tree_hash(specs)
     result = _run(script, *argv, "--specs", str(specs))
@@ -329,10 +330,7 @@ def test_every_refusal_carries_one_fix_that_is_not_itself_refused(
     ]
     assert len(fixes) == 1, result.stderr
     command = fixes[0].replace("$(git rev-parse --short HEAD)", "abc1234").replace("<n>", "7")
-    command += "" if "--specs" in command else f" --specs {specs}"
-    done = subprocess.run(
-        [sys.executable, *command.split()], capture_output=True, text=True, check=False
-    )
+    done = subprocess.run(command, shell=True, capture_output=True, text=True, check=False)
     assert done.returncode == 0, (command, done.stderr)
 
 

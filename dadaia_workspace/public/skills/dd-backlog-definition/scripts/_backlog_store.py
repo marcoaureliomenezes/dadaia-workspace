@@ -22,9 +22,10 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from _backlog_check import pair_findings  # noqa: E402
 from _backlog_schema import HISTO, LEDGER  # noqa: E402
 from _ledger import private_refusal, replace, stamp  # noqa: E402
+from _specs import script  # noqa: E402
 
 Items = list[dict[str, Any]]
-SCRIPT = Path(__file__).parent / "backlog.py"
+SCRIPT = script(Path(__file__).parent / "backlog.py")
 
 
 class Refusal(Exception):

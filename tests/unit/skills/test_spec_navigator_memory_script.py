@@ -12,7 +12,6 @@ from __future__ import annotations
 
 import json
 import re
-import shlex
 import shutil
 import subprocess
 import sys
@@ -181,10 +180,7 @@ def test_a_drifted_pair_names_the_generator_as_its_fix(
 
     (finding,) = json.loads(_run(script, "check", "--specs", str(specs), "--json").stdout)
 
-    prefix = f"{Path(sys.executable).as_posix()} {script.resolve()} catalog generate --specs"
-    assert finding["fix"] == f"{prefix} {shlex.quote(str(specs.resolve()))}"
-    argv = [sys.executable, str(script), *shlex.split(finding["fix"])[2:]]
-    assert subprocess.run(argv, cwd=tmp_path, check=False).returncode == 0
+    assert subprocess.run(finding["fix"], shell=True, cwd=tmp_path, check=False).returncode == 0
     assert _run(script, "check", "--specs", str(specs)).returncode == 0
 
 
