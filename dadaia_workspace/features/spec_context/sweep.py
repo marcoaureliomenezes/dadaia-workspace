@@ -161,18 +161,21 @@ REAPED_ZONE = "reaped"
 
 def hold(workspace_root: Path, target: Path, label: str, *, note: str = "") -> str | None:
     """:func:`move` *target* to ``.dadaia/reaped/<YYYYMMDD>/<workspace-relative path>``,
-    the one hold: the origin path is the record of where the entry came from."""
-    day = datetime.now(tz=UTC).strftime("%Y%m%d")
+    the one hold: the origin path is the record of where the entry came from. The hold's
+    clock is its top entry ``reaped/<YYYYMMDD>/<first segment>``, stamped once here."""
+    day = workspace_root / ".dadaia" / REAPED_ZONE / datetime.now(tz=UTC).strftime("%Y%m%d")
     rel = target.relative_to(workspace_root)
-    held = workspace_root / ".dadaia" / REAPED_ZONE / day / rel
-    return move(workspace_root, target, held, label, note=note)
+    done = move(workspace_root, target, day / rel, label, note=note)
+    if len(rel.parts) > 1 and (done or "").startswith("moved "):
+        os.utime(day / rel.parts[0])
+    return done
 
 
 def move(
     workspace_root: Path, target: Path, destination: Path, label: str, *, note: str = ""
 ) -> str | None:
     """Relocate *target* to *destination*, creating its parents. Both ends must sit
-    inside the workspace. All it moves is stamped: a hold counts from the move.
+    inside the workspace. *destination* itself is stamped: a hold counts from the move.
 
     N moves make N holds (ADR 0074): an occupied destination yields the first free
     ``<name>-N`` beside it, so no hold dies before its own TTL.
@@ -207,10 +210,8 @@ def move(
         else:
             shutil.copy2(target, destination)
         remove(workspace_root, target, label)
-    below = os.walk(destination) if destination.is_dir() and not destination.is_symlink() else ()
-    for path in [destination, *(Path(d) / n for d, ds, fs in below for n in ds + fs)]:
-        if not path.is_symlink():  # a link is never followed to its target
-            os.utime(path)
+    if not destination.is_symlink():  # a link is never followed to its target
+        os.utime(destination)
     try:
         shown = destination.relative_to(workspace_root).as_posix()
     except ValueError:  # pragma: no cover — _inside already proved it is under the root

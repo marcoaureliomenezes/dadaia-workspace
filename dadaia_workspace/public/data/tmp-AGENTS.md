@@ -8,6 +8,7 @@ Nothing here is product source or an approval artifact.
 ## 1. Rules
 
 - Use task/agent-scoped subdirectories: `.dadaia/tmp/<agent>/<YYYYMMDD>/<slug>/`.
+- A dated dir expires one day after its own mtime, whatever it holds; work that outlives the day continues in today's dir.
 - Prefer small text, JSON, screenshots, or logs that support a report.
 - Do not store secrets, credentials, tokens, private keys, or production dumps.
 - Do not import files from here as application/runtime dependencies.

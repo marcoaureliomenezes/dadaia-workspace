@@ -290,15 +290,17 @@ def doctor(
         "--expired-only",
         help=(
             "Scope the run to the workspace TTL lane: the workspace section reports "
-            "only expired entries and --fix skips the specs repairs. The reaper lane "
-            "itself is one lane and runs whole either way."
+            "only expired entries and --fix deletes only those and stale session records "
+            "— no slop move, no repo walk, no specs repairs (the SessionStart lane)."
         ),
     ),
     json_out: bool = typer.Option(
         False, "--json", help="Machine-readable output: sections and fixed."
     ),
     quiet: bool = typer.Option(
-        False, "--quiet", help="Print only what --fix deleted (nothing on a compliant run)."
+        False,
+        "--quiet",
+        help="Print only what --fix did and exit 0 — no report is built.",
     ),
     redact: bool = typer.Option(
         False,
@@ -316,6 +318,11 @@ def doctor(
     fixed = _apply_fixes(
         service, specs_doctor, target, source_root, alias_map, fix=fix, expired_only=expired_only
     )
+    render = _render_for(workspace_root, redact=redact)
+    if quiet:
+        for action in fixed:
+            typer.echo(render(action))
+        return
     reports = [
         merge_sections(
             [
@@ -328,13 +335,8 @@ def doctor(
     ]
     # Render boundary ONLY: no doctor ever sees the redactor; every finding and fix action
     # keeps carrying true names inside the sections themselves.
-    render = _render_for(workspace_root, redact=redact)
-
     if json_out:
         typer.echo(_json_payload(reports, fixed, render, target))
-    elif quiet:
-        for action in fixed:
-            typer.echo(render(action))
     else:
         _emit_human(reports, fixed, render, fix=fix)
 
@@ -360,13 +362,11 @@ def _apply_fixes(
     fixes, and the `ledgers` rules that carry one. Fixes run BEFORE the sections are
     built, so what the run then reports is the post-repair truth.
 
-    `--expired-only` is a SCOPE, never a second reaper: `service.fix()` is the one lane
-    and runs whole either way (T-047-20 deleted the early stop it used to buy). All the
-    flag still does on the write path is skip the specs and ledgers repairs, which keeps
-    the SessionStart lane off the specs tree."""
+    `--expired-only` runs `service.expire()` — `fix()`'s TTL tail alone — and skips the
+    specs and ledgers repairs: the SessionStart lane costs one lstat per zone entry."""
     if not fix:
         return []
-    fixed = list(service.fix()) if service is not None else []
+    fixed = [] if service is None else service.expire() if expired_only else service.fix()
     if not expired_only and specs_doctor is not None:
         fixed.extend(f"[specs] {issue.code}: {finding_path(issue)}" for issue in specs_doctor.fix())
     return fixed

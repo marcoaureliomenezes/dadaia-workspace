@@ -5,7 +5,8 @@
 (``features.spec_context.sweep``) serves both it and ``fix()``, driven by the zone registry
 (``core.workspace_layout.DADAIA_ZONES``): root, harness dirs, the ``.dadaia/`` top level,
 the closed-canon zones, the TTL zones (only expired entries and holds) — each finding one
-``WS-<zone>-<verdict>`` code. ``fix()`` consumes the same findings in the fixed order.
+``WS-<zone>-<verdict>`` code. ``fix()`` consumes the same findings in the fixed order;
+``expire()`` is its TTL tail alone, the SessionStart lane.
 
 Bug class (the six-bug ``.dadaia/`` ledger, workspace-doctor-root4-false-positive-dadaia-hooks
 .. dadaia-reconcile-quarantines-sanctioned-references-clone): the doctor kept its own name
@@ -285,10 +286,14 @@ class DoctorService:
         findings.extend(self._scan_repo_trees())
         for zone in workspace_layout.zones_with_canon():
             findings.extend(self._scan_canon_zone(zone, globs))
+        return (*findings, *self.scan_ttl())
+
+    def scan_ttl(self) -> tuple[Finding, ...]:
+        """The TTL zones alone: expired entries and holds, one lstat per zone entry."""
         now = time.time()
-        for zone in workspace_layout.zones_with_ttl():
-            findings.extend(self._scan_ttl_zone(zone, now))
-        return tuple(findings)
+        return tuple(
+            f for zone in workspace_layout.zones_with_ttl() for f in self._scan_ttl_zone(zone, now)
+        )
 
     def _contexts(self) -> list[SpecContextProject]:
         """The registered contexts, or NOTHING when the registry cannot be read.
@@ -434,13 +439,14 @@ class DoctorService:
         is never a candidate (bug public-install-restores-expired-zone-agents-reblocks-preflight)."""
         assert zone.ttl_seconds is not None
         ttl, zone_dir = zone.ttl_seconds, self._dadaia / zone.name
-        _, report = _ttl_walk(zone_dir, now - ttl, keep_live=zone.name == sweep.REAPED_ZONE)
         out: list[Finding] = []
-        for entry, stamp in report:
+        for entry, stamp in _ttl_walk(zone_dir, now - ttl, depth=2):
             if entry == zone_dir / "AGENTS.md":
                 continue
             age = now - stamp
             if age <= ttl:
+                if zone.name != sweep.REAPED_ZONE:
+                    continue
                 # Held: days ROUNDED UP, a minute-old hold has its whole window left.
                 detail = f"({-(-int(ttl - age) // 86_400)}d left)"
                 out.append(
@@ -459,16 +465,20 @@ class DoctorService:
     # fix() — the one reaper, in the fixed FR4 order
     # ------------------------------------------------------------------
 
+    def expire(self) -> list[str]:
+        """The SessionStart lane (``--expired-only``): stale session records, then every
+        TTL-expired zone entry. It costs one lstat per zone entry and walks no repo."""
+        # The record owner selects the expired records (F002); the one deleter removes them.
+        actions = [
+            f"GRAVEYARD-GC: deleted expired session file '{record.name}'"
+            for record in session_store.stale_records(self._workspace_root)
+            if sweep.remove(self._workspace_root, record, record.name) is not None
+        ]
+        return actions + self._delete(self.scan_ttl(), FindingVerdict.EXPIRED)
+
     def fix(self) -> list[str]:
-        """The ONE reaper lane: session reap -> migrate -> seed missing ->
-        MOVE slop to ``reaped/`` -> reap dead contexts' repos (INV-5) -> delete expired.
-
-        There is no second, smaller lane. ``--expired-only`` used to buy one by stopping
-        this method early; now that slop is HELD rather than deleted, the cheap lane and
-        the full lane are the same acts, so the parameter is deleted and the CLI flag
-        means only what it always should have: which findings the REPORT shows. The
-        SessionStart lane runs exactly this.
-
+        """The full reaper: seed missing -> MOVE slop to ``reaped/`` -> reap dead contexts'
+        repos (INV-5) -> :meth:`expire`.
 
         Nothing here deletes a live entry. Slop is MOVED and holds its 7 days in
         ``.dadaia/reaped/<YYYYMMDD>/<workspace-relative-path>``, the clock starting at the
@@ -478,12 +488,6 @@ class DoctorService:
         through the ONE sweep guard: it reports what it did or that it skipped, never
         aborts, and never touches a location outside the workspace."""
         actions: list[str] = []
-
-        # The record owner selects the expired records (F002); the one deleter removes them.
-        for record in session_store.stale_records(self._workspace_root):
-            if sweep.remove(self._workspace_root, record, record.name) is not None:
-                actions.append(f"GRAVEYARD-GC: deleted expired session file '{record.name}'")
-
         findings = self.scan()
         for finding in findings:
             if finding.verdict is FindingVerdict.MISSING and finding.fixable:
@@ -495,8 +499,7 @@ class DoctorService:
             for repo in ctx.all_repos() if ctx.state is ContextState.DEAD else ():
                 if (repo_path := self._repos_dir() / repo.slug).exists():
                     actions.extend(self._reap_dead_repo(ctx, repo_path))
-        actions.extend(self._delete(findings, FindingVerdict.EXPIRED))
-        return actions
+        return actions + self.expire()
 
     def _reap(self, findings: tuple[Finding, ...]) -> list[str]:
         """MOVE every slop entry into the reaped zone. Never deletes."""
@@ -556,31 +559,23 @@ class DoctorService:
         return actions
 
 
-def _ttl_walk(
-    directory: Path, expiry: float, *, keep_live: bool
-) -> tuple[float | None, list[tuple[Path, float]]]:
-    """One post-order pass, each entry ``lstat``'ed once and never followed: the newest file
-    mtime below *directory*, and ``(entry, stamp)`` for each entry older than *expiry*
-    (whole, its descendants dropped) or, with *keep_live*, each live file. A directory is
-    stamped by its newest file, by its own mtime only when it holds none (bug
-    reaper-needs-many-runs-for-a-nested-expired-tree)."""
-    newest: float | None = None
-    report: list[tuple[Path, float]] = []
+def _ttl_walk(directory: Path, expiry: float, *, depth: int) -> list[tuple[Path, float]]:
+    """``(entry, mtime)`` per zone entry, each judged by its OWN ``lstat`` and never descended
+    into: a file, or a directory at *depth* (``tmp/<agent>/<YYYYMMDD>``, ``handoff/<ctx>/<file>``,
+    ``reaped/<YYYYMMDD>/<top>``). A shallower directory whose entries all expired — none left
+    means its own mtime expired — is itself one entry, reaped whole with its parents in one
+    run (bug reaper-judges-ttl-by-walking-every-file)."""
+    out: list[tuple[Path, float]] = []
     for entry in sweep.walk(directory):
         if (st := sweep.lstat(entry)) is None:
             continue
         is_dir = stat.S_ISDIR(st.st_mode)
-        files, below = (
-            _ttl_walk(entry, expiry, keep_live=keep_live) if is_dir else (st.st_mtime, [])
-        )
-        if files is not None:
-            newest = files if newest is None else max(newest, files)
-        stamp = st.st_mtime if files is None else files
-        if stamp < expiry or (keep_live and not is_dir):
-            report.append((entry, stamp))
+        below = _ttl_walk(entry, expiry, depth=depth - 1) if depth > 1 and is_dir else None
+        if below is None or (below or st.st_mtime < expiry) and all(t < expiry for _, t in below):
+            out.append((entry, max((t for _, t in below or ()), default=st.st_mtime)))
         else:
-            report.extend(below)
-    return newest, report
+            out.extend(below)
+    return out
 
 
 # ── the `workspace` section of the one doctor (0.4.7 FR5, T-047-02) ──────────────
@@ -615,7 +610,7 @@ def workspace_rules(
         return [] if expired_only else service.check_installed_hooks(context)
 
     def entries(service: DoctorService) -> list[SectionFinding]:
-        findings = service.scan()
+        findings = service.scan_ttl() if expired_only else service.scan()
         if expired_only:
             findings = tuple(f for f in findings if f.verdict is FindingVerdict.EXPIRED)
         return [

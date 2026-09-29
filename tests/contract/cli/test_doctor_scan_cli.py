@@ -159,23 +159,36 @@ def test_fix_reports_an_undeletable_entry_exits_1_and_never_raises(
     assert f"{_EXPIRED_CODE}: skipped '{_TTL_ZONE.name}/locked' (errno " in result.output
 
 
-def test_fix_expired_only_quiet_is_the_reaper_lane(workspace: Path) -> None:
-    """sa-reaper-destroys-its-own-hold-before-ttl#B5, #B4, #B3: one reaper lane — expired deleted, slop held
-    in reaped/, a second quiet run prints nothing."""
+def test_the_session_lane_costs_one_lstat_per_zone_entry_whatever_it_holds(
+    workspace: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """reaper-judges-ttl-by-walking-every-file: `--fix --expired-only --quiet` deletes the expired
+    entry, leaves slop to the full `--fix`, prints nothing on a second run, and its filesystem
+    calls and `doctor`'s lines do not grow with the files inside one live tmp entry or one hold."""
     (workspace / "junk.txt").write_text("", encoding="utf-8")
     stale = _plant_expired(workspace)
-
-    result = CliRunner().invoke(app, ["doctor", "--fix", "--expired-only", "--quiet"])
-
-    assert result.exit_code == 0, result.output
-    assert f"{_EXPIRED_CODE}: deleted '{_TTL_ZONE.name}/stale'" in result.output.splitlines()
-    assert not stale.exists()
-    assert not (workspace / "junk.txt").exists()
-    assert any(p.name == "junk.txt" for p in (workspace / ".dadaia" / "reaped").rglob("junk.txt"))
-
-    again = CliRunner().invoke(app, ["doctor", "--fix", "--expired-only", "--quiet"])
-    assert again.exit_code == 0
-    assert again.output == ""
+    day = datetime.now(tz=UTC).strftime("%Y%m%d")
+    trees = [workspace / ".dadaia" / z / day / "x" for z in ("tmp", "reaped")]
+    lane = ["doctor", "--fix", "--expired-only", "--quiet"]
+    first = CliRunner().invoke(app, lane)
+    assert first.output == f"{_EXPIRED_CODE}: deleted '{_TTL_ZONE.name}/stale'\n"
+    assert not stale.exists() and (workspace / "junk.txt").exists()
+    calls: list[str] = []
+    for name in ("stat", "lstat", "scandir", "listdir"):
+        real = getattr(os, name)
+        monkeypatch.setattr(os, name, lambda *a, _r=real, **k: calls.append("") or _r(*a, **k))
+    cost = []
+    for lo, n in ((0, 10), (10, 1_000)):
+        for tree in trees:
+            tree.mkdir(parents=True, exist_ok=True)
+            for i in range(lo, n):
+                (tree / f"f{i}").touch()
+        calls.clear()
+        again = CliRunner().invoke(app, lane).output
+        cost.append(
+            (len(calls), len(CliRunner().invoke(app, ["doctor"]).output.splitlines()), again)
+        )
+    assert cost[0] == cost[1] and cost[0][2] == "", cost
 
 
 def test_a_held_entry_is_always_listed_and_never_fails(workspace: Path) -> None:
@@ -380,7 +393,8 @@ def _git(cwd: Path, *args: str) -> None:
 def test_an_expired_entry_holding_a_worktree_carries_a_fix_that_clears_it(
     workspace: Path,
 ) -> None:
-    """tmp-expired-worktree-fix-line-never-clears: the fix, run verbatim, removes the worktree and the entry reaps."""
+    """tmp-expired-worktree-fix-line-never-clears: the fix, run verbatim, removes the worktree and clears the
+    finding; the entry, touched by that removal, then lives out its own TTL."""
     day = workspace / ".dadaia" / "tmp" / "a" / "20260920"
     repo = day / "r"
     repo.mkdir(parents=True)
@@ -400,7 +414,7 @@ def test_an_expired_entry_holding_a_worktree_carries_a_fix_that_clears_it(
 
     assert done.returncode == 0
     assert _expired(workspace) == []
-    assert not (workspace / ".dadaia" / "tmp" / "a").exists()
+    assert not (day / "wt").exists()
 
 
 @pytest.mark.parametrize(

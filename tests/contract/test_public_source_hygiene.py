@@ -124,9 +124,9 @@ def test_public_source_names_no_retired_surface(
 
 def test_the_retired_facts_have_their_live_statement() -> None:
     """sa-reaper-destroys-its-own-hold-before-ttl#B6 and sa-consumer-law-carries-library-facts#FR8.4:
-    the cli skill says `--expired-only` narrows only the report; the constitution template is English."""
+    the cli skill says `--fix --expired-only` is the TTL lane alone; the constitution template is English."""
     skill = (_PKG / "public" / "skills" / "dd-cli-library" / "SKILL.md").read_text(encoding="utf-8")
-    assert "`--expired-only` narrows only the report" in skill
+    assert "`--fix --expired-only` deletes only TTL-expired entries" in skill
     stub = canon._CONSTITUTION_STUB.lower()
     assert "# constitution" in stub
     assert [t for t, _ in PORTUGUESE_CONTROL_TERMS if t.lower() in stub] == []

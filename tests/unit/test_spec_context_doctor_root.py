@@ -13,7 +13,6 @@ import os
 import time
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any
 
 import pytest
 
@@ -220,13 +219,12 @@ def test_absent_harness_profile_is_missing_and_fix_seeds_it_from_present_dirs(
 
 
 def test_ttl_zones_expire_an_entry_whole_by_its_own_ttl_and_spare_the_zone_law(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path,
 ) -> None:
-    """reaper-needs-many-runs-for-a-nested-expired-tree: an expired entry is ONE finding judged
-    by its newest content; every TTL zone uses its own code and TTL; bug
+    """reaper-judges-ttl-by-walking-every-file: an expired entry is ONE finding judged by its own
+    mtime, a live one none; every TTL zone uses its own code and TTL; bug
     public-install-restores-expired-zone-agents-reblocks-preflight: the projected zone
-    ``AGENTS.md`` is never a candidate; bug doctor-ttl-walk-quadratic-on-live-trees: a live
-    tree costs <= 2 stats per entry (never one per ancestor) and no finding."""
+    ``AGENTS.md`` is never a candidate."""
     _init_workspace(tmp_path)
     for zone in zones_with_ttl():
         (tmp_path / ".dadaia" / zone.name).mkdir(exist_ok=True)
@@ -237,26 +235,14 @@ def test_ttl_zones_expire_an_entry_whole_by_its_own_ttl_and_spare_the_zone_law(
     old = zone_dir / "claude" / "20260801" / "x.png"
     old.parent.mkdir(parents=True)
     old.write_bytes(b"PNG")
-    _age(old)
-    (deep := zone_dir.joinpath("claude", *"abcdef")).mkdir(parents=True)
-    for level in (deep, *deep.parents[:6]):
-        (level / "today.txt").touch()  # claude/a holds 12 live entries, 6 deep
+    _age(old.parent)
+    (zone_dir / "claude" / "today").mkdir()
     law = zone_dir / "AGENTS.md"
     law.write_text("# zone law", encoding="utf-8")
     _age(law, time.time() - 400 * 86_400)
-    stats: list[Path] = []
-    for name in ("stat", "lstat"):  # the os seam every pathlib version stats through
-        real = getattr(os, name)
-
-        def counting(path: Path, *a: object, _real: Any = real, **kw: object) -> os.stat_result:
-            stats.append(Path(path))
-            return _real(path, *a, **kw)  # type: ignore[no-any-return]
-
-        monkeypatch.setattr(os, name, counting)
     found = _by_path(_make_doctor(tmp_path).scan())
 
     z = _TTL_ZONE.name
-    assert len([p for p in stats if p.is_relative_to(deep.parents[4])]) <= 2 * 12
     assert found[f"{z}/claude/20260801"].code == f"WS-{z.lstrip('.')}-expired"
     assert found[f"{z}/claude/20260801"].detail == "(mtime 2d > ttl 1d)"
     assert [p for p in found if p.startswith(f"{z}/")] == [f"{z}/claude/20260801", f"{z}/stale"]
