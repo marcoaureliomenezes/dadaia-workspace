@@ -1,10 +1,8 @@
-"""Intent: CONTRACT — sa-codex-policy-allows-write-capable-commands (0.5.0 WP-13, AC1.5).
+"""Intent: CONTRACT — sa-codex-policy-allows-write-capable-commands, codex-policy-allows-sed-and-rg-exec-and-write-forms (AC1.5).
 
-The rendered Codex ``.rules`` allows no write- or exec-capable prefix (sa-codex-policy-allows-write-capable-commands#B1, sa-codex-policy-allows-write-capable-commands#B2), keeps
-read-only inspection unprompted (sa-codex-policy-allows-write-capable-commands#B3), and registry.json's mandate says what the file is
-(sa-codex-policy-allows-write-capable-commands#B4). The allow set is SPEC row 13's: ``rg ls cat`` and ``sed -n``.
-Size: SMALL (parses the rendered text); #B1 also asks the real ``codex execpolicy`` when
-the binary is on PATH.
+The rendered Codex ``.rules`` auto-allows only argv-closed readers (``ls cat``); interpreter-capable
+sed/rg (``1e``, ``w``, ``-i``, ``--pre``) prompt (#B1-#B3); registry.json says so (#B4).
+Size: SMALL; #B1 also asks the real ``codex execpolicy`` when the binary is on PATH.
 """
 
 from __future__ import annotations
@@ -44,8 +42,8 @@ def _allowed_prefixes() -> set[tuple[str, ...]]:
 
 def test_b3_read_only_inspection_stays_allowed() -> None:
     """#B2 and #B3: the allow set is exactly the read-only one, so no allowed prefix is
-    write- or exec-capable (``sed`` only as ``sed -n``)."""
-    assert _allowed_prefixes() == {("rg",), ("ls",), ("cat",), ("sed", "-n")}
+    write- or exec-capable."""
+    assert _allowed_prefixes() == {("ls",), ("cat",)}
 
 
 @pytest.mark.skipif(shutil.which("codex") is None, reason="codex CLI not on PATH")
@@ -54,8 +52,9 @@ def test_b3_read_only_inspection_stays_allowed() -> None:
     [
         (["sed", "-i", "s/a/b/", "AGENTS.md"], False),
         (["find", ".", "-exec", "rm", "{}", ";"], False),
-        (["sed", "-n", "1,80p", "AGENTS.md"], True),
-        (["rg", "Codex"], True),
+        (["sed", "-n", "1e touch x", "AGENTS.md"], False),
+        (["rg", "--pre", "./x.sh", "pat", "."], False),
+        (["cat", "AGENTS.md"], True),
     ],
 )
 def test_b1_codex_execpolicy_allows_only_read_only_commands(
@@ -77,4 +76,4 @@ def test_b4_the_registry_mandate_describes_the_rendered_file() -> None:
     rules = json.loads(_REGISTRY.read_text(encoding="utf-8"))["rules"]
     mandate = next(r["mandate"] for r in rules if r["id"] == "codex-command-policy")
     assert "venv-guard" not in mandate
-    assert all(token in mandate for token in ("rg", "ls", "cat", "sed -n"))
+    assert all(token in mandate for token in ("ls", "cat")) and " sed" not in mandate

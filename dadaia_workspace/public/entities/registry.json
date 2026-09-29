@@ -104,7 +104,7 @@
     },
     {
       "id": "codex-command-policy",
-      "mandate": "Codex-native executable command policy (Starlark, the only rule dialect Codex executes): allows only read-only rg, ls, cat and sed -n; destructive commands and publishing prompt.",
+      "mandate": "Codex-native executable command policy (Starlark, the only rule dialect Codex executes): allows only the argv-closed readers ls and cat; every other command prompts or falls to the Codex default.",
       "implementations": {
         "codex": ".codex/rules/dadaia-command-policy.rules"
       }
