@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-09-29T01:10:08Z",
+  "generated_at": "2026-09-29T16:34:50Z",
   "features": [
     {
       "rank": 1,
@@ -70,7 +70,7 @@
         "derivation",
         "governance"
       ],
-      "token_estimate": 937,
+      "token_estimate": 938,
       "depends_on": [
         "agent-orchestration",
         "sdd-gate-v3",
@@ -313,7 +313,7 @@
         "hooks",
         "binding"
       ],
-      "token_estimate": 360,
+      "token_estimate": 358,
       "depends_on": [
         "agentic-entities",
         "sdd-gate-v3",
@@ -504,7 +504,6 @@
         "dadaia_workspace/core/invocation.py",
         "dadaia_workspace/core/session_store.py",
         "dadaia_workspace/features/spec_context/injection_policy.py",
-        "dadaia_workspace/features/spec_context/markers.py",
         "dadaia_workspace/features/spec_context/service.py",
         "dadaia_workspace/infrastructure/json_context_store.py",
         "dadaia_workspace/cli/commands/context.py"
@@ -637,7 +636,7 @@
         "compliance",
         "privacy"
       ],
-      "token_estimate": 1739,
+      "token_estimate": 1804,
       "depends_on": [
         "public-asset-distribution",
         "sdd-gate-v3",
@@ -838,7 +837,7 @@
         "no-locks",
         "privacy"
       ],
-      "token_estimate": 1862,
+      "token_estimate": 1863,
       "depends_on": [
         "workspace-doctor",
         "context-management",

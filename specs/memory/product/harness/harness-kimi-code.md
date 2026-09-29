@@ -18,7 +18,7 @@ sources:
 ## Hooks
 
 - Kimi Code has no project-level hook config, so registration is a managed, marker-delimited block in the user-level `$KIMI_CODE_HOME/config.toml` (default `~/.kimi-code/config.toml`); content outside the markers is never touched.
-- Five shims under `$KIMI_CODE_HOME/hooks/dadaia-kimi-*.sh`, rendered from the `HOOK_DIALECTS` table, carry the four hook behaviours ([[agentic-entities]]): `PreToolUse` (`^(Edit|Write|Bash)$`) the merged pre-gate, `PostToolUse` the post-gate (session heartbeat, throttled reaper), `UserPromptSubmit` ctx-inject, `PostCompact` bootstrap re-emission, `SessionStart` `dadaia doctor --fix --expired-only --quiet`.
+- Five shims under `$KIMI_CODE_HOME/hooks/dadaia-kimi-*.sh`, rendered from the `HOOK_DIALECTS` table, carry the four hook behaviours ([[agentic-entities]]): `PreToolUse` (`^(Edit|Write|Bash)$`) the merged pre-gate, `PostToolUse` the post-gate (session heartbeat), `UserPromptSubmit` ctx-inject, `PostCompact` bootstrap re-emission, `SessionStart` `dadaia doctor --fix --expired-only --quiet`.
 - Each shim walks up from the hook cwd to the nearest workspace and runs its venv interpreter, so one global block serves every workspace and exits 0 outside one or without a venv; the shared translator turns a gate deny into exit 2 with the reason on stderr ([[sdd-gate-v3]]).
 - The shims and the block are the only dadaia assets installed outside the workspace tree; `dadaia public doctor` compares them with their renderers.
 - `dadaia certify`'s `kimi-code-live-probe` checks that `kimi` answers `--version`, reporting SKIP `UNVERIFIED` when it is absent.

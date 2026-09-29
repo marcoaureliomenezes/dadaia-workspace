@@ -8,7 +8,7 @@ is `dadaia_workspace/public/data/AGENTS.md`, and the walkthrough is
 ## Context
 
 <!-- derived-from: spec-context-project sha256:b1fa1ed3b027 -->
-<!-- derived-from: context-management sha256:44be26055b2d -->
+<!-- derived-from: context-management sha256:1871a6d846b2 -->
 
 A *context* — a Spec Context Project — is one canonical `specs/` tree owned by one
 main repository, the unit for memory, backlog, bugs, releases, reports and handoffs.
@@ -59,7 +59,7 @@ carry the ordered work, and the ledger scripts move the records.
 
 ## The gate
 
-<!-- derived-from: sdd-gate-v3 sha256:805cabfa0afc -->
+<!-- derived-from: sdd-gate-v3 sha256:f23d17bf7053 -->
 
 The *gate* is one PreToolUse pre-gate evaluating root whitelist, venv guard and SDD
 gate in that order — first block wins, and a policy that raises is ALLOW. It blocks
@@ -78,8 +78,8 @@ gate — a refusal whose fix is itself refused (a Stall) cannot ship.
 
 ## Memory
 
-<!-- derived-from: context-management sha256:44be26055b2d -->
-<!-- derived-from: workspace-doctor sha256:f22724e283a4 -->
+<!-- derived-from: context-management sha256:1871a6d846b2 -->
+<!-- derived-from: workspace-doctor sha256:54de9b41c884 -->
 <!-- derived-from: release-lifecycle sha256:57d8b542e879 -->
 <!-- derived-from: audits-canon sha256:55ce6e25db49 -->
 

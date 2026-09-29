@@ -52,7 +52,7 @@ harness later and `.dadaia/.venv/bin/dadaia harness list` reads the roster.
 ## Level 2 — the project
 
 <!-- derived-from: spec-context-project sha256:b1fa1ed3b027 -->
-<!-- derived-from: context-management sha256:44be26055b2d -->
+<!-- derived-from: context-management sha256:1871a6d846b2 -->
 
 A context — a Spec Context Project — is the unit of work: one canonical `specs/` tree
 owned by one main repository, optionally spanning associated repositories that live and
@@ -94,7 +94,7 @@ branches; a re-run is a no-op.
 
 ## Check compliance — `doctor`
 
-<!-- derived-from: workspace-doctor sha256:f22724e283a4 -->
+<!-- derived-from: workspace-doctor sha256:54de9b41c884 -->
 
 ```bash
 .dadaia/.venv/bin/dadaia doctor --context <ctx> [--json] [--fix] [--redact]

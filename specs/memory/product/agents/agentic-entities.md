@@ -26,7 +26,7 @@ The one enumeration; every harness atom links here.
 |---|---|---|
 | `root-whitelist` | blocks a file-tool write that would mint a new workspace-root entry | pre-tool gate |
 | `venv-guard` | blocks `dadaia`/`pip`/`python -m dadaia_workspace` run outside the workspace venv, naming the corrected command | pre-tool gate |
-| `sdd-gate` | classifies each write ADDITIVE / PROTECTED / MUTATING and scope-judges MUTATING writes under `repos/<slug>/` for a bound session | pre-tool gate (+ post-tool reaper where the harness has one) |
+| `sdd-gate` | classifies each write ADDITIVE / PROTECTED / MUTATING and scope-judges MUTATING writes under `repos/<slug>/` for a bound session | pre-tool gate (+ post-tool session heartbeat where the harness has one) |
 | `context-memory-injection` | runs the session-start reaper (`dadaia doctor --fix --expired-only --quiet`) and, where the harness has a prompt hook, injects the bound context's bootstrap | session start (+ prompt) |
 | `git-chokepoints` | pre-push allows only a work branch of the project gitflow, or the bootstrap birth of its principal and integration branches, and refuses a non-canon `specs/` path or a denylisted secret in the pushed range | git hooks, identical for every harness |
 

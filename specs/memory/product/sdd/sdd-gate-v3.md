@@ -38,7 +38,7 @@ sources:
 - The gate returns a decision and its message per write target: a BLOCK's message is its reason, an ALLOW's is empty; there is no advisory channel.
 - A BLOCK is one envelope carrying `"decision": "block"` plus Claude Code's `permissionDecision: "deny"`; an ALLOW is an explicit envelope with no permission verdict and no `systemMessage`.
 - A MUTATING write records nothing about its session; races between sessions surface through git.
-- The PostToolUse hook refreshes the session record's `last_seen_at` and, on a throttle, runs the workspace reaper; it always exits zero ([[workspace-doctor]]).
+- The PostToolUse hook refreshes the session record's `last_seen_at` and nothing else — it never runs the reaper ([[workspace-doctor]]); it always exits zero.
 
 ## Git chokepoints
 

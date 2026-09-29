@@ -46,8 +46,8 @@ memory atom under its content hash.
 
 <!-- derived-from: pypi-distribution sha256:618098346ed6 -->
 <!-- derived-from: workspace-init sha256:acb8bc28e783 -->
-<!-- derived-from: context-management sha256:44be26055b2d -->
-<!-- derived-from: workspace-doctor sha256:f22724e283a4 -->
+<!-- derived-from: context-management sha256:1871a6d846b2 -->
+<!-- derived-from: workspace-doctor sha256:54de9b41c884 -->
 
 ```bash
 uvx dadaia-workspace init demo --harness claude --repo <clone url>   # level 1 + 2
@@ -93,13 +93,13 @@ and deletes only what a TTL expired.
 
 ## An agent reads AGENTS.md and uses it
 
-<!-- derived-from: agentic-entities sha256:6add03805476 -->
-<!-- derived-from: sdd-gate-v3 sha256:805cabfa0afc -->
+<!-- derived-from: agentic-entities sha256:05fb159f5b4f -->
+<!-- derived-from: sdd-gate-v3 sha256:f23d17bf7053 -->
 <!-- derived-from: release-lifecycle sha256:57d8b542e879 -->
 <!-- derived-from: bug-ledger sha256:9392c1f406a4 -->
-<!-- derived-from: harness-claude-code sha256:4d0f86f6e93f -->
+<!-- derived-from: harness-claude-code sha256:24a59f223f83 -->
 <!-- derived-from: harness-codex sha256:9218e747c24f -->
-<!-- derived-from: harness-kimi-code sha256:4adcdb684542 -->
+<!-- derived-from: harness-kimi-code sha256:127cdd81f783 -->
 <!-- derived-from: harness-cursor sha256:1cae6128564d -->
 <!-- derived-from: harness-devin sha256:ab4a32c4a53d -->
 <!-- derived-from: harness-copilot sha256:b93cef868a6f -->

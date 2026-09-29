@@ -34,6 +34,7 @@ sources:
 - The walk covers the root, `.agents` plus each registered harness's projection directory, the `.dadaia/` top level, the top of every ALIVE repo (main plus associated), the closed-canon zones and the TTL zones; `references/` and `.venv/` are never walked and a symlink is never followed.
 - Every filesystem act of the walk and the reaper goes through `dadaia_workspace/features/spec_context/sweep.py`: a vanished entry is absent, a location outside the workspace is skipped, an `OSError` is one `skipped` action.
 - Verdicts: `canon`, `operator` (matches an instance exception), `slop`, `expired` (older than the zone's TTL), `missing` (an init/install zone or the harness profile absent), `reaped` (held in `reaped/`, listed with days left).
+- A TTL zone is walked once, each entry `lstat`'ed once: a directory's age is its newest file's mtime, its own only when it holds none; an expired entry is one `expired` finding, deleted whole; a live entry is never a finding — a TTL zone reports only expired entries and `reaped/` holds.
 - Canon per level is a view of `dadaia_workspace/core/workspace_layout.py`: the root law's entries, the install ledger's harness entries, the zone names, `STATES_CANON` for `states/`, `spec-contexts.json` for `dist/`, `*.json` for `sessions/`.
 - A repo tree: only a `REPO_TREE_EXCLUDED` name (`.dadaia` and tool caches) is a finding (`WS-repos-slop`); `.git`, `.venv` and `node_modules` end the descent, so source is never judged.
 - Instance exceptions live in `.dadaia/states/instance_exceptions.txt`, one glob per line; the root-whitelist hook reads the same file ([[sdd-gate-v3]]).
@@ -58,9 +59,9 @@ sources:
 
 ## The reaper
 
-- `--fix` runs one lane: marker GC, stale session records, the `root_exceptions.txt` to `instance_exceptions.txt` move, seed missing zones and the harness profile, move every `slop` entry, move a DEAD context's leftover repo (`INV-5`), delete expired; then, unless `--expired-only`, the specs fixes (`MEM-PLACEHOLDER-1`, `TREE-4`, `TREE-5`, `FIXED-1/2`, `SPEC-DOC-034`); a non-canon specs path (`TREE-8`) is reported, never removed.
+- `--fix` runs one lane: stale session records, seed missing zones and the harness profile, move every `slop` entry, move a DEAD context's leftover repo (`INV-5`), delete expired; then, unless `--expired-only`, the specs fixes (`MEM-PLACEHOLDER-1`, `TREE-4`, `TREE-5`, `FIXED-1/2`, `SPEC-DOC-034`); a non-canon specs path (`TREE-8`) is reported, never removed.
 - Nothing is deleted directly: slop moves to `.dadaia/reaped/<YYYYMMDD>/<workspace-relative-path>` (7-day TTL from the move); deletion happens only when a TTL zone's entry expires.
-- The lane runs at SessionStart (`dadaia doctor --fix --expired-only --quiet` from each harness's runtime config) and on the PostToolUse hook's throttle; it judges by registry, never by liveness.
+- The lane runs at SessionStart (`dadaia doctor --fix --expired-only --quiet` from each harness's runtime config) and on `--fix`, never on a tool call; it judges by registry, never by liveness.
 - A fix invents no approval, completion, evidence or disposition, and every step reports what it did or skipped.
 - A linked git worktree — a directory whose `.git` is a file — is skipped, with any path inside or above one; a read-only entry is made owner-writable and retried, so the reaper deletes what it owns.
 - Never touched: `references/`, `.venv/`, repo source, install-ledger entries, `agentic/` and `hooks/` contents (drift belongs to `public doctor`), a zone's `AGENTS.md`, exception matches, unexpired files.

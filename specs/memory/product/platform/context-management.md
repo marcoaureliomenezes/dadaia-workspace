@@ -10,7 +10,6 @@ sources:
   - dadaia_workspace/core/invocation.py
   - dadaia_workspace/core/session_store.py
   - dadaia_workspace/features/spec_context/injection_policy.py
-  - dadaia_workspace/features/spec_context/markers.py
   - dadaia_workspace/features/spec_context/service.py
   - dadaia_workspace/infrastructure/json_context_store.py
   - dadaia_workspace/cli/commands/context.py
