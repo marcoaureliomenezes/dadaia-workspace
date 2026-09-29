@@ -145,10 +145,9 @@ def _rmtree_sites() -> list[str]:
 
 
 def _ttl_clocks() -> list[str]:
-    """No `*_TTL*` constant outside the zone registry (the session record's own clock and a
-    throttle window excepted); markers.py deletes nothing."""
-    allowed = {"SESSION_GC_TTL_SECONDS", "SESSION_GC_TTL_FIELD", "RECONCILER_THROTTLE_TTL_SECONDS"}
-    hits = [
+    """No `*_TTL*` constant outside the zone registry (the session record's own clock excepted)."""
+    allowed = {"SESSION_GC_TTL_SECONDS", "SESSION_GC_TTL_FIELD"}
+    return [
         f"{_rel(path)}:{t.id}"
         for path, tree in _trees()
         if "public" not in path.relative_to(_PKG).parts and path.name != "workspace_layout.py"
@@ -162,8 +161,6 @@ def _ttl_clocks() -> list[str]:
         )
         if isinstance(t, ast.Name) and "_TTL" in t.id and t.id not in allowed
     ]
-    markers = (_PKG / "features" / "spec_context" / "markers.py").read_text(encoding="utf-8")
-    return hits + [f"markers.py: {w}" for w in ("unlink", "sweep.remove") if w in markers]
 
 
 _PATH_CLASS_OWNERS = {"features/spec_context/gate_policy.py", "core/workspace_layout.py"}

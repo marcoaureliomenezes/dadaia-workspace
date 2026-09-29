@@ -37,4 +37,4 @@
 - One finding per line, `<CODE> <verdict> <message>`; findings and the exit code are the whole report, no score line.
 - The workspace scan covers the root, the harness dirs, the zones and every ALIVE repo's top level, plus an excluded name or nested `.dadaia/` at any depth.
 - Slop and dead-repo leftovers are MOVED to `reaped/<YYYYMMDD>/<path>`, listed `WS-reaped-reaped`; nothing is deleted directly — an entry dies at its own TTL; move a mistakenly held one back before then.
-- The reaper runs at SessionStart, the PostToolUse throttle and `--fix`.
+- The reaper runs at SessionStart and on `--fix`, never on a tool call.

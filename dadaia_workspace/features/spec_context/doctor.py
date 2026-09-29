@@ -294,10 +294,8 @@ class DoctorService:
         """The registered contexts, or NOTHING when the registry cannot be read.
 
         The store's contract — degrade to inaction, never to deletion — applied at the one
-        place both readers share. It matters more now than it did: the reaper runs on
-        ``sdd_post_gate``'s throttle, so an unreadable or older-shaped registry must make
-        the pass do less, never raise on the write hot path (and never let the INV-5 lane
-        act on a half-parsed registry)."""
+        place both readers share: an unreadable or older-shaped registry makes the pass do
+        less, never raise (and never lets the INV-5 lane act on a half-parsed registry)."""
         try:
             return list(self._store.list_all())
         except (KeyError, OSError, SchemaVersionError, TypeError, ValueError):
@@ -469,7 +467,7 @@ class DoctorService:
         this method early; now that slop is HELD rather than deleted, the cheap lane and
         the full lane are the same acts, so the parameter is deleted and the CLI flag
         means only what it always should have: which findings the REPORT shows. The
-        SessionStart lane and ``sdd_post_gate``'s throttle run exactly this.
+        SessionStart lane runs exactly this.
 
 
         Nothing here deletes a live entry. Slop is MOVED and holds its 7 days in
@@ -583,19 +581,6 @@ def _ttl_walk(
         else:
             report.extend(below)
     return newest, report
-
-
-def reap(workspace_root: Path) -> list[str]:
-    """The reaper lane, composed without the container (P-12).
-
-    ``sdd_post_gate``'s throttle and the SessionStart lane call this: seed what is
-    missing, move slop into ``reaped/``, delete what TTL expired. Hooks are sanctioned
-    direct importers of a feature and its stores; the composition root is not on the
-    write hot path.
-    """
-    states = workspace_root / ".dadaia" / "states"
-    service = DoctorService(JsonContextStore(states), GitSubprocessClient(), workspace_root)
-    return service.fix()
 
 
 # ── the `workspace` section of the one doctor (0.4.7 FR5, T-047-02) ──────────────

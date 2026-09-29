@@ -26,8 +26,7 @@ Census (file:line, T-044-03):
      only (``hooks/_common.py:176-208`` ``emit_allow``/``emit_block``); it never rewrites
      ``tool_input``, so it cannot touch the bytes a subsequent Edit/Write applies.
    - ``dadaia_workspace/hooks/sdd_post_gate.py`` (PostToolUse) — writes only to
-     ``.dadaia/logs/``, ``.dadaia/states/``, and ``.dadaia/sessions/`` (presence renewal,
-     reconciler flags, stale-record reap); it never opens a ``specs/releases/**`` path.
+     ``.dadaia/sessions/`` (presence renewal); it never opens a ``specs/releases/**`` path.
    - ``dadaia_workspace/hooks/ctx_inject.py`` (SessionStart/UserPromptSubmit) — writes
      only sentinel/compact markers under ``.dadaia/tmp/`` (``ctx_inject.py:378,435``); it
      reads memory atoms, never writes release artifacts.
