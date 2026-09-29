@@ -25,12 +25,13 @@ _MAP = _PKG / "public" / "data" / "AGENTS.md"
 def test_the_map_states_what_the_gate_judges() -> None:
     """sa-text-restates-rules-the-code-contradicts#49.1 (first-token rows: unit test_venv_guard)
     and bug gate-law-claims-out-of-scope-writes-blocked-but-bash-is-never-judged: only file
-    tools are judged as writes, never Bash; the map states exactly this."""
-    tools = ("Write", "Edit", "MultiEdit", "NotebookEdit", "apply_patch")
-    assert {*tools, "write_file", "edit_file"} == _common.WRITE_TOOLS
+    tools are judged as writes, never Bash, and NotebookEdit creates no root entry."""
+    tools = ("Write", "Edit", "MultiEdit", "apply_patch")
+    assert {*tools, "NotebookEdit", "write_file", "edit_file"} == _common.WRITE_TOOLS
     line = next(ln for ln in _MAP.read_text("utf-8").splitlines() if "One PreToolUse gate" in ln)
     assert "first token is `dadaia`, `pip`/`pip3` or `python -m dadaia_workspace`" in line
-    assert "file-tool write (`" + "`, `".join(tools) + "`)" in line
+    assert "file-tool write (`" + "`, `".join(tools) + "`) creating a new" in line
+    assert "a file-tool write (those or `NotebookEdit`) that is PROTECTED" in line
     assert "a Bash write (`sed -i`, `rm`, `mkdir`, a redirect) is never judged" in line
 
 

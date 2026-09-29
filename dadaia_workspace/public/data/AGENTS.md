@@ -35,7 +35,7 @@
 
 ## 3. What is enforced
 
-- One PreToolUse gate blocks exactly three things: a file-tool write (`Write`, `Edit`, `MultiEdit`, `NotebookEdit`, `apply_patch`) creating a new workspace-root entry (§4); a Bash command whose first token is `dadaia`, `pip`/`pip3` or `python -m dadaia_workspace` outside `.dadaia/.venv/bin/`; a file-tool write that is PROTECTED or out-of-scope — a Bash write (`sed -i`, `rm`, `mkdir`, a redirect) is never judged.
+- One PreToolUse gate blocks exactly three things: a file-tool write (`Write`, `Edit`, `MultiEdit`, `apply_patch`) creating a new workspace-root entry (§4); a Bash command whose first token is `dadaia`, `pip`/`pip3` or `python -m dadaia_workspace` outside `.dadaia/.venv/bin/`; a file-tool write (those or `NotebookEdit`) that is PROTECTED or out-of-scope — a Bash write (`sed -i`, `rm`, `mkdir`, a redirect) is never judged.
 - Path classes: ADDITIVE (the append-only governance areas of `specs/AGENTS.md` and the runtime scratch zones of `.dadaia/AGENTS.md`) always writable; PROTECTED (session state, every path the install ledger records) blocked; everything else MUTATING, scope-judged under `repos/<slug>/`.
 - Every BLOCK carries exactly one `fix: <command>` line; a BLOCK whose fix is itself blocked is a Stall, CRITICAL.
 - Git chokepoints (branch names: `specs/constitution.md` `gitflow:`): pre-push allows only the work branch and refuses a non-canon `specs/` path or a denylisted secret; both PRs need CI green and a `dd-code-reviewer` APPROVED verdict; no CI job calls a model API. Mechanics: `dd-gitflow-default`, `.dadaia/AGENTS.md`.

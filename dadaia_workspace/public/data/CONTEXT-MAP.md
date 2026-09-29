@@ -41,7 +41,7 @@ path or entity as it appears in an installed workspace.
 
 | Surface | Purpose | Belongs | Ceiling | Measured |
 |---|---|---|---|---|
-| `AGENTS.md` | the root map: the flow, the roles, the gate invariants, the root, credentials, and one line per scoped file | statements; the index of every other surface | 8192 | 7924 |
+| `AGENTS.md` | the root map: the flow, the roles, the gate invariants, the root, credentials, and one line per scoped file | statements; the index of every other surface | 8192 | 7934 |
 | `specs/AGENTS.md` | the canon of a specs tree and its status tokens | canon table, status tokens, doctor codes | 4096 | 3588 |
 | `specs/releases/AGENTS.md` | candidates, phases, task markers, promote | release procedure and commit shapes | 4096 | 3354 |
 | `specs/backlog/AGENTS.md` | the operator's demand queue and its exits | `BACKLOG.json` shape, intake gate, dispositions | 4096 | 3973 |

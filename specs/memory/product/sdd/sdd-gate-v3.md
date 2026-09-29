@@ -23,7 +23,7 @@ sources:
 
 - No lease, lock file or wait path exists; the gate knows no session mode and reads no `_RELEASE.json`.
 - One pre-gate reads each payload once and evaluates root whitelist, venv guard and SDD gate in that order, first block wins; a policy that raises is ALLOW.
-- It blocks exactly three things: a file-tool write (`Write`, `Edit`, `MultiEdit`, `NotebookEdit`, `apply_patch`) creating a new workspace-root entry outside the root law and `.dadaia/states/instance_exceptions.txt` ([[workspace-doctor]]); a leading `dadaia`, `pip` or `python -m dadaia_workspace` outside `.dadaia/.venv/bin/` (Bash only); a file-tool write that is PROTECTED, or a bound session's MUTATING one into a `repos/<slug>/` outside its scope; a Bash write (`sed -i`, `rm`, `mkdir`, a redirect) is never judged.
+- It blocks exactly three things: a file-tool write (`Write`, `Edit`, `MultiEdit`, `apply_patch`) creating a new workspace-root entry outside the root law and `.dadaia/states/instance_exceptions.txt` ([[workspace-doctor]]); a leading `dadaia`, `pip` or `python -m dadaia_workspace` outside `.dadaia/.venv/bin/` (Bash only); a file-tool write (those or `NotebookEdit`) that is PROTECTED, or a bound session's MUTATING one into a `repos/<slug>/` outside its scope; a Bash write (`sed -i`, `rm`, `mkdir`, a redirect) is never judged.
 
 | Class | Behavior |
 |---|---|
