@@ -82,7 +82,7 @@ record, never the cwd: sitting inside a repository is not a binding.
 
 ## 4. Compliance
 
-<!-- derived-from: workspace-doctor sha256:c26995369f02 -->
+<!-- derived-from: workspace-doctor sha256:f22724e283a4 -->
 
 `doctor` is the one instance validator; three sections run in fixed order —
 `workspace`, `specs`, `ledgers`. Every finding prints as one `<CODE> <verdict>

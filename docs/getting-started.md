@@ -94,7 +94,7 @@ branches; a re-run is a no-op.
 
 ## Check compliance — `doctor`
 
-<!-- derived-from: workspace-doctor sha256:c26995369f02 -->
+<!-- derived-from: workspace-doctor sha256:f22724e283a4 -->
 
 ```bash
 .dadaia/.venv/bin/dadaia doctor --context <ctx> [--json] [--fix] [--redact]
