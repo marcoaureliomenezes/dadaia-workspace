@@ -8,7 +8,7 @@ import contextlib
 import json
 import os
 import sys
-from datetime import datetime
+from datetime import UTC, datetime
 from pathlib import Path
 
 from dadaia_workspace.core import invocation, session_store, workspace_layout
@@ -128,9 +128,9 @@ def _head(workspace: Path, header: str, focus: str | None, bound: bool | None) -
     return [header] if step is None else [header, step.text()]
 
 
-def _generic_preflight(workspace: Path, session: str | None = None) -> str:
-    """The unbound session's payload: next step and ALIVE contexts, never context memory."""
-    sections = _head(workspace, "[no bound context]", None, False if session else None)
+def _generic_preflight(workspace: Path, session: str | None, lost: str) -> str:
+    """The unbound session's payload: next step (rebinding *lost* first) and ALIVE contexts."""
+    sections = _head(workspace, "[no bound context]", lost or None, False if session else None)
     if ghost := os.environ.get("DADAIA_CONTEXT"):  # a stale export is surfaced, never obeyed
         sections.append(f"! DADAIA_CONTEXT={ghost} is not this session's bind — ignored")
     if alive := invocation.alive_context_names(workspace):
@@ -162,7 +162,10 @@ def main() -> int:
     if workspace is None:
         _emit("")
         return 0
-    session_id = _common.resolve_session_id(payload, default="workspace")
+    own = _common.resolve_session_id(payload) or None
+    if own:  # the operator's prompt is activity too: renew the liveness clock
+        session_store.touch_last_seen_at(workspace, own, now=datetime.now(tz=UTC).isoformat())
+    session_id = own or "workspace"
     tmp_dir = workspace / workspace_layout.MARKER_DIR
     sentinel = tmp_dir / f"{_SENTINEL_PREFIX}{session_id}"
     compact_marker = tmp_dir / f"{_COMPACT_PREFIX}{session_id}"
@@ -190,11 +193,10 @@ def main() -> int:
         compacted=newer(_read_sentinel(compact_marker)[0]),
         rebound=newer(_session_bound_at(workspace, session_id)),
     )
-    own = _common.resolve_session_id(payload) or None
     if decision.emit == "bootstrap":
         _emit_bootstrap(workspace, decision.context)
     elif decision.emit == "preflight":
-        _emit(_generic_preflight(workspace, own))
+        _emit(_generic_preflight(workspace, own, decision.context))
     if decision.stamp_slug is not None:
         _stamp_sentinel(tmp_dir, sentinel, decision.stamp_slug)
     return 0

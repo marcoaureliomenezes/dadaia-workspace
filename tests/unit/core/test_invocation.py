@@ -62,7 +62,7 @@ PROJ_OTHER = (_ctx("proj"), _ctx("other"))
         pytest.param({"env": {"DADAIA_CONTEXT": "proj"}}, {"context_name": "proj", "rung": "bind"}, id="rung_env_dadaia_context_alone"),
         pytest.param({"contexts": PROJ_OTHER, "session": ("other", 0), "env": {"DADAIA_CONTEXT": "proj"}}, {"context_name": "other", "bind.context_name": "other"}, id="sa-bind-has-two-stores#S1 record wins over env for a session with an id"),
         pytest.param({"contexts": PROJ_OTHER, "session": ("proj", 0), "cwd": "repos/other"}, {"context_name": "proj", "rung": "bind"}, id="rung_session_wins_over_cwd"),
-        pytest.param({"contexts": PROJ_OTHER, "session": ("proj", 4000), "cwd": "repos/other"}, {"context_name": "other", "rung": "cwd"}, id="rung_session_stale_falls_through_to_cwd"),
+        pytest.param({"contexts": PROJ_OTHER, "session": ("proj", 90000), "cwd": "repos/other"}, {"context_name": "other", "rung": "cwd"}, id="rung_session_stale_falls_through_to_cwd"),
         pytest.param({"contexts": (_ctx("other"),), "session": ("deleted-ctx", 0), "cwd": "repos/other"}, {"context_name": "other", "rung": "cwd"}, id="rung_session_deleted_context_guard_falls_through_to_cwd"),
         pytest.param({"cwd": "repos/proj/specs"}, {"context_name": "proj", "rung": "cwd"}, id="rung_cwd_alone_resolves"),
         pytest.param({"contexts": (_ctx("beta-repo", "alpha-context"),), "cwd": "repos/beta-repo/specs"}, {"context_name": "alpha-context", "repo_slug": "beta-repo"}, id="rung_cwd_maps_slug_to_name_via_registry"),
@@ -84,7 +84,6 @@ def test_resolve_scenarios(tmp_path: Path, given: dict[str, Any], then: dict[str
             "context": ctx,
             "mode": "READ",
             "last_seen_at": seen,
-            "ttl_seconds": 300,
         }
         (ws / ".dadaia" / "sessions" / "sid.json").write_text(json.dumps(record), encoding="utf-8")
         env["CLAUDE_CODE_SESSION_ID"] = "sid"

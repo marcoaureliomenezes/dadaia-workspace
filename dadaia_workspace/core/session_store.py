@@ -1,7 +1,8 @@
 """Session record storage — the sole reader/writer of ``.dadaia/sessions/<id>.json``.
 
 Caller-scoped records only; every read fails soft. ``last_seen_at`` is the one liveness
-clock (stamped at bind, renewed by the heartbeat); the bind-CLI ``pid`` is never consulted.
+clock (stamped at bind, renewed by every hook event carrying the session's id); a record
+dies only after a day of silence, never a pause. The bind-CLI ``pid`` is never consulted.
 """
 
 from __future__ import annotations
@@ -15,7 +16,6 @@ from pathlib import Path
 from dadaia_workspace.core.atomic_write import atomic_write
 
 __all__ = [
-    "SESSION_GC_TTL_FIELD",
     "SESSION_HEARTBEAT_FIELD",
     "read_session",
     "session_record_path",
@@ -28,8 +28,7 @@ __all__ = [
 _NAME_RE = re.compile(r"[A-Za-z0-9_-]+")
 
 SESSION_HEARTBEAT_FIELD = "last_seen_at"
-SESSION_GC_TTL_FIELD = "ttl_seconds"
-SESSION_GC_TTL_SECONDS = 300
+SESSION_GC_TTL_SECONDS = 86400
 
 
 def _validate(name: str, *, field: str) -> str:
@@ -90,7 +89,6 @@ def new_binding_record(
         "pid": pid,
         "bound_at": now,
         SESSION_HEARTBEAT_FIELD: now,
-        SESSION_GC_TTL_FIELD: SESSION_GC_TTL_SECONDS,
     }
 
 
@@ -100,14 +98,14 @@ def binding_env_lines(context: str, session_id: str) -> tuple[str, str]:
 
 
 def is_live(record: dict[str, object], *, clock: Callable[[], datetime] | None = None) -> bool:
-    """``last_seen_at`` younger than ``ttl_seconds``; a missing or unparsable one is not live."""
+    """``last_seen_at`` younger than the TTL; a missing or unparsable one is not live."""
     try:
         seen = datetime.fromisoformat(str(record.get(SESSION_HEARTBEAT_FIELD)))
-        ttl = int(str(record.get(SESSION_GC_TTL_FIELD, SESSION_GC_TTL_SECONDS)))
-    except (TypeError, ValueError):
+    except ValueError:
         return False
     now = clock() if clock is not None else datetime.now(tz=UTC)
-    return (now - (seen if seen.tzinfo else seen.replace(tzinfo=UTC))).total_seconds() < ttl
+    age = now - (seen if seen.tzinfo else seen.replace(tzinfo=UTC))
+    return age.total_seconds() < SESSION_GC_TTL_SECONDS
 
 
 def live_session(workspace: Path, session_id: str) -> dict[str, object] | None:

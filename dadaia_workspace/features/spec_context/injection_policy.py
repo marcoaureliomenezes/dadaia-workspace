@@ -71,11 +71,11 @@ def decide_injection(
         # bound truth.
         context = recorded_slug
     if not context:
-        # Unbound: generic preflight, once per session — silent on repeat prompts unless
-        # a compaction wiped context.
-        if sentinel_exists and not compacted:
+        # Unbound: generic preflight, once per session and once more when a recorded bind
+        # was lost (naming it for the rebind) — silent on repeats unless a compaction.
+        if sentinel_exists and not compacted and not recorded_slug:
             return InjectionDecision("none")
-        return InjectionDecision("preflight", "", "")
+        return InjectionDecision("preflight", recorded_slug, "")
     if sentinel_exists and recorded_slug == context and not compacted and not rebound:
         # Repeat prompt for the same already-injected slug: silent.
         return InjectionDecision("none")

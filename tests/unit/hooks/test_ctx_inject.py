@@ -2,7 +2,8 @@
 
 Intent: CONTRACT — bind-driven injection (FR-W2-01/02, T-50-03), compaction re-entry
 (claude-compact-reinjection-missing, kimi-postcompact-omits-bound-context-bootstrap),
-the catalog digest (AC-W4-03), A19.1 (associated repos inject nothing), A30.1.
+the catalog digest (AC-W4-03), A19.1 (associated repos inject nothing), A30.1,
+bind-lost-silently-after-five-idle-minutes (a lost bind is told once).
 """
 
 from __future__ import annotations
@@ -168,6 +169,9 @@ _A = "[alpha]"
         ),
         pytest.param([("clear", _UNBOUND), ("prompt", "")], id="sessionstart-clear-unbound"),
         pytest.param(
+            [("bind", "alpha"), ("prompt", _A), ("lose", ""), ("prompt", "")], id="lost-bind"
+        ),
+        pytest.param(
             [("prompt", _UNBOUND), ("bind", "alpha"), ("prompt", _A), ("startup", "")],
             id="sessionstart-other-source-follows-the-normal-flow",
         ),
@@ -182,6 +186,10 @@ def test_injection_sequence(tmp_path: Path, steps: list[tuple[str, str]]) -> Non
     for kind, want in steps:
         if kind == "bind":
             _bind(tmp_path, "s", want)
+            continue
+        if kind == "lose":
+            session_store.session_record_path(tmp_path, "s").unlink()
+            assert "context bind alpha" in _run(tmp_path, "s")  # told once
             continue
         if kind == "prompt":
             out = _run(tmp_path, "s")

@@ -58,7 +58,6 @@ def test_new_binding_record_authors_the_schema_and_retired_keys_still_parse() ->
         "pid": 1234,
         "bound_at": now,
         "last_seen_at": now,
-        "ttl_seconds": 300,
     }
     assert si.is_live({**record, "mode": "BOUND_IMPLEMENTATION", "release": "0.5.3"})
 
@@ -66,22 +65,20 @@ def test_new_binding_record_authors_the_schema_and_retired_keys_still_parse() ->
 @pytest.mark.parametrize(
     ("record", "live"),
     [
-        ({"last_seen_at": "2026-06-06T11:59:59+00:00", "ttl_seconds": 1800}, True),
-        ({"last_seen_at": "2026-06-06T11:59:59Z", "ttl_seconds": 1800}, True),
-        ({"last_seen_at": "2026-06-06T11:59:59", "ttl_seconds": 1800}, True),
-        ({"last_seen_at": "2026-06-06T11:30:00+00:00", "ttl_seconds": 1800}, False),
-        ({"last_seen_at": "2026-06-06T11:59:59+00:00", "ttl_seconds": 0}, False),
-        ({"last_seen_at": "2026-06-06T11:59:59+00:00", "ttl_seconds": "x"}, False),
-        ({"last_seen_at": "not-a-date", "ttl_seconds": 1800}, False),
-        ({"last_seen_at": "", "ttl_seconds": 1800}, False),
-        ({"bound_at": "2026-06-06T11:59:59+00:00", "ttl_seconds": 1800}, False),
+        ({"last_seen_at": "2026-06-05T12:00:01+00:00"}, True),
+        ({"last_seen_at": "2026-06-06T11:54:00Z"}, True),
+        ({"last_seen_at": "2026-06-06T11:59:59"}, True),
+        ({"last_seen_at": "2026-06-05T12:00:00+00:00"}, False),
+        ({"last_seen_at": "not-a-date"}, False),
+        ({"last_seen_at": ""}, False),
+        ({"bound_at": "2026-06-06T11:59:59+00:00"}, False),
         ({}, False),
     ],
 )
 def test_is_live_is_the_one_liveness_rule(record: dict[str, object], live: bool) -> None:
-    """Intent: CONTRACT — sa-session-liveness-has-two-rules: ``last_seen_at`` younger than
-    ``ttl_seconds`` (boundary stale) is live; a record without it (``bound_at`` only, the
-    retired creation-time fallback, §4a item 13) or with a corrupt clock/TTL is not."""
+    """Intent: CONTRACT — sa-session-liveness-has-two-rules, bind-lost-silently-after-five-idle-
+    minutes: ``last_seen_at`` younger than a day (boundary stale) is live, minutes idle included; a record without it (``bound_at`` only, the
+    retired creation-time fallback, §4a item 13) or with a corrupt clock is not."""
     assert si.is_live(record, clock=lambda: datetime(2026, 6, 6, 12, tzinfo=UTC)) is live
 
 

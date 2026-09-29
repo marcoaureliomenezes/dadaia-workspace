@@ -46,16 +46,20 @@ def _make_doctor(ws: Path, store: JsonContextStore | None = None) -> DoctorServi
     )
 
 
-def _stale() -> str:
-    return (datetime.now(tz=UTC) - timedelta(seconds=360)).isoformat()
+def _ago(seconds: float) -> str:
+    return (datetime.now(tz=UTC) - timedelta(seconds=seconds)).isoformat()
 
 
-def _bind(ws: Path, sid: str, last_seen_at: str, ttl: int = 300) -> Path:
+def _stale() -> str:  # past a day: a dead session, never a paused one
+    return _ago(86400 + 60)
+
+
+def _bind(ws: Path, sid: str, last_seen_at: str) -> Path:
     """A READ bind record written by the production session-store writer."""
     from dadaia_workspace.core import session_store
 
     record = {"session_id": sid, "context": "myctx", "mode": "READ", "release": None, "runtime": "test",
-              "pid": 4242, "last_seen_at": last_seen_at, "ttl_seconds": ttl, "is_stale": False}  # fmt: skip
+              "pid": 4242, "last_seen_at": last_seen_at}  # fmt: skip
     session_store.write_session(ws, sid, record)
     return ws / ".dadaia" / "sessions" / f"{sid}.json"
 
@@ -115,26 +119,22 @@ def _post_gate_heartbeat(ws: Path, sess_id: str) -> None:
 
 
 @pytest.mark.parametrize(
-    ("last_seen", "renew", "survives"),
+    ("idle", "renew", "survives"),
     [
-        pytest.param("fresh", False, True, id="fresh-session-survives-with-no-GC-action"),
-        pytest.param("stale", True, True, id="FR-W1-04-heartbeat-renewed-bind-survives-and-resolves"),
-        pytest.param("stale", False, False, id="FR-W1-04-unrenewed-stale-bind-collected"),
+        pytest.param(360, False, True, id="bind-lost-silently-after-five-idle-minutes-idle-bind-survives"),
+        pytest.param(None, True, True, id="FR-W1-04-heartbeat-renewed-bind-survives-and-resolves"),
+        pytest.param(None, False, False, id="FR-W1-04-unrenewed-stale-bind-collected"),
     ],
 )  # fmt: skip
-def test_no_stale_records(tmp_path: Path, last_seen: str, renew: bool, survives: bool) -> None:
-    """CRITICAL GC (T-011-04, ADR-8 amended): a bind's TTL is measured against the heartbeat-renewed
-    ``last_seen_at``, renewed through the REAL PostToolUse path — never a planted pid."""
+def test_no_stale_records(tmp_path: Path, idle: int | None, renew: bool, survives: bool) -> None:
+    """Intent: CONTRACT — T-011-04, bind-lost-silently-after-five-idle-minutes: another session's
+    SessionStart lane collects a bind only past a dead session's TTL (a day), measured against
+    ``last_seen_at`` renewed through the REAL PostToolUse path; idle minutes never unbind."""
     from dadaia_workspace.core.session_store import live_session
 
     ws = _make_workspace(tmp_path)
     sid = "sess_01"
-    record = _bind(
-        ws,
-        sid,
-        datetime.now(tz=UTC).isoformat() if last_seen == "fresh" else _stale(),
-        ttl=1800 if last_seen == "fresh" else 300,
-    )
+    record = _bind(ws, sid, _stale() if idle is None else _ago(idle))
     if renew:
         # post-gate-runs-the-reaper-on-the-tool-hot-path: the heartbeat never reaps.
         expired = ws / ".dadaia" / "tmp" / "expired.txt"
@@ -144,7 +144,7 @@ def test_no_stale_records(tmp_path: Path, last_seen: str, renew: bool, survives:
         _post_gate_heartbeat(ws, sid)
         assert expired.exists(), "a tool call must never run the reaper"
 
-    actions = _make_doctor(ws).fix()
+    actions = _make_doctor(ws).expire()
 
     assert record.exists() is survives
     assert any("GRAVEYARD-GC" in a and sid in a for a in actions) is not survives

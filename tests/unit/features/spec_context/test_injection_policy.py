@@ -4,7 +4,7 @@
 Intent: CONTRACT — rows encode kimi-postcompact-omits-bound-context-bootstrap (recorded-slug
 fallback), claude-compact-reinjection-missing (session_restart re-emits AND restamps),
 ctx-inject-newest-bind-epoch-steals-other-sessions-context (self-keyed rebind), the
-compact-marker trigger and sa-bind-has-two-stores#S7.
+compact-marker trigger, sa-bind-has-two-stores#S7 and bind-lost-silently-after-five-idle-minutes.
 """
 
 from __future__ import annotations
@@ -28,6 +28,7 @@ _NONE = InjectionDecision("none")
     pytest.param("prompt", "", "alpha", True, True, False, InjectionDecision("bootstrap", "alpha", "alpha"), id="compacted-recorded-slug-fallback"),
     pytest.param("prompt", "", "", False, False, False, InjectionDecision("preflight", "", ""), id="unbound-fresh-preflight"),
     pytest.param("prompt", "", "", True, False, False, _NONE, id="unbound-preflight-only-once"),
+    pytest.param("prompt", "", "alpha", True, False, False, InjectionDecision("preflight", "alpha", ""), id="bind-lost-silently-after-five-idle-minutes-told-once"),
     pytest.param("prompt", "ghost", "", False, False, False, InjectionDecision("bootstrap", "ghost", "ghost"), id="S7-bound-without-specs-gets-its-next-step"),
     pytest.param("postcompact", "", "alpha", True, False, False, InjectionDecision("bootstrap", "alpha", None), id="postcompact-emits-never-stamps"),
     pytest.param("postcompact", "", "", False, False, False, InjectionDecision("preflight", "", None), id="postcompact-unbound-preflight-no-stamp"),

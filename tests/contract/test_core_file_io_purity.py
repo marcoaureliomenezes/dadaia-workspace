@@ -146,7 +146,7 @@ def _rmtree_sites() -> list[str]:
 
 def _ttl_clocks() -> list[str]:
     """No `*_TTL*` constant outside the zone registry (the session record's own clock excepted)."""
-    allowed = {"SESSION_GC_TTL_SECONDS", "SESSION_GC_TTL_FIELD"}
+    allowed = {"SESSION_GC_TTL_SECONDS"}
     return [
         f"{_rel(path)}:{t.id}"
         for path, tree in _trees()
