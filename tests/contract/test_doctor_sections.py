@@ -69,9 +69,10 @@ def _live_release(specs: Path, **over: Any) -> Path:
 
 
 def _release_findings(specs: Path) -> tuple[list[dict[str, Any]], list[str]]:
-    """(the doctor's findings naming the release state, every specs-section code)."""
+    """(the doctor's findings naming the release state, every specs-section code) — the
+    source root is the tmp tree: walking this checkout costs 3 s and names no release."""
     payload = json.loads(
-        _run("--specs-dir", str(specs), "--source-root", str(_REPO_ROOT), "--json").stdout
+        _run("--specs-dir", str(specs), "--source-root", str(specs.parent), "--json").stdout
     )
     sections = payload["sections"]
     named = [f for s in sections.values() for f in s["findings"] if "_RELEASE.json" in f["message"]]

@@ -12,12 +12,10 @@ crosses — uvx's own environment, the workspace venv provisioning, the clone, t
 the specs scaffold, doctor — is crossed by REAL child processes; no in-process runner
 reaches them. This is the durable form of the 0.4.8 onboarding audit script.
 
-Layout — one class per AC8.1 scenario, one test per level. Every level of a scenario
-runs its predecessors first (memoized on the scenario object), so a test is order-free
-and a level flips to green by deleting ONE ``xfail`` marker naming the task that
-delivers it: level 1 / init -> T-048-04, level 2 -> T-048-03, level 3 -> T-048-05,
-upgrade -> T-048-06, guidance -> T-048-07. After every level (AC8.2) doctor reports
-0 errors and the user repo's HEAD equals its remote's.
+Layout — ONE workspace carries the journey: born on the previous release (level 1),
+upgraded by re-init, then levels 2 and 3 — a real workspace venv is the journey's cost, so
+it is paid once. The current wheel's fresh level 1 is ``test_one_line_bootstrap``'s. After every
+level (AC8.2) doctor reports 0 errors and the user repo's HEAD equals its remote's.
 
 Real venvs are built here by CHILD processes (``uvx`` and ``init``);
 ``tests/conftest.py``'s ``_no_real_venv_in_tests`` backstop is an in-process monkeypatch
@@ -36,7 +34,6 @@ import shutil
 import subprocess
 import sys
 import tomllib
-from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
@@ -190,35 +187,6 @@ class Workspace:
         assert head == remote, f"{repo_slug}: HEAD {head} != remote {remote}"
 
 
-class Scenario:
-    """Memoized levels: each level runs once, a failure is re-raised to every later caller."""
-
-    def __init__(self, env: Env) -> None:
-        self.env = env
-        self._done: dict[str, BaseException | None] = {}
-
-    def once(self, key: str, step: Callable[[], None]) -> None:
-        if key not in self._done:
-            try:
-                step()
-                self._done[key] = None
-            except BaseException as exc:
-                self._done[key] = exc
-                raise
-        failure = self._done[key]
-        if failure is not None:
-            raise failure
-
-
-def _assert_init_quiet(ws: Workspace, done: subprocess.CompletedProcess[str]) -> None:
-    """AC1.1: exit 0, ≤ 12 lines, the absolute venv entrypoint path, no bare verb (AC1.4)."""
-    assert done.returncode == 0, f"init failed:\n{done.stdout}\n{done.stderr}"
-    lines = done.stdout.splitlines()
-    assert len(lines) <= 12, f"init printed {len(lines)} lines:\n{done.stdout}"
-    assert str(ws.dadaia_bin) in done.stdout, done.stdout
-    assert not re.search(r"(^|[\s`])dadaia (context|doctor|specs) ", done.stdout), done.stdout
-
-
 def _specs_scaffolded(ws: Workspace, slug: str) -> None:
     """AC4.1/4.2: canon present, English law sections, nothing committed."""
     specs = ws.path / "repos" / slug / "specs"
@@ -274,223 +242,72 @@ def wheel(tmp_path_factory: pytest.TempPathFactory) -> Path:
     return built
 
 
-@pytest.fixture(scope="class")
-def env(tmp_path_factory: pytest.TempPathFactory, wheel: Path) -> Env:
-    return Env(tmp_path_factory.mktemp("journey"), wheel)
+@pytest.fixture
+def env(tmp_path: Path, wheel: Path) -> Env:
+    return Env(tmp_path, wheel)
 
 
-# ── scenario 1: greenfield ───────────────────────────────────────────────────────
+# ── one operator's journey: born on the previous release, upgraded, then levels 2 and 3 ──
 
 
-class Greenfield(Scenario):
-    """``init --repo`` (levels 1+2 in one line, AC1.5) then ``specs init`` (level 3)."""
+def test_an_operator_journey_from_the_previous_release(env: Env) -> None:
+    """Level 1 is ``init --repo`` on the previous PyPI release; re-``init`` with the ``+e2e``
+    wheel is the upgrade (AC2.1/AC2.2). On that workspace, level 2: a failed ``context
+    create`` leaves nothing (AC3.4/AC3.5), its retry and a second project with an associated
+    repo clone clean; the guidance names level 3 (AC6.1); level 3 ``specs init``. AC8.2 after
+    every level. The current wheel's own level 1 is ``test_one_line_bootstrap``'s."""
+    green = env.bare("green")
+    ws = Workspace(env, "up")
+    previous = previous_release(_SOURCE_VERSION, published_releases())
+    born = env.uvx(
+        "init", "up", "--harness", "claude", "--repo", green,
+        source=f"dadaia-workspace=={previous}",
+    )  # fmt: skip
+    assert born.returncode == 0, f"{born.stdout}\n{born.stderr}"
+    # The previous release committed its specs baseline into the user repo at
+    # birth (the behaviour D6 retires); the upgrade must not move HEAD further.
+    repo = ws.path / "repos" / "green"
+    head = env.git("rev-parse", "HEAD", cwd=repo)
+    done = env.uvx("init", "up")  # AC2.1: no --harness needed
+    assert done.returncode == 0, f"{done.stdout}\n{done.stderr}"
+    assert f"upgraded {previous} -> {_E2E_VERSION}" in done.stdout, done.stdout
+    version = ws.dadaia("--version")
+    assert _E2E_VERSION in version.stdout, version.stdout
+    # The upgrade never writes a user repo; level 3 re-run refreshes its specs law.
+    refreshed = ws.dadaia("specs", "init", "--context", "green")
+    assert refreshed.returncode == 0, f"{refreshed.stdout}\n{refreshed.stderr}"
+    ws.doctor_json("green")
+    assert env.git("rev-parse", "HEAD", cwd=repo) == head
+    again = env.uvx("init", "up")  # AC2.2
+    assert again.returncode == 0 and f"already at {_E2E_VERSION}" in again.stdout
 
-    def __init__(self, env: Env) -> None:
-        super().__init__(env)
-        self.url = env.bare("green")
-        self.ws = Workspace(env, "demo")
+    bad = f"file://{env.fixtures / 'nothere.git'}"
+    failed = ws.dadaia("context", "create", "retry", "--main-repo", bad)
+    assert failed.returncode == 1, failed.stdout + failed.stderr
+    assert "fix:" in failed.stdout + failed.stderr
+    assert not (ws.path / "repos" / "nothere").exists()
+    assert "retry" not in ws.dadaia("context", "list", "--json").stdout  # no context record
 
-    def level1(self) -> None:
-        def step() -> None:
-            done = self.env.uvx("init", "demo", "--harness", "claude", "--repo", self.url)
-            _assert_init_quiet(self.ws, done)
-            repo = self.ws.path / "repos" / "green"
-            assert self.env.git("status", "--porcelain", cwd=repo) == ""  # AC3.6
-            self.ws.assert_level_clean("green", "green", self.url)
+    for slug, associated in (("retry", ()), ("second", ("assoc",))):
+        repos = {name: env.bare(name) for name in (slug, *associated)}
+        argv = ["context", "create", slug, "--main-repo", repos[slug]]
+        for name in associated:
+            argv += ["--associated-repo", repos[name]]
+        done = ws.dadaia(*argv)
+        assert done.returncode == 0, f"{done.stdout}\n{done.stderr}"
+        assert "specs upgrade" not in done.stdout + done.stderr  # AC4.7
+        for name, url in repos.items():
+            assert env.git("status", "--porcelain", cwd=ws.path / "repos" / name) == ""  # AC3.6
+            ws.assert_level_clean(slug, name, url)
 
-        self.once("level1", step)
-
-    def guidance(self) -> None:
-        def step() -> None:
-            self.level1()
-            payload = self.ws.doctor_json("green")
-            fixes = [
-                f["fix"]
-                for section in payload["sections"].values()
-                for f in section["findings"]
-                if f["verdict"] == "info"
-            ]
-            assert any("specs init --context green" in fix for fix in fixes), fixes  # AC6.1
-
-        self.once("guidance", step)
-
-    def level3(self) -> None:
-        def step() -> None:
-            self.guidance()  # observed before level 3 changes the answer (test order is random)
-            done = self.ws.dadaia("specs", "init", "--context", "green")
-            assert done.returncode == 0, f"{done.stdout}\n{done.stderr}"
-            _specs_scaffolded(self.ws, "green")
-            self.ws.assert_level_clean("green", "green", self.url)  # HEAD unchanged
-
-        self.once("level3", step)
-
-
-@pytest.fixture(scope="class")
-def greenfield(env: Env) -> Greenfield:
-    return Greenfield(env)
-
-
-class TestGreenfield:
-    def test_guidance_names_specs_init(self, greenfield: Greenfield) -> None:
-        greenfield.guidance()
-
-    def test_level3_specs_init(self, greenfield: Greenfield) -> None:
-        greenfield.level3()
-
-
-# ── the plain three-verb path shared by the specs-carrying scenarios ────────────
-
-
-class ThreeLevels(Scenario):
-    """``init`` (level 1) -> ``context create --main-repo <url>`` (level 2) -> ``specs init``."""
-
-    specs = "none"
-    slug = "proj"
-    associated: tuple[str, ...] = ()
-
-    def __init__(self, env: Env) -> None:
-        super().__init__(env)
-        self.url = env.bare(self.slug, self.specs)
-        self.assoc_urls = [env.bare(name) for name in self.associated]
-        self.ws = Workspace(env, "ws")
-
-    def level1(self) -> None:
-        def step() -> None:
-            _assert_init_quiet(self.ws, self.env.uvx("init", "ws", "--harness", "claude"))
-            self.ws.doctor_json()
-
-        self.once("level1", step)
-
-    def level2(self) -> None:
-        def step() -> None:
-            self.level1()
-            argv = ["context", "create", self.slug, "--main-repo", self.url]
-            for url in self.assoc_urls:
-                argv += ["--associated-repo", url]
-            done = self.ws.dadaia(*argv)
-            assert done.returncode == 0, f"{done.stdout}\n{done.stderr}"
-            assert "specs upgrade" not in done.stdout + done.stderr  # AC4.7
-            for slug in (self.slug, *self.associated):
-                repo = self.ws.path / "repos" / slug
-                assert self.env.git("status", "--porcelain", cwd=repo) == ""  # AC3.6
-            self.ws.assert_level_clean(self.slug, self.slug, self.url)
-            for slug, url in zip(self.associated, self.assoc_urls, strict=True):
-                self.ws.assert_level_clean(self.slug, slug, url)
-
-        self.once("level2", step)
-
-    def level3(self) -> None:
-        def step() -> None:
-            self.level2()
-            done = self.ws.dadaia("specs", "init", "--context", self.slug)
-            assert done.returncode == 0, f"{done.stdout}\n{done.stderr}"
-            _specs_scaffolded(self.ws, self.slug)
-            self.ws.assert_level_clean(self.slug, self.slug, self.url)
-
-        self.once("level3", step)
-
-
-# ── scenario 4: second project with an associated repo ───────────────────────────
-
-
-class SecondProject(ThreeLevels):
-    slug = "second"
-    associated = ("assoc",)
-
-
-@pytest.fixture(scope="class")
-def second(env: Env) -> SecondProject:
-    return SecondProject(env)
-
-
-class TestSecondProjectWithAssociated:
-    def test_level2_create_clones_main_and_associated(self, second: SecondProject) -> None:
-        second.level2()
-
-    def test_level3_specs_init(self, second: SecondProject) -> None:
-        second.level3()
-
-
-# ── scenario 5: failed create, then the corrected retry ─────────────────────────
-
-
-class FailedCreate(ThreeLevels):
-    slug = "retry"
-
-    def level2(self) -> None:
-        def step() -> None:
-            self.level1()
-            bad = f"file://{self.env.fixtures / 'nothere.git'}"
-            failed = self.ws.dadaia("context", "create", self.slug, "--main-repo", bad)
-            assert failed.returncode == 1, failed.stdout + failed.stderr  # AC3.4
-            assert "fix:" in failed.stdout + failed.stderr  # AC3.5
-            assert not (self.ws.path / "repos" / "nothere").exists()
-            listed = self.ws.dadaia("context", "list", "--json")
-            assert self.slug not in listed.stdout, listed.stdout  # no context record
-            super(FailedCreate, self).level2()
-
-        self.once("level2-retry", step)
-
-
-@pytest.fixture(scope="class")
-def failed_create(env: Env) -> FailedCreate:
-    return FailedCreate(env)
-
-
-class TestFailedCreateThenRetry:
-    def test_level2_failure_leaves_nothing_then_retry_succeeds(
-        self, failed_create: FailedCreate
-    ) -> None:
-        failed_create.level2()
-
-
-# ── scenario 6: re-init is the upgrade ───────────────────────────────────────────
-
-
-class Upgrade(Scenario):
-    """A workspace born on the previous PyPI release, re-inited with the ``+e2e`` wheel."""
-
-    def __init__(self, env: Env) -> None:
-        super().__init__(env)
-        self.url = env.bare("green")
-        self.ws = Workspace(env, "up")
-
-    def upgrade(self) -> None:
-        def step() -> None:
-            previous = previous_release(_SOURCE_VERSION, published_releases())
-            born = self.env.uvx(
-                "init", "up", "--harness", "claude", "--repo", self.url,
-                source=f"dadaia-workspace=={previous}",
-            )  # fmt: skip
-            assert born.returncode == 0, f"{born.stdout}\n{born.stderr}"
-            # The previous release committed its specs baseline into the user repo at
-            # birth (the behaviour D6 retires); the upgrade must not move HEAD further.
-            repo = self.ws.path / "repos" / "green"
-            head = self.env.git("rev-parse", "HEAD", cwd=repo)
-            done = self.env.uvx("init", "up")  # AC2.1: no --harness needed
-            assert done.returncode == 0, f"{done.stdout}\n{done.stderr}"
-            assert f"upgraded {previous} -> {_E2E_VERSION}" in done.stdout, done.stdout
-            version = self.ws.dadaia("--version")
-            assert _E2E_VERSION in version.stdout, version.stdout
-            # The upgrade never writes a user repo; level 3 re-run refreshes its specs law.
-            refreshed = self.ws.dadaia("specs", "init", "--context", "green")
-            assert refreshed.returncode == 0, f"{refreshed.stdout}\n{refreshed.stderr}"
-            self.ws.doctor_json("green")
-            assert self.env.git("rev-parse", "HEAD", cwd=repo) == head
-            again = self.env.uvx("init", "up")  # AC2.2
-            assert again.returncode == 0 and f"already at {_E2E_VERSION}" in again.stdout
-
-        self.once("upgrade", step)
-
-
-@pytest.fixture(scope="class")
-def upgrade(env: Env) -> Upgrade:
-    return Upgrade(env)
-
-
-class TestReinitUpgrade:
-    def test_reinit_upgrades_from_previous_pypi(self, upgrade: Upgrade) -> None:
-        upgrade.upgrade()
+    payload = ws.doctor_json("second")
+    fixes = [f["fix"] for s in payload["sections"].values() for f in s["findings"]
+             if f["verdict"] == "info"]  # fmt: skip
+    assert any("specs init --context second" in fix for fix in fixes), fixes  # AC6.1
+    done = ws.dadaia("specs", "init", "--context", "second")
+    assert done.returncode == 0, f"{done.stdout}\n{done.stderr}"
+    _specs_scaffolded(ws, "second")
+    ws.assert_level_clean("second", "second", repos["second"])
 
 
 # ── AC7.1: the quickstart block, verbatim ────────────────────────────────────────

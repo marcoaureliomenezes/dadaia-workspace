@@ -141,8 +141,9 @@ def test_one_line_bootstrap_yields_a_doctor_clean_workspace(
     )
     assert init.returncode == 0, f"init failed:\n{init.stdout}\n{init.stderr}"
 
-    # 0.4.8 AC1.1/AC1.4: a short closing that names the CLI by its absolute venv path.
+    # 0.4.8 AC1.1/AC1.4: a short closing naming the CLI by its absolute venv path, no bare verb.
     assert len(init.stdout.splitlines()) <= 12, init.stdout
+    assert not re.search(r"(^|[\s`])dadaia (context|doctor|specs) ", init.stdout), init.stdout
     cli = workspace / ".dadaia" / ".venv" / PLATFORM.venv_scripts_dir
     assert f"CLI: {cli / f'dadaia{PLATFORM.venv_exe_suffix}'}" in init.stdout.splitlines()
 
