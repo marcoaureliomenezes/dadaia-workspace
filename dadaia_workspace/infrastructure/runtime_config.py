@@ -170,7 +170,7 @@ def kimi_hooks_block(home: Path) -> str:
         if matcher is not None:
             lines.append(f'matcher = "{matcher}"')
         lines.append(f'command = "{(home / "hooks").as_posix()}/{wrapper_name(record, lane)}"')
-        lines.append("timeout = 10")
+        lines.append(f"timeout = {HOOK_DIALECTS[record.hooks].timeout(lane)}")
         rules.append("\n".join(lines))
     return f"{KIMI_BLOCK_BEGIN}\n" + "\n\n".join(rules) + f"\n{KIMI_BLOCK_END}\n"
 

@@ -9,7 +9,7 @@ a missing venv warns and exits 0.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 from dadaia_workspace.core.harness_registry import HarnessRecord, HookFormat
 
@@ -17,6 +17,9 @@ from dadaia_workspace.core.harness_registry import HarnessRecord, HookFormat
 #: session start — never a hook module (P-12). ``--quiet`` prints only what it deleted, so
 #: a compliant workspace adds nothing to the model context.
 REAPER_ARGS = "doctor --fix --expired-only --quiet"
+#: Every row's ``timeout``, in seconds — all six harnesses read that key (Copilot as the
+#: documented alias of ``timeoutSec``) and let the action through when it fires.
+TOOL_TIMEOUT_S, SESSION_TIMEOUT_S = 10, 30
 
 
 @dataclass(frozen=True)
@@ -38,6 +41,7 @@ class HookLane:
     argv: str
     env: tuple[tuple[str, str], ...] = ()
     decides: bool = False
+    timeout: int = SESSION_TIMEOUT_S
 
 
 @dataclass(frozen=True)
@@ -84,10 +88,13 @@ class HookDialect:
     root: str = _SELF_ROOT
     ungated: tuple[str, ...] = ()
 
+    def timeout(self, lane: str) -> int:
+        return next(each.timeout for each in self.lanes if each.name == lane)
 
-_GATE = HookLane("pre-gate", 'dadaia_workspace.hooks.pre_gate "$@"', decides=True)
+
+_GATE = HookLane("pre-gate", 'dadaia_workspace.hooks.pre_gate "$@"', (), True, TOOL_TIMEOUT_S)
 _REAPER = HookLane("doctor-expired", f"dadaia_workspace {REAPER_ARGS}")
-_POST = HookLane("post-gate", 'dadaia_workspace.hooks.sdd_post_gate "$@"')
+_POST = HookLane("post-gate", 'dadaia_workspace.hooks.sdd_post_gate "$@"', timeout=TOOL_TIMEOUT_S)
 _CTX = HookLane("ctx-inject", 'dadaia_workspace.hooks.ctx_inject "$@"')
 _CODEX_OUT = ("DADAIA_HOOK_OUTPUT", "codex-json")
 _KIMI = ("DADAIA_RUNTIME", "kimi-code")
@@ -119,9 +126,9 @@ HOOK_DIALECTS: dict[HookFormat, HookDialect] = {
     ),
     HookFormat.KIMI_HOOKS: HookDialect(
         lanes=(
-            HookLane(_GATE.name, _GATE.argv, (_KIMI,), decides=True),
-            HookLane(_POST.name, _POST.argv, (_KIMI,)),
-            HookLane(_CTX.name, _CTX.argv, (_KIMI,)),
+            replace(_GATE, env=(_KIMI,)),
+            replace(_POST, env=(_KIMI,)),
+            replace(_CTX, env=(_KIMI,)),
             HookLane("post-compact", _CTX.argv, (("DADAIA_HOOK_EVENT", "PostCompact"), _KIMI)),
             _REAPER,
         ),
@@ -145,7 +152,7 @@ HOOK_DIALECTS: dict[HookFormat, HookDialect] = {
         lanes=(
             _GATE,
             _POST,
-            HookLane("ctx-inject", _CTX.argv, (_CODEX_OUT,)),
+            replace(_CTX, env=(_CODEX_OUT,)),
             HookLane(
                 "ctx-inject-session-start",
                 _CTX.argv,
@@ -283,10 +290,11 @@ def hook_documents(record: HarnessRecord) -> dict[str, dict[str, object]]:
     for spec in dialect.files:
         hooks: dict[str, list[object]] = {}
         for event, lane, matcher in spec.events:
-            entry: dict[str, str] = {"type": "command"} if dialect.typed else {}
+            entry: dict[str, object] = {"type": "command"} if dialect.typed else {}
             entry[dialect.entry_key] = dialect.prefix + hook_wrapper_command(
                 wrapper_name(record, lane)
             )
+            entry["timeout"] = dialect.timeout(lane)
             group: dict[str, object] = {"hooks": [entry]}
             if matcher is not None:
                 group["matcher"] = matcher

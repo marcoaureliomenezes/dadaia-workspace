@@ -100,29 +100,15 @@ def test_b1_b2_the_deny_reaches_the_agent_with_its_reason_and_fix(
 
 def test_b3_devin_hook_file_has_the_documented_shape_and_denies(ws: Path) -> None:
     document = hook_documents(HARNESS_RECORDS["devin"])["hooks.v1.json"]
+
+    def row(lane: str, timeout: int) -> dict[str, object]:
+        hook = {"type": "command", "command": f".dadaia/hooks/devin-{lane}", "timeout": timeout}
+        return {"matcher": "", "hooks": [hook]}
+
     assert document == {
-        "PreToolUse": [
-            {
-                "matcher": "",
-                "hooks": [{"type": "command", "command": ".dadaia/hooks/devin-pre-gate"}],
-            }
-        ],
-        "UserPromptSubmit": [
-            {
-                "matcher": "",
-                "hooks": [{"type": "command", "command": ".dadaia/hooks/devin-ctx-inject"}],
-            }
-        ],
-        "SessionStart": [
-            {
-                "matcher": "",
-                "hooks": [{"type": "command", "command": ".dadaia/hooks/devin-ctx-inject"}],
-            },
-            {
-                "matcher": "",
-                "hooks": [{"type": "command", "command": ".dadaia/hooks/devin-doctor-expired"}],
-            },
-        ],
+        "PreToolUse": [row("pre-gate", 10)],
+        "UserPromptSubmit": [row("ctx-inject", 30)],
+        "SessionStart": [row("ctx-inject", 30), row("doctor-expired", 30)],
     }
     assert _verdict("devin", _run(ws, "devin", "pip")) == "deny"
 

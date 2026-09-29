@@ -62,7 +62,6 @@ def test_kimi_hooks_block_parses_as_toml_and_pins_rules() -> None:
     assert by_event["PostCompact"]["command"] == (
         "/tmp/kimi-home-test/hooks/dadaia-kimi-post-compact.sh"
     )
-    assert all(h["timeout"] == 10 for h in hooks)
 
 
 @pytest.mark.parametrize(
