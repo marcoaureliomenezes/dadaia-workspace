@@ -13,6 +13,7 @@ import os
 import time
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -244,13 +245,14 @@ def test_ttl_zones_expire_an_entry_whole_by_its_own_ttl_and_spare_the_zone_law(
     law.write_text("# zone law", encoding="utf-8")
     _age(law, time.time() - 400 * 86_400)
     stats: list[Path] = []
-    real_stat = Path.stat
+    for name in ("stat", "lstat"):  # the os seam every pathlib version stats through
+        real = getattr(os, name)
 
-    def counting_stat(path: Path, **kwargs: bool) -> os.stat_result:
-        stats.append(path)
-        return real_stat(path, **kwargs)
+        def counting(path: Path, *a: object, _real: Any = real, **kw: object) -> os.stat_result:
+            stats.append(Path(path))
+            return _real(path, *a, **kw)  # type: ignore[no-any-return]
 
-    monkeypatch.setattr(Path, "stat", counting_stat)
+        monkeypatch.setattr(os, name, counting)
     found = _by_path(_make_doctor(tmp_path).scan())
 
     z = _TTL_ZONE.name
@@ -307,6 +309,8 @@ def test_ttl_walk_treats_an_entry_that_vanishes_mid_walk_as_absent(
     gone_file.write_text("", encoding="utf-8")
     gone_dir = zone_dir / "gone_dir"
     gone_dir.mkdir()
+    (stale := zone_dir / "stale.txt").touch()
+    _age(stale)  # the positive control: a walk that saw nothing would miss it
     real_walk = sweep.walk
 
     def racing_walk(directory: Path) -> list[Path]:
@@ -321,7 +325,9 @@ def test_ttl_walk_treats_an_entry_that_vanishes_mid_walk_as_absent(
 
     found = _by_path(_make_doctor(tmp_path).scan())
 
-    assert not [p for p in found if p.startswith(f"{_TTL_ZONE.name}/")]
+    assert [p for p in found if p.startswith(f"{_TTL_ZONE.name}/")] == [
+        f"{_TTL_ZONE.name}/stale.txt"
+    ]
 
 
 # ---------------------------------------------------------------------------

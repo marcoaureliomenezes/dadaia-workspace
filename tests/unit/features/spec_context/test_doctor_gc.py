@@ -136,7 +136,13 @@ def test_no_stale_records(tmp_path: Path, last_seen: str, renew: bool, survives:
         ttl=1800 if last_seen == "fresh" else 300,
     )
     if renew:
+        # post-gate-runs-the-reaper-on-the-tool-hot-path: the heartbeat never reaps.
+        expired = ws / ".dadaia" / "tmp" / "expired.txt"
+        expired.parent.mkdir(parents=True, exist_ok=True)
+        expired.touch()
+        os.utime(expired, (0, 0))
         _post_gate_heartbeat(ws, sid)
+        assert expired.exists(), "a tool call must never run the reaper"
 
     actions = _make_doctor(ws).fix()
 
