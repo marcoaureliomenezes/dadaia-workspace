@@ -1,12 +1,17 @@
 """Intent: CONTRACT — AC6.2 (T-050-11): the constitution gitflow reads back; one merge-writer
-keeps every other key and the body byte-identical."""
+keeps every other key and the body byte-identical. Bug
+upgrade-leaves-project-specs-unmigrated-and-silent: the canon a tree must meet is pinned
+to ``CANONICAL_SPECS_VERSION``."""
 
 from __future__ import annotations
 
+import hashlib
 from pathlib import Path
 
+from dadaia_workspace.core import workspace_layout
+from dadaia_workspace.core.fixed_sections import FIXED_SECTIONS
 from dadaia_workspace.core.gitflow import DEFAULT, Gitflow, merge_frontmatter, read_gitflow
-from dadaia_workspace.core.specs_version import state
+from dadaia_workspace.core.specs_version import CANONICAL_SPECS_VERSION, state
 
 _CUSTOM = Gitflow(principal="trunk", integration="next", work_prefix="work/")
 
@@ -14,6 +19,28 @@ _CUSTOM = Gitflow(principal="trunk", integration="next", work_prefix="work/")
 def _write(tmp_path: Path, text: str) -> Path:
     (tmp_path / "constitution.md").write_text(text, encoding="utf-8")
     return tmp_path
+
+
+#: The canon fingerprint each stamp was cut at — re-pinned only together with a stamp bump.
+_CANON_AT = {8: "a33cffae20b4a98b"}
+
+
+def test_a_canon_change_bumps_the_stamp() -> None:
+    """The stamp and the doctor's canon are one decision: fixed fragments, area laws and
+    memory templates, the canon registry and the default gitflow block. A change here
+    without a CANONICAL_SPECS_VERSION bump leaves older trees reading ``canonical`` while
+    the doctor is red — bump the stamp, then pin the new fingerprint under it."""
+    public = workspace_layout.public_scripts_dir().parent
+    files = sorted((public / "scaffold").rglob("*.md")) + sorted(
+        (public / "data" / "fixed").glob("*.md")
+    )
+    digest = hashlib.sha256()
+    for path in files:
+        digest.update(f"{path.relative_to(public).as_posix()}\n".encode() + path.read_bytes())
+    digest.update(
+        repr((workspace_layout.specs_canon_table_rows(), FIXED_SECTIONS, DEFAULT)).encode()
+    )
+    assert {CANONICAL_SPECS_VERSION: digest.hexdigest()[:16]} == _CANON_AT
 
 
 def test_gitflow_round_trips(tmp_path: Path) -> None:

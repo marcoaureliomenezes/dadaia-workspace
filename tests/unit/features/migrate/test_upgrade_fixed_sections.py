@@ -1,5 +1,5 @@
 """Intent: CONTRACT — T-048-05 (SPEC 0.4.8 AC4.3, R6): ``specs upgrade`` on a v6 tree ends
-stamped v7 WITH its fixed law sections, so the specs doctor reports 0 errors — the S3 dead
+stamped canonical WITH its fixed law sections, so the specs doctor reports 0 errors — the S3 dead
 end (upgrade said "no-op", doctor said FIXED-1) is gone. 0.5.0 WP-14: the repair is the
 doctor's one writer, so the seam is the `specs upgrade` verb. Size: SMALL (CliRunner)."""
 
@@ -38,7 +38,7 @@ def _v6_tree(tmp_path: Path) -> Path:
     return specs
 
 
-def test_a_v6_tree_ends_v7_with_fixed_sections_and_a_clean_doctor(tmp_path: Path) -> None:
+def test_a_v6_tree_ends_canonical_with_fixed_sections_and_a_clean_doctor(tmp_path: Path) -> None:
     """sa-specs-upgrade-writes-through-symlinks#B3, sa-specs-upgrade-writes-through-symlinks#B4: the hop, then the doctor's repair set — a superseded shipped scoped
     law (a real published specs/bugs/AGENTS.md) is refreshed too: no TREE-5, no FIXED."""
     specs = _v6_tree(tmp_path)

@@ -1,8 +1,8 @@
 """Consumer specs-upgrade path E2E — the v0.5.1 contract (K10, T-051-16).
 
-``dadaia specs upgrade`` carries exactly one hop — 6 -> 7, memory canon v7, which folds a
-consumer's ``memory/TECHSTACK.md`` body into ``ARCHITECTURE.md``'s ``## Tech Stack``
-section and deletes the file. A tree ``state`` calls absent, malformed or foreign is
+``dadaia specs upgrade`` re-stamps an upgradable tree (v6 or later) to the canonical
+version, folding a consumer's ``memory/TECHSTACK.md`` body into ``ARCHITECTURE.md``'s
+``## Tech Stack`` section and deleting the file. A tree ``state`` calls absent, malformed or foreign is
 REFUSED (exit non-zero, its one fix printed) and nothing is written; a tree already at the canonical version
 is a no-op (exit 0, byte-identical tree). The two scenarios are driven end-to-end through
 the real CLI subprocess against a real on-disk tree.
@@ -84,7 +84,7 @@ def test_upgrade_at_the_canonical_version_is_a_byte_identical_no_op(tmp_path: Pa
     assert _snapshot(specs) == before
 
 
-# ----------------------------------------------------------------- the 6 -> 7 hop (FR1)
+# ----------------------------------------------------------------- the upgrade hop (FR1)
 
 _V6_ARCHITECTURE = (
     "---\nslug: ARCHITECTURE\ntitle: Architecture\ntldr: Architecture.\nsummary: Architecture.\n"
@@ -116,7 +116,7 @@ def test_upgrade_folds_techstack_into_architecture_and_deletes_it(tmp_path: Path
 
     assert upgrade.returncode == 0, upgrade.stderr or upgrade.stdout
     assert not (specs / "memory" / "TECHSTACK.md").exists(), (
-        "the 6 -> 7 hop deletes the file it folded"
+        "the upgrade hop deletes the file it folded"
     )
     architecture = (specs / "memory" / "ARCHITECTURE.md").read_text(encoding="utf-8")
     assert architecture.startswith(_V6_ARCHITECTURE.rstrip("\n")), (

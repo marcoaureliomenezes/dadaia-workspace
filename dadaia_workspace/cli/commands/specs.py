@@ -44,8 +44,9 @@ def upgrade(
     """Upgrade a specs/ tree to the canonical pattern version.
 
     An absent, malformed or foreign tree refuses, writing nothing, with the one state
-    fix (``specs_version.state``). A tree at v6 walks to v7; every tree gets its
-    fixed law sections and template-artifact repairs, so the doctor ends clean.
+    fix (``specs_version.state``). An upgradable tree (stamp v6 or later) is re-stamped
+    to the canonical version; every tree gets the doctor's repair set, so the doctor
+    ends clean.
     """
     resolved = resolve_specs_dir_for_cli(specs_dir)
     try:
