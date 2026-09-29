@@ -178,8 +178,8 @@ resolution contract; FR9):
    surviving row never changes in a commit touching `dadaia_workspace/**`.
 7. **Net-positive ceilings** (AC1.1, AC2.1, AC3.1, AC4.1): `context dead` +3, the Cursor/Copilot/Devin
    gate +12, the hooks-path install +5, unfixable findings +7, unrendered law +4, principal detection +2,
-   path classes +5. Every other package is net ≤ 0. A value is a ceiling: exceeding it stops the task for
-   the architecture lens; the ceiling is never raised.
+   path classes +5. Every other package aims at net ≤ 0 (SPEC AC10.5, the relaxation); a net-positive fix
+   states in its `evidence_diff` why nothing could be deleted.
 8. `Δprod` = as-is production + law text; `Δtest` = audit add − delete, before AC9.9's pruning.
 
 ### Open packages (RED seam · deletes · Δprod/Δtest)
