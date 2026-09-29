@@ -22,6 +22,9 @@ from dadaia_workspace.infrastructure.install_helpers import (
     resolve_codex_agent_model,
 )
 from dadaia_workspace.infrastructure.projection import ProjectionRule, install_rules
+from dadaia_workspace.infrastructure.runtime_transforms.codex_assets import (
+    _parse_agent_frontmatter,
+)
 
 pytestmark = pytest.mark.unit
 
@@ -154,12 +157,28 @@ def test_a_persona_without_read_only_never_renders(tmp_path: Path, body: str) ->
         codex_agent_toml_bytes(md, "dd-software-engineer", resolved)
 
 
-@pytest.mark.parametrize("agent", ["dd-software-engineer", "frontend-engineer"])
-def test_resolve_codex_agent_model_fails_closed_for_any_agent_without_model(agent: str) -> None:
+@pytest.mark.parametrize(
+    ("agent", "persona"),
+    [
+        ("dd-software-engineer", "---\nname: dd-software-engineer\n---\nmodel: claude-sonnet-5\n"),
+        ("frontend-engineer", "---\nname: frontend-engineer\nmodel: claude-ghost-9\n---\n"),
+    ],
+)
+def test_resolve_codex_agent_model_fails_closed_for_any_agent_without_model(
+    agent: str, persona: str
+) -> None:
     """sa-staged-assets-without-consumers#44.4: a persona, core or not, with neither an
-    authored ``model:`` nor a resolved policy model raises — never a silent default."""
+    authored ``model:`` nor a resolved policy model raises — never a silent default.
+    sa-persona-model-read-by-two-parsers: the one frontmatter reader is the only reader (a
+    body ``model:`` line is no declaration) and an unregistered model is refused."""
     with pytest.raises(PublicAssetError, match=agent):
-        resolve_codex_agent_model(agent, None, None)
+        resolve_codex_agent_model(agent, _parse_agent_frontmatter(persona).get("model"), None)
+
+
+def test_an_inline_comment_is_not_part_of_the_declared_model() -> None:
+    """sa-persona-model-read-by-two-parsers: YAML ``model: x # note`` declares ``x``."""
+    persona = "---\nname: a\nmodel: claude-sonnet-5 # tier\n---\n"
+    assert _parse_agent_frontmatter(persona)["model"] == "claude-sonnet-5"
 
 
 def test_resolve_codex_agent_model_falls_back_to_staged_when_no_resolved_policy() -> None:

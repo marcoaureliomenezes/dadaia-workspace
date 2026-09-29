@@ -386,7 +386,7 @@ def _parse_agent_frontmatter(text: str) -> dict[str, object]:
         simple_m = _AGENT_FM_SIMPLE_RE.match(line)
         if simple_m:
             key = simple_m.group(1)
-            value_str = simple_m.group(2).strip()
+            value_str = simple_m.group(2).split(" #", 1)[0].strip()  # YAML inline comment
             if key in _TOML_SAFE_AGENT_FIELDS:
                 result[key] = value_str
         i += 1

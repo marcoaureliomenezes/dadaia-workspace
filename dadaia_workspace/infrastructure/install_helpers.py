@@ -6,7 +6,11 @@ from collections.abc import Callable, Iterable, Mapping
 from pathlib import Path
 
 from dadaia_workspace.core.exceptions import PublicAssetError
-from dadaia_workspace.core.model_registry import ResolvedAgentModel, codex_effort_for_claude_effort
+from dadaia_workspace.core.model_registry import (
+    ResolvedAgentModel,
+    codex_effort_for_claude_effort,
+    registry_by_claude_id,
+)
 from dadaia_workspace.infrastructure.public_assets_common import (
     _SCHEMA_VERSION,
     _package_version,
@@ -80,9 +84,9 @@ def resolve_codex_agent_model(
     codex_effort = codex_effort_for_claude_effort(effort) if effort is not None else "medium"
     if resolved is not None:
         return resolved.model, codex_effort
-    if staged_model:
+    if str(staged_model) in registry_by_claude_id():
         return str(staged_model), codex_effort
     raise PublicAssetError(
-        f"cannot render agent '{agent_name}': it has neither an authored 'model:' nor a "
-        "resolved agent-model policy model (fail-closed: no default model)"
+        f"cannot render agent '{agent_name}': its authored 'model:' ({staged_model}) is not "
+        "in core.model_registry.REGISTRY and no agent-model policy resolves one (fail-closed)"
     )
