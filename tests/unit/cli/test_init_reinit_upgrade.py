@@ -116,7 +116,7 @@ def test_older_running_version_exits_1_with_the_pinned_fix(
 
     assert result.exit_code == 1
     root = workspace.resolve()
-    assert f"fix: {fix_line(root, 'init', str(root))}" in result.output
+    assert f"fix: {fix_line(root, 'init', str(root), '--harness', 'claude')}" in result.output
     assert sorted(p for p in workspace.rglob("*")) == before
 
 

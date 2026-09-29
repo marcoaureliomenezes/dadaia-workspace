@@ -18,6 +18,8 @@ import zipfile
 from importlib import metadata
 from pathlib import Path
 
+from packaging.version import Version
+
 import dadaia_workspace
 from dadaia_workspace.core.exceptions import (
     BootstrapPackageError,
@@ -118,24 +120,9 @@ _REQUIRES_PYTHON_FLOOR_RE = re.compile(r">=\s*3\.(\d+)")
 _DEFAULT_FLOOR_MINOR = 12  # dadaia-workspace's floor today (pyproject.toml: python = "^3.12")
 
 
-_VERSION_RE = re.compile(r"^(?P<release>\d+(?:\.\d+)*)(?:\+(?P<local>[a-z0-9.]+))?$")
-
-
 def _tail_lines(exc: subprocess.CalledProcessError, count: int = 5) -> str:
     """The last *count* whole lines of a failed installer's output — never cut mid-line."""
     return "\n".join((exc.stderr or exc.output or "").strip().split("\n")[-count:])
-
-
-def _version_key(version: str) -> tuple[tuple[int, ...], tuple[str, ...]]:
-    """Order the versions dadaia-workspace publishes: ``M.m.p`` plus an optional local
-    segment that sorts after its base (``0.4.7 < 0.4.7+e2e``). Anything else sorts lowest."""
-    m = _VERSION_RE.match(version.strip().lower())
-    if m is None:
-        return ((-1,), ())
-    release = tuple(int(p) for p in m["release"].split("."))
-    while len(release) > 1 and release[-1] == 0:
-        release = release[:-1]
-    return release, tuple((m["local"] or "").split(".")) if m["local"] else ()
 
 
 def _version_satisfies(version: tuple[int, ...], spec: str | None) -> bool:
@@ -473,9 +460,9 @@ class VenvPythonEnvironmentManager:
         installed = self.installed_version(workspace_root)
         if installed is None or running is None:
             return installed, running, "same"
-        if _version_key(installed) > _version_key(running):
+        if Version(installed) > Version(running):
             raise WorkspaceVenvNewerError(installed, running)
-        action = "upgrade" if _version_key(installed) < _version_key(running) else "same"
+        action = "upgrade" if Version(installed) < Version(running) else "same"
         return installed, running, action
 
     def installed_version(self, workspace_root: str) -> str | None:

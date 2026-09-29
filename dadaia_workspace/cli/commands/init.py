@@ -147,7 +147,7 @@ def init(
         before, after, action = svc.venv_change(root)
         installed = svc.init(root, skip_assets=skip_assets, harnesses=(chosen,))
     except WorkspaceVenvNewerError as exc:
-        fail(f"{exc}\nfix: {fix_line(root, 'init', str(root))}")
+        fail(f"{exc}\nfix: {fix_line(root, 'init', str(root), '--harness', chosen)}")
     except WorkspaceVenvBootstrapError as exc:
         fail(exc)
 

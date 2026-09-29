@@ -50,6 +50,7 @@ typer = ">=0.27.1"
 rich = ">=13,<16"
 pyyaml = "^6.0"
 jsonschema = "^4"
+packaging = ">=22"
 
 
 [tool.poetry.group.dev.dependencies]

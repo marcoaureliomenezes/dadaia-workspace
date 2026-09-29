@@ -106,18 +106,27 @@ def test_healthy_venv_is_a_noop(tmp_path: Path, recorder: _Recorder) -> None:
 
 
 @pytest.mark.parametrize(
-    ("installed", "installs"),
-    [("0.4.7", True), ("1.0.0", False), ("1.0.0rc1", True), ("0.9.9+e2e", True)],
+    ("installed", "running", "installs"),
+    [
+        ("0.4.7", "1.0.0", True),
+        ("1.0.0", "1.0.0", False),
+        ("1.0.0rc1", "1.0.0", True),
+        ("0.9.9+e2e", "1.0.0", True),
+        ("0.4.7", "0.5.0rc1", True),  # PEP 440: a pre-release outranks the prior final
+        ("0.4.7.post1", "0.5.0.dev1", True),
+    ],
 )
 def test_reinit_reinstalls_only_an_older_venv(
     tmp_path: Path,
     recorder: _Recorder,
     monkeypatch: pytest.MonkeyPatch,
     installed: str,
+    running: str,
     installs: bool,
 ) -> None:
-    """0.4.8 AC2.1/AC2.2: an older venv takes the one install path; an equal one is untouched."""
-    install_fake_dist(monkeypatch, "1.0.0")
+    """0.4.8 AC2.1/AC2.2, bug upgrade-refuses-a-prerelease-label-as-a-downgrade: PEP 440
+    order; an older venv takes the one install path, an equal one is untouched."""
+    install_fake_dist(monkeypatch, running)
     _healthy(tmp_path)
     recorder.installed = installed
     VenvPythonEnvironmentManager().ensure_workspace_venv(str(tmp_path))
@@ -127,33 +136,22 @@ def test_reinit_reinstalls_only_an_older_venv(
     )
 
 
+@pytest.mark.parametrize(("installed", "running"), [("1.0.0+e2e", "1.0.0"), ("0.5.0rc1", "0.4.7")])
 def test_reinit_refuses_a_newer_venv_before_any_write(
-    tmp_path: Path, recorder: _Recorder, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path,
+    recorder: _Recorder,
+    monkeypatch: pytest.MonkeyPatch,
+    installed: str,
+    running: str,
 ) -> None:
     """0.4.8 AC2.3: never downgrade; name the version."""
-    install_fake_dist(monkeypatch, "1.0.0")
+    install_fake_dist(monkeypatch, running)
     _healthy(tmp_path)
-    recorder.installed = "1.0.0+e2e"
+    recorder.installed = installed
     with pytest.raises(python_env_module.WorkspaceVenvNewerError) as exc:
         VenvPythonEnvironmentManager().ensure_workspace_venv(str(tmp_path))
-    assert exc.value.installed == "1.0.0+e2e"
+    assert exc.value.installed == installed
     assert recorder.commands == []
-
-
-@pytest.mark.parametrize(
-    ("lower", "higher"),
-    [
-        ("0.4.7", "0.4.8"),
-        ("0.4.7", "0.4.7+e2e"),
-        ("0.4.8rc1", "0.4.8"),
-        ("0.4.9", "0.4.10"),
-        ("0.4.7+e2e", "0.4.7+e2e.1"),
-    ],
-)
-def test_version_key_orders_published_version_shapes(lower: str, higher: str) -> None:
-    """0.4.8 T-048-06: release tuple, then the local segment; ``rc`` sorts lowest."""
-    assert python_env_module._version_key(lower) < python_env_module._version_key(higher)
-    assert python_env_module._version_key("0.4") == python_env_module._version_key("0.4.0")
 
 
 @pytest.mark.parametrize("repacks", [True, False])
