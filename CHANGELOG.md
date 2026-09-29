@@ -54,6 +54,13 @@ for this task, so none is touched here):
 
 Left exactly as written; a future task can pick this up.
 
+## [0.4.8](https://github.com/marcoaureliomenezes/dadaia-workspace/compare/v0.4.7...v0.4.8) (2026-09-23)
+
+
+### Continuous Integration
+
+* the publish workflow is release.yml again (ADR 0026) ([#268](https://github.com/marcoaureliomenezes/dadaia-workspace/issues/268)) ([9941038](https://github.com/marcoaureliomenezes/dadaia-workspace/commit/9941038c9642a5bc08ce3c904b45c2657b807f2f))
+
 ## [0.4.7](https://github.com/marcoaureliomenezes/dadaia-workspace/compare/v0.4.6...v0.4.7) (2026-09-23)
 
 
