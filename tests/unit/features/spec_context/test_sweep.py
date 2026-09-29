@@ -69,12 +69,6 @@ def test_walk_lists_only_a_real_directorys_sorted_entries(tmp_path: Path, setup:
     assert [p.name for p in sweep.walk(setup(tmp_path))] == names
 
 
-def test_mtime_is_absent_for_a_vanished_entry_and_reads_a_link_itself(tmp_path: Path) -> None:
-    (tmp_path / "dangling").symlink_to(tmp_path / "absent")
-    assert sweep.mtime(tmp_path / "gone") is None
-    assert sweep.mtime(tmp_path / "dangling") is not None
-
-
 def test_guarded_turns_an_oserror_into_exactly_one_skipped_action() -> None:
     def boom() -> str | None:
         raise OSError(13, "Permission denied")
@@ -147,7 +141,7 @@ def test_move_resets_the_ttl_clock_and_never_follows_a_symlinked_source(tmp_path
     os.utime(old, (0, 0))
     sweep.move(workspace, old, workspace / "reaped" / "old", "old")
     sweep.move(workspace, workspace / "link", workspace / "reaped" / "link", "link")
-    assert (sweep.mtime(workspace / "reaped" / "old") or 0) > 1_000_000_000
+    assert (workspace / "reaped" / "old").lstat().st_mtime > 1_000_000_000
     assert (workspace / "reaped" / "link").is_symlink()
     assert (tmp_path / "outside" / "treasure.txt").exists()
 

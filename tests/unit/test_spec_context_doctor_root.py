@@ -219,12 +219,13 @@ def test_absent_harness_profile_is_missing_and_fix_seeds_it_from_present_dirs(
 
 
 def test_ttl_zones_expire_an_entry_whole_by_its_own_ttl_and_spare_the_zone_law(
-    tmp_path: Path,
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """reaper-needs-many-runs-for-a-nested-expired-tree: an expired entry is ONE finding judged
     by its newest content; every TTL zone uses its own code and TTL; bug
     public-install-restores-expired-zone-agents-reblocks-preflight: the projected zone
-    ``AGENTS.md`` is canon whatever its mtime."""
+    ``AGENTS.md`` is never a candidate; bug doctor-ttl-walk-quadratic-on-live-trees: a live
+    tree costs <= 2 stats per entry (never one per ancestor) and no finding."""
     _init_workspace(tmp_path)
     for zone in zones_with_ttl():
         (tmp_path / ".dadaia" / zone.name).mkdir(exist_ok=True)
@@ -236,19 +237,27 @@ def test_ttl_zones_expire_an_entry_whole_by_its_own_ttl_and_spare_the_zone_law(
     old.parent.mkdir(parents=True)
     old.write_bytes(b"PNG")
     _age(old)
-    (zone_dir / "claude" / "today.txt").write_text("fresh", encoding="utf-8")
+    (deep := zone_dir.joinpath("claude", *"abcdef")).mkdir(parents=True)
+    for level in (deep, *deep.parents[:6]):
+        (level / "today.txt").touch()  # claude/a holds 12 live entries, 6 deep
     law = zone_dir / "AGENTS.md"
     law.write_text("# zone law", encoding="utf-8")
     _age(law, time.time() - 400 * 86_400)
+    stats: list[Path] = []
+    real_stat = Path.stat
 
+    def counting_stat(path: Path, **kwargs: bool) -> os.stat_result:
+        stats.append(path)
+        return real_stat(path, **kwargs)
+
+    monkeypatch.setattr(Path, "stat", counting_stat)
     found = _by_path(_make_doctor(tmp_path).scan())
 
     z = _TTL_ZONE.name
+    assert len([p for p in stats if p.is_relative_to(deep.parents[4])]) <= 2 * 12
     assert found[f"{z}/claude/20260801"].code == f"WS-{z.lstrip('.')}-expired"
     assert found[f"{z}/claude/20260801"].detail == "(mtime 2d > ttl 1d)"
-    assert f"{z}/claude/20260801/x.png" not in found and f"{z}/claude" not in found
-    assert found[f"{z}/claude/today.txt"].verdict is FindingVerdict.CANON
-    assert found[f"{z}/AGENTS.md"].verdict is FindingVerdict.CANON
+    assert [p for p in found if p.startswith(f"{z}/")] == [f"{z}/claude/20260801", f"{z}/stale"]
     codes = {f.code for f in found.values()}
     assert {f"WS-{zone.name.lstrip('.')}-expired" for zone in zones_with_ttl()} <= codes
     _make_doctor(tmp_path).fix()
@@ -298,7 +307,6 @@ def test_ttl_walk_treats_an_entry_that_vanishes_mid_walk_as_absent(
     gone_file.write_text("", encoding="utf-8")
     gone_dir = zone_dir / "gone_dir"
     gone_dir.mkdir()
-    (zone_dir / "kept.txt").write_text("", encoding="utf-8")
     real_walk = sweep.walk
 
     def racing_walk(directory: Path) -> list[Path]:
@@ -313,9 +321,7 @@ def test_ttl_walk_treats_an_entry_that_vanishes_mid_walk_as_absent(
 
     found = _by_path(_make_doctor(tmp_path).scan())
 
-    assert found[f"{_TTL_ZONE.name}/kept.txt"].verdict is FindingVerdict.CANON
-    assert f"{_TTL_ZONE.name}/gone.txt" not in found
-    assert f"{_TTL_ZONE.name}/gone_dir" not in found
+    assert not [p for p in found if p.startswith(f"{_TTL_ZONE.name}/")]
 
 
 # ---------------------------------------------------------------------------

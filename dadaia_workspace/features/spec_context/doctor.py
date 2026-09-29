@@ -4,7 +4,7 @@
 ``scan()`` is the ONE walk over the instance — one traversal primitive
 (``features.spec_context.sweep``) serves both it and ``fix()``, driven by the zone registry
 (``core.workspace_layout.DADAIA_ZONES``): root, harness dirs, the ``.dadaia/`` top level,
-the closed-canon zones, the TTL zones — every entry gets one finding verdict and one
+the closed-canon zones, the TTL zones (only expired entries and holds) — each finding one
 ``WS-<zone>-<verdict>`` code. ``fix()`` consumes the same findings in the fixed order.
 
 Bug class (the six-bug ``.dadaia/`` ledger, workspace-doctor-root4-false-positive-dadaia-hooks
@@ -14,6 +14,7 @@ allow set, TTL and canon is a view of the registry.
 """
 
 import os
+import stat
 import time
 from collections.abc import Callable
 from dataclasses import dataclass, replace
@@ -431,50 +432,30 @@ class DoctorService:
         return out
 
     def _scan_ttl_zone(self, zone: Zone, now: float) -> list[Finding]:
-        out: list[Finding] = []
-        self._walk_ttl(zone, self._dadaia / zone.name, now, out, is_zone_root=True)
-        return out
-
-    def _walk_ttl(
-        self, zone: Zone, directory: Path, now: float, out: list[Finding], *, is_zone_root: bool
-    ) -> None:
-        """One finding per entry, judged once by its newest content (``sweep.newest``): an
-        expired entry is reaped whole; a live directory is walked for expired entries below
-        it. A directory mtime a deletion refreshed never counts (bug
-        reaper-needs-many-runs-for-a-nested-expired-tree)."""
+        """Expired entries, whole, and each live hold in ``reaped/``; the zone's ``AGENTS.md``
+        is never a candidate (bug public-install-restores-expired-zone-agents-reblocks-preflight)."""
         assert zone.ttl_seconds is not None
-        for entry in sweep.walk(directory):
-            newest = sweep.newest(entry)
-            if newest is None:
+        ttl, zone_dir = zone.ttl_seconds, self._dadaia / zone.name
+        _, report = _ttl_walk(zone_dir, now - ttl, keep_live=zone.name == sweep.REAPED_ZONE)
+        out: list[Finding] = []
+        for entry, stamp in report:
+            if entry == zone_dir / "AGENTS.md":
                 continue
-            age = now - newest
-            if is_zone_root and entry.name == "AGENTS.md":
-                # The zone's own law file is canon by projection, never a TTL candidate
-                # (bug public-install-restores-expired-zone-agents-reblocks-preflight).
-                verdict, detail = FindingVerdict.CANON, ""
-            elif age > zone.ttl_seconds:
-                days = timedelta(seconds=age).days
-                detail = f"(mtime {days}d > ttl {timedelta(seconds=zone.ttl_seconds).days}d)"
-                finding = self._finding(
-                    zone.name, self._dadaia, entry, FindingVerdict.EXPIRED, detail
+            age = now - stamp
+            if age <= ttl:
+                # Held: days ROUNDED UP, a minute-old hold has its whole window left.
+                detail = f"({-(-int(ttl - age) // 86_400)}d left)"
+                out.append(
+                    self._finding(zone.name, self._dadaia, entry, FindingVerdict.REAPED, detail)
                 )
-                if tree := sweep.linked_worktree(self._workspace_root, entry):
-                    gdir = sweep.worktree_git_dir(tree)
-                    finding = replace(finding, fix=git_line(gdir, "worktree", "remove", str(tree)))
-                out.append(finding)
                 continue
-            elif entry.is_dir() and not entry.is_symlink():
-                self._walk_ttl(zone, entry, now, out, is_zone_root=False)
-                continue
-            elif zone.name == sweep.REAPED_ZONE:
-                # Held, not slop and not expired: report where it came from and how long
-                # the operator still has to take it back. Days ROUNDED UP: a hold taken a
-                # minute ago has its whole window left, never "0d left" on a live entry.
-                verdict = FindingVerdict.REAPED
-                detail = f"({-(-int(zone.ttl_seconds - age) // 86_400)}d left)"
-            else:
-                verdict, detail = FindingVerdict.CANON, ""
-            out.append(self._finding(zone.name, self._dadaia, entry, verdict, detail))
+            detail = f"(mtime {timedelta(seconds=age).days}d > ttl {timedelta(seconds=ttl).days}d)"
+            finding = self._finding(zone.name, self._dadaia, entry, FindingVerdict.EXPIRED, detail)
+            if tree := sweep.linked_worktree(self._workspace_root, entry):
+                gdir = sweep.worktree_git_dir(tree)
+                finding = replace(finding, fix=git_line(gdir, "worktree", "remove", str(tree)))
+            out.append(finding)
+        return out
 
     # ------------------------------------------------------------------
     # fix() — the one reaper, in the fixed FR4 order
@@ -575,6 +556,33 @@ class DoctorService:
                     )
                 )
         return actions
+
+
+def _ttl_walk(
+    directory: Path, expiry: float, *, keep_live: bool
+) -> tuple[float | None, list[tuple[Path, float]]]:
+    """One post-order pass, each entry ``lstat``'ed once and never followed: the newest file
+    mtime below *directory*, and ``(entry, stamp)`` for each entry older than *expiry*
+    (whole, its descendants dropped) or, with *keep_live*, each live file. A directory is
+    stamped by its newest file, by its own mtime only when it holds none (bug
+    reaper-needs-many-runs-for-a-nested-expired-tree)."""
+    newest: float | None = None
+    report: list[tuple[Path, float]] = []
+    for entry in sweep.walk(directory):
+        if (st := sweep.lstat(entry)) is None:
+            continue
+        is_dir = stat.S_ISDIR(st.st_mode)
+        files, below = (
+            _ttl_walk(entry, expiry, keep_live=keep_live) if is_dir else (st.st_mtime, [])
+        )
+        if files is not None:
+            newest = files if newest is None else max(newest, files)
+        stamp = st.st_mtime if files is None else files
+        if stamp < expiry or (keep_live and not is_dir):
+            report.append((entry, stamp))
+        else:
+            report.extend(below)
+    return newest, report
 
 
 def reap(workspace_root: Path) -> list[str]:

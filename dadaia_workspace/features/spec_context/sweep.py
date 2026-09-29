@@ -1,6 +1,6 @@
 """The ONE traversal primitive of the workspace reaper (0.4.7 FR6a).
 
-``walk`` reads a directory, ``mtime`` reads one entry's age, ``move`` relocates an
+``walk`` reads a directory, ``lstat`` reads one entry, ``move`` relocates an
 entry, ``remove`` deletes it — all four behind ONE guard:
 
 * a symlink is never followed (``walk`` refuses a symlinked root; ``move``/``remove``
@@ -34,7 +34,7 @@ from collections.abc import Callable
 from datetime import UTC, datetime
 from pathlib import Path
 
-__all__ = ["guarded", "move", "mtime", "remove", "rmtree", "walk"]
+__all__ = ["guarded", "lstat", "move", "remove", "rmtree", "walk"]
 
 _OUTSIDE = "skipped '{label}' (outside the workspace)"
 _WORKTREE = "skipped '{label}' (holds a linked git worktree)"
@@ -52,23 +52,13 @@ def walk(directory: Path) -> list[Path]:
         return []
 
 
-def mtime(path: Path) -> float | None:
-    """``lstat`` mtime (the LINK's own, never its destination's), or ``None`` for an
+def lstat(path: Path) -> os.stat_result | None:
+    """The entry's OWN ``lstat`` (the link's, never its destination's), or ``None`` for an
     entry that vanished between ``walk`` and here — absent, never an exception."""
     try:
-        return path.lstat().st_mtime
+        return path.lstat()
     except OSError:
         return None
-
-
-def newest(path: Path) -> float | None:
-    """The newest ``lstat`` mtime of *path*'s content: itself when not a real directory,
-    else its newest non-directory entry (its own mtime when it holds none) — a directory
-    mtime a deletion refreshed is never content. ``None`` when it vanished."""
-    if path.is_symlink() or not path.is_dir():
-        return mtime(path)
-    stamps = [mtime(Path(d) / f) for d, _, files in os.walk(path) for f in files]
-    return max((t for t in stamps if t is not None), default=mtime(path))
 
 
 def guarded(code: str, label: str, step: Callable[[], str | None]) -> list[str]:
