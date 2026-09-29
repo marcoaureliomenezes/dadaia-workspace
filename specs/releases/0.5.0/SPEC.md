@@ -209,8 +209,8 @@ Baseline `9cd5fbf4`. Lines: `git grep -h '' <sha> -- '<pathspec>' | wc -l`; test
   behavior keeps working."
   - A DELETE proves one of: no documented behavior; a duplicate whose one authority keeps the behavior;
     dead code.
-  - A bug fix nets ≤ 0 in production and tests; the only exceptions are the production ceilings of
-    AC1.1, AC2.1, AC3.1, AC4.1; tests have none.
+  - A bug fix aims at net ≤ 0 in production and tests (Origin, relaxation); a net-positive fix states
+    in its `evidence_diff` why nothing could be deleted.
   - The RED proof is a rewritten existing test when one exists.
   - `dd-bug-resolution` Phase 5/6 and `dd-test-stewardship` admission comply without restating it;
     this resolves `sa-implementation-adds-before-it-deletes`.
