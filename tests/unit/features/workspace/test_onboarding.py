@@ -15,7 +15,7 @@ import pytest
 
 from dadaia_workspace.core import workspace_layout
 from dadaia_workspace.core.cli_line import fix_line
-from dadaia_workspace.core.specs_version import state
+from dadaia_workspace.core.specs_version import CANONICAL_SPECS_VERSION, state
 from dadaia_workspace.features.specs.rules import RULES
 from dadaia_workspace.features.workspace.onboarding import next_step
 from dadaia_workspace.infrastructure.git_subprocess import GitSubprocessClient
@@ -33,7 +33,8 @@ def _git(monkeypatch: pytest.MonkeyPatch) -> dict[str, bool]:
 def _specs(tmp_path: Path, name: str = "app", *, audited: bool = False) -> Path:
     specs = tmp_path / "repos" / name / "specs"
     (specs / "memory" / "product").mkdir(parents=True)
-    (specs / "constitution.md").write_text("---\nspecs_pattern_version: 7\n---\n# c\n", "utf-8")
+    stamp = f"---\nspecs_pattern_version: {CANONICAL_SPECS_VERSION}\n---\n# c\n"
+    (specs / "constitution.md").write_text(stamp, "utf-8")
     for stub in ("ARCHITECTURE.md", "QUALITY.md"):
         shutil.copyfile(_SCAFFOLD / "memory" / stub, specs / "memory" / stub)
     if audited:
@@ -62,6 +63,12 @@ def _typo(tmp: Path) -> dict[str, Path]:
     return {"app": specs}
 
 
+def _v047(tmp: Path) -> dict[str, Path]:
+    specs = _specs(tmp, audited=True)
+    (specs / "constitution.md").write_text("---\nspecs_pattern_version: 7\n---\n# c\n", "utf-8")
+    return {"app": specs}
+
+
 _CMD = "command"
 
 
@@ -72,6 +79,7 @@ _CMD = "command"
     pytest.param(_bare, {"bound": False}, False, ("bind", _CMD), ("context", "bind", "app"), [], id="S1-unbound-session-binds"),
     pytest.param(_bare, {"bound": True}, False, ("specs", _CMD), ("specs", "init", "--context", "app"), [], id="S1-bound-is-past-bind"),
     pytest.param(_foreign, {}, False, ("specs", _CMD), ("specs", "init", "--context", "app", "--replace-foreign"), [], id="B28-4-foreign-tree-replace-foreign"),
+    pytest.param(_v047, {}, False, ("specs", _CMD), ("specs", "init", "--context", "app"), [], id="upgrade-leaves-project-specs-unmigrated-and-silent-0.4.7-tree"),
     pytest.param(_typo, {}, False, ("constitution", "agent"), None, ["repos/app/specs/constitution.md"], id="ADR0047-yaml-typo-is-an-agent-repair"),
     pytest.param(lambda t: {"app": _specs(t)}, {}, False, ("first-pass", "agent"), None,
                  [".agents/skills/dd-audit-project/SKILL.md §first pass", "memory/QUALITY.md", "no atom"], id="shipped-stubs-first-pass"),

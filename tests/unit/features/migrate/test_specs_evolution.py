@@ -64,7 +64,7 @@ def test_upgrade_at_or_above_floor_is_idempotent_and_repairs_placeholders(
     _write_constitution(specs, f"---\nspecs_pattern_version: {stamp}\n---\n# C\n")
 
     result = _upgrade.upgrade(specs, remove=lambda p: sweep.remove(specs, p, p.name))
-    assert result.from_version == stamp
+    assert not result.stamped
     assert result.to_version == stamp
     assert result.ideas_removed == []
 

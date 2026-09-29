@@ -149,7 +149,7 @@ def test_an_associated_repo_inherits_its_context_gitflow(tmp_path: Path) -> None
     assert _run_push_gate(infra, tmp_path, _push("feature/0.0.1", sha)).returncode != 0
 
 
-@pytest.mark.parametrize("stamp", ["7", "7\ngitflow: {principal: main"])
+@pytest.mark.parametrize("stamp", ["8", "8\ngitflow: {principal: main"])
 def test_the_pushed_commits_tree_state_governs_the_canon_scan(tmp_path: Path, stamp: str) -> None:
     """sa-specs-tree-state-read-five-ways#B28-2: the pushed commit's stamp, not a checkout
     stamped 6; sa-specs-tree-state-read-five-ways#B28-3: a malformed one still scans."""

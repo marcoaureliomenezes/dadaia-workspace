@@ -2,7 +2,7 @@
 
 Sequence: read the tree through ``specs_version.state`` -- an absent, malformed or
 foreign tree raises :class:`UpgradeRefused` carrying that state's fix, without touching
-the filesystem; a tree at 6 walks the 6 -> 7 hop (:func:`fold_tech_stack`) and is re-stamped;
+the filesystem; an upgradable tree walks the hops (:func:`fold_tech_stack`, the doctor's repair set) and is re-stamped;
 a tree already at canonical is a no-op except for the empty ``_ideas/`` removal.
 Every other repair is the doctor's (``specs upgrade`` runs its repair set, WP-14).
 """
@@ -28,7 +28,8 @@ class UpgradeRefused(Exception):
 class UpgradeResult:
     """Outcome of an upgrade run."""
 
-    from_version: int
+    #: True when the constitution was (or, dry-run, would be) re-stamped to ``to_version``.
+    stamped: bool
     to_version: int
     dry_run: bool
     no_op: bool = False
@@ -55,7 +56,6 @@ def upgrade(
     if kind not in ("upgradable", "canonical"):
         raise UpgradeRefused(f"specs tree {specs_dir} is {kind}; nothing written.\nfix: {fix}")
     goal = _version.CANONICAL_SPECS_VERSION
-    current = goal if kind == "canonical" else _version.OLDEST_UPGRADABLE_VERSION
     architecture = specs_dir / "memory" / "ARCHITECTURE.md"
     if architecture.is_file() and _RETIRED_PART_HEADING in architecture.read_text("utf-8"):
         raise UpgradeRefused(
@@ -71,13 +71,13 @@ def upgrade(
         removed = remove_empty_ideas_dir(specs_dir, remove)
         restated = rewrite_status_tokens(specs_dir)
         folded = fold_tech_stack(specs_dir, remove)
-        if current < goal:
+        if kind == "upgradable":
             merge_frontmatter(specs_dir, specs_pattern_version=goal)
     return UpgradeResult(
-        from_version=current,
+        stamped=kind == "upgradable",
         to_version=goal,
         dry_run=dry_run,
-        no_op=current >= goal and not (removed or restated or folded),
+        no_op=kind == "canonical" and not (removed or restated or folded),
         ideas_removed=removed,
         status_rewritten=restated,
         tech_stack_folded=folded,

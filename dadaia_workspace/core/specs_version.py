@@ -19,14 +19,17 @@ from dadaia_workspace.core.frontmatter import Frontmatter, parse
 from dadaia_workspace.core.gitflow import constitution_error, constitution_text, specs_tree_exists
 
 #: Single source of truth for the current canonical specs-pattern version.
-#: Bump this when a new migration step is added to the registry (see ``registry.py``).
+#: Bump this whenever the canon a tree must meet changes.
 #: v3 = agent-tier-frontmatter (v0.1.72 FR1); v4 = bugs-single-file (v0.1.73 FR1 —
 #: the operator's ONE-append-only-ledger contract); v5 = specs-canon-v6's tree shape
 #: (T-050-05); v6 = this stamp, T-050-06A — the version number itself, deferred by
 #: T-050-05 because the release-id axis flip was this task's write set;
 #: v7 = memory canon v7 — ``memory/TECHSTACK.md`` left the canon and its body became
-#: ``ARCHITECTURE.md``'s ``## Tech Stack`` section, which ``features/migrate`` folds.
-CANONICAL_SPECS_VERSION = 7
+#: ``ARCHITECTURE.md``'s ``## Tech Stack`` section, which ``features/migrate`` folds;
+#: v8 = the 0.5.0 canon — fixed law sections, the gitflow block, the refreshed area laws
+#: and catalog, all written by the repair set ``specs init`` runs. A canon change that
+#: keeps the stamp leaves every older tree reading ``canonical`` while the doctor is red.
+CANONICAL_SPECS_VERSION = 8
 
 #: The oldest stamp the one live upgrade hop starts from — and so the oldest a tree may
 #: carry and still be a dadaia tree (SPEC 0.4.8 D7, D9); anything older is foreign.

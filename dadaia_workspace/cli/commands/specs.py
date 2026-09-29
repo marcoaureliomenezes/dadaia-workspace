@@ -96,16 +96,10 @@ def _echo_upgrade(specs: Path, result: UpgradeResult) -> bool:
         )
     for action in [] if result.dry_run else script_repairs(specs):
         typer.echo(f"[repair] {action}")
-    if result.from_version < result.to_version:
-        typer.echo(
-            f"[stamp] {will}stamp {specs / 'constitution.md'} "
-            f"{result.from_version} -> {result.to_version}"
-        )
+    if result.stamped:
+        typer.echo(f"[stamp] {will}stamp {specs / 'constitution.md'} -> {result.to_version}")
     if result.no_op:
-        typer.echo(
-            f"[ok] {specs} already at pattern version {result.from_version} "
-            f"(target {result.to_version}) — no-op."
-        )
+        typer.echo(f"[ok] {specs} already at pattern version {result.to_version} — no-op.")
     return bool(refused)
 
 

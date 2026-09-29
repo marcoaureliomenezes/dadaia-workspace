@@ -89,7 +89,7 @@ def test_canon_scan_does_not_apply_to_a_tree_stamped_below_the_canon(
         fix_line(None, "specs", "init", "--context", "<ctx>", "--replace-foreign") in result.output
     )
 
-    result = _runner.invoke(app, ["ci", "push-gate-check"], input=_stamped_specs(repo, 7))
+    result = _runner.invoke(app, ["ci", "push-gate-check"], input=_stamped_specs(repo, 8))
     assert result.exit_code == 1
     assert "specs/backlog/candidates.md" in result.output
 

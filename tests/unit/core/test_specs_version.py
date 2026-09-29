@@ -17,7 +17,7 @@ def _write(tmp_path: Path, text: str) -> Path:
 
 
 def test_gitflow_round_trips(tmp_path: Path) -> None:
-    specs = _write(tmp_path, "---\nspecs_pattern_version: 7\n---\n# C\n")
+    specs = _write(tmp_path, "---\nspecs_pattern_version: 8\n---\n# C\n")
     merge_frontmatter(specs, gitflow=_CUSTOM)
     assert read_gitflow(specs) == (_CUSTOM, None)
     assert state(specs)[0] == "canonical"
@@ -30,7 +30,7 @@ def test_merge_preserves_unknown_keys_and_body(tmp_path: Path) -> None:
         "---\nspecs_pattern_version: 6\nconstitution_version: 6.0.0  # note\n"
         "owner:\n  - a\n  - b\n---" + body,
     )
-    merge_frontmatter(specs, specs_pattern_version=7, gitflow=DEFAULT)
+    merge_frontmatter(specs, specs_pattern_version=8, gitflow=DEFAULT)
     text = (specs / "constitution.md").read_text(encoding="utf-8")
     assert text.endswith("---" + body)
     assert "constitution_version: 6.0.0  # note\nowner:\n  - a\n  - b\n" in text
