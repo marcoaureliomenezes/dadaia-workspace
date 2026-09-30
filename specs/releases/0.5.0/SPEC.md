@@ -9,6 +9,7 @@
   - audit `20260930-structural-convergence` (ADR 0121 as amended by 0140);
   - grill round 2 (ADRs 0121–0138, handoff `2026-09-30T022849Z-main-thread-remediation-grill-r2-adrs`);
   - ADR 0140.
+  - Operator demand, 2026-09-30: ADR 0150 ("não é nem permitido pela minha lei criar uma release plana"); ADR 0151 ("crie mecanismos claros para isso nunca mais acontecer"; "Aprovo os 5").
 - Operator, 2026-09-30: "devemos implementar toda parte que toca worktrees e bind primeiro numa rc prioritária. e as seguintes garantir que já estamos usando worktrees plenamente, bem como o bind." Stop producing bugs; deliver the release.
 - This candidate registers no bug and adds no backlog entry.
 - The header is the pick `backlog.py exit` reads. It names only this candidate's deliveries; each later candidate's header names its own.
@@ -30,7 +31,7 @@
 
 ## Decisions
 
-- These ADRs decide: 0097, 0099, 0100, 0103, 0105–0117, 0124–0131, 0135 (read path only), 0136, 0140, 0141, 0147, 0148.
+- These ADRs decide: 0097, 0099, 0100, 0103, 0105–0117, 0124–0131, 0135 (read path only), 0136, 0140, 0141, 0147, 0148, 0150, 0151.
 - The PLAN carries the Parallel schedule of ADR 0141 from the task after `worktree.py merge`; closure logs planned against measured width, the critical path walked and every rebase conflict.
 - A reader imports the owner script's read-only parser (0135): `worktree.py` imports `release.py`'s status parser, `backlog.py` imports `bugs.py`'s record reader. Running another script's verb stays forbidden (0018). ADR 0126's `measured_by` is repaired to match ("chore(adrs): repair 0126 measured_by").
 - A backlog entry that is a contract break is delivered as an FR of the candidate owning its cause and exits `delivered`, with no new bug record (operator). `to-bug` (0137) stays for future cases.
@@ -153,6 +154,23 @@ F019–F051 share the destination of the bug each cites. F090–F112 share the d
   - `release.py check` passes.
   - Candidate 6's SPEC is written in `worktrees/dadaia-workspace/0.5.0<letter>-release` and lands by `worktree.py merge`; its reflog line proves it.
 
+### Amendments 3–4 (ADRs 0150, 0151)
+
+- AC1.17 Every candidate in `rc-<N>/` (0150; T-050-109):
+  - (1) `release.py new` writes the trio into `releases/<v>/rc-<N+1>/`; no verb moves or rewrites a closed `rc-<N>/`.
+  - (2) Only `_RELEASE.json` sits at the release root; the canon and pre-push refuse a flat trio (0151 M5).
+  - (3) One resolver, `core/release_state.py`, returns the highest open `rc-<N>/`; every reader asks it.
+  - (4) Data: `rc-1`..`rc-4` equal `git show` of the trio at f61be1a0, acd8443a, 96d8f9ee, 47858cf8; the live trio is `git mv`-ed to `rc-5/`.
+  - (5) The size caps measure one `rc-<N>/` trio.
+  - Command: `pytest tests/contract/test_release_script.py tests/unit/skills/test_release_implementation_release_script.py tests/unit/features/specs/test_release_tree.py`; `release.py check` passes.
+- AC1.18 Only the operator accepts (0151; T-050-110):
+  - M1 LEDGER-ADR-SCHEMA refuses an `accepted` record without `ruling: {date, words}`, or whose acceptance reads delegated or "in session".
+  - M2 It refuses a record superseding or amending an accepted one unless itself accepted with a ruling.
+  - M3 pre-push refuses a pushed commit deleting an `AGENTS.md`/`SKILL.md` line whose message cites no `ADR NNNN`, with one `fix:`.
+  - M4 The three role personas and the root map point to `specs/ADRs/AGENTS.md` §2: no role agent writes `accepted` or `ruling`.
+  - Data: before the batch push, each accepted record on the operator-reviewed retro-audit list gets `ruling` from its own context quote; every other returns to `proposed`.
+  - Command: `pytest tests/contract/test_adr_canon.py tests/unit/features/chokepoints/test_push_specs_canon_scan.py`; `doctor --context dadaia-workspace` exits 0.
+
 Study conclusions carried (ADR 0100; the scratch copy is ephemeral):
 - A `wt/` branch is always named, never a detached HEAD.
 - A worktree is destroyed only after a verified fast-forward: never by TTL or count.
@@ -175,6 +193,7 @@ Study conclusions carried (ADR 0100; the scratch copy is ephemeral):
 - The separate RED commit.
 - `session_store`'s "an unreadable record is never stale".
 - `context bind --print-env` (0148 (4): an env-only id leaves it nothing to print).
+- The flat trio each candidate overwrote (0150); acceptance by an agent (0151).
 
 ## Risk registers
 
