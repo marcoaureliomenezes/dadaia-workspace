@@ -69,7 +69,7 @@ def _at(zone: str, repo: str, owner: str | None = None, **session: object) -> di
     pytest.param("repos/ctx-a/specs/audits/20260101-x/index.md", _at("audit", "ctx-a", **_A), None, id="AC1.1-own-audit-allowed"),
     pytest.param("repos/ctx-a/src/x.py", _at("repo", "ctx-a", **_A), _wt("ctx-a", "impl"), id="AC1.1-own-repo-code-is-merge-only"),
     pytest.param("repos/ctx-a/specs/bugs/BUGS.jsonl", _at("repo", "ctx-a", **_A), _wt("ctx-a", "bug"), id="ADR0124-ledger-no-longer-always-writable"),
-    pytest.param("repos/ctx-a/specs/constitution.md", _at("repo", "ctx-a", **_A), "fix: Operator action: edit repos/ctx-a/specs/constitution.md by hand; no worktree kind merges it", id="F5-no-kind-merges-it-names-the-operator"),
+    pytest.param("repos/ctx-a/specs/bugs/notes.md", _at("repo", "ctx-a", **_A), "fix: Operator action: edit repos/ctx-a/specs/bugs/notes.md by hand; no worktree kind merges it", id="F5-no-kind-merges-it-names-the-operator"),
     pytest.param("repos/ctx-b/src/x.py", _at("repo", "ctx-b", **_A), f"fix: {_DADAIA} context bind ctx-b", id="write-outside-the-bind-scope-names-the-bind"),
     pytest.param("worktrees/ctx-b/0.5.0a-impl/src/x.py", _at("worktree", "ctx-b"), f"fix: {_DADAIA} context bind ctx-b", id="unbound-native-session-refused-names-the-bind"),
     pytest.param("worktrees/ctx-b/0.5.0a-impl/src/x.py", _at("worktree", "ctx-b", has_id=False), None, id="ADR0116-id-less-unbound-worktree-is-the-declared-gap"),

@@ -1,7 +1,8 @@
-"""Intent: CONTRACT — AC1.8 (T-050-96, T-050-108): `worktree.py merge` fast-forwards, removes
-and `branch -d`s a reviewed worktree, re-runnable; every refusal (dirty, outside the kind's
-allowed set, conflicting rebase, no APPROVED verdict for HEAD, ignored files, wrong branch)
-carries one `fix:` that clears it; `clean` removes only an empty `dadaia:` worktree.
+"""Intent: CONTRACT — AC1.8 (T-050-96, T-050-108, T-050-98): `worktree.py merge` fast-forwards,
+removes and `branch -d`s a reviewed worktree, re-runnable; every refusal (dirty, outside the
+kind's allowed set, conflicting rebase, no APPROVED verdict for HEAD, ignored files, wrong
+branch, failed fast-forward: a stray or a moved work branch) carries one `fix:` that clears it; `clean`
+removes only an empty `dadaia:` worktree. AC1.9 (T-050-98): ledgers union, TASKS markers replay.
 Size: MEDIUM (real git, tmp workspace).
 """
 
@@ -66,8 +67,10 @@ def test_dirty_outside_set_and_conflict_each_refuse_with_one_fix(root: Path) -> 
         outside = run(root, "merge", TREE)
         assert rel in outside.stderr and f"{owner} worktree" in outside.stderr
         _fix(root, outside)
-    commit(repo, "src/a.py", "main side\n")
-    commit(tree, "src/a.py", "tree side\n")
+    commit(repo, "README.md", "- [ ] a\n")  # markers alone, but not TASKS: never replayed
+    git(tree, "rebase", "-q", "feature/0.5.0")
+    commit(repo, "README.md", "- [-] a\n")
+    commit(tree, "README.md", "- [x] a\n")
     conflict = run(root, "merge", TREE)
     assert not (Path(git(tree, "rev-parse", "--git-dir").strip()) / "rebase-merge").exists()
     assert fixes(conflict) == [f"fix: git -C {tree} rebase feature/0.5.0"]
@@ -92,6 +95,68 @@ def test_merge_needs_a_valid_approval_of_the_exact_head(
     assert result.returncode == 1 and head in result.stderr
     assert fixes(result) == [f"fix: {root / '.dadaia/.venv/bin/dadaia'} reports validate {target}"]
     assert git(root / "repos/r", "rev-parse", "feature/0.5.0").strip() != head
+
+
+def test_failed_fast_forward_tells_a_stray_from_a_moved_work_branch(root: Path) -> None:
+    repo, tree = root / "repos/r", root / TREE
+    sha = commit(tree, "src/a.py")
+    approve(root, sha)
+    (repo / "src").mkdir()
+    (repo / "src/a.py").write_text(
+        "stray"
+    )  # untracked in repos/r: the fast-forward would clobber it
+    stray = run(root, "merge", TREE)
+    assert "src/a.py" in stray.stderr and fixes(stray) == [
+        f"fix: Operator action: commit or remove the paths above in {repo}"
+    ]
+    (repo / "src/a.py").unlink()
+    cli = root / ".dadaia/.venv/bin/dadaia"  # a sibling lands while the verdict is read
+    move = f"subprocess.run(['git', '-C', {str(repo)!r}, 'commit', '-qm', 'm', '--allow-empty'])"
+    verdict = 'elif args[:2] == ["reports", "validate"]:\n'
+    cli.write_text(cli.read_text().replace(verdict, f"{verdict}    import subprocess; {move}\n"))
+    moved = run(root, "merge", TREE)
+    assert fixes(moved) == [f"fix: python3 {SCRIPT} merge {tree}"] and tree.exists()
+
+
+def test_parallel_siblings_union_ledgers_and_replay_task_markers(root: Path) -> None:
+    """AC1.9 (ADR 0111): the worktree's TASKS marker flips replay onto the sibling-advanced work
+    side, most advanced state winning; any worktree change beyond markers, or a missing side,
+    refuses; JSONL ledgers merge by union."""
+    repo, tree, tasks = root / "repos/r", root / TREE, "specs/releases/0.5.0/rc-1/TASKS.md"
+    s = "**Status:** Approved\n"  # the trio stays Approved for the next `new`
+    commit(repo, tasks, s + "- [ ] **T-1**\n- [ ] **T-2**\n- [ ] **T-3**\n")
+    git(tree, "rebase", "-q", "feature/0.5.0")
+    commit(tree, tasks, s + "- [x] **T-1**\n- [-] **T-2**\n- [ ] **T-3**\n")
+    commit(repo, tasks, s + "- [ ] **T-1**\n- [x] **T-2**\n- [ ] **T-3** amended\n")
+    run(root, "merge", TREE)  # rebased with the markers replayed; HEAD awaits its verdict
+    approve(root, git(tree, "rev-parse", "HEAD").strip())
+    assert run(root, "merge", TREE).returncode == 0
+    assert (repo / tasks).read_text() == s + "- [x] **T-1**\n- [x] **T-2**\n- [ ] **T-3** amended\n"
+    refused = [f"fix: git -C {tree} rebase feature/0.5.0"]
+    assert run(root, "new", "r", "--kind", "impl").returncode == 0
+    t2, t3 = "- [x] **T-2**\n", "- [ ] **T-3** amended\n"
+    for mine, theirs in (  # the worktree adds a line; the work side rewrote the flipped one
+        ("- [-] **T-1**\n" + t2 + t3 + "- [ ] **T-4**\n", "- [ ] **T-1**\n" + t2 + t3),
+        ("- [-] **T-1**\n" + t2 + t3, "- [x] **T-1** moved\n" + t2 + t3),
+    ):
+        commit(tree, tasks, s + mine)
+        commit(repo, tasks, s + theirs)
+        assert fixes(run(root, "merge", TREE)) == refused
+        git(tree, "reset", "-q", "--hard", "feature/0.5.0")
+    commit(tree, tasks, s + "- [x] **T-1**\n- [x] **T-2** amended\n")
+    git(repo, "rm", "-q", tasks)
+    git(repo, "commit", "-qm", "moved away")
+    assert fixes(run(root, "merge", TREE)) == refused  # modify/delete: no side to replay onto
+    git(tree, "reset", "-q", "--hard", "feature/0.5.0")
+    assert run(root, "clean", TREE).returncode == 0
+    assert run(root, "new", "r", "--kind", "bug").returncode == 0
+    bug, ledger = root / "worktrees/r/0.5.0a-bug", "specs/bugs/BUGS.jsonl"
+    commit(repo, ledger, '{"id": "a"}\n')
+    git(bug, "rebase", "-q", "feature/0.5.0")
+    commit(bug, ledger, '{"id": "a"}\n{"id": "b"}\n')
+    commit(repo, ledger, '{"id": "a"}\n{"id": "c"}\n')
+    run(root, "merge", "worktrees/r/0.5.0a-bug")
+    assert (bug / ledger).read_text() == '{"id": "a"}\n{"id": "c"}\n{"id": "b"}\n'
 
 
 def test_merge_lists_ignored_files_and_keeps_them_by_its_fix(root: Path) -> None:
@@ -123,7 +188,7 @@ def test_clean_removes_only_an_empty_worktree_of_ours(root: Path) -> None:
 
 
 def test_each_kind_allows_its_own_set_only() -> None:
-    """ADRs 0106, 0124: the allowed sets `merge` enforces, one row per kind boundary."""
+    """ADRs 0106, 0124, 0148 (7), 0153: the allowed sets `merge` enforces, one row per kind boundary."""
     spec = importlib.util.spec_from_file_location("kinds", SCRIPT.parent / "_worktree_kinds.py")
     assert spec and spec.loader
     kinds = importlib.util.module_from_spec(spec)
@@ -134,10 +199,13 @@ def test_each_kind_allows_its_own_set_only() -> None:
         ("impl", "specs/releases/0.5.0/TASKS.md"): False,
         ("impl", "specs/backlog/BACKLOG.json"): False,
         ("bug", "specs/bugs/BUGS.jsonl"): True,
+        ("bug", "specs/bugs/_archive/bugs_histo.jsonl"): True,
         ("bug", "specs/releases/0.5.0/rc-5/SPEC.md"): False,
         ("backlog", "specs/backlog/_archive/backlog_histo.jsonl"): True,
         ("backlog", "src/a.py"): False,
         ("release", "specs/memory/ARCHITECTURE.md"): True,
-        ("release", "specs/constitution.md"): False,
+        ("release", "specs/constitution.md"): True,
+        ("release", "specs/bugs/AGENTS.md"): True,
+        ("release", "specs/audits/x/FINDINGS.jsonl"): False,
     }
     assert {row: kinds.allows(*row) for row in rows} == rows

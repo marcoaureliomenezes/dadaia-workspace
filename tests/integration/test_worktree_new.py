@@ -69,21 +69,29 @@ def test_caps_refuse_naming_an_existing_worktree(root: Path) -> None:
     for _ in range(5):
         assert _run(root, "new", "r", "--kind", "impl").returncode == 0
     sixth = _run(root, "new", "r", "--kind", "impl")
-    assert sixth.returncode == 1
-    (fix,) = _fixes(sixth)
-    assert "worktree.py merge" in fix and "0.5.0a-impl" in fix
+    assert sixth.returncode == 1  # a commit-less worktree's exit is clean (ADR 0128)
+    assert _fixes(sixth)[0].endswith(f"worktree.py clean {root}/worktrees/r/0.5.0a-impl")
+    tree = root / "worktrees/r/0.5.0a-impl"
+    (tree / "x.py").write_text("")
+    _git(tree, "add", "x.py")
+    _git(tree, "commit", "-qm", "x")
+    assert _fixes(_run(root, "new", "r", "--kind", "impl"))[0].endswith(f"merge {tree}")
     assert _run(root, "new", "r", "--kind", "release").returncode == 0
     second_release = _run(root, "new", "r", "--kind", "release")
     assert second_release.returncode == 1
     assert "0.5.0f-release" in _fixes(second_release)[0]
 
 
-def test_letters_past_z_refuse(root: Path) -> None:
-    repo = root / "repos/r"
-    for letter in "abcdefghijklmnopqrstuvwxyz":
+def test_letters_past_z_refuse_naming_a_worktree_exit(root: Path) -> None:
+    repo, tree = root / "repos/r", root / "worktrees/r/0.5.0a-bug"
+    assert _run(root, "new", "r", "--kind", "bug").returncode == 0
+    (tree / "x.py").write_text("")
+    _git(tree, "add", "x.py")
+    _git(tree, "commit", "-qm", "x")
+    for letter in "bcdefghijklmnopqrstuvwxyz":
         _git(repo, "branch", f"wt/0.5.0{letter}-bug", "feature/0.5.0")
     result = _run(root, "new", "r", "--kind", "bug")
-    assert result.returncode == 1 and len(_fixes(result)) == 1
+    assert result.returncode == 1 and _fixes(result)[0].endswith(f"merge {tree}")
 
 
 def test_symlinked_worktrees_component_refuses(

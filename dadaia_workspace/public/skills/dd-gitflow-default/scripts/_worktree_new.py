@@ -10,7 +10,7 @@ from pathlib import Path
 sys.path.append(str(Path(__file__).resolve().parents[2] / "dd-release-implementation" / "scripts"))
 
 from _release_schema import candidate_number, extract_status  # noqa: E402
-from _worktree_git import flow_for, git, work_version  # noqa: E402
+from _worktree_git import flow_for, git, rows, work_version  # noqa: E402
 from _worktree_git import ours as our_trees  # noqa: E402
 from _worktree_kinds import CAPS, LOCK, SCRIPT, UNION, Refusal  # noqa: E402
 
@@ -19,6 +19,11 @@ def _refuse_symlink(root: Path, repo_name: str) -> None:
     for part in (root / "worktrees", root / "worktrees" / repo_name):
         if part.is_symlink():
             raise Refusal(f"{part} is a symlink", f"rm {part}")
+
+
+def _exit(root: Path, path: str) -> str:
+    """The worktree's one exit, `clean` or `merge`, as `rows()` rules it (ADR 0128)."""
+    return next(str(row["exit"]) for row in rows(root) if row["path"] == path)
 
 
 def new(root: Path, repo_name: str, kind: str) -> Path:
@@ -41,8 +46,7 @@ def new(root: Path, repo_name: str, kind: str) -> Path:
     same = [row for row in ours if row["kind"] == kind]
     if kind in CAPS and len(same) >= CAPS[kind]:
         raise Refusal(
-            f"{kind} cap {CAPS[kind]} reached for {version}",
-            f"python3 {SCRIPT} merge {same[0]['path']}",
+            f"{kind} cap {CAPS[kind]} reached for {version}", _exit(root, same[0]["path"])
         )
     taken = {
         b[len(f"wt/{version}")]
@@ -52,8 +56,10 @@ def new(root: Path, repo_name: str, kind: str) -> Path:
     }
     free = [letter for letter in string.ascii_lowercase if letter not in taken]
     if not free:
-        target = ours[0]["path"] if ours else f"<a worktrees/{repo_name}/{version}?-* tree>"
-        raise Refusal(f"letters a-z exhausted for {version}", f"python3 {SCRIPT} clean {target}")
+        target = f"python3 {SCRIPT} clean <a worktrees/{repo_name}/{version}?-* tree>"
+        raise Refusal(
+            f"letters a-z exhausted for {version}", _exit(root, ours[0]["path"]) if ours else target
+        )
     name = f"{version}{free[0]}-{kind}"
     tree, branch = root / "worktrees" / repo_name / name, f"wt/{name}"
     git(repo, "worktree", "add", "-q", "-b", branch, str(tree), work)
