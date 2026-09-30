@@ -52,7 +52,7 @@ path or entity as it appears in an installed workspace.
 | `.dadaia/handoff/AGENTS.md` | the handoff lane | emission, schema, ack-on-consume | 4096 | 1757 |
 | `.dadaia/tmp/AGENTS.md` | the TTL scratch lane | what may be written there and for how long | 4096 | 1233 |
 | `.dadaia/states/AGENTS.md` | CLI-owned state files | who writes them and by which verb | 4096 | 1397 |
-| `worktrees/AGENTS.md` | the canonical worktrees | kinds, the merge ritual, one venv, hygiene | 4096 | 3831 |
+| `worktrees/AGENTS.md` | the canonical worktrees | kinds, the merge ritual, one venv, hygiene | 4096 | 3927 |
 | `repos/<slug>/AGENTS.md` | a repo working tree | clean-tree rule, cache redirection | 4096 | 3342 |
 | `tests/AGENTS.md` | a repo's test tree | admission, intent, size tiers | 4096 | 2694 |
 

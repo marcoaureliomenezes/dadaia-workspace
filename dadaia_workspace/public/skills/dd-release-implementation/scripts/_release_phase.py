@@ -42,13 +42,13 @@ def _refuse_unapproved_trio(live: Live) -> Path:
         document = candidate / name
         if not document.is_file():
             raise Refusal(
-                f"release {live.release_id} has no {document.relative_to(live.release_dir)}",
+                f"release {live.release_id} has no {document.relative_to(live.release_dir).as_posix()}",
                 f"write {document.resolve()} carrying '**Status:** {APPROVED}'",
             )
         status = extract_status(document.read_text(encoding="utf-8"))
         if status != APPROVED:
             raise Refusal(
-                f"{document.relative_to(live.release_dir)} of release {live.release_id} "
+                f"{document.relative_to(live.release_dir).as_posix()} of release {live.release_id} "
                 f"carries status {status!r} — SPEC, PLAN "
                 f"and TASKS must all be '**Status:** {APPROVED}' to enter IMPLEMENTATION",
                 f"set '**Status:** {APPROVED}' in {document.resolve()}",

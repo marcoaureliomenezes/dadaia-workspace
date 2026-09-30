@@ -9,7 +9,7 @@ a skill points here, never restates them.
 
 ## 1. Kinds
 
-- `impl` — one release task.
+- `impl` — one release task, or the closure's derived-docs step (`MEMORY-UPDATE` step 7).
 - `bug` — one fix.
 - `backlog` — demand and decision records.
 - `release` — one candidate, from definition to closure.
@@ -21,7 +21,7 @@ a skill points here, never restates them.
 1. The main thread opens `WT new <repo> --kind <kind>` only as these allow (an `impl` needs the Approved trio):
    - `impl` and `bug` worktrees run in parallel only where the PLAN's Parallel schedule puts tasks in one step with disjoint `W:`; the bugs a release fixes are tasks of its PLAN.
    - An Arm B fix no PLAN names is the only open `bug` worktree, opened only when disjoint from the open tasks' `W:`; otherwise it waits.
-   - Nothing else opens on the main thread's initiative, except the serial `release` worktree and the registration, backlog or resolve tail of one act.
+   - Nothing else opens on the main thread's initiative, except the serial `release` worktree, the closure's derived-docs `impl` and the registration, backlog or resolve tail of one act.
 2. Work happens inside the worktree path only; `repos/<repo>` is never edited for the task.
 3. Commit per the commit shapes of `dd-gitflow-default`; a dirty tree is refused at merge.
 4. Run the kind's checks inside the worktree: the ledger script's `check`, and for `impl`/`bug` the tests.
