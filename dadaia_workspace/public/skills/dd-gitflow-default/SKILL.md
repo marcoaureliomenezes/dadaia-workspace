@@ -47,8 +47,6 @@ The branch contract by role; the names are `specs/constitution.md`'s `gitflow:` 
 
 ## 3a. Commit shapes — each write alone, in its own shape
 
-| # | Write | Staged set | Message |
-|---|---|---|---|
 Each row lands in the worktree kind whose allowed set holds it (`worktrees/AGENTS.md`).
 
 | # | Kind | Write | Staged set | Message |
