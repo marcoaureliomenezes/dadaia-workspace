@@ -38,6 +38,7 @@ from importlib import metadata
 from pathlib import Path
 
 import pytest
+from packaging.requirements import Requirement
 
 from dadaia_workspace.core import workspace_layout
 from dadaia_workspace.core.platform import PLATFORM
@@ -235,15 +236,12 @@ def _repack_dependency_closure(wheel: Path, dest: Path) -> Path:
     seen: set[str] = set()
     stack = list(requires)
     while stack:
-        requirement = stack.pop()
-        if "extra ==" in requirement:
-            continue
-        name = re.split(r"[<>=!~;\[\s(]", requirement.strip())[0]
-        key = name.lower().replace("_", "-")
-        if not name or key in seen:
-            continue
+        requirement = Requirement(stack.pop())
+        key = requirement.name.lower().replace("_", "-")
+        if key in seen or (requirement.marker and not requirement.marker.evaluate({"extra": ""})):
+            continue  # an optional extra or another platform's dependency
         seen.add(key)
-        dist = metadata.distribution(name)
+        dist = metadata.distribution(requirement.name)
         stack.extend(dist.requires or [])
         repack_installed_wheel(dest, dist=dist)
     return dest
