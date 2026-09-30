@@ -137,10 +137,10 @@ F019–F051 share the destination of the bug each cites. F090–F112 share the d
   - `public install` projects `worktrees/AGENTS.md`, the one home of the worktree rules (ADR 0146 (4)). The root map gains the `worktrees/` lines in §3, §4 and §5.
   - Only `worktrees/AGENTS.md` and `dd-gitflow-default` name `scripts/worktree.py`; the seven skills carry one pointer line each to `worktrees/AGENTS.md` (contract test).
   - The §3a shape table becomes the kinds' allowed sets. A bug worktree holds one fix commit (code, test, resolve lines, RED quoted), or, for a bug a task fixed, one resolve commit (0148 (2)); §3a row 4 is rewritten to it. `dd-bug-resolution`'s separate RED commit is deleted (F053–F057, F008).
-  - HTML reports live in `.dadaia/reports/<ctx>/` in every law file, persona and template (0147 (1)); `.dadaia/mcps/` is an operator zone (0148 (6)); the zone registry agrees (`tests/contract/test_zone_registry.py`).
-  - No law or recipe calls a `repos/<r>/specs/` path ADDITIVE (0124), measured by `tests/contract/test_law_states_what_the_code_does.py`.
+  - HTML reports live in `.dadaia/reports/<ctx>/`, an OUTPUT zone never reaped that the gate allows (0147 (1)); `.dadaia/mcps/` is an operator zone (0148 (6)); `tests/contract/test_zone_registry.py` passes and `git grep -nE 'reports/<agent>|reports/dd-' -- dadaia_workspace/public` prints nothing.
+  - No law or recipe calls a `repos/<r>/specs/` path ADDITIVE (0124); audits are written directly by a bound session. Measured by `tests/contract/test_law_states_what_the_code_does.py`.
   - `CONTEXT.md` gains **Worktree**, **Worktree kind** and **Zone**, and its **Scope** and **Bind** entries are rewritten.
-  - `dd-release-definition` §5 and `specs/releases/AGENTS.md` §3 state ADR 0141: one impl worktree per task, true `blocked by:` edges, exact `W:`, and a PLAN "Parallel schedule" (steps, width, critical path). `release.py check` refuses a PLAN without it, and two tasks in one step whose `W:` overlap outside the union/replay files.
+  - `dd-release-definition` §5 and `specs/releases/AGENTS.md` §3 state ADR 0141: one impl worktree per task, true `blocked by:` edges, exact `W:`, and a PLAN "Parallel schedule" (steps, width, critical path). `release.py check` refuses a PLAN without it, and two tasks in one step whose `W:` overlap outside the union/replay files and the derived `behavior-map.json` (0148 (5)).
 - AC1.14 Bootstrap (0140): once the `new` and `merge` tasks land, every later task of this candidate is made in a worktree. Every `git -C repos/dadaia-workspace reflog feature/0.5.0` entry after that commit reads `merge wt/…: Fast-forward`, except T-050-106 and its two CI test fixes, the by-hand bootstrap of ADR 0145 that made `worktrees/` canon first.
 - AC1.15 Migration, after AC1.14, in ADR 0131's order:
   - `git -C repos/<r> worktree list --porcelain` names only `worktrees/<r>/<name>`. The three worktrees in another session's `/tmp` are excepted until the operator confirms.
@@ -149,7 +149,7 @@ F019–F051 share the destination of the bug each cites. F090–F112 share the d
 - AC1.16 Closure (0140):
   - The main-thread session is bound: `context show --json` names `dadaia-workspace`.
   - The memory pass, the `_RELEASE.json` log and the ledger dispositions each land through their kind's worktree; audit dispositions land directly (0124).
-  - Closure's release worktree is the one that writes candidate 6's SPEC (cap 1). It also re-syncs the `specs/*/AGENTS.md` copies from `public/scaffold/` after T-050-103 (0148 (7)) and repairs ADR 0027's title in place (F084); `dadaia doctor --context dadaia-workspace` then shows no template drift.
+  - Closure's release worktree is the one that writes candidate 6's SPEC (cap 1). It also copies `public/scaffold/*/AGENTS.md` over the `specs/*/AGENTS.md` copies inside that worktree after T-050-103 (0148 (7); the doctor only measures) and repairs ADR 0027's title in place (F084); `dadaia doctor --context dadaia-workspace` then shows no template drift.
   - `release.py check` passes.
   - Candidate 6's SPEC is written in `worktrees/dadaia-workspace/0.5.0<letter>-release` and lands by `worktree.py merge`; its reflog line proves it.
 
