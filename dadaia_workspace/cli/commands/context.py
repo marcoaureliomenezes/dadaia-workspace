@@ -347,24 +347,11 @@ def dead(
         fail(e)
 
 
-@app.command(
-    epilog="Examples: .dadaia/.venv/bin/dadaia context bind my-ctx | eval $(.dadaia/.venv/bin/dadaia context bind my-ctx --print-env)"
-)
-def bind(
-    name: str = typer.Argument(..., help="Context name to bind to"),
-    print_env: bool = typer.Option(
-        False,
-        "--print-env",
-        help=(
-            "Emit eval-compatible 'export DADAIA_CONTEXT/DADAIA_SESSION_ID' lines for "
-            "`eval $(.dadaia/.venv/bin/dadaia context bind ... --print-env)`. Default off — the binding is "
-            "persisted in the session record either way."
-        ),
-    ),
-) -> None:
+@app.command(epilog="Examples: .dadaia/.venv/bin/dadaia context bind my-ctx")
+def bind(name: str = typer.Argument(..., help="Context name to bind to")) -> None:
     """Bind this shell session to a context.
 
-    Run: dadaia context bind <name> [--print-env]
+    Run: dadaia context bind <name>
 
     The bind sets this session's write scope to the context's main repo plus its
     associated repos.
@@ -398,11 +385,6 @@ def bind(
             now=_now_iso(),
         ),
     )
-
-    if print_env:
-        for line in session_store.binding_env_lines(name, session_id):
-            print(line)
-        return
     console.print(f"[green]✓[/green] Bound to '[bold]{name}[/bold]' (session id: {session_id})")
 
 

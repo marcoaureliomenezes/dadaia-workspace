@@ -163,23 +163,29 @@ def test_absent_init_or_install_zone_is_missing_and_fixable(tmp_path: Path) -> N
 
 def test_closed_canon_zones_flag_every_non_canon_entry_and_fix_removes_it(tmp_path: Path) -> None:
     """A non-canon entry in a closed-canon zone is slop (the retired ``states/ctx_locks`` and
-    ``sessions/runtime`` have no code of their own); fix() leaves a fully canonical scan."""
+    ``sessions/runtime`` have no code of their own), and so is an unreadable session record
+    (corrupt-session-record-never-collected, AC1.4); fix() holds them and leaves a fully
+    canonical scan."""
     _init_workspace(tmp_path)
     dadaia = tmp_path / ".dadaia"
     (dadaia / _STATE_ZONE.name / "ctx_locks").mkdir()
     (dadaia / _STATE_ZONE.name / "ctx_locks" / "stale.lock.json").write_text("{}", "utf-8")
     sessions = next(z for z in zones_with_canon() if z.cls is ZoneClass.PROTECTED)
     (dadaia / sessions.name / "runtime").mkdir(parents=True)
+    (dadaia / sessions.name / "corrupt.json").write_text("{", "utf-8")  # canon name, unreadable
     for zone in zones_with_canon():
         assert zone.canon is not None
         (dadaia / zone.name).mkdir(exist_ok=True)
         (dadaia / zone.name / "stray.bin").write_bytes(b"")
-        (dadaia / zone.name / sorted(zone.canon)[0].replace("*", "sample")).write_text("", "utf-8")
+        (dadaia / zone.name / sorted(zone.canon)[0].replace("*", "sample")).write_text(
+            "{}", "utf-8"
+        )
 
     found = _by_path(_make_doctor(tmp_path).scan())
 
     assert found[f"{_STATE_ZONE.name}/ctx_locks"].code == f"WS-{_STATE_ZONE.name}-slop"
     assert found[f"{sessions.name}/runtime"].code == f"WS-{sessions.name}-slop"
+    assert found[f"{sessions.name}/corrupt.json"].code == f"WS-{sessions.name}-slop"  # AC1.4
     assert found[f"{_STATE_ZONE.name}/spec_contexts.json"].verdict is FindingVerdict.CANON
     for zone in zones_with_canon():
         assert zone.canon is not None

@@ -38,12 +38,17 @@ def _resolve_context() -> str:
 
 
 def _emit(payload: str) -> None:
-    if os.environ.get("DADAIA_HOOK_OUTPUT", "") in ("codex-json", "json"):
-        event = os.environ.get("DADAIA_HOOK_EVENT", "UserPromptSubmit")
-        out = {"hookEventName": event, "additionalContext": payload}
-        print(json.dumps({"hookSpecificOutput": out}))
-    else:
-        sys.stdout.write(payload)
+    """*payload* in the envelope ``DADAIA_HOOK_OUTPUT`` names — each vendor's documented
+    context key (Cursor and Copilot read a top-level one at sessionStart) — else plain text."""
+    event = os.environ.get("DADAIA_HOOK_EVENT", "UserPromptSubmit")
+    native: dict[str, object] = {
+        "hookSpecificOutput": {"hookEventName": event, "additionalContext": payload}
+    }
+    envelopes: dict[str, dict[str, object]] = {"codex-json": native, "json": native}
+    envelopes |= {"cursor-json": {"additional_context": payload}}
+    envelopes |= {"copilot-json": {"additionalContext": payload}}
+    out = envelopes.get(os.environ.get("DADAIA_HOOK_OUTPUT", ""))
+    sys.stdout.write(payload if out is None else json.dumps(out) + "\n")
 
 
 def _digest_catalog(raw: str) -> str:
@@ -71,11 +76,14 @@ def _tech_stack_section(raw: str) -> str:
 
 
 def _build_memory(specs_dir: Path) -> str:
-    """The tech-stack section + the catalog digest (else ``index.md``)."""
+    """``constitution.md`` + the tech-stack section + the catalog digest (else ``index.md``)
+    — one hook for every harness, so every harness gets the constitution (ADR 0103)."""
     memory_dir = specs_dir / "memory"
     if not memory_dir.is_dir():
         return ""
-    parts = ["", "=== workspace memory (tech + catalog) ==="]
+    parts = ["", "=== workspace memory (constitution + tech + catalog) ==="]
+    with contextlib.suppress(OSError):
+        parts.append((specs_dir / "constitution.md").read_text(encoding="utf-8").strip())
     architecture = memory_dir / "ARCHITECTURE.md"
     if architecture.is_file():
         with contextlib.suppress(OSError):
@@ -175,7 +183,7 @@ def main() -> int:
     if workspace is None:
         _emit("")
         return 0
-    own = _common.resolve_session_id() or None
+    own = invocation.resolve_session_id(os.environ) or None
     if own:  # the operator's prompt is activity too: renew the liveness clock
         session_store.touch_last_seen_at(workspace, own, now=datetime.now(tz=UTC).isoformat())
     session_id = own or "workspace"
@@ -189,11 +197,13 @@ def main() -> int:
         with contextlib.suppress(OSError):
             tmp_dir.mkdir(parents=True, exist_ok=True)
             compact_marker.write_text("", encoding="utf-8")
-    elif payload.get("hook_event_name") == "SessionStart" and payload.get("source") in (
-        "compact",
-        "clear",
-    ):
-        event = "session_restart"
+    elif "SessionStart" in (os.environ.get("DADAIA_HOOK_EVENT"), payload.get("hook_event_name")):
+        # compact/clear re-enter this session; a resume continues it; anything else is new
+        source = payload.get("source")
+        if source in ("compact", "clear"):
+            event = "session_restart"
+        elif source != "resume":
+            event = "session_start"
 
     def newer(stamp: float | None) -> bool:
         return sentinel_mtime is not None and stamp is not None and stamp > sentinel_mtime

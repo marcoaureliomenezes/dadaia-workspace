@@ -48,21 +48,35 @@ def resolve_workspace_root(cwd: Path | None = None) -> Path:
     own = own_workspace_root() if cwd is None else None
     if own is not None:
         return own
-    start: Path = (cwd or Path.cwd()).resolve()
-    fenced = _fenced()
+    start = (cwd or Path.cwd()).resolve()
+    root, skipped = _walk(start, _fenced())
+    if root is None:
+        raise not_initialized(start, skipped)
+    return root
 
+
+def acting_root(path: Path) -> Path | None:
+    """The unfenced workspace holding *path* — where a process may act."""
+    return _walk(path.resolve(), _fenced())[0]
+
+
+def owning_root(path: Path) -> Path | None:
+    """The workspace holding *path*, fenced or not — the gate's question "which root
+    protects this target" alone: the fence stops a process ACTING on a root, never the
+    protection of that root (bug fenced-roots-env-disables-the-gate)."""
+    return _walk(path.resolve(), frozenset())[0]
+
+
+def _walk(start: Path, fenced: frozenset[Path]) -> tuple[Path | None, list[Path]]:
+    """The first unfenced sentinel-holding ancestor of *start*, and every skipped partial
+    ``.dadaia/`` (a sub-repo or partial init)."""
     skipped: list[Path] = []
-
-    for candidate in [start, *start.parents]:
-        dadaia_dir = candidate / ".dadaia"
-        if dadaia_dir.exists() and candidate not in fenced:
-            sentinel = candidate / _SENTINEL
-            if sentinel.exists():
-                return candidate.resolve()
-            # Has .dadaia/ but not the sentinel — sub-repo or partial init.
+    for candidate in (start, *start.parents):
+        if (candidate / ".dadaia").exists() and candidate not in fenced:
+            if (candidate / _SENTINEL).exists():
+                return candidate, skipped
             skipped.append(candidate)
-
-    raise not_initialized(start, skipped)
+    return None, skipped
 
 
 def own_workspace_root() -> Path | None:

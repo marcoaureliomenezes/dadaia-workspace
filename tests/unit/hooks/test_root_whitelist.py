@@ -18,6 +18,7 @@ below as a named parametrized row, including the W1-6 first-path-component block
 
 from __future__ import annotations
 
+import os
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any
@@ -25,6 +26,7 @@ from typing import Any
 import pytest
 
 from dadaia_workspace.core.workspace_layout import DADAIAIGNORE
+from dadaia_workspace.core.workspace_resolver import FENCE_ENV
 from dadaia_workspace.infrastructure.git_subprocess import GitSubprocessClient
 from tests.fixtures.harness_env import claude_hook_env, run_hook_subprocess
 from tests.fixtures.stores import context_store
@@ -96,13 +98,21 @@ def test_law_declared_root_files_are_canon_for_the_hook_and_the_doctor(
             lambda ws: ws / ".opencode" / "agents" / "foo.md",
             ".opencode",
         ),
+        ("AC1.3-a-fenced-root-stays-protected", lambda ws: ws / "junk.txt", "junk.txt"),
     ],
 )
 def test_block_table(
-    tmp_path: Path, name: str, target_fn: Callable[[Path], Path], reason_fragment: str
+    tmp_path: Path,
+    name: str,
+    target_fn: Callable[[Path], Path],
+    reason_fragment: str,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """sa-gate-allows-root-entries-the-reaper-moves#E1: a new root entry is blocked."""
+    """sa-gate-allows-root-entries-the-reaper-moves#E1: a new root entry is blocked, in a
+    fenced root too (fenced-roots-env-disables-the-gate)."""
     ws = _ws(tmp_path)
+    if name.startswith("AC1.3"):  # the fence says "never act on", never "nothing protects"
+        monkeypatch.setenv(FENCE_ENV, os.pathsep.join((os.environ[FENCE_ENV], str(ws))))
     target = target_fn(ws)
     _out, block = _run(tmp_path, {"tool_name": "Write", "tool_input": {"file_path": str(target)}})
     assert block is not None

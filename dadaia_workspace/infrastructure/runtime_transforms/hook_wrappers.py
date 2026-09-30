@@ -43,6 +43,12 @@ class HookLane:
     decides: bool = False
     timeout: int = SESSION_TIMEOUT_S
 
+    @property
+    def speaks(self) -> bool:
+        """A lane with a ``DADAIA_HOOK_OUTPUT`` answers in its vendor's own envelope: its
+        stdout is that vendor's context channel, never redirected."""
+        return any(key == "DADAIA_HOOK_OUTPUT" for key, _ in self.env)
+
 
 @dataclass(frozen=True)
 class HookFileSpec:
@@ -98,6 +104,7 @@ _POST = HookLane("post-gate", 'dadaia_workspace.hooks.sdd_post_gate "$@"', timeo
 _CTX = HookLane("ctx-inject", 'dadaia_workspace.hooks.ctx_inject "$@"')
 _CODEX_OUT = ("DADAIA_HOOK_OUTPUT", "codex-json")
 _KIMI = ("DADAIA_RUNTIME", "kimi-code")
+_START = ("DADAIA_HOOK_EVENT", "SessionStart")
 _REAP = ("SessionStart", "doctor-expired", "startup|resume")
 
 #: One row per :class:`HookFormat`, total by construction (ADR 0054: every pre-tool event
@@ -156,7 +163,7 @@ HOOK_DIALECTS: dict[HookFormat, HookDialect] = {
             HookLane(
                 "ctx-inject-session-start",
                 _CTX.argv,
-                (_CODEX_OUT, ("DADAIA_HOOK_EVENT", "SessionStart")),
+                (_CODEX_OUT, _START),
             ),
             _REAPER,
         ),
@@ -175,11 +182,15 @@ HOOK_DIALECTS: dict[HookFormat, HookDialect] = {
         nested=True,
     ),
     HookFormat.CURSOR_HOOKS: HookDialect(
-        lanes=(_GATE, _REAPER),
+        lanes=(_GATE, replace(_CTX, env=(("DADAIA_HOOK_OUTPUT", "cursor-json"), _START)), _REAPER),
         files=(
             HookFileSpec(
                 "hooks.json",
-                (("preToolUse", "pre-gate", None), ("sessionStart", "doctor-expired", None)),
+                (
+                    ("preToolUse", "pre-gate", None),
+                    ("sessionStart", "ctx-inject", None),
+                    ("sessionStart", "doctor-expired", None),
+                ),
             ),
         ),
         typed=False,
@@ -203,10 +214,13 @@ HOOK_DIALECTS: dict[HookFormat, HookDialect] = {
         bare=True,
     ),
     HookFormat.COPILOT_HOOKS: HookDialect(
-        lanes=(_GATE, _REAPER),
+        lanes=(_GATE, replace(_CTX, env=(("DADAIA_HOOK_OUTPUT", "copilot-json"), _START)), _REAPER),
         files=(
             HookFileSpec("hooks/pre-tool-use.json", (("preToolUse", "pre-gate", None),)),
-            HookFileSpec("hooks/session-start.json", (("sessionStart", "doctor-expired", None),)),
+            HookFileSpec(
+                "hooks/session-start.json",
+                (("sessionStart", "ctx-inject", None), ("sessionStart", "doctor-expired", None)),
+            ),
         ),
         entry_key="bash",
         version=1,
@@ -274,7 +288,7 @@ def hook_wrapper_contents(record: HarnessRecord) -> dict[str, str]:
                 f"_envelope=$({run}) || exit 0\n"
                 f"printf '%s' \"$_envelope\" | \"$PYTHON_BIN\" -B -c '{_translator(answer)}'\n"
             )
-        elif answer is not None and not answer.exit_code:
+        elif answer is not None and not answer.exit_code and not lane.speaks:
             body = f"exec {run} >&2\n"  # stdout is this harness's decision channel
         else:
             body = f"exec {run}\n"

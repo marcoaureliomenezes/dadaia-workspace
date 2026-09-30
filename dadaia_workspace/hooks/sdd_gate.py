@@ -7,24 +7,23 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
-from dadaia_workspace.core import invocation
+from dadaia_workspace.core import invocation, workspace_resolver
 from dadaia_workspace.features.spec_context import gate_policy
 from dadaia_workspace.hooks import _common
 from dadaia_workspace.infrastructure.json_install_ledger_store import JsonInstallLedgerStore
 
 
-def _evaluate_target(
-    payload: dict[str, object], workspace: Path | None, raw_path: str
-) -> tuple[gate_policy.Decision, str]:
+def _evaluate_target(workspace: Path | None, raw_path: str) -> tuple[gate_policy.Decision, str]:
     """``(ALLOW, "")`` or ``(BLOCK, reason)`` for one target."""
     fpath = Path(raw_path)
     if not fpath.is_absolute():
         fpath = (workspace or Path.cwd()) / fpath
-    # target-first root: a nested sandbox under the cwd never shadows the root owning fpath
-    inv = invocation.resolve(target_path=fpath, env=os.environ, cwd=Path.cwd())
-    effective_workspace = inv.workspace_root or workspace
+    # the root owning fpath, fenced or not: the fence never unprotects a root
+    effective_workspace = workspace_resolver.owning_root(fpath)
     if effective_workspace is None:
         return gate_policy.Decision.ALLOW, ""  # fail-open: no root owns the target
+    session_id = invocation.resolve_session_id(os.environ) or None
+    bind = invocation.resolve_bind(effective_workspace, session_id, os.environ)
 
     try:
         rel_path = fpath.resolve().relative_to(effective_workspace.resolve()).as_posix()
@@ -43,9 +42,9 @@ def _evaluate_target(
         zone=zone,
         repo=repo,
         owner=invocation.context_name_for_repo_slug(effective_workspace, repo) if repo else None,
-        context=inv.bind.context_name,
-        repos=inv.bind.repos,
-        has_id=inv.session_id is not None,
+        context=bind.context_name,
+        repos=bind.repos,
+        has_id=session_id is not None,
     )
 
 
@@ -60,7 +59,7 @@ def evaluate_payload(payload: dict[str, object]) -> str | None:
     # the cwd root only anchors a relative target
     workspace = invocation.resolve(env=os.environ, cwd=Path.cwd()).workspace_root
     for raw_path in raw_paths:
-        decision, reason = _evaluate_target(payload, workspace, raw_path)
+        decision, reason = _evaluate_target(workspace, raw_path)
         if decision == gate_policy.Decision.BLOCK:
             return reason
     return None

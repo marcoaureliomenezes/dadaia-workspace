@@ -3,7 +3,8 @@
 Intent: CONTRACT — bind-driven injection (FR-W2-01/02, T-50-03), compaction re-entry
 (claude-compact-reinjection-missing, kimi-postcompact-omits-bound-context-bootstrap),
 the catalog digest (AC-W4-03), A19.1 (associated repos inject nothing), A30.1,
-bind-lost-silently-after-five-idle-minutes (a lost bind is told once).
+bind-lost-silently-after-five-idle-minutes (a lost bind is told once); AC1.2 Cursor/Copilot
+envelopes and new-session injection.
 """
 
 from __future__ import annotations
@@ -178,8 +179,18 @@ _A = "[alpha]"
             [("bind", "alpha"), ("prompt", _A), ("lose", ""), ("prompt", "")], id="lost-bind"
         ),
         pytest.param(
-            [("prompt", _UNBOUND), ("bind", "alpha"), ("prompt", _A), ("startup", "")],
-            id="sessionstart-other-source-follows-the-normal-flow",
+            [
+                ("prompt", _UNBOUND),
+                ("bind", "alpha"),
+                ("prompt", _A),
+                ("resume", ""),
+                ("startup", _A),
+            ],
+            id="sessionstart-resume-continues-a-new-session-injects",
+        ),
+        pytest.param(
+            [("bind", "alpha"), ("SessionStart", _A), ("SessionStart", _A)],
+            id="AC1.2-every-new-session-of-a-sessionstart-only-harness-injects",
         ),
     ],
 )
@@ -199,9 +210,9 @@ def test_injection_sequence(tmp_path: Path, steps: list[tuple[str, str]]) -> Non
             continue
         if kind == "prompt":
             out = _run(tmp_path, "s")
-        elif kind == "PostCompact":
+        elif kind in ("PostCompact", "SessionStart"):  # the lane's own env names the event
             out = _run(tmp_path, "s", event=kind)
-            assert marker.is_file()
+            assert marker.is_file() is (kind == "PostCompact")
         else:
             out = _run(tmp_path, "s", source=kind)
             assert not marker.exists()
@@ -300,18 +311,26 @@ def test_env_override_injects_context_memory(tmp_path: Path) -> None:
 
 
 @pytest.mark.parametrize(
-    ("extra", "event"),
+    ("extra", "event", "key"),
     [
-        ({"DADAIA_HOOK_OUTPUT": "codex-json", "DADAIA_HOOK_EVENT": "SessionStart"}, "SessionStart"),
-        ({"DADAIA_HOOK_OUTPUT": "json"}, "UserPromptSubmit"),
+        ({"DADAIA_HOOK_OUTPUT": "codex-json", "DADAIA_HOOK_EVENT": "SessionStart"}, "SessionStart", ""),
+        ({"DADAIA_HOOK_OUTPUT": "json"}, "UserPromptSubmit", ""),
+        ({"DADAIA_HOOK_OUTPUT": "cursor-json"}, None, "additional_context"),
+        ({"DADAIA_HOOK_OUTPUT": "copilot-json"}, None, "additionalContext"),
     ],
-    ids=["codex-json-envelope", "json-default-event"],
-)
-def test_output_contract_envelopes(tmp_path: Path, extra: dict[str, str], event: str) -> None:
+    ids=["codex-json-envelope", "json-default-event", "AC1.2-cursor-top-level", "AC1.2-copilot-top-level"],
+)  # fmt: skip
+def test_output_contract_envelopes(
+    tmp_path: Path, extra: dict[str, str], event: str | None, key: str
+) -> None:
+    """Each output mode is its vendor's documented envelope: the native ``hookSpecificOutput``,
+    or (Cursor, Copilot sessionStart) one top-level context key."""
     _ws(tmp_path, {"name": "ctx"})
-    envelope = json.loads(_run(tmp_path, "s", extra=extra))["hookSpecificOutput"]
-    assert envelope["hookEventName"] == event
-    assert envelope["additionalContext"].startswith(_UNBOUND)
+    out = json.loads(_run(tmp_path, "s", extra=extra))
+    envelope = out["hookSpecificOutput"] if event else out
+    assert list(out) == [key or "hookSpecificOutput"]
+    assert envelope.get("hookEventName") == event
+    assert envelope[key or "additionalContext"].startswith(_UNBOUND)
 
 
 def test_emissions_attach_the_derived_help_digest(tmp_path: Path) -> None:

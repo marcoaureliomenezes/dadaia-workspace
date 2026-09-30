@@ -59,9 +59,9 @@
         "claude": "UserPromptSubmit + SessionStart hooks via dadaia_workspace.hooks.ctx_inject; SessionStart also runs dadaia doctor --fix --expired-only --quiet (the reaper lane)",
         "codex": "SessionStart + UserPromptSubmit wrappers → dadaia_workspace.hooks.ctx_inject; SessionStart also runs the reaper lane",
         "kimi-code": "managed hook block → the same ctx_inject module",
-        "cursor": ".cursor/hooks.json sessionStart runs dadaia doctor --fix --expired-only --quiet (the reaper lane); the root AGENTS.md map is read natively",
+        "cursor": ".cursor/hooks.json sessionStart only → dadaia_workspace.hooks.ctx_inject (additional_context): no prompt-time injection, a bind shows at the next session start; sessionStart also runs dadaia doctor --fix --expired-only --quiet (the reaper lane)",
         "devin": ".devin/hooks.v1.json UserPromptSubmit + SessionStart → dadaia_workspace.hooks.ctx_inject; SessionStart also runs the same reaper lane",
-        "copilot": ".github/hooks/session-start.json sessionStart runs the same reaper lane; the root AGENTS.md map is read natively"
+        "copilot": ".github/hooks/session-start.json sessionStart only → dadaia_workspace.hooks.ctx_inject (additionalContext): no prompt-time injection, a bind shows at the next session start; sessionStart also runs the same reaper lane"
       }
     },
     {

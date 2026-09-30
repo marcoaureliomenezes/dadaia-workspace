@@ -8,7 +8,7 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
-from dadaia_workspace.core import invocation, workspace_layout
+from dadaia_workspace.core import invocation, workspace_layout, workspace_resolver
 from dadaia_workspace.core.cli_line import mkdir_line
 from dadaia_workspace.hooks import _common
 
@@ -23,25 +23,22 @@ def evaluate_payload(payload: dict[str, object]) -> str | None:
     if not raw_paths:
         return None
     try:
-        workspace = invocation.resolve(env=os.environ, cwd=Path.cwd()).workspace_root
+        anchor = invocation.resolve(env=os.environ, cwd=Path.cwd()).workspace_root
     except Exception:  # noqa: BLE001 — fail-open
         return None
-    if workspace is None:
-        return None
-    return next(filter(None, (_root_violation(workspace, p) for p in raw_paths)), None)
+    return next(filter(None, (_root_violation(anchor, p) for p in raw_paths)), None)
 
 
-def _root_violation(workspace: Path, raw_path: str) -> str | None:
-    """A block reason when ``workspace_layout.verdict`` judges *raw_path*'s entry slop — the
-    doctor's own answer; ``None`` for a path outside the workspace."""
+def _root_violation(anchor: Path | None, raw_path: str) -> str | None:
+    """A block reason when ``workspace_layout.verdict`` judges *raw_path*'s entry slop in
+    the root owning it, fenced or not — the doctor's own answer; ``None`` outside any."""
     fpath = Path(raw_path)
     if not fpath.is_absolute():
-        fpath = workspace / fpath
-    try:
-        ws = workspace.resolve()
-        rel = fpath.resolve().relative_to(ws)
-    except (OSError, ValueError):
+        fpath = (anchor or Path.cwd()) / fpath
+    ws = workspace_resolver.owning_root(fpath)  # an ancestor of the resolved fpath
+    if ws is None:
         return None
+    rel = fpath.resolve().relative_to(ws)
     if (
         not rel.parts
         or workspace_layout.verdict(rel.as_posix(), False, workspace_layout.operator_globs(ws)[0])

@@ -2,12 +2,13 @@
 
 Intent: CONTRACT — the install ledger decides PROTECTED (sa-gate-path-classes-diverge-from-the-law);
 scope is path-first and repos/<r>/ is merge-only (T-050-97, AC1.1); the gate never blocks on
-concurrency (NO-LOCKS doctrine, v0.1.76); a repo's own AGENTS.md is never law (v0.4.5 FR1).
+concurrency (NO-LOCKS doctrine, v0.1.76); a fenced root stays protected (AC1.3); a repo's own AGENTS.md is never law (v0.4.5 FR1).
 """
 
 from __future__ import annotations
 
 import json
+import os
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -15,6 +16,7 @@ from typing import Any
 import pytest
 
 from dadaia_workspace.core import session_store
+from dadaia_workspace.core.workspace_resolver import FENCE_ENV
 from tests.fixtures.harness_env import claude_hook_env, run_hook_subprocess
 
 
@@ -50,6 +52,8 @@ def _row(id: str, target: Any, want: str | None = None, **opts: Any) -> Any:
         _row("unparseable-target", None),
         _row("F3-non-grammar-slug-is-no-repo", "repos/a.b/x.py"),
         _row("protected-sessions-fails-closed", ".dadaia/sessions/runtime/a.ptr", "SEC-01"),
+        _row("AC1.3-a-fenced-root-stays-protected", ".dadaia/sessions/runtime/a.ptr",
+             "SEC-01", fence=True),
         _row("worktree-agents-md-is-never-law-A1.1", _WT_A + "AGENTS.md", records=_BOUND_A),
         _row("AC1.1-bound-repos-write-names-the-worktree", "repos/a/src/x.py",
              "worktree.py new a --kind impl", records=_BOUND_A),
@@ -108,6 +112,8 @@ def test_gate_verdict(tmp_path: Path, target: Any, want: str | None, opts: dict[
     env = claude_hook_env(ws, session_id="s")
     env.pop("DADAIA_CONTEXT", None)  # never inherit the operator's shell
     env.update(opts.get("env", {}))
+    if opts.get("fence"):  # the fence says "never act on", never "nothing protects"
+        env[FENCE_ENV] = os.pathsep.join(filter(None, (env.get(FENCE_ENV), str(ws))))
     payload = {"tool_name": tool, "tool_input": tool_input, "session_id": "s"}
     result = run_hook_subprocess("sdd_gate", payload, env, cwd=ws / opts.get("cwd", ""))
     assert result.returncode == 0, result.stderr

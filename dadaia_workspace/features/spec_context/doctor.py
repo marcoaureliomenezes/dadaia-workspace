@@ -301,8 +301,9 @@ class DoctorService:
         findings.extend(self._scan_root(globs))
         findings.extend(self._scan_dadaia_top(globs))
         findings.extend(self._scan_repo_trees())
+        unreadable = frozenset(session_store.unreadable_records(self._workspace_root))
         for zone in workspace_layout.zones_with_canon():
-            findings.extend(self._scan_canon_zone(zone, globs))
+            findings.extend(self._scan_canon_zone(zone, globs, unreadable))
         return (*findings, *self.scan_ttl())
 
     def scan_ttl(self) -> tuple[Finding, ...]:
@@ -453,10 +454,14 @@ class DoctorService:
                 )
         return out
 
-    def _scan_canon_zone(self, zone: Zone, globs: tuple[str, ...]) -> list[Finding]:
+    def _scan_canon_zone(
+        self, zone: Zone, globs: tuple[str, ...], unreadable: frozenset[Path]
+    ) -> list[Finding]:
         out: list[Finding] = []
         for entry in sweep.walk(self._dadaia / zone.name):
             verdict, detail = self._judged(entry, globs)
+            if entry in unreadable:  # the record owner's answer: a corrupt record is slop
+                verdict, detail = FindingVerdict.SLOP, "(unreadable session record)"
             out.append(self._finding(zone.name, self._dadaia, entry, verdict, detail))
         profile = JsonHarnessProfileStore.path(self._states)
         if profile.parent == self._dadaia / zone.name and not profile.exists():

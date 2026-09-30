@@ -69,13 +69,13 @@ clones every repo, installs the hook and makes the context ALIVE; `context bind`
 <!-- derived-from: context-management sha256:1871a6d846b2 -->
 
 ```bash
-eval "$(.dadaia/.venv/bin/dadaia context bind <your-repo> --print-env)"
+.dadaia/.venv/bin/dadaia context bind <your-repo>
 .dadaia/.venv/bin/dadaia context show <your-repo> --json
 ```
 
 `bind` writes one record, `.dadaia/sessions/<session-id>.json` (context, runtime, pid,
-`bound_at`), and acquires nothing; `--print-env` emits `DADAIA_CONTEXT` and
-`DADAIA_SESSION_ID` for the `eval $(…)` flow. The bind names the session's scope — the
+`bound_at`), and acquires nothing; the gate and the bind read the session id from the
+environment only. The bind names the session's scope — the
 context's main repo plus its associated repos — and the bound context's memory is
 injected once into the session. The bind is read from `DADAIA_CONTEXT` then the session
 record, never the cwd: sitting inside a repository is not a binding.

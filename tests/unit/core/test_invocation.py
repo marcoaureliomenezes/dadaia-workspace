@@ -108,14 +108,14 @@ def test_resolve_scenarios(tmp_path: Path, given: dict[str, Any], then: dict[str
     [
         pytest.param({"CLAUDE_CODE_SESSION_ID": "harness-env"}, "harness-env", id="harness_env"),
         pytest.param({"CODEX_SESSION_ID": "codex", "DADAIA_SESSION_ID": "explicit"}, "explicit", id="dadaia_override_first"),
-        pytest.param({}, "workspace", id="default_when_nothing_resolves"),
+        pytest.param({}, "", id="empty_when_nothing_resolves"),
         pytest.param({"CODEX_THREAD_ID": "thread-1"}, "thread-1", id="codex_thread_id_resolves_when_no_codex_session_id"),
         pytest.param({"CODEX_SESSION_ID": "sess-1", "CODEX_THREAD_ID": "thread-1"}, "sess-1", id="codex_session_id_preferred_over_codex_thread_id"),
     ],
 )  # fmt: skip
 def test_resolve_session_id_precedence(env: dict[str, str], expected: str) -> None:
-    """DADAIA_SESSION_ID > harness env > the default; env only — bind sees no payload (review F1)."""
-    assert invocation.resolve_session_id(env, default="workspace") == expected
+    """DADAIA_SESSION_ID > harness env > ""; env only — bind sees no payload (review F1)."""
+    assert invocation.resolve_session_id(env) == expected
 
 
 def test_context_name_for_repo_slug_maps_main_associated_and_legacy_repo_field(

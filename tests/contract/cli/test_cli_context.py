@@ -145,7 +145,7 @@ def test_context_bind_is_one_verb_with_one_argument(
 ) -> None:
     """0.4.7 FR4: `bind <ctx>` exits 0, persists the record, prints a human
     confirmation — never a shell export line. No --mode, no --release, no --force,
-    no --reason; the record carries neither `mode` nor `release`."""
+    no --reason, no --print-env (0148 (4)); the record carries neither `mode` nor `release`."""
     monkeypatch.setenv("DADAIA_SESSION_ID", "sess_t1")
     _register_alive_ctx(workspace)
     result = _runner.invoke(app, ["context", "bind", "myctx"])
@@ -158,8 +158,8 @@ def test_context_bind_is_one_verb_with_one_argument(
     assert "mode" not in record
     assert "release" not in record
 
-    for flag in ("--mode", "--release", "--force", "--reason"):
-        refused = _runner.invoke(app, ["context", "bind", "myctx", flag, "x"])
+    for flag in ("--mode", "--release", "--force", "--reason", "--print-env"):
+        refused = _runner.invoke(app, ["context", "bind", "myctx", flag])
         assert refused.exit_code != 0, f"{flag} must not exist any more"
 
 

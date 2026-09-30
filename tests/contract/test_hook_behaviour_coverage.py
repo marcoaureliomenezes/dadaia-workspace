@@ -132,8 +132,8 @@ _BEHAVIOUR_TABLE = {
     "codex": {"ctx_inject", "pre_gate", "reaper", "sdd_post_gate"},
     "kimi-code": {"ctx_inject", "pre_gate", "reaper", "sdd_post_gate"},
     "devin": {"ctx_inject", "pre_gate", "reaper"},
-    "cursor": {"pre_gate", "reaper"},
-    "copilot": {"pre_gate", "reaper"},
+    "cursor": {"ctx_inject", "pre_gate", "reaper"},
+    "copilot": {"ctx_inject", "pre_gate", "reaper"},
 }
 _BEHAVIOUR_RE = re.compile(r"-m dadaia_workspace(?:\.hooks\.([a-z_]+)| doctor)")
 

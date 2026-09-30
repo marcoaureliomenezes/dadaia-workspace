@@ -68,9 +68,8 @@ die with it. Specs, bind, memory, releases and backlog resolve only from the mai
 the context ALIVE — it never binds; on failure nothing is left behind. The name
 defaults to the main repo's slug. `bind` writes exactly one record,
 `.dadaia/sessions/<session-id>.json` (context, runtime, pid, `bound_at`), and acquires
-nothing; `.dadaia/.venv/bin/dadaia context bind <ctx> --print-env` emits
-`DADAIA_CONTEXT` and `DADAIA_SESSION_ID` for an `eval $(…)` shell, and a session
-without a harness-native id carries the binding in `DADAIA_CONTEXT`. The bind's scope
+nothing; the session id comes from the environment only, and a session without a
+harness-native id exports `DADAIA_SESSION_ID` before it binds. The bind's scope
 is the context's main repo plus its associated repos; a bound session's MUTATING
 file-tool write into a repo another context owns is refused with the bind that would
 allow it. After a bind, the ctx-inject hook injects the context header, `ARCHITECTURE.md`'s

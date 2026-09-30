@@ -17,10 +17,8 @@ from typing import Literal
 
 from dadaia_workspace.core import workspace_resolver
 from dadaia_workspace.core.cli_line import fix_line
-from dadaia_workspace.core.exceptions import WorkspaceNotInitializedError
 from dadaia_workspace.core.models.spec_context import CONTEXT_NAME_RE
 from dadaia_workspace.core.session_store import live_session
-from dadaia_workspace.core.workspace_resolver import resolve_workspace_root
 
 __all__ = [
     "CONTEXT_NAME_RE",
@@ -82,14 +80,14 @@ def sanitize_session_id(raw: str | None) -> str:
     return _SESSION_ID_STRIP.sub("", raw or "")
 
 
-def resolve_session_id(env: Mapping[str, str], *, default: str = "") -> str:
+def resolve_session_id(env: Mapping[str, str]) -> str:
     """The one session-id rule, sanitized: ``DADAIA_SESSION_ID``, then
-    :data:`HARNESS_SESSION_ID_ENV_VARS`, then *default*. Env only: ``context bind`` sees no
+    :data:`HARNESS_SESSION_ID_ENV_VARS`, else ``""``. Env only: ``context bind`` sees no
     hook payload, so a payload id would be an id no bind can ever record (ADR 0116)."""
     candidate = env.get("DADAIA_SESSION_ID") or next(
         filter(None, map(env.get, HARNESS_SESSION_ID_ENV_VARS)), ""
     )
-    return sanitize_session_id(candidate) or default
+    return sanitize_session_id(candidate)
 
 
 def _registry_contexts(workspace_root: Path) -> list[dict[str, object]]:
@@ -179,21 +177,11 @@ def scope(workspace_root: Path, path: Path) -> tuple[str | None, Zone]:
     return parts[1], "audit" if parts[2:4] == ("specs", "audits") else "repo"
 
 
-def _root_from(start: Path) -> Path | None:
-    try:
-        return resolve_workspace_root(start)
-    except WorkspaceNotInitializedError:
-        return None
-
-
 def _resolve_root(*, cwd: Path, target_path: Path | None) -> Path | None:
-    """The target's own location first, then the running CLI's own workspace, then cwd."""
-    if target_path is not None:
-        start = target_path if target_path.is_dir() else target_path.parent
-        root = _root_from(start)
-        if root is not None:
-            return root
-    return workspace_resolver.own_workspace_root() or _root_from(cwd)
+    """The target's own root, then the running CLI's own workspace, then the cwd's — every
+    rung fenced: an Invocation is where a process acts."""
+    owned = workspace_resolver.acting_root(target_path) if target_path is not None else None
+    return owned or workspace_resolver.own_workspace_root() or workspace_resolver.acting_root(cwd)
 
 
 def _live_session_context(workspace_root: Path, session_id: str | None) -> str | None:
