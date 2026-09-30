@@ -15,8 +15,8 @@ def context_store(states_dir: Path) -> JsonContextStore:
 
 
 def own_venv_workspace(root: Path) -> Path:
-    """A registry plus a venv whose `python` is this interpreter and whose `dadaia` drains
-    the pre-push pipe: a process on that `python` is owned by *root* (no install)."""
+    """A registry plus a venv whose `python` and `dadaia` are this environment's own: a
+    process on that `python` is owned by *root* (no install)."""
     tools = root / ".dadaia" / ".venv" / PLATFORM.venv_scripts_dir
     tools.mkdir(parents=True)
     (root / ".dadaia" / "states").mkdir()
@@ -25,7 +25,9 @@ def own_venv_workspace(root: Path) -> Path:
     (root / ".dadaia" / ".venv" / "pyvenv.cfg").write_text(
         f"home = {Path(sys.executable).resolve().parent}\n"
     )
-    return workspace_cli(root)
+    cli = f"dadaia{PLATFORM.venv_exe_suffix}"
+    (tools / cli).symlink_to(Path(sys.executable).parent / cli)
+    return root
 
 
 def workspace_cli(root: Path, *listed: dict[str, object]) -> Path:
