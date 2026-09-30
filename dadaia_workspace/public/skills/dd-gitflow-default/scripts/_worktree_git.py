@@ -9,10 +9,11 @@ import os
 import re
 import shlex
 import subprocess
+import sys
 import time
 from pathlib import Path
 
-from _worktree_kinds import _NAME_RE, LOCK, SCRIPT, Refusal
+from _worktree_kinds import _NAME_RE, SCRIPT, Refusal
 
 _TAG_RE = re.compile(r"^v?(\d+)\.(\d+)\.(\d+)$")
 
@@ -40,14 +41,21 @@ def find_root() -> Path:
 
 
 def cli(root: Path, *args: str) -> subprocess.CompletedProcess[str]:
-    """One read-only run of the workspace CLI — the owner of every package grammar."""
+    """One read-only run of the workspace CLI — the owner of every package grammar: the
+    venv's entry point, else the package the running interpreter carries (a sandbox)."""
     bins = (root / ".dadaia/.venv/bin/dadaia", root / ".dadaia/.venv/Scripts/dadaia.exe")
-    exe = next((b for b in bins if b.exists()), None)
-    if exe is None:
-        raise Refusal(
-            f"no workspace CLI under {root / '.dadaia/.venv'}", "uvx dadaia-workspace init"
-        )
-    return subprocess.run([str(exe), *args], cwd=root, env=_env(), capture_output=True, text=True)
+    exe = next(
+        ([str(b)] for b in bins if b.exists()), [sys.executable, "-m", "dadaia_workspace.cli.main"]
+    )
+    run = subprocess.run  # stdin closed: a CLI never waits on the caller's pipe
+    return run(
+        [*exe, *args],
+        cwd=root,
+        env=_env(),
+        stdin=subprocess.DEVNULL,
+        capture_output=True,
+        text=True,
+    )
 
 
 def doctor(root: Path) -> str:
@@ -58,11 +66,17 @@ def gitflows(root: Path) -> dict[str, dict[str, str]]:
     """Each registered repo's gitflow `{principal, integration, work}`, read by the one
     reader through `context list --json` (ADR 0144); a repo whose record has none is absent."""
     done = cli(root, "context", "list", "--json")
-    if done.returncode:
-        raise Refusal(f"context list failed: {done.stderr.strip()}", doctor(root))
+    try:
+        listed = json.loads(done.stdout) if not done.returncode else None
+    except ValueError:
+        listed = None
+    if not isinstance(listed, list):
+        raise Refusal(
+            f"context list failed: {done.stderr.strip() or done.stdout.strip()}", doctor(root)
+        )
     return {
         repo: row["gitflow"]
-        for row in json.loads(done.stdout)
+        for row in listed
         if row.get("gitflow")
         for repo in (row["main_repo"], *(a["slug"] for a in row["associated_repos"]))
     }
@@ -104,27 +118,29 @@ def _trees(repo: Path) -> list[dict[str, str]]:
 
 
 def ours(repo: Path) -> list[dict[str, str]]:
-    """Our `dadaia:`-locked worktrees of *repo*."""
+    """Our worktrees of *repo*: any tree on a canonical `wt/<M.m.p><l>-<kind>` branch, locked
+    or not — merge's own re-attach leaves one unlocked."""
     return [
-        {"path": t["worktree"], "kind": m["k"], "id": m["v"] + m["l"], "v": m["v"]}
+        {"path": t["worktree"], "kind": m["k"], "id": m["v"] + m["l"], "v": m["v"], "name": m[0]}
         for t in _trees(repo)
-        if t.get("locked", "").startswith(LOCK) and (m := _NAME_RE.match(Path(t["worktree"]).name))
+        if (m := _NAME_RE.match(t.get("branch", "").removeprefix("refs/heads/wt/")))
     ]
 
 
 def _row(repo: Path, path: str, state: str, age: float = 0.0, **facts: object) -> dict[str, object]:
     """One worktree: WARN past a day or off-canon; `fix` shown only when ready or orphan;
-    `exit`, the `merge` a hold names for every wt/* (ADR 0128)."""
-    merge = shlex.join(["python3", str(SCRIPT), "merge", path])
+    `exit`, the line a hold names — `clean` for an empty tree, else `merge` (ADR 0128)."""
+    verb = "clean" if state == "empty" else "merge"
+    line = shlex.join(["python3", str(SCRIPT), verb, path])
     return {"repo": repo.name, "path": path, "state": state, "age_hours": age, **facts,
-            "warn": state not in ("ready", "open") or age > 24,
-            "fix": merge if state in ("ready", "orphan") else "",
-            "exit": merge if state in ("ready", "open", "orphan") else ""}  # fmt: skip
+            "warn": state not in ("ready", "open", "empty") or age > 24,
+            "fix": line if state in ("ready", "orphan") else "",
+            "exit": line if state in ("ready", "open", "empty", "orphan") else ""}  # fmt: skip
 
 
 def rows(root: Path) -> list[dict[str, object]]:
     """Every worktree fact of every registered repo, read from git alone (ADR 0108):
-    ours `ready` (ahead, clean) or `open`, an `orphan` wt/* with no tree, a `foreign`
+    ours `ready` (ahead, clean), `open` (ahead, dirty) or `empty`, an `orphan` wt/* with no tree, a `foreign`
     worktree git registers (harness-native, hand-made, under a TTL zone), and an
     `unregistered` directory under `worktrees/<repo>/`."""
     out: list[dict[str, object]] = []
@@ -138,14 +154,21 @@ def rows(root: Path) -> list[dict[str, object]]:
             if (row := mine.get(Path(path).resolve())) is None:
                 out.append(_row(repo, path, "foreign"))
                 continue
-            admin = Path(
-                git(Path(path), "rev-parse", "--path-format=absolute", "--git-dir").strip()
-            )
-            span = f"{flow['work']}{row['v']}..wt/{Path(path).name}"
+            span = f"{flow['work']}{row['v']}..wt/{row['name']}"
             ahead = int(git(repo, "rev-list", "--count", span, check=False) or 0)
             dirty = bool(git(Path(path), "status", "--porcelain").strip())
-            age = round((time.time() - (admin / "locked").stat().st_mtime) / 3600, 1)
-            state = "ready" if ahead and not dirty else "open"
+            born = git(
+                repo,
+                "reflog",
+                "show",
+                "--date=unix",
+                "--format=%gd",
+                f"wt/{row['name']}",
+                check=False,
+            )
+            stamps = re.findall(r"@\{(\d+)\}", born) or [str(int(time.time()))]
+            age = round((time.time() - int(stamps[-1])) / 3600, 1)  # the branch's birth
+            state = "empty" if not ahead else "ready" if not dirty else "open"
             out.append(
                 _row(
                     repo, path, state, age, kind=row["kind"], id=row["id"], ahead=ahead, dirty=dirty

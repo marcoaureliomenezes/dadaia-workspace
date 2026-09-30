@@ -7,12 +7,9 @@ and its milestone move in one act, so they cannot disagree.
 
 from __future__ import annotations
 
-import json
 import re
 import shlex
-import subprocess
 import sys
-from functools import partial
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -33,7 +30,6 @@ PREDECESSOR = {"IMPLEMENTATION": "DEFINITION", "CLOSURE": "IMPLEMENTATION"}
 #: PLAN §1 — structure only (ADR 0041): any level-2 heading naming the As-is review.
 AS_IS = re.compile(r"^##[ \t].*\bas[- ]is review", re.IGNORECASE | re.MULTILINE)
 SKILL = Path(__file__).resolve().parents[2] / "dd-release-definition" / "SKILL.md"
-WORKTREE = Path(__file__).resolve().parents[2] / "dd-gitflow-default" / "scripts" / "worktree.py"
 AS_IS_FIX = f"copy the PLAN §1 skeleton under the As-is review section of {SKILL} into PLAN.md"
 COLUMNS = ["unit", "today", "bugs", "verdict", "why"]
 AUTH_COLUMNS = ["question", "authority", "consults", "deleted"]
@@ -65,25 +61,30 @@ def _refuse_unapproved_trio(live: Live) -> None:
 
 
 def _refuse_open_worktrees(specs: Path) -> None:
-    """ADR 0128 (4): a candidate closes with every `wt/*` of its repo merged — read from
-    the owner's `worktree.py list --json` rows, sparing the tree closure runs from."""
-    if not WORKTREE.is_file():  # not projected beside us: no workspace, no worktree
+    """ADR 0128 (4): a candidate closes with every `wt/*` of its repo merged or cleaned — read
+    from the owner's rows (imported, ADR 0135), sparing the tree closure runs from."""
+    marker = Path(".dadaia", "states", "spec_contexts.json")
+    root = next((d for d in (specs, *specs.parents) if (d / marker).is_file()), None)
+    if root is None:  # no workspace holds this tree: there is no worktree to wait for
         return
-    run = partial(subprocess.run, capture_output=True, text=True, check=False)
-    common, top = run(["git", "-C", str(specs), "rev-parse", "--path-format=absolute",
-                       "--git-common-dir", "--show-toplevel"]).stdout.split() or ["", ""]  # fmt: skip
-    listed = run([sys.executable, str(WORKTREE), "list", "--json"], cwd=specs)
-    if listed.returncode:
-        raise Refusal(
-            f"worktree.py list failed: {listed.stderr.strip()}",
-            shlex.join(["python3", str(WORKTREE), "list"]),
-        )
-    repo = Path(common).parent.name
-    held = [r for r in json.loads(listed.stdout)
-            if r["repo"] == repo and r["exit"] and Path(r["path"]).resolve() != Path(top).resolve()]  # fmt: skip
+    sys.path.append(str(Path(__file__).resolve().parents[2] / "dd-gitflow-default" / "scripts"))
+    import _worktree_git as worktree_git  # the worktrees' owner, read-only (ADR 0135)
+    from _worktree_kinds import SCRIPT as WORKTREE_PY
+    from _worktree_kinds import Refusal as WorktreeRefusal
+
+    top = worktree_git.git(specs, "rev-parse", "--path-format=absolute", "--show-toplevel",
+                           "--git-common-dir", check=False).split() or ["", ""]  # fmt: skip
+    try:
+        found = worktree_git.rows(root)
+    except (WorktreeRefusal, RuntimeError) as error:
+        raise Refusal(f"worktree rows unreadable: {error}", getattr(error, "fix", "") or
+                      shlex.join(["python3", str(WORKTREE_PY), "list"])) from error  # fmt: skip
+    repo = Path(top[1]).parent.name
+    held = [r for r in found if r["repo"] == repo and r["exit"]
+            and Path(str(r["path"])).resolve() != Path(top[0]).resolve()]  # fmt: skip
     if held:
         raise Refusal(f"repos/{repo} still holds {len(held)} open wt/* worktree(s) — a "
-                      "candidate closes with every one merged", held[0]["exit"])  # fmt: skip
+                      "candidate closes with every one merged", str(held[0]["exit"]))  # fmt: skip
 
 
 def _table(text: str, columns: list[str]) -> list[list[str]]:

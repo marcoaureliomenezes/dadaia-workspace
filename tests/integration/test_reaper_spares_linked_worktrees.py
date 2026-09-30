@@ -10,6 +10,7 @@ Size: MEDIUM — git's own `.git`-file shape and `prunable` verdict are the cont
 from __future__ import annotations
 
 import os
+import re
 import subprocess
 import time
 from pathlib import Path
@@ -110,7 +111,8 @@ def test_doctor_lists_the_contexts_worktrees_from_git_and_touches_none(tmp_path:
         assert worktree_ws.run(root, "new", "r", "--kind", "impl").returncode == 0
     ready, empty = root / "worktrees/r/0.5.0a-impl", root / "worktrees/r/0.5.0b-impl"
     worktree_ws.commit(ready, "src/a.py")
-    os.utime(repo / ".git/worktrees/0.5.0a-impl/locked", (_TWO_DAYS_AGO, _TWO_DAYS_AGO))
+    log = repo / ".git/logs/refs/heads/wt/0.5.0a-impl"  # age is the branch's birth (ADR 0108)
+    log.write_text(re.sub(r"> \d+ ", f"> {int(_TWO_DAYS_AGO)} ", log.read_text(), count=1))
     foreign = root / ".dadaia/tmp/claude/20200101/wt-a"
     worktree_ws.git(repo, "worktree", "add", "-q", "-b", "side", str(foreign))
     _age_tree(root / ".dadaia/tmp/claude")
@@ -124,7 +126,7 @@ def test_doctor_lists_the_contexts_worktrees_from_git_and_touches_none(tmp_path:
         "warning",
         f"python3 {worktree_ws.SCRIPT} merge {ready}",
     )
-    assert (found[str(empty)].verdict, found[str(empty)].fix) == ("info", "")  # nothing ahead
+    assert found[str(empty)].message.startswith("empty") and found[str(empty)].fix == ""
     assert found[str(foreign)].message.startswith("foreign")  # the expired TTL entry surfaces here
     assert not [f for f in doctor.scan_ttl() if "20200101" in f.path]
     assert found[str(root / "worktrees/r/0.5.0c-impl")].message.startswith("orphan")

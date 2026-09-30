@@ -85,6 +85,16 @@ def _alive(
     bare = _published(tmp_path, repo)
     lib = _published(tmp_path, ws / "repos" / "lib")
     store = context_store(ws / ".dadaia" / "states")
+    # the stub CLI names the set's gitflow to worktree.py list
+    cli = ws / ".dadaia/.venv/bin/dadaia"
+    cli.parent.mkdir(parents=True)
+    row = {
+        "main_repo": "main",
+        "associated_repos": [{"slug": "lib"}],
+        "gitflow": {"work": "feature/"},
+    }
+    cli.write_text(f"#!{sys.executable}\nprint({json.dumps([row])!r})\n")
+    cli.chmod(0o755)
     store.save(
         SpecContextProject(
             "proj", ContextState.ALIVE, "main", str(bare), "2026-09-27T00:00:00+00:00",
@@ -118,17 +128,9 @@ def _worktree(repo: Path) -> None:
 
 def _wt(repo: Path, *, checked_out: bool) -> None:
     """An UNPUSHED `wt/0.5.0a-impl` carrying a commit — `dadaia:`-locked in its canonical
-    tree, or an orphan with none; the stub CLI names the set's gitflow to the owner script."""
-    ws, tree = repo.parents[1], repo.parents[1] / "worktrees" / repo.name / "0.5.0a-impl"
-    cli = ws / ".dadaia/.venv/bin/dadaia"
-    cli.parent.mkdir(parents=True)
-    row = {
-        "main_repo": "main",
-        "associated_repos": [{"slug": "lib"}],
-        "gitflow": {"work": "feature/"},
-    }
-    cli.write_text(f"#!{sys.executable}\nprint({json.dumps([row])!r})\n")
-    cli.chmod(0o755)
+    tree, or an orphan with none."""
+    tree = repo.parents[1] / "worktrees" / repo.name / "0.5.0a-impl"
+    _git("branch", "feature/0.5.0", cwd=repo)  # the work branch it is ahead of
     _git("worktree", "add", "-b", "wt/0.5.0a-impl", str(tree), cwd=repo)
     (tree / "w.txt").write_text("w\n")
     _git("add", "w.txt", cwd=tree)

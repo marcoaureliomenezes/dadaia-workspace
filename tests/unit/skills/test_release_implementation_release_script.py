@@ -39,7 +39,8 @@ _PLAN_AS_IS = (
 def script(tmp_path: Path) -> Path:
     """The staged shape: release.py with both schema copies beside it, and the spec
     navigator's scripts projected as its sibling skill (the drift decider it imports)."""
-    stage_skill_scripts("dd-spec-navigator", tmp_path / "skills" / "dd-spec-navigator" / "scripts")
+    for skill in ("dd-spec-navigator", "dd-gitflow-default"):  # the siblings it imports
+        stage_skill_scripts(skill, tmp_path / "skills" / skill / "scripts")
     return (
         stage_skill_scripts(
             "dd-release-implementation",
@@ -238,20 +239,20 @@ def test_phase_closure_from_its_release_worktree_waits_for_every_other_wt(
     script: Path, tmp_path: Path
 ) -> None:
     """AC1.10 (F4): closure runs in its release worktree, whose own wt/* is spared; any
-    other wt/* refuses it, naming repos/<r> and the owner's merge fix, which clears it."""
-    stage_skill_scripts("dd-gitflow-default", script.parents[2] / "dd-gitflow-default" / "scripts")
+    other wt/* refuses it, naming repos/<r> and the owner's exit — `clean` for an empty
+    tree (N1), which clears it."""
     (root := tmp_path / "ws").mkdir()
     worktree_ws.make_workspace(root)
     worktree_ws.git(root / "repos/r", "checkout", "-q", "feature/0.5.0")
     assert worktree_ws.run(root, "new", "r", "--kind", "release").returncode == 0
     specs = _specs(root / "worktrees/r/0.5.0a-release")
     _release(specs, "0.5.0", phase="IMPLEMENTATION")
-    worktree_ws.git(root / "repos/r", "branch", "wt/0.5.0b-impl")
+    assert worktree_ws.run(root, "new", "r", "--kind", "impl").returncode == 0  # empty
     closure = ("phase", "CLOSURE", "--sha", "beef123", "--specs", str(specs))
 
     refused = _run(script, *closure, cwd=root)
     fix = refused.stderr.rsplit("fix: ", 1)[1].strip()
-    assert "repos/r " in refused.stderr and fix.endswith(f"merge {root}/worktrees/r/0.5.0b-impl")
+    assert "repos/r " in refused.stderr and fix.endswith(f"clean {root}/worktrees/r/0.5.0b-impl")
     subprocess.run(fix.replace("python3", sys.executable, 1), shell=True, cwd=root, check=True)  # noqa: S602
     assert _run(script, *closure, cwd=root).returncode == 0
 

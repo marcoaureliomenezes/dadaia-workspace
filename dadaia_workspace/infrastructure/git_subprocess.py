@@ -241,7 +241,7 @@ class GitSubprocessClient:
         except GitObjectReadError:
             return True
 
-    def unrecoverable(self, path: Path) -> list[str]:
+    def unrecoverable(self, path: Path, spare: Sequence[str] = ()) -> list[str]:
         """One fix line per thing removing *path* loses: a linked worktree, or a local
         branch carrying a commit neither origin nor HEAD holds — archived on origin as
         ``archive/<branch>/<sha7>`` (ADR 0120: a tag push is never gated on branch policy),
@@ -252,6 +252,7 @@ class GitSubprocessClient:
             return [git_line(path, "remote", "add", "origin", "<clone-url>")]
         run = _run(["git", "worktree", "list", "--porcelain"], cwd=path).stdout.split("\n")
         trees = [line[9:] for line in run if line.startswith("worktree ")][1:]
+        trees = [t for t in trees if t not in spare]  # a tree whose exit the caller names
         refs = ["git", "for-each-ref", "--format=%(objectname) %(refname:short)", "refs/heads"]
         heads = [line.split(" ", 1) for line in _run(refs, cwd=path).stdout.split("\n") if line]
         in_head = ["git", "merge-base", "--is-ancestor"]  # HEAD itself is pushed by dead()

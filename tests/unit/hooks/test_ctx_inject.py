@@ -9,6 +9,7 @@ bind-lost-silently-after-five-idle-minutes (a lost bind is told once).
 from __future__ import annotations
 
 import json
+import subprocess
 import sys
 from datetime import UTC, datetime
 from pathlib import Path
@@ -352,9 +353,13 @@ def test_injected_catalog_is_tldr_digest_and_measurably_smaller(tmp_path: Path) 
 def test_bound_session_carries_the_onboarding_next_step(tmp_path: Path) -> None:
     """AC1.5 + session-start-bound-session-omits-onboarding-next-step: the bound path
     prints exactly the step text ``doctor`` reports (the one helper both paths call);
-    AC1.10: and the doctor's worktree block (here: no CLI to list with)."""
+    AC1.10: and the doctor's worktree block, fix included, in the doctor's rendering."""
     _ws(tmp_path, {"name": "ctx"})
     _bind(tmp_path, "sb", "ctx")
+    repo = tmp_path / "repos" / "ctx"
+    for argv in (["init", "-q"], ["-c", "user.name=t", "-c", "user.email=t@t", "commit", "-q",
+                 "--allow-empty", "-m", "x"], ["branch", "wt/0.5.0a-impl"]):  # fmt: skip
+        subprocess.run(["git", "-C", str(repo), *argv], check=True, capture_output=True)
 
     out = _run(tmp_path, "sb")
 
@@ -362,6 +367,5 @@ def test_bound_session_carries_the_onboarding_next_step(tmp_path: Path) -> None:
     step = next_step(tmp_path, alive_context_trees(tmp_path), "ctx", "sb")
     assert step is not None and step.id == "specs"
     assert f"\n{step.text()}\n" in out
-    assert (
-        "\n=== open worktrees ===\nWORKTREE warning list failed" in out
-    )  # AC1.10, the doctor's rendering
+    orphan = f"WORKTREE warning orphan {tmp_path}/worktrees/ctx/0.5.0a-impl"
+    assert f"\n=== open worktrees ===\n{orphan}" in out and "worktree.py merge" in out  # AC1.10

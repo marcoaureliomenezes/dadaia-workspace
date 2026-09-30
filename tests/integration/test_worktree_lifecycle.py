@@ -101,13 +101,14 @@ def test_merge_lists_ignored_files_and_keeps_them_by_its_fix(root: Path) -> None
     assert (repo / "notes.scratch").read_text() == "keep me" and not tree.exists()
 
 
-def test_clean_removes_only_an_empty_dadaia_worktree(root: Path) -> None:
+def test_clean_removes_only_an_empty_worktree_of_ours(root: Path) -> None:
     repo, tree = root / "repos/r", root / TREE
     commit(tree, "src/a.py")
     assert fixes(run(root, "clean", TREE)) == [f"fix: python3 {SCRIPT} merge {tree}"]
     git(tree, "reset", "-q", "--hard", "feature/0.5.0")
     assert run(root, "clean", TREE).returncode == 0 and not tree.exists()
-    git(repo, "worktree", "add", "-q", "-b", "wt/0.5.0b-bug", str(root / "worktrees/r/0.5.0b-bug"))
+    # ours is the canonical wt/ branch, locked or not (T-050-99 N2); a tree on another is not
+    git(repo, "worktree", "add", "-q", "-b", "side", str(root / "worktrees/r/0.5.0b-bug"))
     foreign = run(root, "clean", "worktrees/r/0.5.0b-bug")
     assert foreign.returncode == 1 and (root / "worktrees/r/0.5.0b-bug").exists()
 

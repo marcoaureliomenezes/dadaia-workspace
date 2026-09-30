@@ -24,7 +24,10 @@ def own_venv_workspace(root: Path) -> Path:
     (root / ".dadaia" / ".venv" / "pyvenv.cfg").write_text(
         f"home = {Path(sys.executable).resolve().parent}\n"
     )
-    (tools / f"dadaia{PLATFORM.venv_exe_suffix}").write_text("#!/bin/sh\ncat >/dev/null\n")
+    stub = '#!/bin/sh\n[ "$1 $2" = "context list" ] && echo "[]" && exit 0\ncat >/dev/null\n'
+    (tools / f"dadaia{PLATFORM.venv_exe_suffix}").write_text(
+        stub
+    )  # + the one read worktree.py makes
     (tools / f"dadaia{PLATFORM.venv_exe_suffix}").chmod(0o755)
     return root
 

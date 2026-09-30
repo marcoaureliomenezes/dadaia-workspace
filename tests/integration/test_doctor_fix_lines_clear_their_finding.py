@@ -191,7 +191,12 @@ def _plant_stray_dotfile(root: Path) -> None:
 
 
 def _plant_orphan_wt(root: Path) -> None:
-    worktree_ws.git(root / "repos/r", "branch", "wt/0.5.0a-impl")  # at the work tip: merged
+    """An unmerged orphan: `wt/0.5.0a-impl` carries a commit and has no tree."""
+    repo, tree = root / "repos/r", root / "worktrees/r/0.5.0a-impl"
+    worktree_ws.git(repo, "checkout", "-q", "feature/0.5.0")
+    worktree_ws.git(repo, "worktree", "add", "-q", "-b", "wt/0.5.0a-impl", str(tree))
+    worktree_ws.commit(tree, "src/a.py")
+    worktree_ws.git(repo, "worktree", "remove", str(tree))
 
 
 #: code -> how to make it fire. The eight remedies the 0.4.7 candidate-2 review named,
@@ -500,12 +505,21 @@ def test_doctor_fix_renders_a_raw_law_copy_and_clears_its_finding(repo: Path) ->
 
 
 def test_a_worktree_finding_is_cleared_by_its_merge_fix(tmp_path: Path) -> None:
-    """AC1.10: an orphan wt/* carries the owner's `worktree.py merge`; run as printed, the
-    finding is gone (the re-run path `branch -d`s a merged branch)."""
+    """AC1.10: an unmerged orphan wt/* carries the owner's `worktree.py merge`; its chain —
+    merge refuses with the re-attach, the re-attached (unlocked) tree is still ours and
+    `ready`, the reviewed merge lands — ends with no finding."""
     root = worktree_ws.make_workspace(tmp_path)
     PLANTS["WORKTREE"].plant(root)
     doctor = _registered(root)
-    (fix,) = [f.fix for f in doctor.check_worktrees("c")]
-    command = fix.replace("python3", shlex.quote(sys.executable), 1)
-    subprocess.run(command, shell=True, cwd=root, check=True, capture_output=True)  # noqa: S602
+    for _ in range(3):
+        if not (found := doctor.check_worktrees("c")):
+            break
+        worktree_ws.approve(
+            root, worktree_ws.git(root / "repos/r", "rev-parse", "wt/0.5.0a-impl").strip()
+        )
+        command = found[0].fix.replace("python3", shlex.quote(sys.executable), 1)
+        done = subprocess.run(command, shell=True, cwd=root, capture_output=True, text=True)  # noqa: S602
+        if done.returncode:
+            (refix,) = worktree_ws.fixes(done)
+            subprocess.run(refix.removeprefix("fix: "), shell=True, check=True, capture_output=True)  # noqa: S602
     assert doctor.check_worktrees("c") == []

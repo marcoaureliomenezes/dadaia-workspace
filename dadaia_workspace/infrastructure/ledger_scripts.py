@@ -205,17 +205,22 @@ def _parse(result: Any) -> list[dict[str, Any]] | None:
 
 
 def worktree_rows(root: Path, runner: _Runner | None = None) -> tuple[list[dict[str, Any]], str]:
-    """``worktree.py list --json``'s rows for the workspace at *root*, or ``([], reason)`` —
-    bounded, since SessionStart waits on it."""
+    """``worktree.py list --json``'s rows for the workspace at *root*, or ``([], reason)``
+    whose last line is one ``fix:`` — bounded, since SessionStart waits on it."""
     path = resolve_script(WORKTREE_SCRIPT, root)
     if path is None:
-        return [], "list failed: worktree.py is not installed"
+        return (
+            [],
+            f"list failed: worktree.py is not installed\nfix: {fix_line(root, 'public', 'install')}",
+        )
     process = runner if runner is not None else SubprocessProcessRunner()
+    rerun = f"fix: {WORKTREE_SCRIPT.invocation} list"
     try:
         done = process.run([sys.executable, str(path), "list", "--json"], cwd=root, timeout=10.0)
         found = json.loads(done.stdout) if done.returncode == 0 else None
     except (OSError, TimeoutError, ValueError) as exc:
-        return [], f"list failed: {type(exc).__name__}"
+        return [], f"list failed: {type(exc).__name__}\n{rerun}"
     if not isinstance(found, list):
-        return [], f"list failed: {done.stderr.strip()}"
+        told = done.stderr.strip()
+        return [], f"list failed: {told}" + ("" if "\nfix: " in f"\n{told}" else f"\n{rerun}")
     return found, ""

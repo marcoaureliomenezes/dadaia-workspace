@@ -3,7 +3,6 @@
 import contextlib
 import logging
 import re
-import shlex
 import shutil
 import sys
 from dataclasses import replace
@@ -652,8 +651,7 @@ class SpecContextService:
         secret, unpushed branches or a linked worktree, a dirty tree without git identity,
         changes to sync off a work branch. Every refusal names its repo."""
         main_repo = self._repo_path(ctx.repo_slug)
-        # AC1.10: the owner's rows; unreadable, unrecoverable() still holds every linked tree
-        trees, _ = worktree_rows(self._workspace_root)
+        trees, failed = worktree_rows(self._workspace_root)  # AC1.10: the owner's rows
         for repo in ctx.all_repos():
             slug, path = repo.slug, self._repo_path(repo.slug)
             lead = f"Context '{name}': repo '{slug}'"
@@ -682,18 +680,17 @@ class SpecContextService:
                     "Nothing was pushed.\nfix: "
                     + git_line(path, "stash", "push", "-u", "--", *flagged)
                 )
-            held = [r for r in trees if r["repo"] == slug and r["exit"]]  # the owner's merge
-            lost = [r["exit"] for r in held] + [  # replaces git's `worktree remove` of those trees
-                ln for ln in self._git.unrecoverable(path)
-                if not any(ln.endswith(f" {shlex.quote(str(r['path']))}") for r in held)
-            ]  # fmt: skip
+            held = [r for r in trees if r["repo"] == slug and r["exit"]]  # the owner's exits
+            lost = [failed.rsplit("fix: ", 1)[1]] if failed else [r["exit"] for r in held]
+            lost += self._git.unrecoverable(path, spare=[str(r["path"]) for r in held])
             if tree := sweep.linked_worktree(self._workspace_root, path):
                 gdir = sweep.worktree_git_dir(tree)
                 lost.append(git_line(gdir, "worktree", "move", str(tree), "<keep-dir>"))
             if lost:
                 raise DeadUnpushedCommitsError(
-                    f"{lead} holds {len(lost)} linked worktree(s) or unpushed branch(es) "
-                    f"dead() would lose. Nothing was touched.\nfix: {lost[0]}"
+                    f"{lead} holds {len(lost)} worktree(s) or unpushed branch(es) dead() would "
+                    f"lose{f' ({failed.splitlines()[0]})' if failed else ''}. Nothing was "
+                    f"touched.\nfix: {lost[0]}"
                 )
             dirty = self._git.is_dirty(path)
             if not (self._git.has_commits(path) and (dirty or self._git.unpushed(path))):
