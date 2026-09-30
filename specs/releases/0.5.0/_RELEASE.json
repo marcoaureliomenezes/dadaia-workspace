@@ -1,7 +1,7 @@
 {
   "schema": "release-state-v1",
   "release": "0.5.0",
-  "phase": "CLOSURE",
+  "phase": "DEFINITION",
   "defined": {
     "sha": "c8f0321a",
     "ts": "2026-09-30T03:22:46Z"
@@ -604,6 +604,12 @@
         "sdd-gate-v3"
       ],
       "changed": []
+    },
+    {
+      "ts": "2026-09-30T23:35:59Z",
+      "agent": "release.py new",
+      "kind": "note",
+      "text": "Candidate born on 0.5.0 (prior candidate closed at 91262c55)"
     }
   ]
 }
