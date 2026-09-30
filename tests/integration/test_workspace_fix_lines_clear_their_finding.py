@@ -9,6 +9,7 @@ size: MEDIUM — the CLI and the ledger scripts run as real subprocesses.
 
 from __future__ import annotations
 
+import contextlib
 import json
 import os
 import shlex
@@ -17,18 +18,34 @@ import sys
 from pathlib import Path
 
 import pytest
+from typer.testing import CliRunner
+
+from dadaia_workspace.cli.main import app
 
 _REPO = Path(__file__).resolve().parents[2]
-_ENV = {**os.environ, "PYTHONPATH": str(_REPO)}
-for _var in ("DADAIA_CONTEXT", "DADAIA_SESSION_ID", "CLAUDE_CODE_SESSION_ID"):
-    _ENV.pop(_var, None)
+_UNSET = ("DADAIA_CONTEXT", "DADAIA_SESSION_ID", "CLAUDE_CODE_SESSION_ID")
+_ENV = {k: v for k, v in os.environ.items() if k not in _UNSET} | {"PYTHONPATH": str(_REPO)}
 _GIT = ["git", "-c", "user.name=t", "-c", "user.email=t@t"]
 
 
 def _findings(root: Path, *scope: str) -> list[dict[str, str]]:
+    """The real CLI's ``doctor --json`` — the run judging a fix."""
     argv = [sys.executable, "-m", "dadaia_workspace", "doctor", *scope, "--json"]
     run = subprocess.run(argv, cwd=root, env=_ENV, capture_output=True, text=True, check=False)  # noqa: S603
-    sections = json.loads(run.stdout)["sections"]
+    return _parse(run.stdout, scope)
+
+
+def _findings_before(root: Path, *scope: str) -> list[dict[str, str]]:
+    """The same ``doctor --json`` in-process — the planted finding and its printed fix,
+    before any child runs; the fix and the re-run doctor stay real processes."""
+    env = {**_ENV, **dict.fromkeys(_UNSET)}
+    with contextlib.chdir(root):
+        run = CliRunner().invoke(app, ["doctor", *scope, "--json"], env=env)
+    return _parse(run.stdout, scope)
+
+
+def _parse(stdout: str, scope: tuple[str, ...]) -> list[dict[str, str]]:
+    sections = json.loads(stdout)["sections"]
     if scope:  # a bare specs tree: the fenced child judges no workspace at all
         assert sections.get("workspace", {}).get("findings", []) == [], "unfenced"
     return [f for s in sections.values() for f in s["findings"]]
@@ -60,7 +77,7 @@ def test_the_printed_fix_clears_its_finding(tmp_path: Path, code: str) -> None:
     subprocess.run(["git", "init", "-q", str(tmp_path)], check=True)  # noqa: S603, S607
     (tmp_path / "specs").mkdir()
     fills = _SPECS_PLANTS[code](tmp_path)
-    before = _findings(tmp_path, "--specs-dir", "specs")
+    before = _findings_before(tmp_path, "--specs-dir", "specs")
     fix = next(f["fix"] for f in before if f["code"] == code)
     for placeholder, value in fills.items():
         fix = fix.replace(placeholder, value)
@@ -97,7 +114,8 @@ def test_an_invalid_ledger_line_names_an_operator_action(
     subprocess.run([*_GIT, "-C", str(tmp_path), "add", rel], check=True)  # noqa: S603
     subprocess.run([*_GIT, "-C", str(tmp_path), "commit", "-qm", "l"], check=True)  # noqa: S603
     ledger.write_text("{not json\n")
-    (fix,) = [f["fix"] for f in _findings(tmp_path, "--specs-dir", "specs") if f["code"] == code]
+    found = _findings_before(tmp_path, "--specs-dir", "specs")
+    (fix,) = [f["fix"] for f in found if f["code"] == code]
     line = f"{ledger.resolve()} line 1 is invalid; repair that line by hand, then commit."
     assert fix == f"Operator action: {line}"
 
@@ -164,6 +182,6 @@ def test_a_workspace_finding_is_cleared_by_its_printed_fix(tmp_path: Path, plant
     workspace the printed fix, run from repos/alpha, clears the workspace finding."""
     ws = _workspace(tmp_path)
     code = plant(ws)  # type: ignore[operator]
-    fix = next(f["fix"] for f in _findings(ws) if f["code"] == code)
+    fix = next(f["fix"] for f in _findings_before(ws) if f["code"] == code)
     _run_from_elsewhere(ws, shlex.join(shlex.split(fix)))
     assert code not in {f["code"] for f in _findings(ws)}
