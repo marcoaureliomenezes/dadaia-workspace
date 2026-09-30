@@ -57,6 +57,11 @@
           "type": "array",
           "description": "Optional typed intents[]: each binds one change to one canonical subject anchor. Required once 'status' is past 'idea' (backlog.py check, LEDGER-BACKLOG-SCHEMA); absent or empty is valid at 'idea'.",
           "items": { "$ref": "#/$defs/intent" }
+        },
+        "relates": {
+          "type": "array",
+          "description": "The live entries this one was judged to update, obsolete or relate to at birth, empty for none (ADR 0127); absent when the backlog was empty.",
+          "items": { "type": "string", "pattern": "^[a-z][a-z0-9-]+$" }
         }
       }
     },

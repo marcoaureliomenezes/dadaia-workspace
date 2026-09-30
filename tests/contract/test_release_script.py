@@ -19,6 +19,7 @@ import pytest
 
 from dadaia_workspace.core import gitflow
 from dadaia_workspace.core.release_state import CANDIDATE_RE
+from tests.helpers.release_state import SCHEDULE
 from tests.helpers.skill_scripts import stage_skill_scripts
 
 pytestmark = pytest.mark.contract
@@ -70,7 +71,7 @@ def _phase(script: Path, specs: Path) -> subprocess.CompletedProcess[str]:
 
 def _admits(script: Path, tmp_path: Path, plan: str, *, authorities: bool = True) -> None:
     """*authorities*: append a valid §1.1 table to a PLAN whose case is the As-is table."""
-    specs = _specs(tmp_path, plan + (_AUTHORITIES if authorities else ""))
+    specs = _specs(tmp_path, plan + (_AUTHORITIES if authorities else "") + SCHEDULE)
     result = _phase(script, specs)
     assert result.returncode == 0, result.stderr
     state = json.loads((specs / "releases/0.5.0/_RELEASE.json").read_text("utf-8"))
@@ -184,12 +185,9 @@ def test_the_refusal_says_heading_missing_or_table_malformed(script: Path, tmp_p
 
 def test_every_fix_names_an_existing_absolute_path(script: Path, tmp_path: Path) -> None:
     """F1 — fix lines point at files, never at a cwd-relative or section-numbered command."""
-    sys.path.insert(0, str(_SCRIPTS))
-    try:
-        import _release_phase
-    finally:
-        sys.path.remove(str(_SCRIPTS))
-    assert _release_phase.SKILL.is_file() and str(_release_phase.SKILL) in _release_phase.AS_IS_FIX
+    plan_fix = _refuses(script, tmp_path / "plan", "").split("fix: ")[1]
+    skill = Path(re.search(r"of (\S+SKILL\.md)", plan_fix)[1]).relative_to(tmp_path)
+    assert (_PUBLIC / skill).is_file(), "the staged sibling skill the fix names ships"
     fix = [ln for ln in _phase(script, _specs(tmp_path, "", plan_status="Draft")).stderr.splitlines()
            if ln.lstrip().startswith("fix:")][0]  # fmt: skip
     assert Path(fix.split(" in ", 1)[1].strip()).is_file()
@@ -273,3 +271,49 @@ def test_the_pinned_pair_resolves_the_same_live_candidate(tmp_path: Path) -> Non
     (release / "rc-11").write_text("", encoding="utf-8")
     assert [resolve(tmp_path) for resolve in pair] == [release / "rc-10"] * 2
     assert gitflow.next_candidate(release) == twin.next_candidate(release) == release / "rc-12"
+
+
+_TASKS = (
+    "- [ ] **T-1 — a.** `W:` `a.py`, `TASKS.md`, `specs/bugs/BUGS.jsonl`, `dir/map.json` (`x.py`)\n"
+    "- [x] **T-3 — merged.** `W:` `a.py`\n"
+    "- [ ] **T-2 — b.** `W:` `b.py`, `TASKS.md`, `specs/bugs/BUGS.jsonl`, `dir/map.json`, `x.py` · x\n"
+)
+_WIDE = SCHEDULE.replace("| T-1 | 1 |", "| T-1, T-2, T-3 | 3 |")
+
+
+@pytest.mark.parametrize(
+    ("schedule", "tasks", "needle"),
+    [
+        pytest.param(_WIDE, _TASKS, None, id="disjoint-outside-markers-ledgers-and-derived"),
+        pytest.param("", _TASKS, "no '## … Parallel schedule' table", id="no-section"),
+        pytest.param(_WIDE.replace("Critical path", "Path"), _TASKS, "critical path", id="no-path"),
+        pytest.param(_WIDE.replace("| 3 |", "| 2 |"), _TASKS, "width 2 for 3", id="width"),
+        pytest.param(_WIDE, _TASKS.replace("`b.py`", "`a.py`"), "T-1 and T-2 both write a.py", id="overlap"),
+        pytest.param(_WIDE.replace("derived `dir", "derived `ir").replace("but", "`dir/map.json` but"),
+                     _TASKS, "both write dir/map.json", id="derived-is-a-declared-path-suffix-only"),
+    ],
+)  # fmt: skip
+def test_the_transition_and_check_judge_the_parallel_schedule_alike(
+    script: Path, tmp_path: Path, schedule: str, tasks: str, needle: str | None
+) -> None:
+    """ADR 0141 `measured_by`: the PLAN carries the schedule and its critical path; each
+    step's width counts its tasks, whose unfinished `W:` sets are disjoint outside TASKS.md,
+    the JSONL ledgers and each path the schedule declares "derived `<path>`". `phase IMPLEMENTATION` refuses a row on
+    DEFINITION, and `check` refuses the same row written onto an admitted tree."""
+    specs = _specs(tmp_path, "")
+    release = specs / "releases/0.5.0/rc-1"
+
+    def write(schedule: str, tasks: str) -> None:
+        (release / "PLAN.md").write_text(f"**Status:** Approved\n\n{_GOOD}{schedule}", "utf-8")
+        (release / "TASKS.md").write_text(f"**Status:** Approved\n\n{tasks}", "utf-8")
+
+    write(schedule, tasks)
+    phase = _phase(script, specs)
+    if needle:
+        write(_WIDE, _TASKS)
+        assert _phase(script, specs).returncode == 0
+        write(schedule, tasks)
+    check = subprocess.run([sys.executable, str(script), "check", "--specs", str(specs)],
+                           capture_output=True, text=True)  # fmt: skip
+    assert (phase.returncode != 0, check.returncode != 0) == (bool(needle),) * 2, check.stdout
+    assert needle is None or needle in phase.stderr and needle in check.stdout

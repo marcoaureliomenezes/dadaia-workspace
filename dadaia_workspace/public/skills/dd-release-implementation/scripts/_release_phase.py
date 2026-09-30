@@ -7,12 +7,12 @@ and its milestone move in one act, so they cannot disagree.
 
 from __future__ import annotations
 
-import re
 import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
+from _release_plan import PLAN_FIX, plan_errors  # noqa: E402
 from _release_schema import (  # noqa: E402
     APPROVED,
     SHA_RE,
@@ -26,13 +26,6 @@ from _release_store import SCRIPT, Live, Refusal, State, commit, live_release  #
 
 #: DEFINITION is `new`'s; each later phase has one predecessor (out-of-order = re-run).
 PREDECESSOR = {"IMPLEMENTATION": "DEFINITION", "CLOSURE": "IMPLEMENTATION"}
-#: PLAN §1 — structure only (ADR 0041): any level-2 heading naming the As-is review.
-AS_IS = re.compile(r"^##[ \t].*\bas[- ]is review", re.IGNORECASE | re.MULTILINE)
-SKILL = Path(__file__).resolve().parents[2] / "dd-release-definition" / "SKILL.md"
-AS_IS_FIX = f"copy the PLAN §1 skeleton under the As-is review section of {SKILL} into PLAN.md"
-COLUMNS = ["unit", "today", "bugs", "verdict", "why"]
-AUTH_COLUMNS = ["question", "authority", "consults", "deleted"]
-AUTHORITIES = re.compile(r"^###[ \t].*\bAuthorities\b", re.IGNORECASE | re.MULTILINE)
 
 
 def note(state: State, ts: str, text: str) -> None:
@@ -88,42 +81,6 @@ def _refuse_open_worktrees(specs: Path) -> None:
                       "candidate closes with every one merged", str(held[0]["exit"]))  # fmt: skip
 
 
-def _table(text: str, columns: list[str]) -> list[list[str]]:
-    rows: list[list[str]] = []
-    for line in text.splitlines():
-        cells = [c.strip(" \t`*") for c in re.split(r"(?<!\\)\|", line.strip().strip("|"))]
-        if rows and "|" not in line:
-            break
-        if rows or [c.lower() for c in cells] == columns:
-            rows.append(cells + [""] * len(columns))
-    return rows[2:] if len(rows) >= 3 else []
-
-
-def _refuse_missing_as_is_table(plan: str) -> None:
-    heading = AS_IS.search(plan)
-    if heading is None:
-        raise Refusal("PLAN.md has no '## … As-is review' heading", AS_IS_FIX)
-    rows = _table(section := plan[heading.end() :].split("\n## ")[0], COLUMNS)
-    if not rows:
-        raise Refusal("PLAN.md's As-is review heading is not followed by a table with header "
-                      "'unit | today | bugs | verdict | why' and >= 1 row", AS_IS_FIX)  # fmt: skip
-    for row in rows:
-        if row[3].upper() not in {"DELETE", "REBUILD", "UPDATE", "KEEP", "ADD"}:
-            raise Refusal(f"PLAN.md As-is review row {row[0]!r} carries verdict {row[3]!r} "
-                          "— one of DELETE REBUILD UPDATE KEEP ADD", AS_IS_FIX)  # fmt: skip
-    rows = _table(section[m.end() :], AUTH_COLUMNS) if (m := AUTHORITIES.search(section)) else []
-    if not rows:
-        raise Refusal("PLAN.md §1 has no '### … Authorities' table with header "
-                      "'question | authority | consults | deleted' and >= 1 row", AS_IS_FIX)  # fmt: skip
-    seen: dict[str, str] = {}
-    for question, authority, *_ in rows:
-        if not authority:
-            raise Refusal(f"PLAN.md Authorities row {question!r} has an empty authority", AS_IS_FIX)
-        if (first := seen.setdefault(question.lower(), authority)) != authority:
-            raise Refusal(f"PLAN.md Authorities question {question.lower()!r} names two "
-                          f"authorities: `{first}` and `{authority}` — keep one", AS_IS_FIX)  # fmt: skip
-
-
 #: The one verb that moves each phase forward — every refusal's fix names it, so a fix
 #: never names a verb that refuses in the same state.
 NEXT = {"DEFINITION": "phase IMPLEMENTATION", "IMPLEMENTATION": "phase CLOSURE",
@@ -148,7 +105,9 @@ def set_phase(specs: Path, phase: str, sha: str) -> tuple[str, str]:
     ts = utc_now()
     if phase == "IMPLEMENTATION":
         candidate = _refuse_unapproved_trio(live)
-        _refuse_missing_as_is_table((candidate / "PLAN.md").read_text(encoding="utf-8"))
+        plan = (candidate / "PLAN.md").read_text(encoding="utf-8")
+        if errors := plan_errors(plan, unfinished_tasks(candidate)):
+            raise Refusal(errors[0], PLAN_FIX)
     elif live.candidate and (unfinished := unfinished_tasks(live.candidate)):
         raise Refusal(
             f"TASKS.md still carries {len(unfinished)} open '[ ]'/reserved '[-]' marker(s) "

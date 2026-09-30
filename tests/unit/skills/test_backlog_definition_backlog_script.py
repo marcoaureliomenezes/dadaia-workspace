@@ -124,6 +124,22 @@ def test_new_refuses_a_duplicate_slug_with_one_fix_line(script: Path, tmp_path: 
     assert len(_active(specs)) == 1
 
 
+def test_new_names_the_live_entries_it_relates_to(script: Path, tmp_path: Path) -> None:
+    """ADR 0127 / AC1.12: past the first entry, `new` refuses without `--relates`, listing
+    the live entries, and always refuses a slug that is not one; the named ones are recorded."""
+    specs = _specs(tmp_path)
+    assert _run(script, "new", "first", "--specs", str(specs), "--relates", "ghost").returncode == 1
+    assert _run(script, "new", "first", "--specs", str(specs)).returncode == 0
+    bare = _run(script, "new", "second", "--specs", str(specs))
+    stray = _run(script, "new", "second", "--specs", str(specs), "--relates", "ghost")
+    assert bare.returncode == stray.returncode == 1
+    assert "relates to (ADR 0127): first\n" in bare.stderr
+    assert (
+        _run(script, "new", "second", "--specs", str(specs), "--relates", "first").returncode == 0
+    )
+    assert _active(specs)[-1]["relates"] == ["first"]
+
+
 def test_new_refuses_a_malformed_slug(script: Path, tmp_path: Path) -> None:
     specs = _specs(tmp_path)
     done = _run(script, "new", "Not A Slug", "--specs", str(specs))
@@ -384,7 +400,7 @@ def _exited(script: Path, tmp_path: Path) -> Path:
     """A tree whose histo holds one exit of `gone` and whose active[] holds `an-idea`."""
     specs = _specs(tmp_path)
     for slug in ("gone", "an-idea"):
-        assert _run(script, "new", slug, "--specs", str(specs)).returncode == 0
+        assert _run(script, "new", slug, "--specs", str(specs), "--relates", "none").returncode == 0
     done = _run(
         script, "exit", "gone", "--specs", str(specs), "--disposition", "rejected",
         "--reason", "r",
@@ -422,7 +438,7 @@ def test_new_refuses_a_slug_that_already_exited_and_writes_nothing(
     specs = _exited(script, tmp_path)
     before = _pair(specs)
 
-    done = _run(script, "new", "gone", "--specs", str(specs))
+    done = _run(script, "new", "gone", "--specs", str(specs), "--relates", "none")
 
     assert done.returncode == 1, done.stdout
     assert "'gone' exited at this line" in done.stderr

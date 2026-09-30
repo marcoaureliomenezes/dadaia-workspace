@@ -11,6 +11,7 @@ from __future__ import annotations
 import argparse
 import datetime as _dt
 import json
+import subprocess
 import sys
 from collections import Counter
 from pathlib import Path
@@ -25,11 +26,11 @@ import _bugs_transition as tr  # noqa: E402
 import _bugs_write as wr  # noqa: E402
 from _bugs_check import CODE, HISTO, LEDGER, check  # noqa: E402
 from _bugs_store import Refusal, commit, read_records  # noqa: E402
-from _specs import find_specs, refuse  # noqa: E402
+from _specs import find_specs, refuse, script  # noqa: E402
 
 _OPTIONS: dict[str, tuple[str, ...]] = {
     "append": ("--bug-id", "--reported-by", "--ts", "--title", "--severity", "--surface",
-               "--component", "--context", "--symptom", "--repro", "--expected"),
+               "--component", "--context", "--symptom", "--repro", "--expected", "--correlates"),
     "resolve": tuple(f"--{name.replace('_', '-')}" for name in tr.REQUIRED_BY_VERB["resolve"]),
     "supersede": ("--by",), "defer": ("--reason",), "reject": ("--reason",),
 }  # fmt: skip
@@ -111,7 +112,17 @@ def _write(args: argparse.Namespace, specs: Path) -> int:
         values["id"] = values.pop("bug_id")
         values["ts"] = values["ts"] or wr.now_iso()
         values["reported_by"] = values["reported_by"] or "dd-software-engineer"
-        commit(ledger, lambda records: wr.append(records, values))
+        try:
+            listed = subprocess.run(["git", "-C", str(specs), "ls-files", "--full-name", ":/"],
+                                    capture_output=True, text=True, check=True).stdout  # fmt: skip
+        except (OSError, subprocess.CalledProcessError) as exc:
+            cause = getattr(exc, "stderr", "") or str(exc)
+            raise Refusal(f"cannot list the repo's tracked directories: {cause.strip()}",
+                          f"cd <the context's git repo> && {script(Path(__file__))} append … --specs specs") from None  # fmt: skip
+        dirs = {part for path in listed.splitlines() for part in path.split("/")[:-1]}
+        near = wr.candidates(read_records(ledger), values["surface"])
+        print(f"correlation candidates on {values['surface']!r}: {', '.join(near) or 'none'}")
+        commit(ledger, lambda records: wr.append(records, values, dirs))
         print(f"[ok] registered {values['id']} -> {specs}")
         return 0
     if args.verb == "update":

@@ -10,6 +10,8 @@ refuses a differing second write, and a field a verb owns is never `update`'s.
 from __future__ import annotations
 
 import datetime as _dt
+import difflib
+import re
 import sys
 from pathlib import Path
 from typing import Any
@@ -36,9 +38,18 @@ def now_iso() -> str:
     return _dt.datetime.now(tz=_dt.UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
-def append(records: Records, values: dict[str, Any]) -> Records:
-    """One brand-new record, `status: "open"`. Refuses a duplicate id and the legacy
-    `unknown` surface sentinel; the schema check on the candidate bytes does the rest."""
+def candidates(records: Records, surface: object) -> list[str]:
+    """The records a new bug on *surface* is judged against (ADR 0127): the open ones and
+    those resolved in the last 30 days, a recurrence."""
+    since = (_dt.datetime.now(tz=_dt.UTC) - _dt.timedelta(days=30)).strftime("%Y-%m-%dT%H:%M:%SZ")
+    return sorted(str(r["id"]) for r in records if r.get("surface") == surface and (
+        r.get("status") == "open" or r.get("status") == "resolved" and str(r.get("closed_at")) >= since))  # fmt: skip
+
+
+def append(records: Records, values: dict[str, Any], dirs: set[str]) -> Records:
+    """One brand-new record, `status: "open"`. Refuses a duplicate id, a surface that is
+    not one tracked directory name (F011), and a record naming no ledger ids or `none` as
+    its correlation (ADR 0127); the schema check does the rest."""
     bug_id = values["id"]
     if any(r.get("id") == bug_id for r in records):
         raise Refusal(
@@ -46,12 +57,21 @@ def append(records: Records, values: dict[str, Any]) -> Records:
             "'caused_by: <prior-id>' at resolve, never a second record under this id",
             f"{_SCRIPT} append --bug-id <new-id>",
         )
-    if values.get("surface") == "unknown":
+    surface = str(values.get("surface"))
+    if not re.fullmatch(r"[a-z0-9_-]+", surface) or surface not in dirs:
+        close = "|".join(difflib.get_close_matches(surface, sorted(dirs), 5, 0)) or "dir"
         raise Refusal(
-            "surface 'unknown' is a legacy sentinel, valid only on records that already carry it",
-            f"{_SCRIPT} append --surface <the-unit-that-broke>",
+            f"surface {surface!r} is not the name of a directory tracked in this repo",
+            f"{_SCRIPT} append --surface <{close}>",
         )
-    record = {key: values.get(key) for key in CORE}
+    correlates = values.get("correlates")
+    ids = [] if correlates == "none" else str(correlates or "").split(",")
+    if not set(ids) <= {r.get("id") for r in records}:
+        raise Refusal(
+            "name the ledger ids this bug correlates with — the candidates are listed above",
+            f"{_SCRIPT} append --correlates <ids>|none",
+        )
+    record = {key: values.get(key) for key in CORE} | {"correlates": ids}
     record.update({key: None for key in GOVERNANCE})
     record["status"] = "open"
     return [*records, record]

@@ -20,7 +20,16 @@ sys.path.insert(1, str(Path(__file__).resolve().parents[2] / "dd-spec-navigator"
 
 import _memory_drift as drift  # noqa: E402
 from _release_check import finding, histo_findings, state_findings  # noqa: E402
-from _release_schema import HISTO, SEMVER_RE, STATE, TRIO, TRIO_PHASES, candidate_dir  # noqa: E402
+from _release_plan import plan_errors  # noqa: E402
+from _release_schema import (  # noqa: E402
+    HISTO,
+    SEMVER_RE,
+    STATE,
+    TRIO,
+    TRIO_PHASES,
+    candidate_dir,
+    unfinished_tasks,
+)
 from _release_store import SCRIPT, Refusal, live_ids, live_release, window_start  # noqa: E402
 from _specs import with_specs  # noqa: E402
 
@@ -37,13 +46,15 @@ def _directory_findings(release_dir: Path, specs: Path) -> list[dict[str, Any]]:
     if findings := state_findings(text, f"{dir_rel}/{STATE}"):
         return findings
     phase, candidate = json.loads(text)["phase"], candidate_dir(release_dir)
+    if phase not in TRIO_PHASES:
+        return []
     missing = [n for n in TRIO if not (candidate and (candidate / n).is_file())]
-    where = candidate.name if candidate else "rc-<N>"
-    return (
-        [finding(dir_rel, 1, f"phase {phase} is missing {where}/{', '.join(missing)}")]
-        if missing and phase in TRIO_PHASES
-        else []
-    )
+    if candidate is None or missing:
+        where = candidate.name if candidate else "rc-<N>"
+        return [finding(dir_rel, 1, f"phase {phase} is missing {where}/{', '.join(missing)}")]
+    plan = (candidate / "PLAN.md").read_text(encoding="utf-8")
+    errors = plan_errors(plan, unfinished_tasks(candidate))
+    return [finding(f"{dir_rel}/{candidate.name}/PLAN.md", 1, e) for e in errors]
 
 
 def memory_errors(specs: Path, phase: str, entry: dict[str, Any]) -> list[str]:

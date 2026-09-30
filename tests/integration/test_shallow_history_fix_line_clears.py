@@ -16,6 +16,7 @@ from pathlib import Path
 import pytest
 
 from dadaia_workspace.infrastructure.ledger_scripts import script_findings
+from tests.helpers.release_state import PLAN
 
 pytestmark = [pytest.mark.integration, pytest.mark.slow(reason="real git clones")]
 
@@ -48,7 +49,10 @@ def _origin(tmp: Path) -> Path:
     release = origin / "specs" / "releases" / "9.9.9"
     (release / "rc-1").mkdir(parents=True)
     for name in ("SPEC.md", "PLAN.md", "TASKS.md"):
-        (release / "rc-1" / name).write_text("# x\n", "utf-8")
+        (release / "rc-1" / name).write_text(
+            f"# x\n\n{PLAN if name == 'PLAN.md' else ''}",
+            "utf-8",
+        )
     ts = "2026-01-01T00:00:00Z"
     state = {
         "schema": "release-state-v1", "release": "9.9.9", "phase": "CLOSURE",

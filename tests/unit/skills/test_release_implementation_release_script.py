@@ -18,6 +18,7 @@ from unittest.mock import ANY
 import pytest
 
 from tests.helpers import worktree_ws
+from tests.helpers.release_state import PLAN
 from tests.helpers.skill_scripts import stage_skill_scripts
 
 pytestmark = pytest.mark.unit
@@ -30,10 +31,6 @@ _SCHEMAS = (
 )
 _TRIO = ("SPEC.md", "PLAN.md", "TASKS.md")
 _TS = "2026-09-22T00:00:00Z"
-_PLAN_AS_IS = (
-    "## 1. As-is review\n\n| unit | today | bugs | verdict | why |\n|---|---|---|---|---|\n| a | b | 0 | KEEP | c |\n"
-    + "\n### 1.1 Authorities\n\n| question | authority | consults | deleted |\n|---|---|---|---|\n| q | `a` |  |  |\n"
-)
 
 
 @pytest.fixture
@@ -82,7 +79,7 @@ def _release(
     release_dir = specs / "releases" / release_id
     (release_dir / "rc-1").mkdir(parents=True, exist_ok=True)
     for name in _TRIO:
-        body = {"TASKS.md": tasks, "PLAN.md": _PLAN_AS_IS}.get(name, "")
+        body = {"TASKS.md": tasks, "PLAN.md": PLAN}.get(name, "")
         release_dir.joinpath("rc-1", name).write_text(
             f"# {name}\n\n**Status:** Approved\n\n{body}", encoding="utf-8"
         )
