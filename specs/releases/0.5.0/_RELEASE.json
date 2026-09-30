@@ -506,6 +506,36 @@
         "sdd-gate-v3",
         "worktrees"
       ]
+    },
+    {
+      "ts": "2026-09-30T19:25:18Z",
+      "agent": "dd-product-engineer",
+      "kind": "size",
+      "text": "G1 readout (T-050-105 handoff 2026-09-30T184738Z, b9578197..21af179c, dadaia_workspace/**/*.py): production 23,793 -> 24,823 (+1,030); the worktree script family counted apart — worktree.py 64, _worktree_end.py 220, _worktree_git.py 190, _worktree_new.py 85, _worktree_kinds.py 58 = 617 — leaving +413 for the rest; tests 43,232 -> 44,042 (+810). Over plan: T-050-109 prod +160/tests +125 vs ~+60; T-050-102 +221 vs +60; T-050-98 prod +63/tests +76 vs +20; T-050-110 prod +61/tests +104 vs <= +30; T-050-100 prod +5/tests +81 vs +10. A readout, never a gate (ADR 0142)."
+    },
+    {
+      "ts": "2026-09-30T19:25:18Z",
+      "agent": "dd-product-engineer",
+      "kind": "drifts",
+      "text": "Parallel schedule, planned vs measured (ADR 0141 point 6, reflog of feature/0.5.0): OVER-WIDTH at step 3 — 5 worktrees open together against 4 planned (a, b, c, e impl plus d-impl T-050-99); OVER-WIDTH at steps 5 and 5b — 5 open against 1 planned (T-050-103, -102, -104, -100, -109; ADR 0149 and amendment 11 parked four at archive/wt/0.5.0{a,b,d,f}-impl and resumed them one at a time). Step 4 (T-050-104) ran after 5c; the critical path walked 13 serial merges against 9 planned steps. Rebase conflicts: T-050-102 x T-050-109 six files outside the union/replay set; T-050-103 x T-050-109 derived behavior-map hashes only (0148 (5) exemption); T-050-103 over T-050-104 and T-050-100 over T-050-98 clean. Review rejections before APPROVED: T-050-102 5, T-050-100 4, T-050-103/98/110 3, T-050-109/104 and amendment 11 2."
+    },
+    {
+      "ts": "2026-09-30T19:25:18Z",
+      "agent": "dd-product-engineer",
+      "kind": "drifts",
+      "text": "Found at closure, handed to the main thread: (1) 63 derived sections of README.md, llms.txt and docs/*.md are stale against the 17 re-derived atoms — MEMORY-UPDATE step 7 puts them in the atoms' commit, but the release kind's allowed set holds nothing outside specs/, so test_docs_derived_from_memory stays red here until an impl/bug worktree re-derives them; its measure (QUALITY P-29) cites rejected ADR 0012, left for the operator at the publish gate. (2) worktrees/AGENTS.md §1 lists the release set without specs/constitution.md and specs/*/AGENTS.md, and the bug set without specs/bugs/_archive/*, which KINDS holds (T-050-98, ADR 0153). (3) dd-bug-resolution LINEAGE.md:10 says no per-release _RELEASE.json survives archiving, while ship moves the whole folder (F058 residue). (4) AC1.16's ADR 0027 title repair (F084) not made: the accepted record's decision text also says create binds, so a title-only edit would contradict it; it needs an operator ruling. (5) ARCHITECTURE.md:132 still says features/migrate stamps 8 (canonical; out of closure scope). (6) agent-comms gained source dd-handoff-emitter/** so its reports-path claim entered the worklist. (7) G4 at 21af179c: 1 failed (test_adr_canon committed-ledger test, red until the ruling backfill), doctor rc 1 on workspace hygiene only; CI on three OSes runs at the candidate PR. (8) An untracked reports/ sits in repos/dadaia-workspace."
+    },
+    {
+      "ts": "2026-09-30T19:25:18Z",
+      "agent": "dd-product-engineer",
+      "kind": "dispositions",
+      "text": "G3/G2 (re-run at the wave's end, T-050-105): 3 open bugs no longer reproduce and are resolved — corrupt-session-record-never-collected at d056143b and fenced-roots-env-disables-the-gate at 91262c55 (both by T-050-100, 8fac616a), instance-exceptions-file-writable-by-agents at 1d59ac9b (by T-050-106, 7e7d84e1); W1's DEL bugs unbound-native-session-writes-freely-into-repos and additive-globs-hand-kept-beside-the-canon resolved at af538c20 (T-050-97, 36df3baa). 4 still reproduce and stay with their waves: dadaia-bin-still-honoured-after-adr-0045, help-examples-spell-the-blocked-bare-cli, implementer-persona-states-a-second-task-marker-lifecycle (W4), removals-shipped-without-recorded-authority (W7); context-dead-ignores-the-hold-refusal not re-run (destructive on the live instance). Open bugs 31 -> 28. G2: no open record's caused_by names a record or commit of the wave."
+    },
+    {
+      "ts": "2026-09-30T19:25:18Z",
+      "agent": "dd-product-engineer",
+      "kind": "dispositions",
+      "text": "G6 (amendment 11) — audit 20260930-structural-convergence: open before 133; resolved 34 by 5fefdf5b on feature/0.5.0 (ADR 0124 direct write), each reason naming its commit — F006 F062 F066 F077 F078 F081 (records already made: 41d9c16d, 0e9694f0, 97ae45b7, f49a1a34); F008 F053-F057 F074 (3dafcb50); F011 (5ab0d75f); F068 F085 (7b44d4e9); F071 F072 (318ee6b8, 36df3baa); F073 (41d9c16d, 820bee3b); F079 F023 (8fac616a, bug 91262c55); F020 (7e7d84e1, bug 1d59ac9b); F027 (8fac616a, bug d056143b); F083 (152da630); F093 (3dafcb50); F094 (36df3baa, 8fac616a); F095 (8fac616a); F106 (152da630, 820bee3b, 36ce79d7); F107 (f10ead2f); F117 F118 F119 F122 F150 (this closure's memory commit, by subject); open after 99. F058 and F061 stay in the W3 row: at 91262c55 LINEAGE.md:10 still says no archived _RELEASE.json survives, and phase restamps defined/implemented per candidate (this closure's phase CLOSURE overwrote 0d31a5f2 with 91262c55). F084 stays open (ADR 0027 title); F149 stays open (0095 init scaffold and 0096 SessionStart self-heal, W2). Backlog active[]: open before 23; resolved by this candidate 5 — delivered canonical-worktrees (152da630, 820bee3b, 36ce79d7), worktree-harness-mechanics-study (f10ead2f), bind-scope-durable-on-every-harness (36df3baa, 8fac616a), ctx-inject-on-cursor-copilot (8fac616a); rejected gate-judges-bash-writes (ADRs 0096, 0103; 3dafcb50) — each exit owed by backlog.py exit in a backlog worktree; open after 18."
     }
   ]
 }
