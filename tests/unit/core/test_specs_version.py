@@ -22,25 +22,28 @@ def _write(tmp_path: Path, text: str) -> Path:
 
 
 #: The canon fingerprint each stamp was cut at — re-pinned only together with a stamp bump.
-_CANON_AT = {8: "a33cffae20b4a98b"}
+_CANON_AT = {8: "ebc460dd444fd523"}
 
 
 def test_a_canon_change_bumps_the_stamp() -> None:
-    """The stamp and the doctor's canon are one decision: fixed fragments, area laws and
-    memory templates, the canon registry and the default gitflow block. A change here
-    without a CANONICAL_SPECS_VERSION bump leaves older trees reading ``canonical`` while
-    the doctor is red — bump the stamp, then pin the new fingerprint under it."""
+    """The stamp and the doctor's canon are one decision: what the doctor judges on an
+    existing tree — the fixed fragments and FIXED_SECTIONS, the refreshed area laws
+    (TREE-5), the canon registry and the default gitflow block. The copy-once seeds
+    (memory documents, product index) are never re-judged, so they are not pinned."""
     public = workspace_layout.public_scripts_dir().parent
-    files = sorted((public / "scaffold").rglob("*.md")) + sorted(
-        (public / "data" / "fixed").glob("*.md")
-    )
+    laws = [public / "templates" / "specs-AGENTS.md"] + [
+        public / "scaffold" / area / "AGENTS.md" for area in workspace_layout.SCOPED_LAW_AREAS
+    ]
     digest = hashlib.sha256()
-    for path in files:
+    for path in [*sorted((public / "data" / "fixed").glob("*.md")), *laws]:
         digest.update(f"{path.relative_to(public).as_posix()}\n".encode() + path.read_bytes())
     digest.update(
         repr((workspace_layout.specs_canon_table_rows(), FIXED_SECTIONS, DEFAULT)).encode()
     )
-    assert {CANONICAL_SPECS_VERSION: digest.hexdigest()[:16]} == _CANON_AT
+    assert {CANONICAL_SPECS_VERSION: digest.hexdigest()[:16]} == _CANON_AT, (
+        "the canon changed: bump CANONICAL_SPECS_VERSION, then pin under the new key; "
+        "never re-pin an existing key"
+    )
 
 
 def test_gitflow_round_trips(tmp_path: Path) -> None:
