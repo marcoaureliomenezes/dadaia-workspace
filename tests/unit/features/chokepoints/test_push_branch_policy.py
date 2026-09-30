@@ -109,7 +109,7 @@ _D, _C = DEFAULT, _CUSTOM
     pytest.param(_D, _birth("integration"), id="default-ADR0036-contentless-integration-birth"),
     pytest.param(_C, _birth("integration"), id="custom-ADR0036-contentless-integration-birth"),
     pytest.param(_D, _birth_from_any_source, id="H4-contentless-birth-from-any-source"),
-    pytest.param(_D, _commit_then(lambda s, f: f"refs/tags/v9.9.9 {s} refs/tags/v9.9.9 {_ZERO}"), id="tag-carve-out"),
+    pytest.param(_D, _commit_then(lambda s, f: f"refs/heads/wt/x {s} refs/tags/archive/wt/x {_ZERO}"), id="tag-carve-out-keys-on-the-remote-ref"),
     pytest.param(_D, lambda repo, flow: "", id="finding-1-empty-stdin-has-nothing-to-gate"),
 ])
 # fmt: on

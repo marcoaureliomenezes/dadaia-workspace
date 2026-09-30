@@ -45,7 +45,7 @@ class PushRef:
 
     @property
     def is_tag(self) -> bool:
-        return self.local_ref.startswith("refs/tags/")
+        return self.remote_ref.startswith("refs/tags/")
 
 
 def parse_push_stdin(stdin_text: str) -> tuple[list[PushRef], int]:

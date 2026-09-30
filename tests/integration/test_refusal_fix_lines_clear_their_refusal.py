@@ -721,9 +721,11 @@ def _dead_no_identity(world: World) -> list[str]:
 
 
 def _unpushed_side_branch(world: World) -> list[str]:
-    """sa-context-dead-removes-repos-outside-the-reaper#C3: a local branch other than HEAD's carries a commit origin lacks."""
+    """sa-context-dead-removes-repos-outside-the-reaper#C3: a local branch other than HEAD's
+    carries a commit origin lacks; unrecoverable-fix-line-pushes-a-wt-branch-the-pre-push-refuses:
+    a non-work branch the gate refuses to push."""
     _published(world)
-    world.git(world.repo, "checkout", "-q", "-b", "feature/1.0.0", "origin/develop")
+    world.git(world.repo, "checkout", "-q", "-b", "wt/0.5.0a", "origin/develop")
     world.commit("notes.md", "n\n")
     world.git(world.repo, "checkout", "-q", "--detach", "origin/main")
     return ["context", "dead", "proj"]

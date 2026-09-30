@@ -12,6 +12,9 @@ from dadaia_workspace.core.gitflow import DEFAULT, Gitflow, read_gitflow
 from dadaia_workspace.core.models.git_scan import GitObjectReadError
 from dadaia_workspace.infrastructure.git_objects import unpublished
 
+#: A lost branch's archive-tag push also records it as ``origin/archive/<branch>``.
+_ARCHIVE_TRACKING = "remote.origin.fetch=+refs/tags/archive/*:refs/remotes/origin/archive/*"
+
 logger = logging.getLogger(__name__)
 
 
@@ -235,7 +238,10 @@ class GitSubprocessClient:
 
     def unrecoverable(self, path: Path) -> list[str]:
         """One fix line per thing removing *path* loses: a linked worktree, or a local
-        branch carrying a commit neither origin nor HEAD holds; commits with no remote."""
+        branch carrying a commit neither origin nor HEAD holds — archived on origin as
+        ``archive/<branch>`` (a tag push is never gated on branch policy, a branch push
+        outside the gitflow is), the push recording it under ``refs/remotes/origin/`` so
+        ``unpushed`` sees origin hold it; commits with no remote."""
         if self.has_commits(path) and not self.has_remote(path):
             return [git_line(path, "remote", "add", "origin", "<clone-url>")]
         run = _run(["git", "worktree", "list", "--porcelain"], cwd=path).stdout.split("\n")
@@ -250,7 +256,8 @@ class GitSubprocessClient:
             and self.unpushed(path, f"refs/heads/{b}")
         ]
         return [git_line(path, "worktree", "remove", t) for t in trees] + [
-            git_line(path, "push", "-u", "origin", b) for b in lost
+            git_line(path, "-c", _ARCHIVE_TRACKING, "push", "origin", f"{b}:refs/tags/archive/{b}")
+            for b in lost
         ]
 
     def identity_fix(self, path: Path) -> str:
