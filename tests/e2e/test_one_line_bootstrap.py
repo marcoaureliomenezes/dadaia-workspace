@@ -26,12 +26,14 @@ Hermetic by construction — no network, no container:
 
 from __future__ import annotations
 
+import email
 import json
 import os
 import re
 import shutil
 import subprocess
 import sys
+import zipfile
 from importlib import metadata
 from pathlib import Path
 
@@ -215,36 +217,35 @@ def _build_wheel(source: Path, dest: Path) -> Path:
     return built[0]
 
 
-def _repack_dependency_closure(dest: Path) -> Path:
-    """Re-pack this distribution's installed runtime dependencies into *dest*.
+def _repack_dependency_closure(wheel: Path, dest: Path) -> Path:
+    """Re-pack the runtime dependency closure of *wheel* into *dest*.
 
     The offline dependency mirror both venvs resolve against, built with the product's
     OWN :func:`repack_installed_wheel` — the same function the fix under test uses for
-    ``dadaia-workspace`` itself. 17 wheels, well under a second.
+    ``dadaia-workspace`` itself. The walk starts at the wheel's own ``Requires-Dist``, never
+    the installed metadata, which a stale editable install leaves behind; a dependency
+    missing from this venv fails here, by name.
     """
     from dadaia_workspace.infrastructure.python_env import repack_installed_wheel
 
     dest.mkdir(parents=True, exist_ok=True)
+    with zipfile.ZipFile(wheel) as archive:
+        meta = next(n for n in archive.namelist() if n.endswith(".dist-info/METADATA"))
+        requires = email.message_from_bytes(archive.read(meta)).get_all("Requires-Dist") or []
     seen: set[str] = set()
-    stack = ["dadaia-workspace"]
+    stack = list(requires)
     while stack:
-        name = stack.pop()
+        requirement = stack.pop()
+        if "extra ==" in requirement:
+            continue
+        name = re.split(r"[<>=!~;\[\s(]", requirement.strip())[0]
         key = name.lower().replace("_", "-")
-        if key in seen:
+        if not name or key in seen:
             continue
         seen.add(key)
-        try:
-            dist = metadata.distribution(name)
-        except metadata.PackageNotFoundError:
-            continue
-        for requirement in dist.requires or []:
-            if "extra ==" in requirement:
-                continue
-            dependency = re.split(r"[<>=!~;\[\s]", requirement.strip())[0]
-            if dependency:
-                stack.append(dependency)
-        if key != "dadaia-workspace":
-            repack_installed_wheel(dest, dist=dist)
+        dist = metadata.distribution(name)
+        stack.extend(dist.requires or [])
+        repack_installed_wheel(dest, dist=dist)
     return dest
 
 
@@ -293,7 +294,7 @@ def test_the_workspace_venv_carries_the_bootstrappers_own_bytes(tmp_path: Path, 
     same accommodation the sibling test documents.
     """
     real_wheel = _build_wheel(_REPO_ROOT, tmp_path / "dist")
-    deps = _repack_dependency_closure(tmp_path / "deps")
+    deps = _repack_dependency_closure(real_wheel, tmp_path / "deps")
     decoy_dir = tmp_path / "decoy-dist"
     decoy_wheel = _build_wheel(_decoy_source(tmp_path), decoy_dir)
     assert decoy_wheel.name == real_wheel.name, "the decoy must be indistinguishable by version"
