@@ -88,9 +88,9 @@ def test_gc_deletion_matrix(tmp_path: Path) -> None:
 def _post_gate_heartbeat(ws: Path, sess_id: str) -> None:
     """Invoke the REAL PostToolUse heartbeat (refreshes last_seen_at) for ``sess_id``.
 
-    No env-var leak: the harness session id is fed through the stdin payload, exactly as
-    the production hook resolves it (resolve_session_id). This is the renewal path the
-    operator's live sessions actually take — not a planted timestamp.
+    The harness session id is the hook env's, exactly as the production hook resolves it
+    (resolve_session_id, env only). This is the renewal path the operator's live sessions
+    actually take — not a planted timestamp.
     """
     import io
     import sys
@@ -104,6 +104,7 @@ def _post_gate_heartbeat(ws: Path, sess_id: str) -> None:
         "CODEX_THREAD_ID",
     )
     saved_env = {k: os.environ.pop(k, None) for k in override_vars}
+    os.environ["CLAUDE_CODE_SESSION_ID"] = sess_id
     saved_cwd = Path.cwd()
     old_stdin = sys.stdin
     sys.stdin = io.StringIO(json.dumps({"session_id": sess_id}))
@@ -113,6 +114,7 @@ def _post_gate_heartbeat(ws: Path, sess_id: str) -> None:
     finally:
         sys.stdin = old_stdin
         os.chdir(saved_cwd)
+        os.environ.pop("CLAUDE_CODE_SESSION_ID")
         for k, v in saved_env.items():
             if v is not None:
                 os.environ[k] = v

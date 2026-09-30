@@ -21,7 +21,7 @@ def _evaluate_target(
     if not fpath.is_absolute():
         fpath = (workspace or Path.cwd()) / fpath
     # target-first root: a nested sandbox under the cwd never shadows the root owning fpath
-    inv = invocation.resolve(target_path=fpath, payload=payload, env=os.environ, cwd=Path.cwd())
+    inv = invocation.resolve(target_path=fpath, env=os.environ, cwd=Path.cwd())
     effective_workspace = inv.workspace_root or workspace
     if effective_workspace is None:
         return gate_policy.Decision.ALLOW, ""  # fail-open: no root owns the target

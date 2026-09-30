@@ -65,9 +65,9 @@ def target_path(payload: dict[str, Any]) -> str:
     return next(iter(target_paths(payload)), "")
 
 
-def resolve_session_id(payload: dict[str, Any], *, default: str = "") -> str:
+def resolve_session_id() -> str:
     """The sanitized session id by the one rule (:func:`invocation.resolve_session_id`)."""
-    return invocation.resolve_session_id(payload, os.environ, default=default)
+    return invocation.resolve_session_id(os.environ)
 
 
 def emit_block(reason: str) -> None:

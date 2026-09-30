@@ -26,10 +26,9 @@ from collections.abc import Callable
 from enum import Enum
 from functools import cache
 from pathlib import Path, PurePath
-from typing import Any
 
 from dadaia_workspace.core import workspace_layout
-from dadaia_workspace.core.cli_line import fix_line
+from dadaia_workspace.core.cli_line import fix_line, script_line
 
 __all__ = ["Decision", "PathClass", "classify_path", "evaluate"]
 
@@ -69,6 +68,7 @@ _MERGE_ONLY_MESSAGE = (
     "[GATE] '{rel_path}' is under repos/{repo}/, which receives only merges (ADR 0105): "
     "write it inside a worktree of {repo}.\n"
 )
+_WORKTREE_SCRIPT = ".agents/skills/dd-gitflow-default/scripts/worktree.py"
 _KINDS = Path(__file__).parents[2] / "public/skills/dd-gitflow-default/scripts/_worktree_kinds.py"
 
 
@@ -87,16 +87,17 @@ class Decision(Enum):
 
 
 @cache
-def _worktree_kinds() -> dict[str, Any]:
-    """The KINDS table's owner script (ADR 0135), run in place: no bytecode left beside it."""
-    return runpy.run_path(str(_KINDS))
+def _kind_holding() -> Callable[[str], str | None]:
+    """The KINDS grammar's owner (ADR 0135), run in place: no bytecode left beside it."""
+    holding: Callable[[str], str | None] = runpy.run_path(str(_KINDS))["kind_holding"]
+    return holding
 
 
 def _worktree_fix(repo: str, repo_rel: str) -> str:
-    kinds = _worktree_kinds()
-    allows: Callable[[str, str], bool] = kinds["allows"]
-    kind = next((k for k in kinds["KINDS"] if allows(k, repo_rel)), "release")
-    return f"python3 .agents/skills/dd-gitflow-default/scripts/worktree.py new {repo} --kind {kind}"
+    kind = _kind_holding()(repo_rel)
+    if kind is None:  # no worktree merges it: only the operator's hand reaches it
+        return f"Operator action: edit repos/{repo}/{repo_rel} by hand; no worktree kind merges it"
+    return script_line(_WORKTREE_SCRIPT, "new", repo, "--kind", kind)
 
 
 def classify_path(rel_path: str, projected: frozenset[str] = frozenset()) -> PathClass:

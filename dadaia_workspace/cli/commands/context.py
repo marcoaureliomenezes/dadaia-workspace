@@ -379,7 +379,7 @@ def bind(
     except ContextNotFoundError as e:
         fail(e)
     # ADR 0116: the gate, the hooks and this record share one id; bind never mints one.
-    session_id = resolve_session_id(None, os.environ)
+    session_id = resolve_session_id(os.environ)
     if not session_id:
         fail(
             "No session id in this shell: a bind needs one the gate and the hooks can see.\n"

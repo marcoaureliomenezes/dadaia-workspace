@@ -1,5 +1,6 @@
-"""One table through the gate and the doctor: the gate ALLOWs a write iff the doctor
-does not judge the entry it creates SLOP.
+"""One table of ROOT ENTRIES through the gate and the doctor: the gate ALLOWs a write that
+creates a workspace-root entry iff the doctor does not judge that entry SLOP. Scope inside
+``repos/``/``worktrees/`` is test_sdd_gate's, not this table's.
 
 Intent: CONTRACT — sa-gate-allows-root-entries-the-reaper-moves#E6 (every row), #E1
 (notes/ without a glob), #E2 (with one), sa-gate-allows-root-entries-the-reaper-moves#E3 (wrong type), #E4 (.dadaia non-zone and

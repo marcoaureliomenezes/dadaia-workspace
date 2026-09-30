@@ -406,7 +406,13 @@ class DoctorService:
         out: list[Finding] = []
         for entry in sweep.walk(self._workspace_root):
             verdict, detail = self._judged(entry, globs)
-            out.append(self._finding("root", self._workspace_root, entry, verdict, detail))
+            credential = verdict is FindingVerdict.SLOP and entry.name == ".env"
+            if credential:  # ADR 0146: the library never touches a credential file
+                detail = "(credentials live outside the workspace: the operator moves it out or names it in .dadaiaignore)"
+            fixable = False if credential else None
+            out.append(
+                self._finding("root", self._workspace_root, entry, verdict, detail, fixable=fixable)
+            )
         return out
 
     def _scan_dadaia_top(self, globs: tuple[str, ...]) -> list[Finding]:

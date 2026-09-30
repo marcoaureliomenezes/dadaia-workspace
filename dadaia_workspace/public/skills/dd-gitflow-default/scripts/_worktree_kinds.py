@@ -43,3 +43,8 @@ def allows(kind: str, path: str) -> bool:
         not path.startswith("specs/") if glob == CODE else fnmatch.fnmatch(path, glob)
         for glob in KINDS[kind]
     )
+
+
+def kind_holding(path: str) -> str | None:
+    """The first kind whose allowed set holds repo-relative *path*; ``None`` when no kind can merge it."""
+    return next((k for k in KINDS if allows(k, path)), None)

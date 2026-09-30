@@ -9,7 +9,7 @@ import shutil
 from pathlib import Path
 
 from _worktree_git import cli, flow_for, git, ours
-from _worktree_kinds import _NAME_RE, KINDS, SCRIPT, Refusal, allows
+from _worktree_kinds import _NAME_RE, SCRIPT, Refusal, allows, kind_holding
 
 REVIEWER = "dd-code-reviewer"
 
@@ -78,7 +78,7 @@ def _check_allowed(tree: Path, work: str, name: str) -> None:
     for rel in git(tree, "diff", "--name-only", f"{work}...HEAD").splitlines():
         if allows(kind, rel):
             continue
-        owner = next((k for k in KINDS if allows(k, rel)), None)
+        owner = kind_holding(rel)
         undo = f"checkout {work} -- {rel}" if _exists(tree, work, rel) else f"rm -q {rel}"
         raise Refusal(
             f"{rel} is outside the {kind} allowed set"

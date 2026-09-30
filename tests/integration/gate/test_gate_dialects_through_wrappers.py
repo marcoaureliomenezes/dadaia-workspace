@@ -3,7 +3,7 @@
 sa-gate-blind-on-cursor-copilot-devin#B8: for every registry harness, a payload fixture in the harness's native shape
 (``tests/fixtures/hook_payloads/<harness>/``, shapes from the bug record's vendor-doc
 citations — authored, not recorded) through its rendered hook gets Claude's verdict for
-pip / a new root entry / a PROTECTED file / an id-less worktree write (scope, ADR 0116).
+pip / a new root entry / a PROTECTED file / a worktree write of an unregistered slug (scope: allowed).
 sa-gate-blind-on-cursor-copilot-devin#B1 Copilot's deny carries the venv guard's reason and fix line; sa-gate-blind-on-cursor-copilot-devin#B2 Cursor's preToolUse
 deny reaches the model (agent_message) with a fix line; sa-gate-blind-on-cursor-copilot-devin#B3 Devin's hooks.v1.json has the
 documented event -> [{matcher, hooks}] shape; sa-gate-blind-on-cursor-copilot-devin#B4 an allowed call prints nothing on the

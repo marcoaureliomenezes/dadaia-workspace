@@ -31,11 +31,9 @@ def _session_bound_at(workspace: Path, session_id: str) -> float | None:
         return None
 
 
-def _resolve_context(payload: dict[str, object]) -> str:
+def _resolve_context() -> str:
     """The session's bind — never the cwd's repo: an unbound session injects no memory."""
-    return (
-        invocation.resolve(payload=payload, env=os.environ, cwd=Path.cwd()).bind.context_name or ""
-    )
+    return invocation.resolve(env=os.environ, cwd=Path.cwd()).bind.context_name or ""
 
 
 def _emit(payload: str) -> None:
@@ -154,15 +152,13 @@ def _emit_bootstrap(workspace: Path, context: str) -> None:
 def main() -> int:
     payload = _common.read_stdin_json()
     try:
-        workspace = invocation.resolve(
-            payload=payload, env=os.environ, cwd=Path.cwd()
-        ).workspace_root
+        workspace = invocation.resolve(env=os.environ, cwd=Path.cwd()).workspace_root
     except Exception:  # noqa: BLE001 — fail-open: emit nothing rather than crash
         workspace = None
     if workspace is None:
         _emit("")
         return 0
-    own = _common.resolve_session_id(payload) or None
+    own = _common.resolve_session_id() or None
     if own:  # the operator's prompt is activity too: renew the liveness clock
         session_store.touch_last_seen_at(workspace, own, now=datetime.now(tz=UTC).isoformat())
     session_id = own or "workspace"
@@ -187,7 +183,7 @@ def main() -> int:
 
     decision = injection_policy.decide_injection(
         event=event,
-        context=_resolve_context(payload),
+        context=_resolve_context(),
         recorded_slug=recorded_slug,
         sentinel_exists=sentinel_mtime is not None,
         compacted=newer(_read_sentinel(compact_marker)[0]),

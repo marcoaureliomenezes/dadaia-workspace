@@ -450,28 +450,27 @@ def test_a_symlinked_zone_root_is_never_walked(
     assert actions == []
 
 
-def test_fix_migrates_the_legacy_exceptions_into_dadaiaignore_and_never_moves_it(
+def test_fix_migrates_the_legacy_exceptions_and_never_touches_operator_files(
     tmp_path: Path,
 ) -> None:
     """ADRs 0092, 0093, 0145: a missing ``.dadaiaignore`` is seeded 1:1 from the legacy
-    file, which is then slop and held; an invalid line is reported and never fixed."""
+    file, which is then slop and held; an invalid line is reported and never fixed. ADR 0146:
+    a root ``.env`` is a non-fixable finding the reaper never moves."""
     _init_workspace(tmp_path)
     (tmp_path / DADAIAIGNORE).unlink()
     legacy = tmp_path / ".dadaia/states/instance_exceptions.txt"
     legacy.write_text("*.png\n!keep\n", encoding="utf-8")
     (tmp_path / "shot.png").write_bytes(b"PNG")  # admitted only by the migrated line
+    (tmp_path / ".env").write_text("K=v\n", encoding="utf-8")
     assert _by_path(_make_doctor(tmp_path).scan())[DADAIAIGNORE].verdict is FindingVerdict.MISSING
     _make_doctor(tmp_path).fix()
     assert (tmp_path / DADAIAIGNORE).read_text(encoding="utf-8") == "*.png\n!keep\n"
     assert not legacy.exists()
     assert (tmp_path / "shot.png").exists()  # judged after the seed, never reaped
-    (invalid,) = [
-        f
-        for f in _make_doctor(tmp_path).scan()
-        if f.path == DADAIAIGNORE and f.verdict is FindingVerdict.SLOP
-    ]
-    assert (
-        invalid.verdict is FindingVerdict.SLOP and not invalid.fixable and "!keep" in invalid.detail
-    )
+    found = [f for f in _make_doctor(tmp_path).scan() if f.verdict is FindingVerdict.SLOP]
+    (invalid,) = [f for f in found if f.path == DADAIAIGNORE]
+    (env,) = [f for f in found if f.path == ".env"]
+    assert not invalid.fixable and "!keep" in invalid.detail
+    assert not env.fixable and "outside the workspace" in env.detail
     _make_doctor(tmp_path).fix()
-    assert (tmp_path / DADAIAIGNORE).is_file()
+    assert (tmp_path / DADAIAIGNORE).is_file() and (tmp_path / ".env").is_file()

@@ -82,19 +82,13 @@ def sanitize_session_id(raw: str | None) -> str:
     return _SESSION_ID_STRIP.sub("", raw or "")
 
 
-def resolve_session_id(
-    payload: Mapping[str, object] | None,
-    env: Mapping[str, str],
-    *,
-    default: str = "",
-) -> str:
-    """The one session-id rule, sanitized: ``DADAIA_SESSION_ID``, then the hook payload's id,
-    then :data:`HARNESS_SESSION_ID_ENV_VARS` (possibly inherited and stale), then *default*."""
-    fields = (payload or {}).get  # every harness's payload key for its session
-    candidate = env.get("DADAIA_SESSION_ID") or str(
-        fields("session_id") or fields("conversation_id") or fields("sessionId") or ""
+def resolve_session_id(env: Mapping[str, str], *, default: str = "") -> str:
+    """The one session-id rule, sanitized: ``DADAIA_SESSION_ID``, then
+    :data:`HARNESS_SESSION_ID_ENV_VARS`, then *default*. Env only: ``context bind`` sees no
+    hook payload, so a payload id would be an id no bind can ever record (ADR 0116)."""
+    candidate = env.get("DADAIA_SESSION_ID") or next(
+        filter(None, map(env.get, HARNESS_SESSION_ID_ENV_VARS)), ""
     )
-    candidate = candidate or next(filter(None, map(env.get, HARNESS_SESSION_ID_ENV_VARS)), "")
     return sanitize_session_id(candidate) or default
 
 
@@ -246,15 +240,13 @@ def resolve(
     *,
     explicit: str | None = None,
     target_path: Path | None = None,
-    payload: Mapping[str, object] | None = None,
     env: Mapping[str, str],
     cwd: Path,
 ) -> Invocation:
     """Resolve session, context, root and bind once. *explicit*/*target_path* are rung 0 (a
-    write under ``repos/x/`` resolves ``x`` even while bound to ``y``); *payload* is a hook's
-    parsed stdin (``None`` for the CLI)."""
+    write under ``repos/x/`` resolves ``x`` even while bound to ``y``)."""
     root = _resolve_root(cwd=cwd, target_path=target_path)
-    session_id = resolve_session_id(payload, env) or None
+    session_id = resolve_session_id(env) or None
     bind = resolve_bind(root, session_id, env)
 
     def owner(path: Path | None) -> str | None:

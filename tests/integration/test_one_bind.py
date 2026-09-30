@@ -95,10 +95,10 @@ def test_the_readers_agree_on_the_bind(
     inv = resolve(env=env, cwd=ws)
     assert inv.bind.context_name == expected  # the gate reads inv.bind
 
-    hook_env = {**claude_hook_env(ws), **env}
+    hook_env = {**claude_hook_env(ws, session_id=sid or "x"), **env}
     if not sid:
         hook_env = {**kimi_hook_env(ws), "DADAIA_CONTEXT": env_ctx}
-    payload = {"session_id": sid} if sid else {}
+    payload = {"session_id": sid or "kimi-stdin-only"}  # Kimi: stdin id, no env id
     out = run_hook_subprocess("ctx_inject", payload, hook_env).stdout
     assert (f"[{expected}]" if expected else "[no bound context]") in out
 
@@ -118,13 +118,16 @@ def test_the_readers_agree_on_the_bind(
 
 
 def test_a_ghost_env_never_denies_and_is_surfaced(tmp_path: Path) -> None:
-    """sa-bind-has-two-stores#S3: a ghost DADAIA_CONTEXT is unbound (an id-less worktree
-    write is the declared gap, ADR 0116) and ctx_inject emits a warning line."""
+    """sa-bind-has-two-stores#S3: a ghost DADAIA_CONTEXT is unbound and ctx_inject warns.
+    Review F1: Kimi's stdin-only session id is no id (bind cannot see it), so its write
+    into a registered repo's worktree is the declared id-less gap, never a bind Stall."""
     ws = _workspace(tmp_path, "alpha")
-    out = run_hook_subprocess("ctx_inject", {}, {**kimi_hook_env(ws), "DADAIA_CONTEXT": "ghost"})
+    out = run_hook_subprocess(
+        "ctx_inject", {"session_id": "k1"}, {**kimi_hook_env(ws), "DADAIA_CONTEXT": "ghost"}
+    )
     assert "! DADAIA_CONTEXT=ghost is not this session's bind" in out.stdout
     target = ws / "worktrees" / "alpha" / "0.5.0a-impl" / "x.py"
-    payload = {"tool_name": "Write", "tool_input": {"file_path": str(target)}}
+    payload = {"tool_name": "Write", "tool_input": {"file_path": str(target)}, "session_id": "k1"}
     gate = run_hook_subprocess(
         "sdd_gate", payload, {**kimi_hook_env(ws), "DADAIA_CONTEXT": "ghost"}
     )
@@ -164,7 +167,9 @@ def test_a_bound_context_without_specs_gets_its_next_step(tmp_path: Path) -> Non
     """sa-bind-has-two-stores#S7: header and next step, never "[no bound context]"."""
     ws = _workspace(tmp_path, "alpha")
     _record(ws, "s1", "alpha")
-    out = run_hook_subprocess("ctx_inject", {"session_id": "s1"}, claude_hook_env(ws)).stdout
+    out = run_hook_subprocess(
+        "ctx_inject", {"session_id": "s1"}, claude_hook_env(ws, session_id="s1")
+    ).stdout
     assert "[alpha]" in out and "Next (" in out and "[no bound context]" not in out
 
 

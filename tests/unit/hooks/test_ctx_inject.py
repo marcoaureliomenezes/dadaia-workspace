@@ -71,10 +71,11 @@ def _run(
     source: str | None = None,
     extra: dict[str, str] | None = None,
 ) -> str:
-    env = claude_hook_env(
-        root, extra={**(extra or {}), **({"DADAIA_HOOK_EVENT": event} if event else {})}
+    env = claude_hook_env(  # the env id is the one id channel: bind sees no stdin (review F1)
+        root,
+        session_id=sid,
+        extra={**(extra or {}), **({"DADAIA_HOOK_EVENT": event} if event else {})},
     )
-    env.pop("CLAUDE_CODE_SESSION_ID", None)  # the stdin field is the one id channel
     env.pop("DADAIA_CONTEXT", None)
     payload: dict[str, object] = {"session_id": sid}
     if source:  # Claude Code's SessionStart re-entry

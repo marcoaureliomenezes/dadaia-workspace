@@ -14,8 +14,8 @@ from dadaia_workspace.hooks import _common
 
 
 def main() -> int:
-    payload = _common.read_stdin_json()
-    sess_id = _common.resolve_session_id(payload)
+    _common.read_stdin_json()  # drain the harness payload; the session id is env-only
+    sess_id = _common.resolve_session_id()
     if not sess_id:
         return 0
     try:
