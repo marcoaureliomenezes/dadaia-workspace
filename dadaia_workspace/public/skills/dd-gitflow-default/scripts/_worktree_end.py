@@ -125,7 +125,8 @@ def _check_approved(root: Path, sha: str) -> None:
 def merge(root: Path, path: str, keep: list[str], drop: bool) -> str:
     repo, tree, name, work = _target(root, path)
     branch = f"wt/{name}"
-    if not tree.exists():  # removed by an earlier run: only the branch may be left
+    if not tree.exists():  # removed by an earlier run or by hand: only the branch may be left
+        git(repo, "worktree", "unlock", str(tree), check=False)
         git(repo, "worktree", "prune")
         if git(repo, "branch", "--list", branch).strip():
             try:

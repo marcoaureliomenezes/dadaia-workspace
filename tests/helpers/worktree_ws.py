@@ -11,19 +11,16 @@ import subprocess
 import sys
 from pathlib import Path
 
+from dadaia_workspace.core.models.spec_context import ContextState, SpecContextProject
+from dadaia_workspace.features.spec_context.doctor import DoctorService
+from dadaia_workspace.infrastructure.git_subprocess import GitSubprocessClient
+from tests.fixtures.stores import context_store, workspace_cli
+
 SCRIPT = (
     Path(__file__).resolve().parents[2]
     / "dadaia_workspace/public/skills/dd-gitflow-default/scripts/worktree.py"
 )
 FLOW = {"principal": "trunk", "integration": "dev", "work": "feature/"}
-_STUB = """#!{python}
-import json, sys
-args = sys.argv[1:]
-if args[:2] == ["context", "list"]:
-    print(json.dumps([{{"main_repo": "r", "associated_repos": [], "gitflow": {flow}}}]))
-elif args[:2] == ["reports", "validate"]:
-    sys.exit(0 if "schema_version" in json.load(open(args[2])) else 1)
-"""
 
 
 def git(repo: Path, *args: str) -> str:
@@ -39,10 +36,7 @@ def make_workspace(root: Path) -> Path:
     (root / ".gitconfig").write_text("[user]\n\tname = t\n\temail = t@t\n")  # HOME for rebase
     (root / ".dadaia/states").mkdir(parents=True)
     (root / ".dadaia/states/spec_contexts.json").write_text("{}")
-    stub = root / ".dadaia/.venv/bin/dadaia"
-    stub.parent.mkdir(parents=True)
-    stub.write_text(_STUB.format(python=sys.executable, flow=json.dumps(FLOW)))
-    stub.chmod(0o755)
+    workspace_cli(root, {"main_repo": "r", "associated_repos": [], "gitflow": FLOW})
     repo = root / "repos/r"
     rel = repo / "specs/releases/0.5.0"
     rel.mkdir(parents=True)
@@ -66,6 +60,14 @@ def run(root: Path, *args: str) -> subprocess.CompletedProcess[str]:
     return subprocess.run(
         [sys.executable, str(SCRIPT), *args], cwd=root, env=env, capture_output=True, text=True
     )
+
+
+def registered_doctor(root: Path) -> DoctorService:
+    """The doctor over *root* with context `c` (main repo `r`) ALIVE."""
+    (root / ".dadaia/states/spec_contexts.json").write_text('{"contexts": []}')
+    store = context_store(root / ".dadaia/states")
+    store.save(SpecContextProject("c", ContextState.ALIVE, "r", "", "2026-09-30T00:00:00+00:00"))
+    return DoctorService(store, GitSubprocessClient(), root)
 
 
 def fixes(result: subprocess.CompletedProcess[str]) -> list[str]:

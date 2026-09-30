@@ -8,7 +8,6 @@ and its milestone move in one act, so they cannot disagree.
 from __future__ import annotations
 
 import re
-import shlex
 import sys
 from pathlib import Path
 
@@ -69,16 +68,14 @@ def _refuse_open_worktrees(specs: Path) -> None:
         return
     sys.path.append(str(Path(__file__).resolve().parents[2] / "dd-gitflow-default" / "scripts"))
     import _worktree_git as worktree_git  # the worktrees' owner, read-only (ADR 0135)
-    from _worktree_kinds import SCRIPT as WORKTREE_PY
     from _worktree_kinds import Refusal as WorktreeRefusal
 
     top = worktree_git.git(specs, "rev-parse", "--path-format=absolute", "--show-toplevel",
                            "--git-common-dir", check=False).split() or ["", ""]  # fmt: skip
     try:
         found = worktree_git.rows(root)
-    except (WorktreeRefusal, RuntimeError) as error:
-        raise Refusal(f"worktree rows unreadable: {error}", getattr(error, "fix", "") or
-                      shlex.join(["python3", str(WORKTREE_PY), "list"])) from error  # fmt: skip
+    except WorktreeRefusal as error:
+        raise Refusal(f"worktree rows unreadable: {error}", error.fix) from error
     repo = Path(top[1]).parent.name
     held = [r for r in found if r["repo"] == repo and r["exit"]
             and Path(str(r["path"])).resolve() != Path(top[0]).resolve()]  # fmt: skip

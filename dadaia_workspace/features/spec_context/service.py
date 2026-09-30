@@ -682,7 +682,7 @@ class SpecContextService:
                 )
             held = [r for r in trees if r["repo"] == slug and r["exit"]]  # the owner's exits
             lost = [refix] if failed else [r["exit"] for r in held]
-            lost += self._git.unrecoverable(path, spare=[str(r["path"]) for r in held])
+            lost += self._git.unrecoverable(path)
             if tree := sweep.linked_worktree(self._workspace_root, path):
                 gdir = sweep.worktree_git_dir(tree)
                 lost.append(git_line(gdir, "worktree", "move", str(tree), "<keep-dir>"))

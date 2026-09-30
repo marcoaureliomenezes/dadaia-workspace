@@ -55,7 +55,6 @@ from dadaia_workspace.features.specs.doctor import SpecsDoctor
 from dadaia_workspace.features.specs.rules import RULES as SPECS_RULES
 from tests.fixtures.harness_env import session_home
 from tests.helpers import worktree_ws
-from tests.integration.test_reaper_spares_linked_worktrees import _registered
 
 from ..unit.features.specs.test_doctor import _make_clean_specs_tree
 from .test_backlog_doctor import _SOURCE, _active_entry
@@ -510,7 +509,7 @@ def test_a_worktree_finding_is_cleared_by_its_merge_fix(tmp_path: Path) -> None:
     `ready`, the reviewed merge lands — ends with no finding."""
     root = worktree_ws.make_workspace(tmp_path)
     PLANTS["WORKTREE"].plant(root)
-    doctor = _registered(root)
+    doctor = worktree_ws.registered_doctor(root)
     for _ in range(3):
         if not (found := doctor.check_worktrees("c")):
             break

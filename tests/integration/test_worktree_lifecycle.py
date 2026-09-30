@@ -8,6 +8,9 @@ Size: MEDIUM (real git, tmp workspace).
 from __future__ import annotations
 
 import importlib.util
+import json
+import shlex
+import shutil
 from pathlib import Path
 
 import pytest
@@ -37,6 +40,12 @@ def test_merge_fast_forwards_removes_and_reruns(root: Path) -> None:
     assert git(repo, "rev-parse", "feature/0.5.0").strip() == sha
     assert not tree.exists() and not git(repo, "branch", "--list", "wt/*").strip()
     assert run(root, "merge", TREE).returncode == 0  # a finished merge re-runs clean
+    assert run(root, "new", "r", "--kind", "impl").returncode == 0
+    shutil.rmtree(tree)  # the dadaia:-locked tree deleted by hand: an orphan, its exit clears it
+    (row,) = json.loads(run(root, "list", "--json").stdout)
+    assert (row["state"], row["path"]) == ("orphan", str(tree))
+    assert run(root, *shlex.split(row["exit"])[2:]).returncode == 0
+    assert json.loads(run(root, "list", "--json").stdout) == []
     git(repo, "worktree", "add", "-q", "-b", "wt/0.5.0a-impl", str(tree))
     commit(tree, "src/b.py")
     git(repo, "worktree", "remove", str(tree))  # interrupted: tree gone, its commit unmerged

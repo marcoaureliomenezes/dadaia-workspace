@@ -44,7 +44,9 @@ def cli(root: Path, *args: str) -> subprocess.CompletedProcess[str]:
     bins = (root / ".dadaia/.venv/bin/dadaia", root / ".dadaia/.venv/Scripts/dadaia.exe")
     exe = next((b for b in bins if b.exists()), None)
     if exe is None:
-        raise Refusal("no workspace CLI", "uvx dadaia-workspace init")
+        raise Refusal(
+            "no workspace CLI", shlex.join(["uvx", "dadaia-workspace", "init", str(root)])
+        )
     run = subprocess.run  # stdin closed: a CLI never waits on the caller's pipe
     return run(
         [str(exe), *args],
@@ -140,7 +142,8 @@ def _row(repo: Path, path: str, state: str, age: float = 0.0, **facts: object) -
 
 def rows(root: Path) -> list[dict[str, object]]:
     """Every worktree fact of every registered repo, read from git alone (ADR 0108):
-    ours `ready` (ahead, clean), `open` (ahead, dirty) or `empty`, an `orphan` wt/* with no tree, a `foreign`
+    ours `ready` (ahead, clean), `open` (ahead, dirty) or `empty`, an `orphan` wt/* with no tree
+    (never checked out, or its directory deleted), a `foreign`
     worktree git registers (harness-native, hand-made, under a TTL zone), and an
     `unregistered` directory under `worktrees/<repo>/`."""
     out: list[dict[str, object]] = []
@@ -151,8 +154,8 @@ def rows(root: Path) -> list[dict[str, object]]:
         trees, mine = _trees(repo), {Path(r["path"]).resolve(): r for r in ours(repo)}
         for tree in trees:
             path = tree["worktree"]
-            if (row := mine.get(Path(path).resolve())) is None:
-                out.append(_row(repo, path, "foreign"))
+            if (row := mine.get(Path(path).resolve())) is None or not Path(path).is_dir():
+                out.append(_row(repo, path, "foreign" if row is None else "orphan"))
                 continue
             span = f"{flow['work']}{row['v']}..wt/{row['name']}"
             ahead = int(git(repo, "rev-list", "--count", span, check=False) or 0)

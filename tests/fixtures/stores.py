@@ -29,18 +29,28 @@ def own_venv_workspace(root: Path) -> Path:
 
 
 def workspace_cli(root: Path, *listed: dict[str, object]) -> Path:
-    """The venv's `dadaia` at *root*: `context list` prints *listed* (the one read worktree.py
-    makes); any other verb drains its stdin (the pre-push pipe)."""
+    """The venv's `dadaia` at *root*, standing for the reads the worktree script makes:
+    `context list` prints *listed*, `reports validate` passes iff `schema_version`; any other
+    verb drains its stdin (the pre-push pipe)."""
     cli = (
         root / ".dadaia" / ".venv" / PLATFORM.venv_scripts_dir / f"dadaia{PLATFORM.venv_exe_suffix}"
     )
     cli.parent.mkdir(parents=True, exist_ok=True)
-    rows = json.dumps(list(listed))
-    cli.write_text(
-        f'#!/bin/sh\n[ "$1 $2" = "context list" ] && echo \'{rows}\' && exit 0\ncat >/dev/null\n'
-    )
+    cli.write_text(_CLI.format(python=sys.executable, rows=json.dumps(list(listed))))
     cli.chmod(0o755)
     return root
+
+
+_CLI = """#!{python}
+import json, sys
+args = sys.argv[1:]
+if args[:2] == ["context", "list"]:
+    print({rows!r})
+elif args[:2] == ["reports", "validate"]:
+    sys.exit(0 if "schema_version" in json.load(open(args[2])) else 1)
+else:
+    sys.stdin.read()
+"""
 
 
 def own_venv_python(root: Path) -> Path:

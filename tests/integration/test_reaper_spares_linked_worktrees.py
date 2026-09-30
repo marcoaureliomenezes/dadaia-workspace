@@ -17,7 +17,6 @@ from pathlib import Path
 
 import pytest
 
-from dadaia_workspace.core.models.spec_context import ContextState, SpecContextProject
 from dadaia_workspace.features.spec_context.doctor import DoctorService
 from dadaia_workspace.infrastructure.git_subprocess import GitSubprocessClient
 from tests.fixtures.stores import context_store
@@ -94,15 +93,6 @@ def test_doctor_fix_never_reaps_or_moves_a_linked_worktree(
     assert "prunable" not in _git(repo, "worktree", "list", "--porcelain")
 
 
-def _registered(root: Path) -> DoctorService:
-    """The doctor over *root* with context `c` (main repo `r`) ALIVE."""
-    (root / ".dadaia/states/spec_contexts.json").write_text('{"contexts": []}')
-    context_store(root / ".dadaia/states").save(
-        SpecContextProject("c", ContextState.ALIVE, "r", "", "2026-09-30T00:00:00+00:00")
-    )
-    return _doctor(root)
-
-
 def test_doctor_lists_the_contexts_worktrees_from_git_and_touches_none(tmp_path: Path) -> None:
     root = worktree_ws.make_workspace(tmp_path)
     repo = root / "repos/r"
@@ -119,7 +109,7 @@ def test_doctor_lists_the_contexts_worktrees_from_git_and_touches_none(tmp_path:
     _age_tree(root / ".dadaia/tmp/claude")
     worktree_ws.git(repo, "branch", "wt/0.5.0c-impl")
     (root / "worktrees/r/stray").mkdir()
-    doctor = _registered(root)
+    doctor = worktree_ws.registered_doctor(root)
 
     found = {f.message.split()[1]: f for f in doctor.check_worktrees("c")}
 

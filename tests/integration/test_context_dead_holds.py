@@ -150,7 +150,7 @@ _REFUSALS = [
     pytest.param("main", _worktree, DeadUnpushedCommitsError, r"fix: git -C \S+ worktree remove ", id="C2-registered-worktree"),
     pytest.param("lib", partial(_wt, checked_out=True), DeadUnpushedCommitsError, r"fix: python3 \S+worktree\.py merge \S+/worktrees/lib/0\.5\.0a-impl$", id="AC1.10-open-wt-worktree"),
     pytest.param("main", partial(_wt, checked_out=False), DeadUnpushedCommitsError, r"fix: python3 \S+worktree\.py merge \S+/worktrees/main/0\.5\.0a-impl$", id="AC1.10-unpushed-orphan-wt"),
-    pytest.param("main", lambda r: (r.parents[1] / ".dadaia/.venv/bin/dadaia").unlink(), DeadUnpushedCommitsError, r"no workspace CLI[\s\S]*fix: uvx dadaia-workspace init$", id="AC1.10-rows-unreadable-fails-closed"),
+    pytest.param("main", lambda r: (r.parents[1] / ".dadaia/.venv/bin/dadaia").unlink(), DeadUnpushedCommitsError, r"no workspace CLI[\s\S]*fix: uvx dadaia-workspace init \S+/ws$", id="AC1.10-rows-unreadable-fails-closed"),
     pytest.param("lib", lambda r: (r / "leftover.txt").write_text("x\n"), DeadReviewRequiredError, r"lib[\s\S]*leftover\.txt", id="A16.2-untracked-in-lib"),
     pytest.param("lib", _no_remote, DeadUnpushedCommitsError, "lib", id="A16.2-local-commits-no-remote-in-lib"),
     pytest.param("lib", _url_less, RepoUrlMissingError, r"fix: git -C \S+/repos/lib remote add origin", id="url-less-never-clone-back"),

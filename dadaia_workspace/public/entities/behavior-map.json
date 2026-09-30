@@ -86,7 +86,7 @@
       "hash_tuple": {
         "section": "sha256:9e05f0d795a46501239af0a3592075a7c278420f84b763bf43bb9a8aa07a8dec",
         "skill": "sha256:759485df844eca45ba0283331b31153fd920ed19fe4fc2ed54171ded9004a468",
-        "scripts": "sha256:bbff8bef05b96485d0fd2e26990e195e6b39e73893eb8a9496a2abdb613f93bd",
+        "scripts": "sha256:75327eac3db0b4fdd1cb13dcbdc4ba63742fbb02572be1eb4a028842242bfb26",
         "scoped": [
           "sha256:7f813750722e939ccc88e57baa5e4a9947caa45abcec292fe6e664aeb8ec4f55"
         ]
@@ -190,7 +190,7 @@
       "hash_tuple": {
         "section": "sha256:3baf0276f94f20a4c11658725934a573feea42f9924ee586555688520ee450a0",
         "skill": "sha256:e3b87e39544f8d194535ea8e7df7c12e357d6b71f3a3bc905e54331fb3641987",
-        "scripts": "sha256:211e74c9f8d0ad2bbd13568420cfd1e23b68bb3c42e6e44dccf0a6f55ae02f2e",
+        "scripts": "sha256:7fb477bf6fe32c28de97e2da6de1c04efd604749995ba13d6a503b5e01462054",
         "scoped": [
           "sha256:4c3552a8a804100c6961a13a1b3b5a36740bd7137b1b566bd50ce127977737af"
         ]
