@@ -35,7 +35,7 @@ from dadaia_workspace.infrastructure.privacy_check import (
 )
 from tests.fakes import register_dead
 from tests.fixtures.real_git import seeded_remote
-from tests.fixtures.stores import context_store, workspace_cli
+from tests.fixtures.stores import context_store
 
 _DASHES = "-" * 5
 _TERM = "zz" + "fixtureterm"
@@ -128,7 +128,7 @@ def _pre_push_refuses(name: str, content: str | bytes) -> bool:
 
 def _dead_commit_refuses(root: Path, name: str, content: str | bytes) -> bool:
     """The publish side: ``dead --commit`` over the same file, untracked in its repo."""
-    (workspace_cli(root) / "repos").mkdir()
+    (root / "repos").mkdir()
     git = GitSubprocessClient()
     service = SpecContextService(
         context_store=context_store(root / ".dadaia" / "states"),

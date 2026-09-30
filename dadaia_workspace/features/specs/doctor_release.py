@@ -117,7 +117,7 @@ class ReleaseValidator:
         if not path.exists() or not (problem := self._origin_problem(path, known_bug_ids)):
             return []
         fix = f"Operator action: name the work's origin under **Opened:** in {path}"
-        description = f"{path.relative_to(self.specs_dir)} {problem}"
+        description = f"{path.relative_to(self.specs_dir).as_posix()} {problem}"
         return [specs_finding("SPEC-DOC-048", Severity.ERROR, description, str(path), fix=fix)]
 
     def _origin_problem(self, path: Path, known_bug_ids: Callable[[], Collection[str]]) -> str:
@@ -315,7 +315,7 @@ class ReleaseValidator:
             specs_finding(
                 "SPEC-DOC-046",
                 Severity.WARNING,
-                f"{legacy.relative_to(self.specs_dir)} carries the legacy state-file name — "
+                f"{legacy.relative_to(self.specs_dir).as_posix()} carries the legacy state-file name — "
                 f"canonical is {RELEASE_STATE_FILENAME} (ADR 0007)",
                 str(legacy),
                 fixable=True,

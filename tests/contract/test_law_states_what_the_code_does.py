@@ -96,7 +96,7 @@ _LAW = sorted((_PKG / "public").rglob("*.md"))
 
 def _lines(pattern: str) -> list[str]:
     return [
-        f"{path.relative_to(_PKG)}:{n}"
+        f"{path.relative_to(_PKG).as_posix()}:{n}"
         for path in _LAW
         for n, line in enumerate(path.read_text("utf-8").splitlines(), start=1)
         if re.search(pattern, line)

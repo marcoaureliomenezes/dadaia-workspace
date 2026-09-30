@@ -10,7 +10,6 @@ envelopes and new-session injection.
 from __future__ import annotations
 
 import json
-import subprocess
 import sys
 from datetime import UTC, datetime
 from pathlib import Path
@@ -19,10 +18,7 @@ from typing import Any
 import pytest
 
 from dadaia_workspace.core import session_store
-from dadaia_workspace.core.invocation import alive_context_trees
-from dadaia_workspace.features.workspace.onboarding import next_step
 from tests.fixtures.harness_env import claude_hook_env, kimi_hook_env, run_hook_subprocess
-from tests.fixtures.stores import workspace_cli
 
 
 def _ws(root: Path, *contexts: dict[str, Any]) -> Path:
@@ -368,27 +364,3 @@ def test_injected_catalog_is_tldr_digest_and_measurably_smaller(tmp_path: Path) 
     }
     assert len(block) < len(raw) * 0.5
     assert (tmp_path / "repos/ctx/specs/memory/product/catalog.json").read_text("utf-8") == raw
-
-
-def test_bound_session_carries_the_onboarding_next_step(tmp_path: Path) -> None:
-    """AC1.5 + session-start-bound-session-omits-onboarding-next-step: the bound path
-    prints exactly the step text ``doctor`` reports (the one helper both paths call);
-    AC1.10: and the doctor's worktree block, fix included, in the doctor's rendering."""
-    _ws(tmp_path, {"name": "ctx"})
-    _bind(tmp_path, "sb", "ctx")
-    repo = tmp_path / "repos" / "ctx"
-    workspace_cli(
-        tmp_path, {"main_repo": "ctx", "associated_repos": [], "gitflow": {"work": "feature/"}}
-    )
-    for argv in (["init", "-q"], ["-c", "user.name=t", "-c", "user.email=t@t", "commit", "-q",
-                 "--allow-empty", "-m", "x"], ["branch", "wt/0.5.0a-impl"]):  # fmt: skip
-        subprocess.run(["git", "-C", str(repo), *argv], check=True, capture_output=True)
-
-    out = _run(tmp_path, "sb")
-
-    assert out.startswith("[ctx]\n")
-    step = next_step(tmp_path, alive_context_trees(tmp_path), "ctx", "sb")
-    assert step is not None and step.id == "specs"
-    assert f"\n{step.text()}\n" in out
-    orphan = f"WORKTREE warning orphan {tmp_path}/worktrees/ctx/0.5.0a-impl"
-    assert f"\n=== open worktrees ===\n{orphan}" in out and "worktree.py merge" in out  # AC1.10

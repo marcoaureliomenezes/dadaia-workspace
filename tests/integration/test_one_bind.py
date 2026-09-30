@@ -8,6 +8,7 @@ boundaries over a tmp workspace).
 from __future__ import annotations
 
 import json
+import subprocess
 from pathlib import Path
 
 import pytest
@@ -17,7 +18,7 @@ from typer.testing import CliRunner
 from dadaia_workspace.cli._specs_resolution import resolve_specs_dir_for_cli
 from dadaia_workspace.cli.main import app
 from dadaia_workspace.core import session_store
-from dadaia_workspace.core.invocation import resolve
+from dadaia_workspace.core.invocation import alive_context_trees, resolve
 from dadaia_workspace.features.workspace.onboarding import next_step
 from tests.fixtures.harness_env import (
     claude_hook_env,
@@ -25,6 +26,7 @@ from tests.fixtures.harness_env import (
     run_hook_subprocess,
     scrub_context_resolution_env,
 )
+from tests.fixtures.stores import workspace_cli
 
 _NOW = "2999-01-01T00:00:00+00:00"
 _CLAUDE = "CLAUDE_CODE_SESSION_ID"
@@ -164,13 +166,30 @@ def test_an_unbound_session_in_a_repo_injects_no_memory(tmp_path: Path) -> None:
 
 
 def test_a_bound_context_without_specs_gets_its_next_step(tmp_path: Path) -> None:
-    """sa-bind-has-two-stores#S7: header and next step, never "[no bound context]"."""
+    """sa-bind-has-two-stores#S7: header and next step, never "[no bound context]"; AC1.5:
+    exactly the step text ``doctor`` reports; AC1.10: then the doctor's worktree block, fix
+    included, in the doctor's rendering (read through `worktree.py`, hence this tier)."""
     ws = _workspace(tmp_path, "alpha")
     _record(ws, "s1", "alpha")
+    flow = {"main_repo": "alpha", "associated_repos": [], "gitflow": {"work": "feature/"}}
+    workspace_cli(ws, flow)
+    for argv in (["init", "-q"], ["commit", "-q", "--allow-empty", "-m", "x"],
+                 ["branch", "wt/0.5.0a-impl"]):  # fmt: skip
+        subprocess.run(
+            ["git", "-C", str(ws / "repos/alpha"), *argv], check=True, capture_output=True
+        )
     out = run_hook_subprocess(
         "ctx_inject", {"session_id": "s1"}, claude_hook_env(ws, session_id="s1")
     ).stdout
-    assert "[alpha]" in out and "Next (" in out and "[no bound context]" not in out
+    step = next_step(ws, alive_context_trees(ws), "alpha", "s1")
+    assert (
+        step is not None
+        and step.id == "specs"
+        and out.startswith("[alpha]\n")
+        and f"\n{step.text()}\n" in out
+    )
+    orphan = f"WORKTREE warning orphan {ws}/worktrees/alpha/0.5.0a-impl"
+    assert f"\n=== open worktrees ===\n{orphan}" in out and "worktree.py merge" in out
 
 
 @pytest.mark.parametrize(

@@ -29,7 +29,7 @@ from dadaia_workspace.infrastructure.git_subprocess import GitSubprocessClient  
 from dadaia_workspace.infrastructure.json_context_store import JsonContextStore
 from tests.fakes import register_dead  # noqa: E402
 from tests.fixtures.real_git import clone, git, seeded_remote
-from tests.fixtures.stores import context_store, workspace_cli
+from tests.fixtures.stores import context_store
 
 
 @pytest.fixture()
@@ -37,7 +37,7 @@ def workspace_root(tmp_path: Path) -> Path:
     root = tmp_path / "ws"
     root.mkdir()
     (root / "repos").mkdir()
-    return workspace_cli(root)
+    return root
 
 
 @pytest.fixture()

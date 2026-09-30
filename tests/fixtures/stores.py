@@ -29,12 +29,10 @@ def own_venv_workspace(root: Path) -> Path:
 
 
 def workspace_cli(root: Path, *listed: dict[str, object]) -> Path:
-    """The venv's `dadaia` at *root*, standing for the reads the worktree script makes:
-    `context list` prints *listed*, `reports validate` passes iff `schema_version`; any other
+    """A POSIX `dadaia` stub in *root*'s venv (a text script: Windows runs none), standing for
+    the reads the worktree script makes: `context list` prints *listed*, `reports validate` passes iff `schema_version`; any other
     verb drains its stdin (the pre-push pipe)."""
-    cli = (
-        root / ".dadaia" / ".venv" / PLATFORM.venv_scripts_dir / f"dadaia{PLATFORM.venv_exe_suffix}"
-    )
+    cli = root / ".dadaia" / ".venv" / "bin" / "dadaia"
     cli.parent.mkdir(parents=True, exist_ok=True)
     cli.write_text(_CLI.format(python=sys.executable, rows=json.dumps(list(listed))))
     cli.chmod(0o755)

@@ -12,10 +12,14 @@ import importlib.util
 import json
 import shlex
 import shutil
+import subprocess
+import sys
 from pathlib import Path
 
 import pytest
 
+from tests.helpers.release_state import write_release_phase
+from tests.helpers.skill_scripts import stage_skill_scripts
 from tests.helpers.worktree_ws import SCRIPT, approve, commit, fixes, git, make_workspace, run
 from tests.helpers.worktree_ws import run_fix as _fix
 
@@ -209,3 +213,29 @@ def test_each_kind_allows_its_own_set_only() -> None:
         ("release", "specs/audits/x/FINDINGS.jsonl"): False,
     }
     assert {row: kinds.allows(*row) for row in rows} == rows
+
+
+def test_release_closure_waits_for_every_other_wt(tmp_path: Path) -> None:
+    """AC1.10 (F4): closure runs in its release worktree, whose own wt/* is spared; any
+    other wt/* refuses it, naming repos/<r> and the owner's exit — `clean` for an empty
+    tree (N1), which clears it."""
+    (root := tmp_path / "ws").mkdir()
+    make_workspace(root)
+    git(root / "repos/r", "checkout", "-q", "feature/0.5.0")
+    assert run(root, "new", "r", "--kind", "release").returncode == 0
+    specs = root / "worktrees/r/0.5.0a-release/specs"
+    write_release_phase(specs, "0.5.0", "IMPLEMENTATION")
+    (specs / "releases/_archive").mkdir()
+    (specs / "releases/_archive/releases_histo.jsonl").write_text("")
+    assert run(root, "new", "r", "--kind", "impl").returncode == 0  # empty
+    for skill in ("dd-spec-navigator", "dd-gitflow-default", "dd-release-implementation"):
+        stage_skill_scripts(skill, tmp_path / "skills" / skill / "scripts")
+    script = tmp_path / "skills/dd-release-implementation/scripts/release.py"
+    closure = [sys.executable, str(script), "phase", "CLOSURE", "--sha", "beef123"]
+    closure += ["--specs", str(specs)]
+
+    refused = subprocess.run(closure, cwd=root, capture_output=True, text=True)
+    fix = refused.stderr.rsplit("fix: ", 1)[1].strip()
+    assert "repos/r " in refused.stderr and fix.endswith(f"clean {root}/worktrees/r/0.5.0b-impl")
+    subprocess.run(fix.replace("python3", sys.executable, 1), shell=True, cwd=root, check=True)  # noqa: S602
+    assert subprocess.run(closure, cwd=root, capture_output=True).returncode == 0

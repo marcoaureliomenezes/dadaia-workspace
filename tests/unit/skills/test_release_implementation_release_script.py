@@ -17,7 +17,6 @@ from unittest.mock import ANY
 
 import pytest
 
-from tests.helpers import worktree_ws
 from tests.helpers.release_state import PLAN
 from tests.helpers.skill_scripts import stage_skill_scripts
 
@@ -233,28 +232,6 @@ def test_phase_closure_refuses_an_open_task(script: Path, tmp_path: Path, marker
     result = _run(script, "phase", "CLOSURE", "--sha", "abc1234", "--specs", str(specs))
     assert result.returncode == 1
     assert "T-1" in result.stderr
-
-
-def test_phase_closure_from_its_release_worktree_waits_for_every_other_wt(
-    script: Path, tmp_path: Path
-) -> None:
-    """AC1.10 (F4): closure runs in its release worktree, whose own wt/* is spared; any
-    other wt/* refuses it, naming repos/<r> and the owner's exit — `clean` for an empty
-    tree (N1), which clears it."""
-    (root := tmp_path / "ws").mkdir()
-    worktree_ws.make_workspace(root)
-    worktree_ws.git(root / "repos/r", "checkout", "-q", "feature/0.5.0")
-    assert worktree_ws.run(root, "new", "r", "--kind", "release").returncode == 0
-    specs = _specs(root / "worktrees/r/0.5.0a-release")
-    _release(specs, "0.5.0", phase="IMPLEMENTATION")
-    assert worktree_ws.run(root, "new", "r", "--kind", "impl").returncode == 0  # empty
-    closure = ("phase", "CLOSURE", "--sha", "beef123", "--specs", str(specs))
-
-    refused = _run(script, *closure, cwd=root)
-    fix = refused.stderr.rsplit("fix: ", 1)[1].strip()
-    assert "repos/r " in refused.stderr and fix.endswith(f"clean {root}/worktrees/r/0.5.0b-impl")
-    subprocess.run(fix.replace("python3", sys.executable, 1), shell=True, cwd=root, check=True)  # noqa: S602
-    assert _run(script, *closure, cwd=root).returncode == 0
 
 
 def test_phase_refuses_a_malformed_sha(script: Path, tmp_path: Path) -> None:
