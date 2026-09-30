@@ -82,7 +82,7 @@ def adr_record_issues(specs_dir: Path) -> list[SectionFinding]:
     if not ledger.is_file():
         return []
     issues: list[SectionFinding] = []
-    ids: list[tuple[int, object]] = []
+    records: list[tuple[int, dict[str, object]]] = []
     for number, raw in enumerate(ledger.read_text(encoding="utf-8").split("\n"), start=1):
         if not raw.strip():
             continue
@@ -91,13 +91,19 @@ def adr_record_issues(specs_dir: Path) -> list[SectionFinding]:
         except ValueError as exc:
             issues.append(_record_issue(number, f"line is not valid JSON: {exc}"))
             continue
-        ids.append((number, record.get("id") if isinstance(record, dict) else None))
+        records.append((number, record if isinstance(record, dict) else {}))
         for message in schema_errors(record, "ADRs/decision-record-v1"):
             issues.append(_record_issue(number, message))
-    for position, (number, adr_id) in enumerate(ids, start=1):
-        if adr_id != (want := f"{position:04d}"):
+    for position, (number, record) in enumerate(records, start=1):
+        if (adr_id := record.get("id")) != (want := f"{position:04d}"):
             issues.append(_record_issue(number, f"id {adr_id!r} breaks 0001..N: expected {want}"))
             break
+    accepted = {str(r.get("id")) for _, r in records if r.get("status") == "accepted"}
+    for number, r in records:  # M2 (ADR 0151): only a ruled record changes a ruled one
+        named = f"{r.get('supersedes') or ''},{r.get('amends') or ''}".split(",")
+        ruled = r.get("status") == "accepted" and "ruling" in r
+        if r.get("status") != "rejected" and not ruled and (hit := sorted(accepted & set(named))):
+            issues.append(_record_issue(number, f"changes accepted {hit} without a ruling"))
     return issues
 
 

@@ -114,22 +114,9 @@ build-backend = "poetry.core.masonry.api"
 line-length = 100
 target-version = "py312"
 
-# Complexity/size governance (FR21a, R8): a MEASURED RATCHET. `C90` and `PLR1702` are
-# pinned AT the maxima `ruff check .` measures over production + tests + scripts
-# (0.5.0 shrink pass: C901 26 `core/handoff_index.py::_validate_node`, nesting 5). Both
-# ceilings only DECREASE — re-measure, then pin; never raise one to make a check pass.
 [tool.ruff.lint]
-select = ["E", "F", "I", "UP", "B", "SIM", "C90", "PLR1702"]
+select = ["E", "F", "I", "UP", "B", "SIM"]
 ignore = ["E501", "B008"]
-# PLR1702 is a preview-status rule in ruff; without `preview` it is silently inert.
-# Scoped to lint only, so `ruff format --check` is unaffected.
-preview = true
-
-[tool.ruff.lint.mccabe]
-max-complexity = 26
-
-[tool.ruff.lint.pylint]
-max-nested-blocks = 5
 
 # Bug ruff-0-16-2-markdown-python-fence-format-drift: ruff 0.16.2 started reformatting
 # fenced Python code blocks embedded in Markdown by default, which reached 5

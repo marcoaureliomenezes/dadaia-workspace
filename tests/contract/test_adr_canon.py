@@ -28,7 +28,13 @@ def _ledger(tmp_path: Path, ids: list[str], **fields: object) -> Path:
 
 
 def test_the_committed_ledger_is_clean_under_the_doctor_rule() -> None:
-    assert adr_record_issues(_REPO_ROOT / "specs") == []
+    """ADR 0151 M1: red until every committed accepted record carries its ruling."""
+    ledger = (_REPO_ROOT / "specs" / "ADRs" / "decisions.jsonl").read_text("utf-8").split("\n")
+    issues = [
+        f"ADR {json.loads(ledger[int(i.message.rsplit(':', 1)[1][:-1]) - 1])['id']}: {i.message}"
+        for i in adr_record_issues(_REPO_ROOT / "specs")
+    ]
+    assert not issues, "\n".join(issues)
 
 
 _VALID_RECORD: dict[str, object] = {
@@ -46,6 +52,11 @@ _VALID_RECORD: dict[str, object] = {
 
 
 _ABSENT = object()
+_RULED = {
+    "status": "accepted",
+    "measured_by": "ruff check",
+    "ruling": {"date": "2026-09-30", "words": "Aprovo"},
+}
 _RECORD_ROWS = [
     pytest.param({}, [], id="valid"),
     *(
@@ -59,16 +70,42 @@ _RECORD_ROWS = [
     ),
     pytest.param(
         {"status": "accepted"},
-        ["None is not of type 'string'"],
+        ["'ruling' is a required property", "None is not of type 'string'"],
         id="sa-adr-measured-by-pattern-refuses-real-checks#B27-2-accepted-null",
     ),
     pytest.param(
         {"status": "accepted", "measured_by": ""},
-        ["'' should be non-empty"],
+        ["'' should be non-empty", "'ruling' is a required property"],
         id="accepted-empty-measured-by",
     ),
+    pytest.param({**_RULED, "measured_by": "ruff check"}, [], id="accepted-with-a-ruling"),
     pytest.param(
-        {"status": "accepted", "measured_by": "ruff check"}, [], id="accepted-with-measured-by"
+        {"status": "accepted", "measured_by": "ruff check"},
+        ["'ruling' is a required property"],
+        id="0151-M1-accepted-without-ruling",
+    ),
+    *(
+        pytest.param(
+            {**_RULED, "ruling": {"date": "2026-09-30", "words": words}},
+            [f"{words!r} should not be valid under {{'pattern': '(?i)delega|in session'}}"],
+            id=f"0151-M1-{words}",
+        )
+        for words in ("Delegated to the PM", "accepted in session", "delegado ao PM")
+    ),
+    pytest.param(
+        {**_RULED, "ruling": {"date": "2026-09-30", "words": "Q6 A na sessão"}},
+        [],
+        id="0151-M1-operator-sessao",
+    ),
+    pytest.param(
+        {**_RULED, "ruling": {"date": "2026-09-30", "words": " "}},
+        ["' ' does not match '\\\\S'"],
+        id="0151-M1-blank-words",
+    ),
+    pytest.param(
+        {**_RULED, "ruling": {"date": "30/09/2026", "words": "Aprovo"}},
+        ["'30/09/2026' does not match '^\\\\d{4}-\\\\d{2}-\\\\d{2}$'"],
+        id="0151-M1-date-shape",
     ),
     # The six records the 2026-09-12 audit found carried `"supersedes": []`.
     pytest.param(
@@ -113,6 +150,27 @@ def test_the_doctor_rule_flags_the_first_id_breaking_0001_to_n(
     """sa-adr-measured-by-pattern-refuses-real-checks#B27-3: a gap or a start past 0001 is a LEDGER-ADR-SCHEMA finding."""
     issues = adr_record_issues(_ledger(tmp_path, ids))
     assert [i.message for i in issues] == expected
+
+
+@pytest.mark.parametrize(
+    ("change", "expected"),
+    [
+        ({"status": "proposed"}, ["changes accepted ['0001'] without a ruling"]),
+        ({"status": "superseded"}, ["changes accepted ['0001'] without a ruling"]),
+        ({"status": "accepted", "measured_by": "x"}, ["'ruling' is a required property", "changes accepted ['0001'] without a ruling"]),
+        (_RULED, []),
+        ({"status": "rejected"}, []),
+    ],
+)  # fmt: skip
+def test_only_a_ruled_record_changes_an_accepted_one(
+    tmp_path: Path, change: dict[str, object], expected: list[str]
+) -> None:
+    """ADR 0151 M2: every non-rejected record (born-superseded too) amending an accepted one is itself accepted with a ruling."""
+    specs = _ledger(tmp_path, ["0001"], **_RULED)
+    ledger = specs / "ADRs" / "decisions.jsonl"
+    successor = {**_VALID_RECORD, **change, "id": "0002", "amends": "0001"}
+    ledger.write_text(ledger.read_text("utf-8") + json.dumps(successor) + "\n", "utf-8")
+    assert [i.message.rsplit(" (", 1)[0] for i in adr_record_issues(specs)] == expected
 
 
 def test_doctor_admits_any_named_check_and_flags_a_duplicate_id(

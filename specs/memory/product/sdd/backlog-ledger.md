@@ -16,16 +16,17 @@ sources:
 
 - Only the operator creates demand; `dd-product-engineer` curates it, and an entry materializes only through the main thread's operator-facing intake report or an operator-ratified deferral inside a release ([[agent-orchestration]]).
 - `specs/backlog/` holds `BACKLOG.json` (`backlog-v1`, `{schema, active: [...]}`), `AGENTS.md` and `_archive/backlog_histo.jsonl`; no per-entry file exists.
-- An `active[]` entry carries `title`, `opened`, `status`, `description`, `provenance` and optional `intents`; its slug matches `^[a-z][a-z0-9-]+$`.
+- An `active[]` entry carries `title`, `opened`, `status`, `description`, `provenance`, optional `intents` and `relates` — the live entries it was judged to update, obsolete or relate to at birth, empty for none, absent when the backlog was empty; its slug matches `^[a-z][a-z0-9-]+$`.
 - `status` is a lowercase live token, never a backlog terminal word; an `idea` needs no intents, every later status binds `intents[]` whose subjects resolve to a code, doc or CLI anchor.
-- A release picks an entry by naming its slug on its SPEC's `**Origin:** backlog:` line; the entry stays in `active[]` and exits once, at the closure disposition sweep ([[release-lifecycle]]); a deferred entry stays in `active[]`.
+- The document is written in a `backlog` worktree ([[worktrees]]).
+- A release picks an entry by naming its slug on a candidate SPEC's `**Origin:** backlog:` line; the entry stays in `active[]` and exits once, at the closure disposition sweep ([[release-lifecycle]]); a deferred entry stays in `active[]`.
 
 ## The writer — `backlog.py`
 
 - `python3 .agents/skills/dd-backlog-definition/scripts/backlog.py <verb> [--specs <path>]` is the one writer and validator; every write validates the bytes it is about to commit, so writer and validator cannot disagree.
-- `new <slug> [--title] [--description] [--provenance] [--intent KIND:REF=CHANGE]` appends one entry born at `idea`.
+- `new <slug> [--title] [--description] [--provenance] [--intent KIND:REF=CHANGE] --relates <slugs>|none` appends one entry born at `idea`; with a non-empty `active[]` it refuses a missing `--relates` or one naming a slug not live, listing the live slugs.
 - `exit <slug> --disposition delivered|superseded|rejected [--release <id>] [--reason <text>] [--summary <text>]` removes the one `active[]` object and appends one `histo-record-v1` `{id, ts, disposition, release, reason, summary, entry}`, `entry` being the removed object, redacted.
-- `exit` refuses before writing anything: a slug not live in `active[]` (already exited or unknown), a disposition outside the three, `delivered`/`superseded` without `--release` naming a live or archived release, `delivered`/`superseded` of an entry whose slug that release's `**Origin:** backlog:` line does not name, and `rejected` without `--reason` — each with one `fix:` line.
+- `exit` refuses before writing anything: a slug not live in `active[]` (already exited or unknown), a disposition outside the three, `delivered`/`superseded` without `--release` naming a live or archived release, `delivered`/`superseded` of an entry whose slug no `rc-<N>/SPEC.md` of that release names on its `**Origin:** backlog:` line, and `rejected` without `--reason` — each with one `fix:` line.
 - `subjects [--kind <kind>]` lists the anchors of the operator alias map (`.dadaia/states/backlog_subject_aliases.txt`).
 - `check [--json]` validates `BACKLOG.json` and `backlog_histo.jsonl`.
 
@@ -40,4 +41,4 @@ sources:
 
 ## Dependencies
 
-[[release-lifecycle]], [[workspace-doctor]], [[agent-orchestration]].
+[[release-lifecycle]], [[workspace-doctor]], [[agent-orchestration]], [[worktrees]].

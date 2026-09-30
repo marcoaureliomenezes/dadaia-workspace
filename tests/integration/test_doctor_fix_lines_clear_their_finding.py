@@ -31,8 +31,10 @@ from __future__ import annotations
 import json
 import os
 import re
+import shlex
 import shutil
 import subprocess
+import sys
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -52,6 +54,7 @@ from dadaia_workspace.features.specs.citations import dead_verb_citations
 from dadaia_workspace.features.specs.doctor import SpecsDoctor
 from dadaia_workspace.features.specs.rules import RULES as SPECS_RULES
 from tests.fixtures.harness_env import session_home
+from tests.helpers import worktree_ws
 
 from ..unit.features.specs.test_doctor import _make_clean_specs_tree
 from .test_backlog_doctor import _SOURCE, _active_entry
@@ -121,13 +124,13 @@ def _plant_gitflow_gone(root: Path) -> None:
 def _plant_status_line_gone(root: Path) -> None:
     """sa-status-line-has-two-parsers#B26-3 a 173-line TASKS.md, lowercase token on line 3;
     sa-status-line-has-two-parsers#B26-4 a SPEC.md with no status line — both fire."""
-    release = root / "specs" / "releases" / _RELEASE
+    release = root / "specs" / "releases" / _RELEASE / "rc-1"
     (release / "SPEC.md").write_text("# Spec\n\nContent.\n", encoding="utf-8")
     (release / "TASKS.md").write_text("# Tasks\n\n**Status:** approved\n" + "- t\n" * 170)
 
 
 def _plant_origin_line_gone(root: Path) -> None:
-    spec = root / "specs" / "releases" / _RELEASE / "SPEC.md"
+    spec = root / "specs" / "releases" / _RELEASE / "rc-1" / "SPEC.md"
     spec.write_text(
         "# Spec\n\n**Status:** Approved\n**Opened:** 2026-09-21\n\nContent.\n",
         encoding="utf-8",
@@ -135,7 +138,7 @@ def _plant_origin_line_gone(root: Path) -> None:
 
 
 def _plant_oversized_plan(root: Path) -> None:
-    plan = root / "specs" / "releases" / _RELEASE / "PLAN.md"
+    plan = root / "specs" / "releases" / _RELEASE / "rc-1" / "PLAN.md"
     body = "\n".join(f"- line {i}" for i in range(400))
     plan.write_text(f"# Plan\n\n**Status:** Approved\n\n{body}\n", encoding="utf-8")
 
@@ -180,10 +183,25 @@ def _plant_dispositioned_audit(root: Path) -> None:
     )
 
 
+def _plant_legacy_state_name(root: Path) -> None:
+    """ADR 0007: the legacy state-file name, renamed by `doctor --fix`."""
+    state = root / "specs" / "releases" / _RELEASE / "_RELEASE.json"
+    state.rename(state.with_name("RELEASE.json"))
+
+
 def _plant_stray_dotfile(root: Path) -> None:
     # Untracked and with no canon home — the case a ``git mv`` fix line could not serve
     # (bug tree8-fix-line-not-runnable-for-every-case).
     (root / "specs" / ".DS_Store").write_bytes(b"\x00")
+
+
+def _plant_orphan_wt(root: Path) -> None:
+    """An unmerged orphan: `wt/0.5.0a-impl` carries a commit and has no tree."""
+    repo, tree = root / "repos/r", root / "worktrees/r/0.5.0a-impl"
+    worktree_ws.git(repo, "checkout", "-q", "feature/0.5.0")
+    worktree_ws.git(repo, "worktree", "add", "-q", "-b", "wt/0.5.0a-impl", str(tree))
+    worktree_ws.commit(tree, "src/a.py")
+    worktree_ws.git(repo, "worktree", "remove", str(tree))
 
 
 #: code -> how to make it fire. The eight remedies the 0.4.7 candidate-2 review named,
@@ -192,6 +210,8 @@ PLANTS: dict[str, Plant] = {
     # sa-unfixable-doctor-findings-say-doctor-fix#S2 — the doctor's own repairs, run as
     # printed (`doctor --fix --specs-dir <specs>`).
     "TREE-4": Plant(_plant_nothing),
+    # AC1.10: the workspace section's WORKTREE rule, proven by its own test below.
+    "WORKTREE": Plant(_plant_orphan_wt),
     "TREE-5": Plant(_plant_missing_root_agents),
     "SPEC-DOC-034": Plant(_plant_nothing),
     "MEM-PLACEHOLDER-1": Plant(_plant_placeholder_atom),
@@ -208,6 +228,7 @@ PLANTS: dict[str, Plant] = {
         )
     ),
     "TREE-3": Plant(_plant_missing_memory_document),
+    "SPEC-DOC-046": Plant(_plant_legacy_state_name),
 }
 
 
@@ -321,6 +342,20 @@ def test_the_fix_line_clears_the_finding_it_was_stamped_on(
     assert not new_errors, f"{code}: the fix created {new_errors}"
 
 
+def test_spec_doc_046_never_clobbers_a_canonical_state_file(repo: Path) -> None:
+    """ADR 0007: with both names on disk SPEC-DOC-046 is silent, and a fix stamped before
+    `_RELEASE.json` appeared re-checks and renames nothing."""
+    release = repo / "specs" / "releases" / _RELEASE
+    _plant_legacy_state_name(repo)
+    doctor = _doctor(repo)
+    [stale] = [i for i in doctor.check() if i.code == "SPEC-DOC-046"]
+    (release / "_RELEASE.json").write_text("{}", encoding="utf-8")
+    assert [i for i in doctor.check() if i.code == "SPEC-DOC-046"] == []
+    doctor.fix([stale])
+    assert (release / "RELEASE.json").is_file()
+    assert (release / "_RELEASE.json").read_text(encoding="utf-8") == "{}"
+
+
 def _whole(root: Path) -> set[tuple[str, str, bool]]:
     """Every finding of the whole specs section: (code, message, error-class)."""
     report = _specs_section(_doctor(root), None)
@@ -386,9 +421,9 @@ OPERATOR_ACTION: dict[str, Callable[[Path], None]] = {
     "TREE-8": _plant_stray_dotfile,
     "LINT-1": lambda r: _write(r / "specs" / "memory" / "product" / "testarea" / "x.md", "# X\n"),
     "SPEC-DOC-001": lambda r: (r / "specs" / "constitution.md").unlink(),
-    "SPEC-DOC-024": lambda r: _write(r / f"specs/releases/{_RELEASE}/TASKS.md", "# Tasks\n\n**Status:** Draft\n"),
+    "SPEC-DOC-024": lambda r: _write(r / f"specs/releases/{_RELEASE}/rc-1/TASKS.md", "# Tasks\n\n**Status:** Draft\n"),
     "SPEC-DOC-026": lambda r: _write(r / f"specs/releases/_archive/{_RELEASE}/SPEC.md", "# S\n"),
-    "SPEC-DOC-047": lambda r: _append(r / f"specs/releases/{_RELEASE}/TASKS.md", "- [ ] T2 x\n  Write set: specs/memory/QUALITY.md\n"),
+    "SPEC-DOC-047": lambda r: _append(r / f"specs/releases/{_RELEASE}/rc-1/TASKS.md", "- [ ] T2 x\n  Write set: specs/memory/QUALITY.md\n"),
     "ADR-SUPERSEDED-CITATION": lambda r: (
         _write(r / "specs/ADRs/decisions.jsonl", '{"id": "0001", "status": "superseded"}\n'),
         _append(r / "specs/memory/QUALITY.md", "\nADR: 0001\n"),
@@ -487,3 +522,24 @@ def test_doctor_fix_renders_a_raw_law_copy_and_clears_its_finding(repo: Path) ->
     assert _AREA_HEADER in text and _ROOT_ROW in text
     assert not [p for p in _PLACEHOLDERS if p in text]
     assert root_law_findings() == []
+
+
+def test_a_worktree_finding_is_cleared_by_its_merge_fix(tmp_path: Path) -> None:
+    """AC1.10: an unmerged orphan wt/* carries the owner's `worktree.py merge`; its chain —
+    merge refuses with the re-attach, the re-attached (unlocked) tree is still ours and
+    `ready`, the reviewed merge lands — ends with no finding."""
+    root = worktree_ws.make_workspace(tmp_path)
+    PLANTS["WORKTREE"].plant(root)
+    doctor = worktree_ws.registered_doctor(root)
+    for _ in range(3):
+        if not (found := doctor.check_worktrees("c")):
+            break
+        worktree_ws.approve(
+            root, worktree_ws.git(root / "repos/r", "rev-parse", "wt/0.5.0a-impl").strip()
+        )
+        command = found[0].fix.replace("python3", shlex.quote(sys.executable), 1)
+        done = subprocess.run(command, shell=True, cwd=root, capture_output=True, text=True)  # noqa: S602
+        if done.returncode:
+            (refix,) = worktree_ws.fixes(done)
+            subprocess.run(refix.removeprefix("fix: "), shell=True, check=True, capture_output=True)  # noqa: S602
+    assert doctor.check_worktrees("c") == []

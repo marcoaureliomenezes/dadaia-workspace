@@ -7,8 +7,8 @@ live. Terms are defined in [concepts](concepts.md); the long walkthrough is
 
 ## 1. The three levels in one block
 
-<!-- derived-from: pypi-distribution sha256:9078512b58f9 -->
-<!-- derived-from: workspace-init sha256:56685f3d0950 -->
+<!-- derived-from: pypi-distribution sha256:92dbd2d7ed61 -->
+<!-- derived-from: workspace-init sha256:6ef28aa7796e -->
 
 Set `REPO_URL` to your repository's clone URL; everything else runs as printed (needs
 uv and network access):
@@ -45,7 +45,7 @@ Then `.dadaia/.venv/bin/dadaia specs init --context <ctx>` refreshes the project
 
 ## 2. What the init line provisioned
 
-<!-- derived-from: workspace-init sha256:56685f3d0950 -->
+<!-- derived-from: workspace-init sha256:6ef28aa7796e -->
 
 `--harness` names one registered harness: `claude` | `codex` | `kimi-code` | `cursor` |
 `devin` | `copilot`. The directory is required and a directory holding a foreign tree
@@ -53,7 +53,8 @@ is refused with one `fix:` line.
 
 - `.dadaia/.venv`, the `.dadaia/` zones init and install create, `.agents/skills`, and
   the named harness's projection.
-- the seeded state documents and the harness roster, never overwriting existing data.
+- the seeded state documents, the harness roster and an absent root `.dadaiaignore`
+  (the operator's file), never overwriting existing data.
 - the staged and installed public assets, the one writer of every hook wiring;
   `--skip-assets` leaves the workspace ungated until
   `.dadaia/.venv/bin/dadaia public install` runs, and the output says so.
@@ -66,23 +67,23 @@ clones every repo, installs the hook and makes the context ALIVE; `context bind`
 
 ## 3. The bind
 
-<!-- derived-from: context-management sha256:1871a6d846b2 -->
+<!-- derived-from: context-management sha256:22e5ab09dc0d -->
 
 ```bash
-eval "$(.dadaia/.venv/bin/dadaia context bind <your-repo> --print-env)"
+.dadaia/.venv/bin/dadaia context bind <your-repo>
 .dadaia/.venv/bin/dadaia context show <your-repo> --json
 ```
 
 `bind` writes one record, `.dadaia/sessions/<session-id>.json` (context, runtime, pid,
-`bound_at`), and acquires nothing; `--print-env` emits `DADAIA_CONTEXT` and
-`DADAIA_SESSION_ID` for the `eval $(…)` flow. The bind names the session's scope — the
+`bound_at`), and acquires nothing; the gate and the bind read the session id from the
+environment only. The bind names the session's scope — the
 context's main repo plus its associated repos — and the bound context's memory is
-injected once into the session. The bind is read from `DADAIA_CONTEXT` then the session
-record, never the cwd: sitting inside a repository is not a binding.
+injected once into the session. The bind is read from the session's own record when it has an
+id, else `DADAIA_CONTEXT`, never the cwd: sitting inside a repository is not a binding.
 
 ## 4. Compliance
 
-<!-- derived-from: workspace-doctor sha256:772d9d7a78d3 -->
+<!-- derived-from: workspace-doctor sha256:1d52a99379ba -->
 
 `doctor` is the one instance validator; three sections run in fixed order —
 `workspace`, `specs`, `ledgers`. Every finding prints as one `<CODE> <verdict>
@@ -92,25 +93,26 @@ run. `--fix` moves slop to `.dadaia/reaped/` and deletes only what a TTL expired
 
 ## 5. The first backlog entry
 
-<!-- derived-from: backlog-ledger sha256:721ed11c7220 -->
+<!-- derived-from: backlog-ledger sha256:4bdc376c943d -->
 
 `backlog.py new` appends one entry, born `idea`, to `specs/backlog/BACKLOG.json`'s
 `active[]` — the operator's demand queue; from the workspace root `--specs` names the
 context's specs tree, since no `specs/` sits at or above the cwd. The script is the
 document's one writer and validator: every write validates the bytes it is about to
-commit. Only the operator creates demand.
+commit. Only the operator creates demand, and the document is written in a `backlog`
+worktree.
 
 ## 6. The first release
 
-<!-- derived-from: release-lifecycle sha256:57d8b542e879 -->
+<!-- derived-from: release-lifecycle sha256:cf04bb23d3bd -->
 
-`release.py new` is one birth act, all or nothing: a `SPEC.md` stub plus
-`_RELEASE.json` in `DEFINITION` under `specs/releases/<id>/`, refusing a second live
+`release.py new` is one birth act, all or nothing: a `SPEC.md` stub in
+`specs/releases/<id>/rc-1/` plus `_RELEASE.json` in `DEFINITION` at the release root, refusing a second live
 release or a non-SemVer id with a `fix:` line. From there, author `SPEC.md`, `PLAN.md`
-and `TASKS.md` at the release root, `PLAN.md` opening with the As-is review table
-(`unit | today | bugs | verdict | why`); `release.py phase IMPLEMENTATION --sha <sha>`
-opens implementation once all three carry `**Status:** Approved` and that table is
-present.
+and `TASKS.md` in that `rc-<N>/`, `PLAN.md` opening with the As-is review table
+(`unit | today | bugs | verdict | why`) and carrying the Authorities and Parallel schedule
+tables; `release.py phase IMPLEMENTATION --sha <sha>` opens implementation once all
+three carry `**Status:** Approved` and that structure is present.
 
 Next: [positioning](positioning.md) for why this shape, [the bug loop](bug-loop.md)
 for the path a defect takes.

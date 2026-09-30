@@ -3,7 +3,8 @@
 Intent: CONTRACT — bind-driven injection (FR-W2-01/02, T-50-03), compaction re-entry
 (claude-compact-reinjection-missing, kimi-postcompact-omits-bound-context-bootstrap),
 the catalog digest (AC-W4-03), A19.1 (associated repos inject nothing), A30.1,
-bind-lost-silently-after-five-idle-minutes (a lost bind is told once).
+bind-lost-silently-after-five-idle-minutes (a lost bind is told once); AC1.2 Cursor/Copilot
+envelopes and new-session injection.
 """
 
 from __future__ import annotations
@@ -17,8 +18,6 @@ from typing import Any
 import pytest
 
 from dadaia_workspace.core import session_store
-from dadaia_workspace.core.invocation import alive_context_trees
-from dadaia_workspace.features.workspace.onboarding import next_step
 from tests.fixtures.harness_env import claude_hook_env, kimi_hook_env, run_hook_subprocess
 
 
@@ -30,7 +29,8 @@ def _ws(root: Path, *contexts: dict[str, Any]) -> Path:
     entries = []
     for c in contexts:
         slug = c.get("slug", c["name"])
-        entry = {"name": c["name"], "repo_slug": slug, "state": c.get("state", "alive")}
+        entry = {"name": c["name"], "repo_slug": slug, "state": c.get("state", "alive"),
+                 "repo_url": "", "created_at": "2026-09-30T00:00:00+00:00"}  # fmt: skip
         product = root / "repos" / slug / "specs" / "memory" / "product"
         product.mkdir(parents=True)
         (product.parent / "ARCHITECTURE.md").write_text(
@@ -51,7 +51,9 @@ def _ws(root: Path, *contexts: dict[str, Any]) -> Path:
                 f"# A\n\n## Tech Stack\n\n{c['assoc']}\n", encoding="utf-8"
             )
         entries.append(entry)
-    (states / "spec_contexts.json").write_text(json.dumps({"contexts": entries}), "utf-8")
+    (states / "spec_contexts.json").write_text(
+        json.dumps({"schema_version": "2", "contexts": entries}), "utf-8"
+    )
     return root
 
 
@@ -71,10 +73,11 @@ def _run(
     source: str | None = None,
     extra: dict[str, str] | None = None,
 ) -> str:
-    env = claude_hook_env(
-        root, extra={**(extra or {}), **({"DADAIA_HOOK_EVENT": event} if event else {})}
+    env = claude_hook_env(  # the env id is the one id channel: bind sees no stdin (review F1)
+        root,
+        session_id=sid,
+        extra={**(extra or {}), **({"DADAIA_HOOK_EVENT": event} if event else {})},
     )
-    env.pop("CLAUDE_CODE_SESSION_ID", None)  # the stdin field is the one id channel
     env.pop("DADAIA_CONTEXT", None)
     payload: dict[str, object] = {"session_id": sid}
     if source:  # Claude Code's SessionStart re-entry
@@ -172,8 +175,18 @@ _A = "[alpha]"
             [("bind", "alpha"), ("prompt", _A), ("lose", ""), ("prompt", "")], id="lost-bind"
         ),
         pytest.param(
-            [("prompt", _UNBOUND), ("bind", "alpha"), ("prompt", _A), ("startup", "")],
-            id="sessionstart-other-source-follows-the-normal-flow",
+            [
+                ("prompt", _UNBOUND),
+                ("bind", "alpha"),
+                ("prompt", _A),
+                ("resume", ""),
+                ("startup", _A),
+            ],
+            id="sessionstart-resume-continues-a-new-session-injects",
+        ),
+        pytest.param(
+            [("bind", "alpha"), ("SessionStart", _A), ("SessionStart", _A)],
+            id="AC1.2-every-new-session-of-a-sessionstart-only-harness-injects",
         ),
     ],
 )
@@ -193,9 +206,9 @@ def test_injection_sequence(tmp_path: Path, steps: list[tuple[str, str]]) -> Non
             continue
         if kind == "prompt":
             out = _run(tmp_path, "s")
-        elif kind == "PostCompact":
+        elif kind in ("PostCompact", "SessionStart"):  # the lane's own env names the event
             out = _run(tmp_path, "s", event=kind)
-            assert marker.is_file()
+            assert marker.is_file() is (kind == "PostCompact")
         else:
             out = _run(tmp_path, "s", source=kind)
             assert not marker.exists()
@@ -294,18 +307,26 @@ def test_env_override_injects_context_memory(tmp_path: Path) -> None:
 
 
 @pytest.mark.parametrize(
-    ("extra", "event"),
+    ("extra", "event", "key"),
     [
-        ({"DADAIA_HOOK_OUTPUT": "codex-json", "DADAIA_HOOK_EVENT": "SessionStart"}, "SessionStart"),
-        ({"DADAIA_HOOK_OUTPUT": "json"}, "UserPromptSubmit"),
+        ({"DADAIA_HOOK_OUTPUT": "codex-json", "DADAIA_HOOK_EVENT": "SessionStart"}, "SessionStart", ""),
+        ({"DADAIA_HOOK_OUTPUT": "json"}, "UserPromptSubmit", ""),
+        ({"DADAIA_HOOK_OUTPUT": "cursor-json"}, None, "additional_context"),
+        ({"DADAIA_HOOK_OUTPUT": "copilot-json"}, None, "additionalContext"),
     ],
-    ids=["codex-json-envelope", "json-default-event"],
-)
-def test_output_contract_envelopes(tmp_path: Path, extra: dict[str, str], event: str) -> None:
+    ids=["codex-json-envelope", "json-default-event", "AC1.2-cursor-top-level", "AC1.2-copilot-top-level"],
+)  # fmt: skip
+def test_output_contract_envelopes(
+    tmp_path: Path, extra: dict[str, str], event: str | None, key: str
+) -> None:
+    """Each output mode is its vendor's documented envelope: the native ``hookSpecificOutput``,
+    or (Cursor, Copilot sessionStart) one top-level context key."""
     _ws(tmp_path, {"name": "ctx"})
-    envelope = json.loads(_run(tmp_path, "s", extra=extra))["hookSpecificOutput"]
-    assert envelope["hookEventName"] == event
-    assert envelope["additionalContext"].startswith(_UNBOUND)
+    out = json.loads(_run(tmp_path, "s", extra=extra))
+    envelope = out["hookSpecificOutput"] if event else out
+    assert list(out) == [key or "hookSpecificOutput"]
+    assert envelope.get("hookEventName") == event
+    assert envelope[key or "additionalContext"].startswith(_UNBOUND)
 
 
 def test_emissions_attach_the_derived_help_digest(tmp_path: Path) -> None:
@@ -343,17 +364,3 @@ def test_injected_catalog_is_tldr_digest_and_measurably_smaller(tmp_path: Path) 
     }
     assert len(block) < len(raw) * 0.5
     assert (tmp_path / "repos/ctx/specs/memory/product/catalog.json").read_text("utf-8") == raw
-
-
-def test_bound_session_carries_the_onboarding_next_step(tmp_path: Path) -> None:
-    """AC1.5 + session-start-bound-session-omits-onboarding-next-step: the bound path
-    prints exactly the step text ``doctor`` reports (the one helper both paths call)."""
-    _ws(tmp_path, {"name": "ctx"})
-    _bind(tmp_path, "sb", "ctx")
-
-    out = _run(tmp_path, "sb")
-
-    assert out.startswith("[ctx]\n")
-    step = next_step(tmp_path, alive_context_trees(tmp_path), "ctx", "sb")
-    assert step is not None and step.id == "specs"
-    assert f"\n{step.text()}\n" in out

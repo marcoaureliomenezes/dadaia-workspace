@@ -40,7 +40,7 @@ The canon (operator, 2026-08-28) — the ONLY members permitted under ``specs/``
     AGENTS.md constitution.md memory/ releases/ backlog/ bugs/ audits/ ADRs/
 
     releases/{AGENTS.md, _archive/{releases_histo.jsonl, <M.m.p>/**},
-              <M.m.p>/{_RELEASE.json, SPEC.md, PLAN.md, TASKS.md}}
+              <M.m.p>/{_RELEASE.json, rc-<N>/{SPEC.md, PLAN.md, TASKS.md}}}
     backlog/{AGENTS.md, BACKLOG.json, _archive/backlog_histo.jsonl}
     bugs/{AGENTS.md, BUGS.jsonl, _archive/bugs_histo.jsonl}
     audits/{AGENTS.md, _archive/audits_histo.jsonl,
@@ -51,7 +51,7 @@ The canon (operator, 2026-08-28) — the ONLY members permitted under ``specs/``
 
 Nothing else — no ``.gitkeep``, no dotfiles, no ``remote-bugs/``, no ``reviews/``, no
 ``.md`` ADRs. Every path checked is POSIX-relative to ``specs/`` (e.g.
-``"releases/0.5.0/SPEC.md"``, never an absolute filesystem path or a
+``"releases/0.5.0/rc-1/SPEC.md"``, never an absolute filesystem path or a
 backslash-separated one) — the same shape both a filesystem walk (``Path.as_posix()``)
 and a git tree listing (``git ls-tree``'s own native output) already produce.
 """
@@ -324,7 +324,7 @@ def _write_absent(root: Path, writes: list[tuple[Path, Callable[[], str], bool]]
 def scaffold_entry(specs_dir: Path, rel_path: str, /, **context: str) -> Path:
     """Render and write ONE canon-conformant, on-demand entry — the generic sibling of
     :func:`scaffold`'s birth-time fold (e.g. ``scaffold_entry(specs_dir,
-    "releases/0.6.0/SPEC.md", release_id="0.6.0")``).
+    "releases/0.6.0/rc-1/SPEC.md", release_id="0.6.0")``).
 
     File-level no-clobber: refuses (``FileExistsError``) when *rel_path* already
     exists. Raises ``ValueError`` when *rel_path* matches no :data:`CANON` entry, or

@@ -1,16 +1,13 @@
 """Shared primitives of the Python governance hooks: stdin JSON, payload normalization,
-write-target extraction, session id and the block/allow envelopes. Every file read or
+write-target extraction and the block/allow envelopes. Every file read or
 write passes ``encoding="utf-8"`` (Windows defaults to the locale code page)."""
 
 from __future__ import annotations
 
 import contextlib
 import json
-import os
 import sys
 from typing import Any
-
-from dadaia_workspace.core import invocation
 
 WRITE_TOOLS = frozenset({"Write", "write_file", "Edit", "edit_file", "MultiEdit", "NotebookEdit"})
 WRITE_TOOLS |= {"apply_patch"}
@@ -63,11 +60,6 @@ def target_paths(payload: dict[str, Any]) -> list[str]:
 def target_path(payload: dict[str, Any]) -> str:
     """The first of :func:`target_paths`, or ``""``."""
     return next(iter(target_paths(payload)), "")
-
-
-def resolve_session_id(payload: dict[str, Any], *, default: str = "") -> str:
-    """The sanitized session id by the one rule (:func:`invocation.resolve_session_id`)."""
-    return invocation.resolve_session_id(payload, os.environ, default=default)
 
 
 def emit_block(reason: str) -> None:

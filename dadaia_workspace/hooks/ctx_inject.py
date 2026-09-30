@@ -12,6 +12,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 from dadaia_workspace.core import invocation, session_store, workspace_layout
+from dadaia_workspace.core.doctor_rules import render_finding
 from dadaia_workspace.features.spec_context import injection_policy
 from dadaia_workspace.features.workspace import onboarding
 from dadaia_workspace.hooks import _common
@@ -31,20 +32,23 @@ def _session_bound_at(workspace: Path, session_id: str) -> float | None:
         return None
 
 
-def _resolve_context(payload: dict[str, object]) -> str:
+def _resolve_context() -> str:
     """The session's bind — never the cwd's repo: an unbound session injects no memory."""
-    return (
-        invocation.resolve(payload=payload, env=os.environ, cwd=Path.cwd()).bind.context_name or ""
-    )
+    return invocation.resolve(env=os.environ, cwd=Path.cwd()).bind.context_name or ""
 
 
 def _emit(payload: str) -> None:
-    if os.environ.get("DADAIA_HOOK_OUTPUT", "") in ("codex-json", "json"):
-        event = os.environ.get("DADAIA_HOOK_EVENT", "UserPromptSubmit")
-        out = {"hookEventName": event, "additionalContext": payload}
-        print(json.dumps({"hookSpecificOutput": out}))
-    else:
-        sys.stdout.write(payload)
+    """*payload* in the envelope ``DADAIA_HOOK_OUTPUT`` names — each vendor's documented
+    context key (Cursor and Copilot read a top-level one at sessionStart) — else plain text."""
+    event = os.environ.get("DADAIA_HOOK_EVENT", "UserPromptSubmit")
+    native: dict[str, object] = {
+        "hookSpecificOutput": {"hookEventName": event, "additionalContext": payload}
+    }
+    envelopes: dict[str, dict[str, object]] = {"codex-json": native, "json": native}
+    envelopes |= {"cursor-json": {"additional_context": payload}}
+    envelopes |= {"copilot-json": {"additionalContext": payload}}
+    out = envelopes.get(os.environ.get("DADAIA_HOOK_OUTPUT", ""))
+    sys.stdout.write(payload if out is None else json.dumps(out) + "\n")
 
 
 def _digest_catalog(raw: str) -> str:
@@ -72,11 +76,14 @@ def _tech_stack_section(raw: str) -> str:
 
 
 def _build_memory(specs_dir: Path) -> str:
-    """The tech-stack section + the catalog digest (else ``index.md``)."""
+    """``constitution.md`` + the tech-stack section + the catalog digest (else ``index.md``)
+    — one hook for every harness, so every harness gets the constitution (ADR 0103)."""
     memory_dir = specs_dir / "memory"
     if not memory_dir.is_dir():
         return ""
-    parts = ["", "=== workspace memory (tech + catalog) ==="]
+    parts = ["", "=== workspace memory (constitution + tech + catalog) ==="]
+    with contextlib.suppress(OSError):
+        parts.append((specs_dir / "constitution.md").read_text(encoding="utf-8").strip())
     architecture = memory_dir / "ARCHITECTURE.md"
     if architecture.is_file():
         with contextlib.suppress(OSError):
@@ -141,11 +148,27 @@ def _generic_preflight(workspace: Path, session: str | None, lost: str) -> str:
     return "\n".join(sections) + "\n"
 
 
+def _worktrees(workspace: Path, context: str) -> list[str]:
+    """The doctor's worktree findings for *context* (AC1.10), in the doctor's own rendering."""
+    from dadaia_workspace.features.spec_context.doctor import DoctorService  # P-12: no container
+    from dadaia_workspace.infrastructure.git_subprocess import GitSubprocessClient
+    from dadaia_workspace.infrastructure.json_context_store import JsonContextStore
+
+    try:
+        store = JsonContextStore(workspace / ".dadaia" / "states")
+        found = DoctorService(store, GitSubprocessClient(), workspace).check_worktrees(context)
+    except Exception:  # noqa: BLE001 — fail-open: a hook never crashes the session
+        return []
+    return [render_finding(f) for f in found]
+
+
 def _emit_bootstrap(workspace: Path, context: str) -> None:
     sections = _head(workspace, f"[{context}]", context, True)
     specs = invocation.resolve_context_specs_dir(workspace, context)
     if memory := _build_memory(specs) if specs else "":
         sections.append(memory)
+    if worktrees := _worktrees(workspace, context):
+        sections += ["", "=== open worktrees ===", *worktrees, "=== end worktrees ==="]
     if digest := _read_help_digest(workspace):
         sections.append(digest.rstrip("\n"))
     _emit("\n".join(sections) + "\n")
@@ -154,15 +177,13 @@ def _emit_bootstrap(workspace: Path, context: str) -> None:
 def main() -> int:
     payload = _common.read_stdin_json()
     try:
-        workspace = invocation.resolve(
-            payload=payload, env=os.environ, cwd=Path.cwd()
-        ).workspace_root
+        workspace = invocation.resolve(env=os.environ, cwd=Path.cwd()).workspace_root
     except Exception:  # noqa: BLE001 — fail-open: emit nothing rather than crash
         workspace = None
     if workspace is None:
         _emit("")
         return 0
-    own = _common.resolve_session_id(payload) or None
+    own = invocation.resolve_session_id(os.environ) or None
     if own:  # the operator's prompt is activity too: renew the liveness clock
         session_store.touch_last_seen_at(workspace, own, now=datetime.now(tz=UTC).isoformat())
     session_id = own or "workspace"
@@ -176,18 +197,20 @@ def main() -> int:
         with contextlib.suppress(OSError):
             tmp_dir.mkdir(parents=True, exist_ok=True)
             compact_marker.write_text("", encoding="utf-8")
-    elif payload.get("hook_event_name") == "SessionStart" and payload.get("source") in (
-        "compact",
-        "clear",
-    ):
-        event = "session_restart"
+    elif "SessionStart" in (os.environ.get("DADAIA_HOOK_EVENT"), payload.get("hook_event_name")):
+        # compact/clear re-enter this session; a resume continues it; anything else is new
+        source = payload.get("source")
+        if source in ("compact", "clear"):
+            event = "session_restart"
+        elif source != "resume":
+            event = "session_start"
 
     def newer(stamp: float | None) -> bool:
         return sentinel_mtime is not None and stamp is not None and stamp > sentinel_mtime
 
     decision = injection_policy.decide_injection(
         event=event,
-        context=_resolve_context(payload),
+        context=_resolve_context(),
         recorded_slug=recorded_slug,
         sentinel_exists=sentinel_mtime is not None,
         compacted=newer(_read_sentinel(compact_marker)[0]),

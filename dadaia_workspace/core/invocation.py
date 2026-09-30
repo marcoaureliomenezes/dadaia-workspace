@@ -13,31 +13,31 @@ import re
 from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Literal
 
 from dadaia_workspace.core import workspace_resolver
 from dadaia_workspace.core.cli_line import fix_line
-from dadaia_workspace.core.exceptions import WorkspaceNotInitializedError
 from dadaia_workspace.core.models.spec_context import CONTEXT_NAME_RE
 from dadaia_workspace.core.session_store import live_session
-from dadaia_workspace.core.workspace_resolver import resolve_workspace_root
 
 __all__ = [
     "CONTEXT_NAME_RE",
     "HARNESS_SESSION_ID_ENV_VARS",
     "Bind",
     "Invocation",
+    "Zone",
     "all_repos",
     "alive_context_trees",
     "context_name_for_repo_slug",
     "repo_owner",
     "repo_slug_for_context",
-    "repo_slug_under_repos",
     "resolve",
     "resolve_bind",
     "resolve_context_specs_dir",
     "resolve_specs_dir",
     "resolve_session_id",
     "sanitize_session_id",
+    "scope",
 ]
 
 #: Harness-native session-id env vars, in resolution order (a modern Codex subprocess
@@ -54,7 +54,7 @@ _SESSION_ID_STRIP = re.compile(r"[^A-Za-z0-9_-]")
 @dataclass(frozen=True)
 class Bind:
     """The session's own binding: its context and every repo slug that context owns.
-    Unbound (``None``, empty ``repos``) is never scope-blocked."""
+    Unbound (``None``, empty ``repos``) owns no repo."""
 
     context_name: str | None = None
     repos: frozenset[str] = frozenset()
@@ -80,20 +80,14 @@ def sanitize_session_id(raw: str | None) -> str:
     return _SESSION_ID_STRIP.sub("", raw or "")
 
 
-def resolve_session_id(
-    payload: Mapping[str, object] | None,
-    env: Mapping[str, str],
-    *,
-    default: str = "",
-) -> str:
-    """The one session-id rule, sanitized: ``DADAIA_SESSION_ID``, then the hook payload's id,
-    then :data:`HARNESS_SESSION_ID_ENV_VARS` (possibly inherited and stale), then *default*."""
-    fields = (payload or {}).get  # every harness's payload key for its session
-    candidate = env.get("DADAIA_SESSION_ID") or str(
-        fields("session_id") or fields("conversation_id") or fields("sessionId") or ""
+def resolve_session_id(env: Mapping[str, str]) -> str:
+    """The one session-id rule, sanitized: ``DADAIA_SESSION_ID``, then
+    :data:`HARNESS_SESSION_ID_ENV_VARS`, else ``""``. Env only: ``context bind`` sees no
+    hook payload, so a payload id would be an id no bind can ever record (ADR 0116)."""
+    candidate = env.get("DADAIA_SESSION_ID") or next(
+        filter(None, map(env.get, HARNESS_SESSION_ID_ENV_VARS)), ""
     )
-    candidate = candidate or next(filter(None, map(env.get, HARNESS_SESSION_ID_ENV_VARS)), "")
-    return sanitize_session_id(candidate) or default
+    return sanitize_session_id(candidate)
 
 
 def _registry_contexts(workspace_root: Path) -> list[dict[str, object]]:
@@ -140,9 +134,9 @@ def context_name_for_repo_slug(workspace_root: Path, slug: str) -> str | None:
 
 
 def repo_owner(workspace_root: Path, path: Path) -> tuple[str, str, str] | None:
-    """``(context, repo slug, main repo slug)`` for any path under ``repos/<slug>/``, or
+    """``(context, repo slug, main repo slug)`` for any path :func:`scope` gives a repo, or
     ``None`` when no registered context owns it."""
-    slug = repo_slug_under_repos(workspace_root, path)
+    slug, _ = scope(workspace_root, path)
     owner = _owning_entry(workspace_root, slug) if slug else None
     return (owner[0], str(slug), owner[1]) if owner else None
 
@@ -162,36 +156,32 @@ def _owning_entry(workspace_root: Path, slug: str) -> tuple[str, str] | None:
     return None
 
 
-def repo_slug_under_repos(workspace_root: Path, path: Path) -> str | None:
-    """First path component of *path* under ``<workspace_root>/repos/``, sanitized
-    (CWE-22/CWE-59), or ``None``. *path* need not exist."""
-    repos_dir = workspace_root / "repos"
+Zone = Literal["root", "repo", "audit", "worktree"]
+
+
+def scope(workspace_root: Path, path: Path) -> tuple[str | None, Zone]:
+    """The one path-to-repo decider: ``(repo, zone)``. ``worktrees/<r>/**`` belongs to ``r``
+    (worktree), ``repos/<r>/specs/audits/**`` is audit, the rest of ``repos/<r>/`` repo,
+    anything else root. *path* need not exist; a slug outside the name grammar is root
+    (CWE-22/CWE-59)."""
     try:
-        rel = path.resolve().relative_to(repos_dir.resolve())
+        parts = path.resolve().relative_to(workspace_root.resolve()).parts
     except (ValueError, OSError):
-        return None
-    parts = rel.parts
-    if not parts:
-        return None
-    slug = parts[0]
-    return slug if CONTEXT_NAME_RE.fullmatch(slug) else None
-
-
-def _root_from(start: Path) -> Path | None:
-    try:
-        return resolve_workspace_root(start)
-    except WorkspaceNotInitializedError:
-        return None
+        return None, "root"
+    if len(parts) < 2 or parts[0] not in ("repos", "worktrees"):
+        return None, "root"
+    if not CONTEXT_NAME_RE.fullmatch(parts[1]):
+        return None, "root"
+    if parts[0] == "worktrees":
+        return parts[1], "worktree"
+    return parts[1], "audit" if parts[2:4] == ("specs", "audits") else "repo"
 
 
 def _resolve_root(*, cwd: Path, target_path: Path | None) -> Path | None:
-    """The target's own location first, then the running CLI's own workspace, then cwd."""
-    if target_path is not None:
-        start = target_path if target_path.is_dir() else target_path.parent
-        root = _root_from(start)
-        if root is not None:
-            return root
-    return workspace_resolver.own_workspace_root() or _root_from(cwd)
+    """The target's own root, then the running CLI's own workspace, then the cwd's — every
+    rung fenced: an Invocation is where a process acts."""
+    owned = workspace_resolver.acting_root(target_path) if target_path is not None else None
+    return owned or workspace_resolver.own_workspace_root() or workspace_resolver.acting_root(cwd)
 
 
 def _live_session_context(workspace_root: Path, session_id: str | None) -> str | None:
@@ -238,19 +228,17 @@ def resolve(
     *,
     explicit: str | None = None,
     target_path: Path | None = None,
-    payload: Mapping[str, object] | None = None,
     env: Mapping[str, str],
     cwd: Path,
 ) -> Invocation:
     """Resolve session, context, root and bind once. *explicit*/*target_path* are rung 0 (a
-    write under ``repos/x/`` resolves ``x`` even while bound to ``y``); *payload* is a hook's
-    parsed stdin (``None`` for the CLI)."""
+    write under ``repos/x/`` resolves ``x`` even while bound to ``y``)."""
     root = _resolve_root(cwd=cwd, target_path=target_path)
-    session_id = resolve_session_id(payload, env) or None
+    session_id = resolve_session_id(env) or None
     bind = resolve_bind(root, session_id, env)
 
     def owner(path: Path | None) -> str | None:
-        slug = repo_slug_under_repos(root, path) if root and path else None
+        slug = scope(root, path)[0] if root and path else None
         return context_name_for_repo_slug(root, slug) if root and slug else None
 
     rungs = (

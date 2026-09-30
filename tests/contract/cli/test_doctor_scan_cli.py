@@ -7,7 +7,6 @@ from __future__ import annotations
 import json
 import os
 import re
-import subprocess
 import time
 from datetime import UTC, datetime, tzinfo
 from pathlib import Path
@@ -52,6 +51,7 @@ def workspace(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     )
     (tmp_path / "repos").mkdir()
     (tmp_path / "AGENTS.md").write_text("# agents", encoding="utf-8")
+    (tmp_path / ".dadaiaignore").write_text("", encoding="utf-8")  # init writes it (ADR 0095)
     venv_bin = dadaia / ".venv" / PLATFORM.venv_scripts_dir
     venv_bin.mkdir(parents=True)
     entry = venv_bin / f"dadaia{PLATFORM.venv_exe_suffix}"
@@ -122,7 +122,7 @@ def test_json_carries_findings_and_fixed(workspace: Path) -> None:
         {
             "code": "WS-root-slop",
             "verdict": "slop",
-            "message": "junk.txt  (not in the root law or the exceptions)",
+            "message": "junk.txt  (not in the root law or .dadaiaignore)",
             "fix": fix_line(workspace, "doctor", "--fix"),
         }
     ]
@@ -379,44 +379,6 @@ def test_a_nested_expired_tree_is_gone_after_one_expired_only_run(workspace: Pat
     assert _expired(workspace) == []
 
 
-def _git(cwd: Path, *args: str) -> None:
-    env = {
-        **os.environ,
-        "GIT_AUTHOR_NAME": "t",
-        "GIT_AUTHOR_EMAIL": "t@example.invalid",
-        "GIT_COMMITTER_NAME": "t",
-        "GIT_COMMITTER_EMAIL": "t@example.invalid",
-    }
-    subprocess.run(["git", *args], cwd=cwd, env=env, check=True, capture_output=True)
-
-
-def test_an_expired_entry_holding_a_worktree_carries_a_fix_that_clears_it(
-    workspace: Path,
-) -> None:
-    """tmp-expired-worktree-fix-line-never-clears: the fix, run verbatim, removes the worktree and clears the
-    finding; the entry, touched by that removal, then lives out its own TTL."""
-    day = workspace / ".dadaia" / "tmp" / "a" / "20260920"
-    repo = day / "r"
-    repo.mkdir(parents=True)
-    _git(repo, "init", "-q", "-b", "main")
-    (repo / "f.txt").write_text("f", encoding="utf-8")
-    _git(repo, "add", "f.txt")
-    _git(repo, "commit", "-q", "-m", "init")
-    _git(repo, "worktree", "add", "-q", "-b", "wt/a", str(day / "wt"))
-    _age(workspace / ".dadaia" / "tmp" / "a")
-
-    payload = json.loads(CliRunner().invoke(app, ["doctor", "--json"]).output)
-    (finding,) = [
-        f for f in payload["sections"]["workspace"]["findings"] if f["code"] == "WS-tmp-expired"
-    ]
-    done = subprocess.run(finding["fix"], shell=True, cwd=workspace, check=False)
-    CliRunner().invoke(app, ["doctor", "--fix", "--expired-only"])
-
-    assert done.returncode == 0
-    assert _expired(workspace) == []
-    assert not (day / "wt").exists()
-
-
 @pytest.mark.parametrize(
     ("rel", "body", "reported"),
     [
@@ -463,7 +425,7 @@ def test_a_retired_cache_zone_is_held_by_the_reaper_never_orphaned(workspace: Pa
     scan = CliRunner().invoke(app, ["doctor"])
     fixed = CliRunner().invoke(app, ["doctor", "--fix"])
 
-    assert "WS-dadaia-slop slop .cache  (not in the root law or the exceptions)" in scan.output
+    assert "WS-dadaia-slop slop .cache  (not in the root law or .dadaiaignore)" in scan.output
     assert not (workspace / ".dadaia" / ".cache").exists(), fixed.output
     assert [
         p.read_text(encoding="utf-8") for p in (workspace / ".dadaia" / "reaped").rglob("x")

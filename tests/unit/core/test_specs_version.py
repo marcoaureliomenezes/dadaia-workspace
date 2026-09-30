@@ -22,7 +22,7 @@ def _write(tmp_path: Path, text: str) -> Path:
 
 
 #: The canon fingerprint each stamp was cut at — re-pinned only together with a stamp bump.
-_CANON_AT = {8: "ebc460dd444fd523"}
+_CANON_AT = {9: "4d3ba74c734608ff"}
 
 
 def test_a_canon_change_bumps_the_stamp() -> None:
@@ -43,12 +43,12 @@ def test_a_canon_change_bumps_the_stamp() -> None:
     )
     assert {CANONICAL_SPECS_VERSION: digest.hexdigest()[:16]} == _CANON_AT, (
         "the canon changed: bump CANONICAL_SPECS_VERSION, then pin under the new key; "
-        "never re-pin an existing key"
+        "never re-pin a published key"
     )
 
 
 def test_gitflow_round_trips(tmp_path: Path) -> None:
-    specs = _write(tmp_path, "---\nspecs_pattern_version: 8\n---\n# C\n")
+    specs = _write(tmp_path, f"---\nspecs_pattern_version: {CANONICAL_SPECS_VERSION}\n---\n# C\n")
     merge_frontmatter(specs, gitflow=_CUSTOM)
     assert read_gitflow(specs) == (_CUSTOM, None)
     assert state(specs)[0] == "canonical"
@@ -61,7 +61,7 @@ def test_merge_preserves_unknown_keys_and_body(tmp_path: Path) -> None:
         "---\nspecs_pattern_version: 6\nconstitution_version: 6.0.0  # note\n"
         "owner:\n  - a\n  - b\n---" + body,
     )
-    merge_frontmatter(specs, specs_pattern_version=8, gitflow=DEFAULT)
+    merge_frontmatter(specs, specs_pattern_version=CANONICAL_SPECS_VERSION, gitflow=DEFAULT)
     text = (specs / "constitution.md").read_text(encoding="utf-8")
     assert text.endswith("---" + body)
     assert "constitution_version: 6.0.0  # note\nowner:\n  - a\n  - b\n" in text

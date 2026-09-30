@@ -18,14 +18,14 @@ import os
 import stat
 import time
 from collections.abc import Callable
-from dataclasses import dataclass, replace
+from dataclasses import dataclass
 from datetime import timedelta
 from enum import StrEnum
 from functools import partial
 from pathlib import Path
 
 from dadaia_workspace.core import session_store, workspace_layout
-from dadaia_workspace.core.cli_line import fix_line, git_line, shell_line
+from dadaia_workspace.core.cli_line import fix_line, shell_line
 from dadaia_workspace.core.doctor_rules import Rule, SectionFinding
 from dadaia_workspace.core.exceptions import SchemaVersionError
 from dadaia_workspace.core.harness_registry import (
@@ -41,6 +41,7 @@ from dadaia_workspace.features.spec_context.service import git_hooks_dir
 from dadaia_workspace.infrastructure.git_subprocess import GitSubprocessClient
 from dadaia_workspace.infrastructure.json_context_store import JsonContextStore
 from dadaia_workspace.infrastructure.json_harness_profile_store import JsonHarnessProfileStore
+from dadaia_workspace.infrastructure.ledger_scripts import worktree_rows
 
 
 class FindingVerdict(StrEnum):
@@ -59,8 +60,8 @@ class FindingVerdict(StrEnum):
 
 _DETAIL = {
     FindingVerdict.CANON: "",
-    FindingVerdict.OPERATOR: "(instance exception)",
-    FindingVerdict.SLOP: "(not in the root law or the exceptions)",
+    FindingVerdict.OPERATOR: "(named in .dadaiaignore)",
+    FindingVerdict.SLOP: "(not in the root law or .dadaiaignore)",
 }
 _CANONICAL = frozenset({FindingVerdict.CANON, FindingVerdict.OPERATOR, FindingVerdict.REAPED})
 
@@ -98,6 +99,11 @@ class Finding:
         needing a branch in the renderer, the exit rule or the score.
         """
         return self.verdict is not FindingVerdict.REAPED
+
+
+def _worktree(verdict: str, message: str, fix: str = "") -> SectionFinding:
+    """A worktree finding: printed, never an error, never acted on by ``--fix`` (AC1.10)."""
+    return SectionFinding("WORKTREE", verdict, message, False, False, fix, fixable=False)
 
 
 def _invariant(code: str, message: str, fix: str = "", *, fixable: bool = False) -> SectionFinding:
@@ -199,6 +205,17 @@ class DoctorService:
             ]
         return []
 
+    def check_worktrees(self, context: str | None = None) -> list[SectionFinding]:
+        """AC1.10: the context's worktree rows, rendered — never judged or touched here."""
+        if not (repos := {t.name for t in self._alive_repo_tops(context)}):
+            return []
+        found, failed, fix = worktree_rows(self._workspace_root)
+        return [_worktree("warning", failed, fix)] if failed else [
+            _worktree("warning" if r["warn"] else "info", f"{r['state']} {r['path']}"
+                      + "".join(f"  {k}={r[k]}" for k in ("kind", "age_hours", "ahead", "dirty") if k in r), r["fix"])
+            for r in found if r["repo"] in repos
+        ]  # fmt: skip
+
     def check(self) -> list[SectionFinding]:
         issues: list[SectionFinding] = []
         try:
@@ -279,13 +296,14 @@ class DoctorService:
 
     def scan(self) -> tuple[Finding, ...]:
         """Every entry of the instance, classified, in the fixed FR3 order."""
-        globs = self._exception_globs()
-        findings: list[Finding] = []
+        globs, invalid = workspace_layout.operator_globs(self._workspace_root)
+        findings: list[Finding] = [*self._scan_dadaiaignore(invalid)]
         findings.extend(self._scan_root(globs))
         findings.extend(self._scan_dadaia_top(globs))
         findings.extend(self._scan_repo_trees())
+        unreadable = frozenset(session_store.unreadable_records(self._workspace_root))
         for zone in workspace_layout.zones_with_canon():
-            findings.extend(self._scan_canon_zone(zone, globs))
+            findings.extend(self._scan_canon_zone(zone, globs, unreadable))
         return (*findings, *self.scan_ttl())
 
     def scan_ttl(self) -> tuple[Finding, ...]:
@@ -359,15 +377,6 @@ class DoctorService:
                         pending.append(entry)
         return out
 
-    def _exception_globs(self) -> tuple[str, ...]:
-        try:
-            text = (self._workspace_root / workspace_layout.INSTANCE_EXCEPTIONS).read_text(
-                encoding="utf-8"
-            )
-        except OSError:
-            return ()
-        return workspace_layout.parse_exception_globs(text)
-
     def _judged(self, entry: Path, globs: tuple[str, ...]) -> tuple[FindingVerdict, str]:
         """``workspace_layout.verdict`` — the gate's own answer — plus the report detail."""
         rel = entry.relative_to(self._workspace_root).as_posix()
@@ -393,11 +402,35 @@ class DoctorService:
             target=target,
         )
 
+    def _scan_dadaiaignore(self, invalid: tuple[str, ...]) -> list[Finding]:
+        """A missing ``.dadaiaignore`` is seeded by ``--fix``; an invalid line is reported,
+        never fixed — the file is the operator's (ADRs 0092, 0093, 0145)."""
+        target = self._workspace_root / workspace_layout.DADAIAIGNORE
+        if not target.exists():
+            detail = "(seeded by --fix from the legacy states/instance_exceptions.txt, else empty)"
+            return [
+                self._finding("root", self._workspace_root, target, FindingVerdict.MISSING, detail)
+            ]
+        return [
+            self._finding(
+                "root", self._workspace_root, target, FindingVerdict.SLOP,
+                f"(invalid line {line!r}: no !, **, / or .. — ADR 0093; the operator edits it)",
+                fixable=False,
+            )
+            for line in invalid
+        ]  # fmt: skip
+
     def _scan_root(self, globs: tuple[str, ...]) -> list[Finding]:
         out: list[Finding] = []
         for entry in sweep.walk(self._workspace_root):
             verdict, detail = self._judged(entry, globs)
-            out.append(self._finding("root", self._workspace_root, entry, verdict, detail))
+            credential = verdict is FindingVerdict.SLOP and entry.name == ".env"
+            if credential:  # ADR 0146: the library never touches a credential file
+                detail = "(credentials live outside the workspace: the operator moves it out or names it in .dadaiaignore)"
+            fixable = False if credential else None
+            out.append(
+                self._finding("root", self._workspace_root, entry, verdict, detail, fixable=fixable)
+            )
         return out
 
     def _scan_dadaia_top(self, globs: tuple[str, ...]) -> list[Finding]:
@@ -421,10 +454,14 @@ class DoctorService:
                 )
         return out
 
-    def _scan_canon_zone(self, zone: Zone, globs: tuple[str, ...]) -> list[Finding]:
+    def _scan_canon_zone(
+        self, zone: Zone, globs: tuple[str, ...], unreadable: frozenset[Path]
+    ) -> list[Finding]:
         out: list[Finding] = []
         for entry in sweep.walk(self._dadaia / zone.name):
             verdict, detail = self._judged(entry, globs)
+            if entry in unreadable:  # the record owner's answer: a corrupt record is slop
+                verdict, detail = FindingVerdict.SLOP, "(unreadable session record)"
             out.append(self._finding(zone.name, self._dadaia, entry, verdict, detail))
         profile = JsonHarnessProfileStore.path(self._states)
         if profile.parent == self._dadaia / zone.name and not profile.exists():
@@ -454,11 +491,10 @@ class DoctorService:
                 )
                 continue
             detail = f"(mtime {timedelta(seconds=age).days}d > ttl {timedelta(seconds=ttl).days}d)"
-            finding = self._finding(zone.name, self._dadaia, entry, FindingVerdict.EXPIRED, detail)
-            if tree := sweep.linked_worktree(self._workspace_root, entry):
-                gdir = sweep.worktree_git_dir(tree)
-                finding = replace(finding, fix=git_line(gdir, "worktree", "remove", str(tree)))
-            out.append(finding)
+            if not sweep.linked_worktree(self._workspace_root, entry):  # a WORKTREE `foreign` row
+                out.append(
+                    self._finding(zone.name, self._dadaia, entry, FindingVerdict.EXPIRED, detail)
+                )
         return out
 
     # ------------------------------------------------------------------
@@ -488,13 +524,12 @@ class DoctorService:
         through the ONE sweep guard: it reports what it did or that it skipped, never
         aborts, and never touches a location outside the workspace."""
         actions: list[str] = []
-        findings = self.scan()
-        for finding in findings:
+        for finding in self.scan():
             if finding.verdict is FindingVerdict.MISSING and finding.fixable:
                 actions.extend(
                     sweep.guarded(finding.code, finding.path, partial(self._seed, finding))
                 )
-        actions.extend(self._reap(findings))
+        actions.extend(self._reap(self.scan()))  # judged after the seed: a new .dadaiaignore counts
         for ctx in self._contexts():
             for repo in ctx.all_repos() if ctx.state is ContextState.DEAD else ():
                 if (repo_path := self._repos_dir() / repo.slug).exists():
@@ -505,7 +540,7 @@ class DoctorService:
         """MOVE every slop entry into the reaped zone. Never deletes."""
         actions: list[str] = []
         for finding in findings:
-            if finding.verdict is not FindingVerdict.SLOP:
+            if finding.verdict is not FindingVerdict.SLOP or not finding.fixable:
                 continue
             step = partial(sweep.hold, self._workspace_root, finding.target, finding.path)
             actions.extend(sweep.guarded(finding.code, finding.path, step))
@@ -541,6 +576,9 @@ class DoctorService:
                 if any((self._workspace_root / d).is_dir() for d in dirs)
             )
             JsonHarnessProfileStore().write(self._states, HarnessProfile.of(present))
+        elif finding.target.name == workspace_layout.DADAIAIGNORE:
+            text = workspace_layout.dadaiaignore_seed(self._workspace_root)
+            finding.target.write_text(text, encoding="utf-8")
         else:
             finding.target.mkdir(parents=True, exist_ok=True)
         return f"created '{finding.path}'"
@@ -644,6 +682,11 @@ def workspace_rules(
             SECTION,
             lambda service: [] if expired_only else service.check_projection(),
             fix_help=("public", "install"),
+        ),
+        Rule(
+            ("WORKTREE",),
+            SECTION,
+            lambda service: [] if expired_only else service.check_worktrees(context),
         ),
         Rule(
             ("WS-ENTRY",),

@@ -19,7 +19,7 @@
 | slug | title | tldr |
 |------|-------|------|
 | `public-asset-distribution` | public-asset-distribution | Public assets staged once, projected into the root map, scoped AGENTS.md, .agents/ and each harness's files, with scaffold and scripts; doctor reports drift. |
-| `pypi-distribution` | pypi-distribution | The PyPI package on one version axis, two console-script names, the OIDC pipeline, the wheel contract and the docs folder. |
+| `pypi-distribution` | pypi-distribution | The PyPI package on one version axis, two console-script names, the OIDC pipeline, the wheel contract and the derived docs. |
 
 ### harness
 
@@ -27,8 +27,8 @@
 |------|-------|------|
 | `harness-claude-code` | harness-claude-code | Entry harness with native sub-agent dispatch; reads the root AGENTS.md map natively and reaches skills and personas through per-entry symlinks into .agents/. |
 | `harness-codex` | harness-codex | Entry harness on the Codex CLI: native AGENTS.md chain and .agents/skills; .codex/ carries config, hooks, the command policy and persona TOML. |
-| `harness-copilot` | harness-copilot | Entry harness on GitHub Copilot CLI — native root AGENTS.md and .agents/skills; .github/ carries agents/*.agent.md transcodes and two hook files. |
-| `harness-cursor` | harness-cursor | Entry harness on Cursor — native root AGENTS.md and .agents/skills; .cursor/ carries hooks.json (gate on every tool, reaper at start) and persona symlinks. |
+| `harness-copilot` | harness-copilot | Entry harness on GitHub Copilot CLI — native root AGENTS.md and .agents/skills; .github/ carries agent transcodes and two hook files, bootstrap at start. |
+| `harness-cursor` | harness-cursor | Entry harness on Cursor — native root AGENTS.md and .agents/skills; .cursor/hooks.json gates every tool, injects and reaps at start; persona symlinks. |
 | `harness-devin` | harness-devin | Entry harness on the Devin CLI — native AGENTS.md, .agents/skills and .agents/agents; its one file, .devin/hooks.v1.json, wires gate, injection and reaper. |
 | `harness-kimi-code` | harness-kimi-code | Entry harness with an empty projection: reads root AGENTS.md, .agents/skills and .agents/agents natively; user-level hook shims; DADAIA_CONTEXT binds. |
 
@@ -46,11 +46,11 @@
 | `capabilities` | capabilities | dadaia capabilities [--json] prints the installed contract: distribution and specs pattern versions, status tokens, the live verbs and harnesses. |
 | `ci-preflight` | ci-preflight | dadaia ci preflight runs the library's seven CI checks locally, fenced like a bare checkout, and refuses outside the source repo. |
 | `consumer-agent-support` | Consumer validation gate | A consumer-side validation agent running the shipped recipe on a real workspace is the release gate; no wheel publishes until every statement reports PASS. |
-| `context-management` | context-management | ALIVE/DEAD registry of a main repo plus associated repos; create clones, hooks and ALIVEs in one step; only context bind binds, naming the session's scope. |
+| `context-management` | context-management | ALIVE/DEAD registry of a main repo plus associated repos; create clones, hooks and ALIVEs; only context bind binds, by env session id, naming the scope. |
 | `context-portability` | context-portability | dadaia export writes the workspace's context set to one file; dadaia import registers each unknown context DEAD elsewhere, ready for dadaia context alive. |
 | `cross-platform-portability` | cross-platform-portability | Linux, macOS and Windows through one platform capability seam carrying the venv layout, Python hooks and cross-OS CI legs. |
 | `server-registry` | server-registry | Dev-server port registry with TTL and PID tracking so parallel sessions never collide — one stdlib skill script over one JSON state file; no CLI verb. |
-| `specs-migration` | specs-migration | specs init brings specs/ to the canon and writes the project gitflow, never committing; specs upgrade re-stamps 6 or 7 to 8; migrate lifts registry v1. |
+| `specs-migration` | specs-migration | specs init brings specs/ to the canon and writes the gitflow, never committing; specs upgrade re-stamps 6-8 as 9, folding flat trios; migrate lifts registry v1. |
 | `workspace-doctor` | workspace-doctor | dadaia doctor is the one compliance check — workspace, specs and ledgers sections, one line per finding, exit 1 with a fix line; --fix moves slop, TTL deletes. |
 | `workspace-init` | workspace-init | Level 1 — uvx dadaia-workspace init [DIR] provisions venv, zones, law, one harness; re-init upgrades; --repo adds level 2; next step from one ordered step list. |
 
@@ -58,8 +58,9 @@
 
 | slug | title | tldr |
 |------|-------|------|
-| `audits-canon` | audits-canon | Audits are committed three-pillar reviews over a sha window, their findings moved by audit.py; decisions are decisions.jsonl records the operator accepts. |
+| `audits-canon` | audits-canon | Audits are committed three-pillar reviews over a sha window, findings moved by audit.py; decisions.jsonl records only the operator accepts, with his ruling. |
 | `backlog-ledger` | backlog-ledger | The operator's demand queue: BACKLOG.json active[] plus one histo record per exit; backlog.py writes it, dadaia doctor judges bound subjects. |
 | `bug-ledger` | bug-ledger | One bug record per line in BUGS.jsonl, registered after operator confirmation, closed only by a transition carrying evidence; bugs.py writes it. |
-| `release-lifecycle` | release-lifecycle | Closed-scope candidates grow one live release, each defined from an as-is review; release.py writes _RELEASE.json; memory gates closure; promote merges a PR. |
-| `sdd-gate-v3` | sdd-gate-v3 | No-lock enforcement — three gate blocks (root entry, non-venv command, PROTECTED or out-of-scope file-tool write), one fix line each, a gitflow push chokepoint. |
+| `release-lifecycle` | release-lifecycle | Candidates, each in its own rc-<N>/, grow one live release; release.py writes _RELEASE.json; memory gates closure; promote merges a PR and archives it. |
+| `sdd-gate-v3` | sdd-gate-v3 | No-lock enforcement — three gate blocks (root entry, non-venv command, PROTECTED or out-of-scope write; repos/<r> takes merges), one fix each, a push chokepoint |
+| `worktrees` | worktrees | Every agent change to a repo is made in a canonical worktree of one of four kinds and lands by worktree.py merge — reviewed, rebased, fast-forwarded. |

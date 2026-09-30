@@ -4,8 +4,9 @@ Races between sessions are never prevented; there is no session mode. Protected 
 file-tool writes.
 
 **The gate blocks three things (0.4.7 FR1).** A PROTECTED write (CLI-owned session
-records and projected law files); a MUTATING write into a repo the session's bind does
-not own; and — in ``hooks/root_whitelist`` — a new workspace-root entry. There is no
+records and projected law files); a MUTATING write out of the bind's scope or under
+``repos/<r>/`` outside ``specs/audits/`` (ADRs 0103, 0105, 0124); and — in
+``hooks/root_whitelist`` — a new workspace-root entry. There is no
 fourth block and no path class beyond ``ADDITIVE``/``MUTATING``/``PROTECTED``.
 
 The MEMORY class and its phase rule are DELETED, with the gate's ``_RELEASE.json``
@@ -20,12 +21,14 @@ documented way out was a bind flag that no longer exists.
 
 from __future__ import annotations
 
+import runpy
+from collections.abc import Callable
 from enum import Enum
-from fnmatch import fnmatch
-from pathlib import PurePath
+from functools import cache
+from pathlib import Path, PurePath
 
 from dadaia_workspace.core import workspace_layout
-from dadaia_workspace.core.cli_line import fix_line
+from dadaia_workspace.core.cli_line import fix_line, script_line
 
 __all__ = ["Decision", "PathClass", "classify_path", "evaluate"]
 
@@ -50,13 +53,23 @@ _LAW_MESSAGE = (
     "The source is dadaia_workspace/public/; this re-projects it:\n"
 )
 
-#: BLOCK message for a MUTATING write into a repo outside the Bind's scope (FR1, Q1).
-#: Only ``repos/<slug>/`` is scope-judged: a workspace-root path is in scope under any
-#: bind, and a slug no Context registers is unattributable, so it ALLOWS (fail-open).
-_SCOPE_BLOCK_MESSAGE = (
-    "[GATE] '{rel_path}' writes into repo '{slug}', owned by context '{owner}' — this "
-    "session is bound to '{bound}', whose scope is: {scope}.\n"
+#: ``.dadaiaignore`` is the operator's alone (ADR 0092): an agent proposes a pattern, never writes it.
+_OPERATOR_MESSAGE = (
+    "[GATE] .dadaiaignore is the operator's file (ADR 0092): only the operator edits it by "
+    "hand. Hand the operator the pattern you need; the doctor names every unadmitted entry.\n"
 )
+
+_SCOPE_MESSAGE = (
+    "[GATE] '{rel_path}' writes into repo '{repo}', owned by context '{owner}' — this "
+    "session is bound to {bound}, whose scope is: {scope}.\n"
+)
+#: ADR 0105: ``repos/<r>`` receives only merges; every agent write happens in a worktree.
+_MERGE_ONLY_MESSAGE = (
+    "[GATE] '{rel_path}' is under repos/{repo}/, which receives only merges (ADR 0105): "
+    "write it inside a worktree of {repo}.\n"
+)
+_WORKTREE_SCRIPT = ".agents/skills/dd-gitflow-default/scripts/worktree.py"
+_KINDS = Path(__file__).parents[2] / "public/skills/dd-gitflow-default/scripts/_worktree_kinds.py"
 
 
 class PathClass(Enum):
@@ -73,83 +86,30 @@ class Decision(Enum):
     BLOCK = "block"
 
 
-def _is_specs_additive(spec_rel: str) -> bool:
-    """True when a root- or context-relative ``specs/`` path is ADDITIVE."""
-    return any(fnmatch(spec_rel, glob) for glob in workspace_layout.SPECS_ADDITIVE_GLOBS)
+@cache
+def _kind_holding() -> Callable[[str], str | None]:
+    """The KINDS grammar's owner (ADR 0135), run in place: no bytecode left beside it."""
+    holding: Callable[[str], str | None] = runpy.run_path(str(_KINDS))["kind_holding"]
+    return holding
 
 
-def _context_relative(p: str) -> str | None:
-    """Return the remainder of ``p`` after a ``repos/<slug>/`` prefix, else ``None``.
-
-    ``repos/`` alone or ``repos/<slug>`` with no trailing remainder yields ``""`` (still
-    in-repo, so the caller classifies it MUTATING). A non-``repos/`` path yields ``None``.
-    """
-    if not p.startswith("repos/"):
-        return None
-    rest = p[len("repos/") :]
-    slash = rest.find("/")
-    if slash == -1:
-        return ""  # 'repos/<slug>' with no remainder — in-repo, no class match
-    return rest[slash + 1 :]
+def _worktree_fix(repo: str, repo_rel: str) -> str:
+    kind = _kind_holding()(repo_rel)
+    if kind is None:  # no worktree merges it: only the operator's hand reaches it
+        return f"Operator action: edit repos/{repo}/{repo_rel} by hand; no worktree kind merges it"
+    return script_line(_WORKTREE_SCRIPT, "new", repo, "--kind", kind)
 
 
 def classify_path(rel_path: str, projected: frozenset[str] = frozenset()) -> PathClass:
-    """Classify a workspace-relative path into one of THREE classes; first match wins.
-
-    A path under ``repos/<slug>/`` is classified by its **context-relative** remainder
-    using the same ``specs/`` ADDITIVE prefixes that govern workspace-root paths; every
-    other remainder is MUTATING. A workspace-root path is PROTECTED (session records,
-    paths in *projected*, the install ledger's), ADDITIVE (the zone-registry prefixes), or MUTATING —
-    there is no UNGATED fall-through, so nothing at the root escapes classification.
-    """
+    """Classify a workspace-relative path; first match wins: PROTECTED (session records,
+    *projected* paths, ``.dadaiaignore``), ADDITIVE (the zone-registry ``.dadaia/``
+    prefixes), else MUTATING — no ``repos/`` path is ever ADDITIVE (ADR 0124)."""
     p = rel_path.lstrip("/")
-    if p in projected or p.startswith(_PROTECTED_PREFIX):
+    if p in projected or p.startswith(_PROTECTED_PREFIX) or p == workspace_layout.DADAIAIGNORE:
         return PathClass.PROTECTED
-
-    ctx_rel = _context_relative(p)
-    if ctx_rel is not None:
-        return PathClass.ADDITIVE if _is_specs_additive(ctx_rel) else PathClass.MUTATING
-
     if any(p.startswith(x) for x in _ADDITIVE_DADAIA_PREFIXES):
         return PathClass.ADDITIVE
     return PathClass.MUTATING
-
-
-def _scope_block(
-    root: PurePath,
-    rel_path: str,
-    bound_context: str | None,
-    bound_repos: frozenset[str],
-    target_slug: str | None,
-    target_owner: str | None,
-    bound_by_env: bool = False,
-) -> str | None:
-    """The scope refusal for a MUTATING write, or ``None`` when the write is in scope.
-
-    The bind is PLAIN DATA here — the name the session bound and the repo slugs that
-    scope covers. Resolving them is the hook's job (``hooks/sdd_gate._evaluate_target``
-    already resolves the Invocation once); this module imports nothing from
-    ``core.invocation`` (P-09: the resolution seam has a single home).
-    """
-    if bound_context is None or target_slug is None or target_owner is None:
-        return None
-    if target_slug in bound_repos or target_owner == bound_context:
-        return None
-    return (
-        _SCOPE_BLOCK_MESSAGE.format(
-            rel_path=rel_path,
-            slug=target_slug,
-            owner=target_owner,
-            bound=bound_context,
-            scope=", ".join(sorted(bound_repos)) or "no registered repo",
-        )
-        + "fix: "
-        + (  # an id-less session's bind is its env: only the operator can change it
-            f"Operator action: relaunch this session with DADAIA_CONTEXT={target_owner}"
-            if bound_by_env
-            else fix_line(root, "context", "bind", target_owner)
-        )
-    )
 
 
 def evaluate(
@@ -157,48 +117,52 @@ def evaluate(
     *,
     root: PurePath,
     projected: frozenset[str] = frozenset(),
-    bound_context: str | None = None,
-    bound_repos: frozenset[str] = frozenset(),
-    target_slug: str | None = None,
-    target_owner: str | None = None,
-    bound_by_env: bool = False,
+    zone: str = "root",
+    repo: str | None = None,
+    owner: str | None = None,
+    context: str | None = None,
+    repos: frozenset[str] = frozenset(),
+    has_id: bool = True,
 ) -> tuple[Decision, str]:
-    """Return the gate decision and its message for one write target. *root* is the
-    workspace every ``fix:`` line's CLI path is built from.
+    """The gate decision and its message for one write target; *root* builds every
+    ``fix:`` line. The target arrives as ``core.invocation.scope``'s *zone*/*repo* plus
+    the context registering *repo* (*owner*); the session as its bind (*context*,
+    *repos*) and whether it carries an id (*has_id*), never re-resolved here.
 
-    Three blocks, in order: PROTECTED (fail-CLOSED, the projected-law message or the
-    session-record message), then — for a MUTATING write — the bind's SCOPE, received as
-    plain data (*bound_context* / *bound_repos*), never re-resolved here. Everything
-    else ALLOWS with an empty message.
-
-    SCOPE (FR1, Q1): only ``repos/<slug>/`` is scope-judged. *target_slug* is the repo
-    the write lands in and *target_owner* the context that registers it; the write is
-    refused only when the session is BOUND, some context demonstrably owns that slug,
-    and it is not the bound context's own (*bound_repos* = main + associated). An
-    unbound session, a workspace-root path, and a slug no context registers all ALLOW —
-    the gate cannot attribute them, and fail-open is the posture. A MUTATING write is
-    never blocked on another session: races surface through git.
+    PROTECTED blocks first (fail-closed). A MUTATING write into an owned repo outside the
+    bind's *repos* is refused with ``context bind <owner>`` — an unbound session with an id
+    owns nothing (ADR 0072); an id-less one bound by env is told to relaunch; an id-less
+    unbound one is the declared gap (ADR 0116). Then every write in zone ``repo`` is
+    refused with the ``worktree.py new`` fix (ADR 0105). Everything else ALLOWS.
     """
     cls = classify_path(rel_path, projected)
-
-    # PROTECTED is the sole fail-closed path and is evaluated before fail-open branches.
     if cls == PathClass.PROTECTED:
-        if not rel_path.lstrip("/").startswith(_PROTECTED_PREFIX):
-            restore = fix_line(root, "public", "install")  # re-projects the law from staging
-            return Decision.BLOCK, _LAW_MESSAGE.format(path=rel_path) + f"fix: {restore}"
-        return (
-            Decision.BLOCK,
-            _PROTECTED_MESSAGE + f"fix: {fix_line(root, 'context', 'bind', '<ctx>')}",
-        )
-
-    if cls == PathClass.ADDITIVE:
+        p = rel_path.lstrip("/")
+        if p.startswith(_PROTECTED_PREFIX):
+            message, fix = _PROTECTED_MESSAGE, fix_line(root, "context", "bind", "<ctx>")
+        elif p == workspace_layout.DADAIAIGNORE:
+            message, fix = _OPERATOR_MESSAGE, fix_line(root, "doctor")  # names what to ask for
+        else:  # re-projects the law from staging
+            message, fix = _LAW_MESSAGE.format(path=rel_path), fix_line(root, "public", "install")
+        return Decision.BLOCK, message + f"fix: {fix}"
+    if cls == PathClass.ADDITIVE or repo is None:
         return Decision.ALLOW, ""
-
-    scope_block = _scope_block(
-        root, rel_path, bound_context, bound_repos, target_slug, target_owner, bound_by_env
-    )
-    if scope_block is not None:
-        return Decision.BLOCK, scope_block
-
-    # MUTATING: always allowed; races surface through git, never through a block.
+    if owner is not None and repo not in repos and (context is not None or has_id):
+        message = _SCOPE_MESSAGE.format(
+            rel_path=rel_path,
+            repo=repo,
+            owner=owner,
+            bound=f"'{context}'" if context else "no context",
+            scope=", ".join(sorted(repos)) or "no registered repo",
+        )
+        fix = (  # an id-less session's bind is its env: only the operator can change it
+            fix_line(root, "context", "bind", owner)
+            if has_id
+            else f"Operator action: relaunch this session with DADAIA_CONTEXT={owner}"
+        )
+        return Decision.BLOCK, message + f"fix: {fix}"
+    if zone == "repo":
+        repo_rel = rel_path.lstrip("/").split("/", 2)[2:]
+        message = _MERGE_ONLY_MESSAGE.format(rel_path=rel_path, repo=repo)
+        return Decision.BLOCK, message + f"fix: {_worktree_fix(repo, ''.join(repo_rel))}"
     return Decision.ALLOW, ""

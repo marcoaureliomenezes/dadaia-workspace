@@ -56,8 +56,14 @@ def script(tmp_path: Path) -> Path:
 
 
 def _ledger(root: Path, *records: dict[str, object]) -> Path:
+    """A git repo tracking `cli/` and the non-conforming `Docs/` (F011)."""
     specs = root / "specs"
     (specs / "bugs").mkdir(parents=True, exist_ok=True)
+    for tracked in ("cli", "Docs"):
+        (root / tracked).mkdir(exist_ok=True)
+        (root / tracked / "x.py").touch()
+    subprocess.run(["git", "init", "-q", str(root)], check=True)
+    subprocess.run(["git", "-C", str(root), "add", "cli", "Docs"], check=True)
     (specs / "bugs" / "BUGS.jsonl").write_text(
         "".join(json.dumps(r) + "\n" for r in records), encoding="utf-8"
     )
@@ -251,40 +257,72 @@ def test_append_registers_one_open_record(script: Path, tmp_path: Path) -> None:
     done = _run(
         script, "append", "--specs", str(specs), "--bug-id", "new-bug", "--title", "t",
         "--severity", "LOW", "--surface", "cli", "--component", "c", "--context", "ctx",
-        "--symptom", "s", "--repro", "r", "--expected", "e",
+        "--symptom", "s", "--repro", "r", "--expected", "e", "--correlates", "none",
     )  # fmt: skip
     assert done.returncode == 0, done.stderr
-    assert done.stdout.startswith("[ok] registered new-bug")
+    assert "\n[ok] registered new-bug" in done.stdout
     [record] = _records(specs)
     assert record["status"] == "open" and record["closed_at"] is None
     assert _run(script, "check", "--specs", str(specs)).returncode == 0
 
 
-def test_append_accepts_a_consumer_surface_and_refuses_unknown(
+def test_append_names_its_correlations_from_the_ledger(script: Path, tmp_path: Path) -> None:
+    """ADR 0127 / AC1.12: append lists the open and the recently resolved records on its
+    surface, refusing without `--correlates` or with an id the ledger lacks."""
+    recent = {
+        **_OPEN_RECORD,
+        "id": "recent",
+        "status": "resolved",
+        "closed_at": "2999-01-01T00:00:00Z",
+    }
+    old = {**recent, "id": "old", "ts": "1999-01-01T00:00:00Z", "closed_at": "2000-01-01T00:00:00Z"}
+    other = {**_OPEN_RECORD, "id": "other", "surface": "hooks"}
+    specs = _ledger(tmp_path, _OPEN_RECORD, recent, old, other)
+    argv = ["append", "--specs", str(specs), "--bug-id", "new-bug", "--title", "t",
+            "--severity", "LOW", "--surface", "cli", "--component", "c", "--context", "ctx",
+            "--symptom", "s", "--repro", "r", "--expected", "e"]  # fmt: skip
+    bare, stray = _run(script, *argv), _run(script, *argv, "--correlates", "a-bug,ghost")
+    assert bare.returncode == stray.returncode == 1
+    assert "candidates on 'cli': a-bug, recent\n" in bare.stdout
+    named = _run(script, *argv, "--correlates", "a-bug,old")
+    assert named.stdout.startswith("correlation candidates on 'cli': a-bug, recent\n")
+    assert _records(specs)[-1]["correlates"] == ["a-bug", "old"]
+
+
+@pytest.mark.parametrize(
+    ("field", "value", "needle"),
+    [("surface", "cli", None), ("surface", "unknown", "--surface <"), ("surface", "Docs", "--surface <"),
+     ("context", "", "shorter than its minLength"), ("component", "", "shorter than its minLength")],
+)  # fmt: skip
+def test_append_takes_a_tracked_directory_surface_and_non_blank_fields(
+    script: Path, tmp_path: Path, field: str, value: str, needle: str | None
+) -> None:
+    """F011 / AC1.12: the surface is one conforming directory name tracked in the repo —
+    never an untracked (`unknown`) or non-conforming (`Docs`) name; this re-proves
+    sa-consumer-law-carries-library-facts#FR8.1 (the context's own tree names it) and
+    supersedes sa-spec-doc-033-duplicates-bugs-check#B5 (free text). #B2: a blank context
+    or component is refused. Every refusal leaves the ledger untouched."""
+    specs = _ledger(tmp_path)
+    values = {"surface": "cli", "context": "ctx", "component": "c", field: value}
+    done = _run(script, "append", "--specs", str(specs), "--bug-id", "b", "--title", "t",
+                "--severity", "LOW", *[f"--{k}={v}" for k, v in values.items()],
+                "--symptom", "s", "--repro", "r", "--expected", "e", "--correlates", "none")  # fmt: skip
+    assert (done.returncode, needle is None or needle in done.stderr) == (int(bool(needle)), True)
+    assert len(_records(specs)) == int(needle is None), done.stderr
+
+
+def test_append_outside_a_git_tree_is_one_refusal_naming_the_cause(
     script: Path, tmp_path: Path
 ) -> None:
-    """sa-consumer-law-carries-library-facts#FR8.1: a consumer names its own unit as the
-    surface (`billing-api` is no library layer or package) and it is accepted; the
-    `unknown` sentinel is refused. sa-spec-doc-033-duplicates-bugs-check#B5: surface is
-    free text with minLength 1. sa-spec-doc-033-duplicates-bugs-check#B2: an empty context or component is refused and the
-    ledger is untouched."""
-    specs = _ledger(tmp_path)
-    argv = ["append", "--specs", str(specs), "--title", "t", "--severity", "LOW",
-            "--component", "c", "--context", "ctx", "--symptom", "s", "--repro", "r",
-            "--expected", "e"]  # fmt: skip
-    ok = _run(script, *argv, "--bug-id", "consumer-bug", "--surface", "billing-api")
-    refused = _run(script, *argv, "--bug-id", "vague-bug", "--surface", "unknown")
-
-    assert ok.returncode == 0, ok.stderr
-    assert refused.returncode == 1
-    for empty in ("surface", "context", "component"):
-        blank = [*argv, "--bug-id", "blank-bug", "--surface", "cli"]
-        blank[blank.index(f"--{empty}") + 1] = ""
-        done = _run(script, *blank)
-        assert done.returncode == 1
-        assert f"field '{empty}' is shorter than its minLength of 1" in done.stderr
-    assert [r["surface"] for r in _records(specs)] == ["billing-api"]
-    assert _run(script, "check", "--specs", str(specs)).returncode == 0
+    """F011: with no tracked tree to read, append refuses once, never with a traceback."""
+    specs = tmp_path / "specs"
+    (specs / "bugs").mkdir(parents=True)
+    done = _run(script, "append", "--specs", str(specs), "--bug-id", "b", "--title", "t",
+                "--severity", "LOW", "--surface", "cli", "--component", "c", "--context", "ctx",
+                "--symptom", "s", "--repro", "r", "--expected", "e", "--correlates", "none")  # fmt: skip
+    assert done.returncode == 1 and "Traceback" not in done.stderr
+    assert "cannot list the repo's tracked directories: fatal:" in done.stderr
+    assert "append … --specs specs" in done.stderr
 
 
 def test_append_refuses_a_duplicate_id_and_writes_nothing(script: Path, tmp_path: Path) -> None:
@@ -329,7 +367,7 @@ def test_the_seam_refuses_exactly_what_the_push_refuses(
     appended = _run(
         script, "append", "--specs", str(specs), "--bug-id", "leaky", "--title", "t",
         "--severity", "LOW", "--surface", "cli", "--component", "c", "--context", "ctx",
-        "--symptom", value, "--repro", "r", "--expected", "e",
+        "--symptom", value, "--repro", "r", "--expected", "e", "--correlates", "none",
     )  # fmt: skip
     resolved = _run(script, *argv, "--specs", str(specs))
     for done, field in ((appended, "symptom"), (resolved, "evidence_loop")):
@@ -357,14 +395,20 @@ def test_every_ledger_skill_stages_a_byte_identical_privacy_pair(tmp_path: Path)
 
 
 def test_resolve_closes_the_record_and_derives_diff_direction(script: Path, tmp_path: Path) -> None:
-    specs = _ledger(tmp_path, _OPEN_RECORD)
+    deferred = {
+        **_OPEN_RECORD,
+        "status": "deferred",
+        "cause": "c",
+        "closed_at": "2026-09-21T00:00:00Z",
+    }
+    specs = _ledger(tmp_path, deferred)
     done = _run(script, *_resolve_argv(), "--specs", str(specs))
     assert done.returncode == 0, done.stderr
     assert done.stdout.strip() == "[ok] resolved a-bug"
     [record] = _records(specs)
     assert record["status"] == "resolved"
     assert record["diff_direction"] == "net-negative"
-    assert record["closed_at"] is not None
+    assert record["closed_at"] > deferred["closed_at"]  # the transition's own instant
     assert _run(script, "check", "--specs", str(specs)).returncode == 0
 
 

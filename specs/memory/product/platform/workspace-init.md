@@ -29,7 +29,7 @@ sources:
 - The venv mirrors the running distribution: editable from a source checkout, else its re-packed wheel written to a system temp directory deleted after the install; `DADAIA_BOOTSTRAP_PACKAGE=<wheel>` names another wheel. A base Python without `ensurepip` is reported as missing `ensurepip`/`venv`; any other venv creation failure names a `noexec` target as its likely cause.
 - A failed dependency install says the venv resolves its dependencies from PyPI (network required) and quotes the installer's last whole lines, never a mid-line cut.
 - The tree it lays down is a view of `dadaia_workspace/core/workspace_layout.py` — the root law, `DADAIA_ZONES`, `STATES_CANON` — the same rows `dadaia public stage` renders into the law files ([[public-asset-distribution]]).
-- It seeds `states/spec_contexts.json` and `states/server_registry.json` as empty documents without overwriting existing data ([[server-registry]]).
+- It seeds `states/spec_contexts.json` and `states/server_registry.json` as empty documents without overwriting existing data ([[server-registry]]), and an absent root `.dadaiaignore` from the legacy `states/instance_exceptions.txt`, verbatim, else a comment-only template; the file is the operator's from then on ([[workspace-doctor]]).
 - `states/harness_profile.json` is the roster, written through the profile store's one writer (shared with `dadaia doctor --fix`); a re-init with another harness merges into the persisted roster, never narrowing it.
 - Unless `--skip-assets`, init runs public stage and install, the one writer of every hook wiring; with `--skip-assets` the output carries the warning that the workspace is ungated until `dadaia public install` runs.
 - Output is at most twelve lines: the workspace line, one asset-count line (never a per-path listing), `CLI: <absolute path of .dadaia/.venv/bin/dadaia>`, the root-launch note, then the next step; no harness-specific or user-settings advice is printed; no line names a bare `dadaia` verb.
@@ -48,7 +48,7 @@ sources:
 
 ## First project
 
-- `--repo <url>` with repeatable `--associated-repo <url>` calls `context create` and produces exactly what it produces — cloned, hooked and ALIVE, never bound: it writes no session record and prints no `--print-env` line; only `context bind` binds ([[context-management]]).
+- `--repo <url>` with repeatable `--associated-repo <url>` calls `context create` and produces exactly what it produces — cloned, hooked and ALIVE, never bound: it writes no session record; only `context bind` binds ([[context-management]]).
 - A re-run naming a context already holding that main-repo URL reuses it through `context alive`; any failure exits 1 with the same `fix:` line `context create` prints — the create invocation, every `--associated-repo` kept, the failed URL a `<clone-url>` placeholder.
 
 ## Onboarding status

@@ -88,6 +88,8 @@ def _echo_upgrade(specs: Path, result: UpgradeResult) -> bool:
         typer.echo(f"[status-vocabulary] {will}rewrite {path}")
     for path in result.tech_stack_folded:
         typer.echo(f"[tech-stack] {will}fold {path} into memory/ARCHITECTURE.md")
+    for path in result.trio_folded:
+        typer.echo(f"[candidate] {will}move {path} into the next rc-<N>/")
     fixed, refused = _repair(specs, dry_run=result.dry_run)
     for issue in fixed:
         typer.echo(f"[repair] {will}fix {issue.code} {finding_path(issue)}")

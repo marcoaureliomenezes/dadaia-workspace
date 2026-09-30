@@ -64,7 +64,13 @@
       "type": "string",
       "minLength": 1,
       "x-mutability": "immutable-core",
-      "description": "The unit of the context's own tree whose tooling broke — a module, package or area name the context chooses. `unknown` is a legacy sentinel: valid on records already carrying it, refused by `bugs.py append`."
+      "description": "The directory of the context's own repo whose tooling broke — one name matching ^[a-z0-9_-]+$, tracked at any depth (F011); `bugs.py append` refuses anything else. Records born before carry free text or the legacy `unknown`, valid as written."
+    },
+    "correlates": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 },
+      "x-mutability": "write-once",
+      "description": "The ledger ids this bug was judged to correlate with at registration, empty for none (ADR 0127); absent on records born before it."
     },
     "component": {
       "type": "string",

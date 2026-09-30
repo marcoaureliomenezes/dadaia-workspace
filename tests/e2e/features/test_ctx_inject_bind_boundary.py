@@ -1,7 +1,8 @@
 """Intent: CONTRACT — v0.1.14 FR-W2 (T-50-03): the ONE real-process SENTINEL of bind ->
 ctx_inject. `context bind` runs as its own process and the hook as another, both carrying
 the same CLAUDE_CODE_SESSION_ID: unbound -> no memory; bind X -> X injected; re-bind Y ->
-Y; a repeat prompt is silent; a same-context re-bind re-injects. A bind under a distinct
+Y; a repeat prompt is silent; a same-context re-bind re-injects; the injection carries
+constitution.md (AC1.2, ADR 0103). A bind under a distinct
 session id never bridges (T-50-04): test_one_bind.py row native-id-no-record-unbound.
 Hand-built workspace, never a real venv.
 """
@@ -45,6 +46,7 @@ def _add_context(workspace: Path, slug: str, *, tech: str) -> None:
         f"# Architecture\n\n## Tech Stack\n\n{tech}", encoding="utf-8"
     )
     (mem / "product" / "catalog.json").write_text('{"features": []}', encoding="utf-8")
+    (mem.parent / "constitution.md").write_text(f"# {slug} CONSTITUTION-MARKER\n", "utf-8")
 
 
 def _real_bind(
@@ -134,6 +136,7 @@ def test_seed3_bind_drives_injection_across_real_process_boundary(tmp_path: Path
 
     after_alpha = _inject(tmp_path, sid)
     assert "[alpha]" in after_alpha
+    assert "alpha CONSTITUTION-MARKER" in after_alpha  # AC1.2 (0103): every harness, one hook
     assert "end memory bootstrap" in after_alpha
     assert "ALPHA-MARKER" in after_alpha
     assert "BETA-MARKER" not in after_alpha

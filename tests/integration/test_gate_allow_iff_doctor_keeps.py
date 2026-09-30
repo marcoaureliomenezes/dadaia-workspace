@@ -1,5 +1,6 @@
-"""One table through the gate and the doctor: the gate ALLOWs a write iff the doctor
-does not judge the entry it creates SLOP.
+"""One table of ROOT ENTRIES through the gate and the doctor: the gate ALLOWs a write that
+creates a workspace-root entry iff the doctor does not judge that entry SLOP. Scope inside
+``repos/``/``worktrees/`` is test_sdd_gate's, not this table's.
 
 Intent: CONTRACT — sa-gate-allows-root-entries-the-reaper-moves#E6 (every row), #E1
 (notes/ without a glob), #E2 (with one), sa-gate-allows-root-entries-the-reaper-moves#E3 (wrong type), #E4 (.dadaia non-zone and
@@ -20,7 +21,7 @@ from pathlib import Path
 
 import pytest
 
-from dadaia_workspace.core.workspace_layout import INSTANCE_EXCEPTIONS
+from dadaia_workspace.core.workspace_layout import DADAIAIGNORE
 from dadaia_workspace.features.spec_context.doctor import DoctorService, FindingVerdict
 from dadaia_workspace.infrastructure.git_subprocess import GitSubprocessClient
 from tests.fixtures.harness_env import claude_hook_env, run_hook_subprocess
@@ -37,7 +38,7 @@ _TABLE = [
     ("prompt.md", None, None, True),
     ("specs/bugs/x.md", None, None, False),
     (".dadaia/newzone/x.txt", None, None, False),
-    ("repos/x/f.py", None, None, True),
+    ("worktrees/x/0.5.0a-impl/f.py", None, None, True),
     (".dadaia/tmp/agent/20260927/x.txt", None, None, True),
 ]
 
@@ -52,7 +53,7 @@ def test_gate_allows_iff_the_doctor_keeps_the_entry(
     if existing is not None:
         (tmp_path / existing).mkdir()
     if glob is not None:
-        (tmp_path / INSTANCE_EXCEPTIONS).write_text(f"{glob}\n", encoding="utf-8")
+        (tmp_path / DADAIAIGNORE).write_text(f"{glob}\n", encoding="utf-8")
     path = tmp_path / target
     payload = {"tool_name": "Write", "tool_input": {"file_path": str(path), "content": "x"}}
 

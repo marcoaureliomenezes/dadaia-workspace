@@ -21,7 +21,7 @@ One harness process, identified by exactly one `session_id` — the harness's ow
 _Avoid_: sid ladder, CLI-minted session, thread id
 
 **Bind**:
-The session record that names the context a session works in, and nothing else — `.dadaia/.venv/bin/dadaia context bind <ctx> [--print-env]` is one verb with no mode, release, force or reason. A context with at least one live bind is alive; a bind carries a Scope.
+The session record that names the context a session works in, and nothing else — `.dadaia/.venv/bin/dadaia context bind <ctx>` is one verb with no mode, release, force or reason; the session id is read from the environment only, so a nested session inheriting it shares the parent's bind. A context with at least one live bind is alive; a bind carries a Scope.
 _Avoid_: alive flag, lease, lock, bind mode, bind release
 
 **Presence**:
@@ -96,11 +96,23 @@ _Avoid_: release boundary, publish step, baseline (for a tolerated literal)
 
 **Path class**:
 The category a written path belongs to — ADDITIVE, MUTATING, PROTECTED, three and no fourth — and the only thing the gate classifies. `specs/memory/` is MUTATING in every phase.
-_Avoid_: lane, zone, MEMORY, LAW, UNGATED, FROZEN (retired classes)
+_Avoid_: lane, MEMORY, LAW, UNGATED, FROZEN (retired classes)
 
 **Scope**:
-The repo set one Bind owns — its context's main repo plus its associated repos. A bound session's MUTATING write under a `repos/<slug>/` outside it is the gate's one non-PROTECTED block; an unbound session, an unregistered slug and a workspace-root path are never scope-judged.
+The repo set one Bind owns — its context's main repo plus its associated repos. A file-tool write under `repos/<slug>/` or `worktrees/<slug>/` outside it is blocked, and an unbound session with an id owns no repo; inside it, `repos/<slug>/` takes only `specs/audits/` directly, the rest lands by a Worktree merge. An unregistered slug and a workspace-root path are never scope-judged.
 _Avoid_: ownership, lease, territory, allowlist (for the repo set)
+
+**Zone**:
+A region with one write rule. A `.dadaia/` zone is a row of `core.workspace_layout.DADAIA_ZONES` (class, TTL, creator); a path's scope zone is `core.invocation.scope`'s `root`, `repo`, `audit` or `worktree`.
+_Avoid_: area (for a zone), lane
+
+**Worktree**:
+A canonical git worktree `worktrees/<repo>/<M.m.p><letter>-<kind>` on the local branch `wt/<same>`, holding one task, fix, backlog edit or candidate definition; it reaches `repos/<repo>` only by `worktree.py merge`. Rules: `worktrees/AGENTS.md`.
+_Avoid_: sandbox, harness worktree (a `.claude/worktrees/**` tree is not one)
+
+**Worktree kind**:
+`impl`, `bug`, `backlog` or `release` — the allowed set of paths a Worktree may merge (`KINDS`).
+_Avoid_: worktree type, lane
 
 **Stall**:
 The flow cannot advance because an enforcement point (gate, chokepoint, doctor exit, CLI refusal) refuses the next action the law itself requires; every BLOCK carries one executable `fix:` line, and a BLOCK whose fix is itself blocked is a CRITICAL bug by definition (operator ruling 2026-09-12).
@@ -154,7 +166,7 @@ _Avoid_: update --set status, flip
 The open-scope publication unit, named last-published-PyPI + 1 patch — exactly one live, growing by stacked Candidates; its state is `_RELEASE.json`, its narrative is that file's `log`. The version increments only at operator-approved deploy (ADR 0021). _Avoid_: "release" for one closed scope — that is a Candidate.
 
 **Candidate**:
-One closed-scope SDD cycle inside the live Release (as-is review → grill → SPEC/PLAN/TASKS `Aprovado` → implementation → memory → closure → integration-branch merge → promote-or-continue gate). The live Candidate's trio sits at the release root and the next Candidate overwrites it in place — git is the archive, and no closed Candidate is ever copied into a folder of its own.
+One closed-scope SDD cycle inside the live Release (as-is review → grill → SPEC/PLAN/TASKS `Aprovado` → implementation → memory → closure → integration-branch merge → promote-or-continue gate). Every Candidate lives in `specs/releases/<v>/rc-<N>/`, never rewritten after its closure; the live one is the highest `rc-<N>/`, and the whole release is archived at promote.
 _Avoid_: version (for the unit), sprint, "rc" as a branch name or a fixes-only round
 
 **As-is review**:
@@ -281,9 +293,9 @@ _Avoid_: reaper walk, gc, cleanup pass, per-call-site guard
 `WS-<zone>-<verdict>` — `<zone>` is `root`, a harness dir (`claude codex kimi-code agents`), `dadaia` (the `.dadaia/` top level) or a zone name with its leading dot stripped (`cache`); the `workspace` section's code family, beside `SPEC-DOC-*`, `TREE-*`, `RELEASE-TREE-*` (specs) and `BL-SCHEMA|CONFLICT|STALE`, `LEDGER-<NAME>-SCHEMA` (ledgers).
 _Avoid_: ROOT-n, EFF-n, issue code
 
-**Instance exceptions**:
-`states/instance_exceptions.txt` — one glob per line, `#` comments, deduplicated, order kept; matches at the root and inside the harness dirs. Outside the projection manifest and outside the exceptions = slop. Replaces `root_exceptions.txt`.
-_Avoid_: root exceptions, allowlist, whitelist (the root whitelist is the gate's law, not the operator's globs)
+**.dadaiaignore**:
+The operator's file at the workspace root, PROTECTED from agents: one root-relative pattern per line, `#` comments, `*` within one segment, a trailing `/` for a directory; no `!`, no `**` (an invalid line is a doctor finding). An entry neither in level 1 of the root canon nor named here = slop. Replaces `states/instance_exceptions.txt`, which `doctor --fix` migrates 1:1.
+_Avoid_: instance exceptions, allowlist, whitelist (the root whitelist is the gate's law, not the operator's patterns)
 
 ## Authorities
 

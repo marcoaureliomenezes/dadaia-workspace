@@ -15,6 +15,7 @@ import pytest
 
 from dadaia_workspace.features.specs.doctor import SpecsDoctor
 from dadaia_workspace.features.specs.doctor_common import resolve_active_release
+from tests.helpers.release_state import PLAN
 
 pytestmark = pytest.mark.unit
 
@@ -42,9 +43,12 @@ def _specs(
 ) -> Path:
     specs = tmp_path / "specs"
     release_dir = specs / "releases" / rid
-    release_dir.mkdir(parents=True, exist_ok=True)
+    (release_dir / "rc-1").mkdir(parents=True, exist_ok=True)
     for name in ("SPEC.md", "PLAN.md", "TASKS.md") if trio else ():
-        (release_dir / name).write_text("# x\n\n**Status:** Approved\n", encoding="utf-8")
+        (release_dir / "rc-1" / name).write_text(
+            f"# x\n\n**Status:** Approved\n\n{PLAN if name == 'PLAN.md' else ''}",
+            encoding="utf-8",
+        )
     (release_dir / "_RELEASE.json").write_text(json.dumps({
         "schema": "release-state-v1", "release": rid, "phase": phase,
         "defined": {"sha": "0000001", "ts": "2026-09-20T10:00:00Z"},

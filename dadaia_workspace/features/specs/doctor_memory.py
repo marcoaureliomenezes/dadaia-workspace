@@ -84,7 +84,7 @@ class MemoryValidator:
             specs_finding(
                 "MEM-PLACEHOLDER-1",
                 Severity.ERROR,
-                f"{path.relative_to(self.specs_dir)} is an unfilled placeholder atom (template "
+                f"{path.relative_to(self.specs_dir).as_posix()} is an unfilled placeholder atom (template "
                 "markers never replaced) — remove it or fill it with real content",
                 str(path),
                 fixable=True,
@@ -173,7 +173,7 @@ class MemoryValidator:
         rels = [*TOPLEVEL_MEMORY_FILES, PRODUCT_INDEX_REL]
         if product_dir.is_dir():
             rels += [
-                f"product/{p.relative_to(product_dir)}"
+                f"product/{p.relative_to(product_dir).as_posix()}"
                 for p in sorted(product_dir.rglob("*.md"))
                 if p.name != "index.md"
             ]

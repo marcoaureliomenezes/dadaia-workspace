@@ -57,6 +57,14 @@ def new_entry(active: Items, slug: str, values: dict[str, Any]) -> Items:
             "forever, so a second entry under this id would be a second identity for it",
             f"{SCRIPT} new <another-slug>",
         )
+    relates, live = values.get("relates"), [str(item.get("id")) for item in active]
+    names = [] if relates in (None, "none") else str(relates).split(",")
+    if not set(names) <= set(live) or live and relates is None:
+        raise Refusal(
+            "name the live entries this one updates, obsoletes or relates to (ADR 0127): "
+            + (", ".join(live) or "none"),
+            f"{SCRIPT} new {slug} --relates <slugs>|none",
+        )
     intents = parse_intents(values.get("intent"))
     entry: dict[str, Any] = {
         "id": slug,
@@ -68,4 +76,6 @@ def new_entry(active: Items, slug: str, values: dict[str, Any]) -> Items:
     }
     if intents:
         entry["intents"] = intents
+    if live:
+        entry["relates"] = names
     return [*active, entry]

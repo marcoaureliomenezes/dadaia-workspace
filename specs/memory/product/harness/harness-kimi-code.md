@@ -25,8 +25,8 @@ sources:
 
 ## Binding
 
-- Kimi Code exposes no native session id, so its binding is `DADAIA_CONTEXT` exported into the launching environment ([[context-management]]).
-- `dadaia context bind` in a shell with neither a native session id nor `DADAIA_CONTEXT` warns and names the export (`eval $(dadaia context bind <ctx> --print-env)`).
+- Kimi Code exposes no native session id, so its binding is `DADAIA_CONTEXT` exported into the launching environment, or `DADAIA_SESSION_ID` exported before the session opens and then `dadaia context bind` ([[context-management]]).
+- `dadaia context bind` in a shell with no session id exits 1, its fix line naming the `DADAIA_SESSION_ID` export.
 
 ## Dependencies
 

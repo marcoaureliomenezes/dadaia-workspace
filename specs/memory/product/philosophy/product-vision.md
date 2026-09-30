@@ -13,7 +13,7 @@ sources:
 ## The paradigm
 
 - One workspace folder; the agent session launches at its root, always.
-- Projects live in repos inside it (`repos/<slug>/`); governance — the root `AGENTS.md` map, the scoped `AGENTS.md` files, `.agents/skills`, `.agents/agents`, `.dadaia/` — lives outside every repo.
+- Projects live in repos inside it (`repos/<slug>/`), which receive agent work only as merges from their worktrees under `worktrees/<repo>/` ([[worktrees]]); governance — the root `AGENTS.md` map, the scoped `AGENTS.md` files, `.agents/skills`, `.agents/agents`, `.dadaia/` — lives outside every repo.
 - A project is a context: one main repo, where `specs/` lives, plus its associated repos; a workspace holds many contexts and a context many repos — never a monorepo; a single-repo context is the minimal case ([[spec-context-project]], [[context-management]]).
 - The same canonical rules reach every harness through the one authored set ([[agentic-entities]]).
 
@@ -38,4 +38,4 @@ sources:
 
 ## Dependencies
 
-[[spec-context-project]], [[context-management]], [[sdd-gate-v3]], [[release-lifecycle]], [[bug-ledger]], [[backlog-ledger]], [[ARCHITECTURE]], [[public-asset-distribution]], [[pypi-distribution]], [[QUALITY]], [[agentic-entities]].
+[[spec-context-project]], [[context-management]], [[sdd-gate-v3]], [[release-lifecycle]], [[bug-ledger]], [[backlog-ledger]], [[ARCHITECTURE]], [[public-asset-distribution]], [[pypi-distribution]], [[QUALITY]], [[agentic-entities]], [[worktrees]].

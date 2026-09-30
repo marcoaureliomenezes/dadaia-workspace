@@ -16,6 +16,7 @@ published baseline's amnesty because there is only one way to compute it.
 from __future__ import annotations
 
 import contextlib
+import re
 import subprocess
 from collections.abc import Iterator
 from pathlib import Path
@@ -827,6 +828,65 @@ class GitSubprocessObjectReader:
         """``refs/remotes/origin/<branch>`` exists locally (offline)."""
         ref = f"refs/remotes/origin/{branch}"
         return _run(["git", "rev-parse", "-q", "--verify", ref], repo).returncode == 0
+
+    def netted_specs(self, repo: Path, local_sha: str, remote_sha: str) -> list[str]:
+        """The ``specs/`` paths the push nets in. Netted in = present at the tip and
+        different from every publication boundary; an empty range nets nothing; a range
+        with no boundary (bootstrap) nets the tip's whole ``specs/``. A force-push
+        re-judges paths carried from the overwritten tip (it is no boundary)."""
+        if not SHA_SHAPE_RE.match(local_sha) or local_sha == ZERO_SHA:
+            return []
+        exclusions = _base_exclusions(repo, remote_sha)
+        if not _range_commit_shas(repo, local_sha, exclusions):
+            return []
+        bases = _publication_boundaries(repo, local_sha, exclusions)
+        runs = [["diff", "--name-only", "--no-renames", "--diff-filter=AM", b] for b in bases]
+        netted: set[str] | None = None
+        for run in runs or [["ls-tree", "-r", "--name-only"]]:
+            result = _run(["git", *run, local_sha, "--", "specs/"], repo)
+            if result.returncode != 0:
+                raise GitObjectReadError(f"git {run[0]} failed: {_decode(result.stderr).strip()}")
+            paths = set(_lines(result.stdout))
+            netted = paths if netted is None else netted & paths
+        return sorted(netted or ())
+
+    def law_deletions(self, repo: Path, local_sha: str, remote_sha: str) -> list[tuple[str, str]]:
+        """ADR 0151 M3: (commit, path) for every range commit deleting a non-blank
+        ``AGENTS.md``/``SKILL.md`` line whose own message cites no ``ADR NNNN``."""
+        if local_sha == ZERO_SHA or not SHA_SHAPE_RE.match(local_sha):
+            return []
+        laws = [":(glob)**/AGENTS.md", ":(glob)**/SKILL.md"]
+        args = [
+            "git",
+            "log",
+            "--full-history",
+            "-p",
+            "-U0",
+            "--no-renames",
+            "--format=%x00%H%n%B%x00",
+        ]
+        result = _run(
+            [*args, local_sha, "--not", *_base_exclusions(repo, remote_sha), "--", *laws], repo
+        )
+        if result.returncode != 0:
+            raise GitObjectReadError(f"git log failed: {_decode(result.stderr).strip()}")
+        found: dict[tuple[str, str], None] = {}
+        chunks = _decode(result.stdout).split("\x00")[1:]
+        for head, diff in zip(chunks[::2], chunks[1::2], strict=True):
+            sha, _, message = head.partition("\n")
+            if re.search(r"\bADR \d{4}\b", message):
+                continue
+            path, in_hunk = "", False
+            for line in diff.split("\n"):
+                if line.startswith("diff --git "):
+                    in_hunk = False
+                elif not in_hunk and line.startswith("--- a/"):
+                    path = line[6:]
+                elif line.startswith("@@"):
+                    in_hunk = True
+                elif in_hunk and line.startswith("-") and line[1:].strip():
+                    found[(sha, path)] = None
+        return list(found)
 
     def new_objects(self, repo: Path, local_sha: str, remote_sha: str) -> Iterator[ScannedObject]:
         if not local_sha or local_sha == ZERO_SHA:

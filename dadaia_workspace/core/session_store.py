@@ -92,11 +92,6 @@ def new_binding_record(
     }
 
 
-def binding_env_lines(context: str, session_id: str) -> tuple[str, str]:
-    """The two eval-ready ``export`` lines that carry a binding into a shell."""
-    return (f"export DADAIA_CONTEXT={context}", f"export DADAIA_SESSION_ID={session_id}")
-
-
 def is_live(record: dict[str, object], *, clock: Callable[[], datetime] | None = None) -> bool:
     """``last_seen_at`` younger than the TTL; a missing or unparsable one is not live."""
     try:
@@ -113,14 +108,19 @@ def live_session(workspace: Path, session_id: str) -> dict[str, object] | None:
     return record if record is not None and is_live(record) else None
 
 
-def stale_records(workspace: Path) -> list[Path]:
-    """Every TTL-expired session record file; an unreadable record is never stale."""
+def _records(workspace: Path) -> list[tuple[Path, dict[str, object] | None]]:
     directory = sessions_dir(workspace)
     entries = sorted(directory.glob("*.json")) if directory.is_dir() else []
+    return [(e, read_session(workspace, e.stem)) for e in entries if e.is_file()]
+
+
+def stale_records(workspace: Path) -> list[Path]:
+    """Every TTL-expired session record file — deleted by the reaper."""
     return [
-        entry
-        for entry in entries
-        if entry.is_file()
-        and (record := read_session(workspace, entry.stem)) is not None
-        and not is_live(record)
+        entry for entry, record in _records(workspace) if record is not None and not is_live(record)
     ]
+
+
+def unreadable_records(workspace: Path) -> list[Path]:
+    """Every record file that does not read — never stale, so doctor holds it as slop."""
+    return [entry for entry, record in _records(workspace) if record is None]

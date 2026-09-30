@@ -1,5 +1,5 @@
 """Intent: CONTRACT — 0.4.6 AC8 (FR7, bug doctor-root1-flags-env-that-dadaia-md-9-declares-canonical)
-and AC7 (FR6, the ``INSTANCE_EXCEPTIONS`` reader); size: SMALL.
+and AC7 (FR6, the ``.dadaiaignore`` reader); size: SMALL.
 
 Harness-real behavior tests for dadaia_workspace.hooks.root_whitelist.
 
@@ -18,13 +18,15 @@ below as a named parametrized row, including the W1-6 first-path-component block
 
 from __future__ import annotations
 
+import os
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
 import pytest
 
-from dadaia_workspace.core.workspace_layout import INSTANCE_EXCEPTIONS
+from dadaia_workspace.core.workspace_layout import DADAIAIGNORE
+from dadaia_workspace.core.workspace_resolver import FENCE_ENV
 from dadaia_workspace.infrastructure.git_subprocess import GitSubprocessClient
 from tests.fixtures.harness_env import claude_hook_env, run_hook_subprocess
 from tests.fixtures.stores import context_store
@@ -55,22 +57,19 @@ def test_block_message_lists_every_whitelisted_entry(tmp_path: Path) -> None:
     assert block is not None
     reason = block["reason"]
     assert (
-        ".agents/ .claude/ .codex/ .cursor/ .dadaia/ .devin/ .git/ .github/ repos/ "
-        ".env .gitignore AGENTS.md prompt.md"
+        ".agents/ .claude/ .codex/ .cursor/ .dadaia/ .devin/ .git/ .github/ repos/ worktrees/ "
+        ".dadaiaignore .gitignore AGENTS.md prompt.md"
     ) in reason
-    assert INSTANCE_EXCEPTIONS not in reason
     assert "instance_exceptions" not in reason
 
 
-@pytest.mark.parametrize("name", [".env", ".gitignore", "AGENTS.md", "prompt.md"])
+@pytest.mark.parametrize("name", [".gitignore", "AGENTS.md", "prompt.md"])
 def test_law_declared_root_files_are_canon_for_the_hook_and_the_doctor(
     tmp_path: Path, name: str
 ) -> None:
-    """sa-gate-allows-root-entries-the-reaper-moves#E8, #E6. Bug
-    doctor-root1-flags-env-that-dadaia-md-9-declares-canonical: the root `AGENTS.md` map §4
-    names the root ``.env`` as the one credential home and §5.3 presumes a root
-    ``.gitignore``, yet ``ROOT_ALLOWED_FILES`` listed neither — the hook blocked the write
-    and the doctor flagged the file. Both derive from that one set, so one row fixes both."""
+    """sa-gate-allows-root-entries-the-reaper-moves#E8, #E6: the hook and the doctor derive
+    from ``ROOT_ALLOWED_FILES``, so one row admits a file to both. ``.env`` left it (ADR 0146
+    (1): credentials live outside the workspace); the block message above no longer names it."""
     from dadaia_workspace.features.spec_context.doctor import DoctorService, FindingVerdict
 
     ws = _ws(tmp_path)
@@ -99,13 +98,21 @@ def test_law_declared_root_files_are_canon_for_the_hook_and_the_doctor(
             lambda ws: ws / ".opencode" / "agents" / "foo.md",
             ".opencode",
         ),
+        ("AC1.3-a-fenced-root-stays-protected", lambda ws: ws / "junk.txt", "junk.txt"),
     ],
 )
 def test_block_table(
-    tmp_path: Path, name: str, target_fn: Callable[[Path], Path], reason_fragment: str
+    tmp_path: Path,
+    name: str,
+    target_fn: Callable[[Path], Path],
+    reason_fragment: str,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """sa-gate-allows-root-entries-the-reaper-moves#E1: a new root entry is blocked."""
+    """sa-gate-allows-root-entries-the-reaper-moves#E1: a new root entry is blocked, in a
+    fenced root too (fenced-roots-env-disables-the-gate)."""
     ws = _ws(tmp_path)
+    if name.startswith("AC1.3"):  # the fence says "never act on", never "nothing protects"
+        monkeypatch.setenv(FENCE_ENV, os.pathsep.join((os.environ[FENCE_ENV], str(ws))))
     target = target_fn(ws)
     _out, block = _run(tmp_path, {"tool_name": "Write", "tool_input": {"file_path": str(target)}})
     assert block is not None
@@ -178,7 +185,7 @@ def test_exception_glob_table(
 ) -> None:
     """sa-gate-allows-root-entries-the-reaper-moves#E2: an operator glob allows the entry."""
     ws = _ws(tmp_path)
-    (ws / INSTANCE_EXCEPTIONS).write_text(exceptions_content, encoding="utf-8")
+    (ws / DADAIAIGNORE).write_text(exceptions_content, encoding="utf-8")
     target = target_fn(ws)
     out, block = _run(
         tmp_path,

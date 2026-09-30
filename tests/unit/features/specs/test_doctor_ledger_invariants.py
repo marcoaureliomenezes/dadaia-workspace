@@ -30,14 +30,14 @@ def _skip_memory_lint_subprocess(monkeypatch: pytest.MonkeyPatch) -> None:
 def _tree(root: Path, release_id: str = "0.1.10", phase: str = "IMPLEMENTATION") -> Path:
     specs = root / "specs"
     rel = specs / "releases" / release_id
-    rel.mkdir(parents=True)
+    (rel / "rc-1").mkdir(parents=True)
     (specs / "constitution.md").write_text("# Constitution\n", encoding="utf-8")
     state = {"schema": "release-state-v1", "release": release_id, "phase": phase}
     state |= {"defined": None, "implemented": None, "shipped": None, "log": []}
     (rel / "_RELEASE.json").write_text(json.dumps(state) + "\n", encoding="utf-8")
     for name in ("SPEC", "PLAN"):
-        (rel / f"{name}.md").write_text(f"# {name}\n\n**Status:** Approved\n", encoding="utf-8")
-    (rel / "TASKS.md").write_text(
+        (rel / "rc-1" / f"{name}.md").write_text(f"# {name}\n\n**Status:** Approved\n", "utf-8")
+    (rel / "rc-1" / "TASKS.md").write_text(
         "# Tasks\n\n**Status:** Approved\n\n- [-] T1 something\n- [ ] T2 other\n", encoding="utf-8"
     )
     return specs
@@ -61,7 +61,7 @@ def _audits(*names: str) -> Callable[[Path], None]:
 
 
 def _draft_tasks(specs: Path) -> None:
-    tasks = specs / "releases" / "0.1.10" / "TASKS.md"
+    tasks = specs / "releases" / "0.1.10" / "rc-1" / "TASKS.md"
     tasks.write_text(tasks.read_text("utf-8").replace("Approved", "Draft"), encoding="utf-8")
 
 

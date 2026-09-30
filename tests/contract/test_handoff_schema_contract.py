@@ -127,7 +127,7 @@ _REWRITE: dict[str, dict[str, Any]] = {
         pytest.param("handoff", None, id="handoff"),
         pytest.param("bug", None, id="bug"),
         pytest.param("finding", {"id", "pillar", "severity", "refs", "claim", "evidence", "disposition", "release", "reason"}, id="finding"),
-        pytest.param("adr", {"id", "ts", "title", "status", "context", "decision", "consequences", "measured_by", "supersedes", "amends"}, id="adr"),
+        pytest.param("adr", {"id", "ts", "title", "status", "context", "decision", "consequences", "measured_by", "supersedes", "amends", "ruling"}, id="adr"),
         pytest.param("release", {"schema", "release", "phase", "defined", "implemented", "shipped", "log"}, id="release"),
     ],
 )  # fmt: skip
@@ -140,7 +140,9 @@ def test_schema_is_draft_2020_12_and_closes_the_envelope(
     Draft202012Validator.check_schema(schema)
     assert schema["additionalProperties"] is False
     if properties is not None:
-        assert set(schema["properties"]) == set(schema["required"]) == properties
+        # ADR 0151 M1: `ruling` is required on `accepted` only, by the schema's allOf.
+        assert set(schema["properties"]) == set(schema["required"]) | {"ruling"} & properties
+        assert set(schema["properties"]) == properties
 
 
 def _milestone(**extra: object) -> dict[str, object]:

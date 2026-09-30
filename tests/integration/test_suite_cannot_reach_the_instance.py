@@ -69,6 +69,12 @@ def test_a_child_inside_a_fenced_workspace_cannot_resolve_it(tmp_path: Path) -> 
     probe = _PROBE.replace("resolve_workspace_root", "resolve_cli_workspace_root")
     explicit = _resolve_in_child(tmp_path, str(ws), probe.replace("r()", named))
     assert explicit.returncode != 0 and "No initialized workspace" in explicit.stderr
+    # fenced-roots-env-disables-the-gate (AC1.3): an Invocation is where a process acts
+    # (hook heartbeats, specs repairs, ci push-gate-check) — its cwd and target rungs fenced
+    inv = "import os,pathlib as p;from dadaia_workspace.core.invocation import resolve as r;"
+    inv += "print(r(env=os.environ,cwd=p.Path.cwd(),target_path=p.Path('f')).workspace_root)"
+    acting = _resolve_in_child(ws / "repos" / "x", str(ws), inv)
+    assert acting.stdout.split() == ["None"], acting.stderr
 
 
 def test_the_suite_fences_every_instance_enclosing_this_checkout() -> None:

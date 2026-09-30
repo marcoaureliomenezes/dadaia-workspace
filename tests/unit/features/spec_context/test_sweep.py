@@ -168,7 +168,7 @@ def test_a_live_bind_record_survives_a_full_doctor_fix_pass(tmp_path: Path) -> N
     dadaia = tmp_path / ".dadaia"
     for zone in provisioned_zones():
         (dadaia / zone.name).mkdir(parents=True, exist_ok=True)
-    (tmp_path / workspace_layout.INSTANCE_EXCEPTIONS).parent.mkdir(parents=True, exist_ok=True)
+    (tmp_path / workspace_layout.DADAIAIGNORE).write_text("", encoding="utf-8")
 
     now = datetime.now(tz=UTC).isoformat().replace("+00:00", "Z")
     record = session_store.new_binding_record(

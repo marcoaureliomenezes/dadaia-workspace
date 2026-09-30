@@ -98,7 +98,7 @@ def _assert_sdd_invariants_preserved(before: str, after: str) -> None:
 
 
 def _seed_release_tasks_md(specs_dir: Path, release_id: str = "v1.0.0") -> Path:
-    release_dir = specs_dir / "releases" / release_id
+    release_dir = specs_dir / "releases" / release_id / "rc-1"
     release_dir.mkdir(parents=True, exist_ok=True)
     path = release_dir / "TASKS.md"
     path.write_text(_FIXTURE_TASKS_MD, encoding="utf-8")
@@ -122,7 +122,7 @@ def _mk_hook_workspace(tmp_path: Path, ctx: str = "dummy-ctx") -> Path:
 
 def test_pre_gate_hook_never_mutates_tasks_md_between_read_and_edit(tmp_path: Path) -> None:
     ws = _mk_hook_workspace(tmp_path)
-    specs_dir = ws / "repos" / "dummy-ctx" / "specs"
+    specs_dir = ws / "worktrees" / "dummy-ctx" / "0.5.0a-impl" / "specs"
     target = _seed_release_tasks_md(specs_dir)
     before = target.read_text(encoding="utf-8")
 

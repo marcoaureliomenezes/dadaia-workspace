@@ -8,6 +8,7 @@ boundaries over a tmp workspace).
 from __future__ import annotations
 
 import json
+import subprocess
 from pathlib import Path
 
 import pytest
@@ -17,8 +18,7 @@ from typer.testing import CliRunner
 from dadaia_workspace.cli._specs_resolution import resolve_specs_dir_for_cli
 from dadaia_workspace.cli.main import app
 from dadaia_workspace.core import session_store
-from dadaia_workspace.core.invocation import resolve
-from dadaia_workspace.features.spec_context import gate_policy
+from dadaia_workspace.core.invocation import alive_context_trees, resolve
 from dadaia_workspace.features.workspace.onboarding import next_step
 from tests.fixtures.harness_env import (
     claude_hook_env,
@@ -26,6 +26,7 @@ from tests.fixtures.harness_env import (
     run_hook_subprocess,
     scrub_context_resolution_env,
 )
+from tests.fixtures.stores import workspace_cli
 
 _NOW = "2999-01-01T00:00:00+00:00"
 _CLAUDE = "CLAUDE_CODE_SESSION_ID"
@@ -96,10 +97,10 @@ def test_the_readers_agree_on_the_bind(
     inv = resolve(env=env, cwd=ws)
     assert inv.bind.context_name == expected  # the gate reads inv.bind
 
-    hook_env = {**claude_hook_env(ws), **env}
+    hook_env = {**claude_hook_env(ws, session_id=sid or "x"), **env}
     if not sid:
         hook_env = {**kimi_hook_env(ws), "DADAIA_CONTEXT": env_ctx}
-    payload = {"session_id": sid} if sid else {}
+    payload = {"session_id": sid or "kimi-stdin-only"}  # Kimi: stdin id, no env id
     out = run_hook_subprocess("ctx_inject", payload, hook_env).stdout
     assert (f"[{expected}]" if expected else "[no bound context]") in out
 
@@ -119,13 +120,16 @@ def test_the_readers_agree_on_the_bind(
 
 
 def test_a_ghost_env_never_denies_and_is_surfaced(tmp_path: Path) -> None:
-    """sa-bind-has-two-stores#S3: a ghost DADAIA_CONTEXT is unbound (no scope deny) and
-    ctx_inject emits a warning line."""
+    """sa-bind-has-two-stores#S3: a ghost DADAIA_CONTEXT is unbound and ctx_inject warns.
+    Review F1: Kimi's stdin-only session id is no id (bind cannot see it), so its write
+    into a registered repo's worktree is the declared id-less gap, never a bind Stall."""
     ws = _workspace(tmp_path, "alpha")
-    out = run_hook_subprocess("ctx_inject", {}, {**kimi_hook_env(ws), "DADAIA_CONTEXT": "ghost"})
+    out = run_hook_subprocess(
+        "ctx_inject", {"session_id": "k1"}, {**kimi_hook_env(ws), "DADAIA_CONTEXT": "ghost"}
+    )
     assert "! DADAIA_CONTEXT=ghost is not this session's bind" in out.stdout
-    target = ws / "repos" / "alpha" / "x.py"
-    payload = {"tool_name": "Write", "tool_input": {"file_path": str(target)}}
+    target = ws / "worktrees" / "alpha" / "0.5.0a-impl" / "x.py"
+    payload = {"tool_name": "Write", "tool_input": {"file_path": str(target)}, "session_id": "k1"}
     gate = run_hook_subprocess(
         "sdd_gate", payload, {**kimi_hook_env(ws), "DADAIA_CONTEXT": "ghost"}
     )
@@ -140,7 +144,7 @@ def test_running_the_printed_scope_fix_clears_the_deny(
     ws = _workspace(tmp_path, "alpha", "beta")
     _record(ws, "s1", "alpha")
     env = {**claude_hook_env(ws, session_id="s1"), "DADAIA_CONTEXT": "alpha"}
-    target = ws / "repos" / "beta" / "x.py"
+    target = ws / "worktrees" / "beta" / "0.5.0a-impl" / "x.py"
     payload = {"tool_name": "Write", "tool_input": {"file_path": str(target)}, "session_id": "s1"}
     denied = run_hook_subprocess("sdd_gate", payload, env).block_envelope()
     assert denied is not None and "context bind beta" in denied["reason"]
@@ -149,16 +153,6 @@ def test_running_the_printed_scope_fix_clears_the_deny(
     monkeypatch.setenv("CLAUDE_CODE_SESSION_ID", "s1")
     assert CliRunner().invoke(app, ["context", "bind", "beta"]).exit_code == 0
     assert run_hook_subprocess("sdd_gate", payload, env).block_envelope() is None
-
-
-def test_an_env_bound_session_is_told_an_operator_step() -> None:
-    """sa-bind-has-two-stores#S5: with no session id the fix is to relaunch, not bind."""
-    _, message = gate_policy.evaluate(
-        "repos/beta/x.py", root=Path("/ws"), bound_context="alpha",
-        bound_repos=frozenset({"alpha"}), target_slug="beta", target_owner="beta",
-        bound_by_env=True,
-    )  # fmt: skip
-    assert message.endswith("fix: Operator action: relaunch this session with DADAIA_CONTEXT=beta")
 
 
 def test_an_unbound_session_in_a_repo_injects_no_memory(tmp_path: Path) -> None:
@@ -172,19 +166,49 @@ def test_an_unbound_session_in_a_repo_injects_no_memory(tmp_path: Path) -> None:
 
 
 def test_a_bound_context_without_specs_gets_its_next_step(tmp_path: Path) -> None:
-    """sa-bind-has-two-stores#S7: header and next step, never "[no bound context]"."""
+    """sa-bind-has-two-stores#S7: header and next step, never "[no bound context]"; AC1.5:
+    exactly the step text ``doctor`` reports; AC1.10: then the doctor's worktree block, fix
+    included, in the doctor's rendering (read through `worktree.py`, hence this tier)."""
     ws = _workspace(tmp_path, "alpha")
     _record(ws, "s1", "alpha")
-    out = run_hook_subprocess("ctx_inject", {"session_id": "s1"}, claude_hook_env(ws)).stdout
-    assert "[alpha]" in out and "Next (" in out and "[no bound context]" not in out
+    flow = {"main_repo": "alpha", "associated_repos": [], "gitflow": {"work": "feature/"}}
+    workspace_cli(ws, flow)
+    for argv in (["init", "-q"], ["commit", "-q", "--allow-empty", "-m", "x"],
+                 ["branch", "wt/0.5.0a-impl"]):  # fmt: skip
+        subprocess.run(
+            ["git", "-C", str(ws / "repos/alpha"), *argv], check=True, capture_output=True
+        )
+    out = run_hook_subprocess(
+        "ctx_inject", {"session_id": "s1"}, claude_hook_env(ws, session_id="s1")
+    ).stdout
+    step = next_step(ws, alive_context_trees(ws), "alpha", "s1")
+    assert (
+        step is not None
+        and step.id == "specs"
+        and out.startswith("[alpha]\n")
+        and f"\n{step.text()}\n" in out
+    )
+    orphan = f"WORKTREE warning orphan {ws}/worktrees/alpha/0.5.0a-impl"
+    assert f"\n=== open worktrees ===\n{orphan}" in out and "worktree.py merge" in out
 
 
-def test_binding_a_dead_context_refuses_with_the_alive_fix(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+@pytest.mark.parametrize(
+    ("sid", "name", "fix"),
+    [
+        pytest.param("s1", "gamma", "context alive gamma", id="S9-dead-context"),
+        pytest.param(None, "alpha", "export DADAIA_SESSION_ID=", id="ADR0116-no-id-never-mints"),
+    ],
+)
+def test_bind_refuses_with_its_fix_and_writes_no_record(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, sid: str | None, name: str, fix: str
 ) -> None:
-    """sa-bind-has-two-stores#S9."""
-    ws = _workspace(tmp_path, "gamma", dead=("gamma",))
+    """sa-bind-has-two-stores#S9; AC1.2: with no native id and no DADAIA_SESSION_ID the
+    bind exits non-zero with the export fix instead of minting an id no hook can see."""
+    ws = _workspace(tmp_path, "gamma", "alpha", dead=("gamma",))
+    scrub_context_resolution_env(monkeypatch)
     monkeypatch.chdir(ws)
-    result = CliRunner().invoke(app, ["context", "bind", "gamma"])
-    assert result.exit_code == 1
-    assert "context alive gamma" in result.output
+    if sid:
+        monkeypatch.setenv(_CLAUDE, sid)
+    result = CliRunner().invoke(app, ["context", "bind", name])
+    assert result.exit_code == 1 and fix in result.output
+    assert not list((ws / ".dadaia").glob("sessions/*.json"))

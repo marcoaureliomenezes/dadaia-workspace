@@ -18,9 +18,8 @@ hook can rely on is whatever the *operator's shell* exported (``DADAIA_CONTEXT``
 documented operator-shell convenience var). In particular the harness never sets:
 
 - ``DADAIA_SESSION_ID`` — the dadaia hooks resolve session identity from the harness's
-  *native* id var (``CLAUDE_CODE_SESSION_ID`` / ``CODEX_SESSION_ID``) or the stdin
-  ``session_id`` field
-  (``dadaia_workspace/hooks/_common.py:resolve_session_id``). ``DADAIA_SESSION_ID`` is an
+  *native* id var (``CLAUDE_CODE_SESSION_ID`` / ``CODEX_SESSION_ID``)
+  (``dadaia_workspace/core/invocation.py:resolve_session_id``, env only). ``DADAIA_SESSION_ID`` is an
   *operator override only*, never a harness-supplied value.
 - ``DADAIA_PERSONA`` / ``*_AGENT_PERSONA`` — no harness exposes the dispatched persona to
   a hook subprocess. Tests must never plant it.
@@ -28,7 +27,7 @@ documented operator-shell convenience var). In particular the harness never sets
   (WS-R4). A hook env never carries it from the harness.
 
 Verification source: ``dadaia_workspace/hooks/{sdd_gate,sdd_post_gate,ctx_inject}.py`` +
-``hooks/_common.resolve_session_id`` (which env vars the hooks actually read), and the
+``core/invocation.resolve_session_id`` (which env vars the hooks actually read), and the
 existing real-harness subprocess test ``tests/integration/gate/test_path_scope.py`` (which
 already strips ``DADAIA_SESSION_ID`` / ``*_AGENT_PERSONA`` before invoking the gate). The
 env returned here is **pinned-minimal**: a clean base (operator shell *without* any leaked
@@ -146,7 +145,7 @@ def scrub_context_resolution_env(monkeypatch: Any) -> None:
 #:   - ``DADAIA_AGENTS_DIR`` — agents-dir override (resolution branch 1); read by
 #:     ``features/agents/reader`` (``os.environ.get("DADAIA_AGENTS_DIR")``).
 #:   - ``DADAIA_SESSION_ID`` — the operator **override** leg of ``resolve_session_id``
-#:     (``hooks/_common`` reads it first, ahead of the harness-native id vars). The harness
+#:     (``core/invocation`` reads it first, ahead of the harness-native id vars). The harness
 #:     never sets it (so it stays in :data:`_FORBIDDEN_HOOK_ENV`, scrubbed from a real hook
 #:     *subprocess*), but a unit test of the override leg legitimately ``setenv``s it.
 #:   - ``DADAIA_MODE`` — the operator-shell mode escape, order (1) of
@@ -339,8 +338,8 @@ def kimi_hook_env(
     """Pinned-minimal env a real Kimi Code hook subprocess receives (v0.2.8).
 
     Kimi Code delivers **no native session-id env var** to a hook process — the session
-    id travels exclusively in the stdin JSON payload (``session_id`` field), exactly what
-    ``hooks/_common.resolve_session_id`` reads second. The env is therefore the scrubbed
+    id travels exclusively in the stdin JSON payload (``session_id`` field), which
+    ``core/invocation.resolve_session_id`` never reads (env only, ADR 0116). The env is therefore the scrubbed
     operator shell plus ``PWD`` only; ``extra`` may add the shim-exported
     wiring vars (``DADAIA_RUNTIME``/``DADAIA_HOOK_EVENT``) or operator-shell vars — a
     non-allowlisted ``DADAIA_*`` raises ``ValueError``.

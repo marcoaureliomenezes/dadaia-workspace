@@ -14,13 +14,14 @@ Repository: <https://github.com/marcoaureliomenezes/dadaia-workspace>
 
 ## What it is
 
-<!-- derived-from: product-vision sha256:cfd469d90787 -->
+<!-- derived-from: product-vision sha256:7e335ffc3ee1 -->
 
 dadaia-workspace is the operating environment around repositories developed with AI
 agents, and its unit is the context.
 
 A workspace is one folder. The agent session launches at its root, always. Projects
-live in repos inside it (`repos/<slug>/`) and the governance — the root `AGENTS.md`
+live in repos inside it (`repos/<slug>/`), which take agent work only as merges from
+their worktrees under `worktrees/<repo>/`, and the governance — the root `AGENTS.md`
 map, the scoped `AGENTS.md` files, `.agents/skills`, `.agents/agents`, `.dadaia/` —
 lives outside every repo. A project is a context: one main repo, where `specs/` lives,
 plus its associated repos. A workspace holds many contexts and a context many repos; it
@@ -45,7 +46,7 @@ What it rests on:
 
 ## Two ways in
 
-<!-- derived-from: product-vision sha256:cfd469d90787 -->
+<!-- derived-from: product-vision sha256:7e335ffc3ee1 -->
 
 A human drives it from a shell in three levels:
 `uvx dadaia-workspace init <dir> --harness <name> --repo <url>` provisions the

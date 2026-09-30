@@ -4,7 +4,8 @@
 Intent: CONTRACT — rows encode kimi-postcompact-omits-bound-context-bootstrap (recorded-slug
 fallback), claude-compact-reinjection-missing (session_restart re-emits AND restamps),
 ctx-inject-newest-bind-epoch-steals-other-sessions-context (self-keyed rebind), the
-compact-marker trigger, sa-bind-has-two-stores#S7 and bind-lost-silently-after-five-idle-minutes.
+compact-marker trigger, sa-bind-has-two-stores#S7, bind-lost-silently-after-five-idle-minutes and
+AC1.2 ctx-inject-on-cursor-copilot (session_start is a new session in every harness).
 """
 
 from __future__ import annotations
@@ -34,6 +35,8 @@ _NONE = InjectionDecision("none")
     pytest.param("postcompact", "", "", False, False, False, InjectionDecision("preflight", "", None), id="postcompact-unbound-preflight-no-stamp"),
     pytest.param("session_restart", "", "alpha", True, False, False, InjectionDecision("bootstrap", "alpha", "alpha"), id="restart-re-emits-and-restamps"),
     pytest.param("session_restart", "", "", False, False, False, InjectionDecision("preflight", "", ""), id="restart-unbound-stamps-empty"),
+    pytest.param("session_start", "alpha", "alpha", True, False, False, InjectionDecision("bootstrap", "alpha", "alpha"), id="AC1.2-a-new-session-is-never-a-repeat"),
+    pytest.param("session_start", "", "alpha", True, True, False, InjectionDecision("preflight", "", ""), id="AC1.2-a-new-session-inherits-no-stamp"),
 ])
 # fmt: on
 def test_decide_injection(

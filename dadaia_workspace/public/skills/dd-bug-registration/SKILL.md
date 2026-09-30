@@ -37,10 +37,10 @@ description: >
 
 1. `python3 .agents/skills/dd-bug-resolution/scripts/bugs.py append --bug-id <slug> --reported-by <agent> --title "…"
    --severity LOW|MEDIUM|HIGH|CRITICAL --surface … --component … --context …
-   --symptom … --repro … --expected …`
-2. `--surface unknown` is refused; name the real surface.
-3. Stage `BUGS.jsonl` alone; commit `chore(bugs): report <id>` — shape 1 of
-   `dd-gitflow-default` §3a.
+   --symptom … --repro … --expected … --correlates <ids>|none`
+2. The surface is the name of a directory tracked in the repo.
+3. In a `bug` worktree (`worktrees/AGENTS.md`), stage `BUGS.jsonl` alone; commit
+   `chore(bugs): report <id>` — shape 1 of `dd-gitflow-default` §3a.
 4. A bug belongs to the context whose tooling broke: its own `specs/bugs/`, plus an
    upstream report when the broken tool is someone else's.
 5. Hand the fix to `dd-bug-resolution` once the record exists.

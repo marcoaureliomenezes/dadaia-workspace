@@ -1,7 +1,7 @@
 ---
 slug: pypi-distribution
 title: pypi-distribution
-tldr: The PyPI package on one version axis, two console-script names, the OIDC pipeline, the wheel contract and the docs folder.
+tldr: The PyPI package on one version axis, two console-script names, the OIDC pipeline, the wheel contract and the derived docs.
 summary: dadaia-workspace publishes to PyPI under OIDC trusted publishing from the release-please workflow; release-please owns the version, the CHANGELOG and the tag, and pyproject carries the published floor.
 tags: [distribution, pypi, release, packaging]
 sources:
@@ -9,7 +9,7 @@ sources:
   - release-please-config.json
   - dadaia_workspace/cli/main.py
   - dadaia_workspace/__main__.py
-  - docs/**
+  - pyproject.toml
 ---
 
 ## Pipeline

@@ -5,16 +5,18 @@ from __future__ import annotations
 
 import json
 import re
-from collections.abc import Mapping
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal
 
 from dadaia_workspace.core.frontmatter import FRONTMATTER_RE, FrontmatterError, parse
-from dadaia_workspace.core.release_state import RELEASE_ID_RE, RELEASE_STATE_FILENAME
+from dadaia_workspace.core.release_state import CANDIDATE_RE, RELEASE_ID_RE, RELEASE_STATE_FILENAME
 
 __all__ = [
     "DEFAULT",
+    "candidate_dir",
+    "candidate_number",
     "Gitflow",
     "Role",
     "constitution_error",
@@ -22,7 +24,9 @@ __all__ = [
     "constitution_text",
     "from_mapping",
     "merge_frontmatter",
+    "next_candidate",
     "read_gitflow",
+    "resolve_live_candidate",
     "resolve_live_release_id",
     "work_branch",
 ]
@@ -66,6 +70,32 @@ def resolve_live_release_id(specs_dir: Path) -> str | None:
     live = [d.name for d in root.iterdir() if RELEASE_ID_RE.match(d.name)
             and (d / RELEASE_STATE_FILENAME).is_file()] if root.is_dir() else []  # fmt: skip
     return live[0] if len(live) == 1 else None
+
+
+def candidate_number(names: Iterable[str]) -> int:
+    """The highest ``rc-<N>`` among *names*, 0 when none — `_release_schema`'s twin."""
+    return max((int(m.group(1)) for n in names if (m := CANDIDATE_RE.match(n))), default=0)
+
+
+def candidate_dir(release_dir: Path) -> Path | None:
+    """The highest-numbered ``rc-<N>/`` under *release_dir* (ADR 0150), ``None`` when none."""
+    n = candidate_number(d.name for d in release_dir.iterdir() if d.is_dir())
+    return release_dir / f"rc-{n}" if n else None
+
+
+def next_candidate(release_dir: Path) -> Path:
+    """The ``rc-<N+1>/`` a new candidate is born in — past every ``rc-<N>`` entry, a stray
+    file included, so the birth never lands on an existing path."""
+    names = [p.name for p in release_dir.iterdir()] if release_dir.is_dir() else []
+    return release_dir / f"rc-{candidate_number(names) + 1}"
+
+
+def resolve_live_candidate(specs_dir: Path) -> Path | None:
+    """The live release's highest-numbered ``rc-<N>/`` (ADR 0150) — `_release_store`'s
+    `candidate_dir` rule; ``None`` with no live release or no candidate folder."""
+    if (release_id := resolve_live_release_id(specs_dir)) is None:
+        return None
+    return candidate_dir(specs_dir / "releases" / release_id)
 
 
 def work_branch(specs_dir: Path, flow: Gitflow) -> str:

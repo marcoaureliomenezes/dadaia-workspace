@@ -29,7 +29,7 @@ read or any output written.
 
 ## Phase 3 — resolve the live release and its trio
 
-1. Read `<specs-dir>/releases/<release-id>/_RELEASE.json` — its `phase` field is the resolver; the live candidate's trio is always flat at the release root.
+1. Read `<specs-dir>/releases/<release-id>/_RELEASE.json` — its `phase` field is the resolver; the live candidate's trio is the highest `rc-<N>/` beside it.
 2. No state-document-carrying release directory: stop before implementation and inform the operator.
 3. Read the SPEC; add the PLAN when planning or implementing, the TASKS when implementing; read `_RELEASE.json`'s `log` when `phase` is `CLOSURE`.
 4. Verify every loaded SPEC/PLAN/TASKS carries `**Status:** Approved` before any implementation; stop and name the unapproved artifact otherwise.

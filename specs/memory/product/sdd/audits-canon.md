@@ -1,7 +1,7 @@
 ---
 slug: audits-canon
 title: audits-canon
-tldr: Audits are committed three-pillar reviews over a sha window, their findings moved by audit.py; decisions are decisions.jsonl records the operator accepts.
+tldr: Audits are committed three-pillar reviews over a sha window, findings moved by audit.py; decisions.jsonl records only the operator accepts, with his ruling.
 summary: The two governance records that police canonical truth — an audit folder (AUDIT.md plus FINDINGS.jsonl) whose findings move by audit.py disposition and which audit.py close archives, and the decision ledger specs/ADRs/decisions.jsonl whose accepted records admit every canonical memory statement.
 tags: [sdd, audits, findings, adrs, decisions, governance]
 sources:
@@ -15,7 +15,7 @@ sources:
 ## The audit
 
 - The audit is the only full-tree inspection lane; every other quality boundary is diff-scoped. `dd-code-reviewer` runs it under the audit lens, suggested every five releases, never mandatory ([[agent-orchestration]]).
-- An audit is a committed folder `specs/audits/<YYYYMMDD>-<slug>/` holding `AUDIT.md` (scope, the window `[from-sha, HEAD]`, method per pillar, the eight forensic metrics, summary) and `FINDINGS.jsonl`; `specs/audits/**` is ADDITIVE, writable bound or not ([[sdd-gate-v3]]).
+- An audit is a committed folder `specs/audits/<YYYYMMDD>-<slug>/` holding `AUDIT.md` (scope, the window `[from-sha, HEAD]`, method per pillar, the eight forensic metrics, summary) and `FINDINGS.jsonl`; a bound session writes `specs/audits/**` directly in the repo checkout, the one repo path no worktree carries ([[sdd-gate-v3]]).
 - The window opens at the newest record in `specs/audits/_archive/audits_histo.jsonl`, or covers the whole history when that file is empty; an audit is never a release milestone.
 - A context whose memory holds no real content — `ARCHITECTURE.md` or `QUALITY.md`, fixed sections stripped, still equal to a shipped scaffold digest (every historical scaffold's digest is kept in `shipped-hashes.json`), or no product atom in the catalog — gets the first pass (`dd-audit-project`'s first-pass section, applying while doctor's next step is `first-pass`), the `ONBOARDING` agent step whose fix line names that section's absolute path and the pending items ([[workspace-init]]): its worklist is `memory.py drift --since <the repo's first commit>`, every uncovered code unit; `dd-product-engineer` fills `ARCHITECTURE.md`, `QUALITY.md` and the product atoms from the code and from `specs-bkp/` when present; done = the worklist covered and `dadaia doctor --context <ctx>` exit 0 (`LINT-1` validates the atoms, `LEDGER-MEMORY-SCHEMA` runs `memory.py check` over the generated pair). The first pass opens no audit window; the next onboarding step is `publish` (`context baseline`).
 - All three pillars run together, and fewer than three is not an audit: bug history over every record in the window, stamping `audited` through `bugs.py update --set` ([[bug-ledger]]); spec compliance through `dadaia doctor` plus commit shapes and milestone completeness ([[workspace-doctor]]); memory drift, running every principle's `Measured by:` check and flagging HIGH a canonical memory hunk with no accepted decision in the same commit.
@@ -31,10 +31,12 @@ sources:
 
 ## Decisions
 
-- `specs/ADRs/decisions.jsonl` (`decision-record-v1`) is the decision ledger: one line per decision, fields `id ts title status context decision consequences measured_by supersedes amends`, `status` one of `proposed accepted rejected superseded`; it has no writer script — agents append with file tools.
-- Any agent appends a `proposed` record; only the operator flips it to `accepted`, and an `accepted` record carries a non-empty `measured_by`, free text naming the check.
+- `specs/ADRs/decisions.jsonl` (`decision-record-v1`) is the decision ledger: one line per decision, fields `id ts title status context decision consequences measured_by supersedes amends ruling`, `status` one of `proposed accepted rejected superseded`; it has no writer script — agents append with file tools inside a `backlog` or `release` worktree ([[worktrees]]).
+- Any agent appends a `proposed` record; only the operator accepts one, and no role agent writes `accepted` or `ruling` (the personas and the root map point to `specs/ADRs/AGENTS.md`).
+- An `accepted` record carries a non-empty `measured_by`, free text naming the check, and `ruling: {date, words}` — the operator's verbatim words or his recorded grill answer id; words reading as delegated or "in session" are refused.
+- A record that is not `rejected` and supersedes or amends an accepted one must itself be accepted with a ruling.
 - A canonical memory statement in `ARCHITECTURE.md` or `QUALITY.md` changes only in the commit carrying its accepted decision, except a correction of a non-principle section (Tech Stack, Structure, Gates, the fixed blocks) that only states what the code already is, whose commit names its code evidence instead; a reversal is a new record naming the old one in `supersedes` or `amends`, the superseded line staying in place.
-- `dadaia doctor` runs `LEDGER-ADR-SCHEMA` over every committed line and the `0001..N` numbering, and `ADR-SUPERSEDED-CITATION` over memory atoms, skills, data and scaffold that cite a superseded decision ([[workspace-doctor]]).
+- `dadaia doctor` runs `LEDGER-ADR-SCHEMA` over every committed line — the schema with its `ruling` rule, the ruled-lineage rule and the `0001..N` numbering — and `ADR-SUPERSEDED-CITATION` over memory atoms, skills, data and scaffold that cite a superseded decision ([[workspace-doctor]]).
 
 ## Runtime state
 
@@ -42,4 +44,4 @@ sources:
 
 ## Dependencies
 
-[[bug-ledger]], [[release-lifecycle]], [[workspace-doctor]], [[sdd-gate-v3]], [[agent-orchestration]].
+[[bug-ledger]], [[release-lifecycle]], [[workspace-doctor]], [[sdd-gate-v3]], [[agent-orchestration]], [[worktrees]].

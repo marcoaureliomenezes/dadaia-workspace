@@ -15,7 +15,7 @@ description: >
 
 1. Open `specs/backlog/AGENTS.md` (the area's scoped law) and follow it — `BACKLOG.json`
    shape, required fields, live status tokens, the histo record, the dispositions.
-2. Append via `python3 .agents/skills/dd-backlog-definition/scripts/backlog.py new <slug>`; validate via `.dadaia/.venv/bin/dadaia doctor` (`ledgers`
+2. Write in a `backlog` worktree (`worktrees/AGENTS.md`). Append via `python3 .agents/skills/dd-backlog-definition/scripts/backlog.py new <slug> --relates <slugs>|none`; validate via `.dadaia/.venv/bin/dadaia doctor` (`ledgers`
    section).
 
 ## Continuous curation

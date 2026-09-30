@@ -15,11 +15,9 @@ Scope: this file governs only `specs/ADRs/`.
 
 - Any agent may append a record with `status: "proposed"`.
 - One decision per change set, naming every canonical memory statement it creates or changes — never one per statement that merely exists.
-- Only the operator flips `status` to `accepted` (in-place edit, `measured_by` set to a real check).
-- A record born from an operator grill ruling is `accepted` at append, the ruling date in `context`.
-- An agent that writes `status: "accepted"` has violated this law.
+- Only the operator accepts: the main thread writes `accepted` with `ruling: {date, words}` (his verbatim words or grill answer id, in the turn he rules) and `measured_by` a real check; never delegated, and no role agent writes `accepted` or `ruling`.
 - `accepted` is then immutable: `context`/`decision`/`consequences` never rewritten again.
-- A reversal is always a new record (`supersedes`/`amends` naming the earlier `id`), never an edit.
+- A reversal is always a new record (`supersedes`/`amends` naming the earlier `id`), never an edit; a proposed record never changes a ruled one.
 
 ## 3. Commit shapes (FR8 shape 2, extended)
 

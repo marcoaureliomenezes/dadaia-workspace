@@ -13,7 +13,6 @@ from pathlib import Path
 import pytest
 
 from dadaia_workspace.hooks import _common
-from tests.contract.test_slop_ratchets import _V34_CEILINGS
 
 pytestmark = pytest.mark.unit
 
@@ -50,14 +49,6 @@ def test_no_docstring_restates_the_session_id_order() -> None:
             if re.search(r"→|->", line) and sum(name in line for name in _SESSION_NAMES) >= 2:
                 chains.append(f"{path.relative_to(_REPO)}:{number}")
     assert chains == []
-
-
-def test_the_release_law_states_the_trio_byte_ceilings() -> None:
-    """sa-text-restates-rules-the-code-contradicts#49.3: the law states KiB with the byte
-    counts the V34 ratchet enforces."""
-    law = (_PKG / "public" / "scaffold" / "releases" / "AGENTS.md").read_text("utf-8")
-    assert _V34_CEILINGS == {"SPEC.md": 24576, "TASKS.md": 12288}
-    assert "SPEC.md fits 24 KiB (24576 bytes) and TASKS.md 12 KiB (12288 bytes)" in law
 
 
 def test_the_bind_resolution_contract_covers_every_verb_module() -> None:
@@ -98,3 +89,75 @@ def test_the_work_order_has_one_home_the_map() -> None:
     assert _MAP.read_text("utf-8").count(rule) == 1 and not [
         t for t in skills if "REBUILD → UPDATE" in t
     ]
+
+
+_LAW = sorted((_PKG / "public").rglob("*.md"))
+
+
+def _lines(pattern: str) -> list[str]:
+    return [
+        f"{path.relative_to(_PKG).as_posix()}:{n}"
+        for path in _LAW
+        for n, line in enumerate(path.read_text("utf-8").splitlines(), start=1)
+        if re.search(pattern, line)
+    ]
+
+
+def test_reports_live_in_the_dadaia_reports_zone() -> None:
+    """AC1.13, ADR 0147 (1): the map names `.dadaia/reports/<context>/`; no law names a
+    report home inside a repo tree."""
+    assert "HTML reports: `.dadaia/reports/<context>/`" in _MAP.read_text("utf-8")
+    assert _lines(r"repos/[^`\s]*/reports|reports/<agent>|reports/dd-|repo's reports") == []
+
+
+def test_no_specs_law_calls_a_path_additive() -> None:
+    """AC1.13, ADR 0124: no specs-tree law or recipe grants ADDITIVE, and the map's
+    ADDITIVE class names no specs area."""
+    specs_laws = [
+        _PKG / "public/templates/specs-AGENTS.md",
+        _PKG / "public/data/CONSUMER_VALIDATION_RECIPE.md",
+    ]
+    specs_laws += sorted((_PKG / "public/scaffold").rglob("AGENTS.md"))
+    assert [p.name for p in specs_laws if "ADDITIVE" in p.read_text("utf-8")] == []
+    assert [
+        ln for ln in _MAP.read_text("utf-8").splitlines() if "ADDITIVE" in ln and "specs" in ln
+    ] == []
+
+
+def test_the_bind_law_names_no_print_env() -> None:
+    """ADR 0148 (4): the session id comes from the environment only; no law teaches
+    `context bind --print-env`."""
+    assert _lines(r"--print-env") == []
+
+
+_POINTERS = ("dd-backlog-definition", "dd-bug-registration", "dd-bug-resolution",
+             "dd-code-review", "dd-manager-orchestration", "dd-release-definition",
+             "dd-release-implementation")  # fmt: skip
+
+
+def test_the_worktree_rules_have_one_home() -> None:
+    """AC1.13, ADR 0146 (4): only `worktrees/AGENTS.md` and `dd-gitflow-default` name
+    `scripts/worktree.py`; seven skills point to the home."""
+    namers = {hit.split(":")[0] for hit in _lines(r"scripts/worktree\.py")}
+    assert namers == {
+        "public/data/worktrees-AGENTS.md",
+        "public/skills/dd-gitflow-default/SKILL.md",
+    }
+    skills = _PKG / "public" / "skills"
+    missing = [
+        s
+        for s in _POINTERS
+        if "`worktrees/AGENTS.md`" not in (skills / s / "SKILL.md").read_text("utf-8")
+    ]
+    assert missing == []
+
+
+def test_the_acceptance_law_has_one_home() -> None:
+    """ADR 0151 M4: the map and the three role personas point to `specs/ADRs/AGENTS.md` §2."""
+    assert {h.split(":")[0] for h in _lines(r"`specs/ADRs/AGENTS\.md` §2")} == {
+        "public/data/AGENTS.md",
+        *(
+            f"public/agents/dd-{r}.md"
+            for r in ("product-engineer", "software-engineer", "code-reviewer")
+        ),
+    }

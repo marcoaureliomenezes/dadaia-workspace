@@ -26,11 +26,13 @@ REQUIRED_EVIDENCE = {"delivered": "release", "superseded": "release", "rejected"
 
 
 def _origin_cites(specs: Path, release: str, slug: str) -> bool:
-    """Whether the release's SPEC names *slug* on its `**Origin:** backlog:` line — the pick."""
-    spec = specs / "releases" / release / "SPEC.md"
-    text = spec.read_text(encoding="utf-8") if spec.is_file() else ""
-    match = re.search(r"^\*\*Origin:\*\*\s*backlog:(.+)$", text, re.MULTILINE)
-    return match is not None and slug in (s.strip() for s in match.group(1).split(","))
+    """Whether a candidate SPEC of the release (``rc-<N>/``, ADR 0150) names *slug* on its
+    `**Origin:** backlog:` line — the pick."""
+    texts = (
+        s.read_text(encoding="utf-8") for s in (specs / "releases" / release).glob("rc-*/SPEC.md")
+    )
+    matches = (re.search(r"^\*\*Origin:\*\*\s*backlog:(.+)$", t, re.MULTILINE) for t in texts)
+    return any(m and slug in (s.strip() for s in m.group(1).split(",")) for m in matches)
 
 
 def check_exit(specs: Path, active: Items, slug: str, values: dict[str, Any]) -> dict[str, Any]:
@@ -61,7 +63,7 @@ def check_exit(specs: Path, active: Items, slug: str, values: dict[str, Any]) ->
         )
     if required == "release" and not _origin_cites(specs, str(release), slug):
         raise Refusal(
-            f"releases/{release}/SPEC.md does not name {slug!r} on its `**Origin:** backlog:` "
+            f"no releases/{release}/rc-<N>/SPEC.md names {slug!r} on its `**Origin:** backlog:` "
             f"line — only a release that picked an item can exit it as {disposition!r}",
             f"{SCRIPT} exit {slug} --disposition {disposition} --release <the release whose Origin names {slug}>",
         )

@@ -54,7 +54,7 @@ def _functions(tree: ast.AST) -> Iterator[ast.FunctionDef | ast.AsyncFunctionDef
 #: enters core/ only by joining this set on purpose.
 _CORE_IO_STEMS = frozenset(
     {"workspace_resolver", "atomic_write", "invocation", "session_store", "handoff_index",
-     "template_history", "gitflow"}
+     "template_history", "gitflow", "workspace_layout"}
 )  # fmt: skip
 _PATH_IO_ATTRS = frozenset(
     {"read_text", "write_text", "mkdir", "exists", "glob", "iterdir", "rglob"}
@@ -167,7 +167,7 @@ _PATH_CLASS_OWNERS = {"features/spec_context/gate_policy.py", "core/workspace_la
 
 
 def _path_class_tables_read_elsewhere() -> list[str]:
-    tables = {"SPECS_ADDITIVE_GLOBS", "additive_prefixes"}
+    tables = {"additive_prefixes"}
     return [
         _rel(path)
         for path, tree in _trees()
@@ -323,8 +323,9 @@ def test_importing_a_hook_never_imports_the_container(module: str) -> None:
 
 
 def test_gate_resolution_path_never_imports_the_container(tmp_path: Path) -> None:
-    """P-12, the executed path: the gate's real entry allows a repo write in a hermetic
-    workspace with the container still unimported."""
+    """P-12, the executed path: the gate's real entry judges a repo write (its BLOCK path:
+    the worktree fix, `kind_holding`, `script_line`) with the container still unimported;
+    the child carries the conftest pin, so it judges THIS checkout."""
     ws = tmp_path / "ws"
     (ws / ".dadaia" / "states").mkdir(parents=True)
     (ws / ".dadaia" / "states" / "spec_contexts.json").write_text(
@@ -337,10 +338,12 @@ def test_gate_resolution_path_never_imports_the_container(tmp_path: Path) -> Non
     }
     code = (
         "import json, sys\nfrom dadaia_workspace.hooks import sdd_gate\n"
-        f"block = sdd_gate.evaluate_payload(json.loads({json.dumps(payload)!r}))\n"
-        "assert block is None, block\nassert 'dadaia_workspace.container' not in sys.modules\n"
+        f"sdd_gate.evaluate_payload(json.loads({json.dumps(payload)!r}))\n"
+        "assert 'dadaia_workspace.container' not in sys.modules\n"
     )
-    env = {"PATH": "/usr/bin:/bin", "DADAIA_FENCED_ROOTS": os.environ["DADAIA_FENCED_ROOTS"]}
+    env = {k: os.environ[k] for k in ("PYTHONPATH", "DADAIA_FENCED_ROOTS")} | {
+        "PATH": "/usr/bin:/bin"
+    }
     result = subprocess.run(
         [sys.executable, "-c", code], capture_output=True, text=True, timeout=120, cwd=ws, env=env
     )

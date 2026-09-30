@@ -20,7 +20,7 @@ from dadaia_workspace.core import workspace_layout
 from dadaia_workspace.core.harness_registry import L1_ENTRY_HARNESSES
 from dadaia_workspace.core.workspace_layout import (
     DADAIA_ROOT_FILES,
-    INSTANCE_EXCEPTIONS,
+    DADAIAIGNORE,
     Creator,
     ZoneClass,
     provisioned_zones,
@@ -55,7 +55,8 @@ def _reaped(root: Path, rel: str) -> Path:
 
 
 def _init_workspace(root: Path) -> None:
-    """The minimal compliant skeleton: every INIT/INSTALL zone present, one root file."""
+    """The minimal compliant skeleton: every INIT/INSTALL zone present, `.dadaiaignore`."""
+    (root / DADAIAIGNORE).write_text("", encoding="utf-8")
     dadaia = root / ".dadaia"
     for zone in provisioned_zones():
         (dadaia / zone.name).mkdir(parents=True, exist_ok=True)
@@ -106,11 +107,11 @@ def test_root_and_dadaia_top_level_classify_every_entry(tmp_path: Path) -> None:
     slop, globbed = operator, a non-zone .dadaia/ entry is slop."""
     _init_workspace(tmp_path)
     dadaia = tmp_path / ".dadaia"
-    for name in (".claude", ".git", ".ruff_cache", ".dadaia/reports"):
+    for name in (".claude", ".git", ".ruff_cache", ".dadaia/junk"):
         (tmp_path / name).mkdir()
     (tmp_path / "random_junk.txt").write_text("oops", encoding="utf-8")
     (tmp_path / "shot.png").write_bytes(b"PNG")
-    (tmp_path / INSTANCE_EXCEPTIONS).write_text("# comment\n*.png\n", encoding="utf-8")
+    (tmp_path / DADAIAIGNORE).write_text("# comment\n*.png\n", encoding="utf-8")
     for name in (*DADAIA_ROOT_FILES, ".DS_Store"):
         (dadaia / name).write_text("x", encoding="utf-8")
     (dadaia / _OPERATOR_ZONE.name / "some-clone").mkdir(parents=True)
@@ -129,7 +130,7 @@ def test_root_and_dadaia_top_level_classify_every_entry(tmp_path: Path) -> None:
     assert "# comment" not in {f.detail for f in found.values()}
     for name in (*DADAIA_ROOT_FILES, _STATE_ZONE.name, _OPERATOR_ZONE.name):
         assert found[name].code == "WS-dadaia-canon"
-    assert found["reports"].code == found[".DS_Store"].code == "WS-dadaia-slop"
+    assert found["junk"].code == found[".DS_Store"].code == "WS-dadaia-slop"
 
 
 def test_absent_init_or_install_zone_is_missing_and_fixable(tmp_path: Path) -> None:
@@ -162,23 +163,29 @@ def test_absent_init_or_install_zone_is_missing_and_fixable(tmp_path: Path) -> N
 
 def test_closed_canon_zones_flag_every_non_canon_entry_and_fix_removes_it(tmp_path: Path) -> None:
     """A non-canon entry in a closed-canon zone is slop (the retired ``states/ctx_locks`` and
-    ``sessions/runtime`` have no code of their own); fix() leaves a fully canonical scan."""
+    ``sessions/runtime`` have no code of their own), and so is an unreadable session record
+    (corrupt-session-record-never-collected, AC1.4); fix() holds them and leaves a fully
+    canonical scan."""
     _init_workspace(tmp_path)
     dadaia = tmp_path / ".dadaia"
     (dadaia / _STATE_ZONE.name / "ctx_locks").mkdir()
     (dadaia / _STATE_ZONE.name / "ctx_locks" / "stale.lock.json").write_text("{}", "utf-8")
     sessions = next(z for z in zones_with_canon() if z.cls is ZoneClass.PROTECTED)
     (dadaia / sessions.name / "runtime").mkdir(parents=True)
+    (dadaia / sessions.name / "corrupt.json").write_text("{", "utf-8")  # canon name, unreadable
     for zone in zones_with_canon():
         assert zone.canon is not None
         (dadaia / zone.name).mkdir(exist_ok=True)
         (dadaia / zone.name / "stray.bin").write_bytes(b"")
-        (dadaia / zone.name / sorted(zone.canon)[0].replace("*", "sample")).write_text("", "utf-8")
+        (dadaia / zone.name / sorted(zone.canon)[0].replace("*", "sample")).write_text(
+            "{}", "utf-8"
+        )
 
     found = _by_path(_make_doctor(tmp_path).scan())
 
     assert found[f"{_STATE_ZONE.name}/ctx_locks"].code == f"WS-{_STATE_ZONE.name}-slop"
     assert found[f"{sessions.name}/runtime"].code == f"WS-{sessions.name}-slop"
+    assert found[f"{sessions.name}/corrupt.json"].code == f"WS-{sessions.name}-slop"  # AC1.4
     assert found[f"{_STATE_ZONE.name}/spec_contexts.json"].verdict is FindingVerdict.CANON
     for zone in zones_with_canon():
         assert zone.canon is not None
@@ -447,3 +454,29 @@ def test_a_symlinked_zone_root_is_never_walked(
     assert victim.read_text(encoding="utf-8") == "keep"
     assert zone_dir.is_symlink()
     assert actions == []
+
+
+def test_fix_migrates_the_legacy_exceptions_and_never_touches_operator_files(
+    tmp_path: Path,
+) -> None:
+    """ADRs 0092, 0093, 0145: a missing ``.dadaiaignore`` is seeded 1:1 from the legacy
+    file, which is then slop and held; an invalid line is reported and never fixed. ADR 0146:
+    a root ``.env`` is a non-fixable finding the reaper never moves."""
+    _init_workspace(tmp_path)
+    (tmp_path / DADAIAIGNORE).unlink()
+    legacy = tmp_path / ".dadaia/states/instance_exceptions.txt"
+    legacy.write_text("*.png\n!keep\n", encoding="utf-8")
+    (tmp_path / "shot.png").write_bytes(b"PNG")  # admitted only by the migrated line
+    (tmp_path / ".env").write_text("K=v\n", encoding="utf-8")
+    assert _by_path(_make_doctor(tmp_path).scan())[DADAIAIGNORE].verdict is FindingVerdict.MISSING
+    _make_doctor(tmp_path).fix()
+    assert (tmp_path / DADAIAIGNORE).read_text(encoding="utf-8") == "*.png\n!keep\n"
+    assert not legacy.exists()
+    assert (tmp_path / "shot.png").exists()  # judged after the seed, never reaped
+    found = [f for f in _make_doctor(tmp_path).scan() if f.verdict is FindingVerdict.SLOP]
+    (invalid,) = [f for f in found if f.path == DADAIAIGNORE]
+    (env,) = [f for f in found if f.path == ".env"]
+    assert not invalid.fixable and "!keep" in invalid.detail
+    assert not env.fixable and "outside the workspace" in env.detail
+    _make_doctor(tmp_path).fix()
+    assert (tmp_path / DADAIAIGNORE).is_file() and (tmp_path / ".env").is_file()

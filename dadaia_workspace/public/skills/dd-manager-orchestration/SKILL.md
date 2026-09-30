@@ -19,9 +19,10 @@ description: >
    further dispatch; route a leaf's returned handoff to its `next_handoff.agent`.
 3. Open every dispatch prompt with the Input Contract block: context, specs_dir,
    release_id, task_id, report_dir, handoff_dir, allowed_write_paths.
-4. Reports land in the repo's reports home; every report
+4. Reports land where the root `AGENTS.md` map §4 says; every report
    feeding another agent gets a handoff under `.dadaia/handoff/<context>/`.
-5. The review/QA sequence holds by discipline (main thread, implementer, reviewer
+5. Opening, dispatching into and merging worktrees: `worktrees/AGENTS.md`.
+6. The review/QA sequence holds by discipline (main thread, implementer, reviewer
    each uphold their half); git chokepoints are the only mechanical backstop.
 
 ## 2. Conflict resolution

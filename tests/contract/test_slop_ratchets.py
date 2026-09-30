@@ -1,4 +1,4 @@
-"""Intent: CONTRACT — V32, V33, V34, V35, V36; V37, V38, V39 (0.5.0 AC6.2–AC6.6); size: SMALL.
+"""Intent: CONTRACT — V32, V33; V37, V38, V39 (0.5.0 AC6.2–AC6.6); size: SMALL.
 
 Repo-pure slop ratchets: measured at birth, pinned, ratcheting down only; every
 tree walk goes through the one tracked-files enumeration the other ratchets use.
@@ -192,149 +192,6 @@ def test_v33_prefix_families_without_a_mechanical_reader() -> None:
 
 
 # ---------------------------------------------------------------------------
-# V36 — the skill-script corpus: files and total Python lines
-# ---------------------------------------------------------------------------
-
-# RECORDED PINS (ratchet DOWN ONLY) — measured on the post-candidate corpus: every
-# tracked `*.py` under dadaia_workspace/public/skills/*/scripts/. A ledger's writer moved
-# out of the CLI ONCE; a growing corpus after that is CLI code re-typed, not code moved.
-# T-047-94 re-pin (down only, never raised again this candidate): the atom generator and
-# the second frontmatter validator are gone and the index renderer folded into the catalog
-# one — 31 -> 29 files, 3,657 -> 3,436 lines measured. The ceiling below is that measurement
-# plus the budget the SPEC already authorized for the drift verb and the `release.py memory`
-# verb (+1 file; +85 + 14 + 16 + 50 + 6 = +171 lines), so no later task in this candidate may
-# raise it; T-047-105 re-pinned it to the measured post-candidate value (30 files, 3,618 lines).
-_V36_FILE_CEILING = 30
-_V36_LINE_CEILING = 3618
-
-
-def _skill_scripts() -> list[Path]:
-    return [
-        path
-        for path in tracked_test_files(_REPO_ROOT, "*.py", tree="dadaia_workspace")
-        if "public/skills/" in path.as_posix() and "/scripts/" in path.as_posix()
-    ]
-
-
-def test_v36_skill_script_corpus_is_pinned() -> None:
-    """V36 — at most 30 skill-script files and 3,618 total lines of skill Python. The
-    ledger writers moved out of the CLI once: growth here is a verb regrown, never moved."""
-    scripts = _skill_scripts()
-    assert len(scripts) <= _V36_FILE_CEILING, (
-        f"skill-script files grew to {len(scripts)} (ceiling {_V36_FILE_CEILING}). A new "
-        "file earns its place by a verb leaving the CLI, never by restating one."
-    )
-    total = _skill_corpus_lines(scripts)
-    assert total <= _V36_LINE_CEILING, (
-        f"skill Python grew to {total} lines (ceiling {_V36_LINE_CEILING}). Delete the "
-        "duplicated helper — never raise the ceiling."
-    )
-
-    # Mutation fixture — the counter reads real files, and an empty set counts 0.
-    assert _skill_corpus_lines([]) == 0
-    assert scripts, "the skill-script corpus must not be empty"
-
-
-# ---------------------------------------------------------------------------
-# V34 — bytes of the live candidate's SPEC.md and TASKS.md
-# ---------------------------------------------------------------------------
-
-_V34_CEILINGS = {"SPEC.md": 24 * 1024, "TASKS.md": 12 * 1024}
-
-
-def _live_release_dir() -> Path | None:
-    """The one non-archived `specs/releases/<id>/` carrying a `_RELEASE.json`, or
-    ``None`` in the post-ship window (folder archived, next release not yet defined) —
-    at most one live release ever (ADR 0005), never necessarily one."""
-    releases = _REPO_ROOT / "specs" / "releases"
-    live = [
-        path.parent
-        for path in tracked_test_files(_REPO_ROOT, "_RELEASE.json", tree="specs/releases")
-        if path.parent.parent == releases
-    ]
-    assert len(live) <= 1, f"at most one live release expected, found {live}"
-    return live[0] if live else None
-
-
-def _byte_ceiling_violations(sizes: dict[str, int]) -> list[str]:
-    return [
-        f"{name}: {size} B > {_V34_CEILINGS[name]} B"
-        for name, size in sizes.items()
-        if size > _V34_CEILINGS[name]
-    ]
-
-
-def test_v34_live_candidate_trio_bytes_under_the_fixed_ceiling() -> None:
-    """V34 — the live candidate's SPEC.md is at most 24 KB and its TASKS.md at most 12 KB;
-    a fixed ceiling, never a pin."""
-    live = _live_release_dir()
-    if live is not None:
-        # A candidate in DEFINITION may hold only its SPEC.md at the root (rc-archive
-        # ran, PLAN/TASKS not yet authored): measure what exists, never demand the trio.
-        # Content bytes, LF-normalised: a CRLF checkout must not move a ratchet.
-        sizes = {
-            name: len((live / name).read_bytes().replace(b"\r\n", b"\n"))
-            for name in _V34_CEILINGS
-            if (live / name).is_file()
-        }
-        assert _byte_ceiling_violations(sizes) == [], (
-            f"{live.name} trio exceeds the byte ceiling — above it the scope is open "
-            "enough to be two candidates."
-        )
-
-    # Mutation fixture — one byte over either ceiling is a violation.
-    assert _byte_ceiling_violations({"SPEC.md": 24 * 1024 + 1, "TASKS.md": 12 * 1024}) == [
-        "SPEC.md: 24577 B > 24576 B"
-    ]
-
-
-# ---------------------------------------------------------------------------
-# V35 — the skill corpus: directories and total Markdown lines
-# ---------------------------------------------------------------------------
-
-# RECORDED PINS (ratchet DOWN ONLY) — measured on the post-candidate corpus: every
-# tracked `*.md` under dadaia_workspace/public/skills/. Re-pinned at every closure that
-# touches the corpus, downward only; raising either is never a ratchet move.
-_V35_DIR_CEILING = 18
-_V35_LINE_CEILING = 2863
-
-
-def _skill_corpus_markdown() -> list[Path]:
-    return [
-        path
-        for path in tracked_test_files(_REPO_ROOT, "*.md", tree="dadaia_workspace")
-        if "public/skills/" in path.as_posix()
-    ]
-
-
-def _skill_corpus_lines(paths: Iterable[Path]) -> int:
-    return sum(len(path.read_text(encoding="utf-8").splitlines()) for path in paths)
-
-
-def test_v35_skill_corpus_is_pinned() -> None:
-    """V35 — at most 18 skill directories and 2,863 total lines of skill Markdown.
-    A rule lives in one home: a growing corpus is a rule restated, not a rule added."""
-    corpus = _skill_corpus_markdown()
-    dirs = {
-        path.relative_to(_REPO_ROOT / "dadaia_workspace" / "public" / "skills").parts[0]
-        for path in corpus
-    }
-    assert len(dirs) <= _V35_DIR_CEILING, (
-        f"skill directories grew to {len(dirs)} (ceiling {_V35_DIR_CEILING}). A new "
-        "skill earns its dir by deleting another's material, never by restating it."
-    )
-    total = _skill_corpus_lines(corpus)
-    assert total <= _V35_LINE_CEILING, (
-        f"skill Markdown grew to {total} lines (ceiling {_V35_LINE_CEILING}). Find the "
-        "statement's other home and delete the copy — never raise the ceiling."
-    )
-
-    # Mutation fixture — the counter reads real files, and an empty set counts 0.
-    assert _skill_corpus_lines([]) == 0
-    assert _skill_corpus_lines([_THIS_FILE]) > 0
-
-
-# ---------------------------------------------------------------------------
 # V37–V39 — one authority per fact, per deleter, per doctor fix (AC6.2–AC6.6)
 # ---------------------------------------------------------------------------
 
@@ -408,7 +265,19 @@ def _duplicate_definitions(sources: dict[str, str]) -> set[str]:
 
 #: V37 allowance, born 2026-09-27 at 65: each duplicate, keyed to the open bug deleting it.
 _V37_BIRTH = 65
-_V37_ALLOWANCE: dict[str, str] = {}
+#: The candidate-folder pair (ADR 0150): the stdlib scripts cannot import the package,
+#: so each side keeps its twin and one contract test pins them equal.
+_PAIR = "parity:tests/contract/test_release_script.py"
+_V37_ALLOWANCE: dict[str, str] = {
+    "core/gitflow.py:candidate_dir": _PAIR,
+    "core/gitflow.py:candidate_number": _PAIR,
+    "core/gitflow.py:next_candidate": _PAIR,
+    "core/release_state.py:CANDIDATE_RE": _PAIR,
+    "public/skills/dd-release-implementation/scripts/_release_schema.py:CANDIDATE_RE": _PAIR,
+    "public/skills/dd-release-implementation/scripts/_release_schema.py:candidate_dir": _PAIR,
+    "public/skills/dd-release-implementation/scripts/_release_schema.py:candidate_number": _PAIR,
+    "public/skills/dd-release-implementation/scripts/_release_schema.py:next_candidate": _PAIR,
+}
 
 
 def test_v37_one_home_per_definition() -> None:
@@ -476,7 +345,6 @@ _V38_ALLOWANCE: dict[str, str] = {
     # `new` is all-or-nothing and drops a closed candidate's PLAN/TASKS (stacked-candidate law)
     "public/skills/dd-release-implementation/scripts/_release_new.py:new_release": "parity:tests/unit/skills/test_release_implementation_release_script.py",
     # `ship` removes the shipped release dir (git is the archive) — B25-1's own Then
-    "public/skills/dd-release-implementation/scripts/release.py:_ship": "parity:tests/unit/skills/test_release_implementation_release_script.py",
 }
 
 

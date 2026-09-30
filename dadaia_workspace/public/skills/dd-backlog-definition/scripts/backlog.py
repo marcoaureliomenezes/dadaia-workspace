@@ -49,7 +49,7 @@ def _parser() -> argparse.ArgumentParser:
         if verb in ("new", "exit"):
             command.add_argument("slug", help="the backlog entry's slug")
         if verb == "new":
-            for option in ("--title", "--description", "--provenance"):
+            for option in ("--title", "--description", "--provenance", "--relates"):
                 command.add_argument(option)
             command.add_argument("--intent", action="append", metavar="KIND:REF=CHANGE",
                                  help="one typed intent (repeatable)")  # fmt: skip
@@ -72,7 +72,7 @@ def _values(args: argparse.Namespace, names: tuple[str, ...]) -> dict[str, Any]:
 
 
 def _new(args: argparse.Namespace, specs: Path) -> int:
-    values = _values(args, ("title", "description", "provenance", "intent"))
+    values = _values(args, ("title", "description", "provenance", "intent", "relates"))
     commit(specs, lambda active: wr.new_entry(active, args.slug, values))
     print(f"[ok] appended {args.slug!r} -> {specs / LEDGER}")
     return 0

@@ -25,6 +25,8 @@ compatibility: Standalone Agent Skill. Inside a dadaia-workspace (pip install da
   (new coverage or kills a new mutant) that no existing test can carry by a rewrite
   (the root map §1 work order); change-detector tests, tautologies and reflex snapshots
   fail admission; a brittle test is fixed or deleted, never appeased.
+- A behaviour's test lives in the existing file that owns it; a new file enters only when none
+  does, after the change deletes or rewrites the tests it makes dead or hollow.
 - A mock exists only at the system boundary — network, clock, randomness; a
   collaborator inside the module under test runs for real.
 - The expected value comes from an independent source (the SPEC, a worked example),

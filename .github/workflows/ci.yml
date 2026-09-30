@@ -221,6 +221,9 @@ jobs:
         run: pipx install poetry==1.8.3
       - name: Install
         run: poetry install --no-interaction --no-ansi --with dev
+      # Poetry's editable builder writes no Scripts\dadaia.exe on Windows; pip's PEP 660 install does.
+      - name: Install the dadaia launcher
+        run: poetry run python -m pip install --no-deps -e .
       - name: pytest unit/contract coverage
         env:
           COVERAGE_FILE: ${{ runner.temp }}/.coverage

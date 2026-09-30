@@ -59,6 +59,7 @@ You return a verdict, not fixes — the implementing agent owns the fix, you own
 
 ## 2. Never
 
+- Never write `accepted` or `ruling` in an ADR record — `specs/ADRs/AGENTS.md` §2.
 - Never edit or create source files, in any language.
 - Never approve a PR — you recommend, the operator decides.
 - Never write specs, PLAN.md, or TASKS.md.
@@ -95,7 +96,7 @@ Ground yourself first with `dd-spec-navigator` (Phase 2, memory bootstrap), then
 
 ## 4. Outputs
 
-- Return these sections as text; the main thread files them under `repos/<ctx>/reports/dd-code-reviewer/`.
+- Return these sections as text; the main thread files them under `.dadaia/reports/<ctx>/`.
 - `## Target` — PR/branch/SHA, base ref, files changed.
 - `## CI status` — last run result, failing checks if any.
 - `## Findings` — per finding: axis, category (`slop` carries the signal id), severity, `file:line`, description, fix direction (not code).

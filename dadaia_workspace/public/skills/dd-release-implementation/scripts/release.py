@@ -1,14 +1,13 @@
 #!/usr/bin/env python3
 """The release ledger's ONE writer and validator — `_RELEASE.json`, the candidate trio and
 the ship ledger, stdlib only. Every write is validated by `check` before an atomic
-replace; `ship` records the merged promote PR (git is the archive).
+replace; `ship` records the merged promote PR and moves the release to `_archive/<v>/`.
 """
 
 from __future__ import annotations
 
 import argparse
 import json
-import shutil
 import sys
 from pathlib import Path
 
@@ -27,11 +26,11 @@ from _release_tree import check, drift, memory_errors  # noqa: E402
 from _specs import find_specs, refuse  # noqa: E402
 
 _HELP = {
-    "new": "mint the one live release: its SPEC.md stub and _RELEASE.json, in one act",
+    "new": "open the next candidate: its rc-<N+1>/SPEC.md stub and _RELEASE.json, in one act",
     "phase": "move the live release to IMPLEMENTATION or CLOSURE, stamping its milestone",
     "drift": "the closure worklist over the live release's memory window (memory.py drift)",
     "memory": "append the closure's one structured `kind: memory` entry to the live log",
-    "ship": "record the merged promote PR: shipped, a delivered histo line, the dir removed",
+    "ship": "record the merged promote PR: shipped, a delivered histo line, the dir archived",
     "check": "validate every _RELEASE.json under releases/ and the ship ledger",
 }
 
@@ -61,8 +60,8 @@ def _parser() -> argparse.ArgumentParser:
 
 
 def _new(args: argparse.Namespace, specs: Path) -> int:
-    release_dir = new_release(specs, args.release_id, utc_now()[:10], args.origin)
-    print(f"[ok] created: {release_dir / 'SPEC.md'}\n[ok] created: {release_dir / STATE}")
+    candidate = new_release(specs, args.release_id, utc_now()[:10], args.origin)
+    print(f"[ok] created: {candidate / 'SPEC.md'}\n[ok] wrote: {candidate.parent / STATE}")
     return 0
 
 
@@ -102,7 +101,8 @@ def _memory(args: argparse.Namespace, specs: Path) -> int:
 
 
 def _ship(args: argparse.Namespace, specs: Path) -> int:
-    """CLOSURE -> shipped {sha, pr, ts}, one `delivered` histo line, the directory gone."""
+    """CLOSURE -> shipped {sha, pr, ts}, one `delivered` histo line, the whole directory
+    moved to `_archive/<v>/`, never deleted (ADR 0152 (1))."""
     live, ts, fix = live_release(specs), utc_now(), f"{SCRIPT} check"
     if not (SHA_RE.match(args.sha) and args.pr.isdigit() and int(args.pr) > 0):
         raise Refusal(f"--sha {args.sha!r} / --pr {args.pr!r}: a hex sha and a PR number",
@@ -110,6 +110,8 @@ def _ship(args: argparse.Namespace, specs: Path) -> int:
     if live.state.get("phase") != "CLOSURE":
         raise Refusal(f"release {live.release_id} is in phase {live.state.get('phase')!r} — "
                       "only a CLOSURE release ships", fix)  # fmt: skip
+    if (archive := specs / "releases" / "_archive" / live.release_id).exists():
+        raise Refusal(f"{archive} already exists — a shipped release is archived once", fix)
     line = json.dumps({"id": live.release_id, "ts": ts, "disposition": "delivered",
                        "release": live.release_id, "reason": None, "entry": None,
                        "summary": f"shipped {args.sha} PR #{args.pr}"}) + "\n"  # fmt: skip
@@ -120,7 +122,7 @@ def _ship(args: argparse.Namespace, specs: Path) -> int:
            lambda s: {**s, "shipped": {"sha": args.sha, "pr": int(args.pr), "ts": ts}})  # fmt: skip
     with histo.open("a", encoding="utf-8") as ledger:
         ledger.write(line)
-    shutil.rmtree(live.release_dir)
+    live.release_dir.rename(archive)
     print(f"[ok] release {live.release_id} shipped at {args.sha} (PR #{args.pr})")
     return 0
 

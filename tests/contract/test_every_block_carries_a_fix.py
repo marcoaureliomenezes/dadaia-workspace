@@ -16,6 +16,7 @@ size: SMALL.
 
 from __future__ import annotations
 
+import os
 import re
 import shlex
 import subprocess
@@ -133,7 +134,9 @@ def test_the_real_doctor_prints_every_fix_as_one_whole_runnable_line(tmp_path: P
             assert re.search(r"\s(/|\w:\\)\S", fix) and not re.search(r"<[^<>]+>", fix), fix
             continue
         argv0 = shlex.split(fix)[0]
-        assert Path(argv0).is_file() or shutil.which(argv0), f"not an executable: {fix}"
+        assert Path(argv0).is_file() or shutil.which(argv0), (
+            f"not an executable: {fix}\n{run.stdout}"
+        )
     # Whole lines: a wrapped fix would leave a continuation line that is neither a finding
     # (`CODE verdict …`) nor a `fix:` line.
     assert [ln for ln in lines if ln and not re.match(r"(fix: |[A-Z][A-Za-z0-9-]+ )", ln)] == []
@@ -244,7 +247,7 @@ def test_the_root_block_fix_runs_from_a_repo_cwd_and_never_writes_the_exceptions
     ]
     assert [r.returncode for r in runs] == [0, 0]
     assert (workspace / ".dadaia" / "tmp").is_dir()
-    assert not (workspace / ".dadaia" / "states" / "instance_exceptions.txt").exists()
+    assert not (workspace / ".dadaiaignore").exists()  # the fix never writes the operator's file
 
 
 # ── dadaia doctor (exit 1) ──────────────────────────────────────────────────────
@@ -321,8 +324,9 @@ _FIX_LINES = _fix_lines()
 _INSTALLED_SKILL_PREFIX = ".agents/skills/"
 _VENV_BINARY_PREFIX = ".dadaia/"
 #: ``script_line``'s two absolute heads, as literals of the running environment: the
-#: interpreter running now and the skills this package ships (never a derived workspace).
-_VENV_PYTHON = Path(sys.executable).as_posix()
+#: interpreter running now, normalized as `sys.prefix` is (a `../` launch path keeps its dots in
+#: `sys.executable`), and the skills this package ships (never a derived workspace).
+_VENV_PYTHON = Path(os.path.normpath(sys.executable)).as_posix()
 _SKILLS = _PUBLIC_SKILLS.as_posix() + "/"
 
 _PLACEHOLDER_RE = re.compile(r"<[^>]*>")
@@ -500,6 +504,7 @@ _ENTRY_SCRIPTS: dict[str, str] = {
     "dd-backlog-definition": "backlog.py",
     "dd-bug-resolution": "bugs.py",
     "dd-cli-library": "registry.py",
+    "dd-gitflow-default": "worktree.py",
     "dd-release-implementation": "release.py",
     "dd-spec-navigator": "memory.py",
 }

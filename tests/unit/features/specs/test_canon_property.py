@@ -71,8 +71,8 @@ def _fresh_repo_specs(tmp_path: Path) -> Path:
 
 
 def _fresh_release(tmp_path: Path) -> Path:
-    """Fresh root specs/ plus one freshly-opened release — the flat trio shape (the
-    segment lane is retired at 0.4.6, ADR 0006). Successor of the shape bug
+    """Fresh root specs/ plus one freshly-opened release — its trio in `rc-1/` (ADR 0150).
+    Successor of the shape bug
     ``fresh-release-scaffold-emits-spec-doctor-warnings-042`` regressed on.
 
     The release directory is written here rather than minted: `release new` is the skill
@@ -80,10 +80,12 @@ def _fresh_release(tmp_path: Path) -> Path:
     release directory passes `check_tree`, not who wrote it."""
     specs_dir = _fresh_root_specs(tmp_path)
     release_dir = specs_dir / "releases" / "0.6.0"
-    release_dir.mkdir(parents=True)
+    (release_dir / "rc-1").mkdir(parents=True)
     for artifact in ("SPEC.md", "PLAN.md", "TASKS.md"):
         origin = "**Origin:** operator-demand\n" if artifact == "SPEC.md" else ""
-        (release_dir / artifact).write_text(f"**Status:** Draft\n{origin}", encoding="utf-8")
+        (release_dir / "rc-1" / artifact).write_text(
+            f"**Status:** Draft\n{origin}", encoding="utf-8"
+        )
     (release_dir / "_RELEASE.json").write_text(
         json.dumps(
             {

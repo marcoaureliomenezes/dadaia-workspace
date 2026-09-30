@@ -20,7 +20,7 @@ sys.path.append(str(Path(__file__).resolve().parents[2] / "dd-bug-resolution" / 
 
 from _ledger import replace, stamp  # noqa: E402
 from _release_check import state_findings  # noqa: E402
-from _release_schema import SEMVER_RE, STATE  # noqa: E402
+from _release_schema import SEMVER_RE, STATE, candidate_dir  # noqa: E402
 from _specs import script  # noqa: E402
 
 State = dict[str, Any]
@@ -37,11 +37,12 @@ class Refusal(Exception):
 
 @dataclass(frozen=True)
 class Live:
-    """The one live release, already proven readable."""
+    """The one live release, already proven readable, and its live candidate folder."""
 
     release_id: str
     release_dir: Path
     state: State
+    candidate: Path | None
 
 
 def live_ids(specs: Path) -> list[str]:
@@ -86,7 +87,7 @@ def live_release(specs: Path) -> Live:
             f"{SCRIPT} check",
         )
     release_dir = specs / "releases" / ids[0]
-    return Live(ids[0], release_dir, read_state(release_dir / STATE))
+    return Live(ids[0], release_dir, read_state(release_dir / STATE), candidate_dir(release_dir))
 
 
 def window_start(state: State) -> str:

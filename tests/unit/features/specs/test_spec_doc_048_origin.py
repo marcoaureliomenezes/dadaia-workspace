@@ -31,7 +31,7 @@ def _no_memory_lint_subprocess(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 def _write_spec(specs: Path, origin_line: str) -> Path:
-    path = specs / "releases" / _RELEASE / "SPEC.md"
+    path = specs / "releases" / _RELEASE / "rc-1" / "SPEC.md"
     path.write_text(
         f"# Spec\n\n**Status:** Approved\n**Opened:** 2026-09-21\n{origin_line}\n\nBody.\n",
         encoding="utf-8",
@@ -121,18 +121,19 @@ def test_spec_origin(tmp_path: Path, origin: str, needle: str | None, absent: st
         assert needle in issue and (absent is None or absent not in issue)
 
 
-def test_a_candidate_folder_is_not_ranked_and_is_off_canon(tmp_path: Path) -> None:
-    """sa-release-json-validated-three-times#B6: rc-1/SPEC.md is history, never ranked —
-    SPEC-DOC-048 stays silent and TREE-8 names the path (no rc-N canon member)."""
+def test_only_the_live_candidate_is_ranked_and_a_flat_spec_is_off_canon(tmp_path: Path) -> None:
+    """ADR 0150 (3), 0151 M5: the highest rc-<N>/ is ranked, a closed rc-1 is history, and a
+    flat SPEC.md at the release root is TREE-8, never read."""
     specs = _make_clean_specs_tree(tmp_path, _RELEASE)
     _write_spec(specs, "**Origin:** operator-demand")
-    rc = specs / "releases" / _RELEASE / "rc-1"
-    rc.mkdir()
-    (rc / "SPEC.md").write_text("# Spec\n\n**Status:** Approved\n", encoding="utf-8")
+    (specs / "releases" / _RELEASE / "rc-2").mkdir()
+    (specs / "releases" / _RELEASE / "rc-2" / "SPEC.md").write_text("**Status:** Draft\n")
+    (specs / "releases" / _RELEASE / "SPEC.md").write_text("**Origin:** operator-demand\n")
 
-    assert _issues(specs) == []
-    tree8 = [i for i in SpecsDoctor(specs).check() if i.code == "TREE-8"]
-    assert any("rc-1/SPEC.md" in i.message for i in tree8), tree8
+    [issue] = _issues(specs)
+    assert "rc-2/SPEC.md has no `**Origin:**`" in issue
+    tree8 = [i.message for i in SpecsDoctor(specs).check() if i.code == "TREE-8"]
+    assert any(f"releases/{_RELEASE}/SPEC.md is not" in m for m in tree8), tree8
 
 
 def test_this_repos_live_and_candidate_specs_all_pass() -> None:

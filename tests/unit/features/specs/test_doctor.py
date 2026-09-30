@@ -100,7 +100,7 @@ def _write_release_jsonl(specs: Path, release_id: str, phase: str) -> None:
 def _make_clean_specs_tree(root: Path, release_id: str = "1.2.3") -> Path:
     specs = root / "specs"
     (specs / "memory" / "product" / "testarea").mkdir(parents=True)
-    (specs / "releases" / release_id).mkdir(parents=True)
+    (specs / "releases" / release_id / "rc-1").mkdir(parents=True)
     (specs / "backlog").mkdir(parents=True)
 
     (specs / "constitution.md").write_text("# Constitution\n\nThe laws.\n", encoding="utf-8")
@@ -127,9 +127,9 @@ def _make_clean_specs_tree(root: Path, release_id: str = "1.2.3") -> Path:
     )
     plan_md = "# Plan\n\n**Status:** Approved\n\nShort.\n"
     tasks_md = "# Tasks\n\n**Status:** Approved\n\n- [-] T1 something\n"
-    (specs / "releases" / release_id / "SPEC.md").write_text(spec_md, encoding="utf-8")
-    (specs / "releases" / release_id / "PLAN.md").write_text(plan_md, encoding="utf-8")
-    (specs / "releases" / release_id / "TASKS.md").write_text(tasks_md, encoding="utf-8")
+    (specs / "releases" / release_id / "rc-1" / "SPEC.md").write_text(spec_md, encoding="utf-8")
+    (specs / "releases" / release_id / "rc-1" / "PLAN.md").write_text(plan_md, encoding="utf-8")
+    (specs / "releases" / release_id / "rc-1" / "TASKS.md").write_text(tasks_md, encoding="utf-8")
     for rel, section_id in FIXED_SECTIONS:
         path = specs / rel
         fragment = read_fixed_fragment(_PUBLIC_DIR, section_id)
@@ -147,7 +147,7 @@ def _by_code(issues: list[SectionFinding], code: str) -> list[SectionFinding]:
 
 
 def _write_tasks(specs: Path, release_id: str, body: str) -> None:
-    (specs / "releases" / release_id / "TASKS.md").write_text(
+    (specs / "releases" / release_id / "rc-1" / "TASKS.md").write_text(
         f"# Tasks\n\n**Status:** Approved\n\n{body}\n", encoding="utf-8"
     )
 
@@ -212,13 +212,13 @@ _ATOM = (
             id="doc002-subdir-atom-ok",
         ),
         pytest.param(
-            _write("releases/1.2.3/SPEC.md", "# Spec\n\n**Status:** Accepted\n"),
+            _write("releases/1.2.3/rc-1/SPEC.md", "# Spec\n\n**Status:** Accepted\n"),
             "SPEC-DOC-004",
             True,
             id="doc004-non-canonical-status",
         ),
         pytest.param(
-            _replace("releases/1.2.3/SPEC.md", "Approved", "Draft"),
+            _replace("releases/1.2.3/rc-1/SPEC.md", "Approved", "Draft"),
             "SPEC-DOC-004",
             True,
             id="doc004-draft-in-implementation",
@@ -257,22 +257,25 @@ def test_tree5_drift_is_reported_never_auto_repaired(tmp_path: Path) -> None:
 def test_doc005_oversized_plan_warns_whatever_the_spec_creation_date(
     tmp_path: Path, created: str
 ) -> None:
-    """0.4.7 c2: a PLAN split is judgment with no command, so never error-class."""
+    """0.4.7 c2: a PLAN split is judgment with no command, so never error-class; ADR 0150:
+    only the live candidate is judged — once rc-2 opens, the closed rc-1 falls silent."""
     specs = _make_clean_specs_tree(tmp_path)
     big = "# Plan\n\n**Status:** Approved\n\n" + "\n".join(f"- line {i}" for i in range(400))
-    (specs / "releases" / "1.2.3" / "PLAN.md").write_text(big, encoding="utf-8")
-    _write("releases/1.2.3/SPEC.md", f"# Spec\n\n**Status:** Approved\n> **Created:** {created}\n")(
-        specs
-    )
+    (specs / "releases" / "1.2.3" / "rc-1" / "PLAN.md").write_text(big, encoding="utf-8")
+    _write(
+        "releases/1.2.3/rc-1/SPEC.md", f"# Spec\n\n**Status:** Approved\n> **Created:** {created}\n"
+    )(specs)
     doc5 = _by_code(SpecsDoctor(specs).check(), "SPEC-DOC-005")
     assert doc5 and doc5[0].verdict == "warning"
+    (specs / "releases" / "1.2.3" / "rc-2").mkdir()
+    assert _by_code(SpecsDoctor(specs).check(), "SPEC-DOC-005") == []
 
 
 def test_one_defect_one_code_missing_active_artifact(tmp_path: Path) -> None:
     """F005: trio presence has ONE home, `release.py check`; the specs section reports
     nothing for a missing PLAN.md and fix never creates it."""
     specs = _make_clean_specs_tree(tmp_path)
-    plan = specs / "releases" / "1.2.3" / "PLAN.md"
+    plan = specs / "releases" / "1.2.3" / "rc-1" / "PLAN.md"
     plan.unlink()
     doctor = SpecsDoctor(specs, templates_dir=_TEMPLATES_DIR)
     issues = doctor.check()

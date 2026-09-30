@@ -1,5 +1,7 @@
 """The real context registry in a tmp states dir — the store every non-CLI test uses."""
 
+import json
+import shutil
 import sys
 from pathlib import Path
 
@@ -14,8 +16,8 @@ def context_store(states_dir: Path) -> JsonContextStore:
 
 
 def own_venv_workspace(root: Path) -> Path:
-    """A registry plus a venv whose `python` is this interpreter and whose `dadaia` drains
-    the pre-push pipe: a process on that `python` is owned by *root* (no install)."""
+    """A registry plus a venv whose `python` and `dadaia` are this environment's own: a
+    process on that `python` is owned by *root* (no install)."""
     tools = root / ".dadaia" / ".venv" / PLATFORM.venv_scripts_dir
     tools.mkdir(parents=True)
     (root / ".dadaia" / "states").mkdir()
@@ -24,9 +26,32 @@ def own_venv_workspace(root: Path) -> Path:
     (root / ".dadaia" / ".venv" / "pyvenv.cfg").write_text(
         f"home = {Path(sys.executable).resolve().parent}\n"
     )
-    (tools / f"dadaia{PLATFORM.venv_exe_suffix}").write_text("#!/bin/sh\ncat >/dev/null\n")
-    (tools / f"dadaia{PLATFORM.venv_exe_suffix}").chmod(0o755)
+    cli = f"dadaia{PLATFORM.venv_exe_suffix}"
+    shutil.copy2(Path(sys.executable).parent / cli, tools / cli)
     return root
+
+
+def workspace_cli(root: Path, *listed: dict[str, object]) -> Path:
+    """A POSIX `dadaia` stub in *root*'s venv (a text script: Windows runs none), standing for
+    the reads the worktree script makes: `context list` prints *listed*, `reports validate` passes iff `schema_version`; any other
+    verb drains its stdin (the pre-push pipe)."""
+    cli = root / ".dadaia" / ".venv" / "bin" / "dadaia"
+    cli.parent.mkdir(parents=True, exist_ok=True)
+    cli.write_text(_CLI.format(python=sys.executable, rows=json.dumps(list(listed))))
+    cli.chmod(0o755)
+    return root
+
+
+_CLI = """#!{python}
+import json, sys
+args = sys.argv[1:]
+if args[:2] == ["context", "list"]:
+    print({rows!r})
+elif args[:2] == ["reports", "validate"]:
+    sys.exit(0 if "schema_version" in json.load(open(args[2])) else 1)
+else:
+    sys.stdin.read()
+"""
 
 
 def own_venv_python(root: Path) -> Path:

@@ -8,14 +8,15 @@ sources:
   - dadaia_workspace/core/handoff_index.py
   - dadaia_workspace/cli/commands/reports.py
   - dadaia_workspace/public/schemas/handoff-v1.schema.json
+  - dadaia_workspace/public/skills/dd-handoff-emitter/**
 ---
 
 ## The contract
 
 - `handoff-v1` is the JSON record every agent emits, written to `.dadaia/handoff/<context>/<UTC>-<agent>-<slug>.handoff.json`.
-- An optional HTML report under `repos/<slug>/reports/<agent>/` is referenced by `artifact.path` plus `artifact.content_hash`.
+- An optional HTML report at `.dadaia/reports/<context>/<UTC>-<agent>-<slug>.html` — an output zone never reaped or committed — is referenced by `artifact.path` plus `artifact.content_hash`.
 - `schema_version` accepts `handoff-v1`, `handoff-v1.1` and `handoff-v1.2`; `handoff-v1.2` carries `self_pull.refs` — the `specs/`-prefixed atoms the session read — and `handoff-v1.1` is the emission for a session that read none.
-- An optional `verdict` (`APPROVED`/`REJECTED`) records `dd-code-reviewer`'s recommendation.
+- An optional `verdict` (`APPROVED`/`REJECTED`) records `dd-code-reviewer`'s recommendation; `worktree.py merge` lands a worktree only when a valid `APPROVED` handoff names its rebased HEAD in `scope` ([[worktrees]]).
 - `dadaia_workspace/public/schemas/handoff-v1.schema.json` is the single source of field semantics, staged to `.dadaia/agentic/schemas/` and never projected into a harness root; only the CLI reads it.
 
 ## Validation
@@ -33,4 +34,4 @@ sources:
 
 ## Dependencies
 
-[[public-asset-distribution]] — the schema reaches `.dadaia/agentic/schemas/` through staging; [[workspace-doctor]] — the TTL reaper.
+[[public-asset-distribution]] — the schema reaches `.dadaia/agentic/schemas/` through staging; [[workspace-doctor]] — the TTL reaper; [[worktrees]] — the merge's verdict gate.

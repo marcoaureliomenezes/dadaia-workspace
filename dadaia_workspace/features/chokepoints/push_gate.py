@@ -1,5 +1,5 @@
-"""Push-gate orchestration: branch policy, then the range-scoped specs/ canon and
-denylist scans over ONE object walk — first refusal wins. Business logic only: the
+"""Push-gate orchestration: branch policy, then the specs/ canon scan over the paths
+the push nets in and the denylist scan over ONE object walk — first refusal wins. Business logic only: the
 canon predicate and the :class:`ObjectSource` are injected by ``cli/commands/ci.py``."""
 
 from __future__ import annotations
@@ -57,6 +57,12 @@ class ObjectSource(Protocol):
 
     def remote_branch(self, repo: Path, branch: str) -> bool: ...
 
+    def netted_specs(self, repo: Path, local_sha: str, remote_sha: str) -> list[str]: ...
+
+    def law_deletions(self, repo: Path, local_sha: str, remote_sha: str) -> list[tuple[str, str]]:
+        """ADR 0151 M3: (commit, path) per range commit deleting a law line uncited."""
+        ...
+
 
 def _refusal(head: str, rows: Sequence[str] = (), noun: str = "", advice: str = "") -> str:
     """The one pre-push refusal shape: head, rows capped at 10 plus a remainder count,
@@ -109,20 +115,16 @@ def _run_denylist_scan(
     terms: list[tuple[str, str]],
     patterns: list[BaselinePatternLike],
     masker: PathMasker,
-    specs: dict[str, list[str]],
 ) -> tuple[list[tuple[PushRef, Hit]], int, list[OversizedNote]] | Decision:
     """ONE streamed walk over every ref's new objects (deduplicated across refs; a
-    materialized range measured ~129 MB): denylist hits, skip counts, and each ref's
-    ``specs/`` paths recorded into *specs*. A read failure refuses (fail closed)."""
+    materialized range measured ~129 MB): denylist hits and skip counts. A read failure
+    refuses (fail closed)."""
     seen: set[str] = set()
 
     def fresh(ref: PushRef) -> Iterator[ScannedObject]:
-        sink = specs.setdefault(ref.local_sha, [])
         for obj in object_source.new_objects(repo, ref.local_sha, ref.remote_sha):
             if obj.sha not in seen:
                 seen.add(obj.sha)
-                if obj.path.startswith("specs/"):
-                    sink.append(obj.path)
                 yield obj
 
     hits: list[tuple[PushRef, Hit]] = []
@@ -134,18 +136,23 @@ def _run_denylist_scan(
             oversized.extend(outcome.oversized_notes)
             hits.extend((ref, hit) for hit in outcome.hits)
     except GitObjectReadError as exc:
-        masked = f" (path: {masker.mask_path(exc.path)})" if exc.path is not None else ""
-        return Decision(
-            allowed=False,
-            message=_fail_closed(f"reading the pushed-range git objects failed ({exc}{masked})")
-            + "\nfix: "
-            + (  # a run failure is not corruption: no fsck for it
-                "Operator action: make git runnable here, then push again"
-                if isinstance(exc, GitRunError)
-                else git_line(repo, "fsck")
-            ),
-        )
+        return _read_failure(exc, masker, repo)
     return hits, binaries, oversized
+
+
+def _read_failure(exc: GitObjectReadError, masker: PathMasker, repo: Path) -> Decision:
+    """A git read failure refuses (fail closed), its path masked."""
+    masked = f" (path: {masker.mask_path(exc.path)})" if exc.path is not None else ""
+    return Decision(
+        allowed=False,
+        message=_fail_closed(f"reading the pushed-range git objects failed ({exc}{masked})")
+        + "\nfix: "
+        + (  # a run failure is not corruption: no fsck for it
+            "Operator action: make git runnable here, then push again"
+            if isinstance(exc, GitRunError)
+            else git_line(repo, "fsck")
+        ),
+    )
 
 
 def push_gate_decision(
@@ -163,8 +170,8 @@ def push_gate_decision(
     """Decide a push, first refusal wins: a malformed stdin line (fail closed); branch
     policy over every non-deletion, non-tag ref (a principal/integration birth allowed
     when origin holds no gitflow branch or it publishes nothing); then ONE walk over
-    every non-deletion ref's new objects (tags included) feeding the specs/ canon scan
-    (refused first) and the denylist scan; an unreadable object store refuses. Every
+    every non-deletion ref's new objects (tags included) for the denylist scan, while
+    the specs/ canon scan (refused first) judges only the paths each ref nets in; an unreadable object store refuses. Every
     capability is a required parameter: an unwired call site is a CLI defect, never a
     bypass."""
     if malformed_lines > 0:
@@ -190,18 +197,25 @@ def push_gate_decision(
     scan_refs = [r for r in refs if not r.is_deletion]
     terms, patterns = list(denylist_terms), list(baseline_patterns)  # one-shot iterables
     masker = PathMasker(terms, patterns)
-    specs: dict[str, list[str]] = {}
-    scan = _run_denylist_scan(scan_refs, object_source, repo, terms, patterns, masker, specs)
+    scan = _run_denylist_scan(scan_refs, object_source, repo, terms, patterns, masker)
     if isinstance(scan, Decision):
         return scan
     hits, binaries, oversized = scan
-    canon = [
-        (ref, path)
-        for ref in scan_refs
-        for path in sorted(
-            set(canon_violations_fn(sorted({p[6:] for p in specs.get(ref.local_sha, [])})))
-        )
-    ]
+    try:
+        laws = [
+            (r, c, p)
+            for r in scan_refs
+            for c, p in object_source.law_deletions(repo, r.local_sha, r.remote_sha)
+        ]
+        canon = [
+            (r, p)
+            for r in scan_refs
+            for p in canon_violations_fn(
+                [s[6:] for s in object_source.netted_specs(repo, r.local_sha, r.remote_sha)]
+            )
+        ]
+    except GitObjectReadError as exc:
+        return _read_failure(exc, masker, repo)
     if canon:
         message = _refusal(
             f"the pushed range publishes {len(canon)} specs/ path(s) violating the v6 canon "
@@ -212,6 +226,13 @@ def push_gate_decision(
                 for r, p in canon
             ],
             "path(s)",
+        )
+    elif laws:
+        message = _refusal(
+            f"{len(laws)} pushed commit(s) delete a law line citing no `ADR NNNN` (ADR 0151).",
+            [f"  {r.local_ref}: commit {c[:12]} deletes a line of {p}" for r, c, p in laws],
+            "commit(s)",
+            "Cite the ADR that rules each deletion in that commit's message. ",
         )
     elif hits:
         message = _refusal(
@@ -234,7 +255,7 @@ def push_gate_decision(
         message="[pre-push] branch policy + specs-canon scan + denylist scan passed; allow.",
     )
     if message:
-        first = (canon or hits)[0][0]
+        first = (canon or laws or hits)[0][0]
         fix = _rewrite_fix(first, object_source, repo, fixes)
         decision = Decision(allowed=False, message=f"{message}\n{_REWRITE}\n{fix}")
     return _notes(decision, binaries, oversized, masker)

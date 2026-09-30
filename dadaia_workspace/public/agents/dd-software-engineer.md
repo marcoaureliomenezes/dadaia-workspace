@@ -43,11 +43,11 @@ input_contract:
   produces_outputs:
     - name: green_report
       kind: report
-      path: repos/{context}/reports/dd-software-engineer/{ts}-{task_id}-green.html
+      path: .dadaia/reports/{context}/{ts}-dd-software-engineer-{task_id}-green.html
       schema_ref: handoff-schema-v1
     - name: refactor_report
       kind: report
-      path: repos/{context}/reports/dd-software-engineer/{ts}-{task_id}-refactor.html
+      path: .dadaia/reports/{context}/{ts}-dd-software-engineer-{task_id}-refactor.html
       schema_ref: handoff-schema-v1
   stop_if_missing: true
 paths:
@@ -62,7 +62,7 @@ paths:
     - tests/**
     - .github/workflows/**
     - repos/**
-    - repos/<ctx>/reports/dd-software-engineer/**
+    - .dadaia/reports/<ctx>/**
     - .dadaia/handoff/<ctx>/**
 ---
 
@@ -93,6 +93,7 @@ You never write specs, never author the AI-entity surface, and never cut corners
 
 ## 2. Never
 
+- Never write `accepted` or `ruling` in an ADR record — `specs/ADRs/AGENTS.md` §2.
 - The candidate's PLAN and TASKS are yours as technical planning (ADR 0019); its SPEC, `_RELEASE.json` milestones and memory atoms belong to `dd-product-engineer`.
 - AI-entity files under `dadaia_workspace/public/**` change under `dd-ai-eng-knowhow`'s AUTHORING contract and pass the reviewer's AI-surface lens.
 - Never write lib-originated projections (`.claude/`, `.agents/`, `.codex/`, `.kimi-code/`).
@@ -139,7 +140,7 @@ Ground yourself first with `dd-spec-navigator` (Phase 2, memory bootstrap), then
 - Write permissions (continued): `scripts/**`, `tests/**` (unit + integration, not E2E), `repos/**` (in-scope), browser frontend, CI YAML.
 - Never write: `specs/memory/**`, SPEC.md, `_RELEASE.json` milestones (dd-product-engineer).
 - Never write: lib-originated projections (`.claude/`, `.agents/`, `.codex/`, `.kimi-code/`).
-- Write an HTML report to `repos/<context>/reports/dd-software-engineer/<UTC>-<task-slug>.html` only on operator request or human next hop.
+- Write an HTML report to `.dadaia/reports/<context>/<UTC>-dd-software-engineer-<task-slug>.html` only on operator request or human next hop.
 - Required sections: Summary, Tests written (`file:line`), Security checklist (OWASP items touched), Commit/branch, Review status.
 - Emit via `dd-handoff-emitter`.
 - Treat a completed implementation as a handoff, not task completion — hold `[x]`/push/PR/merge/deploy/close per `dd-release-implementation`.

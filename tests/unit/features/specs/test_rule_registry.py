@@ -56,6 +56,7 @@ def test_fix_dispatch_and_help_derive_from_the_registry() -> None:
         "MEM-PLACEHOLDER-1",
         "FIXED-1",
         "FIXED-2",
+        "SPEC-DOC-046",  # ADR 0007, restored by ADR 0152 (4): the legacy RELEASE.json rename
     }
     help_text = rules_mod.render_fix_help()
     for code in fixable:

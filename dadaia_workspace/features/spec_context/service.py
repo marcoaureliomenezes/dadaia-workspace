@@ -37,6 +37,7 @@ from dadaia_workspace.core.template_history import was_shipped
 from dadaia_workspace.features.spec_context import sweep
 from dadaia_workspace.infrastructure.git_subprocess import GitSubprocessClient
 from dadaia_workspace.infrastructure.json_context_store import JsonContextStore
+from dadaia_workspace.infrastructure.ledger_scripts import worktree_rows
 
 _log = logging.getLogger(__name__)
 
@@ -650,6 +651,7 @@ class SpecContextService:
         secret, unpushed branches or a linked worktree, a dirty tree without git identity,
         changes to sync off a work branch. Every refusal names its repo."""
         main_repo = self._repo_path(ctx.repo_slug)
+        trees, failed, refix = worktree_rows(self._workspace_root)  # AC1.10: the owner's rows
         for repo in ctx.all_repos():
             slug, path = repo.slug, self._repo_path(repo.slug)
             lead = f"Context '{name}': repo '{slug}'"
@@ -678,14 +680,17 @@ class SpecContextService:
                     "Nothing was pushed.\nfix: "
                     + git_line(path, "stash", "push", "-u", "--", *flagged)
                 )
-            lost = self._git.unrecoverable(path)
+            held = [r for r in trees if r["repo"] == slug and r["exit"]]  # the owner's exits
+            lost = [refix] if failed else [r["exit"] for r in held]
+            lost += self._git.unrecoverable(path)
             if tree := sweep.linked_worktree(self._workspace_root, path):
                 gdir = sweep.worktree_git_dir(tree)
                 lost.append(git_line(gdir, "worktree", "move", str(tree), "<keep-dir>"))
             if lost:
                 raise DeadUnpushedCommitsError(
-                    f"{lead} holds {len(lost)} linked worktree(s) or unpushed branch(es) "
-                    f"dead() would lose. Nothing was touched.\nfix: {lost[0]}"
+                    f"{lead} holds {len(lost)} worktree(s) or unpushed branch(es) dead() would "
+                    f"lose{f' ({failed})' if failed else ''}. Nothing was "
+                    f"touched.\nfix: {lost[0]}"
                 )
             dirty = self._git.is_dirty(path)
             if not (self._git.has_commits(path) and (dirty or self._git.unpushed(path))):

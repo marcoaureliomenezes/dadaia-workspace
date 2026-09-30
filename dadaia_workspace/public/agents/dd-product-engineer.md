@@ -39,12 +39,12 @@ input_contract:
   produces_outputs:
     - name: spec_report
       kind: report
-      path: repos/{context}/reports/dd-product-engineer/{ts}-spec.html
+      path: .dadaia/reports/{context}/{ts}-dd-product-engineer-spec.html
       schema_ref: handoff-schema-v1
   stop_if_missing: true
 paths:
   write_allowlist:
-    - repos/<ctx>/reports/dd-product-engineer/**
+    - .dadaia/reports/<ctx>/**
     - .dadaia/handoff/<ctx>/**
     - specs/backlog/**
     - specs/releases/**/SPEC.md
@@ -69,6 +69,7 @@ You own the specs: what the product is, what it must become, and what it now is.
 
 ## 2. Never
 
+- Never write `accepted` or `ruling` in an ADR record — `specs/ADRs/AGENTS.md` §2.
 - Never dispatch another agent — the main thread is the only coordinator; your tool grant carries no dispatch tool.
 - Never run the grill as coordinator — the main thread grills the operator; an open question goes back in your handoff.
 - Never write production code, tests, PLAN, TASKS, CI YAML or lib-originated projections.
@@ -95,7 +96,7 @@ Reviews and every lens -> dd-code-reviewer.
 
 ## 4. Outputs
 
-- Reports: handoff-first (the root `AGENTS.md` map §4); an HTML report lands in `repos/<ctx>/reports/dd-product-engineer/` only on request.
+- Reports: handoff-first (the root `AGENTS.md` map §4); an HTML report lands in `.dadaia/reports/<ctx>/` only on request.
 
 ## 5. References
 

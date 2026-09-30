@@ -1,13 +1,14 @@
 """sdd_gate's ALLOW/BLOCK verdict, driven as a real PreToolUse subprocess.
 
-Intent: CONTRACT — PROTECTED is the sole fail-CLOSED path; the install ledger decides it
-(sa-gate-path-classes-diverge-from-the-law); scope is path-first; the gate never blocks on
-concurrency (NO-LOCKS doctrine, v0.1.76); a repo's own AGENTS.md is never law (v0.4.5 FR1).
+Intent: CONTRACT — the install ledger decides PROTECTED (sa-gate-path-classes-diverge-from-the-law);
+scope is path-first and repos/<r>/ is merge-only (T-050-97, AC1.1); the gate never blocks on
+concurrency (NO-LOCKS doctrine, v0.1.76); a fenced root stays protected (AC1.3); a repo's own AGENTS.md is never law (v0.4.5 FR1).
 """
 
 from __future__ import annotations
 
 import json
+import os
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -15,13 +16,14 @@ from typing import Any
 import pytest
 
 from dadaia_workspace.core import session_store
+from dadaia_workspace.core.workspace_resolver import FENCE_ENV
 from tests.fixtures.harness_env import claude_hook_env, run_hook_subprocess
 
 
 def _mk_workspace(tmp_path: Path, *slugs: str) -> Path:
     (tmp_path / ".dadaia" / "states").mkdir(parents=True)
     (tmp_path / ".dadaia" / "states" / "spec_contexts.json").write_text(
-        json.dumps({"contexts": [{"repo_slug": s, "state": "alive"} for s in slugs]}),
+        json.dumps({"contexts": [{"name": s, "repo_slug": s, "state": "alive"} for s in slugs]}),
         encoding="utf-8",
     )
     for s in slugs:
@@ -35,7 +37,8 @@ _LEDGERED = (
 )  # fmt: skip
 _BLOCK = ""  # any block, whatever its reason
 _PATCH = "*** Begin Patch\n*** Update File: README.md\n+ok\n*** Update File: {}\n+x\n*** End Patch"
-_AGENTS = "repos/a/AGENTS.md"
+_WT_A = "worktrees/a/0.5.0a-impl/"
+_BOUND_A = {"s": {"context": "a"}}
 
 
 def _row(id: str, target: Any, want: str | None = None, **opts: Any) -> Any:
@@ -47,26 +50,29 @@ def _row(id: str, target: Any, want: str | None = None, **opts: Any) -> Any:
     [
         _row("non-write-tool", "x", tool="Read"),
         _row("unparseable-target", None),
-        _row("ungated-path", "README.md"),
+        _row("F3-non-grammar-slug-is-no-repo", "repos/a.b/x.py"),
         _row("protected-sessions-fails-closed", ".dadaia/sessions/runtime/a.ptr", "SEC-01"),
-        _row("fresh-repo-agents-md-A1.1", _AGENTS),
-        _row("existing-repo-agents-md-edit-A1.2", _AGENTS, tool="Edit", seed="# repo rules\n"),
+        _row("AC1.3-a-fenced-root-stays-protected", ".dadaia/sessions/runtime/a.ptr",
+             "SEC-01", fence=True),
+        _row("worktree-agents-md-is-never-law-A1.1", _WT_A + "AGENTS.md", records=_BOUND_A),
+        _row("AC1.1-bound-repos-write-names-the-worktree", "repos/a/src/x.py",
+             "worktree.py new a --kind impl", records=_BOUND_A),
         _row("apply-patch-a-later-protected-header-blocks-T-014-02",
              _PATCH.format(".dadaia/sessions/runtime/a.ptr"), "SEC-01", tool="apply_patch"),
         _row("apply-patch-all-headers-allowed", _PATCH.format("docs/notes.md"), tool="apply_patch"),
         _row("path-first-a-write-under-b-is-b-never-first-alive-a",
-             "repos/b/specs/releases/rel-1/TASKS.md"),
+             "worktrees/b/0.5.0a-impl/src/x.py", "context bind b"),
         _row("no-repo-no-context-fails-open", "specs/releases/x/TASKS.md"),
         _row("sa-bind-has-two-stores#S1-dadaia-context-is-ignored-for-an-unbound-native-id",
-             "repos/a/specs/releases/rel-1/TASKS.md", env={"DADAIA_CONTEXT": "b"}),
-        _row("no-repo-write-resolves-via-rung2-live-session-record", "specs/releases/r/TASKS.md",
-             records={"s": {"context": "a", "mode": "IMPLEMENTATION"}}),
+             "worktrees/b/0.5.0a-impl/src/x.py", "context bind b", env={"DADAIA_CONTEXT": "b"}),
+        _row("F3-bound-audit-write-allowed", "repos/a/specs/audits/20260101-x/index.md",
+             records=_BOUND_A),
         _row("no-repo-write-resolves-via-rung3-cwd-repo", "specs/releases/r/TASKS.md",
              cwd="repos/a"),
-        _row("two-live-sessions-both-write-no-lock",
-             "repos/a/specs/releases/rel-1/PLAN.md", records={"peer": {"context": "a"}}),
-        _row("a-foreign-read-bind-never-imposes-read-on-my-write",
-             "repos/a/specs/releases/rel-1/TASKS.md", records={"peer": {"mode": "READ"}}),
+        _row("two-live-sessions-both-write-no-lock", _WT_A + "specs/releases/rel-1/TASKS.md",
+             records={**_BOUND_A, "peer": {"context": "a"}}),
+        _row("a-foreign-read-bind-never-imposes-read-on-my-write", _WT_A + "src/x.py",
+             records={**_BOUND_A, "peer": {"mode": "READ"}}),
         *(_row(f"sa-gate-path-classes-diverge-from-the-law#B39-1-hook-wiring-{r}", r,
                "public install", ledger=True)
           for r in (".claude/settings.json", ".codex/hooks.json", ".dadaia/hooks/codex-pre-gate")),
@@ -78,14 +84,13 @@ def _row(id: str, target: Any, want: str | None = None, **opts: Any) -> Any:
           for r in ("AGENTS.md", ".dadaia/AGENTS.md", ".dadaia/tmp/AGENTS.md")),
         _row("sa-gate-path-classes-diverge-from-the-law#B39-3-a-tmp-probe-agents-md",
              ".dadaia/tmp/probe/20260927/AGENTS.md", ledger=True),
-        *(_row(f"sa-gate-path-classes-diverge-from-the-law#B39-4-any-area-histo-{r}", r)
-          for r in ("specs/releases/_archive/releases_histo.jsonl",
-                    "repos/b/specs/releases/_archive/releases_histo.jsonl")),
+        _row("sa-gate-path-classes-diverge-from-the-law#B39-4-root-histo",
+             "specs/releases/_archive/releases_histo.jsonl"),
     ],
 )  # fmt: skip
 def test_gate_verdict(tmp_path: Path, target: Any, want: str | None, opts: dict[str, Any]) -> None:
-    """The hook blocks exactly the PROTECTED/ledgered paths (``want`` names the reason) and
-    allows everything else — whatever the session, its peers, the env or the cwd."""
+    """The hook blocks the PROTECTED/ledgered paths and the out-of-scope or merge-only ones
+    (``want`` names the reason), never on a peer session, the env or the cwd."""
     ws = _mk_workspace(tmp_path, "a", "b")
     if opts.get("ledger"):
         entries = [
@@ -104,12 +109,11 @@ def test_gate_verdict(tmp_path: Path, target: Any, want: str | None, opts: dict[
         tool_input = {}
     else:
         tool_input = {"file_path": str(ws / target)}
-        if "seed" in opts:
-            (ws / target).write_text(opts["seed"], encoding="utf-8")
-            tool_input.update(old_string="# repo", new_string="# the repo")
     env = claude_hook_env(ws, session_id="s")
     env.pop("DADAIA_CONTEXT", None)  # never inherit the operator's shell
     env.update(opts.get("env", {}))
+    if opts.get("fence"):  # the fence says "never act on", never "nothing protects"
+        env[FENCE_ENV] = os.pathsep.join(filter(None, (env.get(FENCE_ENV), str(ws))))
     payload = {"tool_name": tool, "tool_input": tool_input, "session_id": "s"}
     result = run_hook_subprocess("sdd_gate", payload, env, cwd=ws / opts.get("cwd", ""))
     assert result.returncode == 0, result.stderr
@@ -126,7 +130,8 @@ def test_a_truncated_registry_is_no_context_at_the_gate_and_in_context_show(
     """sa-context-repo-mapping-falls-back-to-the-name#B4 (the gate and `context show
     --json` legs; alive_context_names is test_invocation's): with a truncated
     spec_contexts.json and DADAIA_CONTEXT naming a context, the real hook neither crashes
-    nor scope-blocks (no context is registered), and `context show --json` answers
+    nor scope-blocks an id-less worktree write (no context is registered, ADR 0116), and
+    `context show --json` answers
     `{"context": null}`, exit 0."""
     from typer.testing import CliRunner
 
@@ -137,7 +142,10 @@ def test_a_truncated_registry_is_no_context_at_the_gate_and_in_context_show(
     env = claude_hook_env(ws, session_id="s")
     env.pop("CLAUDE_CODE_SESSION_ID", None)
     env["DADAIA_CONTEXT"] = "proj"
-    payload = {"tool_name": "Write", "tool_input": {"file_path": str(ws / "repos/other/x.py")}}
+    payload = {
+        "tool_name": "Write",
+        "tool_input": {"file_path": str(ws / "worktrees/other/0.5.0a-impl/x.py")},
+    }
 
     gate = run_hook_subprocess("sdd_gate", payload, env)
 

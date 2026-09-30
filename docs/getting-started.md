@@ -5,8 +5,8 @@ the terms are defined in [concepts](concepts.md) and in [`CONTEXT.md`](../CONTEX
 
 ## Install
 
-<!-- derived-from: pypi-distribution sha256:9078512b58f9 -->
-<!-- derived-from: workspace-init sha256:56685f3d0950 -->
+<!-- derived-from: pypi-distribution sha256:92dbd2d7ed61 -->
+<!-- derived-from: workspace-init sha256:6ef28aa7796e -->
 
 ```bash
 uvx dadaia-workspace init <dir> --harness claude --repo <url>
@@ -27,7 +27,7 @@ refreshes each project's specs law.
 
 ## Level 1 — the workspace
 
-<!-- derived-from: workspace-init sha256:56685f3d0950 -->
+<!-- derived-from: workspace-init sha256:6ef28aa7796e -->
 
 `uvx dadaia-workspace init <dir> --harness claude|codex|kimi-code|cursor|devin|copilot
 [--repo <url>] [--associated-repo <url>]… [--skip-assets]` is the only verb that works
@@ -42,6 +42,9 @@ invocation's `--repo` and `--associated-repo` flags. It lays down:
   empty documents, never overwriting existing data, and
   `.dadaia/states/harness_profile.json`, the harness roster; a re-init with another
   harness merges into it, never narrowing it.
+- An absent root `.dadaiaignore`, seeded from the legacy
+  `states/instance_exceptions.txt` or a comment-only template; it is the operator's file
+  from then on.
 - Unless `--skip-assets`, the staged and installed public assets — the one writer of
   every hook wiring. With `--skip-assets` the output warns that the workspace is
   ungated until `.dadaia/.venv/bin/dadaia public install` runs.
@@ -51,8 +54,8 @@ harness later and `.dadaia/.venv/bin/dadaia harness list` reads the roster.
 
 ## Level 2 — the project
 
-<!-- derived-from: spec-context-project sha256:b1fa1ed3b027 -->
-<!-- derived-from: context-management sha256:1871a6d846b2 -->
+<!-- derived-from: spec-context-project sha256:9690f09f679b -->
+<!-- derived-from: context-management sha256:22e5ab09dc0d -->
 
 A context — a Spec Context Project — is the unit of work: one canonical `specs/` tree
 owned by one main repository, optionally spanning associated repositories that live and
@@ -68,17 +71,17 @@ die with it. Specs, bind, memory, releases and backlog resolve only from the mai
 the context ALIVE — it never binds; on failure nothing is left behind. The name
 defaults to the main repo's slug. `bind` writes exactly one record,
 `.dadaia/sessions/<session-id>.json` (context, runtime, pid, `bound_at`), and acquires
-nothing; `.dadaia/.venv/bin/dadaia context bind <ctx> --print-env` emits
-`DADAIA_CONTEXT` and `DADAIA_SESSION_ID` for an `eval $(…)` shell, and a session
-without a harness-native id carries the binding in `DADAIA_CONTEXT`. The bind's scope
-is the context's main repo plus its associated repos; a bound session's MUTATING
-file-tool write into a repo another context owns is refused with the bind that would
-allow it. After a bind, the ctx-inject hook injects the context header, `ARCHITECTURE.md`'s
-`## Tech Stack` section and the memory catalog digest once.
+nothing; the session id comes from the environment only, and a session without a
+harness-native id exports `DADAIA_SESSION_ID` before it binds. The bind's scope
+is the context's main repo plus its associated repos; a MUTATING file-tool write into a
+repo outside it is refused with the bind that would allow it, and agents write a repo
+only inside its worktrees. After a bind, the ctx-inject hook injects the context header,
+`constitution.md`, `ARCHITECTURE.md`'s `## Tech Stack` section, the memory catalog digest
+and the open worktrees once.
 
 ## Level 3 — the specs
 
-<!-- derived-from: spec-context-project sha256:b1fa1ed3b027 -->
+<!-- derived-from: spec-context-project sha256:9690f09f679b -->
 
 ```bash
 .dadaia/.venv/bin/dadaia specs init --context <ctx> [--replace-foreign]
@@ -94,7 +97,7 @@ branches; a re-run is a no-op.
 
 ## Check compliance — `doctor`
 
-<!-- derived-from: workspace-doctor sha256:772d9d7a78d3 -->
+<!-- derived-from: workspace-doctor sha256:1d52a99379ba -->
 
 ```bash
 .dadaia/.venv/bin/dadaia doctor --context <ctx> [--json] [--fix] [--redact]
@@ -120,36 +123,38 @@ a TTL expired.
 
 ## Run the first candidate
 
-<!-- derived-from: release-lifecycle sha256:57d8b542e879 -->
-<!-- derived-from: backlog-ledger sha256:721ed11c7220 -->
-<!-- derived-from: bug-ledger sha256:9392c1f406a4 -->
+<!-- derived-from: release-lifecycle sha256:cf04bb23d3bd -->
+<!-- derived-from: backlog-ledger sha256:4bdc376c943d -->
+<!-- derived-from: bug-ledger sha256:7182ac16c27c -->
 
 A candidate is one closed-scope cycle inside the live release. Nothing drives it: the
 documents are the state, the ledger scripts move the records, and the markers in
 `TASKS.md` are the trace.
 
 1. **Demand enters the backlog.** Only the operator creates demand;
-   `python3 .agents/skills/dd-backlog-definition/scripts/backlog.py new <slug>` appends
-   one `active[]` entry born `idea`, and every later status binds `intents[]` that resolve to a code, doc or CLI anchor.
+   `python3 .agents/skills/dd-backlog-definition/scripts/backlog.py new <slug> --relates <slugs>|none`
+   appends one `active[]` entry born `idea`, and every later status binds `intents[]` that resolve to a code, doc or CLI anchor.
 2. **Birth the release.**
    `python3 .agents/skills/dd-release-implementation/scripts/release.py new <M.m.p>`
-   writes a `SPEC.md` stub and `_RELEASE.json` in `DEFINITION` under
-   `specs/releases/<M.m.p>/`, all or nothing, refusing a second live release.
+   writes a `SPEC.md` stub in `specs/releases/<M.m.p>/rc-<N>/` and `_RELEASE.json` in
+   `DEFINITION` at the release root, all or nothing, refusing a second live release.
 3. **Define the candidate.** The picked set; the as-is review — one row per unit the
    set touches, `unit | today | bugs | verdict | why`, the As-is verdict DELETE,
    REBUILD, UPDATE or KEEP, then ADD only for what no unit can carry; the mandatory
    grill; then `SPEC.md` (its `Replaces` naming what DELETE/REBUILD rows remove),
-   `PLAN.md` (opening with that table as §1) and `TASKS.md` at the release root, in one
+   `PLAN.md` (opening with that table as §1) and `TASKS.md` in that `rc-<N>/`, in one
    definition commit on the work branch (`<work>M.m.p`; the names are the
    `gitflow:` block of `specs/constitution.md`).
 4. **Open implementation.** `release.py phase IMPLEMENTATION --sha <sha>` requires all
-   three files `**Status:** Approved` and PLAN's As-is review table, and stamps
+   three files `**Status:** Approved` and PLAN's As-is review, Authorities and Parallel
+   schedule tables, and stamps
    `defined`.
-5. **Implement one task at a time.** Reserve it `[-]` in its own commit, work
-   test-first, run the local CI preflight, and mark `[x]` only after the reviewer's
-   `APPROVED` on the same commit.
+5. **Implement each task in its own `impl` worktree.** Reserve it `[-]` in its own
+   commit, work test-first, run the local CI preflight, and land it by `worktree.py
+   merge` only after the reviewer's `APPROVED` on the rebased commit.
 6. **Close the candidate.** `release.py phase CLOSURE --sha <sha>` requires no `[ ]`
-   or `[-]` marker and stamps `implemented`. Then, in order: memory reconciliation, the
+   or `[-]` marker and no other open `wt/*` worktree, and stamps `implemented`. Then,
+   in the candidate's `release` worktree, in order: memory reconciliation, the
    closure `log` entries, the disposition sweep (`backlog.py exit`,
    `audit.py disposition`/`close`, `bugs.py archive`), artifact GC, and the
    work -> integration PR merged green.
@@ -157,7 +162,7 @@ documents are the state, the ledger scripts move the records, and the markers in
    candidate, reopening `DEFINITION`. Promote: merge the integration branch into the
    principal, then merge the release PR release-please opens there — it owns the version, the CHANGELOG
    section and the tag, and the publish jobs run on it; `release.py ship --sha <sha> --pr <n>`
-   then records the merged promote PR.
+   then records the merged promote PR and moves the release folder to `_archive/`.
 
 A bug needs none of this: register, lineage, RED test, root-cause fix, GREEN, `resolve`
-with evidence, one commit — on the live feature branch, in any phase.
+with evidence, one commit — in one `bug` worktree, in any phase.

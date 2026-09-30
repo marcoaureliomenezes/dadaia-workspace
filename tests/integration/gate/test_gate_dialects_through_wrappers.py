@@ -3,12 +3,14 @@
 sa-gate-blind-on-cursor-copilot-devin#B8: for every registry harness, a payload fixture in the harness's native shape
 (``tests/fixtures/hook_payloads/<harness>/``, shapes from the bug record's vendor-doc
 citations — authored, not recorded) through its rendered hook gets Claude's verdict for
-pip / a new root entry / a PROTECTED file / an unbound repo write (scope).
+pip / a new root entry / a PROTECTED file / a worktree write of an unregistered slug (scope: allowed).
 sa-gate-blind-on-cursor-copilot-devin#B1 Copilot's deny carries the venv guard's reason and fix line; sa-gate-blind-on-cursor-copilot-devin#B2 Cursor's preToolUse
 deny reaches the model (agent_message) with a fix line; sa-gate-blind-on-cursor-copilot-devin#B3 Devin's hooks.v1.json has the
 documented event -> [{matcher, hooks}] shape; sa-gate-blind-on-cursor-copilot-devin#B4 an allowed call prints nothing on the
 translated harnesses; sa-gate-blind-on-cursor-copilot-devin#B5 Kimi's shim prints the reason with real newlines, `fix:` at a
-line start, exit 2.
+line start, exit 2. AC1.2 (ADR 0103, ctx-inject-on-cursor-copilot): every harness's
+rendered ctx-inject wrapper answers on stdout, Cursor and Copilot in their vendor key, at
+every sessionStart.
 Size: MEDIUM — runs the real generated wrappers/shim over the real pre_gate.
 """
 
@@ -16,6 +18,7 @@ from __future__ import annotations
 
 import json
 import os
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -23,6 +26,7 @@ from pathlib import Path
 import pytest
 
 from dadaia_workspace.core.harness_registry import HARNESS_RECORDS
+from dadaia_workspace.core.workspace_layout import MARKER_DIR
 from dadaia_workspace.infrastructure.runtime_transforms.hook_wrappers import (
     hook_documents,
     hook_wrapper_contents,
@@ -123,3 +127,28 @@ def test_b5_kimi_prints_the_reason_with_real_newlines_and_exits_2(ws: Path) -> N
     assert proc.returncode == 2
     assert any(line.startswith("fix: ") for line in proc.stderr.splitlines())
     assert "\\n" not in proc.stderr
+
+
+@pytest.mark.parametrize("harness", sorted(HARNESS_RECORDS))
+def test_ac1_2_every_ctx_inject_wrapper_answers_on_stdout(ws: Path, harness: str) -> None:
+    """AC1.2: a bound id-less session gets its context on the wrapper's STDOUT (never
+    ``>&2``); Cursor and Copilot twice, as two sessionStarts are two new sessions."""
+    (ws / ".dadaia/states/spec_contexts.json").write_text(
+        json.dumps({"contexts": [{"name": "alpha", "state": "alive", "repo_slug": "alpha"}]})
+    )
+    vendor = {"cursor": "additional_context", "copilot": "additionalContext"}.get(harness)
+    env = {"PATH": os.environ["PATH"], "PYTHONPATH": os.environ.get("PYTHONPATH", "")}
+    env |= {"DADAIA_FENCED_ROOTS": os.environ["DADAIA_FENCED_ROOTS"], "DADAIA_CONTEXT": "alpha"}
+    wrappers = hook_wrapper_contents(HARNESS_RECORDS[harness])
+    docs = json.dumps(hook_documents(HARNESS_RECORDS[harness]))  # registered, not only rendered
+    names = sorted(n for n, body in wrappers.items() if "hooks.ctx_inject" in body and n in docs)
+    assert names, harness
+    for name in names:
+        (ws / ".dadaia" / "hooks" / name).write_text(wrappers[name])
+        shutil.rmtree(ws / MARKER_DIR, ignore_errors=True)  # each wrapper starts fresh
+        for _ in range(2 if vendor else 1):
+            out = subprocess.run(
+                ["sh", str(ws / ".dadaia" / "hooks" / name)],
+                input="{}", capture_output=True, text=True, cwd=ws, env=env, timeout=60,
+            ).stdout  # fmt: skip
+            assert "[alpha]" in (json.loads(out)[vendor] if vendor else out), (name, out)

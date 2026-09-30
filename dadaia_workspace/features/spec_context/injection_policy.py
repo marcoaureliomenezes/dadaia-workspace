@@ -23,8 +23,10 @@ Emission = Literal["bootstrap", "preflight", "none"]
 #: The hook event kinds the policy distinguishes. ``postcompact`` is Kimi's
 #: observation-only PostCompact (never stamps — the next prompt still re-injects);
 #: ``session_restart`` is Claude Code's SessionStart with source compact/clear (emits
-#: AND stamps — exactly-once discipline); everything else is a normal ``prompt``.
-Event = Literal["postcompact", "session_restart", "prompt"]
+#: AND stamps — exactly-once discipline); ``session_start`` is any harness's new session
+#: (nothing injected yet, whatever an earlier session stamped); everything else is a
+#: normal ``prompt``.
+Event = Literal["postcompact", "session_restart", "session_start", "prompt"]
 
 
 @dataclass(frozen=True)
@@ -54,6 +56,8 @@ def decide_injection(
     session's own bound_at newer than the sentinel" (covers a same-context re-bind). A
     bound context without a specs tree still gets its header and next step.
     """
+    if event == "session_start":
+        recorded_slug, sentinel_exists, compacted = "", False, False
     if event in ("postcompact", "session_restart"):
         # Recorded-slug fallback: a bind with no prior prompt leaves no sentinel, but
         # a compact/clear re-entry still deserves the bound context's bootstrap (bug

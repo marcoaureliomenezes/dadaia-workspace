@@ -17,7 +17,7 @@ import pytest
 from dadaia_workspace.hooks import pre_gate
 from tests.fixtures.harness_env import claude_hook_env, run_hook_subprocess
 
-_PATCH = "*** Begin Patch\n*** Update File: repos/a/README.md\n+ok\n*** Update File: {}\n+x\n*** End Patch"
+_PATCH = "*** Begin Patch\n*** Update File: worktrees/a/0.5.0a-impl/README.md\n+ok\n*** Update File: {}\n+x\n*** End Patch"
 
 
 def _spawn(ws: Path, payload: dict[str, Any]) -> Any:
@@ -31,7 +31,7 @@ def _spawn(ws: Path, payload: dict[str, Any]) -> Any:
 @pytest.mark.parametrize(
     ("tool", "tool_input", "want"),
     [
-        ("Write", {"file_path": "repos/a/src/thing.py"}, None),
+        ("Write", {"file_path": "repos/a/src/thing.py"}, "worktree.py new a --kind impl"),
         ("NotebookEdit", {"notebook_path": "junk.ipynb"}, None),
         ("Read", {"file_path": "x"}, None),
         ("Write", {"file_path": ".dadaia/sessions/a.json"}, "SEC-01"),
@@ -39,7 +39,7 @@ def _spawn(ws: Path, payload: dict[str, Any]) -> Any:
         ("apply_patch", {"command": _PATCH.format(".dadaia/sessions/a.json")}, "SEC-01"),
     ],
     ids=[
-        "in-repo-subdir-write-allows",
+        "in-repo-write-is-merge-only",
         "notebook-edit-is-root-whitelist-exempt",
         "non-write-tool-allows",
         "protected-sessions-fails-closed",

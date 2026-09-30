@@ -63,7 +63,7 @@ _PACKAGE = _REPO_ROOT / "dadaia_workspace"
 #: ``.dadaia/<retired>`` anywhere in the package is a path into a directory no record
 #: sanctions.
 _RETIRED_ZONES: frozenset[str] = frozenset(
-    {"reports", "academy", "logs", "runs", "scripts", "dev-report", "runtime"}
+    {"academy", "logs", "runs", "scripts", "dev-report", "runtime"}
 )
 
 #: The module that creates each ``Creator``'s zones. ``None`` = no single package module

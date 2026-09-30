@@ -3,7 +3,9 @@
 - sa-context-dead-removes-repos-outside-the-reaper#C3 /
   sa-context-dead-removes-repos-outside-the-reaper#C4: a local branch carrying a commit origin lacks,
   in ANY repo of the set, refuses dead; sa-context-dead-removes-repos-outside-the-reaper#C2: a linked
-  worktree registered by the repo or nested inside it refuses dead;
+  worktree registered by the repo or nested inside it refuses dead; AC1.10: any `wt/*`
+  refuses dead with the owner's `worktree.py merge` fix, checked out or orphan, and
+  rows the owner cannot read refuse with its fix;
   sa-context-dead-removes-repos-outside-the-reaper#C7: a refusal touches nothing, the record stays ALIVE;
   sa-context-dead-removes-repos-outside-the-reaper#C1: otherwise each repo is HELD under `.dadaia/reaped/`.
 - A16.1 (FR16 v0.4.4): alive clones the whole set, idempotently. A16.2: an untracked file
@@ -26,6 +28,7 @@ import shutil
 import subprocess
 from collections.abc import Callable
 from dataclasses import replace
+from functools import partial
 from pathlib import Path
 
 import pytest
@@ -47,7 +50,7 @@ from dadaia_workspace.features.spec_context.service import (  # noqa: E402
 )
 from dadaia_workspace.infrastructure.git_subprocess import GitSubprocessClient  # noqa: E402
 from dadaia_workspace.infrastructure.json_context_store import JsonContextStore
-from tests.fixtures.stores import context_store
+from tests.fixtures.stores import context_store, workspace_cli
 from tests.helpers.privacy_fixtures import aws_key_shape
 
 pytestmark = [pytest.mark.integration, pytest.mark.slow]
@@ -81,6 +84,8 @@ def _alive(
     bare = _published(tmp_path, repo)
     lib = _published(tmp_path, ws / "repos" / "lib")
     store = context_store(ws / ".dadaia" / "states")
+    flow = {"work": "feature/"}  # the stub CLI names the set's gitflow to worktree.py list
+    workspace_cli(ws, {"main_repo": "main", "associated_repos": [{"slug": "lib"}], "gitflow": flow})
     store.save(
         SpecContextProject(
             "proj", ContextState.ALIVE, "main", str(bare), "2026-09-27T00:00:00+00:00",
@@ -112,6 +117,21 @@ def _worktree(repo: Path) -> None:
     (outside / "uncommitted.txt").write_text("keep\n")
 
 
+def _wt(repo: Path, *, checked_out: bool) -> None:
+    """An UNPUSHED `wt/0.5.0a-impl` carrying a commit — `dadaia:`-locked in its canonical
+    tree, or an orphan with none."""
+    tree = repo.parents[1] / "worktrees" / repo.name / "0.5.0a-impl"
+    _git("branch", "feature/0.5.0", cwd=repo)  # the work branch it is ahead of
+    _git("worktree", "add", "-b", "wt/0.5.0a-impl", str(tree), cwd=repo)
+    (tree / "w.txt").write_text("w\n")
+    _git("add", "w.txt", cwd=tree)
+    _git("-c", "user.name=T", "-c", "user.email=t@example.com", "commit", "-qm", "w", cwd=tree)
+    if checked_out:
+        _git("worktree", "lock", "--reason", "dadaia: impl", str(tree), cwd=repo)
+    else:
+        _git("worktree", "remove", str(tree), cwd=repo)
+
+
 def _no_remote(repo: Path) -> None:
     _git("remote", "remove", "origin", cwd=repo)
     (repo / "notes.md").write_text("local only\n")
@@ -128,6 +148,9 @@ _REFUSALS = [
     pytest.param("main", _side_branch, DeadUnpushedCommitsError, r"fix: git -C \S+ -c \S+ push origin topic:refs/tags/archive/topic/[0-9a-f]{7}$", id="C3-side-branch-main"),
     pytest.param("lib", _side_branch, DeadUnpushedCommitsError, r"fix: git -C \S+ -c \S+ push origin topic:refs/tags/archive/topic/[0-9a-f]{7}$", id="C4-side-branch-lib"),
     pytest.param("main", _worktree, DeadUnpushedCommitsError, r"fix: git -C \S+ worktree remove ", id="C2-registered-worktree"),
+    pytest.param("lib", partial(_wt, checked_out=True), DeadUnpushedCommitsError, r"fix: python3 \S+worktree\.py merge \S+/worktrees/lib/0\.5\.0a-impl$", id="AC1.10-open-wt-worktree"),
+    pytest.param("main", partial(_wt, checked_out=False), DeadUnpushedCommitsError, r"fix: python3 \S+worktree\.py merge \S+/worktrees/main/0\.5\.0a-impl$", id="AC1.10-unpushed-orphan-wt"),
+    pytest.param("main", lambda r: (r.parents[1] / ".dadaia/.venv/bin/dadaia").unlink(), DeadUnpushedCommitsError, r"no workspace CLI[\s\S]*fix: uvx dadaia-workspace init \S+/ws$", id="AC1.10-rows-unreadable-fails-closed"),
     pytest.param("lib", lambda r: (r / "leftover.txt").write_text("x\n"), DeadReviewRequiredError, r"lib[\s\S]*leftover\.txt", id="A16.2-untracked-in-lib"),
     pytest.param("lib", _no_remote, DeadUnpushedCommitsError, "lib", id="A16.2-local-commits-no-remote-in-lib"),
     pytest.param("lib", _url_less, RepoUrlMissingError, r"fix: git -C \S+/repos/lib remote add origin", id="url-less-never-clone-back"),
