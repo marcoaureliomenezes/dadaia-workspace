@@ -76,5 +76,5 @@ Lanes: PLAN §2 FR10; files and lines: `AGGREGATE.md` §6.
 
 ### C — closure evidence (FR7, FR8, FR9)
 
-- [-] **T-050-62 — Measure.** AC8.1 deltas reported (AC10.7), allowance subset, AC9.11 counts, fenced rubric (AC7.1); mutmut is review evidence (AC9.10).
+- [x] **T-050-62 — Measure.** AC8.1 deltas reported (AC10.7), allowance subset, AC9.11 counts, fenced rubric (AC7.1); mutmut is review evidence (AC9.10).
   `W:` tests, handoff · `blocked by:` T-050-23..93 · `delivers:` AC7.1–7.3, AC8.1, AC9.9–9.11 · `RED:` n/a.
