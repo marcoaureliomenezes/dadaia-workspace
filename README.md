@@ -44,7 +44,7 @@ memory atom under its content hash.
 
 ## A human installs and uses it
 
-<!-- derived-from: pypi-distribution sha256:9078512b58f9 -->
+<!-- derived-from: pypi-distribution sha256:92dbd2d7ed61 -->
 <!-- derived-from: workspace-init sha256:6ef28aa7796e -->
 <!-- derived-from: context-management sha256:22e5ab09dc0d -->
 <!-- derived-from: workspace-doctor sha256:1d52a99379ba -->
@@ -95,7 +95,7 @@ and deletes only what a TTL expired.
 
 <!-- derived-from: agentic-entities sha256:358a6086252d -->
 <!-- derived-from: sdd-gate-v3 sha256:46dea6ca9c6c -->
-<!-- derived-from: release-lifecycle sha256:06933c8a2d4c -->
+<!-- derived-from: release-lifecycle sha256:cf04bb23d3bd -->
 <!-- derived-from: bug-ledger sha256:7182ac16c27c -->
 <!-- derived-from: harness-claude-code sha256:15a591119bed -->
 <!-- derived-from: harness-codex sha256:9218e747c24f -->
@@ -136,7 +136,7 @@ with a RED test. Completed work leaves as a `handoff-v1` record, validated by
 
 ## Documentation
 
-<!-- derived-from: pypi-distribution sha256:9078512b58f9 -->
+<!-- derived-from: pypi-distribution sha256:92dbd2d7ed61 -->
 <!-- derived-from: public-asset-distribution sha256:9be8dd881241 -->
 
 The documentation is the repository's [docs folder](https://github.com/marcoaureliomenezes/dadaia-workspace/tree/main/docs):
@@ -152,7 +152,7 @@ The documentation is the repository's [docs folder](https://github.com/marcoaure
 
 ## Links
 
-<!-- derived-from: pypi-distribution sha256:9078512b58f9 -->
+<!-- derived-from: pypi-distribution sha256:92dbd2d7ed61 -->
 
 - GitHub — <https://github.com/marcoaureliomenezes/dadaia-workspace>
 - PyPI — <https://pypi.org/project/dadaia-workspace/>

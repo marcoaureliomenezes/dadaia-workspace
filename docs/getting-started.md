@@ -5,7 +5,7 @@ the terms are defined in [concepts](concepts.md) and in [`CONTEXT.md`](../CONTEX
 
 ## Install
 
-<!-- derived-from: pypi-distribution sha256:9078512b58f9 -->
+<!-- derived-from: pypi-distribution sha256:92dbd2d7ed61 -->
 <!-- derived-from: workspace-init sha256:6ef28aa7796e -->
 
 ```bash
@@ -123,7 +123,7 @@ a TTL expired.
 
 ## Run the first candidate
 
-<!-- derived-from: release-lifecycle sha256:06933c8a2d4c -->
+<!-- derived-from: release-lifecycle sha256:cf04bb23d3bd -->
 <!-- derived-from: backlog-ledger sha256:4bdc376c943d -->
 <!-- derived-from: bug-ledger sha256:7182ac16c27c -->
 
