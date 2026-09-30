@@ -5,6 +5,9 @@ git in a tmp workspace, never the live instance).
 from __future__ import annotations
 
 import json
+import os
+import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -113,3 +116,17 @@ def test_list_reports_only_ours_with_ahead_and_dirty(root: Path) -> None:
     assert row["repo"] == "r" and row["kind"] == "impl" and row["id"] == "0.5.0a"
     assert row["ahead"] == 1 and row["dirty"] is True and row["age_hours"] >= 0
     assert not list((root / ".dadaia/states").glob("*worktree*"))
+
+
+def test_the_one_venv_imports_the_checkout_it_runs_from() -> None:
+    """AC1.11 (ADR 0113): the shared venv's editable install points at repos/; the repo law's
+    command, run from a worktree root, still imports THAT worktree's code (cwd first), and
+    no checkout carries its own venv. Measured without the suite's PYTHONPATH law."""
+    checkout = Path(__file__).resolve().parents[2]
+    env = {k: v for k, v in os.environ.items() if k != "PYTHONPATH"}
+    child = subprocess.run(
+        [sys.executable, "-c", "import dadaia_workspace; print(dadaia_workspace.__file__)"],
+        cwd=checkout, env=env, capture_output=True, text=True, check=True,
+    )  # fmt: skip
+    assert Path(child.stdout.strip()).resolve().is_relative_to(checkout)
+    assert not (checkout / ".venv").exists()

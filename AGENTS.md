@@ -13,5 +13,8 @@ into the source tree it projects from, so nothing here is regenerated.
   projected instance file to fake the result.
 - Any failure of a workspace operation here is a product bug of this library:
   register it in `specs/bugs/`.
+- In a worktree (`worktrees/dadaia-workspace/<name>/`, the rules: `worktrees/AGENTS.md`), run
+  tests from its root with the one venv: `../../../.dadaia/.venv/bin/python -m pytest` —
+  cwd comes first, so the worktree's code is imported, never `repos/`; no venv of its own.
 - Versioning here: release-please owns the version, tag and CHANGELOG; the work branch
   is named for the live release (`_RELEASE.json`).
