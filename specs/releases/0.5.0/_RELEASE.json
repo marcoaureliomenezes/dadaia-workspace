@@ -412,6 +412,52 @@
       "agent": "dd-product-engineer",
       "kind": "dispositions",
       "text": "Origin 78 bugs: 78/78 resolved (BUGS.jsonl status, verified against the SPEC Origin line). No backlog entry picked (Origin bugs:). Audit 20260930-structural-convergence stays open for candidates 5+: F064 (closure measurement) and F065 (no APPROVED verdict) resolved --release 0.5.0 by T-050-62 (0d31a5f2) and the APPROVED review; each memory truth-correction fixed under ADR 0138 in this closure's memory pass is dispositioned resolved in the commit after its fix; every other finding stays open. No new bug and no backlog entry registered (operator order). bugs.py archive not run."
+    },
+    {
+      "ts": "2026-09-30T02:58:29Z",
+      "agent": "release.py memory",
+      "kind": "memory",
+      "text": "Memory reconciled over 61e39efc3fadd3947b1c7c8ed72ed8a9c8df6468..684e44bd3ccd: 16 reviewed, 12 changed.",
+      "since": "61e39efc3fadd3947b1c7c8ed72ed8a9c8df6468",
+      "until": "684e44bd3ccd1d9acf599e6ba6e711e07f8b9073",
+      "reviewed": [
+        "agent-comms",
+        "agent-orchestration",
+        "harness-claude-code",
+        "harness-codex",
+        "harness-kimi-code",
+        "product-vision",
+        "spec-context-project",
+        "capabilities",
+        "context-management",
+        "context-portability",
+        "cross-platform-portability",
+        "server-registry",
+        "backlog-ledger",
+        "bug-ledger",
+        "release-lifecycle",
+        "sdd-gate-v3"
+      ],
+      "changed": [
+        "agentic-entities",
+        "public-asset-distribution",
+        "pypi-distribution",
+        "harness-copilot",
+        "harness-cursor",
+        "harness-devin",
+        "specs-migration",
+        "workspace-doctor",
+        "workspace-init",
+        "audits-canon",
+        "ci-preflight",
+        "consumer-agent-support"
+      ]
+    },
+    {
+      "ts": "2026-09-30T02:58:39Z",
+      "agent": "dd-product-engineer",
+      "kind": "note",
+      "text": "Memory pass bounds: context-management, spec-context-project, sdd-gate-v3 and workspace-doctor are reviewed with their audit-named surfaces left as they are — the F150 lines (rung 0, repo_owner, is_live, parallel worktree, ctx-inject law, the dead flow; bind scope; MUTATING scope; the TTL walk and worktree skip; findings F117, F118, F119, F122 folded there) are rewritten with the worktrees/bind redesign, and the F149 lines (operator verdict, instance_exceptions.txt, root-entry fix line, root-whitelist row) with the root-canon redesign. Principle blocks named by F124-F131 need their accepted ADR (ADR 0138 lane excludes ### P-NN) and F123 waits for AC6.3's contract; all stay open."
     }
   ]
 }
