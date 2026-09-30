@@ -99,3 +99,19 @@ Bug-history lessons (audit of the fix chain):
 - T-050-97 itself is made in a `wt.py new` worktree and lands by `wt.py merge`; from it on every task does (AC1.14).
 - Declared gap (SPEC AC1.1): an unbound session with no native id and no `DADAIA_SESSION_ID` is not refused under `worktrees/` — refusing it would be a Stall, since the harness env is not the shell env; ADR 0116 carries it to candidate 6.
 - Defects found here map to open records: `unbound-native-…`, `additive-globs-…`, `fenced-roots-…`, `corrupt-session-record-…` (DEL/FR here); no new record.
+
+## 5. Parallel schedule (ADR 0141)
+
+| step | tasks open together | width | how |
+|---|---|---|---|
+| 1 | T-050-95 | 1 | by hand on `feature/0.5.0` (bootstrap) |
+| 2 | T-050-96 | 1 | by hand on `feature/0.5.0` (bootstrap) |
+| 3 | T-050-97, T-050-98, T-050-99, T-050-101, T-050-102 | 5 | one impl worktree each |
+| 4 | T-050-100, T-050-103, T-050-104 | 3 | one impl worktree each; T-050-104 writes git refs only |
+| 5 | T-050-105 | 1 | measure |
+
+- True edges only: a worktree task needs `wt.py new`/`merge` merged (T-050-96); T-050-100 also needs T-050-97 (`hooks/sdd_gate.py`) and T-050-99 (`hooks/ctx_inject.py`, `f/spec_context/doctor.py`). T-050-103 and T-050-104 are ready at step 3 but wait for the 5-worktree cap.
+- Overlap check: every task in one step has a `W:` set disjoint from its siblings', except `TASKS.md` markers (replay) and the JSONL ledgers (union), ADR 0111. Step 3's `release.py` writers: only T-050-102 (`_release_check.py`) and T-050-99 (`_release_phase.py`), distinct files; no task writes `release.py` itself.
+- Critical path: T-050-95 → 96 → 97 → 100 → 105 = 5 steps.
+- Merge order inside a step: step 3 — T-050-97 first (the gate lands before the law describes it), then T-050-98, T-050-99, T-050-102, T-050-101; step 4 — T-050-100, T-050-103, T-050-104. After each merge every open sibling worktree rebases onto `feature/0.5.0`; a conflict outside union/replay files means this PLAN's `W:` sets were wrong and the PLAN is corrected before the next merge.
+- T-050-105 logs planned vs measured width per step, the critical path walked and every rebase conflict.
