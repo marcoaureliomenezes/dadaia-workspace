@@ -80,10 +80,18 @@ def commit(tree: Path, rel: str, text: str = "x = 1\n") -> str:
     return git(tree, "rev-parse", "HEAD").strip()
 
 
-def approve(root: Path, sha: str, *, verdict: str = "APPROVED", valid: bool = True) -> Path:
+def approve(root: Path, sha: str, *, verdict: str = "APPROVED") -> Path:
     """The reviewer's verdict as the main thread writes it: a handoff naming *sha*."""
     handoff = root / ".dadaia/handoff/c" / f"{sha[:8]}-{verdict}-dd-code-reviewer.handoff.json"
     handoff.parent.mkdir(parents=True, exist_ok=True)
     body = {"agent": "dd-code-reviewer", "verdict": verdict, "scope": f"wt/0.5.0a-impl@{sha}"}
-    handoff.write_text(json.dumps({**body, **({"schema_version": "1.1"} if valid else {})}))
+    handoff.write_text(json.dumps({**body, "schema_version": "1.2"}))
     return handoff
+
+
+def run_fix(root: Path, result: subprocess.CompletedProcess[str]) -> None:
+    """Run the refusal's one `fix:` line as an agent would, from the workspace root."""
+    (fix,) = fixes(result)
+    command = fix.removeprefix("fix: ").replace("python3 ", f"{sys.executable} ", 1)
+    env = {"HOME": str(root), "PATH": "/usr/bin:/bin", "GIT_CONFIG_NOSYSTEM": "1"}
+    subprocess.run(command, shell=True, cwd=root, env=env, check=True, capture_output=True)

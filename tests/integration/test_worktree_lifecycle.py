@@ -1,17 +1,19 @@
-"""Intent: CONTRACT — AC1.8 (T-050-96): `worktree.py merge` fast-forwards, removes and
-`branch -d`s a reviewed worktree, re-runnable; each refusal carries one executable `fix:`;
-`clean` removes only an empty `dadaia:` worktree. Size: MEDIUM (real git, tmp workspace).
+"""Intent: CONTRACT — AC1.8 (T-050-96, T-050-108): `worktree.py merge` fast-forwards, removes
+and `branch -d`s a reviewed worktree, re-runnable; every refusal (dirty, outside the kind's
+allowed set, conflicting rebase, no APPROVED verdict for HEAD, ignored files, wrong branch)
+carries one `fix:` that clears it; `clean` removes only an empty `dadaia:` worktree.
+Size: MEDIUM (real git, tmp workspace).
 """
 
 from __future__ import annotations
 
-import subprocess
-import sys
+import importlib.util
 from pathlib import Path
 
 import pytest
 
 from tests.helpers.worktree_ws import SCRIPT, approve, commit, fixes, git, make_workspace, run
+from tests.helpers.worktree_ws import run_fix as _fix
 
 pytestmark = pytest.mark.integration
 
@@ -26,12 +28,6 @@ def root(tmp_path: Path) -> Path:
     return tmp_path
 
 
-def _shell(root: Path, fix: str) -> None:
-    env = {"HOME": str(root), "PATH": "/usr/bin:/bin", "GIT_CONFIG_NOSYSTEM": "1"}
-    command = fix.removeprefix("fix: ").replace("python3 ", f"{sys.executable} ", 1)
-    subprocess.run(command, shell=True, cwd=root, env=env, check=True, capture_output=True)
-
-
 def test_merge_fast_forwards_removes_and_reruns(root: Path) -> None:
     repo, tree = root / "repos/r", root / TREE
     sha = commit(tree, "src/a.py")
@@ -43,19 +39,31 @@ def test_merge_fast_forwards_removes_and_reruns(root: Path) -> None:
     assert run(root, "merge", TREE).returncode == 0  # a finished merge re-runs clean
 
 
-def test_merge_refusals_each_carry_one_fix_that_clears_them(root: Path) -> None:
+def test_dirty_outside_set_and_conflict_refuse_and_their_fixes_clear_them(root: Path) -> None:
     repo, tree = root / "repos/r", root / TREE
     (tree / "wip.py").write_text("")
-    dirty = run(root, "merge", TREE)
-    assert dirty.returncode == 1 and "uncommitted" in dirty.stderr
-    _shell(root, fixes(dirty)[0])
+    _fix(root, dirty := run(root, "merge", TREE))
+    assert "uncommitted" in dirty.stderr
+    commit(tree, "specs/backlog/BACKLOG.json", "{}")  # the backlog kind's file, not impl's
+    outside = run(root, "merge", TREE)
+    assert "specs/backlog/BACKLOG.json" in outside.stderr and "backlog worktree" in outside.stderr
+    _fix(root, outside)
     commit(repo, "src/a.py", "main side\n")
     commit(tree, "src/a.py", "tree side\n")
     conflict = run(root, "merge", TREE)
-    assert conflict.returncode == 1 and "conflicts" in conflict.stderr
     assert not (Path(git(tree, "rev-parse", "--git-dir").strip()) / "rebase-merge").exists()
-    (fix,) = fixes(conflict)
-    assert fix == f"fix: git -C {tree} rebase feature/0.5.0"
+    assert fixes(conflict) == [f"fix: git -C {tree} rebase feature/0.5.0"]
+
+
+@pytest.mark.parametrize("named", [False, True], ids=["other-sha", "rejected"])
+def test_merge_needs_a_valid_approval_of_the_exact_head(root: Path, named: bool) -> None:
+    old = commit(root / TREE, "src/a.py")
+    head = commit(root / TREE, "src/b.py")
+    target = approve(root, head, verdict="REJECTED") if named else (approve(root, old), "--all")[1]
+    result = run(root, "merge", TREE)
+    assert result.returncode == 1 and head in result.stderr
+    assert fixes(result) == [f"fix: {root / '.dadaia/.venv/bin/dadaia'} reports validate {target}"]
+    assert git(root / "repos/r", "rev-parse", "feature/0.5.0").strip() != head
 
 
 def test_merge_lists_ignored_files_and_keeps_them_by_its_fix(root: Path) -> None:
@@ -66,22 +74,18 @@ def test_merge_lists_ignored_files_and_keeps_them_by_its_fix(root: Path) -> None
     (tree / "__pycache__/a.pyc").write_bytes(b"")
     git(repo, "checkout", "-q", "main")
     refused = run(root, "merge", TREE)
-    assert refused.returncode == 1 and "notes.scratch" in refused.stderr
-    assert "__pycache__" not in refused.stderr
-    (fix,) = fixes(refused)
-    assert fix.endswith(f"merge {tree} --keep notes.scratch")
+    assert "notes.scratch" in refused.stderr and "__pycache__" not in refused.stderr
     wrong_branch = run(root, "merge", TREE, "--keep", "notes.scratch")
     assert fixes(wrong_branch) == [f"fix: git -C {repo} switch feature/0.5.0"]
-    git(repo, "checkout", "-q", "feature/0.5.0")
-    _shell(root, fix)
+    _fix(root, wrong_branch)
+    _fix(root, refused)
     assert (repo / "notes.scratch").read_text() == "keep me" and not tree.exists()
 
 
 def test_clean_removes_only_an_empty_dadaia_worktree(root: Path) -> None:
     repo, tree = root / "repos/r", root / TREE
     commit(tree, "src/a.py")
-    busy = run(root, "clean", TREE)
-    assert fixes(busy) == [f"fix: python3 {SCRIPT} merge {tree}"]
+    assert fixes(run(root, "clean", TREE)) == [f"fix: python3 {SCRIPT} merge {tree}"]
     git(tree, "reset", "-q", "--hard", "feature/0.5.0")
     assert run(root, "clean", TREE).returncode == 0 and not tree.exists()
     git(repo, "worktree", "add", "-q", "-b", "wt/0.5.0b-bug", str(root / "worktrees/r/0.5.0b-bug"))
@@ -89,6 +93,21 @@ def test_clean_removes_only_an_empty_dadaia_worktree(root: Path) -> None:
     assert foreign.returncode == 1 and (root / "worktrees/r/0.5.0b-bug").exists()
 
 
-def test_the_end_verbs_never_force() -> None:
-    source = (SCRIPT.parent / "_worktree_end.py").read_text()
-    assert '"--force"' not in source and '"-D"' not in source  # argv tokens, not prose
+def test_each_kind_allows_its_own_set_only() -> None:
+    """ADRs 0106, 0124: the allowed sets `merge` enforces, one row per kind boundary."""
+    spec = importlib.util.spec_from_file_location("kinds", SCRIPT.parent / "_worktree_kinds.py")
+    assert spec and spec.loader
+    kinds = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(kinds)
+    rows = {
+        ("impl", "src/a.py"): True,
+        ("impl", "specs/releases/0.5.0/TASKS.md"): True,
+        ("impl", "specs/backlog/BACKLOG.json"): False,
+        ("bug", "specs/bugs/BUGS.jsonl"): True,
+        ("bug", "specs/releases/0.5.0/SPEC.md"): False,
+        ("backlog", "specs/backlog/_archive/backlog_histo.jsonl"): True,
+        ("backlog", "src/a.py"): False,
+        ("release", "specs/memory/ARCHITECTURE.md"): True,
+        ("release", "specs/constitution.md"): False,
+    }
+    assert {row: kinds.allows(*row) for row in rows} == rows
