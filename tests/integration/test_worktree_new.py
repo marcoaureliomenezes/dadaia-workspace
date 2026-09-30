@@ -5,62 +5,21 @@ git in a tmp workspace, never the live instance).
 from __future__ import annotations
 
 import json
-import os
-import subprocess
-import sys
 from pathlib import Path
 
 import pytest
 
+from tests.helpers.worktree_ws import fixes as _fixes
+from tests.helpers.worktree_ws import git as _git
+from tests.helpers.worktree_ws import make_workspace
+from tests.helpers.worktree_ws import run as _run
+
 pytestmark = pytest.mark.integration
-
-_SCRIPT = (
-    Path(__file__).resolve().parents[2]
-    / "dadaia_workspace/public/skills/dd-gitflow-default/scripts/worktree.py"
-)
-_TRIO = ("SPEC", "PLAN", "TASKS")
-
-
-def _git(repo: Path, *args: str) -> str:
-    env = {"HOME": str(repo), "PATH": os.environ["PATH"], "GIT_CONFIG_NOSYSTEM": "1"}
-    ident = ["-c", "user.name=t", "-c", "user.email=t@t", "-c", "init.defaultBranch=main"]
-    out = subprocess.run(
-        ["git", *ident, "-C", str(repo), *args], env=env, check=True, capture_output=True, text=True
-    )
-    return out.stdout
 
 
 @pytest.fixture
 def root(tmp_path: Path) -> Path:
-    (tmp_path / ".dadaia/states").mkdir(parents=True)
-    (tmp_path / ".dadaia/states/spec_contexts.json").write_text("{}")
-    repo = tmp_path / "repos/r"
-    repo.mkdir(parents=True)
-    _git(repo, "init", "-q")
-    rel = repo / "specs/releases/0.5.0"
-    rel.mkdir(parents=True)
-    for doc in _TRIO:
-        (rel / f"{doc}.md").write_text(f"# {doc}\n\n**Status:** Approved\n")
-    _git(repo, "add", "-A")
-    _git(repo, "commit", "-qm", "init")
-    _git(repo, "branch", "feature/0.5.0")
-    return tmp_path
-
-
-def _run(root: Path, *args: str) -> subprocess.CompletedProcess[str]:
-    env = {
-        "HOME": str(root),
-        "PATH": os.environ["PATH"],
-        "GIT_DIR": "/nonexistent",
-        "GIT_CONFIG_NOSYSTEM": "1",
-    }
-    return subprocess.run(
-        [sys.executable, str(_SCRIPT), *args], cwd=root, env=env, capture_output=True, text=True
-    )
-
-
-def _fixes(result: subprocess.CompletedProcess[str]) -> list[str]:
-    return [line for line in result.stderr.splitlines() if line.startswith("fix: ")]
+    return make_workspace(tmp_path)
 
 
 def test_new_branches_locks_and_marks_union_idempotently(root: Path) -> None:
@@ -84,7 +43,7 @@ def test_no_work_branch_refuses_with_a_fix_that_creates_it(root: Path) -> None:
     result = _run(root, "new", "r", "--kind", "bug")
     assert result.returncode == 1
     (fix,) = _fixes(result)
-    assert fix == f"fix: git -C {repo} branch feature/0.1.0 main"
+    assert fix == f"fix: git -C {repo} branch feature/0.1.0 dev"  # the flow's integration
 
 
 def test_impl_needs_an_approved_trio_on_the_work_branch(root: Path) -> None:

@@ -10,7 +10,7 @@ from pathlib import Path
 sys.path.append(str(Path(__file__).resolve().parents[2] / "dd-release-implementation" / "scripts"))
 
 from _release_schema import extract_status  # noqa: E402
-from _worktree_git import git, work_version
+from _worktree_git import flow_for, git, work_version  # noqa: E402
 from _worktree_git import ours as our_trees  # noqa: E402
 from _worktree_kinds import CAPS, LOCK, SCRIPT, UNION, Refusal  # noqa: E402
 
@@ -24,8 +24,9 @@ def _refuse_symlink(root: Path, repo_name: str) -> None:
 def new(root: Path, repo_name: str, kind: str) -> Path:
     repo = root / "repos" / repo_name
     _refuse_symlink(root, repo_name)
-    version = work_version(repo)
-    work = f"feature/{version}"
+    flow = flow_for(root, repo)
+    version = work_version(repo, flow)
+    work = f"{flow['work']}{version}"
     if kind == "impl":
         for doc in ("SPEC", "PLAN", "TASKS"):
             text = git(repo, "show", f"{work}:specs/releases/{version}/{doc}.md", check=False)
@@ -65,6 +66,7 @@ def new(root: Path, repo_name: str, kind: str) -> Path:
             attributes.parent.mkdir(parents=True, exist_ok=True)
             attributes.write_text("\n".join([*lines, UNION]) + "\n", encoding="utf-8")
     except (OSError, RuntimeError) as error:
+        # --force and -D only here: this call made the tree and branch, both hold nothing.
         git(repo, "worktree", "unlock", str(tree), check=False)
         git(repo, "worktree", "remove", "--force", str(tree), check=False)
         git(repo, "branch", "-D", branch, check=False)

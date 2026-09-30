@@ -93,6 +93,7 @@ _KEYS = {
     "current_branch",
     "stored_branch",
     "associated_repos",
+    "gitflow",
 }
 
 

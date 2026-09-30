@@ -126,6 +126,7 @@ def test_context_create_show_list_happy_lifecycle(workspace: Path) -> None:
             "repo_url": "https://x.test/alpha.git",
             "state": "dead",
             "stored_branch": None,
+            "gitflow": None,
         }
     ]
 

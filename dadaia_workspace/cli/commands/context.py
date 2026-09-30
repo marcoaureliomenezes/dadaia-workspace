@@ -65,9 +65,11 @@ def _ctx_service() -> SpecContextService:
 def _ctx_to_dict(svc: SpecContextService, ctx: SpecContextProject) -> dict[str, Any]:
     """The one record ``list`` and ``show`` render, JSON and table alike; every branch
     resolved live through ``repos_live_status`` (FR18/A18.3), the stored snapshot kept
-    as ``stored_branch`` (A18.1)."""
+    as ``stored_branch`` (A18.1); ``gitflow`` is the one reader's, off the main repo (ADR 0144)."""
     statuses = svc.repos_live_status(ctx)
     main_status, associated_statuses = statuses[0], statuses[1:]
+    main_path = resolve_workspace_root() / "repos" / ctx.repo_slug
+    flow = container.build_git_client().gitflow(main_path)[0] if main_status.on_disk else None
     return {
         "name": ctx.name,
         "state": ctx.state.value,
@@ -87,6 +89,13 @@ def _ctx_to_dict(svc: SpecContextService, ctx: SpecContextProject) -> dict[str, 
             }
             for status in associated_statuses
         ],
+        "gitflow": None
+        if flow is None
+        else {
+            "principal": flow.principal,
+            "integration": flow.integration,
+            "work": flow.work_prefix,
+        },
     }
 
 
