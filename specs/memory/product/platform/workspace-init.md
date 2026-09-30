@@ -38,12 +38,12 @@ sources:
 
 ## Upgrade
 
-- Re-running `init` on an existing workspace is the upgrade; the venv's installed version is compared with the running distribution by one decider.
-- An older venv is reinstalled from the running distribution and reconciled, printing `upgraded A -> B`; a failed reconcile exits 1 with `fix: <cli> reconcile --expect-version B`.
+- Re-running `init` on an existing workspace is the upgrade; the venv's installed build — its version plus a digest of the package payload — is compared with the running distribution's by one decider.
+- An older venv, or another build of the same version, is reinstalled from the running distribution by one `pip install --force-reinstall` (a failed install keeps the old build) and reconciled, printing `upgraded A -> B`; a failed reconcile exits 1 with `fix: <cli> reconcile --expect-version B`.
 - Every init also refreshes the pre-push hook of every ALIVE repo whose installed hook is byte-identical to one the library shipped; an operator's own hook is kept ([[context-management]]).
-- An equal venv prints `already at A` and writes no file under the workspace.
-- A newer venv is refused before any write, exit 1, `fix: <cli> init <ws>` — the workspace's own newer CLI.
-- Versions order as `M.m.p` with an optional local segment sorting after its base.
+- The same build prints `already at A` and writes no file under the workspace.
+- A newer venv is refused before any write, exit 1, `fix: <cli> init <ws> --harness <h>` — the workspace's own newer CLI.
+- Versions order by PEP 440 (`packaging.version`), so a pre-release sorts above the release before it.
 - The upgrade never writes a project repo; `<cli> specs init --context <ctx>`, re-run per project, then refreshes that project's specs law ([[specs-migration]]).
 
 ## First project

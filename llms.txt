@@ -10,22 +10,22 @@
 
 ## Install
 
-<!-- derived-from: pypi-distribution sha256:618098346ed6 -->
-<!-- derived-from: workspace-init sha256:acb8bc28e783 -->
+<!-- derived-from: pypi-distribution sha256:9078512b58f9 -->
+<!-- derived-from: workspace-init sha256:56685f3d0950 -->
 
 - [PyPI project](https://pypi.org/project/dadaia-workspace/): three levels — `uvx dadaia-workspace init <dir> --harness <name> --repo <url>` (workspace + project: cloned and ALIVE; only `.dadaia/.venv/bin/dadaia context bind <slug>` binds a session), then `.dadaia/.venv/bin/dadaia specs init --context <slug>` (specs on the canon) and `.dadaia/.venv/bin/dadaia doctor`; every later command runs through `.dadaia/.venv/bin/dadaia`; re-running the `uvx` init line upgrades the workspace, then `.dadaia/.venv/bin/dadaia specs init --context <ctx>` refreshes each project's specs law.
 - [Changelog](CHANGELOG.md): written by release-please, one section per released version.
 
 ## The law
 
-<!-- derived-from: agentic-entities sha256:05fb159f5b4f -->
+<!-- derived-from: agentic-entities sha256:31b7a580085f -->
 <!-- derived-from: sdd-gate-v3 sha256:f23d17bf7053 -->
 
 - [AGENTS.md](dadaia_workspace/public/data/AGENTS.md): the always-on root map — flow, roles, gate invariants, where things live, the index of every scoped `AGENTS.md` and skill; projected once to the workspace root.
 
 ## Reference
 
-<!-- derived-from: pypi-distribution sha256:618098346ed6 -->
+<!-- derived-from: pypi-distribution sha256:9078512b58f9 -->
 
 - [CLI reference](docs/cli.md): the committed output of `.dadaia/.venv/bin/dadaia help tree`.
 - [Concepts](docs/concepts.md): the vocabulary — context, release, candidate, gate, memory, ledgers, audits.
@@ -36,7 +36,7 @@
 
 ## The docs
 
-<!-- derived-from: pypi-distribution sha256:618098346ed6 -->
+<!-- derived-from: pypi-distribution sha256:9078512b58f9 -->
 <!-- derived-from: product-vision sha256:cfd469d90787 -->
 
 - [Documentation](https://github.com/marcoaureliomenezes/dadaia-workspace/tree/main/docs): the repository's `docs/` folder on `main`, every page derived under its markers.

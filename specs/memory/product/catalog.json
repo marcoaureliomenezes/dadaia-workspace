@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-09-29T16:34:50Z",
+  "generated_at": "2026-09-30T02:57:02Z",
   "features": [
     {
       "rank": 1,
@@ -70,7 +70,7 @@
         "derivation",
         "governance"
       ],
-      "token_estimate": 938,
+      "token_estimate": 1006,
       "depends_on": [
         "agent-orchestration",
         "sdd-gate-v3",
@@ -100,7 +100,7 @@
         "projection",
         "privacy"
       ],
-      "token_estimate": 990,
+      "token_estimate": 1006,
       "depends_on": [
         "harness-kimi-code",
         "agentic-entities",
@@ -144,7 +144,7 @@
         "release",
         "packaging"
       ],
-      "token_estimate": 761,
+      "token_estimate": 767,
       "depends_on": [
         "release-lifecycle",
         "public-asset-distribution",
@@ -232,7 +232,7 @@
         "projection",
         "hooks"
       ],
-      "token_estimate": 204,
+      "token_estimate": 212,
       "depends_on": [
         "agentic-entities",
         "sdd-gate-v3",
@@ -250,8 +250,8 @@
       "slug": "harness-cursor",
       "title": "harness-cursor",
       "area": "harness",
-      "tldr": "Entry harness on Cursor — native root AGENTS.md and .agents/skills; .cursor/ carries hooks.json (gate on shell, reaper at session start) and persona symlinks.",
-      "summary": "Cursor reads the universal surface natively; its projection is the dd- personas as relative symlinks under .cursor/agents/ and one hooks.json whose wrappers answer in Cursor's permission JSON; IDE file edits are not gated.",
+      "tldr": "Entry harness on Cursor — native root AGENTS.md and .agents/skills; .cursor/ carries hooks.json (gate on every tool, reaper at start) and persona symlinks.",
+      "summary": "Cursor reads the universal surface natively; its projection is the dd- personas as relative symlinks under .cursor/agents/ and one hooks.json whose gate wrapper answers a deny in Cursor's permission JSON.",
       "path": "specs/memory/product/harness/harness-cursor.md",
       "tags": [
         "harness",
@@ -259,7 +259,7 @@
         "projection",
         "hooks"
       ],
-      "token_estimate": 188,
+      "token_estimate": 173,
       "depends_on": [
         "agentic-entities",
         "sdd-gate-v3",
@@ -277,7 +277,7 @@
       "slug": "harness-devin",
       "title": "harness-devin",
       "area": "harness",
-      "tldr": "Entry harness on the Devin CLI — native AGENTS.md, .agents/skills and .agents/agents; its one projected file, .devin/hooks.v1.json, registers gate and reaper.",
+      "tldr": "Entry harness on the Devin CLI — native AGENTS.md, .agents/skills and .agents/agents; its one file, .devin/hooks.v1.json, wires gate, injection and reaper.",
       "summary": "Devin reads the universal surface including the personas natively, so its projection is only .devin/hooks.v1.json, which reads the gate's Claude-compatible envelope without translation.",
       "path": "specs/memory/product/harness/harness-devin.md",
       "tags": [
@@ -286,7 +286,7 @@
         "projection",
         "hooks"
       ],
-      "token_estimate": 151,
+      "token_estimate": 173,
       "depends_on": [
         "agentic-entities",
         "sdd-gate-v3",
@@ -591,8 +591,8 @@
       "slug": "specs-migration",
       "title": "specs-migration",
       "area": "platform",
-      "tldr": "specs init brings specs/ to the canon and writes the project gitflow, never committing; specs upgrade walks 6 to 7; migrate lifts registry v1.",
-      "summary": "The verbs that bring persisted state up to what this installation reads — dadaia specs init (onboarding level 3a; absent scaffolds, dadaia upgrades, foreign moves to specs-bkp/, the constitution's gitflow block written or kept), dadaia specs upgrade (one live hop, 6 to 7, plus fixed law sections and lossless template repairs; below 6 it refuses without writing) and dadaia migrate (spec_contexts.json v1 to v2, planned, confirmed, atomic).",
+      "tldr": "specs init brings specs/ to the canon and writes the project gitflow, never committing; specs upgrade re-stamps 6 or 7 to 8; migrate lifts registry v1.",
+      "summary": "The verbs that bring persisted state up to what this installation reads — dadaia specs init (onboarding level 3a; absent scaffolds, dadaia upgrades, foreign moves to specs-bkp/, the constitution's gitflow block written or kept), dadaia specs upgrade (a tree stamped 6 or above folds TECHSTACK.md, runs the doctor's repair set and is re-stamped 8; below 6 it refuses without writing) and dadaia migrate (spec_contexts.json v1 to v2, planned, confirmed, atomic).",
       "path": "specs/memory/product/platform/specs-migration.md",
       "tags": [
         "migration",
@@ -601,7 +601,7 @@
         "registry",
         "onboarding"
       ],
-      "token_estimate": 1135,
+      "token_estimate": 1150,
       "depends_on": [
         "public-asset-distribution",
         "sdd-gate-v3",
@@ -675,7 +675,7 @@
         "upgrade",
         "onboarding"
       ],
-      "token_estimate": 1585,
+      "token_estimate": 1631,
       "depends_on": [
         "context-management",
         "specs-migration",
@@ -712,7 +712,7 @@
         "decisions",
         "governance"
       ],
-      "token_estimate": 913,
+      "token_estimate": 952,
       "depends_on": [
         "agent-orchestration",
         "sdd-gate-v3",

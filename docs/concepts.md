@@ -43,7 +43,7 @@ moves only at an operator-approved deploy.
 
 <!-- derived-from: release-lifecycle sha256:57d8b542e879 -->
 <!-- derived-from: bug-ledger sha256:9392c1f406a4 -->
-<!-- derived-from: audits-canon sha256:55ce6e25db49 -->
+<!-- derived-from: audits-canon sha256:ed8125c42aac -->
 
 Every demand takes one of two arms. **Arm A**, a feature, leaves through a candidate:
 the picked backlog and bug set, the as-is review (one As-is verdict — DELETE, REBUILD,
@@ -79,13 +79,14 @@ gate — a refusal whose fix is itself refused (a Stall) cannot ship.
 ## Memory
 
 <!-- derived-from: context-management sha256:1871a6d846b2 -->
-<!-- derived-from: workspace-doctor sha256:54de9b41c884 -->
+<!-- derived-from: workspace-doctor sha256:772d9d7a78d3 -->
 <!-- derived-from: release-lifecycle sha256:57d8b542e879 -->
-<!-- derived-from: audits-canon sha256:55ce6e25db49 -->
+<!-- derived-from: audits-canon sha256:ed8125c42aac -->
 
 *Memory* is current product truth: the atoms under `specs/memory/product/**`, plus
 `ARCHITECTURE.md` (its `## Tech Stack` section included) and `QUALITY.md`, whose
-canonical statements change only in the commit carrying an accepted decision. A bound
+canonical statements change only in the commit carrying an accepted decision; a
+non-principle section may take a truth-only correction whose commit names its code evidence. A bound
 session receives its onboarding next step while one remains, the Tech Stack section and
 the catalog digest (`slug`, `title`, `tldr`, `path` per atom). At each candidate's closure, `memory.py drift` lists the
 atoms whose sources changed, each is reconciled — delete, update, then add — and
@@ -113,7 +114,7 @@ superseded deferred rejected`.
 
 ## Audits
 
-<!-- derived-from: audits-canon sha256:55ce6e25db49 -->
+<!-- derived-from: audits-canon sha256:ed8125c42aac -->
 
 An *audit* is the only full-tree inspection lane, every other quality boundary being
 diff-scoped: a committed folder `specs/audits/<YYYYMMDD>-<slug>/` holding `AUDIT.md` —

@@ -33,7 +33,7 @@ sources:
 
 - `specs/ADRs/decisions.jsonl` (`decision-record-v1`) is the decision ledger: one line per decision, fields `id ts title status context decision consequences measured_by supersedes amends`, `status` one of `proposed accepted rejected superseded`; it has no writer script — agents append with file tools.
 - Any agent appends a `proposed` record; only the operator flips it to `accepted`, and an `accepted` record carries a non-empty `measured_by`, free text naming the check.
-- A canonical memory statement in `ARCHITECTURE.md` or `QUALITY.md` changes only in the commit carrying its accepted decision; a reversal is a new record naming the old one in `supersedes` or `amends`, the superseded line staying in place.
+- A canonical memory statement in `ARCHITECTURE.md` or `QUALITY.md` changes only in the commit carrying its accepted decision, except a correction of a non-principle section (Tech Stack, Structure, Gates, the fixed blocks) that only states what the code already is, whose commit names its code evidence instead; a reversal is a new record naming the old one in `supersedes` or `amends`, the superseded line staying in place.
 - `dadaia doctor` runs `LEDGER-ADR-SCHEMA` over every committed line and the `0001..N` numbering, and `ADR-SUPERSEDED-CITATION` over memory atoms, skills, data and scaffold that cite a superseded decision ([[workspace-doctor]]).
 
 ## Runtime state

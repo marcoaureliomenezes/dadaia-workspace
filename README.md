@@ -44,10 +44,10 @@ memory atom under its content hash.
 
 ## A human installs and uses it
 
-<!-- derived-from: pypi-distribution sha256:618098346ed6 -->
-<!-- derived-from: workspace-init sha256:acb8bc28e783 -->
+<!-- derived-from: pypi-distribution sha256:9078512b58f9 -->
+<!-- derived-from: workspace-init sha256:56685f3d0950 -->
 <!-- derived-from: context-management sha256:1871a6d846b2 -->
-<!-- derived-from: workspace-doctor sha256:54de9b41c884 -->
+<!-- derived-from: workspace-doctor sha256:772d9d7a78d3 -->
 
 ```bash
 uvx dadaia-workspace init demo --harness claude --repo <clone url>   # level 1 + 2
@@ -93,16 +93,16 @@ and deletes only what a TTL expired.
 
 ## An agent reads AGENTS.md and uses it
 
-<!-- derived-from: agentic-entities sha256:05fb159f5b4f -->
+<!-- derived-from: agentic-entities sha256:31b7a580085f -->
 <!-- derived-from: sdd-gate-v3 sha256:f23d17bf7053 -->
 <!-- derived-from: release-lifecycle sha256:57d8b542e879 -->
 <!-- derived-from: bug-ledger sha256:9392c1f406a4 -->
 <!-- derived-from: harness-claude-code sha256:24a59f223f83 -->
 <!-- derived-from: harness-codex sha256:9218e747c24f -->
 <!-- derived-from: harness-kimi-code sha256:127cdd81f783 -->
-<!-- derived-from: harness-cursor sha256:1cae6128564d -->
-<!-- derived-from: harness-devin sha256:ab4a32c4a53d -->
-<!-- derived-from: harness-copilot sha256:b93cef868a6f -->
+<!-- derived-from: harness-cursor sha256:3af055af8407 -->
+<!-- derived-from: harness-devin sha256:a35113e51a30 -->
+<!-- derived-from: harness-copilot sha256:3464b2393377 -->
 <!-- derived-from: agent-comms sha256:9125b23de81e -->
 
 The always-on law is the root `AGENTS.md` map; every governed area carries its own
@@ -135,8 +135,8 @@ with a RED test. Completed work leaves as a `handoff-v1` record, validated by
 
 ## Documentation
 
-<!-- derived-from: pypi-distribution sha256:618098346ed6 -->
-<!-- derived-from: public-asset-distribution sha256:bac7c2fc8d67 -->
+<!-- derived-from: pypi-distribution sha256:9078512b58f9 -->
+<!-- derived-from: public-asset-distribution sha256:5697e0625edf -->
 
 The documentation is the repository's [docs folder](https://github.com/marcoaureliomenezes/dadaia-workspace/tree/main/docs):
 
@@ -151,7 +151,7 @@ The documentation is the repository's [docs folder](https://github.com/marcoaure
 
 ## Links
 
-<!-- derived-from: pypi-distribution sha256:618098346ed6 -->
+<!-- derived-from: pypi-distribution sha256:9078512b58f9 -->
 
 - GitHub — <https://github.com/marcoaureliomenezes/dadaia-workspace>
 - PyPI — <https://pypi.org/project/dadaia-workspace/>

@@ -32,6 +32,7 @@ The one enumeration; every harness atom links here.
 
 - The first three ride ONE merged entrypoint, `dadaia_workspace.hooks.pre_gate`; with the session-start reaper they are the four hook behaviours every harness receives, and every BLOCK carries one `fix:` line.
 - A harness differs only in serialization — the event names, the hook file and the answer shape its wrapper translates to; no harness adds a behaviour ([[sdd-gate-v3]]).
+- Every projected hook entry carries a `timeout`: 10 s for the tool lanes (pre-gate, post-gate), 30 s for the session lanes (ctx-inject, reaper); every harness lets the action through when it fires, so a pre-gate slower than 10 s is a declared fail-open window and itself a Stall-class bug.
 
 ## The universal surface
 
