@@ -10,7 +10,7 @@ tags: [architecture, layers, dependency-rules, tech-stack, sdd]
 
 ### P-01 · We keep the dependency ring: core imports nothing internal, infrastructure imports only core, no layer imports upward; a feature imports the concrete infrastructure class it alone consumes.
 Measured by: `lint-imports --config setup.cfg --no-cache` — contracts `core-no-upper-layers` and `infrastructure-no-upper-layers` (zero ignored imports).
-ADR: 0152 (accepted) — record 0001 is rejected, 0152 (3); this principle is listed for the operator at the 0.5.0 publish gate, 0152 (4)
+ADR: 0001 (accepted)
 Rationale: the ledger shows zero adapter substitutions ever fixed a bug; the port requirement only grew the container funnel.
 
 ### P-02 · We never spawn a subprocess from a feature; process execution goes through the one infrastructure adapter, `infrastructure/subprocess_runner.py`.
@@ -40,7 +40,7 @@ Rationale: a hand-kept `modules =` list hid three real sibling edges from the ch
 
 ### P-09 · We resolve the whole Invocation — workspace root, session, context, specs dir, the session's Bind — once per process in `core.invocation.resolve`, imported directly only by `cli._specs_resolution`, `container` and `hooks`.
 Measured by: `lint-imports --config setup.cfg --no-cache` — contract `bind-resolution-seam-is-a-single-home` (zero ignored imports, none ever accepted); `pytest tests/unit/core/test_invocation.py`.
-ADR: 0152 (accepted) — record 0003 is rejected, 0152 (3); this principle is listed for the operator at the 0.5.0 publish gate, 0152 (4)
+ADR: 0003 (accepted)
 Rationale: every context bug came from a second resolution path answering differently.
 
 ### P-10 · We cap every suppressed layering edge and ratchet the cap only downward; an edge is added with its reason and the cap moved in the same commit.
@@ -65,12 +65,12 @@ Rationale: a diagram nobody checks is the first artifact to lie.
 
 ### P-14 · We keep the release-state reader pure: `core/release_state.py` parses and serializes already-read text and performs no file I/O.
 Measured by: `pytest tests/contract/test_release_state_read_only.py`.
-ADR: 0152 (accepted) — record 0004 is rejected, 0152 (3); this principle is listed for the operator at the 0.5.0 publish gate, 0152 (4)
+ADR: 0004 (accepted)
 Rationale: a reader that can write is a reader that can rewrite history.
 
 ### P-15 · We close the release-state envelope: `release-state-v1` carries `additionalProperties: false` at every level, a closed log-entry shape, and no harness `session_id`.
 Measured by: `pytest tests/contract/test_release_state_schema.py`.
-ADR: 0152 (accepted) — record 0004 is rejected, 0152 (3); this principle is listed for the operator at the 0.5.0 publish gate, 0152 (4)
+ADR: 0004 (accepted)
 Rationale: an open envelope accumulates fields until no consumer can fold it.
 
 ### P-17 · We map every core skill and every scoped `AGENTS.md` source to exactly one `DADAIA.md` section, every section to at least one owner, with content hashes re-recorded only by review.
