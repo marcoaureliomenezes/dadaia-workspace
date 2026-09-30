@@ -19,6 +19,7 @@ from pathlib import Path
 
 import pytest
 
+from dadaia_workspace.infrastructure.projection_rules import _DADAIA_FAMILY_AGENTS_MD
 from dadaia_workspace.infrastructure.public_assets import render_registry_tables
 from tests.helpers.scan_population import assert_populated
 
@@ -55,11 +56,9 @@ SCOPED_SOURCE_BY_INSTALLED_PATH: dict[str, Path] = {
     "specs/audits/AGENTS.md": _PUBLIC / "scaffold" / "audits" / "AGENTS.md",
     "specs/memory/AGENTS.md": _PUBLIC / "scaffold" / "memory" / "AGENTS.md",
     "specs/ADRs/AGENTS.md": _PUBLIC / "scaffold" / "ADRs" / "AGENTS.md",
-    ".dadaia/AGENTS.md": _PUBLIC / "data" / "dadaia-AGENTS.md",
-    ".dadaia/handoff/AGENTS.md": _PUBLIC / "data" / "handoff-AGENTS.md",
-    ".dadaia/tmp/AGENTS.md": _PUBLIC / "data" / "tmp-AGENTS.md",
-    ".dadaia/states/AGENTS.md": _PUBLIC / "data" / "states-AGENTS.md",
-    "worktrees/AGENTS.md": _PUBLIC / "data" / "worktrees-AGENTS.md",
+    # the runtime-zone family is read from its projection rows: a shipped source with no row
+    # is an orphan below
+    **{dst: _PUBLIC / "data" / src for src, dst, _ in _DADAIA_FAMILY_AGENTS_MD},
     "repos/<slug>/AGENTS.md": _PUBLIC / "templates" / "repo-AGENTS.md",
     "tests/AGENTS.md": _PUBLIC / "templates" / "tests-AGENTS.md",
 }

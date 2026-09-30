@@ -49,10 +49,10 @@ path or entity as it appears in an installed workspace.
 | `specs/ADRs/AGENTS.md` | the decision record | `decisions.jsonl` shape, acceptance | 4096 | 3386 |
 | `specs/audits/AGENTS.md` | the periodic three-pillar review | audit procedure, findings, closure | 4096 | 1813 |
 | `.dadaia/AGENTS.md` | the runtime tree: zones, doctor, reprojection, context | zone registry rules, chokepoints | 4096 | 4094 |
-| `.dadaia/handoff/AGENTS.md` | the handoff lane | emission, schema, ack-on-consume | 4096 | 1635 |
+| `.dadaia/handoff/AGENTS.md` | the handoff lane | emission, schema, ack-on-consume | 4096 | 1778 |
 | `.dadaia/tmp/AGENTS.md` | the TTL scratch lane | what may be written there and for how long | 4096 | 1240 |
 | `.dadaia/states/AGENTS.md` | CLI-owned state files | who writes them and by which verb | 4096 | 1397 |
-| `worktrees/AGENTS.md` | the canonical worktrees | kinds, the merge ritual, one venv, hygiene | 4096 | 3102 |
+| `worktrees/AGENTS.md` | the canonical worktrees | kinds, the merge ritual, one venv, hygiene | 4096 | 3012 |
 | `repos/<slug>/AGENTS.md` | a repo working tree | clean-tree rule, cache redirection | 4096 | 3331 |
 | `tests/AGENTS.md` | a repo's test tree | admission, intent, size tiers | 4096 | 2694 |
 
