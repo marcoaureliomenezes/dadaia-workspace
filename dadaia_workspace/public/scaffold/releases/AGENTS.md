@@ -27,8 +27,9 @@ Scope: this file governs only `specs/releases/`.
 ## 3. Tasks — the auditable trace
 
 - Read SPEC, PLAN and TASKS before implementing; all three must carry `**Status:** Approved`.
-- Reserve before writing: flip `[ ] -> [-]`; one `[-]` at a time unless TASKS declares disjoint write sets.
-- Complete the work inside the task's declared write set; a completed task group is one commit.
+- Reserve before writing: flip `[ ] -> [-]`.
+- One `impl` worktree per task, opened once every `blocked by:` task is merged; the schedule: `dd-release-definition` §5.
+- The `W:` is exact: every file the task touches. A test pinning behaviour the task removes is rewritten or deleted in the same task, its `W:` widened in the feat commit, the body naming each file and why.
 - Flip `[-] -> [x]` and commit as `conventional-commit(task-id): description`.
 - `phase` and the `defined`/`implemented` milestones move only by `RELEASE_PY phase`; `shipped` only by `RELEASE_PY ship`.
 

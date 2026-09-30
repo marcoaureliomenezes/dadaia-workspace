@@ -39,12 +39,12 @@ input_contract:
   produces_outputs:
     - name: spec_report
       kind: report
-      path: repos/{context}/reports/dd-product-engineer/{ts}-spec.html
+      path: .dadaia/reports/{context}/{ts}-dd-product-engineer-spec.html
       schema_ref: handoff-schema-v1
   stop_if_missing: true
 paths:
   write_allowlist:
-    - repos/<ctx>/reports/dd-product-engineer/**
+    - .dadaia/reports/<ctx>/**
     - .dadaia/handoff/<ctx>/**
     - specs/backlog/**
     - specs/releases/**/SPEC.md
@@ -95,7 +95,7 @@ Reviews and every lens -> dd-code-reviewer.
 
 ## 4. Outputs
 
-- Reports: handoff-first (the root `AGENTS.md` map §4); an HTML report lands in `repos/<ctx>/reports/dd-product-engineer/` only on request.
+- Reports: handoff-first (the root `AGENTS.md` map §4); an HTML report lands in `.dadaia/reports/<ctx>/` only on request.
 
 ## 5. References
 

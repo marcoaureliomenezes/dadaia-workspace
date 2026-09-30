@@ -74,7 +74,7 @@ Every implementation report must include:
 - changed production paths
 - known risk or `none`
 
-Write reports under this repo's `reports/<agent>/`.
+Reports never live in this tree: the root `AGENTS.md` map §4.
 
 ## 8. Stop conditions
 

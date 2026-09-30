@@ -41,7 +41,7 @@ The branch contract by role; the names are `specs/constitution.md`'s `gitflow:` 
 | principal | No — never a direct push | — | PR from the integration branch, at the final `rc` |
 
 - No `v` prefix, no suffix, no other branch we cut; `hotfix/*` is retired (operator request only, no cadence).
-- Exactly one live work branch, named for the live release; bugs fix on it in any phase, no ceremony.
+- Exactly one live work branch, named for the live release; a bug fix reaches it in any phase through a `bug` worktree (`worktrees/AGENTS.md` §2).
 - Each candidate closure burns one work -> integration merge; after it, ask the operator: promote or continue.
 - Every flow stage runs on the work branch; the other two are PR targets only, never a working branch.
 
@@ -49,12 +49,16 @@ The branch contract by role; the names are `specs/constitution.md`'s `gitflow:` 
 
 | # | Write | Staged set | Message |
 |---|---|---|---|
-| 1 | Bug registration | `specs/bugs/BUGS.jsonl` alone | `chore(bugs): report <id>` |
-| 2 | Backlog / ADR | `BACKLOG.json` alone, or `ADRs/decisions.jsonl` alone | `chore(backlog): …` / `chore(adrs): …` |
-| 3 | Bug fix | code + regression test + the `BUGS.jsonl` line, together | `fix(bugs): <id> — <cause>` |
-| 4 | Resolve record | commits only; a push happens when asked, the repo's own CI checks first | — |
-| 5 | Release definition | SPEC + PLAN + TASKS + picked bugs, one commit | `feat(specs): define candidate …` |
-| 6 | Task implementation | the task's declared write set | `conventional-commit(task-id): description` — the auditable trace |
+Each row lands in the worktree kind whose allowed set holds it (`worktrees/AGENTS.md`).
+
+| # | Kind | Write | Staged set | Message |
+|---|---|---|---|---|
+| 1 | `bug` | Bug registration | `specs/bugs/BUGS.jsonl` alone | `chore(bugs): report <id>` |
+| 2 | `backlog`, `release` | Backlog / ADR | `BACKLOG.json` alone, or `ADRs/decisions.jsonl` alone | `chore(backlog): …` / `chore(adrs): …` |
+| 3 | `bug` | Bug fix | code + regression test + the `BUGS.jsonl` line, red loop quoted in the body | `fix(bugs): <id> — <cause>` |
+| 4 | `bug` | Resolve of a bug a task fixed | `specs/bugs/BUGS.jsonl` alone | `chore(bugs): resolve <id>[, <id>] — by <task-id> (<sha>)` |
+| 5 | `release` | Release definition | SPEC + PLAN + TASKS + picked bugs, one commit | `feat(specs): define candidate …` |
+| 6 | `impl` | Task implementation | the task's `W:` plus its TASKS marker | `conventional-commit(task-id): description` — the auditable trace |
 
 ## 3b. The PR gate
 
@@ -70,6 +74,7 @@ The branch contract by role; the names are `specs/constitution.md`'s `gitflow:` 
 
 ## 5. References
 
+- `scripts/worktree.py` — opens, lists, merges and cleans worktrees; the rules: `worktrees/AGENTS.md`.
 - [`CICD-AUTOMATION.md`](CICD-AUTOMATION.md) — CI/CD checks to suggest a consumer operator.
 - Mechanical enforcement (pre-push hook / CI): branch-name pattern, push refusal,
   denylist scan, `pr-source-guard`. Everything else in this skill is discipline, upheld by agents and

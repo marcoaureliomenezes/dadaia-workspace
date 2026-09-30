@@ -10,7 +10,7 @@ Root workspace behavior is in the workspace `AGENTS.md`; production-source behav
 
 <!-- specs-canon -->
 
-- Path classes: the append-only ledger areas and each area's `_archive/*_histo.jsonl` are ADDITIVE, always writable; everything else here is MUTATING, `memory/` included.
+- Every path here is MUTATING, `memory/` included; how a write lands: the root `AGENTS.md` map §3.
 
 ## 2. Load order
 
@@ -29,7 +29,7 @@ Root workspace behavior is in the workspace `AGENTS.md`; production-source behav
 |---|---|
 | `constitution.md` | operator, or `dd-product-engineer` under approved governance work |
 | `releases/<id>/_RELEASE.json` | `python3 .agents/skills/dd-release-implementation/scripts/release.py new\|phase`; `log` entries by the narrating agent |
-| `releases/<id>/{SPEC,PLAN,TASKS}.md` | `dd-product-engineer` (SPEC), `dd-software-engineer` (PLAN, TASKS); implementers change only their own task marker |
+| `releases/<id>/rc-<N>/{SPEC,PLAN,TASKS}.md` (never rewritten after its closure; archived whole at promote) | `dd-product-engineer` (SPEC), `dd-software-engineer` (PLAN, TASKS); implementers change only their own task marker |
 | `memory/**` | `dd-product-engineer`, in `DEFINITION` and `CLOSURE` phase |
 | `backlog/**` | `dd-product-engineer`; entries exit by `python3 .agents/skills/dd-backlog-definition/scripts/backlog.py exit` |
 | `bugs/**` | any agent, after the operator confirms the proposal; verbs only |

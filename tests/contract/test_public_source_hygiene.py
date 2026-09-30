@@ -90,7 +90,7 @@ def _denied_lines(globs: tuple[str, ...], pattern: str, spare: str | None) -> li
     ("globs", "pattern", "spare"),
     [
         # 0.4.6 c4 AC13 (FR16, D2/D3/D9): retired surfaces staged verbatim must not be taught
-        pytest.param(_ALL, r"\.dadaia/reports|academy|dadaia clean|tmp gc|reports cleanup|ROOT-4|legacy-quarantine|repos catalog", None, id="retired-surface"),
+        pytest.param(_ALL, r"academy|dadaia clean|tmp gc|reports cleanup|ROOT-4|legacy-quarantine|repos catalog", None, id="retired-surface"),
         # 0.4.7 FR4/AC4.1 (T-047-58): the published surface is 100% English
         pytest.param(("public/**/*.md", "public/**/*.json", "public/**/*.py", "public/**/*.txt", "public/**/*.j2"), rf"(?i){_PT_TERMS}", None, id="portuguese-control-vocabulary"),
         # 0.4.7 FR1/FR7: a retired bug-record key named as a live field (its retirement line is spared)

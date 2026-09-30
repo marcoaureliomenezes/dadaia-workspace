@@ -33,6 +33,7 @@ _AUTH_HEADER = "| question | authority | consults | deleted |\n|---|---|---|---|
 _AUTHORITIES = (
     "\n### 1.1 Authorities\n\n" + _AUTH_HEADER + "| who writes x | `core/x.run` | cli | `y` |\n"
 )
+_SKELETONS = (r"## 1\. As-is review", r"## 5\. Parallel schedule")
 _GOOD = (
     "## 1. As-is review\n\n" + _HEADER + _ROW.format(verdict="UPDATE") + _AUTHORITIES
     + "\n## 2. Strategy\n"
@@ -69,9 +70,11 @@ def _phase(script: Path, specs: Path) -> subprocess.CompletedProcess[str]:
     return subprocess.run([*argv, "--specs", str(specs)], capture_output=True, text=True)
 
 
-def _admits(script: Path, tmp_path: Path, plan: str, *, authorities: bool = True) -> None:
+def _admits(
+    script: Path, tmp_path: Path, plan: str, *, authorities: bool = True, schedule: str = SCHEDULE
+) -> None:
     """*authorities*: append a valid §1.1 table to a PLAN whose case is the As-is table."""
-    specs = _specs(tmp_path, plan + (_AUTHORITIES if authorities else "") + SCHEDULE)
+    specs = _specs(tmp_path, plan + (_AUTHORITIES if authorities else "") + schedule)
     result = _phase(script, specs)
     assert result.returncode == 0, result.stderr
     state = json.loads((specs / "releases/0.5.0/_RELEASE.json").read_text("utf-8"))
@@ -135,11 +138,13 @@ def test_an_unapproved_trio_refuses_before_the_table(script: Path, tmp_path: Pat
 
 
 def test_the_taught_skeleton_passes_the_check(script: Path, tmp_path: Path) -> None:
-    """The skeleton `dd-release-definition` shows is the PLAN shape the gate admits."""
+    """Both skeletons `dd-release-definition` shows (§1 As-is, §5 schedule) are the PLAN
+    shape the gate admits."""
     skill = _SKILL.read_text("utf-8")
-    fence = re.search(r"```markdown\n(## 1\. As-is review\n.*?)```", skill, re.DOTALL)
-    assert fence, "dd-release-definition lost its PLAN §1 skeleton"
-    _admits(script, tmp_path, fence.group(1), authorities=False)
+    fences = [re.search(rf"```markdown\n({h}\n.*?)```", skill, re.DOTALL) for h in _SKELETONS]
+    assert all(fences), "dd-release-definition lost a PLAN skeleton"
+    as_is, schedule = (f.group(1) for f in fences if f)
+    _admits(script, tmp_path, as_is, authorities=False, schedule="\n" + schedule)
 
 
 def test_new_writes_a_spec_stub_carrying_replaces(script: Path, tmp_path: Path) -> None:

@@ -141,10 +141,11 @@ DADAIA_ZONES: tuple[Zone, ...] = (
     Zone("states", ZoneClass.STATE, Creator.INIT, None, STATES_CANON, "workspace database"),
     Zone("sessions", ZoneClass.PROTECTED, Creator.RUNTIME, None, frozenset({"*.json"}), "session records; reaper = core.session_store"),
     Zone("handoff", ZoneClass.OUTPUT, Creator.RUNTIME, _ONE_DAY, None, "agent handoffs, ack-on-consume"),
+    Zone("reports", ZoneClass.OUTPUT, Creator.RUNTIME, None, None, "HTML reports; never reaped or committed"),
     Zone("tmp", ZoneClass.EPHEMERAL, Creator.RUNTIME, _ONE_DAY, None, "scratch + evidence"),
     Zone("reaped", ZoneClass.EPHEMERAL, Creator.RUNTIME, _SEVEN_DAYS, None, "slop held by the reaper; deleted only by TTL expiry"),
-    Zone("mcps", ZoneClass.EPHEMERAL, Creator.RUNTIME, _ONE_DAY, None, "MCP working dirs"),
     Zone("dist", ZoneClass.STATE, Creator.RUNTIME, None, frozenset({"spec-contexts.json"}), "the one export artifact"),
+    Zone("mcps", ZoneClass.OPERATOR, Creator.OPERATOR, None, None, "anything an MCP server needs; never scanned"),
     Zone("references", ZoneClass.OPERATOR, Creator.OPERATOR, None, None, "operator reference clones; never scanned"),
     Zone(".venv", ZoneClass.MANAGED, Creator.INIT, None, None, "workspace venv; never scanned"),
 )  # fmt: skip

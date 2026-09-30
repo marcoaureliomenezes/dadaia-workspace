@@ -20,7 +20,7 @@ completed agent task; the HTML report is the exception, not the rule.
 3. Default to handoff-only; switch to report mode only when the operator asked or
    `next_handoff.agent == "human"`.
 4. Report mode first writes the HTML to
-   `repos/<slug>/reports/<agent>/<UTC>-<slug>.html`, then captures
+   `.dadaia/reports/<context>/<UTC>-<agent>-<slug>.html`, then captures
    `sha256sum <report>` as `artifact.content_hash`.
 5. Assemble the handoff field-by-field against
    `.dadaia/agentic/schemas/handoff-v1.schema.json`; set `artifact.path` only for a

@@ -18,7 +18,7 @@
 - F-05 `$D public stage`; `$D public install`; `$D public doctor` → exit 0, every asset `[ok]`.
 - F-06 `$D context create alpha --main-repo file:///tmp/f06/src.git`; `$D context list --json`; `$D context show alpha --json`; `$D context dead alpha`; `$D context alive alpha`; `$D doctor --context alpha` → 0 errors, 0 warnings; `$D context dead ghost` → non-zero, no traceback.
 - F-07 `export DADAIA_SESSION_ID=f07`; unbound `$D context show --json` → `{"context": null}`; `$D context bind beta` twice → same session id, one session record.
-- F-08 pipe PreToolUse JSON payloads into `python -m dadaia_workspace.hooks.pre_gate`: an ADDITIVE `repos/vp/specs/bugs/` path → allow; `.dadaia/sessions/x` → block; a new root entry → block; each block carries one `fix:` line that is itself allowed.
+- F-08 pipe PreToolUse JSON payloads into `python -m dadaia_workspace.hooks.pre_gate`: with vp bound, `repos/vp/specs/bugs/BUGS.jsonl` → block, `repos/vp/specs/audits/x/AUDIT.md` → allow, `.dadaia/reports/vp/r.html` → allow; `.dadaia/sessions/x` → block; a new root entry → block; each block carries one `fix:` line that is itself allowed.
 - F-09 `python3 $S/dd-bug-resolution/scripts/bugs.py append` with every required field `--specs repos/vp/specs` → exit 0, listed by `bugs.py status --specs repos/vp/specs`; an append missing fields → non-zero, nothing written.
 - F-10 `$D doctor --json --specs-dir repos/vp/specs` → parseable JSON, exit 0; a `candidate` entry with no `intents[]` in `BACKLOG.json` → `BL-SCHEMA`, non-zero.
 - F-12 `$D reports validate <good>.handoff.json` → exit 0 for a document valid against `.dadaia/agentic/schemas/handoff-v1.schema.json`; a tampered copy → non-zero, names the failure.

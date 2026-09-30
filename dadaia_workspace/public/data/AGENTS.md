@@ -16,8 +16,8 @@
 - Classify every demand: Arm A (feature) or Arm B (bug); state the arm before acting.
 - Arm A: `demand -> backlog -> as-is review -> release candidate (SPEC/PLAN/TASKS) -> implementation + review -> memory -> closure -> promote by merging the release PR`.
 - Arm B: `propose -> operator confirms -> register -> RED test -> root-cause fix -> GREEN -> resolved`.
-- Test: does the tool break its own contract? Yes -> Arm B, fixed now. No -> Arm A, via a candidate.
-- A feature enters only through the backlog or an operator demand recorded in the SPEC `Origin`; a confirmed bug is fixed immediately.
+- Test: does the tool break its own contract? Yes -> Arm B. No -> Arm A.
+- A feature enters only through the backlog or an operator demand recorded in the SPEC `Origin`; a confirmed bug is fixed per `worktrees/AGENTS.md` §2.
 - Every change minimizes code and tests: DELETE → REBUILD → UPDATE → KEEP → ADD last; verbose code, comments or tests that could be shorter are defects; every documented behavior keeps working.
 - No workflow engine: the SDD documents (`specs/releases/AGENTS.md`) are the record of progress.
 
@@ -35,8 +35,9 @@
 
 ## 3. What is enforced
 
-- One PreToolUse gate blocks exactly three things: a file-tool write (`Write`, `Edit`, `MultiEdit`, `apply_patch`) creating a new workspace-root entry (§4); a Bash command whose first token is `dadaia`, `pip`/`pip3` or `python -m dadaia_workspace` outside `.dadaia/.venv/bin/`; a file-tool write (those or `NotebookEdit`) that is PROTECTED or out-of-scope — a Bash write (`sed -i`, `rm`, `mkdir`, a redirect) is never judged.
-- Path classes: ADDITIVE (the append-only governance areas of `specs/AGENTS.md` and the runtime scratch zones of `.dadaia/AGENTS.md`) always writable; PROTECTED (session state, every path the install ledger records) blocked; everything else MUTATING, scope-judged under `repos/<slug>/`.
+- One PreToolUse gate blocks exactly three things: a file-tool write (`Write`, `Edit`, `MultiEdit`, `apply_patch`) creating a new workspace-root entry (§4); a Bash command whose first token is `dadaia`, `pip`/`pip3` or `python -m dadaia_workspace` outside `.dadaia/.venv/bin/`; a file-tool write (those or `NotebookEdit`) that is PROTECTED or out-of-scope — a Bash write (`sed -i`, `rm`, `mkdir`, a redirect) is never judged, yet no tool may write out of scope or PROTECTED.
+- Path classes: ADDITIVE (the output and ephemeral zones of `.dadaia/AGENTS.md`) always writable; PROTECTED (session state, every path the install ledger records) blocked; everything else MUTATING.
+- Agent writes under `repos/<slug>/`, by any tool: `specs/audits/` directly, the rest by a worktree merge; §7's CLI verbs own theirs.
 - Every BLOCK carries exactly one `fix: <command>` line; a BLOCK whose fix is itself blocked is a Stall, CRITICAL.
 - Git chokepoints (branch names: `specs/constitution.md` `gitflow:`): pre-push allows only the work branch and refuses a non-canon `specs/` path or a denylisted secret; both PRs need CI green and a `dd-code-reviewer` APPROVED verdict; no CI job calls a model API. Mechanics: `dd-gitflow-default`, `.dadaia/AGENTS.md`.
 - Races surface, never block; context binding: `.dadaia/.venv/bin/dadaia context show --json`, `.dadaia/.venv/bin/dadaia context bind <ctx>`.
@@ -44,8 +45,8 @@
 
 ## 4. Where things are written
 
-- Root holds only: `<!-- root -->`; any other entry, the operator's included, needs an operator-written pattern in `.dadaiaignore`, which only the operator edits.
-- Temp: `.dadaia/tmp/<agent>/<YYYYMMDD>/`; handoffs: `.dadaia/handoff/<context>/`; HTML reports: `repos/<slug>/reports/<agent>/`; caches: `.dadaia/tmp/<tool>-cache/` (absolute, via the harness env); anything an MCP server needs: `.dadaia/mcps/<server>/`.
+- Root holds only: `<!-- root -->`; any other entry, the operator's included, needs a pattern in `.dadaiaignore`, which only the operator edits.
+- Temp: `.dadaia/tmp/<agent>/<YYYYMMDD>/`; handoffs: `.dadaia/handoff/<context>/`; HTML reports: `.dadaia/reports/<context>/`; worktrees: `worktrees/<repo>/<name>/`; caches: `.dadaia/tmp/<tool>-cache/` (absolute, harness env); anything an MCP server needs: `.dadaia/mcps/<server>/`.
 - A repo tree carries source and its own artifacts only — never `.dadaia/`; caches redirect by configuration (`repos/<slug>/AGENTS.md`).
 - Credentials live outside the workspace, in the operator's own file: never create, copy, persist, commit, print or report a secret, anywhere.
 - Invoke `.dadaia/.venv/bin/dadaia` by absolute path; register every dev server through `dd-cli-library`.

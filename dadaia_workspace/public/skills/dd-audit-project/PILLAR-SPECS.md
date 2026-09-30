@@ -45,7 +45,7 @@ Input: the ratchet modules and the window `from-sha..HEAD`. Output: the "Slop re
 (ratchet, baseline, HEAD, trend, verdict). Definition and signals: `dd-code-review`'s `SLOP.md`.
 
 1. Run `pytest tests/contract/test_slop_ratchets.py tests/contract/test_test_suite_ratchets.py`; record each count beside its pinned ceiling.
-2. Trend each ratchet over the window: the count at the from-sha against HEAD, via a temporary worktree under `.dadaia/tmp/` — never a stash.
+2. Trend each ratchet over the window: the count at the from-sha against HEAD, read-only: `git archive <from-sha>` under `.dadaia/tmp/<agent>/<YYYYMMDD>/` or `git show <sha>:<path>` — never a worktree or a stash.
 3. Read the density of every SPEC in the window: bytes, words, codes per 1,000 words, numbered families outside FR/AC/T-.
 4. Read the GC: each closure's recorded `.dadaia/.venv/bin/dadaia doctor` score line, `archive/` tags whose branch survives.
 5. Sample the ten commits with the most additions; apply `SLOP.md` S1-S5 to each diff — the audit proves the review worked, it never redoes it.

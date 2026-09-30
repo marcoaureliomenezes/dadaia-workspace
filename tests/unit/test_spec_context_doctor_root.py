@@ -107,7 +107,7 @@ def test_root_and_dadaia_top_level_classify_every_entry(tmp_path: Path) -> None:
     slop, globbed = operator, a non-zone .dadaia/ entry is slop."""
     _init_workspace(tmp_path)
     dadaia = tmp_path / ".dadaia"
-    for name in (".claude", ".git", ".ruff_cache", ".dadaia/reports"):
+    for name in (".claude", ".git", ".ruff_cache", ".dadaia/junk"):
         (tmp_path / name).mkdir()
     (tmp_path / "random_junk.txt").write_text("oops", encoding="utf-8")
     (tmp_path / "shot.png").write_bytes(b"PNG")
@@ -130,7 +130,7 @@ def test_root_and_dadaia_top_level_classify_every_entry(tmp_path: Path) -> None:
     assert "# comment" not in {f.detail for f in found.values()}
     for name in (*DADAIA_ROOT_FILES, _STATE_ZONE.name, _OPERATOR_ZONE.name):
         assert found[name].code == "WS-dadaia-canon"
-    assert found["reports"].code == found[".DS_Store"].code == "WS-dadaia-slop"
+    assert found["junk"].code == found[".DS_Store"].code == "WS-dadaia-slop"
 
 
 def test_absent_init_or_install_zone_is_missing_and_fixable(tmp_path: Path) -> None:

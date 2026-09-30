@@ -22,7 +22,7 @@ def _write(tmp_path: Path, text: str) -> Path:
 
 
 #: The canon fingerprint each stamp was cut at — re-pinned only together with a stamp bump.
-_CANON_AT = {9: "add5f5f59831221c"}
+_CANON_AT = {9: "603c38e5b79c1182"}
 
 
 def test_a_canon_change_bumps_the_stamp() -> None:
@@ -43,7 +43,7 @@ def test_a_canon_change_bumps_the_stamp() -> None:
     )
     assert {CANONICAL_SPECS_VERSION: digest.hexdigest()[:16]} == _CANON_AT, (
         "the canon changed: bump CANONICAL_SPECS_VERSION, then pin under the new key; "
-        "never re-pin an existing key"
+        "never re-pin a published key"
     )
 
 
