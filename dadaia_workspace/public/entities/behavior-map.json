@@ -40,7 +40,7 @@
       "skill": "dd-manager-orchestration",
       "scoped_agents_md": [],
       "hash_tuple": {
-        "section": "sha256:0c3b6c3c620a370b174a4887bab1d505b5a051dc77de03d13377970b9d59389e",
+        "section": "sha256:44c516a20de40d92bee3d0d4bdad3ea45448881fdc2be112ba8a7eb4d3619120",
         "skill": "sha256:091d68be13673c1780e73c6a4681188111713d90f7862ac2e738d73011e968f6",
         "scripts": null,
         "scoped": []
@@ -68,7 +68,7 @@
       "skill": "dd-ai-eng-knowhow",
       "scoped_agents_md": [],
       "hash_tuple": {
-        "section": "sha256:0c3b6c3c620a370b174a4887bab1d505b5a051dc77de03d13377970b9d59389e",
+        "section": "sha256:44c516a20de40d92bee3d0d4bdad3ea45448881fdc2be112ba8a7eb4d3619120",
         "skill": "sha256:e2b296a3ff462d70160aa74fe22f8cbd5c8f7ad38fed65ebbfdcdcbcf1408616",
         "scripts": null,
         "scoped": []
@@ -228,7 +228,7 @@
         "skill": null,
         "scripts": null,
         "scoped": [
-          "sha256:e02021cf5f903bd46b201e250d33e6d03262b56d3818e8aeaee7daa13bba5d72"
+          "sha256:f0d3d3d6ffa207f76a3f19e29e99a9bacf390c9a99eabc412e2a573e1556497f"
         ]
       },
       "recorded_by": "dd-software-engineer",
@@ -404,7 +404,7 @@
       "skill": "dd-code-review",
       "scoped_agents_md": [],
       "hash_tuple": {
-        "section": "sha256:0c3b6c3c620a370b174a4887bab1d505b5a051dc77de03d13377970b9d59389e",
+        "section": "sha256:44c516a20de40d92bee3d0d4bdad3ea45448881fdc2be112ba8a7eb4d3619120",
         "skill": "sha256:e10c6a65dd58b717c535f4a9726818abd05cfe3dfb81c29fc14bc7acebd095c7",
         "scripts": null,
         "scoped": []

@@ -150,3 +150,14 @@ def test_the_worktree_rules_have_one_home() -> None:
         if "`worktrees/AGENTS.md`" not in (skills / s / "SKILL.md").read_text("utf-8")
     ]
     assert missing == []
+
+
+def test_the_acceptance_law_has_one_home() -> None:
+    """ADR 0151 M4: the map and the three role personas point to `specs/ADRs/AGENTS.md` §2."""
+    assert {h.split(":")[0] for h in _lines(r"`specs/ADRs/AGENTS\.md` §2")} == {
+        "public/data/AGENTS.md",
+        *(
+            f"public/agents/dd-{r}.md"
+            for r in ("product-engineer", "software-engineer", "code-reviewer")
+        ),
+    }

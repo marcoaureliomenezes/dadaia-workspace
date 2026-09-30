@@ -57,6 +57,10 @@ class ObjectSource(Protocol):
 
     def remote_branch(self, repo: Path, branch: str) -> bool: ...
 
+    def law_deletions(self, repo: Path, local_sha: str, remote_sha: str) -> list[tuple[str, str]]:
+        """ADR 0151 M3: (commit, path) per range commit deleting a law line uncited."""
+        ...
+
 
 def _refusal(head: str, rows: Sequence[str] = (), noun: str = "", advice: str = "") -> str:
     """The one pre-push refusal shape: head, rows capped at 10 plus a remainder count,
@@ -134,18 +138,23 @@ def _run_denylist_scan(
             oversized.extend(outcome.oversized_notes)
             hits.extend((ref, hit) for hit in outcome.hits)
     except GitObjectReadError as exc:
-        masked = f" (path: {masker.mask_path(exc.path)})" if exc.path is not None else ""
-        return Decision(
-            allowed=False,
-            message=_fail_closed(f"reading the pushed-range git objects failed ({exc}{masked})")
-            + "\nfix: "
-            + (  # a run failure is not corruption: no fsck for it
-                "Operator action: make git runnable here, then push again"
-                if isinstance(exc, GitRunError)
-                else git_line(repo, "fsck")
-            ),
-        )
+        return _read_failure(exc, masker, repo)
     return hits, binaries, oversized
+
+
+def _read_failure(exc: GitObjectReadError, masker: PathMasker, repo: Path) -> Decision:
+    """A git read failure refuses (fail closed), its path masked."""
+    masked = f" (path: {masker.mask_path(exc.path)})" if exc.path is not None else ""
+    return Decision(
+        allowed=False,
+        message=_fail_closed(f"reading the pushed-range git objects failed ({exc}{masked})")
+        + "\nfix: "
+        + (  # a run failure is not corruption: no fsck for it
+            "Operator action: make git runnable here, then push again"
+            if isinstance(exc, GitRunError)
+            else git_line(repo, "fsck")
+        ),
+    )
 
 
 def push_gate_decision(
@@ -195,6 +204,14 @@ def push_gate_decision(
     if isinstance(scan, Decision):
         return scan
     hits, binaries, oversized = scan
+    try:
+        laws = [
+            (r, c, p)
+            for r in scan_refs
+            for c, p in object_source.law_deletions(repo, r.local_sha, r.remote_sha)
+        ]
+    except GitObjectReadError as exc:
+        return _read_failure(exc, masker, repo)
     canon = [
         (ref, path)
         for ref in scan_refs
@@ -212,6 +229,13 @@ def push_gate_decision(
                 for r, p in canon
             ],
             "path(s)",
+        )
+    elif laws:
+        message = _refusal(
+            f"{len(laws)} pushed commit(s) delete a law line citing no `ADR NNNN` (ADR 0151).",
+            [f"  {r.local_ref}: commit {c[:12]} deletes a line of {p}" for r, c, p in laws],
+            "commit(s)",
+            "Cite the ADR that rules each deletion in that commit's message. ",
         )
     elif hits:
         message = _refusal(
@@ -234,7 +258,7 @@ def push_gate_decision(
         message="[pre-push] branch policy + specs-canon scan + denylist scan passed; allow.",
     )
     if message:
-        first = (canon or hits)[0][0]
+        first = (canon or laws or hits)[0][0]
         fix = _rewrite_fix(first, object_source, repo, fixes)
         decision = Decision(allowed=False, message=f"{message}\n{_REWRITE}\n{fix}")
     return _notes(decision, binaries, oversized, masker)

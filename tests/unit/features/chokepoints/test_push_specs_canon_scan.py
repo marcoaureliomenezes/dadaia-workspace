@@ -74,3 +74,36 @@ def test_the_canon_scan_refuses_a_non_canon_path_in_the_pushed_range(
     if refused:
         assert refused in decision.message
         assert "delete the path; canon: specs/AGENTS.md" in decision.message
+
+
+
+_LAW = "# law\n- keep\n- drop\n"
+
+
+# fmt: off
+@pytest.mark.parametrize(("change", "message", "refused"), [
+    pytest.param({"x/SKILL.md": "# law\n- keep\n"}, "chore: tidy", "x/SKILL.md", id="skill-line"),
+    pytest.param({"AGENTS.md": "# law\n- keep\n"}, "chore: tidy", "AGENTS.md", id="agents-line"),
+    pytest.param({"x/SKILL.md": None}, "chore: tidy", "x/SKILL.md", id="whole-file-delete"),
+    pytest.param({"y/SKILL.md": "# law\n- keep\n"}, "chore: tidy", "y/SKILL.md", id="one-of-two-identical-copies"),
+    pytest.param({"x/SKILL.md": None, "y/AGENTS.md": _LAW}, "chore: tidy", "x/SKILL.md", id="rename"),
+    pytest.param({"x/SKILL.md": "# law\n- keep\n"}, "chore: ADR ruled", "x/SKILL.md", id="ADR-without-an-id"),
+    pytest.param({"x/SKILL.md": "# law\n- keep\n"}, "docs: per ADR 0151", None, id="cited"),
+    pytest.param({"x/SKILL.md": _LAW + "- more\n"}, "chore: add", None, id="addition-only"),
+])
+# fmt: on
+def test_a_law_line_deletion_cites_an_adr_in_its_own_commit(
+    repo: PushRepo, change: dict[str, str | None], message: str, refused: str | None
+) -> None:
+    """ADR 0151 M3: commit A deletes a law line uncited; commit B citing ADR 0150 (adding a law file)
+    never hides it (per commit); a whole-file delete, a rename and one of two identical copies are seen."""
+    remote = repo.commit({"x/SKILL.md": _LAW, "y/SKILL.md": _LAW, "AGENTS.md": _LAW})
+    repo.publish()
+    for rel, text in change.items():
+        (repo.path / rel).unlink() if text is None else (repo.path / rel).write_text(text)
+    hidden = repo.commit({}, message)
+    sha = repo.commit({"y.txt": "x\n", "z/SKILL.md": "# new law\n"}, "docs: ADR 0150")
+    decision = _decide(repo, _BRANCH.format(sha=sha, remote=remote))
+    assert decision.allowed is (refused is None), decision.message
+    if refused:
+        assert f"commit {hidden[:12]} deletes a line of {refused}" in decision.message

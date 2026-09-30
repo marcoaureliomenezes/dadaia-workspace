@@ -5,7 +5,7 @@ Intent: CONTRACT — bugs release-publishes-an-unordered-dadaia-skills-repositor
 release-workflow-coverage-file-in-checkout, pr-source-guard-refuses-the-release-please-pr-to-main,
 dependabot-targets-main-and-every-update-pr-is-refused, ci-history-depth-is-decided-per-job,
 secret-scan-workflow-never-runs-on-develop-prs-so-its-required-context-blocks-every-merge
-(v0.5.1 A-12.1, A-12.2); T-047-87/88 (release.yml mints and publishes behind one gate); ADR 0026;
+(v0.5.1 A-12.1, A-12.2); T-047-87/88 (release.yml mints and publishes behind one gate);
 sa-doctor-job-not-a-required-check (AC1.7, ADR 0078). Size: SMALL (YAML reads; the guard runs bash).
 """
 
@@ -213,7 +213,7 @@ def test_release_please_mints_on_main_only_pinned_and_config_driven() -> None:
 
 
 def test_the_publish_chain_is_one_gated_path() -> None:
-    """ADR 0026: publish runs under environment `pypi` with id-token write (the trusted publisher
+    """Publish runs under environment `pypi` with id-token write (the trusted publisher
     binds the file name); approval keeps `release-gate`; one `id: version` step strips the tag's
     `v` for approve/publish/smoke-test; a dispatch with `tag` republishes an existing tag by
     checking it out; the build waits for ci.yml itself and no job redeclares pytest

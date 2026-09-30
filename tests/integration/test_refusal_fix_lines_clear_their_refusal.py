@@ -805,7 +805,7 @@ SITES: dict[str, tuple[Case | tuple[Case, ...] | Skip, ...]] = {
             Case(_non_canon, _no_junk, operator=_rm_junk, then=_COMMIT_PUSH),
         ),
     ),
-    "push_gate._run_denylist_scan": (Skip("needs a corrupted object store; `git fsck` names it"),),
+    "push_gate._read_failure": (Skip("needs a corrupted object store; `git fsck` names it"),),
     "push_gate.push_gate_decision": (Case(_malformed, _work_pushed, replaces=True),),
     "ci._repo_root": (Skip("the pre-push hook always runs inside the repo it pushes"),),
     "ci.push_gate_check": (Skip("the gate's refusal: its fix is a branch_policy/push_gate site"),),

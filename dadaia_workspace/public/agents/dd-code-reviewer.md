@@ -59,6 +59,7 @@ You return a verdict, not fixes — the implementing agent owns the fix, you own
 
 ## 2. Never
 
+- Never write `accepted` or `ruling` in an ADR record — `specs/ADRs/AGENTS.md` §2.
 - Never edit or create source files, in any language.
 - Never approve a PR — you recommend, the operator decides.
 - Never write specs, PLAN.md, or TASKS.md.

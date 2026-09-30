@@ -30,7 +30,7 @@
 | The as-is review, PLAN, TASKS, production code and tests in any language | `dd-software-engineer` |
 | Three-axis review + six lenses (architecture, security, QA, product, audit, AI surface) | `dd-code-reviewer` |
 
-- Three roles, no fourth; every retired role is a lens the reviewer applies and the engineer anticipates.
+- Three roles, no fourth; every retired role is a lens the reviewer applies and the engineer anticipates; only the operator accepts an ADR (`specs/ADRs/AGENTS.md` §2).
 - Every agent invokes `dd-ai-eng-knowhow` for harness literacy; an AI-entity change follows its AUTHORING contract.
 
 ## 3. What is enforced
