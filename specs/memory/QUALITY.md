@@ -53,11 +53,6 @@ Measured by: `pytest tests/contract/test_test_suite_ratchets.py -k v29` (competi
 ADR: none
 Rationale: two homes for one parameter guarantee two different values.
 
-### P-27 · We measure the pyramid every run — SMALL/MEDIUM/LARGE shares from one `--collect-only`, judged against 75/20/5 (±5 pp) — reported, not gated; a drift is a closure finding.
-Measured by: `pytest -s tests/contract/test_test_suite_ratchets.py -k v30` (prints the shares; the detector is proven on a mutation fixture).
-ADR: none
-Rationale: a reported number promoted as if it gated is fabricated detection.
-
 ### P-28 · We keep the pytest marker set closed and single-sourced: `pyproject.toml`'s `markers` equals `tests/conftest.py`'s `_KNOWN_MARKERS`, and `flaky`/`quarantine` are always among them.
 Measured by: `pytest tests/contract/test_stewardship_mechanics.py -k marker_set`.
 ADR: none
