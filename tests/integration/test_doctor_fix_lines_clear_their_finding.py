@@ -31,6 +31,7 @@ from __future__ import annotations
 import json
 import os
 import re
+import shutil
 import subprocess
 from collections.abc import Callable
 from dataclasses import dataclass, field
@@ -220,12 +221,22 @@ def _git(root: Path, *args: str) -> None:
     )
 
 
-def _repo(tmp_path: Path) -> Path:
-    """A git-backed fixture tree: a fix line may legitimately be a `git rm`/`git mv`."""
-    _make_clean_specs_tree(tmp_path, _RELEASE)
-    _git(tmp_path, "init", "-q")
-    _git(tmp_path, "config", "user.email", "fixture@example.invalid")
-    _git(tmp_path, "config", "user.name", "fixture")
+@pytest.fixture(scope="module")
+def clean_repo(tmp_path_factory: pytest.TempPathFactory) -> Path:
+    """A git-backed fixture tree, built once per module: a fix line may legitimately be a
+    `git rm`/`git mv`."""
+    root = tmp_path_factory.mktemp("clean")
+    _make_clean_specs_tree(root, _RELEASE)
+    _git(root, "init", "-q")
+    _git(root, "config", "user.email", "fixture@example.invalid")
+    _git(root, "config", "user.name", "fixture")
+    return root
+
+
+@pytest.fixture
+def repo(tmp_path: Path, clean_repo: Path) -> Path:
+    """This test's own copy of the clean tree — every plant and fix mutates it."""
+    shutil.copytree(clean_repo, tmp_path, symlinks=True, dirs_exist_ok=True)
     return tmp_path
 
 
@@ -255,10 +266,10 @@ _PLANTED_RULES: list[tuple[str, Rule[SpecsDoctor]]] = [
 
 @pytest.mark.parametrize(("code", "rule"), _PLANTED_RULES, ids=[code for code, _ in _PLANTED_RULES])
 def test_the_fix_line_clears_the_finding_it_was_stamped_on(
-    code: str, rule: Rule[SpecsDoctor], tmp_path: Path
+    code: str, rule: Rule[SpecsDoctor], repo: Path
 ) -> None:
     """Plant the finding, run the rule's OWN fix line, and the rule falls silent."""
-    root = _repo(tmp_path)
+    root = repo
     plant = PLANTS[code]
     plant.plant(root)
     _git(root, "add", "-A")
@@ -393,26 +404,26 @@ OPERATOR_ACTION: dict[str, Callable[[Path], None]] = {
 
 
 @pytest.mark.parametrize("code", sorted(OPERATOR_ACTION))
-def test_an_operator_action_names_the_file_to_change(code: str, tmp_path: Path) -> None:
+def test_an_operator_action_names_the_file_to_change(code: str, repo: Path) -> None:
     """sa-unfixable-doctor-findings-say-doctor-fix#S1: an unfixable error's fix is one
     `Operator action:` line naming the finding's own file — never a placeholder."""
-    root = _repo(tmp_path)
+    root = repo
     OPERATOR_ACTION[code](root)
     ledgers = _ledgers_section(None, root / "specs", str(root), None)
     found = [f for f in (*_specs_section(_doctor(root), None).findings, *ledgers.findings) if f.code == code]  # fmt: skip
     assert found, f"{code}: the fixture did not make the rule fire"
     for finding in found:
         assert finding.fix.startswith("Operator action: "), finding.fix
-        assert str(tmp_path) in finding.fix and not re.search(r"<[^<>]+>", finding.fix)
+        assert str(repo) in finding.fix and not re.search(r"<[^<>]+>", finding.fix)
 
 
-def test_a_judgment_only_rule_never_makes_the_run_exit_1(tmp_path: Path) -> None:
+def test_a_judgment_only_rule_never_makes_the_run_exit_1(repo: Path) -> None:
     """The exit-code half of the contract: every judgment-only rule fires at once and
     contributes NO error-class finding and NO fix line, so it stalls nobody
     (sa-unfixable-doctor-findings-say-doctor-fix#S1 — the `report-only` proof).
     sa-memory-atom-has-two-grammars#B29-6: a history heading planted beside them is
     reported once, by LINT-1 — CAT-1 and SPEC-DOC-008 do not exist."""
-    root = _repo(tmp_path)
+    root = repo
     for code in ("SPEC-DOC-005", "AGENTS-PLACEHOLDER-1"):
         PLANTS[code].plant(root)
     _plant_changelog_heading(root)
@@ -454,11 +465,11 @@ _PLACEHOLDERS = (
 )
 
 
-def test_doctor_fix_renders_a_raw_law_copy_and_clears_its_finding(tmp_path: Path) -> None:
+def test_doctor_fix_renders_a_raw_law_copy_and_clears_its_finding(repo: Path) -> None:
     """sa-specs-init-writes-unrendered-law#B38-3: a raw specs/AGENTS.md (the template an
     older `specs init` copied) is flagged by `dadaia doctor` as refreshable; `dadaia
     doctor --fix` renders it and the TREE-5 finding is gone."""
-    specs = _repo(tmp_path) / "specs"
+    specs = repo / "specs"
     public = Path(__file__).resolve().parents[2] / "dadaia_workspace" / "public"
     law = specs / "AGENTS.md"
     law.write_bytes((public / "templates" / "specs-AGENTS.md").read_bytes())
