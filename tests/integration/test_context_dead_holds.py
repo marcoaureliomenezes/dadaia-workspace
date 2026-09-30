@@ -125,8 +125,8 @@ def _url_less(repo: Path) -> None:
 
 
 _REFUSALS = [
-    pytest.param("main", _side_branch, DeadUnpushedCommitsError, r"fix: git -C \S+ -c \S+ push origin topic:refs/tags/archive/topic$", id="C3-side-branch-main"),
-    pytest.param("lib", _side_branch, DeadUnpushedCommitsError, r"fix: git -C \S+ -c \S+ push origin topic:refs/tags/archive/topic$", id="C4-side-branch-lib"),
+    pytest.param("main", _side_branch, DeadUnpushedCommitsError, r"fix: git -C \S+ -c \S+ push origin topic:refs/tags/archive/topic/[0-9a-f]{7}$", id="C3-side-branch-main"),
+    pytest.param("lib", _side_branch, DeadUnpushedCommitsError, r"fix: git -C \S+ -c \S+ push origin topic:refs/tags/archive/topic/[0-9a-f]{7}$", id="C4-side-branch-lib"),
     pytest.param("main", _worktree, DeadUnpushedCommitsError, r"fix: git -C \S+ worktree remove ", id="C2-registered-worktree"),
     pytest.param("lib", lambda r: (r / "leftover.txt").write_text("x\n"), DeadReviewRequiredError, r"lib[\s\S]*leftover\.txt", id="A16.2-untracked-in-lib"),
     pytest.param("lib", _no_remote, DeadUnpushedCommitsError, "lib", id="A16.2-local-commits-no-remote-in-lib"),

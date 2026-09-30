@@ -12,8 +12,13 @@ from dadaia_workspace.core.gitflow import DEFAULT, Gitflow, read_gitflow
 from dadaia_workspace.core.models.git_scan import GitObjectReadError
 from dadaia_workspace.infrastructure.git_objects import unpublished
 
-#: A lost branch's archive-tag push also records it as ``origin/archive/<branch>``.
-_ARCHIVE_TRACKING = "remote.origin.fetch=+refs/tags/archive/*:refs/remotes/origin/archive/*"
+#: A lost branch's archive-tag push, also recording it under ``refs/remotes/origin/archive/``.
+_ARCHIVE_PUSH = (
+    "-c",
+    "remote.origin.fetch=+refs/tags/archive/*:refs/remotes/origin/archive/*",
+    "push",
+    "origin",
+)
 
 logger = logging.getLogger(__name__)
 
@@ -239,25 +244,25 @@ class GitSubprocessClient:
     def unrecoverable(self, path: Path) -> list[str]:
         """One fix line per thing removing *path* loses: a linked worktree, or a local
         branch carrying a commit neither origin nor HEAD holds — archived on origin as
-        ``archive/<branch>`` (a tag push is never gated on branch policy, a branch push
-        outside the gitflow is), the push recording it under ``refs/remotes/origin/`` so
-        ``unpushed`` sees origin hold it; commits with no remote."""
+        ``archive/<branch>/<sha7>`` (ADR 0120: a tag push is never gated on branch policy),
+        the push recording it under ``refs/remotes/origin/`` so ``unpushed`` sees origin hold
+        it until a ``fetch --prune`` drops it (re-running the line restores it); commits with
+        no remote."""
         if self.has_commits(path) and not self.has_remote(path):
             return [git_line(path, "remote", "add", "origin", "<clone-url>")]
         run = _run(["git", "worktree", "list", "--porcelain"], cwd=path).stdout.split("\n")
         trees = [line[9:] for line in run if line.startswith("worktree ")][1:]
-        refs = ["git", "for-each-ref", "--format=%(refname:short)", "refs/heads"]
-        heads = [b for b in _run(refs, cwd=path).stdout.split("\n") if b]
+        refs = ["git", "for-each-ref", "--format=%(objectname) %(refname:short)", "refs/heads"]
+        heads = [line.split(" ", 1) for line in _run(refs, cwd=path).stdout.split("\n") if line]
         in_head = ["git", "merge-base", "--is-ancestor"]  # HEAD itself is pushed by dead()
         lost = [
-            b
-            for b in heads
+            (s, b)
+            for s, b in heads
             if _run([*in_head, f"refs/heads/{b}", "HEAD"], cwd=path).returncode != 0
             and self.unpushed(path, f"refs/heads/{b}")
         ]
         return [git_line(path, "worktree", "remove", t) for t in trees] + [
-            git_line(path, "-c", _ARCHIVE_TRACKING, "push", "origin", f"{b}:refs/tags/archive/{b}")
-            for b in lost
+            git_line(path, *_ARCHIVE_PUSH, f"{b}:refs/tags/archive/{b}/{s[:7]}") for s, b in lost
         ]
 
     def identity_fix(self, path: Path) -> str:

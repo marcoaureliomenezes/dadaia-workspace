@@ -93,7 +93,7 @@ def _notes(
 
 def _rewrite_fix(ref: PushRef, object_source: ObjectSource, repo: Path, fixes: GateFixes) -> str:
     """The one fix for the first refused ref (R13: origin is never rewritten)."""
-    if ref.is_tag or not fixes.head:
+    if ref.local_ref.startswith("refs/tags/") or not fixes.head:
         return "Operator action: a tag or a detached HEAD has no branch to amend; push a branch."
     branch = ref.local_ref.removeprefix(HEADS_PREFIX)
     if branch != ref.local_ref and branch != fixes.head:
