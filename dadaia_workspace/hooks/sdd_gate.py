@@ -52,6 +52,8 @@ def _evaluate_target(
         return gate_policy.evaluate(rel_path, root=effective_workspace, projected=projected)
 
     ctx = inv.context_name or ""
+    if cls == gate_policy.PathClass.MUTATING and not ctx:
+        return gate_policy.Decision.ALLOW, ""
     # an unregistered slug has no owner, so the policy fails open on it
     target_slug = _target_slug(effective_workspace, fpath)
     owner_repos = invocation.all_repos(effective_workspace, ctx) if target_slug else frozenset()
