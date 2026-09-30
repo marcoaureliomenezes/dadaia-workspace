@@ -536,6 +536,21 @@
       "agent": "dd-product-engineer",
       "kind": "dispositions",
       "text": "G6 (amendment 11) — audit 20260930-structural-convergence: open before 133; resolved 34 by 5fefdf5b on feature/0.5.0 (ADR 0124 direct write), each reason naming its commit — F006 F062 F066 F077 F078 F081 (records already made: 41d9c16d, 0e9694f0, 97ae45b7, f49a1a34); F008 F053-F057 F074 (3dafcb50); F011 (5ab0d75f); F068 F085 (7b44d4e9); F071 F072 (318ee6b8, 36df3baa); F073 (41d9c16d, 820bee3b); F079 F023 (8fac616a, bug 91262c55); F020 (7e7d84e1, bug 1d59ac9b); F027 (8fac616a, bug d056143b); F083 (152da630); F093 (3dafcb50); F094 (36df3baa, 8fac616a); F095 (8fac616a); F106 (152da630, 820bee3b, 36ce79d7); F107 (f10ead2f); F117 F118 F119 F122 F150 (this closure's memory commit, by subject); open after 99. F058 and F061 stay in the W3 row: at 91262c55 LINEAGE.md:10 still says no archived _RELEASE.json survives, and phase restamps defined/implemented per candidate (this closure's phase CLOSURE overwrote 0d31a5f2 with 91262c55). F084 stays open (ADR 0027 title); F149 stays open (0095 init scaffold and 0096 SessionStart self-heal, W2). Backlog active[]: open before 23; resolved by this candidate 5 — delivered canonical-worktrees (152da630, 820bee3b, 36ce79d7), worktree-harness-mechanics-study (f10ead2f), bind-scope-durable-on-every-harness (36df3baa, 8fac616a), ctx-inject-on-cursor-copilot (8fac616a); rejected gate-judges-bash-writes (ADRs 0096, 0103; 3dafcb50) — each exit owed by backlog.py exit in a backlog worktree; open after 18."
+    },
+    {
+      "ts": "2026-09-30T21:01:34Z",
+      "agent": "release.py memory",
+      "kind": "memory",
+      "text": "Memory reconciled over dd17b8836b7d753931bd11222f1bbe4ba6f7ac08..413bb9d6cfb9: 4 reviewed, 0 changed.",
+      "since": "dd17b8836b7d753931bd11222f1bbe4ba6f7ac08",
+      "until": "413bb9d6cfb9a444da2274653e44113d3e36301f",
+      "reviewed": [
+        "agentic-entities",
+        "pypi-distribution",
+        "bug-ledger",
+        "worktrees"
+      ],
+      "changed": []
     }
   ]
 }
