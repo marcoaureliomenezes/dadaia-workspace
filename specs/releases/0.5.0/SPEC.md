@@ -53,15 +53,15 @@ F019–F051 share the destination of the bug each cites. F090–F112 share the d
 
 ## Gate — this candidate, and every later wave
 
-- G1 Production shrinks:
-  - `git grep -h '' <end> -- 'dadaia_workspace/*.py' | wc -l` is lower than the same count at `<start>`.
-  - Both counts are logged in `_RELEASE.json`.
-  - Candidates 5 and 6 are one structural move: `<start>` is candidate 5's first task, `<end>` candidate 6's close. `worktree.py`'s size is reported separately.
-  - Every later wave is measured alone. If a wave cannot shrink, stop and ask the operator.
+- G1 Principles, never a line-count limit (ADR 0142):
+  - Every unit walks DELETE → REBUILD → UPDATE → KEEP → ADD, and an ADD names what it could not delete or rebuild.
+  - No question gets a second decider, and no rule contradicts another (the review's bug-surface axis judges it).
+  - Modules keep clean, narrow boundaries.
+  - Production and test line counts at `<start>` and `<end>` are logged in `_RELEASE.json` as a readout, `worktree.py` apart.
 - G2 `bugs.py status` lists no open record whose `caused_by` names a record or a commit of the wave.
 - G3 Every still-open bug is re-run at `<end>`. One that no longer reproduces is resolved, citing the commit that removed its cause. The count is logged.
 - G4 CI is green on the three OSes. `.dadaia/.venv/bin/dadaia doctor --context dadaia-workspace` exits 0. The per-job wall-clock stays within ADR 0119.
-- G5 A fix nets ≤ 0 in tests. A test that a DEL leaves dead leaves in the same commit.
+- G5 A test that a DEL leaves dead leaves in the same commit; a new test states its intent and passes `dd-test-stewardship`'s admission.
 
 ## W1 — scope, bind, worktrees
 

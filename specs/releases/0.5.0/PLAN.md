@@ -83,7 +83,7 @@ Bug-history lessons (audit of the fix chain):
 
 ### 2.7 Delta summary
 - Package excluding `wt.py`: ≈ −45 (2.1) + 25 (2.3) + 10 (2.4) + 45 (2.5) = **≈ +35**.
-- `wt.py`: **≈ +380**. Candidate 5 total ≈ **+415**; G1 (5+6 together) needs candidate 6 to remove more — flagged to the operator in the handoff.
+- `wt.py`: **≈ +380**. Candidate 5 total ≈ **+415**: a readout, never a limit (ADR 0142); the gate is G1's principles — every ADD above names what could not be deleted or rebuilt.
 - Order per unit: DELETE (2.1 losers) → REBUILD (`scope`, `evaluate`) → UPDATE (layout, bind, session store, doctor, scripts) → KEEP (PROTECTED messages, root gate) → ADD (`wt.py`).
 
 ## 3. Test strategy
