@@ -35,7 +35,8 @@ def test_a_canon_change_bumps_the_stamp() -> None:
         public / "scaffold" / area / "AGENTS.md" for area in workspace_layout.SCOPED_LAW_AREAS
     ]
     digest = hashlib.sha256()
-    for path in [*sorted((public / "data" / "fixed").glob("*.md")), *laws]:
+    fixed = sorted((public / "data" / "fixed").glob("*.md"), key=Path.as_posix)
+    for path in [*fixed, *laws]:
         digest.update(f"{path.relative_to(public).as_posix()}\n".encode() + path.read_bytes())
     digest.update(
         repr((workspace_layout.specs_canon_table_rows(), FIXED_SECTIONS, DEFAULT)).encode()
