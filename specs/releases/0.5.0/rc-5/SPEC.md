@@ -170,7 +170,7 @@ F019–F051 share the destination of the bug each cites. F090–F112 share the d
   - M2 It refuses a non-`rejected` record superseding or amending an accepted one unless itself accepted with a ruling; a `rejected` record is not judged.
   - M3 pre-push refuses a pushed commit deleting an `AGENTS.md`/`SKILL.md` line whose message cites no `ADR NNNN`, with one `fix:`.
   - M4 The three role personas and the root map point to `specs/ADRs/AGENTS.md` §2: no role agent writes `accepted` or `ruling`.
-  - Data: the 12 records accepted without the operator's order are `rejected` (1894ab74, 0152 (3)). Before the batch push, each still-`accepted` record gets `ruling.words` = the operator's verbatim quote, or his recorded grill answer id, taken from its own `context`; never composed. An accepted record whose `context` holds neither returns to `proposed` until the operator rules; 0007 is the known case.
+  - Data: the 12 records accepted without the operator's order are `rejected` (commit "docs(adrs): ADR 0152 (3) — 0001-0004, 0010-0013, 0024, 0026, 0090, 0091 rejected: accepted without the operator's order"). Before the batch push, each still-`accepted` record gets `ruling.words` = the operator's verbatim quote, or his recorded grill answer id, taken from its own `context`; never composed. An accepted record whose `context` holds neither returns to `proposed` until the operator rules; 0007 is the known case.
   - Command: `pytest tests/contract/test_adr_canon.py tests/unit/features/chokepoints/test_push_specs_canon_scan.py`; `doctor --context dadaia-workspace` exits 0.
 
 Study conclusions carried (ADR 0100; the scratch copy is ephemeral):

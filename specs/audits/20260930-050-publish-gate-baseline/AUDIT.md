@@ -4,8 +4,8 @@ The 0.5.0 publish gate's BASELINE: six reports compiled into one record. It is n
 The gate's own run is recorded as a NEW record beside this one, never as an edit of it.
 
 - **Timestamp:** 2026-09-30T13:15Z.
-- **Window:** `v0.4.7` (`2d1f4351`, PyPI 2026-09-23) to `feature/0.5.0` @ `16a72c4e`. The six reports measured snapshots from 2026-09-17 to 2026-09-29 (§1).
-- **Agents:** the main thread (six claude.ai report artifacts); three read-only digest agents (baseline, ambiguity, competitive); `dd-product-engineer` (this record; ids spot-checked against the ledgers at `16a72c4e`).
+- **Window:** `v0.4.7` (`2d1f4351`, PyPI 2026-09-23) to `feature/0.5.0` @ `14f0f7d6`. The six reports measured snapshots from 2026-09-17 to 2026-09-29 (§1).
+- **Agents:** the main thread (six claude.ai report artifacts); three read-only digest agents (baseline, ambiguity, competitive); `dd-product-engineer` (this record; ids spot-checked against the ledgers at `14f0f7d6`).
 - **Scope:** context `dadaia-workspace`, the 0.5.0 publish gate: the 0.4.7 → 0.5.0 changelog, E2E, main-feature bugs, systemic ambiguities, worktree resilience, onboarding, docs and adoption.
 - **Origin:** the operator, 2026-09-30: the reports "precisam ser persistidos para compararmos ao final. Vai ser um gate para deployar a versão 0.5.0 … analisarmos o changelog entre 0.4.7 e 0.5.0, avaliar testes E2E, verificar se features principais apresentam bugs para somente se aprovado deployarmos a 0.5.0 no pypi … não pegue lixo".
 - **Findings:** none. `FINDINGS.jsonl` is empty (`audit.py check` requires the file). Every item maps to an existing record (§4) or is a gate check (§6).
@@ -109,9 +109,9 @@ Source tags are from §1. Where two sources disagree, both values are shown.
   5. Environment: `find worktrees -name .venv` empty; `GIT_*` scrubbed; hooks resolve from the workspace root inside a worktree (AC1.11).
   6. Real use: the `feature/0.5.0` reflog after the bootstrap reads only `merge wt/…: Fast-forward` (AC1.14). T-050-105 logs planned vs measured width and every rebase conflict.
 
-## 4. Trace: idea → record → status at `16a72c4e`
+## 4. Trace: idea → record → status at `14f0f7d6`
 
-Ledgers at `16a72c4e`: 31 open bugs; 23 active backlog entries; `20260930-structural-convergence` has 133 open and 17 resolved findings. Each open id has one destination in the candidate 5 SPEC (§Origin map, §Carried).
+Ledgers at `14f0f7d6`: 31 open bugs; 23 active backlog entries; `20260930-structural-convergence` has 133 open and 17 resolved findings. Each open id has one destination in the candidate 5 SPEC (§Origin map, §Carried).
 
 | Idea (source) | Record(s) | Status |
 |---|---|---|
