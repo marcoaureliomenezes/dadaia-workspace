@@ -6,7 +6,7 @@ Scope: this file governs only `specs/releases/`.
 
 - Exactly ONE live release directory, ever: a bare SemVer id, created only by `RELEASE_PY new <id>`,
   which writes `rc-1/SPEC.md` + `_RELEASE.json` (DEFINITION) in one transaction and refuses a second one.
-- The release has OPEN scope: it grows by closed-scope CANDIDATES, each born by `RELEASE_PY new` in its own `rc-<N>/` and never moved or rewritten after its closure (ADR 0150).
+- The release has OPEN scope: it grows by closed-scope CANDIDATES, each born by `RELEASE_PY new` in its own `rc-<N>/` and never rewritten after its closure (ADR 0150).
 - Canonical release state: `_RELEASE.json` — one mutable document (`phase`/milestones) plus an append-only `log`; a legacy `RELEASE.json` is renamed by `.dadaia/.venv/bin/dadaia doctor --fix` (SPEC-DOC-046, ADR 0007).
 - No `_RELEASE.jsonl` event stream, no `CLOSURE.md`, no `reviews/` directory, no `segment`/`audited` fields.
 

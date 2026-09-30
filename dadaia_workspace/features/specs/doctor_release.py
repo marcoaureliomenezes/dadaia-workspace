@@ -205,8 +205,12 @@ class ReleaseValidator:
         return issues
 
     def check_plan_line_limit(self) -> list[SectionFinding]:
+        """SPEC-DOC-005: the live candidate's PLAN only — a closed ``rc-<N>/`` is history."""
         issues: list[SectionFinding] = []
-        for plan in self.specs_dir.glob("releases/*/rc-*/PLAN.md"):
+        candidate = self.tree.active_release.candidate
+        for plan in (
+            [candidate / "PLAN.md"] if candidate and (candidate / "PLAN.md").is_file() else []
+        ):
             n_lines = sum(1 for _ in plan.read_text(encoding="utf-8").splitlines())
             if n_lines <= PLAN_MAX_LINES:
                 continue

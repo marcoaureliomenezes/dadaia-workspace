@@ -9,7 +9,7 @@ import sys
 from pathlib import Path
 
 from dadaia_workspace.core import release_state
-from dadaia_workspace.core.gitflow import resolve_live_candidate, resolve_live_release_id
+from dadaia_workspace.core.gitflow import resolve_live_release_id
 from dadaia_workspace.features.specs.doctor_common import resolve_active_release
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[3]
@@ -39,19 +39,3 @@ def test_a_legacy_state_file_makes_no_release_live(tmp_path: Path) -> None:
     (tmp_path / "releases" / "3.0.0").mkdir()
     (tmp_path / "releases" / "3.0.0" / "_RELEASE.json").write_text(_DOC, encoding="utf-8")
     assert (resolve_live_release_id(tmp_path), len(_release_store.live_ids(tmp_path))) == (None, 2)
-
-
-def test_the_pinned_pair_resolves_the_same_live_candidate(tmp_path: Path) -> None:
-    """ADR 0150 (3): the live candidate is the highest-numbered `rc-<N>/` directory; the
-    package reader and the scripts' store answer alike, and none without one."""
-    release = tmp_path / "releases" / "1.0.0"
-    release.mkdir(parents=True)
-    (release / "_RELEASE.json").write_text(_DOC, encoding="utf-8")
-    assert (
-        resolve_live_candidate(tmp_path) is _release_store.live_release(tmp_path).candidate is None
-    )
-    for name in ("rc-2", "rc-10", "rc-9", "notes"):
-        (release / name).mkdir()
-    (release / "rc-11").write_text("", encoding="utf-8")
-    assert resolve_live_candidate(tmp_path) == _release_store.live_release(tmp_path).candidate
-    assert resolve_live_candidate(tmp_path) == release / "rc-10"

@@ -1,5 +1,6 @@
 """Intent: CONTRACT — AC2.1–AC2.6, AC1.9 (release 0.5.0 candidate 2, ADR 0041 `measured_by`);
-AC5.2, AC5.3 (release 0.5.0 candidate 4, the Authorities table).
+AC5.2, AC5.3 (release 0.5.0 candidate 4, the Authorities table); AC1.17(3) (ADR 0150, the
+pinned pair resolving the live candidate).
 
 `release.py phase IMPLEMENTATION` admits a candidate only when PLAN.md carries the As-is
 review table — structure only — and the skeleton `dd-release-definition` teaches passes
@@ -16,6 +17,8 @@ from pathlib import Path
 
 import pytest
 
+from dadaia_workspace.core import gitflow
+from dadaia_workspace.core.release_state import CANDIDATE_RE
 from tests.helpers.skill_scripts import stage_skill_scripts
 
 pytestmark = pytest.mark.contract
@@ -249,3 +252,24 @@ def test_an_authorities_table_outside_section_1_does_not_count(
     """AC5.2: the table belongs to §1; one under a later section is not the table."""
     plan = "## 1. As-is review\n\n" + _HEADER + _ROW.format(verdict="KEEP") + "\n## 2. Strategy\n"
     _refuses(script, tmp_path, plan + _AUTHORITIES, "Authorities")
+
+
+def test_the_pinned_pair_resolves_the_same_live_candidate(tmp_path: Path) -> None:
+    """AC1.17(3): one grammar (`rc-<N>`, N from 1, no leading zero); the package and the
+    scripts pick the same highest `rc-<N>/` directory, and birth the next one past a stray
+    `rc-<N>` file; none without a candidate."""
+    sys.path.insert(0, str(_SCRIPTS))
+    import _release_schema as twin
+    import _release_store
+
+    assert twin.CANDIDATE_RE.pattern == CANDIDATE_RE.pattern
+    release = tmp_path / "releases" / "1.0.0"
+    release.mkdir(parents=True)
+    (release / "_RELEASE.json").write_text('{"phase": "DEFINITION"}', encoding="utf-8")
+    pair = (gitflow.resolve_live_candidate, lambda s: _release_store.live_release(s).candidate)
+    assert [resolve(tmp_path) for resolve in pair] == [None, None]
+    for name in ("rc-2", "rc-10", "rc-9", "rc-01", "rc-0", "notes"):
+        (release / name).mkdir()
+    (release / "rc-11").write_text("", encoding="utf-8")
+    assert [resolve(tmp_path) for resolve in pair] == [release / "rc-10"] * 2
+    assert gitflow.next_candidate(release) == twin.next_candidate(release) == release / "rc-12"

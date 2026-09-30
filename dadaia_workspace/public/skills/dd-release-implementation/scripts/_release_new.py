@@ -14,7 +14,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 sys.path.append(str(Path(__file__).resolve().parents[2] / "dd-bug-resolution" / "scripts"))
 
 from _ledger import replace  # noqa: E402
-from _release_schema import SEMVER_RE, STATE, candidate_number, utc_now  # noqa: E402
+from _release_schema import SEMVER_RE, STATE, next_candidate, utc_now  # noqa: E402
 from _release_store import SCRIPT, Refusal, State, live_ids, read_state, validated  # noqa: E402
 from _release_tree import tree_findings  # noqa: E402
 
@@ -133,8 +133,7 @@ def new_release(specs: Path, release_id: str, today: str, origin: str) -> Path:
     stub = SPEC_STUB.format(
         release_id=release_id, today=today, origin=origin, scope=seeded_scope(specs, origin)
     )
-    names = [d.name for d in release_dir.iterdir() if d.is_dir()] if release_dir.is_dir() else []
-    candidate = release_dir / f"rc-{candidate_number(names) + 1}"
+    candidate = next_candidate(release_dir)
     made = candidate if release_dir.exists() else release_dir
     candidate.mkdir(parents=True)
     try:

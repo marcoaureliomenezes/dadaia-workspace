@@ -16,13 +16,10 @@ from pathlib import Path
 from dadaia_workspace.core import specs_version as _version
 from dadaia_workspace.core.atomic_write import atomic_write
 from dadaia_workspace.core.frontmatter import FRONTMATTER_RE
-from dadaia_workspace.core.gitflow import (
-    candidate_number,
-    merge_frontmatter,
-    resolve_live_candidate,
-    resolve_live_release_id,
-)
+from dadaia_workspace.core.gitflow import candidate_dir, merge_frontmatter, next_candidate
+from dadaia_workspace.core.release_state import RELEASE_ID_RE
 from dadaia_workspace.core.spec_status import APPROVED, DRAFT, IN_REVIEW
+from dadaia_workspace.core.workspace_layout import CANDIDATE_DOCUMENTS
 
 
 class UpgradeRefused(Exception):
@@ -71,7 +68,7 @@ def upgrade(
         )
 
     if dry_run:
-        trio = plan_flat_trio_fold(specs_dir)
+        trio = [source for source, _ in plan_flat_trio_fold(specs_dir)]
         removed = plan_empty_ideas_dir(specs_dir)
         restated = plan_status_token_rewrites(specs_dir)
         folded = plan_tech_stack_fold(specs_dir)
@@ -94,26 +91,32 @@ def upgrade(
     )
 
 
-def plan_flat_trio_fold(specs_dir: Path) -> list[Path]:
-    """The documents still flat at the live release's root — a v8 tree's candidate (ADR
-    0150: only the state document sits there)."""
-    release_id = resolve_live_release_id(specs_dir)
-    return sorted((specs_dir / "releases" / release_id).glob("*.md")) if release_id else []
+def _release_dirs(specs_dir: Path) -> list[Path]:
+    releases = specs_dir / "releases"
+    dirs = releases.iterdir() if releases.is_dir() else iter(())
+    return sorted(d for d in dirs if d.is_dir() and RELEASE_ID_RE.match(d.name))
+
+
+def plan_flat_trio_fold(specs_dir: Path) -> list[tuple[Path, Path]]:
+    """Each candidate document still flat at a release root — a v8 tree — and the
+    ``rc-<N+1>/`` path it moves to. Judged by shape, not by the state file's name, so the
+    fold never waits on the legacy rename (ADR 0150)."""
+    return [
+        (d / name, next_candidate(d) / name)
+        for d in _release_dirs(specs_dir)
+        for name in CANDIDATE_DOCUMENTS
+        if (d / name).is_file()
+    ]
 
 
 def fold_flat_trio(specs_dir: Path) -> list[Path]:
-    """Move the flat live trio, verbatim, into the next ``rc-<N>/`` — the 8 -> 9 hop; a
-    closed candidate folder is never touched."""
+    """Move the flat trio, verbatim, into the next ``rc-<N>/`` — the 8 -> 9 hop; a closed
+    candidate folder is never touched."""
     planned = plan_flat_trio_fold(specs_dir)
-    if planned:
-        root = planned[0].parent
-        candidate = (
-            root / f"rc-{candidate_number(p.name for p in root.iterdir() if p.is_dir()) + 1}"
-        )
-        candidate.mkdir()
-        for document in planned:
-            document.rename(candidate / document.name)
-    return planned
+    for source, target in planned:
+        target.parent.mkdir(exist_ok=True)
+        source.rename(target)
+    return [source for source, _ in planned]
 
 
 #: The section ``TECHSTACK.md``'s body becomes, appended at the END of ``ARCHITECTURE.md``
@@ -187,21 +190,23 @@ _RETIRED_STATUS_TOKENS = {
 }
 
 
-def _live_trio_documents(specs_dir: Path) -> list[Path]:
-    """The live candidate's documents (the rewrite touches only a ``**Status:**`` line).
-    A closed ``rc-<N>/`` and ``releases/_archive/`` are history, never rewritten (ADR 0150)."""
-    candidate = resolve_live_candidate(specs_dir)
-    return sorted(candidate.glob("*.md")) if candidate else []
+def _live_trio_documents(specs_dir: Path) -> list[tuple[Path, Path]]:
+    """(where the text is read, where it lands after the fold) for each release's live
+    candidate — the rewrite touches only a ``**Status:**`` line. A closed ``rc-<N>/`` and
+    ``releases/_archive/`` are history, never rewritten (ADR 0150)."""
+    moves = plan_flat_trio_fold(specs_dir)
+    folded = {source.parent for source, _ in moves}
+    live = [candidate_dir(d) for d in _release_dirs(specs_dir) if d not in folded]
+    return moves + [(p, p) for c in live if c for p in sorted(c.glob("*.md"))]
 
 
 def plan_status_token_rewrites(specs_dir: Path) -> list[Path]:
     """Live trio documents still declaring a retired Portuguese status token."""
-    planned: list[Path] = []
-    for path in _live_trio_documents(specs_dir):
-        text = path.read_text(encoding="utf-8")
-        if _rewrite_status_line(text) != text:
-            planned.append(path)
-    return planned
+    return [
+        target
+        for source, target in _live_trio_documents(specs_dir)
+        if _rewrite_status_line(text := source.read_text(encoding="utf-8")) != text
+    ]
 
 
 def rewrite_status_tokens(specs_dir: Path) -> list[Path]:

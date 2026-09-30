@@ -11,10 +11,11 @@ from pathlib import Path
 from typing import Literal
 
 from dadaia_workspace.core.frontmatter import FRONTMATTER_RE, FrontmatterError, parse
-from dadaia_workspace.core.release_state import RELEASE_ID_RE, RELEASE_STATE_FILENAME
+from dadaia_workspace.core.release_state import CANDIDATE_RE, RELEASE_ID_RE, RELEASE_STATE_FILENAME
 
 __all__ = [
     "DEFAULT",
+    "candidate_dir",
     "candidate_number",
     "Gitflow",
     "Role",
@@ -23,6 +24,7 @@ __all__ = [
     "constitution_text",
     "from_mapping",
     "merge_frontmatter",
+    "next_candidate",
     "read_gitflow",
     "resolve_live_candidate",
     "resolve_live_release_id",
@@ -32,8 +34,6 @@ __all__ = [
 Role = Literal["principal", "integration", "work"]
 
 _VERSION_RE = re.compile(r"\d+\.\d+\.\d+")
-#: A candidate folder (ADR 0150) — `_release_schema.CANDIDATE_RE`'s pattern.
-_CANDIDATE_RE = re.compile(r"^rc-(\d+)$")
 # git check-ref-format's refusals, for one branch name (a prefix may end in "/").
 _BAD_REF_RE = re.compile(r"[\x00-\x20\x7f~^:?*\[\\]|\.\.|//|@\{|^[/.]|\.$|\.lock(/|$)|/\.|^@$")
 
@@ -74,7 +74,20 @@ def resolve_live_release_id(specs_dir: Path) -> str | None:
 
 def candidate_number(names: Iterable[str]) -> int:
     """The highest ``rc-<N>`` among *names*, 0 when none — `_release_schema`'s twin."""
-    return max((int(m.group(1)) for n in names if (m := _CANDIDATE_RE.match(n))), default=0)
+    return max((int(m.group(1)) for n in names if (m := CANDIDATE_RE.match(n))), default=0)
+
+
+def candidate_dir(release_dir: Path) -> Path | None:
+    """The highest-numbered ``rc-<N>/`` under *release_dir* (ADR 0150), ``None`` when none."""
+    n = candidate_number(d.name for d in release_dir.iterdir() if d.is_dir())
+    return release_dir / f"rc-{n}" if n else None
+
+
+def next_candidate(release_dir: Path) -> Path:
+    """The ``rc-<N+1>/`` a new candidate is born in — past every ``rc-<N>`` entry, a stray
+    file included, so the birth never lands on an existing path."""
+    names = [p.name for p in release_dir.iterdir()] if release_dir.is_dir() else []
+    return release_dir / f"rc-{candidate_number(names) + 1}"
 
 
 def resolve_live_candidate(specs_dir: Path) -> Path | None:
@@ -82,9 +95,7 @@ def resolve_live_candidate(specs_dir: Path) -> Path | None:
     `candidate_dir` rule; ``None`` with no live release or no candidate folder."""
     if (release_id := resolve_live_release_id(specs_dir)) is None:
         return None
-    root = specs_dir / "releases" / release_id
-    n = candidate_number(d.name for d in root.iterdir() if d.is_dir())
-    return root / f"rc-{n}" if n else None
+    return candidate_dir(specs_dir / "releases" / release_id)
 
 
 def work_branch(specs_dir: Path, flow: Gitflow) -> str:

@@ -265,7 +265,19 @@ def _duplicate_definitions(sources: dict[str, str]) -> set[str]:
 
 #: V37 allowance, born 2026-09-27 at 65: each duplicate, keyed to the open bug deleting it.
 _V37_BIRTH = 65
-_V37_ALLOWANCE: dict[str, str] = {}
+#: The candidate-folder pair (ADR 0150): the stdlib scripts cannot import the package,
+#: so each side keeps its twin and one contract test pins them equal.
+_PAIR = "parity:tests/contract/test_release_script.py"
+_V37_ALLOWANCE: dict[str, str] = {
+    "core/gitflow.py:candidate_dir": _PAIR,
+    "core/gitflow.py:candidate_number": _PAIR,
+    "core/gitflow.py:next_candidate": _PAIR,
+    "core/release_state.py:CANDIDATE_RE": _PAIR,
+    "public/skills/dd-release-implementation/scripts/_release_schema.py:CANDIDATE_RE": _PAIR,
+    "public/skills/dd-release-implementation/scripts/_release_schema.py:candidate_dir": _PAIR,
+    "public/skills/dd-release-implementation/scripts/_release_schema.py:candidate_number": _PAIR,
+    "public/skills/dd-release-implementation/scripts/_release_schema.py:next_candidate": _PAIR,
+}
 
 
 def test_v37_one_home_per_definition() -> None:

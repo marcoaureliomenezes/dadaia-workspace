@@ -10,7 +10,13 @@ from __future__ import annotations
 import json
 import re
 
-__all__ = ["LEGACY_RELEASE_STATE_FILENAME", "RELEASE_ID_RE", "RELEASE_STATE_FILENAME", "read_phase"]
+__all__ = [
+    "CANDIDATE_RE",
+    "LEGACY_RELEASE_STATE_FILENAME",
+    "RELEASE_ID_RE",
+    "RELEASE_STATE_FILENAME",
+    "read_phase",
+]
 
 #: The one release-state filename (ADR 0007): the legacy name is never read as live —
 #: the doctor renames it (SPEC-DOC-046).
@@ -21,6 +27,10 @@ LEGACY_RELEASE_STATE_FILENAME = "RELEASE.json"
 #: pinned equal by ``tests/contract/test_release_semver_canon.py``. No ``v``, no suffix;
 #: an archived directory is exempt by its location (``_archive/``), never by its name.
 RELEASE_ID_RE = re.compile(r"^\d+\.\d+\.\d+$")
+
+#: The ONE candidate-folder grammar (ADR 0150): ``rc-<N>``, N from 1, no leading zero —
+#: `_release_schema.CANDIDATE_RE`'s pattern, pinned equal by tests/contract/test_release_script.py.
+CANDIDATE_RE = re.compile(r"^rc-([1-9][0-9]*)$")
 
 
 def read_phase(text: str) -> str | None:

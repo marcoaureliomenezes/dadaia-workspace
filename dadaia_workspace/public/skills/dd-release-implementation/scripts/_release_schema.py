@@ -13,8 +13,8 @@ STATE = "_RELEASE.json"
 HISTO = "releases/_archive/releases_histo.jsonl"
 #: One candidate's trio, born in its own `rc-<N>/` and never rewritten after closure (ADR 0150).
 TRIO = ("SPEC.md", "PLAN.md", "TASKS.md")
-#: A candidate folder; the live one is the highest N — `core.gitflow._CANDIDATE_RE`.
-CANDIDATE_RE = re.compile(r"^rc-(\d+)$")
+#: A candidate folder; the live one is the highest N — `core.release_state.CANDIDATE_RE`.
+CANDIDATE_RE = re.compile(r"^rc-([1-9][0-9]*)$")
 #: The three lifecycle phases — pinned equal to the schema's enum; a shipped release
 #: moves whole to `_archive/<v>/` (ADR 0152 (1)).
 PHASES = ("DEFINITION", "IMPLEMENTATION", "CLOSURE")
@@ -49,9 +49,16 @@ def candidate_number(names: Iterable[str]) -> int:
 
 def candidate_dir(release_dir: Path) -> Path | None:
     """The highest-numbered ``rc-<N>/`` under *release_dir* (ADR 0150) —
-    `core.gitflow.resolve_live_candidate`'s rule; ``None`` when there is none."""
+    `core.gitflow.candidate_dir`'s twin; ``None`` when there is none."""
     n = candidate_number(d.name for d in release_dir.iterdir() if d.is_dir())
     return release_dir / f"rc-{n}" if n else None
+
+
+def next_candidate(release_dir: Path) -> Path:
+    """The ``rc-<N+1>/`` a new candidate is born in — past every ``rc-<N>`` entry, a stray
+    file included, so the birth never lands on an existing path."""
+    names = [p.name for p in release_dir.iterdir()] if release_dir.is_dir() else []
+    return release_dir / f"rc-{candidate_number(names) + 1}"
 
 
 def unfinished_tasks(candidate: Path) -> list[str]:

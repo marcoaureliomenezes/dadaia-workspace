@@ -17,7 +17,7 @@ import re
 from pathlib import Path
 
 from dadaia_workspace.core.gitflow import resolve_live_release_id
-from dadaia_workspace.core.release_state import RELEASE_STATE_FILENAME, read_phase
+from dadaia_workspace.core.release_state import CANDIDATE_RE, RELEASE_STATE_FILENAME, read_phase
 
 # A dir counts as a "release dir" iff it carries at least one SDD release artifact.
 #
@@ -29,7 +29,7 @@ from dadaia_workspace.core.release_state import RELEASE_STATE_FILENAME, read_pha
 RELEASE_ARTIFACTS: tuple[str, ...] = ("SPEC.md", "PLAN.md", "TASKS.md")
 # Candidate dirs (rc-N, ADR 0150) and the historical alpha-N/`integration` segments live
 # *inside* a release dir and are not themselves releases.
-_SEGMENT_NAME_RE = re.compile(r"^(?:alpha|rc)-\d+$|^integration$")
+_SEGMENT_NAME_RE = re.compile(rf"{CANDIDATE_RE.pattern}|^alpha-\d+$|^integration$")
 
 
 def resolve_active_release(specs_dir: Path) -> tuple[str | None, str | None]:

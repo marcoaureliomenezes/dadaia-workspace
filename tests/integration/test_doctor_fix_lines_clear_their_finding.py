@@ -342,6 +342,20 @@ def test_the_fix_line_clears_the_finding_it_was_stamped_on(
     assert not new_errors, f"{code}: the fix created {new_errors}"
 
 
+def test_spec_doc_046_never_clobbers_a_canonical_state_file(repo: Path) -> None:
+    """ADR 0007: with both names on disk SPEC-DOC-046 is silent, and a fix stamped before
+    `_RELEASE.json` appeared re-checks and renames nothing."""
+    release = repo / "specs" / "releases" / _RELEASE
+    _plant_legacy_state_name(repo)
+    doctor = _doctor(repo)
+    [stale] = [i for i in doctor.check() if i.code == "SPEC-DOC-046"]
+    (release / "_RELEASE.json").write_text("{}", encoding="utf-8")
+    assert [i for i in doctor.check() if i.code == "SPEC-DOC-046"] == []
+    doctor.fix([stale])
+    assert (release / "RELEASE.json").is_file()
+    assert (release / "_RELEASE.json").read_text(encoding="utf-8") == "{}"
+
+
 def _whole(root: Path) -> set[tuple[str, str, bool]]:
     """Every finding of the whole specs section: (code, message, error-class)."""
     report = _specs_section(_doctor(root), None)

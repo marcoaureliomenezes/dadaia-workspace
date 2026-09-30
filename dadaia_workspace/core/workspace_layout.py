@@ -15,7 +15,7 @@ from pathlib import Path
 from typing import Literal
 
 from dadaia_workspace.core.harness_registry import HARNESS_PROJECTION_DIRS
-from dadaia_workspace.core.release_state import RELEASE_ID_RE
+from dadaia_workspace.core.release_state import CANDIDATE_RE, RELEASE_ID_RE
 
 __all__ = [
     "render_registry_tables",
@@ -328,7 +328,7 @@ SpecsArea = Literal[
 #: A canon shape's variable tokens (the law's notation) and the regex each compiles to.
 _SHAPE_TOKENS: tuple[tuple[str, str], ...] = (
     ("<M.m.p>", RELEASE_ID_RE.pattern[1:-1]),
-    ("<N>", r"[1-9][0-9]*"),
+    ("rc-<N>", CANDIDATE_RE.pattern[1:-1]),
     ("<40hex>", r"[0-9a-f]{40}"),
     ("<YYYYMMDD-slug>", AUDIT_DIR_NAME_PATTERN),
     ("<area>", r"[a-z][a-z0-9_-]*"),
@@ -396,6 +396,11 @@ SPECS_CANON: tuple[CanonEntry, ...] = (
     CanonEntry("audits/<YYYYMMDD-slug>/FINDINGS.jsonl", "audits"),
     CanonEntry("ADRs/AGENTS.md", "ADRs", True),
     CanonEntry("ADRs/decisions.jsonl", "ADRs", True),
+)
+
+#: One candidate's documents (ADR 0150), read off the canon rows.
+CANDIDATE_DOCUMENTS: tuple[str, ...] = tuple(
+    e.shape.rsplit("/", 1)[1] for e in SPECS_CANON if e.shape.startswith("releases/<M.m.p>/rc-<N>/")
 )
 
 #: Every entry permitted directly under ``specs/``.
