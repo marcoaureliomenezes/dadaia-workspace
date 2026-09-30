@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-09-30T02:57:02Z",
+  "generated_at": "2026-09-30T02:58:10Z",
   "features": [
     {
       "rank": 1,
@@ -422,8 +422,8 @@
       "slug": "ci-preflight",
       "title": "ci-preflight",
       "area": "platform",
-      "tldr": "dadaia ci preflight runs the library's CI checks locally — ruff format, ruff check, mypy --strict, lint-imports, pytest — and refuses outside the source repo.",
-      "summary": "The local CI-equivalent run a contributor makes before every push of the dadaia-workspace source repo: five ordered checks resolved from the running venv, fail-fast by default, exit 1 with each failing check's output tail; any other repo is refused with a message pointing at its own CI.",
+      "tldr": "dadaia ci preflight runs the library's seven CI checks locally, fenced like a bare checkout, and refuses outside the source repo.",
+      "summary": "The local CI-equivalent run a contributor makes before every push of the dadaia-workspace source repo: seven ordered checks resolved from the running venv, run in a fenced bare checkout as CI runs them, fail-fast by default, exit 1 with each failing check's output tail; any other repo is refused with a message pointing at its own CI.",
       "path": "specs/memory/product/platform/ci-preflight.md",
       "tags": [
         "ci",
@@ -432,7 +432,7 @@
         "typecheck",
         "tests"
       ],
-      "token_estimate": 277,
+      "token_estimate": 348,
       "depends_on": [
         "sdd-gate-v3",
         "pypi-distribution",
@@ -457,7 +457,7 @@
         "release-gate",
         "sdd"
       ],
-      "token_estimate": 370,
+      "token_estimate": 367,
       "depends_on": [
         "pypi-distribution",
         "workspace-init",
