@@ -30,7 +30,8 @@
 
 ## Decisions
 
-- These ADRs decide: 0097, 0099, 0100, 0103, 0105–0117, 0124–0131, 0135 (read path only), 0136, 0140.
+- These ADRs decide: 0097, 0099, 0100, 0103, 0105–0117, 0124–0131, 0135 (read path only), 0136, 0140, 0141.
+- The PLAN carries the Parallel schedule of ADR 0141 from the task after `worktree.py merge`; closure logs planned against measured width, the critical path walked and every rebase conflict.
 - A reader imports the owner script's read-only parser (0135): `worktree.py` imports `release.py`'s status parser, `backlog.py` imports `bugs.py`'s record reader. Running another script's verb stays forbidden (0018). ADR 0126's `measured_by` is repaired to match ("chore(adrs): repair 0126 measured_by").
 - A backlog entry that is a contract break is delivered as an FR of the candidate owning its cause and exits `delivered`, with no new bug record (operator). `to-bug` (0137) stays for future cases.
 - An ADR beats an audit proposal:
@@ -66,10 +67,11 @@ F019–F051 share the destination of the bug each cites. F090–F112 share the d
 
 ### Scope and bind
 
-- AC1.1 One decider, `scope(target) -> (repo, kind)`; a path under `worktrees/<r>/` belongs to `r`.
-  - A bound file-tool write under `repos/<r>/` outside `specs/audits/**` is refused with `fix: worktree.py new <r> --kind <kind>`, naming the kind whose allowed set holds the path.
+- AC1.1 One decider, `scope(target) -> (repo, zone)`, zone ∈ root|repo|audit|worktree (never "kind", which names the four worktree kinds); a path under `worktrees/<r>/` belongs to `r`.
+  - A bound file-tool write under `repos/<r>/` outside `specs/audits/**` is refused with `fix: worktree.py new <r> --kind <kind>`, the kind taken from `worktree.py`'s KINDS table as the one whose allowed set holds the path.
   - The same write is allowed under `worktrees/<r>/<name>/` and under `repos/<r>/specs/audits/` (0124).
   - An unbound session with a native id is refused under both, with the `context bind` fix (0072).
+  - An unbound session with no native id and no `DADAIA_SESSION_ID` is not refused under `worktrees/<r>/`. This is a declared gap: refusing it would be a Stall, because the harness process env is not the shell env (0116). A write under `repos/<r>/` is refused for every session (0105).
   - `pytest tests/unit/features/spec_context/test_gate_policy.py tests/unit/hooks/test_sdd_gate.py` passes.
   - The row `unbound-session-never-scope-blocked` (`test_gate_policy.py:83`) and the always-writable ledger rows are rewritten to the refusals above. Restoring the unbound ALLOW fails them (F070).
   - `git grep -nE 'SPECS_ADDITIVE_GLOBS|bound_|_scope_block' -- dadaia_workspace` prints nothing. One path-to-repo decider remains: `core/invocation.py` and `hooks/sdd_gate.py` today.
@@ -134,7 +136,8 @@ F019–F051 share the destination of the bug each cites. F090–F112 share the d
   - Only `dd-gitflow-default` names `scripts/worktree.py`, and the seven skills carry one worktree line each (contract test).
   - The §3a shape table becomes the kinds' allowed sets. A bug worktree holds one fix commit (code, test, resolve lines, RED quoted). `dd-bug-resolution`'s separate RED commit is deleted (F053–F057, F008).
   - The title of ADR 0027 is repaired in place (F084).
-  - `CONTEXT.md` gains **Worktree** and **Worktree kind**, and its **Scope** and **Bind** entries are rewritten.
+  - `CONTEXT.md` gains **Worktree**, **Worktree kind** and **Zone**, and its **Scope** and **Bind** entries are rewritten.
+  - `dd-release-definition` §5 and `specs/releases/AGENTS.md` §3 state ADR 0141: one impl worktree per task, true `blocked by:` edges, exact `W:`, and a PLAN "Parallel schedule" (steps, width, critical path). `release.py check` refuses a PLAN without it, and two tasks in one step whose `W:` overlap outside the union/replay files.
 - AC1.14 Bootstrap (0140): once the `new` and `merge` tasks land, every later task of this candidate is made in a worktree. Every `git -C repos/dadaia-workspace reflog feature/0.5.0` entry after that commit reads `merge wt/…: Fast-forward`.
 - AC1.15 Migration, after AC1.14, in ADR 0131's order:
   - `git -C repos/<r> worktree list --porcelain` names only `worktrees/<r>/<name>`. The three worktrees in another session's `/tmp` are excepted until the operator confirms.
@@ -160,7 +163,8 @@ Study conclusions carried (ADR 0100; the scratch copy is ephemeral):
 - `gate_policy` `bound_*` and `_scope_block`.
 - The second path-to-repo decider.
 - `SPECS_ADDITIVE_GLOBS` and its always-writable ledgers under `repos/<r>/`.
-- The session id in the write decision.
+- The second session-id reader: the gate and bind read one id, environment first (the 1a27ae1f lesson; bind no longer invents a `sess_*` id).
+- "One `[-]` at a time unless TASKS declares disjoint write sets" (`specs/releases/AGENTS.md` §3), replaced by ADR 0141's schedule.
 - ADR 0098's split.
 - Worktrees under `.dadaia/tmp` and `/tmp`.
 - The §3a shape table.
