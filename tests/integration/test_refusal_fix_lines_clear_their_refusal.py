@@ -4,10 +4,14 @@ that, executed verbatim, clears the refusal.
 
 The doctor has this harness (``test_doctor_fix_lines_clear_their_finding.py``); these
 three verbs did not, and their fix lines failed review round after round, one site at a
-time. Each case below builds the triggering state over ``file://`` remotes, runs the
-real command as a child process with no TTY (what every agent harness sees — Rich wraps
-at 80 columns there), takes the single ``fix:`` line, fills its documented
-``<placeholders>``, runs it with ``sh -c`` and runs the command again. Progress rule:
+time. Each case below builds the triggering state over ``file://`` remotes and hits the
+refusal: a push-gate case feeds the ref lines git hands its hook to an in-process
+``ci push-gate-check`` (80 columns, no TTY); a baseline/alive/dead case runs the real
+command as a child process. It takes the single ``fix:`` line, fills its documented
+``<placeholders>``, runs it with ``sh -c`` and runs the real command (the real push through
+the shipped hook) again. One line without a TTY — every family prints through
+``cli/_fail.fail`` — is proven on a real child by
+:func:`test_every_fix_line_prints_on_one_line_without_a_tty`. Progress rule:
 the command then succeeds, or refuses with a DIFFERENT fix line (the next step), which is
 followed the same way — at most four steps, never a repeated line. A fix that is itself
 the publish (``git push …``, ``context baseline``) replaces the refused command: its
