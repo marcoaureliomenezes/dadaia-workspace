@@ -108,11 +108,11 @@ F019–F051 share the destination of the bug each cites. F090–F112 share the d
   - The merge runs fast-forward, then remove, then `branch -d`. Never `--force` or `-D`, and it re-runs after an interruption.
   - `clean` removes only a merged or commit-less `dadaia:`-locked worktree.
   - `worktree.py` runs no other script's verb. It imports only owner parsers (0135).
-  - Command: `pytest tests/integration/test_worktree_lifecycle.py tests/integration/test_worktree_merge_requires_review.py tests/integration/test_worktree_merge_allowed_sets.py`.
+  - Command: `pytest tests/integration/test_worktree_lifecycle.py` (the owner file, ADR 0146 (5)).
 - AC1.9 Parallel worktrees (0111):
   - JSONL ledgers merge by union, and the ledger check refuses a duplicate id.
   - TASKS markers replay, and the most advanced state wins.
-  - Command: `pytest tests/integration/test_worktree_parallel_merge.py`.
+  - Command: `pytest tests/integration/test_worktree_lifecycle.py`.
 - AC1.10 Hygiene, read from git alone (0108, 0112, 0128, 0100):
   - At SessionStart and compaction, the doctor lists the context's open worktrees: kind, age, commits ahead, dirty or clean.
   - A ready worktree carries `fix: worktree.py merge <path>`. One older than a day gets a WARN.
@@ -132,13 +132,13 @@ F019–F051 share the destination of the bug each cites. F090–F112 share the d
 ### Law, bootstrap, migration
 
 - AC1.13 One home per rule (0115, 0136):
-  - init scaffolds `worktrees/AGENTS.md`. The root map gains the `worktrees/` lines in §3, §4 and §5.
-  - Only `dd-gitflow-default` names `scripts/worktree.py`, and the seven skills carry one worktree line each (contract test).
+  - `public install` projects `worktrees/AGENTS.md`, the one home of the worktree rules (ADR 0146 (4)). The root map gains the `worktrees/` lines in §3, §4 and §5.
+  - Only `worktrees/AGENTS.md` and `dd-gitflow-default` name `scripts/worktree.py`; the seven skills carry one pointer line each to `worktrees/AGENTS.md` (contract test).
   - The §3a shape table becomes the kinds' allowed sets. A bug worktree holds one fix commit (code, test, resolve lines, RED quoted). `dd-bug-resolution`'s separate RED commit is deleted (F053–F057, F008).
   - The title of ADR 0027 is repaired in place (F084).
   - `CONTEXT.md` gains **Worktree**, **Worktree kind** and **Zone**, and its **Scope** and **Bind** entries are rewritten.
   - `dd-release-definition` §5 and `specs/releases/AGENTS.md` §3 state ADR 0141: one impl worktree per task, true `blocked by:` edges, exact `W:`, and a PLAN "Parallel schedule" (steps, width, critical path). `release.py check` refuses a PLAN without it, and two tasks in one step whose `W:` overlap outside the union/replay files.
-- AC1.14 Bootstrap (0140): once the `new` and `merge` tasks land, every later task of this candidate is made in a worktree. Every `git -C repos/dadaia-workspace reflog feature/0.5.0` entry after that commit reads `merge wt/…: Fast-forward`.
+- AC1.14 Bootstrap (0140): once the `new` and `merge` tasks land, every later task of this candidate is made in a worktree. Every `git -C repos/dadaia-workspace reflog feature/0.5.0` entry after that commit reads `merge wt/…: Fast-forward`, except T-050-106 and its two CI test fixes, the by-hand bootstrap of ADR 0145 that made `worktrees/` canon first.
 - AC1.15 Migration, after AC1.14, in ADR 0131's order:
   - `git -C repos/<r> worktree list --porcelain` names only `worktrees/<r>/<name>`. The three worktrees in another session's `/tmp` are excepted until the operator confirms.
   - `git ls-remote --tags origin 'archive/*'` names each discarded branch (F068, F085).

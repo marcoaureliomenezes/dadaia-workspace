@@ -90,7 +90,7 @@ Bug-history lessons (audit of the fix chain):
 
 - RED first per task; the RED command is named on each task line.
 - DEL leaves dead tests in the same commit: `test_gate_policy.py` ADDITIVE-ledger rows and `unbound-session-never-scope-blocked` (`:83`) are REWRITTEN to the refusals (F070); `test_core_file_io_purity.py:170` drops `SPECS_ADDITIVE_GLOBS`; `test_sdd_gate.py` rows on `_target_slug`/`bound_by_env` deleted — tests net ≤ 0 on 2.1.
-- New files the ACs cite: `tests/integration/test_worktree_new.py`, `test_worktree_lifecycle.py`, `test_worktree_merge_requires_review.py`, `test_worktree_merge_allowed_sets.py`, `test_worktree_parallel_merge.py`; a closure-refusal test; a worktree-venv `__file__` subprocess test. Existing: `test_gate_policy.py`, `test_sdd_gate.py`, `test_one_bind.py`, `test_ctx_inject_bind_boundary.py`, `test_context_dead_holds.py`, `test_reaper_spares_linked_worktrees.py`.
+- New files the ACs cite: `tests/integration/test_worktree_new.py` (`new`, `list`, the one-venv `__file__` case) and `test_worktree_lifecycle.py` (`merge`, `clean`, parallel merges); every other RED lands in the file that owns the behavior (ADR 0146 (5)): the closure refusal in `tests/unit/skills/test_release_implementation_release_script.py`, correlation in `test_bug_resolution_bugs_script.py` / `test_backlog_definition_backlog_script.py`. Existing: `test_gate_policy.py`, `test_sdd_gate.py`, `test_one_bind.py`, `test_ctx_inject_bind_boundary.py`, `test_context_dead_holds.py`, `test_reaper_spares_linked_worktrees.py`.
 - Worktree tests use a `tmp_path` git repo (real git, no venv, fenced root); every test carries `Intent: CONTRACT — AC1.x`.
 
 ## 4. Bootstrap and risks
@@ -106,12 +106,13 @@ Bug-history lessons (audit of the fix chain):
 |---|---|---|---|
 | 1 | T-050-95 | 1 | by hand on `feature/0.5.0` (bootstrap) |
 | 2 | T-050-96 | 1 | by hand on `feature/0.5.0` (bootstrap) |
-| 3 | T-050-97, T-050-98, T-050-99, T-050-101, T-050-102 | 5 | one impl worktree each |
-| 4 | T-050-100, T-050-103, T-050-104 | 3 | one impl worktree each; T-050-104 writes git refs only |
+| 2b | T-050-106 | 1 | by hand on `feature/0.5.0` (bootstrap: `worktrees/` canon before the first worktree, ADR 0145); the trio amendment of ADR 0146 in the first `release` worktree |
+| 3 | T-050-97, T-050-107, T-050-108, T-050-99, T-050-101 | 5 | one impl worktree each |
+| 4 | T-050-98, T-050-100, T-050-102, T-050-103, T-050-104 | 5 | one impl worktree each; T-050-104 writes git refs only |
 | 5 | T-050-105 | 1 | measure |
 
-- True edges only: a worktree task needs `wt.py new`/`merge` merged (T-050-96); T-050-100 also needs T-050-97 (`hooks/sdd_gate.py`) and T-050-99 (`hooks/ctx_inject.py`, `f/spec_context/doctor.py`). T-050-103 and T-050-104 are ready at step 3 but wait for the 5-worktree cap.
-- Overlap check: every task in one step has a `W:` set disjoint from its siblings', except `TASKS.md` markers (replay) and the JSONL ledgers (union), ADR 0111. Step 3's `release.py` writers: only T-050-102 (`_release_check.py`) and T-050-99 (`_release_phase.py`), distinct files; no task writes `release.py` itself.
-- Critical path: T-050-95 → 96 → 97 → 100 → 105 = 5 steps.
-- Merge order inside a step: step 3 — T-050-97 first (the gate lands before the law describes it), then T-050-98, T-050-99, T-050-102, T-050-101; step 4 — T-050-100, T-050-103, T-050-104. After each merge every open sibling worktree rebases onto `feature/0.5.0`; a conflict outside union/replay files means this PLAN's `W:` sets were wrong and the PLAN is corrected before the next merge.
+- True edges only: a worktree task needs T-050-106 merged (`worktrees/` canon); T-050-100 also needs T-050-97 (`hooks/sdd_gate.py`) and T-050-99 (`hooks/ctx_inject.py`, `f/spec_context/doctor.py`); T-050-98 needs T-050-108 (`test_worktree_lifecycle.py`); T-050-103 needs T-050-107 (`pub/data/AGENTS.md`). T-050-102 and T-050-104 are ready at step 3 but wait for the 5-worktree cap.
+- Overlap check: every task in one step has a `W:` set disjoint from its siblings', except `TASKS.md` markers (replay) and the JSONL ledgers (union), ADR 0111. `release.py` writers: T-050-99 (`_release_phase.py`, step 3) and T-050-102 (`_release_check.py`, step 4), different steps; no task writes `release.py` itself.
+- Critical path: T-050-95 → 96 → 106 → 97 → 100 → 105 = 6 steps.
+- Merge order inside a step: step 3 — T-050-107 first (the worktree law exists before the gate's refusal names it), then T-050-97, T-050-108, T-050-99, T-050-101; step 4 — T-050-98, T-050-100, T-050-102, T-050-103, T-050-104. After each merge every open sibling worktree rebases onto `feature/0.5.0`; a conflict outside union/replay files means this PLAN's `W:` sets were wrong and the PLAN is corrected before the next merge.
 - T-050-105 logs planned vs measured width per step, the critical path walked and every rebase conflict.
