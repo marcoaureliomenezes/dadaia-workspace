@@ -117,14 +117,14 @@ def test_list_reports_only_ours_with_ahead_and_dirty(root: Path) -> None:
     assert not list((root / ".dadaia/states").glob("*worktree*"))
 
 
-def test_the_one_venv_imports_the_checkout_it_runs_from(tmp_path: Path) -> None:
+def test_the_one_venv_imports_the_checkout_it_runs_from() -> None:
     """AC1.11 (ADR 0113): the shared venv's editable install points at repos/, yet a child
-    spawned from any cwd imports THIS checkout (the conftest PYTHONPATH pin), and no
+    spawned from the suite's hermetic cwd imports THIS checkout (the conftest PYTHONPATH pin), and no
     checkout carries its own venv."""
     checkout = Path(__file__).resolve().parents[2]
     child = subprocess.run(
         [sys.executable, "-c", "import dadaia_workspace; print(dadaia_workspace.__file__)"],
-        cwd=tmp_path, capture_output=True, text=True, check=True,
+        capture_output=True, text=True, check=True,
     )  # fmt: skip
     assert Path(child.stdout.strip()).resolve().is_relative_to(checkout)
     assert not (checkout / ".venv").exists()
