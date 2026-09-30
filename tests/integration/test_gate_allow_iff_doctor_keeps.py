@@ -20,7 +20,7 @@ from pathlib import Path
 
 import pytest
 
-from dadaia_workspace.core.workspace_layout import INSTANCE_EXCEPTIONS
+from dadaia_workspace.core.workspace_layout import DADAIAIGNORE
 from dadaia_workspace.features.spec_context.doctor import DoctorService, FindingVerdict
 from dadaia_workspace.infrastructure.git_subprocess import GitSubprocessClient
 from tests.fixtures.harness_env import claude_hook_env, run_hook_subprocess
@@ -52,7 +52,7 @@ def test_gate_allows_iff_the_doctor_keeps_the_entry(
     if existing is not None:
         (tmp_path / existing).mkdir()
     if glob is not None:
-        (tmp_path / INSTANCE_EXCEPTIONS).write_text(f"{glob}\n", encoding="utf-8")
+        (tmp_path / DADAIAIGNORE).write_text(f"{glob}\n", encoding="utf-8")
     path = tmp_path / target
     payload = {"tool_name": "Write", "tool_input": {"file_path": str(path), "content": "x"}}
 

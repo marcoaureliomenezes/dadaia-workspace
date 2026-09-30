@@ -1,5 +1,5 @@
 """Intent: CONTRACT — 0.4.6 AC8 (FR7, bug doctor-root1-flags-env-that-dadaia-md-9-declares-canonical)
-and AC7 (FR6, the ``INSTANCE_EXCEPTIONS`` reader); size: SMALL.
+and AC7 (FR6, the ``.dadaiaignore`` reader); size: SMALL.
 
 Harness-real behavior tests for dadaia_workspace.hooks.root_whitelist.
 
@@ -24,7 +24,7 @@ from typing import Any
 
 import pytest
 
-from dadaia_workspace.core.workspace_layout import INSTANCE_EXCEPTIONS
+from dadaia_workspace.core.workspace_layout import DADAIAIGNORE
 from dadaia_workspace.infrastructure.git_subprocess import GitSubprocessClient
 from tests.fixtures.harness_env import claude_hook_env, run_hook_subprocess
 from tests.fixtures.stores import context_store
@@ -55,10 +55,9 @@ def test_block_message_lists_every_whitelisted_entry(tmp_path: Path) -> None:
     assert block is not None
     reason = block["reason"]
     assert (
-        ".agents/ .claude/ .codex/ .cursor/ .dadaia/ .devin/ .git/ .github/ repos/ "
-        ".env .gitignore AGENTS.md prompt.md"
+        ".agents/ .claude/ .codex/ .cursor/ .dadaia/ .devin/ .git/ .github/ repos/ worktrees/ "
+        ".dadaiaignore .env .gitignore AGENTS.md prompt.md"
     ) in reason
-    assert INSTANCE_EXCEPTIONS not in reason
     assert "instance_exceptions" not in reason
 
 
@@ -178,7 +177,7 @@ def test_exception_glob_table(
 ) -> None:
     """sa-gate-allows-root-entries-the-reaper-moves#E2: an operator glob allows the entry."""
     ws = _ws(tmp_path)
-    (ws / INSTANCE_EXCEPTIONS).write_text(exceptions_content, encoding="utf-8")
+    (ws / DADAIAIGNORE).write_text(exceptions_content, encoding="utf-8")
     target = target_fn(ws)
     out, block = _run(
         tmp_path,

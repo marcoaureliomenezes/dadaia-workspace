@@ -1,5 +1,6 @@
 """Workspace filesystem-layout constants: the one home of every root, ``.dadaia/`` zone and
-``specs/`` canon name. Pure ``core`` leaf — stdlib only, no I/O; every consumer derives from it.
+``specs/`` canon name. ``core`` leaf — stdlib only; its one read is the operator's
+``.dadaiaignore`` (:func:`operator_globs`); every consumer derives from it.
 """
 
 from __future__ import annotations
@@ -24,7 +25,7 @@ __all__ = [
     "DADAIA_ROOT_FILES",
     "DADAIA_ZONES",
     "HARNESS_DIRS",
-    "INSTANCE_EXCEPTIONS",
+    "DADAIAIGNORE",
     "SPECS_ADDITIVE_GLOBS",
     "MEMORY_TOPLEVEL_FILES",
     "REPO_LAW",
@@ -44,7 +45,9 @@ __all__ = [
     "Zone",
     "ZoneClass",
     "additive_prefixes",
-    "parse_exception_globs",
+    "dadaiaignore_seed",
+    "operator_globs",
+    "parse_dadaiaignore",
     "public_scripts_dir",
     "repo_excluded_display",
     "root_entries_display",
@@ -68,8 +71,14 @@ AUDIT_DIR_NAME_PATTERN: str = r"\d{8}-[a-z0-9][a-z0-9-]*"
 AUDIT_DIR_NAME_RE: re.Pattern[str] = re.compile(f"^{AUDIT_DIR_NAME_PATTERN}$")
 
 
-#: Files the workspace root may contain: the root map, the operator prompt, the credential home.
-ROOT_ALLOWED_FILES: frozenset[str] = frozenset({"AGENTS.md", "prompt.md", ".env", ".gitignore"})
+#: The operator's file of legitimate workspace paths, at the root (ADRs 0092, 0145).
+DADAIAIGNORE: str = ".dadaiaignore"
+
+#: Files the workspace root may contain: the root map, the operator prompt, the credential
+#: home, the operator's own globs.
+ROOT_ALLOWED_FILES: frozenset[str] = frozenset(
+    {"AGENTS.md", "prompt.md", ".env", ".gitignore", DADAIAIGNORE}
+)
 
 
 class ZoneClass(StrEnum):
@@ -117,7 +126,6 @@ STATES_CANON: frozenset[str] = frozenset(
         "agent_model_policy.json",
         "agent_model_policy.json.last-good.json",
         "privacy_denylist.json",
-        "instance_exceptions.txt",
         "backlog_subject_aliases.txt",
         "harness_profile.json",
         "AGENTS.md",
@@ -145,19 +153,55 @@ DADAIA_ZONES: tuple[Zone, ...] = (
 #: Files (not zones) the ``.dadaia/`` top level may contain.
 DADAIA_ROOT_FILES: frozenset[str] = frozenset({"AGENTS.md", ".gitignore"})
 
-#: The operator's exception globs (workspace-relative).
-INSTANCE_EXCEPTIONS: str = ".dadaia/states/instance_exceptions.txt"
-
 #: Absolute tool caches in tmp, exported by the harness env.
 TOOL_CACHE_ENV: dict[str, str] = {"MYPY_CACHE_DIR": "mypy-cache", "RUFF_CACHE_DIR": "ruff-cache"}
 MARKER_DIR: Path = Path(".dadaia") / "tmp" / "hooks"
 
 
-def parse_exception_globs(text: str) -> tuple[str, ...]:
-    """One glob per line; ``#`` lines and blanks dropped; a directory glob's trailing ``/``
-    dropped (``fnmatch`` never matches it); deduplicated, first kept, order kept."""
-    lines = (line.strip().rstrip("/") for line in text.splitlines())
-    return tuple(dict.fromkeys(line for line in lines if line and not line.startswith("#")))
+def parse_dadaiaignore(text: str) -> tuple[tuple[str, ...], tuple[str, ...]]:
+    """(patterns, invalid lines) of a ``.dadaiaignore`` (ADR 0093): one root-relative pattern
+    per line, ``#`` comments, ``*`` within one segment, a trailing ``/`` for a directory
+    (dropped); ``!``, ``**``, an absolute path or ``..`` is invalid. Deduplicated, order kept."""
+    kept: dict[str, None] = {}
+    invalid: list[str] = []
+    for raw in text.splitlines():
+        line = raw.strip()
+        if not line or line.startswith("#"):
+            continue
+        pattern = line.rstrip("/")
+        if line.startswith(("!", "/")) or "**" in line or ".." in pattern.split("/"):
+            invalid.append(line)
+        else:
+            kept[pattern] = None
+    return tuple(kept), tuple(invalid)
+
+
+def operator_globs(workspace: Path) -> tuple[tuple[str, ...], tuple[str, ...]]:
+    """The one reader of ``<workspace>/.dadaiaignore``, for the gate and the doctor; absent
+    or unreadable is no pattern."""
+    try:
+        text = (workspace / DADAIAIGNORE).read_text(encoding="utf-8")
+    except OSError:
+        return (), ()
+    return parse_dadaiaignore(text)
+
+
+def dadaiaignore_seed(workspace: Path) -> str:
+    """What a new ``.dadaiaignore`` starts with — ``init`` and ``doctor --fix`` alike: the
+    legacy ``states/instance_exceptions.txt`` 1:1 (then held as slop), else the template."""
+    try:
+        return (workspace / ".dadaia" / "states" / "instance_exceptions.txt").read_text("utf-8")
+    except OSError:
+        return (
+            "# Operator-only: one root-relative pattern per line, * within one segment, a\n"
+            "# trailing / for a directory; no ! and no ** (ADR 0093).\n"
+        )
+
+
+def _matches(sub: str, pattern: str) -> bool:
+    """*pattern* matches the root-relative *sub* segment by segment (``*`` never crosses ``/``)."""
+    parts, globs = sub.split("/"), pattern.split("/")
+    return len(parts) == len(globs) and all(map(fnmatch.fnmatch, parts, globs))
 
 
 def verdict(rel: str, is_dir: bool, globs: tuple[str, ...]) -> Literal["canon", "operator", "slop"]:
@@ -180,8 +224,7 @@ def verdict(rel: str, is_dir: bool, globs: tuple[str, ...]) -> Literal["canon", 
             return "canon"
         if any(fnmatch.fnmatch(name, a) for a in allowed):
             continue
-        sub = "/".join(parts[: depth + 1])
-        excepted = any(fnmatch.fnmatch(name, g) or fnmatch.fnmatch(sub, g) for g in globs)
+        excepted = any(_matches("/".join(parts[: depth + 1]), g) for g in globs)
         return "operator" if excepted else "slop"
     return "canon"
 
@@ -259,7 +302,9 @@ HARNESS_DIRS: frozenset[str] = frozenset(
     {".agents", *(d for dirs in HARNESS_PROJECTION_DIRS.values() for d in dirs)}
 )
 
-ROOT_ALLOWED_DIRS: frozenset[str] = frozenset({".dadaia", ".git", "repos"} | HARNESS_DIRS)
+ROOT_ALLOWED_DIRS: frozenset[str] = frozenset(
+    {".dadaia", ".git", "repos", "worktrees"} | HARNESS_DIRS
+)
 
 #: Tool artifacts a repo working tree may carry but that are never source.
 REPO_TREE_ARTIFACTS: tuple[str, ...] = (

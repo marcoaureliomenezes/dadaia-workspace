@@ -281,9 +281,9 @@ _Avoid_: reaper walk, gc, cleanup pass, per-call-site guard
 `WS-<zone>-<verdict>` — `<zone>` is `root`, a harness dir (`claude codex kimi-code agents`), `dadaia` (the `.dadaia/` top level) or a zone name with its leading dot stripped (`cache`); the `workspace` section's code family, beside `SPEC-DOC-*`, `TREE-*`, `RELEASE-TREE-*` (specs) and `BL-SCHEMA|CONFLICT|STALE`, `LEDGER-<NAME>-SCHEMA` (ledgers).
 _Avoid_: ROOT-n, EFF-n, issue code
 
-**Instance exceptions**:
-`states/instance_exceptions.txt` — one glob per line, `#` comments, deduplicated, order kept; matches at the root and inside the harness dirs. Outside the projection manifest and outside the exceptions = slop. Replaces `root_exceptions.txt`.
-_Avoid_: root exceptions, allowlist, whitelist (the root whitelist is the gate's law, not the operator's globs)
+**.dadaiaignore**:
+The operator's file at the workspace root, PROTECTED from agents: one root-relative pattern per line, `#` comments, `*` within one segment, a trailing `/` for a directory; no `!`, no `**` (an invalid line is a doctor finding). An entry neither in level 1 of the root canon nor named here = slop. Replaces `states/instance_exceptions.txt`, which `doctor --fix` migrates 1:1.
+_Avoid_: instance exceptions, allowlist, whitelist (the root whitelist is the gate's law, not the operator's patterns)
 
 ## Authorities
 

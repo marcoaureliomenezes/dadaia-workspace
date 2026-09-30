@@ -59,8 +59,8 @@ class FindingVerdict(StrEnum):
 
 _DETAIL = {
     FindingVerdict.CANON: "",
-    FindingVerdict.OPERATOR: "(instance exception)",
-    FindingVerdict.SLOP: "(not in the root law or the exceptions)",
+    FindingVerdict.OPERATOR: "(named in .dadaiaignore)",
+    FindingVerdict.SLOP: "(not in the root law or .dadaiaignore)",
 }
 _CANONICAL = frozenset({FindingVerdict.CANON, FindingVerdict.OPERATOR, FindingVerdict.REAPED})
 
@@ -279,8 +279,8 @@ class DoctorService:
 
     def scan(self) -> tuple[Finding, ...]:
         """Every entry of the instance, classified, in the fixed FR3 order."""
-        globs = self._exception_globs()
-        findings: list[Finding] = []
+        globs, invalid = workspace_layout.operator_globs(self._workspace_root)
+        findings: list[Finding] = [*self._scan_dadaiaignore(invalid)]
         findings.extend(self._scan_root(globs))
         findings.extend(self._scan_dadaia_top(globs))
         findings.extend(self._scan_repo_trees())
@@ -359,15 +359,6 @@ class DoctorService:
                         pending.append(entry)
         return out
 
-    def _exception_globs(self) -> tuple[str, ...]:
-        try:
-            text = (self._workspace_root / workspace_layout.INSTANCE_EXCEPTIONS).read_text(
-                encoding="utf-8"
-            )
-        except OSError:
-            return ()
-        return workspace_layout.parse_exception_globs(text)
-
     def _judged(self, entry: Path, globs: tuple[str, ...]) -> tuple[FindingVerdict, str]:
         """``workspace_layout.verdict`` — the gate's own answer — plus the report detail."""
         rel = entry.relative_to(self._workspace_root).as_posix()
@@ -392,6 +383,24 @@ class DoctorService:
             detail=detail,
             target=target,
         )
+
+    def _scan_dadaiaignore(self, invalid: tuple[str, ...]) -> list[Finding]:
+        """A missing ``.dadaiaignore`` is seeded by ``--fix``; an invalid line is reported,
+        never fixed — the file is the operator's (ADRs 0092, 0093, 0145)."""
+        target = self._workspace_root / workspace_layout.DADAIAIGNORE
+        if not target.exists():
+            detail = "(seeded by --fix from the legacy states/instance_exceptions.txt, else empty)"
+            return [
+                self._finding("root", self._workspace_root, target, FindingVerdict.MISSING, detail)
+            ]
+        return [
+            self._finding(
+                "root", self._workspace_root, target, FindingVerdict.SLOP,
+                f"(invalid line {line!r}: no !, **, / or .. — ADR 0093; the operator edits it)",
+                fixable=False,
+            )
+            for line in invalid
+        ]  # fmt: skip
 
     def _scan_root(self, globs: tuple[str, ...]) -> list[Finding]:
         out: list[Finding] = []
@@ -488,13 +497,12 @@ class DoctorService:
         through the ONE sweep guard: it reports what it did or that it skipped, never
         aborts, and never touches a location outside the workspace."""
         actions: list[str] = []
-        findings = self.scan()
-        for finding in findings:
+        for finding in self.scan():
             if finding.verdict is FindingVerdict.MISSING and finding.fixable:
                 actions.extend(
                     sweep.guarded(finding.code, finding.path, partial(self._seed, finding))
                 )
-        actions.extend(self._reap(findings))
+        actions.extend(self._reap(self.scan()))  # judged after the seed: a new .dadaiaignore counts
         for ctx in self._contexts():
             for repo in ctx.all_repos() if ctx.state is ContextState.DEAD else ():
                 if (repo_path := self._repos_dir() / repo.slug).exists():
@@ -505,7 +513,7 @@ class DoctorService:
         """MOVE every slop entry into the reaped zone. Never deletes."""
         actions: list[str] = []
         for finding in findings:
-            if finding.verdict is not FindingVerdict.SLOP:
+            if finding.verdict is not FindingVerdict.SLOP or not finding.fixable:
                 continue
             step = partial(sweep.hold, self._workspace_root, finding.target, finding.path)
             actions.extend(sweep.guarded(finding.code, finding.path, step))
@@ -541,6 +549,9 @@ class DoctorService:
                 if any((self._workspace_root / d).is_dir() for d in dirs)
             )
             JsonHarnessProfileStore().write(self._states, HarnessProfile.of(present))
+        elif finding.target.name == workspace_layout.DADAIAIGNORE:
+            text = workspace_layout.dadaiaignore_seed(self._workspace_root)
+            finding.target.write_text(text, encoding="utf-8")
         else:
             finding.target.mkdir(parents=True, exist_ok=True)
         return f"created '{finding.path}'"

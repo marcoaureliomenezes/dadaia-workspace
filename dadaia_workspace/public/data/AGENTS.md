@@ -44,7 +44,7 @@
 
 ## 4. Where things are written
 
-- Root holds only: `<!-- root -->`; any other entry, the operator's included, needs an operator-written glob in `.dadaia/states/instance_exceptions.txt`.
+- Root holds only: `<!-- root -->`; any other entry, the operator's included, needs an operator-written pattern in `.dadaiaignore`, which only the operator edits.
 - Temp: `.dadaia/tmp/<agent>/<YYYYMMDD>/`; handoffs: `.dadaia/handoff/<context>/`; HTML reports: `repos/<slug>/reports/<agent>/`; caches: `.dadaia/tmp/<tool>-cache/` (absolute, via the harness env), `.dadaia/mcps/<server>/`.
 - A repo tree carries source and its own artifacts only — never `.dadaia/`; caches redirect by configuration (`repos/<slug>/AGENTS.md`).
 - Credentials live only in the operator's root `.env`: never create, copy, persist, commit, print or report a secret, anywhere.

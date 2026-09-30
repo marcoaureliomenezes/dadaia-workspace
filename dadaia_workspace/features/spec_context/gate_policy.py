@@ -50,6 +50,12 @@ _LAW_MESSAGE = (
     "The source is dadaia_workspace/public/; this re-projects it:\n"
 )
 
+#: ``.dadaiaignore`` is the operator's alone (ADR 0092): an agent proposes a pattern, never writes it.
+_OPERATOR_MESSAGE = (
+    "[GATE] .dadaiaignore is the operator's file (ADR 0092): only the operator edits it by "
+    "hand. Hand the operator the pattern you need; the doctor names every unadmitted entry.\n"
+)
+
 #: BLOCK message for a MUTATING write into a repo outside the Bind's scope (FR1, Q1).
 #: Only ``repos/<slug>/`` is scope-judged: a workspace-root path is in scope under any
 #: bind, and a slug no Context registers is unattributable, so it ALLOWS (fail-open).
@@ -103,7 +109,7 @@ def classify_path(rel_path: str, projected: frozenset[str] = frozenset()) -> Pat
     there is no UNGATED fall-through, so nothing at the root escapes classification.
     """
     p = rel_path.lstrip("/")
-    if p in projected or p.startswith(_PROTECTED_PREFIX):
+    if p in projected or p.startswith(_PROTECTED_PREFIX) or p == workspace_layout.DADAIAIGNORE:
         return PathClass.PROTECTED
 
     ctx_rel = _context_relative(p)
@@ -183,13 +189,14 @@ def evaluate(
 
     # PROTECTED is the sole fail-closed path and is evaluated before fail-open branches.
     if cls == PathClass.PROTECTED:
-        if not rel_path.lstrip("/").startswith(_PROTECTED_PREFIX):
-            restore = fix_line(root, "public", "install")  # re-projects the law from staging
-            return Decision.BLOCK, _LAW_MESSAGE.format(path=rel_path) + f"fix: {restore}"
-        return (
-            Decision.BLOCK,
-            _PROTECTED_MESSAGE + f"fix: {fix_line(root, 'context', 'bind', '<ctx>')}",
-        )
+        p = rel_path.lstrip("/")
+        if p.startswith(_PROTECTED_PREFIX):
+            message, fix = _PROTECTED_MESSAGE, fix_line(root, "context", "bind", "<ctx>")
+        elif p == workspace_layout.DADAIAIGNORE:
+            message, fix = _OPERATOR_MESSAGE, fix_line(root, "doctor")  # names what to ask for
+        else:  # re-projects the law from staging
+            message, fix = _LAW_MESSAGE.format(path=rel_path), fix_line(root, "public", "install")
+        return Decision.BLOCK, message + f"fix: {fix}"
 
     if cls == PathClass.ADDITIVE:
         return Decision.ALLOW, ""

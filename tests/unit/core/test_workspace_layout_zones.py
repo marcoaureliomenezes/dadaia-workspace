@@ -35,7 +35,6 @@ _SPEC_STATES_CANON = {
     "agent_model_policy.json",
     "agent_model_policy.json.last-good.json",
     "privacy_denylist.json",
-    "instance_exceptions.txt",
     "backlog_subject_aliases.txt",
     "harness_profile.json",
     "AGENTS.md",
@@ -71,7 +70,7 @@ def test_derived_views_follow_the_registry() -> None:
     assert rows["tmp"][2:] == ("ephemeral", "86400", "runtime")
     assert rows["references"][2:] == ("operator", "never", "operator")
     assert frozenset({"AGENTS.md", ".gitignore"}) == wl.DADAIA_ROOT_FILES
-    assert wl.INSTANCE_EXCEPTIONS == ".dadaia/states/instance_exceptions.txt"
+    assert wl.DADAIAIGNORE in wl.ROOT_ALLOWED_FILES and "worktrees" in wl.ROOT_ALLOWED_DIRS
 
 
 @pytest.mark.parametrize(
@@ -92,6 +91,16 @@ def test_derived_views_follow_the_registry() -> None:
         ),
     ],
 )
-def test_parse_exception_globs(text: str, expected: tuple[str, ...]) -> None:
-    """The operator exception file parses to stripped, deduped, slash-free globs."""
-    assert wl.parse_exception_globs(text) == expected
+def test_parse_dadaiaignore(text: str, expected: tuple[str, ...]) -> None:
+    """``.dadaiaignore`` parses to stripped, deduped, slash-free root-relative patterns."""
+    assert wl.parse_dadaiaignore(text) == (expected, ())
+
+
+def test_dadaiaignore_invalid_lines_and_segment_scope() -> None:
+    """ADR 0093: ``!``, ``**``, an absolute path or ``..`` is invalid, never a pattern; ``*``
+    stays inside one segment, so a root pattern admits nothing below the root."""
+    text = "!keep\nnotes/**\n/abs\na/../b\n*.png\n"
+    assert wl.parse_dadaiaignore(text) == (("*.png",), ("!keep", "notes/**", "/abs", "a/../b"))
+    assert wl.verdict("shot.png", False, ("*.png",)) == "operator"
+    assert wl.verdict(".dadaia/shot.png", False, ("*.png",)) == "slop"
+    assert wl.verdict(".dadaia/shot.png", False, (".dadaia/*.png",)) == "operator"

@@ -55,6 +55,7 @@ _CTX_REL = (
     pytest.param(".dadaia/handoff/ctx/h.json", A, id="root-dadaia-handoff"),
     pytest.param(".dadaia/tmp/agent/x.txt", A, id="root-dadaia-tmp"),
     pytest.param(".dadaia/sessions/runtime/ctx.ptr", P, id="root-session-state-protected"),
+    pytest.param(".dadaiaignore", P, id="root-dadaiaignore-operator-only"),
     pytest.param("some/loose/path.txt", M, id="root-loose"),
     pytest.param("repos/foo", M, id="bare-repo-no-remainder"),
     pytest.param("repos/foo/", M, id="bare-repo-trailing-slash"),

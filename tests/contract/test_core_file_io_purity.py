@@ -54,7 +54,7 @@ def _functions(tree: ast.AST) -> Iterator[ast.FunctionDef | ast.AsyncFunctionDef
 #: enters core/ only by joining this set on purpose.
 _CORE_IO_STEMS = frozenset(
     {"workspace_resolver", "atomic_write", "invocation", "session_store", "handoff_index",
-     "template_history", "gitflow"}
+     "template_history", "gitflow", "workspace_layout"}
 )  # fmt: skip
 _PATH_IO_ATTRS = frozenset(
     {"read_text", "write_text", "mkdir", "exists", "glob", "iterdir", "rglob"}

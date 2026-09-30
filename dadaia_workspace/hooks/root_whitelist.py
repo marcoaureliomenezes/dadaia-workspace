@@ -13,14 +13,6 @@ from dadaia_workspace.core.cli_line import mkdir_line
 from dadaia_workspace.hooks import _common
 
 
-def _exception_globs(workspace: Path) -> tuple[str, ...]:
-    try:
-        text = (workspace / workspace_layout.INSTANCE_EXCEPTIONS).read_text(encoding="utf-8")
-    except OSError:
-        return ()
-    return workspace_layout.parse_exception_globs(text)
-
-
 def evaluate_payload(payload: dict[str, object]) -> str | None:
     """The block reason when ANY write target lands a slop entry, else ``None``."""
     name = str(payload.get("tool_name") or "")
@@ -52,7 +44,8 @@ def _root_violation(workspace: Path, raw_path: str) -> str | None:
         return None
     if (
         not rel.parts
-        or workspace_layout.verdict(rel.as_posix(), False, _exception_globs(ws)) != "slop"
+        or workspace_layout.verdict(rel.as_posix(), False, workspace_layout.operator_globs(ws)[0])
+        != "slop"
     ):
         return None
     return (

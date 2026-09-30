@@ -20,7 +20,7 @@ from dadaia_workspace.core import workspace_layout
 from dadaia_workspace.core.harness_registry import L1_ENTRY_HARNESSES
 from dadaia_workspace.core.workspace_layout import (
     DADAIA_ROOT_FILES,
-    INSTANCE_EXCEPTIONS,
+    DADAIAIGNORE,
     Creator,
     ZoneClass,
     provisioned_zones,
@@ -55,7 +55,8 @@ def _reaped(root: Path, rel: str) -> Path:
 
 
 def _init_workspace(root: Path) -> None:
-    """The minimal compliant skeleton: every INIT/INSTALL zone present, one root file."""
+    """The minimal compliant skeleton: every INIT/INSTALL zone present, `.dadaiaignore`."""
+    (root / DADAIAIGNORE).write_text("", encoding="utf-8")
     dadaia = root / ".dadaia"
     for zone in provisioned_zones():
         (dadaia / zone.name).mkdir(parents=True, exist_ok=True)
@@ -110,7 +111,7 @@ def test_root_and_dadaia_top_level_classify_every_entry(tmp_path: Path) -> None:
         (tmp_path / name).mkdir()
     (tmp_path / "random_junk.txt").write_text("oops", encoding="utf-8")
     (tmp_path / "shot.png").write_bytes(b"PNG")
-    (tmp_path / INSTANCE_EXCEPTIONS).write_text("# comment\n*.png\n", encoding="utf-8")
+    (tmp_path / DADAIAIGNORE).write_text("# comment\n*.png\n", encoding="utf-8")
     for name in (*DADAIA_ROOT_FILES, ".DS_Store"):
         (dadaia / name).write_text("x", encoding="utf-8")
     (dadaia / _OPERATOR_ZONE.name / "some-clone").mkdir(parents=True)
@@ -447,3 +448,30 @@ def test_a_symlinked_zone_root_is_never_walked(
     assert victim.read_text(encoding="utf-8") == "keep"
     assert zone_dir.is_symlink()
     assert actions == []
+
+
+def test_fix_migrates_the_legacy_exceptions_into_dadaiaignore_and_never_moves_it(
+    tmp_path: Path,
+) -> None:
+    """ADRs 0092, 0093, 0145: a missing ``.dadaiaignore`` is seeded 1:1 from the legacy
+    file, which is then slop and held; an invalid line is reported and never fixed."""
+    _init_workspace(tmp_path)
+    (tmp_path / DADAIAIGNORE).unlink()
+    legacy = tmp_path / ".dadaia/states/instance_exceptions.txt"
+    legacy.write_text("*.png\n!keep\n", encoding="utf-8")
+    (tmp_path / "shot.png").write_bytes(b"PNG")  # admitted only by the migrated line
+    assert _by_path(_make_doctor(tmp_path).scan())[DADAIAIGNORE].verdict is FindingVerdict.MISSING
+    _make_doctor(tmp_path).fix()
+    assert (tmp_path / DADAIAIGNORE).read_text(encoding="utf-8") == "*.png\n!keep\n"
+    assert not legacy.exists()
+    assert (tmp_path / "shot.png").exists()  # judged after the seed, never reaped
+    (invalid,) = [
+        f
+        for f in _make_doctor(tmp_path).scan()
+        if f.path == DADAIAIGNORE and f.verdict is FindingVerdict.SLOP
+    ]
+    assert (
+        invalid.verdict is FindingVerdict.SLOP and not invalid.fixable and "!keep" in invalid.detail
+    )
+    _make_doctor(tmp_path).fix()
+    assert (tmp_path / DADAIAIGNORE).is_file()

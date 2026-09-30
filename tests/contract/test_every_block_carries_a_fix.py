@@ -244,7 +244,7 @@ def test_the_root_block_fix_runs_from_a_repo_cwd_and_never_writes_the_exceptions
     ]
     assert [r.returncode for r in runs] == [0, 0]
     assert (workspace / ".dadaia" / "tmp").is_dir()
-    assert not (workspace / ".dadaia" / "states" / "instance_exceptions.txt").exists()
+    assert not (workspace / ".dadaiaignore").exists()  # the fix never writes the operator's file
 
 
 # ── dadaia doctor (exit 1) ──────────────────────────────────────────────────────
