@@ -132,13 +132,20 @@ def test_a_ghost_env_never_denies_and_is_surfaced(tmp_path: Path) -> None:
     assert gate.block_envelope() is None
 
 
+@pytest.mark.parametrize(
+    "bound",
+    ["alpha", None],
+    ids=["bound-elsewhere", "unbound-native-session-writes-freely-into-repos"],
+)
 def test_running_the_printed_scope_fix_clears_the_deny(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, bound: str | None
 ) -> None:
-    """sa-bind-has-two-stores#S4: a record-bound session denied a write runs the printed
-    `context bind` fix and the retried write is ALLOWED — even with a stale env export."""
+    """sa-bind-has-two-stores#S4 + ADR 0072: a session with a native id, bound elsewhere or
+    unbound, denied a write runs the printed `context bind` fix and the retried write is
+    ALLOWED — even with a stale env export."""
     ws = _workspace(tmp_path, "alpha", "beta")
-    _record(ws, "s1", "alpha")
+    if bound:
+        _record(ws, "s1", bound)
     env = {**claude_hook_env(ws, session_id="s1"), "DADAIA_CONTEXT": "alpha"}
     target = ws / "repos" / "beta" / "x.py"
     payload = {"tool_name": "Write", "tool_input": {"file_path": str(target)}, "session_id": "s1"}

@@ -55,7 +55,7 @@ _LAW_MESSAGE = (
 #: bind, and a slug no Context registers is unattributable, so it ALLOWS (fail-open).
 _SCOPE_BLOCK_MESSAGE = (
     "[GATE] '{rel_path}' writes into repo '{slug}', owned by context '{owner}' — this "
-    "session is bound to '{bound}', whose scope is: {scope}.\n"
+    "session is bound to {bound}, whose scope is: {scope}.\n"
 )
 
 
@@ -131,7 +131,7 @@ def _scope_block(
     already resolves the Invocation once); this module imports nothing from
     ``core.invocation`` (P-09: the resolution seam has a single home).
     """
-    if bound_context is None or target_slug is None or target_owner is None:
+    if target_owner is None or (bound_context is None and bound_by_env):
         return None
     if target_slug in bound_repos or target_owner == bound_context:
         return None
@@ -140,7 +140,7 @@ def _scope_block(
             rel_path=rel_path,
             slug=target_slug,
             owner=target_owner,
-            bound=bound_context,
+            bound=f"'{bound_context}'" if bound_context else "no context",
             scope=", ".join(sorted(bound_repos)) or "no registered repo",
         )
         + "fix: "
@@ -173,9 +173,10 @@ def evaluate(
 
     SCOPE (FR1, Q1): only ``repos/<slug>/`` is scope-judged. *target_slug* is the repo
     the write lands in and *target_owner* the context that registers it; the write is
-    refused only when the session is BOUND, some context demonstrably owns that slug,
-    and it is not the bound context's own (*bound_repos* = main + associated). An
-    unbound session, a workspace-root path, and a slug no context registers all ALLOW —
+    refused when some context demonstrably owns that slug and it is not the bound
+    context's own (*bound_repos* = main + associated) — an unbound session with a native
+    id owns nothing (ADR 0072). An id-less session with no env bind, a workspace-root
+    path, and a slug no context registers all ALLOW —
     the gate cannot attribute them, and fail-open is the posture. A MUTATING write is
     never blocked on another session: races surface through git.
     """

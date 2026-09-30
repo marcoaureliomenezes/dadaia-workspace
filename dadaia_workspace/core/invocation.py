@@ -54,7 +54,7 @@ _SESSION_ID_STRIP = re.compile(r"[^A-Za-z0-9_-]")
 @dataclass(frozen=True)
 class Bind:
     """The session's own binding: its context and every repo slug that context owns.
-    Unbound (``None``, empty ``repos``) is never scope-blocked."""
+    Unbound (``None``, empty ``repos``) owns no repo."""
 
     context_name: str | None = None
     repos: frozenset[str] = frozenset()
