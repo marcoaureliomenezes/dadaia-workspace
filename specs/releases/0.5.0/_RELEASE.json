@@ -1,14 +1,14 @@
 {
   "schema": "release-state-v1",
   "release": "0.5.0",
-  "phase": "IMPLEMENTATION",
+  "phase": "CLOSURE",
   "defined": {
     "sha": "c8f0321a",
     "ts": "2026-09-30T03:22:46Z"
   },
   "implemented": {
-    "sha": "0d31a5f2",
-    "ts": "2026-09-30T02:48:05Z"
+    "sha": "91262c55",
+    "ts": "2026-09-30T19:07:41Z"
   },
   "shipped": null,
   "log": [
@@ -464,6 +464,12 @@
       "agent": "release.py",
       "kind": "note",
       "text": "Candidate defined at c8f0321a; phase IMPLEMENTATION."
+    },
+    {
+      "ts": "2026-09-30T19:07:41Z",
+      "agent": "release.py",
+      "kind": "note",
+      "text": "Candidate implemented at 91262c55; phase CLOSURE."
     }
   ]
 }
