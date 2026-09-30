@@ -17,10 +17,13 @@ Each write set includes its tests; a DEL's dead tests leave in the same commit. 
 - [x] **T-050-96 — `worktree.py merge` and `clean`.** `W:` `wt.py`, `tests/integration/test_worktree_lifecycle.py`, `tests/integration/test_worktree_merge_requires_review.py`, `tests/integration/test_worktree_merge_allowed_sets.py`
   `blocked by:` T-050-95 · `delivers:` AC1.8 · `RED:` `pytest tests/integration/test_worktree_lifecycle.py tests/integration/test_worktree_merge_requires_review.py tests/integration/test_worktree_merge_allowed_sets.py` · Δ +140 (`wt.py`).
 
+- [-] **T-050-106 — Level-1 root canon: `worktrees/` and `.dadaiaignore` (ADR 0145).** `W:` `core/workspace_layout.py`, `hooks/root_whitelist.py`, `f/spec_context/doctor.py`, `f/spec_context/gate_policy.py`, `pub/data/AGENTS.md`, `CONTEXT.md`, `docs/concepts.md`, `tests/unit/core/test_workspace_layout_zones.py`, `tests/unit/hooks/test_root_whitelist.py`, `tests/unit/test_spec_context_doctor_root.py`, `tests/integration/test_gate_allow_iff_doctor_keeps.py`, `tests/unit/features/spec_context/test_sweep.py`, `tests/contract/test_every_block_carries_a_fix.py`
+  `blocked by:` T-050-96 · `delivers:` AC1.6 (root slice), ADRs 0092-0094 core; by hand on the work branch (bootstrap, like T-050-95/96) · `RED:` `pytest tests/unit/core/test_workspace_layout_zones.py tests/unit/test_spec_context_doctor_root.py` · Δ ≈ 0.
+
 ### Scope — the first task made in a worktree
 
 - [ ] **T-050-97 — One `scope()` decider, the gate rewrite, bind without a mint.** `W:` `core/invocation.py`, `core/workspace_layout.py`, `f/spec_context/gate_policy.py`, `hooks/sdd_gate.py`, `cli/commands/context.py`, `tests/unit/features/spec_context/test_gate_policy.py`, `tests/unit/hooks/test_sdd_gate.py`, `tests/integration/test_one_bind.py`, `tests/contract/test_core_file_io_purity.py`, `tests/contract/test_zone_registry.py`
-  `blocked by:` T-050-96 · `delivers:` AC1.14 starts (made in a `wt.py new` worktree, landed by `wt.py merge`); AC1.1, AC1.6, AC1.2 (bind refusal clause); DEL `unbound-native-session-writes-freely-into-repos`, `additive-globs-hand-kept-beside-the-canon` · `RED:` `pytest tests/unit/features/spec_context/test_gate_policy.py tests/unit/hooks/test_sdd_gate.py` with the `:83` row and the ledger rows rewritten to refusals · Δ −45.
+  `blocked by:` T-050-106 · `delivers:` AC1.14 starts (made in a `wt.py new` worktree, landed by `wt.py merge`); AC1.1, AC1.6, AC1.2 (bind refusal clause); DEL `unbound-native-session-writes-freely-into-repos`, `additive-globs-hand-kept-beside-the-canon` · `RED:` `pytest tests/unit/features/spec_context/test_gate_policy.py tests/unit/hooks/test_sdd_gate.py` with the `:83` row and the ledger rows rewritten to refusals · Δ −45.
 
 ### Worktrees in use — step 3 (with T-050-97), step 4, step 5 (PLAN §5)
 
