@@ -63,6 +63,11 @@ F019–F051 share the destination of the bug each cites. F090–F112 share the d
 - G3 Every still-open bug is re-run at `<end>`. One that no longer reproduces is resolved, citing the commit that removed its cause. The count is logged.
 - G4 CI is green on the three OSes. `.dadaia/.venv/bin/dadaia doctor --context dadaia-workspace` exits 0. The per-job wall-clock stays within ADR 0119.
 - G5 A test that a DEL leaves dead leaves in the same commit; a new test states its intent and passes `dd-test-stewardship`'s admission.
+- G6 At each candidate's closure (amendment 11):
+  - The open findings of `20260930-structural-convergence` and the `active[]` backlog are re-audited against the merged wave.
+  - What no longer holds is resolved, citing the commit.
+  - The next candidate's SPEC is re-scoped before its PLAN.
+  - The counts are logged in `_RELEASE.json`.
 
 ## W1 — scope, bind, worktrees
 
@@ -144,8 +149,12 @@ F019–F051 share the destination of the bug each cites. F090–F112 share the d
   - `dd-release-definition` §5 and `specs/releases/AGENTS.md` §3 state ADR 0141: one impl worktree per task, true `blocked by:` edges, exact `W:`, and a PLAN "Parallel schedule" (steps, width, critical path). `release.py check` refuses a PLAN without it, and two tasks in one step whose `W:` overlap outside the union/replay files and the derived `behavior-map.json` (0148 (5)).
 - AC1.14 Bootstrap (0140): once the `new` and `merge` tasks land, every later task of this candidate is made in a worktree. Every `git -C repos/dadaia-workspace reflog feature/0.5.0` entry after that commit reads `merge wt/…: Fast-forward`, except T-050-106 and its two CI test fixes, the by-hand bootstrap of ADR 0145 that made `worktrees/` canon first.
 - AC1.15 Migration, after AC1.14, in ADR 0131's order:
-  - `git -C repos/<r> worktree list --porcelain` names only `worktrees/<r>/<name>`. The three worktrees in another session's `/tmp` are excepted until the operator confirms.
-  - `git ls-remote --tags origin 'archive/*'` names each discarded branch (F068, F085).
+  - Among linked worktrees, `git -C repos/<r> worktree list --porcelain` names only `worktrees/<r>/<name>`; the main checkout is always listed. The three worktrees in another session's `/tmp` are excepted until the operator confirms.
+  - `git ls-remote --tags origin 'archive/*'` names each discarded branch (F068, F085), except `archive/wt/t-048-0{1,3}`:
+    - Operator ruling, 2026-09-30: "Tag só local + bundle".
+    - Their history (commit 22c4188b) carries a denylisted internal hostname, and pre-push refuses publishing it; they stay LOCAL annotated tags.
+    - The bundle lives in the TTL zone `.dadaia/tmp`; the durable archive is the local tags.
+    - Rule: history that carries a denylisted term is archived locally, never on origin.
   - A consumer worktree's protected folder is checked first. A dirty one stays the operator's.
 - AC1.16 Closure (0140):
   - The main-thread session is bound: `context show --json` names `dadaia-workspace`.
@@ -180,6 +189,13 @@ Study conclusions carried (ADR 0100; the scratch copy is ephemeral):
 - No worktree lives under a TTL zone.
 - Hooks resolve from the workspace root.
 - `GIT_*` variables are scrubbed before any tool-driven git.
+
+### Amendment 11 (operator order, 2026-09-30)
+
+- No impl worktree runs on specs older than the rc law. Operator, 2026-09-30: "vc está criando mais e mais worktrees de impl sendo que ainda não fechou a worktree de release que declara a lei das rc".
+- The impl worktrees of T-050-100/102/103/104 were parked at tags `archive/wt/0.5.0{f,b,a,d}-impl` and resumed one at a time, each ported onto the rc layout.
+- T-050-109, T-050-102 and T-050-104 are merged.
+- This amendment also adds §Gate G6, the §Carried candidate map and AC1.15's local-archive ruling.
 
 ## Replaces
 
@@ -226,6 +242,18 @@ Study conclusions carried (ADR 0100; the scratch copy is ephemeral):
 
 ## Carried to candidates 6+ (ADR 0140; specified by their own SPECs)
 
+Candidate map (soft size, ADR 0152 (2): past the recommendation, open `rc-<N+1>/`):
+- The main thread's proposal, applying the operator's order to split the remaining work across candidates rather than put it all in rc-5 ("vc colocou tudo que falta em 1 rc, o rc-5???"). It is not an operator ruling on the grouping.
+
+| candidate | contents |
+|---|---|
+| rc-6 | W2 |
+| rc-7 | W3 + W4 |
+| rc-8 | W5 + W6 |
+| rc-9 | W7 + Promote PR |
+
+- The row "Decided at candidate 6's definition" is decided in rc-6's SPEC.
+
 Each item is listed once, at its target wave.
 
 | Target | Bugs | Backlog | Findings, carry-overs |
@@ -250,6 +278,9 @@ Risk seeds for candidate 6, so they are not lost:
   - **Reading the bug id.** `backlog.py` imports `bugs.py`'s record reader (0135).
   - **Rejected targets.** A target bug that is later rejected is reported by `release.py check`.
 
-## Open questions
+## Open questions for the operator
 
-None for candidate 5.
+- Q1 ADR 0124 allows one direct write, `specs/audits/**`. `context create`, `specs init` (the constitution restamp) and `doctor --fix` TREE-5 write `specs/` outside any worktree, and the release kind does not hold `specs/constitution.md`.
+  - Amend ADR 0124 with the exact verbs, or give a kind `specs/constitution.md`?
+  - Blocks: the closure `specs init` restamp to 9, and the `public/data/fixed/slop-law.md:3` byte-ceiling fix, which must re-render the constitution (FIXED-2).
+- Q2 Until that restamp, pre-push warns "specs tree is upgradable". Blocked by Q1.
