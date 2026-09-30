@@ -24,6 +24,7 @@ from __future__ import annotations
 import ast
 import os
 import re
+import shutil
 import subprocess
 import sys
 import sysconfig
@@ -69,12 +70,48 @@ def _constitution(
     )
 
 
+class Templates:
+    """One world per seed prefix per module: a prefix's git steps run once, and every case
+    starts from its own copy — never one mutable world shared, fix chains mutate the remote."""
+
+    def __init__(self, factory: pytest.TempPathFactory) -> None:
+        self.factory = factory
+        self.dirs: dict[Callable[[World], None], Path] = {}
+
+    def get(self, prefix: Callable[[World], None]) -> Path:
+        if prefix not in self.dirs:
+            world = World(self.factory.mktemp(prefix.__name__.strip("_")))
+            prefix(world)
+            self.dirs[prefix] = world.tmp
+        return self.dirs[prefix]
+
+
+def _template(prefix: Callable[[World], None]) -> Callable[[World], None]:
+    """*prefix*, run through :meth:`World.adopt`."""
+
+    def adopt(world: World) -> None:
+        world.adopt(prefix)
+
+    return adopt
+
+
+@pytest.fixture(scope="module")
+def templates(tmp_path_factory: pytest.TempPathFactory) -> Templates:
+    return Templates(tmp_path_factory)
+
+
+@pytest.fixture
+def world(tmp_path: Path, templates: Templates) -> World:
+    return World(tmp_path, templates)
+
+
 class World:
     """One workspace (registry + the CLI at the path ``fix_line`` spells), one context
     ``proj`` whose main repo ``repos/proj`` is a clone of the bare ``proj.git``."""
 
-    def __init__(self, tmp: Path) -> None:
+    def __init__(self, tmp: Path, templates: Templates | None = None) -> None:
         self.tmp = tmp
+        self.templates = templates
         self.ws = tmp / "ws"
         self.repo = self.ws / "repos" / "proj"
         self.bare = tmp / "proj.git"
@@ -125,6 +162,21 @@ class World:
             )
         )
         self.fills = {**_FILLS, "<clone-url>": self.bare.as_uri(), "<keep-dir>": str(tmp / "kept")}
+
+    def adopt(self, prefix: Callable[[World], None]) -> None:
+        """Run *prefix* on this fresh world — as a copy of the module's template world when
+        there is one. A prefix writes the bare remote and the clone only; the clone's
+        ``origin`` and hook are the absolute paths relocated."""
+        if self.templates is None:
+            prefix(self)
+            return
+        template = self.templates.get(prefix)
+        shutil.rmtree(self.bare)
+        shutil.copytree(template / self.bare.name, self.bare, symlinks=True)
+        if (template / self.repo.relative_to(self.tmp)).is_dir():
+            shutil.copytree(template / self.repo.relative_to(self.tmp), self.repo, symlinks=True)
+            self.git(self.repo, "remote", "set-url", "origin", self.bare.as_uri())
+            install_git_hooks(self.repo, force=True)
 
     def run(
         self, argv: list[str] | str, cwd: Path, stdin: str = ""
@@ -253,9 +305,15 @@ def _drive(world: World, case: Case) -> None:
 # ── push-gate cases ──────────────────────────────────────────────────────────────────
 
 
+@_template
 def _published(world: World) -> None:
     world.seed(_constitution())
     world.clone()
+
+
+@_template
+def _seeded(world: World) -> None:
+    world.seed(_constitution())
 
 
 def _outside(world: World, published: bool = True) -> str:
@@ -489,7 +547,7 @@ _AMEND_BASELINE = (
 
 
 def _no_url_no_checkout(world: World) -> list[str]:
-    world.seed(_constitution())
+    _seeded(world)
     store = JsonContextStore(world.ws / ".dadaia" / "states")
     store.update(
         SpecContextProject("proj", ContextState.DEAD, "proj", "", "2026-01-01T00:00:00+00:00")
@@ -512,7 +570,7 @@ def _advance_origin_work(world: World) -> None:
 
 def _no_checkout(world: World) -> list[str]:
     """Review M-A (P7a)."""
-    world.seed(_constitution())
+    _seeded(world)
     return ["context", "baseline", "proj"]
 
 
@@ -534,13 +592,13 @@ def _never_onboarded(world: World) -> list[str]:
 
 def _unknown_context(world: World) -> list[str]:
     """Review M-A (P7c)."""
-    world.seed(_constitution())
+    _seeded(world)
     JsonContextStore(world.ws / ".dadaia" / "states").delete("proj")
     return ["context", "baseline", "proj"]
 
 
 def _alive_remote_gone(world: World) -> list[str]:
-    world.seed(_constitution())
+    _seeded(world)
     store = JsonContextStore(world.ws / ".dadaia" / "states")
     store.update(
         SpecContextProject(
@@ -639,7 +697,7 @@ def _unpushed_side_branch(world: World) -> list[str]:
 
 def _dead_twice(world: World) -> list[str]:
     """Review M-A: dead on a DEAD context."""
-    world.seed(_constitution())
+    _seeded(world)
     store = JsonContextStore(world.ws / ".dadaia" / "states")
     store.update(
         SpecContextProject(
@@ -829,22 +887,20 @@ _CASES = [
 ]
 
 
-def test_dead_leaves_a_clean_published_detached_head(tmp_path: Path) -> None:
-    world = World(tmp_path)
+def test_dead_leaves_a_clean_published_detached_head(world: World) -> None:
     done = _hit(world, _dead_clean_detached(world))
     assert done.returncode == 0, done.stdout + done.stderr
     _dead_done(world)
 
 
 @pytest.mark.parametrize("case", _CASES)
-def test_the_fix_line_clears_the_refusal(case: Case, tmp_path: Path) -> None:
-    _drive(World(tmp_path), case)
+def test_the_fix_line_clears_the_refusal(case: Case, world: World) -> None:
+    _drive(world, case)
 
 
-def test_a_repaired_custom_gitflow_publishes_end_to_end(tmp_path: Path) -> None:
+def test_a_repaired_custom_gitflow_publishes_end_to_end(world: World) -> None:
     """C1 (r3-typo): on an empty origin the draft constitution names non-default branches —
     baseline publishes under those names, the shipped gate admitting every push."""
-    world = World(tmp_path)
     world.clone()
     world.onboard(_constitution("trunk", "stage", "rel/"))
     done = world.cli("context", "baseline", "proj")
@@ -852,10 +908,9 @@ def test_a_repaired_custom_gitflow_publishes_end_to_end(tmp_path: Path) -> None:
     _baseline_done(world, "rel/0.1.0", ("trunk", "stage"))
 
 
-def test_a_clone_on_the_integration_branch_is_never_auto_committed(tmp_path: Path) -> None:
+def test_a_clone_on_the_integration_branch_is_never_auto_committed(world: World) -> None:
     """H (dead on develop): the refusal comes before any commit — the local integration
     branch is exactly the remote's."""
-    world = World(tmp_path)
     _dirty_on_integration(world)
     before = world.git(world.repo, "rev-parse", "develop")
     assert world.cli("context", "dead", "proj").returncode != 0
@@ -872,12 +927,11 @@ def test_every_fix_line_prints_on_one_line_without_a_tty(tmp_path: Path) -> None
 
 
 def test_the_gate_is_read_only_and_its_rewrite_fix_uncommits_only_unpublished_work(
-    tmp_path: Path,
+    world: World,
 ) -> None:
     """R13 rule 3 / review 5 H2: the denylist refusal's fix uncommits the refused ref's own
     unpublished range, down to its oldest unpublished commit (N3) — never a squash of
     published history, never a publish verb that rewrites."""
-    world = World(tmp_path)
     command = _denylisted(world)
     oldest = world.git(world.repo, "rev-parse", "HEAD~1")
     fix = _single_fix(_hit(world, command))
@@ -886,11 +940,10 @@ def test_the_gate_is_read_only_and_its_rewrite_fix_uncommits_only_unpublished_wo
 
 
 def test_a_denylisted_tag_from_a_detached_head_on_an_empty_origin_prints_no_command(
-    tmp_path: Path,
+    world: World,
 ) -> None:
     """Review 5 C1 (P1): the range reaches a root commit and the ref is a tag — the refusal
     names the operator action, prints no command, and the repo stays a repo."""
-    world = World(tmp_path)
     world.clone()
     world.deny()
     world.commit("README.md", "r\n")
@@ -908,11 +961,10 @@ def test_a_denylisted_tag_from_a_detached_head_on_an_empty_origin_prints_no_comm
 
 
 def test_dead_on_a_non_fast_forward_carries_gits_own_text_and_removes_nothing(
-    tmp_path: Path,
+    world: World,
 ) -> None:
     """Review 5 H6: no pull fix row leads dead into a conflicted merge it would commit and
     push — git's own text stands alone; the checkout stays."""
-    world = World(tmp_path)
     _on_work(world)
     _advance_origin_work(world)
     (world.repo / "README.md").write_text("edited\n", encoding="utf-8")
@@ -924,12 +976,11 @@ def test_dead_on_a_non_fast_forward_carries_gits_own_text_and_removes_nothing(
 
 
 def test_a_refused_baseline_push_names_the_anchor_and_the_publish_as_the_next_step(
-    tmp_path: Path,
+    world: World,
 ) -> None:
     """Design review C7 / C2: the gate refuses baseline's push — the refusal keeps the gate's
     one fix (reset to the oldest unpublished commit) and names the anchor and the publish
     as the step after the amend (a hand push would drop origin's merge parent)."""
-    world = World(tmp_path)
     done = _hit(world, _baseline_denylisted(world))
     output = done.stdout + done.stderr
     assert done.returncode != 0 and _single_fix(done).startswith("git -C")
@@ -938,12 +989,11 @@ def test_a_refused_baseline_push_names_the_anchor_and_the_publish_as_the_next_st
 
 
 def test_dead_after_the_operator_pulls_into_a_conflict_publishes_no_markers(
-    tmp_path: Path,
+    world: World,
 ) -> None:
     """Review 6 H6 (R7): the operator follows git's own `git pull` hint into a conflict;
     dead stages no unmerged entry, so git refuses the commit — its text, nothing published,
     the checkout kept."""
-    world = World(tmp_path)
     _on_work(world)
     _advance_origin_work(world)
     other = world.tmp / "other"
@@ -960,12 +1010,11 @@ def test_dead_after_the_operator_pulls_into_a_conflict_publishes_no_markers(
     assert world.repo.is_dir() and world.remote_heads()["feature/1.0.0"] == published
 
 
-def test_dead_commit_without_a_git_identity_refuses_and_removes_nothing(tmp_path: Path) -> None:
+def test_dead_commit_without_a_git_identity_refuses_and_removes_nothing(world: World) -> None:
     """Behavior (AC4.9, security finding SA-H3-2, commit 75b92f25): with no git identity in env or config,
     ``context dead --commit`` over a checkout holding changes refuses before any write —
     exit non-zero, one fix line setting ``user.name`` in that repo, the checkout, its
     change and the published branch all left as they were."""
-    world = World(tmp_path)
     _on_work(world)
     (world.repo / "README.md").write_text("edited\n", encoding="utf-8")
     head = world.git(world.repo, "rev-parse", "HEAD")
