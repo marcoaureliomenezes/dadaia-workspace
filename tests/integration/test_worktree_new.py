@@ -100,7 +100,7 @@ def test_failure_after_add_rolls_back(root: Path) -> None:
     assert "0.5.0a-bug" not in _git(repo, "worktree", "list")
 
 
-def test_list_reports_only_ours_with_ahead_and_dirty(root: Path) -> None:
+def test_list_reports_ours_with_ahead_and_dirty_and_a_native_one_as_foreign(root: Path) -> None:
     repo = root / "repos/r"
     assert _run(root, "new", "r", "--kind", "impl").returncode == 0
     _git(repo, "worktree", "add", "-q", str(root / "native"), "-b", "native")
@@ -111,9 +111,12 @@ def test_list_reports_only_ours_with_ahead_and_dirty(root: Path) -> None:
     (tree / "y.py").write_text("")
     result = _run(root, "list", "--json")
     assert result.returncode == 0, result.stderr
-    (row,) = json.loads(result.stdout)
+    by_state = {row["state"]: row for row in json.loads(result.stdout)}
+    row = by_state["open"]  # dirty: never `ready`, no fix shown, its exit still the merge
     assert row["repo"] == "r" and row["kind"] == "impl" and row["id"] == "0.5.0a"
     assert row["ahead"] == 1 and row["dirty"] is True and row["age_hours"] >= 0
+    assert row["fix"] == "" and row["exit"].endswith(f"merge {tree}")
+    assert by_state["foreign"]["path"] == str(root / "native") and by_state["foreign"]["exit"] == ""
     assert not list((root / ".dadaia/states").glob("*worktree*"))
 
 

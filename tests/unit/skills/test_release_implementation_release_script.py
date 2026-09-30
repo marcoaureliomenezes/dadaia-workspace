@@ -16,6 +16,7 @@ from pathlib import Path
 
 import pytest
 
+from tests.helpers import worktree_ws
 from tests.helpers.skill_scripts import stage_skill_scripts
 
 pytestmark = pytest.mark.unit
@@ -233,22 +234,26 @@ def test_phase_closure_refuses_an_open_task(script: Path, tmp_path: Path, marker
     assert "T-1" in result.stderr
 
 
-def test_phase_closure_refuses_while_a_wt_branch_exists_and_its_fix_clears_it(
+def test_phase_closure_from_its_release_worktree_waits_for_every_other_wt(
     script: Path, tmp_path: Path
 ) -> None:
-    """AC1.10: closure waits for every `wt/*` of the repo; the refusal's one fix clears it."""
-    specs = _specs(tmp_path)
+    """AC1.10 (F4): closure runs in its release worktree, whose own wt/* is spared; any
+    other wt/* refuses it, naming repos/<r> and the owner's merge fix, which clears it."""
+    stage_skill_scripts("dd-gitflow-default", script.parents[2] / "dd-gitflow-default" / "scripts")
+    (root := tmp_path / "ws").mkdir()
+    worktree_ws.make_workspace(root)
+    worktree_ws.git(root / "repos/r", "checkout", "-q", "feature/0.5.0")
+    assert worktree_ws.run(root, "new", "r", "--kind", "release").returncode == 0
+    specs = _specs(root / "worktrees/r/0.5.0a-release")
     _release(specs, "0.5.0", phase="IMPLEMENTATION")
-    for argv in (("init", "-q"), ("-c", "user.name=t", "-c", "user.email=t@t", "commit", "-q",
-                 "--allow-empty", "-m", "base"), ("branch", "wt/0.5.0a-impl")):  # fmt: skip
-        _git(tmp_path, *argv)
-    refused = _run(script, "phase", "CLOSURE", "--sha", "beef123", "--specs", str(specs))
+    worktree_ws.git(root / "repos/r", "branch", "wt/0.5.0b-impl")
+    closure = ("phase", "CLOSURE", "--sha", "beef123", "--specs", str(specs))
+
+    refused = _run(script, *closure, cwd=root)
     fix = refused.stderr.rsplit("fix: ", 1)[1].strip()
-    assert refused.returncode == 1 and fix == f"git -C {tmp_path} branch -d wt/0.5.0a-impl"
-    subprocess.run(fix, shell=True, check=True)  # noqa: S602
-    assert (
-        _run(script, "phase", "CLOSURE", "--sha", "beef123", "--specs", str(specs)).returncode == 0
-    )
+    assert "repos/r " in refused.stderr and fix.endswith(f"merge {root}/worktrees/r/0.5.0b-impl")
+    subprocess.run(fix.replace("python3", sys.executable, 1), shell=True, cwd=root, check=True)  # noqa: S602
+    assert _run(script, *closure, cwd=root).returncode == 0
 
 
 def test_phase_refuses_a_malformed_sha(script: Path, tmp_path: Path) -> None:

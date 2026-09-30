@@ -39,6 +39,7 @@ __all__ = [
     "resolve_script",
     "script_findings",
     "script_repairs",
+    "worktree_rows",
 ]
 
 #: The package's own copy of the skills — the fallback when the doctored tree is a bare
@@ -79,6 +80,8 @@ BACKLOG_SCRIPT = LedgerScript("BACKLOG", "dd-backlog-definition", "backlog.py")
 RELEASE_SCRIPT = LedgerScript("RELEASE", "dd-release-implementation", "release.py")
 AUDIT_SCRIPT = LedgerScript("FINDINGS", "dd-audit-project", "audit.py")
 MEMORY_SCRIPT = LedgerScript("MEMORY", "dd-spec-navigator", "memory.py", ("catalog", "generate"))
+#: Not a ledger: the worktrees' owner, read by `worktree_rows` alone (ADR 0135).
+WORKTREE_SCRIPT = LedgerScript("WORKTREES", "dd-gitflow-default", "worktree.py")
 LEDGER_SCRIPTS = (BUGS_SCRIPT, BACKLOG_SCRIPT, RELEASE_SCRIPT, AUDIT_SCRIPT, MEMORY_SCRIPT)
 
 
@@ -199,3 +202,20 @@ def _parse(result: Any) -> list[dict[str, Any]] | None:
     if not isinstance(payload, list):
         return None
     return [record for record in payload if isinstance(record, dict)]
+
+
+def worktree_rows(root: Path, runner: _Runner | None = None) -> tuple[list[dict[str, Any]], str]:
+    """``worktree.py list --json``'s rows for the workspace at *root*, or ``([], reason)`` —
+    bounded, since SessionStart waits on it."""
+    path = resolve_script(WORKTREE_SCRIPT, root)
+    if path is None:
+        return [], "list failed: worktree.py is not installed"
+    process = runner if runner is not None else SubprocessProcessRunner()
+    try:
+        done = process.run([sys.executable, str(path), "list", "--json"], cwd=root, timeout=10.0)
+        found = json.loads(done.stdout) if done.returncode == 0 else None
+    except (OSError, TimeoutError, ValueError) as exc:
+        return [], f"list failed: {type(exc).__name__}"
+    if not isinstance(found, list):
+        return [], f"list failed: {done.stderr.strip()}"
+    return found, ""

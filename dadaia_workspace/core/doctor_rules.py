@@ -152,8 +152,6 @@ def _with_fix[C](
 
 
 def render_finding(finding: SectionFinding) -> str:
-    """One finding, rendered: its line, plus the ``fix:`` line when it fails the run or
-    is itself guidance (an ``info`` finding such as the onboarding next step)."""
+    """One finding, rendered: its line, plus its ``fix:`` line whenever it carries one."""
     line = f"{finding.code} {finding.verdict} {finding.message}"
-    shows_fix = finding.error or finding.verdict == "info"
-    return f"{line}\nfix: {finding.fix}" if shows_fix and finding.fix else line
+    return f"{line}\nfix: {finding.fix}" if finding.fix else line

@@ -93,32 +93,43 @@ def test_doctor_fix_never_reaps_or_moves_a_linked_worktree(
     assert "prunable" not in _git(repo, "worktree", "list", "--porcelain")
 
 
-def test_doctor_lists_the_contexts_worktrees_from_git_and_touches_none(tmp_path: Path) -> None:
-    root = worktree_ws.make_workspace(tmp_path)
-    repo = root / "repos/r"
-    worktree_ws.git(repo, "checkout", "-q", "feature/0.5.0")
-    assert worktree_ws.run(root, "new", "r", "--kind", "impl").returncode == 0
-    tree = root / "worktrees/r/0.5.0a-impl"
-    worktree_ws.commit(tree, "src/a.py")
-    foreign = root / ".dadaia/tmp/claude/20200101/wt-a"
-    worktree_ws.git(repo, "worktree", "add", "-q", "-b", "side", str(foreign))
-    _age_tree(root / ".dadaia/tmp/claude")
-    worktree_ws.git(repo, "branch", "wt/0.5.0b-impl")
-    (root / "worktrees/r/stray").mkdir()
+def _registered(root: Path) -> DoctorService:
+    """The doctor over *root* with context `c` (main repo `r`) ALIVE."""
     (root / ".dadaia/states/spec_contexts.json").write_text('{"contexts": []}')
     context_store(root / ".dadaia/states").save(
         SpecContextProject("c", ContextState.ALIVE, "r", "", "2026-09-30T00:00:00+00:00")
     )
-    doctor = _doctor(root)
+    return _doctor(root)
 
-    found = {f.message.split()[0]: f for f in doctor.check_worktrees("c")}
 
-    assert found["open"].message.endswith("impl  0.0h  +1  clean  ready")
-    assert found["open"].fix.endswith(f"worktree.py merge {tree}")
-    assert str(foreign) in found["foreign"].message
-    assert found["orphan"].fix == f"git -C {repo} branch -d wt/0.5.0b-impl"
-    assert "stray" in found["unregistered"].message
-    assert not [f for f in doctor.scan_ttl() if "wt-a" in f.path or "20200101" in f.path]
-    assert doctor.fix() is not None and tree.is_dir() and foreign.is_dir()
-    subprocess.run(found["orphan"].fix, shell=True, check=True)  # noqa: S602
-    assert "orphan" not in {f.message.split()[0] for f in doctor.check_worktrees("c")}
+def test_doctor_lists_the_contexts_worktrees_from_git_and_touches_none(tmp_path: Path) -> None:
+    root = worktree_ws.make_workspace(tmp_path)
+    repo = root / "repos/r"
+    worktree_ws.git(repo, "checkout", "-q", "feature/0.5.0")
+    for _ in "ab":
+        assert worktree_ws.run(root, "new", "r", "--kind", "impl").returncode == 0
+    ready, empty = root / "worktrees/r/0.5.0a-impl", root / "worktrees/r/0.5.0b-impl"
+    worktree_ws.commit(ready, "src/a.py")
+    os.utime(repo / ".git/worktrees/0.5.0a-impl/locked", (_TWO_DAYS_AGO, _TWO_DAYS_AGO))
+    foreign = root / ".dadaia/tmp/claude/20200101/wt-a"
+    worktree_ws.git(repo, "worktree", "add", "-q", "-b", "side", str(foreign))
+    _age_tree(root / ".dadaia/tmp/claude")
+    worktree_ws.git(repo, "branch", "wt/0.5.0c-impl")
+    (root / "worktrees/r/stray").mkdir()
+    doctor = _registered(root)
+
+    found = {f.message.split()[1]: f for f in doctor.check_worktrees("c")}
+
+    assert (found[str(ready)].verdict, found[str(ready)].fix) == (
+        "warning",
+        f"python3 {worktree_ws.SCRIPT} merge {ready}",
+    )
+    assert (found[str(empty)].verdict, found[str(empty)].fix) == ("info", "")  # nothing ahead
+    assert found[str(foreign)].message.startswith("foreign")  # the expired TTL entry surfaces here
+    assert not [f for f in doctor.scan_ttl() if "20200101" in f.path]
+    assert found[str(root / "worktrees/r/0.5.0c-impl")].message.startswith("orphan")
+    assert found[str(root / "worktrees/r/stray")].message.startswith("unregistered")
+    (ready / "wip.txt").write_text("x")
+    assert [f.fix for f in doctor.check_worktrees("c") if str(ready) in f.message] == [""]  # dirty
+    doctor.fix()
+    assert ready.is_dir() and empty.is_dir() and foreign.is_dir()

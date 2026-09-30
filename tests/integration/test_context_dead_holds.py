@@ -4,7 +4,7 @@
   sa-context-dead-removes-repos-outside-the-reaper#C4: a local branch carrying a commit origin lacks,
   in ANY repo of the set, refuses dead; sa-context-dead-removes-repos-outside-the-reaper#C2: a linked
   worktree registered by the repo or nested inside it refuses dead; AC1.10: any `wt/*`
-  branch refuses dead with its `worktree.py merge` (checked out) or `branch -d` (orphan) fix;
+  refuses dead with the owner's `worktree.py merge` fix, checked out or orphan;
   sa-context-dead-removes-repos-outside-the-reaper#C7: a refusal touches nothing, the record stays ALIVE;
   sa-context-dead-removes-repos-outside-the-reaper#C1: otherwise each repo is HELD under `.dadaia/reaped/`.
 - A16.1 (FR16 v0.4.4): alive clones the whole set, idempotently. A16.2: an untracked file
@@ -23,8 +23,10 @@ Size: MEDIUM — real git and bare origins in tmp_path (the question is a git qu
 
 from __future__ import annotations
 
+import json
 import shutil
 import subprocess
+import sys
 from collections.abc import Callable
 from dataclasses import replace
 from functools import partial
@@ -115,10 +117,26 @@ def _worktree(repo: Path) -> None:
 
 
 def _wt(repo: Path, *, checked_out: bool) -> None:
-    _git("branch", "wt/0.5.0a-impl", cwd=repo)
-    _git("push", "origin", "wt/0.5.0a-impl", cwd=repo)  # published: only the wt/ hold refuses
+    """An UNPUSHED `wt/0.5.0a-impl` carrying a commit — `dadaia:`-locked in its canonical
+    tree, or an orphan with none; the stub CLI names the set's gitflow to the owner script."""
+    ws, tree = repo.parents[1], repo.parents[1] / "worktrees" / repo.name / "0.5.0a-impl"
+    cli = ws / ".dadaia/.venv/bin/dadaia"
+    cli.parent.mkdir(parents=True)
+    row = {
+        "main_repo": "main",
+        "associated_repos": [{"slug": "lib"}],
+        "gitflow": {"work": "feature/"},
+    }
+    cli.write_text(f"#!{sys.executable}\nprint({json.dumps([row])!r})\n")
+    cli.chmod(0o755)
+    _git("worktree", "add", "-b", "wt/0.5.0a-impl", str(tree), cwd=repo)
+    (tree / "w.txt").write_text("w\n")
+    _git("add", "w.txt", cwd=tree)
+    _git("-c", "user.name=T", "-c", "user.email=t@example.com", "commit", "-qm", "w", cwd=tree)
     if checked_out:
-        _git("worktree", "add", str(repo.parents[2] / "0.5.0a-impl"), "wt/0.5.0a-impl", cwd=repo)
+        _git("worktree", "lock", "--reason", "dadaia: impl", str(tree), cwd=repo)
+    else:
+        _git("worktree", "remove", str(tree), cwd=repo)
 
 
 def _no_remote(repo: Path) -> None:
@@ -137,8 +155,8 @@ _REFUSALS = [
     pytest.param("main", _side_branch, DeadUnpushedCommitsError, r"fix: git -C \S+ -c \S+ push origin topic:refs/tags/archive/topic/[0-9a-f]{7}$", id="C3-side-branch-main"),
     pytest.param("lib", _side_branch, DeadUnpushedCommitsError, r"fix: git -C \S+ -c \S+ push origin topic:refs/tags/archive/topic/[0-9a-f]{7}$", id="C4-side-branch-lib"),
     pytest.param("main", _worktree, DeadUnpushedCommitsError, r"fix: git -C \S+ worktree remove ", id="C2-registered-worktree"),
-    pytest.param("lib", partial(_wt, checked_out=True), DeadUnpushedCommitsError, r"fix: \S+ \S+worktree\.py merge \S+0\.5\.0a-impl$", id="AC1.10-open-wt-worktree"),
-    pytest.param("main", partial(_wt, checked_out=False), DeadUnpushedCommitsError, r"fix: git -C \S+ branch -D wt/0\.5\.0a-impl$", id="AC1.10-orphan-wt-branch"),
+    pytest.param("lib", partial(_wt, checked_out=True), DeadUnpushedCommitsError, r"fix: python3 \S+worktree\.py merge \S+/worktrees/lib/0\.5\.0a-impl$", id="AC1.10-open-wt-worktree"),
+    pytest.param("main", partial(_wt, checked_out=False), DeadUnpushedCommitsError, r"fix: python3 \S+worktree\.py merge \S+/worktrees/main/0\.5\.0a-impl$", id="AC1.10-unpushed-orphan-wt"),
     pytest.param("lib", lambda r: (r / "leftover.txt").write_text("x\n"), DeadReviewRequiredError, r"lib[\s\S]*leftover\.txt", id="A16.2-untracked-in-lib"),
     pytest.param("lib", _no_remote, DeadUnpushedCommitsError, "lib", id="A16.2-local-commits-no-remote-in-lib"),
     pytest.param("lib", _url_less, RepoUrlMissingError, r"fix: git -C \S+/repos/lib remote add origin", id="url-less-never-clone-back"),

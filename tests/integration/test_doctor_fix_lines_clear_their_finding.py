@@ -31,8 +31,10 @@ from __future__ import annotations
 import json
 import os
 import re
+import shlex
 import shutil
 import subprocess
+import sys
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -52,6 +54,8 @@ from dadaia_workspace.features.specs.citations import dead_verb_citations
 from dadaia_workspace.features.specs.doctor import SpecsDoctor
 from dadaia_workspace.features.specs.rules import RULES as SPECS_RULES
 from tests.fixtures.harness_env import session_home
+from tests.helpers import worktree_ws
+from tests.integration.test_reaper_spares_linked_worktrees import _registered
 
 from ..unit.features.specs.test_doctor import _make_clean_specs_tree
 from .test_backlog_doctor import _SOURCE, _active_entry
@@ -186,12 +190,18 @@ def _plant_stray_dotfile(root: Path) -> None:
     (root / "specs" / ".DS_Store").write_bytes(b"\x00")
 
 
+def _plant_orphan_wt(root: Path) -> None:
+    worktree_ws.git(root / "repos/r", "branch", "wt/0.5.0a-impl")  # at the work tip: merged
+
+
 #: code -> how to make it fire. The eight remedies the 0.4.7 candidate-2 review named,
 #: plus the memory-document pair they share a shape with.
 PLANTS: dict[str, Plant] = {
     # sa-unfixable-doctor-findings-say-doctor-fix#S2 — the doctor's own repairs, run as
     # printed (`doctor --fix --specs-dir <specs>`).
     "TREE-4": Plant(_plant_nothing),
+    # AC1.10: the workspace section's WORKTREE rule, proven by its own test below.
+    "WORKTREE": Plant(_plant_orphan_wt),
     "TREE-5": Plant(_plant_missing_root_agents),
     "SPEC-DOC-034": Plant(_plant_nothing),
     "MEM-PLACEHOLDER-1": Plant(_plant_placeholder_atom),
@@ -487,3 +497,15 @@ def test_doctor_fix_renders_a_raw_law_copy_and_clears_its_finding(repo: Path) ->
     assert _AREA_HEADER in text and _ROOT_ROW in text
     assert not [p for p in _PLACEHOLDERS if p in text]
     assert root_law_findings() == []
+
+
+def test_a_worktree_finding_is_cleared_by_its_merge_fix(tmp_path: Path) -> None:
+    """AC1.10: an orphan wt/* carries the owner's `worktree.py merge`; run as printed, the
+    finding is gone (the re-run path `branch -d`s a merged branch)."""
+    root = worktree_ws.make_workspace(tmp_path)
+    PLANTS["WORKTREE"].plant(root)
+    doctor = _registered(root)
+    (fix,) = [f.fix for f in doctor.check_worktrees("c")]
+    command = fix.replace("python3", shlex.quote(sys.executable), 1)
+    subprocess.run(command, shell=True, cwd=root, check=True, capture_output=True)  # noqa: S602
+    assert doctor.check_worktrees("c") == []

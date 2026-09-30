@@ -56,9 +56,7 @@ def main(argv: list[str] | None = None) -> int:
     if args.json:
         print(json.dumps(found, indent=2))
     for row in [] if args.json else found:
-        print(
-            f"{row['path']}  {row['kind']}  {row['age_hours']}h  +{row['ahead']}  {'dirty' if row['dirty'] else 'clean'}"
-        )
+        print(f"{row['state']}  {row['path']}" + (f"  fix: {row['fix']}" if row["fix"] else ""))
     return 0
 
 

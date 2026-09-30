@@ -30,7 +30,8 @@ def _ws(root: Path, *contexts: dict[str, Any]) -> Path:
     entries = []
     for c in contexts:
         slug = c.get("slug", c["name"])
-        entry = {"name": c["name"], "repo_slug": slug, "state": c.get("state", "alive")}
+        entry = {"name": c["name"], "repo_slug": slug, "state": c.get("state", "alive"),
+                 "repo_url": "", "created_at": "2026-09-30T00:00:00+00:00"}  # fmt: skip
         product = root / "repos" / slug / "specs" / "memory" / "product"
         product.mkdir(parents=True)
         (product.parent / "ARCHITECTURE.md").write_text(
@@ -51,7 +52,9 @@ def _ws(root: Path, *contexts: dict[str, Any]) -> Path:
                 f"# A\n\n## Tech Stack\n\n{c['assoc']}\n", encoding="utf-8"
             )
         entries.append(entry)
-    (states / "spec_contexts.json").write_text(json.dumps({"contexts": entries}), "utf-8")
+    (states / "spec_contexts.json").write_text(
+        json.dumps({"schema_version": "2", "contexts": entries}), "utf-8"
+    )
     return root
 
 
@@ -348,7 +351,8 @@ def test_injected_catalog_is_tldr_digest_and_measurably_smaller(tmp_path: Path) 
 
 def test_bound_session_carries_the_onboarding_next_step(tmp_path: Path) -> None:
     """AC1.5 + session-start-bound-session-omits-onboarding-next-step: the bound path
-    prints exactly the step text ``doctor`` reports (the one helper both paths call)."""
+    prints exactly the step text ``doctor`` reports (the one helper both paths call);
+    AC1.10: and the doctor's worktree block (here: no CLI to list with)."""
     _ws(tmp_path, {"name": "ctx"})
     _bind(tmp_path, "sb", "ctx")
 
@@ -358,3 +362,6 @@ def test_bound_session_carries_the_onboarding_next_step(tmp_path: Path) -> None:
     step = next_step(tmp_path, alive_context_trees(tmp_path), "ctx", "sb")
     assert step is not None and step.id == "specs"
     assert f"\n{step.text()}\n" in out
+    assert (
+        "\n=== open worktrees ===\nWORKTREE warning list failed" in out
+    )  # AC1.10, the doctor's rendering

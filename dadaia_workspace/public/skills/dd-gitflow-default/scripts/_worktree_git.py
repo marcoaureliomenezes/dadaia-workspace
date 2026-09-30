@@ -7,11 +7,12 @@ from __future__ import annotations
 import json
 import os
 import re
+import shlex
 import subprocess
 import time
 from pathlib import Path
 
-from _worktree_kinds import _NAME_RE, LOCK, Refusal
+from _worktree_kinds import _NAME_RE, LOCK, SCRIPT, Refusal
 
 _TAG_RE = re.compile(r"^v?(\d+)\.(\d+)\.(\d+)$")
 
@@ -95,44 +96,69 @@ def work_version(repo: Path, flow: dict[str, str]) -> str:
     )
 
 
+def _trees(repo: Path) -> list[dict[str, str]]:
+    """Every linked worktree of *repo* (the main checkout excluded), from git's porcelain."""
+    blocks = git(repo, "worktree", "list", "--porcelain").split("\n\n")
+    parsed = [dict(ln.partition(" ")[::2] for ln in b.splitlines() if ln) for b in blocks]
+    return [fields for fields in parsed if "worktree" in fields][1:]
+
+
 def ours(repo: Path) -> list[dict[str, str]]:
-    """Our `dadaia:`-locked worktrees of *repo*, from `git worktree list --porcelain`."""
-    rows: list[dict[str, str]] = []
-    for block in git(repo, "worktree", "list", "--porcelain").split("\n\n"):
-        fields = dict(line.partition(" ")[::2] for line in block.splitlines() if line)
-        reason = fields.get("locked", "")
-        if reason.startswith(LOCK) and (m := _NAME_RE.match(Path(fields["worktree"]).name)):
-            rows.append(
-                {"path": fields["worktree"], "kind": m["k"], "id": m["v"] + m["l"], "v": m["v"]}
-            )
-    return rows
+    """Our `dadaia:`-locked worktrees of *repo*."""
+    return [
+        {"path": t["worktree"], "kind": m["k"], "id": m["v"] + m["l"], "v": m["v"]}
+        for t in _trees(repo)
+        if t.get("locked", "").startswith(LOCK) and (m := _NAME_RE.match(Path(t["worktree"]).name))
+    ]
+
+
+def _row(repo: Path, path: str, state: str, age: float = 0.0, **facts: object) -> dict[str, object]:
+    """One worktree: WARN past a day or off-canon; `fix` shown only when ready or orphan;
+    `exit`, the `merge` a hold names for every wt/* (ADR 0128)."""
+    merge = shlex.join(["python3", str(SCRIPT), "merge", path])
+    return {"repo": repo.name, "path": path, "state": state, "age_hours": age, **facts,
+            "warn": state not in ("ready", "open") or age > 24,
+            "fix": merge if state in ("ready", "orphan") else "",
+            "exit": merge if state in ("ready", "open", "orphan") else ""}  # fmt: skip
 
 
 def rows(root: Path) -> list[dict[str, object]]:
+    """Every worktree fact of every registered repo, read from git alone (ADR 0108):
+    ours `ready` (ahead, clean) or `open`, an `orphan` wt/* with no tree, a `foreign`
+    worktree git registers (harness-native, hand-made, under a TTL zone), and an
+    `unregistered` directory under `worktrees/<repo>/`."""
     out: list[dict[str, object]] = []
     for name, flow in sorted(gitflows(root).items()):
         repo = root / "repos" / name
-        for row in ours(repo) if (repo / ".git").exists() else []:
-            tree = Path(row["path"])
-            admin = Path(git(tree, "rev-parse", "--path-format=absolute", "--git-dir").strip())
-            ahead = git(
-                repo,
-                "rev-list",
-                "--count",
-                f"{flow['work']}{row['v']}..wt/{tree.name}",
-                check=False,
+        if not (repo / ".git").exists():
+            continue
+        trees, mine = _trees(repo), {Path(r["path"]).resolve(): r for r in ours(repo)}
+        for tree in trees:
+            path = tree["worktree"]
+            if (row := mine.get(Path(path).resolve())) is None:
+                out.append(_row(repo, path, "foreign"))
+                continue
+            admin = Path(
+                git(Path(path), "rev-parse", "--path-format=absolute", "--git-dir").strip()
             )
+            span = f"{flow['work']}{row['v']}..wt/{Path(path).name}"
+            ahead = int(git(repo, "rev-list", "--count", span, check=False) or 0)
+            dirty = bool(git(Path(path), "status", "--porcelain").strip())
+            age = round((time.time() - (admin / "locked").stat().st_mtime) / 3600, 1)
+            state = "ready" if ahead and not dirty else "open"
             out.append(
-                {
-                    "repo": repo.name,
-                    "path": row["path"],
-                    "kind": row["kind"],
-                    "id": row["id"],
-                    "age_hours": round(
-                        (time.time() - (admin / "locked").stat().st_mtime) / 3600, 1
-                    ),
-                    "ahead": int(ahead or 0),
-                    "dirty": bool(git(tree, "status", "--porcelain").strip()),
-                }
+                _row(
+                    repo, path, state, age, kind=row["kind"], id=row["id"], ahead=ahead, dirty=dirty
+                )
             )
+        held = {t.get("branch", "") for t in trees}
+        for branch in git(
+            repo, "for-each-ref", "--format=%(refname:short)", "refs/heads/wt/"
+        ).split():
+            if f"refs/heads/{branch}" not in held and _NAME_RE.match(branch[3:]):
+                out.append(_row(repo, str(root / "worktrees" / name / branch[3:]), "orphan"))
+        listed = {Path(t["worktree"]).resolve() for t in trees}
+        for stray in sorted((root / "worktrees" / name).glob("*")):
+            if stray.is_dir() and stray.resolve() not in listed:
+                out.append(_row(repo, str(stray), "unregistered"))
     return out

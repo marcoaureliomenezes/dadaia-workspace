@@ -12,6 +12,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 from dadaia_workspace.core import invocation, session_store, workspace_layout
+from dadaia_workspace.core.doctor_rules import render_finding
 from dadaia_workspace.features.spec_context import injection_policy
 from dadaia_workspace.features.workspace import onboarding
 from dadaia_workspace.hooks import _common
@@ -140,16 +141,17 @@ def _generic_preflight(workspace: Path, session: str | None, lost: str) -> str:
 
 
 def _worktrees(workspace: Path, context: str) -> list[str]:
-    """The doctor's worktree listing for *context* (AC1.10), each fix under its line."""
-    from dadaia_workspace.container import build_doctor_service  # the hook's one composition
+    """The doctor's worktree findings for *context* (AC1.10), in the doctor's own rendering."""
+    from dadaia_workspace.features.spec_context.doctor import DoctorService  # P-12: no container
+    from dadaia_workspace.infrastructure.git_subprocess import GitSubprocessClient
+    from dadaia_workspace.infrastructure.json_context_store import JsonContextStore
 
     try:
-        found = build_doctor_service(workspace).check_worktrees(context)
+        store = JsonContextStore(workspace / ".dadaia" / "states")
+        found = DoctorService(store, GitSubprocessClient(), workspace).check_worktrees(context)
     except Exception:  # noqa: BLE001 — fail-open: a hook never crashes the session
         return []
-    return [
-        f"{f.code} {f.verdict} {f.message}" + (f"\n  fix: {f.fix}" if f.fix else "") for f in found
-    ]
+    return [render_finding(f) for f in found]
 
 
 def _emit_bootstrap(workspace: Path, context: str) -> None:

@@ -7,9 +7,12 @@ and its milestone move in one act, so they cannot disagree.
 
 from __future__ import annotations
 
+import json
 import re
+import shlex
 import subprocess
 import sys
+from functools import partial
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -61,15 +64,26 @@ def _refuse_unapproved_trio(live: Live) -> None:
             )
 
 
-def _refuse_open_worktrees(repo: Path) -> None:
-    """ADR 0128 (4): a candidate closes with no `wt/*` branch left in its repo, read from git."""
-    refs = subprocess.run(["git", "-C", str(repo), "for-each-ref", "--format=%(refname:short) %(worktreepath)",
-                           "refs/heads/wt/"], capture_output=True, text=True, check=False).stdout  # fmt: skip
-    if refs.strip():
-        branch, _, path = refs.splitlines()[0].partition(" ")
-        raise Refusal(f"{repo} still holds branch {branch} — a candidate closes with every wt/* "
-                      "worktree merged", f"python3 {WORKTREE} merge {path}" if path
-                      else f"git -C {repo} branch -d {branch}")  # fmt: skip
+def _refuse_open_worktrees(specs: Path) -> None:
+    """ADR 0128 (4): a candidate closes with every `wt/*` of its repo merged — read from
+    the owner's `worktree.py list --json` rows, sparing the tree closure runs from."""
+    if not WORKTREE.is_file():  # not projected beside us: no workspace, no worktree
+        return
+    run = partial(subprocess.run, capture_output=True, text=True, check=False)
+    common, top = run(["git", "-C", str(specs), "rev-parse", "--path-format=absolute",
+                       "--git-common-dir", "--show-toplevel"]).stdout.split() or ["", ""]  # fmt: skip
+    listed = run([sys.executable, str(WORKTREE), "list", "--json"], cwd=specs)
+    if listed.returncode:
+        raise Refusal(
+            f"worktree.py list failed: {listed.stderr.strip()}",
+            shlex.join(["python3", str(WORKTREE), "list"]),
+        )
+    repo = Path(common).parent.name
+    held = [r for r in json.loads(listed.stdout)
+            if r["repo"] == repo and r["exit"] and Path(r["path"]).resolve() != Path(top).resolve()]  # fmt: skip
+    if held:
+        raise Refusal(f"repos/{repo} still holds {len(held)} open wt/* worktree(s) — a "
+                      "candidate closes with every one merged", held[0]["exit"])  # fmt: skip
 
 
 def _table(text: str, columns: list[str]) -> list[list[str]]:
@@ -140,7 +154,7 @@ def set_phase(specs: Path, phase: str, sha: str) -> tuple[str, str]:
             f"finish and mark every task '[x]' in {(live.release_dir / 'TASKS.md').resolve()}",
         )
     else:
-        _refuse_open_worktrees(specs.resolve().parent)
+        _refuse_open_worktrees(specs.resolve())
 
     def apply(state: State) -> State:
         if phase == "IMPLEMENTATION":

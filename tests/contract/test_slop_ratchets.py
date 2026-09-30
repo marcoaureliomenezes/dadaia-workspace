@@ -397,7 +397,6 @@ _V39_BIRTH = 52
 _V39_ALLOWANCE: dict[str, str] = {
     "ONBOARDING": "parity:tests/integration/test_onboarding_steps_property.py",
     "WS-INVARIANT": "parity:tests/integration/test_unfixable_findings_carry_their_own_fix.py",
-    "WORKTREE": "parity:tests/integration/test_reaper_spares_linked_worktrees.py",
 }
 
 

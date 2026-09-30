@@ -3,6 +3,7 @@
 import contextlib
 import logging
 import re
+import shlex
 import shutil
 import sys
 from dataclasses import replace
@@ -12,7 +13,7 @@ from pathlib import Path
 from typing import Protocol
 
 from dadaia_workspace.core import workspace_layout
-from dadaia_workspace.core.cli_line import fix_line, git_line, script_line, shell_line
+from dadaia_workspace.core.cli_line import fix_line, git_line, shell_line
 from dadaia_workspace.core.exceptions import (
     AssociatedRepoConflictError,
     AssociatedRepoNotFoundError,
@@ -37,6 +38,7 @@ from dadaia_workspace.core.template_history import was_shipped
 from dadaia_workspace.features.spec_context import sweep
 from dadaia_workspace.infrastructure.git_subprocess import GitSubprocessClient
 from dadaia_workspace.infrastructure.json_context_store import JsonContextStore
+from dadaia_workspace.infrastructure.ledger_scripts import worktree_rows
 
 _log = logging.getLogger(__name__)
 
@@ -91,18 +93,6 @@ class DeadUnpushedCommitsError(DadaiaError):
     """Raised when removing a repo would lose work no remote holds: local commits with
     no remote, a linked worktree, or a non-HEAD branch origin lacks (FR16, A16.2).
     HEAD's own unpushed commits are not refused — Phase 2 pushes them."""
-
-
-#: The owner of the canonical worktrees; every open one's fix is its `merge` (ADR 0128).
-WORKTREE_SCRIPT = ".agents/skills/dd-gitflow-default/scripts/worktree.py"
-
-
-def open_worktrees(git: GitSubprocessClient, repo: Path) -> list[tuple[str, str]]:
-    """``(branch, checked-out path or "")`` per ``wt/*`` branch of *repo*, from git alone (ADR 0108)."""
-    refs = git.git(
-        repo, "for-each-ref", "--format=%(refname:short) %(worktreepath)", "refs/heads/wt/"
-    )
-    return [(branch, path) for branch, _, path in (line.partition(" ") for line in refs.splitlines() if line)]  # fmt: skip
 
 
 def _now() -> str:
@@ -662,6 +652,8 @@ class SpecContextService:
         secret, unpushed branches or a linked worktree, a dirty tree without git identity,
         changes to sync off a work branch. Every refusal names its repo."""
         main_repo = self._repo_path(ctx.repo_slug)
+        # AC1.10: the owner's rows; unreadable, unrecoverable() still holds every linked tree
+        trees, _ = worktree_rows(self._workspace_root)
         for repo in ctx.all_repos():
             slug, path = repo.slug, self._repo_path(repo.slug)
             lead = f"Context '{name}': repo '{slug}'"
@@ -690,20 +682,17 @@ class SpecContextService:
                     "Nothing was pushed.\nfix: "
                     + git_line(path, "stash", "push", "-u", "--", *flagged)
                 )
-            # AC1.10: an open wt/* is merged first; an orphan one is deleted last, once the
-            # archive lines before it made its commits recoverable.
-            held = open_worktrees(self._git, path)
-            lost = [
-                *(script_line(WORKTREE_SCRIPT, "merge", tree) for _, tree in held if tree),
-                *self._git.unrecoverable(path),
-                *(git_line(path, "branch", "-D", branch) for branch, tree in held if not tree),
-            ]
+            held = [r for r in trees if r["repo"] == slug and r["exit"]]  # the owner's merge
+            lost = [r["exit"] for r in held] + [  # replaces git's `worktree remove` of those trees
+                ln for ln in self._git.unrecoverable(path)
+                if not any(ln.endswith(f" {shlex.quote(str(r['path']))}") for r in held)
+            ]  # fmt: skip
             if tree := sweep.linked_worktree(self._workspace_root, path):
                 gdir = sweep.worktree_git_dir(tree)
                 lost.append(git_line(gdir, "worktree", "move", str(tree), "<keep-dir>"))
             if lost:
                 raise DeadUnpushedCommitsError(
-                    f"{lead} holds {len(lost)} linked worktree(s), wt/* or unpushed branch(es) "
+                    f"{lead} holds {len(lost)} linked worktree(s) or unpushed branch(es) "
                     f"dead() would lose. Nothing was touched.\nfix: {lost[0]}"
                 )
             dirty = self._git.is_dirty(path)
