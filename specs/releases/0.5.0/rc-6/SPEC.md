@@ -41,6 +41,8 @@
 
 ## Origin map — candidate 6
 
+F019–F051 share the destination of the bug each cites, and F090–F112 share the destination of the entry each cites. Every other id is listed once, here or in §Carried.
+
 | Where | Bugs | Backlog | Findings |
 |---|---|---|---|
 | Already resolved; not carried | `instance-exceptions-file-writable-by-agents`, resolved at 1d59ac9b by 7e7d84e1 (T-050-106) | — | F020 |
@@ -184,7 +186,7 @@ Candidate map (soft size, ADR 0152 (2)); the main thread's proposal, not an oper
 | W4 one text renderer | DEL `dadaia-bin-still-honoured-after-adr-0045`, `help-examples-spell-the-blocked-bare-cli`, `fix-lines-are-not-one-runnable-command`, `ledger-finding-fix-line-orders-a-hand-edit-the-law-forbids`, `implementer-persona-states-a-second-task-marker-lifecycle` | `consumer-guidance-names-no-library-toolchain` | F007, F017 |
 | W5 one test child-env builder | DEL `test-suite-writes-outside-tmp`; FR `ci-preflight-writes-coverage-into-the-repo`, `default-suite-calls-a-real-model-through-codex`, `hook-entrypoints-invisible-to-coverage` | `preflight-ci-parity-derived`, `test-intent-docstring-backfill` | F018, F135, F136; c4 AC9.5, AC9.11 |
 | W6 local fixes in severity groups (0123) | FR `onboarding-next-step-names-another-context`, `init-on-a-copied-workspace-leaves-a-cli-bound-to-the-original`, `pre-push-warns-no-gitflow-block-for-an-absent-specs-tree`, `upgrade-leaves-reconcile-scratch-behind` | `doctor-context-ignores-other-contexts`, `release-memory-idempotent`, `guidance-messages-name-the-right-target`, `init-announces-codex-trust`, `tests-agents-scaffold-without-placeholders` (each an FR, exit `delivered`, no new bug record) | — |
-| W7 docs site (0039), clone detection as V37 rebuilt, launch-act preparation D3–D6, truth-only lane (0138), memory drift | FR `removals-shipped-without-recorded-authority` | `docs-site-zensical-pages`, `clone-detection`, `launch-operator-acts` | F001, F003–F005, F009, F060, F069, F084, F088, F089, F113–F116, F119–F121, F123–F129, F131–F134, F137, F139–F148; c4 AC10.1, AC10.2 |
+| W7 docs site (0039), clone detection as V37 rebuilt, launch-act preparation D3–D6, truth-only lane (0138), memory drift | FR `removals-shipped-without-recorded-authority` | `docs-site-zensical-pages`, `clone-detection`, `launch-operator-acts` | F001, F003–F005, F009, F060, F069, F084, F088, F089, F123–F129, F131, F137, F139–F148; c4 AC10.1, AC10.2 |
 | Promote PR (0122) | `bugs.py status` → `[ok] 0 open bug(s).` | `active[]` is `[]`, and `backlog.py check` passes | F067: `audit.py check` shows no `open` finding and the audit is closed; the rubric D1–D10 logged as a readout |
 
 Risk seeds for W3 (from rc-5), so they are not lost:
