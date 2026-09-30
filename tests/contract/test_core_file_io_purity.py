@@ -323,8 +323,9 @@ def test_importing_a_hook_never_imports_the_container(module: str) -> None:
 
 
 def test_gate_resolution_path_never_imports_the_container(tmp_path: Path) -> None:
-    """P-12, the executed path: the gate's real entry allows an id-less worktree write (the
-    ADR 0116 gap) in a hermetic workspace with the container still unimported."""
+    """P-12, the executed path: the gate's real entry judges a repo write (its BLOCK path:
+    the worktree fix, `kind_holding`, `script_line`) with the container still unimported;
+    the child carries the conftest pin, so it judges THIS checkout."""
     ws = tmp_path / "ws"
     (ws / ".dadaia" / "states").mkdir(parents=True)
     (ws / ".dadaia" / "states" / "spec_contexts.json").write_text(
@@ -333,14 +334,16 @@ def test_gate_resolution_path_never_imports_the_container(tmp_path: Path) -> Non
     (ws / "repos" / "demo").mkdir(parents=True)
     payload = {
         "tool_name": "Write",
-        "tool_input": {"file_path": str(ws / "worktrees" / "demo" / "0.5.0a-impl" / "f.py")},
+        "tool_input": {"file_path": str(ws / "repos" / "demo" / "f.py")},
     }
     code = (
         "import json, sys\nfrom dadaia_workspace.hooks import sdd_gate\n"
-        f"block = sdd_gate.evaluate_payload(json.loads({json.dumps(payload)!r}))\n"
-        "assert block is None, block\nassert 'dadaia_workspace.container' not in sys.modules\n"
+        f"sdd_gate.evaluate_payload(json.loads({json.dumps(payload)!r}))\n"
+        "assert 'dadaia_workspace.container' not in sys.modules\n"
     )
-    env = {"PATH": "/usr/bin:/bin", "DADAIA_FENCED_ROOTS": os.environ["DADAIA_FENCED_ROOTS"]}
+    env = {k: os.environ[k] for k in ("PYTHONPATH", "DADAIA_FENCED_ROOTS")} | {
+        "PATH": "/usr/bin:/bin"
+    }
     result = subprocess.run(
         [sys.executable, "-c", code], capture_output=True, text=True, timeout=120, cwd=ws, env=env
     )
