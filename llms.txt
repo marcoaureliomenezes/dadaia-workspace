@@ -19,7 +19,7 @@
 ## The law
 
 <!-- derived-from: agentic-entities sha256:358a6086252d -->
-<!-- derived-from: sdd-gate-v3 sha256:5bcdd03f3ffb -->
+<!-- derived-from: sdd-gate-v3 sha256:46dea6ca9c6c -->
 
 - [AGENTS.md](dadaia_workspace/public/data/AGENTS.md): the always-on root map — flow, roles, gate invariants, where things live, the index of every scoped `AGENTS.md` and skill; projected once to the workspace root.
 
