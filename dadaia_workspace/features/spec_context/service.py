@@ -651,7 +651,7 @@ class SpecContextService:
         secret, unpushed branches or a linked worktree, a dirty tree without git identity,
         changes to sync off a work branch. Every refusal names its repo."""
         main_repo = self._repo_path(ctx.repo_slug)
-        trees, failed = worktree_rows(self._workspace_root)  # AC1.10: the owner's rows
+        trees, failed, refix = worktree_rows(self._workspace_root)  # AC1.10: the owner's rows
         for repo in ctx.all_repos():
             slug, path = repo.slug, self._repo_path(repo.slug)
             lead = f"Context '{name}': repo '{slug}'"
@@ -681,7 +681,7 @@ class SpecContextService:
                     + git_line(path, "stash", "push", "-u", "--", *flagged)
                 )
             held = [r for r in trees if r["repo"] == slug and r["exit"]]  # the owner's exits
-            lost = [failed.rsplit("fix: ", 1)[1]] if failed else [r["exit"] for r in held]
+            lost = [refix] if failed else [r["exit"] for r in held]
             lost += self._git.unrecoverable(path, spare=[str(r["path"]) for r in held])
             if tree := sweep.linked_worktree(self._workspace_root, path):
                 gdir = sweep.worktree_git_dir(tree)
@@ -689,7 +689,7 @@ class SpecContextService:
             if lost:
                 raise DeadUnpushedCommitsError(
                     f"{lead} holds {len(lost)} worktree(s) or unpushed branch(es) dead() would "
-                    f"lose{f' ({failed.splitlines()[0]})' if failed else ''}. Nothing was "
+                    f"lose{f' ({failed})' if failed else ''}. Nothing was "
                     f"touched.\nfix: {lost[0]}"
                 )
             dirty = self._git.is_dirty(path)

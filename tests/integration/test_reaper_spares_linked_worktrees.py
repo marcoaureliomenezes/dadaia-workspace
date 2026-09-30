@@ -114,7 +114,8 @@ def test_doctor_lists_the_contexts_worktrees_from_git_and_touches_none(tmp_path:
     log = repo / ".git/logs/refs/heads/wt/0.5.0a-impl"  # age is the branch's birth (ADR 0108)
     log.write_text(re.sub(r"> \d+ ", f"> {int(_TWO_DAYS_AGO)} ", log.read_text(), count=1))
     foreign = root / ".dadaia/tmp/claude/20200101/wt-a"
-    worktree_ws.git(repo, "worktree", "add", "-q", "-b", "side", str(foreign))
+    # a canonical wt/ branch outside worktrees/r/ is still foreign — its merge would refuse
+    worktree_ws.git(repo, "worktree", "add", "-q", "-b", "wt/0.5.0d-impl", str(foreign))
     _age_tree(root / ".dadaia/tmp/claude")
     worktree_ws.git(repo, "branch", "wt/0.5.0c-impl")
     (root / "worktrees/r/stray").mkdir()

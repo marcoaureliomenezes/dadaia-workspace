@@ -1,5 +1,6 @@
 """The real context registry in a tmp states dir — the store every non-CLI test uses."""
 
+import json
 import sys
 from pathlib import Path
 
@@ -24,11 +25,21 @@ def own_venv_workspace(root: Path) -> Path:
     (root / ".dadaia" / ".venv" / "pyvenv.cfg").write_text(
         f"home = {Path(sys.executable).resolve().parent}\n"
     )
-    stub = '#!/bin/sh\n[ "$1 $2" = "context list" ] && echo "[]" && exit 0\ncat >/dev/null\n'
-    (tools / f"dadaia{PLATFORM.venv_exe_suffix}").write_text(
-        stub
-    )  # + the one read worktree.py makes
-    (tools / f"dadaia{PLATFORM.venv_exe_suffix}").chmod(0o755)
+    return workspace_cli(root)
+
+
+def workspace_cli(root: Path, *listed: dict[str, object]) -> Path:
+    """The venv's `dadaia` at *root*: `context list` prints *listed* (the one read worktree.py
+    makes); any other verb drains its stdin (the pre-push pipe)."""
+    cli = (
+        root / ".dadaia" / ".venv" / PLATFORM.venv_scripts_dir / f"dadaia{PLATFORM.venv_exe_suffix}"
+    )
+    cli.parent.mkdir(parents=True, exist_ok=True)
+    rows = json.dumps(list(listed))
+    cli.write_text(
+        f'#!/bin/sh\n[ "$1 $2" = "context list" ] && echo \'{rows}\' && exit 0\ncat >/dev/null\n'
+    )
+    cli.chmod(0o755)
     return root
 
 

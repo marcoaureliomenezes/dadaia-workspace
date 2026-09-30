@@ -21,6 +21,7 @@ from dadaia_workspace.core import session_store
 from dadaia_workspace.core.invocation import alive_context_trees
 from dadaia_workspace.features.workspace.onboarding import next_step
 from tests.fixtures.harness_env import claude_hook_env, kimi_hook_env, run_hook_subprocess
+from tests.fixtures.stores import workspace_cli
 
 
 def _ws(root: Path, *contexts: dict[str, Any]) -> Path:
@@ -357,6 +358,9 @@ def test_bound_session_carries_the_onboarding_next_step(tmp_path: Path) -> None:
     _ws(tmp_path, {"name": "ctx"})
     _bind(tmp_path, "sb", "ctx")
     repo = tmp_path / "repos" / "ctx"
+    workspace_cli(
+        tmp_path, {"main_repo": "ctx", "associated_repos": [], "gitflow": {"work": "feature/"}}
+    )
     for argv in (["init", "-q"], ["-c", "user.name=t", "-c", "user.email=t@t", "commit", "-q",
                  "--allow-empty", "-m", "x"], ["branch", "wt/0.5.0a-impl"]):  # fmt: skip
         subprocess.run(["git", "-C", str(repo), *argv], check=True, capture_output=True)

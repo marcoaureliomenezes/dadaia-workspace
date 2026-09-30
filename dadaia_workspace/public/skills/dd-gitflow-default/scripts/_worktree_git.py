@@ -9,7 +9,6 @@ import os
 import re
 import shlex
 import subprocess
-import sys
 import time
 from pathlib import Path
 
@@ -41,15 +40,14 @@ def find_root() -> Path:
 
 
 def cli(root: Path, *args: str) -> subprocess.CompletedProcess[str]:
-    """One read-only run of the workspace CLI — the owner of every package grammar: the
-    venv's entry point, else the package the running interpreter carries (a sandbox)."""
+    """One read-only run of the workspace CLI — the owner of every package grammar."""
     bins = (root / ".dadaia/.venv/bin/dadaia", root / ".dadaia/.venv/Scripts/dadaia.exe")
-    exe = next(
-        ([str(b)] for b in bins if b.exists()), [sys.executable, "-m", "dadaia_workspace.cli.main"]
-    )
+    exe = next((b for b in bins if b.exists()), None)
+    if exe is None:
+        raise Refusal("no workspace CLI", "uvx dadaia-workspace init")
     run = subprocess.run  # stdin closed: a CLI never waits on the caller's pipe
     return run(
-        [*exe, *args],
+        [str(exe), *args],
         cwd=root,
         env=_env(),
         stdin=subprocess.DEVNULL,
@@ -118,12 +116,14 @@ def _trees(repo: Path) -> list[dict[str, str]]:
 
 
 def ours(repo: Path) -> list[dict[str, str]]:
-    """Our worktrees of *repo*: any tree on a canonical `wt/<M.m.p><l>-<kind>` branch, locked
-    or not — merge's own re-attach leaves one unlocked."""
+    """Our worktrees of *repo*: a tree at `worktrees/<repo>/<name>` on its canonical
+    `wt/<name>` branch, locked or not — merge's own re-attach leaves one unlocked."""
+    home = repo.parents[1] / "worktrees" / repo.name
     return [
         {"path": t["worktree"], "kind": m["k"], "id": m["v"] + m["l"], "v": m["v"], "name": m[0]}
         for t in _trees(repo)
         if (m := _NAME_RE.match(t.get("branch", "").removeprefix("refs/heads/wt/")))
+        and Path(t["worktree"]).resolve() == (home / m[0]).resolve()
     ]
 
 

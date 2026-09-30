@@ -19,6 +19,7 @@ from dadaia_workspace.infrastructure.git_subprocess import GitSubprocessClient
 from dadaia_workspace.infrastructure.public_assets import FileSystemPublicAssetManager
 from dadaia_workspace.infrastructure.python_env import VenvPythonEnvironmentManager
 from tests.fakes import seed_dead_context
+from tests.fixtures.stores import workspace_cli
 
 _runner = CliRunner()
 
@@ -29,7 +30,7 @@ def workspace(tmp_path: Path, monkeypatch) -> Path:
         public_assets=FileSystemPublicAssetManager(),
         python_env=VenvPythonEnvironmentManager(),
     ).init(tmp_path, harnesses=L1_ENTRY_HARNESSES)
-    monkeypatch.chdir(tmp_path)
+    monkeypatch.chdir(workspace_cli(tmp_path))
     # Hermetic identity: each test sets exactly the id sources it needs.
     for var in (
         "DADAIA_SESSION_ID",

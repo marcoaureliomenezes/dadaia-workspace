@@ -4,7 +4,8 @@
   sa-context-dead-removes-repos-outside-the-reaper#C4: a local branch carrying a commit origin lacks,
   in ANY repo of the set, refuses dead; sa-context-dead-removes-repos-outside-the-reaper#C2: a linked
   worktree registered by the repo or nested inside it refuses dead; AC1.10: any `wt/*`
-  refuses dead with the owner's `worktree.py merge` fix, checked out or orphan;
+  refuses dead with the owner's `worktree.py merge` fix, checked out or orphan, and
+  rows the owner cannot read refuse with its fix;
   sa-context-dead-removes-repos-outside-the-reaper#C7: a refusal touches nothing, the record stays ALIVE;
   sa-context-dead-removes-repos-outside-the-reaper#C1: otherwise each repo is HELD under `.dadaia/reaped/`.
 - A16.1 (FR16 v0.4.4): alive clones the whole set, idempotently. A16.2: an untracked file
@@ -23,10 +24,8 @@ Size: MEDIUM — real git and bare origins in tmp_path (the question is a git qu
 
 from __future__ import annotations
 
-import json
 import shutil
 import subprocess
-import sys
 from collections.abc import Callable
 from dataclasses import replace
 from functools import partial
@@ -51,7 +50,7 @@ from dadaia_workspace.features.spec_context.service import (  # noqa: E402
 )
 from dadaia_workspace.infrastructure.git_subprocess import GitSubprocessClient  # noqa: E402
 from dadaia_workspace.infrastructure.json_context_store import JsonContextStore
-from tests.fixtures.stores import context_store
+from tests.fixtures.stores import context_store, workspace_cli
 from tests.helpers.privacy_fixtures import aws_key_shape
 
 pytestmark = [pytest.mark.integration, pytest.mark.slow]
@@ -85,16 +84,8 @@ def _alive(
     bare = _published(tmp_path, repo)
     lib = _published(tmp_path, ws / "repos" / "lib")
     store = context_store(ws / ".dadaia" / "states")
-    # the stub CLI names the set's gitflow to worktree.py list
-    cli = ws / ".dadaia/.venv/bin/dadaia"
-    cli.parent.mkdir(parents=True)
-    row = {
-        "main_repo": "main",
-        "associated_repos": [{"slug": "lib"}],
-        "gitflow": {"work": "feature/"},
-    }
-    cli.write_text(f"#!{sys.executable}\nprint({json.dumps([row])!r})\n")
-    cli.chmod(0o755)
+    flow = {"work": "feature/"}  # the stub CLI names the set's gitflow to worktree.py list
+    workspace_cli(ws, {"main_repo": "main", "associated_repos": [{"slug": "lib"}], "gitflow": flow})
     store.save(
         SpecContextProject(
             "proj", ContextState.ALIVE, "main", str(bare), "2026-09-27T00:00:00+00:00",
@@ -159,6 +150,7 @@ _REFUSALS = [
     pytest.param("main", _worktree, DeadUnpushedCommitsError, r"fix: git -C \S+ worktree remove ", id="C2-registered-worktree"),
     pytest.param("lib", partial(_wt, checked_out=True), DeadUnpushedCommitsError, r"fix: python3 \S+worktree\.py merge \S+/worktrees/lib/0\.5\.0a-impl$", id="AC1.10-open-wt-worktree"),
     pytest.param("main", partial(_wt, checked_out=False), DeadUnpushedCommitsError, r"fix: python3 \S+worktree\.py merge \S+/worktrees/main/0\.5\.0a-impl$", id="AC1.10-unpushed-orphan-wt"),
+    pytest.param("main", lambda r: (r.parents[1] / ".dadaia/.venv/bin/dadaia").unlink(), DeadUnpushedCommitsError, r"no workspace CLI[\s\S]*fix: uvx dadaia-workspace init$", id="AC1.10-rows-unreadable-fails-closed"),
     pytest.param("lib", lambda r: (r / "leftover.txt").write_text("x\n"), DeadReviewRequiredError, r"lib[\s\S]*leftover\.txt", id="A16.2-untracked-in-lib"),
     pytest.param("lib", _no_remote, DeadUnpushedCommitsError, "lib", id="A16.2-local-commits-no-remote-in-lib"),
     pytest.param("lib", _url_less, RepoUrlMissingError, r"fix: git -C \S+/repos/lib remote add origin", id="url-less-never-clone-back"),
