@@ -9,10 +9,10 @@ a skill points here, never restates them.
 
 ## 1. Kinds
 
-- `impl` — one release task each: anything outside `specs/`, plus that task's `TASKS.md` marker.
-- `bug` — one fix: code, its regression test, the `BUGS.jsonl` lines.
-- `backlog` — `specs/backlog/**` and `ADRs/decisions.jsonl`.
-- `release` — a candidate's definition or amendment: `specs/releases/**`, `ADRs/decisions.jsonl`, `specs/memory/**`.
+- `impl` — one release task.
+- `bug` — one fix.
+- `backlog` — demand and decision records.
+- `release` — one candidate, from definition to closure.
 - The allowed set of each kind is `KINDS` in `_worktree_kinds.py`; `WT merge` refuses a file outside it.
 - Caps: `impl` 5 per repo and release, `release` 1 per repo and version, ceilings only (what opens is §2 step 1); a cap refusal names a worktree to end.
 
