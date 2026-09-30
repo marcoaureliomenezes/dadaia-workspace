@@ -67,7 +67,8 @@ F019–F051 share the destination of the bug each cites. F090–F112 share the d
   - The open findings of `20260930-structural-convergence` and the `active[]` backlog are re-audited against the merged wave.
   - What no longer holds is resolved, citing the commit.
   - The next candidate's SPEC is re-scoped before its PLAN.
-  - The counts are logged in `_RELEASE.json`.
+  - A `dispositions` log entry in `_RELEASE.json` records, for findings and for `active[]`: open before, resolved with a commit, open after.
+  - First use, at this candidate's closure: F058 and F061 (claimed by T-050-109, still `open`) are resolved citing it or stay in the W3 row.
 
 ## W1 — scope, bind, worktrees
 
@@ -151,10 +152,9 @@ F019–F051 share the destination of the bug each cites. F090–F112 share the d
 - AC1.15 Migration, after AC1.14, in ADR 0131's order:
   - Among linked worktrees, `git -C repos/<r> worktree list --porcelain` names only `worktrees/<r>/<name>`; the main checkout is always listed. The three worktrees in another session's `/tmp` are excepted until the operator confirms.
   - `git ls-remote --tags origin 'archive/*'` names each discarded branch (F068, F085), except `archive/wt/t-048-0{1,3}`:
-    - Operator ruling, 2026-09-30: "Tag só local + bundle".
+    - Operator ruling, 2026-09-30, selected option: "Tag só local + bundle (Recomendado)". It covers these two tags only; ADRs 0120 and 0131 are unchanged.
     - Their history (commit 22c4188b) carries a denylisted internal hostname, and pre-push refuses publishing it; they stay LOCAL annotated tags.
-    - The bundle lives in the TTL zone `.dadaia/tmp`; the durable archive is the local tags.
-    - Rule: history that carries a denylisted term is archived locally, never on origin.
+    - The bundle lives in the TTL zone `.dadaia/tmp`, and the local tags live only in this clone: `context dead` or a repo removal loses 22c4188b, since the removal guard judges unpushed branches only.
   - A consumer worktree's protected folder is checked first. A dirty one stays the operator's.
 - AC1.16 Closure (0140):
   - The main-thread session is bound: `context show --json` names `dadaia-workspace`.
@@ -192,7 +192,7 @@ Study conclusions carried (ADR 0100; the scratch copy is ephemeral):
 
 ### Amendment 11 (operator order, 2026-09-30)
 
-- No impl worktree runs on specs older than the rc law. Operator, 2026-09-30: "vc está criando mais e mais worktrees de impl sendo que ainda não fechou a worktree de release que declara a lei das rc".
+- No impl worktree runs on specs older than the rc law. Operator, 2026-09-30: "vc está criando mais e mais worktrees de impl sendo que ainda não fechou a wortree de release que declara a lei das rc".
 - The impl worktrees of T-050-100/102/103/104 were parked at tags `archive/wt/0.5.0{f,b,a,d}-impl` and resumed one at a time, each ported onto the rc layout.
 - T-050-109, T-050-102 and T-050-104 are merged.
 - This amendment also adds §Gate G6, the §Carried candidate map and AC1.15's local-archive ruling.
@@ -243,7 +243,7 @@ Study conclusions carried (ADR 0100; the scratch copy is ephemeral):
 ## Carried to candidates 6+ (ADR 0140; specified by their own SPECs)
 
 Candidate map (soft size, ADR 0152 (2): past the recommendation, open `rc-<N+1>/`):
-- The main thread's proposal, applying the operator's order to split the remaining work across candidates rather than put it all in rc-5 ("vc colocou tudo que falta em 1 rc, o rc-5???"). It is not an operator ruling on the grouping.
+- The main thread's proposal, applying the operator's order to split the remaining work across candidates rather than put it all in rc-5 ("vc colocou tudo que falta em 1 rc , o rc-5????"). It is not an operator ruling on the grouping.
 
 | candidate | contents |
 |---|---|
@@ -280,7 +280,6 @@ Risk seeds for candidate 6, so they are not lost:
 
 ## Open questions for the operator
 
-- Q1 ADR 0124 allows one direct write, `specs/audits/**`. `context create`, `specs init` (the constitution restamp) and `doctor --fix` TREE-5 write `specs/` outside any worktree, and the release kind does not hold `specs/constitution.md`.
-  - Amend ADR 0124 with the exact verbs, or give a kind `specs/constitution.md`?
-  - Blocks: the closure `specs init` restamp to 9, and the `public/data/fixed/slop-law.md:3` byte-ceiling fix, which must re-render the constitution (FIXED-2).
-- Q2 Until that restamp, pre-push warns "specs tree is upgradable". Blocked by Q1.
+- Q1 (resolved for closure, ADR 0153): the release kind holds `specs/constitution.md` (T-050-98); the closure `specs init` restamp to 9 and the `slop-law.md:3` fix run in a release worktree. Operator, selected option: "Kind release cobre constitution (Recomendado)".
+- Q2 (resolved by Q1): pre-push warns "specs tree is upgradable" until the closure restamp lands.
+- Q3 (open): onboarding writes — `context create` and the Level-3a `specs init --context` — still have no admissible path: ADR 0124 allows one direct write and 0153 adds none, and the root map's "§7's CLI verbs own theirs" is not in ADR 0124. Name those verbs in ADR 0124, or route onboarding otherwise?
