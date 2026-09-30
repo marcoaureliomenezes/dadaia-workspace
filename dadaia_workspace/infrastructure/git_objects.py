@@ -829,6 +829,27 @@ class GitSubprocessObjectReader:
         ref = f"refs/remotes/origin/{branch}"
         return _run(["git", "rev-parse", "-q", "--verify", ref], repo).returncode == 0
 
+    def netted_specs(self, repo: Path, local_sha: str, remote_sha: str) -> list[str]:
+        """The ``specs/`` paths the push nets in. Netted in = present at the tip and
+        different from every publication boundary; an empty range nets nothing; a range
+        with no boundary (bootstrap) nets the tip's whole ``specs/``. A force-push
+        re-judges paths carried from the overwritten tip (it is no boundary)."""
+        if not SHA_SHAPE_RE.match(local_sha) or local_sha == ZERO_SHA:
+            return []
+        exclusions = _base_exclusions(repo, remote_sha)
+        if not _range_commit_shas(repo, local_sha, exclusions):
+            return []
+        bases = _publication_boundaries(repo, local_sha, exclusions)
+        runs = [["diff", "--name-only", "--no-renames", "--diff-filter=AM", b] for b in bases]
+        netted: set[str] | None = None
+        for run in runs or [["ls-tree", "-r", "--name-only"]]:
+            result = _run(["git", *run, local_sha, "--", "specs/"], repo)
+            if result.returncode != 0:
+                raise GitObjectReadError(f"git {run[0]} failed: {_decode(result.stderr).strip()}")
+            paths = set(_lines(result.stdout))
+            netted = paths if netted is None else netted & paths
+        return sorted(netted or ())
+
     def law_deletions(self, repo: Path, local_sha: str, remote_sha: str) -> list[tuple[str, str]]:
         """ADR 0151 M3: (commit, path) for every range commit deleting a non-blank
         ``AGENTS.md``/``SKILL.md`` line whose own message cites no ``ADR NNNN``."""

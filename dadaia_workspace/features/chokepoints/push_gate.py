@@ -1,5 +1,5 @@
-"""Push-gate orchestration: branch policy, then the range-scoped specs/ canon and
-denylist scans over ONE object walk — first refusal wins. Business logic only: the
+"""Push-gate orchestration: branch policy, then the specs/ canon scan over the paths
+the push nets in and the denylist scan over ONE object walk — first refusal wins. Business logic only: the
 canon predicate and the :class:`ObjectSource` are injected by ``cli/commands/ci.py``."""
 
 from __future__ import annotations
@@ -57,6 +57,8 @@ class ObjectSource(Protocol):
 
     def remote_branch(self, repo: Path, branch: str) -> bool: ...
 
+    def netted_specs(self, repo: Path, local_sha: str, remote_sha: str) -> list[str]: ...
+
     def law_deletions(self, repo: Path, local_sha: str, remote_sha: str) -> list[tuple[str, str]]:
         """ADR 0151 M3: (commit, path) per range commit deleting a law line uncited."""
         ...
@@ -113,20 +115,16 @@ def _run_denylist_scan(
     terms: list[tuple[str, str]],
     patterns: list[BaselinePatternLike],
     masker: PathMasker,
-    specs: dict[str, list[str]],
 ) -> tuple[list[tuple[PushRef, Hit]], int, list[OversizedNote]] | Decision:
     """ONE streamed walk over every ref's new objects (deduplicated across refs; a
-    materialized range measured ~129 MB): denylist hits, skip counts, and each ref's
-    ``specs/`` paths recorded into *specs*. A read failure refuses (fail closed)."""
+    materialized range measured ~129 MB): denylist hits and skip counts. A read failure
+    refuses (fail closed)."""
     seen: set[str] = set()
 
     def fresh(ref: PushRef) -> Iterator[ScannedObject]:
-        sink = specs.setdefault(ref.local_sha, [])
         for obj in object_source.new_objects(repo, ref.local_sha, ref.remote_sha):
             if obj.sha not in seen:
                 seen.add(obj.sha)
-                if obj.path.startswith("specs/"):
-                    sink.append(obj.path)
                 yield obj
 
     hits: list[tuple[PushRef, Hit]] = []
@@ -172,8 +170,8 @@ def push_gate_decision(
     """Decide a push, first refusal wins: a malformed stdin line (fail closed); branch
     policy over every non-deletion, non-tag ref (a principal/integration birth allowed
     when origin holds no gitflow branch or it publishes nothing); then ONE walk over
-    every non-deletion ref's new objects (tags included) feeding the specs/ canon scan
-    (refused first) and the denylist scan; an unreadable object store refuses. Every
+    every non-deletion ref's new objects (tags included) for the denylist scan, while
+    the specs/ canon scan (refused first) judges only the paths each ref nets in; an unreadable object store refuses. Every
     capability is a required parameter: an unwired call site is a CLI defect, never a
     bypass."""
     if malformed_lines > 0:
@@ -199,8 +197,7 @@ def push_gate_decision(
     scan_refs = [r for r in refs if not r.is_deletion]
     terms, patterns = list(denylist_terms), list(baseline_patterns)  # one-shot iterables
     masker = PathMasker(terms, patterns)
-    specs: dict[str, list[str]] = {}
-    scan = _run_denylist_scan(scan_refs, object_source, repo, terms, patterns, masker, specs)
+    scan = _run_denylist_scan(scan_refs, object_source, repo, terms, patterns, masker)
     if isinstance(scan, Decision):
         return scan
     hits, binaries, oversized = scan
@@ -210,15 +207,15 @@ def push_gate_decision(
             for r in scan_refs
             for c, p in object_source.law_deletions(repo, r.local_sha, r.remote_sha)
         ]
+        canon = [
+            (r, p)
+            for r in scan_refs
+            for p in canon_violations_fn(
+                [s[6:] for s in object_source.netted_specs(repo, r.local_sha, r.remote_sha)]
+            )
+        ]
     except GitObjectReadError as exc:
         return _read_failure(exc, masker, repo)
-    canon = [
-        (ref, path)
-        for ref in scan_refs
-        for path in sorted(
-            set(canon_violations_fn(sorted({p[6:] for p in specs.get(ref.local_sha, [])})))
-        )
-    ]
     if canon:
         message = _refusal(
             f"the pushed range publishes {len(canon)} specs/ path(s) violating the v6 canon "
