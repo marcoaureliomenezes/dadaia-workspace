@@ -1,6 +1,6 @@
 # TASKS — Release: 0.5.0
 
-**Status:** In review
+**Status:** Approved
 **Owner:** dd-software-engineer
 
 Candidate 5 — worktrees and bind (ADR 0140). Paths as in PLAN (`f/` features, `pub/` public, `wt.py` = `pub/skills/dd-gitflow-default/scripts/worktree.py`).
