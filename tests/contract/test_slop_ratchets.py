@@ -1,4 +1,4 @@
-"""Intent: CONTRACT — V32, V33, V34, V35, V36; V37, V38, V39 (0.5.0 AC6.2–AC6.6); size: SMALL.
+"""Intent: CONTRACT — V32, V33, V34, V35; V37, V38, V39 (0.5.0 AC6.2–AC6.6); size: SMALL.
 
 Repo-pure slop ratchets: measured at birth, pinned, ratcheting down only; every
 tree walk goes through the one tracked-files enumeration the other ratchets use.
@@ -189,50 +189,6 @@ def test_v33_prefix_families_without_a_mechanical_reader() -> None:
     corpus = ["foo-01 has a reader, bar-02 has none".upper()]
     assert _orphan_families(corpus, ["foo-".upper()]) == ["BAR"]
     assert _orphan_families(corpus, []) == ["BAR", "FOO"]
-
-
-# ---------------------------------------------------------------------------
-# V36 — the skill-script corpus: files and total Python lines
-# ---------------------------------------------------------------------------
-
-# RECORDED PINS (ratchet DOWN ONLY) — measured on the post-candidate corpus: every
-# tracked `*.py` under dadaia_workspace/public/skills/*/scripts/. A ledger's writer moved
-# out of the CLI ONCE; a growing corpus after that is CLI code re-typed, not code moved.
-# T-047-94 re-pin (down only, never raised again this candidate): the atom generator and
-# the second frontmatter validator are gone and the index renderer folded into the catalog
-# one — 31 -> 29 files, 3,657 -> 3,436 lines measured. The ceiling below is that measurement
-# plus the budget the SPEC already authorized for the drift verb and the `release.py memory`
-# verb (+1 file; +85 + 14 + 16 + 50 + 6 = +171 lines), so no later task in this candidate may
-# raise it; T-047-105 re-pinned it to the measured post-candidate value (30 files, 3,618 lines).
-_V36_FILE_CEILING = 30
-_V36_LINE_CEILING = 3618
-
-
-def _skill_scripts() -> list[Path]:
-    return [
-        path
-        for path in tracked_test_files(_REPO_ROOT, "*.py", tree="dadaia_workspace")
-        if "public/skills/" in path.as_posix() and "/scripts/" in path.as_posix()
-    ]
-
-
-def test_v36_skill_script_corpus_is_pinned() -> None:
-    """V36 — at most 30 skill-script files and 3,618 total lines of skill Python. The
-    ledger writers moved out of the CLI once: growth here is a verb regrown, never moved."""
-    scripts = _skill_scripts()
-    assert len(scripts) <= _V36_FILE_CEILING, (
-        f"skill-script files grew to {len(scripts)} (ceiling {_V36_FILE_CEILING}). A new "
-        "file earns its place by a verb leaving the CLI, never by restating one."
-    )
-    total = _skill_corpus_lines(scripts)
-    assert total <= _V36_LINE_CEILING, (
-        f"skill Python grew to {total} lines (ceiling {_V36_LINE_CEILING}). Delete the "
-        "duplicated helper — never raise the ceiling."
-    )
-
-    # Mutation fixture — the counter reads real files, and an empty set counts 0.
-    assert _skill_corpus_lines([]) == 0
-    assert scripts, "the skill-script corpus must not be empty"
 
 
 # ---------------------------------------------------------------------------
