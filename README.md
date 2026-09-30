@@ -13,7 +13,7 @@ its **associated repos** are the others it owns.
 
 ## What it is and principles
 
-<!-- derived-from: product-vision sha256:cfd469d90787 -->
+<!-- derived-from: product-vision sha256:7e335ffc3ee1 -->
 
 dadaia-workspace is the operating environment around repositories developed with AI
 agents. Its unit is the context: one main repo, where `specs/` lives, plus its
@@ -45,9 +45,9 @@ memory atom under its content hash.
 ## A human installs and uses it
 
 <!-- derived-from: pypi-distribution sha256:9078512b58f9 -->
-<!-- derived-from: workspace-init sha256:56685f3d0950 -->
-<!-- derived-from: context-management sha256:1871a6d846b2 -->
-<!-- derived-from: workspace-doctor sha256:772d9d7a78d3 -->
+<!-- derived-from: workspace-init sha256:6ef28aa7796e -->
+<!-- derived-from: context-management sha256:22e5ab09dc0d -->
+<!-- derived-from: workspace-doctor sha256:1d52a99379ba -->
 
 ```bash
 uvx dadaia-workspace init demo --harness claude --repo <clone url>   # level 1 + 2
@@ -93,17 +93,17 @@ and deletes only what a TTL expired.
 
 ## An agent reads AGENTS.md and uses it
 
-<!-- derived-from: agentic-entities sha256:31b7a580085f -->
-<!-- derived-from: sdd-gate-v3 sha256:f23d17bf7053 -->
-<!-- derived-from: release-lifecycle sha256:57d8b542e879 -->
-<!-- derived-from: bug-ledger sha256:9392c1f406a4 -->
-<!-- derived-from: harness-claude-code sha256:24a59f223f83 -->
+<!-- derived-from: agentic-entities sha256:358a6086252d -->
+<!-- derived-from: sdd-gate-v3 sha256:5bcdd03f3ffb -->
+<!-- derived-from: release-lifecycle sha256:06933c8a2d4c -->
+<!-- derived-from: bug-ledger sha256:7182ac16c27c -->
+<!-- derived-from: harness-claude-code sha256:15a591119bed -->
 <!-- derived-from: harness-codex sha256:9218e747c24f -->
-<!-- derived-from: harness-kimi-code sha256:127cdd81f783 -->
-<!-- derived-from: harness-cursor sha256:3af055af8407 -->
+<!-- derived-from: harness-kimi-code sha256:ac3c7be4e426 -->
+<!-- derived-from: harness-cursor sha256:f66b96a0ae77 -->
 <!-- derived-from: harness-devin sha256:a35113e51a30 -->
-<!-- derived-from: harness-copilot sha256:3464b2393377 -->
-<!-- derived-from: agent-comms sha256:9125b23de81e -->
+<!-- derived-from: harness-copilot sha256:ed72a95f6297 -->
+<!-- derived-from: agent-comms sha256:5163f23bc794 -->
 
 The always-on law is the root `AGENTS.md` map; every governed area carries its own
 scoped `AGENTS.md`, and every `dd-` skill touching an area opens that file first. The
@@ -117,26 +117,27 @@ The gate is one PreToolUse pre-gate: root whitelist, venv guard, SDD gate, in th
 order, first block wins; a policy that raises is ALLOW. It blocks exactly three things:
 a file-tool write creating a new workspace-root entry, a `dadaia`/`pip`/`python -m
 dadaia_workspace` run outside `.dadaia/.venv/bin/`, and a file-tool write that is PROTECTED
-or a bound session's MUTATING one into a `repos/<slug>/` outside its scope; a Bash write
-is never judged. Path classes: ADDITIVE (always writable), MUTATING
-(everything else, scope-judged), PROTECTED (session records and the projected law).
+or out of scope — a repo outside the bind, or `repos/<slug>/` beyond `specs/audits/`, which
+takes only worktree merges; a Bash write is never judged. Path classes: ADDITIVE (the
+`.dadaia/` output and ephemeral zones), MUTATING (everything else, scope-judged), PROTECTED (session
+records, the projected law, `.dadaiaignore`).
 Every BLOCK carries exactly one `fix:` line, and a contract test feeds each fix back
 through the gate asserting ALLOW. No lease, lock or wait path exists; the gate reads no
 `_RELEASE.json`.
 
 Work runs as candidates inside one live release: a picked set, an as-is review of every
-unit it touches, a grill, SPEC, PLAN and TASKS, one reserved task at a time, `[x]` only after the reviewer's `APPROVED`, then
+unit it touches, a grill, SPEC, PLAN and TASKS, each task in its own worktree, merged only after the reviewer's `APPROVED`, then
 closure — memory reconciliation, disposition sweep, the work -> integration merge (branch names: the constitution's `gitflow:`). The
 ledger scripts under `.agents/skills/*/scripts/` (`bugs.py`, `backlog.py`,
 `release.py`, `audit.py`) are each record's one writer. A bug is proposed to the
-operator and registered only after confirmation, then fixed on the live feature branch
+operator and registered only after confirmation, then fixed in a `bug` worktree
 with a RED test. Completed work leaves as a `handoff-v1` record, validated by
 `.dadaia/.venv/bin/dadaia reports validate`.
 
 ## Documentation
 
 <!-- derived-from: pypi-distribution sha256:9078512b58f9 -->
-<!-- derived-from: public-asset-distribution sha256:5697e0625edf -->
+<!-- derived-from: public-asset-distribution sha256:9be8dd881241 -->
 
 The documentation is the repository's [docs folder](https://github.com/marcoaureliomenezes/dadaia-workspace/tree/main/docs):
 

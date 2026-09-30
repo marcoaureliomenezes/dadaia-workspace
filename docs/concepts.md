@@ -7,8 +7,8 @@ is `dadaia_workspace/public/data/AGENTS.md`, and the walkthrough is
 
 ## Context
 
-<!-- derived-from: spec-context-project sha256:b1fa1ed3b027 -->
-<!-- derived-from: context-management sha256:1871a6d846b2 -->
+<!-- derived-from: spec-context-project sha256:9690f09f679b -->
+<!-- derived-from: context-management sha256:22e5ab09dc0d -->
 
 A *context* — a Spec Context Project — is one canonical `specs/` tree owned by one
 main repository, the unit for memory, backlog, bugs, releases, reports and handoffs.
@@ -20,38 +20,37 @@ context ALIVE or DEAD, and a repo slug belongs to one context.
 
 One resolution per call answers workspace root, session, context, repo slug, specs dir
 and the session's `Bind`: rung 0 is caller-supplied (`--context`, or a write target
-under `repos/<slug>/`), rung 1 `DADAIA_CONTEXT`, rung 2 this session's record, rung 3
+`scope()` maps to a repo), rung 1 `DADAIA_CONTEXT`, rung 2 this session's record, rung 3
 the repo containing the cwd. The `Bind` — the named context plus every repo slug it
-owns — is read from `DADAIA_CONTEXT` then the session record, never the cwd, so an
-unbound session owns nothing and is never scope-judged. A bind is also what triggers
+owns — is read from the session's own record when it has an id, else `DADAIA_CONTEXT`,
+never the cwd, so an unbound session owns nothing. A bind is also what triggers
 memory injection into the session.
 
 ## Release and candidate
 
-<!-- derived-from: release-lifecycle sha256:57d8b542e879 -->
+<!-- derived-from: release-lifecycle sha256:06933c8a2d4c -->
 
 Exactly one *release* is live, `specs/releases/<M.m.p>/`, with open scope; it grows by
 *candidates*, each a closed-scope cycle whose `SPEC.md`, `PLAN.md` and `TASKS.md` sit
-flat at the release root and are replaced by the next candidate's, the closed trio
-staying in git. `_RELEASE.json` is the one mutable state document: `phase` is
+in `rc-<N>/`, the live one being the highest; only `_RELEASE.json` sits at the release root. `_RELEASE.json` is the one mutable state document: `phase` is
 `DEFINITION`, `IMPLEMENTATION` or `CLOSURE`, the `phase` verbs stamp the `defined` and
-`implemented` milestones, `ship` records the merged promote PR, and `log` is the append-only closure narrative.
+`implemented` milestones, `ship` records the merged promote PR and archives the release folder, and `log` is the append-only closure narrative.
 Every SPEC carries an `**Origin:**` line. Release ids are bare SemVer; the live version
 moves only at an operator-approved deploy.
 
 ## The flow
 
-<!-- derived-from: release-lifecycle sha256:57d8b542e879 -->
-<!-- derived-from: bug-ledger sha256:9392c1f406a4 -->
-<!-- derived-from: audits-canon sha256:ed8125c42aac -->
+<!-- derived-from: release-lifecycle sha256:06933c8a2d4c -->
+<!-- derived-from: bug-ledger sha256:7182ac16c27c -->
+<!-- derived-from: audits-canon sha256:a8a9af477b3d -->
 
 Every demand takes one of two arms. **Arm A**, a feature, leaves through a candidate:
 the picked backlog and bug set, the as-is review (one As-is verdict — DELETE, REBUILD,
 UPDATE, KEEP, then ADD — per touched unit, landing as PLAN §1), the mandatory grill, the
-SPEC with its `Replaces`, PLAN and TASKS, one reserved task at a time, then closure — memory reconciliation, the closure `log`
+SPEC with its `Replaces`, PLAN and TASKS, each task in its own `impl` worktree, then closure — memory reconciliation, the closure `log`
 entries, the disposition sweep (`backlog.py exit`, `audit.py disposition`/`close`,
 `bugs.py archive`), artifact GC, the work -> integration merge (the constitution's `gitflow:`) and the operator's
-promote-or-continue choice. **Arm B**, a bug, is fixed on the live work branch in
+promote-or-continue choice. **Arm B**, a bug, is fixed in one `bug` worktree in
 any phase with no SPEC, PLAN or TASKS: register, lineage, RED test, root-cause fix,
 GREEN, `resolve` with evidence, one commit; a unit fixed twice before is rebuilt, not
 patched a third time. No engine drives either arm: the documents
@@ -59,7 +58,7 @@ carry the ordered work, and the ledger scripts move the records.
 
 ## The gate
 
-<!-- derived-from: sdd-gate-v3 sha256:f23d17bf7053 -->
+<!-- derived-from: sdd-gate-v3 sha256:5bcdd03f3ffb -->
 
 The *gate* is one PreToolUse pre-gate evaluating root whitelist, venv guard and SDD
 gate in that order — first block wins, and a policy that raises is ALLOW. It blocks
@@ -67,28 +66,27 @@ exactly three things: a file-tool write (`Write`, `Edit`, `MultiEdit`, `apply_pa
 creating a new workspace-root entry outside the root law and
 the operator's `.dadaiaignore`; a leading `dadaia`, `pip` or
 `python -m dadaia_workspace` outside `.dadaia/.venv/bin/` (Bash only); a file-tool write
-(those or `NotebookEdit`) that is PROTECTED, or a bound session's MUTATING one into a `repos/<slug>/` outside its
-scope. A Bash write (`sed -i`, `rm`, `mkdir`, a redirect) is never judged. Paths fall in
-three classes: ADDITIVE (`specs/bugs/`, `specs/backlog/`, `specs/audits/` and the
-`.dadaia/` scratch zones, always writable), PROTECTED (`.dadaia/sessions/` and the
-projected law) and MUTATING (everything else). No lease, lock or wait path exists and
+(those or `NotebookEdit`) that is PROTECTED or out of scope — a repo outside the bind, or `repos/<slug>/` beyond
+`specs/audits/`, which takes only worktree merges. A Bash write (`sed -i`, `rm`, `mkdir`, a redirect) is never judged. Paths fall in
+three classes: ADDITIVE (the `.dadaia/` output and ephemeral zones, always writable),
+PROTECTED (`.dadaia/sessions/`, the projected law and `.dadaiaignore`) and MUTATING (everything else). No lease, lock or wait path exists and
 no `_RELEASE.json` is read. Every BLOCK, here and at every other enforcement point,
 carries exactly one `fix:` line, and a contract test feeds each fix back through the
 gate — a refusal whose fix is itself refused (a Stall) cannot ship.
 
 ## Memory
 
-<!-- derived-from: context-management sha256:1871a6d846b2 -->
-<!-- derived-from: workspace-doctor sha256:772d9d7a78d3 -->
-<!-- derived-from: release-lifecycle sha256:57d8b542e879 -->
-<!-- derived-from: audits-canon sha256:ed8125c42aac -->
+<!-- derived-from: context-management sha256:22e5ab09dc0d -->
+<!-- derived-from: workspace-doctor sha256:1d52a99379ba -->
+<!-- derived-from: release-lifecycle sha256:06933c8a2d4c -->
+<!-- derived-from: audits-canon sha256:a8a9af477b3d -->
 
 *Memory* is current product truth: the atoms under `specs/memory/product/**`, plus
 `ARCHITECTURE.md` (its `## Tech Stack` section included) and `QUALITY.md`, whose
 canonical statements change only in the commit carrying an accepted decision; a
 non-principle section may take a truth-only correction whose commit names its code evidence. A bound
-session receives its onboarding next step while one remains, the Tech Stack section and
-the catalog digest (`slug`, `title`, `tldr`, `path` per atom). At each candidate's closure, `memory.py drift` lists the
+session receives its onboarding next step while one remains, `constitution.md`, the Tech Stack
+section, the catalog digest (`slug`, `title`, `tldr`, `path` per atom) and its open worktrees. At each candidate's closure, `memory.py drift` lists the
 atoms whose sources changed, each is reconciled — delete, update, then add — and
 `release.py check` (`LEDGER-RELEASE-SCHEMA`) keeps the release red until the reconciliation is logged.
 `.dadaia/.venv/bin/dadaia doctor`'s `ledgers` section runs `LEDGER-MEMORY-SCHEMA` (the generated pair equals the atom
@@ -98,8 +96,8 @@ the warnings `MEM-DRIFT-1` (features package map vs the live tree) and `MEM-DRIF
 
 ## Bugs and backlog
 
-<!-- derived-from: bug-ledger sha256:9392c1f406a4 -->
-<!-- derived-from: backlog-ledger sha256:721ed11c7220 -->
+<!-- derived-from: bug-ledger sha256:7182ac16c27c -->
+<!-- derived-from: backlog-ledger sha256:4bdc376c943d -->
 
 Both are records with one shape and one writer script. `specs/bugs/BUGS.jsonl` holds
 one record per bug, appended once and keyed by `id`, carrying no git-derived fact;
@@ -114,7 +112,7 @@ superseded deferred rejected`.
 
 ## Audits
 
-<!-- derived-from: audits-canon sha256:ed8125c42aac -->
+<!-- derived-from: audits-canon sha256:a8a9af477b3d -->
 
 An *audit* is the only full-tree inspection lane, every other quality boundary being
 diff-scoped: a committed folder `specs/audits/<YYYYMMDD>-<slug>/` holding `AUDIT.md` —

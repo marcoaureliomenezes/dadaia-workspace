@@ -5,10 +5,11 @@ projects.
 
 ## The paradigm
 
-<!-- derived-from: product-vision sha256:cfd469d90787 -->
+<!-- derived-from: product-vision sha256:7e335ffc3ee1 -->
 
 A workspace is one folder, and the agent session launches at its root, always.
-Projects live in repos inside it — `repos/<slug>/`. Governance lives outside every
+Projects live in repos inside it — `repos/<slug>/` — which take agent work only as
+merges from their worktrees under `worktrees/<repo>/`. Governance lives outside every
 repo: the root `AGENTS.md` map, the scoped `AGENTS.md` files, `.agents/skills`,
 `.agents/agents` and `.dadaia/` sit above them all.
 
@@ -21,7 +22,7 @@ single-repo context is the minimal case of the multi-repo one.
 
 ## The unit is the context
 
-<!-- derived-from: spec-context-project sha256:b1fa1ed3b027 -->
+<!-- derived-from: spec-context-project sha256:9690f09f679b -->
 
 A context — a Spec Context Project — is one canonical `specs/` tree owned by one main
 repository: the unit for memory, backlog, bugs, releases, reports and handoffs. A
@@ -37,16 +38,17 @@ The asymmetry is deliberate:
   associated repo's own `specs/` is never read.
 
 `.dadaia/.venv/bin/dadaia context bind <ctx>` selects a context and nothing else, changing only the
-caller's own session record; a session without a harness-native id carries the binding
-in `DADAIA_CONTEXT`. The bind carries a scope — the main repo plus its associated
-repos — and a bound session's MUTATING file-tool write into a repo another context owns is
-refused, naming the bind that would allow it. An unbound session is never
-scope-judged.
+record of the caller's environment session id; a session without a harness-native id
+exports `DADAIA_SESSION_ID` before it binds, or carries the binding in `DADAIA_CONTEXT`.
+The bind carries a scope — the main repo plus its associated repos — and a MUTATING
+file-tool write into a repo outside it is refused, naming the bind that would allow it;
+an unbound session with an id owns no repo. A repo checkout receives only merges: agents
+write a repo inside its worktrees and land them by `worktree.py merge`, audits aside.
 
 ## Ten repositories, one law
 
-<!-- derived-from: product-vision sha256:cfd469d90787 -->
-<!-- derived-from: spec-context-project sha256:b1fa1ed3b027 -->
+<!-- derived-from: product-vision sha256:7e335ffc3ee1 -->
+<!-- derived-from: spec-context-project sha256:9690f09f679b -->
 
 A team with ten repositories does not maintain ten copies of anything:
 
