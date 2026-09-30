@@ -1,6 +1,7 @@
 """The real context registry in a tmp states dir — the store every non-CLI test uses."""
 
 import json
+import shutil
 import sys
 from pathlib import Path
 
@@ -26,7 +27,7 @@ def own_venv_workspace(root: Path) -> Path:
         f"home = {Path(sys.executable).resolve().parent}\n"
     )
     cli = f"dadaia{PLATFORM.venv_exe_suffix}"
-    (tools / cli).symlink_to(Path(sys.executable).parent / cli)
+    shutil.copy2(Path(sys.executable).parent / cli, tools / cli)
     return root
 
 

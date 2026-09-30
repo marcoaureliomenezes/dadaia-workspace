@@ -134,7 +134,9 @@ def test_the_real_doctor_prints_every_fix_as_one_whole_runnable_line(tmp_path: P
             assert re.search(r"\s(/|\w:\\)\S", fix) and not re.search(r"<[^<>]+>", fix), fix
             continue
         argv0 = shlex.split(fix)[0]
-        assert Path(argv0).is_file() or shutil.which(argv0), f"not an executable: {fix}"
+        assert Path(argv0).is_file() or shutil.which(argv0), (
+            f"not an executable: {fix}\n{run.stdout}"
+        )
     # Whole lines: a wrapped fix would leave a continuation line that is neither a finding
     # (`CODE verdict …`) nor a `fix:` line.
     assert [ln for ln in lines if ln and not re.match(r"(fix: |[A-Z][A-Za-z0-9-]+ )", ln)] == []
