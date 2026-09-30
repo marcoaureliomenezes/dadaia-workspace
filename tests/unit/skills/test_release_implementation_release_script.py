@@ -233,6 +233,24 @@ def test_phase_closure_refuses_an_open_task(script: Path, tmp_path: Path, marker
     assert "T-1" in result.stderr
 
 
+def test_phase_closure_refuses_while_a_wt_branch_exists_and_its_fix_clears_it(
+    script: Path, tmp_path: Path
+) -> None:
+    """AC1.10: closure waits for every `wt/*` of the repo; the refusal's one fix clears it."""
+    specs = _specs(tmp_path)
+    _release(specs, "0.5.0", phase="IMPLEMENTATION")
+    for argv in (("init", "-q"), ("-c", "user.name=t", "-c", "user.email=t@t", "commit", "-q",
+                 "--allow-empty", "-m", "base"), ("branch", "wt/0.5.0a-impl")):  # fmt: skip
+        _git(tmp_path, *argv)
+    refused = _run(script, "phase", "CLOSURE", "--sha", "beef123", "--specs", str(specs))
+    fix = refused.stderr.rsplit("fix: ", 1)[1].strip()
+    assert refused.returncode == 1 and fix == f"git -C {tmp_path} branch -d wt/0.5.0a-impl"
+    subprocess.run(fix, shell=True, check=True)  # noqa: S602
+    assert (
+        _run(script, "phase", "CLOSURE", "--sha", "beef123", "--specs", str(specs)).returncode == 0
+    )
+
+
 def test_phase_refuses_a_malformed_sha(script: Path, tmp_path: Path) -> None:
     specs = _specs(tmp_path)
     _release(specs, "0.5.0")

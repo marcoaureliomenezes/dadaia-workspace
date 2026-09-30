@@ -14,18 +14,20 @@ lists and disagreed with what init/install create. Nothing here spells a zone na
 allow set, TTL and canon is a view of the registry.
 """
 
+import json
 import os
 import stat
+import sys
 import time
 from collections.abc import Callable
-from dataclasses import dataclass, replace
+from dataclasses import dataclass
 from datetime import timedelta
 from enum import StrEnum
 from functools import partial
 from pathlib import Path
 
 from dadaia_workspace.core import session_store, workspace_layout
-from dadaia_workspace.core.cli_line import fix_line, git_line, shell_line
+from dadaia_workspace.core.cli_line import fix_line, git_line, script_line, shell_line
 from dadaia_workspace.core.doctor_rules import Rule, SectionFinding
 from dadaia_workspace.core.exceptions import SchemaVersionError
 from dadaia_workspace.core.harness_registry import (
@@ -37,10 +39,15 @@ from dadaia_workspace.core.models.spec_context import ContextState, SpecContextP
 from dadaia_workspace.core.platform import PLATFORM
 from dadaia_workspace.core.workspace_layout import Zone
 from dadaia_workspace.features.spec_context import sweep
-from dadaia_workspace.features.spec_context.service import git_hooks_dir
+from dadaia_workspace.features.spec_context.service import (
+    WORKTREE_SCRIPT,
+    git_hooks_dir,
+    open_worktrees,
+)
 from dadaia_workspace.infrastructure.git_subprocess import GitSubprocessClient
 from dadaia_workspace.infrastructure.json_context_store import JsonContextStore
 from dadaia_workspace.infrastructure.json_harness_profile_store import JsonHarnessProfileStore
+from dadaia_workspace.infrastructure.subprocess_runner import SubprocessProcessRunner
 
 
 class FindingVerdict(StrEnum):
@@ -98,6 +105,15 @@ class Finding:
         needing a branch in the renderer, the exit rule or the score.
         """
         return self.verdict is not FindingVerdict.REAPED
+
+
+#: The packaged copy of the worktrees' owner — one reader of the fact (ADR 0135).
+_WORKTREE_PY = Path(__file__).parents[2] / "public" / WORKTREE_SCRIPT.removeprefix(".agents/")
+
+
+def _wt(verdict: str, message: str, fix: str = "") -> SectionFinding:
+    """A worktree finding: printed, never an error, never acted on by ``--fix`` (AC1.10)."""
+    return SectionFinding("WORKTREE", verdict, message, False, False, fix, fixable=False)
 
 
 def _invariant(code: str, message: str, fix: str = "", *, fixable: bool = False) -> SectionFinding:
@@ -198,6 +214,45 @@ class DoctorService:
                 )
             ]
         return []
+
+    def check_worktrees(self, context: str | None = None) -> list[SectionFinding]:
+        """AC1.10: the context's worktrees, read from git alone and never touched — the
+        canonical ones by their owner's ``worktree.py list --json``, then what git holds
+        beside them: a foreign worktree, an orphan ``wt/*``, an unregistered directory."""
+        if not (repos := self._alive_repo_tops(context)):
+            return []
+        argv = [sys.executable, str(_WORKTREE_PY), "list", "--json"]
+        done = SubprocessProcessRunner().run(argv, cwd=self._workspace_root, timeout=60)
+        if done.returncode:
+            return [_wt("warning", f"list failed: {done.stderr.strip()}")]
+        rows = [r for r in json.loads(done.stdout) if r["repo"] in {t.name for t in repos}]
+        out = []
+        for row in rows:
+            ready = bool(row["ahead"]) and not row["dirty"]
+            state = ("dirty" if row["dirty"] else "clean") + ("  ready" if ready else "")
+            text = f"{row['path']}  {row['kind']}  {row['age_hours']}h  +{row['ahead']}  {state}"
+            fix = script_line(WORKTREE_SCRIPT, "merge", row["path"]) if ready else ""
+            out.append(_wt("warning" if row["age_hours"] > 24 else "info", f"open {text}", fix))
+        ours = {Path(r["path"]).resolve() for r in rows}
+        for repo in repos:
+            porcelain = self._git.git(repo, "worktree", "list", "--porcelain").splitlines()
+            listed = [Path(line[9:]).resolve() for line in porcelain if line[:9] == "worktree "]
+            out += [
+                _wt("warning", f"foreign {t}  not a canonical worktree (harness-native "
+                    "or hand-made) — left untouched")
+                for t in listed[1:] if t not in ours
+            ]  # fmt: skip
+            out += [
+                _wt("warning", f"orphan {repo.name} {branch} has no worktree",
+                    git_line(repo, "branch", "-d", branch))
+                for branch, path in open_worktrees(self._git, repo) if not path
+            ]  # fmt: skip
+            out += [
+                _wt("warning", f"unregistered {d}  git registers no worktree here")
+                for d in sorted((self._workspace_root / "worktrees" / repo.name).glob("*"))
+                if d.is_dir() and d.resolve() not in listed
+            ]
+        return out
 
     def check(self) -> list[SectionFinding]:
         issues: list[SectionFinding] = []
@@ -469,11 +524,10 @@ class DoctorService:
                 )
                 continue
             detail = f"(mtime {timedelta(seconds=age).days}d > ttl {timedelta(seconds=ttl).days}d)"
-            finding = self._finding(zone.name, self._dadaia, entry, FindingVerdict.EXPIRED, detail)
-            if tree := sweep.linked_worktree(self._workspace_root, entry):
-                gdir = sweep.worktree_git_dir(tree)
-                finding = replace(finding, fix=git_line(gdir, "worktree", "remove", str(tree)))
-            out.append(finding)
+            if not sweep.linked_worktree(self._workspace_root, entry):  # a WT-FOREIGN finding
+                out.append(
+                    self._finding(zone.name, self._dadaia, entry, FindingVerdict.EXPIRED, detail)
+                )
         return out
 
     # ------------------------------------------------------------------
@@ -661,6 +715,11 @@ def workspace_rules(
             SECTION,
             lambda service: [] if expired_only else service.check_projection(),
             fix_help=("public", "install"),
+        ),
+        Rule(
+            ("WORKTREE",),
+            SECTION,
+            lambda service: [] if expired_only else service.check_worktrees(context),
         ),
         Rule(
             ("WS-ENTRY",),

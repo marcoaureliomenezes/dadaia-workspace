@@ -8,6 +8,7 @@ and its milestone move in one act, so they cannot disagree.
 from __future__ import annotations
 
 import re
+import subprocess
 import sys
 from pathlib import Path
 
@@ -29,6 +30,7 @@ PREDECESSOR = {"IMPLEMENTATION": "DEFINITION", "CLOSURE": "IMPLEMENTATION"}
 #: PLAN §1 — structure only (ADR 0041): any level-2 heading naming the As-is review.
 AS_IS = re.compile(r"^##[ \t].*\bas[- ]is review", re.IGNORECASE | re.MULTILINE)
 SKILL = Path(__file__).resolve().parents[2] / "dd-release-definition" / "SKILL.md"
+WORKTREE = Path(__file__).resolve().parents[2] / "dd-gitflow-default" / "scripts" / "worktree.py"
 AS_IS_FIX = f"copy the PLAN §1 skeleton under the As-is review section of {SKILL} into PLAN.md"
 COLUMNS = ["unit", "today", "bugs", "verdict", "why"]
 AUTH_COLUMNS = ["question", "authority", "consults", "deleted"]
@@ -57,6 +59,17 @@ def _refuse_unapproved_trio(live: Live) -> None:
                 f"and TASKS must all be '**Status:** {APPROVED}' to enter IMPLEMENTATION",
                 f"set '**Status:** {APPROVED}' in {document.resolve()}",
             )
+
+
+def _refuse_open_worktrees(repo: Path) -> None:
+    """ADR 0128 (4): a candidate closes with no `wt/*` branch left in its repo, read from git."""
+    refs = subprocess.run(["git", "-C", str(repo), "for-each-ref", "--format=%(refname:short) %(worktreepath)",
+                           "refs/heads/wt/"], capture_output=True, text=True, check=False).stdout  # fmt: skip
+    if refs.strip():
+        branch, _, path = refs.splitlines()[0].partition(" ")
+        raise Refusal(f"{repo} still holds branch {branch} — a candidate closes with every wt/* "
+                      "worktree merged", f"python3 {WORKTREE} merge {path}" if path
+                      else f"git -C {repo} branch -d {branch}")  # fmt: skip
 
 
 def _table(text: str, columns: list[str]) -> list[list[str]]:
@@ -126,6 +139,8 @@ def set_phase(specs: Path, phase: str, sha: str) -> tuple[str, str]:
             f"— a candidate closes fully implemented: {unfinished[0]}",
             f"finish and mark every task '[x]' in {(live.release_dir / 'TASKS.md').resolve()}",
         )
+    else:
+        _refuse_open_worktrees(specs.resolve().parent)
 
     def apply(state: State) -> State:
         if phase == "IMPLEMENTATION":

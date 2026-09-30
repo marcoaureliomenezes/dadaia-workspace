@@ -1,6 +1,9 @@
 """Intent: CONTRACT — reaper-deletes-linked-git-worktrees: `sweep.remove`/`sweep.move`,
 the one chokepoint of every reaper deletion and slop move, never touches a registered
 linked worktree — an expired one under `.dadaia/tmp/` or one at an unlisted root entry.
+AC1.10: the doctor lists the context's worktrees from git and touches none — a canonical one
+with kind/age/ahead/state and, ready, its `worktree.py merge` fix; a foreign one (never a TTL
+`expired` entry), an orphan `wt/*` and an unregistered `worktrees/` dir as findings.
 Size: MEDIUM — git's own `.git`-file shape and `prunable` verdict are the contract.
 """
 
@@ -13,9 +16,11 @@ from pathlib import Path
 
 import pytest
 
+from dadaia_workspace.core.models.spec_context import ContextState, SpecContextProject
 from dadaia_workspace.features.spec_context.doctor import DoctorService
 from dadaia_workspace.infrastructure.git_subprocess import GitSubprocessClient
 from tests.fixtures.stores import context_store
+from tests.helpers import worktree_ws
 
 _TWO_DAYS_AGO = time.time() - 2 * 86_400
 
@@ -61,10 +66,12 @@ def _age_tree(top: Path) -> None:
     os.utime(top, (_TWO_DAYS_AGO, _TWO_DAYS_AGO))
 
 
+def _doctor(root: Path) -> DoctorService:
+    return DoctorService(context_store(root / ".dadaia" / "states"), GitSubprocessClient(), root)
+
+
 def _fix(root: Path) -> list[str]:
-    return DoctorService(
-        context_store(root / ".dadaia" / "states"), GitSubprocessClient(), root
-    ).fix()
+    return _doctor(root).fix()
 
 
 @pytest.mark.parametrize(
@@ -84,3 +91,34 @@ def test_doctor_fix_never_reaps_or_moves_a_linked_worktree(
     assert (worktree / "uncommitted.txt").read_text(encoding="utf-8") == "work in progress"
     assert (worktree / ".git").is_file()
     assert "prunable" not in _git(repo, "worktree", "list", "--porcelain")
+
+
+def test_doctor_lists_the_contexts_worktrees_from_git_and_touches_none(tmp_path: Path) -> None:
+    root = worktree_ws.make_workspace(tmp_path)
+    repo = root / "repos/r"
+    worktree_ws.git(repo, "checkout", "-q", "feature/0.5.0")
+    assert worktree_ws.run(root, "new", "r", "--kind", "impl").returncode == 0
+    tree = root / "worktrees/r/0.5.0a-impl"
+    worktree_ws.commit(tree, "src/a.py")
+    foreign = root / ".dadaia/tmp/claude/20200101/wt-a"
+    worktree_ws.git(repo, "worktree", "add", "-q", "-b", "side", str(foreign))
+    _age_tree(root / ".dadaia/tmp/claude")
+    worktree_ws.git(repo, "branch", "wt/0.5.0b-impl")
+    (root / "worktrees/r/stray").mkdir()
+    (root / ".dadaia/states/spec_contexts.json").write_text('{"contexts": []}')
+    context_store(root / ".dadaia/states").save(
+        SpecContextProject("c", ContextState.ALIVE, "r", "", "2026-09-30T00:00:00+00:00")
+    )
+    doctor = _doctor(root)
+
+    found = {f.message.split()[0]: f for f in doctor.check_worktrees("c")}
+
+    assert found["open"].message.endswith("impl  0.0h  +1  clean  ready")
+    assert found["open"].fix.endswith(f"worktree.py merge {tree}")
+    assert str(foreign) in found["foreign"].message
+    assert found["orphan"].fix == f"git -C {repo} branch -d wt/0.5.0b-impl"
+    assert "stray" in found["unregistered"].message
+    assert not [f for f in doctor.scan_ttl() if "wt-a" in f.path or "20200101" in f.path]
+    assert doctor.fix() is not None and tree.is_dir() and foreign.is_dir()
+    subprocess.run(found["orphan"].fix, shell=True, check=True)  # noqa: S602
+    assert "orphan" not in {f.message.split()[0] for f in doctor.check_worktrees("c")}

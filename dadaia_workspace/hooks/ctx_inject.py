@@ -139,11 +139,26 @@ def _generic_preflight(workspace: Path, session: str | None, lost: str) -> str:
     return "\n".join(sections) + "\n"
 
 
+def _worktrees(workspace: Path, context: str) -> list[str]:
+    """The doctor's worktree listing for *context* (AC1.10), each fix under its line."""
+    from dadaia_workspace.container import build_doctor_service  # the hook's one composition
+
+    try:
+        found = build_doctor_service(workspace).check_worktrees(context)
+    except Exception:  # noqa: BLE001 — fail-open: a hook never crashes the session
+        return []
+    return [
+        f"{f.code} {f.verdict} {f.message}" + (f"\n  fix: {f.fix}" if f.fix else "") for f in found
+    ]
+
+
 def _emit_bootstrap(workspace: Path, context: str) -> None:
     sections = _head(workspace, f"[{context}]", context, True)
     specs = invocation.resolve_context_specs_dir(workspace, context)
     if memory := _build_memory(specs) if specs else "":
         sections.append(memory)
+    if worktrees := _worktrees(workspace, context):
+        sections += ["", "=== open worktrees ===", *worktrees, "=== end worktrees ==="]
     if digest := _read_help_digest(workspace):
         sections.append(digest.rstrip("\n"))
     _emit("\n".join(sections) + "\n")

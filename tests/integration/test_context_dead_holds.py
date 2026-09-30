@@ -3,7 +3,8 @@
 - sa-context-dead-removes-repos-outside-the-reaper#C3 /
   sa-context-dead-removes-repos-outside-the-reaper#C4: a local branch carrying a commit origin lacks,
   in ANY repo of the set, refuses dead; sa-context-dead-removes-repos-outside-the-reaper#C2: a linked
-  worktree registered by the repo or nested inside it refuses dead;
+  worktree registered by the repo or nested inside it refuses dead; AC1.10: any `wt/*`
+  branch refuses dead with its `worktree.py merge` (checked out) or `branch -d` (orphan) fix;
   sa-context-dead-removes-repos-outside-the-reaper#C7: a refusal touches nothing, the record stays ALIVE;
   sa-context-dead-removes-repos-outside-the-reaper#C1: otherwise each repo is HELD under `.dadaia/reaped/`.
 - A16.1 (FR16 v0.4.4): alive clones the whole set, idempotently. A16.2: an untracked file
@@ -26,6 +27,7 @@ import shutil
 import subprocess
 from collections.abc import Callable
 from dataclasses import replace
+from functools import partial
 from pathlib import Path
 
 import pytest
@@ -112,6 +114,13 @@ def _worktree(repo: Path) -> None:
     (outside / "uncommitted.txt").write_text("keep\n")
 
 
+def _wt(repo: Path, *, checked_out: bool) -> None:
+    _git("branch", "wt/0.5.0a-impl", cwd=repo)
+    _git("push", "origin", "wt/0.5.0a-impl", cwd=repo)  # published: only the wt/ hold refuses
+    if checked_out:
+        _git("worktree", "add", str(repo.parents[2] / "0.5.0a-impl"), "wt/0.5.0a-impl", cwd=repo)
+
+
 def _no_remote(repo: Path) -> None:
     _git("remote", "remove", "origin", cwd=repo)
     (repo / "notes.md").write_text("local only\n")
@@ -128,6 +137,8 @@ _REFUSALS = [
     pytest.param("main", _side_branch, DeadUnpushedCommitsError, r"fix: git -C \S+ -c \S+ push origin topic:refs/tags/archive/topic/[0-9a-f]{7}$", id="C3-side-branch-main"),
     pytest.param("lib", _side_branch, DeadUnpushedCommitsError, r"fix: git -C \S+ -c \S+ push origin topic:refs/tags/archive/topic/[0-9a-f]{7}$", id="C4-side-branch-lib"),
     pytest.param("main", _worktree, DeadUnpushedCommitsError, r"fix: git -C \S+ worktree remove ", id="C2-registered-worktree"),
+    pytest.param("lib", partial(_wt, checked_out=True), DeadUnpushedCommitsError, r"fix: \S+ \S+worktree\.py merge \S+0\.5\.0a-impl$", id="AC1.10-open-wt-worktree"),
+    pytest.param("main", partial(_wt, checked_out=False), DeadUnpushedCommitsError, r"fix: git -C \S+ branch -D wt/0\.5\.0a-impl$", id="AC1.10-orphan-wt-branch"),
     pytest.param("lib", lambda r: (r / "leftover.txt").write_text("x\n"), DeadReviewRequiredError, r"lib[\s\S]*leftover\.txt", id="A16.2-untracked-in-lib"),
     pytest.param("lib", _no_remote, DeadUnpushedCommitsError, "lib", id="A16.2-local-commits-no-remote-in-lib"),
     pytest.param("lib", _url_less, RepoUrlMissingError, r"fix: git -C \S+/repos/lib remote add origin", id="url-less-never-clone-back"),
