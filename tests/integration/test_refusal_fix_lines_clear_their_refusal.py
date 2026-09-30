@@ -22,6 +22,7 @@ size: MEDIUM — real git and real CLI child processes, no network.
 from __future__ import annotations
 
 import ast
+import contextlib
 import os
 import re
 import shutil
@@ -34,14 +35,16 @@ from dataclasses import dataclass
 from pathlib import Path
 
 import pytest
+from typer.testing import CliRunner
 
+from dadaia_workspace.cli.main import app
 from dadaia_workspace.core.cli_line import cli_path, fix_line, shell_line
 from dadaia_workspace.core.models.spec_context import (
     ContextState,
     SpecContextProject,
 )
 from dadaia_workspace.core.specs_version import CANONICAL_SPECS_VERSION
-from dadaia_workspace.features.spec_context.service import install_git_hooks
+from dadaia_workspace.features.spec_context.service import git_hooks_dir, install_git_hooks
 from dadaia_workspace.infrastructure.json_context_store import JsonContextStore
 from tests.helpers.privacy_fixtures import aws_key_shape
 
@@ -68,6 +71,21 @@ def _constitution(
         f"---\nspecs_pattern_version: {CANONICAL_SPECS_VERSION}\n"
         f"gitflow: {{principal: {principal}, integration: {integration}, work: {work}}}\n---\n# c\n"
     )
+
+
+#: The caller's environment keys a world never inherits.
+_UNSET = (
+    "COLUMNS",
+    "LINES",
+    "DADAIA_CONTEXT",
+    "DADAIA_SESSION_ID",
+    "DADAIA_BIN",
+    "GIT_AUTHOR_NAME",
+    "GIT_AUTHOR_EMAIL",
+    "GIT_COMMITTER_NAME",
+    "GIT_COMMITTER_EMAIL",
+    "DADAIA_PRIVACY_DENYLIST",
+)
 
 
 class Templates:
@@ -119,18 +137,7 @@ class World:
         self.elsewhere.mkdir(parents=True)
         (self.ws / "repos").mkdir(parents=True)
         (self.ws / ".dadaia" / "states").mkdir(parents=True)
-        self.env = {k: v for k, v in os.environ.items() if k not in ("COLUMNS", "LINES")}
-        for key in (
-            "DADAIA_CONTEXT",
-            "DADAIA_SESSION_ID",
-            "DADAIA_BIN",
-            "GIT_AUTHOR_NAME",
-            "GIT_AUTHOR_EMAIL",
-            "GIT_COMMITTER_NAME",
-            "GIT_COMMITTER_EMAIL",
-            "DADAIA_PRIVACY_DENYLIST",
-        ):
-            self.env.pop(key, None)
+        self.env = {k: v for k, v in os.environ.items() if k not in _UNSET}
         self.env.update(
             GIT_CONFIG_GLOBAL=str(tmp / "gitconfig"),
             GIT_CONFIG_NOSYSTEM="1",
@@ -275,9 +282,32 @@ def _hit(world: World, command: list[str] | str) -> subprocess.CompletedProcess[
     return world.cli(*command) if command[0] != "git" else world.run(command, world.repo)
 
 
+def _gate(world: World, push: str) -> subprocess.CompletedProcess[str]:
+    """The first refusal of *push*: the ref lines git hands its pre-push hook, captured by a
+    stand-in hook, fed to an in-process ``ci push-gate-check`` (80 columns, no TTY) from the
+    hook's cwd. The hook's own forwarding stays proven by the real pushes below and by
+    ``test_the_gate_is_read_only…``; one line without a TTY by the sentinel."""
+    refs, cwd = world.tmp / "pre-push.refs", world.tmp / "pre-push.cwd"
+    hooks = git_hooks_dir(world.repo)
+    assert hooks is not None
+    shipped = (hooks / "pre-push").read_bytes()
+    (hooks / "pre-push").write_text(f'#!/bin/sh\npwd > "{cwd}"\ncat > "{refs}"\nexit 1\n')
+    try:
+        world.run(push, world.repo)
+    finally:
+        (hooks / "pre-push").write_bytes(shipped)
+    env: dict[str, str | None] = {**world.env, **dict.fromkeys(_UNSET), "COLUMNS": "80"}
+    with contextlib.chdir(cwd.read_text().strip()):
+        ran = CliRunner().invoke(app, ["ci", "push-gate-check"], input=refs.read_text(), env=env)
+    return subprocess.CompletedProcess(push, ran.exit_code, ran.output, "")
+
+
 def _drive(world: World, case: Case) -> None:
     command = case.build(world)
-    done = _hit(world, command)
+    if isinstance(command, str) and " push " in command:
+        done = _gate(world, command)
+    else:
+        done = _hit(world, command)
     assert done.returncode != 0, f"the case planted no refusal:\n{done.stdout}{done.stderr}"
     seen: list[str] = []
     for step in range(4):
@@ -918,7 +948,9 @@ def test_a_clone_on_the_integration_branch_is_never_auto_committed(world: World)
 
 
 def test_every_fix_line_prints_on_one_line_without_a_tty(tmp_path: Path) -> None:
-    """H (dead wrapping): a fix naming a path longer than 80 columns stays one line."""
+    """H (dead wrapping): a fix naming a path longer than 80 columns stays one line. The
+    no-TTY sentinel of every family: gate, baseline, alive and dead refusals all print
+    through the one ``cli/_fail.fail`` a real child process exercises here."""
     world = World(tmp_path / ("d" * 90))
     _unborn_dirty(world)
     fix = _single_fix(world.cli("context", "dead", "proj"))
