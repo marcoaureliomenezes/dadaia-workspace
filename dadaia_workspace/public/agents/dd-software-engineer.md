@@ -23,7 +23,6 @@ skills:
   - dd-bug-registration
   - dd-gitflow-default
   - dd-test-stewardship
-maxTurns: 60
 input_contract:
   requires_inputs:
     - name: context

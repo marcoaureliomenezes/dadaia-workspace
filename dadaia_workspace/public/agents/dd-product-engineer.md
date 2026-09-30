@@ -24,7 +24,6 @@ skills:
   - dd-release-implementation
   - dd-bug-registration
   - dd-gitflow-default
-maxTurns: 60
 input_contract:
   requires_inputs:
     - name: context

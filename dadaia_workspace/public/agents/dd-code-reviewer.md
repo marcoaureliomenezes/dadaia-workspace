@@ -22,7 +22,6 @@ skills:
   - dd-ai-eng-knowhow
   - dd-bug-registration
   - dd-gitflow-default
-maxTurns: 40
 input_contract:
   requires_inputs:
     - name: context
