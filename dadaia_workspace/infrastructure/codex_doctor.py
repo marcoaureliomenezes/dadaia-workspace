@@ -1,75 +1,21 @@
-"""Codex-drift doctor family — D-CX-1..D-CX-10 and ancillary checks.
-
-These functions are extracted from ``FileSystemPublicAssetManager`` in
-``public_assets.py`` to keep that module under 600 lines.  Each function takes
-explicit arguments instead of ``self``, so there are no circular imports.
-"""
+"""Codex-drift doctor checks (D-CX-7, D-CX-8); byte drift is the projection rules' job."""
 
 from __future__ import annotations
 
-import json
-import os
 import re
-import shutil
-import subprocess
 import tomllib
-from collections.abc import Callable
 from pathlib import Path
 
-from dadaia_workspace.core.harness_registry import HARNESS_RECORDS
 from dadaia_workspace.core.models.doctor_report import DoctorLine, DoctorStatus
 from dadaia_workspace.infrastructure.runtime_transforms.codex_assets import (
     _CODEX_SKILL_REF_PREFIXES,
 )
-from dadaia_workspace.infrastructure.runtime_transforms.hook_wrappers import (
-    hook_wrapper_command,
-    hook_wrapper_contents,
-)
-
-# ---------------------------------------------------------------------------
-# Dispatcher
-# ---------------------------------------------------------------------------
-
-
-#: The ATTESTING checks of the public-doctor surface: each emits a positive claim
-#: (``[ok] …``) when its universe is non-empty, so each is wrapped in
-#: :func:`dadaia_workspace.core.models.doctor_report.attest` at the assembly point —
-#: an empty universe yields an explicit ``[not-applicable] check:<id>`` line instead of
-#: silence. Pinned by ``tests/unit/infrastructure/test_attesting_checks.py``: removing
-#: an entry is a reviewed decision, never an accidental vanishing.
-ATTESTING_CHECK_IDS: tuple[str, ...] = (
-    "rule-corpus",
-    "trust-boundary",
-    "public-privacy",
-    "symlink-target",
-    "entities-derivation",
-)
-
-
-# ---------------------------------------------------------------------------
-# Individual checks
-#
-# D-CX-1 (missing toml), D-CX-2 (config.toml entries), D-CX-4 (claude-string leaks),
-# D-CX-5 (empty developer_instructions) and D-CX-10 (boundary fields) are RETIRED
-# (K3, v0.5.1): each re-derived "is this projected TOML correct" from its shape via a
-# narrow field/regex check. Since the codex per-agent TOML and config.toml are now
-# ProjectionRule entries compared byte-wise against their renderer
-# (``infrastructure/projection_rules.py``), an incorrect byte IS the drift signal —
-# a missing file is `[missing]`, any content difference is `[drift]` — and the
-# renderer itself (never patched by a hand-edit) is what a dev-time test proves
-# correct. The remaining structural/semantic checks below (D-CX-6/7/8/9) stay: none
-# of them is expressible as "does this one rendered file's bytes match".
-# ---------------------------------------------------------------------------
 
 
 def dcx7_codex_skill_refs(workspace_root: Path) -> list[DoctorLine]:
-    """D-CX-7: generated Codex agents must not reference a missing ``dd-`` member.
-
-    Since 0.4.7 a ``dd-`` token names either a skill directory or one of the three
-    personas — both live under the authored ``.agents/`` set, so both resolve here.
-    """
+    """D-CX-7: generated Codex agents must not reference a missing ``dd-`` skill or persona."""
     codex_agents = workspace_root / ".codex" / "agents"
-    skill_roots = (workspace_root / ".agents" / "skills",)
+    skills = workspace_root / ".agents" / "skills"
     personas = {md.stem for md in (workspace_root / ".agents" / "agents").glob("*.md")}
     out: list[DoctorLine] = []
     if not codex_agents.exists():
@@ -84,306 +30,21 @@ def dcx7_codex_skill_refs(workspace_root: Path) -> list[DoctorLine]:
             continue
         for match in re.finditer(r"`([a-z][a-z0-9.\-]+)`", instructions):
             skill = match.group(1)
-            if not skill.startswith(_CODEX_SKILL_REF_PREFIXES):
-                continue
-            if skill in personas:
-                continue
-            if not any((root / skill / "SKILL.md").exists() for root in skill_roots):
-                out.append(
-                    DoctorLine(
-                        DoctorStatus.ERROR,
-                        f"codex:agents/{toml_file.name}: missing skill '{skill}' (D-CX-7)",
-                    )
-                )
+            if (
+                skill.startswith(_CODEX_SKILL_REF_PREFIXES)
+                and skill not in personas
+                and not (skills / skill / "SKILL.md").exists()
+            ):
+                msg = f"codex:agents/{toml_file.name}: missing skill '{skill}' (D-CX-7)"
+                out.append(DoctorLine(DoctorStatus.ERROR, msg))
     return out
 
 
 def dcx8_codex_rules_shape(codex_dir: Path) -> list[DoctorLine]:
-    """D-CX-8: Codex Rules must be Starlark ``.rules``, not Markdown protocols."""
-    rules_dir = codex_dir / "rules"
-    out: list[DoctorLine] = []
-    if not rules_dir.exists():
-        out.append(DoctorLine(DoctorStatus.MISSING, "codex:rules/ (D-CX-8)"))
-        return out
-    if not any(rules_dir.glob("*.rules")):
-        out.append(DoctorLine(DoctorStatus.MISSING, "codex:rules/*.rules (D-CX-8)"))
-    for rules_file in sorted(rules_dir.glob("*.rules")):
-        try:
-            text = rules_file.read_text(encoding="utf-8")
-        except OSError:
-            continue
-        if "command_allowed(" in text:
-            out.append(
-                DoctorLine(
-                    DoctorStatus.ERROR,
-                    f"codex:rules/{rules_file.name}: undocumented command_allowed policy (D-CX-8)",
-                )
-            )
-        if "prefix_rule(" not in text:
-            out.append(
-                DoctorLine(
-                    DoctorStatus.ERROR,
-                    f"codex:rules/{rules_file.name}: missing prefix_rule declarations (D-CX-8)",
-                )
-            )
-    for md_file in sorted(rules_dir.glob("*.md")):
-        out.append(
-            DoctorLine(
-                DoctorStatus.EXTRA,
-                f"codex:rules/{md_file.name}: markdown is not Codex Rules (D-CX-8)",
-            )
-        )
-    return out
-
-
-def dcx9_codex_hook_shape(workspace_root: Path) -> list[DoctorLine]:
-    """D-CX-9: generated Codex hooks must invoke executable wrapper commands."""
-    hooks_path = workspace_root / ".codex" / "hooks.json"
-    out: list[DoctorLine] = []
-    try:
-        hooks = json.loads(hooks_path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
-        return [DoctorLine(DoctorStatus.ERROR, "codex:hooks.json missing or invalid (D-CX-9)")]
-
-    wrappers = hook_wrapper_contents(HARNESS_RECORDS["codex"])
-    expected = {hook_wrapper_command(name) for name in wrappers}
-    # The exec probe feeds a fake hook payload on stdin: a no-op for a ``hooks.*`` module,
-    # a real run for the CLI reaper wrapper — a doctor never mutates, so it is not probed.
-    probeable = {
-        command
-        for command in expected
-        if "-m dadaia_workspace.hooks." in wrappers[Path(command).name]
-    }
-    commands = set(_codex_hook_commands(hooks))
-    missing = expected - commands
-    for command in sorted(missing):
-        out.append(DoctorLine(DoctorStatus.MISSING, f"codex:hooks.json command {command} (D-CX-9)"))
-
-    stale = commands - expected
-    for command in sorted(stale):
-        out.append(
-            DoctorLine(
-                DoctorStatus.ERROR,
-                f"codex:hooks.json command must use .dadaia/hooks wrapper, got "
-                f"{command!r} (D-CX-9)",
-            )
-        )
-
-    for command in sorted(commands & expected):
-        wrapper = workspace_root / command
-        if not wrapper.is_file():
-            out.append(DoctorLine(DoctorStatus.MISSING, f"codex hook wrapper {command} (D-CX-9)"))
-            continue
-        if not os.access(wrapper, os.X_OK):
-            out.append(
-                DoctorLine(
-                    DoctorStatus.ERROR, f"codex hook wrapper not executable {command} (D-CX-9)"
-                )
-            )
-            continue
-        if command not in probeable:
-            continue
-        try:
-            proc = subprocess.run(
-                [str(wrapper)],
-                input='{"session_id":"doctor","tool_name":"Read","tool_input":{}}',
-                capture_output=True,
-                text=True,
-                cwd=workspace_root,
-                timeout=10,
-                check=False,
-            )
-        except (OSError, subprocess.SubprocessError) as exc:
-            out.append(
-                DoctorLine(
-                    DoctorStatus.UNSUPPORTED,
-                    f"codex hook wrapper launch failed {command}: {exc} (D-CX-9)",
-                )
-            )
-            continue
-        if proc.returncode != 0:
-            detail = (proc.stderr or proc.stdout).strip().splitlines()
-            suffix = f": {detail[0]}" if detail else ""
-            # The exec probe's outcome is ENVIRONMENT-phrased (exit 127 = the venv
-            # runtime is absent; other exits/launch failures vary by host and are
-            # canonicalized as probe noise by the golden helpers). Reinstalling
-            # projections can never fix an environment, so probe outcomes are
-            # UNSUPPORTED (visible, non-blocking). The deterministic misconfig
-            # findings above — wrapper missing, not executable, wrong command path —
-            # remain blocking: those an install genuinely repairs.
-            out.append(
-                DoctorLine(
-                    DoctorStatus.UNSUPPORTED,
-                    f"codex hook wrapper exited {proc.returncode} {command}{suffix} (D-CX-9)",
-                )
-            )
-    return out
-
-
-def _codex_hook_commands(value: object) -> list[str]:
-    """Collect command strings from a Codex hooks.json structure."""
-    commands: list[str] = []
-    if isinstance(value, dict):
-        command = value.get("command")
-        if isinstance(command, str):
-            commands.append(command)
-        for child in value.values():
-            commands.extend(_codex_hook_commands(child))
-    elif isinstance(value, list):
-        for item in value:
-            commands.extend(_codex_hook_commands(item))
-    return commands
-
-
-_CODEX_RULE_CITATION_RE: re.Pattern[str] = re.compile(r"`([a-z][a-z0-9-]+)`\s+rule\b")
-
-
-def check_codex_rule_corpus_reachable(workspace_root: Path) -> list[DoctorLine]:
-    """WS-CDX-PROTOCOL (A6): every by-name rule cited by a Codex artifact is reachable.
-
-    A Codex session reaches the load-bearing rule-law corpus through the on-disk
-    surface ``.claude/rules/<rule-name>.md`` (documented in the projected root
-    ``AGENTS.md`` "Rule-Law Corpus" section). This check proves the contract: for
-    every ``\\`<name>\\` rule`` citation in any ``.codex/agents/*.toml`` artifact, the
-    file ``.claude/rules/<name>.md`` must exist. A missing file means a Codex artifact
-    cites a law surface Codex cannot reach.
-
-    **STATIC reference integrity only (A22.3).** This check answers "does the cited
-    file exist on disk" — nothing here proves a live Codex session actually LOADS that
-    file into its effective prompt. That is a different claim (effective prompt
-    visibility), answered by ``codex_trust_boundary_info`` below for the hook-fire
-    boundary, and by ``features/certification/service.py``'s live ``codex exec`` probe
-    (A22.4) for genuine runtime behavior. Do not read an ``[ok]`` here as proof of
-    anything beyond on-disk reachability.
-
-    Returns ``[ok] codex:rule-corpus-reachable`` when every citation resolves, or one
-    ``[error]`` line per unreachable citation.
-    """
-    codex_agents = workspace_root / ".codex" / "agents"
-    rules_dir = workspace_root / ".claude" / "rules"
-    out: list[DoctorLine] = []
-    if not codex_agents.exists():
-        return out
-
-    unreachable: set[str] = set()
-    cited_any = False
-    for toml_file in sorted(codex_agents.glob("*.toml")):
-        try:
-            text = toml_file.read_text(encoding="utf-8")
-        except OSError:
-            continue
-        for match in _CODEX_RULE_CITATION_RE.finditer(text):
-            name = match.group(1)
-            cited_any = True
-            if not (rules_dir / f"{name}.md").is_file():
-                unreachable.add(name)
-
-    if unreachable:
-        for name in sorted(unreachable):
-            out.append(
-                DoctorLine(
-                    DoctorStatus.ERROR,
-                    f"codex:rule-corpus: by-name rule '{name}' cited in a Codex "
-                    f"artifact has no reachable surface "
-                    f".claude/rules/{name if name.endswith('.md') else name + '.md'} "
-                    "(WS-CDX-PROTOCOL)",
-                )
-            )
-    elif cited_any:
-        out.append(DoctorLine(DoctorStatus.OK, "codex:rule-corpus-reachable (WS-CDX-PROTOCOL)"))
-    # Zero citations ⇒ [] here; the assembly wraps this check in attest("rule-corpus", …),
-    # which turns silence into an explicit not-applicable line (Class-3 guard).
-    return out
-
-
-# The exact codex-cli version for which "projected command hooks fire and block in
-# BOTH the interactive TUI and headless `codex exec`" was live-verified (executed-path
-# probe, cited in the `ai-harness-codex` skill §9 and the T-043-32 scoping note). A
-# stale, unqualified claim carried forward by assumption past a CLI upgrade is exactly
-# what FR22c (A22.3) fixes: `codex_trust_boundary_info` asserts this positive fact
-# ONLY when the runtime-probed version matches this constant exactly; any other
-# observed version — or no observed version at all — degrades honestly instead.
-# Update this constant only after a fresh, reviewed live probe (`dadaia certify`'s
-# codex-live-probe check, A22.4) reconfirms the fact for a newer version.
-_CODEX_HOOKS_LIVE_CERTIFIED_VERSION = "codex-cli 0.144.4"
-
-
-def _probe_installed_codex_version(timeout: float = 5.0) -> str | None:
-    """Best-effort ``codex --version`` runtime probe (A22.3).
-
-    Returns the raw stdout (stripped) of an installed ``codex`` binary reachable on
-    ``PATH``, or ``None`` when the binary is absent, fails to launch, exits non-zero,
-    or does not answer within *timeout* seconds. Never raises — a probe failure IS the
-    "codex absent" observation, not a doctor crash (same discipline as the D-CX-9 hook
-    wrapper probe above).
-    """
-    codex_bin = shutil.which("codex")
-    if codex_bin is None:
-        return None
-    try:
-        proc = subprocess.run(  # noqa: S603
-            [codex_bin, "--version"],
-            capture_output=True,
-            text=True,
-            timeout=timeout,
-            check=False,
-        )
-    except (OSError, subprocess.SubprocessError):
-        return None
-    if proc.returncode != 0:
-        return None
-    version = proc.stdout.strip()
-    return version or None
-
-
-def codex_trust_boundary_info(
-    *, version_probe: Callable[[], str | None] = _probe_installed_codex_version
-) -> list[DoctorLine]:
-    """WS-CDX-HYGIENE (A7/A22.3): version-qualified Codex hook-fire trust boundary.
-
-    This reports EFFECTIVE PROMPT VISIBILITY — does an actually-running Codex session
-    honor the projected hooks at all — a different claim from
-    ``check_codex_rule_corpus_reachable``'s STATIC reference integrity (do the cited
-    files merely exist on disk). The reported text is always version-qualified against
-    a runtime ``codex --version`` probe (``version_probe``, injectable for tests;
-    production wiring always uses ``_probe_installed_codex_version``) and never
-    asserts hook-fire behavior for a version this probe did not itself observe: absent
-    Codex, and any version other than ``_CODEX_HOOKS_LIVE_CERTIFIED_VERSION``, both
-    degrade to an explicit UNVERIFIED line pointing at `dadaia certify`'s live probe
-    (A22.4) instead of guessing.
-    """
-    raw_version = version_probe()
-    if raw_version is None:
-        return [
-            DoctorLine(
-                DoctorStatus.INFO,
-                "codex:trust-boundary — no installed Codex CLI observed on PATH "
-                "('codex --version' unreachable); the interactive-vs-headless "
-                "hook-fire boundary is UNVERIFIED for this environment (the git "
-                "chokepoints — the pre-push CI/branch "
-                "gate + the PR security-verdict gate — remain independent "
-                "defense-in-depth regardless). (WS-CDX-HYGIENE)",
-            )
-        ]
-    if raw_version == _CODEX_HOOKS_LIVE_CERTIFIED_VERSION:
-        return [
-            DoctorLine(
-                DoctorStatus.INFO,
-                f"codex:trust-boundary — installed {raw_version} matches the last "
-                "live-certified version: projected command hooks fire and block in "
-                "BOTH the interactive TUI and headless `codex exec` (the git "
-                "chokepoints remain independent defense-in-depth). (WS-CDX-HYGIENE)",
-            )
-        ]
+    """D-CX-8: a Markdown file in ``rules/`` is not Codex Rules (the ``.rules`` bytes are a rule)."""
     return [
         DoctorLine(
-            DoctorStatus.INFO,
-            f"codex:trust-boundary — installed {raw_version} has not been "
-            "live-certified for hook-fire behavior (last certified: "
-            f"{_CODEX_HOOKS_LIVE_CERTIFIED_VERSION}); the interactive-vs-headless "
-            "claim is UNVERIFIED for this version — rerun `dadaia certify`'s "
-            "codex-live-probe check to reconfirm before relying on it (the git "
-            "chokepoints remain independent defense-in-depth regardless). "
-            "(WS-CDX-HYGIENE)",
+            DoctorStatus.EXTRA, f"codex:rules/{md.name}: markdown is not Codex Rules (D-CX-8)"
         )
+        for md in sorted((codex_dir / "rules").glob("*.md"))
     ]

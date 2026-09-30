@@ -10,20 +10,14 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-from dadaia_workspace.core.model_registry import (
-    codex_effort_for_tier,
-    codex_tier_views,
-    registry_by_claude_id,
-)
+from dadaia_workspace.core.exceptions import PublicAssetError
+from dadaia_workspace.core.model_registry import REGISTRY
 from dadaia_workspace.infrastructure.public_assets_common import _toml_escape
 
 # ---------------------------------------------------------------------------
 # Constants
 # ---------------------------------------------------------------------------
 
-# Fallback reasoning effort when an agent's ``model:`` is unknown to the registry
-# (defensive only — every canonical agent's model id is registry-backed).
-_CODEX_DEFAULT_EFFORT = "medium"
 # Every name/prefix here gates which backtick-quoted skill references
 # ``dcx7_codex_skill_refs`` (D-CX-7) even bothers checking for existence, resolved
 # against the shared ``.agents/skills/`` tree Codex reads natively (codex_doctor.py).
@@ -36,7 +30,7 @@ _CODEX_SKILL_REF_PREFIXES = ("dd-",)
 
 # Whitelist of agent frontmatter fields that may be emitted to codex config.toml.
 _TOML_SAFE_AGENT_FIELDS: frozenset[str] = frozenset(
-    {"name", "description", "model", "tools", "activity_class"}
+    {"name", "description", "model", "tools", "read_only"}
 )
 
 # Matches a YAML list item under `tools:` (e.g. "  - Read")
@@ -45,6 +39,27 @@ _AGENT_FM_TOOLS_ITEM_RE = re.compile(r"^  - (.+)$", re.MULTILINE)
 _AGENT_FM_SIMPLE_RE = re.compile(r"^([A-Za-z_][A-Za-z0-9_]*): (.+)$", re.MULTILINE)
 # Matches a folded/literal scalar intro: `key: >` or `key: |`
 _AGENT_FM_BLOCK_SCALAR_RE = re.compile(r"^([A-Za-z_][A-Za-z0-9_]*): [>|]$", re.MULTILINE)
+
+#: Claude model id -> Codex model id; a Codex view never carries a ``claude-*`` model.
+_CODEX_MODELS: dict[str, str] = {entry.claude_id: entry.codex_id for entry in REGISTRY}
+_CLAUDE_MODEL_RE = re.compile(
+    "|".join(map(re.escape, sorted(_CODEX_MODELS, key=len, reverse=True)))
+)
+
+
+def transform_for_codex(text: str) -> str:
+    """*text* with known Claude model ids mapped and the Anthropic tier phrase renamed
+    (T-013-12); every other ``claude-*`` token (skill names) is kept."""
+    text = text.replace("Opus / Sonnet / Haiku", "deep / dispatch / fast registry tiers")
+    return _CLAUDE_MODEL_RE.sub(lambda m: _CODEX_MODELS[m.group(0)], text)
+
+
+def codex_model(claude_id: str) -> str:
+    """The Codex model for *claude_id*; ``ValueError`` names an unmapped id."""
+    if claude_id not in _CODEX_MODELS:
+        raise ValueError(f"No Codex mapping for model: {claude_id!r}")
+    return _CODEX_MODELS[claude_id]
+
 
 # ---------------------------------------------------------------------------
 # FR22 / A22.1 — Codex persona compaction (shared-law de-duplication)
@@ -120,7 +135,7 @@ def _compact_codex_developer_instructions(body: str) -> str:
     """Strip shared-law / cross-role boilerplate from a Codex persona body (A22.1).
 
     *body* is the already Codex-transformed persona body (post
-    :func:`~dadaia_workspace.infrastructure.runtime_transforms.codex.transform_for_codex`,
+    :func:`transform_for_codex`,
     frontmatter already stripped). Every pattern in :data:`_CODEX_COMPACT_PATTERNS`
     targets content that restates law or protocol Codex already delivers
     elsewhere in the effective context — never role identity, role-specific
@@ -140,37 +155,13 @@ def _compact_codex_developer_instructions(body: str) -> str:
 # ---------------------------------------------------------------------------
 
 
-def _codex_reasoning_effort_for_model(claude_model: str | None) -> str:
-    """Resolve the Codex ``model_reasoning_effort`` from an agent's ``model:``.
-
-    The effort is derived from the registry tier view (the single source of
-    truth) rather than a hand-maintained per-agent table: the frontmatter
-    ``model:`` (a Claude id) resolves to its registry tier, which the
-    per-runtime view maps to a Codex reasoning effort (``deep`` -> ``high``,
-    everything else -> ``medium``). This call also exercises
-    :func:`codex_tier_views`, so a tier collapse (two distinct tiers resolving
-    to one (model, effort) pair) fails loudly at projection time.
-
-    Returns ``_CODEX_DEFAULT_EFFORT`` when *claude_model* is ``None`` or not in
-    the registry (defensive — never breaks install).
-    """
-    # Invariant guard: raises loudly if the live registry collapses two tiers.
-    codex_tier_views()
-    if not claude_model:
-        return _CODEX_DEFAULT_EFFORT
-    entry = registry_by_claude_id().get(claude_model)
-    if entry is None:
-        return _CODEX_DEFAULT_EFFORT
-    return codex_effort_for_tier(entry.tier)
-
-
 def _render_codex_agent_toml(
     name: str,
     model: str,
     developer_instructions: str,
+    *,
+    reasoning_effort: str,
     description: str | None = None,
-    claude_model: str | None = None,
-    reasoning_effort: str | None = None,
     read_only: bool = False,
 ) -> str:
     """Serialize an agent as a TOML file for the Codex runtime.
@@ -180,13 +171,10 @@ def _render_codex_agent_toml(
     - ``description`` — basic string when available
     - ``model`` — basic string
     - ``sandbox_mode`` — ``read-only`` when *read_only* (the persona's
-      ``activity_class: ADDITIVE``, the same source the Claude render uses), else
+      ``read_only: true``, the same source the Claude render uses), else
       ``workspace-write``
-    - ``model_reasoning_effort`` — explicit reasoning profile: *reasoning_effort*
-      when supplied (the D-3 clamp of the RESOLVED agent-model-policy effort,
-      v0.1.65 FR5); otherwise derived from the registry tier of *claude_model*
-      via the per-runtime tier view (legacy path — staged bodies without a
-      resolved policy)
+    - ``model_reasoning_effort`` — *reasoning_effort*, as named by
+      ``install_helpers.resolve_codex_agent_model`` (the one effort authority)
     - ``developer_instructions`` — triple-quoted multiline basic string
 
     The function avoids external TOML serialiser dependencies; it builds the
@@ -215,8 +203,6 @@ def _render_codex_agent_toml(
     if description:
         lines.append(f"description = {_toml_escape(description)}\n")
     sandbox_mode = "read-only" if read_only else "workspace-write"
-    if reasoning_effort is None:
-        reasoning_effort = _codex_reasoning_effort_for_model(claude_model)
     lines.extend(
         [
             f"model = {_toml_escape(model)}\n",
@@ -238,18 +224,11 @@ def _render_codex_command_policy_rules() -> str:
     return """# Generated by "dadaia harness add codex".
 
 prefix_rule(
-    pattern = [["rg", "ls", "find", "cat", "sed"]],
+    pattern = [["ls", "cat"]],
     decision = "allow",
-    justification = "Read-only local inspection commands are safe in the dadaia workspace.",
-    match = ["rg Codex", "ls -la", "find specs -maxdepth 2 -type f", "cat AGENTS.md", "sed -n 1,80p AGENTS.md"],
-)
-
-prefix_rule(
-    pattern = ["git", ["status", "diff", "log", "show"]],
-    decision = "allow",
-    justification = "Local git inspection is safe and needed for review.",
-    match = ["git status --short", "git diff", "git log --oneline", "git show HEAD"],
-    not_match = ["git push", "git commit"],
+    justification = "Argv-closed readers only; sed, rg, find and git can write or exec, so they prompt.",
+    match = ["ls -la", "cat AGENTS.md"],
+    not_match = ["sed -n 1,80p AGENTS.md", "rg --pre ./x.sh pat ."],
 )
 
 prefix_rule(
@@ -338,6 +317,14 @@ def _render_agents_config_file_blocks(agents_dir: Path) -> str:
     return "".join(blocks)
 
 
+def _split_frontmatter(text: str) -> tuple[str, str]:
+    """(frontmatter without its fences, body) of a persona file — the one splitter."""
+    end = text.find("\n---\n", 4)
+    if not text.startswith("---\n") or end == -1:
+        raise PublicAssetError("persona has no closed YAML frontmatter block")
+    return text[4 : end + 1], text[end + 5 :]
+
+
 def _parse_agent_frontmatter(text: str) -> dict[str, object]:
     """Parse YAML frontmatter from an agent .md file using stdlib regex only.
 
@@ -349,12 +336,10 @@ def _parse_agent_frontmatter(text: str) -> dict[str, object]:
     Unknown fields (outside ``_TOML_SAFE_AGENT_FIELDS``) are silently dropped.
     Returns an empty dict if ``name`` is missing or frontmatter is absent.
     """
-    if not text.startswith("---\n"):
+    try:
+        frontmatter = _split_frontmatter(text)[0]
+    except PublicAssetError:
         return {}
-    end_idx = text.find("\n---\n", 4)
-    if end_idx == -1:
-        return {}
-    frontmatter = text[4 : end_idx + 1]
 
     result: dict[str, object] = {}
     lines = frontmatter.splitlines()
@@ -394,7 +379,7 @@ def _parse_agent_frontmatter(text: str) -> dict[str, object]:
         simple_m = _AGENT_FM_SIMPLE_RE.match(line)
         if simple_m:
             key = simple_m.group(1)
-            value_str = simple_m.group(2).strip()
+            value_str = simple_m.group(2).split(" #", 1)[0].strip()  # YAML inline comment
             if key in _TOML_SAFE_AGENT_FIELDS:
                 result[key] = value_str
         i += 1
@@ -405,41 +390,6 @@ def _parse_agent_frontmatter(text: str) -> dict[str, object]:
     return result
 
 
-def _parse_write_allowlist(text: str) -> list[str]:
-    """Extract ``paths.write_allowlist`` globs from agent .md frontmatter (stdlib only).
-
-    Used to pre-compile ``.dadaia/agentic/agents.index.json`` (T-016-00) so the SDD
-    gate's RULE D performs an O(1) JSON lookup instead of an inline YAML parse on
-    every PreToolUse. Returns ``[]`` when the agent declares no write_allowlist.
-    """
-    if not text.startswith("---\n"):
-        return []
-    end_idx = text.find("\n---\n", 4)
-    if end_idx == -1:
-        return []
-
-    in_paths = False
-    in_wl = False
-    items: list[str] = []
-    for line in text[4 : end_idx + 1].splitlines():
-        if not line.strip():
-            continue
-        stripped = line.strip()
-        indent = len(line) - len(line.lstrip())
-        if indent == 0:
-            in_paths = stripped == "paths:"
-            in_wl = False
-            continue
-        if not in_paths:
-            continue
-        if in_wl and stripped.startswith("- "):
-            items.append(stripped[2:].strip())
-            continue
-        # A sub-key under `paths:` (write_allowlist:, read_allowlist:, …).
-        in_wl = stripped == "write_allowlist:"
-    return items
-
-
 def _parse_skills_from_frontmatter(text: str) -> list[str]:
     """Extract the ``skills:`` list from agent YAML frontmatter.
 
@@ -448,13 +398,10 @@ def _parse_skills_from_frontmatter(text: str) -> list[str]:
     end of the frontmatter block.  Returns an empty list when frontmatter is
     absent or contains no ``skills:`` key.
     """
-    if not text.startswith("---\n"):
+    try:
+        frontmatter = _split_frontmatter(text)[0]
+    except PublicAssetError:
         return []
-    end_idx = text.find("\n---\n", 4)
-    if end_idx == -1:
-        return []
-    frontmatter = text[4 : end_idx + 1]
-
     skills: list[str] = []
     in_skills = False
     for line in frontmatter.splitlines():

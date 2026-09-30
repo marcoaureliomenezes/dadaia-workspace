@@ -26,21 +26,10 @@ Census (file:line, T-044-03):
      only (``hooks/_common.py:176-208`` ``emit_allow``/``emit_block``); it never rewrites
      ``tool_input``, so it cannot touch the bytes a subsequent Edit/Write applies.
    - ``dadaia_workspace/hooks/sdd_post_gate.py`` (PostToolUse) — writes only to
-     ``.dadaia/logs/``, ``.dadaia/states/``, and ``.dadaia/sessions/`` (presence renewal,
-     reconciler flags, stale-record reap); it never opens a ``specs/releases/**`` path.
+     ``.dadaia/sessions/`` (presence renewal); it never opens a ``specs/releases/**`` path.
    - ``dadaia_workspace/hooks/ctx_inject.py`` (SessionStart/UserPromptSubmit) — writes
      only sentinel/compact markers under ``.dadaia/tmp/`` (``ctx_inject.py:378,435``); it
      reads memory atoms, never writes release artifacts.
-2. ``dadaia_workspace/features/migrate/registry.py`` (``check_upgradable``) — v0.5.1
-   T-051-16 (K10) retired the versioned migration chain this item used to census (six
-   step modules scoped to ``specs/foundation``/``specs/SPEC.md``, ``specs/bugs/**``, and
-   ``specs/memory/**`` frontmatter — never ``specs/releases/**``). The registry's one
-   surviving function performs NO filesystem I/O at all (it only raises or returns
-   ``None``), so it cannot touch ``specs/releases/**`` by construction — proven below by
-   assertion on the function's signature/behaviour rather than a before/after fixture
-   diff, since there is no longer a write to diff around.
-3. ``dadaia_workspace/core/specs_repair.py:73-90`` (``remove_placeholder_atoms``) is
-   scoped to ``specs_dir/memory/**`` only.
 """
 
 from __future__ import annotations
@@ -49,14 +38,10 @@ import json
 import re
 from pathlib import Path
 
-import pytest
-
-from dadaia_workspace.core import specs_repair
-from dadaia_workspace.features.migrate import registry as migrate_registry
+from dadaia_workspace.core.spec_status import STATUS_LINE
 from tests.fixtures.harness_env import claude_hook_env, run_hook_subprocess
 
 _MARKER_RE = re.compile(r"^- \[([ xX-])\]", re.MULTILINE)
-_STATUS_RE = re.compile(r"^\*\*Status:\*\*\s*(.+)$", re.MULTILINE)
 
 _FIXTURE_TASKS_MD = """\
 # TASKS — Release v1.0.0 — fixture
@@ -80,7 +65,7 @@ def _markers(text: str) -> list[str]:
 
 
 def _status_tokens(text: str) -> list[str]:
-    return [m.strip() for m in _STATUS_RE.findall(text)]
+    return [m.strip() for m in STATUS_LINE.findall(text)]
 
 
 def _paragraph_count(text: str) -> int:
@@ -205,38 +190,5 @@ def test_ctx_inject_hook_never_mutates_tasks_md_content(tmp_path: Path) -> None:
 
 
 # ---------------------------------------------------------------------------------------
-# 2. The migration registry — v0.5.1 T-051-16 (K10) retired the versioned chain; the
-#    one surviving rule (`check_upgradable`) writes nothing, so it cannot touch
-#    `specs/releases/**` by construction. Filesystem-level "nothing was written" proof
-#    for `upgrade()`'s refuse path lives in
-#    `tests/unit/features/migrate/test_specs_evolution.py::
-#    test_upgrade_refuses_below_floor_without_any_write` — not duplicated here.
-# ---------------------------------------------------------------------------------------
-
-
-def test_migration_registry_check_upgradable_performs_no_filesystem_io() -> None:
-    """`check_upgradable` is a pure predicate over two ints — it cannot mutate
-    `specs/releases/**` (or anything else) because it never opens a path at all."""
-    # Silent (no exception) at or above the floor: no write, nothing to assert against.
-    migrate_registry.check_upgradable(current=6, goal=6)
-
-    # Below the floor: raises, still no write.
-    with pytest.raises(migrate_registry.UpgradeRefused):
-        migrate_registry.check_upgradable(current=0, goal=6)
-
-
-# ---------------------------------------------------------------------------------------
 # 3. CLI-verb scaffolders/repairers explicitly named in the task's census.
 # ---------------------------------------------------------------------------------------
-
-
-def test_specs_repair_placeholder_removal_never_touches_releases(tmp_path: Path) -> None:
-    specs_dir = tmp_path / "specs"
-    target = _seed_release_tasks_md(specs_dir)
-    before = target.read_text(encoding="utf-8")
-
-    removed = specs_repair.remove_placeholder_atoms(specs_dir, dry_run=False)
-
-    after = target.read_text(encoding="utf-8")
-    _assert_sdd_invariants_preserved(before, after)
-    assert target not in removed

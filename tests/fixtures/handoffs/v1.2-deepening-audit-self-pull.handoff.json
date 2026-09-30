@@ -1,7 +1,7 @@
 {
   "schema_version": "handoff-v1.2",
   "self_pull": {"refs": ["specs/memory/ARCHITECTURE.md", "specs/memory/TECHSTACK.md"]},
-  "agent": "software-architect",
+  "agent": "dd-software-engineer",
   "context": "dadaia-workspace",
   "produced_at": "2026-08-28T18:36:44Z",
   "scope": "REVIEW-mode deepening audit of repos/dadaia-workspace at c4a539c1 (feature/0.5.0) using codebase-design / improve-codebase-architecture / domain-modeling; five axes: context-bind, projection, SDD ledger, enforcement, read-side+CLI",

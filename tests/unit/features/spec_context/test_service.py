@@ -18,13 +18,16 @@ import pytest
 
 pytest.importorskip("fcntl")
 
-import stat  # noqa: E402
 from pathlib import Path  # noqa: E402
 
 from dadaia_workspace.container import scan_publish_candidates
-from dadaia_workspace.core.models.spec_context import ContextState  # noqa: E402
 from dadaia_workspace.features.spec_context.service import SpecContextService  # noqa: E402
-from tests.fakes import FakeContextStore, FakeGitClient, register_dead  # noqa: E402
+from dadaia_workspace.infrastructure.git_subprocess import GitSubprocessClient
+from dadaia_workspace.infrastructure.json_context_store import JsonContextStore
+from tests.fakes import register_dead  # noqa: E402
+from tests.fixtures.real_git import clone, seeded_remote
+from tests.fixtures.real_git import git as run_git
+from tests.fixtures.stores import context_store
 
 
 @pytest.fixture()
@@ -36,58 +39,18 @@ def workspace_root(tmp_path: Path) -> Path:
 
 
 @pytest.fixture()
-def store() -> FakeContextStore:
-    return FakeContextStore()
+def store(workspace_root: Path) -> JsonContextStore:
+    return context_store(workspace_root / ".dadaia" / "states")
 
 
 @pytest.fixture()
-def git() -> FakeGitClient:
-    return FakeGitClient()
-
-
-@pytest.fixture()
-def service(
-    store: FakeContextStore,
-    git: FakeGitClient,
-    workspace_root: Path,
-) -> SpecContextService:
-    return SpecContextService(
-        context_store=store,
-        git_client=git,
-        workspace_root=workspace_root,
-        install_hooks=lambda _repo: None,
-        secret_scan=scan_publish_candidates,
-    )
-
-
-def test_dead_succeeds_on_non_writable_files(
-    service: SpecContextService,
-    store: FakeContextStore,
-    git: FakeGitClient,
-    workspace_root: Path,
-) -> None:
-    """v0.1.50 FR3 (bug context-dead-nonwritable-guard-rejects-standard-git-objects):
-    read-only files (git loose objects are 0444 BY DESIGN) no longer refuse dead() —
-    rmtree runs with a chmod-and-retry handler, replacing the old GitSyncError guard.
-    """
-    register_dead(service, "proj", "my-repo", "https://github.com/org/my-repo")
-    service.alive("proj")
-
-    repo = workspace_root / "repos" / "my-repo"
-    assert repo.exists()
-
-    locked_file = repo / "locked.txt"
-    locked_file.write_text("content")
-    locked_file.chmod(stat.S_IRUSR | stat.S_IRGRP)  # read-only, like a loose object
-
-    result = service.dead("proj")
-    assert result.state is ContextState.DEAD
-    assert not repo.exists()
+def git() -> GitSubprocessClient:
+    return GitSubprocessClient()
 
 
 def test_alive_leaves_a_preexisting_specs_tree_untouched_and_hooks_the_repo(
-    store: FakeContextStore,
-    git: FakeGitClient,
+    store: JsonContextStore,
+    git: GitSubprocessClient,
     workspace_root: Path,
 ) -> None:
     """0.4.8 AC3.7: alive() never merges, backs up or commits specs — an operator tree
@@ -100,15 +63,16 @@ def test_alive_leaves_a_preexisting_specs_tree_untouched_and_hooks_the_repo(
         install_hooks=hooked.append,
         secret_scan=scan_publish_candidates,
     )
-    register_dead(svc, "proj", "my-repo", "https://github.com/org/my-repo")
-    repo = workspace_root / "repos" / "my-repo"
+    remote = seeded_remote(workspace_root.parent, "my-repo")
+    register_dead(svc, "proj", "my-repo", remote.as_uri())
+    repo = clone(remote, workspace_root / "repos" / "my-repo")
+    head = run_git(repo, "rev-parse", "HEAD")
     (repo / "specs").mkdir(parents=True)
     (repo / "specs" / "constitution.md").write_text("# operator\n", encoding="utf-8")
-    git._dirty.add(repo)
 
     svc.alive("proj")
 
     assert sorted(p.name for p in (repo / "specs").iterdir()) == ["constitution.md"]
     assert not (workspace_root / "repos" / "my-repo" / "specs_bkp").exists()
-    assert repo not in git.committed
+    assert run_git(repo, "rev-parse", "HEAD") == head
     assert hooked == [repo]

@@ -1,40 +1,16 @@
 """dadaia public subcommands."""
 
 from pathlib import Path
-from typing import Literal
 
 import typer
 from rich.console import Console
 
 from dadaia_workspace import container
-from dadaia_workspace.core.models.doctor_report import DoctorLine, DoctorStatus
+from dadaia_workspace.core.models.doctor_report import DoctorStatus
 from dadaia_workspace.core.workspace_resolver import resolve_workspace_root
-
-#: Display styles by status. Rendering only — the verdict NEVER depends on this map:
-#: an unmapped status prints unstyled and still blocks if its status blocks.
-_STYLE_BY_STATUS: dict[DoctorStatus, str] = {
-    DoctorStatus.OK: "green",
-    DoctorStatus.MISSING: "yellow",
-    DoctorStatus.DRIFT: "yellow",
-    DoctorStatus.ERROR: "red",
-    DoctorStatus.LEAK: "red",
-    DoctorStatus.EXTRA: "yellow",
-    DoctorStatus.NOT_APPLICABLE: "cyan",
-    DoctorStatus.UNSUPPORTED: "cyan",
-}
 
 app = typer.Typer(help="Manage distributed public agent assets.")
 console = Console()
-_ONLY_CHOICES = (
-    "agents",
-    "skills",
-    "rules",
-    "schemas",
-    "scripts",
-    "runtime",
-    "templates",
-    "data",
-)
 
 
 @app.command()
@@ -65,17 +41,6 @@ def stage() -> None:
 @app.command(epilog="Recipe: dadaia public stage && dadaia public install && dadaia public doctor")
 def install(
     force: bool = typer.Option(False, "--force", help="Overwrite existing files"),
-    repos_only: bool = typer.Option(
-        False, "--repos-only", help="Install only consumer repo assets."
-    ),
-    workspace_only: bool = typer.Option(
-        False, "--workspace-only", help="Install only workspace-root guardrail pair."
-    ),
-    only: str = typer.Option(
-        "",
-        "--only",
-        help=f"Install only one asset category: {', '.join(_ONLY_CHOICES)}",
-    ),
 ) -> None:
     """Install staged public assets into runtime projections.
 
@@ -83,29 +48,9 @@ def install(
     `.dadaia/states/harness_profile.json` — the roster of record. A harness enters
     that roster through `dadaia harness add <name>`, never through a flag here.
     """
-    if repos_only and workspace_only:
-        typer.echo("Error: --repos-only and --workspace-only are mutually exclusive.", err=True)
-        raise typer.Exit(1)
-
-    only_value: str | None = only if only else None
-    if only_value is not None and only_value not in _ONLY_CHOICES:
-        typer.echo(
-            f"Error: --only '{only_value}' is not valid. Choose from: {', '.join(_ONLY_CHOICES)}",
-            err=True,
-        )
-        raise typer.Exit(1)
-
-    scope: Literal["all", "repos-only", "workspace-only"]
-    if repos_only:
-        scope = "repos-only"
-    elif workspace_only:
-        scope = "workspace-only"
-    else:
-        scope = "all"
-
     workspace_root = resolve_workspace_root()
     svc = container.build_public_service()
-    installed = svc.install(workspace_root, force=force, scope=scope, only=only_value)
+    installed = svc.install(workspace_root, force=force)
 
     if installed:
         console.print(f"[green]✓[/green] {len(installed)} asset(s) processed:")
@@ -129,12 +74,9 @@ def doctor() -> None:
     harnesses registered in the profile.
     """
     workspace_root = resolve_workspace_root()
-    report = container.build_public_service().doctor(workspace_root)
-    lines: list[DoctorLine] = list(report.lines)
+    lines, fix = container.build_public_service().verdict(workspace_root)
     for line in lines:
-        console.print(line.render(), style=_STYLE_BY_STATUS.get(line.status), markup=False)
-    # The verdict is the typed report's — fail-closed: EVERY blocking status exits 1,
-    # including ones this CLI never special-cased (bug public-doctor-exits-zero-
-    # despite-error: [error] used to fall into a decorative else and exit 0).
-    if any(line.status.blocking for line in lines):
+        print(line.render())  # plain: a fix line is never wrapped at the terminal width
+    if fix:
+        print(f"fix: {fix}")
         raise typer.Exit(1)

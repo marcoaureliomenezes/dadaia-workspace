@@ -10,7 +10,7 @@
 
 | slug | title | tldr |
 |------|-------|------|
-| `agent-comms` | agent-comms | The handoff-v1 JSON contract agents emit, its stdlib validator behind `dadaia reports validate`, and ack-on-consume deletion with a one-day TTL. |
+| `agent-comms` | agent-comms | The handoff-v1 JSON contract agents emit, its validator behind `dadaia reports validate`, and ack-on-consume deletion with a one-day TTL. |
 | `agent-orchestration` | agent-orchestration | Three dd- personas dispatched by the main thread alone; ordered work carried by the SDD documents and handoffs, never a runtime; concurrent sessions, no locks. |
 | `agentic-entities` | agentic-entities | The entity registry — three personas, the deterministic behaviours every harness implements, the rules — and the behavior map binding each skill to law. |
 
@@ -28,8 +28,8 @@
 | `harness-claude-code` | harness-claude-code | Entry harness with native sub-agent dispatch; reads the root AGENTS.md map natively and reaches skills and personas through per-entry symlinks into .agents/. |
 | `harness-codex` | harness-codex | Entry harness on the Codex CLI: native AGENTS.md chain and .agents/skills; .codex/ carries config, hooks, the command policy and persona TOML. |
 | `harness-copilot` | harness-copilot | Entry harness on GitHub Copilot CLI — native root AGENTS.md and .agents/skills; .github/ carries agents/*.agent.md transcodes and two hook files. |
-| `harness-cursor` | harness-cursor | Entry harness on Cursor — native root AGENTS.md and .agents/skills; .cursor/ carries hooks.json (gate on shell, reaper at session start) and persona symlinks. |
-| `harness-devin` | harness-devin | Entry harness on the Devin CLI — native AGENTS.md, .agents/skills and .agents/agents; its one projected file, .devin/hooks.v1.json, registers gate and reaper. |
+| `harness-cursor` | harness-cursor | Entry harness on Cursor — native root AGENTS.md and .agents/skills; .cursor/ carries hooks.json (gate on every tool, reaper at start) and persona symlinks. |
+| `harness-devin` | harness-devin | Entry harness on the Devin CLI — native AGENTS.md, .agents/skills and .agents/agents; its one file, .devin/hooks.v1.json, wires gate, injection and reaper. |
 | `harness-kimi-code` | harness-kimi-code | Entry harness with an empty projection: reads root AGENTS.md, .agents/skills and .agents/agents natively; user-level hook shims; DADAIA_CONTEXT binds. |
 
 ### philosophy
@@ -44,13 +44,13 @@
 | slug | title | tldr |
 |------|-------|------|
 | `capabilities` | capabilities | dadaia capabilities [--json] prints the installed contract: distribution and specs pattern versions, status tokens, the live verbs and harnesses. |
-| `ci-preflight` | ci-preflight | dadaia ci preflight runs the library's CI checks locally — ruff format, ruff check, mypy --strict, lint-imports, pytest — and refuses outside the source repo. |
+| `ci-preflight` | ci-preflight | dadaia ci preflight runs the library's seven CI checks locally, fenced like a bare checkout, and refuses outside the source repo. |
 | `consumer-agent-support` | Consumer validation gate | A consumer-side validation agent running the shipped recipe on a real workspace is the release gate; no wheel publishes until every statement reports PASS. |
 | `context-management` | context-management | ALIVE/DEAD registry of a main repo plus associated repos; create clones, hooks and ALIVEs in one step; only context bind binds, naming the session's scope. |
 | `context-portability` | context-portability | dadaia export writes the workspace's context set to one file; dadaia import registers each unknown context DEAD elsewhere, ready for dadaia context alive. |
 | `cross-platform-portability` | cross-platform-portability | Linux, macOS and Windows through one platform capability seam carrying the venv layout, Python hooks and cross-OS CI legs. |
 | `server-registry` | server-registry | Dev-server port registry with TTL and PID tracking so parallel sessions never collide — one stdlib skill script over one JSON state file; no CLI verb. |
-| `specs-migration` | specs-migration | specs init brings specs/ to the canon and writes the project gitflow, never committing; specs upgrade walks 6 to 7; migrate lifts registry v1. |
+| `specs-migration` | specs-migration | specs init brings specs/ to the canon and writes the project gitflow, never committing; specs upgrade re-stamps 6 or 7 to 8; migrate lifts registry v1. |
 | `workspace-doctor` | workspace-doctor | dadaia doctor is the one compliance check — workspace, specs and ledgers sections, one line per finding, exit 1 with a fix line; --fix moves slop, TTL deletes. |
 | `workspace-init` | workspace-init | Level 1 — uvx dadaia-workspace init [DIR] provisions venv, zones, law, one harness; re-init upgrades; --repo adds level 2; next step from one ordered step list. |
 
@@ -62,4 +62,4 @@
 | `backlog-ledger` | backlog-ledger | The operator's demand queue: BACKLOG.json active[] plus one histo record per exit; backlog.py writes it, dadaia doctor judges bound subjects. |
 | `bug-ledger` | bug-ledger | One bug record per line in BUGS.jsonl, registered after operator confirmation, closed only by a transition carrying evidence; bugs.py writes it. |
 | `release-lifecycle` | release-lifecycle | Closed-scope candidates grow one live release, each defined from an as-is review; release.py writes _RELEASE.json; memory gates closure; promote merges a PR. |
-| `sdd-gate-v3` | sdd-gate-v3 | No-lock enforcement — three gate blocks (root entry, non-venv command, PROTECTED or out-of-scope write), one fix line each, a gitflow push chokepoint. |
+| `sdd-gate-v3` | sdd-gate-v3 | No-lock enforcement — three gate blocks (root entry, non-venv command, PROTECTED or out-of-scope file-tool write), one fix line each, a gitflow push chokepoint. |

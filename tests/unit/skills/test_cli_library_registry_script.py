@@ -3,12 +3,14 @@ c5 T-047-45: the `dadaia server` group retired into one stdlib script). Size: SM
 
 from __future__ import annotations
 
+import importlib.util
 import json
 import os
 import subprocess
 import sys
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -97,18 +99,21 @@ def test_clean_removes_expired_entries_only(tmp_path: Path) -> None:
     assert [e["port"] for e in _entries(reg)] == [3200]
 
 
+def _load_module() -> Any:
+    spec = importlib.util.spec_from_file_location("registry", _SCRIPT)
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
 def test_release_without_selector_is_refused(tmp_path: Path) -> None:
     result = _run(tmp_path / "r.json", "release")
     assert result.returncode == 1 and "--port" in result.stderr
 
 
 def test_scan_parses_ss_lines_and_skips_registered_and_privileged_ports() -> None:
-    import importlib.util
-
-    spec = importlib.util.spec_from_file_location("registry", _SCRIPT)
-    module = importlib.util.module_from_spec(spec)
-    assert spec.loader is not None
-    spec.loader.exec_module(module)
+    module = _load_module()
     raw = "\n".join(
         [
             "State Recv-Q Send-Q Local Address:Port Peer Address:Port Process",
@@ -135,25 +140,28 @@ def _run_in(cwd: Path, *argv: str) -> subprocess.CompletedProcess[str]:
     )
 
 
-def test_registry_resolves_by_walking_up_to_the_nearest_dadaia_dir(tmp_path: Path) -> None:
-    """The ancestor walk lands on the workspace that owns the cwd (review 0.4.7 c5 F4)."""
+def test_registry_resolves_the_workspace_sentinel_never_a_partial_dadaia(tmp_path: Path) -> None:
+    """sa-seven-workspace-root-rules#S6: from repos/<slug> holding a partial .dadaia/ (no
+    sentinel), the registry lands in the workspace owning the sentinel."""
     workspace = tmp_path / "ws"
-    nested = workspace / "repos" / "app" / "src"
-    nested.mkdir(parents=True)
-    (workspace / ".dadaia").mkdir()
-    assert _run_in(nested, "register", "--port", "3100", "--project", "demo").returncode == 0
+    repo = workspace / "repos" / "yb"
+    (repo / ".dadaia").mkdir(parents=True)
+    (workspace / ".dadaia" / "states").mkdir(parents=True)
+    (workspace / ".dadaia" / "states" / "spec_contexts.json").write_text("{}", encoding="utf-8")
+    assert _run_in(repo, "register", "--port", "3100", "--project", "demo").returncode == 0
     reg = workspace / ".dadaia" / "states" / "server_registry.json"
     assert [e["port"] for e in _entries(reg)] == [3100]
-    assert not (nested / ".dadaia").exists()
+    assert not (repo / ".dadaia" / "states").exists()
 
 
 def test_registry_refuses_when_no_dadaia_dir_is_above_the_cwd(tmp_path: Path) -> None:
-    """Never a silent registry in a foreign tree: no ``.dadaia/`` above → exit non-zero."""
+    """sa-seven-workspace-root-rules#S6: no workspace sentinel above (a bare .dadaia/ is
+    not one) → exit non-zero, no registry written."""
     lonely = tmp_path / "lonely"
-    lonely.mkdir()
+    (lonely / ".dadaia").mkdir(parents=True)
     result = _run_in(lonely, "list")
     assert result.returncode != 0
-    assert "no .dadaia/ above the current directory" in result.stderr
+    assert "no workspace sentinel above the cwd" in result.stderr
     assert not any(tmp_path.rglob("server_registry.json"))
 
 
@@ -173,3 +181,19 @@ def test_entry_with_a_dead_pid_is_stale_before_its_ttl(tmp_path: Path) -> None:
     assert alive.returncode == 0
     listed = json.loads(_run(reg, "list", "--json", "--status", "all").stdout)
     assert {e["port"]: e["status"] for e in listed} == {3200: "active"}
+
+
+def test_a_concurrent_load_never_reads_a_half_written_registry(tmp_path: Path) -> None:
+    """sa-ledger-vocabulary-and-atomic-write-duplicated-in-scripts#48.4: interleaved save
+    and load never raise JSONDecodeError (a load raising it fails the reader thread)."""
+    import threading
+
+    module = _load_module()
+    registry = tmp_path / "server_registry.json"
+    doc = json.dumps({"entries": [{"port": p} for p in range(2000)]}) + "\n"
+    module.replace(registry, doc)
+    reader = threading.Thread(target=lambda: [module.load(registry) for _ in range(300)])
+    reader.start()
+    for _ in range(300):
+        module.replace(registry, doc)
+    reader.join()

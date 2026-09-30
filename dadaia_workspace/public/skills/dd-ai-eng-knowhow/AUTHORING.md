@@ -49,7 +49,7 @@ Every library skill must satisfy all fifteen; each rule's detail lives in the se
 | Context load | The agent, every turn | Speed/reliability of reaching material without a human in the loop |
 | Cognitive load | The operator/reviewer | Zero context tax, but the human must remember the document exists |
 
-- This is `dd-ai-eng-knowhow`'s own shape in miniature: Part 1 is context-loaded for every agent, every session.
+- This is `dd-ai-eng-knowhow`'s own shape in miniature: its `SKILL.md` is context-loaded for every agent, every session.
 - Siblings are reached only by pointer — free until an author needs them.
 
 ---

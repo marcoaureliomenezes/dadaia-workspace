@@ -2,7 +2,7 @@
 slug: ARCHITECTURE
 title: Architecture
 tldr: The system's principles, technology stack and structure.
-summary: Part 1 holds the architecture principles, changed only by an accepted ADR; the Tech Stack and Structure sections describe what the code is today.
+summary: The Principles section holds the architecture principles, changed only by an accepted ADR; the Tech Stack and Structure sections describe what the code is today.
 tags:
   - architecture
   - layers

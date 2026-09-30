@@ -1,8 +1,6 @@
 """Unit tests for the memory validator's LINT-1 mapping (v0.4.3 T-043-20/FR16).
 
-LINT-1 imports ``features.specs.memory_lint`` directly now — no subprocess, no
-``ProcessRunner``, no dependency on the projected ``public/scripts/lint-memory-atoms.py``
-copy existing (A16.1). These tests exercise ``check_lint1_memory_atoms`` against REAL
+LINT-1 imports ``features.specs.memory_lint`` directly (A16.1). These tests exercise ``check_lint1_memory_atoms`` against REAL
 memory-atom fixtures written under ``tmp_path``, proving the severity mapping end to end
 through the real ``memory_lint`` implementation — never a faked subprocess result.
 
@@ -13,8 +11,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from dadaia_workspace.features.specs import Severity
 from dadaia_workspace.features.specs.doctor_memory import MemoryValidator
+from dadaia_workspace.features.specs.doctor_types import finding_path
 
 _VALID_FRONTMATTER = """---
 slug: {slug}
@@ -22,19 +20,20 @@ title: "Fixture atom"
 tldr: "a valid atom for LINT-1 fixture purposes"
 summary: "a valid atom for LINT-1 fixture purposes, used across doctor_memory tests"
 tags: ["fixture"]
+sources: ["specs/**"]
 ---
 """
 
 
 def _make_specs_with_memory(tmp_path: Path) -> Path:
     specs = tmp_path / "specs"
-    (specs / "memory").mkdir(parents=True)
+    (specs / "memory" / "product" / "a").mkdir(parents=True)
     return specs
 
 
 def test_lint1_clean_atom_produces_no_issues(tmp_path: Path) -> None:
     specs = _make_specs_with_memory(tmp_path)
-    (specs / "memory" / "architecture.md").write_text(
+    (specs / "memory" / "product" / "a" / "architecture.md").write_text(
         _VALID_FRONTMATTER.format(slug="architecture") + "\n## Purpose\n\nclean atom\n",
         encoding="utf-8",
     )
@@ -46,7 +45,7 @@ def test_lint1_clean_atom_produces_no_issues(tmp_path: Path) -> None:
 
 def test_lint1_forbidden_heading_maps_to_error(tmp_path: Path) -> None:
     specs = _make_specs_with_memory(tmp_path)
-    (specs / "memory" / "architecture.md").write_text(
+    (specs / "memory" / "product" / "a" / "architecture.md").write_text(
         _VALID_FRONTMATTER.format(slug="architecture") + "\n## Changelog\n\nnot allowed\n",
         encoding="utf-8",
     )
@@ -55,9 +54,9 @@ def test_lint1_forbidden_heading_maps_to_error(tmp_path: Path) -> None:
 
     assert len(issues) == 1
     assert issues[0].code == "LINT-1"
-    assert issues[0].severity == Severity.ERROR
-    assert "Forbidden heading" in issues[0].description
-    assert "Changelog" in issues[0].description
+    assert issues[0].error
+    assert "Forbidden heading" in issues[0].message
+    assert "Changelog" in issues[0].message
 
 
 def test_lint1_unknown_heading_produces_no_issue(tmp_path: Path) -> None:
@@ -66,7 +65,7 @@ def test_lint1_unknown_heading_produces_no_issue(tmp_path: Path) -> None:
     nobody has ever seen before is neither an error nor a warning at the doctor
     mapping layer either."""
     specs = _make_specs_with_memory(tmp_path)
-    (specs / "memory" / "architecture.md").write_text(
+    (specs / "memory" / "product" / "a" / "architecture.md").write_text(
         _VALID_FRONTMATTER.format(slug="architecture")
         + "\n## Some Brand New Never Before Seen Heading\n\ncontent\n",
         encoding="utf-8",
@@ -82,11 +81,11 @@ def test_lint1_error_atom_and_clean_atom_coexist_only_the_error_surfaces(tmp_pat
     atom surfaces, while a sibling atom with an ordinary (never-curated) heading
     contributes nothing — exactly one issue, not silently swallowed or duplicated."""
     specs = _make_specs_with_memory(tmp_path)
-    (specs / "memory" / "architecture.md").write_text(
+    (specs / "memory" / "product" / "a" / "architecture.md").write_text(
         _VALID_FRONTMATTER.format(slug="architecture") + "\n## History\n\nforbidden\n",
         encoding="utf-8",
     )
-    (specs / "memory" / "tech-stack.md").write_text(
+    (specs / "memory" / "product" / "a" / "tech-stack.md").write_text(
         _VALID_FRONTMATTER.format(slug="tech-stack") + "\n## Some Other Heading\n\nx\n",
         encoding="utf-8",
     )
@@ -94,7 +93,7 @@ def test_lint1_error_atom_and_clean_atom_coexist_only_the_error_surfaces(tmp_pat
     issues = MemoryValidator(specs).check_lint1_memory_atoms()
 
     assert len(issues) == 1
-    assert issues[0].severity == Severity.ERROR
+    assert issues[0].error
 
 
 def test_lint1_no_memory_dir_is_a_noop(tmp_path: Path) -> None:
@@ -119,21 +118,21 @@ def test_lint1_emits_one_single_line_issue_per_atom_error(tmp_path: Path) -> Non
     `<CODE> <verdict> <message>` line per finding, so every lint error is its own issue
     naming its own atom — never a multi-line block of `  [path] ERROR:` lines."""
     specs = _make_specs_with_memory(tmp_path)
-    architecture = specs / "memory" / "architecture.md"
+    architecture = specs / "memory" / "product" / "a" / "architecture.md"
     architecture.write_text(
         _VALID_FRONTMATTER.format(slug="architecture") + "\n## History\n\nx\n## Changelog\n",
         encoding="utf-8",
     )
-    quality = specs / "memory" / "quality.md"
+    quality = specs / "memory" / "product" / "a" / "quality.md"
     quality.write_text(
         _VALID_FRONTMATTER.format(slug="quality") + "\n## History\n\nx\n", encoding="utf-8"
     )
 
     issues = MemoryValidator(specs).check_lint1_memory_atoms()
 
-    assert [(issue.code, issue.path) for issue in issues] == [
+    assert [(issue.code, finding_path(issue)) for issue in issues] == [
         ("LINT-1", str(architecture)),
         ("LINT-1", str(architecture)),
         ("LINT-1", str(quality)),
     ]
-    assert all("\n" not in issue.description for issue in issues)
+    assert all("\n" not in issue.message for issue in issues)

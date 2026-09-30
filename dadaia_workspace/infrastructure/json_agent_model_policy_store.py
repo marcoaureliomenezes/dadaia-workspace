@@ -14,7 +14,7 @@ Two load paths, deliberately distinct (NFR-4, "missing != invalid"):
   :class:`AgentModelPolicyStoreError` with a distinct, actionable message per FR3
   rejection: corrupt JSON, non-object root, unknown top-level/override key, wrong
   schema version, unknown ``applied_template`` id, unknown agent name (valid names =
-  the three core agents; a retired persona name migrates on read), a model not in the registry, an
+  the ``CORE_AGENTS``; a retired persona name migrates on read), a model not in the registry, an
   effort outside the D-3 vocabulary, an empty override, and — D-7 — any combination
   that resolves a Fable-family model onto ``dd-code-reviewer``.
 
@@ -26,20 +26,20 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from dadaia_workspace.core.agent_model_templates import (
-    CORE_AGENTS,
-    resolve_agent_model,
-    template_by_id,
-)
 from dadaia_workspace.core.atomic_write import atomic_write
-from dadaia_workspace.core.model_registry import is_fable_model, registry_by_claude_id
-from dadaia_workspace.core.models.agent_model_policy import (
+from dadaia_workspace.core.model_registry import (
     _SCHEMA_VERSION,
     CLAUDE_EFFORTS,
+    CORE_AGENTS,
+    FABLE_FORBIDDEN_AGENT,
     AgentModelOverride,
     AgentModelPolicyOverlay,
     AgentModelPolicyStoreError,
     ClaudeEffort,
+    is_fable_model,
+    registry_by_claude_id,
+    resolve_agent_model,
+    template_by_id,
 )
 
 _FILENAME = "agent_model_policy.json"
@@ -49,18 +49,7 @@ _ALLOWED_TOP_LEVEL = frozenset({"schema_version", "applied_template", "overrides
 #: Allowed keys inside one per-agent override (per-field: model, effort, or both).
 _ALLOWED_OVERRIDE_KEYS = frozenset({"model", "effort"})
 
-#: Retired persona names an operator-owned overlay may still carry -> the current name.
-#: The pre-0.4.7 bare names (T-047-56) and ADR 0022's deleted coordinator persona.
-_RETIRED_AGENT_NAMES: dict[str, str] = {
-    "project-manager": "dd-product-engineer",
-    "dd-project-manager": "dd-product-engineer",
-    "product-engineer": "dd-product-engineer",
-    "software-engineer": "dd-software-engineer",
-    "code-reviewer": "dd-code-reviewer",
-}
-
 #: The agent that must never resolve to a Fable-family model (G-1/D-7).
-_FABLE_FORBIDDEN_AGENT = "dd-code-reviewer"
 
 
 class JsonAgentModelPolicyStore:
@@ -170,7 +159,7 @@ class JsonAgentModelPolicyStore:
         valid_agents = set(CORE_AGENTS)
         overrides: dict[str, AgentModelOverride] = {}
         for agent_name, override_value in value.items():
-            agent = _RETIRED_AGENT_NAMES.get(str(agent_name), str(agent_name))
+            agent = str(agent_name)
             if agent not in valid_agents:
                 raise AgentModelPolicyStoreError(
                     f"unknown agent {agent!r} in 'overrides'; valid agents: "
@@ -233,10 +222,10 @@ class JsonAgentModelPolicyStore:
         Uses the single resolver (FR4) so the check covers every combination
         (override model, template interplay), not just the literal override value.
         """
-        resolved = resolve_agent_model(_FABLE_FORBIDDEN_AGENT, overlay)
+        resolved = resolve_agent_model(FABLE_FORBIDDEN_AGENT, overlay)
         if is_fable_model(resolved.model):
             raise AgentModelPolicyStoreError(
-                f"policy resolves {resolved.model!r} onto {_FABLE_FORBIDDEN_AGENT!r}; "
+                f"policy resolves {resolved.model!r} onto {FABLE_FORBIDDEN_AGENT!r}; "
                 "Fable is never assigned to dd-code-reviewer (operator ruling G-1)",
                 path,
             )

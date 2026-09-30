@@ -19,7 +19,7 @@ line here and `--help` disagree, `--help` wins.
 3. `.dadaia/.venv/bin/dadaia harness list` names this workspace's projected runtimes; `.dadaia/.venv/bin/dadaia harness add <name>` registers one more.
 4. Run `.dadaia/.venv/bin/dadaia capabilities --json` first in any new or upgraded session.
 5. Bind the session: `.dadaia/.venv/bin/dadaia context bind <ctx>` — `--print-env` emits `DADAIA_CONTEXT`/`DADAIA_SESSION_ID` for `eval $(…)`; the bind sets the write scope to the context's main repo plus its associated repos (`.dadaia/AGENTS.md`).
-6. Workspace compliance: `.dadaia/.venv/bin/dadaia doctor --context <ctx> [--json]` — clean before any implementation write; `--fix` MOVES slop to `.dadaia/reaped/` (7-day hold) and nothing is deleted before its own TTL; `--fix --expired-only` reaps without touching slop (`.dadaia/AGENTS.md`).
+6. Workspace compliance: `.dadaia/.venv/bin/dadaia doctor --context <ctx> [--json]` — clean before any implementation write; `--fix` MOVES slop to `.dadaia/reaped/` (7-day hold) and nothing is deleted before its own TTL; `--fix --expired-only` deletes only TTL-expired entries and stale session records — the SessionStart lane (`.dadaia/AGENTS.md`).
 7. Pass an explicit `--context` on every command that takes it.
 8. Converge a runtime: resolve `provider.distribution_version` from `.dadaia/.venv/bin/dadaia capabilities --json`, then `.dadaia/.venv/bin/dadaia reconcile --expect-version "$v" --json`, then `.dadaia/.venv/bin/dadaia certify --json` — a failed certify check is a release blocker.
 9. On a failing command: preserve the evidence trail (command, exit code, output); classify and register a genuine bug (`dd-bug-registration`) before any workaround.
@@ -31,7 +31,7 @@ line here and `--help` disagree, `--help` wins.
   create|alive|dead` and `.dadaia/.venv/bin/dadaia import|export` own those.
 - Level 1: `uvx dadaia-workspace init [DIR] [--harness …] [--repo <url>]`; re-run = upgrade. Level 2: `.dadaia/.venv/bin/dadaia context create [<name>] --main-repo <url> [--associated-repo <url>]…`
   clones, hooks and ALIVEs, transactionally — it never binds; `.dadaia/.venv/bin/dadaia context bind <ctx>` does. Level 3: `.dadaia/.venv/bin/dadaia specs init --context <ctx>`, the `dd-audit-project` first pass (done at `.dadaia/.venv/bin/dadaia doctor --context <ctx>` exit 0), then `.dadaia/.venv/bin/dadaia context baseline <ctx>`. Retire: `.dadaia/.venv/bin/dadaia context dead` (removes the repo; never mid-switch) → `.dadaia/.venv/bin/dadaia context delete`.
-- A project is published once by `.dadaia/.venv/bin/dadaia context baseline <ctx>` (principal, integration and work branches; a re-run is a no-op); every later write is an ordinary commit.
+- A project is published once by `.dadaia/.venv/bin/dadaia context baseline <ctx>` (every `gitflow:` branch; a re-run is a no-op); every later write is an ordinary commit.
 - The associated set is written by `.dadaia/.venv/bin/dadaia context repo add <ctx> <slug> [--url <url>]` / `.dadaia/.venv/bin/dadaia context repo remove <ctx> <slug>` and READ only by `.dadaia/.venv/bin/dadaia context show <ctx> --json`, whose `associated_repos` carries slug, url, on-disk and branch.
 - Portability: `.dadaia/.venv/bin/dadaia export` writes `.dadaia/dist/spec-contexts.json` (overwritten each run); on the destination `.dadaia/.venv/bin/dadaia import <file>` registers each unknown context DEAD, then `.dadaia/.venv/bin/dadaia context alive <slug>` clones it; verify with `.dadaia/.venv/bin/dadaia context list`.
 
@@ -39,7 +39,7 @@ line here and `--help` disagree, `--help` wins.
 
 - The registry (`.dadaia/states/server_registry.json`) is the one record of who holds
   which local port; every verb is `python3 <skill-dir>/scripts/registry.py <verb>` (the
-  script walks up from cwd to the nearest `.dadaia/`; `--registry <path>` overrides).
+  script walks up from cwd to the nearest `.dadaia/states/spec_contexts.json`; `--registry <path>` overrides).
 - Open a port in this order: `list` → `next --project <name> --json` → start the server on
   loopback → `register --port N --project <name> [--pid <pid>] [--ttl <hours>]` — idempotent
   for the same project; a port held by another project exits 1 naming the owner.

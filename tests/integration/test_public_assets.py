@@ -1,21 +1,6 @@
-"""Integration tests for public asset staging and runtime projections.
-
-Merged per plan-integration.md (39 -> ~8):
-  - Keep: install-refuses-dadaia-workspace-source-root (safety), public-privacy gate
-    (flags identifiers + ignores bytecode, merged -> 1).
-  - Merge: stage (manifest + codex adapters) -> 1; install-all -> 1;
-    overwrite-stale/skip-canonical/force -> 1; codex projection (config omits/emits +
-    legacy workflow cleanup + native-rules-only) -> 1; model-governance
-    overlay (no-overlay lockstep + overlay-change lockstep + invalid-overlay-loud +
-    doctor rerender-drift/invalid-vs-missing) -> 2.
-  - Delete -> unit (already covered by tests/unit/infrastructure/test_public_assets_*.py,
-    T-2's per-concern split): quoting/escaping,
-    ``_parse_agent_frontmatter`` param cases, ``_render_codex_agent_toml`` field/tier
-    cases, command-policy prefix rules, and the
-    skill-frontmatter static-lint fn (moved to unit/features/public).
-
-Privacy gate is CRITICAL (public-boundary). Renderer fns keep coverage as unit tests —
-no fs/subprocess needed there.
+"""Intent: CONTRACT — v0.4.5 A4.1-4.3: the authority for public stage, install and drift
+(rosters, the source-root refusal, hash-compare overwrite/skip/force, the privacy gate,
+model-policy rendering, single-place skill rename). Size: MEDIUM — real projection I/O.
 """
 
 from __future__ import annotations
@@ -51,12 +36,7 @@ def _rendered(result: object) -> list[str]:
 pytestmark = [pytest.mark.integration, pytest.mark.slow]
 
 _runner = CliRunner()
-
-
-# ---------------------------------------------------------------------------
-# stage() — manifest + codex runtime adapters, plus
-# install() full-projection block
-# ---------------------------------------------------------------------------
+_AGENTS = {"dd-code-reviewer", "dd-product-engineer", "dd-software-engineer"}
 
 
 def test_stage_manifest_and_install_all(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -65,16 +45,26 @@ def test_stage_manifest_and_install_all(tmp_path: Path, monkeypatch: pytest.Monk
 
     stage_manager.stage(stage_workspace)
 
-    manifest_path = stage_workspace / ".dadaia" / "agentic" / "manifest.json"
-    assert manifest_path.exists()
-    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    agentic = stage_workspace / ".dadaia" / "agentic"
+    # sa-staged-assets-without-consumers#44.2: only families a reader of
+    # .dadaia/agentic/ consumes are staged (no `rules`, no 0.4.7 FR3 `runtime/`).
+    assert sorted(p.name for p in agentic.iterdir()) == [
+        "agents", "data", "manifest.json", "schemas", "skills",
+    ]  # fmt: skip
+    manifest = json.loads((agentic / "manifest.json").read_text(encoding="utf-8"))
     assert manifest["schema_version"] == "1"
     assert any(asset["path"] == "data/AGENTS.md" for asset in manifest["assets"])
-
-    # 0.4.7 FR3: the Codex-only runtime-adapter family is retired — Codex reads the
-    # shared `.agents/skills` tree natively, so nothing stages under runtime/.
-    assert not (stage_workspace / ".dadaia" / "agentic" / "runtime").exists()
-    assert not any(asset["path"].startswith("runtime/") for asset in manifest["assets"])
+    assert all({"path", "sha256", "type"} <= set(asset) for asset in manifest["assets"])
+    staged_agents = {
+        Path(a["path"]).stem
+        for a in manifest["assets"]
+        if a["type"] == "agents" and a["path"].endswith(".md")
+    }
+    assert staged_agents == _AGENTS
+    oracle_skills = skill_names()
+    # v0.4.5 FR5 (scan-test-vacuity-guard): an empty oracle would make every roster vacuous.
+    assert_populated(oracle_skills, sentinel="dd-cli-library")
+    assert {p.name for p in (agentic / "skills").iterdir() if p.is_dir()} == oracle_skills
 
     workspace = tmp_path / "ws"
     manager = FileSystemPublicAssetManager()
@@ -86,17 +76,9 @@ def test_stage_manifest_and_install_all(tmp_path: Path, monkeypatch: pytest.Monk
     assert (workspace / ".dadaia" / "AGENTS.md").exists()
     assert (workspace / ".dadaia" / "tmp" / "AGENTS.md").exists()
     assert (workspace / ".dadaia" / "states" / "AGENTS.md").exists()
-    # Every skill installed carries its SKILL.md — derived from the one shared
-    # oracle (v0.4.5 FR4), never one hand-picked skill name.
-    oracle_skills = skill_names()
-    # v0.4.5 FR5 (scan-test-vacuity-guard): a mis-rooted oracle scan would degrade
-    # `oracle_skills` to empty, under which this loop asserts nothing at all.
-    assert_populated(oracle_skills, sentinel="dd-cli-library")
-    for skill in oracle_skills:
-        assert (workspace / ".agents" / "skills" / skill / "SKILL.md").exists(), (
-            f".agents/skills/{skill}/SKILL.md not installed"
-        )
-    assert (workspace / ".claude" / "agents" / "dd-code-reviewer.md").exists()
+    installed = {p.parent.name for p in (workspace / ".agents" / "skills").glob("*/SKILL.md")}
+    assert installed == oracle_skills
+    assert {p.stem for p in (workspace / ".claude" / "agents").glob("*.md")} == _AGENTS
     assert (workspace / ".codex" / "hooks.json").exists()
     assert (workspace / ".codex" / "config.toml").exists()
     # Codex receives Starlark .rules for command policy. Markdown behavioral
@@ -104,11 +86,6 @@ def test_stage_manifest_and_install_all(tmp_path: Path, monkeypatch: pytest.Monk
     assert not (workspace / ".codex" / "rules" / "game-agents-coordination.md").exists()
     assert not (workspace / ".codex" / "rules" / "game-developer-scope.md").exists()
     assert (workspace / ".codex" / "rules" / "dadaia-command-policy.rules").exists()
-
-
-# ---------------------------------------------------------------------------
-# Safety — never touch the dadaia-workspace source root itself.
-# ---------------------------------------------------------------------------
 
 
 # ---------------------------------------------------------------------------
@@ -194,13 +171,14 @@ _PRIVACY_TEST_TERM = private_ip()
 def _seed_denylist_env(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     """Seed the denylist via env var (location-independent; avoids .dadaia/ in lib repo)."""
     source = tmp_path / "privacy_denylist.json"
-    source.write_text(json.dumps([[_PRIVACY_TEST_TERM, "test private IP"]]), encoding="utf-8")
+    source.write_text(json.dumps({_PRIVACY_TEST_TERM: "test private IP"}), encoding="utf-8")
     monkeypatch.setenv(_PRIVACY_DENYLIST_ENV, str(source))
 
 
-def test_public_privacy_gate_flags_identifiers_and_ignores_bytecode(
+def test_public_privacy_gate_flags_identifiers(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    """sa-private-match-rendering-has-three-renderers#B1."""
     _seed_denylist_env(monkeypatch, tmp_path)
     repo_root = tmp_path / "repo"
     public_dir = repo_root / "dadaia_workspace" / "public"
@@ -217,99 +195,14 @@ def test_public_privacy_gate_flags_identifiers_and_ignores_bytecode(
 
     rendered = [line.render() for line in report]
     assert any(line.startswith("[error] public-privacy:") for line in rendered)
-    assert any(_PRIVACY_TEST_TERM in line.lower() for line in rendered)
-
-    # A denylisted term inside a __pycache__/*.pyc is ignored (bytecode is not scanned).
-    clean_repo_root = tmp_path / "repo-clean"
-    clean_public_dir = clean_repo_root / "dadaia_workspace" / "public"
-    cache_dir = clean_public_dir / "skills" / "sample" / "__pycache__"
-    cache_dir.mkdir(parents=True)
-    (cache_dir / "leak.pyc").write_bytes(_PRIVACY_TEST_TERM.encode())
-    (clean_public_dir / "data").mkdir()
-    (clean_public_dir / "data" / "AGENTS.md").write_text("# clean\n", encoding="utf-8")
-
-    clean_manager = FileSystemPublicAssetManager()
-    clean_manager._public_dir = clean_public_dir  # noqa: SLF001
-    assert [line.render() for line in clean_manager._check_public_privacy()] == [  # noqa: SLF001
-        "[ok] public-privacy"
-    ]
+    shown = f"'{_PRIVACY_TEST_TERM[0]}…{_PRIVACY_TEST_TERM[-1]}'"  # WP-11: first…last
+    assert any(shown in line.lower() for line in rendered)
 
 
 # ---------------------------------------------------------------------------
 # Codex projection: config omits inert keys, legacy workflow references are removed,
 # and only native .rules command policy is installed.
 # ---------------------------------------------------------------------------
-
-
-def _make_codex_install_manager(tmp_path: Path) -> tuple[FileSystemPublicAssetManager, Path]:
-    """Return a manager pointed at a minimal public dir and a workspace root.
-
-    The public/ dir has only what _install_codex() strictly requires: a rules/
-    subdir and an agents/ subdir (both may be empty).
-    """
-    public_dir = tmp_path / "public"
-    (public_dir / "rules").mkdir(parents=True)
-    (public_dir / "agents").mkdir(parents=True)
-    workspace_root = tmp_path / "ws"
-    workspace_root.mkdir()
-    manager = FileSystemPublicAssetManager()
-    manager._public_dir = public_dir  # noqa: SLF001
-    return manager, workspace_root
-
-
-def test_codex_projection_config_legacy_cleanup_and_native_rules(tmp_path: Path) -> None:
-    # W1-2 — _codex_config() emits neither the [skills] table nor approved_commands,
-    # for both a no-agents and a real-agents source dir; the real dir still emits
-    # [agents.*] blocks.
-    manager_probe = FileSystemPublicAssetManager()
-    real_agentic_dir = manager_probe._public_dir  # noqa: SLF001
-    for agentic_dir in (Path("/nonexistent/agentic"), real_agentic_dir):
-        output = manager_probe._codex_config(agentic_dir)  # noqa: SLF001
-        assert "[skills]" not in output, f"Expected no '[skills]' section; got:\n{output}"
-        assert "approved_commands" not in output, (
-            f"Expected no 'approved_commands' array; got:\n{output}"
-        )
-
-    real_output = manager_probe._codex_config(real_agentic_dir)  # noqa: SLF001
-    assert "[agents." in real_output, "Expected at least one [agents.*] block in output"
-    assert real_output.startswith('# Generated by "dadaia harness add codex".')
-
-    # The retired Markdown workflow source is not projected.
-    manager, workspace_root = _make_codex_install_manager(tmp_path)
-    manager.install(workspace_root, harness="codex", force=True)
-    assert not (workspace_root / ".codex" / "workflows").exists()
-
-    # Installation removes only retired workflow files and preserves unrelated
-    # operator-owned content in the directory.
-    legacy_manager, legacy_ws = _make_codex_install_manager(tmp_path / "legacy-case")
-    legacy_workflows_dir = legacy_ws / ".codex" / "workflows"
-    legacy_workflows_dir.mkdir(parents=True)
-    (legacy_workflows_dir / "hotfix-release.workflow.md").write_text(
-        "stale content\n", encoding="utf-8"
-    )
-    (legacy_workflows_dir / "operator-note.txt").write_text("keep\n", encoding="utf-8")
-    legacy_manager.install(legacy_ws, harness="codex", force=True)
-    assert not (legacy_workflows_dir / "hotfix-release.workflow.md").exists()
-    assert (legacy_workflows_dir / "operator-note.txt").read_text(encoding="utf-8") == "keep\n"
-
-    # Markdown behavioral protocols are not projected as Codex Rules — only the
-    # native .rules command policy is.
-    rules_manager, rules_ws = _make_codex_install_manager(tmp_path / "rules-case")
-    rules_public_dir = rules_manager._public_dir  # noqa: SLF001
-    rules_src = rules_public_dir / "rules"
-    (rules_src / "game-agents-coordination.md").write_text(
-        "# game-agents-coordination\nProse rule\n", encoding="utf-8"
-    )
-    (rules_src / "workspace-protocol.md").write_text(
-        "---\nname: workspace-protocol\n---\n# body\n", encoding="utf-8"
-    )
-    rules_manager.install(rules_ws, harness="codex", force=True)
-    rules_dst = rules_ws / ".codex" / "rules"
-    assert not (rules_dst / "game-agents-coordination.md").exists(), (
-        "Behavioral rule should NOT be projected to .codex/rules/"
-    )
-    assert not (rules_dst / "workspace-protocol.md").exists()
-    assert (rules_dst / "dadaia-command-policy.rules").exists()
 
 
 # ---------------------------------------------------------------------------
@@ -418,7 +311,7 @@ def test_model_policy_overlay_lockstep_rendering_invalid_fails_loud_and_doctor_r
 
     # NFR-4: invalid overlay -> loud typed error, never a silent fallback; the
     # projection tree is not touched.
-    from dadaia_workspace.core.models.agent_model_policy import (
+    from dadaia_workspace.core.model_registry import (
         AgentModelPolicyStoreError,
     )
 

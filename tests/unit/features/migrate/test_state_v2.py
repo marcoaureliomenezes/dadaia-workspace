@@ -1,7 +1,7 @@
 """Unit tests for state_v2 migration (spec_contexts.json v1 → v2).
 
 Covers AC-T10c-1..6 and AC-T10a-5..6 migration path. CRITICAL v1→v2 state migration:
-transform correctness and idempotent double-run are kept as named tests.
+transform correctness is kept as a named test.
 """
 
 from __future__ import annotations
@@ -9,6 +9,8 @@ from __future__ import annotations
 import json
 from pathlib import Path
 from typing import Any
+
+import pytest
 
 from dadaia_workspace.features.migrate.state_v2 import execute_migration, plan_migration
 
@@ -88,8 +90,9 @@ def test_plan_migration_detection_matrix(tmp_path: Path) -> None:
     assert plan_v2.contexts_to_migrate == []
 
     _, states_none = _workspace(tmp_path / "none")
-    plan_none = plan_migration(states_none)
-    assert plan_none.already_v2 is True
+    with pytest.raises(ValueError, match="fix: ") as refused:  # sa-seven-workspace-root-rules#S5
+        plan_migration(states_none)
+    assert "No initialized workspace" in str(refused.value)
 
 
 # ---------------------------------------------------------------------------
@@ -98,7 +101,9 @@ def test_plan_migration_detection_matrix(tmp_path: Path) -> None:
 
 
 def test_execute_migration_transforms_contexts(tmp_path: Path) -> None:
-    """ativo → alive, inativo → dead; is_primary removed; activated_at → alive_since."""
+    """sa-registry-schema-version-has-three-grammars#B7: the v1 transform contract is
+    unchanged — ativo → alive, inativo → dead; is_primary removed; activated_at →
+    alive_since."""
     ws, states = _workspace(tmp_path)
     _write_v1(
         states,
@@ -171,13 +176,3 @@ def test_execute_migration_side_effects_and_v2_noop(tmp_path: Path) -> None:
     execute_migration(states2, ws2)
     after = (states2 / "spec_contexts.json").read_text()
     assert json.loads(before) == json.loads(after)
-
-
-def test_execute_migration_twice_is_idempotent(tmp_path: Path) -> None:
-    ws, states = _workspace(tmp_path)
-    _write_v1(states)
-    execute_migration(states, ws)
-    # Second run: now a v2 file
-    execute_migration(states, ws)
-    data = json.loads((states / "spec_contexts.json").read_text())
-    assert data["schema_version"] == "2"

@@ -57,10 +57,9 @@
     "consumer_requirements": {"type": "object"},
     "certification": {
       "type": "object",
-      "required": ["command", "schema_version"],
+      "required": ["schema_version"],
       "additionalProperties": false,
       "properties": {
-        "command": {"const": "dadaia certify --json"},
         "schema_version": {"const": "dadaia-certification-v1"}
       }
     }

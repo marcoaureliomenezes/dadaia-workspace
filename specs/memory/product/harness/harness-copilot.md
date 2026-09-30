@@ -19,7 +19,7 @@ sources:
 ## Hooks
 
 - The four hook behaviours ([[agentic-entities]]) arrive as two files in the workspace root's `.github` hooks directory, entry key `bash`, `version: 1`: `pre-tool-use.json` (`preToolUse` -> the `copilot-pre-gate` wrapper) and `session-start.json` (`sessionStart` -> `copilot-doctor-expired`, the reaper).
-- Copilot decides by stdout JSON, so the wrapper remaps the gate's envelope to `{"permissionDecision": allow|deny, "permissionDecisionReason"}` ([[sdd-gate-v3]]).
+- Copilot decides by stdout JSON, so the wrapper answers only a deny, remapped to `{"permissionDecision": "deny", "permissionDecisionReason": <reason>}`; an allow emits nothing ([[sdd-gate-v3]]).
 - `dadaia certify`'s `copilot-live-probe` checks that the `copilot` binary answers `--version`, reporting SKIP `UNVERIFIED` when it is absent; no version floor.
 
 ## Dependencies

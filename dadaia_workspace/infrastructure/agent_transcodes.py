@@ -12,11 +12,10 @@ from __future__ import annotations
 from collections.abc import Callable
 from pathlib import Path
 
-from dadaia_workspace.core.exceptions import PublicAssetError
 from dadaia_workspace.core.harness_registry import AgentTranscode, HarnessRecord
-from dadaia_workspace.core.models.agent_model_policy import ResolvedAgentModel
+from dadaia_workspace.core.model_registry import ResolvedAgentModel
 from dadaia_workspace.infrastructure.install_helpers import (
-    activity_read_only,
+    persona_read_only,
     resolve_codex_agent_model,
 )
 from dadaia_workspace.infrastructure.install_plan import InstallPlan
@@ -31,29 +30,20 @@ from dadaia_workspace.infrastructure.public_assets_common import (
     iter_public_files,
 )
 from dadaia_workspace.infrastructure.runtime_config import codex_config
-from dadaia_workspace.infrastructure.runtime_transforms.codex import transform_for_codex
 from dadaia_workspace.infrastructure.runtime_transforms.codex_assets import (
     _parse_agent_frontmatter,
     _render_codex_agent_toml,
     _render_codex_command_policy_rules,
+    _split_frontmatter,
+    codex_model,
+    transform_for_codex,
 )
-from dadaia_workspace.infrastructure.runtime_transforms.model_mapping import map_model
 
 
 def no_rules(record: HarnessRecord, plan: InstallPlan) -> tuple[ProjectionRule, ...]:
     """The harness reads the authored tree natively — it projects no view of its own."""
     del record, plan
     return ()
-
-
-def _split_frontmatter(text: str) -> tuple[str, str]:
-    """(frontmatter body without its fences, the rest) of a canonical agent file."""
-    if not text.startswith("---\n"):
-        raise PublicAssetError("cannot transcode agent: staged body has no YAML frontmatter block")
-    end_idx = text.find("\n---\n", 4)
-    if end_idx == -1:
-        raise PublicAssetError("cannot transcode agent: staged frontmatter block is not closed")
-    return text[4 : end_idx + 1], text[end_idx + 5 :]
 
 
 def md_symlink_rules(record: HarnessRecord, plan: InstallPlan) -> tuple[ProjectionRule, ...]:
@@ -63,9 +53,8 @@ def md_symlink_rules(record: HarnessRecord, plan: InstallPlan) -> tuple[Projecti
     authored = plan.workspace_root / ".agents"
     src_agents = plan.agentic_dir / "agents"
     src_skills = plan.agentic_dir / "skills"
-    dirs = _CLAUDE_DIRS if plan.only is None else tuple(d for d in _CLAUDE_DIRS if d == plan.only)
     rules: list[ProjectionRule] = []
-    for name in dirs:
+    for name in _CLAUDE_DIRS:
         if name == "agents":
             rules.extend(_agent_link_rules(record, harness_dir / "agents", authored, src_agents))
         elif name == "skills":
@@ -110,8 +99,6 @@ def _agent_link_rules(
 def cursor_md_rules(record: HarnessRecord, plan: InstallPlan) -> tuple[ProjectionRule, ...]:
     """Cursor reads Markdown personas from its own directory — one link per authored
     file, the same hash-verified copy fallback, no second rendered copy."""
-    if plan.only is not None and plan.only != "agents":
-        return ()
     return _agent_link_rules(
         record,
         plan.workspace_root / str(record.directory) / "agents",
@@ -145,8 +132,6 @@ def copilot_agent_md_bytes(md_path: Path) -> bytes:
 def copilot_agent_md_rules(record: HarnessRecord, plan: InstallPlan) -> tuple[ProjectionRule, ...]:
     """``<dir>/agents/<name>.agent.md`` per authored persona — and nothing else under
     the harness directory, which the repository's own workflows already share."""
-    if plan.only is not None and plan.only != "agents":
-        return ()
     dst_dir = plan.workspace_root / str(record.directory) / "agents"
     rules: list[ProjectionRule] = []
     for md_file in sorted((plan.agentic_dir / "agents").glob("*.md")):
@@ -177,27 +162,19 @@ def codex_agent_toml_bytes(
     through the :class:`ProjectionRule` seam.
     """
     text = md_path.read_text(encoding="utf-8")
+    body = transform_for_codex(_split_frontmatter(text)[1])
     fm = _parse_agent_frontmatter(text)
-    if text.startswith("---\n"):
-        end_idx = text.find("\n---\n", 4)
-        body = text[end_idx + 5 :] if end_idx != -1 else text
-    else:
-        body = text
-    body = transform_for_codex(body, agent_name)
-    staged_model_raw = fm.get("model") if fm else None
-    staged_model = str(staged_model_raw) if staged_model_raw else None
-    claude_model, reasoning_effort = resolve_codex_agent_model(agent_name, staged_model, resolved)
-    codex_model = map_model(claude_model)
+    claude_model, reasoning_effort = resolve_codex_agent_model(
+        agent_name, fm.get("model") if fm else None, resolved
+    )
     description = fm.get("description") if fm else None
-    codex_description = transform_for_codex(str(description), agent_name) if description else None
     toml_content = _render_codex_agent_toml(
         agent_name,
-        codex_model,
+        codex_model(claude_model),
         body,
-        description=codex_description,
-        claude_model=claude_model,
+        description=transform_for_codex(str(description)) if description else None,
         reasoning_effort=reasoning_effort,
-        read_only=activity_read_only(fm),
+        read_only=persona_read_only(fm),
     )
     return toml_content.encode("utf-8")
 
@@ -207,48 +184,46 @@ def toml_transcode_rules(record: HarnessRecord, plan: InstallPlan) -> tuple[Proj
     byte-wise. The shared ``.agents/skills`` tree is read natively."""
     harness_dir = plan.workspace_root / str(record.directory)
     rules: list[ProjectionRule] = []
-    if plan.only is None or plan.only == "rules":
+    rules.append(
+        bytes_rule(
+            f"{record.name}:rules/dadaia-command-policy.rules",
+            record.name,
+            harness_dir / "rules" / "dadaia-command-policy.rules",
+            _render_codex_command_policy_rules().encode("utf-8"),
+        )
+    )
+    agents_src = plan.agentic_dir / "agents"
+    for md_file in sorted(agents_src.glob("*.md")):
+        fm = _parse_agent_frontmatter(md_file.read_text(encoding="utf-8"))
+        agent_name = str(fm.get("name", "")) if fm else ""
+        if not agent_name:
+            continue
+        resolved = plan.resolved_models.get(agent_name)
+
+        def _render(
+            _current: bytes | None,
+            _md_file: Path = md_file,
+            _agent_name: str = agent_name,
+            _resolved: ResolvedAgentModel | None = resolved,
+        ) -> bytes:
+            return codex_agent_toml_bytes(_md_file, _agent_name, _resolved)
+
         rules.append(
-            bytes_rule(
-                f"{record.name}:rules/dadaia-command-policy.rules",
-                record.name,
-                harness_dir / "rules" / "dadaia-command-policy.rules",
-                _render_codex_command_policy_rules().encode("utf-8"),
+            ProjectionRule(
+                label=f"{record.name}:agents/{agent_name}.toml",
+                harness=record.name,
+                dst=harness_dir / "agents" / f"{agent_name}.toml",
+                render=_render,
             )
         )
-    if plan.only is None or plan.only == "agents":
-        agents_src = plan.agentic_dir / "agents"
-        for md_file in sorted(agents_src.glob("*.md")):
-            fm = _parse_agent_frontmatter(md_file.read_text(encoding="utf-8"))
-            agent_name = str(fm.get("name", "")) if fm else ""
-            if not agent_name:
-                continue
-            resolved = plan.resolved_models.get(agent_name)
-
-            def _render(
-                _current: bytes | None,
-                _md_file: Path = md_file,
-                _agent_name: str = agent_name,
-                _resolved: ResolvedAgentModel | None = resolved,
-            ) -> bytes:
-                return codex_agent_toml_bytes(_md_file, _agent_name, _resolved)
-
-            rules.append(
-                ProjectionRule(
-                    label=f"{record.name}:agents/{agent_name}.toml",
-                    harness=record.name,
-                    dst=harness_dir / "agents" / f"{agent_name}.toml",
-                    render=_render,
-                )
-            )
-        rules.append(
-            bytes_rule(
-                f"{record.name}:config.toml",
-                record.name,
-                harness_dir / "config.toml",
-                codex_config(plan.agentic_dir).encode("utf-8"),
-            )
+    rules.append(
+        bytes_rule(
+            f"{record.name}:config.toml",
+            record.name,
+            harness_dir / "config.toml",
+            codex_config(plan.agentic_dir, plan.workspace_root).encode("utf-8"),
         )
+    )
     return tuple(rules)
 
 

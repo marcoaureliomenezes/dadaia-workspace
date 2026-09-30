@@ -3,12 +3,12 @@
   "release": "0.5.0",
   "phase": "CLOSURE",
   "defined": {
-    "sha": "fa569482",
-    "ts": "2026-09-25T04:15:57Z"
+    "sha": "10eee7ff",
+    "ts": "2026-09-27T13:09:45Z"
   },
   "implemented": {
-    "sha": "8673b5c6",
-    "ts": "2026-09-27T02:48:46Z"
+    "sha": "0d31a5f2",
+    "ts": "2026-09-30T02:48:05Z"
   },
   "shipped": null,
   "log": [
@@ -358,6 +358,106 @@
         "sdd-gate-v3"
       ],
       "changed": []
+    },
+    {
+      "ts": "2026-09-27T12:59:21Z",
+      "agent": "release.py new",
+      "kind": "note",
+      "text": "Candidate born on 0.5.0 (prior candidate closed at 8673b5c6)"
+    },
+    {
+      "ts": "2026-09-27T13:09:45Z",
+      "agent": "release.py",
+      "kind": "note",
+      "text": "Candidate defined at 10eee7ff; phase IMPLEMENTATION."
+    },
+    {
+      "ts": "2026-09-30T02:48:05Z",
+      "agent": "release.py",
+      "kind": "note",
+      "text": "Candidate implemented at 0d31a5f2; phase CLOSURE."
+    },
+    {
+      "ts": "2026-09-30T02:54:49Z",
+      "agent": "dd-product-engineer",
+      "kind": "summary",
+      "text": "Candidate 4 \"critical systemic-ambiguity remediation\" (operator demand 2026-09-26/28, Origin bugs: 78 ids — 49 open at definition, the work-order bug, the git-output bug, the 11 closure bugs) closes at 0d31a5f2 by ADR 0121: its remaining steps only, no scope added. All 46 tasks [x]; T-050-62 took the closure measurements. dd-code-reviewer closure review: VERDICT APPROVED 0d31a5f2 (the earlier closure review REJECTED at rubric 67/100 is answered by the 11 closure bugs and T-050-62). Commits after 0d31a5f2 are out of candidate scope: a89941bf/32af55ce (ADR 0139, maxTurns leaves the personas), 816ef661 (ADR 0140). Remediation of audit 20260930-structural-convergence is carried by later candidates: candidate 5 is worktrees and bind only (ADR 0140, amends 0121), candidates 6+ carry the rest."
+    },
+    {
+      "ts": "2026-09-30T02:54:49Z",
+      "agent": "dd-product-engineer",
+      "kind": "size",
+      "text": "T-050-62 (baseline 9cd5fbf4 -> 0d31a5f2): production lines 33,543 -> 23,793 (-29.1%); test lines 66,289 -> 43,232 (-34.8%); test functions 2,063 -> 1,168 (-43.4%). First-run rubric D1-D10 (fenced, promote-head wheel): 80/100 against 67 at the rejected closure review — a readout, never a gate (ADR 0122). Reviewer-required ratchet move: V38 allowance 16 -> 12."
+    },
+    {
+      "ts": "2026-09-30T02:54:49Z",
+      "agent": "dd-product-engineer",
+      "kind": "drifts",
+      "text": "Undelivered acceptance criteria, recorded as the APPROVED review required, carried to candidates 6+ (ADR 0140; audit moves M3-M5 and F123): AC9.5 — tests/fixtures/harness_env.py was not rebuilt; AC6.3 — the shutil import-linter ban never landed (setup.cfg holds six contracts, F123); AC9.11 residue — up to 10 mirrored findings in sa-gate-allows-root-entries-the-reaper-moves, sa-seven-workspace-root-rules, sa-fix-lines-not-built-by-cli-line, sa-hook-parity-claims-false-and-interpreter-rules-diverge and sa-specs-init-writes-unrendered-law, with live cross-checks at tests/unit/hooks/test_root_whitelist.py:66 and tests/contract/test_ci_preflight_ci_gating_parity.py:99; AC6.6 — the subset rule is unenforced (tests/contract/test_slop_ratchets.py:378). The memory surfaces audit finding F150 names are rewritten with the worktrees/bind redesign, not patched at this closure. Candidate 5 keeps only bind and worktree items, e.g. the reopened HIGH unbound-native-session-writes-freely-into-repos (fix 1a27ae1f reverted by 3a279529)."
+    },
+    {
+      "ts": "2026-09-30T02:54:49Z",
+      "agent": "dd-product-engineer",
+      "kind": "artifact-gc",
+      "text": "dadaia doctor --context dadaia-workspace dry at 816ef661: 6 slop/expired workspace lines — WS-repos-slop repos/dadaia-workspace/.coverage, WS-tmp-expired (3 hook markers, tmp/wt holding a dd-chain-explorer linked worktree whose fix is git worktree remove), WS-reaped-expired reaped/20260922; reaped/ holds 15 entries under TTL, none from this candidate. The doctor prints no compliance score (it reports findings and an exit code). doctor --fix not run by this closure: RC-FLOW step 8 is the main thread's, and tmp/wt needs the operator's worktree removal."
+    },
+    {
+      "ts": "2026-09-30T02:54:49Z",
+      "agent": "dd-product-engineer",
+      "kind": "test-dispositions",
+      "text": "Test disposition per T-050-62: test functions 2,063 -> 1,168 (-43.4%) and test lines -34.8% through the T-050-63..94 DELETE/REWRITE passes, each commit body naming its dispositions (DELETE-LOSER, DELETE-HOLLOW, DUP, REWRITE). No quarantine-marked test and no expired SCAFFOLD at closure. Open test debt carried to candidates 6+: AC9.5 harness_env fixture rebuild, AC6.6 subset rule (test_slop_ratchets.py:378), AC9.11 mirrored cross-checks (test_root_whitelist.py:66, test_ci_preflight_ci_gating_parity.py:99)."
+    },
+    {
+      "ts": "2026-09-30T02:54:49Z",
+      "agent": "dd-product-engineer",
+      "kind": "dispositions",
+      "text": "Origin 78 bugs: 78/78 resolved (BUGS.jsonl status, verified against the SPEC Origin line). No backlog entry picked (Origin bugs:). Audit 20260930-structural-convergence stays open for candidates 5+: F064 (closure measurement) and F065 (no APPROVED verdict) resolved --release 0.5.0 by T-050-62 (0d31a5f2) and the APPROVED review; each memory truth-correction fixed under ADR 0138 in this closure's memory pass is dispositioned resolved in the commit after its fix; every other finding stays open. No new bug and no backlog entry registered (operator order). bugs.py archive not run."
+    },
+    {
+      "ts": "2026-09-30T02:58:29Z",
+      "agent": "release.py memory",
+      "kind": "memory",
+      "text": "Memory reconciled over 61e39efc3fadd3947b1c7c8ed72ed8a9c8df6468..684e44bd3ccd: 16 reviewed, 12 changed.",
+      "since": "61e39efc3fadd3947b1c7c8ed72ed8a9c8df6468",
+      "until": "684e44bd3ccd1d9acf599e6ba6e711e07f8b9073",
+      "reviewed": [
+        "agent-comms",
+        "agent-orchestration",
+        "harness-claude-code",
+        "harness-codex",
+        "harness-kimi-code",
+        "product-vision",
+        "spec-context-project",
+        "capabilities",
+        "context-management",
+        "context-portability",
+        "cross-platform-portability",
+        "server-registry",
+        "backlog-ledger",
+        "bug-ledger",
+        "release-lifecycle",
+        "sdd-gate-v3"
+      ],
+      "changed": [
+        "agentic-entities",
+        "public-asset-distribution",
+        "pypi-distribution",
+        "harness-copilot",
+        "harness-cursor",
+        "harness-devin",
+        "specs-migration",
+        "workspace-doctor",
+        "workspace-init",
+        "audits-canon",
+        "ci-preflight",
+        "consumer-agent-support"
+      ]
+    },
+    {
+      "ts": "2026-09-30T02:58:39Z",
+      "agent": "dd-product-engineer",
+      "kind": "note",
+      "text": "Memory pass bounds: context-management, spec-context-project, sdd-gate-v3 and workspace-doctor are reviewed with their audit-named surfaces left as they are — the F150 lines (rung 0, repo_owner, is_live, parallel worktree, ctx-inject law, the dead flow; bind scope; MUTATING scope; the TTL walk and worktree skip; findings F117, F118, F119, F122 folded there) are rewritten with the worktrees/bind redesign, and the F149 lines (operator verdict, instance_exceptions.txt, root-entry fix line, root-whitelist row) with the root-canon redesign. Principle blocks named by F124-F131 need their accepted ADR (ADR 0138 lane excludes ### P-NN) and F123 waits for AC6.3's contract; all stay open."
     }
   ]
 }

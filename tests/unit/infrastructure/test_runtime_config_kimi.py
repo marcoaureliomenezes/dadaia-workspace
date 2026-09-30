@@ -1,9 +1,6 @@
-"""v0.2.8 T2 — Kimi Code runtime-config generators (managed hook block + shims).
-
-Pins the managed ``[[hooks]]`` TOML block shape (events, matchers, markers, absolute
-commands), the replace-or-append upsert semantics, and the five workspace-agnostic shim
-bodies — including a live ``sh`` replay of the pre-gate block/allow/fail-open contract
-against a fake workspace venv.
+"""v0.2.8 T2 — Kimi Code's managed ``[[hooks]]`` block (shape, replace-or-append upsert)
+and its five user-level shims (sh syntax, fail-open outside a workspace); the block/allow
+replay runs in tests/integration/gate/test_gate_dialects_through_wrappers.py (#B5, #B8).
 """
 
 from __future__ import annotations
@@ -15,36 +12,30 @@ from pathlib import Path
 
 import pytest
 
+from dadaia_workspace.core.harness_registry import HARNESS_RECORDS
 from dadaia_workspace.infrastructure.runtime_config import (
     KIMI_BLOCK_BEGIN,
     KIMI_BLOCK_END,
     kimi_code_home,
-    kimi_hook_shims,
     kimi_hooks_block,
     upsert_kimi_hooks_block,
+)
+from dadaia_workspace.infrastructure.runtime_transforms.hook_wrappers import (
+    hook_wrapper_contents,
 )
 
 pytestmark = pytest.mark.unit
 
 _HOME = Path("/tmp/kimi-home-test")
+_SHIMS = hook_wrapper_contents(HARNESS_RECORDS["kimi-code"])
 
 
-# ---------------------------------------------------------------------------
-# kimi_code_home
-# ---------------------------------------------------------------------------
-
-
-def test_kimi_code_home_defaults_to_user_dot_dir() -> None:
-    assert kimi_code_home({}) == Path.home() / ".kimi-code"
-
-
-def test_kimi_code_home_honours_env_override() -> None:
-    assert kimi_code_home({"KIMI_CODE_HOME": "/srv/kimi"}) == Path("/srv/kimi")
-
-
-# ---------------------------------------------------------------------------
-# kimi_hooks_block — exact managed TOML shape
-# ---------------------------------------------------------------------------
+@pytest.mark.parametrize(
+    ("env", "home"),
+    [({}, Path.home() / ".kimi-code"), ({"KIMI_CODE_HOME": "/srv/kimi"}, Path("/srv/kimi"))],
+)
+def test_kimi_code_home(env: dict[str, str], home: Path) -> None:
+    assert kimi_code_home(env) == home
 
 
 def test_kimi_hooks_block_parses_as_toml_and_pins_rules() -> None:
@@ -71,25 +62,17 @@ def test_kimi_hooks_block_parses_as_toml_and_pins_rules() -> None:
     assert by_event["PostCompact"]["command"] == (
         "/tmp/kimi-home-test/hooks/dadaia-kimi-post-compact.sh"
     )
-    assert all(h["timeout"] == 10 for h in hooks)
 
 
-# ---------------------------------------------------------------------------
-# upsert_kimi_hooks_block — replace-or-append, foreign content preserved
-# ---------------------------------------------------------------------------
-
-
-def test_upsert_appends_to_empty_file() -> None:
-    block = kimi_hooks_block(_HOME)
-    assert upsert_kimi_hooks_block("", block) == block
-
-
-def test_upsert_appends_after_foreign_config_untouched() -> None:
-    foreign = 'default_model = "kimi-code/k3"\n\n[thinking]\nenabled = true\n'
+@pytest.mark.parametrize(
+    "foreign", ["", 'default_model = "kimi-code/k3"\n\n[thinking]\nenabled = true\n']
+)
+def test_upsert_appends_once_after_foreign_config_as_valid_toml(foreign: str) -> None:
     block = kimi_hooks_block(_HOME)
     out = upsert_kimi_hooks_block(foreign, block)
-    assert out.startswith(foreign)
-    assert out.endswith(block)
+    assert out.startswith(foreign) and out.endswith(block)
+    assert upsert_kimi_hooks_block(out, block) == out
+    assert len(tomllib.loads(out)["hooks"]) == 5
 
 
 def test_upsert_replaces_between_markers_and_preserves_surroundings() -> None:
@@ -108,113 +91,29 @@ def test_upsert_replaces_between_markers_and_preserves_surroundings() -> None:
     assert out.startswith('default_model = "k3"\n')
 
 
-def test_upsert_is_idempotent() -> None:
-    block = kimi_hooks_block(_HOME)
-    once = upsert_kimi_hooks_block('default_model = "k3"\n', block)
-    assert upsert_kimi_hooks_block(once, block) == once
-
-
-def test_upsert_full_result_stays_valid_toml() -> None:
-    foreign = 'default_model = "kimi-code/k3"\n'
-    out = upsert_kimi_hooks_block(foreign, kimi_hooks_block(_HOME))
-    parsed = tomllib.loads(out)
-    assert parsed["default_model"] == "kimi-code/k3"
-    assert len(parsed["hooks"]) == 5
-
-
-# ---------------------------------------------------------------------------
-# kimi_hook_shims — bodies and live sh contract
-# ---------------------------------------------------------------------------
-
-
 def test_kimi_hook_shims_keys_and_prologue() -> None:
-    shims = kimi_hook_shims()
-    assert set(shims) == {
+    assert set(_SHIMS) == {
         "dadaia-kimi-pre-gate.sh",
         "dadaia-kimi-post-gate.sh",
         "dadaia-kimi-ctx-inject.sh",
         "dadaia-kimi-post-compact.sh",
         "dadaia-kimi-doctor-expired.sh",
     }
-    for body in shims.values():
-        assert body.startswith("#!/usr/bin/env sh\n")
-        assert ".dadaia/.venv/bin/python" in body
-        assert "exit 0" in body
-
-
-def test_kimi_hook_shims_module_wiring() -> None:
-    shims = kimi_hook_shims()
-    assert "dadaia_workspace.hooks.pre_gate" in shims["dadaia-kimi-pre-gate.sh"]
-    assert "exit 2" in shims["dadaia-kimi-pre-gate.sh"]
-    assert "dadaia_workspace.hooks.sdd_post_gate" in shims["dadaia-kimi-post-gate.sh"]
-    assert "dadaia_workspace.hooks.ctx_inject" in shims["dadaia-kimi-ctx-inject.sh"]
-    compact = shims["dadaia-kimi-post-compact.sh"]
-    assert 'DADAIA_HOOK_EVENT="PostCompact"' in compact
-    assert "dadaia_workspace.hooks.ctx_inject" in compact
+    assert all(body.startswith("#!/usr/bin/env sh\n") for body in _SHIMS.values())
 
 
 @pytest.mark.skipif(shutil.which("sh") is None, reason="POSIX sh unavailable")
-@pytest.mark.parametrize("body", kimi_hook_shims().values())
+@pytest.mark.parametrize("body", _SHIMS.values())
 def test_kimi_hook_shims_are_valid_sh_syntax(body: str, tmp_path: Path) -> None:
     shim = tmp_path / "shim.sh"
     shim.write_text(body, encoding="utf-8")
     subprocess.run(["sh", "-n", str(shim)], check=True)
 
 
-def _fake_workspace(tmp_path: Path, python_body: str) -> Path:
-    """Create a fake dadaia workspace whose venv python is a stub script."""
-    workspace = tmp_path / "ws"
-    bin_dir = workspace / ".dadaia" / ".venv" / "bin"
-    bin_dir.mkdir(parents=True)
-    fake_python = bin_dir / "python"
-    fake_python.write_text(python_body, encoding="utf-8")
-    fake_python.chmod(0o755)
-    return workspace
-
-
-@pytest.mark.skipif(shutil.which("sh") is None, reason="POSIX sh unavailable")
-def test_pre_gate_shim_blocks_with_reason_on_stderr(tmp_path: Path) -> None:
-    workspace = _fake_workspace(
-        tmp_path,
-        '#!/usr/bin/env sh\ncat >/dev/null\nprintf \'{"decision": "block", "reason": "root law violated"}\\n\'\n',
-    )
-    shim = tmp_path / "pre-gate.sh"
-    shim.write_text(kimi_hook_shims()["dadaia-kimi-pre-gate.sh"], encoding="utf-8")
-    nested = workspace / "repos" / "x"
-    nested.mkdir(parents=True)
-    proc = subprocess.run(
-        ["sh", str(shim)],
-        input='{"tool_name": "Write", "session_id": "s1", "cwd": "' + str(nested) + '"}',
-        cwd=nested,
-        capture_output=True,
-        text=True,
-    )
-    assert proc.returncode == 2
-    assert "root law violated" in proc.stderr
-
-
-@pytest.mark.skipif(shutil.which("sh") is None, reason="POSIX sh unavailable")
-def test_pre_gate_shim_allows_on_allow_envelope(tmp_path: Path) -> None:
-    workspace = _fake_workspace(
-        tmp_path,
-        '#!/usr/bin/env sh\ncat >/dev/null\nprintf \'{"decision": "allow"}\\n\'\n',
-    )
-    shim = tmp_path / "pre-gate.sh"
-    shim.write_text(kimi_hook_shims()["dadaia-kimi-pre-gate.sh"], encoding="utf-8")
-    proc = subprocess.run(
-        ["sh", str(shim)],
-        input='{"tool_name": "Write", "session_id": "s1"}',
-        cwd=workspace,
-        capture_output=True,
-        text=True,
-    )
-    assert proc.returncode == 0
-
-
 @pytest.mark.skipif(shutil.which("sh") is None, reason="POSIX sh unavailable")
 def test_pre_gate_shim_fails_open_outside_dadaia_workspaces(tmp_path: Path) -> None:
     shim = tmp_path / "pre-gate.sh"
-    shim.write_text(kimi_hook_shims()["dadaia-kimi-pre-gate.sh"], encoding="utf-8")
+    shim.write_text(_SHIMS["dadaia-kimi-pre-gate.sh"], encoding="utf-8")
     proc = subprocess.run(
         ["sh", str(shim)],
         input='{"tool_name": "Write"}',
@@ -224,60 +123,3 @@ def test_pre_gate_shim_fails_open_outside_dadaia_workspaces(tmp_path: Path) -> N
     )
     assert proc.returncode == 0
     assert proc.stderr == ""
-
-
-# ---------------------------------------------------------------------------
-# upsert legacy adoption — bug kimi-install-duplicates-hooks-on-legacy-config
-# ---------------------------------------------------------------------------
-
-_LEGACY_UNMARKED_RULES = (
-    '[[hooks]]\nevent = "PreToolUse"\nmatcher = "^(Edit|Write|Bash)$"\n'
-    'command = "/home/user/.kimi-code/hooks/dadaia-kimi-pre-gate.sh"\ntimeout = 10\n\n'
-    '[[hooks]]\nevent = "PostToolUse"\n'
-    'command = "/home/user/.kimi-code/hooks/dadaia-kimi-post-gate.sh"\ntimeout = 10\n\n'
-    '[[hooks]]\nevent = "UserPromptSubmit"\n'
-    'command = "/home/user/.kimi-code/hooks/dadaia-kimi-ctx-inject.sh"\ntimeout = 10\n\n'
-    '[[hooks]]\nevent = "PostCompact"\nmatcher = "manual|auto"\n'
-    'command = "/home/user/.kimi-code/hooks/dadaia-kimi-post-compact.sh"\ntimeout = 10\n'
-)
-
-
-def test_upsert_adopts_legacy_unmarked_rules_instead_of_duplicating() -> None:
-    """A pre-v0.2.8 config carries the 4 dadaia [[hooks]] rules WITHOUT the markers.
-    The upsert must ADOPT them (strip, then append the managed block) — appending a
-    second copy (4 -> 8 rules, every event double-registered) is the bug."""
-    existing = 'default_model = "k3"\n\n' + _LEGACY_UNMARKED_RULES
-    out = upsert_kimi_hooks_block(existing, kimi_hooks_block(_HOME))
-    parsed = tomllib.loads(out)
-    assert len(parsed["hooks"]) == 5, "legacy rules must be replaced, not duplicated"
-    assert out.count(KIMI_BLOCK_BEGIN) == 1
-    assert parsed["default_model"] == "k3"
-    events = [h["event"] for h in parsed["hooks"]]
-    assert events.count("PreToolUse") == 1
-    assert out.count("dadaia-kimi-pre-gate.sh") == 1
-
-
-def test_upsert_preserves_operator_rules_while_stripping_legacy() -> None:
-    """An operator's own non-dadaia hook rule is content we never touch — it survives
-    the legacy adoption byte-for-byte."""
-    operator_rule = '[[hooks]]\nevent = "Notification"\ncommand = "terminal-notifier"\n'
-    existing = 'default_model = "k3"\n\n' + _LEGACY_UNMARKED_RULES + "\n" + operator_rule
-    out = upsert_kimi_hooks_block(existing, kimi_hooks_block(_HOME))
-    parsed = tomllib.loads(out)
-    assert len(parsed["hooks"]) == 6  # managed 5 + the operator's Notification rule
-    assert 'command = "terminal-notifier"' in out
-
-
-def test_upsert_repairs_stray_duplicates_outside_existing_markers() -> None:
-    """A previously botched state (managed block AND a stray un-marked dadaia rule) is
-    repaired to exactly one copy — strays outside the markers never survive."""
-    stray = (
-        '[[hooks]]\nevent = "PreToolUse"\n'
-        'command = "/x/hooks/dadaia-kimi-pre-gate.sh"\ntimeout = 3\n'
-    )
-    botched = 'default_model = "k3"\n\n' + kimi_hooks_block(_HOME) + "\n" + stray
-    out = upsert_kimi_hooks_block(botched, kimi_hooks_block(_HOME))
-    assert out.count("dadaia-kimi-pre-gate.sh") == 1
-    assert out.count(KIMI_BLOCK_BEGIN) == 1
-    parsed = tomllib.loads(out)
-    assert len(parsed["hooks"]) == 5

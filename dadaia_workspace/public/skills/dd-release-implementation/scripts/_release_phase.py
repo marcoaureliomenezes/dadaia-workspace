@@ -22,9 +22,8 @@ from _release_schema import (  # noqa: E402
     unfinished_tasks,
     utc_now,
 )
-from _release_store import Live, Refusal, State, commit, live_release  # noqa: E402
+from _release_store import SCRIPT, Live, Refusal, State, commit, live_release  # noqa: E402
 
-SCRIPT = Path(__file__).parent / "release.py"
 #: DEFINITION is `new`'s; each later phase has one predecessor (out-of-order = re-run).
 PREDECESSOR = {"IMPLEMENTATION": "DEFINITION", "CLOSURE": "IMPLEMENTATION"}
 #: PLAN §1 — structure only (ADR 0041): any level-2 heading naming the As-is review.
@@ -32,6 +31,8 @@ AS_IS = re.compile(r"^##[ \t].*\bas[- ]is review", re.IGNORECASE | re.MULTILINE)
 SKILL = Path(__file__).resolve().parents[2] / "dd-release-definition" / "SKILL.md"
 AS_IS_FIX = f"copy the PLAN §1 skeleton under the As-is review section of {SKILL} into PLAN.md"
 COLUMNS = ["unit", "today", "bugs", "verdict", "why"]
+AUTH_COLUMNS = ["question", "authority", "consults", "deleted"]
+AUTHORITIES = re.compile(r"^###[ \t].*\bAuthorities\b", re.IGNORECASE | re.MULTILINE)
 
 
 def note(state: State, ts: str, text: str) -> None:
@@ -47,7 +48,7 @@ def _refuse_unapproved_trio(live: Live) -> None:
         if not document.is_file():
             raise Refusal(
                 f"release {live.release_id} has no {name} at root",
-                f"{SCRIPT} new {live.release_id} --specs <specs>",
+                f"{SCRIPT} new {live.release_id}",
             )
         status = extract_status(document.read_text(encoding="utf-8"))
         if status != APPROVED:
@@ -58,51 +59,62 @@ def _refuse_unapproved_trio(live: Live) -> None:
             )
 
 
+def _table(text: str, columns: list[str]) -> list[list[str]]:
+    rows: list[list[str]] = []
+    for line in text.splitlines():
+        cells = [c.strip(" \t`*") for c in re.split(r"(?<!\\)\|", line.strip().strip("|"))]
+        if rows and "|" not in line:
+            break
+        if rows or [c.lower() for c in cells] == columns:
+            rows.append(cells + [""] * len(columns))
+    return rows[2:] if len(rows) >= 3 else []
+
+
 def _refuse_missing_as_is_table(plan: str) -> None:
     heading = AS_IS.search(plan)
     if heading is None:
         raise Refusal("PLAN.md has no '## … As-is review' heading", AS_IS_FIX)
-    rows: list[list[str]] = []  # from the first COLUMNS header line to the first non-row line
-    for line in plan[heading.end() :].split("\n## ")[0].splitlines()[1:]:
-        cells = [c.strip(" \t`*") for c in re.split(r"(?<!\\)\|", line.strip().strip("|"))]
-        if rows and "|" not in line:
-            break
-        if rows or [c.lower() for c in cells] == COLUMNS:
-            rows.append(cells)
-    if len(rows) < 3:
+    rows = _table(section := plan[heading.end() :].split("\n## ")[0], COLUMNS)
+    if not rows:
         raise Refusal("PLAN.md's As-is review heading is not followed by a table with header "
                       "'unit | today | bugs | verdict | why' and >= 1 row", AS_IS_FIX)  # fmt: skip
-    for row in (r + [""] * 4 for r in rows[2:]):
+    for row in rows:
         if row[3].upper() not in {"DELETE", "REBUILD", "UPDATE", "KEEP", "ADD"}:
             raise Refusal(f"PLAN.md As-is review row {row[0]!r} carries verdict {row[3]!r} "
                           "— one of DELETE REBUILD UPDATE KEEP ADD", AS_IS_FIX)  # fmt: skip
+    rows = _table(section[m.end() :], AUTH_COLUMNS) if (m := AUTHORITIES.search(section)) else []
+    if not rows:
+        raise Refusal("PLAN.md §1 has no '### … Authorities' table with header "
+                      "'question | authority | consults | deleted' and >= 1 row", AS_IS_FIX)  # fmt: skip
+    seen: dict[str, str] = {}
+    for question, authority, *_ in rows:
+        if not authority:
+            raise Refusal(f"PLAN.md Authorities row {question!r} has an empty authority", AS_IS_FIX)
+        if (first := seen.setdefault(question.lower(), authority)) != authority:
+            raise Refusal(f"PLAN.md Authorities question {question.lower()!r} names two "
+                          f"authorities: `{first}` and `{authority}` — keep one", AS_IS_FIX)  # fmt: skip
 
 
-def set_phase(specs: Path, phase: str, sha: str, pr: int | None = None) -> tuple[str, str]:
-    """Move the live release to *phase*, stamp its milestone; *pr* (CLOSURE) enters the note."""
+#: The one verb that moves each phase forward — every refusal's fix names it, so a fix
+#: never names a verb that refuses in the same state.
+NEXT = {"DEFINITION": "phase IMPLEMENTATION", "IMPLEMENTATION": "phase CLOSURE",
+        "CLOSURE": "ship --pr <n>"}  # fmt: skip
+
+
+def set_phase(specs: Path, phase: str, sha: str) -> tuple[str, str]:
+    """Move the live release to *phase* and stamp its milestone."""
     if not SHA_RE.match(sha):
         raise Refusal(
             f"--sha {sha!r} is not a 7-40 character lowercase hex commit sha",
             f"{SCRIPT} phase {phase} --sha $(git rev-parse --short HEAD)",
         )
-    if pr is not None and phase != "CLOSURE":
-        raise Refusal(
-            f"--pr names the merged release PR and belongs to CLOSURE, not {phase}",
-            f"{SCRIPT} phase {phase} --sha {sha}",
-        )
-    if phase not in PREDECESSOR:
-        raise Refusal(
-            f"{phase!r} is not a phase this verb writes: DEFINITION belongs to `new` "
-            "and ARCHIVED is never written by a verb",
-            f"{SCRIPT} phase IMPLEMENTATION --sha {sha}",
-        )
     live = live_release(specs)
-    current, expected = live.state.get("phase"), PREDECESSOR[phase]
-    if current != expected:
+    current = str(live.state.get("phase"))
+    if PREDECESSOR.get(phase) != current:
         raise Refusal(
-            f"release {live.release_id} is in phase {current!r} — {phase} follows "
-            f"{expected} exactly once",
-            f"{SCRIPT} phase {expected} --sha {sha}",
+            f"release {live.release_id} is in phase {current!r} — `phase` writes "
+            "IMPLEMENTATION after DEFINITION and CLOSURE after IMPLEMENTATION, once each",
+            f"{SCRIPT} {NEXT.get(current, 'check')} --sha {sha}",
         )
     ts = utc_now()
     if phase == "IMPLEMENTATION":
@@ -121,8 +133,7 @@ def set_phase(specs: Path, phase: str, sha: str, pr: int | None = None) -> tuple
             note(state, ts, f"Candidate defined at {sha}; phase IMPLEMENTATION.")
         else:
             state["implemented"] = {"sha": sha, "ts": ts}
-            promoted = f" Release PR #{pr} merged." if pr is not None else ""
-            note(state, ts, f"Candidate implemented at {sha}; phase CLOSURE.{promoted}")
+            note(state, ts, f"Candidate implemented at {sha}; phase CLOSURE.")
         state["phase"] = phase
         return state
 

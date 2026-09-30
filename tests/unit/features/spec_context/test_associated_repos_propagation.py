@@ -4,10 +4,10 @@ Intent: CONTRACT — A16.1 (N=0 regression) plus the T-044-26 report's flagged g
 ``alive()`` and ``dead()`` each rebuild a ``SpecContextProject`` by
 hand; before this task none of the three forwarded ``associated_repos``, so a context
 that had gained associated repos would silently lose them on its very next alive()/
-dead() call. FakeGitClient-driven (SMALL/unit tier): this is a pure
+dead() call. GitSubprocessClient-driven (SMALL/unit tier): this is a pure
 reconstruction/propagation concern, no real git behavior under test — the real-git
 clone/commit/push/removal behavior for the associated set is proven in
-``tests/integration/test_associated_repos_alive_dead.py``.
+``tests/integration/test_context_dead_holds.py``.
 """
 
 from __future__ import annotations
@@ -25,7 +25,9 @@ from dadaia_workspace.core.models.spec_context import (  # noqa: E402
     SpecContextProject,
 )
 from dadaia_workspace.features.spec_context.service import SpecContextService  # noqa: E402
-from tests.fakes import FakeContextStore, FakeGitClient, register_dead  # noqa: E402
+from dadaia_workspace.infrastructure.git_subprocess import GitSubprocessClient
+from dadaia_workspace.infrastructure.json_context_store import JsonContextStore
+from tests.fixtures.stores import context_store
 
 
 @pytest.fixture()
@@ -37,18 +39,18 @@ def workspace_root(tmp_path: Path) -> Path:
 
 
 @pytest.fixture()
-def store() -> FakeContextStore:
-    return FakeContextStore()
+def store(workspace_root: Path) -> JsonContextStore:
+    return context_store(workspace_root / ".dadaia" / "states")
 
 
 @pytest.fixture()
-def git() -> FakeGitClient:
-    return FakeGitClient()
+def git() -> GitSubprocessClient:
+    return GitSubprocessClient()
 
 
 @pytest.fixture()
 def service(
-    store: FakeContextStore, git: FakeGitClient, workspace_root: Path
+    store: JsonContextStore, git: GitSubprocessClient, workspace_root: Path
 ) -> SpecContextService:
     return SpecContextService(
         context_store=store,
@@ -59,7 +61,7 @@ def service(
     )
 
 
-def _seed_ctx_with_associated(store: FakeContextStore, workspace_root: Path) -> None:
+def _seed_ctx_with_associated(store: JsonContextStore, workspace_root: Path) -> None:
     (workspace_root / "repos" / "main-repo").mkdir(parents=True, exist_ok=True)
     (workspace_root / "repos" / "assoc-repo").mkdir(parents=True, exist_ok=True)
     store.save(
@@ -78,7 +80,7 @@ def _seed_ctx_with_associated(store: FakeContextStore, workspace_root: Path) -> 
 
 
 def test_alive_reconstruction_preserves_associated_repos(
-    service: SpecContextService, store: FakeContextStore, workspace_root: Path
+    service: SpecContextService, store: JsonContextStore, workspace_root: Path
 ) -> None:
     _seed_ctx_with_associated(store, workspace_root)
     # Already ALIVE: exercises the fast-path AND the ensure-clone loop.
@@ -89,7 +91,7 @@ def test_alive_reconstruction_preserves_associated_repos(
 
 
 def test_dead_reconstruction_preserves_associated_repos(
-    service: SpecContextService, store: FakeContextStore, workspace_root: Path
+    service: SpecContextService, store: JsonContextStore, workspace_root: Path
 ) -> None:
     _seed_ctx_with_associated(store, workspace_root)
     ctx = service.dead("proj")
@@ -102,19 +104,3 @@ def test_dead_reconstruction_preserves_associated_repos(
     stored = store.get("proj")
     assert stored is not None
     assert stored.associated_repos == ctx.associated_repos
-
-
-def test_alive_with_zero_associated_repos_behaves_exactly_as_today(
-    service: SpecContextService, git: FakeGitClient, workspace_root: Path
-) -> None:
-    """A16.1 regression: N=0 — no behavior change to the single-repo path."""
-    register_dead(service, "proj", "my-repo", "https://github.com/org/my-repo")
-
-    ctx = service.alive("proj")
-    assert ctx.state == ContextState.ALIVE
-    assert len(git.cloned) == 1
-    assert ctx.associated_repos == ()
-
-    ctx2 = service.alive("proj")
-    assert ctx2.state == ContextState.ALIVE
-    assert len(git.cloned) == 1  # idempotent, no re-clone

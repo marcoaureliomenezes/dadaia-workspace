@@ -1,7 +1,7 @@
 ---
 slug: sdd-gate-v3
 title: sdd-gate-v3
-tldr: No-lock enforcement — three gate blocks (root entry, non-venv command, PROTECTED or out-of-scope write), one fix line each, a gitflow push chokepoint.
+tldr: No-lock enforcement — three gate blocks (root entry, non-venv command, PROTECTED or out-of-scope file-tool write), one fix line each, a gitflow push chokepoint.
 summary: The merged PreToolUse gate blocks exactly three things and reads no SDD artifact; every refusal anywhere carries one executable fix line; the pre-push chokepoint enforces the branch contract read from the project gitflow, the specs canon and one secret registry over every pushed object, with one rewrite formula as its fix, and no CI job calls a model API — the security review is the reviewer's lens before each pull request.
 tags: [sdd, gate, hooks, enforcement, no-locks, privacy]
 sources:
@@ -23,7 +23,7 @@ sources:
 
 - No lease, lock file or wait path exists; the gate knows no session mode and reads no `_RELEASE.json`.
 - One pre-gate reads each payload once and evaluates root whitelist, venv guard and SDD gate in that order, first block wins; a policy that raises is ALLOW.
-- It blocks exactly three things: a new workspace-root entry outside the root law and `.dadaia/states/instance_exceptions.txt` ([[workspace-doctor]]); a leading `dadaia`, `pip` or `python -m dadaia_workspace` outside `.dadaia/.venv/bin/` (Bash only); a PROTECTED write, or a bound session's MUTATING write into a `repos/<slug>/` outside its scope.
+- It blocks exactly three things: a file-tool write (`Write`, `Edit`, `MultiEdit`, `apply_patch`) creating a new workspace-root entry outside the root law and `.dadaia/states/instance_exceptions.txt` ([[workspace-doctor]]); a leading `dadaia`, `pip` or `python -m dadaia_workspace` outside `.dadaia/.venv/bin/` (Bash only); a file-tool write (those or `NotebookEdit`) that is PROTECTED, or a bound session's MUTATING one into a `repos/<slug>/` outside its scope; a Bash write (`sed -i`, `rm`, `mkdir`, a redirect) is never judged.
 
 | Class | Behavior |
 |---|---|
@@ -38,7 +38,7 @@ sources:
 - The gate returns a decision and its message per write target: a BLOCK's message is its reason, an ALLOW's is empty; there is no advisory channel.
 - A BLOCK is one envelope carrying `"decision": "block"` plus Claude Code's `permissionDecision: "deny"`; an ALLOW is an explicit envelope with no permission verdict and no `systemMessage`.
 - A MUTATING write records nothing about its session; races between sessions surface through git.
-- The PostToolUse hook refreshes the session record's `last_seen_at` and, on a throttle, runs the workspace reaper; it always exits zero ([[workspace-doctor]]).
+- The PostToolUse hook refreshes the session record's `last_seen_at` and nothing else — it never runs the reaper ([[workspace-doctor]]); it always exits zero.
 
 ## Git chokepoints
 
@@ -46,7 +46,7 @@ sources:
 - The branch contract is the project gitflow — the `gitflow: {principal, integration, work}` block of `specs/constitution.md` frontmatter ([[specs-migration]]), read once per push from committed data only: the constitution at HEAD, else the newest one on a local branch or an `origin` remote-tracking ref, else — an associated repo — its owning context's main repo; absent or malformed it is the default (`main`, `develop`, `feature/`) with one stderr warning, never a block.
 - Policy order, first refusal wins: branch policy; the `specs/` canon over every `specs/` path the range touches; the denylist scan. An unparseable stdin line refuses, naming `git push --no-verify` as the one bypass; empty stdin allows; `git push origin HEAD` is judged as the checked-out branch.
 - Branch policy judges each ref by the remote branch it lands on: a work branch (`<work prefix><M.m.p>`) pushed from the same-named local head passes; the principal or integration branch passes only as a bootstrap birth — a zero remote sha and either an origin holding neither role branch or a ref with no unpublished commit — from any source; every other ref is refused.
-- Every branch refusal names the gitflow's own branches: a principal or integration push → `gh pr create --base <branch> --head <integration or work>`; a ref outside the gitflow → switch to (or cut) the live work branch, the last tag + 1 patch; a birth carrying new objects to an origin holding a role branch → birth it at the other role's published tip; a mismatched refspec → rename the local branch.
+- Every branch refusal names the gitflow's own branches: a principal or integration push → `gh pr create --base <branch> --head <integration or work>`; a ref outside the gitflow → switch to (or cut) the live work branch; a birth carrying new objects to an origin holding a role branch → birth it at the other role's published tip; a mismatched refspec → rename the local branch.
 - A specs-canon or denylist refusal carries one rewrite formula for every unpublished range, a root-reaching one included: `git -C <repo> reset --soft <oldest unpublished commit of the refused ref>`, remove what is listed, `git commit --amend`, push (a branch HEAD is not on is switched to first); a tag or a detached HEAD gets operator-action text; origin's history is never rewritten.
 - "Already published" is one rule, `unpublished` (the commits of a ref no `origin` ref holds), shared by births, the rewrite fix and every "unpushed" check.
 - The security review is the `dd-code-reviewer` security lens on the PR head, run by the main thread before each pull request; no workflow calls a model API. `secret-scan.yml` runs gitleaks on every PR to `develop` and `main`.

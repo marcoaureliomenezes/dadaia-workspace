@@ -6,7 +6,6 @@ summary: Who owns which artifact, who may dispatch, how a stage's sequencing is 
 tags: [orchestration, agents, dispatch, sdd]
 sources:
   - dadaia_workspace/public/agents/**
-  - dadaia_workspace/core/agent_model_templates.py
   - dadaia_workspace/core/model_registry.py
   - dadaia_workspace/public/skills/dd-manager-orchestration/**
 ---
@@ -37,8 +36,8 @@ The main thread — the operator's own session — coordinates: intake, the gril
 
 ## Models and privilege
 
-- Persona sources carry no model; `public install` resolves `(model, effort)` per persona from one of three templates — `balanced` (default), `max-quality`, `economy` — with a per-agent overlay taking precedence, all through the one resolver in `dadaia_workspace/core/agent_model_templates.py`.
-- The resolver refuses a model unknown to `dadaia_workspace/core/model_registry.py` and a Fable-family model for `dd-code-reviewer`.
+- Persona sources carry no model; `public install` resolves `(model, effort)` per persona from one of three templates — `balanced` (default), `max-quality`, `economy` — with a per-agent overlay taking precedence, all through the one resolver in `dadaia_workspace/core/model_registry.py`.
+- The resolver in `dadaia_workspace/core/model_registry.py` refuses a model unknown to its registry and a Fable-family model for `dd-code-reviewer`.
 - Least privilege derives from each persona's `activity_class` at install: Claude `permissionMode`/`disallowedTools`, Codex `sandbox_mode` ([[harness-claude-code]], [[harness-codex]]).
 
 ## Dependencies

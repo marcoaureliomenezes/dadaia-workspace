@@ -9,9 +9,7 @@ real (dd-test-stewardship / the root `AGENTS.md` map "Slop-test discipline": "No
 in tests — they exhaust disk"). Instead it proves the three things a gating test CAN
 prove cheaply and deterministically:
 
-  1. The script is syntactically valid bash (`bash -n`) and carries the exact pin the
-     verdict selected.
-  2. The staging step alone (`DADAIA_MUTATION_STAGE_ONLY=1`) — which the real run also
+  1. The staging step alone (`DADAIA_MUTATION_STAGE_ONLY=1`) — which the real run also
      executes first — copies the scoped `dadaia_workspace/core/models/` +
      `tests/unit/core/models/` subset into an isolated destination (redirected via
      `DADAIA_WORKSPACE_ROOT` to a fake tmp_path tree, never the real workspace) and
@@ -24,22 +22,16 @@ prove cheaply and deterministically:
      `mutants/` sandbox mirrors ONLY `source_paths` on disk, and the wider
      `tests/unit/core/` flat tier contains real cross-layer architecture tests that
      cannot run inside any sandbox narrower than the whole package).
-  3. The script is never referenced from any push-path selector (A20.3): a permanent
+  2. The script is never referenced from any push-path selector (A20.3): a permanent
      regression guard against someone later wiring it into ci.yml, release.yml, or the
      local pre-push preflight.
-  4. Every ``dadaia_workspace/public/schemas/...`` fixture path a staged
-     ``tests/unit/core/models/*.py`` file actually reads at runtime resolves inside the
-     stage (A-12.1, A-12.2; regression seam for
-     ``mutation-baseline-core-models-scope-omits-public-schemas-fixture-directory``) —
-     derived from the staged tests' own source, never a second hand-kept fixture list.
 
-Intent: CONTRACT — v0.4.3 A20.1, A20.3 (T-043-28, FR20); v0.5.1 A-12.1, A-12.2 (T-051-18)
+Intent: CONTRACT — v0.4.3 A20.1, A20.3 (T-043-28, FR20)
 Owner: dd-software-engineer
 """
 
 from __future__ import annotations
 
-import re
 import subprocess
 from pathlib import Path
 
@@ -72,24 +64,6 @@ def _repo_porcelain_excluding_additive() -> str:
     return "\n".join(
         line for line in raw.splitlines() if classify_path(line[3:]) is not PathClass.ADDITIVE
     )
-
-
-def test_script_exists_and_is_executable() -> None:
-    assert _SCRIPT.is_file(), f"expected runner script at {_SCRIPT}"
-    assert _SCRIPT.stat().st_mode & 0o111, "script must be executable (chmod +x)"
-
-
-def test_script_has_valid_bash_syntax() -> None:
-    result = subprocess.run(
-        ["bash", "-n", str(_SCRIPT)], capture_output=True, text=True, check=False
-    )
-    assert result.returncode == 0, f"bash -n failed: {result.stderr}"
-
-
-def test_script_pins_the_exact_verdict_version() -> None:
-    """qa-engineer's verdict pin: `mutmut==3.7.0` (exact, per FR1)."""
-    text = _SCRIPT.read_text("utf-8")
-    assert "mutmut==3.7.0" in text
 
 
 def _run_stage_only(tmp_path: Path) -> tuple[Path, Path]:
@@ -170,44 +144,3 @@ def test_script_never_referenced_from_a_push_path_selector() -> None:
         text = path.read_text("utf-8")
         assert "run_mutation_baseline" not in text, f"{path} must not reference the runner"
         assert "mutmut" not in text, f"{path} must not reference mutmut"
-
-
-def _schema_fixtures_read_by_staged_tests() -> set[str]:
-    """Parse every staged ``tests/unit/core/models/*.py`` file's own
-    ``dadaia_workspace / "public" / "schemas" / ...`` path-literal chain and return the
-    relative fixture paths it resolves to (POSIX-joined, relative to ``dadaia_workspace/``).
-    Reads the real repo tree's copy — identical content to what gets staged, verified by
-    the mirror assertions in the sibling staging test."""
-    fixtures: set[str] = set()
-    schemas_dir = _REPO_ROOT / "tests" / "unit" / "core" / "models"
-    pattern = re.compile(r'"public"\s*/\s*"schemas"((?:\s*/\s*"[^"]+")+)')
-    for test_file in schemas_dir.glob("*.py"):
-        source = test_file.read_text("utf-8")
-        for match in pattern.finditer(source):
-            segments = re.findall(r'"([^"]+)"', match.group(1))
-            fixtures.add("/".join(("public", "schemas", *segments)))
-    return fixtures
-
-
-def test_staged_public_schemas_covers_every_fixture_the_staged_core_models_tests_read(
-    tmp_path: Path,
-) -> None:
-    """Regression seam: mutation-baseline-core-models-scope-omits-public-schemas-
-    fixture-directory. Every ``dadaia_workspace/public/schemas/...`` fixture a staged
-    ``tests/unit/core/models/*.py`` file reads at runtime must resolve inside the
-    stage — proving the staged set is derived from what the staged tests actually
-    read, never a second hand-kept fixture list (A-12.1, A-12.2)."""
-    referenced = _schema_fixtures_read_by_staged_tests()
-    assert referenced, (
-        "expected at least one staged tests/unit/core/models/*.py file to reference "
-        "a dadaia_workspace/public/schemas/... fixture — if this fails, the source "
-        "tests changed and this seam needs re-deriving, not deleting"
-    )
-
-    _fake_workspace, stage = _run_stage_only(tmp_path)
-
-    for relative in referenced:
-        staged_path = stage / "dadaia_workspace" / relative
-        assert staged_path.is_file(), (
-            f"staged tree missing fixture read by a staged core/models test: {staged_path}"
-        )

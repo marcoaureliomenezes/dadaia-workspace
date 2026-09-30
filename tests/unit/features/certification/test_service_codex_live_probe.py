@@ -1,15 +1,12 @@
 """codex-live-probe boundary — certify() exercises the INSTALLED Codex, not statics.
 
-Intent: CONTRACT — v0.4.3 A22.4
+Intent: CONTRACT — v0.4.3 A22.4; codex-live-probe-gate-checks-presence-not-usability (an
+installed-but-unentitled Codex is the same honest SKIP as an absent one);
+certify-skip-detail-leaks-full-codex-output (CWE-532: SKIP/FAIL detail carries only the parsed
+upstream message, length-capped — never the banner's workdir/session id, never a raw blob).
 
-Static Codex projection tests validate SHAPE only (files exist, TOML parses); they
-never attest runtime behavior. ``_codex_live_probe_detail`` is the one place
-certification actually runs a live ``codex exec`` — bounded timeout, honest
-``_CertificationSkip`` (never FAIL) when no ``codex`` binary is reachable. These unit
-tests inject a FAKE ``CertificationProcess`` and never touch a real binary; a live
-integration test that runs when Codex is actually installed lives at
-tests/integration/features/certification/test_codex_live_probe_live.py (T-043-34,
-env-gated with a declared plan ref).
+A FAKE ``CertificationProcess`` answers; the live probe is
+tests/integration/features/certification/test_codex_live_probe_live.py.
 """
 
 from __future__ import annotations
@@ -51,47 +48,6 @@ class _FakeCertificationProcess:
         raise NotImplementedError("codex-live-probe never starts a background process")
 
 
-def test_codex_live_probe_skips_honestly_when_codex_absent(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    monkeypatch.setattr(
-        "dadaia_workspace.features.certification.service.shutil.which", lambda name: None
-    )
-    fake = _FakeCertificationProcess({})
-    with pytest.raises(_CertificationSkip):
-        _codex_live_probe_detail(fake, tmp_path, "codex", "codex")
-    assert fake.calls == [], "an absent binary must never be shelled out to"
-
-
-def test_codex_live_probe_fails_on_nonzero_version_exit(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    monkeypatch.setattr(
-        "dadaia_workspace.features.certification.service.shutil.which",
-        lambda name: "/usr/bin/codex",
-    )
-    fake = _FakeCertificationProcess({"--version": CertificationProcessResult(1, "", "boom")})
-    with pytest.raises(RuntimeError, match="codex --version exited 1"):
-        _codex_live_probe_detail(fake, tmp_path, "codex", "codex")
-
-
-def test_codex_live_probe_fails_on_nonzero_exec_exit(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    monkeypatch.setattr(
-        "dadaia_workspace.features.certification.service.shutil.which",
-        lambda name: "/usr/bin/codex",
-    )
-    fake = _FakeCertificationProcess(
-        {
-            "--version": CertificationProcessResult(0, "codex-cli 0.147.0\n", ""),
-            "exec": CertificationProcessResult(1, "", "denied"),
-        }
-    )
-    with pytest.raises(RuntimeError, match="codex exec exited 1"):
-        _codex_live_probe_detail(fake, tmp_path, "codex", "codex")
-
-
 # codex-live-probe-gate-checks-presence-not-usability (MEDIUM, reported 2026-08-23):
 # an installed-but-unentitled Codex account rejects `codex exec` with an upstream
 # invalid_request_error/4xx — that is the SAME "installed Codex is unusable" condition
@@ -130,45 +86,51 @@ _REAL_ENTITLEMENT_REJECTION_STDERR = (
 )
 
 
+_WORKDIR = "/fake/sentinel/workdir-9f3c"
+_SESSION = "sentinel-session-id-77aa"
+_BANNER = (
+    f"OpenAI Codex v0.999.0\n--------\nworkdir: {_WORKDIR}\nsession id: {_SESSION}\n--------\n"
+)
+_SERVER_ERROR = (
+    _BANNER
+    + 'ERROR: {"type":"error","status":500,"error":{"type":"server_error","message":"upstream internal error, please retry"}}\n'
+)
+_V = CertificationProcessResult(0, "codex-cli 0.147.0\n", "")
+_SKIP = _CertificationSkip
+
+
+def _exec(code: int, stdout: str = "", stderr: str = "") -> dict[str, CertificationProcessResult]:
+    return {"--version": _V, "exec": CertificationProcessResult(code, stdout, stderr)}
+
+
+# fmt: off
+@pytest.mark.parametrize(("which", "responses", "raises", "in_detail"), [
+    pytest.param(None, {}, _SKIP, [], id="absent-binary-skips-never-shelled"),
+    pytest.param("/usr/bin/codex", {"--version": CertificationProcessResult(1, "", "boom")}, RuntimeError, ["codex --version exited 1"], id="version-exit-fails"),
+    pytest.param("/usr/bin/codex", _exec(1, stderr="denied"), RuntimeError, ["codex exec exited 1"], id="exec-exit-fails"),
+    pytest.param("/usr/bin/codex", _exec(1, stderr=_REAL_ENTITLEMENT_REJECTION_STDERR), _SKIP,
+                 ["installed but unusable", "not supported when using Codex with a ChatGPT account"], id="unentitled-codex-skips-honestly"),
+    pytest.param("/usr/bin/codex", _exec(0, "not the marker"), RuntimeError, ["did not echo the expected marker"], id="marker-absent-fails"),
+    pytest.param("/usr/bin/codex", _exec(1, stderr=_BANNER + "Error: not logged in. Run `codex login` first.\n"), _SKIP, ["not logged in"], id="CWE-532-not-logged-in-skip-redacted"),
+    pytest.param("/usr/bin/codex", _exec(1, stderr=_SERVER_ERROR), RuntimeError, ["upstream internal error, please retry"], id="CWE-532-genuine-failure-parsed-message-only"),
+    pytest.param("/usr/bin/codex", _exec(1, stderr=f"segfault probing {_WORKDIR} session={_SESSION}"), RuntimeError, [], id="CWE-532-no-json-no-raw-blob"),
+    pytest.param("/usr/bin/codex", _exec(1, stderr="not logged in - " + "x" * 500), _SKIP, [], id="CWE-532-detail-length-capped"),
+])
+# fmt: on
 def test_codex_live_probe_skips_honestly_when_installed_codex_lacks_entitlement(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """codex-live-probe-gate-checks-presence-not-usability: installed-but-unusable
-    Codex (upstream 4xx invalid_request_error, e.g. no model entitlement on the signed
-    -in account) is an honest environment degrade, not a probe defect — same
-    ``_CertificationSkip`` classification as an absent binary, consumed identically by
-    both ``certify()``'s ``check()`` wrapper and the live integration test's dynamic
-    skip."""
-    monkeypatch.setattr(
-        "dadaia_workspace.features.certification.service.shutil.which",
-        lambda name: "/usr/bin/codex",
-    )
-    fake = _FakeCertificationProcess(
-        {
-            "--version": CertificationProcessResult(0, "codex-cli 0.145.0\n", ""),
-            "exec": CertificationProcessResult(1, "", _REAL_ENTITLEMENT_REJECTION_STDERR),
-        }
-    )
-    with pytest.raises(_CertificationSkip, match="installed but unusable") as excinfo:
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, which: str | None,
+    responses: dict[str, CertificationProcessResult], raises: type[Exception], in_detail: list[str],
+) -> None:  # fmt: skip
+    monkeypatch.setattr("dadaia_workspace.features.certification.service.shutil.which", lambda name: which)
+    fake = _FakeCertificationProcess(responses)
+    with pytest.raises(raises) as caught:
         _codex_live_probe_detail(fake, tmp_path, "codex", "codex")
-    assert "not supported when using Codex with a ChatGPT account" in str(excinfo.value)
-
-
-def test_codex_live_probe_fails_when_marker_absent_from_stdout(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    monkeypatch.setattr(
-        "dadaia_workspace.features.certification.service.shutil.which",
-        lambda name: "/usr/bin/codex",
-    )
-    fake = _FakeCertificationProcess(
-        {
-            "--version": CertificationProcessResult(0, "codex-cli 0.147.0\n", ""),
-            "exec": CertificationProcessResult(0, "not the marker", ""),
-        }
-    )
-    with pytest.raises(RuntimeError, match="did not echo the expected marker"):
-        _codex_live_probe_detail(fake, tmp_path, "codex", "codex")
+    detail = str(caught.value)
+    assert type(caught.value) is raises
+    assert all(part.lower() in detail.lower() for part in in_detail)
+    assert not [leak for leak in (_WORKDIR, _SESSION, "segfault", "x" * 500) if leak in detail]
+    assert len(detail) < 400
+    assert which or fake.calls == []
 
 
 def test_codex_live_probe_passes_and_reports_version_and_marker(
@@ -194,19 +156,8 @@ def test_codex_live_probe_passes_and_reports_version_and_marker(
     assert "--skip-git-repo-check" in exec_call
 
 
-def test_all_checks_ok_treats_skip_as_a_non_failing_outcome() -> None:
-    """A22.4: an honest SKIP (e.g. no Codex CLI on this host) must never fail
-    certification — only PASS/SKIP are acceptable outcomes, FAIL is not."""
-    checks = [
-        CertificationCheck("capability-contract", "PASS", "ok"),
-        CertificationCheck("codex-live-probe", "SKIP", "codex CLI not found on PATH"),
-    ]
-    assert _all_checks_ok(checks) is True
-
-
-def test_all_checks_ok_still_fails_on_a_real_failure() -> None:
-    checks = [
-        CertificationCheck("capability-contract", "PASS", "ok"),
-        CertificationCheck("codex-live-probe", "FAIL", "codex exec exited 1: denied"),
-    ]
-    assert _all_checks_ok(checks) is False
+@pytest.mark.parametrize(("status", "ok"), [("SKIP", True), ("FAIL", False)])
+def test_all_checks_ok_accepts_only_pass_and_skip(status: str, ok: bool) -> None:
+    """A22.4: an honest SKIP (no Codex CLI on this host) never fails certification; a FAIL does."""
+    checks = [CertificationCheck("capability-contract", "PASS", "ok"), CertificationCheck("codex-live-probe", status, "d")]
+    assert _all_checks_ok(checks) is ok

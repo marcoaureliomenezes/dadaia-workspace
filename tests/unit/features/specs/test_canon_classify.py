@@ -1,7 +1,5 @@
-"""Intent: CONTRACT — T-048-05 (SPEC 0.4.8 D7, D9, AC4.2): a specs tree is dadaia when its
-constitution carries ``specs_pattern_version`` >= 6, malformed when its frontmatter does not
-parse (ADR 0047, AC6.3), foreign otherwise; the scaffolded
-stubs speak English and carry the fixed memory sections. Size: SMALL."""
+"""Intent: CONTRACT — sa-specs-tree-state-read-five-ways, T-048-05 (ADR 0047): the tree state
+and its fix; the scaffolded stubs speak English with the fixed memory sections. SMALL."""
 
 from __future__ import annotations
 
@@ -10,50 +8,52 @@ from pathlib import Path
 
 import pytest
 
-from dadaia_workspace.core.specs_version import classify
+from dadaia_workspace.core import specs_version
 from dadaia_workspace.features.specs import canon
 
 pytestmark = pytest.mark.unit
 
 
-def _constitution(specs: Path, text: str) -> None:
-    specs.mkdir(parents=True)
-    (specs / "constitution.md").write_text(text, encoding="utf-8")
-
-
-def test_a_missing_tree_is_absent(tmp_path: Path) -> None:
-    assert classify(tmp_path / "specs") == "absent"
-
-
-@pytest.mark.parametrize("version", [6, 7])
-def test_a_stamp_of_six_or_more_is_dadaia(tmp_path: Path, version: int) -> None:
-    _constitution(tmp_path / "specs", f"---\nspecs_pattern_version: {version}\n---\n# C\n")
-    assert classify(tmp_path / "specs") == "dadaia"
+_MALFORMED = "---\nspecs_pattern_version: 7\ngitflow: {principal: main\n---\n# C\n"
 
 
 @pytest.mark.parametrize(
-    "text", ["---\nspecs_pattern_version: 5\n---\n# C\n", "# A foreign constitution\n"]
-)
-def test_a_stamp_below_six_or_no_stamp_is_foreign(tmp_path: Path, text: str) -> None:
-    _constitution(tmp_path / "specs", text)
-    assert classify(tmp_path / "specs") == "foreign"
-
-
-@pytest.mark.parametrize(
-    "text",
+    ("text", "kind", "fix_tail"),
     [
-        "---\nspecs_pattern_version: 7\ngitflow: {principal: main\n---\n# C\n",
-        "---\nspecs_pattern_version: 7\ngitflow: {principal: a, integration: a, work: w/}\n---\n",
+        (None, "absent", "specs init --context demo"),
+        ("---\nspecs_pattern_version: 8\n---\n# C\n", "canonical", None),
+        ("---\nspecs_pattern_version: 7\n---\n# C\n", "upgradable", "specs init --context demo"),
+        ("---\nspecs_pattern_version: 6\n---\n# C\n", "upgradable", "specs init --context demo"),
+        (
+            "---\nspecs_pattern_version: 5\n---\n# C\n",
+            "foreign",
+            "--context demo --replace-foreign",
+        ),
+        ("# A foreign constitution\n", "foreign", "--context demo --replace-foreign"),
+        ("", "foreign", "--context demo --replace-foreign"),
+        (_MALFORMED, "malformed", "{principal: main"),
+        (
+            "---\nspecs_pattern_version: 7\ngitflow: {principal: a, integration: a, work: w/}\n---\n",
+            "malformed",
+            "differ",
+        ),
     ],
 )
-def test_an_unparseable_constitution_is_malformed_never_foreign(tmp_path: Path, text: str) -> None:
-    _constitution(tmp_path / "specs", text)
-    assert classify(tmp_path / "specs") == "malformed"
-
-
-def test_a_tree_without_a_constitution_is_foreign(tmp_path: Path) -> None:
-    (tmp_path / "specs" / "features").mkdir(parents=True)
-    assert classify(tmp_path / "specs") == "foreign"
+def test_state_is_the_one_reader_with_one_fix(
+    tmp_path: Path, text: str | None, kind: str, fix_tail: str | None
+) -> None:
+    """sa-specs-tree-state-read-five-ways#B28-1: exactly one state plus one fix; a malformed
+    constitution is malformed, never pattern 0. ``""`` = no constitution file in the tree.
+    sa-specs-tree-state-read-five-ways#B28-7: state() is the module's only tree reader."""
+    specs = tmp_path / "specs"
+    if text is not None:
+        specs.mkdir()
+        if text:
+            (specs / "constitution.md").write_text(text, encoding="utf-8")
+    found, fix = specs_version.state(specs, context="demo")
+    assert found == kind
+    assert fix == fix_tail if fix_tail is None else fix is not None and fix_tail in fix
+    assert not {"read_pattern_version", "classify"} & set(vars(specs_version))
 
 
 def test_the_scaffolded_stubs_are_english_with_the_fixed_memory_sections(tmp_path: Path) -> None:

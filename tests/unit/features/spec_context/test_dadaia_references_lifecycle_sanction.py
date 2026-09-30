@@ -1,26 +1,10 @@
 """Intent: CONTRACT — SPEC v0.4.5 FR10, A10.1-A10.4; operator ruling O4 (T-045-23).
 
-``.dadaia/references/`` is the sanctioned home for operator-placed reference clones
-(``.dadaia/references/<clone>/``). Two independent guarantees, proven at the seam every
-consumer actually shares — never a rule bolted onto each verb (A10.3):
-
-1. A10.1 — the doctor's zone walk never flags a reference clone: ``references`` is an
-   OPERATOR-class row of ``core.workspace_layout.DADAIA_ZONES`` (0.4.6 FR3) — canon at the
-   ``.dadaia/`` top level and never walked, whatever it contains.
-2. A10.2 — a reference clone sits OUTSIDE the context lifecycle: no lifecycle verb can ever
-   resolve, bind, alive, dead or GC it. This is proven twice: once at the ONE shared
-   enumeration seam every lifecycle verb funnels context resolution through
-   (``core.invocation.resolve`` / ``repo_slug_under_repos``, scoped to
-   ``<workspace_root>/repos/`` only — a reference clone under ``.dadaia/references/`` is
-   structurally unreachable from it), and once on a REAL verb call path: the exact function
-   backing ``dadaia context bind``/``show``'s no-arg resolution
-   (``cli._specs_resolution.resolve_context_for_cli``), and the real, whole
-   ``DoctorService.fix()`` GC sweep (``dadaia doctor --fix``).
-
-Bug history this FR closes off (prior-art: lifecycle verbs acting on foreign trees
-destroyed work before — e.g. ``dadaia context alive`` committing foreign dirty work,
-bug ``alive-scaffold-blocks-dead``/class). A10.4: ``specs/`` is untouched by this FR — no
-test here writes under ``specs/``.
+``.dadaia/references/<clone>/`` holds operator-placed reference clones. A10.1: the doctor's
+zone walk never flags one (``references`` is an OPERATOR zone, never walked). A10.2: no
+lifecycle verb resolves, binds or GCs one — proven at the shared resolution seam, on the real
+bind/show resolution path, and on the whole ``DoctorService.fix()`` sweep. A10.4: nothing here
+writes under ``specs/``.
 """
 
 from __future__ import annotations
@@ -39,14 +23,16 @@ from dadaia_workspace.cli._specs_resolution import (  # noqa: E402
 )
 from dadaia_workspace.core import invocation  # noqa: E402
 from dadaia_workspace.features.spec_context.doctor import DoctorService  # noqa: E402
-from tests.fakes import FakeContextStore, FakeGitClient  # noqa: E402
+from dadaia_workspace.infrastructure.git_subprocess import GitSubprocessClient
+from dadaia_workspace.infrastructure.json_context_store import JsonContextStore
 from tests.fixtures.harness_env import scrub_context_resolution_env  # noqa: E402
+from tests.fixtures.stores import context_store
 
 
 @pytest.fixture(autouse=True)
 def _clean_env(monkeypatch: pytest.MonkeyPatch) -> None:
     """Every rung-0/1/2 env var neutralized — see ``test_specs_resolver_resolve_context.py``
-    for why (ambient ``WORKSPACE_ROOT``/session leaks make this suite flaky otherwise)."""
+    for why (ambient session leaks make this suite flaky otherwise)."""
     scrub_context_resolution_env(monkeypatch)
 
 
@@ -69,10 +55,10 @@ def _plant_reference_clone(root: Path, clone: str = "mattpocock-skills") -> Path
     return clone_dir
 
 
-def _make_doctor(root: Path, store: FakeContextStore | None = None) -> DoctorService:
+def _make_doctor(root: Path, store: JsonContextStore | None = None) -> DoctorService:
     return DoctorService(
-        context_store=store or FakeContextStore(),
-        git_client=FakeGitClient(),
+        context_store=store or context_store(root / ".dadaia" / "states"),
+        git_client=GitSubprocessClient(),
         workspace_root=root,
     )
 
@@ -99,36 +85,15 @@ def test_reference_clone_reports_doctor_clean(tmp_path: Path) -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_shared_resolution_seam_never_resolves_a_reference_clone(
+def test_no_resolution_path_selects_a_reference_clone(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """The ONE seam every lifecycle verb (bind/alive/dead/show's default resolution)
-    funnels context resolution through is ``core.invocation.resolve`` — its cwd rung
-    (``repo_slug_under_repos``) is scoped to ``<workspace_root>/repos/`` only.
-    A cwd inside ``.dadaia/references/<clone>/`` sits entirely outside that tree, so the
-    seam can never select the reference clone as an active context — proven directly,
-    not inferred from the allowlist."""
+    """A cwd inside ``.dadaia/references/<clone>/`` is outside ``<root>/repos/``: the shared seam
+    (``core.invocation.resolve``) selects nothing, and the bind/show path raises instead of inventing one."""
     _init_workspace(tmp_path)
-    clone_dir = _plant_reference_clone(tmp_path)
-    monkeypatch.setenv("WORKSPACE_ROOT", str(tmp_path))
-    monkeypatch.chdir(clone_dir)
+    monkeypatch.chdir(_plant_reference_clone(tmp_path))
 
-    inv = invocation.resolve(env=os.environ, cwd=Path.cwd())
-    assert inv.context_name is None
-
-
-def test_bind_and_show_resolution_path_refuses_to_select_a_reference_clone(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """Real verb call path: ``resolve_context_for_cli`` is the exact function
-    ``dadaia context bind``/``dadaia context show``'s no-arg resolution calls. With cwd
-    inside the reference clone and no explicit/env/session override, it must raise —
-    never silently resolve to (or "invent") the reference clone as a bindable context."""
-    _init_workspace(tmp_path)
-    clone_dir = _plant_reference_clone(tmp_path)
-    monkeypatch.setenv("WORKSPACE_ROOT", str(tmp_path))
-    monkeypatch.chdir(clone_dir)
-
+    assert invocation.resolve(env=os.environ, cwd=Path.cwd()).context_name is None
     with pytest.raises(ValueError, match="No caller-owned Spec Context is selected"):
         resolve_context_for_cli(None)
 
@@ -151,8 +116,6 @@ def test_doctor_fix_gc_sweep_never_touches_a_reference_clone(tmp_path: Path) -> 
 
     actions = _make_doctor(tmp_path).fix()
 
-    assert clone_dir.exists()
-    assert (clone_dir / "README.md").exists()
     assert (clone_dir / "README.md").read_text(encoding="utf-8") == before
     assert (clone_dir / ".git").exists()
     assert not any("references" in a.lower() for a in actions), actions

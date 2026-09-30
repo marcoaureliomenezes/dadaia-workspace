@@ -16,7 +16,7 @@ from typing import Any
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from _bugs_store import Records, Refusal, by_id  # noqa: E402
-from _bugs_write import _redacted, _set, now_iso  # noqa: E402
+from _bugs_write import _SCRIPT, _set, now_iso  # noqa: E402
 
 REQUIRED_BY_VERB = {
     "resolve": ("cause", "caused_by", "resolved_release", "solution",
@@ -26,7 +26,6 @@ REQUIRED_BY_VERB = {
 _EVIDENCE_DIFF_RE = re.compile(r"^(net-negative|net-positive|net-neutral):\s*\S.*$")
 STATUS_BY_VERB = {"resolve": "resolved", "supersede": "superseded",
                   "defer": "deferred", "reject": "rejected"}  # fmt: skip
-_SCRIPT = Path(__file__).parent / "bugs.py"
 
 
 def transition(records: Records, bug_id: str, verb: str, values: dict[str, Any],
@@ -52,7 +51,7 @@ def transition(records: Records, bug_id: str, verb: str, values: dict[str, Any],
         if values["caused_by"] != "none" and values["caused_by"] not in known_ids:
             raise Refusal(
                 f"caused_by {values['caused_by']!r} is not a record of this bug ledger",
-                f"{_SCRIPT} resolve {bug_id} --caused-by none --specs <specs>",
+                f"{_SCRIPT} resolve {bug_id} --caused-by none",
             )
         for key in REQUIRED_BY_VERB["resolve"]:
             _set(updated, key, values[key])
@@ -63,4 +62,4 @@ def transition(records: Records, bug_id: str, verb: str, values: dict[str, Any],
         _set(updated, "cause", values["reason"])
     updated["status"] = STATUS_BY_VERB[verb]
     updated["closed_at"] = record.get("closed_at") or now_iso()
-    return [_redacted(updated) if r is record else r for r in records]
+    return [updated if r is record else r for r in records]

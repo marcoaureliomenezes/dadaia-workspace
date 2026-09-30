@@ -7,6 +7,7 @@ import json
 import typer
 
 from dadaia_workspace import container
+from dadaia_workspace.core.cli_line import fix_line
 from dadaia_workspace.core.workspace_resolver import resolve_workspace_root
 from dadaia_workspace.features.reconcile import reconcile_workspace
 
@@ -40,7 +41,8 @@ def reconcile(
         if result.rollback_required:
             typer.echo(
                 "[rollback-required] reinstall the previous exact provider version, then run "
-                "its matching 'dadaia public stage' and 'dadaia public install'.",
+                f"its matching '{fix_line(None, 'public', 'stage')}' and "
+                f"'{fix_line(None, 'public', 'install')}'.",
                 err=True,
             )
     if not result.ok:

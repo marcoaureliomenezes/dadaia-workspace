@@ -66,12 +66,7 @@ class GitSyncError(DadaiaError):
 
 
 class HandoffSchemaError(DadaiaError):
-    """Raised when the schema file itself is invalid or contains unsupported keywords.
-
-    Example: ``core.handoff_index._load_schema`` encounters 'oneOf' which is outside
-    the supported keyword subset. This forces conscious schema evolution decisions
-    rather than silent misses.
-    """
+    """Raised when the projected handoff schema file is missing or not valid JSON."""
 
 
 class HandoffValidationError(DadaiaError):
@@ -90,11 +85,12 @@ class HandoffValidationError(DadaiaError):
 
 
 class SchemaVersionError(DadaiaError):
-    """Raised when spec_contexts.json uses an incompatible schema version (v1 or legacy values).
+    """spec_contexts.json is unreadable at its schema version: the *problem* and its ONE
+    *fix* (``migrate --yes``, or an ``Operator action:`` when no dadaia verb clears it)."""
 
-    The message always contains "dadaia migrate" so the user knows what to run.
-    Callers must never silently correct v1 data — raise this instead.
-    """
+    def __init__(self, problem: str, fix: str) -> None:
+        self.problem, self.fix = problem, fix
+        super().__init__(f"{problem}\nfix: {fix}")
 
 
 class WorkspaceVenvBootstrapError(DadaiaError, RuntimeError):

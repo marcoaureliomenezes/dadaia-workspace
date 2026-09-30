@@ -1,10 +1,9 @@
 #!/usr/bin/env python3
 """What a valid memory tree is HERE: the two generated files say what the atoms say.
 
-The atoms' own frontmatter is validated by the library lint (`features/specs/
-memory_lint.py`, the doctor's LINT-1) and by nothing else — this module is the
-generated-pair decider, and `catalog generate` validates its own result against it, so
-the renderer and the checker cannot disagree about what the pair should contain.
+The atoms' schema is the library lint's (the doctor's LINT-1, over this skill's one
+grammar) — this module is the generated-pair decider, and `catalog generate` validates
+its own result against it, so the renderer and the checker cannot disagree.
 """
 
 from __future__ import annotations
@@ -18,6 +17,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import _memory_catalog as cat  # noqa: E402
 from _memory_schema import CATALOG, CODE, INDEX  # noqa: E402
+from _specs import script, with_specs  # noqa: E402
 
 Finding = dict[str, Any]
 
@@ -38,6 +38,9 @@ def check(specs: Path) -> list[Finding]:
                 "path": name, "line": 0,
                 "message": f"{path.name} does not match the atoms it is generated from",
             })  # fmt: skip
-    for finding in out:
-        finding["code"] = CODE
+    fix = with_specs(
+        f"{script(Path(__file__).with_name('memory.py'))} catalog generate", specs.resolve()
+    )
+    for finding in out:  # the pair is regenerated, never hand-fixed: the fix line clears it
+        finding |= {"code": CODE, "fix": fix}
     return out

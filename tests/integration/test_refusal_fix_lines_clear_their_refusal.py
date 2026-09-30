@@ -4,18 +4,21 @@ that, executed verbatim, clears the refusal.
 
 The doctor has this harness (``test_doctor_fix_lines_clear_their_finding.py``); these
 three verbs did not, and their fix lines failed review round after round, one site at a
-time. Each case below builds the triggering state over ``file://`` remotes, runs the
-real command as a child process with no TTY (what every agent harness sees — Rich wraps
-at 80 columns there), takes the single ``fix:`` line, fills its documented
-``<placeholders>``, runs it with ``sh -c`` and runs the command again. Progress rule:
+time. Each case below builds the triggering state over ``file://`` remotes and hits the
+refusal: a push-gate case feeds the ref lines git hands its hook to an in-process
+``ci push-gate-check`` (80 columns, no TTY); a baseline/alive/dead case runs the real
+command as a child process. It takes the single ``fix:`` line, fills its documented
+``<placeholders>``, runs it with ``sh -c`` and runs the real command (the real push through
+the shipped hook) again. One line without a TTY — every family prints through
+``cli/_fail.fail`` — is proven on a real child by
+:func:`test_every_fix_line_prints_on_one_line_without_a_tty`. Progress rule:
 the command then succeeds, or refuses with a DIFFERENT fix line (the next step), which is
 followed the same way — at most four steps, never a repeated line. A fix that is itself
 the publish (``git push …``, ``context baseline``) replaces the refused command: its
 success is the clearance.
 
-The census pins that every ``fix:`` producer in the four modules is accounted for — a
-new refusal without a case (or a written reason it cannot run here) fails
-:func:`test_every_fix_site_has_a_case`.
+The census counts every ``fix:`` producer in the four modules per enclosing function: a new
+refusal without a case (or a ``Skip`` reason) fails :func:`test_every_fix_site_has_a_case`.
 
 size: MEDIUM — real git and real CLI child processes, no network.
 """
@@ -23,24 +26,29 @@ size: MEDIUM — real git and real CLI child processes, no network.
 from __future__ import annotations
 
 import ast
+import contextlib
 import os
 import re
+import shutil
 import subprocess
 import sys
 import sysconfig
+from collections import Counter
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 
 import pytest
+from typer.testing import CliRunner
 
+from dadaia_workspace.cli.main import app
 from dadaia_workspace.core.cli_line import cli_path, fix_line, shell_line
 from dadaia_workspace.core.models.spec_context import (
     ContextState,
     SpecContextProject,
 )
 from dadaia_workspace.core.specs_version import CANONICAL_SPECS_VERSION
-from dadaia_workspace.features.spec_context.service import install_git_hooks
+from dadaia_workspace.features.spec_context.service import git_hooks_dir, install_git_hooks
 from dadaia_workspace.infrastructure.json_context_store import JsonContextStore
 from tests.helpers.privacy_fixtures import aws_key_shape
 
@@ -69,12 +77,63 @@ def _constitution(
     )
 
 
+#: The caller's environment keys a world never inherits.
+_UNSET = (
+    "COLUMNS",
+    "LINES",
+    "DADAIA_CONTEXT",
+    "DADAIA_SESSION_ID",
+    "DADAIA_BIN",
+    "GIT_AUTHOR_NAME",
+    "GIT_AUTHOR_EMAIL",
+    "GIT_COMMITTER_NAME",
+    "GIT_COMMITTER_EMAIL",
+    "DADAIA_PRIVACY_DENYLIST",
+)
+
+
+class Templates:
+    """One world per seed prefix per module: a prefix's git steps run once, and every case
+    starts from its own copy — never one mutable world shared, fix chains mutate the remote."""
+
+    def __init__(self, factory: pytest.TempPathFactory) -> None:
+        self.factory = factory
+        self.dirs: dict[Callable[[World], None], Path] = {}
+
+    def get(self, prefix: Callable[[World], None]) -> Path:
+        if prefix not in self.dirs:
+            world = World(self.factory.mktemp(prefix.__name__.strip("_")))
+            prefix(world)
+            self.dirs[prefix] = world.tmp
+        return self.dirs[prefix]
+
+
+def _template(prefix: Callable[[World], None]) -> Callable[[World], None]:
+    """*prefix*, run through :meth:`World.adopt`."""
+
+    def adopt(world: World) -> None:
+        world.adopt(prefix)
+
+    return adopt
+
+
+@pytest.fixture(scope="module")
+def templates(tmp_path_factory: pytest.TempPathFactory) -> Templates:
+    return Templates(tmp_path_factory)
+
+
+@pytest.fixture
+def world(tmp_path: Path, templates: Templates) -> World:
+    return World(tmp_path, templates)
+
+
 class World:
     """One workspace (registry + the CLI at the path ``fix_line`` spells), one context
     ``proj`` whose main repo ``repos/proj`` is a clone of the bare ``proj.git``."""
 
-    def __init__(self, tmp: Path) -> None:
+    def __init__(self, tmp: Path, templates: Templates | None = None) -> None:
         self.tmp = tmp
+        self.templates = templates
         self.ws = tmp / "ws"
         self.repo = self.ws / "repos" / "proj"
         self.bare = tmp / "proj.git"
@@ -82,19 +141,7 @@ class World:
         self.elsewhere.mkdir(parents=True)
         (self.ws / "repos").mkdir(parents=True)
         (self.ws / ".dadaia" / "states").mkdir(parents=True)
-        self.env = {k: v for k, v in os.environ.items() if k not in ("COLUMNS", "LINES")}
-        for key in (
-            "DADAIA_CONTEXT",
-            "DADAIA_SESSION_ID",
-            "DADAIA_BIN",
-            "WORKSPACE_ROOT",
-            "GIT_AUTHOR_NAME",
-            "GIT_AUTHOR_EMAIL",
-            "GIT_COMMITTER_NAME",
-            "GIT_COMMITTER_EMAIL",
-            "DADAIA_PRIVACY_DENYLIST",
-        ):
-            self.env.pop(key, None)
+        self.env = {k: v for k, v in os.environ.items() if k not in _UNSET}
         self.env.update(
             GIT_CONFIG_GLOBAL=str(tmp / "gitconfig"),
             GIT_CONFIG_NOSYSTEM="1",
@@ -126,6 +173,21 @@ class World:
             )
         )
         self.fills = {**_FILLS, "<clone-url>": self.bare.as_uri(), "<keep-dir>": str(tmp / "kept")}
+
+    def adopt(self, prefix: Callable[[World], None]) -> None:
+        """Run *prefix* on this fresh world — as a copy of the module's template world when
+        there is one. A prefix writes the bare remote and the clone only; the clone's
+        ``origin`` and hook are the absolute paths relocated."""
+        if self.templates is None:
+            prefix(self)
+            return
+        template = self.templates.get(prefix)
+        shutil.rmtree(self.bare)
+        shutil.copytree(template / self.bare.name, self.bare, symlinks=True)
+        if (template / self.repo.relative_to(self.tmp)).is_dir():
+            shutil.copytree(template / self.repo.relative_to(self.tmp), self.repo, symlinks=True)
+            self.git(self.repo, "remote", "set-url", "origin", self.bare.as_uri())
+            install_git_hooks(self.repo, force=True)
 
     def run(
         self, argv: list[str] | str, cwd: Path, stdin: str = ""
@@ -185,7 +247,7 @@ class World:
 
     def deny(self) -> None:
         (self.ws / ".dadaia" / "states" / "privacy_denylist.json").write_text(
-            f'["{_TERM}"]', encoding="utf-8"
+            f'{{"{_TERM}": "t"}}', encoding="utf-8"
         )
 
 
@@ -224,9 +286,32 @@ def _hit(world: World, command: list[str] | str) -> subprocess.CompletedProcess[
     return world.cli(*command) if command[0] != "git" else world.run(command, world.repo)
 
 
+def _gate(world: World, push: str) -> subprocess.CompletedProcess[str]:
+    """The first refusal of *push*: the ref lines git hands its pre-push hook, captured by a
+    stand-in hook, fed to an in-process ``ci push-gate-check`` (80 columns, no TTY) from the
+    hook's cwd. The hook's own forwarding stays proven by the real pushes below and by
+    ``test_the_gate_is_read_only…``; one line without a TTY by the sentinel."""
+    refs, cwd = world.tmp / "pre-push.refs", world.tmp / "pre-push.cwd"
+    hooks = git_hooks_dir(world.repo)
+    assert hooks is not None
+    shipped = (hooks / "pre-push").read_bytes()
+    (hooks / "pre-push").write_text(f'#!/bin/sh\npwd > "{cwd}"\ncat > "{refs}"\nexit 1\n')
+    try:
+        world.run(push, world.repo)
+    finally:
+        (hooks / "pre-push").write_bytes(shipped)
+    env: dict[str, str | None] = {**world.env, **dict.fromkeys(_UNSET), "COLUMNS": "80"}
+    with contextlib.chdir(cwd.read_text().strip()):
+        ran = CliRunner().invoke(app, ["ci", "push-gate-check"], input=refs.read_text(), env=env)
+    return subprocess.CompletedProcess(push, ran.exit_code, ran.output, "")
+
+
 def _drive(world: World, case: Case) -> None:
     command = case.build(world)
-    done = _hit(world, command)
+    if isinstance(command, str) and " push " in command:
+        done = _gate(world, command)
+    else:
+        done = _hit(world, command)
     assert done.returncode != 0, f"the case planted no refusal:\n{done.stdout}{done.stderr}"
     seen: list[str] = []
     for step in range(4):
@@ -254,9 +339,15 @@ def _drive(world: World, case: Case) -> None:
 # ── push-gate cases ──────────────────────────────────────────────────────────────────
 
 
+@_template
 def _published(world: World) -> None:
     world.seed(_constitution())
     world.clone()
+
+
+@_template
+def _seeded(world: World) -> None:
+    world.seed(_constitution())
 
 
 def _outside(world: World, published: bool = True) -> str:
@@ -490,7 +581,7 @@ _AMEND_BASELINE = (
 
 
 def _no_url_no_checkout(world: World) -> list[str]:
-    world.seed(_constitution())
+    _seeded(world)
     store = JsonContextStore(world.ws / ".dadaia" / "states")
     store.update(
         SpecContextProject("proj", ContextState.DEAD, "proj", "", "2026-01-01T00:00:00+00:00")
@@ -513,7 +604,7 @@ def _advance_origin_work(world: World) -> None:
 
 def _no_checkout(world: World) -> list[str]:
     """Review M-A (P7a)."""
-    world.seed(_constitution())
+    _seeded(world)
     return ["context", "baseline", "proj"]
 
 
@@ -535,13 +626,13 @@ def _never_onboarded(world: World) -> list[str]:
 
 def _unknown_context(world: World) -> list[str]:
     """Review M-A (P7c)."""
-    world.seed(_constitution())
+    _seeded(world)
     JsonContextStore(world.ws / ".dadaia" / "states").delete("proj")
     return ["context", "baseline", "proj"]
 
 
 def _alive_remote_gone(world: World) -> list[str]:
-    world.seed(_constitution())
+    _seeded(world)
     store = JsonContextStore(world.ws / ".dadaia" / "states")
     store.update(
         SpecContextProject(
@@ -629,9 +720,24 @@ def _dead_no_identity(world: World) -> list[str]:
     return ["context", "dead", "proj"]
 
 
+def _unpushed_side_branch(world: World) -> list[str]:
+    """sa-context-dead-removes-repos-outside-the-reaper#C3: a local branch other than HEAD's
+    carries a commit origin lacks; unrecoverable-fix-line-pushes-a-wt-branch-the-pre-push-refuses:
+    a non-work branch the gate refuses to push — already archived once, then advanced
+    (ADR 0120: one archive tag per tip, never a collision)."""
+    _published(world)
+    world.git(world.repo, "checkout", "-q", "-b", "wt/0.5.0a", "origin/develop")
+    world.commit("notes.md", "n\n")
+    archived = world.git(world.repo, "rev-parse", "HEAD")[:7]
+    world.git(world.repo, "push", "-q", "origin", f"HEAD:refs/tags/archive/wt/0.5.0a/{archived}")
+    world.commit("notes.md", "m\n")
+    world.git(world.repo, "checkout", "-q", "--detach", "origin/main")
+    return ["context", "dead", "proj"]
+
+
 def _dead_twice(world: World) -> list[str]:
     """Review M-A: dead on a DEAD context."""
-    world.seed(_constitution())
+    _seeded(world)
     store = JsonContextStore(world.ws / ".dadaia" / "states")
     store.update(
         SpecContextProject(
@@ -665,75 +771,71 @@ _VERBS = {
     "service": (_PKG / "features" / "spec_context" / "service.py", ("alive", "baseline", "dead")),
 }
 
-SITES: dict[str, tuple[Case, ...] | Skip] = {
-    "branch_policy._refuse_branch#0": (Case(_birth_published, _develop_at_main, replaces=True),),
-    "branch_policy._refuse_branch#1": (
-        Case(_outside, _work_carries_topic, then=_MERGE_TOPIC),
-        Case(_outside_with_work, _work_carries_topic, then=_MERGE_TOPIC),
-        Case(_outside_detached, _work_carries_topic, then="git push -q origin feature/0.1.0"),
+SITES: dict[str, tuple[Case | tuple[Case, ...] | Skip, ...]] = {
+    "branch_policy._refuse_branch": (
+        Case(_birth_published, _develop_at_main, replaces=True),
+        (
+            Case(_outside, _work_carries_topic, then=_MERGE_TOPIC),
+            Case(_outside_with_work, _work_carries_topic, then=_MERGE_TOPIC),
+            Case(_outside_detached, _work_carries_topic, then="git push -q origin feature/0.1.0"),
+        ),
+        Skip("`gh pr create` needs GitHub; the PR path is the fix"),
     ),
-    "branch_policy._refuse_branch#2": Skip("`gh pr create` needs GitHub; the PR path is the fix"),
-    "branch_policy.check_branch_policy#0": (
+    "branch_policy.check_branch_policy": (
         Case(_mismatch, _work_pushed, then="git push -q origin feature/1.0.0"),
     ),
-    "push_gate._rewrite_fix#0": (
+    "push_gate._rewrite_fix": (
         Case(_denylisted_not_checked_out, _clean_publish, then=_CLEAN_COMMIT_PUSH),
-    ),
-    "push_gate._rewrite_fix#1": (
-        Case(_denylisted, _clean_publish, operator=_drop_term, then=_COMMIT_PUSH),
-        Case(
-            _denylisted_in_a_worktree,
-            _worktree_clean,
-            operator=_drop_worktree_term,
-            then="git -C .claude/worktrees/agent-x commit -qa --amend --no-edit && "
-            "git -C .claude/worktrees/agent-x push -q origin feature/1.0.0",
+        (
+            Case(_denylisted, _clean_publish, operator=_drop_term, then=_COMMIT_PUSH),
+            Case(
+                _denylisted_in_a_worktree,
+                _worktree_clean,
+                operator=_drop_worktree_term,
+                then="git -C .claude/worktrees/agent-x commit -qa --amend --no-edit && "
+                "git -C .claude/worktrees/agent-x push -q origin feature/1.0.0",
+            ),
+            Case(_denylisted_no_context, _clean_publish, operator=_drop_term, then=_COMMIT_PUSH),
+            Case(
+                _denylisted_advanced_integration,
+                _nothing_reverted,
+                operator=_drop_term,
+                then="git commit -qa --amend --no-edit && git push -q origin feature/1.0.1",
+            ),
+            Case(_non_canon, _no_junk, operator=_rm_junk, then=_COMMIT_PUSH),
         ),
-        Case(_denylisted_no_context, _clean_publish, operator=_drop_term, then=_COMMIT_PUSH),
-        Case(
-            _denylisted_advanced_integration,
-            _nothing_reverted,
-            operator=_drop_term,
-            then="git commit -qa --amend --no-edit && git push -q origin feature/1.0.1",
-        ),
-        Case(_non_canon, _no_junk, operator=_rm_junk, then=_COMMIT_PUSH),
     ),
-    "push_gate._run_denylist_scan#0": Skip("needs a corrupted object store; `git fsck` names it"),
-    "push_gate.push_gate_decision#0": (Case(_malformed, _work_pushed, replaces=True),),
-    "ci._repo_root#0": Skip("the pre-push hook always runs inside the repo it pushes"),
-    "ci.push_gate_check#0": Skip("the gate's refusal: its fix is a branch_policy/push_gate site"),
-    "service.SpecContextService.show#0": (Case(_unknown_context, _cloned),),
-    "service.SpecContextService.alive#0": (Case(_no_url_no_checkout, _cloned),),
-    "service.SpecContextService.alive#1": (
+    "push_gate._run_denylist_scan": (Skip("needs a corrupted object store; `git fsck` names it"),),
+    "push_gate.push_gate_decision": (Case(_malformed, _work_pushed, replaces=True),),
+    "ci._repo_root": (Skip("the pre-push hook always runs inside the repo it pushes"),),
+    "ci.push_gate_check": (Skip("the gate's refusal: its fix is a branch_policy/push_gate site"),),
+    "service.SpecContextService.show": (Case(_unknown_context, _cloned),),
+    "service.SpecContextService.alive": (
+        Case(_no_url_no_checkout, _cloned),
         Case(_alive_remote_gone, _cloned, operator=_remote_back),
     ),
-    "service.SpecContextService.baseline#0": (Case(_no_checkout, _cloned),),
-    "service.SpecContextService.baseline#1": (Case(_no_identity, _baseline_done),),
-    "service.SpecContextService.baseline#2": (Case(_never_onboarded, _baseline_done),),
-    "service.SpecContextService.baseline#3": (
+    "service.SpecContextService.baseline": (
+        Case(_no_checkout, _cloned),
+        Case(_no_identity, _baseline_done),
+        Case(_never_onboarded, _baseline_done),
         Case(_baseline_denylisted, _baseline_done, operator=_drop_draft_term, then=_AMEND_BASELINE),
     ),
-    "service.SpecContextService._refuse_principal_absent#0": (
+    "service.SpecContextService._refuse_principal_absent": (
         Case(_draft_principal_absent, lambda w: _baseline_done(w, "rel/0.1.0", ("main", "stage"))),
     ),
-    "service.SpecContextService._require_publishable#0": (
+    "service.SpecContextService._require_publishable": (
         Case(_secret_draft, _baseline_done, operator=_drop_secret),
     ),
-    "service.SpecContextService._enforce_dead_review_gate#0": Skip(
-        "fires only when `git ls-files` itself fails on a git root"
-    ),
-    "service.SpecContextService._enforce_dead_review_gate#1": (
+    "service.SpecContextService._dead_preflight": (
         Case(_untracked, _dead_done, replaces=True),
-    ),
-    "service.SpecContextService._enforce_dead_review_gate#2": (
         Case(_secret_untracked, _dead_done),
+        Case(_no_origin, _dead_done),
+        (Case(_unpushed_side_branch, _dead_done), Case(_commits_no_remote, _dead_done)),
+        Case(_dead_no_identity, _dead_done),
+        Case(_dirty_on_integration, _dead_via_work),
     ),
-    "service.SpecContextService.dead#0": (Case(_dead_twice, _dead_done),),
-    "service.SpecContextService.dead#1": (Case(_no_origin, _dead_done),),
-    "service.SpecContextService.dead#2": (Case(_unborn_dirty, _dead_done),),
-    "service.SpecContextService.dead#3": (Case(_commits_no_remote, _dead_done),),
-    "service.SpecContextService.dead#4": (Case(_dead_no_identity, _dead_done),),
-    "service.SpecContextService.dead#5": (Case(_dirty_on_integration, _dead_via_work),),
-    "service.SpecContextService.dead#6": (
+    "service.SpecContextService.dead": (
+        Case(_dead_twice, _dead_done),
         Case(
             _dead_denylisted,
             _dead_done,
@@ -785,7 +887,7 @@ def _reachable(scopes: dict[str, ast.FunctionDef], roots: tuple[str, ...]) -> li
 def _fix_sites() -> list[str]:
     """The chokepoints' refusals (a string constant carrying ``fix:`` or a call to
     branch_policy's ``_blocked``, whose own body is the renderer) and every ``raise``
-    the verbs reach — by enclosing function and order."""
+    the verbs reach — one entry per refusal, keyed by its enclosing function."""
     sites: list[str] = []
     for stem, path in _CHOKEPOINTS.items():
         for name, fn in _scopes(ast.parse(path.read_text(encoding="utf-8"))).items():
@@ -798,43 +900,47 @@ def _fix_sites() -> list[str]:
                     or (isinstance(n, ast.Call) and getattr(n.func, "id", "") == "_blocked")
                 )
             ]
-            sites += [f"{stem}.{name}#{i}" for i in range(len(hits))]
+            sites += [f"{stem}.{name}"] * len(hits)
     for stem, (path, roots) in _VERBS.items():
         scopes = _scopes(ast.parse(path.read_text(encoding="utf-8")))
         for name in _reachable(scopes, roots):
-            raises = [n for n in ast.walk(scopes[name]) if isinstance(n, ast.Raise) and n.exc]
-            sites += [f"{stem}.{name}#{i}" for i in range(len(raises))]
+            raises = [
+                n
+                for n in ast.walk(scopes[name])
+                if (isinstance(n, ast.Raise) and n.exc)
+                or (isinstance(n, ast.Call) and getattr(n.func, "id", "") == "fail")
+            ]
+            sites += [f"{stem}.{name}"] * len(raises)
     return sites
 
 
 def test_every_fix_site_has_a_case() -> None:
-    assert sorted(_fix_sites()) == sorted(SITES)
+    assert Counter(_fix_sites()) == {site: len(refusals) for site, refusals in SITES.items()}
 
 
 _CASES = [
-    pytest.param(case, id=f"{site}-{n}")
-    for site, entry in SITES.items()
+    pytest.param(case, id=case.build.__name__.strip("_"))
+    for refusals in SITES.values()
+    for entry in refusals
     if not isinstance(entry, Skip)
-    for n, case in enumerate(entry)
+    for case in (entry if isinstance(entry, tuple) else (entry,))
 ]
 
 
-def test_dead_leaves_a_clean_published_detached_head(tmp_path: Path) -> None:
-    world = World(tmp_path)
+def test_dead_leaves_a_clean_published_detached_head(world: World) -> None:
     done = _hit(world, _dead_clean_detached(world))
     assert done.returncode == 0, done.stdout + done.stderr
     _dead_done(world)
 
 
 @pytest.mark.parametrize("case", _CASES)
-def test_the_fix_line_clears_the_refusal(case: Case, tmp_path: Path) -> None:
-    _drive(World(tmp_path), case)
+def test_the_fix_line_clears_the_refusal(case: Case, world: World) -> None:
+    _drive(world, case)
 
 
-def test_a_repaired_custom_gitflow_publishes_end_to_end(tmp_path: Path) -> None:
+def test_a_repaired_custom_gitflow_publishes_end_to_end(world: World) -> None:
     """C1 (r3-typo): on an empty origin the draft constitution names non-default branches —
     baseline publishes under those names, the shipped gate admitting every push."""
-    world = World(tmp_path)
     world.clone()
     world.onboard(_constitution("trunk", "stage", "rel/"))
     done = world.cli("context", "baseline", "proj")
@@ -842,10 +948,9 @@ def test_a_repaired_custom_gitflow_publishes_end_to_end(tmp_path: Path) -> None:
     _baseline_done(world, "rel/0.1.0", ("trunk", "stage"))
 
 
-def test_a_clone_on_the_integration_branch_is_never_auto_committed(tmp_path: Path) -> None:
+def test_a_clone_on_the_integration_branch_is_never_auto_committed(world: World) -> None:
     """H (dead on develop): the refusal comes before any commit — the local integration
     branch is exactly the remote's."""
-    world = World(tmp_path)
     _dirty_on_integration(world)
     before = world.git(world.repo, "rev-parse", "develop")
     assert world.cli("context", "dead", "proj").returncode != 0
@@ -853,21 +958,22 @@ def test_a_clone_on_the_integration_branch_is_never_auto_committed(tmp_path: Pat
 
 
 def test_every_fix_line_prints_on_one_line_without_a_tty(tmp_path: Path) -> None:
-    """H (dead wrapping): a fix naming a path longer than 80 columns stays one line."""
+    """H (dead wrapping): a fix naming a path longer than 80 columns stays one line. The
+    no-TTY sentinel of every family: gate, baseline, alive and dead refusals all print
+    through the one ``cli/_fail.fail`` a real child process exercises here."""
     world = World(tmp_path / ("d" * 90))
     _unborn_dirty(world)
     fix = _single_fix(world.cli("context", "dead", "proj"))
-    assert fix.endswith("'<keep-dir>'") or fix.endswith("<keep-dir>"), fix
-    assert re.search(re.escape(str(world.repo)), fix)
+    assert fix.endswith("context dead proj --commit"), fix
+    assert re.search(re.escape(str(world.ws)), fix)
 
 
 def test_the_gate_is_read_only_and_its_rewrite_fix_uncommits_only_unpublished_work(
-    tmp_path: Path,
+    world: World,
 ) -> None:
     """R13 rule 3 / review 5 H2: the denylist refusal's fix uncommits the refused ref's own
     unpublished range, down to its oldest unpublished commit (N3) — never a squash of
     published history, never a publish verb that rewrites."""
-    world = World(tmp_path)
     command = _denylisted(world)
     oldest = world.git(world.repo, "rev-parse", "HEAD~1")
     fix = _single_fix(_hit(world, command))
@@ -876,11 +982,10 @@ def test_the_gate_is_read_only_and_its_rewrite_fix_uncommits_only_unpublished_wo
 
 
 def test_a_denylisted_tag_from_a_detached_head_on_an_empty_origin_prints_no_command(
-    tmp_path: Path,
+    world: World,
 ) -> None:
     """Review 5 C1 (P1): the range reaches a root commit and the ref is a tag — the refusal
     names the operator action, prints no command, and the repo stays a repo."""
-    world = World(tmp_path)
     world.clone()
     world.deny()
     world.commit("README.md", "r\n")
@@ -898,11 +1003,10 @@ def test_a_denylisted_tag_from_a_detached_head_on_an_empty_origin_prints_no_comm
 
 
 def test_dead_on_a_non_fast_forward_carries_gits_own_text_and_removes_nothing(
-    tmp_path: Path,
+    world: World,
 ) -> None:
     """Review 5 H6: no pull fix row leads dead into a conflicted merge it would commit and
     push — git's own text stands alone; the checkout stays."""
-    world = World(tmp_path)
     _on_work(world)
     _advance_origin_work(world)
     (world.repo / "README.md").write_text("edited\n", encoding="utf-8")
@@ -914,12 +1018,11 @@ def test_dead_on_a_non_fast_forward_carries_gits_own_text_and_removes_nothing(
 
 
 def test_a_refused_baseline_push_names_the_anchor_and_the_publish_as_the_next_step(
-    tmp_path: Path,
+    world: World,
 ) -> None:
     """Design review C7 / C2: the gate refuses baseline's push — the refusal keeps the gate's
     one fix (reset to the oldest unpublished commit) and names the anchor and the publish
     as the step after the amend (a hand push would drop origin's merge parent)."""
-    world = World(tmp_path)
     done = _hit(world, _baseline_denylisted(world))
     output = done.stdout + done.stderr
     assert done.returncode != 0 and _single_fix(done).startswith("git -C")
@@ -928,12 +1031,11 @@ def test_a_refused_baseline_push_names_the_anchor_and_the_publish_as_the_next_st
 
 
 def test_dead_after_the_operator_pulls_into_a_conflict_publishes_no_markers(
-    tmp_path: Path,
+    world: World,
 ) -> None:
     """Review 6 H6 (R7): the operator follows git's own `git pull` hint into a conflict;
     dead stages no unmerged entry, so git refuses the commit — its text, nothing published,
     the checkout kept."""
-    world = World(tmp_path)
     _on_work(world)
     _advance_origin_work(world)
     other = world.tmp / "other"
@@ -950,12 +1052,11 @@ def test_dead_after_the_operator_pulls_into_a_conflict_publishes_no_markers(
     assert world.repo.is_dir() and world.remote_heads()["feature/1.0.0"] == published
 
 
-def test_dead_commit_without_a_git_identity_refuses_and_removes_nothing(tmp_path: Path) -> None:
+def test_dead_commit_without_a_git_identity_refuses_and_removes_nothing(world: World) -> None:
     """Behavior (AC4.9, security finding SA-H3-2, commit 75b92f25): with no git identity in env or config,
     ``context dead --commit`` over a checkout holding changes refuses before any write —
     exit non-zero, one fix line setting ``user.name`` in that repo, the checkout, its
     change and the published branch all left as they were."""
-    world = World(tmp_path)
     _on_work(world)
     (world.repo / "README.md").write_text("edited\n", encoding="utf-8")
     head = world.git(world.repo, "rev-parse", "HEAD")

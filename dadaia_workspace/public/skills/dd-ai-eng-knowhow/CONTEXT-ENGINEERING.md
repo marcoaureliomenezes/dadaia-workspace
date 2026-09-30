@@ -94,8 +94,9 @@ Five invariants MUST hold across all personas. Inconsistencies are bugs — file
 | I4 | TDD / task-manager reservation flow | Identical `[ ]`->`[-]`->`[x]` flow, referenced (not restated) |
 | I5 | Handoff JSON contract | All agents emit via `dd-handoff-emitter` against the same schema version |
 
-- I1 reference key list (on-disk today): `name`, `description`, `dispatch_band`, `activity_class`, `concurrency_relationship`.
-- I1 reference key list (continued): `gate_role`, `tools`, `skills`, `maxTurns`, `input_contract`, `paths.write_allowlist`.
+- I1 reference key list (on-disk today): `name`, `description`, `dispatch_band`, `read_only`, `concurrency_relationship`.
+- I1 reference key list (continued): `gate_role`, `tools`, `skills`, `input_contract`, `paths.write_allowlist`.
+- No persona sets `maxTurns`: a capped subagent stops mid-work and returns no report; the main thread stops a runaway one.
 - Model resolution is a separate policy-overlay mechanism, never asserted in persona frontmatter.
 
 Detection method:

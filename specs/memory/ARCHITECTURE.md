@@ -33,11 +33,6 @@ Measured by: `lint-imports --config setup.cfg --no-cache` — contract `infrastr
 ADR: none
 Rationale: an adapter that knows a use case is no longer an adapter.
 
-### P-06 · We keep `core.kernel_tunables` a pure-constant leaf that imports no upper layer.
-Measured by: `lint-imports --config setup.cfg --no-cache` — contract `kernel-tunables-is-a-leaf`.
-ADR: none
-Rationale: hooks import it on the write hot path; one upper edge drags in the composition graph.
-
 ### P-07 · We keep features mutually independent: they compose through the container, never through sibling imports; a helper two features need lives in each.
 Measured by: `lint-imports --config setup.cfg --no-cache` — contract `features-no-cross-feature`, whose `modules =` list is asserted equal to the on-disk `features/*/__init__.py` package set by `pytest tests/contract/test_import_linter_ignore_cap.py`.
 ADR: none
@@ -101,10 +96,11 @@ Rationale: three closures touched every product atom and left fifteen contradict
 ## Tech Stack
 
 - Python `^3.12`, built by Poetry Core; console entrypoints `dadaia` and `dadaia-workspace` are one callable, and the version lives in `pyproject.toml` alone.
-- Runtime dependencies: Typer, Rich, PyYAML, jsonschema; the package declares no optional extra.
+- Runtime dependencies: Typer, Rich, PyYAML, jsonschema, packaging (PEP 440 version ordering); the package declares no optional extra.
 - Everything else is the standard library; there is no database — every state is a JSON or JSONL file.
 - Claude Code, Codex, Kimi Code, Cursor, Devin CLI and GitHub Copilot are operator-installed external CLIs, never Python dependencies; the workspace runs no agent-execution runtime.
-- Quality toolchain: pytest (`pytest-cov`, `pytest-xdist`, `pytest-randomly`, `pytest-timeout`, Hypothesis), Ruff, mypy `--strict`, import-linter, gitleaks; `mutmut` sits in an optional group ([[QUALITY]]).
+- Quality toolchain: pytest (`pytest-cov`, `pytest-xdist`, `pytest-randomly`, `pytest-timeout`, Hypothesis), Ruff, mypy `--strict`, import-linter; `mutmut` sits in an optional group ([[QUALITY]]).
+- Secret scanning: gitleaks, a CI action in `secret-scan.yml`, never a Python dependency.
 - Packaging: wheel and sdist ship the `dadaia_workspace` package with `public/` inside it and no bytecode.
 - Canonical commands, from the workspace root:
 
@@ -132,8 +128,8 @@ flowchart TB
 - `container.py` is composition wiring only: every definition keeps a production consumer, and a single-consumer adapter is imported directly by its feature.
 - No `core/protocols/` package exists: no seam carries two production adapters, so every adapter is imported by its one consumer; a `typing.Protocol` lives only as a structural type inside the module that consumes it.
 - `setup.cfg` carries seven import-linter contracts; `features-no-subprocess` has no suppressed edge, and the two suppressed edges (`reconcile.service` -> `capabilities`, `reconcile.service` -> `migrate.state_v2`) sit under `features-no-cross-feature` (P-10).
-- Hooks import `core.invocation` directly and build the `Invocation` once per process (P-12); `sdd_post_gate` touches `last_seen_at` and runs the reaper on one throttle and writes nothing else.
-- `features/migrate` stamps `specs_pattern_version: 7` or refuses; a tree below v6 upgrades to 0.4.x first.
+- Hooks import `core.invocation` directly and build the `Invocation` once per process (P-12); `sdd_post_gate` touches `last_seen_at` and writes nothing else.
+- `features/migrate` stamps `specs_pattern_version: 8` or refuses; a tree below v6 upgrades to 0.4.x first.
 
 ### `dadaia_workspace/features` — package map (13 packages)
 
@@ -153,5 +149,5 @@ flowchart TB
 - Code is born with a real caller in the same change; without a caller it does not exist.
 - A fix replaces the old path; it never wraps it and never opens a second path.
 - A port exists only with two production adapters; a parameter exists only when it is read.
-- Detection: `dd-code-review` SLOP.md S1, S2, S4, S5; measured by ratchet V32.
+- Detection: `dd-code-review` SLOP.md S1, S2, S4, S5.
 <!-- /dadaia:fixed slop-code -->

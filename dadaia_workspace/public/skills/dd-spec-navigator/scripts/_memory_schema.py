@@ -1,16 +1,14 @@
 #!/usr/bin/env python3
-"""The memory atom's frontmatter reader and the generated pair's path constants.
+"""The memory atom's ONE frontmatter grammar and the generated pair's path constants.
 
-The block is read without a YAML dependency, for the catalog writer alone: VALIDATING it
-is the library lint's fact (`features/specs/memory_lint.py`, the doctor's LINT-1), and a
-second validator here was a second decider of the same fact.
+Stdlib only: `catalog generate`, `check` and the library lint (LINT-1, which loads this
+module) parse an atom here alike, so they reach one verdict per atom; LINT-1 then applies
+the JSON schema to the dict this returns.
 """
 
 from __future__ import annotations
 
 import re
-import sys
-from pathlib import Path
 from typing import Any
 
 CODE = "LEDGER-MEMORY-SCHEMA"
@@ -22,28 +20,19 @@ _KEY_RE = re.compile(r"^([A-Za-z_][A-Za-z0-9_]*):\s?(.*)$")
 WIKILINK_RE = re.compile(r"\[\[([^\]]+)\]\]")
 
 
-def find_specs(start: Path) -> Path:
-    """The nearest ``specs/`` at or above *start* whose parent holds ``.git``."""
-    for candidate in (start, *start.parents):
-        if (candidate / "specs").is_dir() and (candidate / ".git").exists():
-            return candidate / "specs"
-    print(f"error: no git-rooted specs/ at or above {start}", file=sys.stderr)
-    print("fix: run this script again with --specs <path-to-specs>", file=sys.stderr)
-    raise SystemExit(1)
-
-
-def _scalar(raw: str) -> str | list[str]:
+def _scalar(raw: str) -> str | list[str] | None:
     value = raw.strip()
     if value.startswith("[") and value.endswith("]"):
-        inner = value[1:-1].strip()
-        return [_unquote(item.strip()) for item in inner.split(",") if item.strip()]
+        items = [_unquote(item.strip()) for item in value[1:-1].split(",") if item.strip()]
+        return None if None in items else [item for item in items if item is not None]
     return _unquote(value)
 
 
-def _unquote(value: str) -> str:
+def _unquote(value: str) -> str | None:
+    """None for a plain scalar YAML would read otherwise (a ': ', a stray quote)."""
     if len(value) >= 2 and value[0] == value[-1] and value[0] in "\"'":
         return value[1:-1]
-    return value
+    return None if ": " in value or {value[:1], value[-1:]} & {'"', "'"} else value
 
 
 def parse(text: str) -> tuple[dict[str, Any] | None, str, str | None]:
@@ -61,18 +50,18 @@ def parse(text: str) -> tuple[dict[str, Any] | None, str, str | None]:
     except StopIteration:
         return None, "", "the frontmatter block is never closed by a '---' line"
     data: dict[str, Any] = {}
-    key: str | None = None
+    key = ""
     for line in lines[1:end]:
         if not line.strip():
             continue
-        if line.lstrip().startswith("- ") and key is not None:
-            data.setdefault(key, [])
-            if isinstance(data[key], list):
-                data[key].append(_unquote(line.lstrip()[2:].strip()))
-            continue
         match = _KEY_RE.match(line)
-        if match is None:
+        item = line.lstrip()[2:].strip() if line.lstrip().startswith("- ") else None
+        value = _scalar(match.group(2)) if match else _unquote(item) if item else None
+        if value is None or (match is None and not isinstance(data.get(key), list)):
             return None, "", f"frontmatter line {line!r} is not 'key: value'"
+        if match is None:
+            data[key].append(value)
+            continue
         key = match.group(1)
-        data[key] = _scalar(match.group(2)) if match.group(2).strip() else []
+        data[key] = value if match.group(2).strip() else []
     return data, "\n".join(lines[end + 1 :]), None

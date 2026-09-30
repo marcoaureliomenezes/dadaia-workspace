@@ -29,7 +29,7 @@ from dadaia_workspace.features.workspace.service import WorkspaceService
 from dadaia_workspace.infrastructure.public_assets import FileSystemPublicAssetManager
 from dadaia_workspace.infrastructure.public_assets_common import read_link_target
 from dadaia_workspace.infrastructure.python_env import VenvPythonEnvironmentManager
-from dadaia_workspace.infrastructure.runtime_config import claude_settings
+from dadaia_workspace.infrastructure.runtime_config import claude_hooks
 
 pytestmark = pytest.mark.contract
 
@@ -190,7 +190,7 @@ def test_pretooluse_matcher_covers_every_gated_write_tool(projected: Path) -> No
     """
     from dadaia_workspace.hooks import _common
 
-    settings = claude_settings(projected)
+    settings = claude_hooks()
     hooks = settings["hooks"]
     assert isinstance(hooks, dict)
     pre = hooks["PreToolUse"]

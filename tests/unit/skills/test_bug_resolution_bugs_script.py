@@ -10,12 +10,13 @@ from __future__ import annotations
 
 import json
 import os
-import shutil
 import subprocess
 import sys
 from pathlib import Path
 
 import pytest
+
+from tests.helpers.skill_scripts import stage_skill_scripts
 
 pytestmark = pytest.mark.unit
 
@@ -26,7 +27,6 @@ _SOURCE = _SCRIPTS / "bugs.py"
 _LOCAL_IP = ".".join(("10", "1", "2", "3"))
 #: Same reason: an absolute home path is composed, never written as a tracked literal.
 _HOME_PATH = "/".join(("", "home", "someone", "work"))
-_SCHEMA = _PUBLIC / "schemas" / "bugs" / "bug-record-v1.schema.json"
 
 _OPEN_RECORD: dict[str, object] = {
     "id": "a-bug",
@@ -52,12 +52,7 @@ _OPEN_RECORD: dict[str, object] = {
 @pytest.fixture
 def script(tmp_path: Path) -> Path:
     """The staged shape: bugs.py with its schema copy beside it."""
-    staged = tmp_path / "staged" / "scripts"
-    (staged / "schemas").mkdir(parents=True)
-    for module in sorted(_SCRIPTS.glob("*.py")):
-        shutil.copy2(module, staged / module.name)
-    shutil.copy2(_SCHEMA, staged / "schemas" / _SCHEMA.name)
-    return staged / "bugs.py"
+    return stage_skill_scripts("dd-bug-resolution", tmp_path / "staged" / "scripts") / "bugs.py"
 
 
 def _ledger(root: Path, *records: dict[str, object]) -> Path:
@@ -147,16 +142,19 @@ def test_json_output_carries_one_object_per_finding(script: Path, tmp_path: Path
     assert payload[0]["line"] == 1
 
 
-def test_missing_specs_above_cwd_is_refused_with_one_fix_line(script: Path, tmp_path: Path) -> None:
-    """No `specs/` at or above cwd whose parent holds `.git` — the default resolution
-    refuses rather than guessing, and says exactly how to proceed."""
-    lonely = tmp_path / "nowhere"
-    lonely.mkdir()
-    done = _run(script, "check", cwd=lonely)
-    assert done.returncode == 1
-    fixes = [ln for ln in (done.stdout + done.stderr).splitlines() if ln.startswith("fix:")]
-    assert len(fixes) == 1
-    assert "--specs" in fixes[0]
+@pytest.mark.skipif(sys.platform == "win32", reason="the fake workspace CLI is a shebang script")
+def test_a_missing_specs_tree_is_refused_never_created(script: Path, tmp_path: Path) -> None:
+    """bug-law-spelling-registers-into-a-reaped-root-specs-tree: the fix names the bound tree."""
+    (cli := tmp_path / ".dadaia/.venv/bin/dadaia").parent.mkdir(parents=True)
+    cli.write_text(f'#!{sys.executable}\nprint(\'{{"main_repo": "demo"}}\')\n', "utf-8")
+    cli.chmod(0o755)
+    (tmp_path / ".git").mkdir()
+    argv = ["append", "--bug-id", "x", "--title", "t", "--severity", "LOW", "--surface", "cli",
+            "--component", "c", "--context", "c", "--symptom", "s", "--repro", "r", "--expected", "e"]  # fmt: skip
+    done = _run(script, *argv, "--specs", "specs", cwd=tmp_path)
+    assert done.returncode == 1 and not (tmp_path / "specs").exists()
+    fix = f"fix: {sys.executable} {script} {' '.join(argv)} --specs {tmp_path}/repos/demo/specs"
+    assert [ln for ln in done.stderr.splitlines() if ln.startswith("fix:")] == [fix]
 
 
 def test_specs_default_resolves_the_nearest_git_rooted_specs_tree(
@@ -170,11 +168,61 @@ def test_specs_default_resolves_the_nearest_git_rooted_specs_tree(
     assert _run(script, "check", cwd=deep).returncode == 0
 
 
+def test_a_bad_archive_line_is_a_finding(script: Path, tmp_path: Path) -> None:
+    """sa-ledger-vocabulary-and-atomic-write-duplicated-in-scripts#48.5: a non-JSON or
+    non-bug-record-v1 line in bugs_histo.jsonl is a finding and check exits non-zero; a
+    pre-v6 `event` line is history."""
+    specs = _ledger(tmp_path, _OPEN_RECORD)
+    (specs / "bugs" / "_archive").mkdir()
+    (specs / "bugs" / "_archive" / "bugs_histo.jsonl").write_text(
+        '{"event": "archived", "data": {}}\nnot json\n{"id": "x"}\n', encoding="utf-8"
+    )
+    done = _run(script, "check", "--specs", str(specs), "--json")
+    assert done.returncode == 1
+    assert [(f["path"], f["line"]) for f in json.loads(done.stdout)][:2] == [
+        ("bugs/_archive/bugs_histo.jsonl", 2),
+        ("bugs/_archive/bugs_histo.jsonl", 3),
+    ]
+
+
 def test_absent_ledger_is_not_a_finding(script: Path, tmp_path: Path) -> None:
     """A young specs tree has no bugs file yet — same posture as the doctor's."""
     specs = tmp_path / "specs"
     specs.mkdir()
     assert _run(script, "check", "--specs", str(specs)).returncode == 0
+
+
+@pytest.mark.parametrize(
+    "bad",
+    [
+        "{not a record",
+        "[1, 2]",
+        json.dumps({**_OPEN_RECORD, "severity": "BLOCKER"}),
+        json.dumps({**_OPEN_RECORD, "context": ""}),
+        json.dumps({**_OPEN_RECORD, "root_cause": "a retired key"}),
+        json.dumps({k: v for k, v in _OPEN_RECORD.items() if k != "title"}),
+    ],
+)
+def test_a_bad_bug_line_is_one_finding_and_the_doctor_says_what_the_script_says(
+    script: Path, tmp_path: Path, bad: str
+) -> None:
+    """sa-spec-doc-033-duplicates-bugs-check#B1: bug-record validity is reported only as
+    LEDGER-BUGS-SCHEMA, and doctor = `bugs.py check` on every row.
+    sa-spec-doc-033-duplicates-bugs-check#B3: severity BLOCKER gives exactly one finding."""
+    from dadaia_workspace.features.specs import SpecsDoctor
+    from dadaia_workspace.infrastructure.ledger_scripts import script_findings
+
+    specs = _ledger(tmp_path, _OPEN_RECORD)
+    ledger = specs / "bugs" / "BUGS.jsonl"
+    ledger.write_text(ledger.read_text(encoding="utf-8") + bad + "\n", encoding="utf-8")
+    checked = json.loads(_run(script, "check", "--specs", str(specs), "--json").stdout)
+    expected = [f"{f['path']}:{f['line']} {f['message']}" for f in checked]
+
+    own = [i.code for i in SpecsDoctor(specs).check() if i.message.endswith(f"({ledger})")]
+    bugs = [f for f in script_findings(specs) if f.code == "LEDGER-BUGS-SCHEMA"]
+
+    assert len(expected) == 1 and own == []
+    assert [f.message for f in bugs] == expected
 
 
 def test_script_is_executable_and_has_a_shebang() -> None:
@@ -212,6 +260,33 @@ def test_append_registers_one_open_record(script: Path, tmp_path: Path) -> None:
     assert _run(script, "check", "--specs", str(specs)).returncode == 0
 
 
+def test_append_accepts_a_consumer_surface_and_refuses_unknown(
+    script: Path, tmp_path: Path
+) -> None:
+    """sa-consumer-law-carries-library-facts#FR8.1: a consumer names its own unit as the
+    surface (`billing-api` is no library layer or package) and it is accepted; the
+    `unknown` sentinel is refused. sa-spec-doc-033-duplicates-bugs-check#B5: surface is
+    free text with minLength 1. sa-spec-doc-033-duplicates-bugs-check#B2: an empty context or component is refused and the
+    ledger is untouched."""
+    specs = _ledger(tmp_path)
+    argv = ["append", "--specs", str(specs), "--title", "t", "--severity", "LOW",
+            "--component", "c", "--context", "ctx", "--symptom", "s", "--repro", "r",
+            "--expected", "e"]  # fmt: skip
+    ok = _run(script, *argv, "--bug-id", "consumer-bug", "--surface", "billing-api")
+    refused = _run(script, *argv, "--bug-id", "vague-bug", "--surface", "unknown")
+
+    assert ok.returncode == 0, ok.stderr
+    assert refused.returncode == 1
+    for empty in ("surface", "context", "component"):
+        blank = [*argv, "--bug-id", "blank-bug", "--surface", "cli"]
+        blank[blank.index(f"--{empty}") + 1] = ""
+        done = _run(script, *blank)
+        assert done.returncode == 1
+        assert f"field '{empty}' is shorter than its minLength of 1" in done.stderr
+    assert [r["surface"] for r in _records(specs)] == ["billing-api"]
+    assert _run(script, "check", "--specs", str(specs)).returncode == 0
+
+
 def test_append_refuses_a_duplicate_id_and_writes_nothing(script: Path, tmp_path: Path) -> None:
     specs = _ledger(tmp_path, _OPEN_RECORD)
     before = (specs / "bugs" / "BUGS.jsonl").read_bytes()
@@ -225,18 +300,60 @@ def test_append_refuses_a_duplicate_id_and_writes_nothing(script: Path, tmp_path
     assert (specs / "bugs" / "BUGS.jsonl").read_bytes() == before
 
 
-def test_append_redacts_a_local_home_path_and_an_ip(script: Path, tmp_path: Path) -> None:
-    specs = _ledger(tmp_path)
-    done = _run(
+_SHA = "0123456789abcdef" * 2 + "01234567"
+
+
+@pytest.mark.parametrize(
+    ("value", "pushed"),
+    [(f"seen at {_HOME_PATH}", True), (f"seen at {_LOCAL_IP}", True), (_SHA, False)],
+)
+def test_the_seam_refuses_exactly_what_the_push_refuses(
+    script: Path, tmp_path: Path, value: str, pushed: bool
+) -> None:
+    """sa-ledger-write-seam-redacts-less-than-push-refuses#B1: append refuses a
+    push-matched value, naming the field and the masked term, ledger unchanged.
+    sa-ledger-write-seam-redacts-less-than-push-refuses#B3: resolve refuses it too and the
+    record stays open. sa-ledger-write-seam-redacts-less-than-push-refuses#B4: on the same
+    matrix the seam refuses iff the push matcher does.
+    sa-ledger-write-seam-redacts-less-than-push-refuses#B5: a bare sha is not refused."""
+    from dadaia_workspace.core.models.git_scan import ScannedObject
+    from dadaia_workspace.features.chokepoints.denylist_scan import scan_objects
+    from dadaia_workspace.infrastructure.privacy_check import load_baseline_patterns
+
+    blob = ScannedObject(path="BUGS.jsonl", sha="", text=value, decodable=True)
+    assert bool(scan_objects([blob], [], load_baseline_patterns()).hits) is pushed
+    specs = _ledger(tmp_path, _OPEN_RECORD)
+    before = (specs / "bugs" / "BUGS.jsonl").read_bytes()
+    argv = _resolve_argv()
+    argv[argv.index("--evidence-loop") + 1] = value
+    appended = _run(
         script, "append", "--specs", str(specs), "--bug-id", "leaky", "--title", "t",
         "--severity", "LOW", "--surface", "cli", "--component", "c", "--context", "ctx",
-        "--symptom", f"seen at {_HOME_PATH} and {_LOCAL_IP}", "--repro", "r",
-        "--expected", "e",
+        "--symptom", value, "--repro", "r", "--expected", "e",
     )  # fmt: skip
-    assert done.returncode == 0, done.stderr
-    [record] = _records(specs)
-    expected = "/".join(("", "home", "[REDACTED]", "work"))
-    assert record["symptom"] == f"seen at {expected} and [REDACTED-IP]"
+    resolved = _run(script, *argv, "--specs", str(specs))
+    for done, field in ((appended, "symptom"), (resolved, "evidence_loop")):
+        assert (done.returncode == 1) is pushed, done.stderr
+        assert (f"field {field!r} carries" in done.stderr) is pushed
+    if pushed:
+        assert (specs / "bugs" / "BUGS.jsonl").read_bytes() == before
+
+
+def test_every_ledger_skill_stages_a_byte_identical_privacy_pair(tmp_path: Path) -> None:
+    """sa-ledger-write-seam-redacts-less-than-push-refuses#B6: every ledger skill carries a
+    byte-identical _privacy.py (the push matcher's module) and baseline copy."""
+    from dadaia_workspace.infrastructure.public_assets import FileSystemPublicAssetManager
+
+    FileSystemPublicAssetManager().stage(tmp_path)
+    package = _PUBLIC.parent
+    for skill in ("dd-bug-resolution", "dd-backlog-definition"):
+        scripts = tmp_path / ".dadaia" / "agentic" / "skills" / skill / "scripts"
+        assert (scripts / "_privacy.py").read_bytes() == (
+            package / "core" / "redaction.py"
+        ).read_bytes()
+        assert (scripts / "privacy_baseline.json").read_bytes() == (
+            package / "infrastructure" / "data" / "privacy_baseline.json"
+        ).read_bytes()
 
 
 def test_resolve_closes_the_record_and_derives_diff_direction(script: Path, tmp_path: Path) -> None:
@@ -256,6 +373,9 @@ def test_resolve_refuses_an_unknown_caused_by(script: Path, tmp_path: Path) -> N
     done = _run(script, *_resolve_argv(caused_by="never-filed"), "--specs", str(specs))
     assert done.returncode == 1
     assert "not a record of this bug ledger" in done.stderr
+    # ledger-fix-lines-drop-specs: the fix runs as printed, from any cwd
+    fix = f"fix: {sys.executable} {script} resolve a-bug --caused-by none --specs {specs.resolve()}"
+    assert fix.replace("\\", "/") in done.stderr.replace("\\", "/")
     assert _records(specs)[0]["status"] == "open"
 
 
@@ -296,30 +416,53 @@ def test_update_writes_a_governance_field(script: Path, tmp_path: Path) -> None:
     assert _records(specs)[0]["audited"] == "20260920-sweep"
 
 
-def test_update_refuses_status_and_names_the_transition_subcommand(
-    script: Path, tmp_path: Path
+@pytest.mark.parametrize(
+    ("change", "owner"),
+    [
+        ("status=resolved", "resolve|supersede|defer|reject"),
+        ("closed_at=2026-09-21T00:00:00Z", "resolve|supersede|defer|reject"),
+        ("caused_by=a-bug", "--caused-by"),
+        ("superseded_by=other", "supersede"),
+        ("title=rewritten", "immutable-core"),
+        ("reported_by=other", "immutable-core"),
+        ("context=other", "immutable-core"),
+    ],
+)
+def test_update_refuses_a_field_it_does_not_own(
+    script: Path, tmp_path: Path, change: str, owner: str
 ) -> None:
+    """sa-spec-doc-033-duplicates-bugs-check#B6: update refuses x-mutability
+    immutable-core (reported_by and context included) and refuses superseded_by; the
+    refusal names the owner and the ledger is untouched."""
     specs = _ledger(tmp_path, _OPEN_RECORD)
-    done = _run(script, "update", "a-bug", "--set", "status=resolved", "--specs", str(specs))
+    before = (specs / "bugs" / "BUGS.jsonl").read_bytes()
+    done = _run(script, "update", "a-bug", "--set", change, "--specs", str(specs))
     assert done.returncode == 1
-    assert "resolve|supersede|defer|reject" in done.stderr
+    assert owner in done.stderr
+    assert (specs / "bugs" / "BUGS.jsonl").read_bytes() == before
+
+
+def test_a_write_once_field_refuses_a_differing_second_write(script: Path, tmp_path: Path) -> None:
+    """`solution` is write-once: a differing second value is refused."""
+    specs = _ledger(tmp_path, _OPEN_RECORD)
+    first = _run(script, "update", "a-bug", "--set", "solution=one", "--specs", str(specs))
+    second = _run(script, "update", "a-bug", "--set", "solution=two", "--specs", str(specs))
+    assert first.returncode == 0, first.stderr
+    assert second.returncode == 1
+    assert "write-once" in second.stderr
+    assert _records(specs)[0]["solution"] == "one"
+
+
+@pytest.mark.parametrize("bad", ["smaller", "net-sideways: x", "net-negative:"])
+def test_resolve_refuses_a_malformed_evidence_diff(script: Path, tmp_path: Path, bad: str) -> None:
+    """`evidence_diff` must open with a `net-*:` direction and carry a rationale."""
+    specs = _ledger(tmp_path, _OPEN_RECORD)
+    argv = _resolve_argv()
+    argv[argv.index("--evidence-diff") + 1] = bad
+    done = _run(script, *argv, "--specs", str(specs))
+    assert done.returncode == 1
+    assert "evidence_diff" in done.stderr
     assert _records(specs)[0]["status"] == "open"
-
-
-def test_update_refuses_caused_by_and_names_resolve(script: Path, tmp_path: Path) -> None:
-    specs = _ledger(tmp_path, _OPEN_RECORD)
-    done = _run(script, "update", "a-bug", "--set", "caused_by=a-bug", "--specs", str(specs))
-    assert done.returncode == 1
-    assert "--caused-by" in done.stderr
-    assert _records(specs)[0]["caused_by"] is None
-
-
-def test_update_refuses_an_immutable_core_change(script: Path, tmp_path: Path) -> None:
-    specs = _ledger(tmp_path, _OPEN_RECORD)
-    done = _run(script, "update", "a-bug", "--set", "title=rewritten", "--specs", str(specs))
-    assert done.returncode == 1
-    assert "immutable-core" in done.stderr
-    assert _records(specs)[0]["title"] == "t"
 
 
 def test_status_and_stats_read_the_ledger(script: Path, tmp_path: Path) -> None:
@@ -339,6 +482,9 @@ def test_status_and_stats_read_the_ledger(script: Path, tmp_path: Path) -> None:
 
 
 def test_archive_moves_only_records_closed_past_the_threshold(script: Path, tmp_path: Path) -> None:
+    """sa-ledger-verbs-append-histo-before-validating-the-pair#J5: "Given a valid pair, when
+    `exit`/`archive` succeed, then the record leaves the document and appears exactly once
+    in the histo, written atomically as a pair." (`archive` half)"""
     old = {
         **_OPEN_RECORD, "id": "old-bug", "ts": "2025-12-01T00:00:00Z",
         "status": "resolved", "closed_at": "2026-01-01T00:00:00Z",
@@ -356,7 +502,7 @@ def test_archive_moves_only_records_closed_past_the_threshold(script: Path, tmp_
     assert done.stdout.strip() == "[ok] archived 1 record(s), 2 kept."
     assert {r["id"] for r in _records(specs)} == {"a-bug", "fresh-bug"}
     histo = (specs / "bugs" / "_archive" / "bugs_histo.jsonl").read_text(encoding="utf-8")
-    assert json.loads(histo.strip())["id"] == "old-bug"
+    assert [json.loads(line)["id"] for line in histo.splitlines()] == ["old-bug"]
 
 
 def test_archive_with_nothing_eligible_is_a_byte_identical_no_op(
@@ -402,16 +548,12 @@ def test_the_projection_rule_carries_the_exec_bit_for_an_executable_source(
     authored `public/skills/` tree through the public rule-table seam."""
     from dadaia_workspace.infrastructure.install_plan import InstallPlan
     from dadaia_workspace.infrastructure.projection_rules import projection_rules
-    from dadaia_workspace.infrastructure.public_assets_common import OverwritePolicy
 
     plan = InstallPlan(
         workspace_root=tmp_path,
         agentic_dir=_PUBLIC,
         harness=None,
-        scope="workspace-only",
-        only="skills",
-        overwrite=OverwritePolicy.PRESERVE,
-        guardrail_targets=frozenset(),
+        force=False,
         harness_targets=("agents",),
         active_harnesses=frozenset({"agents"}),
         overlay=None,
@@ -425,3 +567,28 @@ def test_the_projection_rule_carries_the_exec_bit_for_an_executable_source(
     assert modes, "the skills rule table produced no dd-bug-resolution script rules"
     assert modes["bugs.py"] == 0o755
     assert modes["_bugs_store.py"] == 0o755
+
+
+def test_a_refused_archive_leaves_both_ledger_files_byte_intact(
+    script: Path, tmp_path: Path
+) -> None:
+    """sa-ledger-verbs-append-histo-before-validating-the-pair#J2: "Given BUGS.jsonl
+    holding an invalid record, when `bugs.py archive` runs, then it exits non-zero and
+    BUGS.jsonl and bugs_histo.jsonl are byte-identical." Run twice: a retry included."""
+    old = {
+        **_OPEN_RECORD, "id": "old-bug", "ts": "2025-12-01T00:00:00Z",
+        "status": "resolved", "closed_at": "2026-01-01T00:00:00Z",
+    }  # fmt: skip
+    specs = _ledger(tmp_path, {**_OPEN_RECORD, "severity": "SEVERE"}, old)
+    histo = specs / "bugs" / "_archive" / "bugs_histo.jsonl"
+    histo.parent.mkdir(parents=True)
+    histo.write_text("", encoding="utf-8")
+    before = [(specs / "bugs" / "BUGS.jsonl").read_bytes(), histo.read_bytes()]
+
+    for _ in range(2):
+        done = _run(
+            script, "archive", "--specs", str(specs), "--now", "2026-09-20T00:00:00Z",
+            "--threshold-days", "90",
+        )  # fmt: skip
+        assert done.returncode == 1, done.stdout
+        assert [(specs / "bugs" / "BUGS.jsonl").read_bytes(), histo.read_bytes()] == before

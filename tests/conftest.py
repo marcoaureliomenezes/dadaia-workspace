@@ -36,8 +36,10 @@ from __future__ import annotations
 
 import os
 import sys
+import tempfile
 from collections.abc import Iterator, Sequence
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -64,6 +66,23 @@ _FENCED_ROOTS: tuple[Path, ...] = tuple(
     if (p / _INSTANCE_SENTINEL).is_file()
 )
 os.environ["DADAIA_FENCED_ROOTS"] = os.pathsep.join(map(str, _FENCED_ROOTS))
+
+# No git process the suite runs or spawns may start background maintenance: after a
+# commit git forks a detached `maintenance run --auto` that holds
+# .git/objects/maintenance.lock while a test snapshots the repo (a CI flake). One rule,
+# appended to any GIT_CONFIG_* pairs already in the environment, inherited by every child.
+_GIT_QUIET = {"maintenance.auto": "false", "gc.auto": "0"}
+# Every git process sees one GLOBAL config carrying a committer identity, never the
+# developer's (CI runners have none): global scope, so a repo's own `user.*` and a
+# test's own GIT_CONFIG_GLOBAL still win — a test about a missing identity sets its own.
+_GIT_GLOBAL = Path(tempfile.gettempdir()) / "dadaia-tests.gitconfig"
+_GIT_GLOBAL.write_text("[user]\n\tname = T\n\temail = t@example.invalid\n", encoding="utf-8")
+os.environ["GIT_CONFIG_GLOBAL"] = str(_GIT_GLOBAL)
+_GIT_BASE = int(os.environ.get("GIT_CONFIG_COUNT", "0"))
+for _n, (_key, _value) in enumerate(_GIT_QUIET.items(), start=_GIT_BASE):
+    os.environ[f"GIT_CONFIG_KEY_{_n}"] = _key
+    os.environ[f"GIT_CONFIG_VALUE_{_n}"] = _value
+os.environ["GIT_CONFIG_COUNT"] = str(_GIT_BASE + len(_GIT_QUIET))
 
 
 def _instance_fingerprint() -> dict[str, object]:
@@ -293,8 +312,7 @@ def _no_real_venv_in_tests() -> Iterator[None]:
        reach, which rebuilt a real venv (~19 s unloaded / 242 s loaded) AND exercised
        whatever dadaia happened to be installed in the ambient interpreter instead of
        the source under test. The runner is patched to execute ``init`` in-process via
-       the CLI app (same argv contract), where the venv stub above applies. Every other
-       argv passes through to the real subprocess runner untouched.
+       the CLI app (same argv contract), where the venv stub above applies.
     """
     from dadaia_workspace.infrastructure.python_env import VenvPythonEnvironmentManager
     from dadaia_workspace.infrastructure.subprocess_runner import SubprocessProcessRunner
@@ -311,7 +329,7 @@ def _no_real_venv_in_tests() -> Iterator[None]:
         argv: Sequence[str],
         *,
         cwd: Path | None = None,
-        timeout: float | None = None,
+        **kw: Any,
     ) -> ProcessResult:
         argv = list(argv)
         if argv and Path(argv[0]).name.startswith("dadaia") and argv[1:2] == ["init"]:
@@ -322,7 +340,7 @@ def _no_real_venv_in_tests() -> Iterator[None]:
             target = Path(cwd) if cwd is not None else Path.cwd()
             result = CliRunner().invoke(app, ["init", str(target), *argv[2:]])
             return ProcessResult(returncode=result.exit_code, stdout=result.output, stderr="")
-        return real_run(self, argv, cwd=cwd, timeout=timeout)
+        return real_run(self, argv, cwd=cwd, **kw)
 
     mp = pytest.MonkeyPatch()
     mp.setattr(VenvPythonEnvironmentManager, "ensure_workspace_venv", _fake_ensure, raising=True)

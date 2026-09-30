@@ -16,6 +16,7 @@ from typing import Any
 
 from dadaia_workspace.core.harness_registry import L1_ENTRY_HARNESSES
 from dadaia_workspace.core.redaction import Redactor
+from dadaia_workspace.core.workspace_resolver import fenced_env
 from dadaia_workspace.infrastructure.certification_process import SubprocessCertificationProcess
 
 
@@ -99,7 +100,7 @@ def _codex_probe_outcome(output: str, cwd: Path) -> tuple[bool, str]:
     lowered = output.lower()
     for phrase in _CODEX_ENV_UNAVAILABLE_PHRASES:
         if phrase in lowered:
-            line = next((ln for ln in output.splitlines() if phrase in ln.lower()), phrase)
+            line = next((ln for ln in output.split("\n") if phrase in ln.lower()), phrase)
             return True, _codex_capped_detail(line, cwd)
     for match in re.finditer(r"\{.*?\}\}", output):
         try:
@@ -234,30 +235,6 @@ def _all_checks_ok(checks: Iterable[CertificationCheck]) -> bool:
     return all(item.status in ("PASS", "SKIP") for item in checks)
 
 
-#: The doctor sections the certification tree owns — the `workspace` section reads the
-#: sandbox itself and belongs to `exact-version-reconciliation`'s own step.
-_OWNED_DOCTOR_SECTIONS = ("specs", "ledgers")
-
-
-def _owned_doctor_sections_clean(stdout: str) -> str:
-    """The verdict on a `dadaia doctor --json` payload: both owned sections, no findings.
-
-    An absent section is a FAILURE, never a silent pass: a renamed or dropped section
-    means the check saw nothing, and "clean" about nothing is not a verdict.
-    """
-    sections = json.loads(stdout)["sections"]
-    missing = [name for name in _OWNED_DOCTOR_SECTIONS if name not in sections]
-    if missing:
-        raise RuntimeError(
-            f"doctor payload carries no {', '.join(missing)} section — this check judges "
-            f"{', '.join(_OWNED_DOCTOR_SECTIONS)} and cannot vouch for a section it never read"
-        )
-    owned = {name: sections[name]["findings"] for name in _OWNED_DOCTOR_SECTIONS}
-    if any(owned.values()):
-        raise RuntimeError(f"doctor not clean: {json.dumps(owned, sort_keys=True)}")
-    return "specs and ledgers sections clean"
-
-
 def certify(
     workspace_root: Path, process: SubprocessCertificationProcess, *, keep: bool = False
 ) -> CertificationResult:
@@ -276,8 +253,8 @@ def certify(
     pythonpath = os.pathsep.join(
         [*source_pythonpath, *([inherited_pythonpath] if inherited_pythonpath else [])]
     )
-    env = {
-        **os.environ,
+    env = {  # every child acts on the sandbox only (ADR 0088)
+        **fenced_env(target),
         "HOME": str(home),
         "PYTHONDONTWRITEBYTECODE": "1",
     }
@@ -321,24 +298,9 @@ def certify(
             checks.append(CertificationCheck(name=name, status="FAIL", detail=str(exc)))
 
     def doctor_clean(*args: str) -> str:
-        """`dadaia doctor` over the tree these arguments NAME, judged on the sections
-        that tree owns: `specs` and `ledgers`.
-
-        The `workspace` section reads the certification sandbox itself, which
-        `exact-version-reconciliation`'s own `workspace-doctor` step already owns — so
-        judging it here would make two checks fail for one defect, in a tree neither
-        argument names. The doctor's exit code is that whole-workspace verdict, hence
-        the direct run: a non-zero exit is not this check's failure to report.
-        """
-        proc = process.run(
-            [sys.executable, "-m", "dadaia_workspace.cli.main", "doctor", *args, "--json"],
-            cwd=target,
-            env=env,
-            timeout=180,
-        )
-        if not proc.stdout.strip():
-            raise RuntimeError(f"doctor emitted no payload: {(proc.stderr or '').strip()}")
-        return _owned_doctor_sections_clean(proc.stdout)
+        """`dadaia doctor` over the sandbox and the tree *args* name: its exit code is the
+        verdict, every section judged — certify never picks a subset."""
+        return cli("doctor", *args) and "doctor clean"
 
     check(
         "workspace-init",
@@ -425,7 +387,7 @@ def certify(
                 {
                     "schema_version": "handoff-v1.2",
                     "self_pull": {"refs": ["specs/memory/QUALITY.md"]},
-                    "agent": "qa-engineer",
+                    "agent": "dd-code-reviewer",
                     "context": "certified-consumer",
                     "produced_at": "2026-07-15T00:00:00Z",
                     "artifact": {"type": "other"},

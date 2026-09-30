@@ -5,14 +5,13 @@ Every write goes through :func:`commit`: build the candidate bytes, run the SAME
 they will be validated by, then `os.replace` atomically. A concurrent write is detected
 by the file's own (size, mtime) and re-applied once — a race surfaces and retries.
 
-An exit is a removal plus an append, ordered so a crash leaves the entry live rather
-than lost: the histo record is written first, the removal lands last.
+An exit is a removal plus an append: the PAIR is checked first, then the histo record is
+written and the removal lands last, so a crash leaves the entry live rather than lost.
 """
 
 from __future__ import annotations
 
 import json
-import os
 import sys
 from collections.abc import Callable
 from pathlib import Path
@@ -20,11 +19,13 @@ from typing import Any
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from _backlog_check import document_findings, histo_findings  # noqa: E402
+from _backlog_check import pair_findings  # noqa: E402
 from _backlog_schema import HISTO, LEDGER  # noqa: E402
+from _ledger import private_refusal, replace, stamp  # noqa: E402
+from _specs import script  # noqa: E402
 
 Items = list[dict[str, Any]]
-SCRIPT = Path(__file__).parent / "backlog.py"
+SCRIPT = script(Path(__file__).parent / "backlog.py")
 
 
 class Refusal(Exception):
@@ -33,14 +34,6 @@ class Refusal(Exception):
     def __init__(self, message: str, fix: str = "") -> None:
         super().__init__(message)
         self.fix = fix
-
-
-def _stamp(path: Path) -> tuple[int, int] | None:
-    try:
-        info = path.stat()
-    except FileNotFoundError:
-        return None
-    return (info.st_size, info.st_mtime_ns)
 
 
 def read_active(path: Path) -> Items:
@@ -54,13 +47,13 @@ def read_active(path: Path) -> Items:
         raise Refusal(
             f"{path.name} is not valid JSON ({exc.msg}) — refusing to rewrite a document "
             "this script cannot read in full",
-            f"{SCRIPT} check --specs <specs>",
+            f"{SCRIPT} check",
         ) from exc
     active = document.get("active") if isinstance(document, dict) else None
     if not isinstance(active, list):
         raise Refusal(
             f"{path.name} carries no 'active' array — it is not a backlog-v1 document",
-            f"{SCRIPT} check --specs <specs>",
+            f"{SCRIPT} check",
         )
     return active
 
@@ -69,60 +62,50 @@ def serialize(active: Items) -> str:
     return json.dumps({"schema": "backlog-v1", "active": active}, indent=2) + "\n"
 
 
-def _validated(active: Items) -> str:
+def _validated(active: Items, histo: str, before: Items, record: dict[str, Any] | None) -> str:
+    for item in [*(i for i in active if i not in before), *([record] if record else [])]:
+        why = private_refusal(item)
+        if why is not None:
+            raise Refusal(*why)
     text = serialize(active)
-    findings = document_findings(text)
+    findings = pair_findings(text, histo)
     if findings:
         detail = "; ".join(str(f["message"]) for f in findings[:5])
         raise Refusal(
-            f"the resulting {LEDGER} would not pass check — nothing was written ({detail})",
-            f"{SCRIPT} check --specs <specs>",
+            f"the resulting {LEDGER} + {HISTO} would not pass check — nothing was written "
+            f"({detail})",
+            f"{SCRIPT} check",
         )
     return text
 
 
-def _replace(path: Path, text: str) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    tmp = path.with_name(f".{path.name}.{os.getpid()}.tmp")
-    tmp.write_text(text, encoding="utf-8")
-    os.replace(tmp, path)
+def commit(
+    specs: Path, apply: Callable[[Items], Items], record: dict[str, Any] | None = None
+) -> Items:
+    """Apply *apply* to ``active[]`` and, with *record*, append that one exit to the histo.
 
-
-def commit(path: Path, apply: Callable[[Items], Items]) -> Items:
-    """Apply *apply* to *path*'s ``active[]`` and replace the document atomically.
-
-    The candidate bytes are validated BEFORE the replace, so a refused write leaves the
-    file byte-identical. When the file changed under the computation, the change is
+    The candidate PAIR is checked BEFORE either write, so a refused write leaves both
+    files byte-identical. When the document changed under the computation, the change is
     re-read and re-applied ONCE; a second concurrent write refuses with a retry `fix:`.
     """
-    before = _stamp(path)
-    written = apply(read_active(path))
-    text = _validated(written)
-    if _stamp(path) != before:
-        before = _stamp(path)
-        written = apply(read_active(path))
-        text = _validated(written)
-        if _stamp(path) != before:
+    path, histo = specs / LEDGER, specs / HISTO
+    line = json.dumps(record, sort_keys=True, ensure_ascii=False) + "\n" if record else ""
+    candidate = (histo.read_text(encoding="utf-8") if histo.is_file() else "") + line
+    before = stamp(path)
+    active = read_active(path)
+    written = apply(active)
+    text = _validated(written, candidate, active, record)
+    if stamp(path) != before:
+        before = stamp(path)
+        active = read_active(path)
+        written = apply(active)
+        text = _validated(written, candidate, active, record)
+        if stamp(path) != before:
             raise Refusal(
                 f"{path.name} changed twice under this write — nothing was written",
                 "re-run this command",
             )
-    _replace(path, text)
+    if line:
+        replace(histo, candidate)
+    replace(path, text)
     return written
-
-
-def append_histo(path: Path, record: dict[str, Any]) -> None:
-    """Append one validated terminal record to the append-only exit ledger. The record
-    is validated ALONE — a pre-v6 line already in the file is history, not this write's
-    business, and re-validating the whole file would refuse every exit on a repo that
-    has one."""
-    line = json.dumps(record, sort_keys=True, ensure_ascii=False) + "\n"
-    findings = histo_findings(line)
-    if findings:
-        raise Refusal(
-            f"the {HISTO} record this exit would write does not pass check — nothing was "
-            f"written ({findings[0]['message']})",
-            f"{SCRIPT} check --specs <specs>",
-        )
-    existing = path.read_text(encoding="utf-8") if path.is_file() else ""
-    _replace(path, existing + line)

@@ -20,7 +20,7 @@
     "disposition": {
       "type": "string",
       "enum": ["delivered", "resolved", "superseded", "deferred", "rejected"],
-      "description": "The terminal verdict, from the ONE lowercase vocabulary (core.models.histo.TERMINAL_DISPOSITIONS). Each ledger is validated against its own subset of these five words."
+      "description": "The terminal verdict; this enum is the one lowercase vocabulary, and each ledger script validates its own subset."
     },
     "release": {
       "type": ["string", "null"],

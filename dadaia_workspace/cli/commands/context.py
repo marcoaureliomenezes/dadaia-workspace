@@ -14,11 +14,12 @@ from rich.table import Table
 
 from dadaia_workspace import container
 from dadaia_workspace.cli._fail import fail
-from dadaia_workspace.cli._specs_resolution import alive_context_trees, resolve_session_id
 from dadaia_workspace.cli._specs_resolution import (
-    resolve_context_for_cli as _resolve_context_for_cli,
+    alive_context_trees,
+    own_bind_for_cli,
+    resolve_session_id,
 )
-from dadaia_workspace.cli.redact import ContextRedactor
+from dadaia_workspace.cli.redact import ContextRedactor, build_context_redactor
 from dadaia_workspace.core import session_store
 from dadaia_workspace.core.cli_line import fix_line
 from dadaia_workspace.core.exceptions import (
@@ -50,7 +51,6 @@ app = typer.Typer(help="Manage Spec Context Projects.")
 repo_app = typer.Typer(help="Manage a context's associated repos (main repo excluded).")
 app.add_typer(repo_app, name="repo")
 console = Console()
-err_console = Console(stderr=True)
 
 
 def _ctx_service() -> SpecContextService:
@@ -59,19 +59,13 @@ def _ctx_service() -> SpecContextService:
     except WorkspaceNotInitializedError as exc:
         fail(exc)
     except SchemaVersionError as exc:
-        # Use plain stderr so CliRunner captures it in result.output (mix_stderr=True default)
-        print(str(exc), file=sys.stderr)
-        raise typer.Exit(1) from None
+        fail(exc)
 
 
-def _ctx_to_dict(svc: SpecContextService, ctx: SpecContextProject) -> dict:  # type: ignore[type-arg]
-    # v0.1.72 FR4 (bug `context-current-branch-stale-for-alive-repo`) / v0.4.4 FR18
-    # (bug `context-list-current-branch-stale-for-alive-repo`, A18.3): `current_branch`
-    # is resolved through SpecContextService.repos_live_status — the ONE
-    # branch-resolution implementation `show` AND `list` both call, so the two verbs
-    # can no longer disagree on this field the way they used to (list previously read
-    # the stored snapshot directly while show queried git live). The stored snapshot
-    # remains available under the distinct name `stored_branch` (A18.1).
+def _ctx_to_dict(svc: SpecContextService, ctx: SpecContextProject) -> dict[str, Any]:
+    """The one record ``list`` and ``show`` render, JSON and table alike; every branch
+    resolved live through ``repos_live_status`` (FR18/A18.3), the stored snapshot kept
+    as ``stored_branch`` (A18.1)."""
     statuses = svc.repos_live_status(ctx)
     main_status, associated_statuses = statuses[0], statuses[1:]
     return {
@@ -94,36 +88,6 @@ def _ctx_to_dict(svc: SpecContextService, ctx: SpecContextProject) -> dict:  # t
             for status in associated_statuses
         ],
     }
-
-
-def _resolve_caller_context_name() -> str | None:
-    """Best-effort resolution of the caller's own context name (SPEC v0.9.0 FR8a:
-    "other than the caller's resolved context"). Never raises — an unresolved caller
-    means nothing is excluded, so `--redact` masks every context/slug it encounters."""
-    try:
-        return _resolve_context_for_cli(None)
-    except ValueError:
-        return None
-
-
-def _build_context_redactor(contexts: list[SpecContextProject]) -> ContextRedactor:
-    """Candidates = every known context's name and every repo slug (main + FR15
-    associated repos, via `all_repos()`); excludes the caller's own resolved context
-    name and its own full repo set (render boundary ONLY — `contexts` is data the
-    service already returned with true names). FR18 widened this from "main slug
-    only" — an associated repo can be exactly as private as a main one, so it must
-    redact the same way."""
-    caller_name = _resolve_caller_context_name()
-    caller_ctx = next((ctx for ctx in contexts if ctx.name == caller_name), None)
-    caller_repo_slugs = (
-        {r.slug for r in caller_ctx.all_repos()} if caller_ctx is not None else set()
-    )
-    candidates: list[str] = []
-    for ctx in contexts:
-        candidates.append(ctx.name)
-        for repo in ctx.all_repos():
-            candidates.append(repo.slug)
-    return ContextRedactor(candidates, exclude=(caller_name, *caller_repo_slugs))
 
 
 def _now_iso() -> str:
@@ -154,7 +118,10 @@ def resolve_own_session_id(*, explicit: str | None = None, mint: bool = False) -
 def print_next_step(workspace_root: Path, focus: str | None = None) -> None:
     """The derived onboarding next step (FR6 AC6.2) — the text ``doctor`` also reports."""
     trees = alive_context_trees(workspace_root)
-    step = onboarding.next_step(workspace_root, trees, focus, resolve_own_session_id())
+    bind, session = own_bind_for_cli()
+    step = onboarding.next_step(
+        workspace_root, trees, focus, None if session is None else bool(bind)
+    )
     if step is not None:
         console.print(step.text(), markup=False, highlight=False, soft_wrap=True)
 
@@ -223,17 +190,13 @@ def list_all(
         print(str(exc), file=sys.stderr)
         raise typer.Exit(1) from None
 
-    redactor = _build_context_redactor(contexts) if redact else None
+    redactor = build_context_redactor(contexts) if redact else None
 
     if json_output:
-        payload = []
-        for ctx in contexts:
-            # FR18/A18.1-A18.3: the SAME payload builder `show --json` uses — one
-            # key set, so the two verbs cannot drift apart again.
-            payload.append(_ctx_to_dict(svc, ctx))
-        if redactor is not None:
-            payload = [redactor.json_value(row) for row in payload]
-        print(json.dumps(payload, sort_keys=True))
+        rows = [_ctx_to_dict(svc, ctx) for ctx in contexts]
+        print(
+            json.dumps([redactor.json_value(r) for r in rows] if redactor else rows, sort_keys=True)
+        )
         return
     if not contexts:
         console.print(
@@ -270,26 +233,6 @@ def list_all(
     console.print(table)
 
 
-def _resolve_default_context(svc: Any, workspace_root: Path) -> Any | None:
-    """Resolve no-arg ``context show`` through the caller-owned resolution seam."""
-    from dadaia_workspace.cli._specs_resolution import resolve_context_for_cli
-
-    _ = workspace_root  # kept for signature stability; resolution no longer needs it directly.
-    try:
-        resolved_name = resolve_context_for_cli(None)
-    except ValueError:
-        # ``show`` is a query verb: "nothing is selected" is a valid ANSWER here, not an
-        # error — the resolver's ValueError is for verbs that REQUIRE a context (bug
-        # context-show-json-traceback-unbound, consumer validation 2026-07-15).
-        return None
-    if not resolved_name:
-        return None
-    try:
-        return svc.show(resolved_name)
-    except ContextNotFoundError:
-        return None
-
-
 @app.command()
 def show(
     name: str | None = typer.Argument(None, help="Context name"),
@@ -305,14 +248,12 @@ def show(
 ) -> None:
     """Show details of a context."""
     svc = _ctx_service()
-    if name is None:
-        # No name: use only explicit/caller-owned/cwd resolution.
-        ctx = _resolve_default_context(svc, resolve_workspace_root())
-    else:
-        try:
-            ctx = svc.show(name)
-        except ContextNotFoundError as e:
-            fail(e)
+    bound, session_id = own_bind_for_cli()  # name and session from ONE Bind
+    ctx, target = None, name or bound
+    try:
+        ctx = svc.show(target) if target else None
+    except ContextNotFoundError as e:
+        fail(e)
 
     redactor: ContextRedactor | None = None
     if redact:
@@ -320,65 +261,37 @@ def show(
             all_contexts = svc.list_all()
         except SchemaVersionError:
             all_contexts = [ctx] if ctx is not None else []
-        redactor = _build_context_redactor(all_contexts)
+        redactor = build_context_redactor(all_contexts)
 
+    data = None if ctx is None else _ctx_to_dict(svc, ctx)
+    if data is not None and json_output:
+        # Only this caller's session: a context-wide "last binder" would be foreign state.
+        data["session"] = (
+            _live_session(resolve_workspace_root(), session_id) if session_id else None
+        )
+    if data is not None and redactor is not None:
+        data = redactor.json_value(data)
     if json_output:
-        if ctx is None:
-            print(json.dumps({"context": None}, indent=2))
-        else:
-            data = _ctx_to_dict(svc, ctx)
-            # Show only this caller's session. A context-wide "last binder" fallback would
-            # expose foreign state as the caller's own and can never be authoritative.
-            workspace_root = resolve_workspace_root()
-            session_id = resolve_own_session_id()
-            session_obj = _live_session(workspace_root, session_id) if session_id else None
-            data["session"] = session_obj
-            if redactor is not None:
-                data = redactor.json_value(data)
-            print(json.dumps(data, indent=2))
+        print(json.dumps(data or {"context": None}, indent=2))
         return
-
-    if ctx is None:
+    if data is None:
         msg = f"Context '{name}' not found." if name else "No active context."
         console.print(f"[dim]{msg}[/dim]")
         return
-
-    display_name = redactor.text(ctx.name) if redactor is not None else ctx.name
-    display_repo = redactor.text(ctx.repo_slug) if redactor is not None else ctx.repo_slug
-    repo_url_text = ctx.repo_url or "—"
-    if redactor is not None and ctx.repo_url:
-        repo_url_text = redactor.text(ctx.repo_url)
-
-    # FR18: table and --json share the SAME branch-resolution seam
-    # (SpecContextService.repos_live_status, A18.3) — main repo's live branch here
-    # is the identical value `list`'s --json output reports for this context.
-    statuses = svc.repos_live_status(ctx)
-    main_status, associated_statuses = statuses[0], statuses[1:]
-    branch_text = main_status.current_branch or ctx.current_branch or "—"
-
-    console.print(f"[bold]Name:[/bold]       {display_name}")
-    console.print(f"[bold]State:[/bold]      {ctx.state.value}")
-    console.print(f"[bold]Main repo:[/bold]  {display_repo}")
-    console.print(f"[bold]Repo URL:[/bold]   {repo_url_text}")
-    console.print(f"[bold]Branch:[/bold]     {branch_text}")
-    console.print(f"[bold]Created:[/bold]    {ctx.created_at}")
-    console.print(f"[bold]Alive since:[/bold]  {ctx.alive_since or '—'}")
-    console.print(f"[bold]Dead since:[/bold]   {ctx.dead_since or '—'}")
-
-    if associated_statuses:
-        assoc_table = Table(title="Associated repos")
-        assoc_table.add_column("Slug", style="bold")
-        assoc_table.add_column("URL")
-        assoc_table.add_column("On disk")
-        assoc_table.add_column("Branch")
-        for status in associated_statuses:
-            assoc_table.add_row(
-                status.slug,
-                status.url or "—",
-                "yes" if status.on_disk else "no",
-                status.current_branch or "—",
-            )
-        console.print(assoc_table)
+    for label, key in (
+        *(("Name", "name"), ("State", "state"), ("Main repo", "main_repo")),
+        *(("Repo URL", "repo_url"), ("Branch", "current_branch"), ("Created", "created_at")),
+        *(("Alive since", "alive_since"), ("Dead since", "dead_since")),
+    ):
+        console.print(f"[bold]{label + ':':<13}[/bold] {data[key] or '—'}", highlight=False)
+    if data["associated_repos"]:
+        table = Table(title="Associated repos")
+        for column in ("Slug", "URL", "On disk", "Branch"):
+            table.add_column(column)
+        for r in data["associated_repos"]:
+            on_disk = "yes" if r["on_disk"] else "no"
+            table.add_row(r["slug"], r["url"] or "—", on_disk, r["current_branch"] or "—")
+        console.print(table)
 
 
 @app.command()
@@ -435,7 +348,7 @@ def dead(
 
 
 @app.command(
-    epilog="Examples: dadaia context bind my-ctx | eval $(dadaia context bind my-ctx --print-env)"
+    epilog="Examples: .dadaia/.venv/bin/dadaia context bind my-ctx | eval $(.dadaia/.venv/bin/dadaia context bind my-ctx --print-env)"
 )
 def bind(
     name: str = typer.Argument(..., help="Context name to bind to"),
@@ -444,7 +357,7 @@ def bind(
         "--print-env",
         help=(
             "Emit eval-compatible 'export DADAIA_CONTEXT/DADAIA_SESSION_ID' lines for "
-            "`eval $(dadaia context bind ... --print-env)`. Default off — the binding is "
+            "`eval $(.dadaia/.venv/bin/dadaia context bind ... --print-env)`. Default off — the binding is "
             "persisted in the session record either way."
         ),
     ),
@@ -462,7 +375,9 @@ def bind(
 
     svc = _ctx_service()
     try:
-        svc.show(name)
+        if svc.show(name).state == ContextState.DEAD:
+            fix = fix_line(workspace_root, "context", "alive", name)
+            fail(f"Context '{name}' is DEAD — bring it back first.\nfix: {fix}")
     except ContextNotFoundError as e:
         fail(e)
 
@@ -481,25 +396,18 @@ def bind(
         ),
     )
 
-    # T-50-05 (SPEC v0.5.0 FR1): without this loud warning, a caller with no
-    # harness-native id and no DADAIA_CONTEXT gets a silent no-op. stderr only, so it
-    # never corrupts `eval $(dadaia context bind ... --print-env)`.
-    if (
-        not resolve_session_id(None, os.environ)
-        and not os.environ.get("DADAIA_CONTEXT")
-        and not print_env
-    ):
-        err_console.print(
-            f"[yellow]![/yellow] No harness-native session id and DADAIA_CONTEXT is "
-            f"unset in this shell — this binding is reachable only if DADAIA_CONTEXT="
-            f"{name} is exported here (e.g. `eval $(dadaia context bind {name} "
-            "--print-env)`)."
-        )
-
-    if print_env:
-        for line in session_store.binding_env_lines(name, session_id):
-            print(line)
-        return
+    # An id-less shell's bind lives in its env: the eval epilogue is its only path (#S11).
+    if not resolve_session_id(None, os.environ):
+        if print_env:
+            for line in session_store.binding_env_lines(name, session_id):
+                print(line)
+            return
+        if os.environ.get("DADAIA_CONTEXT") != name:
+            print(
+                f"! No session id in this shell — this binding is reachable only where "
+                f"DADAIA_CONTEXT={name} is exported (`eval $(... --print-env)`).",
+                file=sys.stderr,
+            )
 
     console.print(f"[green]✓[/green] Bound to '[bold]{name}[/bold]' (session id: {session_id})")
 

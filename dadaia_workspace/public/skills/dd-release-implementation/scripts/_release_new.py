@@ -1,8 +1,7 @@
 #!/usr/bin/env python3
-"""`release.py new <id>` — the ONE act that opens a candidate, birth or stacked.
-
-SPEC.md and `_RELEASE.json` are written in ONE transaction; a failure anywhere removes the
-whole directory. `--origin bugs:<ids>` seeds one scope clause per bug from the ledger."""
+"""`release.py new <id>` — the ONE act that opens a candidate, birth or stacked: SPEC.md
+and `_RELEASE.json` in ONE transaction (a failure removes the whole directory);
+`--origin bugs:<ids>` seeds one scope clause per bug from the ledger."""
 
 from __future__ import annotations
 
@@ -12,11 +11,13 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+sys.path.append(str(Path(__file__).resolve().parents[2] / "dd-bug-resolution" / "scripts"))
 
+from _ledger import replace  # noqa: E402
 from _release_schema import ARTIFACTS, SEMVER_RE, STATE, TRIO, utc_now  # noqa: E402
-from _release_store import Refusal, State, live_ids, read_state, replace, validated  # noqa: E402
+from _release_store import SCRIPT, Refusal, State, live_ids, read_state, validated  # noqa: E402
+from _release_tree import tree_findings  # noqa: E402
 
-SCRIPT = Path(__file__).parent / "release.py"
 SPEC_STUB = """\
 # SPEC — Release: {release_id}
 
@@ -87,11 +88,11 @@ def candidate_state(release_id: str, prior: State | None) -> State:
 def refuse_unfree(specs: Path, release_id: str) -> State | None:
     """`new`'s two legal states: no live release (birth — returns ``None``), and the live
     release IS *release_id* in phase CLOSURE, the stacked candidate the law requires
-    (returns the closed state to reopen). Anything else, or a symlink, refuses (CWE-59)."""
+    (returns the closed state to reopen). Anything else, a red tree, or a symlink, refuses."""
     if not SEMVER_RE.match(release_id):
         raise Refusal(
             f"{release_id!r} is not a bare SemVer release id (M.m.p)",
-            f"{SCRIPT} new 0.1.23 --specs {specs}",
+            f"{SCRIPT} new 0.1.23",
         )
     releases, live = specs / "releases", live_ids(specs)
     release_dir = releases / release_id
@@ -101,12 +102,15 @@ def refuse_unfree(specs: Path, release_id: str) -> State | None:
                 f"{path.name} resolves through a symlink — refusing to mint through one",
                 f"ls -l {releases}",
             )
+    if findings := tree_findings(specs):
+        first = f"{findings[0]['path']} {findings[0]['message']}"
+        raise Refusal(f"a release opens only on a clean tree: {first}", f"{SCRIPT} check")
     others = [other for other in live if other != release_id]
     if others:
         raise Refusal(
             f"a live release already exists ({', '.join(others)}) — exactly one is allowed: "
             f"stack the next candidate on it, or ship {others[0]} first",
-            f"{SCRIPT} check --specs {specs}",
+            f"{SCRIPT} check",
         )
     if release_id not in live:
         return None
@@ -115,7 +119,7 @@ def refuse_unfree(specs: Path, release_id: str) -> State | None:
         raise Refusal(
             f"release {release_id} is live in phase {prior.get('phase')!r} — the next "
             "candidate is stacked only on a closed one",
-            f"{SCRIPT} phase CLOSURE --sha $(git rev-parse --short HEAD) --specs {specs}",
+            f"{SCRIPT} phase CLOSURE --sha $(git rev-parse --short HEAD)",
         )
     return prior
 

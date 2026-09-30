@@ -8,9 +8,17 @@ from pathlib import Path
 
 from dadaia_workspace.core.cli_line import git_line
 from dadaia_workspace.core.exceptions import GitCloneError, GitSyncError
-from dadaia_workspace.core.gitflow import Gitflow, read_gitflow
+from dadaia_workspace.core.gitflow import DEFAULT, Gitflow, read_gitflow
 from dadaia_workspace.core.models.git_scan import GitObjectReadError
 from dadaia_workspace.infrastructure.git_objects import unpublished
+
+#: A lost branch's archive-tag push, also recording it under ``refs/remotes/origin/archive/``.
+_ARCHIVE_PUSH = (
+    "-c",
+    "remote.origin.fetch=+refs/tags/archive/*:refs/remotes/origin/archive/*",
+    "push",
+    "origin",
+)
 
 logger = logging.getLogger(__name__)
 
@@ -69,10 +77,10 @@ def _stage_files_safe(path: Path) -> None:
 
     # Discover untracked items (files and dirs)
     result = _run(
-        ["git", "ls-files", "--others", "--exclude-standard"],
+        ["git", "ls-files", "--others", "--exclude-standard", "-z"],
         cwd=path,
     )
-    untracked: list[str] = [line.strip() for line in result.stdout.splitlines() if line.strip()]
+    untracked: list[str] = [item for item in result.stdout.split("\0") if item]
 
     safe: list[str] = []
     skipped: list[str] = []
@@ -226,12 +234,36 @@ class GitSubprocessClient:
         result = _run(["git", "remote"], cwd=path)
         return bool(result.stdout.strip())
 
-    def unpushed(self, path: Path) -> bool:
-        """Whether HEAD carries a commit origin lacks — the ONE rule, ``unpublished``."""
+    def unpushed(self, path: Path, rev: str = "HEAD") -> bool:
+        """Whether *rev* carries a commit origin lacks — the ONE rule, ``unpublished``."""
         try:
-            return bool(unpublished(path, "HEAD"))
+            return bool(unpublished(path, rev))
         except GitObjectReadError:
             return True
+
+    def unrecoverable(self, path: Path) -> list[str]:
+        """One fix line per thing removing *path* loses: a linked worktree, or a local
+        branch carrying a commit neither origin nor HEAD holds — archived on origin as
+        ``archive/<branch>/<sha7>`` (ADR 0120: a tag push is never gated on branch policy),
+        the push recording it under ``refs/remotes/origin/`` so ``unpushed`` sees origin hold
+        it until a ``fetch --prune`` drops it (re-running the line restores it); commits with
+        no remote."""
+        if self.has_commits(path) and not self.has_remote(path):
+            return [git_line(path, "remote", "add", "origin", "<clone-url>")]
+        run = _run(["git", "worktree", "list", "--porcelain"], cwd=path).stdout.split("\n")
+        trees = [line[9:] for line in run if line.startswith("worktree ")][1:]
+        refs = ["git", "for-each-ref", "--format=%(objectname) %(refname:short)", "refs/heads"]
+        heads = [line.split(" ", 1) for line in _run(refs, cwd=path).stdout.split("\n") if line]
+        in_head = ["git", "merge-base", "--is-ancestor"]  # HEAD itself is pushed by dead()
+        lost = [
+            (s, b)
+            for s, b in heads
+            if _run([*in_head, f"refs/heads/{b}", "HEAD"], cwd=path).returncode != 0
+            and self.unpushed(path, f"refs/heads/{b}")
+        ]
+        return [git_line(path, "worktree", "remove", t) for t in trees] + [
+            git_line(path, *_ARCHIVE_PUSH, f"{b}:refs/tags/archive/{b}/{s[:7]}") for s, b in lost
+        ]
 
     def identity_fix(self, path: Path) -> str:
         """The ONE identity probe — git's own rule (env, config, auto-detection): ``""``
@@ -300,11 +332,14 @@ class GitSubprocessClient:
                 return shown.stdout
         return None
 
-    def default_branch(self, path: Path) -> str:
-        """The remote's default branch from the local ``origin/HEAD``; ``main`` when unset
-        (``-C``: *path* may not exist yet)."""
+    def principal(self, path: Path) -> str:
+        """``origin/HEAD``; unset or the integration branch: ``master`` when origin has it,
+        else ``DEFAULT.principal`` (``-C``: *path* may not exist yet)."""
         ref = _run(["git", "-C", str(path), "symbolic-ref", "--short", "refs/remotes/origin/HEAD"])
-        return ref.stdout.strip().removeprefix("origin/") if ref.returncode == 0 else "main"
+        if (head := ref.stdout.strip().removeprefix("origin/")) not in ("", DEFAULT.integration):
+            return head
+        master = _run(["git", "-C", str(path), "rev-parse", "-q", "--verify", "origin/master"])
+        return "master" if master.returncode == 0 else DEFAULT.principal
 
     def current_branch(self, path: Path) -> str:
         result = _run(["git", "branch", "--show-current"], cwd=path)
@@ -330,7 +365,7 @@ class GitSubprocessClient:
         newly committed and pushed, so it must be reviewed/scanned first. ``-z``: the
         real names, never core.quotePath's quoting.
         """
-        result = _run(["git", "ls-files", "-z", "--others", "--exclude-standard"], cwd=path)
+        result = _run(["git", "ls-files", "--others", "--exclude-standard", "-z"], cwd=path)
         return [rel for rel in result.stdout.split("\0") if rel]
 
     def remote_url(self, path: Path) -> str:

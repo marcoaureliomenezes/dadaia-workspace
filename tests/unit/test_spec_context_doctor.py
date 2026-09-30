@@ -8,8 +8,10 @@ import pytest
 pytest.importorskip("fcntl")
 
 import stat  # noqa: E402
+from dataclasses import replace  # noqa: E402
 from pathlib import Path  # noqa: E402
 
+from dadaia_workspace.core.doctor_rules import SectionFinding  # noqa: E402
 from dadaia_workspace.core.models.spec_context import (  # noqa: E402
     AssociatedRepo,
     ContextState,
@@ -17,7 +19,9 @@ from dadaia_workspace.core.models.spec_context import (  # noqa: E402
 )
 from dadaia_workspace.core.platform import PLATFORM  # noqa: E402
 from dadaia_workspace.features.spec_context.doctor import DoctorService  # noqa: E402
-from tests.fakes import FakeContextStore, FakeGitClient  # noqa: E402
+from dadaia_workspace.infrastructure.git_subprocess import GitSubprocessClient
+from dadaia_workspace.infrastructure.json_context_store import JsonContextStore
+from tests.fixtures.stores import context_store
 
 
 def _make_healthy_venv(root: Path) -> None:
@@ -53,11 +57,11 @@ def _ctx(
 def _make_doctor(
     workspace_root: Path,
     contexts: list[SpecContextProject] | None = None,
-) -> tuple[DoctorService, FakeContextStore]:
-    ctx_store = FakeContextStore()
+) -> tuple[DoctorService, JsonContextStore]:
+    ctx_store = context_store(workspace_root / ".dadaia" / "states")
     for c in contexts or []:
         ctx_store.save(c)
-    git_client = FakeGitClient()
+    git_client = GitSubprocessClient()
     svc = DoctorService(ctx_store, git_client, workspace_root)
     return svc, ctx_store
 
@@ -76,66 +80,27 @@ def test_check_clean_state_no_issues(tmp_path: Path) -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_inv4_alive_repo_missing_detected_and_not_fixable(tmp_path: Path) -> None:
-    ctx = _ctx("missing", state=ContextState.ALIVE)
-    # do NOT create the repo dir
-    svc, _ = _make_doctor(tmp_path, [ctx])
-    issues = svc.check()
-    codes = {i.code for i in issues}
-    assert "INV-4" in codes
-    inv4 = next(i for i in issues if i.code == "INV-4")
-    assert inv4.fixable is False
+def _with_lib(ctx: SpecContextProject) -> SpecContextProject:
+    return replace(ctx, associated_repos=(AssociatedRepo(slug="lib", url="https://x.test/lib"),))
 
 
-# ---------------------------------------------------------------------------
-# CTX-URL-1: ALIVE context must not have an empty repo_url (T-011-08 / FR-W2-03 d)
-# ---------------------------------------------------------------------------
-
-
-def _ctx_empty_url(name: str, state: ContextState = ContextState.ALIVE) -> SpecContextProject:
-    return SpecContextProject(
-        name=name,
-        state=state,
-        repo_slug=name,
-        repo_url="",
-        created_at="2026-01-01T00:00:00",
-        alive_since="2026-06-01T00:00:00Z" if state == ContextState.ALIVE else None,
-        dead_since=None,
-        current_branch="main" if state == ContextState.ALIVE else None,
-    )
-
-
-@pytest.mark.parametrize(
-    ("name", "ctx_fn", "make_repo", "expect_code"),
-    [
-        ("alive_empty_url_flagged", lambda: _ctx_empty_url("foo", ContextState.ALIVE), True, True),
-        ("url_present_silent", lambda: _ctx("foo", ContextState.ALIVE), True, False),
-        (
-            # A DEAD context with an empty URL is not flagged (only ALIVE is
-            # un-portable now).
-            "dead_empty_url_silent",
-            lambda: _ctx_empty_url("foo", ContextState.DEAD),
-            False,
-            False,
-        ),
-    ],
-)
-def test_ctx_url_1_table(
-    tmp_path: Path, name: str, ctx_fn: object, make_repo: bool, expect_code: bool
+@pytest.mark.parametrize("missing", ["missing", "lib"])
+def test_inv4_names_a_missing_main_or_associated_repo_with_the_alive_fix(
+    tmp_path: Path, missing: str
 ) -> None:
-    ctx = ctx_fn()  # type: ignore[operator]
-    if make_repo:
-        (tmp_path / "repos" / "foo").mkdir(parents=True)
+    """Intent: CONTRACT — sa-context-dead-removes-repos-outside-the-reaper#C6: INV-4 iterates all_repos(); its fix is `context alive`."""
+    ctx = _with_lib(_ctx("missing", state=ContextState.ALIVE))
+    present = {"missing", "lib"} - {missing}
+    for slug in present:
+        (tmp_path / "repos" / slug).mkdir(parents=True)
     svc, _ = _make_doctor(tmp_path, [ctx])
-    issues = svc.check()
-    codes = {i.code for i in issues}
-    if expect_code:
-        assert "CTX-URL-1" in codes
-        ctx_url = next(i for i in issues if i.code == "CTX-URL-1")
-        assert ctx_url.fixable is False
-        assert "dadaia context alive" in ctx_url.description
-    else:
-        assert "CTX-URL-1" not in codes
+
+    inv4 = [i for i in svc.check() if i.code == "INV-4"]
+
+    assert [(i.message, i.fixable) for i in inv4] == [
+        (f"Context 'missing' is alive but repo '{missing}' not on disk", False)
+    ]
+    assert inv4[0].fix.endswith("dadaia context alive missing")
 
 
 # ---------------------------------------------------------------------------
@@ -143,26 +108,26 @@ def test_ctx_url_1_table(
 # ---------------------------------------------------------------------------
 
 
-def test_inv5_detected_fixable_fix_removes_stale_repo_and_no_issues_returns_empty(
-    tmp_path: Path,
-) -> None:
-    ctx = _ctx("stale", state=ContextState.DEAD)
-    repo_dir = tmp_path / "repos" / "stale"
+@pytest.mark.parametrize("slug", ["stale", "lib"])
+def test_inv5_holds_a_main_or_associated_repo_of_a_dead_context(tmp_path: Path, slug: str) -> None:
+    """Intent: CONTRACT — sa-context-dead-removes-repos-outside-the-reaper#C5: INV-5 iterates all_repos(); --fix HOLDS, never deletes. sa-doctor-finding-has-four-shapes: the invariant is a SectionFinding, emitted directly."""
+    ctx = _with_lib(_ctx("stale", state=ContextState.DEAD))
+    repo_dir = tmp_path / "repos" / slug
     repo_dir.mkdir(parents=True)
+    (repo_dir / "work.txt").write_text("keep\n")
     svc, _ = _make_doctor(tmp_path, [ctx])
-    issues = svc.check()
-    codes = {i.code for i in issues}
-    assert "INV-5" in codes
-    inv5 = next(i for i in issues if i.code == "INV-5")
-    assert inv5.fixable is True
 
-    actions = svc.fix()
+    msg = f"Context 'stale' is dead but repo '{slug}' is on disk"
+    assert [i for i in svc.check() if i.code == "INV-5"] == [
+        SectionFinding("INV-5", "error", msg, False, True, "", True)
+    ]
+
+    svc.fix()
+
+    held = list(tmp_path.glob(f".dadaia/reaped/*/repos/{slug}/work.txt"))
+    assert [p.read_text() for p in held] == ["keep\n"]
     assert not repo_dir.exists()
-    assert any("stale" in a for a in actions)
-
-    # No issues left ⇒ a second fix() pass returns an empty action list.
-    second_actions = svc.fix()
-    assert second_actions == []
+    assert svc.fix() == []
 
 
 # ---------------------------------------------------------------------------
@@ -176,9 +141,8 @@ def test_inv6_main_repo_slug_collision_reported_not_fixable(tmp_path: Path) -> N
     b = _ctx("b", repo_slug="x")
     svc, _ = _make_doctor(tmp_path, [a, b])
     inv6 = [i for i in svc.check() if i.code == "INV-6"]
-    assert len(inv6) == 1
-    assert inv6[0].fixable is False
-    assert "a" in inv6[0].description and "b" in inv6[0].description
+    assert [i.fixable for i in inv6] == [False]
+    assert "a" in inv6[0].message and "b" in inv6[0].message
 
 
 def test_inv6_main_vs_associated_slug_collision_reported(tmp_path: Path) -> None:
@@ -194,9 +158,8 @@ def test_inv6_main_vs_associated_slug_collision_reported(tmp_path: Path) -> None
     )
     svc, _ = _make_doctor(tmp_path, [a, b])
     inv6 = [i for i in svc.check() if i.code == "INV-6"]
-    assert len(inv6) == 1
-    assert inv6[0].fixable is False
-    assert "a" in inv6[0].description and "b" in inv6[0].description
+    assert [i.fixable for i in inv6] == [False]
+    assert "a" in inv6[0].message and "b" in inv6[0].message
 
 
 def test_inv5_fix_refuses_a_dead_slug_that_resolves_outside_repos(tmp_path: Path) -> None:

@@ -21,13 +21,18 @@ from pathlib import Path  # noqa: E402
 
 from dadaia_workspace.core.platform import PLATFORM  # noqa: E402
 from dadaia_workspace.features.spec_context.doctor import DoctorService  # noqa: E402
-from tests.fakes import FakeContextStore, FakeGitClient  # noqa: E402
+from dadaia_workspace.infrastructure.git_subprocess import GitSubprocessClient
+from tests.fixtures.stores import context_store
 
 _WINDOWS = os.name == "nt"
 
 
 def _make_doctor(workspace_root: Path) -> DoctorService:
-    return DoctorService(FakeContextStore(), FakeGitClient(), workspace_root)
+    return DoctorService(
+        context_store(workspace_root / ".dadaia" / "states"),
+        GitSubprocessClient(),
+        workspace_root,
+    )
 
 
 def _init_workspace(root: Path) -> None:
@@ -84,13 +89,6 @@ def test_venv_health_matrix(tmp_path: Path, case: str, setup, expect_finding: bo
         pytest.skip("POSIX exec bit not meaningful on Windows")
     _init_workspace(tmp_path)
     setup(tmp_path)
-    codes = {i.code for i in _make_doctor(tmp_path).check()}
-    assert any(c.startswith("VENV") for c in codes) is expect_finding
-
-
-def test_venv_finding_is_not_fixable(tmp_path: Path) -> None:
-    # Rebuilding a venv is an operator action, not an auto-repair.
-    _init_workspace(tmp_path)
-    venv_issues = [i for i in _make_doctor(tmp_path).check() if i.code.startswith("VENV")]
-    assert venv_issues
-    assert all(not i.fixable for i in venv_issues)
+    venv = [i for i in _make_doctor(tmp_path).check() if i.code.startswith("VENV")]
+    assert bool(venv) is expect_finding
+    assert not any(i.fixable for i in venv)  # rebuilding a venv is an operator action

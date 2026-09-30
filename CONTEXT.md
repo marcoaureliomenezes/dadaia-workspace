@@ -285,6 +285,36 @@ _Avoid_: ROOT-n, EFF-n, issue code
 `states/instance_exceptions.txt` — one glob per line, `#` comments, deduplicated, order kept; matches at the root and inside the harness dirs. Outside the projection manifest and outside the exceptions = slop. Replaces `root_exceptions.txt`.
 _Avoid_: root exceptions, allowlist, whitelist (the root whitelist is the gate's law, not the operator's globs)
 
+## Authorities
+
+**Authority**:
+The one symbol, command or file answering a question; every other reader **consults** (calls) it. A candidate's PLAN §1.1 table names one per touched question (`question | authority | consults | deleted`).
+_Avoid_: owner, source of truth (bare)
+
+**Systemic ambiguity**:
+Two mechanisms — code, or law an agent executes — answering one question with divergent rules.
+_Avoid_: drift, duplication
+
+**Behavior row**:
+A Given/When/Then statement `<bug-id>#<id>` naming its authority and seam; a test cites it literally.
+_Avoid_: scenario, case
+
+**Cross-check test**:
+One input set fed to two live readers of the same question, asserting one verdict.
+_Avoid_: parity test (bare)
+
+**Ratchet allowance**:
+A violation a ratchet tolerates: `file:symbol` → the open bug id deleting it, or `parity:<test>`.
+_Avoid_: baseline
+
+**Resolution contract**:
+A RED at the question's seam failing at definition; GREEN; the losers gone with their tests and fakes; `bugs.py resolve` with the evidence triple; net ≤ 0 in production and tests, except the production ceilings a SPEC's ACs grant; commit shape 3.
+_Avoid_: fix (bare)
+
+**Wave**:
+A harm-ordered group of a candidate's bugs — data loss and gate holes first.
+_Avoid_: phase (a release's state), batch
+
 ## Homonyms — one canonical sense
 
 **Scaffold**:

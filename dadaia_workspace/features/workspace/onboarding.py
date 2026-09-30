@@ -16,15 +16,11 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal
 
-from dadaia_workspace.core import session_store, workspace_layout
+from dadaia_workspace.core import workspace_layout
 from dadaia_workspace.core.cli_line import fix_line
 from dadaia_workspace.core.fixed_sections import strip_fixed_sections
 from dadaia_workspace.core.gitflow import constitution_error
-from dadaia_workspace.core.specs_version import (
-    CANONICAL_SPECS_VERSION,
-    classify,
-    read_pattern_version,
-)
+from dadaia_workspace.core.specs_version import state
 from dadaia_workspace.core.template_history import was_shipped
 from dadaia_workspace.infrastructure.git_subprocess import GitSubprocessClient
 
@@ -52,19 +48,15 @@ class _Ctx:
     root: Path
     name: str
     specs: Path
-    session: str | None
+    bound: bool | None
 
 
 def specs_ready(specs_dir: Path) -> bool:
-    """True once ``specs init`` has run: the tree is stamped at the canonical version."""
-    return specs_dir.is_dir() and read_pattern_version(specs_dir) >= CANONICAL_SPECS_VERSION
+    return state(specs_dir)[0] == "canonical"
 
 
 def _unbound(c: _Ctx) -> str | None:
-    record = session_store.live_session(c.root, c.session) if c.session else None
-    if c.session is None or (record is not None and record.get("context")):
-        return None
-    return "this session has no context binding"
+    return "this session has no context binding" if c.bound is False else None
 
 
 def _first_pass(c: _Ctx) -> list[str]:
@@ -82,13 +74,7 @@ def _first_pass(c: _Ctx) -> list[str]:
         atoms = bool(catalog.get("features"))
     except (OSError, ValueError, AttributeError):
         atoms = False
-    return pending if atoms else [*pending, "specs/memory/product/ (no atom)"]
-
-
-def _specs_fix(c: _Ctx) -> str:
-    # Running the printed line is the consent: only a foreign tree moves to specs-bkp/.
-    consent = ("--replace-foreign",) if classify(c.specs) == "foreign" else ()
-    return fix_line(c.root, "specs", "init", "--context", c.name, *consent)
+    return pending if atoms else [*pending, f"{c.specs / 'memory' / 'product'} (no atom)"]
 
 
 _Pending = Callable[[_Ctx], str | None]
@@ -100,19 +86,19 @@ STEPS: tuple[tuple[str, Kind, _Pending, Callable[[_Ctx], str]], ...] = (
         "constitution",
         "agent",
         lambda c: constitution_error(c.specs),
-        lambda c: f"repair the YAML frontmatter of {c.specs / 'constitution.md'}",
+        lambda c: f"Operator action: repair the YAML frontmatter of {c.specs / 'constitution.md'}",
     ),
     (
         "specs",
         "command",
-        lambda c: None if specs_ready(c.specs) else f"'{c.name}' carries no current specs tree",
-        _specs_fix,
+        lambda c: None if specs_ready(c.specs) else f"'{c.name}' specs tree is {state(c.specs)[0]}",
+        lambda c: str(state(c.specs, root=c.root, context=c.name)[1]),
     ),
     (
         "first-pass",
         "agent",
         lambda c: f"'{c.name}' memory holds no audited content" if _first_pass(c) else None,
-        lambda c: f"{c.root / _SKILL} §first pass — pending: {', '.join(_first_pass(c))}",
+        lambda c: f"Operator action: {c.root / _SKILL} §first pass — {', '.join(_first_pass(c))}",
     ),
     (
         "publish",
@@ -129,16 +115,16 @@ STEP_IDS = ("context", *(step[0] for step in STEPS))
 
 
 def next_step(
-    root: Path, trees: Mapping[str, Path], focus: str | None = None, session: str | None = None
+    root: Path, trees: Mapping[str, Path], focus: str | None = None, bound: bool | None = None
 ) -> Step | None:
-    """The first pending step — *focus* first, then every context in *trees*; *session* is
-    the caller's resolvable session id (``None``: no identity, so no ``bind`` step)."""
+    """The first pending step — *focus* first, then every context in *trees*; *bound* is
+    whether the caller's session is bound (``None``: no identity, so no ``bind`` step)."""
     if not trees:
         create = fix_line(root, "context", "create", "<name>", "--main-repo", "<clone-url>")
         return Step("context", "command", "no ALIVE Spec Context — create one", create)
     names = [focus] if focus is not None and focus in trees else []
     for name in [*names, *trees]:
-        c = _Ctx(root, name, trees[name], session)
+        c = _Ctx(root, name, trees[name], bound)
         for step_id, kind, pending, fix in STEPS:
             if (reason := pending(c)) is not None:
                 return Step(step_id, kind, reason, fix(c))

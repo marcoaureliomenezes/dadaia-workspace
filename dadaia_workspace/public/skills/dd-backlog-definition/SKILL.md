@@ -43,10 +43,9 @@ description: >
 
 ## Pick and dispositions
 
-- A picked entry stays in `active[]` with `status: picked` —
-  nothing is purged at pick time.
+- The pick is the SPEC's `**Origin:** backlog:<ids>` line; the entry keeps its status.
 - It exits exactly once, at closure, by `python3 .agents/skills/dd-backlog-definition/scripts/backlog.py exit <slug> --disposition
-  delivered|superseded|rejected [--release <id>] [--reason <text>]` — one histo
+  <disposition> [--release <id>] [--reason <text>]` — one histo
   record, refused on a second exit (`dd-release-implementation` RC-FLOW step 7).
 - `dd-release-definition` consumes the picked set with no further triage — the
   backlog it reads is already sanitized.
@@ -56,10 +55,9 @@ description: >
 - Every live candidate is in `active[]` with a live token; every closed one has
   exactly one histo record.
 - No entry was created outside the operator-gated intake path.
-- A picked entry's SPEC exists in the same commit its `active[]` entry turned `picked`.
 
 ## References
 
 - `dd-release-definition` — the picked-set consumer.
-- Script: `python3 .agents/skills/dd-backlog-definition/scripts/backlog.py` — `new`, `exit`, `check`, and `subjects` (the declared aliases plus the document's live bindings).
+- Script: `python3 .agents/skills/dd-backlog-definition/scripts/backlog.py` — `new`, `exit`, `check`, and `subjects` (the alias map).
 - A `subject.ref` naming a code/doc/cli anchor is judged by `.dadaia/.venv/bin/dadaia doctor` — `BL-SCHEMA` names the ref it cannot resolve.

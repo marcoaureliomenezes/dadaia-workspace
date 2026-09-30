@@ -1,40 +1,5 @@
-"""ADR canon contract — specs/ADRs/ (v0.5.0 specs-canon closure, operator ruling
-2026-08-28).
-
-Intent: CONTRACT — v0.5.0 specs-canon closure
-
-Validates the specs/ADRs/ decision-record canon this task introduces: JSONL, one
-record per line (dadaia_workspace.core.models.adr.AdrRecord), monotonic gap-free ids
-over ``specs/ADRs/decisions.jsonl`` (0.4.7 FR8 retired the ``_superseded/`` lane: a
-superseded decision is retired IN PLACE with ``status: superseded``, named by its
-successor's ``supersedes`` — the second file shipped empty for the whole life of the
-canon and split one inventory in two), the status enum {proposed, accepted, rejected,
-superseded}, and the operator-only acceptance law (``accepted`` requires a RESOLVABLE
-``measured_by`` — a decision nobody can run is not a principle, it is prose).
-
-Every RED condition below is proven on an in-memory mutation fixture, never a real
-file on disk. The committed file may legitimately be EMPTY (no real principle-level
-decision has been authored yet under the JSONL canon — the 28 mechanical, auto-
-generated markdown ADRs this repository shipped at authoring time were deleted as
-non-canon; a decision record is now authored only when a real principle-level
-decision needs one, never as a backfill) — every check below holds vacuously true
-over an empty inventory.
-
-The record SHAPE is no longer hand-rolled here (0.4.7 FR6, T-047-03): the
-``find_field_violations``/``_record_violations`` copy of the required-field, status-enum
-and acceptance-law checks is DELETED and every shape assertion now runs
-``decision-record-v1.schema.json`` — the same schema the ``ledgers`` section of
-``dadaia doctor`` runs over the committed file, so a schema change can no longer pass
-here and fail there (the exact drift that let six pre-Wave-0 records violate their own
-schema while every check was green). ``find_numbering_violations`` stays: monotonic
-gap-free numbering is a property of the SET of records, which no per-record schema can
-express.
-
-No CLI verb and no doctor rule beyond that section is introduced by this file (item 4's own
-scope) — a pytest-only contract over the files already on disk plus in-memory
-fixtures. Supersedes the pre-v0.5.0-specs-canon-closure markdown-ADR contract
-(``NNNN-<slug>.md``, one file per decision) entirely — that machinery is deleted with
-this rewrite.
+"""Intent: CONTRACT — ADR canon: records validate ``decision-record-v1`` and ids run 0001..N, judged by the
+doctor's LEDGER-ADR-SCHEMA rule (``features/specs/doctor_adr``), the one ADR authority. Size: SMALL.
 """
 
 from __future__ import annotations
@@ -43,92 +8,28 @@ import json
 from pathlib import Path
 
 import pytest
+from typer.testing import CliRunner
 
+from dadaia_workspace.cli.main import app
+from dadaia_workspace.features.specs.doctor_adr import adr_record_issues
 from dadaia_workspace.features.specs.schemas import schema_errors
 
 pytestmark = pytest.mark.contract
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
-_ADR_DIR = _REPO_ROOT / "specs" / "ADRs"
-_DECISIONS_PATH = _ADR_DIR / "decisions.jsonl"
 
 
-def _read_jsonl_records(path: Path) -> list[dict[str, object]]:
-    """Every non-blank line of *path* parsed as a JSON object; an empty or absent
-    file is an empty list — never an error (a legitimately empty inventory)."""
-    if not path.is_file():
-        return []
-    records: list[dict[str, object]] = []
-    for line in path.read_text(encoding="utf-8").split("\n"):
-        stripped = line.strip()
-        if not stripped:
-            continue
-        obj = json.loads(stripped)
-        assert isinstance(obj, dict), f"{path}: not a JSON object: {stripped!r}"
-        records.append(obj)
-    return records
+def _ledger(tmp_path: Path, ids: list[str], **fields: object) -> Path:
+    specs = tmp_path / "specs"
+    (specs / "ADRs").mkdir(parents=True)
+    lines = [json.dumps({**_VALID_RECORD, **fields, "id": i}) for i in ids]
+    (specs / "ADRs" / "decisions.jsonl").write_text("\n".join(lines) + "\n", encoding="utf-8")
+    return specs
 
 
-def find_field_violations(record: dict[str, object]) -> list[str]:
-    """Every ``decision-record-v1`` violation for one record, as messages — the ONE
-    validator, shared by the committed-file assertion and every mutation fixture."""
-    return schema_errors(record, "ADRs/decision-record-v1")
+def test_the_committed_ledger_is_clean_under_the_doctor_rule() -> None:
+    assert adr_record_issues(_REPO_ROOT / "specs") == []
 
-
-def find_numbering_violations(ids: list[str]) -> list[str]:
-    """Pure validator over a *list of id strings only* — numbering never needs the
-    full record body."""
-    violations: list[str] = []
-    if not ids:
-        return violations
-
-    for value in ids:
-        if not (len(value) == 4 and value.isdigit()):
-            violations.append(f"{value!r}: id is not a 4-digit zero-padded string")
-
-    numeric = [int(v) for v in ids if len(v) == 4 and v.isdigit()]
-    duplicates = sorted({n for n in numeric if numeric.count(n) > 1})
-    if duplicates:
-        violations.append(f"duplicate id(s): {[f'{n:04d}' for n in duplicates]}")
-
-    distinct = sorted(set(numeric))
-    expected = list(range(1, len(distinct) + 1))
-    if distinct != expected:
-        violations.append(
-            "numbering is not monotonic and gap-free from 0001: got "
-            f"{[f'{n:04d}' for n in distinct]}, expected {[f'{n:04d}' for n in expected]}"
-        )
-    return violations
-
-
-# ---------------------------------------------------------------------------------------
-# The real, committed inventory — decisions.jsonl.
-# ---------------------------------------------------------------------------------------
-
-
-def test_committed_inventory_may_be_legitimately_empty() -> None:
-    """Discovery itself must never raise regardless of population; every other check
-    in this module holds vacuously true when the discovered set is empty."""
-    assert isinstance(_read_jsonl_records(_DECISIONS_PATH), list)
-
-
-def test_every_committed_record_carries_every_required_field_and_a_valid_status() -> None:
-    for record in _read_jsonl_records(_DECISIONS_PATH):
-        violations = find_field_violations(record)
-        assert violations == [], violations
-
-
-def test_committed_ids_are_monotonic_gap_free_and_duplicate_free() -> None:
-    """decisions.jsonl's ids must be 1..N gap-free — a superseded record is retired in
-    place, so the one file always holds one unbroken sequence."""
-    ids = [str(record.get("id")) for record in _read_jsonl_records(_DECISIONS_PATH)]
-    violations = find_numbering_violations(ids)
-    assert violations == [], violations
-
-
-# ---------------------------------------------------------------------------------------
-# Mutation fixtures — one in-memory RED condition per rule, never a real file.
-# ---------------------------------------------------------------------------------------
 
 _VALID_RECORD: dict[str, object] = {
     "id": "0001",
@@ -144,131 +45,106 @@ _VALID_RECORD: dict[str, object] = {
 }
 
 
-def test_valid_fixture_has_no_violations() -> None:
-    assert find_field_violations(_VALID_RECORD) == []
+_ABSENT = object()
+_RECORD_ROWS = [
+    pytest.param({}, [], id="valid"),
+    *(
+        pytest.param({field: _ABSENT}, [f"'{field}' is a required property"], id=f"missing-{field}")
+        for field in ("id", "ts", "title", "context", "decision", "consequences")
+    ),
+    pytest.param(
+        {"status": "in-review"},
+        ["'in-review' is not one of ['proposed', 'accepted', 'rejected', 'superseded']"],
+        id="unknown-status",
+    ),
+    pytest.param(
+        {"status": "accepted"},
+        ["None is not of type 'string'"],
+        id="sa-adr-measured-by-pattern-refuses-real-checks#B27-2-accepted-null",
+    ),
+    pytest.param(
+        {"status": "accepted", "measured_by": ""},
+        ["'' should be non-empty"],
+        id="accepted-empty-measured-by",
+    ),
+    pytest.param(
+        {"status": "accepted", "measured_by": "ruff check"}, [], id="accepted-with-measured-by"
+    ),
+    # The six records the 2026-09-12 audit found carried `"supersedes": []`.
+    pytest.param(
+        {"supersedes": []}, ["[] is not of type 'string', 'null'"], id="pre-wave0-supersedes-list"
+    ),
+    pytest.param({"supersedes": "0005,0006,0008"}, [], id="supersedes-several"),
+    pytest.param(
+        {"supersedes": "0005, 0006"},
+        ["'0005, 0006' does not match '^\\\\d{4}(,\\\\d{4})*$'"],
+        id="supersedes-spaced",
+    ),
+]
 
 
-@pytest.mark.parametrize("field_name", ["id", "ts", "title", "context", "decision", "consequences"])
-def test_missing_required_field_is_red(field_name: str) -> None:
-    mutated = {k: v for k, v in _VALID_RECORD.items() if k != field_name}
-    violations = find_field_violations(mutated)
-    assert any(field_name in v for v in violations), violations
-
-
-def test_invalid_status_value_is_red() -> None:
-    mutated = {**_VALID_RECORD, "status": "in-review"}
-    violations = find_field_violations(mutated)
-    assert any("'in-review' is not one of" in v for v in violations), violations
-
-
-def test_accepted_status_without_measured_by_is_red() -> None:
-    mutated = {**_VALID_RECORD, "status": "accepted"}
-    violations = find_field_violations(mutated)
-    assert any("None is not of type 'string'" in v for v in violations), violations
-
-
-def test_accepted_status_with_measured_by_is_green() -> None:
-    mutated = {
-        **_VALID_RECORD,
-        "status": "accepted",
-        "measured_by": "pytest tests/contract/test_x.py",
-    }
-    assert find_field_violations(mutated) == []
+@pytest.mark.parametrize(("change", "expected"), _RECORD_ROWS)
+def test_each_record_shape_is_judged_by_the_schema(
+    change: dict[str, object], expected: list[str]
+) -> None:
+    """Each record shape is judged by decision-record-v1 exactly as the row states ."""
+    record = {k: v for k, v in {**_VALID_RECORD, **change}.items() if v is not _ABSENT}
+    assert schema_errors(record, "ADRs/decision-record-v1") == expected
 
 
 @pytest.mark.parametrize(
-    "measured_by",
+    ("ids", "expected"),
     [
-        "pytest tests/contract/test_x.py",
-        "pytest tests/unit/a.py tests/unit/b.py",
-        "pytest tests/contract/test_test_suite_ratchets.py -k v31",
-        "lint-imports --config setup.cfg --no-cache",
-        "lint-imports --config setup.cfg --no-cache \u2014 contract features-no-subprocess",
-        "lint-imports --config setup.cfg --no-cache \u2014 contracts core-no-upper-layers, x",
-        "SPEC-DOC-045",
-        "SPEC-DOC-046 \u2014 the live release's state document is named _RELEASE.json",
-        "WS-dadaia-slop",
-        "BL-SHAPE over BACKLOG.json",
-        "RELEASE-TREE-PHASE over every committed release-state document",
-        "LEDGER-ADR-SCHEMA over specs/ADRs/decisions.jsonl",
-        "dadaia doctor \u2014 the ledgers section is 100 %",
-        "dadaia bugs status \u2014 both records terminal `deferred`",
+        (
+            ["0001", "0003"],
+            ["id '0003' breaks 0001..N: expected 0002 (ADRs/decisions.jsonl:2)"],
+        ),
+        (
+            ["0002", "0003"],
+            ["id '0002' breaks 0001..N: expected 0001 (ADRs/decisions.jsonl:1)"],
+        ),
+        (["0001", "0002"], []),
+        ([], []),
     ],
 )
-def test_resolvable_measured_by_is_green(measured_by: str) -> None:
-    """Intent: CONTRACT — 0.4.7 FR8. Every form a real accepted record uses today
-    resolves to a command, a doctor code or a ledger code someone can run."""
-    mutated = {**_VALID_RECORD, "status": "accepted", "measured_by": measured_by}
-    assert find_field_violations(mutated) == [], (measured_by, find_field_violations(mutated))
+def test_the_doctor_rule_flags_the_first_id_breaking_0001_to_n(
+    tmp_path: Path, ids: list[str], expected: list[str]
+) -> None:
+    """sa-adr-measured-by-pattern-refuses-real-checks#B27-3: a gap or a start past 0001 is a LEDGER-ADR-SCHEMA finding."""
+    issues = adr_record_issues(_ledger(tmp_path, ids))
+    assert [i.message for i in issues] == expected
 
 
-def test_accepted_status_with_prose_measured_by_is_red() -> None:
-    """Intent: CONTRACT — 0.4.7 FR8. ADR 0005-0009 shipped `accepted` naming a
-    sentence ('specs doctor release rules + dd-gitflow-default conformance in
-    audits') that resolved to no runnable check; the acceptance law required only
-    non-emptiness, so prose passed. `measured_by` now matches a resolvable pattern
-    or the record is not acceptable."""
-    mutated = {
-        **_VALID_RECORD,
-        "status": "accepted",
-        "measured_by": "specs doctor release rules + dd-gitflow-default conformance in audits",
-    }
-    violations = find_field_violations(mutated)
-    assert any("does not match" in v for v in violations), violations
+def test_doctor_admits_any_named_check_and_flags_a_duplicate_id(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """sa-adr-measured-by-pattern-refuses-real-checks#B27-1 and #B27-3: doctor accepts `npx vitest run`, flags a duplicate 0049."""
+    monkeypatch.chdir(tmp_path)
+    ids = [f"{n:04d}" for n in range(1, 50)] + ["0049"]
+    specs = _ledger(tmp_path, ids, status="accepted", measured_by="npx vitest run")
+
+    run = CliRunner().invoke(app, ["doctor", "--json", "--specs-dir", str(specs)])
+
+    assert "id '0049' breaks 0001..N: expected 0050" in run.output, run.output
+    assert "vitest" not in run.output and run.output.count("breaks 0001..N") == 1
 
 
-def test_prose_measured_by_on_a_proposed_record_is_green() -> None:
-    """Intent: CONTRACT — 0.4.7 FR8. The pattern is part of the ACCEPTANCE law: a
-    `proposed` record is still a draft and may name its check in prose."""
-    mutated = {**_VALID_RECORD, "measured_by": "some prose nobody can run"}
-    assert find_field_violations(mutated) == []
-
-
-def test_gap_in_numbering_is_red() -> None:
-    violations = find_numbering_violations(["0001", "0003"])
-    assert any("monotonic and gap-free" in v for v in violations), violations
-
-
-def test_duplicate_numbering_is_red() -> None:
-    violations = find_numbering_violations(["0001", "0001", "0002"])
-    assert any("duplicate" in v for v in violations), violations
-
-
-def test_numbering_not_starting_at_0001_is_red() -> None:
-    violations = find_numbering_violations(["0002", "0003"])
-    assert any("monotonic and gap-free" in v for v in violations), violations
-
-
-def test_non_4_digit_id_is_red() -> None:
-    violations = find_numbering_violations(["1", "0002"])
-    assert any("4-digit" in v for v in violations), violations
-
-
-def test_empty_id_list_is_valid() -> None:
-    assert find_numbering_violations([]) == []
-
-
-def test_the_pre_wave0_record_shape_is_red() -> None:
-    """The six records the 2026-09-12 audit found violating their own schema carried
-    `"supersedes": []` (`git show f915b3db^:specs/ADRs/decisions.jsonl`). The hand-rolled
-    validator this file used to carry checked presence only, so it called them clean —
-    the schema does not."""
-    violations = find_field_violations({**_VALID_RECORD, "supersedes": []})
-    assert any("[] is not of type" in v for v in violations), violations
-
-
-def test_supersedes_admits_the_list_one_decision_retiring_several_needs() -> None:
-    """A single-id `supersedes` left four retired records with no successor naming
-    them: the decision that replaced all of them could only cite one. The ascending
-    comma-separated list is what a reader follows from a dead record to the live one."""
-    assert find_field_violations({**_VALID_RECORD, "supersedes": "0005,0006,0008"}) == []
-    assert find_field_violations({**_VALID_RECORD, "supersedes": "0005, 0006"}) != []
+def test_the_projected_law_names_the_doctor_and_no_measured_by_pattern() -> None:
+    """sa-adr-measured-by-pattern-refuses-real-checks#B27-4: the ADR law names the doctor rule, never a test or pattern."""
+    law = (_REPO_ROOT / "dadaia_workspace/public/scaffold/ADRs/AGENTS.md").read_text("utf-8")
+    assert (
+        ".venv/bin/dadaia doctor` (`LEDGER-ADR-SCHEMA`) validates every record and the numbering"
+        in law
+    )
+    assert "test_adr_canon" not in law and "SPEC-DOC-nnn" not in law
 
 
 def test_every_superseded_record_is_named_by_some_successor() -> None:
-    """A `superseded` record whose successor nobody can find is a dead end for every
-    reader the status was meant to redirect."""
-    records = _read_jsonl_records(_DECISIONS_PATH)
+    """Every committed `superseded` record is named by some successor's `supersedes`."""
+    lines = (
+        (_REPO_ROOT / "specs" / "ADRs" / "decisions.jsonl").read_text(encoding="utf-8").splitlines()
+    )
+    records = [json.loads(line) for line in lines if line.strip()]
     named = {
         adr_id
         for record in records

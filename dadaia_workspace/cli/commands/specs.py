@@ -3,32 +3,35 @@
 from __future__ import annotations
 
 import sys
+from collections.abc import Callable
 from dataclasses import replace
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import NoReturn
 
 import typer
 
 from dadaia_workspace import container
+from dadaia_workspace.cli._fail import fail
 from dadaia_workspace.cli._specs_resolution import (
     resolve_context_for_cli,
     resolve_context_specs_dir_for_cli,
     resolve_specs_dir_for_cli,
 )
 from dadaia_workspace.core import gitflow, specs_version
-from dadaia_workspace.core.cli_line import fix_line
+from dadaia_workspace.core.atomic_write import SymlinkRefusedError
+from dadaia_workspace.core.cli_line import fix_line, materialize_line
+from dadaia_workspace.core.doctor_rules import SectionFinding
 from dadaia_workspace.core.gitflow import DEFAULT, Gitflow, from_mapping
 from dadaia_workspace.core.workspace_resolver import resolve_workspace_root
 from dadaia_workspace.features.migrate import upgrade as upgrade_feature
-from dadaia_workspace.features.migrate.registry import UpgradeRefused
-from dadaia_workspace.features.migrate.upgrade import UpgradeResult
-from dadaia_workspace.features.specs import canon
+from dadaia_workspace.features.migrate.upgrade import UpgradeRefused, UpgradeResult
+from dadaia_workspace.features.spec_context import sweep
+from dadaia_workspace.features.specs import SpecsDoctor, canon
+from dadaia_workspace.features.specs.doctor_types import finding_path
+from dadaia_workspace.infrastructure.ledger_scripts import script_repairs
 
 app = typer.Typer(help="SDD release-lifecycle structural checks and helpers.")
-
-
-def _resolve_specs_dir(specs_dir: str | None) -> Path:
-    return resolve_specs_dir_for_cli(specs_dir)
 
 
 @app.command("upgrade")
@@ -36,47 +39,69 @@ def upgrade(
     specs_dir: str | None = typer.Option(
         None, "--specs-dir", help="Path to specs/ directory. Default: bound context."
     ),
-    target: int | None = typer.Option(
-        None, "--target", help="Target pattern version. Default: the canonical version."
-    ),
     dry_run: bool = typer.Option(False, "--dry-run", help="Plan only — no writes."),
 ) -> None:
     """Upgrade a specs/ tree to the canonical pattern version.
 
-    A tree below the one live hop (v6) refuses, no filesystem write, naming the
-    dadaia-workspace 0.4.x prerequisite. A tree at v6 walks to v7; every tree gets its
-    fixed law sections and template-artifact repairs, so the doctor ends clean.
+    An absent, malformed or foreign tree refuses, writing nothing, with the one state
+    fix (``specs_version.state``). An upgradable tree (stamp v6 or later) is re-stamped
+    to the canonical version; every tree gets the doctor's repair set, so the doctor
+    ends clean.
     """
-    resolved = _resolve_specs_dir(specs_dir)
+    resolved = resolve_specs_dir_for_cli(specs_dir)
     try:
-        result = upgrade_feature.upgrade(resolved, target=target, dry_run=dry_run)
+        result = upgrade_feature.upgrade(resolved, remove=_deleter(resolved), dry_run=dry_run)
+    except SymlinkRefusedError as exc:
+        _refuse_symlink(exc)
     except UpgradeRefused as exc:
-        typer.echo(f"[refused] {exc}", err=True)
-        sys.exit(1)
-    _echo_upgrade(resolved, result)
-    sys.exit(0)
+        fail(exc)
+    sys.exit(1 if _echo_upgrade(resolved, result) else 0)
 
 
-def _echo_upgrade(specs: Path, result: UpgradeResult) -> None:
+def _refuse_symlink(exc: SymlinkRefusedError) -> NoReturn:
+    fail(f"{exc}\nfix: {materialize_line(exc.path, exc.path.resolve())}")
+
+
+def _repair(specs: Path, *, dry_run: bool) -> tuple[list[SectionFinding], list[SectionFinding]]:
+    """The doctor's one repair set: `specs upgrade` keeps no second writer of its own.
+    Returns what it repaired and every error left (the promise: clean)."""
+    public = canon.default_public_dir()
+    doctor = SpecsDoctor(specs, public_dir=public, templates_dir=public / "templates")
+    fixable = [issue for issue in doctor.check() if issue.fixable]
+    if dry_run:
+        return fixable, []
+    fixed = doctor.fix(fixable)
+    return fixed, [i for i in doctor.check() if i.error]
+
+
+def _deleter(specs: Path) -> Callable[[Path], object]:
+    """The one guarded deleter (``sweep.remove``) scoped to the specs tree."""
+    return lambda path: sweep.remove(specs, path, path.name)
+
+
+def _echo_upgrade(specs: Path, result: UpgradeResult) -> bool:
+    """Echo the upgrade; True when an error the repair could not clear remains."""
     will = "would " if result.dry_run else ""
-    for path in result.placeholder_removed:
-        typer.echo(f"[placeholder-repair] {will}remove {path}")
+    for path in result.ideas_removed:
+        typer.echo(f"[ideas-repair] {will}remove {path}")
     for path in result.status_rewritten:
         typer.echo(f"[status-vocabulary] {will}rewrite {path}")
     for path in result.tech_stack_folded:
         typer.echo(f"[tech-stack] {will}fold {path} into memory/ARCHITECTURE.md")
-    for path in result.fixed_restored:
-        typer.echo(f"[fixed-section] {will}write {path}")
-    if result.from_version < result.to_version:
+    fixed, refused = _repair(specs, dry_run=result.dry_run)
+    for issue in fixed:
+        typer.echo(f"[repair] {will}fix {issue.code} {finding_path(issue)}")
+    for issue in refused:
         typer.echo(
-            f"[stamp] {will}stamp {specs / 'constitution.md'} "
-            f"{result.from_version} -> {result.to_version}"
+            f"[refused] {issue.code} {finding_path(issue)}: {issue.message}\nfix: {issue.fix}"
         )
+    for action in [] if result.dry_run else script_repairs(specs):
+        typer.echo(f"[repair] {action}")
+    if result.stamped:
+        typer.echo(f"[stamp] {will}stamp {specs / 'constitution.md'} -> {result.to_version}")
     if result.no_op:
-        typer.echo(
-            f"[ok] {specs} already at pattern version {result.from_version} "
-            f"(target {result.to_version}) — no-op."
-        )
+        typer.echo(f"[ok] {specs} already at pattern version {result.to_version} — no-op.")
+    return bool(refused)
 
 
 def _init_fix(*argv: str) -> str:
@@ -117,7 +142,7 @@ def init(
 ) -> None:
     """Bring a repo's specs/ to the canon, never committing.
 
-    Absent: scaffold. Dadaia (stamped >= 6): upgrade, then fill missing files. Foreign:
+    Absent: scaffold. Upgradable or canonical: upgrade, then fill missing files. Foreign:
     after consent, `git mv specs specs-bkp` (staged) and scaffold.
     """
     rerun: tuple[str, ...] = ("--specs-dir", str(specs_dir))
@@ -125,35 +150,42 @@ def init(
         try:
             ctx = resolve_context_for_cli(context)
         except ValueError as exc:
-            typer.echo(f"[error] {exc}\n{_init_fix('--context', '<name>')}", err=True)
-            raise typer.Exit(2) from exc
-        specs_dir = str(resolve_context_specs_dir_for_cli(resolve_workspace_root(), ctx))
+            fail(f"{exc}\n{_init_fix('--context', '<name>')}")
+        tree = resolve_context_specs_dir_for_cli(workspace := resolve_workspace_root(), ctx)
+        if tree is None:  # a name the registry does not know owns no tree to write
+            fail(f"no registered context {ctx!r}\nfix: {fix_line(workspace, 'context', 'list')}")
+        specs_dir = str(tree)
         rerun = ("--context", ctx)
     target = resolve_specs_dir_for_cli(specs_dir)
-    kind = specs_version.classify(target)
+    kind, fix = specs_version.state(target)
     if kind == "malformed":
-        typer.echo(
-            f"[refused] {gitflow.constitution_error(target)}; nothing written.\n"
-            f"fix: repair the YAML frontmatter of {target / 'constitution.md'}",
-            err=True,
-        )
-        raise typer.Exit(2)
+        fail(f"nothing written\n{fix}")
     flow = _gitflow(target, principal, integration, work_prefix, rerun)
+    refused = False  # an unrelated error the repair left never blocks the gitflow write
     if kind == "foreign":
         _move_foreign(target, rerun, replace_foreign)
-    elif kind == "dadaia":
-        _echo_upgrade(target, upgrade_feature.upgrade(target))
+    elif kind in ("upgradable", "canonical"):
+        try:
+            refused = _echo_upgrade(
+                target, upgrade_feature.upgrade(target, remove=_deleter(target))
+            )
+        except SymlinkRefusedError as exc:
+            _refuse_symlink(exc)
 
     project = name or target.parent.name
     written = canon.scaffold(target, project_name=project)
     for path in [*written, *canon.scaffold_repo_law(target.parent, project_name=project)]:
         typer.echo(f"[created] {path}")
+    for action in script_repairs(target):
+        typer.echo(f"[created] {action}")
     gitflow.merge_frontmatter(target, gitflow=flow)
     typer.echo(
         f"[gitflow] principal {flow.principal}, integration {flow.integration}, "
         f"work {flow.work_pattern}"
     )
-    if kind != "dadaia":
+    if refused:
+        raise typer.Exit(1)
+    if kind in ("absent", "foreign"):
         typer.echo(f"[ok] {target} at pattern version {specs_version.CANONICAL_SPECS_VERSION}")
 
 
@@ -164,13 +196,11 @@ def _gitflow(
     work_prefix: str | None,
     rerun: tuple[str, ...],
 ) -> Gitflow:
-    """Flags over the tree's own valid block, over detection (``origin/HEAD``, else
-    ``main``); an invalid result refuses before anything is written."""
+    """Flags over the tree's own valid block, over detection (the git client's
+    ``principal``); an invalid result refuses, its fix naming the kept values."""
     kept, absent = gitflow.read_gitflow(target)  # a malformed block refused upstream
     if absent is not None:
-        kept = replace(
-            DEFAULT, principal=container.build_git_client().default_branch(target.parent)
-        )
+        kept = replace(DEFAULT, principal=container.build_git_client().principal(target.parent))
     try:
         return from_mapping(
             {
@@ -180,9 +210,8 @@ def _gitflow(
             }
         )
     except ValueError as exc:
-        fixed = ("--principal", "main", "--integration", "develop", "--work-prefix", "feature/")
-        typer.echo(f"[error] {exc}\n{_init_fix(*rerun, *fixed)}", err=True)
-        raise typer.Exit(2) from exc
+        fixed = ("--principal", kept.principal, "--integration", kept.integration)
+        fail(f"{exc}\n{_init_fix(*rerun, *fixed, '--work-prefix', kept.work_prefix)}")
 
 
 def _move_foreign(target: Path, rerun: tuple[str, ...], replace_foreign: bool) -> None:
@@ -190,12 +219,10 @@ def _move_foreign(target: Path, rerun: tuple[str, ...], replace_foreign: bool) -
     backup location baseline publishes) under ``--replace-foreign``; exits on a
     refusal, writing nothing."""
     if not replace_foreign:
-        typer.echo(
-            f"[refused] {target} is a foreign specs tree; nothing written.\n"
-            f"{_init_fix(*rerun, '--replace-foreign')}",
-            err=True,
+        fail(
+            f"{target} is a foreign specs tree; nothing written.\n"
+            f"{_init_fix(*rerun, '--replace-foreign')}"
         )
-        raise typer.Exit(2)
     backup = target.parent / _BACKUP
     if backup.exists():
         backup = backup / f"{datetime.now(UTC):%Y%m%dT%H%M%SZ}"

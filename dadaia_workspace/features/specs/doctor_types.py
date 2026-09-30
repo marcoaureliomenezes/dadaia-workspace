@@ -1,18 +1,10 @@
-"""Shared leaf types for the SpecsDoctor decomposition (v0.1.55 FR1).
-
-Pure leaf module: imports ONLY stdlib (``dataclasses`` / ``enum``). It holds no I/O and no
-sibling-validator import, so the coordinator can depend on it without pulling in
-``spec_context`` or ``infrastructure``.
-
-v0.1.76 T-4: the ``PidProbe`` leaf alias (formerly re-homed here for the SPEC-DOC-029
-``pid_probe`` composition-root seam, R-1) is REMOVED — SPEC-DOC-029 is retired (see
-``doctor_coherence.py``) and nothing else in the SpecsDoctor decomposition consumed it.
-"""
+"""The specs doctor's severity and its one finding factory — pure, no I/O."""
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 from enum import StrEnum
+
+from dadaia_workspace.core.doctor_rules import SectionFinding
 
 
 class Severity(StrEnum):
@@ -20,30 +12,31 @@ class Severity(StrEnum):
     WARNING = "warning"
 
 
-@dataclass(frozen=True)
-class SpecsDoctorIssue:
-    code: str
-    severity: Severity
-    description: str
-    path: str | None = None
-    fixable: bool = False
-    #: The issue's own remedy when ``doctor --fix`` cannot repair it (the rule's
-    #: ``fix_help`` otherwise).
-    fix: str = ""
+def specs_finding(
+    code: str,
+    severity: Severity,
+    description: str,
+    path: str | None = None,
+    fixable: bool = False,
+    fix: str = "",
+) -> SectionFinding:
+    """One specs-doctor finding: its location closes the message and rides ``extra`` as
+    ``path`` — the target ``doctor --fix`` repairs. ``fix`` is its own remedy when the
+    doctor cannot repair it (the rule's ``fix_help`` otherwise)."""
+    location = f" ({path})" if path else ""
+    extra = (("path", path),) if path else ()
+    return SectionFinding(
+        code,
+        severity.value,
+        description + location,
+        False,
+        severity is Severity.ERROR,
+        fix,
+        fixable,
+        extra,
+    )
 
-    def to_dict(self) -> dict[str, str | None]:
-        return {
-            "code": self.code,
-            "severity": self.severity.value,
-            "description": self.description,
-            "path": self.path,
-        }
 
-
-@dataclass
-class _MemoryMdSummary:
-    has_heading: bool
-    heading_text: str
-    forbidden_h2: list[str]
-    frontmatter: dict | None  # type: ignore[type-arg]
-    body: str
+def finding_path(finding: SectionFinding) -> str | None:
+    """The file a specs finding names, or ``None``."""
+    return dict(finding.extra).get("path")

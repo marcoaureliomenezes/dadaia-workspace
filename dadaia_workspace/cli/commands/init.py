@@ -8,6 +8,7 @@ import typer
 from rich.console import Console
 
 from dadaia_workspace import container
+from dadaia_workspace.cli._fail import fail
 from dadaia_workspace.cli.commands.context import create_fix, print_next_step
 from dadaia_workspace.core import harness_registry
 from dadaia_workspace.core.cli_line import cli_path, fix_line
@@ -53,13 +54,6 @@ def _interactive() -> bool:
     return sys.stdin.isatty()
 
 
-def _refuse(message: str, fix: str) -> typer.Exit:
-    """Print *message* + its ONE executable ``fix:`` line on stderr and exit 2."""
-    typer.secho(message, err=True, fg=typer.colors.RED)
-    typer.secho(f"fix: {fix}", err=True, fg=typer.colors.RED)
-    return typer.Exit(2)
-
-
 def _root(directory: str) -> Path:
     """The seam is argv: the directory is a parameter, never resolved from cwd."""
     root = Path(directory).expanduser()
@@ -85,10 +79,10 @@ def _plan(directory: str, harness: str, repo: str, associated: tuple[str, ...]) 
         return InitPlan(directory, harness, repo, associated)
     first = harness_registry.L1_ENTRY_HARNESSES[0]
     if not _interactive():
-        raise _refuse(
+        fail(
             "init needs DIR and --harness when no terminal can answer prompts; "
-            f"harnesses: {', '.join(harness_registry.L1_ENTRY_HARNESSES)}.",
-            InitPlan(directory or "<dir>", harness or first, repo, associated).command(),
+            f"harnesses: {', '.join(harness_registry.L1_ENTRY_HARNESSES)}.\nfix: "
+            + InitPlan(directory or "<dir>", harness or first, repo, associated).command()
         )
     directory = directory or str(Path.cwd() / typer.prompt("Workspace name"))
     harness = harness or typer.prompt(
@@ -133,37 +127,29 @@ def init(
     plan = _plan(directory, harness, repo, tuple(associated_repo))
     try:
         chosen = harness_registry.parse_harness_name(plan.harness)
-    except ValueError as exc:
-        raise _refuse(
-            str(exc),
-            replace(plan, harness=harness_registry.L1_ENTRY_HARNESSES[0]).command(),
-        ) from None
+    except ValueError as exc:  # a bad option value is Click's usage error (exit 2)
+        raise typer.BadParameter(str(exc), param_hint="'--harness'") from None
 
     root = _root(plan.directory)
     sibling_fix = replace(plan, harness=chosen).command(
         root.parent / ((root.name or "dadaia") + "-workspace")
     )
     if root.exists() and not root.is_dir():
-        raise _refuse(f"'{root}' is not a directory.", sibling_fix)
+        fail(f"'{root}' is not a directory.\nfix: {sibling_fix}")
     # A directory that already holds `.dadaia/` is THIS workspace (a re-run, idempotent);
     # anything else non-empty is a foreign tree and is never scaffolded over.
     if root.is_dir() and any(root.iterdir()) and not (root / ".dadaia").is_dir():
-        raise _refuse(
-            f"'{root}' already holds a foreign tree (not a dadaia workspace).", sibling_fix
-        )
+        fail(f"'{root}' already holds a foreign tree (not a dadaia workspace).\nfix: {sibling_fix}")
     root.mkdir(parents=True, exist_ok=True)
 
     svc = container.build_workspace_service(root)
     try:
         before, after, action = svc.venv_change(root)
-        _, installed = svc.init(root, skip_assets=skip_assets, harnesses=(chosen,))
+        installed = svc.init(root, skip_assets=skip_assets, harnesses=(chosen,))
     except WorkspaceVenvNewerError as exc:
-        typer.secho(f"Error: {exc}", err=True, fg=typer.colors.RED)
-        typer.secho(f"fix: {fix_line(root, 'init', str(root))}", err=True, fg=typer.colors.RED)
-        raise typer.Exit(1) from None
+        fail(f"{exc}\nfix: {fix_line(root, 'init', str(root), '--harness', chosen)}")
     except WorkspaceVenvBootstrapError as exc:
-        typer.secho(f"Error: {exc}", err=True, fg=typer.colors.RED)
-        raise typer.Exit(1) from None
+        fail(exc)
 
     console.print(f"[green]✓[/green] Workspace {root} ({chosen})", highlight=False, soft_wrap=True)
     if skip_assets:
@@ -194,11 +180,8 @@ def _reconcile_upgrade(root: Path, before: str | None, after: str | None) -> Non
         doctor_service=container.build_doctor_service(root),
     )
     if not result.ok:
-        typer.secho(f"Error: reconcile after upgrade failed: {result.error}", err=True, fg="red")
-        typer.secho(
-            f"fix: {fix_line(root, 'reconcile', '--expect-version', after or '')}", err=True
-        )
-        raise typer.Exit(1)
+        fix = fix_line(root, "reconcile", "--expect-version", after or "")
+        fail(f"reconcile after upgrade failed: {result.error}\nfix: {fix}")
     container.build_spec_context_service(root).refresh_hooks()
     console.print(f"upgraded {before} -> {after}", markup=False, highlight=False)
 
@@ -219,12 +202,6 @@ def _create_context(root: Path, plan: InitPlan) -> str:
                 raise
             ctx_svc.alive(slug)
     except (DadaiaError, OSError) as exc:
-        typer.secho(f"Error: {exc}", err=True, fg=typer.colors.RED)
-        typer.secho(
-            f"fix: {create_fix(root, exc, None, [plan.repo, *plan.associated])}",
-            err=True,
-            fg=typer.colors.RED,
-        )
-        raise typer.Exit(1) from None
+        fail(f"{exc}\nfix: {create_fix(root, exc, None, [plan.repo, *plan.associated])}")
     console.print(f"[green]✓[/green] {slug} ALIVE", highlight=False, soft_wrap=True)
     return slug

@@ -8,7 +8,6 @@ sources:
   - dadaia_workspace/public/skills/dd-bug-resolution/**
   - dadaia_workspace/public/skills/dd-bug-registration/**
   - dadaia_workspace/public/schemas/bugs/**
-  - dadaia_workspace/core/models/bugs.py
   - dadaia_workspace/features/specs/doctor_governance.py
 ---
 

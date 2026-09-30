@@ -1,542 +1,199 @@
 """``core.invocation`` — the single session/context/root/Bind resolution authority.
 
-Intent: CONTRACT — release 0.5.1 candidate K1 ("One Invocation"). Replaces, at the new
-deepened interface, the eight deciders / three sid ladders / four staleness rules the
-deepening audit (2026-08-28) named: ``tests/unit/core/test_specs_resolver.py``,
-``test_specs_resolver_resolve_context.py``, ``test_specs_resolver_associated_repo_walk.py``,
-``test_specs_resolver_delete_bind.py``, ``tests/unit/core/test_session_env.py``,
-``tests/unit/hooks/test_common_sid_precedence.py``. Per the deepening discipline
-(``codebase-design/DEEPENING.md`` — "replace, don't layer"): these tables assert
-observable outcomes through :func:`~dadaia_workspace.core.invocation.resolve`'s single
-interface, not internal ladder state, so they describe behavior rather than pinning any
-one of the deleted implementations.
-
-Also covers the open bug ``sdd-gate-memory-phase-resolves-empty-when-cwd-is-a-linked-
-worktree-outside-repos``: a cwd sitting inside a nested, independently sentinel-bearing
-sandbox workspace must never shadow the real workspace root that owns an explicit write
-target — the root is resolved from the TARGET first, not from cwd, whenever a target is
-known.
+Intent: CONTRACT — 0.5.1 K1 ("One Invocation"): the rung table asserts observable outcomes
+through :func:`invocation.resolve`, never internal ladder state. Also covers
+``sdd-gate-memory-phase-resolves-empty-when-cwd-is-a-linked-worktree-outside-repos``: a nested
+sentinel-bearing sandbox under cwd never shadows the workspace that owns the write target.
 """
 
 from __future__ import annotations
 
 import json
-from collections.abc import Callable
-from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
+from typing import Any
 
 import pytest
-import typer
 
 from dadaia_workspace.core import invocation
-from dadaia_workspace.core.invocation import Invocation
 from dadaia_workspace.core.workspace_resolver import resolve_workspace_root
 from tests.fixtures.harness_env import scrub_context_resolution_env
-
-# --------------------------------------------------------------------------- fixture builders
-
-
-def _mk_ws(tmp_path: Path, *, slug: str = "proj", name: str | None = None) -> Path:
-    """A minimal initialized workspace with one registered ALIVE context."""
-    ws = tmp_path / "ws"
-    states = ws / ".dadaia" / "states"
-    states.mkdir(parents=True)
-    (states / "spec_contexts.json").write_text(
-        json.dumps(
-            {
-                "schema_version": "2",
-                "contexts": [{"name": name or slug, "repo_slug": slug, "state": "alive"}],
-            }
-        ),
-        encoding="utf-8",
-    )
-    (ws / "repos" / slug / "specs").mkdir(parents=True)
-    (ws / ".dadaia" / "sessions").mkdir(parents=True)
-    return ws
-
-
-def _register_context(
-    ws: Path, *, slug: str, name: str | None = None, associated: list[str] | None = None
-) -> None:
-    """Add a second registered context (optionally with associated repos) + its repo dir."""
-    registry = ws / ".dadaia" / "states" / "spec_contexts.json"
-    data = json.loads(registry.read_text(encoding="utf-8"))
-    entry: dict[str, object] = {"name": name or slug, "repo_slug": slug, "state": "alive"}
-    if associated:
-        entry["associated_repos"] = [{"slug": s} for s in associated]
-        for s in associated:
-            (ws / "repos" / s).mkdir(parents=True, exist_ok=True)
-    data["contexts"].append(entry)
-    registry.write_text(json.dumps(data), encoding="utf-8")
-    (ws / "repos" / slug / "specs").mkdir(parents=True, exist_ok=True)
-
-
-def _write_session(
-    ws: Path,
-    session_id: str,
-    context: str,
-    *,
-    mode: str = "READ",
-    age_seconds: int = 0,
-    ttl: int = 300,
-) -> None:
-    """Seed ``sessions/<id>.json`` as ``bind`` would, with a controllable heartbeat age."""
-    last_seen = (datetime.now(tz=UTC) - timedelta(seconds=age_seconds)).isoformat()
-    (ws / ".dadaia" / "sessions" / f"{session_id}.json").write_text(
-        json.dumps(
-            {
-                "session_id": session_id,
-                "context": context,
-                "mode": mode,
-                "last_seen_at": last_seen,
-                "ttl_seconds": ttl,
-            }
-        ),
-        encoding="utf-8",
-    )
-
-
-# --------------------------------------------------------------------------- resolve() — the table
-
-
-@dataclass(frozen=True)
-class Scenario:
-    name: str
-    build: Callable[[Path], dict[str, object]]
-    check: Callable[[Invocation], bool]
-
-
-def _explicit_wins(tmp_path: Path) -> dict[str, object]:
-    ws = _mk_ws(tmp_path, slug="x")
-    _register_context(ws, slug="y")
-    sid = "sess-explicit"
-    _write_session(ws, sid, "y")
-    target = ws / "repos" / "x" / "specs" / "TASKS.md"
-    return {
-        "explicit": "explicit-ctx",
-        "target_path": target,
-        "env": {"DADAIA_CONTEXT": "y", "CLAUDE_CODE_SESSION_ID": sid},
-        "cwd": ws,
-    }
-
-
-def _target_path_beats_env(tmp_path: Path) -> dict[str, object]:
-    ws = _mk_ws(tmp_path, slug="x")
-    _register_context(ws, slug="y")
-    target = ws / "repos" / "x" / "specs" / "releases" / "v1" / "TASKS.md"
-    return {"target_path": target, "env": {"DADAIA_CONTEXT": "y"}, "cwd": ws}
-
-
-def _target_path_maps_slug_to_name(tmp_path: Path) -> dict[str, object]:
-    ws = _mk_ws(tmp_path, slug="beta-repo", name="alpha-context")
-    target = ws / "repos" / "beta-repo" / "specs" / "SPEC.md"
-    return {"target_path": target, "env": {}, "cwd": ws}
-
-
-def _target_path_outside_repo_falls_to_env(tmp_path: Path) -> dict[str, object]:
-    ws = _mk_ws(tmp_path, slug="x")
-    _register_context(ws, slug="y")
-    target = ws / "specs" / "bugs" / "bugs.jsonl"
-    return {"target_path": target, "env": {"DADAIA_CONTEXT": "y"}, "cwd": ws}
-
-
-def _env_alone_resolves(tmp_path: Path) -> dict[str, object]:
-    ws = _mk_ws(tmp_path, slug="proj")
-    return {"env": {"DADAIA_CONTEXT": "proj"}, "cwd": ws}
-
-
-def _env_wins_over_session(tmp_path: Path) -> dict[str, object]:
-    ws = _mk_ws(tmp_path, slug="proj")
-    _register_context(ws, slug="other")
-    sid = "sess-env-wins"
-    _write_session(ws, sid, "other")
-    return {"env": {"DADAIA_CONTEXT": "proj", "CLAUDE_CODE_SESSION_ID": sid}, "cwd": ws}
-
-
-def _session_wins_over_cwd(tmp_path: Path) -> dict[str, object]:
-    ws = _mk_ws(tmp_path, slug="proj")
-    _register_context(ws, slug="other")
-    sid = "sess-ahead-of-cwd"
-    _write_session(ws, sid, "proj")
-    return {"env": {"CLAUDE_CODE_SESSION_ID": sid}, "cwd": ws / "repos" / "other"}
-
-
-def _stale_session_falls_through_to_cwd(tmp_path: Path) -> dict[str, object]:
-    ws = _mk_ws(tmp_path, slug="proj")
-    _register_context(ws, slug="other")
-    sid = "sess-stale"
-    _write_session(ws, sid, "proj", age_seconds=4000, ttl=300)
-    return {"env": {"CLAUDE_CODE_SESSION_ID": sid}, "cwd": ws / "repos" / "other"}
-
-
-def _deleted_context_guard_falls_through(tmp_path: Path) -> dict[str, object]:
-    ws = _mk_ws(tmp_path, slug="other")
-    sid = "sess-deleted-ctx"
-    _write_session(ws, sid, "deleted-ctx")
-    return {"env": {"CLAUDE_CODE_SESSION_ID": sid}, "cwd": ws / "repos" / "other"}
-
-
-def _cwd_alone_resolves(tmp_path: Path) -> dict[str, object]:
-    ws = _mk_ws(tmp_path, slug="proj")
-    return {"env": {}, "cwd": ws / "repos" / "proj" / "specs"}
-
-
-def _cwd_maps_slug_to_name(tmp_path: Path) -> dict[str, object]:
-    ws = _mk_ws(tmp_path, slug="beta-repo", name="alpha-context")
-    return {"env": {}, "cwd": ws / "repos" / "beta-repo" / "specs"}
-
-
-def _nothing_resolves(tmp_path: Path) -> dict[str, object]:
-    plain = tmp_path / "not-a-workspace"
-    plain.mkdir()
-    return {"env": {}, "cwd": plain}
-
-
-def _open_bug_linked_worktree_outside_repos(tmp_path: Path) -> dict[str, object]:
-    """The open bug's exact repro: cwd is a linked worktree parked under
-    ``.dadaia/tmp/`` that carries its OWN independent sentinel; the write target lives
-    under the REAL outer workspace's ``repos/<slug>/specs/memory/``. Root must resolve
-    to the OUTER workspace (the one that owns the target), not the inner one — proven
-    below by first asserting the inner sentinel is genuinely a trap for a cwd-only walk.
-    """
-    outer = _mk_ws(tmp_path, slug="dadaia-workspace")
-    nested = outer / ".dadaia" / "tmp" / "agent-x" / "worktree"
-    nested_states = nested / ".dadaia" / "states"
-    nested_states.mkdir(parents=True)
-    (nested_states / "spec_contexts.json").write_text(
-        json.dumps({"schema_version": "2", "contexts": []}), encoding="utf-8"
-    )
-    # Sanity: a cwd-only walk from `nested` really would land on the WRONG (inner) root.
-    assert resolve_workspace_root(nested) == nested.resolve()
-
-    target = outer / "repos" / "dadaia-workspace" / "specs" / "memory" / "atom.md"
-    return {"target_path": target, "env": {}, "cwd": nested}
-
-
-def _bind_from_env(tmp_path: Path) -> dict[str, object]:
-    ws = _mk_ws(tmp_path, slug="proj")
-    _register_context(ws, slug="other", associated=["other-infra"])
-    return {"env": {"DADAIA_CONTEXT": "other"}, "cwd": ws / "repos" / "proj"}
-
-
-def _bind_unbound(tmp_path: Path) -> dict[str, object]:
-    ws = _mk_ws(tmp_path, slug="proj")
-    return {"env": {}, "cwd": ws / "repos" / "proj"}
-
-
-SCENARIOS: tuple[Scenario, ...] = (
-    Scenario(
-        "explicit_wins_over_target_env_and_session",
-        _explicit_wins,
-        lambda inv: inv.context_name == "explicit-ctx" and inv.rung == "explicit",
-    ),
-    Scenario(
-        "rung0_target_path_wins_over_dadaia_context",
-        _target_path_beats_env,
-        lambda inv: inv.context_name == "x" and inv.rung == "target_path",
-    ),
-    Scenario(
-        "rung0_target_path_maps_slug_to_name_via_registry",
-        _target_path_maps_slug_to_name,
-        lambda inv: (
-            inv.context_name == "alpha-context"
-            and inv.repo_slug == "beta-repo"
-            and inv.rung == "target_path"
-        ),
-    ),
-    Scenario(
-        "rung0_target_outside_repo_falls_through_to_env",
-        _target_path_outside_repo_falls_to_env,
-        lambda inv: inv.context_name == "y" and inv.rung == "env",
-    ),
-    Scenario(
-        "rung_env_dadaia_context_alone",
-        _env_alone_resolves,
-        lambda inv: inv.context_name == "proj" and inv.rung == "env",
-    ),
-    Scenario(
-        "rung_env_wins_over_live_session_record",
-        _env_wins_over_session,
-        lambda inv: inv.context_name == "proj" and inv.rung == "env",
-    ),
-    Scenario(
-        "rung_session_wins_over_cwd",
-        _session_wins_over_cwd,
-        lambda inv: inv.context_name == "proj" and inv.rung == "session",
-    ),
-    Scenario(
-        "rung_session_stale_falls_through_to_cwd",
-        _stale_session_falls_through_to_cwd,
-        lambda inv: inv.context_name == "other" and inv.rung == "cwd",
-    ),
-    Scenario(
-        "rung_session_deleted_context_guard_falls_through_to_cwd",
-        _deleted_context_guard_falls_through,
-        lambda inv: inv.context_name == "other" and inv.rung == "cwd",
-    ),
-    Scenario(
-        "rung_cwd_alone_resolves",
-        _cwd_alone_resolves,
-        lambda inv: inv.context_name == "proj" and inv.rung == "cwd",
-    ),
-    Scenario(
-        "rung_cwd_maps_slug_to_name_via_registry",
-        _cwd_maps_slug_to_name,
-        lambda inv: inv.context_name == "alpha-context" and inv.repo_slug == "beta-repo",
-    ),
-    Scenario(
-        "nothing_resolves_missing_workspace",
-        _nothing_resolves,
-        lambda inv: (
-            inv.workspace_root is None
-            and inv.session_id is None
-            and inv.context_name is None
-            and inv.repo_slug is None
-            and inv.specs_dir is None
-            and inv.bind.context_name is None
-            and inv.rung == "none"
-        ),
-    ),
-    Scenario(
-        "open_bug_linked_worktree_outside_repos_root_resolves_from_target",
-        _open_bug_linked_worktree_outside_repos,
-        lambda inv: (
-            inv.context_name == "dadaia-workspace"
-            and inv.workspace_root is not None
-            and inv.workspace_root.name != "worktree"
-            and inv.specs_dir is not None
-            and inv.specs_dir.is_dir()
-        ),
-    ),
-    Scenario(
-        "bind_carries_the_context_scope_main_plus_associated",
-        _bind_from_env,
-        lambda inv: (
-            inv.bind.context_name == "other"
-            and inv.bind.repos == frozenset({"other", "other-infra"})
-        ),
-    ),
-    Scenario(
-        "bind_is_empty_when_the_session_never_bound_even_inside_a_repo",
-        _bind_unbound,
-        lambda inv: inv.bind.context_name is None and inv.bind.repos == frozenset(),
-    ),
-)
-
-
-@pytest.mark.parametrize("scenario", SCENARIOS, ids=lambda s: s.name)
-def test_resolve_scenarios(tmp_path: Path, scenario: Scenario) -> None:
-    kwargs = scenario.build(tmp_path)
-    inv = invocation.resolve(**kwargs)  # type: ignore[arg-type]
-    assert scenario.check(inv), f"{scenario.name}: unexpected Invocation {inv!r}"
-
-
-# --------------------------------------------------------------------------- session id precedence
-
-
-@pytest.mark.parametrize(
-    ("name", "env", "payload", "default", "expected"),
-    [
-        (
-            "payload_sid_beats_inherited_claude_env",
-            {"CLAUDE_CODE_SESSION_ID": "stale-inherited"},
-            {"session_id": "live-payload"},
-            None,
-            "live-payload",
-        ),
-        (
-            "payload_sid_beats_inherited_codex_env",
-            {"CODEX_SESSION_ID": "stale-inherited"},
-            {"session_id": "live-payload"},
-            None,
-            "live-payload",
-        ),
-        (
-            "dadaia_override_stays_first",
-            {"DADAIA_SESSION_ID": "explicit-override"},
-            {"session_id": "live-payload"},
-            None,
-            "explicit-override",
-        ),
-        (
-            "env_fallback_without_payload",
-            {"CLAUDE_CODE_SESSION_ID": "harness-env"},
-            {},
-            None,
-            "harness-env",
-        ),
-        (
-            "stdin_field_when_no_env",
-            {},
-            {"session_id": "from-stdin"},
-            None,
-            "from-stdin",
-        ),
-        (
-            "dadaia_override_beats_codex_and_stdin",
-            {"CODEX_SESSION_ID": "codex-sid", "DADAIA_SESSION_ID": "explicit"},
-            {"session_id": "x"},
-            None,
-            "explicit",
-        ),
-        (
-            "default_when_nothing_resolves",
-            {},
-            {},
-            "workspace",
-            "workspace",
-        ),
-        (
-            "codex_thread_id_resolves_when_no_codex_session_id",
-            {"CODEX_THREAD_ID": "thread-abc123"},
-            {},
-            None,
-            "thread-abc123",
-        ),
-        (
-            "codex_session_id_preferred_over_codex_thread_id",
-            {"CODEX_SESSION_ID": "codex-sess-1", "CODEX_THREAD_ID": "thread-abc123"},
-            {},
-            None,
-            "codex-sess-1",
-        ),
-    ],
-)
-def test_resolve_session_id_precedence(
-    name: str,
-    env: dict[str, str],
-    payload: dict[str, object],
-    default: str | None,
-    expected: str,
-) -> None:
-    kwargs: dict[str, object] = {"default": default} if default is not None else {}
-    assert invocation.resolve_session_id(payload, env, **kwargs) == expected  # type: ignore[arg-type]
-
-
-# --------------------------------------------------------------------------- context_name_for_repo_slug
-
-
-def test_context_name_for_repo_slug_resolves_matching_entry(tmp_path: Path) -> None:
-    ws = _mk_ws(tmp_path, slug="beta-repo", name="alpha-context")
-    assert invocation.context_name_for_repo_slug(ws, "beta-repo") == "alpha-context"
-
-
-def test_context_name_for_repo_slug_matches_an_associated_repo(tmp_path: Path) -> None:
-    """A16.4: a slug that matches an ASSOCIATED repo resolves the OWNING context's
-    name, never a second context of its own."""
-    ws = _mk_ws(tmp_path, slug="main-repo", name="proj")
-    _register_context(ws, slug="other", associated=["assoc-repo"])
-    assert invocation.context_name_for_repo_slug(ws, "assoc-repo") == "other"
-
-
-def test_context_name_for_repo_slug_falls_back_to_slug_when_unmatched(tmp_path: Path) -> None:
-    ws = _mk_ws(tmp_path, slug="proj")
-    assert invocation.context_name_for_repo_slug(ws, "no-such-slug") == "no-such-slug"
-
-
-def test_context_name_for_repo_slug_falls_back_to_slug_when_registry_missing(
-    tmp_path: Path,
-) -> None:
-    assert invocation.context_name_for_repo_slug(tmp_path, "proj") == "proj"
-
-
-def test_context_name_for_repo_slug_falls_back_to_slug_when_registry_corrupt(
-    tmp_path: Path,
-) -> None:
-    states = tmp_path / ".dadaia" / "states"
-    states.mkdir(parents=True)
-    (states / "spec_contexts.json").write_text("{not json", encoding="utf-8")
-    assert invocation.context_name_for_repo_slug(tmp_path, "proj") == "proj"
-
-
-def test_context_name_for_repo_slug_accepts_legacy_repo_field(tmp_path: Path) -> None:
-    states = tmp_path / ".dadaia" / "states"
-    states.mkdir(parents=True)
-    (states / "spec_contexts.json").write_text(
-        json.dumps(
-            {"schema_version": "2", "contexts": [{"name": "alpha-context", "repo": "beta-repo"}]}
-        ),
-        encoding="utf-8",
-    )
-    assert invocation.context_name_for_repo_slug(tmp_path, "beta-repo") == "alpha-context"
-
-
-# --------------------------------------------------------------------------- resolve_specs_dir (CLI seam)
 
 
 @pytest.fixture(autouse=True)
 def _isolate_process_env(monkeypatch: pytest.MonkeyPatch) -> None:
-    """``resolve_specs_dir``/``resolve_context_specs_dir`` read ``os.environ``/``Path.cwd()``
-    directly (the CLI-ambient seam) — scrub the ambient channel so these tests are
-    hermetic under xdist (mirrors the pre-K1 fixture's own rationale)."""
+    """``resolve_specs_dir`` reads ``os.environ``/``Path.cwd()``: scrub it for xdist."""
     scrub_context_resolution_env(monkeypatch)
 
 
-def test_resolve_specs_dir_explicit_wins_even_without_a_bound_context(tmp_path: Path) -> None:
-    target = tmp_path / "explicit-specs"
-    target.mkdir()
-    assert invocation.resolve_specs_dir(str(target)) == target.resolve()
+def _mk_ws(tmp_path: Path, *contexts: tuple[str, str, tuple[str, ...]]) -> Path:
+    """A workspace registering each ``(slug, name, associated)`` context ALIVE, repos on disk."""
+    ws = tmp_path / "ws"
+    (ws / ".dadaia" / "sessions").mkdir(parents=True)
+    entries = []
+    for slug, name, associated in contexts or (("proj", "proj", ()),):
+        (ws / "repos" / slug / "specs").mkdir(parents=True)
+        for repo in associated:
+            (ws / "repos" / repo).mkdir(parents=True)
+        entry = {"name": name, "repo_slug": slug, "state": "alive"}
+        entries.append({**entry, "associated_repos": [{"slug": s} for s in associated]})
+    (ws / ".dadaia" / "states").mkdir(parents=True)
+    (ws / ".dadaia" / "states" / "spec_contexts.json").write_text(
+        json.dumps({"schema_version": "2", "contexts": entries}), encoding="utf-8"
+    )
+    return ws
 
 
-def test_resolve_specs_dir_refuses_a_symlinked_explicit_root(tmp_path: Path) -> None:
-    real = tmp_path / "real-specs"
-    real.mkdir()
-    link = tmp_path / "linked-specs"
-    link.symlink_to(real, target_is_directory=True)
-    with pytest.raises(typer.BadParameter, match="symlink"):
-        invocation.resolve_specs_dir(str(link))
+def _ctx(slug: str, name: str | None = None, *associated: str) -> tuple[str, str, tuple[str, ...]]:
+    return (slug, name or slug, associated)
 
 
-def test_resolve_specs_dir_raises_when_nothing_resolves(
+XY = (_ctx("x"), _ctx("y"))
+PROJ_OTHER = (_ctx("proj"), _ctx("other"))
+
+
+@pytest.mark.parametrize(
+    ("given", "then"),
+    [
+        pytest.param({"contexts": XY, "session": ("y", 0), "env": {"DADAIA_CONTEXT": "y"}, "target": "repos/x/specs/TASKS.md", "explicit": "explicit-ctx"}, {"context_name": "explicit-ctx", "rung": "explicit"}, id="explicit_wins_over_target_env_and_session"),
+        pytest.param({"contexts": XY, "env": {"DADAIA_CONTEXT": "y"}, "target": "repos/x/specs/releases/v1/TASKS.md"}, {"context_name": "x", "rung": "target_path"}, id="rung0_target_path_wins_over_dadaia_context"),
+        pytest.param({"contexts": (_ctx("beta-repo", "alpha-context"),), "target": "repos/beta-repo/specs/SPEC.md"}, {"context_name": "alpha-context", "repo_slug": "beta-repo", "rung": "target_path"}, id="rung0_target_path_maps_slug_to_name_via_registry"),
+        pytest.param({"contexts": XY, "env": {"DADAIA_CONTEXT": "y"}, "target": "specs/bugs/bugs.jsonl"}, {"context_name": "y", "rung": "bind"}, id="rung0_target_outside_repo_falls_through_to_env"),
+        pytest.param({"env": {"DADAIA_CONTEXT": "proj"}}, {"context_name": "proj", "rung": "bind"}, id="rung_env_dadaia_context_alone"),
+        pytest.param({"contexts": PROJ_OTHER, "session": ("other", 0), "env": {"DADAIA_CONTEXT": "proj"}}, {"context_name": "other", "bind.context_name": "other"}, id="sa-bind-has-two-stores#S1 record wins over env for a session with an id"),
+        pytest.param({"contexts": PROJ_OTHER, "session": ("proj", 0), "cwd": "repos/other"}, {"context_name": "proj", "rung": "bind"}, id="rung_session_wins_over_cwd"),
+        pytest.param({"contexts": PROJ_OTHER, "session": ("proj", 90000), "cwd": "repos/other"}, {"context_name": "other", "rung": "cwd"}, id="rung_session_stale_falls_through_to_cwd"),
+        pytest.param({"contexts": (_ctx("other"),), "session": ("deleted-ctx", 0), "cwd": "repos/other"}, {"context_name": "other", "rung": "cwd"}, id="rung_session_deleted_context_guard_falls_through_to_cwd"),
+        pytest.param({"cwd": "repos/proj/specs"}, {"context_name": "proj", "rung": "cwd"}, id="rung_cwd_alone_resolves"),
+        pytest.param({"contexts": (_ctx("beta-repo", "alpha-context"),), "cwd": "repos/beta-repo/specs"}, {"context_name": "alpha-context", "repo_slug": "beta-repo"}, id="rung_cwd_maps_slug_to_name_via_registry"),
+        pytest.param({"cwd": None}, {"workspace_root": None, "session_id": None, "context_name": None, "repo_slug": None, "specs_dir": None, "bind.context_name": None, "rung": "none"}, id="nothing_resolves_missing_workspace"),
+        pytest.param({"contexts": (_ctx("dadaia-workspace"),), "nested": ".dadaia/tmp/agent-x/worktree", "target": "repos/dadaia-workspace/specs/memory/atom.md"}, {"context_name": "dadaia-workspace", "workspace_root": "ws", "specs_dir": "repos/dadaia-workspace/specs"}, id="open_bug_linked_worktree_outside_repos_root_resolves_from_target"),
+        pytest.param({"contexts": (_ctx("proj"), _ctx("other", None, "other-infra")), "env": {"DADAIA_CONTEXT": "other"}, "cwd": "repos/proj"}, {"bind.context_name": "other", "bind.repos": frozenset({"other", "other-infra"})}, id="bind_carries_the_context_scope_main_plus_associated"),
+        pytest.param({"cwd": "repos/proj"}, {"bind.context_name": None, "bind.repos": frozenset()}, id="bind_is_empty_when_the_session_never_bound_even_inside_a_repo"),
+    ],
+)  # fmt: skip
+def test_resolve_scenarios(tmp_path: Path, given: dict[str, Any], then: dict[str, Any]) -> None:
+    """Each rung wins over the ones below it; a stale or deleted session falls through."""
+    ws = _mk_ws(tmp_path, *given.get("contexts", ()))
+    env = dict(given.get("env", {}))
+    if session := given.get("session"):
+        ctx, age = session
+        seen = (datetime.now(tz=UTC) - timedelta(seconds=age)).isoformat()
+        record = {
+            "session_id": "sid",
+            "context": ctx,
+            "mode": "READ",
+            "last_seen_at": seen,
+        }
+        (ws / ".dadaia" / "sessions" / "sid.json").write_text(json.dumps(record), encoding="utf-8")
+        env["CLAUDE_CODE_SESSION_ID"] = "sid"
+    cwd = ws / given.get("cwd", "") if given.get("cwd", "") is not None else tmp_path
+    if nested := given.get("nested"):
+        cwd = ws / nested
+        (cwd / ".dadaia" / "states").mkdir(parents=True)
+        (cwd / ".dadaia" / "states" / "spec_contexts.json").write_text('{"contexts": []}', "utf-8")
+        assert resolve_workspace_root(cwd) == cwd.resolve()  # the trap is real for a cwd walk
+    target = ws / given["target"] if "target" in given else None
+    inv = invocation.resolve(explicit=given.get("explicit"), target_path=target, env=env, cwd=cwd)
+    for attr, expected in then.items():
+        actual = inv.bind if attr.startswith("bind.") else inv
+        actual = getattr(actual, attr.removeprefix("bind."))
+        if attr in ("workspace_root", "specs_dir") and expected is not None:
+            expected = (ws / ("" if expected == "ws" else expected)).resolve()
+        assert actual == expected, (attr, inv)
+
+
+@pytest.mark.parametrize(
+    ("env", "payload", "expected"),
+    [
+        pytest.param({"CLAUDE_CODE_SESSION_ID": "stale"}, {"session_id": "live"}, "live", id="payload_sid_beats_inherited_claude_env"),
+        pytest.param({"CODEX_SESSION_ID": "stale"}, {"session_id": "live"}, "live", id="payload_sid_beats_inherited_codex_env"),
+        pytest.param({"DADAIA_SESSION_ID": "override"}, {"session_id": "live"}, "override", id="dadaia_override_stays_first"),
+        pytest.param({"CLAUDE_CODE_SESSION_ID": "harness-env"}, {}, "harness-env", id="env_fallback_without_payload"),
+        pytest.param({}, {"session_id": "from-stdin"}, "from-stdin", id="stdin_field_when_no_env"),
+        pytest.param({"CODEX_SESSION_ID": "codex", "DADAIA_SESSION_ID": "explicit"}, {"session_id": "x"}, "explicit", id="dadaia_override_beats_codex_and_stdin"),
+        pytest.param({}, {}, "workspace", id="default_when_nothing_resolves"),
+        pytest.param({"CODEX_THREAD_ID": "thread-1"}, {}, "thread-1", id="codex_thread_id_resolves_when_no_codex_session_id"),
+        pytest.param({"CODEX_SESSION_ID": "sess-1", "CODEX_THREAD_ID": "thread-1"}, {}, "sess-1", id="codex_session_id_preferred_over_codex_thread_id"),
+    ],
+)  # fmt: skip
+def test_resolve_session_id_precedence(
+    env: dict[str, str], payload: dict[str, object], expected: str
+) -> None:
+    """DADAIA_SESSION_ID > payload > harness env > the default."""
+    assert invocation.resolve_session_id(payload, env, default="workspace") == expected
+
+
+def test_context_name_for_repo_slug_maps_main_associated_and_legacy_repo_field(
+    tmp_path: Path,
+) -> None:
+    """A16.4: a main slug maps to its context name, an associated slug to its OWNING context;
+    a legacy ``repo`` field still maps."""
+    ws = _mk_ws(tmp_path, _ctx("beta-repo", "alpha-context"), _ctx("other", None, "assoc-repo"))
+    assert invocation.context_name_for_repo_slug(ws, "beta-repo") == "alpha-context"
+    assert invocation.context_name_for_repo_slug(ws, "assoc-repo") == "other"
+    legacy = {"schema_version": "2", "contexts": [{"name": "alpha-context", "repo": "beta-repo"}]}
+    (ws / ".dadaia" / "states" / "spec_contexts.json").write_text(json.dumps(legacy), "utf-8")
+    assert invocation.context_name_for_repo_slug(ws, "beta-repo") == "alpha-context"
+
+
+def test_an_unowned_repo_resolves_no_context(tmp_path: Path) -> None:
+    """sa-context-repo-mapping-falls-back-to-the-name#B1: repos/foo on disk, owned by no
+    registered context: the mapping answers None and resolve() from repos/foo binds no
+    context named after the directory (DELETE-LOSER: the three name-fallback tests)."""
+    ws = _mk_ws(tmp_path)
+    (ws / "repos" / "foo").mkdir()
+    assert invocation.context_name_for_repo_slug(ws, "foo") is None
+    assert invocation.repo_slug_for_context(ws, "foo") is None
+    inv = invocation.resolve(env={}, cwd=ws / "repos" / "foo")
+    assert inv.context_name is None and inv.specs_dir is None
+
+
+def test_a_truncated_registry_answers_no_context(tmp_path: Path) -> None:
+    """sa-context-repo-mapping-falls-back-to-the-name#B4 (the alive_context_names leg,
+    plus the slug mapping and the bind; the gate and `context show --json` legs are
+    test_sdd_gate's): an unreadable registry answers "no context", never fail-open."""
+    ws = _mk_ws(tmp_path)
+    (ws / ".dadaia" / "states" / "spec_contexts.json").write_text('{"contexts": [{"na', "utf-8")
+    assert invocation.alive_context_names(ws) == []
+    assert invocation.context_name_for_repo_slug(ws, "proj") is None
+    assert invocation.resolve_bind(ws, None, {"DADAIA_CONTEXT": "proj"}).context_name is None
+
+
+def test_resolve_specs_dir_explicit_wins_else_cwd_inside_a_repo(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    plain = tmp_path / "not-a-workspace"
-    plain.mkdir()
-    monkeypatch.chdir(plain)
-    with pytest.raises(typer.BadParameter, match="Could not resolve specs_dir"):
-        invocation.resolve_specs_dir(None)
-
-
-def test_resolve_specs_dir_resolves_from_cwd_inside_a_repo(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    ws = _mk_ws(tmp_path, slug="proj")
+    """An explicit root wins even with no bound context; otherwise cwd inside a repo resolves."""
+    (tmp_path / "explicit-specs").mkdir()
+    assert (
+        invocation.resolve_specs_dir(str(tmp_path / "explicit-specs"))
+        == (tmp_path / "explicit-specs").resolve()
+    )
+    ws = _mk_ws(tmp_path)
     monkeypatch.chdir(ws / "repos" / "proj")
     assert invocation.resolve_specs_dir(None) == (ws / "repos" / "proj" / "specs").resolve()
 
 
+def test_resolve_specs_dir_refuses_a_symlinked_explicit_root(tmp_path: Path) -> None:
+    """A symlinked explicit specs root is refused, never followed."""
+    (tmp_path / "real-specs").mkdir()
+    (tmp_path / "linked-specs").symlink_to(tmp_path / "real-specs", target_is_directory=True)
+    with pytest.raises(ValueError, match="symlink"):
+        invocation.resolve_specs_dir(str(tmp_path / "linked-specs"))
+
+
 class TestAliveContextNames:
-    """F008 (20260830 audit): the registry read family has ONE home — invocation.
-    ctx_inject's private ``_alive_context_names`` parser is deleted; the hook imports
-    :func:`invocation.alive_context_names`. Intent: contract; size: unit."""
+    """F008 (20260830 audit): the registry read family has ONE home — invocation."""
 
     def test_alive_filter_yields_context_names(self, tmp_path: Path) -> None:
+        """Only ALIVE entries (case-insensitive) yield their name; a missing registry yields []."""
+        assert invocation.alive_context_names(tmp_path) == []
         states = tmp_path / ".dadaia" / "states"
         states.mkdir(parents=True)
-        (states / "spec_contexts.json").write_text(
-            json.dumps(
-                {
-                    "schema_version": "2",
-                    "contexts": [
-                        {"name": "pretty", "repo_slug": "actual-dir", "state": "alive"},
-                        {"name": "gone", "repo_slug": "gone-dir", "state": "dead"},
-                        {"name": "bare", "state": "ALIVE"},
-                    ],
-                }
-            ),
-            encoding="utf-8",
-        )
+        contexts = [
+            {"name": "pretty", "repo_slug": "actual-dir", "state": "alive"},
+            {"name": "gone", "repo_slug": "gone-dir", "state": "dead"},
+            {"name": "bare", "state": "ALIVE"},
+        ]
+        (states / "spec_contexts.json").write_text(json.dumps({"contexts": contexts}), "utf-8")
         assert invocation.alive_context_names(tmp_path) == ["pretty", "bare"]
-
-    def test_fail_soft_on_missing_or_malformed(self, tmp_path: Path) -> None:
-        assert invocation.alive_context_names(tmp_path) == []
-        states = tmp_path / ".dadaia" / "states"
-        states.mkdir(parents=True)
-        (states / "spec_contexts.json").write_text("{not json", encoding="utf-8")
-        assert invocation.alive_context_names(tmp_path) == []
-
-    def test_hook_has_no_private_registry_parser(self) -> None:
-        from dadaia_workspace.hooks import ctx_inject
-
-        assert not hasattr(ctx_inject, "_alive_context_names")

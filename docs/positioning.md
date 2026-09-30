@@ -21,7 +21,7 @@ single-repo context is the minimal case of the multi-repo one.
 
 ## The unit is the context
 
-<!-- derived-from: spec-context-project sha256:47c11b26b98f -->
+<!-- derived-from: spec-context-project sha256:b1fa1ed3b027 -->
 
 A context — a Spec Context Project — is one canonical `specs/` tree owned by one main
 repository: the unit for memory, backlog, bugs, releases, reports and handoffs. A
@@ -39,14 +39,14 @@ The asymmetry is deliberate:
 `.dadaia/.venv/bin/dadaia context bind <ctx>` selects a context and nothing else, changing only the
 caller's own session record; a session without a harness-native id carries the binding
 in `DADAIA_CONTEXT`. The bind carries a scope — the main repo plus its associated
-repos — and a bound session's MUTATING write into a repo another context owns is
+repos — and a bound session's MUTATING file-tool write into a repo another context owns is
 refused, naming the bind that would allow it. An unbound session is never
 scope-judged.
 
 ## Ten repositories, one law
 
 <!-- derived-from: product-vision sha256:cfd469d90787 -->
-<!-- derived-from: spec-context-project sha256:47c11b26b98f -->
+<!-- derived-from: spec-context-project sha256:b1fa1ed3b027 -->
 
 A team with ten repositories does not maintain ten copies of anything:
 

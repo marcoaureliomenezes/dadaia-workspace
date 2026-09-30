@@ -25,9 +25,10 @@ description: >
 
 - `dd-software-engineer` runs it read-only (no write to code, specs or tests), dispatched by the main thread after the pick and before the grill.
 - Read every unit the picked set touches and its ledger slice (`python3 .agents/skills/dd-bug-resolution/scripts/bugs.py status`/`stats`, `git log` on the unit); return the table in the handoff — the main thread carries it into the grill; it lands as PLAN §1.
-- One row per touched unit, columns `unit | today | bugs | verdict | why`; DELETE vs KEEP is `dd-codebase-design`'s deletion test; consider DELETE → REBUILD → UPDATE → KEEP, then ADD rows only for what no existing unit can carry (`today` `—`, `why` says why no unit can carry it).
+- One row per touched unit, columns `unit | today | bugs | verdict | why`; DELETE vs KEEP is `dd-codebase-design`'s deletion test; verdicts follow the root map §1 work order, ADD only for what no existing unit can carry (`today` `—`, `why` says why no unit can carry it).
 - REBUILD is mandatory when the unit carries ≥ 2 bugs, the demand changes its fundamental behaviour, the change would need a flag, branch, special case or second path, or its contract contradicts the demand; the engineer and the reviewer judge these triggers — no script counts bugs or reads code.
-- The PLAN §1 skeleton — `release.py phase IMPLEMENTATION` refuses a PLAN without it:
+- §1.1 Authorities: one row per touched question, one authority each; `consults` call it, `deleted` leave with the row's bug.
+- The PLAN §1 skeleton — `release.py phase IMPLEMENTATION` refuses a PLAN without either table, an empty authority or a question with two:
 
 ```markdown
 ## 1. As-is review
@@ -35,9 +36,15 @@ description: >
 | unit | today | bugs | verdict | why |
 |---|---|---|---|---|
 | `features/x/service.py` `run` | what it does today | 2 (`bug-a`, `bug-b`) | REBUILD | two prior fixes on this unit |
+
+### 1.1 Authorities
+
+| question | authority | consults | deleted |
+|---|---|---|---|
+| who runs x | `features/x/service.py` `run` | `cli/x.py` | `legacy_run` |
 ```
 
-**Done when** every touched unit has one row and one As-is verdict.
+**Done when** every touched unit has one As-is verdict and every touched question one authority.
 
 ## 3. The mandatory grill
 
@@ -50,8 +57,7 @@ a fuzzy term in the demand becomes a canonical term before it reaches the SPEC.
 1. Author the SPEC (Draft) only after the grill: the picked bug+backlog set, their
    acceptance, every `superseded_by` link.
 2. Definition runs on the work branch (`<work>M.m.p`, the constitution's `gitflow:`); the trio's place is the releases law's.
-3. Commit shape 5 (`dd-gitflow-default` §3a): SPEC + PLAN + TASKS + the picked entries
-   flipped to `status: picked` + picked bugs, one commit; set the `defined` milestone in `_RELEASE.json`
+3. Commit shape 5 (`dd-gitflow-default` §3a): SPEC + PLAN + TASKS + picked bugs, one commit; set the `defined` milestone in `_RELEASE.json`
    (`dd-release-implementation`'s `RELEASE-EVENTS.md`).
 4. PLAN opens with §1 As-is review (§2); SPEC carries `Replaces` — one bullet per current behaviour a
    DELETE/REBUILD row removes, or `none` with its reason.
@@ -72,15 +78,13 @@ a fuzzy term in the demand becomes a canonical term before it reaches the SPEC.
 
 ## 6. Declaring consumption
 
-- Declare a backlog slug in the SPEC (`**Consumes:** slug-a, slug-b`) only when fully consumed (all its bound anchors shipped); omit the line when none; an unknown slug is fixed before it lands.
-- `**Consumes:**` is SPEC provenance only — no library/CLI verb reads it.
-- A picked entry stays in `active[]` as `status: picked`; it exits once, at closure,
+- The pick is the SPEC's `**Origin:** backlog:<ids>` line (`release.py new --origin`); the entry keeps its status and exits once, at closure,
   by `python3 .agents/skills/dd-backlog-definition/scripts/backlog.py exit` (`dd-release-implementation` RC-FLOW step 7).
 
 ## 7. Done when
 
 - Picked set recorded; the `dd-grill-me` session completed and emitted.
-- PLAN §1 names every unit the picked set touches; SPEC authored from the refined set, `Replaces` present, `**Consumes:**` declared or omitted.
+- PLAN §1 names every unit the picked set touches; SPEC authored from the refined set, `Replaces` present, `**Origin:**` declared.
 - Traceability: every approved requirement maps into PLAN strategy and >=1 TASKS entry.
 - Every unresolved gap routed to the main thread's operator-gated intake report — never a
   direct backlog append.

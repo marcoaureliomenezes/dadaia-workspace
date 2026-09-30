@@ -14,6 +14,7 @@ from typing import Any
 
 import pytest
 
+from dadaia_workspace.core import invocation
 from dadaia_workspace.hooks import _common
 
 
@@ -35,9 +36,6 @@ def test_read_stdin_json(
 
 def test_target_path_forms() -> None:
     # tool_name / is_write_tool.
-    assert _common.tool_name({"tool_name": "Write"}) == "Write"
-    assert _common.tool_name({"tool": "edit_file"}) == "edit_file"
-    assert _common.tool_name({}) == ""
     assert _common.is_write_tool("Write")
     assert _common.is_write_tool("apply_patch")
     assert not _common.is_write_tool("Read")
@@ -90,7 +88,8 @@ def test_target_paths_multi_file_all_headers() -> None:
 
 
 def test_sanitize_session_id_strips_traversal() -> None:
+    """The hooks strip session ids through the one rule in core.invocation."""
     # CWE-22: a session id with '/' or '..' must never survive as a path component.
-    assert _common.sanitize_session_id("../../etc/passwd") == "etcpasswd"
-    assert _common.sanitize_session_id("abc-123_XYZ") == "abc-123_XYZ"
-    assert _common.sanitize_session_id(None) == ""
+    assert invocation.sanitize_session_id("../../etc/passwd") == "etcpasswd"
+    assert invocation.sanitize_session_id("abc-123_XYZ") == "abc-123_XYZ"
+    assert invocation.sanitize_session_id(None) == ""

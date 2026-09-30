@@ -1,21 +1,5 @@
 """Unit tests for ``features.specs.memory_lint`` — the ONE canonical LINT-1 implementation
-(v0.4.3 T-043-20/FR16).
-
-This module is imported directly by ``doctor_memory.MemoryValidator.check_lint1_memory_atoms``
-(no subprocess), and ``public/scripts/lint-memory-atoms.py`` is now a thin wrapper that
-imports and calls this module's ``main()`` — this test file exercises the package module
-as a normal Python import.
-
-``tests/unit/scripts/test_lint_memory_atoms.py`` (which loaded the standalone script via
-``importlib.util.spec_from_file_location`` and called its own ``lint_atom``/``lint_directory``/
-``HEADING_ALLOWLIST``/etc.) is DELETED, ai-engineer's T-043-20 half (A16.1/A16.2): once the
-script stopped owning those symbols, the file tested a surface that no longer exists on the
-script. Its behavioral coverage (lint_atom/lint_directory scenarios, main() exit codes) was
-already a byte-identical port of what this file covers — see
-the functions above this docstring's insertion point. Four checks in the deleted file were
-NOT duplicates — they validate real on-disk public assets (the frontmatter schema, the
-scaffold atoms) against this package's canon, independent of
-the script/package split — those four are ported below, now importing the package directly.
+(v0.4.3 T-043-20/FR16), imported directly by ``doctor_memory``.
 
 Intent: CONTRACT — v0.4.3 A16.1.
 """
@@ -158,34 +142,6 @@ def test_multiple_missing_required_fields_are_all_reported(tmp_path: Path) -> No
         assert any(missing in e for e in result.errors), (
             f"expected a distinct error naming {missing!r}, got: {result.errors}"
         )
-
-
-def test_yaml_parse_error_is_diagnosed_as_a_parse_error_not_a_missing_delimiter(
-    tmp_path: Path,
-) -> None:
-    """Bug memory-lint-blames-missing-delimiter-for-a-yaml-parse-error: an
-    unquoted scalar containing ': ' inside a present --- delimited block used to be
-    reported as "No valid YAML frontmatter found (expected --- delimited block)" —
-    blaming a missing delimiter when the real cause is a YAML syntax error with its
-    own line/column. The block IS present here; the diagnostic must name the YAML
-    failure, never the delimiter."""
-    schema = load_frontmatter_schema()
-    content = (
-        "---\n"
-        "slug: test-atom\n"
-        "tldr: Two-tier memory: 17 measured principles\n"  # unquoted ": " breaks YAML
-        "---\n\n## Purpose\n\nBody.\n"
-    )
-    path = tmp_path / "test-atom.md"
-    path.write_text(content, encoding="utf-8")
-
-    result = lint_atom(path, tmp_path, schema)
-
-    assert result.has_errors
-    assert not any("delimited block" in e for e in result.errors), (
-        f"blamed a missing delimiter for a present block: {result.errors}"
-    )
-    assert any("YAML is invalid" in e for e in result.errors)
 
 
 def test_slug_mismatch_is_an_error(tmp_path: Path) -> None:

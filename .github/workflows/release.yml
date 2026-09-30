@@ -51,104 +51,18 @@ jobs:
   # the release PR and every job here is skipped (PLAN D8: same-workflow chaining,
   # no PAT, no second trigger).
 
-  unit-fast:
-    name: Unit fast (pytest)
-    runs-on: ubuntu-latest
+  ci:
+    name: CI (ci.yml, the one check set)
     needs: [release-please]
     if: needs.release-please.outputs.release_created == 'true'
     permissions:
       contents: read
-    timeout-minutes: 2
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
-        with:
-          fetch-depth: 0
-      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97  # v7.0.0
-        with:
-          python-version: "3.12"
-      - run: pipx install poetry==1.8.3
-      - run: poetry install --no-interaction --no-ansi --with dev
-      - name: pytest unit fast
-        run: poetry run pytest -q -m "unit and not slow and not quarantine" tests/unit -n auto
-
-  contract-coverage:
-    name: Contract coverage (pytest)
-    runs-on: ubuntu-latest
-    needs: [release-please]
-    if: needs.release-please.outputs.release_created == 'true'
-    permissions:
-      contents: read
-    timeout-minutes: 5
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
-        with:
-          fetch-depth: 0
-      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97  # v7.0.0
-        with:
-          python-version: "3.12"
-      - run: pipx install poetry==1.8.3
-      - run: poetry install --no-interaction --no-ansi --with dev
-      - name: pytest unit/contract coverage
-        # -n auto: same long-pole fix as ci.yml (bug test-suite-real-venv-and-ci-longpole).
-        # COVERAGE_FILE redirect mirrors ci.yml (pyproject data_file removed in
-        # T-018-07; bug release-workflow-coverage-file-in-checkout — .coverage
-        # must never land in the checkout). Pinned by
-        # tests/contract/test_workflow_coverage_redirect.py.
-        env:
-          COVERAGE_FILE: ${{ runner.temp }}/.coverage
-        run: poetry run pytest -q -m "(unit or contract) and not quarantine" -n auto --cov=dadaia_workspace --cov-report=term-missing --cov-fail-under=80 tests/unit tests/contract
-
-  integration:
-    name: Integration (pytest)
-    runs-on: ubuntu-latest
-    needs: [release-please]
-    if: needs.release-please.outputs.release_created == 'true'
-    permissions:
-      contents: read
-    timeout-minutes: 8
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
-        with:
-          fetch-depth: 0
-      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97  # v7.0.0
-        with:
-          python-version: "3.12"
-      - run: pipx install poetry==1.8.3
-      - run: poetry install --no-interaction --no-ansi --with dev
-      - name: pytest integration
-        run: poetry run pytest -q -m "integration and not quarantine" tests/integration --durations=30
-
-  e2e-python:
-    name: E2E Python (pytest)
-    runs-on: ubuntu-latest
-    needs: [release-please]
-    if: needs.release-please.outputs.release_created == 'true'
-    permissions:
-      contents: read
-    timeout-minutes: 15
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
-        with:
-          fetch-depth: 0
-      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97  # v7.0.0
-        with:
-          python-version: "3.12"
-      - run: pipx install poetry==1.8.3
-      - run: poetry install --no-interaction --no-ansi --with dev
-      - run: pipx install uv==0.11.16
-      # AC8.3: the onboarding journey and the one-line bootstrap run before publish.
-      - name: pytest e2e python
-        env:
-          DADAIA_REQUIRE_UVX: "1"
-        run: >-
-          poetry run pytest -q -m "e2e and not quarantine" --durations=30
-          tests/e2e/features tests/e2e/test_one_line_bootstrap.py
-          tests/e2e/test_onboarding_journey.py
+    uses: ./.github/workflows/ci.yml
 
   build:
     name: Build sdist + wheel
     runs-on: ubuntu-latest
-    needs: [release-please, unit-fast, contract-coverage, integration, e2e-python]
+    needs: [release-please, ci]
     if: needs.release-please.outputs.release_created == 'true'
     permissions:
       contents: read

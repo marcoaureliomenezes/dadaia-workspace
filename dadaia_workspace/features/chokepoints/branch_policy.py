@@ -1,23 +1,15 @@
-"""Branch policy — the project gitflow read by role (ADRs 0037, 0046).
+"""Branch policy — the project gitflow read by role (ADRs 0037, 0046); zero I/O.
 
-Zero I/O, zero dependency on anything else in this package: :class:`PushRef` (the
-parsed pre-push stdin shape) and :func:`check_branch_policy` (the per-ref loop
-:func:`~dadaia_workspace.features.chokepoints.push_gate.push_gate_decision` runs first,
-before either specs-scan step). Branch names come from the injected
-:class:`~dadaia_workspace.core.gitflow.Gitflow`; none is spelled here.
-:class:`Decision` — the shared outcome shape every chokepoint gate returns — lives here
-too: this module has no internal-package dependency, so every sibling module (``pre_commit``,
-``push_gate``) imports it from here rather than duplicating it or reaching
-into ``__init__.py`` (which itself re-exports from this module, never the reverse).
-"""
+Also home of :class:`Decision`, the outcome every chokepoint gate returns (this module
+has no internal-package dependency, so siblings import it from here)."""
 
 from __future__ import annotations
 
-import re
 from dataclasses import dataclass
 
 from dadaia_workspace.core.cli_line import git_line, shell_line
 from dadaia_workspace.core.gitflow import Gitflow
+from dadaia_workspace.core.models.git_scan import SHA_SHAPE_RE, ZERO_SHA
 
 __all__ = [
     "Decision",
@@ -30,40 +22,17 @@ __all__ = [
 
 @dataclass(frozen=True)
 class Decision:
-    """Outcome of a chokepoint gate.
-
-    ``allowed`` is the only thing the git hook keys its exit code on. ``warn`` carries an
-    advisory line that is logged/printed but never blocks (the DP-4 degradation path).
-    ``message`` is the human-facing block/allow explanation.
-    """
+    """``allowed`` keys the hook's exit code; ``warn`` is advisory, never blocks."""
 
     allowed: bool
     message: str = ""
     warn: str | None = None
 
 
-#: A pre-push sha is 40-char (SHA-1) or 64-char (SHA-256) hex (v0.11.0 FR7/A7.3) — an
-#: option-shaped value (``--glob=refs/nonexistent``) is malformed, never a silent no-op
-#: (CWE-88/CWE-20). The all-zero deletion sentinel is 40 hex characters and already
-#: matches — no special case needed.
-_SHA_SHAPE_RE = re.compile(r"^[0-9a-fA-F]{40}$|^[0-9a-fA-F]{64}$")
-
-#: git's zero-sha deletion sentinel (40 hex zeros) — imported by ``push_gate`` too.
-ZERO_SHA = "0" * 40
-
-
-def _is_sha_shaped(value: str) -> bool:
-    return bool(_SHA_SHAPE_RE.match(value))
-
-
 @dataclass(frozen=True)
 class PushRef:
-    """One parsed pre-push stdin ref line.
-
-    git feeds the pre-push hook lines of ``<local-ref> <local-sha> <remote-ref>
-    <remote-sha>`` on stdin. The push gate keys ONLY on ``local_sha`` (never
-    ``git rev-parse HEAD``): a zero ``local_sha`` is a branch deletion.
-    """
+    """One pre-push stdin line ``<local-ref> <local-sha> <remote-ref> <remote-sha>``;
+    the gate keys on ``local_sha`` (never HEAD), zero meaning a deletion."""
 
     local_ref: str
     local_sha: str
@@ -72,41 +41,28 @@ class PushRef:
 
     @property
     def is_deletion(self) -> bool:
-        """True when this ref is being deleted (zero local sha) — passes the branch policy."""
         return self.local_sha == ZERO_SHA or not self.local_sha
 
     @property
     def is_tag(self) -> bool:
-        """True when this ref is a tag push — passes the branch policy (DP-5)."""
-        return self.local_ref.startswith("refs/tags/")
+        return self.remote_ref.startswith("refs/tags/")
 
 
 def parse_push_stdin(stdin_text: str) -> tuple[list[PushRef], int]:
-    """Parse pre-push stdin into :class:`PushRef` rows plus a malformed-line count.
-
-    A non-empty line that does not split into exactly four fields is counted, not
-    silently dropped — the gate FAILS CLOSED on any malformed line (T-060-07 finding 1:
-    a policy gate that skips what it cannot parse is a policy gate that can be
-    disabled without a trace; ``git push --no-verify`` is the sanctioned bypass).
-
-    v0.11.0 FR7/A7.1-A7.3: both shas are additionally validated against
-    :data:`_SHA_SHAPE_RE` — a violation reuses the SAME malformed-line counter and the
-    SAME fail-closed message (no new branch), so an option-shaped ``local_sha`` (the
-    measured silent-no-op class) refuses instead of producing a successful empty
-    ``git rev-list``.
-    """
+    """Rows plus a malformed-line count (not four fields, or a non-sha-shaped sha —
+    an option-shaped sha included); the gate fails closed on any malformed line."""
     refs: list[PushRef] = []
     malformed = 0
-    for raw in stdin_text.splitlines():
+    for raw in stdin_text.split("\n"):
         line = raw.strip()
         if not line:
             continue
-        parts = line.split()
+        parts = line.split(" ")
         if len(parts) != 4:
             malformed += 1
             continue
         local_ref, local_sha, remote_ref, remote_sha = parts
-        if not _is_sha_shaped(local_sha) or not _is_sha_shaped(remote_sha):
+        if not (SHA_SHAPE_RE.match(local_sha) and SHA_SHAPE_RE.match(remote_sha)):
             malformed += 1
             continue
         refs.append(PushRef(local_ref, local_sha, remote_ref, remote_sha))
@@ -121,9 +77,8 @@ _LAW = "project gitflow: specs/constitution.md"
 
 @dataclass(frozen=True)
 class GateFixes:
-    """What a refusal's fix line names beyond the gitflow — built by the composition
-    root: the repo (every git fix is ``git -C <repo>``, so it runs from any cwd), the
-    live work branch and whether it is cut locally, and HEAD's branch (``""``: detached)."""
+    """What a fix line names: the repo (``git -C``), the live work branch, whether it
+    is cut locally, and HEAD's branch (``""``: detached)."""
 
     repo: str
     work: str = ""
@@ -173,15 +128,9 @@ def check_branch_policy(
     fixes: GateFixes,
     births: frozenset[str] = frozenset(),
 ) -> Decision | None:
-    """Every non-deletion, non-tag ref must land on a branch of *gitflow*: a work branch
-    pushed from the SAME-named local head, or the birth of the principal/integration
-    branch (ADR 0036; R13) — a local sha in *births* (the caller proved origin holds no
-    gitflow branch yet, or the birth publishes nothing), from any source. The
-    principal and integration branches are otherwise PR-only; *fixes* feeds the refusals'
-    fix lines. Returns the first
-    refusal, or ``None`` when every ref clears (the caller has already excluded tags and
-    deletions from *refs*).
-    """
+    """The first refusal, or ``None``: each ref lands on a work branch from the
+    same-named local head, or births the principal/integration at a sha in *births*
+    (ADR 0036; R13); those two are otherwise PR-only."""
     for ref in refs:
         if not ref.remote_ref.startswith(HEADS_PREFIX):
             return _refuse_branch(ref, None, gitflow, fixes)

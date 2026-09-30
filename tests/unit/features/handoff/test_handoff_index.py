@@ -1,55 +1,29 @@
-"""Table-driven tests for the deepened ``core.handoff_index`` interface (release 0.5.1 K6).
+"""Table-driven tests for ``core.handoff_index``.
 
-Intent: CONTRACT — release 0.5.1 K6 ("features/handoff: one module owns discovery,
-version routing and artifact resolution").
+Intent: CONTRACT — release 0.5.1 K6 (one module owns version routing, the self_pull
+rule and artifact resolution); sa-json-schema-validated-by-two-engines (jsonschema is the
+one engine).
 
-Replaces (per ``dd-test-stewardship``'s replace-don't-layer discipline): the 12
-report/handoff test files this candidate's card names for collapse —
-``tests/unit/test_handoff_models.py``, ``tests/unit/test_stdlib_handoff_validator.py``,
-``tests/unit/test_reports_validation_service.py``,
-``tests/unit/features/reports/test_resolve_artifact_path.py``,
-``tests/unit/features/reports/test_handoff_v12_validation.py``,
-``tests/unit/features/panel/test_reports_doctor_invariant.py`` are DELETED outright (the
-symbols they tested — ``HandoffDocument``, ``StdlibHandoffValidator``,
-``ReportsValidationService``, ``ReportsDoctor`` — no longer exist); their coverage is
-re-derived here, at the one new interface (``core.handoff_index``, the sole
-implementation — no feature-layer facade), never re-mocked against the deleted
-shallow modules. The
-remaining reports/panel/CLI test files (``test_next_service.py``,
-``test_retention_service.py``, ``test_views_reports.py``,
-``test_reports_retention_cleanup.py``, ``tests/contract/cli/test_cli_reports*.py``) stay
-— they assert BEHAVIOR through their own public surface (CLI exit codes, service
-results), which this refactor does not change.
-
-Two real, in-tree fixture handoffs (``tests/fixtures/handoffs/*.json``, no absolute
-paths, nothing redacted) anchor the table against genuine production shapes: a
-handoff-v1.1 QA-gate verdict with no ``self_pull`` (pre-v1.2), and a handoff-v1.2
-deepening-audit handoff carrying real ``self_pull.refs``.
+sa-handoff-self-pull-requirement-diverges (0.5.0 WP-46): the schema admits only
+handoff-v1.2 (sa-handoff-self-pull-requirement-diverges#46.1) and self_pull is always required
+(sa-handoff-self-pull-requirement-diverges#46.2).
 """
 
 from __future__ import annotations
 
 import hashlib
 import json
-from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import pytest
 
 from dadaia_workspace.core.exceptions import HandoffSchemaError
-from dadaia_workspace.core.handoff_index import (
-    Handoff,
-    HandoffIndex,
-    discover_handoff_paths,
-    load_schema,
-    scan_handoffs,
-    validate_schema_shape,
-)
+from dadaia_workspace.core.handoff_index import Handoff, HandoffIndex
 
 _REPO_ROOT = Path(__file__).resolve().parents[4]
 _SCHEMA_PATH = _REPO_ROOT / "dadaia_workspace" / "public" / "schemas" / "handoff-v1.schema.json"
 _FIXTURES = Path(__file__).resolve().parents[3] / "fixtures" / "handoffs"
-_SCHEMA = load_schema(_SCHEMA_PATH)
+_SCHEMA = json.loads(_SCHEMA_PATH.read_text(encoding="utf-8"))
 
 
 # ---------------------------------------------------------------------------
@@ -63,9 +37,20 @@ def _write(path: Path, doc: dict[str, object]) -> Path:
     return path
 
 
+#: The atom every default fixture self-pulls; :func:`_atom` makes it exist under a root.
+_REF = "specs/memory/ARCHITECTURE.md"
+
+
+def _atom(root: Path) -> Path:
+    (root / _REF).parent.mkdir(parents=True, exist_ok=True)
+    (root / _REF).write_text("# Architecture\n", encoding="utf-8")
+    return root
+
+
 def _base_doc(**overrides: object) -> dict[str, object]:
     doc: dict[str, object] = {
-        "schema_version": "handoff-v1.1",
+        "schema_version": "handoff-v1.2",
+        "self_pull": {"refs": [_REF]},
         "agent": "dd-software-engineer",
         "context": "dadaia-workspace",
         "produced_at": "2026-08-28T12:00:00Z",
@@ -75,39 +60,6 @@ def _base_doc(**overrides: object) -> dict[str, object]:
     }
     doc.update(overrides)
     return doc
-
-
-def _stage_schema(workspace_root: Path) -> None:
-    schema_path = workspace_root / ".dadaia" / "agentic" / "schemas" / "handoff-v1.schema.json"
-    schema_path.parent.mkdir(parents=True, exist_ok=True)
-    schema_path.write_text(_SCHEMA_PATH.read_text(encoding="utf-8"), encoding="utf-8")
-
-
-# ---------------------------------------------------------------------------
-# 1. Discovery — the one primitive every reader now shares
-# ---------------------------------------------------------------------------
-
-
-def test_scan_handoffs_yields_every_file_and_tolerates_a_missing_root(tmp_path: Path) -> None:
-    assert list(scan_handoffs(tmp_path / "does-not-exist")) == []
-
-    _write(tmp_path / "ctx" / "a.handoff.json", _base_doc(agent="a"))
-    _write(tmp_path / "ctx" / "sub" / "b.handoff.json", _base_doc(agent="b"))
-    _write(tmp_path / "ctx" / "not-a-handoff.json", {"noise": True})
-
-    found = {h.agent for h in scan_handoffs(tmp_path)}
-    assert found == {"a", "b"}
-
-
-def test_discover_handoff_paths_is_pattern_scoped_and_path_only(tmp_path: Path) -> None:
-    """The doctor_release.py:637 use case — a filename-glob, never content parsing."""
-    _write(tmp_path / "releases" / "0.5.1" / "verdicts" / "abc.handoff.json", _base_doc())
-    _write(tmp_path / "releases" / "0.5.1" / "other.handoff.json", _base_doc())
-
-    verdict_paths = discover_handoff_paths(tmp_path, "releases/*/verdicts/*.handoff.json")
-
-    assert [p.name for p in verdict_paths] == ["abc.handoff.json"]
-    assert discover_handoff_paths(tmp_path / "missing", "**/*.handoff.json") == []
 
 
 # ---------------------------------------------------------------------------
@@ -130,23 +82,9 @@ def test_malformed_handoff_classification(tmp_path: Path, name: str, content: st
     handoff = Handoff.load(path)
 
     assert handoff.malformed_error is not None, name
-    assert handoff.agent is None
-    assert handoff.verdict is None
-    assert handoff.findings == ()
     result = handoff.validate(workspace_root=tmp_path, schema=_SCHEMA)
     assert result.valid is False
     assert result.errors[0].field_path == "$root"
-
-
-def test_malformed_sibling_is_skipped_by_discovery_a_good_handoff_still_found(
-    tmp_path: Path,
-) -> None:
-    (tmp_path / "ctx").mkdir()
-    (tmp_path / "ctx" / "broken.handoff.json").write_text("{ not json", encoding="utf-8")
-    _write(tmp_path / "ctx" / "good.handoff.json", _base_doc(agent="qa-engineer"))
-
-    agents = [h.agent for h in scan_handoffs(tmp_path) if h.malformed_error is None]
-    assert agents == ["qa-engineer"]
 
 
 # ---------------------------------------------------------------------------
@@ -160,8 +98,9 @@ def test_malformed_sibling_is_skipped_by_discovery_a_good_handoff_still_found(
 @pytest.mark.parametrize(
     ("schema_version", "expect_valid"),
     [
-        pytest.param("handoff-v1", True, id="v1-legacy-still-valid"),
-        pytest.param("handoff-v1.1", True, id="v1.1-valid"),
+        pytest.param("handoff-v1", False, id="v1-refused"),
+        pytest.param("handoff-v1.1", False, id="v1.1-refused"),
+        pytest.param("handoff-v1.2", True, id="v1.2-valid"),
         pytest.param("handoff-v1.2-with-self-pull", False, id="v1.2-malformed-token-invalid"),
         pytest.param("handoff-v1.3", False, id="future-token-explicitly-refused"),
         pytest.param("handoff-v0.9", False, id="pre-v1-token-refused"),
@@ -171,38 +110,31 @@ def test_malformed_sibling_is_skipped_by_discovery_a_good_handoff_still_found(
 def test_schema_version_routing_matrix(
     tmp_path: Path, schema_version: str, expect_valid: bool
 ) -> None:
+    """sa-handoff-self-pull-requirement-diverges#46.1: only handoff-v1.2 is valid."""
     doc = _base_doc(schema_version=schema_version)
     path = _write(tmp_path / "h.handoff.json", doc)
     handoff = Handoff.load(path)
 
-    result = handoff.validate(workspace_root=tmp_path, schema=_SCHEMA)
+    result = handoff.validate(workspace_root=_atom(tmp_path), schema=_SCHEMA)
 
     assert result.valid is expect_valid, result.errors
     if not expect_valid:
         assert any("schema_version" in e.field_path for e in result.errors)
 
 
-def test_v12_requires_self_pull_v11_does_not(tmp_path: Path) -> None:
-    v11 = Handoff.load(_write(tmp_path / "v11.handoff.json", _base_doc()))
-    assert v11.validate(workspace_root=tmp_path, schema=_SCHEMA).valid is True
-
-    v12_no_refs = Handoff.load(
-        _write(tmp_path / "v12.handoff.json", _base_doc(schema_version="handoff-v1.2"))
+def test_v12_requires_self_pull(tmp_path: Path) -> None:
+    """sa-handoff-self-pull-requirement-diverges#46.2: a v1.2 without self_pull is
+    INVALID, naming the field; sa-json-schema-validated-by-two-engines: the error is
+    jsonschema's own."""
+    doc = _base_doc()
+    del doc["self_pull"]
+    result = Handoff.load(_write(tmp_path / "v12.handoff.json", doc)).validate(
+        workspace_root=tmp_path, schema=_SCHEMA
     )
-    result = v12_no_refs.validate(workspace_root=tmp_path, schema=_SCHEMA)
     assert result.valid is False
-    assert any(e.field_path == "self_pull" for e in result.errors)
-
-
-def test_backcompat_fixture_v11_qa_gate_validates_clean() -> None:
-    """Real fixture, transition posture: a pre-v1.2 verdict handoff keeps validating."""
-    path = _FIXTURES / "v1.1-qa-gate-no-self-pull.handoff.json"
-    handoff = Handoff.load(path)
-
-    result = handoff.validate(workspace_root=path.parent, schema=_SCHEMA)
-
-    assert result.valid is True, result.errors
-    assert handoff.verdict == "APPROVED"
+    assert [(e.field_path, e.message) for e in result.errors] == [
+        ("$", "'self_pull' is a required property")
+    ]
 
 
 def test_real_fixture_v12_deepening_audit_self_pull_refs_and_hash_pass_schema_shape() -> None:
@@ -212,10 +144,6 @@ def test_real_fixture_v12_deepening_audit_self_pull_refs_and_hash_pass_schema_sh
     rule exercised end-to-end against real field values, not synthesized ones."""
     path = _FIXTURES / "v1.2-deepening-audit-self-pull.handoff.json"
     handoff = Handoff.load(path)
-
-    assert handoff.schema_version == "handoff-v1.2"
-    assert handoff.self_pull_refs == ("specs/memory/ARCHITECTURE.md", "specs/memory/TECHSTACK.md")
-    assert validate_schema_shape(handoff.raw, _SCHEMA) == []
 
     result = handoff.validate(workspace_root=path.parent, schema=_SCHEMA)
 
@@ -359,7 +287,7 @@ def test_artifact_hash_status_matrix(
 
     assert handoff.artifact_hash_status(tmp_path) == expected_status
 
-    result = handoff.validate(workspace_root=tmp_path, schema=_SCHEMA)
+    result = handoff.validate(workspace_root=_atom(tmp_path), schema=_SCHEMA)
     assert result.valid is (expected_status == "match")
     if expected_status != "match":
         assert result.hash_status == expected_status
@@ -376,8 +304,15 @@ def _v12_doc_with_refs(refs: list[str]) -> dict[str, object]:
 
 
 def test_self_pull_ref_existence_and_missing_ref_named(tmp_path: Path) -> None:
-    (tmp_path / "repos" / "dadaia-workspace" / "specs" / "memory").mkdir(parents=True)
-    (tmp_path / "repos" / "dadaia-workspace" / "specs" / "memory" / "TECHSTACK.md").write_text("x")
+    """sa-context-repo-mapping-falls-back-to-the-name#B3: refs resolve in the context's
+    registered repo — the context NAME (dadaia-workspace) differs from its repo slug."""
+    states = tmp_path / ".dadaia" / "states"
+    states.mkdir(parents=True)
+    (states / "spec_contexts.json").write_text(
+        json.dumps({"contexts": [{"name": "dadaia-workspace", "repo_slug": "alphamain"}]})
+    )
+    (tmp_path / "repos" / "alphamain" / "specs" / "memory").mkdir(parents=True)
+    (tmp_path / "repos" / "alphamain" / "specs" / "memory" / "TECHSTACK.md").write_text("x")
 
     handoff = Handoff.load(
         _write(
@@ -389,9 +324,8 @@ def test_self_pull_ref_existence_and_missing_ref_named(tmp_path: Path) -> None:
     result = handoff.validate(workspace_root=tmp_path, schema=_SCHEMA)
 
     assert result.valid is False
-    assert any(
-        "self_pull.refs[1]" in e.field_path and "MISSING.md" in e.message for e in result.errors
-    )
+    assert [e.field_path for e in result.errors] == ["self_pull.refs[1]"]
+    assert "MISSING.md" in result.errors[0].message
 
 
 def test_self_pull_resolves_against_reviewed_root_before_workspace(tmp_path: Path) -> None:
@@ -400,6 +334,10 @@ def test_self_pull_resolves_against_reviewed_root_before_workspace(tmp_path: Pat
     but absent/different from whatever ``repos/<context>`` currently has checked out on
     disk must resolve — reviewed_root wins."""
     workspace = tmp_path / "workspace"
+    (workspace / ".dadaia" / "states").mkdir(parents=True)
+    (workspace / ".dadaia" / "states" / "spec_contexts.json").write_text(
+        json.dumps({"contexts": [{"name": "dadaia-workspace", "repo_slug": "dadaia-workspace"}]})
+    )
     (workspace / "repos" / "dadaia-workspace" / "specs" / "memory").mkdir(parents=True)
     (workspace / "repos" / "dadaia-workspace" / "specs" / "memory" / "TECHSTACK.md").write_text(
         "checked-out-branch version"
@@ -432,6 +370,10 @@ def test_self_pull_falls_back_to_workspace_when_reviewed_root_lacks_the_ref(tmp_
     """reviewed_root is tried FIRST, not exclusively — a ref absent there but present
     under the ordinary repos/<context>/<ref> candidate still resolves."""
     workspace = tmp_path / "workspace"
+    (workspace / ".dadaia" / "states").mkdir(parents=True)
+    (workspace / ".dadaia" / "states" / "spec_contexts.json").write_text(
+        json.dumps({"contexts": [{"name": "dadaia-workspace", "repo_slug": "dadaia-workspace"}]})
+    )
     (workspace / "repos" / "dadaia-workspace" / "specs" / "memory").mkdir(parents=True)
     (workspace / "repos" / "dadaia-workspace" / "specs" / "memory" / "TECHSTACK.md").write_text("x")
 
@@ -453,37 +395,8 @@ def test_self_pull_falls_back_to_workspace_when_reviewed_root_lacks_the_ref(tmp_
 
 
 # ---------------------------------------------------------------------------
-# 7. Findings summary / severity / expiry derivation
+# 7. HandoffIndex — the workspace-rooted, schema-caching entry the CLI uses
 # ---------------------------------------------------------------------------
-
-
-def test_expires_at_uses_produced_at_then_filename_then_mtime(tmp_path: Path) -> None:
-    ttl = timedelta(hours=48)
-
-    with_produced_at = Handoff.load(
-        _write(tmp_path / "a.handoff.json", _base_doc(produced_at="2026-01-01T00:00:00Z"))
-    )
-    assert with_produced_at.expires_at(ttl) == datetime(2026, 1, 3, 0, 0, tzinfo=UTC)
-
-    doc_no_produced_at = _base_doc()
-    del doc_no_produced_at["produced_at"]
-    named = _write(
-        tmp_path / "2026-02-01T090000Z-agent-slug.handoff.json",
-        doc_no_produced_at,
-    )
-    from_name = Handoff.load(named)
-    assert from_name.expires_at(ttl) == datetime(2026, 2, 3, 9, 0, tzinfo=UTC)
-
-
-# ---------------------------------------------------------------------------
-# 8. HandoffIndex — the workspace-rooted, schema-caching facade CLI/container use
-# ---------------------------------------------------------------------------
-
-
-def test_handoff_index_construction_is_cheap_no_schema_required(tmp_path: Path) -> None:
-    """Chokepoints/doctor_release/panel readers never need a staged schema."""
-    index = HandoffIndex(tmp_path)  # no .dadaia/agentic/schemas/... on disk at all
-    assert list(index.scan()) == []
 
 
 def test_handoff_index_validate_file_raises_handoff_schema_error_when_unstaged(
@@ -494,32 +407,3 @@ def test_handoff_index_validate_file_raises_handoff_schema_error_when_unstaged(
 
     with pytest.raises(HandoffSchemaError):
         index.validate_file(handoff_path)
-
-
-def test_handoff_index_validate_all_scoped_by_context_and_caches_the_schema(
-    tmp_path: Path,
-) -> None:
-    _stage_schema(tmp_path)
-    index = HandoffIndex(tmp_path)
-    _write(tmp_path / ".dadaia" / "handoff" / "ctx-a" / "h1.handoff.json", _base_doc())
-    _write(tmp_path / ".dadaia" / "handoff" / "ctx-b" / "h2.handoff.json", _base_doc())
-
-    all_results = index.validate_all()
-    scoped = index.validate_all(context="ctx-a")
-
-    assert len(all_results) == 2
-    assert len(scoped) == 1
-    assert all(r.valid for r in all_results)
-    # Schema loaded once, cached — a second call must not raise even if the file moved.
-    (tmp_path / ".dadaia" / "agentic" / "schemas" / "handoff-v1.schema.json").unlink()
-    assert index.validate_file(scoped[0].path).valid is True
-
-
-def test_validate_schema_shape_and_load_schema_are_the_standalone_public_primitives() -> None:
-    """The schema-contract tests (test_handoff_schema_contract.py,
-    test_handoff_instruction_adoption.py) use exactly these two — proving the internal
-    validator (folded from the deleted StdlibHandoffValidator/ValidatorPort) stays
-    reachable without a workspace root."""
-    schema = load_schema(_SCHEMA_PATH)
-    assert validate_schema_shape(_base_doc(), schema) == []
-    assert validate_schema_shape({}, schema) != []

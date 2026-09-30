@@ -1,14 +1,14 @@
 """JsonContextStore — atomic CRUD over spec_contexts.json (schema v3).
 
-Every write goes through ``atomic_write``; there is no lock. ``_load`` tolerates a v2
-file exactly like a v3 one — v3 only adds ``associated_repos``, which ``_from_dict``
-defaults to an empty tuple — so a v2 workspace needs no migration step.
+Every write goes through ``atomic_write``; there is no lock. A v2 file reads like a v3
+one — v3 only adds ``associated_repos``, which ``_from_dict`` defaults to empty.
 """
 
 import json
 from pathlib import Path
 
 from dadaia_workspace.core.atomic_write import atomic_write
+from dadaia_workspace.core.cli_line import fix_line
 from dadaia_workspace.core.exceptions import SchemaVersionError
 from dadaia_workspace.core.models.spec_context import (
     AssociatedRepo,
@@ -16,52 +16,38 @@ from dadaia_workspace.core.models.spec_context import (
     SpecContextProject,
 )
 
-_VERSION = "3"
+_VERSION = 3
 
-# Prior registry schema versions still readable without a forced migration — see the
-# module docstring for why v2 is tolerated rather than hard-refused.
-_READABLE_VERSIONS: frozenset[str] = frozenset({"2", _VERSION})
+# Legacy state values that mark a v1 row — the rows ``migrate`` rewrites.
+LEGACY_STATES: frozenset[str] = frozenset({"ativo", "inativo"})
 
-# Legacy state values that indicate a v1 file (used only by the migration path — T-10c)
-_LEGACY_STATES: frozenset[str] = frozenset({"ativo", "inativo"})
+
+def parse_schema_version(data: dict, path: Path) -> int:  # type: ignore[type-arg]
+    """THE registry version: 1 while any row is v1 or the stamp is below 2, else the stamp.
+
+    A non-numeric or newer stamp raises."""
+    raw = data.get("schema_version", data.get("version"))
+    text = str(_VERSION if raw is None else raw)
+    if isinstance(raw, bool) or not text.isdigit():
+        problem = f"spec_contexts.json schema_version {raw!r} is not a number."
+        raise SchemaVersionError(problem, f"Operator action: set it to {_VERSION} in {path}")
+    if int(text) > _VERSION:
+        problem = f"spec_contexts.json schema_version {text} is newer than this dadaia."
+        raise SchemaVersionError(
+            problem, f"Operator action: upgrade dadaia-workspace to read {path}"
+        )
+    legacy = any(c.get("state") in LEGACY_STATES for c in data.get("contexts", []))
+    return 1 if legacy or int(text) < 2 else int(text)
 
 
 def _load(path: Path) -> dict:  # type: ignore[type-arg]
-    """Load spec_contexts.json.  Raises SchemaVersionError on v1 files.
-
-    Must NOT be called outside SpecContextService methods — see module docstring.
-    """
+    """Load spec_contexts.json; a v1 registry refuses with the one ``migrate --yes`` fix."""
     if not path.exists():
-        return {"schema_version": _VERSION, "contexts": []}
-    with path.open(encoding="utf-8") as f:
-        data = json.load(f)
-
-    # Detect v1 by explicit schema_version field
-    schema_ver = data.get("schema_version") or data.get("version")
-    if schema_ver == "1":
-        raise SchemaVersionError(
-            "[MIGRATION REQUIRED] This workspace uses spec_contexts.json v1.\n"
-            "Run: dadaia migrate\n"
-            "After migration, all v2 commands will work normally."
-        )
-
-    # Detect v1 by legacy state values in context rows
-    for ctx in data.get("contexts", []):
-        if ctx.get("state") in _LEGACY_STATES:
-            raise SchemaVersionError(
-                "[MIGRATION REQUIRED] This workspace uses spec_contexts.json v1.\n"
-                "Run: dadaia migrate\n"
-                "After migration, all v2 commands will work normally."
-            )
-
-    # Unknown schema version — fail loudly
-    if schema_ver not in (None, *_READABLE_VERSIONS):
-        raise SchemaVersionError(
-            f"[MIGRATION REQUIRED] Unknown schema_version '{schema_ver}' in spec_contexts.json.\n"
-            "Run: dadaia migrate\n"
-            "After migration, all v2 commands will work normally."
-        )
-
+        return {"schema_version": str(_VERSION), "contexts": []}
+    data = json.loads(path.read_text(encoding="utf-8"))
+    if parse_schema_version(data, path) < 2:
+        problem = "spec_contexts.json holds v1 rows (ativo/inativo or schema_version < 2)."
+        raise SchemaVersionError(problem, fix_line(path.parents[2], "migrate", "--yes"))
     return data  # type: ignore[no-any-return]
 
 
@@ -110,15 +96,12 @@ class JsonContextStore:
         atomic_write(self._path, json.dumps(data, indent=2))
 
     def get(self, name: str) -> SpecContextProject | None:
-        data = _load(self._path)
-        for c in data["contexts"]:
-            if c["name"] == name:
-                return _from_dict(c)
-        return None
+        return next(
+            (_from_dict(c) for c in _load(self._path)["contexts"] if c["name"] == name), None
+        )
 
     def list_all(self) -> list[SpecContextProject]:
-        data = _load(self._path)
-        return [_from_dict(c) for c in data["contexts"]]
+        return [_from_dict(c) for c in _load(self._path)["contexts"]]
 
     def delete(self, name: str) -> None:
         data = _load(self._path)

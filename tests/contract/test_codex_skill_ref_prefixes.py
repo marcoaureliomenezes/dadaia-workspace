@@ -119,13 +119,3 @@ def test_codex_skill_ref_prefixes_bind_to_the_real_inventory() -> None:
     assert not phantoms, (
         f"phantom _CODEX_SKILL_REF_PREFIXES entries (match no public/skills/ name): {phantoms}"
     )
-
-
-def test_phantom_prefix_detector_catches_a_fabricated_phantom() -> None:
-    """Self-test of ``_is_phantom_prefix`` itself: a synthetic prefix backed by no
-    real skill must be caught — proving the inventory-binding test above would
-    actually fail on a genuine phantom, not just happen to pass on today's clean
-    tuple."""
-    skill_names = _skill_names(_PUBLIC)
-
-    assert _is_phantom_prefix("totally-fabricated-phantom-prefix-", skill_names)

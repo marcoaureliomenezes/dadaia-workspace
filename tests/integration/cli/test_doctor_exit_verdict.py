@@ -11,10 +11,12 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
 from typer.testing import CliRunner
 
 from dadaia_workspace.cli.main import app
 from dadaia_workspace.core.models.doctor_report import DoctorLine, DoctorReport, DoctorStatus
+from dadaia_workspace.features.public.service import PublicAssetService
 
 _runner = CliRunner()
 
@@ -24,6 +26,8 @@ def _run_doctor_with(monkeypatch, tmp_path: Path, lines: tuple[DoctorLine, ...])
     import dadaia_workspace.cli.commands.public as public_cmd
 
     class _FakeService:
+        verdict = PublicAssetService.verdict
+
         def doctor(self, workspace_root: Path) -> DoctorReport:
             return DoctorReport(lines=lines)
 
@@ -36,39 +40,26 @@ def _run_doctor_with(monkeypatch, tmp_path: Path, lines: tuple[DoctorLine, ...])
     return _runner.invoke(app, ["public", "doctor"])
 
 
-def test_error_line_exits_nonzero(monkeypatch, tmp_path: Path) -> None:
-    """An ``[error]`` finding (e.g. public-privacy) MUST fail the run."""
+@pytest.mark.parametrize(
+    ("status", "code"),
+    [
+        (DoctorStatus.ERROR, 1),  # public-privacy / codex [error] lines fail the run
+        (DoctorStatus.DRIFT, 1),
+        (DoctorStatus.MISSING, 1),
+        (DoctorStatus.LEAK, 1),
+        (DoctorStatus.WARN, 0),
+        (DoctorStatus.INFO, 0),
+        (DoctorStatus.FOREIGN, 0),  # Ruling 16
+        (DoctorStatus.NOT_APPLICABLE, 0),
+    ],
+    ids=lambda v: getattr(v, "name", str(v)),
+)
+def test_the_exit_code_is_the_reports_blocking_verdict(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, status: DoctorStatus, code: int
+) -> None:
+    line = DoctorLine(status, "public-privacy:x.md: contains 'secret-name'")
     result = _run_doctor_with(
-        monkeypatch,
-        tmp_path,
-        (
-            DoctorLine(DoctorStatus.OK, "stage:data/AGENTS.md"),
-            DoctorLine(DoctorStatus.ERROR, "public-privacy:x.md: contains 'secret-name'"),
-        ),
+        monkeypatch, tmp_path, (DoctorLine(DoctorStatus.OK, "root:AGENTS.md"), line)
     )
-    assert result.exit_code == 1, result.output
-    assert "[error] public-privacy:x.md" in result.output
-
-
-def test_all_nonblocking_exits_zero(monkeypatch, tmp_path: Path) -> None:
-    """warn/info/foreign/not-applicable stay non-blocking (Ruling 16 for foreign)."""
-    result = _run_doctor_with(
-        monkeypatch,
-        tmp_path,
-        (
-            DoctorLine(DoctorStatus.OK, "root:AGENTS.md"),
-            DoctorLine(DoctorStatus.WARN, "claude: out-of-profile runtime present"),
-            DoctorLine(DoctorStatus.INFO, "codex:trust-boundary — informational"),
-            DoctorLine(DoctorStatus.FOREIGN, "repos/consumer:AGENTS.md"),
-            DoctorLine(DoctorStatus.NOT_APPLICABLE, "git-dirty check (not a git repo)"),
-        ),
-    )
-    assert result.exit_code == 0, result.output
-
-
-def test_drift_and_missing_still_exit_nonzero(monkeypatch, tmp_path: Path) -> None:
-    for status in (DoctorStatus.DRIFT, DoctorStatus.MISSING, DoctorStatus.LEAK):
-        result = _run_doctor_with(
-            monkeypatch, tmp_path, (DoctorLine(status, "claude:agents/x.md"),)
-        )
-        assert result.exit_code == 1, (status, result.output)
+    assert result.exit_code == code, result.output  # type: ignore[attr-defined]
+    assert f"[{status.value}] public-privacy:x.md" in result.output  # type: ignore[attr-defined]

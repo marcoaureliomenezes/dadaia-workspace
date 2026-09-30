@@ -9,7 +9,6 @@ sources:
   - dadaia_workspace/features/import_/**
   - dadaia_workspace/cli/commands/export.py
   - dadaia_workspace/cli/commands/import_.py
-  - dadaia_workspace/core/models/export.py
 ---
 
 ## Why one atom

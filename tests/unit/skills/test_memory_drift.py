@@ -9,12 +9,13 @@ patch. Every case below is a property of the window, never of this repo's atom c
 from __future__ import annotations
 
 import json
-import shutil
 import subprocess
 import sys
 from pathlib import Path
 
 import pytest
+
+from tests.helpers.skill_scripts import stage_skill_scripts
 
 pytestmark = [pytest.mark.unit, pytest.mark.slow(reason="runs git over a tmp repository")]
 
@@ -45,10 +46,7 @@ def _git(cwd: Path, *argv: str) -> str:
 def script(tmp_path: Path) -> Path:
     """memory.py staged alone: the navigator imports nothing from any other skill."""
     staged = tmp_path / "skills" / "dd-spec-navigator" / "scripts"
-    staged.mkdir(parents=True)
-    for module in sorted(_SCRIPTS.glob("*.py")):
-        shutil.copy2(module, staged / module.name)
-    return staged / "memory.py"
+    return stage_skill_scripts("dd-spec-navigator", staged) / "memory.py"
 
 
 @pytest.fixture
@@ -177,6 +175,48 @@ def test_drift_requires_since_and_resolves_no_window_itself(script: Path, repo: 
 
     assert result.returncode == 2
     assert "--since" in result.stderr
+
+
+def _release_drift(script: Path, repo: Path, state: dict[str, object]) -> dict[str, object]:
+    """`release.py drift` over a live release carrying *state*: the release skill is
+    projected beside the navigator, as `public install` lays it out."""
+    release = stage_skill_scripts(
+        "dd-release-implementation", script.parents[2] / "dd-release-implementation" / "scripts"
+    )
+    (repo / "specs" / "releases" / "9.9.9").mkdir(parents=True)
+    (repo / "specs" / "releases" / "9.9.9" / "_RELEASE.json").write_text(json.dumps(state))
+    result = subprocess.run(
+        [sys.executable, str(release / "release.py"), "drift", "--specs", str(repo / "specs"),
+         "--json"], capture_output=True, text=True, check=False, cwd=repo,
+    )  # fmt: skip
+    assert result.returncode in (0, 1), result.stderr
+    return dict(json.loads(result.stdout))
+
+
+def test_the_closure_window_opens_at_the_live_release_defined_sha(script: Path, repo: Path) -> None:
+    """memory-drift-requires-since-that-the-procedure-says-it-infers#window: the closure
+    worklist is asked with no sha; with no memory entry the window opens at defined.sha."""
+    base = _git(repo, "rev-parse", "HEAD")
+    (repo / "dadaia_workspace" / "features" / "alpha" / "core.py").write_text("x = 2\n", "utf-8")
+    _git(repo, "commit", "-aqm", "touch alpha")
+
+    report = _release_drift(script, repo, {"defined": {"sha": base}, "log": []})
+
+    assert report["since"] == base
+    assert [a["slug"] for a in report["atoms"]] == ["alpha"]  # type: ignore[union-attr]
+
+
+def test_the_closure_window_opens_at_the_last_memory_entry_until(script: Path, repo: Path) -> None:
+    """memory-drift-requires-since-that-the-procedure-says-it-infers#window: a recorded
+    `kind: memory` entry moves the window start to its `until`."""
+    base = _git(repo, "rev-parse", "HEAD")
+    (repo / "README.md").write_text("later\n", "utf-8")
+    _git(repo, "add", "README.md")
+    _git(repo, "commit", "-qm", "later")
+    until = _git(repo, "rev-parse", "HEAD")
+    state = {"defined": {"sha": base}, "log": [{"kind": "memory", "since": base, "until": until}]}
+
+    assert _release_drift(script, repo, state)["since"] == until
 
 
 def test_a_root_level_code_file_is_its_own_unit(script: Path, repo: Path) -> None:

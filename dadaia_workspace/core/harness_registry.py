@@ -1,7 +1,7 @@
 """Typed harness identity registry — ``core/harness_registry.py``.
 
 The **code embodiment** of the agent-runtime roster that ``specs/memory/tech-stack.md``
-("Agent runtimes") documents as the single source of truth (SPEC-DOC-037). One
+("Agent runtimes") documents as the single source of truth. One
 :class:`HarnessRecord` per harness is the whole registry: every other constant here
 (:data:`L1_ENTRY_HARNESSES`, :data:`HARNESS_PROJECTION_DIRS`,
 :data:`PROJECTION_TARGETS`) and every projection rule in

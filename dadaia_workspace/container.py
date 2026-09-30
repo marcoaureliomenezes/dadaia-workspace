@@ -5,11 +5,8 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from dadaia_workspace.core.models.bugs import BugRecord
     from dadaia_workspace.features.certification import CertificationResult
-    from dadaia_workspace.infrastructure.jsonl_record_store import JsonlRecordStore
 
-from dadaia_workspace.core.handoff_index import HandoffIndex
 from dadaia_workspace.core.workspace_resolver import not_initialized
 from dadaia_workspace.features.chokepoints.denylist_scan import BaselinePatternLike
 from dadaia_workspace.features.export.service import ExportService
@@ -27,12 +24,12 @@ from dadaia_workspace.infrastructure.python_env import VenvPythonEnvironmentMana
 logger = logging.getLogger(__name__)
 
 
-def _states_dir(workspace_root: Path) -> Path:
+def states_dir(workspace_root: Path) -> Path:
     return workspace_root / ".dadaia" / "states"
 
 
 def _guard_initialized(workspace_root: Path) -> None:
-    marker = _states_dir(workspace_root) / "spec_contexts.json"
+    marker = states_dir(workspace_root) / "spec_contexts.json"
     if not marker.exists():
         raise not_initialized(workspace_root)
 
@@ -46,7 +43,7 @@ def build_workspace_service(workspace_root: Path) -> WorkspaceService:
 
 def build_spec_context_service(workspace_root: Path) -> SpecContextService:
     _guard_initialized(workspace_root)
-    states = _states_dir(workspace_root)
+    states = states_dir(workspace_root)
 
     return SpecContextService(
         context_store=JsonContextStore(states),
@@ -86,32 +83,6 @@ def build_git_object_reader() -> GitSubprocessObjectReader:
     return GitSubprocessObjectReader()
 
 
-def build_bug_record_store(specs_dir: Path) -> "JsonlRecordStore[BugRecord]":
-    """Composition-root seam for the generic bug-record JSONL store.
-
-    Stays a container seam because the doctor reads the ledger through it
-    (``bug_store_factory`` -> ``features.specs.doctor_governance.GovernanceValidator``);
-    the ledger's ONE WRITER is the skill script ``dd-bug-resolution/scripts/bugs.py``
-    which shares no code with this reader.
-
-    Takes *specs_dir* directly — the SAME resolved directory the doctor's
-    ``--specs-dir``/bind-resolution seam already produces (never a
-    ``workspace_root``, which would silently assume ``<root>/specs`` and break every
-    ``--specs-dir <tmp>`` test fixture and remote-context routing). The ledger's
-    physical filename is ``BUGS.jsonl`` (T-050-10 physically migrated the ledger
-    from the retired v5-event-shaped ``bugs.jsonl`` — the record model FR3
-    produced, one line per bug id, commit provenance derived from git).
-    """
-    from dadaia_workspace.core.models.bugs import BugRecord
-    from dadaia_workspace.infrastructure.jsonl_record_store import JsonlRecordStore
-
-    return JsonlRecordStore(
-        Path(specs_dir) / "bugs" / "BUGS.jsonl",
-        to_dict=BugRecord.to_dict,
-        from_dict=BugRecord.from_dict,
-    )
-
-
 def load_denylist_terms() -> tuple[tuple[str, str], ...]:
     """Composition-root seam over the operator privacy denylist (v0.9.0 FR3, source 1).
 
@@ -133,7 +104,7 @@ def load_denylist_baseline_patterns() -> tuple[BaselinePatternLike, ...]:
 
 def scan_publish_candidates(repo: Path, rels: list[str]) -> dict[str, str]:
     """AC5.6: the pre-push matcher, in-process, over the files baseline and ``dead
-    --commit`` are about to commit — a repo with ``core.hooksPath`` never runs the hook.
+    --commit`` are about to commit, before any hook could see them.
     Read as the object reader reads a blob: undecodable bytes are scanned by path only."""
     from dadaia_workspace.core.models.git_scan import ScannedObject
     from dadaia_workspace.features.chokepoints.denylist_scan import scan_objects
@@ -165,17 +136,18 @@ def is_source_repo_root(path: Path) -> bool:
 
 def build_doctor_service(workspace_root: Path) -> DoctorService:
     _guard_initialized(workspace_root)
-    states = _states_dir(workspace_root)
+    states = states_dir(workspace_root)
     return DoctorService(
         context_store=JsonContextStore(states),
         git_client=GitSubprocessClient(),
         workspace_root=workspace_root,
+        projection=build_public_service().verdict,
     )
 
 
 def build_export_service(workspace_root: Path) -> ExportService:
     _guard_initialized(workspace_root)
-    states = _states_dir(workspace_root)
+    states = states_dir(workspace_root)
     return ExportService(
         context_store=JsonContextStore(states),
         git_client=GitSubprocessClient(),
@@ -195,16 +167,3 @@ def run_certification(workspace_root: Path, *, keep: bool = False) -> "Certifica
     )
 
     return certify(workspace_root, SubprocessCertificationProcess(), keep=keep)
-
-
-def build_handoff_index(workspace_root: Path) -> HandoffIndex:
-    """Compose the workspace-rooted :class:`HandoffIndex` (release 0.5.1 K6).
-
-    Construction is cheap (no schema load) — schema loading happens lazily, once, on
-    the first ``validate_file``/``validate_all`` call, from
-    ``workspace_root/.dadaia/agentic/schemas/handoff-v1.schema.json``.
-
-    Args:
-        workspace_root: Root directory of the initialized dadaia workspace.
-    """
-    return HandoffIndex(workspace_root)

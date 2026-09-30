@@ -1,13 +1,7 @@
-"""CLI integration tests for `dadaia context repo add/remove/list` and
-(v0.4.4 FR17, T-044-28).
-
-Intent: CONTRACT — A17.1, A17.2, A17.3.
-
-Covers:
-- A17.1 each verb is idempotent and fails loudly on an unknown context or slug.
-- A17.2 `remove` never deletes an on-disk repo silently — it states what it leaves
-  behind.
-- A17.3 adding the main repo's own slug as associated is refused.
+"""Intent: CONTRACT — v0.4.4 FR17 A17.1-A17.3 (T-044-28): `context repo add/remove` are
+idempotent, refuse loudly (unknown context or slug, a conflicting URL, the main repo's own
+slug) leaving the record unchanged, and `remove` never deletes an on-disk checkout — it
+says what it leaves behind.
 """
 
 from __future__ import annotations
@@ -57,124 +51,59 @@ def _record(workspace: Path, name: str) -> dict:  # type: ignore[type-arg]
     return next(c for c in contexts if c["name"] == name)
 
 
-# --------------------------------------------------------------------- repo add
+_A = [{"slug": "assoc-a", "url": "https://x.test/a.git"}]
+_ADD_A = ["context", "repo", "add", "foo", "assoc-a", "--url", "https://x.test/a.git"]
 
 
-def test_repo_add_registers_and_is_idempotent(workspace: Path) -> None:
+@pytest.fixture()
+def foo(workspace: Path) -> Path:
+    """DEAD `foo` (main repo `foo-repo`) with `assoc-a` registered once."""
     seed_dead_context(workspace, "foo", "foo-repo", "https://x.test/foo.git")
-
-    result = _runner.invoke(
-        app, ["context", "repo", "add", "foo", "assoc-a", "--url", "https://x.test/a.git"]
-    )
-    assert result.exit_code == 0, result.output
-    rec = _record(workspace, "foo")
-    assert rec["associated_repos"] == [{"slug": "assoc-a", "url": "https://x.test/a.git"}]
-
-    # Idempotent: same slug + same url again -> success, no-op, no duplicate entry.
-    result2 = _runner.invoke(
-        app, ["context", "repo", "add", "foo", "assoc-a", "--url", "https://x.test/a.git"]
-    )
-    assert result2.exit_code == 0, result2.output
-    assert "no change" in result2.output.lower() or "already" in result2.output.lower()
-    rec2 = _record(workspace, "foo")
-    assert rec2["associated_repos"] == [{"slug": "assoc-a", "url": "https://x.test/a.git"}]
+    assert _runner.invoke(app, _ADD_A).exit_code == 0
+    assert _record(workspace, "foo")["associated_repos"] == _A
+    return workspace
 
 
-def test_repo_add_refuses_conflicting_url(workspace: Path) -> None:
-    seed_dead_context(workspace, "foo", "foo-repo", "https://x.test/foo.git")
-    _runner.invoke(
-        app, ["context", "repo", "add", "foo", "assoc-a", "--url", "https://x.test/a.git"]
-    )
-
-    result = _runner.invoke(
-        app, ["context", "repo", "add", "foo", "assoc-a", "--url", "https://x.test/a-renamed.git"]
-    )
-    assert result.exit_code == 1
-    assert "remove" in result.output.lower()  # tells the operator the one path forward
-    rec = _record(workspace, "foo")
-    assert rec["associated_repos"] == [{"slug": "assoc-a", "url": "https://x.test/a.git"}]
+def test_repo_add_is_idempotent(foo: Path) -> None:
+    again = _runner.invoke(app, _ADD_A)
+    assert again.exit_code == 0 and "no change" in again.output.lower(), again.output
+    assert _record(foo, "foo")["associated_repos"] == _A
 
 
-def test_repo_add_refuses_main_repo_slug(workspace: Path) -> None:
-    seed_dead_context(workspace, "foo", "foo-repo", "https://x.test/foo.git")
-
-    result = _runner.invoke(app, ["context", "repo", "add", "foo", "foo-repo"])
-    assert result.exit_code == 1
-    assert "main repo" in result.output.lower()
-    rec = _record(workspace, "foo")
-    assert rec["associated_repos"] == []
-
-
-def test_repo_add_unknown_context_exits_1(workspace: Path) -> None:
-    result = _runner.invoke(app, ["context", "repo", "add", "nope", "assoc-a"])
-    assert result.exit_code == 1
-    assert "not found" in result.output.lower()
-
-
-def test_repo_add_invalid_slug_exits_1(workspace: Path) -> None:
-    seed_dead_context(workspace, "foo", "foo-repo", "https://x.test/foo.git")
-    result = _runner.invoke(app, ["context", "repo", "add", "foo", "not a valid slug"])
-    assert result.exit_code == 1
+@pytest.mark.parametrize(
+    ("argv", "text"),
+    [
+        pytest.param(["add", "foo", "assoc-a", "--url", "https://x.test/b.git"], "remove", id="conflicting-url-names-remove"),
+        pytest.param(["add", "foo", "foo-repo"], "main repo", id="A17.3-main-repo-slug"),
+        pytest.param(["add", "nope", "assoc-b"], "not found", id="add-unknown-context"),
+        pytest.param(["add", "foo", "not a valid slug"], "", id="add-invalid-slug"),
+        pytest.param(["remove", "foo", "never-added"], "never-added", id="remove-unknown-slug"),
+        pytest.param(["remove", "nope", "assoc-a"], "not found", id="remove-unknown-context"),
+    ],
+)  # fmt: skip
+def test_a_refused_repo_verb_exits_1_and_changes_nothing(
+    foo: Path, argv: list[str], text: str
+) -> None:
+    result = _runner.invoke(app, ["context", "repo", *argv])
+    assert result.exit_code == 1 and text in result.output.lower(), result.output
+    assert _record(foo, "foo")["associated_repos"] == _A
 
 
-# --------------------------------------------------------------------- repo remove
-
-
-def test_repo_remove_states_on_disk_checkout_left_untouched(workspace: Path) -> None:
-    seed_dead_context(workspace, "foo", "foo-repo", "https://x.test/foo.git")
-    _runner.invoke(
-        app, ["context", "repo", "add", "foo", "assoc-a", "--url", "https://x.test/a.git"]
-    )
-    on_disk = workspace / "repos" / "assoc-a"
-    on_disk.mkdir(parents=True)
-    (on_disk / "marker.txt").write_text("still here\n", encoding="utf-8")
+@pytest.mark.parametrize(
+    ("checkout", "text"), [(True, "untouched"), (False, "no on-disk checkout")]
+)
+def test_repo_remove_never_deletes_a_checkout_and_says_so(
+    foo: Path, checkout: bool, text: str
+) -> None:
+    """A17.2; A17.1: a second remove of the same slug is a loud failure."""
+    on_disk = foo / "repos" / "assoc-a"
+    if checkout:
+        on_disk.mkdir(parents=True)
+        (on_disk / "marker.txt").write_text("still here\n", encoding="utf-8")
 
     result = _runner.invoke(app, ["context", "repo", "remove", "foo", "assoc-a"])
-    assert result.exit_code == 0, result.output
-    assert "untouched" in result.output.lower()
-    assert "assoc-a" in result.output
 
-    # Registry entry gone.
-    rec = _record(workspace, "foo")
-    assert rec["associated_repos"] == []
-    # On-disk checkout genuinely left alone (A17.2 — never deletes silently, or at all).
-    assert on_disk.exists()
-    assert (on_disk / "marker.txt").exists()
-
-
-def test_repo_remove_states_no_on_disk_checkout_found(workspace: Path) -> None:
-    seed_dead_context(workspace, "foo", "foo-repo", "https://x.test/foo.git")
-    _runner.invoke(
-        app, ["context", "repo", "add", "foo", "assoc-a", "--url", "https://x.test/a.git"]
-    )
-
-    result = _runner.invoke(app, ["context", "repo", "remove", "foo", "assoc-a"])
-    assert result.exit_code == 0, result.output
-    assert "no on-disk checkout" in result.output.lower()
-
-
-def test_repo_remove_unknown_slug_exits_1(workspace: Path) -> None:
-    seed_dead_context(workspace, "foo", "foo-repo", "https://x.test/foo.git")
-    result = _runner.invoke(app, ["context", "repo", "remove", "foo", "never-added"])
-    assert result.exit_code == 1
-    assert "never-added" in result.output
-
-
-def test_repo_remove_unknown_context_exits_1(workspace: Path) -> None:
-    result = _runner.invoke(app, ["context", "repo", "remove", "nope", "assoc-a"])
-    assert result.exit_code == 1
-    assert "not found" in result.output.lower()
-
-
-def test_repo_remove_second_call_fails_loudly(workspace: Path) -> None:
-    """A17.1: remove converges to "not registered" — a second call on the same slug
-    is a loud failure, not a silent no-op."""
-    seed_dead_context(workspace, "foo", "foo-repo", "https://x.test/foo.git")
-    _runner.invoke(
-        app, ["context", "repo", "add", "foo", "assoc-a", "--url", "https://x.test/a.git"]
-    )
-    first = _runner.invoke(app, ["context", "repo", "remove", "foo", "assoc-a"])
-    assert first.exit_code == 0
-
-    second = _runner.invoke(app, ["context", "repo", "remove", "foo", "assoc-a"])
-    assert second.exit_code == 1
+    assert result.exit_code == 0 and text in result.output.lower(), result.output
+    assert _record(foo, "foo")["associated_repos"] == []
+    assert (on_disk / "marker.txt").exists() is checkout
+    assert _runner.invoke(app, ["context", "repo", "remove", "foo", "assoc-a"]).exit_code == 1

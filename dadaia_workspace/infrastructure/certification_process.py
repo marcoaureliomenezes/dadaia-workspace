@@ -1,6 +1,4 @@
-"""Subprocess-backed certification process control (ADR-0001: no
-``CertificationProcess``/``RunningCertificationProcess`` port — one adapter, no swap
-seam)."""
+"""Subprocess-backed certification process control (one adapter, no port)."""
 
 from __future__ import annotations
 
@@ -68,12 +66,13 @@ class SubprocessCertificationProcess:
         cwd: Path,
         env: Mapping[str, str],
     ) -> _RunningProcess:
-        process = subprocess.Popen(
-            list(argv),
-            cwd=cwd,
-            env=dict(env),
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True,
+        return _RunningProcess(
+            subprocess.Popen(
+                list(argv),
+                cwd=cwd,
+                env=dict(env),
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+            )
         )
-        return _RunningProcess(process)

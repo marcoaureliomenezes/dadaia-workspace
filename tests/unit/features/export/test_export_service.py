@@ -14,7 +14,10 @@ from dadaia_workspace.core.models.spec_context import (
 )
 from dadaia_workspace.core.workspace_layout import zones_with_canon
 from dadaia_workspace.features.export.service import ExportService
-from tests.fakes import FakeContextStore, FakeGitClient
+from dadaia_workspace.infrastructure.git_subprocess import GitSubprocessClient
+from dadaia_workspace.infrastructure.json_context_store import JsonContextStore
+from tests.fixtures.real_git import clone, seeded_remote
+from tests.fixtures.stores import context_store
 
 _INFRA = AssociatedRepo(slug="infra", url="https://example.com/infra.git")
 
@@ -30,14 +33,14 @@ def _ctx(name: str, state: ContextState, **fields: object) -> SpecContextProject
     )
 
 
-def _service(root: Path) -> tuple[ExportService, FakeContextStore, FakeGitClient]:
-    store = FakeContextStore()
-    git = FakeGitClient()
-    return ExportService(context_store=store, git_client=git, workspace_root=root), store, git
+def _service(root: Path) -> tuple[ExportService, JsonContextStore]:
+    store = context_store(root / ".dadaia" / "states")
+    git = GitSubprocessClient()
+    return ExportService(context_store=store, git_client=git, workspace_root=root), store
 
 
 def test_export_writes_fr13_records_and_refreshes_alive_branches_only(tmp_path: Path) -> None:
-    svc, store, git = _service(tmp_path)
+    svc, store = _service(tmp_path)
     store.save(_ctx("alpha", ContextState.ALIVE, current_branch="main", associated_repos=(_INFRA,)))
     store.save(
         _ctx(
@@ -45,8 +48,7 @@ def test_export_writes_fr13_records_and_refreshes_alive_branches_only(tmp_path: 
         )
     )
     for name, branch in (("alpha", "feature/0.4.6"), ("beta", "stale-checkout")):
-        (tmp_path / "repos" / name).mkdir(parents=True)
-        git.checkout(tmp_path / "repos" / name, branch)
+        clone(seeded_remote(tmp_path, name, branch=branch), tmp_path / "repos" / name)
 
     result = svc.run()
 
@@ -94,7 +96,7 @@ def test_export_writes_fr13_records_and_refreshes_alive_branches_only(tmp_path: 
 
 
 def test_export_overwrites_the_single_artifact(tmp_path: Path) -> None:
-    svc, store, _ = _service(tmp_path)
+    svc, store = _service(tmp_path)
     store.save(_ctx("alpha", ContextState.ALIVE))
     store.save(_ctx("beta", ContextState.DEAD))
     first = svc.run()

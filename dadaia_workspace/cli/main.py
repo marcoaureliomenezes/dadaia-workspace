@@ -5,6 +5,7 @@ import sys
 
 import typer
 
+from dadaia_workspace.cli._fail import print_error
 from dadaia_workspace.cli.commands import (
     capabilities,
     certify,
@@ -25,6 +26,7 @@ from dadaia_workspace.cli.commands import (
 from dadaia_workspace.cli.commands.export import export
 from dadaia_workspace.cli.commands.import_ import import_workspace
 from dadaia_workspace.core.exceptions import DadaiaError
+from dadaia_workspace.infrastructure.provider_version import provider_version
 
 app = typer.Typer(
     name="dadaia",
@@ -37,15 +39,6 @@ app = typer.Typer(
     # exceptions still surface their traceback for debugging.
     pretty_exceptions_enable=False,
 )
-
-
-def _resolve_version() -> str:
-    from importlib import metadata
-
-    try:
-        return metadata.version("dadaia-workspace")
-    except metadata.PackageNotFoundError:
-        return "0+source"
 
 
 @app.callback(invoke_without_command=True)
@@ -61,7 +54,7 @@ def _root(
 ) -> None:
     """Root callback: handles the top-level ``--version`` flag."""
     if version:
-        typer.echo(f"dadaia-workspace {_resolve_version()}")
+        typer.echo(f"dadaia-workspace {provider_version() or '0+source'}")
         raise typer.Exit(0)
     # Preserve no_args_is_help behavior: bare `dadaia` prints help and exits.
     if ctx.invoked_subcommand is None:
@@ -127,7 +120,7 @@ def _safe_app() -> None:
     except DadaiaError as exc:
         if _traceback_requested():
             raise
-        print(f"Error: {exc}", file=sys.stderr)
+        print_error(exc)
         raise SystemExit(1) from None
     except Exception as exc:
         if _traceback_requested():

@@ -43,7 +43,7 @@ Each step ends on a checkable criterion. Steps 5–8 are candidate-closure work.
 
 **Step 5 — Memory update (`dd-product-engineer`).**
 - Memory is closure procedure, never a task: a TASKS.md task whose write set names `specs/memory` is refused by `.dadaia/.venv/bin/dadaia doctor` (SPEC-DOC-047).
-- Reconcile product atoms from the code diff — `memory.py drift`, per-atom `git diff`, DELETE → UPDATE → ADD, `catalog generate`, derived docs in the same commit, `release.py memory` — protocol: `MEMORY-UPDATE.md`.
+- Reconcile product atoms from the code diff — `release.py drift`, per-atom `git diff`, DELETE → UPDATE → ADD, `catalog generate`, derived docs in the same commit, `release.py memory` — protocol: `MEMORY-UPDATE.md`.
 - Done when: one `kind: memory` log entry covers every worklist entry as reviewed or changed, `.dadaia/.venv/bin/dadaia doctor` is clean and the derived-docs test is green.
 
 **Step 6 — Record the candidate's closure narrative.**
@@ -80,4 +80,4 @@ The arc ends here. Gate -> promote -> record -> branch cut: `dd-gitflow-default`
 - Writing source code, tests, or pipelines (other agents) — the closer records test dispositions, never authors a test.
 - Modifying `specs/constitution.md` (requires explicit operator approval).
 - Memory updates outside CLOSURE phase (or DEFINITION under its own authorization) — gate-blocked for any other agent/phase.
-- Minting a version, writing a CHANGELOG section or moving a closed trio on disk — release-please owns the first two, git owns the third.
+- Minting a version, writing a CHANGELOG section or moving a closed trio on disk — the project's release pipeline owns the first two, git owns the third.

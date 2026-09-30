@@ -1,13 +1,12 @@
 {
-  "generated_at": "2026-09-27T04:13:11Z",
-  "context": "dadaia-workspace",
+  "generated_at": "2026-09-30T02:58:10Z",
   "features": [
     {
       "rank": 1,
       "slug": "agent-comms",
       "title": "agent-comms",
       "area": "agents",
-      "tldr": "The handoff-v1 JSON contract agents emit, its stdlib validator behind `dadaia reports validate`, and ack-on-consume deletion with a one-day TTL.",
+      "tldr": "The handoff-v1 JSON contract agents emit, its validator behind `dadaia reports validate`, and ack-on-consume deletion with a one-day TTL.",
       "summary": "Agent-to-agent coordination is a JSON handoff under the workspace handoff tree, validated against the packaged handoff-v1 schema, with an HTML report as optional evidence.",
       "path": "specs/memory/product/agents/agent-comms.md",
       "tags": [
@@ -15,7 +14,7 @@
         "handoff",
         "schema"
       ],
-      "token_estimate": 431,
+      "token_estimate": 410,
       "depends_on": [
         "workspace-doctor",
         "public-asset-distribution"
@@ -40,7 +39,7 @@
         "dispatch",
         "sdd"
       ],
-      "token_estimate": 639,
+      "token_estimate": 643,
       "depends_on": [
         "agentic-entities",
         "agent-comms",
@@ -53,7 +52,6 @@
       ],
       "sources": [
         "dadaia_workspace/public/agents/**",
-        "dadaia_workspace/core/agent_model_templates.py",
         "dadaia_workspace/core/model_registry.py",
         "dadaia_workspace/public/skills/dd-manager-orchestration/**"
       ]
@@ -72,7 +70,7 @@
         "derivation",
         "governance"
       ],
-      "token_estimate": 937,
+      "token_estimate": 1006,
       "depends_on": [
         "agent-orchestration",
         "sdd-gate-v3",
@@ -102,17 +100,17 @@
         "projection",
         "privacy"
       ],
-      "token_estimate": 965,
+      "token_estimate": 1006,
       "depends_on": [
         "harness-kimi-code",
         "agentic-entities",
-        "sdd-gate-v3",
         "workspace-init",
         "workspace-doctor",
         "specs-migration",
         "context-management",
-        "consumer-agent-support",
-        "pypi-distribution"
+        "sdd-gate-v3",
+        "pypi-distribution",
+        "consumer-agent-support"
       ],
       "sources": [
         "dadaia_workspace/features/public/**",
@@ -146,7 +144,7 @@
         "release",
         "packaging"
       ],
-      "token_estimate": 761,
+      "token_estimate": 767,
       "depends_on": [
         "release-lifecycle",
         "public-asset-distribution",
@@ -176,7 +174,7 @@
         "projection",
         "hooks"
       ],
-      "token_estimate": 410,
+      "token_estimate": 409,
       "depends_on": [
         "agent-orchestration",
         "agentic-entities",
@@ -234,7 +232,7 @@
         "projection",
         "hooks"
       ],
-      "token_estimate": 204,
+      "token_estimate": 212,
       "depends_on": [
         "agentic-entities",
         "sdd-gate-v3",
@@ -252,8 +250,8 @@
       "slug": "harness-cursor",
       "title": "harness-cursor",
       "area": "harness",
-      "tldr": "Entry harness on Cursor — native root AGENTS.md and .agents/skills; .cursor/ carries hooks.json (gate on shell, reaper at session start) and persona symlinks.",
-      "summary": "Cursor reads the universal surface natively; its projection is the dd- personas as relative symlinks under .cursor/agents/ and one hooks.json whose wrappers answer in Cursor's permission JSON; IDE file edits are not gated.",
+      "tldr": "Entry harness on Cursor — native root AGENTS.md and .agents/skills; .cursor/ carries hooks.json (gate on every tool, reaper at start) and persona symlinks.",
+      "summary": "Cursor reads the universal surface natively; its projection is the dd- personas as relative symlinks under .cursor/agents/ and one hooks.json whose gate wrapper answers a deny in Cursor's permission JSON.",
       "path": "specs/memory/product/harness/harness-cursor.md",
       "tags": [
         "harness",
@@ -261,7 +259,7 @@
         "projection",
         "hooks"
       ],
-      "token_estimate": 192,
+      "token_estimate": 173,
       "depends_on": [
         "agentic-entities",
         "sdd-gate-v3",
@@ -279,7 +277,7 @@
       "slug": "harness-devin",
       "title": "harness-devin",
       "area": "harness",
-      "tldr": "Entry harness on the Devin CLI — native AGENTS.md, .agents/skills and .agents/agents; its one projected file, .devin/hooks.v1.json, registers gate and reaper.",
+      "tldr": "Entry harness on the Devin CLI — native AGENTS.md, .agents/skills and .agents/agents; its one file, .devin/hooks.v1.json, wires gate, injection and reaper.",
       "summary": "Devin reads the universal surface including the personas natively, so its projection is only .devin/hooks.v1.json, which reads the gate's Claude-compatible envelope without translation.",
       "path": "specs/memory/product/harness/harness-devin.md",
       "tags": [
@@ -288,7 +286,7 @@
         "projection",
         "hooks"
       ],
-      "token_estimate": 151,
+      "token_estimate": 173,
       "depends_on": [
         "agentic-entities",
         "sdd-gate-v3",
@@ -315,7 +313,7 @@
         "hooks",
         "binding"
       ],
-      "token_estimate": 329,
+      "token_estimate": 358,
       "depends_on": [
         "agentic-entities",
         "sdd-gate-v3",
@@ -379,7 +377,7 @@
         "lifecycle",
         "concurrency"
       ],
-      "token_estimate": 535,
+      "token_estimate": 536,
       "depends_on": [
         "context-management",
         "specs-migration",
@@ -424,8 +422,8 @@
       "slug": "ci-preflight",
       "title": "ci-preflight",
       "area": "platform",
-      "tldr": "dadaia ci preflight runs the library's CI checks locally — ruff format, ruff check, mypy --strict, lint-imports, pytest — and refuses outside the source repo.",
-      "summary": "The local CI-equivalent run a contributor makes before every push of the dadaia-workspace source repo: five ordered checks resolved from the running venv, fail-fast by default, exit 1 with each failing check's output tail; any other repo is refused with a message pointing at its own CI.",
+      "tldr": "dadaia ci preflight runs the library's seven CI checks locally, fenced like a bare checkout, and refuses outside the source repo.",
+      "summary": "The local CI-equivalent run a contributor makes before every push of the dadaia-workspace source repo: seven ordered checks resolved from the running venv, run in a fenced bare checkout as CI runs them, fail-fast by default, exit 1 with each failing check's output tail; any other repo is refused with a message pointing at its own CI.",
       "path": "specs/memory/product/platform/ci-preflight.md",
       "tags": [
         "ci",
@@ -434,7 +432,7 @@
         "typecheck",
         "tests"
       ],
-      "token_estimate": 277,
+      "token_estimate": 348,
       "depends_on": [
         "sdd-gate-v3",
         "pypi-distribution",
@@ -459,7 +457,7 @@
         "release-gate",
         "sdd"
       ],
-      "token_estimate": 370,
+      "token_estimate": 367,
       "depends_on": [
         "pypi-distribution",
         "workspace-init",
@@ -505,9 +503,7 @@
         "dadaia_workspace/hooks/_common.py",
         "dadaia_workspace/core/invocation.py",
         "dadaia_workspace/core/session_store.py",
-        "dadaia_workspace/core/record_liveness.py",
         "dadaia_workspace/features/spec_context/injection_policy.py",
-        "dadaia_workspace/features/spec_context/markers.py",
         "dadaia_workspace/features/spec_context/service.py",
         "dadaia_workspace/infrastructure/json_context_store.py",
         "dadaia_workspace/cli/commands/context.py"
@@ -536,8 +532,7 @@
         "dadaia_workspace/features/export/**",
         "dadaia_workspace/features/import_/**",
         "dadaia_workspace/cli/commands/export.py",
-        "dadaia_workspace/cli/commands/import_.py",
-        "dadaia_workspace/core/models/export.py"
+        "dadaia_workspace/cli/commands/import_.py"
       ]
     },
     {
@@ -596,8 +591,8 @@
       "slug": "specs-migration",
       "title": "specs-migration",
       "area": "platform",
-      "tldr": "specs init brings specs/ to the canon and writes the project gitflow, never committing; specs upgrade walks 6 to 7; migrate lifts registry v1.",
-      "summary": "The verbs that bring persisted state up to what this installation reads — dadaia specs init (onboarding level 3a; absent scaffolds, dadaia upgrades, foreign moves to specs-bkp/, the constitution's gitflow block written or kept), dadaia specs upgrade (one live hop, 6 to 7, plus fixed law sections and lossless template repairs; below 6 it refuses without writing) and dadaia migrate (spec_contexts.json v1 to v2, planned, confirmed, atomic).",
+      "tldr": "specs init brings specs/ to the canon and writes the project gitflow, never committing; specs upgrade re-stamps 6 or 7 to 8; migrate lifts registry v1.",
+      "summary": "The verbs that bring persisted state up to what this installation reads — dadaia specs init (onboarding level 3a; absent scaffolds, dadaia upgrades, foreign moves to specs-bkp/, the constitution's gitflow block written or kept), dadaia specs upgrade (a tree stamped 6 or above folds TECHSTACK.md, runs the doctor's repair set and is re-stamped 8; below 6 it refuses without writing) and dadaia migrate (spec_contexts.json v1 to v2, planned, confirmed, atomic).",
       "path": "specs/memory/product/platform/specs-migration.md",
       "tags": [
         "migration",
@@ -606,12 +601,13 @@
         "registry",
         "onboarding"
       ],
-      "token_estimate": 1088,
+      "token_estimate": 1150,
       "depends_on": [
         "public-asset-distribution",
         "sdd-gate-v3",
         "context-management",
         "workspace-doctor",
+        "workspace-init",
         "spec-context-project"
       ],
       "sources": [
@@ -640,15 +636,15 @@
         "compliance",
         "privacy"
       ],
-      "token_estimate": 1706,
+      "token_estimate": 1804,
       "depends_on": [
         "public-asset-distribution",
         "sdd-gate-v3",
         "context-management",
         "workspace-init",
         "QUALITY",
-        "release-lifecycle",
         "specs-migration",
+        "release-lifecycle",
         "audits-canon"
       ],
       "sources": [
@@ -679,7 +675,7 @@
         "upgrade",
         "onboarding"
       ],
-      "token_estimate": 1585,
+      "token_estimate": 1631,
       "depends_on": [
         "context-management",
         "specs-migration",
@@ -716,7 +712,7 @@
         "decisions",
         "governance"
       ],
-      "token_estimate": 927,
+      "token_estimate": 952,
       "depends_on": [
         "agent-orchestration",
         "sdd-gate-v3",
@@ -747,7 +743,7 @@
         "ledger",
         "governance"
       ],
-      "token_estimate": 541,
+      "token_estimate": 504,
       "depends_on": [
         "agent-orchestration",
         "release-lifecycle",
@@ -758,8 +754,7 @@
         "dadaia_workspace/public/schemas/backlog/**",
         "dadaia_workspace/public/schemas/histo/**",
         "dadaia_workspace/features/backlog/**",
-        "dadaia_workspace/core/models/backlog.py",
-        "dadaia_workspace/core/models/histo.py"
+        "dadaia_workspace/core/models/backlog.py"
       ]
     },
     {
@@ -788,7 +783,6 @@
         "dadaia_workspace/public/skills/dd-bug-resolution/**",
         "dadaia_workspace/public/skills/dd-bug-registration/**",
         "dadaia_workspace/public/schemas/bugs/**",
-        "dadaia_workspace/core/models/bugs.py",
         "dadaia_workspace/features/specs/doctor_governance.py"
       ]
     },
@@ -798,7 +792,7 @@
       "title": "release-lifecycle",
       "area": "sdd",
       "tldr": "Closed-scope candidates grow one live release, each defined from an as-is review; release.py writes _RELEASE.json; memory gates closure; promote merges a PR.",
-      "summary": "The release lifecycle — one live release directory whose _RELEASE.json state document is written by release.py (new, phase, memory, check), candidates that each review the as-is units their demand touches, then define, implement and close a SPEC/PLAN/TASKS trio at the release root, the structural PLAN §1 check at IMPLEMENTATION, the memory reconciliation gate at closure, and promotion by merging the release PR release-please opens.",
+      "summary": "The release lifecycle — one live release directory whose _RELEASE.json state document is written by release.py (new, phase, drift, memory, ship, check), candidates that each review the as-is units their demand touches, then define, implement and close a SPEC/PLAN/TASKS trio at the release root, the structural PLAN §1 check at IMPLEMENTATION, the memory reconciliation gate at closure, and promotion by merging the release PR release-please opens, which ship records.",
       "path": "specs/memory/product/sdd/release-lifecycle.md",
       "tags": [
         "sdd",
@@ -808,7 +802,7 @@
         "memory",
         "as-is-review"
       ],
-      "token_estimate": 1794,
+      "token_estimate": 1832,
       "depends_on": [
         "sdd-gate-v3",
         "backlog-ledger",
@@ -824,7 +818,6 @@
         "dadaia_workspace/public/skills/dd-spec-navigator/scripts/**",
         "dadaia_workspace/public/schemas/releases/**",
         "dadaia_workspace/core/release_state.py",
-        "dadaia_workspace/features/specs/release_tree.py",
         "dadaia_workspace/features/specs/doctor_release.py"
       ]
     },
@@ -833,7 +826,7 @@
       "slug": "sdd-gate-v3",
       "title": "sdd-gate-v3",
       "area": "sdd",
-      "tldr": "No-lock enforcement — three gate blocks (root entry, non-venv command, PROTECTED or out-of-scope write), one fix line each, a gitflow push chokepoint.",
+      "tldr": "No-lock enforcement — three gate blocks (root entry, non-venv command, PROTECTED or out-of-scope file-tool write), one fix line each, a gitflow push chokepoint.",
       "summary": "The merged PreToolUse gate blocks exactly three things and reads no SDD artifact; every refusal anywhere carries one executable fix line; the pre-push chokepoint enforces the branch contract read from the project gitflow, the specs canon and one secret registry over every pushed object, with one rewrite formula as its fix, and no CI job calls a model API — the security review is the reviewer's lens before each pull request.",
       "path": "specs/memory/product/sdd/sdd-gate-v3.md",
       "tags": [
@@ -844,7 +837,7 @@
         "no-locks",
         "privacy"
       ],
-      "token_estimate": 1835,
+      "token_estimate": 1863,
       "depends_on": [
         "workspace-doctor",
         "context-management",

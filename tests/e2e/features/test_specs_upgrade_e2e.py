@@ -1,9 +1,9 @@
 """Consumer specs-upgrade path E2E — the v0.5.1 contract (K10, T-051-16).
 
-``dadaia specs upgrade`` carries exactly one hop — 6 -> 7, memory canon v7, which folds a
-consumer's ``memory/TECHSTACK.md`` body into ``ARCHITECTURE.md``'s ``## Tech Stack``
-section and deletes the file. A tree below that hop is REFUSED (exit non-zero, message names the 0.4.x release that
-still carries the chain) and nothing is written; a tree already at the canonical version
+``dadaia specs upgrade`` re-stamps an upgradable tree (v6 or later) to the canonical
+version, folding a consumer's ``memory/TECHSTACK.md`` body into ``ARCHITECTURE.md``'s
+``## Tech Stack`` section and deleting the file. A tree ``state`` calls absent, malformed or foreign is
+REFUSED (exit non-zero, its one fix printed) and nothing is written; a tree already at the canonical version
 is a no-op (exit 0, byte-identical tree). The two scenarios are driven end-to-end through
 the real CLI subprocess against a real on-disk tree.
 
@@ -16,8 +16,9 @@ import subprocess
 import sys
 from pathlib import Path
 
+import pytest
+
 from dadaia_workspace.core.specs_version import CANONICAL_SPECS_VERSION
-from dadaia_workspace.features.specs.doctor_structural import StructuralValidator
 
 _MARKER = "specs_pattern_version"
 
@@ -32,77 +33,37 @@ def _cli(cwd: Path, *args: str) -> subprocess.CompletedProcess[str]:
     )
 
 
-def _seed_below_canonical_tree(root: Path) -> Path:
-    """A structurally-complete specs tree at pattern version 0 with legacy artifacts."""
-    specs = root / "consumer" / "specs"
-    (specs / "memory" / "product").mkdir(parents=True)
-    (specs / "backlog").mkdir()
-    (specs / "bugs").mkdir()
-    (specs / "releases").mkdir()
-    (specs / "foundation").mkdir()
-
-    # Unstamped constitution ⇒ version 0 (below canonical).
-    (specs / "constitution.md").write_text(
-        "# Constitution — consumer\n\nAbsolute laws of the consumer project.\n",
-        encoding="utf-8",
-    )
-    # The atoms a real consumer authored from the canonical stubs (valid frontmatter —
-    # LINT-1 requires it); copied from the package's own scaffold source.
-    scaffold_memory = (
-        Path(__import__("dadaia_workspace").__file__).parent / "public" / "scaffold" / "memory"
-    )
-    # This fixture is a deliberately BELOW-canonical (pre-v6, pattern version 0) tree —
-    # `specs upgrade` is not grown to rename these case-only (FR1, T-050-05/T-050-06:
-    # the rename is a by-hand recipe step, never automated) — so the legacy lowercase
-    # destination names are kept on purpose. Only the scaffold SOURCE filenames moved
-    # to the canon (ARCHITECTURE.md/QUALITY.md — TECHSTACK.md left it at v7).
-    _legacy_to_canon_source = {
-        "architecture.md": "ARCHITECTURE.md",
-        "quality-assurance.md": "QUALITY.md",
-    }
-    for rel, source_name in _legacy_to_canon_source.items():
-        (specs / "memory" / rel).write_text(
-            (scaffold_memory / source_name).read_text(encoding="utf-8"), encoding="utf-8"
-        )
-    (specs / "memory" / "product" / "index.md").write_text(
-        (scaffold_memory / "product" / "index.md").read_text(encoding="utf-8"),
-        encoding="utf-8",
-    )
-
-    for d in ("backlog", "bugs", "releases"):
-        (specs / d / "README.md").write_text(f"# {d}\n", encoding="utf-8")
-
-    # Legacy artifacts both registry steps consume: pre-v2 foundation tree + root
-    # SPEC.md (tree-v2 moves them under releases/legacy/) and a legacy bug markdown
-    # (bugs-jsonl converts it).
-    (specs / "foundation" / "vision.md").write_text("# Vision (legacy)\n", encoding="utf-8")
-    (specs / "SPEC.md").write_text("# Legacy root SPEC\n", encoding="utf-8")
-    (specs / "bugs" / "legacy-sample-bug.md").write_text(
-        "---\nname: legacy-sample-bug\nseverity: LOW\nstatus: open\n---\n\n"
-        "# BUG — legacy sample\n\nLegacy markdown bug for the 1→2 conversion step.\n",
-        encoding="utf-8",
-    )
-    return specs
-
-
 def _snapshot(root: Path) -> dict[str, bytes]:
     return {
         str(p.relative_to(root)): p.read_bytes() for p in sorted(root.rglob("*")) if p.is_file()
     }
 
 
-def test_upgrade_refuses_a_tree_below_the_canonical_version_and_writes_nothing(
-    tmp_path: Path,
+@pytest.mark.parametrize(
+    ("constitution", "fix"),
+    [
+        (None, "specs init --context '<ctx>'"),
+        ("---\nspecs_pattern_version: 7\ngitflow: {principal: main\n---\n", "repair the YAML"),
+        (
+            "---\nspecs_pattern_version: 5\n---\n# C\n",
+            "specs init --context '<ctx>' --replace-foreign",
+        ),
+    ],
+)
+def test_upgrade_refuses_a_tree_state_does_not_walk_and_writes_nothing(
+    tmp_path: Path, constitution: str | None, fix: str
 ) -> None:
-    specs = _seed_below_canonical_tree(tmp_path)
-    before = _snapshot(specs)
-
+    """sa-specs-tree-state-read-five-ways#B28-5: absent/malformed/foreign exit non-zero,
+    write nothing and print state()'s fix, never '0.4.x'."""
+    specs = tmp_path / "specs"
+    if constitution is not None:
+        specs.mkdir()
+        (specs / "constitution.md").write_text(constitution, encoding="utf-8")
+    before = _snapshot(tmp_path)
     upgrade = _cli(tmp_path, "specs", "upgrade", "--specs-dir", str(specs))
-
     assert upgrade.returncode != 0, upgrade.stdout
-    assert "0.4.x" in (upgrade.stderr + upgrade.stdout)
-    assert _snapshot(specs) == before, "a refused upgrade must not touch the tree"
-    assert not list(tmp_path.rglob("*backup*")), "no backup dir is created on refusal"
+    assert fix in upgrade.stderr and "0.4.x" not in upgrade.stderr
+    assert _snapshot(tmp_path) == before
 
 
 def test_upgrade_at_the_canonical_version_is_a_byte_identical_no_op(tmp_path: Path) -> None:
@@ -118,11 +79,17 @@ def test_upgrade_at_the_canonical_version_is_a_byte_identical_no_op(tmp_path: Pa
 
     assert upgrade.returncode == 0, upgrade.stderr or upgrade.stdout
     assert _snapshot(specs) == before
+    # sa-specs-upgrade-stamps-any-target-and-memory-vocabulary-diverges#47.1: no --target.
+    assert _cli(root, "specs", "upgrade", "--target", "99").returncode == 2
+    assert _snapshot(specs) == before
 
 
-# ----------------------------------------------------------------- the 6 -> 7 hop (FR1)
+# ----------------------------------------------------------------- the upgrade hop (FR1)
 
-_V6_ARCHITECTURE = "# Architecture\n\n## Principles\n\nThe ring holds.\n"
+_V6_ARCHITECTURE = (
+    "---\nslug: ARCHITECTURE\ntitle: Architecture\ntldr: Architecture.\nsummary: Architecture.\n"
+    "tags:\n  - architecture\n---\n\n# Architecture\n\n## Principles\n\nThe ring holds.\n"
+)
 _V6_TECHSTACK = (
     "---\nslug: TECHSTACK\ntitle: Tech Stack\n---\n\n"
     "# Tech Stack\n\n## Languages\n\nCONSUMER_STACK_SENTINEL\n"
@@ -142,13 +109,14 @@ def _seed_v6_tree(root: Path, architecture: str) -> Path:
 
 
 def test_upgrade_folds_techstack_into_architecture_and_deletes_it(tmp_path: Path) -> None:
+    """sa-specs-upgrade-stamps-any-target-and-memory-vocabulary-diverges#47.2: the stamp written is exactly CANONICAL_SPECS_VERSION."""
     specs = _seed_v6_tree(tmp_path, _V6_ARCHITECTURE)
 
     upgrade = _cli(tmp_path, "specs", "upgrade", "--specs-dir", str(specs))
 
     assert upgrade.returncode == 0, upgrade.stderr or upgrade.stdout
     assert not (specs / "memory" / "TECHSTACK.md").exists(), (
-        "the 6 -> 7 hop deletes the file it folded"
+        "the upgrade hop deletes the file it folded"
     )
     architecture = (specs / "memory" / "ARCHITECTURE.md").read_text(encoding="utf-8")
     assert architecture.startswith(_V6_ARCHITECTURE.rstrip("\n")), (
@@ -164,25 +132,17 @@ def test_upgrade_folds_techstack_into_architecture_and_deletes_it(tmp_path: Path
     )
 
 
-def test_upgrade_leaves_a_two_tier_tree_alone_and_the_doctor_names_it(tmp_path: Path) -> None:
-    """A tree still organised as Part 1 / Part 2 has nowhere safe to append a section:
-    the hop declines to corrupt it, and the doctor is what tells the operator."""
+def test_upgrade_refuses_a_two_tier_tree_without_stamping_or_writing(tmp_path: Path) -> None:
+    """sa-specs-upgrade-stamps-any-target-and-memory-vocabulary-diverges#47.3 (ADR 0082):
+    a v6 tree organised as Part 1 / Part 2 has nowhere safe to fold into — the upgrade
+    refuses, non-zero, stamp still 6, the tree byte-identical."""
     two_tier = "# Architecture\n\n## Part 1 — Principles\n\nx\n\n## Part 2 — Implementation\n\ny\n"
     specs = _seed_v6_tree(tmp_path, two_tier)
+    before = _snapshot(specs)
 
     upgrade = _cli(tmp_path, "specs", "upgrade", "--specs-dir", str(specs))
 
-    assert upgrade.returncode == 0, upgrade.stderr or upgrade.stdout
-    assert (specs / "memory" / "TECHSTACK.md").read_text(encoding="utf-8") == _V6_TECHSTACK
-    # The fold declined: the authored body is untouched and gains no `## Tech Stack`;
-    # only the library-owned fixed law block is appended, as `doctor --fix` would (T-048-05).
-    architecture = (specs / "memory" / "ARCHITECTURE.md").read_text(encoding="utf-8")
-    assert architecture.startswith(two_tier)
-    assert "## Tech Stack" not in architecture
-
-    findings = StructuralValidator(specs, None, None).check_tree8_canon_root()
-
-    assert any("TECHSTACK.md" in issue.path for issue in findings), (
-        "the doctor's canon sweep names the file the hop declined to fold; "
-        f"found {[issue.path for issue in findings]!r}"
-    )
+    assert upgrade.returncode != 0, upgrade.stdout
+    assert "two-tier" in (upgrade.stderr + upgrade.stdout)
+    assert _snapshot(specs) == before
+    assert f"{_MARKER}: 6" in (specs / "constitution.md").read_text(encoding="utf-8")

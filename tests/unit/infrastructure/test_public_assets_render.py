@@ -16,21 +16,29 @@ from pathlib import Path
 
 import pytest
 
-from dadaia_workspace.core.workspace_layout import DADAIA_ZONES, STATES_CANON
-from dadaia_workspace.infrastructure.public_assets import (
-    FileSystemPublicAssetManager,
+from dadaia_workspace.core.workspace_layout import (
+    DADAIA_ZONES,
+    STATES_CANON,
     render_registry_tables,
 )
+from dadaia_workspace.infrastructure.public_assets import FileSystemPublicAssetManager
 
 pytestmark = pytest.mark.unit
 
-_PLACEHOLDERS = ("<!-- zones -->", "<!-- canon -->")
+#: Every registry placeholder a shipped law fragment may carry (literal, the law's own).
+_PLACEHOLDERS = (
+    "<!-- zones -->",
+    "<!-- canon -->",
+    "<!-- root -->",
+    "<!-- repo-excluded -->",
+    "<!-- specs-canon -->",
+)
 
 
 def test_zones_placeholder_renders_one_row_per_zone() -> None:
     out = render_registry_tables("before\n<!-- zones -->\nafter\n")
     rows = [line for line in out.splitlines() if line.startswith("| `")]
-    assert len(rows) == len(DADAIA_ZONES) == 12
+    assert len(rows) == len(DADAIA_ZONES) == 11
     assert rows[0] == (
         "| `agentic/` | staged public assets + manifest.json | projection | never | install |"
     )
@@ -56,9 +64,11 @@ def test_text_without_placeholders_is_returned_unchanged() -> None:
 def test_stage_renders_every_data_fragment_before_the_manifest_hashes_it(
     tmp_path: Path,
 ) -> None:
+    """sa-specs-init-writes-unrendered-law#B38-2: stage's writer leaves no registry
+    placeholder in any staged Markdown (the one renderer, core.workspace_layout)."""
     FileSystemPublicAssetManager().stage(tmp_path)
     agentic = tmp_path / ".dadaia" / "agentic"
-    fragments = sorted((agentic / "data").glob("*.md"))
+    fragments = sorted(agentic.rglob("*.md"))
     assert fragments
     leftovers = [
         p.name for p in fragments if any(ph in p.read_text("utf-8") for ph in _PLACEHOLDERS)

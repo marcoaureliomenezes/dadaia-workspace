@@ -22,12 +22,12 @@ sources:
 
 - The four hook behaviours ([[agentic-entities]]) are registered in `.codex/hooks.json` through wrappers under `.dadaia/hooks/codex-*`: `PreToolUse` the pre-gate (matcher `^(apply_patch|Edit|Write|Bash)$`), a matcher-less `PostToolUse` post-gate, `SessionStart` (`startup|resume`) ctx-inject plus the reaper, and `UserPromptSubmit` ctx-inject.
 - Codex reads the gate's `decision: block`/`reason` envelope directly; the wrappers translate nothing ([[sdd-gate-v3]]).
-- Hook firing is version-qualified: live-certified only at the one codex-cli version pinned in `_CODEX_HOOKS_LIVE_CERTIFIED_VERSION` (`dadaia_workspace/infrastructure/codex_doctor.py`); any other version is reported UNVERIFIED, no version floor enforced. `dadaia certify`'s `codex-live-probe` runs a real `codex exec`.
+- Whether hooks fire is `dadaia certify`'s `codex-live-probe` (a real `codex exec`), never the doctor's.
 
 ## Models and doctor
 
-- Codex tier identity is native `(model id × model_reasoning_effort)`, derived from the model registry; two tiers collapsing to one pair fail loudly.
-- `dadaia public doctor` keeps the structural checks byte comparison cannot express: `D-CX-7` (every `dd-` token a persona cites resolves to a skill or persona), `D-CX-8` (rules are Starlark `.rules`, never Markdown) and `D-CX-9` (hooks invoke executable wrappers).
+- Codex tier identity is native `(model id × model_reasoning_effort)`, derived from the model registry; two tiers collapsing to one pair fail loudly. The effort comes from one resolver: the D-3 clamp of the policy effort, else `medium`.
+- `dadaia public doctor` keeps the structural checks byte comparison cannot express: `D-CX-7` (every `dd-` token a persona cites resolves to a skill or persona) and `D-CX-8` (a Markdown file in `.codex/rules/` is flagged; the `.rules` file itself is a byte-compared rule).
 
 ## Dependencies
 

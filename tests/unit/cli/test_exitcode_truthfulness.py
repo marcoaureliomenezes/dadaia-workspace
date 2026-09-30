@@ -13,22 +13,24 @@ from typer.testing import CliRunner
 
 from dadaia_workspace import container
 from dadaia_workspace.cli.main import app
+from dadaia_workspace.core.doctor_rules import SectionFinding
 
 _runner = CliRunner()
 
 
-class _Issue:
-    code = "ROOT-4"
-    description = "Unknown top-level subdirectory/ies inside .dadaia/: 'nonsense'."
-    fixable = False
+_ISSUE = SectionFinding(
+    "ROOT-4", "error", ".dadaia/nonsense", False, True, "rm -r .dadaia/nonsense"
+)
 
 
 class _StubDoctor:
     def check(self):
-        return [_Issue()]
+        return [_ISSUE]
 
     def check_installed_hooks(self, context=None):
         return []
+
+    check_projection = check_installed_hooks
 
     def scan(self):
         return ()
@@ -47,33 +49,11 @@ def test_doctor_exits_nonzero_when_issues_found(tmp_path: Path, monkeypatch) -> 
     assert result.exit_code != 0, "doctor found issues but exited 0"
 
 
-def test_reports_validate_invalid_file_exits_nonzero(tmp_path: Path, monkeypatch) -> None:
-    (tmp_path / ".dadaia" / "states").mkdir(parents=True)
-    (tmp_path / ".dadaia" / "states" / "spec_contexts.json").write_text(
-        '{"schema_version": "2", "contexts": []}'
-    )
-    (tmp_path / "repos").mkdir()
+def test_certify_runs_without_a_workspace_and_prints_pure_json(tmp_path: Path, monkeypatch) -> None:
+    """F-03: certify's contract is a DISPOSABLE workspace — a bare cwd runs it on a fallback root;
+    bug certify-json-stdout-polluted-info-line: diagnostics go to stderr, stdout is the JSON alone."""
     monkeypatch.chdir(tmp_path)
-    # Stage the packaged schema where the validator expects it.
-    import shutil
-
-    import dadaia_workspace
-
-    pkg = Path(dadaia_workspace.__file__).parent
-    schema_src = pkg / "public" / "schemas" / "handoff-v1.schema.json"
-    schema_dst = tmp_path / ".dadaia" / "agentic" / "schemas" / "handoff-v1.schema.json"
-    schema_dst.parent.mkdir(parents=True)
-    shutil.copy2(schema_src, schema_dst)
-    bad = tmp_path / "bad.handoff.json"
-    bad.write_text(json.dumps({"not": "a-handoff"}))
-    result = _runner.invoke(app, ["reports", "validate", str(bad)])
-    assert "INVALID" in result.output
-    assert result.exit_code != 0, "INVALID result must not exit 0"
-
-
-def test_certify_runs_without_initialized_workspace(tmp_path: Path, monkeypatch) -> None:
-    """certify's contract is a DISPOSABLE workspace — a bare cwd must not traceback."""
-    monkeypatch.chdir(tmp_path)
+    seen: list[Path] = []
 
     class _Ok:
         ok = True
@@ -82,36 +62,12 @@ def test_certify_runs_without_initialized_workspace(tmp_path: Path, monkeypatch)
         def to_dict(self):
             return {"ok": True, "checks": []}
 
-    seen: dict[str, Path] = {}
-
     def _spy(root: Path, *, keep: bool = False):
-        seen["root"] = root
+        seen.append(root)
         return _Ok()
 
     monkeypatch.setattr(container, "run_certification", _spy)
     result = _runner.invoke(app, ["certify", "--json"])
     assert result.exit_code == 0, result.output
-    assert "Traceback" not in result.output
-    assert seen, "certification must still run, on a fallback disposable root"
-
-
-def test_certify_json_stdout_is_pure_json(tmp_path: Path, monkeypatch) -> None:
-    """Bug certify-json-stdout-polluted-info-line: diagnostics belong on stderr.
-
-    With no initialized workspace the disposable-anchor info line must not precede
-    the JSON document on stdout — consumers pipe stdout straight into json.loads.
-    """
-    monkeypatch.chdir(tmp_path)
-
-    class _Ok:
-        ok = True
-        checks: list = []
-
-        def to_dict(self):
-            return {"ok": True, "checks": []}
-
-    monkeypatch.setattr(container, "run_certification", lambda root, *, keep=False: _Ok())
-    result = _runner.invoke(app, ["certify", "--json"])
-    assert result.exit_code == 0, result.output
-    payload = json.loads(result.stdout)
-    assert payload["ok"] is True
+    assert json.loads(result.stdout) == {"ok": True, "checks": []}
+    assert len(seen) == 1

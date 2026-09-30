@@ -10,34 +10,27 @@ from __future__ import annotations
 
 import json
 import os
-import shutil
 import subprocess
 import sys
 from pathlib import Path
 
 import pytest
 
+from tests.helpers.skill_scripts import stage_skill_scripts
+
 pytestmark = pytest.mark.unit
 
 _PUBLIC = Path(__file__).resolve().parents[3] / "dadaia_workspace" / "public"
 _SCRIPTS = _PUBLIC / "skills" / "dd-backlog-definition" / "scripts"
 _SOURCE = _SCRIPTS / "backlog.py"
-_SCHEMAS = (
-    _PUBLIC / "schemas" / "backlog" / "backlog-v1.schema.json",
-    _PUBLIC / "schemas" / "histo" / "histo-record-v1.schema.json",
-)
 
 
 @pytest.fixture
 def script(tmp_path: Path) -> Path:
     """The staged shape: backlog.py with both schema copies beside it."""
-    staged = tmp_path / "staged" / "scripts"
-    (staged / "schemas").mkdir(parents=True)
-    for module in sorted(_SCRIPTS.glob("*.py")):
-        shutil.copy2(module, staged / module.name)
-    for schema in _SCHEMAS:
-        shutil.copy2(schema, staged / "schemas" / schema.name)
-    return staged / "backlog.py"
+    return (
+        stage_skill_scripts("dd-backlog-definition", tmp_path / "staged" / "scripts") / "backlog.py"
+    )
 
 
 def _specs(root: Path, *active: dict[str, object]) -> Path:
@@ -73,19 +66,11 @@ def _histo(specs: Path) -> list[dict[str, object]]:
     return [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines() if line]
 
 
-def _picked(specs: Path, slug: str) -> None:
-    """Mature an entry to the one status a release-lane exit accepts."""
-    document = json.loads((specs / "backlog" / "BACKLOG.json").read_text(encoding="utf-8"))
-    for item in document["active"]:
-        if item["id"] == slug:
-            item["status"] = "picked"
-    (specs / "backlog" / "BACKLOG.json").write_text(
-        json.dumps(document, indent=2) + "\n", encoding="utf-8"
-    )
-
-
-def _release(specs: Path, release_id: str = "0.4.7") -> None:
-    (specs / "releases" / release_id).mkdir(parents=True, exist_ok=True)
+def _pick(specs: Path, origin: str = "backlog:an-idea") -> None:
+    """The pick: `release.py new 0.4.7 --origin <origin>`, no hand edit of BACKLOG.json."""
+    release = _PUBLIC / "skills" / "dd-release-implementation" / "scripts" / "release.py"
+    done = _run(release, "new", "0.4.7", "--origin", origin, "--specs", str(specs))
+    assert done.returncode == 0, done.stdout + done.stderr
 
 
 def _fix_lines(done: subprocess.CompletedProcess[str]) -> list[str]:
@@ -110,15 +95,6 @@ def test_absent_document_is_not_a_finding(script: Path, tmp_path: Path) -> None:
     specs = tmp_path / "specs"
     specs.mkdir()
     assert _run(script, "check", "--specs", str(specs)).returncode == 0
-
-
-def test_missing_specs_above_cwd_is_refused_with_one_fix_line(script: Path, tmp_path: Path) -> None:
-    lonely = tmp_path / "nowhere"
-    lonely.mkdir()
-    done = _run(script, "check", cwd=lonely)
-    assert done.returncode == 1
-    assert len(_fix_lines(done)) == 1
-    assert "--specs" in _fix_lines(done)[0]
 
 
 # --- new ----------------------------------------------------------------------------
@@ -175,10 +151,16 @@ def test_new_records_typed_intents(script: Path, tmp_path: Path) -> None:
 
 
 def test_exit_moves_the_entry_to_the_histo_exactly_once(script: Path, tmp_path: Path) -> None:
+    """sa-ledger-verbs-append-histo-before-validating-the-pair#J5: "Given a valid pair, when
+    `exit`/`archive` succeed, then the record leaves the document and appears exactly once
+    in the histo, written atomically as a pair." (`exit` half)
+    sa-backlog-status-has-no-single-authority#B4: `release.py new --origin backlog:<slug>`,
+    then `exit --disposition delivered`, exits 0 with no hand edit. sa-backlog-status-has-no-single-authority#B6: until then the
+    picked item stays live with its status unchanged."""
     specs = _specs(tmp_path)
-    _release(specs)
     assert _run(script, "new", "an-idea", "--specs", str(specs)).returncode == 0
-    _picked(specs, "an-idea")
+    _pick(specs)
+    assert [e["status"] for e in _active(specs)] == ["idea"]
     done = _run(
         script, "exit", "an-idea", "--specs", str(specs),
         "--disposition", "delivered", "--release", "0.4.7",
@@ -195,9 +177,8 @@ def test_exit_moves_the_entry_to_the_histo_exactly_once(script: Path, tmp_path: 
 
 def test_a_second_exit_exits_one_with_a_fix_naming_the_script(script: Path, tmp_path: Path) -> None:
     specs = _specs(tmp_path)
-    _release(specs)
     _run(script, "new", "an-idea", "--specs", str(specs))
-    _picked(specs, "an-idea")
+    _pick(specs)
     _run(
         script, "exit", "an-idea", "--specs", str(specs),
         "--disposition", "delivered", "--release", "0.4.7",
@@ -209,34 +190,27 @@ def test_a_second_exit_exits_one_with_a_fix_naming_the_script(script: Path, tmp_
     assert again.returncode == 1
     fixes = _fix_lines(again)
     assert len(fixes) == 1
-    assert "backlog.py" in fixes[0] or "backlog_histo.jsonl" in fixes[0]
+    assert fixes == ["fix: grep an-idea specs/backlog/_archive/backlog_histo.jsonl"]
     assert len(_histo(specs)) == 1
 
 
-def test_delivered_on_a_non_picked_entry_is_refused(script: Path, tmp_path: Path) -> None:
+@pytest.mark.parametrize("release", ["0.4.7", "9.9.9"])
+def test_delivered_outside_the_release_origin_is_refused(
+    script: Path, tmp_path: Path, release: str
+) -> None:
+    """sa-backlog-status-has-no-single-authority#B5: delivered on a slug outside Origin
+    is refused, and the fix never suggests rejected."""
     specs = _specs(tmp_path)
-    _release(specs)
     _run(script, "new", "an-idea", "--specs", str(specs))
+    _pick(specs, "operator-demand")
     done = _run(
         script, "exit", "an-idea", "--specs", str(specs),
-        "--disposition", "delivered", "--release", "0.4.7",
+        "--disposition", "delivered", "--release", release,
     )  # fmt: skip
     assert done.returncode == 1
-    assert "picked" in done.stdout + done.stderr
+    assert len(_fix_lines(done)) == 1 and "rejected" not in _fix_lines(done)[0]
     assert len(_active(specs)) == 1
     assert _histo(specs) == []
-
-
-def test_delivered_without_a_known_release_is_refused(script: Path, tmp_path: Path) -> None:
-    specs = _specs(tmp_path)
-    _run(script, "new", "an-idea", "--specs", str(specs))
-    _picked(specs, "an-idea")
-    done = _run(
-        script, "exit", "an-idea", "--specs", str(specs),
-        "--disposition", "delivered", "--release", "9.9.9",
-    )  # fmt: skip
-    assert done.returncode == 1
-    assert len(_active(specs)) == 1
 
 
 def test_rejected_requires_a_reason(script: Path, tmp_path: Path) -> None:
@@ -253,32 +227,6 @@ def test_rejected_requires_a_reason(script: Path, tmp_path: Path) -> None:
     assert _histo(specs)[0]["reason"] == "no release ever took it"
 
 
-def test_bl_conflict_fix_line_runs_as_printed(script: Path, tmp_path: Path) -> None:
-    """Intent: CONTRACT — 0.4.7 c8 review MEDIUM-4.
-
-    BL-CONFLICT's own ``fix:`` line, run verbatim against the two-twin shape it
-    diagnoses, must clear the finding. It printed ``--disposition superseded --reason
-    <the-twin-slug>`` while ``_backlog_exit.REQUIRED_EVIDENCE`` binds ``superseded`` to
-    ``--release``: the one remedy the operator was handed refused itself.
-    """
-    from dadaia_workspace.features.backlog.doctor import RULES
-
-    fix = next(rule.fix_help for rule in RULES if rule.codes == ("BL-CONFLICT",))
-    assert fix is not None
-    specs = _specs(tmp_path)
-    for slug in ("a-twin", "its-divergent-twin"):
-        assert _run(script, "new", slug, "--specs", str(specs)).returncode == 0
-
-    argv = fix.split()[2:]  # drop the interpreter and the script path
-    argv = [str(specs) if token == "specs" else token for token in argv]
-    argv = ["a-twin" if token == "<slug>" else token for token in argv]
-    argv = ["its-divergent-twin" if token == "<the-twin-slug>" else token for token in argv]
-    done = _run(script, *argv, "--specs", str(specs))
-    assert done.returncode == 0, f"BL-CONFLICT's own fix line refuses:\n{fix}\n{done.stderr}"
-    assert [item["id"] for item in _active(specs)] == ["its-divergent-twin"]
-    assert _histo(specs)[0]["reason"] == "its-divergent-twin"
-
-
 def test_exit_refuses_a_disposition_outside_the_backlog_vocabulary(
     script: Path, tmp_path: Path
 ) -> None:
@@ -292,20 +240,24 @@ def test_exit_refuses_a_disposition_outside_the_backlog_vocabulary(
     assert len(_active(specs)) == 1
 
 
-def test_exit_redacts_an_operator_local_path_from_the_histo_record(
-    script: Path, tmp_path: Path
-) -> None:
+def test_new_and_exit_refuse_a_value_the_push_refuses(script: Path, tmp_path: Path) -> None:
+    """sa-ledger-write-seam-redacts-less-than-push-refuses#B2: backlog.py new/exit refuse
+    a push-matched value, naming the field and the masked term; both files unchanged."""
     specs = _specs(tmp_path)
     home = "/".join(("", "home", "someone", "work"))
-    _run(script, "new", "an-idea", "--specs", str(specs), "--description", f"seen at {home}")
-    done = _run(
+    refused_new = _run(script, "new", "leaky", "--specs", str(specs), "--description", home)
+    assert _run(script, "new", "an-idea", "--specs", str(specs)).returncode == 0
+    before = (specs / "backlog" / "BACKLOG.json").read_bytes()
+    refused_exit = _run(
         script, "exit", "an-idea", "--specs", str(specs),
         "--disposition", "rejected", "--reason", f"found under {home}",
     )  # fmt: skip
-    assert done.returncode == 0, done.stdout + done.stderr
-    line = (specs / "backlog" / "_archive" / "backlog_histo.jsonl").read_text(encoding="utf-8")
-    assert "someone" not in line
-    assert "[REDACTED]" in line
+    for done, field in ((refused_new, "description"), (refused_exit, "reason")):
+        assert done.returncode == 1
+        assert f"field {field!r} carries '/…e'" in done.stderr
+    assert [e["id"] for e in _active(specs)] == ["an-idea"]
+    assert (specs / "backlog" / "BACKLOG.json").read_bytes() == before
+    assert _histo(specs) == []
 
 
 # --- check: the invariants that need only the two files ------------------------------
@@ -409,45 +361,70 @@ def _aliases(root: Path, *lines: str) -> Path:
     return path
 
 
-def test_subjects_lists_the_alias_map_anchors(script: Path, tmp_path: Path) -> None:
+def test_subjects_lists_the_alias_map_and_never_resolves(script: Path, tmp_path: Path) -> None:
+    """sa-subjects-resolve-is-circular#B3: `subjects --resolve` no longer exists (argparse
+    error). sa-subjects-resolve-is-circular#B4: `new` refuses the 'panel' kind, nothing written."""
     specs = _specs(tmp_path)
-    aliases = _aliases(tmp_path, "panel:/api/thing -> panel:/api/thing")
+    aliases = _aliases(tmp_path, "the widgets -> api:/v1/widgets")
     done = _run(script, "subjects", "--specs", str(specs), "--alias-map", str(aliases))
     assert done.returncode == 0, done.stdout + done.stderr
-    assert "panel:/api/thing" in done.stdout
+    assert "api:/v1/widgets" in done.stdout
+    resolve = _run(script, "subjects", "--specs", str(specs), "--resolve", "INV-DOES-NOT-EXIST")
+    assert resolve.returncode == 2 and "unrecognized arguments: --resolve" in resolve.stderr
+    panel = _run(script, "new", "x-item", "--specs", str(specs), "--intent", "panel:kanban-board=x")
+    assert panel.returncode == 1 and _active(specs) == []
 
 
-def test_subjects_resolves_a_bound_subject(script: Path, tmp_path: Path) -> None:
+def _pair(specs: Path) -> list[bytes]:
+    histo = specs / "backlog" / "_archive" / "backlog_histo.jsonl"
+    return [(specs / "backlog" / "BACKLOG.json").read_bytes(), histo.read_bytes()]
+
+
+def _exited(script: Path, tmp_path: Path) -> Path:
+    """A tree whose histo holds one exit of `gone` and whose active[] holds `an-idea`."""
     specs = _specs(tmp_path)
-    aliases = _aliases(tmp_path, "the-thing -> panel:/api/thing")
+    for slug in ("gone", "an-idea"):
+        assert _run(script, "new", slug, "--specs", str(specs)).returncode == 0
     done = _run(
-        script, "subjects", "--specs", str(specs), "--alias-map", str(aliases),
-        "--resolve", "the-thing", "--kind", "panel",
+        script, "exit", "gone", "--specs", str(specs), "--disposition", "rejected",
+        "--reason", "r",
     )  # fmt: skip
-    assert done.returncode == 0, done.stdout + done.stderr
-    assert "RESOLVED" in done.stdout
-    assert "panel:/api/thing" in done.stdout
+    assert done.returncode == 0, done.stderr
+    return specs
 
 
-def test_subjects_refuses_an_unresolved_subject(script: Path, tmp_path: Path) -> None:
-    specs = _specs(tmp_path)
-    aliases = _aliases(tmp_path, "the-thing -> panel:/api/thing")
-    done = _run(
-        script, "subjects", "--specs", str(specs), "--alias-map", str(aliases),
-        "--resolve", "nothing-like-it", "--kind", "panel",
-    )  # fmt: skip
-    assert done.returncode == 1
-    assert "UNRESOLVED" in done.stdout + done.stderr
+def test_a_refused_exit_leaves_both_backlog_files_byte_intact(script: Path, tmp_path: Path) -> None:
+    """sa-ledger-verbs-append-histo-before-validating-the-pair#J1: "Given BACKLOG.json
+    holding an invalid entry (an Idea without intents), when `backlog.py exit <other-slug>`
+    runs, then it exits 1 and BACKLOG.json and backlog_histo.jsonl are both
+    byte-identical." Run twice: a retry appends nothing either."""
+    specs = _exited(script, tmp_path)
+    document = json.loads((specs / "backlog" / "BACKLOG.json").read_text(encoding="utf-8"))
+    document["active"].append({"id": "broken", "status": "Idea"})
+    (specs / "backlog" / "BACKLOG.json").write_text(json.dumps(document), encoding="utf-8")
+    before = _pair(specs)
+
+    for _ in range(2):
+        done = _run(
+            script, "exit", "an-idea", "--specs", str(specs), "--disposition", "rejected",
+            "--reason", "r",
+        )  # fmt: skip
+        assert done.returncode == 1, done.stdout
+        assert _pair(specs) == before
 
 
-def test_subjects_lists_the_subjects_the_live_document_already_binds(
+def test_new_refuses_a_slug_that_already_exited_and_writes_nothing(
     script: Path, tmp_path: Path
 ) -> None:
-    specs = _specs(tmp_path)
-    _run(
-        script, "new", "an-idea", "--specs", str(specs),
-        "--intent", "code:dadaia_workspace/container.py#build=wire it",
-    )  # fmt: skip
-    done = _run(script, "subjects", "--specs", str(specs), "--alias-map", str(tmp_path / "none"))
-    assert done.returncode == 0, done.stdout + done.stderr
-    assert "dadaia_workspace/container.py#build" in done.stdout
+    """sa-ledger-verbs-append-histo-before-validating-the-pair#J3: "Given slug zz already
+    exited (a histo record exists), when `backlog.py new zz` runs, then it exits 1 citing
+    the earlier exit and writes nothing." The pair check refuses it."""
+    specs = _exited(script, tmp_path)
+    before = _pair(specs)
+
+    done = _run(script, "new", "gone", "--specs", str(specs))
+
+    assert done.returncode == 1, done.stdout
+    assert "'gone' exited at this line" in done.stderr
+    assert _pair(specs) == before
+    assert _run(script, "check", "--specs", str(specs)).returncode == 0

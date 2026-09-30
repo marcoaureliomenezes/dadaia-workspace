@@ -27,7 +27,7 @@ from typer.testing import CliRunner
 
 from dadaia_workspace.cli.main import app
 from dadaia_workspace.core.harness_registry import L1_ENTRY_HARNESSES
-from dadaia_workspace.core.invocation import alive_context_trees
+from dadaia_workspace.core.invocation import alive_context_trees, resolve_bind
 from dadaia_workspace.features.workspace.onboarding import STEP_IDS, Step, next_step
 from dadaia_workspace.features.workspace.service import WorkspaceService
 from dadaia_workspace.infrastructure.public_assets import FileSystemPublicAssetManager
@@ -82,17 +82,33 @@ def _run_fix(step: Step, root: Path, bare: Path) -> None:
 
 @pytest.fixture(autouse=True)
 def _git_env(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
-    hooks = tmp_path / "no-hooks"
+    # The pre-push gate is installed where core.hooksPath points and runs on every push;
+    # its runner is stubbed out — the gate itself is proven by the push journeys.
+    hooks = tmp_path / "hooks"
     hooks.mkdir()
+    runner = tmp_path / "dadaia-stub"
+    runner.write_text("#!/bin/sh\ncat >/dev/null\n", encoding="utf-8")
+    runner.chmod(0o755)
+    monkeypatch.setenv("DADAIA_BIN", str(runner))
     pairs = {"core.hooksPath": str(hooks), "user.name": "T", "user.email": "t@example.invalid"}
     monkeypatch.setenv("GIT_CONFIG_GLOBAL", str(tmp_path / "gitconfig"))
     monkeypatch.setenv("GIT_CONFIG_NOSYSTEM", "1")
-    monkeypatch.setenv("GIT_CONFIG_COUNT", str(len(pairs)))
-    for n, (key, value) in enumerate(pairs.items()):
+    base = int(os.environ.get("GIT_CONFIG_COUNT", "0"))  # keep conftest's pairs
+    monkeypatch.setenv("GIT_CONFIG_COUNT", str(base + len(pairs)))
+    for n, (key, value) in enumerate(pairs.items(), start=base):
         monkeypatch.setenv(f"GIT_CONFIG_KEY_{n}", key)
         monkeypatch.setenv(f"GIT_CONFIG_VALUE_{n}", value)
     for var in ("CLAUDE_CODE_SESSION_ID", "CODEX_SESSION_ID", "CODEX_THREAD_ID", "DADAIA_CONTEXT"):
         monkeypatch.delenv(var, raising=False)
+
+
+def _bound(root: Path, session: str | None) -> bool | None:
+    """The caller's Bind as the CLI reads it (sa-bind-has-two-stores#S1)."""
+    return (
+        None
+        if session is None
+        else resolve_bind(root, session, os.environ).context_name is not None
+    )
 
 
 @settings(
@@ -123,14 +139,14 @@ def test_every_command_fix_clears_its_step_and_the_loop_advances(
         try:
             seen: list[int] = []
             for _ in range(len(STEP_IDS) + 1):
-                step = next_step(root, alive_context_trees(root), None, session)
+                step = next_step(root, alive_context_trees(root), None, _bound(root, session))
                 if step is None:
                     break
                 index = STEP_IDS.index(step.id)
                 assert not seen or index > seen[-1], f"I4: {step.id} after {STEP_IDS[seen[-1]]}"
                 seen.append(index)
                 _run_fix(step, root, bare)
-                after = next_step(root, alive_context_trees(root), None, session)
+                after = next_step(root, alive_context_trees(root), None, _bound(root, session))
                 assert after is None or after.id != step.id, f"I3: {step.id} still pending"
             else:
                 pytest.fail(f"I4: the loop did not end within {len(STEP_IDS)} steps")

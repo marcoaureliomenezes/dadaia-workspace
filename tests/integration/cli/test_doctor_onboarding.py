@@ -67,49 +67,26 @@ def _register_specless_context(root: Path, *names: str) -> None:
     )
 
 
-def _findings(output: str) -> list[dict[str, str]]:
-    payload = json.loads(output)
-    return [f for section in payload["sections"].values() for f in section["findings"]]
-
-
-def test_zero_contexts_is_no_longer_silent(workspace: Path) -> None:
-    """R2: the next step is one info finding with its fix line; the exit is unaffected."""
-    result = _runner.invoke(app, ["doctor"])
-    assert "ONBOARDING info Next (command step context):" in result.output, result.output
-    cli = (
-        workspace
-        / ".dadaia"
-        / ".venv"
-        / PLATFORM.venv_scripts_dir
-        / f"dadaia{PLATFORM.venv_exe_suffix}"
-    )
-    assert f"fix: {cli} context create" in result.output
-
-
 @pytest.mark.slow(reason="git init subprocess")
-def test_a_specless_context_is_level_two_not_an_error(workspace: Path) -> None:
-    """AC3.1: right after `context create` the doctor is clean and names `specs init`."""
-    _register_specless_context(workspace, "app")
-    result = _runner.invoke(app, ["doctor", "--context", "app", "--json"])
-    findings = _findings(result.output)
-    assert [f for f in findings if f["verdict"] == "error"] == [], result.output
-    assert result.exit_code == 0, result.output
-    info = [f["fix"] for f in findings if f["verdict"] == "info"]
-    assert any(fix.endswith("specs init --context app") for fix in info), info  # ADR 0047
-
-
-def test_a_ghost_context_exits_one_with_no_specs_check(workspace: Path) -> None:
-    """R4 / AC6.3: a named context that is not registered never falls back to a tree."""
-    result = _runner.invoke(app, ["doctor", "--context", "ghost"])
-    assert result.exit_code == 1
-    assert "Error: Context 'ghost' not found." in result.output
-    assert "/.dadaia/.venv/bin/dadaia context list" in result.output
+@pytest.mark.parametrize(
+    ("contexts", "argv", "text", "code"),
+    [
+        pytest.param((), ["doctor"], "ONBOARDING info Next (command step context):", None, id="R2-zero-contexts-is-not-silent"),
+        pytest.param(("app",), ["doctor", "--context", "app"], "specs init --context app", 0, id="AC3.1-specless-context-is-level-two"),
+        pytest.param(("a", "b"), ["doctor", "--context", "b"], "specs init --context b", None, id="G1-the-doctored-context-names-its-own-step"),
+        pytest.param((), ["doctor", "--context", "ghost"], "Error: Context 'ghost' not found.", 1, id="AC6.3-ghost-context-exits-one"),
+    ],
+)  # fmt: skip
+def test_doctor_names_the_onboarding_step_of_the_context_it_judges(
+    workspace: Path, contexts: tuple[str, ...], argv: list[str], text: str, code: int | None
+) -> None:
+    """The next step is one finding whose fix names the workspace CLI (ADR 0047); a
+    ghost context never falls back to a specs tree."""
+    if contexts:
+        _register_specless_context(workspace, *contexts)
+    result = _runner.invoke(app, argv)
+    assert text in result.output, result.output
+    assert code is None or result.exit_code == code, result.output
     assert "SPEC-DOC" not in result.output
-
-
-@pytest.mark.slow(reason="git init subprocess")
-def test_the_doctored_context_names_its_own_next_step(workspace: Path) -> None:
-    """Live audit G1: ``doctor --context b`` reports b's step, not the first context's."""
-    _register_specless_context(workspace, "a", "b")
-    result = _runner.invoke(app, ["doctor", "--context", "b"])
-    assert "specs init --context b" in result.output, result.output
+    cli = workspace / ".dadaia" / ".venv" / PLATFORM.venv_scripts_dir / "dadaia"
+    assert f"{cli}{PLATFORM.venv_exe_suffix} " in result.output

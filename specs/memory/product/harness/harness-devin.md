@@ -1,7 +1,7 @@
 ---
 slug: harness-devin
 title: harness-devin
-tldr: Entry harness on the Devin CLI — native AGENTS.md, .agents/skills and .agents/agents; its one projected file, .devin/hooks.v1.json, registers gate and reaper.
+tldr: Entry harness on the Devin CLI — native AGENTS.md, .agents/skills and .agents/agents; its one file, .devin/hooks.v1.json, wires gate, injection and reaper.
 summary: Devin reads the universal surface including the personas natively, so its projection is only .devin/hooks.v1.json, which reads the gate's Claude-compatible envelope without translation.
 tags: [harness, devin, projection, hooks]
 sources:
@@ -17,7 +17,7 @@ sources:
 
 ## Hooks
 
-- The four hook behaviours ([[agentic-entities]]) arrive as `PreToolUse` -> the `.dadaia/hooks/devin-pre-gate` wrapper (the merged pre-gate) and `SessionStart` -> `devin-doctor-expired` (the reaper), each entry `type: command`.
+- The four hook behaviours ([[agentic-entities]]) arrive as `PreToolUse` -> the `.dadaia/hooks/devin-pre-gate` wrapper (the merged pre-gate), `UserPromptSubmit` and `SessionStart` -> `devin-ctx-inject`, and `SessionStart` -> `devin-doctor-expired` (the reaper); each event maps to `{matcher, hooks: [{type: command, …}]}` groups with no top-level `hooks` key.
 - Devin reads the gate's Claude-compatible envelope and exit code, so the wrapper translates nothing ([[sdd-gate-v3]]).
 - `dadaia certify`'s `devin-live-probe` checks that the `devin` binary answers `--version`, reporting SKIP `UNVERIFIED` when it is absent; no version floor.
 

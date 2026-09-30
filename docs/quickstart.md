@@ -7,8 +7,8 @@ live. Terms are defined in [concepts](concepts.md); the long walkthrough is
 
 ## 1. The three levels in one block
 
-<!-- derived-from: pypi-distribution sha256:618098346ed6 -->
-<!-- derived-from: workspace-init sha256:bc2612c3f80d -->
+<!-- derived-from: pypi-distribution sha256:9078512b58f9 -->
+<!-- derived-from: workspace-init sha256:56685f3d0950 -->
 
 Set `REPO_URL` to your repository's clone URL; everything else runs as printed (needs
 uv and network access):
@@ -45,7 +45,7 @@ Then `.dadaia/.venv/bin/dadaia specs init --context <ctx>` refreshes the project
 
 ## 2. What the init line provisioned
 
-<!-- derived-from: workspace-init sha256:bc2612c3f80d -->
+<!-- derived-from: workspace-init sha256:56685f3d0950 -->
 
 `--harness` names one registered harness: `claude` | `codex` | `kimi-code` | `cursor` |
 `devin` | `copilot`. The directory is required and a directory holding a foreign tree
@@ -66,7 +66,7 @@ clones every repo, installs the hook and makes the context ALIVE; `context bind`
 
 ## 3. The bind
 
-<!-- derived-from: context-management sha256:dc1a239f4970 -->
+<!-- derived-from: context-management sha256:1871a6d846b2 -->
 
 ```bash
 eval "$(.dadaia/.venv/bin/dadaia context bind <your-repo> --print-env)"
@@ -82,7 +82,7 @@ record, never the cwd: sitting inside a repository is not a binding.
 
 ## 4. Compliance
 
-<!-- derived-from: workspace-doctor sha256:8e52123b79e7 -->
+<!-- derived-from: workspace-doctor sha256:772d9d7a78d3 -->
 
 `doctor` is the one instance validator; three sections run in fixed order —
 `workspace`, `specs`, `ledgers`. Every finding prints as one `<CODE> <verdict>
@@ -92,7 +92,7 @@ run. `--fix` moves slop to `.dadaia/reaped/` and deletes only what a TTL expired
 
 ## 5. The first backlog entry
 
-<!-- derived-from: backlog-ledger sha256:46382434daf2 -->
+<!-- derived-from: backlog-ledger sha256:721ed11c7220 -->
 
 `backlog.py new` appends one entry, born `idea`, to `specs/backlog/BACKLOG.json`'s
 `active[]` — the operator's demand queue; from the workspace root `--specs` names the
@@ -102,7 +102,7 @@ commit. Only the operator creates demand.
 
 ## 6. The first release
 
-<!-- derived-from: release-lifecycle sha256:a31b50804ef1 -->
+<!-- derived-from: release-lifecycle sha256:57d8b542e879 -->
 
 `release.py new` is one birth act, all or nothing: a `SPEC.md` stub plus
 `_RELEASE.json` in `DEFINITION` under `specs/releases/<id>/`, refusing a second live

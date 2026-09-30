@@ -41,19 +41,19 @@ path or entity as it appears in an installed workspace.
 
 | Surface | Purpose | Belongs | Ceiling | Measured |
 |---|---|---|---|---|
-| `AGENTS.md` | the root map: the flow, the roles, the gate invariants, the root, credentials, and one line per scoped file | statements; the index of every other surface | 8192 | 7470 |
-| `specs/AGENTS.md` | the canon of a specs tree and its status tokens | canon table, status tokens, doctor codes | 4096 | 3680 |
-| `specs/releases/AGENTS.md` | candidates, phases, task markers, promote | release procedure and commit shapes | 4096 | 3506 |
-| `specs/backlog/AGENTS.md` | the operator's demand queue and its exits | `BACKLOG.json` shape, intake gate, dispositions | 4096 | 4081 |
-| `specs/bugs/AGENTS.md` | what a bug is and how it is proposed, recorded, resolved | bug procedure and the redaction rule | 4096 | 4046 |
-| `specs/memory/AGENTS.md` | current product truth and who writes it | atoms, Part 1/Part 2, ownership | 4096 | 3760 |
-| `specs/ADRs/AGENTS.md` | the decision record | `decisions.jsonl` shape, acceptance | 4096 | 3476 |
+| `AGENTS.md` | the root map: the flow, the roles, the gate invariants, the root, credentials, and one line per scoped file | statements; the index of every other surface | 8192 | 7934 |
+| `specs/AGENTS.md` | the canon of a specs tree and its status tokens | canon table, status tokens, doctor codes | 4096 | 3588 |
+| `specs/releases/AGENTS.md` | candidates, phases, task markers, promote | release procedure and commit shapes | 4096 | 3354 |
+| `specs/backlog/AGENTS.md` | the operator's demand queue and its exits | `BACKLOG.json` shape, intake gate, dispositions | 4096 | 3973 |
+| `specs/bugs/AGENTS.md` | what a bug is and how it is proposed, recorded, resolved | bug procedure and the redaction rule | 4096 | 3782 |
+| `specs/memory/AGENTS.md` | current product truth and who writes it | atoms, ownership | 4096 | 3938 |
+| `specs/ADRs/AGENTS.md` | the decision record | `decisions.jsonl` shape, acceptance | 4096 | 3386 |
 | `specs/audits/AGENTS.md` | the periodic three-pillar review | audit procedure, findings, closure | 4096 | 1813 |
-| `.dadaia/AGENTS.md` | the runtime tree: zones, doctor, reprojection, context | zone registry rules, chokepoints | 4096 | 4078 |
+| `.dadaia/AGENTS.md` | the runtime tree: zones, doctor, reprojection, context | zone registry rules, chokepoints | 4096 | 4094 |
 | `.dadaia/handoff/AGENTS.md` | the handoff lane | emission, schema, ack-on-consume | 4096 | 1635 |
-| `.dadaia/tmp/AGENTS.md` | the TTL scratch lane | what may be written there and for how long | 4096 | 1135 |
+| `.dadaia/tmp/AGENTS.md` | the TTL scratch lane | what may be written there and for how long | 4096 | 1240 |
 | `.dadaia/states/AGENTS.md` | CLI-owned state files | who writes them and by which verb | 4096 | 1427 |
-| `repos/<slug>/AGENTS.md` | a repo working tree | clean-tree rule, cache redirection | 4096 | 3191 |
+| `repos/<slug>/AGENTS.md` | a repo working tree | clean-tree rule, cache redirection | 4096 | 3331 |
 | `tests/AGENTS.md` | a repo's test tree | admission, intent, size tiers | 4096 | 2694 |
 
 ## 3. Skills — `.agents/skills/dd-*/SKILL.md`
@@ -62,24 +62,24 @@ One procedure each; a skill that touches a governed area opens its scoped law as
 
 | Surface | Purpose | Step-1 law | Ceiling | Measured |
 |---|---|---|---|---|
-| `dd-ai-eng-knowhow` | harness literacy and the AI-entity authoring contract | — | 6144 | 2976 |
+| `dd-ai-eng-knowhow` | harness literacy and the AI-entity authoring contract | — | 6144 | 2878 |
 | `dd-architecture-survey` | portfolio-level architecture candidates from bug history | — | 6144 | 4650 |
 | `dd-audit-project` | the three-pillar audit and its window | `specs/audits/AGENTS.md` | 6144 | 2834 |
-| `dd-backlog-definition` | backlog curation, the intake gate, dispositions | `specs/backlog/AGENTS.md` | 6144 | 3265 |
+| `dd-backlog-definition` | backlog curation, the intake gate, dispositions | `specs/backlog/AGENTS.md` | 6144 | 3110 |
 | `dd-bug-registration` | classify-first bug proposal and its record | `specs/bugs/AGENTS.md` | 6144 | 2782 |
-| `dd-bug-resolution` | the seven-phase diagnosing method and the resolve record | `specs/bugs/AGENTS.md` | 6144 | 5306 |
-| `dd-cli-library` | CLI idioms, CLI-owned state, the dev-server registry | `.dadaia/AGENTS.md` | 6144 | 5119 |
-| `dd-code-review` | the three review axes and the six lenses | `specs/memory/AGENTS.md` | 6144 | 4937 |
+| `dd-bug-resolution` | the seven-phase diagnosing method and the resolve record | `specs/bugs/AGENTS.md` | 6144 | 5359 |
+| `dd-cli-library` | CLI idioms, CLI-owned state, the dev-server registry | `.dadaia/AGENTS.md` | 6144 | 5184 |
+| `dd-code-review` | the three review axes and the six lenses | `specs/memory/AGENTS.md` | 6144 | 5235 |
 | `dd-codebase-design` | the deep-module vocabulary and the deletion test | — | 6144 | 5540 |
 | `dd-domain-modeling` | the repo's domain terms and their one home | — | 6144 | 3766 |
-| `dd-gitflow-default` | the branch contract, commit shapes, the PR gate | — | 6144 | 4914 |
+| `dd-gitflow-default` | the branch contract, commit shapes, the PR gate | — | 6144 | 4346 |
 | `dd-grill-me` | the operator grill that precedes a candidate | — | 6144 | 3256 |
-| `dd-handoff-emitter` | handoff-first emission and ack-on-consume | `.dadaia/handoff/AGENTS.md` | 6144 | 2174 |
+| `dd-handoff-emitter` | handoff-first emission and ack-on-consume | `.dadaia/handoff/AGENTS.md` | 6144 | 2188 |
 | `dd-manager-orchestration` | intake, dispatch and the closure pass | — | 6144 | 3661 |
-| `dd-release-definition` | picking the set and authoring the trio | `specs/releases/AGENTS.md` | 6144 | 5370 |
-| `dd-release-implementation` | the candidate arc from reservation to the gate | `specs/releases/AGENTS.md` | 6144 | 3582 |
-| `dd-spec-navigator` | the three-phase session grounding protocol | `specs/AGENTS.md` | 6144 | 5204 |
-| `dd-test-stewardship` | test intent, admission, demotion, quarantine | — | 6144 | 4178 |
+| `dd-release-definition` | picking the set and authoring the trio | `specs/releases/AGENTS.md` | 6144 | 5447 |
+| `dd-release-implementation` | the candidate arc from reservation to the gate | `specs/releases/AGENTS.md` | 6144 | 3559 |
+| `dd-spec-navigator` | the three-phase session grounding protocol | `specs/AGENTS.md` | 6144 | 3393 |
+| `dd-test-stewardship` | test intent, admission, demotion, quarantine | — | 6144 | 4241 |
 
 ## 4. Personas — `.agents/agents/*.md`
 
@@ -87,9 +87,9 @@ Three roles, no fourth; every retired role is a lens the reviewer applies.
 
 | Surface | Purpose | Belongs | Ceiling | Measured |
 |---|---|---|---|---|
-| `dd-product-engineer` | backlog, SPEC, the product-memory pass at closure | role, activity class, model policy | — | 4583 |
-| `dd-software-engineer` | PLAN/TASKS, production code and its tests | role, activity class, model policy | — | 8934 |
-| `dd-code-reviewer` | the three-axis review and its six lenses | role, activity class, model policy | — | 6511 |
+| `dd-product-engineer` | backlog, SPEC, the product-memory pass at closure | role, read_only, model policy | — | 4562 |
+| `dd-software-engineer` | PLAN/TASKS, production code and its tests | role, read_only, model policy | — | 8924 |
+| `dd-code-reviewer` | the three-axis review and its six lenses | role, read_only, model policy | — | 6328 |
 
 - A statement belongs to exactly one surface: the map indexes, the scoped file rules, the
   skill instructs, the persona declares who acts.

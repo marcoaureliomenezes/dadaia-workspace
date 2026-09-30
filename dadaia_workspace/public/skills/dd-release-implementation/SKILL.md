@@ -31,7 +31,7 @@ description: >
 
 ## 2a. Push green
 
-- Every work-branch push (`<work>M.m.p`, the constitution's `gitflow:`) runs the local CI preflight first: `ruff format --check`, `ruff check`, `mypy --strict`, `pytest`.
+- Every work-branch push (`<work>M.m.p`, the constitution's `gitflow:`) runs the repo's own CI checks first (its lint, typecheck and tests), green.
 - The push IS the publication boundary: pre-push scans every object the pushed range introduces or rewrites against the structural baseline and the operator denylist (`$DADAIA_PRIVACY_DENYLIST` or `.dadaia/states/privacy_denylist.json`) — a private repo or context name is protected only when listed there; no path is exempt.
 - Published history is the baseline and is never rescanned; a fixture needing a secret shape composes it at runtime, never as a tracked literal.
 - Only pushes are review-blocked; commits flow freely, and a full scan lives only in the audit lane.

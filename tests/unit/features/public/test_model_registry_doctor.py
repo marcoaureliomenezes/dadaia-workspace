@@ -2,16 +2,13 @@
 
 Closes the `model-catalog-modelmap-pricing-drift-no-registry` bug's doctor half:
 every ``model:`` frontmatter value across canonical ``public/agents/*.md`` must
-resolve in ``core.model_registry.REGISTRY``, and ``MODEL_MAP`` keys must equal the
-``REGISTRY`` claude ids. Any breach is an ERROR line that makes ``dadaia public doctor`` exit
+resolve in ``core.model_registry.REGISTRY``. Any breach is an ERROR line that makes ``dadaia public doctor`` exit
 nonzero (emitted with the ``[drift]`` prefix the CLI already treats as failing).
 """
 
 from __future__ import annotations
 
 from pathlib import Path
-
-import pytest
 
 from dadaia_workspace.features.public.model_resolution import check_model_resolution
 
@@ -26,42 +23,9 @@ def _rendered(result: object) -> list[str]:
     ]
 
 
-def _write_agent(agents_dir: Path, name: str, model: str) -> None:
-    agents_dir.mkdir(parents=True, exist_ok=True)
-    (agents_dir / f"{name}.md").write_text(
-        f"---\nname: {name}\nmodel: {model}\n---\n\n# {name}\n",
-        encoding="utf-8",
-    )
-
-
 def _has_error(reports: list[str]) -> bool:
     """An ERROR line is any [drift]/[error]/[fail] line — all exit-nonzero in the CLI."""
     return any(line.startswith(("[drift]", "[error]", "[fail]")) for line in reports)
-
-
-# ---------------------------------------------------------------------------
-# Keyset desync — the drift bug this check exists to close
-# ---------------------------------------------------------------------------
-
-
-def test_keyset_desync_modelmap_vs_pricing_errors(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """A hand-edited MODEL_MAP that drops a key the others keep ⇒ ERROR."""
-    import dadaia_workspace.features.public.model_resolution as mod
-
-    desynced = {"claude-fable-5": "gpt-5.5"}  # missing every other registered id
-    monkeypatch.setattr(mod, "MODEL_MAP", desynced)
-
-    public_dir = tmp_path / "public"
-    public_dir.mkdir()
-
-    reports = _rendered(check_model_resolution(public_dir))
-
-    assert _has_error(reports)
-    desync_lines = [r for r in reports if "key-set" in r.lower() or "desync" in r.lower()]
-    assert desync_lines, reports
-    assert "[ok] model-resolution" not in reports
 
 
 # ---------------------------------------------------------------------------
@@ -88,22 +52,12 @@ def test_current_tree_resolves_clean() -> None:
 def test_unknown_model_variants(
     tmp_path: Path,
 ) -> None:
-    """Unknown model ids surface as ERROR across every source: agent frontmatter,
-    and resolved overlay (FR7 T-65-09)."""
-    from dadaia_workspace.core.models.agent_model_policy import (
+    """An unknown resolved-overlay model surfaces as ERROR (FR7 T-65-09); an authored
+    ``model:`` is judged by the projection's one reader (test_render_at_install)."""
+    from dadaia_workspace.core.model_registry import (
         AgentModelOverride,
         AgentModelPolicyOverlay,
     )
-
-    # agent frontmatter
-    public_dir = tmp_path / "agent"
-    _write_agent(public_dir / "agents", "ghost-agent", "claude-does-not-exist")
-    reports = _rendered(check_model_resolution(public_dir))
-    assert _has_error(reports)
-    offending = [r for r in reports if "ghost-agent" in r]
-    assert offending, reports
-    assert "claude-does-not-exist" in offending[0]
-    assert "[ok] model-resolution" not in reports
 
     # resolved overlay
     overlay_dir = tmp_path / "overlay"
@@ -122,11 +76,3 @@ def test_unknown_model_variants(
     good_overlay = AgentModelPolicyOverlay(applied_template="max-quality", overrides={})
     clean_reports = _rendered(check_model_resolution(clean_overlay_dir, overlay=good_overlay))
     assert clean_reports == ["[ok] model-resolution"], clean_reports
-
-    # known model in agent frontmatter stays clean
-    known_dir = tmp_path / "known"
-    _write_agent(known_dir / "agents", "good-agent", "claude-fable-5")
-    _write_agent(known_dir / "agents", "another", "claude-opus-4-8")
-    known_reports = _rendered(check_model_resolution(known_dir))
-    assert not _has_error(known_reports)
-    assert "[ok] model-resolution" in known_reports

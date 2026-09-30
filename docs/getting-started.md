@@ -5,8 +5,8 @@ the terms are defined in [concepts](concepts.md) and in [`CONTEXT.md`](../CONTEX
 
 ## Install
 
-<!-- derived-from: pypi-distribution sha256:618098346ed6 -->
-<!-- derived-from: workspace-init sha256:bc2612c3f80d -->
+<!-- derived-from: pypi-distribution sha256:9078512b58f9 -->
+<!-- derived-from: workspace-init sha256:56685f3d0950 -->
 
 ```bash
 uvx dadaia-workspace init <dir> --harness claude --repo <url>
@@ -27,7 +27,7 @@ refreshes each project's specs law.
 
 ## Level 1 — the workspace
 
-<!-- derived-from: workspace-init sha256:bc2612c3f80d -->
+<!-- derived-from: workspace-init sha256:56685f3d0950 -->
 
 `uvx dadaia-workspace init <dir> --harness claude|codex|kimi-code|cursor|devin|copilot
 [--repo <url>] [--associated-repo <url>]… [--skip-assets]` is the only verb that works
@@ -51,8 +51,8 @@ harness later and `.dadaia/.venv/bin/dadaia harness list` reads the roster.
 
 ## Level 2 — the project
 
-<!-- derived-from: spec-context-project sha256:47c11b26b98f -->
-<!-- derived-from: context-management sha256:dc1a239f4970 -->
+<!-- derived-from: spec-context-project sha256:b1fa1ed3b027 -->
+<!-- derived-from: context-management sha256:1871a6d846b2 -->
 
 A context — a Spec Context Project — is the unit of work: one canonical `specs/` tree
 owned by one main repository, optionally spanning associated repositories that live and
@@ -71,14 +71,14 @@ defaults to the main repo's slug. `bind` writes exactly one record,
 nothing; `.dadaia/.venv/bin/dadaia context bind <ctx> --print-env` emits
 `DADAIA_CONTEXT` and `DADAIA_SESSION_ID` for an `eval $(…)` shell, and a session
 without a harness-native id carries the binding in `DADAIA_CONTEXT`. The bind's scope
-is the context's main repo plus its associated repos; a bound session's MUTATING write
-into a repo another context owns is refused with the bind that would allow it. After a
-bind, the ctx-inject hook injects the context header, `ARCHITECTURE.md`'s
+is the context's main repo plus its associated repos; a bound session's MUTATING
+file-tool write into a repo another context owns is refused with the bind that would
+allow it. After a bind, the ctx-inject hook injects the context header, `ARCHITECTURE.md`'s
 `## Tech Stack` section and the memory catalog digest once.
 
 ## Level 3 — the specs
 
-<!-- derived-from: spec-context-project sha256:47c11b26b98f -->
+<!-- derived-from: spec-context-project sha256:b1fa1ed3b027 -->
 
 ```bash
 .dadaia/.venv/bin/dadaia specs init --context <ctx> [--replace-foreign]
@@ -94,7 +94,7 @@ branches; a re-run is a no-op.
 
 ## Check compliance — `doctor`
 
-<!-- derived-from: workspace-doctor sha256:8e52123b79e7 -->
+<!-- derived-from: workspace-doctor sha256:772d9d7a78d3 -->
 
 ```bash
 .dadaia/.venv/bin/dadaia doctor --context <ctx> [--json] [--fix] [--redact]
@@ -120,9 +120,9 @@ a TTL expired.
 
 ## Run the first candidate
 
-<!-- derived-from: release-lifecycle sha256:a31b50804ef1 -->
-<!-- derived-from: backlog-ledger sha256:46382434daf2 -->
-<!-- derived-from: bug-ledger sha256:eeebe84481a4 -->
+<!-- derived-from: release-lifecycle sha256:57d8b542e879 -->
+<!-- derived-from: backlog-ledger sha256:721ed11c7220 -->
+<!-- derived-from: bug-ledger sha256:9392c1f406a4 -->
 
 A candidate is one closed-scope cycle inside the live release. Nothing drives it: the
 documents are the state, the ledger scripts move the records, and the markers in
@@ -130,8 +130,7 @@ documents are the state, the ledger scripts move the records, and the markers in
 
 1. **Demand enters the backlog.** Only the operator creates demand;
    `python3 .agents/skills/dd-backlog-definition/scripts/backlog.py new <slug>` appends
-   one `active[]` entry born `idea`, and every later status (`candidate`, `picked`)
-   binds `intents[]` that resolve to a code, doc or CLI anchor.
+   one `active[]` entry born `idea`, and every later status binds `intents[]` that resolve to a code, doc or CLI anchor.
 2. **Birth the release.**
    `python3 .agents/skills/dd-release-implementation/scripts/release.py new <M.m.p>`
    writes a `SPEC.md` stub and `_RELEASE.json` in `DEFINITION` under
@@ -157,7 +156,8 @@ documents are the state, the ledger scripts move the records, and the markers in
 7. **Continue or promote.** Continue: `release.py new` with the same id stacks the next
    candidate, reopening `DEFINITION`. Promote: merge the integration branch into the
    principal, then merge the release PR release-please opens there — it owns the version, the CHANGELOG
-   section and the tag, and the publish jobs run on it.
+   section and the tag, and the publish jobs run on it; `release.py ship --sha <sha> --pr <n>`
+   then records the merged promote PR.
 
 A bug needs none of this: register, lineage, RED test, root-cause fix, GREEN, `resolve`
 with evidence, one commit — on the live feature branch, in any phase.

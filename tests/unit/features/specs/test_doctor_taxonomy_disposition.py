@@ -1,36 +1,20 @@
 """Unit tests for SpecsDoctor taxonomy + disposition invariants (T-46-13, AC-4).
 
-Four invariants:
-  SPEC-DOC-034 — the three ``_archive`` dirs exist (WARN + auto-fix);
-  SPEC-DOC-035 — the single-source invariant (re-targeted, SPEC v0.12.0 FR5/T-120-08): a
-                 loose per-entry ``*.md`` directly under ``specs/backlog/`` — other than
-                 ``BACKLOG.md``/``README.md`` — warns, regardless of any status it carries;
-  SPEC-DOC-036 — audit-without-disposition (archived audit naming its release → clean) —
-                 the audit-disposition law's own doctor invariant, kept as a named pair;
-  SPEC-DOC-037 — constitution must not enumerate AgentRuntimeKind members;
-  SPEC-DOC-038 — loose (unarchived) audit directories.
-
-v0.5.0 T-050-25A (fold 3, `qa-engineer` amendment 3): the DOC-036/DOC-038 fixtures below
-were rewritten off ``**Disposition:** vX.Y.Z`` prose (T-050-25 already deleted that regex
-— these rows had been silently passing/failing for the wrong reason since) onto
-``FINDINGS.jsonl`` records, the SAME shape ``doctor_closure_audit.py`` actually folds.
-Verdict: two rows genuinely rewritten as new coverage (the "+2" tests FR15 extended
-scope names) — an archived audit with a still-``open`` finding record (DOC-036 sad
-path), and a live audit whose finding records are ALL terminal-and-release-named
-(DOC-038 sad path, single + multiple) — never a reflex re-baseline.
+SPEC-DOC-034 — the three ``_archive`` dirs exist (WARN + auto-fix).
 """
 
 from __future__ import annotations
 
-import json
 from pathlib import Path
 
 import pytest
 
-from dadaia_workspace.features.specs import Severity, SpecsDoctor, SpecsDoctorIssue
+from dadaia_workspace.core.doctor_rules import SectionFinding
+from dadaia_workspace.features.specs import Severity, SpecsDoctor
+from dadaia_workspace.features.specs.doctor_types import finding_path
 
 
-def _codes(specs: Path, code: str) -> list[SpecsDoctorIssue]:
+def _codes(specs: Path, code: str) -> list[SectionFinding]:
     return [i for i in SpecsDoctor(specs).check() if i.code == code]
 
 
@@ -39,65 +23,8 @@ def _seed_archives(specs: Path) -> None:
         (specs / parent / "_archive").mkdir(parents=True)
 
 
-def _backlog_entry(specs: Path, name: str, status: str, *, archived: bool = False) -> None:
-    parent = specs / "backlog" / ("_archive" if archived else "")
-    parent.mkdir(parents=True, exist_ok=True)
-    (parent / name).write_text(f"# {name}\n\n**Status:** {status}\n", encoding="utf-8")
-
-
-def _archived_audit(specs: Path, name: str, body: str) -> None:
-    audit_dir = specs / "audits" / "_archive" / name
-    audit_dir.mkdir(parents=True)
-    (audit_dir / "audit.md").write_text(body, encoding="utf-8")
-
-
-def _finding_record(
-    finding_id: str, *, disposition: str = "open", release: str | None = None
-) -> dict[str, object]:
-    """A minimal well-formed ``FindingRecord`` JSONL row (schema:
-    ``public/schemas/audits/finding-record-v1.schema.json``)."""
-    return {
-        "id": finding_id,
-        "pillar": "coverage",
-        "severity": "medium",
-        "refs": ["dadaia_workspace/features/specs/doctor_closure_audit.py"],
-        "claim": "fixture claim",
-        "evidence": "fixture evidence",
-        "disposition": disposition,
-        "release": release,
-        "reason": None,
-    }
-
-
-def _write_findings(audit_dir: Path, records: list[dict[str, object]]) -> None:
-    audit_dir.mkdir(parents=True, exist_ok=True)
-    lines = "\n".join(json.dumps(record) for record in records)
-    (audit_dir / "FINDINGS.jsonl").write_text(lines + "\n", encoding="utf-8")
-
-
-def _archived_audit_findings(specs: Path, name: str, records: list[dict[str, object]]) -> None:
-    _write_findings(specs / "audits" / "_archive" / name, records)
-
-
-def _loose_audit(specs: Path, name: str) -> None:
-    audit_dir = specs / "audits" / name
-    audit_dir.mkdir(parents=True)
-    (audit_dir / "report.md").write_text("# Audit\n\nFindings.\n", encoding="utf-8")
-
-
-def _loose_audit_findings(specs: Path, name: str, records: list[dict[str, object]]) -> None:
-    _write_findings(specs / "audits" / name, records)
-
-
-def _write_constitution(specs: Path, body: str) -> None:
-    specs.mkdir(parents=True, exist_ok=True)
-    (specs / "constitution.md").write_text(body, encoding="utf-8")
-
-
 # ---------------------------------------------------------------------------
-# Sad-path + fix-behavior matrix (DOC-034 missing dir + auto-fix, DOC-035 loose
-# terminal backlog, DOC-036 archived audit without disposition, DOC-038 loose
-# audit dirs — single and multiple) — merged into one parametrized matrix
+# Sad-path + fix-behavior matrix (DOC-034 missing dir + auto-fix)
 # ---------------------------------------------------------------------------
 
 
@@ -105,47 +32,6 @@ def _setup_doc034(specs) -> None:  # type: ignore[no-untyped-def]
     (specs / "backlog").mkdir(parents=True)
     (specs / "audits" / "_archive").mkdir(parents=True)
     (specs / "bugs" / "_archive").mkdir(parents=True)
-
-
-def _setup_doc035(specs) -> None:  # type: ignore[no-untyped-def]
-    """A loose per-entry file directly under specs/backlog/ is drift under the
-    single-source model (SPEC v0.12.0 FR5/T-120-08), regardless of its Status content."""
-    _seed_archives(specs)
-    _backlog_entry(specs, "shipped-item.md", "DELIVERED — v0.1.30")
-
-
-def _setup_doc036(specs) -> None:  # type: ignore[no-untyped-def]
-    """An archived audit whose FINDINGS.jsonl still carries an ``open`` record — an
-    audit archives only once every finding is terminal (SPEC-DOC-036 ERROR)."""
-    _seed_archives(specs)
-    _archived_audit_findings(
-        specs,
-        "20260612T001813Z-deadbeef",
-        [_finding_record("F-1", disposition="open")],
-    )
-
-
-def _setup_doc038_single(specs) -> None:  # type: ignore[no-untyped-def]
-    """A live audit whose FINDINGS.jsonl records are ALL terminal-and-release-named —
-    archive due (SPEC-DOC-038 WARNING)."""
-    _loose_audit_findings(
-        specs,
-        "20260701T201136Z-0bcd6c19",
-        [_finding_record("F-1", disposition="resolved", release="v0.1.47")],
-    )
-
-
-def _setup_doc038_multiple(specs) -> None:  # type: ignore[no-untyped-def]
-    _loose_audit_findings(
-        specs,
-        "20260701T201136Z-0bcd6c19",
-        [_finding_record("F-1", disposition="resolved", release="v0.1.47")],
-    )
-    _loose_audit_findings(
-        specs,
-        "20260612T001813Z-deadbeef",
-        [_finding_record("F-1", disposition="deferred", release="v0.1.48")],
-    )
 
 
 @pytest.mark.parametrize(
@@ -156,43 +42,8 @@ def _setup_doc038_multiple(specs) -> None:  # type: ignore[no-untyped-def]
             _setup_doc034,
             1,
             "backlog",
-            Severity.WARNING,
+            "warning",
             id="doc034-missing-archive-dir",
-        ),
-        pytest.param(
-            "SPEC-DOC-035",
-            _setup_doc035,
-            1,
-            "shipped-item.md",
-            Severity.WARNING,
-            id="doc035-loose-per-entry-file",
-        ),
-        pytest.param(
-            "SPEC-DOC-036",
-            _setup_doc036,
-            1,
-            "20260612T001813Z-deadbeef",
-            # A finding still 'open' inside an archived audit is an ERROR (D5/D7) —
-            # never a WARNING; distinct from SPEC-DOC-036's OTHER, WARNING-severity
-            # aggregate ("N archived audit(s) predate the FINDINGS.jsonl canon").
-            Severity.ERROR,
-            id="doc036-archived-audit-with-open-finding",
-        ),
-        pytest.param(
-            "SPEC-DOC-038",
-            _setup_doc038_single,
-            1,
-            "20260701T201136Z-0bcd6c19",
-            Severity.WARNING,
-            id="doc038-single-loose-audit",
-        ),
-        pytest.param(
-            "SPEC-DOC-038",
-            _setup_doc038_multiple,
-            2,
-            None,
-            Severity.WARNING,
-            id="doc038-multiple-loose-audits",
         ),
     ],
 )
@@ -208,15 +59,14 @@ def test_sad_path_matrix(  # type: ignore[no-untyped-def]
     setup(specs)
     warns = _codes(specs, code)
     assert len(warns) == expect_count
-    assert all(w.severity is expect_severity for w in warns)
+    assert all(w.verdict == expect_severity for w in warns)
     if expect_substring is not None:
-        assert expect_substring in warns[0].description
+        assert expect_substring in warns[0].message
 
     if code == "SPEC-DOC-034":
         # Auto-fix behavior: fixable, and fix() clears the residual issue.
         assert warns[0].fixable is True
-        assert warns[0].path is not None
-        assert Path(warns[0].path).parts[-2:] == ("backlog", "_archive")
+        assert Path(str(finding_path(warns[0]))).parts[-2:] == ("backlog", "_archive")
         doctor = SpecsDoctor(specs)
         fixed = doctor.fix()
         assert any(i.code == "SPEC-DOC-034" for i in fixed)
@@ -237,38 +87,6 @@ def _silent_doc034_absent_parent(specs: Path) -> None:
     specs.mkdir()
 
 
-def _silent_doc035_archived(specs: Path) -> None:
-    """A superseded per-entry file already under _archive/ is clean — the check is a
-    non-recursive glob of specs/backlog/ itself; it never scans _archive/."""
-    _seed_archives(specs)
-    _backlog_entry(specs, "shipped-item.md", "DELIVERED — v0.1.30", archived=True)
-
-
-def _silent_doc035_only_single_source_files(specs: Path) -> None:
-    """BACKLOG.json and AGENTS.md are the only two filenames the single-source invariant
-    permits loose directly under specs/backlog/ — present together, the tree is clean."""
-    _seed_archives(specs)
-    (specs / "backlog" / "BACKLOG.json").write_text(
-        '{"schema": "backlog-v1", "active": []}\n', encoding="utf-8"
-    )
-    (specs / "backlog" / "AGENTS.md").write_text("# Backlog\n", encoding="utf-8")
-
-
-def _silent_doc036_with_disposition(specs: Path) -> None:
-    """An archived audit whose FINDINGS.jsonl records are ALL terminal — clean, no
-    ``open`` record survives into the archive (SPEC-DOC-036 stays silent)."""
-    _seed_archives(specs)
-    _archived_audit_findings(
-        specs,
-        "20260701T135346Z-6145b869",
-        [_finding_record("F-1", disposition="resolved", release="v0.1.46")],
-    )
-
-
-def _silent_doc036_empty_archive(specs: Path) -> None:
-    _seed_archives(specs)
-
-
 @pytest.mark.parametrize(
     ("code", "setup"),
     [
@@ -280,81 +98,9 @@ def _silent_doc036_empty_archive(specs: Path) -> None:
             _silent_doc034_absent_parent,
             id="doc034-absent-parent-not-flagged-tree4-owns-it",
         ),
-        pytest.param(
-            "SPEC-DOC-035",
-            _silent_doc035_archived,
-            id="doc035-under-archive-not-scanned-clean",
-        ),
-        pytest.param(
-            "SPEC-DOC-035",
-            _silent_doc035_only_single_source_files,
-            id="doc035-backlog-and-readme-only-clean",
-        ),
-        pytest.param(
-            "SPEC-DOC-036",
-            _silent_doc036_with_disposition,
-            id="doc036-with-disposition-clean",
-        ),
-        pytest.param(
-            "SPEC-DOC-036",
-            _silent_doc036_empty_archive,
-            id="doc036-empty-audit-archive-clean",
-        ),
-        pytest.param(
-            "SPEC-DOC-038",
-            lambda specs: _archived_audit(
-                specs, "20260701T135346Z-6145b869", "# Audit\n\n**Disposition:** v0.1.47\n"
-            ),
-            id="doc038-archived-only-audits-clean",
-        ),
-        pytest.param(
-            "SPEC-DOC-038",
-            lambda specs: specs.mkdir(parents=True),
-            id="doc038-absent-audits-dir-clean",
-        ),
     ],
 )
 def test_silent_and_exempt_matrix(tmp_path: Path, code: str, setup) -> None:  # type: ignore[no-untyped-def]
     specs = tmp_path / "specs"
     setup(specs)
     assert _codes(specs, code) == []
-
-
-# ---------------------------------------------------------------------------
-# DOC-037: constitution must not enumerate AgentRuntimeKind members — trio merged
-# ---------------------------------------------------------------------------
-
-
-def test_doc037_constitution_enum_prohibition(tmp_path) -> None:  # type: ignore[no-untyped-def]
-    specs_clean = tmp_path / "clean" / "specs"
-    _write_constitution(
-        specs_clean,
-        "# Constitution\n\n"
-        "Runtime kinds are the roster single-source in [[tech-stack]]; the constitution "
-        "states only the invariant. Layer 1 = {claude, codex, pi}; Layer 2 = {pi, codex}.\n"
-        "The word fake in lowercase prose is fine.\n",
-    )
-    assert _codes(specs_clean, "SPEC-DOC-037") == []
-
-    specs_bad = tmp_path / "bad" / "specs"
-    _write_constitution(
-        specs_bad,
-        "# Constitution\n\n"
-        "§8: the AgentRuntimeKind enum members are FAKE, CODEX_EXEC, CLAUDE_SDK, "
-        "PI_HEADLESS, OPENCODE_RUN.\n",
-    )
-    errs = _codes(specs_bad, "SPEC-DOC-037")
-    assert len(errs) == 1
-    assert errs[0].severity is Severity.ERROR
-    for tok in ("FAKE", "CODEX_EXEC", "CLAUDE_SDK", "PI_HEADLESS", "OPENCODE_RUN"):
-        assert tok in errs[0].description
-
-    specs_single = tmp_path / "single" / "specs"
-    _write_constitution(specs_single, "# Constitution\n\nWorkers default to CODEX_EXEC today.\n")
-    errs_single = _codes(specs_single, "SPEC-DOC-037")
-    assert len(errs_single) == 1 and errs_single[0].severity is Severity.ERROR
-
-    specs_absent = tmp_path / "absent" / "specs"
-    specs_absent.mkdir(parents=True)
-    # No constitution.md — SPEC-DOC-001 owns absence; SPEC-DOC-037 stays silent.
-    assert _codes(specs_absent, "SPEC-DOC-037") == []

@@ -10,7 +10,7 @@ Root workspace behavior is in the workspace `AGENTS.md`; production-source behav
 
 <!-- specs-canon -->
 
-- Path classes: `bugs/`, `backlog/`, `audits/` and each area's `_archive/*_histo.jsonl` are ADDITIVE, always writable; everything else here is MUTATING, `memory/` included.
+- Path classes: the append-only ledger areas and each area's `_archive/*_histo.jsonl` are ADDITIVE, always writable; everything else here is MUTATING, `memory/` included.
 
 ## 2. Load order
 
@@ -19,7 +19,7 @@ Root workspace behavior is in the workspace `AGENTS.md`; production-source behav
 
 ## 3. Before implementing
 
-- The live release's `_RELEASE.json` `phase` reads `IMPLEMENTATION`, and `SPEC.md`/`PLAN.md`/`TASKS.md` all carry `**Status:** Approved`.
+- The live release's `_RELEASE.json` `phase` reads `IMPLEMENTATION`, and every trio document carries `**Status:** Approved`.
 - The task is flipped `[ ]` -> `[-]` before any production edit, and its declared write set names every file touched.
 - Any item missing: stop and repair the SDD artifact instead of editing production.
 

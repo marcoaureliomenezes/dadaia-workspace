@@ -1,23 +1,9 @@
-"""Direct unit pin of caller-owned ``resolve_context_for_cli`` resolution
-and its context-NAME allowlist guard (v0.1.80 FR3).
+"""Caller-owned ``resolve_context_for_cli`` resolution and its context-NAME allowlist (v0.1.80 FR3).
 
-The seam never borrows a foreign first-ALIVE context. Consumer workspaces must bind
-or pass a context explicitly; only the recognizable source checkout gets the
-self-hosting slug fallback.
-
-v0.1.80 FR3 (backlog ``20260711-context-name-allowlist-at-resolution-rungs``, P4,
-security-review INFO defense-in-depth): both the ``explicit`` and ``DADAIA_CONTEXT``
-env rungs feed a ``repos/<name>/specs`` path join further downstream, unvalidated.
-Applies the existing ``[A-Za-z0-9_-]+`` allowlist (mirrored from
-``core.specs_resolver._CONTEXT_NAME_RE`` / ``features.spec_context.presence._valid_name``)
-at the seam, BEFORE any path join:
-
-- a traversal-shaped ``explicit`` argument is INTENTIONAL operator input — reject it
-  loudly with an actionable ``ValueError`` (this module is not typer-bound, so callers
-  surface the message themselves);
-- a traversal-shaped ``DADAIA_CONTEXT`` env value is AMBIENT (not a deliberate call-site
-  argument) — treat it as unset and fall through to the next resolution rung, never
-  crash a CLI invocation over inherited/stale environment.
+Intent: CONTRACT — the seam never borrows a foreign first-ALIVE context; a traversal-shaped
+``explicit`` (deliberate input) raises naming the value, a traversal-shaped ``DADAIA_CONTEXT``
+(ambient) is treated as unset; sa-bind-has-two-stores#S1, #S2, #S3; T-50-02 rung 3 (the repo
+containing cwd) resolves any registered ``repos/<slug>``.
 """
 
 from __future__ import annotations
@@ -60,165 +46,58 @@ def _mk_workspace(root: Path, contexts: list[str]) -> None:
 
 @pytest.fixture
 def _clean_session_env(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Bug ``specs-resolver-context-tests-flaky-under-xdist-full-suite``: also scrubs
-    ``WORKSPACE_ROOT``, which ``resolve_context_for_cli`` -> the resolution authority
-    honours ahead of every ``monkeypatch.chdir()`` these tests perform."""
+    """Bug ``specs-resolver-context-tests-flaky-under-xdist-full-suite``: no ambient
+    session or context var leaks into these cwd-driven scenarios."""
     scrub_context_resolution_env(monkeypatch)
 
 
-@pytest.mark.usefixtures("_clean_session_env")
-@pytest.mark.parametrize("contexts", [[], ["consumer-only-context"]])
-def test_unbound_consumer_never_selects_first_alive(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-    contexts: list[str],
-) -> None:
-    ws = tmp_path / "ws"
-    _mk_workspace(ws, contexts)
-    monkeypatch.chdir(ws)
-    with pytest.raises(ValueError, match="context bind"):
-        resolve_context_for_cli(None)
-
-
-@pytest.mark.usefixtures("_clean_session_env")
-def test_explicit_and_env_resolve_without_fallback(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    ws = tmp_path / "ws"
-    _mk_workspace(ws, ["alive-ctx"])
-    monkeypatch.chdir(ws)
-    assert resolve_context_for_cli("explicit-ctx") == "explicit-ctx"
-    monkeypatch.setenv("DADAIA_CONTEXT", "env-ctx")
-    assert resolve_context_for_cli(None) == "env-ctx"
-
-
-@pytest.mark.usefixtures("_clean_session_env")
-def test_repo_cwd_resolves_via_rung3_no_bind_no_env(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """T-50-02 (SPEC v0.5.0 FR1) widening: the single authority's rung 3 (the repo
-    containing cwd) now resolves ANY registered ``repos/<slug>``, generalizing the OLD
-    hardcoded self-hosting-literal special case (which recognized only a checkout named
-    exactly ``"dadaia-workspace"``). No explicit argument, no ``DADAIA_CONTEXT``, no
-    bound session record — the cwd alone resolves it."""
-    ws = tmp_path / "ws"
-    _mk_workspace(ws, ["alive-ctx"])
-    repo_dir = ws / "repos" / "alive-ctx"
-    repo_dir.mkdir(parents=True)
-    monkeypatch.chdir(repo_dir)
-
-    assert resolve_context_for_cli(None) == "alive-ctx"
-
-
-# --- FR3: context-name allowlist at the explicit/env resolution rungs ----------------
-
-
-#: Non-empty traversal/injection-shaped names. Excludes the empty string deliberately:
-#: ``""`` is FALSY, so it already falls through BOTH rungs' pre-existing ``if value:``
-#: truthiness checks before reaching the allowlist guard at all (identical to "not
-#: provided") — it is never a validation case, at either rung.
-_TRAVERSAL_SHAPED_NAMES = [
-    pytest.param("../escape", id="parent-traversal"),
-    pytest.param("../../etc/passwd", id="deep-parent-traversal"),
-    pytest.param("a/b", id="embedded-slash"),
-    pytest.param("ctx/../../x", id="mixed-traversal"),
-    pytest.param(".", id="dot"),
-    pytest.param("..", id="dotdot"),
-    pytest.param("ctx name", id="embedded-space"),
-    pytest.param("ctx;rm -rf", id="shell-metacharacter"),
+_REGISTERED = ["alive-ctx", "env-ctx", "valid-ctx", "valid_ctx", "ValidCtx123"]
+_TRAVERSAL = [
+    "../escape",
+    "../../etc/passwd",
+    "a/b",
+    "ctx/../../x",
+    ".",
+    "..",
+    "ctx name",
+    "ctx;rm -rf",
 ]
+_BIND = ValueError("context bind")
 
 
+# fmt: off
 @pytest.mark.usefixtures("_clean_session_env")
-@pytest.mark.parametrize("name", _TRAVERSAL_SHAPED_NAMES)
-def test_traversal_shaped_explicit_raises_actionable_error(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, name: str
-) -> None:
-    """A traversal-shaped ``explicit`` argument is deliberate operator input — the seam
-    rejects it loudly, before any ``repos/<name>/specs`` path join, with a message that
-    names the offending value and the allowlist it violates."""
+@pytest.mark.parametrize(("registered", "in_repo", "explicit", "env", "session", "expected"), [
+    pytest.param([], False, None, None, None, _BIND, id="no-contexts-never-first-alive"),
+    pytest.param(_REGISTERED, False, None, None, None, _BIND, id="unbound-consumer-never-first-alive"),
+    pytest.param(_REGISTERED, False, "explicit-ctx", None, None, "explicit-ctx", id="explicit"),
+    pytest.param(_REGISTERED, False, None, "env-ctx", None, "env-ctx", id="S1-S2-registered-env-is-the-bind"),
+    pytest.param(_REGISTERED, False, None, "env-ctx", "native-no-record", _BIND, id="S2-native-session-without-record-ignores-env"),
+    pytest.param(_REGISTERED, True, None, None, None, "alive-ctx", id="T-50-02-rung3-cwd-repo"),
+    pytest.param(_REGISTERED, True, None, "../escape", None, "alive-ctx", id="S3-traversal-env-never-echoes-rung3-wins"),
+    pytest.param(_REGISTERED, False, "", "", None, _BIND, id="empty-explicit-and-env-fall-through"),
+    *[pytest.param(_REGISTERED, False, n, None, None, ValueError(n), id=f"explicit-traversal-raises-{n}") for n in _TRAVERSAL],
+    *[pytest.param(_REGISTERED, False, None, n, None, _BIND, id=f"env-traversal-skipped-{n}") for n in _TRAVERSAL],
+    *[pytest.param(_REGISTERED, False, n, None, None, n, id=f"valid-explicit-{n}") for n in _REGISTERED[2:]],
+    *[pytest.param(_REGISTERED, False, None, n, None, n, id=f"valid-env-{n}") for n in _REGISTERED[2:]],
+])
+# fmt: on
+def test_resolve_context_for_cli(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, registered: list[str], in_repo: bool,
+    explicit: str | None, env: str | None, session: str | None, expected: str | ValueError,
+) -> None:  # fmt: skip
     ws = tmp_path / "ws"
-    _mk_workspace(ws, ["alive-ctx"])
-    monkeypatch.chdir(ws)
-    with pytest.raises(ValueError, match="context") as exc_info:
-        resolve_context_for_cli(name)
-    # Actionable: the message names the rejected value so an operator can see what was
-    # typed/passed, not just "invalid context".
-    assert repr(name) in str(exc_info.value) or name in str(exc_info.value)
-
-
-@pytest.mark.usefixtures("_clean_session_env")
-def test_traversal_shaped_env_never_echoes_through_even_with_rung3_available(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """T-50-05: the pop/restore env mutation this seam used to need (to stop the
-    delegated authority call from re-reading and echoing back the SAME rejected
-    ``DADAIA_CONTEXT``) is deleted; the replacement is validating whatever the authority
-    returns against the SAME allowlist. A traversal-shaped ``DADAIA_CONTEXT`` still never
-    reaches the caller — even from a cwd that WOULD otherwise resolve via rung 3 —
-    because the authority's own rung 1 short-circuits on any truthy env var before rung
-    3 is ever consulted, and the echoed-back invalid value fails the allowlist check."""
-    ws = tmp_path / "ws"
-    _mk_workspace(ws, ["alive-ctx"])
-    repo_dir = ws / "repos" / "alive-ctx"
-    repo_dir.mkdir(parents=True)
-    monkeypatch.chdir(repo_dir)
-    monkeypatch.setenv("DADAIA_CONTEXT", "../escape")
-    with pytest.raises(ValueError, match="context bind"):
-        resolve_context_for_cli(None)
-
-
-@pytest.mark.usefixtures("_clean_session_env")
-@pytest.mark.parametrize("name", _TRAVERSAL_SHAPED_NAMES)
-def test_traversal_shaped_env_is_skipped_not_crashed(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, name: str
-) -> None:
-    """A traversal-shaped ``DADAIA_CONTEXT`` env value is AMBIENT (inherited shell state,
-    not a deliberate call-site argument) — the seam treats it as unset and falls through
-    to the next resolution rung (first-ALIVE here) rather than raising."""
-    ws = tmp_path / "ws"
-    _mk_workspace(ws, ["alive-ctx"])
-    monkeypatch.chdir(ws)
-    monkeypatch.setenv("DADAIA_CONTEXT", name)
-    with pytest.raises(ValueError, match="context bind"):
-        resolve_context_for_cli(None)
-
-
-@pytest.mark.usefixtures("_clean_session_env")
-def test_empty_string_explicit_and_env_fall_through_unchanged(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """Pins pre-existing behavior (regression guard, not new FR3 behavior): an empty
-    string is FALSY at both rungs' own ``if value:`` checks, so it is treated exactly
-    like "not provided" and falls through to the next rung — it never reaches the
-    allowlist guard, and the guard must not change this."""
-    ws = tmp_path / "ws"
-    _mk_workspace(ws, ["alive-ctx"])
-    monkeypatch.chdir(ws)
-    with pytest.raises(ValueError, match="context bind"):
-        resolve_context_for_cli("")
-    monkeypatch.setenv("DADAIA_CONTEXT", "")
-    with pytest.raises(ValueError, match="context bind"):
-        resolve_context_for_cli(None)
-
-
-@pytest.mark.usefixtures("_clean_session_env")
-@pytest.mark.parametrize(
-    "name",
-    [
-        pytest.param("valid-ctx", id="hyphenated"),
-        pytest.param("valid_ctx", id="underscored"),
-        pytest.param("ValidCtx123", id="mixed-case-alnum"),
-    ],
-)
-def test_valid_names_unchanged_at_explicit_and_env_rungs(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, name: str
-) -> None:
-    """The allowlist guard must not regress any name matching ``[A-Za-z0-9_-]+`` — the
-    exact behavior at HEAD (no exception, value passed through) is preserved."""
-    ws = tmp_path / "ws"
-    _mk_workspace(ws, ["alive-ctx"])
-    monkeypatch.chdir(ws)
-    assert resolve_context_for_cli(name) == name
-    monkeypatch.setenv("DADAIA_CONTEXT", name)
-    assert resolve_context_for_cli(None) == name
+    _mk_workspace(ws, registered)
+    cwd = ws / "repos" / "alive-ctx" if in_repo else ws
+    cwd.mkdir(parents=True, exist_ok=True)
+    monkeypatch.chdir(cwd)
+    if env is not None:
+        monkeypatch.setenv("DADAIA_CONTEXT", env)
+    if session:
+        monkeypatch.setenv("CLAUDE_CODE_SESSION_ID", session)
+    if isinstance(expected, ValueError):
+        with pytest.raises(ValueError) as caught:
+            resolve_context_for_cli(explicit)
+        assert str(expected.args[0]) in str(caught.value)
+    else:
+        assert resolve_context_for_cli(explicit) == expected

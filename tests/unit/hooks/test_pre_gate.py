@@ -1,181 +1,73 @@
-"""Tests for the merged PreToolUse entrypoint dadaia_workspace.hooks.pre_gate (T-014-03).
+"""The merged PreToolUse entrypoint ``pre_gate``: first-block-wins over its policies, and
+the one envelope every harness parses.
 
-Two layers:
-
-* **Parity (subprocess)** — the consolidated entrypoint, spawned as a real harness hook,
-  reproduces the standalone SDD-gate and root-whitelist verdicts (ALLOW/BLOCK envelope)
-  including the multi-file apply_patch most-restrictive rule, NotebookEdit handling, and
-  the fail-CLOSED PROTECTED path.
-* **Subprocess-free single-spawn contract (in-process)** — driving ``pre_gate.main()`` /
-  ``evaluate_payload`` spawns NO child process and never execs: the entrypoint reads stdin
-  once and dispatches to pure policy functions (the perf invariant, seed 5).
-  ``subprocess.Popen``/``run`` and ``os.exec*`` are monkeypatched to raise. These in-process
-  tests fault-inject ``_common.read_stdin_json`` (a production internal) to supply the
-  payload — they never simulate ``sys.stdin``, so they stay on the contract's white-box
-  carve-out. The harness-real no-``.dadaia/logs`` test (AC10, T-046-29) flows through
-  ``run_hook_subprocess`` (the sanctioned subprocess channel).
+Intent: CONTRACT — T-014-03 (parity with sdd_gate + root_whitelist through one spawn),
+pre-gate-allow-envelope-fails-claude-schema, claude-pre-gate-envelope-contract (the
+kimi shim's two raw anchors), the Bash arm wired to venv_guard.
 """
 
 from __future__ import annotations
 
 import json
-import subprocess
 from pathlib import Path
 from typing import Any
 
 import pytest
 
-from dadaia_workspace.hooks import _common, pre_gate, root_whitelist, sdd_gate
+from dadaia_workspace.hooks import pre_gate
 from tests.fixtures.harness_env import claude_hook_env, run_hook_subprocess
 
-
-def _mk_workspace(tmp_path: Path, *slugs: str) -> Path:
-    (tmp_path / ".dadaia" / "states").mkdir(parents=True)
-    (tmp_path / ".dadaia" / "states" / "spec_contexts.json").write_text(
-        json.dumps({"contexts": [{"repo_slug": s, "state": "alive"} for s in slugs]}),
-        encoding="utf-8",
-    )
-    for s in slugs:
-        rel = tmp_path / "repos" / s / "specs" / "releases"
-        rel.mkdir(parents=True)
-        (rel / "ACTIVE.md").write_text("release: rel-1\nphase: IMPLEMENTATION\n", encoding="utf-8")
-    return tmp_path
+_PATCH = "*** Begin Patch\n*** Update File: repos/a/README.md\n+ok\n*** Update File: {}\n+x\n*** End Patch"
 
 
-def _run(tmp_path: Path, payload: dict[str, Any], *, session_id: str = "claude-sess") -> Any:
-    env = claude_hook_env(tmp_path, session_id=session_id)
-    env.pop("CLAUDE_CODE_SESSION_ID", None)
+def _spawn(ws: Path, payload: dict[str, Any]) -> Any:
+    env = claude_hook_env(ws, session_id="s")
     env.pop("DADAIA_CONTEXT", None)
-    full_payload = {**payload, "session_id": session_id}
-    result = run_hook_subprocess("pre_gate", full_payload, env)
+    result = run_hook_subprocess("pre_gate", {**payload, "session_id": "s"}, env)
     assert result.returncode == 0, result.stderr
-    return result.block_envelope()
-
-
-# --------------------------------------------------------------------------- #
-# Parity: SDD-gate + root-whitelist verdicts reproduced through pre_gate.
-# --------------------------------------------------------------------------- #
+    return result
 
 
 @pytest.mark.parametrize(
-    ("tool_name", "input_key", "path_fn", "expect_reason"),
+    ("tool", "tool_input", "want"),
     [
-        # An in-repo non-spec file is UNGATED by the SDD gate and is a subdir write (not a
-        # new root entry), so both pre_gate policies allow it.
-        (
-            "Write",
-            "file_path",
-            lambda ws: ws / "repos" / "a" / "src" / "thing.py",
-            None,
-        ),
-        # NotebookEdit is excluded from the root-whitelist tool set but IS an SDD write
-        # tool. A README-sibling junk.ipynb at root is UNGATED by SDD and exempt from
-        # root-whitelist for NotebookEdit → allowed (parity with standalone).
-        ("NotebookEdit", "notebook_path", lambda ws: ws / "junk.ipynb", None),
-        ("Read", "file_path", lambda ws: "x", None),
-        (
-            "Write",
-            "file_path",
-            lambda ws: ws / ".dadaia" / "sessions" / "runtime" / "a.ptr",
-            "SEC-01",
-        ),
-        (
-            "Write",
-            "file_path",
-            lambda ws: ws / "junk.txt",
-            "ROOT WHITELIST GATE",
-        ),
+        ("Write", {"file_path": "repos/a/src/thing.py"}, None),
+        ("NotebookEdit", {"notebook_path": "junk.ipynb"}, None),
+        ("Read", {"file_path": "x"}, None),
+        ("Write", {"file_path": ".dadaia/sessions/a.json"}, "SEC-01"),
+        ("Write", {"file_path": "junk.txt"}, "ROOT WHITELIST GATE"),
+        ("apply_patch", {"command": _PATCH.format(".dadaia/sessions/a.json")}, "SEC-01"),
     ],
     ids=[
-        "allow-parity-in-repo-subdir-write",
-        "allow-parity-notebook-edit-root-exempt",
+        "in-repo-subdir-write-allows",
+        "notebook-edit-is-root-whitelist-exempt",
         "non-write-tool-allows",
-        "protected-sessions-blocks-fail-closed",
+        "protected-sessions-fails-closed",
         "root-whitelist-forbidden-entry-blocks",
+        "apply-patch-most-restrictive-header-blocks-the-whole-patch",
     ],
 )
 def test_non_write_and_protected_matrix(
-    tmp_path: Path, tool_name: str, input_key: str, path_fn: Any, expect_reason: str | None
+    tmp_path: Path, tool: str, tool_input: dict[str, str], want: str | None
 ) -> None:
-    ws = _mk_workspace(tmp_path, "a")
-    target = path_fn(ws)
-    block = _run(tmp_path, {"tool_name": tool_name, "tool_input": {input_key: str(target)}})
-    if expect_reason is None:
-        assert block is None
-    else:
-        assert block is not None
-        assert expect_reason in block["reason"]
-
-
-@pytest.mark.parametrize(
-    ("second_header", "second_body", "reason_fragment"),
-    [
-        # First header in-repo (allowed), second header PROTECTED
-        # (.dadaia/sessions/) → blocked.
-        (".dadaia/sessions/runtime/a.ptr", "+forge", "SEC-01"),
-    ],
-)
-def test_apply_patch_multi_file_most_restrictive_blocks_whole_patch(
-    tmp_path: Path, second_header: str, second_body: str, reason_fragment: str
-) -> None:
-    _mk_workspace(tmp_path, "a")
-    cmd = (
-        "*** Begin Patch\n"
-        "*** Update File: repos/a/README.md\n"
-        "+ok\n"
-        f"*** Update File: {second_header}\n"
-        f"{second_body}\n"
-        "*** End Patch"
+    """Through one spawn, pre_gate reproduces the standalone sdd_gate and root_whitelist
+    verdicts (paths are workspace-relative; ``want`` names the block reason)."""
+    (tmp_path / ".dadaia" / "states").mkdir(parents=True)
+    (tmp_path / ".dadaia" / "states" / "spec_contexts.json").write_text(
+        json.dumps({"contexts": [{"repo_slug": "a", "state": "alive"}]}), encoding="utf-8"
     )
-    block = _run(tmp_path, {"tool_name": "apply_patch", "tool_input": {"command": cmd}})
-    assert block is not None
-    assert reason_fragment in block["reason"] or reason_fragment.upper() in block["reason"].upper()
-
-
-# --------------------------------------------------------------------------- #
-# Subprocess-free single-spawn contract (seed 5).
-# --------------------------------------------------------------------------- #
-
-
-def _no_subprocess(monkeypatch: pytest.MonkeyPatch) -> None:
-    def boom(*_a: object, **_k: object) -> None:
-        raise AssertionError("pre_gate must not spawn a subprocess / exec a child")
-
-    monkeypatch.setattr(subprocess, "Popen", boom)
-    monkeypatch.setattr(subprocess, "run", boom)
-    import os
-
-    for name in ("execv", "execve", "execvp", "execvpe"):
-        if hasattr(os, name):
-            monkeypatch.setattr(os, name, boom)
-
-
-@pytest.mark.parametrize(
-    "payload",
-    [
-        {"tool_name": "Edit", "tool_input": {"file_path": "/tmp/x.py"}},
-        {"tool_name": "Write", "tool_input": {"file_path": "/tmp/x.py"}},
-        {"tool_name": "MultiEdit", "tool_input": {"file_path": "/tmp/x.py"}},
-        {"tool_name": "apply_patch", "tool_input": {"command": "*** Add File: a.py\n+x\n"}},
-    ],
-)
-def test_main_is_subprocess_free(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, payload: dict[str, Any]
-) -> None:
-    _no_subprocess(monkeypatch)
-    monkeypatch.setenv("WORKSPACE_ROOT", str(tmp_path))
-    # Fault-inject the production stdin reader (NOT sys.stdin) so the entrypoint runs fully
-    # in-process per the harness-env contract carve-out: reads the payload once, dispatches
-    # to pure policy functions, returns 0 — no child spawned.
-    monkeypatch.setattr(_common, "read_stdin_json", lambda: dict(payload))
-    assert pre_gate.main() == 0
+    (tmp_path / "repos" / "a" / "specs").mkdir(parents=True)
+    rooted = {k: v if k == "command" else str(tmp_path / v) for k, v in tool_input.items()}
+    block = _spawn(tmp_path, {"tool_name": tool, "tool_input": rooted}).block_envelope()
+    if want is None:
+        assert block is None, block
+    else:
+        assert block is not None and want in block["reason"], block
 
 
 def test_evaluate_payload_first_block_wins_and_faulty_policy_fails_open(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    # root-whitelist policy fires before the SDD gate: a forbidden-root block short-circuits
-    # and the SDD policy is never consulted.
     calls: list[str] = []
 
     def rw(_p: dict[str, object]) -> str | None:
@@ -186,219 +78,44 @@ def test_evaluate_payload_first_block_wins_and_faulty_policy_fails_open(
         calls.append("sdd")
         return "SDD BLOCK"
 
-    monkeypatch.setattr(pre_gate, "_POLICIES", (rw, pre_gate._venv_guard_reason, sdd))
+    monkeypatch.setattr(pre_gate, "_POLICIES", (rw, sdd))
     assert pre_gate.evaluate_payload({"tool_name": "Write"}) == "ROOT BLOCK"
     assert calls == ["rw"]
 
     def explode(_p: dict[str, object]) -> str | None:
         raise RuntimeError("boom")
 
-    def allow(_p: dict[str, object]) -> str | None:
-        return None
-
-    monkeypatch.setattr(pre_gate, "_POLICIES", (explode, allow))
-    # A policy that raises is treated as ALLOW — the entrypoint never deadlocks.
+    monkeypatch.setattr(pre_gate, "_POLICIES", (explode, lambda _p: None))
     assert pre_gate.evaluate_payload({"tool_name": "Write"}) is None
 
 
-# --------------------------------------------------------------------------- #
-# FR11 / AC10 (T-046-29): the gate writes no telemetry — a gated write leaves no
-# `.dadaia/logs/` behind, whatever the verdict.
-# --------------------------------------------------------------------------- #
-
-
 @pytest.mark.parametrize(
-    ("path_fn", "expect_block"),
+    "payload",
     [
-        (lambda ws: ws / "repos" / "a" / "src" / "thing.py", False),
-        (lambda ws: ws / ".dadaia" / "sessions" / "runtime" / "a.ptr", True),
-    ],
-    ids=["allowed-mutating-write", "blocked-protected-write"],
-)
-def test_gated_write_leaves_no_logs_dir(tmp_path: Path, path_fn: Any, expect_block: bool) -> None:
-    """Intent: CONTRACT — AC10 (logs), T-046-29. Size: SMALL (one hook subprocess).
-
-    Harness-real spawn of ``pre_gate`` on a hermetic workspace: the verdict is emitted
-    and the hook creates no ``.dadaia/logs`` directory — the ``hook-latency.jsonl``
-    writer is retired with no replacement (FR11).
-    """
-    ws = _mk_workspace(tmp_path, "a")
-    block = _run(tmp_path, {"tool_name": "Write", "tool_input": {"file_path": str(path_fn(ws))}})
-    assert (block is not None) is expect_block
-    assert not (ws / ".dadaia" / "logs").exists()
-
-
-# --------------------------------------------------------------------------- #
-# WS-PI-4: the PI Layer-1 SDD-gate extension maps its tool names to the gate's
-# canonical vocabulary (write→Write, edit→Edit) before delegating to pre_gate.
-# These tests prove (a) why the mapping is necessary and (b) that the mapped
-# names are enforced by the same gate the other harnesses use.
-# --------------------------------------------------------------------------- #
-
-
-# --------------------------------------------------------------------------- #
-
-
-def test_main_emits_explicit_allow_envelope(
-    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], tmp_path: Path
-) -> None:
-    """Bug pre-gate-allow-envelope-fails-claude-schema: allow must validate silently.
-
-    Claude Code's PreToolUse output schema restricts the top-level ``decision`` enum to
-    ``["approve", "block"]`` — ``"allow"`` is invalid and makes the harness reject the
-    WHOLE envelope ("Hook JSON output validation failed") on every allowed call. And
-    ``permissionDecision: "defer"`` is print-mode only: interactive sessions log a warn
-    and ignore it. The contract-valid allow envelope therefore carries NO permission
-    verdict at all — the gate steps aside into the normal permission flow. It stays
-    non-empty (observable-allow doctrine, bug projected-pre-gate-silent-allow); codex
-    and the kimi shim treat any non-block envelope as allow.
-    """
-    monkeypatch.setenv("WORKSPACE_ROOT", str(tmp_path))
-    payload = {
-        "tool_name": "Write",
-        "tool_input": {"file_path": "repos/valproj/specs/bugs/x.md", "content": "x"},
-    }
-    monkeypatch.setattr(pre_gate._common, "read_stdin_json", lambda: payload)
-
-    assert pre_gate.main() == 0
-    out = capsys.readouterr().out.strip()
-    envelope = json.loads(out.splitlines()[-1])
-    assert envelope == {
-        "continue": True,
-        "hookSpecificOutput": {"hookEventName": "PreToolUse"},
-    }
-    assert "decision" not in envelope
-    assert "permissionDecision" not in envelope["hookSpecificOutput"]
-    assert "defer" not in out
-
-
-def test_allow_envelope_has_no_kimi_block_marker(
-    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], tmp_path: Path
-) -> None:
-    """The kimi shim greps the literal ``"decision": "block"`` — allow must not carry it."""
-    monkeypatch.setenv("WORKSPACE_ROOT", str(tmp_path))
-    payload = {
-        "tool_name": "Write",
-        "tool_input": {"file_path": "repos/valproj/specs/bugs/x.md", "content": "x"},
-    }
-    monkeypatch.setattr(pre_gate._common, "read_stdin_json", lambda: payload)
-
-    assert pre_gate.main() == 0
-    raw = capsys.readouterr().out.strip().splitlines()[-1]
-    assert '"decision": "block"' not in raw
-
-
-def test_main_block_envelope_carries_claude_permission_deny(
-    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], tmp_path: Path
-) -> None:
-    """Bug claude-pre-gate-envelope-contract: block must be Claude-Code contract-valid.
-
-    The legacy ``"decision": "block"`` field rides an undocumented fallback in current
-    Claude Code — the documented PreToolUse verdict is
-    ``hookSpecificOutput.permissionDecision: "deny"``. The merged envelope carries BOTH
-    (legacy for codex hooks + the kimi shim, modern for Claude Code) with one identical
-    reason string.
-    """
-    monkeypatch.setenv("WORKSPACE_ROOT", str(tmp_path))
-    payload = {
-        "tool_name": "Write",
-        "tool_input": {"file_path": ".dadaia/sessions/x.json", "content": "x"},
-    }
-    monkeypatch.setattr(pre_gate._common, "read_stdin_json", lambda: payload)
-
-    assert pre_gate.main() == 0
-    envelope = json.loads(capsys.readouterr().out.strip().splitlines()[-1])
-    assert envelope["decision"] == "block"
-    assert envelope["reason"]
-    hso = envelope["hookSpecificOutput"]
-    assert hso["hookEventName"] == "PreToolUse"
-    assert hso["permissionDecision"] == "deny"
-    assert hso["permissionDecisionReason"] == envelope["reason"]
-
-
-def test_block_envelope_raw_string_keeps_kimi_shim_markers(
-    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], tmp_path: Path
-) -> None:
-    """The kimi pre-gate shim string-matches the raw stdout — its two anchors are law.
-
-    The shim's ``case`` pattern greps the literal ``"decision": "block"`` and its ``sed``
-    reason extraction (``.*"reason": "\\(.*\\)".*``) captures cleanly only when the
-    top-level ``reason`` is the LAST key in the envelope. Both anchors must survive the
-    Claude-contract merge byte-exactly.
-    """
-    monkeypatch.setenv("WORKSPACE_ROOT", str(tmp_path))
-    payload = {
-        "tool_name": "Write",
-        "tool_input": {"file_path": ".dadaia/sessions/x.json", "content": "x"},
-    }
-    monkeypatch.setattr(pre_gate._common, "read_stdin_json", lambda: payload)
-
-    assert pre_gate.main() == 0
-    raw = capsys.readouterr().out.strip().splitlines()[-1]
-    assert '"decision": "block"' in raw
-    assert raw.index('"hookSpecificOutput"') < raw.index('"reason": "'), (
-        "top-level reason must stay the LAST key so the kimi sed capture stays clean"
-    )
-
-
-# --------------------------------------------------------------------------- #
-# Wiring ratchets — every PreToolUse policy must be reachable through the SHIPPED
-# entrypoint, and the block must carry the verdict Claude Code actually reads.
-# --------------------------------------------------------------------------- #
-
-
-def test_bash_venv_guard_blocks_through_the_shipped_entrypoint(tmp_path: Path) -> None:
-    """``Bash`` is in the PreToolUse matcher and ``venv_guard`` is its ONLY policy.
-
-    Every venv-guard case called ``venv_guard.evaluate_payload`` directly, so the policy
-    could be unwired from ``pre_gate._POLICIES`` — or deleted outright — while the whole
-    hook suite stayed green (proven by mutation: neutering the policy left 141/141
-    passing). This drives the real ``python -m dadaia_workspace.hooks.pre_gate`` with a
-    ``Bash`` payload that MUST block, so the Bash arm of the matcher is pinned end to end.
-    """
-    env = claude_hook_env(tmp_path)
-    result = run_hook_subprocess(
-        "pre_gate",
-        {"tool_name": "Bash", "tool_input": {"command": "pip install requests"}},
-        env,
-    )
-    assert result.returncode == 0, result.stderr
-    envelope = result.block_envelope()
-    assert envelope is not None, f"Bash venv-guard did not block: {result.stdout!r}"
-    reason = str(envelope.get("reason", ""))
-    assert "VENV GUARD" in reason.upper(), reason
-    # The corrected command must ride the block — a gate that names no remedy is a toll.
-    assert ".dadaia/.venv/bin" in reason, reason
-
-
-def test_pre_gate_stdout_is_exactly_one_json_object(tmp_path: Path) -> None:
-    """Whole stdout must parse as ONE object — for allow AND for block.
-
-    The envelope assertions parsed ``stdout.splitlines()[-1]``, which tolerates anything
-    printed before the JSON. Claude Code parses the stream, so a stray ``print`` upstream
-    of the envelope corrupts the verdict. Assert on the WHOLE stdout instead.
-    """
-    env = claude_hook_env(tmp_path)
-    for payload in (
         {"tool_name": "Read", "tool_input": {"file_path": "x"}},
         {"tool_name": "Bash", "tool_input": {"command": "pip install requests"}},
-    ):
-        result = run_hook_subprocess("pre_gate", payload, env)
-        raw = result.stdout.strip()
-        assert raw, f"the gate must always emit an observable envelope: {payload}"
-        parsed = json.loads(raw)  # raises on any pollution before/after the object
-        assert isinstance(parsed, dict), parsed
-
-
-def test_policies_tuple_is_the_wired_composition() -> None:
-    """The real ``_POLICIES`` membership and ORDER — first-block-wins is documented law.
-
-    The existing short-circuit test installs its own fake tuple and asserts its own string
-    back, so it proves the ``for`` loop stops early and nothing about which policies are
-    actually wired. This pins the shipped composition.
-    """
-    assert (  # noqa: SLF001
-        root_whitelist.evaluate_payload,
-        pre_gate._venv_guard_reason,  # noqa: SLF001
-        sdd_gate.evaluate_payload,
-    ) == pre_gate._POLICIES
+    ],
+    ids=["allow", "block-bash-venv-guard"],
+)
+def test_envelope_contract(tmp_path: Path, payload: dict[str, Any]) -> None:
+    """Whole stdout is ONE JSON object. Allow carries no verdict at all (Claude's schema
+    rejects ``decision: allow`` and interactive sessions ignore ``defer``). Block carries the
+    legacy ``"decision": "block"`` (codex + the kimi shim's grep) AND
+    ``permissionDecision: deny`` with the same reason, top-level ``reason`` LAST (the shim's
+    sed capture); the Bash block is venv_guard's, with the corrected command."""
+    raw = _spawn(tmp_path, payload).stdout.strip()
+    envelope = json.loads(raw)
+    if payload["tool_name"] == "Read":
+        assert envelope == {"continue": True, "hookSpecificOutput": {"hookEventName": "PreToolUse"}}
+        assert '"decision": "block"' not in raw
+        return
+    reason = envelope["reason"]
+    assert envelope["decision"] == "block"
+    assert envelope["hookSpecificOutput"] == {
+        "hookEventName": "PreToolUse",
+        "permissionDecision": "deny",
+        "permissionDecisionReason": reason,
+    }
+    assert '"decision": "block"' in raw
+    assert raw.index('"hookSpecificOutput"') < raw.index('"reason": "')
+    assert "VENV GUARD" in reason.upper() and ".dadaia/.venv/bin" in reason

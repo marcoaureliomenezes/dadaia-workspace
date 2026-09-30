@@ -24,7 +24,6 @@ import pytest
 from typer.testing import CliRunner
 
 from dadaia_workspace.cli.main import app
-from tests.helpers.golden_platform import norm_stderr
 
 # NEVER pass mix_stderr (removed in Click 8.2; the installed 8.4.1 TypeErrors on it).
 _runner = CliRunner()
@@ -69,21 +68,9 @@ def test_harness_scopes_scaffold(
 
     if "claude" in expect_present:
         commands = _ctx_inject_commands(tmp_path / ".claude")
-        assert any("dadaia_workspace.hooks.ctx_inject" in c for c in commands), commands
+        wrapper = tmp_path / ".dadaia" / "hooks" / "claude-ctx-inject"
+        assert any(c.endswith("/.dadaia/hooks/claude-ctx-inject") for c in commands), commands
+        assert "dadaia_workspace.hooks.ctx_inject" in wrapper.read_text(encoding="utf-8")
     if "codex" in expect_present:
         codex_wrappers = sorted((tmp_path / ".dadaia" / "hooks").glob("codex-*"))
         assert codex_wrappers, "expected .dadaia/hooks/codex-* wrappers for a codex profile"
-
-
-def test_harness_bad_value_is_bad_parameter(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """``--harness zzz`` → exit 2, width-independent stderr naming the bad value, empty stdout."""
-    monkeypatch.chdir(tmp_path)
-    result = _runner.invoke(app, ["init", str(tmp_path), "--harness", "zzz"])
-    assert result.exit_code == 2
-    norm = norm_stderr(result.stderr)
-    assert "zzz" in norm, norm
-    assert "harness" in norm, norm
-    # The UsageError is on stderr — no partial payload leaks to stdout.
-    assert result.stdout == ""

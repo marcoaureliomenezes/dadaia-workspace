@@ -13,7 +13,6 @@ Pins two composition-root guarantees:
 from __future__ import annotations
 
 import subprocess
-from collections.abc import Iterable
 from pathlib import Path
 
 from typer.testing import CliRunner
@@ -21,28 +20,10 @@ from typer.testing import CliRunner
 from dadaia_workspace import container
 from dadaia_workspace.cli.commands import ci
 from dadaia_workspace.cli.main import app
-from dadaia_workspace.core.models.git_scan import ScannedObject
+from dadaia_workspace.core.cli_line import fix_line
 
 _runner = CliRunner()
 _ZERO = "0" * 40
-
-
-class _SpyObjectSource:
-    """Wraps no real git — records every call so the test can assert it was reached.
-
-    ``list_tree_paths``/``first_parent`` (v0.5.0 specs-canon closure) return
-    empty/None — this spy never publishes a specs/ tree, so the pre-push canon scan
-    step this class also now reaches is a pure pass-through."""
-
-    def remote_branch(self, repo: Path, branch: str) -> bool:
-        return True
-
-    def __init__(self) -> None:
-        self.calls: list[tuple[Path, str, str]] = []
-
-    def new_objects(self, repo: Path, local_sha: str, remote_sha: str) -> Iterable[ScannedObject]:
-        self.calls.append((repo, local_sha, remote_sha))
-        return ()
 
 
 def _init_repo(path: Path) -> str:
@@ -60,70 +41,55 @@ def _init_repo(path: Path) -> str:
 
 
 def test_push_gate_check_always_wires_a_real_object_source(monkeypatch, tmp_path: Path) -> None:
-    """A6.3: the scan step is genuinely reached — the spy sees at least one call — for
-    a tag push, which has no branch policy to short-circuit it."""
+    """A6.3: the scan runs over the real range — a tag push whose commit carries a
+    denylisted term is refused (a tag has no branch policy to short-circuit it)."""
     repo = tmp_path / "repo"
-    tip_sha = _init_repo(repo)
+    _init_repo(repo)
+    (repo / "leak.md").write_text("zz-synthetic-term\n", encoding="utf-8")
+    subprocess.run(["git", "add", "-A"], cwd=repo, check=True)
+    subprocess.run(["git", "commit", "-q", "-m", "leak"], cwd=repo, check=True)
+    tip_sha = _git(repo, "rev-parse", "HEAD")
 
     monkeypatch.setattr(ci, "_repo_root", lambda: repo)
-    monkeypatch.setenv("WORKSPACE_ROOT", str(tmp_path))
-
-    spy = _SpyObjectSource()
-    monkeypatch.setattr(container, "build_git_object_reader", lambda: spy)
+    monkeypatch.setattr(container, "load_denylist_terms", lambda: (("zz-synthetic-term", "t"),))
 
     result = _runner.invoke(
-        app,
-        ["ci", "push-gate-check"],
-        input=f"refs/tags/v1 {tip_sha} refs/tags/v1 {_ZERO}\n",
+        app, ["ci", "push-gate-check"], input=f"refs/tags/v1 {tip_sha} refs/tags/v1 {_ZERO}\n"
     )
 
-    assert result.exit_code == 0, result.output
-    assert spy.calls, "push-gate-check never reached the scan — object source unused"
-    assert spy.calls[0] == (repo, tip_sha, _ZERO)
+    assert result.exit_code == 1, result.output
+    assert "leak.md:1" in result.output
 
 
-class _StraySpecsObjectSource(_SpyObjectSource):
-    """Yields one pushed-range object at a pattern-5 specs/ path (a Markdown backlog)."""
-
-    def remote_branch(self, repo: Path, branch: str) -> bool:
-        return True
-
-    def new_objects(self, repo: Path, local_sha: str, remote_sha: str) -> Iterable[ScannedObject]:
-        self.calls.append((repo, local_sha, remote_sha))
-        return [
-            ScannedObject(path="specs/backlog/candidates.md", sha="blob0", text="", decodable=True)
-        ]
-
-
-def _stamped_specs(repo: Path, version: int) -> None:
-    (repo / "specs").mkdir(exist_ok=True)
+def _stamped_specs(repo: Path, version: int) -> str:
+    """Commit the stamp: the gate reads the pushed commit, never the checkout."""
     (repo / "specs" / "constitution.md").write_text(
         f"---\nspecs_pattern_version: {version}\n---\n# constitution\n", encoding="utf-8"
     )
+    subprocess.run(["git", "add", "-A"], cwd=repo, check=True)
+    subprocess.run(["git", "commit", "-q", "-m", "stamp"], cwd=repo, check=True)
+    return f"refs/heads/feature/0.0.1 {_git(repo, 'rev-parse', 'HEAD')} refs/heads/feature/0.0.1 {_ZERO}\n"
 
 
 def test_canon_scan_does_not_apply_to_a_tree_stamped_below_the_canon(
     monkeypatch, tmp_path: Path
 ) -> None:
-    """Bug pre-push-canon-scan-not-range-scoped (operator ruling 2026-09-13): a specs/
-    tree stamped pattern 5 has nothing for the current canon scan to enforce — the push
-    proceeds with one stderr note naming the migration; the same range is refused
-    once the tree is stamped at the canonical version."""
+    """Bug pre-push-canon-scan-not-range-scoped: a pushed tree stamped 5 is foreign — the
+    push proceeds printing state()'s fix; stamped canonical, the same path is refused."""
     repo = tmp_path / "repo"
-    tip_sha = _init_repo(repo)
+    _init_repo(repo)
+    (repo / "specs" / "backlog").mkdir(parents=True)
+    (repo / "specs" / "backlog" / "candidates.md").write_text("x\n", encoding="utf-8")
     monkeypatch.setattr(ci, "_repo_root", lambda: repo)
-    monkeypatch.setenv("WORKSPACE_ROOT", str(tmp_path))
-    monkeypatch.setattr(container, "build_git_object_reader", lambda: _StraySpecsObjectSource())
-    stdin = f"refs/heads/feature/0.0.1 {tip_sha} refs/heads/feature/0.0.1 {_ZERO}\n"
 
-    _stamped_specs(repo, 5)
-    result = _runner.invoke(app, ["ci", "push-gate-check"], input=stdin)
+    result = _runner.invoke(app, ["ci", "push-gate-check"], input=_stamped_specs(repo, 5))
     assert result.exit_code == 0, result.output
-    assert "stamped pattern 5" in result.output
-    assert "dadaia specs upgrade" in result.output
+    # sa-fix-lines-not-built-by-cli-line#S1: the fix is named through the builder.
+    assert (
+        fix_line(None, "specs", "init", "--context", "<ctx>", "--replace-foreign") in result.output
+    )
 
-    _stamped_specs(repo, 7)
-    result = _runner.invoke(app, ["ci", "push-gate-check"], input=stdin)
+    result = _runner.invoke(app, ["ci", "push-gate-check"], input=_stamped_specs(repo, 8))
     assert result.exit_code == 1
     assert "specs/backlog/candidates.md" in result.output
 
@@ -137,7 +103,7 @@ def test_mode_line_distinguishes_operator_denylist_from_baseline_only(
     relying on ``DADAIA_PRIVACY_DENYLIST``/filesystem discovery — this sandbox's own
     real workspace carries an operator denylist file, and
     ``infrastructure.privacy_check``'s workspace-root walk resolves from ``cwd``
-    (unaffected by the ``WORKSPACE_ROOT`` env override this test also sets), so a
+    (the test's own tmp workspace is its cwd), so a
     file/env-based test would spuriously observe the ambient real denylist. The mode
     line's OWN branching logic — reacting to whatever term-loading returns — is what
     A3.5 actually pins.
@@ -146,8 +112,6 @@ def test_mode_line_distinguishes_operator_denylist_from_baseline_only(
     tip_sha = _init_repo(repo)
 
     monkeypatch.setattr(ci, "_repo_root", lambda: repo)
-    monkeypatch.setenv("WORKSPACE_ROOT", str(tmp_path))
-    monkeypatch.setattr(container, "build_git_object_reader", lambda: _SpyObjectSource())
 
     monkeypatch.setattr(container, "load_denylist_terms", lambda: ())
     baseline_only = _runner.invoke(
@@ -188,7 +152,6 @@ def test_a_sibling_repo_name_that_is_an_english_word_does_not_block_the_push(
     ).stdout.strip()
 
     monkeypatch.setattr(ci, "_repo_root", lambda: repo)
-    monkeypatch.setenv("WORKSPACE_ROOT", str(tmp_path))
     monkeypatch.setattr(container, "load_denylist_terms", lambda: ())
 
     result = _runner.invoke(
@@ -220,7 +183,6 @@ def _remote_objects(remote: Path) -> set[str]:
 
 def _gate(monkeypatch, tmp_path: Path, repo: Path, line: str) -> int:
     monkeypatch.setattr(ci, "_repo_root", lambda: repo)
-    monkeypatch.setenv("WORKSPACE_ROOT", str(tmp_path))
     return _runner.invoke(app, ["ci", "push-gate-check"], input=line).exit_code
 
 

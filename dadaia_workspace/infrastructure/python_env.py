@@ -7,6 +7,7 @@ Executable paths are constructed using ``PLATFORM.venv_scripts_dir`` and
 
 import base64
 import hashlib
+import inspect
 import ntpath
 import os
 import re
@@ -15,8 +16,11 @@ import subprocess
 import sys
 import tempfile
 import zipfile
+from collections.abc import Iterable
 from importlib import metadata
 from pathlib import Path
+
+from packaging.version import Version
 
 import dadaia_workspace
 from dadaia_workspace.core.exceptions import (
@@ -25,6 +29,7 @@ from dadaia_workspace.core.exceptions import (
     WorkspaceVenvNewerError,
 )
 from dadaia_workspace.core.platform import PLATFORM
+from dadaia_workspace.infrastructure.provider_version import provider_version
 
 __all__ = [
     "VenvPythonEnvironmentManager",
@@ -117,24 +122,26 @@ _REQUIRES_PYTHON_FLOOR_RE = re.compile(r">=\s*3\.(\d+)")
 _DEFAULT_FLOOR_MINOR = 12  # dadaia-workspace's floor today (pyproject.toml: python = "^3.12")
 
 
-_VERSION_RE = re.compile(r"^(?P<release>\d+(?:\.\d+)*)(?:\+(?P<local>[a-z0-9.]+))?$")
+def build_digest(files: "Iterable[metadata.PackagePath] | None") -> str:
+    """The payload's RECORD hashes digested — the build a version label cannot name; the
+    venv probe runs this same source, so both sides hash alike."""
+    import hashlib
+
+    rows = sorted(
+        f"{f}={f.hash.value}" for f in files or () if f.hash and f.parts[0] == "dadaia_workspace"
+    )
+    return hashlib.sha256("\n".join(rows).encode()).hexdigest()[:16]
+
+
+def provider_build() -> str | None:
+    """``"<version> <build digest>"`` of the running distribution, or ``None``."""
+    version = provider_version()
+    return version and f"{version} {build_digest(metadata.distribution('dadaia-workspace').files)}"
 
 
 def _tail_lines(exc: subprocess.CalledProcessError, count: int = 5) -> str:
     """The last *count* whole lines of a failed installer's output — never cut mid-line."""
-    return "\n".join((exc.stderr or exc.output or "").strip().splitlines()[-count:])
-
-
-def _version_key(version: str) -> tuple[tuple[int, ...], tuple[str, ...]]:
-    """Order the versions dadaia-workspace publishes: ``M.m.p`` plus an optional local
-    segment that sorts after its base (``0.4.7 < 0.4.7+e2e``). Anything else sorts lowest."""
-    m = _VERSION_RE.match(version.strip().lower())
-    if m is None:
-        return ((-1,), ())
-    release = tuple(int(p) for p in m["release"].split("."))
-    while len(release) > 1 and release[-1] == 0:
-        release = release[:-1]
-    return release, tuple((m["local"] or "").split(".")) if m["local"] else ()
+    return "\n".join((exc.stderr or exc.output or "").strip().split("\n")[-count:])
 
 
 def _version_satisfies(version: tuple[int, ...], spec: str | None) -> bool:
@@ -286,13 +293,13 @@ def _is_fully_qualified(candidate: str) -> bool:
     ``python = \"^3.12\"``, so the probe cannot rely on that yet.)
 
     Routed through the ``ntpath`` module explicitly — never the host-bound ``os.path``
-    — when ``os.name == \"nt\"``: this makes the Windows-specific check provable on any
+    — on a Windows ``PLATFORM``: this makes the Windows-specific check provable on any
     host OS (``ntpath`` is a pure-Python module, always importable regardless of the
     running platform), and is exactly what real Windows already does (there,
-    ``os.path`` IS ``ntpath``). POSIX (``os.name != \"nt\"``) is unaffected — plain
+    ``os.path`` IS ``ntpath``). POSIX is unaffected — plain
     ``os.path.isabs`` has no such gap there.
     """
-    if os.name == "nt":
+    if PLATFORM.windows:
         return ntpath.isabs(candidate) and ntpath.splitdrive(candidate)[0] != ""
     return os.path.isabs(candidate)
 
@@ -348,7 +355,7 @@ class VenvPythonEnvironmentManager:
         if repacked is None:
             raise WorkspaceVenvBootstrapError(
                 "workspace venv bootstrap cannot mirror the running distribution: "
-                f"dadaia-workspace {metadata.version('dadaia-workspace')} is neither a "
+                f"dadaia-workspace {provider_version()} is neither a "
                 "source checkout nor a re-packable installed distribution. Point "
                 "DADAIA_BOOTSTRAP_PACKAGE at a local wheel and retry, e.g. "
                 "DADAIA_BOOTSTRAP_PACKAGE=/path/to/dadaia_workspace-X.Y.Z-py3-none-any.whl "
@@ -428,7 +435,9 @@ class VenvPythonEnvironmentManager:
             pip = self.pip_executable(workspace_root)
             with tempfile.TemporaryDirectory(prefix="dadaia-wheel-") as scratch:
                 spec = self._install_spec(scratch)
-                install_cmd = [pip, "install", "--quiet"]
+                # ONE pip transaction replaces any installed build (same label or not)
+                # with its dependencies; on failure pip rolls back to the old build.
+                install_cmd = [pip, "install", "--quiet", "--force-reinstall"]
                 editable = Path(spec).is_dir()
                 if editable:
                     install_cmd.append("--editable")
@@ -454,31 +463,32 @@ class VenvPythonEnvironmentManager:
             expected = (
                 None
                 if editable or os.environ.get("DADAIA_BOOTSTRAP_PACKAGE", "").strip()
-                else self._running_version()
+                else provider_build()
             )
             self._verify_venv_provider(workspace_root, expected=expected)
         return str(venv_dir)
 
     def version_change(self, workspace_root: str) -> tuple[str | None, str | None, str]:
-        """The ONE decider of "did the version change": ``(before, after, action)``.
+        """The ONE decider of which distribution the workspace runs: ``(before, after, action)``.
 
-        ``action`` is ``install`` (no entrypoint), ``upgrade`` (the venv is OLDER than the
-        running distribution — D3: re-init is the upgrade) or ``same``; a NEWER venv is
-        refused before any write (AC2.3).
+        ``action`` is ``install`` (no entrypoint), ``upgrade`` (the venv's build differs
+        from the running distribution's — same label or not; D3: re-init is the upgrade)
+        or ``same``; a venv with a NEWER version is refused before any write (AC2.3).
         """
-        running = self._running_version()
+        running = provider_build()
+        after = running.split()[0] if running else None
         if not self._dadaia_entrypoint(workspace_root).exists():
-            return None, running, "install"
-        installed = self.installed_version(workspace_root)
-        if installed is None or running is None:
-            return installed, running, "same"
-        if _version_key(installed) > _version_key(running):
-            raise WorkspaceVenvNewerError(installed, running)
-        action = "upgrade" if _version_key(installed) < _version_key(running) else "same"
-        return installed, running, action
+            return None, after, "install"
+        installed = self.installed_build(workspace_root)
+        before = installed.split()[0] if installed else None
+        if before is None or after is None:
+            return before, after, "same"
+        if Version(before) > Version(after):
+            raise WorkspaceVenvNewerError(before, after)
+        return before, after, "same" if installed == running else "upgrade"
 
-    def installed_version(self, workspace_root: str) -> str | None:
-        """The dadaia-workspace version the venv's own python reports, or ``None``."""
+    def installed_build(self, workspace_root: str) -> str | None:
+        """``"<version> <build digest>"`` the venv's own python reports, or ``None``."""
         if not self._dadaia_entrypoint(workspace_root).exists():
             return None
         try:
@@ -488,13 +498,15 @@ class VenvPythonEnvironmentManager:
         return (proc.stdout or "").strip() or None if proc.returncode == 0 else None
 
     def _probe_provider(self, workspace_root: str) -> "subprocess.CompletedProcess[str]":
-        """Ask the venv's own python, under a CLEAN env, which dadaia-workspace it imports."""
+        """Ask the venv's own python, under a CLEAN env, which dadaia-workspace build it imports."""
         return subprocess.run(
             [
                 self.python_executable(workspace_root),
                 "-c",
-                "import dadaia_workspace, importlib.metadata as m; "
-                "print(m.version('dadaia-workspace'))",
+                f"{inspect.getsource(build_digest)}"
+                "import dadaia_workspace, importlib.metadata as m\n"
+                "d = m.distribution('dadaia-workspace')\n"
+                "print(d.version, build_digest(d.files))",
             ],
             capture_output=True,
             text=True,
@@ -576,7 +588,7 @@ class VenvPythonEnvironmentManager:
         """
         required = self._running_requires_python()
         if required is None:
-            return  # nothing to check against — fail open, matching _running_version()
+            return  # nothing to check against — fail open, matching provider_version()
         version = _interpreter_version(self.python_executable(workspace_root))
         if version is None:
             return  # could not introspect — pip install remains the final authority
@@ -586,8 +598,8 @@ class VenvPythonEnvironmentManager:
                 f"'{self._venv_path(workspace_root)}' carries Python "
                 f"{'.'.join(map(str, version))}, but dadaia-workspace requires Python "
                 f"{required}. Recreate the venv with an interpreter that satisfies "
-                "this requirement (delete the venv directory and re-run 'dadaia "
-                "init', or point DADAIA_BOOTSTRAP_PACKAGE at a matching build) and "
+                "this requirement (delete the venv directory and re-run 'uvx "
+                "dadaia-workspace init <dir>', or point DADAIA_BOOTSTRAP_PACKAGE at a matching build) and "
                 "retry."
             )
 
@@ -613,13 +625,6 @@ class VenvPythonEnvironmentManager:
                 "[bootstrap] warning: could not install pytest into the workspace venv; "
                 "test validation (ci preflight, closure gate) will report it missing"
             )
-
-    @staticmethod
-    def _running_version() -> str | None:
-        try:
-            return metadata.version("dadaia-workspace")
-        except metadata.PackageNotFoundError:
-            return None
 
     @staticmethod
     def _running_requires_python() -> str | None:

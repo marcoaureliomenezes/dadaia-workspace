@@ -15,11 +15,9 @@ def test_harness_independent_checks_live_in_entity_doctor() -> None:
     from dadaia_workspace.infrastructure import codex_doctor, entity_doctor
 
     assert callable(entity_doctor.check_agent_skill_refs)
-    assert callable(entity_doctor.check_memory_phase_single_source)
     assert callable(entity_doctor.check_entities_derivation)
     for name in (
         "check_agent_skill_refs",
-        "check_memory_phase_single_source",
         "check_entities_derivation",
     ):
         assert not hasattr(codex_doctor, name), name

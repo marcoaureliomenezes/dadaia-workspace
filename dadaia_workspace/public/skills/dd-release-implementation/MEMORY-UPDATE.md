@@ -5,7 +5,7 @@ Disclosed reference reached at `SKILL.md` step 7 — `dd-product-engineer` runs 
 ## Protocol — delete, update, add
 
 1. `python3 .agents/skills/dd-release-implementation/scripts/release.py phase CLOSURE --sha <sha>` — it refuses while any task is not `[x]`; no memory write before it.
-2. `python3 .agents/skills/dd-spec-navigator/scripts/memory.py drift` — the window opens at the live release's last `kind: memory` entry's `until`, else its `defined.sha`; exit 1 means there is work. The worklist is every atom at least one of whose `sources` globs matched a changed path, and every `features/<pkg>/` package or `hooks/*.py` module no atom's sources cover.
+2. `python3 .agents/skills/dd-release-implementation/scripts/release.py drift` — the window opens at the live release's last `kind: memory` entry's `until`, else its `defined.sha`; exit 1 means there is work. The worklist is every atom at least one of whose `sources` globs matched a changed path, and every `features/<pkg>/` package or `hooks/*.py` module no atom's sources cover.
 3. For each listed atom, read `git diff <since>..HEAD -- <matched paths>` in full, then edit the atom in this order and no other:
    - DELETE every claim the code no longer supports — a verb, a file, a behavior, a number.
    - UPDATE every claim whose behavior changed; the tldr and summary are claims too.
@@ -15,7 +15,7 @@ Disclosed reference reached at `SKILL.md` step 7 — `dd-product-engineer` runs 
 6. `python3 .agents/skills/dd-spec-navigator/scripts/memory.py catalog generate`, then `memory.py check`.
 7. `pytest tests/contract/test_docs_derived_from_memory.py` — re-derive each red section of `README.md`, `llms.txt` and `docs/*.md` from its atom and re-record its `derived-from` marker's `sha256:<12 hex>` in the SAME commit as the atom; `docs/cli.md` regenerates from `.dadaia/.venv/bin/dadaia help tree` whenever a verb changed.
 8. Commit the atoms, then `python3 .agents/skills/dd-release-implementation/scripts/release.py memory --reviewed <slugs> --changed <slugs>` — it derives the same window, computes the worklist itself and records `since`/`until`; `reviewed` names the entries read and left as they were, `changed` those rewritten or created; it refuses a worklist entry in neither list, a name outside the worklist, a `changed` atom that did not move over the window, and any phase but `CLOSURE`.
-9. `.dadaia/.venv/bin/dadaia doctor`: `RELEASE-TREE-MEMORY`, `MEM-DRIFT-1/2`, `LINT-1` (history lines included) and `CAT-1` clean; the candidate PR stays red until they are.
+9. `.dadaia/.venv/bin/dadaia doctor`: `LEDGER-RELEASE-SCHEMA` (the memory record), `MEM-DRIFT-1/2`, `LINT-1` (history lines included) and `LEDGER-MEMORY-SCHEMA` clean; the candidate PR stays red until they are.
 
 ## Canonical memory is out of scope here
 

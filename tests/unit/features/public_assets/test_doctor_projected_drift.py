@@ -8,20 +8,18 @@ Verifies that `dadaia public doctor` (via FileSystemPublicAssetManager.doctor):
 
 Doctor drift detection gates agent dispatch, so both failure modes ([drift] and
 [missing]) are kept as named tests; the clean/[ok] path (incl. the scripts
-staging↔projected facet) and the CLI exit-code propagation are each merged into
-one parametrized test.
+staging↔projected facet) is merged into one parametrized test; the CLI exit code is
+pinned by tests/integration/cli/test_doctor_exit_verdict.py.
 """
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
-from unittest.mock import MagicMock, patch
 
 import pytest
 
 from dadaia_workspace.core.models.doctor_report import (
-    DoctorLine,
-    DoctorReport,
     DoctorStatus,
 )
 from dadaia_workspace.infrastructure.projection import doctor_rules, tree_bytes_rules
@@ -80,8 +78,7 @@ def test_drift_and_missing_exit_nonzero(tmp_path: Path) -> None:
 
 
 def test_clean_ok_paths_incl_scripts(tmp_path: Path) -> None:
-    """T-PROP-02 AC-2: identical staged/projected content is [ok], for both plain
-    file pairs and the scripts staging↔projected expectation generator."""
+    """T-PROP-02 AC-2: identical staged/projected content is [ok]."""
     public_dir = tmp_path / "public"
     public_dir.mkdir()
     mgr = _make_manager(public_dir)
@@ -96,90 +93,17 @@ def test_clean_ok_paths_incl_scripts(tmp_path: Path) -> None:
     assert "[drift]" not in line
     assert "[missing]" not in line
 
-    # Scripts: matching staged/projected script content → [ok]. K3 (v0.5.1): the
-    # scripts family is `projection_rules._scripts_tree_rules`, one `_tree_bytes_rules`
-    # call over `.dadaia/agentic/scripts` -> `.dadaia/scripts` — exercised directly
-    # here (the manager no longer carries a `_runtime_expectations` generator; `doctor`
-    # compares this SAME rule table via `doctor_rules`).
-    workspace = tmp_path / "ws"
-    workspace.mkdir()
-    agentic_scripts = workspace / ".dadaia" / "agentic" / "scripts"
-    agentic_scripts.mkdir(parents=True)
-    script_content = b"#!/bin/bash\necho hello\n"
-    _write(agentic_scripts / "hook.sh", script_content)
-    projected_scripts = workspace / ".dadaia" / "scripts"
-    projected_scripts.mkdir(parents=True)
-    _write(projected_scripts / "hook.sh", script_content)
 
-    rules = tree_bytes_rules(
-        agentic_scripts, projected_scripts, harness="agents", label_prefix="dadaia:scripts/"
-    )
-    lines = doctor_rules(rules)
-    assert lines and all(line.status is DoctorStatus.OK for line in lines), (
-        f"Expected [ok] for matching scripts, got: {[_render_one(line) for line in lines]}"
-    )
-
-
-@pytest.mark.parametrize(
-    ("reports", "expect_zero"),
-    [
-        pytest.param(
-            DoctorReport(
-                lines=(
-                    DoctorLine(DoctorStatus.OK, "stage:foo.md"),
-                    DoctorLine(DoctorStatus.OK, "claude:rules/bar.md"),
-                )
-            ),
-            True,
-            id="all-ok-exits-0",
-        ),
-        pytest.param(
-            DoctorReport(
-                lines=(
-                    DoctorLine(DoctorStatus.OK, "stage:foo.md"),
-                    DoctorLine(DoctorStatus.DRIFT, "stage:scripts/hook.sh"),
-                )
-            ),
-            False,
-            id="drift-exits-nonzero",
-        ),
-        pytest.param(
-            DoctorReport(
-                lines=(
-                    DoctorLine(DoctorStatus.OK, "stage:foo.md"),
-                    DoctorLine(DoctorStatus.MISSING, "claude:rules/bar.md"),
-                )
-            ),
-            False,
-            id="missing-exits-nonzero",
-        ),
-    ],
-)
-def test_cli_exit_code_propagation(
-    tmp_path: Path, reports: DoctorReport, expect_zero: bool
-) -> None:
-    """The CLI doctor command must propagate [drift]/[missing] to a non-zero exit."""
-    from typer.testing import CliRunner
-
-    from dadaia_workspace.cli.commands.public import app
-
-    with patch("dadaia_workspace.cli.commands.public.container") as mock_container:
-        mock_svc = MagicMock()
-        mock_svc.doctor.return_value = reports
-        mock_container.build_public_service.return_value = mock_svc
-
-        with patch(
-            "dadaia_workspace.cli.commands.public.resolve_workspace_root",
-            return_value=tmp_path,
-        ):
-            runner = CliRunner()
-            result = runner.invoke(app, ["doctor"])
-
-    if expect_zero:
-        assert result.exit_code == 0, (
-            f"Expected exit code 0, got {result.exit_code}. Output: {result.output}"
-        )
-    else:
-        assert result.exit_code != 0, (
-            f"Expected non-zero exit code, got {result.exit_code}. Output: {result.output}"
-        )
+@pytest.mark.skipif(os.name == "nt", reason="Windows has no POSIX exec bit")
+def test_an_executable_rule_that_lost_its_exec_bit_is_drift(tmp_path: Path) -> None:
+    """sa-projected-file-judged-by-four-verifiers: doctor_rules is the one verifier, with an
+    exec-bit mode check — equal bytes with a cleared exec bit are [drift]; chmod clears it."""
+    src, dst = tmp_path / "src" / "hook.sh", tmp_path / "dst" / "hook.sh"
+    _write(src, b"#!/bin/sh\n")
+    _write(dst, b"#!/bin/sh\n")
+    src.chmod(0o755)
+    dst.chmod(0o644)
+    rules = tree_bytes_rules(src.parent, dst.parent, harness="agents", label_prefix="s/")
+    assert [line.render() for line in doctor_rules(rules)] == ["[drift] s/hook.sh (not executable)"]
+    dst.chmod(0o755)
+    assert [line.status for line in doctor_rules(rules)] == [DoctorStatus.OK]

@@ -10,7 +10,7 @@ from pathlib import Path
 
 from dadaia_workspace.features.specs.doctor import SpecsDoctor
 from dadaia_workspace.features.specs.doctor_memory import MemoryValidator
-from dadaia_workspace.features.specs.doctor_types import Severity
+from dadaia_workspace.features.specs.doctor_types import finding_path
 
 _FRAGMENTS = {
     "slop-law": "## Slop — workspace law (fixed)\n- LAW_BULLET\n",
@@ -42,13 +42,16 @@ def _specs(tmp_path: Path, *, constitution: str, architecture: str, quality: str
 
 def _fixed_issues(doctor: SpecsDoctor) -> list[tuple[str, str]]:
     return [
-        (i.code, Path(i.path or "").name) for i in doctor.check() if i.code.startswith("FIXED-")
+        (i.code, Path(finding_path(i) or "").name)
+        for i in doctor.check()
+        if i.code.startswith("FIXED-")
     ]
 
 
 def test_check_reports_missing_and_drifted_blocks_and_stays_silent_on_exact_ones(
     tmp_path: Path,
 ) -> None:
+    """sa-doctor-finding-has-four-shapes: a specs rule emits a SectionFinding directly."""
     public = _public_dir(tmp_path)
     specs = _specs(
         tmp_path,
@@ -57,13 +60,15 @@ def test_check_reports_missing_and_drifted_blocks_and_stays_silent_on_exact_ones
         quality="# Q\n\n" + _block("slop-tests", _FRAGMENTS["slop-tests"]),
     )
     issues = MemoryValidator(specs).check_fixed_sections(public)
-    assert [(i.code, i.severity, i.fixable, i.path) for i in issues] == [
-        ("FIXED-1", Severity.ERROR, True, str(specs / "constitution.md")),
-        ("FIXED-2", Severity.ERROR, True, str(specs / "memory" / "ARCHITECTURE.md")),
+    assert [(i.code, i.error, i.fixable, finding_path(i)) for i in issues] == [
+        ("FIXED-1", True, True, str(specs / "constitution.md")),
+        ("FIXED-2", True, True, str(specs / "memory" / "ARCHITECTURE.md")),
     ]
-    assert issues[0].description == ("constitution.md: fixed law section `slop-law` is missing")
-    assert issues[1].description == (
-        "memory/ARCHITECTURE.md: fixed law section `slop-code` differs from the library fragment"
+    assert issues[0].message.startswith(
+        "constitution.md: fixed law section `slop-law` is missing ("
+    )
+    assert issues[1].message.startswith(
+        "memory/ARCHITECTURE.md: fixed law section `slop-code` differs from the library fragment ("
     )
 
 
@@ -73,7 +78,9 @@ def test_check_is_a_no_op_for_an_absent_file(tmp_path: Path) -> None:
     (specs / "memory").mkdir(parents=True)
     (specs / "constitution.md").write_text("# C\n", encoding="utf-8")
     issues = MemoryValidator(specs).check_fixed_sections(public)
-    assert [(i.code, Path(i.path or "").name) for i in issues] == [("FIXED-1", "constitution.md")]
+    assert [(i.code, Path(finding_path(i) or "").name) for i in issues] == [
+        ("FIXED-1", "constitution.md")
+    ]
 
 
 def test_check_reports_a_missing_library_fragment_as_a_non_fixable_error(tmp_path: Path) -> None:
@@ -81,10 +88,8 @@ def test_check_reports_a_missing_library_fragment_as_a_non_fixable_error(tmp_pat
     (public / "data" / "fixed").mkdir(parents=True)
     specs = _specs(tmp_path, constitution="# C\n", architecture="# A\n", quality="# Q\n")
     issues = MemoryValidator(specs).check_fixed_sections(public)
-    assert [(i.code, i.severity, i.fixable) for i in issues] == [
-        ("FIXED-1", Severity.ERROR, False)
-    ] * 3
-    assert all("library fragment" in i.description for i in issues)
+    assert [(i.code, i.verdict, i.fixable) for i in issues] == [("FIXED-1", "error", False)] * 3
+    assert all("library fragment" in i.message for i in issues)
 
 
 def test_fix_inserts_a_missing_block_and_refreshes_a_drifted_one(tmp_path: Path) -> None:
@@ -102,7 +107,7 @@ def test_fix_inserts_a_missing_block_and_refreshes_a_drifted_one(tmp_path: Path)
 
     fixed = doctor.fix()
 
-    assert [i.code for i in fixed] == ["FIXED-1", "FIXED-2"]
+    assert [i.code for i in fixed if i.code.startswith("FIXED")] == ["FIXED-1", "FIXED-2"]
     assert (specs / "constitution.md").read_text(encoding="utf-8") == (
         "# C\n\n" + _block("slop-law", _FRAGMENTS["slop-law"])
     )
@@ -113,9 +118,3 @@ def test_fix_inserts_a_missing_block_and_refreshes_a_drifted_one(tmp_path: Path)
         "# Q\n\n" + _block("slop-tests", _FRAGMENTS["slop-tests"])
     )
     assert _fixed_issues(doctor) == []
-
-
-def test_fix_help_names_the_fixed_family() -> None:
-    from dadaia_workspace.features.specs.rules import render_fix_help
-
-    assert "FIXED-1/FIXED-2" in render_fix_help()

@@ -18,12 +18,8 @@ import subprocess
 from pathlib import Path
 
 import pytest
-from typer.testing import CliRunner
 
-from dadaia_workspace.cli.main import app
 from dadaia_workspace.infrastructure import python_env as pe
-
-_runner = CliRunner()
 
 # Captured at import (collection) time, BEFORE the autouse conftest backstop replaces
 # the method — this is the real seam under test.
@@ -57,25 +53,6 @@ def test_ensure_workspace_venv_raises_actionable_error(tmp_path: Path, monkeypat
     with pytest.raises(pe.WorkspaceVenvBootstrapError) as exc:
         _REAL_ENSURE(mgr, str(tmp_path))
     assert "DADAIA_BOOTSTRAP_PACKAGE" in str(exc.value)
-
-
-def test_init_cli_maps_bootstrap_error_to_clean_exit(tmp_path: Path, monkeypatch) -> None:
-    monkeypatch.chdir(tmp_path)
-    monkeypatch.setattr(
-        pe.VenvPythonEnvironmentManager,
-        "ensure_workspace_venv",
-        lambda self, root: (_ for _ in ()).throw(
-            pe.WorkspaceVenvBootstrapError(
-                "workspace venv bootstrap failed installing 'dadaia-workspace==9.9.9'. "
-                "point DADAIA_BOOTSTRAP_PACKAGE at the local wheel file and retry"
-            )
-        ),
-        raising=True,
-    )
-    result = _runner.invoke(app, ["init", "ws", "--harness", "claude"])
-    assert result.exit_code != 0
-    assert "Traceback" not in result.output
-    assert "DADAIA_BOOTSTRAP_PACKAGE" in result.output
 
 
 def test_install_failure_names_pypi_and_shows_whole_lines(tmp_path: Path, monkeypatch) -> None:

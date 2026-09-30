@@ -9,6 +9,9 @@ from enum import StrEnum
 #: ``SpecContextService.register``; every resolver reads it through ``core.invocation``.
 CONTEXT_NAME_RE = re.compile(r"[A-Za-z0-9_-]+")
 
+#: The `schema_version` `dadaia export` writes and `dadaia import` accepts (FR13).
+EXPORT_SCHEMA_VERSION = "spec-contexts-export-v1"
+
 
 class ContextState(StrEnum):
     ALIVE = "alive"

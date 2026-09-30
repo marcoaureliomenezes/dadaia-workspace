@@ -1,16 +1,5 @@
-"""Intent: CONTRACT — 0.4.6 AC2, AC4 (the `dadaia doctor` surface: finding lines, score line,
-exit code, `--json`, `--fix --expired-only --quiet`); size: SMALL.
-
-The CLI renders what ``DoctorService.scan()``/``fix()`` return — nothing here re-tests the
-walk (``tests/unit/test_spec_context_doctor_root.py``); it pins the shapes SPEC §3 names:
-one ``WS-<zone>-<verdict> <path>  (<detail>)`` line per non-canonical entry, the section
-score line, exit 1 on any slop/expired/missing, the `--json` section shape, and a quiet lane
-that speaks only when it deleted something.
-
-0.4.7 T-047-02 folded the three doctors into one: the same findings now render inside the
-`workspace` SECTION of ``dadaia doctor`` (`<CODE> <verdict> <message>`, then
-``compliance(workspace): …``), and `--json` nests them under ``sections.workspace``. The
-walk, the verdict vocabulary and the exit rule are unchanged.
+"""Intent: CONTRACT — 0.4.6 AC2, AC4 (`dadaia doctor` workspace section: finding lines, exit code,
+`--json`, `--fix --expired-only --quiet`, holds in reaped/, expiry); size: SMALL.
 """
 
 from __future__ import annotations
@@ -18,7 +7,9 @@ from __future__ import annotations
 import json
 import os
 import re
+import subprocess
 import time
+from datetime import UTC, datetime, tzinfo
 from pathlib import Path
 
 import pytest
@@ -27,11 +18,13 @@ from typer.testing import CliRunner
 from dadaia_workspace import container
 from dadaia_workspace.cli.main import app
 from dadaia_workspace.core.cli_line import fix_line
-from dadaia_workspace.core.harness_registry import L1_ENTRY_HARNESSES
+from dadaia_workspace.core.harness_registry import HARNESS_PROJECTION_DIRS, L1_ENTRY_HARNESSES
 from dadaia_workspace.core.platform import PLATFORM
 from dadaia_workspace.core.workspace_layout import provisioned_zones, zones_with_ttl
+from dadaia_workspace.features.spec_context import sweep
 from dadaia_workspace.features.spec_context.doctor import DoctorService
-from tests.fakes import FakeContextStore, FakeGitClient
+from dadaia_workspace.infrastructure.git_subprocess import GitSubprocessClient
+from tests.fixtures.stores import context_store
 
 pytestmark = pytest.mark.contract
 
@@ -50,12 +43,10 @@ def workspace(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     (dadaia / "states" / "spec_contexts.json").write_text(
         '{"schema_version": "2", "contexts": []}', encoding="utf-8"
     )
-    # FR8: a healthy states/ carries the profile; absent it is WS-states-missing.
     (dadaia / "states" / "harness_profile.json").write_text(
         json.dumps({"schema_version": "1", "harnesses": list(L1_ENTRY_HARNESSES)}),
         encoding="utf-8",
     )
-    # ... and the install ledger: absent, the harness dirs are never classified.
     (dadaia / "states" / "install_ledger.json").write_text(
         json.dumps({"schema_version": "1", "entries": []}), encoding="utf-8"
     )
@@ -70,18 +61,23 @@ def workspace(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     monkeypatch.setattr(
         container,
         "build_doctor_service",
-        lambda root: DoctorService(FakeContextStore(), FakeGitClient(), root),
+        lambda root: DoctorService(
+            context_store(root / ".dadaia" / "states"), GitSubprocessClient(), root
+        ),
     )
     return tmp_path
 
 
+def _touch(path: Path, days: float) -> None:
+    stamp = time.time() - days * 86_400
+    os.utime(path, (stamp, stamp))
+
+
 def _plant_expired(workspace: Path) -> Path:
-    zone_dir = workspace / ".dadaia" / _TTL_ZONE.name
-    zone_dir.mkdir(exist_ok=True)
-    stale = zone_dir / "stale"
+    stale = workspace / ".dadaia" / _TTL_ZONE.name / "stale"
+    stale.parent.mkdir(exist_ok=True)
     stale.write_text("", encoding="utf-8")
-    two_days_ago = time.time() - 2 * 86_400
-    os.utime(stale, (two_days_ago, two_days_ago))
+    _touch(stale, 2)
     return stale
 
 
@@ -100,7 +96,7 @@ def test_lists_findings_and_exits_1(workspace: Path) -> None:
 
 
 def test_healthy_workspace_exits_0_and_prints_only_the_next_step(workspace: Path) -> None:
-    """0.4.8 R2: zero contexts is no longer silent — the one onboarding info finding."""
+    """Zero contexts prints the one ONBOARDING info finding and its fix line, exit 0."""
     result = CliRunner().invoke(app, ["doctor"])
     lines = result.output.splitlines()
 
@@ -110,7 +106,6 @@ def test_healthy_workspace_exits_0_and_prints_only_the_next_step(workspace: Path
 
 
 def _scan(findings: list[dict[str, str]]) -> list[dict[str, str]]:
-    """The zone-scan findings — the onboarding step is test_doctor_onboarding's business."""
     return [f for f in findings if f["code"] != "ONBOARDING"]
 
 
@@ -138,18 +133,13 @@ def test_json_carries_findings_and_fixed(workspace: Path) -> None:
 def test_fix_reports_an_undeletable_entry_exits_1_and_never_raises(
     workspace: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Bug doctor-fix-aborts-whole-pass-on-first-undeletable-entry: the live symptom was
-    ``Error: unexpected PermissionError`` with 0 repairs reported although earlier repairs
-    had been applied — the pass must finish, report the skip, and exit 1 for what remains.
-    The refusal is planted at the unlink boundary: a read-only tree is reapable since bug
-    doctor-reaper-cannot-delete-read-only-trees."""
+    """doctor-fix-aborts-whole-pass-on-first-undeletable-entry: the pass finishes, reports the skip, exits 1."""
     stale = _plant_expired(workspace)
     locked = workspace / ".dadaia" / _TTL_ZONE.name / "locked"
     locked.mkdir()
     undeletable = locked / "a.js"
     undeletable.write_text("", encoding="utf-8")
-    two_days_ago = time.time() - 2 * 86_400
-    os.utime(undeletable, (two_days_ago, two_days_ago))
+    _touch(undeletable, 2)
     real_unlink = os.unlink
 
     def refusing_unlink(path: object, *args: object, **kwargs: object) -> None:
@@ -166,74 +156,315 @@ def test_fix_reports_an_undeletable_entry_exits_1_and_never_raises(
     assert not stale.exists()
     assert undeletable.exists()
     assert f"{_EXPIRED_CODE}: deleted '{_TTL_ZONE.name}/stale'" in result.output
-    assert f"{_EXPIRED_CODE}: skipped '{_TTL_ZONE.name}/locked/a.js' (errno 13" in result.output
+    assert f"{_EXPIRED_CODE}: skipped '{_TTL_ZONE.name}/locked' (errno " in result.output
 
 
-def test_fix_expired_only_quiet_is_the_reaper_lane(workspace: Path) -> None:
-    """0.4.7 FR6b: ``--expired-only`` scopes what the REPORT shows, not what the reaper
-    does — there is one lane (seed, move slop, expire). The SessionStart hook runs this
-    exact command, so slop leaves the working tree there too; it is HELD in ``reaped/``,
-    never deleted, and a second run has nothing left to take."""
+def test_the_session_lane_costs_one_lstat_per_zone_entry_whatever_it_holds(
+    workspace: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """reaper-judges-ttl-by-walking-every-file: `--fix --expired-only --quiet` deletes the expired
+    entry, leaves slop to the full `--fix`, prints nothing on a second run, and its filesystem
+    calls and `doctor`'s lines do not grow with the files inside one live tmp entry or one hold."""
     (workspace / "junk.txt").write_text("", encoding="utf-8")
     stale = _plant_expired(workspace)
+    day = datetime.now(tz=UTC).strftime("%Y%m%d")
+    trees = [workspace / ".dadaia" / z / day / "x" for z in ("tmp", "reaped")]
+    lane = ["doctor", "--fix", "--expired-only", "--quiet"]
+    first = CliRunner().invoke(app, lane)
+    assert first.output == f"{_EXPIRED_CODE}: deleted '{_TTL_ZONE.name}/stale'\n"
+    assert not stale.exists() and (workspace / "junk.txt").exists()
+    calls: list[str] = []
+    for name in ("stat", "lstat", "scandir", "listdir"):
+        real = getattr(os, name)
+        monkeypatch.setattr(os, name, lambda *a, _r=real, **k: calls.append("") or _r(*a, **k))
+    cost = []
+    for lo, n in ((0, 10), (10, 1_000)):
+        for tree in trees:
+            tree.mkdir(parents=True, exist_ok=True)
+            for i in range(lo, n):
+                (tree / f"f{i}").touch()
+        calls.clear()
+        again = CliRunner().invoke(app, lane).output
+        cost.append(
+            (len(calls), len(CliRunner().invoke(app, ["doctor"]).output.splitlines()), again)
+        )
+    assert cost[0] == cost[1] and cost[0][2] == "", cost
 
-    result = CliRunner().invoke(app, ["doctor", "--fix", "--expired-only", "--quiet"])
 
-    assert result.exit_code == 0, result.output
-    assert f"{_EXPIRED_CODE}: deleted '{_TTL_ZONE.name}/stale'" in result.output.splitlines()
-    assert not stale.exists()
-    assert not (workspace / "junk.txt").exists()
-    assert any(p.name == "junk.txt" for p in (workspace / ".dadaia" / "reaped").rglob("junk.txt"))
+def test_a_held_entry_is_always_listed_and_never_fails(workspace: Path) -> None:
+    """sa-reaper-destroys-its-own-hold-before-ttl#B7: a hold is listed with its days left (text and
+    `--json`) and exits 0."""
+    held = workspace / ".dadaia" / "reaped" / "20260913" / "x"
+    held.parent.mkdir(parents=True)
+    held.write_text("", encoding="utf-8")
 
-    again = CliRunner().invoke(app, ["doctor", "--fix", "--expired-only", "--quiet"])
-    assert again.exit_code == 0
-    assert again.output == ""
+    text = CliRunner().invoke(app, ["doctor"])
+    as_json = CliRunner().invoke(app, ["doctor", "--json"])
+
+    assert (text.exit_code, as_json.exit_code) == (0, 0), text.output
+    assert [ln for ln in text.output.splitlines() if ln.startswith("WS-reaped-reaped")] == [
+        "WS-reaped-reaped reaped reaped/20260913/x  (7d left)"
+    ]
+    (finding,) = _scan(json.loads(as_json.output)["sections"]["workspace"]["findings"])
+    assert (finding["code"], finding["verdict"], finding["message"]) == (
+        "WS-reaped-reaped",
+        "reaped",
+        "reaped/20260913/x  (7d left)",
+    )
 
 
-def test_fix_moves_slop_to_reaped_and_lists_the_repair(workspace: Path) -> None:
-    (workspace / "junk.txt").write_text("", encoding="utf-8")
+class _FrozenClock(datetime):
+    @classmethod
+    def now(cls, tz: tzinfo | None = None) -> _FrozenClock:  # type: ignore[override]
+        return cls(2026, 9, 27, 12, 0, 0, tzinfo=UTC)
+
+
+def test_two_same_second_reaps_of_one_origin_leave_two_intact_holds(
+    workspace: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """sa-reaper-destroys-its-own-hold-before-ttl#B1, sa-reaper-destroys-its-own-hold-before-ttl#B2: two reaps in
+    one frozen second leave the first hold byte-intact and a second distinct hold."""
+    monkeypatch.setattr(sweep, "datetime", _FrozenClock)
+    skill = workspace / "stray"
+    skill.mkdir()
+    (skill / "SKILL.md").write_bytes(b"v1\n")
+    (skill / "refs.md").write_bytes(b"refs\n")
+    assert CliRunner().invoke(app, ["doctor", "--fix"]).exit_code == 0
+    skill.mkdir()
+    (skill / "SKILL.md").write_bytes(b"v2\n")
+    assert CliRunner().invoke(app, ["doctor", "--fix"]).exit_code == 0
+
+    day = workspace / ".dadaia" / "reaped" / "20260927"
+    assert sorted(p.name for p in day.iterdir()) == ["stray", "stray-1"]
+    assert (day / "stray" / "SKILL.md").read_bytes() == b"v1\n"
+    assert (day / "stray" / "refs.md").read_bytes() == b"refs\n"
+    assert (day / "stray-1" / "SKILL.md").read_bytes() == b"v2\n"
+
+
+def test_fix_deletes_a_hold_past_seven_days_and_keeps_a_younger_one(workspace: Path) -> None:
+    """sa-reaper-destroys-its-own-hold-before-ttl#B3: an 8-day hold is deleted (WS-reaped-expired); a 6-day one survives."""
+    old = workspace / ".dadaia" / "reaped" / "20260901" / "old"
+    young = workspace / ".dadaia" / "reaped" / "20260921" / "young"
+    for path, days in ((old, 8), (young, 6)):
+        path.parent.mkdir(parents=True)
+        path.write_text("x", encoding="utf-8")
+        _touch(path, days)
+        _touch(path.parent, days)
+
+    result = CliRunner().invoke(app, ["doctor", "--fix"])
+
+    assert "WS-reaped-expired" in result.output, result.output
+    assert not old.exists()
+    assert young.read_text(encoding="utf-8") == "x"
+
+
+def test_a_hold_of_old_files_counts_from_the_move(workspace: Path) -> None:
+    """sa-reaper-destroys-its-own-hold-before-ttl#B3: a hold of 30-day-old files ages from the move, dying at 8 days."""
+    stray = workspace / "stray"
+    (stray / "deep").mkdir(parents=True)
+    (stray / "a.md").write_text("a", encoding="utf-8")
+    (stray / "deep" / "b.md").write_text("b", encoding="utf-8")
+    for path in (stray / "deep" / "b.md", stray / "a.md", stray / "deep", stray):
+        _touch(path, 30)
+
+    assert CliRunner().invoke(app, ["doctor", "--fix"]).exit_code == 0
+    (held,) = (workspace / ".dadaia" / "reaped").glob("*/stray")
+    again = CliRunner().invoke(app, ["doctor", "--fix", "--expired-only"])
+
+    assert again.exit_code == 0, again.output
+    assert (held / "a.md").read_text(encoding="utf-8") == "a"
+    assert (held / "deep" / "b.md").read_text(encoding="utf-8") == "b"
+
+    for path in (held / "deep" / "b.md", held / "a.md", held / "deep", held):
+        _touch(path, 8)
+    CliRunner().invoke(app, ["doctor", "--fix"])
+
+    assert not held.exists()
+
+
+_OPERATOR_HARNESS_FILES = {
+    ".claude/settings.local.json": b'{"permissions": {"allow": ["Bash(ls)"]}}\n',
+    ".claude/skills/dm-x/SKILL.md": b"---\nname: dm-x\n---\n",
+}
+
+
+def test_fix_leaves_operator_files_in_a_harness_dir_byte_identical(workspace: Path) -> None:
+    """sa-doctor-reaps-harness-owned-entries#H1: operator files in .claude/ stay byte-identical; no WS-claude-slop."""
+    for rel, body in _OPERATOR_HARNESS_FILES.items():
+        (workspace / rel).parent.mkdir(parents=True, exist_ok=True)
+        (workspace / rel).write_bytes(body)
 
     result = CliRunner().invoke(app, ["doctor", "--fix"])
 
     assert result.exit_code == 0, result.output
-    assert "WS-root-slop: moved 'junk.txt' -> '.dadaia/reaped/" in result.output
-    assert not (workspace / "junk.txt").exists()
+    assert "WS-claude-slop" not in result.output
+    for rel, body in _OPERATOR_HARNESS_FILES.items():
+        assert (workspace / rel).read_bytes() == body, rel
 
 
-def _plant_hold(workspace: Path) -> Path:
-    """One entry HELD in ``reaped/``: off the working tree, inside its 7-day window."""
-    held = workspace / ".dadaia" / "reaped" / "20260913" / "x"
-    held.parent.mkdir(parents=True, exist_ok=True)
-    held.write_text("", encoding="utf-8")
-    return held
+@pytest.mark.parametrize(
+    "harness_dir", sorted({d for dirs in HARNESS_PROJECTION_DIRS.values() for d in dirs})
+)
+def test_no_harness_dir_entry_is_ever_slop_or_moved(workspace: Path, harness_dir: str) -> None:
+    """sa-doctor-reaps-harness-owned-entries#H2, sa-doctor-reaps-harness-owned-entries#H3: an unledgered tree in any
+    harness dir is no finding and ``--fix`` moves nothing."""
+    planted = {
+        f"{harness_dir}/hooks/stray.json": b"{}\n",
+        f"{harness_dir}/workflows/ci.yml": b"on: push\n",
+        f"{harness_dir}/deep/a/b/notes.md": b"mine\n",
+    }
+    for rel, body in planted.items():
+        (workspace / rel).parent.mkdir(parents=True, exist_ok=True)
+        (workspace / rel).write_bytes(body)
+
+    scan = json.loads(CliRunner().invoke(app, ["doctor", "--json"]).output)
+    fix = CliRunner().invoke(app, ["doctor", "--fix"])
+
+    messages = [f["message"] for f in scan["sections"]["workspace"]["findings"]]
+    assert not [m for m in messages if m.startswith(harness_dir)], messages
+    assert fix.exit_code == 0, fix.output
+    for rel, body in planted.items():
+        assert (workspace / rel).read_bytes() == body, rel
 
 
-def test_a_held_entry_is_always_listed_and_never_fails(workspace: Path) -> None:
-    """Intent: CONTRACT — 0.4.7 FR6 AC (`dadaia doctor` LISTS what the reaper holds); size: SMALL.
+@pytest.mark.parametrize("ledger_state", ["absent", "corrupt"])
+def test_fix_changes_nothing_in_a_harness_dir_without_a_readable_ledger(
+    workspace: Path, ledger_state: str
+) -> None:
+    """sa-doctor-reaps-harness-owned-entries#H5: with no readable ledger ``--fix`` touches no harness file."""
+    ledger = workspace / ".dadaia" / "states" / "install_ledger.json"
+    if ledger_state == "corrupt":
+        ledger.write_text("{not json", encoding="utf-8")
+    else:
+        ledger.unlink()
+    projected = workspace / ".claude" / "agents" / "pm.md"
+    projected.parent.mkdir(parents=True)
+    projected.write_text("projected", encoding="utf-8")
 
-    A hold is the one finding that is neither compliance nor failure: the operator must SEE
-    what was moved and how long is left to take it back, while the score stays whole — the
-    entry already left the working tree, so it is no longer one of the entries being scored.
-    """
-    _plant_hold(workspace)
+    CliRunner().invoke(app, ["doctor", "--fix"])
 
-    result = CliRunner().invoke(app, ["doctor"])
-    lines = result.output.splitlines()
-    held_lines = [ln for ln in lines if ln.startswith("WS-reaped-reaped")]
+    assert projected.read_text(encoding="utf-8") == "projected"
+    assert sorted(p.name for p in (workspace / ".claude").rglob("*")) == ["agents", "pm.md"]
+
+
+def _age(top: Path) -> None:
+    for dirpath, dirnames, filenames in os.walk(top, topdown=False):
+        for name in [*filenames, *dirnames]:
+            _touch(Path(dirpath) / name, 3)
+    _touch(top, 3)
+
+
+def _expired(workspace: Path) -> list[str]:
+    payload = json.loads(CliRunner().invoke(app, ["doctor", "--json"]).output)
+    findings = payload["sections"]["workspace"]["findings"]
+    return [f["message"] for f in findings if f["code"] == "WS-tmp-expired"]
+
+
+def test_a_nested_expired_tree_is_gone_after_one_expired_only_run(workspace: Path) -> None:
+    """reaper-needs-many-runs-for-a-nested-expired-tree: an entry ages by its newest file, so one run reaps it whole."""
+    day = workspace / ".dadaia" / "tmp" / "a" / "20260920"
+    for n in range(4):
+        deep = day / "tree" / f"d{n}" / "e" / "f"
+        deep.mkdir(parents=True)
+        (deep / "leaf.txt").write_text("x", encoding="utf-8")
+        (day / "tree" / f"d{n}" / "mid.txt").write_text("x", encoding="utf-8")
+    _age(workspace / ".dadaia" / "tmp" / "a")
+    # An interrupted earlier pass leaves an emptied directory with a fresh mtime.
+    (day / "tree" / "emptied-today").mkdir()
+
+    result = CliRunner().invoke(app, ["doctor", "--fix", "--expired-only"])
 
     assert result.exit_code == 0, result.output
-    assert held_lines == ["WS-reaped-reaped reaped reaped/20260913/x  (7d left)"], lines
+    assert not (workspace / ".dadaia" / "tmp" / "a").exists()
+    assert _expired(workspace) == []
 
 
-def test_json_lists_a_held_entry_and_does_not_fail(workspace: Path) -> None:
-    """Intent: CONTRACT — 0.4.7 FR6 AC (the `--json` mirror of the held-entry listing); size: SMALL."""
-    _plant_hold(workspace)
+def _git(cwd: Path, *args: str) -> None:
+    env = {
+        **os.environ,
+        "GIT_AUTHOR_NAME": "t",
+        "GIT_AUTHOR_EMAIL": "t@example.invalid",
+        "GIT_COMMITTER_NAME": "t",
+        "GIT_COMMITTER_EMAIL": "t@example.invalid",
+    }
+    subprocess.run(["git", *args], cwd=cwd, env=env, check=True, capture_output=True)
 
-    result = CliRunner().invoke(app, ["doctor", "--json"])
-    payload = json.loads(result.output)
-    section = payload["sections"]["workspace"]
 
-    assert result.exit_code == 0, result.output
-    (held,) = _scan(section["findings"])
-    assert (held["code"], held["verdict"]) == ("WS-reaped-reaped", "reaped")
-    assert held["message"] == "reaped/20260913/x  (7d left)"
+def test_an_expired_entry_holding_a_worktree_carries_a_fix_that_clears_it(
+    workspace: Path,
+) -> None:
+    """tmp-expired-worktree-fix-line-never-clears: the fix, run verbatim, removes the worktree and clears the
+    finding; the entry, touched by that removal, then lives out its own TTL."""
+    day = workspace / ".dadaia" / "tmp" / "a" / "20260920"
+    repo = day / "r"
+    repo.mkdir(parents=True)
+    _git(repo, "init", "-q", "-b", "main")
+    (repo / "f.txt").write_text("f", encoding="utf-8")
+    _git(repo, "add", "f.txt")
+    _git(repo, "commit", "-q", "-m", "init")
+    _git(repo, "worktree", "add", "-q", "-b", "wt/a", str(day / "wt"))
+    _age(workspace / ".dadaia" / "tmp" / "a")
+
+    payload = json.loads(CliRunner().invoke(app, ["doctor", "--json"]).output)
+    (finding,) = [
+        f for f in payload["sections"]["workspace"]["findings"] if f["code"] == "WS-tmp-expired"
+    ]
+    done = subprocess.run(finding["fix"], shell=True, cwd=workspace, check=False)
+    CliRunner().invoke(app, ["doctor", "--fix", "--expired-only"])
+
+    assert done.returncode == 0
+    assert _expired(workspace) == []
+    assert not (day / "wt").exists()
+
+
+@pytest.mark.parametrize(
+    ("rel", "body", "reported"),
+    [
+        pytest.param(
+            "tmp/reconciler-last-x",
+            "2026-09-26T00:00:00+00:00",
+            "WS-tmp-expired: deleted 'tmp/reconciler-last-x'",
+            id="sa-expiry-has-two-clocks#45.1-marker",
+        ),
+        pytest.param(
+            "handoff/ctx/old.handoff.json",
+            '{"produced_at": "2099-01-01T00:00:00Z"}',
+            "WS-handoff-expired: deleted 'handoff/ctx/old.handoff.json'",
+            id="sa-expiry-has-two-clocks#45.2-handoff",
+        ),
+    ],
+)
+def test_an_expired_marker_is_reaped_by_the_zone_walk(
+    workspace: Path, rel: str, body: str, reported: str
+) -> None:
+    """sa-expiry-has-two-clocks#45.1, #45.2: an entry one second past its zone TTL by mtime is reaped by the one
+    zone walk whatever its content says; a fresh handoff with an old produced_at is kept."""
+    old = workspace / ".dadaia" / rel
+    fresh = workspace / ".dadaia" / "handoff" / "ctx" / "fresh.handoff.json"
+    fresh.parent.mkdir(parents=True, exist_ok=True)
+    old.parent.mkdir(parents=True, exist_ok=True)
+    old.write_text(body, encoding="utf-8")
+    fresh.write_text('{"produced_at": "2026-09-24T00:00:00Z"}', encoding="utf-8")
+    _touch(old, 86_401 / 86_400)
+
+    result = CliRunner().invoke(app, ["doctor", "--fix", "--expired-only"])
+
+    assert reported in result.output, result.output
+    assert not old.exists()
+    assert fresh.exists()
+
+
+def test_a_retired_cache_zone_is_held_by_the_reaper_never_orphaned(workspace: Path) -> None:
+    """sa-tool-caches-land-outside-the-cache-zone#B40-3: a retired .dadaia/.cache/ is reported slop and held in reaped/."""
+    cache = workspace / ".dadaia" / ".cache" / "ruff" / "x"
+    cache.parent.mkdir(parents=True)
+    cache.write_text("x", encoding="utf-8")
+
+    scan = CliRunner().invoke(app, ["doctor"])
+    fixed = CliRunner().invoke(app, ["doctor", "--fix"])
+
+    assert "WS-dadaia-slop slop .cache  (not in the root law or the exceptions)" in scan.output
+    assert not (workspace / ".dadaia" / ".cache").exists(), fixed.output
+    assert [
+        p.read_text(encoding="utf-8") for p in (workspace / ".dadaia" / "reaped").rglob("x")
+    ] == ["x"]

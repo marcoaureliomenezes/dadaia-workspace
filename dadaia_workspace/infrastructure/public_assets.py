@@ -3,55 +3,36 @@
 K3 (v0.5.1): install/doctor are now two folds over one ``ProjectionRule`` table
 (``infrastructure/projection_rules.py``) — ``install`` writes ``render``, ``doctor``
 compares against it. What remains here is genuinely bespoke: staging, plan
-resolution, the consumer-repo guardrail fan-out (N-target, provenance-gated — not a
-fixed-destination rule), install-ledger reconciliation, and the harness-independent
-doctor checks (privacy, entities-derivation, memory-phase, rule-corpus, symlink-target,
-git-dirty).
+resolution, install-ledger reconciliation, and the harness-independent
+doctor checks (privacy, entities-derivation).
 """
 
 from __future__ import annotations
 
-import json
 import os
-import subprocess
-from collections.abc import Callable, Iterable
+from collections.abc import Iterable
 from pathlib import Path
-from typing import Literal
 
-from dadaia_workspace.core.agent_model_templates import CORE_AGENTS, resolve_agent_model
 from dadaia_workspace.core.atomic_write import atomic_write
-from dadaia_workspace.core.cli_line import fix_line
 from dadaia_workspace.core.exceptions import PublicAssetError
 from dadaia_workspace.core.harness_registry import (
     HARNESS_PROJECTION_DIRS,
     HARNESS_RECORDS,
     L1_ENTRY_HARNESSES,
 )
-from dadaia_workspace.core.models.agent_model_policy import (
+from dadaia_workspace.core.model_registry import (
+    CORE_AGENTS,
     AgentModelPolicyOverlay,
     AgentModelPolicyStoreError,
     ResolvedAgentModel,
+    resolve_agent_model,
 )
 from dadaia_workspace.core.models.doctor_report import DoctorLine, DoctorStatus, attest
 from dadaia_workspace.core.models.install_ledger import InstallLedger, LedgerEntry
-from dadaia_workspace.core.workspace_layout import (
-    HARNESS_DIRS,
-    STATES_CANON,
-    repo_excluded_display,
-    root_entries_display,
-    specs_canon_table_rows,
-    zone_table_rows,
-)
-from dadaia_workspace.infrastructure.codex_doctor import check_codex_rule_corpus_reachable
+from dadaia_workspace.core.workspace_layout import render_registry_tables
 from dadaia_workspace.infrastructure.entity_doctor import (
     check_agent_skill_refs,
     check_entities_derivation,
-    check_memory_phase_single_source,
-)
-from dadaia_workspace.infrastructure.install_helpers import (
-    remove_legacy_bind_epoch_state,
-    remove_legacy_workflow_projections,
-    remove_retired_core_rules,
 )
 from dadaia_workspace.infrastructure.install_plan import InstallPlan
 from dadaia_workspace.infrastructure.json_agent_model_policy_store import (
@@ -66,78 +47,23 @@ from dadaia_workspace.infrastructure.projection import (
     Transcript,
     doctor_rules,
     install_rules,
-    link_entry_defect,
 )
 from dadaia_workspace.infrastructure.projection_rules import (
     harness_checks,
     projection_rules,
-    prune_stale_codex_tomls,
 )
 from dadaia_workspace.infrastructure.public_assets_common import (
     _COPY_DIRS,
-    OverwritePolicy,
     _entry_digest,
     _json_dump,
-    is_ignored_public_asset,
     iter_public_files,
 )
-from dadaia_workspace.infrastructure.runtime_config import codex_config as _build_codex_config
-from dadaia_workspace.infrastructure.workspace_guardrail import (
-    _agents_md_source,
-    _consumer_repos_for_root,
-    _doctor_consumer_pair_lines,
-    _install_guardrail_pair,
-    _is_source_repo_root,
-)
+from dadaia_workspace.infrastructure.workspace_guardrail import _is_source_repo_root
 
 __all__ = [
     "FileSystemPublicAssetManager",
     "InstallPlan",
-    "OverwritePolicy",
-    "render_registry_tables",
 ]
-
-
-def _zone_table() -> str:
-    rows = ["| Zone | Purpose | Class | TTL | Creator |", "|---|---|---|---|---|"]
-    rows += [
-        f"| `{name}/` | {purpose} | {cls} | {ttl} | {creator} |"
-        for name, purpose, cls, ttl, creator in zone_table_rows()
-    ]
-    return "\n".join(rows)
-
-
-def _states_canon_table() -> str:
-    return "\n".join(["| Entry |", "|---|", *(f"| `{entry}` |" for entry in sorted(STATES_CANON))])
-
-
-def _specs_canon_table() -> str:
-    rows = ["| Area | Members |", "|---|---|"]
-    rows += [
-        f"| {'root' if parent == '' else f'`{parent}/`'} | `{members}` |"
-        for parent, members in specs_canon_table_rows()
-    ]
-    return "\n".join(rows)
-
-
-#: Law-fragment placeholder -> the registry view that fills it. The projected law's
-#: canonical-name tables ARE ``core.workspace_layout`` (0.4.6 FR14/D14 for the zone and
-#: states tables; 0.4.7 FR5b for the root map, repo-AGENTS.md and specs-AGENTS.md) — never a hand-kept copy
-#: that the next fix edits in one home and forgets in the other.
-_PLACEHOLDERS: dict[str, Callable[[], str]] = {
-    "<!-- zones -->": _zone_table,
-    "<!-- canon -->": _states_canon_table,
-    "<!-- root -->": root_entries_display,
-    "<!-- repo-excluded -->": repo_excluded_display,
-    "<!-- specs-canon -->": _specs_canon_table,
-}
-
-
-def render_registry_tables(text: str) -> str:
-    """Fill every registry placeholder in a law fragment from ``core.workspace_layout``."""
-    for placeholder, render in _PLACEHOLDERS.items():
-        text = text.replace(placeholder, render())
-    return text
 
 
 #: A skill script enforces a shipped schema from its OWN copy beside it.
@@ -159,6 +85,29 @@ _SKILL_SCRIPT_SCHEMAS: tuple[tuple[str, str], ...] = (
     ),
     ("schemas/audits/finding-record-v1.schema.json", "skills/dd-audit-project/scripts/schemas"),
     ("schemas/histo/histo-record-v1.schema.json", "skills/dd-audit-project/scripts/schemas"),
+)
+
+
+#: The shared ledger modules each ledger script runs from its OWN copy beside it, the
+#: same way (``_ledger.py`` imports ``_privacy.py``, a copy of ``core/redaction.py``,
+#: the push gate's own matcher). (package-relative source, ``public/``-relative target).
+_SKILL_SCRIPT_SHARED: tuple[tuple[str, str], ...] = tuple(
+    (src, f"skills/{skill}/scripts/{name}")
+    for skill in (
+        "dd-bug-resolution",
+        "dd-backlog-definition",
+        "dd-audit-project",
+        "dd-cli-library",
+        "dd-spec-navigator",
+        "dd-release-implementation",
+    )
+    for src, name in (
+        ("core/redaction.py", "_privacy.py"),
+        ("infrastructure/data/privacy_baseline.json", "privacy_baseline.json"),
+        ("public/skills/dd-bug-resolution/scripts/_ledger.py", "_ledger.py"),
+        ("public/skills/dd-bug-resolution/scripts/_specs.py", "_specs.py"),
+    )
+    if not src.endswith(f"{skill}/scripts/{name}")
 )
 
 
@@ -230,15 +179,11 @@ class FileSystemPublicAssetManager:
 
         staged: list[str] = []
         for name in _COPY_DIRS:
-            src = self._public_dir / name
-            if not src.exists():
-                continue
-            dst = agentic_dir / name
-            if src.is_dir():
-                shutil.copytree(src, dst)
-            else:
+            for src in iter_public_files(self._public_dir / name):
+                dst = agentic_dir / src.relative_to(self._public_dir)
+                dst.parent.mkdir(parents=True, exist_ok=True)
                 shutil.copy2(src, dst)
-            staged.append(f"[stage] {dst}")
+            staged.append(f"[stage] {agentic_dir / name}")
 
         for schema_rel, scripts_rel in _SKILL_SCRIPT_SCHEMAS:
             schema_src = self._public_dir / schema_rel
@@ -249,7 +194,14 @@ class FileSystemPublicAssetManager:
             shutil.copy2(schema_src, dst)
             staged.append(f"[stage] {dst}")
 
-        for src in self._iter_files(self._public_dir):
+        for src_rel, dst_rel in _SKILL_SCRIPT_SHARED:
+            if not (self._public_dir.parent / src_rel).exists():
+                continue
+            dst = agentic_dir / dst_rel
+            shutil.copy2(self._public_dir.parent / src_rel, dst)
+            staged.append(f"[stage] {dst}")
+
+        for src in self._staged_sources():
             expected = _staged_bytes(src)
             if expected != src.read_bytes():
                 dst = agentic_dir / src.relative_to(self._public_dir)
@@ -258,18 +210,11 @@ class FileSystemPublicAssetManager:
 
         # LF-exact, atomic writes: staged JSON is hash-compared by doctor, so it must
         # not pick up Windows CRLF translation (FR-RC2-2).
-        from dadaia_workspace.infrastructure.install_helpers import (
-            build_agents_index,
-            build_manifest,
-        )
+        from dadaia_workspace.infrastructure.install_helpers import build_manifest
 
         manifest_path = agentic_dir / "manifest.json"
-        atomic_write(manifest_path, _json_dump(build_manifest(agentic_dir, self._iter_files)))
+        atomic_write(manifest_path, _json_dump(build_manifest(agentic_dir, iter_public_files)))
         staged.append(f"[stage] {manifest_path}")
-
-        index_path = agentic_dir / "agents.index.json"
-        atomic_write(index_path, _json_dump(build_agents_index(agentic_dir)))
-        staged.append(f"[stage] {index_path}")
         return staged
 
     def list_all(self) -> dict[str, list[str]]:
@@ -292,8 +237,6 @@ class FileSystemPublicAssetManager:
         workspace_root: Path,
         harness: str | None = None,
         force: bool = False,
-        scope: Literal["all", "repos-only", "workspace-only"] = "all",
-        only: str | None = None,
     ) -> list[str]:
         self._validate_install_harness(harness)
         self._guard_source_root_install(workspace_root)
@@ -303,54 +246,18 @@ class FileSystemPublicAssetManager:
         if not (agentic_dir / "manifest.json").exists():
             installed.extend(self.stage(workspace_root))
 
-        plan = self._resolve_install_plan(
-            workspace_root, agentic_dir, harness, OverwritePolicy.of(force), scope, only
-        )
+        plan = self._resolve_install_plan(workspace_root, agentic_dir, harness, force)
         rules = projection_rules(plan)
-        transcript = install_rules(rules, force=plan.overwrite.force)
+        transcript = install_rules(rules, force=plan.force)
         installed.extend(transcript.render())
-
-        # Codex per-agent TOML pruning is independent of the rule table (a rule
-        # exists only for what SHOULD be there — pruning what should NOT is a
-        # separate, unconditional migration, unchanged from the historical
-        # `install_codex_agents` behavior).
-        if "codex" in plan.harness_targets and plan.only in (None, "agents"):
-            expected = frozenset(
-                r.dst.name for r in rules if r.harness == "codex" and r.dst.parent.name == "agents"
-            )
-            prune_stale_codex_tomls(workspace_root / ".codex", expected, installed)
-
-        # the root `AGENTS.md` map lands via the rule table above; the remaining harness-independent
-        # migrations are unconditional cleanup, unchanged.
-        remove_retired_core_rules(workspace_root, installed)
-        remove_legacy_workflow_projections(workspace_root, installed)
-        remove_legacy_bind_epoch_state(workspace_root, installed)
-
-        # Consumer-repo guardrail fan-out (bespoke: N-target discovery + provenance
-        # gating, never a fixed-destination rule).
-        guardrail_managed: list[Path] = []
-        if "repos" in plan.guardrail_targets:
-            data_agents_md = agentic_dir / "data" / "AGENTS.md"
-            if data_agents_md.is_file():
-                guardrail_managed = _install_guardrail_pair(
-                    data_agents_md,
-                    workspace_root,
-                    plan.overwrite.force,
-                    installed,
-                    targets={"repos"},
-                )
 
         # LEDGER RECONCILIATION (bug retired-lib-asset-leaves-orphan-projection): the
         # desired state is diffed against the RECORD of what a prior install wrote —
         # never against whatever the current source happens to carry, which is blind to
-        # a retired family. Full reconciliation (prune) runs only on an all-target,
-        # all-scope install; a scoped install merges its entries and never prunes.
+        # a retired family. Full reconciliation (prune) runs on every whole install;
+        # `harness add`'s one-harness install merges its entries and never prunes.
         self._reconcile_install_ledger(
-            workspace_root,
-            transcript,
-            guardrail_managed,
-            installed,
-            full=(plan.harness is None and plan.scope == "all"),
+            workspace_root, transcript, installed, full=plan.harness is None
         )
 
         return installed
@@ -381,9 +288,7 @@ class FileSystemPublicAssetManager:
         workspace_root: Path,
         agentic_dir: Path,
         harness: str | None,
-        overwrite: OverwritePolicy,
-        scope: Literal["all", "repos-only", "workspace-only"],
-        only: str | None,
+        force: bool,
     ) -> InstallPlan:
         """Resolve ``install()``'s arguments ONCE (FR6): the single translation point.
 
@@ -392,7 +297,7 @@ class FileSystemPublicAssetManager:
         typed store error HERE — loud, before any projection write (NFR-4). A missing
         overlay resolves the `balanced` defaults.
         """
-        overlay = self._load_agent_policy(workspace_root, agentic_dir)
+        overlay = self._load_agent_policy(workspace_root)
         resolved_models = self._resolved_core_models(overlay)
 
         # No harness named: project the roster of record — the shared authored set plus
@@ -413,16 +318,7 @@ class FileSystemPublicAssetManager:
             workspace_root=workspace_root,
             agentic_dir=agentic_dir,
             harness=harness,
-            scope=scope,
-            only=only,
-            overwrite=overwrite,
-            guardrail_targets=frozenset(
-                {
-                    "all": ("workspace", "repos"),
-                    "workspace-only": ("workspace",),
-                    "repos-only": ("repos",),
-                }[scope]
-            ),
+            force=force,
             harness_targets=harness_targets,
             active_harnesses=active_harnesses,
             overlay=overlay,
@@ -444,16 +340,13 @@ class FileSystemPublicAssetManager:
     # Agent-model policy (v0.1.65 FR4/FR5) — loaded ONCE per install/doctor run
     # ------------------------------------------------------------------
 
-    def _load_agent_policy(
-        self, workspace_root: Path, agentic_dir: Path
-    ) -> AgentModelPolicyOverlay | None:
+    def _load_agent_policy(self, workspace_root: Path) -> AgentModelPolicyOverlay | None:
         """Load the operator overlay (``None`` when absent ⇒ ``balanced`` defaults).
 
         Raises the typed ``AgentModelPolicyStoreError`` on an invalid overlay — install
         fails loud BEFORE any projection write (NFR-4); doctor converts it to an ERROR
-        line. Valid override targets are the 9 core agents.
+        line. Valid override targets are the ``CORE_AGENTS``.
         """
-        del agentic_dir
         return JsonAgentModelPolicyStore(workspace_root).load()
 
     @staticmethod
@@ -463,9 +356,6 @@ class FileSystemPublicAssetManager:
         """Resolve the full core roster through the single resolver (FR4)."""
         return {agent: resolve_agent_model(agent, overlay) for agent in CORE_AGENTS}
 
-    def _codex_config(self, agentic_dir: Path) -> str:
-        return _build_codex_config(agentic_dir)
-
     # ------------------------------------------------------------------
     # Ledger reconciliation
     # ------------------------------------------------------------------
@@ -474,7 +364,6 @@ class FileSystemPublicAssetManager:
         self,
         workspace_root: Path,
         transcript: Transcript,
-        extra_managed: list[Path],
         installed: list[str],
         *,
         full: bool,
@@ -488,11 +377,8 @@ class FileSystemPublicAssetManager:
         surfaced with a ``[warn]``; a missing/corrupt previous ledger bootstraps —
         record everything, prune nothing.
 
-        Paths arrive TYPED only: the rule table via ``transcript.paths()``, the bespoke
-        consumer-repo guardrail fan-out via *extra_managed* (its return value). The
-        historical two-prefix string re-parse of *installed* is deleted (F006): it
-        silently dropped ``[updated]`` restores — a restored consumer AGENTS.md never
-        reached the ledger.
+        Paths arrive TYPED only, from the rule table. A path under ``repos/`` a former
+        release ledgered is forgotten, never pruned: install owns nothing in a repo.
         """
         states_dir = workspace_root / ".dadaia" / "states"
         ws = workspace_root.resolve()
@@ -521,16 +407,16 @@ class FileSystemPublicAssetManager:
         for line in transcript.lines:
             _record(line.path, line.kind)
 
-        for path in extra_managed:
-            _record(path, "file")
-
         previous = self._install_ledger_store.read(states_dir)
-        merged: dict[str, LedgerEntry] = {}
-        if previous is not None:
-            merged.update(previous.by_relpath())
+        owned = {
+            rel: entry
+            for rel, entry in (previous.by_relpath() if previous is not None else {}).items()
+            if not rel.startswith("repos/")
+        }
+        merged: dict[str, LedgerEntry] = dict(owned)
 
         if full and previous is not None:
-            for rel_posix, entry in previous.by_relpath().items():
+            for rel_posix, entry in owned.items():
                 if rel_posix in current:
                     continue
                 path = ws / entry.relpath
@@ -567,24 +453,12 @@ class FileSystemPublicAssetManager:
         agentic_dir = workspace_root / ".dadaia" / "agentic"
         reports: list[DoctorLine] = []
 
-        for src in self._iter_files(self._public_dir):
+        for src in self._staged_sources():
             rel = src.relative_to(self._public_dir)
             reports.append(self._compare(src, agentic_dir / rel, f"stage:{rel.as_posix()}"))
 
         if not (agentic_dir / "manifest.json").exists():
             reports.append(DoctorLine(DoctorStatus.MISSING, "stage:manifest.json"))
-
-        index_path = agentic_dir / "agents.index.json"
-        if not index_path.exists():
-            reports.append(DoctorLine(DoctorStatus.MISSING, "stage:agents.index.json"))
-        else:
-            try:
-                json.loads(index_path.read_text(encoding="utf-8"))
-                reports.append(DoctorLine(DoctorStatus.OK, "stage:agents.index.json"))
-            except (json.JSONDecodeError, OSError):
-                reports.append(
-                    DoctorLine(DoctorStatus.DRIFT, "stage:agents.index.json (invalid JSON)")
-                )
 
         # Resolve the profile-scoped active harness set FIRST — absent profile ⇒
         # all-four (back-compat). An out-of-profile runtime whose directory physically
@@ -599,12 +473,12 @@ class FileSystemPublicAssetManager:
         # (NFR-4 — missing != invalid).
         overlay: AgentModelPolicyOverlay | None = None
         try:
-            overlay = self._load_agent_policy(workspace_root, agentic_dir)
+            overlay = self._load_agent_policy(workspace_root)
         except AgentModelPolicyStoreError as exc:
             reports.append(DoctorLine(DoctorStatus.DRIFT, f"agent-model-policy ERROR: {exc}"))
         resolved_models = self._resolved_core_models(overlay)
 
-        # The doctor plan is "install(scope=all)" over the roster, scoped to the PERSISTED
+        # The doctor plan is a whole install over the roster, scoped to the PERSISTED
         # profile — never an operator's scoped --target selection. It is never executed
         # (install_rules is never called against it); it exists only to build the SAME
         # rule table doctor_rules() compares.
@@ -612,10 +486,7 @@ class FileSystemPublicAssetManager:
             workspace_root=workspace_root,
             agentic_dir=agentic_dir,
             harness=None,
-            scope="all",
-            only=None,
-            overwrite=OverwritePolicy.PRESERVE,
-            guardrail_targets=frozenset({"workspace", "repos"}),
+            force=False,
             harness_targets=("agents", *(h for h in L1_ENTRY_HARNESSES if h in active)),
             active_harnesses=frozenset(active),
             overlay=overlay,
@@ -632,63 +503,11 @@ class FileSystemPublicAssetManager:
             if name not in active and any((workspace_root / d).exists() for d in rel_dirs):
                 reports.append(_out_of_profile_warn(name))
 
-        # Consumer-repo guardrail AGENTS.md (FR9, bug public-doctor-flags-hand-authored-
-        # consumer-agents-md): the `repos/<slug>:AGENTS.md` line flows through the SINGLE
-        # provenance-aware authority — a hand-authored (no-banner) consumer reads [foreign]
-        # (never [drift]/[missing]), so `public doctor` exits 0 (Ruling 16).
-        consumer_source = self._agents_md_source(agentic_dir)
-        if consumer_source is not None:
-            reports.extend(
-                _doctor_consumer_pair_lines(consumer_source, workspace_root, emit_stderr=False)
-            )
-
-        # Harness-independent checks stay unconditional. The rule-corpus check
-        # early-returns on an absent .codex/agents; skill/memory/privacy checks read the
-        # package public dir, not a runtime projection. `rule-corpus` stays a TOP-LEVEL,
-        # unconditional attestation (never gated on codex-in-profile — ATTESTING_CHECK_IDS
-        # must never vanish silently for a codex-absent profile); `trust-boundary` stays
-        # gated (the codex-hooks record check above, matching the historical guard).
-        reports.extend(attest("rule-corpus", check_codex_rule_corpus_reachable(workspace_root)))
+        # Harness-independent checks stay unconditional: they read the package public
+        # dir, not a runtime projection.
         reports.extend(check_agent_skill_refs(self._public_dir))
-        reports.extend(check_memory_phase_single_source(self._public_dir))
-        reports.extend(attest("symlink-target", self._check_symlink_targets(workspace_root)))
         reports.extend(attest("public-privacy", self._check_public_privacy()))
         reports.extend(attest("entities-derivation", check_entities_derivation(self._public_dir)))
-
-        try:
-            git_result = subprocess.run(
-                ["git", "diff", "--name-only", "HEAD", "--", str(self._public_dir)],
-                capture_output=True,
-                text=True,
-                cwd=self._public_dir.parent.parent,
-                timeout=5,
-            )
-            if git_result.returncode == 0:
-                for dirty_path in git_result.stdout.splitlines():
-                    if dirty_path.strip():
-                        reports.append(
-                            DoctorLine(DoctorStatus.WARN, f"git-dirty: {dirty_path.strip()}")
-                        )
-            elif git_result.returncode == 128:
-                reports.append(
-                    DoctorLine(DoctorStatus.NOT_APPLICABLE, "git-dirty check (not a git repo)")
-                )
-        except FileNotFoundError:
-            reports.append(
-                DoctorLine(DoctorStatus.NOT_APPLICABLE, "git-dirty check (git not found)")
-            )
-        except subprocess.TimeoutExpired:
-            reports.append(DoctorLine(DoctorStatus.WARN, "git-dirty check timed out"))
-
-        for harness_dir in sorted(HARNESS_DIRS):
-            legacy_dir = workspace_root / harness_dir / "workflows"
-            for legacy in sorted(legacy_dir.glob("*.workflow.md")):
-                reports.append(
-                    DoctorLine(
-                        DoctorStatus.EXTRA,
-                        f"retired-workflow-projection:{legacy.relative_to(workspace_root)}",
-                    )
-                )
 
         return reports
 
@@ -696,17 +515,8 @@ class FileSystemPublicAssetManager:
     # Internal helpers
     # ------------------------------------------------------------------
 
-    def _agents_md_source(self, agentic_dir: Path) -> Path | None:
-        return _agents_md_source(agentic_dir)
-
-    def _consumer_repos(self, workspace_root: Path) -> list[Path]:
-        return _consumer_repos_for_root(workspace_root)
-
-    def _iter_files(self, root: Path) -> Iterable[Path]:
-        return iter_public_files(root)
-
-    def _is_ignored_public_asset(self, path: Path) -> bool:
-        return is_ignored_public_asset(path)
+    def _staged_sources(self) -> Iterable[Path]:
+        return (f for name in _COPY_DIRS for f in iter_public_files(self._public_dir / name))
 
     def _compare(self, src: Path, dst: Path, label: str) -> DoctorLine:
         if not dst.exists():
@@ -715,48 +525,6 @@ class FileSystemPublicAssetManager:
             return DoctorLine(DoctorStatus.DRIFT, f"{label}")
         return DoctorLine(DoctorStatus.OK, f"{label}")
 
-    def _check_symlink_targets(self, workspace_root: Path) -> list[DoctorLine]:
-        """SYMLINK-TARGET-1 — every ledgered harness view still points at the authored set.
-
-        One authored set (``.agents/skills/``, ``.agents/agents/``) with N harness
-        views replaced the per-harness byte-drift classes that used to compare a copy
-        of the law per harness dir. The install ledger is what makes the replacement
-        checkable: it records each entry's KIND, so a view that was installed as a
-        symlink and is now a plain file — or a dangling link, or a link retargeted at
-        a foreign path, or a fallback copy that drifted — is nameable without
-        re-deriving the projection plan. ``file`` entries are ordinary projections,
-        already compared byte-wise by the rule table.
-        """
-        states_dir = workspace_root / ".dadaia" / "states"
-        ledger = self._install_ledger_store.read(states_dir)
-        if ledger is None:
-            return []
-        linked = [entry for entry in ledger.entries if entry.kind != "file"]
-        if not linked:
-            return []
-        out: list[DoctorLine] = []
-        for entry in sorted(linked, key=lambda e: e.relpath):
-            canonical = workspace_root / ".agents" / entry.relpath.partition("/")[2]
-            defect = link_entry_defect(workspace_root / entry.relpath, canonical)
-            if defect is not None:
-                out.append(
-                    DoctorLine(DoctorStatus.ERROR, f"SYMLINK-TARGET-1 {entry.relpath}: {defect}")
-                )
-        if out:
-            # The one repair for every SYMLINK-TARGET-1 finding: re-project the harness
-            # views onto the authored set.
-            repair = fix_line(workspace_root, "public", "install", "--force")
-            out.append(DoctorLine(DoctorStatus.INFO, f"fix: {repair}"))
-            return out
-        return [
-            DoctorLine(
-                DoctorStatus.OK,
-                f"symlink-target: {len(linked)} projected views resolve to the authored set",
-            )
-        ]
-
     def _check_public_privacy(self) -> list[DoctorLine]:
         """Fail doctor if public distributed assets contain known private identifiers."""
-        return _check_public_privacy_fn(
-            self._public_dir, self._iter_files, self._is_ignored_public_asset
-        )
+        return _check_public_privacy_fn(self._public_dir, iter_public_files)

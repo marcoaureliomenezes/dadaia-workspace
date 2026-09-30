@@ -18,27 +18,17 @@ failures after two local-green runs):
    marker while a fresh CI checkout emits the ``(baseline structural scan, no operator
    denylist)`` variant. → :func:`norm_path_line` canonicalizes both to the bare marker;
    :func:`is_env_doctor_line` excludes live source-repo ``git-dirty`` lines entirely.
-   ``codex_trust_boundary_info`` (v0.4.3 A22.3) probes the REAL installed ``codex``
-   binary's version at runtime, so its whole line is host-state too — a dev sandbox
-   with Codex installed reports a different line than a CI runner without it. →
-   :func:`canon_env_line` canonicalizes the whole line to one fixed marker (leak class
-   3's mechanism, not class 1's exclusion, since the attesting-check governance test
-   requires the ``codex:trust-boundary`` substring to keep appearing in the golden).
 2. **iteration-order** — directory-iteration order differs across OSes (Windows yielded
    ``pi/extensions/*`` before ``pi/SYSTEM.md`` where Linux sorted the reverse) and is
    not a product contract. → :func:`sort_line_lists` locks the exact MULTISET of lines
    per key (order-insensitive, count-preserving).
-3. **OS-phrase** — probes that EXECUTE something report the host OS's wording (POSIX
-   ``exited 127 ... missing executable``; Windows ``[WinError 193]``). The invariant is
-   *that the probe errored for that wrapper*, not the OS's words. →
-   :func:`canon_env_line` (the D-CX-9 wrapper regex).
-4. **path-version** — absolute fixture roots and ``os.sep`` leak machine identity into
+3. **path-version** — absolute fixture roots and ``os.sep`` leak machine identity into
    plain-text and JSON-escaped output. → :func:`norm_path_line` /
    :func:`norm_panel_body` scrub the workspace root to ``<WS>`` and canonicalize
    separators (the v0.1.55 platform-invariant law).
-5. **clock** — ``datetime.now`` timestamps differ per run. → :func:`norm_panel_body`
+4. **clock** — ``datetime.now`` timestamps differ per run. → :func:`norm_panel_body`
    replaces every ISO-8601 timestamp with ``<TS>``.
-6. **Rich-width** — Typer/Rich renders usage errors with ANSI colour + a box wrapped at
+5. **Rich-width** — Typer/Rich renders usage errors with ANSI colour + a box wrapped at
    an env-dependent terminal width, splitting asserted substrings across borders on CI
    while staying plain locally (the v0.1.57 QA-atom law). → :func:`norm_stderr`.
 
@@ -61,7 +51,6 @@ import pytest
 
 __all__ = [
     "assert_golden",
-    "canon_env_line",
     "is_env_doctor_line",
     "norm_path_line",
     "norm_stderr",
@@ -70,21 +59,6 @@ __all__ = [
 
 # Any ISO-8601 timestamp (with or without fractional seconds / offset / Z).
 _TS_RE = re.compile(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})?")
-
-# The D-CX-9 probe EXECUTES the codex hook wrapper, so its error text is OS-phrased.
-_DCX9_WRAPPER_RE = re.compile(
-    r"^\[(?:error|unsupported)\] codex hook wrapper .*? (\.dadaia/hooks/\S+?):.*\(D-CX-9\)$"
-)
-
-# codex_trust_boundary_info (A22.3, v0.4.3 T-043-34) probes the REAL installed `codex`
-# binary's version at runtime — host-state, leak class 1 (whether/which Codex CLI is on
-# PATH varies host to host, e.g. a dev sandbox with Codex installed vs a CI runner
-# without it). Canonicalize the whole line to one fixed marker regardless of which of
-# the three branches (absent / certified-version-match / uncertified-version) the
-# capturing host produced — a doctor golden's job is to prove a trust-boundary line
-# still appears at all, not to pin its host-dependent wording; the exact per-branch wording is unit-tested directly against
-# an injected fake probe in test_codex_rule_corpus_reachable.py.
-_CODEX_TRUST_BOUNDARY_RE = re.compile(r"^\[info\] codex:trust-boundary — .*\(WS-CDX-HYGIENE\)$")
 
 # ANSI colour escapes emitted by Rich when it detects (or is forced into) a colour tty.
 _ANSI_RE = re.compile(r"\x1b\[[0-9;]*m")
@@ -130,35 +104,15 @@ def is_env_doctor_line(line: object) -> bool:
     return "git-dirty" in _as_text(line)
 
 
-def canon_env_line(line: object) -> str:
-    """Canonicalize OS-dependent doctor probe text (leak class 3 — the D-CX-9 wrapper).
-
-    The D-CX-9 probe EXECUTES the codex hook wrapper, so its error text is the host
-    OS's phrasing (POSIX: "exited 127 ... missing executable .../python"; Windows:
-    "launch failed ... [WinError 193] ..."). The invariant is that the probe errored
-    for that wrapper — not the OS's words. Keep the wrapper path, canonicalize the
-    reason.
-    """
-    text = _DCX9_WRAPPER_RE.sub(
-        r"[unsupported] codex hook wrapper probe failed \1 (D-CX-9)", _as_text(line)
-    )
-    return _CODEX_TRUST_BOUNDARY_RE.sub(
-        "[info] codex:trust-boundary — <host-dependent live Codex CLI version "
-        "observation> (WS-CDX-HYGIENE)",
-        text,
-    )
-
-
 def sort_line_lists(obj: object) -> object:
     """Sort every list-of-strings in the captured object (leak class 2 — dir order).
 
     Directory-iteration order differs across OSes and is not a product contract. The
     golden locks the exact MULTISET of lines per key — order-insensitive,
-    count-preserving. String lines are additionally canonicalized for OS-dependent
-    probe text (:func:`canon_env_line`).
+    count-preserving.
     """
     if isinstance(obj, list) and all(isinstance(x, str) or hasattr(x, "render") for x in obj):
-        return sorted(canon_env_line(x) for x in obj)
+        return sorted(_as_text(x) for x in obj)
     if isinstance(obj, dict):
         return {k: sort_line_lists(v) for k, v in obj.items()}
     return obj

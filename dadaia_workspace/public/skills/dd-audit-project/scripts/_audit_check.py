@@ -15,15 +15,24 @@ from typing import Any
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from _audit_schema import (  # noqa: E402
-    AUDITS,
-    CODE,
-    DISPOSITIONS,
-    FINDINGS,
-    HISTO,
-    load_schema,
-    validate,
-)
+from _ledger import load_schema, validate  # noqa: E402
+
+CODE = "LEDGER-FINDINGS-SCHEMA"
+AUDITS = "audits"
+HISTO = "audits/_archive/audits_histo.jsonl"
+FINDINGS = "FINDINGS.jsonl"
+#: The three pillars every audit reports counts for, in their fixed order.
+PILLARS = ("bugs", "specs", "memory")
+#: A finding is born `open` and exits by exactly one of these four words.
+DISPOSITIONS = ("resolved", "superseded", "deferred", "rejected")
+#: The evidence each terminal word requires — the finding's governance triple is the
+#: only surviving record of how it was closed.
+REQUIRED_EVIDENCE = {
+    "resolved": "release", "superseded": "release",
+    "deferred": "reason", "rejected": "reason",
+}  # fmt: skip
+#: The three fields `disposition` rewrites; every other field is the immutable core.
+GOVERNANCE = ("disposition", "release", "reason")
 
 Finding = dict[str, Any]
 

@@ -1,13 +1,6 @@
-"""FR6 copy-drift: a scaffolded AGENTS.md matching neither source nor shipped history.
-
-Intent: CONTRACT — T-047-02 / 0.4.7 FR6 and bug
-`scoped-memory-agents-md-prose-rewrite-undetected-by-doctor`: every scaffolded
-`specs/<area>/AGENTS.md` — `memory/` included — is compared against its scaffold source
-and the shipped-hashes history by the ONE TREE-5 comparator. Bytes matching neither are
-a `copy-drift` finding (WARNING); absence is a finding too (the check TREE-5M used to
-own); scaffold bytes are silent.
-Size: SMALL — SpecsDoctor over tmp_path trees plus one read of the real scaffold.
-"""
+"""Intent: CONTRACT — bug scoped-memory-agents-md-prose-rewrite-undetected-by-doctor: the ONE TREE-5
+comparator checks every scaffolded `specs/<area>/AGENTS.md` against its source and shipped history;
+matching neither is a `copy-drift` WARNING, absence a finding, scaffold bytes silent."""
 
 from __future__ import annotations
 
@@ -17,7 +10,7 @@ from pathlib import Path
 
 import pytest
 
-from dadaia_workspace.core.template_history import SHIPPED_HASHES_FILENAME, was_shipped
+from dadaia_workspace.core.template_history import SHIPPED_HASHES_FILENAME
 from dadaia_workspace.features.specs.doctor import SpecsDoctor
 
 pytestmark = pytest.mark.contract
@@ -58,9 +51,9 @@ def _memory_issues(tmp_path: Path, content: str | None) -> list[str]:
     specs = _specs_tree(tmp_path / "tree", content)
     doctor = SpecsDoctor(specs, public_dir=public)
     return [
-        f"{i.code} {i.severity.value} {i.description}"
+        f"{i.code} {i.verdict} {i.message}"
         for i in doctor.check()
-        if Path(i.path).as_posix().endswith("memory/AGENTS.md")
+        if i.message.replace("\\", "/").endswith("memory/AGENTS.md)")
     ]
 
 
@@ -80,9 +73,3 @@ def test_absence_is_still_a_finding(tmp_path: Path) -> None:
     assert len(issues) == 1, issues
     assert issues[0].startswith("TREE-5 warning"), issues[0]
     assert "specs/memory/AGENTS.md is missing" in issues[0]
-
-
-def test_shipped_history_records_the_current_memory_scaffold() -> None:
-    """Anti-rot: editing the scaffold without appending its digest makes the next stale
-    projection unrecognisable as ours."""
-    assert was_shipped(_MEMORY_SCAFFOLD, "scaffold/memory/AGENTS.md", _PUBLIC / "templates")

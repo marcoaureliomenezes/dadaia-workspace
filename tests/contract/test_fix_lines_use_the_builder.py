@@ -123,3 +123,36 @@ def test_the_scan_catches_a_hand_built_fix() -> None:
     source = 'X = f"fix: {DADAIA_BIN} doctor"\nY = Step("r", ".dadaia/.venv/bin/dadaia doctor")\n'
     hits = [line for line, pieces in _fix_positions(ast.parse(source)) if _hand_built(pieces)]
     assert sorted(set(hits)) == [1, 2]
+
+
+def _instruction_sites() -> list[str]:
+    """Every non-docstring literal instructing the reader to run a CLI verb by hand."""
+    from dadaia_workspace.cli.help_digest import command_paths
+
+    verbs = "|".join(sorted({path[0] for path in command_paths() if path}))
+    rule = re.compile(
+        rf"(?:['`]|\$\(|\b[Rr]e-?run:? |\b[Rr]un:? |\bwith |\buntil |\bthen )dadaia ({verbs})\b"
+    )
+    found: list[str] = []
+    for path in sorted(_PKG.rglob("*.py")):
+        if path == _BUILDER:
+            continue
+        tree = ast.parse(path.read_text(encoding="utf-8"))
+        docs = {
+            id(node.body[0].value)
+            for node in ast.walk(tree)
+            if isinstance(node, ast.Module | ast.FunctionDef | ast.ClassDef)
+            and node.body
+            and isinstance(node.body[0], ast.Expr)
+        }
+        for node in ast.walk(tree):
+            text = node.value if isinstance(node, ast.Constant) else None
+            if isinstance(text, str) and id(node) not in docs and rule.search(text):
+                found.append(f"{path.relative_to(_PKG).as_posix()}:{node.lineno}")
+    return found
+
+
+def test_every_cli_instruction_is_spelled_by_cli_line() -> None:
+    """Intent: sa-fix-lines-not-built-by-cli-line#S1 — an instruction to run the CLI, fix
+    position or prose (``Run: dadaia migrate``), is spelled by ``core/cli_line``."""
+    assert _instruction_sites() == []

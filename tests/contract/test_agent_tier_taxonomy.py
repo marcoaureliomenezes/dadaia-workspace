@@ -1,4 +1,4 @@
-"""Intent: CONTRACT — core.agent_model_templates FR2 table and ruling G-1 (Fable never on dd-code-reviewer)
+"""Intent: CONTRACT — core.model_registry FR2 table and ruling G-1 (Fable never on dd-code-reviewer)
 
 MANDATORY tier-taxonomy contract (v0.1.60 FR6 / Ruling 17 — reworked v0.1.65 FR9).
 
@@ -12,7 +12,7 @@ The word "tier" names two distinct axes and this contract machine-enforces the s
 v0.1.65 rework (FR9): the staged core agent bodies are now MODEL-AGNOSTIC templates
 (FR1 — render-at-install injects the resolved ``model:``/``effort:``), so this contract
 stops pinning per-file frontmatter rosters and instead pins the **built-in template
-registry** in ``core/agent_model_templates.py``:
+registry** in ``core/model_registry.py`` (sa-agent-model-resolved-by-two-modules: one module):
 
   (a) the full contents of the 3 built-in templates (the FR2 table, verbatim);
   (b) ``balanced`` is the default;
@@ -33,12 +33,12 @@ import pytest
 import yaml
 
 import dadaia_workspace
-from dadaia_workspace.core.agent_model_templates import (
+from dadaia_workspace.core.model_registry import (
     CORE_AGENTS,
-    default_template,
-    list_templates,
+    TEMPLATES,
+    is_fable_model,
+    registry_by_claude_id,
 )
-from dadaia_workspace.core.model_registry import is_fable_model, registry_by_claude_id
 
 pytestmark = pytest.mark.contract
 
@@ -101,38 +101,33 @@ _MODEL_TIER: dict[str, str] = {
 def test_builtin_templates_pin_fr2_table_default_and_registry_tiers() -> None:
     """(a)+(b)+(d): the FR2 table verbatim, ``balanced`` is the single default, and every
     template cell's model resolves in REGISTRY with the pinned tier."""
-    templates = {t.id: t for t in list_templates()}
-    assert set(templates) == set(_EXPECTED_TEMPLATES), sorted(templates)
+    assert list(TEMPLATES) == list(_EXPECTED_TEMPLATES)  # balanced first: the default
     registry = registry_by_claude_id()
     for template_id, expected_roster in _EXPECTED_TEMPLATES.items():
-        template = templates[template_id]
-        actual = {agent: (a.model, a.effort) for agent, a in template.assignments.items()}
+        cells = TEMPLATES[template_id]
+        actual = {agent: (a.model, a.effort) for agent, a in cells.items()}
         assert actual == expected_roster, (
             f"template {template_id!r} drifted from the FR2 table: {actual}"
         )
-        for agent, assignment in template.assignments.items():
+        for agent, assignment in cells.items():
             assert assignment.model in registry, (
-                f"{template.id}/{agent}: model {assignment.model!r} not registry-known"
+                f"{template_id}/{agent}: model {assignment.model!r} not registry-known"
             )
             assert assignment.model in _MODEL_TIER, (
-                f"{template.id}/{agent}: model {assignment.model!r} not in the pinned "
+                f"{template_id}/{agent}: model {assignment.model!r} not in the pinned "
                 "tier map — extend _MODEL_TIER deliberately"
             )
             assert registry[assignment.model].tier == _MODEL_TIER[assignment.model], (
-                f"{template.id}/{agent}: {assignment.model!r} must resolve to the "
+                f"{template_id}/{agent}: {assignment.model!r} must resolve to the "
                 f"{_MODEL_TIER[assignment.model]!r} registry tier"
             )
-
-    assert default_template().id == "balanced"
-    defaults = [t.id for t in list_templates() if t.default]
-    assert defaults == ["balanced"]
 
 
 def test_no_template_assigns_fable_to_security_reviewer() -> None:
     """(c): G-1 — Fable is NEVER assigned to dd-code-reviewer, in any template."""
-    for template in list_templates():
-        assert not is_fable_model(template.assignments["dd-code-reviewer"].model), (
-            f"template {template.id!r} assigns Fable to dd-code-reviewer (G-1 violation)"
+    for template_id, cells in TEMPLATES.items():
+        assert not is_fable_model(cells["dd-code-reviewer"].model), (
+            f"template {template_id!r} assigns Fable to dd-code-reviewer (G-1 violation)"
         )
 
 

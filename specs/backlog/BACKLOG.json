@@ -24,6 +24,166 @@
       "status": "idea",
       "description": "Deferred by ADR 0046 (operator grill round 3, 2026-09-25): the pre-push gate resolves the gitflow from the pushed repo's own specs/constitution.md, else the owning context's main-repo constitution, else the default with a warning. An associated repo carries no specs/, so it inherits the main repo's gitflow block {principal, integration, work}. When an associated repo's principal (or integration) branch has a different name than the main repo's, the inherited block names the wrong branches and its pushes are judged against them. A later evolution would let the gitflow block (or a per-repo entry beside it) name an override for one associated repo, read by the same resolution at push time. Not before the operator reopens it.",
       "provenance": "operator grill 2026-09-25 (onboarding foundation, round 3, Q5), ADR 0046 consequences: 'A per-repo override for an associated repo whose principal differs is backlog.'; grill handoff 2026-09-25T050500Z-main-thread-foundation-grill-r3: 'Backlog to add: per-repo gitflow override for associated repos.'"
+    },
+    {
+      "id": "gate-judges-bash-writes",
+      "title": "The PreToolUse gate judges Bash writes as it judges file-tool writes",
+      "opened": "2026-09-28",
+      "status": "idea",
+      "description": "A Bash write (sed -i, rm, mkdir, >, python3 -m pip, uv pip) is never judged, so a root, PROTECTED or out-of-scope path blocked through Write is allowed through Bash, and rm .claude/settings.json disarms the gate. Evidence: rubric 0.5.0 at a5e9a2ee (.dadaia/tmp/general-purpose/20260928/rubric-050/RUBRIC.md) J5 table, Top 5 #1; the root map \u00a73 is corrected by bug gate-law-claims-out-of-scope-writes-blocked-but-bash-is-never-judged.",
+      "provenance": "operator closure ruling 2026-09-28: the rest is mapped to the backlog; source rubric 0.5.0 at a5e9a2ee (.dadaia/tmp/general-purpose/20260928/rubric-050/RUBRIC.md)"
+    },
+    {
+      "id": "bind-scope-durable-on-every-harness",
+      "title": "A bind is reachable by the hooks and stays live on every harness",
+      "opened": "2026-09-28",
+      "status": "idea",
+      "description": "On Cursor/Copilot/Devin/Kimi an in-session context bind carries no session id the hooks match; Devin/Cursor/Copilot have no PostToolUse heartbeat; after the 300 s TTL lapses (any harness) an out-of-scope Write is allowed. Evidence: rubric 0.5.0 at a5e9a2ee (.dadaia/tmp/general-purpose/20260928/rubric-050/RUBRIC.md) J5 bind lapse, J9 gaps, N3, Top 5 #5; core/session_store.py ttl_seconds.",
+      "provenance": "operator closure ruling 2026-09-28: the rest is mapped to the backlog; source rubric 0.5.0 at a5e9a2ee (.dadaia/tmp/general-purpose/20260928/rubric-050/RUBRIC.md)"
+    },
+    {
+      "id": "ctx-inject-on-cursor-copilot",
+      "title": "Cursor and Copilot sessions receive the ctx-inject memory and bind prompt",
+      "opened": "2026-09-28",
+      "status": "idea",
+      "description": "Cursor and Copilot project only the preToolUse gate and the sessionStart doctor, so they get no ctx-inject: no memory bootstrap, no bind prompt. Evidence: rubric 0.5.0 at a5e9a2ee (.dadaia/tmp/general-purpose/20260928/rubric-050/RUBRIC.md) J9 projections, N3.",
+      "provenance": "operator closure ruling 2026-09-28: the rest is mapped to the backlog; source rubric 0.5.0 at a5e9a2ee (.dadaia/tmp/general-purpose/20260928/rubric-050/RUBRIC.md)"
+    },
+    {
+      "id": "doctor-context-ignores-other-contexts",
+      "title": "doctor --context X judges only X's repos",
+      "opened": "2026-09-28",
+      "status": "idea",
+      "description": "dadaia doctor --context invoicer exits 1 on slop in another context's repo (repos/payroll/.pytest_cache). Evidence: rubric 0.5.0 at a5e9a2ee (.dadaia/tmp/general-purpose/20260928/rubric-050/RUBRIC.md) J8 S6; 0.4.7 blockers table, still OPEN.",
+      "provenance": "operator closure ruling 2026-09-28: the rest is mapped to the backlog; source rubric 0.5.0 at a5e9a2ee (.dadaia/tmp/general-purpose/20260928/rubric-050/RUBRIC.md)"
+    },
+    {
+      "id": "release-memory-idempotent",
+      "title": "release.py memory appends the closure's one kind: memory entry once",
+      "opened": "2026-09-28",
+      "status": "idea",
+      "description": "A second release.py memory call appends a second kind: memory log entry. Evidence: rubric 0.5.0 at a5e9a2ee (.dadaia/tmp/general-purpose/20260928/rubric-050/RUBRIC.md) J6, N5; the memory verb of dd-release-implementation/scripts/release.py.",
+      "provenance": "operator closure ruling 2026-09-28: the rest is mapped to the backlog; source rubric 0.5.0 at a5e9a2ee (.dadaia/tmp/general-purpose/20260928/rubric-050/RUBRIC.md)"
+    },
+    {
+      "id": "guidance-messages-name-the-right-target",
+      "title": "Guidance messages name the bound context and the real target",
+      "opened": "2026-09-28",
+      "status": "idea",
+      "description": "SessionStart shows a session bound to invoicer the next step of payroll; the root-whitelist fix line proposes mkdir .dadaia/tmp instead of where the file belongs; HOOKS-DRIFT-1 says differs for an absent hook. Evidence: rubric 0.5.0 at a5e9a2ee (.dadaia/tmp/general-purpose/20260928/rubric-050/RUBRIC.md) N6, J8 S1; hooks/root_whitelist.py, features/spec_context/doctor.py HOOKS-DRIFT-1.",
+      "provenance": "operator closure ruling 2026-09-28: the rest is mapped to the backlog; source rubric 0.5.0 at a5e9a2ee (.dadaia/tmp/general-purpose/20260928/rubric-050/RUBRIC.md)"
+    },
+    {
+      "id": "consumer-guidance-names-no-library-toolchain",
+      "title": "Consumer-facing guidance names no library-only tool",
+      "opened": "2026-09-28",
+      "status": "idea",
+      "description": "The installed pre-push hook comment still says run dadaia ci preflight, which refuses consumer repos; docs/getting-started.md step 7 names release-please; the develop/main push refusal's fix is gh pr create. Evidence: rubric 0.5.0 at a5e9a2ee (.dadaia/tmp/general-purpose/20260928/rubric-050/RUBRIC.md) J7; 0.4.7 blockers table, ci preflight and gitflow rows PARTIAL; public/scripts/pre-push-ci-gate.sh, features/chokepoints/branch_policy.py.",
+      "provenance": "operator closure ruling 2026-09-28: the rest is mapped to the backlog; source rubric 0.5.0 at a5e9a2ee (.dadaia/tmp/general-purpose/20260928/rubric-050/RUBRIC.md)"
+    },
+    {
+      "id": "init-announces-codex-trust",
+      "title": "init --harness codex announces the Codex project-trust step",
+      "opened": "2026-09-28",
+      "status": "idea",
+      "description": "init is silent on Codex project trust; only dd-ai-eng-knowhow/CODEX.md mentions it. Evidence: rubric 0.5.0 at a5e9a2ee (.dadaia/tmp/general-purpose/20260928/rubric-050/RUBRIC.md) J9; 0.4.7 blockers table, NEW-FR-12 PARTIAL.",
+      "provenance": "operator closure ruling 2026-09-28: the rest is mapped to the backlog; source rubric 0.5.0 at a5e9a2ee (.dadaia/tmp/general-purpose/20260928/rubric-050/RUBRIC.md)"
+    },
+    {
+      "id": "tests-agents-scaffold-without-placeholders",
+      "title": "specs init renders tests/AGENTS.md without placeholders",
+      "opened": "2026-09-28",
+      "status": "idea",
+      "description": "The scaffolded tests/AGENTS.md keeps <UNIT_TIMEOUT_S>, <PACKAGE>, <COVERAGE_FLOOR>; doctor warns AGENTS-PLACEHOLDER-1. Evidence: rubric 0.5.0 at a5e9a2ee (.dadaia/tmp/general-purpose/20260928/rubric-050/RUBRIC.md) J3; 0.4.7 blockers table, OPEN (surfaced); public/templates/tests-AGENTS.md.",
+      "provenance": "operator closure ruling 2026-09-28: the rest is mapped to the backlog; source rubric 0.5.0 at a5e9a2ee (.dadaia/tmp/general-purpose/20260928/rubric-050/RUBRIC.md)"
+    },
+    {
+      "id": "task-line-grammar-one-reader",
+      "title": "One task-line grammar reads TASKS.md",
+      "opened": "2026-09-28",
+      "status": "idea",
+      "description": "_release_schema.UNFINISHED_RE accepts a + bullet before a task marker; doctor_release._TASK_BLOCK_RE accepts only - or *. Evidence: public/skills/dd-release-implementation/scripts/_release_schema.py UNFINISHED_RE, features/specs/doctor_release.py _TASK_BLOCK_RE.",
+      "provenance": "operator closure ruling 2026-09-28: the rest is mapped to the backlog; source the 0.5.0 closure review"
+    },
+    {
+      "id": "ledger-schema-one-engine",
+      "title": "Ledger schemas are validated by one JSON-Schema engine",
+      "opened": "2026-09-28",
+      "status": "idea",
+      "description": "The shipped ledger scripts validate with _ledger.validate, a stdlib JSON-Schema subset walker, while the doctor validates with jsonschema Draft202012Validator; the residue of resolved bug sa-json-schema-validated-by-two-engines. Evidence: public/skills/dd-bug-resolution/scripts/_ledger.py validate, features/specs/schemas.py validator_for.",
+      "provenance": "operator closure ruling 2026-09-28: the rest is mapped to the backlog; source the 0.5.0 closure review"
+    },
+    {
+      "id": "preflight-ci-parity-derived",
+      "title": "The preflight/CI parity test derives both sides from their sources",
+      "opened": "2026-09-28",
+      "status": "idea",
+      "description": "The parity test matches checks_for() and ci.yml against two identical hand-kept marker dicts, so a check named in neither (the doctor its docstring claims) is never compared. Evidence: tests/contract/test_ci_preflight_ci_gating_parity.py _LOCAL_MARKERS, _CI_MARKERS.",
+      "provenance": "operator closure ruling 2026-09-28: the rest is mapped to the backlog; source the 0.5.0 closure review"
+    },
+    {
+      "id": "dadaiaignore-and-root-core-canon",
+      "title": "c5: .dadaiaignore replaces instance_exceptions.txt, a two-level root canon, init scaffolds the root files, core protected in two layers",
+      "opened": "2026-09-29",
+      "status": "idea",
+      "description": "Operator design (grill 2026-09-26, ADRs 0092-0096), back in 0.5.0 by ADR 0101 (operator 2026-09-29). Deliver: a root .dadaiaignore, operator-only and PROTECTED, replacing .dadaia/states/instance_exceptions.txt 1:1 (0092); its stdlib grammar, invalid line = doctor finding (0093); level-1 library core in core/workspace_layout.py incl. worktrees/ and .dadaiaignore, level 2 = .dadaiaignore (0094); init creates prompt.md, AGENTS.md, .dadaiaignore from a template (0095); gate blocks agent writes to core law/state, doctor --fix at SessionStart self-heals missing core, no Bash parsing (0096). Today: root whitelist exists; worktrees/ and .dadaiaignore absent from canon. Blocks canonical-worktrees (worktrees/ must be canon) and operator-protected-path-class. OPEN QUESTIONS for the operator (not resolved by the product engineer): (1) grill R2 'a missing .venv is fixed by uvx dadaia-workspace init <ws>' vs ADR 0067 (without the venv every gate wrapper warns and exits 0) and open bug missing-venv-hook-disarms-the-gate-invisibly: without the venv core protection's gate layer is off - which rules? (2) ADR 0092 / grill Q6 applies .dadaiaignore to harness directories, but ADR 0059 (later) says the doctor judges only ledger-owned entries there - does .dadaiaignore reach harness-dir interiors or only their top level? (3) ADR 0096 'no Bash parsing' vs the idea gate-judges-bash-writes (closure ruling 2026-09-28) - keep both, or reject one?",
+      "provenance": "operator grill 2026-09-26 (c5, Q1-Q6, R1-R3), handoff reports/main-thread/20260927-050-c4-evidence/handoffs/2026-09-26T211000Z-main-thread-grill-050-c4-c5-c6.handoff.json findings[3]-[9]; ADRs 0092-0096; deferred by ADR 0053 (2026-09-27), returned to 0.5.0 by operator ruling 2026-09-29 ('Coloque', ADR 0101); inventory rows A01-A03 in reports/main-thread/20260929-050-rc1-audit/leftbehind/ (REPORT.md, inventory.json)"
+    },
+    {
+      "id": "canonical-worktrees",
+      "title": "c6: workspace-owned worktrees at worktrees/<repo>/<M.m.p><letter> on local wt/ branches, merged then deleted, with audit/recognize/clean verbs",
+      "opened": "2026-09-29",
+      "status": "idea",
+      "description": "Operator design (grill 2026-09-26, ADRs 0097-0100), back in 0.5.0 by ADR 0101 (operator 2026-09-29). Deliver: worktrees at worktrees/<repo>/<M.m.p><letter>, local branch wt/<same> cut from the work branch, never pushed, never under .dadaia/tmp (0097, amends 0002); only for release implementation and bug fixes, specs never edited there except TASKS.md markers, other specs/ changes refused at merge (0098); always merged into repos/<repo> then deleted, verbs audit/recognize/clean, orphan wt/* reported by list and doctor, cleaning the worst case (0099); multi-harness first, harness-native worktrees allowed but workspace policy wins (0100). Today: only the R11 Arm B fix (reaper spares linked worktrees, tests/integration/test_reaper_spares_linked_worktrees.py). Depends on: dadaiaignore-and-root-core-canon (worktrees/ in level-1 canon), worktree-harness-mechanics-study (round 3 runs after it). Closes: deferred bugs concurrent-sessions-share-git-index-commit-boundary-contamination and concurrent-agent-git-add-clobbers-other-sessions-staged-files-into-unrelated-commit (ADR 0002: one index per checkout; a worktree per session is the cure). NEEDS GRILL ROUND 3 - the four open questions, verbatim: (1) 'c6 round 3 (after harness worktree research): TASKS.md marker merge between parallel worktrees (adjacent-line conflicts) - replay marker flips at merge?' (2) 'c6: merge verb = integrate + remove in one step? remove refuses dirty; an unmerged branch survives removal (tool never deletes commits)?' (3) 'c6: closure refusal while any worktree or wt/* branch exists; bug resolution requires the fix commit on the work branch?' (4) 'c6: gate scope for worktrees/<repo>/<name>/ maps to repo <repo>; per-worktree test env setup; Claude WorktreeCreate hook redirect feasibility'.",
+      "provenance": "operator grill 2026-09-26 (c6, Q9, R7-R11), handoff reports/main-thread/20260927-050-c4-evidence/handoffs/2026-09-26T211000Z-main-thread-grill-050-c4-c5-c6.handoff.json findings[10]-[12],[16] and decisions_required[0]-[3]; ADRs 0097-0100; deferred by ADR 0053, returned to 0.5.0 by operator ruling 2026-09-29 (ADR 0101); inventory rows A05-A07 in reports/main-thread/20260929-050-rc1-audit/leftbehind/ (REPORT.md, inventory.json)"
+    },
+    {
+      "id": "worktree-harness-mechanics-study",
+      "title": "c6 study: how Claude Code, Codex and Cursor do worktrees, and what makes them robust to copy",
+      "opened": "2026-09-29",
+      "status": "idea",
+      "description": "Operator design (grill 2026-09-26 R10, ADR 0100): before canonical-worktrees closes its design, study each harness's native worktree mechanics (creation, location, branch naming, cleanup, hooks such as Claude Code's WorktreeCreate, session cwd) and copy what makes them robust into the workspace policy. Output feeds grill round 3 of canonical-worktrees; a read-only study, no code.",
+      "provenance": "operator grill 2026-09-26 (c6, R10), handoff reports/main-thread/20260927-050-c4-evidence/handoffs/2026-09-26T211000Z-main-thread-grill-050-c4-c5-c6.handoff.json findings[12]; ADR 0100; inventory row A08 in reports/main-thread/20260929-050-rc1-audit/leftbehind/ (REPORT.md, inventory.json)"
+    },
+    {
+      "id": "operator-protected-path-class",
+      "title": "DEC-11: an operator-protected path class the gate enforces in every harness",
+      "opened": "2026-09-29",
+      "status": "idea",
+      "description": "Deferred by ADR 0053 (2026-09-27) and kept deferred by ADR 0101 (operator 2026-09-29) until the operator rules otherwise. Today an operator-only folder inside a consumer repo is guarded only by one harness's permissions.deny; Codex and the others carry no protection. Remediation-plan DEC-11 options: (a) an operator glob file read by the gate in every harness (about +25 lines), the law stating Bash is not covered (backstop git/pre-push); (b) keep it per-harness config plus the git backstop, the law saying so. Recommendation (a). Grill 2026-09-26 Q2 routed 'operator-declared protection file' to the backlog. Depends on dadaiaignore-and-root-core-canon (same operator-file grammar). Open question: (a) or (b), and whether it is a second operator file or a section of .dadaiaignore.",
+      "provenance": "operator grill 2026-09-26 Q2 (handoff reports/main-thread/20260927-050-c4-evidence/handoffs/2026-09-26T211000Z-main-thread-grill-050-c4-c5-c6.handoff.json findings[4]); remediation-plan DEC-11 (reports/main-thread/20260927-050-c4-evidence/verify/plan.json); ADR 0053; ADR 0101; inventory row A04 in reports/main-thread/20260929-050-rc1-audit/leftbehind/ (REPORT.md, inventory.json)"
+    },
+    {
+      "id": "docs-site-zensical-pages",
+      "title": "c7: the docs site per ADR 0039 - Zensical on GitHub Pages, generated reference pages with a staleness check, README about 60 lines",
+      "opened": "2026-09-29",
+      "status": "idea",
+      "description": "ADR 0039 (operator grill 2026-09-24), deferred not superseded by ADR 0053 and kept deferred by ADR 0101 until the operator rules otherwise. Deliver: CLI reference, onboarding step table and doctor codes generated with a staleness check (measured_by tests/contract/test_docs_generated.py, which does not exist yet); docs/ published by Zensical to GitHub Pages with a generated llms.txt; README about 60 lines. Today (2026-09-29): docs/*.md, the docs/cli.md digest and llms.txt exist; no Zensical, the Pages URL answers 404, README 159 lines. Unblocks launch-operator-acts (D3 Pages, D5 homepage).",
+      "provenance": "ADR 0039 (grill 2026-09-24), ADR 0053 (2026-09-27), ADR 0101 (operator 2026-09-29); inventory row A09 in reports/main-thread/20260929-050-rc1-audit/leftbehind/ (REPORT.md, inventory.json)"
+    },
+    {
+      "id": "clone-detection",
+      "title": "Clone detection (duplicate-code scanning) as a systemic-ambiguity check",
+      "opened": "2026-09-29",
+      "status": "idea",
+      "description": "Listed out of scope in specs/releases/0.5.0/SPEC.md ('Clone detection.') with no entry to hold it. The c4 as-is scan (f) measured it: 11 exact normalized-AST clone groups, mostly script-to-script copies the self-contained-script law sanctions; it misses the divergent copies that caused the ambiguity bugs (WP-26 status parser, WP-29 frontmatter grammar) and was not adopted in favour of a parity test per sanctioned pair (reports/main-thread/20260927-050-c4-evidence/c4/ASIS-B.md scan (f)). The operator decides: pick it with a design that finds divergent copies, or reject it.",
+      "provenance": "0.5.0 SPEC 'Out of scope and deferred' (candidate 4 definition, 2026-09-27); c4 as-is scan (f); inventory row A11 in reports/main-thread/20260929-050-rc1-audit/leftbehind/ (REPORT.md, inventory.json)"
+    },
+    {
+      "id": "launch-operator-acts",
+      "title": "0.4.7 operator acts D3-D6 that never happened: skills repo + token, Pages, marketplace PR, homepage/topics, launch posts",
+      "opened": "2026-09-29",
+      "status": "idea",
+      "description": "The 0.4.7 rc-9 SPEC (specs/releases/_archive/0.4.7/rc-9/SPEC.md, D3-D6) left these to the operator, and backlog entries standalone-skills-distribution and public-presence-and-launch exited 'delivered' with the summary 'operator acts D3-D6 pending'. Checked 2026-09-29: repo dadaia-skills not found; Pages 404; homepage = PyPI; topics lack agent-skills, cursor, github-copilot, devin. Acts: D3 create the public skills repo, the SKILLS_REPO_TOKEN secret, enable Pages; D4 marketplace PR and the install line in the README; D5 gh repo edit homepage and topics; D6 video, Show HN, awesome-list PRs. Operator acts, not library code; D3's Pages and D5's homepage depend on docs-site-zensical-pages.",
+      "provenance": "0.4.7 rc-9 SPEC D3-D6 (2026-09-21); histo records standalone-skills-distribution, public-presence-and-launch; inventory row A10 in reports/main-thread/20260929-050-rc1-audit/leftbehind/ (REPORT.md, inventory.json); operator order 2026-09-29"
+    },
+    {
+      "id": "test-intent-docstring-backfill",
+      "title": "Backfill the Intent: module docstring on the unit and integration test files that lack it",
+      "opened": "2026-09-29",
+      "status": "idea",
+      "description": "Deferred at 0.4.6 rc-3 closure ('new task ids') and never picked. dd-test-stewardship requires every test module to declare 'Intent: <KIND> - <AC id | bug-id | ...>' in its docstring. Counted 2026-09-29 on feature/0.5.0: tests/unit 29 of 149 files and tests/integration 7 of 55 lack it; tests/e2e and tests/contract are complete. A file deleted by the 0.5.0 test reduction leaves the count; the rest gets its intent or is itself a deletion candidate (a test that cannot state its intent).",
+      "provenance": "0.4.6 rc-3 SPEC Out of scope (specs/releases/_archive/0.4.6/rc-3/SPEC.md); inventory row A12 in reports/main-thread/20260929-050-rc1-audit/leftbehind/ (REPORT.md, inventory.json); operator order 2026-09-29"
     }
   ]
 }

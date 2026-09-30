@@ -9,12 +9,11 @@ with empty stdout and BLOCK with a ``{"decision":"block",...}`` envelope; both a
 on the subprocess result, never by importing ``main()`` in-process.
 
 Rewritten from the old in-process ``root_whitelist.main()`` + ``sys.stdin`` simulation (the
-pattern the harness-env contract bans). The workspace root the gate consults is delivered
-through ``WORKSPACE_ROOT`` — a real harness-provided var — set by ``claude_hook_env``.
+pattern the harness-env contract bans). The gate resolves the workspace root from the
+write target and the session cwd, as in production (sa-seven-workspace-root-rules#S3).
 
 CRIT: root-whitelist is a deterministic enforcement policy — every current input survives
-below as a named parametrized row, including the W1-6 first-path-component block and the
-fail-open-for-existing-operator-dir decision.
+below as a named parametrized row, including the W1-6 first-path-component block.
 """
 
 from __future__ import annotations
@@ -26,11 +25,14 @@ from typing import Any
 import pytest
 
 from dadaia_workspace.core.workspace_layout import INSTANCE_EXCEPTIONS
+from dadaia_workspace.infrastructure.git_subprocess import GitSubprocessClient
 from tests.fixtures.harness_env import claude_hook_env, run_hook_subprocess
+from tests.fixtures.stores import context_store
 
 
 def _ws(tmp_path: Path) -> Path:
     (tmp_path / ".dadaia" / "states").mkdir(parents=True)
+    (tmp_path / ".dadaia" / "states" / "spec_contexts.json").write_text("{}", encoding="utf-8")
     return tmp_path
 
 
@@ -43,42 +45,42 @@ def _run(tmp_path: Path, payload: dict[str, Any]) -> tuple[str, dict[str, Any] |
 
 
 def test_block_message_lists_every_whitelisted_entry(tmp_path: Path) -> None:
-    """The block reason is DERIVED from the policy — it can never lag the whitelist.
-
-    Consumer-gate bug class (v0.2.8): the message literal omitted a whitelisted dir while the
-    policy already allowed it. Assert the reason names EVERY whitelisted basename and the
-    one exceptions file the policy reads.
-    """
-    from dadaia_workspace.hooks.root_whitelist import _WHITELIST
-
+    """sa-gate-allows-root-entries-the-reaper-moves#E1, #E7: the block names every root
+    entry the law admits, and neither its text nor its fix points the agent at the
+    operator's exceptions file (DEC-1 (a))."""
     _out, block = _run(
-        tmp_path, {"tool_name": "Write", "tool_input": {"file_path": str(tmp_path / "junk.txt")}}
+        _ws(tmp_path),
+        {"tool_name": "Write", "tool_input": {"file_path": str(tmp_path / "junk.txt")}},
     )
     assert block is not None
     reason = block["reason"]
-    for entry in _WHITELIST:
-        assert entry in reason, f"{entry} missing from the block message: {reason}"
-    assert INSTANCE_EXCEPTIONS in reason
-    assert "root_exceptions" not in reason
+    assert (
+        ".agents/ .claude/ .codex/ .cursor/ .dadaia/ .devin/ .git/ .github/ repos/ "
+        ".env .gitignore AGENTS.md prompt.md"
+    ) in reason
+    assert INSTANCE_EXCEPTIONS not in reason
+    assert "instance_exceptions" not in reason
 
 
-@pytest.mark.parametrize("name", [".env", ".gitignore"])
+@pytest.mark.parametrize("name", [".env", ".gitignore", "AGENTS.md", "prompt.md"])
 def test_law_declared_root_files_are_canon_for_the_hook_and_the_doctor(
     tmp_path: Path, name: str
 ) -> None:
-    """Bug doctor-root1-flags-env-that-dadaia-md-9-declares-canonical: the root `AGENTS.md` map §4
+    """sa-gate-allows-root-entries-the-reaper-moves#E8, #E6. Bug
+    doctor-root1-flags-env-that-dadaia-md-9-declares-canonical: the root `AGENTS.md` map §4
     names the root ``.env`` as the one credential home and §5.3 presumes a root
     ``.gitignore``, yet ``ROOT_ALLOWED_FILES`` listed neither — the hook blocked the write
     and the doctor flagged the file. Both derive from that one set, so one row fixes both."""
     from dadaia_workspace.features.spec_context.doctor import DoctorService, FindingVerdict
-    from tests.fakes import FakeContextStore, FakeGitClient
 
     ws = _ws(tmp_path)
     out, block = _run(tmp_path, {"tool_name": "Write", "tool_input": {"file_path": str(ws / name)}})
     assert (out, block) == ("", None)
 
     (ws / name).write_text("", encoding="utf-8")
-    findings = DoctorService(FakeContextStore(), FakeGitClient(), ws).scan()
+    findings = DoctorService(
+        context_store(ws / ".dadaia" / "states"), GitSubprocessClient(), ws
+    ).scan()
     assert {f.path: f.verdict for f in findings if f.code.startswith("WS-root-")}[name] is (
         FindingVerdict.CANON
     )
@@ -102,6 +104,7 @@ def test_law_declared_root_files_are_canon_for_the_hook_and_the_doctor(
 def test_block_table(
     tmp_path: Path, name: str, target_fn: Callable[[Path], Path], reason_fragment: str
 ) -> None:
+    """sa-gate-allows-root-entries-the-reaper-moves#E1: a new root entry is blocked."""
     ws = _ws(tmp_path)
     target = target_fn(ws)
     _out, block = _run(tmp_path, {"tool_name": "Write", "tool_input": {"file_path": str(target)}})
@@ -118,17 +121,6 @@ def test_block_table(
         ("whitelisted_root_entry", None, lambda ws: ws / "AGENTS.md", "Write", "file_path"),
         ("subdir_write", None, lambda ws: ws / "repos" / "x" / "file.py", "Write", "file_path"),
         ("unparseable_path_fails_open", None, None, "Write", None),
-        (
-            # A nested write into an EXISTING (operator-created) top-level dir stays
-            # allowed. Only a not-yet-existing first component is blocked; an existing
-            # non-whitelisted top-level entry is presumed operator-created (fail-open per
-            # the Root Law).
-            "nested_write_under_existing_operator_dir",
-            lambda ws: (ws / "operator-tool").mkdir(),
-            lambda ws: ws / "operator-tool" / "sub" / "note.txt",
-            "Write",
-            "file_path",
-        ),
         (
             # A deep write under a whitelisted root entry (.dadaia/...) is allowed
             # regardless.
@@ -148,6 +140,7 @@ def test_allow_table(
     tool_name: str,
     input_key: str | None,
 ) -> None:
+    """sa-gate-allows-root-entries-the-reaper-moves#E8: law-admitted entries and writes below them are allowed."""
     ws = _ws(tmp_path)
     if setup_fn is not None:
         setup_fn(ws)
@@ -183,6 +176,7 @@ def test_allow_table(
 def test_exception_glob_table(
     tmp_path: Path, name: str, exceptions_content: str, target_fn: Callable[[Path], Path]
 ) -> None:
+    """sa-gate-allows-root-entries-the-reaper-moves#E2: an operator glob allows the entry."""
     ws = _ws(tmp_path)
     (ws / INSTANCE_EXCEPTIONS).write_text(exceptions_content, encoding="utf-8")
     target = target_fn(ws)
@@ -192,15 +186,3 @@ def test_exception_glob_table(
     )
     assert out == ""
     assert block is None
-
-
-def test_legacy_root_exceptions_file_is_not_a_reader_anymore(tmp_path: Path) -> None:
-    """FR6: ``INSTANCE_EXCEPTIONS`` is the one exceptions file the hook reads; the retired
-    ``root_exceptions.txt`` grants nothing until ``dadaia doctor --fix`` migrates it."""
-    ws = _ws(tmp_path)
-    (ws / ".dadaia" / "states" / "root_exceptions.txt").write_text("*.png\n", encoding="utf-8")
-    _out, block = _run(
-        tmp_path, {"tool_name": "Write", "tool_input": {"file_path": str(ws / "shot.png")}}
-    )
-    assert block is not None
-    assert block["decision"] == "block"

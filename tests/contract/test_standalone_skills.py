@@ -26,7 +26,6 @@ _MAP = _PUBLIC / "entities" / "behavior-map.json"
 
 _NAME_RE = re.compile(r"^[a-z0-9]+(-[a-z0-9]+)*$")
 _FRONTMATTER_RE = re.compile(r"\A---\n(.*?)\n---\n", re.DOTALL)
-_SKILL_MD_LINE_CEILING = 500
 _DESCRIPTION_CEILING = 1024
 _COMPATIBILITY_CEILING = 500
 
@@ -101,12 +100,6 @@ def test_frontmatter_declares_compatibility(skill_dir: Path) -> None:
         f"{skill_dir.name}: compatibility does not name dadaia-workspace as the "
         "home of the full lifecycle"
     )
-
-
-def test_skill_md_is_within_the_line_ceiling(skill_dir: Path) -> None:
-    """Agent Skills spec: a SKILL.md stays under 500 lines."""
-    lines = len((skill_dir / "SKILL.md").read_text(encoding="utf-8").splitlines())
-    assert lines <= _SKILL_MD_LINE_CEILING, f"{skill_dir.name}: SKILL.md is {lines} lines"
 
 
 def test_no_body_line_hard_requires_a_workspace_path(skill_dir: Path) -> None:

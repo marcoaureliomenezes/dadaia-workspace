@@ -18,7 +18,7 @@ from typing import Any
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from _audit_schema import AUDITS, DISPOSITIONS, FINDINGS, PILLARS, REQUIRED_EVIDENCE  # noqa: E402
+from _audit_check import AUDITS, DISPOSITIONS, FINDINGS, PILLARS, REQUIRED_EVIDENCE  # noqa: E402
 from _audit_store import (  # noqa: E402
     SCRIPT,
     Refusal,
@@ -95,12 +95,13 @@ def close(specs: Path, audit: str, sha: str) -> str:
         )
     pillars = Counter(str(record.get("pillar")) for record in records)
     verdicts = Counter(str(record.get("disposition")) for record in records)
+    verdict = "resolved" if releases else "deferred" if verdicts["deferred"] else "rejected"
     append_histo(specs, {
         "id": audit,
         "ts": datetime.now(tz=UTC).strftime("%Y-%m-%d"),
-        "disposition": "resolved",
+        "disposition": verdict,
         "release": releases[0] if releases else None,
-        "reason": None,
+        "reason": None if releases else f"no finding resolved ({dict(verdicts) or 'none'})",
         "summary": ", ".join(f"{pillar} {pillars[pillar]}" for pillar in PILLARS),
         "entry": {
             "sha": sha,

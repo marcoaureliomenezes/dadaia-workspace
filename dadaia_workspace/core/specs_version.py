@@ -6,96 +6,53 @@ source of truth (:data:`CANONICAL_SPECS_VERSION`); each project records its own
 version in the ``specs_pattern_version`` field of ``specs/constitution.md``'s YAML
 frontmatter.
 
-Absent-stamp semantics: a constitution with no frontmatter (or no
-``specs_pattern_version`` key) is treated as **version 0** — pre-framework, the flat
-layout that predates the tree-v2 migration. Doctor warns and recommends
-``dadaia specs upgrade``.
+A tree with no stamp is ``foreign``; :func:`state` is the one reader of all of it.
 """
 
 from __future__ import annotations
 
-import re
 from pathlib import Path
 from typing import Literal
 
+from dadaia_workspace.core.cli_line import fix_line
 from dadaia_workspace.core.frontmatter import Frontmatter, parse
 from dadaia_workspace.core.gitflow import constitution_error, constitution_text, specs_tree_exists
 
 #: Single source of truth for the current canonical specs-pattern version.
-#: Bump this when a new migration step is added to the registry (see ``registry.py``).
+#: Bump this whenever the canon a tree must meet changes.
 #: v3 = agent-tier-frontmatter (v0.1.72 FR1); v4 = bugs-single-file (v0.1.73 FR1 —
 #: the operator's ONE-append-only-ledger contract); v5 = specs-canon-v6's tree shape
 #: (T-050-05); v6 = this stamp, T-050-06A — the version number itself, deferred by
-#: T-050-05 because RELEASE_SEMVER_RE's axis flip (below) is this task's write set;
+#: T-050-05 because the release-id axis flip was this task's write set;
 #: v7 = memory canon v7 — ``memory/TECHSTACK.md`` left the canon and its body became
-#: ``ARCHITECTURE.md``'s ``## Tech Stack`` section, which ``features/migrate`` folds.
-CANONICAL_SPECS_VERSION = 7
+#: ``ARCHITECTURE.md``'s ``## Tech Stack`` section, which ``features/migrate`` folds;
+#: v8 = the 0.5.0 canon — fixed law sections, the gitflow block, the refreshed area laws
+#: and catalog, all written by the repair set ``specs init`` runs. A canon change that
+#: keeps the stamp leaves every older tree reading ``canonical`` while the doctor is red.
+CANONICAL_SPECS_VERSION = 8
 
 #: The oldest stamp the one live upgrade hop starts from — and so the oldest a tree may
 #: carry and still be a dadaia tree (SPEC 0.4.8 D7, D9); anything older is foreign.
 OLDEST_UPGRADABLE_VERSION = 6
-
-#: Version assigned to a tree with no stamp (pre-framework flat layout).
-UNSTAMPED_VERSION = 0
-
-#: Single source of truth for the release-directory SemVer form (v0.1.53 FR3, flipped
-#: to canon v6 / two-axis form at T-050-06A, SPEC FR1 boundary 2a / AS-13). This is the
-#: ONE compiled home for the pattern — previously triplicated in
-#: ``features/specs/scaffolder.py``, ``features/specs/doctor.py``, and the retired
-#: ``features/spec_artifacts/new_artifacts.py`` (its ``release_new`` now lives in
-#: ``features/specs/canon.py``, v0.5.1 K4). Every consumer imports THIS object; the
-#: agreement contract ``tests/contract/test_release_semver_canon.py`` locks the identity
-#: (same compiled object everywhere) and forbids any re-introduced ``re.compile`` copy.
-#:
-#: Two axes, ONE compiled object (AS-13): the current, LIVE axis is bare
-#: ``MAJOR.MINOR.PATCH`` (canon v6 moved live/archived release ids off the ``v`` prefix);
-#: the retired axis (every id shipped before v0.5.0's canon move) is ``vMAJOR.MINOR.PATCH``
-#: and stays matched here ONLY so an existing archived directory still resolves for
-#: read-only lookups (doctor naming checks). The ``v``
-#: prefix is therefore OPTIONAL in this object, but ``is_release_semver()`` below narrows
-#: to the bare, current-axis form ONLY — nothing may *mint* a new ``v``-prefixed id. Both
-#: axes keep the optional ``-suffix`` segment (rc/canary/hotfix flows are legitimate
-#: release identities on either axis).
-RELEASE_SEMVER_RE = re.compile(r"^v?\d+\.\d+\.\d+(-[0-9A-Za-z][0-9A-Za-z.]*)?$")
-
-#: The bare release-id pattern FRAGMENT (no anchors, no ``v`` prefix), mechanically
-#: derived from :data:`RELEASE_SEMVER_RE` — never a second hand-typed copy (F004,
-#: 20260830 audit). The one composable source for path regexes embedding a release id
-#: (``features/specs/canon.py``'s TREE-8 canon entries).
-#: The suffix group stays CAPTURING in the compiled pattern but is neutralized here so
-#: embedding the fragment never shifts a consumer regex's group indices.
-RELEASE_ID_FRAGMENT: str = (
-    RELEASE_SEMVER_RE.pattern.removeprefix("^v?").removesuffix("$").replace("(-", "(?:-")
-)
+State = Literal["absent", "malformed", "foreign", "upgradable", "canonical"]
 
 
-def is_release_semver(value: str) -> bool:
-    """Return ``True`` when ``value`` is the CURRENT-axis release id: bare
-    ``MAJOR.MINOR.PATCH`` (optional ``-suffix``), no ``v`` prefix.
-
-    The single MINT predicate (AS-13/A1.10, T-050-06A): "is this string a value a NEW
-    release/segment may be created under?" A ``v``-prefixed id matches the broader
-    :data:`RELEASE_SEMVER_RE` (it must still resolve for archived-directory lookups) but
-    is refused here — the retired axis is read-only, never mintable again. Used by
-    ``release.py new``. Callers that also accept the
-    legacy slug form compose this with their own slug check.
-    """
-    return RELEASE_SEMVER_RE.match(value) is not None and not value.startswith("v")
-
-
-def read_pattern_version(specs_dir: Path) -> int:
-    """The constitution's ``specs_pattern_version``; :data:`UNSTAMPED_VERSION` (0) when
-    the constitution, its frontmatter or the key is absent or unreadable."""
-    fm = parse(constitution_text(specs_dir))
-    value = fm.data.get("specs_pattern_version") if isinstance(fm, Frontmatter) else None
-    return value if isinstance(value, int) and not isinstance(value, bool) else UNSTAMPED_VERSION
-
-
-def classify(specs_dir: Path) -> Literal["absent", "malformed", "dadaia", "foreign"]:
-    """``absent`` (no directory), ``malformed`` (:func:`constitution_error`), ``dadaia``
-    (stamped >= 6) or ``foreign`` — a tree without a dadaia constitution (ADR 0047)."""
-    if not specs_tree_exists(specs_dir):
-        return "absent"
-    if constitution_error(specs_dir):
-        return "malformed"
-    return "dadaia" if read_pattern_version(specs_dir) >= OLDEST_UPGRADABLE_VERSION else "foreign"
+def state(
+    specs_dir: Path, text: str | None = None, *, root: Path | None = None, context: str = "<ctx>"
+) -> tuple[State, str | None]:
+    """The ONE reader of a specs tree's state and its one fix (``None`` when canonical) — of
+    *text* when given (a pushed commit's constitution, ``""`` when it carries none), else
+    of the tree on disk. A constitution whose YAML or gitflow block fails is ``malformed``."""
+    if text is None and not specs_tree_exists(specs_dir):
+        kind: State = "absent"
+    elif reason := constitution_error(specs_dir, text):
+        return "malformed", f"Operator action: repair the YAML frontmatter of {reason}"
+    else:
+        fm = parse(constitution_text(specs_dir) if text is None else text)
+        stamp = fm.data.get("specs_pattern_version") if isinstance(fm, Frontmatter) else None
+        stamp = stamp if isinstance(stamp, int) and not isinstance(stamp, bool) else 0
+        if stamp >= CANONICAL_SPECS_VERSION:
+            return "canonical", None
+        kind = "upgradable" if stamp >= OLDEST_UPGRADABLE_VERSION else "foreign"
+    consent = ("--replace-foreign",) if kind == "foreign" else ()
+    return kind, fix_line(root, "specs", "init", "--context", context, *consent)

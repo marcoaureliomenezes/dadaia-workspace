@@ -7,8 +7,8 @@ contract, drifting apart by construction.
 
 This module runs each script's `check --specs <dir> --json` and re-emits its findings.
 It lives in `infrastructure/` because running a subprocess is an infrastructure act
-(`features` may not import `subprocess` — setup.cfg), and the CLI composition root is
-the only caller.
+(`features` may not import `subprocess` — setup.cfg). Its rows are the one table of
+the scripts' paths: every `fix:` naming a ledger script spells it by `<ROW>.invocation`.
 
 The interpreter is always `sys.executable`: the installed script may have no exec bit
 (Windows), and the venv's Python is the one that must read the tree.
@@ -23,16 +23,22 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Protocol
 
-from dadaia_workspace.core.cli_line import fix_line
+from dadaia_workspace.core.cli_line import fix_line, script_line
 from dadaia_workspace.core.doctor_rules import SectionFinding
 from dadaia_workspace.core.workspace_resolver import own_workspace_root
 from dadaia_workspace.infrastructure.subprocess_runner import SubprocessProcessRunner
 
 __all__ = [
+    "AUDIT_SCRIPT",
+    "BACKLOG_SCRIPT",
+    "BUGS_SCRIPT",
     "LEDGER_SCRIPTS",
+    "MEMORY_SCRIPT",
+    "RELEASE_SCRIPT",
     "LedgerScript",
     "resolve_script",
     "script_findings",
+    "script_repairs",
 ]
 
 #: The package's own copy of the skills — the fallback when the doctored tree is a bare
@@ -53,6 +59,9 @@ class LedgerScript:
     name: str
     skill: str
     filename: str
+    #: The script's own verb that re-derives a DERIVED ledger from its source — empty
+    #: for a ledger of record, which no repair may rewrite.
+    regenerate: tuple[str, ...] = ()
 
     @property
     def code(self) -> str:
@@ -61,17 +70,16 @@ class LedgerScript:
     @property
     def invocation(self) -> str:
         """The `fix:` spelling — the installed path, run through the interpreter."""
-        return f"python3 .agents/skills/{self.skill}/scripts/{self.filename}"
+        return script_line(f".agents/skills/{self.skill}/scripts/{self.filename}")
 
 
 #: One row per ledger script (0.4.7 FR2's table). A new ledger is a row, never a branch.
-LEDGER_SCRIPTS: tuple[LedgerScript, ...] = (
-    LedgerScript("BUGS", "dd-bug-resolution", "bugs.py"),
-    LedgerScript("BACKLOG", "dd-backlog-definition", "backlog.py"),
-    LedgerScript("RELEASE", "dd-release-implementation", "release.py"),
-    LedgerScript("FINDINGS", "dd-audit-project", "audit.py"),
-    LedgerScript("MEMORY", "dd-spec-navigator", "memory.py"),
-)
+BUGS_SCRIPT = LedgerScript("BUGS", "dd-bug-resolution", "bugs.py")
+BACKLOG_SCRIPT = LedgerScript("BACKLOG", "dd-backlog-definition", "backlog.py")
+RELEASE_SCRIPT = LedgerScript("RELEASE", "dd-release-implementation", "release.py")
+AUDIT_SCRIPT = LedgerScript("FINDINGS", "dd-audit-project", "audit.py")
+MEMORY_SCRIPT = LedgerScript("MEMORY", "dd-spec-navigator", "memory.py", ("catalog", "generate"))
+LEDGER_SCRIPTS = (BUGS_SCRIPT, BACKLOG_SCRIPT, RELEASE_SCRIPT, AUDIT_SCRIPT, MEMORY_SCRIPT)
 
 
 class _Runner(Protocol):
@@ -119,7 +127,7 @@ def _unrunnable(script: LedgerScript, reason: str) -> SectionFinding:
     )
 
 
-def _finding(script: LedgerScript, record: dict[str, Any]) -> SectionFinding:
+def _finding(script: LedgerScript, record: dict[str, Any], specs_dir: Path) -> SectionFinding:
     unit = f"{record.get('path', '')}:{record.get('line', 0)}".strip(":")
     return SectionFinding(
         code=str(record.get("code") or script.code),
@@ -127,7 +135,11 @@ def _finding(script: LedgerScript, record: dict[str, Any]) -> SectionFinding:
         message=f"{unit} {record.get('message', '')}".strip(),
         canonical=False,
         error=str(record.get("verdict") or "error") == "error",
-        fix=f"{script.invocation} check --specs specs",
+        fix=str(
+            record.get("fix")
+            or f"Operator action: {specs_dir.resolve() / record['path']} line "
+            f"{record.get('line', 0)} is invalid; repair that line by hand, then commit."
+        ),
     )
 
 
@@ -150,8 +162,30 @@ def script_findings(specs_dir: Path, runner: _Runner | None = None) -> list[Sect
         if records is None:
             findings.append(_unrunnable(script, f"check exited {result.returncode} with no JSON"))
             continue
-        findings.extend(_finding(script, record) for record in records)
+        findings.extend(_finding(script, record, specs_dir) for record in records)
     return findings
+
+
+def script_repairs(specs_dir: Path, runner: _Runner | None = None) -> list[str]:
+    """Re-derive every derived ledger whose check has findings, through its ONE writer —
+    the repair never writes a ledger itself."""
+    process = runner if runner is not None else SubprocessProcessRunner()
+    repaired: list[str] = []
+    for script in LEDGER_SCRIPTS:
+        path = resolve_script(script, specs_dir) if script.regenerate else None
+        if path is None:
+            continue
+        run = [sys.executable, str(path)]
+        tail = ["--specs", str(specs_dir)]
+        checked = process.run(
+            [*run, "check", *tail], cwd=specs_dir.parent, timeout=_TIMEOUT_SECONDS
+        )
+        if checked.returncode == 1:
+            process.run(
+                [*run, *script.regenerate, *tail], cwd=specs_dir.parent, timeout=_TIMEOUT_SECONDS
+            )
+            repaired.append(f"[ledgers] {script.code}: {' '.join(script.regenerate)}")
+    return repaired
 
 
 def _parse(result: Any) -> list[dict[str, Any]] | None:

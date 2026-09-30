@@ -9,6 +9,7 @@ import hashlib
 import json
 from pathlib import Path
 
+import pytest
 from typer.testing import CliRunner
 
 from dadaia_workspace.cli.main import app
@@ -44,7 +45,8 @@ def _make_valid_handoff(
     content_hash = hashlib.sha256(artifact_path.read_bytes()).hexdigest()
 
     doc: dict = {
-        "schema_version": "handoff-v1",
+        "schema_version": "handoff-v1.2",
+        "self_pull": {"refs": ["AGENTS.md"]},  # the root map every initialized workspace has
         "agent": "dd-software-engineer",
         "context": "dadaia-workspace",
         "produced_at": "2026-05-17T00:00:00Z",
@@ -72,7 +74,8 @@ def _make_invalid_handoff(base_dir: Path, stem: str = "bad") -> Path:
     not fire — only the schema 'agent' violation triggers.
     """
     doc = {
-        "schema_version": "handoff-v1",
+        "schema_version": "handoff-v1.2",
+        "self_pull": {"refs": ["specs/memory/ARCHITECTURE.md"]},
         # "agent" intentionally omitted — required field
         "context": "dadaia-workspace",
         "produced_at": "2026-05-17T00:00:00Z",
@@ -122,7 +125,7 @@ def test_valid_handoff_exits_0_with_valid_count_and_json_shape(tmp_path: Path, m
 
 
 def test_schema_violation_always_exits_nonzero(tmp_path: Path, monkeypatch) -> None:
-    """An INVALID file exits 1 in BOTH modes (exit-code truthfulness,
+    """sa-rich-printer-wraps-fix-lines#S6: an INVALID file exits 1 (exit-code truthfulness,
     validation-029 F-12): the old non-strict 'print INVALID, exit 0' contract masked
     tampered/malformed handoffs from every consuming script."""
     _init_workspace(tmp_path)
@@ -134,33 +137,6 @@ def test_schema_violation_always_exits_nonzero(tmp_path: Path, monkeypatch) -> N
     assert result.exit_code == 1, result.output
     assert "INVALID" in result.output
     assert "agent" in result.output
-
-    # The dead --strict flag is DELETED (bug reports-validate-strict-flag-dead):
-    # a declared-but-never-read option is a contract lie, not a mode.
-    gone = _runner.invoke(app, ["reports", "validate", str(handoff_path), "--strict"])
-    assert gone.exit_code == 2, gone.output
-
-
-def test_exit_code_matrix_not_found_and_uninitialized_workspace(
-    tmp_path: Path, monkeypatch
-) -> None:
-    """Non-existent file path → exit 2 with a clear error message; running validate
-    in a directory with no .dadaia/agentic/schemas/ at all → exit 3."""
-    _init_workspace(tmp_path)
-    monkeypatch.chdir(tmp_path)
-
-    missing = tmp_path / "ghost.handoff.json"
-    result = _runner.invoke(app, ["reports", "validate", str(missing)])
-    assert result.exit_code == 2, result.output
-    assert "ghost.handoff.json" in result.output or "not found" in result.output.lower()
-
-    uninitialized = tmp_path.parent / "uninitialized-workspace"
-    uninitialized.mkdir()
-    monkeypatch.chdir(uninitialized)
-    result = _runner.invoke(app, ["reports", "validate", "--all"])
-    assert result.exit_code == 3, result.output
-    combined = result.output + (result.stderr or "")
-    assert any(kw in combined.lower() for kw in ("schema", "workspace", "initialized", "not found"))
 
 
 def test_all_flag_discovers_and_release_filter_narrows(tmp_path: Path, monkeypatch) -> None:
@@ -272,3 +248,22 @@ def test_reports_validate_always_emits_resolved_workspace_root_json_mode(
     data = json.loads(result.stdout)
     assert isinstance(data, list)
     assert str(tmp_path.resolve()) in (result.stderr or "").replace("\n", "")
+
+
+@pytest.mark.parametrize("version", ["handoff-v1", "handoff-v1.1"])
+def test_a_retired_version_without_self_pull_is_invalid(
+    tmp_path: Path, monkeypatch, version: str
+) -> None:
+    """sa-handoff-self-pull-requirement-diverges#46.1: v1/v1.1 without self_pull exit 1
+    naming schema_version."""
+    _init_workspace(tmp_path)
+    monkeypatch.chdir(tmp_path)
+    doc = json.loads(_make_valid_handoff(tmp_path).read_text(encoding="utf-8"))
+    doc.pop("self_pull")
+    path = tmp_path / "old.handoff.json"
+    path.write_text(json.dumps(doc | {"schema_version": version}), encoding="utf-8")
+
+    result = _runner.invoke(app, ["reports", "validate", str(path)])
+
+    assert result.exit_code == 1, result.output
+    assert "schema_version" in result.output

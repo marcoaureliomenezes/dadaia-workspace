@@ -61,8 +61,12 @@ def _write_valid_handoff(base_dir: Path, stem: str = "report") -> Path:
     artifact.write_text(f"<html>{stem}</html>", encoding="utf-8")
     content_hash = hashlib.sha256(artifact.read_bytes()).hexdigest()
 
+    atom = base_dir / "specs" / "memory" / "ARCHITECTURE.md"  # the atom it self-pulled
+    atom.parent.mkdir(parents=True, exist_ok=True)
+    atom.write_text("# Architecture\n", encoding="utf-8")
     doc = {
-        "schema_version": "handoff-v1",
+        "schema_version": "handoff-v1.2",
+        "self_pull": {"refs": ["specs/memory/ARCHITECTURE.md"]},
         "agent": "dd-software-engineer",
         "context": "dadaia-workspace",
         "produced_at": "2026-05-17T00:00:00Z",

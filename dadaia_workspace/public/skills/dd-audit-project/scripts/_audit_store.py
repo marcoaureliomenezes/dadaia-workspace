@@ -9,17 +9,23 @@ candidate bytes, run the SAME `check` they will be validated by, then `os.replac
 from __future__ import annotations
 
 import json
-import os
 import sys
 from pathlib import Path
 from typing import Any
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from _audit_check import findings_findings, histo_findings  # noqa: E402
-from _audit_schema import AUDITS, FINDINGS, HISTO  # noqa: E402
+from _audit_check import (  # noqa: E402
+    AUDITS,
+    FINDINGS,
+    HISTO,
+    findings_findings,
+    histo_findings,
+)
+from _ledger import replace  # noqa: E402
+from _specs import script  # noqa: E402
 
-SCRIPT = Path(__file__).parent / "audit.py"
+SCRIPT = script(Path(__file__).parent / "audit.py")
 
 
 class Refusal(Exception):
@@ -34,13 +40,13 @@ def audit_dir(specs: Path, audit: str, fix: str) -> Path:
     """Resolve one live audit directory, or refuse naming the ones that exist.
 
     *audit* is operator input naming a directory `close` DELETES, so it is CONFINED
-    before it is read: the fully resolved target must sit strictly inside the resolved
-    ``specs/audits/``. One containment rule covers every escape shape — ``..``
+    before it is read: the fully resolved target must be a direct child of the resolved
+    ``specs/audits/`` other than ``_archive``. One containment rule covers every escape shape — ``..``
     traversal, an absolute path, and a symlink out of the tree (CWE-22/CWE-59).
     """
     audits = (specs / AUDITS).resolve()
     target = (audits / audit).resolve()
-    if target != audits and target.is_relative_to(audits) and (target / FINDINGS).is_file():
+    if target.parent == audits and target.name != "_archive" and (target / FINDINGS).is_file():
         return target
     live = sorted(
         child.name
@@ -55,33 +61,21 @@ def audit_dir(specs: Path, audit: str, fix: str) -> Path:
 
 
 def read_findings(directory: Path) -> list[dict[str, Any]]:
-    """Every record of *directory*'s FINDINGS.jsonl, or a refusal naming the bad line."""
+    """Every record of *directory*'s FINDINGS.jsonl, refused unless the document passes
+    the same check every write runs — no verb writes the pair from an invalid document."""
     text = (directory / FINDINGS).read_text(encoding="utf-8")
-    records: list[dict[str, Any]] = []
-    for number, line in enumerate(text.split("\n"), start=1):
-        if not line.strip():
-            continue
-        try:
-            records.append(json.loads(line))
-        except json.JSONDecodeError as exc:
-            raise Refusal(
-                f"specs/{AUDITS}/{directory.name}/{FINDINGS} line {number} is not valid "
-                f"JSON ({exc.msg}) — refusing to rewrite a file this script cannot read "
-                "in full",
-                f"{SCRIPT} check --specs <specs>",
-            ) from exc
-    return records
+    problems = findings_findings(text, f"{AUDITS}/{directory.name}/{FINDINGS}")
+    if problems:
+        raise Refusal(
+            f"specs/{AUDITS}/{directory.name}/{FINDINGS} line {problems[0]['line']} does not "
+            f"pass check ({problems[0]['message']}) — nothing was written",
+            f"{SCRIPT} check",
+        )
+    return [json.loads(line) for line in text.split("\n") if line.strip()]
 
 
 def serialize(records: list[dict[str, Any]]) -> str:
     return "".join(json.dumps(r, sort_keys=True, ensure_ascii=False) + "\n" for r in records)
-
-
-def _replace(path: Path, text: str) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    tmp = path.with_name(f".{path.name}.{os.getpid()}.tmp")
-    tmp.write_text(text, encoding="utf-8")
-    os.replace(tmp, path)
 
 
 def write_findings(directory: Path, records: list[dict[str, Any]]) -> None:
@@ -92,9 +86,9 @@ def write_findings(directory: Path, records: list[dict[str, Any]]) -> None:
         raise Refusal(
             f"the resulting {FINDINGS} would not pass check — nothing was written "
             f"({problems[0]['message']})",
-            f"{SCRIPT} check --specs <specs>",
+            f"{SCRIPT} check",
         )
-    _replace(directory / FINDINGS, text)
+    replace(directory / FINDINGS, text)
 
 
 def append_histo(specs: Path, record: dict[str, Any]) -> None:
@@ -107,8 +101,8 @@ def append_histo(specs: Path, record: dict[str, Any]) -> None:
         raise Refusal(
             f"the {HISTO} record this close would write does not pass check — nothing "
             f"was written ({problems[0]['message']})",
-            f"{SCRIPT} check --specs <specs>",
+            f"{SCRIPT} check",
         )
     path = specs / HISTO
     existing = path.read_text(encoding="utf-8") if path.is_file() else ""
-    _replace(path, existing + line)
+    replace(path, existing + line)

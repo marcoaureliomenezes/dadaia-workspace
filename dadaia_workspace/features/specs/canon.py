@@ -40,8 +40,7 @@ The canon (operator, 2026-08-28) — the ONLY members permitted under ``specs/``
     AGENTS.md constitution.md memory/ releases/ backlog/ bugs/ audits/ ADRs/
 
     releases/{AGENTS.md, _archive/{releases_histo.jsonl, <M.m.p>/**},
-              <M.m.p>/{_RELEASE.json, SPEC.md, PLAN.md, TASKS.md, rc-N/{SPEC,PLAN,TASKS}.md,
-                       <alpha|rc>-N/{SPEC.md, PLAN.md, TASKS.md}}}
+              <M.m.p>/{_RELEASE.json, SPEC.md, PLAN.md, TASKS.md}}
     backlog/{AGENTS.md, BACKLOG.json, _archive/backlog_histo.jsonl}
     bugs/{AGENTS.md, BUGS.jsonl, _archive/bugs_histo.jsonl}
     audits/{AGENTS.md, _archive/audits_histo.jsonl,
@@ -59,25 +58,24 @@ and a git tree listing (``git ls-tree``'s own native output) already produce.
 
 from __future__ import annotations
 
-import errno
-import json
-import os
 from collections.abc import Callable, Iterable
-from dataclasses import dataclass
+from dataclasses import astuple, dataclass
 from datetime import UTC, datetime
 from functools import partial
 from pathlib import Path
 from typing import Literal
 
-from dadaia_workspace.core.specs_version import (
-    CANONICAL_SPECS_VERSION,
-)
+from dadaia_workspace.core.atomic_write import SymlinkRefusedError, atomic_write
+from dadaia_workspace.core.gitflow import DEFAULT
+from dadaia_workspace.core.specs_version import CANONICAL_SPECS_VERSION
 from dadaia_workspace.core.workspace_layout import (
     CANON_ROOT_MEMBERS,
     MEMORY_TOPLEVEL_FILES,
+    REPO_LAW,
     REQUIRED_ROOT_DIRS,
     SPECS_CANON,
     CanonEntry,
+    render_registry_tables,
 )
 from dadaia_workspace.features.specs.memory_canon import (
     FIXED_SECTION_BY_PATH,
@@ -89,8 +87,6 @@ from dadaia_workspace.features.specs.memory_canon import (
 #: canonical names, shared with the root law, the zone table and the projected
 #: ``specs/AGENTS.md`` canon table). This module is their renderer and checker.
 CANON: tuple[CanonEntry, ...] = SPECS_CANON
-
-_NOFOLLOW = getattr(os, "O_NOFOLLOW", 0)
 
 __all__ = [
     "CANON",
@@ -111,7 +107,7 @@ __all__ = [
 _CONSTITUTION_STUB = """\
 ---
 specs_pattern_version: {specs_pattern_version}
-gitflow: {{principal: main, integration: develop, work: feature/}}
+gitflow: {gitflow}
 ---
 # Constitution — {project_name}
 
@@ -143,12 +139,8 @@ _BACKLOG_STUB = '{"schema": "backlog-v1", "active": []}\n'
 #                       several static templates hold literal JSON braces).
 # * ``"format"``      — ``template.format(**context)``; used only where every brace in
 #                       the template is a deliberate placeholder.
-# * ``"json_catalog"`` — one dedicated renderer (``json.dumps``, correctly escaped) —
-#                       the ONE entry needing computed, safely-escaped JSON content;
-#                       folding it into ``"format"`` would risk JSON injection from an
-#                       arbitrary ``project_name``.
 # ---------------------------------------------------------------------------------
-Kind = Literal["copy", "static", "format", "json_catalog"]
+Kind = Literal["copy", "static", "format"]
 
 TEMPLATES: dict[str, tuple[Kind, str]] = {
     "AGENTS.md": ("copy", "templates/specs-AGENTS.md"),
@@ -156,7 +148,6 @@ TEMPLATES: dict[str, tuple[Kind, str]] = {
     "memory/AGENTS.md": ("copy", "scaffold/memory/AGENTS.md"),
     **{f"memory/{name}": ("copy", f"scaffold/memory/{name}") for name in MEMORY_TOPLEVEL_FILES},
     "memory/product/index.md": ("copy", "scaffold/memory/product/index.md"),
-    "memory/product/catalog.json": ("json_catalog", ""),
     "releases/AGENTS.md": ("copy", "scaffold/releases/AGENTS.md"),
     "releases/_archive/releases_histo.jsonl": ("static", ""),
     "backlog/AGENTS.md": ("copy", "scaffold/backlog/AGENTS.md"),
@@ -169,13 +160,6 @@ TEMPLATES: dict[str, tuple[Kind, str]] = {
     "ADRs/AGENTS.md": ("copy", "scaffold/ADRs/AGENTS.md"),
     "ADRs/decisions.jsonl": ("static", ""),
 }
-
-
-#: The main repo's scoped law, beside ``specs/``: ``templates/<name>`` -> ``<repo>/<dest>``.
-REPO_LAW: tuple[tuple[str, str], ...] = (
-    ("repo-AGENTS.md", "AGENTS.md"),
-    ("tests-AGENTS.md", "tests/AGENTS.md"),
-)
 
 
 def is_canon_path(rel_posix: str) -> bool:
@@ -242,27 +226,11 @@ def _today() -> str:
 def _render(entry: CanonEntry, *, public_dir: Path, context: dict[str, str]) -> str:
     kind, template = TEMPLATES[entry.shape]
     if kind == "copy":
-        text = (public_dir / template).read_text(encoding="utf-8")
+        text = render_registry_tables((public_dir / template).read_text(encoding="utf-8"))
     elif kind == "static":
         text = template
-    elif kind == "format":
-        text = template.format(**context)
     else:
-        text = (
-            json.dumps(
-                {
-                    "generated_at": f"{context['today']}T00:00:00Z",
-                    # The catalog's ONE writer is `memory.py catalog generate`, which
-                    # derives `context` from the tree's own directory name; a scaffold
-                    # writing the project label instead was invalid the moment it was
-                    # born (`memory.py check` regenerates and compares).
-                    "context": context["tree_name"],
-                    "features": [],
-                },
-                indent=2,
-            )
-            + "\n"
-        )
+        text = template.format(**context)
     section_id = FIXED_SECTION_BY_PATH.get(entry.dest or "")
     if section_id is None:
         return text
@@ -287,14 +255,12 @@ def scaffold(
     context = {
         "today": _today(),
         "project_name": project_name,
-        "tree_name": specs_dir.resolve().parent.name,
         "specs_pattern_version": str(CANONICAL_SPECS_VERSION),
+        "gitflow": "{{principal: {}, integration: {}, work: {}}}".format(*astuple(DEFAULT)),
     }
     writes: list[tuple[Path, Callable[[], str], bool]] = [
         # Only "no destination" disqualifies an entry: a required_at_birth row always
-        # has a renderer (``memory/product/catalog.json``'s is computed, not a template —
-        # a prior guard skipped it for having no template string and silently dropped it
-        # from every fresh scaffold: fresh-specs-scaffold-fails-specs-doctor's own class).
+        # has a renderer (a skipped row once dropped silently from every fresh scaffold).
         (
             specs_dir / entry.dest,
             partial(_render, entry, public_dir=resolved_public, context=context),
@@ -329,30 +295,28 @@ def scaffold_repo_law(
 
 
 def _fill_repo_name(template: Path, project_name: str) -> str:
-    return template.read_text(encoding="utf-8").replace("<repo-name>", project_name)
+    return render_registry_tables(template.read_text(encoding="utf-8")).replace(
+        "<repo-name>", project_name
+    )
 
 
 def _write_absent(root: Path, writes: list[tuple[Path, Callable[[], str], bool]]) -> list[Path]:
-    """The one scaffold write under *root*: each ``(target, render, overwrite)`` through one
-    ``O_CREAT|O_NOFOLLOW`` open (``O_EXCL`` unless *overwrite*): the final component is
-    created atomically and never through a symlink (CWE-59); intermediate directories are
-    checked for escape before ``mkdir``, not atomically. An existing file or a symlinked
-    destination (ELOOP; EMLINK on BSD) is skipped; any other ``OSError`` propagates."""
+    """The one scaffold write under *root*: each ``(target, render, overwrite)`` through
+    :func:`atomic_write`, which refuses a symlinked destination (CWE-59); intermediate
+    directories are checked for escape before ``mkdir``. An existing file (unless
+    *overwrite*) or a symlinked destination, dangling or not, is skipped."""
     created: list[Path] = []
     for target, render, overwrite in writes:
         anchor = next(p for p in (target.parent, *target.parent.parents) if p.exists() or p == root)
         if root.is_symlink() or anchor.resolve() != root.resolve() / anchor.relative_to(root):
             continue
+        if target.exists() and not overwrite:
+            continue
         target.parent.mkdir(parents=True, exist_ok=True)
-        flags = os.O_WRONLY | os.O_CREAT | _NOFOLLOW | (os.O_TRUNC if overwrite else os.O_EXCL)
         try:
-            fd = os.open(target, flags, 0o644)
-        except OSError as exc:
-            if isinstance(exc, FileExistsError) or exc.errno in (errno.ELOOP, errno.EMLINK):
-                continue
-            raise
-        with os.fdopen(fd, "w", encoding="utf-8") as fh:
-            fh.write(render())
+            atomic_write(target, render())
+        except SymlinkRefusedError:
+            continue
         created.append(target)
     return created
 
@@ -380,6 +344,5 @@ def scaffold_entry(specs_dir: Path, rel_path: str, /, **context: str) -> Path:
         public_dir=default_public_dir(),
         context={"today": _today(), **context},
     )
-    target.parent.mkdir(parents=True, exist_ok=True)
-    target.write_text(rendered, encoding="utf-8")
+    atomic_write(target, rendered, ensure_parent=True)
     return target

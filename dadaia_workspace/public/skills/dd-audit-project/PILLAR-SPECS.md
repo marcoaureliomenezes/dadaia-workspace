@@ -35,10 +35,9 @@ Also input: `.dadaia/.venv/bin/dadaia doctor` against every release the window t
 
 ## SPEC provenance and the one exit
 
-1. For each release's SPEC in the window, confirm `**Consumes:**` names the backlog entry/entries it picked.
-2. Confirm the release-definition commit (shape 5) flipped those entries to `status: picked` in `BACKLOG.json`.
-3. Confirm each picked entry left `active[]` exactly once, at that release's closure, as one `backlog_histo.jsonl` record.
-4. Flag a consumed entry with no histo record, or with two — the one-exit contract is unmet.
+1. For each release's SPEC in the window, confirm `**Origin:** backlog:` names the backlog entry/entries it picked.
+2. Confirm each picked entry left `active[]` exactly once, at that release's closure, as one `backlog_histo.jsonl` record.
+3. Flag a consumed entry with no histo record, or with two — the one-exit contract is unmet.
 
 ## Slop readout
 
@@ -50,7 +49,8 @@ Input: the ratchet modules and the window `from-sha..HEAD`. Output: the "Slop re
 3. Read the density of every SPEC in the window: bytes, words, codes per 1,000 words, numbered families outside FR/AC/T-.
 4. Read the GC: each closure's recorded `.dadaia/.venv/bin/dadaia doctor` score line, `archive/` tags whose branch survives.
 5. Sample the ten commits with the most additions; apply `SLOP.md` S1-S5 to each diff — the audit proves the review worked, it never redoes it.
-6. One `FINDINGS-FORMAT.md` record per ratchet that rose or signal hit; ratchet rose HIGH, density over the ceiling MEDIUM, S4/S5 in a sample HIGH.
+6. Fixed hunt, every audit: for each question in the window's PLAN §1.1 tables, search code and law for a second answer — a restated rule, a second symbol; each is an S10 finding, HIGH.
+7. One `FINDINGS-FORMAT.md` record per ratchet that rose or signal hit; ratchet rose HIGH, density over the ceiling MEDIUM, S4/S5 in a sample HIGH, S10 HIGH.
 
 ## Findings
 

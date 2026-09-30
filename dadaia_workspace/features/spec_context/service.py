@@ -25,7 +25,7 @@ from dadaia_workspace.core.exceptions import (
     InvalidContextNameError,
     RepoUrlMissingError,
 )
-from dadaia_workspace.core.gitflow import Gitflow
+from dadaia_workspace.core.gitflow import Gitflow, work_branch
 from dadaia_workspace.core.models.spec_context import (
     CONTEXT_NAME_RE,
     AssociatedRepo,
@@ -41,8 +41,11 @@ from dadaia_workspace.infrastructure.json_context_store import JsonContextStore
 _log = logging.getLogger(__name__)
 
 #: What onboarding writes into a main repo — the only paths ``baseline`` commits.
-_ONBOARDING = ("specs", "specs-bkp", "AGENTS.md")
-_TAG_RE = re.compile(r"v?(\d+)\.(\d+)\.(\d+)")
+_ONBOARDING = ("specs", "specs-bkp", *(dest for _, dest in workspace_layout.REPO_LAW))
+
+
+def _onboarded(rel: str) -> bool:
+    return any(rel == p or rel.startswith(f"{p}/") for p in _ONBOARDING)
 
 
 class InstallHooks(Protocol):
@@ -85,25 +88,9 @@ class DeadSecretFoundError(DadaiaError):
 
 
 class DeadUnpushedCommitsError(DadaiaError):
-    """Raised when a repo in the set has local commits and NO remote to receive them
-    (A16.2).
-
-    FR16: ``dead()`` refuses when **any** repo — main or associated — is dirty or
-    unpushed, naming which one, and checks every repo in the set BEFORE acting on any
-    (no partial dead: a later repo's refusal must never follow an earlier repo already
-    being synced and removed).
-
-    ``unpushed`` is deliberately narrow: ``has_commits() and not has_remote()`` —
-    commits that can genuinely never reach anywhere, not merely "ahead of the last
-    push". dead()'s own Phase 2 (below) already auto-syncs and pushes pending commits
-    whenever a remote exists — including the scaffold commit alive() itself just made
-    (always locally unpushed by design, on every fresh repo). Refusing on
-    "commits ahead of upstream" regardless of ``has_remote()`` would
-    therefore make dead() refuse right after every ordinary alive()-then-dead() call —
-    a false-positive landmine, not a safety net. Only the truly unrecoverable case
-    (commits with no remote at all) refuses; a remote-backed repo is left to Phase 2's
-    existing auto-push.
-    """
+    """Raised when removing a repo would lose work no remote holds: local commits with
+    no remote, a linked worktree, or a non-HEAD branch origin lacks (FR16, A16.2).
+    HEAD's own unpushed commits are not refused — Phase 2 pushes them."""
 
 
 def _now() -> str:
@@ -132,19 +119,23 @@ def slug_from_url(url: str) -> str:
     return slug
 
 
-def install_git_hooks(repo_root: Path, *, force: bool = False) -> list[Path]:
-    """Copy every ``workspace_layout.INSTALLED_GIT_HOOKS`` row into ``<repo>/.git/hooks``.
+def git_hooks_dir(repo_root: Path) -> Path | None:
+    """Where git runs *repo_root*'s hooks (``core.hooksPath`` honoured); None off a git top."""
+    git = GitSubprocessClient()
+    if not git.is_git_root(repo_root):
+        return None
+    return repo_root / git.git(repo_root, "rev-parse", "--git-path", "hooks")
 
-    The ONE git-chokepoint installer — `dadaia ci install-hook`, `context create` and
-    `context alive` are its callers. An installed hook is overwritten only when *force*
-    or when it is byte-identical to a version this library shipped (``shipped-hashes.json``
-    — an upgrade refreshes it); never the operator's own hook (HOOKS-DRIFT-1 names
-    it). Returns the hooks written; raises :class:`FileNotFoundError` when *repo_root* is
-    not a git repository.
-    """
-    hooks_dir = repo_root / ".git" / "hooks"
-    if not hooks_dir.is_dir():
-        raise FileNotFoundError(f"{hooks_dir} not found (is this a git repository?)")
+
+def install_git_hooks(repo_root: Path, *, force: bool = False) -> list[Path]:
+    """Copy every ``INSTALLED_GIT_HOOKS`` row into :func:`git_hooks_dir`; the ONE installer
+    (`ci install-hook`, `context create`, `context alive`). A hook is overwritten only when
+    *force* or byte-identical to a shipped version (``shipped-hashes.json``), never the
+    operator's own (HOOKS-DRIFT-1 names it); raises FileNotFoundError off a git repo."""
+    hooks_dir = git_hooks_dir(repo_root)
+    if hooks_dir is None:
+        raise FileNotFoundError(f"{repo_root} is not a git repository")
+    hooks_dir.mkdir(parents=True, exist_ok=True)
     scripts = workspace_layout.public_scripts_dir()
     written = []
     for target, source in workspace_layout.INSTALLED_GIT_HOOKS:
@@ -162,14 +153,6 @@ def install_git_hooks(repo_root: Path, *, force: bool = False) -> list[Path]:
             dest.chmod(0o755)
             written.append(dest)
     return written
-
-
-def work_name(git: GitSubprocessClient, repo: Path, flow: Gitflow) -> str:
-    """The ONE live-work-branch rule (gate fixes, ``baseline``): the last tag + 1 patch,
-    else ``0.1.0``."""
-    tags = (_TAG_RE.fullmatch(t) for t in git.git(repo, "tag", "--sort=-v:refname").split())
-    last = next((m for m in tags if m), None)
-    return f"{flow.work_prefix}{f'{last[1]}.{last[2]}.{int(last[3]) + 1}' if last else '0.1.0'}"
 
 
 class SpecContextService:
@@ -302,8 +285,9 @@ class SpecContextService:
                 raise AssociatedRepoConflictError(
                     f"'{slug}' is already owned by context '{other.name}' (as its own main "
                     "repo or one of its associated repos). 'repos/<slug>' is a namespace every "
-                    f"context shares — registering it on '{name}' too would let 'dadaia "
-                    f"context dead {name}' commit, push and delete '{other.name}''s working "
+                    f"context shares — registering it on '{name}' too would let "
+                    f"'{fix_line(self._workspace_root, 'context', 'dead', name)}' commit, push "
+                    f"and delete '{other.name}''s working "
                     "tree. Choose a different slug, or coordinate with the owning context first."
                 )
 
@@ -346,7 +330,8 @@ class SpecContextService:
                 f"Associated repo '{slug}' is already registered on context "
                 f"'{name}' with a different URL ({existing.url!r} != "
                 f"{repo_url!r}). 'repo add' never overwrites a URL silently — "
-                f"run 'dadaia context repo remove {name} {slug}' first, then "
+                f"run '{fix_line(self._workspace_root, 'context', 'repo', 'remove', name, slug)}' "
+                "first, then "
                 "re-add with the intended URL."
             )
         updated = SpecContextProject(
@@ -494,7 +479,8 @@ class SpecContextService:
         nothing (0.4.8 AC3.7): the working tree is exactly what the remote holds.
         """
         ctx = self.show(name)
-        for repo in self._backfilled(ctx).all_repos():
+        filled = self._backfilled(ctx)
+        for repo in filled.all_repos():
             repo_dest = self._repo_path(repo.slug)
             if not repo_dest.exists():
                 if not repo.url:  # a checkout there is adopted, its origin back-filled
@@ -510,8 +496,9 @@ class SpecContextService:
                     raise GitSyncError(f"{exc}\nfix: {fix}") from None
             self._install_hooks(repo_dest)
 
-        if ctx.state == ContextState.ALIVE:
-            return ctx
+        if ctx.state == ContextState.ALIVE:  # re-confirm, and keep a back-filled URL (CTX-URL-1)
+            self._store.update(filled)
+            return filled
 
         repo_slug = ctx.repo_slug
         repo_path = self._repo_path(repo_slug)
@@ -593,7 +580,7 @@ class SpecContextService:
         self._git.commit_paths(repo, message, [p for p in _ONBOARDING if (repo / p).exists()])
         anchor = git("rev-parse", "HEAD")
         flow, _ = self._git.gitflow(repo)
-        work = work_name(self._git, repo, flow)
+        work = work_branch(repo / "specs", flow)
         try:
             if born:
                 old = git("for-each-ref", "--format=%(objectname)", f"refs/heads/{work}")
@@ -609,7 +596,8 @@ class SpecContextService:
             if start := next((f"origin/{b}" for b in roles if b in heads), ""):
                 roots = git("rev-list", "--max-parents=0", "HEAD").split()
                 ours = all(
-                    {*git("ls-tree", "--name-only", r).split()} <= {*_ONBOARDING} for r in roots
+                    all(map(_onboarded, git("ls-tree", "-r", "--name-only", r).split()))
+                    for r in roots
                 )
                 git("merge", "--no-edit", *["--allow-unrelated-histories"] * ours, start)
             at = f"refs/remotes/origin/{flow.principal}" if heads else anchor
@@ -645,7 +633,7 @@ class SpecContextService:
     def _require_publishable(self, name: str, repo: Path) -> None:
         """Refuse, before any write, a secret in an untracked onboarding file the publish
         would commit — fix: the publish again, once the operator removed each value."""
-        rels = [r for r in self._git.list_untracked(repo) if r.split("/")[0] in _ONBOARDING]
+        rels = [r for r in self._git.list_untracked(repo) if _onboarded(r)]
         if flagged := self._secret_scan(repo, rels):
             report = "\n".join(f"  {rel}: {hit}" for rel, hit in flagged.items())
             fix = fix_line(self._workspace_root, "context", "baseline", name)
@@ -656,146 +644,82 @@ class SpecContextService:
 
     # ------------------------------------------------------------------ dead (T-10b / T-11)
 
-    def _enforce_dead_review_gate(
-        self, name: str, repo_path: Path, *, commit: bool, repo_slug: str
-    ) -> None:
-        """Gate dead() on untracked content (F-5 / AC-R7-01), one repo of the set.
-
-        No untracked files ⇒ no-op (clean-tree / tracked-only path unchanged).
-        Untracked files + not *commit* ⇒ raise DeadReviewRequiredError (refuse).
-        Untracked files + *commit* ⇒ secret-scan their content; any match raises
-        DeadSecretFoundError. This runs before any commit/push/rmtree so a refusal
-        leaves every repo untouched (A16.2: called from dead()'s preflight sweep over
-        the whole set — main and every associated repo alike — before any of them is
-        acted on). *repo_slug* is folded into every raised message so a multi-repo
-        refusal names which repo of the set it is (A16.2).
-        """
-        try:
-            untracked = self._git.list_untracked(repo_path)
-        except Exception:
-            # Fail-closed for the gate: if we cannot enumerate untracked files we
-            # cannot prove the tree is clean. Without consent, refuse.
-            if commit:
-                return
-            raise DeadReviewRequiredError(
-                f"Context '{name}': could not verify the working tree of repo "
-                f"'{repo_slug}' at '{repo_path}'; consent to committing its changes.\n"
-                f"fix: {fix_line(self._workspace_root, 'context', 'dead', name, '--commit')}"
-            ) from None
-
-        if not untracked:
-            return  # clean tree (no untracked files) — behave exactly as before
-
-        if not commit:
-            shown = untracked[:20]
-            more = "" if len(untracked) <= 20 else f"\n  ... and {len(untracked) - 20} more"
-            listing = "\n".join(f"  {f}" for f in shown)
-            raise DeadReviewRequiredError(
-                f"Context '{name}': repo '{repo_slug}' has {len(untracked)} untracked "
-                f"file(s) that dead() would otherwise commit and push WITHOUT review:\n"
-                f"{listing}{more}\n"
-                "Review them, then delete/gitignore them or consent to committing them.\n"
-                f"fix: {fix_line(self._workspace_root, 'context', 'dead', name, '--commit')}"
-            )
-
-        # commit=True: scan the content of the files we are about to newly commit.
-        if flagged := self._secret_scan(repo_path, untracked):
-            report = "\n".join(f"  {rel}: {hit}" for rel, hit in flagged.items())
-            fix = git_line(repo_path, "stash", "push", "-u", "--", *flagged)
-            raise DeadSecretFoundError(
-                f"Context '{name}': repo '{repo_slug}' secret scan blocked dead() "
-                f"--commit. {len(flagged)} untracked file(s) match a secret/identifier "
-                "rule (values redacted):\n"
-                f"{report}\n"
-                f"Nothing was pushed.\nfix: {fix}"
-            )
+    def _dead_preflight(self, name: str, ctx: SpecContextProject, *, commit: bool) -> None:
+        """Refuse, before any repo of the set is touched (A16.2), what dead() would lose or
+        push unreviewed: no origin URL, untracked files without *commit* (F-5) or holding a
+        secret, unpushed branches or a linked worktree, a dirty tree without git identity,
+        changes to sync off a work branch. Every refusal names its repo."""
+        main_repo = self._repo_path(ctx.repo_slug)
+        for repo in ctx.all_repos():
+            slug, path = repo.slug, self._repo_path(repo.slug)
+            lead = f"Context '{name}': repo '{slug}'"
+            if path.exists() and not repo.url:
+                raise RepoUrlMissingError(
+                    f"{lead} has no clone URL (no origin remote) — removing it would leave "
+                    "nothing 'context alive' could clone back. Nothing was touched.\nfix: "
+                    + git_line(path, "remote", "add", "origin", "<clone-url>")
+                )
+            if not (path.exists() and self._git.is_git_root(path)):
+                continue
+            if (untracked := self._git.list_untracked(path)) and not commit:
+                more = f"\n  ... and {len(untracked) - 20} more" if len(untracked) > 20 else ""
+                listing = "\n".join(f"  {f}" for f in untracked[:20])
+                raise DeadReviewRequiredError(
+                    f"{lead} has {len(untracked)} untracked file(s) that dead() would otherwise "
+                    f"commit and push WITHOUT review:\n{listing}{more}\n"
+                    "Review them, then delete/gitignore them or consent to committing them.\n"
+                    f"fix: {fix_line(self._workspace_root, 'context', 'dead', name, '--commit')}"
+                )
+            if flagged := self._secret_scan(path, untracked):
+                report = "\n".join(f"  {rel}: {hit}" for rel, hit in flagged.items())
+                raise DeadSecretFoundError(
+                    f"{lead} secret scan blocked dead() --commit. {len(flagged)} untracked "
+                    f"file(s) match a secret/identifier rule (values redacted):\n{report}\n"
+                    "Nothing was pushed.\nfix: "
+                    + git_line(path, "stash", "push", "-u", "--", *flagged)
+                )
+            lost = self._git.unrecoverable(path)
+            if tree := sweep.linked_worktree(self._workspace_root, path):
+                gdir = sweep.worktree_git_dir(tree)
+                lost.append(git_line(gdir, "worktree", "move", str(tree), "<keep-dir>"))
+            if lost:
+                raise DeadUnpushedCommitsError(
+                    f"{lead} holds {len(lost)} linked worktree(s) or unpushed branch(es) "
+                    f"dead() would lose. Nothing was touched.\nfix: {lost[0]}"
+                )
+            dirty = self._git.is_dirty(path)
+            if not (self._git.has_commits(path) and (dirty or self._git.unpushed(path))):
+                continue
+            if dirty and (fix := self._git.identity_fix(path)):
+                raise ContextStateError(
+                    f"{lead} has changes to commit and git identity unknown. "
+                    f"Nothing was touched.\nfix: {fix}"
+                )
+            flow, _ = self._git.gitflow(path, main_repo)
+            branch = self._git.current_branch(path)
+            if flow.role_of(branch) != "work":
+                raise DeadReviewRequiredError(
+                    f"{lead} is on '{branch or 'a detached HEAD'}', which the gitflow never "
+                    "pushes directly — dead() would commit and push its changes there. "
+                    "Nothing was touched.\nfix: "
+                    + git_line(path, "checkout", "-b", flow.work_pattern)
+                )
 
     def dead(self, name: str, *, commit: bool = False) -> SpecContextProject:
-        """Transition a context from ALIVE to DEAD; sets dead_since, removes every repo.
-
-        FR16/A16.2: covers the whole set — the main repo, then every associated repo
-        (``SpecContextProject.all_repos()``, the one accessor, A15.3) — in **two**
-        passes over the same loop, never a second resolution path:
-
-        1. **Preflight** every repo in the set, mutating nothing. Untracked
-           non-gitignored files and *commit* is False ⇒ ``DeadReviewRequiredError``,
-           naming the repo (F-5 / AC-R7-01). ``commit=True`` runs the secret scan over
-           those files' content; any match ⇒ ``DeadSecretFoundError``, naming the repo.
-           A repo carrying local commits with **no remote at all** to receive them
-           (``has_commits() and not has_remote()``) ⇒ ``DeadUnpushedCommitsError``,
-           naming the repo — removing it would destroy those commits irrecoverably (see
-           ``DeadUnpushedCommitsError`` for why this check stays narrower than "any
-           commit ahead of the last push"). Any refusal here leaves **every** repo in
-           the set untouched (no partial dead). A repo with changes to sync must sit on a
-           work branch of its gitflow (``GitSubprocessClient.gitflow``) — the only branch the
-           pre-push gate lets it push — else it is refused before anything is committed.
-        2. **Act** on every repo only once every repo has cleared the preflight:
-           tracked-but-dirty modifications auto-sync (commit + push, FR-R7 — only
-           untracked content is gated), then the repo is removed. A clean tree behaves
-           exactly as before.
-
-        Concurrent races are accepted and surface through git; this operation
-        never waits for or refuses another session.
-        """
+        """ALIVE -> DEAD over the whole set (FR16/A16.2): back-fill every URL from origin
+        (FR-W2-03 b), preflight every repo mutating nothing, then auto-sync (commit + push,
+        FR-R7) and hold each repo. Races surface through git (NO-LOCKS)."""
         ctx = self.show(name)
         if ctx.state != ContextState.ALIVE:
             raise ContextStateError(
                 f"Context '{name}' is not ALIVE. It cannot be made DEAD.\nfix: "
                 + fix_line(self._workspace_root, "context", "alive", name)
             )
-
-        # Back-fill every URL from the on-disk origin while the repos still exist
-        # (FR-W2-03 b), BEFORE the rmtree below — a DEAD record stays re-obtainable.
         ctx = self._backfilled(ctx)
         repo_paths = [(repo.slug, self._repo_path(repo.slug)) for repo in ctx.all_repos()]
+        self._dead_preflight(name, ctx, commit=commit)
 
-        # Phase 1 — preflight EVERY repo before mutating ANY (A16.2: no partial dead).
-        main_repo = self._repo_path(ctx.repo_slug)
-        for repo in ctx.all_repos():
-            slug, repo_path = repo.slug, self._repo_path(repo.slug)
-            if repo_path.exists() and not repo.url:
-                raise RepoUrlMissingError(
-                    f"Context '{name}': repo '{slug}' has no clone URL (no origin remote) — "
-                    "removing it would leave nothing 'context alive' could clone back. "
-                    "Nothing was touched.\nfix: "
-                    + git_line(repo_path, "remote", "add", "origin", "<clone-url>")
-                )
-            if repo_path.exists() and self._git.is_git_root(repo_path):
-                if not self._git.has_commits(repo_path) and self._git.is_dirty(repo_path):
-                    raise DeadReviewRequiredError(
-                        f"Context '{name}': repo '{slug}' has no commits yet holds files "
-                        "dead() would destroy — commit and push them to a reachable "
-                        "remote, or move the checkout out. Nothing was touched.\nfix: "
-                        + shell_line("mv", str(repo_path), "<keep-dir>")
-                    )
-                self._enforce_dead_review_gate(name, repo_path, commit=commit, repo_slug=slug)
-                if self._git.has_commits(repo_path) and not self._git.has_remote(repo_path):
-                    raise DeadUnpushedCommitsError(
-                        f"Context '{name}': repo '{slug}' at '{repo_path}' has local "
-                        "commits and no remote configured to receive them. dead() "
-                        "refuses to remove it — configure a remote and push first, "
-                        "then retry. Nothing was touched.\nfix: "
-                        + git_line(repo_path, "remote", "add", "origin", "<clone-url>")
-                    )
-                if self._git.has_commits(repo_path) and (
-                    self._git.is_dirty(repo_path) or self._git.unpushed(repo_path)
-                ):
-                    if self._git.is_dirty(repo_path) and (fix := self._git.identity_fix(repo_path)):
-                        raise ContextStateError(
-                            f"Context '{name}': repo '{slug}' has changes to commit and git "
-                            f"identity unknown. Nothing was touched.\nfix: {fix}"
-                        )
-                    flow, _ = self._git.gitflow(repo_path, main_repo)
-                    branch = self._git.current_branch(repo_path)
-                    if flow.role_of(branch) != "work":
-                        raise DeadReviewRequiredError(
-                            f"Context '{name}': repo '{slug}' is on '{branch or 'a detached HEAD'}'"
-                            ", which the gitflow never pushes directly — dead() would commit and "
-                            "push its changes there. Nothing was touched.\nfix: "
-                            + git_line(repo_path, "checkout", "-b", flow.work_pattern)
-                        )
-
-        # Phase 2 — git sync + rmtree for every repo. Races are accepted by the
+        # Phase 2 — git sync + hold for every repo. Races are accepted by the
         # NO-LOCKS doctrine.
         branch_before_sync: str | None = None
         for slug, repo_path in repo_paths:
@@ -814,7 +738,7 @@ class SpecContextService:
                 except GitSyncError as exc:
                     lead = f"Git sync failed for context '{name}' repo '{slug}'; nothing was removed.\n"
                     raise GitSyncError(f"{lead}{exc}") from exc
-            sweep.rmtree(repo_path)
+            sweep.hold(self._workspace_root, repo_path, f"repos/{slug}")
 
         dead_ctx = SpecContextProject(
             name=ctx.name,
@@ -839,7 +763,8 @@ class SpecContextService:
             raise ContextNotFoundError(f"Context '{name}' not found.")
         if ctx.state == ContextState.ALIVE:
             raise ContextStateError(
-                f"Context '{name}' is active. Run 'dadaia context dead {name}' before deleting."
+                f"Context '{name}' is active. Run "
+                f"'{fix_line(self._workspace_root, 'context', 'dead', name)}' before deleting."
             )
         self._store.delete(name)
         # Bug context-delete-leaves-stale-session-bind: a session record pointing at a

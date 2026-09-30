@@ -1,6 +1,6 @@
 """The ONE traversal primitive of the workspace reaper (0.4.7 FR6a).
 
-``walk`` reads a directory, ``mtime`` reads one entry's age, ``move`` relocates an
+``walk`` reads a directory, ``lstat`` reads one entry, ``move`` relocates an
 entry, ``remove`` deletes it — all four behind ONE guard:
 
 * a symlink is never followed (``walk`` refuses a symlinked root; ``move``/``remove``
@@ -31,9 +31,10 @@ import os
 import shutil
 import stat
 from collections.abc import Callable
+from datetime import UTC, datetime
 from pathlib import Path
 
-__all__ = ["guarded", "move", "mtime", "remove", "rmtree", "walk"]
+__all__ = ["guarded", "lstat", "move", "remove", "rmtree", "walk"]
 
 _OUTSIDE = "skipped '{label}' (outside the workspace)"
 _WORKTREE = "skipped '{label}' (holds a linked git worktree)"
@@ -51,11 +52,11 @@ def walk(directory: Path) -> list[Path]:
         return []
 
 
-def mtime(path: Path) -> float | None:
-    """``lstat`` mtime (the LINK's own, never its destination's), or ``None`` for an
+def lstat(path: Path) -> os.stat_result | None:
+    """The entry's OWN ``lstat`` (the link's, never its destination's), or ``None`` for an
     entry that vanished between ``walk`` and here — absent, never an exception."""
     try:
-        return path.lstat().st_mtime
+        return path.lstat()
     except OSError:
         return None
 
@@ -86,19 +87,27 @@ def _is_gitfile(entry: Path) -> bool:
     return entry.name == ".git" and entry.is_file() and not entry.is_symlink()
 
 
-def _holds_worktree(workspace_root: Path, target: Path) -> bool:
-    """True when *target* sits inside a linked worktree or its subtree holds one — an
-    rmtree of ``tmp/<agent>/<day>/`` kills every worktree below it. Local and cheap: no
-    git call, symlinks never followed."""
+def linked_worktree(workspace_root: Path, target: Path) -> Path | None:
+    """The linked worktree *target* sits inside or whose subtree holds one — an rmtree
+    of ``tmp/<agent>/<day>/`` kills every worktree below it. Local and cheap: no git
+    call, symlinks never followed."""
     root, here = workspace_root.resolve(), target.parent.resolve()
     for ancestor in (here, *here.parents):
         if ancestor == root:
             break
         if _is_gitfile(ancestor / ".git"):
-            return True
+            return ancestor
     if target.is_symlink() or not target.is_dir():
-        return False
-    return any(".git" in files and _is_gitfile(Path(d) / ".git") for d, _, files in os.walk(target))
+        return None
+    trees = (Path(d) for d, _, files in os.walk(target) if ".git" in files)
+    return next((d for d in trees if _is_gitfile(d / ".git")), None)
+
+
+def worktree_git_dir(tree: Path) -> Path:
+    """The common git dir a move or remove of linked worktree *tree* runs from — Windows
+    refuses to delete or rename a process's cwd, so never *tree* itself."""
+    gitdir = (tree / ".git").read_text(encoding="utf-8").removeprefix("gitdir:").strip()
+    return (tree / gitdir).parents[1]
 
 
 def _exists(target: Path) -> bool:
@@ -130,7 +139,7 @@ def remove(workspace_root: Path, target: Path, label: str) -> str | None:
         return None
     if not _inside(workspace_root, target):
         return _OUTSIDE.format(label=label)
-    if _holds_worktree(workspace_root, target):
+    if linked_worktree(workspace_root, target):
         return _WORKTREE.format(label=label)
     if target.is_symlink() or target.is_file():
         try:
@@ -144,19 +153,32 @@ def remove(workspace_root: Path, target: Path, label: str) -> str | None:
     return f"deleted '{label}'"
 
 
+#: The zone the reaper HOLDS what it takes off the working tree. Deletion is reserved to
+#: TTL expiry of this zone, so no scan verdict ever deletes anything directly — the shape
+#: behind the CRITICAL doctor-ptr-gc-deletes-valid-lock-free-bind.
+REAPED_ZONE = "reaped"
+
+
+def hold(workspace_root: Path, target: Path, label: str, *, note: str = "") -> str | None:
+    """:func:`move` *target* to ``.dadaia/reaped/<YYYYMMDD>/<workspace-relative path>``,
+    the one hold: the origin path is the record of where the entry came from. The hold's
+    clock is its top entry ``reaped/<YYYYMMDD>/<first segment>``, stamped once here."""
+    day = workspace_root / ".dadaia" / REAPED_ZONE / datetime.now(tz=UTC).strftime("%Y%m%d")
+    rel = target.relative_to(workspace_root)
+    done = move(workspace_root, target, day / rel, label, note=note)
+    if len(rel.parts) > 1 and (done or "").startswith("moved "):
+        os.utime(day / rel.parts[0])
+    return done
+
+
 def move(
     workspace_root: Path, target: Path, destination: Path, label: str, *, note: str = ""
 ) -> str | None:
     """Relocate *target* to *destination*, creating its parents. Both ends must sit
-    inside the workspace. The moved entry's mtime is stamped at the move, so a TTL zone
-    clocks a held entry from when it was reaped, never from the origin's own age.
+    inside the workspace. *destination* itself is stamped: a hold counts from the move.
 
-    ONE hold per destination: a tool re-creates what the reaper just took (a
-    ``.mypy_cache`` regenerated by the next typecheck), so the same origin is reaped
-    again within one TTL window. The earlier hold is REMOVED here and the new entry takes
-    its place, restarting the clock — never a second ``<name>-N`` copy of one origin.
-    ``os.replace`` cannot do it alone: onto an existing non-empty directory it raises
-    ENOTEMPTY, which the guard would report as ``skipped`` forever.
+    N moves make N holds (ADR 0074): an occupied destination yields the first free
+    ``<name>-N`` beside it, so no hold dies before its own TTL.
 
     A cross-device ``os.replace`` (EXDEV) falls back to copy + remove here — the one
     place — and the copy lands before the origin is unlinked, so a failure leaves the
@@ -169,10 +191,13 @@ def move(
         return None
     if not _inside(workspace_root, target) or not _inside(workspace_root, destination):
         return _OUTSIDE.format(label=label)
-    if _holds_worktree(workspace_root, target):
+    if linked_worktree(workspace_root, target):
         return _WORKTREE.format(label=label)
     destination.parent.mkdir(parents=True, exist_ok=True)
-    remove(workspace_root, destination, label)
+    stem, n = destination.name, 0
+    while _exists(destination):
+        n += 1
+        destination = destination.with_name(f"{stem}-{n}")
     try:
         os.replace(target, destination)
     except OSError as exc:
@@ -185,7 +210,7 @@ def move(
         else:
             shutil.copy2(target, destination)
         remove(workspace_root, target, label)
-    if not destination.is_symlink():
+    if not destination.is_symlink():  # a link is never followed to its target
         os.utime(destination)
     try:
         shown = destination.relative_to(workspace_root).as_posix()

@@ -17,9 +17,7 @@ import json
 from pathlib import Path
 
 import pytest
-import typer
 
-from dadaia_workspace.cli.anchors import derive_cli_anchors
 from dadaia_workspace.core.models.backlog import SubjectKind
 from dadaia_workspace.features.backlog.subject_registry import (
     BindStatus,
@@ -58,7 +56,7 @@ MINIMAL_CATALOG = {
 
 MINIMAL_ALIAS_MAP = """
 # fixture alias map
-the panel API -> panel:/api/widgets
+the widgets API -> api:/v1/widgets
 widget factory -> pkg/sample.py#WidgetFactory
 """
 
@@ -74,28 +72,6 @@ A fixture invariant.
 
 Mentions SPEC-DOC-099 in prose.
 """
-
-
-def _fixture_app() -> typer.Typer:
-    """A tiny Typer app tree mirroring ``dadaia <group> <verb>`` shape."""
-    app = typer.Typer()
-    backlog = typer.Typer()
-
-    @backlog.command("doctor")
-    def _doctor() -> None:  # pragma: no cover - registration only
-        pass
-
-    @backlog.command("subjects")
-    def _subjects() -> None:  # pragma: no cover - registration only
-        pass
-
-    app.add_typer(backlog, name="backlog")
-
-    @app.command("version")
-    def _version() -> None:  # pragma: no cover - registration only
-        pass
-
-    return app
 
 
 @pytest.fixture()
@@ -129,7 +105,7 @@ def _build(tree: dict[str, Path]) -> object:
         catalog_path=tree["catalog_path"],
         alias_map_path=tree["alias_map_path"],
         specs_dir=tree["specs_dir"],
-        cli_anchors=derive_cli_anchors(_fixture_app()),
+        cli_anchors=frozenset({"backlog doctor", "backlog subjects", "version"}),
     )
 
 
@@ -185,13 +161,10 @@ def test_doc_kind_table(fixture_tree: dict[str, Path]) -> None:
     )
     assert reg.bind("SPEC-DOC-12345", SubjectKind.DOC).status is BindStatus.UNRESOLVED
 
-    # panel/api — alias-map ONLY in R1.
-    # The alias map maps "the panel API" -> panel:/api/widgets.
-    result = reg.bind("the panel API", SubjectKind.PANEL)
-    assert result.status is BindStatus.RESOLVED
-    assert result.anchor is not None and result.anchor.id == "panel:/api/widgets"
-    # No auto-derivation for panel in R1; an unaliased panel ref must HALT.
-    assert reg.bind("panel:/api/never-aliased", SubjectKind.PANEL).status is BindStatus.UNRESOLVED
+    # api binds through the alias map only; an unaliased api ref HALTs.
+    result = reg.bind("the widgets API", SubjectKind.API)
+    assert result.anchor is not None and result.anchor.id == "api:/v1/widgets"
+    assert reg.bind("api:/v1/never-aliased", SubjectKind.API).status is BindStatus.UNRESOLVED
 
 
 # ── invariant kind ──────────────────────────────────────────────────────────────
@@ -251,31 +224,12 @@ def test_alias_collapses_synonym_and_absent_alias_map_tolerated(
         catalog_path=catalog_path,
         alias_map_path=absent_root / "missing-aliases.txt",
         specs_dir=absent_root / "missing-specs",
-        cli_anchors=derive_cli_anchors(_fixture_app()),
+        cli_anchors=frozenset({"backlog doctor", "backlog subjects", "version"}),
     )
     assert (
         absent_reg.bind("pkg/sample.py#make_widget", SubjectKind.CODE).status is BindStatus.RESOLVED
     )
     assert absent_reg.bind("widget factory", SubjectKind.CODE).status is BindStatus.UNRESOLVED
-
-
-# ── list_anchors (preview surface feed) ─────────────────────────────────────────
-
-
-def test_list_anchors_filters_by_kind_and_all_kinds(fixture_tree: dict[str, Path]) -> None:
-    reg = _build(fixture_tree)
-    code_anchors = reg.list_anchors(SubjectKind.CODE)
-    ids = {a.id for a in code_anchors}
-    assert "pkg/sample.py#WidgetFactory" in ids
-    assert "pkg/sample.py#make_widget" in ids
-    # No catalog anchors leak into a code listing.
-    assert all(a.kind is SubjectKind.CODE for a in code_anchors)
-
-    all_anchors = reg.list_anchors()
-    kinds = {a.kind for a in all_anchors}
-    assert SubjectKind.CODE in kinds
-    assert SubjectKind.CLI in kinds
-    assert SubjectKind.CATALOG in kinds
 
 
 # ── scoped LIVE-derivation test (creates/deletes its own source file) ────────────
@@ -302,7 +256,7 @@ def test_live_derivation_reflects_source_changes(tmp_path: Path) -> None:
             catalog_path=catalog_path,
             alias_map_path=alias_map_path,
             specs_dir=specs_dir,
-            cli_anchors=derive_cli_anchors(_fixture_app()),
+            cli_anchors=frozenset({"backlog doctor", "backlog subjects", "version"}),
         )
 
     # Step 1 — symbol present.

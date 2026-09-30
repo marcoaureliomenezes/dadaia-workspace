@@ -1,481 +1,155 @@
-"""Unit tests for SpecsDoctor ledger invariants.
+"""Intent: CONTRACT — the specs doctor's ledger invariants SPEC-DOC-024/026/030/041.
 
-Release v0.1.10 / T-010-14 (R6b). Ledger invariants, each with an ERROR/WARNING code
-following the SPEC-DOC-NNN convention:
-
-- SPEC-DOC-024 — phase<->markers coherence (ACTIVE.md phase vs TASKS markers).
-- SPEC-DOC-006 (extended) — CLOSURE-before-archive, recursive into nested archive dirs.
-- SPEC-DOC-026 — unique release ids across releases/ u releases/_archive/ (recursive).
-- SPEC-DOC-027 — the ONE release-dir naming canon (bare MAJOR.MINOR.PATCH), legacy WARN,
-  forward-enforced.
-- SPEC-DOC-028 — constitution file-ref resolution (WARN on a missing repo file).
-- SPEC-DOC-029 — RETIRED (v0.1.76 T-4, FR7, NO-LOCKS DOCTRINE). Formerly the
-  lease<->session coherence backstop; retired along with the lease acquisition/CAS
-  authority it diagnosed forgery against. See the retirement tests below.
-- SPEC-DOC-030 — specs/audits/ naming canon.
-- SPEC-DOC-032 — RETIRED (v0.5.1 K5 deepening). Was a per-bug
-  ``specs/bugs/<slug>.md`` frontmatter ``status:`` regex canon check — dead code
-  behind a dead artifact (the v0.5.0 FR2 single-JSONL-ledger cutover retired the
-  per-bug Markdown file shape two migrations before this one).
+Bugs: spec-doc-030-audit-dir-rule-contradicts-dadaia-6-8-canon (audit dirs are
+``<YYYYMMDD>-<slug>``), doctor-reads-phantom-specs-archive-releases-root (archived
+releases live under ``specs/releases/_archive/``), sa-promote-has-no-verb#B25-6 (an open task in
+CLOSURE is release.py's refusal, never a doctor code),
+sa-spec-doc-033-duplicates-bugs-check#B8 (archive-overdue is one WARNING, fix
+``bugs.py archive``).
 """
 
 from __future__ import annotations
 
 import json
+from collections.abc import Callable
 from pathlib import Path
 
 import pytest
 
-from dadaia_workspace.features.specs import Severity, SpecsDoctor, SpecsDoctorIssue
-
-MINIMAL_MEMORY_PRODUCT_INDEX_MD = """\
----
-slug: index
-title: Product Index
-tldr: 'Product catalog entry point.'
-summary: 'Product catalog entry point.'
-tags: []
-agent_tier: self-pull
-token_estimate: 20
----
-
-## Catalog
-
-Feature atoms.
-"""
-
-MINIMAL_MEMORY_ATOM_MD = """\
----
-slug: {slug}
-title: {title}
-tldr: 'tldr.'
-summary: 'summary.'
-tags: []
-agent_tier: self-pull
-token_estimate: 20
----
-
-## Heading
-
-Body.
-"""
-
-_CLOSURE_MD = """\
-# Closure
-
-## Summary
-Done.
-
-## Validations
-| Check | Command | Result |
-|---|---|---|
-| pytest | pytest | green |
-
-## Drifts
-None.
-
-## Memory updates
-None.
-"""
-
-_DOCTOR_MODULE_NAMES = (
-    "doctor",
-    "doctor_types",
-    "doctor_common",
-    "doctor_structural",
-    "doctor_memory",
-    "doctor_release",
-    "doctor_closure_audit",
-    "doctor_governance",
-    "doctor_coherence",
-)
+from dadaia_workspace.features.specs import SpecsDoctor
+from dadaia_workspace.features.specs.rules import RULES
 
 
 @pytest.fixture(autouse=True)
 def _skip_memory_lint_subprocess(monkeypatch: pytest.MonkeyPatch) -> None:
-    """v0.1.55 FR1: LINT-1 moved off the coordinator into ``doctor_memory.MemoryValidator``."""
     from dadaia_workspace.features.specs.doctor_memory import MemoryValidator
 
     monkeypatch.setattr(MemoryValidator, "check_lint1_memory_atoms", lambda self: [])
 
 
-def _make_clean_specs_tree(root: Path, release_id: str = "v0.1.10") -> Path:
-    """A minimal but ledger-valid specs/ tree."""
+def _tree(root: Path, release_id: str = "0.1.10", phase: str = "IMPLEMENTATION") -> Path:
     specs = root / "specs"
-    (specs / "memory" / "product").mkdir(parents=True)
-    (specs / "releases" / release_id).mkdir(parents=True)
-    (specs / "backlog").mkdir(parents=True)
-
-    (specs / "constitution.md").write_text("# Constitution\n\nThe laws.\n", encoding="utf-8")
-    (specs / "memory" / "product" / "index.md").write_text(
-        MINIMAL_MEMORY_PRODUCT_INDEX_MD, encoding="utf-8"
+    rel = specs / "releases" / release_id
+    rel.mkdir(parents=True)
+    (specs / "constitution.md").write_text("# Constitution\n", encoding="utf-8")
+    state = {"schema": "release-state-v1", "release": release_id, "phase": phase}
+    state |= {"defined": None, "implemented": None, "shipped": None, "log": []}
+    (rel / "_RELEASE.json").write_text(json.dumps(state) + "\n", encoding="utf-8")
+    for name in ("SPEC", "PLAN"):
+        (rel / f"{name}.md").write_text(f"# {name}\n\n**Status:** Approved\n", encoding="utf-8")
+    (rel / "TASKS.md").write_text(
+        "# Tasks\n\n**Status:** Approved\n\n- [-] T1 something\n- [ ] T2 other\n", encoding="utf-8"
     )
-    for slug, title in (
-        ("architecture", "Architecture"),
-        ("tech-stack", "Tech Stack"),
-        ("quality-assurance", "Quality Assurance"),
-    ):
-        (specs / "memory" / f"{slug}.md").write_text(
-            MINIMAL_MEMORY_ATOM_MD.format(slug=slug, title=title), encoding="utf-8"
-        )
-
-    _set_active(specs, release_id, "IMPLEMENTATION")
-    spec_md = (
-        "# Spec\n\n> **Status:** Approved\n> **Created:** 2026-06-09\n"
-        "**Origin:** operator-demand\n\nContent.\n"
-    )
-    plan_md = "# Plan\n\n> **Status:** Approved\n\nShort.\n"
-    tasks_md = "# Tasks\n\n> **Status:** Approved\n\n- [-] T1 something\n- [ ] T2 other\n"
-    (specs / "releases" / release_id / "SPEC.md").write_text(spec_md, encoding="utf-8")
-    (specs / "releases" / release_id / "PLAN.md").write_text(plan_md, encoding="utf-8")
-    (specs / "releases" / release_id / "TASKS.md").write_text(tasks_md, encoding="utf-8")
     return specs
 
 
-def _set_active(specs: Path, release_id: str, phase: str) -> None:
-    """Write (overwrite) the release's ``RELEASE.json`` with a minimal
-    release-state-v1 document (v0.5.x, successor to the RELEASE.jsonl fold; v0.5.0
-    FR4/T-050-21A) -- the fixture-side replacement for the retired ``ACTIVE.md``."""
-    import json as _json
+def _archive(name: str) -> Callable[[Path], None]:
+    def plant(specs: Path) -> None:
+        rel = specs / "releases" / "_archive" / name
+        rel.mkdir(parents=True)
+        (rel / "SPEC.md").write_text("# Spec\n\n**Status:** Approved\n", encoding="utf-8")
 
-    rdir = specs / "releases" / release_id
-    rdir.mkdir(parents=True, exist_ok=True)
-    state = {
-        "schema": "release-state-v1",
-        "release": release_id,
-        "phase": phase,
-        "defined": None,
-        "implemented": None,
-        "shipped": None,
-        "log": [],
-    }
-    (rdir / "RELEASE.json").write_text(_json.dumps(state) + "\n", encoding="utf-8")
+    return plant
 
 
-def _write_tasks(specs: Path, release_id: str, body: str) -> None:
-    (specs / "releases" / release_id / "TASKS.md").write_text(
-        f"# Tasks\n\n> **Status:** Approved\n\n{body}\n", encoding="utf-8"
-    )
+def _audits(*names: str) -> Callable[[Path], None]:
+    def plant(specs: Path) -> None:
+        for name in names:
+            (specs / "audits" / name).mkdir(parents=True)
+
+    return plant
 
 
-def _codes(issues: list[SpecsDoctorIssue]) -> set[str]:
-    return {i.code for i in issues}
+def _draft_tasks(specs: Path) -> None:
+    tasks = specs / "releases" / "0.1.10" / "TASKS.md"
+    tasks.write_text(tasks.read_text("utf-8").replace("Approved", "Draft"), encoding="utf-8")
 
 
-def _by_code(issues: list[SpecsDoctorIssue], code: str) -> list[SpecsDoctorIssue]:
-    return [i for i in issues if i.code == code]
+def _nothing(specs: Path) -> None:
+    pass
 
 
-_MINIMAL_SPEC_MD = "# Spec\n\n> **Status:** Approved\n"
+_CASES = [
+    pytest.param(
+        "0.1.10",
+        "IMPLEMENTATION",
+        _draft_tasks,
+        "SPEC-DOC-024",
+        "error",
+        id="024-draft-tasks-in-impl",
+    ),
+    pytest.param("0.1.10", "IMPLEMENTATION", _nothing, "SPEC-DOC-024", None, id="024-coherent"),
+    pytest.param(
+        "0.1.10", "CLOSURE", _nothing, "SPEC-DOC-024", None, id="024-open-task-in-closure-B25-6"
+    ),
+    pytest.param(
+        "0.1.10",
+        "IMPLEMENTATION",
+        _archive("0.1.10"),
+        "SPEC-DOC-026",
+        "error",
+        id="026-dup-id-in-archive",
+    ),
+    pytest.param(
+        "0.1.10", "IMPLEMENTATION", _archive("v0.1.9"), "SPEC-DOC-026", None, id="026-distinct-ids"
+    ),
+    pytest.param(
+        "0.1.10",
+        "IMPLEMENTATION",
+        _audits("2026-07-01T000000Z"),
+        "SPEC-DOC-030",
+        "warning",
+        id="030-bad-name",
+    ),
+    pytest.param(
+        "0.1.10",
+        "IMPLEMENTATION",
+        _audits("20260827-canon-v6-first-audit"),
+        "SPEC-DOC-030",
+        None,
+        id="030-yyyymmdd-slug-canon",
+    ),
+    pytest.param(
+        "0.1.10",
+        "IMPLEMENTATION",
+        _audits(
+            "2026-06-09T075056Z",
+            "2026-06-10T010550Z",
+            "2026-06-10T052944Z",
+            "2026-06-10T140553Z",
+            "_archive",
+        ),
+        "SPEC-DOC-030",
+        None,
+        id="030-grandfathered",
+    ),
+    pytest.param(
+        "0.1.10", "IMPLEMENTATION", _nothing, "SPEC-DOC-030", None, id="030-no-audits-dir"
+    ),
+]
 
 
-def _write_minimal_spec(rel: Path) -> None:
-    """A companion SPEC.md (v0.5.0 T-050-25A, A4.4): ``RELEASE_ARTIFACTS`` dropped
-    ``CLOSURE.md`` — a lone CLOSURE.md, with no SPEC/PLAN/TASKS alongside it, no longer
-    counts as release-dir evidence (``is_release_dir``/``iter_archive_release_dirs``).
-    Every real archived release in this repo's own history already carries at least
-    one surviving artifact alongside its CLOSURE.md (verified at T-050-25A time);
-    fixtures below that used to rely on CLOSURE.md ALONE now need this companion so
-    they keep exercising the SAME (unrelated) invariant they always tested."""
-    rel.mkdir(parents=True, exist_ok=True)
-    (rel / "SPEC.md").write_text(_MINIMAL_SPEC_MD, encoding="utf-8")
-
-
-def _seed_lock_record(
-    workspace: Path,
-    ctx: str,
-    session_id: str,
-    *,
-    clock: object = None,
-    pid: int = 4242,
+@pytest.mark.parametrize(("release_id", "phase", "plant", "code", "verdict"), _CASES)
+def test_ledger_invariant(
+    tmp_path: Path,
+    release_id: str,
+    phase: str,
+    plant: Callable[[Path], None],
+    code: str,
+    verdict: str | None,
 ) -> None:
-    """Plant a raw ``<ctx>.lock.json`` — v0.1.76 T-3 successor to ``lease.acquire``.
-
-    ``lease.acquire`` is DELETED (the acquisition/CAS machinery it belonged to is gone).
-    Used by ``test_doc029_retired_never_fires_and_seam_removed`` to prove a residual
-    record on disk never resurrects the retired SPEC-DOC-029 check.
-    """
-    from datetime import UTC, datetime
-
-    now = (clock() if callable(clock) else datetime.now(tz=UTC)).isoformat()
-    lock_dir = workspace / ".dadaia" / "states" / "ctx_locks"
-    lock_dir.mkdir(parents=True, exist_ok=True)
-    record = {
-        "context": ctx,
-        "release": "rel-1",
-        "session_id": session_id,
-        "mode": "IMPLEMENTATION",
-        "pid": pid,
-        "acquired_at": now,
-        "heartbeat": now,
-        "ttl": 120,
-    }
-    (lock_dir / f"{ctx}.lock.json").write_text(json.dumps(record, indent=2), encoding="utf-8")
+    specs = _tree(tmp_path, release_id, phase)
+    plant(specs)
+    verdicts = {i.verdict for i in SpecsDoctor(specs).check() if i.code == code}
+    assert verdicts == ({verdict} if verdict else set())
 
 
-# ---------------------------------------------------------------------------
-# Sad matrix: each broken fixture fires its code (DOC-024/006/026/027/028/030)
-# ---------------------------------------------------------------------------
-
-
-def test_sad_matrix(tmp_path: Path) -> None:
-    # DOC-024: phase=SPEC but TASKS are an [x]-majority (the live audit incident).
-    specs_a = _make_clean_specs_tree(tmp_path)
-    _set_active(specs_a, "v0.1.10", "SPEC")
-    _write_tasks(specs_a, "v0.1.10", "- [x] T1 done\n- [x] T2 done\n- [ ] T3 open\n")
-    assert "SPEC-DOC-024" in _codes(SpecsDoctor(specs_a).check())
-
-    # DOC-024: phase=CLOSURE but a non-[x] task remains.
-    specs_b = _make_clean_specs_tree(tmp_path.parent / (tmp_path.name + "-024b"))
-    _set_active(specs_b, "v0.1.10", "CLOSURE")
-    _write_tasks(specs_b, "v0.1.10", "- [x] T1 done\n- [-] T2 in-progress\n")
-    assert "SPEC-DOC-024" in _codes(SpecsDoctor(specs_b).check())
-
-    # DOC-006 RETIRED (v0.5.0 T-050-25A, A4.4): check_archive_closures deleted along
-    # with CLOSURE.md itself -- a checker that parses a file which no longer exists is
-    # dead code behind a dead artifact. Verdict: criterion (a) feature removed,
-    # dadaia_workspace/features/specs/doctor_closure_audit.py (this task's own commit).
-
-    # DOC-026: duplicate release id across releases/ and releases/_archive/ -> ERROR.
-    specs_d = _make_clean_specs_tree(tmp_path.parent / (tmp_path.name + "-026"))
-    dup = specs_d / "releases" / "_archive" / "v0.1.10"
-    _write_minimal_spec(dup)
-    doc026 = _by_code(SpecsDoctor(specs_d).check(), "SPEC-DOC-026")
-    assert any(i.severity == Severity.ERROR for i in doc026)
-
-    # DOC-027: non-SemVer active release dir -> ERROR.
-    specs_e = _make_clean_specs_tree(
-        tmp_path.parent / (tmp_path.name + "-027"), release_id="my-feature-v1"
-    )
-    doc027 = _by_code(SpecsDoctor(specs_e).check(), "SPEC-DOC-027")
-    assert any(i.severity == Severity.ERROR for i in doc027)
-
-    # DOC-028: dangling constitution file ref -> WARNING.
-    specs_f = _make_clean_specs_tree(tmp_path.parent / (tmp_path.name + "-028"))
-    (specs_f / "constitution.md").write_text(
-        "# Constitution\n\nSee `does/not/exist.py` for details.\n", encoding="utf-8"
-    )
-    doc028 = _by_code(SpecsDoctor(specs_f, repo_root=specs_f.parent).check(), "SPEC-DOC-028")
-    assert doc028 and all(i.severity == Severity.WARNING for i in doc028)
-
-    # DOC-030: non-conforming new audit dir -> WARNING.
-    specs_g = _make_clean_specs_tree(tmp_path.parent / (tmp_path.name + "-030"))
-    (specs_g / "audits" / "2026-07-01T000000Z").mkdir(parents=True)
-    doc030 = _by_code(SpecsDoctor(specs_g).check(), "SPEC-DOC-030")
-    assert doc030 and all(i.severity == Severity.WARNING for i in doc030)
-
-    # DOC-032 (bug status-token canon over a per-bug specs/bugs/<slug>.md frontmatter
-    # file) is RETIRED at v0.5.1 K5 — see test_bug_record.py and
-    # test_doctor_governance.py for the replacement coverage over the single-JSONL
-    # ledger this doctor now reads exclusively.
-
-
-# ---------------------------------------------------------------------------
-# Silent matrix: coherent/terminal/allowlisted/grandfathered/skipped aggregates
-# ---------------------------------------------------------------------------
-
-
-def test_silent_matrix(tmp_path: Path) -> None:
-    # DOC-024: coherent phase/markers.
-    specs_a = _make_clean_specs_tree(tmp_path)
-    assert "SPEC-DOC-024" not in _codes(SpecsDoctor(specs_a).check())
-    specs_a2 = _make_clean_specs_tree(tmp_path.parent / (tmp_path.name + "-024ok"))
-    _set_active(specs_a2, "v0.1.10", "CLOSURE")
-    _write_tasks(specs_a2, "v0.1.10", "- [x] T1 done\n- [x] T2 done\n")
-    assert "SPEC-DOC-024" not in _codes(SpecsDoctor(specs_a2).check())
-
-    # DOC-006 RETIRED (v0.5.0 T-050-25A, A4.4): see test_sad_matrix's own note above.
-
-    # DOC-026: distinct release ids -> silent.
-    specs_d = _make_clean_specs_tree(tmp_path.parent / (tmp_path.name + "-026ok"))
-    arch_d = specs_d / "releases" / "_archive" / "v0.1.9"
-    _write_minimal_spec(arch_d)
-    assert "SPEC-DOC-026" not in _codes(SpecsDoctor(specs_d).check())
-
-    # DOC-027: SemVer-clean dirs -> silent; allowlisted legacy names -> silent.
-    specs_e = _make_clean_specs_tree(tmp_path.parent / (tmp_path.name + "-027ok"))
-    arch_e = specs_e / "releases" / "_archive" / "v0.1.9"
-    _write_minimal_spec(arch_e)
-    assert "SPEC-DOC-027" not in _codes(SpecsDoctor(specs_e).check())
-
-    # DOC-028: resolvable ref + no-repo-root no-op -> silent.
-    specs_f1 = _make_clean_specs_tree(tmp_path.parent / (tmp_path.name + "-028ok"))
-    (specs_f1.parent / "real_file.py").write_text("# ok\n", encoding="utf-8")
-    (specs_f1 / "constitution.md").write_text(
-        "# Constitution\n\nSee `real_file.py` for details.\n", encoding="utf-8"
-    )
-    assert "SPEC-DOC-028" not in _codes(SpecsDoctor(specs_f1, repo_root=specs_f1.parent).check())
-    specs_f2 = _make_clean_specs_tree(tmp_path.parent / (tmp_path.name + "-028noop"))
-    (specs_f2 / "constitution.md").write_text(
-        "# Constitution\n\nSee `does/not/exist.py`.\n", encoding="utf-8"
-    )
-    assert "SPEC-DOC-028" not in _codes(SpecsDoctor(specs_f2).check())  # no repo_root
-
-    # DOC-030: canonical (`specs/audits/AGENTS.md` <YYYYMMDD>-<slug>)/grandfathered dirs + absent
-    # audits/ -> silent.
-    specs_g1 = _make_clean_specs_tree(tmp_path.parent / (tmp_path.name + "-030ok"))
-    (specs_g1 / "audits" / "20260701-my-audit-slug").mkdir(parents=True)
-    assert "SPEC-DOC-030" not in _codes(SpecsDoctor(specs_g1).check())
-    specs_g2 = _make_clean_specs_tree(tmp_path.parent / (tmp_path.name + "-030gf"))
-    for name in (
-        "2026-06-09T075056Z",
-        "2026-06-10T010550Z",
-        "2026-06-10T052944Z",
-        "2026-06-10T140553Z",
-        "_archive",
-    ):
-        (specs_g2 / "audits" / name).mkdir(parents=True)
-    assert "SPEC-DOC-030" not in _codes(SpecsDoctor(specs_g2).check())
-    specs_g3 = _make_clean_specs_tree(tmp_path.parent / (tmp_path.name + "-030absent"))
-    assert not (specs_g3 / "audits").exists()
-    assert "SPEC-DOC-030" not in _codes(SpecsDoctor(specs_g3).check())
-
-
-def test_doc030_accepts_the_dadaia_md_6_8_canon_shape_yyyymmdd_dash_slug(tmp_path: Path) -> None:
-    """Bug spec-doc-030-audit-dir-rule-contradicts-dadaia-6-8-canon: the root `AGENTS.md` map section
-    6.8 (the current law) and features.specs.canon's own audits CanonEntry both declare
-    an audit dir as ``<YYYYMMDD>-<slug>`` — the SAME shape a real audit dir on this repo
-    carries (``20260827-canon-v6-first-audit``). SPEC-DOC-030 must accept it silently,
-    never WARN against a stale session-timestamp shape the law no longer states."""
-    specs = _make_clean_specs_tree(tmp_path)
-    (specs / "audits" / "20260827-canon-v6-first-audit").mkdir(parents=True)
-    assert "SPEC-DOC-030" not in _codes(SpecsDoctor(specs).check())
-
-
-# ---------------------------------------------------------------------------
-# DOC-027 forward enforcement. The legacy-nested severity branch and the ADR-9
-# name allowlist died with the phantom ``specs/_archive/releases/`` root (bug
-# doctor-reads-phantom-specs-archive-releases-root): no nested milestone layout
-# and no legacy-named dir can exist under ``releases/_archive/``, and the frozen
-# ids live in ``releases/_archive/releases_histo.jsonl``.
-# ---------------------------------------------------------------------------
-
-
-def test_doc027_scores_the_live_root_only(tmp_path: Path) -> None:
-    """Intent: CONTRACT — 0.4.7 c8 review MEDIUM-2/LOW-1.
-
-    An archived release dir's name is the canon's unit (TREE-8), not this rule's: three
-    readers of one fact made a single legacy archived name cost a TREE-8 ERROR per
-    reader plus a SPEC-DOC-027 WARNING (ledger precedent
-    ``doctor-016-errors-archived-legacy-release-027-tolerates``). SPEC-DOC-027 scores
-    the live ``releases/`` root and nothing else.
-    """
-    specs_archived = _make_clean_specs_tree(tmp_path / "027archived")
-    legacy = specs_archived / "releases" / "_archive" / "some-unlisted-legacy-name-v1"
-    _write_minimal_spec(legacy)
-    assert "SPEC-DOC-027" not in _codes(SpecsDoctor(specs_archived).check())
-
-    specs_live = _make_clean_specs_tree(tmp_path / "027live", release_id="v0.1.4.6")
-    doc027_live = _by_code(SpecsDoctor(specs_live).check(), "SPEC-DOC-027")
-    assert any(i.severity == Severity.ERROR for i in doc027_live)
-
-
-# ---------------------------------------------------------------------------
-# DOC-039 DELETED (bug spec-doc-039-inspects-non-canon-path). The rule walked
-# ``specs/_archive/releases/`` and its fix: named ``specs/_archive/wip-abandoned/``
-# — neither root exists in the v6 specs canon (archived releases live under
-# ``specs/releases/_archive/``), so the check could never fire and its fix could
-# never be run. Deletion-shaped fix: the rule, its registry entry and its
-# behavioural tests are gone; this deletion test keeps them gone.
-# ---------------------------------------------------------------------------
-
-
-def test_no_specs_feature_file_names_the_phantom_archive_root() -> None:
-    """Intent: CONTRACT — bug doctor-reads-phantom-specs-archive-releases-root.
-
-    Archived releases live under ``specs/releases/_archive/``. The pre-0.5.0
-    ``specs/_archive/releases/`` root is never created by canon v6, so no walker,
-    rule, message or docstring may name it.
-    """
-    from dadaia_workspace.features.specs import rules as specs_rules
-
-    sources = sorted(Path(specs_rules.__file__).parent.glob("*.py"))
-    assert sources
-    for src in sources:
-        text = src.read_text(encoding="utf-8")
-        assert "_archive/releases/" not in text, src
-        assert '"_archive" / "releases"' not in text, src
-
-
-def test_doc039_is_not_a_registered_rule_and_no_doctor_path_names_it() -> None:
-    """Intent: CONTRACT — bug spec-doc-039-inspects-non-canon-path.
-
-    SPEC-DOC-039 is deleted: it is absent from the specs rule registry, and no
-    doctor module names the two non-canon roots it inspected.
-    """
-    from dadaia_workspace.features.specs import rules as specs_rules
-
-    registered = {code for rule in specs_rules.RULES for code in rule.codes}
-    assert "SPEC-DOC-039" not in registered
-
-    sources = sorted(Path(specs_rules.__file__).parent.glob("*.py"))
-    assert sources
-    for src in sources:
-        text = src.read_text(encoding="utf-8")
-        assert "SPEC-DOC-039" not in text, src
-        assert "wip-abandoned" not in text, src
-
-
-# ---------------------------------------------------------------------------
-# DOC-029 RETIRED (v0.1.76 T-4, FR7, NO-LOCKS DOCTRINE). The lease-record holder no
-# longer carries any acquisition/CAS authority to be "forged" against — ``lease.acquire``/
-# ``steal``/the by-session index are deleted (T-3), so a residual ``<ctx>.lock.json`` is
-# legacy/diagnostic noise, not a security-relevant divergence. Its stale-reclaim WARN
-# duplicated ``LOCK-GC`` (``features/spec_context/doctor.py``) exactly. The check, its
-# ``workspace_state_dir``/``pid_probe`` composition-root seam, and the
-# ``spec_context.{lease, session_identity}`` import edge are all retired together — the
-# simplest honest end state (never leave a no-op security check standing). Successor
-# invariant asserted below: SPEC-DOC-029 never fires, from any doctor construction.
-# ---------------------------------------------------------------------------
-
-
-def test_doc029_retired_never_fires_and_seam_removed(tmp_path: Path) -> None:
-    """SPEC-DOC-029 is retired: the code never appears in ``check()`` output regardless
-    of any residual ``<ctx>.lock.json`` on disk, and the ``workspace_state_dir``/
-    ``pid_probe`` composition-root seam is gone from ``SpecsDoctor.__init__`` — there is
-    nothing left for it to select or inject (R-1: the coordinator no longer holds the
-    ``spec_context`` import edge via ``doctor_coherence``)."""
-    import inspect
-
-    specs = _make_clean_specs_tree(tmp_path)
-
-    # A residual, genuinely-diverged lock record on disk must not resurrect SPEC-DOC-029.
-    _seed_lock_record(tmp_path, "ctx-retired", "sessForgedLive")
-    issues = SpecsDoctor(specs).check()
-    assert "SPEC-DOC-029" not in _codes(issues)
-
-    sig = inspect.signature(SpecsDoctor.__init__)
-    assert "workspace_state_dir" not in sig.parameters, (
-        "SPEC-DOC-029 retirement must remove the now-purposeless workspace_state_dir seam"
-    )
-    assert "pid_probe" not in sig.parameters, (
-        "SPEC-DOC-029 retirement must remove the now-purposeless pid_probe seam"
-    )
-
-
-def test_doctor_coherence_no_longer_imports_spec_context() -> None:
-    """R-1 cap invariant, post-retirement: ``doctor_coherence.py`` (and the coordinator)
-    must hold NO ``spec_context`` cross-feature IMPORT STATEMENT — SPEC-DOC-029 was its
-    sole reason to import ``lease``/``session_identity``. AST-based (not a source-text
-    substring match) so prose mentioning "spec_context" in docstrings/comments never
-    produces a false positive."""
-    import ast
-    import importlib
-
-    for name in _DOCTOR_MODULE_NAMES:
-        mod = importlib.import_module(f"dadaia_workspace.features.specs.{name}")
-        assert mod.__file__ is not None
-        tree = ast.parse(Path(mod.__file__).read_text(encoding="utf-8"))
-        for node in ast.walk(tree):
-            if isinstance(node, ast.ImportFrom) and node.module:
-                assert "spec_context" not in node.module, (
-                    f"{mod.__name__} must not import dadaia_workspace.features.spec_context "
-                    "(SPEC-DOC-029 retirement removed the sole reason for that edge): "
-                    f"line {node.lineno}"
-                )
-            elif isinstance(node, ast.Import):
-                for alias in node.names:
-                    assert "spec_context" not in alias.name, (
-                        f"{mod.__name__} must not import dadaia_workspace.features."
-                        f"spec_context: line {node.lineno}"
-                    )
+def test_doc041_archive_overdue_is_one_warning_fixed_by_bugs_archive(tmp_path: Path) -> None:
+    """sa-spec-doc-033-duplicates-bugs-check#B8."""
+    specs = _tree(tmp_path)
+    (specs / "bugs").mkdir()
+    closed = {"id": "old", "status": "resolved", "closed_at": "2026-01-01T00:00:00Z"}
+    (specs / "bugs" / "BUGS.jsonl").write_text(json.dumps(closed) + "\nnot json {\n")
+    [doc041] = [i for i in SpecsDoctor(specs).check() if i.code == "SPEC-DOC-041"]
+    [rule] = [r for r in RULES if "SPEC-DOC-041" in r.codes]
+    assert doc041.verdict == "warning" and "bugs.py archive" in str(rule.fix_help)

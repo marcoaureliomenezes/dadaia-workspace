@@ -10,7 +10,12 @@ from typing import NoReturn
 import typer
 
 
-def fail(error: object) -> NoReturn:
-    """Print ``Error: <error>`` to stderr and exit 1."""
+def print_error(error: object) -> None:
+    """``Error: <error>`` on stderr — the one rendering of a refusal."""
     print(f"Error: {error}", file=sys.stderr)
+
+
+def fail(error: object) -> NoReturn:
+    """Print the refusal (:func:`print_error`) and exit 1."""
+    print_error(error)
     raise typer.Exit(1) from None

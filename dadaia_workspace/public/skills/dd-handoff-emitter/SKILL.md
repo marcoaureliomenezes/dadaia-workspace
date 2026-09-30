@@ -15,8 +15,8 @@ completed agent task; the HTML report is the exception, not the rule.
 ## Emitting
 
 1. Open `.dadaia/handoff/AGENTS.md` (the area's scoped law) and follow it.
-2. Resolve the workspace root: walk up from cwd to the nearest ancestor already
-   containing `.dadaia/` — never create a new one.
+2. Resolve the workspace root: walk up from cwd to the nearest ancestor holding
+   `.dadaia/states/spec_contexts.json` — never create a new one.
 3. Default to handoff-only; switch to report mode only when the operator asked or
    `next_handoff.agent == "human"`.
 4. Report mode first writes the HTML to

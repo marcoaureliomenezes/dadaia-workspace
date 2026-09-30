@@ -21,10 +21,10 @@ sources:
 ## Bootstrap
 
 - `uvx dadaia-workspace init [DIR] [--harness <name>] [--repo <url> [--associated-repo <url>]...] [--skip-assets]` is the only verb that works on an empty directory; every later command runs through the workspace's own `.dadaia/.venv/bin/dadaia`.
-- Flags and prompts fill ONE plan: on a TTY a missing DIR or harness is asked (a bare name becomes `./<name>`), then the main-repo URL (blank = none) and associated URLs until a blank line; with no TTY a missing DIR or harness exits 2 with `fix: uvx dadaia-workspace init <dir> --harness <h>`; a missing `--repo` is never an error.
+- Flags and prompts fill ONE plan: on a TTY a missing DIR or harness is asked (a bare name becomes `./<name>`), then the main-repo URL (blank = none) and associated URLs until a blank line; with no TTY a missing DIR or harness exits 1 with `fix: uvx dadaia-workspace init <dir> --harness <h>`; a missing `--repo` is never an error.
 - Every refusal's `fix:` line is rendered from the plan itself, so it repeats the invocation's `--repo` and every `--associated-repo`.
 - `--harness` names one registered harness (`claude`, `codex`, `kimi-code`, `cursor`, `devin`, `copilot`); on an existing workspace it defaults to the persisted profile's first harness.
-- DIR is created if absent and never resolved from the cwd; a non-directory or a non-empty directory without `.dadaia/` is refused, exit 2, with a sibling `<dir>-workspace` in the `fix:` line; every refusal happens before any write.
+- DIR is created if absent and never resolved from the cwd; a non-directory or a non-empty directory without `.dadaia/` is refused, exit 1, with a sibling `<dir>-workspace` in the `fix:` line; every refusal happens before any write.
 - It provisions `.dadaia/.venv` (stdlib venv plus pip, the package's dependencies resolved from PyPI), every `.dadaia/` zone whose creator is init or install, and `.agents/skills`; the harness's own directory comes from its projection. An absent zone is [[workspace-doctor]]'s `WS-<zone>-missing`.
 - The venv mirrors the running distribution: editable from a source checkout, else its re-packed wheel written to a system temp directory deleted after the install; `DADAIA_BOOTSTRAP_PACKAGE=<wheel>` names another wheel. A base Python without `ensurepip` is reported as missing `ensurepip`/`venv`; any other venv creation failure names a `noexec` target as its likely cause.
 - A failed dependency install says the venv resolves its dependencies from PyPI (network required) and quotes the installer's last whole lines, never a mid-line cut.
@@ -38,12 +38,12 @@ sources:
 
 ## Upgrade
 
-- Re-running `init` on an existing workspace is the upgrade; the venv's installed version is compared with the running distribution by one decider.
-- An older venv is reinstalled from the running distribution and reconciled, printing `upgraded A -> B`; a failed reconcile exits 1 with `fix: <cli> reconcile --expect-version B`.
+- Re-running `init` on an existing workspace is the upgrade; the venv's installed build — its version plus a digest of the package payload — is compared with the running distribution's by one decider.
+- An older venv, or another build of the same version, is reinstalled from the running distribution by one `pip install --force-reinstall` (a failed install keeps the old build) and reconciled, printing `upgraded A -> B`; a failed reconcile exits 1 with `fix: <cli> reconcile --expect-version B`.
 - Every init also refreshes the pre-push hook of every ALIVE repo whose installed hook is byte-identical to one the library shipped; an operator's own hook is kept ([[context-management]]).
-- An equal venv prints `already at A` and writes no file under the workspace.
-- A newer venv is refused before any write, exit 1, `fix: <cli> init <ws>` — the workspace's own newer CLI.
-- Versions order as `M.m.p` with an optional local segment sorting after its base.
+- The same build prints `already at A` and writes no file under the workspace.
+- A newer venv is refused before any write, exit 1, `fix: <cli> init <ws> --harness <h>` — the workspace's own newer CLI.
+- Versions order by PEP 440 (`packaging.version`), so a pre-release sorts above the release before it.
 - The upgrade never writes a project repo; `<cli> specs init --context <ctx>`, re-run per project, then refreshes that project's specs law ([[specs-migration]]).
 
 ## First project

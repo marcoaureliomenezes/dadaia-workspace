@@ -39,18 +39,16 @@ Tree-/package-walking population scans (the convention applies at the call site 
 
 * ``tests/contract/test_frozen_clock_aging_ratchet.py`` ::
   test_no_file_combines_a_frozen_datetime_constant_with_a_real_clock_call
-* ``tests/contract/test_harness_env_contract.py`` :: ``_iter_test_files()``
-* ``tests/unit/helpers/test_no_local_helper_copies.py`` :: ``_test_files()``
+* ``tests/contract/test_harness_env_contract.py`` :: ``_trees()``
 * ``tests/contract/test_core_file_io_purity.py`` ::
   test_core_file_io_purity_ratchet_and_authorized_set_grounded
 * ``tests/contract/test_release_semver_canon.py`` :: ``_find_semver_compile_sites()``
 * ``tests/contract/test_session_store_ownership.py`` ::
   test_pointer_and_record_namespace_residue_is_owner_or_allowlisted_only
-* ``tests/unit/public/test_no_gpt_only_claim.py`` :: test_no_surviving_gpt_only_claim
 * ``tests/contract/test_behavior_map.py`` :: ``_skills_on_disk()``,
   ``_scoped_agents_md_sources()``
 * ``tests/contract/test_public_scripts_thin_wrapper.py`` ::
-  test_thin_wrapper_registry_stays_data_driven_and_correctly_scoped
+  test_ledger_owner_scripts_expose_check
 * ``tests/contract/test_bind_resolution_seam_dynamic_walk.py`` ::
   test_no_resolver_driven_verb_hardcodes_the_dadaia_workspace_default
 * ``tests/unit/core/test_atomic_write_census.py`` ::
@@ -75,9 +73,6 @@ Deliberately EXCLUDED:
   test_no_allowlist_or_sanctioned_terms_constant_in_matcher_source — reads
   ``Path(module.__file__)`` after a successful ``import``; a broken path fails the
   import, not the scan.
-* ``tests/unit/core/test_kernel_tunables.py`` :: every case —
-  ``importlib.import_module(dotted)`` on a fixed, parametrized dotted path; a
-  mis-rooted/renamed module fails the import, never scans zero files silently.
 """
 
 from __future__ import annotations

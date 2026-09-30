@@ -18,8 +18,6 @@ lives in ``core/harness_registry.py`` or nowhere.
 from __future__ import annotations
 
 import json
-import os
-import stat as stat_module
 from collections.abc import Callable, Mapping
 from pathlib import Path
 
@@ -30,16 +28,17 @@ from dadaia_workspace.core.harness_registry import (
     HarnessRecord,
     HookFormat,
 )
-from dadaia_workspace.core.models.agent_model_policy import ResolvedAgentModel
+from dadaia_workspace.core.model_registry import ResolvedAgentModel
 from dadaia_workspace.core.models.doctor_report import DoctorLine, DoctorStatus
 from dadaia_workspace.infrastructure.agent_transcodes import AGENT_RULE_BUILDERS, no_rules
 from dadaia_workspace.infrastructure.codex_doctor import (
-    codex_trust_boundary_info,
     dcx7_codex_skill_refs,
     dcx8_codex_rules_shape,
-    dcx9_codex_hook_shape,
 )
-from dadaia_workspace.infrastructure.install_helpers import render_claude_agent
+from dadaia_workspace.infrastructure.install_helpers import (
+    render_claude_agent,
+    resolve_codex_agent_model,
+)
 from dadaia_workspace.infrastructure.install_plan import InstallPlan
 from dadaia_workspace.infrastructure.projection import (
     ProjectionRule,
@@ -48,21 +47,17 @@ from dadaia_workspace.infrastructure.projection import (
 )
 from dadaia_workspace.infrastructure.public_assets_common import iter_public_files
 from dadaia_workspace.infrastructure.runtime_config import (
-    claude_settings,
-    codex_hooks,
+    claude_hooks,
     foreign_claude_hook_commands,
     kimi_code_home,
-    kimi_hook_shims,
     kimi_hooks_block,
     merge_claude_settings,
     upsert_kimi_hooks_block,
 )
+from dadaia_workspace.infrastructure.runtime_transforms.codex_assets import _parse_agent_frontmatter
 from dadaia_workspace.infrastructure.runtime_transforms.hook_wrappers import (
-    hook_file_payloads,
+    hook_documents,
     hook_wrapper_contents,
-)
-from dadaia_workspace.infrastructure.workspace_guardrail import (
-    _agents_md_source,
 )
 
 # ---------------------------------------------------------------------------
@@ -71,19 +66,10 @@ from dadaia_workspace.infrastructure.workspace_guardrail import (
 
 
 def _guardrail_pair_rules(plan: InstallPlan) -> tuple[ProjectionRule, ...]:
-    """The root ``AGENTS.md`` map — one rule, one destination (collapsed the
-    pair: the Claude bridge stub is retired, Claude Code reads ``AGENTS.md`` natively).
-
-    Consumer-repo fan-out (``repos/<slug>:AGENTS.md``) is provenance-gated, N-target
-    discovery-based writing with foreign-authorship detection — a fundamentally
-    different mechanism from "one rule, one destination" — and stays the bespoke
-    ``workspace_guardrail._install_guardrail_pair`` path, invoked directly by the
-    manager.
-    """
-    if "workspace" not in plan.guardrail_targets:
-        return ()
-    src = _agents_md_source(plan.agentic_dir)
-    if src is None:
+    """The root ``AGENTS.md`` map — one source (``data/AGENTS.md``), one destination;
+    ``public install`` never writes under ``repos/`` (repo law is ``specs init``'s)."""
+    src = plan.agentic_dir / "data" / "AGENTS.md"
+    if not src.is_file():
         return ()
     return (
         bytes_rule("root:AGENTS.md", "agents", plan.workspace_root / "AGENTS.md", src.read_bytes()),
@@ -138,41 +124,26 @@ def _agents_agent_rules(
     for src in iter_public_files(src_dir):
         rel = src.relative_to(src_dir)
         label = f"agents:agents/{rel.as_posix()}"
-        resolved = resolved_models.get(src.stem)
-        if resolved is None or src.suffix != ".md":
+        if src.suffix != ".md":
             rules.append(bytes_rule(label, "agents", dst_dir / rel, src.read_bytes()))
             continue
-        staged_text = src.read_text(encoding="utf-8")
 
         def _render(
             _current: bytes | None,
-            _text: str = staged_text,
-            _resolved: ResolvedAgentModel = resolved,
+            _src: Path = src,
+            _resolved: ResolvedAgentModel | None = resolved_models.get(src.stem),
         ) -> bytes:
-            return render_claude_agent(_text, _resolved).encode("utf-8")
+            text = _src.read_text(encoding="utf-8")
+            if _resolved is not None:
+                return render_claude_agent(text, _resolved).encode("utf-8")
+            # An authored model renders verbatim; a persona with none is refused.
+            resolve_codex_agent_model(_src.stem, _parse_agent_frontmatter(text).get("model"), None)
+            return _src.read_bytes()
 
         rules.append(
             ProjectionRule(label=label, harness="agents", dst=dst_dir / rel, render=_render)
         )
     return tuple(rules)
-
-
-def prune_stale_codex_tomls(
-    codex_dir: Path, expected: frozenset[str], installed: list[str]
-) -> None:
-    """Remove a ``.codex/agents/*.toml`` whose agent no longer exists in source.
-
-    Unconditional (rc-4 / T-017-32): an agent removed from source must not leave an
-    orphan projection, regardless of ``--force``. *expected* is the set of TOML
-    filenames the current rule table just projected.
-    """
-    agents_dst = codex_dir / "agents"
-    if not agents_dst.is_dir():
-        return
-    for stale in sorted(agents_dst.glob("*.toml")):
-        if stale.name not in expected:
-            stale.unlink()
-            installed.append(f"[rm]   {stale}")
 
 
 # ---------------------------------------------------------------------------
@@ -185,8 +156,6 @@ def _settings_merge_rules(record: HarnessRecord, plan: InstallPlan) -> tuple[Pro
     file, folding in only the dadaia hook wiring and leaving every other top-level key and
     non-dadaia hook entry untouched. Still one algorithm, because the merge is a fixed
     point on already-canonical content."""
-    if plan.only is not None:
-        return ()
     workspace_root = plan.workspace_root
     dst = workspace_root / str(record.directory) / "settings.json"
 
@@ -212,6 +181,7 @@ def _settings_merge_rules(record: HarnessRecord, plan: InstallPlan) -> tuple[Pro
             render=_render,
             compare="owned-slice",
         ),
+        *_wrapper_rules(record, workspace_root),
     )
 
 
@@ -227,7 +197,7 @@ def _settings_merge_checks(record: HarnessRecord, workspace_root: Path) -> list[
         return []
     if not isinstance(loaded, dict):
         return []
-    foreign = foreign_claude_hook_commands(loaded, claude_settings(workspace_root))
+    foreign = foreign_claude_hook_commands(loaded, claude_hooks())
     if not foreign:
         return []
     return [
@@ -237,26 +207,6 @@ def _settings_merge_checks(record: HarnessRecord, workspace_root: Path) -> list[
             + ", ".join(foreign),
         )
     ]
-
-
-def _hooks_json_rules(record: HarnessRecord, plan: InstallPlan) -> tuple[ProjectionRule, ...]:
-    """``codex-hooks``: a project-level ``hooks.json`` plus the shared wrapper scripts the
-    harness shells out to."""
-    if plan.only is not None:
-        return ()
-    workspace_root = plan.workspace_root
-    rules = [
-        bytes_rule(
-            f"{record.name}:hooks.json",
-            record.name,
-            workspace_root / str(record.directory) / "hooks.json",
-            (json.dumps(codex_hooks(workspace_root), indent=2, sort_keys=True) + "\n").encode(
-                "utf-8"
-            ),
-        )
-    ]
-    rules.extend(_wrapper_rules(record, workspace_root))
-    return tuple(rules)
 
 
 def _wrapper_rules(record: HarnessRecord, workspace_root: Path) -> tuple[ProjectionRule, ...]:
@@ -281,13 +231,7 @@ def _wrapper_rules(record: HarnessRecord, workspace_root: Path) -> tuple[Project
 
 
 def _hook_files_rules(record: HarnessRecord, plan: InstallPlan) -> tuple[ProjectionRule, ...]:
-    """A format whose whole registration is one or more plain JSON files citing wrappers.
-
-    The files are data (``HOOK_DIALECTS``) and the behaviours are the wrappers', so a
-    harness joining this builder cannot invent a fifth behaviour nor drop one of the four.
-    """
-    if plan.only is not None:
-        return ()
+    """A format whose whole registration is one or more JSON files citing wrappers."""
     workspace_root = plan.workspace_root
     directory = workspace_root / str(record.directory)
     rules = [
@@ -295,33 +239,24 @@ def _hook_files_rules(record: HarnessRecord, plan: InstallPlan) -> tuple[Project
             f"{record.name}:{relpath}",
             record.name,
             directory / relpath,
-            payload.encode("utf-8"),
+            (json.dumps(document, indent=2, sort_keys=True) + "\n").encode("utf-8"),
         )
-        for relpath, payload in hook_file_payloads(record).items()
+        for relpath, document in hook_documents(record).items()
     ]
     rules.extend(_wrapper_rules(record, workspace_root))
     return tuple(rules)
 
 
-def _hooks_json_checks(record: HarnessRecord, workspace_root: Path) -> list[DoctorLine]:
-    """D-CX-6/7/8/9 plus the version-qualified trust-boundary INFO line — all gated on the
-    harness being in profile. ``check_codex_rule_corpus_reachable`` stays a top-level,
-    UNCONDITIONAL doctor() attestation (never gated): the ``rule-corpus`` id in
-    ``ATTESTING_CHECK_IDS`` must never vanish for an out-of-profile harness."""
-    out: list[DoctorLine] = []
-    out.extend(dcx7_codex_skill_refs(workspace_root))
-    out.extend(dcx8_codex_rules_shape(workspace_root / str(record.directory)))
-    out.extend(dcx9_codex_hook_shape(workspace_root))
-    out.extend(codex_trust_boundary_info())
-    return out
+def _codex_checks(record: HarnessRecord, workspace_root: Path) -> list[DoctorLine]:
+    """D-CX-7/8 — gated on the harness being in profile."""
+    codex_dir = workspace_root / str(record.directory)
+    return [*dcx7_codex_skill_refs(workspace_root), *dcx8_codex_rules_shape(codex_dir)]
 
 
 def _user_home_hook_rules(record: HarnessRecord, plan: InstallPlan) -> tuple[ProjectionRule, ...]:
     """``kimi-hooks``: no project-level config file — hook registration is a managed block
     folded into the user-level ``$KIMI_CODE_HOME/config.toml``, the same fixed-point
     algorithm as every other rule."""
-    if plan.only is not None:
-        return ()
     home = kimi_code_home()
     rules = [
         bytes_rule(
@@ -331,7 +266,7 @@ def _user_home_hook_rules(record: HarnessRecord, plan: InstallPlan) -> tuple[Pro
             content.encode("utf-8"),
             mode=0o755,
         )
-        for name, content in kimi_hook_shims().items()
+        for name, content in hook_wrapper_contents(record).items()
     ]
 
     def _render(current: bytes | None) -> bytes:
@@ -350,36 +285,6 @@ def _user_home_hook_rules(record: HarnessRecord, plan: InstallPlan) -> tuple[Pro
     return tuple(rules)
 
 
-def _user_home_hook_checks(record: HarnessRecord, workspace_root: Path) -> list[DoctorLine]:
-    """Executability is not a byte-compare claim: a cleared exec bit is repairable DRIFT,
-    but a noexec mount is UNSUPPORTED — reinstalling can never fix a mount option."""
-    del workspace_root  # these hooks live at the user-level home, not the workspace
-    home = kimi_code_home()
-    out: list[DoctorLine] = []
-    for name in kimi_hook_shims():
-        dst = home / "hooks" / name
-        label = f"{record.name}:hooks/{name}"
-        if not dst.is_file() or os.access(dst, os.X_OK):
-            continue
-        if dst.stat().st_mode & stat_module.S_IXUSR:
-            out.append(
-                DoctorLine(
-                    DoctorStatus.UNSUPPORTED,
-                    f"{label} (filesystem mounted noexec — the exec bits are set "
-                    "but the mount forbids execution; point KIMI_CODE_HOME at a path "
-                    "on an executable filesystem)",
-                )
-            )
-        else:
-            out.append(DoctorLine(DoctorStatus.DRIFT, f"{label} (not executable)"))
-    return out
-
-
-def _no_checks(record: HarnessRecord, workspace_root: Path) -> list[DoctorLine]:
-    del record, workspace_root
-    return []
-
-
 #: One builder per :class:`HookFormat` value — total, so no harness can fall through a
 #: missing key. ``no_rules`` remains reachable for a format that genuinely registers
 #: nothing; every format that registers a plain JSON file shares ``_hook_files_rules``,
@@ -389,7 +294,7 @@ HOOK_RULE_BUILDERS: dict[
 ] = {
     HookFormat.NONE: no_rules,
     HookFormat.CLAUDE_SETTINGS: _settings_merge_rules,
-    HookFormat.CODEX_HOOKS: _hooks_json_rules,
+    HookFormat.CODEX_HOOKS: _hook_files_rules,
     HookFormat.KIMI_HOOKS: _user_home_hook_rules,
     HookFormat.CURSOR_HOOKS: _hook_files_rules,
     HookFormat.DEVIN_HOOKS: _hook_files_rules,
@@ -411,18 +316,10 @@ def harnesses_with_a_hook_derivation() -> frozenset[str]:
     )
 
 
-#: The doctor residue per :class:`HookFormat` value — a structural/semantic claim a
-#: single rendered file cannot express.
+#: The doctor residue a byte-compare cannot express, per :class:`HookFormat`.
 _HOOK_CHECKS: dict[HookFormat, Callable[[HarnessRecord, Path], list[DoctorLine]]] = {
-    HookFormat.NONE: _no_checks,
     HookFormat.CLAUDE_SETTINGS: _settings_merge_checks,
-    HookFormat.CODEX_HOOKS: _hooks_json_checks,
-    HookFormat.KIMI_HOOKS: _user_home_hook_checks,
-    # The rendered files and the wrappers are byte-compared, and the exec bit rides the
-    # rule's own mode — these formats leave no residue a byte-compare cannot express.
-    HookFormat.CURSOR_HOOKS: _no_checks,
-    HookFormat.DEVIN_HOOKS: _no_checks,
-    HookFormat.COPILOT_HOOKS: _no_checks,
+    HookFormat.CODEX_HOOKS: _codex_checks,
 }
 
 #: Which targets pull in the authored ``.agents/`` persona + skills set: the shared
@@ -440,7 +337,8 @@ _AUTHORED_SET_TARGETS: frozenset[str] = frozenset(
 def harness_checks(name: str, workspace_root: Path) -> list[DoctorLine]:
     """The doctor lines for harness *name* that its rule table cannot express."""
     record = HARNESS_RECORDS[name]
-    return _HOOK_CHECKS[record.hooks](record, workspace_root)
+    check = _HOOK_CHECKS.get(record.hooks)
+    return check(record, workspace_root) if check else []
 
 
 def projection_rules(plan: InstallPlan) -> tuple[ProjectionRule, ...]:
@@ -449,12 +347,10 @@ def projection_rules(plan: InstallPlan) -> tuple[ProjectionRule, ...]:
     rules.extend(_guardrail_pair_rules(plan))
     rules.extend(_dadaia_family_agents_md_rules(plan))
     if _AUTHORED_SET_TARGETS & set(plan.harness_targets):
-        if plan.only is None or plan.only == "skills":
-            rules.extend(_skills_tree_rules(plan))
-        if plan.only is None or plan.only == "agents":
-            rules.extend(
-                _agents_agent_rules(plan.agentic_dir, plan.workspace_root, plan.resolved_models)
-            )
+        rules.extend(_skills_tree_rules(plan))
+        rules.extend(
+            _agents_agent_rules(plan.agentic_dir, plan.workspace_root, plan.resolved_models)
+        )
     for name, record in HARNESS_RECORDS.items():
         if name not in plan.harness_targets:
             continue

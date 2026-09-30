@@ -33,60 +33,34 @@ def _make_exe(directory: Path, name: str) -> Path:
     return exe
 
 
-# ---------------------------------------------------------------------------
-# Resolution precedence: venv sibling > DADAIA_BIN > poetry fallback — 1 param
-# ---------------------------------------------------------------------------
-
-
-@pytest.mark.parametrize(
-    ("build", "tool", "expected_source"),
-    [
-        pytest.param("venv-wins-over-dadaia-bin", "ruff", "venv", id="venv-sibling-wins"),
-        pytest.param("dadaia-bin-only", "mypy", "dadaia-bin", id="fallback-to-dadaia-bin"),
-        pytest.param("neither", "pytest", "poetry", id="poetry-fallback-when-missing-everywhere"),
-        pytest.param(
-            "no-dadaia-bin-set", "ruff", "poetry", id="poetry-fallback-when-dadaia-bin-unset"
-        ),
-        pytest.param(
-            "dir-named-like-tool", "ruff", "poetry", id="dir-named-like-tool-not-executable"
-        ),
-    ],
-)
-def test_resolve_tool_precedence(
-    tmp_path: Path, build: str, tool: str, expected_source: str
-) -> None:
+# fmt: off
+@pytest.mark.parametrize(("venv", "dadaia", "dadaia_bin", "expected"), [
+    pytest.param(["ruff"], ["ruff", "dadaia"], True, "venv/bin/ruff", id="venv-sibling-wins"),
+    pytest.param([], ["ruff", "dadaia"], True, "dadaia/bin/ruff", id="fallback-to-dadaia-bin"),
+    pytest.param([], ["dadaia"], True, None, id="poetry-fallback-when-missing-everywhere"),
+    pytest.param([], [], False, None, id="poetry-fallback-when-dadaia-bin-unset"),
+    pytest.param(["ruff/"], [], False, None, id="dir-named-like-tool-not-executable"),
+    pytest.param(["ruff", "python->base"], [], False, "venv/bin/ruff", id="sibling-of-a-python-symlink-never-its-target"),
+])
+# fmt: on
+def test_resolve_tool_precedence(tmp_path: Path, venv: list[str], dadaia: list[str], dadaia_bin: bool, expected: str | None) -> None:
+    """Bug B2: venv sibling of sys.executable (next to the SYMLINK, never its target) > DADAIA_BIN dir > poetry."""
     venv_bin = tmp_path / "venv" / "bin"
-    python = _make_exe(venv_bin, "python")
-    dadaia_bin_dir = tmp_path / "dadaia" / "bin"
-
-    if build == "venv-wins-over-dadaia-bin":
-        expected = _make_exe(venv_bin, tool)
-        _make_exe(dadaia_bin_dir, tool)
-        _make_exe(dadaia_bin_dir, "dadaia")
-        argv = _resolve_tool(
-            tool, python_executable=str(python), dadaia_bin=str(dadaia_bin_dir / "dadaia")
-        )
-        assert argv == (str(expected),)
-    elif build == "dadaia-bin-only":
-        _make_exe(dadaia_bin_dir, "dadaia")
-        expected = _make_exe(dadaia_bin_dir, tool)
-        argv = _resolve_tool(
-            tool, python_executable=str(python), dadaia_bin=str(dadaia_bin_dir / "dadaia")
-        )
-        assert argv == (str(expected),)
-    elif build == "neither":
-        _make_exe(dadaia_bin_dir, "dadaia")
-        argv = _resolve_tool(
-            tool, python_executable=str(python), dadaia_bin=str(dadaia_bin_dir / "dadaia")
-        )
-        assert argv == ("poetry", "run", tool)
-    elif build == "no-dadaia-bin-set":
-        argv = _resolve_tool(tool, python_executable=str(python), dadaia_bin=None)
-        assert argv == ("poetry", "run", tool)
-    elif build == "dir-named-like-tool":
-        (venv_bin / tool).mkdir()  # a *directory* named like the tool, not an executable
-        argv = _resolve_tool(tool, python_executable=str(python), dadaia_bin=None)
-        assert argv == ("poetry", "run", tool)
+    if "python->base" in venv:
+        venv_bin.mkdir(parents=True)
+        (venv_bin / "python").symlink_to(_make_exe(tmp_path / "usr" / "bin", "python3.12"))
+    else:
+        _make_exe(venv_bin, "python")
+    for name in venv:
+        if name.endswith("/"):
+            (venv_bin / name[:-1]).mkdir()
+        elif "->" not in name:
+            _make_exe(venv_bin, name)
+    for name in dadaia:
+        _make_exe(tmp_path / "dadaia" / "bin", name)
+    bin_arg = str(tmp_path / "dadaia" / "bin" / "dadaia") if dadaia_bin else None
+    argv = _resolve_tool("ruff", python_executable=str(venv_bin / "python"), dadaia_bin=bin_arg)
+    assert argv == ((str(tmp_path / expected),) if expected else ("poetry", "run", "ruff"))
 
 
 def test_resolve_tool_never_calls_shutil_which_and_wires_all_checks(
@@ -113,6 +87,7 @@ def test_resolve_tool_never_calls_shutil_which_and_wires_all_checks(
     ruff = _make_exe(venv_bin, "ruff")
     mypy = _make_exe(venv_bin, "mypy")
     pytest_exe = _make_exe(venv_bin, "pytest")
+    _make_exe(venv_bin, "dadaia")
     python = venv_bin / "python"
 
     full = checks_for(quick=False, python_executable=str(python), dadaia_bin=None)
@@ -129,43 +104,3 @@ def test_resolve_tool_never_calls_shutil_which_and_wires_all_checks(
 
     for c in (*full, *quick):
         assert c.argv[0] != "poetry", c.name
-
-
-# ---------------------------------------------------------------------------
-# Named regressions — kept verbatim
-# ---------------------------------------------------------------------------
-
-
-def test_resolve_tool_sibling_of_python_symlink_not_its_target(tmp_path: Path) -> None:
-    """Venv-symlink regression (live-gate defect): ``bin/python`` is a symlink to
-    the base interpreter; resolution must look for siblings next to the SYMLINK,
-    never next to its target (which would escape the venv into the system bin)."""
-    base_bin = tmp_path / "usr" / "bin"
-    base_python = _make_exe(base_bin, "python3.12")  # no ruff here
-
-    venv_bin = tmp_path / "venv" / "bin"
-    venv_bin.mkdir(parents=True)
-    python_link = venv_bin / "python"
-    python_link.symlink_to(base_python)
-    ruff = _make_exe(venv_bin, "ruff")
-
-    argv = _resolve_tool("ruff", python_executable=str(python_link), dadaia_bin=None)
-    assert argv == (str(ruff),)
-
-
-def test_preflight_works_with_poetry_off_path(tmp_path: Path) -> None:
-    """Named regression for bug ci-preflight-checks-hardcode-poetry-run.
-
-    The whole point of the bug: with poetry absent, a fully populated venv must
-    still yield runnable argv. We build the checks against a fake venv tree (no
-    poetry anywhere) and assert NONE of the resolved argv reference poetry.
-    """
-    venv_bin = tmp_path / "venv" / "bin"
-    _make_exe(venv_bin, "python")
-    for tool in ("ruff", "mypy", "pytest"):
-        _make_exe(venv_bin, tool)
-    python = venv_bin / "python"
-
-    checks = checks_for(quick=False, python_executable=str(python), dadaia_bin=None)
-    for c in checks:
-        assert "poetry" not in c.argv, f"{c.name} still references poetry: {c.argv}"

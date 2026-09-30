@@ -23,7 +23,7 @@
         "claude": "PreToolUse hook (.claude/settings.json → dadaia_workspace.hooks.pre_gate)",
         "codex": ".codex/hooks.json wrapper → .dadaia/hooks/pre_gate.sh (interactive sessions)",
         "kimi-code": "managed hook block in $KIMI_CODE_HOME/config.toml → the same Python gate",
-        "cursor": ".cursor/hooks.json beforeShellExecution → .dadaia/hooks/cursor-pre-gate → the same Python gate",
+        "cursor": ".cursor/hooks.json preToolUse → .dadaia/hooks/cursor-pre-gate → the same Python gate",
         "devin": ".devin/hooks.v1.json PreToolUse → .dadaia/hooks/devin-pre-gate → the same Python gate",
         "copilot": ".github/hooks/pre-tool-use.json preToolUse → .dadaia/hooks/copilot-pre-gate → the same Python gate"
       }
@@ -35,7 +35,7 @@
         "claude": "PreToolUse hook (Bash payloads) via dadaia_workspace.hooks.pre_gate",
         "codex": ".codex/hooks.json wrapper → the same Python gate",
         "kimi-code": "managed hook block → the same Python gate",
-        "cursor": ".cursor/hooks.json beforeShellExecution (the shell lane the guard polices) → dadaia_workspace.hooks.pre_gate",
+        "cursor": ".cursor/hooks.json preToolUse (Shell payloads) → dadaia_workspace.hooks.pre_gate",
         "devin": ".devin/hooks.v1.json PreToolUse (Bash payloads) → dadaia_workspace.hooks.pre_gate",
         "copilot": ".github/hooks/pre-tool-use.json preToolUse (Bash payloads) → dadaia_workspace.hooks.pre_gate"
       }
@@ -44,10 +44,10 @@
       "id": "sdd-gate",
       "mandate": "Three path classes on every write: ADDITIVE always writable, PROTECTED blocked, MUTATING writable but scope-judged under repos/<slug>/ when the session is bound; no phase, no mode; every block carries one fix: line; races surfaced, never prevented.",
       "implementations": {
-        "claude": "PreToolUse hook via dadaia_workspace.hooks.pre_gate (single merged entrypoint) + PostToolUse session heartbeat and the throttled workspace reaper via dadaia_workspace.hooks.sdd_post_gate",
-        "codex": ".codex/hooks.json wrapper → the same Python gate (pre + post)",
-        "kimi-code": "managed hook block → the same Python gate (pre + post)",
-        "cursor": ".cursor/hooks.json beforeShellExecution → dadaia_workspace.hooks.pre_gate; its file-edit event fires AFTER the write, so IDE edits are ungated by Cursor's own event vocabulary",
+        "claude": "PreToolUse hook via dadaia_workspace.hooks.pre_gate (single merged entrypoint) + PostToolUse session heartbeat via dadaia_workspace.hooks.sdd_post_gate",
+        "codex": ".codex/hooks.json PreToolUse wrapper → the same Python gate (pre + post)",
+        "kimi-code": "managed hook block PreToolUse → the same Python gate (pre + post)",
+        "cursor": ".cursor/hooks.json preToolUse → dadaia_workspace.hooks.pre_gate (single merged entrypoint)",
         "devin": ".devin/hooks.v1.json PreToolUse → dadaia_workspace.hooks.pre_gate (single merged entrypoint)",
         "copilot": ".github/hooks/pre-tool-use.json preToolUse → dadaia_workspace.hooks.pre_gate (single merged entrypoint)"
       }
@@ -57,10 +57,10 @@
       "mandate": "The session's own bind selects which product memory is injected at prompt time; never another session's bind.",
       "implementations": {
         "claude": "UserPromptSubmit + SessionStart hooks via dadaia_workspace.hooks.ctx_inject; SessionStart also runs dadaia doctor --fix --expired-only --quiet (the reaper lane)",
-        "codex": "session bootstrap via the projected wrapper (headless sessions read AGENTS.md natively)",
+        "codex": "SessionStart + UserPromptSubmit wrappers → dadaia_workspace.hooks.ctx_inject; SessionStart also runs the reaper lane",
         "kimi-code": "managed hook block → the same ctx_inject module",
         "cursor": ".cursor/hooks.json sessionStart runs dadaia doctor --fix --expired-only --quiet (the reaper lane); the root AGENTS.md map is read natively",
-        "devin": ".devin/hooks.v1.json SessionStart runs the same reaper lane; the root AGENTS.md map is read natively",
+        "devin": ".devin/hooks.v1.json UserPromptSubmit + SessionStart → dadaia_workspace.hooks.ctx_inject; SessionStart also runs the same reaper lane",
         "copilot": ".github/hooks/session-start.json sessionStart runs the same reaper lane; the root AGENTS.md map is read natively"
       }
     },
@@ -74,6 +74,18 @@
         "cursor": "same git hooks (harness-independent)",
         "devin": "same git hooks (harness-independent)",
         "copilot": "same git hooks (harness-independent)"
+      }
+    },
+    {
+      "id": "tool-cache-env",
+      "mandate": "ruff and mypy caches land in absolute .dadaia/tmp/<tool>-cache (workspace_layout.tool_cache_env); a harness that cannot carry an env declares the gap, and a run there leaves an in-tree cache the doctor holds in reaped/ (fix: dadaia doctor --fix).",
+      "implementations": {
+        "claude": ".claude/settings.json env (RUFF_CACHE_DIR, MYPY_CACHE_DIR)",
+        "codex": ".codex/config.toml [shell_environment_policy.set]",
+        "kimi-code": "gap: no project-level env in the managed hook block",
+        "cursor": "gap: .cursor/hooks.json carries no env",
+        "devin": "gap: .devin/hooks.v1.json carries no env",
+        "copilot": "gap: .github/hooks carry no env"
       }
     }
   ],
@@ -92,7 +104,7 @@
     },
     {
       "id": "codex-command-policy",
-      "mandate": "Codex-native executable command policy derived from the venv-guard behavior (Starlark, the only rule dialect Codex executes).",
+      "mandate": "Codex-native executable command policy (Starlark, the only rule dialect Codex executes): allows only the argv-closed readers ls and cat; every other command prompts or falls to the Codex default.",
       "implementations": {
         "codex": ".codex/rules/dadaia-command-policy.rules"
       }

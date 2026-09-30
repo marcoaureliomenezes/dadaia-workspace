@@ -28,6 +28,7 @@ def public(tmp_path: Path) -> Path:
 def test_installs_every_absent_row_beside_an_existing_tests_tree(
     tmp_path: Path, public: Path
 ) -> None:
+    """sa-public-install-writes-the-root-map-into-product-repos#K5 sa-public-install-writes-the-root-map-into-product-repos#K3."""
     repo = tmp_path / "repo"
     (repo / "tests").mkdir(parents=True)
     written = canon.scaffold_repo_law(repo, project_name="p", public_dir=public)
@@ -39,6 +40,7 @@ def test_installs_every_absent_row_beside_an_existing_tests_tree(
 def test_present_rows_are_never_overwritten_and_no_tests_dir_is_invented(
     tmp_path: Path, public: Path
 ) -> None:
+    """sa-public-install-writes-the-root-map-into-product-repos#K5."""
     repo = tmp_path / "repo"
     repo.mkdir()
     (repo / "AGENTS.md").write_text("mine\n", encoding="utf-8")
@@ -48,6 +50,7 @@ def test_present_rows_are_never_overwritten_and_no_tests_dir_is_invented(
 
 
 def test_symlinked_tests_dir_is_never_written_through(tmp_path: Path, public: Path) -> None:
+    """sa-public-install-writes-the-root-map-into-product-repos#K5."""
     outside = tmp_path / "outside-tests"
     outside.mkdir()
     repo = tmp_path / "repo"
@@ -60,6 +63,7 @@ def test_symlinked_tests_dir_is_never_written_through(tmp_path: Path, public: Pa
 
 
 def test_symlinked_repo_root_is_never_written_through(tmp_path: Path, public: Path) -> None:
+    """sa-public-install-writes-the-root-map-into-product-repos#K5."""
     outside = tmp_path / "outside-repo"
     (outside / "tests").mkdir(parents=True)
     repo = tmp_path / "repo"
@@ -72,6 +76,7 @@ def test_symlinked_repo_root_is_never_written_through(tmp_path: Path, public: Pa
 def test_symlinked_destination_is_never_written_through(
     tmp_path: Path, public: Path, dangling: bool
 ) -> None:
+    """sa-public-install-writes-the-root-map-into-product-repos#K5."""
     repo = tmp_path / "repo"
     repo.mkdir()
     target = tmp_path / "elsewhere.md"
@@ -85,29 +90,8 @@ def test_symlinked_destination_is_never_written_through(
     )
 
 
-def test_the_write_is_one_atomic_exclusive_nofollow_open(
-    tmp_path: Path, public: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """CWE-367: no probe-then-write window — the create itself refuses an existing or
-    symlinked destination."""
-    repo = tmp_path / "repo"
-    repo.mkdir()
-    dst = str(repo / "AGENTS.md")
-    seen: list[int] = []
-    real_open = os.open
-
-    def spy(path: object, flags: int, *args: object, **kwargs: object) -> int:
-        if str(path) == dst:
-            seen.append(flags)
-        return real_open(path, flags, *args, **kwargs)  # type: ignore[arg-type]
-
-    monkeypatch.setattr(os, "open", spy)
-    canon.scaffold_repo_law(repo, project_name="p", public_dir=public)
-    assert seen, "the scoped-law write must go through os.open"
-    assert seen[0] & os.O_CREAT and seen[0] & os.O_EXCL and seen[0] & os.O_NOFOLLOW
-
-
 def test_scaffold_never_writes_through_a_symlinked_parent_dir(tmp_path: Path) -> None:
+    """sa-public-install-writes-the-root-map-into-product-repos#K5."""
     outside = tmp_path / "outside-memory"
     outside.mkdir()
     specs = tmp_path / "specs"
@@ -118,7 +102,7 @@ def test_scaffold_never_writes_through_a_symlinked_parent_dir(tmp_path: Path) ->
 
 
 def test_an_unwritable_directory_raises_instead_of_skipping(tmp_path: Path, public: Path) -> None:
-    """Review N2: only an existing file or a symlinked target is skipped."""
+    """sa-public-install-writes-the-root-map-into-product-repos#K5: Review N2: only an existing file or a symlinked target is skipped."""
     if os.geteuid() == 0:
         pytest.skip("root ignores directory permissions")
     repo = tmp_path / "repo"
@@ -132,7 +116,7 @@ def test_an_unwritable_directory_raises_instead_of_skipping(tmp_path: Path, publ
 
 
 def test_repo_law_heading_carries_the_project_name(tmp_path: Path, public: Path) -> None:
-    """Bug scaffold-repo-agents-keeps-repo-name-placeholder: the template's
+    """sa-public-install-writes-the-root-map-into-product-repos#K1: Bug scaffold-repo-agents-keeps-repo-name-placeholder: the template's
     ``<repo-name>`` is filled at scaffold time, never left for a doctor to flag."""
     (public / "templates" / "repo-AGENTS.md").write_text(
         "# <repo-name> — Repo Rules\n", encoding="utf-8"

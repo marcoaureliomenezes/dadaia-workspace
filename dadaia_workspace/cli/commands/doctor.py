@@ -1,7 +1,7 @@
 """CLI command: ``dadaia doctor`` — the ONE compliance surface (0.4.7 FR5, T-047-02).
 
 Three sections in fixed order — ``workspace`` (zones, root, harness dirs), ``specs``
-(the SPEC-DOC + RELEASE-TREE rules), ``ledgers`` (BL-SCHEMA/CONFLICT/STALE) — collected
+(the SPEC-DOC rules), ``ledgers`` (BL-SCHEMA/CONFLICT/STALE) — collected
 from one rule registry (:mod:`dadaia_workspace.core.doctor_rules`), rendered by one
 grammar, exited by one rule. ``dadaia specs doctor`` and
 ``dadaia backlog doctor`` are DELETED, not aliased: three commands with three finding
@@ -17,6 +17,7 @@ its own adapter at the seam).
 from __future__ import annotations
 
 import json
+import re
 from collections.abc import Callable
 from pathlib import Path
 
@@ -26,16 +27,15 @@ from dadaia_workspace import container
 from dadaia_workspace.cli._backlog_roots import resolve_backlog_roots
 from dadaia_workspace.cli._specs_resolution import (
     alive_context_trees,
+    own_bind_for_cli,
     resolve_context_for_cli,
     resolve_context_specs_dir_for_cli,
     resolve_specs_dir_for_cli,
 )
-from dadaia_workspace.cli.commands.context import resolve_own_session_id
 from dadaia_workspace.cli.help_digest import command_paths
-from dadaia_workspace.cli.redact import ContextRedactor
+from dadaia_workspace.cli.redact import build_context_redactor
 from dadaia_workspace.core.cli_line import fix_line
 from dadaia_workspace.core.doctor_rules import (
-    Rule,
     SectionFinding,
     SectionReport,
     merge_sections,
@@ -50,8 +50,8 @@ from dadaia_workspace.core.exceptions import (
 from dadaia_workspace.core.workspace_resolver import resolve_workspace_root
 from dadaia_workspace.features.backlog import doctor as backlog_doctor
 from dadaia_workspace.features.spec_context.doctor import DoctorService, workspace_rules
-from dadaia_workspace.features.specs import Severity, SpecsDoctor, doctor_adr
-from dadaia_workspace.features.specs.doctor_types import SpecsDoctorIssue
+from dadaia_workspace.features.specs import SpecsDoctor, doctor_adr
+from dadaia_workspace.features.specs.doctor_types import finding_path
 from dadaia_workspace.features.specs.rules import RULES as SPECS_RULES
 from dadaia_workspace.features.specs.rules import render_fix_help
 from dadaia_workspace.features.workspace import onboarding
@@ -60,43 +60,6 @@ app = typer.Typer(help="Diagnose and repair workspace, specs and ledger complian
 
 #: Canonical templates directory — inside the installed package.
 _TEMPLATES_DIR = Path(__file__).parent.parent.parent / "public" / "templates"
-
-
-# ── redaction (unchanged: a render-boundary concern, never seen by a doctor) ─────
-
-
-def _resolve_caller_context_and_slug(workspace_root: Path) -> tuple[str | None, str | None]:
-    """Best-effort resolution of the caller's own context name + repo slug (SPEC v0.9.0
-    FR8a: "other than the caller's resolved context"). Never raises — an unresolved
-    caller (no bind, no DADAIA_CONTEXT, cwd outside any repo) simply means nothing is
-    excluded, so `--redact` masks every context/slug it encounters."""
-    try:
-        name = resolve_context_for_cli(None)
-    except ValueError:
-        return None, None
-    slug: str | None = None
-    try:
-        for ctx in container.build_spec_context_service(workspace_root).list_all():
-            if ctx.name == name:
-                slug = ctx.repo_slug
-                break
-    except (WorkspaceNotInitializedError, SchemaVersionError):
-        pass
-    return name, slug
-
-
-def _build_redactor(workspace_root: Path) -> ContextRedactor:
-    """Candidates = every known registered context name/repo slug."""
-    caller_name, caller_slug = _resolve_caller_context_and_slug(workspace_root)
-    try:
-        contexts = container.build_spec_context_service(workspace_root).list_all()
-    except (WorkspaceNotInitializedError, SchemaVersionError):
-        contexts = []
-    candidates: list[str] = []
-    for ctx in contexts:
-        candidates.append(ctx.name)
-        candidates.append(ctx.repo_slug)
-    return ContextRedactor(candidates, exclude=(caller_name, caller_slug))
 
 
 # ── the three sections ──────────────────────────────────────────────────────────
@@ -115,21 +78,7 @@ def _workspace_section(
         "workspace",
         workspace_rules(expired_only=expired_only, context=scope),
         service,
-        lambda _rule, finding: finding,
         root,
-    )
-
-
-def _specs_render[C](rule: Rule[C, SpecsDoctorIssue], issue: SpecsDoctorIssue) -> SectionFinding:
-    """Render one specs-doctor issue as a section finding."""
-    location = f" ({issue.path})" if issue.path else ""
-    return SectionFinding(
-        code=issue.code,
-        verdict=issue.severity.value,
-        message=f"{issue.description}{location}",
-        canonical=False,
-        error=issue.severity is Severity.ERROR,
-        fix=issue.fix,
     )
 
 
@@ -145,23 +94,8 @@ def _specs_section(doctor: SpecsDoctor | None, root: Path | None) -> SectionRepo
         "specs",
         SPECS_RULES,
         doctor,
-        _specs_render,
         root,
-    )
-
-
-def _ledgers_render(
-    _rule: Rule[backlog_doctor.DoctorContext, backlog_doctor.Finding],
-    finding: backlog_doctor.Finding,
-) -> SectionFinding:
-    """Render one backlog finding as a section finding."""
-    slug = f" [{finding.slug}]" if finding.slug else ""
-    return SectionFinding(
-        code=finding.code.value,
-        verdict=finding.severity.value,
-        message=f"{slug.strip()} {finding.message}".strip(),
-        canonical=False,
-        error=finding.severity is backlog_doctor.Severity.ERROR,
+        doctor.specs_dir,
     )
 
 
@@ -178,9 +112,7 @@ def _ledgers_section(
     `check`, run as a subprocess here. The doctor holds no second implementation of any
     ledger schema — this is the one delegation point.
     """
-    from dadaia_workspace.cli.anchors import derive_cli_anchors
-    from dadaia_workspace.core.models.histo import HistoRecord
-    from dadaia_workspace.infrastructure.jsonl_record_store import JsonlRecordStore
+    from dadaia_workspace.cli.help_digest import command_paths
     from dadaia_workspace.infrastructure.ledger_scripts import script_findings
 
     if specs_dir is None:
@@ -192,27 +124,15 @@ def _ledgers_section(
         source_root=src,
         catalog_path=catalog_path,
         alias_map_path=alias_map_path,
-        cli_anchors=derive_cli_anchors(),
-        histo_store=JsonlRecordStore(
-            specs_dir / "backlog" / "_archive" / "backlog_histo.jsonl",
-            to_dict=HistoRecord.to_dict,
-            from_dict=HistoRecord.from_dict,
-        ),
+        cli_anchors=frozenset(" ".join(p) for p in command_paths() if p),
     )
     return merge_sections(
         [
-            run_section(
-                "ledgers",
-                backlog_doctor.RULES,
-                context,
-                _ledgers_render,
-                root,
-            ),
+            run_section("ledgers", backlog_doctor.RULES, context, root, specs_dir),
             run_section(
                 "ledgers",
                 doctor_adr.LEDGER_RULES,
                 specs_dir,
-                _specs_render,
                 root,
             ),
             SectionReport(name="ledgers", findings=tuple(script_findings(specs_dir))),
@@ -232,12 +152,11 @@ def _build_specs_doctor(specs_dir: Path | None, public_dir: str | None) -> Specs
         specs_dir,
         public_dir=resolved_public,
         templates_dir=_TEMPLATES_DIR,
-        # repo_root: specs/ sits directly at the repo root; feeds SPEC-DOC-028 and SPEC-DOC-045.
+        # repo_root: specs/ sits directly at the repo root; feeds MEM-DRIFT-2.
         repo_root=specs_dir.parent,
         # The ONE Typer walk (0.4.7 FR2), done here and handed in as plain data;
         # `features` never imports `cli`.
         command_paths=command_paths(),
-        bug_store_factory=container.build_bug_record_store,
     )
 
 
@@ -281,7 +200,12 @@ def _resolve_run(
     target = resolve_context_specs_dir_for_cli(workspace_root, name)
     # The ONE place a context's tree is resolved: a tree `specs init` has not stamped yet
     # is onboarding level 2 — nothing for the specs/ledgers sections to judge (AC3.1).
-    return workspace_root, service, name, target if onboarding.specs_ready(target) else None
+    return (
+        workspace_root,
+        service,
+        name,
+        target if target and onboarding.specs_ready(target) else None,
+    )
 
 
 def _bound_context() -> str | None:
@@ -298,7 +222,10 @@ def _onboarding_section(
     if workspace_root is None or expired_only:
         return _empty_section("workspace")
     trees = alive_context_trees(workspace_root)
-    step = onboarding.next_step(workspace_root, trees, scope, resolve_own_session_id())
+    bind, session = own_bind_for_cli()
+    step = onboarding.next_step(
+        workspace_root, trees, scope, None if session is None else bool(bind)
+    )
     if step is None:
         return _empty_section("workspace")
     finding = SectionFinding(
@@ -314,10 +241,16 @@ def _onboarding_section(
 
 
 def _render_for(workspace_root: Path | None, *, redact: bool) -> Callable[[str], str]:
-    """The render boundary: the redactor over the instance's known names, or the
-    identity — no instance holds no names to mask."""
+    """The render boundary: the redactor over the instance's known names and paths, or
+    the identity — no instance holds no names to mask."""
     if redact and workspace_root is not None:
-        return _build_redactor(workspace_root).text
+        try:
+            contexts = container.build_spec_context_service(workspace_root).list_all()
+        except (WorkspaceNotInitializedError, SchemaVersionError):
+            contexts = []
+        redactor = build_context_redactor(contexts)  # paths print workspace-relative:
+        root = re.compile(re.escape(f"{workspace_root.as_posix()}/").replace("/", r"[\\/]"))
+        return lambda text: redactor.text(root.sub("", text))  # either separator matches
     return _identity
 
 
@@ -357,15 +290,17 @@ def doctor(
         "--expired-only",
         help=(
             "Scope the run to the workspace TTL lane: the workspace section reports "
-            "only expired entries and --fix skips the specs repairs. The reaper lane "
-            "itself is one lane and runs whole either way."
+            "only expired entries and --fix deletes only those and stale session records "
+            "— no slop move, no repo walk, no specs repairs (the SessionStart lane)."
         ),
     ),
     json_out: bool = typer.Option(
         False, "--json", help="Machine-readable output: sections and fixed."
     ),
     quiet: bool = typer.Option(
-        False, "--quiet", help="Print only what --fix deleted (nothing on a compliant run)."
+        False,
+        "--quiet",
+        help="Print only what --fix did and exit 0 — no report is built.",
     ),
     redact: bool = typer.Option(
         False,
@@ -383,6 +318,11 @@ def doctor(
     fixed = _apply_fixes(
         service, specs_doctor, target, source_root, alias_map, fix=fix, expired_only=expired_only
     )
+    render = _render_for(workspace_root, redact=redact)
+    if quiet:
+        for action in fixed:
+            typer.echo(render(action))
+        return
     reports = [
         merge_sections(
             [
@@ -395,13 +335,8 @@ def doctor(
     ]
     # Render boundary ONLY: no doctor ever sees the redactor; every finding and fix action
     # keeps carrying true names inside the sections themselves.
-    render = _render_for(workspace_root, redact=redact)
-
     if json_out:
         typer.echo(_json_payload(reports, fixed, render, target))
-    elif quiet:
-        for action in fixed:
-            typer.echo(render(action))
     else:
         _emit_human(reports, fixed, render, fix=fix)
 
@@ -427,15 +362,13 @@ def _apply_fixes(
     fixes, and the `ledgers` rules that carry one. Fixes run BEFORE the sections are
     built, so what the run then reports is the post-repair truth.
 
-    `--expired-only` is a SCOPE, never a second reaper: `service.fix()` is the one lane
-    and runs whole either way (T-047-20 deleted the early stop it used to buy). All the
-    flag still does on the write path is skip the specs and ledgers repairs, which keeps
-    the SessionStart lane off the specs tree."""
+    `--expired-only` runs `service.expire()` — `fix()`'s TTL tail alone — and skips the
+    specs and ledgers repairs: the SessionStart lane costs one lstat per zone entry."""
     if not fix:
         return []
-    fixed = list(service.fix()) if service is not None else []
+    fixed = [] if service is None else service.expire() if expired_only else service.fix()
     if not expired_only and specs_doctor is not None:
-        fixed.extend(f"[specs] {issue.code}: {issue.path}" for issue in specs_doctor.fix())
+        fixed.extend(f"[specs] {issue.code}: {finding_path(issue)}" for issue in specs_doctor.fix())
     return fixed
 
 
@@ -450,7 +383,7 @@ def _json_payload(
             # `specs_dir` names the tree this run resolved — the one piece of run
             # identity a machine consumer cannot derive, and the seam two resolution
             # contract tests assert against (`bind-resolution-seam-is-a-single-home`).
-            "specs_dir": str(specs_dir) if specs_dir else None,
+            "specs_dir": render(str(specs_dir)) if specs_dir else None,
             "sections": {
                 report.name: {
                     "findings": [
@@ -459,7 +392,7 @@ def _json_payload(
                             "verdict": f.verdict,
                             "message": render(f.message),
                             "fix": render(f.fix),
-                            **dict(f.extra),
+                            **{key: render(value) for key, value in f.extra},
                         }
                         for f in report.printable
                     ],

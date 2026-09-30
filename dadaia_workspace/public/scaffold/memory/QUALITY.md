@@ -2,7 +2,7 @@
 slug: QUALITY
 title: Quality Assurance
 tldr: QA principles, test architecture and the gates every change passes.
-summary: Part 1 holds the quality principles, changed only by an accepted ADR; the Test architecture and Gates sections describe how the project is verified today.
+summary: The Principles section holds the quality principles, changed only by an accepted ADR; the Test architecture and Gates sections describe how the project is verified today.
 tags:
   - quality-assurance
   - testing

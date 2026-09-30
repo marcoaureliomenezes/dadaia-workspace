@@ -44,10 +44,10 @@ memory atom under its content hash.
 
 ## A human installs and uses it
 
-<!-- derived-from: pypi-distribution sha256:618098346ed6 -->
-<!-- derived-from: workspace-init sha256:bc2612c3f80d -->
-<!-- derived-from: context-management sha256:dc1a239f4970 -->
-<!-- derived-from: workspace-doctor sha256:8e52123b79e7 -->
+<!-- derived-from: pypi-distribution sha256:9078512b58f9 -->
+<!-- derived-from: workspace-init sha256:56685f3d0950 -->
+<!-- derived-from: context-management sha256:1871a6d846b2 -->
+<!-- derived-from: workspace-doctor sha256:772d9d7a78d3 -->
 
 ```bash
 uvx dadaia-workspace init demo --harness claude --repo <clone url>   # level 1 + 2
@@ -93,17 +93,17 @@ and deletes only what a TTL expired.
 
 ## An agent reads AGENTS.md and uses it
 
-<!-- derived-from: agentic-entities sha256:6add03805476 -->
-<!-- derived-from: sdd-gate-v3 sha256:f870acc7c776 -->
-<!-- derived-from: release-lifecycle sha256:a31b50804ef1 -->
-<!-- derived-from: bug-ledger sha256:eeebe84481a4 -->
-<!-- derived-from: harness-claude-code sha256:55ba15667a89 -->
-<!-- derived-from: harness-codex sha256:b907c260a862 -->
-<!-- derived-from: harness-kimi-code sha256:4300d3a1724d -->
-<!-- derived-from: harness-cursor sha256:480b18aa9b61 -->
-<!-- derived-from: harness-devin sha256:ab4a32c4a53d -->
-<!-- derived-from: harness-copilot sha256:b93cef868a6f -->
-<!-- derived-from: agent-comms sha256:c485c616b2df -->
+<!-- derived-from: agentic-entities sha256:31b7a580085f -->
+<!-- derived-from: sdd-gate-v3 sha256:f23d17bf7053 -->
+<!-- derived-from: release-lifecycle sha256:57d8b542e879 -->
+<!-- derived-from: bug-ledger sha256:9392c1f406a4 -->
+<!-- derived-from: harness-claude-code sha256:24a59f223f83 -->
+<!-- derived-from: harness-codex sha256:9218e747c24f -->
+<!-- derived-from: harness-kimi-code sha256:127cdd81f783 -->
+<!-- derived-from: harness-cursor sha256:3af055af8407 -->
+<!-- derived-from: harness-devin sha256:a35113e51a30 -->
+<!-- derived-from: harness-copilot sha256:3464b2393377 -->
+<!-- derived-from: agent-comms sha256:9125b23de81e -->
 
 The always-on law is the root `AGENTS.md` map; every governed area carries its own
 scoped `AGENTS.md`, and every `dd-` skill touching an area opens that file first. The
@@ -115,9 +115,10 @@ behaviour.
 
 The gate is one PreToolUse pre-gate: root whitelist, venv guard, SDD gate, in that
 order, first block wins; a policy that raises is ALLOW. It blocks exactly three things:
-a new workspace-root entry, a `dadaia`/`pip`/`python -m dadaia_workspace` run outside
-`.dadaia/.venv/bin/`, and a PROTECTED write or a bound session's MUTATING write into a
-`repos/<slug>/` outside its scope. Path classes: ADDITIVE (always writable), MUTATING
+a file-tool write creating a new workspace-root entry, a `dadaia`/`pip`/`python -m
+dadaia_workspace` run outside `.dadaia/.venv/bin/`, and a file-tool write that is PROTECTED
+or a bound session's MUTATING one into a `repos/<slug>/` outside its scope; a Bash write
+is never judged. Path classes: ADDITIVE (always writable), MUTATING
 (everything else, scope-judged), PROTECTED (session records and the projected law).
 Every BLOCK carries exactly one `fix:` line, and a contract test feeds each fix back
 through the gate asserting ALLOW. No lease, lock or wait path exists; the gate reads no
@@ -134,8 +135,8 @@ with a RED test. Completed work leaves as a `handoff-v1` record, validated by
 
 ## Documentation
 
-<!-- derived-from: pypi-distribution sha256:618098346ed6 -->
-<!-- derived-from: public-asset-distribution sha256:7e9eddf68214 -->
+<!-- derived-from: pypi-distribution sha256:9078512b58f9 -->
+<!-- derived-from: public-asset-distribution sha256:5697e0625edf -->
 
 The documentation is the repository's [docs folder](https://github.com/marcoaureliomenezes/dadaia-workspace/tree/main/docs):
 
@@ -150,7 +151,7 @@ The documentation is the repository's [docs folder](https://github.com/marcoaure
 
 ## Links
 
-<!-- derived-from: pypi-distribution sha256:618098346ed6 -->
+<!-- derived-from: pypi-distribution sha256:9078512b58f9 -->
 
 - GitHub — <https://github.com/marcoaureliomenezes/dadaia-workspace>
 - PyPI — <https://pypi.org/project/dadaia-workspace/>

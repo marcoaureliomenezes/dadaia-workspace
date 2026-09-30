@@ -28,7 +28,6 @@ class ActiveRelease:
 
     release: str | None
     phase: str | None
-    error: str | None
 
 
 class SpecsTree:
@@ -40,5 +39,4 @@ class SpecsTree:
     @cached_property
     def active_release(self) -> ActiveRelease:
         """Parsed ONCE per run — the four per-check re-reads collapse here."""
-        release, phase, error = resolve_active_release(self.specs_dir)
-        return ActiveRelease(release=release, phase=phase, error=error)
+        return ActiveRelease(*resolve_active_release(self.specs_dir))

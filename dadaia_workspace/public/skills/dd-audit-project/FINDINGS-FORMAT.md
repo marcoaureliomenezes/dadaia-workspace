@@ -37,6 +37,6 @@ Disclosed sibling of `SKILL.md`. Every claim any pillar makes becomes exactly on
 
 ## Disposition and close — by verb
 
-- `python3 .agents/skills/dd-audit-project/scripts/audit.py disposition <dir> <finding-id> --disposition resolved|superseded|deferred|rejected --release <id> [--reason]` rewrites the three governance fields in place; every immutable field stays byte-identical.
+- `python3 .agents/skills/dd-audit-project/scripts/audit.py disposition <dir> <finding-id> --disposition <disposition> --release <id> [--reason]` (the vocabulary its `--help` lists) rewrites the three governance fields in place; every immutable field stays byte-identical.
 - `--reason` is required for `deferred` and `rejected`; a second disposition of the same finding is refused.
 - `python3 .agents/skills/dd-audit-project/scripts/audit.py close <dir> --sha <window-end>` refuses while any finding is `open`, appends the one `audits_histo.jsonl` record and deletes the directory — all-or-nothing.

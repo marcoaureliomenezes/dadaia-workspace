@@ -5,7 +5,8 @@ Scope: this file governs only `specs/bugs/`.
 - This directory holds the bug ledger: `BUGS.jsonl`, one JSON record per bug, appended once.
 - No event stream, no fold. Schema: `bug-record-v1` (`schemas/bugs/bug-record-v1.schema.json`).
 - There is no per-bug Markdown file and no session-lock gate on filing.
-- The ledger's ONE writer and validator — `bugs.py` below — is `python3 .agents/skills/dd-bug-resolution/scripts/bugs.py <verb> --specs specs`.
+- The ledger's ONE writer and validator — `bugs.py` below — is `python3 .agents/skills/dd-bug-resolution/scripts/bugs.py <verb> --specs repos/<context>/specs` from the workspace root.
+- `bugs.py` never creates a specs tree: a `--specs` that does not exist refuses, and its `fix:` names the bound context's tree.
 
 ## 1. What a bug is
 
@@ -18,21 +19,16 @@ Scope: this file governs only `specs/bugs/`.
 
 ## 2. Resolution
 
-- Close in the same session as the fix: `bugs.py resolve` carrying the red-loop command, the regression-test seam and the diff direction.
+- Close in the same session as the fix: `bugs.py resolve`, with the flags `dd-bug-resolution` Phase 6 names.
 - Check prior resolutions on the same component first; declare `caused_by: <bug_id>|none`.
 - Commit exactly what the fix touched, never a blanket `-A`; a net-positive diff passes the architecture lens first.
 
 ## 3. Field classes (D11)
 
-| Class | Meaning |
-|---|---|
-| `immutable-core` | Never rewritten once appended |
-| `write-once` | Absent at registration; settable once, then immutable |
-| `mutable-governance` | Rewritten in place, atomic refuse-stale |
-
-- `immutable-core` fields: `id`, `ts`, `title`, `severity`, `surface`, `component`, `symptom`, `repro`, `expected`.
-- `write-once` fields: `solution`, `evidence_loop`, `evidence_seam`, `evidence_diff`, `diff_direction` (derived from `evidence_diff`'s `net-*:` prefix).
-- `mutable-governance` fields: `status`, `closed_at`, `cause`, `caused_by`, `resolved_release`, `audited`.
+- Each field's class is its `x-mutability` in `bug-record-v1`; this law lists no fields.
+- `immutable-core`: never rewritten once appended.
+- `write-once`: absent at registration; settable once, then immutable.
+- `mutable-governance`: rewritten in place, atomic refuse-stale.
 
 ## 4. Authoring rules
 
@@ -40,9 +36,8 @@ Scope: this file governs only `specs/bugs/`.
 - Full command reference: `dd-bug-registration`.
 - Never hand-edit `BUGS.jsonl` to keep every entry schema-valid.
 - Every record change is one governance verb: `bugs.py append|update|resolve|supersede|defer|reject|archive`.
-- That seam is atomic, refuse-stale, redacted, and refuses any `immutable-core` field or a differing re-set of a `write-once` field.
+- That seam is atomic, refuse-stale, refuses a value the push would refuse, and refuses any `immutable-core` field or a differing re-set of a `write-once` field.
 - `status` and `closed_at` change only through the four terminal transitions, never through `--set`; `bugs.py archive` ages by `closed_at`.
-- `status` has no `picked` value — a pick is the bundled release-definition commit, never a ledger write.
 - Bug reports are not specs — they do not authorize implementation changes on their own.
 - Never hand-delete a record once appended — `bugs.py archive` is the only retiring path, and it is idempotent.
 

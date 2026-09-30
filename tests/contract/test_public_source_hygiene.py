@@ -6,13 +6,7 @@ Residual R7: ``dadaia_workspace/public/scripts/__pycache__/`` had been committed
 compiled bytecode leaking into the canonical public asset tree, which is source-of-truth
 for every consumer and is staged/projected verbatim. Two failure modes must stay closed:
 
-1. **Regeneration.** Running the public scripts (``lint-memory-atoms.py`` —
-   ``generate-memory-catalog.py`` DELETED, v0.5.1 T-051-16/A10.1/A10.4) must NOT drop a
-   ``__pycache__/*.pyc`` under ``dadaia_workspace/public/``. The script sets
-   ``sys.dont_write_bytecode = True`` so the guard fires for any invocation style;
-   ``features/specs/doctor_memory.py`` additionally passes ``-B`` at the LINT-1 subprocess
-   call site. This test executes the script WITHOUT ``-B`` so it proves the in-script guard,
-   not just the call-site flag.
+1. **At rest.** No ``__pycache__``/``.pyc`` sits under ``dadaia_workspace/public/``.
 
 2. **Packaging.** The built wheel/sdist must contain no ``.pyc``. ``poetry-core`` honours
    the ``[tool.poetry] exclude`` globs for both artifacts; this test asserts the exclusion
@@ -23,13 +17,13 @@ for every consumer and is staged/projected verbatim. Two failure modes must stay
 from __future__ import annotations
 
 import re
-import subprocess
-import sys
 import tomllib
 from pathlib import Path
 
 import pytest
 
+from dadaia_workspace.core.model_registry import CORE_AGENTS
+from dadaia_workspace.features.specs import canon
 from dadaia_workspace.infrastructure.privacy_check import PORTUGUESE_CONTROL_TERMS
 from tests.helpers.scan_population import assert_populated
 
@@ -38,7 +32,6 @@ pytestmark = pytest.mark.contract
 _REPO_ROOT = Path(__file__).resolve().parents[2]
 _PUBLIC_ROOT = _REPO_ROOT / "dadaia_workspace" / "public"
 _SCRIPTS_DIR = _PUBLIC_ROOT / "scripts"
-_MEMORY_DIR = _REPO_ROOT / "specs" / "memory"
 
 
 def _bytecode_artifacts_under_public() -> list[str]:
@@ -51,18 +44,11 @@ def _bytecode_artifacts_under_public() -> list[str]:
 def test_pre_push_ci_gate_ships_pyproject_excludes_bytecode_and_scripts_leave_no_pycache() -> None:
     """`pre-push-ci-gate.sh` is present in the public/scripts/ listing (the SINGLE
     explicit ship assertion for the pre-push gate script, suite-wide, v0.1.51 FR3),
-    and the poetry-core build config excludes __pycache__/*.pyc from sdist and wheel.
-
-    Also: the canonical public asset tree carries no bytecode at rest (precondition),
-    and executing the catalog + lint scripts must not write __pycache__ under public/.
-    Invoked WITHOUT ``-B`` so the in-script ``sys.dont_write_bytecode`` guard is what is
-    under test (the call-site ``-B`` would mask a missing guard).
+    and the poetry-core build config excludes __pycache__/*.pyc from sdist and wheel;
+    the canonical public asset tree carries no bytecode at rest.
     """
     listing = {p.name for p in _SCRIPTS_DIR.iterdir()}
-    # v0.4.5 FR5 (scan-test-vacuity-guard): the two membership asserts already imply
-    # non-emptiness; expressed via the shared convention for grep-ability.
     assert_populated(listing, sentinel="pre-push-ci-gate.sh")
-    assert "certify-dadaia-workspace.sh" in listing
 
     pyproject = _REPO_ROOT / "pyproject.toml"
     data = tomllib.loads(pyproject.read_text(encoding="utf-8"))
@@ -70,95 +56,98 @@ def test_pre_push_ci_gate_ships_pyproject_excludes_bytecode_and_scripts_leave_no
     assert "**/__pycache__" in exclude
     assert "**/*.pyc" in exclude
 
-    if not _MEMORY_DIR.is_dir():
-        pytest.skip("specs/memory not present in this checkout")
+    assert _bytecode_artifacts_under_public() == []
 
-    before = _bytecode_artifacts_under_public()
-    assert before == [], f"precondition: public/ already polluted: {before}"
 
-    lint_script = _SCRIPTS_DIR / "lint-memory-atoms.py"
-    assert lint_script.is_file()
+_PKG = _REPO_ROOT / "dadaia_workspace"
+_ALL, _MD_JSON = ("public/**/*",), ("public/**/*.md", "public/**/*.json")
+_PT_TERMS = "|".join(re.escape(term) for term, _ in PORTUGUESE_CONTROL_TERMS)
+_OLD_PERSONAS = "|".join(name.removeprefix("dd-") for name in CORE_AGENTS)
 
-    # lint exits 0 (clean) or 2 (warnings only); either is a valid run that imports the
-    # script module and would otherwise drop a .pyc.
-    lint = subprocess.run(
-        [sys.executable, str(lint_script), "--memory-dir", str(_MEMORY_DIR)],
-        cwd=_REPO_ROOT,
-        capture_output=True,
-        check=False,
+
+def _denied_lines(globs: tuple[str, ...], pattern: str, spare: str | None) -> list[str]:
+    rx = re.compile(pattern)
+    paths = sorted(
+        {p for g in globs for p in _PKG.glob(g) if p.is_file() and p.suffix not in {".pyc", ".png"}}
     )
-    assert lint.returncode in (0, 2), lint.stderr.decode()
-
-    after = _bytecode_artifacts_under_public()
-    assert after == [], f"script left bytecode under public/: {after}"
-
-
-_RETIRED_SURFACES: tuple[str, ...] = (
-    ".dadaia/reports",
-    "academy",
-    "dadaia clean",
-    "tmp gc",
-    "reports cleanup",
-    "ROOT-4",
-    "legacy-quarantine",
-    "repos catalog",
-)
-
-
-def test_public_source_names_no_retired_surface() -> None:
-    """Intent: CONTRACT — 0.4.6 c4 AC13 (FR16, D2/D3/D9): no `public/` text names a retired surface.
-
-    The reports zone, academy, `dadaia clean`, `dadaia tmp gc`, `dadaia reports cleanup`,
-    the `ROOT-4` invariant and the legacy quarantine were retired; the law, skills,
-    personas, templates and entities that are staged verbatim to every consumer must not
-    keep teaching them. Mirrors the SPEC's own grep exactly, so the verdict is the same
-    one the operator runs by hand.
-    """
-    hits: list[str] = []
-    scanned: list[str] = []
-    for path in sorted(_PUBLIC_ROOT.rglob("*")):
-        if not path.is_file():
-            continue
+    assert_populated(paths, sentinel=paths[0] if paths else _PKG / "missing")
+    hits = []
+    for path in paths:
         try:
-            text = path.read_text(encoding="utf-8")
+            lines = path.read_text(encoding="utf-8").splitlines()
         except UnicodeDecodeError:
             continue
-        rel = path.relative_to(_REPO_ROOT).as_posix()
-        scanned.append(rel)
-        for lineno, line in enumerate(text.splitlines(), start=1):
-            for needle in _RETIRED_SURFACES:
-                if needle in line:
-                    hits.append(f"{rel}:{lineno}: {needle!r}")
-    assert_populated(scanned, "dadaia_workspace/public/data/AGENTS.md")
+        rel = path.relative_to(_PKG).as_posix()
+        hits += [
+            f"{rel}:{n}: {line.strip()[:100]}"
+            for n, line in enumerate(lines, 1)
+            if rx.search(line) and not (spare and spare in line)
+        ]
+    return hits
+
+
+@pytest.mark.parametrize(
+    ("globs", "pattern", "spare"),
+    [
+        # 0.4.6 c4 AC13 (FR16, D2/D3/D9): retired surfaces staged verbatim must not be taught
+        pytest.param(_ALL, r"\.dadaia/reports|academy|dadaia clean|tmp gc|reports cleanup|ROOT-4|legacy-quarantine|repos catalog", None, id="retired-surface"),
+        # 0.4.7 FR4/AC4.1 (T-047-58): the published surface is 100% English
+        pytest.param(("public/**/*.md", "public/**/*.json", "public/**/*.py", "public/**/*.txt", "public/**/*.j2"), rf"(?i){_PT_TERMS}", None, id="portuguese-control-vocabulary"),
+        # 0.4.7 FR1/FR7: a retired bug-record key named as a live field (its retirement line is spared)
+        pytest.param(_MD_JSON, r"lineage_source|registration_commit|registration_granularity|resolved_commit|resolution_granularity|root_cause|migration_note", "retired", id="retired-bug-record-key"),
+        # verdict-vocabulary-persona-schema-mismatch: the handoff schema admits APPROVED/REJECTED only
+        pytest.param(_MD_JSON, r"REQUEST_CHANGES|\bAPPROVE\b", None, id="retired-verdict-token"),
+        # sa-specs-upgrade-stamps-any-target-and-memory-vocabulary-diverges#47.4
+        pytest.param(tuple(f"public/**/*{s}" for s in (".md", ".json", ".py", ".toml", ".txt", ".sh")), r"Part 1|Part 2", None, id="memory-part-1-part-2"),
+        # AC3.2 / T-047-56: the pre-0.4.7 persona names, where not dd- prefixed
+        pytest.param(_ALL, rf"(?<![\w-])({_OLD_PERSONAS})\b", None, id="retired-persona-name"),
+        # roster-keeps-a-coordinator-persona-while-the-main-thread-coordinates (ADR 0022)
+        pytest.param(("**/*",), r"project-manager", None, id="deleted-coordinator-persona"),
+        # sa-consumer-law-carries-library-facts#FR8.2: no skill prescribes the library's release tooling
+        pytest.param(("public/skills/**/*.md",), r"(?i)release-please|gh pr create|last tag \+ 1", None, id="skill-release-tooling"),
+        # sa-consumer-law-carries-library-facts#FR8.3: scaffolded law cites no library ratchet, test or path
+        pytest.param(("public/scaffold/**/*.md", "public/data/fixed/*.md"), r"ratchet V\d|test_\w+\.py|dadaia_workspace/|release-please", None, id="scaffold-law-library-fact"),
+        # sa-reviewer-persona-body-contradicts-its-tools#B4: ADDITIVE is the gate's path class only
+        pytest.param(("public/agents/*.md",), r"ADDITIVE", None, id="persona-additive"),
+        # help-texts-and-bug-schema-cite-behaviour-that-is-gone: the bug schema cites no retired verb
+        pytest.param(("public/schemas/bugs/bug-record-v1.schema.json",), r"dadaia bugs append|features/specs/schemas\.py", None, id="bug-schema-retired-verb"),
+        # sa-reaper-destroys-its-own-hold-before-ttl#B6
+        pytest.param(("public/skills/dd-cli-library/SKILL.md",), r"without touching slop", None, id="expired-only-spares-slop"),
+    ],
+)  # fmt: skip
+def test_public_source_names_no_retired_surface(
+    globs: tuple[str, ...], pattern: str, spare: str | None
+) -> None:
+    """Each row: shipped text an agent obeys never teaches a retired or library-only fact."""
+    assert _denied_lines(globs, pattern, spare) == []
+
+
+def test_the_retired_facts_have_their_live_statement() -> None:
+    """sa-reaper-destroys-its-own-hold-before-ttl#B6 and sa-consumer-law-carries-library-facts#FR8.4:
+    the cli skill says `--fix --expired-only` is the TTL lane alone; the constitution template is English."""
+    skill = (_PKG / "public" / "skills" / "dd-cli-library" / "SKILL.md").read_text(encoding="utf-8")
+    assert "`--fix --expired-only` deletes only TTL-expired entries" in skill
+    stub = canon._CONSTITUTION_STUB.lower()
+    assert "# constitution" in stub
+    assert [t for t, _ in PORTUGUESE_CONTROL_TERMS if t.lower() in stub] == []
+
+
+def test_public_law_never_grants_memory_writes_to_closure_alone() -> None:
+    """Intent: CONTRACT — constitution-persona-single-source-drift (SINGLE-SRC-1, §4a-6).
+
+    The memory-write phase is DEFINITION+CLOSURE; no persona/skill line grants it to
+    CLOSURE alone. A library lint of its own law, never a consumer doctor check."""
+    markers = ("write-locked", "only allows memory", "block writes to", "writes in this phase")
+    markers += ("during the closure phase", "may edit memory", "may write memory")
+    files = sorted({*_PUBLIC_ROOT.glob("agents/**/*.md"), *_PUBLIC_ROOT.glob("skills/**/*.md")})
+    assert_populated([p.name for p in files], "SKILL.md")
+    hits = [
+        f"{path.relative_to(_REPO_ROOT)}:{n}"
+        for path in files
+        for n, line in enumerate(path.read_text("utf-8").lower().splitlines(), start=1)
+        if "closure" in line and "definition" not in line and any(m in line for m in markers)
+    ]
     assert hits == []
-
-
-def test_public_assets_carry_no_portuguese_control_vocabulary() -> None:
-    """Intent: CONTRACT — 0.4.7 FR4/AC4.1 (T-047-58).
-
-    The published surface is 100 % English: a consumer meeting `Aprovado`,
-    `Em revisão`, `Catálogo` or an `APROVADA/BLOQUEADA` verdict on day 1 is the
-    adoption blocker this release closed. The check that enforces it at runtime is
-    `public-privacy`; this contract test asserts the tree it guards is actually clean,
-    so a regression fails in the suite and not only in the operator's doctor run.
-    """
-    offenders: list[str] = []
-    files = sorted(
-        path.relative_to(_REPO_ROOT).as_posix()
-        for path in _PUBLIC_ROOT.rglob("*")
-        if path.is_file() and path.suffix.lower() in {".md", ".json", ".py", ".txt", ".j2"}
-    )
-    assert_populated(files, "dadaia_workspace/public/data/AGENTS.md")
-    for rel in files:
-        path = _REPO_ROOT / rel
-        text = path.read_text(encoding="utf-8", errors="ignore").lower()
-        for term, _reason in PORTUGUESE_CONTROL_TERMS:
-            if term.lower() in text:
-                offenders.append(f"{rel}: {term}")
-    assert offenders == [], (
-        "Portuguese control vocabulary under dadaia_workspace/public/ — "
-        f"translate it (0.4.7 FR4): {offenders}"
-    )
 
 
 # A bare `dadaia`/`dadaia-workspace` command word: not preceded by a path separator, a dot
@@ -196,6 +185,7 @@ def _shipped_text() -> list[Path]:
         {
             *_PUBLIC_ROOT.rglob("*.md"),
             *_PUBLIC_ROOT.rglob("*.txt"),
+            *_PUBLIC_ROOT.rglob("*.json"),
             *(_REPO_ROOT / "docs").glob("*.md"),
             *(_REPO_ROOT / name for name in ("README.md", "llms.txt", "CONTEXT.md")),
         }

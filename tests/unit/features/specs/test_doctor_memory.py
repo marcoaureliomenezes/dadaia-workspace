@@ -1,17 +1,9 @@
-"""Unit tests for the memory validator's MEM-DRIFT-1 rule (v0.5.1 T-051-22 rework).
+"""Intent: CONTRACT — v0.5.1 T-051-22 rework: MEM-DRIFT-1, the features package-map
+diagram in ARCHITECTURE.md vs the live ``dadaia_workspace/features`` packages (bug
+push-gate-test-pins-memory-package-count-that-only-closure-may-change).
 
-Relocates the diagram-vs-code correspondence guard the deleted push-gated contract test
-``tests/contract/test_architecture_diagrams_current.py`` used to own (removed at 5e0719af,
-bug ``push-gate-test-pins-memory-package-count-that-only-closure-may-change``) into a
-`specs doctor` WARNING per qa-engineer's 2026-08-29 deletion-verdict handoff. Table-driven:
-stale diagram node, missing live package, matching set, and no ``ARCHITECTURE.md`` at all.
-
-The live-package introspection (``_live_feature_package_names``) is monkeypatched so this
-test never depends on this REPO's own actual ``dadaia_workspace/features`` package set —
-only the doctor interface (``check_mem_drift1_features_package_map``) is under test.
-
-Intent: CONTRACT — v0.5.1 T-051-22 rework (qa-engineer deletion verdict
-2026-08-29T212000Z-qa-engineer-0.5.1-diagram-test-deletion-verdict).
+The live-package introspection is monkeypatched in the table; one smoke test runs it for
+real.
 """
 
 from __future__ import annotations
@@ -22,132 +14,65 @@ import pytest
 
 from dadaia_workspace.features.specs import doctor_memory
 from dadaia_workspace.features.specs.doctor_memory import MemoryValidator
-from dadaia_workspace.features.specs.doctor_types import Severity
 
 _HEADING = "### `dadaia_workspace/features` — package map ({n} packages)"
 
 
 def _architecture_md(pkgs: tuple[str, ...]) -> str:
-    """A minimal ARCHITECTURE.md carrying the real features package-map mermaid shape."""
-    pkgs_line = " · ".join(pkgs)
     return (
-        "# Architecture\n\n"
-        "## Part 2 — Implementation\n\n"
-        f"{_HEADING.format(n=len(pkgs))}\n\n"
-        "```mermaid\n"
-        "flowchart TB\n"
+        "# Architecture\n\n## Part 2 — Implementation\n\n"
+        f"{_HEADING.format(n=len(pkgs))}\n\n```mermaid\nflowchart TB\n"
         '    subgraph features["dadaia_workspace/features"]\n'
-        f'      pkgs["{pkgs_line}"]\n'
-        '      subs["reports submodules — next · retention · validation"]\n'
-        "    end\n"
-        '    container["container.py"] --> features\n'
-        '    features --> core["core"]\n'
-        "```\n\n"
-        "### next section\n\nsome unrelated content\n"
+        f'      pkgs["{" · ".join(pkgs)}"]\n'
+        "    end\n```\n\n### next section\n\nunrelated\n"
     )
 
 
-def _write_architecture_md(specs: Path, pkgs: tuple[str, ...]) -> None:
-    mem_dir = specs / "memory"
-    mem_dir.mkdir(parents=True, exist_ok=True)
-    (mem_dir / "ARCHITECTURE.md").write_text(_architecture_md(pkgs), encoding="utf-8")
-
-
 @pytest.mark.parametrize(
-    "case_id, diagrammed, live, expected_codes, expected_needle",
+    ("architecture", "live", "needle"),
     [
-        (
-            "stale_node",
-            ("panel", "spec_artifacts"),
-            frozenset({"panel"}),
-            ["MEM-DRIFT-1"],
+        pytest.param(
+            _architecture_md(("panel", "spec_artifacts")),
+            {"panel"},
             "spec_artifacts",
+            id="stale-node",
         ),
-        (
-            "missing_live_package",
-            ("panel",),
-            frozenset({"panel", "repos"}),
-            ["MEM-DRIFT-1"],
-            "repos",
+        pytest.param(
+            _architecture_md(("panel",)), {"panel", "repos"}, "repos", id="missing-live-package"
         ),
-        (
-            "matching",
-            ("panel", "repos"),
-            frozenset({"panel", "repos"}),
-            [],
+        pytest.param(_architecture_md(("panel", "repos")), {"panel", "repos"}, None, id="matching"),
+        pytest.param(
+            "# Architecture\n\nnothing relevant.\n",
+            {"panel"},
             None,
+            id="consumer-no-heading-silent",
         ),
+        pytest.param(None, {"panel"}, None, id="no-architecture-md"),
     ],
 )
 def test_mem_drift1_table(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
-    case_id: str,
-    diagrammed: tuple[str, ...],
-    live: frozenset[str],
-    expected_codes: list[str],
-    expected_needle: str | None,
-) -> None:
-    specs = tmp_path / "specs"
-    _write_architecture_md(specs, diagrammed)
-    monkeypatch.setattr(doctor_memory, "_live_feature_package_names", lambda: set(live))
-
-    issues = MemoryValidator(specs).check_mem_drift1_features_package_map()
-
-    assert [i.code for i in issues] == expected_codes, case_id
-    if expected_codes:
-        assert len(issues) == 1, case_id
-        assert issues[0].severity == Severity.WARNING, case_id
-        assert issues[0].fixable is False, case_id
-        assert expected_needle is not None
-        assert expected_needle in issues[0].description, case_id
-
-
-def test_mem_drift1_no_architecture_md_produces_nothing(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    architecture: str | None,
+    live: set[str],
+    needle: str | None,
 ) -> None:
     specs = tmp_path / "specs"
     (specs / "memory").mkdir(parents=True)
-    monkeypatch.setattr(doctor_memory, "_live_feature_package_names", lambda: {"panel"})
+    if architecture is not None:
+        (specs / "memory" / "ARCHITECTURE.md").write_text(architecture, encoding="utf-8")
+    monkeypatch.setattr(doctor_memory, "_live_feature_package_names", lambda: live)
 
     issues = MemoryValidator(specs).check_mem_drift1_features_package_map()
 
-    assert issues == []
-
-
-def test_mem_drift1_no_memory_dir_produces_nothing(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    specs = tmp_path / "specs"
-    specs.mkdir(parents=True)
-    monkeypatch.setattr(doctor_memory, "_live_feature_package_names", lambda: {"panel"})
-
-    issues = MemoryValidator(specs).check_mem_drift1_features_package_map()
-
-    assert issues == []
-
-
-def test_mem_drift1_missing_heading_produces_nothing(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """A consumer's ARCHITECTURE.md with no features-package-map heading at all (this
-    rule's content is dadaia-workspace-library-specific) is a silent no-op, never a
-    'heading missing' complaint — SPEC-DOC-002/TREE-3 already own atom-presence."""
-    specs = tmp_path / "specs"
-    mem_dir = specs / "memory"
-    mem_dir.mkdir(parents=True)
-    (mem_dir / "ARCHITECTURE.md").write_text("# Architecture\n\nnothing relevant here.\n")
-    monkeypatch.setattr(doctor_memory, "_live_feature_package_names", lambda: {"panel"})
-
-    issues = MemoryValidator(specs).check_mem_drift1_features_package_map()
-
-    assert issues == []
+    if needle is None:
+        assert issues == []
+    else:
+        [issue] = issues
+        assert (issue.code, issue.verdict, issue.fixable) == ("MEM-DRIFT-1", "warning", False)
+        assert needle in issue.message
 
 
 def test_mem_drift1_real_live_introspection_returns_package_names() -> None:
-    """Unmocked smoke test: ``_live_feature_package_names`` really introspects this repo's
-    own installed ``dadaia_workspace.features`` package (no hardcoded expectation list)."""
     live = doctor_memory._live_feature_package_names()
-
-    assert "specs" in live  # this very module's own package
-    assert all(isinstance(name, str) and name for name in live)
+    assert "specs" in live and all(isinstance(name, str) and name for name in live)

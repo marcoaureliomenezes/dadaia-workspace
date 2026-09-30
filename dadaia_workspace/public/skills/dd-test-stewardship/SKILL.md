@@ -22,9 +22,9 @@ compatibility: Standalone Agent Skill. Inside a dadaia-workspace (pip install da
   task/release closure), **QUARANTINE** (temporary, carries a bug id). An undeclared
   test is SCAFFOLD — the default is to die, not to stay.
 - Admit a test only if it compiles, runs deterministically, and adds real detection
-  (new coverage or kills a new mutant). Change-detector tests, tautologies and
-  reflex-regenerated snapshots fail admission; a brittle test is fixed or deleted,
-  never appeased.
+  (new coverage or kills a new mutant) that no existing test can carry by a rewrite
+  (the root map §1 work order); change-detector tests, tautologies and reflex snapshots
+  fail admission; a brittle test is fixed or deleted, never appeased.
 - A mock exists only at the system boundary — network, clock, randomness; a
   collaborator inside the module under test runs for real.
 - The expected value comes from an independent source (the SPEC, a worked example),

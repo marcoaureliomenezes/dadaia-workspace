@@ -3,22 +3,19 @@
 from __future__ import annotations
 
 from collections.abc import Collection
-from importlib import metadata
 from typing import Any
 
 from dadaia_workspace.core.harness_registry import L1_ENTRY_HARNESSES
 from dadaia_workspace.core.spec_status import CANONICAL_STATUS
 from dadaia_workspace.core.specs_version import CANONICAL_SPECS_VERSION
+from dadaia_workspace.infrastructure.provider_version import provider_version
 
 CAPABILITY_SCHEMA_VERSION = "dadaia-capabilities-v3"
 
 
 def distribution_version() -> str:
-    """The installed provider version — what ``reconcile`` checks after an upgrade."""
-    try:
-        return metadata.version("dadaia-workspace")
-    except metadata.PackageNotFoundError:
-        return "0+source"
+    """The running provider version — what ``reconcile`` checks after an upgrade."""
+    return provider_version() or "0+source"
 
 
 def build_capabilities(command_paths: Collection[tuple[str, ...]]) -> dict[str, Any]:
@@ -44,7 +41,7 @@ def build_capabilities(command_paths: Collection[tuple[str, ...]]) -> dict[str, 
             "pattern_version": CANONICAL_SPECS_VERSION,
             # Derived from the doctor's own canon, never a second copy.
             "status_tokens": sorted(CANONICAL_STATUS),
-            "commands": [f"dadaia specs {verb}" for verb in groups.get("specs", [])],
+            "commands": groups.get("specs", []),
         },
         "contexts": {
             "states": ["alive", "dead"],
@@ -60,8 +57,5 @@ def build_capabilities(command_paths: Collection[tuple[str, ...]]) -> dict[str, 
             "preserve_complete_diagnostics": True,
             "credentials_location": "workspace-root-.env-only",
         },
-        "certification": {
-            "command": "dadaia certify --json",
-            "schema_version": "dadaia-certification-v1",
-        },
+        "certification": {"schema_version": "dadaia-certification-v1"},
     }

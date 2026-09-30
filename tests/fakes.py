@@ -1,113 +1,9 @@
 """In-memory fakes for the container-built collaborators — unit tests without I/O."""
 
-from collections.abc import Sequence
 from pathlib import Path
 from typing import Any
 
 from dadaia_workspace.core.models.doctor_report import DoctorLine, DoctorStatus
-from dadaia_workspace.core.models.spec_context import SpecContextProject
-
-
-class FakeContextStore:
-    def __init__(self) -> None:
-        self._store: dict[str, SpecContextProject] = {}
-
-    def save(self, ctx: SpecContextProject) -> None:
-        self._store[ctx.name] = ctx
-
-    def update(self, ctx: SpecContextProject) -> None:
-        self._store[ctx.name] = ctx
-
-    def get(self, name: str) -> SpecContextProject | None:
-        return self._store.get(name)
-
-    def list_all(self) -> list[SpecContextProject]:
-        return list(self._store.values())
-
-    def delete(self, name: str) -> None:
-        self._store.pop(name, None)
-
-
-class FakeGitClient:
-    def __init__(self) -> None:
-        self.cloned: list[tuple[str, Path]] = []
-        self.committed: list[Path] = []
-        self.committed_paths: list[tuple[Path, tuple[str, ...]]] = []
-        self.pushed: list[Path] = []
-        self.checked_out: list[tuple[Path, str]] = []
-        self._dirty: set[Path] = set()
-        self._has_remote: set[Path] = set()
-        self._branches: dict[Path, str] = {}
-        self._untracked: dict[Path, list[str]] = {}
-        self._remote_urls: dict[Path, str] = {}
-        self._has_commits: set[Path] = set()
-
-    def clone(self, url: str, dest: Path) -> None:
-        dest.mkdir(parents=True, exist_ok=True)
-        self.cloned.append((url, dest))
-
-    def is_dirty(self, path: Path) -> bool:
-        return path in self._dirty
-
-    def has_commits(self, path: Path) -> bool:
-        return path in self._has_commits
-
-    def commit_all(self, path: Path, msg: str) -> None:
-        self.committed.append(path)
-        self._has_commits.add(path)
-        self._dirty.discard(path)
-        self._untracked.pop(path, None)
-
-    def commit_paths(self, path: Path, msg: str, paths: Sequence[str]) -> None:
-        """Explicit-path staging counterpart of ``commit_all`` (never a blanket sweep).
-
-        Records the exact *paths* the caller staged in ``committed_paths`` so tests can
-        assert the scaffold commit never widened beyond what it authored. A no-op when
-        *paths* is empty, mirroring :class:`GitSubprocessClient`.
-        """
-        if not paths:
-            return
-        self.committed.append(path)
-        self.committed_paths.append((path, tuple(paths)))
-        self._has_commits.add(path)
-        self._dirty.discard(path)
-        self._untracked.pop(path, None)
-
-    def has_remote(self, path: Path) -> bool:
-        return path in self._has_remote
-
-    def push(self, path: Path) -> None:
-        self.pushed.append(path)
-
-    def unpushed(self, path: Path) -> bool:
-        return False
-
-    def identity_fix(self, path: Path) -> str:
-        return ""
-
-    def committed_text(self, path: Path, rel: str) -> str | None:
-        return None
-
-    def gitflow(self, repo: Path, main_repo: Path | None = None) -> tuple[Any, str | None]:
-        from dadaia_workspace.core.gitflow import DEFAULT
-
-        return DEFAULT, None
-
-    def current_branch(self, path: Path) -> str:
-        return self._branches.get(path, "main")
-
-    def checkout(self, path: Path, branch: str) -> None:
-        self.checked_out.append((path, branch))
-        self._branches[path] = branch
-
-    def is_git_root(self, path: Path) -> bool:
-        return path.exists()
-
-    def list_untracked(self, path: Path) -> list[str]:
-        return list(self._untracked.get(path, []))
-
-    def remote_url(self, path: Path) -> str:
-        return self._remote_urls.get(path, "")
 
 
 class FakePublicAssetManager:
@@ -127,7 +23,6 @@ class FakePublicAssetManager:
         harness: str | None = None,
         force: bool = False,
         scope: str = "all",
-        only: str | None = None,
     ) -> list[str]:
         self.installed.append((workspace_root, harness, force))
         return [str(workspace_root / ".agents" / "skills" / "fake-skill" / "SKILL.md")]

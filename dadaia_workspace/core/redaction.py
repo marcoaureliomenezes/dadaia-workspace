@@ -1,180 +1,74 @@
-"""Stdlib-pure masking primitives (SPEC v0.11.0 FR6/ADR D1-a; :func:`redact_text`
-relocated here at the bug ``backlog-histo-writer-skips-write-time-denylist-redaction``
-fix — see below).
+"""Stdlib-pure privacy matching and masking primitives; zero I/O, zero internal import.
 
-Extracted mechanically from ``cli/redact.py#ContextRedactor`` (v0.9.0 FR8a) so the SAME
-masking primitive can be consumed both by the CLI's ``--redact`` rendering
-(``cli/redact.py``) AND by the push-range denylist gate's own render boundary
-(``features/chokepoints/service.py``'s ``_compose_denylist_refusal`` /
-``_annotate_skip``), which may import ``core`` but never ``cli``
-(``architecture.md`` ring purity) — the extension entry #23's resolution A requires
-would otherwise be unimplementable in either direction (grill P4).
-
-Word-boundary alternation, longest-first ordering, and stable first-appearance ordinal
-placeholders are the whole of the :class:`Redactor` primitive; everything
-caller-specific (which candidates to mask, what to exclude, JSON-tree recursion) stays
-in the consumer. :func:`redact_text` is a SEPARATE, older primitive (SPEC v0.4.5 FR6/
-FR7, T-045-19) with different semantics — plain case-insensitive substring masking (no
-word-boundary restriction, mirroring ``features.chokepoints.denylist_scan``'s own
-``operator_terms_match`` exactly, A6.3) plus unconditional control/format-character
-stripping and IP/home-path scrubbing. It lived only in ``core/models/bugs.py`` until
-the bug above: a SECOND write-time record model (``core.models.backlog
-.BacklogHistoRecord``) needed the identical seam, and duplicating ~40 lines of
-denylist-masking regex logic per domain model is exactly the hand-kept-copy defect
-class A2.10 forbids for field lists — so the primitive itself moves to this shared,
-domain-agnostic module (neither ``core/models/bugs.py`` nor ``core/models/backlog.py``
-imports the other; both import this one, stdlib-pure sibling). ``core/models/bugs.py``
-re-exports :func:`redact_text` unchanged for every existing caller.
-
-Zero I/O — ``core/`` stays stdlib-pure; the file-I/O authorized set
-(``specs_repair``/``specs_version``/``workspace_resolver``/
-``atomic_write``/``invocation``/``session_store``) is unaffected.
+``public stage`` copies this file beside every ledger script as ``_privacy.py``, so the ledger
+seam refuses exactly what the push refuses.
 """
 
 from __future__ import annotations
 
+import json
 import re
-from collections.abc import Iterable, Sequence
-from typing import Protocol
+from collections.abc import Iterable, Iterator, Mapping
+from typing import Any
 
 __all__ = [
     "UNSAFE_FORMAT_CHARS_RE",
-    "PatternLike",
     "Redactor",
     "compile_candidates",
-    "first_privacy_hit",
-    "redact_text",
+    "first_private",
+    "mask",
+    "privacy_matches",
 ]
 
-# ============================================================================
-# redact_text — case-insensitive substring masking (SPEC v0.4.5 FR6/FR7, T-045-19).
-# ============================================================================
 
-# Redaction patterns (privacy rules): operator-local home paths + IPs never land in a
-# committed record. The username segment of a home path is scrubbed; the IPv4 form is
-# masked wholesale. (A version token like v0.1.46 has only three numeric groups and is
-# never matched.)
-_IPV4_RE = re.compile(r"\b(?:\d{1,3}\.){3}\d{1,3}\b")
-_POSIX_HOME_RE = re.compile(r"(/home/|/Users/)[^/\s:]+")
-_WIN_HOME_RE = re.compile(r"([A-Za-z]:\\Users\\)[^\\\s:]+")
-
-#: The C0/C1/DEL control range MINUS TAB (0x09), LF (0x0A) and CR (0x0D), plus the
-#: Unicode LINE/PARAGRAPH SEPARATORS (U+2028/U+2029). Stripped — never escaped — FIRST
-#: inside :func:`redact_text`, before any masking pass (v0.4.5 FR7/A7.3/A7.6, narrowed
-#: by bug ``bug-event-sanitation-strips-tab-lf-cr-from-free-text``; bundles bug
-#: ``bug-event-field-with-unicode-line-separator-silently-drops-the-event``).
-#: A caller serializing with ``json.dumps(..., ensure_ascii=False)`` already escapes
-#: the WHOLE C0/C1/DEL range as a JSON string escape — a literal TAB/LF/CR inside a
-#: field value can never fragment a JSONL line, as long as the reader splits on a
-#: literal ``"\\n"`` character, never on ``str.splitlines()``'s wider terminator set
-#: (v0.4.5 FR7 read-side fix). TAB/LF/CR carry neither hazard this class exists to
-#: close and must round-trip intact — deleting them only destroyed the word boundaries
-#: of every multi-line free-text field, silently, on the live write path (bug
-#: ``bug-event-sanitation-strips-tab-lf-cr-from-free-text``). What DOES still need
-#: stripping: (a) U+0085/U+2028/U+2029 — the only bytes ``json.dumps`` leaves raw AND a
-#: naive ``str.splitlines()``-style reader would treat as a terminator, the actual
-#: fragmentation hazard (A7.1); (b) ESC and the rest of C0/C1/DEL — a raw ESC forges an
-#: ANSI escape sequence or a fake second output line in any consumer that ever decodes
-#: a folded record back to a terminal (CWE-117, A7.2). Deleted rather than escaped,
-#: unlike that precedent: a denylisted term an attacker interrupts with one of these
-#: bytes must re-join into a contiguous substring for the masking pass immediately
-#: below to still catch it (A7.6) — an escape sequence (``"\\x1b"``) would leave the
-#: two halves apart.
-UNSAFE_FORMAT_CHARS_RE = re.compile("[\x00-\x08\x0b\x0c\x0e-\x1f\x7f\x80-\x9f\u2028\u2029]")
+def mask(term: str) -> str:
+    """The one way a private match is shown: ``first…last``, never the term itself."""
+    return f"{term[0]}…{term[-1]}" if term else term
 
 
-def redact_text(text: str, denylist_terms: Sequence[tuple[str, str]] = ()) -> str:
-    """Return ``text`` with unsafe control/format characters stripped, then
-    operator-local home-path usernames, IPv4 addresses, and any operator denylist term
-    masked.
-
-    The control/format strip (see :data:`UNSAFE_FORMAT_CHARS_RE`) runs FIRST, before
-    every masking pass (v0.4.5 FR7/A7.6) — so a denylisted term an attacker split with
-    an embedded ESC or Unicode line/paragraph separator still gets matched below, and
-    no such byte ever survives into a persisted field.
-
-    ``denylist_terms`` is ``(term, reason)`` pairs from the SAME operator-term source
-    the push-time scan already refuses on
-    (``infrastructure.privacy_check.load_privacy_terms`` /
-    ``features.chokepoints.denylist_scan.operator_terms_match``) — threaded in by the
-    caller since this module is pure core and must never import ``infrastructure``
-    (v0.4.5 FR6/T-045-19, `core-no-upper-layers`). Matched case-insensitively as a
-    literal substring, mirroring the push-time scan's own semantics exactly (A6.3), so
-    a term that would refuse a push is masked before it is ever committed. Defaults to
-    ``()`` — a no-op for the denylist pass — so every pre-FR6 caller keeps masking
-    IP/home paths; the control/format strip is unconditional and a no-op on clean text.
-    """
-    out = UNSAFE_FORMAT_CHARS_RE.sub("", text)
-    out = _IPV4_RE.sub("[REDACTED-IP]", out)
-    out = _POSIX_HOME_RE.sub(r"\1[REDACTED]", out)
-    out = _WIN_HOME_RE.sub(r"\1[REDACTED]", out)
-    for term, _reason in denylist_terms:
-        if term:
-            out = re.sub(re.escape(term), "[REDACTED-TERM]", out, flags=re.IGNORECASE)
-    return out
-
-
-# ============================================================================
-# first_privacy_hit — the one place a write-once free-text field is checked against
-# the operator's own baseline privacy patterns (v0.5.1 K5 deepening, D5).
-# ============================================================================
-
-
-class PatternLike(Protocol):
-    """Structural shape a compiled privacy pattern must satisfy — the same shape
-    ``infrastructure.privacy_check.load_baseline_patterns()`` / ``container
-    .load_denylist_baseline_patterns()`` already returns (and
-    ``features.chokepoints.denylist_scan.BaselinePatternLike`` already names for the
-    push-range scan). Declared locally rather than imported: ``core`` never imports
-    ``infrastructure`` or ``features`` (ring purity) — a caller threads real pattern
-    instances in as data; this Protocol only pins the two attributes
-    :func:`first_privacy_hit` reads."""
-
-    @property
-    def regex(self) -> re.Pattern[str]: ...
-
-    @property
-    def exclude(self) -> re.Pattern[str] | None: ...
-
-    @property
-    def reason(self) -> str: ...
-
-
-def first_privacy_hit(text: str, patterns: Sequence[PatternLike]) -> str | None:
-    """Return the ``reason`` of the FIRST *patterns* entry that matches *text* (honoring
-    each pattern's own ``exclude`` carve-out), or ``None`` when nothing matches.
-
-    The ONE privacy check a write-once free-text field is refused against — the SAME
-    baseline the push-range denylist scan already refuses on (operator carve-outs like
-    ``/home/runner``/``noreply@anthropic.com`` included), never a stricter or narrower
-    copy: a value this function refuses would already refuse the push that committed it.
-    """
+def privacy_matches(
+    text: str, terms: Iterable[tuple[str, str]], patterns: Iterable[Any]
+) -> Iterator[tuple[str, str, str]]:
+    """``(value, source, reason)`` for every private match in *text*: operator terms (a
+    case-insensitive substring) first, then each baseline pattern (``id``, ``regex``,
+    ``exclude``, ``reason``) whose match its ``exclude`` does not carve out."""
+    text = UNSAFE_FORMAT_CHARS_RE.sub("", text)
+    lowered = text.lower()
+    for term, reason in terms:
+        if term and term.lower() in lowered:
+            yield term, "operator denylist", reason
     for pattern in patterns:
         for match in pattern.regex.finditer(text):
-            if pattern.exclude is not None and pattern.exclude.search(match.group(0)):
-                continue
-            return pattern.reason
+            value = match.group(0)
+            if pattern.exclude is None or not pattern.exclude.search(value):
+                yield value, f"baseline pattern '{pattern.id}'", pattern.reason
+
+
+def first_private(
+    record: Mapping[str, Any], terms: Iterable[tuple[str, str]], patterns: Iterable[Any]
+) -> tuple[str, str] | None:
+    """``(field, masked match)`` of the first field whose serialized value the push would
+    refuse, or ``None`` — a ledger line is scanned as the bytes it is written as."""
+    terms, patterns = list(terms), list(patterns)
+    for key, value in record.items():
+        for found, _source, _reason in privacy_matches(
+            json.dumps(value, ensure_ascii=False), terms, patterns
+        ):
+            return key, mask(found)
     return None
 
 
-# ============================================================================
-# Redactor — word-boundary ordinal-placeholder masking (SPEC v0.11.0 FR6/ADR D1-a).
-# ============================================================================
+#: C0/C1/DEL minus TAB/LF/CR, plus U+2028/U+2029: line-fragmenting or terminal-forging
+#: bytes. Deleted, never escaped, so a denylisted term split by one re-joins for the mask.
+UNSAFE_FORMAT_CHARS_RE = re.compile("[\x00-\x08\x0b\x0c\x0e-\x1f\x7f\x80-\x9f\u2028\u2029]")
 
-#: Characters that make an adjacent match "not a whole word". Hyphens are
-#: deliberately treated as WORD characters (not boundaries): a candidate (a context
-#: name, a repo slug, a path segment) commonly contains them, and a short candidate
-#: that is merely a substring/prefix of a longer, unrelated hyphenated string must
-#: never be partially matched.
+
+#: Word characters; hyphens included so a candidate never matches inside a hyphenated name.
 _WORD_CHARS = "A-Za-z0-9_-"
 
 
 def compile_candidates(terms: Iterable[str]) -> re.Pattern[str] | None:
-    """Word-boundary alternation over *terms*, longest-first so a short candidate that
-    happens to be a prefix of a longer one never shadows the longer match.
-
-    Returns ``None`` when *terms* carries no non-empty candidate — nothing to mask.
-    """
+    """Word-boundary alternation over *terms*, longest-first; ``None`` when there is none."""
     ordered = sorted({t for t in terms if t}, key=len, reverse=True)
     if not ordered:
         return None
@@ -185,12 +79,8 @@ def compile_candidates(terms: Iterable[str]) -> re.Pattern[str] | None:
 
 
 class Redactor:
-    """Stateful per-invocation masker: stable first-appearance ordinal placeholders.
-
-    Construct ONE instance per rendering pass with the full candidate set. Reuse the
-    SAME instance across every piece of output that pass renders, in rendering order,
-    so the ordinal map accumulates in the TRUE first-appearance order of the pass.
-    """
+    """Per-pass masker with stable first-appearance ordinal placeholders: one instance per
+    rendering pass, reused in rendering order."""
 
     def __init__(self, candidates: Iterable[str], *, placeholder_fmt: str) -> None:
         self._pattern = compile_candidates(candidates)
@@ -199,11 +89,9 @@ class Redactor:
 
     @property
     def active(self) -> bool:
-        """True when at least one candidate exists to mask."""
         return self._pattern is not None
 
     def mask(self, value: str) -> str:
-        """Mask every candidate substring found inside *value*."""
         if not value or self._pattern is None:
             return value
 

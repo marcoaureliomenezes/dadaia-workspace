@@ -18,6 +18,7 @@
 - Arm B: `propose -> operator confirms -> register -> RED test -> root-cause fix -> GREEN -> resolved`.
 - Test: does the tool break its own contract? Yes -> Arm B, fixed now. No -> Arm A, via a candidate.
 - A feature enters only through the backlog or an operator demand recorded in the SPEC `Origin`; a confirmed bug is fixed immediately.
+- Every change minimizes code and tests: DELETE → REBUILD → UPDATE → KEEP → ADD last; verbose code, comments or tests that could be shorter are defects; every documented behavior keeps working.
 - No workflow engine: the SDD documents (`specs/releases/AGENTS.md`) are the record of progress.
 
 ## 2. Who does what
@@ -34,17 +35,17 @@
 
 ## 3. What is enforced
 
-- One PreToolUse gate blocks exactly three things: a new workspace-root entry (§4), a `dadaia`/`pip` run outside `.dadaia/.venv/bin/`, a PROTECTED or out-of-scope write.
-- Path classes: ADDITIVE (the append-only governance areas of `specs/AGENTS.md` and the runtime scratch zones of `.dadaia/AGENTS.md`) always writable; PROTECTED (session state, the projected law files) blocked; everything else MUTATING, scope-judged under `repos/<slug>/`.
+- One PreToolUse gate blocks exactly three things: a file-tool write (`Write`, `Edit`, `MultiEdit`, `apply_patch`) creating a new workspace-root entry (§4); a Bash command whose first token is `dadaia`, `pip`/`pip3` or `python -m dadaia_workspace` outside `.dadaia/.venv/bin/`; a file-tool write (those or `NotebookEdit`) that is PROTECTED or out-of-scope — a Bash write (`sed -i`, `rm`, `mkdir`, a redirect) is never judged.
+- Path classes: ADDITIVE (the append-only governance areas of `specs/AGENTS.md` and the runtime scratch zones of `.dadaia/AGENTS.md`) always writable; PROTECTED (session state, every path the install ledger records) blocked; everything else MUTATING, scope-judged under `repos/<slug>/`.
 - Every BLOCK carries exactly one `fix: <command>` line; a BLOCK whose fix is itself blocked is a Stall, CRITICAL.
-- Git chokepoints (branch names: `specs/constitution.md` `gitflow:`): pre-push allows the work branch and refuses the integration and principal branches, a non-canon `specs/` path or a denylisted secret; both PRs need CI green and a `dd-code-reviewer` APPROVED verdict; no CI job calls a model API. Mechanics: `dd-gitflow-default`, `.dadaia/AGENTS.md`.
+- Git chokepoints (branch names: `specs/constitution.md` `gitflow:`): pre-push allows only the work branch and refuses a non-canon `specs/` path or a denylisted secret; both PRs need CI green and a `dd-code-reviewer` APPROVED verdict; no CI job calls a model API. Mechanics: `dd-gitflow-default`, `.dadaia/AGENTS.md`.
 - Races surface, never block; context binding: `.dadaia/.venv/bin/dadaia context show --json`, `.dadaia/.venv/bin/dadaia context bind <ctx>`.
 - The gate reads no SDD artifact; procedure is skill-taught and audit-measured, never gated.
 
 ## 4. Where things are written
 
-- Root holds only: `<!-- root -->`; what the operator created by hand stays; a tool's extra entry needs a glob in `.dadaia/states/instance_exceptions.txt`.
-- Temp: `.dadaia/tmp/<agent>/<YYYYMMDD>/`; handoffs: `.dadaia/handoff/<context>/`; HTML reports: `repos/<slug>/reports/<agent>/`; caches: `.dadaia/.cache/`, `.dadaia/mcps/<server>/`.
+- Root holds only: `<!-- root -->`; any other entry, the operator's included, needs an operator-written glob in `.dadaia/states/instance_exceptions.txt`.
+- Temp: `.dadaia/tmp/<agent>/<YYYYMMDD>/`; handoffs: `.dadaia/handoff/<context>/`; HTML reports: `repos/<slug>/reports/<agent>/`; caches: `.dadaia/tmp/<tool>-cache/` (absolute, via the harness env), `.dadaia/mcps/<server>/`.
 - A repo tree carries source and its own artifacts only — never `.dadaia/`; caches redirect by configuration (`repos/<slug>/AGENTS.md`).
 - Credentials live only in the operator's root `.env`: never create, copy, persist, commit, print or report a secret, anywhere.
 - Invoke `.dadaia/.venv/bin/dadaia` by absolute path; register every dev server through `dd-cli-library`.
@@ -57,7 +58,7 @@
 | releases | `specs/releases/AGENTS.md` | candidates, phases, task markers, promote, commit shapes |
 | backlog | `specs/backlog/AGENTS.md` | demand queue, `exit`, dispositions |
 | bugs | `specs/bugs/AGENTS.md` | what a bug is, propose/confirm, records, resolution |
-| memory | `specs/memory/AGENTS.md` | product truth, atoms, Part 1/Part 2, ownership |
+| memory | `specs/memory/AGENTS.md` | product truth, atoms, ownership |
 | ADRs | `specs/ADRs/AGENTS.md` | decisions.jsonl, acceptance |
 | audits | `specs/audits/AGENTS.md` | three pillars, remediation release |
 | runtime | `.dadaia/AGENTS.md` | zones, doctor, reprojection, chokepoints, context freeze |

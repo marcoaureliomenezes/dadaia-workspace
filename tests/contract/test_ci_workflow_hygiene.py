@@ -1,56 +1,79 @@
-"""Intent: CONTRACT — bug release-publishes-an-unordered-dadaia-skills-repository: the
-release publishes dadaia-workspace to PyPI and nothing else — no job, script or doc names
-a dadaia-skills repository.
+"""The GitHub workflows: what every job may never do, how release.yml publishes, and the gitflow
+the triggers and the PR source guard encode.
 
-Intent: CONTRACT — T-047-87: release.yml is the one workflow minting the
-version, CHANGELOG and tag: push-to-main trigger, sha-pinned action, release type
-read from the config file rather than an input.
-
-Intent: CONTRACT — T-047-88: release.yml is gone and its publishing jobs live inside
-release.yml behind the single `release_created` gate: no `release:` event, no
-`push: tags`, no hand-rolled tag arithmetic.
-
-Intent: CONTRACT — 0.5.0 c3 rework (regression of 114be682): every ci.yml job that runs
-`dadaia doctor` checks out full history. Size: SMALL."""
+Intent: CONTRACT — bugs release-publishes-an-unordered-dadaia-skills-repository,
+release-workflow-coverage-file-in-checkout, pr-source-guard-refuses-the-release-please-pr-to-main,
+dependabot-targets-main-and-every-update-pr-is-refused, ci-history-depth-is-decided-per-job,
+secret-scan-workflow-never-runs-on-develop-prs-so-its-required-context-blocks-every-merge
+(v0.5.1 A-12.1, A-12.2); T-047-87/88 (release.yml mints and publishes behind one gate); ADR 0026;
+sa-doctor-job-not-a-required-check (AC1.7, ADR 0078). Size: SMALL (YAML reads; the guard runs bash).
+"""
 
 from __future__ import annotations
 
+import json
 import os
 import re
+import subprocess
 import sys
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
 import pytest
 import yaml
 
+from dadaia_workspace.core.gitflow import read_gitflow
+
 pytestmark = pytest.mark.contract
 
 _WORKFLOWS = Path(__file__).resolve().parents[2] / ".github" / "workflows"
 _RELEASE_YML = _WORKFLOWS / "release.yml"
 _REPO_ROOT = _WORKFLOWS.parents[1]
+_ACTION = "googleapis/release-please-action"
+_GATE = "needs.release-please.outputs.release_created == 'true'"
+
+
+def _load(name: str) -> Any:
+    return yaml.safe_load((_WORKFLOWS / name).read_text(encoding="utf-8"))
 
 
 def _workflows() -> dict[str, Any]:
     return {
-        path.name: yaml.safe_load(path.read_text(encoding="utf-8"))
-        for path in sorted(_WORKFLOWS.glob("*.yml"))
+        p.name: _load(p.name)
+        for p in sorted([*_WORKFLOWS.glob("*.yml"), *_WORKFLOWS.glob("*.yaml")])
     }
 
 
+def _on(document: Any) -> Any:
+    """PyYAML (YAML 1.1) reads the bare `on:` key as the boolean True."""
+    return document.get("on", document.get(True)) or {}
+
+
 def _jobs() -> dict[str, Any]:
-    return dict(yaml.safe_load(_RELEASE_YML.read_text(encoding="utf-8"))["jobs"])
+    return dict(_load("release.yml")["jobs"])
 
 
-_UNORDERED_SKILLS_REPO = re.compile(
-    r"dadaia-skills|SKILLS_REPO_TOKEN|build-skills-repo|npx skills add|skills-repository"
-)
+def _needs(job: dict[str, Any]) -> list[str]:
+    needs = job.get("needs") or []
+    return [needs] if isinstance(needs, str) else list(needs)
 
 
-def test_the_release_publishes_no_skills_repository() -> None:
-    """The operator never ordered a standalone skills repository (grill Q14: later); a job
-    publishing one fails every release and README, docs and memory point at a repository
-    that does not exist. Delete this test when Q14's distribution is ordered."""
+def _steps() -> list[tuple[str, str, dict[str, Any]]]:
+    return [
+        (name, job_name, step)
+        for name, doc in _workflows().items()
+        for job_name, job in (doc.get("jobs") or {}).items()
+        if isinstance(job, dict)
+        for step in job.get("steps") or []
+    ]
+
+
+def _skills_repo_mentions() -> list[str]:
+    """Grill Q14: no standalone skills repository was ordered (delete this row when it is)."""
+    rx = re.compile(
+        r"dadaia-skills|SKILLS_REPO_TOKEN|build-skills-repo|npx skills add|skills-repository"
+    )
     surfaces = [
         *sorted(_WORKFLOWS.glob("*.yml")),
         _REPO_ROOT / "README.md",
@@ -58,415 +81,289 @@ def test_the_release_publishes_no_skills_repository() -> None:
         *sorted((_REPO_ROOT / "docs").rglob("*.md")),
         *sorted((_REPO_ROOT / "specs" / "memory").rglob("*.md")),
     ]
-    offenders = [
-        f"{path.relative_to(_REPO_ROOT)}:{n}"
-        for path in surfaces
-        for n, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1)
-        if _UNORDERED_SKILLS_REPO.search(line)
+    hits = [
+        f"{p.relative_to(_REPO_ROOT)}:{n}"
+        for p in surfaces
+        for n, line in enumerate(p.read_text(encoding="utf-8").splitlines(), 1)
+        if rx.search(line)
     ]
-    assert offenders == [], offenders
-    assert not (_REPO_ROOT / "dadaia_workspace/public/scripts/build-skills-repo.py").exists()
+    return hits + [
+        p
+        for p in ["dadaia_workspace/public/scripts/build-skills-repo.py"]
+        if (_REPO_ROOT / p).exists()
+    ]
 
 
-def _run_bodies() -> list[tuple[str, str, str | None, str]]:
-    """Every `run:` body in every workflow, as (workflow, job, step name, line)."""
+def _model_api_calls() -> list[str]:
+    """P-33 (ADR 0025): no `anthropics/*` action, model API secret or endpoint in any workflow."""
+    rx = re.compile(r"CLAUDE_API_KEY|ANTHROPIC_(?:API_)?KEY|api\.anthropic\.com", re.IGNORECASE)
+    hits = []
+    for name, doc in _workflows().items():
+        jobs = [j for j in ((doc or {}).get("jobs") or {}).values() if isinstance(j, dict)]
+        uses = [str(j.get("uses", "")) for j in jobs] + [
+            str(s["uses"])
+            for j in jobs
+            for s in j.get("steps") or []
+            if isinstance(s, dict) and "uses" in s
+        ]
+        hits += [f"{name}: uses {u}" for u in uses if u.lower().startswith("anthropics/")]
+        text = (_WORKFLOWS / name).read_text(encoding="utf-8")
+        hits += [f"{name}:{n}" for n, line in enumerate(text.splitlines(), 1) if rx.search(line)]
+    return hits
+
+
+def _uncovered_coverage_files() -> list[str]:
+    """release-workflow-coverage-file-in-checkout: a `pytest --cov` step writes COVERAGE_FILE
+    under runner.temp (step or job env), never `.coverage` in the checkout."""
     return [
-        (name, job_name, step.get("name"), line)
-        for name, document in _workflows().items()
-        for job_name, job in (document.get("jobs") or {}).items()
+        f"{name}:{job_name}"
+        for name, doc in _workflows().items()
+        for job_name, job in (doc.get("jobs") or {}).items()
         for step in job.get("steps") or []
-        for line in (step.get("run") or "").splitlines()
+        if "pytest" in (run := step.get("run") or "")
+        and "--cov" in run
+        and "runner.temp"
+        not in str(
+            (step.get("env") or {}).get("COVERAGE_FILE")
+            or (job.get("env") or {}).get("COVERAGE_FILE")
+        )
     ]
 
 
-@pytest.mark.parametrize("workflow", sorted(p.name for p in _WORKFLOWS.glob("*.yml")))
-def test_no_run_body_of_any_workflow_interpolates_a_workflow_expression(workflow: str) -> None:
-    """A workflow expression pasted into a shell body is the template-injection shape:
-    the expression is substituted before the shell parses the line, so attacker-authored
-    text becomes code. Every value reaches a run body through `env:` and is read as a
-    quoted shell variable — in EVERY job of EVERY workflow, not just the ones that were
-    reviewed."""
-    offenders = [
-        f"{job}/{step or '<unnamed>'}: {line.strip()}"
-        for name, job, step, line in _run_bodies()
-        if name == workflow and "${{" in line
+_NEVER: dict[str, Callable[[], list[str]]] = {
+    "skills-repository-published": _skills_repo_mentions,
+    # the template-injection shape: every value reaches a run body through env:
+    "workflow-expression-in-a-run-body": lambda: [
+        f"{n}/{j}/{s.get('name')}: {line.strip()}"
+        for n, j, s in _steps()
+        for line in (s.get("run") or "").splitlines()
+        if "${{" in line
+    ],
+    "model-api-call": _model_api_calls,
+    "coverage-file-in-the-checkout": _uncovered_coverage_files,
+    "release-please-outside-release-yml": lambda: [
+        n
+        for n in _workflows()
+        if _ACTION in (_WORKFLOWS / n).read_text(encoding="utf-8") and n != "release.yml"
+    ],
+    "pypi-publisher-outside-release-yml": lambda: [
+        n
+        for n in _workflows()
+        if "pypa/gh-action-pypi-publish" in (_WORKFLOWS / n).read_text(encoding="utf-8")
+        and n != "release.yml"
+    ],
+    # same-workflow chaining only: a second trigger would need a PAT (PLAN D8)
+    "release-event-or-tag-push-trigger": lambda: [
+        n
+        for n, doc in _workflows().items()
+        if "release" in (t := _on(doc))
+        or (isinstance(t, dict) and bool({"tags", "tags-ignore"} & set(t.get("push") or {})))
+    ],
+    "publishing-job-without-the-release-gate": lambda: [
+        n
+        for n, job in _jobs().items()
+        if n != "release-please"
+        and ("release-please" not in _needs(job) or str(job.get("if") or "").strip() != _GATE)
+    ],
+    "needs-an-undefined-job": lambda: [
+        f"{n} -> {d}" for n, job in _jobs().items() for d in _needs(job) if d not in _jobs()
+    ],
+    # T-047-88: the action mints the tag, never workflow arithmetic
+    "hand-computed-tag": lambda: [
+        f"{j}: {line.strip()}"
+        for n, j, s in _steps()
+        if n == "release.yml"
+        for line in (s.get("run") or "").splitlines()
+        if "git ls-remote --tags" in line or "git tag " in line
+    ],
+}
+
+
+@pytest.mark.parametrize("rule", list(_NEVER))
+def test_no_workflow_breaks_the_rule(rule: str) -> None:
+    offenders = _NEVER[rule]()
+    assert offenders == [], f"{rule}: {offenders}"
+
+
+def test_release_please_mints_on_main_only_pinned_and_config_driven() -> None:
+    """T-047-87: push-to-main trigger (and manual dispatch), a main-only job whatever ref
+    dispatched it, contents/pull-requests write only, a sha-pinned action with its `# vX.Y.Z`
+    comment, and the release type read from the config file (a `release-type` input leaves
+    manifest mode); the step id exposes release_created/tag_name."""
+    doc = _load("release.yml")
+    assert _on(doc)["push"]["branches"] == ["main"] and "workflow_dispatch" in _on(doc)
+    assert doc["permissions"] == {"contents": "write", "pull-requests": "write"}
+    assert (
+        str(_jobs()["release-please"].get("if") or "").strip() == "github.ref == 'refs/heads/main'"
+    )
+    (uses,) = [
+        ln
+        for ln in _RELEASE_YML.read_text(encoding="utf-8").splitlines()
+        if _ACTION in ln and "uses:" in ln
     ]
-    assert offenders == [], (
-        f"{workflow} must pass every workflow expression through env:, never a run "
-        f"body: {offenders}"
+    ref, _, comment = uses.partition("#")
+    assert re.match(r"^[0-9a-f]{40}$", ref.split("@", 1)[1].strip()) and re.match(
+        r"^\s*v\d+\.\d+\.\d+\s*$", comment
     )
-
-
-# ---------------------------------------------------------------------------
-# release.yml — the one workflow that mints the version, CHANGELOG and tag
-# ---------------------------------------------------------------------------
-
-_RELEASE_PLEASE_YML = _RELEASE_YML
-_ACTION = "googleapis/release-please-action"
-_SHA_RE = re.compile(r"^[0-9a-f]{40}$")
-
-
-def _release_please_step() -> dict[str, Any]:
-    """The single step invoking the release-please action, with its `uses:` comment."""
-    document = yaml.safe_load(_RELEASE_PLEASE_YML.read_text(encoding="utf-8"))
-    steps = [
-        step
-        for job in document["jobs"].values()
-        for step in job.get("steps") or []
-        if _ACTION in str(step.get("uses") or "")
-    ]
-    assert len(steps) == 1, f"expected exactly one release-please step, got {len(steps)}"
-    return dict(steps[0])
-
-
-def test_release_please_workflow_runs_on_a_push_to_main() -> None:
-    document = yaml.safe_load(_RELEASE_PLEASE_YML.read_text(encoding="utf-8"))
-    # PyYAML reads the bare `on:` key as the boolean True (the YAML 1.1 truthy set).
-    triggers = document.get("on", document.get(True))
-    assert triggers["push"]["branches"] == ["main"], (
-        f"the release workflow triggers on a push to main alone: {triggers}"
-    )
-    assert "workflow_dispatch" in triggers, "the workflow stays manually runnable"
-    assert document["permissions"] == {"contents": "write", "pull-requests": "write"}, (
-        "release-please writes the release PR and the tag — and nothing wider"
-    )
-
-
-def test_the_release_please_job_runs_only_on_main() -> None:
-    """`workflow_dispatch` accepts any ref: without this guard a run started off a
-    feature branch would let the action read that history and mint a version from it."""
-    job = _jobs()["release-please"]
-    assert str(job.get("if") or "").strip() == "github.ref == 'refs/heads/main'", (
-        f"the version-minting job is main-only whatever ref dispatched it: {job.get('if')!r}"
-    )
-
-
-def test_release_please_action_is_sha_pinned_with_its_version_comment() -> None:
-    """A mutable tag on a release-minting action is a supply-chain hole; the trailing
-    `# v<x.y.z>` comment is what makes the pin auditable by a human."""
-    raw = _RELEASE_PLEASE_YML.read_text(encoding="utf-8")
-    uses_lines = [line for line in raw.splitlines() if _ACTION in line and "uses:" in line]
-    assert len(uses_lines) == 1, uses_lines
-    ref, _, comment = uses_lines[0].partition("#")
-    sha = ref.split("@", 1)[1].strip()
-    assert _SHA_RE.match(sha), f"the action must be pinned to a 40-hex commit sha: {sha!r}"
-    assert re.match(r"^\s*v\d+\.\d+\.\d+\s*$", comment), (
-        f"the pin carries a trailing `# v<x.y.z>` comment naming the tag: {comment!r}"
-    )
-
-
-def test_release_please_reads_its_release_type_from_the_config_file() -> None:
-    """A `release-type:` input switches the action out of manifest mode and the config
-    file is then ignored — the type belongs in the config's root package instead."""
-    step = _release_please_step()
+    (step,) = [s for _, _, s in _steps() if _ACTION in str(s.get("uses") or "")]
     inputs = step.get("with") or {}
-    assert "release-type" not in inputs, (
-        f"no release-type input — it lives in release-please-config.json: {inputs}"
-    )
+    assert "release-type" not in inputs and step.get("id") == "release-please"
     assert inputs["config-file"] == "release-please-config.json"
     assert inputs["manifest-file"] == ".release-please-manifest.json"
-    assert step.get("id") == "release-please", (
-        "the step is identified so its release_created/tag_name outputs can gate the "
-        f"publishing jobs: {step}"
-    )
 
 
-# ---------------------------------------------------------------------------
-# T-047-88 — one workflow, one trigger, one boolean deciding publication
-# ---------------------------------------------------------------------------
-
-_GATE = "needs.release-please.outputs.release_created == 'true'"
-
-
-def test_one_workflow_carries_release_please() -> None:
-    carriers = [
-        name for name in _workflows() if _ACTION in (_WORKFLOWS / name).read_text(encoding="utf-8")
-    ]
-    assert carriers == ["release.yml"], (
-        f"exactly one workflow may carry the release-please action: {carriers}"
-    )
-
-
-def test_no_workflow_listens_to_a_release_event_or_a_tag_push() -> None:
-    offenders: list[str] = []
-    for name, document in _workflows().items():
-        triggers = document.get("on", document.get(True)) or {}
-        if not isinstance(triggers, dict):
-            triggers = {str(triggers): {}}
-        if "release" in triggers:
-            offenders.append(f"{name}: release event")
-        push = triggers.get("push") or {}
-        if isinstance(push, dict) and ("tags" in push or "tags-ignore" in push):
-            offenders.append(f"{name}: push.tags")
-    assert offenders == [], (
-        f"same-workflow chaining only — a second trigger would need a PAT (PLAN D8): {offenders}"
-    )
-
-
-def test_every_publishing_job_needs_the_release_please_job_and_its_gate() -> None:
+def test_the_publish_chain_is_one_gated_path() -> None:
+    """ADR 0026: publish runs under environment `pypi` with id-token write (the trusted publisher
+    binds the file name); approval keeps `release-gate`; one `id: version` step strips the tag's
+    `v` for approve/publish/smoke-test; a dispatch with `tag` republishes an existing tag by
+    checking it out; the build waits for ci.yml itself and no job redeclares pytest
+    (sa-doctor-job-not-a-required-check#B2)."""
     jobs = _jobs()
-    assert "release-please" in jobs
-    ungated = []
-    for name, job in jobs.items():
-        if name == "release-please":
-            continue
-        needs = job.get("needs") or []
-        needs = [needs] if isinstance(needs, str) else list(needs)
-        if "release-please" not in needs or str(job.get("if") or "").strip() != _GATE:
-            ungated.append(f"{name}: needs={needs} if={job.get('if')!r}")
-    assert ungated == [], (
-        f"every publishing job is gated on {_GATE!r} and reaches the release-please job: {ungated}"
+    assert (
+        jobs["publish"]["environment"] == "pypi"
+        and jobs["publish"]["permissions"]["id-token"] == "write"
     )
-
-
-def test_no_job_needs_an_undefined_job() -> None:
-    jobs = _jobs()
-    dangling = []
-    for name, job in jobs.items():
-        needs = job.get("needs") or []
-        needs = [needs] if isinstance(needs, str) else list(needs)
-        dangling += [f"{name} -> {dep}" for dep in needs if dep not in jobs]
-    assert dangling == [], f"needs: naming a job that does not exist: {dangling}"
-
-
-def test_the_workflow_never_computes_a_version_or_a_tag_by_hand() -> None:
-    """The action creates the tag and owns the version; `check`'s pyproject-vs-tags
-    arithmetic and publish's `git tag` step died with it (T-047-88)."""
-    offenders = [
-        f"{job_name}: {line.strip()}"
-        for job_name, job in _jobs().items()
-        for step in job.get("steps") or []
-        for line in (step.get("run") or "").splitlines()
-        if "git ls-remote --tags" in line or "git tag " in line
-    ]
-    assert offenders == [], f"the tag is the action's to mint, never the workflow's: {offenders}"
-
-
-def test_the_approve_job_keeps_the_release_gate_environment() -> None:
-    approve = _jobs()["approve"]
-    assert approve.get("environment") == "release-gate", (
-        f"the human approval gate survives the fold: {approve.get('environment')}"
-    )
-
-
-def test_one_version_step_feeds_every_consumer_of_the_version() -> None:
-    """One `id: version` step in `build` strips the tag's `v`; artifact name, approval
-    message, and pip install line all read that one output."""
-    build = _jobs()["build"]
+    assert jobs["approve"].get("environment") == "release-gate"
+    build = jobs["build"]
     assert build.get("outputs", {}).get("version") == "${{ steps.version.outputs.version }}"
     step = next(s for s in build["steps"] if s.get("id") == "version")
     assert step["env"] == {"TAG": "${{ needs.release-please.outputs.tag_name }}"}
     assert 'echo "version=${TAG#v}" >> "$GITHUB_OUTPUT"' in step["run"]
-    assert "${{" not in step["run"], "no workflow expression inside a run body"
-    consumers = [
-        name
-        for name, job in _jobs().items()
-        if "needs.build.outputs.version" in yaml.safe_dump(job)
-    ]
-    assert set(consumers) == {"approve", "publish", "smoke-test"}, consumers
-
-
-_MODEL_API_TEXT = re.compile(
-    r"CLAUDE_API_KEY|ANTHROPIC_(?:API_)?KEY|api\.anthropic\.com", re.IGNORECASE
-)
-
-
-def _uses(document: Any) -> list[str]:
-    """Every `uses:` a workflow declares — job-level reusable workflows and step actions."""
-    jobs = (document or {}).get("jobs") or {}
-    found = [str(job.get("uses", "")) for job in jobs.values() if isinstance(job, dict)]
-    for job in jobs.values():
-        for step in (job.get("steps") or []) if isinstance(job, dict) else []:
-            if isinstance(step, dict) and "uses" in step:
-                found.append(str(step["uses"]))
-    return [use for use in found if use]
-
-
-def test_no_workflow_calls_a_model_api() -> None:
-    """P-33 (ADR 0025): no CI job calls a model API — no `anthropics/*` action (any case,
-    any quoting, `.yml` or `.yaml`) and no model API secret or endpoint in any workflow;
-    the security review is the local dd-code-reviewer lens."""
-    offenders: list[str] = []
-    for path in sorted([*_WORKFLOWS.glob("*.yml"), *_WORKFLOWS.glob("*.yaml")]):
-        text = path.read_text(encoding="utf-8")
-        offenders += [f"{path.name}: uses {u}" for u in _uses(yaml.safe_load(text))
-                      if u.lower().startswith("anthropics/")]  # fmt: skip
-        offenders += [f"{path.name}:{n}: {line.strip()}"
-                      for n, line in enumerate(text.splitlines(), start=1)
-                      if _MODEL_API_TEXT.search(line)]  # fmt: skip
-    assert offenders == [], "a workflow calls a model API:\n" + "\n".join(offenders)
-
-
-def _guard_exit(head: str, base: str, cwd: Path = _REPO_ROOT) -> int:
-    """Run pr-source-guard's python step exactly as CI does, for one (head, base) pair,
-    reading the gitflow of the constitution under *cwd*."""
-    import subprocess
-
-    ci = yaml.safe_load((_WORKFLOWS / "ci.yml").read_text(encoding="utf-8"))
-    step = next(s for s in ci["jobs"]["pr-source-guard"]["steps"] if "HEAD_REF" in s.get("env", {}))
-    env = {"HEAD_REF": head, "BASE_REF": base, "PATH": os.pathsep.join([str(Path(sys.executable).parent), os.environ["PATH"]]),
-           "PYTHONPATH": str(_REPO_ROOT), "BASE_SPECS": str(cwd / "specs")}  # fmt: skip
-    run = subprocess.run(["bash", "-c", step["run"]], env=env, cwd=cwd, capture_output=True)
-    return run.returncode
-
-
-@pytest.mark.skipif(sys.platform == "win32", reason="the guard is a bash step on ubuntu-latest")
-@pytest.mark.parametrize(
-    ("head", "base", "allowed"),
-    [
-        ("develop", "main", True),
-        ("release-please--branches--main", "main", True),
-        ("feature/0.4.7", "main", False),
-        ("release-please--branches--develop", "main", False),
-        ("feature/0.4.7", "develop", True),
-        ("develop", "develop", False),
-        ("dependabot/pip/ruff-0.16.8", "develop", True),
-        ("dependabot/github_actions/actions/checkout-7.1.0", "develop", True),
-        ("dependabot/pip/ruff-0.16.8", "main", False),
-    ],
-)
-def test_pr_source_guard_admits_the_release_pr_into_main(
-    head: str, base: str, allowed: bool
-) -> None:
-    """ADR 0021: promote is merging release-please's release PR, so main accepts exactly
-    develop and release-please's own branch; develop accepts feature/{M.m.p} and the
-    Dependabot update branches (bug dependabot-targets-main-and-every-update-pr-is-refused)."""
-    assert (_guard_exit(head, base) == 0) is allowed
-
-
-@pytest.mark.skipif(sys.platform == "win32", reason="the guard is a bash step on ubuntu-latest")
-@pytest.mark.parametrize(
-    ("head", "base", "allowed"),
-    [
-        ("next", "trunk", True),
-        ("develop", "trunk", False),
-        ("work/1.2.3", "next", True),
-        ("feature/1.2.3", "next", False),
-    ],
-)
-def test_pr_source_guard_reads_the_gitflow_by_role(
-    tmp_path: Path, head: str, base: str, allowed: bool
-) -> None:
-    """T-050-19 AC6.8: the guard names no branch; a renamed gitflow moves its rules."""
-    (tmp_path / "specs").mkdir()
-    (tmp_path / "specs" / "constitution.md").write_text(
-        "---\nspecs_pattern_version: 6\n"
-        "gitflow: {principal: trunk, integration: next, work: work/}\n---\n# C\n",
-        encoding="utf-8",
-    )
-    assert (_guard_exit(head, base, tmp_path) == 0) is allowed
-
-
-def test_the_ci_triggers_are_the_library_gitflow() -> None:
-    """T-050-19 AC6.9: GitHub reads no file, so ci.yml's triggers stay literal — pinned
-    here to the library constitution's gitflow; changing one without the other is red."""
-    from dadaia_workspace.core.gitflow import read_gitflow
-
-    flow, warning = read_gitflow(_REPO_ROOT / "specs")
-    assert warning is None
-    on = yaml.safe_load((_WORKFLOWS / "ci.yml").read_text(encoding="utf-8"))[True]
-    assert on["push"]["branches"] == [flow.principal, flow.integration, f"{flow.work_prefix}**"]
-    assert on["pull_request"]["branches"] == [flow.principal, flow.integration]
-    release = yaml.safe_load((_WORKFLOWS / "release.yml").read_text(encoding="utf-8"))[True]
-    assert release["push"]["branches"] == [flow.principal]
-    bot = yaml.safe_load((_WORKFLOWS.parent / "dependabot.yml").read_text(encoding="utf-8"))
-    assert {u["target-branch"] for u in bot["updates"]} == {flow.integration}
-
-
-def test_every_dependabot_update_targets_develop() -> None:
-    """Bug dependabot-targets-main-and-every-update-pr-is-refused: without `target-branch`
-    Dependabot opens its PRs against main, which accepts only develop and the release PR,
-    so every update stalls red and the open-PR limit fills."""
-    config = yaml.safe_load((_WORKFLOWS.parent / "dependabot.yml").read_text(encoding="utf-8"))
-    targets = {u["package-ecosystem"]: u.get("target-branch") for u in config["updates"]}
-    assert targets and set(targets.values()) == {"develop"}, targets
-
-
-def test_the_publish_workflow_is_release_yml_bound_to_the_pypi_publisher() -> None:
-    """ADR 0026: PyPI binds its trusted publisher to the workflow FILE NAME and the
-    environment, so the publish job lives in release.yml under environment `pypi` —
-    renaming the file breaks the OIDC exchange at the first publication, never in CI."""
-    publishers = [
-        path.name
-        for path in sorted([*_WORKFLOWS.glob("*.yml"), *_WORKFLOWS.glob("*.yaml")])
-        if "pypa/gh-action-pypi-publish" in path.read_text(encoding="utf-8")
-    ]
-    assert publishers == ["release.yml"], publishers
-    publish = _jobs()["publish"]
-    assert publish["environment"] == "pypi"
-    assert publish["permissions"]["id-token"] == "write"
-
-
-def test_a_dispatch_can_republish_an_existing_tag_through_the_same_chain() -> None:
-    """ADR 0026: `workflow_dispatch` with `tag` re-enters the one publish chain for an
-    existing tag; the build checks out that tag, so the wheel is exactly its content."""
-    document = yaml.safe_load(_RELEASE_YML.read_text(encoding="utf-8"))
-    triggers = document.get("on", document.get(True))
-    assert "tag" in triggers["workflow_dispatch"]["inputs"]
-    steps = _jobs()["release-please"]["steps"]
-    existing = [s for s in steps if s.get("id") == "existing"]
+    assert {n for n, j in jobs.items() if "needs.build.outputs.version" in yaml.safe_dump(j)} == {
+        "approve",
+        "publish",
+        "smoke-test",
+    }
+    assert "tag" in _on(_load("release.yml"))["workflow_dispatch"]["inputs"]
+    existing = [s for s in jobs["release-please"]["steps"] if s.get("id") == "existing"]
     assert existing and "inputs.tag" in existing[0]["if"]
-    checkout = _jobs()["build"]["steps"][0]
-    assert checkout["with"]["ref"] == "${{ needs.release-please.outputs.tag_name }}"
+    assert build["steps"][0]["with"]["ref"] == "${{ needs.release-please.outputs.tag_name }}"
+    assert jobs["ci"]["uses"] == "./.github/workflows/ci.yml" and "ci" in build["needs"]
+    assert not any("pytest" in yaml.safe_dump(job) for job in jobs.values())
 
 
 def _step_texts(workflow: str, job: str) -> str:
-    document = yaml.safe_load((_WORKFLOWS / workflow).read_text(encoding="utf-8"))
-    steps = document["jobs"][job]["steps"]
-    return "\n".join(f"{s.get('run', '')}\n{s.get('env', '')}" for s in steps)
+    return "\n".join(
+        f"{s.get('run', '')}\n{s.get('env', '')}" for s in _load(workflow)["jobs"][job]["steps"]
+    )
 
 
-@pytest.mark.parametrize(
-    ("workflow", "job"), [("ci.yml", "e2e-python"), ("release.yml", "e2e-python")]
-)
-def test_the_onboarding_journey_runs_with_uv_and_cannot_skip(workflow: str, job: str) -> None:
-    """Intent: CONTRACT — 0.4.8 AC8.3 (T-048-11). The e2e job installs uv, requires uvx
-    (an absent uvx fails instead of skipping) and selects the journey."""
-    steps = _step_texts(workflow, job)
-    assert "install uv==" in steps and "'DADAIA_REQUIRE_UVX': '1'" in steps, steps
-    assert re.search(r"tests/e2e(?:\s|$|/test_onboarding_journey\.py)", steps), steps
-
-
-def test_the_post_publish_smoke_walks_greenfield_from_pypi() -> None:
-    """Intent: CONTRACT — 0.4.8 AC8.3 (T-048-11): the smoke job runs the published version
-    through `init --repo` + `specs init` + `doctor`."""
-    steps = _step_texts("release.yml", "smoke-test")
+def test_the_onboarding_journey_runs_with_uv_and_the_smoke_walks_greenfield() -> None:
+    """Intent: CONTRACT — 0.4.8 AC8.3 (T-048-11): the e2e job installs uv, requires uvx (absent
+    uvx fails, never skips) and selects the journey; the post-publish smoke runs the published
+    version through `init --repo` + `specs init` + `doctor`."""
+    e2e = _step_texts("ci.yml", "e2e-python")
+    assert "install uv==" in e2e and "'DADAIA_REQUIRE_UVX': '1'" in e2e, e2e
+    assert re.search(r"tests/e2e(?:\s|$|/test_onboarding_journey\.py)", e2e), e2e
+    smoke = _step_texts("release.yml", "smoke-test")
     for needle in (
         'uvx "dadaia-workspace==$VERSION" init',
         "--repo",
         "specs init --context",
         "doctor --context",
     ):
-        assert needle in steps, needle
+        assert needle in smoke, needle
+
+
+def test_the_ci_triggers_are_the_library_gitflow() -> None:
+    """T-050-19 AC6.9: GitHub reads no file, so the literal triggers are pinned to the library
+    constitution's gitflow. secret-scan's required `gitleaks` context reports on both PR edges
+    (A-12.1/A-12.2), pushes only to the principal, and the retired `hotfix/*` is gone; every
+    Dependabot update targets the integration branch (dependabot-targets-main-...)."""
+    flow, warning = read_gitflow(_REPO_ROOT / "specs")
+    assert warning is None
+    ci, release, scan = _on(_load("ci.yml")), _on(_load("release.yml")), _load("secret-scan.yml")
+    assert ci["push"]["branches"] == [flow.principal, flow.integration, f"{flow.work_prefix}**"]
+    assert ci["pull_request"]["branches"] == [flow.principal, flow.integration]
+    assert release["push"]["branches"] == [flow.principal]
+    assert _on(scan)["pull_request"]["branches"] == [flow.principal, flow.integration]
+    assert _on(scan)["push"]["branches"] == [flow.principal]
+    assert scan["jobs"]["gitleaks"]["name"] == "gitleaks"
+    assert "hotfix" not in (_WORKFLOWS / "secret-scan.yml").read_text(encoding="utf-8")
+    bot = yaml.safe_load((_WORKFLOWS.parent / "dependabot.yml").read_text(encoding="utf-8"))
+    assert bot["updates"] and {u.get("target-branch") for u in bot["updates"]} == {
+        flow.integration
+    } == {"develop"}
+
+
+def _guard_exit(head: str, base: str, cwd: Path) -> int:
+    """pr-source-guard's step exactly as CI runs it, reading the constitution under *cwd*."""
+    step = next(
+        s
+        for s in _load("ci.yml")["jobs"]["pr-source-guard"]["steps"]
+        if "HEAD_REF" in s.get("env", {})
+    )
+    env = {"HEAD_REF": head, "BASE_REF": base, "PATH": os.pathsep.join([str(Path(sys.executable).parent), os.environ["PATH"]]),
+           "PYTHONPATH": str(_REPO_ROOT), "BASE_SPECS": str(cwd / "specs")}  # fmt: skip
+    return subprocess.run(
+        ["bash", "-c", step["run"]], env=env, cwd=cwd, capture_output=True
+    ).returncode
+
+
+_RENAMED = "gitflow: {principal: trunk, integration: next, work: work/}\n"
 
 
 @pytest.mark.skipif(sys.platform == "win32", reason="the guard is a bash step on ubuntu-latest")
-def test_pr_source_guard_defaults_when_the_base_has_no_constitution(tmp_path: Path) -> None:
-    """A base branch predating the gitflow block (or any constitution) reads the default
-    gitflow — the guard never needs code the base does not carry."""
-    (tmp_path / "specs").mkdir()
-    assert _guard_exit("develop", "main", tmp_path) == 0
-    assert _guard_exit("feature/0.5.0", "main", tmp_path) != 0
+@pytest.mark.parametrize(
+    ("gitflow", "head", "base", "allowed"),
+    [
+        # ADR 0021: main takes develop and release-please's own branch; develop takes feature/ and Dependabot
+        ("repo", "develop", "main", True),
+        ("repo", "release-please--branches--main", "main", True),
+        ("repo", "feature/0.4.7", "main", False),
+        ("repo", "release-please--branches--develop", "main", False),
+        ("repo", "feature/0.4.7", "develop", True),
+        ("repo", "develop", "develop", False),
+        ("repo", "dependabot/pip/ruff-0.16.8", "develop", True),
+        ("repo", "dependabot/github_actions/actions/checkout-7.1.0", "develop", True),
+        ("repo", "dependabot/pip/ruff-0.16.8", "main", False),
+        # T-050-19 AC6.8: the guard names no branch; a renamed gitflow moves its rules
+        ("renamed", "next", "trunk", True),
+        ("renamed", "develop", "trunk", False),
+        ("renamed", "work/1.2.3", "next", True),
+        ("renamed", "feature/1.2.3", "next", False),
+        # a base with no constitution reads the default gitflow
+        ("absent", "develop", "main", True),
+        ("absent", "feature/0.5.0", "main", False),
+    ],
+)
+def test_pr_source_guard_admits_the_release_pr_into_main(
+    tmp_path: Path, gitflow: str, head: str, base: str, allowed: bool
+) -> None:
+    cwd = _REPO_ROOT
+    if gitflow != "repo":
+        cwd = tmp_path
+        (tmp_path / "specs").mkdir()
+        if gitflow == "renamed":
+            (tmp_path / "specs" / "constitution.md").write_text(
+                f"---\nspecs_pattern_version: 6\n{_RENAMED}---\n# C\n", encoding="utf-8"
+            )
+    assert (_guard_exit(head, base, cwd) == 0) is allowed
 
 
-def test_every_ci_job_running_the_doctor_checks_out_full_history() -> None:
-    """Given a push or PR whose live release is in CLOSURE with a memory entry, the
-    Compliance job's doctor judges the memory window over real git history: it passes
-    when the window is reconciled and fails only on a real drift. The judgement
-    (`_release_tree._window_findings`) runs `git diff since..until`, which a depth-1
-    clone cannot resolve — so the job must fetch depth 0."""
-    ci = yaml.safe_load((_WORKFLOWS / "ci.yml").read_text(encoding="utf-8"))
-    doctor_jobs = {
-        name: job
-        for name, job in ci["jobs"].items()
-        if any("dadaia doctor" in str(step.get("run", "")) for step in job.get("steps", []))
-    }
-    assert doctor_jobs, "ci.yml runs no `dadaia doctor` step"
-    shallow = [
-        name
-        for name, job in doctor_jobs.items()
-        for step in job["steps"]
-        if str(step.get("uses", "")).startswith("actions/checkout@")
-        and (step.get("with") or {}).get("fetch-depth") != 0
+def test_every_ci_checkout_carries_full_history() -> None:
+    """ci-history-depth-is-decided-per-job: all 13 ci.yml checkouts fetch depth 0, so no job
+    edit strips the history a suite reads."""
+    depths = [
+        (name, (s.get("with") or {}).get("fetch-depth"))
+        for name, job in _load("ci.yml")["jobs"].items()
+        for s in job.get("steps", [])
+        if str(s.get("uses", "")).startswith("actions/checkout@")
     ]
-    assert shallow == [], f"doctor jobs with a shallow checkout: {shallow}"
+    assert len(depths) == 13
+    assert [name for name, depth in depths if depth != 0] == []
+
+
+def test_the_required_checks_file_lists_every_check_a_pr_runs() -> None:
+    """sa-doctor-job-not-a-required-check#B1: a PR check absent from the file is
+    red-but-mergeable; a stale entry blocks every merge."""
+    contexts: set[str] = set()
+    for doc in _workflows().values():
+        if "pull_request" not in _on(doc):
+            continue
+        for job in doc["jobs"].values():
+            matrix = ((job.get("strategy") or {}).get("matrix") or {}).get("os")
+            contexts |= {f"{job['name']} ({v})" for v in matrix} if matrix else {job["name"]}
+    required = json.loads((_WORKFLOWS.parent / "required-checks.json").read_text("utf-8"))
+    assert "Compliance (workspace/specs/ledgers sections)" in required
+    assert sorted(required) == sorted(contexts)

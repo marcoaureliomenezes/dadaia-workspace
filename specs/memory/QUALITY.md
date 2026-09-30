@@ -84,7 +84,7 @@ Rationale: a CI job that needs a paid model key fails closed on every PR without
 
 - `flaky` marks a pass-and-fail on identical code; `quarantine` leaves every gating selector, is bug-gated by P-22, and the lane is empty.
 - Quarantine cap, escalation clock, diagnostic reruns, flake-rate target and the LARGE cap have one home each in `dd-test-stewardship`'s `PARAMETERS.md`.
-- The structural audit fires when a `PARAMETERS.md` ceiling is crossed — flake rate, LARGE count, quarantine cap; wall-clock growth is a closure readout with no pinned number.
+- The structural audit fires when a `PARAMETERS.md` ceiling is crossed — flake rate, LARGE count, quarantine cap, and the per-job wall-clock budget frozen by ADR 0119 (growth past it is a budget breach).
 - Every LARGE test carries a demotion, supersession or keep-justification, and the tree misses the LARGE cap.
 - Curation is a `code-reviewer` verdict (QA lens); `software-engineer` executes.
 - Mutation testing runs once per release off the push path (`mutmut==3.7.0`); its score is evidence, never a gate, and the `core/models/` score ratchets upward only.
@@ -102,7 +102,7 @@ Rationale: a CI job that needs a paid model key fails closed on every PR without
 - A citation of a superseded decision is an ERROR (`ADR-SUPERSEDED-CITATION`): a rule pointing at a dead ADR fails the build.
 - A doctor fix is proven on the executed path: `tests/integration/test_doctor_fix_lines_clear_their_finding.py` executes every specs rule's fix line against a planted finding and re-runs the rule, which must then emit nothing, never the fixer's return value; the `ledgers` section delegates to each ledger's skill script (`tests/integration/test_doctor_ledgers_delegate_to_scripts.py`); a schema drop ships with its repair and its test in the same change.
 - The closed pytest marker set is eight — unit, contract, integration, e2e, slow, tmp, flaky, quarantine (P-28).
-- `ci.yml` checks out at the default depth; `release.yml` and `secret-scan.yml` fetch full history; no job fetches history for a bug record's sake.
+- `ci.yml`'s `doctor` (Compliance) job fetches full history, because the CLOSURE memory-window check diffs git history (`tests/contract/test_ci_workflow_hygiene.py`); every other `ci.yml` job checks out at the default depth; `release.yml` and `secret-scan.yml` fetch full history; no job fetches history for a bug record's sake.
 
 - Five repo-pure ratchets pin slop counts and move only downward: V31 (Intent-less test files per tier) in `tests/contract/test_test_suite_ratchets.py`; V32 (governance ids in production comments and docstrings), V33 (`PREFIX-NN` families without a mechanical reader), V34 (live SPEC/TASKS byte ceiling) and V35 (skill directories ≤ 18 and total `public/skills/**/*.md` lines, pinned at the measured value and re-pinned at every corpus-touching closure) in `tests/contract/test_slop_ratchets.py`; `PLAN.md` has no byte ratchet (`SPEC-DOC-005` is advisory).
 - The derived-docs contract sits beside the ratchets: `tests/contract/test_docs_derived_from_memory.py` (P-29) checks every `<!-- derived-from: <slug> sha256:<12 hex> -->` marker's slug and hash over `README.md`, `llms.txt` and `docs/*.md`, the `docs/cli.md` body against `render_digest()`, the 10 KB README budget, the one tagline across `README.md`, `pyproject.toml` and `llms.txt`, the five `[tool.poetry.urls]` keys, and runs `dead_citations` over the same set; a red row is closure work — re-read the atom, re-derive the section, re-record the hash in the atom's own commit (`dd-release-implementation` MEMORY-UPDATE).
@@ -117,5 +117,5 @@ Related: [[ARCHITECTURE]]
 - A mock exists only at the system boundary (network, clock, randomness); an own module is tested through its interface.
 - A test name states current behavior; a tombstone (a test of an absence) and an expired SCAFFOLD die at closure.
 - Pruning is a `dd-code-reviewer` verdict executed by `dd-software-engineer`; a deletion cites its criterion and its replacement `file:line`.
-- Detection: `dd-code-review` SLOP.md S3; measured by ratchet V31 and `test_test_suite_ratchets.py`.
+- Detection: `dd-code-review` SLOP.md S3.
 <!-- /dadaia:fixed slop-tests -->

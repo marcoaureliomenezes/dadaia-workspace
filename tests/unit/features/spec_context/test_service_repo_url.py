@@ -16,8 +16,6 @@ import pytest
 
 pytest.importorskip("fcntl")
 
-import shutil  # noqa: E402
-import subprocess  # noqa: E402
 from pathlib import Path  # noqa: E402
 
 from dadaia_workspace.container import scan_publish_candidates
@@ -28,18 +26,10 @@ from dadaia_workspace.core.models.spec_context import (  # noqa: E402
 )
 from dadaia_workspace.features.spec_context.service import SpecContextService  # noqa: E402
 from dadaia_workspace.infrastructure.git_subprocess import GitSubprocessClient  # noqa: E402
-from tests.fakes import FakeContextStore, FakeGitClient, register_dead  # noqa: E402
-
-_HAS_GIT = shutil.which("git") is not None
-
-
-def _make_writable(root: Path) -> None:
-    import os
-    import stat
-
-    for p in root.rglob("*"):
-        with __import__("contextlib").suppress(OSError):
-            os.chmod(p, stat.S_IWRITE | stat.S_IREAD | (stat.S_IEXEC if p.is_dir() else 0))
+from dadaia_workspace.infrastructure.json_context_store import JsonContextStore
+from tests.fakes import register_dead  # noqa: E402
+from tests.fixtures.real_git import clone, git, seeded_remote
+from tests.fixtures.stores import context_store
 
 
 @pytest.fixture()
@@ -51,36 +41,18 @@ def workspace_root(tmp_path: Path) -> Path:
 
 
 @pytest.fixture()
-def store() -> FakeContextStore:
-    return FakeContextStore()
+def store(workspace_root: Path) -> JsonContextStore:
+    return context_store(workspace_root / ".dadaia" / "states")
 
 
 @pytest.fixture()
-def fake_service(store: FakeContextStore, workspace_root: Path) -> SpecContextService:
+def fake_service(store: JsonContextStore, workspace_root: Path) -> SpecContextService:
     return SpecContextService(
         context_store=store,
-        git_client=FakeGitClient(),
+        git_client=GitSubprocessClient(),
         workspace_root=workspace_root,
         install_hooks=lambda _repo: None,
         secret_scan=scan_publish_candidates,
-    )
-
-
-def _git(args: list[str], cwd: Path) -> None:
-    subprocess.run(
-        ["git", *args],
-        cwd=cwd,
-        check=True,
-        capture_output=True,
-        text=True,
-        env={
-            "GIT_AUTHOR_NAME": "t",
-            "GIT_AUTHOR_EMAIL": "t@e",
-            "GIT_COMMITTER_NAME": "t",
-            "GIT_COMMITTER_EMAIL": "t@e",
-            "PATH": __import__("os").environ.get("PATH", ""),
-            "HOME": str(cwd),
-        },
     )
 
 
@@ -90,7 +62,7 @@ def _git(args: list[str], cwd: Path) -> None:
 
 
 def test_create_persists_a_url_and_admits_an_empty_one_only_over_a_checkout(
-    fake_service: SpecContextService, store: FakeContextStore, workspace_root: Path
+    fake_service: SpecContextService, store: JsonContextStore, workspace_root: Path
 ) -> None:
     """Bug context-create-admits-uncloneable-empty-url: a repo with no URL and no
     ``repos/<slug>`` checkout is refused before any write — ``alive`` could only run
@@ -106,88 +78,27 @@ def test_create_persists_a_url_and_admits_an_empty_one_only_over_a_checkout(
     assert store.get("bar") is None
     assert store.get("foo").associated_repos == ()  # type: ignore[union-attr]
 
-    (workspace_root / "repos" / "bar").mkdir()
+    git(workspace_root, "init", "-q", str(workspace_root / "repos" / "bar"))
     assert register_dead(fake_service, "bar", "bar", "").repo_url == ""
 
 
-# ---------------------------------------------------------------------------
-# back-fill (real git) — CRITICAL data-loss guards, kept
-# ---------------------------------------------------------------------------
-
-
-@pytest.mark.skipif(not _HAS_GIT, reason="git not available")
-def test_alive_backfills_repo_url_from_origin_remote(
-    store: FakeContextStore, workspace_root: Path, tmp_path: Path
+@pytest.mark.parametrize("verb", ["alive", "dead"])
+def test_alive_and_dead_backfill_an_empty_repo_url_from_origin(
+    fake_service: SpecContextService, store: JsonContextStore, workspace_root: Path, verb: str
 ) -> None:
-    """alive() back-fills an empty repo_url from the on-disk origin remote.
+    """CRITICAL last-chance capture (ADR-7, AC-W2-03): an empty record URL is back-filled from the
+    on-disk ``origin`` — dead() BEFORE its hold removes the checkout — over a real ``file://`` remote."""
+    remote = seeded_remote(workspace_root.parent, "foo")
+    repo = clone(remote, workspace_root / "repos" / "foo")
+    if verb == "alive":
+        register_dead(fake_service, "foo", "foo", "")
+    else:
+        store.save(SpecContextProject(name="foo", state=ContextState.ALIVE, repo_slug="foo", repo_url="",
+                                      created_at="2026-01-01T00:00:00+00:00", alive_since="2026-01-01T00:00:00+00:00",
+                                      current_branch=git(repo, "branch", "--show-current")))  # fmt: skip
 
-    Uses a REAL GitSubprocessClient + a local ``file://`` fixture remote (AC-W2-03).
-    """
-    upstream = tmp_path / "upstream.git"
-    _git(["init", "--bare", str(upstream)], cwd=tmp_path)
-    file_url = upstream.as_uri()  # file:// URL
+    ctx = getattr(fake_service, verb)("foo")
 
-    repo_path = workspace_root / "repos" / "foo"
-    repo_path.mkdir(parents=True)
-    _git(["init"], cwd=repo_path)
-    _git(["remote", "add", "origin", file_url], cwd=repo_path)
-
-    service = SpecContextService(
-        context_store=store,
-        git_client=GitSubprocessClient(),
-        workspace_root=workspace_root,
-        install_hooks=lambda _repo: None,
-        secret_scan=scan_publish_candidates,
-    )
-    register_dead(service, "foo", "foo", "")
-
-    ctx = service.alive("foo")
-    assert ctx.state == ContextState.ALIVE
-    assert ctx.repo_url == file_url
-    assert store.get("foo").repo_url == file_url  # type: ignore[union-attr]
-
-
-@pytest.mark.skipif(not _HAS_GIT, reason="git not available")
-def test_dead_backfills_repo_url_before_rmtree(
-    store: FakeContextStore, workspace_root: Path, tmp_path: Path
-) -> None:
-    upstream = tmp_path / "upstream.git"
-    _git(["init", "--bare", str(upstream)], cwd=tmp_path)
-    file_url = upstream.as_uri()
-
-    repo_path = workspace_root / "repos" / "foo"
-    repo_path.mkdir(parents=True)
-    _git(["init"], cwd=repo_path)
-    _git(["checkout", "-b", "main"], cwd=repo_path)
-    _git(["remote", "add", "origin", file_url], cwd=repo_path)
-    (repo_path / "README.md").write_text("hi\n", encoding="utf-8")
-    _git(["add", "-A"], cwd=repo_path)
-    _git(["commit", "-m", "init"], cwd=repo_path)
-    _git(["push", "-u", "origin", "main"], cwd=repo_path)
-
-    ctx0 = SpecContextProject(
-        name="foo",
-        state=ContextState.ALIVE,
-        repo_slug="foo",
-        repo_url="",
-        created_at="2026-01-01T00:00:00+00:00",
-        alive_since="2026-01-01T00:00:00+00:00",
-        dead_since=None,
-        current_branch="main",
-    )
-    store.save(ctx0)
-
-    service = SpecContextService(
-        context_store=store,
-        git_client=GitSubprocessClient(),
-        workspace_root=workspace_root,
-        install_hooks=lambda _repo: None,
-        secret_scan=scan_publish_candidates,
-    )
-
-    _make_writable(repo_path)
-
-    ctx = service.dead("foo")
-    assert ctx.state == ContextState.DEAD
-    assert ctx.repo_url == file_url  # back-filled before rmtree removed the repo
-    assert not repo_path.exists()
+    assert ctx.state == (ContextState.ALIVE if verb == "alive" else ContextState.DEAD)
+    assert ctx.repo_url == store.get("foo").repo_url == str(remote)  # type: ignore[union-attr]
+    assert repo.exists() is (verb == "alive")

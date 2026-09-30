@@ -16,14 +16,17 @@ published baseline's amnesty because there is only one way to compute it.
 from __future__ import annotations
 
 import contextlib
-import queue
-import re
 import subprocess
-import threading
 from collections.abc import Iterator
 from pathlib import Path
 
-from dadaia_workspace.core.models.git_scan import ZERO_SHA, GitObjectReadError, ScannedObject
+from dadaia_workspace.core.models.git_scan import (
+    SHA_SHAPE_RE,
+    ZERO_SHA,
+    GitObjectReadError,
+    GitRunError,
+    ScannedObject,
+)
 
 _TIMEOUT_S = 30
 
@@ -32,7 +35,6 @@ _TIMEOUT_S = 30
 #: as a second, independent layer: this adapter must never interpolate an
 #: option-shaped string into a git argv, regardless of what already validated the
 #: caller's input (CWE-88).
-_SHA_SHAPE_RE = re.compile(r"^[0-9a-fA-F]{40}$|^[0-9a-fA-F]{64}$")
 
 #: SPEC v0.9.0 R3 — a per-blob size guard so one pathological blob cannot dominate the
 #: scan's wall clock or memory: a blob at or under this cap is read and decoded; a blob
@@ -72,19 +74,24 @@ def _run(
             args, cwd=cwd, input=input_bytes, capture_output=True, timeout=_TIMEOUT_S
         )
     except OSError as exc:  # no git on PATH, or a cwd that is not a directory (WinError 267)
-        raise GitObjectReadError(f"git could not run in {cwd}: {exc}") from exc
+        raise GitRunError(f"git could not run in {cwd}: {exc}") from exc
     except subprocess.TimeoutExpired as exc:
-        raise GitObjectReadError(f"git command timed out: {' '.join(args)}") from exc
+        raise GitRunError(f"git command timed out: {' '.join(args)}") from exc
 
 
 def _decode(raw: bytes) -> str:
     return raw.decode("utf-8", errors="replace")
 
 
+def _lines(raw: bytes) -> list[str]:
+    """Non-empty lines of git output, split on ``\n`` only (a path may hold U+2028)."""
+    return [line for line in _decode(raw).split("\n") if line]
+
+
 def _is_resolvable_commit(repo: Path, sha: str) -> bool:
     """True when *sha* resolves to a commit object reachable locally.
 
-    v0.11.0 FR7/A7.4: *sha* is shape-checked against :data:`_SHA_SHAPE_RE` BEFORE it is
+    v0.11.0 FR7/A7.4: *sha* is shape-checked against :data:`SHA_SHAPE_RE` BEFORE it is
     ever interpolated into the ``git cat-file -e <sha>^{commit}`` argv — an
     option-shaped value (e.g. ``--upload-pack=...``) is rejected here, never
     interpolated (CWE-88). Used by :func:`_base_exclusions` to decide whether
@@ -92,7 +99,7 @@ def _is_resolvable_commit(repo: Path, sha: str) -> bool:
     choose between two different range shapes (bug
     new-branch-push-loses-prior-published-denylist-amnesty deleted that choice).
     """
-    if not sha or sha == ZERO_SHA or not _SHA_SHAPE_RE.match(sha):
+    if not sha or sha == ZERO_SHA or not SHA_SHAPE_RE.match(sha):
         return False
     result = _run(["git", "cat-file", "-e", f"{sha}^{{commit}}"], repo)
     return result.returncode == 0
@@ -145,9 +152,7 @@ def _rev_list_candidates(
     if result.returncode != 0:
         raise GitObjectReadError(f"git rev-list --objects failed: {_decode(result.stderr).strip()}")
     entries: list[tuple[str, str]] = []
-    for raw_line in _decode(result.stdout).splitlines():
-        if not raw_line:
-            continue
+    for raw_line in _lines(result.stdout):
         sha, _, path = raw_line.partition(" ")
         if path:
             entries.append((sha, path))
@@ -158,19 +163,12 @@ def _range_commit_shas(repo: Path, local_sha: str, exclusions: list[str]) -> lis
     """Return every COMMIT sha in the range (never ``--objects`` — commits only), the
     SAME range shape :func:`_rev_list_candidates` walks (the SAME *exclusions*,
     :func:`_base_exclusions`), reused here so the two callers agree on what "the
-    range" means without either re-deriving it.
-
-    Commit count is bounded by the number of commits actually being pushed (an
-    ordinary push is a handful; this module's own ``commits_in_range`` metric on this
-    repository's v0.4.2 delta was 34) — orders of magnitude fewer than the object count
-    the SAME range's ``--objects`` walk produces, which is what keeps
-    :func:`_multi_path_shas`'s per-commit ``git ls-tree`` loop below affordable.
-    """
+    range" means without either re-deriving it."""
     args = ["git", "rev-list", local_sha, "--not", *exclusions, "--"]
     result = _run(args, repo)
     if result.returncode != 0:
         raise GitObjectReadError(f"git rev-list failed: {_decode(result.stderr).strip()}")
-    return [line for line in _decode(result.stdout).splitlines() if line]
+    return _lines(result.stdout)
 
 
 def _publication_boundaries(repo: Path, local_sha: str, exclusions: list[str]) -> tuple[str, ...]:
@@ -206,7 +204,7 @@ def _publication_boundaries(repo: Path, local_sha: str, exclusions: list[str]) -
         raise GitObjectReadError(
             f"git rev-list --boundary failed: {_decode(result.stderr).strip()}"
         )
-    return tuple(line[1:] for line in _decode(result.stdout).splitlines() if line.startswith("-"))
+    return tuple(line[1:] for line in _lines(result.stdout) if line.startswith("-"))
 
 
 def _is_annotated_tag(repo: Path, sha: str) -> bool:
@@ -217,7 +215,7 @@ def _is_annotated_tag(repo: Path, sha: str) -> bool:
     separate tag body exists to scan). Shape-checked BEFORE interpolation into the
     ``git cat-file -t`` argv, mirroring :func:`_is_resolvable_commit` (CWE-88).
     """
-    if not sha or sha == ZERO_SHA or not _SHA_SHAPE_RE.match(sha):
+    if not sha or sha == ZERO_SHA or not SHA_SHAPE_RE.match(sha):
         return False
     result = _run(["git", "cat-file", "-t", sha], repo)
     return result.returncode == 0 and _decode(result.stdout).strip() == "tag"
@@ -412,7 +410,7 @@ def _multi_path_shas(
         result = _run(["git", "ls-tree", "-r", "--full-tree", commit_sha, "--"], repo)
         if result.returncode != 0:
             raise GitObjectReadError(f"git ls-tree -r failed: {_decode(result.stderr).strip()}")
-        for line in _decode(result.stdout).splitlines():
+        for line in _lines(result.stdout):
             meta, _, path = line.partition("\t")
             parts = meta.split()
             if len(parts) != 3 or parts[1] != "blob":
@@ -456,7 +454,7 @@ def _blob_info(repo: Path, candidates: list[tuple[str, str]]) -> dict[str, tuple
             f"git cat-file --batch-check failed: {_decode(result.stderr).strip()}"
         )
     blob_sizes: dict[str, int] = {}
-    for line in _decode(result.stdout).splitlines():
+    for line in _lines(result.stdout):
         parts = line.split()
         if len(parts) != 3:
             raise GitObjectReadError(f"git cat-file --batch-check: unexpected row shape {line!r}")
@@ -532,7 +530,7 @@ def _resolve_prior_texts_at_base(repo: Path, base: str, paths: list[str]) -> dic
             "git cat-file --batch-check failed resolving prior content: "
             f"{_decode(check_result.stderr).strip()}"
         )
-    check_lines = _decode(check_result.stdout).splitlines()
+    check_lines = _lines(check_result.stdout)
     if len(check_lines) != len(unique_paths):
         raise GitObjectReadError(
             "git cat-file --batch-check desynchronised resolving prior content "
@@ -708,32 +706,9 @@ def _read_blob_chunk(
 
 
 def _read_oversized_blob_prefix(repo: Path, sha: str) -> bytes:
-    """Read at most :data:`_MAX_BLOB_BYTES` of *sha*'s content through a SEPARATE,
-    bounded per-object stream, then close it early (SPEC v0.11.0 FR4/ADR D2-a).
-
-    This call deliberately does NOT go through :func:`_run`: closing the pipe before
-    git has finished writing makes a non-zero exit / broken-pipe outcome EXPECTED on
-    THIS call only, and ``_run``'s contract is to convert every subprocess failure into
-    :class:`GitObjectReadError` — which would misreport this intentional early close as
-    a git failure. git genuinely never produces the remainder once the pipe is closed,
-    so v0.9.0's R3 "never fetched" property holds for the truncated tail exactly as
-    before; only the DECISION of what to do with the (now non-empty) prefix changed.
-
-    A missing ``git`` executable, or the read exceeding :data:`_TIMEOUT_S` with no
-    prefix delivered, still raises :class:`GitObjectReadError` — the bound is on the
-    NORMAL, expected-success path only, not on genuine git/environment failure.
-
-    SPEC v0.4.2 FR8(1)/GRILL P11/A8.1-A8.2: *after* the early-close ``wait()``, the
-    process's own exit status is inspected — a nonexistent oid or a non-blob object
-    (e.g. a tree sha) makes ``git cat-file blob`` fail immediately and deliver ZERO
-    bytes on stdout; pre-fix, that 0-byte outcome was indistinguishable from "genuinely
-    empty content" and was reported as a successfully (if trivially) scanned prefix. A
-    process that FAILED (``returncode not in (0,)``) and delivered FEWER than the cap's
-    worth of bytes now raises. A full-cap read keeps swallowing the terminate/EPIPE
-    outcome unconditionally (A8.2) — our own early close intentionally makes git exit
-    non-zero on the SUCCESS path too, so a full cap's worth of bytes never triggers
-    this check regardless of the exit status.
-    """
+    """At most :data:`_MAX_BLOB_BYTES` of *sha*'s content (SPEC v0.11.0 FR4): leaving the
+    ``with`` closes the pipe early, git dies on SIGPIPE and the tail is never fetched. A
+    short read from a failed git (unknown oid, a tree) raises (v0.4.2 FR8(1)/A8.1-A8.2)."""
     try:
         proc = subprocess.Popen(  # noqa: S603 — fixed argv, no shell
             ["git", "cat-file", "blob", sha],
@@ -743,49 +718,14 @@ def _read_oversized_blob_prefix(repo: Path, sha: str) -> bytes:
         )
     except OSError as exc:  # same conversion as ``_run``
         raise GitObjectReadError(f"git could not run in {repo}: {exc}") from exc
-
-    result_q: queue.Queue[bytes | Exception] = queue.Queue(maxsize=1)
-
-    def _reader() -> None:
-        try:
-            assert proc.stdout is not None
-            result_q.put(proc.stdout.read(_MAX_BLOB_BYTES))
-        except Exception as exc:  # noqa: BLE001 — surfaced via the queue, never re-raised bare
-            result_q.put(exc)
-
-    reader_thread = threading.Thread(target=_reader, daemon=True)
-    reader_thread.start()
-    try:
-        outcome: bytes | Exception | None
-        try:
-            outcome = result_q.get(timeout=_TIMEOUT_S)
-        except queue.Empty:
-            outcome = None
-    finally:
-        # Close the read end and terminate now — this is the deliberate EARLY CLOSE:
-        # git will see EPIPE/SIGPIPE on its next write and exit non-zero, which is
-        # EXPECTED here and is never inspected or converted into an error.
-        if proc.stdout is not None:
-            proc.stdout.close()
-        proc.terminate()
-        try:
-            proc.wait(timeout=_TIMEOUT_S)
-        except subprocess.TimeoutExpired:
-            proc.kill()
-            proc.wait()
-
-    if outcome is None:
-        raise GitObjectReadError(f"git cat-file blob timed out reading oversized object {sha}")
-    if isinstance(outcome, Exception):
-        raise GitObjectReadError(
-            f"git cat-file blob failed reading oversized object {sha}: {outcome}"
-        ) from outcome
-    if len(outcome) < _MAX_BLOB_BYTES and proc.returncode not in (0,):
+    with proc:
+        prefix = proc.stdout.read(_MAX_BLOB_BYTES) if proc.stdout else b""
+    if len(prefix) < _MAX_BLOB_BYTES and proc.returncode != 0:
         raise GitObjectReadError(
             f"git cat-file blob failed reading oversized object {sha} "
-            f"(exit {proc.returncode}, {len(outcome)} byte(s) delivered before failure)"
+            f"(exit {proc.returncode}, {len(prefix)} byte(s) delivered before failure)"
         )
-    return outcome
+    return prefix
 
 
 def _read_oversized_blob(repo: Path, sha: str, path: str, size: int) -> ScannedObject:
@@ -879,7 +819,7 @@ class GitSubprocessObjectReader:
         """:func:`unpublished` for the gate, failing closed: an unreadable *sha* is
         itself unpublished — never a birth, never an empty range."""
         try:
-            return unpublished(repo, sha) if _SHA_SHAPE_RE.match(sha) else [sha]
+            return unpublished(repo, sha) if SHA_SHAPE_RE.match(sha) else [sha]
         except GitObjectReadError:
             return [sha]
 
@@ -897,7 +837,7 @@ class GitSubprocessObjectReader:
         # `remote_sha`, here applied BEFORE `local_sha` ever reaches
         # `_rev_list_candidates`'s `git rev-list` argv (CWE-88). An option-shaped value
         # is rejected as a read failure rather than ever being interpolated.
-        if not _SHA_SHAPE_RE.match(local_sha):
+        if not SHA_SHAPE_RE.match(local_sha):
             raise GitObjectReadError(f"local_sha is not a valid sha shape: {local_sha!r}")
         # bug new-branch-push-loses-prior-published-denylist-amnesty: exclusions
         # resolved ONCE per call (_base_exclusions — ALWAYS `--remotes=origin`, optionally

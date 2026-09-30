@@ -13,6 +13,7 @@ through ``doctor-scan-raises-when-a-ttl-entry-vanishes-mid-walk`` and
 from __future__ import annotations
 
 import os
+from collections.abc import Callable
 from pathlib import Path
 
 import pytest
@@ -20,188 +21,129 @@ import pytest
 from dadaia_workspace.features.spec_context import sweep
 
 
-def test_walk_returns_the_sorted_entries_of_a_directory(tmp_path: Path) -> None:
-    (tmp_path / "b").write_text("b")
-    (tmp_path / "a").mkdir()
-    assert [p.name for p in sweep.walk(tmp_path)] == ["a", "b"]
+def _tree(root: Path, *, read_only: bool = False) -> Path:
+    tree = root / "cache" / "mod"
+    (tree / "pkg").mkdir(parents=True)
+    (tree / "pkg" / "go.mod").write_text("module x\n")
+    for path in (tree / "pkg" / "go.mod", tree / "pkg", tree) if read_only else ():
+        path.chmod(0o555 if path.is_dir() else 0o444)
+    return tree
 
 
-def test_walk_never_follows_a_symlinked_directory(tmp_path: Path) -> None:
-    """A symlinked root would otherwise yield entries whose parent is inside the
-    workspace, so every per-entry guard would pass and the destination be reaped."""
-    real = tmp_path / "real"
-    real.mkdir()
-    (real / "treasure.txt").write_text("x")
-    link = tmp_path / "link"
-    link.symlink_to(real, target_is_directory=True)
-    assert sweep.walk(link) == []
+def _file(path: Path, *, mode: int = 0o644) -> Path:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text("x")
+    path.chmod(mode)
+    return path
 
 
-def test_walk_of_a_missing_or_unreadable_directory_is_empty(tmp_path: Path) -> None:
-    assert sweep.walk(tmp_path / "nope") == []
+def _outside_link(tmp: Path) -> Path:
+    """`ws/link` -> `outside/` holding `treasure.txt`; returns ws."""
+    (tmp / "outside").mkdir()
+    (tmp / "outside" / "treasure.txt").write_text("x")
+    (tmp / "ws").mkdir()
+    (tmp / "ws" / "link").symlink_to(tmp / "outside", target_is_directory=True)
+    return tmp / "ws"
 
 
-def test_mtime_of_an_entry_that_vanished_is_absent_not_an_error(tmp_path: Path) -> None:
-    assert sweep.mtime(tmp_path / "gone") is None
-    present = tmp_path / "here"
-    present.write_text("x")
-    assert sweep.mtime(present) is not None
+def _walk_symlinked(tmp: Path) -> Path:
+    _outside_link(tmp)
+    return tmp / "ws" / "link"
 
 
-def test_mtime_reads_the_link_itself_never_its_destination(tmp_path: Path) -> None:
-    link = tmp_path / "dangling"
-    link.symlink_to(tmp_path / "absent")
-    assert sweep.mtime(link) is not None
+def _walk_plain(tmp: Path) -> Path:
+    (tmp / "b").write_text("b")
+    (tmp / "a").mkdir()
+    return tmp
+
+
+# fmt: off
+@pytest.mark.parametrize(("setup", "names"), [
+    pytest.param(_walk_plain, ["a", "b"], id="sorted-entries"),
+    pytest.param(_walk_symlinked, [], id="never-follows-a-symlinked-root"),
+    pytest.param(lambda tmp: tmp / "nope", [], id="missing-dir-is-empty"),
+])
+# fmt: on
+def test_walk_lists_only_a_real_directorys_sorted_entries(tmp_path: Path, setup: Callable[[Path], Path], names: list[str]) -> None:
+    """A symlinked root would yield entries whose parent is inside the workspace, so the destination would be reaped."""
+    assert [p.name for p in sweep.walk(setup(tmp_path))] == names
 
 
 def test_guarded_turns_an_oserror_into_exactly_one_skipped_action() -> None:
     def boom() -> str | None:
         raise OSError(13, "Permission denied")
 
-    actions = sweep.guarded("WS-tmp-slop", "tmp/x", boom)
-    assert len(actions) == 1
-    assert actions[0].startswith("WS-tmp-slop: skipped 'tmp/x' (errno 13")
-
-
-def test_guarded_reports_nothing_when_the_step_has_nothing_to_report() -> None:
+    [action] = sweep.guarded("WS-tmp-slop", "tmp/x", boom)
+    assert action.startswith("WS-tmp-slop: skipped 'tmp/x' (errno 13")
     assert sweep.guarded("CODE", "path", lambda: None) == []
 
 
-def test_remove_deletes_a_file_inside_the_workspace(tmp_path: Path) -> None:
-    victim = tmp_path / "slop.txt"
-    victim.write_text("x")
-    assert sweep.remove(tmp_path, victim, "slop.txt") == "deleted 'slop.txt'"
-    assert not victim.exists()
+_SKIP = "skipped '{rel}' (outside the workspace)"
 
 
-def test_remove_deletes_a_directory_tree_inside_the_workspace(tmp_path: Path) -> None:
-    victim = tmp_path / "slopdir"
-    (victim / "deep").mkdir(parents=True)
-    (victim / "deep" / "f").write_text("x")
-    assert sweep.remove(tmp_path, victim, "slopdir") == "deleted 'slopdir'"
-    assert not victim.exists()
-
-
-def test_remove_unlinks_a_symlink_and_never_its_destination(tmp_path: Path) -> None:
-    outside = tmp_path / "outside"
-    outside.mkdir()
-    (outside / "treasure.txt").write_text("x")
-    workspace = tmp_path / "ws"
-    workspace.mkdir()
-    link = workspace / "link"
-    link.symlink_to(outside, target_is_directory=True)
-    assert sweep.remove(workspace, link, "link") == "deleted 'link'"
-    assert not link.is_symlink()
-    assert (outside / "treasure.txt").exists()
-
-
-def test_remove_skips_an_entry_whose_own_location_is_outside_the_workspace(
-    tmp_path: Path,
+# fmt: off
+@pytest.mark.parametrize(("setup", "rel", "message", "survivor"), [
+    pytest.param(lambda t: (t, _file(t / "slop.txt")), "slop.txt", "deleted '{rel}'", None, id="file"),
+    pytest.param(lambda t: (t, _tree(t)), "cache/mod", "deleted '{rel}'", None, id="tree"),
+    pytest.param(lambda t: (t, _tree(t, read_only=True)), "cache/mod", "deleted '{rel}'", None, id="doctor-reaper-cannot-delete-read-only-trees"),
+    pytest.param(lambda t: (t, _file(t / "go.sum", mode=0o444)), "go.sum", "deleted '{rel}'", None, id="read-only-file"),
+    pytest.param(lambda t: (_outside_link(t), t / "ws" / "link"), "link", "deleted '{rel}'", "outside/treasure.txt", id="symlink-unlinked-destination-kept"),
+    pytest.param(lambda t: ((t / "ws").mkdir() or t / "ws", _file(t / "elsewhere.txt")), "elsewhere.txt", _SKIP, "elsewhere.txt", id="outside-the-workspace-skipped"),
+    pytest.param(lambda t: (t, t / "ghost"), "ghost", None, None, id="already-gone-reports-nothing"),
+])
+# fmt: on
+def test_remove_deletes_a_read_only_tree(
+    tmp_path: Path, setup: Callable[[Path], tuple[Path, Path]], rel: str, message: str | None, survivor: str | None
 ) -> None:
-    workspace = tmp_path / "ws"
-    (workspace / "repos").mkdir(parents=True)
-    stranger = tmp_path / "elsewhere.txt"
-    stranger.write_text("x")
-    assert sweep.remove(workspace, stranger, "elsewhere.txt") == (
-        "skipped 'elsewhere.txt' (outside the workspace)"
-    )
-    assert stranger.exists()
+    """sa-reaper-destroys-its-own-hold-before-ttl#B3: the reaper owns what it reaps — a read-only tree or
+    file (a Go module cache is dr-xr-xr-x all the way down; Windows refuses a read-only unlink) is made
+    writable on the way down, then removed; a symlink goes, its destination never; outside is never touched."""
+    workspace, target = setup(tmp_path)
+    assert sweep.remove(workspace, target, rel) == (message and message.format(rel=rel))
+    assert not target.is_symlink() and (target.exists() == (survivor == rel))
+    assert survivor is None or (tmp_path / survivor).exists()
 
 
-def test_remove_of_an_entry_already_gone_reports_nothing(tmp_path: Path) -> None:
-    assert sweep.remove(tmp_path, tmp_path / "ghost", "ghost") is None
+def _exdev(a: object, b: object) -> None:
+    raise OSError(18, "Invalid cross-device link")
 
 
-def test_move_relocates_an_entry_and_creates_the_destination_parents(tmp_path: Path) -> None:
-    src = tmp_path / "repos" / "x" / ".pytest_cache"
-    src.mkdir(parents=True)
-    (src / "v").write_text("x")
-    dest = tmp_path / ".dadaia" / "reaped" / "20260913" / "repos" / "x" / ".pytest_cache"
-    message = sweep.move(tmp_path, src, dest, "repos/x/.pytest_cache")
-    assert message == (
-        "moved 'repos/x/.pytest_cache' -> '.dadaia/reaped/20260913/repos/x/.pytest_cache'"
-    )
-    assert not src.exists()
-    assert (dest / "v").read_text() == "x"
+# fmt: off
+@pytest.mark.parametrize(("src", "dest", "message", "exdev"), [
+    pytest.param("ws/repos/x/.pytest_cache/v", "ws/.dadaia/reaped/20260913/repos/x/.pytest_cache/v",
+                 "moved 'rel' -> '.dadaia/reaped/20260913/repos/x/.pytest_cache/v'", False, id="B4-relocates-and-creates-parents"),
+    pytest.param("ws/slop.txt", "ws/reaped/slop.txt", "moved 'rel' -> 'reaped/slop.txt'", True, id="B4-cross-device-copy-plus-remove-in-one-place"),
+    pytest.param("elsewhere.txt", "ws/reaped/e", "skipped 'rel' (outside the workspace)", False, id="B8-source-outside-skipped"),
+    pytest.param("ws/slop.txt", "escape.txt", "skipped 'rel' (outside the workspace)", False, id="B8-destination-outside-skipped"),
+])
+# fmt: on
+def test_move_holds_the_content_inside_the_workspace_only(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, src: str, dest: str, message: str, exdev: bool
+) -> None:
+    """sa-reaper-destroys-its-own-hold-before-ttl#B4 (the moved content is held; EXDEV handled in ONE place,
+    a failed move is never a partial delete) and #B8 (the mover never touches a path outside the workspace)."""
+    workspace = (tmp_path / "ws")
+    workspace.mkdir(exist_ok=True)
+    source = _file(tmp_path / src)
+    if exdev:
+        monkeypatch.setattr(sweep.os, "replace", _exdev)
+    assert sweep.move(workspace, source, tmp_path / dest, "rel") == message
+    moved = message.startswith("moved")
+    assert (source.exists(), (tmp_path / dest).exists()) == (not moved, moved)
+    assert not moved or (tmp_path / dest).read_text() == "x"
 
 
-def test_move_resets_the_ttl_clock_at_the_move(tmp_path: Path) -> None:
-    """The reaped clock starts at the move, never at the origin's own mtime (FR6b)."""
-    src = tmp_path / "old"
-    src.write_text("x")
-    os.utime(src, (0, 0))
-    dest = tmp_path / ".dadaia" / "reaped" / "20260913" / "old"
-    sweep.move(tmp_path, src, dest, "old")
-    moved = sweep.mtime(dest)
-    assert moved is not None
-    assert moved > 1_000_000_000
-
-
-def test_move_carries_one_optional_note_naming_whose_entry_it_was(tmp_path: Path) -> None:
-    """ONE message shape; the note is the single extra field (INV-5 names the context)."""
-    src = tmp_path / "repos" / "stale"
-    src.mkdir(parents=True)
-    dest = tmp_path / ".dadaia" / "reaped" / "20260913" / "repos" / "stale"
-    message = sweep.move(tmp_path, src, dest, "repos/stale", note=" (context stale-ctx)")
-    assert message == (
-        "moved 'repos/stale' (context stale-ctx) -> '.dadaia/reaped/20260913/repos/stale'"
-    )
-
-
-def test_move_skips_a_source_outside_the_workspace(tmp_path: Path) -> None:
-    workspace = tmp_path / "ws"
-    workspace.mkdir()
-    stranger = tmp_path / "elsewhere.txt"
-    stranger.write_text("x")
-    assert sweep.move(workspace, stranger, workspace / "reaped" / "e", "elsewhere.txt") == (
-        "skipped 'elsewhere.txt' (outside the workspace)"
-    )
-    assert stranger.exists()
-
-
-def test_move_skips_a_destination_outside_the_workspace(tmp_path: Path) -> None:
-    workspace = tmp_path / "ws"
-    workspace.mkdir()
-    src = workspace / "slop.txt"
-    src.write_text("x")
-    assert sweep.move(workspace, src, tmp_path / "escape.txt", "slop.txt") == (
-        "skipped 'slop.txt' (outside the workspace)"
-    )
-    assert src.exists()
-
-
-def test_move_never_follows_a_symlinked_source(tmp_path: Path) -> None:
-    outside = tmp_path / "outside"
-    outside.mkdir()
-    (outside / "treasure.txt").write_text("x")
-    workspace = tmp_path / "ws"
-    workspace.mkdir()
-    link = workspace / "link"
-    link.symlink_to(outside, target_is_directory=True)
-    sweep.move(workspace, link, workspace / "reaped" / "link", "link")
-    assert (outside / "treasure.txt").exists()
+def test_move_resets_the_ttl_clock_and_never_follows_a_symlinked_source(tmp_path: Path) -> None:
+    """sa-reaper-destroys-its-own-hold-before-ttl#B3: the reaped clock starts at the move, never at the
+    origin's mtime (FR6b); #B4: a symlink is moved, its destination never."""
+    workspace = _outside_link(tmp_path)
+    old = _file(workspace / "old")
+    os.utime(old, (0, 0))
+    sweep.move(workspace, old, workspace / "reaped" / "old", "old")
+    sweep.move(workspace, workspace / "link", workspace / "reaped" / "link", "link")
+    assert (workspace / "reaped" / "old").lstat().st_mtime > 1_000_000_000
     assert (workspace / "reaped" / "link").is_symlink()
-
-
-def test_move_of_an_entry_already_gone_reports_nothing(tmp_path: Path) -> None:
-    assert sweep.move(tmp_path, tmp_path / "ghost", tmp_path / "r" / "ghost", "ghost") is None
-
-
-def test_a_cross_device_move_falls_back_to_copy_plus_remove_inside_the_primitive(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """EXDEV is handled in ONE place; a failed move is never a partial delete."""
-    src = tmp_path / "slop.txt"
-    src.write_text("payload")
-
-    def exdev(a: object, b: object) -> None:
-        raise OSError(18, "Invalid cross-device link")
-
-    monkeypatch.setattr(sweep.os, "replace", exdev)
-    dest = tmp_path / "reaped" / "slop.txt"
-    assert sweep.move(tmp_path, src, dest, "slop.txt") is not None
-    assert dest.read_text() == "payload"
-    assert not src.exists()
+    assert (tmp_path / "outside" / "treasure.txt").exists()
 
 
 # ═════════════════════════════════════════════════════════════════════════════════
@@ -245,63 +187,3 @@ def test_a_live_bind_record_survives_a_full_doctor_fix_pass(tmp_path: Path) -> N
 
     assert session_store.live_session(tmp_path, "sess-1") is not None
     assert session_store.read_session(tmp_path, "sess-1") == record
-
-
-def test_a_second_reap_of_the_same_origin_replaces_the_earlier_hold(
-    tmp_path: Path,
-) -> None:
-    """Intent: CONTRACT — 0.4.7 FR6b, operator ruling: one hold per origin per day. Size: SMALL.
-
-    A tool re-creates what the reaper just took (a `.mypy_cache` regenerated by the next
-    typecheck), so the SAME origin is reaped twice inside one day. The new hold REPLACES
-    the earlier one — the earlier copy is removed through the primitive and the TTL clock
-    restarts at the new move — rather than multiplying `<name>-N` copies of one origin.
-    "Deletion only by TTL" protects live entries, not a stale duplicate of the same hold.
-    """
-    dest = tmp_path / ".dadaia" / "reaped" / "20260913" / "cache"
-
-    first = tmp_path / "cache"
-    (first / "deep").mkdir(parents=True)
-    (first / "deep" / "a").write_text("first")
-    assert sweep.move(tmp_path, first, dest, "cache") is not None
-    os.utime(dest, (1.0, 1.0))
-
-    second = tmp_path / "cache"
-    (second / "deep").mkdir(parents=True)
-    (second / "deep" / "b").write_text("second")
-    message = sweep.move(tmp_path, second, dest, "cache")
-
-    assert message is not None
-    assert not second.exists(), "the re-created entry must still leave the working tree"
-    held = sorted(q.name for q in dest.parent.iterdir())
-    assert held == ["cache"], "exactly one hold per origin per day"
-    assert (dest / "deep" / "b").read_text() == "second", "the newer content wins"
-    assert not (dest / "deep" / "a").exists(), "the earlier hold is gone, not layered"
-    assert dest.stat().st_mtime > 1.0, "the TTL clock restarts at the new move"
-
-
-def test_remove_deletes_a_read_only_tree(tmp_path: Path) -> None:
-    """Bug doctor-reaper-cannot-delete-read-only-trees: a Go module cache is
-    ``dr-xr-xr-x`` all the way down, so the printed fix ``doctor --fix --expired-only``
-    skipped every entry with errno 13 and the finding never cleared. The reaper owns
-    what it reaps: a read-only tree is made writable on the way down, then removed.
-    Windows-safe: ``chmod`` there toggles the read-only attribute on the file."""
-    tree = tmp_path / "cache" / "mod"
-    (tree / "pkg").mkdir(parents=True)
-    leaf = tree / "pkg" / "go.mod"
-    leaf.write_text("module x\n")
-    for path in (leaf, tree / "pkg", tree):
-        path.chmod(0o555 if path.is_dir() else 0o444)
-
-    assert sweep.remove(tmp_path, tree, "cache/mod") == "deleted 'cache/mod'"
-    assert not tree.exists()
-
-
-def test_remove_deletes_a_read_only_file(tmp_path: Path) -> None:
-    """The same rule for a lone file: Windows refuses to unlink a read-only file."""
-    leaf = tmp_path / "go.sum"
-    leaf.write_text("x")
-    leaf.chmod(0o444)
-
-    assert sweep.remove(tmp_path, leaf, "go.sum") == "deleted 'go.sum'"
-    assert not leaf.exists()

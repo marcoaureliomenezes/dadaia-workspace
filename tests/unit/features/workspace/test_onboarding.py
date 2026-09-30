@@ -8,12 +8,15 @@ from __future__ import annotations
 
 import json
 import shutil
+from collections.abc import Callable
 from pathlib import Path
 
 import pytest
 
-from dadaia_workspace.core import session_store, workspace_layout
+from dadaia_workspace.core import workspace_layout
 from dadaia_workspace.core.cli_line import fix_line
+from dadaia_workspace.core.specs_version import CANONICAL_SPECS_VERSION, state
+from dadaia_workspace.features.specs.rules import RULES
 from dadaia_workspace.features.workspace.onboarding import next_step
 from dadaia_workspace.infrastructure.git_subprocess import GitSubprocessClient
 
@@ -30,7 +33,8 @@ def _git(monkeypatch: pytest.MonkeyPatch) -> dict[str, bool]:
 def _specs(tmp_path: Path, name: str = "app", *, audited: bool = False) -> Path:
     specs = tmp_path / "repos" / name / "specs"
     (specs / "memory" / "product").mkdir(parents=True)
-    (specs / "constitution.md").write_text("---\nspecs_pattern_version: 7\n---\n# c\n", "utf-8")
+    stamp = f"---\nspecs_pattern_version: {CANONICAL_SPECS_VERSION}\n---\n# c\n"
+    (specs / "constitution.md").write_text(stamp, "utf-8")
     for stub in ("ARCHITECTURE.md", "QUALITY.md"):
         shutil.copyfile(_SCAFFOLD / "memory" / stub, specs / "memory" / stub)
     if audited:
@@ -42,61 +46,72 @@ def _specs(tmp_path: Path, name: str = "app", *, audited: bool = False) -> Path:
     return specs
 
 
-def test_zero_contexts_is_the_context_step(tmp_path: Path) -> None:
-    step = next_step(tmp_path, {})
-    assert step is not None and (step.id, step.kind) == ("context", "command")
-    assert step.command == fix_line(
-        tmp_path, "context", "create", "<name>", "--main-repo", "<clone-url>"
+def _bare(tmp: Path) -> dict[str, Path]:
+    return {"app": tmp / "repos" / "app" / "specs"}
+
+
+def _foreign(tmp: Path) -> dict[str, Path]:
+    (tmp / "repos" / "app" / "specs" / "features").mkdir(parents=True)
+    return _bare(tmp)
+
+
+def _typo(tmp: Path) -> dict[str, Path]:
+    specs = _specs(tmp, audited=True)
+    (specs / "constitution.md").write_text(
+        "---\nspecs_pattern_version: 7\ngitflow: {principal: main\n---\n"
     )
+    return {"app": specs}
 
 
-def test_bind_only_for_a_resolvable_unbound_session(tmp_path: Path) -> None:
-    trees = {"app": tmp_path / "repos" / "app" / "specs"}
-    assert next_step(tmp_path, trees).id == "specs"  # type: ignore[union-attr]
-    step = next_step(tmp_path, trees, session="s1")
-    assert step is not None and step.id == "bind"
-    assert step.command == fix_line(tmp_path, "context", "bind", "app")
-    session_store.write_session(
-        tmp_path,
-        "s1",
-        session_store.new_binding_record(
-            session_id="s1", context="app", runtime="t", pid=1, now="2999-01-01T00:00:00+00:00"
-        ),
-    )
-    assert next_step(tmp_path, trees, session="s1").id == "specs"  # type: ignore[union-attr]
+def _v047(tmp: Path) -> dict[str, Path]:
+    specs = _specs(tmp, audited=True)
+    (specs / "constitution.md").write_text("---\nspecs_pattern_version: 7\n---\n# c\n", "utf-8")
+    return {"app": specs}
 
 
-def test_specs_fix_carries_replace_foreign_only_for_a_foreign_tree(tmp_path: Path) -> None:
-    specs = tmp_path / "repos" / "app" / "specs"
+_CMD = "command"
+
+
+# fmt: off
+@pytest.mark.parametrize(("trees", "kwargs", "published", "expected", "command", "in_command"), [
+    pytest.param(lambda t: {}, {}, False, ("context", _CMD), ("context", "create", "<name>", "--main-repo", "<clone-url>"), [], id="zero-contexts"),
+    pytest.param(_bare, {}, False, ("specs", _CMD), ("specs", "init", "--context", "app"), [], id="S1-no-identity-no-bind-step"),
+    pytest.param(_bare, {"bound": False}, False, ("bind", _CMD), ("context", "bind", "app"), [], id="S1-unbound-session-binds"),
+    pytest.param(_bare, {"bound": True}, False, ("specs", _CMD), ("specs", "init", "--context", "app"), [], id="S1-bound-is-past-bind"),
+    pytest.param(_foreign, {}, False, ("specs", _CMD), ("specs", "init", "--context", "app", "--replace-foreign"), [], id="B28-4-foreign-tree-replace-foreign"),
+    pytest.param(_v047, {}, False, ("specs", _CMD), ("specs", "init", "--context", "app"), [], id="upgrade-leaves-project-specs-unmigrated-and-silent-0.4.7-tree"),
+    pytest.param(_typo, {}, False, ("constitution", "agent"), None, ["repos/app/specs/constitution.md"], id="ADR0047-yaml-typo-is-an-agent-repair"),
+    pytest.param(lambda t: {"app": _specs(t)}, {}, False, ("first-pass", "agent"), None,
+                 [".agents/skills/dd-audit-project/SKILL.md §first pass", "memory/QUALITY.md", "no atom"], id="shipped-stubs-first-pass"),
+    pytest.param(lambda t: {"app": _specs(t, audited=True)}, {}, False, ("publish", _CMD), ("context", "baseline", "app"), [], id="publish-until-on-a-remote"),
+    pytest.param(lambda t: {"app": _specs(t, audited=True)}, {}, True, None, None, [], id="published-is-done"),
+    pytest.param(lambda t: {"new": t / "repos" / "new" / "specs", "app": _specs(t)}, {}, False, ("specs", _CMD), ("specs", "init", "--context", "new"), [], id="first-context-answers-first"),
+    pytest.param(lambda t: {"new": t / "repos" / "new" / "specs", "app": _specs(t)}, {"focus": "app"}, False, ("first-pass", "agent"), None, [], id="focus-context-answers-first"),
+])
+# fmt: on
+def test_next_step_is_derived_from_the_workspace_state(
+    tmp_path: Path, _git: dict[str, bool], trees: Callable[[Path], dict[str, Path]], kwargs: dict[str, object],
+    published: bool, expected: tuple[str, str] | None, command: tuple[str, ...] | None, in_command: list[str],
+) -> None:  # fmt: skip
+    """sa-bind-has-two-stores#S1: the ``bind`` step judges the caller's Bind (no identity, no step).
+    sa-specs-tree-state-read-five-ways#B28-4: the specs fix is state()'s; ADR 0047: a typo is never a move."""
+    _git["published"] = published
+    step = next_step(tmp_path, trees(tmp_path), **kwargs)  # type: ignore[arg-type]
+    assert (step and (step.id, step.kind)) == expected
+    if step is None:
+        return
+    if command:
+        assert step.command == fix_line(tmp_path, *command)
+    assert all(part in step.command.replace("\\", "/") for part in in_command)
+
+
+def test_the_specs_step_reports_state_and_the_doctor_has_no_specs_version_code(tmp_path: Path) -> None:
+    """sa-specs-tree-state-read-five-ways#B28-6: ONBOARDING reports the state; the doctor has no SPECS-VERSION code."""
+    specs = _foreign(tmp_path)["app"]
     step = next_step(tmp_path, {"app": specs})
-    assert step is not None
-    assert step.command == fix_line(tmp_path, "specs", "init", "--context", "app")
-    (specs / "features").mkdir(parents=True)
-    step = next_step(tmp_path, {"app": specs})
-    assert step is not None
-    assert step.command == fix_line(
-        tmp_path, "specs", "init", "--context", "app", "--replace-foreign"
-    )
-
-
-def test_an_unparseable_constitution_is_an_agent_repair_never_a_move(tmp_path: Path) -> None:
-    """ADR 0047 (reviewer H2 repro): a one-character YAML typo."""
-    specs = _specs(tmp_path, audited=True)
-    constitution = specs / "constitution.md"
-    constitution.write_text("---\nspecs_pattern_version: 7\ngitflow: {principal: main\n---\n")
-    step = next_step(tmp_path, {"app": specs})
-    assert step is not None and (step.id, step.kind) == ("constitution", "agent")
-    assert str(constitution) in step.command and "--replace-foreign" not in step.command
-
-
-def test_shipped_stubs_are_the_agent_first_pass_step(tmp_path: Path) -> None:
-    specs = _specs(tmp_path)
-    step = next_step(tmp_path, {"app": specs})
-    assert step is not None and (step.id, step.kind) == ("first-pass", "agent")
-    skill = tmp_path / ".agents" / "skills" / "dd-audit-project" / "SKILL.md"
-    assert step.command.startswith(f"{skill} §first pass")
-    assert str(specs / "memory" / "QUALITY.md") in step.command
-    assert "no atom" in step.command
+    assert step is not None and step.command == state(specs, root=tmp_path, context="app")[1]
+    assert "specs tree is foreign" in step.reason
+    assert not any("SPECS-VERSION" in rule.codes for rule in RULES)
 
 
 def test_i1_an_audits_histo_stamp_changes_no_step(tmp_path: Path) -> None:
@@ -106,21 +121,6 @@ def test_i1_an_audits_histo_stamp_changes_no_step(tmp_path: Path) -> None:
     histo.parent.mkdir(parents=True)
     histo.write_text('{"id": "first"}\n', encoding="utf-8")
     assert next_step(tmp_path, {"app": specs}) == before
-
-
-def test_publish_until_the_constitution_is_on_a_remote(tmp_path: Path, _git) -> None:
-    specs = _specs(tmp_path, audited=True)
-    step = next_step(tmp_path, {"app": specs})
-    assert step is not None and (step.id, step.kind) == ("publish", "command")
-    assert step.command == fix_line(tmp_path, "context", "baseline", "app")
-    _git["published"] = True
-    assert next_step(tmp_path, {"app": specs}) is None
-
-
-def test_the_focus_context_answers_first(tmp_path: Path) -> None:
-    trees = {"new": tmp_path / "repos" / "new" / "specs", "app": _specs(tmp_path)}
-    assert next_step(tmp_path, trees).id == "specs"  # type: ignore[union-attr]
-    assert next_step(tmp_path, trees, focus="app").id == "first-pass"  # type: ignore[union-attr]
 
 
 def test_the_text_names_the_kind_and_carries_one_fix_line(tmp_path: Path) -> None:

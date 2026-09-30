@@ -4,8 +4,9 @@
 ``scan()`` is the ONE walk over the instance — one traversal primitive
 (``features.spec_context.sweep``) serves both it and ``fix()``, driven by the zone registry
 (``core.workspace_layout.DADAIA_ZONES``): root, harness dirs, the ``.dadaia/`` top level,
-the closed-canon zones, the TTL zones — every entry gets one finding verdict and one
-``WS-<zone>-<verdict>`` code. ``fix()`` consumes the same findings in the fixed order.
+the closed-canon zones, the TTL zones (only expired entries and holds) — each finding one
+``WS-<zone>-<verdict>`` code. ``fix()`` consumes the same findings in the fixed order;
+``expire()`` is its TTL tail alone, the SessionStart lane.
 
 Bug class (the six-bug ``.dadaia/`` ledger, workspace-doctor-root4-false-positive-dadaia-hooks
 .. dadaia-reconcile-quarantines-sanctioned-references-clone): the doctor kept its own name
@@ -13,32 +14,33 @@ lists and disagreed with what init/install create. Nothing here spells a zone na
 allow set, TTL and canon is a view of the registry.
 """
 
-import fnmatch
 import os
+import stat
 import time
-from dataclasses import dataclass
-from datetime import UTC, datetime, timedelta
+from collections.abc import Callable
+from dataclasses import dataclass, replace
+from datetime import timedelta
 from enum import StrEnum
 from functools import partial
-from pathlib import Path, PurePosixPath
+from pathlib import Path
 
 from dadaia_workspace.core import session_store, workspace_layout
-from dadaia_workspace.core.cli_line import fix_line
+from dadaia_workspace.core.cli_line import fix_line, git_line, shell_line
 from dadaia_workspace.core.doctor_rules import Rule, SectionFinding
+from dadaia_workspace.core.exceptions import SchemaVersionError
 from dadaia_workspace.core.harness_registry import (
     HARNESS_PROJECTION_DIRS,
-    L1_ENTRY_HARNESSES,
-    PROJECTION_TARGETS,
 )
+from dadaia_workspace.core.models.doctor_report import DoctorLine
 from dadaia_workspace.core.models.harness_profile import HarnessProfile
 from dadaia_workspace.core.models.spec_context import ContextState, SpecContextProject
 from dadaia_workspace.core.platform import PLATFORM
 from dadaia_workspace.core.workspace_layout import Zone
-from dadaia_workspace.features.spec_context import markers, sweep
+from dadaia_workspace.features.spec_context import sweep
+from dadaia_workspace.features.spec_context.service import git_hooks_dir
 from dadaia_workspace.infrastructure.git_subprocess import GitSubprocessClient
 from dadaia_workspace.infrastructure.json_context_store import JsonContextStore
 from dadaia_workspace.infrastructure.json_harness_profile_store import JsonHarnessProfileStore
-from dadaia_workspace.infrastructure.json_install_ledger_store import JsonInstallLedgerStore
 
 
 class FindingVerdict(StrEnum):
@@ -55,12 +57,12 @@ class FindingVerdict(StrEnum):
     REAPED = "reaped"
 
 
+_DETAIL = {
+    FindingVerdict.CANON: "",
+    FindingVerdict.OPERATOR: "(instance exception)",
+    FindingVerdict.SLOP: "(not in the root law or the exceptions)",
+}
 _CANONICAL = frozenset({FindingVerdict.CANON, FindingVerdict.OPERATOR, FindingVerdict.REAPED})
-
-#: The zone the reaper HOLDS what it takes off the working tree. Deletion is reserved to
-#: TTL expiry of this zone, so no scan verdict ever deletes anything directly — the shape
-#: behind the CRITICAL doctor-ptr-gc-deletes-valid-lock-free-bind.
-REAPED_ZONE = "reaped"
 
 #: Directory names that end the repo-tree walk: a nested VCS/venv/dependency tree is
 #: never ours to classify and is where the walk's cost would otherwise live.
@@ -78,6 +80,8 @@ class Finding:
     fixable: bool
     detail: str
     target: Path
+    #: The clearing command when ``doctor --fix`` cannot clear this entry itself.
+    fix: str = ""
 
     @property
     def canonical(self) -> bool:
@@ -96,12 +100,9 @@ class Finding:
         return self.verdict is not FindingVerdict.REAPED
 
 
-@dataclass(frozen=True)
-class DoctorIssue:
-    code: str
-    description: str
-    fixable: bool
-    fix: str = ""
+def _invariant(code: str, message: str, fix: str = "", *, fixable: bool = False) -> SectionFinding:
+    """A context invariant: always error-class, outside the scored entry set."""
+    return SectionFinding(code, "error", message, False, True, fix, fixable)
 
 
 class DoctorService:
@@ -110,7 +111,9 @@ class DoctorService:
         context_store: JsonContextStore,
         git_client: GitSubprocessClient,
         workspace_root: Path,
+        projection: Callable[[Path], tuple[list[DoctorLine], str]] | None = None,
     ) -> None:
+        self._projection = projection
         self._store = context_store
         self._git = git_client
         self._workspace_root = workspace_root
@@ -124,22 +127,20 @@ class DoctorService:
     # check() — the context invariants (unchanged by the zone walk)
     # ------------------------------------------------------------------
 
-    def check_installed_hooks(self, context: str | None = None) -> list[DoctorIssue]:
-        """HOOKS-DRIFT-1: an ALIVE repo's installed git hook differs from the shipped one.
+    def check_projection(self) -> list[SectionFinding]:
+        """PROJECTION: `public doctor`'s own verdict — one error naming every blocking line."""
+        lines, fix = self._projection(self._workspace_root) if self._projection else ([], "")
+        message = "; ".join(line.render() for line in lines if line.status.blocking)
+        return [SectionFinding("PROJECTION", "drift", message, False, True, fix)] if fix else []
 
-        The git chokepoints are the ONE mechanical backstop that runs outside every
-        harness hook (`.dadaia/AGENTS.md`). An installed copy that has drifted — hand-edited,
-        never installed, or left behind by an older release — is a chokepoint silently
-        enforcing yesterday's contract, and nothing else in the workspace can notice.
-        Compared BYTE-WISE against ``public/scripts/``: the installer copies verbatim, so
-        any difference at all is drift. A repo that is not a git checkout has no
-        ``.git/hooks/`` to drift and is never a finding. A named *context* scopes the
-        check to its own repos (0.4.8 R5): another context's hooks are not this run's.
-        """
-        issues: list[DoctorIssue] = []
+    def check_installed_hooks(self, context: str | None = None) -> list[SectionFinding]:
+        """HOOKS-DRIFT-1: an ALIVE repo's hook where git runs hooks is not byte-for-byte the
+        shipped one (hand-edited, missing or stale) — the one backstop outside every harness
+        hook. A non-git repo is never a finding; *context* scopes the repos (0.4.8 R5)."""
+        issues: list[SectionFinding] = []
         for top in self._alive_repo_tops(context):
-            hooks_dir = top / ".git" / "hooks"
-            if not hooks_dir.is_dir():
+            hooks_dir = git_hooks_dir(top)
+            if hooks_dir is None:
                 continue
             for target, source in workspace_layout.INSTALLED_GIT_HOOKS:
                 shipped = workspace_layout.public_scripts_dir() / source
@@ -149,24 +150,21 @@ class DoctorService:
                 except OSError:
                     drifted = True
                 if drifted:
-                    rel = top.relative_to(self._workspace_root).as_posix()
+                    rel = str(top)  # absolute: the fix runs from any cwd
                     issues.append(
-                        DoctorIssue(
-                            code="HOOKS-DRIFT-1",
-                            description=(
-                                f"{rel}/.git/hooks/{target} differs from the shipped "
-                                f"{source} — the chokepoint is enforcing something other "
-                                "than what this release ships."
-                            ),
-                            fixable=False,
-                            fix=fix_line(
+                        _invariant(
+                            "HOOKS-DRIFT-1",
+                            f"{Path(os.path.relpath(installed, self._workspace_root)).as_posix()} differs from the shipped "
+                            f"{source} — the chokepoint is enforcing something other "
+                            "than what this release ships.",
+                            fix_line(
                                 self._workspace_root, "ci", "install-hook", "--force", "--repo", rel
                             ),
                         )
                     )
         return issues
 
-    def _check_venv_health(self) -> list[DoctorIssue]:
+    def _check_venv_health(self) -> list[SectionFinding]:
         """VENV-1 — the workspace venv exists with an executable ``dadaia`` entrypoint.
 
         FR-W3-02 (ADR-G4). Windows-safe — the scripts dir / exe suffix come from ``PLATFORM``
@@ -176,56 +174,47 @@ class DoctorService:
         venv_bin = self._dadaia / ".venv" / PLATFORM.venv_scripts_dir
         if not venv_bin.is_dir():
             return [
-                DoctorIssue(
-                    code="VENV-1",
-                    description=(
-                        f"Workspace venv missing: '{venv_bin}' does not exist. Workspace "
-                        "tooling (dadaia/pip/python -m dadaia_workspace) must run from this "
-                        "venv. Re-bootstrap it (e.g. 'dadaia init' or the documented "
-                        "venv setup)."
-                    ),
-                    fixable=False,
+                _invariant(
+                    "VENV-1",
+                    f"Workspace venv missing: '{venv_bin}' does not exist.",
+                    shell_line("uvx", "dadaia-workspace", "init", str(self._workspace_root)),
                 )
             ]
         entry = venv_bin / f"dadaia{PLATFORM.venv_exe_suffix}"
         if not entry.is_file():
             return [
-                DoctorIssue(
-                    code="VENV-1",
-                    description=(
-                        f"Workspace venv entrypoint missing: '{entry}' not found. "
-                        "Re-bootstrap the workspace venv."
-                    ),
-                    fixable=False,
+                _invariant(
+                    "VENV-1",
+                    f"Workspace venv entrypoint missing: '{entry}' not found.",
+                    shell_line("uvx", "dadaia-workspace", "init", str(self._workspace_root)),
                 )
             ]
         if not os.access(entry, os.X_OK):
             return [
-                DoctorIssue(
-                    code="VENV-1",
-                    description=(
-                        f"Workspace venv entrypoint not executable: '{entry}'. "
-                        "Restore the exec bit (chmod +x) or re-bootstrap the venv."
-                    ),
-                    fixable=False,
+                _invariant(
+                    "VENV-1",
+                    f"Workspace venv entrypoint not executable: '{entry}'.",
+                    shell_line("chmod", "+x", str(entry)),
                 )
             ]
         return []
 
-    def check(self) -> list[DoctorIssue]:
-        issues: list[DoctorIssue] = []
-        contexts = self._store.list_all()
+    def check(self) -> list[SectionFinding]:
+        issues: list[SectionFinding] = []
+        try:
+            contexts = self._store.list_all()
+        except SchemaVersionError as refused:  # the registry's one grammar refused it
+            return [_invariant("REG-SCHEMA", refused.problem, refused.fix)]
 
         # INV-4 (v2): ALIVE context must have repo on disk
         for ctx in contexts:
-            if ctx.state == ContextState.ALIVE:
-                repo_path = self._repos_dir() / ctx.repo_slug
-                if not repo_path.exists():
+            for repo in ctx.all_repos() if ctx.state == ContextState.ALIVE else ():
+                if not (self._repos_dir() / repo.slug).exists():
                     issues.append(
-                        DoctorIssue(
-                            code="INV-4",
-                            description=f"Context '{ctx.name}' is alive but repo '{ctx.repo_slug}' not on disk",
-                            fixable=False,
+                        _invariant(
+                            "INV-4",
+                            f"Context '{ctx.name}' is alive but repo '{repo.slug}' not on disk",
+                            fix_line(self._workspace_root, "context", "alive", ctx.name),
                         )
                     )
 
@@ -235,28 +224,21 @@ class DoctorService:
         for ctx in contexts:
             if ctx.state == ContextState.ALIVE and not ctx.repo_url:
                 issues.append(
-                    DoctorIssue(
-                        code="CTX-URL-1",
-                        description=(
-                            f"Context '{ctx.name}' is alive but has an empty repo_url "
-                            f"(un-portable). Re-run 'dadaia context alive {ctx.name}' "
-                            "while the repo's origin remote is on disk to back-fill it; "
-                            "with no such remote, 'dadaia context delete' and "
-                            "'dadaia context create --main-repo <url>' re-registers it."
-                        ),
-                        fixable=False,
+                    _invariant(
+                        "CTX-URL-1",
+                        f"Context '{ctx.name}' is alive with an empty repo_url.",
+                        fix_line(self._workspace_root, "context", "alive", ctx.name),
                     )
                 )
 
         # INV-5 (v2): DEAD context must not have repo on disk
         for ctx in contexts:
-            if ctx.state == ContextState.DEAD:
-                repo_path = self._repos_dir() / ctx.repo_slug
-                if repo_path.exists():
+            for repo in ctx.all_repos() if ctx.state == ContextState.DEAD else ():
+                if (self._repos_dir() / repo.slug).exists():
                     issues.append(
-                        DoctorIssue(
-                            code="INV-5",
-                            description=f"Context '{ctx.name}' is dead but repo '{ctx.repo_slug}' is on disk",
+                        _invariant(
+                            "INV-5",
+                            f"Context '{ctx.name}' is dead but repo '{repo.slug}' is on disk",
                             fixable=True,
                         )
                     )
@@ -268,21 +250,22 @@ class DoctorService:
             owners.setdefault(ctx.repo_slug, []).append(ctx.name)
             for r in ctx.associated_repos:
                 owners.setdefault(r.slug, []).append(ctx.name)
+        dead = {c.name for c in contexts if c.state is ContextState.DEAD}
         for slug in sorted(owners):
             names = owners[slug]
-            if len(names) > 1:
+            if len(names) > 1:  # the fix retires one owner: delete a dead one, else dead it
+                owner = min(names, key=lambda n: (n not in dead, n))
                 issues.append(
-                    DoctorIssue(
-                        code="INV-6",
-                        fixable=False,
-                        description=(
-                            f"Repo slug '{slug}' is owned by more than one context "
-                            f"({', '.join(sorted(names))}). 'repos/<slug>' is a "
-                            "namespace every context shares — 'dadaia context dead' "
-                            "on any owner would commit, push and delete the others' "
-                            "working tree. Remove it from all but one owner "
-                            "('dadaia context repo remove') or re-create the context "
-                            "with a different slug."
+                    _invariant(
+                        "INV-6",
+                        f"Repo slug '{slug}' is owned by more than one context "
+                        f"({', '.join(sorted(names))}): 'repos/<slug>' is shared, so "
+                        "a dead() on one owner would take the others' working tree.",
+                        fix_line(
+                            self._workspace_root,
+                            "context",
+                            "delete" if owner in dead else "dead",
+                            owner,
                         ),
                     )
                 )
@@ -299,27 +282,28 @@ class DoctorService:
         globs = self._exception_globs()
         findings: list[Finding] = []
         findings.extend(self._scan_root(globs))
-        findings.extend(self._scan_harness_dirs(globs))
-        findings.extend(self._scan_dadaia_top())
+        findings.extend(self._scan_dadaia_top(globs))
         findings.extend(self._scan_repo_trees())
         for zone in workspace_layout.zones_with_canon():
-            findings.extend(self._scan_canon_zone(zone))
+            findings.extend(self._scan_canon_zone(zone, globs))
+        return (*findings, *self.scan_ttl())
+
+    def scan_ttl(self) -> tuple[Finding, ...]:
+        """The TTL zones alone: expired entries and holds, one lstat per zone entry."""
         now = time.time()
-        for zone in workspace_layout.zones_with_ttl():
-            findings.extend(self._scan_ttl_zone(zone, now))
-        return tuple(findings)
+        return tuple(
+            f for zone in workspace_layout.zones_with_ttl() for f in self._scan_ttl_zone(zone, now)
+        )
 
     def _contexts(self) -> list[SpecContextProject]:
         """The registered contexts, or NOTHING when the registry cannot be read.
 
         The store's contract — degrade to inaction, never to deletion — applied at the one
-        place both readers share. It matters more now than it did: the reaper runs on
-        ``sdd_post_gate``'s throttle, so an unreadable or older-shaped registry must make
-        the pass do less, never raise on the write hot path (and never let the INV-5 lane
-        act on a half-parsed registry)."""
+        place both readers share: an unreadable or older-shaped registry makes the pass do
+        less, never raise (and never lets the INV-5 lane act on a half-parsed registry)."""
         try:
             return list(self._store.list_all())
-        except (KeyError, OSError, TypeError, ValueError):
+        except (KeyError, OSError, SchemaVersionError, TypeError, ValueError):
             return []
 
     def _alive_repo_tops(self, context: str | None = None) -> list[Path]:
@@ -384,9 +368,11 @@ class DoctorService:
             return ()
         return workspace_layout.parse_exception_globs(text)
 
-    def _excepted(self, entry: Path, globs: tuple[str, ...]) -> bool:
+    def _judged(self, entry: Path, globs: tuple[str, ...]) -> tuple[FindingVerdict, str]:
+        """``workspace_layout.verdict`` — the gate's own answer — plus the report detail."""
         rel = entry.relative_to(self._workspace_root).as_posix()
-        return any(fnmatch.fnmatch(entry.name, g) or fnmatch.fnmatch(rel, g) for g in globs)
+        judged = FindingVerdict(workspace_layout.verdict(rel, entry.is_dir(), globs))
+        return judged, _DETAIL[judged]
 
     @staticmethod
     def _finding(
@@ -410,84 +396,17 @@ class DoctorService:
     def _scan_root(self, globs: tuple[str, ...]) -> list[Finding]:
         out: list[Finding] = []
         for entry in sweep.walk(self._workspace_root):
-            allowed = (
-                workspace_layout.ROOT_ALLOWED_DIRS
-                if entry.is_dir()
-                else workspace_layout.ROOT_ALLOWED_FILES
-            )
-            if entry.name in allowed:
-                verdict, detail = FindingVerdict.CANON, ""
-            elif self._excepted(entry, globs):
-                verdict, detail = FindingVerdict.OPERATOR, "(instance exception)"
-            else:
-                verdict, detail = FindingVerdict.SLOP, "(not in the root law or the exceptions)"
+            verdict, detail = self._judged(entry, globs)
             out.append(self._finding("root", self._workspace_root, entry, verdict, detail))
         return out
 
-    def _active_harnesses(self) -> tuple[str, ...]:
-        """``agents`` always; the L1 harnesses of the persisted profile (absent ⇒ all)."""
-        profile = JsonHarnessProfileStore().read(self._states)
-        active = L1_ENTRY_HARNESSES if profile is None else profile.harnesses
-        return tuple(t for t in PROJECTION_TARGETS if t not in L1_ENTRY_HARNESSES or t in active)
-
-    def _scan_harness_dirs(self, globs: tuple[str, ...]) -> list[Finding]:
-        """An entry is canon iff it is a projection target (the install ledger — what
-        ``public install`` actually wrote); a directory holding a target is a path, not an
-        entry; anything else is operator (exception glob) or slop. No readable ledger ⇒ the
-        store's contract (degrade to inaction, never deletion) holds here too: ONE
-        non-fixable ``missing`` finding, and no harness-dir entry is classified."""
-        ledger = JsonInstallLedgerStore().read(self._states)
-        if ledger is None:
-            path = JsonInstallLedgerStore.path(self._states)
-            detail = "(run dadaia public install)"
-            return [
-                self._finding(
-                    self._states.name,
-                    self._dadaia,
-                    path,
-                    FindingVerdict.MISSING,
-                    detail,
-                    fixable=False,
-                )
-            ]
-        targets = frozenset(ledger.by_relpath())
-        owned_dirs = frozenset(
-            parent.as_posix() for rel in targets for parent in PurePosixPath(rel).parents
-        )
-        out: list[Finding] = []
-        for harness in self._active_harnesses():
-            root = self._workspace_root / f".{harness}"
-            if not root.is_dir():
-                continue
-            pending = [root]
-            while pending:
-                directory = pending.pop()
-                for entry in sweep.walk(directory):
-                    rel = entry.relative_to(self._workspace_root).as_posix()
-                    if rel in targets:
-                        verdict, detail = FindingVerdict.CANON, ""
-                    elif rel in owned_dirs and entry.is_dir() and not entry.is_symlink():
-                        pending.append(entry)
-                        continue
-                    elif self._excepted(entry, globs):
-                        verdict, detail = FindingVerdict.OPERATOR, "(instance exception)"
-                    else:
-                        verdict = FindingVerdict.SLOP
-                        detail = "(not a projection target or an exception)"
-                    out.append(self._finding(harness, self._workspace_root, entry, verdict, detail))
-        return out
-
-    def _scan_dadaia_top(self) -> list[Finding]:
+    def _scan_dadaia_top(self, globs: tuple[str, ...]) -> list[Finding]:
         out: list[Finding] = []
         present: set[str] = set()
         for entry in sweep.walk(self._dadaia):
-            if entry.is_dir() and entry.name in workspace_layout.zone_names():
+            if entry.is_dir():
                 present.add(entry.name)
-                verdict, detail = FindingVerdict.CANON, ""
-            elif not entry.is_dir() and entry.name in workspace_layout.DADAIA_ROOT_FILES:
-                verdict, detail = FindingVerdict.CANON, ""
-            else:
-                verdict, detail = FindingVerdict.SLOP, "(not a zone)"
+            verdict, detail = self._judged(entry, globs)
             out.append(self._finding("dadaia", self._dadaia, entry, verdict, detail))
         for zone in workspace_layout.provisioned_zones():
             if zone.name not in present:
@@ -502,14 +421,10 @@ class DoctorService:
                 )
         return out
 
-    def _scan_canon_zone(self, zone: Zone) -> list[Finding]:
-        assert zone.canon is not None
+    def _scan_canon_zone(self, zone: Zone, globs: tuple[str, ...]) -> list[Finding]:
         out: list[Finding] = []
         for entry in sweep.walk(self._dadaia / zone.name):
-            if any(fnmatch.fnmatch(entry.name, g) for g in zone.canon):
-                verdict, detail = FindingVerdict.CANON, ""
-            else:
-                verdict, detail = FindingVerdict.SLOP, "(outside the closed canon)"
+            verdict, detail = self._judged(entry, globs)
             out.append(self._finding(zone.name, self._dadaia, entry, verdict, detail))
         profile = JsonHarnessProfileStore.path(self._states)
         if profile.parent == self._dadaia / zone.name and not profile.exists():
@@ -520,77 +435,50 @@ class DoctorService:
         return out
 
     def _scan_ttl_zone(self, zone: Zone, now: float) -> list[Finding]:
-        out: list[Finding] = []
-        self._walk_ttl(zone, self._dadaia / zone.name, now, out, is_zone_root=True)
-        return out
-
-    def _walk_ttl(
-        self, zone: Zone, directory: Path, now: float, out: list[Finding], *, is_zone_root: bool
-    ) -> bool:
-        """Append one finding per file (by lstat mtime, symlinks never followed) and per
-        directory emptied by expiry; return whether *directory* is entirely expired."""
+        """Expired entries, whole, and each live hold in ``reaped/``; the zone's ``AGENTS.md``
+        is never a candidate (bug public-install-restores-expired-zone-agents-reblocks-preflight)."""
         assert zone.ttl_seconds is not None
-        entries = sweep.walk(directory)
-        if not entries:
-            mtime = sweep.mtime(directory)
-            return not is_zone_root and mtime is not None and now - mtime > zone.ttl_seconds
-        all_expired = True
-        for entry in entries:
-            if entry.is_dir() and not entry.is_symlink():
-                if self._walk_ttl(zone, entry, now, out, is_zone_root=False):
-                    out.append(
-                        self._finding(
-                            zone.name,
-                            self._dadaia,
-                            entry,
-                            FindingVerdict.EXPIRED,
-                            "(emptied by expiry)",
-                        )
-                    )
-                else:
-                    all_expired = False
+        ttl, zone_dir = zone.ttl_seconds, self._dadaia / zone.name
+        out: list[Finding] = []
+        for entry, stamp in _ttl_walk(zone_dir, now - ttl, depth=2):
+            if entry == zone_dir / "AGENTS.md":
                 continue
-            mtime = sweep.mtime(entry)
-            if mtime is None:
+            age = now - stamp
+            if age <= ttl:
+                if zone.name != sweep.REAPED_ZONE:
+                    continue
+                # Held: days ROUNDED UP, a minute-old hold has its whole window left.
+                detail = f"({-(-int(ttl - age) // 86_400)}d left)"
+                out.append(
+                    self._finding(zone.name, self._dadaia, entry, FindingVerdict.REAPED, detail)
+                )
                 continue
-            age = now - mtime
-            if is_zone_root and entry.name == "AGENTS.md":
-                # The zone's own law file is canon by projection, never a TTL candidate
-                # (bug public-install-restores-expired-zone-agents-reblocks-preflight).
-                verdict, detail = FindingVerdict.CANON, ""
-            elif age > zone.ttl_seconds:
-                verdict = FindingVerdict.EXPIRED
-                days = timedelta(seconds=age).days
-                detail = f"(mtime {days}d > ttl {timedelta(seconds=zone.ttl_seconds).days}d)"
-            elif zone.name == REAPED_ZONE:
-                # Held, not slop and not expired: report where it came from and how long
-                # the operator still has to take it back.
-                verdict = FindingVerdict.REAPED
-                # Days ROUNDED UP: a hold taken a minute ago has its whole window left,
-                # and the last day reads "1d left", never "0d left" on a live entry.
-                left = -(-int(zone.ttl_seconds - age) // 86_400)
-                detail = f"({left}d left)"
-            else:
-                verdict, detail = FindingVerdict.CANON, ""
-            if verdict is not FindingVerdict.EXPIRED:
-                all_expired = False
-            out.append(self._finding(zone.name, self._dadaia, entry, verdict, detail))
-        return all_expired
+            detail = f"(mtime {timedelta(seconds=age).days}d > ttl {timedelta(seconds=ttl).days}d)"
+            finding = self._finding(zone.name, self._dadaia, entry, FindingVerdict.EXPIRED, detail)
+            if tree := sweep.linked_worktree(self._workspace_root, entry):
+                gdir = sweep.worktree_git_dir(tree)
+                finding = replace(finding, fix=git_line(gdir, "worktree", "remove", str(tree)))
+            out.append(finding)
+        return out
 
     # ------------------------------------------------------------------
     # fix() — the one reaper, in the fixed FR4 order
     # ------------------------------------------------------------------
 
+    def expire(self) -> list[str]:
+        """The SessionStart lane (``--expired-only``): stale session records, then every
+        TTL-expired zone entry. It costs one lstat per zone entry and walks no repo."""
+        # The record owner selects the expired records (F002); the one deleter removes them.
+        actions = [
+            f"GRAVEYARD-GC: deleted expired session file '{record.name}'"
+            for record in session_store.stale_records(self._workspace_root)
+            if sweep.remove(self._workspace_root, record, record.name) is not None
+        ]
+        return actions + self._delete(self.scan_ttl(), FindingVerdict.EXPIRED)
+
     def fix(self) -> list[str]:
-        """The ONE reaper lane: marker reap -> session reap -> migrate -> seed missing ->
-        MOVE slop to ``reaped/`` -> reap dead contexts' repos (INV-5) -> delete expired.
-
-        There is no second, smaller lane. ``--expired-only`` used to buy one by stopping
-        this method early; now that slop is HELD rather than deleted, the cheap lane and
-        the full lane are the same acts, so the parameter is deleted and the CLI flag
-        means only what it always should have: which findings the REPORT shows. The
-        SessionStart lane and ``sdd_post_gate``'s throttle run exactly this.
-
+        """The full reaper: seed missing -> MOVE slop to ``reaped/`` -> reap dead contexts'
+        repos (INV-5) -> :meth:`expire`.
 
         Nothing here deletes a live entry. Slop is MOVED and holds its 7 days in
         ``.dadaia/reaped/<YYYYMMDD>/<workspace-relative-path>``, the clock starting at the
@@ -600,19 +488,6 @@ class DoctorService:
         through the ONE sweep guard: it reports what it did or that it skipped, never
         aborts, and never touches a location outside the workspace."""
         actions: list[str] = []
-
-        # markers.reap_markers is the ONE reaper of spent throttle/sentinel markers.
-        for name in markers.reap_markers(
-            self._workspace_root, now=datetime.now(tz=UTC).timestamp()
-        ):
-            actions.append(f"MARKER-GC: deleted stale marker '{name}'")
-
-        # The session-record owner's ONE reaper (core.session_store.reap_stale, F002).
-        for sess_id in session_store.reap_stale(self._workspace_root):
-            actions.append(f"GRAVEYARD-GC: deleted expired session file '{sess_id}.json'")
-
-        actions.extend(self._migrate_exceptions())
-
         findings = self.scan()
         for finding in findings:
             if finding.verdict is FindingVerdict.MISSING and finding.fixable:
@@ -621,18 +496,10 @@ class DoctorService:
                 )
         actions.extend(self._reap(findings))
         for ctx in self._contexts():
-            repo_path = self._repos_dir() / ctx.repo_slug
-            if ctx.state is ContextState.DEAD and repo_path.exists():
-                actions.extend(self._reap_dead_repo(ctx, repo_path))
-        actions.extend(self._delete(findings, FindingVerdict.EXPIRED))
-        return actions
-
-    def _reaped_destination(self, target: Path) -> Path:
-        """``.dadaia/reaped/<YYYYMMDD>/<workspace-relative-path>`` — the origin path is the
-        record of where the entry came from, so nothing else has to be written down."""
-        day = datetime.now(tz=UTC).strftime("%Y%m%d")
-        rel = target.relative_to(self._workspace_root)
-        return self._dadaia / REAPED_ZONE / day / rel
+            for repo in ctx.all_repos() if ctx.state is ContextState.DEAD else ():
+                if (repo_path := self._repos_dir() / repo.slug).exists():
+                    actions.extend(self._reap_dead_repo(ctx, repo_path))
+        return actions + self.expire()
 
     def _reap(self, findings: tuple[Finding, ...]) -> list[str]:
         """MOVE every slop entry into the reaped zone. Never deletes."""
@@ -640,13 +507,7 @@ class DoctorService:
         for finding in findings:
             if finding.verdict is not FindingVerdict.SLOP:
                 continue
-            step = partial(
-                sweep.move,
-                self._workspace_root,
-                finding.target,
-                self._reaped_destination(finding.target),
-                finding.path,
-            )
+            step = partial(sweep.hold, self._workspace_root, finding.target, finding.path)
             actions.extend(sweep.guarded(finding.code, finding.path, step))
         return actions
 
@@ -659,37 +520,16 @@ class DoctorService:
 
         The leftover is MOVED, like every other reaped entry: a DEAD context whose repo is
         still on disk is exactly the case where an rmtree used to be irreversible."""
-        label = f"repos/{ctx.repo_slug}"
+        label = f"repos/{repo_path.name}"
         if repo_path.resolve().parent != self._repos_dir().resolve():
             return [f"INV-5: skipped '{label}' (outside repos/)"]
         current = self._store.get(ctx.name)
         if current is None or current.state is not ContextState.DEAD:
             return []
         step = partial(
-            sweep.move,
-            self._workspace_root,
-            repo_path,
-            self._reaped_destination(repo_path),
-            label,
-            note=f" (context {ctx.name})",
+            sweep.hold, self._workspace_root, repo_path, label, note=f" (context {ctx.name})"
         )
         return sweep.guarded("INV-5", label, step)
-
-    def _migrate_exceptions(self) -> list[str]:
-        """FR6: ``root_exceptions.txt`` -> ``INSTANCE_EXCEPTIONS`` through the one parser;
-        deleted in the release after every consumer has run it."""
-        old = self._states / "root_exceptions.txt"
-        new = self._workspace_root / workspace_layout.INSTANCE_EXCEPTIONS
-        if not old.is_file() or new.exists():
-            return []
-
-        def migrate() -> str:
-            globs = workspace_layout.parse_exception_globs(old.read_text(encoding="utf-8"))
-            new.write_text("".join(f"{g}\n" for g in globs), encoding="utf-8")
-            old.unlink()
-            return f"migrated '{old.name}' -> '{new.name}' ({len(globs)} globs)"
-
-        return sweep.guarded("EXCEPTIONS-MIGRATION", old.name, migrate)
 
     def _seed(self, finding: Finding) -> str:
         """A missing zone is a directory; the missing profile is written by the one store
@@ -719,17 +559,23 @@ class DoctorService:
         return actions
 
 
-def reap(workspace_root: Path) -> list[str]:
-    """The reaper lane, composed without the container (P-12).
-
-    ``sdd_post_gate``'s throttle and the SessionStart lane call this: seed what is
-    missing, move slop into ``reaped/``, delete what TTL expired. Hooks are sanctioned
-    direct importers of a feature and its stores; the composition root is not on the
-    write hot path.
-    """
-    states = workspace_root / ".dadaia" / "states"
-    service = DoctorService(JsonContextStore(states), GitSubprocessClient(), workspace_root)
-    return service.fix()
+def _ttl_walk(directory: Path, expiry: float, *, depth: int) -> list[tuple[Path, float]]:
+    """``(entry, mtime)`` per zone entry, each judged by its OWN ``lstat`` and never descended
+    into: a file, or a directory at *depth* (``tmp/<agent>/<YYYYMMDD>``, ``handoff/<ctx>/<file>``,
+    ``reaped/<YYYYMMDD>/<top>``). A shallower directory whose entries all expired — none left
+    means its own mtime expired — is itself one entry, reaped whole with its parents in one
+    run (bug reaper-judges-ttl-by-walking-every-file)."""
+    out: list[tuple[Path, float]] = []
+    for entry in sweep.walk(directory):
+        if (st := sweep.lstat(entry)) is None:
+            continue
+        is_dir = stat.S_ISDIR(st.st_mode)
+        below = _ttl_walk(entry, expiry, depth=depth - 1) if depth > 1 and is_dir else None
+        if below is None or (below or st.st_mtime < expiry) and all(t < expiry for _, t in below):
+            out.append((entry, max((t for _, t in below or ()), default=st.st_mtime)))
+        else:
+            out.extend(below)
+    return out
 
 
 # ── the `workspace` section of the one doctor (0.4.7 FR5, T-047-02) ──────────────
@@ -742,7 +588,7 @@ ERROR_VERDICTS = frozenset({FindingVerdict.SLOP, FindingVerdict.EXPIRED, Finding
 
 def workspace_rules(
     *, expired_only: bool = False, context: str | None = None
-) -> tuple[Rule[DoctorService, SectionFinding], ...]:
+) -> tuple[Rule[DoctorService], ...]:
     """This section's contribution to the ONE rule registry.
 
     Two rules, the service's two existing reads: the context invariants (`check()`,
@@ -757,37 +603,14 @@ def workspace_rules(
     """
 
     def invariants(service: DoctorService) -> list[SectionFinding]:
-        if expired_only:
-            return []
-        return [
-            SectionFinding(
-                code=issue.code,
-                verdict="error",
-                message=issue.description,
-                canonical=False,
-                error=True,
-            )
-            for issue in service.check()
-        ]
+        return [] if expired_only else service.check()
 
     def installed_hooks(service: DoctorService) -> list[SectionFinding]:
         """HOOKS-DRIFT-1 — its own rule because its fix is its own runnable line."""
-        if expired_only:
-            return []
-        return [
-            SectionFinding(
-                code=issue.code,
-                verdict="error",
-                message=issue.description,
-                canonical=False,
-                error=True,
-                fix=issue.fix,
-            )
-            for issue in service.check_installed_hooks(context)
-        ]
+        return [] if expired_only else service.check_installed_hooks(context)
 
     def entries(service: DoctorService) -> list[SectionFinding]:
-        findings = service.scan()
+        findings = service.scan_ttl() if expired_only else service.scan()
         if expired_only:
             findings = tuple(f for f in findings if f.verdict is FindingVerdict.EXPIRED)
         return [
@@ -797,6 +620,8 @@ def workspace_rules(
                 message=f"{finding.path}  {finding.detail}",
                 canonical=finding.canonical and finding.scored,
                 error=finding.verdict in ERROR_VERDICTS,
+                fix=finding.fix,
+                fixable=finding.fixable,
             )
             for finding in findings
         ]
@@ -813,6 +638,12 @@ def workspace_rules(
             SECTION,
             installed_hooks,
             fix_help=("ci", "install-hook", "--force", "--repo", "<repo>"),
+        ),
+        Rule(
+            ("PROJECTION",),
+            SECTION,
+            lambda service: [] if expired_only else service.check_projection(),
+            fix_help=("public", "install"),
         ),
         Rule(
             ("WS-ENTRY",),

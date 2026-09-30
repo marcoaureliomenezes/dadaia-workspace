@@ -5,27 +5,12 @@ from __future__ import annotations
 from pathlib import Path
 
 from dadaia_workspace.core.specs_version import CANONICAL_SPECS_VERSION
-from dadaia_workspace.features.backlog.document import load_document
 from dadaia_workspace.features.specs.canon import scaffold
 
 _REPO_ROOT = Path(__file__).parent.parent.parent.parent.parent
 _TEMPLATES_DIR = _REPO_ROOT / "dadaia_workspace" / "public" / "templates"
 
-# Expected canonical outputs (relative to specs_dir).
-# Since memory-markdown-source-v1 (T-MMS-10/11), scaffold emits ONLY .md born-markdown
-# files for memory atoms. Legacy .yaml stubs, .html files, and placeholder.html were
-# retired. The paths below are the complete scaffolded set, including scoped rules,
-# an empty generated catalog, and the v0.1.46
-# AC-4 per-artifact _archive dirs (FROZEN gate-class landing zone).
-#
-# v6 canon (T-050-05, FR1, specs_pattern_version 5 -> 6): root specs/_archive/ and
-# specs/assets/ retire — neither is a v6 canon root member (TREE-8) — replaced by a
-# new ADRs/ root member. Every scaffold README.md retires into its area's AGENTS.md
-# (backlog/, bugs/, releases/, audits/, ADRs/ now each carry one, matching root and
-# memory/). A directory is kept by its AGENTS.md: the .gitkeep landing-zone mechanism
-# for releases/_archive/ and the backlog/audits/bugs per-artifact
-# _archive/ dirs is retired — none of those is pre-created by a fresh scaffold; each
-# lands on disk the moment its first real artifact is written into it.
+# The complete v6 birth set (T-050-05): no README.md, no assets/, no .gitkeep.
 _EXPECTED_FILES = [
     "constitution.md",
     "AGENTS.md",
@@ -33,7 +18,6 @@ _EXPECTED_FILES = [
     "memory/ARCHITECTURE.md",
     "memory/QUALITY.md",
     "memory/product/index.md",
-    "memory/product/catalog.json",
     "releases/AGENTS.md",
     "backlog/AGENTS.md",
     "backlog/BACKLOG.json",
@@ -47,131 +31,43 @@ _EXPECTED_FILES = [
     "audits/_archive/audits_histo.jsonl",
 ]
 
-# T-050-05 (A1.1): the v6 canon root is exactly these 8 members — nothing else is
-# emitted directly under specs_dir by a fresh scaffold (retired: root _archive/,
-# assets/; new: ADRs/).
-_V6_CANON_ROOT = frozenset(
-    {"backlog", "bugs", "memory", "releases", "audits", "ADRs", "constitution.md", "AGENTS.md"}
-)
+
+def _scaffold(specs_dir: Path, *, name: str = "p", force: bool = False) -> list[Path]:
+    return scaffold(specs_dir, project_name=name, force=force, public_dir=_TEMPLATES_DIR.parent)
 
 
-def test_scaffold_happy_path_creates_all_artifacts(tmp_path: Path) -> None:
-    """A fresh directory scaffold creates all expected files with no errors, including
-    the per-artifact _archive dirs (v0.1.46 AC-4)."""
+def test_scaffold_emits_exactly_the_v6_birth_set(tmp_path: Path) -> None:
+    """Intent: CONTRACT — A1.1 (T-050-05): the written set is exactly the canon files, the
+    root is exactly the eight v6 members, no release is live, and the stubs carry
+    frontmatter and the current pattern version."""
     specs_dir = tmp_path / "specs"
-    result = scaffold(
-        specs_dir,
-        project_name="my-project",
-        force=False,
-        public_dir=_TEMPLATES_DIR.parent,
-    )
+    result = _scaffold(specs_dir)
 
-    assert len(result) == len(_EXPECTED_FILES), [str(p) for p in result]
-
-    for rel in _EXPECTED_FILES:
-        full = specs_dir / rel
-        assert full.exists(), f"Expected file/dir missing: {rel}"
-
-    # ACTIVE.md retired (v0.5.0 FR4/T-050-21A, A4.1): no replacement file — a fresh
-    # scaffold's "no active release" state is the honest absence of any directory
-    # under releases/ carrying a RELEASE.json.
-    assert not (specs_dir / "releases" / "ACTIVE.md").exists()
-    assert list((specs_dir / "releases").glob("*/RELEASE.json")) == []
-
-    # Born-markdown .md stubs exist and start with YAML frontmatter (memory-markdown-source-v1).
+    assert sorted(p.relative_to(specs_dir).as_posix() for p in result) == sorted(_EXPECTED_FILES)
+    assert {p.name for p in specs_dir.iterdir()} == {
+        "backlog",
+        "bugs",
+        "memory",
+        "releases",
+        "audits",
+        "ADRs",
+        "constitution.md",
+        "AGENTS.md",
+    }
+    assert list((specs_dir / "releases").glob("*/_RELEASE.json")) == []
     for rel in ("memory/ARCHITECTURE.md", "memory/QUALITY.md", "memory/product/index.md"):
-        content = (specs_dir / rel).read_text(encoding="utf-8")
-        assert content.startswith("---"), f"{rel} must start with YAML frontmatter"
-
-    assert f"specs_pattern_version: {CANONICAL_SPECS_VERSION}" in (
-        specs_dir / "constitution.md"
-    ).read_text(encoding="utf-8")
-    assert (specs_dir / "AGENTS.md").read_text(encoding="utf-8") == (
-        _TEMPLATES_DIR / "specs-AGENTS.md"
-    ).read_text(encoding="utf-8")
-
-
-def test_scaffold_emits_exact_v6_canon_root_zero_readme_zero_assets(tmp_path: Path) -> None:
-    """Intent: CONTRACT — A1.1 (T-050-05).
-
-    A freshly scaffolded workspace emits the v6 canon root exactly (backlog/, bugs/,
-    memory/, releases/, audits/, ADRs/, constitution.md, AGENTS.md) — nothing else
-    directly under specs_dir — and carries zero README.md and zero assets/ anywhere
-    in the scaffolded tree.
-    """
-    specs_dir = tmp_path / "specs"
-    scaffold(
-        specs_dir,
-        project_name="v6-project",
-        force=False,
-        public_dir=_TEMPLATES_DIR.parent,
-    )
-
-    root_entries = {p.name for p in specs_dir.iterdir()}
-    assert root_entries == _V6_CANON_ROOT, (
-        f"specs/ root must be exactly the v6 canon: {sorted(_V6_CANON_ROOT)}, "
-        f"got: {sorted(root_entries)}"
-    )
-
-    readmes = list(specs_dir.rglob("README.md"))
-    assert readmes == [], f"v6 canon emits zero README.md, found: {readmes}"
-
-    assert not (specs_dir / "assets").exists(), "v6 canon emits zero assets/"
-
-    for area in ("backlog", "bugs", "releases", "audits", "ADRs"):
-        assert (specs_dir / area / "AGENTS.md").exists(), f"{area}/AGENTS.md must exist"
-
-
-def test_scaffolded_backlog_skeleton_pins_writer_and_round_trips_load_document(
-    tmp_path: Path,
-) -> None:
-    """A fresh ``specs init`` scaffold's ``BACKLOG.json`` round-trips through
-    ``document.load_document`` with zero errors — an empty ``active`` array is a
-    legitimate empty model."""
-    specs_dir = tmp_path / "specs"
-    scaffold(
-        specs_dir,
-        project_name="pin-project",
-        force=False,
-        public_dir=_TEMPLATES_DIR.parent,
-    )
-
-    doc = load_document(specs_dir / "backlog")
-    assert doc.errors == ()
-    assert doc.active == ()
+        assert (specs_dir / rel).read_text(encoding="utf-8").startswith("---"), rel
+    constitution = (specs_dir / "constitution.md").read_text(encoding="utf-8")
+    assert f"specs_pattern_version: {CANONICAL_SPECS_VERSION}" in constitution
 
 
 def test_scaffold_idempotent_force_and_template_render(tmp_path: Path) -> None:
-    """Idempotence (second run writes nothing) and --force overwrite (mutated content
-    replaced)."""
+    """A second run writes nothing; --force replaces mutated content."""
     specs_dir = tmp_path / "specs"
+    assert len(_scaffold(specs_dir)) == len(_EXPECTED_FILES)
+    assert _scaffold(specs_dir) == []
 
-    first = scaffold(
-        specs_dir,
-        project_name="idempotent-project",
-        force=False,
-        public_dir=_TEMPLATES_DIR.parent,
-    )
-    assert len(first) == len(_EXPECTED_FILES)
-
-    second = scaffold(
-        specs_dir,
-        project_name="idempotent-project",
-        force=False,
-        public_dir=_TEMPLATES_DIR.parent,
-    )
-    assert second == []
-
-    # --force overwrites existing (mutated) files with canonical scaffold content.
     arch_path = specs_dir / "memory" / "ARCHITECTURE.md"
     arch_path.write_text("# MUTATED\n", encoding="utf-8")
-    third = scaffold(
-        specs_dir,
-        project_name="new-name",
-        force=True,
-        public_dir=_TEMPLATES_DIR.parent,
-    )
-    assert len(third) == len(_EXPECTED_FILES)
-    new_content = arch_path.read_text(encoding="utf-8")
-    assert "MUTATED" not in new_content
-    assert new_content.startswith("---")
+    assert len(_scaffold(specs_dir, name="new-name", force=True)) == len(_EXPECTED_FILES)
+    assert arch_path.read_text(encoding="utf-8").startswith("---")

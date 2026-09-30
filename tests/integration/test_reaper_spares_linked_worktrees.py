@@ -1,14 +1,7 @@
-"""The reaper never destroys a registered linked git worktree.
-
-Intent: CONTRACT — reaper-deletes-linked-git-worktrees. Size: MEDIUM (integration: a real
-``git worktree add``; the ``.git``-is-a-file shape and git's own ``prunable`` verdict are
-the contract, and no fake reproduces them).
-
-Structural cause pinned: ``sweep.remove``/``sweep.move`` — the one chokepoint every
-reaper deletion and slop move passes through — judged only "inside the workspace?".
-The TTL walk descends into a worktree and expires it file by file (its ``.git`` file
-included), and a slop move relocates it; either orphans git's registration and
-destroys uncommitted work.
+"""Intent: CONTRACT — reaper-deletes-linked-git-worktrees: `sweep.remove`/`sweep.move`,
+the one chokepoint of every reaper deletion and slop move, never touches a registered
+linked worktree — an expired one under `.dadaia/tmp/` or one at an unlisted root entry.
+Size: MEDIUM — git's own `.git`-file shape and `prunable` verdict are the contract.
 """
 
 from __future__ import annotations
@@ -21,7 +14,8 @@ from pathlib import Path
 import pytest
 
 from dadaia_workspace.features.spec_context.doctor import DoctorService
-from tests.fakes import FakeContextStore, FakeGitClient
+from dadaia_workspace.infrastructure.git_subprocess import GitSubprocessClient
+from tests.fixtures.stores import context_store
 
 _TWO_DAYS_AGO = time.time() - 2 * 86_400
 
@@ -67,29 +61,26 @@ def _age_tree(top: Path) -> None:
     os.utime(top, (_TWO_DAYS_AGO, _TWO_DAYS_AGO))
 
 
-def _assert_intact(repo: Path, worktree: Path) -> None:
+def _fix(root: Path) -> list[str]:
+    return DoctorService(
+        context_store(root / ".dadaia" / "states"), GitSubprocessClient(), root
+    ).fix()
+
+
+@pytest.mark.parametrize(
+    ("worktree_rel", "aged"),
+    [(".dadaia/tmp/claude/20200101/wt-a", ".dadaia/tmp/claude"), ("scratch/wt-b", "")],
+    ids=["ttl-reaper-expired-worktree", "slop-mover-unlisted-root-entry"],
+)
+def test_doctor_fix_never_reaps_or_moves_a_linked_worktree(
+    tmp_path: Path, worktree_rel: str, aged: str
+) -> None:
+    repo, worktree = _workspace_with_worktree(tmp_path, worktree_rel)
+    if aged:
+        _age_tree(tmp_path / aged)
+
+    _fix(tmp_path)
+
     assert (worktree / "uncommitted.txt").read_text(encoding="utf-8") == "work in progress"
     assert (worktree / ".git").is_file()
     assert "prunable" not in _git(repo, "worktree", "list", "--porcelain")
-
-
-def _fix(root: Path) -> list[str]:
-    return DoctorService(FakeContextStore(), FakeGitClient(), root).fix()
-
-
-def test_ttl_reaper_never_deletes_an_expired_linked_worktree(tmp_path: Path) -> None:
-    repo, worktree = _workspace_with_worktree(tmp_path, ".dadaia/tmp/claude/20200101/wt-a")
-    _age_tree(tmp_path / ".dadaia" / "tmp" / "claude")
-
-    _fix(tmp_path)
-
-    _assert_intact(repo, worktree)
-
-
-def test_slop_mover_never_moves_a_linked_worktree(tmp_path: Path) -> None:
-    """A worktree at an unlisted root entry is slop by classification — held, never moved."""
-    repo, worktree = _workspace_with_worktree(tmp_path, "scratch/wt-b")
-
-    _fix(tmp_path)
-
-    _assert_intact(repo, worktree)

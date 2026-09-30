@@ -1,11 +1,7 @@
-"""The ONE spelling of the workspace CLI (ADR 0045): its absolute path and the fix lines
-that invoke it. Every ``fix:`` naming the CLI is built here, so it runs from any cwd:
-``shlex`` on POSIX; on Windows forward slashes and double quotes only around a blank —
-the one form Git Bash (Claude Code's Windows shell), cmd and PowerShell all run — proven
-by executing it in each (``tests/contract/test_fix_line_runs_in_every_shell.py``). A
-quoted executable, i.e. a workspace path holding a blank, needs PowerShell's ``& ``
-prefix: the documented limitation.
-"""
+"""The ONE spelling of the workspace CLI and its venv tools (ADR 0045): absolute paths,
+so every ``fix:`` runs from any cwd — ``shlex`` on POSIX; on Windows forward slashes,
+double quotes only around a blank (Git Bash, cmd and PowerShell all run it; a quoted
+executable needs PowerShell's ``& ``, the documented limitation)."""
 
 from __future__ import annotations
 
@@ -18,20 +14,35 @@ from dadaia_workspace.core import platform
 
 def cli_path[P: PurePath](root: P) -> P:
     """The workspace CLI's real executable (``Scripts\\dadaia.exe`` on Windows)."""
-    return _venv_cli(root / ".dadaia" / ".venv")
+    return _venv_tool(root / ".dadaia" / ".venv", "dadaia")
 
 
 def fix_line(root: PurePath | None, *argv: str) -> str:
-    """``<absolute CLI> argv…`` quoted for the host shell. No workspace around the run
-    (*root* ``None``: CI over a bare checkout) names the CLI of the venv running now."""
-    return shell_line(
-        str(cli_path(root) if root is not None else _venv_cli(Path(sys.prefix))), *argv
-    )
+    """``<absolute CLI> argv…`` quoted for the host shell (:func:`venv_line` for the CLI)."""
+    return venv_line(root, "dadaia", *argv)
 
 
-def _venv_cli[P: PurePath](venv: P) -> P:
+#: The skills this package ships — present wherever the running CLI is installed.
+_SHIPPED_SKILLS = Path(__file__).resolve().parents[1] / "public" / "skills"
+
+
+def script_line(script: str, *argv: str) -> str:
+    """A skill script (its ``.agents/skills/…`` path) run from the copy the running CLI
+    ships, by the running interpreter — both absolute, true in any venv (pipx, poetry)."""
+    shipped = _SHIPPED_SKILLS / PurePath(script).relative_to(".agents/skills")
+    return venv_line(None, "python", str(shipped), *argv)
+
+
+def venv_line(root: PurePath | None, tool: str, *argv: str) -> str:
+    """``<absolute venv tool> argv…`` for *tool* (``dadaia``, ``pip``, ``python``) of the
+    workspace venv; no workspace (*root* ``None``: CI) names the venv running now."""
+    venv = root / ".dadaia" / ".venv" if root is not None else Path(sys.prefix)
+    return shell_line(str(_venv_tool(venv, tool)), *argv)
+
+
+def _venv_tool[P: PurePath](venv: P, tool: str) -> P:
     caps = platform.PLATFORM
-    return venv / caps.venv_scripts_dir / f"dadaia{caps.venv_exe_suffix}"
+    return venv / caps.venv_scripts_dir / f"{tool}{caps.venv_exe_suffix}"
 
 
 def git_line(repo: str | PurePath, *argv: str) -> str:
@@ -44,6 +55,20 @@ def shell_line(*parts: str) -> str:
     if platform.PLATFORM.venv_exe_suffix:  # Windows
         return " ".join(_win_quote(part.replace("\\", "/")) for part in parts)
     return shlex.join(parts)
+
+
+def mkdir_line(directory: PurePath) -> str:
+    """Create *directory* and its parents, idempotent — one interpreter line that runs
+    unchanged under sh, bash, cmd and PowerShell (no shell builtin differs per OS)."""
+    code = f"import pathlib; pathlib.Path(r'{directory}').mkdir(parents=True, exist_ok=True)"
+    return shell_line(sys.executable, "-c", code)
+
+
+def materialize_line(link: PurePath, target: PurePath) -> str:
+    """Replace the symlink *link* by a regular copy of *target* (``os.remove`` drops the
+    link, never its target) — the same interpreter line on every OS."""
+    code = f"import os, shutil; os.remove(r'{link}'); shutil.copyfile(r'{target}', r'{link}')"
+    return shell_line(sys.executable, "-c", code)
 
 
 def _win_quote(arg: str) -> str:

@@ -10,6 +10,7 @@ from pathlib import Path
 import pytest
 
 from dadaia_workspace.features.specs.doctor_adr import superseded_adr_citations
+from dadaia_workspace.features.specs.doctor_types import finding_path
 
 pytestmark = pytest.mark.unit
 
@@ -34,11 +35,11 @@ def test_superseded_citation_in_memory_and_skill_is_an_error(tmp_path: Path) -> 
 
     issues = superseded_adr_citations(specs, public)
 
-    assert [(i.code, Path(i.path or "").name) for i in issues] == [
+    assert [(i.code, Path(finding_path(i) or "").name) for i in issues] == [
         ("ADR-SUPERSEDED-CITATION", "ARCHITECTURE.md"),
         ("ADR-SUPERSEDED-CITATION", "SKILL.md"),
     ]
-    assert all("0005" in i.description for i in issues)
+    assert all("0005" in i.message for i in issues)
 
 
 def test_no_superseded_record_means_silence(tmp_path: Path) -> None:

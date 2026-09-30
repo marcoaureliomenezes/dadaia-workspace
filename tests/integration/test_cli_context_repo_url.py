@@ -121,8 +121,8 @@ def test_empty_url_refusal_ctx_url_1_doctor_flag_and_export_import_clone(
     assert alive.exit_code == 0, alive.output
     assert _record(workspace, "baz")["repo_url"] == ""
 
-    doctor_result = _runner.invoke(app, ["doctor"])
-    assert "CTX-URL-1" in doctor_result.output
+    # (d) CTX-URL-1 itself: tests/integration/test_unfixable_findings_carry_their_own_fix.py
+    # (sa-unfixable-doctor-findings-say-doctor-fix#S3; the substring check was hollow).
 
     # Named regression: export/import clone scenario (own slug "qux" to avoid collision
     # with "foo"/"bar"/"baz" above).

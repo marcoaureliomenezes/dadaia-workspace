@@ -1,21 +1,4 @@
-"""JsonHarnessProfileStore — JSON read/write over harness_profile.json (schema v1).
-
-The ``infrastructure`` adapter for the :class:`~dadaia_workspace.core.protocols.
-harness_profile_store.HarnessProfileStore` port, mirroring ``json_context_store.py``'s
-read/write style (atomic write via ``core.atomic_write.atomic_write``, explicit
-``_to_dict``/``_from_dict`` shaping). It persists the harness-selection profile a workspace was
-scaffolded for to ``.dadaia/states/harness_profile.json``:
-
-    {"schema_version": "1", "harnesses": ["claude"]}
-
-Consumed same-layer by ``public_assets`` install/doctor (v0.1.58 W3) to scope which
-runtime projections a single-harness workspace expects. :meth:`JsonHarnessProfileStore.write`
-is the ONE writer (0.4.6 FR8): ``WorkspaceService.init`` and ``DoctorService.fix`` both call
-it — the init-time inline copy that used to mirror this payload is gone.
-
-The adapter is stateless — the ``states_dir`` is supplied per call, matching the per-call
-workspace-root style ``WorkspaceService`` already uses for its ``PublicAssetManager``.
-"""
+"""JSON adapter for ``.dadaia/states/harness_profile.json`` — its ONE writer; stateless."""
 
 from __future__ import annotations
 
@@ -34,20 +17,14 @@ def _profile_path(states_dir: Path) -> Path:
 
 
 def _to_dict(profile: HarnessProfile) -> dict[str, object]:
-    return {
-        "schema_version": profile.schema_version,
-        "harnesses": list(profile.harnesses),
-    }
+    return {"schema_version": profile.schema_version, "harnesses": list(profile.harnesses)}
 
 
 def _from_dict(data: dict[str, object]) -> HarnessProfile:
     raw = data.get("harnesses", [])
     harnesses = tuple(raw) if isinstance(raw, list) else ()
     version = data.get("schema_version")
-    return HarnessProfile(
-        schema_version=str(version) if version is not None else "1",
-        harnesses=harnesses,
-    )
+    return HarnessProfile(str(version) if version is not None else "1", harnesses)
 
 
 class JsonHarnessProfileStore:
@@ -57,22 +34,12 @@ class JsonHarnessProfileStore:
         return _profile_path(states_dir)
 
     def read(self, states_dir: Path) -> HarnessProfile | None:
-        """Return the persisted profile, or ``None`` when the file is absent."""
+        """The persisted profile, or ``None`` when the file is absent."""
         path = _profile_path(states_dir)
-        if not path.exists():
-            return None
-        data = json.loads(path.read_text(encoding="utf-8"))
-        return _from_dict(data)
+        return _from_dict(json.loads(path.read_text(encoding="utf-8"))) if path.exists() else None
 
     def resolve(self, states_dir: Path, workspace_root: Path) -> HarnessProfile:
-        """Return the persisted profile, migrating a pre-profile workspace once.
-
-        A workspace scaffolded before the profile existed has no file and no flag to
-        fall back on: its roster IS the set of registered harness directories present
-        at *workspace_root*. Reading it here — the one reader — keeps every consumer
-        (``public install``, ``public doctor``, ``harness list``) on a single roster
-        and off an ``all`` default that would project harnesses nobody asked for.
-        """
+        """The persisted profile; without one, the registered harness directories present."""
         persisted = self.read(states_dir)
         if persisted is not None:
             return persisted
