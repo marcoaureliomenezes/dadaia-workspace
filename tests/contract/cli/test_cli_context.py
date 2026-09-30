@@ -67,25 +67,12 @@ def _register_alive_ctx(workspace: Path, name: str = "myctx") -> None:
     )
 
 
-def _session_record_for(workspace: Path, output: str) -> dict:
-    """Resolve the persisted session record from a bind command's confirmation output."""
-    import re
+def _record(workspace: Path) -> dict:
+    from dadaia_workspace.core import session_store
 
-    from dadaia_workspace.core import session_store as session_identity
-
-    session_id = ""
-    for line in output.strip().split("\n"):
-        if "DADAIA_SESSION_ID=" in line:
-            session_id = line.split("DADAIA_SESSION_ID=", 1)[1].strip()
-            break
-        m = re.search(r"(sess_[0-9a-f]+)", line)
-        if m:
-            session_id = m.group(1)
-            break
-    assert session_id, f"no session id in bind output: {output!r}"
-    record = session_identity.read_session(workspace, session_id)
-    assert record is not None, f"session record {session_id} not persisted"
-    return record
+    record = session_store.read_session(workspace, "sess_t1")
+    assert record is not None, "session record sess_t1 not persisted"
+    return dict(record)
 
 
 def test_context_create_show_list_happy_lifecycle(workspace: Path) -> None:
@@ -152,17 +139,20 @@ def test_context_error_matrix(workspace: Path, invoke_args: list[str]) -> None:
     assert result.exit_code != 0
 
 
-def test_context_bind_is_one_verb_with_one_argument(workspace: Path) -> None:
+def test_context_bind_is_one_verb_with_one_argument(
+    workspace: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """0.4.7 FR4: `bind <ctx>` exits 0, persists the record, prints a human
     confirmation — never a shell export line. No --mode, no --release, no --force,
     no --reason; the record carries neither `mode` nor `release`."""
+    monkeypatch.setenv("DADAIA_SESSION_ID", "sess_t1")
     _register_alive_ctx(workspace)
     result = _runner.invoke(app, ["context", "bind", "myctx"])
     assert result.exit_code == 0, result.output
     assert "export DADAIA_CONTEXT" not in result.output
     assert "myctx" in result.output
     assert "sess_" in result.output
-    record = _session_record_for(workspace, result.output)
+    record = _record(workspace)
     assert record["context"] == "myctx"
     assert "mode" not in record
     assert "release" not in record
@@ -172,43 +162,23 @@ def test_context_bind_is_one_verb_with_one_argument(workspace: Path) -> None:
         assert refused.exit_code != 0, f"{flag} must not exist any more"
 
 
-def test_context_bind_print_env_read_and_implementation_shapes(workspace: Path) -> None:
-    """sa-bind-has-two-stores#S11: in a shell with no session id, --print-env emits exactly
-    two eval-compatible export lines and persists the record; a shell with a native id
-    gets no eval epilogue (its record is the bind)."""
-    _register_alive_ctx(workspace)
-    result = _runner.invoke(app, ["context", "bind", "myctx", "--print-env"])
-    assert result.exit_code == 0, result.output
-    assert "export DADAIA_CONTEXT=myctx" in result.output
-    assert "export DADAIA_SESSION_ID=" in result.output
-    assert "export DADAIA_MODE" not in result.output, "0.4.7 FR4: two variables, no mode"
-    record = _session_record_for(workspace, result.output)
-    assert record["context"] == "myctx"
-    native = {**os.environ, "CLAUDE_CODE_SESSION_ID": "native-1"}
-    bound = _runner.invoke(app, ["context", "bind", "myctx", "--print-env"], env=native)
-    assert bound.exit_code == 0 and "export " not in bound.output, bound.output
-
-
 @pytest.mark.parametrize(
-    ("env", "session_id", "warns"),
+    ("env", "session_id"),
     [
-        # T-50-05 (SPEC v0.5.0 FR1): no harness id and no DADAIA_CONTEXT — minted, and warned loudly
-        pytest.param({}, None, True, id="no-id-mints-and-warns"),
         # bug bind-session-id-divergence: one stable harness-native id, never a minted sess_*
-        pytest.param({"CLAUDE_CODE_SESSION_ID": "claude-stable-abc123"}, "claude-stable-abc123", False, id="claude-native-id"),
-        pytest.param({"CODEX_THREAD_ID": "harness-session"}, "harness-session", False, id="codex-native-id"),
+        pytest.param({"CLAUDE_CODE_SESSION_ID": "claude-stable-abc123"}, "claude-stable-abc123", id="claude-native-id"),
+        pytest.param({"CODEX_THREAD_ID": "harness-session"}, "harness-session", id="codex-native-id"),
         # the eval-flow contract: an explicit DADAIA_SESSION_ID is reused, never re-minted
-        pytest.param({"DADAIA_SESSION_ID": "sess_stable01"}, "sess_stable01", None, id="dadaia-session-id"),
+        pytest.param({"DADAIA_SESSION_ID": "sess_stable01"}, "sess_stable01", id="dadaia-session-id"),
         # bug validation-027-f-07: env id AND harness id -> the env id owns the ONE record
-        pytest.param({"DADAIA_SESSION_ID": "sess_envfixed", "CLAUDE_CODE_SESSION_ID": "claude-native-xyz"}, "sess_envfixed", None, id="env-id-wins-one-record"),
+        pytest.param({"DADAIA_SESSION_ID": "sess_envfixed", "CLAUDE_CODE_SESSION_ID": "claude-native-xyz"}, "sess_envfixed", id="env-id-wins-one-record"),
     ],
 )  # fmt: skip
 def test_bind_resolves_one_session_identity(
     workspace: Path,
     monkeypatch: pytest.MonkeyPatch,
     env: dict[str, str],
-    session_id: str | None,
-    warns: bool | None,
+    session_id: str,
 ) -> None:
     """Two binds both exit 0 (peer presence is advisory) and persist the record under the one
     resolved identity — no global pointer, no second record, no minted stray."""
@@ -219,14 +189,8 @@ def test_bind_resolves_one_session_identity(
     _register_alive_ctx(workspace)
     outputs = [_runner.invoke(app, ["context", "bind", "myctx"]) for _ in range(2)]
     assert [r.exit_code for r in outputs] == [0, 0], outputs[0].output
-    if warns is not None:
-        assert ("reachable only" in outputs[0].output) is warns
-        assert "export DADAIA_CONTEXT" not in outputs[0].output
     sessions = workspace / ".dadaia" / "sessions"
     assert not (sessions / "runtime").exists()
-    if session_id is None:
-        assert _session_record_for(workspace, outputs[0].output)["context"] == "myctx"
-        return
     assert all(
         session_id in r.output and "sess_" not in r.output.replace(session_id, "") for r in outputs
     )
@@ -237,18 +201,19 @@ def test_bind_resolves_one_session_identity(
     )
 
 
-def test_bind_records_dadaia_runtime_env(workspace: Path) -> None:
+def test_bind_records_dadaia_runtime_env(workspace: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("DADAIA_SESSION_ID", "sess_t1")
     _register_alive_ctx(workspace)
 
     result = _runner.invoke(app, ["context", "bind", "myctx"])
     assert result.exit_code == 0, result.output
-    record = _session_record_for(workspace, result.output)
+    record = _record(workspace)
     assert record["runtime"] == "unknown"
 
     env_real = {**os.environ, "DADAIA_RUNTIME": "kimi-code"}
     result2 = _runner.invoke(app, ["context", "bind", "myctx"], env=env_real)
     assert result2.exit_code == 0, result2.output
-    record2 = _session_record_for(workspace, result2.output)
+    record2 = _record(workspace)
     assert record2["runtime"] == "kimi-code"
 
 
@@ -265,13 +230,10 @@ def test_context_show_json_session_null_then_populated_when_bound(workspace: Pat
     assert "session" in data
     assert data["session"] is None
 
-    bind_result = _runner.invoke(app, ["context", "bind", "myctx", "--print-env"])
-    assert bind_result.exit_code == 0, bind_result.output
-    lines = bind_result.output.strip().split("\n")
-    session_line = next(line for line in lines if "DADAIA_SESSION_ID" in line)
-    session_id = session_line.split("=")[1].strip()
-
+    session_id = "sess_t1"
     env = {**os.environ, "DADAIA_SESSION_ID": session_id}
+    bind_result = _runner.invoke(app, ["context", "bind", "myctx"], env=env)
+    assert bind_result.exit_code == 0, bind_result.output
     show_result = _runner.invoke(app, ["context", "show", "--json"], env=env)
     assert show_result.exit_code == 0, show_result.output
     data = json.loads(show_result.stdout)
@@ -420,13 +382,12 @@ def test_bind_with_no_live_release_exits_zero_and_the_next_write_is_allowed(
     _register_alive_ctx(workspace)
     assert not (workspace / "repos" / "myctx" / "specs" / "releases").exists()
 
+    monkeypatch.setenv("DADAIA_SESSION_ID", "sess_t1")
     result = _runner.invoke(app, ["context", "bind", "myctx"])
     assert result.exit_code == 0, result.output
 
     # sa-bind-has-two-stores#S4: the record the bind wrote is the bind — no env by hand.
-    record = _session_record_for(workspace, result.output)
-    monkeypatch.setenv("DADAIA_SESSION_ID", str(record["session_id"]))
-    target = workspace / "repos" / "myctx" / "specs" / "releases" / "0.0.1" / "SPEC.md"
+    target = workspace / "worktrees/myctx/0.0.1a-release/specs/releases/0.0.1/SPEC.md"
     block = pre_gate.evaluate_payload(
         {"tool_name": "Write", "tool_input": {"file_path": str(target)}}
     )

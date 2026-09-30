@@ -122,7 +122,7 @@ def _mk_hook_workspace(tmp_path: Path, ctx: str = "dummy-ctx") -> Path:
 
 def test_pre_gate_hook_never_mutates_tasks_md_between_read_and_edit(tmp_path: Path) -> None:
     ws = _mk_hook_workspace(tmp_path)
-    specs_dir = ws / "repos" / "dummy-ctx" / "specs"
+    specs_dir = ws / "worktrees" / "dummy-ctx" / "0.5.0a-impl" / "specs"
     target = _seed_release_tasks_md(specs_dir)
     before = target.read_text(encoding="utf-8")
 

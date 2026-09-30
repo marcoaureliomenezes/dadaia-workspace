@@ -18,7 +18,6 @@ from dadaia_workspace.cli._specs_resolution import resolve_specs_dir_for_cli
 from dadaia_workspace.cli.main import app
 from dadaia_workspace.core import session_store
 from dadaia_workspace.core.invocation import resolve
-from dadaia_workspace.features.spec_context import gate_policy
 from dadaia_workspace.features.workspace.onboarding import next_step
 from tests.fixtures.harness_env import (
     claude_hook_env,
@@ -119,12 +118,12 @@ def test_the_readers_agree_on_the_bind(
 
 
 def test_a_ghost_env_never_denies_and_is_surfaced(tmp_path: Path) -> None:
-    """sa-bind-has-two-stores#S3: a ghost DADAIA_CONTEXT is unbound (no scope deny) and
-    ctx_inject emits a warning line."""
+    """sa-bind-has-two-stores#S3: a ghost DADAIA_CONTEXT is unbound (an id-less worktree
+    write is the declared gap, ADR 0116) and ctx_inject emits a warning line."""
     ws = _workspace(tmp_path, "alpha")
     out = run_hook_subprocess("ctx_inject", {}, {**kimi_hook_env(ws), "DADAIA_CONTEXT": "ghost"})
     assert "! DADAIA_CONTEXT=ghost is not this session's bind" in out.stdout
-    target = ws / "repos" / "alpha" / "x.py"
+    target = ws / "worktrees" / "alpha" / "0.5.0a-impl" / "x.py"
     payload = {"tool_name": "Write", "tool_input": {"file_path": str(target)}}
     gate = run_hook_subprocess(
         "sdd_gate", payload, {**kimi_hook_env(ws), "DADAIA_CONTEXT": "ghost"}
@@ -140,7 +139,7 @@ def test_running_the_printed_scope_fix_clears_the_deny(
     ws = _workspace(tmp_path, "alpha", "beta")
     _record(ws, "s1", "alpha")
     env = {**claude_hook_env(ws, session_id="s1"), "DADAIA_CONTEXT": "alpha"}
-    target = ws / "repos" / "beta" / "x.py"
+    target = ws / "worktrees" / "beta" / "0.5.0a-impl" / "x.py"
     payload = {"tool_name": "Write", "tool_input": {"file_path": str(target)}, "session_id": "s1"}
     denied = run_hook_subprocess("sdd_gate", payload, env).block_envelope()
     assert denied is not None and "context bind beta" in denied["reason"]
@@ -149,16 +148,6 @@ def test_running_the_printed_scope_fix_clears_the_deny(
     monkeypatch.setenv("CLAUDE_CODE_SESSION_ID", "s1")
     assert CliRunner().invoke(app, ["context", "bind", "beta"]).exit_code == 0
     assert run_hook_subprocess("sdd_gate", payload, env).block_envelope() is None
-
-
-def test_an_env_bound_session_is_told_an_operator_step() -> None:
-    """sa-bind-has-two-stores#S5: with no session id the fix is to relaunch, not bind."""
-    _, message = gate_policy.evaluate(
-        "repos/beta/x.py", root=Path("/ws"), bound_context="alpha",
-        bound_repos=frozenset({"alpha"}), target_slug="beta", target_owner="beta",
-        bound_by_env=True,
-    )  # fmt: skip
-    assert message.endswith("fix: Operator action: relaunch this session with DADAIA_CONTEXT=beta")
 
 
 def test_an_unbound_session_in_a_repo_injects_no_memory(tmp_path: Path) -> None:
@@ -179,12 +168,23 @@ def test_a_bound_context_without_specs_gets_its_next_step(tmp_path: Path) -> Non
     assert "[alpha]" in out and "Next (" in out and "[no bound context]" not in out
 
 
-def test_binding_a_dead_context_refuses_with_the_alive_fix(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+@pytest.mark.parametrize(
+    ("sid", "name", "fix"),
+    [
+        pytest.param("s1", "gamma", "context alive gamma", id="S9-dead-context"),
+        pytest.param(None, "alpha", "export DADAIA_SESSION_ID=", id="ADR0116-no-id-never-mints"),
+    ],
+)
+def test_bind_refuses_with_its_fix_and_writes_no_record(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, sid: str | None, name: str, fix: str
 ) -> None:
-    """sa-bind-has-two-stores#S9."""
-    ws = _workspace(tmp_path, "gamma", dead=("gamma",))
+    """sa-bind-has-two-stores#S9; AC1.2: with no native id and no DADAIA_SESSION_ID the
+    bind exits non-zero with the export fix instead of minting an id no hook can see."""
+    ws = _workspace(tmp_path, "gamma", "alpha", dead=("gamma",))
+    scrub_context_resolution_env(monkeypatch)
     monkeypatch.chdir(ws)
-    result = CliRunner().invoke(app, ["context", "bind", "gamma"])
-    assert result.exit_code == 1
-    assert "context alive gamma" in result.output
+    if sid:
+        monkeypatch.setenv(_CLAUDE, sid)
+    result = CliRunner().invoke(app, ["context", "bind", name])
+    assert result.exit_code == 1 and fix in result.output
+    assert not list((ws / ".dadaia").glob("sessions/*.json"))

@@ -3,7 +3,6 @@
 import json
 import os
 import sys
-import uuid
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -114,14 +113,6 @@ def _live_session(workspace_root: Path, session_id: str) -> dict[str, Any] | Non
     owner's predicate (:func:`core.session_store.live_session`, F002)."""
     record = session_store.live_session(workspace_root, session_id)
     return None if record is None else dict(record)
-
-
-def resolve_own_session_id(*, explicit: str | None = None, mint: bool = False) -> str | None:
-    """THIS caller's session identity: *explicit* (a verb's own override), else the ONE
-    session-id rule (:func:`core.invocation.resolve_session_id`, no payload), else — when
-    *mint* is set — a fresh ``sess_*`` id, the write-side fallback ``bind`` owns."""
-    sid = explicit or resolve_session_id(None, os.environ)
-    return sid or (f"sess_{uuid.uuid4().hex[:8]}" if mint else None)
 
 
 def print_next_step(workspace_root: Path, focus: str | None = None) -> None:
@@ -379,8 +370,6 @@ def bind(
     associated repos.
     """
     workspace_root = resolve_workspace_root()
-    sessions_dir = _sessions_dir(workspace_root)
-    sessions_dir.mkdir(parents=True, exist_ok=True)
 
     svc = _ctx_service()
     try:
@@ -389,10 +378,15 @@ def bind(
             fail(f"Context '{name}' is DEAD — bring it back first.\nfix: {fix}")
     except ContextNotFoundError as e:
         fail(e)
-
-    # Stable session identity (bug bind-session-id-divergence, 2026-07-15): the SAME
-    # resolution order the gate/hooks use, so rebinds UPDATE one record.
-    session_id = resolve_own_session_id(mint=True) or ""
+    # ADR 0116: the gate, the hooks and this record share one id; bind never mints one.
+    session_id = resolve_session_id(None, os.environ)
+    if not session_id:
+        fail(
+            "No session id in this shell: a bind needs one the gate and the hooks can see.\n"
+            "fix: Operator action: export DADAIA_SESSION_ID=<any-stable-id> before opening "
+            "the session"
+        )
+    _sessions_dir(workspace_root).mkdir(parents=True, exist_ok=True)
     session_store.write_session(
         workspace_root,
         session_id,
@@ -405,19 +399,10 @@ def bind(
         ),
     )
 
-    # An id-less shell's bind lives in its env: the eval epilogue is its only path (#S11).
-    if not resolve_session_id(None, os.environ):
-        if print_env:
-            for line in session_store.binding_env_lines(name, session_id):
-                print(line)
-            return
-        if os.environ.get("DADAIA_CONTEXT") != name:
-            print(
-                f"! No session id in this shell — this binding is reachable only where "
-                f"DADAIA_CONTEXT={name} is exported (`eval $(... --print-env)`).",
-                file=sys.stderr,
-            )
-
+    if print_env:
+        for line in session_store.binding_env_lines(name, session_id):
+            print(line)
+        return
     console.print(f"[green]✓[/green] Bound to '[bold]{name}[/bold]' (session id: {session_id})")
 
 

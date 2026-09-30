@@ -26,7 +26,6 @@ __all__ = [
     "DADAIA_ZONES",
     "HARNESS_DIRS",
     "DADAIAIGNORE",
-    "SPECS_ADDITIVE_GLOBS",
     "MEMORY_TOPLEVEL_FILES",
     "REPO_LAW",
     "REPO_TREE_ARTIFACTS",
@@ -74,10 +73,10 @@ AUDIT_DIR_NAME_RE: re.Pattern[str] = re.compile(f"^{AUDIT_DIR_NAME_PATTERN}$")
 #: The operator's file of legitimate workspace paths, at the root (ADRs 0092, 0145).
 DADAIAIGNORE: str = ".dadaiaignore"
 
-#: Files the workspace root may contain: the root map, the operator prompt, the credential
-#: home, the operator's own globs.
+#: Files the workspace root may contain: the root map, the operator prompt, the git ignore,
+#: the operator's own globs — credentials live outside the workspace (ADR 0146).
 ROOT_ALLOWED_FILES: frozenset[str] = frozenset(
-    {"AGENTS.md", "prompt.md", ".env", ".gitignore", DADAIAIGNORE}
+    {"AGENTS.md", "prompt.md", ".gitignore", DADAIAIGNORE}
 )
 
 
@@ -291,11 +290,6 @@ def public_scripts_dir() -> Path:
     """The shipped ``public/scripts/`` directory (path arithmetic, no filesystem read)."""
     return Path(__file__).resolve().parents[1] / "public" / "scripts"
 
-
-#: The ADDITIVE ``specs/`` paths (``fnmatch``): the ledger areas and every ``_histo.jsonl``.
-SPECS_ADDITIVE_GLOBS: tuple[str, ...] = (
-    "specs/backlog/*", "specs/bugs/*", "specs/audits/*", "specs/*/_archive/*_histo.jsonl",
-)  # fmt: skip
 
 #: Every projection directory at the workspace root: ``.agents`` plus each harness's own.
 HARNESS_DIRS: frozenset[str] = frozenset(

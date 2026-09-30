@@ -37,7 +37,7 @@ _TABLE = [
     ("prompt.md", None, None, True),
     ("specs/bugs/x.md", None, None, False),
     (".dadaia/newzone/x.txt", None, None, False),
-    ("repos/x/f.py", None, None, True),
+    ("worktrees/x/0.5.0a-impl/f.py", None, None, True),
     (".dadaia/tmp/agent/20260927/x.txt", None, None, True),
 ]
 

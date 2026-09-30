@@ -1,8 +1,8 @@
 """Path taxonomy and bind scope of the SDD gate (v0.4.5 A1.2; 0.4.7 FR1, FR3 AC3.1).
 
-Intent: CONTRACT — the class of a path depends only on its context-relative remainder, never on
-the slug; LAW is decided by origin (the projected set), never by basename; the bind scope is
-the third gate block.
+Intent: CONTRACT — T-050-97 (AC1.1): no repos/ path is ADDITIVE; LAW is decided by origin (the
+projected set), never by basename; a write out of the bind's scope names `context bind`, and
+every write under repos/<r>/ outside specs/audits/ names the worktree of the right kind.
 """
 
 from __future__ import annotations
@@ -21,44 +21,25 @@ from dadaia_workspace.features.spec_context.gate_policy import (
 
 _ROOT = Path("/ws")
 A, M, P = PathClass.ADDITIVE, PathClass.MUTATING, PathClass.PROTECTED
-_SLUGS = ("dadaia-workspace", "sample-engine")
-_CTX_REL = (
-    ("specs/bugs/concurrency-warning.md", A),
-    ("specs/backlog/epic.md", A),
-    ("specs/audits/2026-01-01T000000Z-abc12345/index.md", A),
-    ("specs/releases/_archive/releases_histo.jsonl", A),
-    ("specs/memory/architecture.md", M),
-    ("specs/memory/product/catalog.md", M),
-    ("specs/releases/_archive/v0.1.9/SPEC.md", M),
-    ("specs/releases/v0.1.10/SPEC.md", M),
-    ("specs/constitution.md", M),
-    ("specs/some-loose-file.md", M),
-    ("dadaia_workspace/features/spec_context/gate_policy.py", M),
-    ("src/engine/run.py", M),
-    ("pyproject.toml", M),
-    ("README.md", M),
-    ("Makefile", M),
-    ("tests/unit/test_x.py", M),
-    # repo-agents-md-law-gate-contradicts-template: a repo's own AGENTS.md is never LAW
-    ("AGENTS.md", M),
+_IN_REPO = (
+    "specs/bugs/BUGS.jsonl",
+    "specs/audits/20260101-x/index.md",
+    "src/engine/run.py",
+    "AGENTS.md",
 )
 
 
 # fmt: off
 @pytest.mark.parametrize(("path", "expected"), [
-    *[pytest.param(f"repos/{slug}/{rel}", cls, id=f"in-repo-{slug}-{rel}") for rel, cls in _CTX_REL for slug in _SLUGS],
-    # sa-gate-allows-root-entries-the-reaper-moves#E5: root specs/ is no entry, so no ADDITIVE verdict applies at the root.
-    *[pytest.param(rel, M, id=f"root-{rel}") for rel, _ in _CTX_REL],
-    pytest.param("/specs/bugs/x.md", M, id="leading-slash-stripped"),
-    pytest.param("/repos/foo/specs/bugs/a.md", A, id="leading-slash-in-repo-additive"),
+    # additive-globs-hand-kept-beside-the-canon: no specs path is always writable (ADR 0124)
+    *[pytest.param(f"repos/sample-engine/{rel}", M, id=f"in-repo-{rel}") for rel in _IN_REPO],
+    *[pytest.param(rel, M, id=f"root-{rel}") for rel in _IN_REPO],
+    pytest.param("/repos/foo/specs/bugs/a.md", M, id="leading-slash-stripped"),
     pytest.param(".dadaia/mcps/server/s.json", A, id="root-dadaia-mcps"),
     pytest.param(".dadaia/handoff/ctx/h.json", A, id="root-dadaia-handoff"),
     pytest.param(".dadaia/tmp/agent/x.txt", A, id="root-dadaia-tmp"),
     pytest.param(".dadaia/sessions/runtime/ctx.ptr", P, id="root-session-state-protected"),
     pytest.param(".dadaiaignore", P, id="root-dadaiaignore-operator-only"),
-    pytest.param("some/loose/path.txt", M, id="root-loose"),
-    pytest.param("repos/foo", M, id="bare-repo-no-remainder"),
-    pytest.param("repos/foo/", M, id="bare-repo-trailing-slash"),
     pytest.param("CLAUDE.md", M, id="AC3.1-root-claude-md-is-not-law"),
     *[pytest.param(p, M, id=f"AC3.1-retired-mirror-{p}") for p in (".codex/AGENTS.md", ".kimi-code/AGENTS.md", ".agents/AGENTS.md", ".claude/rules/AGENTS.md")],
 ])
@@ -67,33 +48,37 @@ def test_classification_matrix(path: str, expected: PathClass) -> None:
     assert classify_path(path) == expected
 
 
-_BOUND_A: dict[str, object] = {"bound_context": "ctx-a", "bound_repos": frozenset({"ctx-a", "ctx-a-infra"})}
-_B = {**_BOUND_A, "target_slug": "ctx-b", "target_owner": "ctx-b"}
+_A: dict[str, object] = {"context": "ctx-a", "repos": frozenset({"ctx-a", "ctx-a-infra"})}
 _DADAIA = "/ws/.dadaia/.venv/Scripts/dadaia.exe" if sys.platform == "win32" else "/ws/.dadaia/.venv/bin/dadaia"
-_OWN = {**_BOUND_A, "target_slug": "ctx-a", "target_owner": "ctx-a"}
+_WT = "fix: python3 .agents/skills/dd-gitflow-default/scripts/worktree.py new {} --kind {}"
+
+
+def _at(zone: str, repo: str, owner: str | None = None, **session: object) -> dict[str, object]:
+    return {"zone": zone, "repo": repo, "owner": owner or repo, **session}
 
 
 # fmt: off
 @pytest.mark.parametrize(("path", "kwargs", "fix"), [
-    pytest.param("specs/audits/_archive/audits_histo.jsonl", {}, None, id="area-histo-append"),
-    pytest.param("specs/releases/_archive/releases_histo.jsonl", {}, None, id="releases-histo-append"),
-    pytest.param("specs/bugs/20260701T00Z-00.jsonl", {}, None, id="live-bugs-write"),
-    pytest.param("repos/existing/AGENTS.md", {}, None, id="A1.2-existing-nonmanifest-repo-agents-md-editable"),
-    pytest.param("repos/ctx-b/src/x.py", _B, f"fix: {_DADAIA} context bind ctx-b", id="write-outside-the-bind-scope-names-the-bind"),
-    pytest.param("repos/ctx-a-infra/main.tf", {**_BOUND_A, "target_slug": "ctx-a-infra", "target_owner": "ctx-a"}, None, id="associated-repo-in-scope"),
-    pytest.param("repos/ctx-b/src/x.py", {"target_slug": "ctx-b", "target_owner": "ctx-b"}, None, id="unbound-session-never-scope-blocked"),
-    pytest.param("repos/stranger/src/x.py", {**_BOUND_A, "target_slug": "stranger"}, None, id="unregistered-slug-fails-open"),
-    pytest.param("repos/ctx-b/specs/bugs/BUGS.jsonl", _B, None, id="B39-4-foreign-ledger-stays-writable"),
-    pytest.param("repos/ctx-b/specs/releases/_archive/releases_histo.jsonl", _B, None, id="B39-4-foreign-histo-stays-writable"),
-    pytest.param("specs/memory/ARCHITECTURE.md", _OWN, None, id="memory-write-allowed-every-phase"),
-    pytest.param("repos/ctx-a/specs/memory/product/catalog.json", _OWN, None, id="in-repo-memory-write-allowed"),
+    pytest.param("specs/releases/_archive/releases_histo.jsonl", {}, None, id="root-path-in-scope-under-any-bind"),
+    pytest.param("worktrees/ctx-a/0.5.0a-impl/src/x.py", _at("worktree", "ctx-a", **_A), None, id="AC1.1-own-worktree-allowed"),
+    pytest.param("worktrees/ctx-a-infra/0.5.0a-impl/main.tf", _at("worktree", "ctx-a-infra", "ctx-a", **_A), None, id="associated-repo-worktree-in-scope"),
+    pytest.param("repos/ctx-a/specs/audits/20260101-x/index.md", _at("audit", "ctx-a", **_A), None, id="AC1.1-own-audit-allowed"),
+    pytest.param("repos/ctx-a/src/x.py", _at("repo", "ctx-a", **_A), _WT.format("ctx-a", "impl"), id="AC1.1-own-repo-code-is-merge-only"),
+    pytest.param("repos/ctx-a/specs/bugs/BUGS.jsonl", _at("repo", "ctx-a", **_A), _WT.format("ctx-a", "bug"), id="ADR0124-ledger-no-longer-always-writable"),
+    pytest.param("repos/ctx-a/specs/releases/_archive/releases_histo.jsonl", _at("repo", "ctx-a", **_A), _WT.format("ctx-a", "release"), id="ADR0124-histo-no-longer-always-writable"),
+    pytest.param("repos/ctx-b/src/x.py", _at("repo", "ctx-b", **_A), f"fix: {_DADAIA} context bind ctx-b", id="write-outside-the-bind-scope-names-the-bind"),
+    pytest.param("worktrees/ctx-b/0.5.0a-impl/src/x.py", _at("worktree", "ctx-b"), f"fix: {_DADAIA} context bind ctx-b", id="unbound-native-session-refused-names-the-bind"),
+    pytest.param("worktrees/ctx-b/0.5.0a-impl/src/x.py", _at("worktree", "ctx-b", has_id=False), None, id="ADR0116-id-less-unbound-worktree-is-the-declared-gap"),
+    pytest.param("repos/ctx-b/src/x.py", _at("repo", "ctx-b", has_id=False), _WT.format("ctx-b", "impl"), id="ADR0105-repos-refused-for-every-session"),
+    pytest.param("repos/stranger/src/x.py", {**_at("repo", "stranger", **_A), "owner": None}, _WT.format("stranger", "impl"), id="unregistered-slug-still-merge-only"),
+    pytest.param("repos/beta/x.py", _at("repo", "beta", context="alpha", repos=frozenset({"alpha"}), has_id=False), "fix: Operator action: relaunch this session with DADAIA_CONTEXT=beta", id="sa-bind-has-two-stores#S5-env-bound-is-told-an-operator-step"),
     pytest.param("AGENTS.md", {"projected": frozenset({"AGENTS.md"})}, f"fix: {_DADAIA} public install", id="S6-projected-law-one-restore-command"),
 ])
 # fmt: on
 def test_evaluate_decides_allow_or_block_with_one_fix(path: str, kwargs: dict[str, object], fix: str | None) -> None:
-    """sa-gate-path-classes-diverge-from-the-law#B39-4 (any `_archive/*_histo.jsonl` and ledger ALLOW, a
-    foreign repo's included); sa-fix-lines-not-built-by-cli-line#S6 (a BLOCK ends in ONE command, no `&&`);
-    the MEMORY class is deleted — memory authorship is audited, never gated (0.4.7 FR1)."""
+    """unbound-native-session-writes-freely-into-repos and additive-globs-hand-kept-beside-the-canon
+    (restoring either ALLOW turns its row red); sa-fix-lines-not-built-by-cli-line#S6 (a BLOCK ends
+    in ONE command, no `&&`); memory authorship is audited, never gated (0.4.7 FR1)."""
     decision, message = evaluate(path, root=_ROOT, **kwargs)  # type: ignore[arg-type]
     assert decision == (Decision.ALLOW if fix is None else Decision.BLOCK)
     if fix is None:

@@ -56,20 +56,18 @@ def test_block_message_lists_every_whitelisted_entry(tmp_path: Path) -> None:
     reason = block["reason"]
     assert (
         ".agents/ .claude/ .codex/ .cursor/ .dadaia/ .devin/ .git/ .github/ repos/ worktrees/ "
-        ".dadaiaignore .env .gitignore AGENTS.md prompt.md"
+        ".dadaiaignore .gitignore AGENTS.md prompt.md"
     ) in reason
     assert "instance_exceptions" not in reason
 
 
-@pytest.mark.parametrize("name", [".env", ".gitignore", "AGENTS.md", "prompt.md"])
+@pytest.mark.parametrize("name", [".gitignore", "AGENTS.md", "prompt.md"])
 def test_law_declared_root_files_are_canon_for_the_hook_and_the_doctor(
     tmp_path: Path, name: str
 ) -> None:
-    """sa-gate-allows-root-entries-the-reaper-moves#E8, #E6. Bug
-    doctor-root1-flags-env-that-dadaia-md-9-declares-canonical: the root `AGENTS.md` map §4
-    names the root ``.env`` as the one credential home and §5.3 presumes a root
-    ``.gitignore``, yet ``ROOT_ALLOWED_FILES`` listed neither — the hook blocked the write
-    and the doctor flagged the file. Both derive from that one set, so one row fixes both."""
+    """sa-gate-allows-root-entries-the-reaper-moves#E8, #E6: the hook and the doctor derive
+    from ``ROOT_ALLOWED_FILES``, so one row admits a file to both. ``.env`` left it (ADR 0146
+    (1): credentials live outside the workspace); the block message above no longer names it."""
     from dadaia_workspace.features.spec_context.doctor import DoctorService, FindingVerdict
 
     ws = _ws(tmp_path)

@@ -13,6 +13,7 @@ import re
 from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Literal
 
 from dadaia_workspace.core import workspace_resolver
 from dadaia_workspace.core.cli_line import fix_line
@@ -26,18 +27,19 @@ __all__ = [
     "HARNESS_SESSION_ID_ENV_VARS",
     "Bind",
     "Invocation",
+    "Zone",
     "all_repos",
     "alive_context_trees",
     "context_name_for_repo_slug",
     "repo_owner",
     "repo_slug_for_context",
-    "repo_slug_under_repos",
     "resolve",
     "resolve_bind",
     "resolve_context_specs_dir",
     "resolve_specs_dir",
     "resolve_session_id",
     "sanitize_session_id",
+    "scope",
 ]
 
 #: Harness-native session-id env vars, in resolution order (a modern Codex subprocess
@@ -54,7 +56,7 @@ _SESSION_ID_STRIP = re.compile(r"[^A-Za-z0-9_-]")
 @dataclass(frozen=True)
 class Bind:
     """The session's own binding: its context and every repo slug that context owns.
-    Unbound (``None``, empty ``repos``) is never scope-blocked."""
+    Unbound (``None``, empty ``repos``) owns no repo."""
 
     context_name: str | None = None
     repos: frozenset[str] = frozenset()
@@ -140,9 +142,9 @@ def context_name_for_repo_slug(workspace_root: Path, slug: str) -> str | None:
 
 
 def repo_owner(workspace_root: Path, path: Path) -> tuple[str, str, str] | None:
-    """``(context, repo slug, main repo slug)`` for any path under ``repos/<slug>/``, or
+    """``(context, repo slug, main repo slug)`` for any path :func:`scope` gives a repo, or
     ``None`` when no registered context owns it."""
-    slug = repo_slug_under_repos(workspace_root, path)
+    slug, _ = scope(workspace_root, path)
     owner = _owning_entry(workspace_root, slug) if slug else None
     return (owner[0], str(slug), owner[1]) if owner else None
 
@@ -162,19 +164,25 @@ def _owning_entry(workspace_root: Path, slug: str) -> tuple[str, str] | None:
     return None
 
 
-def repo_slug_under_repos(workspace_root: Path, path: Path) -> str | None:
-    """First path component of *path* under ``<workspace_root>/repos/``, sanitized
-    (CWE-22/CWE-59), or ``None``. *path* need not exist."""
-    repos_dir = workspace_root / "repos"
+Zone = Literal["root", "repo", "audit", "worktree"]
+
+
+def scope(workspace_root: Path, path: Path) -> tuple[str | None, Zone]:
+    """The one path-to-repo decider: ``(repo, zone)``. ``worktrees/<r>/**`` belongs to ``r``
+    (worktree), ``repos/<r>/specs/audits/**`` is audit, the rest of ``repos/<r>/`` repo,
+    anything else root. *path* need not exist; a slug outside the name grammar is root
+    (CWE-22/CWE-59)."""
     try:
-        rel = path.resolve().relative_to(repos_dir.resolve())
+        parts = path.resolve().relative_to(workspace_root.resolve()).parts
     except (ValueError, OSError):
-        return None
-    parts = rel.parts
-    if not parts:
-        return None
-    slug = parts[0]
-    return slug if CONTEXT_NAME_RE.fullmatch(slug) else None
+        return None, "root"
+    if len(parts) < 2 or parts[0] not in ("repos", "worktrees"):
+        return None, "root"
+    if not CONTEXT_NAME_RE.fullmatch(parts[1]):
+        return None, "root"
+    if parts[0] == "worktrees":
+        return parts[1], "worktree"
+    return parts[1], "audit" if parts[2:4] == ("specs", "audits") else "repo"
 
 
 def _root_from(start: Path) -> Path | None:
@@ -250,7 +258,7 @@ def resolve(
     bind = resolve_bind(root, session_id, env)
 
     def owner(path: Path | None) -> str | None:
-        slug = repo_slug_under_repos(root, path) if root and path else None
+        slug = scope(root, path)[0] if root and path else None
         return context_name_for_repo_slug(root, slug) if root and slug else None
 
     rungs = (

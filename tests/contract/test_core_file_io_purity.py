@@ -167,7 +167,7 @@ _PATH_CLASS_OWNERS = {"features/spec_context/gate_policy.py", "core/workspace_la
 
 
 def _path_class_tables_read_elsewhere() -> list[str]:
-    tables = {"SPECS_ADDITIVE_GLOBS", "additive_prefixes"}
+    tables = {"additive_prefixes"}
     return [
         _rel(path)
         for path, tree in _trees()
