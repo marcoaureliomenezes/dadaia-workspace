@@ -84,7 +84,7 @@ Rationale: a CI job that needs a paid model key fails closed on every PR without
 
 - `flaky` marks a pass-and-fail on identical code; `quarantine` leaves every gating selector, is bug-gated by P-22, and the lane is empty.
 - Quarantine cap, escalation clock, diagnostic reruns, flake-rate target and the LARGE cap have one home each in `dd-test-stewardship`'s `PARAMETERS.md`.
-- The structural audit fires when a `PARAMETERS.md` ceiling is crossed — flake rate, LARGE count, quarantine cap; wall-clock growth is a closure readout with no pinned number.
+- The structural audit fires when a `PARAMETERS.md` ceiling is crossed — flake rate, LARGE count, quarantine cap, and the per-job wall-clock budget frozen by ADR 0119 (growth past it is a budget breach).
 - Every LARGE test carries a demotion, supersession or keep-justification, and the tree misses the LARGE cap.
 - Curation is a `code-reviewer` verdict (QA lens); `software-engineer` executes.
 - Mutation testing runs once per release off the push path (`mutmut==3.7.0`); its score is evidence, never a gate, and the `core/models/` score ratchets upward only.
