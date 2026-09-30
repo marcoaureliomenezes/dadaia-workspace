@@ -25,12 +25,12 @@
 - `CONTEXT.md` holds the terms.
 - **W1** is this candidate.
 - **W2–W7** are the target waves of candidates 6+ (§Carried), each gated per §Gate. Inside W6, `CONTEXT.md`'s harm-ordered sense of **Wave** applies.
-- **DEL**: the bug is closed by `bugs.py resolve` in the commit that deletes its surface.
+- **DEL**: the bug is resolved by `bugs.py resolve` citing the commit that deleted its surface; a bug a task fixes resolves in a bug worktree (0148 (2)).
 - **FR**: the item is delivered by ACs.
 
 ## Decisions
 
-- These ADRs decide: 0097, 0099, 0100, 0103, 0105–0117, 0124–0131, 0135 (read path only), 0136, 0140, 0141.
+- These ADRs decide: 0097, 0099, 0100, 0103, 0105–0117, 0124–0131, 0135 (read path only), 0136, 0140, 0141, 0147, 0148.
 - The PLAN carries the Parallel schedule of ADR 0141 from the task after `worktree.py merge`; closure logs planned against measured width, the critical path walked and every rebase conflict.
 - A reader imports the owner script's read-only parser (0135): `worktree.py` imports `release.py`'s status parser, `backlog.py` imports `bugs.py`'s record reader. Running another script's verb stays forbidden (0018). ADR 0126's `measured_by` is repaired to match ("chore(adrs): repair 0126 measured_by").
 - A backlog entry that is a contract break is delivered as an FR of the candidate owning its cause and exits `delivered`, with no new bug record (operator). `to-bug` (0137) stays for future cases.
@@ -68,16 +68,17 @@ F019–F051 share the destination of the bug each cites. F090–F112 share the d
 ### Scope and bind
 
 - AC1.1 One decider, `scope(target) -> (repo, zone)`, zone ∈ root|repo|audit|worktree (never "kind", which names the four worktree kinds); a path under `worktrees/<r>/` belongs to `r`.
-  - A bound file-tool write under `repos/<r>/` outside `specs/audits/**` is refused with `fix: worktree.py new <r> --kind <kind>`, the kind taken from `worktree.py`'s KINDS table as the one whose allowed set holds the path.
+  - A bound file-tool write under `repos/<r>/` outside `specs/audits/**` is refused with `fix: worktree.py new <r> --kind <kind>`, the kind from `kind_holding()` in `_worktree_kinds.py`; a path no kind holds gets an `Operator action:` fix.
   - The same write is allowed under `worktrees/<r>/<name>/` and under `repos/<r>/specs/audits/` (0124).
   - An unbound session with a native id is refused under both, with the `context bind` fix (0072).
   - An unbound session with no native id and no `DADAIA_SESSION_ID` is not refused under `worktrees/<r>/`. This is a declared gap: refusing it would be a Stall, because the harness process env is not the shell env (0116). A write under `repos/<r>/` is refused for every session (0105).
   - `pytest tests/unit/features/spec_context/test_gate_policy.py tests/unit/hooks/test_sdd_gate.py` passes.
   - The row `unbound-session-never-scope-blocked` (`test_gate_policy.py:83`) and the always-writable ledger rows are rewritten to the refusals above. Restoring the unbound ALLOW fails them (F070).
-  - `git grep -nE 'SPECS_ADDITIVE_GLOBS|bound_|_scope_block' -- dadaia_workspace` prints nothing. One path-to-repo decider remains: `core/invocation.py` and `hooks/sdd_gate.py` today.
+  - `git grep -nE 'SPECS_ADDITIVE_GLOBS|_is_specs_additive|_scope_block' -- dadaia_workspace` prints nothing. One path-to-repo decider remains: `core/invocation.py` and `hooks/sdd_gate.py` today.
 - AC1.2 The bound injection carries `constitution.md` on every harness, Cursor and Copilot included (0103).
   - With no native id and no `DADAIA_SESSION_ID`, bind exits non-zero with the export fix (0116).
-  - `pytest tests/integration/test_one_bind.py tests/e2e/features/test_ctx_inject_bind_boundary.py` passes.
+  - Gate and bind read the session id from the environment only; `context bind --print-env` is deleted (0148 (4)).
+  - `pytest tests/integration/test_one_bind.py tests/e2e/features/test_ctx_inject_bind_boundary.py tests/contract/cli/test_cli_context.py tests/unit/core/test_invocation.py` passes.
   - `.dadaia/.venv/bin/dadaia public doctor` is clean.
 - AC1.3 With `DADAIA_FENCED_ROOTS` naming the workspace, a PROTECTED write is still refused (F079).
 - AC1.4 A corrupt `.dadaia/sessions/<id>.json` is reported once, and `doctor --fix` holds it.
@@ -117,7 +118,8 @@ F019–F051 share the destination of the bug each cites. F090–F112 share the d
   - At SessionStart and compaction, the doctor lists the context's open worktrees: kind, age, commits ahead, dirty or clean.
   - A ready worktree carries `fix: worktree.py merge <path>`. One older than a day gets a WARN.
   - An orphan `wt/*`, an unregistered worktree and a harness-native worktree in conflict are findings, never touched.
-  - Release closure and `context dead` are refused while any `wt/*` exists. No Stop hook.
+  - One authority: `worktree.py`'s rows carry each state and its one exit (`merge`, or `clean` when nothing is ahead); the doctor and `context dead` read them through the package reader, and closure imports the row builder (0135), never running another script's verb (0018).
+  - Release closure and `context dead` are refused while any `wt/*` exists; closure excludes the one it runs in (0148 (3)). No Stop hook.
   - Nothing is written under `.dadaia/states/`.
   - Command: `pytest tests/integration/test_context_dead_holds.py tests/integration/test_reaper_spares_linked_worktrees.py`, plus a closure-refusal test.
 - AC1.11 One venv (0113): a subprocess test, run by `repos/dadaia-workspace/AGENTS.md`'s worktree command, imports `dadaia_workspace` from the worktree (asserted on `__file__`). `find worktrees -name .venv` prints nothing.
@@ -134,8 +136,9 @@ F019–F051 share the destination of the bug each cites. F090–F112 share the d
 - AC1.13 One home per rule (0115, 0136):
   - `public install` projects `worktrees/AGENTS.md`, the one home of the worktree rules (ADR 0146 (4)). The root map gains the `worktrees/` lines in §3, §4 and §5.
   - Only `worktrees/AGENTS.md` and `dd-gitflow-default` name `scripts/worktree.py`; the seven skills carry one pointer line each to `worktrees/AGENTS.md` (contract test).
-  - The §3a shape table becomes the kinds' allowed sets. A bug worktree holds one fix commit (code, test, resolve lines, RED quoted). `dd-bug-resolution`'s separate RED commit is deleted (F053–F057, F008).
-  - The title of ADR 0027 is repaired in place (F084).
+  - The §3a shape table becomes the kinds' allowed sets. A bug worktree holds one fix commit (code, test, resolve lines, RED quoted), or, for a bug a task fixed, one resolve commit (0148 (2)); §3a row 4 is rewritten to it. `dd-bug-resolution`'s separate RED commit is deleted (F053–F057, F008).
+  - HTML reports live in `.dadaia/reports/<ctx>/` in every law file, persona and template (0147 (1)); `.dadaia/mcps/` is an operator zone (0148 (6)); the zone registry agrees (`tests/contract/test_zone_registry.py`).
+  - No law or recipe calls a `repos/<r>/specs/` path ADDITIVE (0124), measured by `tests/contract/test_law_states_what_the_code_does.py`.
   - `CONTEXT.md` gains **Worktree**, **Worktree kind** and **Zone**, and its **Scope** and **Bind** entries are rewritten.
   - `dd-release-definition` §5 and `specs/releases/AGENTS.md` §3 state ADR 0141: one impl worktree per task, true `blocked by:` edges, exact `W:`, and a PLAN "Parallel schedule" (steps, width, critical path). `release.py check` refuses a PLAN without it, and two tasks in one step whose `W:` overlap outside the union/replay files.
 - AC1.14 Bootstrap (0140): once the `new` and `merge` tasks land, every later task of this candidate is made in a worktree. Every `git -C repos/dadaia-workspace reflog feature/0.5.0` entry after that commit reads `merge wt/…: Fast-forward`, except T-050-106 and its two CI test fixes, the by-hand bootstrap of ADR 0145 that made `worktrees/` canon first.
@@ -146,6 +149,7 @@ F019–F051 share the destination of the bug each cites. F090–F112 share the d
 - AC1.16 Closure (0140):
   - The main-thread session is bound: `context show --json` names `dadaia-workspace`.
   - The memory pass, the `_RELEASE.json` log and the ledger dispositions each land through their kind's worktree; audit dispositions land directly (0124).
+  - Closure's release worktree is the one that writes candidate 6's SPEC (cap 1). It also re-syncs the `specs/*/AGENTS.md` copies from `public/scaffold/` after T-050-103 (0148 (7)) and repairs ADR 0027's title in place (F084); `dadaia doctor --context dadaia-workspace` then shows no template drift.
   - `release.py check` passes.
   - Candidate 6's SPEC is written in `worktrees/dadaia-workspace/0.5.0<letter>-release` and lands by `worktree.py merge`; its reflog line proves it.
 
@@ -170,6 +174,7 @@ Study conclusions carried (ADR 0100; the scratch copy is ephemeral):
 - The §3a shape table.
 - The separate RED commit.
 - `session_store`'s "an unreadable record is never stale".
+- `context bind --print-env` (0148 (4): an env-only id leaves it nothing to print).
 
 ## Risk registers
 
@@ -180,7 +185,7 @@ Study conclusions carried (ADR 0100; the scratch copy is ephemeral):
 | A bug found between a promote and the next definition has no work branch. | Gitflow step 11 cuts the next work branch at the promote, by default the next patch. |
 | A long-lived worktree drifts. | The WARN after one day and the same-session merge law (0128). Conflicts are resolved inside the worktree. |
 | A trio amended after approval leaves impl worktrees on an older SPEC. | The rebase brings in the new SPEC. The impl review row judges the whole SPEC as merged (0127). |
-| A cap refusal when no worktree is ready risks a Stall. | The fix names the oldest worktree's merge. That merge's refusal names `reports validate <handoff>`. Review is the one step that is not a command (0126). |
+| A cap refusal when no worktree is ready risks a Stall. | The fix names the oldest worktree's exit: `clean` when nothing is ahead, else `merge`, whose refusal names `reports validate <handoff>`. Review is the one step that is not a command (0126). |
 | An associated repo's version differs from the release's. | Its own work branch names the worktree. The impl precondition reads the main repo's trio. |
 | The precondition needs `release.py`'s Status parser. | It is imported read-only (0135); there is no second reader and no script runs another's verb. |
 
