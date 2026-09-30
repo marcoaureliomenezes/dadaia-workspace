@@ -29,14 +29,15 @@
 - These ADRs decide: 0055, 0059, 0067, 0092–0096, 0103, 0114, 0118, 0124, 0132–0134, 0138, 0141, 0145, 0146, 0149, 0153.
 - Proposed here, accepted only by the operator's ruling (ADR 0151 M4):
   - 0154 amends 0124 (Q2);
-  - 0155 retires QUALITY P-27 (Q4).
+  - 0155 retires QUALITY P-27 (Q4);
+  - 0156 amends 0146 (3): the library projects the Playwright MCP output dir (Q3).
 - ADR 0145 left these parts of 0092–0096 and 0132–0133 for this candidate:
   - `repos/` and `worktrees/` first-level judging;
   - DEC-11;
   - `init` scaffolding `prompt.md`;
   - the SessionStart self-heal.
 - ADR 0132 voids 0092's harness-directory clause, so inside a harness directory ADR 0059 holds (F076).
-- F075 (ADR 0067 against 0096) is settled by the operator-confirmed `expected` of `missing-venv-hook-disarms-the-gate-invisibly`. Hooks stay fail-open (0067), and the loss of the gate reaches the agent once per session with its fix (§Open questions OQ2).
+- F075 (ADR 0067 against 0096) is settled by the operator-confirmed `expected` of `missing-venv-hook-disarms-the-gate-invisibly`. Hooks stay fail-open (0067), and the loss of the gate reaches the agent once per session with its fix (§Open questions OQ2, answered).
 
 ## Origin map — candidate 6
 
@@ -122,7 +123,7 @@
   - The root map §3 names `context create` and the first `specs init` as the only direct writers of a repo's `specs/` beside `specs/audits/**`, in place of "§7's CLI verbs own theirs".
   - `docs/quickstart.md` and `docs/getting-started.md` run the first `backlog.py new` and `release.py new` inside a `backlog` and a `release` worktree, after `context baseline`.
   - Command: `pytest tests/contract/test_law_states_what_the_code_does.py`.
-- AC2.14 Playwright MCP output leaves the root (Q3):
+- AC2.14 Playwright MCP output leaves the root (Q3; ADR 0156, once accepted):
   - For the `claude` harness, `public install` and `init` project `PLAYWRIGHT_MCP_OUTPUT_DIR=<absolute ws>/.dadaia/mcps/playwright` into `.claude/settings.json` `env`, beside the cache keys.
   - Keys the operator set there are kept.
   - Command: the owner test of `infrastructure/runtime_config.py`'s env merge, which the PLAN names (ADR 0146 (5)). Today `tests/integration/test_tool_caches_stay_in_the_tmp_zone.py` asserts the projected cache keys.
@@ -143,7 +144,7 @@
   - Drop the `.mcp.json`, `.playwright-mcp` and `QUESTIORNARY.md` lines from `.dadaiaignore`.
   - Rule on `.vscode`: add a line for it, or let `doctor --fix` hold it.
   - Once AC2.14 lands and the line is gone, `doctor --fix` holds the existing `.playwright-mcp/`.
-- ADRs 0154 and 0155: the operator's ruling, transcribed by the main thread.
+- ADRs 0154, 0155 and 0156: the operator's ruling, transcribed by the main thread.
 
 ## Replaces
 
@@ -179,7 +180,7 @@ Candidate map (soft size, ADR 0152 (2)); the main thread's proposal, not an oper
 
 | Target | Bugs | Backlog | Findings, carry-overs |
 |---|---|---|---|
-| W3 one grammar owner (0135, 0137, 0127 release-traceability clause) | DEL `spec-origin-line-has-two-readers`, `task-line-grammar-accepts-a-malformed-open-marker`, `privacy-denylist-has-two-loaders`, `release-ship-accepts-what-release-check-refuses`, `bugs-check-trusts-evidence-fields-unverified`, `release-new-crashes-on-a-unicode-line-separator-in-the-bug-ledger`, `corrupt-context-registry-crashes-doctor-and-next-step`; FR `list-form-privacy-denylist-errors-without-migration`, `secret-scan-misses-github-pat-and-anthropic-keys` | `ledger-schema-one-engine`, `structural-convergence-f053-f054-f057`; exit `to-bug` `task-line-grammar-one-reader` → `task-line-grammar-accepts-a-malformed-open-marker` | F002, F010, F012, F013, F016, F052, F058, F059, F061, F063; c4 AC6.3, AC6.6 (V38) |
+| W3 one grammar owner (0135, 0137, 0127 release-traceability clause) | DEL `spec-origin-line-has-two-readers`, `task-line-grammar-accepts-a-malformed-open-marker`, `privacy-denylist-has-two-loaders`, `release-ship-accepts-what-release-check-refuses`, `bugs-check-trusts-evidence-fields-unverified`, `release-new-crashes-on-a-unicode-line-separator-in-the-bug-ledger`, `corrupt-context-registry-crashes-doctor-and-next-step`; FR `list-form-privacy-denylist-errors-without-migration`, `secret-scan-misses-github-pat-and-anthropic-keys` | `ledger-schema-one-engine`, `structural-convergence-f053-f054-f057` (with it, the law gap found at this definition: commit shape 5 stages "picked bugs" in the `release` kind, whose allowed set holds no `specs/bugs/BUGS.jsonl`); exit `to-bug` `task-line-grammar-one-reader` → `task-line-grammar-accepts-a-malformed-open-marker` | F002, F010, F012, F013, F016, F052, F058, F059, F061, F063; c4 AC6.3, AC6.6 (V38) |
 | W4 one text renderer | DEL `dadaia-bin-still-honoured-after-adr-0045`, `help-examples-spell-the-blocked-bare-cli`, `fix-lines-are-not-one-runnable-command`, `ledger-finding-fix-line-orders-a-hand-edit-the-law-forbids`, `implementer-persona-states-a-second-task-marker-lifecycle` | `consumer-guidance-names-no-library-toolchain` | F007, F017 |
 | W5 one test child-env builder | DEL `test-suite-writes-outside-tmp`; FR `ci-preflight-writes-coverage-into-the-repo`, `default-suite-calls-a-real-model-through-codex`, `hook-entrypoints-invisible-to-coverage` | `preflight-ci-parity-derived`, `test-intent-docstring-backfill` | F018, F135, F136; c4 AC9.5, AC9.11 |
 | W6 local fixes in severity groups (0123) | FR `onboarding-next-step-names-another-context`, `init-on-a-copied-workspace-leaves-a-cli-bound-to-the-original`, `pre-push-warns-no-gitflow-block-for-an-absent-specs-tree`, `upgrade-leaves-reconcile-scratch-behind` | `doctor-context-ignores-other-contexts`, `release-memory-idempotent`, `guidance-messages-name-the-right-target`, `init-announces-codex-trust`, `tests-agents-scaffold-without-placeholders` (each an FR, exit `delivered`, no new bug record) | — |
@@ -199,5 +200,5 @@ Risk seeds for W3 (from rc-5), so they are not lost:
 
 ## Open questions for the operator
 
-- OQ1 (Q3 against ADR 0146 (3)): 0146 (3) says the library keeps MCP config out and "only says MCP lives in `.dadaia/mcps/`". AC2.14 makes the library project one MCP server's output directory. Should a record amending 0146 (3) be proposed, or does the Q3 answer stand as that amendment?
-- OQ2 (F075, Q10(a) of the audit, never ruled on its own): AC2.7 follows the operator-confirmed `expected` of `missing-venv-hook-disarms-the-gate-invisibly` (fail-open, visible once per session, fix `uvx dadaia-workspace init <ws>`) rather than failing closed. Confirm.
+- OQ1 (answered): the operator's Q3 answer ("Assim (Recomendado)") is the ruling. ADR 0156 records it as an amendment of 0146 (3).
+- OQ2 (answered via inspection): the operator confirmed `missing-venv-hook-disarms-the-gate-invisibly` with its `expected` clause (fail-open, visible to the agent once per session with its fix line), and ADR 0067 is accepted. AC2.7 stands.
