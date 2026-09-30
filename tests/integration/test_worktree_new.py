@@ -119,8 +119,8 @@ def test_list_reports_only_ours_with_ahead_and_dirty(root: Path) -> None:
 
 def test_the_one_venv_imports_the_checkout_it_runs_from() -> None:
     """AC1.11 (ADR 0113): the shared venv's editable install points at repos/, yet a child
-    spawned from the suite's hermetic cwd imports THIS checkout (the conftest PYTHONPATH pin), and no
-    checkout carries its own venv."""
+    spawned from the suite's hermetic cwd imports THIS checkout (the conftest PYTHONPATH
+    pin), and no checkout carries its own venv."""
     checkout = Path(__file__).resolve().parents[2]
     child = subprocess.run(
         [sys.executable, "-c", "import dadaia_workspace; print(dadaia_workspace.__file__)"],

@@ -16,6 +16,7 @@ size: SMALL.
 
 from __future__ import annotations
 
+import os
 import re
 import shlex
 import subprocess
@@ -321,8 +322,9 @@ _FIX_LINES = _fix_lines()
 _INSTALLED_SKILL_PREFIX = ".agents/skills/"
 _VENV_BINARY_PREFIX = ".dadaia/"
 #: ``script_line``'s two absolute heads, as literals of the running environment: the
-#: interpreter running now and the skills this package ships (never a derived workspace).
-_VENV_PYTHON = Path(sys.executable).as_posix()
+#: interpreter running now, normalized as `sys.prefix` is (a `../` launch path keeps its dots in
+#: `sys.executable`), and the skills this package ships (never a derived workspace).
+_VENV_PYTHON = Path(os.path.normpath(sys.executable)).as_posix()
 _SKILLS = _PUBLIC_SKILLS.as_posix() + "/"
 
 _PLACEHOLDER_RE = re.compile(r"<[^>]*>")

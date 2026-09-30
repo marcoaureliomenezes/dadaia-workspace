@@ -14,7 +14,6 @@ into the source tree it projects from, so nothing here is regenerated.
 - Any failure of a workspace operation here is a product bug of this library:
   register it in `specs/bugs/`.
 - In a worktree (`worktrees/dadaia-workspace/<name>/`; rules: `../../worktrees/AGENTS.md`),
-  run tests from its root: `"$(realpath ../../../.dadaia/.venv/bin/python)" -m pytest` (absolute:
-  a relative interpreter breaks the fix-line contract tests).
+  run tests from its root: `../../../.dadaia/.venv/bin/python -m pytest`.
 - Versioning here: release-please owns the version, tag and CHANGELOG; the work branch
   is named for the live release (`_RELEASE.json`).
