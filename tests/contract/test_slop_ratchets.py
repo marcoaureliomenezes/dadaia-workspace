@@ -1,4 +1,4 @@
-"""Intent: CONTRACT — V32, V33, V34, V35; V37, V38, V39 (0.5.0 AC6.2–AC6.6); size: SMALL.
+"""Intent: CONTRACT — V32, V33; V37, V38, V39 (0.5.0 AC6.2–AC6.6); size: SMALL.
 
 Repo-pure slop ratchets: measured at birth, pinned, ratcheting down only; every
 tree walk goes through the one tracked-files enumeration the other ratchets use.
@@ -189,105 +189,6 @@ def test_v33_prefix_families_without_a_mechanical_reader() -> None:
     corpus = ["foo-01 has a reader, bar-02 has none".upper()]
     assert _orphan_families(corpus, ["foo-".upper()]) == ["BAR"]
     assert _orphan_families(corpus, []) == ["BAR", "FOO"]
-
-
-# ---------------------------------------------------------------------------
-# V34 — bytes of the live candidate's SPEC.md and TASKS.md
-# ---------------------------------------------------------------------------
-
-_V34_CEILINGS = {"SPEC.md": 24 * 1024, "TASKS.md": 12 * 1024}
-
-
-def _live_release_dir() -> Path | None:
-    """The one non-archived `specs/releases/<id>/` carrying a `_RELEASE.json`, or
-    ``None`` in the post-ship window (folder archived, next release not yet defined) —
-    at most one live release ever (ADR 0005), never necessarily one."""
-    releases = _REPO_ROOT / "specs" / "releases"
-    live = [
-        path.parent
-        for path in tracked_test_files(_REPO_ROOT, "_RELEASE.json", tree="specs/releases")
-        if path.parent.parent == releases
-    ]
-    assert len(live) <= 1, f"at most one live release expected, found {live}"
-    return live[0] if live else None
-
-
-def _byte_ceiling_violations(sizes: dict[str, int]) -> list[str]:
-    return [
-        f"{name}: {size} B > {_V34_CEILINGS[name]} B"
-        for name, size in sizes.items()
-        if size > _V34_CEILINGS[name]
-    ]
-
-
-def test_v34_live_candidate_trio_bytes_under_the_fixed_ceiling() -> None:
-    """V34 — the live candidate's SPEC.md is at most 24 KB and its TASKS.md at most 12 KB;
-    a fixed ceiling, never a pin."""
-    live = _live_release_dir()
-    if live is not None:
-        # A candidate in DEFINITION may hold only its SPEC.md at the root (rc-archive
-        # ran, PLAN/TASKS not yet authored): measure what exists, never demand the trio.
-        # Content bytes, LF-normalised: a CRLF checkout must not move a ratchet.
-        sizes = {
-            name: len((live / name).read_bytes().replace(b"\r\n", b"\n"))
-            for name in _V34_CEILINGS
-            if (live / name).is_file()
-        }
-        assert _byte_ceiling_violations(sizes) == [], (
-            f"{live.name} trio exceeds the byte ceiling — above it the scope is open "
-            "enough to be two candidates."
-        )
-
-    # Mutation fixture — one byte over either ceiling is a violation.
-    assert _byte_ceiling_violations({"SPEC.md": 24 * 1024 + 1, "TASKS.md": 12 * 1024}) == [
-        "SPEC.md: 24577 B > 24576 B"
-    ]
-
-
-# ---------------------------------------------------------------------------
-# V35 — the skill corpus: directories and total Markdown lines
-# ---------------------------------------------------------------------------
-
-# RECORDED PINS (ratchet DOWN ONLY) — measured on the post-candidate corpus: every
-# tracked `*.md` under dadaia_workspace/public/skills/. Re-pinned at every closure that
-# touches the corpus, downward only; raising either is never a ratchet move.
-_V35_DIR_CEILING = 18
-_V35_LINE_CEILING = 2863
-
-
-def _skill_corpus_markdown() -> list[Path]:
-    return [
-        path
-        for path in tracked_test_files(_REPO_ROOT, "*.md", tree="dadaia_workspace")
-        if "public/skills/" in path.as_posix()
-    ]
-
-
-def _skill_corpus_lines(paths: Iterable[Path]) -> int:
-    return sum(len(path.read_text(encoding="utf-8").splitlines()) for path in paths)
-
-
-def test_v35_skill_corpus_is_pinned() -> None:
-    """V35 — at most 18 skill directories and 2,863 total lines of skill Markdown.
-    A rule lives in one home: a growing corpus is a rule restated, not a rule added."""
-    corpus = _skill_corpus_markdown()
-    dirs = {
-        path.relative_to(_REPO_ROOT / "dadaia_workspace" / "public" / "skills").parts[0]
-        for path in corpus
-    }
-    assert len(dirs) <= _V35_DIR_CEILING, (
-        f"skill directories grew to {len(dirs)} (ceiling {_V35_DIR_CEILING}). A new "
-        "skill earns its dir by deleting another's material, never by restating it."
-    )
-    total = _skill_corpus_lines(corpus)
-    assert total <= _V35_LINE_CEILING, (
-        f"skill Markdown grew to {total} lines (ceiling {_V35_LINE_CEILING}). Find the "
-        "statement's other home and delete the copy — never raise the ceiling."
-    )
-
-    # Mutation fixture — the counter reads real files, and an empty set counts 0.
-    assert _skill_corpus_lines([]) == 0
-    assert _skill_corpus_lines([_THIS_FILE]) > 0
 
 
 # ---------------------------------------------------------------------------

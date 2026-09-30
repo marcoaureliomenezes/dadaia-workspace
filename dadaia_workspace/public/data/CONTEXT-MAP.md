@@ -4,12 +4,11 @@ Library document. Projected nowhere: `public stage` copies it into `.dadaia/agen
 with the rest of `data/`, and no projection rule installs it into a runtime tree. Pinned by
 `tests/contract/test_context_map.py`.
 
-One row per surface: what it is for, what belongs in it, its byte ceiling, and its measured
+One row per surface: what it is for, what belongs in it, its soft byte budget, and its measured
 size at the last closure — the INSTALLED bytes, with every `<!-- … -->` registry table
-rendered as `.dadaia/.venv/bin/dadaia public stage` writes it, not the authored source size. Ceilings are
-ratchets — they move down. `Measured` is rewritten by
-`UPDATE_CONTEXT_MAP=1 pytest tests/contract/test_context_map.py`; a value above its ceiling
-fails the build.
+rendered as `.dadaia/.venv/bin/dadaia public stage` writes it, not the authored source size. A budget is
+soft: a surface over it is a review signal (one purpose, no restated rule), never a build failure
+(ADR 0143). `Measured` is rewritten by `UPDATE_CONTEXT_MAP=1 pytest tests/contract/test_context_map.py`.
 
 Every surface is sourced under `dadaia_workspace/public/`; the `Surface` column names the
 path or entity as it appears in an installed workspace.
@@ -39,7 +38,7 @@ path or entity as it appears in an installed workspace.
 
 ## 2. The map and the scoped law
 
-| Surface | Purpose | Belongs | Ceiling | Measured |
+| Surface | Purpose | Belongs | Budget | Measured |
 |---|---|---|---|---|
 | `AGENTS.md` | the root map: the flow, the roles, the gate invariants, the root, credentials, and one line per scoped file | statements; the index of every other surface | 8192 | 7934 |
 | `specs/AGENTS.md` | the canon of a specs tree and its status tokens | canon table, status tokens, doctor codes | 4096 | 3588 |
@@ -60,7 +59,7 @@ path or entity as it appears in an installed workspace.
 
 One procedure each; a skill that touches a governed area opens its scoped law as step 1.
 
-| Surface | Purpose | Step-1 law | Ceiling | Measured |
+| Surface | Purpose | Step-1 law | Budget | Measured |
 |---|---|---|---|---|
 | `dd-ai-eng-knowhow` | harness literacy and the AI-entity authoring contract | — | 6144 | 2878 |
 | `dd-architecture-survey` | portfolio-level architecture candidates from bug history | — | 6144 | 4650 |
@@ -69,7 +68,7 @@ One procedure each; a skill that touches a governed area opens its scoped law as
 | `dd-bug-registration` | classify-first bug proposal and its record | `specs/bugs/AGENTS.md` | 6144 | 2782 |
 | `dd-bug-resolution` | the seven-phase diagnosing method and the resolve record | `specs/bugs/AGENTS.md` | 6144 | 5359 |
 | `dd-cli-library` | CLI idioms, CLI-owned state, the dev-server registry | `.dadaia/AGENTS.md` | 6144 | 5184 |
-| `dd-code-review` | the three review axes and the six lenses | `specs/memory/AGENTS.md` | 6144 | 5235 |
+| `dd-code-review` | the three review axes and the six lenses | `specs/memory/AGENTS.md` | 6144 | 5439 |
 | `dd-codebase-design` | the deep-module vocabulary and the deletion test | — | 6144 | 5540 |
 | `dd-domain-modeling` | the repo's domain terms and their one home | — | 6144 | 3766 |
 | `dd-gitflow-default` | the branch contract, commit shapes, the PR gate | — | 6144 | 4346 |
@@ -85,7 +84,7 @@ One procedure each; a skill that touches a governed area opens its scoped law as
 
 Three roles, no fourth; every retired role is a lens the reviewer applies.
 
-| Surface | Purpose | Belongs | Ceiling | Measured |
+| Surface | Purpose | Belongs | Budget | Measured |
 |---|---|---|---|---|
 | `dd-product-engineer` | backlog, SPEC, the product-memory pass at closure | role, read_only, model policy | — | 4562 |
 | `dd-software-engineer` | PLAN/TASKS, production code and its tests | role, read_only, model policy | — | 8924 |

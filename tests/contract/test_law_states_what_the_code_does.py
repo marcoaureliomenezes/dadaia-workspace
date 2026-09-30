@@ -13,7 +13,6 @@ from pathlib import Path
 import pytest
 
 from dadaia_workspace.hooks import _common
-from tests.contract.test_slop_ratchets import _V34_CEILINGS
 
 pytestmark = pytest.mark.unit
 
@@ -50,14 +49,6 @@ def test_no_docstring_restates_the_session_id_order() -> None:
             if re.search(r"→|->", line) and sum(name in line for name in _SESSION_NAMES) >= 2:
                 chains.append(f"{path.relative_to(_REPO)}:{number}")
     assert chains == []
-
-
-def test_the_release_law_states_the_trio_byte_ceilings() -> None:
-    """sa-text-restates-rules-the-code-contradicts#49.3: the law states KiB with the byte
-    counts the V34 ratchet enforces."""
-    law = (_PKG / "public" / "scaffold" / "releases" / "AGENTS.md").read_text("utf-8")
-    assert _V34_CEILINGS == {"SPEC.md": 24576, "TASKS.md": 12288}
-    assert "SPEC.md fits 24 KiB (24576 bytes) and TASKS.md 12 KiB (12288 bytes)" in law
 
 
 def test_the_bind_resolution_contract_covers_every_verb_module() -> None:

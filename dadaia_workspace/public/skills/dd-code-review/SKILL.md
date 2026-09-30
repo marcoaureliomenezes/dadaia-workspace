@@ -32,6 +32,7 @@ axes are reported side by side — an axis never outranks another.
   Repeated Switches · Shotgun Surgery · Divergent Change · Speculative Generality ·
   Message Chains · Middle Man · Refused Bequest.
 - Speak `dd-codebase-design`: a smell is usually a shallow module or a misplaced seam.
+- Size is a soft signal, never a threshold (ADR 0143): a long method, a class with many methods or a file doing several jobs is judged by responsibility — one reason to change per class and per method.
 - Slop signals S1-S10, each with its diff check: [`SLOP.md`](SLOP.md) — reported inside this axis, never a fourth.
 
 ## 3. Axis 2 — Spec

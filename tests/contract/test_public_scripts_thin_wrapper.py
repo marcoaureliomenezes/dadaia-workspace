@@ -1,7 +1,8 @@
 """Intent: CONTRACT — 0.4.7 FR1 (ADR 0018 measured_by): skill owner scripts. Size: SMALL.
 
 A ``public/skills/*/scripts/`` script OWNS its logic, so it must be self-contained:
-stdlib imports only, exec bit set, ``--help`` exits 0, and at most 150 lines.
+stdlib imports only, exec bit set, and ``--help`` exits 0. Size is never capped: class and
+method size and responsibility are review signals (ADR 0143).
 """
 
 from __future__ import annotations
@@ -24,22 +25,11 @@ pytestmark = pytest.mark.contract
 _REPO_ROOT = Path(__file__).resolve().parents[2]
 _SKILLS_DIR = _REPO_ROOT / "dadaia_workspace" / "public" / "skills"
 
-_OWNER_SCRIPT_MAX_LINES = 150
-
-#: Ratchet: a script measured ABOVE the ceiling when the contract landed keeps its
-#: measured count until it is split — `registry.py` (0.4.7 c5) predates FR1's 150-line
-#: rule. Lowering an entry is welcome; raising one defeats the contract.
-_OWNER_SCRIPT_CEILINGS: dict[str, int] = {"registry.py": 337}
-
 #: Owner scripts whose verb set includes `check` (the ledger scripts of FR2). A
 #: script listed here must expose `check`; `registry.py` owns ports, not a ledger.
 _LEDGER_OWNER_SCRIPTS: frozenset[str] = frozenset(
     {"bugs.py", "backlog.py", "release.py", "audit.py", "memory.py"}
 )
-
-
-def _line_count(path: Path) -> int:
-    return len(path.read_text(encoding="utf-8").splitlines())
 
 
 # --- Owner scripts: public/skills/*/scripts/*.py (0.4.7 FR1) ------------------------
@@ -71,21 +61,13 @@ _CROSS_SKILL_EDGES = {
 
 @pytest.mark.parametrize("script", _owner_scripts(), ids=lambda p: f"{p.parents[1].name}/{p.name}")
 def test_skill_owner_script_meets_the_contract(script: Path) -> None:
-    """FR1: every skill script is a self-contained stdlib owner — ≤ 150 lines, no
-    import into the library, executable, and (for an entry point) `--help` exits 0.
+    """FR1: every skill script is a self-contained stdlib owner — no import into
+    the library, executable, and (for an entry point) `--help` exits 0.
 
-    The ceiling is per FILE: a script whose verb set outgrows it splits into `_`-prefixed
-    sibling modules in the same folder, imported through the script's own directory on
+    A script may split its verbs into `_`-prefixed sibling modules in the same folder, imported through the script's own directory on
     `sys.path`. A sibling is a module, not an entry point, so only the non-`_` scripts
     answer `--help`; everything else applies to every file under `scripts/`.
     """
-    loc = _line_count(script)
-    ceiling = _OWNER_SCRIPT_CEILINGS.get(script.name, _OWNER_SCRIPT_MAX_LINES)
-    assert loc <= ceiling, (
-        f"{script.name} has grown to {loc} lines, over the owner-script ceiling of "
-        f"{ceiling} — a skill script that no longer fits is logic that "
-        "belongs behind a narrower interface, not a raised ceiling."
-    )
     siblings = {module.stem for module in script.parent.glob("*.py")}
     skill = script.parent.parent.name
     siblings |= {Path(d).stem for _, d in _SKILL_SCRIPT_SHARED if d.startswith(f"skills/{skill}/")}

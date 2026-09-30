@@ -99,12 +99,12 @@ def test_every_step_one_path_is_an_installed_scoped_law() -> None:
 
 
 # --------------------------------------------------------------------------- #
-# The surfaces: what CONTEXT-MAP.md must account for, and their ceilings.
+# The surfaces: what CONTEXT-MAP.md must account for, and their soft byte budgets (ADR 0143).
 # --------------------------------------------------------------------------- #
 
-_ROOT_MAP_CEILING = 8192
-_SCOPED_CEILING = 4096
-_SKILL_CEILING = 6144
+_ROOT_MAP_BUDGET = 8192
+_SCOPED_BUDGET = 4096
+_SKILL_BUDGET = 6144
 _UNBOUNDED = "—"
 
 
@@ -113,7 +113,7 @@ def installed_bytes(src: Path) -> int:
 
     `stage` renders every `<!-- … -->` registry placeholder before install, so the
     source size is not what an agent loads: `.dadaia/AGENTS.md` carries the zone table
-    on top of its authored text. The ceiling and the CONTEXT-MAP Measured column are
+    on top of its authored text. The budget and the CONTEXT-MAP Measured column are
     both this number.
     """
     return len(render_registry_tables(src.read_text(encoding="utf-8")).encode("utf-8"))
@@ -128,43 +128,27 @@ def _skill_sources() -> dict[str, Path]:
 
 
 def surfaces() -> dict[str, tuple[Path, int | str]]:
-    """Every context surface the library ships: key -> (source file, byte ceiling).
+    """Every context surface the library ships: key -> (source file, soft byte budget).
 
     The key is the surface as it appears in an installed workspace — the installed
     path for the map and the scoped law, the entity name for a skill or persona.
     """
     found: dict[str, tuple[Path, int | str]] = {
-        "AGENTS.md": (_PUBLIC / "data" / "AGENTS.md", _ROOT_MAP_CEILING)
+        "AGENTS.md": (_PUBLIC / "data" / "AGENTS.md", _ROOT_MAP_BUDGET)
     }
     for installed, src in SCOPED_SOURCE_BY_INSTALLED_PATH.items():
-        found[installed] = (src, _SCOPED_CEILING)
+        found[installed] = (src, _SCOPED_BUDGET)
     for name, src in _skill_sources().items():
-        found[name] = (src, _SKILL_CEILING)
+        found[name] = (src, _SKILL_BUDGET)
     for name, src in _persona_sources().items():
         found[name] = (src, _UNBOUNDED)
     assert_populated(set(found), sentinel="specs/bugs/AGENTS.md")
     return found
 
 
-# --------------------------------------------------------------------------- #
-# (a) The ceilings — measured on the installed-shape SOURCES under `public/`.
-# --------------------------------------------------------------------------- #
-
-
-def test_ceilings_hold_on_every_context_surface() -> None:
-    """AC1.1 — 8192 for the root map, 4096 for a scoped law, 6144 for a skill,
-    measured on the INSTALLED (registry-rendered) form, not the authored source."""
-    over = sorted(
-        f"{key}: {installed_bytes(src)} B > {ceiling} B ({src.name})"
-        for key, (src, ceiling) in surfaces().items()
-        if isinstance(ceiling, int) and installed_bytes(src) > ceiling
-    )
-    assert over == [], "context surfaces over their byte ceiling:\n" + "\n".join(over)
-
-
 def test_every_scoped_law_source_has_an_installed_path() -> None:
     """No scoped `AGENTS.md` ships without a declared installed path — otherwise the
-    ceiling table and the map would silently miss it."""
+    budget table and the map would silently miss it."""
     shipped: set[Path] = set()
     for sub in ("data", "scaffold", "templates"):
         base = _PUBLIC / sub
