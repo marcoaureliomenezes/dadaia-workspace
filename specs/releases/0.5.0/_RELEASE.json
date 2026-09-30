@@ -610,6 +610,12 @@
       "agent": "release.py new",
       "kind": "note",
       "text": "Candidate born on 0.5.0 (prior candidate closed at 91262c55)"
+    },
+    {
+      "ts": "2026-09-30T23:49:53Z",
+      "agent": "main-thread",
+      "kind": "note",
+      "text": "Candidate 5 closure merged into develop by PR #275 (merge 67afcdab, head 86577ab5, every check green, dd-code-reviewer APPROVED 86577ab5). Gate: continue — operator 2026-09-30: \"quando ficar verde começa a rc-6\"."
     }
   ]
 }
