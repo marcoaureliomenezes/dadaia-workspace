@@ -395,14 +395,15 @@ def test_every_ledger_skill_stages_a_byte_identical_privacy_pair(tmp_path: Path)
 
 
 def test_resolve_closes_the_record_and_derives_diff_direction(script: Path, tmp_path: Path) -> None:
-    specs = _ledger(tmp_path, _OPEN_RECORD)
+    deferred = {**_OPEN_RECORD, "status": "deferred", "cause": "c", "closed_at": "2026-09-21T00:00:00Z"}
+    specs = _ledger(tmp_path, deferred)
     done = _run(script, *_resolve_argv(), "--specs", str(specs))
     assert done.returncode == 0, done.stderr
     assert done.stdout.strip() == "[ok] resolved a-bug"
     [record] = _records(specs)
     assert record["status"] == "resolved"
     assert record["diff_direction"] == "net-negative"
-    assert record["closed_at"] is not None
+    assert record["closed_at"] > deferred["closed_at"]  # the transition's own instant
     assert _run(script, "check", "--specs", str(specs)).returncode == 0
 
 

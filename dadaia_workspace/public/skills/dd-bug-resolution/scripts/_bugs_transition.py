@@ -61,5 +61,5 @@ def transition(records: Records, bug_id: str, verb: str, values: dict[str, Any],
     else:
         _set(updated, "cause", values["reason"])
     updated["status"] = STATUS_BY_VERB[verb]
-    updated["closed_at"] = record.get("closed_at") or now_iso()
+    updated["closed_at"] = now_iso()
     return [updated if r is record else r for r in records]
