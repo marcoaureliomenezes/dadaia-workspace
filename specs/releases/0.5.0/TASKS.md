@@ -12,7 +12,7 @@ Each write set includes its tests; a DEL's dead tests leave in the same commit. 
 
 ### Worktrees first — the tool before the refusal that names it
 
-- [-] **T-050-95 — `worktree.py new` and `list`.** `W:` `wt.py` (`KINDS`/`kind_for` included), `tests/integration/test_worktree_new.py`
+- [x] **T-050-95 — `worktree.py new` and `list`.** `W:` `wt.py` (`KINDS`/`kind_for` included), `tests/integration/test_worktree_new.py`
   `blocked by:` none · `delivers:` AC1.7; after this the operator can run `worktree.py new dadaia-workspace --kind impl` · `RED:` `pytest tests/integration/test_worktree_new.py` · Δ +220 (`wt.py`).
 - [ ] **T-050-96 — `worktree.py merge` and `clean`.** `W:` `wt.py`, `tests/integration/test_worktree_lifecycle.py`, `tests/integration/test_worktree_merge_requires_review.py`, `tests/integration/test_worktree_merge_allowed_sets.py`
   `blocked by:` T-050-95 · `delivers:` AC1.8 · `RED:` `pytest tests/integration/test_worktree_lifecycle.py tests/integration/test_worktree_merge_requires_review.py tests/integration/test_worktree_merge_allowed_sets.py` · Δ +140 (`wt.py`).

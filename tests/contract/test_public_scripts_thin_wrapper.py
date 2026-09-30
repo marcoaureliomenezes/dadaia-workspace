@@ -60,9 +60,13 @@ def _imported_roots(path: Path) -> set[str]:
     return roots
 
 
-#: The ONE cross-skill import edge: the release skill reads the spec navigator's drift
-#: decider; the navigator imports nothing from the release skill.
-_CROSS_SKILL_EDGE = {"_memory_drift"}
+#: The cross-skill import edges, each a read-only use of the grammar's one owner (ADR
+#: 0135): the release skill reads the navigator's drift decider; the worktree script reads
+#: the release skill's trio status parser. Neither owner imports back.
+_CROSS_SKILL_EDGES = {
+    "dd-release-implementation": {"_memory_drift"},
+    "dd-gitflow-default": {"_release_schema"},
+}
 
 
 @pytest.mark.parametrize("script", _owner_scripts(), ids=lambda p: f"{p.parents[1].name}/{p.name}")
@@ -85,8 +89,7 @@ def test_skill_owner_script_meets_the_contract(script: Path) -> None:
     siblings = {module.stem for module in script.parent.glob("*.py")}
     skill = script.parent.parent.name
     siblings |= {Path(d).stem for _, d in _SKILL_SCRIPT_SHARED if d.startswith(f"skills/{skill}/")}
-    if script.parent.parent.name == "dd-release-implementation":
-        siblings |= _CROSS_SKILL_EDGE  # SPEC D6: the one drift decider, one way only
+    siblings |= _CROSS_SKILL_EDGES.get(skill, set())
     foreign = _imported_roots(script) - set(sys.stdlib_module_names) - siblings
     assert foreign == set(), (
         f"{script.name} imports non-stdlib module(s) {sorted(foreign)} — a skill script "
