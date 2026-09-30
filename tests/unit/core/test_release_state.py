@@ -18,6 +18,7 @@ _PACKAGE = Path(__file__).resolve().parents[3] / "dadaia_workspace"
 
 def test_core_reads_the_phase_and_judges_nothing() -> None:
     assert sorted(release_state.__all__) == [
+        "LEGACY_RELEASE_STATE_FILENAME",
         "RELEASE_ID_RE",
         "RELEASE_STATE_FILENAME",
         "read_phase",

@@ -61,7 +61,7 @@ def test_dirty_outside_set_and_conflict_each_refuse_with_one_fix(root: Path) -> 
     _fix(root, dirty := run(root, "merge", TREE))
     assert "uncommitted" in dirty.stderr
     commit(tree, "specs/backlog/BACKLOG.json", "{}")  # new: the undo removes it
-    commit(tree, "specs/releases/0.5.0/SPEC.md", "edited")  # on the work branch: restored
+    commit(tree, "specs/releases/0.5.0/rc-1/SPEC.md", "edited")  # on the work branch: restored
     for rel, owner in (("specs/backlog/BACKLOG.json", "backlog"), ("SPEC.md", "release")):
         outside = run(root, "merge", TREE)
         assert rel in outside.stderr and f"{owner} worktree" in outside.stderr
@@ -130,10 +130,11 @@ def test_each_kind_allows_its_own_set_only() -> None:
     spec.loader.exec_module(kinds)
     rows = {
         ("impl", "src/a.py"): True,
-        ("impl", "specs/releases/0.5.0/TASKS.md"): True,
+        ("impl", "specs/releases/0.5.0/rc-5/TASKS.md"): True,
+        ("impl", "specs/releases/0.5.0/TASKS.md"): False,
         ("impl", "specs/backlog/BACKLOG.json"): False,
         ("bug", "specs/bugs/BUGS.jsonl"): True,
-        ("bug", "specs/releases/0.5.0/SPEC.md"): False,
+        ("bug", "specs/releases/0.5.0/rc-5/SPEC.md"): False,
         ("backlog", "specs/backlog/_archive/backlog_histo.jsonl"): True,
         ("backlog", "src/a.py"): False,
         ("release", "specs/memory/ARCHITECTURE.md"): True,

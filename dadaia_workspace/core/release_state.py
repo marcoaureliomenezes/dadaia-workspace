@@ -10,10 +10,12 @@ from __future__ import annotations
 import json
 import re
 
-__all__ = ["RELEASE_ID_RE", "RELEASE_STATE_FILENAME", "read_phase"]
+__all__ = ["LEGACY_RELEASE_STATE_FILENAME", "RELEASE_ID_RE", "RELEASE_STATE_FILENAME", "read_phase"]
 
-#: The one release-state filename (ADR 0090): no legacy name is read.
+#: The one release-state filename (ADR 0007): the legacy name is never read as live —
+#: the doctor renames it (SPEC-DOC-046).
 RELEASE_STATE_FILENAME = "_RELEASE.json"
+LEGACY_RELEASE_STATE_FILENAME = "RELEASE.json"
 
 #: The ONE release-id grammar: bare ``M.m.p`` — `_release_schema.SEMVER_RE`'s pattern,
 #: pinned equal by ``tests/contract/test_release_semver_canon.py``. No ``v``, no suffix;

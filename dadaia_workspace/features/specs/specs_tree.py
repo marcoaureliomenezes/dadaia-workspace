@@ -17,6 +17,7 @@ from dataclasses import dataclass
 from functools import cached_property
 from pathlib import Path
 
+from dadaia_workspace.core.gitflow import resolve_live_candidate
 from dadaia_workspace.features.specs.doctor_common import resolve_active_release
 
 __all__ = ["ActiveRelease", "SpecsTree"]
@@ -24,10 +25,12 @@ __all__ = ["ActiveRelease", "SpecsTree"]
 
 @dataclass(frozen=True)
 class ActiveRelease:
-    """The one shared answer to "which release is live, in which phase"."""
+    """The one shared answer to "which release is live, in which phase, and which
+    ``rc-<N>/`` holds its live candidate" (ADR 0150)."""
 
     release: str | None
     phase: str | None
+    candidate: Path | None
 
 
 class SpecsTree:
@@ -39,4 +42,6 @@ class SpecsTree:
     @cached_property
     def active_release(self) -> ActiveRelease:
         """Parsed ONCE per run — the four per-check re-reads collapse here."""
-        return ActiveRelease(*resolve_active_release(self.specs_dir))
+        return ActiveRelease(
+            *resolve_active_release(self.specs_dir), resolve_live_candidate(self.specs_dir)
+        )

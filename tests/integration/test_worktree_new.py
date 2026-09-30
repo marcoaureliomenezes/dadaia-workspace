@@ -48,11 +48,16 @@ def test_no_work_branch_refuses_with_a_fix_that_creates_it(root: Path) -> None:
     assert fix == f"fix: git -C {repo} branch feature/0.1.0 dev"  # the flow's integration
 
 
-def test_impl_needs_an_approved_trio_on_the_work_branch(root: Path) -> None:
+def test_impl_needs_an_approved_trio_in_the_live_candidate(root: Path) -> None:
+    """ADR 0150 (3): the trio read is the highest `rc-<N>/` on the work branch."""
     repo = root / "repos/r"
     _git(repo, "checkout", "-q", "feature/0.5.0")
-    (repo / "specs/releases/0.5.0/PLAN.md").write_text("**Status:** Draft\n")
-    _git(repo, "commit", "-qam", "draft")
+    (repo / "specs/releases/0.5.0/rc-10").mkdir()
+    for doc in ("SPEC", "PLAN", "TASKS"):
+        status = "Draft" if doc == "PLAN" else "Approved"
+        (repo / f"specs/releases/0.5.0/rc-10/{doc}.md").write_text(f"**Status:** {status}\n")
+    _git(repo, "add", "-A")
+    _git(repo, "commit", "-qm", "draft")
     _git(repo, "checkout", "-q", "main")
     result = _run(root, "new", "r", "--kind", "impl")
     assert result.returncode == 1 and len(_fixes(result)) == 1

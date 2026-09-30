@@ -15,13 +15,19 @@ from __future__ import annotations
 import json
 import re
 from collections.abc import Callable, Collection
+from dataclasses import astuple
 from pathlib import Path
 
 from dadaia_workspace.core.doctor_rules import SectionFinding
+from dadaia_workspace.core.release_state import (
+    LEGACY_RELEASE_STATE_FILENAME,
+    RELEASE_ID_RE,
+    RELEASE_STATE_FILENAME,
+)
 from dadaia_workspace.core.spec_status import APPROVED, extract_status
 from dadaia_workspace.core.spec_status import CANONICAL_STATUS as _CANONICAL_STATUS
 from dadaia_workspace.features.specs.doctor_common import RELEASE_ARTIFACTS, iter_all_release_dirs
-from dadaia_workspace.features.specs.doctor_types import Severity, specs_finding
+from dadaia_workspace.features.specs.doctor_types import Severity, finding_path, specs_finding
 from dadaia_workspace.features.specs.specs_tree import SpecsTree
 
 # Vocabulary + parser live in core.spec_status (single definition); re-exported here
@@ -104,10 +110,10 @@ class ReleaseValidator:
         ledger, so this rule borrows the governance family's ONE bug reader without
         forcing its store on every construction site.
         """
-        release = self.tree.active_release.release
-        if not release:
+        candidate = self.tree.active_release.candidate
+        if not candidate:
             return []
-        path = self.specs_dir / "releases" / release / "SPEC.md"
+        path = candidate / "SPEC.md"
         if not path.exists() or not (problem := self._origin_problem(path, known_bug_ids)):
             return []
         fix = f"Operator action: name the work's origin under **Opened:** in {path}"
@@ -145,12 +151,10 @@ class ReleaseValidator:
     def check_active_release_artifacts(self) -> list[SectionFinding]:
         issues: list[SectionFinding] = []
         active = self.tree.active_release
-        release, phase = active.release, active.phase
-        if not release:
+        if not active.candidate:
             return issues
-        rdir = self.specs_dir / "releases" / release
         for fname in RELEASE_ARTIFACTS:
-            fpath = rdir / fname
+            fpath = active.candidate / fname
             if not fpath.exists():
                 # Presence is `release.py check`'s rule, in ONE home. This rule judges the `**Status:**`
                 # line of the trio documents that exist — a second "missing" finding
@@ -181,7 +185,7 @@ class ReleaseValidator:
                         fix=f"Operator action: set a canonical `**Status:**` in {fpath}",
                     )
                 )
-            elif status != APPROVED and phase in ("IMPLEMENTATION", "CLOSURE"):
+            elif status != APPROVED and active.phase in ("IMPLEMENTATION", "CLOSURE"):
                 # Bug fresh-release-scaffold-emits-spec-doctor-warnings-042: Draft/In
                 # review IS the legitimate state of a DEFINITION-phase release — the
                 # scaffolder emits exactly that. Only implementation-bound phases
@@ -192,7 +196,7 @@ class ReleaseValidator:
                         severity=Severity.WARNING,
                         description=(
                             f"{fname} is '{status}' but the active release phase is "
-                            f"'{phase}'; expected '{APPROVED}' for implementation-bound "
+                            f"'{active.phase}'; expected '{APPROVED}' for implementation-bound "
                             "phases"
                         ),
                         path=str(fpath),
@@ -202,7 +206,7 @@ class ReleaseValidator:
 
     def check_plan_line_limit(self) -> list[SectionFinding]:
         issues: list[SectionFinding] = []
-        for plan in self.specs_dir.glob("releases/*/PLAN.md"):
+        for plan in self.specs_dir.glob("releases/*/rc-*/PLAN.md"):
             n_lines = sum(1 for _ in plan.read_text(encoding="utf-8").splitlines())
             if n_lines <= PLAN_MAX_LINES:
                 continue
@@ -230,9 +234,9 @@ class ReleaseValidator:
         the contradiction is refused at definition, where it is born.
         """
         active = self.tree.active_release
-        if not active.release:
+        if not active.candidate:
             return []
-        tasks = self.specs_dir / "releases" / active.release / "TASKS.md"
+        tasks = active.candidate / "TASKS.md"
         if not tasks.exists():
             return []
         text = tasks.read_text(encoding="utf-8")
@@ -261,11 +265,11 @@ class ReleaseValidator:
         """SPEC-DOC-024: a live release in IMPLEMENTATION carries an approved TASKS.md.
         Whether a task is still open is `release.py phase CLOSURE`'s one refusal
         (`_release_schema.UNFINISHED_RE`) — the doctor keeps no task-marker regex."""
-        release, phase = self.tree.active_release.release, self.tree.active_release.phase
+        release, phase, candidate = astuple(self.tree.active_release)
         if not release or phase != "IMPLEMENTATION":
             return []
-        tasks = self.specs_dir / "releases" / release / "TASKS.md"
-        status = _extract_status(tasks) if tasks.exists() else None
+        tasks = (candidate or self.specs_dir / "releases" / release / "rc-<N>") / "TASKS.md"
+        status = _extract_status(tasks)
         if status == APPROVED:
             return []
         description = (
@@ -299,3 +303,27 @@ class ReleaseValidator:
                 )
             )
         return issues
+
+    def check_release_state_filename(self) -> list[SectionFinding]:
+        """SPEC-DOC-046 (ADR 0007, restored by ADR 0152 (4)): a release directory holds
+        the legacy ``RELEASE.json`` and no ``_RELEASE.json`` — `doctor --fix` renames it."""
+        return [
+            specs_finding(
+                "SPEC-DOC-046",
+                Severity.WARNING,
+                f"{legacy.relative_to(self.specs_dir)} carries the legacy state-file name — "
+                f"canonical is {RELEASE_STATE_FILENAME} (ADR 0007)",
+                str(legacy),
+                fixable=True,
+            )
+            for legacy in sorted(self.specs_dir.glob(f"releases/*/{LEGACY_RELEASE_STATE_FILENAME}"))
+            if RELEASE_ID_RE.match(legacy.parent.name)
+            and not legacy.with_name(RELEASE_STATE_FILENAME).exists()
+        ]
+
+    def fix_release_state_filename(self, issue: SectionFinding) -> None:
+        """Rename the legacy state file (SPEC-DOC-046) — re-verified before the rename."""
+        if (named := finding_path(issue)) and Path(named).name == LEGACY_RELEASE_STATE_FILENAME:
+            legacy = Path(named)
+            if legacy.is_file() and not legacy.with_name(RELEASE_STATE_FILENAME).exists():
+                legacy.rename(legacy.with_name(RELEASE_STATE_FILENAME))

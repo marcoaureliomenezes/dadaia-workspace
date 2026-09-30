@@ -60,13 +60,15 @@ def test_tree8_is_silent_on_a_conformant_v6_tree(tmp_path: Path) -> None:
         "memory/product.html",
         "bugs/some-bug.md",
         "releases/v0.3.0/SPEC.md",
+        "releases/0.3.0/TASKS.md",
     ],
 )
 def test_tree8_reports_a_non_canon_path_and_fix_never_deletes_it(tmp_path: Path, rel: str) -> None:
     """sa-placement-rules-contradict-tree8#B1 sa-placement-rules-contradict-tree8#B2
     sa-placement-rules-contradict-tree8#B3 sa-placement-rules-contradict-tree8#B4
     sa-placement-rules-contradict-tree8#B6
-    sa-release-dir-placement-judged-by-tree8-and-spec-doc-027: a non-canon path yields
+    sa-release-dir-placement-judged-by-tree8-and-spec-doc-027, ADR 0151 M5 (a flat trio
+    file): a non-canon path yields
     exactly one finding, TREE-8 (ERROR, never auto-fixed — bug
     doctor-fix-tree8-deletes-operator-content, decision D8); `doctor --fix` leaves it
     on disk; moving it out of specs/ as the fix says leaves the doctor clean."""

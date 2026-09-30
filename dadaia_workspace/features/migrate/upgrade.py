@@ -16,7 +16,12 @@ from pathlib import Path
 from dadaia_workspace.core import specs_version as _version
 from dadaia_workspace.core.atomic_write import atomic_write
 from dadaia_workspace.core.frontmatter import FRONTMATTER_RE
-from dadaia_workspace.core.gitflow import merge_frontmatter
+from dadaia_workspace.core.gitflow import (
+    candidate_number,
+    merge_frontmatter,
+    resolve_live_candidate,
+    resolve_live_release_id,
+)
 from dadaia_workspace.core.spec_status import APPROVED, DRAFT, IN_REVIEW
 
 
@@ -41,6 +46,8 @@ class UpgradeResult:
     #: ``memory/TECHSTACK.md`` folded into ``ARCHITECTURE.md``'s ``## Tech Stack``
     #: section and deleted by the 6 -> 7 hop (planned-only when ``dry_run``).
     tech_stack_folded: list[Path] = field(default_factory=list)
+    #: A flat live trio moved into the next ``rc-<N>/`` by the 8 -> 9 hop (ADR 0150).
+    trio_folded: list[Path] = field(default_factory=list)
 
 
 def upgrade(
@@ -64,10 +71,12 @@ def upgrade(
         )
 
     if dry_run:
+        trio = plan_flat_trio_fold(specs_dir)
         removed = plan_empty_ideas_dir(specs_dir)
         restated = plan_status_token_rewrites(specs_dir)
         folded = plan_tech_stack_fold(specs_dir)
     else:
+        trio = fold_flat_trio(specs_dir)
         removed = remove_empty_ideas_dir(specs_dir, remove)
         restated = rewrite_status_tokens(specs_dir)
         folded = fold_tech_stack(specs_dir, remove)
@@ -77,11 +86,34 @@ def upgrade(
         stamped=kind == "upgradable",
         to_version=goal,
         dry_run=dry_run,
-        no_op=kind == "canonical" and not (removed or restated or folded),
+        no_op=kind == "canonical" and not (removed or restated or folded or trio),
         ideas_removed=removed,
         status_rewritten=restated,
         tech_stack_folded=folded,
+        trio_folded=trio,
     )
+
+
+def plan_flat_trio_fold(specs_dir: Path) -> list[Path]:
+    """The documents still flat at the live release's root — a v8 tree's candidate (ADR
+    0150: only the state document sits there)."""
+    release_id = resolve_live_release_id(specs_dir)
+    return sorted((specs_dir / "releases" / release_id).glob("*.md")) if release_id else []
+
+
+def fold_flat_trio(specs_dir: Path) -> list[Path]:
+    """Move the flat live trio, verbatim, into the next ``rc-<N>/`` — the 8 -> 9 hop; a
+    closed candidate folder is never touched."""
+    planned = plan_flat_trio_fold(specs_dir)
+    if planned:
+        root = planned[0].parent
+        candidate = (
+            root / f"rc-{candidate_number(p.name for p in root.iterdir() if p.is_dir()) + 1}"
+        )
+        candidate.mkdir()
+        for document in planned:
+            document.rename(candidate / document.name)
+    return planned
 
 
 #: The section ``TECHSTACK.md``'s body becomes, appended at the END of ``ARCHITECTURE.md``
@@ -156,12 +188,10 @@ _RETIRED_STATUS_TOKENS = {
 
 
 def _live_trio_documents(specs_dir: Path) -> list[Path]:
-    """Every document of every LIVE release (the rewrite touches only a ``**Status:**``
-    line). ``releases/_archive/`` is published history: excluded by path, never by
-    token, so an archived tree keeps reading as it shipped."""
-    releases = specs_dir / "releases"
-    live = releases.glob("*/**/*.md")
-    return sorted(p for p in live if "_archive" not in p.relative_to(releases).parts)
+    """The live candidate's documents (the rewrite touches only a ``**Status:**`` line).
+    A closed ``rc-<N>/`` and ``releases/_archive/`` are history, never rewritten (ADR 0150)."""
+    candidate = resolve_live_candidate(specs_dir)
+    return sorted(candidate.glob("*.md")) if candidate else []
 
 
 def plan_status_token_rewrites(specs_dir: Path) -> list[Path]:

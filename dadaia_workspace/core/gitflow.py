@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import json
 import re
-from collections.abc import Mapping
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal
@@ -15,6 +15,7 @@ from dadaia_workspace.core.release_state import RELEASE_ID_RE, RELEASE_STATE_FIL
 
 __all__ = [
     "DEFAULT",
+    "candidate_number",
     "Gitflow",
     "Role",
     "constitution_error",
@@ -23,6 +24,7 @@ __all__ = [
     "from_mapping",
     "merge_frontmatter",
     "read_gitflow",
+    "resolve_live_candidate",
     "resolve_live_release_id",
     "work_branch",
 ]
@@ -30,6 +32,8 @@ __all__ = [
 Role = Literal["principal", "integration", "work"]
 
 _VERSION_RE = re.compile(r"\d+\.\d+\.\d+")
+#: A candidate folder (ADR 0150) — `_release_schema.CANDIDATE_RE`'s pattern.
+_CANDIDATE_RE = re.compile(r"^rc-(\d+)$")
 # git check-ref-format's refusals, for one branch name (a prefix may end in "/").
 _BAD_REF_RE = re.compile(r"[\x00-\x20\x7f~^:?*\[\\]|\.\.|//|@\{|^[/.]|\.$|\.lock(/|$)|/\.|^@$")
 
@@ -66,6 +70,21 @@ def resolve_live_release_id(specs_dir: Path) -> str | None:
     live = [d.name for d in root.iterdir() if RELEASE_ID_RE.match(d.name)
             and (d / RELEASE_STATE_FILENAME).is_file()] if root.is_dir() else []  # fmt: skip
     return live[0] if len(live) == 1 else None
+
+
+def candidate_number(names: Iterable[str]) -> int:
+    """The highest ``rc-<N>`` among *names*, 0 when none — `_release_schema`'s twin."""
+    return max((int(m.group(1)) for n in names if (m := _CANDIDATE_RE.match(n))), default=0)
+
+
+def resolve_live_candidate(specs_dir: Path) -> Path | None:
+    """The live release's highest-numbered ``rc-<N>/`` (ADR 0150) — `_release_store`'s
+    `candidate_dir` rule; ``None`` with no live release or no candidate folder."""
+    if (release_id := resolve_live_release_id(specs_dir)) is None:
+        return None
+    root = specs_dir / "releases" / release_id
+    n = candidate_number(d.name for d in root.iterdir() if d.is_dir())
+    return root / f"rc-{n}" if n else None
 
 
 def work_branch(specs_dir: Path, flow: Gitflow) -> str:

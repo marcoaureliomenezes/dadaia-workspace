@@ -124,13 +124,13 @@ def _plant_gitflow_gone(root: Path) -> None:
 def _plant_status_line_gone(root: Path) -> None:
     """sa-status-line-has-two-parsers#B26-3 a 173-line TASKS.md, lowercase token on line 3;
     sa-status-line-has-two-parsers#B26-4 a SPEC.md with no status line — both fire."""
-    release = root / "specs" / "releases" / _RELEASE
+    release = root / "specs" / "releases" / _RELEASE / "rc-1"
     (release / "SPEC.md").write_text("# Spec\n\nContent.\n", encoding="utf-8")
     (release / "TASKS.md").write_text("# Tasks\n\n**Status:** approved\n" + "- t\n" * 170)
 
 
 def _plant_origin_line_gone(root: Path) -> None:
-    spec = root / "specs" / "releases" / _RELEASE / "SPEC.md"
+    spec = root / "specs" / "releases" / _RELEASE / "rc-1" / "SPEC.md"
     spec.write_text(
         "# Spec\n\n**Status:** Approved\n**Opened:** 2026-09-21\n\nContent.\n",
         encoding="utf-8",
@@ -138,7 +138,7 @@ def _plant_origin_line_gone(root: Path) -> None:
 
 
 def _plant_oversized_plan(root: Path) -> None:
-    plan = root / "specs" / "releases" / _RELEASE / "PLAN.md"
+    plan = root / "specs" / "releases" / _RELEASE / "rc-1" / "PLAN.md"
     body = "\n".join(f"- line {i}" for i in range(400))
     plan.write_text(f"# Plan\n\n**Status:** Approved\n\n{body}\n", encoding="utf-8")
 
@@ -183,6 +183,12 @@ def _plant_dispositioned_audit(root: Path) -> None:
     )
 
 
+def _plant_legacy_state_name(root: Path) -> None:
+    """ADR 0007: the legacy state-file name, renamed by `doctor --fix`."""
+    state = root / "specs" / "releases" / _RELEASE / "_RELEASE.json"
+    state.rename(state.with_name("RELEASE.json"))
+
+
 def _plant_stray_dotfile(root: Path) -> None:
     # Untracked and with no canon home — the case a ``git mv`` fix line could not serve
     # (bug tree8-fix-line-not-runnable-for-every-case).
@@ -222,6 +228,7 @@ PLANTS: dict[str, Plant] = {
         )
     ),
     "TREE-3": Plant(_plant_missing_memory_document),
+    "SPEC-DOC-046": Plant(_plant_legacy_state_name),
 }
 
 
@@ -400,9 +407,9 @@ OPERATOR_ACTION: dict[str, Callable[[Path], None]] = {
     "TREE-8": _plant_stray_dotfile,
     "LINT-1": lambda r: _write(r / "specs" / "memory" / "product" / "testarea" / "x.md", "# X\n"),
     "SPEC-DOC-001": lambda r: (r / "specs" / "constitution.md").unlink(),
-    "SPEC-DOC-024": lambda r: _write(r / f"specs/releases/{_RELEASE}/TASKS.md", "# Tasks\n\n**Status:** Draft\n"),
+    "SPEC-DOC-024": lambda r: _write(r / f"specs/releases/{_RELEASE}/rc-1/TASKS.md", "# Tasks\n\n**Status:** Draft\n"),
     "SPEC-DOC-026": lambda r: _write(r / f"specs/releases/_archive/{_RELEASE}/SPEC.md", "# S\n"),
-    "SPEC-DOC-047": lambda r: _append(r / f"specs/releases/{_RELEASE}/TASKS.md", "- [ ] T2 x\n  Write set: specs/memory/QUALITY.md\n"),
+    "SPEC-DOC-047": lambda r: _append(r / f"specs/releases/{_RELEASE}/rc-1/TASKS.md", "- [ ] T2 x\n  Write set: specs/memory/QUALITY.md\n"),
     "ADR-SUPERSEDED-CITATION": lambda r: (
         _write(r / "specs/ADRs/decisions.jsonl", '{"id": "0001", "status": "superseded"}\n'),
         _append(r / "specs/memory/QUALITY.md", "\nADR: 0001\n"),

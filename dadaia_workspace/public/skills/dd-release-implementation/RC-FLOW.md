@@ -22,7 +22,7 @@ candidates.
 Each step ends on a checkable criterion. Steps 5–8 are candidate-closure work.
 
 **Step 1 — Reserve.**
-- Flip `[ ]`->`[-]` in the release root's `TASKS.md`, commit `chore(tasks): start <id>` alone.
+- Flip `[ ]`->`[-]` in the live candidate's `TASKS.md`, commit `chore(tasks): start <id>` alone.
 - Abandon instead: flip `[-]`->`[ ]`, commit `chore(tasks): abandon <id>` naming the reason.
 - Dispatching a shell-less sub-agent: commit its flip before relaying the work item — one flip per dispatch, never batched.
 - Recovery — two simultaneous `[-]`, or a foreign `[-]` from another session: read `git log`, report to the operator, never transition it yourself.

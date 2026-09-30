@@ -27,9 +27,11 @@ from dadaia_workspace.core.gitflow import constitution_error, constitution_text,
 #: v7 = memory canon v7 — ``memory/TECHSTACK.md`` left the canon and its body became
 #: ``ARCHITECTURE.md``'s ``## Tech Stack`` section, which ``features/migrate`` folds;
 #: v8 = the 0.5.0 canon — fixed law sections, the gitflow block, the refreshed area laws
-#: and catalog, all written by the repair set ``specs init`` runs. A canon change that
+#: and catalog, all written by the repair set ``specs init`` runs; v9 = every candidate
+#: in ``releases/<M.m.p>/rc-<N>/`` (ADR 0150), the flat live trio folded by the hop;
+#: ``RELEASE.json`` back as SPEC-DOC-046's rename input (ADR 0152 (4)). A canon change that
 #: keeps the stamp leaves every older tree reading ``canonical`` while the doctor is red.
-CANONICAL_SPECS_VERSION = 8
+CANONICAL_SPECS_VERSION = 9
 
 #: The oldest stamp the one live upgrade hop starts from — and so the oldest a tree may
 #: carry and still be a dadaia tree (SPEC 0.4.8 D7, D9); anything older is foreign.

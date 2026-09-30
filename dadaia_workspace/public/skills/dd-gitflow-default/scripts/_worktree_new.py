@@ -9,7 +9,7 @@ from pathlib import Path
 
 sys.path.append(str(Path(__file__).resolve().parents[2] / "dd-release-implementation" / "scripts"))
 
-from _release_schema import extract_status  # noqa: E402
+from _release_schema import candidate_number, extract_status  # noqa: E402
 from _worktree_git import flow_for, git, work_version  # noqa: E402
 from _worktree_git import ours as our_trees  # noqa: E402
 from _worktree_kinds import CAPS, LOCK, SCRIPT, UNION, Refusal  # noqa: E402
@@ -28,8 +28,10 @@ def new(root: Path, repo_name: str, kind: str) -> Path:
     version = work_version(repo, flow)
     work = f"{flow['work']}{version}"
     if kind == "impl":
+        release = f"{work}:specs/releases/{version}"
+        rc = candidate_number(git(repo, "ls-tree", "--name-only", release, check=False).split())
         for doc in ("SPEC", "PLAN", "TASKS"):
-            text = git(repo, "show", f"{work}:specs/releases/{version}/{doc}.md", check=False)
+            text = git(repo, "show", f"{release}/rc-{rc}/{doc}.md", check=False)
             if extract_status(text) != "Approved":
                 raise Refusal(
                     f"impl needs an Approved trio; {doc}.md on {work} is not",

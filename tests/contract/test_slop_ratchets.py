@@ -333,7 +333,6 @@ _V38_ALLOWANCE: dict[str, str] = {
     # `new` is all-or-nothing and drops a closed candidate's PLAN/TASKS (stacked-candidate law)
     "public/skills/dd-release-implementation/scripts/_release_new.py:new_release": "parity:tests/unit/skills/test_release_implementation_release_script.py",
     # `ship` removes the shipped release dir (git is the archive) — B25-1's own Then
-    "public/skills/dd-release-implementation/scripts/release.py:_ship": "parity:tests/unit/skills/test_release_implementation_release_script.py",
 }
 
 

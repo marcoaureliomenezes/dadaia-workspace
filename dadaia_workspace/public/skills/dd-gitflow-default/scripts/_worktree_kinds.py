@@ -13,7 +13,7 @@ SCRIPT = Path(__file__).parent / "worktree.py"
 CODE = "<code>"
 #: Each kind's allowed set (ADRs 0106, 0124), fnmatch globs relative to the repo root.
 KINDS: dict[str, tuple[str, ...]] = {
-    "impl": (CODE, "specs/releases/*/TASKS.md"),
+    "impl": (CODE, "specs/releases/*/rc-*/TASKS.md"),
     "bug": (CODE, "specs/bugs/BUGS.jsonl"),
     "backlog": ("specs/backlog/*", "specs/ADRs/decisions.jsonl"),
     "release": ("specs/releases/*", "specs/ADRs/decisions.jsonl", "specs/memory/*"),

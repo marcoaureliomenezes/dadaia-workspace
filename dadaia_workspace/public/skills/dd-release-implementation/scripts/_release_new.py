@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
-"""`release.py new <id>` — the ONE act that opens a candidate, birth or stacked: SPEC.md
-and `_RELEASE.json` in ONE transaction (a failure removes the whole directory);
+"""`release.py new <id>` — the ONE act that opens a candidate, birth or stacked: its
+`rc-<N+1>/SPEC.md` and `_RELEASE.json` in ONE transaction (a failure removes what it made);
 `--origin bugs:<ids>` seeds one scope clause per bug from the ledger."""
 
 from __future__ import annotations
@@ -14,7 +14,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 sys.path.append(str(Path(__file__).resolve().parents[2] / "dd-bug-resolution" / "scripts"))
 
 from _ledger import replace  # noqa: E402
-from _release_schema import ARTIFACTS, SEMVER_RE, STATE, TRIO, utc_now  # noqa: E402
+from _release_schema import SEMVER_RE, STATE, candidate_number, utc_now  # noqa: E402
 from _release_store import SCRIPT, Refusal, State, live_ids, read_state, validated  # noqa: E402
 from _release_tree import tree_findings  # noqa: E402
 
@@ -96,7 +96,7 @@ def refuse_unfree(specs: Path, release_id: str) -> State | None:
         )
     releases, live = specs / "releases", live_ids(specs)
     release_dir = releases / release_id
-    for path in (releases, release_dir, *(release_dir / name for name in ARTIFACTS)):
+    for path in (releases, release_dir, release_dir / STATE):
         if path.is_symlink():
             raise Refusal(
                 f"{path.name} resolves through a symlink — refusing to mint through one",
@@ -125,24 +125,22 @@ def refuse_unfree(specs: Path, release_id: str) -> State | None:
 
 
 def new_release(specs: Path, release_id: str, today: str, origin: str) -> Path:
-    """Open ``releases/<id>/`` on a fresh SPEC stub and state document, all or nothing. A
-    stacked candidate's closed PLAN/TASKS die: a stale Approved pair would let `phase
-    IMPLEMENTATION` pass on the prior candidate's documents."""
+    """Open ``releases/<id>/rc-<N+1>/`` on a fresh SPEC stub and reopen the state document,
+    all or nothing (ADR 0150): a closed ``rc-<N>/`` is never touched. Returns the candidate."""
     prior = refuse_unfree(specs, release_id)
     release_dir = specs / "releases" / release_id
     text = validated(candidate_state(release_id, prior), f"releases/{release_id}/{STATE}")
     stub = SPEC_STUB.format(
         release_id=release_id, today=today, origin=origin, scope=seeded_scope(specs, origin)
     )
-    created = not release_dir.exists()
+    names = [d.name for d in release_dir.iterdir() if d.is_dir()] if release_dir.is_dir() else []
+    candidate = release_dir / f"rc-{candidate_number(names) + 1}"
+    made = candidate if release_dir.exists() else release_dir
+    candidate.mkdir(parents=True)
     try:
-        release_dir.mkdir(parents=True, exist_ok=True)
-        (release_dir / "SPEC.md").write_text(stub, encoding="utf-8")
+        (candidate / "SPEC.md").write_text(stub, encoding="utf-8")
         replace(release_dir / STATE, text)
-        for name in TRIO[1:]:
-            (release_dir / name).unlink(missing_ok=True)
     except BaseException:
-        if created:
-            shutil.rmtree(release_dir, ignore_errors=True)
+        shutil.rmtree(made, ignore_errors=True)
         raise
-    return release_dir
+    return candidate

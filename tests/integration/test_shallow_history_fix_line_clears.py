@@ -46,9 +46,9 @@ def _origin(tmp: Path) -> Path:
     _git(origin, "config", "user.name", "t")
     c1, c2 = _commit(origin, "a.txt"), _commit(origin, "b.txt")
     release = origin / "specs" / "releases" / "9.9.9"
-    release.mkdir(parents=True)
+    (release / "rc-1").mkdir(parents=True)
     for name in ("SPEC.md", "PLAN.md", "TASKS.md"):
-        (release / name).write_text("# x\n", "utf-8")
+        (release / "rc-1" / name).write_text("# x\n", "utf-8")
     ts = "2026-01-01T00:00:00Z"
     state = {
         "schema": "release-state-v1", "release": "9.9.9", "phase": "CLOSURE",

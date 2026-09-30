@@ -41,22 +41,26 @@ def note(state: State, ts: str, text: str) -> None:
     )
 
 
-def _refuse_unapproved_trio(live: Live) -> None:
-    """A candidate enters IMPLEMENTATION only with all three documents `Approved`."""
+def _refuse_unapproved_trio(live: Live) -> Path:
+    """A candidate enters IMPLEMENTATION only with all three documents `Approved`; returns
+    the candidate folder that holds them (no folder yet: `rc-1/` is where they belong)."""
+    candidate = live.candidate or live.release_dir / "rc-1"
     for name in TRIO:
-        document = live.release_dir / name
+        document = candidate / name
         if not document.is_file():
             raise Refusal(
-                f"release {live.release_id} has no {name} at root",
-                f"{SCRIPT} new {live.release_id}",
+                f"release {live.release_id} has no {document.relative_to(live.release_dir)}",
+                f"write {document.resolve()} carrying '**Status:** {APPROVED}'",
             )
         status = extract_status(document.read_text(encoding="utf-8"))
         if status != APPROVED:
             raise Refusal(
-                f"releases/{live.release_id}/{name} carries status {status!r} — SPEC, PLAN "
+                f"{document.relative_to(live.release_dir)} of release {live.release_id} "
+                f"carries status {status!r} — SPEC, PLAN "
                 f"and TASKS must all be '**Status:** {APPROVED}' to enter IMPLEMENTATION",
                 f"set '**Status:** {APPROVED}' in {document.resolve()}",
             )
+    return candidate
 
 
 def _refuse_open_worktrees(specs: Path) -> None:
@@ -143,13 +147,13 @@ def set_phase(specs: Path, phase: str, sha: str) -> tuple[str, str]:
         )
     ts = utc_now()
     if phase == "IMPLEMENTATION":
-        _refuse_unapproved_trio(live)
-        _refuse_missing_as_is_table((live.release_dir / "PLAN.md").read_text(encoding="utf-8"))
-    elif unfinished := unfinished_tasks(live.release_dir):
+        candidate = _refuse_unapproved_trio(live)
+        _refuse_missing_as_is_table((candidate / "PLAN.md").read_text(encoding="utf-8"))
+    elif live.candidate and (unfinished := unfinished_tasks(live.candidate)):
         raise Refusal(
             f"TASKS.md still carries {len(unfinished)} open '[ ]'/reserved '[-]' marker(s) "
             f"— a candidate closes fully implemented: {unfinished[0]}",
-            f"finish and mark every task '[x]' in {(live.release_dir / 'TASKS.md').resolve()}",
+            f"finish and mark every task '[x]' in {(live.candidate / 'TASKS.md').resolve()}",
         )
     else:
         _refuse_open_worktrees(specs.resolve())

@@ -50,10 +50,10 @@ def script(tmp_path: Path) -> Path:
 def _specs(tmp_path: Path, plan: str, *, plan_status: str = "Approved") -> Path:
     specs = tmp_path / "specs"
     release = specs / "releases" / "0.5.0"
-    release.mkdir(parents=True)
+    (release / "rc-1").mkdir(parents=True)
     for name, body in (("SPEC.md", ""), ("PLAN.md", plan), ("TASKS.md", "- [ ] T-1\n")):
         status = plan_status if name == "PLAN.md" else "Approved"
-        (release / name).write_text(f"# {name}\n\n**Status:** {status}\n\n{body}", "utf-8")
+        (release / "rc-1" / name).write_text(f"# {name}\n\n**Status:** {status}\n\n{body}", "utf-8")
     state: dict[str, object] = {"schema": "release-state-v1", "release": "0.5.0", "phase": "DEFINITION",
              "defined": None, "implemented": None, "shipped": None, "log": []}  # fmt: skip
     (release / "_RELEASE.json").write_text(json.dumps(state, indent=2) + "\n", "utf-8")
@@ -144,11 +144,11 @@ def test_new_writes_a_spec_stub_carrying_replaces(script: Path, tmp_path: Path) 
     (specs / "releases").mkdir(parents=True)
     argv = [sys.executable, str(script), "new", "0.9.0", "--specs", str(specs)]
     assert subprocess.run(argv, capture_output=True, text=True).returncode == 0
-    stub = (specs / "releases/0.9.0/SPEC.md").read_text("utf-8")
+    stub = (specs / "releases/0.9.0/rc-1/SPEC.md").read_text("utf-8")
     headings = re.findall(r"^## \d+\. (.+)$", stub, re.MULTILINE)
     assert headings.index("Scope") + 1 == headings.index("Replaces")
     assert headings.index("Replaces") + 1 == headings.index("Out of scope")
-    assert not (specs / "releases/0.9.0/PLAN.md").exists()
+    assert not (specs / "releases/0.9.0/rc-1/PLAN.md").exists()
 
 
 @pytest.mark.parametrize(

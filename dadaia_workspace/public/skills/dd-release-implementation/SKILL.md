@@ -20,7 +20,7 @@ description: >
 
 1. Open `specs/releases/AGENTS.md` (the area's scoped law) and follow it.
 2. Resolve the live release by reading `_RELEASE.json`'s `phase` field directly.
-3. The live candidate's `TASKS.md` sits at `releases/<v>/TASKS.md` — always flat; the prior candidate's trio is in git, never on disk.
+3. The live candidate's `TASKS.md` sits at `releases/<v>/rc-<N>/TASKS.md`, the highest `rc-<N>/`; a lower one is closed history.
 4. Full navigation protocol: `dd-spec-navigator`.
 5. Read `RC-FLOW.md` for the candidate arc and gate cadence before acting past reservation.
 6. Update `_RELEASE.json` per `RELEASE-EVENTS.md`'s shape and `log` conventions.

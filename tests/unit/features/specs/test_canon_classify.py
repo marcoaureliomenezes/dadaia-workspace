@@ -21,7 +21,11 @@ _MALFORMED = "---\nspecs_pattern_version: 7\ngitflow: {principal: main\n---\n# C
     ("text", "kind", "fix_tail"),
     [
         (None, "absent", "specs init --context demo"),
-        ("---\nspecs_pattern_version: 8\n---\n# C\n", "canonical", None),
+        (
+            f"---\nspecs_pattern_version: {specs_version.CANONICAL_SPECS_VERSION}\n---\n# C\n",
+            "canonical",
+            None,
+        ),
         ("---\nspecs_pattern_version: 7\n---\n# C\n", "upgradable", "specs init --context demo"),
         ("---\nspecs_pattern_version: 6\n---\n# C\n", "upgradable", "specs init --context demo"),
         (

@@ -39,7 +39,7 @@ def test_one_release_id_grammar_everywhere(tmp_path: Path, release_id: str, lega
     the canon and `release.py new` agree on every id — a suffix and a `v` are refused."""
     assert RELEASE_ID_RE.pattern == _release_schema.SEMVER_RE.pattern
     assert bool(RELEASE_ID_RE.match(release_id)) is legal
-    assert is_canon_path(f"releases/{release_id}/SPEC.md") is legal
+    assert is_canon_path(f"releases/{release_id}/rc-1/SPEC.md") is legal
     (tmp_path / "specs" / "releases").mkdir(parents=True)
     new = subprocess.run([sys.executable, str(_SCRIPTS / "release.py"), "new", release_id,
                           "--specs", str(tmp_path / "specs")], capture_output=True, text=True)  # fmt: skip

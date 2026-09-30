@@ -13,6 +13,7 @@ import json
 import subprocess
 import sys
 from pathlib import Path
+from unittest.mock import ANY
 
 import pytest
 
@@ -77,12 +78,12 @@ def _state(release_id: str, **over: object) -> dict[str, object]:
 def _release(
     specs: Path, release_id: str, *, tasks: str = "- [x] T-1 — done\n", **over: object
 ) -> Path:
-    """One live release directory with its trio and its state document."""
+    """One live release directory: its state document and candidate 1's trio in `rc-1/`."""
     release_dir = specs / "releases" / release_id
-    release_dir.mkdir(parents=True, exist_ok=True)
+    (release_dir / "rc-1").mkdir(parents=True, exist_ok=True)
     for name in _TRIO:
         body = {"TASKS.md": tasks, "PLAN.md": _PLAN_AS_IS}.get(name, "")
-        release_dir.joinpath(name).write_text(
+        release_dir.joinpath("rc-1", name).write_text(
             f"# {name}\n\n**Status:** Approved\n\n{body}", encoding="utf-8"
         )
     release_dir.joinpath("_RELEASE.json").write_text(
@@ -124,7 +125,8 @@ def test_new_writes_the_spec_stub_and_the_state_in_one_act(script: Path, tmp_pat
     result = _run(script, "new", "0.6.0", "--specs", str(specs))
     assert result.returncode == 0, result.stderr
     release_dir = specs / "releases" / "0.6.0"
-    assert "**Status:** Draft" in (release_dir / "SPEC.md").read_text(encoding="utf-8")
+    assert "**Status:** Draft" in (release_dir / "rc-1/SPEC.md").read_text(encoding="utf-8")
+    assert sorted(p.name for p in release_dir.iterdir()) == ["_RELEASE.json", "rc-1"]
     state = _read(release_dir / "_RELEASE.json")
     assert state["schema"] == "release-state-v1"
     assert state["phase"] == "DEFINITION"
@@ -149,8 +151,8 @@ def test_new_refuses_a_second_live_release_with_one_fix_line(script: Path, tmp_p
 def test_new_births_the_stacked_candidate_on_a_closed_live_release(
     script: Path, tmp_path: Path
 ) -> None:
-    """The law's stacked candidate: `new <id>` on the live release in CLOSURE rewrites
-    SPEC.md, deletes the closed PLAN/TASKS, resets phase to DEFINITION and leaves the
+    """ADR 0150: `new <id>` on the live release in CLOSURE births `rc-<N+1>/` on a SPEC
+    stub, never touches the closed `rc-<N>/`, resets phase to DEFINITION and leaves the
     milestones standing (`phase IMPLEMENTATION` restamps `defined`)."""
     specs = _specs(tmp_path)
     release_dir = _release(
@@ -160,11 +162,12 @@ def test_new_births_the_stacked_candidate_on_a_closed_live_release(
         defined={"sha": "aaaaaaa", "ts": "2026-01-01T00:00:00Z"},
         implemented={"sha": "beef123", "ts": "2026-01-02T00:00:00Z"},
     )
+    closed = _tree_hash(release_dir / "rc-1")
     result = _run(script, "new", "0.5.0", "--specs", str(specs))
     assert result.returncode == 0, result.stderr
-    assert "**Status:** Draft" in (release_dir / "SPEC.md").read_text(encoding="utf-8")
-    assert not (release_dir / "PLAN.md").exists()
-    assert not (release_dir / "TASKS.md").exists()
+    assert "**Status:** Draft" in (release_dir / "rc-2/SPEC.md").read_text(encoding="utf-8")
+    assert sorted(p.name for p in (release_dir / "rc-2").iterdir()) == ["SPEC.md"]
+    assert _tree_hash(release_dir / "rc-1") == closed
     state = _read(release_dir / "_RELEASE.json")
     assert state["phase"] == "DEFINITION"
     assert state["defined"] == {"sha": "aaaaaaa", "ts": "2026-01-01T00:00:00Z"}
@@ -219,7 +222,7 @@ def test_phase_closure_stamps_the_implemented_milestone(script: Path, tmp_path: 
 def test_phase_implementation_refuses_an_unapproved_trio(script: Path, tmp_path: Path) -> None:
     specs = _specs(tmp_path)
     release_dir = _release(specs, "0.5.0")
-    (release_dir / "PLAN.md").write_text("# PLAN.md\n\n**Status:** Draft\n", encoding="utf-8")
+    (release_dir / "rc-1/PLAN.md").write_text("# PLAN\n\n**Status:** Draft\n", encoding="utf-8")
     result = _run(script, "phase", "IMPLEMENTATION", "--sha", "abc1234", "--specs", str(specs))
     assert result.returncode == 1
     assert "PLAN.md" in result.stderr
@@ -360,8 +363,8 @@ def test_every_refusal_carries_one_fix_that_is_not_itself_refused(
 
 def test_ship_records_the_promote_and_new_births_the_next(script: Path, tmp_path: Path) -> None:
     """sa-promote-has-no-verb#B25-1, sa-promote-has-no-verb#B25-2, sa-promote-has-no-verb#B25-4: new -> IMPLEMENTATION -> CLOSURE ->
-    ship -> new by verbs alone; the phases are exactly three and `ship` leaves the
-    promote in the ledger and git, not in a directory."""
+    ship -> new by verbs alone; the phases are exactly three; ADR 0152 (1): `ship` moves
+    the whole release folder to `_archive/<v>/`, never deletes it."""
     specs = _specs(tmp_path)
     _release(specs, "0.5.0", phase="IMPLEMENTATION")
     assert (
@@ -370,7 +373,9 @@ def test_ship_records_the_promote_and_new_births_the_next(script: Path, tmp_path
     state = specs / "releases" / "0.5.0" / "_RELEASE.json"
     result = _run(script, "ship", "--sha", "beef123", "--pr", "261", "--specs", str(specs))
     assert result.returncode == 0, result.stderr
-    assert not state.parent.exists()
+    archived = specs / "releases/_archive/0.5.0"
+    assert not state.parent.exists() and (archived / "rc-1/TASKS.md").is_file()
+    assert _read(archived / "_RELEASE.json")["shipped"] == {"sha": "beef123", "pr": 261, "ts": ANY}
     records = [
         json.loads(x)
         for x in (specs / "releases/_archive/releases_histo.jsonl").read_text("utf-8").splitlines()

@@ -328,6 +328,7 @@ SpecsArea = Literal[
 #: A canon shape's variable tokens (the law's notation) and the regex each compiles to.
 _SHAPE_TOKENS: tuple[tuple[str, str], ...] = (
     ("<M.m.p>", RELEASE_ID_RE.pattern[1:-1]),
+    ("<N>", r"[1-9][0-9]*"),
     ("<40hex>", r"[0-9a-f]{40}"),
     ("<YYYYMMDD-slug>", AUDIT_DIR_NAME_PATTERN),
     ("<area>", r"[a-z][a-z0-9_-]*"),
@@ -377,9 +378,12 @@ SPECS_CANON: tuple[CanonEntry, ...] = (
     CanonEntry("releases/_archive/releases_histo.jsonl", "releases", True),
     CanonEntry("releases/_archive/<M.m.p>/**", "releases"),
     CanonEntry("releases/<M.m.p>/_RELEASE.json", "releases"),
-    CanonEntry("releases/<M.m.p>/SPEC.md", "releases"),
-    CanonEntry("releases/<M.m.p>/PLAN.md", "releases"),
-    CanonEntry("releases/<M.m.p>/TASKS.md", "releases"),
+    # Legacy state-file name — admitted ONLY as the rename-lane input: SPEC-DOC-046
+    # offers the doctor-fixable rename to _RELEASE.json (ADR 0007).
+    CanonEntry("releases/<M.m.p>/RELEASE.json", "releases"),
+    CanonEntry("releases/<M.m.p>/rc-<N>/SPEC.md", "releases"),
+    CanonEntry("releases/<M.m.p>/rc-<N>/PLAN.md", "releases"),
+    CanonEntry("releases/<M.m.p>/rc-<N>/TASKS.md", "releases"),
     CanonEntry("backlog/AGENTS.md", "backlog", True),
     CanonEntry("backlog/BACKLOG.json", "backlog", True),
     CanonEntry("backlog/_archive/backlog_histo.jsonl", "backlog", True),

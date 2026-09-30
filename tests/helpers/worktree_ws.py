@@ -38,7 +38,7 @@ def make_workspace(root: Path) -> Path:
     (root / ".dadaia/states/spec_contexts.json").write_text("{}")
     workspace_cli(root, {"main_repo": "r", "associated_repos": [], "gitflow": FLOW})
     repo = root / "repos/r"
-    rel = repo / "specs/releases/0.5.0"
+    rel = repo / "specs/releases/0.5.0/rc-1"
     rel.mkdir(parents=True)
     git(repo, "init", "-q")
     for doc in ("SPEC", "PLAN", "TASKS"):

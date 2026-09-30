@@ -27,9 +27,8 @@ from dadaia_workspace.core.release_state import RELEASE_STATE_FILENAME, read_pha
 # carries a surviving artifact alongside its CLOSURE.md, so this changes zero
 # classification here.
 RELEASE_ARTIFACTS: tuple[str, ...] = ("SPEC.md", "PLAN.md", "TASKS.md")
-_RELEASE_ARTIFACTS = RELEASE_ARTIFACTS
-# Segment dirs (ADR-1/ADR-5) live *inside* a release dir and are not themselves releases:
-# alpha-N, rc-N, plus the historical `integration` segment container.
+# Candidate dirs (rc-N, ADR 0150) and the historical alpha-N/`integration` segments live
+# *inside* a release dir and are not themselves releases.
 _SEGMENT_NAME_RE = re.compile(r"^(?:alpha|rc)-\d+$|^integration$")
 
 
@@ -49,20 +48,18 @@ def resolve_active_release(specs_dir: Path) -> tuple[str | None, str | None]:
 
 
 def is_release_dir(d: Path) -> bool:
-    if not d.is_dir() or not any((d / a).exists() for a in _RELEASE_ARTIFACTS):
+    """A dir carrying a trio document itself (history) or in an ``rc-<N>/`` candidate
+    (ADR 0150); a candidate or segment dir is never a release — its id is the parent's."""
+    if not d.is_dir() or _SEGMENT_NAME_RE.match(d.name):
         return False
-    # Segment dirs (alpha-N/rc-N/integration) are an orthogonal lifecycle concept,
-    # not releases — they carry artifacts but their *release id* is the parent dir.
-    # Exclude them from release-id-uniqueness and naming-canon invariants.
-    return _SEGMENT_NAME_RE.match(d.name) is None
+    return any((d / a).exists() or any(d.glob(f"rc-*/{a}")) for a in RELEASE_ARTIFACTS)
 
 
 def iter_archive_release_dirs(arch: Path) -> list[Path]:
     """All release dirs under ``releases/_archive/`` (recursive).
 
-    A dir qualifies only when it carries an SDD release artifact; segment containers
-    (``rc-N``) are skipped by :func:`is_release_dir` while any artifact-bearing child
-    is still found by the recursion.
+    A dir qualifies only when it carries an SDD release artifact, its own or an
+    ``rc-N/`` candidate's (:func:`is_release_dir`).
     """
     out: list[Path] = []
     for d in sorted(p for p in arch.rglob("*") if p.is_dir()):

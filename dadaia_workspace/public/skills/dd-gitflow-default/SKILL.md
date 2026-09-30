@@ -24,7 +24,7 @@ The branch contract by role; the names are `specs/constitution.md`'s `gitflow:` 
 3. Identify the one live work branch `<work>M.m.p`.
 4. Surface a work branch predating the integration branch's last move to the operator first — it is stale.
 5. Branch count, cut point and name follow §2a.
-6. Definition stage: author the candidate's SPEC/PLAN/TASKS at the release root on the work branch.
+6. Definition stage: author the candidate's SPEC/PLAN/TASKS in its `rc-<N>/` on the work branch.
 7. Implementation stage: one commit per completed task group, shaped per §3a.
 8. Candidate closure: open one work → integration PR and merge it green.
 9. After the merge, ask the operator: **promote or continue?** Continue = the next candidate's `python3 .agents/skills/dd-release-implementation/scripts/release.py new <id>`; promote = step 10.

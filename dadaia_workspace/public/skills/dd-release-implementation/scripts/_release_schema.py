@@ -5,21 +5,20 @@ from __future__ import annotations
 
 import datetime as _dt
 import re
+from collections.abc import Iterable
 from pathlib import Path
 
 CODE = "LEDGER-RELEASE-SCHEMA"
 STATE = "_RELEASE.json"
 HISTO = "releases/_archive/releases_histo.jsonl"
-#: The closed-scope candidate trio that lives at the release root; the next candidate's
-#: `new`-seeded SPEC overwrites it, and git holds the closed one at its CLOSURE commit.
+#: One candidate's trio, born in its own `rc-<N>/` and never rewritten after closure (ADR 0150).
 TRIO = ("SPEC.md", "PLAN.md", "TASKS.md")
-#: Every artifact `new` refuses to mint over (CWE-73): a release directory is one unit.
-ARTIFACTS = (*TRIO, STATE)
+#: A candidate folder; the live one is the highest N — `core.gitflow._CANDIDATE_RE`.
+CANDIDATE_RE = re.compile(r"^rc-(\d+)$")
 #: The three lifecycle phases — pinned equal to the schema's enum; a shipped release
-#: leaves the tree (its histo line + git are the archive).
+#: moves whole to `_archive/<v>/` (ADR 0152 (1)).
 PHASES = ("DEFINITION", "IMPLEMENTATION", "CLOSURE")
-#: The phases in which the trio is REQUIRED at the release root; DEFINITION sits
-#: between candidates, when the next trio is still being authored.
+#: The phases in which the live candidate's trio is REQUIRED; DEFINITION is authoring it.
 TRIO_PHASES = frozenset({"IMPLEMENTATION", "CLOSURE"})
 #: A release ships `delivered` — the one histo disposition this ledger writes.
 DELIVERED = "delivered"
@@ -43,11 +42,23 @@ def extract_status(text: str) -> str | None:
     return match.group(1) if match else None
 
 
-def unfinished_tasks(release_dir: Path) -> list[str]:
+def candidate_number(names: Iterable[str]) -> int:
+    """The highest ``rc-<N>`` among *names*, 0 when none — the live candidate's number."""
+    return max((int(m.group(1)) for n in names if (m := CANDIDATE_RE.match(n))), default=0)
+
+
+def candidate_dir(release_dir: Path) -> Path | None:
+    """The highest-numbered ``rc-<N>/`` under *release_dir* (ADR 0150) —
+    `core.gitflow.resolve_live_candidate`'s rule; ``None`` when there is none."""
+    n = candidate_number(d.name for d in release_dir.iterdir() if d.is_dir())
+    return release_dir / f"rc-{n}" if n else None
+
+
+def unfinished_tasks(candidate: Path) -> list[str]:
     """The ``[ ]``/``[-]`` lines TASKS.md still carries — the LINES, so a refusal names
     the task that blocks it. A missing TASKS.md carries none: its absence is the trio
     rule's business, not this one's."""
-    tasks = release_dir / "TASKS.md"
+    tasks = candidate / "TASKS.md"
     if not tasks.is_file():
         return []
     text = tasks.read_text(encoding="utf-8")
