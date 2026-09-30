@@ -1,8 +1,8 @@
 ---
 slug: context-management
 title: context-management
-tldr: ALIVE/DEAD registry of a main repo plus associated repos; create clones, hooks and ALIVEs in one step; only context bind binds, naming the session's scope.
-summary: Spec Context Projects and their repos through one registry and the context verbs — create as onboarding level 2, alive, dead, the anchor-first append-only publish of the main repo (baseline), the repo set; one resolution authority whose Bind carries the session's scope; bind-driven injection of the tech stack, catalog and help digests; redaction at the render boundary.
+tldr: ALIVE/DEAD registry of a main repo plus associated repos; create clones, hooks and ALIVEs; only context bind binds, by env session id, naming the scope.
+summary: Spec Context Projects and their repos through one registry and the context verbs — create as onboarding level 2, alive, dead, the anchor-first append-only publish of the main repo (baseline), the repo set; one resolution authority whose Bind carries the session's scope and whose scope() maps a path to its repo and zone; bind-driven injection of the constitution, tech stack, catalog, open worktrees and help digests; redaction at the render boundary.
 tags: [context, lifecycle, session, privacy]
 sources:
   - dadaia_workspace/hooks/ctx_inject.py
@@ -27,6 +27,7 @@ sources:
 - The hook installer copies `pre-push-ci-gate.sh` into the `pre-push` hook under `git rev-parse --git-path hooks` where no hook exists, and refreshes one byte-identical to a hook the library shipped (`shipped-hashes.json`; a re-init upgrade refreshes every ALIVE repo, [[workspace-init]]); an operator's own hook is never overwritten, and [[workspace-doctor]]'s `HOOKS-DRIFT-1` names it; `dadaia ci install-hook [--repo <path>] [--force]` is its other caller ([[sdd-gate-v3]]).
 - `dadaia context alive <name>` clones every missing repo of the set and installs the hook in each, main and associated alike; a failed clone names `git ls-remote <url>` as its fix; it writes no specs, commits nothing and restores the main repo's recorded branch. It is idempotent on an ALIVE context; a DEAD context (after `dadaia import`) becomes ALIVE ([[context-portability]]).
 - `dadaia context dead <name> [--commit]` preflights the whole set before touching any repo, and any refusal touches none: untracked files refuse without `--commit`, and with it the pre-push secret matcher runs in-process over them ([[sdd-gate-v3]]; a hit names `git -C <repo> stash push -u -- <files>`); an unborn repo holding files, a repo with local commits and no remote, a repo with changes to commit and no git identity, and a repo with changes to sync on a branch that is not a work branch of its gitflow (`fix: git -C <repo> checkout -b <work pattern>`) each refuse.
+- A repo holding an open `wt/*` worktree (read from `worktree.py`'s rows, [[worktrees]]), a linked worktree, or a local branch carrying commits neither origin nor HEAD holds refuses the whole `dead` with one fix line: the worktree's own `merge` or `clean`, or the push of that branch as tag `archive/<branch>/<sha7>`.
 - Then each repo's changes are committed and pushed, the branch recorded and every repo removed; the commit never stages an unmerged entry — git's conflict refusal surfaces and no conflict marker is published; a refused push removes nothing and prints git's full output.
 - `alive` and `dead` back-fill every repo's empty URL from its checkout's `origin`; `dead` refuses to remove a repo still URL-less (`fix: git -C repos/<slug> remote add origin <clone-url>`); `alive` refuses a URL-less missing repo, main or associated, with `fix: git clone <clone-url> <repos/slug path>` — a checkout placed there is adopted and its origin back-filled.
 - `dadaia context baseline <name> [--message <text>]` is onboarding level 3c, the project publication ([[workspace-init]]): invoking it is consent, and it publishes the main repo only — an associated repo publishes by plain `git push` under the pre-push gate.
@@ -42,21 +43,25 @@ sources:
 ## Resolution
 
 - `resolve` in `dadaia_workspace/core/invocation.py` answers workspace root, session, context, repo slug, specs dir and the session's `Bind` in one call; the CLI, the container, the gate and ctx-inject each resolve once.
-- Rung 0 is caller-supplied (`--context`, or a write target under `repos/<slug>/`), rung 1 `DADAIA_CONTEXT`, rung 2 this session's live record keyed by its harness-native id, rung 3 the repo containing the cwd. Every rung fails soft; with all exhausted, specs-dir resolution raises instead of guessing.
-- The workspace root is walked from an explicit target path when one is given; otherwise it is the workspace owning the running CLI's venv (`<root>/.dadaia/.venv`), so a fix line runs from any cwd, else the walk from the cwd; every rung shares one root, and a root listed in `DADAIA_FENCED_ROOTS` is never resolved.
-- `repo_owner` maps any path under `repos/<slug>/` — a checkout or a worktree — to its owning context, repo slug and main repo slug; the pre-push gate reads an associated repo's gitflow through it ([[sdd-gate-v3]]).
+- Rung 0 is caller-supplied (`--context`, or a write target `scope()` gives a repo), rung 1 `DADAIA_CONTEXT`, rung 2 this session's live record keyed by its session id, rung 3 the repo containing the cwd. Every rung fails soft; with all exhausted, specs-dir resolution raises instead of guessing.
+- The workspace root is walked from an explicit target path when one is given; otherwise it is the workspace owning the running CLI's venv (`<root>/.dadaia/.venv`), so a fix line runs from any cwd, else the walk from the cwd; every rung shares one root, and a root listed in `DADAIA_FENCED_ROOTS` is never one a process acts on — the gate still protects it ([[sdd-gate-v3]]).
+- `scope(root, path)` in `dadaia_workspace/core/invocation.py` is the one path-to-repo decider: `(repo, zone)`, zone `worktree` for `worktrees/<r>/**`, `audit` for `repos/<r>/specs/audits/**`, `repo` for the rest of `repos/<r>/`, else `root`; a slug outside the name grammar is `root`.
+- `repo_owner` maps any path `scope()` gives a repo to its owning context, repo slug and main repo slug; the pre-push gate reads an associated repo's gitflow through it ([[sdd-gate-v3]]).
 - A context's specs tree is `repos/<main-slug>/specs` whether or not it exists; a context without one has its `specs` onboarding step pending, never redirected to another tree.
-- `Bind` is the named context plus every repo slug it owns (main plus associated); `resolve_bind` reads `DADAIA_CONTEXT` then the session record, never the cwd, and an unbound `Bind` owns nothing.
-- `dadaia_workspace/core/session_store.py` alone reads and writes `.dadaia/sessions/`; its `is_live` is the one liveness rule: `last_seen_at` against `ttl_seconds`, no creation fallback.
-- One harness session runs per checked-out tree; a parallel session uses its own linked worktree.
+- The session id comes from the environment only: `DADAIA_SESSION_ID`, else a harness-native id variable (`CLAUDE_CODE_SESSION_ID`, `CODEX_SESSION_ID`, `CODEX_THREAD_ID`), sanitized; a hook payload's id is never read, so the gate, the hooks and `bind` see one id.
+- `Bind` is the named context plus every repo slug it owns (main plus associated); `resolve_bind` reads the session's own live record when it has an id, else `DADAIA_CONTEXT`, never the cwd, and an unbound `Bind` owns nothing.
+- `dadaia_workspace/core/session_store.py` alone reads and writes `.dadaia/sessions/`; its `is_live` is the one liveness rule: `last_seen_at` younger than the one-day TTL constant, no creation fallback; the post-gate and ctx-inject renew `last_seen_at`.
+- A stale record is deleted by the reaper; an unreadable one is never stale — [[workspace-doctor]] reports it as slop and `--fix` holds it.
+- Agents change a repo inside its worktrees under `worktrees/<repo>/`, one session per tree ([[worktrees]]).
 
 ## Binding and injection
 
-- `dadaia context bind <name> [--print-env]` writes one record, `.dadaia/sessions/<session-id>.json` (context, runtime, pid, `bound_at`), acquiring nothing; `--print-env` emits `DADAIA_CONTEXT` and `DADAIA_SESSION_ID` for `eval $(…)`.
-- The ctx-inject hook injects state, never law, through one onboarding call site for bound and unbound sessions alike: a bound session gets its context header, the derived onboarding next step focused on its context while one remains, `ARCHITECTURE.md`'s `## Tech Stack` section and the catalog digest (`slug`, `title`, `tldr`, `path` per atom); an unbound session gets `[no bound context]`, the same derived step ([[workspace-init]]) and the ALIVE-context list.
+- `dadaia context bind <name>` writes one record, `.dadaia/sessions/<session-id>.json` (context, runtime, pid, `bound_at`), under the environment's session id, acquiring nothing and minting no id; a shell with no session id exits 1 with `fix: Operator action: export DADAIA_SESSION_ID=<any-stable-id> before opening the session`.
+- The ctx-inject hook runs one onboarding call site for bound and unbound sessions alike: a bound session gets its context header, the derived onboarding next step focused on its context while one remains, the context's `specs/constitution.md`, `ARCHITECTURE.md`'s `## Tech Stack` section, the catalog digest (`slug`, `title`, `tldr`, `path` per atom) and its open worktrees in the doctor's rendering; an unbound session gets `[no bound context]`, the same derived step ([[workspace-init]]) and the ALIVE-context list.
+- The same hook serves every harness; each speaks its vendor's envelope (`DADAIA_HOOK_OUTPUT`: the native `hookSpecificOutput.additionalContext`, Cursor's `additional_context`, Copilot's `additionalContext`), else plain text.
 - Every emission also carries `.dadaia/agentic/help-digest.md`, which the hook reads and never builds.
-- Injection fires once per session, again after a later bind or a compaction, and stays silent on repeat prompts; its sentinel and compact markers live in `.dadaia/tmp/` and are reaped by mtime.
-- A bound session's MUTATING write under a `repos/<slug>/` another context owns is refused with a `fix:` naming the owner's bind ([[sdd-gate-v3]]).
+- Injection fires once per session — a new session start always injects, whatever an earlier session stamped, and a resume continues — again after a later bind or a compaction, and stays silent on repeat prompts; its sentinel and compact markers live in `.dadaia/tmp/` and are reaped by mtime.
+- A MUTATING write into a repo outside the bind's scope is refused with a `fix:` naming the owner's bind, for a bound session and for an unbound one carrying an id ([[sdd-gate-v3]]).
 
 ## Redaction
 
@@ -69,4 +74,4 @@ sources:
 
 ## Dependencies
 
-[[spec-context-project]], [[sdd-gate-v3]], [[workspace-doctor]], [[workspace-init]], [[context-portability]], [[QUALITY]].
+[[spec-context-project]], [[sdd-gate-v3]], [[workspace-doctor]], [[workspace-init]], [[context-portability]], [[worktrees]], [[QUALITY]].

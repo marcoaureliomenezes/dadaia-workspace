@@ -1,8 +1,8 @@
 ---
 slug: sdd-gate-v3
 title: sdd-gate-v3
-tldr: No-lock enforcement — three gate blocks (root entry, non-venv command, PROTECTED or out-of-scope file-tool write), one fix line each, a gitflow push chokepoint.
-summary: The merged PreToolUse gate blocks exactly three things and reads no SDD artifact; every refusal anywhere carries one executable fix line; the pre-push chokepoint enforces the branch contract read from the project gitflow, the specs canon and one secret registry over every pushed object, with one rewrite formula as its fix, and no CI job calls a model API — the security review is the reviewer's lens before each pull request.
+tldr: No-lock enforcement — three gate blocks (root entry, non-venv command, PROTECTED or out-of-scope write; repos/<r> takes merges), one fix each, a push chokepoint
+summary: The merged PreToolUse gate blocks exactly three things and reads no SDD artifact; every refusal anywhere carries one executable fix line; the pre-push chokepoint enforces the branch contract read from the project gitflow, the specs canon, ADR-cited law deletions and one secret registry over every pushed object, with one rewrite formula as its fix, and no CI job calls a model API — the security review is the reviewer's lens before each pull request.
 tags: [sdd, gate, hooks, enforcement, no-locks, privacy]
 sources:
   - .github/dependabot.yml
@@ -23,18 +23,21 @@ sources:
 
 - No lease, lock file or wait path exists; the gate knows no session mode and reads no `_RELEASE.json`.
 - One pre-gate reads each payload once and evaluates root whitelist, venv guard and SDD gate in that order, first block wins; a policy that raises is ALLOW.
-- It blocks exactly three things: a file-tool write (`Write`, `Edit`, `MultiEdit`, `apply_patch`) creating a new workspace-root entry outside the root law and `.dadaia/states/instance_exceptions.txt` ([[workspace-doctor]]); a leading `dadaia`, `pip` or `python -m dadaia_workspace` outside `.dadaia/.venv/bin/` (Bash only); a file-tool write (those or `NotebookEdit`) that is PROTECTED, or a bound session's MUTATING one into a `repos/<slug>/` outside its scope; a Bash write (`sed -i`, `rm`, `mkdir`, a redirect) is never judged.
+- It blocks exactly three things: a file-tool write (`Write`, `Edit`, `MultiEdit`, `apply_patch`) creating a new workspace-root entry outside the root law and the operator's `.dadaiaignore` ([[workspace-doctor]]); a leading `dadaia`, `pip` or `python -m dadaia_workspace` outside `.dadaia/.venv/bin/` (Bash only); a file-tool write (those or `NotebookEdit`) that is PROTECTED or out of scope; a Bash write (`sed -i`, `rm`, `mkdir`, a redirect) is never judged, while the law still forbids any tool an out-of-scope or PROTECTED write.
 
 | Class | Behavior |
 |---|---|
-| ADDITIVE | `specs/bugs/`, `specs/backlog/`, `specs/audits/` at the root or inside a repo, and `.dadaia/{handoff,tmp,reaped,mcps,.cache}/` — always writable, bound or not |
-| MUTATING | everything else, `specs/memory/` and `specs/releases/` included; scope-judged under `repos/<slug>/` |
-| PROTECTED | `.dadaia/sessions/` and the projected law — `AGENTS.md` at the workspace root or under `.dadaia/` |
+| ADDITIVE | the output and ephemeral `.dadaia/` zones (`handoff`, `reports`, `tmp`, `reaped`), derived from the zone registry — always writable, bound or not; no `repos/` path is ever ADDITIVE |
+| MUTATING | everything else, every `specs/` path included; judged by the target's `scope()` zone ([[context-management]]) |
+| PROTECTED | `.dadaia/sessions/`, every path the install ledger records (the projected law) and `.dadaiaignore`, the operator's file |
 
 - A repo's own `AGENTS.md` is MUTATING; nothing at the root escapes classification.
-- Scope is the bound context's main repo plus its associated repos ([[context-management]]); an unbound session, a slug no context registers and a workspace-root path are never scope-blocked.
+- Scope is the bound context's main repo plus its associated repos: a MUTATING write into a registered repo outside it is refused for a bound session and for an unbound one carrying a session id (it owns nothing); an id-less session bound by `DADAIA_CONTEXT` is told to relaunch with the owner's context; an id-less unbound session is the one declared gap, since a harness process env is not the shell's.
+- `repos/<r>/` receives only merges: a MUTATING file-tool write there outside `specs/audits/` is refused with the `worktree.py new <r> --kind <kind>` fix, the kind being the first whose allowed set holds the path, or an `Operator action:` line when no kind holds it; the same write inside `worktrees/<r>/<name>/` or under `repos/<r>/specs/audits/` is allowed ([[worktrees]]).
+- A workspace-root path and a slug no context registers are never scope-blocked.
+- The target's own root decides protection even when `DADAIA_FENCED_ROOTS` lists it: the fence stops a process acting on a root, never the root's protection.
 - Every BLOCK — the three gate blocks, `dadaia ci push-gate-check`, the ledger scripts, every error-class doctor rule — carries exactly one `fix: <command>` line; every one naming the workspace CLI is built by `fix_line` in `dadaia_workspace/core/cli_line.py` (the absolute venv CLI path, POSIX `shlex` quoting, the Windows form under Windows), and a contract test fails any other module spelling that CLI in a fix position; `tests/contract/test_every_block_carries_a_fix.py` feeds each fix back through the gate and asserts ALLOW, so a BLOCK whose fix is itself blocked (a Stall) cannot ship.
-- The fix lines: root entry → append the name to `.dadaia/states/instance_exceptions.txt`; session record → `<cli> context bind <ctx>`; projected law → `<cli> public stage && <cli> public install`; out-of-scope write → `<cli> context bind <owner>`; venv → the agent's own arguments after the builder-spelled CLI.
+- The fix lines: root entry → the dated `.dadaia/tmp/` directory the write belongs in (only the operator admits a root entry, in `.dadaiaignore`); session record → `<cli> context bind <ctx>`; projected law → `<cli> public install`; `.dadaiaignore` → `<cli> doctor`, naming what to ask the operator for; out-of-scope write → `<cli> context bind <owner>`; a write under `repos/<r>/` → `worktree.py new`; venv → the agent's own arguments after the builder-spelled CLI.
 - The gate returns a decision and its message per write target: a BLOCK's message is its reason, an ALLOW's is empty; there is no advisory channel.
 - A BLOCK is one envelope carrying `"decision": "block"` plus Claude Code's `permissionDecision: "deny"`; an ALLOW is an explicit envelope with no permission verdict and no `systemMessage`.
 - A MUTATING write records nothing about its session; races between sessions surface through git.
@@ -44,10 +47,10 @@ sources:
 
 - `.git/hooks/pre-push` delegates to `dadaia ci push-gate-check`; `dadaia context create` and `context alive` install it in every repo of the set where no hook exists, and `dadaia ci install-hook [--repo <path>] [--force]` installs it into the cwd's repo or the named one, exiting 1 on an existing hook unless `--force` ([[context-management]]); `dadaia doctor` byte-compares the installed hook per ALIVE repo (`HOOKS-DRIFT-1`, one per-repo `fix:` line).
 - The branch contract is the project gitflow — the `gitflow: {principal, integration, work}` block of `specs/constitution.md` frontmatter ([[specs-migration]]), read once per push from committed data only: the constitution at HEAD, else the newest one on a local branch or an `origin` remote-tracking ref, else — an associated repo — its owning context's main repo; absent or malformed it is the default (`main`, `develop`, `feature/`) with one stderr warning, never a block.
-- Policy order, first refusal wins: branch policy; the `specs/` canon over every `specs/` path the range touches; the denylist scan. An unparseable stdin line refuses, naming `git push --no-verify` as the one bypass; empty stdin allows; `git push origin HEAD` is judged as the checked-out branch.
+- Policy order, first refusal wins: branch policy; the `specs/` canon over every `specs/` path the range touches (a trio document flat at a release root is non-canon); a pushed commit deleting a non-blank `AGENTS.md` or `SKILL.md` line whose own message cites no `ADR NNNN`; the denylist scan. An unparseable stdin line refuses, naming `git push --no-verify` as the one bypass; empty stdin allows; `git push origin HEAD` is judged as the checked-out branch.
 - Branch policy judges each ref by the remote branch it lands on: a work branch (`<work prefix><M.m.p>`) pushed from the same-named local head passes; the principal or integration branch passes only as a bootstrap birth — a zero remote sha and either an origin holding neither role branch or a ref with no unpublished commit — from any source; every other ref is refused.
 - Every branch refusal names the gitflow's own branches: a principal or integration push → `gh pr create --base <branch> --head <integration or work>`; a ref outside the gitflow → switch to (or cut) the live work branch; a birth carrying new objects to an origin holding a role branch → birth it at the other role's published tip; a mismatched refspec → rename the local branch.
-- A specs-canon or denylist refusal carries one rewrite formula for every unpublished range, a root-reaching one included: `git -C <repo> reset --soft <oldest unpublished commit of the refused ref>`, remove what is listed, `git commit --amend`, push (a branch HEAD is not on is switched to first); a tag or a detached HEAD gets operator-action text; origin's history is never rewritten.
+- A specs-canon, law-deletion or denylist refusal carries one rewrite formula for every unpublished range, a root-reaching one included: `git -C <repo> reset --soft <oldest unpublished commit of the refused ref>`, remove what is listed, `git commit --amend`, push (a branch HEAD is not on is switched to first); a tag or a detached HEAD gets operator-action text; origin's history is never rewritten.
 - "Already published" is one rule, `unpublished` (the commits of a ref no `origin` ref holds), shared by births, the rewrite fix and every "unpushed" check.
 - The security review is the `dd-code-reviewer` security lens on the PR head, run by the main thread before each pull request; no workflow calls a model API. `secret-scan.yml` runs gitleaks on every PR to `develop` and `main`.
 - CI's `pr-source-guard` reads the gitflow of the base branch's committed constitution through the same reader and admits into the principal only the integration branch and `release-please--branches--<principal>`, into the integration branch only work branches and Dependabot update branches; the workflow's push triggers stay literal and a contract test pins them equal to the library's own gitflow. `.github/dependabot.yml` targets the integration branch, so dependency updates reach the principal with the next promote.
@@ -67,4 +70,4 @@ sources:
 
 ## Dependencies
 
-[[context-management]], [[workspace-doctor]], [[release-lifecycle]], [[ARCHITECTURE]].
+[[context-management]], [[workspace-doctor]], [[release-lifecycle]], [[worktrees]], [[ARCHITECTURE]].
