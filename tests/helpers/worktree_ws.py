@@ -80,12 +80,12 @@ def commit(tree: Path, rel: str, text: str = "x = 1\n") -> str:
     return git(tree, "rev-parse", "HEAD").strip()
 
 
-def approve(root: Path, sha: str, *, verdict: str = "APPROVED") -> Path:
+def approve(root: Path, sha: str, *, verdict: str = "APPROVED", valid: bool = True) -> Path:
     """The reviewer's verdict as the main thread writes it: a handoff naming *sha*."""
     handoff = root / ".dadaia/handoff/c" / f"{sha[:8]}-{verdict}-dd-code-reviewer.handoff.json"
     handoff.parent.mkdir(parents=True, exist_ok=True)
     body = {"agent": "dd-code-reviewer", "verdict": verdict, "scope": f"wt/0.5.0a-impl@{sha}"}
-    handoff.write_text(json.dumps({**body, "schema_version": "1.2"}))
+    handoff.write_text(json.dumps({**body, **({"schema_version": "1.2"} if valid else {})}))
     return handoff
 
 

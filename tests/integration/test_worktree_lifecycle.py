@@ -37,17 +37,26 @@ def test_merge_fast_forwards_removes_and_reruns(root: Path) -> None:
     assert git(repo, "rev-parse", "feature/0.5.0").strip() == sha
     assert not tree.exists() and not git(repo, "branch", "--list", "wt/*").strip()
     assert run(root, "merge", TREE).returncode == 0  # a finished merge re-runs clean
+    git(repo, "worktree", "add", "-q", "-b", "wt/0.5.0a-impl", str(tree))
+    commit(tree, "src/b.py")
+    git(repo, "worktree", "remove", str(tree))  # interrupted: tree gone, its commit unmerged
+    assert fixes(run(root, "merge", TREE)) == [
+        f"fix: git -C {repo} worktree add {tree} wt/0.5.0a-impl"
+    ]
+    assert git(repo, "branch", "--list", "wt/0.5.0a-impl").strip()  # never -D
 
 
-def test_dirty_outside_set_and_conflict_refuse_and_their_fixes_clear_them(root: Path) -> None:
+def test_dirty_outside_set_and_conflict_each_refuse_with_one_fix(root: Path) -> None:
     repo, tree = root / "repos/r", root / TREE
     (tree / "wip.py").write_text("")
     _fix(root, dirty := run(root, "merge", TREE))
     assert "uncommitted" in dirty.stderr
-    commit(tree, "specs/backlog/BACKLOG.json", "{}")  # the backlog kind's file, not impl's
-    outside = run(root, "merge", TREE)
-    assert "specs/backlog/BACKLOG.json" in outside.stderr and "backlog worktree" in outside.stderr
-    _fix(root, outside)
+    commit(tree, "specs/backlog/BACKLOG.json", "{}")  # new: the undo removes it
+    commit(tree, "specs/releases/0.5.0/SPEC.md", "edited")  # on the work branch: restored
+    for rel, owner in (("specs/backlog/BACKLOG.json", "backlog"), ("SPEC.md", "release")):
+        outside = run(root, "merge", TREE)
+        assert rel in outside.stderr and f"{owner} worktree" in outside.stderr
+        _fix(root, outside)
     commit(repo, "src/a.py", "main side\n")
     commit(tree, "src/a.py", "tree side\n")
     conflict = run(root, "merge", TREE)
@@ -55,11 +64,21 @@ def test_dirty_outside_set_and_conflict_refuse_and_their_fixes_clear_them(root: 
     assert fixes(conflict) == [f"fix: git -C {tree} rebase feature/0.5.0"]
 
 
-@pytest.mark.parametrize("named", [False, True], ids=["other-sha", "rejected"])
-def test_merge_needs_a_valid_approval_of_the_exact_head(root: Path, named: bool) -> None:
+@pytest.mark.parametrize(
+    ("named", "verdict", "valid"),
+    [(False, "APPROVED", True), (True, "REJECTED", True), (True, "APPROVED", False)],
+    ids=["other-sha", "rejected", "invalid"],
+)
+def test_merge_needs_a_valid_approval_of_the_exact_head(
+    root: Path, named: bool, verdict: str, valid: bool
+) -> None:
     old = commit(root / TREE, "src/a.py")
     head = commit(root / TREE, "src/b.py")
-    target = approve(root, head, verdict="REJECTED") if named else (approve(root, old), "--all")[1]
+    target = (
+        approve(root, head, verdict=verdict, valid=valid)
+        if named
+        else (approve(root, old), "--all")[1]
+    )
     result = run(root, "merge", TREE)
     assert result.returncode == 1 and head in result.stderr
     assert fixes(result) == [f"fix: {root / '.dadaia/.venv/bin/dadaia'} reports validate {target}"]
