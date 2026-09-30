@@ -80,12 +80,16 @@
       "section": "§3 What is enforced",
       "anchor": null,
       "skill": "dd-gitflow-default",
-      "scoped_agents_md": [],
+      "scoped_agents_md": [
+        "dadaia_workspace/public/data/worktrees-AGENTS.md"
+      ],
       "hash_tuple": {
         "section": "sha256:9e05f0d795a46501239af0a3592075a7c278420f84b763bf43bb9a8aa07a8dec",
         "skill": "sha256:759485df844eca45ba0283331b31153fd920ed19fe4fc2ed54171ded9004a468",
         "scripts": "sha256:218cab28e3e495cc55b7fc5f77128550f783d8b3b4be9d15ae7127b3385b6221",
-        "scoped": []
+        "scoped": [
+          "sha256:cae9bb78f64cfa90b43973085b1ed704f8036179bd3afbea14ec88ba82a576ea"
+        ]
       },
       "recorded_by": "dd-software-engineer",
       "recorded_at": "2026-09-20"
@@ -98,7 +102,7 @@
         "dadaia_workspace/public/data/handoff-AGENTS.md"
       ],
       "hash_tuple": {
-        "section": "sha256:2980d9a42d1e633b1e9c34c4503f67c1b05f1b81a33b390760714e43a6bcf242",
+        "section": "sha256:3c99a2b29de43d6166ec47328a7916e79a96b97129bf6b7e6095975ba2c33f1b",
         "skill": "sha256:b3f512408582f13b913ee74a119615ae9287e842e10c49f6ff9b53d3f6345cf6",
         "scripts": null,
         "scoped": [
@@ -116,7 +120,7 @@
         "dadaia_workspace/public/data/dadaia-AGENTS.md"
       ],
       "hash_tuple": {
-        "section": "sha256:41912860d5e319f84dc71edefc1342cfc7186dca2e269284e1a8485c8a21f358",
+        "section": "sha256:36c233a7dc74e857d73d7e82a5ff3f84670d72252b74b55ecb231aae313279e1",
         "skill": null,
         "scripts": null,
         "scoped": [
@@ -134,7 +138,7 @@
         "dadaia_workspace/public/data/tmp-AGENTS.md"
       ],
       "hash_tuple": {
-        "section": "sha256:2980d9a42d1e633b1e9c34c4503f67c1b05f1b81a33b390760714e43a6bcf242",
+        "section": "sha256:3c99a2b29de43d6166ec47328a7916e79a96b97129bf6b7e6095975ba2c33f1b",
         "skill": null,
         "scripts": null,
         "scoped": [
@@ -220,7 +224,7 @@
         "dadaia_workspace/public/scaffold/ADRs/AGENTS.md"
       ],
       "hash_tuple": {
-        "section": "sha256:41912860d5e319f84dc71edefc1342cfc7186dca2e269284e1a8485c8a21f358",
+        "section": "sha256:36c233a7dc74e857d73d7e82a5ff3f84670d72252b74b55ecb231aae313279e1",
         "skill": null,
         "scripts": null,
         "scoped": [
@@ -237,7 +241,7 @@
       "scoped_agents_md": [],
       "hash_tuple": {
         "section": "sha256:3baf0276f94f20a4c11658725934a573feea42f9924ee586555688520ee450a0",
-        "skill": "sha256:38265ce891cf1d9d9580bc35a6eb20406956e0d1b6b3c38a85ec34457a459777",
+        "skill": "sha256:a8daeb9a0582ae3d5e72aaea66dfe48d3496a8f287f88e921e816851931e8924",
         "scripts": null,
         "scoped": []
       },
@@ -252,7 +256,7 @@
         "dadaia_workspace/public/scaffold/memory/AGENTS.md"
       ],
       "hash_tuple": {
-        "section": "sha256:41912860d5e319f84dc71edefc1342cfc7186dca2e269284e1a8485c8a21f358",
+        "section": "sha256:36c233a7dc74e857d73d7e82a5ff3f84670d72252b74b55ecb231aae313279e1",
         "skill": "sha256:0b3857121634c6abcb6922480bd07aa979a5d6f5833407285399e416c72e87d7",
         "scripts": "sha256:d83ab7684379d4af9a90505490209202a7277b122ddd2d188ea657b14e84a0a5",
         "scoped": [
@@ -320,7 +324,7 @@
         "dadaia_workspace/public/data/states-AGENTS.md"
       ],
       "hash_tuple": {
-        "section": "sha256:41912860d5e319f84dc71edefc1342cfc7186dca2e269284e1a8485c8a21f358",
+        "section": "sha256:36c233a7dc74e857d73d7e82a5ff3f84670d72252b74b55ecb231aae313279e1",
         "skill": null,
         "scripts": null,
         "scoped": [
@@ -352,7 +356,7 @@
         "dadaia_workspace/public/templates/repo-AGENTS.md"
       ],
       "hash_tuple": {
-        "section": "sha256:2980d9a42d1e633b1e9c34c4503f67c1b05f1b81a33b390760714e43a6bcf242",
+        "section": "sha256:3c99a2b29de43d6166ec47328a7916e79a96b97129bf6b7e6095975ba2c33f1b",
         "skill": null,
         "scripts": null,
         "scoped": [
@@ -370,7 +374,7 @@
         "dadaia_workspace/public/templates/specs-AGENTS.md"
       ],
       "hash_tuple": {
-        "section": "sha256:41912860d5e319f84dc71edefc1342cfc7186dca2e269284e1a8485c8a21f358",
+        "section": "sha256:36c233a7dc74e857d73d7e82a5ff3f84670d72252b74b55ecb231aae313279e1",
         "skill": null,
         "scripts": null,
         "scoped": [

@@ -26,7 +26,7 @@ Reach shared understanding by mapping every open branch of the demand as a desig
 3. Classify each gap against `PROBLEM-TAXONOMY.md` before deciding inspection vs promotion to the tree.
 4. Map every remaining open question as a node; a dependent question hangs beneath its prerequisite as a child.
 5. Identify the frontier: every question whose prerequisites are already settled.
-6. Ask the whole frontier in one round, numbered, each carrying a recommended answer:
+6. Ask the whole frontier in one round, numbered, each carrying a recommended answer; a written questionnaire lives at `.dadaia/handoff/<ctx>/<UTC>-main-thread-grill-<slug>.md`, never at the root:
 
    ```
    ❓ **Q1** - **<question title>**: <question body — cite the exact spec/section/file>

@@ -59,6 +59,7 @@ SCOPED_SOURCE_BY_INSTALLED_PATH: dict[str, Path] = {
     ".dadaia/handoff/AGENTS.md": _PUBLIC / "data" / "handoff-AGENTS.md",
     ".dadaia/tmp/AGENTS.md": _PUBLIC / "data" / "tmp-AGENTS.md",
     ".dadaia/states/AGENTS.md": _PUBLIC / "data" / "states-AGENTS.md",
+    "worktrees/AGENTS.md": _PUBLIC / "data" / "worktrees-AGENTS.md",
     "repos/<slug>/AGENTS.md": _PUBLIC / "templates" / "repo-AGENTS.md",
     "tests/AGENTS.md": _PUBLIC / "templates" / "tests-AGENTS.md",
 }

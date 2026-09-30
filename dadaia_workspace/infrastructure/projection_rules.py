@@ -76,13 +76,14 @@ def _guardrail_pair_rules(plan: InstallPlan) -> tuple[ProjectionRule, ...]:
     )
 
 
-#: (staged source name, destination relpath, doctor label) for the ``.dadaia/**``
-#: ``AGENTS.md`` family — unconditional, harness-independent.
+#: (staged source name, destination relpath, doctor label) for the runtime-zone
+#: ``AGENTS.md`` family (``.dadaia/**``, ``worktrees/``) — unconditional, harness-independent.
 _DADAIA_FAMILY_AGENTS_MD: tuple[tuple[str, str, str], ...] = (
     ("handoff-AGENTS.md", ".dadaia/handoff/AGENTS.md", "handoff:AGENTS.md"),
     ("dadaia-AGENTS.md", ".dadaia/AGENTS.md", "dadaia:AGENTS.md"),
     ("tmp-AGENTS.md", ".dadaia/tmp/AGENTS.md", "dadaia:tmp/AGENTS.md"),
     ("states-AGENTS.md", ".dadaia/states/AGENTS.md", "dadaia:states/AGENTS.md"),
+    ("worktrees-AGENTS.md", "worktrees/AGENTS.md", "worktrees:AGENTS.md"),
 )
 
 

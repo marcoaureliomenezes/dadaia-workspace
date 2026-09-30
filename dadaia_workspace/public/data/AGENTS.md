@@ -45,9 +45,9 @@
 ## 4. Where things are written
 
 - Root holds only: `<!-- root -->`; any other entry, the operator's included, needs an operator-written pattern in `.dadaiaignore`, which only the operator edits.
-- Temp: `.dadaia/tmp/<agent>/<YYYYMMDD>/`; handoffs: `.dadaia/handoff/<context>/`; HTML reports: `repos/<slug>/reports/<agent>/`; caches: `.dadaia/tmp/<tool>-cache/` (absolute, via the harness env), `.dadaia/mcps/<server>/`.
+- Temp: `.dadaia/tmp/<agent>/<YYYYMMDD>/`; handoffs: `.dadaia/handoff/<context>/`; HTML reports: `repos/<slug>/reports/<agent>/`; caches: `.dadaia/tmp/<tool>-cache/` (absolute, via the harness env); anything an MCP server needs: `.dadaia/mcps/<server>/`.
 - A repo tree carries source and its own artifacts only — never `.dadaia/`; caches redirect by configuration (`repos/<slug>/AGENTS.md`).
-- Credentials live only in the operator's root `.env`: never create, copy, persist, commit, print or report a secret, anywhere.
+- Credentials live outside the workspace, in the operator's own file: never create, copy, persist, commit, print or report a secret, anywhere.
 - Invoke `.dadaia/.venv/bin/dadaia` by absolute path; register every dev server through `dd-cli-library`.
 
 ## 5. Scoped law — open before acting there
@@ -65,6 +65,7 @@
 | handoff | `.dadaia/handoff/AGENTS.md` | emission, schema, ack |
 | tmp / states | `.dadaia/tmp/AGENTS.md`, `.dadaia/states/AGENTS.md` | TTL, state files |
 | a repo | `repos/<slug>/AGENTS.md` | clean tree, caches, tests |
+| worktrees | `worktrees/AGENTS.md` | kinds, the merge ritual, one venv |
 
 ## 6. Skills — `.agents/skills/dd-*`
 
