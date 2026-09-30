@@ -157,9 +157,9 @@ F019–F051 share the destination of the bug each cites. F090–F112 share the d
 ### Amendments 3–5 (ADRs 0150, 0151, 0152)
 
 - AC1.17 Every candidate in `rc-<N>/` (0150, 0152; T-050-109):
-  - (1) `release.py new` writes the trio into `releases/<v>/rc-<N+1>/`; no verb moves or rewrites a closed `rc-<N>/`, except the promote move of (5).
+  - (1) `release.py new` writes the trio into `releases/<v>/rc-<N+1>/`. No verb rewrites a closed `rc-<N>/`; the one move is (5)'s promote archive.
   - (2) Only `_RELEASE.json` sits at the release root; the canon and pre-push refuse a flat trio (0151 M5).
-  - (3) One resolver, `core/release_state.py`, returns the highest open `rc-<N>/`; every reader asks it.
+  - (3) The live candidate (highest open `rc-<N>/`) is resolved by the PINNED PAIR `_release_store.live_ids` (stdlib scripts) ↔ `core/gitflow.py` `resolve_live_release_id` (package); one contract test in `tests/contract/test_release_script.py` sends the same trees to both and asserts equal answers.
   - (4) Data: `rc-1`..`rc-4` equal `git show` of the trio at f61be1a0, acd8443a, 96d8f9ee, 47858cf8; the live trio is `git mv`-ed to `rc-5/`.
   - (5) At promote, `release.py ship` moves the whole release folder (`_RELEASE.json`, `rc-1`..`rc-<n>`) to `releases/_archive/<v>/` and deletes nothing: after it, `git ls-tree -r HEAD specs/releases/_archive/<v>/` lists every file the folder held (0152 (1)).
   - (6) SPEC/TASKS size is a recommendation: no check refuses an oversized trio, and `pub/scaffold/releases/AGENTS.md` says past it the next work opens `rc-<N+1>/` (0152 (2)).
@@ -167,10 +167,10 @@ F019–F051 share the destination of the bug each cites. F090–F112 share the d
   - Command: `pytest tests/contract/test_release_script.py tests/unit/skills/test_release_implementation_release_script.py tests/unit/features/specs/test_release_tree.py tests/unit/features/specs/test_doctor.py tests/unit/core/test_release_state_filename.py`; `release.py check` passes.
 - AC1.18 Only the operator accepts (0151; T-050-110):
   - M1 LEDGER-ADR-SCHEMA refuses an `accepted` record without `ruling: {date, words}`, or whose `ruling.words` reads delegated or "in session"; it judges `ruling.words` only, never `context`.
-  - M2 It refuses a record superseding or amending an accepted one unless itself accepted with a ruling.
+  - M2 It refuses a non-`rejected` record superseding or amending an accepted one unless itself accepted with a ruling; a `rejected` record is not judged.
   - M3 pre-push refuses a pushed commit deleting an `AGENTS.md`/`SKILL.md` line whose message cites no `ADR NNNN`, with one `fix:`.
   - M4 The three role personas and the root map point to `specs/ADRs/AGENTS.md` §2: no role agent writes `accepted` or `ruling`.
-  - Data: the 12 records accepted without the operator's order are `rejected` (1894ab74, 0152 (3)). Before the batch push, each still-`accepted` record gets `ruling.words` = the operator's verbatim quote, or his recorded grill answer id, taken from its own `context`; never composed.
+  - Data: the 12 records accepted without the operator's order are `rejected` (1894ab74, 0152 (3)). Before the batch push, each still-`accepted` record gets `ruling.words` = the operator's verbatim quote, or his recorded grill answer id, taken from its own `context`; never composed. An accepted record whose `context` holds neither returns to `proposed` until the operator rules; 0007 is the known case.
   - Command: `pytest tests/contract/test_adr_canon.py tests/unit/features/chokepoints/test_push_specs_canon_scan.py`; `doctor --context dadaia-workspace` exits 0.
 
 Study conclusions carried (ADR 0100; the scratch copy is ephemeral):

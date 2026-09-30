@@ -40,10 +40,10 @@ Source tags are from §1. Where two sources disagree, both values are shown.
 | Onboarding OB /100 | 54 (38/70) | 69 (55/80) @`000b4cd0` [R] | 8 phases × 0–10, agent with no prior knowledge |
 | L1+L2: commands / errors / dead ends / guesses | 11/4/3/6 [F]; 7 cmds, 3 guesses [R] | 3/0/0/2 @`4b55c2df` [F]; 4 cmds, 1 guess @`000b4cd0` [R] | Literal first-time agent, printed output only |
 | `init` output lines | 162 [F]; 176–189 [R] | 6 @`4b55c2df` [F], @`000b4cd0` [R] | stdout of `uvx … init` |
-| Quickstart blocks passing | 2/7 | all @`4b55c2df` | README, quickstart, getting-started, run literally |
+| Quickstart blocks passing | 2/7 [F] | 7/7 @`4b55c2df` [F]; README and getting-started also run whole | README, quickstart, getting-started, run literally |
 | CLI commands / hooks per event | 39 / 8 | 39 / 8 @`4b55c2df` [F], @`000b4cd0` [R] | recursive `--help`; projected hook table |
-| Wheel KB / runtime deps / pip-audit | 788 / 15 / 0 | 584 / 13 / 0 @`000b4cd0` | build; metadata; pip-audit |
-| Law corpus / root map words | 41,035 / 911 | 37,778 / 1,114 @`000b4cd0` | word count of shipped law |
+| Wheel KB / runtime deps / pip-audit | 788 / 15 / 0 | 584 / 13 / 0 @`000b4cd0` [R] | build; metadata; pip-audit |
+| Law corpus / root map words | 41,035 / 911 | 37,778 / 1,114 @`000b4cd0` [R] | word count of shipped law |
 | Confirmed behaviour regressions | — | 0 of 184 failures, 79 files @`4b55c2df` [F]; 0 of 316 files @`000b4cd0` [R] | 0.4.7 test files run on the head; each failure re-proved via CLI/hooks |
 | Upgrade 0.4.7 → head, stateful | — | 0 state diff @`4b55c2df` [F]; project specs red @`000b4cd0` [R] | re-run `init` on a real 0.4.7 workspace; byte diff |
 | Secret shapes blocked by a real push | 4 of the 7 tested | all 7 tested @`4b55c2df`; `github_pat_` and `sk-ant-` were outside the set and pass (bug `secret-scan-misses-github-pat-and-anthropic-keys`) | push to a local remote |
@@ -115,7 +115,7 @@ Ledgers at `16a72c4e`: 31 open bugs; 23 active backlog entries; `20260930-struct
 
 | Idea (source) | Record(s) | Status |
 |---|---|---|
-| 49 ambiguity packages [A,I,F] | WP-01 → c3 T-050-22; WP-02..49 plus 27 folds → 75 `sa-*` bugs; thesis ADRs 0041, 0050, 0052, 0070, 0071, 0123, 0135, 0142; F010 | WP-01 done; 75/75 `sa-*` resolved. Successors bred by WP 03, 08, 11, 13, 20, 24, 30, 36 (and 12, 16, 39 per the c5 PLAN); the open ones are in the rows below |
+| 49 ambiguity packages [A,I,F] | WP-01 → c3 T-050-22; WP-02..49 plus 27 folds → 75 `sa-*` bugs; thesis ADRs 0041, 0050, 0052, 0070, 0071, 0123, 0135, 0142; F010 | WP-01 done; 75/75 `sa-*` resolved. Successors bred by WP 03, 08, 11, 13, 20, 24, 30, 36; the open ones are in the rows below |
 | 0.5.0 audit blockers [F,R] | `codex-policy-allows-sed-and-rg-exec-and-write-forms`, `reaper-judges-ttl-by-walking-every-file`, `doctor-ttl-walk-quadratic-on-live-trees`, `post-gate-runs-the-reaper-on-the-tool-hot-path`, `bind-lost-silently-after-five-idle-minutes`, `projected-hooks-carry-no-timeout` (ADR 0118), `test-suite-wall-clock-doubled-past-its-frozen-budget` (ADR 0119), `upgrade-leaves-project-specs-unmigrated-and-silent`, `reinit-with-unchanged-version-label-mixes-venv-and-projection`, `upgrade-refuses-a-prerelease-label-as-a-downgrade`, `unbound-native-session-writes-freely-into-repos`, `additive-globs-hand-kept-beside-the-canon` | resolved; re-measure at the gate (§3) |
 | Scope, bind, fence [F,R,C] | W1: `fenced-roots-env-disables-the-gate` (F023, F079, AC1.3), `corrupt-session-record-never-collected` (AC1.4); backlog `bind-scope-durable-on-every-harness`, `ctx-inject-on-cursor-copilot` (AC1.2), `canonical-worktrees`, `worktree-harness-mechanics-study`, `doctor-context-ignores-other-contexts` | open / active; T-050-99, T-050-100 |
 | Root canon, protection [F,R] | W2: `instance-exceptions-file-writable-by-agents`, `gate-protects-nothing-without-install-ledger`, `missing-venv-hook-disarms-the-gate-invisibly`, `bug-proposal-handoff-reaped-without-a-hold`, `pip-guard-fix-routes-project-installs-into-the-tool-venv`, `context-dead-ignores-the-hold-refusal`; backlog `dadaiaignore-and-root-core-canon`, `operator-protected-path-class` | open / active |
@@ -132,15 +132,13 @@ Ledgers at `16a72c4e`: 31 open bugs; 23 active backlog entries; `20260930-struct
 | Promote rule [I,F] | ADR 0122; F067; SPEC §Carried "Promote PR" row | 31 bugs, 23 entries, 133 findings open |
 | Skills repo, marketplace [C] | `release-publishes-an-unordered-dadaia-skills-repository` (resolved, reverted); `plugin-packaging-and-skill-evals` rejected (Q13/Q14); `launch-operator-acts` D3 | conflict, §5.1 |
 | Onboarding as three levels plus a derived next step [C] | 0.5.0 c1/c3; ADRs 0027–0031, 0033, 0038; `tests/e2e/test_onboarding_journey.py` | delivered; re-measure at the gate (§3) |
-| Harness breadth, gate blind on 3 of 6 [C] | `sa-gate-blind-on-cursor-copilot-devin` (resolved); W1 and W6 backlog above | partly delivered |
+| Harness breadth, gate blind on 3 of 6 [C] | `sa-gate-blind-on-cursor-copilot-devin` (resolved); W1 and W6 backlog above | resolved; open: backlog `bind-scope-durable-on-every-harness`, `ctx-inject-on-cursor-copilot`, `init-announces-codex-trust` |
 
 ## 5. Open conflicts needing an operator ruling (listed, not decided)
 
 1. **Skills repo.** ADR 0122 keeps "the launch acts D3–D6" in 0.5.0, and `launch-operator-acts` D3 is "create the public skills repo". Against it: F111 proposes EXIT(rejected); the operator's Q13/Q14 grill rejected `plugin-packaging-and-skill-evals`; and the skills-repo job was reverted after bug `release-publishes-an-unordered-dadaia-skills-repository`.
 2. **Bash never judged.** ADR 0103 and root map §3 say the gate never judges Bash. Backlog `gate-judges-bash-writes` (active) asks that it does. SPEC W1 plans its exit as `rejected` (0096, 0103). The D8 security score stays capped until this is ruled.
-3. **Repositioning.** Does 0.5.0 change its public positioning? No record exists.
-4. **Stale CHANGELOG 0.4.7 residue.** `CHANGELOG.md` L357 and L389 still list D1 (`CLAUDE_API_KEY`, removed by ADR 0025) and the skills repo as pending.
-5. **Windows/macOS scope.** Integration and E2E never run on Windows/macOS; ADR 0119 budgets unit + contract only. Does the gate require them?
+3. **Windows/macOS scope.** Integration and E2E never run on Windows/macOS; ADR 0119 budgets unit + contract only. Does the gate require them?
 
 ## 6. The 0.5.0 publish-gate checklist
 
@@ -150,12 +148,12 @@ Ledgers at `16a72c4e`: 31 open bugs; 23 active backlog entries; `20260930-struct
 | 2 | Backlog | `BACKLOG.json` `active[]` is `[]`; `backlog.py check` passes |
 | 3 | Findings | `audit.py check` passes; no `open` finding in any audit; `20260930-structural-convergence` closed |
 | 4 | Candidates | every 0.5.0 candidate closed; `release.py check` passes; §5 ruled |
-| 5 | Changelog 0.4.7 → 0.5.0 | written from the content diff `2d1f4351..<promote head>` and read by the operator; one `[0.5.0]` heading in `CHANGELOG.md` |
+| 5 | Changelog 0.4.7 → 0.5.0 | written from the content diff `2d1f4351..<promote head>` and read by the operator; one `[0.5.0]` heading in `CHANGELOG.md`; the 0.4.7 section no longer lists D1 (`CLAUDE_API_KEY`, removed by ADR 0025) or the skills repo as pending (today L357, L389) |
 | 6 | Removals and lost coverage | every removal vs 0.4.7 (commands, SPEC-DOC rules, flags, deps, the Codex "UNVERIFIED" warning, the silent tier collapse) carries a SPEC `Replaces` line or an ADR; the 3 lost tests (`init` writes nothing under `~/.claude`, `dadaia -V`, `public install` without `--target`) and the 40 unadjudicated deleted tests each have a test or a `Replaces` line |
-| 7 | Rejected records (0152 (4)) | the code and principles behind rejected ADRs 0001–0004, 0010–0013, 0024, 0026, 0091 (memory: `ARCHITECTURE.md` P-01, P-09, P-14, P-15; `QUALITY.md` P-29) are listed, path by path, for the operator, and he rules on each |
+| 7 | Rejected records (0152 (4)) | the code and principles behind rejected ADRs 0001–0004, 0010–0013, 0024, 0026, 0091 (memory: `ARCHITECTURE.md` P-01, P-09, P-14, P-15; `QUALITY.md` P-29) are listed, path by path, for the operator, and he rules on each; until he rules, those five principles still cite their rejected records |
 | 8 | E2E and CI | every CI job green on 3 OSes on the PR to develop and on the release PR; `tests/e2e` green from the built wheel; a `dd-code-reviewer` APPROVED verdict on each PR head |
 | 9 | Main features | §3 regression run: 0 confirmed regressions across the 316 0.4.7 test files; stateful upgrade on every harness and with a DEAD context: operator files byte-identical, both doctors clean; a v1/v1.1 handoff and a list-form denylist migrate or refuse with one `fix:`; `specs upgrade` on a symlinked specs tree refuses with an empty byte diff |
-| 10 | Six harnesses | on each harness: the gate verdict is honoured (a Kimi `WriteFile`/`StrReplaceFile` out-of-scope payload BLOCKs), the bind survives an idle pause, ctx-inject arrives |
+| 10 | Six harnesses | on each harness: the gate verdict is honoured (a Kimi `WriteFile`/`StrReplaceFile` out-of-scope payload BLOCKs), the bind survives 10 idle minutes (`context show --json` still names the context), the session transcript carries the ctx-inject `constitution.md` prefix |
 | 11 | Systemic ambiguity | §3 re-count: 0 questions with disagreeing deciders; V37/V39 empty; 0 mirrored findings; no open bug names a resolved `sa-*` |
 | 12 | Security | fence case refused (AC1.3); `sed`/`rg` forms refused by `codex execpolicy check`; `github_pat_` and `sk-ant-` refused by a real push; the privacy denylist scan over `specs/` and the unpacked wheel reports 0 hits |
 | 13 | Mutation | the same 82 mutants over the same 7 modules: ≥ 72 killed, the reaper linked-worktree guard mutant killed |
