@@ -155,6 +155,24 @@
       "relates": [
         "bind-scope-durable-on-every-harness"
       ]
+    },
+    {
+      "id": "adr-0138-lane-in-memory-and-adrs-law",
+      "title": "specs/memory/AGENTS.md and specs/ADRs/AGENTS.md state the ADR 0138 no-ADR truth-correction lane",
+      "opened": "2026-09-30",
+      "status": "idea",
+      "description": "ADR 0138 (accepted) says candidate 5 edits both law files to state its lane: a commit changing a non-principle section of ARCHITECTURE.md or QUALITY.md only to state what the code already is needs no ADR and names its code evidence; a ### P-NN still needs its ADR. rc-5 did not land it. Both files render from dadaia_workspace/public/scaffold/{memory,ADRs}/AGENTS.md: an impl task plus the restamp. Until then every use cites ADR 0138 in its subject and names its code evidence (413bb9d6, 2158513f).",
+      "provenance": "ADR 0138 consequence unmet at rc-5 closure; dd-code-reviewer review of a12203b5 (2026-09-30)",
+      "relates": []
+    },
+    {
+      "id": "structural-convergence-f053-f054-f057",
+      "title": "Commit shapes the worktree kinds do not enforce: F053, F054, F057 of 20260930-structural-convergence",
+      "opened": "2026-09-30",
+      "status": "idea",
+      "description": "Deferred at rc-5 G6 review (9cb15e8d) to rc-7 W3 (one grammar owner); the rc-5 SPEC W3 row does not list them, so this entry is their carrier until rc-6's SPEC maps them into the candidate map. F053: the bug kind admits code + BUGS.jsonl, nothing enforces a registration-only commit. F054: dd-gitflow-default/SKILL.md row 2 says 'decisions.jsonl alone' while the memory law pairs the ADR and its memory change in one commit. F057: closure commits match no \u00a73a shape.",
+      "provenance": "specs/audits/20260930-structural-convergence FINDINGS F053/F054/F057 (deferred 9cb15e8d); dd-code-reviewer review of 4fb16453 (2026-09-30)",
+      "relates": []
     }
   ]
 }
