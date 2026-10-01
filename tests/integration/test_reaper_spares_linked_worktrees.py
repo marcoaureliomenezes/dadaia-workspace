@@ -46,6 +46,9 @@ def _git(cwd: Path, *args: str) -> str:
 def _workspace_with_worktree(root: Path, worktree_rel: str) -> tuple[Path, Path]:
     for zone in ("tmp", "states", "sessions", "reaped"):
         (root / ".dadaia" / zone).mkdir(parents=True, exist_ok=True)
+    (root / ".dadaia" / "states" / "spec_contexts.json").write_text(
+        '{"contexts": [{"name": "lib", "repo_slug": "lib", "state": "alive"}]}', encoding="utf-8"
+    )
     repo = root / "repos" / "lib"
     repo.mkdir(parents=True)
     _git(repo, "init", "-q", "-b", "main")

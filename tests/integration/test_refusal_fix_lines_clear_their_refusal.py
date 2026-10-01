@@ -141,6 +141,7 @@ class World:
         self.elsewhere.mkdir(parents=True)
         (self.ws / "repos").mkdir(parents=True)
         (self.ws / ".dadaia" / "states").mkdir(parents=True)
+        (self.ws / ".dadaia" / "states" / "spec_contexts.json").write_text('{"contexts": []}')
         self.env = {k: v for k, v in os.environ.items() if k not in _UNSET}
         self.env.update(
             GIT_CONFIG_GLOBAL=str(tmp / "gitconfig"),

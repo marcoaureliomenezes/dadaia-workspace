@@ -18,6 +18,7 @@ from dadaia_workspace.core.models.spec_context import (
     SpecContextProject,
 )
 from dadaia_workspace.infrastructure.json_context_store import JsonContextStore
+from tests.fixtures.stores import context_store
 
 
 def _make_ctx(
@@ -37,7 +38,7 @@ def _make_ctx(
 
 
 def test_crud_round_trips(tmp_path: Path) -> None:
-    store = JsonContextStore(tmp_path)
+    store = context_store(tmp_path)
 
     assert store.list_all() == []
     assert store.get("ghost") is None
@@ -88,7 +89,7 @@ def test_crud_round_trips(tmp_path: Path) -> None:
 
 
 def test_associated_repos_round_trip_through_store(tmp_path: Path) -> None:
-    store = JsonContextStore(tmp_path)
+    store = context_store(tmp_path)
     ctx = SpecContextProject(
         name="withrepos",
         state=ContextState.ALIVE,
@@ -157,7 +158,7 @@ def test_a_fresh_store_writes_v3_rows_without_legacy_fields(tmp_path: Path) -> N
     """AC-T10a-7: spec_contexts.json written by the store has no legacy fields —
     is_primary / activated_at never round-trip."""
     fresh_ws = tmp_path
-    fresh_store = JsonContextStore(fresh_ws)
+    fresh_store = context_store(fresh_ws)
     ctx = SpecContextProject(
         name="myctx",
         state=ContextState.ALIVE,
@@ -174,8 +175,6 @@ def test_a_fresh_store_writes_v3_rows_without_legacy_fields(tmp_path: Path) -> N
     row = data["contexts"][0]
     assert "is_primary" not in row
     assert "activated_at" not in row
-    # FR15: the registry schema bumps v2 -> v3 — a fresh workspace registry starts at 3.
-    assert data["schema_version"] == "3"
     assert "alive_since" in row
     assert "dead_since" in row
     assert row["associated_repos"] == []

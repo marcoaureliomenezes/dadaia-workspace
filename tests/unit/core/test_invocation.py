@@ -16,6 +16,7 @@ from typing import Any
 import pytest
 
 from dadaia_workspace.core import invocation
+from dadaia_workspace.core.exceptions import SchemaVersionError
 from dadaia_workspace.core.workspace_resolver import resolve_workspace_root
 from tests.fixtures.harness_env import scrub_context_resolution_env
 
@@ -143,15 +144,20 @@ def test_an_unowned_repo_resolves_no_context(tmp_path: Path) -> None:
     assert inv.context_name is None and inv.specs_dir is None
 
 
-def test_a_truncated_registry_answers_no_context(tmp_path: Path) -> None:
-    """sa-context-repo-mapping-falls-back-to-the-name#B4 (the alive_context_names leg,
-    plus the slug mapping and the bind; the gate and `context show --json` legs are
-    test_sdd_gate's): an unreadable registry answers "no context", never fail-open."""
+@pytest.mark.parametrize("body", ['{"contexts": [{"na', "{}"], ids=["truncated", "empty-object"])
+def test_an_unreadable_registry_refuses_never_answers_no_context(tmp_path: Path, body: str) -> None:
+    """AC3.9 (rewrites sa-context-repo-mapping-falls-back-to-the-name#B4's fail-soft leg):
+    the name list, the slug mapping and the bind each raise REG-SCHEMA's refusal; the gate
+    maps it to no bind (test_sdd_gate)."""
     ws = _mk_ws(tmp_path)
-    (ws / ".dadaia" / "states" / "spec_contexts.json").write_text('{"contexts": [{"na', "utf-8")
-    assert invocation.alive_context_names(ws) == []
-    assert invocation.context_name_for_repo_slug(ws, "proj") is None
-    assert invocation.resolve_bind(ws, None, {"DADAIA_CONTEXT": "proj"}).context_name is None
+    (ws / ".dadaia" / "states" / "spec_contexts.json").write_text(body, "utf-8")
+    for read in (
+        lambda: invocation.alive_context_names(ws),
+        lambda: invocation.context_name_for_repo_slug(ws, "proj"),
+        lambda: invocation.resolve_bind(ws, None, {"DADAIA_CONTEXT": "proj"}),
+    ):
+        with pytest.raises(SchemaVersionError, match="Operator action: rewrite"):
+            read()
 
 
 def test_resolve_specs_dir_explicit_wins_else_cwd_inside_a_repo(
@@ -180,8 +186,7 @@ class TestAliveContextNames:
     """F008 (20260830 audit): the registry read family has ONE home — invocation."""
 
     def test_alive_filter_yields_context_names(self, tmp_path: Path) -> None:
-        """Only ALIVE entries (case-insensitive) yield their name; a missing registry yields []."""
-        assert invocation.alive_context_names(tmp_path) == []
+        """Only ALIVE entries (case-insensitive) yield their name."""
         states = tmp_path / ".dadaia" / "states"
         states.mkdir(parents=True)
         contexts = [

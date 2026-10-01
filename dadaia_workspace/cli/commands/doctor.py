@@ -221,8 +221,11 @@ def _onboarding_section(
     """The derived next step (FR6 AC6.1) as one info finding — never an error."""
     if workspace_root is None or expired_only:
         return _empty_section("workspace")
-    trees = alive_context_trees(workspace_root)
-    bind, session = own_bind_for_cli()
+    try:
+        trees = alive_context_trees(workspace_root)
+        bind, session = own_bind_for_cli()
+    except SchemaVersionError:  # `check` reports REG-SCHEMA; no next step is guessed
+        return _empty_section("workspace")
     step = onboarding.next_step(
         workspace_root, trees, scope, None if session is None else bool(bind)
     )

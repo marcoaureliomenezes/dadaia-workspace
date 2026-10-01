@@ -34,7 +34,9 @@ def _init_repo(workspace: Path, slug: str) -> tuple[Path, str]:
     closed as a genuine git-read failure (FR6 row 2), so tests use a REAL commit sha.
     """
     (workspace / ".dadaia" / "states").mkdir(parents=True, exist_ok=True)
-    (workspace / ".dadaia" / "states" / "spec_contexts.json").write_text("{}", encoding="utf-8")
+    (workspace / ".dadaia" / "states" / "spec_contexts.json").write_text(
+        '{"contexts": []}', encoding="utf-8"
+    )
     repo = workspace / "repos" / slug
     repo.mkdir(parents=True)
     subprocess.run(["git", "init", "-q"], cwd=repo, check=True)

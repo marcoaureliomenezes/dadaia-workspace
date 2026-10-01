@@ -10,8 +10,11 @@ from dadaia_workspace.infrastructure.json_context_store import JsonContextStore
 
 
 def context_store(states_dir: Path) -> JsonContextStore:
-    """``JsonContextStore`` over *states_dir*, created as ``init`` creates it."""
+    """``JsonContextStore`` over *states_dir*; an absent registry created as ``init`` creates it."""
     states_dir.mkdir(parents=True, exist_ok=True)
+    registry = states_dir / "spec_contexts.json"
+    if not registry.exists():
+        registry.write_text('{"contexts": []}', encoding="utf-8")
     return JsonContextStore(states_dir)
 
 

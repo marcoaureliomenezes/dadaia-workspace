@@ -49,6 +49,9 @@ def test_the_bare_command_writes_no_cache_into_the_tree(
     workspace = tmp_path
     for zone in ("tmp", "states", "sessions", "reaped"):
         (workspace / ".dadaia" / zone).mkdir(parents=True, exist_ok=True)
+    (workspace / ".dadaia" / "states" / "spec_contexts.json").write_text(
+        '{"contexts": [{"name": "demo", "repo_slug": "demo", "state": "alive"}]}', encoding="utf-8"
+    )
     repo = workspace / "repos" / "demo"
     (repo / "pkg" / "sub").mkdir(parents=True)
     shutil.copyfile(_REPO_ROOT / "pyproject.toml", repo / "pyproject.toml")

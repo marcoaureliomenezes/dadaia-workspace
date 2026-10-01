@@ -12,7 +12,8 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 from dadaia_workspace.core import invocation, session_store, workspace_layout
-from dadaia_workspace.core.doctor_rules import render_finding
+from dadaia_workspace.core.doctor_rules import SectionFinding, render_finding
+from dadaia_workspace.core.exceptions import SchemaVersionError
 from dadaia_workspace.features.spec_context import injection_policy
 from dadaia_workspace.features.workspace import onboarding
 from dadaia_workspace.hooks import _common
@@ -167,10 +168,7 @@ def _emit_bootstrap(workspace: Path, context: str) -> None:
 
 def main() -> int:
     payload = _common.read_stdin_json()
-    try:
-        workspace = invocation.resolve(env=os.environ, cwd=Path.cwd()).workspace_root
-    except Exception:  # noqa: BLE001 — fail-open: emit nothing rather than crash
-        workspace = None
+    workspace = invocation.resolve_root(cwd=Path.cwd(), target_path=None)
     if workspace is None:
         _emit("")
         return 0
@@ -199,18 +197,23 @@ def main() -> int:
     def newer(stamp: float | None) -> bool:
         return sentinel_mtime is not None and stamp is not None and stamp > sentinel_mtime
 
-    decision = injection_policy.decide_injection(
-        event=event,
-        context=_resolve_context(),
-        recorded_slug=recorded_slug,
-        sentinel_exists=sentinel_mtime is not None,
-        compacted=newer(_read_sentinel(compact_marker)[0]),
-        rebound=newer(_session_bound_at(workspace, session_id)),
-    )
-    if decision.emit == "bootstrap":
-        _emit_bootstrap(workspace, decision.context)
-    elif decision.emit == "preflight":
-        _emit(_generic_preflight(workspace, own, decision.context))
+    try:
+        decision = injection_policy.decide_injection(
+            event=event,
+            context=_resolve_context(),
+            recorded_slug=recorded_slug,
+            sentinel_exists=sentinel_mtime is not None,
+            compacted=newer(_read_sentinel(compact_marker)[0]),
+            rebound=newer(_session_bound_at(workspace, session_id)),
+        )
+        if decision.emit == "bootstrap":
+            _emit_bootstrap(workspace, decision.context)
+        elif decision.emit == "preflight":
+            _emit(_generic_preflight(workspace, own, decision.context))
+    except SchemaVersionError as refused:  # unreadable, never "no context": the doctor's finding
+        finding = SectionFinding("REG-SCHEMA", "error", refused.problem, False, True, refused.fix)
+        _emit(render_finding(finding) + "\n")
+        return 0
     if decision.stamp_slug is not None:
         _stamp_sentinel(tmp_dir, sentinel, decision.stamp_slug)
     return 0

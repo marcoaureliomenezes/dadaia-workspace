@@ -25,7 +25,7 @@ from dadaia_workspace.features.spec_context.service import (
     SpecContextService,
 )
 from dadaia_workspace.infrastructure.git_subprocess import GitSubprocessClient
-from dadaia_workspace.infrastructure.json_context_store import JsonContextStore
+from tests.fixtures.stores import context_store
 from tests.helpers.privacy_fixtures import aws_key_shape
 
 _WORK = "feature/0.1.0"
@@ -71,10 +71,9 @@ def _seed(bare: Path, work: Path, *branches: str, tag: str = "") -> None:
 def env(tmp_path: Path) -> tuple[SpecContextService, Path, Path]:
     root = tmp_path / "ws"
     (root / "repos").mkdir(parents=True)
-    (root / ".dadaia" / "states").mkdir(parents=True)
     bare = tmp_path / "proj.git"
     _git(tmp_path, "init", "-q", "--bare", "-b", "main", str(bare))
-    store = JsonContextStore(root / ".dadaia" / "states")
+    store = context_store(root / ".dadaia" / "states")
     store.save(SpecContextProject("proj", ContextState.ALIVE, "proj", bare.as_uri(), "2026-01-01"))
     svc = SpecContextService(
         store, GitSubprocessClient(), root, lambda _repo: None, scan_publish_candidates

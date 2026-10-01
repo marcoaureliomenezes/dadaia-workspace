@@ -63,6 +63,8 @@ def _row(id: str, target: Any, want: str | None = None, **opts: Any) -> Any:
         _row("path-first-a-write-under-b-is-b-never-first-alive-a",
              "worktrees/b/0.5.0a-impl/src/x.py", "context bind b"),
         _row("no-repo-no-context-fails-open", "specs/releases/x/TASKS.md"),
+        _row("AC3.9-a-cwd-outside-any-workspace-judges-the-absolute-target",
+             ".dadaia/sessions/runtime/a.ptr", "SEC-01", cwd="/", truncated=True),
         _row("sa-bind-has-two-stores#S1-dadaia-context-is-ignored-for-an-unbound-native-id",
              "worktrees/b/0.5.0a-impl/src/x.py", "context bind b", env={"DADAIA_CONTEXT": "b"}),
         _row("F3-bound-audit-write-allowed", "repos/a/specs/audits/20260101-x/index.md",
@@ -99,6 +101,8 @@ def test_gate_verdict(tmp_path: Path, target: Any, want: str | None, opts: dict[
         (ws / ".dadaia" / "states" / "install_ledger.json").write_text(
             json.dumps({"schema_version": "1", "entries": entries}), encoding="utf-8"
         )
+    if opts.get("truncated"):
+        (ws / ".dadaia" / "states" / "spec_contexts.json").write_text('{"contexts": [{"na')
     now = datetime.now(tz=UTC).isoformat()
     for sid, record in opts.get("records", {}).items():
         session_store.write_session(ws, sid, {"session_id": sid, "last_seen_at": now, **record})
@@ -124,19 +128,11 @@ def test_gate_verdict(tmp_path: Path, target: Any, want: str | None, opts: dict[
         assert block is not None and want in block["reason"], block
 
 
-def test_a_truncated_registry_is_no_context_at_the_gate_and_in_context_show(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """sa-context-repo-mapping-falls-back-to-the-name#B4 (the gate and `context show
-    --json` legs; alive_context_names is test_invocation's): with a truncated
+def test_a_truncated_registry_is_no_context_at_the_gate(tmp_path: Path) -> None:
+    """sa-context-repo-mapping-falls-back-to-the-name#B4 (the gate leg; `context show`
+    prints REG-SCHEMA since AC3.9, test_registry_version_grammar): with a truncated
     spec_contexts.json and DADAIA_CONTEXT naming a context, the real hook neither crashes
-    nor scope-blocks an id-less worktree write (no context is registered, ADR 0116), and
-    `context show --json` answers
-    `{"context": null}`, exit 0."""
-    from typer.testing import CliRunner
-
-    from dadaia_workspace.cli.main import app
-
+    nor scope-blocks an id-less worktree write (no context is registered, ADR 0116)."""
     ws = _mk_workspace(tmp_path, "proj", "other")
     (ws / ".dadaia" / "states" / "spec_contexts.json").write_text('{"contexts": [{"na')
     env = claude_hook_env(ws, session_id="s")
@@ -151,17 +147,3 @@ def test_a_truncated_registry_is_no_context_at_the_gate_and_in_context_show(
 
     assert gate.returncode == 0, gate.stderr
     assert gate.block_envelope() is None
-
-    monkeypatch.chdir(ws)
-    monkeypatch.setenv("DADAIA_CONTEXT", "proj")
-    for var in (
-        "CLAUDE_CODE_SESSION_ID",
-        "CODEX_SESSION_ID",
-        "CODEX_THREAD_ID",
-        "DADAIA_SESSION_ID",
-    ):
-        monkeypatch.delenv(var, raising=False)
-    shown = CliRunner().invoke(app, ["context", "show", "--json"])
-
-    assert shown.exit_code == 0, shown.output
-    assert json.loads(shown.output) == {"context": None}

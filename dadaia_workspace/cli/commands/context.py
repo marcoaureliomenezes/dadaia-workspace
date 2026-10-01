@@ -18,7 +18,7 @@ from dadaia_workspace.cli._specs_resolution import (
     own_bind_for_cli,
     resolve_session_id,
 )
-from dadaia_workspace.cli.redact import ContextRedactor, build_context_redactor
+from dadaia_workspace.cli.redact import build_context_redactor
 from dadaia_workspace.core import session_store
 from dadaia_workspace.core.cli_line import fix_line
 from dadaia_workspace.core.exceptions import (
@@ -158,6 +158,8 @@ def create(
         ctx = container.build_spec_context_service(ws).create(
             main_repo, name=name, associated_urls=tuple(associated)
         )
+    except SchemaVersionError as e:  # the registry's refusal carries its own one fix
+        fail(e)
     except (DadaiaError, OSError) as e:
         fail(f"{e}\nfix: {create_fix(ws, e, name, [main_repo, *associated])}")
     suffix = f", {len(ctx.associated_repos)} associated repo(s)" if ctx.associated_repos else ""
@@ -248,20 +250,13 @@ def show(
 ) -> None:
     """Show details of a context."""
     svc = _ctx_service()
-    bound, session_id = own_bind_for_cli()  # name and session from ONE Bind
-    ctx, target = None, name or bound
     try:
-        ctx = svc.show(target) if target else None
-    except ContextNotFoundError as e:
+        bound, session_id = own_bind_for_cli()  # name and session from ONE Bind
+        ctx = svc.show(target) if (target := name or bound) else None
+    except (ContextNotFoundError, SchemaVersionError) as e:
         fail(e)
 
-    redactor: ContextRedactor | None = None
-    if redact:
-        try:
-            all_contexts = svc.list_all()
-        except SchemaVersionError:
-            all_contexts = [ctx] if ctx is not None else []
-        redactor = build_context_redactor(all_contexts)
+    redactor = build_context_redactor(svc.list_all()) if redact else None
 
     data = None if ctx is None else _ctx_to_dict(svc, ctx)
     if data is not None and json_output:

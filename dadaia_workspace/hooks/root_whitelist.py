@@ -5,7 +5,6 @@ is blocked; the doctor asks the same function, so ALLOW ⇔ not slop. Fails open
 
 from __future__ import annotations
 
-import os
 from pathlib import Path
 
 from dadaia_workspace.core import context_registry, invocation, workspace_layout, workspace_resolver
@@ -22,10 +21,7 @@ def evaluate_payload(payload: dict[str, object]) -> str | None:
     raw_paths = _common.target_paths(payload)
     if not raw_paths:
         return None
-    try:
-        anchor = invocation.resolve(env=os.environ, cwd=Path.cwd()).workspace_root
-    except Exception:  # noqa: BLE001 — fail-open
-        return None
+    anchor = invocation.resolve_root(cwd=Path.cwd(), target_path=None)
     return next(filter(None, (_root_violation(anchor, p) for p in raw_paths)), None)
 
 

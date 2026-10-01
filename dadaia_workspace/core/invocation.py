@@ -32,6 +32,7 @@ __all__ = [
     "repo_slug_for_context",
     "resolve",
     "resolve_bind",
+    "resolve_root",
     "resolve_context_specs_dir",
     "resolve_specs_dir",
     "resolve_session_id",
@@ -89,30 +90,26 @@ def resolve_session_id(env: Mapping[str, str]) -> str:
     return sanitize_session_id(candidate)
 
 
-def _registry_contexts(workspace_root: Path) -> list[dict[str, object]]:
-    return context_registry.entries(workspace_root) or []
-
-
 def alive_context_names(workspace_root: Path) -> list[str]:
-    """The name of every ALIVE context (what ``context bind`` accepts), fail-soft to ``[]``."""
+    """The name of every ALIVE context (what ``context bind`` accepts)."""
     return [
         str(entry["name"])
-        for entry in _registry_contexts(workspace_root)
+        for entry in context_registry.entries(workspace_root)
         if str(entry.get("state", "")).lower() == "alive" and entry.get("name")
     ]
 
 
 def _context_registered(workspace_root: Path, name: str) -> bool:
-    """True while *name* is registered; an unreadable registry registers nothing."""
+    """True while *name* is registered."""
     return any(
         e.get("name") == name or e.get("repo_slug") == name
-        for e in _registry_contexts(workspace_root)
+        for e in context_registry.entries(workspace_root)
     )
 
 
 def repo_slug_for_context(workspace_root: Path, name: str) -> str | None:
     """The ``repos/<slug>`` dir a context NAME lives in, or ``None`` when unregistered."""
-    for entry in _registry_contexts(workspace_root):
+    for entry in context_registry.entries(workspace_root):
         slug = context_registry.entry_slugs(entry)[0]
         if entry.get("name") == name and isinstance(slug, str) and slug:
             return slug
@@ -134,7 +131,7 @@ def repo_owner(workspace_root: Path, path: Path) -> tuple[str, str, str] | None:
 
 
 def _owning_entry(workspace_root: Path, slug: str) -> tuple[str, str] | None:
-    for entry in _registry_contexts(workspace_root):
+    for entry in context_registry.entries(workspace_root):
         main, *_ = slugs = context_registry.entry_slugs(entry)
         name = entry.get("name")
         if slug in slugs and isinstance(name, str) and name and isinstance(main, str):
@@ -163,9 +160,9 @@ def scope(workspace_root: Path, path: Path) -> tuple[str | None, Zone]:
     return parts[1], "audit" if parts[2:4] == ("specs", "audits") else "repo"
 
 
-def _resolve_root(*, cwd: Path, target_path: Path | None) -> Path | None:
+def resolve_root(*, cwd: Path, target_path: Path | None) -> Path | None:
     """The target's own root, then the running CLI's own workspace, then the cwd's — every
-    rung fenced: an Invocation is where a process acts."""
+    rung fenced: an Invocation is where a process acts. Reads no registry; never raises."""
     owned = workspace_resolver.acting_root(target_path) if target_path is not None else None
     return owned or workspace_resolver.own_workspace_root() or workspace_resolver.acting_root(cwd)
 
@@ -178,7 +175,7 @@ def _live_session_context(workspace_root: Path, session_id: str | None) -> str |
 
 def all_repos(workspace_root: Path, context_name: str) -> frozenset[str]:
     """Every repo slug *context_name* owns (main plus associated); unknown owns nothing."""
-    for entry in _registry_contexts(workspace_root):
+    for entry in context_registry.entries(workspace_root):
         if entry.get("name") != context_name:
             continue
         main, *associated = context_registry.entry_slugs(entry)
@@ -212,7 +209,7 @@ def resolve(
 ) -> Invocation:
     """Resolve session, context, root and bind once. *explicit*/*target_path* are rung 0 (a
     write under ``repos/x/`` resolves ``x`` even while bound to ``y``)."""
-    root = _resolve_root(cwd=cwd, target_path=target_path)
+    root = resolve_root(cwd=cwd, target_path=target_path)
     session_id = resolve_session_id(env) or None
     bind = resolve_bind(root, session_id, env)
 
