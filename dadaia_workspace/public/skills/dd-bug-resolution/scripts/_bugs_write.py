@@ -11,7 +11,6 @@ from __future__ import annotations
 
 import datetime as _dt
 import difflib
-import re
 import sys
 from pathlib import Path
 from typing import Any
@@ -58,7 +57,7 @@ def append(records: Records, values: dict[str, Any], dirs: set[str]) -> Records:
             f"{_SCRIPT} append --bug-id <new-id>",
         )
     surface = str(values.get("surface"))
-    if not re.fullmatch(r"[a-z0-9_-]+", surface) or surface not in dirs:
+    if surface not in dirs:
         close = "|".join(difflib.get_close_matches(surface, sorted(dirs), 5, 0)) or "dir"
         raise Refusal(
             f"surface {surface!r} is not the name of a directory tracked in this repo",

@@ -16,7 +16,7 @@ Every task is made in its own `worktree.py new` impl worktree, opened when its `
 
 ### Deletions and small units — step 2
 
-- [ ] **T-050-112 — The tracked-directory set is the one surface decider.** `W:` `pub/skills/dd-bug-resolution/scripts/_bugs_write.py`, `tests/unit/skills/test_bug_resolution_bugs_script.py`, `pub/entities/behavior-map.json`
+- [x] **T-050-112 — The tracked-directory set is the one surface decider.** `W:` `pub/skills/dd-bug-resolution/scripts/_bugs_write.py`, `tests/unit/skills/test_bug_resolution_bugs_script.py`, `pub/entities/behavior-map.json`
   `blocked by:` T-050-111 · `delivers:` AC2.17; after this the operator can run `bugs.py append --surface .github`; FR `bugs-append-refuses-the-dot-directory-its-fix-offers` · `RED:` `pytest tests/unit/skills/test_bug_resolution_bugs_script.py` (the `("surface","Docs","--surface <")` row at :294 rewritten into the `.github` admit row; an untracked name still refused with close matches) · Δ −1 / ≤ 0.
 - [ ] **T-050-113 — The venv guard judges only the dadaia CLI.** `W:` `hooks/venv_guard.py`, `tests/unit/hooks/test_venv_guard.py`, `tests/unit/hooks/test_pre_gate.py`
   `blocked by:` T-050-111 · `delivers:` AC2.9 (code; the law clause is T-050-120); DEL `pip-guard-fix-routes-project-installs-into-the-tool-venv` (ADR 0134); pip rows rewritten to ALLOW · `RED:` `pytest tests/unit/hooks/test_venv_guard.py tests/unit/hooks/test_pre_gate.py` · Δ −6 / −10.

@@ -56,14 +56,14 @@ def script(tmp_path: Path) -> Path:
 
 
 def _ledger(root: Path, *records: dict[str, object]) -> Path:
-    """A git repo tracking `cli/` and the non-conforming `Docs/` (F011)."""
+    """A git repo tracking `cli/` and the dot-directory `.github/` (F011, AC2.17)."""
     specs = root / "specs"
     (specs / "bugs").mkdir(parents=True, exist_ok=True)
-    for tracked in ("cli", "Docs"):
+    for tracked in ("cli", ".github"):
         (root / tracked).mkdir(exist_ok=True)
         (root / tracked / "x.py").touch()
     subprocess.run(["git", "init", "-q", str(root)], check=True)
-    subprocess.run(["git", "-C", str(root), "add", "cli", "Docs"], check=True)
+    subprocess.run(["git", "-C", str(root), "add", "cli", ".github"], check=True)
     (specs / "bugs" / "BUGS.jsonl").write_text(
         "".join(json.dumps(r) + "\n" for r in records), encoding="utf-8"
     )
@@ -291,14 +291,14 @@ def test_append_names_its_correlations_from_the_ledger(script: Path, tmp_path: P
 
 @pytest.mark.parametrize(
     ("field", "value", "needle"),
-    [("surface", "cli", None), ("surface", "unknown", "--surface <"), ("surface", "Docs", "--surface <"),
+    [("surface", "cli", None), ("surface", ".github", None), ("surface", "unknown", "--surface <.github|cli>"),
      ("context", "", "shorter than its minLength"), ("component", "", "shorter than its minLength")],
 )  # fmt: skip
 def test_append_takes_a_tracked_directory_surface_and_non_blank_fields(
     script: Path, tmp_path: Path, field: str, value: str, needle: str | None
 ) -> None:
-    """F011 / AC1.12: the surface is one conforming directory name tracked in the repo —
-    never an untracked (`unknown`) or non-conforming (`Docs`) name; this re-proves
+    """F011 / AC2.17: the tracked-directory set is the one decider — `.github` admitted,
+    an untracked `unknown` refused naming close matches; this re-proves
     sa-consumer-law-carries-library-facts#FR8.1 (the context's own tree names it) and
     supersedes sa-spec-doc-033-duplicates-bugs-check#B5 (free text). #B2: a blank context
     or component is refused. Every refusal leaves the ledger untouched."""
