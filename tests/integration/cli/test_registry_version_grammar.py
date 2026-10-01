@@ -123,6 +123,7 @@ def test_the_refusal_fix_line_migrates_with_no_tty(tmp_path: Path) -> None:
 
 
 _TRUNCATED, _SHAPE = '{"contexts": [{"na', '{"contexts": [...]}'
+_DEEP = '{"contexts": ' + "[" * 100_000  # past json's recursion limit (CWE-674)
 
 
 @pytest.mark.parametrize(
@@ -130,8 +131,9 @@ _TRUNCATED, _SHAPE = '{"contexts": [{"na', '{"contexts": [...]}'
     [(json.dumps({"schema_version": "1", "contexts": [_ATIVO]}), None),
      (json.dumps({"schema_version": "4", "contexts": [_ALIVE]}), "Operator action: "),
      (json.dumps({"schema_version": "banana", "contexts": [_ALIVE]}), "Operator action: "),
-     (_TRUNCATED, "Operator action: rewrite "), ("{}", "Operator action: rewrite ")],
-    ids=["v1", "newer", "banana", "AC3.9-truncated", "AC3.9-empty-object"],
+     (_TRUNCATED, "Operator action: rewrite "), ("{}", "Operator action: rewrite "),
+     (_DEEP, "Operator action: rewrite ")],
+    ids=["v1", "newer", "banana", "AC3.9-truncated", "AC3.9-empty-object", "AC3.9-deep-nesting"],
 )  # fmt: skip
 def test_doctor_on_a_bad_registry_gives_a_finding_with_a_fix(
     ws: Path, body: str, fix_head: str | None
@@ -152,7 +154,9 @@ def test_doctor_on_a_bad_registry_gives_a_finding_with_a_fix(
         assert fix.startswith(fix_head) and str(ws) in fix
 
 
-@pytest.mark.parametrize("body", [_TRUNCATED, "{}"], ids=["truncated", "empty-object"])
+@pytest.mark.parametrize(
+    "body", [_TRUNCATED, "{}", _DEEP], ids=["truncated", "empty-object", "deep-nesting"]
+)
 def test_ac3_9_an_unreadable_registry_is_reg_schema_at_every_reader(ws: Path, body: str) -> None:
     """AC3.9 (DEL corrupt-context-registry-crashes-doctor-and-next-step): `context
     list|show|create` refuse with the one fix line and no traceback; SessionStart prints
@@ -176,3 +180,14 @@ def test_ac3_9_an_unreadable_registry_is_reg_schema_at_every_reader(ws: Path, bo
     assert "REG-SCHEMA" in started.stdout and "Operator action: rewrite" in started.stdout
     assert "create a context" not in started.stdout.lower(), started.stdout
     assert context_registry.registered_slugs(ws) == (frozenset("*"), frozenset("*"))
+
+
+def test_ac3_9_doctor_fix_acts_on_nothing_over_an_unreadable_registry(ws: Path) -> None:
+    """AC3.9: an unreadable registry makes every `doctor --fix` lane act on nothing — a root
+    slop file stays where it is."""
+    (ws / ".dadaia" / "states" / "spec_contexts.json").write_text(_TRUNCATED, encoding="utf-8")
+    (ws / "junk.txt").write_text("slop", encoding="utf-8")
+
+    _runner.invoke(app, ["doctor", "--fix"])
+
+    assert (ws / "junk.txt").read_text(encoding="utf-8") == "slop"

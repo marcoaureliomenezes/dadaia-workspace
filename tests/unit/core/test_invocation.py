@@ -144,7 +144,11 @@ def test_an_unowned_repo_resolves_no_context(tmp_path: Path) -> None:
     assert inv.context_name is None and inv.specs_dir is None
 
 
-@pytest.mark.parametrize("body", ['{"contexts": [{"na', "{}"], ids=["truncated", "empty-object"])
+@pytest.mark.parametrize(
+    "body",
+    ['{"contexts": [{"na', "{}", '{"contexts": ' + "[" * 100_000],
+    ids=["truncated", "empty-object", "deep-nesting"],
+)
 def test_an_unreadable_registry_refuses_never_answers_no_context(tmp_path: Path, body: str) -> None:
     """AC3.9 (rewrites sa-context-repo-mapping-falls-back-to-the-name#B4's fail-soft leg):
     the name list, the slug mapping and the bind each raise REG-SCHEMA's refusal; the gate

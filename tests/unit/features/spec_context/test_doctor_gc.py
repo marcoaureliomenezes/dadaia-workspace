@@ -30,7 +30,9 @@ def _make_workspace(tmp_path: Path) -> Path:
     ws = tmp_path / "ws"
     ws.mkdir()
     (ws / ".dadaia" / "states").mkdir(parents=True)
-    (ws / ".dadaia" / "states" / "spec_contexts.json").write_text("{}", encoding="utf-8")
+    (ws / ".dadaia" / "states" / "spec_contexts.json").write_text(
+        '{"contexts": []}', encoding="utf-8"
+    )
     (ws / ".dadaia" / "sessions").mkdir(parents=True)
     (ws / "repos").mkdir()
     return ws

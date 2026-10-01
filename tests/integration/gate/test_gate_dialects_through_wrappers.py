@@ -91,10 +91,15 @@ def test_b8_every_harness_gets_claudes_verdict(ws: Path, harness: str, case: str
     assert _verdict(harness, _run(ws, harness, case)) == _CLAUDE[case]
 
 
+@pytest.mark.parametrize(
+    "body",
+    ['{"contexts": [{"na', '{"contexts": ' + "[" * 100_000],
+    ids=["truncated", "deep-nesting"],
+)
 @pytest.mark.parametrize("case", ["protected", "new-root", "repos"])
 @pytest.mark.parametrize("harness", sorted(HARNESS_RECORDS))
 def test_ac3_9_a_bound_session_over_a_truncated_registry_still_blocks(
-    ws: Path, harness: str, case: str
+    ws: Path, harness: str, case: str, body: str
 ) -> None:
     """AC3.9 (PLAN §2.6): a session bound by its live record, its registry truncated: an
     unreadable registry is no bind, never a raise the pre-gate fails open on — a PROTECTED
@@ -104,7 +109,7 @@ def test_ac3_9_a_bound_session_over_a_truncated_registry_still_blocks(
     session_store.write_session(
         ws, "s", {"session_id": "s", "last_seen_at": now, "context": "demo"}
     )
-    (ws / ".dadaia" / "states" / "spec_contexts.json").write_text('{"contexts": [{"na')
+    (ws / ".dadaia" / "states" / "spec_contexts.json").write_text(body)
     assert _verdict(harness, _run(ws, harness, case, DADAIA_SESSION_ID="s")) == "deny"
 
 

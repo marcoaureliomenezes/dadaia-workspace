@@ -15,7 +15,7 @@ def read(path: Path) -> dict[str, object]:
     or any other shape (``{}`` included) is unreadable, never empty: :class:`SchemaVersionError`."""
     try:
         data = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, ValueError):
+    except (OSError, RecursionError, ValueError):  # too deep a nest is unreadable too
         data = None
     if not isinstance(data, dict) or not isinstance(data.get("contexts"), list):
         shape = '{"contexts": [...]}'
