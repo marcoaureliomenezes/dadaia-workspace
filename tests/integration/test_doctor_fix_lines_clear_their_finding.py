@@ -53,7 +53,7 @@ from dadaia_workspace.cli.help_digest import command_paths
 from dadaia_workspace.cli.main import app
 from dadaia_workspace.core.doctor_rules import Rule, SectionFinding, rule_fix, run_section
 from dadaia_workspace.core.specs_version import CANONICAL_SPECS_VERSION
-from dadaia_workspace.core.workspace_layout import provisioned_zones
+from dadaia_workspace.core.workspace_layout import LEVEL1_SEEDS, occupied, provisioned_zones
 from dadaia_workspace.features.spec_context.doctor import DoctorService
 from dadaia_workspace.features.specs.citations import dead_verb_citations
 from dadaia_workspace.features.specs.doctor import SpecsDoctor
@@ -548,9 +548,30 @@ def test_a_worktree_finding_is_cleared_by_its_merge_fix(tmp_path: Path) -> None:
     assert doctor.check_worktrees("c") == []
 
 
-@pytest.mark.parametrize("present", [".dadaiaignore", "prompt.md", "dangling-link"])
+def _plant_file(entry: Path, _outside: Path) -> None:
+    entry.write_text("# mine\n", encoding="utf-8")
+
+
+def _plant_link(entry: Path, outside: Path) -> None:
+    entry.symlink_to(outside)
+
+
+def _identity(entry: Path) -> tuple[int, str]:
+    """lstat identity: the inode plus the link target or the content — never followed."""
+    body = os.readlink(entry) if entry.is_symlink() else entry.read_text(encoding="utf-8")
+    return entry.lstat().st_ino, body
+
+
+@pytest.mark.parametrize(
+    ("present", "plant"),
+    [(".dadaiaignore", _plant_file), ("prompt.md", _plant_file), ("prompt.md", _plant_link)],
+    ids=["dadaiaignore", "prompt", "dangling-link"],
+)
 def test_the_session_lane_re_creates_missing_core_and_rewrites_none(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, present: str
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    present: str,
+    plant: Callable[[Path, Path], None],
 ) -> None:
     """Intent: CONTRACT — AC2.4 (ADR 0096): the SessionStart lane re-creates a missing level-1
     entry (`.dadaiaignore`, `prompt.md`, every provisioned zone) and rewrites no present one —
@@ -559,10 +580,8 @@ def test_the_session_lane_re_creates_missing_core_and_rewrites_none(
     (tmp_path / ".dadaia" / "states" / "spec_contexts.json").write_text("{}", encoding="utf-8")
     outside = tmp_path / "outside" / "pwned.md"
     outside.parent.mkdir()
-    if present == "dangling-link":
-        (tmp_path / "prompt.md").symlink_to(outside)
-    else:
-        (tmp_path / present).write_text("# mine\n", encoding="utf-8")
+    plant(tmp_path / present, outside)
+    planted = _identity(tmp_path / present)
     monkeypatch.chdir(tmp_path)
     monkeypatch.setattr(
         container,
@@ -575,8 +594,6 @@ def test_the_session_lane_re_creates_missing_core_and_rewrites_none(
     lane = CliRunner().invoke(app, ["doctor", "--fix", "--expired-only", "--quiet"])
 
     assert lane.exit_code == 0, lane.output
-    assert (tmp_path / ".dadaiaignore").is_file() and not outside.exists()
+    assert all(occupied(tmp_path / name) for name in LEVEL1_SEEDS) and not outside.exists()
     assert all((tmp_path / ".dadaia" / zone.name).is_dir() for zone in provisioned_zones())
-    if present != "dangling-link":
-        assert (tmp_path / "prompt.md").is_file()
-        assert (tmp_path / present).read_text(encoding="utf-8") == "# mine\n"
+    assert _identity(tmp_path / present) == planted

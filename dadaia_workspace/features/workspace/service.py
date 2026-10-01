@@ -106,5 +106,5 @@ class WorkspaceService:
         return JsonHarnessProfileStore().resolve(states_dir, workspace_root).harnesses
 
     def _init_json_file(self, path: Path, empty: dict) -> None:  # type: ignore[type-arg]
-        if not path.exists():
+        if not occupied(path):
             path.write_text(json.dumps(empty, indent=2), encoding="utf-8")
