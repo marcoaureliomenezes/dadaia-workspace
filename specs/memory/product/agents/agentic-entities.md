@@ -24,27 +24,28 @@ The one enumeration; every harness atom links here.
 
 | Behaviour | What it does | Lane |
 |---|---|---|
-| `root-whitelist` | blocks a file-tool write that would mint a new workspace-root entry | pre-tool gate |
-| `venv-guard` | blocks `dadaia`/`pip`/`python -m dadaia_workspace` run outside the workspace venv, naming the corrected command | pre-tool gate |
-| `sdd-gate` | classifies each write ADDITIVE / PROTECTED / MUTATING, scope-judges MUTATING writes into a repo against the session's bind and sends every other write under `repos/<slug>/`, audits aside, to a worktree | pre-tool gate (+ post-tool session heartbeat where the harness has one) |
+| `root-whitelist` | blocks a file-tool write that would mint an entry the layout law judges slop — at the root, `.dadaia/`, a closed-canon zone, or the first level of `repos/` and `worktrees/` | pre-tool gate |
+| `venv-guard` | blocks the dadaia CLI (`dadaia`, `python -m dadaia_workspace`) run outside the workspace venv, naming the corrected command | pre-tool gate |
+| `sdd-gate` | classifies each write ADDITIVE / PROTECTED / MUTATING (PROTECTED holding a code floor with or without the install ledger), scope-judges MUTATING writes into a repo against the session's bind and sends every other write under `repos/<slug>/`, audits aside, to a worktree | pre-tool gate (+ post-tool session heartbeat where the harness has one) |
 | `context-memory-injection` | runs the session-start reaper (`dadaia doctor --fix --expired-only --quiet`) and injects the bound context's bootstrap through whichever session-start and prompt hooks the harness has | session start (+ prompt) |
 | `git-chokepoints` | pre-push allows only a work branch of the project gitflow, or the bootstrap birth of its principal and integration branches, and refuses a non-canon `specs/` path or a denylisted secret in the pushed range | git hooks, identical for every harness |
 
 - The first three ride ONE merged entrypoint, `dadaia_workspace.hooks.pre_gate`; with the session-start reaper they are the four hook behaviours every harness receives, and every BLOCK carries one `fix:` line.
 - A harness differs only in serialization — the event names, the hook file and the answer shape its wrapper translates to; no harness adds a behaviour ([[sdd-gate-v3]]).
 - Every projected hook entry carries a `timeout`: 10 s for the tool lanes (pre-gate, post-gate), 30 s for the session lanes (ctx-inject, reaper); every harness lets the action through when it fires, so a pre-gate slower than 10 s is a declared fail-open window and itself a Stall-class bug.
+- With no workspace venv every hook wrapper — the Kimi Code shims included — warns on stderr and exits 0, letting the action through; each ctx-inject lane also prints, in its harness's context envelope ([[context-management]]), `dadaia: no workspace venv at <ws>/.dadaia/.venv — the gate is off. fix: uvx dadaia-workspace init <ws>`, on every firing until the venv exists, with no marker file and no per-session state ([[sdd-gate-v3]]).
 
 ## The universal surface
 
 - The root `AGENTS.md` map, the scoped `AGENTS.md` files, `.agents/skills/dd-*` and `.agents/agents/dd-*.md` are authored once and read natively or through per-entry symlinks and transcodes, so they carry no per-harness derivation.
 - Every `dd-` skill touching a governed area opens that area's scoped `AGENTS.md` as step 1 — how scoped law reaches a harness that loads only the root->cwd chain.
-- `dadaia_workspace/public/data/CONTEXT-MAP.md` records every surface's byte ceiling, measured installed size and per-harness load trigger: the always-on load is the root map (<= 8192 B), each scoped file <= 4096 B, each `SKILL.md` <= 6144 B; `tests/contract/test_context_map.py` is the ratchet.
+- `dadaia_workspace/public/data/CONTEXT-MAP.md` records every surface's soft byte budget, measured installed size and per-harness load trigger: the always-on root map 8192 B, each scoped file 4096 B, each `SKILL.md` 6144 B, budgets a surface may exceed (ADR 0143); `tests/contract/test_context_map.py` pins the Measured column to the installed bytes.
 
 ## The behavior map
 
 - `dadaia_workspace/public/entities/behavior-map.json` declares which skill and which scoped rule file operate which section of the root map: `rows` of `{section, anchor, skill, scoped_agents_md[], hash_tuple, recorded_by, recorded_at}`, plus `skill_md_line_ceiling`, `declared_overlaps` and `standalone_skills` (the skills that stand without a workspace, pinned by `tests/contract/test_standalone_skills.py`).
 - Every skill and scoped `AGENTS.md` source has exactly one row, every law section at least one owner; several skills may own one section.
-- The corpus is 18 `dd-*` skill directories, pinned with the total skill Markdown line count by the down-only ratchet in `tests/contract/test_slop_ratchets.py` ([[QUALITY]]).
+- The corpus is 18 `dd-*` skill directories; a `SKILL.md` longer than the map's `skill_md_line_ceiling` turns `tests/contract/test_behavior_map.py` red ([[QUALITY]]).
 
 ## Enforcement
 

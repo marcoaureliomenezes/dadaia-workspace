@@ -16,7 +16,7 @@ sources:
 - `specs/bugs/BUGS.jsonl` holds one record per bug, appended once and keyed by `id`; git history is that line's change log, and the record carries no git-derived fact.
 - `bug-record-v1` sorts every field into immutable core (`id ts reported_by title severity surface component context symptom repro expected`), mutable governance (`status cause caused_by resolved_release audited closed_at`) and write-once (`correlates solution evidence_loop evidence_seam evidence_diff diff_direction superseded_by`); an unknown key is a finding.
 - `status` is `open | resolved | superseded | deferred | rejected`; `closed_at` is non-null exactly when `status` is terminal and never earlier than `ts`.
-- `surface` is the name of one directory tracked in the context's repo, at any depth (`^[a-z0-9_-]+$`); records already carrying free text or `unknown` stay valid as written; `component` is free-text `path#symbol`.
+- `surface` is the name of one directory tracked in the context's repo, at any depth, a dot-directory such as `.github` included — the set of tracked directory names is the one decider; records already carrying free text or `unknown` stay valid as written; `component` is free-text `path#symbol`.
 - `correlates` lists the ledger ids the bug was judged to correlate with at registration, empty for none.
 - Every written field except `id`, `ts` and `reported_by` is redacted on write: control characters stripped, home-directory user names and IPv4 addresses masked.
 

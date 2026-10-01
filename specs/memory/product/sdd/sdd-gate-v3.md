@@ -22,22 +22,23 @@ sources:
 ## PreToolUse
 
 - No lease, lock file or wait path exists; the gate knows no session mode and reads no `_RELEASE.json`.
-- One pre-gate reads each payload once and evaluates root whitelist, venv guard and SDD gate in that order, first block wins; a policy that raises is ALLOW.
-- It blocks exactly three things: a file-tool write (`Write`, `Edit`, `MultiEdit`, `apply_patch`) creating a new workspace-root entry outside the root law and the operator's `.dadaiaignore` ([[workspace-doctor]]); a leading `dadaia`, `pip` or `python -m dadaia_workspace` outside `.dadaia/.venv/bin/` (Bash only); a file-tool write (those or `NotebookEdit`) that is PROTECTED or out of scope; a Bash write (`sed -i`, `rm`, `mkdir`, a redirect) is never judged, while the law still forbids any tool an out-of-scope or PROTECTED write.
+- One pre-gate reads each payload once and evaluates root whitelist, venv guard and SDD gate in that order, first block wins.
+- It blocks exactly three things: a file-tool write (`Write`, `Edit`, `MultiEdit`, `apply_patch`) creating an entry the layout law judges slop — at the root, `.dadaia/`, a closed-canon zone, or the first level of `repos/` and `worktrees/` ([[workspace-doctor]]); a leading `dadaia` or `python -m dadaia_workspace` outside `.dadaia/.venv/bin/` (Bash only); a file-tool write (those or `NotebookEdit`) that is PROTECTED or out of scope.
+- Where the gate fails open is stated once, in the root map §3; an unreadable context registry also lets the layout check admit every name under `repos/` and `worktrees/` ([[workspace-doctor]]).
 
 | Class | Behavior |
 |---|---|
 | ADDITIVE | the output and ephemeral `.dadaia/` zones (`handoff`, `reports`, `tmp`, `reaped`), derived from the zone registry — always writable, bound or not; no `repos/` path is ever ADDITIVE |
 | MUTATING | everything else, every `specs/` path included; judged by the target's `scope()` zone ([[context-management]]) |
-| PROTECTED | `.dadaia/sessions/`, every path the install ledger records (the projected law) and `.dadaiaignore`, the operator's file |
+| PROTECTED | a floor that holds with no install ledger — the root `AGENTS.md`, `.dadaiaignore`, `.dadaia/states/`, `.dadaia/hooks/`, `.dadaia/sessions/` and each harness's hook wiring file; every path the install ledger records; a `.dadaiaignore` `[protected]` glob, repo-relative, under `repos/<r>/` or `worktrees/<r>/<name>/` |
 
-- A repo's own `AGENTS.md` is MUTATING; nothing at the root escapes classification.
-- Scope is the bound context's main repo plus its associated repos: a MUTATING write into a registered repo outside it is refused for a bound session and for an unbound one carrying a session id (it owns nothing); an id-less session bound by `DADAIA_CONTEXT` is told to relaunch with the owner's context; an id-less unbound session is the one declared gap, since a harness process env is not the shell's.
+- A repo's own `AGENTS.md` is MUTATING unless a `[protected]` glob names it; nothing at the root escapes classification.
+- Scope is the bound context's main repo plus its associated repos: a MUTATING write into a registered repo outside it is refused for a bound session and for an unbound one carrying a session id (it owns nothing); an id-less session bound by `DADAIA_CONTEXT` is told to relaunch with the owner's context.
 - `repos/<r>/` receives only merges: a MUTATING file-tool write there outside `specs/audits/` is refused with the `worktree.py new <r> --kind <kind>` fix, the kind being the first whose allowed set holds the path, or an `Operator action:` line when no kind holds it; the same write inside `worktrees/<r>/<name>/` or under `repos/<r>/specs/audits/` is allowed ([[worktrees]]).
 - A workspace-root path and a slug no context registers are never scope-blocked.
 - The target's own root decides protection even when `DADAIA_FENCED_ROOTS` lists it: the fence stops a process acting on a root, never the root's protection.
 - Every BLOCK — the three gate blocks, `dadaia ci push-gate-check`, the ledger scripts, every error-class doctor rule — carries exactly one `fix: <command>` line; every one naming the workspace CLI is built by `fix_line` in `dadaia_workspace/core/cli_line.py` (the absolute venv CLI path, POSIX `shlex` quoting, the Windows form under Windows), and a contract test fails any other module spelling that CLI in a fix position; `tests/contract/test_every_block_carries_a_fix.py` feeds each fix back through the gate and asserts ALLOW, so a BLOCK whose fix is itself blocked (a Stall) cannot ship.
-- The fix lines: root entry → the dated `.dadaia/tmp/` directory the write belongs in (only the operator admits a root entry, in `.dadaiaignore`); session record → `<cli> context bind <ctx>`; projected law → `<cli> public install`; `.dadaiaignore` → `<cli> doctor`, naming what to ask the operator for; out-of-scope write → `<cli> context bind <owner>`; a write under `repos/<r>/` → `worktree.py new`; venv → the agent's own arguments after the builder-spelled CLI.
+- The fix lines: root entry → the dated `.dadaia/tmp/` directory the write belongs in (only the operator admits a root entry, in `.dadaiaignore`); session record → `<cli> context bind <ctx>`; core or projected law → `<cli> public install`; `.dadaiaignore` or a `[protected]` match → a `.dadaia/tmp/` draft for the operator, the refusal naming the glob; out-of-scope write → `<cli> context bind <owner>`; a write under `repos/<r>/` → `worktree.py new`; venv → the agent's own arguments after the builder-spelled CLI.
 - The gate returns a decision and its message per write target: a BLOCK's message is its reason, an ALLOW's is empty; there is no advisory channel.
 - A BLOCK is one envelope carrying `"decision": "block"` plus Claude Code's `permissionDecision: "deny"`; an ALLOW is an explicit envelope with no permission verdict and no `systemMessage`.
 - A MUTATING write records nothing about its session; races between sessions surface through git.
@@ -70,4 +71,4 @@ sources:
 
 ## Dependencies
 
-[[context-management]], [[workspace-doctor]], [[release-lifecycle]], [[worktrees]], [[ARCHITECTURE]].
+[[context-management]], [[workspace-doctor]], [[release-lifecycle]], [[worktrees]], [[agentic-entities]], [[ARCHITECTURE]].
