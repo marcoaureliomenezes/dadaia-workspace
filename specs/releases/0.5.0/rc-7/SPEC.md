@@ -112,7 +112,7 @@ Each finding that cites a bug or an entry shares its destination; findings are `
 - AC3.13 Commit shapes (F053, F054, F057; FR `gitflow-shape2-omits-backlog-histo`; 0106, 0136):
   - `dd-gitflow-default` §3a's staged set becomes "the kind's allowed set" (`KINDS`): a backlog exit stages `BACKLOG.json` with its histo; shape 2's ADR message is `docs(adr): propose|accept <slug>`.
   - The "alone" clauses and "+ picked bugs" leave, there and in `dd-release-definition` §4; each closure commit form (`chore(tasks)`, `docs(memory)`, `docs(specs)`, `chore(release)`) gets a row.
-  - Check: `git grep -c 'picked bugs' -- dadaia_workspace/public` prints nothing; `tests/contract/test_law_states_what_the_code_does.py` asserts §3a's sets equal `KINDS`.
+  - Check: `git grep -c 'picked bugs' -- dadaia_workspace/public` prints nothing; §3a points to `KINDS` by reference, since `tests/contract/test_zone_registry.py` refuses a law line restating a canonical set, and `tests/contract/test_law_states_what_the_code_does.py` asserts §3a names exactly `KINDS`'s kinds and every row's staged paths pass `allows(kind, path)` (T-050-142 review L1).
 - AC3.14 Archive and milestones (F058, F059, F061):
   - `LINEAGE.md` states ADR 0152 (1): the release folder survives under `_archive/<v>/`.
   - A shipped sha and PR live in one structured field, which `release.py check` verifies for each release archived from 0.5.0 on.
@@ -121,7 +121,7 @@ Each finding that cites a bug or an entry shares its destination; findings are `
 - AC3.15 Audit close (F052): `audit.py close` refuses to run without `--sha`, and `LINEAGE.md` says how to recover a missing sha (`git log -S <audit-id> -- specs/audits`).
 - AC3.16 Ratchet carry-overs (c4 AC6.3, AC6.6):
   - A destructive file call outside `features/spec_context/sweep.py` fails V38 or an import-linter contract; the PLAN measures today's sites first.
-  - `_allowance_violations` asserts that the V38 and V39 closure allowances are subsets of their birth allowances. V37 is rc-9's (AC7.4).
+  - `_allowance_violations` asserts that the V38 and V39 closure allowances are subsets of their birth allowances, read at 1bcfdba8f: its ledger fix (`sa-ledger-write-seam-redacts-less-than-push-refuses`) added the V38 site `_ledger.py:replace`, and V39's keys are already a subset at b86bb65b (operator 2026-10-01: "Move the base to 1bcfdba8f (Recommended)"). Pure set membership, no special case or numeric cap (0142, 0143). V37 is rc-9's (AC7.4).
 - AC3.17 Law: `CONTEXT.md` gains **Grammar**, **Grammar owner** and **Pinned pair**; the scaffold `specs/releases/AGENTS.md` §2 states the 0161 Origin grammar once.
 - AC3.18 Core-floor refusal messages (PR #276 review):
   - The message for each floor entry lives beside `CORE_FLOOR` in `core/workspace_layout.py`, and `gate_policy.evaluate` keys none on a string literal.
