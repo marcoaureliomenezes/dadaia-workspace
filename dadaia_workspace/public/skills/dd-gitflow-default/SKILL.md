@@ -45,18 +45,23 @@ The branch contract by role; the names are `specs/constitution.md`'s `gitflow:` 
 - Each candidate closure burns one work -> integration merge; after it, ask the operator: promote or continue.
 - Every flow stage runs on the work branch; the other two are PR targets only, never a working branch.
 
-## 3a. Commit shapes — each write alone, in its own shape
+## 3a. Commit shapes — each write in its own shape
 
-Each row lands in the worktree kind whose allowed set holds it (`worktrees/AGENTS.md`).
+A commit stages only paths its worktree kind's allowed set holds (`_worktree_kinds.KINDS`, `worktrees/AGENTS.md`); `<code>` is any path outside `specs/`.
 
-| # | Kind | Write | Staged set | Message |
-|---|---|---|---|---|
-| 1 | `bug` | Bug registration | `specs/bugs/BUGS.jsonl` alone | `chore(bugs): report <id>` |
-| 2 | `backlog`, `release` | Backlog / ADR | `BACKLOG.json` alone, or `ADRs/decisions.jsonl` alone | `chore(backlog): …` / `chore(adrs): …` |
-| 3 | `bug` | Bug fix | code + regression test + the `BUGS.jsonl` line, red loop quoted in the body | `fix(bugs): <id> — <cause>` |
-| 4 | `bug` | Resolve of a bug a task fixed | `specs/bugs/BUGS.jsonl` alone | `chore(bugs): resolve <id>[, <id>] — by <task-id> (<sha>)` |
-| 5 | `release` | Release definition | SPEC + PLAN + TASKS + picked bugs, one commit | `feat(specs): define candidate …` |
-| 6 | `impl` | Task implementation | the task's `W:` plus its TASKS marker | `conventional-commit(task-id): description` — the auditable trace |
+| # | Kind | Write | Message |
+|---|---|---|---|
+| 1 | `bug`, `backlog` | Bug registration: `specs/bugs/BUGS.jsonl` | `chore(bugs): report <id>` |
+| 2 | `backlog` | Backlog entry or exit: `specs/backlog/BACKLOG.json`, `specs/backlog/_archive/backlog_histo.jsonl` | `chore(backlog): …` |
+| 2 | `backlog`, `release` | ADR propose, accept, or in-place `measured_by` repair (ADR 0138): `specs/ADRs/decisions.jsonl` | `docs(adr): propose\|accept <slug>` / `chore(adrs): repair …` |
+| 3 | `bug` | Bug fix: `<code>` + regression test + its `specs/bugs/BUGS.jsonl` line, red loop quoted in the body | `fix(bugs): <id> — <cause>` |
+| 4 | `bug` | Resolve of a bug a task fixed: `specs/bugs/BUGS.jsonl` | `chore(bugs): resolve <id>[, <id>] — by <task-id> (<sha>)` |
+| 5 | `release` | Release definition: the trio, one commit, `specs/releases/<v>/rc-<N>/*` | `feat(specs): define candidate …` |
+| 6 | `impl` | Task implementation: its `W:` (`<code>`) | `conventional-commit(task-id): description` — the auditable trace |
+| 7 | `impl` | Task marker: `specs/releases/<v>/rc-<N>/TASKS.md` | `chore(tasks): start\|done\|reopen\|abandon <id>` |
+| 8 | `release` | Trio amendment or approval: `specs/releases/<v>/rc-<N>/SPEC.md` | `docs(specs): …` |
+| 9 | `release` | Closure memory pass: `specs/memory/ARCHITECTURE.md` | `docs(memory): …` |
+| 10 | `release` | Release state: `specs/releases/<v>/_RELEASE.json` | `chore(release): …` |
 
 ## 3b. The PR gate
 
@@ -67,7 +72,7 @@ Each row lands in the worktree kind whose allowed set holds it (`worktrees/AGENT
 ## 4. Done when
 
 - Every commit for a release traces to a candidate's definition, implementation,
-  closure merge, or a bug fix — each write alone in its §3a shape, verifiable by
+  closure merge, or a bug fix — each write in its §3a shape, verifiable by
   `git log`.
 
 ## 5. References
