@@ -15,13 +15,12 @@ from pathlib import Path
 
 import pytest
 
-from dadaia_workspace.core.exceptions import DadaiaError
 from dadaia_workspace.infrastructure.privacy_check import (
     _PRIVACY_DENYLIST_ENV,
     _BaselinePattern,
     _check_baseline_exclude_rationale,
     _load_privacy_baseline,
-    _load_privacy_denylist,
+    load_privacy_terms,
 )
 from dadaia_workspace.infrastructure.public_assets import FileSystemPublicAssetManager
 
@@ -187,27 +186,29 @@ def test_carve_out_without_rationale_is_flagged_by_name() -> None:
 def test_load_denylist_source_formats(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, name: str, payload: object
 ) -> None:
-    """sa-denylist-file-has-three-shapes: the dict is the one grammar; any other shape is refused
-    naming the absolute file. Malformed, missing or absent sources load as empty, never a crash."""
+    """sa-denylist-file-has-three-shapes, ADR 0157: the dict is the one grammar; any other
+    shape or an unreadable file is refused naming the file. Missing or absent loads as empty."""
     source = tmp_path / "d.json"
     source.write_text(json.dumps(payload), encoding="utf-8")
     monkeypatch.setenv(_PRIVACY_DENYLIST_ENV, str(source))
     if name == "list_of_strings":
-        with pytest.raises(DadaiaError) as refused:
-            _load_privacy_denylist()
+        with pytest.raises(SystemExit) as refused:
+            load_privacy_terms()
         assert str(refused.value).splitlines()[-1] == (
             f'fix: Operator action: rewrite {source} as one JSON object {{"<term>": "<reason>"}}'
         )
         return
-    assert _load_privacy_denylist() == (("foo", "reason-a"), ("bar", "reason-b"))
+    assert load_privacy_terms() == (("foo", "reason-a"), ("bar", "reason-b"))
     (tmp_path / "no_workspace").mkdir()
     monkeypatch.chdir(tmp_path / "no_workspace")
     (tmp_path / "malformed.json").write_text("{not valid json", encoding="utf-8")
-    for env in (tmp_path / "malformed.json", tmp_path / "nope.json"):
-        monkeypatch.setenv(_PRIVACY_DENYLIST_ENV, str(env))
-        assert _load_privacy_denylist() == ()
+    monkeypatch.setenv(_PRIVACY_DENYLIST_ENV, str(tmp_path / "malformed.json"))
+    with pytest.raises(SystemExit):
+        load_privacy_terms()
+    monkeypatch.setenv(_PRIVACY_DENYLIST_ENV, str(tmp_path / "nope.json"))
+    assert load_privacy_terms() == ()
     monkeypatch.delenv(_PRIVACY_DENYLIST_ENV)
-    assert _load_privacy_denylist() == ()
+    assert load_privacy_terms() == ()
 
 
 def test_load_denylist_env_precedence_and_workspace_fallback(
@@ -223,6 +224,6 @@ def test_load_denylist_env_precedence_and_workspace_fallback(
     (tmp_path / "env.json").write_text(json.dumps({"from-env": "env"}), encoding="utf-8")
     monkeypatch.setenv(_PRIVACY_DENYLIST_ENV, str(tmp_path / "env.json"))
     monkeypatch.chdir(tmp_path / "ws")
-    assert _load_privacy_denylist() == (("from-env", "env"),)
+    assert load_privacy_terms() == (("from-env", "env"),)
     monkeypatch.delenv(_PRIVACY_DENYLIST_ENV)
-    assert _load_privacy_denylist() == (("from-file", "file"),)
+    assert load_privacy_terms() == (("from-file", "file"),)

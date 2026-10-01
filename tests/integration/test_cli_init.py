@@ -1,6 +1,7 @@
 """dadaia init CLI — one fn: creates .dadaia+states and the level-1 root files from the argv
 DIR; the rerun overwrites no operator file."""
 
+import json
 from pathlib import Path
 
 import pytest
@@ -42,3 +43,29 @@ def test_init_creates_states_and_the_three_root_files_and_is_idempotent(
     assert rerun.exit_code == 0, rerun.output
     assert (ws / ".dadaiaignore").read_text(encoding="utf-8") == "# mine\n"
     assert list(outside.iterdir()) == []
+
+
+def test_init_converts_a_list_form_denylist_once_and_holds_the_original(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Intent: CONTRACT — AC3.10 / list-form-privacy-denylist-errors-without-migration
+    (ADR 0157): the upgrade rewrites a 0.4.7 list form as the object form once, the original
+    held under `.dadaia/reaped/`; the pre-push loader then reads it."""
+    from dadaia_workspace.container import load_denylist_terms
+
+    ws = tmp_path / "ws"
+    ws.mkdir()
+    monkeypatch.chdir(ws)
+    monkeypatch.delenv("DADAIA_PRIVACY_DENYLIST", raising=False)
+    assert _runner.invoke(app, ["init", str(ws), "--harness", "claude"]).exit_code == 0
+    denylist = ws / ".dadaia" / "states" / "privacy_denylist.json"
+    original = '["zz-term-a", ["zz-term-b", "why"]]'
+    denylist.write_text(original, encoding="utf-8")
+
+    for _ in range(2):
+        result = _runner.invoke(app, ["init", str(ws), "--harness", "claude"])
+        assert result.exit_code == 0, result.output
+    assert json.loads(denylist.read_text(encoding="utf-8")) == {"zz-term-a": "", "zz-term-b": "why"}
+    held = list((ws / ".dadaia" / "reaped").rglob("privacy_denylist.json"))
+    assert [h.read_text(encoding="utf-8") for h in held] == [original]
+    assert load_denylist_terms() == (("zz-term-a", ""), ("zz-term-b", "why"))

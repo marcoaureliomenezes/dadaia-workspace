@@ -62,9 +62,11 @@ def serialize(active: Items) -> str:
     return json.dumps({"schema": "backlog-v1", "active": active}, indent=2) + "\n"
 
 
-def _validated(active: Items, histo: str, before: Items, record: dict[str, Any] | None) -> str:
+def _validated(
+    specs: Path, active: Items, histo: str, before: Items, record: dict[str, Any] | None
+) -> str:
     for item in [*(i for i in active if i not in before), *([record] if record else [])]:
-        why = private_refusal(item)
+        why = private_refusal(item, specs)
         if why is not None:
             raise Refusal(*why)
     text = serialize(active)
@@ -94,12 +96,12 @@ def commit(
     before = stamp(path)
     active = read_active(path)
     written = apply(active)
-    text = _validated(written, candidate, active, record)
+    text = _validated(specs, written, candidate, active, record)
     if stamp(path) != before:
         before = stamp(path)
         active = read_active(path)
         written = apply(active)
-        text = _validated(written, candidate, active, record)
+        text = _validated(specs, written, candidate, active, record)
         if stamp(path) != before:
             raise Refusal(
                 f"{path.name} changed twice under this write — nothing was written",

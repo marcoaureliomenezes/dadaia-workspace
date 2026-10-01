@@ -14,6 +14,7 @@ from types import ModuleType, SimpleNamespace
 from typing import Any
 
 _HERE = Path(__file__).resolve().parent
+_STATES = Path(".dadaia") / "states"
 _OWN = _HERE / "_privacy.py"
 _SOURCE = _OWN if _OWN.is_file() else _HERE.parents[3] / "core" / "redaction.py"
 _privacy = ModuleType("_privacy")  # executed from source: no loader, no bytecode beside it
@@ -146,26 +147,43 @@ def _baseline() -> list[SimpleNamespace]:
     ]  # fmt: skip
 
 
-def _terms() -> list[tuple[str, str]]:
-    """`$DADAIA_PRIVACY_DENYLIST`, else the nearest `.dadaia/states/privacy_denylist.json`."""
-    env, cwd = os.environ.get("DADAIA_PRIVACY_DENYLIST"), Path.cwd().resolve()
-    paths = [Path(env)] if env else []
-    paths += [d / ".dadaia" / "states" / "privacy_denylist.json" for d in (cwd, *cwd.parents)]
-    for path in paths:
+def workspace_of(path: Path) -> Path | None:
+    """The nearest ancestor of *path* holding ``.dadaia/states/spec_contexts.json``."""
+    path = path.resolve()
+    return next(
+        (d for d in (path, *path.parents) if (d / _STATES / "spec_contexts.json").is_file()), None
+    )
+
+
+def terms(root: Path | None) -> list[tuple[str, str]]:
+    """The operator denylist, ONE loader (ADR 0157): `$DADAIA_PRIVACY_DENYLIST`, else
+    ``<root>/.dadaia/states/privacy_denylist.json``. Absent is empty; a present file that is
+    not one ``{"<term>": "<reason>"}`` object refuses — never read as no terms."""
+    env = os.environ.get("DADAIA_PRIVACY_DENYLIST")
+    for path in [
+        *([Path(env)] if env else []),
+        *([root / _STATES / "privacy_denylist.json"] if root else []),
+    ]:
+        if not path.exists():
+            continue
         try:
             raw = json.loads(path.read_text(encoding="utf-8"))
         except (OSError, ValueError):
-            continue
+            raw = None
         if not isinstance(raw, dict):
-            raise SystemExit(f"error: privacy denylist {path} is not one JSON object")
+            raise SystemExit(
+                f"error: privacy denylist {path} is not one JSON object\n"
+                f'fix: Operator action: rewrite {path} as one JSON object {{"<term>": "<reason>"}}'
+            )
         if raw:
             return [(str(term), str(reason)) for term, reason in raw.items()]
-    return []
+    return []  # fmt: skip
 
 
-def private_refusal(record: dict[str, Any]) -> tuple[str, str] | None:
-    """``(message, fix)`` for the first field of *record* the push refuses, else ``None``."""
-    if (hit := _privacy.first_private(record, _terms(), _baseline())) is None:
+def private_refusal(record: dict[str, Any], specs: Path) -> tuple[str, str] | None:
+    """``(message, fix)`` for the first field of *record* the push refuses, else ``None``;
+    the terms are the workspace's that holds *specs*, whatever the cwd."""
+    if (hit := _privacy.first_private(record, terms(workspace_of(specs)), _baseline())) is None:
         return None
     return (
         f"field {hit[0]!r} carries {hit[1]!r}, which the push refuses — nothing was written",

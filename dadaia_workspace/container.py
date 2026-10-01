@@ -14,6 +14,7 @@ from dadaia_workspace.features.import_.service import ImportService
 from dadaia_workspace.features.public.service import PublicAssetService
 from dadaia_workspace.features.spec_context.doctor import DoctorService
 from dadaia_workspace.features.spec_context.service import SpecContextService, install_git_hooks
+from dadaia_workspace.features.spec_context.sweep import hold
 from dadaia_workspace.features.workspace.service import WorkspaceService
 from dadaia_workspace.infrastructure.git_objects import GitSubprocessObjectReader
 from dadaia_workspace.infrastructure.git_subprocess import GitSubprocessClient
@@ -38,6 +39,7 @@ def build_workspace_service(workspace_root: Path) -> WorkspaceService:
     return WorkspaceService(
         public_assets=FileSystemPublicAssetManager(),
         python_env=VenvPythonEnvironmentManager(),
+        hold=hold,
     )
 
 

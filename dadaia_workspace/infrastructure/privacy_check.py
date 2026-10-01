@@ -16,18 +16,18 @@ from __future__ import annotations
 
 import importlib.resources
 import json
-import os
 import re
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from functools import lru_cache
 from pathlib import Path
 
-from dadaia_workspace.core.exceptions import DadaiaError, WorkspaceNotInitializedError
+from dadaia_workspace.core.exceptions import WorkspaceNotInitializedError
 from dadaia_workspace.core.models.doctor_report import DoctorLine, DoctorStatus
 from dadaia_workspace.core.redaction import mask, privacy_matches
 from dadaia_workspace.core.workspace_layout import REPO_TREE_ARTIFACTS
 from dadaia_workspace.core.workspace_resolver import resolve_workspace_root
+from dadaia_workspace.infrastructure.ledger_scripts import load_owner
 
 #: Directory names never walked when scanning public assets: the repo-tree artifact
 #: set (`repos/<slug>/AGENTS.md`, one registry — 0.4.7 FR5) plus Python's own bytecode cache.
@@ -49,18 +49,9 @@ _PUBLIC_PRIVACY_TEXT_SUFFIXES = {
     ".yaml",
     ".yml",
 }
-# Operator-private privacy terms are NEVER hardcoded in this published library
-# (dev-guardrail rule #4: no consumer-specific data in shipped source). Each
-# workspace supplies its own terms via a runtime file kept OUT of the package:
-#   1. $DADAIA_PRIVACY_DENYLIST            (path to a JSON file), or
-#   2. <workspace_root>/.dadaia/states/privacy_denylist.json
-#      where workspace_root is resolved by walking up from cwd looking for the
-#      .dadaia/states/spec_contexts.json sentinel (via resolve_workspace_root).
-# Format: [["term", "reason"], ...] or {"term": "reason", ...}.
-# Absent -> the baseline structural scan (below) runs instead; the check is
-# never a no-op (fail-closed).
-_PRIVACY_DENYLIST_ENV = "DADAIA_PRIVACY_DENYLIST"
-_PRIVACY_DENYLIST_REL = Path(".dadaia") / "states" / "privacy_denylist.json"
+# Operator-private privacy terms are NEVER hardcoded in this published library; each
+# workspace keeps them OUT of the package, read by :func:`load_privacy_terms`.
+_PRIVACY_DENYLIST_ENV = "DADAIA_PRIVACY_DENYLIST"  # the override `_ledger.terms` reads first
 
 # Packaged, versioned baseline of STRUCTURAL patterns. Shipped inside the wheel
 # so the check is fail-closed even with no operator denylist. Operator terms are
@@ -149,58 +140,15 @@ def _load_privacy_baseline() -> tuple[_BaselinePattern, ...]:
     return tuple(patterns)
 
 
-def _load_privacy_denylist() -> tuple[tuple[str, str], ...]:
-    """Load operator-private privacy terms from outside the published package.
-
-    Resolution order:
-    1. ``$DADAIA_PRIVACY_DENYLIST`` environment variable — path to a JSON file.
-    2. ``<workspace_root>/.dadaia/states/privacy_denylist.json`` where
-       *workspace_root* is resolved by walking up from ``cwd`` looking for the
-       ``.dadaia/states/spec_contexts.json`` sentinel. Returns ``()`` when no
-       workspace root is found (e.g. pip-installed in site-packages without an
-       active workspace) or the file is absent / unreadable / malformed; any JSON
-       value but one ``{"<term>": "<reason>"}`` object is refused.
-    """
-    candidates: list[Path] = []
-    env_path = os.environ.get(_PRIVACY_DENYLIST_ENV)
-    if env_path:
-        candidates.append(Path(env_path))
-    # Resolve workspace root via cwd-based walk-up; never fall back to the lib repo.
-    try:
-        workspace_root = resolve_workspace_root()
-        candidates.append(workspace_root / _PRIVACY_DENYLIST_REL)
-    except WorkspaceNotInitializedError:
-        pass  # No workspace found — file-based fallback is simply unavailable.
-    for source in candidates:
-        try:
-            raw = json.loads(source.read_text(encoding="utf-8"))
-        except (OSError, ValueError):
-            continue
-        if not isinstance(raw, dict):
-            raise DadaiaError(
-                f"privacy denylist {source.absolute()} is not a JSON object\n"
-                f"fix: Operator action: rewrite {source.absolute()} as one JSON object "
-                '{"<term>": "<reason>"}'
-            )
-        terms = [(str(key), str(value)) for key, value in raw.items()]
-        if terms:
-            return tuple(terms)
-    return ()
-
-
 def load_privacy_terms() -> tuple[tuple[str, str], ...]:
-    """Public accessor over the operator denylist loader (SPEC v0.9.0 FR3, source 1).
-
-    Reused by the push-range denylist scan (``features.chokepoints.denylist_scan``)
-    AND, since v0.4.5 FR6 (T-045-19), by the bug-append write-time redaction
-    (the ``dd-bug-resolution/scripts/bugs.py`` write path, threaded through
-    ``container.load_denylist_terms`` -> ``cli/commands/bugs.py``) — the SAME loader,
-    consumed twice, never a second reader — so the CLI wires ONE operator term source,
-    not a second denylist — same resolution order as :func:`check_public_privacy`
-    (``$DADAIA_PRIVACY_DENYLIST``, then ``<workspace>/.dadaia/states/privacy_denylist.json``).
-    Empty when neither resolves.
-    """
-    return _load_privacy_denylist()
+    """The operator denylist through its ONE loader, ``_ledger.terms`` (ADR 0157), rooted at
+    the resolved workspace; empty outside one. The push scan, the public doctor and the
+    ledger write seam read the same terms."""
+    try:
+        root: Path | None = resolve_workspace_root()
+    except WorkspaceNotInitializedError:
+        root = None
+    return tuple(load_owner("dd-bug-resolution", "_ledger").terms(root))
 
 
 def load_baseline_patterns() -> tuple[_BaselinePattern, ...]:
@@ -260,7 +208,7 @@ def check_public_privacy(
     """
     lib_root = public_dir.parent.parent
     roots: list[Path] = [public_dir]
-    denylist = _load_privacy_denylist()
+    denylist = load_privacy_terms()
     baseline = _load_privacy_baseline()
     baseline_only = not denylist
     root_agents = lib_root / "AGENTS.md"

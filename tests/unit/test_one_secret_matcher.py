@@ -49,6 +49,15 @@ _MATRIX: list[tuple[str, str, str | bytes, bool]] = [
     ("asia", "a.txt", "id=" + "AS" + "IA" + "Z" * 16 + "\n", True),
     ("ghs", "g.txt", "t=" + "gh" + "s_" + "a" * 36 + "\n", True),
     ("ghp-odd-length", "g2.txt", "t=" + "gh" + "p_" + "b" * 30 + "\n", True),
+    # secret-scan-misses-github-pat-and-anthropic-keys: outside any *_key= assignment.
+    ("github-pat-env", ".env", "GH_TOKEN=" + "github" + "_pat_" + "A" * 40 + "\n", True),
+    (
+        "github-pat-header",
+        "h.txt",
+        "Authorization: token " + "github" + "_pat_" + "B" * 40 + "\n",
+        True,
+    ),
+    ("anthropic-key-yaml", "a.yml", "key: " + "sk" + "-ant-api03-" + "C" * 40 + "\n", True),
     ("glpat", "gl.txt", "t=" + "gl" + "pat-" + "c" * 20 + "\n", True),
     ("sk-live", "st.txt", "t=" + "sk" + "_live_" + "d" * 24 + "\n", True),
     ("password", "p.txt", "pass" + "word=" + "hunter2hunter\n", True),

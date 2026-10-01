@@ -1,6 +1,7 @@
 """WorkspaceService — bootstrap and management of the .dadaia/ template."""
 
 import json
+from collections.abc import Callable
 from pathlib import Path
 
 from dadaia_workspace.core.cli_line import fix_line
@@ -24,9 +25,11 @@ class WorkspaceService:
         self,
         public_assets: FileSystemPublicAssetManager,
         python_env: VenvPythonEnvironmentManager,
+        hold: Callable[[Path, Path, str], str | None] = lambda *_: None,
     ) -> None:
         self._public_assets = public_assets
         self._python_env = python_env
+        self._hold = hold
 
     def init(
         self,
@@ -67,6 +70,7 @@ class WorkspaceService:
         # Initialize JSON state files (idempotent — never overwrite existing data)
         self._init_json_file(states_dir / "spec_contexts.json", _EMPTY_CONTEXTS)
         self._init_json_file(states_dir / "server_registry.json", _EMPTY_SERVER_REGISTRY)
+        self._migrate_denylist(workspace_root, states_dir / "privacy_denylist.json")
 
         store = JsonHarnessProfileStore()
         persisted = store.read(states_dir)
@@ -108,3 +112,16 @@ class WorkspaceService:
     def _init_json_file(self, path: Path, empty: dict) -> None:  # type: ignore[type-arg]
         if not occupied(path):
             path.write_text(json.dumps(empty, indent=2), encoding="utf-8")
+
+    def _migrate_denylist(self, workspace_root: Path, path: Path) -> None:
+        """A 0.4.7 list form (``["term"]`` or ``[["term", "reason"]]``) rewritten once as
+        the one object form, the original held (ADR 0157); any other content is left for
+        the loader to refuse."""
+        try:
+            raw = json.loads(path.read_text(encoding="utf-8"))
+            pairs = (e if isinstance(e, list) else (e, "") for e in raw)
+            terms = {str(term): str(reason) for term, reason in pairs}
+        except (OSError, ValueError, TypeError):
+            return
+        if isinstance(raw, list) and self._hold(workspace_root, path, path.name):
+            path.write_text(json.dumps(terms, indent=2), encoding="utf-8")

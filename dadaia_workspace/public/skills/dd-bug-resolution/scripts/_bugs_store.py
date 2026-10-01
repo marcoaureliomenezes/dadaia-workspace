@@ -49,9 +49,11 @@ def serialize(records: Records) -> str:
     return "".join(json.dumps(r, sort_keys=True, ensure_ascii=False) + "\n" for r in records)
 
 
-def _validated(records: Records, rel: str, before: Records, known: frozenset[str]) -> str:
+def _validated(
+    path: Path, records: Records, rel: str, before: Records, known: frozenset[str]
+) -> str:
     for record in records:
-        why = None if record in before else private_refusal(record)
+        why = None if record in before else private_refusal(record, path)
         if why is not None:
             raise Refusal(*why)
     text = serialize(records)
@@ -91,7 +93,7 @@ def commit(
             old,
             records,
             written,
-            _validated(written, rel, records, archived_ids(old) | moved),
+            _validated(path, written, rel, records, archived_ids(old) | moved),
         )
 
     before, old, records, written, text = attempt()

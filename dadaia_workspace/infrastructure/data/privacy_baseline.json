@@ -86,7 +86,7 @@
     },
     {
       "id": "secret-token",
-      "regex": "(?i:(?:password|passwd|secret|aws_secret_access_key|api[_-]?key|secret[_-]?key|access[_-]?token|private[_-]?key|bearer)['\"]?\\s*[:=]\\s*(?!['\"]?(?-i:[a-z]+(?:[-_][a-z]+)+)(?:['\"]|\\s*(?:#.*)?$))(?:(['\"])(?!\\$)[^'\"\\s{}<>]{8,}\\1|[^\\s'\"()\\[\\]{}<>.,;:*=$#]{8,}={0,2}\\s*(?:#.*)?$))|(?:AKIA|ASIA)[0-9A-Z]{16}|gh[pousr]_[A-Za-z0-9]{20,}|glpat-[A-Za-z0-9_\\-]{20,}|(?:sk|rk)_live_[A-Za-z0-9]{16,}|sk-[A-Za-z0-9]{32,}|xox[baprs]-[A-Za-z0-9-]{10,}",
+      "regex": "(?i:(?:password|passwd|secret|aws_secret_access_key|api[_-]?key|secret[_-]?key|access[_-]?token|private[_-]?key|bearer)['\"]?\\s*[:=]\\s*(?!['\"]?(?-i:[a-z]+(?:[-_][a-z]+)+)(?:['\"]|\\s*(?:#.*)?$))(?:(['\"])(?!\\$)[^'\"\\s{}<>]{8,}\\1|[^\\s'\"()\\[\\]{}<>.,;:*=$#]{8,}={0,2}\\s*(?:#.*)?$))|(?:AKIA|ASIA)[0-9A-Z]{16}|gh[pousr]_[A-Za-z0-9]{20,}|glpat-[A-Za-z0-9_\\-]{20,}|(?:sk|rk)_live_[A-Za-z0-9]{16,}|sk-[A-Za-z0-9]{32,}|sk-ant-[A-Za-z0-9_\\-]{20,}|github_pat_[A-Za-z0-9_]{22,}|xox[baprs]-[A-Za-z0-9-]{10,}",
       "reason": "secret-looking credential token or assignment",
       "exclude_regex": null
     }
