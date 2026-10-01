@@ -25,11 +25,11 @@ def import_workspace(
 ) -> None:
     """Register every context of an exported `spec-contexts.json` not known here as DEAD.
 
-    Known names are skipped; `.dadaia/.venv/bin/dadaia context alive <name>` clones each
+    Known names are skipped; `context alive <name>` clones each
     registered context.
     """
-    root = resolve_cli_workspace_root(workspace)
     try:
+        root = resolve_cli_workspace_root(workspace)
         result = container.build_import_service(root).run(file)
     except (DadaiaError, ValueError) as exc:
         fail(exc)

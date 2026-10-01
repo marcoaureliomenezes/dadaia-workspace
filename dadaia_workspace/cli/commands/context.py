@@ -342,7 +342,7 @@ def dead(
         fail(e)
 
 
-@app.command(epilog="Examples: .dadaia/.venv/bin/dadaia context bind my-ctx")
+@app.command(epilog=f"Examples: {fix_line(None)} context bind my-ctx")
 def bind(name: str = typer.Argument(..., help="Context name to bind to")) -> None:
     """Bind this shell session to a context.
 
@@ -434,7 +434,7 @@ def repo_remove(
     Registry-only: this NEVER deletes the on-disk checkout at
     'repos/<slug>' — it only drops the registry entry, and always states
     explicitly what it leaves behind on disk. To also remove the checkout, delete
-    it yourself, or run '.dadaia/.venv/bin/dadaia context dead <ctx>' first (which git-syncs and
+    it yourself, or run 'context dead <ctx>' first (which git-syncs and
     removes every repo in the set, including this one, before you unregister it).
     """
     try:

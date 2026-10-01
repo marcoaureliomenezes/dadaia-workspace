@@ -12,6 +12,7 @@ import pytest
 from typer.testing import CliRunner
 
 from dadaia_workspace.cli.main import app
+from dadaia_workspace.core.cli_line import fix_line
 from dadaia_workspace.core.harness_registry import L1_ENTRY_HARNESSES
 from dadaia_workspace.core.models.spec_context import ContextState, SpecContextProject
 from dadaia_workspace.features.workspace.service import WorkspaceService
@@ -66,7 +67,7 @@ def test_export_then_import_restores_unknown_contexts_dead_and_skips_known(
     imported = _runner.invoke(app, ["import", str(file), "--workspace", str(tmp_path / "target")])
     assert imported.exit_code == 0, imported.output
     assert "skipped (exists)" in imported.output and "alpha" in imported.output
-    assert "dadaia context alive beta" in imported.output
+    assert fix_line(tmp_path / "target", "context", "alive", "beta") in imported.output
 
     beta = target.get("beta")
     assert beta is not None
@@ -88,6 +89,10 @@ def test_import_refuses_a_file_outside_the_contract(tmp_path: Path) -> None:
 
     assert result.exit_code == 1
     assert "Error" in result.output
+
+    bare = _runner.invoke(app, ["import", str(bogus), "--workspace", str(tmp_path / "bare")])
+    assert (bare.exit_code, bare.exception.__class__) == (1, SystemExit), bare.output
+    assert "fix: " in bare.output
 
 
 def _real_checkout(repo: Path, branch: str) -> None:

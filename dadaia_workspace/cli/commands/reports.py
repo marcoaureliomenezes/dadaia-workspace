@@ -25,7 +25,20 @@ console = Console()
 # ---------------------------------------------------------------------------
 
 
-@app.command(name="validate")
+@app.command(
+    name="validate",
+    epilog="Examples:\n\n"
+    + "\n\n".join(
+        f"{fix_line(None)} reports validate {args}"
+        for args in (
+            "path/to/report.handoff.json",
+            "--all",
+            "--all --json",
+            "path/to/report.handoff.json --workspace /path/to/other/ws",
+            "path/to/verdict.handoff.json --reviewed-root /path/to/worktree",
+        )
+    ),
+)
 def validate(
     paths: list[Path] | None = typer.Argument(
         default=None, help="Paths to .handoff.json files to validate."
@@ -73,14 +86,6 @@ def validate(
       1  One or more INVALID files
       2  One or more file paths not found
       3  Bad invocation (no paths and not --all) or workspace not initialized
-
-    \b
-    Examples:
-      .dadaia/.venv/bin/dadaia reports validate path/to/report.handoff.json
-      .dadaia/.venv/bin/dadaia reports validate --all
-      .dadaia/.venv/bin/dadaia reports validate --all --json
-      .dadaia/.venv/bin/dadaia reports validate path/to/report.handoff.json --workspace /path/to/other/ws
-      .dadaia/.venv/bin/dadaia reports validate path/to/verdict.handoff.json --reviewed-root /path/to/worktree
     """
     # Invocation guard: must have paths or --all
     if not paths and not all_:

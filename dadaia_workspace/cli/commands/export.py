@@ -22,8 +22,8 @@ def export(
 ) -> None:
     """Write `.dadaia/dist/spec-contexts.json` — one record per spec context.
 
-    The file is overwritten on every run. On another workspace, `.dadaia/.venv/bin/dadaia import <file>`
-    registers each unknown context DEAD and `.dadaia/.venv/bin/dadaia context alive <name>` clones it.
+    The file is overwritten on every run; on another workspace, `import <file>`
+    registers each unknown context DEAD and `context alive <name>` clones it.
     """
     try:
         result = container.build_export_service(resolve_cli_workspace_root(workspace)).run()
