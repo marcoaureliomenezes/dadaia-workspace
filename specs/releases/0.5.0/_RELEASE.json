@@ -634,6 +634,35 @@
       "agent": "release.py",
       "kind": "note",
       "text": "Candidate implemented at 3699adfe; phase CLOSURE."
+    },
+    {
+      "ts": "2026-10-01T05:12:05Z",
+      "agent": "release.py memory",
+      "kind": "memory",
+      "text": "Memory reconciled over dfa3aceb6812bc51909f03789fc8969e6488d1d5..3070161d9e4f: 9 reviewed, 8 changed.",
+      "since": "dfa3aceb6812bc51909f03789fc8969e6488d1d5",
+      "until": "3070161d9e4fe278b818b951de6547e24d710a3d",
+      "reviewed": [
+        "agent-orchestration",
+        "public-asset-distribution",
+        "harness-codex",
+        "harness-copilot",
+        "harness-cursor",
+        "harness-devin",
+        "harness-kimi-code",
+        "product-vision",
+        "spec-context-project"
+      ],
+      "changed": [
+        "agentic-entities",
+        "harness-claude-code",
+        "context-management",
+        "specs-migration",
+        "workspace-doctor",
+        "workspace-init",
+        "bug-ledger",
+        "sdd-gate-v3"
+      ]
     }
   ]
 }
