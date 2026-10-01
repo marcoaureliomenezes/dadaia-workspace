@@ -16,15 +16,16 @@ As-is read at `wt/0.5.0b-release` HEAD 71c1d27d (base `feature/0.5.0` bfaadba2; 
 | `pub/skills/dd-bug-resolution/scripts/_bugs_write.py:61` surface check | a regex `[a-z0-9_-]+` AND the tracked-directory set decide; the regex refuses `.github` that the fix line offers | 1 (`bugs-append-refuses-the-dot-directory-its-fix-offers` open) | DELETE | two deciders for one question; the tracked set (`bugs.py:116-121`) is the one decider |
 | `hooks/venv_guard.py:13,41-42` pip arm | `pip`/`pip3` outside the venv BLOCKED, fix routes into the tool venv | 3 (`pip-guard-fix-routes-…` open; `sa-fix-lines-not-built-by-cli-line`; `sa-text-restates-rules-the-code-contradicts`) | DELETE | ADR 0134 |
 | `f/spec_context/service.py:746` `dead` hold | `sweep.hold(...)`'s refusal string is discarded; the registry flips DEAD with the checkout still in `repos/` | 2 (`context-dead-ignores-the-hold-refusal` open; `sa-context-dead-removes-repos-outside-the-reaper`) | UPDATE | the refusal is the hold's return value; the caller raises it before the store write — no new path |
-| `f/spec_context/doctor.py:505-513,586-597` `expire` / `_delete` | every TTL-expired entry, `handoff/` included, is deleted directly; `fix()` seeds missing core, `expire()` (the SessionStart lane) does not | 6 on `sweep`/expiry (`bug-proposal-handoff-reaped-without-a-hold` open; `sa-expiry-has-two-clocks`, `sa-reaper-destroys-its-own-hold-before-ttl`, `reaper-needs-many-runs-…`, `doctor-ttl-walk-quadratic-…`, `reaper-judges-ttl-by-walking-every-file`) | REBUILD | ≥ 2 bugs. One deleter: expiry outside `reaped/` is a hold, only `reaped/` expiry deletes; the core seed moves into `expire()`, which `fix()` already ends with — no content key, no zone flag |
+| `f/spec_context/doctor.py:505-513,586-597` `expire` / `_delete` | every TTL-expired entry, `handoff/` included, is deleted directly; `fix()` seeds missing core, `expire()` (the SessionStart lane) does not | 6 on `sweep`/expiry (`bug-proposal-handoff-reaped-without-a-hold` open; `sa-expiry-has-two-clocks`, `sa-reaper-destroys-its-own-hold-before-ttl`, `reaper-needs-many-runs-…`, `doctor-ttl-walk-quadratic-…`, `reaper-judges-ttl-by-walking-every-file`) | REBUILD | ≥ 2 bugs. The expiry act is the zone row's class (`core/workspace_layout.py:143-146`): an expired OUTPUT entry (`handoff/`) is held, an expired EPHEMERAL entry (`tmp/`, `reaped/`) is deleted; the core seed moves into `expire()`, which `fix()` already ends with — no content key, no flag |
 | `f/workspace/service.py:63-65` init seed | `init` writes `.dadaiaignore` by hand; `prompt.md` is written by nobody | 0 | UPDATE | one level-1 seed table in `core/workspace_layout.py` read by `init` and the doctor seed (AC2.2, AC2.4) |
-| `core/workspace_layout.py:204-230` `verdict` | judges the root and `.dadaia/` levels; `repos/` and `worktrees/` children are always `canon` | 3 (`sa-gate-allows-root-entries-the-reaper-moves`, `sa-seven-workspace-root-rules`, `root-whitelist-misses-nested-new-toplevel-writes`) | UPDATE | ADR 0132: two more judged levels in the same loop, the allow set being the registered (repos) and ALIVE (worktrees) slugs passed in; still the gate's and the doctor's one answer |
+| `core/workspace_layout.py:204-230` `verdict` | judges the root and `.dadaia/` levels; `repos/` and `worktrees/` children are always `canon` | 3 (`sa-gate-allows-root-entries-the-reaper-moves`, `sa-seven-workspace-root-rules`, `root-whitelist-misses-nested-new-toplevel-writes`) | UPDATE | ADR 0132: two more judged levels in the same loop, the allow set being the registered slugs (`ctx.all_repos()`, main plus associated, of every registered context, DEAD included) under `repos/` and the ALIVE contexts' slugs under `worktrees/`; still the gate's and the doctor's one answer |
 | `f/spec_context/doctor.py:417-447` `_scan_root`, `_scan_dadaia_top` | two walks over two of the four places | 1 (`sa-doctor-reaps-harness-owned-entries`) | REBUILD | one walk over the four places `verdict` judges; the two functions collapse |
 | `hooks/root_whitelist.py` | asks `verdict` with the operator globs only | 5 (resolved chain, last `fenced-roots-env-disables-the-gate`) | KEEP | passes the slug sets `verdict` now needs; no new decision |
 | `f/spec_context/gate_policy.py:101-112,129-139` PROTECTED | PROTECTED = `projected` (the ledger) ∪ `.dadaia/sessions/` ∪ `.dadaiaignore`; no ledger → the law files and hook wiring are writable | 9 (`gate-protects-nothing-without-install-ledger` open; `sa-gate-path-classes-diverge-from-the-law`, `instance-exceptions-file-writable-by-agents`, `repo-agents-md-law-gate-contradicts-template`, …) | REBUILD | ≥ 2 bugs: PROTECTED = code floor ∪ ledger ∪ protected-section match, one predicate, three messages (CLI state, operator, projected law) |
 | `hooks/sdd_gate.py:33-36` projected set | built from the ledger alone | ″ | UPDATE | unions the floor and the harness hook-registration files read from `hook_documents` (existing function, no edit there) |
 | `core/workspace_layout.py:161-177` `parse_dadaiaignore` | one section of root-relative globs | 0 | UPDATE | ADR 0133: a `[protected]` header starts the repo-relative section; the same grammar, the same invalid-line rule |
-| `infrastructure/runtime_transforms/hook_wrappers.py:242-251` `VENV_PYTHON` | a missing venv: stderr line, exit 0 on every lane | 1 (`missing-venv-hook-disarms-the-gate-invisibly` open) | UPDATE | the SessionStart `doctor-expired` lane (registered once per session in every dialect) prints the message on its context channel; every other lane exits 0 silently; the stderr line is deleted |
+| `infrastructure/runtime_transforms/hook_wrappers.py:242-251` `VENV_PYTHON` | a missing venv: stderr line, exit 0 on every lane | 1 (`missing-venv-hook-disarms-the-gate-invisibly` open) | UPDATE | KEEP the stderr warning on every lane (ADR 0067); ADD on the SessionStart `doctor-expired` lane one context message, rendered from the envelope table `hooks/ctx_inject.py` `_emit` already owns (§2.4) |
+| `hooks/ctx_inject.py:41-50` `_emit` envelopes | the per-vendor context envelopes, a local dict | 0 | UPDATE | becomes the module-level table the wrapper renderer also reads — one envelope owner, no second `HookDialect` column |
 | `infrastructure/runtime_config.py:68,86` Claude env merge | projects the tool-cache keys, keeps the operator's | 2 (`sa-tool-caches-land-outside-the-cache-zone`, `sa-hook-files-written-by-table-and-by-hand`) | UPDATE | ADR 0156: one more owned key, `PLAYWRIGHT_MCP_OUTPUT_DIR`, in the same merge |
 | `pub/data/AGENTS.md` §3 lines 38, 40 | names `pip`; states the Bash path inline; "§7's CLI verbs own theirs"; no fail-open list; no protected rule | 1 (`gate-law-claims-out-of-scope-writes-blocked-but-bash-is-never-judged`) | UPDATE | AC2.6, AC2.8, AC2.9, AC2.13; the fourth fail-open gap (ADR 0116, grill Q5) stated in the same list |
 | `pub/scaffold/{memory,ADRs}/AGENTS.md` | no ADR 0138 lane | 0 | UPDATE | AC2.16, one line each |
@@ -46,9 +47,10 @@ Bug-history lessons (audit of the fix chain):
 | which paths are PROTECTED | `f/spec_context/gate_policy.py` `classify_path` over floor ∪ ledger ∪ protected section | `hooks/sdd_gate.py` | ledger-only PROTECTED |
 | which paths are core level 1 | `core/workspace_layout.py` core floor and seed table | gate, doctor seed, `init` | `init`'s hand-written `.dadaiaignore` seed |
 | what `.dadaiaignore` says | `core/workspace_layout.py` `parse_dadaiaignore` | gate, doctor, root gate | — |
-| what a TTL expiry does | `f/spec_context/doctor.py` `expire` (hold; delete in `reaped/` only) | `fix`, SessionStart lane | `_delete`'s direct delete outside `reaped/` |
+| what a TTL expiry does | the zone row's class in `core/workspace_layout.py` (OUTPUT held, EPHEMERAL deleted), applied by `f/spec_context/doctor.py` `expire` | `fix`, SessionStart lane | the direct delete of an expired `handoff/` entry |
 | did a hold happen | `f/spec_context/sweep.py` `hold` return | `doctor._reap`, `service.dead` | `dead`'s discarded refusal |
-| how a missing venv reaches the agent | `hook_wrappers.py` prologue on the SessionStart lane | every dialect | the stderr warning |
+| how a missing venv reaches the agent | `hook_wrappers.py` prologue: stderr on every lane (0067) + one context message on the SessionStart lane | every dialect | — |
+| which envelope carries context per vendor | `hooks/ctx_inject.py` envelope table | `_emit`, `hook_wrappers.py` renderer | the local dict in `_emit` |
 | which Claude env keys dadaia owns | `infrastructure/runtime_config.py` env merge | `public install`, `init` | — |
 | which commands the venv guard judges | `hooks/venv_guard.py` (`dadaia`, `python -m dadaia_workspace`) | pre-gate | the pip arm |
 | which paths fail open | root map §3, one list | every other law file points or is silent | line 38's inline Bash clause |
@@ -57,46 +59,63 @@ Bug-history lessons (audit of the fix chain):
 
 ### 2.1 One deleter, one level-1 seed (AC2.2, AC2.4, AC2.10, AC2.12)
 - `core/workspace_layout.py`: `LEVEL1_SEEDS` maps `.dadaiaignore` → `dadaiaignore_seed`, `prompt.md` → empty; `AGENTS.md` stays the projection's (ledger). `init` and the doctor seed read it (AC2.2).
-- `doctor.expire()`: seeds missing core (`.dadaiaignore`, `prompt.md`, provisioned zones) first, then stale sessions, then TTL: an expired entry in `reaped/` is removed, any other is `sweep.hold`. `fix()`'s seed loop becomes that one seed step, called first by both lanes (idempotent when `fix()`'s closing `expire()` re-runs it), so the reap still judges after the seed. An expired bug-proposal handoff is held and listed as a `REAPED` finding (`Nd left`) — no content key (AC2.10).
+- `doctor.expire()`: seeds missing core (`.dadaiaignore`, `prompt.md`, provisioned zones) first, then stale sessions, then TTL: the expired entry's zone class decides — OUTPUT (`handoff/`) is `sweep.hold`, EPHEMERAL (`tmp/`, `reaped/`) is removed; `dadaia-AGENTS.md:39` and `tmp-AGENTS.md:11` stay true. `fix()`'s seed loop becomes that one seed step, called first by both lanes (idempotent when `fix()`'s closing `expire()` re-runs it), so the reap still judges after the seed. An expired bug-proposal handoff is held and listed as a `REAPED` finding (`Nd left`) — no content key (AC2.10).
 - Deletion test: `_delete(…, verdict)` collapses into the expiry act; the seed loop leaves `fix()`.
-- Δ prod ≈ +5, tests ≈ +6.
+- Tests: the expiry rows of `test_spec_context_doctor_root.py` (:228, :266, :331, :401) and `test_doctor_gc.py`'s expiry cases collapse into one owner table in `test_doctor_gc.py`, rewritten, not added.
+- Δ prod ≈ +5, tests ≈ −4.
 
 ### 2.2 Four judged places (AC2.1)
-- `verdict(rel, is_dir, globs, repos=frozenset(), alive=frozenset())`: depth 1 under `repos/` allows the registered slugs; depth 1 under `worktrees/` the ALIVE slugs plus `AGENTS.md`; depth 2 under `worktrees/<r>/` any name; inside a harness directory nothing is judged (ADR 0059, already true — pinned by a row).
+- `verdict(rel, is_dir, globs, repos=frozenset(), alive=frozenset())`: depth 1 under `repos/` allows the registered slugs (`ctx.all_repos()` — main plus associated — of every registered context, DEAD included; INV-5 owns a DEAD one's checkout); depth 1 under `worktrees/` the ALIVE slugs plus `AGENTS.md`; depth 2 under `worktrees/<r>/` any name; inside a harness directory nothing is judged (ADR 0059, already true — pinned by a row).
 - `doctor`: one walk over the four places replaces `_scan_root` + `_scan_dadaia_top`; slug sets from `_contexts()`. Root gate: the same sets from the registry store.
 - Risk: an unregistered clone under `repos/` becomes slop and `doctor --fix` holds it (7 days, reversible).
-- Δ prod ≈ +10, tests ≈ +12.
+- Tests: one place × {stray, globbed} table replaces `test_root_whitelist.py:104` and `test_spec_context_doctor_root.py:164`.
+- Δ prod ≈ +10, tests ≈ 0.
 
 ### 2.3 PROTECTED floor and DEC-11 (AC2.3, AC2.5)
 - `workspace_layout.CORE_FLOOR`: `AGENTS.md`, `.dadaiaignore`, `.dadaia/states/`, `.dadaia/hooks/`, `.dadaia/sessions/`. `sdd_gate` unions the floor, each harness's hook-registration files (`hook_documents` keys under the record's directory) and the ledger.
 - `parse_dadaiaignore` returns `(globs, protected, invalid)`; a line `[protected]` opens the repo-relative section (same glob rules).
 - `classify_path` PROTECTED when the path is in floor ∪ ledger, or its repo-relative tail (`repos/<r>/…`, `worktrees/<r>/<name>/…`) has a prefix matching a protected glob. Messages: CLI state (`.dadaia/sessions/`), operator (`.dadaiaignore`, protected section; fix `mkdir -p <ws>/.dadaia/tmp/<agent>/<date>`), projected law.
 - Contract row (SPEC risk): every floor path is one `init` creates or `public install` writes.
-- Not built: a doctor listing of each protected glob with its matches (a SPEC risk mitigation with no AC; it would grow the doctor).
-- Δ prod ≈ +20, tests ≈ +15.
+- The operator refusal names the protected glob that matched (SPEC Risks row 2), asserted in an existing refusal row; no doctor listing.
+- Tests: rows; the ledger-era special rows (`.dadaiaignore`, `.dadaia/sessions/`) fold into the floor rows.
+- Δ prod ≈ +20, tests ≈ +8.
 
 ### 2.4 Missing venv seen once per session (AC2.7)
-- The prologue keeps exit 0. On the `doctor-expired` lane (SessionStart in every dialect) it prints `dadaia: no workspace venv at <ws>/.dadaia/.venv — the gate is off. fix: uvx dadaia-workspace init <ws>` on stdout in the dialect's SessionStart context shape (a `HookDialect` column; plain text where stdout is the channel). Other lanes are silent. The task first measures each dialect's SessionStart channel against the envelopes `hooks/ctx_inject.py` already uses; a dialect with none is named in the AC2.8 list.
-- Δ prod ≈ +8, tests ≈ 0 (the existing missing-venv case is rewritten).
+- KEEP: the stderr warning and exit 0 on every wrapper (ADR 0067); `test_hook_interpreter.py:81-95` keeps its stderr assertions.
+- ADD: on the `doctor-expired` lane only, one stdout line `dadaia: no workspace venv at <ws>/.dadaia/.venv — the gate is off. fix: uvx dadaia-workspace init <ws>` in the dialect's SessionStart envelope.
+- The envelope table moves out of `_emit` (`hooks/ctx_inject.py:41-50`) to module level; `_emit` and the wrapper renderer both read it, keyed by the lane's `DADAIA_HOOK_OUTPUT` — no `HookDialect` column.
+- Channels measured (doctor-expired lane, SessionStart):
+
+| dialect | SessionStart registration | channel | envelope |
+|---|---|---|---|
+| Claude | `SessionStart` `startup\|resume` | stdout = context | `json`: `hookSpecificOutput.additionalContext` |
+| Codex | `SessionStart` | stdout = context | `codex-json`: `hookSpecificOutput.additionalContext` |
+| Cursor | `sessionStart` | stdout JSON | `cursor-json`: `additional_context` |
+| Copilot | `sessionStart` | stdout JSON | `copilot-json`: `additionalContext` |
+| Devin | `SessionStart` | stdout = context | plain text |
+| Kimi | `SessionStart` `doctor-expired` only, stderr answer (`hook_wrappers.py:134-150`) | none | — |
+
+- Kimi has no SessionStart context lane: it keeps the stderr warning only, and T-050-120 names that gap in the one fail-open statement.
+- Δ prod ≈ +8, tests ≈ +2 (one stdout row per dialect in the existing missing-venv case).
 
 ### 2.5 Small units (AC2.9, AC2.11, AC2.14, AC2.17)
 - `venv_guard`: pip arm and `_PIP_NAMES` deleted. Δ ≈ −6 / tests ≈ −10.
-- `service.dead`: a hold that returns anything but `moved …` raises `ContextStateError` with it before `store.update`. Δ ≈ +4 / tests ≈ +8.
-- `runtime_config`: `PLAYWRIGHT_MCP_OUTPUT_DIR` = `<ws>/.dadaia/mcps/playwright` merged with the cache keys, Claude only. Δ ≈ +2 / tests ≈ +3.
-- `_bugs_write.append`: regex deleted. Δ ≈ −1 / tests ≈ +3 (one row rewritten, one added).
+- `service.dead`: a hold that returns anything but `moved …` raises `ContextStateError` with it before `store.update`. Δ ≈ +4 / tests ≤ +3 (one `_REFUSALS` row).
+- `runtime_config`: `PLAYWRIGHT_MCP_OUTPUT_DIR` = `<ws>/.dadaia/mcps/playwright` merged with the cache keys, Claude only. Δ ≈ +2 / tests ≤ +1.
+- `_bugs_write.append`: regex deleted. Δ ≈ −1 / tests ≤ 0 (the `("surface","Docs","--surface <")` row at `test_bug_resolution_bugs_script.py:294` becomes the `.github` admit row).
 
 ### 2.6 Law (AC2.6, AC2.8, AC2.9, AC2.13, AC2.16)
-- Root map §3: the pip clause leaves; one bullet lists the fail-open paths — missing venv (0067), pre-gate past 10 s (0118), a Bash write (0096, 0103; protected paths included, 0133), an id-less unbound session under `worktrees/<r>/` (0116, grill Q5); line 40 names `context create` and the first `specs init` (0154). `pub/scaffold/{memory,ADRs}/AGENTS.md` one line each (0138). Quickstart and getting-started run the births in worktrees. No `.py` delta.
+- Root map §3: the pip clause leaves; one bullet lists the four fail-open paths — missing venv (0067; on Kimi seen only on stderr), pre-gate past 10 s (0118), a Bash write (0096, 0103; protected paths included, 0133), and the id-less unbound session under `worktrees/<r>/` (0116, grill Q5); line 40 names `context create` and the first `specs init` (0154). `pub/scaffold/{memory,ADRs}/AGENTS.md` one line each (0138). Quickstart and getting-started run the births in worktrees. No `.py` delta; `test_law_states_what_the_code_does.py:30` rewritten in place (tests ≤ +3).
 
 ### 2.7 Delta summary
-- Prod ≈ +5 + 10 + 20 + 8 − 6 + 4 + 2 − 1 = **≈ +42**; tests ≈ **+43**. A readout, never a limit (ADR 0142). Net-positive because DEC-11 and the floor are new behavior no unit carried; each ADD above names what was deleted or rebuilt first.
+- Prod ≈ +5 + 10 + 20 + 8 − 6 + 4 + 2 − 1 = **≈ +42**; tests ≈ −4 + 0 + 8 + 2 − 10 + 3 + 1 + 0 + 3 = **≈ +3** (≤ +15). A readout, never a limit (ADR 0142). Net-positive because DEC-11 and the floor are new behavior no unit carried; each ADD above names what was deleted or rebuilt first.
 - Order: DELETE (pip arm, surface regex) → REBUILD (expiry, PROTECTED, the doctor walk) → UPDATE (verdict, dead, wrappers, env, law) → KEEP (root gate) → ADD (floor, protected section).
 
 ## 3. Test strategy
 
 - RED first per task, in the file that owns the behavior (ADR 0146 (5)); no new test file. Every new or rewritten test carries `Intent: CONTRACT — AC2.x`.
-- DEL tests leave in the same commit: the pip rows of `test_venv_guard.py` and `test_pre_gate.py:96` are rewritten to ALLOW; the stderr assertion of `test_hook_interpreter.py:70` is rewritten to the context-channel message.
-- Owners: AC2.1 `test_root_whitelist.py`, `test_spec_context_doctor_root.py`; AC2.2 `test_cli_init.py`; AC2.3/AC2.5 `test_gate_policy.py`, `test_pre_gate.py`; AC2.4 `test_doctor_fix_lines_clear_their_finding.py`; AC2.7 `tests/integration/gate/test_hook_interpreter.py` (the executable case `test_hook_behaviour_coverage.py` points to); AC2.8/AC2.13 `test_law_states_what_the_code_does.py`; AC2.9 `test_venv_guard.py`, `test_pre_gate.py`; AC2.10 `test_doctor_gc.py`; AC2.11 `test_context_dead_holds.py`; AC2.14 `test_tool_caches_stay_in_the_tmp_zone.py`; AC2.17 `test_bug_resolution_bugs_script.py`.
+- DEL tests leave in the same commit: the pip rows of `test_venv_guard.py` and `test_pre_gate.py:96` are rewritten to ALLOW; the stderr assertions of `test_hook_interpreter.py:81-95` stay; the context message is one more assertion in that case.
+- Owners: AC2.1 `test_root_whitelist.py`, `test_spec_context_doctor_root.py`; AC2.2 `test_cli_init.py`; AC2.3/AC2.5 `test_gate_policy.py`, `test_pre_gate.py`; AC2.4 `test_doctor_fix_lines_clear_their_finding.py`; AC2.7 `tests/integration/gate/test_hook_interpreter.py` (the executable case `test_hook_behaviour_coverage.py` points to); AC2.8/AC2.13 `test_law_states_what_the_code_does.py`; AC2.9 `test_venv_guard.py`, `test_pre_gate.py`; AC2.10 `test_doctor_gc.py` (the one expiry owner, absorbing `test_spec_context_doctor_root.py`'s expiry rows); AC2.11 `test_context_dead_holds.py`; AC2.14 `test_tool_caches_stay_in_the_tmp_zone.py`; AC2.17 `test_bug_resolution_bugs_script.py`.
 
 ## 4. Bootstrap and risks
 
@@ -118,7 +137,7 @@ Bug-history lessons (audit of the fix chain):
 | 5 | T-050-120 | 1 | one impl worktree |
 | 6 | T-050-121 | 1 | measure; closure in the release worktree |
 
-- True edges: T-050-116 needs T-050-115 (`core/workspace_layout.py`, `f/spec_context/doctor.py`); T-050-117 needs T-050-116 (the same two files) and T-050-113 (`tests/unit/hooks/test_pre_gate.py`); T-050-120 needs T-050-113, T-050-117 and T-050-118 (the law states what they built). Every other step boundary is the cap or the green base.
+- True edges: T-050-116 needs T-050-115 (`core/workspace_layout.py`, `f/spec_context/doctor.py`, `tests/unit/test_spec_context_doctor_root.py`); T-050-117 needs T-050-116 (the same two files) and T-050-113 (`tests/unit/hooks/test_pre_gate.py`); T-050-120 needs T-050-113, T-050-117 and T-050-118 (the law states what they built). Every other step boundary is the cap or the green base.
 - Critical path: T-050-111 → T-050-115 → T-050-116 → T-050-117 → T-050-120 → T-050-121 = 6 steps.
 - Overlap check: disjoint in every step except `TASKS.md`, the `*.jsonl` ledgers and the derived `pub/entities/behavior-map.json`.
 - Merge order inside a step: ready order; after each merge every open sibling rebases onto `feature/0.5.0`.
