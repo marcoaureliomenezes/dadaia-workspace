@@ -61,15 +61,8 @@ carry the ordered work, and the ledger scripts move the records.
 <!-- derived-from: sdd-gate-v3 sha256:46dea6ca9c6c -->
 
 The *gate* is one PreToolUse pre-gate evaluating root whitelist, venv guard and SDD
-gate in that order — first block wins, and a policy that raises is ALLOW. It blocks
-exactly three things: a file-tool write (`Write`, `Edit`, `MultiEdit`, `apply_patch`)
-creating a new workspace-root entry outside the root law and
-the operator's `.dadaiaignore`; a leading `dadaia`, `pip` or
-`python -m dadaia_workspace` outside `.dadaia/.venv/bin/` (Bash only); a file-tool write
-(those or `NotebookEdit`) that is PROTECTED or out of scope — a repo outside the bind, or `repos/<slug>/` beyond
-`specs/audits/`, which takes only worktree merges. A Bash write (`sed -i`, `rm`, `mkdir`, a redirect) is never judged. Paths fall in
-three classes: ADDITIVE (the `.dadaia/` output and ephemeral zones, always writable),
-PROTECTED (`.dadaia/sessions/`, the projected law and `.dadaiaignore`) and MUTATING (everything else). No lease, lock or wait path exists and
+gate in that order — first block wins. What it blocks, its path classes and every
+fail-open path are stated once, in the root `AGENTS.md` §3. No lease, lock or wait path exists and
 no `_RELEASE.json` is read. Every BLOCK, here and at every other enforcement point,
 carries exactly one `fix:` line, and a contract test feeds each fix back through the
 gate — a refusal whose fix is itself refused (a Stall) cannot ship.

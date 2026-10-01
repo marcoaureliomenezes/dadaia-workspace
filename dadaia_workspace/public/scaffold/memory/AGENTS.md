@@ -8,7 +8,7 @@ Memory is current product truth: what the product is now, never how it got there
 
 | Tier | Files | Changes how |
 |---|---|---|
-| Canonical memory | `ARCHITECTURE.md`, `QUALITY.md` | only in the commit carrying its accepted ADR; text (never a statement) may be rewritten by an audit or on the operator's explicit order |
+| Canonical memory | `ARCHITECTURE.md`, `QUALITY.md` | a `### P-NN` principle only in the commit carrying its accepted ADR; any other section may be rewritten to state what the code is, naming its code evidence, with no ADR (ADR 0138) |
 | Product memory | `product/<area>/<slug>.md` | at every closure, by `dd-product-engineer`, reconciled from the window's code diff |
 
 - No other agent edits memory in any phase; `specs/memory/**` is MUTATING for the hook, the doctor and the audit's memory pillar measure the discipline.

@@ -205,8 +205,8 @@ def dadaiaignore_seed(workspace: Path) -> str:
         return (workspace / ".dadaia" / "states" / "instance_exceptions.txt").read_text("utf-8")
     except OSError:
         return (
-            "# Operator-only: one root-relative pattern per line, * within one segment, a\n"
-            "# trailing / for a directory; no ! and no ** (ADR 0093).\n"
+            "# Operator-only (ADR 0093): root-relative patterns, * within a segment, / = dir,\n"
+            "# no ! and no **; under a [protected] line, repo-relative protected globs (ADR 0133).\n"
         )
 
 

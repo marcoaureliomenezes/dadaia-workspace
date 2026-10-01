@@ -131,6 +131,9 @@ A candidate is one closed-scope cycle inside the live release. Nothing drives it
 documents are the state, the ledger scripts move the records, and the markers in
 `TASKS.md` are the trace.
 
+After `context baseline`, each step writes inside a worktree that then merges: a
+`backlog` one for step 1, a `release` one from step 2 (ADR 0154).
+
 1. **Demand enters the backlog.** Only the operator creates demand;
    `python3 .agents/skills/dd-backlog-definition/scripts/backlog.py new <slug> --relates <slugs>|none`
    appends one `active[]` entry born `idea`, and every later status binds `intents[]` that resolve to a code, doc or CLI anchor.

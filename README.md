@@ -114,13 +114,8 @@ differs only in serialization — event names, hook file, answer shape — and a
 behaviour.
 
 The gate is one PreToolUse pre-gate: root whitelist, venv guard, SDD gate, in that
-order, first block wins; a policy that raises is ALLOW. It blocks exactly three things:
-a file-tool write creating a new workspace-root entry, a `dadaia`/`pip`/`python -m
-dadaia_workspace` run outside `.dadaia/.venv/bin/`, and a file-tool write that is PROTECTED
-or out of scope — a repo outside the bind, or `repos/<slug>/` beyond `specs/audits/`, which
-takes only worktree merges; a Bash write is never judged. Path classes: ADDITIVE (the
-`.dadaia/` output and ephemeral zones), MUTATING (everything else, scope-judged), PROTECTED (session
-records, the projected law, `.dadaiaignore`).
+order, first block wins; what it blocks, its path classes and every fail-open path are
+stated once, in the root `AGENTS.md` §3.
 Every BLOCK carries exactly one `fix:` line, and a contract test feeds each fix back
 through the gate asserting ALLOW. No lease, lock or wait path exists; the gate reads no
 `_RELEASE.json`.

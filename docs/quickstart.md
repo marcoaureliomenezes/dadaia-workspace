@@ -20,11 +20,23 @@ uvx dadaia-workspace init demo --harness claude --repo "$REPO_URL"
 cd demo
 .dadaia/.venv/bin/dadaia specs init --context "$SLUG"
 .dadaia/.venv/bin/dadaia doctor --context "$SLUG"
-python3 .agents/skills/dd-backlog-definition/scripts/backlog.py new my-first-idea \
-  --specs "repos/$SLUG/specs" --title "What I want" --description "Why I want it"
-python3 .agents/skills/dd-release-implementation/scripts/release.py new 0.1.0 \
-  --specs "repos/$SLUG/specs" --origin backlog:my-first-idea
 ```
+
+After the 3b first pass (below), publish and file the first entry in a `backlog`
+worktree — only `context create` (the `--repo` clone) and the first `specs init` write
+`specs/` directly (ADR 0154):
+
+```bash
+.dadaia/.venv/bin/dadaia context baseline "$SLUG"
+B=$(python3 .agents/skills/dd-gitflow-default/scripts/worktree.py new "$SLUG" --kind backlog | sed 's/^\[ok\] //')
+python3 .agents/skills/dd-backlog-definition/scripts/backlog.py new my-first-idea \
+  --specs "$B/specs" --title "What I want" --description "Why I want it"
+git -C "$B" commit -qam "chore(backlog): new my-first-idea"
+```
+
+After an APPROVED `dd-code-reviewer` verdict, `worktree.py merge "$B"` lands it; the
+release is born the same way in a `release` worktree:
+`release.py new 0.1.0 --specs "$R/specs" --origin backlog:my-first-idea`.
 
 - **Level 1 — workspace.** `uvx dadaia-workspace init` provisions `demo/` with its own
   virtualenv; every later command runs through the workspace's CLI,
