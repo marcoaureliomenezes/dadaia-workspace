@@ -180,4 +180,5 @@ def test_the_fix_creates_the_agents_own_temp_dir(
     days.append(datetime.now(UTC).strftime("%Y%m%d"))
     assert block is not None
     fix = block["reason"].rsplit("fix: ", 1)[1]
-    assert any(str(tmp_path / ".dadaia" / "tmp" / segment / day) in fix for day in days)
+    tmp = tmp_path.resolve() / ".dadaia" / "tmp" / segment  # the hook prints it resolved, POSIX
+    assert any((tmp / day).as_posix() in fix for day in days)

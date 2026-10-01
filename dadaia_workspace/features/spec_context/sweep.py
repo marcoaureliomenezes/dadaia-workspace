@@ -176,7 +176,7 @@ def remove(workspace_root: Path, target: Path, label: str) -> str | None:
             rmtree(target)
         else:
             return None
-    except PermissionError as exc:  # the chmod retry failed: another account owns it
+    except OSError as exc:  # judged by outcome: the target survived the chmod retry
         owner = _owner(Path(exc.filename or target).parent)
         return Skipped(
             f"skipped '{label}' (errno {exc.errno}: {exc.strerror}) — it holds an entry "

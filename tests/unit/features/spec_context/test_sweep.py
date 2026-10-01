@@ -124,9 +124,10 @@ def test_an_expired_entry_another_account_holds_names_the_one_operator_act(
 
     done = sweep.remove(tmp_path, entry, "tmp/a/20200101")
 
-    assert done == (
-        "skipped 'tmp/a/20200101' (errno 13: Permission denied) — it holds an entry owned by "
-        f"{getpass.getuser()}; Operator action: remove {tmp_path}/.dadaia/tmp/a/20200101"
+    assert done.startswith("skipped 'tmp/a/20200101' (errno ")  # 13, or 39/66 on 3.14
+    assert done.endswith(
+        f"it holds an entry owned by {getpass.getuser()}; "
+        f"Operator action: remove {tmp_path}/.dadaia/tmp/a/20200101"
     )
     assert isinstance(done, sweep.Skipped) and entry.exists()
     monkeypatch.undo()
