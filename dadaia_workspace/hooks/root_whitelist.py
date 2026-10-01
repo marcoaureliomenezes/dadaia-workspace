@@ -1,6 +1,6 @@
 """PreToolUse layout gate: a write whose new entry ``workspace_layout.verdict`` judges
-``slop`` — at the root, ``.dadaia/`` or a closed-canon zone — is blocked; the doctor
-asks the same function, so ALLOW ⇔ not slop. Fails open on unparseable input.
+``slop`` — at the root, ``.dadaia/``, a closed-canon zone, ``repos/`` or ``worktrees/`` —
+is blocked; the doctor asks the same function, so ALLOW ⇔ not slop. Fails open on unparseable input.
 """
 
 from __future__ import annotations
@@ -39,11 +39,9 @@ def _root_violation(anchor: Path | None, raw_path: str) -> str | None:
     if ws is None:
         return None
     rel = fpath.resolve().relative_to(ws)
-    if (
-        not rel.parts
-        or workspace_layout.verdict(rel.as_posix(), False, workspace_layout.operator_globs(ws)[0])
-        != "slop"
-    ):
+    globs = workspace_layout.operator_globs(ws)[0]
+    slugs = invocation.registered_slugs(ws)
+    if not rel.parts or workspace_layout.verdict(rel.as_posix(), False, globs, *slugs) != "slop":
         return None
     return (
         f"[ROOT WHITELIST GATE] Writing '{rel.as_posix()}' creates an entry the layout law "

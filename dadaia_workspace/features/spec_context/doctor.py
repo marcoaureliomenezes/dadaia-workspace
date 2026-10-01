@@ -25,7 +25,7 @@ from enum import StrEnum
 from functools import partial
 from pathlib import Path
 
-from dadaia_workspace.core import session_store, workspace_layout
+from dadaia_workspace.core import invocation, session_store, workspace_layout
 from dadaia_workspace.core.cli_line import fix_line, shell_line
 from dadaia_workspace.core.doctor_rules import Rule, SectionFinding
 from dadaia_workspace.core.exceptions import SchemaVersionError
@@ -73,6 +73,8 @@ _EXPIRY_ACT = {ZoneClass.OUTPUT: sweep.hold, ZoneClass.EPHEMERAL: sweep.remove}
 #: Directory names that end the repo-tree walk: a nested VCS/venv/dependency tree is
 #: never ours to classify and is where the walk's cost would otherwise live.
 _REPO_WALK_PRUNED: frozenset[str] = frozenset({".git", ".venv", "node_modules"})
+#: ``workspace_layout.verdict``'s inputs after the entry: the operator globs, then the slugs.
+_Rules = tuple[tuple[str, ...], frozenset[str], frozenset[str]]
 
 
 @dataclass(frozen=True)
@@ -302,13 +304,13 @@ class DoctorService:
     def scan(self) -> tuple[Finding, ...]:
         """Every entry of the instance, classified, in the fixed FR3 order."""
         globs, invalid = workspace_layout.operator_globs(self._workspace_root)
+        rules = (globs, *invocation.registered_slugs(self._workspace_root))
         findings: list[Finding] = [*self._missing_core(), *self._scan_dadaiaignore(invalid)]
-        findings.extend(self._scan_root(globs))
-        findings.extend(self._scan_dadaia_top(globs))
+        findings.extend(self._scan_places(rules))
         findings.extend(self._scan_repo_trees())
         unreadable = frozenset(session_store.unreadable_records(self._workspace_root))
         for zone in workspace_layout.zones_with_canon():
-            findings.extend(self._scan_canon_zone(zone, globs, unreadable))
+            findings.extend(self._scan_canon_zone(zone, rules, unreadable))
         return (*findings, *self.scan_ttl())
 
     def scan_ttl(self) -> tuple[Finding, ...]:
@@ -382,10 +384,10 @@ class DoctorService:
                         pending.append(entry)
         return out
 
-    def _judged(self, entry: Path, globs: tuple[str, ...]) -> tuple[FindingVerdict, str]:
+    def _judged(self, entry: Path, rules: _Rules) -> tuple[FindingVerdict, str]:
         """``workspace_layout.verdict`` — the gate's own answer — plus the report detail."""
         rel = entry.relative_to(self._workspace_root).as_posix()
-        judged = FindingVerdict(workspace_layout.verdict(rel, entry.is_dir(), globs))
+        judged = FindingVerdict(workspace_layout.verdict(rel, entry.is_dir(), *rules))
         return judged, _DETAIL[judged]
 
     @staticmethod
@@ -436,32 +438,29 @@ class DoctorService:
             for line in invalid
         ]  # fmt: skip
 
-    def _scan_root(self, globs: tuple[str, ...]) -> list[Finding]:
+    def _scan_places(self, rules: _Rules) -> list[Finding]:
+        """One walk over the four places ``verdict`` judges by name: the root, ``.dadaia/``,
+        ``repos/`` and ``worktrees/``."""
+        root = self._workspace_root
+        places = (("root", root, root), ("dadaia", self._dadaia, self._dadaia),
+                  ("repos", root, root / "repos"), ("worktrees", root, root / "worktrees"))  # fmt: skip
         out: list[Finding] = []
-        for entry in sweep.walk(self._workspace_root):
-            verdict, detail = self._judged(entry, globs)
-            credential = verdict is FindingVerdict.SLOP and entry.name == ".env"
-            if credential:  # ADR 0146: the library never touches a credential file
-                detail = "(credentials live outside the workspace: the operator moves it out or names it in .dadaiaignore)"
-            fixable = False if credential else None
-            out.append(
-                self._finding("root", self._workspace_root, entry, verdict, detail, fixable=fixable)
-            )
-        return out
-
-    def _scan_dadaia_top(self, globs: tuple[str, ...]) -> list[Finding]:
-        out: list[Finding] = []
-        for entry in sweep.walk(self._dadaia):
-            verdict, detail = self._judged(entry, globs)
-            out.append(self._finding("dadaia", self._dadaia, entry, verdict, detail))
+        for zone, base, directory in places:
+            for entry in sweep.walk(directory):
+                verdict, detail = self._judged(entry, rules)
+                credential = verdict is FindingVerdict.SLOP and entry.name == ".env"
+                if credential:  # ADR 0146: the library never touches a credential file
+                    detail = "(credentials live outside the workspace: the operator moves it out or names it in .dadaiaignore)"
+                fixable = False if credential else None
+                out.append(self._finding(zone, base, entry, verdict, detail, fixable=fixable))
         return out
 
     def _scan_canon_zone(
-        self, zone: Zone, globs: tuple[str, ...], unreadable: frozenset[Path]
+        self, zone: Zone, rules: _Rules, unreadable: frozenset[Path]
     ) -> list[Finding]:
         out: list[Finding] = []
         for entry in sweep.walk(self._dadaia / zone.name):
-            verdict, detail = self._judged(entry, globs)
+            verdict, detail = self._judged(entry, rules)
             if entry in unreadable:  # the record owner's answer: a corrupt record is slop
                 verdict, detail = FindingVerdict.SLOP, "(unreadable session record)"
             out.append(self._finding(zone.name, self._dadaia, entry, verdict, detail))

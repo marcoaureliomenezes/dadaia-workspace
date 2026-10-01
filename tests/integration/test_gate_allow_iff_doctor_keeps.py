@@ -1,6 +1,7 @@
 """One table of ROOT ENTRIES through the gate and the doctor: the gate ALLOWs a write that
-creates a workspace-root entry iff the doctor does not judge that entry SLOP. Scope inside
-``repos/``/``worktrees/`` is test_sdd_gate's, not this table's.
+creates an entry at a judged level (the root, ``.dadaia/``, ``repos/<r>``, ``worktrees/<r>``,
+ADR 0132) iff the doctor does not judge that entry SLOP. Scope inside a registered repo is
+test_sdd_gate's, not this table's.
 
 Intent: CONTRACT — sa-gate-allows-root-entries-the-reaper-moves#E6 (every row), #E1
 (notes/ without a glob), #E2 (with one), sa-gate-allows-root-entries-the-reaper-moves#E3 (wrong type), #E4 (.dadaia non-zone and
@@ -38,7 +39,7 @@ _TABLE = [
     ("prompt.md", None, None, True),
     ("specs/bugs/x.md", None, None, False),
     (".dadaia/newzone/x.txt", None, None, False),
-    ("worktrees/x/0.5.0a-impl/f.py", None, None, True),
+    ("worktrees/x/0.5.0a-impl/f.py", None, None, False),  # x: no registered slug (ADR 0132)
     (".dadaia/tmp/agent/20260927/x.txt", None, None, True),
 ]
 

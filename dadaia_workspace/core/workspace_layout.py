@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import fnmatch
 import re
-from collections.abc import Callable
+from collections.abc import Callable, Collection
 from dataclasses import dataclass
 from enum import StrEnum
 from functools import cached_property
@@ -219,13 +219,23 @@ def _matches(sub: str, pattern: str) -> bool:
     return len(parts) == len(globs) and all(map(fnmatch.fnmatch, parts, globs))
 
 
-def verdict(rel: str, is_dir: bool, globs: tuple[str, ...]) -> Literal["canon", "operator", "slop"]:
+def verdict(
+    rel: str,
+    is_dir: bool,
+    globs: tuple[str, ...],
+    repos: Collection[str],
+    worktrees: Collection[str],
+) -> Literal["canon", "operator", "slop"]:
     """The one answer to "may this entry exist", for the gate and the doctor: a judged level
-    (root, ``.dadaia/<zone>``, a closed zone's entry) outside its allow set is ``operator`` iff
-    an exception glob matches its name or path, else ``slop``; below an open level, ``canon``."""
+    (root, ``.dadaia/<zone>``, a closed zone's entry, ``repos/<r>``, ``worktrees/<r>``) outside
+    its allow set is ``operator`` iff an exception glob matches its name or path, else
+    ``slop``; below an open level, ``canon``. *repos*/*worktrees* are the admitted slugs
+    (``invocation.registered_slugs``)."""
+    slugs: dict[str, Collection[str]] = {"repos": repos, "worktrees": {*worktrees, "AGENTS.md"}}
     parts = rel.strip("/").split("/")
     for depth, name in enumerate(parts):
         directory = is_dir or depth < len(parts) - 1
+        allowed: Collection[str]
         if depth == 0:
             allowed = ROOT_ALLOWED_DIRS if directory else ROOT_ALLOWED_FILES
         elif depth == 1 and parts[0] == ".dadaia":
@@ -235,6 +245,8 @@ def verdict(rel: str, is_dir: bool, globs: tuple[str, ...]) -> Literal["canon", 
             if zone is None or zone.canon is None:
                 return "canon"
             allowed = zone.canon
+        elif depth == 1 and parts[0] in slugs:
+            allowed = slugs[parts[0]]
         else:
             return "canon"
         if any(fnmatch.fnmatch(name, a) for a in allowed):

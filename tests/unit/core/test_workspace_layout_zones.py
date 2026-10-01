@@ -102,6 +102,6 @@ def test_dadaiaignore_invalid_lines_and_segment_scope() -> None:
     stays inside one segment, so a root pattern admits nothing below the root."""
     text = "!keep\nnotes/**\n/abs\na/../b\n*.png\n"
     assert wl.parse_dadaiaignore(text) == (("*.png",), ("!keep", "notes/**", "/abs", "a/../b"))
-    assert wl.verdict("shot.png", False, ("*.png",)) == "operator"
-    assert wl.verdict(".dadaia/shot.png", False, ("*.png",)) == "slop"
-    assert wl.verdict(".dadaia/shot.png", False, (".dadaia/*.png",)) == "operator"
+    assert wl.verdict("shot.png", False, ("*.png",), (), ()) == "operator"
+    assert wl.verdict(".dadaia/shot.png", False, ("*.png",), (), ()) == "slop"
+    assert wl.verdict(".dadaia/shot.png", False, (".dadaia/*.png",), (), ()) == "operator"

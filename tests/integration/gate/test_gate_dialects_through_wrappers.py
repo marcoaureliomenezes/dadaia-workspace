@@ -45,8 +45,8 @@ def ws(tmp_path: Path) -> Path:
     (tmp_path / ".dadaia" / ".venv" / "bin" / "python").symlink_to(sys.executable)
     (tmp_path / ".dadaia" / "states").mkdir()
     (tmp_path / ".dadaia" / "states" / "spec_contexts.json").write_text(
-        '{"schema_version": "2", "contexts": []}'
-    )
+        '{"schema_version": "2", "contexts": [{"name": "demo", "state": "alive", "repo_slug": "demo"}]}'
+    )  # the payloads write under worktrees/demo/
     ledger = {"relpath": "AGENTS.md", "sha256": "0" * 64, "family": "root", "kind": "file"}
     (tmp_path / ".dadaia" / "states" / "install_ledger.json").write_text(  # projects AGENTS.md
         json.dumps({"schema_version": "1", "entries": [ledger]})

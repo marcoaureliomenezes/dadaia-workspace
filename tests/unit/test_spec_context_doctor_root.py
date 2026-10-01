@@ -89,36 +89,64 @@ def _write_ledger(root: Path, *relpaths: str) -> None:
         target.write_text("projected", encoding="utf-8")
 
 
-def test_root_and_dadaia_top_level_classify_every_entry(tmp_path: Path) -> None:
-    """sa-gate-allows-root-entries-the-reaper-moves#E2, sa-gate-allows-root-entries-the-reaper-moves#E4,
-    sa-gate-allows-root-entries-the-reaper-moves#E6: the doctor side of the parity — unlisted =
-    slop, globbed = operator, a non-zone .dadaia/ entry is slop."""
+_REGISTRY = json.dumps({"contexts": [
+    {"name": "alpha", "state": "ALIVE", "repo_slug": "main-r", "associated_repos": [{"slug": "assoc-r"}]},
+    {"name": "gone", "state": "DEAD", "repo_slug": "dead-r"},
+]})  # fmt: skip
+_PLACES = {
+    "random_junk.txt": "WS-root-slop", ".ruff_cache": "WS-root-slop", "shot.png": "WS-root-operator",
+    "AGENTS.md": "WS-root-canon", ".claude": "WS-root-canon", ".git": "WS-root-canon",
+    "junk": "WS-dadaia-slop", ".DS_Store": "WS-dadaia-slop", "kept.png": "WS-dadaia-operator",
+    **{n: "WS-dadaia-canon" for n in (*DADAIA_ROOT_FILES, _STATE_ZONE.name, _OPERATOR_ZONE.name)},
+    "repos/alpha": "WS-repos-slop", "repos/kept": "WS-repos-operator",
+    **{f"repos/{r}": "WS-repos-canon" for r in ("main-r", "assoc-r", "dead-r")},
+    "worktrees/dead-r": "WS-worktrees-slop", "worktrees/kept": "WS-worktrees-operator",
+    "worktrees/assoc-r": "WS-worktrees-canon", "worktrees/AGENTS.md": "WS-worktrees-canon",
+}  # fmt: skip
+
+
+@pytest.mark.parametrize(
+    ("registry", "expected"),
+    [
+        pytest.param(_REGISTRY, _PLACES, id="registered"),
+        *(pytest.param(text, {"repos/alpha": "WS-repos-canon", "worktrees/dead-r": "WS-worktrees-canon"}, id=f"unreadable-registry-{text}")
+          for text in ("{", '{"contexts": 5}')),
+    ],
+)  # fmt: skip
+def test_four_places_classify_every_entry(
+    tmp_path: Path, registry: str, expected: dict[str, str]
+) -> None:
+    """T-050-116 (ADR 0132), sa-gate-allows-root-entries-the-reaper-moves#E2, #E4, #E6: one walk
+    over the root, ``.dadaia/``, ``repos/`` and ``worktrees/`` — unlisted = slop, globbed =
+    operator; repo slugs, never context names, DEAD ones under ``repos/`` only; an unreadable
+    registry keeps every ``repos/<r>`` and ``worktrees/<r>``."""
     _init_workspace(tmp_path)
     dadaia = tmp_path / ".dadaia"
-    for name in (".claude", ".git", ".ruff_cache", ".dadaia/junk"):
+    (dadaia / _STATE_ZONE.name / "spec_contexts.json").write_text(registry, encoding="utf-8")
+    for name in (
+        ".claude",
+        ".git",
+        ".ruff_cache",
+        ".dadaia/junk",
+        ".dadaia/" + _OPERATOR_ZONE.name,
+    ):
         (tmp_path / name).mkdir()
-    (tmp_path / "random_junk.txt").write_text("oops", encoding="utf-8")
-    (tmp_path / "shot.png").write_bytes(b"PNG")
-    (tmp_path / DADAIAIGNORE).write_text("# comment\n*.png\n", encoding="utf-8")
-    for name in (*DADAIA_ROOT_FILES, ".DS_Store"):
+    for name in ("alpha", "kept", "main-r", "assoc-r", "dead-r"):
+        (tmp_path / "repos" / name).mkdir()
+    for name in ("dead-r", "kept", "assoc-r"):
+        (tmp_path / "worktrees" / name).mkdir(parents=True)
+    for name in ("random_junk.txt", "shot.png", "worktrees/AGENTS.md"):
+        (tmp_path / name).write_text("x", encoding="utf-8")
+    for name in (*DADAIA_ROOT_FILES, ".DS_Store", "kept.png"):
         (dadaia / name).write_text("x", encoding="utf-8")
-    (dadaia / _OPERATOR_ZONE.name / "some-clone").mkdir(parents=True)
-
-    found = _by_path(_make_doctor(tmp_path).scan())
-
-    assert {n: found[n].verdict for n in ("AGENTS.md", ".claude", ".git")} == dict.fromkeys(
-        ("AGENTS.md", ".claude", ".git"), FindingVerdict.CANON
+    (tmp_path / DADAIAIGNORE).write_text(
+        "# comment\n*.png\n.dadaia/*.png\nrepos/kept\nworktrees/kept\n", encoding="utf-8"
     )
-    assert (found["shot.png"].verdict, found["shot.png"].code) == (
-        FindingVerdict.OPERATOR,
-        "WS-root-operator",
-    )
-    assert found["random_junk.txt"].code == found[".ruff_cache"].code == "WS-root-slop"
-    assert found["random_junk.txt"].fixable is True
-    assert "# comment" not in {f.detail for f in found.values()}
-    for name in (*DADAIA_ROOT_FILES, _STATE_ZONE.name, _OPERATOR_ZONE.name):
-        assert found[name].code == "WS-dadaia-canon"
-    assert found["junk"].code == found[".DS_Store"].code == "WS-dadaia-slop"
+
+    found = _make_doctor(tmp_path).scan()
+
+    assert {p: c for p, c in ((f.path, f.code) for f in found) if p in expected} == expected
+    assert "# comment" not in {f.detail for f in found}
 
 
 def test_absent_init_or_install_zone_is_missing_and_fixable(tmp_path: Path) -> None:
@@ -301,7 +329,8 @@ def test_a_symlinked_zone_root_is_never_walked(
     ws = tmp_path / "ws"
     ws.mkdir()
     _init_workspace(ws)
-    target = (ws / "repos" / "victim") if target_inside_workspace else (tmp_path / "outside")
+    (ws / ".dadaia" / _STATE_ZONE.name / "spec_contexts.json").write_text(_REGISTRY, "utf-8")
+    target = (ws / "repos" / "main-r") if target_inside_workspace else (tmp_path / "outside")
     target.mkdir(parents=True)
     victim = target / "old.txt"
     victim.write_text("keep", encoding="utf-8")

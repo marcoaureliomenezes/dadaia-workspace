@@ -18,8 +18,8 @@ below as a named parametrized row, including the W1-6 first-path-component block
 
 from __future__ import annotations
 
+import json
 import os
-from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
@@ -31,10 +31,16 @@ from dadaia_workspace.infrastructure.git_subprocess import GitSubprocessClient
 from tests.fixtures.harness_env import claude_hook_env, run_hook_subprocess
 from tests.fixtures.stores import context_store
 
+#: Context names differ from their repo slugs: ``repos/`` and ``worktrees/`` admit slugs only.
+REGISTRY = json.dumps({"contexts": [
+    {"name": "alpha", "state": "ALIVE", "repo_slug": "main-r", "associated_repos": [{"slug": "assoc-r"}]},
+    {"name": "gone", "state": "DEAD", "repo_slug": "dead-r"},
+]})  # fmt: skip
 
-def _ws(tmp_path: Path) -> Path:
+
+def _ws(tmp_path: Path, registry: str = REGISTRY) -> Path:
     (tmp_path / ".dadaia" / "states").mkdir(parents=True)
-    (tmp_path / ".dadaia" / "states" / "spec_contexts.json").write_text("{}", encoding="utf-8")
+    (tmp_path / ".dadaia" / "states" / "spec_contexts.json").write_text(registry, encoding="utf-8")
     return tmp_path
 
 
@@ -86,110 +92,68 @@ def test_law_declared_root_files_are_canon_for_the_hook_and_the_doctor(
 
 
 @pytest.mark.parametrize(
-    ("name", "target_fn", "reason_fragment"),
+    ("target", "ignore", "registry", "allowed"),
     [
-        ("forbidden_root_entry", lambda ws: ws / "junk.txt", "ROOT WHITELIST GATE"),
-        (
-            # W1-6 (T-47-15): a nested write that materializes a forbidden NEW top-level
-            # entry is blocked. `<root>/.opencode/agents/foo.md` used to be allowed (its
-            # immediate parent was not the root); it must now block because `.opencode` is
-            # a new, non-whitelisted top-level entry.
-            "nested_write_under_new_toplevel_dir",
-            lambda ws: ws / ".opencode" / "agents" / "foo.md",
-            ".opencode",
-        ),
-        ("AC1.3-a-fenced-root-stays-protected", lambda ws: ws / "junk.txt", "junk.txt"),
+        pytest.param("junk.txt", "", REGISTRY, False, id="root-stray"),
+        pytest.param("shot.png", "*.png\n", REGISTRY, True, id="root-globbed"),
+        pytest.param(".opencode/agents/foo.md", "", REGISTRY, False, id="root-stray-nested"),
+        pytest.param(".playwright-mcp/x.log", ".playwright-mcp/\n", REGISTRY, True, id="root-globbed-dir"),
+        pytest.param(".dadaia/junk.txt", "*.txt\n", REGISTRY, False, id="dadaia-stray"),
+        pytest.param(".dadaia/junk.txt", ".dadaia/*.txt\n", REGISTRY, True, id="dadaia-globbed"),
+        pytest.param(".dadaia/tmp/agent/20260701/s.json", "", REGISTRY, True, id="dadaia-zone"),
+        pytest.param("repos/alpha/f.py", "", REGISTRY, False, id="repos-stray-context-name"),
+        pytest.param("repos/alpha/f.py", "repos/alpha\n", REGISTRY, True, id="repos-globbed"),
+        pytest.param("repos/assoc-r/f.py", "", REGISTRY, True, id="repos-associated"),
+        pytest.param("repos/dead-r/f.py", "", REGISTRY, True, id="repos-dead-context"),
+        pytest.param("repos/any/f.py", "", "{", True, id="repos-unreadable-registry"),
+        pytest.param("worktrees/any/n/f.py", "", "[]", True, id="worktrees-wrong-shaped-registry"),
+        pytest.param("worktrees/dead-r/x/f.py", "", REGISTRY, False, id="worktrees-stray-dead"),
+        pytest.param("worktrees/dead-r/x/f.py", "worktrees/dead-r\n", REGISTRY, True, id="worktrees-globbed"),
+        pytest.param("worktrees/assoc-r/0.5.0b-impl/f.py", "", REGISTRY, True, id="worktrees-associated"),
+        pytest.param("worktrees/AGENTS.md", "", REGISTRY, True, id="worktrees-law"),
+        pytest.param(".claude/agents/unledgered.md", "", REGISTRY, True, id="harness-dir-unjudged"),
     ],
-)
-def test_block_table(
-    tmp_path: Path,
-    name: str,
-    target_fn: Callable[[Path], Path],
-    reason_fragment: str,
-    monkeypatch: pytest.MonkeyPatch,
+)  # fmt: skip
+def test_four_places_table(
+    tmp_path: Path, target: str, ignore: str, registry: str, allowed: bool
 ) -> None:
-    """sa-gate-allows-root-entries-the-reaper-moves#E1: a new root entry is blocked, in a
-    fenced root too (fenced-roots-env-disables-the-gate)."""
-    ws = _ws(tmp_path)
-    if name.startswith("AC1.3"):  # the fence says "never act on", never "nothing protects"
-        monkeypatch.setenv(FENCE_ENV, os.pathsep.join((os.environ[FENCE_ENV], str(ws))))
-    target = target_fn(ws)
-    _out, block = _run(tmp_path, {"tool_name": "Write", "tool_input": {"file_path": str(target)}})
-    assert block is not None
-    assert block["decision"] == "block"
-    assert "ROOT WHITELIST GATE" in block["reason"]
-    assert reason_fragment in block["reason"]
-
-
-@pytest.mark.parametrize(
-    ("name", "setup_fn", "target_fn", "tool_name", "input_key"),
-    [
-        ("non_write_tool", None, lambda ws: "x", "Read", "path"),
-        ("whitelisted_root_entry", None, lambda ws: ws / "AGENTS.md", "Write", "file_path"),
-        ("subdir_write", None, lambda ws: ws / "repos" / "x" / "file.py", "Write", "file_path"),
-        ("unparseable_path_fails_open", None, None, "Write", None),
-        (
-            # A deep write under a whitelisted root entry (.dadaia/...) is allowed
-            # regardless.
-            "nested_write_under_whitelisted_root",
-            None,
-            lambda ws: ws / ".dadaia" / "tmp" / "agent" / "20260701" / "scratch.json",
-            "Write",
-            "file_path",
-        ),
-    ],
-)
-def test_allow_table(
-    tmp_path: Path,
-    name: str,
-    setup_fn: Callable[[Path], object] | None,
-    target_fn: Callable[[Path], object] | None,
-    tool_name: str,
-    input_key: str | None,
-) -> None:
-    """sa-gate-allows-root-entries-the-reaper-moves#E8: law-admitted entries and writes below them are allowed."""
-    ws = _ws(tmp_path)
-    if setup_fn is not None:
-        setup_fn(ws)
-    tool_input: dict[str, Any] = {}
-    if input_key is not None:
-        target = target_fn(ws) if target_fn is not None else None
-        tool_input = {input_key: str(target)}
-    out, block = _run(tmp_path, {"tool_name": tool_name, "tool_input": tool_input})
-    assert out == ""
-    assert block is None
-
-
-@pytest.mark.parametrize(
-    ("name", "exceptions_content", "target_fn"),
-    [
-        ("exact_glob_match", "# operator exceptions\n*.png\n", lambda ws: ws / "screenshot.png"),
-        (
-            # An operator-exception glob matching the first component allows a nested
-            # write.
-            "nested_glob_matches_first_component",
-            ".opencode\n",
-            lambda ws: ws / ".opencode" / "agents" / "foo.md",
-        ),
-        (
-            # A directory glob written gitignore-style (trailing slash) names the
-            # directory — the one parser drops the slash for every reader.
-            "directory_glob_with_trailing_slash",
-            ".playwright-mcp/\n",
-            lambda ws: ws / ".playwright-mcp" / "console.log",
-        ),
-    ],
-)
-def test_exception_glob_table(
-    tmp_path: Path, name: str, exceptions_content: str, target_fn: Callable[[Path], Path]
-) -> None:
-    """sa-gate-allows-root-entries-the-reaper-moves#E2: an operator glob allows the entry."""
-    ws = _ws(tmp_path)
-    (ws / DADAIAIGNORE).write_text(exceptions_content, encoding="utf-8")
-    target = target_fn(ws)
+    """sa-gate-allows-root-entries-the-reaper-moves#E1 (stray blocked), #E2 (globbed allowed),
+    #E8 (law-admitted entries allowed) and T-050-116 (ADR 0132), which narrows #E8: a write
+    under an unregistered ``repos/<x>/`` — the retired ``subdir_write`` row — now blocks
+    (``repos-stray-context-name``). The root, ``.dadaia/``, ``repos/`` and ``worktrees/`` each block
+    a stray entry and admit a globbed one; ``repos/`` admits every repo slug of every context
+    (DEAD included), ``worktrees/`` those of ALIVE ones, and an unreadable registry admits all."""
+    ws = _ws(tmp_path, registry)
+    (ws / DADAIAIGNORE).write_text(ignore, encoding="utf-8")
     out, block = _run(
-        tmp_path,
-        {"tool_name": "Write", "tool_input": {"file_path": str(target)}},
+        tmp_path, {"tool_name": "Write", "tool_input": {"file_path": str(ws / target)}}
     )
-    assert out == ""
-    assert block is None
+    assert (block is None) is allowed
+    if block is not None:
+        assert "ROOT WHITELIST GATE" in block["reason"]
+        assert target in block["reason"]
+
+
+def test_a_fenced_root_stays_protected(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """AC1.3 (fenced-roots-env-disables-the-gate): the fence says "never act on", never
+    "nothing protects"."""
+    ws = _ws(tmp_path)
+    monkeypatch.setenv(FENCE_ENV, os.pathsep.join((os.environ[FENCE_ENV], str(ws))))
+    _out, block = _run(
+        tmp_path, {"tool_name": "Write", "tool_input": {"file_path": str(ws / "junk.txt")}}
+    )
+    assert block is not None and "junk.txt" in block["reason"]
+
+
+@pytest.mark.parametrize(
+    ("tool_name", "tool_input"),
+    [
+        pytest.param("Read", {"path": "x"}, id="non_write_tool"),
+        pytest.param("Write", {}, id="unparseable_path_fails_open"),
+    ],
+)
+def test_fail_open_table(tmp_path: Path, tool_name: str, tool_input: dict[str, Any]) -> None:
+    """Nothing to judge is an allow, never a block."""
+    _ws(tmp_path)
+    out, block = _run(tmp_path, {"tool_name": tool_name, "tool_input": tool_input})
+    assert (out, block) == ("", None)
