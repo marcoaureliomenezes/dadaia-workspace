@@ -77,21 +77,26 @@ def commit(
     re-read and re-applied ONCE; a second concurrent write refuses with a retry `fix:`.
     """
     histo = path.parents[1] / HISTO
-    old = histo.read_text(encoding="utf-8") if histo.is_file() else ""
 
-    def known(records: Records, written: Records) -> frozenset[str]:
-        moved = {str(r.get("id")) for r in records if r not in written} if archive else set()
-        return archived_ids(old) | moved
-
-    before = stamp(path)
-    records = read_records(path)
-    written = apply(records)
-    text = _validated(written, rel, records, known(records, written))
-    if stamp(path) != before:
+    def attempt() -> tuple[tuple[int, int] | None, str, Records, Records, str]:
+        """One snapshot of both files: the archive read here is both the known ids and
+        the base of the append, so a concurrent archive is never overwritten."""
         before = stamp(path)
+        old = histo.read_text(encoding="utf-8") if histo.is_file() else ""
         records = read_records(path)
         written = apply(records)
-        text = _validated(written, rel, records, known(records, written))
+        moved = {str(r.get("id")) for r in records if r not in written} if archive else set()
+        return (
+            before,
+            old,
+            records,
+            written,
+            _validated(written, rel, records, archived_ids(old) | moved),
+        )
+
+    before, old, records, written, text = attempt()
+    if stamp(path) != before:
+        before, old, records, written, text = attempt()
         if stamp(path) != before:
             raise Refusal(
                 f"{path.name} changed twice under this write — nothing was written",

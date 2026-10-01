@@ -8,11 +8,14 @@ stage does, which is also what proves the copy is the only path the script has.
 
 from __future__ import annotations
 
+import importlib.util
 import json
 import os
 import subprocess
 import sys
+import time
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -282,6 +285,22 @@ def test_script_is_executable_and_has_a_shebang() -> None:
 # --- the write verbs (T-047-64): one ledger, one writer ------------------------------
 
 
+def _store(script: Path) -> Any:
+    """The staged `_bugs_store` module, loaded beside its own siblings as bugs.py loads it."""
+    spec = importlib.util.spec_from_file_location("_bugs_store", script.parent / "_bugs_store.py")
+    assert spec is not None and spec.loader is not None
+    store = importlib.util.module_from_spec(spec)
+    loaded, siblings = set(sys.modules), str(script.parent)
+    sys.path.insert(0, siblings)
+    try:
+        spec.loader.exec_module(store)
+    finally:  # its siblings stay this test's: never a cached copy of another tmp tree
+        sys.path.remove(siblings)
+        for name in set(sys.modules) - loaded:
+            del sys.modules[name]
+    return store
+
+
 def _records(specs: Path) -> list[dict[str, object]]:
     text = (specs / "bugs" / "BUGS.jsonl").read_text(encoding="utf-8")
     return [json.loads(line) for line in text.splitlines() if line.strip()]
@@ -486,20 +505,9 @@ def test_only_an_archived_drop_keeps_its_id_known(
 ) -> None:
     """A commit dropping a referenced record without archiving it would leave a target
     `check` refuses: the write refuses it too. Archived, the id stays known."""
-    import importlib.util
-
+    store = _store(script)
     other = {**_OPEN_RECORD, "id": "b-bug", "caused_by": "a-bug"}
     specs = _ledger(tmp_path, _OPEN_RECORD, other)
-    sys.path.insert(0, str(script.parent))
-    try:
-        spec = importlib.util.spec_from_file_location(
-            "_bugs_store", script.parent / "_bugs_store.py"
-        )
-        assert spec is not None and spec.loader is not None
-        store = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(store)
-    finally:
-        sys.path.remove(str(script.parent))
     ledger = specs / "bugs" / "BUGS.jsonl"
     drop = lambda rs: [r for r in rs if r["id"] != "a-bug"]  # noqa: E731
     if archive:
@@ -509,6 +517,34 @@ def test_only_an_archived_drop_keeps_its_id_known(
         with pytest.raises(store.Refusal, match="names no record"):
             store.commit(ledger, drop)
         assert [r["id"] for r in _records(specs)] == ["a-bug", "b-bug"]
+
+
+def test_an_archive_racing_an_archive_loses_no_record(script: Path, tmp_path: Path) -> None:
+    """Review R4: B archives during A's first apply; A's retry re-reads both files, so
+    every record survives in the ledger or the archive."""
+    store = _store(script)
+    closed = {
+        **_OPEN_RECORD,
+        "status": "rejected",
+        "cause": "c",
+        "closed_at": "2026-09-21T00:00:00Z",
+    }
+    specs = _ledger(tmp_path, {**closed, "id": "old-a"}, {**closed, "id": "old-b"}, _OPEN_RECORD)
+    ledger = specs / "bugs" / "BUGS.jsonl"
+    calls: list[int] = []
+
+    def apply_a(records: list[dict[str, object]]) -> list[dict[str, object]]:
+        calls.append(1)
+        if len(calls) == 1:  # B runs to completion inside A's first attempt
+            time.sleep(0.01)  # a distinct mtime: the stamp sees B's write
+            store.commit(ledger, lambda rs: [r for r in rs if r["id"] != "old-b"], archive=True)
+        return [r for r in records if r["id"] != "old-a"]
+
+    store.commit(ledger, apply_a, archive=True)
+    histo = specs / "bugs" / "_archive" / "bugs_histo.jsonl"
+    archived = [json.loads(line)["id"] for line in histo.read_text().splitlines()]
+    assert [r["id"] for r in _records(specs)] == ["a-bug"]
+    assert sorted(archived) == ["old-a", "old-b"]
 
 
 def test_resolve_accepts_an_archived_caused_by(script: Path, tmp_path: Path) -> None:
