@@ -135,10 +135,12 @@ def main(argv: list[str] | None = None) -> int:
     specs = find_specs(args.specs)
     if args.verb == "check":
         findings = check(specs)
-        print(json.dumps(findings, indent=2)) if args.json else [
+        errors = [f for f in findings if f["verdict"] == "error"]
+        # --json is the doctor's contract: errors only; the text view also lists (AC3.2).
+        print(json.dumps(errors, indent=2)) if args.json else [
             print(f"{CODE} {f['verdict']} {f['path']}:{f['line']} {f['message']}") for f in findings
         ]
-        return 1 if any(f["verdict"] == "error" for f in findings) else 0
+        return 1 if errors else 0
     try:
         return _VERBS[args.verb](args, specs)
     except (Refusal, drift.Refusal) as refusal:

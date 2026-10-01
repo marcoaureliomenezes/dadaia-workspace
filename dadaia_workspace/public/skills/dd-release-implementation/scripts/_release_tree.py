@@ -39,22 +39,31 @@ from _specs import quote, script, with_specs  # noqa: E402
 __all__ = ["check", "drift", "memory_errors", "tree_findings"]
 
 _SKILLS = Path(__file__).resolve().parents[2]
-#: The verb that writes each kind's pointer back to the release (`{i}` the id, `{r}` it).
+#: The verb writing a LIVE record's pointer back to the release (`{i}` the id, `{r}` it).
 _POINTER = {
     "backlog": ("dd-backlog-definition/scripts/backlog.py",
                 "exit {i} --disposition delivered --release {r}"),
-    "bugs": ("dd-bug-resolution/scripts/bugs.py", "resolve {i} --resolved-release {r}"),
     "findings": ("dd-audit-project/scripts/audit.py",
                  "disposition {a} {i} --disposition resolved --release {r}"),
 }  # fmt: skip
+#: The one operator act for a record no verb can point back alone (ADR 0158: no placeholder).
+_ACT = {
+    "backlog": "backlog entry {i} already exited naming another release",
+    "bugs": "resolve bug {i} in release {r} (`bugs.py resolve {i} --resolved-release {r}` "
+            "with its cause, lineage and evidence triple)",
+    "findings": "finding {i}'s audit closed without naming release {r}",
+}  # fmt: skip
 
 
-def _trace(specs: Path, release: str, carried: dict[str, list[str]]) -> list[tuple[str, str, str]]:
-    """Each carried id as ``(kind, id, standing)`` (ADR 0127), asked of its OWNING ledger,
+def _trace(
+    specs: Path, release: str, carried: dict[str, list[str]]
+) -> list[tuple[str, str, str, bool]]:
+    """Each carried id as ``(kind, id, standing, live)`` (ADR 0127), asked of its OWNING ledger,
     live or archived: ``traced`` when its record points back to *release* (a delivered or
     superseded exit naming it, a to-bug exit whose bug stands, a bug resolved in it,
     rejected, or superseded by a bug that traces, a finding dispositioned to it, live or in
-    its closed audit's record), ``untraced`` while it does not yet, else why it is wrong."""
+    its closed audit's record), ``untraced`` while it does not yet, else why it is wrong;
+    ``live`` when a verb can still write its pointer (an active entry, an open audit's finding)."""
     document = specs / "backlog" / "BACKLOG.json"
     active = json.loads(document.read_text(encoding="utf-8")) if document.is_file() else {}
     exits = records(specs / "backlog/_archive/backlog_histo.jsonl")
@@ -86,7 +95,14 @@ def _trace(specs: Path, release: str, carried: dict[str, list[str]]) -> list[tup
         back = record.get("resolved_release" if kind == "bugs" else "release")
         return "traced" if back == release or record.get("status") == "rejected" else "untraced"
 
-    return [(kind, i, standing(kind, i)) for kind, ids in carried.items() for i in ids]
+    live = {
+        "backlog": {e.get("id") for e in active.get("active") or []},
+        "bugs": set(),
+        "findings": set(found),
+    }
+    return [
+        (kind, i, standing(kind, i), i in live[kind]) for kind, ids in carried.items() for i in ids
+    ]
 
 
 def _origin_findings(specs: Path) -> list[dict[str, Any]]:
@@ -121,12 +137,15 @@ def _origin_findings(specs: Path) -> list[dict[str, Any]]:
         )
     )
     out = []
-    for kind, i, standing in rows:
+    for kind, i, standing, writable in rows:
         row = finding(rel, line, f"Origin {kind}:{i} {standing}")
-        if standing == "untraced" and swept:
+        values = {"i": quote(i), "a": quote(i.rpartition("-F")[0]), "r": live.release_id}
+        if standing == "untraced" and swept and writable:
             skill, verb = _POINTER[kind]
-            fix = verb.format(i=quote(i), a=quote(i.rpartition("-F")[0]), r=live.release_id)
-            row["fix"] = with_specs(f"{script(_SKILLS / skill)} {fix}", specs)
+            row["fix"] = with_specs(f"{script(_SKILLS / skill)} {verb.format(**values)}", specs)
+        elif standing == "untraced" and swept:
+            act = _ACT[kind].format(**values)
+            row["fix"] = f"Operator action: {act}, or rule it out of the Origin line of {spec}."
         elif standing in ("traced", "untraced"):
             row["verdict"] = "info"
         out.append(row)

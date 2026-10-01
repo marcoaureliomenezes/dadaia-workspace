@@ -58,9 +58,10 @@ def check_exit(specs: Path, active: Items, slug: str, values: dict[str, Any]) ->
     required = REQUIRED_EVIDENCE[disposition]
     supplied = {"release": release, "reason": reason}[required]
     picks = _picks(specs, slug) if required == "release" else []
-    # The latest picking release is the real value; with none, show the Origins there are.
+    # The latest picking release is the real value; with none, the act is the operator's.
     fix = (f"{SCRIPT} exit {slug} --disposition {disposition} --release {picks[-1]}" if picks
-           else f"grep -n '^\\*\\*Origin:' {specs / 'releases'}/*/rc-*/SPEC.md")  # fmt: skip
+           else f"Operator action: name {slug} in the `backlog:` clause of a candidate SPEC's "
+                f"first `**Origin:**` line under {specs / 'releases'}, then rerun this exit.")  # fmt: skip
     if not (supplied or "").strip():
         raise Refusal(
             f"disposition {disposition!r} requires --{required}: the histo record is the "

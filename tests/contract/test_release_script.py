@@ -414,10 +414,15 @@ def test_a_missing_pointer_is_a_finding_once_the_candidate_logs_its_dispositions
     (specs / "releases/0.5.0/rc-1/SPEC.md").write_text(
         "# S\n\n**Status:** Approved\n**Origin:** backlog:a-real-entry; bugs:still-broken,already-fixed\n", "utf-8")  # fmt: skip
     _seed_ledgers(specs, log=[{**entry, "ts": "2025-12-31T00:00:00Z"}])
-    assert [(f["verdict"], f["message"]) for f in _origin_rows(script, specs)] == [
-        ("info", "Origin backlog:a-real-entry untraced"),
-        ("info", "Origin bugs:still-broken untraced"),
-        ("info", "Origin bugs:already-fixed traced"),
+    assert _origin_rows(script, specs) == []  # --json, the doctor's contract: errors only
+    listed = subprocess.run([sys.executable, str(script), "check", "--specs", str(specs)],
+                            capture_output=True, text=True)  # fmt: skip
+    assert [
+        ln.split(" ", 3)[3] for ln in listed.stdout.splitlines() if " info " in ln
+    ] == [  # fmt: skip
+        "Origin backlog:a-real-entry untraced",
+        "Origin bugs:still-broken untraced",
+        "Origin bugs:already-fixed traced",
     ]
 
     _seed_ledgers(specs, log=[entry])
@@ -426,7 +431,26 @@ def test_a_missing_pointer_is_a_finding_once_the_candidate_logs_its_dispositions
     assert [(f["line"], f["message"]) for f in errors] == [
         (4, "Origin backlog:a-real-entry untraced"), (4, "Origin bugs:still-broken untraced")]  # fmt: skip
     assert " exit a-real-entry --disposition delivered --release 0.5.0 --specs " in errors[0]["fix"]
-    assert " resolve still-broken --resolved-release 0.5.0 --specs " in errors[1]["fix"]
+    assert errors[1]["fix"].startswith("Operator action: resolve bug still-broken in release 0.5.0")
+    assert "<" not in errors[1]["fix"]  # ADR 0158: a bug's resolve needs evidence no row holds
+
+
+def test_a_deferred_carried_bug_is_untraced_after_the_sweep(script: Path, tmp_path: Path) -> None:
+    """Operator ruling 2026-10-01: a carried bug `deferred` at the closing sweep stays
+    untraced, an error whose fix is the operator's act (resolve it here, or rule on scope)."""
+    specs = _specs(tmp_path, _GOOD + SCHEDULE)
+    state = specs / "releases/0.5.0/_RELEASE.json"
+    state.write_text(json.dumps({**json.loads(state.read_text("utf-8")), "phase": "CLOSURE"}))
+    _seed_ledgers(specs, log=[{"ts": "2026-01-02T00:00:00Z", "agent": "a", "kind": "dispositions",
+                               "text": "t"}])  # fmt: skip
+    with (specs / "bugs/BUGS.jsonl").open("a") as ledger:
+        ledger.write(json.dumps({"id": "parked", "status": "deferred", "reason": "later"}) + "\n")
+    (specs / "releases/0.5.0/rc-1/SPEC.md").write_text("**Origin:** bugs:parked\n", "utf-8")
+
+    [row] = _origin_rows(script, specs)
+
+    assert row["message"] == "Origin bugs:parked untraced"
+    assert row["fix"].startswith("Operator action: resolve bug parked in release 0.5.0")
 
 
 def test_a_carried_id_is_traced_through_its_owning_ledger_after_it_moves(

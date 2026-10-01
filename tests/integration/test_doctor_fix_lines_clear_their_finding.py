@@ -458,13 +458,17 @@ def test_an_untraced_origin_id_is_cleared_by_its_printed_fix(repo: Path) -> None
         {"schema": "backlog-v1", "active": [_active_entry("carried", "c", "candidate")]}))  # fmt: skip
     spec = specs / "releases" / _RELEASE / "rc-1" / "SPEC.md"
     spec.write_text(spec.read_text("utf-8").replace("operator-demand", "backlog:carried"), "utf-8")
-    state = specs / "releases" / _RELEASE / "_RELEASE.json"
-    sweep = {"ts": "2026-01-01T00:00:00Z", "agent": "a", "kind": "dispositions", "text": "t"}
-    state.write_text(json.dumps({**json.loads(state.read_text("utf-8")), "log": [sweep]}))
 
     def origin_errors() -> list[SectionFinding]:
         found = _ledgers_section(None, specs, str(repo), None).findings
-        return [f for f in found if "Origin" in f.message and f.error]
+        rows = [f for f in found if "Origin" in f.message]
+        assert all(f.error for f in rows), rows  # a listing row never reaches the doctor
+        return rows
+
+    assert origin_errors() == []  # before the sweep the carried id is only listed
+    state = specs / "releases" / _RELEASE / "_RELEASE.json"
+    sweep = {"ts": "2026-01-01T00:00:00Z", "agent": "a", "kind": "dispositions", "text": "t"}
+    state.write_text(json.dumps({**json.loads(state.read_text("utf-8")), "log": [sweep]}))
 
     [before] = origin_errors()
     assert before.message.startswith(f"releases/{_RELEASE}/rc-1/SPEC.md:5 "), before.message
