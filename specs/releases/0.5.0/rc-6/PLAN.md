@@ -99,7 +99,6 @@ Bug-history lessons (audit of the fix chain):
 | Kimi | `UserPromptSubmit` (:148), `PostCompact` → `post-compact` (:149) | none (`_KIMI` env only, :136-138) | plain stdout = context (the channel `ctx_inject` already injects memory through) |
 
 - Every harness therefore has a context channel; Kimi's is UserPromptSubmit, so no AC2.7 narrowing.
-- Cadence: a ctx-inject lane registered on `UserPromptSubmit` repeats the line on every prompt while the venv is missing (the shell prologue has no session state without the venv). The first delivery is the session's first hook on that channel; the repeat is the honest cost of no marker file — no flag, no second path. The main thread confirms this reading of "once per session" at the review checkpoint.
 - Δ prod ≈ +7 (the dead `json` key −1), tests ≈ +3 (one stdout row per dialect, Kimi included, in the existing missing-venv case).
 
 ### 2.5 Small units (AC2.9, AC2.11, AC2.14, AC2.17)
