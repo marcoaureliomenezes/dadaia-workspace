@@ -53,11 +53,13 @@ def _imported_roots(path: Path) -> set[str]:
 #: The cross-skill import edges, each a read-only use of the grammar's one owner (ADR
 #: 0135): the release skill reads the navigator's drift decider and, at closure, the
 #: worktrees' rows; the worktree script reads the release skill's trio status parser and
-#: the backlog exit its Origin parser (ADR 0161) and the bug reader (ADR 0137). No module imports back along its own edge.
+#: the backlog exit its Origin parser (ADR 0161) and the bug reader (ADR 0137); `_specs`
+#: reads the worktree kinds. No module imports back along its own edge.
 _CROSS_SKILL_EDGES = {
     "dd-release-implementation": {"_memory_drift", "_worktree_git", "_worktree_kinds"},
     "dd-gitflow-default": {"_release_schema"},
     "dd-backlog-definition": {"_release_schema", "_bugs_store"},
+    "dd-bug-resolution": {"_worktree_kinds"},  # `_specs`: a write verb's kind (AC4.4)
 }
 
 

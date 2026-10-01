@@ -13,9 +13,10 @@ import sys
 from pathlib import Path
 
 
-def find_specs(given: Path | None) -> Path:
+def find_specs(given: Path | None, *, ledger: str | None = None) -> Path:
     """*given*, else the nearest git-rooted ``specs/`` at or above the cwd — never created:
-    a missing tree refuses, its fix naming the tree of the context `dadaia` reports bound."""
+    a missing tree refuses, its fix rerunning on the bound context's tree — for a verb
+    writing *ledger* (repo-relative), the worktree of the kind whose allowed set holds it."""
     here, argv = Path.cwd().resolve(), sys.argv
     trees = (
         [given] if given else [d / "specs" for d in (here, *here.parents) if (d / ".git").exists()]
@@ -24,19 +25,13 @@ def find_specs(given: Path | None) -> Path:
         return tree.resolve()
     rest = (w for i, w in enumerate(argv) if i and "--specs" not in (w, argv[i - 1]))
     rerun = " ".join((script(Path(argv[0])), *map(quote, rest)))
-    print(f"error: no specs tree at {given or f'or above {here}'} — nothing was written",
-          f"fix: {_bound_fix(here, rerun)}", sep="\n", file=sys.stderr)  # fmt: skip
+    fix, note = _bound_fix(here, rerun, ledger)
+    print(f"error: no specs tree at {given or f'or above {here}'} — nothing was written{note}",
+          f"fix: {fix}", sep="\n", file=sys.stderr)  # fmt: skip
     raise SystemExit(1)
 
 
-#: The worktree kind each ledger script writes through; `audit.py` writes `specs/audits/`
-#: in the repo tree directly (rc-5 AC1.1).
-_KIND = {"bugs": "bug", "backlog": "backlog", "release": "release", "memory": "release"}
-
-
-def _bound_fix(here: Path, rerun: str) -> str:
-    """*rerun* on a writable tree of the bound context's main repo: the open worktree of
-    the ledger's kind, else the command opening one."""
+def _bound_fix(here: Path, rerun: str, ledger: str | None) -> tuple[str, str]:
     for root, venv in ((d, d / ".dadaia" / ".venv") for d in (here, *here.parents)):
         if cli := shutil.which("dadaia", path=f"{venv / 'bin'}{os.pathsep}{venv / 'Scripts'}"):
             shown = subprocess.run(
@@ -45,16 +40,26 @@ def _bound_fix(here: Path, rerun: str) -> str:
             try:
                 repo = str(json.loads(shown.stdout)["main_repo"])
             except (ValueError, LookupError, TypeError):
-                return f"{quote(cli)} context list"
-            if (kind := _KIND.get(Path(sys.argv[0]).stem)) is None:
-                return with_specs(rerun, root / "repos" / repo / "specs")
+                return f"{quote(cli)} context list", ""
+            if (kind := _kind(ledger)) is None:  # a read, or `specs/audits/` (rc-5 AC1.1)
+                return with_specs(rerun, root / "repos" / repo / "specs"), ""
             if trees := sorted((root / "worktrees" / repo).glob(f"*-{kind}")):
-                return with_specs(rerun, trees[0] / "specs")
-            worktree = (
-                Path(__file__).resolve().parents[2] / "dd-gitflow-default/scripts/worktree.py"
-            )
-            return f"{script(worktree)} new {quote(repo)} --kind {kind}"
-    return "Operator action: re-run inside a repo that holds its specs/ tree"
+                many = f"; the first by name of {len(trees)} open {kind} worktrees"
+                return with_specs(rerun, trees[0] / "specs"), many if trees[1:] else ""
+            return f"{script(_GITFLOW / 'worktree.py')} new {quote(repo)} --kind {kind}", ""
+    return "Operator action: re-run inside a repo that holds its specs/ tree", ""
+
+
+_GITFLOW = Path(__file__).resolve().parents[2] / "dd-gitflow-default" / "scripts"
+
+
+def _kind(ledger: str | None) -> str | None:
+    if ledger is None:
+        return None
+    sys.path.append(str(_GITFLOW))  # the kinds' one owner, as `_worktree_new.py` reaches it
+    from _worktree_kinds import kind_holding
+
+    return kind_holding(ledger)
 
 
 def quote(word: str) -> str:

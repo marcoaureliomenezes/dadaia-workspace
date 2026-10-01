@@ -194,33 +194,44 @@ def test_a_write_over_an_unreadable_line_refuses_naming_it(
     assert f"sed -n '2p' {ledger}" in done.stderr
 
 
+_APPEND = ["append", "--bug-id", "x", "--title", "t", "--severity", "LOW", "--surface", "cli",
+           "--component", "c", "--context", "c", "--symptom", "s", "--repro", "r", "--expected", "e"]  # fmt: skip
+
+
 @pytest.mark.skipif(sys.platform == "win32", reason="the fake workspace CLI is a shebang script")
-@pytest.mark.parametrize("open_tree", [True, False], ids=["open-bug-worktree", "no-bug-worktree"])
+@pytest.mark.parametrize(
+    ("argv", "trees", "fix", "note"),
+    [
+        (["stats"], ("0.5.0a-bug",), "{rerun} --specs {ws}/repos/demo/specs", ""),
+        (_APPEND, ("0.5.0a-impl", "0.5.0b-bug"), "{rerun} --specs {ws}/worktrees/demo/0.5.0b-bug/specs", ""),
+        (_APPEND, ("0.5.0c-bug", "0.5.0b-bug"), "{rerun} --specs {ws}/worktrees/demo/0.5.0b-bug/specs",
+         "; the first by name of 2 open bug worktrees"),
+        (_APPEND, (), "{py} {ws}/dd-gitflow-default/scripts/worktree.py new demo --kind bug", ""),
+    ],
+)  # fmt: skip
 def test_a_missing_specs_tree_is_refused_never_created(
-    script: Path, tmp_path: Path, open_tree: bool
+    script: Path, tmp_path: Path, argv: list[str], trees: tuple[str, ...], fix: str, note: str
 ) -> None:
-    """bug-law-spelling-registers-into-a-reaped-root-specs-tree; AC4.4 `_bound_tree`: the fix
-    names the open worktree of the ledger's kind (`bug`), else the command opening one —
-    never `repos/<r>/specs`, which only `specs/audits/` may write."""
+    """bug-law-spelling-registers-into-a-reaped-root-specs-tree; AC4.4 `_bound_tree`: a read
+    verb reruns on the bound repo tree (and runs as printed); a write verb's fix names the
+    open worktree of its ledger's kind (`bug`), else the command opening one — never
+    `repos/<r>/specs`, which only `specs/audits/` may write."""
     (cli := tmp_path / ".dadaia/.venv/bin/dadaia").parent.mkdir(parents=True)
     cli.write_text(f'#!{sys.executable}\nprint(\'{{"main_repo": "demo"}}\')\n', "utf-8")
     cli.chmod(0o755)
     (tmp_path / ".git").mkdir()
-    if open_tree:
-        (tmp_path / "worktrees/demo/0.5.0a-impl").mkdir(parents=True)
-        (tmp_path / "worktrees/demo/0.5.0b-bug").mkdir(parents=True)
-    argv = ["append", "--bug-id", "x", "--title", "t", "--severity", "LOW", "--surface", "cli",
-            "--component", "c", "--context", "c", "--symptom", "s", "--repro", "r", "--expected", "e"]  # fmt: skip
+    stage_skill_scripts("dd-gitflow-default", tmp_path / "dd-gitflow-default" / "scripts")
+    for name in trees:
+        (tmp_path / "worktrees" / "demo" / name).mkdir(parents=True)
     done = _run(script, *argv, "--specs", "specs", cwd=tmp_path)
     assert done.returncode == 1 and not (tmp_path / "specs").exists()
-    worktree = script.parents[2] / "dd-gitflow-default" / "scripts" / "worktree.py"
-    fix = (
-        f"fix: {sys.executable} {script} {' '.join(argv)} "
-        f"--specs {tmp_path}/worktrees/demo/0.5.0b-bug/specs"
-        if open_tree
-        else f"fix: {sys.executable} {worktree} new demo --kind bug"
-    )
-    assert [ln for ln in done.stderr.splitlines() if ln.startswith("fix:")] == [fix]
+    rerun = f"{sys.executable} {script} {' '.join(argv)}"
+    want = fix.format(rerun=rerun, ws=tmp_path, py=sys.executable)
+    assert [ln for ln in done.stderr.splitlines() if ln.startswith("fix:")] == [f"fix: {want}"]
+    assert done.stderr.splitlines()[0].endswith(f"nothing was written{note}")
+    if argv == ["stats"]:  # the read runs as printed
+        _ledger(tmp_path / "repos" / "demo")
+        assert subprocess.run(want, shell=True, check=False, cwd=tmp_path).returncode == 0  # noqa: S602
 
 
 def test_a_fix_already_naming_its_tree_gains_no_second_specs() -> None:

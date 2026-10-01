@@ -132,7 +132,8 @@ _VERBS = {"new": _new, "phase": _phase, "drift": _drift, "memory": _memory, "shi
 
 def main(argv: list[str] | None = None) -> int:
     args = _parser().parse_args(argv)
-    specs = find_specs(args.specs)
+    reads = args.verb in ("check", "drift")
+    specs = find_specs(args.specs, ledger=None if reads else f"specs/releases/{STATE}")
     if args.verb == "check":
         findings = check(specs)
         errors = [f for f in findings if f["verdict"] == "error"]

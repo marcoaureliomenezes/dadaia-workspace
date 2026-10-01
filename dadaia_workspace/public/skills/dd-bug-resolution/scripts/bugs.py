@@ -142,7 +142,8 @@ def _write(args: argparse.Namespace, specs: Path) -> int:
 
 def main(argv: list[str] | None = None) -> int:
     args = _parser().parse_args(argv)
-    specs = find_specs(args.specs)
+    reads = args.verb in ("check", "status", "stats")
+    specs = find_specs(args.specs, ledger=None if reads else f"specs/{LEDGER}")
     if args.verb == "check":
         findings = check(specs)
         print(json.dumps(findings, indent=2)) if args.json else [
