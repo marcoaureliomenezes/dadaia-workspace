@@ -140,6 +140,15 @@
       "description": "specs/AGENTS.md is rendered and ignored (.gitignore /specs/*), so a new worktree lacks it and doctor --specs-dir <wt>/specs reports TREE-5 plus a knock-on MEM-DRIFT-2. Decide whether worktree.py new renders it or doctor scopes TREE-5 to the main checkout. Destination: rc-8 W6.",
       "provenance": "dd-code-reviewer review of bdae61bb (2026-09-30) INFO 5; rc-6 PLAN \u00a74 carry",
       "relates": []
+    },
+    {
+      "id": "seventh-fail-open-path-law-line",
+      "title": "The root map \u00a73 states the seventh fail-open path: an unreadable context registry judges nothing under repos/ or worktrees/",
+      "opened": "2026-10-01",
+      "status": "idea",
+      "description": "Operator ruling 2026-10-01: \"Aprovo AC2.8 = os 7 reais (Recomendado)\" \u2014 the law states every fail-open path the code has. core/context_registry.py registered_slugs returns ({\"*\"},{\"*\"}) on an unreadable registry, so the layout gate and doctor judge nothing under repos/ or worktrees/ (rc-6 PLAN \u00a72.2); the root map \u00a73 (dadaia_workspace/public/data/AGENTS.md), the single statement of fail-open paths, lists six and lacks this line. Add it there, pinned by tests/contract/test_law_states_what_the_code_does.py. Destination: rc-7 W4 (one text renderer / law statements). Cites: finding 20260930-structural-convergence-F080, ADR 0132, rc-6 PLAN \u00a72.2, the rc-7 SPEC draft.",
+      "provenance": "operator ruling 2026-10-01 on rc-6 AC2.8 (\"Aprovo AC2.8 = os 7 reais (Recomendado)\"); F080 reason carries the unreadable-registry law line to rc-7 W4",
+      "relates": []
     }
   ]
 }
