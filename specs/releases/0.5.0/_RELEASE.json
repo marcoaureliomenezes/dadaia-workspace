@@ -1,7 +1,7 @@
 {
   "schema": "release-state-v1",
   "release": "0.5.0",
-  "phase": "CLOSURE",
+  "phase": "DEFINITION",
   "defined": {
     "sha": "73b2b863",
     "ts": "2026-10-01T04:46:02Z"
@@ -723,6 +723,12 @@
       "agent": "main-thread",
       "kind": "note",
       "text": "Candidate 6 closure merged into develop by PR #276 (merge 0d2610ee, head bdf3b602, every check green, dd-code-reviewer APPROVED bdf3b602). Gate: continue — operator standing goal: four RC waves (rc-6..rc-9) by severity, then promote."
+    },
+    {
+      "ts": "2026-10-01T05:44:21Z",
+      "agent": "release.py new",
+      "kind": "note",
+      "text": "Candidate born on 0.5.0 (prior candidate closed at 3699adfe)"
     }
   ]
 }
