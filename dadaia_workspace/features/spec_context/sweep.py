@@ -36,7 +36,12 @@ from pathlib import Path
 
 from dadaia_workspace.core.workspace_layout import occupied
 
-__all__ = ["guarded", "lstat", "move", "remove", "rmtree", "walk"]
+__all__ = ["Skipped", "guarded", "lstat", "move", "remove", "rmtree", "walk"]
+
+
+class Skipped(str):
+    """A refusal line: the type, not the wording, tells a caller nothing was touched."""
+
 
 _OUTSIDE = "skipped '{label}' (outside the workspace)"
 _WORKTREE = "skipped '{label}' (holds a linked git worktree)"
@@ -136,9 +141,9 @@ def remove(workspace_root: Path, target: Path, label: str) -> str | None:
     if not occupied(target):
         return None
     if not _inside(workspace_root, target):
-        return _OUTSIDE.format(label=label)
+        return Skipped(_OUTSIDE.format(label=label))
     if linked_worktree(workspace_root, target):
-        return _WORKTREE.format(label=label)
+        return Skipped(_WORKTREE.format(label=label))
     if target.is_symlink() or target.is_file():
         try:
             target.unlink()
@@ -164,7 +169,7 @@ def hold(workspace_root: Path, target: Path, label: str, *, note: str = "") -> s
     day = workspace_root / ".dadaia" / REAPED_ZONE / datetime.now(tz=UTC).strftime("%Y%m%d")
     rel = target.relative_to(workspace_root)
     done = move(workspace_root, target, day / rel, label, note=note)
-    if len(rel.parts) > 1 and (done or "").startswith("moved "):
+    if len(rel.parts) > 1 and done is not None and not isinstance(done, Skipped):
         os.utime(day / rel.parts[0])
     return done
 
@@ -188,9 +193,9 @@ def move(
     if not occupied(target):
         return None
     if not _inside(workspace_root, target) or not _inside(workspace_root, destination):
-        return _OUTSIDE.format(label=label)
+        return Skipped(_OUTSIDE.format(label=label))
     if linked_worktree(workspace_root, target):
-        return _WORKTREE.format(label=label)
+        return Skipped(_WORKTREE.format(label=label))
     destination.parent.mkdir(parents=True, exist_ok=True)
     stem, n = destination.name, 0
     while occupied(destination):
