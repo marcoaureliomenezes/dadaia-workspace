@@ -23,7 +23,6 @@ from tests.helpers.skill_scripts import stage_skill_scripts
 pytestmark = pytest.mark.unit
 
 _PUBLIC = Path(__file__).resolve().parents[3] / "dadaia_workspace" / "public"
-_ROOT = Path(__file__).resolve().parents[3]
 _SCRIPTS = _PUBLIC / "skills" / "dd-release-implementation" / "scripts"
 _SCHEMAS = (
     _PUBLIC / "schemas" / "releases" / "release-state-v1.schema.json",
@@ -275,16 +274,15 @@ def test_check_reads_an_unspaced_open_marker_and_its_w_set(script: Path, tmp_pat
     assert "T-1 and T-2 both write x.py" in result.stdout, result.stdout
 
 
-def test_writes_reads_rc6_t_050_117_to_its_ten_paths() -> None:
-    """AC3.3: a backticked path inside parentheses is named, not written."""
-    sys.path.insert(0, str(_SCRIPTS))
-    from _release_schema import writes
+def test_writes_reads_rc6_t_050_117_to_its_ten_paths(script: Path) -> None:
+    """AC3.3: a backticked path inside parentheses is named, not written. The line is
+    rc-6 TASKS.md's T-050-117 verbatim (commit a386efc7), inlined: `ship` archives rc-6."""
+    sys.path.insert(0, str(script.parent))  # the staged copy: no bytecode beside the source
+    from _release_schema import MARK_RE, writes
 
-    line = next(
-        line
-        for line in (_ROOT / "specs/releases/0.5.0/rc-6/TASKS.md").read_text().splitlines()
-        if "**T-050-117 " in line
-    )
+    line = '- [x] **T-050-117 — PROTECTED floor in code; the protected section.** `W:` `core/workspace_layout.py`, `f/spec_context/gate_policy.py`, `hooks/sdd_gate.py`, `f/spec_context/doctor.py`, `CONTEXT.md`, `tests/unit/features/spec_context/test_gate_policy.py`, `tests/unit/hooks/test_pre_gate.py`, `tests/unit/core/test_workspace_layout_zones.py`, `tests/unit/hooks/test_sdd_gate.py`, `tests/integration/scripts/test_run_mutation_baseline_wiring.py` (:65 reads `classify_path(...)[0]`), (:83 B39-7 unledgered row drops root `AGENTS.md`, now floor) (the grammar owner, :97,104 rewritten to the triple; `doctor.py:299` follows the triple)'  # fmt: skip
+    assert writes("`W:` `a.py` ) `b.py`") == ["a.py", "b.py"]  # a stray `)` drops nothing
+    assert [m[0] for m in MARK_RE.finditer("-\n\n- [ ]**T-1**")] == ["- [ ]**T-1**"]
     assert writes(line) == [
         "core/workspace_layout.py", "f/spec_context/gate_policy.py", "hooks/sdd_gate.py",
         "f/spec_context/doctor.py", "CONTEXT.md", "tests/unit/features/spec_context/test_gate_policy.py",

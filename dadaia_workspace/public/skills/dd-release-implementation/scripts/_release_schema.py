@@ -29,7 +29,7 @@ SHA_RE = re.compile(r"^[0-9a-f]{7,40}$")
 #: The task markers in order — open < reserved < done (ADR 0111); the ONE task-line grammar.
 MARKS = (" ", "-", "x")
 #: A task line: indent and any Markdown bullet (``-``, ``*``, ``+``) or none, the marker, the rest.
-MARK_RE = re.compile(r"^(\s*(?:[-*+]\s*)?\[)([ x-])(\].*)$", re.MULTILINE)
+MARK_RE = re.compile(r"^([ \t]*(?:[-*+][ \t]*)?\[)([ x-])(\].*)$", re.MULTILINE)
 _STATUS_RE = re.compile(r"^\*\*Status:\*\*\s*(.+?)\s*$", re.MULTILINE)
 #: The Origin clause kinds, each at most once on the line (ADR 0161).
 ORIGIN_KINDS = ("backlog", "bugs", "findings")
@@ -104,6 +104,6 @@ def writes(line: str) -> list[str]:
     parenthesized span (nesting counted) is named, not written."""
     field, depth, kept = line.partition("`W:`")[2].split("·")[0], 0, ""
     for char in field:
-        depth += (char == "(") - (char == ")")
+        depth = max(0, depth + (char == "(") - (char == ")"))
         kept += char if depth == 0 and char != ")" else ""
     return re.findall(r"`([^`]+)`", kept)
