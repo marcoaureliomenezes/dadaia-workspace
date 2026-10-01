@@ -107,7 +107,7 @@ Each finding that cites a bug or an entry shares its destination; findings are `
   - Fixtures compose the secrets at runtime (`dd-release-implementation` §2a).
 - AC3.12 The `to-bug` exit (0137; F063, F102):
   - `backlog.py exit <slug> --disposition to-bug --reason <bug-id>` exits when the id names a `BUGS.jsonl` record, read by importing `bugs.py`'s reader; an unknown id is refused.
-  - `backlog.py check` accepts `to-bug`; `specs/backlog/AGENTS.md` lists four dispositions; the backlog kind admits `specs/bugs/BUGS.jsonl`, so registration and exit share one worktree.
+  - `backlog.py check` accepts `to-bug`; the scaffold `specs/backlog/AGENTS.md` §3 points to `backlog.py exit --help`, which lists the four dispositions, since `tests/contract/test_zone_registry.py` refuses a law line restating a canonical set (T-050-138 review F7); the backlog kind admits `specs/bugs/BUGS.jsonl`, so registration and exit share one worktree.
   - `release.py check` reports a `to-bug` target that was later rejected; `task-line-grammar-one-reader` exits by it (§Origin map).
 - AC3.13 Commit shapes (F053, F054, F057; FR `gitflow-shape2-omits-backlog-histo`; 0106, 0136):
   - `dd-gitflow-default` §3a's staged set becomes "the kind's allowed set" (`KINDS`): a backlog exit stages `BACKLOG.json` with its histo; shape 2's ADR message is `docs(adr): propose|accept <slug>`.
@@ -142,11 +142,11 @@ Each finding that cites a bug or an entry shares its destination; findings are `
   - Command: `pytest tests/contract/test_cli_help_quality.py` over the whole command tree.
 - AC4.4 Fix lines run as printed (DEL `fix-lines-are-not-one-runnable-command`; FR `doctor-tmp-expiry-foreign-owned-entry-never-clears`; 0158):
   - Each site the record names, in its 0158 form with real values:
-    - command: the session-record BLOCK (`context bind` with the resolved context; unbound, `context list`); the pre-push refusal (the live work branch); the root-whitelist BLOCK (through `mkdir_line`, to `.dadaia/tmp/<agent>/<YYYYMMDD>/`: `<agent>` is the payload's agent identity where the dialect carries one, per the as-is review, else the main thread's one fixed segment, never invented, which the PLAN names and checks against the segments in use; the printed path is always one the tmp law admits; F098's message is rc-8's AC6.4); `doctor --context nosuch` (`context list`); the gate scope BLOCK (`context bind <owner>`); the `backlog exit` hint (a disposition the entry can take);
-    - `Operator action:`: the id-less session relaunch, and the onboarding first-pass Next.
+    - command: the session-record BLOCK (`context bind` with the resolved context; unbound, `context list`); the pre-push refusal (the live work branch); the root-whitelist BLOCK (through `mkdir_line`, to `.dadaia/tmp/<agent>/<YYYYMMDD>/`: `<agent>` is the payload's agent identity where the dialect carries one, per the as-is review, else the main thread's one fixed segment, never invented, which the PLAN names and checks against the segments in use; the printed path is always one the tmp law admits; F098's message is rc-8's AC6.4); `doctor --context nosuch` (`context list`); the gate scope BLOCK (`context bind <owner>`);
+    - `Operator action:`: the id-less session relaunch; the onboarding first-pass Next; `backlog.py exit` with a word outside the exit dispositions (`deferred` included), refused with `Operator action: a postponed item stays in active[] and needs no exit` and nothing written, as backlog law §3 keeps a postponed item live (operator ruling 2026-10-01: "Say it stays live").
   - `sweep.guarded`'s skip line for an expired entry it cannot delete names the owner and `Operator action: remove <real path>`; once the entry is gone, `doctor --fix` clears the finding.
   - Correlate: `_specs._bound_tree` stops routing `--specs` to `repos/<r>/specs` (unwritable outside `specs/audits/`, rc-5 AC1.1); it names the open worktree of the ledger's kind, else `worktree.py new <r> --kind <kind>`.
-  - Correlate: `_backlog_exit`'s `--release` fix names the release it found.
+  - Correlate: each `backlog.py exit` refusal's fix belongs to its own evidence row. A live entry's `delivered` or `superseded` exit without a picking `--release` is refused with the same disposition and the latest release whose candidate SPEC picked it; no picking release, `Operator action:` naming the Origin's `backlog:` clause.
   - Command: the AC4.1 harness.
 - AC4.5 Ledger fixes (DEL `ledger-finding-fix-line-orders-a-hand-edit-the-law-forbids`):
   - Each ledger script's `check` emits its own fix naming its governance verb, one per invalid line; `ledger_scripts.py`'s hand-edit fallback is deleted. In the bug's repro the fix runs a `bugs.py` verb.
