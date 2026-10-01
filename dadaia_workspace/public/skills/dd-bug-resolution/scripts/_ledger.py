@@ -80,12 +80,15 @@ class LineError(ValueError):
 
 
 def records(path: Path) -> list[dict[str, Any]]:
-    """Every JSON object of the JSONL ledger *path*, in file order; absent reads empty.
-    Splits on ``\\n`` alone — ``splitlines()`` breaks a record holding U+2028."""
-    if not path.is_file():
-        return []
+    """Every JSON object of the JSONL ledger *path*, in file order; absent reads empty."""
+    return parse(path.read_text(encoding="utf-8")) if path.is_file() else []
+
+
+def parse(text: str) -> list[dict[str, Any]]:
+    """Every JSON object of JSONL *text*, split on ``\\n`` alone — ``splitlines()``
+    breaks a record holding U+2028."""
     out: list[dict[str, Any]] = []
-    for number, line in enumerate(path.read_text(encoding="utf-8").split("\n"), start=1):
+    for number, line in enumerate(text.split("\n"), start=1):
         if not line.strip():
             continue
         try:
