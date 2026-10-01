@@ -41,19 +41,26 @@ from pathlib import Path
 from typing import Any
 
 import pytest
+from typer.testing import CliRunner
 
+from dadaia_workspace import container
 from dadaia_workspace.cli.commands.doctor import (
     _build_specs_doctor,
     _ledgers_section,
     _specs_section,
 )
 from dadaia_workspace.cli.help_digest import command_paths
+from dadaia_workspace.cli.main import app
 from dadaia_workspace.core.doctor_rules import Rule, SectionFinding, rule_fix, run_section
 from dadaia_workspace.core.specs_version import CANONICAL_SPECS_VERSION
+from dadaia_workspace.core.workspace_layout import provisioned_zones
+from dadaia_workspace.features.spec_context.doctor import DoctorService
 from dadaia_workspace.features.specs.citations import dead_verb_citations
 from dadaia_workspace.features.specs.doctor import SpecsDoctor
 from dadaia_workspace.features.specs.rules import RULES as SPECS_RULES
+from dadaia_workspace.infrastructure.git_subprocess import GitSubprocessClient
 from tests.fixtures.harness_env import session_home
+from tests.fixtures.stores import context_store
 from tests.helpers import worktree_ws
 
 from ..unit.features.specs.test_doctor import _make_clean_specs_tree
@@ -479,10 +486,6 @@ def test_a_judgment_only_rule_never_makes_the_run_exit_1(repo: Path) -> None:
 
 
 def _doctor_json(specs: Path, *flags: str) -> list[dict[str, str]]:
-    from typer.testing import CliRunner
-
-    from dadaia_workspace.cli.main import app
-
     result = CliRunner().invoke(app, ["doctor", "--json", *flags, "--specs-dir", str(specs)])
     findings: list[dict[str, str]] = json.loads(result.output)["sections"]["specs"]["findings"]
     return findings
@@ -543,3 +546,29 @@ def test_a_worktree_finding_is_cleared_by_its_merge_fix(tmp_path: Path) -> None:
             (refix,) = worktree_ws.fixes(done)
             subprocess.run(refix.removeprefix("fix: "), shell=True, check=True, capture_output=True)  # noqa: S602
     assert doctor.check_worktrees("c") == []
+
+
+@pytest.mark.parametrize("present", [".dadaiaignore", "prompt.md"])
+def test_the_session_lane_re_creates_missing_core_and_rewrites_none(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, present: str
+) -> None:
+    """Intent: CONTRACT — AC2.4 (ADR 0096): the SessionStart lane re-creates a missing level-1
+    entry (`.dadaiaignore`, `prompt.md`, every provisioned zone) and rewrites no present one."""
+    (tmp_path / ".dadaia" / "states").mkdir(parents=True)
+    (tmp_path / ".dadaia" / "states" / "spec_contexts.json").write_text("{}", encoding="utf-8")
+    (tmp_path / present).write_text("# mine\n", encoding="utf-8")
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(
+        container,
+        "build_doctor_service",
+        lambda root: DoctorService(
+            context_store(root / ".dadaia/states"), GitSubprocessClient(), root
+        ),
+    )
+
+    lane = CliRunner().invoke(app, ["doctor", "--fix", "--expired-only", "--quiet"])
+
+    assert lane.exit_code == 0, lane.output
+    assert (tmp_path / ".dadaiaignore").is_file() and (tmp_path / "prompt.md").is_file()
+    assert all((tmp_path / ".dadaia" / zone.name).is_dir() for zone in provisioned_zones())
+    assert (tmp_path / present).read_text(encoding="utf-8") == "# mine\n"

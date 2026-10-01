@@ -11,7 +11,6 @@ from __future__ import annotations
 import json
 import os
 import time
-from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
@@ -21,6 +20,7 @@ from dadaia_workspace.core.harness_registry import L1_ENTRY_HARNESSES
 from dadaia_workspace.core.workspace_layout import (
     DADAIA_ROOT_FILES,
     DADAIAIGNORE,
+    LEVEL1_SEEDS,
     Creator,
     ZoneClass,
     provisioned_zones,
@@ -34,10 +34,9 @@ from dadaia_workspace.features.spec_context.doctor import (
     FindingVerdict,
 )
 from dadaia_workspace.infrastructure.git_subprocess import GitSubprocessClient
-from dadaia_workspace.infrastructure.json_harness_profile_store import JsonHarnessProfileStore
 from tests.fixtures.stores import context_store
 
-_TTL_ZONE = zones_with_ttl()[0]
+_TTL_ZONE = next(z for z in zones_with_ttl() if z.cls is ZoneClass.EPHEMERAL)
 _STATE_ZONE = next(z for z in zones_with_canon() if z.creator is Creator.INIT)
 _OPERATOR_ZONE = next(z for z in workspace_layout.DADAIA_ZONES if z.creator is Creator.OPERATOR)
 _INSTALL_ZONE = next(z for z in provisioned_zones() if z.creator is Creator.INSTALL)
@@ -48,15 +47,10 @@ def _make_doctor(root: Path) -> DoctorService:
     return DoctorService(context_store(root / ".dadaia" / "states"), GitSubprocessClient(), root)
 
 
-def _reaped(root: Path, rel: str) -> Path:
-    """Where the reaper holds *rel*: ``.dadaia/reaped/<YYYYMMDD>/<workspace-relative>``."""
-    day = datetime.now(tz=UTC).strftime("%Y%m%d")
-    return root / ".dadaia" / "reaped" / day / rel
-
-
 def _init_workspace(root: Path) -> None:
-    """The minimal compliant skeleton: every INIT/INSTALL zone present, `.dadaiaignore`."""
-    (root / DADAIAIGNORE).write_text("", encoding="utf-8")
+    """The minimal compliant skeleton: every INIT/INSTALL zone present, the level-1 seeds."""
+    for name in LEVEL1_SEEDS:
+        (root / name).write_text("", encoding="utf-8")
     dadaia = root / ".dadaia"
     for zone in provisioned_zones():
         (dadaia / zone.name).mkdir(parents=True, exist_ok=True)
@@ -77,13 +71,7 @@ def _profile(root: Path) -> Path:
 
 
 def _age(path: Path, epoch: float = _TWO_DAYS_AGO) -> None:
-    # Windows implements neither ``follow_symlinks=False`` nor lstat-side utime (bug
-    # doctor-root-tests-age-with-utime-follow-symlinks-false-unsupported-on-windows); the
-    # one test that must age a link itself skips there.
-    if os.utime in os.supports_follow_symlinks:
-        os.utime(path, (epoch, epoch), follow_symlinks=False)
-    else:
-        os.utime(path, (epoch, epoch))
+    os.utime(path, (epoch, epoch))
 
 
 def _by_path(findings: tuple[Finding, ...]) -> dict[str, Finding]:
@@ -225,71 +213,6 @@ def test_absent_harness_profile_is_missing_and_fix_seeds_it_from_present_dirs(
     assert not [f for f in _make_doctor(tmp_path).scan() if f.verdict is FindingVerdict.MISSING]
 
 
-def test_ttl_zones_expire_an_entry_whole_by_its_own_ttl_and_spare_the_zone_law(
-    tmp_path: Path,
-) -> None:
-    """reaper-judges-ttl-by-walking-every-file: an expired entry is ONE finding judged by its own
-    mtime, a live one none; every TTL zone uses its own code and TTL; bug
-    public-install-restores-expired-zone-agents-reblocks-preflight: the projected zone
-    ``AGENTS.md`` is never a candidate."""
-    _init_workspace(tmp_path)
-    for zone in zones_with_ttl():
-        (tmp_path / ".dadaia" / zone.name).mkdir(exist_ok=True)
-        stale = tmp_path / ".dadaia" / zone.name / "stale"
-        stale.write_text("", encoding="utf-8")
-        _age(stale, time.time() - (zone.ttl_seconds or 0) - 60)
-    zone_dir = tmp_path / ".dadaia" / _TTL_ZONE.name
-    old = zone_dir / "claude" / "20260801" / "x.png"
-    old.parent.mkdir(parents=True)
-    old.write_bytes(b"PNG")
-    _age(old.parent)
-    (zone_dir / "claude" / "today").mkdir()
-    law = zone_dir / "AGENTS.md"
-    law.write_text("# zone law", encoding="utf-8")
-    _age(law, time.time() - 400 * 86_400)
-    found = _by_path(_make_doctor(tmp_path).scan())
-
-    z = _TTL_ZONE.name
-    assert found[f"{z}/claude/20260801"].code == f"WS-{z.lstrip('.')}-expired"
-    assert found[f"{z}/claude/20260801"].detail == "(mtime 2d > ttl 1d)"
-    assert [p for p in found if p.startswith(f"{z}/")] == [f"{z}/claude/20260801", f"{z}/stale"]
-    codes = {f.code for f in found.values()}
-    assert {f"WS-{zone.name.lstrip('.')}-expired" for zone in zones_with_ttl()} <= codes
-    _make_doctor(tmp_path).fix()
-    assert law.exists()
-
-
-@pytest.mark.skipif(
-    os.utime not in os.supports_follow_symlinks,
-    reason="ageing a symlink itself needs utime(follow_symlinks=False), absent on Windows",
-)
-def test_symlinks_are_never_followed_and_only_the_link_is_deleted(tmp_path: Path) -> None:
-    ws = tmp_path / "ws"
-    ws.mkdir()
-    _init_workspace(ws)
-    outside = tmp_path / "outside"
-    outside.mkdir()
-    victim = outside / "keep.txt"
-    victim.write_text("keep", encoding="utf-8")
-    _age(victim)
-    zone_dir = ws / ".dadaia" / _TTL_ZONE.name
-    zone_dir.mkdir(exist_ok=True)
-    link = zone_dir / "link"
-    link.symlink_to(outside, target_is_directory=True)
-    _age(link)
-
-    findings = _make_doctor(ws).scan()
-    paths = {f.path for f in findings}
-
-    assert f"{_TTL_ZONE.name}/link" in paths
-    assert not any("keep.txt" in p for p in paths)
-
-    _make_doctor(ws).fix()
-
-    assert not link.exists() and not link.is_symlink()
-    assert victim.read_text(encoding="utf-8") == "keep"
-
-
 def test_ttl_walk_treats_an_entry_that_vanishes_mid_walk_as_absent(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -324,38 +247,8 @@ def test_ttl_walk_treats_an_entry_that_vanishes_mid_walk_as_absent(
 
 
 # ---------------------------------------------------------------------------
-# The reaper order, --expired-only
+# The reaper never aborts a pass
 # ---------------------------------------------------------------------------
-
-
-def test_the_reaper_lane_seeds_moves_slop_and_deletes_only_what_expired(tmp_path: Path) -> None:
-    """0.4.7 FR6b: there is no second, smaller lane. One ``fix()`` seeds what is missing,
-    MOVES slop into ``reaped/`` (never deletes it) and deletes only TTL-expired entries."""
-    _init_workspace(tmp_path)
-    (tmp_path / ".dadaia" / _INSTALL_ZONE.name).rmdir()
-    junk = tmp_path / "junk.txt"
-    junk.write_text("", encoding="utf-8")
-    zone_dir = tmp_path / ".dadaia" / _TTL_ZONE.name
-    zone_dir.mkdir(exist_ok=True)
-    stale = zone_dir / "stale"
-    stale.write_text("", encoding="utf-8")
-    _age(stale)
-
-    actions = _make_doctor(tmp_path).fix()
-
-    assert not stale.exists()
-    assert not junk.exists(), "slop is moved, not left in place"
-    assert _reaped(tmp_path, "junk.txt").exists(), "slop is held in reaped/, never deleted"
-    assert (tmp_path / ".dadaia" / _INSTALL_ZONE.name).is_dir()
-    assert [a.split(":")[0] for a in actions] == [
-        f"WS-{_INSTALL_ZONE.name}-missing",
-        "WS-root-slop",
-        f"WS-{_TTL_ZONE.name.lstrip('.')}-expired",
-    ]
-
-    # A second pass has nothing left to take: the held entry is canonical where it sits.
-    assert _make_doctor(tmp_path).fix() == []
-    assert _reaped(tmp_path, "junk.txt").exists()
 
 
 def test_fix_skips_and_reports_an_undeletable_entry_and_finishes_the_pass(
@@ -396,35 +289,6 @@ def test_fix_skips_and_reports_an_undeletable_entry_and_finishes_the_pass(
     assert not any(f"'{_TTL_ZONE.name}/x'" in a for a in deleted)
     assert any(f"skipped '{_TTL_ZONE.name}/x' (errno " in a for a in skipped), actions
     assert remaining[f"{_TTL_ZONE.name}/x"].verdict is FindingVerdict.EXPIRED
-
-
-def test_fix_skips_and_reports_a_failing_seed_and_still_deletes_expired(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """Bug doctor-scan-raises-when-a-ttl-entry-vanishes-mid-walk (finding 2): an unwritable
-    seed is skipped with its errno in the deletion's shape and the pass still deletes expired."""
-    _init_workspace(tmp_path)
-    _profile(tmp_path).unlink()
-    zone_dir = tmp_path / ".dadaia" / _TTL_ZONE.name
-    zone_dir.mkdir(exist_ok=True)
-    stale = zone_dir / "stale"
-    stale.write_text("", encoding="utf-8")
-    _age(stale)
-
-    def denied(*_: object, **__: object) -> None:
-        raise PermissionError(13, "Permission denied")
-
-    monkeypatch.setattr(JsonHarnessProfileStore, "write", denied)
-
-    actions = _make_doctor(tmp_path).fix()
-
-    assert not _profile(tmp_path).exists()
-    assert not stale.exists()
-    assert actions == [
-        f"WS-{_STATE_ZONE.name}-missing: skipped '{_STATE_ZONE.name}/harness_profile.json'"
-        " (errno 13: Permission denied)",
-        f"WS-{_TTL_ZONE.name}-expired: deleted '{_TTL_ZONE.name}/stale'",
-    ]
 
 
 @pytest.mark.parametrize("target_inside_workspace", [True, False])

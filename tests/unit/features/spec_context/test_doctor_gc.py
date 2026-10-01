@@ -1,4 +1,4 @@
-"""Doctor cleanup for retired concurrency state and caller-owned sessions.
+"""Doctor cleanup: retired concurrency state, caller-owned sessions and the one expiry table.
 
 Re-classification note (T-011-04 / FR-W1-04, ADR-8 amended): SESSION-record (bind) GC TTL
 semantics measure against the heartbeat-renewed ``last_seen_at`` (``session_store.is_live``);
@@ -10,19 +10,19 @@ exercising the REAL PostToolUse renewal path (no planted-pid fixtures).
 
 from __future__ import annotations
 
-# Guard: skip this entire module on platforms where fcntl is not available (e.g. Windows).
+import json
+import os
+import time
+from datetime import UTC, datetime, timedelta
+from pathlib import Path
+
 import pytest
 
-pytest.importorskip("fcntl")
-
-import json  # noqa: E402
-import os  # noqa: E402
-from datetime import UTC, datetime, timedelta  # noqa: E402
-from pathlib import Path  # noqa: E402
-
-from dadaia_workspace.features.spec_context.doctor import DoctorService  # noqa: E402
+from dadaia_workspace.core.workspace_layout import DADAIA_ZONES
+from dadaia_workspace.features.spec_context.doctor import DoctorService, FindingVerdict
 from dadaia_workspace.infrastructure.git_subprocess import GitSubprocessClient
 from dadaia_workspace.infrastructure.json_context_store import JsonContextStore
+from dadaia_workspace.infrastructure.json_harness_profile_store import JsonHarnessProfileStore
 from tests.fixtures.stores import context_store
 
 
@@ -151,3 +151,58 @@ def test_no_stale_records(tmp_path: Path, idle: int | None, renew: bool, survive
     assert record.exists() is survives
     assert any("GRAVEYARD-GC" in a and sid in a for a in actions) is not survives
     assert (live_session(ws, sid) is not None) is survives
+
+
+@pytest.mark.parametrize("lane", ["expire", "fix"])
+@pytest.mark.parametrize(
+    ("rel", "past_ttl", "after"),
+    [
+        pytest.param("tmp/claude/20260801", 60, "gone", id="ephemeral-tmp-deleted"),
+        pytest.param("reaped/20260901/x", 60, "gone", id="ephemeral-hold-deleted-at-its-ttl"),
+        pytest.param("handoff/ctx/p.handoff.json", 60, "held", id="AC2.10-output-handoff-held"),
+        pytest.param("tmp/claude/today", -60, "kept", id="live-entry-no-finding"),
+        pytest.param("handoff/AGENTS.md", 400 * 86_400, "kept", id="zone-law-never-a-candidate"),
+        pytest.param("tmp/link", 60, "gone", id="a-link-is-acted-on-never-followed"),
+    ],
+)  # fmt: skip
+def test_a_ttl_expiry_is_its_zone_class_act(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, lane: str, rel: str, past_ttl: int, after: str
+) -> None:
+    """Intent: CONTRACT — AC2.10, AC2.12 (the one expiry table; bugs
+    bug-proposal-handoff-reaped-without-a-hold, reaper-judges-ttl-by-walking-every-file,
+    doctor-scan-raises-when-a-ttl-entry-vanishes-mid-walk finding 2): an expired entry is one
+    finding; both lanes take it by its zone class — EPHEMERAL deleted, OUTPUT held in reaped/
+    and named by one REAPED finding; a live entry or a zone law yields none; a link is acted on,
+    its target never; a failing seed never stops the pass."""
+    ws = _make_workspace(tmp_path)
+    victim = tmp_path / "outside" / "keep.txt"
+    victim.parent.mkdir()
+    victim.write_text("keep", encoding="utf-8")
+    entry = ws / ".dadaia" / rel
+    entry.parent.mkdir(parents=True, exist_ok=True)
+    if rel.endswith("link"):
+        if os.utime not in os.supports_follow_symlinks:
+            pytest.skip("ageing a link itself needs utime(follow_symlinks=False)")
+        entry.symlink_to(victim.parent, target_is_directory=True)
+    else:
+        entry.write_text('{"findings": [{"message": "bug-proposal: x"}]}', encoding="utf-8")
+    zone = next(z for z in DADAIA_ZONES if z.name == rel.split("/")[0])
+    stamp = time.time() - (zone.ttl_seconds or 0) - past_ttl
+    os.utime(entry, (stamp, stamp), **({"follow_symlinks": False} if entry.is_symlink() else {}))
+    monkeypatch.setattr(JsonHarnessProfileStore, "write", _denied)
+    doctor = _make_doctor(ws)
+    before = [f.verdict for f in doctor.scan_ttl()]
+
+    actions = getattr(doctor, lane)()
+
+    held = list((ws / ".dadaia" / "reaped").glob(f"*/.dadaia/{rel}"))
+    assert before == ([] if after == "kept" else [FindingVerdict.EXPIRED])
+    assert (entry.is_symlink() or entry.exists(), bool(held)) == (after == "kept", after == "held")
+    remaining = [f.verdict for f in doctor.scan_ttl()]
+    assert remaining == ([FindingVerdict.REAPED] if after == "held" else [])
+    assert victim.read_text(encoding="utf-8") == "keep"
+    assert any("skipped 'states/harness_profile.json' (errno 13" in a for a in actions), actions
+
+
+def _denied(*_: object, **__: object) -> None:
+    raise PermissionError(13, "Permission denied")

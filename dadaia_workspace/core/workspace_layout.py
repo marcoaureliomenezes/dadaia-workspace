@@ -26,6 +26,7 @@ __all__ = [
     "DADAIA_ZONES",
     "HARNESS_DIRS",
     "DADAIAIGNORE",
+    "LEVEL1_SEEDS",
     "MEMORY_TOPLEVEL_FILES",
     "REPO_LAW",
     "REPO_TREE_ARTIFACTS",
@@ -196,6 +197,14 @@ def dadaiaignore_seed(workspace: Path) -> str:
             "# Operator-only: one root-relative pattern per line, * within one segment, a\n"
             "# trailing / for a directory; no ! and no ** (ADR 0093).\n"
         )
+
+
+#: The level-1 root files a workspace is born with and the SessionStart lane re-creates,
+#: never rewrites (ADRs 0095, 0096): name -> its first content. ``AGENTS.md`` is projected.
+LEVEL1_SEEDS: dict[str, Callable[[Path], str]] = {
+    DADAIAIGNORE: dadaiaignore_seed,
+    "prompt.md": lambda _: "",
+}
 
 
 def _matches(sub: str, pattern: str) -> bool:

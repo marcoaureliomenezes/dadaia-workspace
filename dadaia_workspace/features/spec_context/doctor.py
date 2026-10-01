@@ -5,8 +5,9 @@
 (``features.spec_context.sweep``) serves both it and ``fix()``, driven by the zone registry
 (``core.workspace_layout.DADAIA_ZONES``): root, harness dirs, the ``.dadaia/`` top level,
 the closed-canon zones, the TTL zones (only expired entries and holds) — each finding one
-``WS-<zone>-<verdict>`` code. ``fix()`` consumes the same findings in the fixed order;
-``expire()`` is its TTL tail alone, the SessionStart lane.
+``WS-<zone>-<verdict>`` code. ``expire()`` — the SessionStart lane and ``fix()``'s first
+step — seeds missing level-1 core and takes each TTL-expired entry by its zone class;
+``fix()`` then holds the slop.
 
 Bug class (the six-bug ``.dadaia/`` ledger, workspace-doctor-root4-false-positive-dadaia-hooks
 .. dadaia-reconcile-quarantines-sanctioned-references-clone): the doctor kept its own name
@@ -35,7 +36,7 @@ from dadaia_workspace.core.models.doctor_report import DoctorLine
 from dadaia_workspace.core.models.harness_profile import HarnessProfile
 from dadaia_workspace.core.models.spec_context import ContextState, SpecContextProject
 from dadaia_workspace.core.platform import PLATFORM
-from dadaia_workspace.core.workspace_layout import Zone
+from dadaia_workspace.core.workspace_layout import Zone, ZoneClass
 from dadaia_workspace.features.spec_context import sweep
 from dadaia_workspace.features.spec_context.service import git_hooks_dir
 from dadaia_workspace.infrastructure.git_subprocess import GitSubprocessClient
@@ -64,6 +65,10 @@ _DETAIL = {
     FindingVerdict.SLOP: "(not in the root law or .dadaiaignore)",
 }
 _CANONICAL = frozenset({FindingVerdict.CANON, FindingVerdict.OPERATOR, FindingVerdict.REAPED})
+
+#: What a TTL expiry does, by the zone's class: an OUTPUT entry may be unseen work (a
+#: no-operator bug proposal), so it is held; an EPHEMERAL one is deleted (AC2.10, AC2.12).
+_EXPIRY_ACT = {ZoneClass.OUTPUT: sweep.hold, ZoneClass.EPHEMERAL: sweep.remove}
 
 #: Directory names that end the repo-tree walk: a nested VCS/venv/dependency tree is
 #: never ours to classify and is where the walk's cost would otherwise live.
@@ -297,7 +302,7 @@ class DoctorService:
     def scan(self) -> tuple[Finding, ...]:
         """Every entry of the instance, classified, in the fixed FR3 order."""
         globs, invalid = workspace_layout.operator_globs(self._workspace_root)
-        findings: list[Finding] = [*self._scan_dadaiaignore(invalid)]
+        findings: list[Finding] = [*self._missing_core(), *self._scan_dadaiaignore(invalid)]
         findings.extend(self._scan_root(globs))
         findings.extend(self._scan_dadaia_top(globs))
         findings.extend(self._scan_repo_trees())
@@ -402,15 +407,26 @@ class DoctorService:
             target=target,
         )
 
+    def _missing_core(self) -> list[Finding]:
+        """Level-1 core absent from disk — the root seeds, the provisioned zones, the harness
+        profile: one stat each, no walk, so the SessionStart lane can afford it (ADR 0096)."""
+        root, dadaia = self._workspace_root, self._dadaia
+        profile = JsonHarnessProfileStore.path(self._states)
+        core = [
+            *(("root", root, root / name, "(seeded by --fix)") for name in workspace_layout.LEVEL1_SEEDS),
+            *((z.name, dadaia, dadaia / z.name, "(created by --fix)") for z in workspace_layout.provisioned_zones()),
+            (profile.parent.name, dadaia, profile, "(seeded by --fix from the projection dirs present)"),
+        ]  # fmt: skip
+        return [
+            self._finding(zone, base, target, FindingVerdict.MISSING, detail)
+            for zone, base, target, detail in core
+            if not target.exists()
+        ]
+
     def _scan_dadaiaignore(self, invalid: tuple[str, ...]) -> list[Finding]:
-        """A missing ``.dadaiaignore`` is seeded by ``--fix``; an invalid line is reported,
-        never fixed — the file is the operator's (ADRs 0092, 0093, 0145)."""
+        """An invalid line is reported, never fixed — the file is the operator's (ADRs 0092,
+        0093, 0145)."""
         target = self._workspace_root / workspace_layout.DADAIAIGNORE
-        if not target.exists():
-            detail = "(seeded by --fix from the legacy states/instance_exceptions.txt, else empty)"
-            return [
-                self._finding("root", self._workspace_root, target, FindingVerdict.MISSING, detail)
-            ]
         return [
             self._finding(
                 "root", self._workspace_root, target, FindingVerdict.SLOP,
@@ -435,23 +451,9 @@ class DoctorService:
 
     def _scan_dadaia_top(self, globs: tuple[str, ...]) -> list[Finding]:
         out: list[Finding] = []
-        present: set[str] = set()
         for entry in sweep.walk(self._dadaia):
-            if entry.is_dir():
-                present.add(entry.name)
             verdict, detail = self._judged(entry, globs)
             out.append(self._finding("dadaia", self._dadaia, entry, verdict, detail))
-        for zone in workspace_layout.provisioned_zones():
-            if zone.name not in present:
-                out.append(
-                    self._finding(
-                        zone.name,
-                        self._dadaia,
-                        self._dadaia / zone.name,
-                        FindingVerdict.MISSING,
-                        "(created by --fix)",
-                    )
-                )
         return out
 
     def _scan_canon_zone(
@@ -463,12 +465,6 @@ class DoctorService:
             if entry in unreadable:  # the record owner's answer: a corrupt record is slop
                 verdict, detail = FindingVerdict.SLOP, "(unreadable session record)"
             out.append(self._finding(zone.name, self._dadaia, entry, verdict, detail))
-        profile = JsonHarnessProfileStore.path(self._states)
-        if profile.parent == self._dadaia / zone.name and not profile.exists():
-            detail = "(seeded by --fix from the projection dirs present)"
-            out.append(
-                self._finding(zone.name, self._dadaia, profile, FindingVerdict.MISSING, detail)
-            )
         return out
 
     def _scan_ttl_zone(self, zone: Zone, now: float) -> list[Finding]:
@@ -502,19 +498,33 @@ class DoctorService:
     # ------------------------------------------------------------------
 
     def expire(self) -> list[str]:
-        """The SessionStart lane (``--expired-only``): stale session records, then every
-        TTL-expired zone entry. It costs one lstat per zone entry and walks no repo."""
-        # The record owner selects the expired records (F002); the one deleter removes them.
+        """The SessionStart lane (``--expired-only``): missing level-1 core seeded (ADR 0096),
+        stale session records deleted, then each TTL-expired zone entry taken by its zone
+        class — an OUTPUT entry held in ``reaped/``, an EPHEMERAL one deleted (AC2.10). It
+        costs one lstat per zone entry and walks no repo."""
         actions = [
+            line
+            for finding in self._missing_core()
+            for line in sweep.guarded(finding.code, finding.path, partial(self._seed, finding))
+        ]
+        # The record owner selects the expired records (F002); the one deleter removes them.
+        actions += [
             f"GRAVEYARD-GC: deleted expired session file '{record.name}'"
             for record in session_store.stale_records(self._workspace_root)
             if sweep.remove(self._workspace_root, record, record.name) is not None
         ]
-        return actions + self._delete(self.scan_ttl(), FindingVerdict.EXPIRED)
+        now = time.time()
+        for zone in workspace_layout.zones_with_ttl():
+            for finding in self._scan_ttl_zone(zone, now):
+                if finding.verdict is FindingVerdict.EXPIRED:
+                    act = _EXPIRY_ACT[zone.cls]
+                    step = partial(act, self._workspace_root, finding.target, finding.path)
+                    actions.extend(sweep.guarded(finding.code, finding.path, step))
+        return actions
 
     def fix(self) -> list[str]:
-        """The full reaper: seed missing -> MOVE slop to ``reaped/`` -> reap dead contexts'
-        repos (INV-5) -> :meth:`expire`.
+        """The full reaper: :meth:`expire` (seed first, so the scan judges after it) -> MOVE
+        slop to ``reaped/`` -> reap dead contexts' repos (INV-5).
 
         Nothing here deletes a live entry. Slop is MOVED and holds its 7 days in
         ``.dadaia/reaped/<YYYYMMDD>/<workspace-relative-path>``, the clock starting at the
@@ -523,18 +533,13 @@ class DoctorService:
         now costs a week of holding, not the operator's state. Every step on an entry runs
         through the ONE sweep guard: it reports what it did or that it skipped, never
         aborts, and never touches a location outside the workspace."""
-        actions: list[str] = []
-        for finding in self.scan():
-            if finding.verdict is FindingVerdict.MISSING and finding.fixable:
-                actions.extend(
-                    sweep.guarded(finding.code, finding.path, partial(self._seed, finding))
-                )
+        actions = self.expire()
         actions.extend(self._reap(self.scan()))  # judged after the seed: a new .dadaiaignore counts
         for ctx in self._contexts():
             for repo in ctx.all_repos() if ctx.state is ContextState.DEAD else ():
                 if (repo_path := self._repos_dir() / repo.slug).exists():
                     actions.extend(self._reap_dead_repo(ctx, repo_path))
-        return actions + self.expire()
+        return actions
 
     def _reap(self, findings: tuple[Finding, ...]) -> list[str]:
         """MOVE every slop entry into the reaped zone. Never deletes."""
@@ -576,25 +581,11 @@ class DoctorService:
                 if any((self._workspace_root / d).is_dir() for d in dirs)
             )
             JsonHarnessProfileStore().write(self._states, HarnessProfile.of(present))
-        elif finding.target.name == workspace_layout.DADAIAIGNORE:
-            text = workspace_layout.dadaiaignore_seed(self._workspace_root)
-            finding.target.write_text(text, encoding="utf-8")
+        elif (seed := workspace_layout.LEVEL1_SEEDS.get(finding.path)) is not None:
+            finding.target.write_text(seed(self._workspace_root), encoding="utf-8")
         else:
             finding.target.mkdir(parents=True, exist_ok=True)
         return f"created '{finding.path}'"
-
-    def _delete(self, findings: tuple[Finding, ...], verdict: FindingVerdict) -> list[str]:
-        actions: list[str] = []
-        for finding in findings:
-            if finding.verdict is verdict:
-                actions.extend(
-                    sweep.guarded(
-                        finding.code,
-                        finding.path,
-                        partial(sweep.remove, self._workspace_root, finding.target, finding.path),
-                    )
-                )
-        return actions
 
 
 def _ttl_walk(directory: Path, expiry: float, *, depth: int) -> list[tuple[Path, float]]:

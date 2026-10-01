@@ -6,11 +6,7 @@ from pathlib import Path
 from dadaia_workspace.core.cli_line import fix_line
 from dadaia_workspace.core.harness_registry import L1_ENTRY_HARNESSES
 from dadaia_workspace.core.models.harness_profile import HarnessProfile
-from dadaia_workspace.core.workspace_layout import (
-    DADAIAIGNORE,
-    dadaiaignore_seed,
-    provisioned_zones,
-)
+from dadaia_workspace.core.workspace_layout import LEVEL1_SEEDS, provisioned_zones
 from dadaia_workspace.infrastructure.json_harness_profile_store import JsonHarnessProfileStore
 from dadaia_workspace.infrastructure.public_assets import FileSystemPublicAssetManager
 from dadaia_workspace.infrastructure.python_env import VenvPythonEnvironmentManager
@@ -60,9 +56,9 @@ class WorkspaceService:
         self._python_env.ensure_workspace_venv(str(workspace_root))
         for zone in provisioned_zones():
             (workspace_root / ".dadaia" / zone.name).mkdir(parents=True, exist_ok=True)
-        ignore = workspace_root / DADAIAIGNORE  # the operator's from then on (ADR 0095)
-        if not ignore.exists():
-            ignore.write_text(dadaiaignore_seed(workspace_root), encoding="utf-8")
+        for name, seed in LEVEL1_SEEDS.items():  # the operator's from then on (ADR 0095)
+            if not (target := workspace_root / name).exists():
+                target.write_text(seed(workspace_root), encoding="utf-8")
         # The shared skills root is harness-independent — always created.
         (workspace_root / ".agents" / "skills").mkdir(parents=True, exist_ok=True)
         # Every harness directory is created by its own projection (the record's
