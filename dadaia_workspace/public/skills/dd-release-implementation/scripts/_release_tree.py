@@ -19,6 +19,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 sys.path.insert(1, str(Path(__file__).resolve().parents[2] / "dd-spec-navigator" / "scripts"))
 
 import _memory_drift as drift  # noqa: E402
+from _ledger import records  # noqa: E402
 from _release_check import finding, histo_findings, state_findings  # noqa: E402
 from _release_plan import plan_errors  # noqa: E402
 from _release_schema import (  # noqa: E402
@@ -28,12 +29,62 @@ from _release_schema import (  # noqa: E402
     TRIO,
     TRIO_PHASES,
     candidate_dir,
+    origin,
     unfinished_tasks,
 )
 from _release_store import SCRIPT, Refusal, live_ids, live_release, window_start  # noqa: E402
 from _specs import with_specs  # noqa: E402
 
-__all__ = ["check", "drift", "memory_errors", "tree_findings"]
+__all__ = ["check", "drift", "memory_errors", "trace", "tree_findings"]
+
+
+def trace(specs: Path, release: str, carried: dict[str, list[str]]) -> list[tuple[str, str]]:
+    """Each carried id as ``(kind:id, standing)`` (ADR 0127): ``traced`` when its record
+    points back to *release* (a delivered or superseded exit naming it, a to-bug exit whose
+    bug stands, a bug resolved in it or rejected, a finding dispositioned to it),
+    ``untraced`` while it does not yet, else why the id is wrong."""
+    document = specs / "backlog" / "BACKLOG.json"
+    active = json.loads(document.read_text(encoding="utf-8")) if document.is_file() else {}
+    live: dict[Any, dict[str, Any]] = {e.get("id"): {} for e in active.get("active") or []}
+    exits = {r.get("id"): r for r in records(specs / "backlog/_archive/backlog_histo.jsonl")}
+    bugs = {r.get("id"): r for r in records(specs / "bugs" / "BUGS.jsonl")}
+    found = {r.get("id"): r for p in sorted(specs.glob("audits/**/FINDINGS.jsonl"))
+             for r in records(p)}  # fmt: skip
+    ledgers = {"backlog": {**live, **exits}, "bugs": bugs, "findings": found}
+
+    def standing(kind: str, i: str) -> str:
+        record = ledgers[kind].get(i)
+        if record is None:
+            return f"names no record under {kind}/"
+        if record.get("disposition") == "to-bug":
+            if bugs.get(record.get("reason"), {}).get("status") in (None, "rejected"):
+                return f"exited to-bug {record.get('reason')!r}, a bug rejected or unknown"
+            return "traced"
+        back = record.get("resolved_release" if kind == "bugs" else "release")
+        return "traced" if back == release or record.get("status") == "rejected" else "untraced"
+
+    return [(f"{kind}:{i}", standing(kind, i)) for kind, ids in carried.items() for i in ids]
+
+
+def _origin_findings(specs: Path, release_dir: Path, state: dict[str, Any]) -> list[dict[str, Any]]:
+    """The live candidate's Origin line judged — grammar, existence, and, once the candidate
+    logged its `dispositions` entry or shipped, every carried id traced back to it."""
+    candidate = candidate_dir(release_dir)
+    spec = candidate / "SPEC.md" if candidate else release_dir / "-"
+    if not spec.is_file():
+        return []
+    rel = spec.relative_to(specs).as_posix()
+    try:
+        rows = trace(specs, release_dir.name, origin(spec.read_text(encoding="utf-8")))
+    except ValueError as error:
+        return [finding(rel, 1, f"{rel} {error}")]
+    since = str((state.get("defined") or {}).get("ts") or "")
+    swept = state.get("shipped") or any(
+        e.get("kind") == "dispositions" and str(e.get("ts")) >= since
+        for e in state.get("log") or []
+    )
+    return [finding(rel, 1, f"Origin {carried} {standing}") for carried, standing in rows
+            if standing != "traced" and (swept or standing != "untraced")]  # fmt: skip
 
 
 def _directory_findings(release_dir: Path, specs: Path) -> list[dict[str, Any]]:
@@ -45,16 +96,18 @@ def _directory_findings(release_dir: Path, specs: Path) -> list[dict[str, Any]]:
     text = path.read_text(encoding="utf-8")
     if findings := state_findings(text, f"{dir_rel}/{STATE}"):
         return findings
-    phase, candidate = json.loads(text)["phase"], candidate_dir(release_dir)
+    state = json.loads(text)
+    phase, candidate = state["phase"], candidate_dir(release_dir)
+    origin_findings = _origin_findings(specs, release_dir, state)
     if phase not in TRIO_PHASES:
-        return []
+        return origin_findings
     missing = [n for n in TRIO if not (candidate and (candidate / n).is_file())]
     if candidate is None or missing:
         where = candidate.name if candidate else "rc-<N>"
         return [finding(dir_rel, 1, f"phase {phase} is missing {where}/{', '.join(missing)}")]
     plan = (candidate / "PLAN.md").read_text(encoding="utf-8")
     errors = plan_errors(plan, unfinished_tasks(candidate))
-    return [finding(f"{dir_rel}/{candidate.name}/PLAN.md", 1, e) for e in errors]
+    return origin_findings + [finding(f"{dir_rel}/{candidate.name}/PLAN.md", 1, e) for e in errors]
 
 
 def memory_errors(specs: Path, phase: str, entry: dict[str, Any]) -> list[str]:

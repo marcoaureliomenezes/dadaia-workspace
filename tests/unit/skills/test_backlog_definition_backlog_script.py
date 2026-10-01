@@ -27,10 +27,13 @@ _SOURCE = _SCRIPTS / "backlog.py"
 
 @pytest.fixture
 def script(tmp_path: Path) -> Path:
-    """The staged shape: backlog.py with both schema copies beside it."""
-    return (
-        stage_skill_scripts("dd-backlog-definition", tmp_path / "staged" / "scripts") / "backlog.py"
+    """The staged shape: backlog.py with both schema copies beside it, and the release
+    skill beside it, whose Origin parser `exit` imports (ADR 0161)."""
+    stage_skill_scripts(
+        "dd-release-implementation", tmp_path / "skills" / "dd-release-implementation" / "scripts"
     )
+    skill = tmp_path / "skills" / "dd-backlog-definition" / "scripts"
+    return stage_skill_scripts("dd-backlog-definition", skill) / "backlog.py"
 
 
 def _specs(root: Path, *active: dict[str, object]) -> Path:
@@ -227,6 +230,31 @@ def test_delivered_outside_the_release_origin_is_refused(
     assert len(_fix_lines(done)) == 1 and "rejected" not in _fix_lines(done)[0]
     assert len(_active(specs)) == 1
     assert _histo(specs) == []
+
+
+@pytest.mark.parametrize(
+    ("origin", "code"),
+    [
+        ("**Origin:** operator-demand\n**Origin:** backlog:an-idea", 1),
+        ("**Origin:** backlog:an-idea; bugs:a-bug", 0),
+    ],
+    ids=["a-second-origin-line-does-not-count", "a-multi-clause-line-parses"],
+)
+def test_exit_reads_origin_through_the_release_parser(
+    script: Path, tmp_path: Path, origin: str, code: int
+) -> None:
+    """spec-origin-line-has-two-readers: only the first Origin line counts, and a
+    clause line parses (ADR 0161) — `exit` asks `release.py`'s one parser."""
+    specs = _specs(tmp_path)
+    _run(script, "new", "an-idea", "--specs", str(specs))
+    _pick(specs, "operator-demand")
+    spec = specs / "releases/0.4.7/rc-1/SPEC.md"
+    spec.write_text(spec.read_text("utf-8").replace("**Origin:** operator-demand", origin), "utf-8")
+    done = _run(
+        script, "exit", "an-idea", "--specs", str(specs),
+        "--disposition", "delivered", "--release", "0.4.7",
+    )  # fmt: skip
+    assert done.returncode == code, done.stdout + done.stderr
 
 
 def test_rejected_requires_a_reason(script: Path, tmp_path: Path) -> None:

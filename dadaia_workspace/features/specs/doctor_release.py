@@ -12,9 +12,7 @@ state document is valid is `release.py check`'s answer (LEDGER-RELEASE-SCHEMA).
 
 from __future__ import annotations
 
-import json
 import re
-from collections.abc import Callable, Collection
 from dataclasses import astuple
 from pathlib import Path
 
@@ -55,42 +53,6 @@ def _extract_status(md_path: Path) -> str | None:
     return extract_status(md_path.read_text(encoding="utf-8"))
 
 
-_ORIGIN_RE = re.compile(r"^\*\*Origin:\*\*\s*(.+?)\s*$", re.MULTILINE)
-_OPERATOR_DEMAND = "operator-demand"
-_ORIGIN_VOCABULARY = f"{_OPERATOR_DEMAND} | backlog:<id>[,..] | bugs:<id>[,..]"
-
-
-def _json_records(path: Path) -> list[dict[str, object]]:
-    """Every JSON object in *path*, read as a document or as one object per line."""
-    if not path.is_file():
-        return []
-    text = path.read_text(encoding="utf-8")
-    lines = [text] if path.suffix == ".json" else text.splitlines()
-    records: list[dict[str, object]] = []
-    for line in lines:
-        if not line.strip():
-            continue
-        try:
-            parsed = json.loads(line)
-        except json.JSONDecodeError:
-            continue
-        if isinstance(parsed, dict):
-            records.append(parsed)
-    return records
-
-
-def _known_backlog_ids(specs_dir: Path) -> frozenset[str]:
-    """Every backlog id a SPEC may cite: the live entries plus the archived histo."""
-    backlog = specs_dir / "backlog"
-    document = _json_records(backlog / "BACKLOG.json")
-    active = document[0].get("active", []) if document else []
-    entries: list[object] = list(active) if isinstance(active, list) else []
-    entries += _json_records(backlog / "_archive" / "backlog_histo.jsonl")
-    return frozenset(
-        str(e["id"]) for e in entries if isinstance(e, dict) and e.get("id") is not None
-    )
-
-
 class ReleaseValidator:
     """Active-release lifecycle and release-ledger invariants."""
 
@@ -99,54 +61,6 @@ class ReleaseValidator:
         #: Fresh per check() run (assigned by the coordinator, F010) — the parsed
         #: snapshot every active-release read goes through; never survives a fix pass.
         self.tree: SpecsTree = SpecsTree(specs_dir)
-
-    def check_spec_origin(
-        self, known_bug_ids: Callable[[], Collection[str]]
-    ) -> list[SectionFinding]:
-        """SPEC-DOC-048: the live SPEC names where the work came from — the header is the
-        flow's only machine-read input. A closed candidate is history in git, never ranked.
-
-        ``known_bug_ids`` is read lazily: a tree citing no bug never touches the bug
-        ledger, so this rule borrows the governance family's ONE bug reader without
-        forcing its store on every construction site.
-        """
-        candidate = self.tree.active_release.candidate
-        if not candidate:
-            return []
-        path = candidate / "SPEC.md"
-        if not path.exists() or not (problem := self._origin_problem(path, known_bug_ids)):
-            return []
-        fix = f"Operator action: name the work's origin under **Opened:** in {path}"
-        description = f"{path.relative_to(self.specs_dir).as_posix()} {problem}"
-        return [specs_finding("SPEC-DOC-048", Severity.ERROR, description, str(path), fix=fix)]
-
-    def _origin_problem(self, path: Path, known_bug_ids: Callable[[], Collection[str]]) -> str:
-        """One SPEC header judged — presence, vocabulary, then the cited ids; "" is clean."""
-        match = _ORIGIN_RE.search(path.read_text(encoding="utf-8"))
-        if match is None:
-            return f"has no `**Origin:**` line — every live and candidate SPEC declares its origin ({_ORIGIN_VOCABULARY})"
-        value = match.group(1)
-        if value == _OPERATOR_DEMAND:
-            return ""
-        kind, _, rest = value.partition(":")
-        cited = [i.strip() for i in rest.split(",") if i.strip()]
-        if kind == "backlog" and cited:
-            unknown = [i for i in cited if i not in _known_backlog_ids(self.specs_dir)]
-            return (
-                f"Origin cites backlog {', '.join(unknown)} — no such entry in "
-                "backlog/BACKLOG.json or backlog/_archive/backlog_histo.jsonl"
-                if unknown
-                else ""
-            )
-        if kind == "bugs" and cited:
-            known = set(known_bug_ids())
-            unknown = [i for i in cited if i not in known]
-            return (
-                f"Origin cites bugs {', '.join(unknown)} — no such record in bugs/BUGS.jsonl"
-                if unknown
-                else ""
-            )
-        return f"Origin {value!r} is not canonical. Valid: {_ORIGIN_VOCABULARY}"
 
     def check_active_release_artifacts(self) -> list[SectionFinding]:
         issues: list[SectionFinding] = []

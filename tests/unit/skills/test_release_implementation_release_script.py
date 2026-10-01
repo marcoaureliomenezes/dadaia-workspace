@@ -78,7 +78,7 @@ def _release(
     release_dir = specs / "releases" / release_id
     (release_dir / "rc-1").mkdir(parents=True, exist_ok=True)
     for name in _TRIO:
-        body = {"TASKS.md": tasks, "PLAN.md": PLAN}.get(name, "")
+        body = {"TASKS.md": tasks, "PLAN.md": PLAN}.get(name, "**Origin:** operator-demand\n")
         release_dir.joinpath("rc-1", name).write_text(
             f"# {name}\n\n**Status:** Approved\n\n{body}", encoding="utf-8"
         )

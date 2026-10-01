@@ -9,7 +9,6 @@ exited must be told so rather than diagnosed for a status it no longer has.
 
 from __future__ import annotations
 
-import re
 import sys
 from pathlib import Path
 from typing import Any
@@ -19,20 +18,24 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from _backlog_schema import DISPOSITIONS  # noqa: E402
 from _backlog_store import SCRIPT, Items, Refusal  # noqa: E402
 from _backlog_write import today  # noqa: E402
+from _release_schema import origin  # noqa: E402
 
 #: Which evidence flag each terminal word must carry — the histo record is the only
 #: surviving trace of why the item left.
 REQUIRED_EVIDENCE = {"delivered": "release", "superseded": "release", "rejected": "reason"}
 
 
-def _origin_cites(specs: Path, release: str, slug: str) -> bool:
-    """Whether a candidate SPEC of the release (``rc-<N>/``, ADR 0150) names *slug* on its
-    `**Origin:** backlog:` line — the pick."""
-    texts = (
-        s.read_text(encoding="utf-8") for s in (specs / "releases" / release).glob("rc-*/SPEC.md")
-    )
-    matches = (re.search(r"^\*\*Origin:\*\*\s*backlog:(.+)$", t, re.MULTILINE) for t in texts)
-    return any(m and slug in (s.strip() for s in m.group(1).split(",")) for m in matches)
+def _picks(specs: Path, slug: str) -> list[str]:
+    """Each release whose candidate SPEC (``rc-<N>/``, ADR 0150) carries *slug* in its
+    Origin's `backlog:` clause — read by `release.py`'s one parser (ADR 0161)."""
+    picks = []
+    for spec in sorted((specs / "releases").glob("*/rc-*/SPEC.md")):
+        try:
+            if slug in origin(spec.read_text(encoding="utf-8")).get("backlog", []):
+                picks.append(spec.parents[1].name)
+        except ValueError:
+            continue  # a malformed Origin picks nothing; `release.py check` reports it
+    return picks
 
 
 def check_exit(specs: Path, active: Items, slug: str, values: dict[str, Any]) -> dict[str, Any]:
@@ -61,11 +64,11 @@ def check_exit(specs: Path, active: Items, slug: str, values: dict[str, Any]) ->
             f"only surviving trace of why {slug!r} left active[]",
             f"{SCRIPT} exit {slug} --disposition {disposition} {example}",
         )
-    if required == "release" and not _origin_cites(specs, str(release), slug):
+    if required == "release" and release not in (picks := _picks(specs, slug)):
         raise Refusal(
-            f"no releases/{release}/rc-<N>/SPEC.md names {slug!r} on its `**Origin:** backlog:` "
-            f"line — only a release that picked an item can exit it as {disposition!r}",
-            f"{SCRIPT} exit {slug} --disposition {disposition} --release <the release whose Origin names {slug}>",
+            f"no releases/{release}/rc-<N>/SPEC.md names {slug!r} in its first `**Origin:**` "
+            f"line's backlog clause — only a release that picked an item can exit it as {disposition!r}",
+            f"{SCRIPT} exit {slug} --disposition {disposition} --release {picks[-1] if picks else '<release-id>'}",
         )
     return entry
 

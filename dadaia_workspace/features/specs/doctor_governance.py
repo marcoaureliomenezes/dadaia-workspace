@@ -1,8 +1,7 @@
-"""Governance validator: bug archive age, known bug ids.
+"""Governance validator: bug archive age.
 
 Single-responsibility sibling of the SpecsDoctor coordinator: the archive-overdue signal
-(SPEC-DOC-041) and the bug ids SPEC-DOC-048 cites. Leaf-only: imports the shared leaves + core, never a sibling
-validator.
+(SPEC-DOC-041). Leaf-only: imports the shared leaves + core, never a sibling validator.
 
 **Whether a bug record is valid is not asked here.** `bugs.py check` is the one
 validator (the doctor re-emits it as LEDGER-BUGS-SCHEMA); this module reads raw JSON
@@ -34,7 +33,7 @@ def _parse_ts(value: str) -> datetime | None:
 
 
 class GovernanceValidator:
-    """Bug governance: bug archive age, known bug ids."""
+    """Bug governance: bug archive age."""
 
     def __init__(self, specs_dir: Path, public_dir: Path | None = None) -> None:
         self.specs_dir = specs_dir
@@ -52,11 +51,6 @@ class GovernanceValidator:
                 continue
             if isinstance(record, dict):
                 yield record
-
-    def known_bug_ids(self) -> frozenset[str]:
-        """The id of every line, whatever its status or validity — SPEC-DOC-048 judges
-        membership in the ledger, never liveness."""
-        return frozenset(str(r["id"]) for r in self._bug_lines() if "id" in r)
 
     def check_bug_archive_overdue(self, *, now: datetime | None = None) -> list[SectionFinding]:
         """SPEC-DOC-041 — WARN when a record closed (``closed_at``, never the filing date

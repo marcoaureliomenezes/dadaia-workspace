@@ -30,6 +30,10 @@ SHA_RE = re.compile(r"^[0-9a-f]{7,40}$")
 #: under any Markdown bullet (``-``, ``*``, ``+``) or none — the ONE task-marker rule.
 UNFINISHED_RE = re.compile(r"^\s*(?:[-*+]\s+)?\[( |-)\]\s.*$", re.MULTILINE)
 _STATUS_RE = re.compile(r"^\*\*Status:\*\*\s*(.+?)\s*$", re.MULTILINE)
+#: The Origin clause kinds, each at most once on the line (ADR 0161).
+ORIGIN_KINDS = ("backlog", "bugs", "findings")
+_ORIGIN_RE = re.compile(r"^\*\*Origin:\*\*[ \t]*(.*?)[ \t]*$", re.MULTILINE)
+_ORIGIN_GRAMMAR = "operator-demand | backlog:<ids>; bugs:<ids>; findings:<ids>, each kind once"
 
 
 def utc_now() -> str:
@@ -40,6 +44,22 @@ def extract_status(text: str) -> str | None:
     """The ``**Status:**`` token a trio document carries, or ``None``."""
     match = _STATUS_RE.search(text)
     return match.group(1) if match else None
+
+
+def origin(text: str) -> dict[str, list[str]]:
+    """The ids the first ``**Origin:**`` line carries, by kind; ``{}`` for operator-demand.
+    The ONE Origin parser (ADR 0161): raises ``ValueError`` saying what is wrong."""
+    match = _ORIGIN_RE.search(text)
+    if match is None:
+        raise ValueError(f"has no `**Origin:**` line ({_ORIGIN_GRAMMAR})")
+    carried: dict[str, list[str]] = {}
+    for clause in [] if match.group(1) == "operator-demand" else match.group(1).split(";"):
+        kind, _, ids = clause.strip().partition(":")
+        cited = [i.strip() for i in ids.split(",") if i.strip()]
+        if kind not in ORIGIN_KINDS or kind in carried or not cited:
+            raise ValueError(f"Origin {match.group(1)!r} is not canonical: {_ORIGIN_GRAMMAR}")
+        carried[kind] = cited
+    return carried
 
 
 def candidate_number(names: Iterable[str]) -> int:

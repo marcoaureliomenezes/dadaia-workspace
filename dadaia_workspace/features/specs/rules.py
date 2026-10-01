@@ -161,10 +161,6 @@ RULES: tuple[SpecsRule, ...] = (
         lambda d: d._release.check_no_memory_task(),
         fix_help="Operator action: drop the memory task from the live TASKS.md under <specs>/releases, then commit.",
     ),
-    _rule(
-        ("SPEC-DOC-048",),
-        lambda d: d._release.check_spec_origin(d._governance.known_bug_ids),
-    ),
 )
 
 #: code -> Rule, for every rule that carries a fix — the ONE fix dispatch table.

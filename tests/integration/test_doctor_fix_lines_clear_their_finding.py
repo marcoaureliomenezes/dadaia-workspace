@@ -136,14 +136,6 @@ def _plant_status_line_gone(root: Path) -> None:
     (release / "TASKS.md").write_text("# Tasks\n\n**Status:** approved\n" + "- t\n" * 170)
 
 
-def _plant_origin_line_gone(root: Path) -> None:
-    spec = root / "specs" / "releases" / _RELEASE / "rc-1" / "SPEC.md"
-    spec.write_text(
-        "# Spec\n\n**Status:** Approved\n**Opened:** 2026-09-21\n\nContent.\n",
-        encoding="utf-8",
-    )
-
-
 def _plant_oversized_plan(root: Path) -> None:
     plan = root / "specs" / "releases" / _RELEASE / "rc-1" / "PLAN.md"
     body = "\n".join(f"- line {i}" for i in range(400))
@@ -424,7 +416,6 @@ def _append(path: Path, text: str) -> None:
 OPERATOR_ACTION: dict[str, Callable[[Path], None]] = {
     "SPEC-DOC-002": _plant_headingless_memory_document,
     "SPEC-DOC-004": _plant_status_line_gone,
-    "SPEC-DOC-048": _plant_origin_line_gone,
     "TREE-8": _plant_stray_dotfile,
     "LINT-1": lambda r: _write(r / "specs" / "memory" / "product" / "testarea" / "x.md", "# X\n"),
     "SPEC-DOC-001": lambda r: (r / "specs" / "constitution.md").unlink(),
