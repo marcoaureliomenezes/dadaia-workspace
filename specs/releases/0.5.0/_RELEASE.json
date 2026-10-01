@@ -1,14 +1,14 @@
 {
   "schema": "release-state-v1",
   "release": "0.5.0",
-  "phase": "IMPLEMENTATION",
+  "phase": "CLOSURE",
   "defined": {
     "sha": "73b2b863",
     "ts": "2026-10-01T04:46:02Z"
   },
   "implemented": {
-    "sha": "91262c55",
-    "ts": "2026-09-30T19:07:41Z"
+    "sha": "3699adfe",
+    "ts": "2026-10-01T04:51:52Z"
   },
   "shipped": null,
   "log": [
@@ -628,6 +628,12 @@
       "agent": "main-thread",
       "kind": "drifts",
       "text": "Candidate 6 was implemented while phase still read DEFINITION: the main thread never ran `release.py phase IMPLEMENTATION` after the trio was approved (73b2b863). Retro-recorded at 73b2b863 by the candidate-close review (dd-code-reviewer F1, 2026-10-01). Tooling gap: release.py check accepted every task [x] under phase DEFINITION."
+    },
+    {
+      "ts": "2026-10-01T04:51:52Z",
+      "agent": "release.py",
+      "kind": "note",
+      "text": "Candidate implemented at 3699adfe; phase CLOSURE."
     }
   ]
 }
