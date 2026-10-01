@@ -24,7 +24,7 @@ _MAP = _PKG / "public" / "data" / "AGENTS.md"
 def test_the_map_states_what_the_gate_judges() -> None:
     """sa-text-restates-rules-the-code-contradicts#49.1 (first-token rows: unit test_venv_guard);
     gate-law-claims-out-of-scope-writes-blocked-but-bash-is-never-judged (map, README);
-    AC2.8 the four fail-open paths in one place; AC2.9 no pip; AC2.13 the onboarding writers."""
+    AC2.8 the six fail-open paths in one place; AC2.9 no pip; AC2.13 the onboarding writers."""
     tools = ("Write", "Edit", "MultiEdit", "apply_patch")
     assert {*tools, "NotebookEdit", "write_file", "edit_file"} == _common.WRITE_TOOLS
     line = next(ln for ln in _MAP.read_text("utf-8").splitlines() if "One PreToolUse gate" in ln)
