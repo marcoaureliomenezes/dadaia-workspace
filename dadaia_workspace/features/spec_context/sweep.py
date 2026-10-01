@@ -36,11 +36,26 @@ from pathlib import Path
 
 from dadaia_workspace.core.workspace_layout import occupied
 
-__all__ = ["Skipped", "guarded", "lstat", "move", "remove", "rmtree", "walk"]
+__all__ = [
+    "Skipped",
+    "deleter",
+    "guarded",
+    "lstat",
+    "move",
+    "remove",
+    "rmtree",
+    "succeeded",
+    "walk",
+]
 
 
 class Skipped(str):
     """A refusal line: the type, not the wording, tells a caller nothing was touched."""
+
+
+def succeeded(done: str | None) -> bool:
+    """The one success rule every caller reads: the step acted — neither refused nor a no-op."""
+    return not isinstance(done, Skipped | None)
 
 
 _OUTSIDE = "skipped '{label}' (outside the workspace)"
@@ -156,6 +171,11 @@ def remove(workspace_root: Path, target: Path, label: str) -> str | None:
     return f"deleted '{label}'"
 
 
+def deleter(workspace_root: Path) -> Callable[[Path], bool]:
+    """:func:`remove` scoped to *workspace_root*, answering :func:`succeeded`."""
+    return lambda path: succeeded(remove(workspace_root, path, path.name))
+
+
 #: The zone the reaper HOLDS what it takes off the working tree. Deletion is reserved to
 #: TTL expiry of this zone, so no scan verdict ever deletes anything directly — the shape
 #: behind the CRITICAL doctor-ptr-gc-deletes-valid-lock-free-bind.
@@ -169,7 +189,7 @@ def hold(workspace_root: Path, target: Path, label: str, *, note: str = "") -> s
     day = workspace_root / ".dadaia" / REAPED_ZONE / datetime.now(tz=UTC).strftime("%Y%m%d")
     rel = target.relative_to(workspace_root)
     done = move(workspace_root, target, day / rel, label, note=note)
-    if len(rel.parts) > 1 and done is not None and not isinstance(done, Skipped):
+    if len(rel.parts) > 1 and succeeded(done):
         os.utime(day / rel.parts[0])
     return done
 

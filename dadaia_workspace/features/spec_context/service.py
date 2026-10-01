@@ -744,7 +744,7 @@ class SpecContextService:
                     lead = f"Git sync failed for context '{name}' repo '{slug}'; nothing was removed.\n"
                     raise GitSyncError(f"{lead}{exc}") from exc
             done = sweep.hold(self._workspace_root, repo_path, f"repos/{slug}")
-            if isinstance(done, sweep.Skipped):
+            if not sweep.succeeded(done):
                 raise ContextStateError(f"Context '{name}' stays ALIVE: {done}")
 
         dead_ctx = SpecContextProject(

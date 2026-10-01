@@ -48,7 +48,7 @@ class UpgradeResult:
 
 
 def upgrade(
-    specs_dir: Path, *, remove: Callable[[Path], object], dry_run: bool = False
+    specs_dir: Path, *, remove: Callable[[Path], bool], dry_run: bool = False
 ) -> UpgradeResult:
     """Upgrade ``specs/`` to :data:`CANONICAL_SPECS_VERSION`, the one target. Every
     delete goes through *remove* — the caller's one guarded deleter (``sweep.remove``).
@@ -135,21 +135,26 @@ def plan_tech_stack_fold(specs_dir: Path) -> list[Path]:
     return [tech] if tech.is_file() and architecture.is_file() else []
 
 
-def fold_tech_stack(specs_dir: Path, remove: Callable[[Path], object]) -> list[Path]:
+def fold_tech_stack(specs_dir: Path, remove: Callable[[Path], bool]) -> list[Path]:
     """Append ``TECHSTACK.md``'s body under ``## Tech Stack`` at the end of
     ``ARCHITECTURE.md``, then delete the file — the 6 -> 7 hop (memory canon v7).
 
     The body is everything after the document's own H1/frontmatter title block, taken
-    verbatim: the hop moves a consumer's authored text, it never rewrites it.
+    verbatim: the hop moves a consumer's authored text, it never rewrites it. A refused
+    delete restores ``ARCHITECTURE.md``: the fold lands whole or not at all.
     """
-    planned = plan_tech_stack_fold(specs_dir)
-    for tech in planned:
-        architecture = tech.parent / "ARCHITECTURE.md"
-        body = _tech_stack_body(tech.read_text(encoding="utf-8"))
-        existing = architecture.read_text(encoding="utf-8").rstrip("\n")
-        atomic_write(architecture, f"{existing}\n\n{_TECH_STACK_HEADING}\n\n{body}\n")
-        remove(tech)
-    return planned
+    return [tech for tech in plan_tech_stack_fold(specs_dir) if _fold(tech, remove)]
+
+
+def _fold(tech: Path, remove: Callable[[Path], bool]) -> bool:
+    architecture = tech.parent / "ARCHITECTURE.md"
+    body = _tech_stack_body(tech.read_text(encoding="utf-8"))
+    original = architecture.read_text(encoding="utf-8")
+    atomic_write(architecture, f"{original.rstrip(chr(10))}\n\n{_TECH_STACK_HEADING}\n\n{body}\n")
+    if remove(tech):
+        return True
+    atomic_write(architecture, original)
+    return False
 
 
 def _tech_stack_body(text: str) -> str:
@@ -172,11 +177,8 @@ def plan_empty_ideas_dir(specs_dir: Path) -> list[Path]:
     return [ideas] if entries in ([], ["AGENTS.md"]) else []
 
 
-def remove_empty_ideas_dir(specs_dir: Path, remove: Callable[[Path], object]) -> list[Path]:
-    planned = plan_empty_ideas_dir(specs_dir)
-    for ideas in planned:
-        remove(ideas)
-    return planned
+def remove_empty_ideas_dir(specs_dir: Path, remove: Callable[[Path], bool]) -> list[Path]:
+    return [ideas for ideas in plan_empty_ideas_dir(specs_dir) if remove(ideas)]
 
 
 #: The retired Portuguese status tokens mapped onto the one English vocabulary

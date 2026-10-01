@@ -121,21 +121,28 @@ def _post_gate_heartbeat(ws: Path, sess_id: str) -> None:
 
 
 @pytest.mark.parametrize(
-    ("idle", "renew", "survives"),
+    ("idle", "renew", "sessions_outside", "survives"),
     [
-        pytest.param(360, False, True, id="bind-lost-silently-after-five-idle-minutes-idle-bind-survives"),
-        pytest.param(None, True, True, id="FR-W1-04-heartbeat-renewed-bind-survives-and-resolves"),
-        pytest.param(None, False, False, id="FR-W1-04-unrenewed-stale-bind-collected"),
+        pytest.param(360, False, False, True, id="bind-lost-silently-after-five-idle-minutes-idle-bind-survives"),
+        pytest.param(None, True, False, True, id="FR-W1-04-heartbeat-renewed-bind-survives-and-resolves"),
+        pytest.param(None, False, False, False, id="FR-W1-04-unrenewed-stale-bind-collected"),
+        pytest.param(None, False, True, False, id="doctor-reports-a-refused-removal-as-deleted"),
     ],
 )  # fmt: skip
-def test_no_stale_records(tmp_path: Path, idle: int | None, renew: bool, survives: bool) -> None:
+def test_no_stale_records(
+    tmp_path: Path, idle: int | None, renew: bool, sessions_outside: bool, survives: bool
+) -> None:
     """Intent: CONTRACT — T-011-04, bind-lost-silently-after-five-idle-minutes: another session's
     SessionStart lane collects a bind only past a dead session's TTL (a day), measured against
-    ``last_seen_at`` renewed through the REAL PostToolUse path; idle minutes never unbind."""
+    ``last_seen_at`` renewed through the REAL PostToolUse path; idle minutes never unbind. A
+    sessions dir resolving outside the workspace is refused, never reported deleted."""
     from dadaia_workspace.core.session_store import live_session
 
     ws = _make_workspace(tmp_path)
     sid = "sess_01"
+    if sessions_outside:
+        (ws / ".dadaia" / "sessions").rename(tmp_path / "elsewhere")
+        (ws / ".dadaia" / "sessions").symlink_to(tmp_path / "elsewhere")
     record = _bind(ws, sid, _stale() if idle is None else _ago(idle))
     if renew:
         # post-gate-runs-the-reaper-on-the-tool-hot-path: the heartbeat never reaps.
@@ -148,8 +155,10 @@ def test_no_stale_records(tmp_path: Path, idle: int | None, renew: bool, survive
 
     actions = _make_doctor(ws).expire()
 
-    assert record.exists() is survives
-    assert any("GRAVEYARD-GC" in a and sid in a for a in actions) is not survives
+    assert record.exists() is (survives or sessions_outside)
+    assert any("GRAVEYARD-GC: deleted" in a and sid in a for a in actions) is not (
+        survives or sessions_outside
+    )
     assert (live_session(ws, sid) is not None) is survives
 
 

@@ -99,7 +99,9 @@ def test_remove_deletes_a_read_only_tree(
     file (a Go module cache is dr-xr-xr-x all the way down; Windows refuses a read-only unlink) is made
     writable on the way down, then removed; a symlink goes, its destination never; outside is never touched."""
     workspace, target = setup(tmp_path)
-    assert sweep.remove(workspace, target, rel) == (message and message.format(rel=rel))
+    done = sweep.remove(workspace, target, rel)
+    assert done == (message and message.format(rel=rel))
+    assert isinstance(done, sweep.Skipped) is (message == _SKIP) and sweep.succeeded(done) is (message not in (None, _SKIP))
     assert not target.is_symlink() and (target.exists() == (survivor == rel))
     assert survivor is None or (tmp_path / survivor).exists()
 
@@ -127,8 +129,9 @@ def test_move_holds_the_content_inside_the_workspace_only(
     source = _file(tmp_path / src)
     if exdev:
         monkeypatch.setattr(sweep.os, "replace", _exdev)
-    assert sweep.move(workspace, source, tmp_path / dest, "rel") == message
+    done = sweep.move(workspace, source, tmp_path / dest, "rel")
     moved = message.startswith("moved")
+    assert done == message and isinstance(done, sweep.Skipped) is (not moved) and sweep.succeeded(done) is moved
     assert (source.exists(), (tmp_path / dest).exists()) == (not moved, moved)
     assert not moved or (tmp_path / dest).read_text() == "x"
 

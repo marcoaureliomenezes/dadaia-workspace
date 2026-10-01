@@ -507,11 +507,9 @@ class DoctorService:
             for line in sweep.guarded(finding.code, finding.path, partial(self._seed, finding))
         ]
         # The record owner selects the expired records (F002); the one deleter removes them.
-        actions += [
-            f"GRAVEYARD-GC: deleted expired session file '{record.name}'"
-            for record in session_store.stale_records(self._workspace_root)
-            if sweep.remove(self._workspace_root, record, record.name) is not None
-        ]
+        for record in session_store.stale_records(self._workspace_root):
+            step = partial(sweep.remove, self._workspace_root, record, record.name)
+            actions.extend(sweep.guarded("GRAVEYARD-GC", record.name, step))
         now = time.time()
         for zone in workspace_layout.zones_with_ttl():
             for finding in self._scan_ttl_zone(zone, now):

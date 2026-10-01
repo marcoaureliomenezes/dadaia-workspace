@@ -93,22 +93,31 @@ def test_b1_specs_upgrade_refuses_a_symlinked_quality_md_with_its_fix(tmp_path: 
     ]
 
 
-def test_b1_the_tech_stack_fold_refuses_a_symlinked_architecture_md(tmp_path: Path) -> None:
-    """#B1: the 6 -> 7 fold writes ARCHITECTURE.md through the same writer."""
+@pytest.mark.parametrize("linked", [
+    pytest.param("memory/ARCHITECTURE.md", id="B1-the-fold-refuses-a-symlinked-architecture-md"),
+    pytest.param("memory", id="doctor-reports-a-refused-removal-as-deleted-fold-lands-whole-or-not-at-all"),
+])  # fmt: skip
+def test_b1_the_tech_stack_fold_never_writes_outside(tmp_path: Path, linked: str) -> None:
+    """#B1: the 6 -> 7 fold writes ARCHITECTURE.md through the same writer; a TECHSTACK.md the
+    deleter refuses (memory/ linked outside specs) restores ARCHITECTURE.md and is never reported
+    folded, so a re-run never appends a second ``## Tech Stack``."""
     specs = tmp_path / "repo" / "specs"
     canon.scaffold(specs, project_name="p")
     merge_frontmatter(specs, specs_pattern_version=6)
-    outside = tmp_path / "arch.md"
-    outside.write_text("# Architecture\n", encoding="utf-8")
-    arch = specs / "memory" / "ARCHITECTURE.md"
-    arch.unlink()
-    arch.symlink_to(outside)
+    (specs / "memory" / "ARCHITECTURE.md").write_text("# Architecture\n", encoding="utf-8")
     (specs / "memory" / "TECHSTACK.md").write_text("# Tech\n\npython\n", encoding="utf-8")
+    outside = tmp_path / "outside"
+    (specs / linked).rename(outside)
+    (specs / linked).symlink_to(outside)
+    arch = outside / "ARCHITECTURE.md" if outside.is_dir() else outside
 
-    with pytest.raises(SymlinkRefusedError):
-        upgrade(specs, remove=lambda p: sweep.remove(specs, p, p.name))
+    for _ in range(2):
+        try:
+            assert upgrade(specs, remove=sweep.deleter(specs)).tech_stack_folded == []
+        except SymlinkRefusedError:
+            assert linked.endswith(".md")
 
-    assert outside.read_text(encoding="utf-8") == "# Architecture\n"
+    assert arch.read_text(encoding="utf-8") == "# Architecture\n"
 
 
 def test_b2_doctor_fix_leaves_a_symlinked_quality_md_a_link(tmp_path: Path) -> None:
