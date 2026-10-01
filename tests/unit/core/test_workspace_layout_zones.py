@@ -72,6 +72,10 @@ def test_derived_views_follow_the_registry() -> None:
     assert rows["references"][2:] == ("operator", "never", "operator")
     assert frozenset({"AGENTS.md", ".gitignore"}) == wl.DADAIA_ROOT_FILES
     assert wl.DADAIAIGNORE in wl.ROOT_ALLOWED_FILES and "worktrees" in wl.ROOT_ALLOWED_DIRS
+    # ADR 0133 SPEC risk: the floor is what init/install create, plus the CLI's PROTECTED zone
+    zones = [z for z in wl.DADAIA_ZONES if z in wl.provisioned_zones() or z.cls is K.PROTECTED]
+    made = {"AGENTS.md", *wl.LEVEL1_SEEDS, *(f".dadaia/{z.name}" for z in zones)}
+    assert set(wl.CORE_FLOOR) <= made
 
 
 @pytest.mark.parametrize(
@@ -94,14 +98,17 @@ def test_derived_views_follow_the_registry() -> None:
 )
 def test_parse_dadaiaignore(text: str, expected: tuple[str, ...]) -> None:
     """``.dadaiaignore`` parses to stripped, deduped, slash-free root-relative patterns."""
-    assert wl.parse_dadaiaignore(text) == (expected, ())
+    assert wl.parse_dadaiaignore(text) == (expected, (), ())
 
 
 def test_dadaiaignore_invalid_lines_and_segment_scope() -> None:
     """ADR 0093: ``!``, ``**``, an absolute path or ``..`` is invalid, never a pattern; ``*``
     stays inside one segment, so a root pattern admits nothing below the root."""
-    text = "!keep\nnotes/**\n/abs\na/../b\n*.png\n"
-    assert wl.parse_dadaiaignore(text) == (("*.png",), ("!keep", "notes/**", "/abs", "a/../b"))
+    text = "!keep\nnotes/**\n/abs\na/../b\n*.png\n[protected]\nsecrets/\n**/k\n"
+    invalid = ("!keep", "notes/**", "/abs", "a/../b", "**/k")
+    assert wl.parse_dadaiaignore(text) == (("*.png",), ("secrets",), invalid)
+    assert wl.protected_glob("worktrees/r/n/secrets/k", ("secrets",)) == "secrets"
+    assert wl.protected_glob("secrets/k", ("secrets",)) is None  # repo-relative only
     assert wl.verdict("shot.png", False, ("*.png",), (), ()) == "operator"
     assert wl.verdict(".dadaia/shot.png", False, ("*.png",), (), ()) == "slop"
     assert wl.verdict(".dadaia/shot.png", False, (".dadaia/*.png",), (), ()) == "operator"

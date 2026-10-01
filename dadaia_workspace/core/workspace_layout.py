@@ -49,6 +49,8 @@ __all__ = [
     "dadaiaignore_seed",
     "operator_globs",
     "parse_dadaiaignore",
+    "protected_glob",
+    "CORE_FLOOR",
     "public_scripts_dir",
     "repo_excluded_display",
     "root_entries_display",
@@ -80,6 +82,11 @@ DADAIAIGNORE: str = ".dadaiaignore"
 ROOT_ALLOWED_FILES: frozenset[str] = frozenset(
     {"AGENTS.md", "prompt.md", ".gitignore", DADAIAIGNORE}
 )
+
+
+#: PROTECTED without any install ledger (ADR 0133): the root map, the operator's globs, and
+#: the CLI-owned ``.dadaia/`` zones; the ledger adds every projected path on top.
+CORE_FLOOR: tuple[str, ...] = ("AGENTS.md", DADAIAIGNORE, ".dadaia/states", ".dadaia/hooks", ".dadaia/sessions")  # fmt: skip
 
 
 class ZoneClass(StrEnum):
@@ -160,31 +167,34 @@ TOOL_CACHE_ENV: dict[str, str] = {"MYPY_CACHE_DIR": "mypy-cache", "RUFF_CACHE_DI
 MARKER_DIR: Path = Path(".dadaia") / "tmp" / "hooks"
 
 
-def parse_dadaiaignore(text: str) -> tuple[tuple[str, ...], tuple[str, ...]]:
-    """(patterns, invalid lines) of a ``.dadaiaignore`` (ADR 0093): one root-relative pattern
-    per line, ``#`` comments, ``*`` within one segment, a trailing ``/`` for a directory
-    (dropped); ``!``, ``**``, an absolute path or ``..`` is invalid. Deduplicated, order kept."""
-    kept: dict[str, None] = {}
+def parse_dadaiaignore(text: str) -> tuple[tuple[str, ...], tuple[str, ...], tuple[str, ...]]:
+    """(patterns, protected, invalid lines) of a ``.dadaiaignore`` (ADRs 0093, 0133): one
+    pattern per line, ``#`` comments, ``*`` within one segment, a trailing ``/`` for a
+    directory (dropped); ``!``, ``**``, an absolute path or ``..`` is invalid. Lines after a
+    ``[protected]`` header are repo-relative protected globs. Deduplicated, order kept."""
+    sections: tuple[dict[str, None], dict[str, None]] = ({}, {})
+    kept = sections[0]
     invalid: list[str] = []
     for raw in text.splitlines():
         line = raw.strip()
-        if not line or line.startswith("#"):
+        if line == "[protected]":
+            kept = sections[1]
+        elif not line or line.startswith("#"):
             continue
-        pattern = line.rstrip("/")
-        if line.startswith(("!", "/")) or "**" in line or ".." in pattern.split("/"):
+        elif line.startswith(("!", "/")) or "**" in line or ".." in line.rstrip("/").split("/"):
             invalid.append(line)
         else:
-            kept[pattern] = None
-    return tuple(kept), tuple(invalid)
+            kept[line.rstrip("/")] = None
+    return tuple(sections[0]), tuple(sections[1]), tuple(invalid)
 
 
-def operator_globs(workspace: Path) -> tuple[tuple[str, ...], tuple[str, ...]]:
+def operator_globs(workspace: Path) -> tuple[tuple[str, ...], tuple[str, ...], tuple[str, ...]]:
     """The one reader of ``<workspace>/.dadaiaignore``, for the gate and the doctor; absent
     or unreadable is no pattern."""
     try:
         text = (workspace / DADAIAIGNORE).read_text(encoding="utf-8")
     except OSError:
-        return (), ()
+        return (), (), ()
     return parse_dadaiaignore(text)
 
 
@@ -217,6 +227,15 @@ def _matches(sub: str, pattern: str) -> bool:
     """*pattern* matches the root-relative *sub* segment by segment (``*`` never crosses ``/``)."""
     parts, globs = sub.split("/"), pattern.split("/")
     return len(parts) == len(globs) and all(map(fnmatch.fnmatch, parts, globs))
+
+
+def protected_glob(rel: str, protected: tuple[str, ...]) -> str | None:
+    """The protected glob a prefix of *rel*'s repo-relative tail matches (``repos/<r>/…``,
+    ``worktrees/<r>/<name>/…``), else ``None``."""
+    parts = rel.split("/")
+    tail = parts[2:] if parts[0] == "repos" else parts[3:] if parts[0] == "worktrees" else []
+    prefixes = ["/".join(tail[: n + 1]) for n in range(len(tail))]
+    return next((g for g in protected for sub in prefixes if _matches(sub, g)), None)
 
 
 def verdict(

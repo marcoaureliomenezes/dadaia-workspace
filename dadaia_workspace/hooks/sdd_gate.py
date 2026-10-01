@@ -7,10 +7,20 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
-from dadaia_workspace.core import invocation, workspace_resolver
+from dadaia_workspace.core import invocation, workspace_layout, workspace_resolver
+from dadaia_workspace.core.harness_registry import HARNESS_RECORDS
 from dadaia_workspace.features.spec_context import gate_policy
 from dadaia_workspace.hooks import _common
 from dadaia_workspace.infrastructure.json_install_ledger_store import JsonInstallLedgerStore
+from dadaia_workspace.infrastructure.runtime_transforms.hook_wrappers import hook_documents
+
+#: Each harness's hook wiring is floor too: the gate holds without the ledger (ADR 0133).
+_HOOK_WIRING = frozenset(
+    f"{r.directory}/{doc}"
+    for r in HARNESS_RECORDS.values()
+    if r.directory
+    for doc in hook_documents(r)
+)
 
 
 def _evaluate_target(workspace: Path | None, raw_path: str) -> tuple[gate_policy.Decision, str]:
@@ -33,12 +43,15 @@ def _evaluate_target(workspace: Path | None, raw_path: str) -> tuple[gate_policy
     states = effective_workspace / ".dadaia" / "states"  # the install ledger is the law set
     ledger = JsonInstallLedgerStore().read(states)
     projected = frozenset(e.relpath for e in ledger.entries) if ledger else frozenset()
-    projected |= {JsonInstallLedgerStore.path(states).relative_to(effective_workspace).as_posix()}
+    projected |= _HOOK_WIRING | {
+        JsonInstallLedgerStore.path(states).relative_to(effective_workspace).as_posix()
+    }
     repo, zone = invocation.scope(effective_workspace, fpath)
     return gate_policy.evaluate(
         rel_path,
         root=effective_workspace,
         projected=projected,
+        protected=workspace_layout.operator_globs(effective_workspace)[1],
         zone=zone,
         repo=repo,
         owner=invocation.context_name_for_repo_slug(effective_workspace, repo) if repo else None,

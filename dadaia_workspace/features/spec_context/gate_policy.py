@@ -25,18 +25,16 @@ import runpy
 from collections.abc import Callable
 from enum import Enum
 from functools import cache
+from itertools import chain
 from pathlib import Path, PurePath
 
 from dadaia_workspace.core import workspace_layout
-from dadaia_workspace.core.cli_line import fix_line, script_line
+from dadaia_workspace.core.cli_line import fix_line, mkdir_line, script_line
 
 __all__ = ["Decision", "PathClass", "classify_path", "evaluate"]
 
 # Derived from the zone registry (OUTPUT + EPHEMERAL zones) — never a second literal.
 _ADDITIVE_DADAIA_PREFIXES: tuple[str, ...] = workspace_layout.additive_prefixes()
-#: .dadaia/sessions/ holds protected, caller-owned bind records. Agents must not write
-#: these via file tools; only the CLI/bootstrap may write them.
-_PROTECTED_PREFIX = ".dadaia/sessions/"
 #: SEC-01 block reason emitted by the Python hook ``dadaia_workspace.hooks.sdd_gate``,
 #: which delegates here so PROTECTED has a single message source.
 _PROTECTED_MESSAGE = (
@@ -44,10 +42,10 @@ _PROTECTED_MESSAGE = (
     "here via file tools. Blocked to preserve caller session identity integrity "
     "(SEC-01 / CWE-284).\n"
 )
-#: PROTECTED also holds every path the install ledger records (the caller passes that
-#: set as *projected*): the ledger, not a basename, decides what is projected law.
+#: PROTECTED also holds the code floor and every path the install ledger records (the caller
+#: passes that set as *projected*) — the floor holds without a ledger (ADR 0133).
 _LAW_MESSAGE = (
-    "[GATE] '{path}' is a projected file (the install ledger records it). In an "
+    "[GATE] '{path}' is core workspace law or a projected file. In an "
     "instantiated workspace only a human operator edits it by hand; "
     "an agent changes the law at its source and re-projects.\n"
     "The source is dadaia_workspace/public/; this re-projects it:\n"
@@ -55,8 +53,8 @@ _LAW_MESSAGE = (
 
 #: ``.dadaiaignore`` is the operator's alone (ADR 0092): an agent proposes a pattern, never writes it.
 _OPERATOR_MESSAGE = (
-    "[GATE] .dadaiaignore is the operator's file (ADR 0092): only the operator edits it by "
-    "hand. Hand the operator the pattern you need; the doctor names every unadmitted entry.\n"
+    "[GATE] '{path}' is the operator's ({why}; ADRs 0092, 0133): only the operator edits it "
+    "by hand. Draft your change under .dadaia/tmp/<agent>/<YYYYMMDD>/ and hand it over.\n"
 )
 
 _SCOPE_MESSAGE = (
@@ -100,12 +98,29 @@ def _worktree_fix(repo: str, repo_rel: str) -> str:
     return script_line(_WORKTREE_SCRIPT, "new", repo, "--kind", kind)
 
 
-def classify_path(rel_path: str, projected: frozenset[str] = frozenset()) -> PathClass:
-    """Classify a workspace-relative path; first match wins: PROTECTED (session records,
-    *projected* paths, ``.dadaiaignore``), ADDITIVE (the zone-registry ``.dadaia/``
-    prefixes), else MUTATING — no ``repos/`` path is ever ADDITIVE (ADR 0124)."""
+def _protection(
+    p: str, projected: frozenset[str], protected: tuple[str, ...]
+) -> tuple[str, str] | None:
+    """The one PROTECTED predicate, in precedence order: ``(source, match)`` — ``projected``
+    and the path, ``floor`` and its entry, ``glob`` and the matched protected glob — else ``None``."""
+    return next(
+        chain(
+            [("projected", p)] if p in projected else [],
+            (("floor", f) for f in workspace_layout.CORE_FLOOR if p == f or p.startswith(f + "/")),
+            (("glob", g) for g in protected if workspace_layout.protected_glob(p, (g,))),
+        ),
+        None,
+    )
+
+
+def classify_path(
+    rel_path: str, projected: frozenset[str] = frozenset(), protected: tuple[str, ...] = ()
+) -> PathClass:
+    """Classify a workspace-relative path; first match wins: PROTECTED (the code floor, the
+    *projected* paths, a *protected* glob of ``.dadaiaignore``), ADDITIVE (the zone-registry
+    ``.dadaia/`` prefixes), else MUTATING — no ``repos/`` path is ever ADDITIVE (ADR 0124)."""
     p = rel_path.lstrip("/")
-    if p in projected or p.startswith(_PROTECTED_PREFIX) or p == workspace_layout.DADAIAIGNORE:
+    if _protection(p, projected, protected):
         return PathClass.PROTECTED
     if any(p.startswith(x) for x in _ADDITIVE_DADAIA_PREFIXES):
         return PathClass.ADDITIVE
@@ -117,6 +132,7 @@ def evaluate(
     *,
     root: PurePath,
     projected: frozenset[str] = frozenset(),
+    protected: tuple[str, ...] = (),
     zone: str = "root",
     repo: str | None = None,
     owner: str | None = None,
@@ -135,17 +151,19 @@ def evaluate(
     unbound one is the declared gap (ADR 0116). Then every write in zone ``repo`` is
     refused with the ``worktree.py new`` fix (ADR 0105). Everything else ALLOWS.
     """
-    cls = classify_path(rel_path, projected)
-    if cls == PathClass.PROTECTED:
-        p = rel_path.lstrip("/")
-        if p.startswith(_PROTECTED_PREFIX):
+    hit = _protection(rel_path.lstrip("/"), projected, protected)
+    if hit:
+        source, match = hit
+        if match == ".dadaia/sessions":
             message, fix = _PROTECTED_MESSAGE, fix_line(root, "context", "bind", "<ctx>")
-        elif p == workspace_layout.DADAIAIGNORE:
-            message, fix = _OPERATOR_MESSAGE, fix_line(root, "doctor")  # names what to ask for
+        elif source == "glob" or match == workspace_layout.DADAIAIGNORE:
+            why = f"protected glob '{match}'" if source == "glob" else "its own file"
+            message = _OPERATOR_MESSAGE.format(path=rel_path, why=why)
+            fix = mkdir_line(root / ".dadaia" / "tmp")
         else:  # re-projects the law from staging
             message, fix = _LAW_MESSAGE.format(path=rel_path), fix_line(root, "public", "install")
         return Decision.BLOCK, message + f"fix: {fix}"
-    if cls == PathClass.ADDITIVE or repo is None:
+    if any(rel_path.lstrip("/").startswith(x) for x in _ADDITIVE_DADAIA_PREFIXES) or repo is None:
         return Decision.ALLOW, ""
     if owner is not None and repo not in repos and (context is not None or has_id):
         message = _SCOPE_MESSAGE.format(

@@ -28,6 +28,7 @@ def _spawn(ws: Path, payload: dict[str, Any]) -> Any:
     return result
 
 
+# fmt: off
 @pytest.mark.parametrize(
     ("tool", "tool_input", "want"),
     [
@@ -37,6 +38,10 @@ def _spawn(ws: Path, payload: dict[str, Any]) -> Any:
         ("Write", {"file_path": ".dadaia/sessions/a.json"}, "SEC-01"),
         ("Write", {"file_path": "junk.txt"}, "ROOT WHITELIST GATE"),
         ("apply_patch", {"command": _PATCH.format(".dadaia/sessions/a.json")}, "SEC-01"),
+        *[("Write", {"file_path": p}, "[GATE]") for p in ("AGENTS.md", ".dadaiaignore", ".claude/settings.json", ".dadaia/hooks/w.sh", ".dadaia/states/spec_contexts.json")],
+        ("Edit", {"file_path": "repos/a/secrets/k"}, "protected glob 'secrets'"),
+        ("apply_patch", {"command": _PATCH.format("worktrees/a/0.5.0a-impl/secrets/k")}, "protected glob 'secrets'"),
+        ("Write", {"file_path": "worktrees/a/0.5.0a-impl/src/ok.py"}, None),
     ],
     ids=[
         "in-repo-write-is-merge-only",
@@ -45,8 +50,13 @@ def _spawn(ws: Path, payload: dict[str, Any]) -> Any:
         "protected-sessions-fails-closed",
         "root-whitelist-forbidden-entry-blocks",
         "apply-patch-most-restrictive-header-blocks-the-whole-patch",
+        *[f"AC2.3-no-ledger-floor-{n}" for n in ("agents-md", "dadaiaignore", "hook-wiring", "hook-wrapper", "states")],
+        "AC2.5-protected-glob-in-repo",
+        "AC2.5-protected-glob-in-worktree-codex-dialect",
+        "AC2.5-unprotected-sibling-allowed",
     ],
 )
+# fmt: on
 def test_non_write_and_protected_matrix(
     tmp_path: Path, tool: str, tool_input: dict[str, str], want: str | None
 ) -> None:
@@ -57,6 +67,7 @@ def test_non_write_and_protected_matrix(
         json.dumps({"contexts": [{"repo_slug": "a", "state": "alive"}]}), encoding="utf-8"
     )
     (tmp_path / "repos" / "a" / "specs").mkdir(parents=True)
+    (tmp_path / ".dadaiaignore").write_text("[protected]\nsecrets\n", encoding="utf-8")
     rooted = {k: v if k == "command" else str(tmp_path / v) for k, v in tool_input.items()}
     block = _spawn(tmp_path, {"tool_name": tool, "tool_input": rooted}).block_envelope()
     if want is None:

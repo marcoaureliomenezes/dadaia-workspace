@@ -303,7 +303,7 @@ class DoctorService:
 
     def scan(self) -> tuple[Finding, ...]:
         """Every entry of the instance, classified, in the fixed FR3 order."""
-        globs, invalid = workspace_layout.operator_globs(self._workspace_root)
+        globs, _, invalid = workspace_layout.operator_globs(self._workspace_root)
         rules = (globs, *invocation.registered_slugs(self._workspace_root))
         findings: list[Finding] = [*self._missing_core(), *self._scan_dadaiaignore(invalid)]
         findings.extend(self._scan_places(rules))
