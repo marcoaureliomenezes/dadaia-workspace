@@ -115,16 +115,16 @@ def _protection(
 
 def classify_path(
     rel_path: str, projected: frozenset[str] = frozenset(), protected: tuple[str, ...] = ()
-) -> PathClass:
-    """Classify a workspace-relative path; first match wins: PROTECTED (the code floor, the
-    *projected* paths, a *protected* glob of ``.dadaiaignore``), ADDITIVE (the zone-registry
-    ``.dadaia/`` prefixes), else MUTATING — no ``repos/`` path is ever ADDITIVE (ADR 0124)."""
+) -> tuple[PathClass, tuple[str, str] | None]:
+    """(class, ``_protection`` hit) of a workspace-relative path; first match wins: PROTECTED
+    (floor, *projected*, a *protected* glob), ADDITIVE (the zone-registry ``.dadaia/``
+    prefixes), else MUTATING — no ``repos/`` path is ever ADDITIVE (ADR 0124)."""
     p = rel_path.lstrip("/")
-    if _protection(p, projected, protected):
-        return PathClass.PROTECTED
+    if hit := _protection(p, projected, protected):
+        return PathClass.PROTECTED, hit
     if any(p.startswith(x) for x in _ADDITIVE_DADAIA_PREFIXES):
-        return PathClass.ADDITIVE
-    return PathClass.MUTATING
+        return PathClass.ADDITIVE, None
+    return PathClass.MUTATING, None
 
 
 def evaluate(
@@ -151,7 +151,7 @@ def evaluate(
     unbound one is the declared gap (ADR 0116). Then every write in zone ``repo`` is
     refused with the ``worktree.py new`` fix (ADR 0105). Everything else ALLOWS.
     """
-    hit = _protection(rel_path.lstrip("/"), projected, protected)
+    cls, hit = classify_path(rel_path, projected, protected)
     if hit:
         source, match = hit
         if match == ".dadaia/sessions":
@@ -163,7 +163,7 @@ def evaluate(
         else:  # re-projects the law from staging
             message, fix = _LAW_MESSAGE.format(path=rel_path), fix_line(root, "public", "install")
         return Decision.BLOCK, message + f"fix: {fix}"
-    if any(rel_path.lstrip("/").startswith(x) for x in _ADDITIVE_DADAIA_PREFIXES) or repo is None:
+    if cls == PathClass.ADDITIVE or repo is None:
         return Decision.ALLOW, ""
     if owner is not None and repo not in repos and (context is not None or has_id):
         message = _SCOPE_MESSAGE.format(

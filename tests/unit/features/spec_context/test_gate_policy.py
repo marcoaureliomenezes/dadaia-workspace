@@ -47,7 +47,7 @@ _IN_REPO = (
 ])
 # fmt: on
 def test_classification_matrix(path: str, expected: PathClass) -> None:
-    assert classify_path(path) == expected
+    assert classify_path(path)[0] == expected
 
 
 _A: dict[str, object] = {"context": "ctx-a", "repos": frozenset({"ctx-a", "ctx-a-infra"})}
