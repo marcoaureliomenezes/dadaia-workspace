@@ -49,15 +49,13 @@ def serialize(records: Records) -> str:
     return "".join(json.dumps(r, sort_keys=True, ensure_ascii=False) + "\n" for r in records)
 
 
-def _validated(records: Records, rel: str, before: Records, histo: Path) -> str:
+def _validated(records: Records, rel: str, before: Records, known: frozenset[str]) -> str:
     for record in records:
         why = None if record in before else private_refusal(record)
         if why is not None:
             raise Refusal(*why)
     text = serialize(records)
-    archive = histo.read_text(encoding="utf-8") if histo.is_file() else ""
-    moved = frozenset(str(r.get("id")) for r in before)  # an archived record stays known
-    findings = findings_for(text, rel, archived_ids(archive) | moved)
+    findings = findings_for(text, rel, known)
     if findings:
         detail = "; ".join(f"line {f['line']}: {f['message']}" for f in findings[:5])
         raise Refusal(
@@ -68,33 +66,39 @@ def _validated(records: Records, rel: str, before: Records, histo: Path) -> str:
 
 
 def commit(
-    path: Path, apply: Callable[[Records], Records], rel: str = LEDGER, archive: Path | None = None
+    path: Path, apply: Callable[[Records], Records], rel: str = LEDGER, archive: bool = False
 ) -> Records:
     """Apply *apply* to *path*'s records and replace the file atomically; with *archive*,
-    the records *apply* dropped are appended there first.
+    the records *apply* dropped are appended to the ledger's archive first, and only those
+    stay known ids — a drop without it leaves a dangling `caused_by` refused here.
 
     The candidate bytes are validated BEFORE either write, so a refused write leaves both
     files byte-identical. When the file changed under the computation, the change is
     re-read and re-applied ONCE; a second concurrent write refuses with a retry `fix:`.
     """
     histo = path.parents[1] / HISTO
+    old = histo.read_text(encoding="utf-8") if histo.is_file() else ""
+
+    def known(records: Records, written: Records) -> frozenset[str]:
+        moved = {str(r.get("id")) for r in records if r not in written} if archive else set()
+        return archived_ids(old) | moved
+
     before = stamp(path)
     records = read_records(path)
     written = apply(records)
-    text = _validated(written, rel, records, histo)
+    text = _validated(written, rel, records, known(records, written))
     if stamp(path) != before:
         before = stamp(path)
         records = read_records(path)
         written = apply(records)
-        text = _validated(written, rel, records, histo)
+        text = _validated(written, rel, records, known(records, written))
         if stamp(path) != before:
             raise Refusal(
                 f"{path.name} changed twice under this write — nothing was written",
                 "re-run this command",
             )
-    if archive is not None:  # pre-v6 lines live there: only the moved records are new
-        existing = archive.read_text(encoding="utf-8") if archive.is_file() else ""
-        replace(archive, existing + serialize([r for r in records if r not in written]))
+    if archive:  # pre-v6 lines live there: only the moved records are new
+        replace(histo, old + serialize([r for r in records if r not in written]))
     replace(path, text)
     return written
 

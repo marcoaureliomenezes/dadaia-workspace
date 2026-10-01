@@ -177,7 +177,6 @@ def test_json_output_carries_one_object_per_finding(script: Path, tmp_path: Path
     assert payload[0]["line"] == 1
 
 
-@pytest.mark.skipif(sys.platform == "win32", reason="the fake workspace CLI is a shebang script")
 @pytest.mark.parametrize("bad", ["[1, 2]", "{not json"])
 def test_a_write_over_an_unreadable_line_refuses_naming_it(
     script: Path, tmp_path: Path, bad: str
@@ -192,6 +191,7 @@ def test_a_write_over_an_unreadable_line_refuses_naming_it(
     assert f"sed -n '2p' {ledger}" in done.stderr
 
 
+@pytest.mark.skipif(sys.platform == "win32", reason="the fake workspace CLI is a shebang script")
 def test_a_missing_specs_tree_is_refused_never_created(script: Path, tmp_path: Path) -> None:
     """bug-law-spelling-registers-into-a-reaped-root-specs-tree: the fix names the bound tree."""
     (cli := tmp_path / ".dadaia/.venv/bin/dadaia").parent.mkdir(parents=True)
@@ -478,6 +478,37 @@ def test_a_write_refuses_the_lineage_check_refuses(
     fix = f"fix: {sys.executable} {script} check --specs {specs.resolve()}"
     assert fix.replace("\\", "/") in done.stderr.replace("\\", "/")
     assert (specs / "bugs" / "BUGS.jsonl").read_bytes() == before
+
+
+@pytest.mark.parametrize("archive", [False, True])
+def test_only_an_archived_drop_keeps_its_id_known(
+    script: Path, tmp_path: Path, archive: bool
+) -> None:
+    """A commit dropping a referenced record without archiving it would leave a target
+    `check` refuses: the write refuses it too. Archived, the id stays known."""
+    import importlib.util
+
+    other = {**_OPEN_RECORD, "id": "b-bug", "caused_by": "a-bug"}
+    specs = _ledger(tmp_path, _OPEN_RECORD, other)
+    sys.path.insert(0, str(script.parent))
+    try:
+        spec = importlib.util.spec_from_file_location(
+            "_bugs_store", script.parent / "_bugs_store.py"
+        )
+        assert spec is not None and spec.loader is not None
+        store = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(store)
+    finally:
+        sys.path.remove(str(script.parent))
+    ledger = specs / "bugs" / "BUGS.jsonl"
+    drop = lambda rs: [r for r in rs if r["id"] != "a-bug"]  # noqa: E731
+    if archive:
+        store.commit(ledger, drop, archive=True)
+        assert _run(script, "check", "--specs", str(specs)).returncode == 0
+    else:
+        with pytest.raises(store.Refusal, match="names no record"):
+            store.commit(ledger, drop)
+        assert [r["id"] for r in _records(specs)] == ["a-bug", "b-bug"]
 
 
 def test_resolve_accepts_an_archived_caused_by(script: Path, tmp_path: Path) -> None:
