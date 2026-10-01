@@ -18,11 +18,17 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from _backlog_schema import DISPOSITIONS  # noqa: E402
 from _backlog_store import SCRIPT, Items, Refusal  # noqa: E402
 from _backlog_write import today  # noqa: E402
+from _bugs_store import read_records  # noqa: E402
 from _release_schema import origin  # noqa: E402
 
 #: Which evidence flag each terminal word must carry — the histo record is the only
 #: surviving trace of why the item left.
-REQUIRED_EVIDENCE = {"delivered": "release", "superseded": "release", "rejected": "reason"}
+REQUIRED_EVIDENCE = {
+    "delivered": "release",
+    "superseded": "release",
+    "rejected": "reason",
+    "to-bug": "reason",  # the id of the bug record that carries the item on (ADR 0137)
+}
 
 
 def _picks(specs: Path, slug: str) -> list[str]:
@@ -49,32 +55,36 @@ def check_exit(specs: Path, active: Items, slug: str, values: dict[str, Any]) ->
             "so a slug missing from active[] has already exited",
             f"grep {slug} specs/backlog/_archive/backlog_histo.jsonl",
         )
+    picks = _picks(specs, slug)
+    # The exit this entry can take: the latest picking release's; with none, the operator's.
+    fix = (f"{SCRIPT} exit {slug} --disposition delivered --release {picks[-1]}" if picks
+           else f"Operator action: name {slug} in the `backlog:` clause of a candidate SPEC's "
+                f"first `**Origin:**` line under {specs / 'releases'}, then rerun this exit.")  # fmt: skip
     if disposition not in DISPOSITIONS:
         raise Refusal(
             f"unknown disposition {disposition!r}: a backlog item exits as one of "
             f"{'|'.join(DISPOSITIONS)}",
-            f"{SCRIPT} exit {slug} --disposition rejected --reason '<why it was refused>'",
+            fix,
         )
     required = REQUIRED_EVIDENCE[disposition]
-    supplied = {"release": release, "reason": reason}[required]
-    picks = _picks(specs, slug) if required == "release" else []
-    # The latest picking release is the real value; with none, the act is the operator's.
-    fix = (f"{SCRIPT} exit {slug} --disposition {disposition} --release {picks[-1]}" if picks
-           else f"Operator action: name {slug} in the `backlog:` clause of a candidate SPEC's "
-                f"first `**Origin:**` line under {specs / 'releases'}, then rerun this exit.")  # fmt: skip
-    if not (supplied or "").strip():
+    if not ({"release": release, "reason": reason}[required] or "").strip():
         raise Refusal(
             f"disposition {disposition!r} requires --{required}: the histo record is the "
             f"only surviving trace of why {slug!r} left active[]",
-            fix
-            if required == "release"
-            else f"{SCRIPT} exit {slug} --disposition {disposition} --reason '<why>'",
+            fix,
         )
     if required == "release" and release not in picks:
         raise Refusal(
             f"no releases/{release}/rc-<N>/SPEC.md names {slug!r} in its first `**Origin:**` "
             f"line's backlog clause — only a release that picked an item can exit it as {disposition!r}",
             fix,
+        )
+    bugs = specs / "bugs" / "BUGS.jsonl"
+    if disposition == "to-bug" and reason not in {r.get("id") for r in read_records(bugs)}:
+        raise Refusal(
+            f"{reason!r} names no record of {bugs} — `to-bug` hands {slug!r} to a registered bug",
+            f"Operator action: register {reason} with bugs.py append (dd-bug-registration), "
+            "then rerun this exit.",
         )
     return entry
 

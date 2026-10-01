@@ -86,7 +86,7 @@
       "hash_tuple": {
         "section": "sha256:bcf5a6fecb79a0a49fdc159387b731b2afbbb4f62e66985e6d27d1fcea41654c",
         "skill": "sha256:3c38d169ad179ea12336ea0d9e8750293e52d54ccd7ef2bf356416a859e1c090",
-        "scripts": "sha256:54b622447b1accab4133d6ee6ca195dfc09284765284fa7905662df038cb1695",
+        "scripts": "sha256:15553771c95bc98b7f84bfc4cb737192aa57aec9a9ce7553b8fd06f73eb938e4",
         "scoped": [
           "sha256:4bfdccc16405b6c385642528cf63c3b2c8dd9195a8d65e94bff486643fd0e2d1"
         ]
@@ -158,9 +158,9 @@
       "hash_tuple": {
         "section": "sha256:2e1085fbf82116cafcf8fd7226e28f50606442dd4df32ead26e19320b106ec88",
         "skill": "sha256:b158dfdd127766fb07bb86affd409a3b2b9e6f26a14b00e2fc6438aad62f12aa",
-        "scripts": "sha256:43e16bd6835b3ec684be9c71fb1d4f100e8f6f5050abea8c8f541afde1280120",
+        "scripts": "sha256:bb27175ddbfa3e0a82084f594821276a8afc69da81e99b293bd2a6a4c1031e4c",
         "scoped": [
-          "sha256:cf1b95b3cf5e9bd74639ebaf125567b6b949dd41a4a93923e4c3f6580a004627"
+          "sha256:f510e0fa83e8a41b7ed79194146615fade4ad255c652498e87f8e3d9dc46b1d8"
         ]
       },
       "recorded_by": "dd-software-engineer",
@@ -190,7 +190,7 @@
       "hash_tuple": {
         "section": "sha256:2e1085fbf82116cafcf8fd7226e28f50606442dd4df32ead26e19320b106ec88",
         "skill": "sha256:8b99a29bc45ab2c0c9e82ee339cd58fd8922bb0e4924e133542c4de588a8fcd7",
-        "scripts": "sha256:6f854690c1c7f506fff8b0f4ffc3d74c3b8605b43eaa10795686729593eac6de",
+        "scripts": "sha256:f23bc3526eb453e2f7cf71e88c59be0c66300d50e196c4894f490f4d9004550d",
         "scoped": [
           "sha256:eed5f4dac374205f89eb38ddaf224674c8da112575367427284120db214824e1"
         ]
@@ -208,7 +208,7 @@
       "hash_tuple": {
         "section": "sha256:dd7fa02f42e51618b5d991954f1a5f379dad89210ba85ea93a940c247dd24a93",
         "skill": "sha256:35b3803817f4601ffeebc590ed1c98d5d779427ecb4e9de1034fab38e4958422",
-        "scripts": "sha256:cf4e01df06508dd66045760eeb607bb5aaffbe7483b8d821f251b302f047454c",
+        "scripts": "sha256:45798e1ede79059a4842e229aeb40ff12deec88a95e1e9bf144886262760cdff",
         "scoped": [
           "sha256:b49c2c7d74916bf1af3ba2c06ae1c8bb8b6ed72ee5b7a1d3caa9b98480ec6348"
         ]

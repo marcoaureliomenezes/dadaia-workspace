@@ -17,7 +17,7 @@ REPLAY = "specs/releases/*/rc-*/TASKS.md"
 KINDS: dict[str, tuple[str, ...]] = {
     "impl": (CODE, REPLAY),
     "bug": (CODE, "specs/bugs/BUGS.jsonl", "specs/bugs/_archive/*"),
-    "backlog": ("specs/backlog/*", "specs/ADRs/decisions.jsonl"),
+    "backlog": ("specs/backlog/*", "specs/ADRs/decisions.jsonl", "specs/bugs/BUGS.jsonl"),
     "release": (
         "specs/releases/*",
         "specs/ADRs/decisions.jsonl",

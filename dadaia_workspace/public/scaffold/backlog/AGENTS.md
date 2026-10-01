@@ -31,7 +31,7 @@ Scope: this file governs only `specs/backlog/`.
 
 ## 3. Terminal disposition tokens
 
-- An entry exits with one disposition of the vocabulary `BACKLOG_PY exit --help` lists; a delivery or supersession carries the release id in `release`, a rejection a one-line `reason`.
+- An entry exits with one disposition of the vocabulary `BACKLOG_PY exit --help` lists: a delivery or supersession carries the release id in `release`, a rejection a one-line `reason`, a `to-bug` the id of its `BUGS.jsonl` record in `reason` — registration and exit share one `backlog` worktree.
 - A postponed item stays in `active[]` with its status unchanged — it never exits.
 
 ## 4. Idea-stage freedom vs bound intents

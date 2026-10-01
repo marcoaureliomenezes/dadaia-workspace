@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import json
 import os
+import shlex
 import subprocess
 import sys
 from pathlib import Path
@@ -28,10 +29,9 @@ _SOURCE = _SCRIPTS / "backlog.py"
 @pytest.fixture
 def script(tmp_path: Path) -> Path:
     """The staged shape: backlog.py with both schema copies beside it, and the release
-    skill beside it, whose Origin parser `exit` imports (ADR 0161)."""
-    stage_skill_scripts(
-        "dd-release-implementation", tmp_path / "skills" / "dd-release-implementation" / "scripts"
-    )
+    and bug skills beside it, whose Origin parser and bug reader `exit` imports (ADR 0161)."""
+    for owner in ("dd-release-implementation", "dd-bug-resolution"):
+        stage_skill_scripts(owner, tmp_path / "skills" / owner / "scripts")
     skill = tmp_path / "skills" / "dd-backlog-definition" / "scripts"
     return stage_skill_scripts("dd-backlog-definition", skill) / "backlog.py"
 
@@ -289,17 +289,41 @@ def test_rejected_requires_a_reason(script: Path, tmp_path: Path) -> None:
     assert _histo(specs)[0]["reason"] == "no release ever took it"
 
 
-def test_exit_refuses_a_disposition_outside_the_backlog_vocabulary(
+def test_a_deferred_exit_is_refused_with_a_disposition_the_entry_can_take(
     script: Path, tmp_path: Path
 ) -> None:
+    """T-050-138: `deferred` is no backlog word; the refusal's fix is the exit this
+    picked entry can take, and it runs as printed (ADR 0158)."""
     specs = _specs(tmp_path)
     _run(script, "new", "an-idea", "--specs", str(specs))
-    done = _run(
-        script, "exit", "an-idea", "--specs", str(specs), "--disposition", "resolved",
-        "--reason", "r",
-    )  # fmt: skip
+    _pick(specs)
+    done = _run(script, "exit", "an-idea", "--specs", str(specs), "--disposition", "deferred")
     assert done.returncode == 1
     assert len(_active(specs)) == 1
+    [fix] = _fix_lines(done)
+    ran = subprocess.run(shlex.split(fix.removeprefix("fix: ")), capture_output=True, check=False)
+    assert ran.returncode == 0, ran.stderr
+    assert _histo(specs)[0]["disposition"] == "delivered"
+
+
+@pytest.mark.parametrize(("bug", "code"), [("a-bug", 0), ("no-such-bug", 1)])
+def test_to_bug_exits_only_into_a_registered_bug(
+    script: Path, tmp_path: Path, bug: str, code: int
+) -> None:
+    """AC3.12 (ADR 0137): `to-bug` exits when --reason names a BUGS.jsonl record, an
+    unknown id is refused with nothing written, and `check` accepts the record."""
+    specs = _specs(tmp_path)
+    _run(script, "new", "an-idea", "--specs", str(specs))
+    (specs / "bugs").mkdir()
+    (specs / "bugs" / "BUGS.jsonl").write_text(json.dumps({"id": "a-bug"}) + "\n", "utf-8")
+    done = _run(
+        script, "exit", "an-idea", "--specs", str(specs), "--disposition", "to-bug",
+        "--reason", bug,
+    )  # fmt: skip
+    assert done.returncode == code, done.stdout + done.stderr
+    assert len(_active(specs)) == code
+    assert [r["reason"] for r in _histo(specs)] == [bug] * (1 - code)
+    assert _run(script, "check", "--specs", str(specs)).returncode == 0
 
 
 def test_new_and_exit_refuse_a_value_the_push_refuses(script: Path, tmp_path: Path) -> None:
