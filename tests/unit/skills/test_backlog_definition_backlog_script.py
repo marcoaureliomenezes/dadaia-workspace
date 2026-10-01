@@ -280,6 +280,8 @@ def test_rejected_requires_a_reason(script: Path, tmp_path: Path) -> None:
     _run(script, "new", "an-idea", "--specs", str(specs))
     done = _run(script, "exit", "an-idea", "--specs", str(specs), "--disposition", "rejected")
     assert done.returncode == 1
+    [fix] = _fix_lines(done)
+    assert fix.startswith("fix: Operator action:") and "--disposition rejected" in fix
     assert len(_active(specs)) == 1
     ok = _run(
         script, "exit", "an-idea", "--specs", str(specs),
@@ -289,21 +291,48 @@ def test_rejected_requires_a_reason(script: Path, tmp_path: Path) -> None:
     assert _histo(specs)[0]["reason"] == "no release ever took it"
 
 
-def test_a_deferred_exit_is_refused_with_a_disposition_the_entry_can_take(
-    script: Path, tmp_path: Path
+@pytest.mark.parametrize(
+    ("disposition", "evidence"),
+    [("superseded", ["--release", "9.9.9"]), ("rejected", []), ("to-bug", [])],
+)
+def test_each_refusal_fix_keeps_the_chosen_disposition(
+    script: Path, tmp_path: Path, disposition: str, evidence: list[str]
 ) -> None:
-    """T-050-138: `deferred` is no backlog word; the refusal's fix is the exit this
-    picked entry can take, and it runs as printed (ADR 0158)."""
+    """T-050-138 review F1: a picked entry refused for its evidence gets the fix of THAT
+    evidence row — never a `delivered` exit the operator did not choose (#B5 class).
+    A runnable fix runs as printed and exits under the chosen disposition (ADR 0158)."""
+    specs = _specs(tmp_path)
+    _run(script, "new", "an-idea", "--specs", str(specs))
+    _pick(specs)
+    done = _run(
+        script, "exit", "an-idea", "--specs", str(specs), "--disposition", disposition, *evidence
+    )
+    assert done.returncode == 1
+    [fix] = _fix_lines(done)
+    assert "delivered" not in fix and "<" not in fix
+    if fix.startswith("fix: Operator action:"):
+        assert f"--disposition {disposition}" in fix
+        assert ("bugs.py append" in fix) == (disposition == "to-bug")
+        assert _histo(specs) == []
+        return
+    ran = subprocess.run(shlex.split(fix.removeprefix("fix: ")), capture_output=True, check=False)
+    assert ran.returncode == 0, ran.stderr
+    assert [r["disposition"] for r in _histo(specs)] == [disposition]
+
+
+def test_a_deferred_exit_is_refused_and_the_entry_stays_live(script: Path, tmp_path: Path) -> None:
+    """Operator ruling 2026-10-01 (T-050-138 review F4): `deferred` is no backlog word —
+    a postponed item stays in active[] and needs no exit; nothing is written."""
     specs = _specs(tmp_path)
     _run(script, "new", "an-idea", "--specs", str(specs))
     _pick(specs)
     done = _run(script, "exit", "an-idea", "--specs", str(specs), "--disposition", "deferred")
     assert done.returncode == 1
+    assert _fix_lines(done) == [
+        "fix: Operator action: a postponed item stays in active[] and needs no exit."
+    ]
     assert len(_active(specs)) == 1
-    [fix] = _fix_lines(done)
-    ran = subprocess.run(shlex.split(fix.removeprefix("fix: ")), capture_output=True, check=False)
-    assert ran.returncode == 0, ran.stderr
-    assert _histo(specs)[0]["disposition"] == "delivered"
+    assert _histo(specs) == []
 
 
 @pytest.mark.parametrize(("bug", "code"), [("a-bug", 0), ("no-such-bug", 1)])
@@ -363,21 +392,25 @@ def test_check_reports_a_duplicate_active_id(script: Path, tmp_path: Path) -> No
     assert "duplicate" in lines[0]
 
 
-def test_check_reports_a_terminal_status_in_active(script: Path, tmp_path: Path) -> None:
+@pytest.mark.parametrize("status", ["delivered", "to-bug"])
+def test_check_reports_a_terminal_status_in_active(
+    script: Path, tmp_path: Path, status: str
+) -> None:
+    """T-050-138 review F2: every disposition is terminal, `to-bug` included."""
     specs = _specs(
         tmp_path,
         {
             "id": "gone",
             "title": "t",
             "opened": "2026-09-20",
-            "status": "delivered",
+            "status": status,
             "description": "d",
             "provenance": "operator request",
         },  # fmt: skip
     )
     done = _run(script, "check", "--specs", str(specs))
     assert done.returncode == 1
-    assert "delivered" in done.stdout
+    assert status in done.stdout
 
 
 def test_check_reports_a_missing_required_field(script: Path, tmp_path: Path) -> None:

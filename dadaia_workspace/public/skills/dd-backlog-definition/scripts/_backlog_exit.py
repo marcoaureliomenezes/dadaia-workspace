@@ -18,17 +18,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from _backlog_schema import DISPOSITIONS  # noqa: E402
 from _backlog_store import SCRIPT, Items, Refusal  # noqa: E402
 from _backlog_write import today  # noqa: E402
-from _bugs_store import read_records  # noqa: E402
 from _release_schema import origin  # noqa: E402
-
-#: Which evidence flag each terminal word must carry — the histo record is the only
-#: surviving trace of why the item left.
-REQUIRED_EVIDENCE = {
-    "delivered": "release",
-    "superseded": "release",
-    "rejected": "reason",
-    "to-bug": "reason",  # the id of the bug record that carries the item on (ADR 0137)
-}
 
 
 def _picks(specs: Path, slug: str) -> list[str]:
@@ -44,10 +34,63 @@ def _picks(specs: Path, slug: str) -> list[str]:
     return sorted(set(picks), key=lambda v: [int(p) if p.isdigit() else -1 for p in v.split(".")])
 
 
+def _release(specs: Path, slug: str, disposition: str, release: str | None) -> None:
+    """A release whose candidate SPEC picked *slug*; the fix keeps the disposition."""
+    picks = _picks(specs, slug)
+    if release not in picks:
+        raise Refusal(
+            f"--release {release!r}: no releases/<v>/rc-<N>/SPEC.md first `**Origin:**` line "
+            f"picks {slug!r} — only a release that picked an item can exit it as {disposition!r}",
+            f"{SCRIPT} exit {slug} --disposition {disposition} --release {picks[-1]}" if picks
+            else f"Operator action: name {slug} in the `backlog:` clause of a candidate SPEC's "
+                 f"first `**Origin:**` line under {specs / 'releases'}, then rerun this exit.",
+        )  # fmt: skip
+
+
+def _reason(specs: Path, slug: str, disposition: str, reason: str | None) -> None:
+    """The one-line why of a rejection."""
+    if not (reason or "").strip():
+        raise Refusal(
+            f"{disposition!r} requires --reason: the histo record is the only trace of why {slug!r} left",
+            f"Operator action: rerun `{SCRIPT} exit {slug} --disposition {disposition}` with a "
+            f"one-line --reason saying why {slug} is refused.",
+        )  # fmt: skip
+
+
+def _bug(specs: Path, slug: str, disposition: str, reason: str | None) -> None:
+    """The id of the BUGS.jsonl record the item is handed to (ADR 0137), read by the bug
+    skill's reader — imported here, so only this exit depends on that skill."""
+    from _bugs_store import Refusal as BugRefusal  # noqa: PLC0415
+    from _bugs_store import read_records  # noqa: PLC0415
+
+    bugs = specs / "bugs" / "BUGS.jsonl"
+    try:
+        ids = {record.get("id") for record in read_records(bugs)}
+    except BugRefusal as exc:  # translated at the seam: one Refusal type leaves this module
+        raise Refusal(str(exc), exc.fix) from exc
+    if reason not in ids:
+        raise Refusal(
+            f"--reason {reason!r} names no record of {bugs}: `to-bug` hands {slug!r} to a registered bug",
+            f"Operator action: register the bug {slug} becomes with bugs.py append "
+            f"(dd-bug-registration), then rerun `{SCRIPT} exit {slug} --disposition {disposition}` "
+            "with its id as --reason.",
+        )  # fmt: skip
+
+
+#: Each terminal word -> the evidence flag it carries and its verifier; the histo record
+#: is the only surviving trace of why the item left.
+EVIDENCE = {
+    "delivered": ("release", _release),
+    "superseded": ("release", _release),
+    "rejected": ("reason", _reason),
+    "to-bug": ("reason", _bug),
+}
+
+
 def check_exit(specs: Path, active: Items, slug: str, values: dict[str, Any]) -> dict[str, Any]:
     """Refuse, before any write, an exit whose subject is not live or whose evidence does
     not match its disposition. Returns the entry the exit will remove."""
-    disposition, release, reason = values["disposition"], values["release"], values["reason"]
+    disposition = values["disposition"]
     entry = next((item for item in active if item.get("id") == slug), None)
     if entry is None:
         raise Refusal(
@@ -55,37 +98,14 @@ def check_exit(specs: Path, active: Items, slug: str, values: dict[str, Any]) ->
             "so a slug missing from active[] has already exited",
             f"grep {slug} specs/backlog/_archive/backlog_histo.jsonl",
         )
-    picks = _picks(specs, slug)
-    # The exit this entry can take: the latest picking release's; with none, the operator's.
-    fix = (f"{SCRIPT} exit {slug} --disposition delivered --release {picks[-1]}" if picks
-           else f"Operator action: name {slug} in the `backlog:` clause of a candidate SPEC's "
-                f"first `**Origin:**` line under {specs / 'releases'}, then rerun this exit.")  # fmt: skip
-    if disposition not in DISPOSITIONS:
+    if disposition not in EVIDENCE:
         raise Refusal(
             f"unknown disposition {disposition!r}: a backlog item exits as one of "
             f"{'|'.join(DISPOSITIONS)}",
-            fix,
+            "Operator action: a postponed item stays in active[] and needs no exit.",
         )
-    required = REQUIRED_EVIDENCE[disposition]
-    if not ({"release": release, "reason": reason}[required] or "").strip():
-        raise Refusal(
-            f"disposition {disposition!r} requires --{required}: the histo record is the "
-            f"only surviving trace of why {slug!r} left active[]",
-            fix,
-        )
-    if required == "release" and release not in picks:
-        raise Refusal(
-            f"no releases/{release}/rc-<N>/SPEC.md names {slug!r} in its first `**Origin:**` "
-            f"line's backlog clause — only a release that picked an item can exit it as {disposition!r}",
-            fix,
-        )
-    bugs = specs / "bugs" / "BUGS.jsonl"
-    if disposition == "to-bug" and reason not in {r.get("id") for r in read_records(bugs)}:
-        raise Refusal(
-            f"{reason!r} names no record of {bugs} — `to-bug` hands {slug!r} to a registered bug",
-            f"Operator action: register {reason} with bugs.py append (dd-bug-registration), "
-            "then rerun this exit.",
-        )
+    flag, verify = EVIDENCE[disposition]
+    verify(specs, slug, disposition, values[flag])
     return entry
 
 

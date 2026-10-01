@@ -31,7 +31,6 @@ import _backlog_write as wr  # noqa: E402
 from _backlog_check import check  # noqa: E402
 from _backlog_schema import CODE, DISPOSITIONS, HISTO, LEDGER  # noqa: E402
 from _backlog_store import Refusal, commit, read_active  # noqa: E402
-from _bugs_store import Refusal as BugsRefusal  # noqa: E402
 from _specs import find_specs, refuse  # noqa: E402
 
 _HELP = {
@@ -115,7 +114,7 @@ def main(argv: list[str] | None = None) -> int:
         if args.verb == "subjects":
             return _subjects(args, specs)
         return _new(args, specs) if args.verb == "new" else _exit(args, specs)
-    except (Refusal, BugsRefusal) as refusal:
+    except Refusal as refusal:
         return refuse(refusal, specs)
 
 

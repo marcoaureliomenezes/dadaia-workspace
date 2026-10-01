@@ -10,6 +10,7 @@ from the pair check the verb runs over its candidate bytes before writing.
 from __future__ import annotations
 
 import ast
+import contextlib
 import hashlib
 import json
 import subprocess
@@ -129,13 +130,23 @@ def test_the_one_ledger_writer_leaves_no_temp_and_writes_lf(
     assert target.read_bytes() == b"a\nb\n"
 
 
+class _Names(dict[str, Any]):
+    """A name the module binds elsewhere (a function, an import) reads as its own text."""
+
+    def __missing__(self, key: str) -> str:
+        return key
+
+
 def _script_table(rel: str, name: str = "REQUIRED_EVIDENCE") -> Any:
+    """The module's top-level assignments run in order, so a table derived from another
+    (`TERMINAL` from `DISPOSITIONS`) reads as the script itself builds it."""
     tree = ast.parse((_PUBLIC / "skills" / rel).read_text(encoding="utf-8"))
-    [value] = [
-        n.value for n in tree.body
-        if isinstance(n, ast.Assign) and getattr(n.targets[0], "id", "") == name
-    ]  # fmt: skip
-    return ast.literal_eval(value)
+    names = _Names()
+    for node in tree.body:
+        if isinstance(node, ast.Assign):  # one that needs a runtime value is not a table
+            with contextlib.suppress(Exception):
+                exec(compile(ast.Module([node], []), rel, "exec"), {}, names)  # noqa: S102
+    return names[name]
 
 
 @pytest.mark.parametrize(
@@ -149,14 +160,15 @@ def _script_table(rel: str, name: str = "REQUIRED_EVIDENCE") -> Any:
 )
 def test_every_script_subset_is_drawn_from_the_one_vocabulary(rel: str, name: str) -> None:
     subset = _script_table(rel, name)
-    assert subset == tuple(w for w in TERMINAL_DISPOSITIONS if w in subset)
+    assert set(subset) <= set(TERMINAL_DISPOSITIONS)
 
 
 def test_a_shared_disposition_requires_the_same_evidence_in_both_ledgers() -> None:
     """sa-ledger-vocabulary-and-atomic-write-duplicated-in-scripts#48.1: the scripts' own
     tables are the only definition, core carries none, and a word both ledgers use
     requires the same evidence in each."""
-    backlog = _script_table("dd-backlog-definition/scripts/_backlog_exit.py")
+    rows = _script_table("dd-backlog-definition/scripts/_backlog_exit.py", "EVIDENCE")
+    backlog = {word: flag for word, (flag, _verifier) in rows.items()}
     audit = _script_table("dd-audit-project/scripts/_audit_check.py")
     shared = {w: (backlog[w], audit[w]) for w in backlog.keys() & audit.keys()}
     assert shared == {"superseded": ("release",) * 2, "rejected": ("reason",) * 2}
