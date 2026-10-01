@@ -96,7 +96,7 @@ F019–F051 share the destination of the bug each cites, and F090–F112 share t
 
 - AC2.7 With `.dadaia/.venv` absent (FR `missing-venv-hook-disarms-the-gate-invisibly`; 0067):
   - Every hook still lets the action through.
-  - Once per session, the first hook that fires sends the agent, through the harness's context channel and not stderr alone, one message naming the gate's absence and `fix: uvx dadaia-workspace init <ws>`.
+  - On every firing of a ctx-inject lane while the venv is missing, that lane sends the agent, through its harness's context channel in the lane's own envelope and not stderr alone, one message naming the gate's absence and `fix: uvx dadaia-workspace init <ws>`; the message repeats until the venv is fixed, with no marker file and no per-session state (operator 2026-10-01: "Repetir até corrigir (Recomendado)").
   - Command: `pytest tests/contract/test_hook_behaviour_coverage.py`, the missing-venv case, per harness.
 - AC2.8 One statement of the four fail-open paths (F080):
   - The paths are:
