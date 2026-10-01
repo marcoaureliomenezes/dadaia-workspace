@@ -128,20 +128,20 @@ def test_parallel_siblings_union_ledgers_and_replay_task_markers(root: Path) -> 
     refuses; JSONL ledgers merge by union."""
     repo, tree, tasks = root / "repos/r", root / TREE, "specs/releases/0.5.0/rc-1/TASKS.md"
     s = "**Status:** Approved\n"  # the trio stays Approved for the next `new`
-    commit(repo, tasks, s + "- [ ] **T-1**\n- [ ] **T-2**\n- [ ] **T-3**\n")
+    commit(repo, tasks, s + "- [ ]**T-1**\n* [ ] **T-2**\n+ [ ] **T-3**\n")  # AC3.3 spellings
     git(tree, "rebase", "-q", "feature/0.5.0")
-    commit(tree, tasks, s + "- [x] **T-1**\n- [-] **T-2**\n- [ ] **T-3**\n")
-    commit(repo, tasks, s + "- [ ] **T-1**\n- [x] **T-2**\n- [ ] **T-3** amended\n")
+    commit(tree, tasks, s + "- [x]**T-1**\n* [-] **T-2**\n+ [ ] **T-3**\n")
+    commit(repo, tasks, s + "- [ ]**T-1**\n* [x] **T-2**\n+ [ ] **T-3** amended\n")
     run(root, "merge", TREE)  # rebased with the markers replayed; HEAD awaits its verdict
     approve(root, git(tree, "rev-parse", "HEAD").strip())
     assert run(root, "merge", TREE).returncode == 0
-    assert (repo / tasks).read_text() == s + "- [x] **T-1**\n- [x] **T-2**\n- [ ] **T-3** amended\n"
+    assert (repo / tasks).read_text() == s + "- [x]**T-1**\n* [x] **T-2**\n+ [ ] **T-3** amended\n"
     refused = [f"fix: git -C {tree} rebase feature/0.5.0"]
     assert run(root, "new", "r", "--kind", "impl").returncode == 0
-    t2, t3 = "- [x] **T-2**\n", "- [ ] **T-3** amended\n"
+    t2, t3 = "* [x] **T-2**\n", "+ [ ] **T-3** amended\n"
     for mine, theirs in (  # the worktree adds a line; the work side rewrote the flipped one
-        ("- [-] **T-1**\n" + t2 + t3 + "- [ ] **T-4**\n", "- [ ] **T-1**\n" + t2 + t3),
-        ("- [-] **T-1**\n" + t2 + t3, "- [x] **T-1** moved\n" + t2 + t3),
+        ("- [-]**T-1**\n" + t2 + t3 + "- [ ] **T-4**\n", "- [ ]**T-1**\n" + t2 + t3),
+        ("- [-]**T-1**\n" + t2 + t3, "- [x]**T-1** moved\n" + t2 + t3),
     ):
         commit(tree, tasks, s + mine)
         commit(repo, tasks, s + theirs)

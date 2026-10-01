@@ -24,6 +24,7 @@ from _release_check import finding, histo_findings, state_findings  # noqa: E402
 from _release_plan import plan_errors  # noqa: E402
 from _release_schema import (  # noqa: E402
     HISTO,
+    MARK_RE,
     SEMVER_RE,
     STATE,
     TRIO,
@@ -32,6 +33,7 @@ from _release_schema import (  # noqa: E402
     origin,
     origin_line,
     unfinished_tasks,
+    writes,
 )
 from _release_store import SCRIPT, Refusal, live_ids, live_release, window_start  # noqa: E402
 from _specs import quote, script, with_specs  # noqa: E402
@@ -171,7 +173,18 @@ def _directory_findings(release_dir: Path, specs: Path) -> list[dict[str, Any]]:
         return [finding(dir_rel, 1, f"phase {phase} is missing {where}/{', '.join(missing)}")]
     plan = (candidate / "PLAN.md").read_text(encoding="utf-8")
     errors = plan_errors(plan, unfinished_tasks(candidate))
-    return [finding(f"{dir_rel}/{candidate.name}/PLAN.md", 1, e) for e in errors]
+    plan_rel = f"{dir_rel}/{candidate.name}/PLAN.md"
+    return [finding(plan_rel, 1, e) for e in errors] + _memory_tasks(candidate, dir_rel)
+
+
+def _memory_tasks(candidate: Path, dir_rel: str) -> list[dict[str, Any]]:
+    """A task whose `W:` writes `specs/memory`: memory is closure procedure, never a task."""
+    tasks = candidate / "TASKS.md"
+    lines = [m[0].strip() for m in MARK_RE.finditer(tasks.read_text(encoding="utf-8"))]
+    fix = f"Operator action: drop the specs/memory path from that task's `W:` in {tasks}"
+    return [{**finding(f"{dir_rel}/{candidate.name}/TASKS.md", 1, f"task {line[:80]!r} writes "
+                       "specs/memory — memory is closure procedure (RC-FLOW step 5)"), "fix": fix}
+            for line in lines if any(p.split("/")[:2] == ["specs", "memory"] for p in writes(line))]  # fmt: skip
 
 
 def memory_errors(specs: Path, phase: str, entry: dict[str, Any]) -> list[str]:

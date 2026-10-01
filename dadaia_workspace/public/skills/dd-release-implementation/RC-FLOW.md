@@ -42,7 +42,7 @@ Each step ends on a checkable criterion. Steps 5–8 are candidate-closure work.
 - Done when: the verdict is `APPROVED` on that sha.
 
 **Step 5 — Memory update (`dd-product-engineer`).**
-- Memory is closure procedure, never a task: a TASKS.md task whose write set names `specs/memory` is refused by `.dadaia/.venv/bin/dadaia doctor` (SPEC-DOC-047).
+- Memory is closure procedure, never a task: a TASKS.md task whose write set names `specs/memory` is a `release.py check` finding.
 - Reconcile product atoms from the code diff — `release.py drift`, per-atom `git diff`, DELETE → UPDATE → ADD, `catalog generate`, `release.py memory`, then derived docs in an `impl` worktree — protocol: `MEMORY-UPDATE.md`.
 - Done when: one `kind: memory` log entry covers every worklist entry as reviewed or changed, `.dadaia/.venv/bin/dadaia doctor` is clean and the derived-docs test is green.
 

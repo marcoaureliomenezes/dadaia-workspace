@@ -421,7 +421,6 @@ OPERATOR_ACTION: dict[str, Callable[[Path], None]] = {
     "SPEC-DOC-001": lambda r: (r / "specs" / "constitution.md").unlink(),
     "SPEC-DOC-024": lambda r: _write(r / f"specs/releases/{_RELEASE}/rc-1/TASKS.md", "# Tasks\n\n**Status:** Draft\n"),
     "SPEC-DOC-026": lambda r: _write(r / f"specs/releases/_archive/{_RELEASE}/SPEC.md", "# S\n"),
-    "SPEC-DOC-047": lambda r: _append(r / f"specs/releases/{_RELEASE}/rc-1/TASKS.md", "- [ ] T2 x\n  Write set: specs/memory/QUALITY.md\n"),
     "ADR-SUPERSEDED-CITATION": lambda r: (
         _write(r / "specs/ADRs/decisions.jsonl", '{"id": "0001", "status": "superseded"}\n'),
         _append(r / "specs/memory/QUALITY.md", "\nADR: 0001\n"),

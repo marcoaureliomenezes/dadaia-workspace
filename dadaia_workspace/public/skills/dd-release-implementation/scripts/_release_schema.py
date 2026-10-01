@@ -26,9 +26,10 @@ APPROVED = "Approved"
 SEMVER_RE = re.compile(r"^\d+\.\d+\.\d+$")
 #: A shipped commit sha as a human pastes it from a merge: short (7) to full (40).
 SHA_RE = re.compile(r"^[0-9a-f]{7,40}$")
-#: Task markers that mean the candidate is NOT closed: open ``[ ]`` or reserved ``[-]``,
-#: under any Markdown bullet (``-``, ``*``, ``+``) or none — the ONE task-marker rule.
-UNFINISHED_RE = re.compile(r"^\s*(?:[-*+]\s+)?\[( |-)\]\s.*$", re.MULTILINE)
+#: The task markers in order — open < reserved < done (ADR 0111); the ONE task-line grammar.
+MARKS = (" ", "-", "x")
+#: A task line: indent and any Markdown bullet (``-``, ``*``, ``+``) or none, the marker, the rest.
+MARK_RE = re.compile(r"^(\s*(?:[-*+]\s*)?\[)([ x-])(\].*)$", re.MULTILINE)
 _STATUS_RE = re.compile(r"^\*\*Status:\*\*\s*(.+?)\s*$", re.MULTILINE)
 #: The Origin clause kinds, each at most once on the line (ADR 0161).
 ORIGIN_KINDS = ("backlog", "bugs", "findings")
@@ -95,4 +96,14 @@ def unfinished_tasks(candidate: Path) -> list[str]:
     if not tasks.is_file():
         return []
     text = tasks.read_text(encoding="utf-8")
-    return [match.group(0).strip() for match in UNFINISHED_RE.finditer(text)]
+    return [m.group(0).strip() for m in MARK_RE.finditer(text) if m[2] != MARKS[-1]]
+
+
+def writes(line: str) -> list[str]:
+    """The backticked paths a task line's `W:` writes, up to the first ``·``; a path in a
+    parenthesized span (nesting counted) is named, not written."""
+    field, depth, kept = line.partition("`W:`")[2].split("·")[0], 0, ""
+    for char in field:
+        depth += (char == "(") - (char == ")")
+        kept += char if depth == 0 and char != ")" else ""
+    return re.findall(r"`([^`]+)`", kept)

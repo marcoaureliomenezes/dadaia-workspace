@@ -12,7 +12,6 @@ state document is valid is `release.py check`'s answer (LEDGER-RELEASE-SCHEMA).
 
 from __future__ import annotations
 
-import re
 from dataclasses import astuple
 from pathlib import Path
 
@@ -32,18 +31,6 @@ from dadaia_workspace.features.specs.specs_tree import SpecsTree
 # because doctor_release has been the documented import site for both.
 CANONICAL_STATUS = _CANONICAL_STATUS
 PLAN_MAX_LINES = 300
-
-# SPEC-DOC-047: a task block runs from its marker line to the next marker line; a
-# ``Write set:`` naming the ``specs/memory`` tree inside it schedules memory as
-# implementation work. Both patterns are anchored: the block indent is HORIZONTAL space
-# only (``\s`` spans newlines, so a block matched from the blank line above it reported
-# an empty task id), and the path ends on a word boundary, so the source file
-# ``features/specs/memory_lint.py`` is not the memory tree.
-_TASK_BLOCK_RE = re.compile(
-    r"^[ \t]*[-*]?[ \t]*\[[ \-xX]\][^\n]*(?:\n(?![ \t]*[-*]?[ \t]*\[[ \-xX]\])[^\n]*)*",
-    re.MULTILINE,
-)
-_MEMORY_WRITE_SET_RE = re.compile(r"Write set:[^\n]*\bspecs/memory\b")
 
 
 def _extract_status(md_path: Path) -> str | None:
@@ -141,48 +128,10 @@ class ReleaseValidator:
             )
         return issues
 
-    def check_no_memory_task(self) -> list[SectionFinding]:
-        """SPEC-DOC-047: memory is closure procedure, never a task. ``specs/memory/AGENTS.md`` lets
-        ``specs/memory/**`` be written only in DEFINITION/CLOSURE (the gate's RULE A
-        reads no SDD artifact), and §6.7 orders memory update -> closure narrative ->
-        gate AFTER the last task; SPEC-DOC-024 refuses CLOSURE with an open task. A
-        TASKS.md task whose ``Write set:`` names ``specs/memory`` therefore cannot be
-        executed in any phase without toggling the phase twice (bug
-        memory-gate-requires-closure-phase-that-spec-doc-024-forbids-before-last-task):
-        the contradiction is refused at definition, where it is born.
-        """
-        active = self.tree.active_release
-        if not active.candidate:
-            return []
-        tasks = active.candidate / "TASKS.md"
-        if not tasks.exists():
-            return []
-        text = tasks.read_text(encoding="utf-8")
-        issues: list[SectionFinding] = []
-        for block in _TASK_BLOCK_RE.finditer(text):
-            if _MEMORY_WRITE_SET_RE.search(block.group(0)) is None:
-                continue
-            task_line = block.group(0).splitlines()[0].strip()
-            issues.append(
-                specs_finding(
-                    code="SPEC-DOC-047",
-                    severity=Severity.ERROR,
-                    description=(
-                        f"TASKS.md of release '{active.release}' schedules memory as a "
-                        f"task ({task_line[:80]}): its write set names specs/memory. "
-                        "Memory update is closure procedure (RC-FLOW step 5, "
-                        "§6.7) run in CLOSURE after the last task — drop the task and "
-                        "keep the memory work in the closure steps."
-                    ),
-                    path=str(tasks),
-                )
-            )
-        return issues
-
     def check_phase_markers_coherence(self) -> list[SectionFinding]:
         """SPEC-DOC-024: a live release in IMPLEMENTATION carries an approved TASKS.md.
         Whether a task is still open is `release.py phase CLOSURE`'s one refusal
-        (`_release_schema.UNFINISHED_RE`) — the doctor keeps no task-marker regex."""
+        (`_release_schema.MARK_RE`) — the doctor keeps no task-marker regex."""
         release, phase, candidate = astuple(self.tree.active_release)
         if not release or phase != "IMPLEMENTATION":
             return []

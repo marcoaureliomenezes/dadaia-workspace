@@ -6,15 +6,15 @@ from __future__ import annotations
 
 import fnmatch
 import json
-import re
 import shutil
+import sys
 from pathlib import Path
 
-from _worktree_git import cli, flow_for, git, ours
-from _worktree_kinds import _NAME_RE, REPLAY, SCRIPT, Refusal, allows, kind_holding
+sys.path.append(str(Path(__file__).resolve().parents[2] / "dd-release-implementation" / "scripts"))
 
-#: A TASKS marker line; its state ranks open < reserved < done (ADR 0111).
-_MARK = re.compile(r"^(\s*- \[)([ x-])(\].*)$")
+from _release_schema import MARK_RE, MARKS  # noqa: E402
+from _worktree_git import cli, flow_for, git, ours  # noqa: E402
+from _worktree_kinds import _NAME_RE, REPLAY, SCRIPT, Refusal, allows, kind_holding  # noqa: E402
 
 REVIEWER = "dd-code-reviewer"
 
@@ -99,7 +99,11 @@ def _check_allowed(tree: Path, work: str, name: str) -> None:
 
 
 def _bare(line: str) -> str:
-    return _MARK.sub(r"\1 \3", line)
+    return MARK_RE.sub(r"\1 \3", line)
+
+
+def _rank(line: str) -> int:
+    return MARKS.index(m[2]) if (m := MARK_RE.match(line)) else -1
 
 
 def _replayed(tree: Path, rel: str) -> list[str] | None:
@@ -118,7 +122,7 @@ def _replayed(tree: Path, rel: str) -> list[str] | None:
             if bare.count(_bare(new)) != 1:
                 return None
             i = bare.index(_bare(new))
-            work[i] = max(work[i], new)
+            work[i] = max(work[i], new, key=_rank)
     return work
 
 
