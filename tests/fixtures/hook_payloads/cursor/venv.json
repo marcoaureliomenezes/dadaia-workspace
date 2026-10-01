@@ -2,6 +2,6 @@
   "hook_event_name": "preToolUse",
   "tool_name": "Shell",
   "tool_input": {
-    "command": "pip install requests"
+    "command": "dadaia doctor"
   }
 }

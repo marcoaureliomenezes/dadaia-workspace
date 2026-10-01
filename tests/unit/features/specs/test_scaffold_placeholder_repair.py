@@ -85,7 +85,7 @@ def test_filled_atom_is_never_flagged_or_removed(tmp_path: Path) -> None:
 
 def test_upgrade_dry_run_reports_without_deleting(tmp_path: Path) -> None:
     specs, atom = _placeholder_atom(tmp_path)
-    upgrade_feat.upgrade(specs, remove=lambda p: sweep.remove(specs, p, p.name), dry_run=True)
+    upgrade_feat.upgrade(specs, remove=sweep.deleter(specs), dry_run=True)
     assert atom.exists()
 
 

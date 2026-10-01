@@ -170,7 +170,10 @@ def test_inv5_fix_refuses_a_dead_slug_that_resolves_outside_repos(tmp_path: Path
     (tmp_path / "repos" / "victim").mkdir(parents=True)
     (tmp_path / "repos" / "victim" / "keep.txt").write_text("keep", encoding="utf-8")
     (tmp_path / ".dadaia" / "states").mkdir(parents=True)
-    svc, _ = _make_doctor(tmp_path, [_ctx("escape", repo_slug=".."), _ctx("dot", repo_slug=".")])
+    victim = _ctx("victim", state=ContextState.ALIVE)  # registered: the layout keeps repos/victim
+    svc, _ = _make_doctor(
+        tmp_path, [_ctx("escape", repo_slug=".."), _ctx("dot", repo_slug="."), victim]
+    )
 
     actions = svc.fix()
 

@@ -80,8 +80,8 @@ def _row(id: str, target: Any, want: str | None = None, **opts: Any) -> Any:
           for r in (".agents/skills/dd-x/SKILL.md", ".dadaia/states/install_ledger.json")),
         *(_row(f"sa-gate-path-classes-diverge-from-the-law#B39-7-ledgered-law-{r}", r, _BLOCK,
                ledger=True) for r in ("AGENTS.md", ".dadaia/AGENTS.md", ".dadaia/tmp/AGENTS.md")),
-        *(_row(f"B39-7-unledgered-law-is-an-ordinary-write-{r}", r)
-          for r in ("AGENTS.md", ".dadaia/AGENTS.md", ".dadaia/tmp/AGENTS.md")),
+        *(_row(f"B39-7-unledgered-law-is-an-ordinary-write-{r}", r)  # root AGENTS.md: floor, gate-protects-nothing-without-install-ledger
+          for r in (".dadaia/AGENTS.md", ".dadaia/tmp/AGENTS.md")),
         _row("sa-gate-path-classes-diverge-from-the-law#B39-3-a-tmp-probe-agents-md",
              ".dadaia/tmp/probe/20260927/AGENTS.md", ledger=True),
         _row("sa-gate-path-classes-diverge-from-the-law#B39-4-root-histo",

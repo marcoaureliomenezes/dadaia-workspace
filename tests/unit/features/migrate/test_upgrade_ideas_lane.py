@@ -14,19 +14,23 @@ pytestmark = pytest.mark.unit
 
 
 @pytest.mark.parametrize(
-    ("files", "removed"),
-    [(["AGENTS.md"], True), (["0.9.9/SPEC.md"], False), ([], False)],
-    ids=["only-agents-md-removed", "holding-a-draft-left-alone", "no-ideas-dir-no-op"],
-)
+    ("files", "outside", "removed"),
+    [(["AGENTS.md"], False, True), (["0.9.9/SPEC.md"], False, False), ([], False, False), (["AGENTS.md"], True, False)],
+    ids=["only-agents-md-removed", "holding-a-draft-left-alone", "no-ideas-dir-no-op",
+         "doctor-reports-a-refused-removal-as-deleted-refused-ideas-dir-not-reported"],
+)  # fmt: skip
 def test_upgrade_removes_an_ideas_dir_holding_only_its_agents_md(
-    tmp_path: Path, files: list[str], removed: bool
+    tmp_path: Path, files: list[str], outside: bool, removed: bool
 ) -> None:
-    ideas = tmp_path / "releases" / "_ideas"
+    specs = tmp_path / "specs"
+    ideas = specs / "releases" / "_ideas"
     for rel in files:
         (ideas / rel).parent.mkdir(parents=True, exist_ok=True)
         (ideas / rel).write_text("x\n", encoding="utf-8")
-    expected = [ideas] if removed else []
+    if outside:  # releases/ resolves outside the specs tree: the deleter refuses
+        (specs / "releases").rename(tmp_path / "elsewhere")
+        (specs / "releases").symlink_to(tmp_path / "elsewhere")
 
-    assert plan_empty_ideas_dir(tmp_path) == expected
-    assert remove_empty_ideas_dir(tmp_path, lambda p: sweep.remove(tmp_path, p, p.name)) == expected
+    assert plan_empty_ideas_dir(specs) == ([ideas] if files == ["AGENTS.md"] else [])
+    assert remove_empty_ideas_dir(specs, sweep.deleter(specs)) == ([ideas] if removed else [])
     assert ideas.exists() is (bool(files) and not removed)

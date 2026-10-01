@@ -19,7 +19,12 @@ from dadaia_workspace.cli.main import app
 from dadaia_workspace.core.cli_line import fix_line
 from dadaia_workspace.core.harness_registry import HARNESS_PROJECTION_DIRS, L1_ENTRY_HARNESSES
 from dadaia_workspace.core.platform import PLATFORM
-from dadaia_workspace.core.workspace_layout import provisioned_zones, zones_with_ttl
+from dadaia_workspace.core.workspace_layout import (
+    LEVEL1_SEEDS,
+    ZoneClass,
+    provisioned_zones,
+    zones_with_ttl,
+)
 from dadaia_workspace.features.spec_context import sweep
 from dadaia_workspace.features.spec_context.doctor import DoctorService
 from dadaia_workspace.infrastructure.git_subprocess import GitSubprocessClient
@@ -27,7 +32,7 @@ from tests.fixtures.stores import context_store
 
 pytestmark = pytest.mark.contract
 
-_TTL_ZONE = zones_with_ttl()[0]
+_TTL_ZONE = next(z for z in zones_with_ttl() if z.cls is ZoneClass.EPHEMERAL)
 _EXPIRED_CODE = f"WS-{_TTL_ZONE.name.lstrip('.')}-expired"
 _FINDING_LINE = re.compile(
     r"^WS-[a-z.-]+-(slop|expired|missing) (slop|expired|missing) \S+  \(.+\)$"
@@ -51,7 +56,8 @@ def workspace(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     )
     (tmp_path / "repos").mkdir()
     (tmp_path / "AGENTS.md").write_text("# agents", encoding="utf-8")
-    (tmp_path / ".dadaiaignore").write_text("", encoding="utf-8")  # init writes it (ADR 0095)
+    for name in LEVEL1_SEEDS:  # init writes them (ADR 0095)
+        (tmp_path / name).write_text("", encoding="utf-8")
     venv_bin = dadaia / ".venv" / PLATFORM.venv_scripts_dir
     venv_bin.mkdir(parents=True)
     entry = venv_bin / f"dadaia{PLATFORM.venv_exe_suffix}"
@@ -391,7 +397,7 @@ def test_a_nested_expired_tree_is_gone_after_one_expired_only_run(workspace: Pat
         pytest.param(
             "handoff/ctx/old.handoff.json",
             '{"produced_at": "2099-01-01T00:00:00Z"}',
-            "WS-handoff-expired: deleted 'handoff/ctx/old.handoff.json'",
+            "WS-handoff-expired: moved 'handoff/ctx/old.handoff.json'",
             id="sa-expiry-has-two-clocks#45.2-handoff",
         ),
     ],

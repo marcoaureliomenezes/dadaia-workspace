@@ -65,7 +65,10 @@ def merge_claude_settings(existing: dict[str, object] | None, root: Path) -> dic
     canonical = claude_hooks()
     canonical_hooks = canonical["hooks"]
     assert isinstance(canonical_hooks, dict)
-    env = workspace_layout.tool_cache_env(root)  # absolute caches (ADR 0080)
+    env = {  # absolute caches (ADR 0080); the Playwright MCP output in its zone (ADR 0156)
+        **workspace_layout.tool_cache_env(root),
+        "PLAYWRIGHT_MCP_OUTPUT_DIR": str(root / ".dadaia" / "mcps" / "playwright"),
+    }
     if not existing:
         return {**canonical, "env": env}
 
@@ -82,7 +85,7 @@ def merge_claude_settings(existing: dict[str, object] | None, root: Path) -> dic
         assert isinstance(entries, list)
         existing_hooks[event] = [*entries, *foreign]
     merged["hooks"] = existing_hooks
-    prior_env = existing.get("env")  # dadaia owns only its cache keys
+    prior_env = existing.get("env")  # dadaia owns only its own keys
     merged["env"] = {**(prior_env if isinstance(prior_env, dict) else {}), **env}
     return merged
 

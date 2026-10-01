@@ -13,7 +13,7 @@ the price of the previous fix.
 
 ## Measuring the ledger
 
-<!-- derived-from: bug-ledger sha256:7182ac16c27c -->
+<!-- derived-from: bug-ledger sha256:fee190b6d940 -->
 
 The numbers are never copied into a page; the ledger's own verbs measure them.
 
@@ -30,8 +30,8 @@ agreement.
 
 ## Lesson 1 — a per-caller fix breeds the next caller's bug
 
-<!-- derived-from: context-management sha256:22e5ab09dc0d -->
-<!-- derived-from: bug-ledger sha256:7182ac16c27c -->
+<!-- derived-from: context-management sha256:4eca78be3c95 -->
+<!-- derived-from: bug-ledger sha256:fee190b6d940 -->
 
 When a guard lives at the caller that was just caught, the next caller without it is
 the next bug in the family, and each such fix is `net-positive`: it grows the feature.
@@ -42,7 +42,7 @@ multi-owner slug already on disk.
 
 ## Lesson 2 — a per-measurement exclusion breeds the next measurement's bug
 
-<!-- derived-from: QUALITY sha256:023d6844061c -->
+<!-- derived-from: QUALITY sha256:9e621b2e0ae5 -->
 
 When each measurement walks the tree itself and is fixed by its own special-case
 exclusion, the next measurement counts the same stray files. The structure that ends
@@ -53,8 +53,8 @@ construction, not by a list somebody has to remember to extend.
 
 ## Lesson 3 — a derived cache breeds a bug per environment that derives it
 
-<!-- derived-from: bug-ledger sha256:7182ac16c27c -->
-<!-- derived-from: QUALITY sha256:023d6844061c -->
+<!-- derived-from: bug-ledger sha256:fee190b6d940 -->
+<!-- derived-from: QUALITY sha256:9e621b2e0ae5 -->
 
 A record that caches a fact git already knows is wrong in every environment that
 derives it differently — a shallow checkout first among them. The structure that ends
@@ -63,8 +63,8 @@ history is that line's change log. No CI job fetches history for a bug record's 
 
 ## The standing order the lessons produced
 
-<!-- derived-from: QUALITY sha256:023d6844061c -->
-<!-- derived-from: bug-ledger sha256:7182ac16c27c -->
+<!-- derived-from: QUALITY sha256:9e621b2e0ae5 -->
+<!-- derived-from: bug-ledger sha256:fee190b6d940 -->
 
 The workspace is in a permanent state of architecture review, oriented by its bug
 history:

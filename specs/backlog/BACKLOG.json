@@ -2,30 +2,6 @@
   "schema": "backlog-v1",
   "active": [
     {
-      "id": "gitflow-trunk-based-model",
-      "title": "Trunk-based gitflow model (no integration branch) as an option of the project gitflow block",
-      "opened": "2026-09-25",
-      "status": "idea",
-      "description": "Deferred by ADR 0037 (operator grill 2026-09-24): the constitution frontmatter gitflow block has fixed roles today (principal, integration, work) with free names. A trunk-based model would drop the integration role \u2014 work branches merge straight into principal \u2014 as an opt-in shape of the same block, read by the same pre-push gate. Pick only when an operator or consumer asks for it; until then the three-role model is the only one.",
-      "provenance": "operator grill 2026-09-24 (onboarding foundation, Q1-Q11), ADR 0037 consequences: 'Trunk-based (no integration branch) is a backlog item.'"
-    },
-    {
-      "id": "consumer-gitflow-server-side-enforcement",
-      "title": "Server-side gitflow enforcement for consumer repos (CI guard / rulesets reading the constitution gitflow)",
-      "opened": "2026-09-25",
-      "status": "idea",
-      "description": "Deferred by ADR 0040 (operator grill 2026-09-24): consumer enforcement is local only \u2014 the pre-push gate reading the constitution gitflow block; dd-gitflow-default/CICD-AUTOMATION.md is a reference document and the workspace writes no CI workflow into a consumer repo. A later evolution would add server-side enforcement (a CI guard job and/or branch rulesets) derived from the same gitflow block. Operator: 'no momento n\u00e3o devemos ter nada referente a jobs de CI no github... depois evoluiremos isso' \u2014 not before the operator reopens it.",
-      "provenance": "operator grill 2026-09-24 (onboarding foundation, Q10), ADR 0040 consequences: 'Server-side enforcement for consumers (CI guard, rulesets) enters through the backlog.'"
-    },
-    {
-      "id": "associated-repo-gitflow-override",
-      "title": "Per-repo gitflow override for an associated repo whose principal branch differs from the main repo's",
-      "opened": "2026-09-25",
-      "status": "idea",
-      "description": "Deferred by ADR 0046 (operator grill round 3, 2026-09-25): the pre-push gate resolves the gitflow from the pushed repo's own specs/constitution.md, else the owning context's main-repo constitution, else the default with a warning. An associated repo carries no specs/, so it inherits the main repo's gitflow block {principal, integration, work}. When an associated repo's principal (or integration) branch has a different name than the main repo's, the inherited block names the wrong branches and its pushes are judged against them. A later evolution would let the gitflow block (or a per-repo entry beside it) name an override for one associated repo, read by the same resolution at push time. Not before the operator reopens it.",
-      "provenance": "operator grill 2026-09-25 (onboarding foundation, round 3, Q5), ADR 0046 consequences: 'A per-repo override for an associated repo whose principal differs is backlog.'; grill handoff 2026-09-25T050500Z-main-thread-foundation-grill-r3: 'Backlog to add: per-repo gitflow override for associated repos.'"
-    },
-    {
       "id": "doctor-context-ignores-other-contexts",
       "title": "doctor --context X judges only X's repos",
       "opened": "2026-09-28",
@@ -98,22 +74,6 @@
       "provenance": "operator closure ruling 2026-09-28: the rest is mapped to the backlog; source the 0.5.0 closure review"
     },
     {
-      "id": "dadaiaignore-and-root-core-canon",
-      "title": "c5: .dadaiaignore replaces instance_exceptions.txt, a two-level root canon, init scaffolds the root files, core protected in two layers",
-      "opened": "2026-09-29",
-      "status": "idea",
-      "description": "Operator design (grill 2026-09-26, ADRs 0092-0096), back in 0.5.0 by ADR 0101 (operator 2026-09-29). Deliver: a root .dadaiaignore, operator-only and PROTECTED, replacing .dadaia/states/instance_exceptions.txt 1:1 (0092); its stdlib grammar, invalid line = doctor finding (0093); level-1 library core in core/workspace_layout.py incl. worktrees/ and .dadaiaignore, level 2 = .dadaiaignore (0094); init creates prompt.md, AGENTS.md, .dadaiaignore from a template (0095); gate blocks agent writes to core law/state, doctor --fix at SessionStart self-heals missing core, no Bash parsing (0096). Today: root whitelist exists; worktrees/ and .dadaiaignore absent from canon. Blocks canonical-worktrees (worktrees/ must be canon) and operator-protected-path-class. OPEN QUESTIONS for the operator (not resolved by the product engineer): (1) grill R2 'a missing .venv is fixed by uvx dadaia-workspace init <ws>' vs ADR 0067 (without the venv every gate wrapper warns and exits 0) and open bug missing-venv-hook-disarms-the-gate-invisibly: without the venv core protection's gate layer is off - which rules? (2) ADR 0092 / grill Q6 applies .dadaiaignore to harness directories, but ADR 0059 (later) says the doctor judges only ledger-owned entries there - does .dadaiaignore reach harness-dir interiors or only their top level? (3) ADR 0096 'no Bash parsing' vs the idea gate-judges-bash-writes (closure ruling 2026-09-28) - keep both, or reject one?",
-      "provenance": "operator grill 2026-09-26 (c5, Q1-Q6, R1-R3), handoff reports/main-thread/20260927-050-c4-evidence/handoffs/2026-09-26T211000Z-main-thread-grill-050-c4-c5-c6.handoff.json findings[3]-[9]; ADRs 0092-0096; deferred by ADR 0053 (2026-09-27), returned to 0.5.0 by operator ruling 2026-09-29 ('Coloque', ADR 0101); inventory rows A01-A03 in reports/main-thread/20260929-050-rc1-audit/leftbehind/ (REPORT.md, inventory.json)"
-    },
-    {
-      "id": "operator-protected-path-class",
-      "title": "DEC-11: an operator-protected path class the gate enforces in every harness",
-      "opened": "2026-09-29",
-      "status": "idea",
-      "description": "Deferred by ADR 0053 (2026-09-27) and kept deferred by ADR 0101 (operator 2026-09-29) until the operator rules otherwise. Today an operator-only folder inside a consumer repo is guarded only by one harness's permissions.deny; Codex and the others carry no protection. Remediation-plan DEC-11 options: (a) an operator glob file read by the gate in every harness (about +25 lines), the law stating Bash is not covered (backstop git/pre-push); (b) keep it per-harness config plus the git backstop, the law saying so. Recommendation (a). Grill 2026-09-26 Q2 routed 'operator-declared protection file' to the backlog. Depends on dadaiaignore-and-root-core-canon (same operator-file grammar). Open question: (a) or (b), and whether it is a second operator file or a section of .dadaiaignore.",
-      "provenance": "operator grill 2026-09-26 Q2 (handoff reports/main-thread/20260927-050-c4-evidence/handoffs/2026-09-26T211000Z-main-thread-grill-050-c4-c5-c6.handoff.json findings[4]); remediation-plan DEC-11 (reports/main-thread/20260927-050-c4-evidence/verify/plan.json); ADR 0053; ADR 0101; inventory row A04 in reports/main-thread/20260929-050-rc1-audit/leftbehind/ (REPORT.md, inventory.json)"
-    },
-    {
       "id": "docs-site-zensical-pages",
       "title": "c7: the docs site per ADR 0039 - Zensical on GitHub Pages, generated reference pages with a staleness check, README about 60 lines",
       "opened": "2026-09-29",
@@ -146,32 +106,48 @@
       "provenance": "0.4.6 rc-3 SPEC Out of scope (specs/releases/_archive/0.4.6/rc-3/SPEC.md); inventory row A12 in reports/main-thread/20260929-050-rc1-audit/leftbehind/ (REPORT.md, inventory.json); operator order 2026-09-29"
     },
     {
-      "id": "idless-unbound-session-writes-worktrees",
-      "title": "An unbound session with no native id and no DADAIA_SESSION_ID is refused under worktrees/<r>/ without a Stall",
-      "opened": "2026-09-30",
-      "status": "idea",
-      "description": "Declared gap of rc-5 (SPEC AC1.1 bullet 4, PLAN: ADR 0116 carries it to candidate 6): on a harness without a native session id (Kimi, Cursor, Devin, Copilot) an unbound session that never exported DADAIA_SESSION_ID is not refused under worktrees/<r>/<name>/, because refusing it would be a Stall (the harness process env is not the shell env). repos/<r>/ stays merge-only for every session (0105). Also: sessionStart-only harnesses (Cursor, Copilot) renew the bind heartbeat only at session start, so the bind lapses one day after the last start and they re-bind per session (fail-closed).",
-      "provenance": "rc-5 SPEC AC1.1 and PLAN (ADR 0116, operator ruling 2026-09-30 'Aceito as duas (Recomendado)'); carried out of bind-scope-durable-on-every-harness at its exit, dd-code-reviewer review of d55c3625",
-      "relates": [
-        "bind-scope-durable-on-every-harness"
-      ]
-    },
-    {
-      "id": "adr-0138-lane-in-memory-and-adrs-law",
-      "title": "specs/memory/AGENTS.md and specs/ADRs/AGENTS.md state the ADR 0138 no-ADR truth-correction lane",
-      "opened": "2026-09-30",
-      "status": "idea",
-      "description": "ADR 0138 (accepted) says candidate 5 edits both law files to state its lane: a commit changing a non-principle section of ARCHITECTURE.md or QUALITY.md only to state what the code already is needs no ADR and names its code evidence; a ### P-NN still needs its ADR. rc-5 did not land it. Both files render from dadaia_workspace/public/scaffold/{memory,ADRs}/AGENTS.md: an impl task plus the restamp. Until then every use cites ADR 0138 in its subject and names its code evidence (413bb9d6, 2158513f).",
-      "provenance": "ADR 0138 consequence unmet at rc-5 closure; dd-code-reviewer review of a12203b5 (2026-09-30)",
-      "relates": []
-    },
-    {
       "id": "structural-convergence-f053-f054-f057",
       "title": "Commit shapes the worktree kinds do not enforce: F053, F054, F057 of 20260930-structural-convergence",
       "opened": "2026-09-30",
       "status": "idea",
       "description": "Deferred at rc-5 G6 review (9cb15e8d) to rc-7 W3 (one grammar owner); the rc-5 SPEC W3 row does not list them, so this entry is their carrier until rc-6's SPEC maps them into the candidate map. F053: the bug kind admits code + BUGS.jsonl, nothing enforces a registration-only commit. F054: dd-gitflow-default/SKILL.md row 2 says 'decisions.jsonl alone' while the memory law pairs the ADR and its memory change in one commit. F057: closure commits match no \u00a73a shape.",
       "provenance": "specs/audits/20260930-structural-convergence FINDINGS F053/F054/F057 (deferred 9cb15e8d); dd-code-reviewer review of 4fb16453 (2026-09-30)",
+      "relates": []
+    },
+    {
+      "id": "worktree-rows-injected-not-monkeypatched",
+      "title": "SpecContextService and DoctorService take worktree rows by constructor injection; the unit-tier autouse monkeypatch is deleted",
+      "opened": "2026-10-01",
+      "status": "idea",
+      "description": "The rc-5 Windows fix (1f0155ee) patches service.worktree_rows and doctor.worktree_rows from tests/unit/conftest.py. Both services are container-built: accept a worktree_rows callable defaulting to the adapter (infrastructure/ledger_scripts.py), pass a stub in unit tests, delete the autouse fixture and the inline patch in test_cli_context.py (dd-codebase-design: accept dependencies, don't create them). Destination: rc-8 W6.",
+      "provenance": "dd-code-reviewer review of 4d29e905 (2026-09-30), finding 3; rc-6 PLAN \u00a74 carry",
+      "relates": []
+    },
+    {
+      "id": "windows-integration-coverage-gap",
+      "title": "dead()'s worktree hold, ctx-inject's worktree block and the closure wait are exercised on Windows at some tier",
+      "opened": "2026-10-01",
+      "status": "idea",
+      "description": "Integration runs only on ubuntu (.github/workflows/ci.yml); after 1f0155ee moved those cases to tests/integration, no Windows job exercises them. Production on Windows uses the real Scripts/dadaia.exe; the gap is coverage, not behavior. Destination: rc-8 W5 (one test child-env builder).",
+      "provenance": "dd-code-reviewer review of 4d29e905 (2026-09-30) INFO; rc-6 PLAN \u00a74 carry",
+      "relates": []
+    },
+    {
+      "id": "doctor-in-a-fresh-worktree-lacks-rendered-specs-law",
+      "title": "doctor run inside a fresh worktree reports TREE-5 because the rendered, git-ignored specs/AGENTS.md is absent",
+      "opened": "2026-10-01",
+      "status": "idea",
+      "description": "specs/AGENTS.md is rendered and ignored (.gitignore /specs/*), so a new worktree lacks it and doctor --specs-dir <wt>/specs reports TREE-5 plus a knock-on MEM-DRIFT-2. Decide whether worktree.py new renders it or doctor scopes TREE-5 to the main checkout. Destination: rc-8 W6.",
+      "provenance": "dd-code-reviewer review of bdae61bb (2026-09-30) INFO 5; rc-6 PLAN \u00a74 carry",
+      "relates": []
+    },
+    {
+      "id": "seventh-fail-open-path-law-line",
+      "title": "The root map \u00a73 states the seventh fail-open path: an unreadable context registry judges nothing under repos/ or worktrees/",
+      "opened": "2026-10-01",
+      "status": "idea",
+      "description": "Operator ruling 2026-10-01: \"Aprovo AC2.8 = os 7 reais (Recomendado)\" \u2014 the law states every fail-open path the code has. core/context_registry.py registered_slugs returns ({\"*\"},{\"*\"}) on an unreadable registry, so the layout gate and doctor judge nothing under repos/ or worktrees/ (rc-6 PLAN \u00a72.2); the root map \u00a73 (dadaia_workspace/public/data/AGENTS.md), the single statement of fail-open paths, lists six and lacks this line. Add it there, pinned by tests/contract/test_law_states_what_the_code_does.py. Destination: rc-7 W4 (one text renderer / law statements). Cites: finding 20260930-structural-convergence-F080, ADR 0132, rc-6 PLAN \u00a72.2, the rc-7 SPEC draft.",
+      "provenance": "operator ruling 2026-10-01 on rc-6 AC2.8 (\"Aprovo AC2.8 = os 7 reais (Recomendado)\"); F080 reason carries the unreadable-registry law line to rc-7 W4",
       "relates": []
     }
   ]

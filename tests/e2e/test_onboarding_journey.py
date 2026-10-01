@@ -315,16 +315,23 @@ def test_an_operator_journey_from_the_previous_release(env: Env) -> None:
 
 @pytest.mark.skipif(_UVX is None, reason="the quickstart block is a `uvx` line, run as printed")
 class TestQuickstartVerbatim:
-    """AC7.1: docs/quickstart.md's first bash block runs as printed with only ``REPO_URL``
-    set — the one other substitution points ``uvx`` at the built wheel instead of PyPI."""
+    """AC7.1: docs/quickstart.md's two bash blocks run as printed with only ``REPO_URL``
+    set — the one other substitution points ``uvx`` at the built wheel instead of PyPI;
+    the second files the first backlog entry in a ``backlog`` worktree (T-050-120)."""
 
     def test_the_quickstart_block_runs_as_printed(self, env: Env) -> None:
         text = (_REPO_ROOT / "docs" / "quickstart.md").read_text("utf-8")
-        block = re.findall(r"```bash\n(.*?)```", text, re.DOTALL)[0]
+        block, filing = re.findall(r"```bash\n(.*?)```", text, re.DOTALL)[:2]
         url = env.bare("quick")
         script, count = re.subn(r"^REPO_URL=.*$", f"REPO_URL={url}", block, flags=re.M)
         assert count == 1, block
         script = script.replace("uvx dadaia-workspace", f"uvx --from {env.wheel} dadaia-workspace")
         done = env.run("bash", "-euo", "pipefail", "-c", script, cwd=env.root)
         assert done.returncode == 0, f"quickstart failed:\n{done.stdout}\n{done.stderr}"
-        Workspace(env, "demo").assert_level_clean("quick", "quick", url)
+        ws = Workspace(env, "demo")
+        ws.assert_level_clean("quick", "quick", url)
+        done = env.run("bash", "-euo", "pipefail", "-c", f"SLUG=quick\n{filing}", cwd=ws.path)
+        assert done.returncode == 0, f"quickstart block 2 failed:\n{done.stdout}\n{done.stderr}"
+        (wt,) = (ws.path / "worktrees" / "quick").glob("*-backlog")
+        assert env.git("log", "-1", "--format=%s", cwd=wt) == "chore(backlog): new my-first-idea"
+        assert "my-first-idea" in env.git("show", "HEAD:specs/backlog/BACKLOG.json", cwd=wt)

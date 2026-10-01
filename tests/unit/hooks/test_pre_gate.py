@@ -28,6 +28,7 @@ def _spawn(ws: Path, payload: dict[str, Any]) -> Any:
     return result
 
 
+# fmt: off
 @pytest.mark.parametrize(
     ("tool", "tool_input", "want"),
     [
@@ -37,6 +38,10 @@ def _spawn(ws: Path, payload: dict[str, Any]) -> Any:
         ("Write", {"file_path": ".dadaia/sessions/a.json"}, "SEC-01"),
         ("Write", {"file_path": "junk.txt"}, "ROOT WHITELIST GATE"),
         ("apply_patch", {"command": _PATCH.format(".dadaia/sessions/a.json")}, "SEC-01"),
+        *[("Write", {"file_path": p}, "[GATE]") for p in ("AGENTS.md", ".dadaiaignore", ".claude/settings.json", ".dadaia/hooks/w.sh", ".dadaia/states/spec_contexts.json")],
+        ("Edit", {"file_path": "repos/a/secrets/k"}, "protected glob 'secrets'"),
+        ("apply_patch", {"command": _PATCH.format("worktrees/a/0.5.0a-impl/secrets/k")}, "protected glob 'secrets'"),
+        ("Write", {"file_path": "worktrees/a/0.5.0a-impl/src/ok.py"}, None),
     ],
     ids=[
         "in-repo-write-is-merge-only",
@@ -45,8 +50,13 @@ def _spawn(ws: Path, payload: dict[str, Any]) -> Any:
         "protected-sessions-fails-closed",
         "root-whitelist-forbidden-entry-blocks",
         "apply-patch-most-restrictive-header-blocks-the-whole-patch",
+        *[f"AC2.3-no-ledger-floor-{n}" for n in ("agents-md", "dadaiaignore", "hook-wiring", "hook-wrapper", "states")],
+        "AC2.5-protected-glob-in-repo",
+        "AC2.5-protected-glob-in-worktree-codex-dialect",
+        "AC2.5-unprotected-sibling-allowed",
     ],
 )
+# fmt: on
 def test_non_write_and_protected_matrix(
     tmp_path: Path, tool: str, tool_input: dict[str, str], want: str | None
 ) -> None:
@@ -57,6 +67,7 @@ def test_non_write_and_protected_matrix(
         json.dumps({"contexts": [{"repo_slug": "a", "state": "alive"}]}), encoding="utf-8"
     )
     (tmp_path / "repos" / "a" / "specs").mkdir(parents=True)
+    (tmp_path / ".dadaiaignore").write_text("[protected]\nsecrets\n", encoding="utf-8")
     rooted = {k: v if k == "command" else str(tmp_path / v) for k, v in tool_input.items()}
     block = _spawn(tmp_path, {"tool_name": tool, "tool_input": rooted}).block_envelope()
     if want is None:
@@ -90,14 +101,15 @@ def test_evaluate_payload_first_block_wins_and_faulty_policy_fails_open(
 
 
 @pytest.mark.parametrize(
-    "payload",
+    ("payload", "blocked"),
     [
-        {"tool_name": "Read", "tool_input": {"file_path": "x"}},
-        {"tool_name": "Bash", "tool_input": {"command": "pip install requests"}},
+        ({"tool_name": "Read", "tool_input": {"file_path": "x"}}, False),
+        ({"tool_name": "Bash", "tool_input": {"command": "pip install requests"}}, False),
+        ({"tool_name": "Bash", "tool_input": {"command": "dadaia doctor"}}, True),
     ],
-    ids=["allow", "block-bash-venv-guard"],
+    ids=["allow", "allow-bash-pip", "block-bash-venv-guard"],
 )
-def test_envelope_contract(tmp_path: Path, payload: dict[str, Any]) -> None:
+def test_envelope_contract(tmp_path: Path, payload: dict[str, Any], blocked: bool) -> None:
     """Whole stdout is ONE JSON object. Allow carries no verdict at all (Claude's schema
     rejects ``decision: allow`` and interactive sessions ignore ``defer``). Block carries the
     legacy ``"decision": "block"`` (codex + the kimi shim's grep) AND
@@ -105,7 +117,7 @@ def test_envelope_contract(tmp_path: Path, payload: dict[str, Any]) -> None:
     sed capture); the Bash block is venv_guard's, with the corrected command."""
     raw = _spawn(tmp_path, payload).stdout.strip()
     envelope = json.loads(raw)
-    if payload["tool_name"] == "Read":
+    if not blocked:
         assert envelope == {"continue": True, "hookSpecificOutput": {"hookEventName": "PreToolUse"}}
         assert '"decision": "block"' not in raw
         return

@@ -8,7 +8,7 @@ live. Terms are defined in [concepts](concepts.md); the long walkthrough is
 ## 1. The three levels in one block
 
 <!-- derived-from: pypi-distribution sha256:92dbd2d7ed61 -->
-<!-- derived-from: workspace-init sha256:6ef28aa7796e -->
+<!-- derived-from: workspace-init sha256:f158dffe2a7e -->
 
 Set `REPO_URL` to your repository's clone URL; everything else runs as printed (needs
 uv and network access):
@@ -20,11 +20,23 @@ uvx dadaia-workspace init demo --harness claude --repo "$REPO_URL"
 cd demo
 .dadaia/.venv/bin/dadaia specs init --context "$SLUG"
 .dadaia/.venv/bin/dadaia doctor --context "$SLUG"
-python3 .agents/skills/dd-backlog-definition/scripts/backlog.py new my-first-idea \
-  --specs "repos/$SLUG/specs" --title "What I want" --description "Why I want it"
-python3 .agents/skills/dd-release-implementation/scripts/release.py new 0.1.0 \
-  --specs "repos/$SLUG/specs" --origin backlog:my-first-idea
 ```
+
+After the 3b first pass (below), publish and file the first entry in a `backlog`
+worktree — only `context create` (the `--repo` clone) and the first `specs init` write
+`specs/` directly (ADR 0154):
+
+```bash
+.dadaia/.venv/bin/dadaia context baseline "$SLUG"
+B=$(python3 .agents/skills/dd-gitflow-default/scripts/worktree.py new "$SLUG" --kind backlog | sed 's/^\[ok\] //')
+python3 .agents/skills/dd-backlog-definition/scripts/backlog.py new my-first-idea \
+  --specs "$B/specs" --title "What I want" --description "Why I want it"
+git -C "$B" commit -qam "chore(backlog): new my-first-idea"
+```
+
+After an APPROVED `dd-code-reviewer` verdict, `worktree.py merge "$B"` lands it; the
+release is born the same way in a `release` worktree:
+`release.py new 0.1.0 --specs "$R/specs" --origin backlog:my-first-idea`.
 
 - **Level 1 — workspace.** `uvx dadaia-workspace init` provisions `demo/` with its own
   virtualenv; every later command runs through the workspace's CLI,
@@ -45,7 +57,7 @@ Then `.dadaia/.venv/bin/dadaia specs init --context <ctx>` refreshes the project
 
 ## 2. What the init line provisioned
 
-<!-- derived-from: workspace-init sha256:6ef28aa7796e -->
+<!-- derived-from: workspace-init sha256:f158dffe2a7e -->
 
 `--harness` names one registered harness: `claude` | `codex` | `kimi-code` | `cursor` |
 `devin` | `copilot`. The directory is required and a directory holding a foreign tree
@@ -54,7 +66,7 @@ is refused with one `fix:` line.
 - `.dadaia/.venv`, the `.dadaia/` zones init and install create, `.agents/skills`, and
   the named harness's projection.
 - the seeded state documents, the harness roster and an absent root `.dadaiaignore`
-  (the operator's file), never overwriting existing data.
+  and `prompt.md` (the operator's files), never overwriting existing data.
 - the staged and installed public assets, the one writer of every hook wiring;
   `--skip-assets` leaves the workspace ungated until
   `.dadaia/.venv/bin/dadaia public install` runs, and the output says so.
@@ -67,7 +79,7 @@ clones every repo, installs the hook and makes the context ALIVE; `context bind`
 
 ## 3. The bind
 
-<!-- derived-from: context-management sha256:22e5ab09dc0d -->
+<!-- derived-from: context-management sha256:4eca78be3c95 -->
 
 ```bash
 .dadaia/.venv/bin/dadaia context bind <your-repo>
@@ -83,7 +95,7 @@ id, else `DADAIA_CONTEXT`, never the cwd: sitting inside a repository is not a b
 
 ## 4. Compliance
 
-<!-- derived-from: workspace-doctor sha256:1d52a99379ba -->
+<!-- derived-from: workspace-doctor sha256:ca5238a261e0 -->
 
 `doctor` is the one instance validator; three sections run in fixed order —
 `workspace`, `specs`, `ledgers`. Every finding prints as one `<CODE> <verdict>

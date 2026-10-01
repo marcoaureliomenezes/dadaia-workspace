@@ -4,11 +4,13 @@ A row per :class:`~dadaia_workspace.core.harness_registry.HookFormat` names the 
 lanes (gate, post-gate, context injection, reaper), the files that register them and how
 the harness reads a deny. Each lane is a generated, self-locating wrapper: it resolves the
 venv interpreter from its own path (a user-level shim: from the hook cwd), never ``PATH``;
-a missing venv warns and exits 0.
+a missing venv warns, tells the agent on every ctx-inject lane and exits 0.
 """
 
 from __future__ import annotations
 
+import json
+from collections.abc import Mapping
 from dataclasses import dataclass, replace
 
 from dadaia_workspace.core.harness_registry import HarnessRecord, HookFormat
@@ -229,6 +231,17 @@ HOOK_DIALECTS: dict[HookFormat, HookDialect] = {
 }
 
 
+def envelope(env: Mapping[str, str], text: str) -> str:
+    """*text* in the context envelope *env*'s ``DADAIA_HOOK_OUTPUT`` names — each vendor's
+    documented key, Codex's naming ``DADAIA_HOOK_EVENT`` — else plain text."""
+    event = env.get("DADAIA_HOOK_EVENT", "UserPromptSubmit")
+    native = {"hookSpecificOutput": {"hookEventName": event, "additionalContext": text}}
+    shaped = {"codex-json": native, "cursor-json": {"additional_context": text}}
+    shaped["copilot-json"] = {"additionalContext": text}
+    out = shaped.get(env.get("DADAIA_HOOK_OUTPUT", ""))
+    return text if out is None else json.dumps(out) + "\n"
+
+
 def hook_wrapper_command(name: str) -> str:
     """Return a direct-exec-safe hook command path for a generated wrapper."""
     return f".dadaia/hooks/{name}"
@@ -239,17 +252,32 @@ def wrapper_name(record: HarnessRecord, lane: str) -> str:
     return HOOK_DIALECTS[record.hooks].wrapper.format(harness=record.name, lane=lane)
 
 
-#: The ONE missing-venv posture (DEC-10): warn on stderr naming the venv, exit 0.
-#: ``$ROOT`` is the workspace; POSIX ``bin/python`` or Windows ``Scripts/python.exe``.
+#: The ONE missing-venv posture (DEC-10): warn on stderr naming the venv, ``{tell}`` the
+#: agent (a ctx-inject lane), exit 0. ``$ROOT`` is the workspace (``$ESC`` JSON-escaped);
+#: POSIX ``bin/python`` or Windows ``Scripts/python.exe``.
 VENV_PYTHON = (
     'for PYTHON_BIN in "$ROOT/.dadaia/.venv/bin/python" "$ROOT/.dadaia/.venv/Scripts/python.exe"; do\n'
     '  [ -x "$PYTHON_BIN" ] && break\n'
     "done\n"
     'if [ ! -x "$PYTHON_BIN" ]; then\n'
     '  echo "dadaia hook: no workspace venv at $ROOT/.dadaia/.venv — hook skipped" >&2\n'
-    "  exit 0\n"
+    """  ESC=$(printf '%s' "$ROOT" | sed 's/[\\\\"]/\\\\&/g')\n"""
+    "{tell}  exit 0\n"
     "fi\n"
 )
+#: What every ctx-inject firing tells the agent until the venv is fixed (AC2.7).
+VENV_MISSING = (
+    "dadaia: no workspace venv at $ROOT/.dadaia/.venv — the gate is off. "
+    "fix: uvx dadaia-workspace init $ROOT\n"
+)
+
+
+def _tell(lane: HookLane) -> str:
+    """A ctx-inject *lane*'s ``printf`` of :data:`VENV_MISSING` in its envelope, root slot open."""
+    if lane.argv != _CTX.argv:
+        return ""
+    slot = "'\"$ESC\"'" if lane.speaks else "'\"$ROOT\"'"
+    return f"  printf '%s' '{slot.join(envelope(dict(lane.env), VENV_MISSING).split('$ROOT'))}'\n"
 
 
 def _translator(answer: HookAnswer) -> str:
@@ -278,9 +306,10 @@ def hook_wrapper_contents(record: HarnessRecord) -> dict[str, str]:
     every harness registers a plain path whether it shell-parses or direct-execs it."""
     dialect = HOOK_DIALECTS[record.hooks]
     answer = dialect.answer
-    prologue = f"#!/usr/bin/env sh\nset -eu\n{dialect.root}{VENV_PYTHON}"
     wrappers: dict[str, str] = {}
     for lane in dialect.lanes:
+        venv = VENV_PYTHON.format(tell=_tell(lane))
+        prologue = f"#!/usr/bin/env sh\nset -eu\n{dialect.root}{venv}"
         exports = "".join(f'{key}="{value}"\nexport {key}\n' for key, value in lane.env)
         run = f'"$PYTHON_BIN" -B -m {lane.argv}'
         if answer is not None and lane.decides:

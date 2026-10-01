@@ -8,7 +8,7 @@ is `dadaia_workspace/public/data/AGENTS.md`, and the walkthrough is
 ## Context
 
 <!-- derived-from: spec-context-project sha256:9690f09f679b -->
-<!-- derived-from: context-management sha256:22e5ab09dc0d -->
+<!-- derived-from: context-management sha256:4eca78be3c95 -->
 
 A *context* — a Spec Context Project — is one canonical `specs/` tree owned by one
 main repository, the unit for memory, backlog, bugs, releases, reports and handoffs.
@@ -41,7 +41,7 @@ moves only at an operator-approved deploy.
 ## The flow
 
 <!-- derived-from: release-lifecycle sha256:cf04bb23d3bd -->
-<!-- derived-from: bug-ledger sha256:7182ac16c27c -->
+<!-- derived-from: bug-ledger sha256:fee190b6d940 -->
 <!-- derived-from: audits-canon sha256:a8a9af477b3d -->
 
 Every demand takes one of two arms. **Arm A**, a feature, leaves through a candidate:
@@ -58,26 +58,19 @@ carry the ordered work, and the ledger scripts move the records.
 
 ## The gate
 
-<!-- derived-from: sdd-gate-v3 sha256:46dea6ca9c6c -->
+<!-- derived-from: sdd-gate-v3 sha256:745061a2d4f7 -->
 
 The *gate* is one PreToolUse pre-gate evaluating root whitelist, venv guard and SDD
-gate in that order — first block wins, and a policy that raises is ALLOW. It blocks
-exactly three things: a file-tool write (`Write`, `Edit`, `MultiEdit`, `apply_patch`)
-creating a new workspace-root entry outside the root law and
-the operator's `.dadaiaignore`; a leading `dadaia`, `pip` or
-`python -m dadaia_workspace` outside `.dadaia/.venv/bin/` (Bash only); a file-tool write
-(those or `NotebookEdit`) that is PROTECTED or out of scope — a repo outside the bind, or `repos/<slug>/` beyond
-`specs/audits/`, which takes only worktree merges. A Bash write (`sed -i`, `rm`, `mkdir`, a redirect) is never judged. Paths fall in
-three classes: ADDITIVE (the `.dadaia/` output and ephemeral zones, always writable),
-PROTECTED (`.dadaia/sessions/`, the projected law and `.dadaiaignore`) and MUTATING (everything else). No lease, lock or wait path exists and
+gate in that order — first block wins. What it blocks, its path classes and every
+fail-open path are stated once, in the root `AGENTS.md` §3. No lease, lock or wait path exists and
 no `_RELEASE.json` is read. Every BLOCK, here and at every other enforcement point,
 carries exactly one `fix:` line, and a contract test feeds each fix back through the
 gate — a refusal whose fix is itself refused (a Stall) cannot ship.
 
 ## Memory
 
-<!-- derived-from: context-management sha256:22e5ab09dc0d -->
-<!-- derived-from: workspace-doctor sha256:1d52a99379ba -->
+<!-- derived-from: context-management sha256:4eca78be3c95 -->
+<!-- derived-from: workspace-doctor sha256:ca5238a261e0 -->
 <!-- derived-from: release-lifecycle sha256:cf04bb23d3bd -->
 <!-- derived-from: audits-canon sha256:a8a9af477b3d -->
 
@@ -96,7 +89,7 @@ the warnings `MEM-DRIFT-1` (features package map vs the live tree) and `MEM-DRIF
 
 ## Bugs and backlog
 
-<!-- derived-from: bug-ledger sha256:7182ac16c27c -->
+<!-- derived-from: bug-ledger sha256:fee190b6d940 -->
 <!-- derived-from: backlog-ledger sha256:4bdc376c943d -->
 
 Both are records with one shape and one writer script. `specs/bugs/BUGS.jsonl` holds

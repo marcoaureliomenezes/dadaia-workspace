@@ -34,7 +34,29 @@ from collections.abc import Callable
 from datetime import UTC, datetime
 from pathlib import Path
 
-__all__ = ["guarded", "lstat", "move", "remove", "rmtree", "walk"]
+from dadaia_workspace.core.workspace_layout import occupied
+
+__all__ = [
+    "Skipped",
+    "deleter",
+    "guarded",
+    "lstat",
+    "move",
+    "remove",
+    "rmtree",
+    "succeeded",
+    "walk",
+]
+
+
+class Skipped(str):
+    """A refusal line: the type, not the wording, tells a caller nothing was touched."""
+
+
+def succeeded(done: str | None) -> bool:
+    """The one success rule every caller reads: the step acted — neither refused nor a no-op."""
+    return not isinstance(done, Skipped | None)
+
 
 _OUTSIDE = "skipped '{label}' (outside the workspace)"
 _WORKTREE = "skipped '{label}' (holds a linked git worktree)"
@@ -110,10 +132,6 @@ def worktree_git_dir(tree: Path) -> Path:
     return (tree / gitdir).parents[1]
 
 
-def _exists(target: Path) -> bool:
-    return target.is_symlink() or target.exists()
-
-
 def _writable_retry(func: Callable[[str], object], path: str, _exc: BaseException) -> None:
     """``shutil.rmtree`` ``onexc``: grant owner write on the failing entry's parent (where
     unlink permission lives) and on the entry itself — never through a symlink, whose
@@ -135,12 +153,12 @@ def rmtree(target: Path) -> None:
 def remove(workspace_root: Path, target: Path, label: str) -> str | None:
     """Delete *target* iff its own location resolves inside the workspace. A symlink is
     unlinked, never followed; an entry already gone is nothing to report."""
-    if not _exists(target):
+    if not occupied(target):
         return None
     if not _inside(workspace_root, target):
-        return _OUTSIDE.format(label=label)
+        return Skipped(_OUTSIDE.format(label=label))
     if linked_worktree(workspace_root, target):
-        return _WORKTREE.format(label=label)
+        return Skipped(_WORKTREE.format(label=label))
     if target.is_symlink() or target.is_file():
         try:
             target.unlink()
@@ -151,6 +169,11 @@ def remove(workspace_root: Path, target: Path, label: str) -> str | None:
     else:
         return None
     return f"deleted '{label}'"
+
+
+def deleter(workspace_root: Path) -> Callable[[Path], bool]:
+    """:func:`remove` scoped to *workspace_root*, answering :func:`succeeded`."""
+    return lambda path: succeeded(remove(workspace_root, path, path.name))
 
 
 #: The zone the reaper HOLDS what it takes off the working tree. Deletion is reserved to
@@ -166,7 +189,7 @@ def hold(workspace_root: Path, target: Path, label: str, *, note: str = "") -> s
     day = workspace_root / ".dadaia" / REAPED_ZONE / datetime.now(tz=UTC).strftime("%Y%m%d")
     rel = target.relative_to(workspace_root)
     done = move(workspace_root, target, day / rel, label, note=note)
-    if len(rel.parts) > 1 and (done or "").startswith("moved "):
+    if len(rel.parts) > 1 and succeeded(done):
         os.utime(day / rel.parts[0])
     return done
 
@@ -187,15 +210,15 @@ def move(
     ONE message shape for every mover: ``moved '<label>'<note> -> '<destination>'``.
     *note* is the one extra field a caller may add when the label alone does not say
     whose entry it was (INV-5 names the context that owned the repo)."""
-    if not _exists(target):
+    if not occupied(target):
         return None
     if not _inside(workspace_root, target) or not _inside(workspace_root, destination):
-        return _OUTSIDE.format(label=label)
+        return Skipped(_OUTSIDE.format(label=label))
     if linked_worktree(workspace_root, target):
-        return _WORKTREE.format(label=label)
+        return Skipped(_WORKTREE.format(label=label))
     destination.parent.mkdir(parents=True, exist_ok=True)
     stem, n = destination.name, 0
-    while _exists(destination):
+    while occupied(destination):
         n += 1
         destination = destination.with_name(f"{stem}-{n}")
     try:

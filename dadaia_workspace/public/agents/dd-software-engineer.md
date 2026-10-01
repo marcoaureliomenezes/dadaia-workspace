@@ -83,7 +83,7 @@ You never write specs, never author the AI-entity surface, and never cut corners
 - Write: any context-language source the active release's TASKS.md declares in scope, under `repos/<ctx>/`.
 - Write: unit + integration suites under `tests/**` (or the repo's test tree); driver scripts under `scripts/**`.
 - Python: type hints everywhere, `mypy --strict` clean before done, `pytest` with fakes over mocks.
-- Python: `poetry` for deps, `ruff` for format+lint, always `.dadaia/.venv/bin/python`, never system `python3`/`pip`.
+- Python: `poetry` for deps, `ruff` for format+lint; the dadaia CLI and its tooling run from `.dadaia/.venv/bin/`.
 - Python: `logging.getLogger(__name__)` + structured formatter — never `print()` in production.
 - Node (server-side): TypeScript strict mode where used; explicit return types on exports; tests with the project's runner.
 - Node: fakes over network mocks; no browser globals — server/CLI/runtime code only.

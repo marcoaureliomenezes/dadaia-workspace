@@ -23,15 +23,26 @@ _MAP = _PKG / "public" / "data" / "AGENTS.md"
 
 def test_the_map_states_what_the_gate_judges() -> None:
     """sa-text-restates-rules-the-code-contradicts#49.1 (first-token rows: unit test_venv_guard);
-    gate-law-claims-out-of-scope-writes-blocked-but-bash-is-never-judged (map, README)."""
+    gate-law-claims-out-of-scope-writes-blocked-but-bash-is-never-judged (map, README);
+    AC2.8 the six fail-open paths in one place; AC2.9 no pip; AC2.13 the onboarding writers."""
     tools = ("Write", "Edit", "MultiEdit", "apply_patch")
     assert {*tools, "NotebookEdit", "write_file", "edit_file"} == _common.WRITE_TOOLS
     line = next(ln for ln in _MAP.read_text("utf-8").splitlines() if "One PreToolUse gate" in ln)
-    assert "first token is `dadaia`, `pip`/`pip3` or `python -m dadaia_workspace`" in line
+    assert "first token is `dadaia` or `python -m dadaia_workspace`" in line and "pip" not in line
     assert "file-tool write (`" + "`, `".join(tools) + "`) creating a new" in line
     assert "a file-tool write (those or `NotebookEdit`) that is PROTECTED" in line
-    assert "a Bash write (`sed -i`, `rm`, `mkdir`, a redirect) is never judged" in line
-    assert "and a file-tool write that is PROTECTED" in (_REPO / "README.md").read_text("utf-8")
+    paths = ("a missing `.dadaia/.venv` (ADR 0067)", "a pre-gate past 10 s (ADR 0118)",
+             "a Bash write (ADRs 0096, 0103, 0133)",
+             "an id-less unbound session writing under `worktrees/<r>/` (ADR 0116)",
+             "a policy that raises", "an unreadable payload")  # fmt: skip
+    assert [ln for ln in _MAP.read_text("utf-8").splitlines() if all(p in ln for p in paths)]
+    assert [h.split(":")[0] for h in _lines(r"fails? open")] == ["public/data/AGENTS.md"]
+    assert "only `context create` and a repo's first `specs init` write `specs/`" in _MAP.read_text(
+        "utf-8"
+    )
+    readme = (_REPO / "README.md").read_text("utf-8")
+    gate = next(p for p in readme.split("\n\n") if "The gate is one PreToolUse" in p)
+    assert "root `AGENTS.md` §3" in gate and "pip" not in gate
 
 
 _SESSION_NAMES = ("DADAIA_SESSION_ID", "CLAUDE_CODE_SESSION_ID", "CODEX_SESSION_ID",

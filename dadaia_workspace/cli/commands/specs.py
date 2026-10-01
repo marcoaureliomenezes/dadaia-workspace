@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import sys
-from collections.abc import Callable
 from dataclasses import replace
 from datetime import UTC, datetime
 from pathlib import Path
@@ -50,7 +49,7 @@ def upgrade(
     """
     resolved = resolve_specs_dir_for_cli(specs_dir)
     try:
-        result = upgrade_feature.upgrade(resolved, remove=_deleter(resolved), dry_run=dry_run)
+        result = upgrade_feature.upgrade(resolved, remove=sweep.deleter(resolved), dry_run=dry_run)
     except SymlinkRefusedError as exc:
         _refuse_symlink(exc)
     except UpgradeRefused as exc:
@@ -72,11 +71,6 @@ def _repair(specs: Path, *, dry_run: bool) -> tuple[list[SectionFinding], list[S
         return fixable, []
     fixed = doctor.fix(fixable)
     return fixed, [i for i in doctor.check() if i.error]
-
-
-def _deleter(specs: Path) -> Callable[[Path], object]:
-    """The one guarded deleter (``sweep.remove``) scoped to the specs tree."""
-    return lambda path: sweep.remove(specs, path, path.name)
 
 
 def _echo_upgrade(specs: Path, result: UpgradeResult) -> bool:
@@ -169,7 +163,7 @@ def init(
     elif kind in ("upgradable", "canonical"):
         try:
             refused = _echo_upgrade(
-                target, upgrade_feature.upgrade(target, remove=_deleter(target))
+                target, upgrade_feature.upgrade(target, remove=sweep.deleter(target))
             )
         except SymlinkRefusedError as exc:
             _refuse_symlink(exc)

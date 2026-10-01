@@ -310,11 +310,10 @@ def test_env_override_injects_context_memory(tmp_path: Path) -> None:
     ("extra", "event", "key"),
     [
         ({"DADAIA_HOOK_OUTPUT": "codex-json", "DADAIA_HOOK_EVENT": "SessionStart"}, "SessionStart", ""),
-        ({"DADAIA_HOOK_OUTPUT": "json"}, "UserPromptSubmit", ""),
         ({"DADAIA_HOOK_OUTPUT": "cursor-json"}, None, "additional_context"),
         ({"DADAIA_HOOK_OUTPUT": "copilot-json"}, None, "additionalContext"),
     ],
-    ids=["codex-json-envelope", "json-default-event", "AC1.2-cursor-top-level", "AC1.2-copilot-top-level"],
+    ids=["codex-json-envelope", "AC1.2-cursor-top-level", "AC1.2-copilot-top-level"],
 )  # fmt: skip
 def test_output_contract_envelopes(
     tmp_path: Path, extra: dict[str, str], event: str | None, key: str

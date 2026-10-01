@@ -16,6 +16,7 @@ from dadaia_workspace.core.doctor_rules import render_finding
 from dadaia_workspace.features.spec_context import injection_policy
 from dadaia_workspace.features.workspace import onboarding
 from dadaia_workspace.hooks import _common
+from dadaia_workspace.infrastructure.runtime_transforms.hook_wrappers import envelope
 
 _DIGEST_FIELDS: tuple[str, ...] = ("slug", "title", "tldr", "path")
 
@@ -38,17 +39,7 @@ def _resolve_context() -> str:
 
 
 def _emit(payload: str) -> None:
-    """*payload* in the envelope ``DADAIA_HOOK_OUTPUT`` names — each vendor's documented
-    context key (Cursor and Copilot read a top-level one at sessionStart) — else plain text."""
-    event = os.environ.get("DADAIA_HOOK_EVENT", "UserPromptSubmit")
-    native: dict[str, object] = {
-        "hookSpecificOutput": {"hookEventName": event, "additionalContext": payload}
-    }
-    envelopes: dict[str, dict[str, object]] = {"codex-json": native, "json": native}
-    envelopes |= {"cursor-json": {"additional_context": payload}}
-    envelopes |= {"copilot-json": {"additionalContext": payload}}
-    out = envelopes.get(os.environ.get("DADAIA_HOOK_OUTPUT", ""))
-    sys.stdout.write(payload if out is None else json.dumps(out) + "\n")
+    sys.stdout.write(envelope(os.environ, payload))
 
 
 def _digest_catalog(raw: str) -> str:

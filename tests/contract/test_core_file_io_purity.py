@@ -53,7 +53,7 @@ def _functions(tree: ast.AST) -> Iterator[ast.FunctionDef | ast.AsyncFunctionDef
 #: core/ modules whose file I/O is architecture-authorized (ARCHITECTURE.md P-11); new I/O
 #: enters core/ only by joining this set on purpose.
 _CORE_IO_STEMS = frozenset(
-    {"workspace_resolver", "atomic_write", "invocation", "session_store", "handoff_index",
+    {"workspace_resolver", "atomic_write", "context_registry", "session_store", "handoff_index",
      "template_history", "gitflow", "workspace_layout"}
 )  # fmt: skip
 _PATH_IO_ATTRS = frozenset(
@@ -381,10 +381,8 @@ def test_each_harness_carries_the_cache_env_or_declares_the_gap(tmp_path: Path) 
     absolute env; kimi-code, cursor, devin and copilot declare a gap — never silence."""
     tmp = Path("/ws/.dadaia/tmp")  # native separators (a backslash path on Windows)
     ruff, mypy = str(tmp / "ruff-cache"), str(tmp / "mypy-cache")
-    assert merge_claude_settings(None, Path("/ws"))["env"] == {
-        "MYPY_CACHE_DIR": mypy,
-        "RUFF_CACHE_DIR": ruff,
-    }
+    env = merge_claude_settings(None, Path("/ws"))["env"]
+    assert (env["MYPY_CACHE_DIR"], env["RUFF_CACHE_DIR"]) == (mypy, ruff)
     codex = codex_config(tmp_path / "agentic", Path("/ws"))
     assert (
         f"[shell_environment_policy.set]\nMYPY_CACHE_DIR = '{mypy}'\nRUFF_CACHE_DIR = '{ruff}'\n"

@@ -362,7 +362,7 @@ def _apply_fixes(
     fixes, and the `ledgers` rules that carry one. Fixes run BEFORE the sections are
     built, so what the run then reports is the post-repair truth.
 
-    `--expired-only` runs `service.expire()` — `fix()`'s TTL tail alone — and skips the
+    `--expired-only` runs `service.expire()` — `fix()`'s first step alone — and skips the
     specs and ledgers repairs: the SessionStart lane costs one lstat per zone entry."""
     if not fix:
         return []

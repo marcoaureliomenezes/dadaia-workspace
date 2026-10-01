@@ -12,7 +12,7 @@ from pathlib import Path
 
 import pytest
 
-from dadaia_workspace.core.cli_line import script_line
+from dadaia_workspace.core.cli_line import mkdir_line, script_line
 from dadaia_workspace.features.spec_context.gate_policy import (
     Decision,
     PathClass,
@@ -26,7 +26,7 @@ _IN_REPO = (
     "specs/bugs/BUGS.jsonl",
     "specs/audits/20260101-x/index.md",
     "src/engine/run.py",
-    "AGENTS.md",
+    "README.md",
 )
 
 
@@ -39,14 +39,15 @@ _IN_REPO = (
     pytest.param(".dadaia/reports/ctx/r.html", A, id="root-dadaia-reports"),
     pytest.param(".dadaia/handoff/ctx/h.json", A, id="root-dadaia-handoff"),
     pytest.param(".dadaia/tmp/agent/x.txt", A, id="root-dadaia-tmp"),
-    pytest.param(".dadaia/sessions/runtime/ctx.ptr", P, id="root-session-state-protected"),
-    pytest.param(".dadaiaignore", P, id="root-dadaiaignore-operator-only"),
+    # gate-protects-nothing-without-install-ledger: the code floor needs no ledger (ADR 0133)
+    *[pytest.param(p, P, id=f"floor-{p}") for p in ("AGENTS.md", ".dadaiaignore", ".dadaia/sessions/runtime/ctx.ptr", ".dadaia/states/spec_contexts.json", ".dadaia/hooks/x.sh")],
+    pytest.param("repos/sample-engine/AGENTS.md", M, id="repo-agents-md-is-not-the-floor"),
     pytest.param("CLAUDE.md", M, id="AC3.1-root-claude-md-is-not-law"),
     *[pytest.param(p, M, id=f"AC3.1-retired-mirror-{p}") for p in (".codex/AGENTS.md", ".kimi-code/AGENTS.md", ".agents/AGENTS.md", ".claude/rules/AGENTS.md")],
 ])
 # fmt: on
 def test_classification_matrix(path: str, expected: PathClass) -> None:
-    assert classify_path(path) == expected
+    assert classify_path(path)[0] == expected
 
 
 _A: dict[str, object] = {"context": "ctx-a", "repos": frozenset({"ctx-a", "ctx-a-infra"})}
@@ -76,7 +77,9 @@ def _at(zone: str, repo: str, owner: str | None = None, **session: object) -> di
     pytest.param("repos/ctx-b/src/x.py", _at("repo", "ctx-b", has_id=False), _wt("ctx-b", "impl"), id="ADR0105-repos-refused-for-every-session"),
     pytest.param("repos/stranger/src/x.py", {**_at("repo", "stranger", **_A), "owner": None}, _wt("stranger", "impl"), id="unregistered-slug-still-merge-only"),
     pytest.param("repos/beta/x.py", _at("repo", "beta", context="alpha", repos=frozenset({"alpha"}), has_id=False), "fix: Operator action: relaunch this session with DADAIA_CONTEXT=beta", id="sa-bind-has-two-stores#S5-env-bound-is-told-an-operator-step"),
-    pytest.param("AGENTS.md", {"projected": frozenset({"AGENTS.md"})}, f"fix: {_DADAIA} public install", id="S6-projected-law-one-restore-command"),
+    pytest.param("AGENTS.md", {}, f"fix: {_DADAIA} public install", id="S6-floor-law-one-restore-command"),
+    pytest.param(".dadaia/states/install_ledger.json", {"projected": frozenset({".dadaia/states/install_ledger.json"})}, f"fix: {_DADAIA} public install", id="H1-ledgered-floor-path-is-projected-law-first"),
+    pytest.param("repos/x/secrets/k", {"protected": ("secrets",)}, f"fix: {mkdir_line(_ROOT / '.dadaia' / 'tmp')}", id="AC2.5-protected-glob-operator-drafts-in-tmp"),
 ])
 # fmt: on
 def test_evaluate_decides_allow_or_block_with_one_fix(path: str, kwargs: dict[str, object], fix: str | None) -> None:
@@ -89,3 +92,4 @@ def test_evaluate_decides_allow_or_block_with_one_fix(path: str, kwargs: dict[st
         assert "[GATE]" not in message
     else:
         assert message.splitlines()[-1] == fix and "&&" not in message
+        assert "protected" not in kwargs or "'secrets'" in message and "<agent>/<YYYYMMDD>/" in message

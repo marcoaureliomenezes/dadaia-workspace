@@ -2,7 +2,8 @@
 
 One interpreter rule for every hook: the workspace's own self-locating wrapper (Kimi's
 user-level shim: the nearest `.dadaia/states/spec_contexts.json` sentinel), and one
-missing-venv posture — a loud stderr warning and exit 0 (DEC-10 (a)).
+missing-venv posture — a loud stderr warning and exit 0 (DEC-10 (a)), told to the agent by
+every ctx-inject firing (missing-venv-hook-disarms-the-gate-invisibly, AC2.7).
 Size: MEDIUM — executes the rendered hook commands as the harness would.
 """
 
@@ -10,6 +11,7 @@ from __future__ import annotations
 
 import json
 import os
+import shlex
 import shutil
 import subprocess
 import sys
@@ -20,7 +22,9 @@ import pytest
 from dadaia_workspace.core.harness_registry import HARNESS_RECORDS
 from dadaia_workspace.infrastructure.runtime_config import claude_hooks
 from dadaia_workspace.infrastructure.runtime_transforms.hook_wrappers import (
+    envelope,
     hook_wrapper_contents,
+    wrapper_name,
 )
 
 pytestmark = [
@@ -38,7 +42,7 @@ def _workspace(root: Path, *, venv: bool) -> Path:
     )
     hooks = root / ".dadaia" / "hooks"
     hooks.mkdir()
-    for name in ("claude", "codex", "cursor", "devin", "copilot"):
+    for name in ("claude", "codex", "cursor", "devin", "copilot", "kimi-code"):
         for wrapper, body in hook_wrapper_contents(HARNESS_RECORDS[name]).items():
             (hooks / wrapper).write_text(body, encoding="utf-8")
             (hooks / wrapper).chmod(0o755)
@@ -66,20 +70,29 @@ def _run(command: str, cwd: Path, **env: str) -> subprocess.CompletedProcess[str
     )  # fmt: skip
 
 
-@pytest.mark.parametrize("harness", ["claude", "codex", "cursor", "devin", "copilot", "kimi-code"])
-def test_missing_venv_is_loud_and_fails_open_on_every_harness(tmp_path: Path, harness: str) -> None:
+@pytest.mark.parametrize(
+    ("harness", "output"),  # output: the ctx-inject lane's DADAIA_HOOK_OUTPUT ("": plain)
+    [("claude", ""), ("codex", "codex-json"), ("cursor", "cursor-json"), ("devin", ""),
+     ("copilot", "copilot-json"), ("kimi-code", "")],
+)  # fmt: skip
+def test_missing_venv_is_loud_and_fails_open_on_every_harness(
+    tmp_path: Path, harness: str, output: str
+) -> None:
     """sa-hook-parity-claims-false-and-interpreter-rules-diverge#B3: no `.dadaia/.venv` —
-    the pre-gate hook exits 0 (never 127) and names the missing venv on stderr."""
-    ws = _workspace(tmp_path / "ws", venv=False)
-    if harness == "claude":
-        command = _claude_pre_gate()
-    elif harness == "kimi-code":
-        command = f"sh {_kimi_shim(tmp_path)}"
-    else:
-        command = str(ws / ".dadaia" / "hooks" / f"{harness}-pre-gate")
-    done = _run(command, ws, CLAUDE_PROJECT_DIR=str(ws))
-    assert done.returncode == 0, done.stderr
-    assert ".dadaia/.venv" in done.stderr
+    every lane exits 0 (never 127) naming the missing venv on stderr; and (AC2.7) each
+    ctx-inject firing tells the agent, in that lane's envelope, with no file written."""
+    ws = _workspace(tmp_path / 'w"s', venv=False)
+    before = sorted((ws / ".dadaia").rglob("*"))
+    hooks, record = ws / ".dadaia" / "hooks", HARNESS_RECORDS[harness]
+    lanes = [wrapper_name(record, lane) for lane in ("pre-gate", "ctx-inject", "ctx-inject")]
+    done = [_run(f"sh {shlex.quote(str(hooks / lane))}", ws) for lane in lanes]
+    assert all(d.returncode == 0 and ".dadaia/.venv" in d.stderr for d in done), done
+    told = (
+        f"dadaia: no workspace venv at {ws}/.dadaia/.venv — the gate is off. "
+        f"fix: uvx dadaia-workspace init {ws}\n"
+    )
+    assert [d.stdout for d in done[1:]] == [envelope({"DADAIA_HOOK_OUTPUT": output}, told)] * 2
+    assert sorted((ws / ".dadaia").rglob("*")) == before
 
 
 def test_kimi_shim_judges_the_nearest_sentinel_workspace(tmp_path: Path) -> None:

@@ -62,7 +62,7 @@ def _repo_porcelain_excluding_additive() -> str:
         check=True,
     ).stdout
     return "\n".join(
-        line for line in raw.splitlines() if classify_path(line[3:]) is not PathClass.ADDITIVE
+        line for line in raw.splitlines() if classify_path(line[3:])[0] is not PathClass.ADDITIVE
     )
 
 

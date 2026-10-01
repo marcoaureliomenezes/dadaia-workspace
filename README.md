@@ -45,9 +45,9 @@ memory atom under its content hash.
 ## A human installs and uses it
 
 <!-- derived-from: pypi-distribution sha256:92dbd2d7ed61 -->
-<!-- derived-from: workspace-init sha256:6ef28aa7796e -->
-<!-- derived-from: context-management sha256:22e5ab09dc0d -->
-<!-- derived-from: workspace-doctor sha256:1d52a99379ba -->
+<!-- derived-from: workspace-init sha256:f158dffe2a7e -->
+<!-- derived-from: context-management sha256:4eca78be3c95 -->
+<!-- derived-from: workspace-doctor sha256:ca5238a261e0 -->
 
 ```bash
 uvx dadaia-workspace init demo --harness claude --repo <clone url>   # level 1 + 2
@@ -93,11 +93,11 @@ and deletes only what a TTL expired.
 
 ## An agent reads AGENTS.md and uses it
 
-<!-- derived-from: agentic-entities sha256:358a6086252d -->
-<!-- derived-from: sdd-gate-v3 sha256:46dea6ca9c6c -->
+<!-- derived-from: agentic-entities sha256:e74931cf1c40 -->
+<!-- derived-from: sdd-gate-v3 sha256:745061a2d4f7 -->
 <!-- derived-from: release-lifecycle sha256:cf04bb23d3bd -->
-<!-- derived-from: bug-ledger sha256:7182ac16c27c -->
-<!-- derived-from: harness-claude-code sha256:15a591119bed -->
+<!-- derived-from: bug-ledger sha256:fee190b6d940 -->
+<!-- derived-from: harness-claude-code sha256:68e07ea44a20 -->
 <!-- derived-from: harness-codex sha256:9218e747c24f -->
 <!-- derived-from: harness-kimi-code sha256:ac3c7be4e426 -->
 <!-- derived-from: harness-cursor sha256:f66b96a0ae77 -->
@@ -114,13 +114,8 @@ differs only in serialization — event names, hook file, answer shape — and a
 behaviour.
 
 The gate is one PreToolUse pre-gate: root whitelist, venv guard, SDD gate, in that
-order, first block wins; a policy that raises is ALLOW. It blocks exactly three things:
-a file-tool write creating a new workspace-root entry, a `dadaia`/`pip`/`python -m
-dadaia_workspace` run outside `.dadaia/.venv/bin/`, and a file-tool write that is PROTECTED
-or out of scope — a repo outside the bind, or `repos/<slug>/` beyond `specs/audits/`, which
-takes only worktree merges; a Bash write is never judged. Path classes: ADDITIVE (the
-`.dadaia/` output and ephemeral zones), MUTATING (everything else, scope-judged), PROTECTED (session
-records, the projected law, `.dadaiaignore`).
+order, first block wins; what it blocks, its path classes and every fail-open path are
+stated once, in the root `AGENTS.md` §3.
 Every BLOCK carries exactly one `fix:` line, and a contract test feeds each fix back
 through the gate asserting ALLOW. No lease, lock or wait path exists; the gate reads no
 `_RELEASE.json`.

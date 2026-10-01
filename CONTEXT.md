@@ -297,6 +297,10 @@ _Avoid_: ROOT-n, EFF-n, issue code
 The operator's file at the workspace root, PROTECTED from agents: one root-relative pattern per line, `#` comments, `*` within one segment, a trailing `/` for a directory; no `!`, no `**` (an invalid line is a doctor finding). An entry neither in level 1 of the root canon nor named here = slop. Replaces `states/instance_exceptions.txt`, which `doctor --fix` migrates 1:1.
 _Avoid_: instance exceptions, allowlist, whitelist (the root whitelist is the gate's law, not the operator's patterns)
 
+**Protected section**:
+The `.dadaiaignore` lines after a `[protected]` header: repo-relative globs, same grammar, that make a match under `repos/<r>/` or `worktrees/<r>/<name>/` PROTECTED — beside the code floor (`CORE_FLOOR`) and the install ledger (ADR 0133). Bash writes are not judged.
+_Avoid_: protected list, deny list
+
 ## Authorities
 
 **Authority**:

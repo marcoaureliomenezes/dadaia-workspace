@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import fnmatch
 import re
-from collections.abc import Callable
+from collections.abc import Callable, Collection
 from dataclasses import dataclass
 from enum import StrEnum
 from functools import cached_property
@@ -26,6 +26,8 @@ __all__ = [
     "DADAIA_ZONES",
     "HARNESS_DIRS",
     "DADAIAIGNORE",
+    "LEVEL1_SEEDS",
+    "occupied",
     "MEMORY_TOPLEVEL_FILES",
     "REPO_LAW",
     "REPO_TREE_ARTIFACTS",
@@ -47,6 +49,8 @@ __all__ = [
     "dadaiaignore_seed",
     "operator_globs",
     "parse_dadaiaignore",
+    "protected_glob",
+    "CORE_FLOOR",
     "public_scripts_dir",
     "repo_excluded_display",
     "root_entries_display",
@@ -78,6 +82,11 @@ DADAIAIGNORE: str = ".dadaiaignore"
 ROOT_ALLOWED_FILES: frozenset[str] = frozenset(
     {"AGENTS.md", "prompt.md", ".gitignore", DADAIAIGNORE}
 )
+
+
+#: PROTECTED without any install ledger (ADR 0133): the root map, the operator's globs, and
+#: the CLI-owned ``.dadaia/`` zones; the ledger adds every projected path on top.
+CORE_FLOOR: tuple[str, ...] = ("AGENTS.md", DADAIAIGNORE, ".dadaia/states", ".dadaia/hooks", ".dadaia/sessions")  # fmt: skip
 
 
 class ZoneClass(StrEnum):
@@ -158,31 +167,34 @@ TOOL_CACHE_ENV: dict[str, str] = {"MYPY_CACHE_DIR": "mypy-cache", "RUFF_CACHE_DI
 MARKER_DIR: Path = Path(".dadaia") / "tmp" / "hooks"
 
 
-def parse_dadaiaignore(text: str) -> tuple[tuple[str, ...], tuple[str, ...]]:
-    """(patterns, invalid lines) of a ``.dadaiaignore`` (ADR 0093): one root-relative pattern
-    per line, ``#`` comments, ``*`` within one segment, a trailing ``/`` for a directory
-    (dropped); ``!``, ``**``, an absolute path or ``..`` is invalid. Deduplicated, order kept."""
-    kept: dict[str, None] = {}
+def parse_dadaiaignore(text: str) -> tuple[tuple[str, ...], tuple[str, ...], tuple[str, ...]]:
+    """(patterns, protected, invalid lines) of a ``.dadaiaignore`` (ADRs 0093, 0133): one
+    pattern per line, ``#`` comments, ``*`` within one segment, a trailing ``/`` for a
+    directory (dropped); ``!``, ``**``, an absolute path or ``..`` is invalid. Lines after a
+    ``[protected]`` header are repo-relative protected globs. Deduplicated, order kept."""
+    sections: tuple[dict[str, None], dict[str, None]] = ({}, {})
+    kept = sections[0]
     invalid: list[str] = []
     for raw in text.splitlines():
         line = raw.strip()
-        if not line or line.startswith("#"):
+        if line == "[protected]":
+            kept = sections[1]
+        elif not line or line.startswith("#"):
             continue
-        pattern = line.rstrip("/")
-        if line.startswith(("!", "/")) or "**" in line or ".." in pattern.split("/"):
+        elif line.startswith(("!", "/")) or "**" in line or ".." in line.rstrip("/").split("/"):
             invalid.append(line)
         else:
-            kept[pattern] = None
-    return tuple(kept), tuple(invalid)
+            kept[line.rstrip("/")] = None
+    return tuple(sections[0]), tuple(sections[1]), tuple(invalid)
 
 
-def operator_globs(workspace: Path) -> tuple[tuple[str, ...], tuple[str, ...]]:
+def operator_globs(workspace: Path) -> tuple[tuple[str, ...], tuple[str, ...], tuple[str, ...]]:
     """The one reader of ``<workspace>/.dadaiaignore``, for the gate and the doctor; absent
     or unreadable is no pattern."""
     try:
         text = (workspace / DADAIAIGNORE).read_text(encoding="utf-8")
     except OSError:
-        return (), ()
+        return (), (), ()
     return parse_dadaiaignore(text)
 
 
@@ -193,9 +205,22 @@ def dadaiaignore_seed(workspace: Path) -> str:
         return (workspace / ".dadaia" / "states" / "instance_exceptions.txt").read_text("utf-8")
     except OSError:
         return (
-            "# Operator-only: one root-relative pattern per line, * within one segment, a\n"
-            "# trailing / for a directory; no ! and no ** (ADR 0093).\n"
+            "# Operator-only (ADR 0093): root-relative patterns, * within a segment, / = dir,\n"
+            "# no ! and no **; under a [protected] line, repo-relative protected globs (ADR 0133).\n"
         )
+
+
+#: The level-1 root files a workspace is born with and the SessionStart lane re-creates,
+#: never rewrites (ADRs 0095, 0096): name -> its first content. ``AGENTS.md`` is projected.
+LEVEL1_SEEDS: dict[str, Callable[[Path], str]] = {
+    DADAIAIGNORE: dadaiaignore_seed,
+    "prompt.md": lambda _: "",
+}
+
+
+def occupied(entry: Path) -> bool:
+    """An entry is present when it is on disk, a dangling link included — never followed."""
+    return entry.is_symlink() or entry.exists()
 
 
 def _matches(sub: str, pattern: str) -> bool:
@@ -204,13 +229,32 @@ def _matches(sub: str, pattern: str) -> bool:
     return len(parts) == len(globs) and all(map(fnmatch.fnmatch, parts, globs))
 
 
-def verdict(rel: str, is_dir: bool, globs: tuple[str, ...]) -> Literal["canon", "operator", "slop"]:
+def protected_glob(rel: str, protected: tuple[str, ...]) -> str | None:
+    """The protected glob a prefix of *rel*'s repo-relative tail matches (``repos/<r>/…``,
+    ``worktrees/<r>/<name>/…``), else ``None``."""
+    parts = rel.split("/")
+    tail = parts[2:] if parts[0] == "repos" else parts[3:] if parts[0] == "worktrees" else []
+    prefixes = ["/".join(tail[: n + 1]) for n in range(len(tail))]
+    return next((g for g in protected for sub in prefixes if _matches(sub, g)), None)
+
+
+def verdict(
+    rel: str,
+    is_dir: bool,
+    globs: tuple[str, ...],
+    repos: Collection[str],
+    worktrees: Collection[str],
+) -> Literal["canon", "operator", "slop"]:
     """The one answer to "may this entry exist", for the gate and the doctor: a judged level
-    (root, ``.dadaia/<zone>``, a closed zone's entry) outside its allow set is ``operator`` iff
-    an exception glob matches its name or path, else ``slop``; below an open level, ``canon``."""
+    (root, ``.dadaia/<zone>``, a closed zone's entry, ``repos/<r>``, ``worktrees/<r>``) outside
+    its allow set is ``operator`` iff an exception glob matches its name or path, else
+    ``slop``; below an open level, ``canon``. *repos*/*worktrees* are the admitted slugs
+    (``context_registry.registered_slugs``)."""
+    slugs: dict[str, Collection[str]] = {"repos": repos, "worktrees": {*worktrees, "AGENTS.md"}}
     parts = rel.strip("/").split("/")
     for depth, name in enumerate(parts):
         directory = is_dir or depth < len(parts) - 1
+        allowed: Collection[str]
         if depth == 0:
             allowed = ROOT_ALLOWED_DIRS if directory else ROOT_ALLOWED_FILES
         elif depth == 1 and parts[0] == ".dadaia":
@@ -220,6 +264,8 @@ def verdict(rel: str, is_dir: bool, globs: tuple[str, ...]) -> Literal["canon", 
             if zone is None or zone.canon is None:
                 return "canon"
             allowed = zone.canon
+        elif depth == 1 and parts[0] in slugs:
+            allowed = slugs[parts[0]]
         else:
             return "canon"
         if any(fnmatch.fnmatch(name, a) for a in allowed):

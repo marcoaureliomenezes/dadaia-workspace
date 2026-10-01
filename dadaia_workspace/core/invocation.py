@@ -7,7 +7,6 @@ walked from the target first, so a cwd inside a nested sandbox never shadows the
 
 from __future__ import annotations
 
-import json
 import os
 import re
 from collections.abc import Mapping
@@ -15,7 +14,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal
 
-from dadaia_workspace.core import workspace_resolver
+from dadaia_workspace.core import context_registry, workspace_resolver
 from dadaia_workspace.core.cli_line import fix_line
 from dadaia_workspace.core.models.spec_context import CONTEXT_NAME_RE
 from dadaia_workspace.core.session_store import live_session
@@ -91,14 +90,7 @@ def resolve_session_id(env: Mapping[str, str]) -> str:
 
 
 def _registry_contexts(workspace_root: Path) -> list[dict[str, object]]:
-    """Read the context registry's ``contexts`` list, fail-soft to ``[]``."""
-    registry = workspace_root / ".dadaia" / "states" / "spec_contexts.json"
-    try:
-        data = json.loads(registry.read_text(encoding="utf-8"))
-    except (json.JSONDecodeError, OSError, ValueError):
-        return []
-    contexts = data.get("contexts", []) if isinstance(data, dict) else []
-    return [e for e in contexts if isinstance(e, dict)] if isinstance(contexts, list) else []
+    return context_registry.entries(workspace_root) or []
 
 
 def alive_context_names(workspace_root: Path) -> list[str]:
@@ -121,7 +113,7 @@ def _context_registered(workspace_root: Path, name: str) -> bool:
 def repo_slug_for_context(workspace_root: Path, name: str) -> str | None:
     """The ``repos/<slug>`` dir a context NAME lives in, or ``None`` when unregistered."""
     for entry in _registry_contexts(workspace_root):
-        slug = entry.get("repo_slug") or entry.get("repo")
+        slug = context_registry.entry_slugs(entry)[0]
         if entry.get("name") == name and isinstance(slug, str) and slug:
             return slug
     return None
@@ -143,15 +135,9 @@ def repo_owner(workspace_root: Path, path: Path) -> tuple[str, str, str] | None:
 
 def _owning_entry(workspace_root: Path, slug: str) -> tuple[str, str] | None:
     for entry in _registry_contexts(workspace_root):
-        main = entry.get("repo_slug") or entry.get("repo")
-        associated = entry.get("associated_repos")
-        slugs = (
-            [a.get("slug") for a in associated if isinstance(a, dict)]
-            if isinstance(associated, list)
-            else []
-        )
+        main, *_ = slugs = context_registry.entry_slugs(entry)
         name = entry.get("name")
-        if slug in (main, *slugs) and isinstance(name, str) and name and isinstance(main, str):
+        if slug in slugs and isinstance(name, str) and name and isinstance(main, str):
             return name, main
     return None
 
@@ -195,15 +181,8 @@ def all_repos(workspace_root: Path, context_name: str) -> frozenset[str]:
     for entry in _registry_contexts(workspace_root):
         if entry.get("name") != context_name:
             continue
-        slugs = {entry.get("repo_slug") or entry.get("repo") or context_name}
-        associated = entry.get("associated_repos")
-        if isinstance(associated, list):
-            slugs |= {
-                assoc["slug"]
-                for assoc in associated
-                if isinstance(assoc, dict) and isinstance(assoc.get("slug"), str)
-            }
-        return frozenset(s for s in slugs if isinstance(s, str) and s)
+        main, *associated = context_registry.entry_slugs(entry)
+        return frozenset(s for s in (main or context_name, *associated) if isinstance(s, str) and s)
     return frozenset()
 
 
