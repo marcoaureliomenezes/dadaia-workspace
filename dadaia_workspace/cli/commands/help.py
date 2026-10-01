@@ -25,8 +25,8 @@ def tree(
     ctx-inject attaches it to every session bootstrap.
 
     Examples:
-      dadaia help tree
-      dadaia help tree --digest
+      .dadaia/.venv/bin/dadaia help tree
+      .dadaia/.venv/bin/dadaia help tree --digest
     """
     from dadaia_workspace.cli.help_digest import render_digest, write_digest
 

@@ -76,11 +76,11 @@ def validate(
 
     \b
     Examples:
-      dadaia reports validate path/to/report.handoff.json
-      dadaia reports validate --all
-      dadaia reports validate --all --json
-      dadaia reports validate path/to/report.handoff.json --workspace /path/to/other/ws
-      dadaia reports validate path/to/verdict.handoff.json --reviewed-root /path/to/worktree
+      .dadaia/.venv/bin/dadaia reports validate path/to/report.handoff.json
+      .dadaia/.venv/bin/dadaia reports validate --all
+      .dadaia/.venv/bin/dadaia reports validate --all --json
+      .dadaia/.venv/bin/dadaia reports validate path/to/report.handoff.json --workspace /path/to/other/ws
+      .dadaia/.venv/bin/dadaia reports validate path/to/verdict.handoff.json --reviewed-root /path/to/worktree
     """
     # Invocation guard: must have paths or --all
     if not paths and not all_:

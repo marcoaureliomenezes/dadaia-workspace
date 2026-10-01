@@ -346,8 +346,6 @@ def dead(
 def bind(name: str = typer.Argument(..., help="Context name to bind to")) -> None:
     """Bind this shell session to a context.
 
-    Run: dadaia context bind <name>
-
     The bind sets this session's write scope to the context's main repo plus its
     associated repos.
     """
@@ -398,8 +396,6 @@ def repo_add(
 ) -> None:
     """Register an associated repo on a context.
 
-    Run: dadaia context repo add <ctx> <slug> [--url <url>]
-
     Idempotent: re-adding the same slug with the same URL is a no-op success. The
     same slug with a DIFFERENT URL is refused — this verb is the one place an
     associated repo's URL is set, so the recovery path is 'context repo remove'
@@ -435,12 +431,10 @@ def repo_remove(
 ) -> None:
     """Remove an associated repo from a context's registry.
 
-    Run: dadaia context repo remove <ctx> <slug>
-
     Registry-only: this NEVER deletes the on-disk checkout at
     'repos/<slug>' — it only drops the registry entry, and always states
     explicitly what it leaves behind on disk. To also remove the checkout, delete
-    it yourself, or run 'dadaia context dead <ctx>' first (which git-syncs and
+    it yourself, or run '.dadaia/.venv/bin/dadaia context dead <ctx>' first (which git-syncs and
     removes every repo in the set, including this one, before you unregister it).
     """
     try:

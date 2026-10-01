@@ -164,3 +164,16 @@ def test_every_advertised_verb_and_harness_exists() -> None:
     assert {(group, verb) for group, verbs in surfaces.items() for verb in verbs} <= live
     assert "panel" not in surfaces
     assert payload["harnesses"]["layer_1"] == list(L1_ENTRY_HARNESSES)
+
+
+def test_every_help_example_renders_the_venv_cli() -> None:
+    """help-examples-spell-the-blocked-bare-cli: the gate blocks a bare `dadaia` first token,
+    so every example in every --help names `.dadaia/.venv/bin/dadaia`."""
+    verbs = "|".join(get_command(app).commands)  # type: ignore[attr-defined]
+    bare = re.compile(rf"(?<![/\w-])(?<!Usage: )(?<!the )(?<!, )dadaia\s+(?:{verbs})\b")
+    hits = [
+        f"{' '.join(p) or '<root>'}: {m.group(0)!r}"
+        for p, _ in _tree()
+        for m in bare.finditer(_help(*p))
+    ]
+    assert hits == [], "\n".join(hits)
