@@ -34,6 +34,8 @@ from collections.abc import Callable
 from datetime import UTC, datetime
 from pathlib import Path
 
+from dadaia_workspace.core.workspace_layout import occupied
+
 __all__ = ["guarded", "lstat", "move", "remove", "rmtree", "walk"]
 
 _OUTSIDE = "skipped '{label}' (outside the workspace)"
@@ -110,10 +112,6 @@ def worktree_git_dir(tree: Path) -> Path:
     return (tree / gitdir).parents[1]
 
 
-def _exists(target: Path) -> bool:
-    return target.is_symlink() or target.exists()
-
-
 def _writable_retry(func: Callable[[str], object], path: str, _exc: BaseException) -> None:
     """``shutil.rmtree`` ``onexc``: grant owner write on the failing entry's parent (where
     unlink permission lives) and on the entry itself — never through a symlink, whose
@@ -135,7 +133,7 @@ def rmtree(target: Path) -> None:
 def remove(workspace_root: Path, target: Path, label: str) -> str | None:
     """Delete *target* iff its own location resolves inside the workspace. A symlink is
     unlinked, never followed; an entry already gone is nothing to report."""
-    if not _exists(target):
+    if not occupied(target):
         return None
     if not _inside(workspace_root, target):
         return _OUTSIDE.format(label=label)
@@ -187,7 +185,7 @@ def move(
     ONE message shape for every mover: ``moved '<label>'<note> -> '<destination>'``.
     *note* is the one extra field a caller may add when the label alone does not say
     whose entry it was (INV-5 names the context that owned the repo)."""
-    if not _exists(target):
+    if not occupied(target):
         return None
     if not _inside(workspace_root, target) or not _inside(workspace_root, destination):
         return _OUTSIDE.format(label=label)
@@ -195,7 +193,7 @@ def move(
         return _WORKTREE.format(label=label)
     destination.parent.mkdir(parents=True, exist_ok=True)
     stem, n = destination.name, 0
-    while _exists(destination):
+    while occupied(destination):
         n += 1
         destination = destination.with_name(f"{stem}-{n}")
     try:

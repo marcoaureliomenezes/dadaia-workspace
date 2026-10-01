@@ -27,6 +27,7 @@ __all__ = [
     "HARNESS_DIRS",
     "DADAIAIGNORE",
     "LEVEL1_SEEDS",
+    "occupied",
     "MEMORY_TOPLEVEL_FILES",
     "REPO_LAW",
     "REPO_TREE_ARTIFACTS",
@@ -205,6 +206,11 @@ LEVEL1_SEEDS: dict[str, Callable[[Path], str]] = {
     DADAIAIGNORE: dadaiaignore_seed,
     "prompt.md": lambda _: "",
 }
+
+
+def occupied(entry: Path) -> bool:
+    """An entry is present when it is on disk, a dangling link included — never followed."""
+    return entry.is_symlink() or entry.exists()
 
 
 def _matches(sub: str, pattern: str) -> bool:

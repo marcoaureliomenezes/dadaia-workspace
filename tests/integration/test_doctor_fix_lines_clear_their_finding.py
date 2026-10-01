@@ -548,15 +548,21 @@ def test_a_worktree_finding_is_cleared_by_its_merge_fix(tmp_path: Path) -> None:
     assert doctor.check_worktrees("c") == []
 
 
-@pytest.mark.parametrize("present", [".dadaiaignore", "prompt.md"])
+@pytest.mark.parametrize("present", [".dadaiaignore", "prompt.md", "dangling-link"])
 def test_the_session_lane_re_creates_missing_core_and_rewrites_none(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, present: str
 ) -> None:
     """Intent: CONTRACT — AC2.4 (ADR 0096): the SessionStart lane re-creates a missing level-1
-    entry (`.dadaiaignore`, `prompt.md`, every provisioned zone) and rewrites no present one."""
+    entry (`.dadaiaignore`, `prompt.md`, every provisioned zone) and rewrites no present one —
+    a dangling link is present, never written through."""
     (tmp_path / ".dadaia" / "states").mkdir(parents=True)
     (tmp_path / ".dadaia" / "states" / "spec_contexts.json").write_text("{}", encoding="utf-8")
-    (tmp_path / present).write_text("# mine\n", encoding="utf-8")
+    outside = tmp_path / "outside" / "pwned.md"
+    outside.parent.mkdir()
+    if present == "dangling-link":
+        (tmp_path / "prompt.md").symlink_to(outside)
+    else:
+        (tmp_path / present).write_text("# mine\n", encoding="utf-8")
     monkeypatch.chdir(tmp_path)
     monkeypatch.setattr(
         container,
@@ -569,6 +575,8 @@ def test_the_session_lane_re_creates_missing_core_and_rewrites_none(
     lane = CliRunner().invoke(app, ["doctor", "--fix", "--expired-only", "--quiet"])
 
     assert lane.exit_code == 0, lane.output
-    assert (tmp_path / ".dadaiaignore").is_file() and (tmp_path / "prompt.md").is_file()
+    assert (tmp_path / ".dadaiaignore").is_file() and not outside.exists()
     assert all((tmp_path / ".dadaia" / zone.name).is_dir() for zone in provisioned_zones())
-    assert (tmp_path / present).read_text(encoding="utf-8") == "# mine\n"
+    if present != "dangling-link":
+        assert (tmp_path / "prompt.md").is_file()
+        assert (tmp_path / present).read_text(encoding="utf-8") == "# mine\n"

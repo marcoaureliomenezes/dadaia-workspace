@@ -420,7 +420,7 @@ class DoctorService:
         return [
             self._finding(zone, base, target, FindingVerdict.MISSING, detail)
             for zone, base, target, detail in core
-            if not target.exists()
+            if not workspace_layout.occupied(target)
         ]
 
     def _scan_dadaiaignore(self, invalid: tuple[str, ...]) -> list[Finding]:

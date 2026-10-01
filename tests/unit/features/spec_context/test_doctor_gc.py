@@ -18,8 +18,8 @@ from pathlib import Path
 
 import pytest
 
-from dadaia_workspace.core.workspace_layout import DADAIA_ZONES
-from dadaia_workspace.features.spec_context.doctor import DoctorService, FindingVerdict
+from dadaia_workspace.core.workspace_layout import DADAIA_ZONES, zones_with_ttl
+from dadaia_workspace.features.spec_context.doctor import _EXPIRY_ACT, DoctorService, FindingVerdict
 from dadaia_workspace.infrastructure.git_subprocess import GitSubprocessClient
 from dadaia_workspace.infrastructure.json_context_store import JsonContextStore
 from dadaia_workspace.infrastructure.json_harness_profile_store import JsonHarnessProfileStore
@@ -202,6 +202,7 @@ def test_a_ttl_expiry_is_its_zone_class_act(
     assert remaining == ([FindingVerdict.REAPED] if after == "held" else [])
     assert victim.read_text(encoding="utf-8") == "keep"
     assert any("skipped 'states/harness_profile.json' (errno 13" in a for a in actions), actions
+    assert {z.cls for z in zones_with_ttl()} <= _EXPIRY_ACT.keys()
 
 
 def _denied(*_: object, **__: object) -> None:
