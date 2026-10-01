@@ -119,7 +119,14 @@ _SET_HOME: dict[str, str] = {
 
 #: AC6.5 allowance for the widened sets (born 2026-09-27 at 8): each second list,
 #: keyed ``file`` -> the open bug that deletes it.
-_SECOND_LIST_BIRTH = 8
+_SECOND_LIST_BIRTH = frozenset(  # its keys at T-050-135; the allowance only shrinks
+    {
+        "dadaia_workspace/public/skills/dd-audit-project/scripts/_audit_check.py",
+        "dadaia_workspace/public/skills/dd-backlog-definition/scripts/_backlog_schema.py",
+        "dadaia_workspace/public/skills/dd-bug-resolution/scripts/_bugs_check.py",
+        "dadaia_workspace/public/skills/dd-release-implementation/scripts/_release_schema.py",
+    }
+)
 _SECOND_LIST_ALLOWANCE: dict[str, str] = {
     "dadaia_workspace/public/skills/dd-audit-project/scripts/_audit_check.py": _PARITY,
     "dadaia_workspace/public/skills/dd-backlog-definition/scripts/_backlog_schema.py": _PARITY,
@@ -289,7 +296,7 @@ def test_a_planted_second_list_of_a_widened_set_trips() -> None:
 
 #: AC6.1 allowance (born 2026-09-27 at 16): law files restating a set, ``path:set`` ->
 #: the open bug that makes them cite the authority instead.
-_RESTATED_LAW_BIRTH = 16
+_RESTATED_LAW_BIRTH: frozenset[str] = frozenset()  # drained
 _RESTATED_LAW_ALLOWANCE: dict[str, str] = {}
 
 

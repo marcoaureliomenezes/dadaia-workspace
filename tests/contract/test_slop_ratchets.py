@@ -4,7 +4,7 @@ Repo-pure slop ratchets: measured at birth, pinned, ratcheting down only; every
 tree walk goes through the one tracked-files enumeration the other ratchets use.
 V37–V39 carry a keyed allowance (AC6.5): an unlisted hit fails, a vanished key fails
 stale, a value is an OPEN bug id (or ``parity:<test>`` / ``report-only`` where stated),
-and the allowance never outgrows its birth size (AC6.6).
+and the allowance only shrinks: its keys stay within its birth keys (AC6.6, AC3.16).
 """
 
 from __future__ import annotations
@@ -214,10 +214,14 @@ def _open_bug_ids() -> set[str]:
 
 
 def _allowance_violations(
-    hits: set[str], allowance: dict[str, str], *, birth: int, also: frozenset[str] = frozenset()
+    hits: set[str],
+    allowance: dict[str, str],
+    *,
+    birth: frozenset[str],
+    also: frozenset[str] = frozenset(),
 ) -> list[str]:
     """AC6.5/AC6.6: unlisted hits, stale keys, values that are no open bug id, and an
-    allowance grown past its birth size — each one line, empty when the ratchet holds."""
+    keys absent at birth — each one line, empty when the ratchet holds."""
     open_bugs = _open_bug_ids()
     problems = [f"unlisted: {hit}" for hit in sorted(hits - allowance.keys())]
     problems += [f"stale key (delete it): {key}" for key in sorted(allowance.keys() - hits)]
@@ -232,8 +236,9 @@ def _allowance_violations(
             and not (_REPO_ROOT / value.removeprefix("parity:")).is_file()
         ):
             problems.append(f"{key} -> {value!r} names no test file")
-    if len(allowance) > birth:
-        problems.append(f"allowance grew to {len(allowance)} (birth {birth}) — it only shrinks")
+    problems += [
+        f"absent at birth (it only shrinks): {key}" for key in sorted(allowance.keys() - birth)
+    ]
     return problems
 
 
@@ -263,8 +268,19 @@ def _duplicate_definitions(sources: dict[str, str]) -> set[str]:
     return {f"{rel}:{name}" for (name, _), rels in homes.items() if len(rels) > 1 for rel in rels}
 
 
-#: V37 allowance, born 2026-09-27 at 65: each duplicate, keyed to the open bug deleting it.
-_V37_BIRTH = 65
+#: V37 allowance, born 2026-09-27: each duplicate, keyed to the open bug deleting it.
+_V37_BIRTH = frozenset(
+    {
+        "core/gitflow.py:candidate_dir",
+        "core/gitflow.py:candidate_number",
+        "core/gitflow.py:next_candidate",
+        "core/release_state.py:CANDIDATE_RE",
+        "public/skills/dd-release-implementation/scripts/_release_schema.py:CANDIDATE_RE",
+        "public/skills/dd-release-implementation/scripts/_release_schema.py:candidate_dir",
+        "public/skills/dd-release-implementation/scripts/_release_schema.py:candidate_number",
+        "public/skills/dd-release-implementation/scripts/_release_schema.py:next_candidate",
+    }
+)  # its keys today; rc-9 re-bases V37 (AC7.4)
 #: The candidate-folder pair (ADR 0150): the stdlib scripts cannot import the package,
 #: so each side keeps its twin and one contract test pins them equal.
 _PAIR = "parity:tests/contract/test_release_script.py"
@@ -324,10 +340,25 @@ def _destructive_calls(sources: dict[str, str]) -> set[str]:
     return hits
 
 
-#: V38 allowance, born 2026-09-27 at 16. The install-ledger prune is PLAN §1.1's
+#: V38 allowance, born 2026-09-27. The install-ledger prune is PLAN §1.1's
 #: "who owns an entry under a harness dir" authority (`_reconcile_install_ledger`). Certify
 #: deletes its own disposable run; reconcile's rollback restores a state file to absent.
-_V38_BIRTH = 16
+# birth keys read at 1bcfdba8f (operator ruling 2026-10-01, AC3.16)
+_V38_BIRTH = frozenset(
+    {
+        "core/atomic_write.py:atomic_write",
+        "features/certification/service.py:certify",
+        "features/migrate/state_v2.py:execute_migration",
+        "features/reconcile/service.py:_restore_state",
+        "features/specs/doctor_memory.py:fix_placeholder_atom",
+        "infrastructure/projection.py:_clear",
+        "infrastructure/public_assets.py:_prune_empty_dirs",
+        "infrastructure/public_assets.py:_reconcile_install_ledger",
+        "infrastructure/public_assets.py:stage",
+        "public/skills/dd-bug-resolution/scripts/_ledger.py:replace",
+        "public/skills/dd-release-implementation/scripts/_release_new.py:new_release",
+    }
+)
 _V38_ALLOWANCE: dict[str, str] = {
     # a failed swap never leaves its temp sibling — pinned by each writer's own test
     "core/atomic_write.py:atomic_write": "parity:tests/unit/core/test_atomic_write.py",
@@ -401,10 +432,27 @@ def _doctor_codes() -> set[str]:
     )
 
 
-#: V39 allowance, born 2026-09-27 at 52: a code with no fix-clears case in
+#: V39 allowance, born 2026-09-27: a code with no fix-clears case in
 #: tests/integration/test_doctor_fix_lines_clear_their_finding.py; a code carrying a fix
 #: is keyed to the bug that says its fix may not clear, one with none is `report-only`.
-_V39_BIRTH = 52
+# birth keys read at 1bcfdba8f (operator ruling 2026-10-01, AC3.16)
+_V39_BIRTH = frozenset(
+    {
+        "ONBOARDING",
+        "RELEASE-TREE-ARCHIVED",
+        "RELEASE-TREE-MEMORY",
+        "RELEASE-TREE-PARSE",
+        "RELEASE-TREE-PHASE",
+        "RELEASE-TREE-SCHEMA",
+        "RELEASE-TREE-STATE-MISSING",
+        "RELEASE-TREE-TRIO",
+        "RELEASE-TREE-TS-ORDER",
+        "SPEC-DOC-002L",
+        "SPEC-DOC-035",
+        "TREE-7",
+        "WS-INVARIANT",
+    }
+)
 _V39_ALLOWANCE: dict[str, str] = {
     "ONBOARDING": "parity:tests/integration/test_onboarding_steps_property.py",
     "WS-INVARIANT": "parity:tests/integration/test_unfixable_findings_carry_their_own_fix.py",
@@ -440,5 +488,16 @@ def test_v39_every_doctor_code_has_a_fix_clears_case_or_a_key() -> None:
 
 def test_v39_trips_on_an_unlisted_code() -> None:
     """RED fixture: a code with neither a plant nor a key is reported unlisted."""
-    problems = _allowance_violations(_uncovered({"ZZ-NEW-1", "ZZ-OK-1"}, {"ZZ-OK-1"}), {}, birth=0)
+    problems = _allowance_violations(
+        _uncovered({"ZZ-NEW-1", "ZZ-OK-1"}, {"ZZ-OK-1"}), {}, birth=frozenset()
+    )
     assert problems == ["unlisted: ZZ-NEW-1"]
+
+
+def test_allowance_key_absent_at_birth_fails() -> None:
+    """RED fixture (AC3.16): a key born after the birth set is a violation, even when it
+    covers a live hit and carries an allowed value."""
+    problems = _allowance_violations(
+        {"NEW-1"}, {"NEW-1": "report-only"}, birth=frozenset(), also=frozenset({"report-only"})
+    )
+    assert problems == ["absent at birth (it only shrinks): NEW-1"]
