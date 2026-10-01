@@ -6,7 +6,7 @@ the terms are defined in [concepts](concepts.md) and in [`CONTEXT.md`](../CONTEX
 ## Install
 
 <!-- derived-from: pypi-distribution sha256:92dbd2d7ed61 -->
-<!-- derived-from: workspace-init sha256:6ef28aa7796e -->
+<!-- derived-from: workspace-init sha256:f158dffe2a7e -->
 
 ```bash
 uvx dadaia-workspace init <dir> --harness claude --repo <url>
@@ -27,7 +27,7 @@ refreshes each project's specs law.
 
 ## Level 1 — the workspace
 
-<!-- derived-from: workspace-init sha256:6ef28aa7796e -->
+<!-- derived-from: workspace-init sha256:f158dffe2a7e -->
 
 `uvx dadaia-workspace init <dir> --harness claude|codex|kimi-code|cursor|devin|copilot
 [--repo <url>] [--associated-repo <url>]… [--skip-assets]` is the only verb that works
@@ -43,8 +43,8 @@ invocation's `--repo` and `--associated-repo` flags. It lays down:
   `.dadaia/states/harness_profile.json`, the harness roster; a re-init with another
   harness merges into it, never narrowing it.
 - An absent root `.dadaiaignore`, seeded from the legacy
-  `states/instance_exceptions.txt` or a comment-only template; it is the operator's file
-  from then on.
+  `states/instance_exceptions.txt` or a comment-only template, and an empty `prompt.md`;
+  each is the operator's file from then on.
 - Unless `--skip-assets`, the staged and installed public assets — the one writer of
   every hook wiring. With `--skip-assets` the output warns that the workspace is
   ungated until `.dadaia/.venv/bin/dadaia public install` runs.
@@ -55,7 +55,7 @@ harness later and `.dadaia/.venv/bin/dadaia harness list` reads the roster.
 ## Level 2 — the project
 
 <!-- derived-from: spec-context-project sha256:9690f09f679b -->
-<!-- derived-from: context-management sha256:22e5ab09dc0d -->
+<!-- derived-from: context-management sha256:4eca78be3c95 -->
 
 A context — a Spec Context Project — is the unit of work: one canonical `specs/` tree
 owned by one main repository, optionally spanning associated repositories that live and
@@ -97,7 +97,7 @@ branches; a re-run is a no-op.
 
 ## Check compliance — `doctor`
 
-<!-- derived-from: workspace-doctor sha256:1d52a99379ba -->
+<!-- derived-from: workspace-doctor sha256:ca5238a261e0 -->
 
 ```bash
 .dadaia/.venv/bin/dadaia doctor --context <ctx> [--json] [--fix] [--redact]
@@ -125,7 +125,7 @@ a TTL expired.
 
 <!-- derived-from: release-lifecycle sha256:cf04bb23d3bd -->
 <!-- derived-from: backlog-ledger sha256:4bdc376c943d -->
-<!-- derived-from: bug-ledger sha256:7182ac16c27c -->
+<!-- derived-from: bug-ledger sha256:fee190b6d940 -->
 
 A candidate is one closed-scope cycle inside the live release. Nothing drives it: the
 documents are the state, the ledger scripts move the records, and the markers in

@@ -8,7 +8,7 @@ live. Terms are defined in [concepts](concepts.md); the long walkthrough is
 ## 1. The three levels in one block
 
 <!-- derived-from: pypi-distribution sha256:92dbd2d7ed61 -->
-<!-- derived-from: workspace-init sha256:6ef28aa7796e -->
+<!-- derived-from: workspace-init sha256:f158dffe2a7e -->
 
 Set `REPO_URL` to your repository's clone URL; everything else runs as printed (needs
 uv and network access):
@@ -57,7 +57,7 @@ Then `.dadaia/.venv/bin/dadaia specs init --context <ctx>` refreshes the project
 
 ## 2. What the init line provisioned
 
-<!-- derived-from: workspace-init sha256:6ef28aa7796e -->
+<!-- derived-from: workspace-init sha256:f158dffe2a7e -->
 
 `--harness` names one registered harness: `claude` | `codex` | `kimi-code` | `cursor` |
 `devin` | `copilot`. The directory is required and a directory holding a foreign tree
@@ -66,7 +66,7 @@ is refused with one `fix:` line.
 - `.dadaia/.venv`, the `.dadaia/` zones init and install create, `.agents/skills`, and
   the named harness's projection.
 - the seeded state documents, the harness roster and an absent root `.dadaiaignore`
-  (the operator's file), never overwriting existing data.
+  and `prompt.md` (the operator's files), never overwriting existing data.
 - the staged and installed public assets, the one writer of every hook wiring;
   `--skip-assets` leaves the workspace ungated until
   `.dadaia/.venv/bin/dadaia public install` runs, and the output says so.
@@ -79,7 +79,7 @@ clones every repo, installs the hook and makes the context ALIVE; `context bind`
 
 ## 3. The bind
 
-<!-- derived-from: context-management sha256:22e5ab09dc0d -->
+<!-- derived-from: context-management sha256:4eca78be3c95 -->
 
 ```bash
 .dadaia/.venv/bin/dadaia context bind <your-repo>
@@ -95,7 +95,7 @@ id, else `DADAIA_CONTEXT`, never the cwd: sitting inside a repository is not a b
 
 ## 4. Compliance
 
-<!-- derived-from: workspace-doctor sha256:1d52a99379ba -->
+<!-- derived-from: workspace-doctor sha256:ca5238a261e0 -->
 
 `doctor` is the one instance validator; three sections run in fixed order —
 `workspace`, `specs`, `ledgers`. Every finding prints as one `<CODE> <verdict>
