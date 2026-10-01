@@ -151,10 +151,13 @@ def _fold(tech: Path, remove: Callable[[Path], bool]) -> bool:
     body = _tech_stack_body(tech.read_text(encoding="utf-8"))
     original = architecture.read_text(encoding="utf-8")
     atomic_write(architecture, f"{original.rstrip(chr(10))}\n\n{_TECH_STACK_HEADING}\n\n{body}\n")
-    if remove(tech):
-        return True
-    atomic_write(architecture, original)
-    return False
+    folded = False
+    try:
+        folded = remove(tech)
+    finally:
+        if not folded:  # refused, a no-op or raised: the fold lands whole or not at all
+            atomic_write(architecture, original)
+    return folded
 
 
 def _tech_stack_body(text: str) -> str:

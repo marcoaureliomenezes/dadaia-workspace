@@ -19,7 +19,7 @@ from typer.testing import CliRunner
 from dadaia_workspace.cli.main import app
 from dadaia_workspace.core.atomic_write import SymlinkRefusedError, atomic_write
 from dadaia_workspace.core.gitflow import merge_frontmatter
-from dadaia_workspace.features.migrate.upgrade import upgrade
+from dadaia_workspace.features.migrate.upgrade import fold_tech_stack, upgrade
 from dadaia_workspace.features.spec_context import sweep
 from dadaia_workspace.features.specs import SpecsDoctor, canon
 
@@ -93,14 +93,9 @@ def test_b1_specs_upgrade_refuses_a_symlinked_quality_md_with_its_fix(tmp_path: 
     ]
 
 
-@pytest.mark.parametrize("linked", [
-    pytest.param("memory/ARCHITECTURE.md", id="B1-the-fold-refuses-a-symlinked-architecture-md"),
-    pytest.param("memory", id="doctor-reports-a-refused-removal-as-deleted-fold-lands-whole-or-not-at-all"),
-])  # fmt: skip
-def test_b1_the_tech_stack_fold_never_writes_outside(tmp_path: Path, linked: str) -> None:
-    """#B1: the 6 -> 7 fold writes ARCHITECTURE.md through the same writer; a TECHSTACK.md the
-    deleter refuses (memory/ linked outside specs) restores ARCHITECTURE.md and is never reported
-    folded, so a re-run never appends a second ``## Tech Stack``."""
+def _v6_tree_linking(tmp_path: Path, linked: str) -> tuple[Path, Path]:
+    """A v6 tree holding TECHSTACK.md whose *linked* entry is moved outside and symlinked back;
+    returns the specs dir and the outside ARCHITECTURE.md."""
     specs = tmp_path / "repo" / "specs"
     canon.scaffold(specs, project_name="p")
     merge_frontmatter(specs, specs_pattern_version=6)
@@ -109,13 +104,32 @@ def test_b1_the_tech_stack_fold_never_writes_outside(tmp_path: Path, linked: str
     outside = tmp_path / "outside"
     (specs / linked).rename(outside)
     (specs / linked).symlink_to(outside)
-    arch = outside / "ARCHITECTURE.md" if outside.is_dir() else outside
+    return specs, outside / "ARCHITECTURE.md" if outside.is_dir() else outside
 
-    for _ in range(2):
-        try:
-            assert upgrade(specs, remove=sweep.deleter(specs)).tech_stack_folded == []
-        except SymlinkRefusedError:
-            assert linked.endswith(".md")
+
+def test_b1_the_tech_stack_fold_refuses_a_symlinked_architecture_md(tmp_path: Path) -> None:
+    """#B1: the 6 -> 7 fold writes ARCHITECTURE.md through the same writer."""
+    specs, arch = _v6_tree_linking(tmp_path, "memory/ARCHITECTURE.md")
+
+    with pytest.raises(SymlinkRefusedError):
+        upgrade(specs, remove=sweep.deleter(specs))
+
+    assert arch.read_text(encoding="utf-8") == "# Architecture\n"
+
+
+def test_a_fold_whose_delete_does_not_succeed_restores_architecture_md(tmp_path: Path) -> None:
+    """doctor-reports-a-refused-removal-as-deleted: a TECHSTACK.md the deleter refuses (memory/
+    linked outside specs) or fails on is never reported folded and ARCHITECTURE.md is restored,
+    so a re-run never appends a second ``## Tech Stack``."""
+    specs, arch = _v6_tree_linking(tmp_path, "memory")
+
+    def boom(path: Path) -> bool:
+        raise OSError(13, "Permission denied")
+
+    assert upgrade(specs, remove=sweep.deleter(specs)).tech_stack_folded == []
+    assert upgrade(specs, remove=sweep.deleter(specs)).tech_stack_folded == []
+    with pytest.raises(OSError, match="Permission denied"):
+        fold_tech_stack(specs, boom)
 
     assert arch.read_text(encoding="utf-8") == "# Architecture\n"
 
