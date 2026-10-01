@@ -26,7 +26,7 @@ from dadaia_workspace.core.harness_registry import L1_ENTRY_HARNESSES
 from dadaia_workspace.features.capabilities import build_capabilities
 
 _PUBLIC = Path(__file__).resolve().parents[2] / "dadaia_workspace" / "public"
-_ENV = {"COLUMNS": "400", "NO_COLOR": "1", "TERM": "dumb"}
+_ENV = {"COLUMNS": "400", "NO_COLOR": "1", "TERM": "dumb", "FORCE_COLOR": None}
 
 
 def _tree() -> list[tuple[tuple[str, ...], Any]]:
