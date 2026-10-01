@@ -17,7 +17,7 @@ from typing import Any
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from _bugs_check import LEDGER, findings_for  # noqa: E402
-from _ledger import private_refusal, replace, stamp  # noqa: E402
+from _ledger import LineError, private_refusal, records, replace, stamp  # noqa: E402
 from _specs import script  # noqa: E402
 
 Records = list[dict[str, Any]]
@@ -34,26 +34,14 @@ class Refusal(Exception):
 def read_records(path: Path) -> Records:
     """Every record of *path*, in file order. A line that is not a JSON object refuses
     the read rather than being silently dropped from the rewrite that follows."""
-    if not path.is_file():
-        return []
-    out: Records = []
-    for number, line in enumerate(path.read_text(encoding="utf-8").split("\n"), start=1):
-        if not line.strip():
-            continue
-        try:
-            record = json.loads(line)
-        except json.JSONDecodeError as exc:
-            raise Refusal(
-                f"{path.name}:{number} is not valid JSON ({exc.msg}) — refusing to "
-                "rewrite a ledger this script cannot read in full",
-                f"sed -n '{number}p' {path}",
-            ) from exc
-        if not isinstance(record, dict):
-            raise Refusal(
-                f"{path.name}:{number} is not a JSON object", f"sed -n '{number}p' {path}"
-            )
-        out.append(record)
-    return out
+    try:
+        return records(path)
+    except LineError as exc:
+        raise Refusal(
+            f"{path.name}:{exc.number} {exc} — refusing to rewrite a ledger this script "
+            "cannot read in full",
+            f"sed -n '{exc.number}p' {path}",
+        ) from exc
 
 
 def serialize(records: Records) -> str:

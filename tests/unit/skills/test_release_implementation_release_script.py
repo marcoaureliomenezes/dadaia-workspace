@@ -117,11 +117,17 @@ def _tree_hash(root: Path) -> list[tuple[str, str]]:
 
 
 def test_new_writes_the_spec_stub_and_the_state_in_one_act(script: Path, tmp_path: Path) -> None:
+    """A U+2028 inside a bug record is text, not a line break (release-new-crashes-on-a-
+    unicode-line-separator-in-the-bug-ledger): the bugs: origin seeds the SPEC from it."""
     specs = _specs(tmp_path)
-    result = _run(script, "new", "0.6.0", "--specs", str(specs))
+    bug = {"id": "ls-probe", "title": "t\u2028x", "repro": "r"}
+    (specs / "bugs").mkdir()
+    (specs / "bugs/BUGS.jsonl").write_text(json.dumps(bug, ensure_ascii=False) + "\n", "utf-8")
+    result = _run(script, "new", "0.6.0", "--specs", str(specs), "--origin", "bugs:ls-probe")
     assert result.returncode == 0, result.stderr
     release_dir = specs / "releases" / "0.6.0"
-    assert "**Status:** Draft" in (release_dir / "rc-1/SPEC.md").read_text(encoding="utf-8")
+    spec_md = (release_dir / "rc-1/SPEC.md").read_text(encoding="utf-8")
+    assert "**Status:** Draft" in spec_md and "### FR1 — t\u2028x" in spec_md
     assert sorted(p.name for p in release_dir.iterdir()) == ["_RELEASE.json", "rc-1"]
     state = _read(release_dir / "_RELEASE.json")
     assert state["schema"] == "release-state-v1"

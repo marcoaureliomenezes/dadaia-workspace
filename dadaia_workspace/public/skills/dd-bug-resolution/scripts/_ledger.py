@@ -71,6 +71,33 @@ def validate(value: object, spec: dict[str, Any], root: dict[str, Any], where: s
                 yield from validate(child, properties[key], root, f"{where}.{key}")
 
 
+class LineError(ValueError):
+    """Line *number* of a JSONL ledger is not a JSON object."""
+
+    def __init__(self, number: int, message: str) -> None:
+        super().__init__(message)
+        self.number = number
+
+
+def records(path: Path) -> list[dict[str, Any]]:
+    """Every JSON object of the JSONL ledger *path*, in file order; absent reads empty.
+    Splits on ``\\n`` alone — ``splitlines()`` breaks a record holding U+2028."""
+    if not path.is_file():
+        return []
+    out: list[dict[str, Any]] = []
+    for number, line in enumerate(path.read_text(encoding="utf-8").split("\n"), start=1):
+        if not line.strip():
+            continue
+        try:
+            record = json.loads(line)
+        except json.JSONDecodeError as exc:
+            raise LineError(number, f"is not valid JSON ({exc.msg})") from exc
+        if not isinstance(record, dict):
+            raise LineError(number, "is not a JSON object")
+        out.append(record)
+    return out
+
+
 def finding(code: str, path: str, line: int, message: str) -> dict[str, Any]:
     return {"code": code, "verdict": "error", "path": path, "line": line, "message": message}
 
