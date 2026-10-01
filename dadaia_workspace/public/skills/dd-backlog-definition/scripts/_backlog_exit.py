@@ -29,13 +29,13 @@ def _picks(specs: Path, slug: str) -> list[str]:
     """Each release whose candidate SPEC (``rc-<N>/``, ADR 0150) carries *slug* in its
     Origin's `backlog:` clause — read by `release.py`'s one parser (ADR 0161)."""
     picks = []
-    for spec in sorted((specs / "releases").glob("*/rc-*/SPEC.md")):
+    for spec in (specs / "releases").glob("*/rc-*/SPEC.md"):
         try:
             if slug in origin(spec.read_text(encoding="utf-8")).get("backlog", []):
                 picks.append(spec.parents[1].name)
         except ValueError:
             continue  # a malformed Origin picks nothing; `release.py check` reports it
-    return picks
+    return sorted(set(picks), key=lambda v: [int(p) if p.isdigit() else -1 for p in v.split(".")])
 
 
 def check_exit(specs: Path, active: Items, slug: str, values: dict[str, Any]) -> dict[str, Any]:
@@ -57,18 +57,23 @@ def check_exit(specs: Path, active: Items, slug: str, values: dict[str, Any]) ->
         )
     required = REQUIRED_EVIDENCE[disposition]
     supplied = {"release": release, "reason": reason}[required]
+    picks = _picks(specs, slug) if required == "release" else []
+    # The latest picking release is the real value; with none, show the Origins there are.
+    fix = (f"{SCRIPT} exit {slug} --disposition {disposition} --release {picks[-1]}" if picks
+           else f"grep -n '^\\*\\*Origin:' {specs / 'releases'}/*/rc-*/SPEC.md")  # fmt: skip
     if not (supplied or "").strip():
-        example = "--release <release-id>" if required == "release" else "--reason '<why>'"
         raise Refusal(
             f"disposition {disposition!r} requires --{required}: the histo record is the "
             f"only surviving trace of why {slug!r} left active[]",
-            f"{SCRIPT} exit {slug} --disposition {disposition} {example}",
+            fix
+            if required == "release"
+            else f"{SCRIPT} exit {slug} --disposition {disposition} --reason '<why>'",
         )
-    if required == "release" and release not in (picks := _picks(specs, slug)):
+    if required == "release" and release not in picks:
         raise Refusal(
             f"no releases/{release}/rc-<N>/SPEC.md names {slug!r} in its first `**Origin:**` "
             f"line's backlog clause — only a release that picked an item can exit it as {disposition!r}",
-            f"{SCRIPT} exit {slug} --disposition {disposition} --release {picks[-1] if picks else '<release-id>'}",
+            fix,
         )
     return entry
 

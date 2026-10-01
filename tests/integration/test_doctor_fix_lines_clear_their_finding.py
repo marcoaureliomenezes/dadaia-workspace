@@ -450,6 +450,28 @@ def test_an_operator_action_names_the_file_to_change(code: str, repo: Path) -> N
         assert str(repo) in finding.fix and not re.search(r"<[^<>]+>", finding.fix)
 
 
+def test_an_untraced_origin_id_is_cleared_by_its_printed_fix(repo: Path) -> None:
+    """AC3.2 (review F4; SPEC-DOC-048's row re-homed): after the sweep, a carried entry with
+    no exit is an error on the real Origin line; its printed fix writes the pointer back."""
+    specs = repo / "specs"
+    _write(specs / "backlog/BACKLOG.json", json.dumps(
+        {"schema": "backlog-v1", "active": [_active_entry("carried", "c", "candidate")]}))  # fmt: skip
+    spec = specs / "releases" / _RELEASE / "rc-1" / "SPEC.md"
+    spec.write_text(spec.read_text("utf-8").replace("operator-demand", "backlog:carried"), "utf-8")
+    state = specs / "releases" / _RELEASE / "_RELEASE.json"
+    sweep = {"ts": "2026-01-01T00:00:00Z", "agent": "a", "kind": "dispositions", "text": "t"}
+    state.write_text(json.dumps({**json.loads(state.read_text("utf-8")), "log": [sweep]}))
+
+    def origin_errors() -> list[SectionFinding]:
+        found = _ledgers_section(None, specs, str(repo), None).findings
+        return [f for f in found if "Origin" in f.message and f.error]
+
+    [before] = origin_errors()
+    assert before.message.startswith(f"releases/{_RELEASE}/rc-1/SPEC.md:5 "), before.message
+    subprocess.run(["bash", "-c", before.fix], cwd=repo, check=True, capture_output=True)
+    assert origin_errors() == []
+
+
 def test_a_judgment_only_rule_never_makes_the_run_exit_1(repo: Path) -> None:
     """The exit-code half of the contract: every judgment-only rule fires at once and
     contributes NO error-class finding and NO fix line, so it stalls nobody

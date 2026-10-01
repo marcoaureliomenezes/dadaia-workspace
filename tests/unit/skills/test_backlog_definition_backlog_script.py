@@ -227,9 +227,27 @@ def test_delivered_outside_the_release_origin_is_refused(
         "--disposition", "delivered", "--release", release,
     )  # fmt: skip
     assert done.returncode == 1
-    assert len(_fix_lines(done)) == 1 and "rejected" not in _fix_lines(done)[0]
+    [fix] = _fix_lines(done)
+    assert "rejected" not in fix and "<" not in fix  # ADR 0158: no placeholder
     assert len(_active(specs)) == 1
     assert _histo(specs) == []
+
+
+def test_the_refusal_fix_names_the_latest_picking_release_by_version(
+    script: Path, tmp_path: Path
+) -> None:
+    """Review F8: 0.10.0 is later than 0.9.0, though it sorts before it as text."""
+    specs = _specs(tmp_path)
+    _run(script, "new", "an-idea", "--specs", str(specs))
+    for release in ("0.9.0", "0.10.0"):
+        (specs / f"releases/{release}/rc-1").mkdir(parents=True)
+        (specs / f"releases/{release}/rc-1/SPEC.md").write_text("**Origin:** backlog:an-idea\n")
+    done = _run(
+        script, "exit", "an-idea", "--specs", str(specs),
+        "--disposition", "delivered", "--release", "9.9.9",
+    )  # fmt: skip
+    [fix] = _fix_lines(done)
+    assert fix.split(" --specs ")[0].endswith("--disposition delivered --release 0.10.0")
 
 
 @pytest.mark.parametrize(

@@ -62,6 +62,12 @@ def origin(text: str) -> dict[str, list[str]]:
     return carried
 
 
+def origin_line(text: str) -> int:
+    """The 1-based line :func:`origin` reads, 1 when there is none."""
+    match = _ORIGIN_RE.search(text)
+    return text.count("\n", 0, match.start()) + 1 if match else 1
+
+
 def candidate_number(names: Iterable[str]) -> int:
     """The highest ``rc-<N>`` among *names*, 0 when none — the live candidate's number."""
     return max((int(m.group(1)) for n in names if (m := CANDIDATE_RE.match(n))), default=0)
