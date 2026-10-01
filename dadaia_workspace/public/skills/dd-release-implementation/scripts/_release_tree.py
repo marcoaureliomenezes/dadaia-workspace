@@ -26,6 +26,7 @@ from _release_schema import (  # noqa: E402
     HISTO,
     MARK_RE,
     SEMVER_RE,
+    SHA_RE,
     STATE,
     TRIO,
     TRIO_PHASES,
@@ -38,7 +39,7 @@ from _release_schema import (  # noqa: E402
 from _release_store import SCRIPT, Refusal, live_ids, live_release, window_start  # noqa: E402
 from _specs import quote, script, with_specs  # noqa: E402
 
-__all__ = ["check", "drift", "memory_errors", "tree_findings"]
+__all__ = ["check", "drift", "memory_errors", "ship_findings", "tree_findings"]
 
 _SKILLS = Path(__file__).resolve().parents[2]
 #: The verb writing a LIVE record's pointer back to the release (`{i}` the id, `{r}` it).
@@ -154,9 +155,25 @@ def _origin_findings(specs: Path) -> list[dict[str, Any]]:
     return out
 
 
+def _definition_findings(
+    state: dict[str, Any], tasks: Path, rel: str, specs: Path
+) -> list[dict[str, Any]]:
+    """DEFINITION implements nothing: a `[-]`/`[x]` marker, or a closure entry logged
+    after the live candidate's birth note, means the phase verb was never run."""
+    log = state["log"]
+    born = max((n for n, e in enumerate(log) if e["agent"] == "release.py new"), default=-1)
+    found = [f"closure entry kind {e['kind']!r} logged after the candidate's birth"
+             for e in log[born + 1:] if e["kind"] not in ("note", "milestone")]  # fmt: skip
+    text = tasks.read_text(encoding="utf-8") if tasks.is_file() else ""
+    found += [f"task {m[0].strip()[:80]!r} is marked past '[ ]' in phase DEFINITION"
+              for m in MARK_RE.finditer(text) if m[2] != " "]  # fmt: skip
+    fix = with_specs(f"{SCRIPT} phase IMPLEMENTATION --sha $(git rev-parse --short HEAD)", specs)
+    return [{**finding(rel, 1, message), "fix": fix} for message in found]
+
+
 def _directory_findings(release_dir: Path, specs: Path) -> list[dict[str, Any]]:
-    """One live directory: its state document, then its live candidate's trio in
-    IMPLEMENTATION/CLOSURE."""
+    """One live directory: its state document, its live candidate's `W:` sets, then the
+    trio in IMPLEMENTATION/CLOSURE or the untouched markers in DEFINITION."""
     dir_rel, path = release_dir.relative_to(specs).as_posix(), release_dir / STATE
     if not path.is_file():
         return [finding(dir_rel, 1, f"release directory carries no {STATE}")]
@@ -165,8 +182,10 @@ def _directory_findings(release_dir: Path, specs: Path) -> list[dict[str, Any]]:
         return findings
     state = json.loads(text)
     phase, candidate = state["phase"], candidate_dir(release_dir)
+    memory = _memory_tasks(candidate, dir_rel) if candidate else []
     if phase not in TRIO_PHASES:
-        return []
+        tasks = candidate / "TASKS.md" if candidate else release_dir / "TASKS.md"
+        return _definition_findings(state, tasks, f"{dir_rel}/{STATE}", specs) + memory
     missing = [n for n in TRIO if not (candidate and (candidate / n).is_file())]
     if candidate is None or missing:
         where = candidate.name if candidate else "rc-<N>"
@@ -174,13 +193,14 @@ def _directory_findings(release_dir: Path, specs: Path) -> list[dict[str, Any]]:
     plan = (candidate / "PLAN.md").read_text(encoding="utf-8")
     errors = plan_errors(plan, unfinished_tasks(candidate))
     plan_rel = f"{dir_rel}/{candidate.name}/PLAN.md"
-    return [finding(plan_rel, 1, e) for e in errors] + _memory_tasks(candidate, dir_rel)
+    return [finding(plan_rel, 1, e) for e in errors] + memory
 
 
 def _memory_tasks(candidate: Path, dir_rel: str) -> list[dict[str, Any]]:
     """A task whose `W:` writes `specs/memory`: memory is closure procedure, never a task."""
     tasks = candidate / "TASKS.md"
-    lines = [m[0].strip() for m in MARK_RE.finditer(tasks.read_text(encoding="utf-8"))]
+    text = tasks.read_text(encoding="utf-8") if tasks.is_file() else ""
+    lines = [m[0].strip() for m in MARK_RE.finditer(text)]
     fix = f"Operator action: drop the specs/memory path from that task's `W:` in {tasks}"
     return [{**finding(f"{dir_rel}/{candidate.name}/TASKS.md", 1, f"task {line[:80]!r} writes "
                        "specs/memory — memory is closure procedure (RC-FLOW step 5)"), "fix": fix}
@@ -274,6 +294,18 @@ def tree_findings(specs: Path) -> list[dict[str, Any]]:
                                 f"{STATE}: {', '.join(ids)} — exactly one is allowed"))  # fmt: skip
     if (specs / HISTO).is_file():
         findings += histo_findings((specs / HISTO).read_text(encoding="utf-8"))
+    for state in sorted(releases.glob(f"_archive/*/{STATE}")):
+        version = state.parent.name
+        shipped = json.loads(state.read_text(encoding="utf-8")).get("shipped") or {}
+        if (
+            SEMVER_RE.match(version)
+            and tuple(map(int, version.split("."))) >= (0, 5, 0)
+            and not (SHA_RE.match(str(shipped.get("sha"))) and isinstance(shipped.get("pr"), int))
+        ):  # ADR 0152 (1): `shipped` is the archived release's one sha/PR record (F059)
+            findings.append({**finding(state.relative_to(specs).as_posix(), 1,
+                             f"archived release {version} carries no shipped {{sha, pr}}"),
+                             "fix": f"Operator action: write the merged promote PR's sha and "
+                             f"number into shipped of {state.resolve()}"})  # fmt: skip
     return findings
 
 
@@ -281,3 +313,21 @@ def check(specs: Path) -> list[dict[str, Any]]:
     """The ONE release validator (the doctor delegates here): the tree, the live
     candidate's Origin, then the live CLOSURE's memory record."""
     return tree_findings(specs) + _origin_findings(specs) + _window_findings(specs)
+
+
+def ship_findings(specs: Path) -> list[dict[str, Any]]:
+    """What `ship` refuses on: `check`'s errors, a phase short of CLOSURE, an archive
+    already holding the id — `check` is the one readiness authority (AC3.4)."""
+    live = live_release(specs)
+    found = [f for f in check(specs) if f["verdict"] == "error"]
+    rel, phase = f"releases/{live.release_id}/{STATE}", live.state.get("phase")
+    if phase != "CLOSURE":
+        found.append({**finding(rel, 1, f"release {live.release_id} is in phase {phase!r} — "
+                      "only a CLOSURE release ships"),
+                      "fix": with_specs(f"{SCRIPT} phase CLOSURE --sha $(git rev-parse --short "
+                                        "HEAD)", specs)})  # fmt: skip
+    if (archive := specs / "releases" / "_archive" / live.release_id).exists():
+        found.append({**finding(rel, 1, f"{archive} already exists — a release is archived "
+                      "once"), "fix": f"Operator action: remove the live duplicate "
+                      f"{live.release_dir.resolve()} of the shipped release"})  # fmt: skip
+    return found

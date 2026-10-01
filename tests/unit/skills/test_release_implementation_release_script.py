@@ -219,6 +219,10 @@ def test_phase_closure_stamps_the_implemented_milestone(script: Path, tmp_path: 
     state = _read(specs / "releases" / "0.5.0" / "_RELEASE.json")
     assert state["phase"] == "CLOSURE"
     assert state["implemented"] == {"sha": "beef123", "ts": state["implemented"]["ts"]}
+    # AC3.14 (F061): the slot holds the live candidate's stamp; the log keeps every one.
+    assert state["log"][-1] == {"ts": ANY, "agent": "release.py", "kind": "milestone",
+                                "candidate": "rc-1", "milestone": "implemented",
+                                "sha": "beef123", "text": ANY}  # fmt: skip
 
 
 def test_phase_implementation_refuses_an_unapproved_trio(script: Path, tmp_path: Path) -> None:
@@ -311,6 +315,36 @@ def test_a_source_file_named_memory_is_not_a_memory_write_set(script: Path, tmp_
     assert "T-2" in result.stdout and "T-1" not in result.stdout, result.stdout
 
 
+@pytest.mark.parametrize(
+    ("tasks", "log", "needle"),
+    [
+        ("- [x] **T-1** done\n", [], "T-1"),
+        ("- [-] **T-1** reserved\n", [], "T-1"),
+        ("- [ ] **T-1** `W:` `specs/memory/x.md`\n", [], "specs/memory"),
+        (
+            "- [ ] **T-1** open\n",
+            [{"kind": "note", "text": "Candidate born"}, {"kind": "dispositions", "text": "swept"}],
+            "dispositions",
+        ),
+    ],
+)
+def test_check_judges_a_definition_release(
+    script: Path, tmp_path: Path, tasks: str, log: list[dict[str, str]], needle: str
+) -> None:
+    """AC3.4 (release-check-accepts-done-tasks-in-definition): a marker past `[ ]`, a `W:`
+    naming specs/memory (refused where it is born, memory-gate-requires-closure-phase-
+    that-spec-doc-024-forbids-before-last-task) or a closure entry after the candidate's
+    birth note is a finding under DEFINITION; an open, memory-free candidate is clean."""
+    specs = _specs(tmp_path)
+    entries = [{"ts": _TS, "agent": f"release.py {'new' if n == 0 else 'x'}", **e}
+               for n, e in enumerate(log)]  # fmt: skip
+    _release(specs, "0.5.0", tasks=tasks, log=entries)
+    result = _run(script, "check", "--specs", str(specs))
+    assert result.returncode == 1 and needle in result.stdout, result.stdout
+    _release(specs, "0.5.0", tasks="- [ ] **T-1** open\n", log=entries[:1])
+    assert _run(script, "check", "--specs", str(specs)).returncode == 0
+
+
 def test_check_reports_a_schema_violation_and_emits_json(script: Path, tmp_path: Path) -> None:
     specs = _specs(tmp_path)
     release_dir = _release(specs, "0.5.0")
@@ -376,8 +410,11 @@ def test_every_refusal_carries_one_fix_that_is_not_itself_refused(
     """sa-promote-has-no-verb#B25-7 and sa-promote-has-no-verb#B25-3: a refusal exits 1, writes nothing, prints
     one `fix:` — and that fix, run as printed in the same state, is not refused;
     ledger-fix-lines-drop-specs: under a spaced specs path too."""
-    specs = _specs(tmp_path / "a b")
-    _release(specs, "0.5.0", phase=phase, tasks="- [x] T-1 — done\n")
+    if phase == "CLOSURE":  # `ship` is CLOSURE's next verb: the closure is reconciled
+        specs = _reconciled_closure(tmp_path / "a b", script)
+    else:
+        specs = _specs(tmp_path / "a b")
+        _release(specs, "0.5.0", phase=phase, tasks="- [x] T-1 — done\n")
     before = _tree_hash(specs)
     result = _run(script, *argv, "--specs", str(specs))
     assert result.returncode == 1, result.stdout
@@ -391,33 +428,6 @@ def test_every_refusal_carries_one_fix_that_is_not_itself_refused(
     command = fixes[0].replace("$(git rev-parse --short HEAD)", "abc1234").replace("<n>", "7")
     done = subprocess.run(command, shell=True, capture_output=True, text=True, check=False)
     assert done.returncode == 0, (command, done.stderr)
-
-
-def test_ship_records_the_promote_and_new_births_the_next(script: Path, tmp_path: Path) -> None:
-    """sa-promote-has-no-verb#B25-1, sa-promote-has-no-verb#B25-2, sa-promote-has-no-verb#B25-4: new -> IMPLEMENTATION -> CLOSURE ->
-    ship -> new by verbs alone; the phases are exactly three; ADR 0152 (1): `ship` moves
-    the whole release folder to `_archive/<v>/`, never deletes it."""
-    specs = _specs(tmp_path)
-    _release(specs, "0.5.0", phase="IMPLEMENTATION")
-    assert (
-        _run(script, "phase", "CLOSURE", "--sha", "beef123", "--specs", str(specs)).returncode == 0
-    )
-    state = specs / "releases" / "0.5.0" / "_RELEASE.json"
-    result = _run(script, "ship", "--sha", "beef123", "--pr", "261", "--specs", str(specs))
-    assert result.returncode == 0, result.stderr
-    archived = specs / "releases/_archive/0.5.0"
-    assert not state.parent.exists() and (archived / "rc-1/TASKS.md").is_file()
-    assert _read(archived / "_RELEASE.json")["shipped"] == {"sha": "beef123", "pr": 261, "ts": ANY}
-    records = [
-        json.loads(x)
-        for x in (specs / "releases/_archive/releases_histo.jsonl").read_text("utf-8").splitlines()
-    ]
-    assert [(r["id"], r["disposition"]) for r in records] == [("0.5.0", "delivered")]
-    assert "beef123" in records[0]["summary"] and "#261" in records[0]["summary"]
-    assert _run(script, "new", "0.5.1", "--specs", str(specs)).returncode == 0
-    assert _run(script, "check", "--specs", str(specs)).returncode == 0
-    schema = json.loads(_SCHEMAS[0].read_text("utf-8"))
-    assert schema["properties"]["phase"]["enum"] == ["DEFINITION", "IMPLEMENTATION", "CLOSURE"]
 
 
 # ── memory ────────────────────────────────────────────────────────────────────
@@ -457,6 +467,16 @@ def _memory_repo(tmp_path: Path, script: Path) -> tuple[Path, Path, str]:
     _git(root, "add", "-A")
     _git(root, "commit", "-qm", "code moved")
     return root, specs, base
+
+
+def _reconciled_closure(tmp_path: Path, script: Path) -> Path:
+    """`_memory_repo` with its one atom rewritten and the `memory` entry recorded: ready."""
+    root, specs, _ = _memory_repo(tmp_path, script)
+    atom = specs / "memory" / "product" / "platform" / "alpha.md"
+    atom.write_text(_ATOM.format("alpha") + "rewritten\n", encoding="utf-8")
+    _git(root, "commit", "-qam", "atom reconciled")
+    assert _memory(script, root, specs, changed="alpha").returncode == 0
+    return specs
 
 
 def _memory(script: Path, root: Path, specs: Path, **lists: str):
@@ -593,3 +613,46 @@ def test_check_refuses_code_that_moved_after_the_entry(script: Path, tmp_path: P
 
     assert result.returncode == 1
     assert "'alpha'" in result.stdout and until[:12] in result.stdout
+
+
+# ── ship ──────────────────────────────────────────────────────────────────────
+
+
+def test_ship_refuses_what_check_refuses_and_touches_nothing(script: Path, tmp_path: Path) -> None:
+    """AC3.4, the bug's repro (release-ship-accepts-what-release-check-refuses): a CLOSURE
+    with no memory entry — `ship` exits 1 with `check`'s message and fix, nothing written."""
+    specs = _specs(tmp_path)
+    _release(specs, "0.5.0", phase="CLOSURE")
+    before = _tree_hash(specs)
+    checked = json.loads(_run(script, "check", "--json", "--specs", str(specs)).stdout)[0]
+    result = _run(script, "ship", "--sha", "beef123", "--pr", "261", "--specs", str(specs))
+    assert result.returncode == 1
+    assert checked["message"] in result.stderr and f"fix: {checked['fix']}" in result.stderr
+    assert _tree_hash(specs) == before
+
+
+def test_ship_records_the_promote_and_new_births_the_next(script: Path, tmp_path: Path) -> None:
+    """sa-promote-has-no-verb#B25-1, #B25-2, #B25-4: a reconciled CLOSURE ships by verb;
+    ADR 0152 (1): the folder moves to
+    `_archive/<v>/`; AC3.14 (F059): `shipped` is the one sha/PR field, `check` verifies
+    it from 0.5.0 on, the histo `summary` null."""
+    specs = _reconciled_closure(tmp_path, script)
+    result = _run(script, "ship", "--sha", "beef123", "--pr", "261", "--specs", str(specs))
+    assert result.returncode == 0, result.stderr
+    archived = specs / "releases/_archive/0.5.0"
+    assert not (specs / "releases/0.5.0").exists() and (archived / "rc-1/TASKS.md").is_file()
+    assert _read(archived / "_RELEASE.json")["shipped"] == {"sha": "beef123", "pr": 261, "ts": ANY}
+    records = [
+        json.loads(x)
+        for x in (specs / "releases/_archive/releases_histo.jsonl").read_text("utf-8").splitlines()
+    ]
+    assert [(r["id"], r["disposition"], r["summary"]) for r in records] == [
+        ("0.5.0", "delivered", None)
+    ]
+    assert _run(script, "new", "0.5.1", "--specs", str(specs)).returncode == 0
+    assert _run(script, "check", "--specs", str(specs)).returncode == 0
+    state = _read(archived / "_RELEASE.json")
+    (archived / "_RELEASE.json").write_text(json.dumps({**state, "shipped": None}), "utf-8")
+    assert "0.5.0" in _run(script, "check", "--specs", str(specs)).stdout
+    schema = json.loads(_SCHEMAS[0].read_text("utf-8"))
+    assert schema["properties"]["phase"]["enum"] == ["DEFINITION", "IMPLEMENTATION", "CLOSURE"]

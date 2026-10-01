@@ -28,12 +28,6 @@ from _release_store import SCRIPT, Live, Refusal, State, commit, live_release  #
 PREDECESSOR = {"IMPLEMENTATION": "DEFINITION", "CLOSURE": "IMPLEMENTATION"}
 
 
-def note(state: State, ts: str, text: str) -> None:
-    state.setdefault("log", []).append(
-        {"ts": ts, "agent": "release.py", "kind": "note", "text": text}
-    )
-
-
 def _refuse_unapproved_trio(live: Live) -> Path:
     """A candidate enters IMPLEMENTATION only with all three documents `Approved`; returns
     the candidate folder that holds them (no folder yet: `rc-1/` is where they belong)."""
@@ -117,13 +111,16 @@ def set_phase(specs: Path, phase: str, sha: str) -> tuple[str, str]:
     else:
         _refuse_open_worktrees(specs.resolve())
 
+    milestone = "defined" if phase == "IMPLEMENTATION" else "implemented"
+    rc = (live.candidate or live.release_dir / "rc-1").name
+
     def apply(state: State) -> State:
-        if phase == "IMPLEMENTATION":
-            state["defined"] = {"sha": sha, "ts": ts}
-            note(state, ts, f"Candidate defined at {sha}; phase IMPLEMENTATION.")
-        else:
-            state["implemented"] = {"sha": sha, "ts": ts}
-            note(state, ts, f"Candidate implemented at {sha}; phase CLOSURE.")
+        # The slot is the live candidate's stamp; the `milestone` entry is its history (F061).
+        state[milestone] = {"sha": sha, "ts": ts}
+        state.setdefault("log", []).append({
+            "ts": ts, "agent": "release.py", "kind": "milestone", "candidate": rc,
+            "milestone": milestone, "sha": sha,
+            "text": f"Candidate {rc} {milestone} at {sha}; phase {phase}."})  # fmt: skip
         state["phase"] = phase
         return state
 

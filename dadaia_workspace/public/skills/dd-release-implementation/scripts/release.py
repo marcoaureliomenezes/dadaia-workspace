@@ -22,7 +22,7 @@ from _release_new import new_release  # noqa: E402
 from _release_phase import set_phase  # noqa: E402
 from _release_schema import CODE, HISTO, SHA_RE, STATE, utc_now  # noqa: E402
 from _release_store import SCRIPT, Refusal, commit, live_release, window_start  # noqa: E402
-from _release_tree import check, drift, memory_errors  # noqa: E402
+from _release_tree import check, drift, memory_errors, ship_findings  # noqa: E402
 from _specs import find_specs, refuse  # noqa: E402
 
 _HELP = {
@@ -102,27 +102,25 @@ def _memory(args: argparse.Namespace, specs: Path) -> int:
 
 def _ship(args: argparse.Namespace, specs: Path) -> int:
     """CLOSURE -> shipped {sha, pr, ts}, one `delivered` histo line, the whole directory
-    moved to `_archive/<v>/`, never deleted (ADR 0152 (1))."""
-    live, ts, fix = live_release(specs), utc_now(), f"{SCRIPT} check"
+    moved to `_archive/<v>/`, never deleted (ADR 0152 (1)); refused on any `ship_findings`."""
+    live, ts = live_release(specs), utc_now()
     if not (SHA_RE.match(args.sha) and args.pr.isdigit() and int(args.pr) > 0):
         raise Refusal(f"--sha {args.sha!r} / --pr {args.pr!r}: a hex sha and a PR number",
                       f"{SCRIPT} ship --sha $(git rev-parse --short HEAD) --pr <n>")  # fmt: skip
-    if live.state.get("phase") != "CLOSURE":
-        raise Refusal(f"release {live.release_id} is in phase {live.state.get('phase')!r} — "
-                      "only a CLOSURE release ships", fix)  # fmt: skip
-    if (archive := specs / "releases" / "_archive" / live.release_id).exists():
-        raise Refusal(f"{archive} already exists — a shipped release is archived once", fix)
+    if found := ship_findings(specs):
+        raise Refusal(found[0]["message"], found[0].get("fix") or f"{SCRIPT} check")
     line = json.dumps({"id": live.release_id, "ts": ts, "disposition": "delivered",
                        "release": live.release_id, "reason": None, "entry": None,
-                       "summary": f"shipped {args.sha} PR #{args.pr}"}) + "\n"  # fmt: skip
+                       "summary": None}) + "\n"  # fmt: skip
     histo = specs / HISTO
     if errors := histo_findings((histo.read_text("utf-8") if histo.is_file() else "") + line):
-        raise Refusal(f"the ship ledger would not pass check: {errors[-1]['message']}", fix)
+        raise Refusal(f"the ship ledger would not pass check: {errors[-1]['message']}",
+                      f"{SCRIPT} check")  # fmt: skip
     commit(live.release_dir / STATE, f"releases/{live.release_id}/{STATE}",
            lambda s: {**s, "shipped": {"sha": args.sha, "pr": int(args.pr), "ts": ts}})  # fmt: skip
     with histo.open("a", encoding="utf-8") as ledger:
         ledger.write(line)
-    live.release_dir.rename(archive)
+    live.release_dir.rename(specs / "releases" / "_archive" / live.release_id)
     print(f"[ok] release {live.release_id} shipped at {args.sha} (PR #{args.pr})")
     return 0
 

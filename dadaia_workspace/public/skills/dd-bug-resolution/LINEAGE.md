@@ -7,8 +7,9 @@ The audit's pillar 1 cites this section, never restates it — if the two disagr
 
 - The window runs from the newest archived audit to `HEAD`.
 - Read `specs/audits/_archive/audits_histo.jsonl` — an audit is not a release milestone.
-- Archived facts live in `releases/_archive/releases_histo.jsonl` (no per-release `_RELEASE.json` survives archiving).
+- A shipped release survives whole under `releases/_archive/<v>/` (ADR 0152 (1)); its `_RELEASE.json` `shipped` holds the sha and PR.
 - The window is `[newest archived audit's sha, HEAD]`; the whole file when that histo is empty.
+- An audit record missing its sha: recover it with `git log -S <audit-id> -- specs/audits`.
 
 ## The filter
 

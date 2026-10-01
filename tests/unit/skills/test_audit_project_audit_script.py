@@ -121,6 +121,8 @@ def test_disposition_then_close_appends_the_histo_and_removes_the_directory(
         )  # fmt: skip
         assert done.returncode == 0, done.stderr
 
+    # AC3.15 (F052): a histo record without its window-end sha is unrecordable.
+    assert _run(script, "close", _AUDIT, "--specs", str(specs)).returncode == 2
     result = _run(script, "close", _AUDIT, "--sha", "abc1234", "--specs", str(specs))
 
     assert result.returncode == 0, result.stderr
@@ -190,6 +192,8 @@ def test_close_without_a_resolved_finding_never_records_resolved(
         "".join(json.dumps(r) + "\n" for r in records), encoding="utf-8"
     )
 
+    # AC3.15 (F052): a histo record without its window-end sha is unrecordable.
+    assert _run(script, "close", _AUDIT, "--specs", str(specs)).returncode == 2
     result = _run(script, "close", _AUDIT, "--sha", "abc1234", "--specs", str(specs))
 
     assert result.returncode == 0, result.stderr
