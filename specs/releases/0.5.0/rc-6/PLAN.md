@@ -1,6 +1,6 @@
 # PLAN — Release: 0.5.0
 
-**Status:** Draft
+**Status:** Approved
 **Release ID:** 0.5.0
 **Owner:** dd-software-engineer
 
@@ -67,7 +67,7 @@ Bug-history lessons (audit of the fix chain):
 
 ### 2.2 Four judged places (AC2.1)
 - `verdict(rel, is_dir, globs, repos, worktrees)`: the slug sets are required arguments, no default — every caller passes them, so no implicit empty set exists. Depth 1 under `repos/` allows every repo slug (main + associated) of every registered context, DEAD included (INV-5 owns a DEAD one's checkout); depth 1 under `worktrees/` every repo slug (main + associated) of every ALIVE context, plus `AGENTS.md`; depth 2 under `worktrees/<r>/` any name; inside a harness directory nothing is judged (ADR 0059, already true — pinned by a row). The sets enter the same `fnmatch` over `allowed` (`workspace_layout.py:225`) — no new branch.
-- One reader: `core/invocation.py`'s registry read (`_registry_contexts`, `:93-102`) is split into one public core function `registered_slugs(ws) -> (repos, worktrees)`; on a parse/OS failure it returns `({"*"}, {"*"})`, so nothing under `repos/` or `worktrees/` is judged. `_registry_contexts` keeps its `[]` for its five existing callers.
+- One reader: `core/invocation.py`'s registry read (`_registry_contexts`, `:93-102`) is split into one public core function `registered_slugs(ws) -> (repos, worktrees)`; on a parse/OS failure it returns `({"*"}, {"*"})`, so nothing under `repos/` or `worktrees/` is judged. `_registry_contexts` keeps its `[]` for its five existing callers. One private helper turns a registry entry into its slugs (main + associated); `registered_slugs`, `_owning_entry` (`:144-156`) and `all_repos` (`:193-207`) all use it, so the slug pull lives once (review N2).
 - `doctor`: one walk over the four places replaces `_scan_root` + `_scan_dadaia_top`; its slug sets come from that core function (features → core). `_contexts()` (`doctor.py:316-325`) is unchanged and keeps `[]` for INV-5 and `_alive_repo_tops`. Root gate: the same function.
 - Risk (open bug `corrupt-context-registry-crashes-doctor-and-next-step`): an empty set from an unreadable registry would make `doctor --fix` hold every `repos/<r>` and the root gate block every write under `repos/` and `worktrees/` — a Stall. `{"*"}` closes it. rc-7 T-050-139 (REG-SCHEMA) unifies the registry reading onto one reader — this function and `JsonContextStore` become one, not two — and keeps the allow-all answer on an unreadable registry, the REG-SCHEMA finding reporting it.
 - Risk: an unregistered clone under `repos/` becomes slop and `doctor --fix` holds it (7 days, reversible).
