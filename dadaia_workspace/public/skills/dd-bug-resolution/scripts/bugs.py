@@ -135,10 +135,7 @@ def _write(args: argparse.Namespace, specs: Path) -> int:
         print(f"[ok] updated {', '.join(sorted(changes))} for {args.bug_id}")
         return 0
     values = _values(args, _OPTIONS[args.verb])
-    known = {str(r["id"]) for r in read_records(ledger)}
-    commit(
-        ledger, lambda rs: tr.transition(rs, args.bug_id, args.verb, values, known, specs.parent)
-    )
+    commit(ledger, lambda rs: tr.transition(rs, args.bug_id, args.verb, values, specs.parent))
     print(f"[ok] {tr.STATUS_BY_VERB[args.verb]} {args.bug_id}")
     return 0
 

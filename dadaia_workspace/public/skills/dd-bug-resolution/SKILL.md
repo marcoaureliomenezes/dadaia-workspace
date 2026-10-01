@@ -23,7 +23,7 @@ compatibility: Standalone Agent Skill. Inside a dadaia-workspace (pip install da
 
 **Phase 0 — Lineage.** Read the bug ledger for prior fixes to the same
 `surface`/`component` in the bounded window ([`LINEAGE.md`](LINEAGE.md)); ≥ 2 prior fixes on the unit
-make this fix a REBUILD of it (LINEAGE.md); carry the link to Phase 6 (`resolve --caused-by`, its one writer);
+make this fix a REBUILD of it (LINEAGE.md); carry the link to Phase 6 (`resolve --caused-by`; `update` repairs);
 echo the `caused_by:`/`evidence:`/`prior diffs read:`/`rebuild:` block in the fix commit body.
 *Done when prior diffs were actually read and the link and the rebuild decision (`rebuild` or `none`) are decided.*
 
@@ -70,7 +70,7 @@ python3 .agents/skills/dd-bug-resolution/scripts/bugs.py resolve <bug-id> --caus
 ```
 
 - The direction is `--evidence-diff`'s `net-*:` prefix; `--evidence-seam` must name an existing file and `def`.
-- `--caused-by` is validated against the ledger or the literal `none`; an unknown id exits 1.
+- `caused_by` names a live or archived record, or `none`, never a loop; writes refuse else.
 - Stage code + regression test + the `BUGS.jsonl` line together, the red loop quoted in the
   body — ONE commit, shape 3 of `dd-gitflow-default` §3a.
 

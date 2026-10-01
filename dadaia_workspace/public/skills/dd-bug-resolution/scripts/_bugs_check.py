@@ -44,12 +44,16 @@ def invariant_errors(record: dict[str, Any]) -> Iterator[str]:
         yield f"record {record['id']!r} closed_at={closed_at!r} precedes its filing date ts={ts!r}"
 
 
-def findings_for(text: str, rel: str = LEDGER) -> list[dict[str, Any]]:
+def findings_for(
+    text: str, rel: str = LEDGER, archived: frozenset[str] = frozenset()
+) -> list[dict[str, Any]]:
     """Every finding the ledger *text* carries — the ONE validation path, run both by
-    ``check`` over the committed file and by every write over its own candidate bytes."""
+    ``check`` over the committed file and by every write over its own candidate bytes.
+    Lineage (AC3.8): a `caused_by` names a record of *text* or *archived*, and never loops."""
     schema = load_schema()
     findings: list[dict[str, Any]] = []
     seen: dict[str, int] = {}
+    links: dict[str, object] = {}
 
     def add(line: int, message: str) -> None:
         findings.append(
@@ -74,6 +78,16 @@ def findings_for(text: str, rel: str = LEDGER) -> list[dict[str, Any]]:
         first = seen.setdefault(record["id"], number)
         if first != number:
             add(number, f"duplicate record id {record['id']!r} (first appended at line {first})")
+        links.setdefault(record["id"], record["caused_by"])
+    known = {None, "none", *links, *archived}
+    for bug_id, target in links.items():
+        chain, at = [bug_id], target
+        while at in links and at not in chain:
+            chain.append(str(at))
+            at = links[str(at)]
+        if target not in known or at == bug_id:
+            why = f"forms a cycle: {' -> '.join(chain)}" if at == bug_id else "names no record"
+            add(seen[bug_id], f"{bug_id!r} caused_by {why}")
     return findings
 
 
@@ -99,9 +113,23 @@ def histo_findings(text: str) -> list[dict[str, Any]]:
     return out
 
 
+def archived_ids(text: str) -> frozenset[str]:
+    """The record ids of the archive *text*; an unreadable line is `histo_findings`' to name."""
+    out = set()
+    for raw in text.split("\n"):
+        try:
+            record = json.loads(raw) if raw.strip() else None
+        except json.JSONDecodeError:
+            continue
+        if isinstance(record, dict) and "id" in record:
+            out.add(str(record["id"]))
+    return frozenset(out)
+
+
 def check(specs: Path) -> list[dict[str, Any]]:
     """Validate the committed ledger and its archive; a young specs tree with neither is
-    not a finding."""
+    not a finding. A union merge can join two valid writes into a cycle: check re-judges."""
     ledger, histo = specs / LEDGER, specs / HISTO
-    out = findings_for(ledger.read_text(encoding="utf-8")) if ledger.is_file() else []
-    return out + (histo_findings(histo.read_text(encoding="utf-8")) if histo.is_file() else [])
+    text = ledger.read_text(encoding="utf-8") if ledger.is_file() else ""
+    archived = histo.read_text(encoding="utf-8") if histo.is_file() else ""
+    return findings_for(text, archived=archived_ids(archived)) + histo_findings(archived)

@@ -39,7 +39,7 @@ def _seam_exists(seam: str, root: Path) -> bool:
 
 
 def transition(records: Records, bug_id: str, verb: str, values: dict[str, Any],
-               known_ids: set[str], root: Path) -> Records:  # fmt: skip
+               root: Path) -> Records:  # fmt: skip
     """The ONE way a record reaches a terminal status. Every field the verb requires is
     checked first and every problem named at once; the record is untouched on refusal.
     A resolve's seam is read under *root*, the repo the ledger belongs to."""
@@ -58,11 +58,6 @@ def transition(records: Records, bug_id: str, verb: str, values: dict[str, Any],
                 "'evidence_diff' must match '^(net-negative|net-positive|net-neutral): "
                 "<rationale>'",
                 f"{_SCRIPT} resolve {bug_id} --evidence-diff 'net-negative: <why>'",
-            )
-        if values["caused_by"] != "none" and values["caused_by"] not in known_ids:
-            raise Refusal(
-                f"caused_by {values['caused_by']!r} is not a record of this bug ledger",
-                f"{_SCRIPT} resolve {bug_id} --caused-by none",
             )
         if not _seam_exists(values["evidence_seam"], root):
             raise Refusal(

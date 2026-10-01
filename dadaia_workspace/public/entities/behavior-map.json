@@ -273,8 +273,8 @@
       "scoped_agents_md": [],
       "hash_tuple": {
         "section": "sha256:2e1085fbf82116cafcf8fd7226e28f50606442dd4df32ead26e19320b106ec88",
-        "skill": "sha256:67797a575c1a77fdc5f7cdb78ab214581a8597d7d647b676deed3f79cdc6fbea",
-        "scripts": "sha256:9e46fb8bc2faf37f9e7cc4e68546ed623de259e813e894bda6c8c8518b057b4f",
+        "skill": "sha256:7b7a428134c557d3a3d47a90df2688da671fff0cb33ba66087dba47b30dc9281",
+        "scripts": "sha256:2ec3bb0961e8e31986c26a7a4645ce7ecc08bbcbb2552a07c7dff29dbeb9af4f",
         "scoped": []
       },
       "recorded_by": "dd-software-engineer",

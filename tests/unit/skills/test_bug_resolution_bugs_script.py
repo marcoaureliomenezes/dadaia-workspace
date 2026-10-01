@@ -138,6 +138,34 @@ def test_duplicate_ids_are_refused(script: Path, tmp_path: Path) -> None:
     assert "duplicate" in done.stdout
 
 
+@pytest.mark.parametrize(
+    ("links", "needle"),
+    [
+        ({"a-bug": "b-bug", "b-bug": "a-bug"}, "cycle"),
+        ({"a-bug": "never-filed"}, "names no record"),
+    ],
+)
+def test_check_refuses_a_caused_by_cycle_or_dangling_target(
+    script: Path, tmp_path: Path, links: dict[str, str], needle: str
+) -> None:
+    """AC3.8 (F012): lineage is acyclic and every target is a record, the archive's included."""
+    records = [{**_OPEN_RECORD, "id": i, "caused_by": links.get(i)} for i in ("a-bug", "b-bug")]
+    specs = _ledger(tmp_path, *records)
+    done = _run(script, "check", "--specs", str(specs))
+    assert done.returncode == 1
+    assert needle in done.stdout, done.stdout
+    _archive(specs, "never-filed")
+    done = _run(script, "check", "--specs", str(specs))
+    assert done.returncode == (1 if needle == "cycle" else 0), done.stdout
+
+
+def _archive(specs: Path, bug_id: str) -> None:
+    archived = {**_OPEN_RECORD, "id": bug_id, "status": "rejected", "cause": "c",
+                "closed_at": "2026-09-21T00:00:00Z"}  # fmt: skip
+    (specs / "bugs" / "_archive").mkdir()
+    (specs / "bugs" / "_archive" / "bugs_histo.jsonl").write_text(json.dumps(archived) + "\n")
+
+
 def test_json_output_carries_one_object_per_finding(script: Path, tmp_path: Path) -> None:
     broken = {k: v for k, v in _OPEN_RECORD.items() if k != "symptom"}
     done = _run(script, "check", "--specs", str(_ledger(tmp_path, broken)), "--json")
@@ -150,6 +178,20 @@ def test_json_output_carries_one_object_per_finding(script: Path, tmp_path: Path
 
 
 @pytest.mark.skipif(sys.platform == "win32", reason="the fake workspace CLI is a shebang script")
+@pytest.mark.parametrize("bad", ["[1, 2]", "{not json"])
+def test_a_write_over_an_unreadable_line_refuses_naming_it(
+    script: Path, tmp_path: Path, bad: str
+) -> None:
+    """The store refuses to rewrite a ledger it cannot read in full, naming the line."""
+    specs = _ledger(tmp_path, _OPEN_RECORD)
+    ledger = specs / "bugs" / "BUGS.jsonl"
+    ledger.write_text(ledger.read_text(encoding="utf-8") + bad + "\n", encoding="utf-8")
+    done = _run(script, "update", "a-bug", "--set", "audited=x", "--specs", str(specs))
+    assert done.returncode == 1
+    assert "BUGS.jsonl:2" in done.stderr and "cannot read in full" in done.stderr
+    assert f"sed -n '2p' {ledger}" in done.stderr
+
+
 def test_a_missing_specs_tree_is_refused_never_created(script: Path, tmp_path: Path) -> None:
     """bug-law-spelling-registers-into-a-reaped-root-specs-tree: the fix names the bound tree."""
     (cli := tmp_path / ".dadaia/.venv/bin/dadaia").parent.mkdir(parents=True)
@@ -413,15 +455,38 @@ def test_resolve_closes_the_record_and_stores_one_direction(script: Path, tmp_pa
     assert _run(script, "check", "--specs", str(specs)).returncode == 0
 
 
-def test_resolve_refuses_an_unknown_caused_by(script: Path, tmp_path: Path) -> None:
-    specs = _ledger(tmp_path, _OPEN_RECORD)
-    done = _run(script, *_resolve_argv(caused_by="never-filed"), "--specs", str(specs))
+@pytest.mark.parametrize(
+    "argv",
+    [
+        ["update", "a-bug", "--set", "caused_by=never-filed"],
+        ["update", "a-bug", "--set", "caused_by="],
+        ["update", "a-bug", "--set", "caused_by=b-bug"],  # b-bug -> a-bug: a cycle
+        _resolve_argv(caused_by="never-filed"),
+    ],
+)
+def test_a_write_refuses_the_lineage_check_refuses(
+    script: Path, tmp_path: Path, argv: list[str]
+) -> None:
+    """AC3.8, one judge: every write runs the lineage rule `check` runs, before writing."""
+    other = {**_OPEN_RECORD, "id": "b-bug", "caused_by": "a-bug"}
+    specs = _ledger(tmp_path, _OPEN_RECORD, other)
+    before = (specs / "bugs" / "BUGS.jsonl").read_bytes()
+    done = _run(script, *argv, "--specs", str(specs))
     assert done.returncode == 1
-    assert "not a record of this bug ledger" in done.stderr
+    assert "caused_by" in done.stderr
     # ledger-fix-lines-drop-specs: the fix runs as printed, from any cwd
-    fix = f"fix: {sys.executable} {script} resolve a-bug --caused-by none --specs {specs.resolve()}"
+    fix = f"fix: {sys.executable} {script} check --specs {specs.resolve()}"
     assert fix.replace("\\", "/") in done.stderr.replace("\\", "/")
-    assert _records(specs)[0]["status"] == "open"
+    assert (specs / "bugs" / "BUGS.jsonl").read_bytes() == before
+
+
+def test_resolve_accepts_an_archived_caused_by(script: Path, tmp_path: Path) -> None:
+    """An archived record is a record: `resolve` and `check` agree on it."""
+    specs = _ledger(tmp_path, _OPEN_RECORD)
+    _archive(specs, "old-bug")
+    done = _run(script, *_resolve_argv(caused_by="old-bug"), "--specs", str(specs))
+    assert done.returncode == 0, done.stderr
+    assert _records(specs)[0]["caused_by"] == "old-bug"
 
 
 @pytest.mark.parametrize("seam", ["cli/gone.py::y", "cli/x.py::gone", "cli/x.py::y_more"])

@@ -16,8 +16,9 @@ from typing import Any
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from _bugs_check import LEDGER, findings_for  # noqa: E402
-from _ledger import LineError, private_refusal, records, replace, stamp  # noqa: E402
+import _ledger  # noqa: E402
+from _bugs_check import HISTO, LEDGER, archived_ids, findings_for  # noqa: E402
+from _ledger import LineError, private_refusal, replace, stamp  # noqa: E402
 from _specs import script  # noqa: E402
 
 Records = list[dict[str, Any]]
@@ -35,7 +36,7 @@ def read_records(path: Path) -> Records:
     """Every record of *path*, in file order. A line that is not a JSON object refuses
     the read rather than being silently dropped from the rewrite that follows."""
     try:
-        return records(path)
+        return _ledger.records(path)
     except LineError as exc:
         raise Refusal(
             f"{path.name}:{exc.number} {exc} — refusing to rewrite a ledger this script "
@@ -48,13 +49,15 @@ def serialize(records: Records) -> str:
     return "".join(json.dumps(r, sort_keys=True, ensure_ascii=False) + "\n" for r in records)
 
 
-def _validated(records: Records, rel: str, before: Records) -> str:
+def _validated(records: Records, rel: str, before: Records, histo: Path) -> str:
     for record in records:
         why = None if record in before else private_refusal(record)
         if why is not None:
             raise Refusal(*why)
     text = serialize(records)
-    findings = findings_for(text, rel)
+    archive = histo.read_text(encoding="utf-8") if histo.is_file() else ""
+    moved = frozenset(str(r.get("id")) for r in before)  # an archived record stays known
+    findings = findings_for(text, rel, archived_ids(archive) | moved)
     if findings:
         detail = "; ".join(f"line {f['line']}: {f['message']}" for f in findings[:5])
         raise Refusal(
@@ -74,15 +77,16 @@ def commit(
     files byte-identical. When the file changed under the computation, the change is
     re-read and re-applied ONCE; a second concurrent write refuses with a retry `fix:`.
     """
+    histo = path.parents[1] / HISTO
     before = stamp(path)
     records = read_records(path)
     written = apply(records)
-    text = _validated(written, rel, records)
+    text = _validated(written, rel, records, histo)
     if stamp(path) != before:
         before = stamp(path)
         records = read_records(path)
         written = apply(records)
-        text = _validated(written, rel, records)
+        text = _validated(written, rel, records, histo)
         if stamp(path) != before:
             raise Refusal(
                 f"{path.name} changed twice under this write — nothing was written",
