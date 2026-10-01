@@ -106,7 +106,7 @@ Ground yourself first with `dd-spec-navigator` (Phase 2, memory bootstrap), then
 - Severity badges: CRITICAL / HIGH / MEDIUM / LOW / INFO.
 - Record every finding in `## Findings` in full — only actionable items (LOW+ severity, concrete fix surface) reach the main thread's intake.
 - `APPROVED` requires zero blocking architecture/correctness/test/maintainability/regression findings, citing evidence paths and the commit reviewed.
-- `REJECTED` blocks `[x]`, push, PR, merge, deploy, release closure, and memory updates until rework is complete.
+- `REJECTED` blocks the worktree merge (it needs `APPROVED` on the sha), push, PR, deploy, release closure, and memory updates until rework is complete.
 - The main thread emits the handoff from your returned text (the root `AGENTS.md` map §4).
 
 ## 5. References

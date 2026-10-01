@@ -19,7 +19,7 @@ Also input: `.dadaia/.venv/bin/dadaia doctor` against every release the window t
 .dadaia/.venv/bin/dadaia doctor --context <ctx> --json
 ```
 
-1. `--json` gives the structured sections, findings and `compliance(...)` scores.
+1. `--json` gives the structured sections and findings.
 2. Each finding reads `<CODE> <verdict> <message>`; the message carries its own remediation.
 3. Every non-zero-severity issue inside the window becomes a `FINDINGS-FORMAT.md` record with `pillar: "specs"`.
 4. Record a WARN that `--fix` can repair mechanically as a finding too — this pillar measures, it never fixes.

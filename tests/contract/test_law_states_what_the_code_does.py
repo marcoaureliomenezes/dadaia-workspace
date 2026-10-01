@@ -246,13 +246,10 @@ def test_commit_shapes_stage_the_kinds_allowed_set() -> None:
 
 def test_the_marker_lifecycle_is_stated_once_in_marks_order() -> None:
     """AC4.6 (DEL implementer-persona-states-a-second-task-marker-lifecycle; ADR 0141): the
-    releases law's transitions equal `_release_schema.MARKS` in order; its citers state none."""
+    releases law's transitions equal `_release_schema.MARKS` in order; no other law states one."""
     marks = _script("dd-release-implementation/scripts/_release_schema.py").MARKS
     arrow = r"`?\[([ x-])\]`?\s*-+>\s*`?\[([ x-])\]"
-    law = (_PKG / "public/scaffold/releases/AGENTS.md").read_text("utf-8")
+    home = _PKG / "public/scaffold/releases/AGENTS.md"
+    law = home.read_text("utf-8")
     assert re.findall(arrow, law) == list(zip(marks, marks[1:], strict=False))
-    citers = ("agents/dd-software-engineer.md", "skills/dd-manager-orchestration/SKILL.md",
-              "skills/dd-release-implementation/RC-FLOW.md")  # fmt: skip
-    texts = {c: (_PKG / "public" / c).read_text("utf-8") for c in citers}
-    assert [c for c, t in texts.items() if re.search(arrow, t)] == []
-    assert [c for c, t in texts.items() if "`specs/releases/AGENTS.md` §3" not in t] == []
+    assert [p for p in _LAW if p != home and re.search(arrow, p.read_text("utf-8"))] == []

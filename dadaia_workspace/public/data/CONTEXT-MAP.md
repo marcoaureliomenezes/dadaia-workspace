@@ -41,7 +41,7 @@ path or entity as it appears in an installed workspace.
 | Surface | Purpose | Belongs | Budget | Measured |
 |---|---|---|---|---|
 | `AGENTS.md` | the root map: the flow, the roles, the gate invariants, the root, credentials, and one line per scoped file | statements; the index of every other surface | 8192 | 8436 |
-| `specs/AGENTS.md` | the canon of a specs tree and its status tokens | canon table, status tokens, doctor codes | 4096 | 3643 |
+| `specs/AGENTS.md` | the canon of a specs tree and its status tokens | canon table, status tokens, doctor codes | 4096 | 3662 |
 | `specs/releases/AGENTS.md` | candidates, phases, task markers, promote | release procedure and commit shapes | 4096 | 4102 |
 | `specs/backlog/AGENTS.md` | the operator's demand queue and its exits | `BACKLOG.json` shape, intake gate, dispositions | 4096 | 4086 |
 | `specs/bugs/AGENTS.md` | what a bug is and how it is proposed, recorded, resolved | bug procedure and the redaction rule | 4096 | 3847 |
@@ -89,7 +89,7 @@ Three roles, no fourth; every retired role is a lens the reviewer applies.
 |---|---|---|---|---|
 | `dd-product-engineer` | backlog, SPEC, the product-memory pass at closure | role, read_only, model policy | — | 4614 |
 | `dd-software-engineer` | PLAN/TASKS, production code and its tests | role, read_only, model policy | — | 8809 |
-| `dd-code-reviewer` | the three-axis review and its six lenses | role, read_only, model policy | — | 6399 |
+| `dd-code-reviewer` | the three-axis review and its six lenses | role, read_only, model policy | — | 6438 |
 
 - A statement belongs to exactly one surface: the map indexes, the scoped file rules, the
   skill instructs, the persona declares who acts.
