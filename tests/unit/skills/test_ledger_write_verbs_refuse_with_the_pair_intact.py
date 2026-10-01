@@ -9,12 +9,12 @@ from the pair check the verb runs over its candidate bytes before writing.
 
 from __future__ import annotations
 
-import ast
-import contextlib
 import hashlib
 import json
+import runpy
 import subprocess
 import sys
+from collections.abc import Iterator
 from pathlib import Path
 from typing import Any
 
@@ -130,23 +130,16 @@ def test_the_one_ledger_writer_leaves_no_temp_and_writes_lf(
     assert target.read_bytes() == b"a\nb\n"
 
 
-class _Names(dict[str, Any]):
-    """A name the module binds elsewhere (a function, an import) reads as its own text."""
-
-    def __missing__(self, key: str) -> str:
-        return key
-
-
-def _script_table(rel: str, name: str = "REQUIRED_EVIDENCE") -> Any:
-    """The module's top-level assignments run in order, so a table derived from another
-    (`TERMINAL` from `DISPOSITIONS`) reads as the script itself builds it."""
-    tree = ast.parse((_PUBLIC / "skills" / rel).read_text(encoding="utf-8"))
-    names = _Names()
-    for node in tree.body:
-        if isinstance(node, ast.Assign):  # one that needs a runtime value is not a table
-            with contextlib.suppress(Exception):
-                exec(compile(ast.Module([node], []), rel, "exec"), {}, names)  # noqa: S102
-    return names[name]
+@pytest.fixture
+def script_table(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Iterator[Any]:
+    """A staged script's module-level name, read by running the script as `public stage`
+    ships it; the modules it imports leave with the test."""
+    skills, before = _stage(tmp_path), set(sys.modules)
+    monkeypatch.setattr(sys, "path", list(sys.path))
+    monkeypatch.setattr(sys, "dont_write_bytecode", True)
+    yield lambda rel, name="REQUIRED_EVIDENCE": runpy.run_path(str(skills / rel))[name]
+    for module in set(sys.modules) - before:
+        del sys.modules[module]
 
 
 @pytest.mark.parametrize(
@@ -158,17 +151,23 @@ def _script_table(rel: str, name: str = "REQUIRED_EVIDENCE") -> Any:
         ("dd-audit-project/scripts/_audit_check.py", "DISPOSITIONS"),
     ],
 )
-def test_every_script_subset_is_drawn_from_the_one_vocabulary(rel: str, name: str) -> None:
-    subset = _script_table(rel, name)
+def test_every_script_subset_is_drawn_from_the_one_vocabulary(
+    script_table: Any, rel: str, name: str
+) -> None:
+    subset = script_table(rel, name)
     assert set(subset) <= set(TERMINAL_DISPOSITIONS)
 
 
-def test_a_shared_disposition_requires_the_same_evidence_in_both_ledgers() -> None:
+def test_a_shared_disposition_requires_the_same_evidence_in_both_ledgers(
+    script_table: Any,
+) -> None:
     """sa-ledger-vocabulary-and-atomic-write-duplicated-in-scripts#48.1: the scripts' own
     tables are the only definition, core carries none, and a word both ledgers use
     requires the same evidence in each."""
-    rows = _script_table("dd-backlog-definition/scripts/_backlog_exit.py", "EVIDENCE")
+    rows = script_table("dd-backlog-definition/scripts/_backlog_exit.py", "EVIDENCE")
+    dispositions = script_table("dd-backlog-definition/scripts/_backlog_schema.py", "DISPOSITIONS")
+    assert set(rows) == set(dispositions)
     backlog = {word: flag for word, (flag, _verifier) in rows.items()}
-    audit = _script_table("dd-audit-project/scripts/_audit_check.py")
+    audit = script_table("dd-audit-project/scripts/_audit_check.py")
     shared = {w: (backlog[w], audit[w]) for w in backlog.keys() & audit.keys()}
     assert shared == {"superseded": ("release",) * 2, "rejected": ("reason",) * 2}

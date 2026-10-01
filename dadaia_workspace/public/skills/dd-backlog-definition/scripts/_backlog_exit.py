@@ -19,6 +19,7 @@ from _backlog_schema import DISPOSITIONS  # noqa: E402
 from _backlog_store import SCRIPT, Items, Refusal  # noqa: E402
 from _backlog_write import today  # noqa: E402
 from _release_schema import origin  # noqa: E402
+from _specs import quote  # noqa: E402
 
 
 def _picks(specs: Path, slug: str) -> list[str]:
@@ -39,7 +40,7 @@ def _release(specs: Path, slug: str, disposition: str, release: str | None) -> N
     picks = _picks(specs, slug)
     if release not in picks:
         raise Refusal(
-            f"--release {release!r}: no releases/<v>/rc-<N>/SPEC.md first `**Origin:**` line "
+            f"--release {release or '(none)'}: no releases/<v>/rc-<N>/SPEC.md first `**Origin:**` line "
             f"picks {slug!r} — only a release that picked an item can exit it as {disposition!r}",
             f"{SCRIPT} exit {slug} --disposition {disposition} --release {picks[-1]}" if picks
             else f"Operator action: name {slug} in the `backlog:` clause of a candidate SPEC's "
@@ -52,7 +53,8 @@ def _reason(specs: Path, slug: str, disposition: str, reason: str | None) -> Non
     if not (reason or "").strip():
         raise Refusal(
             f"{disposition!r} requires --reason: the histo record is the only trace of why {slug!r} left",
-            f"Operator action: rerun `{SCRIPT} exit {slug} --disposition {disposition}` with a "
+            f"Operator action: rerun `{SCRIPT} exit {slug} --disposition {disposition} --specs "
+            f"{quote(str(specs))}` with a "
             f"one-line --reason saying why {slug} is refused.",
         )  # fmt: skip
 
@@ -72,7 +74,8 @@ def _bug(specs: Path, slug: str, disposition: str, reason: str | None) -> None:
         raise Refusal(
             f"--reason {reason!r} names no record of {bugs}: `to-bug` hands {slug!r} to a registered bug",
             f"Operator action: register the bug {slug} becomes with bugs.py append "
-            f"(dd-bug-registration), then rerun `{SCRIPT} exit {slug} --disposition {disposition}` "
+            f"(dd-bug-registration), then rerun `{SCRIPT} exit {slug} --disposition {disposition} "
+            f"--specs {quote(str(specs))}` "
             "with its id as --reason.",
         )  # fmt: skip
 

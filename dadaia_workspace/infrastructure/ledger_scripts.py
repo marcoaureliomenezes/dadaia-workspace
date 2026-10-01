@@ -144,7 +144,7 @@ def _unrunnable(script: LedgerScript, reason: str) -> SectionFinding:
     )
 
 
-def _finding(script: LedgerScript, record: dict[str, Any], specs_dir: Path) -> SectionFinding:
+def _finding(script: LedgerScript, record: dict[str, Any]) -> SectionFinding:
     unit = f"{record.get('path', '')}:{record.get('line', 0)}".strip(":")
     return SectionFinding(
         code=str(record.get("code") or script.code),
@@ -152,11 +152,7 @@ def _finding(script: LedgerScript, record: dict[str, Any], specs_dir: Path) -> S
         message=f"{unit} {record.get('message', '')}".strip(),
         canonical=False,
         error=str(record.get("verdict") or "error") == "error",
-        fix=str(
-            record.get("fix")
-            or f"Operator action: {specs_dir.resolve() / record['path']} line "
-            f"{record.get('line', 0)} is invalid; repair that line by hand, then commit."
-        ),
+        fix=str(record["fix"]),
     )
 
 
@@ -177,9 +173,11 @@ def script_findings(specs_dir: Path, runner: _Runner | None = None) -> list[Sect
             continue
         records = _parse(result)
         if records is None:
-            findings.append(_unrunnable(script, f"check exited {result.returncode} with no JSON"))
+            findings.append(
+                _unrunnable(script, f"check exited {result.returncode} outside its contract")
+            )
             continue
-        findings.extend(_finding(script, record, specs_dir) for record in records)
+        findings.extend(_finding(script, record) for record in records)
     return findings
 
 
@@ -206,7 +204,8 @@ def script_repairs(specs_dir: Path, runner: _Runner | None = None) -> list[str]:
 
 
 def _parse(result: Any) -> list[dict[str, Any]] | None:
-    """The script's findings, or ``None`` when it did not answer in the contract."""
+    """The script's findings, or ``None`` when it did not answer in the contract — every
+    record carries its own fix."""
     if result.returncode not in _CHECK_EXITS:
         return None
     try:
@@ -215,7 +214,8 @@ def _parse(result: Any) -> list[dict[str, Any]] | None:
         return None
     if not isinstance(payload, list):
         return None
-    return [record for record in payload if isinstance(record, dict)]
+    records = [record for record in payload if isinstance(record, dict)]
+    return records if all("fix" in record for record in records) else None
 
 
 def worktree_rows(

@@ -26,7 +26,7 @@ from _backlog_schema import (  # noqa: E402
     LEDGER,
     TERMINAL,
 )
-from _ledger import load_schema, validate  # noqa: E402
+from _ledger import fixed, load_schema, validate  # noqa: E402
 
 
 def finding(path: str, line: int, message: str) -> dict[str, Any]:
@@ -107,7 +107,8 @@ def histo_findings(text: str) -> list[dict[str, Any]]:
 def check(specs: Path) -> list[dict[str, Any]]:
     """Validate both committed files; a young specs tree with neither is not a finding."""
     document, histo = (p.read_text(encoding="utf-8") if p.is_file() else "" for p in (specs / LEDGER, specs / HISTO))  # fmt: skip
-    return pair_findings(document or None, histo)
+    found = pair_findings(document or None, histo)
+    return fixed(found, Path(__file__).with_name("backlog.py"), specs)
 
 
 def pair_findings(document: str | None, histo: str) -> list[dict[str, Any]]:

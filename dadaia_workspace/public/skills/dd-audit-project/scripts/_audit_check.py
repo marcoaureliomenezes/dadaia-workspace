@@ -15,7 +15,7 @@ from typing import Any
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from _ledger import load_schema, validate  # noqa: E402
+from _ledger import fixed, load_schema, validate  # noqa: E402
 
 CODE = "LEDGER-FINDINGS-SCHEMA"
 AUDITS = "audits"
@@ -110,4 +110,4 @@ def check(specs: Path) -> list[Finding]:
         out.extend(histo_findings(archive.read_text(encoding="utf-8")))
     for finding in out:
         finding["code"] = CODE
-    return out
+    return fixed(out, Path(__file__).with_name("audit.py"), specs)

@@ -132,4 +132,5 @@ def check(specs: Path) -> list[dict[str, Any]]:
     ledger, histo = specs / LEDGER, specs / HISTO
     text = ledger.read_text(encoding="utf-8") if ledger.is_file() else ""
     archived = histo.read_text(encoding="utf-8") if histo.is_file() else ""
-    return findings_for(text, archived=archived_ids(archived)) + histo_findings(archived)
+    found = findings_for(text, archived=archived_ids(archived)) + histo_findings(archived)
+    return _ledger.fixed(found, Path(__file__).with_name("bugs.py"), specs)

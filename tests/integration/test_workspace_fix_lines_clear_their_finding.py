@@ -91,21 +91,21 @@ def test_the_printed_fix_clears_its_finding(tmp_path: Path, code: str) -> None:
 
 
 _LEDGER_ROWS = [
-    ("LEDGER-BUGS-SCHEMA", "specs/bugs/BUGS.jsonl", ""),
-    ("LEDGER-BUGS-SCHEMA", "specs/bugs/BUGS.jsonl", "{not json\n"),  # invalid at HEAD too
-    ("LEDGER-BACKLOG-SCHEMA", "specs/backlog/BACKLOG.json", '{"schema": "backlog-v1", "active": []}'),
-    ("LEDGER-FINDINGS-SCHEMA", "specs/audits/20260101-x/FINDINGS.jsonl", ""),
-    ("LEDGER-RELEASE-SCHEMA", "specs/releases/1.0.0/_RELEASE.json", "{}\n"),
+    ("LEDGER-BUGS-SCHEMA", "specs/bugs/BUGS.jsonl", "", '{"id": "broken"}\n'),  # the bug's repro
+    ("LEDGER-BUGS-SCHEMA", "specs/bugs/BUGS.jsonl", "{not json\n", "{not json\n"),  # invalid at HEAD too
+    ("LEDGER-BACKLOG-SCHEMA", "specs/backlog/BACKLOG.json", '{"schema": "backlog-v1", "active": []}', "{not json\n"),
+    ("LEDGER-FINDINGS-SCHEMA", "specs/audits/20260101-x/FINDINGS.jsonl", "", "{not json\n"),
+    ("LEDGER-RELEASE-SCHEMA", "specs/releases/1.0.0/_RELEASE.json", "{}\n", "{not json\n"),
 ]  # fmt: skip
 
 
-@pytest.mark.parametrize(("code", "rel", "committed"), _LEDGER_ROWS)
-def test_an_invalid_ledger_line_names_an_operator_action(
-    tmp_path: Path, code: str, rel: str, committed: str
+@pytest.mark.parametrize(("code", "rel", "committed", "bad"), _LEDGER_ROWS)
+def test_an_invalid_ledger_line_names_its_scripts_verb(
+    tmp_path: Path, code: str, rel: str, committed: str, bad: str
 ) -> None:
-    """Intent: sa-unfixable-doctor-findings-say-doctor-fix#S1 — no writer verb repairs an
-    unparseable ledger and a restore would discard uncommitted records: one operator
-    action names the absolute file and line."""
+    """Intent: CONTRACT — ledger-finding-fix-line-orders-a-hand-edit-the-law-forbids (AC4.5):
+    an invalid line carries ONE fix, which runs its ledger script's own verb, never a
+    hand edit the law forbids; run, it names that line."""
     subprocess.run(["git", "init", "-q", str(tmp_path)], check=True)  # noqa: S603, S607
     ledger = tmp_path / rel
     ledger.parent.mkdir(parents=True)
@@ -113,11 +113,14 @@ def test_an_invalid_ledger_line_names_an_operator_action(
     ledger.write_text(committed)
     subprocess.run([*_GIT, "-C", str(tmp_path), "add", rel], check=True)  # noqa: S603
     subprocess.run([*_GIT, "-C", str(tmp_path), "commit", "-qm", "l"], check=True)  # noqa: S603
-    ledger.write_text("{not json\n")
+    ledger.write_text(bad)
     found = _findings_before(tmp_path, "--specs-dir", "specs")
-    (fix,) = [f["fix"] for f in found if f["code"] == code]
-    line = f"{ledger.resolve()} line 1 is invalid; repair that line by hand, then commit."
-    assert fix == f"Operator action: {line}"
+    (fix,) = {f["fix"] for f in found if f["code"] == code}
+    assert "Operator action" not in fix and " check --specs " in fix, fix
+    ran = subprocess.run(
+        ["bash", "-c", fix], cwd=tmp_path, env=_ENV, capture_output=True, text=True
+    )  # noqa: S603, S607
+    assert ran.returncode == 1 and f"{rel.removeprefix('specs/')}:1 " in ran.stdout, ran.stdout
 
 
 def _workspace(tmp_path: Path) -> Path:
@@ -168,7 +171,7 @@ def _plant_disarmed_gate(ws: Path) -> str:
 #: Every code this module proves: cleared by its printed fix, or an operator action (V39).
 WORKSPACE_PLANTS = {
     **_SPECS_PLANTS,
-    **dict.fromkeys(code for code, _, _ in _LEDGER_ROWS),
+    **dict.fromkeys(code for code, *_ in _LEDGER_ROWS),
     "WS-ENTRY": _plant_root_slop,  # the fixable sub-rule (S5)
     "HOOKS-DRIFT-1": _plant_drifted_hook,
     "PROJECTION": _plant_disarmed_gate,

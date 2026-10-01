@@ -20,7 +20,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 sys.path.insert(1, str(Path(__file__).resolve().parents[2] / "dd-spec-navigator" / "scripts"))
 
 import _memory_drift as drift  # noqa: E402
-from _ledger import records  # noqa: E402
+from _ledger import fixed, records  # noqa: E402
 from _release_check import finding, histo_findings, state_findings  # noqa: E402
 from _release_phase import NEXT  # noqa: E402
 from _release_plan import plan_errors  # noqa: E402
@@ -272,7 +272,10 @@ def _window_findings(specs: Path) -> list[dict[str, Any]]:
         return []
     rel = f"releases/{live.release_id}/{STATE}"
     if message := _memory_record_error(live.state):
-        fix = with_specs(f"{SCRIPT} memory --reviewed <slugs> --changed <slugs>", specs)
+        fix = (
+            f"Operator action: run `{SCRIPT} memory --specs {quote(str(specs))}` with the "
+            "atom slugs the memory pass reviewed as --reviewed and changed as --changed"
+        )
         return [{**finding(rel, 1, message), "fix": fix}]
     entry = [e for e in live.state["log"] if isinstance(e, dict) and e.get("kind") == "memory"][-1]
     until = str(entry["until"])
@@ -324,7 +327,8 @@ def tree_findings(specs: Path) -> list[dict[str, Any]]:
 def check(specs: Path) -> list[dict[str, Any]]:
     """The ONE release validator (the doctor delegates here): the tree, the live
     candidate's Origin, then the live CLOSURE's memory record."""
-    return tree_findings(specs) + _origin_findings(specs) + _window_findings(specs)
+    found = tree_findings(specs) + _origin_findings(specs) + _window_findings(specs)
+    return fixed(found, Path(__file__).with_name("release.py"), specs)
 
 
 def ship_findings(specs: Path) -> list[dict[str, Any]]:

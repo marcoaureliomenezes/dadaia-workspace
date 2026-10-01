@@ -110,6 +110,15 @@ def finding(code: str, path: str, line: int, message: str) -> dict[str, Any]:
     return {"code": code, "verdict": "error", "path": path, "line": line, "message": message}
 
 
+def fixed(found: list[dict[str, Any]], owner: Path, specs: Path) -> list[dict[str, Any]]:
+    """``check``'s records, each with a fix: its own, else *owner*'s ``check`` naming the
+    line — no verb rewrites a line no verb wrote, and the law forbids a hand edit."""
+    from _specs import script, with_specs  # beside every owner; the package never calls this
+
+    rerun = with_specs(f"{script(owner)} check", specs.resolve())
+    return [{**row, "fix": row.get("fix") or rerun} for row in found]
+
+
 def stamp(path: Path) -> tuple[int, int] | None:
     """(size, mtime) — how a write detects a concurrent one; ``None`` when absent."""
     try:
