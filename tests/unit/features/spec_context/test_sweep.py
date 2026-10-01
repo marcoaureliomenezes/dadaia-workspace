@@ -1,6 +1,6 @@
 """The guard matrix over the ONE traversal primitive (0.4.7 FR6a, T-047-19).
 
-Intent: CONTRACT — 0.4.7 FR6 / T-047-19; doctor-tmp-expiry-foreign-owned-entry-never-clears. Size: SMALL (unit).
+Intent: CONTRACT — 0.4.7 FR6 / T-047-19. Size: SMALL (unit).
 
 Structural cause this suite pins: the five per-call-site guards in ``doctor.py``
 (``_entries``, ``_mtime``, ``_remove``, ``_guarded``, ``_remove_dead_repo``) each
@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import getpass
 import os
+import shutil
 from collections.abc import Callable
 from pathlib import Path
 
@@ -70,19 +71,12 @@ def test_walk_lists_only_a_real_directorys_sorted_entries(tmp_path: Path, setup:
     assert [p.name for p in sweep.walk(setup(tmp_path))] == names
 
 
-def test_guarded_turns_an_oserror_into_exactly_one_skipped_action(tmp_path: Path) -> None:
-    """doctor-tmp-expiry-foreign-owned-entry-never-clears: a skip the process cannot
-    lift names the directory's owner and the one operator act that clears it."""
-    (held := tmp_path / "dist").mkdir()
-
+def test_guarded_turns_an_oserror_into_exactly_one_skipped_action() -> None:
     def boom() -> str | None:
-        raise OSError(13, "Permission denied", str(held / "f"))
+        raise OSError(13, "Permission denied")
 
     [action] = sweep.guarded("WS-tmp-slop", "tmp/x", boom)
-    assert action == (
-        "WS-tmp-slop: skipped 'tmp/x' (errno 13: Permission denied) — "
-        f"{held} is owned by {getpass.getuser()}; Operator action: remove {held}"
-    )
+    assert action.startswith("WS-tmp-slop: skipped 'tmp/x' (errno 13")
     assert sweep.guarded("CODE", "path", lambda: None) == []
 
 
@@ -112,6 +106,37 @@ def test_remove_deletes_a_read_only_tree(
     assert isinstance(done, sweep.Skipped) is (message == _SKIP) and sweep.succeeded(done) is (message not in (None, _SKIP))
     assert not target.is_symlink() and (target.exists() == (survivor == rel))
     assert survivor is None or (tmp_path / survivor).exists()
+
+
+@pytest.mark.skipif(os.name == "nt" or os.geteuid() == 0, reason="POSIX dir permissions; root bypasses them")
+def test_an_expired_entry_another_account_holds_names_the_one_operator_act(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Intent: CONTRACT — doctor-tmp-expiry-foreign-owned-entry-never-clears: the TTL delete
+    act that cannot lift a permission (chmod refused: not the owner) skips naming the owner
+    and `Operator action: remove <the expired entry>`; once the operator removed it, the
+    act has nothing left to report, so the finding clears."""
+    entry = tmp_path / ".dadaia" / "tmp" / "a" / "20200101"
+    (held := entry / "x" / "dist").mkdir(parents=True)
+    (held / "f.whl").write_text("w", encoding="utf-8")
+    held.chmod(0o555)
+    monkeypatch.setattr(sweep.os, "chmod", _not_the_owner)
+
+    done = sweep.remove(tmp_path, entry, "tmp/a/20200101")
+
+    assert done == (
+        "skipped 'tmp/a/20200101' (errno 13: Permission denied) — it holds an entry owned by "
+        f"{getpass.getuser()}; Operator action: remove {tmp_path}/.dadaia/tmp/a/20200101"
+    )
+    assert isinstance(done, sweep.Skipped) and entry.exists()
+    monkeypatch.undo()
+    held.chmod(0o755)
+    shutil.rmtree(entry)  # the operator's act
+    assert sweep.remove(tmp_path, entry, "tmp/a/20200101") is None
+
+
+def _not_the_owner(*_: object) -> None:
+    raise PermissionError(1, "Operation not permitted")
 
 
 def _exdev(a: object, b: object) -> None:

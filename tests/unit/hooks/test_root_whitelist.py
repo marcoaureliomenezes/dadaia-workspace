@@ -167,16 +167,6 @@ def test_fail_open_table(tmp_path: Path, tool_name: str, tool_input: dict[str, A
         ({"agent_id": "a1", "agent_type": "dd-software-engineer"}, "dd-software-engineer"),
         *(({"agent_type": bad}, "main-thread") for bad in ("../x", "a/b", "", "..", 3, None)),
     ],
-    ids=[
-        "main-thread",
-        "subagent-agent-type",
-        "dotdot-x",
-        "slash",
-        "empty",
-        "dotdot",
-        "int",
-        "none",
-    ],
 )
 def test_the_fix_creates_the_agents_own_temp_dir(
     tmp_path: Path, extra: dict[str, object], segment: str
@@ -185,8 +175,9 @@ def test_the_fix_creates_the_agents_own_temp_dir(
     agent's own `.dadaia/tmp/<agent>/<YYYYMMDD>/`, never the existing `tmp/` (a no-op); a
     subagent payload's `agent_type` names it, only as a plain name (CWE-22)."""
     payload = {"tool_name": "Write", "tool_input": {"file_path": str(tmp_path / "junk.txt")}}
+    days = [datetime.now(UTC).strftime("%Y%m%d")]  # the call may cross UTC midnight
     _out, block = _run(_ws(tmp_path), {**payload, **extra})
+    days.append(datetime.now(UTC).strftime("%Y%m%d"))
     assert block is not None
-    today = datetime.now(UTC).strftime("%Y%m%d")
     fix = block["reason"].rsplit("fix: ", 1)[1]
-    assert str(tmp_path / ".dadaia" / "tmp" / segment / today) in fix
+    assert any(str(tmp_path / ".dadaia" / "tmp" / segment / day) in fix for day in days)
