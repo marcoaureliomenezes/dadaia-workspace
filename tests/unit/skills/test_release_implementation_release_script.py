@@ -321,28 +321,25 @@ def test_a_source_file_named_memory_is_not_a_memory_write_set(script: Path, tmp_
         ("- [x] **T-1** done\n", [], "T-1"),
         ("- [-] **T-1** reserved\n", [], "T-1"),
         ("- [ ] **T-1** `W:` `specs/memory/x.md`\n", [], "specs/memory"),
-        (
-            "- [ ] **T-1** open\n",
-            [{"kind": "note", "text": "Candidate born"}, {"kind": "dispositions", "text": "swept"}],
-            "dispositions",
-        ),
+        ("- [ ] **T-1** open\n", [("new", "note"), ("x", "dispositions")], "dispositions"),
+        ("- [ ] **T-1** open\n", [("x", "dispositions"), ("new", "note")], None),
     ],
 )
 def test_check_judges_a_definition_release(
-    script: Path, tmp_path: Path, tasks: str, log: list[dict[str, str]], needle: str
+    script: Path, tmp_path: Path, tasks: str, log: list[tuple[str, str]], needle: str | None
 ) -> None:
     """AC3.4 (release-check-accepts-done-tasks-in-definition): a marker past `[ ]`, a `W:`
     naming specs/memory (refused where it is born, memory-gate-requires-closure-phase-
     that-spec-doc-024-forbids-before-last-task) or a closure entry after the candidate's
-    birth note is a finding under DEFINITION; an open, memory-free candidate is clean."""
+    birth note is a finding under DEFINITION; a stacked candidate's inherited closure
+    entries, logged before its birth, are not."""
     specs = _specs(tmp_path)
-    entries = [{"ts": _TS, "agent": f"release.py {'new' if n == 0 else 'x'}", **e}
-               for n, e in enumerate(log)]  # fmt: skip
+    entries = [{"ts": _TS, "agent": f"release.py {a}", "kind": k, "text": k} for a, k in log]
     _release(specs, "0.5.0", tasks=tasks, log=entries)
     result = _run(script, "check", "--specs", str(specs))
-    assert result.returncode == 1 and needle in result.stdout, result.stdout
-    _release(specs, "0.5.0", tasks="- [ ] **T-1** open\n", log=entries[:1])
-    assert _run(script, "check", "--specs", str(specs)).returncode == 0
+    assert (result.returncode, needle in result.stdout if needle else True) == (
+        (1, True) if needle else (0, True)
+    ), result.stdout
 
 
 def test_check_reports_a_schema_violation_and_emits_json(script: Path, tmp_path: Path) -> None:
@@ -392,6 +389,17 @@ def test_check_finds_the_specs_tree_by_walking_up_from_cwd(script: Path, tmp_pat
 # ── every refusal carries exactly one runnable `fix:` ─────────────────────────
 
 
+def _in_phase(root: Path, script: Path, phase: str) -> Path:
+    """A tree whose next verb runs: DEFINITION open, IMPLEMENTATION done, CLOSURE reconciled."""
+    if phase == "CLOSURE":
+        return _reconciled_closure(root, script)
+    specs = _specs(root)
+    _release(
+        specs, "0.5.0", phase=phase, tasks=f"- [{' ' if phase == 'DEFINITION' else 'x'}] T-1\n"
+    )
+    return specs
+
+
 @pytest.mark.parametrize(
     ("phase", "argv"),
     [
@@ -400,6 +408,7 @@ def test_check_finds_the_specs_tree_by_walking_up_from_cwd(script: Path, tmp_pat
         ("IMPLEMENTATION", ("phase", "IMPLEMENTATION", "--sha", "abc1234")),
         ("CLOSURE", ("phase", "DEFINITION", "--sha", "abc1234")),
         ("CLOSURE", ("phase", "ARCHIVED", "--sha", "abc1234")),
+        ("DEFINITION", ("ship", "--sha", "abc1234", "--pr", "7")),
         ("IMPLEMENTATION", ("ship", "--sha", "abc1234", "--pr", "7")),
         ("CLOSURE", ("ship", "--sha", "abc1234", "--pr", "zero")),
     ],
@@ -410,11 +419,7 @@ def test_every_refusal_carries_one_fix_that_is_not_itself_refused(
     """sa-promote-has-no-verb#B25-7 and sa-promote-has-no-verb#B25-3: a refusal exits 1, writes nothing, prints
     one `fix:` — and that fix, run as printed in the same state, is not refused;
     ledger-fix-lines-drop-specs: under a spaced specs path too."""
-    if phase == "CLOSURE":  # `ship` is CLOSURE's next verb: the closure is reconciled
-        specs = _reconciled_closure(tmp_path / "a b", script)
-    else:
-        specs = _specs(tmp_path / "a b")
-        _release(specs, "0.5.0", phase=phase, tasks="- [x] T-1 — done\n")
+    specs = _in_phase(tmp_path / "a b", script, phase)
     before = _tree_hash(specs)
     result = _run(script, *argv, "--specs", str(specs))
     assert result.returncode == 1, result.stdout
@@ -627,15 +632,18 @@ def test_ship_refuses_what_check_refuses_and_touches_nothing(script: Path, tmp_p
     checked = json.loads(_run(script, "check", "--json", "--specs", str(specs)).stdout)[0]
     result = _run(script, "ship", "--sha", "beef123", "--pr", "261", "--specs", str(specs))
     assert result.returncode == 1
-    assert checked["message"] in result.stderr and f"fix: {checked['fix']}" in result.stderr
+    assert checked["message"] in result.stderr
+    assert [x for x in result.stderr.splitlines() if x.startswith("fix: ")] == [
+        f"fix: {checked['fix']}"
+    ]
     assert _tree_hash(specs) == before
 
 
 def test_ship_records_the_promote_and_new_births_the_next(script: Path, tmp_path: Path) -> None:
-    """sa-promote-has-no-verb#B25-1, #B25-2, #B25-4: a reconciled CLOSURE ships by verb;
-    ADR 0152 (1): the folder moves to
-    `_archive/<v>/`; AC3.14 (F059): `shipped` is the one sha/PR field, `check` verifies
-    it from 0.5.0 on, the histo `summary` null."""
+    """sa-promote-has-no-verb#B25-1, sa-promote-has-no-verb#B25-2,
+    sa-promote-has-no-verb#B25-4: a reconciled CLOSURE ships by verb; ADR 0152 (1): the
+    folder moves to `_archive/<v>/`; AC3.14 (F059): `shipped` is the one sha/PR field,
+    `check` runs every archived state through the one validator; the histo `summary` null."""
     specs = _reconciled_closure(tmp_path, script)
     result = _run(script, "ship", "--sha", "beef123", "--pr", "261", "--specs", str(specs))
     assert result.returncode == 0, result.stderr
@@ -653,6 +661,10 @@ def test_ship_records_the_promote_and_new_births_the_next(script: Path, tmp_path
     assert _run(script, "check", "--specs", str(specs)).returncode == 0
     state = _read(archived / "_RELEASE.json")
     (archived / "_RELEASE.json").write_text(json.dumps({**state, "shipped": None}), "utf-8")
-    assert "0.5.0" in _run(script, "check", "--specs", str(specs)).stdout
+    assert "no shipped" in _run(script, "check", "--specs", str(specs)).stdout
+    (archived / "_RELEASE.json").write_text('{"schema": ', "utf-8")  # truncated
+    truncated = _run(script, "check", "--json", "--specs", str(specs))
+    assert truncated.returncode == 1 and "Traceback" not in truncated.stderr
+    assert json.loads(truncated.stdout)[0]["path"] == "releases/_archive/0.5.0/_RELEASE.json"
     schema = json.loads(_SCHEMAS[0].read_text("utf-8"))
     assert schema["properties"]["phase"]["enum"] == ["DEFINITION", "IMPLEMENTATION", "CLOSURE"]

@@ -23,7 +23,7 @@ from _release_phase import set_phase  # noqa: E402
 from _release_schema import CODE, HISTO, SHA_RE, STATE, utc_now  # noqa: E402
 from _release_store import SCRIPT, Refusal, commit, live_release, window_start  # noqa: E402
 from _release_tree import check, drift, memory_errors, ship_findings  # noqa: E402
-from _specs import find_specs, refuse  # noqa: E402
+from _specs import find_specs, quote, refuse  # noqa: E402
 
 _HELP = {
     "new": "open the next candidate: its rc-<N+1>/SPEC.md stub and _RELEASE.json, in one act",
@@ -108,7 +108,9 @@ def _ship(args: argparse.Namespace, specs: Path) -> int:
         raise Refusal(f"--sha {args.sha!r} / --pr {args.pr!r}: a hex sha and a PR number",
                       f"{SCRIPT} ship --sha $(git rev-parse --short HEAD) --pr <n>")  # fmt: skip
     if found := ship_findings(specs):
-        raise Refusal(found[0]["message"], found[0].get("fix") or f"{SCRIPT} check")
+        # `refuse` names --specs once: a `check` row's fix already carries it.
+        fix = str(found[0].get("fix") or f"{SCRIPT} check")
+        raise Refusal(found[0]["message"], fix.removesuffix(f" --specs {quote(str(specs))}"))
     line = json.dumps({"id": live.release_id, "ts": ts, "disposition": "delivered",
                        "release": live.release_id, "reason": None, "entry": None,
                        "summary": None}) + "\n"  # fmt: skip

@@ -9,6 +9,7 @@ this one judges a tree on disk and the history beside it.
 from __future__ import annotations
 
 import json
+import re
 import sys
 from pathlib import Path
 from typing import Any
@@ -21,12 +22,12 @@ sys.path.insert(1, str(Path(__file__).resolve().parents[2] / "dd-spec-navigator"
 import _memory_drift as drift  # noqa: E402
 from _ledger import records  # noqa: E402
 from _release_check import finding, histo_findings, state_findings  # noqa: E402
+from _release_phase import NEXT  # noqa: E402
 from _release_plan import plan_errors  # noqa: E402
 from _release_schema import (  # noqa: E402
     HISTO,
     MARK_RE,
     SEMVER_RE,
-    SHA_RE,
     STATE,
     TRIO,
     TRIO_PHASES,
@@ -156,7 +157,7 @@ def _origin_findings(specs: Path) -> list[dict[str, Any]]:
 
 
 def _definition_findings(
-    state: dict[str, Any], tasks: Path, rel: str, specs: Path
+    state: dict[str, Any], marks: list[re.Match[str]], rel: str, candidate: Path, specs: Path
 ) -> list[dict[str, Any]]:
     """DEFINITION implements nothing: a `[-]`/`[x]` marker, or a closure entry logged
     after the live candidate's birth note, means the phase verb was never run."""
@@ -164,10 +165,16 @@ def _definition_findings(
     born = max((n for n, e in enumerate(log) if e["agent"] == "release.py new"), default=-1)
     found = [f"closure entry kind {e['kind']!r} logged after the candidate's birth"
              for e in log[born + 1:] if e["kind"] not in ("note", "milestone")]  # fmt: skip
-    text = tasks.read_text(encoding="utf-8") if tasks.is_file() else ""
     found += [f"task {m[0].strip()[:80]!r} is marked past '[ ]' in phase DEFINITION"
-              for m in MARK_RE.finditer(text) if m[2] != " "]  # fmt: skip
-    fix = with_specs(f"{SCRIPT} phase IMPLEMENTATION --sha $(git rev-parse --short HEAD)", specs)
+              for m in marks if m[2] != " "]  # fmt: skip
+    if not found:
+        return []
+    try:  # `defined` is the commit that approved the trio, never HEAD: impl commits follow it
+        docs = [str(candidate / n) for n in ("SPEC.md", "PLAN.md")]
+        sha = drift.git(specs.parent, "log", "-1", "--format=%h", "--", *docs)[0]
+        fix = with_specs(f"{SCRIPT} {NEXT['DEFINITION']} --sha {sha}", specs)
+    except (drift.Refusal, IndexError):
+        fix = f"Operator action: run `{NEXT['DEFINITION']}` at the commit approving {candidate}"
     return [{**finding(rel, 1, message), "fix": fix} for message in found]
 
 
@@ -182,10 +189,12 @@ def _directory_findings(release_dir: Path, specs: Path) -> list[dict[str, Any]]:
         return findings
     state = json.loads(text)
     phase, candidate = state["phase"], candidate_dir(release_dir)
-    memory = _memory_tasks(candidate, dir_rel) if candidate else []
+    tasks = candidate / "TASKS.md" if candidate else None
+    marks = list(MARK_RE.finditer(tasks.read_text("utf-8"))) if tasks and tasks.is_file() else []
+    memory = _memory_tasks(marks, tasks, dir_rel) if tasks else []
     if phase not in TRIO_PHASES:
-        tasks = candidate / "TASKS.md" if candidate else release_dir / "TASKS.md"
-        return _definition_findings(state, tasks, f"{dir_rel}/{STATE}", specs) + memory
+        return (_definition_findings(state, marks, f"{dir_rel}/{STATE}", candidate, specs)
+                if candidate else []) + memory  # fmt: skip
     missing = [n for n in TRIO if not (candidate and (candidate / n).is_file())]
     if candidate is None or missing:
         where = candidate.name if candidate else "rc-<N>"
@@ -196,15 +205,13 @@ def _directory_findings(release_dir: Path, specs: Path) -> list[dict[str, Any]]:
     return [finding(plan_rel, 1, e) for e in errors] + memory
 
 
-def _memory_tasks(candidate: Path, dir_rel: str) -> list[dict[str, Any]]:
+def _memory_tasks(marks: list[re.Match[str]], tasks: Path, dir_rel: str) -> list[dict[str, Any]]:
     """A task whose `W:` writes `specs/memory`: memory is closure procedure, never a task."""
-    tasks = candidate / "TASKS.md"
-    text = tasks.read_text(encoding="utf-8") if tasks.is_file() else ""
-    lines = [m[0].strip() for m in MARK_RE.finditer(text)]
     fix = f"Operator action: drop the specs/memory path from that task's `W:` in {tasks}"
-    return [{**finding(f"{dir_rel}/{candidate.name}/TASKS.md", 1, f"task {line[:80]!r} writes "
+    return [{**finding(f"{dir_rel}/{tasks.parent.name}/TASKS.md", 1, f"task {line[:80]!r} writes "
                        "specs/memory — memory is closure procedure (RC-FLOW step 5)"), "fix": fix}
-            for line in lines if any(p.split("/")[:2] == ["specs", "memory"] for p in writes(line))]  # fmt: skip
+            for line in (m[0].strip() for m in marks)
+            if any(p.split("/")[:2] == ["specs", "memory"] for p in writes(line))]  # fmt: skip
 
 
 def memory_errors(specs: Path, phase: str, entry: dict[str, Any]) -> list[str]:
@@ -278,8 +285,8 @@ def _window_findings(specs: Path) -> list[dict[str, Any]]:
 
 
 def tree_findings(specs: Path) -> list[dict[str, Any]]:
-    """Every live directory under ``releases/`` (``_archive/`` is history, exempt by
-    location), the one-live-release rule and the ship ledger — what `new` refuses on."""
+    """Every live directory under ``releases/``, each archived state document, the
+    one-live-release rule and the ship ledger — what `new` refuses on."""
     releases, findings = specs / "releases", []
     for d in sorted(releases.iterdir()) if releases.is_dir() else []:
         if SEMVER_RE.match(d.name):
@@ -294,18 +301,21 @@ def tree_findings(specs: Path) -> list[dict[str, Any]]:
                                 f"{STATE}: {', '.join(ids)} — exactly one is allowed"))  # fmt: skip
     if (specs / HISTO).is_file():
         findings += histo_findings((specs / HISTO).read_text(encoding="utf-8"))
-    for state in sorted(releases.glob(f"_archive/*/{STATE}")):
-        version = state.parent.name
-        shipped = json.loads(state.read_text(encoding="utf-8")).get("shipped") or {}
-        if (
-            SEMVER_RE.match(version)
-            and tuple(map(int, version.split("."))) >= (0, 5, 0)
-            and not (SHA_RE.match(str(shipped.get("sha"))) and isinstance(shipped.get("pr"), int))
-        ):  # ADR 0152 (1): `shipped` is the archived release's one sha/PR record (F059)
-            findings.append({**finding(state.relative_to(specs).as_posix(), 1,
-                             f"archived release {version} carries no shipped {{sha, pr}}"),
-                             "fix": f"Operator action: write the merged promote PR's sha and "
-                             f"number into shipped of {state.resolve()}"})  # fmt: skip
+    for path in sorted(releases.glob(f"_archive/*/{STATE}")):
+        # ADR 0152 (1): an archived state names its ship (F059). Not the live schema: the
+        # 0.4.5-0.4.7 archives predate it (`ARCHIVED`, `rc`) and history is not rewritten.
+        rel, act = path.relative_to(specs).as_posix(), f"rewrite {path.resolve()} as one JSON "
+        try:
+            shipped = json.loads(path.read_text(encoding="utf-8")).get("shipped") or {}
+            shipped = {"sha": shipped.get("sha"), "pr": shipped.get("pr")}
+        except (json.JSONDecodeError, AttributeError) as error:
+            findings.append({**finding(rel, 1, f"archived state is not a JSON object: {error}"),
+                             "fix": f"Operator action: {act}object, from git history"})  # fmt: skip
+            continue
+        if not (shipped.get("sha") and shipped.get("pr")):
+            findings.append({**finding(rel, 1, "archived release carries no shipped {sha, pr}"),
+                             "fix": f"Operator action: {act}object whose shipped names the "
+                             "merged promote PR's sha and number"})  # fmt: skip
     return findings
 
 
@@ -316,18 +326,18 @@ def check(specs: Path) -> list[dict[str, Any]]:
 
 
 def ship_findings(specs: Path) -> list[dict[str, Any]]:
-    """What `ship` refuses on: `check`'s errors, a phase short of CLOSURE, an archive
-    already holding the id — `check` is the one readiness authority (AC3.4)."""
+    """What `ship` refuses on: `check`'s errors, a phase short of CLOSURE (fix: that
+    phase's NEXT verb), an archive already holding the id — one readiness authority (AC3.4)."""
     live = live_release(specs)
     found = [f for f in check(specs) if f["verdict"] == "error"]
-    rel, phase = f"releases/{live.release_id}/{STATE}", live.state.get("phase")
+    rel, phase = f"releases/{live.release_id}/{STATE}", str(live.state.get("phase"))
     if phase != "CLOSURE":
         found.append({**finding(rel, 1, f"release {live.release_id} is in phase {phase!r} — "
                       "only a CLOSURE release ships"),
-                      "fix": with_specs(f"{SCRIPT} phase CLOSURE --sha $(git rev-parse --short "
-                                        "HEAD)", specs)})  # fmt: skip
+                      "fix": f"{SCRIPT} {NEXT[phase]} --sha $(git rev-parse --short HEAD)"})  # fmt: skip
     if (archive := specs / "releases" / "_archive" / live.release_id).exists():
-        found.append({**finding(rel, 1, f"{archive} already exists — a release is archived "
-                      "once"), "fix": f"Operator action: remove the live duplicate "
-                      f"{live.release_dir.resolve()} of the shipped release"})  # fmt: skip
+        found.append({**finding(rel, 1, f"release {live.release_id} is live and already "
+                      f"archived at {archive}"), "fix": f"Operator action: decide which of "
+                      f"{live.release_dir.resolve()} and {archive.resolve()} is release "
+                      f"{live.release_id}; a release ships once"})  # fmt: skip
     return found

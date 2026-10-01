@@ -96,31 +96,31 @@ def set_phase(specs: Path, phase: str, sha: str) -> tuple[str, str]:
             "IMPLEMENTATION after DEFINITION and CLOSURE after IMPLEMENTATION, once each",
             f"{SCRIPT} {NEXT.get(current, 'check')} --sha {sha}",
         )
-    ts = utc_now()
+    ts, candidate = utc_now(), live.candidate
     if phase == "IMPLEMENTATION":
         candidate = _refuse_unapproved_trio(live)
         plan = (candidate / "PLAN.md").read_text(encoding="utf-8")
         if errors := plan_errors(plan, unfinished_tasks(candidate)):
             raise Refusal(errors[0], PLAN_FIX)
-    elif live.candidate and (unfinished := unfinished_tasks(live.candidate)):
+    elif candidate and (unfinished := unfinished_tasks(candidate)):
         raise Refusal(
             f"TASKS.md still carries {len(unfinished)} open '[ ]'/reserved '[-]' marker(s) "
             f"— a candidate closes fully implemented: {unfinished[0]}",
-            f"finish and mark every task '[x]' in {(live.candidate / 'TASKS.md').resolve()}",
+            f"finish and mark every task '[x]' in {(candidate / 'TASKS.md').resolve()}",
         )
     else:
         _refuse_open_worktrees(specs.resolve())
 
     milestone = "defined" if phase == "IMPLEMENTATION" else "implemented"
-    rc = (live.candidate or live.release_dir / "rc-1").name
+    rc = {"candidate": candidate.name} if candidate else {}
 
     def apply(state: State) -> State:
         # The slot is the live candidate's stamp; the `milestone` entry is its history (F061).
         state[milestone] = {"sha": sha, "ts": ts}
         state.setdefault("log", []).append({
-            "ts": ts, "agent": "release.py", "kind": "milestone", "candidate": rc,
+            "ts": ts, "agent": "release.py", "kind": "milestone", **rc,
             "milestone": milestone, "sha": sha,
-            "text": f"Candidate {rc} {milestone} at {sha}; phase {phase}."})  # fmt: skip
+            "text": f"Candidate {milestone} at {sha}; phase {phase}."})  # fmt: skip
         state["phase"] = phase
         return state
 
