@@ -5,7 +5,7 @@
 **Owner:** dd-product-engineer
 **Opened:** 2026-10-01
 **Origin:** backlog:ledger-schema-one-engine,structural-convergence-f053-f054-f057,consumer-guidance-names-no-library-toolchain,seventh-fail-open-path-law-line
-- Sources: rc-6's §Carried W3/W4 rows and risk seeds, its closure log and reviews (step 7b, PR #276); operator order 2026-09-30 ("cria todas as rc … Depois so revisaremos"); the 2026-10-01 batch grill, D1–D6.
+- Sources: rc-6's §Carried W3/W4 rows, closure log and reviews (step 7b, PR #276); operator order 2026-09-30; the 2026-10-01 batch grill, D1–D6.
 - The line holds the `backlog:` clause alone (today's tools refuse a multi-clause line); bugs and findings are in §Origin map; AC3.2 rewrites it. `task-line-grammar-one-reader` exits `to-bug`, which reads no Origin. No bug is registered.
 - At 44d023e6 every carried id is non-terminal: 18 bugs open, 5 entries active, 29 findings open, F053, F054, F057, F080 deferred.
 
@@ -25,25 +25,15 @@
 
 ## Bug history read
 
-- Fix lines: 17 records, 4 open. ADR 0045's builder covered the CLI spelling only, not placeholders, prose or `_specs.py`; three contract files judge one invariant.
-- Unicode line breaks: 5 records, the fifth open; each fix patched its own reader.
-- Denylist: 19 records; `sa-denylist-file-has-three-shapes` migrated no old file (F037).
-- Task line: four readers (`_worktree_end._MARK` from rc-5, `_release_plan`'s `W:`); registry: rc-6 left `JsonContextStore`'s own parse. Same cause: no owner.
+- Fix lines (17 records, 4 open): ADR 0045's builder covered the CLI spelling only; three contract files judge one invariant.
+- Unicode line breaks (5, the fifth open), denylist (19; F037), task line (four readers), registry (rc-6 left `JsonContextStore`'s parse): each fix patched its own reader. Same cause: no owner.
 
 ## Decisions
 
 - These ADRs decide: 0018, 0019, 0045, 0106, 0111, 0119, 0122, 0123, 0126, 0127, 0135, 0136, 0137, 0140, 0141, 0142, 0146, 0150, 0152.
-- Accepted, one record per ruling (operator, 2026-10-01: "Aceito D1–D6 (Recomendado); Aceito 0157–0162 (Recomendado)"); 0158 also narrows 0018's "every fix line names a script or verb".
-
-| D | ruling | ADR |
-|---|---|---|
-| D1 | one denylist loader, the stdlib `_ledger.py`; root from `--specs` | 0157, amends 0135 |
-| D2 | a fix line: a runnable command or `Operator action: <one act>`, no placeholder | 0158, amends 0045 |
-| D3 | the renderer is a pinned pair, `core/cli_line.py` ↔ `_specs.py` | 0159, amends 0045 |
-| D4 | `diff_direction` derived, `evidence_seam` judged at `resolve` only; narrows the bug's `expected` | 0160 |
-| D5 | the Origin line is `backlog:<ids>; bugs:<ids>; findings:<ids>`, parsed only by `release.py` | 0161, amends 0019 |
-| D6 | the registry parse in `core`; the Status token a pinned pair | 0162, amends 0135 |
-
+- Accepted, one record per ruling (operator, 2026-10-01: "Aceito D1–D6 (Recomendado); Aceito 0157–0162 (Recomendado)"): D1 0157 and D6 0162 amend 0135; D2 0158 and D3 0159 amend 0045; D4 0160; D5 0161 amends 0019. 0158 also narrows 0018's "every fix line names a script or verb".
+- 0161's "doctor_release and backlog.py exit import it" narrows to `backlog.py exit`: SPEC-DOC-048 leaves (AC3.2), so `doctor_release` reads no Origin.
+- Dead `measured_by` repaired in place (the ADR 0138 lane, as 0138 did), each in the commit that deletes its unit and citing the ADR (0151 M3): 0019 (SPEC-DOC-048, `test_spec_doc_048_origin.py`) → `release.py check`'s Origin cases (AC3.2); 0018 and 0073 (`test_every_block_carries_a_fix.py`) → the AC4.1 harness.
 - No new record: the doctor delegating to each script's `check` is 0018's; shape 5's "+ picked bugs" leaves by 0106 and 0127; the backlog kind admitting `BUGS.jsonl` is 0137's "one worktree".
 
 ## Origin map — candidate 7
@@ -54,7 +44,6 @@ Each finding that cites a bug or an entry shares its destination; findings are `
 |---|---|---|---|
 | W3 | DEL `spec-origin-line-has-two-readers`, `task-line-grammar-accepts-a-malformed-open-marker`, `privacy-denylist-has-two-loaders`, `release-ship-accepts-what-release-check-refuses`, `bugs-check-trusts-evidence-fields-unverified`, `release-new-crashes-on-a-unicode-line-separator-in-the-bug-ledger`, `corrupt-context-registry-crashes-doctor-and-next-step`; FR `list-form-privacy-denylist-errors-without-migration`, `secret-scan-misses-github-pat-and-anthropic-keys`, `release-check-accepts-done-tasks-in-definition`, `gitflow-shape2-omits-backlog-histo` | FR `ledger-schema-one-engine`, `structural-convergence-f053-f054-f057`, each exits `delivered`; `task-line-grammar-one-reader` exits `to-bug` → `task-line-grammar-accepts-a-malformed-open-marker` | F002, F010, F012, F013, F016, F024, F029, F030, F032–F034, F036–F038, F052–F054, F057–F059, F061, F063, F102, F103; c4 AC6.3, AC6.6 (V38) |
 | W4 | DEL `dadaia-bin-still-honoured-after-adr-0045`, `help-examples-spell-the-blocked-bare-cli`, `fix-lines-are-not-one-runnable-command`, `ledger-finding-fix-line-orders-a-hand-edit-the-law-forbids`, `implementer-persona-states-a-second-task-marker-lifecycle`; FR `doctor-tmp-expiry-foreign-owned-entry-never-clears`, `rc-flow-asks-compliance-line-doctor-never-prints` | FR `consumer-guidance-names-no-library-toolchain`, `seventh-fail-open-path-law-line`, each exits `delivered` | F007, F017, F031, F035, F039–F041, F080, F099 |
-| Closure memory pass | — | — | `bug-ledger`, `backlog-ledger`, `release-lifecycle`, `audits-canon`, `worktrees`, `context-management`, `workspace-doctor`, `sdd-gate-v3`, `ci-preflight` |
 
 ## Gate — rc-5's G1–G6, applied to W3 and W4
 
@@ -74,7 +63,7 @@ Each finding that cites a bug or an entry shares its destination; findings are `
   - The PLAN §1.1 Authorities table has one row per grammar of §Objective, one per JSONL ledger (bugs, backlog histo, ADRs, audit findings and histo, releases histo) and one for `BACKLOG.json`.
   - Each row names one owner that every other reader `consults`; the Status token is a pinned pair, `core/spec_status` ↔ `_release_schema.extract_status`.
   - Measure: 0135's contract test, in the file the PLAN finds owning it, fails when a package module parses a grammar outside its owner or pinned twin, and pins each owner script's location.
-  - It encodes the layer rule the pairs rest on: no `core` module loads a `public/` file; no `public/skills` script imports `dadaia_workspace`. `infrastructure` loads an owner script (0157) by path from the package's own copy; a stdlib script is no package module, so no import-linter contract changes.
+  - It encodes the layer rule the pairs rest on: no `core` module loads a `public/` file; no `public/skills` script imports `dadaia_workspace`. Only `infrastructure` references the `public/skills` root, through one loader that loads an owner script (0157) by path from the package's own copy; a stdlib script is no package module, so no import-linter contract changes. The installed `.agents/skills/` copy equals the package copy by `public doctor`'s hash check.
 - AC3.2 Origin line (DEL `spec-origin-line-has-two-readers`; 0127; 0161):
   - `release.py` owns the 0161 parser, and `release.py check` is the one judge of an Origin line: presence, grammar, id existence and tracing. `_backlog_exit` imports the parser. SPEC-DOC-048 leaves the doctor, which reports Origin through its ledgers section (AC3.6), so no fact is reported twice.
   - Only the first Origin line counts. In the bug's repro, `backlog.py exit <id> --disposition delivered` is refused.
@@ -92,13 +81,13 @@ Each finding that cites a bug or an entry shares its destination; findings are `
   - `release.py check` judges every phase: under DEFINITION, a `[-]` or `[x]` marker, or a closure log entry after the live candidate's birth note, is a finding; `_release_tree._directory_findings`'s phase guard leaves.
   - Command: `pytest tests/unit/skills/test_release_implementation_release_script.py`.
 - AC3.5 One JSONL reader (DEL `release-new-crashes-on-a-unicode-line-separator-in-the-bug-ledger`):
-  - One JSONL reader, in `_ledger.py`, splits on `\n` only. The script stores read through it; the package loads it by 0157's path. `infrastructure/jsonl_record_store.py`, read by no production module, is deleted. No ledger is read with `splitlines()`, `doctor_release._json_records` included.
+  - One JSONL reader, in `_ledger.py`, splits on `\n` only. The script stores read through it; the package loads it by 0157's path. `infrastructure/jsonl_record_store.py`, read by no production module, is deleted, with `test_audit_project_audit_script.py:207,212` (`#B43-5`) re-homed or dropped by its statement id. No ledger is read with `splitlines()`, `doctor_release._json_records` included.
   - In the bug's repro, `release.py new --origin bugs:ls-probe` seeds the SPEC, and `doctor_adr` reads a decisions record holding U+2028.
 - AC3.6 One ledger schema engine (FR `ledger-schema-one-engine`; F103; 0018):
   - The doctor's ledgers section runs each script's `check` and builds no `jsonschema` validator for a ledger schema.
   - Command: `pytest tests/integration/test_backlog_doctor.py` plus the bug-ledger doctor case the PLAN names.
 - AC3.7 Evidence fields (DEL `bugs-check-trusts-evidence-fields-unverified`; F002; 0160):
-  - `diff_direction` leaves `bug-record-v1` and, once, every record: `_bugs_store.commit` (bugs.py's one write path) writes the strip from a command quoted in the commit body, in one shape-3 commit of a `bug` worktree with the schema drop; no new verb, no hand edit. `check` and `stats` derive it from the `evidence_diff` prefix (lines 653–654 read as one); SKILL.md and `PILLAR-BUGS.md` follow.
+  - `diff_direction` leaves `bug-record-v1` and, once, every record: `_bugs_store.commit` (bugs.py's one write path) writes the strip from a command quoted in the commit body, in one shape-3 commit of a `bug` worktree with the schema drop; no new verb, no hand edit. It lands before AC3.11's widened patterns, since `_bugs_store._validated` re-scans every changed record. `check` and `stats` derive it from the `evidence_diff` prefix (lines 653–654 read as one); SKILL.md and `PILLAR-BUGS.md` follow.
   - `bugs.py resolve` refuses an `--evidence-seam` whose file or `def <name>` does not exist. `check` never re-judges a resolved seam: the 15 historic seams and rc-6's moved seam and pre-rebase SHAs stay as written.
   - Command: `pytest tests/unit/skills/test_bug_resolution_bugs_script.py`.
 - AC3.8 Lineage (F012, F013):
@@ -106,7 +95,7 @@ Each finding that cites a bug or an entry shares its destination; findings are `
   - The 2 cycles, 3 dangling targets and 3 null `caused_by` of F012 and F013 are set by the `bugs.py` governance verb, never by hand; `check` exits 0.
 - AC3.9 One context-registry parse (DEL `corrupt-context-registry-crashes-doctor-and-next-step`; F024; 0162):
   - `core/context_registry.py` is the one parse: `JsonContextStore` and the doctor's `_contexts()` read through it; `invocation._registry_contexts`'s fail-soft `or []` is deleted.
-  - An absent file is the empty registry at every reader (the resolver's sentinel). A file not parsing to a `{"contexts": [...]}` object, `{}` included, is unreadable, never empty, and every doctor `--fix` lane then acts on nothing.
+  - Under a resolved root, an absent file, or one not parsing to a `{"contexts": [...]}` object (`{}` included), is unreadable, never empty: REG-SCHEMA, the layout check answers `{"*"}`, and every doctor `--fix` lane acts on nothing (empty-as-answer is rc-6 PLAN's Stall); the file is the resolver's sentinel, so only a racing deletion makes it absent. `JsonContextStore`'s absent branch (`json_context_store.py:45-46`) is deleted once the PLAN confirms only tests rely on it.
   - Truncated registry: SessionStart, `doctor`, `context list`, `show` and `create` each print REG-SCHEMA with one fix line, no traceback, never "create a context"; the layout check keeps `{"*"}`.
   - Command: the owner test the PLAN names, one case per reader.
 - AC3.10 One denylist loader (DEL `privacy-denylist-has-two-loaders`, FR `list-form-privacy-denylist-errors-without-migration`; 0157):
@@ -142,7 +131,7 @@ Each finding that cites a bug or an entry shares its destination; findings are `
 ## W4 — one text renderer: acceptance
 
 - AC4.1 One renderer, one harness (F017; 0045, 0158, 0159):
-  - `test_every_block_carries_a_fix.py`, `test_fix_lines_use_the_builder.py` and `test_fix_line_runs_in_every_shell.py` become one harness over every site, rc-6's refusals included; each case is re-homed by name (G5).
+  - `test_every_block_carries_a_fix.py`, `test_fix_lines_use_the_builder.py` and `test_fix_line_runs_in_every_shell.py` become one harness over every site, rc-6's DEC-11, missing-venv and root-whitelist refusals included; each case is re-homed by name (G5).
   - Per site it asserts exactly one fix line, in a 0158 form (a command whose argv0 exists, or `Operator action:`), no `<…>` placeholder, and a command the pre-gate allows when fed back as Bash.
   - It holds 0159's pinned-pair case: one argv through `cli_line` and `_specs.py` renders one line.
   - The `push-refspec` case keeps its name and its bug id `every-block-fix-push-refspec-flaky-under-xdist`; the fix stays rc-8 W5's unless the rebuild removes the shared state, which G3 then resolves citing that commit.
@@ -153,7 +142,7 @@ Each finding that cites a bug or an entry shares its destination; findings are `
   - Command: `pytest tests/contract/test_cli_help_quality.py` over the whole command tree.
 - AC4.4 Fix lines run as printed (DEL `fix-lines-are-not-one-runnable-command`; FR `doctor-tmp-expiry-foreign-owned-entry-never-clears`; 0158):
   - Each site the record names, in its 0158 form with real values:
-    - command: the session-record BLOCK (`context bind` with the resolved context); the pre-push refusal (the live work branch); the root-whitelist BLOCK (`mkdir -p` of the real `.dadaia/tmp/<agent>/<YYYYMMDD>/`; F098's message is rc-8's AC6.4); `doctor --context nosuch` (`context list`); the gate scope BLOCK (`context bind <owner>`); the `backlog exit` hint (a disposition the entry can take);
+    - command: the session-record BLOCK (`context bind` with the resolved context; unbound, `context list`); the pre-push refusal (the live work branch); the root-whitelist BLOCK (through `mkdir_line`, the dated `.dadaia/tmp/<YYYYMMDD>/` directory with no agent segment, since no hook reads the agent, unless the as-is review finds a per-dialect payload field carrying one; F098's message is rc-8's AC6.4); `doctor --context nosuch` (`context list`); the gate scope BLOCK (`context bind <owner>`); the `backlog exit` hint (a disposition the entry can take);
     - `Operator action:`: the id-less session relaunch, and the onboarding first-pass Next.
   - `sweep.guarded`'s skip line for an expired entry it cannot delete names the owner and `Operator action: remove <real path>`; once the entry is gone, `doctor --fix` clears the finding.
   - Correlate: `_specs._bound_tree` stops routing `--specs` to `repos/<r>/specs` (unwritable outside `specs/audits/`, rc-5 AC1.1); it names the open worktree of the ledger's kind, else `worktree.py new <r> --kind <kind>`.
@@ -173,11 +162,13 @@ Each finding that cites a bug or an entry shares its destination; findings are `
 - AC4.9 The seventh fail-open path in law (FR `seventh-fail-open-path-law-line`; F080; rc-6 step-7b review):
   - The root map §3 (`public/data/AGENTS.md`) adds the seventh path: an unreadable registry judges nothing below `repos/` and `worktrees/` (`{"*"}`); its first bullet states the judged scope: the root, `.dadaia/`, the closed-canon zones, the first level of `repos/` and `worktrees/`.
   - `docs/getting-started.md` Level 1 lets "absent" govern both `.dadaiaignore` and `prompt.md`; the doctor paragraphs of README, getting-started and quickstart say a TTL expiry acts by zone class (OUTPUT held, EPHEMERAL deleted).
-  - Command: `pytest tests/contract/test_law_states_what_the_code_does.py`: one row per fail-open path drives the code to ALLOW (or `{"*"}`), and the root map's list is set-equal to the rows' keys. No sentence is pinned (S3d, rc-8 W5).
+  - Command: `pytest tests/contract/test_law_states_what_the_code_does.py`: the root map's list is set-equal to one row per fail-open path, each naming its evidence. Policy raise, unreadable payload, Bash write, id-less session and unreadable registry drive the code to ALLOW (or `{"*"}`); the timeout row reads the wrappers' declared `TOOL_TIMEOUT_S`; the missing-venv row cites `tests/integration/gate/test_hook_interpreter.py`'s case. No sentence is pinned (S3d, rc-8 W5).
 
 ## Replaces
 
 - SPEC-DOC-048 (`doctor_release._ORIGIN_RE`, `check_spec_origin`, `_known_backlog_ids`) and `_backlog_exit`'s Origin regex.
+- `doctor_governance.known_bug_ids`, whose only consumer was SPEC-DOC-048 (`rules.py:165-166`), with its docstrings.
+- The `SPEC-DOC-048` citation in `public/scaffold/releases/AGENTS.md:20`.
 - `_TASK_BLOCK_RE`'s marker reading, `_worktree_end._MARK` and `_release_plan`'s `W:` regex.
 - `ship`'s own readiness judgement, and `check`'s DEFINITION skip.
 - The `splitlines()` ledger reads (`_release_new.py:63`, `doctor_adr.py:30`, `doctor_release._json_records`) and `infrastructure/jsonl_record_store.py`.
@@ -206,8 +197,6 @@ Each finding that cites a bug or an entry shares its destination; findings are `
 | A pinned pair drifts (0159, 0162). | Its one contract test fails on any difference (AC3.1, AC4.1). |
 | 0137: a registration without its exit; a target rejected later. | One backlog worktree holds both; `release.py check` reports a rejected target (AC3.12). |
 | The 0160 strip rewrites every `BUGS.jsonl` line; a parallel `bug` worktree's union merge (0111) doubles a record. | The strip runs with no `bug` worktree open; `bugs.py check` refuses a duplicate id at merge. |
-| The 0161 grammar breaks closed SPECs. | A one-clause line is its one-clause case; no second grammar exists. |
-| The widened secret patterns hit published history. | Published history is never rescanned (§2a). |
 | The root map passes its soft budget (8,304 B of 8,192, ADR 0143). | AC4.1 and AC4.9 edit existing bullets. |
 
 ## Carried to candidates 8+ (ADR 0140; specified by their own SPECs)
