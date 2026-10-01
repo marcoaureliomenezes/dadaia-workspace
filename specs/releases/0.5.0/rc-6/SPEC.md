@@ -37,7 +37,7 @@
   - `init` scaffolding `prompt.md`;
   - the SessionStart self-heal.
 - ADR 0132 voids 0092's harness-directory clause, so inside a harness directory ADR 0059 holds (F076).
-- F075 (ADR 0067 against 0096) is settled by the operator-confirmed `expected` of `missing-venv-hook-disarms-the-gate-invisibly`. Hooks stay fail-open (0067), and the loss of the gate reaches the agent once per session with its fix (§Open questions OQ2, answered).
+- F075 (ADR 0067 against 0096) is settled by the operator-confirmed `expected` of `missing-venv-hook-disarms-the-gate-invisibly`. Hooks stay fail-open (0067), and the loss of the gate reaches the agent with its fix and repeats until the venv is fixed (§Open questions OQ2, answered).
 
 ## Origin map — candidate 6
 
@@ -170,7 +170,6 @@ F019–F051 share the destination of the bug each cites, and F090–F112 share t
 |---|---|
 | Core paths listed in code drift from what `public install` projects. | The code floor is a subset that the ledger extends. A contract test checks that every floor path is one that `install` writes or that `init` creates. |
 | A protected glob matches too wide and refuses the agent's real work. | The fix line routes the draft to `.dadaia/tmp/`. The refusal names the protected glob that matched. |
-| The once-per-session venv message needs a session id, and there is no venv to read one with. | The wrapper's prologue decides with no Python. The as-is review measures each harness's context channel before the PLAN. |
 | Holding expired handoffs grows `.dadaia/reaped/`. | The reaped TTL (7 days) bounds it. The G1 readout logs the size. |
 | The quickstart's worktree path needs the work branch before the first backlog entry. | `context baseline` publishes every gitflow branch, and the quickstart runs it first. |
 
@@ -207,4 +206,4 @@ Risk seeds for W3 (from rc-5), so they are not lost:
 ## Open questions for the operator
 
 - OQ1 (answered): the operator's Q3 answer ("Assim (Recomendado)") is the ruling. ADR 0156 records it as an amendment of 0146 (3).
-- OQ2 (answered via inspection): the operator confirmed `missing-venv-hook-disarms-the-gate-invisibly` with its `expected` clause (fail-open, visible to the agent once per session with its fix line), and ADR 0067 is accepted. AC2.7 stands.
+- OQ2 (answered via inspection): the operator confirmed `missing-venv-hook-disarms-the-gate-invisibly` with its `expected` clause (fail-open, visible to the agent with its fix line), and ADR 0067 is accepted. The operator's 2026-10-01 ruling ("Repetir até corrigir (Recomendado)") sets the cadence: the message repeats on every ctx-inject firing until the venv is fixed (AC2.7).
