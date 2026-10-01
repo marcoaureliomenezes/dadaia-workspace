@@ -54,7 +54,7 @@ def _fake_venv(tmp_path: Path, exit_code: int = 0) -> Path:
 def _resolved_checks(python: Path) -> list[Check]:
     """Every tool-resolved check; `repo hygiene` runs the repo's own bash script (system
     shell + git), outside the tool-resolution contract pinned here."""
-    checks = checks_for(quick=True, python_executable=str(python), dadaia_bin=None)
+    checks = checks_for(quick=True, python_executable=str(python))
     return [c for c in checks if c.name != "repo hygiene"]
 
 
@@ -68,10 +68,9 @@ def test_preflight_resolved_tool_pass_and_failure_report_with_poetry_off_path(
     ABSOLUTE fake-venv sibling path with zero poetry references and all checks pass;
     a failing stub venv reports the first resolved tool's non-zero exit as a failed
     check (fail-fast stops there) — no poetry fallback in either case. A tool absent
-    from venv AND DADAIA_BIN AND PATH falls back to poetry and fails closed (127,
+    from venv AND PATH falls back to poetry and fails closed (127,
     clean 'command not found', no traceback — the v0.1.10 fail-closed contract)."""
     monkeypatch.setenv("PATH", "")
-    monkeypatch.delenv("DADAIA_BIN", raising=False)
 
     if stub_exit_code is None:
         venv_bin = tmp_path / "barevenv" / "bin"

@@ -139,16 +139,12 @@ def _plant_backlog_doctor_violation(repo: Path) -> None:
     )
 
 
-def _hook_env(workspace: Path, *, dadaia_bin: Path | None = None) -> dict[str, str]:
+def _hook_env() -> dict[str, str]:
     """A harness-FREE env mirroring the real installed hook's child env."""
     env = dict(os.environ)
     for bad in ("CLAUDE_CODE_SESSION_ID", "CODEX_SESSION_ID", "CODEX_THREAD_ID", "DADAIA_MODE"):
         env.pop(bad, None)
     env.pop("DADAIA_SESSION_ID", None)
-    if dadaia_bin is not None:
-        env["DADAIA_BIN"] = str(dadaia_bin)
-    else:
-        env.pop("DADAIA_BIN", None)
     return env
 
 
@@ -182,7 +178,8 @@ def test_failing_preflight_no_longer_blocks_the_push(tmp_path: Path) -> None:
     repo.mkdir(parents=True)
     subprocess.run(["git", "init", "-q"], cwd=repo, check=True)
 
-    stub = workspace / "dadaia-stub.sh"
+    stub = workspace / ".dadaia" / ".venv" / "bin" / "dadaia"  # the hook's venv walk
+    stub.parent.mkdir(parents=True)
     _write_preflight_fails_stub(stub)
 
     stdin_text = f"refs/heads/feature/0.0.1 {'a' * 40} refs/heads/feature/0.0.1 {_ZERO}\n"
@@ -192,7 +189,7 @@ def test_failing_preflight_no_longer_blocks_the_push(tmp_path: Path) -> None:
         input=stdin_text,
         capture_output=True,
         text=True,
-        env=_hook_env(workspace, dadaia_bin=stub),
+        env=_hook_env(),
         timeout=_DEADLINE,
     )
     out = result.stdout + result.stderr
@@ -201,7 +198,7 @@ def test_failing_preflight_no_longer_blocks_the_push(tmp_path: Path) -> None:
 
 
 def test_unresolvable_runner_still_refuses_the_push(tmp_path: Path) -> None:
-    """A9.2: with no ``$DADAIA_BIN``, no workspace venv, no poetry, and no repo-local
+    """A9.2: with no workspace venv, no poetry, and no repo-local
     venv, ``pre-push-ci-gate.sh`` REFUSES the push (exit 1) — never silently skipped.
     Pre-push keeps its fail-closed runner resolution; only pre-commit became
     unconditionally exit 0 (D9)."""

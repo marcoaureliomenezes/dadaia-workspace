@@ -163,8 +163,7 @@ After `context baseline`, each step writes inside a worktree that then merges: a
    work -> integration PR merged green.
 7. **Continue or promote.** Continue: `release.py new` with the same id stacks the next
    candidate, reopening `DEFINITION`. Promote: merge the integration branch into the
-   principal, then merge the release PR release-please opens there — it owns the version, the CHANGELOG
-   section and the tag, and the publish jobs run on it; `release.py ship --sha <sha> --pr <n>`
+   principal by PR — that merge is the deploy; `release.py ship --sha <sha> --pr <n>`
    then records the merged promote PR and moves the release folder to `_archive/`.
 
 A bug needs none of this: register, lineage, RED test, root-cause fix, GREEN, `resolve`

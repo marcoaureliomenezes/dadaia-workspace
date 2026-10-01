@@ -10,24 +10,15 @@
 # (`push_gate_decision`'s docstring) is the one list of refusals; this script itself only
 # refuses an unresolvable runner (below).
 #
-# The CI-equivalent preflight (ruff format --check, ruff check, mypy --strict,
-# lint-imports, pytest) NO LONGER runs from this hook (v0.5.0 FR9/D9 — it moved OFF
-# the hook and became the always-on rule "run `dadaia ci preflight` before you push",
-# `dd-code-review` + `dd-gitflow-default` + `dd-release-implementation`). A failing local
-# preflight therefore no longer blocks a push through THIS hook — run `dadaia ci
-# preflight` yourself before pushing; CI still gates on the same checks independently,
-# on every push.
-#
 # Installed to .git/hooks/pre-push by `dadaia ci install-hook`.
 # Emergency bypass (discouraged, leaves a trace in reflog): git push --no-verify
 #
 # Runner resolution (v0.1.10, T-010-26, bug pre-push-gate-cannot-locate-workspace-venv):
-#   1. $DADAIA_BIN env override        → "$DADAIA_BIN ci <verb>"
-#   2. walk UP from repo root to the workspace root, probe
+#   1. walk UP from repo root to the workspace root, probe
 #      "<dir>/.dadaia/.venv/bin/dadaia"  (canonical self-hosting layout: the repo
 #      lives at <ws>/repos/<slug> and the venv at <ws>/.dadaia/.venv)
-#   3. poetry on PATH                  → "poetry run dadaia ci <verb>"
-#   4. repo-local ".venv/bin/dadaia"
+#   2. poetry on PATH                  → "poetry run dadaia ci <verb>"
+#   3. repo-local ".venv/bin/dadaia"
 #   None found → fail CLOSED with a clear error (never silently skip the gate).
 #
 # --probe-only: print the resolved runner and exit 0 without running the suite
@@ -55,14 +46,7 @@ RUNNER_BIN=()
 RUNNER_LABEL=""
 
 resolve_runner() {
-    # 1. Explicit override.
-    if [ -n "${DADAIA_BIN:-}" ]; then
-        RUNNER_BIN=("$DADAIA_BIN")
-        RUNNER_LABEL="DADAIA_BIN=$DADAIA_BIN"
-        return 0
-    fi
-
-    # 2. Walk up from repo root looking for the workspace-level venv.
+    # 1. Walk up from repo root looking for the workspace-level venv.
     local dir="$ROOT"
     while :; do
         local candidate="$dir/.dadaia/.venv/bin/dadaia"
@@ -79,14 +63,14 @@ resolve_runner() {
         dir="$parent"
     done
 
-    # 3. poetry on PATH.
+    # 2. poetry on PATH.
     if command -v poetry >/dev/null 2>&1; then
         RUNNER_BIN=(poetry run dadaia)
         RUNNER_LABEL="poetry run dadaia"
         return 0
     fi
 
-    # 4. Repo-local venv.
+    # 3. Repo-local venv.
     if [ -x ".venv/bin/dadaia" ]; then
         RUNNER_BIN=(.venv/bin/dadaia)
         RUNNER_LABEL="repo-venv .venv/bin/dadaia"
@@ -98,8 +82,8 @@ resolve_runner() {
 
 if ! resolve_runner; then
     echo "[pre-push] ERROR: could not locate the dadaia runner to run the CI gate." >&2
-    echo "[pre-push]   tried: \$DADAIA_BIN, walk-up <ws>/.dadaia/.venv/bin/dadaia, poetry, .venv/bin/dadaia" >&2
-    echo "[pre-push]   fix: set DADAIA_BIN, install deps (poetry install), or run the checks manually." >&2
+    echo "[pre-push]   tried: walk-up <ws>/.dadaia/.venv/bin/dadaia, poetry, .venv/bin/dadaia" >&2
+    echo "[pre-push]   fix: Operator action: install the workspace venv (re-run \`uvx dadaia-workspace init\` at the workspace root)." >&2
     exit 1
 fi
 

@@ -215,19 +215,17 @@ def test_baseline_adopts_origin_and_publishes_the_draft(
 
 @pytest.mark.skipif(sys.platform == "win32", reason="the shipped pre-push hook is bash")
 @pytest.mark.parametrize("seeded", [(), ("main",)], ids=["empty", "principal-only"])
-def test_every_publish_passes_the_shipped_pre_push_gate(
-    env, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, seeded
-) -> None:
+def test_every_publish_passes_the_shipped_pre_push_gate(env, tmp_path: Path, seeded) -> None:
     """The real shipped pre-push gate (this interpreter's CLI) admits the first publish and
     the integration birth at the published principal."""
     svc, repo, bare = env
     if seeded:
         _seed(bare, tmp_path / "seed", *seeded)
     _clone_onboarded(bare, repo)
-    runner = tmp_path / "dadaia"
+    runner = tmp_path / ".dadaia" / ".venv" / "bin" / "dadaia"
+    runner.parent.mkdir(parents=True)
     runner.write_text(f'#!/bin/sh\nexec "{sys.executable}" -m dadaia_workspace "$@"\n')
     runner.chmod(0o755)
-    monkeypatch.setenv("DADAIA_BIN", str(runner))
     hook = repo / ".git" / "hooks" / "pre-push"
     shutil.copyfile(workspace_layout.public_scripts_dir() / "pre-push-ci-gate.sh", hook)
     hook.chmod(0o755)

@@ -3,7 +3,7 @@ install-hook` + a real `git push` to a local bare remote. The planted-term refus
 amend -> push journey is the refusal harness Case `denylisted`
 (test_refusal_fix_lines_clear_their_refusal.py); the refusal message shape (A5.1-A5.3,
 masking) is tests/unit/features/chokepoints/test_push_denylist_scan.py.
-`DADAIA_BIN` is stubbed to skip only `ci preflight`, which refuses outside the source repo.
+The hook's runner is a `<ws>/.dadaia/.venv/bin/dadaia` stub forwarding to this interpreter's CLI.
 Size: LARGE — real git hooks.
 """
 
@@ -45,37 +45,22 @@ def _init_repo_and_remote(workspace: Path, slug: str) -> tuple[Path, Path]:
     return repo, bare
 
 
-def _write_dadaia_stub(workspace: Path, python_exe: str) -> Path:
-    """``DADAIA_BIN`` override for the installed hook (resolution rank 1, see
-    ``pre-push-ci-gate.sh``): skip ONLY the ``ci preflight`` stage — that stage targets
-    the dadaia-workspace source repo and refuses honestly outside it
-    (``ci-preflight-unusable-outside-the-source-repo``); A9.2 proves it green for THIS
-    release's own repo separately. Every other verb — in particular
-    ``ci push-gate-check``, which is what this journey proves — forwards to the REAL
-    CLI through this interpreter, stdin included (``exec`` preserves file descriptors).
-    """
-    stub = workspace / "dadaia-stub.sh"
+def _write_dadaia_stub(workspace: Path, python_exe: str) -> None:
+    """The workspace venv CLI the installed hook finds by its walk up from the repo:
+    forwards to the REAL CLI through this interpreter, stdin included."""
+    stub = workspace / ".dadaia" / ".venv" / "bin" / "dadaia"
+    stub.parent.mkdir(parents=True)
     stub.write_text(
-        "#!/usr/bin/env bash\n"
-        "set -euo pipefail\n"
-        'if [ "${1:-}" = "ci" ] && [ "${2:-}" = "preflight" ]; then\n'
-        '    echo "[stub] ci preflight skipped for this throwaway repo '
-        '(A9.2 covers the real repo)" >&2\n'
-        "    exit 0\n"
-        "fi\n"
-        f'exec "{python_exe}" -m dadaia_workspace.cli.main "$@"\n',
-        encoding="utf-8",
+        f'#!/bin/sh\nexec "{python_exe}" -m dadaia_workspace.cli.main "$@"\n', encoding="utf-8"
     )
     stub.chmod(0o755)
-    return stub
 
 
-def _hook_env(workspace: Path, *, stub: Path, denylist_file: Path) -> dict[str, str]:
+def _hook_env(workspace: Path, *, denylist_file: Path) -> dict[str, str]:
     """A harness-FREE env mirroring the installed pre-push hook's real child env."""
     env = dict(os.environ)
     for bad in ("CLAUDE_CODE_SESSION_ID", "CODEX_SESSION_ID", "CODEX_THREAD_ID", "DADAIA_MODE"):
         env.pop(bad, None)
-    env["DADAIA_BIN"] = str(stub)
     env["DADAIA_PRIVACY_DENYLIST"] = str(denylist_file)
     return env
 
@@ -126,8 +111,8 @@ def test_the_gate_runs_where_core_hookspath_points(tmp_path: Path) -> None:
     assert result.returncode == 0, result.stdout + result.stderr
     assert (repo / ".husky" / "pre-push").is_file()
 
-    stub = _write_dadaia_stub(tmp_path, sys.executable)
-    env = _hook_env(tmp_path, stub=stub, denylist_file=_write_denylist_file(tmp_path))
+    _write_dadaia_stub(tmp_path, sys.executable)
+    env = _hook_env(tmp_path, denylist_file=_write_denylist_file(tmp_path))
     refused = _push(repo, env)
 
     assert refused.returncode != 0, refused.stdout + refused.stderr

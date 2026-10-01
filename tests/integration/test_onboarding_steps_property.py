@@ -86,10 +86,10 @@ def _git_env(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     # its runner is stubbed out — the gate itself is proven by the push journeys.
     hooks = tmp_path / "hooks"
     hooks.mkdir()
-    runner = tmp_path / "dadaia-stub"
+    runner = tmp_path / ".dadaia" / ".venv" / "bin" / "dadaia"  # the hook's venv walk
+    runner.parent.mkdir(parents=True)
     runner.write_text("#!/bin/sh\ncat >/dev/null\n", encoding="utf-8")
     runner.chmod(0o755)
-    monkeypatch.setenv("DADAIA_BIN", str(runner))
     pairs = {"core.hooksPath": str(hooks), "user.name": "T", "user.email": "t@example.invalid"}
     monkeypatch.setenv("GIT_CONFIG_GLOBAL", str(tmp_path / "gitconfig"))
     monkeypatch.setenv("GIT_CONFIG_NOSYSTEM", "1")

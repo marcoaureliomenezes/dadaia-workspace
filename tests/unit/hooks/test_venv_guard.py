@@ -4,8 +4,8 @@ ONE rule lives in this policy (0.4.7 FR3 deleted the second):
 
 **Venv-rooting** (ADR-G4): a fixed leading-token check on the FIRST command token
 only — NO general shell parsing. It blocks `dadaia` and `python -m dadaia_workspace`
-invocations NOT rooted in `.dadaia/.venv/bin/` (or the workspace-absolute equivalent /
-``$DADAIA_BIN``), emitting a block message that contains the corrected command.
+invocations NOT rooted in `.dadaia/.venv/bin/` (or the workspace-absolute equivalent),
+emitting a block message that contains the corrected command.
 ``pip``/``pip3`` are never judged (ADR 0134). pytest, ruff, and mypy are never matched — their
 caches are redirected by `pyproject.toml` configuration, so no flag is enforced here
 (tests/unit/features/ci_preflight/test_no_pollution.py proves the bare commands clean).
@@ -43,6 +43,7 @@ def test_bare_dadaia_is_corrected_to_the_cli_fix_line(args: str) -> None:
     reason = venv_guard.evaluate_payload(_bash(f"dadaia {args}"))
     assert reason is not None
     assert f"fix: {fix_line(None)} {args}" in reason
+    assert "DADAIA_BIN" not in reason  # dadaia-bin-still-honoured-after-adr-0045
 
 
 @pytest.mark.parametrize(
@@ -67,7 +68,7 @@ def test_blocks_bare_workspace_invocation(command: str, tool: str, args: str) ->
 
 
 # ----------------------------------------------------------------------------
-# ALLOW matrix — venv-rooted / overridden / out-of-scope tools.
+# ALLOW matrix — venv-rooted / out-of-scope tools.
 # ----------------------------------------------------------------------------
 
 
@@ -79,9 +80,6 @@ def test_blocks_bare_workspace_invocation(command: str, tool: str, args: str) ->
         ".dadaia/.venv/bin/python -m dadaia_workspace",
         # Workspace-absolute venv equivalent.
         "/home/user/ws/.dadaia/.venv/bin/dadaia doctor",
-        # $DADAIA_BIN override.
-        "$DADAIA_BIN doctor",
-        "${DADAIA_BIN} doctor",
         # ADR-G4 explicit exclusions from the VENV-ROOTING rule — never matched by it.
         # (Compliant with the FR28 cache-guard too, see the dedicated matrices below.)
         "pytest -p no:cacheprovider",
@@ -103,7 +101,7 @@ def test_blocks_bare_workspace_invocation(command: str, tool: str, args: str) ->
         "python -m http.server",
     ],
 )
-def test_allows_venv_rooted_overridden_or_unmatched(command: str) -> None:
+def test_allows_venv_rooted_or_unmatched(command: str) -> None:
     assert venv_guard.evaluate_payload(_bash(command)) is None
 
 

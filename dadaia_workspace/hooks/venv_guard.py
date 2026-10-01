@@ -1,6 +1,6 @@
 """Venv-determinism PreToolUse policy: a Bash command whose FIRST token is a bare ``dadaia``
 or ``python[3] -m dadaia_workspace`` is BLOCKED with one ``fix:`` — the absolute venv
-command. A venv-rooted token, ``$DADAIA_BIN``, any other shape (``pip`` included, ADR 0134)
+command. A venv-rooted token, any other shape (``pip`` included, ADR 0134)
 or an unparseable payload is ALLOWED (fail-open)."""
 
 from __future__ import annotations
@@ -11,7 +11,6 @@ from dadaia_workspace.core.cli_line import fix_line, venv_line
 
 _PYTHON_NAMES: frozenset[str] = frozenset({"python", "python3"})
 _VENV_BIN = ".dadaia/.venv/bin/"
-_ALLOWED_PREFIXES: tuple[str, ...] = ("$DADAIA_BIN", "${DADAIA_BIN}")
 
 
 def evaluate_payload(payload: dict[str, object]) -> str | None:
@@ -26,7 +25,7 @@ def evaluate_payload(payload: dict[str, object]) -> str | None:
         args = shlex.split(command, comments=False, posix=True)
     except ValueError:
         return None
-    if not args or args[0].startswith(_ALLOWED_PREFIXES) or _VENV_BIN in args[0]:
+    if not args or _VENV_BIN in args[0]:
         return None
     token = args[0]
     rest = command.strip()[len(token) :].lstrip()
@@ -46,7 +45,7 @@ def evaluate_payload(payload: dict[str, object]) -> str | None:
         "[VENV GUARD] This command must run from the workspace venv "
         f"({_VENV_BIN}). Blocked:\n"
         f"  {command.strip()}\n"
-        "(pytest/ruff/mypy are never matched by this rule; set $DADAIA_BIN to override.)\n"
+        "(pytest/ruff/mypy are never matched by this rule.)\n"
         f"fix: {corrected}"
     )
 
