@@ -1,6 +1,6 @@
 # SPEC — Release: 0.5.0, candidate 6 (W2: root canon, `.dadaiaignore`, DEC-11, one deleter)
 
-**Status:** Draft
+**Status:** Approved
 **Release ID:** 0.5.0
 **Owner:** dd-product-engineer
 **Opened:** 2026-09-30
