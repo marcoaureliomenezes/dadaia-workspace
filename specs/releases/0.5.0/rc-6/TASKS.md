@@ -11,7 +11,7 @@ Every task is made in its own `worktree.py new` impl worktree, opened when its `
 
 ### Green base
 
-- [ ] **T-050-111 — Derived docs re-recorded after P-27.** `W:` `docs/bug-ledger-lessons.md`
+- [x] **T-050-111 — Derived docs re-recorded after P-27.** `W:` `docs/bug-ledger-lessons.md`
   `blocked by:` none · `delivers:` `feature/0.5.0` green on `test_docs_derived_from_memory.py`: Lessons 2–4 re-record their `QUALITY` markers, prose corrected only where P-27's removal made it false (MEMORY-UPDATE step 7); AC2.15 re-checked (`grep -c '^### P-27' specs/memory/QUALITY.md` = 0, landed by 3ca0585a) · `RED:` `pytest tests/contract/test_docs_derived_from_memory.py` (red today) · Δ 0 / 0.
 
 ### Deletions and small units — step 2
