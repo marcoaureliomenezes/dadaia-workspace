@@ -1,4 +1,5 @@
-"""Intent: CONTRACT — 0.4.7 FR1 (ADR 0018 measured_by): skill owner scripts. Size: SMALL.
+"""Intent: CONTRACT — 0.4.7 FR1 (ADR 0018 measured_by): skill owner scripts; AC3.1 (ADR 0135):
+one loader, one owner per grammar. Size: SMALL.
 
 A ``public/skills/*/scripts/`` script OWNS its logic, so it must be self-contained:
 stdlib imports only, exec bit set, and ``--help`` exits 0. Size is never capped: class and
@@ -119,28 +120,16 @@ _LOADER = "infrastructure/ledger_scripts.py"
 _RE_CALLS = {"compile", "search", "match", "fullmatch", "finditer", "findall", "sub", "split"}
 #: A grammar's head, as a package regex would spell it; only its owner and pinned twin hold it.
 _GRAMMAR_HEADS = {r"\*\*Origin:\*\*": set(), r"\*\*Status:\*\*": {"core/spec_status.py"}}
-#: Each §1.1 owner at its pinned location: `(file under dadaia_workspace/, top-level name)`.
+#: Each §1.1 owner's pinned file and top-level names (the Status pair: `test_spec_status.py`).
+_SCHEMA = "public/skills/dd-release-implementation/scripts/_release_schema.py"
 _OWNERS = {
-    "Origin line": ("public/skills/dd-release-implementation/scripts/_release_schema.py", "origin"),
-    "task marker": (
-        "public/skills/dd-release-implementation/scripts/_release_schema.py",
-        "MARK_RE",
-    ),
-    "marker order": ("public/skills/dd-release-implementation/scripts/_release_schema.py", "MARKS"),
-    "task W:": ("public/skills/dd-release-implementation/scripts/_release_schema.py", "writes"),
-    "Status token": ("core/spec_status.py", "extract_status"),
-    "Status twin": (
-        "public/skills/dd-release-implementation/scripts/_release_schema.py",
-        "extract_status",
-    ),
-    "JSONL split": ("public/skills/dd-bug-resolution/scripts/_ledger.py", "records"),
-    "ledger engine": ("public/skills/dd-bug-resolution/scripts/_ledger.py", "validate"),
-    "denylist terms": ("public/skills/dd-bug-resolution/scripts/_ledger.py", "terms"),
-    "owner loader": (_LOADER, "load_owner"),
-    "context registry": ("core/context_registry.py", "entries"),
-    "registry upgrader": ("features/migrate/state_v2.py", "execute_migration"),
-    "commit staging": ("public/skills/dd-gitflow-default/scripts/_worktree_kinds.py", "KINDS"),
-    "command printing": ("core/cli_line.py", "script_line"),
+    _SCHEMA: {"origin", "MARK_RE", "MARKS", "writes"},
+    "public/skills/dd-bug-resolution/scripts/_ledger.py": {"records", "validate", "terms"},
+    _LOADER: {"load_owner"},
+    "core/context_registry.py": {"entries"},
+    "features/migrate/state_v2.py": {"execute_migration"},  # the registry's upgrader
+    "public/skills/dd-gitflow-default/scripts/_worktree_kinds.py": {"KINDS"},
+    "core/cli_line.py": {"script_line"},
 }
 
 
@@ -197,13 +186,12 @@ def test_a_planted_second_loader_or_parser_bites(planted: str) -> None:
     assert _violations(planted, "features/x.py")
 
 
-@pytest.mark.parametrize("grammar", _OWNERS)
-def test_each_owner_sits_at_its_pinned_location(grammar: str) -> None:
-    rel, name = _OWNERS[grammar]
+@pytest.mark.parametrize("rel", _OWNERS)
+def test_each_owner_sits_at_its_pinned_location(rel: str) -> None:
     tree = ast.parse((_PACKAGE / rel).read_text("utf-8"))
     defined = {
         t.id if isinstance(t, ast.Name) else getattr(t, "name", None)
         for node in tree.body
         for t in (getattr(node, "targets", None) or [getattr(node, "target", node)])
     }
-    assert name in defined, f"{grammar}: {name} is not defined in {rel}"
+    assert _OWNERS[rel] <= defined, f"{rel} lost {sorted(_OWNERS[rel] - defined)}"
