@@ -220,7 +220,7 @@ def _allowance_violations(
     birth: frozenset[str],
     also: frozenset[str] = frozenset(),
 ) -> list[str]:
-    """AC6.5/AC6.6: unlisted hits, stale keys, values that are no open bug id, and an
+    """AC6.5/AC6.6: unlisted hits, stale keys, values that are no open bug id, and
     keys absent at birth — each one line, empty when the ratchet holds."""
     open_bugs = _open_bug_ids()
     problems = [f"unlisted: {hit}" for hit in sorted(hits - allowance.keys())]
@@ -268,7 +268,8 @@ def _duplicate_definitions(sources: dict[str, str]) -> set[str]:
     return {f"{rel}:{name}" for (name, _), rels in homes.items() if len(rels) > 1 for rel in rels}
 
 
-#: V37 allowance, born 2026-09-27: each duplicate, keyed to the open bug deleting it.
+#: V37 allowance: each duplicate, keyed to its proof; birth keys pinned at T-050-135
+#: (added 2026-09-30 by T-050-109), re-based by rc-9 AC7.4.
 _V37_BIRTH = frozenset(
     {
         "core/gitflow.py:candidate_dir",
@@ -487,17 +488,12 @@ def test_v39_every_doctor_code_has_a_fix_clears_case_or_a_key() -> None:
 
 
 def test_v39_trips_on_an_unlisted_code() -> None:
-    """RED fixture: a code with neither a plant nor a key is reported unlisted."""
+    """RED fixture: a code with neither a plant nor a key is reported unlisted; a key
+    absent at birth (AC3.16) is reported even when it covers a live code."""
     problems = _allowance_violations(
-        _uncovered({"ZZ-NEW-1", "ZZ-OK-1"}, {"ZZ-OK-1"}), {}, birth=frozenset()
+        _uncovered({"ZZ-NEW-1", "ZZ-LATE-1", "ZZ-OK-1"}, {"ZZ-OK-1"}),
+        {"ZZ-LATE-1": "report-only"},
+        birth=frozenset(),
+        also=frozenset({"report-only"}),
     )
-    assert problems == ["unlisted: ZZ-NEW-1"]
-
-
-def test_allowance_key_absent_at_birth_fails() -> None:
-    """RED fixture (AC3.16): a key born after the birth set is a violation, even when it
-    covers a live hit and carries an allowed value."""
-    problems = _allowance_violations(
-        {"NEW-1"}, {"NEW-1": "report-only"}, birth=frozenset(), also=frozenset({"report-only"})
-    )
-    assert problems == ["absent at birth (it only shrinks): NEW-1"]
+    assert problems == ["unlisted: ZZ-NEW-1", "absent at birth (it only shrinks): ZZ-LATE-1"]
