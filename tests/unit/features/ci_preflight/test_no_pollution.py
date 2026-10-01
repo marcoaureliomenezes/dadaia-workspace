@@ -26,18 +26,9 @@ def _pyproject() -> dict[str, object]:
     return tomllib.loads((_REPO_ROOT / "pyproject.toml").read_text(encoding="utf-8"))
 
 
-def test_the_projected_harness_env_names_absolute_caches_and_pyproject_none() -> None:
-    """sa-tool-caches-land-outside-the-cache-zone#B40-2: the Claude settings the library
-    projects export absolute RUFF_CACHE_DIR/MYPY_CACHE_DIR under .dadaia/tmp; pyproject
-    carries no relative .dadaia path."""
-    from dadaia_workspace.infrastructure.runtime_config import merge_claude_settings
-
-    env = merge_claude_settings(None, Path("/ws"))["env"]
-    assert env == {
-        "MYPY_CACHE_DIR": str(Path("/ws/.dadaia/tmp/mypy-cache")),
-        "RUFF_CACHE_DIR": str(Path("/ws/.dadaia/tmp/ruff-cache")),
-        "PLAYWRIGHT_MCP_OUTPUT_DIR": str(Path("/ws/.dadaia/mcps/playwright")),
-    }
+def test_pyproject_redirects_no_cache_relatively() -> None:
+    """sa-tool-caches-land-outside-the-cache-zone#B40-2: pyproject carries no relative
+    .dadaia cache path (the projected env is owned by test_tool_caches_stay_in_the_tmp_zone)."""
     tool = _pyproject()["tool"]
     assert "cache-dir" not in tool["ruff"] and "cache_dir" not in tool["mypy"]  # type: ignore[index,operator]
     assert "-p no:cacheprovider" in str(_pyproject()["tool"]["pytest"]["ini_options"]["addopts"])  # type: ignore[index]
