@@ -843,6 +843,7 @@ SITES: dict[str, tuple[Case | tuple[Case, ...] | Skip, ...]] = {
             then="git commit -qa --amend --no-edit && "
             "../../.dadaia/.venv/bin/dadaia context dead proj",
         ),
+        Skip("a refused hold (`repos/` outside the workspace): test_context_dead_holds.py"),
     ),
 }
 
