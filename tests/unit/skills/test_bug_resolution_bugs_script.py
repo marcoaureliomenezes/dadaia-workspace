@@ -61,7 +61,7 @@ def _ledger(root: Path, *records: dict[str, object]) -> Path:
     (specs / "bugs").mkdir(parents=True, exist_ok=True)
     for tracked in ("cli", ".github"):
         (root / tracked).mkdir(exist_ok=True)
-        (root / tracked / "x.py").touch()
+        (root / tracked / "x.py").write_text("def y() -> None: ...\n", encoding="utf-8")
     subprocess.run(["git", "init", "-q", str(root)], check=True)
     subprocess.run(["git", "-C", str(root), "add", "cli", ".github"], check=True)
     (specs / "bugs" / "BUGS.jsonl").write_text(
@@ -108,6 +108,7 @@ def test_record_missing_an_immutable_core_field_is_one_error_line(
         ({"severity": "URGENT"}, "severity"),
         ({"ts": "yesterday"}, "ts"),
         ({"root_cause": "retired key"}, "root_cause"),
+        ({"diff_direction": "net-negative"}, "diff_direction"),  # ADR 0160: derived, never stored
     ],
 )
 def test_invariant_violations_are_reported(
@@ -248,7 +249,7 @@ def _resolve_argv(bug_id: str = "a-bug", caused_by: str = "none") -> list[str]:
     return [
         "resolve", bug_id, "--cause", "c", "--caused-by", caused_by,
         "--resolved-release", "0.4.7", "--solution", "s", "--evidence-loop", "pytest -k x",
-        "--evidence-seam", "tests/x.py::y", "--evidence-diff", "net-negative: smaller",
+        "--evidence-seam", "cli/x.py::y[case]", "--evidence-diff", "net-negative: smaller",
     ]  # fmt: skip
 
 
@@ -394,7 +395,7 @@ def test_every_ledger_skill_stages_a_byte_identical_privacy_pair(tmp_path: Path)
         ).read_bytes()
 
 
-def test_resolve_closes_the_record_and_derives_diff_direction(script: Path, tmp_path: Path) -> None:
+def test_resolve_closes_the_record_and_stores_one_direction(script: Path, tmp_path: Path) -> None:
     deferred = {
         **_OPEN_RECORD,
         "status": "deferred",
@@ -407,7 +408,7 @@ def test_resolve_closes_the_record_and_derives_diff_direction(script: Path, tmp_
     assert done.stdout.strip() == "[ok] resolved a-bug"
     [record] = _records(specs)
     assert record["status"] == "resolved"
-    assert record["diff_direction"] == "net-negative"
+    assert "diff_direction" not in record  # ADR 0160: evidence_diff's prefix is the one source
     assert record["closed_at"] > deferred["closed_at"]  # the transition's own instant
     assert _run(script, "check", "--specs", str(specs)).returncode == 0
 
@@ -421,6 +422,23 @@ def test_resolve_refuses_an_unknown_caused_by(script: Path, tmp_path: Path) -> N
     fix = f"fix: {sys.executable} {script} resolve a-bug --caused-by none --specs {specs.resolve()}"
     assert fix.replace("\\", "/") in done.stderr.replace("\\", "/")
     assert _records(specs)[0]["status"] == "open"
+
+
+@pytest.mark.parametrize("seam", ["cli/gone.py::y", "cli/x.py::gone", "cli/x.py::y_more"])
+def test_resolve_refuses_a_seam_naming_no_file_or_def(
+    script: Path, tmp_path: Path, seam: str
+) -> None:
+    """ADR 0160: the seam is judged once, at resolve; check never re-judges a resolved one."""
+    specs = _ledger(tmp_path, _OPEN_RECORD)
+    argv = _resolve_argv()
+    argv[argv.index("--evidence-seam") + 1] = seam
+    done = _run(script, *argv, "--specs", str(specs))
+    assert done.returncode == 1
+    assert f"evidence_seam {seam!r}" in done.stderr
+    assert _records(specs)[0]["status"] == "open"
+    resolved = {**_OPEN_RECORD, "status": "resolved", "closed_at": "2026-09-21T00:00:00Z",
+                "evidence_seam": seam}  # fmt: skip
+    assert _run(script, "check", "--specs", str(_ledger(tmp_path, resolved))).returncode == 0
 
 
 def test_resolve_names_every_missing_field_at_once(script: Path, tmp_path: Path) -> None:
@@ -454,10 +472,12 @@ def test_the_other_three_transitions_close_the_record(
 
 def test_update_writes_a_governance_field(script: Path, tmp_path: Path) -> None:
     specs = _ledger(tmp_path, _OPEN_RECORD)
-    done = _run(script, "update", "a-bug", "--set", "audited=20260920-sweep", "--specs", str(specs))
+    done = _run(script, "update", "a-bug", "--set", "audited=20260920-sweep",
+                "--set", "caused_by=none", "--specs", str(specs))  # fmt: skip
     assert done.returncode == 0, done.stderr
-    assert done.stdout.strip() == "[ok] updated audited for a-bug"
+    assert done.stdout.strip() == "[ok] updated audited, caused_by for a-bug"
     assert _records(specs)[0]["audited"] == "20260920-sweep"
+    assert _records(specs)[0]["caused_by"] == "none"
 
 
 @pytest.mark.parametrize(
@@ -465,7 +485,6 @@ def test_update_writes_a_governance_field(script: Path, tmp_path: Path) -> None:
     [
         ("status=resolved", "resolve|supersede|defer|reject"),
         ("closed_at=2026-09-21T00:00:00Z", "resolve|supersede|defer|reject"),
-        ("caused_by=a-bug", "--caused-by"),
         ("superseded_by=other", "supersede"),
         ("title=rewritten", "immutable-core"),
         ("reported_by=other", "immutable-core"),
@@ -513,6 +532,7 @@ def test_status_and_stats_read_the_ledger(script: Path, tmp_path: Path) -> None:
     closed = {
         **_OPEN_RECORD, "id": "old-bug", "status": "resolved",
         "closed_at": "2026-09-20T11:00:00Z", "severity": "HIGH",
+        "evidence_diff": "net-positive: prod +2",
     }  # fmt: skip
     specs = _ledger(tmp_path, _OPEN_RECORD, closed)
     open_only = _run(script, "status", "--specs", str(specs))
@@ -523,6 +543,7 @@ def test_status_and_stats_read_the_ledger(script: Path, tmp_path: Path) -> None:
     assert "total\t2" in stats.stdout
     assert "status:resolved\t1" in stats.stdout
     assert "severity:HIGH\t1" in stats.stdout
+    assert "direction:net-positive\t1" in stats.stdout  # ADR 0160: read from evidence_diff
 
 
 def test_archive_moves_only_records_closed_past_the_threshold(script: Path, tmp_path: Path) -> None:

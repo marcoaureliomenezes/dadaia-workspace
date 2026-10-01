@@ -38,7 +38,7 @@ _HELP = {
     "append": "register a brand-new open record",
     "status": "list records, open only by default",
     "stats": "aggregate counts by status and by severity",
-    "update": "write a governance field other than status/closed_at/caused_by",
+    "update": "write a governance field other than status/closed_at",
     "resolve": "close a record as resolved, with its lineage and evidence triple",
     "supersede": "close a record as superseded by another slug",
     "defer": "close a record as deferred, with a reason",
@@ -80,8 +80,12 @@ def _read(args: argparse.Namespace, specs: Path) -> int:
     records = read_records(specs / LEDGER)
     if args.verb == "stats":
         print(f"total\t{len(records)}")
-        for label, key in (("status", "status"), ("severity", "severity")):
-            counts = Counter(str(r[key]) for r in records if r.get(key))
+        for label, key in (
+            ("status", "status"),
+            ("severity", "severity"),
+            ("direction", "evidence_diff"),
+        ):
+            counts = Counter(str(r[key]).split(":")[0] for r in records if r.get(key))
             for value, count in sorted(counts.items()):
                 print(f"{label}:{value}\t{count}")
         return 0
@@ -132,7 +136,9 @@ def _write(args: argparse.Namespace, specs: Path) -> int:
         return 0
     values = _values(args, _OPTIONS[args.verb])
     known = {str(r["id"]) for r in read_records(ledger)}
-    commit(ledger, lambda records: tr.transition(records, args.bug_id, args.verb, values, known))
+    commit(
+        ledger, lambda rs: tr.transition(rs, args.bug_id, args.verb, values, known, specs.parent)
+    )
     print(f"[ok] {tr.STATUS_BY_VERB[args.verb]} {args.bug_id}")
     return 0
 

@@ -24,14 +24,25 @@ REQUIRED_BY_VERB = {
     "supersede": ("by",), "defer": ("reason",), "reject": ("reason",),
 }  # fmt: skip
 _EVIDENCE_DIFF_RE = re.compile(r"^(net-negative|net-positive|net-neutral):\s*\S.*$")
+_SEAM_RE = re.compile(r"^([^\s:;]+)(?:::(?:\w+::)*(\w+))?")
 STATUS_BY_VERB = {"resolve": "resolved", "supersede": "superseded",
                   "defer": "deferred", "reject": "rejected"}  # fmt: skip
 
 
+def _seam_exists(seam: str, root: Path) -> bool:
+    """The seam's leading ``path[::…::name]`` names a file under *root* and, with a name,
+    a ``def <name>`` in it (ADR 0160) — judged once, here, never re-judged by ``check``."""
+    match = _SEAM_RE.match(seam)
+    if match is None or not (path := root / match[1]).is_file():
+        return False
+    return not match[2] or re.search(rf"\bdef {match[2]}\b", path.read_text("utf-8")) is not None
+
+
 def transition(records: Records, bug_id: str, verb: str, values: dict[str, Any],
-               known_ids: set[str]) -> Records:  # fmt: skip
+               known_ids: set[str], root: Path) -> Records:  # fmt: skip
     """The ONE way a record reaches a terminal status. Every field the verb requires is
-    checked first and every problem named at once; the record is untouched on refusal."""
+    checked first and every problem named at once; the record is untouched on refusal.
+    A resolve's seam is read under *root*, the repo the ledger belongs to."""
     missing = [name for name in REQUIRED_BY_VERB[verb] if not (values.get(name) or "").strip()]
     if missing:
         raise Refusal(
@@ -53,9 +64,14 @@ def transition(records: Records, bug_id: str, verb: str, values: dict[str, Any],
                 f"caused_by {values['caused_by']!r} is not a record of this bug ledger",
                 f"{_SCRIPT} resolve {bug_id} --caused-by none",
             )
+        if not _seam_exists(values["evidence_seam"], root):
+            raise Refusal(
+                f"evidence_seam {values['evidence_seam']!r} names no file or 'def <name>' "
+                f"under {root}",
+                f"{_SCRIPT} resolve {bug_id} --evidence-seam <tests/path.py::test_name>",
+            )
         for key in REQUIRED_BY_VERB["resolve"]:
             _set(updated, key, values[key])
-        _set(updated, "diff_direction", values["evidence_diff"].split(":", 1)[0])
     elif verb == "supersede":
         _set(updated, "superseded_by", values["by"])
     else:

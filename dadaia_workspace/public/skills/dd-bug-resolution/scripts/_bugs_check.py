@@ -9,7 +9,6 @@ commit, so a writer/validator disagreement is unrepresentable. The schema is
 from __future__ import annotations
 
 import json
-import re
 import sys
 from collections.abc import Iterator
 from pathlib import Path
@@ -18,7 +17,6 @@ from typing import Any
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import _ledger  # noqa: E402
-from _ledger import JSON_TYPES  # noqa: E402
 
 CODE = "LEDGER-BUGS-SCHEMA"
 LEDGER = "bugs/BUGS.jsonl"
@@ -28,44 +26,6 @@ TERMINAL = ("resolved", "superseded", "deferred", "rejected")
 
 def load_schema() -> dict[str, Any]:
     return _ledger.load_schema("bug-record-v1")
-
-
-def _field_errors(key: str, value: object, spec: dict[str, Any]) -> Iterator[str]:
-    declared = spec.get("type")
-    allowed: list[str] = declared if isinstance(declared, list) else [declared] if declared else []
-    if allowed and not any(isinstance(value, JSON_TYPES[name]) for name in allowed):
-        yield f"field {key!r} must be of type {declared}"
-        return
-    if not isinstance(value, str):
-        return
-    enum = spec.get("enum")
-    if enum and value not in enum:
-        yield f"field {key!r} must be one of {sorted(enum)}, got {value!r}"
-    pattern = spec.get("pattern")
-    if pattern is not None and re.search(pattern, value) is None:
-        yield f"field {key!r} value {value!r} does not match {pattern}"
-    minimum = spec.get("minLength")
-    if minimum is not None and len(value) < minimum:
-        yield f"field {key!r} is shorter than its minLength of {minimum}"
-
-
-def schema_errors(record: object, schema: dict[str, Any]) -> Iterator[str]:
-    """The subset bug-record-v1 uses: required, type, enum, pattern, minLength and
-    ``additionalProperties: false`` — the one that reports a retired key."""
-    if not isinstance(record, dict):
-        yield "record is not a JSON object"
-        return
-    properties: dict[str, Any] = schema["properties"]
-    for key in schema["required"]:
-        if key not in record:
-            yield f"missing required field {key!r}"
-    if schema.get("additionalProperties") is False:
-        for key in sorted(set(record) - set(properties)):
-            yield f"field {key!r} is not allowed by bug-record-v1 (unknown or retired key)"
-    for key, value in record.items():
-        spec = properties.get(key)
-        if spec is not None:
-            yield from _field_errors(key, value, spec)
 
 
 def invariant_errors(record: dict[str, Any]) -> Iterator[str]:
@@ -104,7 +64,7 @@ def findings_for(text: str, rel: str = LEDGER) -> list[dict[str, Any]]:
         except json.JSONDecodeError as exc:
             add(number, f"line is not valid JSON: {exc.msg}")
             continue
-        messages = list(schema_errors(record, schema))
+        messages = list(_ledger.validate(record, schema, schema, "record"))
         for message in messages:
             add(number, message)
         if messages:
@@ -129,7 +89,11 @@ def histo_findings(text: str) -> list[dict[str, Any]]:
             record, messages = None, [f"line is not valid JSON: {exc.msg}"]
         else:
             legacy = isinstance(record, dict) and "event" in record
-            messages = [] if record is None or legacy else list(schema_errors(record, schema))
+            messages = (
+                []
+                if record is None or legacy
+                else list(_ledger.validate(record, schema, schema, "record"))
+            )
         out += [{"code": CODE, "verdict": "error", "path": HISTO, "line": number,
                  "message": m} for m in messages]  # fmt: skip
     return out

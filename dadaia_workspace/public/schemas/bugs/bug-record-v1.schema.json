@@ -179,16 +179,6 @@
       "x-mutability": "write-once",
       "description": "The FR23 evidence triple: the diff direction on the touched feature, prefixed 'net-negative:'/'net-positive:'/'net-neutral:' with a checkable rationale."
     },
-    "diff_direction": {
-      "type": "string",
-      "enum": [
-        "net-negative",
-        "net-neutral",
-        "net-positive"
-      ],
-      "x-mutability": "write-once",
-      "description": "The closed-enum token `evidence_diff` already carries as free text — the fix-shape metric reads this field, not a parse of `evidence_diff` (FR14 metric 3)."
-    },
     "superseded_by": {
       "type": "string",
       "minLength": 1,

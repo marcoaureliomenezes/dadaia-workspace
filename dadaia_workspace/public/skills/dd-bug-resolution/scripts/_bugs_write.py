@@ -28,7 +28,6 @@ WRITE_ONCE = tuple(k for k, v in _MUTABILITY.items() if v == "write-once")
 #: The fields a verb owns, so `update` refuses them and names the verb.
 _TRANSITIONS = ("resolve|supersede|defer|reject", "")
 _VERB_OWNED = {"status": _TRANSITIONS, "closed_at": _TRANSITIONS,
-               "caused_by": ("resolve", "--caused-by <bug-id|none> "),
                "superseded_by": ("supersede", "--by <slug> ")}  # fmt: skip
 _SCRIPT = script(Path(__file__).parent / "bugs.py")
 

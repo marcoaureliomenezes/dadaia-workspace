@@ -69,7 +69,7 @@ python3 .agents/skills/dd-bug-resolution/scripts/bugs.py resolve <bug-id> --caus
   --solution … --evidence-loop … --evidence-seam … --evidence-diff 'net-negative: prod +a/-b, tests +c/-d'
 ```
 
-- `diff_direction` is derived from `--evidence-diff`'s `net-*:` prefix — there is no `--diff-direction` flag.
+- The direction is `--evidence-diff`'s `net-*:` prefix; `--evidence-seam` must name an existing file and `def`.
 - `--caused-by` is validated against the ledger or the literal `none`; an unknown id exits 1.
 - Stage code + regression test + the `BUGS.jsonl` line together, the red loop quoted in the
   body — ONE commit, shape 3 of `dd-gitflow-default` §3a.
