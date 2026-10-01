@@ -25,7 +25,7 @@ from enum import StrEnum
 from functools import partial
 from pathlib import Path
 
-from dadaia_workspace.core import invocation, session_store, workspace_layout
+from dadaia_workspace.core import context_registry, session_store, workspace_layout
 from dadaia_workspace.core.cli_line import fix_line, shell_line
 from dadaia_workspace.core.doctor_rules import Rule, SectionFinding
 from dadaia_workspace.core.exceptions import SchemaVersionError
@@ -304,7 +304,7 @@ class DoctorService:
     def scan(self) -> tuple[Finding, ...]:
         """Every entry of the instance, classified, in the fixed FR3 order."""
         globs, _, invalid = workspace_layout.operator_globs(self._workspace_root)
-        rules = (globs, *invocation.registered_slugs(self._workspace_root))
+        rules = (globs, *context_registry.registered_slugs(self._workspace_root))
         findings: list[Finding] = [*self._missing_core(), *self._scan_dadaiaignore(invalid)]
         findings.extend(self._scan_places(rules))
         findings.extend(self._scan_repo_trees())

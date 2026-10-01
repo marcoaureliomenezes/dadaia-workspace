@@ -8,7 +8,7 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
-from dadaia_workspace.core import invocation, workspace_layout, workspace_resolver
+from dadaia_workspace.core import context_registry, invocation, workspace_layout, workspace_resolver
 from dadaia_workspace.core.cli_line import mkdir_line
 from dadaia_workspace.hooks import _common
 
@@ -40,7 +40,7 @@ def _root_violation(anchor: Path | None, raw_path: str) -> str | None:
         return None
     rel = fpath.resolve().relative_to(ws)
     globs = workspace_layout.operator_globs(ws)[0]
-    slugs = invocation.registered_slugs(ws)
+    slugs = context_registry.registered_slugs(ws)
     if not rel.parts or workspace_layout.verdict(rel.as_posix(), False, globs, *slugs) != "slop":
         return None
     return (

@@ -7,7 +7,6 @@ walked from the target first, so a cwd inside a nested sandbox never shadows the
 
 from __future__ import annotations
 
-import json
 import os
 import re
 from collections.abc import Mapping
@@ -15,7 +14,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal
 
-from dadaia_workspace.core import workspace_resolver
+from dadaia_workspace.core import context_registry, workspace_resolver
 from dadaia_workspace.core.cli_line import fix_line
 from dadaia_workspace.core.models.spec_context import CONTEXT_NAME_RE
 from dadaia_workspace.core.session_store import live_session
@@ -90,44 +89,8 @@ def resolve_session_id(env: Mapping[str, str]) -> str:
     return sanitize_session_id(candidate)
 
 
-def _registry_entries(workspace_root: Path) -> list[dict[str, object]] | None:
-    """The context registry's ``contexts`` list, or ``None`` when it cannot be read or is
-    not a ``{"contexts": [...]}`` object."""
-    registry = workspace_root / ".dadaia" / "states" / "spec_contexts.json"
-    try:
-        data = json.loads(registry.read_text(encoding="utf-8"))
-    except (json.JSONDecodeError, OSError, ValueError):
-        return None
-    contexts = data.get("contexts", []) if isinstance(data, dict) else None
-    return [e for e in contexts if isinstance(e, dict)] if isinstance(contexts, list) else None
-
-
 def _registry_contexts(workspace_root: Path) -> list[dict[str, object]]:
-    return _registry_entries(workspace_root) or []
-
-
-def _entry_slugs(entry: dict[str, object]) -> tuple[object, ...]:
-    """A registry entry's repo slugs, unvalidated: the main one (falsy when absent) first."""
-    associated = entry.get("associated_repos")
-    listed = associated if isinstance(associated, list) else []
-    return (
-        entry.get("repo_slug") or entry.get("repo"),
-        *(a.get("slug") for a in listed if isinstance(a, dict)),
-    )
-
-
-def registered_slugs(workspace_root: Path) -> tuple[frozenset[str], frozenset[str]]:
-    """What ``repos/`` and ``worktrees/`` admit: every repo slug of every registered context,
-    then of every ALIVE one; an unreadable registry admits all (``*``), never nothing."""
-    entries = _registry_entries(workspace_root)
-    if entries is None:
-        return frozenset("*"), frozenset("*")
-    alive = [e for e in entries if str(e.get("state", "")).lower() == "alive"]
-    every, live = (
-        frozenset(s for e in group for s in _entry_slugs(e) if isinstance(s, str) and s)
-        for group in (entries, alive)
-    )
-    return every, live
+    return context_registry.entries(workspace_root) or []
 
 
 def alive_context_names(workspace_root: Path) -> list[str]:
@@ -150,7 +113,7 @@ def _context_registered(workspace_root: Path, name: str) -> bool:
 def repo_slug_for_context(workspace_root: Path, name: str) -> str | None:
     """The ``repos/<slug>`` dir a context NAME lives in, or ``None`` when unregistered."""
     for entry in _registry_contexts(workspace_root):
-        slug = _entry_slugs(entry)[0]
+        slug = context_registry.entry_slugs(entry)[0]
         if entry.get("name") == name and isinstance(slug, str) and slug:
             return slug
     return None
@@ -172,7 +135,7 @@ def repo_owner(workspace_root: Path, path: Path) -> tuple[str, str, str] | None:
 
 def _owning_entry(workspace_root: Path, slug: str) -> tuple[str, str] | None:
     for entry in _registry_contexts(workspace_root):
-        main, *_ = slugs = _entry_slugs(entry)
+        main, *_ = slugs = context_registry.entry_slugs(entry)
         name = entry.get("name")
         if slug in slugs and isinstance(name, str) and name and isinstance(main, str):
             return name, main
@@ -218,7 +181,7 @@ def all_repos(workspace_root: Path, context_name: str) -> frozenset[str]:
     for entry in _registry_contexts(workspace_root):
         if entry.get("name") != context_name:
             continue
-        main, *associated = _entry_slugs(entry)
+        main, *associated = context_registry.entry_slugs(entry)
         return frozenset(s for s in (main or context_name, *associated) if isinstance(s, str) and s)
     return frozenset()
 

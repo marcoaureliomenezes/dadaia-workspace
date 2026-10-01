@@ -53,7 +53,7 @@ def _functions(tree: ast.AST) -> Iterator[ast.FunctionDef | ast.AsyncFunctionDef
 #: core/ modules whose file I/O is architecture-authorized (ARCHITECTURE.md P-11); new I/O
 #: enters core/ only by joining this set on purpose.
 _CORE_IO_STEMS = frozenset(
-    {"workspace_resolver", "atomic_write", "invocation", "session_store", "handoff_index",
+    {"workspace_resolver", "atomic_write", "context_registry", "session_store", "handoff_index",
      "template_history", "gitflow", "workspace_layout"}
 )  # fmt: skip
 _PATH_IO_ATTRS = frozenset(

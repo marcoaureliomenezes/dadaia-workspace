@@ -249,7 +249,7 @@ def verdict(
     (root, ``.dadaia/<zone>``, a closed zone's entry, ``repos/<r>``, ``worktrees/<r>``) outside
     its allow set is ``operator`` iff an exception glob matches its name or path, else
     ``slop``; below an open level, ``canon``. *repos*/*worktrees* are the admitted slugs
-    (``invocation.registered_slugs``)."""
+    (``context_registry.registered_slugs``)."""
     slugs: dict[str, Collection[str]] = {"repos": repos, "worktrees": {*worktrees, "AGENTS.md"}}
     parts = rel.strip("/").split("/")
     for depth, name in enumerate(parts):
