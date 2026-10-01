@@ -1,6 +1,6 @@
 """`dadaia doctor` reports the derived onboarding step and refuses a ghost context.
 
-Intent: CONTRACT — 0.4.8 FR6 AC6.1, AC6.3, AC3.1 doctor half (T-048-07). Size: MEDIUM
+Intent: CONTRACT — 0.4.8 FR6 AC6.1, AC6.3, AC3.1 doctor half (T-048-07); 0.5.0 AC4.4. Size: MEDIUM
 (integration: a real initialized workspace, a real git checkout as the level-2 repo).
 """
 
@@ -88,5 +88,6 @@ def test_doctor_names_the_onboarding_step_of_the_context_it_judges(
     assert text in result.output, result.output
     assert code is None or result.exit_code == code, result.output
     assert "SPEC-DOC" not in result.output
+    assert code != 1 or result.output.count("fix: ") == 1, result.output  # a refusal: one fix line
     cli = workspace / ".dadaia" / ".venv" / PLATFORM.venv_scripts_dir / "dadaia"
     assert f"{cli}{PLATFORM.venv_exe_suffix} " in result.output

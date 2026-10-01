@@ -194,8 +194,10 @@ def _resolve_run(
     except ContextNotFoundError as exc:
         if context is None:  # a stale ambient bind is no bind — only a NAMED ghost refuses
             return workspace_root, service, None, None
-        typer.echo(f"Error: {exc}", err=True)
-        typer.echo(f"fix: {fix_line(workspace_root, 'context', 'list')}", err=True)
+        problem = str(exc).partition("\n")[0]  # show()'s `create` fix is not doctor's
+        typer.echo(
+            f"Error: {problem}\nfix: {fix_line(workspace_root, 'context', 'list')}", err=True
+        )
         raise typer.Exit(1) from None
     target = resolve_context_specs_dir_for_cli(workspace_root, name)
     # The ONE place a context's tree is resolved: a tree `specs init` has not stamped yet

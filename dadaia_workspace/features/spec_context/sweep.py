@@ -85,13 +85,25 @@ def lstat(path: Path) -> os.stat_result | None:
 
 def guarded(code: str, label: str, step: Callable[[], str | None]) -> list[str]:
     """Run one step, yielding at most one action line: what the step reports, or
-    ``skipped`` with the errno when the process cannot perform it. The pass never
+    ``skipped`` with the errno when the process cannot perform it — a permission refusal
+    naming the holding directory's owner and the operator's one act. The pass never
     aborts on an undeletable entry."""
     try:
         done = step()
     except OSError as exc:
-        return [f"{code}: skipped '{label}' (errno {exc.errno}: {exc.strerror})"]
+        line = f"{code}: skipped '{label}' (errno {exc.errno}: {exc.strerror})"
+        if isinstance(exc, PermissionError) and exc.filename:  # chmod failed: not ours
+            held = Path(exc.filename).parent  # where unlink permission lives
+            line += f" — {held} is owned by {_owner(held)}; Operator action: remove {held}"
+        return [line]
     return [] if done is None else [f"{code}: {done}"]
+
+
+def _owner(path: Path) -> str:
+    try:
+        return path.owner()
+    except (NotImplementedError, KeyError, OSError):  # Windows; a uid with no account
+        return "another account"
 
 
 def _inside(workspace_root: Path, target: Path) -> bool:

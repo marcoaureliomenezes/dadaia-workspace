@@ -195,18 +195,41 @@ def test_a_write_over_an_unreadable_line_refuses_naming_it(
 
 
 @pytest.mark.skipif(sys.platform == "win32", reason="the fake workspace CLI is a shebang script")
-def test_a_missing_specs_tree_is_refused_never_created(script: Path, tmp_path: Path) -> None:
-    """bug-law-spelling-registers-into-a-reaped-root-specs-tree: the fix names the bound tree."""
+@pytest.mark.parametrize("open_tree", [True, False], ids=["open-bug-worktree", "no-bug-worktree"])
+def test_a_missing_specs_tree_is_refused_never_created(
+    script: Path, tmp_path: Path, open_tree: bool
+) -> None:
+    """bug-law-spelling-registers-into-a-reaped-root-specs-tree; AC4.4 `_bound_tree`: the fix
+    names the open worktree of the ledger's kind (`bug`), else the command opening one —
+    never `repos/<r>/specs`, which only `specs/audits/` may write."""
     (cli := tmp_path / ".dadaia/.venv/bin/dadaia").parent.mkdir(parents=True)
     cli.write_text(f'#!{sys.executable}\nprint(\'{{"main_repo": "demo"}}\')\n', "utf-8")
     cli.chmod(0o755)
     (tmp_path / ".git").mkdir()
+    if open_tree:
+        (tmp_path / "worktrees/demo/0.5.0a-impl").mkdir(parents=True)
+        (tmp_path / "worktrees/demo/0.5.0b-bug").mkdir(parents=True)
     argv = ["append", "--bug-id", "x", "--title", "t", "--severity", "LOW", "--surface", "cli",
             "--component", "c", "--context", "c", "--symptom", "s", "--repro", "r", "--expected", "e"]  # fmt: skip
     done = _run(script, *argv, "--specs", "specs", cwd=tmp_path)
     assert done.returncode == 1 and not (tmp_path / "specs").exists()
-    fix = f"fix: {sys.executable} {script} {' '.join(argv)} --specs {tmp_path}/repos/demo/specs"
+    worktree = script.parents[2] / "dd-gitflow-default" / "scripts" / "worktree.py"
+    fix = (
+        f"fix: {sys.executable} {script} {' '.join(argv)} "
+        f"--specs {tmp_path}/worktrees/demo/0.5.0b-bug/specs"
+        if open_tree
+        else f"fix: {sys.executable} {worktree} new demo --kind bug"
+    )
     assert [ln for ln in done.stderr.splitlines() if ln.startswith("fix:")] == [fix]
+
+
+def test_a_fix_already_naming_its_tree_gains_no_second_specs() -> None:
+    """T-050-140 review I1: `with_specs` is idempotent."""
+    spec = importlib.util.spec_from_file_location("_specs", _SCRIPTS / "_specs.py")
+    assert spec is not None and spec.loader is not None
+    spec.loader.exec_module(specs := importlib.util.module_from_spec(spec))
+    fix = f"{specs.script(_SOURCE)} check --specs /a/specs"
+    assert specs.with_specs(fix, Path("/b/specs")) == fix
 
 
 def test_specs_default_resolves_the_nearest_git_rooted_specs_tree(

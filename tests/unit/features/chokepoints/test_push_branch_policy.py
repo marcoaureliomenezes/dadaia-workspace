@@ -3,7 +3,7 @@ AC8.1): work branches ``<prefix><M.m.p>`` are pushable; the principal and integr
 branches are PR-only; every refusal and its fix line name the CONFIGURED branches.
 Every row runs under the default gitflow or a custom one (``trunk``/``next``/``work/``).
 
-Intent: CONTRACT — AC6.5, AC8.1 (T-050-12); v0.4.4 A3.1, A3.5; T-060-07 findings 1, 2, 6
+Intent: CONTRACT — AC6.5, AC8.1 (T-050-12); AC4.4 fix-lines-are-not-one-runnable-command; v0.4.4 A3.1, A3.5; T-060-07 findings 1, 2, 6
 """
 
 from __future__ import annotations
@@ -41,7 +41,7 @@ def repo(tmp_path: Path) -> PushRepo:
 def _decide(stdin: str, repo: PushRepo, flow: Gitflow) -> Decision:
     refs, malformed = parse_push_stdin(stdin)
     return push_gate_decision(
-        refs, gitflow=flow, fixes=gate_fixes(), object_source=GitSubprocessObjectReader(),
+        refs, gitflow=flow, fixes=replace(gate_fixes(), work=f"{flow.work_prefix}0.6.0"), object_source=GitSubprocessObjectReader(),
         repo=repo.path, canon_violations_fn=canon_violations, malformed_lines=malformed,
     )  # fmt: skip
 
@@ -118,7 +118,7 @@ def test_the_gate_allows(repo: PushRepo, flow: Gitflow, scenario: Scenario) -> N
     assert decision.allowed, decision.message
 
 
-_WORK = "{prefix}<M.m.p>"
+_WORK = "{prefix}0.6.0"  # the live work branch, never the <M.m.p> pattern (fix-lines-are-not-one-runnable-command)
 _PR_TO_INTEGRATION = ["gh", "pr", "create", "--base", "{integration}", "--head", _WORK]
 _PR_TO_PRINCIPAL = ["gh", "pr", "create", "--base", "{principal}", "--head", "{integration}"]
 
@@ -143,7 +143,7 @@ def _birth_fix(tip: str, role: str) -> list[str]:
                  ["git", "-C", "/repo", "branch", "-m", "work/0.0.1", "work/0.0.2"], id="finding-2-work-branch-to-a-foreign-remote-ref"),
     pytest.param(_C, _feature_to_published_integration, "", None, id="finding-2-work-branch-to-the-integration-ref"),
     pytest.param(_C, lambda r, f: f"HEAD {_A} refs/heads/work/0.0.1 {_ZERO}", "",
-                 ["git", "-C", "/repo", "switch", "-c", "work/<M.m.p>", _A], id="finding-6-detached-head-cuts-the-work-branch"),
+                 ["git", "-C", "/repo", "switch", "-c", "work/0.6.0", _A], id="finding-6-detached-head-cuts-the-work-branch"),
     pytest.param(_D, lambda r, f: "this line has three fields", "--no-verify", None, id="finding-1-malformed-stdin-fails-closed"),
 ])
 # fmt: on
@@ -178,7 +178,7 @@ def test_a_branch_outside_the_gitflow_is_refused_naming_the_work_branch(
     assert not decision.allowed
     assert "outside the gitflow" in decision.message
     assert all(word in decision.message for word in (branch, flow.principal, flow.integration, flow.work_prefix))
-    assert _fix(decision) == ["git", "-C", "/repo", "switch", "-c", f"{flow.work_prefix}<M.m.p>", _A]
+    assert _fix(decision) == ["git", "-C", "/repo", "switch", "-c", f"{flow.work_prefix}0.6.0", _A]
 
 
 def test_an_outside_ref_is_carried_onto_the_live_work_branch() -> None:

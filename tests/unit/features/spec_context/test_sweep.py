@@ -1,6 +1,6 @@
 """The guard matrix over the ONE traversal primitive (0.4.7 FR6a, T-047-19).
 
-Intent: CONTRACT — 0.4.7 FR6 / T-047-19. Size: SMALL (unit).
+Intent: CONTRACT — 0.4.7 FR6 / T-047-19; doctor-tmp-expiry-foreign-owned-entry-never-clears. Size: SMALL (unit).
 
 Structural cause this suite pins: the five per-call-site guards in ``doctor.py``
 (``_entries``, ``_mtime``, ``_remove``, ``_guarded``, ``_remove_dead_repo``) each
@@ -12,6 +12,7 @@ through ``doctor-scan-raises-when-a-ttl-entry-vanishes-mid-walk`` and
 
 from __future__ import annotations
 
+import getpass
 import os
 from collections.abc import Callable
 from pathlib import Path
@@ -69,12 +70,19 @@ def test_walk_lists_only_a_real_directorys_sorted_entries(tmp_path: Path, setup:
     assert [p.name for p in sweep.walk(setup(tmp_path))] == names
 
 
-def test_guarded_turns_an_oserror_into_exactly_one_skipped_action() -> None:
+def test_guarded_turns_an_oserror_into_exactly_one_skipped_action(tmp_path: Path) -> None:
+    """doctor-tmp-expiry-foreign-owned-entry-never-clears: a skip the process cannot
+    lift names the directory's owner and the one operator act that clears it."""
+    (held := tmp_path / "dist").mkdir()
+
     def boom() -> str | None:
-        raise OSError(13, "Permission denied")
+        raise OSError(13, "Permission denied", str(held / "f"))
 
     [action] = sweep.guarded("WS-tmp-slop", "tmp/x", boom)
-    assert action.startswith("WS-tmp-slop: skipped 'tmp/x' (errno 13")
+    assert action == (
+        "WS-tmp-slop: skipped 'tmp/x' (errno 13: Permission denied) — "
+        f"{held} is owned by {getpass.getuser()}; Operator action: remove {held}"
+    )
     assert sweep.guarded("CODE", "path", lambda: None) == []
 
 

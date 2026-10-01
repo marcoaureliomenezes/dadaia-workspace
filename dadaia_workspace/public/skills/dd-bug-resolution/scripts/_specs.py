@@ -4,7 +4,6 @@ script prints through, staged beside each one like `_ledger.py`."""
 
 from __future__ import annotations
 
-import contextlib
 import json
 import os
 import shlex
@@ -26,19 +25,36 @@ def find_specs(given: Path | None) -> Path:
     rest = (w for i, w in enumerate(argv) if i and "--specs" not in (w, argv[i - 1]))
     rerun = " ".join((script(Path(argv[0])), *map(quote, rest)))
     print(f"error: no specs tree at {given or f'or above {here}'} — nothing was written",
-          f"fix: {with_specs(rerun, _bound_tree(here))}", sep="\n", file=sys.stderr)  # fmt: skip
+          f"fix: {_bound_fix(here, rerun)}", sep="\n", file=sys.stderr)  # fmt: skip
     raise SystemExit(1)
 
 
-def _bound_tree(here: Path) -> Path | str:
+#: The worktree kind each ledger script writes through; `audit.py` writes `specs/audits/`
+#: in the repo tree directly (rc-5 AC1.1).
+_KIND = {"bugs": "bug", "backlog": "backlog", "release": "release", "memory": "release"}
+
+
+def _bound_fix(here: Path, rerun: str) -> str:
+    """*rerun* on a writable tree of the bound context's main repo: the open worktree of
+    the ledger's kind, else the command opening one."""
     for root, venv in ((d, d / ".dadaia" / ".venv") for d in (here, *here.parents)):
         if cli := shutil.which("dadaia", path=f"{venv / 'bin'}{os.pathsep}{venv / 'Scripts'}"):
             shown = subprocess.run(
                 [cli, "context", "show", "--json"], capture_output=True, text=True
             )
-            with contextlib.suppress(ValueError, LookupError, TypeError):
-                return root / "repos" / str(json.loads(shown.stdout)["main_repo"]) / "specs"
-    return "repos/<context>/specs"
+            try:
+                repo = str(json.loads(shown.stdout)["main_repo"])
+            except (ValueError, LookupError, TypeError):
+                return f"{quote(cli)} context list"
+            if (kind := _KIND.get(Path(sys.argv[0]).stem)) is None:
+                return with_specs(rerun, root / "repos" / repo / "specs")
+            if trees := sorted((root / "worktrees" / repo).glob(f"*-{kind}")):
+                return with_specs(rerun, trees[0] / "specs")
+            worktree = (
+                Path(__file__).resolve().parents[2] / "dd-gitflow-default/scripts/worktree.py"
+            )
+            return f"{script(worktree)} new {quote(repo)} --kind {kind}"
+    return "Operator action: re-run inside a repo that holds its specs/ tree"
 
 
 def quote(word: str) -> str:
@@ -56,8 +72,8 @@ def script(path: Path) -> str:
 
 
 def with_specs(fix: str, specs: Path | str) -> str:
-    """The ONE ledger fix-line builder: a :func:`script` command gains ``--specs``."""
-    named = fix.startswith(f"{quote(sys.executable)} ")
+    """The ONE ledger fix-line builder: a :func:`script` command gains ``--specs`` once."""
+    named = fix.startswith(f"{quote(sys.executable)} ") and " --specs " not in fix
     return f"{fix} --specs {quote(str(specs))}" if named else fix
 
 
