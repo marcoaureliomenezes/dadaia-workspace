@@ -35,7 +35,16 @@ __all__ = ["Decision", "PathClass", "classify_path", "evaluate"]
 
 # Derived from the zone registry (OUTPUT + EPHEMERAL zones) — never a second literal.
 _ADDITIVE_DADAIA_PREFIXES: tuple[str, ...] = workspace_layout.additive_prefixes()
-_R = workspace_layout.Refusal
+_R = workspace_layout.FloorRefusal
+_Fix = Callable[[PurePath, str | None], str]
+_DRAFT: _Fix = lambda root, _: mkdir_line(root / ".dadaia" / "tmp")  # noqa: E731
+#: One fix per refusal, total: a new ``FloorRefusal`` member fails here, as ``REFUSALS`` does.
+_FIXES: dict[workspace_layout.FloorRefusal, _Fix] = {
+    _R.LAW: lambda root, _: fix_line(root, "public", "install"),
+    _R.OPERATOR: _DRAFT,
+    _R.GLOB: _DRAFT,
+    _R.SESSION: lambda root, ctx: fix_line(root, "context", *(("bind", ctx) if ctx else ("list",))),
+}
 
 _SCOPE_MESSAGE = (
     "[GATE] '{rel_path}' writes into repo '{repo}', owned by context '{owner}' — this "
@@ -80,7 +89,7 @@ def _worktree_fix(repo: str, repo_rel: str) -> str:
 
 def _protection(
     p: str, projected: frozenset[str], protected: tuple[str, ...]
-) -> tuple[workspace_layout.Refusal, str] | None:
+) -> tuple[workspace_layout.FloorRefusal, str] | None:
     """The one PROTECTED predicate, in precedence order: ``(refusal, match)`` — a *projected*
     path (LAW), a ``CORE_FLOOR`` entry (its own refusal), a *protected* glob (GLOB) — else ``None``."""
     floor = workspace_layout.CORE_FLOOR
@@ -96,7 +105,7 @@ def _protection(
 
 def classify_path(
     rel_path: str, projected: frozenset[str] = frozenset(), protected: tuple[str, ...] = ()
-) -> tuple[PathClass, tuple[workspace_layout.Refusal, str] | None]:
+) -> tuple[PathClass, tuple[workspace_layout.FloorRefusal, str] | None]:
     """(class, ``_protection`` hit) of a workspace-relative path; first match wins: PROTECTED
     (*projected*, then the floor, then a *protected* glob — ``_protection``'s order), ADDITIVE (the zone-registry ``.dadaia/``
     prefixes), else MUTATING — no ``repos/`` path is ever ADDITIVE (ADR 0124)."""
@@ -135,10 +144,7 @@ def evaluate(
     cls, hit = classify_path(rel_path, projected, protected)
     if hit:
         refusal, match = hit
-        fix = {
-            _R.LAW: fix_line(root, "public", "install"),
-            _R.SESSION: fix_line(root, "context", *(("bind", context) if context else ("list",))),
-        }.get(refusal, mkdir_line(root / ".dadaia" / "tmp"))
+        fix = _FIXES[refusal](root, context)
         message = workspace_layout.REFUSALS[refusal].format(path=rel_path, match=match)
         return Decision.BLOCK, message + f"fix: {fix}"
     if cls == PathClass.ADDITIVE or repo is None:
