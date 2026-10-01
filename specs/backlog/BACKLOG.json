@@ -74,22 +74,6 @@
       "provenance": "operator closure ruling 2026-09-28: the rest is mapped to the backlog; source the 0.5.0 closure review"
     },
     {
-      "id": "dadaiaignore-and-root-core-canon",
-      "title": "c5: .dadaiaignore replaces instance_exceptions.txt, a two-level root canon, init scaffolds the root files, core protected in two layers",
-      "opened": "2026-09-29",
-      "status": "idea",
-      "description": "Operator design (grill 2026-09-26, ADRs 0092-0096), back in 0.5.0 by ADR 0101 (operator 2026-09-29). Deliver: a root .dadaiaignore, operator-only and PROTECTED, replacing .dadaia/states/instance_exceptions.txt 1:1 (0092); its stdlib grammar, invalid line = doctor finding (0093); level-1 library core in core/workspace_layout.py incl. worktrees/ and .dadaiaignore, level 2 = .dadaiaignore (0094); init creates prompt.md, AGENTS.md, .dadaiaignore from a template (0095); gate blocks agent writes to core law/state, doctor --fix at SessionStart self-heals missing core, no Bash parsing (0096). Today: root whitelist exists; worktrees/ and .dadaiaignore absent from canon. Blocks canonical-worktrees (worktrees/ must be canon) and operator-protected-path-class. OPEN QUESTIONS for the operator (not resolved by the product engineer): (1) grill R2 'a missing .venv is fixed by uvx dadaia-workspace init <ws>' vs ADR 0067 (without the venv every gate wrapper warns and exits 0) and open bug missing-venv-hook-disarms-the-gate-invisibly: without the venv core protection's gate layer is off - which rules? (2) ADR 0092 / grill Q6 applies .dadaiaignore to harness directories, but ADR 0059 (later) says the doctor judges only ledger-owned entries there - does .dadaiaignore reach harness-dir interiors or only their top level? (3) ADR 0096 'no Bash parsing' vs the idea gate-judges-bash-writes (closure ruling 2026-09-28) - keep both, or reject one?",
-      "provenance": "operator grill 2026-09-26 (c5, Q1-Q6, R1-R3), handoff reports/main-thread/20260927-050-c4-evidence/handoffs/2026-09-26T211000Z-main-thread-grill-050-c4-c5-c6.handoff.json findings[3]-[9]; ADRs 0092-0096; deferred by ADR 0053 (2026-09-27), returned to 0.5.0 by operator ruling 2026-09-29 ('Coloque', ADR 0101); inventory rows A01-A03 in reports/main-thread/20260929-050-rc1-audit/leftbehind/ (REPORT.md, inventory.json)"
-    },
-    {
-      "id": "operator-protected-path-class",
-      "title": "DEC-11: an operator-protected path class the gate enforces in every harness",
-      "opened": "2026-09-29",
-      "status": "idea",
-      "description": "Deferred by ADR 0053 (2026-09-27) and kept deferred by ADR 0101 (operator 2026-09-29) until the operator rules otherwise. Today an operator-only folder inside a consumer repo is guarded only by one harness's permissions.deny; Codex and the others carry no protection. Remediation-plan DEC-11 options: (a) an operator glob file read by the gate in every harness (about +25 lines), the law stating Bash is not covered (backstop git/pre-push); (b) keep it per-harness config plus the git backstop, the law saying so. Recommendation (a). Grill 2026-09-26 Q2 routed 'operator-declared protection file' to the backlog. Depends on dadaiaignore-and-root-core-canon (same operator-file grammar). Open question: (a) or (b), and whether it is a second operator file or a section of .dadaiaignore.",
-      "provenance": "operator grill 2026-09-26 Q2 (handoff reports/main-thread/20260927-050-c4-evidence/handoffs/2026-09-26T211000Z-main-thread-grill-050-c4-c5-c6.handoff.json findings[4]); remediation-plan DEC-11 (reports/main-thread/20260927-050-c4-evidence/verify/plan.json); ADR 0053; ADR 0101; inventory row A04 in reports/main-thread/20260929-050-rc1-audit/leftbehind/ (REPORT.md, inventory.json)"
-    },
-    {
       "id": "docs-site-zensical-pages",
       "title": "c7: the docs site per ADR 0039 - Zensical on GitHub Pages, generated reference pages with a staleness check, README about 60 lines",
       "opened": "2026-09-29",
@@ -120,15 +104,6 @@
       "status": "idea",
       "description": "Deferred at 0.4.6 rc-3 closure ('new task ids') and never picked. dd-test-stewardship requires every test module to declare 'Intent: <KIND> - <AC id | bug-id | ...>' in its docstring. Counted 2026-09-29 on feature/0.5.0: tests/unit 29 of 149 files and tests/integration 7 of 55 lack it; tests/e2e and tests/contract are complete. A file deleted by the 0.5.0 test reduction leaves the count; the rest gets its intent or is itself a deletion candidate (a test that cannot state its intent).",
       "provenance": "0.4.6 rc-3 SPEC Out of scope (specs/releases/_archive/0.4.6/rc-3/SPEC.md); inventory row A12 in reports/main-thread/20260929-050-rc1-audit/leftbehind/ (REPORT.md, inventory.json); operator order 2026-09-29"
-    },
-    {
-      "id": "adr-0138-lane-in-memory-and-adrs-law",
-      "title": "specs/memory/AGENTS.md and specs/ADRs/AGENTS.md state the ADR 0138 no-ADR truth-correction lane",
-      "opened": "2026-09-30",
-      "status": "idea",
-      "description": "ADR 0138 (accepted) says candidate 5 edits both law files to state its lane: a commit changing a non-principle section of ARCHITECTURE.md or QUALITY.md only to state what the code already is needs no ADR and names its code evidence; a ### P-NN still needs its ADR. rc-5 did not land it. Both files render from dadaia_workspace/public/scaffold/{memory,ADRs}/AGENTS.md: an impl task plus the restamp. Until then every use cites ADR 0138 in its subject and names its code evidence (413bb9d6, 2158513f).",
-      "provenance": "ADR 0138 consequence unmet at rc-5 closure; dd-code-reviewer review of a12203b5 (2026-09-30)",
-      "relates": []
     },
     {
       "id": "structural-convergence-f053-f054-f057",
