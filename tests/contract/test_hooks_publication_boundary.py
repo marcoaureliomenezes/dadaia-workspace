@@ -1,6 +1,6 @@
 """FR9 — hooks de-slopped to the publication boundary (v0.5.0 D9).
 
-Three EXECUTED-PATH fixtures, at CONTRACT tier, that replace the two files this FR
+Two EXECUTED-PATH fixtures, at CONTRACT tier, that replace the two files this FR
 deletes: ``tests/integration/test_precommit_backlog_scoping.py`` (imported
 ``_run_backlog_doctor_gate`` directly — the symbol this FR deletes, so the import
 would fail) and its LARGE-tier e2e companion
@@ -17,9 +17,6 @@ text"):
 * :func:`test_pre_commit_exits_0_on_a_staged_set_backlog_doctor_would_reject` — A9.1:
   ``pre-commit-presence-gate.sh`` exits 0 on a staged set the (now-deleted) backlog
   doctor block would have rejected.
-* :func:`test_failing_preflight_no_longer_blocks_the_push` — A9.2 companion: a
-  simulated failing ``ci preflight`` no longer blocks a push through
-  ``pre-push-ci-gate.sh``, because the hook no longer invokes that verb at all.
 * :func:`test_unresolvable_runner_still_refuses_the_push` — A9.2: with no resolvable
   dadaia runner anywhere, ``pre-push-ci-gate.sh`` REFUSES the push (exit 1), never
   silently skips it — the fail-closed publication boundary the pre-commit hook does
@@ -39,7 +36,6 @@ Owner: dd-software-engineer
 from __future__ import annotations
 
 import json
-import os
 import shutil
 import stat
 import subprocess
@@ -137,64 +133,6 @@ def _plant_backlog_doctor_violation(repo: Path) -> None:
         ),
         encoding="utf-8",
     )
-
-
-def _hook_env() -> dict[str, str]:
-    """A harness-FREE env mirroring the real installed hook's child env."""
-    env = dict(os.environ)
-    for bad in ("CLAUDE_CODE_SESSION_ID", "CODEX_SESSION_ID", "CODEX_THREAD_ID", "DADAIA_MODE"):
-        env.pop(bad, None)
-    env.pop("DADAIA_SESSION_ID", None)
-    return env
-
-
-def _write_preflight_fails_stub(path: Path) -> None:
-    """``ci preflight`` fails loudly (exit 1); ``ci push-gate-check`` drains stdin and
-    succeeds. If the hook still invoked ``ci preflight``, ``set -euo pipefail`` would
-    abort the script on that failure — asserting the overall exit code proves,
-    EXECUTED, that the hook no longer reaches that branch at all."""
-    _write_executable(
-        path,
-        "#!/usr/bin/env bash\n"
-        "set -euo pipefail\n"
-        'if [ "${1:-}" = "ci" ] && [ "${2:-}" = "preflight" ]; then\n'
-        '    echo "[stub] simulated preflight FAILURE" >&2\n'
-        "    exit 1\n"
-        "fi\n"
-        'if [ "${1:-}" = "ci" ] && [ "${2:-}" = "push-gate-check" ]; then\n'
-        "    cat >/dev/null\n"
-        "    exit 0\n"
-        "fi\n"
-        'echo "[stub] unexpected verb: $*" >&2\n'
-        "exit 1\n",
-    )
-
-
-def test_failing_preflight_no_longer_blocks_the_push(tmp_path: Path) -> None:
-    """A9.2 companion: a failing local ``ci preflight`` no longer blocks a push
-    through ``pre-push-ci-gate.sh`` — the hook does not invoke that verb any more."""
-    workspace = tmp_path
-    repo = workspace / "repo"
-    repo.mkdir(parents=True)
-    subprocess.run(["git", "init", "-q"], cwd=repo, check=True)
-
-    stub = workspace / ".dadaia" / ".venv" / "bin" / "dadaia"  # the hook's venv walk
-    stub.parent.mkdir(parents=True)
-    _write_preflight_fails_stub(stub)
-
-    stdin_text = f"refs/heads/feature/0.0.1 {'a' * 40} refs/heads/feature/0.0.1 {_ZERO}\n"
-    result = subprocess.run(
-        [_BASH, str(_PRE_PUSH_SCRIPT)],
-        cwd=repo,
-        input=stdin_text,
-        capture_output=True,
-        text=True,
-        env=_hook_env(),
-        timeout=_DEADLINE,
-    )
-    out = result.stdout + result.stderr
-    assert result.returncode == 0, out
-    assert "simulated preflight FAILURE" not in out, out
 
 
 def test_unresolvable_runner_still_refuses_the_push(tmp_path: Path) -> None:

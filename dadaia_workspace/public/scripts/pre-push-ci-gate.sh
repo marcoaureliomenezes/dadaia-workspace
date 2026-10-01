@@ -21,7 +21,7 @@
 #   3. repo-local ".venv/bin/dadaia"
 #   None found → fail CLOSED with a clear error (never silently skip the gate).
 #
-# --probe-only: print the resolved runner and exit 0 without running the suite
+# --probe-only: print the resolved runner and exit 0 without running the push gate
 #               (cheap smoke for CLOSURE evidence).
 set -euo pipefail
 
@@ -81,8 +81,8 @@ resolve_runner() {
 }
 
 if ! resolve_runner; then
-    echo "[pre-push] ERROR: could not locate the dadaia runner to run the CI gate." >&2
-    echo "[pre-push]   tried: walk-up <ws>/.dadaia/.venv/bin/dadaia, poetry, .venv/bin/dadaia" >&2
+    echo "[pre-push] ERROR: could not locate the dadaia runner to run the push gate." >&2
+    echo "[pre-push]   tried: .dadaia/.venv/bin/dadaia walking up from $ROOT, poetry, .venv/bin/dadaia" >&2
     echo "[pre-push]   fix: Operator action: install the workspace venv (re-run \`uvx dadaia-workspace init\` at the workspace root)." >&2
     exit 1
 fi

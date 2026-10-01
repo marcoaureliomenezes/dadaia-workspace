@@ -99,7 +99,7 @@ def _run_probe(repo_dir: Path, *, path_dirs: list[Path]) -> subprocess.Completed
     ("name", "setup_fn", "expect_label"),
     [
         (
-            # Walk up from <ws>/repos/<slug> to <ws>/.dadaia/.venv/bin/dadaia.
+            # Walk up from <ws>/repos/<slug> to <ws>/.dadaia/.venv/bin/dadaia; it precedes poetry.
             "walk_up_to_workspace_venv",
             None,  # handled specially below
             "workspace-venv",
@@ -128,10 +128,12 @@ def test_runner_resolution_branch_table(
         ws_dadaia = ws / ".dadaia" / ".venv" / "bin" / "dadaia"
         _write_executable(ws_dadaia)
         bin_dir = _make_repo_with_fake_git(tmp_path, repo)
+        _write_executable(bin_dir / "poetry")
         res = _run_probe(repo, path_dirs=[bin_dir])
         assert res.returncode == 0, res.stderr
         assert expect_label in res.stdout
         assert str(ws_dadaia) in res.stdout
+        assert "poetry" not in res.stdout
         return
 
     if name == "poetry_on_path":
@@ -152,26 +154,3 @@ def test_runner_resolution_branch_table(
     res = _run_probe(repo, path_dirs=[bin_dir])
     assert res.returncode == 0, res.stderr
     assert expect_label in res.stdout
-
-
-def test_no_runner_fails_closed(tmp_path: Path) -> None:
-    """No runner anywhere → exit 1 with a clear error, never silently skipped
-    (CRIT-adjacent never-push-red)."""
-    repo = tmp_path / "isolated"
-    repo.mkdir(parents=True)
-    res = _run_probe(repo, path_dirs=[_make_repo_with_fake_git(tmp_path, repo)])
-    assert res.returncode == 1
-    assert "could not locate the dadaia runner" in res.stderr
-
-
-def test_workspace_venv_precedes_poetry(tmp_path: Path) -> None:
-    ws = tmp_path / "ws"
-    repo = ws / "repos" / "slug"
-    repo.mkdir(parents=True)
-    _write_executable(ws / ".dadaia" / ".venv" / "bin" / "dadaia")
-    bin_dir = _make_repo_with_fake_git(tmp_path, repo)
-    _write_executable(bin_dir / "poetry")
-    res = _run_probe(repo, path_dirs=[bin_dir])
-    assert res.returncode == 0, res.stderr
-    assert "workspace-venv" in res.stdout
-    assert "poetry" not in res.stdout
