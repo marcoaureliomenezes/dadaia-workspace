@@ -70,7 +70,7 @@ Each finding that cites a bug or an entry shares its destination; findings are `
   - Readout at `<start>` and `<end>`, by the commands rc-8 §G1 also uses: production lines `git ls-files -z 'dadaia_workspace/*.py' | xargs -0 cat | wc -l`, test functions `git grep -hE '^\s*(async\s+)?def test_' -- 'tests/*.py' | wc -l`, test lines `git ls-files -z 'tests/*.py' | xargs -0 cat | wc -l`. At 44d023e6: 24,965 / 1,193 / 44,164.
 - G2 `bugs.py status` lists no open record whose `caused_by` names a record or a commit of W3 or W4.
 - G3 Every still-open bug is re-run at `<end>`; one that no longer reproduces is resolved citing the commit that removed its cause; the count is logged.
-- G4 CI is green on the three OSes; `.dadaia/.venv/bin/dadaia doctor --context dadaia-workspace` exits 0; no job's wall-clock grows past its rc-6 closure duration (run 36813899731), pending OQ1.
+- G4 CI is green on the three OSes; `.dadaia/.venv/bin/dadaia doctor --context dadaia-workspace` exits 0; no job's wall-clock grows past its rc-6 closure duration (run 36813899731); the ADR 0119 breach stays with rc-8 W5 (operator 2026-10-01: "Sim, base rc-6 (Recomendado)").
 - G5 A test a DEL leaves dead leaves in the same commit; a new test states its intent and passes `dd-test-stewardship`'s admission; a new test file enters only when no file owns the behavior (0146 (5)).
 - G6 At closure, the audit's open findings and `active[]` are re-audited against the merged waves, rc-8's SPEC is re-scoped before its PLAN, and one `dispositions` entry logs open before, resolved with a commit, open after.
 
@@ -226,4 +226,4 @@ Each finding that cites a bug or an entry shares its destination; findings are `
 
 ## Open questions for the operator
 
-- OQ1: G4's wall-clock clause for rc-7 judges growth against rc-6's closure durations (run 36813899731) and leaves the ADR 0119 breach to rc-8 W5, as the rc-6 close review ruled for rc-6. Recommended: yes.
+- None. OQ1 (G4's wall-clock base) answered by the operator on 2026-10-01: rc-6's closure durations; see G4.
