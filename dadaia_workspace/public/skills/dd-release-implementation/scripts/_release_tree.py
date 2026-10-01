@@ -28,6 +28,7 @@ from _release_schema import (  # noqa: E402
     HISTO,
     MARK_RE,
     SEMVER_RE,
+    SHA_RE,
     STATE,
     TRIO,
     TRIO_PHASES,
@@ -173,7 +174,7 @@ def _definition_findings(
         docs = [str(candidate / n) for n in ("SPEC.md", "PLAN.md")]
         sha = drift.git(specs.parent, "log", "-1", "--format=%h", "--", *docs)[0]
         fix = with_specs(f"{SCRIPT} {NEXT['DEFINITION']} --sha {sha}", specs)
-    except (drift.Refusal, IndexError):
+    except (drift.Refusal, OSError, IndexError):  # no history, no git binary
         fix = f"Operator action: run `{NEXT['DEFINITION']}` at the commit approving {candidate}"
     return [{**finding(rel, 1, message), "fix": fix} for message in found]
 
@@ -306,13 +307,14 @@ def tree_findings(specs: Path) -> list[dict[str, Any]]:
         # 0.4.5-0.4.7 archives predate it (`ARCHIVED`, `rc`) and history is not rewritten.
         rel, act = path.relative_to(specs).as_posix(), f"rewrite {path.resolve()} as one JSON "
         try:
-            shipped = json.loads(path.read_text(encoding="utf-8")).get("shipped") or {}
-            shipped = {"sha": shipped.get("sha"), "pr": shipped.get("pr")}
-        except (json.JSONDecodeError, AttributeError) as error:
-            findings.append({**finding(rel, 1, f"archived state is not a JSON object: {error}"),
+            state = json.loads(path.read_text(encoding="utf-8"))
+        except json.JSONDecodeError as error:
+            findings.append({**finding(rel, 1, f"archived state is not valid JSON: {error}"),
                              "fix": f"Operator action: {act}object, from git history"})  # fmt: skip
             continue
-        if not (shipped.get("sha") and shipped.get("pr")):
+        shipped = state.get("shipped") if isinstance(state, dict) else None
+        if not (isinstance(shipped, dict) and SHA_RE.match(str(shipped.get("sha")))
+                and isinstance(shipped.get("pr"), int)):  # fmt: skip
             findings.append({**finding(rel, 1, "archived release carries no shipped {sha, pr}"),
                              "fix": f"Operator action: {act}object whose shipped names the "
                              "merged promote PR's sha and number"})  # fmt: skip
@@ -334,7 +336,7 @@ def ship_findings(specs: Path) -> list[dict[str, Any]]:
     if phase != "CLOSURE":
         found.append({**finding(rel, 1, f"release {live.release_id} is in phase {phase!r} — "
                       "only a CLOSURE release ships"),
-                      "fix": f"{SCRIPT} {NEXT[phase]} --sha $(git rev-parse --short HEAD)"})  # fmt: skip
+                      "fix": f"{SCRIPT} {NEXT.get(phase, 'check')} --sha $(git rev-parse --short HEAD)"})  # fmt: skip
     if (archive := specs / "releases" / "_archive" / live.release_id).exists():
         found.append({**finding(rel, 1, f"release {live.release_id} is live and already "
                       f"archived at {archive}"), "fix": f"Operator action: decide which of "

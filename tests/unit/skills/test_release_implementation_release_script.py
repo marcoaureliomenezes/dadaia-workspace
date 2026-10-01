@@ -337,9 +337,26 @@ def test_check_judges_a_definition_release(
     entries = [{"ts": _TS, "agent": f"release.py {a}", "kind": k, "text": k} for a, k in log]
     _release(specs, "0.5.0", tasks=tasks, log=entries)
     result = _run(script, "check", "--specs", str(specs))
-    assert (result.returncode, needle in result.stdout if needle else True) == (
-        (1, True) if needle else (0, True)
-    ), result.stdout
+    if needle:
+        assert result.returncode == 1 and needle in result.stdout, result.stdout
+    else:
+        assert result.returncode == 0, result.stdout
+
+
+def test_a_definition_finding_stamps_the_commit_that_touched_the_trio(
+    script: Path, tmp_path: Path
+) -> None:
+    """AC3.4 review M3: `defined` is the trio's last commit, never HEAD — implementation
+    commits after it stay inside the memory window `defined.sha` opens."""
+    root, specs, _ = _memory_repo(tmp_path, script)
+    trio = _git(root, "log", "-1", "--format=%h", "--", "specs/releases/0.5.0/rc-1/SPEC.md")
+    _release(specs, "0.5.0")  # DEFINITION, `[x]` T-1; the trio's bytes unchanged
+    (root / "dadaia_workspace/features/alpha/core.py").write_text("x = 3\n", encoding="utf-8")
+    _git(root, "commit", "-qam", "implementation after the trio")
+    fixes = [
+        f["fix"] for f in json.loads(_run(script, "check", "--json", "--specs", str(specs)).stdout)
+    ]
+    assert fixes and all(f" --sha {trio} " in f for f in fixes), (trio, fixes)
 
 
 def test_check_reports_a_schema_violation_and_emits_json(script: Path, tmp_path: Path) -> None:
@@ -637,13 +654,17 @@ def test_ship_refuses_what_check_refuses_and_touches_nothing(script: Path, tmp_p
         f"fix: {checked['fix']}"
     ]
     assert _tree_hash(specs) == before
+    _release(specs, "0.5.0", phase="BOGUS")  # review L1: an invalid phase refuses, no KeyError
+    bogus = _run(script, "ship", "--sha", "beef123", "--pr", "261", "--specs", str(specs))
+    assert bogus.returncode == 1 and "Traceback" not in bogus.stderr, bogus.stderr
 
 
 def test_ship_records_the_promote_and_new_births_the_next(script: Path, tmp_path: Path) -> None:
     """sa-promote-has-no-verb#B25-1, sa-promote-has-no-verb#B25-2,
     sa-promote-has-no-verb#B25-4: a reconciled CLOSURE ships by verb; ADR 0152 (1): the
     folder moves to `_archive/<v>/`; AC3.14 (F059): `shipped` is the one sha/PR field,
-    `check` runs every archived state through the one validator; the histo `summary` null."""
+    an archived state without a hex `shipped.sha` and int `shipped.pr` is a finding, a
+    truncated one a finding with a fix and no traceback; the histo `summary` null."""
     specs = _reconciled_closure(tmp_path, script)
     result = _run(script, "ship", "--sha", "beef123", "--pr", "261", "--specs", str(specs))
     assert result.returncode == 0, result.stderr
