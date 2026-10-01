@@ -30,7 +30,7 @@ As-is read at `wt/0.5.0a-release` e4c651b9; no code moved since 44d023e6, so the
 | `f/specs/memory_canon.py:46-52` `_atom_grammar` | a second exec-loader of a skill script, in `features` | 1 resolved | UPDATE | loads through the infrastructure loader (AC3.1) |
 | `f/spec_context/gate_policy.py:70,88-91` `_kind_holding` | a third package loader: `runpy.run_path` of `_worktree_kinds.py`, `@cache`d, on the pre-gate path but run only when a `repos/<r>/` write is refused | 0 | UPDATE | loads through the infrastructure loader, still lazy and cached: the pre-gate pays it only on that BLOCK, as today; the SPEC Risks line holds because the loader adds no subprocess and no eager load |
 | `S/dd-bug-resolution/scripts/_bugs_check.py:52` `schema_errors` | a third hand-rolled engine (`:107`, `:132`) | 3, 1 open | DELETE | `_ledger.validate` is the one engine (§1.1) |
-| `f/migrate/state_v2.py:40,99` registry `json.loads` | reads the registry raw | 0 | KEEP | the v1 → v2 upgrader reads the pre-v2 rows the grammar refuses (`SchemaVersionError`); the 0135 contract lists it as the grammar's upgrader |
+| `f/migrate/state_v2.py:40,99` registry `json.loads` | reads the registry raw | 0 | KEEP | `migrate` rewrites the whole document, `schema_version` included, while `entries` returns only the list; the 0135 contract lists it as the grammar's upgrader |
 | `_bugs_transition.py:58`, bug-record-v1 `diff_direction`, `_bugs_check`, `_bugs_write._VERB_OWNED` | 277 of 716 records store the direction `evidence_diff` already carries; 653–654 disagree; seams unverified; 2 `caused_by` cycles and 3 dangling targets pass; `update` refuses `caused_by`, which the schema marks `mutable-governance` | 3, 1 open; F002, F012, F013 | REBUILD | 0160; the `caused_by` row of `_VERB_OWNED` is deleted, so `update` is the governance verb F013 needs |
 | `core/context_registry.py` `entries` | fail-soft `None`; `{}` reads as empty | 10, 2 open | REBUILD | 0162: the one parse; absent and `{}` are unreadable |
 | `infrastructure/json_context_store.py:43-51` `_load` | its own `json.loads`; absent reads empty; corrupt raises a traceback | ″ | REBUILD | reads through `context_registry`; the absent branch leaves (M8) |
@@ -101,7 +101,7 @@ Bug-history lessons (audit of the fix chain):
 | how a task marker moves | `pub/scaffold/releases/AGENTS.md` §3 | persona, orchestration skill, RC-FLOW | RC-FLOW's second lifecycle |
 | which paths fail open | root map §3 | every other law file is silent | — |
 | who deletes a file | `f/spec_context/sweep.py` (V38) | — | — |
-| when a candidate was defined and implemented | `_release_phase`'s `milestone` log entry | `window_start`, the memory record (the live slot is derived from it) | the prose stamp note; the `defined`/`implemented` slots |
+| when a candidate was defined and implemented | `_release_phase`: the live slots and, per candidate, its `milestone` log entry | `window_start`, `_memory_record_error`, `PILLAR-SPECS.md` | the prose stamp note |
 
 ### 1.2 Facts the SPEC defers here
 
@@ -147,7 +147,7 @@ Bug-history lessons (audit of the fix chain):
 - `_release_tree.ship_findings(specs)` = `check` + "phase is not CLOSURE" + "`_archive/<id>` already exists"; `_ship` raises its first finding and fix before any write; its own branches leave.
 - `check` under DEFINITION: a `[-]`/`[x]` marker, or a closure-kind log entry after the live candidate's birth note, is a finding; `_directory_findings`' phase guard leaves.
 - The histo `summary` is `null`; `shipped{sha, pr, ts}` is the one field; `check` verifies it in each `_archive/<v>/_RELEASE.json` from 0.5.0 on.
-- Milestones: `phase` appends `{"kind": "milestone", "candidate": "rc-<N>", "milestone": "defined"|"implemented", "sha", "ts", "text"}` in place of its prose note; `window_start` and the memory record read the live candidate's last `milestone` entry, and `phase` stops writing the `defined`/`implemented` slots, so the fact lives once. The schema gains the kind and two optional fields and makes the slots optional, so the live document stays valid; the closure nulls the stale slots in the release worktree. Earlier stamps are the prose notes "Candidate defined at …", which `RELEASE-EVENTS.md` names as their record.
+- Milestones: `phase` appends `{"kind": "milestone", "candidate": "rc-<N>", "milestone": "defined"|"implemented", "sha", "ts", "text"}` in place of its prose note; the `defined`/`implemented` slots KEEP the live candidate's values, because `window_start`, `_memory_record_error` and audit pillar 2 read them; the `milestone` entries are the history. The schema gains the kind and two optional fields, so the live document stays valid. Earlier stamps are the prose notes "Candidate defined at …", which `RELEASE-EVENTS.md` names as their record.
 - `audit.py close` requires `--sha`; `LINEAGE.md` states ADR 0152 (1) and the `git log -S <audit-id> -- specs/audits` recovery.
 - Δ prod ≈ +5, tests ≈ +20.
 
@@ -160,7 +160,7 @@ Bug-history lessons (audit of the fix chain):
 - Δ prod ≈ +20, tests ≈ +25.
 
 ### 2.6 Registry and denylist (AC3.9, AC3.10, AC3.11)
-- `context_registry.entries(root)` raises `SchemaVersionError(problem, fix)` (the registry's existing typed refusal) for absent, unparseable or non-`{"contexts": [...]}` content, `{}` included; fix `Operator action: rewrite <abs path> as one {"contexts": [...]} object`. `registered_slugs` maps it to `{"*"}`; `JsonContextStore._load` reads through `entries`; `_registry_contexts`' `or []` leaves; the doctor's `check` and `_contexts`, `ctx_inject` and `context list|show|create` render REG-SCHEMA. The gate rule: an unreadable registry is no bind. `sdd_gate` catches the refusal at its seam (`resolve_bind`, `context_name_for_repo_slug`): `context=None`, `repos=∅`, `owner=None`, `repo=None` below `repos/` and `worktrees/`; `gate_policy.evaluate` still runs, so the floor, PROTECTED, the root, `.dadaia/` and the closed-canon zones are judged; only below `repos/` and `worktrees/` nothing is judged (`{"*"}`, the seventh path). The policy-raise path is never the route.
+- `context_registry.entries(root)` raises `SchemaVersionError(problem, fix)` (the registry's existing typed refusal) for absent, unparseable or non-`{"contexts": [...]}` content, `{}` included; fix `Operator action: rewrite <abs path> as one {"contexts": [...]} object`. `registered_slugs` maps it to `{"*"}`; `JsonContextStore._load` reads through `entries`; `_registry_contexts`' `or []` leaves; the doctor's `check` and `_contexts`, `ctx_inject` and `context list|show|create` render REG-SCHEMA. The gate rule: an unreadable registry is no bind. The two pre-gate registry reads outside `_evaluate_target` are deleted, not caught: `sdd_gate.evaluate_payload:73` and `root_whitelist.py:26` use `invocation.resolve` only for `.workspace_root`, so both call the root-only resolution (`workspace_resolver`). The one gate-path registry read left is in `_evaluate_target`, under one catch that maps the bind and `owner` to none and keeps `scope()`'s path-derived `repo`; `gate_policy.evaluate` still judges the floor, PROTECTED, the root, `.dadaia/`, the closed-canon zones, and merge-only `repos/<r>/` (ADR 0105), as today. The seventh path's `{"*"}` is the layout check's answer (`registered_slugs`), which AC4.9 measures. The policy-raise path is never the route.
 - `_ledger.terms(root)`: `$DADAIA_PRIVACY_DENYLIST`, else `<root>/.dadaia/states/privacy_denylist.json`, object form only. Scripts pass the nearest ancestor of `--specs` holding the sentinel; `privacy_check` passes `resolve_workspace_root()` and loads `_ledger` through the loader.
 - `init` rewrites a list-form file once in object form after `sweep.hold` keeps the original; `container.py` injects `hold` (features stay independent).
 - Two secret-token alternations; fixtures compose the prefixes at runtime.
@@ -245,6 +245,7 @@ Bug-history lessons (audit of the fix chain):
   - 139 needs 131 (`_ledger.py`, `_bugs_store.py`), 133 (strip before widened patterns), 136 (the loader);
   - 140 needs 136 (the audit test) and 137 (`_release_tree.py`, the release unit test);
   - 142 needs 138 (`KINDS`); 144 and 145 need 134 (`test_context_baseline.py`, `cli/commands/context.py`); 146 needs 133 (the bugs test);
+  - 146 needs 134 (`hooks/root_whitelist.py`, its test);
   - 143 needs 134, 136, 137, 138, 139 (final owners) and 141 (`gate_policy.py`); 147 needs 133, 136, 138, 139, 140 (every check, `_ledger.py`, `ledger_scripts.py`);
   - 148 needs 132, 137, 142, 144 (scaffold releases, RC-FLOW, the law test, getting-started);
   - 149 needs 141, 144, 145, 146, 147, 148 (the sites and the shipped text it judges); 150 needs all.
