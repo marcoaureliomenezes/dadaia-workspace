@@ -1,6 +1,6 @@
 """Tool caches land in the workspace's tmp zone from any cwd — never in the tree.
 
-Intent: CONTRACT — sa-tool-caches-land-outside-the-cache-zone#B40-1, #B40-3. Size: MEDIUM
+Intent: CONTRACT — sa-tool-caches-land-outside-the-cache-zone#B40-1, #B40-3; AC2.14 (T-050-119). Size: MEDIUM
 (real ruff/mypy subprocesses and a real git worktree in tmp_path).
 """
 
@@ -59,7 +59,10 @@ def test_the_bare_command_writes_no_cache_into_the_tree(
     _git(repo, "commit", "-q", "-m", "init")
     worktree = repo / ".claude" / "worktrees" / "wt1"
     _git(repo, "worktree", "add", "-q", "-b", "wt/1", str(worktree))
-    env = {**os.environ, **merge_claude_settings(None, workspace)["env"]}  # type: ignore[dict-item]
+    projected = merge_claude_settings({"env": {"OPERATOR": "kept"}}, workspace)["env"]
+    assert projected["OPERATOR"] == "kept"  # type: ignore[index]  # AC2.14: operator keys kept
+    assert projected["PLAYWRIGHT_MCP_OUTPUT_DIR"] == f"{workspace}/.dadaia/mcps/playwright"  # type: ignore[index]
+    env = {**os.environ, **projected}  # type: ignore[dict-item]
 
     for cwd in (repo, repo / "pkg" / "sub", worktree):
         subprocess.run([str(binary), *argv], cwd=cwd, env=env, capture_output=True, check=False)

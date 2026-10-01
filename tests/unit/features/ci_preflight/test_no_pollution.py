@@ -36,6 +36,7 @@ def test_the_projected_harness_env_names_absolute_caches_and_pyproject_none() ->
     assert env == {
         "MYPY_CACHE_DIR": str(Path("/ws/.dadaia/tmp/mypy-cache")),
         "RUFF_CACHE_DIR": str(Path("/ws/.dadaia/tmp/ruff-cache")),
+        "PLAYWRIGHT_MCP_OUTPUT_DIR": str(Path("/ws/.dadaia/mcps/playwright")),
     }
     tool = _pyproject()["tool"]
     assert "cache-dir" not in tool["ruff"] and "cache_dir" not in tool["mypy"]  # type: ignore[index,operator]
