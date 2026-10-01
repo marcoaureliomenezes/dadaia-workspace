@@ -10,13 +10,13 @@ the drift the community asks CI to fail on; the successor lives in ``decisions.j
 
 from __future__ import annotations
 
-import json
 import re
+from contextlib import suppress
 from pathlib import Path
 
 from dadaia_workspace.core.doctor_rules import Rule, SectionFinding
 from dadaia_workspace.features.specs.doctor_types import Severity, specs_finding
-from dadaia_workspace.features.specs.schemas import schema_errors
+from dadaia_workspace.infrastructure.ledger_scripts import load_owner
 
 #: The ADR ledger, relative to a specs tree.
 LEDGER = "ADRs/decisions.jsonl"
@@ -26,16 +26,12 @@ _ADR_CITATION_RE = re.compile(r"\bADR[:\s-]+(\d{4})\b")
 
 
 def _superseded_ids(ledger: Path) -> set[str]:
+    """An unreadable line supersedes nothing here; it is `adr_record_issues`' finding."""
+    owner = load_owner("dd-bug-resolution", "_ledger")
     ids: set[str] = set()
-    for line in ledger.read_text(encoding="utf-8").splitlines():
-        if not line.strip():
-            continue
-        try:
-            record = json.loads(line)
-        except ValueError:
-            continue
-        if isinstance(record, dict) and record.get("status") == "superseded":
-            ids.add(str(record.get("id")))
+    for raw in ledger.read_text(encoding="utf-8").split("\n"):
+        with suppress(owner.LineError):
+            ids |= {str(r.get("id")) for r in owner.parse(raw) if r.get("status") == "superseded"}
     return ids
 
 
@@ -83,17 +79,19 @@ def adr_record_issues(specs_dir: Path) -> list[SectionFinding]:
         return []
     issues: list[SectionFinding] = []
     records: list[tuple[int, dict[str, object]]] = []
+    owner = load_owner("dd-bug-resolution", "_ledger")
+    schema = owner.load_schema("decision-record-v1")
     for number, raw in enumerate(ledger.read_text(encoding="utf-8").split("\n"), start=1):
-        if not raw.strip():
-            continue
         try:
-            record = json.loads(raw)
-        except ValueError as exc:
-            issues.append(_record_issue(number, f"line is not valid JSON: {exc}"))
+            parsed = owner.parse(raw)
+        except owner.LineError as exc:
+            issues.append(_record_issue(number, f"line {exc}"))
             continue
-        records.append((number, record if isinstance(record, dict) else {}))
-        for message in schema_errors(record, "ADRs/decision-record-v1"):
-            issues.append(_record_issue(number, message))
+        for record in parsed:
+            records.append((number, record))
+            issues.extend(
+                _record_issue(number, m) for m in owner.validate(record, schema, schema, "record")
+            )
     for position, (number, record) in enumerate(records, start=1):
         if (adr_id := record.get("id")) != (want := f"{position:04d}"):
             issues.append(_record_issue(number, f"id {adr_id!r} breaks 0001..N: expected {want}"))

@@ -13,7 +13,6 @@ from __future__ import annotations
 import re
 from collections.abc import Callable
 from pathlib import Path
-from types import ModuleType
 from typing import Any
 
 from dadaia_workspace.core.fixed_sections import (
@@ -24,6 +23,7 @@ from dadaia_workspace.core.fixed_sections import (
 from dadaia_workspace.core.workspace_layout import (
     MEMORY_TOPLEVEL_FILES as _MEMORY_TOPLEVEL_FILES,
 )
+from dadaia_workspace.infrastructure.ledger_scripts import load_owner
 
 #: Top-level memory files (.md canonical source; v7 canon).
 #: Re-exported from the one canonical-name registry (0.4.7 FR5) — the canon rows that
@@ -42,17 +42,8 @@ FORBIDDEN_MEMORY_HEADING_RE = re.compile(
 )
 
 
-def _atom_grammar() -> ModuleType:
-    """The ONE atom grammar: the stdlib reader ``memory.py`` ships (sa-memory-atom-has-two-
-    grammars) — executed from the packaged script's source, so LINT-1 and the catalog parse alike
-    and no bytecode lands in ``public/``."""
-    path = Path(__file__).parents[2] / "public/skills/dd-spec-navigator/scripts/_memory_schema.py"
-    module = ModuleType("_memory_schema")
-    exec(compile(path.read_text(encoding="utf-8"), path, "exec"), module.__dict__)
-    return module
-
-
-_GRAMMAR = _atom_grammar()
+#: The ONE atom grammar: the stdlib reader ``memory.py`` ships (sa-memory-atom-has-two-grammars).
+_GRAMMAR = load_owner("dd-spec-navigator", "_memory_schema")
 #: ``(frontmatter | None, body, error | None)`` for one atom's text.
 parse_atom: Callable[[str], tuple[dict[str, Any] | None, str, str | None]] = _GRAMMAR.parse
 #: Wikilink grammar for memory atoms: ``[[slug]]``.

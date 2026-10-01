@@ -202,11 +202,9 @@ def test_close_without_a_resolved_finding_never_records_resolved(
 def test_the_doctor_neither_folds_findings_nor_recommends_close() -> None:
     """sa-audit-close-archives-without-validating#B43-2: no doctor rule recommends
     `audit.py close`. sa-audit-close-archives-without-validating#B43-5: features/specs
-    parses no finding record, and the record store has no write half."""
+    parses no finding record."""
     from dadaia_workspace.features.specs.rules import RULES
-    from dadaia_workspace.infrastructure.jsonl_record_store import JsonlRecordStore
 
     assert not [r.codes for r in RULES if "close" in str(r.fix_help)]
     specs_src = Path(__file__).resolve().parents[3] / "dadaia_workspace" / "features" / "specs"
     assert not [p for p in specs_src.glob("*.py") if "from_dict" in p.read_text("utf-8")]
-    assert not {"append", "update", "remove"} & set(vars(JsonlRecordStore))

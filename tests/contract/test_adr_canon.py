@@ -12,7 +12,6 @@ from typer.testing import CliRunner
 
 from dadaia_workspace.cli.main import app
 from dadaia_workspace.features.specs.doctor_adr import adr_record_issues
-from dadaia_workspace.features.specs.schemas import schema_errors
 
 pytestmark = pytest.mark.contract
 
@@ -59,35 +58,47 @@ _RULED = {
 }
 _RECORD_ROWS = [
     pytest.param({}, [], id="valid"),
+    pytest.param(
+        {"id": _ABSENT},
+        ["record is missing required field 'id'", "id None breaks 0001..N: expected 0001"],
+        id="missing-id",
+    ),
     *(
-        pytest.param({field: _ABSENT}, [f"'{field}' is a required property"], id=f"missing-{field}")
-        for field in ("id", "ts", "title", "context", "decision", "consequences")
+        pytest.param(
+            {field: _ABSENT}, [f"record is missing required field {field!r}"], id=f"missing-{field}"
+        )
+        for field in ("ts", "title", "context", "decision", "consequences")
     ),
     pytest.param(
         {"status": "in-review"},
-        ["'in-review' is not one of ['proposed', 'accepted', 'rejected', 'superseded']"],
+        [
+            "record.status must be one of ['accepted', 'proposed', 'rejected', 'superseded'], got 'in-review'"
+        ],
         id="unknown-status",
     ),
     pytest.param(
         {"status": "accepted"},
-        ["'ruling' is a required property", "None is not of type 'string'"],
+        ["record is missing required field 'ruling'", "record.measured_by must be of type string"],
         id="sa-adr-measured-by-pattern-refuses-real-checks#B27-2-accepted-null",
     ),
     pytest.param(
         {"status": "accepted", "measured_by": ""},
-        ["'' should be non-empty", "'ruling' is a required property"],
+        [
+            "record is missing required field 'ruling'",
+            "record.measured_by is shorter than its minLength of 1",
+        ],
         id="accepted-empty-measured-by",
     ),
     pytest.param({**_RULED, "measured_by": "ruff check"}, [], id="accepted-with-a-ruling"),
     pytest.param(
         {"status": "accepted", "measured_by": "ruff check"},
-        ["'ruling' is a required property"],
+        ["record is missing required field 'ruling'"],
         id="0151-M1-accepted-without-ruling",
     ),
     *(
         pytest.param(
             {**_RULED, "ruling": {"date": "2026-09-30", "words": words}},
-            [f"{words!r} should not be valid under {{'pattern': '(?i)delega|in session'}}"],
+            ["record.ruling.words must not match {'pattern': '(?i)delega|in session'}"],
             id=f"0151-M1-{words}",
         )
         for words in ("Delegated to the PM", "accepted in session", "delegado ao PM")
@@ -99,34 +110,65 @@ _RECORD_ROWS = [
     ),
     pytest.param(
         {**_RULED, "ruling": {"date": "2026-09-30", "words": " "}},
-        ["' ' does not match '\\\\S'"],
+        ["record.ruling.words value ' ' does not match \\S"],
         id="0151-M1-blank-words",
     ),
     pytest.param(
         {**_RULED, "ruling": {"date": "30/09/2026", "words": "Aprovo"}},
-        ["'30/09/2026' does not match '^\\\\d{4}-\\\\d{2}-\\\\d{2}$'"],
+        ["record.ruling.date value '30/09/2026' does not match ^\\d{4}-\\d{2}-\\d{2}$"],
         id="0151-M1-date-shape",
     ),
     # The six records the 2026-09-12 audit found carried `"supersedes": []`.
     pytest.param(
-        {"supersedes": []}, ["[] is not of type 'string', 'null'"], id="pre-wave0-supersedes-list"
+        {"supersedes": []},
+        ["record.supersedes must be of type ['string', 'null']"],
+        id="pre-wave0-supersedes-list",
     ),
     pytest.param({"supersedes": "0005,0006,0008"}, [], id="supersedes-several"),
     pytest.param(
         {"supersedes": "0005, 0006"},
-        ["'0005, 0006' does not match '^\\\\d{4}(,\\\\d{4})*$'"],
+        ["record.supersedes value '0005, 0006' does not match ^\\d{4}(,\\d{4})*$"],
         id="supersedes-spaced",
     ),
 ]
 
 
 @pytest.mark.parametrize(("change", "expected"), _RECORD_ROWS)
-def test_each_record_shape_is_judged_by_the_schema(
-    change: dict[str, object], expected: list[str]
+def test_each_record_shape_is_judged_by_the_doctor(
+    change: dict[str, object], expected: list[str], tmp_path: Path
 ) -> None:
-    """Each record shape is judged by decision-record-v1 exactly as the row states ."""
+    """Each record shape is judged through the doctor's LEDGER-ADR-SCHEMA exactly as the row
+    states — `_ledger.validate` is the one engine (ADR 0018)."""
     record = {k: v for k, v in {**_VALID_RECORD, **change}.items() if v is not _ABSENT}
-    assert schema_errors(record, "ADRs/decision-record-v1") == expected
+    (tmp_path / "ADRs").mkdir()
+    (tmp_path / "ADRs" / "decisions.jsonl").write_text(json.dumps(record) + "\n", "utf-8")
+    issues = adr_record_issues(tmp_path)
+    assert [i.message.removesuffix(" (ADRs/decisions.jsonl:1)") for i in issues] == expected
+
+
+def test_an_unreadable_line_is_its_own_finding_and_the_next_record_is_still_read(
+    tmp_path: Path,
+) -> None:
+    """A malformed and a non-object line each name their line; the record after them is
+    still judged (here: its id is the first, so 0001..N holds)."""
+    specs = _ledger(tmp_path, ["0001"])
+    ledger = specs / "ADRs" / "decisions.jsonl"
+    ledger.write_text("{not json\n[1]\n" + ledger.read_text("utf-8"), "utf-8")
+    assert [i.message for i in adr_record_issues(specs)] == [
+        "line is not valid JSON (Expecting property name enclosed in double quotes) (ADRs/decisions.jsonl:1)",
+        "line is not a JSON object (ADRs/decisions.jsonl:2)",
+    ]
+
+
+def test_no_ledger_reader_builds_a_jsonschema_validator() -> None:
+    """FR ledger-schema-one-engine (AC3.6, ADR 0018): `_ledger.validate` is the one engine."""
+    readers = (
+        "features/specs/doctor_adr.py",
+        "features/specs/doctor_governance.py",
+        "features/backlog/doctor.py",
+    )
+    package = _REPO_ROOT / "dadaia_workspace"
+    assert [r for r in readers if "jsonschema" in (package / r).read_text("utf-8")] == []
 
 
 @pytest.mark.parametrize(
@@ -157,7 +199,7 @@ def test_the_doctor_rule_flags_the_first_id_breaking_0001_to_n(
     [
         ({"status": "proposed"}, ["changes accepted ['0001'] without a ruling"]),
         ({"status": "superseded"}, ["changes accepted ['0001'] without a ruling"]),
-        ({"status": "accepted", "measured_by": "x"}, ["'ruling' is a required property", "changes accepted ['0001'] without a ruling"]),
+        ({"status": "accepted", "measured_by": "x"}, ["record is missing required field 'ruling'", "changes accepted ['0001'] without a ruling"]),
         (_RULED, []),
         ({"status": "rejected"}, []),
     ],
