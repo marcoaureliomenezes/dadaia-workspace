@@ -717,6 +717,12 @@
       "agent": "dd-product-engineer",
       "kind": "dispositions",
       "text": "G6 — audit 20260930-structural-convergence: open before 94 (15 HIGH, 51 MEDIUM, 28 LOW); 12 resolved and F080 carried; the audit write f19ea5b4 on feature/0.5.0 (ADR 0124 direct write) names each commit — F015 move M2 (cc7e1763, a34f3b73, a386efc7, a2635750, c570e41d, d26d92a0, dab58343, 39ca52d2, 9788071b); F021 (a386efc7, a2635750; bug 18fb36e6); F025 (c570e41d, d26d92a0, dab58343; bug fb42217d); F026 (37bf945e, e7755a00; bug 7e37c3c3); F042 (1b0d9685; bug 7e37c3c3); F046 (ff2e0920; bug 7e37c3c3); F075 C6 (ff2e0920); F076 C7 (cc7e1763, ADR 0132); F082 C13 (a386efc7, ADR 0133); F105 (cc7e1763, a386efc7, c570e41d); F108 (a386efc7, a2635750); F149 (this closure's memory commit, by subject). F080 C11 is carried, not resolved: the six law paths landed (9f20b1fb, d79aaa57), the seventh's law line has not — it moves with backlog seventh-fail-open-path-law-line to rc-7 W4, and its FINDINGS record, written resolved at f19ea5b4 before the operator's AC2.8 ruling, moves to deferred by audit.py. Open after 81 (the audit stays open; candidates 7+ carry the rest). Backlog active[]: 20 before; delivered by candidate 6, each named by the SPEC Origin and exited delivered (release 0.5.0) in a backlog worktree, since the release kind holds no specs/backlog/ path (chore(backlog): exit dadaiaignore-and-root-core-canon, operator-protected-path-class, adr-0138-lane-in-memory-and-adrs-law delivered — candidate 6); the carrier seventh-fail-open-path-law-line enters; 18 active after. bugs.py archive at this sweep: 0 records to age."
+    },
+    {
+      "ts": "2026-10-01T05:44:13Z",
+      "agent": "main-thread",
+      "kind": "note",
+      "text": "Candidate 6 closure merged into develop by PR #276 (merge 0d2610ee, head bdf3b602, every check green, dd-code-reviewer APPROVED bdf3b602). Gate: continue — operator standing goal: four RC waves (rc-6..rc-9) by severity, then promote."
     }
   ]
 }
