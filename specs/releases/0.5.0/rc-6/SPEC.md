@@ -98,14 +98,17 @@ F019–F051 share the destination of the bug each cites, and F090–F112 share t
   - Every hook still lets the action through.
   - On every firing of a ctx-inject lane while the venv is missing, that lane sends the agent, through its harness's context channel in the lane's own envelope and not stderr alone, one message naming the gate's absence and `fix: uvx dadaia-workspace init <ws>`; the message repeats until the venv is fixed, with no marker file and no per-session state (operator 2026-10-01: "Repetir até corrigir (Recomendado)").
   - Command: `pytest tests/contract/test_hook_behaviour_coverage.py`, the missing-venv case, per harness.
-- AC2.8 One statement of the four fail-open paths (F080):
+- AC2.8 One statement of the seven fail-open paths in the code (F080):
   - The paths are:
     - a missing venv (0067);
     - a pre-gate past its 10 s timeout (0118);
-    - a Bash write (0096, 0103);
-    - an id-less unbound session under `worktrees/<r>/`, which is not refused (ADR 0116; grill Q5 'lacuna fica na lei').
-  - All four are listed in one place in the law, and no other law file restates them.
-  - Command: `pytest tests/contract/test_law_states_what_the_code_does.py`, which asserts the four paths in that one place.
+    - a Bash write (0096, 0103, 0133);
+    - an id-less unbound session under `worktrees/<r>/`, which is not refused (ADR 0116; grill Q5 'lacuna fica na lei');
+    - a policy that raises;
+    - an unreadable payload;
+    - an unreadable context registry, which admits every name under `repos/` and `worktrees/` (`{"*"}`), so the layout check judges nothing there.
+  - The root map §3 lists the first six in one place, and no other law file restates them; the seventh's law line is carried to backlog `seventh-fail-open-path-law-line` (rc-7 W4).
+  - Command: `pytest tests/contract/test_law_states_what_the_code_does.py`, which asserts the six law paths in that one place.
 - AC2.9 The venv guard judges only the dadaia CLI (DEL `pip-guard-fix-routes-project-installs-into-the-tool-venv`; 0134):
   - `pip install requests` is allowed.
   - `dadaia doctor` run outside `.dadaia/.venv/bin/` is refused, naming the venv path.
@@ -168,7 +171,7 @@ F019–F051 share the destination of the bug each cites, and F090–F112 share t
 
 | Weakness | Mitigation |
 |---|---|
-| Core paths listed in code drift from what `public install` projects. | The code floor is a subset that the ledger extends. A contract test checks that every floor path is one that `install` writes or that `init` creates. |
+| Core paths listed in code drift from what `public install` projects. | The code floor is a subset that the ledger extends. A test checks that every floor path is one that `install` writes, one that `init` creates, or `.dadaia/sessions`, the CLI's PROTECTED runtime zone (`tests/unit/core/test_workspace_layout_zones.py`). |
 | A protected glob matches too wide and refuses the agent's real work. | The fix line routes the draft to `.dadaia/tmp/`. The refusal names the protected glob that matched. |
 | Holding expired handoffs grows `.dadaia/reaped/`. | The reaped TTL (7 days) bounds it. The G1 readout logs the size. |
 | The quickstart's worktree path needs the work branch before the first backlog entry. | `context baseline` publishes every gitflow branch, and the quickstart runs it first. |
