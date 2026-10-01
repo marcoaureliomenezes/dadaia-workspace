@@ -167,8 +167,8 @@ Bug-history lessons (audit of the fix chain):
 - Δ prod ≈ −37, tests ≈ +40.
 
 ### 2.7 `to-bug`, shapes, terms (AC3.12, AC3.13, AC3.17)
-- `REQUIRED_EVIDENCE` and one verifier table: `delivered`/`superseded` → release Origin; `rejected` → reason; `to-bug` → reason naming a `BUGS.jsonl` record, read through the imported `_bugs_store.read_records`. The hint offers a disposition the entry can take.
-- `KINDS["backlog"]` gains `specs/bugs/BUGS.jsonl`; the scaffold backlog law lists four dispositions; histo-record-v1's enum gains `to-bug`.
+- `REQUIRED_EVIDENCE` and one verifier table: `delivered`/`superseded` → release Origin; `rejected` → reason; `to-bug` → reason naming a `BUGS.jsonl` record, read through the imported `_bugs_store.read_records`. Each refusal's fix lives in its own evidence row; a word outside the exit dispositions (`deferred` included) is refused with `Operator action: a postponed item stays in active[] and needs no exit`, nothing written (AC4.4, operator ruling 2026-10-01).
+- `KINDS["backlog"]` gains `specs/bugs/BUGS.jsonl`; the scaffold backlog law §3 points to `backlog.py exit --help`, which lists the four dispositions (`test_zone_registry.py` refuses a law line restating a canonical set); histo-record-v1's enum gains `to-bug`.
 - §3a's staged column becomes the kind's allowed set; ADR message `docs(adr): propose|accept <slug>`; rows for `chore(tasks)`, `docs(memory)`, `docs(specs)`, `chore(release)`; the law test asserts §3a = `KINDS`.
 - Δ prod ≈ +14, tests ≈ +23.
 
