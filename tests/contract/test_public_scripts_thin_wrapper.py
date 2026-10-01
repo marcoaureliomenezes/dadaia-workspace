@@ -110,3 +110,100 @@ def test_ledger_owner_scripts_expose_check() -> None:
             check=False,
         )
         assert done.returncode == 0, f"{script.name} has no `check` subcommand: {done.stderr}"
+
+
+# --- The 0135 contract: one loader, one owner per grammar (AC3.1, PLAN §1.1) --------
+
+_PACKAGE = _REPO_ROOT / "dadaia_workspace"
+_LOADER = "infrastructure/ledger_scripts.py"
+_RE_CALLS = {"compile", "search", "match", "fullmatch", "finditer", "findall", "sub", "split"}
+#: A grammar's head, as a package regex would spell it; only its owner and pinned twin hold it.
+_GRAMMAR_HEADS = {r"\*\*Origin:\*\*": set(), r"\*\*Status:\*\*": {"core/spec_status.py"}}
+#: Each §1.1 owner at its pinned location: `(file under dadaia_workspace/, top-level name)`.
+_OWNERS = {
+    "Origin line": ("public/skills/dd-release-implementation/scripts/_release_schema.py", "origin"),
+    "task marker": (
+        "public/skills/dd-release-implementation/scripts/_release_schema.py",
+        "MARK_RE",
+    ),
+    "marker order": ("public/skills/dd-release-implementation/scripts/_release_schema.py", "MARKS"),
+    "task W:": ("public/skills/dd-release-implementation/scripts/_release_schema.py", "writes"),
+    "Status token": ("core/spec_status.py", "extract_status"),
+    "Status twin": (
+        "public/skills/dd-release-implementation/scripts/_release_schema.py",
+        "extract_status",
+    ),
+    "JSONL split": ("public/skills/dd-bug-resolution/scripts/_ledger.py", "records"),
+    "ledger engine": ("public/skills/dd-bug-resolution/scripts/_ledger.py", "validate"),
+    "denylist terms": ("public/skills/dd-bug-resolution/scripts/_ledger.py", "terms"),
+    "owner loader": (_LOADER, "load_owner"),
+    "context registry": ("core/context_registry.py", "entries"),
+    "registry upgrader": ("features/migrate/state_v2.py", "execute_migration"),
+    "commit staging": ("public/skills/dd-gitflow-default/scripts/_worktree_kinds.py", "KINDS"),
+    "command printing": ("core/cli_line.py", "script_line"),
+}
+
+
+def _violations(source: str, rel: str) -> list[str]:
+    """What `rel` does that only the loader or a grammar's owner may: exec, `runpy`, or a grammar regex."""
+    found: list[str] = []
+    for node in ast.walk(ast.parse(source)):
+        if isinstance(node, ast.Import | ast.ImportFrom):
+            names = [a.name for a in node.names] + [getattr(node, "module", None) or ""]
+            if "runpy" in names or any("public.skills" in n for n in names):
+                found.append(f"{rel}:{node.lineno} loads a script outside the loader")
+        if not isinstance(node, ast.Call):
+            continue
+        func = node.func
+        name = func.id if isinstance(func, ast.Name) else getattr(func, "attr", "")
+        if name in {"exec", "run_path", "exec_module"} and rel != _LOADER:
+            found.append(f"{rel}:{node.lineno} {name}s outside the loader")
+        arg = node.args[0] if node.args else None
+        if name in _RE_CALLS and isinstance(arg, ast.Constant) and isinstance(arg.value, str):
+            found += [
+                f"{rel}:{node.lineno} parses {head} outside its owner"
+                for head, twins in _GRAMMAR_HEADS.items()
+                if head in arg.value and rel not in twins
+            ]
+    return found
+
+
+def _package_modules() -> list[Path]:
+    return [p for p in _PACKAGE.rglob("*.py") if "public" not in p.relative_to(_PACKAGE).parts[:1]]
+
+
+def test_no_package_module_loads_a_script_or_parses_a_grammar_but_its_owner() -> None:
+    """AC3.1: only the loader execs a `public/skills` script; no second grammar parser."""
+    modules = _package_modules()
+    assert_populated({p.name for p in modules}, sentinel="ledger_scripts.py")
+    found = [
+        v
+        for p in modules
+        for v in _violations(p.read_text("utf-8"), p.relative_to(_PACKAGE).as_posix())
+    ]
+    assert found == []
+
+
+@pytest.mark.parametrize(
+    "planted",
+    [
+        'import re\nORIGIN = re.compile(r"^\\*\\*Origin:\\*\\*(.*)$")\n',
+        'exec(open("s.py").read())\n',
+        'import runpy\nrunpy.run_path("s.py")\n',
+    ],
+    ids=["origin-parser", "exec", "runpy-run-path"],
+)
+def test_a_planted_second_loader_or_parser_bites(planted: str) -> None:
+    assert _violations(planted, "features/x.py")
+
+
+@pytest.mark.parametrize("grammar", _OWNERS)
+def test_each_owner_sits_at_its_pinned_location(grammar: str) -> None:
+    rel, name = _OWNERS[grammar]
+    tree = ast.parse((_PACKAGE / rel).read_text("utf-8"))
+    defined = {
+        t.id if isinstance(t, ast.Name) else getattr(t, "name", None)
+        for node in tree.body
+        for t in (getattr(node, "targets", None) or [getattr(node, "target", node)])
+    }
+    assert name in defined, f"{grammar}: {name} is not defined in {rel}"

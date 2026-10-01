@@ -21,12 +21,11 @@ documented way out was a bind flag that no longer exists.
 
 from __future__ import annotations
 
-import runpy
 from collections.abc import Callable
 from enum import Enum
 from functools import cache
 from itertools import chain
-from pathlib import Path, PurePath
+from pathlib import PurePath
 
 from dadaia_workspace.core import workspace_layout
 from dadaia_workspace.core.cli_line import fix_line, mkdir_line, script_line
@@ -56,7 +55,6 @@ _MERGE_ONLY_MESSAGE = (
     "write it inside a worktree of {repo}.\n"
 )
 _WORKTREE_SCRIPT = ".agents/skills/dd-gitflow-default/scripts/worktree.py"
-_KINDS = Path(__file__).parents[2] / "public/skills/dd-gitflow-default/scripts/_worktree_kinds.py"
 
 
 class PathClass(Enum):
@@ -75,8 +73,13 @@ class Decision(Enum):
 
 @cache
 def _kind_holding() -> Callable[[str], str | None]:
-    """The KINDS grammar's owner (ADR 0135), run in place: no bytecode left beside it."""
-    holding: Callable[[str], str | None] = runpy.run_path(str(_KINDS))["kind_holding"]
+    """The KINDS grammar's owner (ADR 0135) through the one loader, imported on the first
+    merge-only BLOCK so the pre-gate's ALLOW path pays nothing."""
+    from dadaia_workspace.infrastructure.ledger_scripts import load_owner
+
+    holding: Callable[[str], str | None] = load_owner(
+        "dd-gitflow-default", "_worktree_kinds"
+    ).kind_holding
     return holding
 
 
