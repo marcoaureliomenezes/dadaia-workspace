@@ -98,10 +98,14 @@ F019–F051 share the destination of the bug each cites, and F090–F112 share t
   - Every hook still lets the action through.
   - Once per session, the first hook that fires sends the agent, through the harness's context channel and not stderr alone, one message naming the gate's absence and `fix: uvx dadaia-workspace init <ws>`.
   - Command: `pytest tests/contract/test_hook_behaviour_coverage.py`, the missing-venv case, per harness.
-- AC2.8 One statement of the three fail-open paths (F080):
-  - The paths are a missing venv (0067), a pre-gate past its 10 s timeout (0118) and a Bash write (0096, 0103).
-  - They are listed in one place in the law, and no other law file restates them.
-  - Command: `pytest tests/contract/test_law_states_what_the_code_does.py`.
+- AC2.8 One statement of the four fail-open paths (F080):
+  - The paths are:
+    - a missing venv (0067);
+    - a pre-gate past its 10 s timeout (0118);
+    - a Bash write (0096, 0103);
+    - an id-less unbound session under `worktrees/<r>/`, which is not refused (ADR 0116; grill Q5 'lacuna fica na lei').
+  - All four are listed in one place in the law, and no other law file restates them.
+  - Command: `pytest tests/contract/test_law_states_what_the_code_does.py`, which asserts the four paths in that one place.
 - AC2.9 The venv guard judges only the dadaia CLI (DEL `pip-guard-fix-routes-project-installs-into-the-tool-venv`; 0134):
   - `pip install requests` is allowed.
   - `dadaia doctor` run outside `.dadaia/.venv/bin/` is refused, naming the venv path.
@@ -165,7 +169,7 @@ F019–F051 share the destination of the bug each cites, and F090–F112 share t
 | Weakness | Mitigation |
 |---|---|
 | Core paths listed in code drift from what `public install` projects. | The code floor is a subset that the ledger extends. A contract test checks that every floor path is one that `install` writes or that `init` creates. |
-| A protected glob matches too wide and refuses the agent's real work. | The fix line routes the draft to `.dadaia/tmp/`. The doctor names every glob together with the paths it matches. |
+| A protected glob matches too wide and refuses the agent's real work. | The fix line routes the draft to `.dadaia/tmp/`. The refusal names the protected glob that matched. |
 | The once-per-session venv message needs a session id, and there is no venv to read one with. | The wrapper's prologue decides with no Python. The as-is review measures each harness's context channel before the PLAN. |
 | Holding expired handoffs grows `.dadaia/reaped/`. | The reaped TTL (7 days) bounds it. The G1 readout logs the size. |
 | The quickstart's worktree path needs the work branch before the first backlog entry. | `context baseline` publishes every gitflow branch, and the quickstart runs it first. |
