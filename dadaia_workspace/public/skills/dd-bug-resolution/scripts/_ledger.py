@@ -177,7 +177,7 @@ def terms(root: Path | None) -> list[tuple[str, str]]:
             )
         if raw:
             return [(str(term), str(reason)) for term, reason in raw.items()]
-    return []  # fmt: skip
+    return []
 
 
 def private_refusal(record: dict[str, Any], specs: Path) -> tuple[str, str] | None:

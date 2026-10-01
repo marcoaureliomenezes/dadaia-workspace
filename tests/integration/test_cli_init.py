@@ -1,5 +1,7 @@
-"""dadaia init CLI — one fn: creates .dadaia+states and the level-1 root files from the argv
-DIR; the rerun overwrites no operator file."""
+"""dadaia init CLI: creates .dadaia+states and the level-1 root files from the argv DIR; the
+rerun overwrites no operator file and migrates a list-form privacy denylist once.
+
+Intent: CONTRACT — AC2.2 (ADR 0095); AC3.10 (ADR 0157)."""
 
 import json
 from pathlib import Path
@@ -69,3 +71,23 @@ def test_init_converts_a_list_form_denylist_once_and_holds_the_original(
     held = list((ws / ".dadaia" / "reaped").rglob("privacy_denylist.json"))
     assert [h.read_text(encoding="utf-8") for h in held] == [original]
     assert load_denylist_terms() == (("zz-term-a", ""), ("zz-term-b", "why"))
+
+
+def test_a_failed_denylist_conversion_leaves_the_operator_terms_in_place(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Intent: CONTRACT — AC3.10, review L1 (CWE-636): when the converted file cannot be
+    written, the original stays where the loader reads it and nothing is held; a list holding
+    anything but strings or string pairs is never converted."""
+    ws = tmp_path / "ws"
+    ws.mkdir()
+    monkeypatch.chdir(ws)
+    assert _runner.invoke(app, ["init", str(ws), "--harness", "claude"]).exit_code == 0
+    denylist = ws / ".dadaia" / "states" / "privacy_denylist.json"
+    for original, blocker in (('["zz-term-a"]', True), ('[{"zz-term-a": "x"}]', False)):
+        denylist.write_text(original, encoding="utf-8")
+        if blocker:
+            (denylist.parent / "privacy_denylist.json.migrating").mkdir()
+        assert _runner.invoke(app, ["init", str(ws), "--harness", "claude"]).exit_code == 0
+        assert denylist.read_text(encoding="utf-8") == original
+        assert not list((ws / ".dadaia" / "reaped").rglob("privacy_denylist.json"))

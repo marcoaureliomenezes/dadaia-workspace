@@ -16,7 +16,6 @@ from pathlib import Path
 import pytest
 
 from dadaia_workspace.infrastructure.privacy_check import (
-    _PRIVACY_DENYLIST_ENV,
     _BaselinePattern,
     _check_baseline_exclude_rationale,
     _load_privacy_baseline,
@@ -35,7 +34,7 @@ _OTHER_MAILBOX = "someone" + "else@" + _host("anthropic", "com")
 
 @pytest.fixture
 def no_denylist(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.delenv(_PRIVACY_DENYLIST_ENV, raising=False)
+    monkeypatch.delenv("DADAIA_PRIVACY_DENYLIST", raising=False)
     (tmp_path / "no_workspace").mkdir()
     monkeypatch.chdir(tmp_path / "no_workspace")
 
@@ -190,7 +189,7 @@ def test_load_denylist_source_formats(
     shape or an unreadable file is refused naming the file. Missing or absent loads as empty."""
     source = tmp_path / "d.json"
     source.write_text(json.dumps(payload), encoding="utf-8")
-    monkeypatch.setenv(_PRIVACY_DENYLIST_ENV, str(source))
+    monkeypatch.setenv("DADAIA_PRIVACY_DENYLIST", str(source))
     if name == "list_of_strings":
         with pytest.raises(SystemExit) as refused:
             load_privacy_terms()
@@ -202,12 +201,12 @@ def test_load_denylist_source_formats(
     (tmp_path / "no_workspace").mkdir()
     monkeypatch.chdir(tmp_path / "no_workspace")
     (tmp_path / "malformed.json").write_text("{not valid json", encoding="utf-8")
-    monkeypatch.setenv(_PRIVACY_DENYLIST_ENV, str(tmp_path / "malformed.json"))
+    monkeypatch.setenv("DADAIA_PRIVACY_DENYLIST", str(tmp_path / "malformed.json"))
     with pytest.raises(SystemExit):
         load_privacy_terms()
-    monkeypatch.setenv(_PRIVACY_DENYLIST_ENV, str(tmp_path / "nope.json"))
+    monkeypatch.setenv("DADAIA_PRIVACY_DENYLIST", str(tmp_path / "nope.json"))
     assert load_privacy_terms() == ()
-    monkeypatch.delenv(_PRIVACY_DENYLIST_ENV)
+    monkeypatch.delenv("DADAIA_PRIVACY_DENYLIST")
     assert load_privacy_terms() == ()
 
 
@@ -222,8 +221,8 @@ def test_load_denylist_env_precedence_and_workspace_fallback(
         json.dumps({"from-file": "file"}), encoding="utf-8"
     )
     (tmp_path / "env.json").write_text(json.dumps({"from-env": "env"}), encoding="utf-8")
-    monkeypatch.setenv(_PRIVACY_DENYLIST_ENV, str(tmp_path / "env.json"))
+    monkeypatch.setenv("DADAIA_PRIVACY_DENYLIST", str(tmp_path / "env.json"))
     monkeypatch.chdir(tmp_path / "ws")
     assert load_privacy_terms() == (("from-env", "env"),)
-    monkeypatch.delenv(_PRIVACY_DENYLIST_ENV)
+    monkeypatch.delenv("DADAIA_PRIVACY_DENYLIST")
     assert load_privacy_terms() == (("from-file", "file"),)

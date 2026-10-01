@@ -22,11 +22,10 @@ from dataclasses import dataclass
 from functools import lru_cache
 from pathlib import Path
 
-from dadaia_workspace.core.exceptions import WorkspaceNotInitializedError
 from dadaia_workspace.core.models.doctor_report import DoctorLine, DoctorStatus
 from dadaia_workspace.core.redaction import mask, privacy_matches
 from dadaia_workspace.core.workspace_layout import REPO_TREE_ARTIFACTS
-from dadaia_workspace.core.workspace_resolver import resolve_workspace_root
+from dadaia_workspace.core.workspace_resolver import own_workspace_root
 from dadaia_workspace.infrastructure.ledger_scripts import load_owner
 
 #: Directory names never walked when scanning public assets: the repo-tree artifact
@@ -51,7 +50,6 @@ _PUBLIC_PRIVACY_TEXT_SUFFIXES = {
 }
 # Operator-private privacy terms are NEVER hardcoded in this published library; each
 # workspace keeps them OUT of the package, read by :func:`load_privacy_terms`.
-_PRIVACY_DENYLIST_ENV = "DADAIA_PRIVACY_DENYLIST"  # the override `_ledger.terms` reads first
 
 # Packaged, versioned baseline of STRUCTURAL patterns. Shipped inside the wheel
 # so the check is fail-closed even with no operator denylist. Operator terms are
@@ -141,14 +139,12 @@ def _load_privacy_baseline() -> tuple[_BaselinePattern, ...]:
 
 
 def load_privacy_terms() -> tuple[tuple[str, str], ...]:
-    """The operator denylist through its ONE loader, ``_ledger.terms`` (ADR 0157), rooted at
-    the resolved workspace; empty outside one. The push scan, the public doctor and the
-    ledger write seam read the same terms."""
-    try:
-        root: Path | None = resolve_workspace_root()
-    except WorkspaceNotInitializedError:
-        root = None
-    return tuple(load_owner("dd-bug-resolution", "_ledger").terms(root))
+    """The operator denylist through its ONE loader and ONE root decision (ADR 0157):
+    ``_ledger.terms`` rooted at ``_ledger.workspace_of`` the cwd (the ledger seam passes its
+    ``--specs``), else the workspace owning this venv. ``$DADAIA_PRIVACY_DENYLIST`` loads
+    even outside any workspace."""
+    ledger = load_owner("dd-bug-resolution", "_ledger")
+    return tuple(ledger.terms(ledger.workspace_of(Path.cwd()) or own_workspace_root()))
 
 
 def load_baseline_patterns() -> tuple[_BaselinePattern, ...]:

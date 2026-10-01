@@ -1,9 +1,11 @@
 """WorkspaceService — bootstrap and management of the .dadaia/ template."""
 
 import json
+import os
 from collections.abc import Callable
 from pathlib import Path
 
+from dadaia_workspace.core.atomic_write import atomic_write
 from dadaia_workspace.core.cli_line import fix_line
 from dadaia_workspace.core.harness_registry import L1_ENTRY_HARNESSES
 from dadaia_workspace.core.models.harness_profile import HarnessProfile
@@ -114,14 +116,21 @@ class WorkspaceService:
             path.write_text(json.dumps(empty, indent=2), encoding="utf-8")
 
     def _migrate_denylist(self, workspace_root: Path, path: Path) -> None:
-        """A 0.4.7 list form (``["term"]`` or ``[["term", "reason"]]``) rewritten once as
-        the one object form, the original held (ADR 0157); any other content is left for
-        the loader to refuse."""
+        """A 0.4.7 list form (``["term"]`` or ``[["term", "reason"]]``, strings only) rewritten
+        once as the one object form (ADR 0157): the converted file lands beside it first, then
+        the original is held and the conversion moved into place, so no failed step leaves the
+        terms unreadable. Any other content is left for the loader to refuse."""
+        staged = path.with_name(f"{path.name}.migrating")
         try:
             raw = json.loads(path.read_text(encoding="utf-8"))
-            pairs = (e if isinstance(e, list) else (e, "") for e in raw)
-            terms = {str(term): str(reason) for term, reason in pairs}
+            pairs = [[e, ""] if isinstance(e, str) else e for e in raw]
+            if not isinstance(raw, list) or not all(
+                isinstance(p, list) and len(p) == 2 and all(isinstance(x, str) for x in p)
+                for p in pairs
+            ):
+                return
+            atomic_write(staged, json.dumps(dict(pairs), indent=2))
+            if self._hold(workspace_root, path, path.name):
+                os.replace(staged, path)
         except (OSError, ValueError, TypeError):
             return
-        if isinstance(raw, list) and self._hold(workspace_root, path, path.name):
-            path.write_text(json.dumps(terms, indent=2), encoding="utf-8")
