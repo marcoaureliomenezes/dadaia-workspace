@@ -1,7 +1,7 @@
-"""Venv-determinism PreToolUse policy: a Bash command whose FIRST token is a bare ``dadaia``,
-``pip``/``pip3`` or ``python[3] -m dadaia_workspace`` is BLOCKED with one ``fix:`` — the
-absolute venv command. A venv-rooted token, ``$DADAIA_BIN``, any other shape or an
-unparseable payload is ALLOWED (fail-open)."""
+"""Venv-determinism PreToolUse policy: a Bash command whose FIRST token is a bare ``dadaia``
+or ``python[3] -m dadaia_workspace`` is BLOCKED with one ``fix:`` — the absolute venv
+command. A venv-rooted token, ``$DADAIA_BIN``, any other shape (``pip`` included, ADR 0134)
+or an unparseable payload is ALLOWED (fail-open)."""
 
 from __future__ import annotations
 
@@ -9,7 +9,6 @@ import shlex
 
 from dadaia_workspace.core.cli_line import fix_line, venv_line
 
-_PIP_NAMES: frozenset[str] = frozenset({"pip", "pip3"})
 _PYTHON_NAMES: frozenset[str] = frozenset({"python", "python3"})
 _VENV_BIN = ".dadaia/.venv/bin/"
 _ALLOWED_PREFIXES: tuple[str, ...] = ("$DADAIA_BIN", "${DADAIA_BIN}")
@@ -34,8 +33,6 @@ def evaluate_payload(payload: dict[str, object]) -> str | None:
     tail = f" {rest}" if rest else ""
     if token == "dadaia":
         corrected = fix_line(None) + tail
-    elif token in _PIP_NAMES:
-        corrected = venv_line(None, token) + tail
     elif (
         token in _PYTHON_NAMES
         and args[1:2] == ["-m"]

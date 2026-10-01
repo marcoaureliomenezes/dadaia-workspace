@@ -90,14 +90,15 @@ def test_evaluate_payload_first_block_wins_and_faulty_policy_fails_open(
 
 
 @pytest.mark.parametrize(
-    "payload",
+    ("payload", "blocked"),
     [
-        {"tool_name": "Read", "tool_input": {"file_path": "x"}},
-        {"tool_name": "Bash", "tool_input": {"command": "pip install requests"}},
+        ({"tool_name": "Read", "tool_input": {"file_path": "x"}}, False),
+        ({"tool_name": "Bash", "tool_input": {"command": "pip install requests"}}, False),
+        ({"tool_name": "Bash", "tool_input": {"command": "dadaia doctor"}}, True),
     ],
-    ids=["allow", "block-bash-venv-guard"],
+    ids=["allow", "allow-bash-pip", "block-bash-venv-guard"],
 )
-def test_envelope_contract(tmp_path: Path, payload: dict[str, Any]) -> None:
+def test_envelope_contract(tmp_path: Path, payload: dict[str, Any], blocked: bool) -> None:
     """Whole stdout is ONE JSON object. Allow carries no verdict at all (Claude's schema
     rejects ``decision: allow`` and interactive sessions ignore ``defer``). Block carries the
     legacy ``"decision": "block"`` (codex + the kimi shim's grep) AND
@@ -105,7 +106,7 @@ def test_envelope_contract(tmp_path: Path, payload: dict[str, Any]) -> None:
     sed capture); the Bash block is venv_guard's, with the corrected command."""
     raw = _spawn(tmp_path, payload).stdout.strip()
     envelope = json.loads(raw)
-    if payload["tool_name"] == "Read":
+    if not blocked:
         assert envelope == {"continue": True, "hookSpecificOutput": {"hookEventName": "PreToolUse"}}
         assert '"decision": "block"' not in raw
         return

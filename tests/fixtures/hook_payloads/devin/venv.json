@@ -1,5 +1,5 @@
 {
   "hook_event_name": "PreToolUse",
   "tool_name": "exec",
-  "command": "pip install requests"
+  "command": "dadaia doctor"
 }

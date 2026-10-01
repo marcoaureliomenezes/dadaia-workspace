@@ -3,14 +3,14 @@
 ONE rule lives in this policy (0.4.7 FR3 deleted the second):
 
 **Venv-rooting** (ADR-G4): a fixed leading-token check on the FIRST command token
-only — NO general shell parsing. It blocks `dadaia`, `pip`/`pip3`, and
-`python -m dadaia_workspace` invocations NOT rooted in `.dadaia/.venv/bin/` (or the
-workspace-absolute equivalent / ``$DADAIA_BIN``), emitting a block message that
-contains the corrected command. pytest, ruff, and mypy are never matched — their
+only — NO general shell parsing. It blocks `dadaia` and `python -m dadaia_workspace`
+invocations NOT rooted in `.dadaia/.venv/bin/` (or the workspace-absolute equivalent /
+``$DADAIA_BIN``), emitting a block message that contains the corrected command.
+``pip``/``pip3`` are never judged (ADR 0134). pytest, ruff, and mypy are never matched — their
 caches are redirected by `pyproject.toml` configuration, so no flag is enforced here
 (tests/unit/features/ci_preflight/test_no_pollution.py proves the bare commands clean).
 The false-block law (ADR-G1) requires that quoted strings, in-repo paths like
-``repos/x/pip.py``, and another venv's explicit bin path are never blocked — covered by
+``repos/x/dadaia``, and another venv's explicit bin path are never blocked — covered by
 the negative matrix below.
 
 CRIT: the corrected-command message content is preserved as a parametrized column (was 3
@@ -48,8 +48,6 @@ def test_bare_dadaia_is_corrected_to_the_cli_fix_line(args: str) -> None:
 @pytest.mark.parametrize(
     ("command", "tool", "args"),
     [
-        ("pip install foo", "pip", "install foo"),
-        ("pip3 install foo", "pip3", "install foo"),
         ("python -m dadaia_workspace", "python", "-m dadaia_workspace"),
         ("python3 -m dadaia_workspace", "python", "-m dadaia_workspace"),
         (
@@ -60,7 +58,7 @@ def test_bare_dadaia_is_corrected_to_the_cli_fix_line(args: str) -> None:
     ],
 )
 def test_blocks_bare_workspace_invocation(command: str, tool: str, args: str) -> None:
-    """Intent: sa-fix-lines-not-built-by-cli-line#S4 — the pip/python fix is the absolute venv tool."""
+    """Intent: sa-fix-lines-not-built-by-cli-line#S4 — the python fix is the absolute venv tool."""
     reason = venv_guard.evaluate_payload(_bash(command))
     assert reason is not None, f"expected block for {command!r}"
     fix = reason.splitlines()[-1]
@@ -78,11 +76,9 @@ def test_blocks_bare_workspace_invocation(command: str, tool: str, args: str) ->
     [
         # Venv-rooted (relative) — the canonical correct form.
         ".dadaia/.venv/bin/dadaia doctor",
-        ".dadaia/.venv/bin/pip install foo",
         ".dadaia/.venv/bin/python -m dadaia_workspace",
         # Workspace-absolute venv equivalent.
         "/home/user/ws/.dadaia/.venv/bin/dadaia doctor",
-        "/home/user/ws/.dadaia/.venv/bin/pip install foo",
         # $DADAIA_BIN override.
         "$DADAIA_BIN doctor",
         "${DADAIA_BIN} doctor",
@@ -97,6 +93,9 @@ def test_blocks_bare_workspace_invocation(command: str, tool: str, args: str) ->
         # docstring); only `python -m dadaia_workspace` is special-cased (rule 1).
         "python -m pytest",
         "python -m ruff check",
+        # ADR 0134: a project's own pip is never judged.
+        "pip install requests",
+        "pip3 install foo",
         # Unrelated commands.
         "ls -la",
         "git status",
@@ -118,23 +117,15 @@ def test_allows_venv_rooted_overridden_or_unmatched(command: str) -> None:
     [
         # Quoted strings that merely CONTAIN the words must not block.
         'echo "run dadaia doctor"',
-        "echo 'pip install foo'",
-        'grep -r "pip install" repos/',
         # In-repo paths ending in the tool name are not the leading token.
-        "cat repos/x/pip.py",
-        "python repos/x/pip.py",
+        "cat repos/x/dadaia",
         "vim repos/dadaia-workspace/dadaia_workspace/cli/main.py",
         # Another venv's explicit bin path (rooted, just not ours) — out of scope.
-        "repos/other/.venv/bin/pip install foo",
-        "/opt/otherproj/.venv/bin/pip install foo",
-        # A path that merely has 'pip' or 'dadaia' as a substring.
-        "./scripts/pip-helper.sh",
+        "repos/other/.venv/bin/dadaia doctor",
+        # A path that merely has 'dadaia' as a substring.
         "./dadaia-wrapper.sh doctor",
         # sa-text-restates-rules-the-code-contradicts#49.1: only the FIRST token counts.
-        "python -m pip install x",
-        "uv pip install x",
-        "cd x && pip install y",
-        "/usr/bin/pip install x",
+        "cd x && dadaia doctor",
     ],
 )
 def test_no_false_block(command: str) -> None:
@@ -150,16 +141,16 @@ def test_no_false_block(command: str) -> None:
 @pytest.mark.parametrize(
     ("payload", "expect_block"),
     [
-        ({"tool_name": "Edit", "tool_input": {"command": "pip install foo"}}, False),
+        ({"tool_name": "Edit", "tool_input": {"command": "dadaia doctor"}}, False),
         ({"tool_name": "Bash", "tool_input": {"command": ""}}, False),
         ({"tool_name": "Bash", "tool_input": {"command": "   "}}, False),
         ({"tool_name": "Bash", "tool_input": {}}, False),
         # sa-gate-blind-on-cursor-copilot-devin#B6: every harness's shell alias, read through the one alias table.
-        ({"tool_name": "Bash", "tool_input": {"command": "pip install foo"}}, True),
-        ({"tool_name": "exec", "command": "pip install foo"}, True),
-        ({"tool_name": "Shell", "tool_input": {"command": "pip install foo"}}, True),
-        ({"toolName": "bash", "toolArgs": '{"command": "pip install foo"}'}, True),
-        ({"command": "pip install foo"}, True),
+        ({"tool_name": "Bash", "tool_input": {"command": "dadaia doctor"}}, True),
+        ({"tool_name": "exec", "command": "dadaia doctor"}, True),
+        ({"tool_name": "Shell", "tool_input": {"command": "dadaia doctor"}}, True),
+        ({"toolName": "bash", "toolArgs": '{"command": "dadaia doctor"}'}, True),
+        ({"command": "dadaia doctor"}, True),
     ],
 )
 def test_every_shell_alias_is_judged_like_bash(
