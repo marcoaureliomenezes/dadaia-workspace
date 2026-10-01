@@ -62,8 +62,8 @@ description: >
 |---|---|
 | Recursive agent chains without operator approval | Breaks traceability |
 | Marking tasks DONE without validation evidence | Skips acceptance |
-| Push, PR, merge, deploy, closure, or `[x]` before the reviewer's `APPROVED` | Bypasses the quality gate |
-| Editing production files without a `[-]` reservation | Breaks task traceability |
+| Push, PR, merge, deploy or closure before the reviewer's `APPROVED` | Bypasses the quality gate |
+| Editing production files without a `[-]` reservation (`specs/releases/AGENTS.md` §3) | Breaks task traceability |
 | Private/project-specific details in public assets | Security and portability |
 
 ## 4. The router

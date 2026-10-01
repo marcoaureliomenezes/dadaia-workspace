@@ -8,8 +8,8 @@ candidates.
 
 | Boundary | Who validates | What unlocks |
 |---|---|---|
-| Per task | implementer discipline only (TDD, tests, local CI preflight, handoff); marker stays `[-]` | nothing; no per-task reviewer gate |
-| Candidate close | `dd-code-reviewer` `APPROVED` (three axes, six lenses) on the same commit | `[x]`; the candidate's work -> integration PR |
+| Per task | implementer discipline (TDD, tests, local CI preflight, handoff); `dd-code-reviewer` at the worktree merge | the merge |
+| Candidate close | `dd-code-reviewer` `APPROVED` (three axes, six lenses) on the same commit | the candidate's work -> integration PR |
 | Promote (ship) | pre-staged security verdict naming the integration tip | the integration -> principal PR |
 
 - Any `REJECTED`, CRITICAL/HIGH finding, failed E2E, or missing evidence sends the work back to implementation.
@@ -22,12 +22,11 @@ candidates.
 Each step ends on a checkable criterion. Steps 5–8 are candidate-closure work.
 
 **Step 1 — Reserve.**
-- Flip `[ ]`->`[-]` in the live candidate's `TASKS.md`, commit `chore(tasks): start <id>` alone.
-- Abandon instead: flip `[-]`->`[ ]`, commit `chore(tasks): abandon <id>` naming the reason.
+- Mark the live candidate's `TASKS.md` per `specs/releases/AGENTS.md` §3, the one marker lifecycle.
 - Dispatching a shell-less sub-agent: commit its flip before relaying the work item — one flip per dispatch, never batched.
-- Recovery — two simultaneous `[-]`, or a foreign `[-]` from another session: read `git log`, report to the operator, never transition it yourself.
+- Recovery — a foreign `[-]` from another session: read `git log`, report to the operator, never transition it yourself.
 - Recovery — a gate block: run the block's own one `fix:` line; a BLOCK whose fix is itself blocked is a Stall, reported at once.
-- Done when: the reservation commit exists and no other task on the branch is `[-]`.
+- Done when: the reservation commit exists.
 
 **Step 2 — TDD loop.**
 - Implement with tests; run the local CI preflight.
@@ -59,9 +58,9 @@ Each step ends on a checkable criterion. Steps 5–8 are candidate-closure work.
 - Done when: `python3 .agents/skills/dd-bug-resolution/scripts/bugs.py stats` and `.dadaia/.venv/bin/dadaia doctor`'s `ledgers` section show zero non-terminal picked items.
 
 **Step 8 — Artifact GC sweep.**
-- `.dadaia/.venv/bin/dadaia doctor` dry: read every `WS-<zone>-<verdict>` line and the `compliance:` score line.
+- `.dadaia/.venv/bin/dadaia doctor` dry: read its findings and its exit code.
 - `.dadaia/.venv/bin/dadaia doctor --fix` runs the reaper (slop MOVED to `.dadaia/reaped/`, 7-day hold) then the specs repairs; list what it held for the operator.
-- Done when: the `kind: artifact-gc` log entry records the `compliance(total)` line and it reads 100%, or names the slop the operator holds.
+- Done when: the `kind: artifact-gc` log entry records doctor's exit code and findings, or names the slop the operator holds.
 
 **Step 9 — Candidate PR.**
 - Open the work -> integration PR (branch names: the constitution's `gitflow:`) (security verdict covering the head, `dd-gitflow-default` §2a); watch CI to green; merge.

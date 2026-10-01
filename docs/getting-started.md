@@ -43,8 +43,8 @@ invocation's `--repo` and `--associated-repo` flags. It lays down:
   `.dadaia/states/harness_profile.json`, the harness roster; a re-init with another
   harness merges into it, never narrowing it.
 - An absent root `.dadaiaignore`, seeded from the legacy
-  `states/instance_exceptions.txt` or a comment-only template, and an empty `prompt.md`;
-  each is the operator's file from then on.
+  `states/instance_exceptions.txt` or a comment-only template, and an absent `prompt.md`,
+  empty; each is the operator's file from then on.
 - Unless `--skip-assets`, the staged and installed public assets — the one writer of
   every hook wiring. With `--skip-assets` the output warns that the workspace is
   ungated until `.dadaia/.venv/bin/dadaia public install` runs.
@@ -118,8 +118,8 @@ Every printed finding is one `<CODE> <verdict> <message>` line, every error-clas
 finding carries one `fix: <command>` line, and any error-class finding exits 1. There
 is no score: the findings and the exit code are the run. `--json` mirrors it,
 `--redact` masks every foreign context name and repo slug, and `--fix` is the reaper —
-it moves slop to `.dadaia/reaped/<YYYYMMDD>/` under a 7-day hold and deletes only what
-a TTL expired.
+it moves slop to `.dadaia/reaped/<YYYYMMDD>/` under a 7-day hold; a TTL expiry acts by
+zone class, an OUTPUT entry held, an EPHEMERAL one deleted.
 
 ## Run the first candidate
 

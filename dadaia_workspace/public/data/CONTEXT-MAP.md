@@ -40,9 +40,9 @@ path or entity as it appears in an installed workspace.
 
 | Surface | Purpose | Belongs | Budget | Measured |
 |---|---|---|---|---|
-| `AGENTS.md` | the root map: the flow, the roles, the gate invariants, the root, credentials, and one line per scoped file | statements; the index of every other surface | 8192 | 8304 |
+| `AGENTS.md` | the root map: the flow, the roles, the gate invariants, the root, credentials, and one line per scoped file | statements; the index of every other surface | 8192 | 8436 |
 | `specs/AGENTS.md` | the canon of a specs tree and its status tokens | canon table, status tokens, doctor codes | 4096 | 3643 |
-| `specs/releases/AGENTS.md` | candidates, phases, task markers, promote | release procedure and commit shapes | 4096 | 3844 |
+| `specs/releases/AGENTS.md` | candidates, phases, task markers, promote | release procedure and commit shapes | 4096 | 4102 |
 | `specs/backlog/AGENTS.md` | the operator's demand queue and its exits | `BACKLOG.json` shape, intake gate, dispositions | 4096 | 4086 |
 | `specs/bugs/AGENTS.md` | what a bug is and how it is proposed, recorded, resolved | bug procedure and the redaction rule | 4096 | 3847 |
 | `specs/memory/AGENTS.md` | current product truth and who writes it | atoms, ownership | 4096 | 3982 |
@@ -75,7 +75,7 @@ One procedure each; a skill that touches a governed area opens its scoped law as
 | `dd-gitflow-default` | the branch contract, commit shapes, the PR gate | — | 6144 | 5467 |
 | `dd-grill-me` | the operator grill that precedes a candidate | — | 6144 | 3367 |
 | `dd-handoff-emitter` | handoff-first emission and ack-on-consume | `.dadaia/handoff/AGENTS.md` | 6144 | 2193 |
-| `dd-manager-orchestration` | intake, dispatch and the closure pass | — | 6144 | 3749 |
+| `dd-manager-orchestration` | intake, dispatch and the closure pass | — | 6144 | 3774 |
 | `dd-release-definition` | picking the set and authoring the trio | `specs/releases/AGENTS.md` | 6144 | 6077 |
 | `dd-release-implementation` | the candidate arc from reservation to the gate | `specs/releases/AGENTS.md` | 6144 | 3638 |
 | `dd-spec-navigator` | the three-phase session grounding protocol | `specs/AGENTS.md` | 6144 | 3393 |
@@ -88,7 +88,7 @@ Three roles, no fourth; every retired role is a lens the reviewer applies.
 | Surface | Purpose | Belongs | Budget | Measured |
 |---|---|---|---|---|
 | `dd-product-engineer` | backlog, SPEC, the product-memory pass at closure | role, read_only, model policy | — | 4614 |
-| `dd-software-engineer` | PLAN/TASKS, production code and its tests | role, read_only, model policy | — | 8994 |
+| `dd-software-engineer` | PLAN/TASKS, production code and its tests | role, read_only, model policy | — | 8809 |
 | `dd-code-reviewer` | the three-axis review and its six lenses | role, read_only, model policy | — | 6399 |
 
 - A statement belongs to exactly one surface: the map indexes, the scoped file rules, the

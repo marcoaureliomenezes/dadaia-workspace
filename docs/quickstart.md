@@ -101,7 +101,8 @@ id, else `DADAIA_CONTEXT`, never the cwd: sitting inside a repository is not a b
 `workspace`, `specs`, `ledgers`. Every finding prints as one `<CODE> <verdict>
 <message>` line, every error-class finding carries one `fix: <command>` line, and any
 error-class finding exits 1. There is no score: the findings and the exit code are the
-run. `--fix` moves slop to `.dadaia/reaped/` and deletes only what a TTL expired.
+run. `--fix` moves slop to `.dadaia/reaped/`; a TTL expiry acts by zone class, an OUTPUT
+entry held, an EPHEMERAL one deleted.
 
 ## 5. The first backlog entry
 

@@ -88,8 +88,8 @@ into the session.
 `.dadaia/.venv/bin/dadaia doctor` is the one instance validator. Three sections run in fixed order —
 `workspace`, `specs`, `ledgers` — each finding one `<CODE> <verdict> <message>` line,
 every error-class finding with one `fix: <command>` line and exit 1; there is no score.
-`--json` mirrors the run; `--fix` is the reaper: it moves slop to `.dadaia/reaped/`
-and deletes only what a TTL expired.
+`--json` mirrors the run; `--fix` is the reaper: it moves slop to `.dadaia/reaped/`;
+a TTL expiry acts by zone class, an OUTPUT entry held, an EPHEMERAL one deleted.
 
 ## An agent reads AGENTS.md and uses it
 

@@ -35,11 +35,11 @@
 
 ## 3. What is enforced
 
-- One PreToolUse gate blocks exactly three things: a file-tool write (`Write`, `Edit`, `MultiEdit`, `apply_patch`) creating a new workspace-root entry (§4); a Bash command whose first token is `dadaia` or `python -m dadaia_workspace` outside `.dadaia/.venv/bin/`; a file-tool write (those or `NotebookEdit`) that is PROTECTED or out-of-scope.
-- No tool, Bash included, writes out of scope or PROTECTED; the gate fails open on: a missing `.dadaia/.venv` (ADR 0067), a pre-gate past 10 s (ADR 0118), a Bash write (ADRs 0096, 0103, 0133), an id-less unbound session writing under `worktrees/<r>/` (ADR 0116), a policy that raises, an unreadable payload.
+- One PreToolUse gate blocks exactly three things: a file-tool write (`Write`, `Edit`, `MultiEdit`, `apply_patch`) creating a new workspace-root entry (§4); a Bash command whose first token is `dadaia` or `python -m dadaia_workspace` outside `.dadaia/.venv/bin/`; a file-tool write (those or `NotebookEdit`) that is PROTECTED or out-of-scope; it judges the root, `.dadaia/`, the closed-canon zones and `repos/`, `worktrees/` first level.
+- No tool, Bash included, writes out of scope or PROTECTED; the gate fails open on: a missing `.dadaia/.venv` (ADR 0067); a pre-gate past 10 s (ADR 0118); a Bash write (ADRs 0096, 0103, 0133); an id-less unbound session under `worktrees/<r>/` (ADR 0116); a policy that raises (`pre_gate`); an unreadable payload (`read_stdin_json`); an unreadable registry, judging nothing below `repos/`, `worktrees/` (ADR 0132).
 - Path classes: ADDITIVE (`.dadaia/AGENTS.md`'s output and ephemeral zones) writable; PROTECTED (`workspace_layout.CORE_FLOOR`, `sdd_gate._HOOK_WIRING`, the install ledger, the `.dadaiaignore` `[protected]` globs, repo-relative) blocked; the rest MUTATING.
 - Writes under `repos/<slug>/`: `specs/audits/` directly, the rest by worktree merge; only `context create` and a repo's first `specs init` write `specs/` directly (ADR 0154).
-- Every BLOCK carries exactly one `fix: <command>` line; a BLOCK whose fix is itself blocked is a Stall, CRITICAL.
+- Every BLOCK carries exactly one fix line, `fix: <command>` or `Operator action: <one act>` (ADR 0158); a BLOCK whose fix is itself blocked is a Stall, CRITICAL.
 - Git chokepoints (branch names: `specs/constitution.md` `gitflow:`): pre-push allows only the work branch and refuses a non-canon `specs/` path or a denylisted secret; both PRs need CI green and a `dd-code-reviewer` APPROVED verdict; no CI job calls a model API. Mechanics: `dd-gitflow-default`, `.dadaia/AGENTS.md`.
 - Races surface, never block; the binding: `.dadaia/.venv/bin/dadaia context show --json`.
 - The gate reads no SDD artifact; procedure is skill-taught and audit-measured, never gated.
@@ -97,5 +97,4 @@
 - Level 1 workspace: `uvx dadaia-workspace init [DIR]`; re-running it on an existing workspace is the upgrade.
 - Level 2 context: `.dadaia/.venv/bin/dadaia context create <name> --main-repo <url> [--associated-repo <url>]...` clones, hooks and marks ALIVE; only `.dadaia/.venv/bin/dadaia context bind <ctx>` binds a session.
 - Level 3 specs: 3a `.dadaia/.venv/bin/dadaia specs init --context <ctx>`; 3b the `dd-audit-project` first pass, done when memory holds real content (never a stamp); 3c `.dadaia/.venv/bin/dadaia context baseline <ctx>` publishes.
-- A new project in an existing workspace is levels 2 + 3; procedure: `dd-cli-library` (1-2), `dd-audit-project` (3).
 - The next step is never guessed: `.dadaia/.venv/bin/dadaia doctor` (`ONBOARDING`) and SessionStart print it with its `fix:` line.
