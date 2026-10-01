@@ -1,10 +1,10 @@
 {
   "schema": "release-state-v1",
   "release": "0.5.0",
-  "phase": "DEFINITION",
+  "phase": "IMPLEMENTATION",
   "defined": {
-    "sha": "c8f0321a",
-    "ts": "2026-09-30T03:22:46Z"
+    "sha": "73b2b863",
+    "ts": "2026-10-01T04:46:02Z"
   },
   "implemented": {
     "sha": "91262c55",
@@ -616,6 +616,18 @@
       "agent": "main-thread",
       "kind": "note",
       "text": "Candidate 5 closure merged into develop by PR #275 (merge 67afcdab, head 86577ab5, every check green, dd-code-reviewer APPROVED 86577ab5). Gate: continue — operator 2026-09-30: \"quando ficar verde começa a rc-6\"."
+    },
+    {
+      "ts": "2026-10-01T04:46:02Z",
+      "agent": "release.py",
+      "kind": "note",
+      "text": "Candidate defined at 73b2b863; phase IMPLEMENTATION."
+    },
+    {
+      "ts": "2026-10-01T04:46:02Z",
+      "agent": "main-thread",
+      "kind": "drifts",
+      "text": "Candidate 6 was implemented while phase still read DEFINITION: the main thread never ran `release.py phase IMPLEMENTATION` after the trio was approved (73b2b863). Retro-recorded at 73b2b863 by the candidate-close review (dd-code-reviewer F1, 2026-10-01). Tooling gap: release.py check accepted every task [x] under phase DEFINITION."
     }
   ]
 }
