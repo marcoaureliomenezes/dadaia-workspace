@@ -105,6 +105,50 @@ def test_a_write_verb_over_an_invalid_document_refuses_with_the_pair_intact(
     assert _hashes(specs) == before, done.stderr
 
 
+_R = "releases"
+#: (script, {specs-relative file: text}) — together, every finding branch of every `check`.
+_BROKEN = [
+    ("dd-bug-resolution/scripts/bugs.py", {"bugs/BUGS.jsonl": '{x\n{"id": "a"}\n',
+                                           "bugs/_archive/bugs_histo.jsonl": '{x\n{"id": "h"}\n'}),
+    ("dd-backlog-definition/scripts/backlog.py", {"backlog/BACKLOG.json": "{x",
+                                                  "backlog/_archive/backlog_histo.jsonl": '{x\n{"id": "h"}\n'}),
+    ("dd-backlog-definition/scripts/backlog.py", {"backlog/BACKLOG.json": '{"active": 1}'}),
+    ("dd-backlog-definition/scripts/backlog.py", {"backlog/BACKLOG.json": json.dumps({
+        "schema": "backlog-v1", "active": [{"id": "a", "status": "resolved"}] * 2})}),
+    ("dd-audit-project/scripts/audit.py", {"audits/a1/FINDINGS.jsonl": '{x\n{"id": "f"}\n{"id": "f"}\n',
+                                           "audits/a2/AUDIT.md": "# A\n",
+                                           "audits/_archive/audits_histo.jsonl": '{x\n{"disposition": "open"}\n'}),
+    ("dd-release-implementation/scripts/release.py", {f"{_R}/1.0.0/rc-1/SPEC.md": "",
+                                                      f"{_R}/foo/_RELEASE.json": "{}",
+                                                      f"{_R}/_archive/0.9.0/_RELEASE.json": "{x",
+                                                      f"{_R}/_archive/0.8.0/_RELEASE.json": "{}",
+                                                      f"{_R}/_archive/releases_histo.jsonl": '{x\n{"id": "h"}\n'}),
+    ("dd-release-implementation/scripts/release.py", {f"{_R}/1.0.0/_RELEASE.json": "{x",
+                                                      f"{_R}/2.0.0/_RELEASE.json": "{}"}),
+    ("dd-spec-navigator/scripts/memory.py", {"memory/product/core/a.md": "no frontmatter\n"}),
+    ("dd-spec-navigator/scripts/memory.py", {"memory/product/core/a.md": "---\ntitle: a\ntldr: t\n---\n"}),
+]  # fmt: skip
+
+
+@pytest.mark.parametrize(("script", "files"), _BROKEN)
+def test_every_check_finding_carries_its_fix(
+    tmp_path: Path, script: str, files: dict[str, str]
+) -> None:
+    """Intent: CONTRACT — AC4.5: every record each ledger script's `check --json` emits
+    carries a non-empty fix (ADR 0158), so the doctor never invents one."""
+    skills, specs = _stage(tmp_path), tmp_path / "specs"
+    for rel, text in files.items():
+        (specs / rel).parent.mkdir(parents=True, exist_ok=True)
+        (specs / rel).write_text(text, encoding="utf-8")
+    done = subprocess.run(
+        [sys.executable, str(skills / script), "check", "--specs", str(specs), "--json"],
+        capture_output=True, text=True, check=False,
+    )  # fmt: skip
+    records = json.loads(done.stdout)
+    assert done.returncode == 1 and records, done.stderr
+    assert [r for r in records if not str(r.get("fix", "")).strip()] == [], records
+
+
 def test_the_one_ledger_writer_leaves_no_temp_and_writes_lf(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -135,7 +179,10 @@ def script_table(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Iterator[An
     """A staged script's module-level name, read by running the script as `public stage`
     ships it; the modules it imports leave with the test."""
     skills, before = _stage(tmp_path), set(sys.modules)
-    monkeypatch.setattr(sys, "path", list(sys.path))
+    sibling = [
+        str(skills / s / "scripts") for s in ("dd-bug-resolution", "dd-release-implementation")
+    ]
+    monkeypatch.setattr(sys, "path", [*sys.path, *sibling])  # as backlog.py appends them
     monkeypatch.setattr(sys, "dont_write_bytecode", True)
     yield lambda rel, name="REQUIRED_EVIDENCE": runpy.run_path(str(skills / rel))[name]
     for module in set(sys.modules) - before:

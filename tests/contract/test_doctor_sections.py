@@ -81,11 +81,12 @@ def _release_findings(specs: Path) -> tuple[list[dict[str, Any]], list[str]]:
 
 def test_a_mis_cased_phase_is_one_finding_whose_fix_clears_it(tmp_path: Path) -> None:
     """sa-release-json-validated-three-times#B1: phase 'closure' yields exactly one
-    finding, whose fix runs release.py check over the tree (AC4.5); the repair clears it."""
+    finding, whose fix is ADR 0158's `Operator action:` naming the file, line and law
+    (AC4.5); the repair clears it."""
     state = _live_release(tmp_path / "specs", phase="closure")
     named, _ = _release_findings(tmp_path / "specs")
     assert len(named) == 1 and named[0]["code"] == "LEDGER-RELEASE-SCHEMA", named
-    assert named[0]["fix"].endswith(f"release.py check --specs {state.parents[2].resolve()}"), named
+    assert named[0]["fix"].startswith(f"Operator action: line 1 of {state.resolve()} "), named
     state.write_text(state.read_text("utf-8").replace('"closure"', '"CLOSURE"'), "utf-8")
     assert not [f for f in _release_findings(tmp_path / "specs")[0] if "'closure'" in f["message"]]
 

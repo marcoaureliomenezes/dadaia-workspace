@@ -106,17 +106,19 @@ def parse(text: str) -> list[dict[str, Any]]:
     return out
 
 
-def finding(code: str, path: str, line: int, message: str) -> dict[str, Any]:
-    return {"code": code, "verdict": "error", "path": path, "line": line, "message": message}
+def finding(code: str, path: str, line: int, message: str, fix: str) -> dict[str, Any]:
+    return {"code": code, "verdict": "error", "path": path, "line": line, "message": message,
+            "fix": fix}  # fmt: skip
 
 
-def fixed(found: list[dict[str, Any]], owner: Path, specs: Path) -> list[dict[str, Any]]:
-    """``check``'s records, each with a fix: its own, else *owner*'s ``check`` naming the
-    line — no verb rewrites a line no verb wrote, and the law forbids a hand edit."""
-    from _specs import script, with_specs  # beside every owner; the package never calls this
+#: Where a fix names a ledger when no tree is given: a write's own candidate bytes.
+SPECS = Path("specs")
 
-    rerun = with_specs(f"{script(owner)} check", specs.resolve())
-    return [{**row, "fix": row.get("fix") or rerun} for row in found]
+
+def unwritten(file: Path, line: int, verbs: str, law: str) -> str:
+    """The fix for a line no verb wrote: no verb rewrites it and *law* forbids a hand edit."""
+    return (f"Operator action: line {line} of {file} was not written by {verbs} — revert "
+            f"the change that wrote it, then redo it through {verbs} ({law})")  # fmt: skip
 
 
 def stamp(path: Path) -> tuple[int, int] | None:

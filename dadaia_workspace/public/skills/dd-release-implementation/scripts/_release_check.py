@@ -11,7 +11,6 @@ to; this file validates the documents a write touches.
 
 from __future__ import annotations
 
-import functools
 import json
 import sys
 from pathlib import Path
@@ -20,16 +19,26 @@ from typing import Any
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 sys.path.append(str(Path(__file__).resolve().parents[2] / "dd-bug-resolution" / "scripts"))
 
-from _ledger import finding as _finding  # noqa: E402
-from _ledger import load_schema, validate  # noqa: E402
+import _ledger  # noqa: E402
+from _ledger import SPECS, load_schema, validate  # noqa: E402
 from _release_schema import (  # noqa: E402
     CODE,
     DELIVERED,
     HISTO,
 )
 
-#: One `check --json` record of this ledger: `_ledger.finding` bound to CODE.
-finding = functools.partial(_finding, CODE)
+_LAW = "specs/releases/AGENTS.md: release.py is this ledger's ONE writer"
+
+
+def finding(path: str, line: int, message: str, fix: str) -> dict[str, Any]:
+    """One `check --json` record of this ledger."""
+    return _ledger.finding(CODE, path, line, message, fix)
+
+
+def _unwritten(path: str, line: int, message: str, root: Path) -> dict[str, Any]:
+    """A line of this ledger no `release.py` verb wrote."""
+    fix = _ledger.unwritten(root / path, line, "`release.py`", _LAW)
+    return finding(path, line, message, fix)
 
 
 def _log_errors(document: dict[str, Any]) -> list[str]:
@@ -42,19 +51,18 @@ def _log_errors(document: dict[str, Any]) -> list[str]:
     ]
 
 
-def state_findings(text: str, rel: str) -> list[dict[str, Any]]:
+def state_findings(text: str, rel: str, root: Path = SPECS) -> list[dict[str, Any]]:
     """Every finding one live release-state document's *text* carries, at *rel*."""
     try:
         document = json.loads(text)
     except json.JSONDecodeError as exc:
-        return [finding(rel, exc.lineno, f"document is not valid JSON: {exc.msg}")]
+        return [_unwritten(rel, exc.lineno, f"document is not valid JSON: {exc.msg}", root)]
     schema = load_schema("release-state-v1")
-    if messages := list(validate(document, schema, schema, "state")):
-        return [finding(rel, 1, message) for message in messages]
-    return [finding(rel, 1, m) for m in _log_errors(document)]
+    messages = list(validate(document, schema, schema, "state")) or _log_errors(document)
+    return [_unwritten(rel, 1, "; ".join(messages), root)] if messages else []
 
 
-def histo_findings(text: str) -> list[dict[str, Any]]:
+def histo_findings(text: str, root: Path = SPECS) -> list[dict[str, Any]]:
     """The append-only ship ledger: the histo-record-v1 shape, `delivered`, one line per
     release, ever."""
     schema = load_schema("histo-record-v1")
@@ -66,23 +74,15 @@ def histo_findings(text: str) -> list[dict[str, Any]]:
         try:
             record = json.loads(raw)
         except json.JSONDecodeError as exc:
-            findings.append(finding(HISTO, number, f"line is not valid JSON: {exc.msg}"))
+            findings.append(_unwritten(HISTO, number, f"line is not valid JSON: {exc.msg}", root))
             continue
         messages = list(validate(record, schema, schema, "record"))
-        findings.extend(finding(HISTO, number, message) for message in messages)
+        if not messages and record["disposition"] != DELIVERED:
+            messages.append(
+                f"disposition {record['disposition']!r} — a release ships {DELIVERED!r}"
+            )
+        if not messages and (first := seen.setdefault(str(record["id"]), number)) != number:
+            messages.append(f"{record['id']!r} ships twice (first at line {first})")
         if messages:
-            continue
-        if record["disposition"] != DELIVERED:
-            findings.append(
-                finding(
-                    HISTO,
-                    number,
-                    f"disposition {record['disposition']!r} — a release ships {DELIVERED!r}",
-                )
-            )
-        first = seen.setdefault(str(record["id"]), number)
-        if first != number:
-            findings.append(
-                finding(HISTO, number, f"{record['id']!r} ships twice (first at line {first})")
-            )
+            findings.append(_unwritten(HISTO, number, "; ".join(messages), root))
     return findings

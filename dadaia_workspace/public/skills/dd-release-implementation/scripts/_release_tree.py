@@ -20,7 +20,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 sys.path.insert(1, str(Path(__file__).resolve().parents[2] / "dd-spec-navigator" / "scripts"))
 
 import _memory_drift as drift  # noqa: E402
-from _ledger import fixed, records  # noqa: E402
+from _ledger import records  # noqa: E402
 from _release_check import finding, histo_findings, state_findings  # noqa: E402
 from _release_phase import NEXT  # noqa: E402
 from _release_plan import plan_errors  # noqa: E402
@@ -131,7 +131,8 @@ def _origin_findings(specs: Path) -> list[dict[str, Any]]:
     try:
         rows = _trace(specs, live.release_id, origin(text))
     except ValueError as error:
-        return [finding(rel, line, str(error))]
+        return [finding(rel, line, str(error), f"Operator action: rewrite the Origin line "
+                        f"{line} of {spec} to the Origin grammar ({error})")]  # fmt: skip
     since = str((state.get("defined") or {}).get("ts") or "")
     swept = (
         state.get("shipped")
@@ -143,7 +144,8 @@ def _origin_findings(specs: Path) -> list[dict[str, Any]]:
     )
     out = []
     for kind, i, standing, writable in rows:
-        row = finding(rel, line, f"Origin {kind}:{i} {standing}")
+        row = finding(rel, line, f"Origin {kind}:{i} {standing}", f"Operator action: name a "
+                      f"live {kind} id for {kind}:{i}, or rule it out of the Origin line of {spec}.")  # fmt: skip
         values = {"i": quote(i), "a": quote(i.rpartition("-F")[0]), "r": live.release_id}
         if standing == "untraced" and swept and writable:
             skill, verb = _POINTER[kind]
@@ -176,7 +178,7 @@ def _definition_findings(
         fix = with_specs(f"{SCRIPT} {NEXT['DEFINITION']} --sha {sha}", specs)
     except (drift.Refusal, OSError, IndexError):  # no history, no git binary
         fix = f"Operator action: run `{NEXT['DEFINITION']}` at the commit approving {candidate}"
-    return [{**finding(rel, 1, message), "fix": fix} for message in found]
+    return [finding(rel, 1, "; ".join(found), fix)]
 
 
 def _directory_findings(release_dir: Path, specs: Path) -> list[dict[str, Any]]:
@@ -184,9 +186,10 @@ def _directory_findings(release_dir: Path, specs: Path) -> list[dict[str, Any]]:
     trio in IMPLEMENTATION/CLOSURE or the untouched markers in DEFINITION."""
     dir_rel, path = release_dir.relative_to(specs).as_posix(), release_dir / STATE
     if not path.is_file():
-        return [finding(dir_rel, 1, f"release directory carries no {STATE}")]
+        return [finding(dir_rel, 1, f"release directory carries no {STATE}", f"Operator action: "
+                        f"restore {path} from git history, or move {release_dir} out of specs/")]  # fmt: skip
     text = path.read_text(encoding="utf-8")
-    if findings := state_findings(text, f"{dir_rel}/{STATE}"):
+    if findings := state_findings(text, f"{dir_rel}/{STATE}", specs.resolve()):
         return findings
     state = json.loads(text)
     phase, candidate = state["phase"], candidate_dir(release_dir)
@@ -199,18 +202,21 @@ def _directory_findings(release_dir: Path, specs: Path) -> list[dict[str, Any]]:
     missing = [n for n in TRIO if not (candidate and (candidate / n).is_file())]
     if candidate is None or missing:
         where = candidate.name if candidate else "rc-<N>"
-        return [finding(dir_rel, 1, f"phase {phase} is missing {where}/{', '.join(missing)}")]
+        return [finding(dir_rel, 1, f"phase {phase} is missing {where}/{', '.join(missing)}",
+                        f"Operator action: define {', '.join(missing)} in {candidate or release_dir}"
+                        " (dd-release-definition)")]  # fmt: skip
     plan = (candidate / "PLAN.md").read_text(encoding="utf-8")
     errors = plan_errors(plan, unfinished_tasks(candidate))
     plan_rel = f"{dir_rel}/{candidate.name}/PLAN.md"
-    return [finding(plan_rel, 1, e) for e in errors] + memory
+    fix = f"Operator action: correct {candidate / 'PLAN.md'} (dd-release-definition)"
+    return ([finding(plan_rel, 1, "; ".join(errors), fix)] if errors else []) + memory
 
 
 def _memory_tasks(marks: list[re.Match[str]], tasks: Path, dir_rel: str) -> list[dict[str, Any]]:
     """A task whose `W:` writes `specs/memory`: memory is closure procedure, never a task."""
     fix = f"Operator action: drop the specs/memory path from that task's `W:` in {tasks}"
-    return [{**finding(f"{dir_rel}/{tasks.parent.name}/TASKS.md", 1, f"task {line[:80]!r} writes "
-                       "specs/memory — memory is closure procedure (RC-FLOW step 5)"), "fix": fix}
+    return [finding(f"{dir_rel}/{tasks.parent.name}/TASKS.md", 1, f"task {line[:80]!r} writes "
+                    "specs/memory — memory is closure procedure (RC-FLOW step 5)", fix)
             for line in (m[0].strip() for m in marks)
             if any(p.split("/")[:2] == ["specs", "memory"] for p in writes(line))]  # fmt: skip
 
@@ -271,12 +277,12 @@ def _window_findings(specs: Path) -> list[dict[str, Any]]:
     if live.state.get("phase") != "CLOSURE":
         return []
     rel = f"releases/{live.release_id}/{STATE}"
+    fix = (
+        f"Operator action: run `{SCRIPT} memory --specs {quote(str(specs))}` with the "
+        "atom slugs the memory pass reviewed as --reviewed and changed as --changed"
+    )
     if message := _memory_record_error(live.state):
-        fix = (
-            f"Operator action: run `{SCRIPT} memory --specs {quote(str(specs))}` with the "
-            "atom slugs the memory pass reviewed as --reviewed and changed as --changed"
-        )
-        return [{**finding(rel, 1, message), "fix": fix}]
+        return [finding(rel, 1, message, fix)]
     entry = [e for e in live.state["log"] if isinstance(e, dict) and e.get("kind") == "memory"][-1]
     until = str(entry["until"])
     try:
@@ -284,8 +290,8 @@ def _window_findings(specs: Path) -> list[dict[str, Any]]:
         errors += [f"atom {a['slug']!r} moved after the memory entry's until {until[:12]}: "
                    f"{', '.join(a['matched'])}" for a in drift.report(specs, until)["atoms"]]  # fmt: skip
     except (drift.Refusal, OSError) as refusal:  # a Refusal carries the fix that clears it
-        return [{**finding(rel, 1, str(refusal)), "fix": getattr(refusal, "fix", "")}]
-    return [finding(rel, 1, message) for message in errors]
+        return [finding(rel, 1, str(refusal), getattr(refusal, "fix", "") or fix)]
+    return [finding(rel, 1, "; ".join(errors), fix)] if errors else []
 
 
 def tree_findings(specs: Path) -> list[dict[str, Any]]:
@@ -297,14 +303,16 @@ def tree_findings(specs: Path) -> list[dict[str, Any]]:
             findings += _directory_findings(d, specs)
         elif d.name != "_archive" and (d / STATE).is_file():
             move = f"{d.resolve()} into its canon shape (a bare M.m.p id), or out of specs/"
-            findings.append({**finding(f"releases/{d.name}", 1, f"{d.name!r} is not a bare M.m.p "
-                             "release id, so it is not a live release"),
-                             "fix": f"Operator action: move {move}"})  # fmt: skip
+            findings.append(finding(f"releases/{d.name}", 1, f"{d.name!r} is not a bare M.m.p "
+                                    "release id, so it is not a live release",
+                                    f"Operator action: move {move}"))  # fmt: skip
     if len(ids := live_ids(specs)) > 1:
         findings.append(finding("releases", 1, f"multiple live release directories carry "
-                                f"{STATE}: {', '.join(ids)} — exactly one is allowed"))  # fmt: skip
+                                f"{STATE}: {', '.join(ids)} — exactly one is allowed",
+                                f"Operator action: keep one of {', '.join(ids)} live under "
+                                f"{releases}; ship or move out the others"))  # fmt: skip
     if (specs / HISTO).is_file():
-        findings += histo_findings((specs / HISTO).read_text(encoding="utf-8"))
+        findings += histo_findings((specs / HISTO).read_text(encoding="utf-8"), specs.resolve())
     for path in sorted(releases.glob(f"_archive/*/{STATE}")):
         # ADR 0152 (1): an archived state names its ship (F059). Not the live schema: the
         # 0.4.5-0.4.7 archives predate it (`ARCHIVED`, `rc`) and history is not rewritten.
@@ -312,23 +320,22 @@ def tree_findings(specs: Path) -> list[dict[str, Any]]:
         try:
             state = json.loads(path.read_text(encoding="utf-8"))
         except json.JSONDecodeError as error:
-            findings.append({**finding(rel, 1, f"archived state is not valid JSON: {error}"),
-                             "fix": f"Operator action: {act}object, from git history"})  # fmt: skip
+            findings.append(finding(rel, 1, f"archived state is not valid JSON: {error}",
+                                    f"Operator action: {act}object, from git history"))  # fmt: skip
             continue
         shipped = state.get("shipped") if isinstance(state, dict) else None
         if not (isinstance(shipped, dict) and SHA_RE.match(str(shipped.get("sha")))
                 and isinstance(shipped.get("pr"), int)):  # fmt: skip
-            findings.append({**finding(rel, 1, "archived release carries no shipped {sha, pr}"),
-                             "fix": f"Operator action: {act}object whose shipped names the "
-                             "merged promote PR's sha and number"})  # fmt: skip
+            findings.append(finding(rel, 1, "archived release carries no shipped {sha, pr}",
+                                    f"Operator action: {act}object whose shipped names the "
+                                    "merged promote PR's sha and number"))  # fmt: skip
     return findings
 
 
 def check(specs: Path) -> list[dict[str, Any]]:
     """The ONE release validator (the doctor delegates here): the tree, the live
     candidate's Origin, then the live CLOSURE's memory record."""
-    found = tree_findings(specs) + _origin_findings(specs) + _window_findings(specs)
-    return fixed(found, Path(__file__).with_name("release.py"), specs)
+    return tree_findings(specs) + _origin_findings(specs) + _window_findings(specs)
 
 
 def ship_findings(specs: Path) -> list[dict[str, Any]]:
@@ -338,12 +345,12 @@ def ship_findings(specs: Path) -> list[dict[str, Any]]:
     found = [f for f in check(specs) if f["verdict"] == "error"]
     rel, phase = f"releases/{live.release_id}/{STATE}", str(live.state.get("phase"))
     if phase != "CLOSURE":
-        found.append({**finding(rel, 1, f"release {live.release_id} is in phase {phase!r} — "
-                      "only a CLOSURE release ships"),
-                      "fix": f"{SCRIPT} {NEXT.get(phase, 'check')} --sha $(git rev-parse --short HEAD)"})  # fmt: skip
+        found.append(finding(rel, 1, f"release {live.release_id} is in phase {phase!r} — "
+                     "only a CLOSURE release ships",
+                     f"{SCRIPT} {NEXT.get(phase, 'check')} --sha $(git rev-parse --short HEAD)"))  # fmt: skip
     if (archive := specs / "releases" / "_archive" / live.release_id).exists():
-        found.append({**finding(rel, 1, f"release {live.release_id} is live and already "
-                      f"archived at {archive}"), "fix": f"Operator action: decide which of "
-                      f"{live.release_dir.resolve()} and {archive.resolve()} is release "
-                      f"{live.release_id}; a release ships once"})  # fmt: skip
+        found.append(finding(rel, 1, f"release {live.release_id} is live and already "
+                     f"archived at {archive}", f"Operator action: decide which of "
+                     f"{live.release_dir.resolve()} and {archive.resolve()} is release "
+                     f"{live.release_id}; a release ships once"))  # fmt: skip
     return found

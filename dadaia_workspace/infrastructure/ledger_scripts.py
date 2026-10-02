@@ -152,7 +152,8 @@ def _finding(script: LedgerScript, record: dict[str, Any]) -> SectionFinding:
         message=f"{unit} {record.get('message', '')}".strip(),
         canonical=False,
         error=str(record.get("verdict") or "error") == "error",
-        fix=str(record["fix"]),
+        # Every check record carries its fix; one without is an install older than this one.
+        fix=str(record.get("fix") or fix_line(None, "public", "install")),
     )
 
 
@@ -173,9 +174,7 @@ def script_findings(specs_dir: Path, runner: _Runner | None = None) -> list[Sect
             continue
         records = _parse(result)
         if records is None:
-            findings.append(
-                _unrunnable(script, f"check exited {result.returncode} outside its contract")
-            )
+            findings.append(_unrunnable(script, f"check exited {result.returncode} with no JSON"))
             continue
         findings.extend(_finding(script, record) for record in records)
     return findings
@@ -204,8 +203,7 @@ def script_repairs(specs_dir: Path, runner: _Runner | None = None) -> list[str]:
 
 
 def _parse(result: Any) -> list[dict[str, Any]] | None:
-    """The script's findings, or ``None`` when it did not answer in the contract — every
-    record carries its own fix."""
+    """The script's findings, or ``None`` when it did not answer in the contract."""
     if result.returncode not in _CHECK_EXITS:
         return None
     try:
@@ -214,8 +212,7 @@ def _parse(result: Any) -> list[dict[str, Any]] | None:
         return None
     if not isinstance(payload, list):
         return None
-    records = [record for record in payload if isinstance(record, dict)]
-    return records if all("fix" in record for record in records) else None
+    return [record for record in payload if isinstance(record, dict)]
 
 
 def worktree_rows(

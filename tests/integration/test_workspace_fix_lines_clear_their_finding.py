@@ -100,12 +100,12 @@ _LEDGER_ROWS = [
 
 
 @pytest.mark.parametrize(("code", "rel", "committed", "bad"), _LEDGER_ROWS)
-def test_an_invalid_ledger_line_names_its_scripts_verb(
+def test_an_invalid_ledger_line_is_one_operator_action(
     tmp_path: Path, code: str, rel: str, committed: str, bad: str
 ) -> None:
-    """Intent: CONTRACT — ledger-finding-fix-line-orders-a-hand-edit-the-law-forbids (AC4.5):
-    an invalid line carries ONE fix, which runs its ledger script's own verb, never a
-    hand edit the law forbids; run, it names that line."""
+    """Intent: CONTRACT — AC4.5, sa-unfixable-doctor-findings-say-doctor-fix#S1: an
+    invalid line is ONE finding whose fix is ADR 0158's `Operator action:` naming the
+    file, the line and the ledger's law — no verb rewrites a line no verb wrote."""
     subprocess.run(["git", "init", "-q", str(tmp_path)], check=True)  # noqa: S603, S607
     ledger = tmp_path / rel
     ledger.parent.mkdir(parents=True)
@@ -115,12 +115,9 @@ def test_an_invalid_ledger_line_names_its_scripts_verb(
     subprocess.run([*_GIT, "-C", str(tmp_path), "commit", "-qm", "l"], check=True)  # noqa: S603
     ledger.write_text(bad)
     found = _findings_before(tmp_path, "--specs-dir", "specs")
-    (fix,) = {f["fix"] for f in found if f["code"] == code}
-    assert "Operator action" not in fix and " check --specs " in fix, fix
-    ran = subprocess.run(
-        ["bash", "-c", fix], cwd=tmp_path, env=_ENV, capture_output=True, text=True
-    )  # noqa: S603, S607
-    assert ran.returncode == 1 and f"{rel.removeprefix('specs/')}:1 " in ran.stdout, ran.stdout
+    (fix,) = [f["fix"] for f in found if f["code"] == code]
+    assert fix.startswith("Operator action: ") and f"line 1 of {ledger.resolve()} " in fix, fix
+    assert "AGENTS.md" in fix and "<" not in fix, fix
 
 
 def _workspace(tmp_path: Path) -> Path:

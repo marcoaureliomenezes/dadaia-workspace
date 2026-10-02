@@ -22,6 +22,7 @@ CODE = "LEDGER-BUGS-SCHEMA"
 LEDGER = "bugs/BUGS.jsonl"
 HISTO = "bugs/_archive/bugs_histo.jsonl"
 TERMINAL = ("resolved", "superseded", "deferred", "rejected")
+_VERBS, _LAW = "`bugs.py append|update`", "specs/bugs/AGENTS.md: never hand-edit BUGS.jsonl"
 
 
 def load_schema() -> dict[str, Any]:
@@ -45,20 +46,18 @@ def invariant_errors(record: dict[str, Any]) -> Iterator[str]:
 
 
 def findings_for(
-    text: str, rel: str = LEDGER, archived: frozenset[str] = frozenset()
+    text: str, rel: str = LEDGER, archived: frozenset[str] = frozenset(), root: Path = _ledger.SPECS
 ) -> list[dict[str, Any]]:
     """Every finding the ledger *text* carries — the ONE validation path, run both by
     ``check`` over the committed file and by every write over its own candidate bytes.
     Lineage (AC3.8): a `caused_by` names a record of *text* or *archived*, and never loops."""
     schema = load_schema()
-    findings: list[dict[str, Any]] = []
+    lines: dict[int, list[str]] = {}
     seen: dict[str, int] = {}
     links: dict[str, object] = {}
 
     def add(line: int, message: str) -> None:
-        findings.append(
-            {"code": CODE, "verdict": "error", "path": rel, "line": line, "message": message}
-        )
+        lines.setdefault(line, []).append(message)
 
     for number, raw in enumerate(text.split("\n"), start=1):
         if not raw.strip():
@@ -69,12 +68,10 @@ def findings_for(
             add(number, f"line is not valid JSON: {exc.msg}")
             continue
         messages = list(_ledger.validate(record, schema, schema, "record"))
-        for message in messages:
+        for message in messages or invariant_errors(record):
             add(number, message)
         if messages:
             continue
-        for message in invariant_errors(record):
-            add(number, message)
         first = seen.setdefault(record["id"], number)
         if first != number:
             add(number, f"duplicate record id {record['id']!r} (first appended at line {first})")
@@ -88,10 +85,13 @@ def findings_for(
         if target not in known or at == bug_id:
             why = f"forms a cycle: {' -> '.join(chain)}" if at == bug_id else "names no record"
             add(seen[bug_id], f"{bug_id!r} caused_by {why}")
-    return findings
+    return [
+        _ledger.finding(CODE, rel, n, "; ".join(m), _ledger.unwritten(root / rel, n, _VERBS, _LAW))
+        for n, m in sorted(lines.items())
+    ]
 
 
-def histo_findings(text: str) -> list[dict[str, Any]]:
+def histo_findings(text: str, root: Path = _ledger.SPECS) -> list[dict[str, Any]]:
     """The archive's lines: each a bug-record-v1 record, or a pre-v6 ``event`` line that
     predates the record shape and is history, never rewritten."""
     schema = load_schema()
@@ -108,8 +108,9 @@ def histo_findings(text: str) -> list[dict[str, Any]]:
                 if record is None or legacy
                 else list(_ledger.validate(record, schema, schema, "record"))
             )
-        out += [{"code": CODE, "verdict": "error", "path": HISTO, "line": number,
-                 "message": m} for m in messages]  # fmt: skip
+        if messages:
+            fix = _ledger.unwritten(root / HISTO, number, "`bugs.py archive`", _LAW)
+            out.append(_ledger.finding(CODE, HISTO, number, "; ".join(messages), fix))
     return out
 
 
@@ -132,5 +133,7 @@ def check(specs: Path) -> list[dict[str, Any]]:
     ledger, histo = specs / LEDGER, specs / HISTO
     text = ledger.read_text(encoding="utf-8") if ledger.is_file() else ""
     archived = histo.read_text(encoding="utf-8") if histo.is_file() else ""
-    found = findings_for(text, archived=archived_ids(archived)) + histo_findings(archived)
-    return _ledger.fixed(found, Path(__file__).with_name("bugs.py"), specs)
+    root = specs.resolve()
+    return findings_for(text, archived=archived_ids(archived), root=root) + histo_findings(
+        archived, root
+    )
