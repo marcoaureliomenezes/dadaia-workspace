@@ -78,12 +78,9 @@ def _remove(repo: Path, tree: Path, name: str, kept: list[str]) -> None:
     git(repo, "branch", "-d", f"wt/{name}")
 
 
-def _undo(tree: Path, work: str, name: str, rel: str) -> str:
-    """The one command putting *rel* back to the work branch's version, absent included."""
-    return (
-        f"git -C {tree} restore -s {work} -SW -- {rel}"
-        f" && git -C {tree} commit -qm 'revert: {rel} leaves {name}'"
-    )
+def _undo(tree: Path, work: str, rel: str) -> str:
+    """The one act putting *rel* back to the work branch's version, absent included."""
+    return f"Operator action: run `git -C {tree} restore -s {work} -SW -- {rel}`, then commit it"
 
 
 def _check_allowed(tree: Path, work: str, name: str) -> None:
@@ -94,7 +91,7 @@ def _check_allowed(tree: Path, work: str, name: str) -> None:
             raise Refusal(
                 f"{rel} is outside the {kind} allowed set"
                 + (f"; it belongs in a {owner} worktree" if owner else ""),
-                _undo(tree, work, name, rel),
+                _undo(tree, work, rel),
             )
 
 

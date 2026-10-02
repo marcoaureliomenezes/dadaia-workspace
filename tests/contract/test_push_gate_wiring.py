@@ -87,7 +87,8 @@ def test_canon_scan_does_not_apply_to_a_tree_stamped_below_the_canon(
     assert result.exit_code == 0, result.output
     # sa-fix-lines-not-built-by-cli-line#S1: the fix is named through the builder.
     assert (
-        fix_line(None, "specs", "init", "--context", "<ctx>", "--replace-foreign") in result.output
+        fix_line(None, "specs", "init", "--specs-dir", str(repo / "specs"), "--replace-foreign")
+        in result.output
     )
 
     result = _runner.invoke(

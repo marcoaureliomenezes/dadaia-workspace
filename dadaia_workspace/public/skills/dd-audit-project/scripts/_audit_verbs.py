@@ -34,26 +34,24 @@ def disposition(specs: Path, audit: str, finding_id: str, values: dict[str, Any]
     identical. Refuses — writing nothing — an unknown audit or finding, a word outside
     the one finding vocabulary, or a verdict missing the evidence it requires."""
     verdict = values["disposition"]
-    example = f"--disposition {verdict} --release <release-id>"
-    directory = audit_dir(specs, audit, f"{SCRIPT} disposition <audit-dir> <finding-id> {example}")
+    rerun = f"{SCRIPT} disposition {audit} {finding_id}"
+    directory = audit_dir(specs, audit, f"Operator action: run `{SCRIPT} disposition` again "
+                                        "with one of the live audits listed above")  # fmt: skip
     if verdict not in DISPOSITIONS:
         raise Refusal(
             f"unknown disposition {verdict!r}: a finding is dispositioned as one of "
             f"{'|'.join(DISPOSITIONS)}",
-            f"{SCRIPT} disposition {audit} {finding_id} --disposition resolved "
-            "--release <release-id>",
+            f"Operator action: run `{rerun}` with --disposition set to one of "
+            f"{', '.join(DISPOSITIONS)} and the evidence it requires",
         )
     required = REQUIRED_EVIDENCE[verdict]
     if not (values.get(required) or "").strip():
-        needed = (
-            "--release <release-id>"
-            if required == "release"
-            else "--reason '<why it was not fixed>'"
-        )
+        needed = "the release that fixed it" if required == "release" else "why it was not fixed"
         raise Refusal(
             f"disposition {verdict!r} requires --{required}: the finding's governance "
             "triple is the only surviving record of how it was closed",
-            f"{SCRIPT} disposition {audit} {finding_id} --disposition {verdict} {needed}",
+            f"Operator action: run `{rerun} --disposition {verdict}` with --{required} set to "
+            f"{needed}",
         )
     records = read_findings(directory)
     known = [str(record.get("id")) for record in records]
@@ -75,23 +73,24 @@ def disposition(specs: Path, audit: str, finding_id: str, values: dict[str, Any]
 
 def close(specs: Path, audit: str, sha: str) -> str:
     """Append the audit's ONE histo record, then delete the directory."""
-    directory = audit_dir(specs, audit, f"{SCRIPT} close <audit-dir> --sha <window-end>")
+    directory = audit_dir(specs, audit, f"Operator action: run `{SCRIPT} close` again with one "
+                                        f"of the live audits listed above and --sha {sha}")  # fmt: skip
     records = read_findings(directory)
     open_ids = [str(r.get("id")) for r in records if r.get("disposition") not in DISPOSITIONS]
     if open_ids:
         raise Refusal(
             f"audit {audit!r} still carries {len(open_ids)} undispositioned finding(s): "
             f"{', '.join(open_ids)}. Every finding gets a disposition before the audit closes",
-            f"{SCRIPT} disposition {audit} {open_ids[0]} --disposition resolved "
-            "--release <release-id>",
+            f"Operator action: run `{SCRIPT} disposition {audit} {open_ids[0]}` with the "
+            "--disposition it earned and the evidence that requires",
         )
     releases = sorted({str(r["release"]) for r in records if r.get("release")})
     if len(releases) > 1:
+        other = next(r["id"] for r in records if r.get("release") and r["release"] != releases[0])
         raise Refusal(
             f"audit {audit!r} names {len(releases)} remediation releases "
             f"({', '.join(releases)}); an audit generates at most one",
-            f"{SCRIPT} disposition {audit} <finding-id> --disposition resolved "
-            f"--release {releases[0]}",
+            f"{SCRIPT} disposition {audit} {other} --disposition resolved --release {releases[0]}",
         )
     pillars = Counter(str(record.get("pillar")) for record in records)
     verdicts = Counter(str(record.get("disposition")) for record in records)

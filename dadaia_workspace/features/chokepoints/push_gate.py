@@ -179,7 +179,7 @@ def push_gate_decision(
             allowed=False,
             message=_fail_closed(f"{malformed_lines} unparseable pre-push stdin line(s)")
             + "\nPush one explicit refspec.\n"
-            f"fix: {git_line(fixes.repo, 'push', 'origin', gitflow.work_pattern)}",
+            f"fix: {git_line(fixes.repo, 'push', 'origin', fixes.work)}",
         )
     branch_refs = [r for r in refs if not r.is_deletion and not r.is_tag]
     roles = (gitflow.principal, gitflow.integration)

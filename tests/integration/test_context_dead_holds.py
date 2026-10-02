@@ -36,7 +36,6 @@ import pytest
 pytest.importorskip("fcntl")
 
 from dadaia_workspace.container import scan_publish_candidates  # noqa: E402
-from dadaia_workspace.core.cli_line import shell_line  # noqa: E402
 from dadaia_workspace.core.exceptions import ContextStateError, RepoUrlMissingError  # noqa: E402
 from dadaia_workspace.core.models.spec_context import (  # noqa: E402
     AssociatedRepo,
@@ -161,7 +160,7 @@ _REFUSALS = [
     pytest.param("lib", lambda r: (r / "leftover.txt").write_text("x\n"), DeadReviewRequiredError, r"lib[\s\S]*leftover\.txt", id="A16.2-untracked-in-lib"),
     pytest.param("lib", _no_remote, DeadUnpushedCommitsError, "lib", id="A16.2-local-commits-no-remote-in-lib"),
     pytest.param("main", _repos_outside, ContextStateError, r"skipped 'repos/main' \(outside the workspace\)$", id="AC2.11-hold-refused"),
-    pytest.param("lib", _url_less, RepoUrlMissingError, r"fix: git -C \S+/repos/lib remote add origin", id="url-less-never-clone-back"),
+    pytest.param("lib", _url_less, RepoUrlMissingError, r"fix: Operator action: add the clone URL of \S+/repos/lib as its origin remote", id="url-less-never-clone-back"),
 ]  # fmt: skip
 
 
@@ -222,7 +221,7 @@ def test_dead_holds_every_repo_of_the_set_under_reaped(
 def test_c2_a_nested_foreign_worktree_is_refused_and_its_fix_clears_it(tmp_path: Path) -> None:
     """A gitignored linked worktree of ANOTHER repo nested in the checkout: the hold
     would skip it, so dead refuses up front instead of recording DEAD with the repo on
-    disk; the fix line (verbatim, <keep-dir> filled) clears the refusal."""
+    disk; the fix line (its command, the kept directory appended) clears the refusal."""
     service, store, repo = _alive(tmp_path)
     other = tmp_path / "other"
     _published(tmp_path, other)
@@ -235,11 +234,12 @@ def test_c2_a_nested_foreign_worktree_is_refused_and_its_fix_clears_it(tmp_path:
 
     assert (nested / "uncommitted.txt").read_text() == "keep\n"
     assert store.get("proj").state is ContextState.ALIVE  # type: ignore[union-attr]
-    fix = str(refused.value).rsplit("fix: ", 1)[1].replace("<keep-dir>", str(tmp_path / "kept"))
+    fix = str(refused.value).rsplit("fix: ", 1)[1]
+    move = f"{fix.split('`')[1]} {tmp_path / 'kept'}"
     # Git runs from the common git dir, never inside the tree it moves: Windows refuses
     # to rename a process's cwd (sa-context-dead-removes-repos-outside-the-reaper).
-    assert Path(fix.split()[2]).samefile(other / ".git"), fix
-    subprocess.run(fix, shell=True, check=True, capture_output=True)  # noqa: S602
+    assert Path(move.split()[2]).samefile(other / ".git"), fix
+    subprocess.run(move, shell=True, check=True, capture_output=True)  # noqa: S602
     service.dead("proj")
     assert (tmp_path / "kept" / "uncommitted.txt").read_text() == "keep\n"
     assert store.get("proj").state is ContextState.DEAD  # type: ignore[union-attr]
@@ -268,7 +268,7 @@ def test_alive_refuses_a_legacy_url_less_missing_repo_with_a_fix_line(tmp_path: 
     with pytest.raises(RepoUrlMissingError) as refused:
         service.alive("proj")
 
-    # one command (no `&&`): the clone alive then adopts, its origin back-filled
-    clone = shell_line("git", "clone", "<clone-url>", str(repo.parent / "lib"))
+    # the operator's clone, which alive then adopts, its origin back-filled
+    clone = f"Operator action: clone the 'lib' repository into {repo.parent / 'lib'}"
     assert str(refused.value).endswith(f"fix: {clone}")
     assert store.get("proj").state == ContextState.DEAD  # type: ignore[union-attr]

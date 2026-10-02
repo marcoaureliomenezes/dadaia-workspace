@@ -122,7 +122,8 @@ def _write(args: argparse.Namespace, specs: Path) -> int:
         except (OSError, subprocess.CalledProcessError) as exc:
             cause = getattr(exc, "stderr", "") or str(exc)
             raise Refusal(f"cannot list the repo's tracked directories: {cause.strip()}",
-                          f"cd <the context's git repo> && {script(Path(__file__))} append … --specs specs") from None  # fmt: skip
+                          f"Operator action: run `{script(Path(__file__))} append` with --specs "
+                          "naming a specs tree inside a git repo") from None  # fmt: skip
         dirs = {part for path in listed.splitlines() for part in path.split("/")[:-1]}
         near = wr.candidates(read_records(ledger), values["surface"])
         print(f"correlation candidates on {values['surface']!r}: {', '.join(near) or 'none'}")

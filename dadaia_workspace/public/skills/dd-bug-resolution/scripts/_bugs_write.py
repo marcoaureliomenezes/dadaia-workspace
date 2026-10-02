@@ -26,10 +26,10 @@ CORE = tuple(k for k, v in _MUTABILITY.items() if v == "immutable-core")
 GOVERNANCE = tuple(k for k, v in _MUTABILITY.items() if v == "mutable-governance")
 WRITE_ONCE = tuple(k for k, v in _MUTABILITY.items() if v == "write-once")
 #: The fields a verb owns, so `update` refuses them and names the verb.
-_TRANSITIONS = ("resolve|supersede|defer|reject", "")
-_VERB_OWNED = {"status": _TRANSITIONS, "closed_at": _TRANSITIONS,
-               "superseded_by": ("supersede", "--by <slug> ")}  # fmt: skip
+_TRANSITIONS = ("resolve", "supersede", "defer", "reject")
+_VERB_OWNED = {"status": _TRANSITIONS, "closed_at": _TRANSITIONS, "superseded_by": ("supersede",)}
 _SCRIPT = script(Path(__file__).parent / "bugs.py")
+_NEW_ID = f"Operator action: choose a bug id no record holds and run `{_SCRIPT} append` with it"
 
 
 def now_iso() -> str:
@@ -53,21 +53,23 @@ def append(records: Records, values: dict[str, Any], dirs: set[str]) -> Records:
         raise Refusal(
             f"bug id {bug_id!r} already exists — a reopen is a NEW record declaring "
             "'caused_by: <prior-id>' at resolve, never a second record under this id",
-            f"{_SCRIPT} append --bug-id <new-id>",
+            _NEW_ID,
         )
     surface = str(values.get("surface"))
     if surface not in dirs:
-        close = "|".join(difflib.get_close_matches(surface, sorted(dirs), 5, 0)) or "dir"
+        close = ", ".join(difflib.get_close_matches(surface, sorted(dirs), 5, 0)) or "none"
         raise Refusal(
             f"surface {surface!r} is not the name of a directory tracked in this repo",
-            f"{_SCRIPT} append --surface <{close}>",
+            f"Operator action: run `{_SCRIPT} append` with --surface set to a tracked "
+            f"directory name (closest: {close})",
         )
     correlates = values.get("correlates")
     ids = [] if correlates == "none" else str(correlates or "").split(",")
     if not set(ids) <= {r.get("id") for r in records}:
         raise Refusal(
             "name the ledger ids this bug correlates with — the candidates are listed above",
-            f"{_SCRIPT} append --correlates <ids>|none",
+            f"Operator action: run `{_SCRIPT} append` with --correlates set to the "
+            "comma-separated ids it correlates with, or none",
         )
     record = {key: values.get(key) for key in CORE} | {"correlates": ids}
     record.update({key: None for key in GOVERNANCE})
@@ -85,7 +87,7 @@ def _set(record: dict[str, Any], key: str, value: Any) -> None:
     if key in CORE and record.get(key) != value:
         raise Refusal(
             f"bug-record field {key!r} is immutable-core and cannot be changed",
-            f"{_SCRIPT} append --bug-id <new-id>",
+            _NEW_ID,
         )
     record[key] = value
 
@@ -95,10 +97,10 @@ def apply_update(records: Records, bug_id: str, changes: dict[str, str]) -> Reco
     the subcommand that DOES own the field."""
     for key in changes:
         if key in _VERB_OWNED:
-            verb, option = _VERB_OWNED[key]
+            verbs = ", ".join(_VERB_OWNED[key])
             raise Refusal(
-                f"bug-record field {key!r} is written only by {verb}",
-                f"{_SCRIPT} {verb} {bug_id} {option}".rstrip(),
+                f"bug-record field {key!r} is written only by {verbs}",
+                f"Operator action: choose the verb ({verbs}) for {bug_id} and run it with {_SCRIPT}",
             )
         if key not in _MUTABILITY:
             raise Refusal(f"unknown bug-record field {key!r}", f"{_SCRIPT} update --help")

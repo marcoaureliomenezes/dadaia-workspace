@@ -78,7 +78,7 @@ def live_release(specs: Path) -> Live:
     if not ids:
         raise Refusal(
             "no live release under specs/releases/ — nothing to operate on",
-            f"{SCRIPT} new <M.m.p>",
+            f"Operator action: choose the release version and run `{SCRIPT} new` with it",
         )
     if len(ids) > 1:
         raise Refusal(
@@ -96,7 +96,8 @@ def window_start(state: State) -> str:
             if isinstance(e, dict) and e.get("kind") == "memory" and e.get("until")]  # fmt: skip
     if not (start := ends[-1] if ends else (state.get("defined") or {}).get("sha")):
         raise Refusal("the live release has no defined.sha to open the memory window at",
-                      f"{SCRIPT} phase IMPLEMENTATION --sha <sha>")  # fmt: skip
+                      f"Operator action: run `{SCRIPT} phase IMPLEMENTATION --sha` with the sha "
+                      "of the commit that approved the definition")  # fmt: skip
     return str(start)
 
 

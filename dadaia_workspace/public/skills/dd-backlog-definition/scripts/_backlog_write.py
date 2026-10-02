@@ -49,13 +49,14 @@ def new_entry(active: Items, slug: str, values: dict[str, Any]) -> Items:
         raise Refusal(
             f"invalid slug {slug!r}: must match ^[a-z][a-z0-9-]+$ (lowercase letters, "
             "digits and hyphens, starting with a letter)",
-            f"{SCRIPT} new <a-valid-slug>",
+            f"Operator action: choose a slug matching ^[a-z][a-z0-9-]+$ and run `{SCRIPT} new` "
+            "with it",
         )
     if any(item.get("id") == slug for item in active):
         raise Refusal(
             f"backlog slug {slug!r} is already a live active[] entry — an item is retained "
             "forever, so a second entry under this id would be a second identity for it",
-            f"{SCRIPT} new <another-slug>",
+            f"Operator action: choose a slug no entry holds and run `{SCRIPT} new` with it",
         )
     relates, live = values.get("relates"), [str(item.get("id")) for item in active]
     names = [] if relates in (None, "none") else str(relates).split(",")
@@ -63,7 +64,8 @@ def new_entry(active: Items, slug: str, values: dict[str, Any]) -> Items:
         raise Refusal(
             "name the live entries this one updates, obsoletes or relates to (ADR 0127): "
             + (", ".join(live) or "none"),
-            f"{SCRIPT} new {slug} --relates <slugs>|none",
+            f"Operator action: run `{SCRIPT} new {slug} --relates` with the comma-separated "
+            "live entries it relates to, or none",
         )
     intents = parse_intents(values.get("intent"))
     entry: dict[str, Any] = {

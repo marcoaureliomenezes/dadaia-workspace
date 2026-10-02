@@ -245,7 +245,7 @@ _REFUSALS = [
     pytest.param(_symlinked, ["doctor", "--specs-dir", _SPECS, "--fix"], "symlink", id="B5-doctor-fix-symlinked-root"),
     # sa-context-repo-mapping-falls-back-to-the-name#B2: a typo never becomes repos/alpah/.
     pytest.param(lambda r: None, ["specs", "init", "--context", "alpah"], "context list", id="B2-unregistered-context"),
-    pytest.param(lambda r: None, ["specs", "init"], "specs init --context '<name>'", id="ADR-0045-no-context-resolved"),
+    pytest.param(lambda r: None, ["specs", "init"], "specs init --context` with it", id="ADR-0045-no-context-resolved"),
 ]  # fmt: skip
 
 

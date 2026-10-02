@@ -7,9 +7,9 @@ three verbs did not, and their fix lines failed review round after round, one si
 time. Each case below builds the triggering state over ``file://`` remotes and hits the
 refusal: a push-gate case feeds the ref lines git hands its hook to an in-process
 ``ci push-gate-check`` (80 columns, no TTY); a baseline/alive/dead case runs the real
-command as a child process. It takes the single ``fix:`` line, fills its documented
-``<placeholders>``, runs it with ``sh -c`` and runs the real command (the real push through
-the shipped hook) again. One line without a TTY — every family prints through
+command as a child process. It takes the single ``fix:`` line and runs it with ``sh -c`` —
+an ``Operator action:`` line is played by the case's *operator* instead (ADR 0158) — and
+runs the real command (the real push through the shipped hook) again. One line without a TTY — every family prints through
 ``cli/_fail.fail`` — is proven on a real child by
 :func:`test_every_fix_line_prints_on_one_line_without_a_tty`. Progress rule:
 the command then succeeds, or refuses with a DIFFERENT fix line (the next step), which is
@@ -60,12 +60,6 @@ pytestmark = [
 
 _PKG = Path(__file__).resolve().parents[2] / "dadaia_workspace"
 _TERM = "zorblaxquux"
-_FILLS = {
-    "<M.m.p>": "1.0.0",
-    "<user.name>": "T",
-    "<user.email>": "t@example.invalid",
-    "<other-name>": "kept",
-}
 
 
 def _constitution(
@@ -172,7 +166,6 @@ class World:
                 "proj", ContextState.ALIVE, "proj", self.bare.as_uri(), "2026-01-01T00:00:00+00:00"
             )
         )
-        self.fills = {**_FILLS, "<clone-url>": self.bare.as_uri(), "<keep-dir>": str(tmp / "kept")}
 
     def adopt(self, prefix: Callable[[World], None]) -> None:
         """Run *prefix* on this fresh world — as a copy of the module's template world when
@@ -263,7 +256,7 @@ def _single_fix(done: subprocess.CompletedProcess[str]) -> str:
 class Case:
     """*build* plants the refusal and returns the command that hits it (argv, or a shell
     line run in the repo); *operator* is the documented human step the refusal text asks
-    for before its fix (an edit); *then* replaces the re-run when the fix renames what the
+    for before its fix (an edit), or the act an ``Operator action:`` fix names; *then* replaces the re-run when the fix renames what the
     refused command named; *done* asserts the published end state."""
 
     build: Callable[[World], list[str] | str]
@@ -318,14 +311,12 @@ def _drive(world: World, case: Case) -> None:
         fix = _single_fix(done)
         assert fix not in seen, f"no progress — the same fix line again:\n{fix}"
         seen.append(fix)
-        if step == 0 and case.operator is not None:
+        act = fix.startswith("Operator action: ")
+        if case.operator is not None and (act or step == 0):
             case.operator(world)
-        line = fix
-        for placeholder, value in world.fills.items():
-            line = line.replace(placeholder, value)
-        assert "<" not in line.replace("<<", ""), f"an undocumented placeholder: {line}"
-        ran = world.run(line, world.elsewhere)  # a fix line runs from any cwd
-        assert ran.returncode == 0, f"the fix does not run:\n{line}\n{ran.stdout}{ran.stderr}"
+        assert "<" not in fix.replace("<<", ""), f"a placeholder: {fix}"
+        ran = None if act else world.run(fix, world.elsewhere)  # a fix line runs from any cwd
+        assert ran is None or ran.returncode == 0, f"the fix does not run:\n{fix}\n{ran}"
         if case.replaces and step == 0:
             case.done(world)
             return
@@ -414,14 +405,12 @@ def _baseline_done(
 
 def _malformed(world: World) -> str:
     _published(world)
-    world.commit("notes.md", "n\n", branch="feature/1.0.0")
+    world.commit("notes.md", "n\n", branch="feature/0.1.0")
     return f"printf 'not a ref line\\n' | {fix_line(world.ws, 'ci', 'push-gate-check')}"
 
 
-def _work_pushed(world: World) -> None:
-    assert world.remote_heads().get("feature/1.0.0") == world.git(
-        world.repo, "rev-parse", "feature/1.0.0"
-    )
+def _work_pushed(world: World, work: str = "feature/1.0.0") -> None:
+    assert world.remote_heads().get(work) == world.git(world.repo, "rev-parse", work)
 
 
 def _denylisted(world: World) -> str:
@@ -589,6 +578,25 @@ def _no_url_no_checkout(world: World) -> list[str]:
     return ["context", "alive", "proj"]
 
 
+def _identity(world: World) -> None:
+    for key, value in (("user.name", "T"), ("user.email", "t@example.invalid")):
+        world.git(world.repo, "config", key, value)
+
+
+def _origin(world: World) -> None:
+    world.git(world.repo, "remote", "add", "origin", world.bare.as_uri())
+
+
+def _clone(world: World) -> None:
+    world.git(world.tmp, "clone", "-q", world.bare.as_uri(), str(world.repo))
+
+
+def _create(world: World) -> None:
+    assert (
+        world.cli("context", "create", "proj", "--main-repo", world.bare.as_uri()).returncode == 0
+    )
+
+
 def _cloned(world: World) -> None:
     assert (world.repo / "README.md").is_file()
 
@@ -701,7 +709,7 @@ def _dirty_on_integration(world: World) -> list[str]:
 def _dead_via_work(world: World) -> None:
     heads = world.remote_heads()
     assert heads["develop"] == world.git(world.bare, "rev-parse", "main")
-    assert "feature/1.0.0" in heads
+    assert "feature/0.1.0" in heads
     assert not world.repo.exists()
 
 
@@ -806,17 +814,19 @@ SITES: dict[str, tuple[Case | tuple[Case, ...] | Skip, ...]] = {
         ),
     ),
     "push_gate._read_failure": (Skip("needs a corrupted object store; `git fsck` names it"),),
-    "push_gate.push_gate_decision": (Case(_malformed, _work_pushed, replaces=True),),
+    "push_gate.push_gate_decision": (
+        Case(_malformed, lambda w: _work_pushed(w, "feature/0.1.0"), replaces=True),
+    ),
     "ci._repo_root": (Skip("the pre-push hook always runs inside the repo it pushes"),),
     "ci.push_gate_check": (Skip("the gate's refusal: its fix is a branch_policy/push_gate site"),),
-    "service.SpecContextService.show": (Case(_unknown_context, _cloned),),
+    "service.SpecContextService.show": (Case(_unknown_context, _cloned, operator=_create),),
     "service.SpecContextService.alive": (
-        Case(_no_url_no_checkout, _cloned),
+        Case(_no_url_no_checkout, _cloned, operator=_clone),
         Case(_alive_remote_gone, _cloned, operator=_remote_back),
     ),
     "service.SpecContextService.baseline": (
         Case(_no_checkout, _cloned),
-        Case(_no_identity, _baseline_done),
+        Case(_no_identity, _baseline_done, operator=_identity),
         Case(_never_onboarded, _baseline_done),
         Case(_baseline_denylisted, _baseline_done, operator=_drop_draft_term, then=_AMEND_BASELINE),
     ),
@@ -829,9 +839,12 @@ SITES: dict[str, tuple[Case | tuple[Case, ...] | Skip, ...]] = {
     "service.SpecContextService._dead_preflight": (
         Case(_untracked, _dead_done, replaces=True),
         Case(_secret_untracked, _dead_done),
-        Case(_no_origin, _dead_done),
-        (Case(_unpushed_side_branch, _dead_done), Case(_commits_no_remote, _dead_done)),
-        Case(_dead_no_identity, _dead_done),
+        Case(_no_origin, _dead_done, operator=_origin),
+        (
+            Case(_unpushed_side_branch, _dead_done),
+            Case(_commits_no_remote, _dead_done, operator=_origin),
+        ),
+        Case(_dead_no_identity, _dead_done, operator=_identity),
         Case(_dirty_on_integration, _dead_via_work),
     ),
     "service.SpecContextService.dead": (
@@ -1065,7 +1078,7 @@ def test_dead_commit_without_a_git_identity_refuses_and_removes_nothing(world: W
     (world.tmp / "gitconfig").write_text("[user]\n\tuseConfigOnly = true\n", encoding="utf-8")
     done = world.cli("context", "dead", "proj", "--commit")
     assert done.returncode != 0
-    assert _single_fix(done) == f"git -C {world.repo} config user.name '<user.name>'"
+    assert _single_fix(done) == f"Operator action: set git user.name in the config of {world.repo}"
     assert (world.repo / "README.md").read_text(encoding="utf-8") == "edited\n"
     assert world.git(world.repo, "rev-parse", "HEAD") == head
     assert world.remote_heads()["feature/1.0.0"] == published

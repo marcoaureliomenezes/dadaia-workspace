@@ -10,7 +10,6 @@ envelopes and new-session injection.
 from __future__ import annotations
 
 import json
-import sys
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -235,9 +234,7 @@ _NO_MEMORY = ("end memory bootstrap", "Python 3.12")
             [
                 _UNBOUND,
                 "\nNext (command step context): no ALIVE Spec Context",
-                "context create {0}<name>{0} --main-repo {0}<clone-url>{0}".format(
-                    "" if sys.platform == "win32" else "'"
-                ),
+                "context create with a context name and --main-repo set to the main repo's",
             ],
             _NO_MEMORY,
             id="no-alive-context-prints-the-doctor-step-AC6.2",

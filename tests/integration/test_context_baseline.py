@@ -262,11 +262,13 @@ def test_an_origin_without_the_principal_refuses_and_publishes_nothing(env, tmp_
     assert _git(repo, "branch", "--show-current") == "feature/0.1.0"
     assert _git(repo, "for-each-ref", "--format=%(refname:short)", "refs/heads") == "feature/0.1.0"
     anchor = _git(repo, "rev-parse", "HEAD")
-    assert anchor in str(refused.value) and "--principal '<principal>'" in str(refused.value)
+    assert anchor in str(refused.value) and "Operator action: choose the principal" in str(
+        refused.value
+    )
 
 
 def test_several_principal_candidates_are_listed_never_guessed(env, tmp_path: Path) -> None:
-    """Design review C6: two candidate heads — both listed, a `<principal>` placeholder."""
+    """Design review C6: two candidate heads — both listed, the choice the operator's."""
     svc, repo, bare = env
     _seed(bare, tmp_path / "seed", "trunk", "master")
     _git(bare, "symbolic-ref", "HEAD", "refs/heads/trunk")
@@ -274,7 +276,7 @@ def test_several_principal_candidates_are_listed_never_guessed(env, tmp_path: Pa
     with pytest.raises(ContextStateError) as refused:
         svc.baseline("proj")
     message = str(refused.value)
-    assert "master, trunk" in message and message.endswith("--principal '<principal>'")
+    assert "master, trunk" in message and message.endswith("--principal` with it")
 
 
 def test_a_never_onboarded_repo_is_refused_with_the_specs_init_fix(env, tmp_path: Path) -> None:
@@ -389,7 +391,9 @@ def test_a_tool_commit_never_falls_back_to_a_tool_identity(tmp_path: Path, monke
     _git(tmp_path, "init", "-q", str(repo))
     (repo / "a.md").write_text("a\n", encoding="utf-8")
     client = GitSubprocessClient()
-    assert client.identity_fix(repo).startswith("git -C")
+    assert (
+        client.identity_fix(repo) == f"Operator action: set git user.name in the config of {repo}"
+    )
     with pytest.raises(GitSyncError):
         client.commit_all(repo, "c")
 

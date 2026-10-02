@@ -425,9 +425,8 @@ class SpecContextService:
     def show(self, name: str) -> SpecContextProject:
         ctx = self._store.get(name)
         if ctx is None:
-            fix = fix_line(
-                self._workspace_root, "context", "create", name, "--main-repo", "<clone-url>"
-            )
+            create = fix_line(self._workspace_root, "context", "create", name, "--main-repo")
+            fix = f"Operator action: run {create} with the main repo's clone URL"
             raise ContextNotFoundError(f"Context '{name}' not found.\nfix: {fix}")
         return ctx
 
@@ -485,7 +484,7 @@ class SpecContextService:
             repo_dest = self._repo_path(repo.slug)
             if not repo_dest.exists():
                 if not repo.url:  # a checkout there is adopted, its origin back-filled
-                    fix = shell_line("git", "clone", "<clone-url>", str(repo_dest))
+                    fix = f"Operator action: clone the '{repo.slug}' repository into {repo_dest}"
                     raise RepoUrlMissingError(
                         f"'{repo.slug}' has no clone URL and no checkout at repos/{repo.slug} "
                         f"— 'context alive {name}' cannot obtain it.\nfix: {fix}"
@@ -618,12 +617,14 @@ class SpecContextService:
         self, name: str, flow: Gitflow, heads: list[str], anchor: str, work: str
     ) -> None:
         """S11, after the anchor (the gitflow exists only there): one ``specs init`` fix —
-        the one origin candidate, else a ``<principal>`` placeholder over the listed
-        candidates; never a guess."""
+        the one origin candidate, else an operator action naming the choice; never a guess."""
         found = [h for h in heads if h != flow.integration and flow.role_of(h) != "work"]
-        pick = found[0] if len(found) == 1 else "<principal>"
-        fix = fix_line(
-            self._workspace_root, "specs", "init", "--context", name, "--principal", pick
+        argv = ("specs", "init", "--context", name, "--principal")
+        fix = (
+            fix_line(self._workspace_root, *argv, found[0])
+            if len(found) == 1
+            else "Operator action: choose the principal branch origin holds and run "
+            f"`{fix_line(self._workspace_root, *argv)}` with it"
         )
         raise ContextStateError(
             f"Context '{name}': origin holds no principal '{flow.principal}' (origin candidates: "
@@ -659,7 +660,7 @@ class SpecContextService:
                 raise RepoUrlMissingError(
                     f"{lead} has no clone URL (no origin remote) — removing it would leave "
                     "nothing 'context alive' could clone back. Nothing was touched.\nfix: "
-                    + git_line(path, "remote", "add", "origin", "<clone-url>")
+                    f"Operator action: add the clone URL of {path} as its origin remote"
                 )
             if not (path.exists() and self._git.is_git_root(path)):
                 continue
@@ -684,8 +685,10 @@ class SpecContextService:
             lost = [refix] if failed else [r["exit"] for r in held]
             lost += self._git.unrecoverable(path)
             if tree := sweep.linked_worktree(self._workspace_root, path):
-                gdir = sweep.worktree_git_dir(tree)
-                lost.append(git_line(gdir, "worktree", "move", str(tree), "<keep-dir>"))
+                move = git_line(sweep.worktree_git_dir(tree), "worktree", "move", str(tree))
+                lost.append(
+                    f"Operator action: choose a directory to keep {tree} in and run `{move}` with it"
+                )
             if lost:
                 raise DeadUnpushedCommitsError(
                     f"{lead} holds {len(lost)} worktree(s) or unpushed branch(es) dead() would "
@@ -707,7 +710,7 @@ class SpecContextService:
                     f"{lead} is on '{branch or 'a detached HEAD'}', which the gitflow never "
                     "pushes directly — dead() would commit and push its changes there. "
                     "Nothing was touched.\nfix: "
-                    + git_line(path, "checkout", "-b", flow.work_pattern)
+                    + git_line(path, "checkout", "-b", work_branch(path / "specs", flow))
                 )
 
     def dead(self, name: str, *, commit: bool = False) -> SpecContextProject:

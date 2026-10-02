@@ -70,7 +70,9 @@ def test_dirty_outside_set_and_conflict_each_refuse_with_one_fix(root: Path) -> 
     for rel, owner in (("specs/backlog/BACKLOG.json", "backlog"), ("SPEC.md", "release")):
         outside = run(root, "merge", TREE)
         assert rel in outside.stderr and f"{owner} worktree" in outside.stderr
-        _fix(root, outside)
+        act = shlex.split(fixes(outside)[0].split("`")[1])  # Operator action: restore, commit
+        git(tree, *act[3:])
+        git(tree, "commit", "-qm", f"revert: {rel}")
     commit(repo, "README.md", "- [ ] a\n")  # markers alone, but not TASKS: never replayed
     git(tree, "rebase", "-q", "feature/0.5.0")
     commit(repo, "README.md", "- [-] a\n")

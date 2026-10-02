@@ -667,7 +667,7 @@ def workspace_rules(
             ("HOOKS-DRIFT-1",),
             SECTION,
             installed_hooks,
-            fix_help=("ci", "install-hook", "--force", "--repo", "<repo>"),
+            fix_help=("ci", "install-hook", "--force"),
         ),
         Rule(
             ("PROJECTION",),

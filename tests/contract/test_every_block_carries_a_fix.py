@@ -16,6 +16,7 @@ size: SMALL.
 
 from __future__ import annotations
 
+import ast
 import os
 import re
 import shlex
@@ -595,3 +596,119 @@ def test_no_shipped_text_makes_memory_py_check_the_memory_done_criterion() -> No
         if _NON_AUTHORITY_DONE.search(line)
     ]
     assert not offenders, "\n".join(offenders)
+
+
+# ── no fix the package prints carries a placeholder or a chain (AC4.4, ADR 0158) ──
+
+#: `<…>` (bar the `<specs>` `rule_fix` fills), an `&&` chain, an `a|b` menu of verbs.
+_NOT_ONE_COMMAND_RE = re.compile(r"<(?!specs>)[^<>\n]+>|&&|\w\|\w")
+#: A `cli_line` builder's or a fix producer's arguments are fix text.
+_FIX_CALL_RE = re.compile(r"(_line|_fix|^script)$")
+#: Pending until T-050-149 (2026-10-02), which owns the `ship --pr <n>` sites of these two
+#: scripts (release.py:109, _release_phase.py:81) and deletes this entry.
+_PENDING_T_050_149 = ("release.py", "_release_phase.py")
+
+
+def _callee(node: ast.Call) -> str:
+    return getattr(node.func, "id", getattr(node.func, "attr", ""))
+
+
+def _render(node: Any, scope: dict[str, list[Any]], defs: dict[str, Any], depth: int = 0) -> str:
+    """The text *node* can print; alternatives and unknown values join as `·`."""
+    again = lambda n: _render(n, scope, defs, depth + 1) if depth < 12 else "·"  # noqa: E731
+    match node:
+        case ast.Constant(value=str() as text):
+            return text
+        case ast.JoinedStr(values=parts):
+            return "".join(map(again, parts))
+        case ast.List(elts=parts) | ast.Tuple(elts=parts) | ast.Dict(values=parts) | ast.BoolOp(values=parts):  # fmt: skip
+            return "·".join(map(again, parts))
+        case ast.FormattedValue(value=v) | ast.Starred(value=v) | ast.Subscript(value=v):
+            return again(v)
+        case ast.ListComp(elt=v) | ast.GeneratorExp(elt=v):
+            return again(v)
+        case ast.BinOp(left=left, right=right):
+            return again(left) + again(right)
+        case ast.IfExp(body=body, orelse=orelse):
+            return f"{again(body)}·{again(orelse)}"
+        case ast.Name(id=name):
+            return "·".join(map(again, scope.get(name, []))) or "·"
+        case ast.Attribute(attr=attr):  # a gitflow pattern renders its default
+            return str(getattr(DEFAULT, attr, "·"))
+        case ast.Call(func=ast.Attribute(attr="join"), args=[arg]):
+            return again(arg)
+        case ast.Call(func=ast.Attribute(value=receiver)) if not isinstance(receiver, ast.Name):
+            return again(receiver)
+        case ast.Call() if _FIX_CALL_RE.search(_callee(node)) or _callee(node)[:1].isupper():
+            return " ".join(map(again, [*node.args, *(k.value for k in node.keywords)]))
+        case ast.Call() if _callee(node) in defs:
+            return "·".join(again(n.value) for n in ast.walk(defs[_callee(node)]) if isinstance(n, ast.Return))  # fmt: skip
+    return "·"
+
+
+def _scope(node: Any, outer: dict[str, list[Any]]) -> dict[str, list[Any]]:
+    """Every value a name is bound to in *node*: its defaults and assignments, then *outer*'s."""
+    bound: dict[str, list[Any]] = {}
+    if isinstance(node, ast.FunctionDef):
+        args = node.args
+        named = [*args.args[len(args.args) - len(args.defaults) :], *args.kwonlyargs]
+        for arg, default in zip(named, [*args.defaults, *args.kw_defaults], strict=True):
+            bound[arg.arg] = [default]
+    for child in ast.walk(node):
+        if isinstance(child, ast.Assign):
+            for name in (n for t in child.targets for n in ast.walk(t) if isinstance(n, ast.Name)):
+                bound.setdefault(name.id, []).append(child.value)
+    return {**outer, **bound}
+
+
+def _placeholder_sites() -> list[str]:
+    """`file:line` of each fix a package module or a `public/skills` script can print that
+    is not one command: a `fix:` text, a `fix` parameter's argument, a builder's arguments."""
+    modules = sorted((_REPO_ROOT / "dadaia_workspace").rglob("*.py"))
+    trees = {path: ast.parse(path.read_text(encoding="utf-8")) for path in modules}
+    fix_param = {  # each callable taking `fix` (a class: its __init__), and its position
+        (owner.name if fn.name == "__init__" else fn.name): names.index("fix")
+        for owner in (n for t in trees.values() for n in ast.walk(t))
+        for fn in (owner.body if isinstance(owner, ast.ClassDef) else [owner])
+        if isinstance(fn, ast.FunctionDef)
+        and "fix" in (names := [a.arg for a in fn.args.args if a.arg != "self"])
+    }
+    sites: set[str] = set()
+    for path, tree in trees.items():
+        defs = {n.name: n for n in ast.walk(tree) if isinstance(n, ast.FunctionDef)}
+        prose = {id(v.value) for n in ast.walk(tree) if isinstance(n, ast.JoinedStr)  # `Run '…'`
+                 and not any("fix: " in str(getattr(v, "value", "")) for v in n.values)
+                 for v in n.values if isinstance(v, ast.FormattedValue)
+                 and isinstance(v.value, ast.Call) and _callee(v.value).endswith("_line")}  # fmt: skip
+        module = _scope(tree, {})
+        for unit in [tree, *defs.values()]:
+            scope = module if unit is tree else _scope(unit, module)
+            for node in ast.walk(unit):
+                fixes: list[str] = []
+                if isinstance(node, ast.Call):
+                    at = fix_param.get(_callee(node), -1)
+                    carried = [*node.args[at : at + 1 if at >= 0 else 0],
+                               *(k.value for k in node.keywords if k.arg == "fix")]  # fmt: skip
+                    if _FIX_CALL_RE.search(_callee(node)) and id(node) not in prose:
+                        carried.append(node)
+                    fixes = [_render(c, scope, defs) for c in carried]
+                elif isinstance(node, ast.Constant | ast.JoinedStr | ast.BinOp):
+                    fixes = _render(node, scope, defs).split("fix: ")[1:]
+                for fix in fixes:
+                    pending = path.name in _PENDING_T_050_149 and "--pr <n>" in fix
+                    if _NOT_ONE_COMMAND_RE.search(fix) and not pending:
+                        sites.add(f"{path.relative_to(_REPO_ROOT)}:{node.lineno}")
+    return sorted(sites)
+
+
+def test_no_fix_the_package_prints_carries_a_placeholder_or_a_chain() -> None:
+    """Intent: CONTRACT — AC4.4 (DEL fix-lines-are-not-one-runnable-command, ADR 0158):
+    every fix the package or a skill script prints, literal or assembled, and every doctor
+    rule's fix rendered by `rule_fix`, is its real value or `Operator action: <one act>` —
+    no `<…>`, no `&&`, no `a|b` menu."""
+    rendered = [
+        f"{codes}: {fix}"
+        for codes, rule in _DOCTOR_RULES
+        if _NOT_ONE_COMMAND_RE.search(fix := doctor_rules.rule_fix(rule, Path(), Path("specs")))
+    ]
+    assert [*_placeholder_sites(), *rendered] == []

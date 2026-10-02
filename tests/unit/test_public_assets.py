@@ -194,7 +194,8 @@ def test_load_denylist_source_formats(
         with pytest.raises(SystemExit) as refused:
             load_privacy_terms()
         assert str(refused.value).splitlines()[-1] == (
-            f'fix: Operator action: rewrite {source} as one JSON object {{"<term>": "<reason>"}}'
+            f"fix: Operator action: rewrite {source} as one JSON object mapping each term to "
+            "its reason"
         )
         return
     assert load_privacy_terms() == (("foo", "reason-a"), ("bar", "reason-b"))

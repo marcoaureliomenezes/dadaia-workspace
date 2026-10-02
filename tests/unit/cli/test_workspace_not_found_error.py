@@ -58,4 +58,6 @@ def test_fix_bootstraps_when_the_cli_has_no_workspace(
     result = _runner.invoke(app, ["doctor"])
 
     fixes = [line for line in result.output.splitlines() if line.startswith("fix: ")]
-    assert fixes == ["fix: uvx dadaia-workspace init <dir>"], result.output
+    assert fixes == [
+        "fix: Operator action: run `uvx dadaia-workspace init` with the new workspace's directory"
+    ], result.output

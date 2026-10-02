@@ -56,7 +56,8 @@ def new(root: Path, repo_name: str, kind: str) -> Path:
     }
     free = [letter for letter in string.ascii_lowercase if letter not in taken]
     if not free:
-        target = f"python3 {SCRIPT} clean <a worktrees/{repo_name}/{version}?-* tree>"
+        target = (f"Operator action: choose one of the worktrees/{repo_name}/{version}?-* trees "
+                  f"and run `python3 {SCRIPT} clean` with it")  # fmt: skip
         raise Refusal(
             f"letters a-z exhausted for {version}", _exit(root, ours[0]["path"]) if ours else target
         )

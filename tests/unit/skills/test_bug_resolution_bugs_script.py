@@ -387,7 +387,7 @@ def test_append_names_its_correlations_from_the_ledger(script: Path, tmp_path: P
 
 @pytest.mark.parametrize(
     ("field", "value", "needle"),
-    [("surface", "cli", None), ("surface", ".github", None), ("surface", "unknown", "--surface <.github|cli>"),
+    [("surface", "cli", None), ("surface", ".github", None), ("surface", "unknown", "(closest: .github, cli)"),
      ("context", "", "shorter than its minLength"), ("component", "", "shorter than its minLength")],
 )  # fmt: skip
 def test_append_takes_a_tracked_directory_surface_and_non_blank_fields(
@@ -418,7 +418,7 @@ def test_append_outside_a_git_tree_is_one_refusal_naming_the_cause(
                 "--symptom", "s", "--repro", "r", "--expected", "e", "--correlates", "none")  # fmt: skip
     assert done.returncode == 1 and "Traceback" not in done.stderr
     assert "cannot list the repo's tracked directories: fatal:" in done.stderr
-    assert "append … --specs specs" in done.stderr
+    assert "append` with --specs naming a specs tree inside a git repo" in done.stderr
 
 
 def test_append_refuses_a_duplicate_id_and_writes_nothing(script: Path, tmp_path: Path) -> None:
@@ -649,8 +649,8 @@ def test_update_writes_a_governance_field(script: Path, tmp_path: Path) -> None:
 @pytest.mark.parametrize(
     ("change", "owner"),
     [
-        ("status=resolved", "resolve|supersede|defer|reject"),
-        ("closed_at=2026-09-21T00:00:00Z", "resolve|supersede|defer|reject"),
+        ("status=resolved", "resolve, supersede, defer, reject"),
+        ("closed_at=2026-09-21T00:00:00Z", "resolve, supersede, defer, reject"),
         ("superseded_by=other", "supersede"),
         ("title=rewritten", "immutable-core"),
         ("reported_by=other", "immutable-core"),

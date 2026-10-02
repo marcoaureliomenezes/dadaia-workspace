@@ -85,32 +85,40 @@ def adr_record_issues(specs_dir: Path) -> list[SectionFinding]:
         try:
             parsed = owner.parse(raw)
         except owner.LineError as exc:
-            issues.append(_record_issue(number, f"line {exc}"))
+            issues.append(_record_issue(ledger, number, f"line {exc}"))
             continue
         for record in parsed:
             records.append((number, record))
             issues.extend(
-                _record_issue(number, m) for m in owner.validate(record, schema, schema, "record")
+                _record_issue(ledger, number, m)
+                for m in owner.validate(record, schema, schema, "record")
             )
     for position, (number, record) in enumerate(records, start=1):
         if (adr_id := record.get("id")) != (want := f"{position:04d}"):
-            issues.append(_record_issue(number, f"id {adr_id!r} breaks 0001..N: expected {want}"))
+            issues.append(
+                _record_issue(ledger, number, f"id {adr_id!r} breaks 0001..N: expected {want}")
+            )
             break
     accepted = {str(r.get("id")) for _, r in records if r.get("status") == "accepted"}
     for number, r in records:  # M2 (ADR 0151): only a ruled record changes a ruled one
         named = f"{r.get('supersedes') or ''},{r.get('amends') or ''}".split(",")
         ruled = r.get("status") == "accepted" and "ruling" in r
         if r.get("status") != "rejected" and not ruled and (hit := sorted(accepted & set(named))):
-            issues.append(_record_issue(number, f"changes accepted {hit} without a ruling"))
+            issues.append(_record_issue(ledger, number, f"changes accepted {hit} without a ruling"))
     return issues
 
 
-def _record_issue(line: int, message: str) -> SectionFinding:
+#: Who writes an ADR record, and the law forbidding a hand edit of one.
+_VERBS, _LAW = "a `docs(adr)` propose or accept commit", "the ADR law, specs/ADRs/AGENTS.md"
+
+
+def _record_issue(ledger: Path, line: int, message: str) -> SectionFinding:
     return specs_finding(
         code="LEDGER-ADR-SCHEMA",
         severity=Severity.ERROR,
         description=message,
         path=f"{LEDGER}:{line}",
+        fix=load_owner("dd-bug-resolution", "_ledger").unwritten(ledger, line, _VERBS, _LAW),
     )
 
 
@@ -119,6 +127,8 @@ LEDGER_RULES: tuple[Rule[Path], ...] = (
         ("LEDGER-ADR-SCHEMA",),
         "ledgers",
         adr_record_issues,
-        fix_help=f"sed -i '<line>s|.*|<the corrected record>|' specs/{LEDGER}",
+        fix_help=load_owner("dd-bug-resolution", "_ledger").unwritten(
+            Path("<specs>") / LEDGER, "the record named", _VERBS, _LAW
+        ),
     ),
 )

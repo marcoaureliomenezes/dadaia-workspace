@@ -249,7 +249,7 @@ class GitSubprocessClient:
         it until a ``fetch --prune`` drops it (re-running the line restores it); commits with
         no remote."""
         if self.has_commits(path) and not self.has_remote(path):
-            return [git_line(path, "remote", "add", "origin", "<clone-url>")]
+            return [f"Operator action: add the clone URL of {path} as its origin remote"]
         run = _run(["git", "worktree", "list", "--porcelain"], cwd=path).stdout.split("\n")
         trees = [line[9:] for line in run if line.startswith("worktree ")][1:]
         refs = ["git", "for-each-ref", "--format=%(objectname) %(refname:short)", "refs/heads"]
@@ -267,12 +267,12 @@ class GitSubprocessClient:
 
     def identity_fix(self, path: Path) -> str:
         """The ONE identity probe — git's own rule (env, config, auto-detection): ``""``
-        when git resolves an author and a committer, else the config line that sets one."""
+        when git resolves an author and a committer, else the operator action setting one."""
         for ident in ("GIT_AUTHOR_IDENT", "GIT_COMMITTER_IDENT"):
             if _run(["git", "var", ident], cwd=path).returncode != 0:
                 named = _run(["git", "config", "user.name"], cwd=path).stdout.strip()
                 key = "user.email" if named else "user.name"
-                return git_line(path, "config", key, f"<{key}>")
+                return f"Operator action: set git {key} in the config of {path}"
         return ""
 
     def push(self, path: Path) -> None:

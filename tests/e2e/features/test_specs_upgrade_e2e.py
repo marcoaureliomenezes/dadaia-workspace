@@ -42,11 +42,11 @@ def _snapshot(root: Path) -> dict[str, bytes]:
 @pytest.mark.parametrize(
     ("constitution", "fix"),
     [
-        (None, "specs init --context '<ctx>'"),
+        (None, "specs init --specs-dir {specs}"),
         ("---\nspecs_pattern_version: 7\ngitflow: {principal: main\n---\n", "repair the YAML"),
         (
             "---\nspecs_pattern_version: 5\n---\n# C\n",
-            "specs init --context '<ctx>' --replace-foreign",
+            "specs init --specs-dir {specs} --replace-foreign",
         ),
     ],
 )
@@ -62,7 +62,7 @@ def test_upgrade_refuses_a_tree_state_does_not_walk_and_writes_nothing(
     before = _snapshot(tmp_path)
     upgrade = _cli(tmp_path, "specs", "upgrade", "--specs-dir", str(specs))
     assert upgrade.returncode != 0, upgrade.stdout
-    assert fix in upgrade.stderr and "0.4.x" not in upgrade.stderr
+    assert fix.format(specs=specs) in upgrade.stderr and "0.4.x" not in upgrade.stderr
     assert _snapshot(tmp_path) == before
 
 

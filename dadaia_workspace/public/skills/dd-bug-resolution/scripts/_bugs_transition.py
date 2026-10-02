@@ -47,8 +47,9 @@ def transition(records: Records, bug_id: str, verb: str, values: dict[str, Any],
     if missing:
         raise Refusal(
             f"transition {verb!r} refused — {', '.join(repr(m) for m in missing)} required",
-            f"{_SCRIPT} {verb} {bug_id} "
-            + " ".join(f"--{m.replace('_', '-')} <{m}>" for m in missing),
+            f"Operator action: run `{_SCRIPT} {verb} {bug_id}` with "
+            + ", ".join(f"--{m.replace('_', '-')}" for m in missing)
+            + " set",
         )
     record = by_id(records, bug_id)
     updated = dict(record)
@@ -57,13 +58,15 @@ def transition(records: Records, bug_id: str, verb: str, values: dict[str, Any],
             raise Refusal(
                 "'evidence_diff' must match '^(net-negative|net-positive|net-neutral): "
                 "<rationale>'",
-                f"{_SCRIPT} resolve {bug_id} --evidence-diff 'net-negative: <why>'",
+                f"Operator action: run `{_SCRIPT} resolve {bug_id}` with --evidence-diff set to "
+                "net-negative, net-positive or net-neutral, a colon and why",
             )
         if not _seam_exists(values["evidence_seam"], root):
             raise Refusal(
                 f"evidence_seam {values['evidence_seam']!r} names no file or 'def <name>' "
                 f"under {root}",
-                f"{_SCRIPT} resolve {bug_id} --evidence-seam <tests/path.py::test_name>",
+                f"Operator action: run `{_SCRIPT} resolve {bug_id}` with --evidence-seam set to "
+                f"a test file under {root}, :: and its test name",
             )
         for key in REQUIRED_BY_VERB["resolve"]:
             _set(updated, key, values[key])

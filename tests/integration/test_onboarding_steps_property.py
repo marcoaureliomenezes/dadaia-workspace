@@ -2,8 +2,8 @@
 
 Over random real-state starts (remote unborn / principal only / both, a tag or not, a
 session identity or not), the loop takes the printed step, executes its fix line (the
-operator placeholders ``<name>``/``<clone-url>`` are the only substitutions; the ``agent``
-step runs a scripted stand-in that fills memory) and asserts I3 — the step is no longer
+``context`` step's operator action is played with a name and the bare remote's URL; the
+``agent`` step runs a scripted stand-in that fills memory) and asserts I3 — the step is no longer
 pending — and I4 — the printed step's index strictly increases, so the loop ends within
 ``len(STEP_IDS)`` iterations.
 
@@ -73,9 +73,12 @@ def _run_fix(step: Step, root: Path, bare: Path) -> None:
     if step.kind == "agent":
         _fill_memory(root)
         return
-    argv = shlex.split(step.command)
-    assert Path(argv[0]).name.startswith("dadaia"), step.command
-    argv = [{"<name>": "proj", "<clone-url>": bare.as_uri()}.get(a, a) for a in argv[1:]]
+    if step.id == "context":  # the operator's act: a context name and the clone URL
+        argv = ["context", "create", "proj", "--main-repo", bare.as_uri()]
+    else:
+        argv = shlex.split(step.command)
+        assert Path(argv[0]).name.startswith("dadaia"), step.command
+        argv = argv[1:]
     done = _runner.invoke(app, argv)
     assert done.exit_code == 0, f"{step.command}\n{done.output}"
 
