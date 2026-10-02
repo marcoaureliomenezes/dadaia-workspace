@@ -54,7 +54,7 @@ Every task runs in its own `worktree.py new` impl worktree, opened when its `blo
 
 ## Closure
 
-- [ ] **T-050-150 — Measure and hand to closure.** `W:` handoff · `blocked by:` T-050-131..149, T-050-151
+- [-] **T-050-150 — Measure and hand to closure.** `W:` handoff · `blocked by:` T-050-131..149, T-050-151
   `delivers:` G1 readout; G2, G4 against run 36813899731 with the tolerance applied; G3 re-run of every open bug; the closure acts — `release` worktree: this SPEC's Origin rewritten in the 0161 form and traced clean, the 0.4.8 → 0.5.0 log note, the ADR 0019 drift logged, the `specs/*/AGENTS.md` re-render; `backlog` worktree: `backlog.py exit` of the four entries (`delivered`) and `task-line-grammar-one-reader` (`to-bug`); `bug` worktree: G3 resolve batch; planned vs measured width per step; inputs to the memory pass and G6 · `RED:` n/a.
 
 ## AC map
