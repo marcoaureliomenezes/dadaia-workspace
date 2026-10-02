@@ -11,6 +11,7 @@ the drift the community asks CI to fail on; the successor lives in ``decisions.j
 from __future__ import annotations
 
 import re
+from collections.abc import Callable
 from contextlib import suppress
 from pathlib import Path
 from types import ModuleType
@@ -26,14 +27,23 @@ LEDGER = "ADRs/decisions.jsonl"
 _ADR_CITATION_RE = re.compile(r"\bADR[:\s-]+(\d{4})\b")
 
 
-def _superseded_ids(ledger: Path) -> set[str]:
-    """An unreadable line supersedes nothing here; it is `adr_record_issues`' finding."""
+def _ids(text: str, status: str) -> set[str]:
+    """An unreadable line names nothing here; it is `adr_record_issues`' finding."""
     owner = load_owner("dd-bug-resolution", "_ledger")
     ids: set[str] = set()
-    for raw in ledger.read_text(encoding="utf-8").split("\n"):
+    for raw in text.split("\n"):
         with suppress(owner.LineError):
-            ids |= {str(r.get("id")) for r in owner.parse(raw) if r.get("status") == "superseded"}
+            ids |= {str(r.get("id")) for r in owner.parse(raw) if r.get("status") == status}
     return ids
+
+
+def cites_an_accepted_adr(ledger: str | None) -> Callable[[str], bool]:
+    """ADR 0151 M3: a message cites an ADR *ledger* accepts; no ledger (an unowned repo)
+    resolves no id, so any cited id stands."""
+    accepted = None if ledger is None else _ids(ledger, "accepted")
+    return lambda m: bool(
+        (cited := set(_ADR_CITATION_RE.findall(m))) and (accepted is None or cited & accepted)
+    )
 
 
 def superseded_adr_citations(specs_dir: Path, public_dir: Path | None) -> list[SectionFinding]:
@@ -42,7 +52,7 @@ def superseded_adr_citations(specs_dir: Path, public_dir: Path | None) -> list[S
     ledger = specs_dir / "ADRs" / "decisions.jsonl"
     if not ledger.is_file():
         return []
-    superseded = _superseded_ids(ledger)
+    superseded = _ids(ledger.read_text(encoding="utf-8"), "superseded")
     if not superseded:
         return []
     roots = [specs_dir / "memory"]

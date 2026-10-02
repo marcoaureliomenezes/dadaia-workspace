@@ -59,8 +59,10 @@ class ObjectSource(Protocol):
 
     def netted_specs(self, repo: Path, local_sha: str, remote_sha: str) -> list[str]: ...
 
-    def law_deletions(self, repo: Path, local_sha: str, remote_sha: str) -> list[tuple[str, str]]:
-        """ADR 0151 M3: (commit, path) per range commit deleting a law line uncited."""
+    def law_deletions(
+        self, repo: Path, local_sha: str, remote_sha: str
+    ) -> list[tuple[str, str, str]]:
+        """ADR 0151 M3: (commit, path, message) per range commit deleting a law line."""
         ...
 
 
@@ -163,6 +165,7 @@ def push_gate_decision(
     object_source: ObjectSource,
     repo: Path,
     canon_violations_fn: Callable[[Sequence[str]], Sequence[str]],
+    cites_accepted_adr: Callable[[str], bool],
     gitflow: Gitflow,
     fixes: GateFixes,
     malformed_lines: int = 0,
@@ -207,7 +210,8 @@ def push_gate_decision(
         laws = [
             (r, c, p)
             for r in scan_refs
-            for c, p in object_source.law_deletions(repo, r.local_sha, r.remote_sha)
+            for c, p, m in object_source.law_deletions(repo, r.local_sha, r.remote_sha)
+            if not cites_accepted_adr(m)
         ]
         canon = [
             (r, p)
@@ -232,7 +236,7 @@ def push_gate_decision(
         fix = _rewrite_fix(canon[0][0], object_source, repo, fixes)
     elif laws:
         message = _refusal(
-            f"{len(laws)} pushed commit(s) delete a law line citing no `ADR NNNN` (ADR 0151).",
+            f"{len(laws)} pushed commit(s) delete a law line citing no accepted `ADR NNNN` (ADR 0151).",
             [f"  {r.local_ref}: commit {c[:12]} deletes a line of {p}" for r, c, p in laws],
             "commit(s)",
             "Cite the ADR that rules each deletion in that commit's message. ",

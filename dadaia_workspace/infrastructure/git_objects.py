@@ -16,7 +16,6 @@ published baseline's amnesty because there is only one way to compute it.
 from __future__ import annotations
 
 import contextlib
-import re
 import subprocess
 from collections.abc import Iterator
 from pathlib import Path
@@ -850,9 +849,11 @@ class GitSubprocessObjectReader:
             netted = paths if netted is None else netted & paths
         return sorted(netted or ())
 
-    def law_deletions(self, repo: Path, local_sha: str, remote_sha: str) -> list[tuple[str, str]]:
-        """ADR 0151 M3: (commit, path) for every range commit deleting a non-blank
-        ``AGENTS.md``/``SKILL.md`` line whose own message cites no ``ADR NNNN``."""
+    def law_deletions(
+        self, repo: Path, local_sha: str, remote_sha: str
+    ) -> list[tuple[str, str, str]]:
+        """ADR 0151 M3: (commit, path, message) for every range commit deleting a non-blank
+        ``AGENTS.md``/``SKILL.md`` line; judging the message is the gate's."""
         if local_sha == ZERO_SHA or not SHA_SHAPE_RE.match(local_sha):
             return []
         laws = [":(glob)**/AGENTS.md", ":(glob)**/SKILL.md"]
@@ -870,12 +871,10 @@ class GitSubprocessObjectReader:
         )
         if result.returncode != 0:
             raise GitObjectReadError(f"git log failed: {_decode(result.stderr).strip()}")
-        found: dict[tuple[str, str], None] = {}
+        found: dict[tuple[str, str, str], None] = {}
         chunks = _decode(result.stdout).split("\x00")[1:]
         for head, diff in zip(chunks[::2], chunks[1::2], strict=True):
             sha, _, message = head.partition("\n")
-            if re.search(r"\bADR \d{4}\b", message):
-                continue
             path, in_hunk = "", False
             for line in diff.split("\n"):
                 if line.startswith("diff --git "):
@@ -885,7 +884,7 @@ class GitSubprocessObjectReader:
                 elif line.startswith("@@"):
                     in_hunk = True
                 elif in_hunk and line.startswith("-") and line[1:].strip():
-                    found[(sha, path)] = None
+                    found[(sha, path, message)] = None
         return list(found)
 
     def new_objects(self, repo: Path, local_sha: str, remote_sha: str) -> Iterator[ScannedObject]:

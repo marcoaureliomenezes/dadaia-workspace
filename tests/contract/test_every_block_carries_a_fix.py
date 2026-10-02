@@ -34,6 +34,7 @@ from dadaia_workspace.core.gitflow import DEFAULT
 from dadaia_workspace.features.chokepoints import push_gate_decision
 from dadaia_workspace.features.chokepoints.branch_policy import parse_push_stdin
 from dadaia_workspace.features.specs.canon import canon_violations
+from dadaia_workspace.features.specs.doctor_adr import cites_an_accepted_adr
 from dadaia_workspace.hooks import pre_gate
 from dadaia_workspace.infrastructure.git_objects import GitSubprocessObjectReader
 from tests.fakes import gate_fixes
@@ -190,6 +191,7 @@ def _push(ws: Path, line: str = "", files: dict[str, str] | None = None, **kwarg
         object_source=GitSubprocessObjectReader(),
         repo=repo.path,
         canon_violations_fn=canon_violations,
+        cites_accepted_adr=cites_an_accepted_adr(None),
         **{"malformed_lines": 0, "denylist_terms": (), **kwargs},
     )
     assert not decision.allowed, "expected a refusal"
