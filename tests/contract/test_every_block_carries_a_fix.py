@@ -264,7 +264,8 @@ def test_a_fix_runs_verbatim_in_every_host_shell(workspace: Path, shell: list[st
     # exceeded 25 s (run 36269883321) while the line itself was fine.
     runs = [
         subprocess.run(
-            [*shell, line],
+            # cmd reads its raw command tail: list2cmdline's \" is not cmd syntax.
+            f"{subprocess.list2cmdline(shell)} {line}" if shell[0] == "cmd" else [*shell, line],
             cwd=workspace / "repos" / "demo",
             capture_output=True,
             text=True,
