@@ -54,19 +54,20 @@ _NOT_ONE_ACT_RE = re.compile(r"<(?!specs>)[^<>\n]+>|&&|\w\|\w")
 _NOT_ONE_COMMAND_RE = re.compile(rf"{_NOT_ONE_ACT_RE.pattern}| or | then ")
 #: The installer a workspace is born from (getting-started Level 1), absent from CI runners.
 _PREREQUISITES = {"uvx"}
+#: The executables a fix line opens with — a list, not `which`: a host may ship a binary
+#: named like a prose verb (`/usr/bin/write`), and the judgement must not move with it.
+_HEADS = {"chmod", "gh", "git", "grep", "ls", "mkdir", "python3", "rm", "sed", *_PREREQUISITES}
 
 
 def _defect(fix: str) -> bool:
     """The ONE predicate: *fix* is `Operator action: <one act>`, or one command whose head is
-    no prose word (a lowercase word is an executable on PATH); `·` is a value the source
+    no prose word (a lowercase head is one of `_HEADS`); `·` is a value the source
     walk cannot know."""
     known = fix.split("·", 1)[0]  # the text before the first value the walk cannot know
-    if fix.startswith("Operator action: ") or " " not in known.strip() and "·" in fix:
+    if fix.startswith("Operator action: ") or " " not in known and "·" in fix:
         return bool(_NOT_ONE_ACT_RE.search(fix))
     head = known.split(" ", 1)[0]
-    prose = re.fullmatch(r"[a-z][a-z-]*", head) and not (
-        shutil.which(head) or head in _PREREQUISITES
-    )
+    prose = re.fullmatch(r"[a-z][a-z0-9-]*", head) and head not in _HEADS
     return bool(prose or _NOT_ONE_ACT_RE.search(fix) or _NOT_ONE_COMMAND_RE.search(known))
 
 
