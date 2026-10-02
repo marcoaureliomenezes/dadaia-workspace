@@ -27,9 +27,9 @@ def _env() -> dict[str, str]:
     return {k: v for k, v in os.environ.items() if not k.startswith("GIT_")}
 
 
-def git(repo: Path, *args: str, check: bool = True) -> str:
+def git(repo: Path, *args: str, check: bool = True, input: str | None = None) -> str:
     done = subprocess.run(
-        ["git", "-C", str(repo), *args], env=_env(), capture_output=True, text=True
+        ["git", "-C", str(repo), *args], env=_env(), capture_output=True, text=True, input=input
     )
     if check and done.returncode:
         raise RuntimeError(f"git {' '.join(args)}: {done.stderr.strip()}")

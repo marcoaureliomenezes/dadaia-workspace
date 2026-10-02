@@ -149,8 +149,29 @@ def _rebase(tree: Path, work: str) -> None:
         step = ("-c", "core.editor=true", "rebase", "--continue")
 
 
-def _check_approved(root: Path, sha: str) -> None:
-    """An APPROVED dd-code-reviewer handoff names *sha* in its scope and validates (ADR 0110)."""
+def _series(tree: Path, work: str, tip: str) -> list[tuple[str, str]]:
+    """(patch-id, full message) per commit of *work*..*tip*, oldest first, keyed by commit id:
+    an empty commit has no patch-id (""); a changed one without a patch-id never matches."""
+    rng = f"{work}..{tip}"
+    patch = git(tree, "log", "-p", "--no-color", "--no-ext-diff", "--format=commit %H", rng)
+    pids = git(tree, "patch-id", "--stable", input=patch).split()
+    ids = dict(zip(pids[1::2], pids[::2], strict=True))
+    changed = set(git(tree, "log", "--format=%H", rng, "--", ".").split())
+    logs = git(tree, "log", "--reverse", "--no-show-signature", "--format=%H%n%B%x00", rng)
+    return [
+        (ids.get(c, f"unmatched {c}" if c in changed else ""), msg)
+        for c, _, msg in (x.lstrip("\n").partition("\n") for x in logs.split("\0")[:-1])
+    ]
+
+
+def _check_approved(root: Path, tree: Path, work: str, name: str) -> None:
+    """A valid APPROVED dd-code-reviewer handoff names a sha X of this branch's reflog whose
+    (patch-id, message) series over *work*..X equals HEAD's, in order (ADRs 0110, 0168);
+    X == HEAD is the degenerate case; the reflog's base (series []) matches only an empty branch."""
+    head = git(tree, "rev-parse", "HEAD").strip()
+    mine = _series(tree, work, head)
+    reflog = {head, *git(tree, "reflog", "--format=%H", f"wt/{name}", check=False).split()}
+    shas = {x for x in reflog if x == head or _series(tree, work, x) == mine}
     named = []
     for handoff in sorted((root / ".dadaia" / "handoff").glob("*/*.handoff.json")):
         try:
@@ -160,7 +181,7 @@ def _check_approved(root: Path, sha: str) -> None:
         if (
             isinstance(data, dict)
             and data.get("agent") == REVIEWER
-            and sha in str(data.get("scope"))
+            and any(sha in str(data.get("scope")) for sha in shas)
         ):
             named.append(handoff)
             if (
@@ -170,8 +191,8 @@ def _check_approved(root: Path, sha: str) -> None:
                 return
     fix = cli_line(root, "reports", "validate", str(named[-1]) if named else "--all")
     raise Refusal(
-        f"no valid APPROVED {REVIEWER} handoff names HEAD {sha} in its scope"
-        " (the file comes from the reviewer's verdict)",
+        f"no valid APPROVED {REVIEWER} handoff names HEAD {head} or a sha of its patch and"
+        " message series in its scope (the file comes from the reviewer's verdict)",
         fix,
     )
 
@@ -194,7 +215,7 @@ def merge(root: Path, path: str, keep: list[str], drop: bool) -> str:
     _refuse_dirty(tree)
     _check_allowed(tree, work, name)
     _rebase(tree, work)
-    _check_approved(root, git(tree, "rev-parse", "HEAD").strip())
+    _check_approved(root, tree, work, name)
     kept = _kept(tree, "merge", keep, drop)
     if git(repo, "branch", "--show-current").strip() != work:
         raise Refusal(f"repos/{repo.name} is not on {work}", git_line(repo, "switch", work))
