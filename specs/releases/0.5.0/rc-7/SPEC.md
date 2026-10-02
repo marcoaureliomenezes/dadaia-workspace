@@ -4,9 +4,9 @@
 **Release ID:** 0.5.0
 **Owner:** dd-product-engineer
 **Opened:** 2026-10-01
-**Origin:** backlog:ledger-schema-one-engine,structural-convergence-f053-f054-f057,consumer-guidance-names-no-library-toolchain,seventh-fail-open-path-law-line
+**Origin:** backlog:ledger-schema-one-engine,structural-convergence-f053-f054-f057,consumer-guidance-names-no-library-toolchain,seventh-fail-open-path-law-line,task-line-grammar-one-reader; bugs:spec-origin-line-has-two-readers,task-line-grammar-accepts-a-malformed-open-marker,privacy-denylist-has-two-loaders,release-ship-accepts-what-release-check-refuses,bugs-check-trusts-evidence-fields-unverified,release-new-crashes-on-a-unicode-line-separator-in-the-bug-ledger,corrupt-context-registry-crashes-doctor-and-next-step,list-form-privacy-denylist-errors-without-migration,secret-scan-misses-github-pat-and-anthropic-keys,release-check-accepts-done-tasks-in-definition,gitflow-shape2-omits-backlog-histo,dadaia-bin-still-honoured-after-adr-0045,help-examples-spell-the-blocked-bare-cli,fix-lines-are-not-one-runnable-command,ledger-finding-fix-line-orders-a-hand-edit-the-law-forbids,implementer-persona-states-a-second-task-marker-lifecycle,doctor-tmp-expiry-foreign-owned-entry-never-clears,rc-flow-asks-compliance-line-doctor-never-prints; findings:20260930-structural-convergence-F002,20260930-structural-convergence-F007,20260930-structural-convergence-F010,20260930-structural-convergence-F012,20260930-structural-convergence-F013,20260930-structural-convergence-F016,20260930-structural-convergence-F017,20260930-structural-convergence-F024,20260930-structural-convergence-F029,20260930-structural-convergence-F030,20260930-structural-convergence-F031,20260930-structural-convergence-F032,20260930-structural-convergence-F033,20260930-structural-convergence-F034,20260930-structural-convergence-F035,20260930-structural-convergence-F036,20260930-structural-convergence-F037,20260930-structural-convergence-F038,20260930-structural-convergence-F039,20260930-structural-convergence-F040,20260930-structural-convergence-F041,20260930-structural-convergence-F052,20260930-structural-convergence-F053,20260930-structural-convergence-F054,20260930-structural-convergence-F057,20260930-structural-convergence-F058,20260930-structural-convergence-F059,20260930-structural-convergence-F061,20260930-structural-convergence-F063,20260930-structural-convergence-F080,20260930-structural-convergence-F099,20260930-structural-convergence-F102,20260930-structural-convergence-F103
 - Sources: rc-6's §Carried W3/W4 rows, closure log and reviews (step 7b, PR #276); operator order 2026-09-30; the 2026-10-01 batch grill, D1–D6.
-- The line holds the `backlog:` clause alone (today's tools refuse a multi-clause line); bugs and findings are in §Origin map; AC3.2 rewrites it. `task-line-grammar-one-reader` exits `to-bug`, which reads no Origin. No bug is registered.
+- The line is in the ADR 0161 form, rewritten at closure (AC3.2): 5 entries, 18 bugs, 33 findings. Each AC names its bugs as DEL or FR; §Origin map places every id no AC names. `task-line-grammar-one-reader` exits `to-bug`. No bug is registered.
 - At 44d023e6 every carried id is non-terminal: 18 bugs open, 5 entries active, 29 findings open, F053, F054, F057, F080 deferred.
 
 ## Objective
@@ -38,12 +38,8 @@
 
 ## Origin map — candidate 7
 
-Each finding that cites a bug or an entry shares its destination; findings are `20260930-structural-convergence-F<nnn>`.
-
-| Where | Bugs | Backlog | Findings, carry-overs |
-|---|---|---|---|
-| W3 | DEL `spec-origin-line-has-two-readers`, `task-line-grammar-accepts-a-malformed-open-marker`, `privacy-denylist-has-two-loaders`, `release-ship-accepts-what-release-check-refuses`, `bugs-check-trusts-evidence-fields-unverified`, `release-new-crashes-on-a-unicode-line-separator-in-the-bug-ledger`, `corrupt-context-registry-crashes-doctor-and-next-step`; FR `list-form-privacy-denylist-errors-without-migration`, `secret-scan-misses-github-pat-and-anthropic-keys`, `release-check-accepts-done-tasks-in-definition`, `gitflow-shape2-omits-backlog-histo` | FR `ledger-schema-one-engine`, `structural-convergence-f053-f054-f057`, each exits `delivered`; `task-line-grammar-one-reader` exits `to-bug` → `task-line-grammar-accepts-a-malformed-open-marker` | F002, F010, F012, F013, F016, F024, F029, F030, F032–F034, F036–F038, F052–F054, F057–F059, F061, F063, F102, F103; c4 AC6.3, AC6.6 (V38) |
-| W4 | DEL `dadaia-bin-still-honoured-after-adr-0045`, `help-examples-spell-the-blocked-bare-cli`, `fix-lines-are-not-one-runnable-command`, `ledger-finding-fix-line-orders-a-hand-edit-the-law-forbids`, `implementer-persona-states-a-second-task-marker-lifecycle`; FR `doctor-tmp-expiry-foreign-owned-entry-never-clears`, `rc-flow-asks-compliance-line-doctor-never-prints` | FR `consumer-guidance-names-no-library-toolchain`, `seventh-fail-open-path-law-line`, each exits `delivered` | F007, F017, F031, F035, F039–F041, F080, F099 |
+- Findings are `20260930-structural-convergence-F<nnn>`; a finding citing a bug shares that bug's AC.
+- Named by no AC: `structural-convergence-f053-f054-f057` → AC3.13; W3: F010 (one question, N deciders) and F016 (move M3), both AC3.1; F029 (AC3.4), F030 (AC3.3), F032 (AC3.2), F033 (AC3.5), F034 (AC3.7), F036, F037 (AC3.10), F038 (AC3.11), and c4 AC6.3, AC6.6 (V38, AC3.16); W4: F031 (AC4.6), F035 (AC4.5), F039 (AC4.3), F040 (AC4.4), F041 (AC4.2).
 
 ## Gate — rc-5's G1–G6, applied to W3 and W4
 
@@ -108,7 +104,7 @@ Each finding that cites a bug or an entry shares its destination; findings are `
 - AC3.12 The `to-bug` exit (0137; F063, F102):
   - `backlog.py exit <slug> --disposition to-bug --reason <bug-id>` exits when the id names a `BUGS.jsonl` record, read by importing `bugs.py`'s reader; an unknown id is refused.
   - `backlog.py check` accepts `to-bug`; the scaffold `specs/backlog/AGENTS.md` §3 points to `backlog.py exit --help`, which lists the four dispositions, since `tests/contract/test_zone_registry.py` refuses a law line restating a canonical set (T-050-138 review F7); the backlog kind admits `specs/bugs/BUGS.jsonl`, so registration and exit share one worktree.
-  - `release.py check` reports a `to-bug` target that was later rejected; `task-line-grammar-one-reader` exits by it (§Origin map).
+  - `release.py check` reports a `to-bug` target that was later rejected; `task-line-grammar-one-reader` exits by it (the Origin line).
 - AC3.13 Commit shapes (F053, F054, F057; FR `gitflow-shape2-omits-backlog-histo`; 0106, 0136):
   - `dd-gitflow-default` §3a's staged set becomes "the kind's allowed set" (`KINDS`): a backlog exit stages `BACKLOG.json` with its histo; shape 2's ADR message is `docs(adr): propose|accept <slug>`.
   - The "alone" clauses and "+ picked bugs" leave, there and in `dd-release-definition` §4; each closure commit form (`chore(tasks)`, `docs(memory)`, `docs(specs)`, `chore(release)`) gets a row.
