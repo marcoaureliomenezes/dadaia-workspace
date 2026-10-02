@@ -47,6 +47,11 @@ def _argv(result: subprocess.CompletedProcess[str]) -> list[str]:
 def test_merge_fast_forwards_removes_and_reruns(root: Path) -> None:
     repo, tree = root / "repos/r", root / TREE
     sha = commit(tree, "src/a.py")
+    rejected = approve(
+        root, sha, verdict="REJECTED", at="T09:00:00Z"
+    )  # the newer APPROVED overrules
+    (other := root / ".dadaia/handoff/z").mkdir()  # another context and a non-UTC name:
+    rejected.rename(other / "a.handoff.json")  # produced_at orders, never the path
     approve(root, sha)
     git(repo, "config", "color.ui", "always")  # patch-ids still read through a colored config
     z = commit(repo, "src/z.py")  # the work branch moves: the rebase keeps every patch (ADR 0168)
@@ -108,12 +113,23 @@ def test_work_branch_refusals_fix_runs_verbatim(tmp_path: Path) -> None:
 
 
 @pytest.mark.parametrize(
-    ("named", "verdict", "valid"),
-    [(False, "APPROVED", True), (True, "REJECTED", True), (True, "APPROVED", False)],
-    ids=["outside-reflog", "rejected", "invalid"],
+    ("named", "verdict", "valid", "older", "at"),
+    [
+        (False, "APPROVED", True, None, "T10:00:00Z"),
+        (True, "REJECTED", True, None, "T10:00:00Z"),
+        (True, "APPROVED", False, "APPROVED", "T10:00:00Z"),
+        (True, "REJECTED", True, "APPROVED", "T10:00:00Z"),
+        (True, "APPROVED", True, "APPROVED", "Tx"),
+        (True, "REJECTED", True, "APPROVED", "T11:00:00"),  # 02:00Z if read in Asia/Tokyo
+        (True, "REJECTED", True, "APPROVED", "T09:00:00Z"),  # tied with the older APPROVED
+    ],
+    ids=[
+        *("outside-reflog", "rejected", "invalid", "rejected-after-approved"),
+        *("no-produced-at", "naive-produced-at", "tied-produced-at"),
+    ],
 )
 def test_merge_needs_a_valid_approval_of_the_exact_head(
-    root: Path, named: bool, verdict: str, valid: bool
+    root: Path, named: bool, verdict: str, valid: bool, older: str | None, at: str
 ) -> None:
     commit(root / TREE, "src/a.py")
     head = commit(root / TREE, "src/b.py")
@@ -125,8 +141,12 @@ def test_merge_needs_a_valid_approval_of_the_exact_head(
         text=True,
         check=True,
     ).stdout.strip()
+    if older:  # the newest produced_at decides (ADR 0110), never a name sorting last
+        approve(root, head, verdict=older, at="T09:00:00Z").rename(
+            root / ".dadaia/handoff/c/v.handoff.json"
+        )
     target = (
-        approve(root, head, verdict=verdict, valid=valid)
+        approve(root, head, verdict=verdict, valid=valid, at=at)
         if named
         else (approve(root, copy), "--all")[1]
     )

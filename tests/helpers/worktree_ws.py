@@ -56,6 +56,7 @@ def run(root: Path, *args: str) -> subprocess.CompletedProcess[str]:
         "PATH": os.environ["PATH"],
         "GIT_DIR": "/nonexistent",
         "GIT_CONFIG_NOSYSTEM": "1",
+        "TZ": "Asia/Tokyo",  # a naive produced_at never orders by the local zone
     }
     return subprocess.run(
         [sys.executable, str(SCRIPT), *args], cwd=root, env=env, capture_output=True, text=True
@@ -82,11 +83,19 @@ def commit(tree: Path, rel: str, text: str = "x = 1\n") -> str:
     return git(tree, "rev-parse", "HEAD").strip()
 
 
-def approve(root: Path, sha: str, *, verdict: str = "APPROVED", valid: bool = True) -> Path:
-    """The reviewer's verdict as the main thread writes it: a handoff naming *sha*."""
-    handoff = root / ".dadaia/handoff/c" / f"{sha[:8]}-{verdict}-dd-code-reviewer.handoff.json"
+def approve(
+    root: Path, sha: str, *, verdict: str = "APPROVED", valid: bool = True, at: str = "T10:00:00Z"
+) -> Path:
+    """The reviewer's verdict as the main thread writes it: a handoff naming *sha*, emitted *at*."""
+    name = f"2026-10-02{at.replace(':', '')}-dd-code-reviewer-{sha[:8]}-{verdict}.handoff.json"
+    handoff = root / ".dadaia/handoff/c" / name
     handoff.parent.mkdir(parents=True, exist_ok=True)
-    body = {"agent": "dd-code-reviewer", "verdict": verdict, "scope": f"wt/0.5.0a-impl@{sha}"}
+    body = {
+        "agent": "dd-code-reviewer",
+        "verdict": verdict,
+        "scope": f"wt/0.5.0a-impl@{sha}",
+        "produced_at": f"2026-10-02{at}",
+    }
     handoff.write_text(json.dumps({**body, **({"schema_version": "1.2"} if valid else {})}))
     return handoff
 

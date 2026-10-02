@@ -8,6 +8,7 @@ import fnmatch
 import json
 import shutil
 import sys
+from datetime import datetime
 from pathlib import Path
 
 sys.path.append(str(Path(__file__).resolve().parents[2] / "dd-release-implementation" / "scripts"))
@@ -165,15 +166,21 @@ def _series(tree: Path, work: str, tip: str) -> list[tuple[str, str]]:
 
 
 def _check_approved(root: Path, tree: Path, work: str, name: str) -> None:
-    """A valid APPROVED dd-code-reviewer handoff names a sha X of this branch's reflog whose
-    (patch-id, message) series over *work*..X equals HEAD's, in order (ADRs 0110, 0168);
-    X == HEAD is the degenerate case; the reflog's base (series []) matches only an empty branch."""
+    """The newest dd-code-reviewer handoffs naming a candidate sha decide: each must be a valid
+    APPROVED (ADR 0110). A candidate is a sha X of this branch's reflog whose (patch-id, message)
+    series over *work*..X equals HEAD's, in order (ADR 0168); X == HEAD is the degenerate case;
+    the reflog's base (series []) matches only an empty branch. Newest is the schema-required
+    `produced_at`, across every candidate (a newer verdict on a carried-over sha overrules an
+    older one on HEAD); the file name never orders. A missing, unparseable or offset-less
+    `produced_at` ranks newest and refuses; handoffs tied on the newest moment all decide, and
+    the fix names the first in path order that is not a valid APPROVED. An unreadable file
+    names no sha and is skipped."""
     head = git(tree, "rev-parse", "HEAD").strip()
     mine = _series(tree, work, head)
     reflog = {head, *git(tree, "reflog", "--format=%H", f"wt/{name}", check=False).split()}
     shas = {x for x in reflog if x == head or _series(tree, work, x) == mine}
     named = []
-    for handoff in sorted((root / ".dadaia" / "handoff").glob("*/*.handoff.json")):
+    for handoff in (root / ".dadaia" / "handoff").glob("*/*.handoff.json"):
         try:
             data = json.loads(handoff.read_text(encoding="utf-8"))
         except (OSError, ValueError):
@@ -183,17 +190,28 @@ def _check_approved(root: Path, tree: Path, work: str, name: str) -> None:
             and data.get("agent") == REVIEWER
             and any(sha in str(data.get("scope")) for sha in shas)
         ):
-            named.append(handoff)
-            if (
-                data.get("verdict") == "APPROVED"
-                and cli(root, "reports", "validate", str(handoff)).returncode == 0
-            ):
-                return
-    fix = cli_line(root, "reports", "validate", str(named[-1]) if named else "--all")
+            try:
+                at = datetime.fromisoformat(str(data.get("produced_at")))
+                moment = at.timestamp() if at.tzinfo else None
+            except ValueError:
+                moment = None
+            named.append((moment is None, moment or 0.0, str(handoff), data))
+    top = max((row[:2] for row in named), default=None)
+    for unparsed, _, path, data in sorted(row for row in named if row[:2] == top):
+        if (
+            unparsed
+            or data.get("verdict") != "APPROVED"
+            or cli(root, "reports", "validate", path).returncode
+        ):
+            break
+    else:
+        if named:
+            return
+        path = "--all"
     raise Refusal(
-        f"no valid APPROVED {REVIEWER} handoff names HEAD {head} or a sha of its patch and"
-        " message series in its scope (the file comes from the reviewer's verdict)",
-        fix,
+        f"the newest {REVIEWER} handoff naming HEAD {head} or a sha of its patch and message"
+        " series is not a valid APPROVED (the file comes from the reviewer's verdict)",
+        cli_line(root, "reports", "validate", path),
     )
 
 
