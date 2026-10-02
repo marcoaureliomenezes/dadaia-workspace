@@ -480,7 +480,7 @@ def test_every_script_fix_line_names_its_folders_entry_script(module: Path) -> N
 #: A fix callee: a `cli_line` builder's or a fix producer's arguments are fix text.
 _FIX_CALL_RE = re.compile(r"(_line|_fix|^script)$")
 #: A hand-built CLI spelling in a fix (sa-fix-lines-not-built-by-cli-line, ADR 0045).
-_SPELLING = re.compile(r"\.dadaia[/\\]\.venv|(?<![\w./-])dadaia\s")
+_SPELLING = re.compile(r"\.dadaia[/\\]\.venv|(?<![\w./-])dadaia\s|shlex\.")
 _HAND_BUILT = {"DADAIA_BIN", "cli_path"}
 #: A fix's positional index in a constructor no `def` declares (onboarding `Step`, `Refusal`).
 _FIX_CTORS = {"Step": 3, "Refusal": 1}
@@ -505,6 +505,8 @@ def _render(
     match node:
         case ast.Constant(value=str() as text):
             return text
+        case ast.Call(func=ast.Attribute(value=ast.Name(id="shlex"), attr=attr)):  # POSIX-only
+            return "shlex." if attr in ("join", "quote") else "·"
         case ast.Name(id=name) | ast.Attribute(attr=name) | ast.Call(func=ast.Name(id=name)) if name in _HAND_BUILT:  # fmt: skip
             return ".dadaia/.venv "
         case ast.JoinedStr(values=parts):
@@ -735,9 +737,11 @@ def test_the_scans_bite() -> None:
         'W = "fix: Operator action: run `bugs.py resolve|supersede` on it"\n'
         'OK = "fix: Operator action: open the PR"\n'
         'raise Refusal("m", "git push origin")\n'
+        'raise Refusal("m", shlex.join(["git", "diff", "--", a, b]))\n'
+        'raise Refusal("m", "git -C " + shlex.quote(r) + " status")\n'
     )
     assert _code_sites({"m.py": ast.parse(source)}) == [
-        f"m.py:{n}" for n in (1, 2, 3, 4, 5, 6, 8, 9)
+        f"m.py:{n}" for n in (1, 12, 13, 2, 3, 4, 5, 6, 8, 9)
     ]
     shipped = (
         "made by `dadaia public install`\n"
