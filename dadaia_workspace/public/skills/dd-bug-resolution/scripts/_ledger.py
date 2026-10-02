@@ -115,11 +115,25 @@ def finding(code: str, path: str, line: int, message: str, fix: str) -> dict[str
 SPECS = Path("specs")
 
 
-def unwritten(file: Path, line: int, verbs: str, law: str) -> str:
-    """The fix for a line no verb wrote: no verb rewrites it and *law* forbids a hand edit."""
-    return (f"Operator action: line {line} of {file} was not written by {verbs} — revert the "
-            f"commit that wrote it (`git log -L {line},{line}:{file}` finds it), then redo the "
-            f"change through {verbs} ({law})")  # fmt: skip
+def unwritten(file: Path, at: int | str, verbs: str, law: str) -> str:
+    """The fix for content no verb wrote: no verb rewrites it and *law* forbids a hand edit.
+    *at* is a JSONL line number, or a JSON document's entry/key label — a document has no
+    line one commit owns, so its commits are listed whole."""
+    if isinstance(at, int):
+        what = f"line {at} of {file} was not written by {verbs} ({law})"
+        finder = f"`git log -L {at},{at}:{file}` finds it"
+    else:
+        what, finder = f"{file} fails at {at} ({law})", f"`git log -p -- {file}` lists them"
+    return (f"Operator action: {what} — if {file} has uncommitted changes, discard them "
+            f"(`git checkout -- {file}`); otherwise revert the commit that introduced it "
+            f"({finder}), then redo the change through {verbs}")  # fmt: skip
+
+
+def keys(messages: list[str], root: str) -> str:
+    """The top-level keys (with an entry index) *messages* name under *root* — a document
+    finding's label."""
+    found = re.findall(rf"\b{root}\.(\w+(?:\[\d+\])?)", "; ".join(messages))
+    return ", ".join(dict.fromkeys(found)) or root
 
 
 def stamp(path: Path) -> tuple[int, int] | None:

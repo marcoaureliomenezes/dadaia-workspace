@@ -87,8 +87,13 @@ def findings_for(
         if target not in known or at == bug_id:
             why = f"forms a cycle: {' -> '.join(chain)}" if at == bug_id else "names no record"
             add(seen[bug_id], f"{bug_id!r} caused_by {why}")
-            update = f"{script(Path(__file__).with_name('bugs.py'))} update {quote(bug_id)}"
-            fixes[seen[bug_id]] = with_specs(f"{update} --set caused_by=none", root)
+            bugs = script(Path(__file__).with_name("bugs.py"))
+            fixes[seen[bug_id]] = (  # a cycle's wrong link is a judgement; a dangling one is not
+                f"Operator action: decide which of {', '.join(chain)} names the wrong cause and "
+                f"set its caused_by to the real cause's id, or none, through `{bugs} update "
+                f"--specs {quote(str(root))}` ({_LAW})" if at == bug_id
+                else with_specs(f"{bugs} update {quote(bug_id)} --set caused_by=none", root)
+            )  # fmt: skip
     return [
         _ledger.finding(CODE, rel, n, "; ".join(m),
                         fixes.get(n) or _ledger.unwritten(root / rel, n, _VERBS, _LAW))

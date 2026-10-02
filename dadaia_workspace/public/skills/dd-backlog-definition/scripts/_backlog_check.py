@@ -30,12 +30,14 @@ from _backlog_schema import (  # noqa: E402
 from _ledger import SPECS, load_schema, validate  # noqa: E402
 
 
-def finding(path: str, line: int, message: str, root: Path) -> dict[str, Any]:
+def finding(
+    path: str, line: int, message: str, root: Path, at: int | str | None = None
+) -> dict[str, Any]:
+    """*at* labels a BACKLOG.json finding (an entry or key); a histo finding is its line."""
     verbs = "`backlog.py exit`" if path == HISTO else "`backlog.py new|exit`"
     law = "specs/backlog/AGENTS.md: never hand-edit BACKLOG.json"
-    return _ledger.finding(
-        CODE, path, line, message, _ledger.unwritten(root / path, line, verbs, law)
-    )
+    fix = _ledger.unwritten(root / path, line if at is None else at, verbs, law)
+    return _ledger.finding(CODE, path, line, message, fix)
 
 
 def _item_errors(item: dict[str, Any]) -> Iterator[str]:
@@ -57,10 +59,12 @@ def document_findings(text: str, root: Path = SPECS) -> list[dict[str, Any]]:
     try:
         document = json.loads(text)
     except json.JSONDecodeError as exc:
-        return [finding(LEDGER, exc.lineno, f"document is not valid JSON: {exc.msg}", root)]
+        return [finding(LEDGER, exc.lineno, f"document is not valid JSON: {exc.msg}", root,
+                        f"its JSON syntax (line {exc.lineno})")]  # fmt: skip
     schema = load_schema("backlog-v1")
     if messages := list(validate(document, schema, schema, "document")):
-        return [finding(LEDGER, 1, "; ".join(messages), root)]
+        label = _ledger.keys(messages, "document")
+        return [finding(LEDGER, 1, "; ".join(messages), root, label)]
     findings: list[dict[str, Any]] = []
     seen: dict[str, int] = {}
     for index, item in enumerate(document["active"], start=1):
@@ -68,7 +72,7 @@ def document_findings(text: str, root: Path = SPECS) -> list[dict[str, Any]]:
         if (first := seen.setdefault(str(item["id"]), index)) != index:
             errors.append(f"duplicate active[] id {item['id']!r} (first at #{first})")
         if errors:
-            findings.append(finding(LEDGER, index, "; ".join(errors), root))
+            findings.append(finding(LEDGER, index, "; ".join(errors), root, f"active[{index - 1}]"))
     return findings
 
 

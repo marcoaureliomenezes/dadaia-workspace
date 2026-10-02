@@ -90,22 +90,32 @@ def test_the_printed_fix_clears_its_finding(tmp_path: Path, code: str) -> None:
     ] == []
 
 
+_ENTRY = {"id": "a-entry", "title": "a", "opened": "2026-10-02", "status": "idea",
+          "description": "d", "provenance": "operator request"}  # fmt: skip
+_PRETTY = json.dumps(
+    {"schema": "backlog-v1", "active": [_ENTRY, {**_ENTRY, "id": "b", "status": "resolved"}]},
+    indent=2,
+)
+#: (code, file, committed, bad, where): a JSONL ledger names its line; a JSON document
+#: names the entry or key, since none of its lines is one commit's.
 _LEDGER_ROWS = [
-    ("LEDGER-BUGS-SCHEMA", "specs/bugs/BUGS.jsonl", "", '{"id": "broken"}\n'),  # the bug's repro
-    ("LEDGER-BUGS-SCHEMA", "specs/bugs/BUGS.jsonl", "{not json\n", "{not json\n"),  # invalid at HEAD too
-    ("LEDGER-BACKLOG-SCHEMA", "specs/backlog/BACKLOG.json", '{"schema": "backlog-v1", "active": []}', "{not json\n"),
-    ("LEDGER-FINDINGS-SCHEMA", "specs/audits/20260101-x/FINDINGS.jsonl", "", "{not json\n"),
-    ("LEDGER-RELEASE-SCHEMA", "specs/releases/1.0.0/_RELEASE.json", "{}\n", "{not json\n"),
+    ("LEDGER-BUGS-SCHEMA", "specs/bugs/BUGS.jsonl", "", '{"id": "broken"}\n', 1),  # the bug's repro
+    ("LEDGER-BUGS-SCHEMA", "specs/bugs/BUGS.jsonl", "{not json\n", "{not json\n", 1),  # invalid at HEAD too
+    ("LEDGER-BACKLOG-SCHEMA", "specs/backlog/BACKLOG.json", '{"schema": "backlog-v1", "active": []}', "{not json\n", "its JSON syntax (line 1)"),
+    ("LEDGER-BACKLOG-SCHEMA", "specs/backlog/BACKLOG.json", "", _PRETTY, "active[1]"),
+    ("LEDGER-FINDINGS-SCHEMA", "specs/audits/20260101-x/FINDINGS.jsonl", "", "{not json\n", 1),
+    ("LEDGER-RELEASE-SCHEMA", "specs/releases/1.0.0/_RELEASE.json", "{}\n", "{not json\n", "its JSON syntax (line 1)"),
 ]  # fmt: skip
 
 
-@pytest.mark.parametrize(("code", "rel", "committed", "bad"), _LEDGER_ROWS)
+@pytest.mark.parametrize(("code", "rel", "committed", "bad", "where"), _LEDGER_ROWS)
 def test_an_invalid_ledger_line_is_one_operator_action(
-    tmp_path: Path, code: str, rel: str, committed: str, bad: str
+    tmp_path: Path, code: str, rel: str, committed: str, bad: str, where: int | str
 ) -> None:
     """Intent: CONTRACT — AC4.5, sa-unfixable-doctor-findings-say-doctor-fix#S1: an
     invalid line is ONE finding whose fix is ADR 0158's `Operator action:` naming the
-    file, the line and the ledger's law — no verb rewrites a line no verb wrote."""
+    file, where in it, and the ledger's law; uncommitted content is discarded, else the
+    commit that introduced it is reverted — never a hand edit."""
     subprocess.run(["git", "init", "-q", str(tmp_path)], check=True)  # noqa: S603, S607
     ledger = tmp_path / rel
     ledger.parent.mkdir(parents=True)
@@ -116,32 +126,54 @@ def test_an_invalid_ledger_line_is_one_operator_action(
     ledger.write_text(bad)
     found = _findings_before(tmp_path, "--specs-dir", "specs")
     (fix,) = [f["fix"] for f in found if f["code"] == code]
-    assert fix.startswith("Operator action: ") and f"line 1 of {ledger.resolve()} " in fix, fix
-    assert "AGENTS.md" in fix and "<" not in fix and "by hand" not in fix, fix
-    remedy = (
-        "writes audit findings directly"
-        if "audits" in rel
-        else f"git log -L 1,1:{ledger.resolve()}"
-    )
-    assert remedy in fix, fix
+    path = ledger.resolve()
+    assert fix.startswith("Operator action: ") and "AGENTS.md" in fix, fix
+    assert "<" not in fix and "by hand" not in fix, fix
+    if "audits" in rel:  # a bound session writes findings directly: the governed act
+        assert f"line 1 of {path} " in fix and "writes audit findings directly" in fix, fix
+        return
+    finder = f"git log -L 1,1:{path}" if where == 1 else f"git log -p -- {path}"
+    assert f"`git checkout -- {path}`" in fix and finder in fix, fix
+    assert (f"line 1 of {path} " if where == 1 else f"{path} fails at {where} ") in fix, fix
+
+
+_RECORD = {"id": "a-bug", "ts": "2026-09-20T10:00:00Z", "reported_by": "e", "title": "t",
+           "severity": "LOW", "surface": "cli", "component": "c", "context": "x", "symptom": "s",
+           "repro": "r", "expected": "e", "status": "open", "cause": None, "caused_by": None,
+           "resolved_release": None, "audited": None, "closed_at": None}  # fmt: skip
+
+
+def _bugs(tmp_path: Path, *records: dict[str, object]) -> str:
+    """The doctor's one LEDGER-BUGS-SCHEMA fix over a ledger of *records*."""
+    subprocess.run(["git", "init", "-q", str(tmp_path)], check=True)  # noqa: S603, S607
+    ledger = tmp_path / "specs/bugs/BUGS.jsonl"
+    ledger.parent.mkdir(parents=True)
+    ledger.write_text("".join(json.dumps(r) + "\n" for r in records))
+    found = _findings_before(tmp_path, "--specs-dir", "specs")
+    return next(f["fix"] for f in found if f["code"] == "LEDGER-BUGS-SCHEMA")
 
 
 def test_a_dangling_caused_by_is_cleared_by_bugs_update(tmp_path: Path) -> None:
     """Intent: CONTRACT — AC4.5: a line a governance verb clears takes that verb with real
     values; run from elsewhere, `bugs.py update <id> --set caused_by=none` clears it."""
-    from tests.unit.skills.test_bug_resolution_bugs_script import _OPEN_RECORD
-
-    subprocess.run(["git", "init", "-q", str(tmp_path)], check=True)  # noqa: S603, S607
-    ledger = tmp_path / "specs/bugs/BUGS.jsonl"
-    ledger.parent.mkdir(parents=True)
-    ledger.write_text(json.dumps({**_OPEN_RECORD, "caused_by": "a-ghost"}) + "\n")
-    found = _findings_before(tmp_path, "--specs-dir", "specs")
-    (fix,) = [f["fix"] for f in found if f["code"] == "LEDGER-BUGS-SCHEMA"]
+    fix = _bugs(tmp_path, {**_RECORD, "caused_by": "a-ghost"})
     assert " update a-bug --set caused_by=none --specs " in fix, fix
     _run_from_elsewhere(tmp_path, fix)
     assert "LEDGER-BUGS-SCHEMA" not in {
         f["code"] for f in _findings(tmp_path, "--specs-dir", "specs")
     }
+
+
+def test_a_caused_by_cycle_is_an_operator_decision(tmp_path: Path) -> None:
+    """Intent: CONTRACT — AC4.5 (operator ruling 2026-10-02): which link of a cycle is wrong
+    is a judgement; the fix names the cycle's records and the law, and sets no value."""
+    fix = _bugs(
+        tmp_path,
+        {**_RECORD, "caused_by": "b-bug"},
+        {**_RECORD, "id": "b-bug", "caused_by": "a-bug"},
+    )
+    assert fix.startswith("Operator action: decide which of a-bug, b-bug ") and "update" in fix
+    assert "caused_by=none" not in fix and "<" not in fix and "AGENTS.md" in fix, fix
 
 
 def _workspace(tmp_path: Path) -> Path:

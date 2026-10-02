@@ -35,9 +35,11 @@ def finding(path: str, line: int, message: str, fix: str) -> dict[str, Any]:
     return _ledger.finding(CODE, path, line, message, fix)
 
 
-def _unwritten(path: str, line: int, message: str, root: Path) -> dict[str, Any]:
-    """A line of this ledger no `release.py` verb wrote."""
-    fix = _ledger.unwritten(root / path, line, "`release.py`", _LAW)
+def _unwritten(
+    path: str, line: int, message: str, root: Path, at: int | str | None = None
+) -> dict[str, Any]:
+    """Content of this ledger no `release.py` verb wrote: a histo line, or *at* a state key."""
+    fix = _ledger.unwritten(root / path, line if at is None else at, "`release.py`", _LAW)
     return finding(path, line, message, fix)
 
 
@@ -56,10 +58,15 @@ def state_findings(text: str, rel: str, root: Path = SPECS) -> list[dict[str, An
     try:
         document = json.loads(text)
     except json.JSONDecodeError as exc:
-        return [_unwritten(rel, exc.lineno, f"document is not valid JSON: {exc.msg}", root)]
+        message, at = (
+            f"document is not valid JSON: {exc.msg}",
+            f"its JSON syntax (line {exc.lineno})",
+        )
+        return [_unwritten(rel, exc.lineno, message, root, at)]
     schema = load_schema("release-state-v1")
     messages = list(validate(document, schema, schema, "state")) or _log_errors(document)
-    return [_unwritten(rel, 1, "; ".join(messages), root)] if messages else []
+    at = _ledger.keys(messages, "state") if messages else ""
+    return [_unwritten(rel, 1, "; ".join(messages), root, at)] if messages else []
 
 
 def histo_findings(text: str, root: Path = SPECS) -> list[dict[str, Any]]:
