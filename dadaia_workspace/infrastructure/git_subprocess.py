@@ -321,13 +321,13 @@ class GitSubprocessClient:
     def committed_text(self, path: Path, rel: str) -> str | None:
         """*rel* at HEAD, else at the newest commit touching it on a local branch or an
         ``origin`` remote-tracking ref — never another remote's (ADR 0048: local,
-        offline); ``None`` when none carries it."""
+        offline); ``None`` when none carries it (``-C``: *path* may not exist)."""
+        git = ["git", "-C", str(path)]
         newest = _run(
-            ["git", "log", "--branches", "--remotes=origin", "-n1", "--format=%H", "--", rel],
-            cwd=path,
+            [*git, "log", "--branches", "--remotes=origin", "-n1", "--format=%H", "--", rel]
         )
         for rev in ("HEAD", newest.stdout.strip()):
-            shown = _run(["git", "show", f"{rev}:{rel}"], cwd=path)
+            shown = _run([*git, "show", f"{rev}:{rel}"])
             if rev and shown.returncode == 0:
                 return shown.stdout
         return None

@@ -996,6 +996,17 @@ def test_dead_leaves_a_clean_published_detached_head(world: World) -> None:
     _dead_done(world)
 
 
+def test_dead_pushes_an_associated_repo_while_its_main_repo_is_absent(world: World) -> None:
+    """pre-push-gate-crashes-when-owner-main-repo-absent: dead's preflight reads the gitflow
+    through the same reader — an absent main repo is the default, never a traceback."""
+    _associated_on_integration(world)
+    world.git(world.ws / "repos" / "lib", "checkout", "-q", "-b", "feature/1.0.0")
+    shutil.rmtree(world.repo)
+    done = world.cli("context", "dead", "proj")
+    assert done.returncode == 0, done.stdout + done.stderr
+    _associated_dead(world)
+
+
 @pytest.mark.parametrize("case", _CASES)
 def test_the_fix_line_clears_the_refusal(case: Case, world: World) -> None:
     _drive(world, case)
