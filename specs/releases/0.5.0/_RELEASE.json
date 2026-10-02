@@ -741,6 +741,12 @@
       "agent": "dd-software-engineer",
       "kind": "note",
       "text": "Rename note (rc-7 AC3.14; F061): this release was born 0.4.8 (log entry 0, 'Release 0.4.8 born', 2026-09-24T05:07:01Z) and renamed 0.4.8 -> 0.5.0 by operator order at f61be1a04 (2026-09-24, grill Q11, 'Release-As: 0.5.0'): one release carries candidate 1 onward. Every entry before that commit names the release by its birth id; no entry is rewritten."
+    },
+    {
+      "ts": "2026-10-02T16:21:19Z",
+      "agent": "dd-software-engineer",
+      "kind": "drifts",
+      "text": "ADR 0019 measured_by (SPEC Decisions, rc-7 PLAN section 4): SPEC:36 asked the repair in the commit that deletes its unit; the impl kind holds no specs/ADRs/decisions.jsonl, so T-050-132 (c3c172b61, done eee39eacf) deleted SPEC-DOC-048 and test_spec_doc_048_origin.py, and the ADR 0138-lane repair landed in its own release-worktree commit acb916e71 (measured_by = pytest tests/contract/test_release_script.py), right after the merge, per the main-thread ruling on Q1. The deviation is the commit split only; the measured_by points at a live test."
     }
   ]
 }
