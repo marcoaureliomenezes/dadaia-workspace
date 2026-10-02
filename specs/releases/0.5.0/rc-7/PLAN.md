@@ -176,7 +176,7 @@ Bug-history lessons (audit of the fix chain):
 - Floor messages: a mapping beside `CORE_FLOOR`; `evaluate` reads it; the session fix is `context bind <bound context>`, unbound `context list`; `classify_path`'s docstring states projected → floor → glob.
 - `DADAIA_BIN` and the `ci preflight` advice leave the hook; `venv_guard` and `ci_preflight` lose their arms; release-please leaves getting-started.
 - `--help`: each example renders through `cli_line`.
-- Sites: root BLOCK `mkdir_line(<ws>/.dadaia/tmp/<agent_type|main-thread>/<YYYYMMDD>)`; pre-push names the live work branch; `doctor --context nosuch` one `context list`; onboarding Next `Operator action:` with real values; `sweep.remove` names its own target in the advice (`Operator action: remove <real path>`), its outcome arm `except OSError` (the Python 3.14 rmtree fix, 2155d001); `guarded` stays generic; `_bound_tree` names the open worktree of the ledger's kind, else `worktree.py new <r> --kind <kind>`; the two `ship --pr <n>` sites (T-050-149: `release.py:109`, and `_release_phase.py:81` through `set_phase`'s refusal at :97) print `Operator action:` with every other value real, since the PR number exists only once the PR is opened (main-thread ruling 2026-10-01, T-050-147 review F6).
+- Sites: root BLOCK `mkdir_line(<ws>/.dadaia/tmp/<agent_type|main-thread>/<YYYYMMDD>)`; pre-push names the live work branch; `doctor --context nosuch` one `context list`; onboarding Next `Operator action:` with real values; `sweep.remove` names its own target in the advice (`Operator action: remove <real path>`), its outcome arm `except OSError` (the Python 3.14 rmtree fix, 2155d001); `guarded` stays generic; `_bound_tree` names the open worktree of the ledger's kind, else `worktree.py new <r> --kind <kind>`; the two `ship --pr <n>` sites (T-050-149: `release.py:109`, and `_release_phase.py:81` through `set_phase`'s refusal at :97) print `Operator action:` with every other value real, since the PR number exists only once the PR is opened (main-thread ruling 2026-10-01, T-050-147 review F6). T-050-151 (operator ruling 2026-10-02: the AC4.4 probe went RED outside T-050-149's `W:`), 25 sites, each its real value where the code knows it, else `Operator action: <one act>`, never `cd … && …`: `f/spec_context/service.py:429,488,662` (`<clone-url>`), `:710` (`checkout -b <flow.work_pattern>`); `cli/commands/context.py:208,412`; `infrastructure/git_subprocess.py:252`; `f/spec_context/doctor.py:670` HOOKS-DRIFT-1 `--repo '<repo>'` (`rule_fix` fills only `<specs>`); `f/specs/doctor_adr.py:118` LEDGER-ADR-SCHEMA's `sed -i` (a ledger hand edit); `core/workspace_resolver.py:104`; `_release_store.py:81,98`; `_audit_verbs.py:40,82,90`; `_backlog_write.py:49,55,63`; `bugs.py:124` (`cd <the context's git repo> && …`); `_bugs_transition.py:57,63`; `_bugs_write.py:53,61,68,86`. Not sites: `_worktree_git.py:108` (placeholder in the message), GITFLOW-1 and SPEC-DOC-041 (`<specs>` filled by `rule_fix`).
 - Each ledger `check`: one finding per invalid line; fix = the governance verb with real values where one clears it, else `Operator action:` naming file, line and law; `check` is never a fix (AC4.5, operator ruling 2026-10-01); `_finding`'s fallback leaves.
 - Δ prod ≈ +4, tests ≈ +30.
 
@@ -235,8 +235,9 @@ Bug-history lessons (audit of the fix chain):
 | 2 | T-050-136, T-050-137, T-050-138, T-050-144, T-050-145 | 5 | one impl worktree each |
 | 3 | T-050-135, T-050-139, T-050-140, T-050-142, T-050-146 | 5 | one impl worktree each |
 | 4 | T-050-143, T-050-147, T-050-148 | 3 | one impl worktree each |
-| 5 | T-050-149 | 1 | one impl worktree |
-| 6 | T-050-150 | 1 | measure; closure in the release worktree |
+| 5 | T-050-151 | 1 | one impl worktree (operator ruling 2026-10-02) |
+| 6 | T-050-149 | 1 | one impl worktree |
+| 7 | T-050-150 | 1 | measure; closure in the release worktree |
 
 - True edges:
   - 136 needs 131 (`_ledger.records`) and 132 (`doctor_governance.py`);
@@ -248,8 +249,9 @@ Bug-history lessons (audit of the fix chain):
   - 146 needs 134 (`hooks/root_whitelist.py`, its test);
   - 143 needs 134, 136, 137, 138, 139 (final owners) and 141 (`gate_policy.py`); 147 needs 133, 136, 138, 139, 140 (every check, `_ledger.py`, `ledger_scripts.py`);
   - 148 needs 132, 137, 142, 144 (scaffold releases, RC-FLOW, the law test, getting-started);
-  - 149 needs 141, 144, 145, 146, 147, 148 (the sites and the shipped text it judges); 150 needs all.
-- Critical path: T-050-132 → T-050-137 → T-050-140 → T-050-147 → T-050-149 → T-050-150 = 6 steps.
+  - 151 needs no open task (its files' prior writers merged in steps 1-4); it runs alone ahead of 149, whose harness test it shares;
+  - 149 needs 141, 144, 145, 146, 147, 148, 151 (the sites and the shipped text it judges); 150 needs all.
+- Critical path: T-050-132 → T-050-137 → T-050-140 → T-050-147 → T-050-151 → T-050-149 → T-050-150 = 7 steps.
 - Overlap check: disjoint in every step except `TASKS.md`, the `*.jsonl` ledgers and the derived `pub/entities/behavior-map.json`.
 - `bug` worktrees: none opens while T-050-133 runs; every DEL resolve tail opens after T-050-133 merges or batches at G3.
 - Merge order inside a step: ready order; after each merge every open sibling rebases onto `feature/0.5.0`.
