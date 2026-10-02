@@ -38,21 +38,6 @@ Measured by: `pytest tests/contract/test_test_suite_ratchets.py -k v26` (AST-exa
 ADR: none
 Rationale: a test reaching into a private symbol turns a safe refactor red.
 
-### P-24 · We declare intent at birth: the count of test files whose module docstring carries `Intent: <KIND> — <ref>` ratchets upward only.
-Measured by: `pytest tests/contract/test_test_suite_ratchets.py -k v31` (the test module is the ceiling's numeric home, per tier).
-ADR: none
-Rationale: an undeclared test is SCAFFOLD by default.
-
-### P-25 · We expire SCAFFOLD: every `Intent: SCAFFOLD` names `expires: <M.m.p>`, and one naming an archived release is red until renewed by a `code-reviewer` verdict.
-Measured by: `pytest tests/contract/test_test_suite_ratchets.py -k v28`.
-ADR: none
-Rationale: a temporary test that never expires is a permanent cost.
-
-### P-26 · We keep one number per parameter: `dd-test-stewardship`'s `PARAMETERS.md` is the LARGE cap's only literal home; every other doctrine file references it.
-Measured by: `pytest tests/contract/test_test_suite_ratchets.py -k v29` (competing-home ceiling, ratchet down only).
-ADR: none
-Rationale: two homes for one parameter guarantee two different values.
-
 ### P-28 · We keep the pytest marker set closed and single-sourced: `pyproject.toml`'s `markers` equals `tests/conftest.py`'s `_KNOWN_MARKERS`, and `flaky`/`quarantine` are always among them.
 Measured by: `pytest tests/contract/test_stewardship_mechanics.py -k marker_set`.
 ADR: none
