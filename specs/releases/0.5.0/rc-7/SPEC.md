@@ -5,7 +5,7 @@
 **Owner:** dd-product-engineer
 **Opened:** 2026-10-01
 **Origin:** backlog:ledger-schema-one-engine,structural-convergence-f053-f054-f057,consumer-guidance-names-no-library-toolchain,seventh-fail-open-path-law-line,task-line-grammar-one-reader; bugs:spec-origin-line-has-two-readers,task-line-grammar-accepts-a-malformed-open-marker,privacy-denylist-has-two-loaders,release-ship-accepts-what-release-check-refuses,bugs-check-trusts-evidence-fields-unverified,release-new-crashes-on-a-unicode-line-separator-in-the-bug-ledger,corrupt-context-registry-crashes-doctor-and-next-step,list-form-privacy-denylist-errors-without-migration,secret-scan-misses-github-pat-and-anthropic-keys,release-check-accepts-done-tasks-in-definition,gitflow-shape2-omits-backlog-histo,dadaia-bin-still-honoured-after-adr-0045,help-examples-spell-the-blocked-bare-cli,fix-lines-are-not-one-runnable-command,ledger-finding-fix-line-orders-a-hand-edit-the-law-forbids,implementer-persona-states-a-second-task-marker-lifecycle,doctor-tmp-expiry-foreign-owned-entry-never-clears,rc-flow-asks-compliance-line-doctor-never-prints; findings:20260930-structural-convergence-F002,20260930-structural-convergence-F007,20260930-structural-convergence-F010,20260930-structural-convergence-F012,20260930-structural-convergence-F013,20260930-structural-convergence-F016,20260930-structural-convergence-F017,20260930-structural-convergence-F024,20260930-structural-convergence-F029,20260930-structural-convergence-F030,20260930-structural-convergence-F031,20260930-structural-convergence-F032,20260930-structural-convergence-F033,20260930-structural-convergence-F034,20260930-structural-convergence-F035,20260930-structural-convergence-F036,20260930-structural-convergence-F037,20260930-structural-convergence-F038,20260930-structural-convergence-F039,20260930-structural-convergence-F040,20260930-structural-convergence-F041,20260930-structural-convergence-F052,20260930-structural-convergence-F053,20260930-structural-convergence-F054,20260930-structural-convergence-F057,20260930-structural-convergence-F058,20260930-structural-convergence-F059,20260930-structural-convergence-F061,20260930-structural-convergence-F063,20260930-structural-convergence-F080,20260930-structural-convergence-F099,20260930-structural-convergence-F102,20260930-structural-convergence-F103
-- Sources: rc-6's §Carried W3/W4 rows, closure log and reviews (step 7b, PR #276); operator order 2026-09-30; the 2026-10-01 batch grill, D1–D6.
+- Sources: rc-6's §Carried W3/W4 rows, closure log and reviews (step 7b, PR #276); operator order 2026-09-30; the 2026-10-01 batch grill, D1–D6; operator demand 2026-10-02 on ADR 0168 ("Accept, implement in rc-7"), carried as AC3.19. ADR 0161's grammar makes `operator-demand` a whole line, never a clause, so this bullet records it.
 - The line is in the ADR 0161 form, rewritten at closure (AC3.2): 5 entries, 18 bugs, 33 findings. Each AC names its bugs as DEL or FR; §Origin map places every id no AC names. `task-line-grammar-one-reader` exits `to-bug`. No bug is registered.
 - At 44d023e6 every carried id is non-terminal: 18 bugs open, 5 entries active, 29 findings open, F053, F054, F057, F080 deferred.
 
@@ -31,7 +31,7 @@
 ## Decisions
 
 - These ADRs decide: 0018, 0019, 0045, 0106, 0111, 0119, 0122, 0123, 0126, 0127, 0135, 0136, 0137, 0140, 0141, 0142, 0146, 0150, 0152.
-- Accepted, one record per ruling (operator, 2026-10-01: "Aceito D1–D6 (Recomendado); Aceito 0157–0162 (Recomendado)"): D1 0157 and D6 0162 amend 0135; D2 0158 and D3 0159 amend 0045; D4 0160; D5 0161 amends 0019. 0158 also narrows 0018's "every fix line names a script or verb".
+- Accepted, one record per ruling (operator, 2026-10-01: "Aceito D1–D6 (Recomendado); Aceito 0157–0162 (Recomendado)"): D1 0157 and D6 0162 amend 0135; D2 0158 and D3 0159 amend 0045; D4 0160; D5 0161 amends 0019. 0168 (proposed; operator ruling 2026-10-02: "Accept, implement in rc-7") amends 0110 at acceptance. 0158 also narrows 0018's "every fix line names a script or verb".
 - 0161's "doctor_release and backlog.py exit import it" narrows to `backlog.py exit`: SPEC-DOC-048 leaves (AC3.2), so `doctor_release` reads no Origin.
 - Dead `measured_by` repaired in place (the ADR 0138 lane, as 0138 did), each in the commit that deletes its unit and citing the ADR (0151 M3): 0019 (SPEC-DOC-048, `test_spec_doc_048_origin.py`) → `release.py check`'s Origin cases (AC3.2); 0018 and 0073 (`test_every_block_carries_a_fix.py`) → the AC4.1 harness.
 - No new record: the doctor delegating to each script's `check` is 0018's; shape 5's "+ picked bugs" leaves by 0106 and 0127; the backlog kind admitting `BUGS.jsonl` is 0137's "one worktree".
@@ -123,6 +123,10 @@
   - The message for each floor entry lives beside `CORE_FLOOR` in `core/workspace_layout.py`, and `gate_policy.evaluate` keys none on a string literal.
   - `classify_path`'s docstring states `_protection`'s order: projected → floor → glob.
   - Command: `pytest tests/unit/features/spec_context/test_gate_policy.py`.
+- AC3.19 A verdict survives a patch-identical rebase (0168; operator demand 2026-10-02):
+  - `worktree.py merge` accepts an APPROVED `dd-code-reviewer` verdict naming a sha X from the branch's own reflog (`git reflog wt/<name>`) when the series of (`git patch-id --stable`, full commit message) pairs over `<work>..X` equals the series over `<work>..HEAD`, in order; X equal to HEAD is the same rule.
+  - Any difference refuses for review with the `reports validate` fix (0158): a changed patch, a reworded message, an added or dropped commit, a TASKS marker replay (0111) that changes a patch, or an X outside the branch's reflog.
+  - Command: `pytest tests/integration/test_worktree_lifecycle.py`.
 
 ## W4 — one text renderer: acceptance
 
@@ -176,6 +180,7 @@
 - §3a's "alone" clauses, `chore(adrs)` and "+ picked bugs".
 - `LINEAGE.md`'s "no per-release `_RELEASE.json` survives archiving".
 - `gate_policy`'s string-literal floor keys.
+- `worktree.py merge`'s exact-HEAD verdict match and worktrees law §2 step 6's "a rebase after review changes the sha: review again", for a patch-identical rebase (0168 amends 0110).
 - `DADAIA_BIN` at three sites.
 - Hand-spelled `--help` examples.
 - `ledger_scripts._finding`'s hand-edit fallback.
