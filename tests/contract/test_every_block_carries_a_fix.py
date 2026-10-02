@@ -60,13 +60,14 @@ def _defect(fix: str) -> bool:
     """The ONE predicate: *fix* is `Operator action: <one act>`, or one command whose head is
     no prose word (a lowercase word is an executable on PATH); `·` is a value the source
     walk cannot know."""
-    if fix.startswith("Operator action: ") or "·" in fix:  # an act, or text half-known
+    known = fix.split("·", 1)[0]  # the text before the first value the walk cannot know
+    if fix.startswith("Operator action: ") or " " not in known.strip() and "·" in fix:
         return bool(_NOT_ONE_ACT_RE.search(fix))
-    head = fix.split(" ", 1)[0]
+    head = known.split(" ", 1)[0]
     prose = re.fullmatch(r"[a-z][a-z-]*", head) and not (
         shutil.which(head) or head in _PREREQUISITES
     )
-    return bool(prose or _NOT_ONE_COMMAND_RE.search(fix))
+    return bool(prose or _NOT_ONE_ACT_RE.search(fix) or _NOT_ONE_COMMAND_RE.search(known))
 
 
 _SHA_B, _ZERO = "b" * 40, "0" * 40
@@ -544,12 +545,12 @@ def _code_sites(trees: dict[str, ast.Module]) -> list[str]:
             and "fix" in (names := [a.arg for a in fn.args.args if a.arg != "self"])
         }
 
-    every = {**_FIX_CTORS, **fix_params(n for t in trees.values() for n in ast.walk(t))}
-    every |= {f"{PurePosixPath(rel).stem}.{name}": at for rel, t in trees.items()
-              for name, at in fix_params(ast.walk(t)).items()}  # `module.func`, qualified  # fmt: skip
+    local = {rel: fix_params(ast.walk(t)) for rel, t in trees.items()}
+    every = {**_FIX_CTORS, **{n: at for params in local.values() for n, at in params.items()}}
+    every |= {f"{PurePosixPath(rel).stem}.{n}": at for rel, params in local.items() for n, at in params.items()}  # fmt: skip
     sites: set[str] = set()
     for rel, tree in trees.items():
-        fix_param = {**every, **fix_params(ast.walk(tree))}  # a local `def` wins its name
+        fix_param = {**every, **local[rel]}  # a local `def` wins its name
         defs = {n.name: n for n in ast.walk(tree) if isinstance(n, ast.FunctionDef)}
         docs = {id(n.body[0].value) for n in ast.walk(tree)
                 if isinstance(n, ast.Module | ast.FunctionDef | ast.ClassDef) and n.body
@@ -592,7 +593,8 @@ def _code_sites(trees: dict[str, ast.Module]) -> list[str]:
                     ]
                 text = getattr(node, "value", None) if isinstance(node, ast.Constant) else None
                 told = isinstance(text, str) and id(node) not in docs and instruction.search(text)
-                alts = [fix.strip() for fix in fixes if fix.strip()]
+                # a value carrying its own message keeps only what follows its `fix: `
+                alts = [a.strip() for f in fixes for a in f.split("fix: ")[1:] or [f] if a.strip()]
                 hand = not spelled and any(_SPELLING.search(a) for a in alts)
                 if hand or any(map(_defect, alts)) or (told and rel != _BUILDER):
                     sites.add(f"{rel}:{node.lineno}")

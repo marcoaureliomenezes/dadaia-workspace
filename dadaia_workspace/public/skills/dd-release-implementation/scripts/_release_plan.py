@@ -13,9 +13,7 @@ AS_IS = re.compile(r"^##[ \t].*\bas[- ]is review", re.IGNORECASE | re.MULTILINE)
 AUTHORITIES = re.compile(r"^###[ \t].*\bAuthorities\b", re.IGNORECASE | re.MULTILINE)
 SCHEDULE = re.compile(r"^##[ \t].*\bParallel schedule", re.IGNORECASE | re.MULTILINE)
 SKILL = Path(__file__).resolve().parents[2] / "dd-release-definition" / "SKILL.md"
-PLAN_FIX = (
-    f"copy the PLAN skeletons of {SKILL} — §1 As-is review, §5 Parallel schedule — into PLAN.md"
-)
+PLAN_FIX = f"Operator action: copy the PLAN skeletons of {SKILL} — §1 As-is review, §5 Parallel schedule — into PLAN.md"
 _ID = r"T-\d+(?:-\d+)*"
 
 
