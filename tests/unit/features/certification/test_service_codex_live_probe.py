@@ -5,8 +5,7 @@ installed-but-unentitled Codex is the same honest SKIP as an absent one);
 certify-skip-detail-leaks-full-codex-output (CWE-532: SKIP/FAIL detail carries only the parsed
 upstream message, length-capped — never the banner's workdir/session id, never a raw blob).
 
-A FAKE ``CertificationProcess`` answers; the live probe is
-tests/integration/features/certification/test_codex_live_probe_live.py.
+A FAKE ``CertificationProcess`` answers; the live probe runs only under ``dadaia certify``.
 """
 
 from __future__ import annotations
