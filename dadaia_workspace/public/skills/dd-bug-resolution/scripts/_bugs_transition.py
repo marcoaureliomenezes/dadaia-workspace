@@ -16,7 +16,8 @@ from typing import Any
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from _bugs_store import Records, Refusal, by_id  # noqa: E402
-from _bugs_write import _SCRIPT, _set, now_iso  # noqa: E402
+from _bugs_write import _set, now_iso  # noqa: E402
+from _specs import choice  # noqa: E402
 
 REQUIRED_BY_VERB = {
     "resolve": ("cause", "caused_by", "resolved_release", "solution",
@@ -45,29 +46,21 @@ def transition(records: Records, bug_id: str, verb: str, values: dict[str, Any],
     A resolve's seam is read under *root*, the repo the ledger belongs to."""
     missing = [name for name in REQUIRED_BY_VERB[verb] if not (values.get(name) or "").strip()]
     if missing:
-        raise Refusal(
-            f"transition {verb!r} refused — {', '.join(repr(m) for m in missing)} required",
-            f"Operator action: run `{_SCRIPT} {verb} {bug_id}` with "
-            + ", ".join(f"--{m.replace('_', '-')}" for m in missing)
-            + " set",
-        )
+        refusal = Refusal(f"transition {verb!r} refused — {', '.join(map(repr, missing))} required")
+        raise choice(refusal, f"with {', '.join('--' + m.replace('_', '-') for m in missing)} set")
     record = by_id(records, bug_id)
     updated = dict(record)
     if verb == "resolve":
         if not _EVIDENCE_DIFF_RE.match(values["evidence_diff"]):
-            raise Refusal(
-                "'evidence_diff' must match '^(net-negative|net-positive|net-neutral): "
-                "<rationale>'",
-                f"Operator action: run `{_SCRIPT} resolve {bug_id}` with --evidence-diff set to "
-                "net-negative, net-positive or net-neutral, a colon and why",
-            )
+            refusal = Refusal("'evidence_diff' must match '^(net-negative|net-positive|"
+                              "net-neutral): <rationale>'")  # fmt: skip
+            raise choice(refusal, "with --evidence-diff set to net-negative, net-positive or "
+                         "net-neutral, a colon and why", "--evidence-diff")  # fmt: skip
         if not _seam_exists(values["evidence_seam"], root):
-            raise Refusal(
-                f"evidence_seam {values['evidence_seam']!r} names no file or 'def <name>' "
-                f"under {root}",
-                f"Operator action: run `{_SCRIPT} resolve {bug_id}` with --evidence-seam set to "
-                f"a test file under {root}, :: and its test name",
-            )
+            refusal = Refusal(f"evidence_seam {values['evidence_seam']!r} names no file or "
+                              f"'def <name>' under {root}")  # fmt: skip
+            raise choice(refusal, f"with --evidence-seam set to a test file under {root}, :: "
+                         "and its test name", "--evidence-seam")  # fmt: skip
         for key in REQUIRED_BY_VERB["resolve"]:
             _set(updated, key, values[key])
     elif verb == "supersede":

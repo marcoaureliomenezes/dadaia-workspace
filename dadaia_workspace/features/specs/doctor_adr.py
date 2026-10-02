@@ -13,6 +13,7 @@ from __future__ import annotations
 import re
 from contextlib import suppress
 from pathlib import Path
+from types import ModuleType
 
 from dadaia_workspace.core.doctor_rules import Rule, SectionFinding
 from dadaia_workspace.features.specs.doctor_types import Severity, specs_finding
@@ -85,18 +86,20 @@ def adr_record_issues(specs_dir: Path) -> list[SectionFinding]:
         try:
             parsed = owner.parse(raw)
         except owner.LineError as exc:
-            issues.append(_record_issue(ledger, number, f"line {exc}"))
+            issues.append(_record_issue(owner, ledger, number, f"line {exc}"))
             continue
         for record in parsed:
             records.append((number, record))
             issues.extend(
-                _record_issue(ledger, number, m)
+                _record_issue(owner, ledger, number, m)
                 for m in owner.validate(record, schema, schema, "record")
             )
     for position, (number, record) in enumerate(records, start=1):
         if (adr_id := record.get("id")) != (want := f"{position:04d}"):
             issues.append(
-                _record_issue(ledger, number, f"id {adr_id!r} breaks 0001..N: expected {want}")
+                _record_issue(
+                    owner, ledger, number, f"id {adr_id!r} breaks 0001..N: expected {want}"
+                )
             )
             break
     accepted = {str(r.get("id")) for _, r in records if r.get("status") == "accepted"}
@@ -104,7 +107,9 @@ def adr_record_issues(specs_dir: Path) -> list[SectionFinding]:
         named = f"{r.get('supersedes') or ''},{r.get('amends') or ''}".split(",")
         ruled = r.get("status") == "accepted" and "ruling" in r
         if r.get("status") != "rejected" and not ruled and (hit := sorted(accepted & set(named))):
-            issues.append(_record_issue(ledger, number, f"changes accepted {hit} without a ruling"))
+            issues.append(
+                _record_issue(owner, ledger, number, f"changes accepted {hit} without a ruling")
+            )
     return issues
 
 
@@ -112,13 +117,13 @@ def adr_record_issues(specs_dir: Path) -> list[SectionFinding]:
 _VERBS, _LAW = "a `docs(adr)` propose or accept commit", "the ADR law, specs/ADRs/AGENTS.md"
 
 
-def _record_issue(ledger: Path, line: int, message: str) -> SectionFinding:
+def _record_issue(owner: ModuleType, ledger: Path, line: int, message: str) -> SectionFinding:
     return specs_finding(
         code="LEDGER-ADR-SCHEMA",
         severity=Severity.ERROR,
         description=message,
         path=f"{LEDGER}:{line}",
-        fix=load_owner("dd-bug-resolution", "_ledger").unwritten(ledger, line, _VERBS, _LAW),
+        fix=owner.unwritten(ledger, line, _VERBS, _LAW),
     )
 
 

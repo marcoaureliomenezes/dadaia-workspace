@@ -27,6 +27,16 @@ from _audit_store import (  # noqa: E402
     read_findings,
     write_findings,
 )
+from _specs import choice  # noqa: E402
+
+
+def _live(specs: Path, audit: str) -> Path:
+    try:
+        return audit_dir(specs, audit, "")
+    except Refusal as refusal:
+        raise choice(
+            refusal, "with one of the live audits listed above in its place", audit
+        ) from None
 
 
 def disposition(specs: Path, audit: str, finding_id: str, values: dict[str, Any]) -> str:
@@ -34,25 +44,18 @@ def disposition(specs: Path, audit: str, finding_id: str, values: dict[str, Any]
     identical. Refuses — writing nothing — an unknown audit or finding, a word outside
     the one finding vocabulary, or a verdict missing the evidence it requires."""
     verdict = values["disposition"]
-    rerun = f"{SCRIPT} disposition {audit} {finding_id}"
-    directory = audit_dir(specs, audit, f"Operator action: run `{SCRIPT} disposition` again "
-                                        "with one of the live audits listed above")  # fmt: skip
+    directory = _live(specs, audit)
     if verdict not in DISPOSITIONS:
-        raise Refusal(
-            f"unknown disposition {verdict!r}: a finding is dispositioned as one of "
-            f"{'|'.join(DISPOSITIONS)}",
-            f"Operator action: run `{rerun}` with --disposition set to one of "
-            f"{', '.join(DISPOSITIONS)} and the evidence it requires",
-        )
+        refusal = Refusal(f"unknown disposition {verdict!r}: a finding is dispositioned as one "
+                          f"of {'|'.join(DISPOSITIONS)}")  # fmt: skip
+        raise choice(refusal, f"with --disposition set to one of {', '.join(DISPOSITIONS)}",
+                     "--disposition")  # fmt: skip
     required = REQUIRED_EVIDENCE[verdict]
     if not (values.get(required) or "").strip():
         needed = "the release that fixed it" if required == "release" else "why it was not fixed"
-        raise Refusal(
-            f"disposition {verdict!r} requires --{required}: the finding's governance "
-            "triple is the only surviving record of how it was closed",
-            f"Operator action: run `{rerun} --disposition {verdict}` with --{required} set to "
-            f"{needed}",
-        )
+        refusal = Refusal(f"disposition {verdict!r} requires --{required}: the finding's "
+                          "governance triple is the only surviving record of how it was closed")  # fmt: skip
+        raise choice(refusal, f"with --{required} set to {needed}", f"--{required}")
     records = read_findings(directory)
     known = [str(record.get("id")) for record in records]
     if finding_id not in known:
@@ -73,17 +76,14 @@ def disposition(specs: Path, audit: str, finding_id: str, values: dict[str, Any]
 
 def close(specs: Path, audit: str, sha: str) -> str:
     """Append the audit's ONE histo record, then delete the directory."""
-    directory = audit_dir(specs, audit, f"Operator action: run `{SCRIPT} close` again with one "
-                                        f"of the live audits listed above and --sha {sha}")  # fmt: skip
+    directory = _live(specs, audit)
     records = read_findings(directory)
     open_ids = [str(r.get("id")) for r in records if r.get("disposition") not in DISPOSITIONS]
     if open_ids:
-        raise Refusal(
-            f"audit {audit!r} still carries {len(open_ids)} undispositioned finding(s): "
-            f"{', '.join(open_ids)}. Every finding gets a disposition before the audit closes",
-            f"Operator action: run `{SCRIPT} disposition {audit} {open_ids[0]}` with the "
-            "--disposition it earned and the evidence that requires",
-        )
+        refusal = Refusal(f"audit {audit!r} still carries {len(open_ids)} undispositioned "
+                          f"finding(s): {', '.join(open_ids)}. Every finding gets a disposition "
+                          "before the audit closes", f"{SCRIPT} disposition {audit} {open_ids[0]}")  # fmt: skip
+        raise choice(refusal, "with the --disposition it earned and the evidence that requires")
     releases = sorted({str(r["release"]) for r in records if r.get("release")})
     if len(releases) > 1:
         other = next(r["id"] for r in records if r.get("release") and r["release"] != releases[0])

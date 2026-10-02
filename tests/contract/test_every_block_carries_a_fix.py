@@ -607,6 +607,8 @@ _FIX_CALL_RE = re.compile(r"(_line|_fix|^script)$")
 #: Pending until T-050-149 (2026-10-02), which owns the `ship --pr <n>` sites of these two
 #: scripts (release.py:109, _release_phase.py:81) and deletes this entry.
 _PENDING_T_050_149 = ("release.py", "_release_phase.py")
+#: A builder spelling a command inside error prose with no `fix:` line (PLAN §2.8 not-sites).
+_PROSE = {"dadaia_workspace/cli/_specs_resolution.py:64", "dadaia_workspace/core/invocation.py:250"}
 
 
 def _callee(node: ast.Call) -> str:
@@ -637,6 +639,8 @@ def _render(node: Any, scope: dict[str, list[Any]], defs: dict[str, Any], depth:
             return str(getattr(DEFAULT, attr, "·"))
         case ast.Call(func=ast.Attribute(attr="join"), args=[arg]):
             return again(arg)
+        case ast.Call(func=ast.Attribute(attr="get", value=table)):  # a fix table's lookup
+            return again(table)
         case ast.Call(func=ast.Attribute(value=receiver)) if not isinstance(receiver, ast.Name):
             return again(receiver)
         case ast.Call() if _FIX_CALL_RE.search(_callee(node)) or _callee(node)[:1].isupper():
@@ -663,7 +667,9 @@ def _scope(node: Any, outer: dict[str, list[Any]]) -> dict[str, list[Any]]:
 
 def _placeholder_sites() -> list[str]:
     """`file:line` of each fix a package module or a `public/skills` script can print that
-    is not one command: a `fix:` text, a `fix` parameter's argument, a builder's arguments."""
+    is not one command: a `fix:` text, a `fix` parameter's argument, a builder's arguments.
+    Ceilings — what the walk cannot see: a helper's return in another module, `str.format`,
+    `print("fix:", x)` with separate arguments, and a returned dict literal."""
     modules = sorted((_REPO_ROOT / "dadaia_workspace").rglob("*.py"))
     trees = {path: ast.parse(path.read_text(encoding="utf-8")) for path in modules}
     fix_param = {  # each callable taking `fix` (a class: its __init__), and its position
@@ -676,10 +682,6 @@ def _placeholder_sites() -> list[str]:
     sites: set[str] = set()
     for path, tree in trees.items():
         defs = {n.name: n for n in ast.walk(tree) if isinstance(n, ast.FunctionDef)}
-        prose = {id(v.value) for n in ast.walk(tree) if isinstance(n, ast.JoinedStr)  # `Run '…'`
-                 and not any("fix: " in str(getattr(v, "value", "")) for v in n.values)
-                 for v in n.values if isinstance(v, ast.FormattedValue)
-                 and isinstance(v.value, ast.Call) and _callee(v.value).endswith("_line")}  # fmt: skip
         module = _scope(tree, {})
         for unit in [tree, *defs.values()]:
             scope = module if unit is tree else _scope(unit, module)
@@ -689,16 +691,17 @@ def _placeholder_sites() -> list[str]:
                     at = fix_param.get(_callee(node), -1)
                     carried = [*node.args[at : at + 1 if at >= 0 else 0],
                                *(k.value for k in node.keywords if k.arg == "fix")]  # fmt: skip
-                    if _FIX_CALL_RE.search(_callee(node)) and id(node) not in prose:
+                    if _FIX_CALL_RE.search(_callee(node)):
                         carried.append(node)
                     fixes = [_render(c, scope, defs) for c in carried]
                 elif isinstance(node, ast.Constant | ast.JoinedStr | ast.BinOp):
                     fixes = _render(node, scope, defs).split("fix: ")[1:]
                 for fix in fixes:
-                    pending = path.name in _PENDING_T_050_149 and "--pr <n>" in fix
-                    if _NOT_ONE_COMMAND_RE.search(fix) and not pending:
-                        sites.add(f"{path.relative_to(_REPO_ROOT)}:{node.lineno}")
-    return sorted(sites)
+                    if path.name in _PENDING_T_050_149:
+                        fix = fix.replace("--pr <n>", "")
+                    if _NOT_ONE_COMMAND_RE.search(fix):
+                        sites.add(f"{path.relative_to(_REPO_ROOT).as_posix()}:{node.lineno}")
+    return sorted(sites - _PROSE)
 
 
 def test_no_fix_the_package_prints_carries_a_placeholder_or_a_chain() -> None:

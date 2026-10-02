@@ -425,8 +425,7 @@ class SpecContextService:
     def show(self, name: str) -> SpecContextProject:
         ctx = self._store.get(name)
         if ctx is None:
-            create = fix_line(self._workspace_root, "context", "create", name, "--main-repo")
-            fix = f"Operator action: run {create} with the main repo's clone URL"
+            fix = fix_line(self._workspace_root, "context", "list")
             raise ContextNotFoundError(f"Context '{name}' not found.\nfix: {fix}")
         return ctx
 
@@ -710,7 +709,7 @@ class SpecContextService:
                     f"{lead} is on '{branch or 'a detached HEAD'}', which the gitflow never "
                     "pushes directly — dead() would commit and push its changes there. "
                     "Nothing was touched.\nfix: "
-                    + git_line(path, "checkout", "-b", work_branch(path / "specs", flow))
+                    + git_line(path, "checkout", "-b", work_branch(main_repo / "specs", flow))
                 )
 
     def dead(self, name: str, *, commit: bool = False) -> SpecContextProject:

@@ -12,6 +12,7 @@ from typing import Any
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from _backlog_store import SCRIPT, Items, Refusal  # noqa: E402
+from _specs import choice  # noqa: E402
 
 _SLUG_RE = re.compile(r"^[a-z][a-z0-9-]+$")
 _INTENT_RE = re.compile(r"^(?P<kind>[a-z]+):(?P<ref>[^=]+)=(?P<change>.+)$", re.DOTALL)
@@ -46,27 +47,21 @@ def new_entry(active: Items, slug: str, values: dict[str, Any]) -> Items:
     the one status exempt from the typed-intents requirement, so it is doctor-clean with
     no further edits."""
     if not _SLUG_RE.fullmatch(slug):
-        raise Refusal(
-            f"invalid slug {slug!r}: must match ^[a-z][a-z0-9-]+$ (lowercase letters, "
-            "digits and hyphens, starting with a letter)",
-            f"Operator action: choose a slug matching ^[a-z][a-z0-9-]+$ and run `{SCRIPT} new` "
-            "with it",
-        )
+        refusal = Refusal(f"invalid slug {slug!r}: must match ^[a-z][a-z0-9-]+$ (lowercase "
+                          "letters, digits and hyphens, starting with a letter)")  # fmt: skip
+        raise choice(refusal, "with a valid slug in its place", slug)
     if any(item.get("id") == slug for item in active):
-        raise Refusal(
-            f"backlog slug {slug!r} is already a live active[] entry — an item is retained "
-            "forever, so a second entry under this id would be a second identity for it",
-            f"Operator action: choose a slug no entry holds and run `{SCRIPT} new` with it",
-        )
+        refusal = Refusal(f"backlog slug {slug!r} is already a live active[] entry — an item is "
+                          "retained forever, so a second entry under this id would be a second "
+                          "identity for it")  # fmt: skip
+        raise choice(refusal, "with a slug no entry holds in its place", slug)
     relates, live = values.get("relates"), [str(item.get("id")) for item in active]
     names = [] if relates in (None, "none") else str(relates).split(",")
     if not set(names) <= set(live) or live and relates is None:
-        raise Refusal(
-            "name the live entries this one updates, obsoletes or relates to (ADR 0127): "
-            + (", ".join(live) or "none"),
-            f"Operator action: run `{SCRIPT} new {slug} --relates` with the comma-separated "
-            "live entries it relates to, or none",
-        )
+        refusal = Refusal("name the live entries this one updates, obsoletes or relates to "
+                          f"(ADR 0127): {', '.join(live) or 'none'}")  # fmt: skip
+        raise choice(refusal, "with --relates set to the comma-separated live entries, or none",
+                     "--relates")  # fmt: skip
     intents = parse_intents(values.get("intent"))
     entry: dict[str, Any] = {
         "id": slug,

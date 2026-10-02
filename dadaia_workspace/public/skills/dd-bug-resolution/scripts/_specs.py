@@ -17,15 +17,13 @@ def find_specs(given: Path | None, *, ledger: str | None = None) -> Path:
     """*given*, else the nearest git-rooted ``specs/`` at or above the cwd — never created:
     a missing tree refuses, its fix rerunning on the bound context's tree — for a verb
     writing *ledger* (repo-relative), the worktree of the kind whose allowed set holds it."""
-    here, argv = Path.cwd().resolve(), sys.argv
+    here = Path.cwd().resolve()
     trees = (
         [given] if given else [d / "specs" for d in (here, *here.parents) if (d / ".git").exists()]
     )
     if tree := next((t for t in trees if t.is_dir()), None):
         return tree.resolve()
-    rest = (w for i, w in enumerate(argv) if i and "--specs" not in (w, argv[i - 1]))
-    rerun = " ".join((script(Path(argv[0])), *map(quote, rest)))
-    fix, note = _bound_fix(here, rerun, ledger)
+    fix, note = _bound_fix(here, _rerun(), ledger)
     print(f"error: no specs tree at {given or f'or above {here}'} — nothing was written{note}",
           f"fix: {fix}", sep="\n", file=sys.stderr)  # fmt: skip
     raise SystemExit(1)
@@ -82,7 +80,26 @@ def with_specs(fix: str, specs: Path | str) -> str:
     return f"{fix} --specs {quote(str(specs))}" if named else fix
 
 
+def _rerun(*drop: str) -> str:
+    """This invocation again, without ``--specs`` and *drop* (flags with their value, or
+    positional values)."""
+    argv, gone = sys.argv, ("--specs", *drop)
+    rest = [w for i, w in enumerate(argv) if i and w not in gone and w.split("=")[0] not in gone
+            and not (argv[i - 1].startswith("--") and argv[i - 1] in gone)]  # fmt: skip
+    return " ".join((script(Path(argv[0])), *map(quote, rest)))
+
+
+def choice[E: Exception](refusal: E, words: str, *drop: str) -> E:
+    """Make *refusal*'s fix the operator's choice (ADR 0158): its command — its own fix, else
+    this invocation without *drop* — and *words* naming what to supply."""
+    refusal.choice = (words, drop)  # type: ignore[attr-defined]
+    return refusal
+
+
 def refuse(refusal: Exception, specs: Path) -> int:
-    fix = with_specs(str(getattr(refusal, "fix", "")), specs)
+    """Print *refusal* and its one fix, ``--specs`` kept in any command it quotes."""
+    words, drop = getattr(refusal, "choice", ("", ()))
+    fix = with_specs(str(getattr(refusal, "fix", "")) or (_rerun(*drop) if words else ""), specs)
+    fix = f"Operator action: run `{fix}` {words}" if words else fix
     print(f"[error] {refusal}", f"fix: {fix}", sep="\n", file=sys.stderr)
     return 1

@@ -19,7 +19,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from _bugs_check import TERMINAL, load_schema  # noqa: E402
 from _bugs_store import Records, Refusal, by_id  # noqa: E402
-from _specs import script  # noqa: E402
+from _specs import choice, script  # noqa: E402
 
 _MUTABILITY = {k: v["x-mutability"] for k, v in load_schema()["properties"].items()}
 CORE = tuple(k for k, v in _MUTABILITY.items() if v == "immutable-core")
@@ -29,7 +29,6 @@ WRITE_ONCE = tuple(k for k, v in _MUTABILITY.items() if v == "write-once")
 _TRANSITIONS = ("resolve", "supersede", "defer", "reject")
 _VERB_OWNED = {"status": _TRANSITIONS, "closed_at": _TRANSITIONS, "superseded_by": ("supersede",)}
 _SCRIPT = script(Path(__file__).parent / "bugs.py")
-_NEW_ID = f"Operator action: choose a bug id no record holds and run `{_SCRIPT} append` with it"
 
 
 def now_iso() -> str:
@@ -50,26 +49,28 @@ def append(records: Records, values: dict[str, Any], dirs: set[str]) -> Records:
     its correlation (ADR 0127); the schema check does the rest."""
     bug_id = values["id"]
     if any(r.get("id") == bug_id for r in records):
-        raise Refusal(
+        refusal = Refusal(
             f"bug id {bug_id!r} already exists — a reopen is a NEW record declaring "
-            "'caused_by: <prior-id>' at resolve, never a second record under this id",
-            _NEW_ID,
+            "'caused_by: <prior-id>' at resolve, never a second record under this id"
         )
+        raise choice(refusal, "with --bug-id set to an id no record holds", "--bug-id")
     surface = str(values.get("surface"))
     if surface not in dirs:
         close = ", ".join(difflib.get_close_matches(surface, sorted(dirs), 5, 0)) or "none"
-        raise Refusal(
-            f"surface {surface!r} is not the name of a directory tracked in this repo",
-            f"Operator action: run `{_SCRIPT} append` with --surface set to a tracked "
-            f"directory name (closest: {close})",
+        refusal = Refusal(
+            f"surface {surface!r} is not the name of a directory tracked in this repo"
+        )
+        raise choice(
+            refusal, f"with --surface set to a tracked directory (closest: {close})", "--surface"
         )
     correlates = values.get("correlates")
     ids = [] if correlates == "none" else str(correlates or "").split(",")
     if not set(ids) <= {r.get("id") for r in records}:
-        raise Refusal(
-            "name the ledger ids this bug correlates with — the candidates are listed above",
-            f"Operator action: run `{_SCRIPT} append` with --correlates set to the "
-            "comma-separated ids it correlates with, or none",
+        refusal = Refusal(
+            "name the ledger ids this bug correlates with — the candidates are listed above"
+        )
+        raise choice(
+            refusal, "with --correlates set to the comma-separated ids, or none", "--correlates"
         )
     record = {key: values.get(key) for key in CORE} | {"correlates": ids}
     record.update({key: None for key in GOVERNANCE})
@@ -85,10 +86,9 @@ def _set(record: dict[str, Any], key: str, value: Any) -> None:
             f"{_SCRIPT} status --all",
         )
     if key in CORE and record.get(key) != value:
-        raise Refusal(
-            f"bug-record field {key!r} is immutable-core and cannot be changed",
-            _NEW_ID,
-        )
+        refusal = Refusal(f"bug-record field {key!r} is immutable-core and cannot be changed",
+                          f"{_SCRIPT} append")  # fmt: skip
+        raise choice(refusal, "with a new --bug-id, filing the changed value as a new record")
     record[key] = value
 
 
@@ -97,11 +97,11 @@ def apply_update(records: Records, bug_id: str, changes: dict[str, str]) -> Reco
     the subcommand that DOES own the field."""
     for key in changes:
         if key in _VERB_OWNED:
-            verbs = ", ".join(_VERB_OWNED[key])
-            raise Refusal(
-                f"bug-record field {key!r} is written only by {verbs}",
-                f"Operator action: choose the verb ({verbs}) for {bug_id} and run it with {_SCRIPT}",
-            )
+            verb, *twins = _VERB_OWNED[key]
+            refusal = Refusal(f"bug-record field {key!r} is written only by {verb}"
+                              + "".join(f", {t}" for t in twins), f"{_SCRIPT} {verb} {bug_id}")  # fmt: skip
+            raise choice(refusal, f"or its {', '.join(twins)} twin, with the fields it requires"
+                         if twins else "with --by set to the bug superseding it")  # fmt: skip
         if key not in _MUTABILITY:
             raise Refusal(f"unknown bug-record field {key!r}", f"{_SCRIPT} update --help")
     record = by_id(records, bug_id)

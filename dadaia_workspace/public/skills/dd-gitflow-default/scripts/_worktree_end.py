@@ -80,7 +80,8 @@ def _remove(repo: Path, tree: Path, name: str, kept: list[str]) -> None:
 
 def _undo(tree: Path, work: str, rel: str) -> str:
     """The one act putting *rel* back to the work branch's version, absent included."""
-    return f"Operator action: run `git -C {tree} restore -s {work} -SW -- {rel}`, then commit it"
+    return (f"Operator action: revert {rel} to {work} in one commit — `git -C {tree} restore "
+            f"-s {work} -SW -- {rel}` and `git -C {tree} commit`")  # fmt: skip
 
 
 def _check_allowed(tree: Path, work: str, name: str) -> None:

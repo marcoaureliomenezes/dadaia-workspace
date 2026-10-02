@@ -407,6 +407,24 @@ def test_append_takes_a_tracked_directory_surface_and_non_blank_fields(
     assert len(_records(specs)) == int(needle is None), done.stderr
 
 
+def test_an_operator_action_run_outside_the_tree_keeps_its_specs_and_known_argv(
+    script: Path, tmp_path: Path
+) -> None:
+    """Intent: CONTRACT — AC4.4, bug ledger-fix-lines-drop-specs (T-050-151 review H1, L8):
+    an `Operator action: run` fix quotes the refused command with `--specs` and every known
+    flag, so pasted from outside the tree it refuses only on the choice the words name."""
+    specs, elsewhere = _ledger(tmp_path), tmp_path / "elsewhere"
+    elsewhere.mkdir()
+    done = _run(script, "append", "--specs", str(specs), "--bug-id", "b", "--title", "t",
+                "--severity", "LOW", "--surface", "nowhere", "--component", "c", "--context",
+                "ctx", "--symptom", "s", "--repro", "r", "--expected", "e", "--correlates",
+                "none", cwd=elsewhere)  # fmt: skip
+    (fix,) = [ln for ln in done.stderr.splitlines() if ln.startswith("fix: ")]
+    command = fix.split("`")[1]
+    assert fix.startswith("fix: Operator action: run `") and f"--specs {specs}" in command, fix
+    assert "--bug-id b" in command and "--correlates none" in command, fix
+
+
 def test_append_outside_a_git_tree_is_one_refusal_naming_the_cause(
     script: Path, tmp_path: Path
 ) -> None:
@@ -418,7 +436,7 @@ def test_append_outside_a_git_tree_is_one_refusal_naming_the_cause(
                 "--symptom", "s", "--repro", "r", "--expected", "e", "--correlates", "none")  # fmt: skip
     assert done.returncode == 1 and "Traceback" not in done.stderr
     assert "cannot list the repo's tracked directories: fatal:" in done.stderr
-    assert "append` with --specs naming a specs tree inside a git repo" in done.stderr
+    assert "fix: Operator action: point --specs at a specs tree inside a git repo" in done.stderr
 
 
 def test_append_refuses_a_duplicate_id_and_writes_nothing(script: Path, tmp_path: Path) -> None:

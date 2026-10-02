@@ -26,7 +26,7 @@ import _bugs_transition as tr  # noqa: E402
 import _bugs_write as wr  # noqa: E402
 from _bugs_check import CODE, LEDGER, check  # noqa: E402
 from _bugs_store import Refusal, commit, read_records  # noqa: E402
-from _specs import find_specs, refuse, script  # noqa: E402
+from _specs import find_specs, refuse  # noqa: E402
 
 _OPTIONS: dict[str, tuple[str, ...]] = {
     "append": ("--bug-id", "--reported-by", "--ts", "--title", "--severity", "--surface",
@@ -122,8 +122,7 @@ def _write(args: argparse.Namespace, specs: Path) -> int:
         except (OSError, subprocess.CalledProcessError) as exc:
             cause = getattr(exc, "stderr", "") or str(exc)
             raise Refusal(f"cannot list the repo's tracked directories: {cause.strip()}",
-                          f"Operator action: run `{script(Path(__file__))} append` with --specs "
-                          "naming a specs tree inside a git repo") from None  # fmt: skip
+                          "Operator action: point --specs at a specs tree inside a git repo") from None  # fmt: skip
         dirs = {part for path in listed.splitlines() for part in path.split("/")[:-1]}
         near = wr.candidates(read_records(ledger), values["surface"])
         print(f"correlation candidates on {values['surface']!r}: {', '.join(near) or 'none'}")

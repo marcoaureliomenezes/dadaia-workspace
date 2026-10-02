@@ -43,6 +43,7 @@ from typer.testing import CliRunner
 
 from dadaia_workspace.cli.main import app
 from dadaia_workspace.core.cli_line import cli_path, fix_line, shell_line
+from dadaia_workspace.core.gitflow import DEFAULT, work_branch
 from dadaia_workspace.core.models.spec_context import (
     ContextState,
     SpecContextProject,
@@ -405,8 +406,13 @@ def _baseline_done(
 
 def _malformed(world: World) -> str:
     _published(world)
-    world.commit("notes.md", "n\n", branch="feature/0.1.0")
+    world.commit("notes.md", "n\n", branch=_work(world))
     return f"printf 'not a ref line\\n' | {fix_line(world.ws, 'ci', 'push-gate-check')}"
+
+
+def _work(world: World) -> str:
+    """The live work branch by the ONE rule (sa-live-work-branch-named-three-ways)."""
+    return work_branch(world.repo / "specs", DEFAULT)
 
 
 def _work_pushed(world: World, work: str = "feature/1.0.0") -> None:
@@ -709,7 +715,7 @@ def _dirty_on_integration(world: World) -> list[str]:
 def _dead_via_work(world: World) -> None:
     heads = world.remote_heads()
     assert heads["develop"] == world.git(world.bare, "rev-parse", "main")
-    assert "feature/0.1.0" in heads
+    assert _work(world) in heads
     assert not world.repo.exists()
 
 
@@ -815,7 +821,7 @@ SITES: dict[str, tuple[Case | tuple[Case, ...] | Skip, ...]] = {
     ),
     "push_gate._read_failure": (Skip("needs a corrupted object store; `git fsck` names it"),),
     "push_gate.push_gate_decision": (
-        Case(_malformed, lambda w: _work_pushed(w, "feature/0.1.0"), replaces=True),
+        Case(_malformed, lambda w: _work_pushed(w, _work(w)), replaces=True),
     ),
     "ci._repo_root": (Skip("the pre-push hook always runs inside the repo it pushes"),),
     "ci.push_gate_check": (Skip("the gate's refusal: its fix is a branch_policy/push_gate site"),),
