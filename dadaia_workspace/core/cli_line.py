@@ -1,7 +1,7 @@
 """The ONE spelling of the workspace CLI and its venv tools (ADR 0045): absolute paths,
-so every ``fix:`` runs from any cwd — ``shlex`` on POSIX; on Windows forward slashes,
-double quotes only around a blank (Git Bash, cmd and PowerShell all run it; a quoted
-executable needs PowerShell's ``& ``, the documented limitation)."""
+so every ``fix:`` runs from any cwd — ``shlex`` on POSIX; on Windows forward slashes, a
+part holding a blank quoted whole — the executable's quote opened after its drive letter
+(``C":/a b/x.exe"``), since a line opening with a quote is a PowerShell expression."""
 
 from __future__ import annotations
 
@@ -53,7 +53,10 @@ def git_line(repo: str | PurePath, *argv: str) -> str:
 def shell_line(*parts: str) -> str:
     """*parts* joined into one command line quoted for the host shell."""
     if platform.PLATFORM.venv_exe_suffix:  # Windows
-        return " ".join(_win_quote(part.replace("\\", "/")) for part in parts)
+        head, *argv = (_win_quote(part.replace("\\", "/")) for part in parts)
+        if head.startswith('"'):  # a drive path: open the quote after its first char
+            head = f'{head[1]}"{head[2:]}'
+        return " ".join((head, *argv))
     return shlex.join(parts)
 
 

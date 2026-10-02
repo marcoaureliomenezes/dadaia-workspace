@@ -15,6 +15,7 @@ from pathlib import Path
 sys.path.append(str(Path(__file__).resolve().parents[2] / "dd-bug-resolution" / "scripts"))
 
 from _specs import git_line as git_line  # noqa: E402
+from _specs import head  # noqa: E402
 from _specs import quote as quote  # noqa: E402  (`as`: re-exported to the worktree verbs)
 from _specs import script as script  # noqa: E402
 from _worktree_kinds import _NAME_RE, SCRIPT, Refusal  # noqa: E402
@@ -68,7 +69,7 @@ def cli(root: Path, *args: str) -> subprocess.CompletedProcess[str]:
 
 def cli_line(root: Path, *args: str) -> str:
     """The fix line running :func:`cli` with *args*, quoted for the host shell."""
-    return " ".join(map(quote, (str(_exe(root)), *args)))
+    return " ".join((head(str(_exe(root))), *map(quote, args)))
 
 
 def gitflows(root: Path) -> dict[str, dict[str, str]]:

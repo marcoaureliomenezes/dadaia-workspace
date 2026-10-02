@@ -92,7 +92,8 @@ def _the_fix(message: str | None) -> str:
 
 
 def _plant_cli(cli: Path) -> None:
-    """A real executable exiting 0 with no argument, where a fix line spells the CLI."""
+    """A real executable exiting 0 with no argument, where a fix line spells the CLI; its
+    stdout (empty for ``true``, the user for ``whoami``) is what an echo would not print."""
     stand_in = shutil.which("whoami" if sys.platform == "win32" else "true")
     assert stand_in, "the host has no stand-in executable"
     cli.parent.mkdir(parents=True, exist_ok=True)
@@ -292,13 +293,19 @@ def test_a_fix_runs_verbatim_in_every_host_shell(blank_workspace: Path, shell: l
         for line in (root_fix, root_fix, fix_line(workspace))
     ]
     assert [r.returncode for r in runs] == [0, 0, 0], [r.stderr for r in runs]
+    # The CLI ran, not a shell echo of its quoted path (PowerShell exits 0 on an expression).
+    direct = subprocess.run([cli_path(workspace)], capture_output=True, text=True, check=True)
+    assert runs[2].stdout.strip() == direct.stdout.strip()
     assert (workspace / ".dadaia" / "tmp").is_dir()
     assert not (workspace / ".dadaiaignore").exists()  # the fix never writes the operator's file
 
 
-def test_cli_line_and_the_scripts_render_one_argv_as_one_line(tmp_path: Path) -> None:
+def test_cli_line_and_the_scripts_render_one_argv_as_one_line(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """ADR 0159's pinned pair: one argv through ``core/cli_line`` and the scripts' ``_specs``
-    renders one line — a blank, a quote and a ``$`` included."""
+    renders one line — a blank, a quote and a ``$`` included, the head's too."""
+    monkeypatch.setattr("sys.executable", str(tmp_path / "Program Files (x86)" / "python"))
     loader = importlib.util.spec_from_file_location(
         "_specs_pinned", _PUBLIC_SKILLS / "dd-bug-resolution" / "scripts" / "_specs.py"
     )

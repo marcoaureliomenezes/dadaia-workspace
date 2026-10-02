@@ -38,7 +38,7 @@ def _bound_fix(here: Path, rerun: str, ledger: str | None) -> tuple[str, str]:
             try:
                 repo = str(json.loads(shown.stdout)["main_repo"])
             except (ValueError, LookupError, TypeError):
-                return f"{quote(cli)} context list", ""
+                return f"{head(cli)} context list", ""
             if (kind := _kind(ledger)) is None:  # a read, or `specs/audits/` (rc-5 AC1.1)
                 return with_specs(rerun, root / "repos" / repo / "specs"), ""
             if trees := sorted((root / "worktrees" / repo).glob(f"*-{kind}")):
@@ -69,6 +69,14 @@ def quote(word: str) -> str:
     return word if word and not any(c in word for c in ' \t"') else f'"{word}"'
 
 
+def head(word: str) -> str:
+    """A command's first word as `core/cli_line.shell_line` spells it: on Windows a quote
+    opens after the drive letter, so the line never opens with one PowerShell reads as an
+    expression."""
+    word = quote(word)
+    return f'{word[1]}"{word[2:]}' if os.name == "nt" and word.startswith('"') else word
+
+
 def git_line(repo: Path | str, *argv: str) -> str:
     """``git -C <repo> argv…`` quoted, as `core/cli_line.git_line` spells it."""
     return " ".join(map(quote, ("git", "-C", str(repo), *argv)))
@@ -76,14 +84,14 @@ def git_line(repo: Path | str, *argv: str) -> str:
 
 def script(path: Path) -> str:
     """The ONE script-command prefix: this interpreter + *path*, absolute and quoted."""
-    return f"{quote(sys.executable)} {quote(str(path.resolve()))}"
+    return f"{head(sys.executable)} {quote(str(path.resolve()))}"
 
 
 def with_specs(fix: str, specs: Path | str) -> str:
     """The ONE ledger fix-line builder: a :func:`script` command gains ``--specs`` once;
     ``worktree.py``, the one script resolving no specs tree, never does."""
     ledger = not fix.startswith(script(_GITFLOW / "worktree.py"))
-    named = fix.startswith(f"{quote(sys.executable)} ") and ledger and " --specs " not in fix
+    named = fix.startswith(f"{head(sys.executable)} ") and ledger and " --specs " not in fix
     return f"{fix} --specs {quote(str(specs))}" if named else fix
 
 
