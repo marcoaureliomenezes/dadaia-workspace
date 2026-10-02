@@ -254,7 +254,7 @@ jobs:
       - name: Install
         run: poetry install --no-interaction --no-ansi --with dev
       - name: pytest integration
-        run: poetry run pytest -q -m "integration and not quarantine" tests/integration --durations=30
+        run: poetry run pytest -q -m "integration and not quarantine" tests/integration -n auto --durations=30
 
   e2e-python:
     name: E2E Python (pytest)
