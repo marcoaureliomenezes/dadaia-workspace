@@ -25,6 +25,7 @@ from dadaia_workspace.features.spec_context.service import (
     SpecContextService,
 )
 from dadaia_workspace.infrastructure.git_subprocess import GitSubprocessClient
+from tests.conftest import GIT_QUIET_INCLUDE
 from tests.fixtures.stores import context_store
 from tests.helpers.privacy_fixtures import aws_key_shape
 
@@ -48,6 +49,7 @@ def _identity(repo: Path) -> None:
 
 @pytest.fixture(autouse=True)
 def _no_global_git(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    (tmp_path / "gitconfig").write_text(GIT_QUIET_INCLUDE, encoding="utf-8")
     monkeypatch.setenv("GIT_CONFIG_GLOBAL", str(tmp_path / "gitconfig"))
     monkeypatch.setenv("GIT_CONFIG_NOSYSTEM", "1")
 
@@ -383,7 +385,9 @@ def test_a_draft_origin_tracks_is_never_stashed_away(env, tmp_path: Path) -> Non
 
 def test_a_tool_commit_never_falls_back_to_a_tool_identity(tmp_path: Path, monkeypatch) -> None:
     """SA-H3-2: one identity rule (git's own) — no hard-coded fallback author."""
-    (tmp_path / "gitconfig").write_text("[user]\n\tuseConfigOnly = true\n", encoding="utf-8")
+    (tmp_path / "gitconfig").write_text(
+        f"{GIT_QUIET_INCLUDE}[user]\n\tuseConfigOnly = true\n", encoding="utf-8"
+    )
     for var in ("NAME", "EMAIL"):
         monkeypatch.delenv(f"GIT_AUTHOR_{var}", raising=False)
         monkeypatch.delenv(f"GIT_COMMITTER_{var}", raising=False)

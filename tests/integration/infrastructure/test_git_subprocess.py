@@ -13,6 +13,7 @@ import pytest
 
 from dadaia_workspace.core.exceptions import GitCloneError, GitSyncError
 from dadaia_workspace.infrastructure.git_subprocess import GitSubprocessClient
+from tests.conftest import _GIT_QUIET
 
 pytestmark = [pytest.mark.integration, pytest.mark.slow]
 
@@ -37,7 +38,7 @@ def test_repo_lifecycle_clone_dirty_commit_remote_branch_checkout_and_error_path
 ) -> None:
     """clone -> is_dirty -> commit_all (operator identity; nothing-to-commit is a no-op)
     -> has_remote -> current_branch/checkout; an invalid clone and a missing branch raise."""
-    monkeypatch.setenv("GIT_CONFIG_GLOBAL", str(tmp_path / "no-global-config"))
+    monkeypatch.setenv("GIT_CONFIG_GLOBAL", str(_GIT_QUIET))
     monkeypatch.setenv("GIT_CONFIG_SYSTEM", "/dev/null")
     client = GitSubprocessClient()
     src = _repo(tmp_path / "src")

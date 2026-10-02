@@ -42,6 +42,7 @@ from packaging.requirements import Requirement
 
 from dadaia_workspace.core import workspace_layout
 from dadaia_workspace.core.platform import PLATFORM
+from tests.conftest import GIT_QUIET_INCLUDE
 
 pytestmark = [pytest.mark.e2e, pytest.mark.slow]
 
@@ -54,6 +55,7 @@ def _child_env(home: Path) -> dict[str, str]:
     """A clean environment: no inherited ``DADAIA_*`` but the suite's fence (the dev CLI's
     own workspace is never this child's: M1's first rung), a tmp ``HOME``, a git identity."""
     keep = "DADAIA_FENCED_ROOTS"
+    (home / "gitconfig").write_text(GIT_QUIET_INCLUDE, encoding="utf-8")
     env = {k: v for k, v in os.environ.items() if not k.startswith("DADAIA_") or k == keep}
     env.update(
         HOME=str(home),

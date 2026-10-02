@@ -21,6 +21,7 @@ import pytest
 
 from dadaia_workspace.features.spec_context.doctor import DoctorService
 from dadaia_workspace.infrastructure.git_subprocess import GitSubprocessClient
+from tests.conftest import _GIT_QUIET
 from tests.fixtures.stores import context_store
 from tests.helpers import worktree_ws
 
@@ -32,7 +33,7 @@ pytestmark = pytest.mark.slow(reason="real git init + worktree add subprocesses"
 def _git(cwd: Path, *args: str) -> str:
     env = {
         **os.environ,
-        "GIT_CONFIG_GLOBAL": os.devnull,
+        "GIT_CONFIG_GLOBAL": str(_GIT_QUIET),
         "GIT_CONFIG_SYSTEM": os.devnull,
         "GIT_AUTHOR_NAME": "t",
         "GIT_AUTHOR_EMAIL": "t@example.invalid",

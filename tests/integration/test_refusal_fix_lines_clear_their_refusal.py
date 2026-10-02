@@ -52,6 +52,7 @@ from dadaia_workspace.core.models.spec_context import (
 from dadaia_workspace.core.specs_version import CANONICAL_SPECS_VERSION
 from dadaia_workspace.features.spec_context.service import git_hooks_dir, install_git_hooks
 from dadaia_workspace.infrastructure.json_context_store import JsonContextStore
+from tests.conftest import GIT_QUIET_INCLUDE
 from tests.helpers.privacy_fixtures import aws_key_shape
 
 pytestmark = [
@@ -144,7 +145,7 @@ class World:
             TERM="dumb",
         )
         (tmp / "gitconfig").write_text(
-            "[user]\n\tname = T\n\temail = t@example.invalid\n\tuseConfigOnly = true\n"
+            f"{GIT_QUIET_INCLUDE}[user]\n\tname = T\n\temail = t@example.invalid\n\tuseConfigOnly = true\n"
             "[init]\n\tdefaultBranch = main\n",
             encoding="utf-8",
         )
@@ -598,7 +599,9 @@ def _denylisted_no_context(world: World) -> str:
 def _no_identity(world: World) -> list[str]:
     world.clone()
     world.onboard()
-    (world.tmp / "gitconfig").write_text("[user]\n\tuseConfigOnly = true\n", encoding="utf-8")
+    (world.tmp / "gitconfig").write_text(
+        f"{GIT_QUIET_INCLUDE}[user]\n\tuseConfigOnly = true\n", encoding="utf-8"
+    )
     return ["context", "baseline", "proj"]
 
 
@@ -822,7 +825,9 @@ def _dead_no_identity(world: World) -> list[str]:
     """SA-H3-2: dead's auto-sync commit needs git's identity — refused before any write."""
     _on_work(world)
     (world.repo / "README.md").write_text("edited\n", encoding="utf-8")
-    (world.tmp / "gitconfig").write_text("[user]\n\tuseConfigOnly = true\n", encoding="utf-8")
+    (world.tmp / "gitconfig").write_text(
+        f"{GIT_QUIET_INCLUDE}[user]\n\tuseConfigOnly = true\n", encoding="utf-8"
+    )
     return ["context", "dead", "proj"]
 
 
@@ -1190,7 +1195,9 @@ def test_dead_commit_without_a_git_identity_refuses_and_removes_nothing(world: W
     (world.repo / "README.md").write_text("edited\n", encoding="utf-8")
     head = world.git(world.repo, "rev-parse", "HEAD")
     published = world.remote_heads()["feature/1.0.0"]
-    (world.tmp / "gitconfig").write_text("[user]\n\tuseConfigOnly = true\n", encoding="utf-8")
+    (world.tmp / "gitconfig").write_text(
+        f"{GIT_QUIET_INCLUDE}[user]\n\tuseConfigOnly = true\n", encoding="utf-8"
+    )
     done = world.cli("context", "dead", "proj", "--commit")
     assert done.returncode != 0
     assert _single_fix(done) == f"Operator action: set git user.name in the config of {world.repo}"

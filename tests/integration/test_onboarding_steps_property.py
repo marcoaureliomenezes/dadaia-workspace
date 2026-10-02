@@ -32,6 +32,7 @@ from dadaia_workspace.features.workspace.onboarding import STEP_IDS, Step, next_
 from dadaia_workspace.features.workspace.service import WorkspaceService
 from dadaia_workspace.infrastructure.public_assets import FileSystemPublicAssetManager
 from dadaia_workspace.infrastructure.python_env import VenvPythonEnvironmentManager
+from tests.conftest import GIT_QUIET_INCLUDE
 
 pytest.importorskip("fcntl")
 
@@ -94,9 +95,10 @@ def _git_env(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     runner.write_text("#!/bin/sh\ncat >/dev/null\n", encoding="utf-8")
     runner.chmod(0o755)
     pairs = {"core.hooksPath": str(hooks), "user.name": "T", "user.email": "t@example.invalid"}
+    (tmp_path / "gitconfig").write_text(GIT_QUIET_INCLUDE, encoding="utf-8")
     monkeypatch.setenv("GIT_CONFIG_GLOBAL", str(tmp_path / "gitconfig"))
     monkeypatch.setenv("GIT_CONFIG_NOSYSTEM", "1")
-    base = int(os.environ.get("GIT_CONFIG_COUNT", "0"))  # keep conftest's pairs
+    base = int(os.environ.get("GIT_CONFIG_COUNT", "0"))
     monkeypatch.setenv("GIT_CONFIG_COUNT", str(base + len(pairs)))
     for n, (key, value) in enumerate(pairs.items(), start=base):
         monkeypatch.setenv(f"GIT_CONFIG_KEY_{n}", key)
