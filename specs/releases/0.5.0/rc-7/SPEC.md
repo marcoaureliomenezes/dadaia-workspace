@@ -31,7 +31,7 @@
 ## Decisions
 
 - These ADRs decide: 0018, 0019, 0045, 0106, 0111, 0119, 0122, 0123, 0126, 0127, 0135, 0136, 0137, 0140, 0141, 0142, 0146, 0150, 0152.
-- Accepted, one record per ruling (operator, 2026-10-01: "Aceito D1–D6 (Recomendado); Aceito 0157–0162 (Recomendado)"): D1 0157 and D6 0162 amend 0135; D2 0158 and D3 0159 amend 0045; D4 0160; D5 0161 amends 0019. 0168 (proposed; operator ruling 2026-10-02: "Accept, implement in rc-7") amends 0110 at acceptance. 0158 also narrows 0018's "every fix line names a script or verb".
+- Accepted, one record per ruling (operator, 2026-10-01: "Aceito D1–D6 (Recomendado); Aceito 0157–0162 (Recomendado)"): D1 0157 and D6 0162 amend 0135; D2 0158 and D3 0159 amend 0045; D4 0160; D5 0161 amends 0019. 0168 (proposed; operator ruling 2026-10-02: "Accept, implement in rc-7") amends 0110 and 0126 at acceptance. 0158 also narrows 0018's "every fix line names a script or verb".
 - 0161's "doctor_release and backlog.py exit import it" narrows to `backlog.py exit`: SPEC-DOC-048 leaves (AC3.2), so `doctor_release` reads no Origin.
 - Dead `measured_by` repaired in place (the ADR 0138 lane, as 0138 did), each in the commit that deletes its unit and citing the ADR (0151 M3): 0019 (SPEC-DOC-048, `test_spec_doc_048_origin.py`) → `release.py check`'s Origin cases (AC3.2); 0018 and 0073 (`test_every_block_carries_a_fix.py`) → the AC4.1 harness.
 - No new record: the doctor delegating to each script's `check` is 0018's; shape 5's "+ picked bugs" leaves by 0106 and 0127; the backlog kind admitting `BUGS.jsonl` is 0137's "one worktree".
@@ -180,7 +180,7 @@
 - §3a's "alone" clauses, `chore(adrs)` and "+ picked bugs".
 - `LINEAGE.md`'s "no per-release `_RELEASE.json` survives archiving".
 - `gate_policy`'s string-literal floor keys.
-- `worktree.py merge`'s exact-HEAD verdict match and worktrees law §2 step 6's "a rebase after review changes the sha: review again", for a patch-identical rebase (0168 amends 0110).
+- `worktree.py merge`'s exact-HEAD verdict match and worktrees law §2 step 6's "a rebase after review changes the sha: review again", for a patch-identical rebase (0168 amends 0110 and 0126).
 - `DADAIA_BIN` at three sites.
 - Hand-spelled `--help` examples.
 - `ledger_scripts._finding`'s hand-edit fallback.
