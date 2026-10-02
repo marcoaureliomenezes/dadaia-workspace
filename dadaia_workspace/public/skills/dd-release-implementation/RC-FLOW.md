@@ -22,7 +22,7 @@ candidates.
 Each step ends on a checkable criterion. Steps 5–8 are candidate-closure work.
 
 **Step 1 — Reserve.**
-- Mark the live candidate's `TASKS.md` per `specs/releases/AGENTS.md` §3, the one marker lifecycle.
+- Mark the live candidate's `TASKS.md` per `specs/releases/AGENTS.md` §3.
 - Dispatching a shell-less sub-agent: commit its flip before relaying the work item — one flip per dispatch, never batched.
 - Recovery — a foreign `[-]` from another session: read `git log`, report to the operator, never transition it yourself.
 - Recovery — a gate block: run the block's own one `fix:` line; a BLOCK whose fix is itself blocked is a Stall, reported at once.

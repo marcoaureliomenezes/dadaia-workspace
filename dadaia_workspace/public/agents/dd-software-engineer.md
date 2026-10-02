@@ -118,7 +118,7 @@ Reviews and lenses -> dd-code-reviewer.
 Ground yourself first with `dd-spec-navigator` (Phase 2, memory bootstrap), then:
 
 1. Read the approved SPEC.md and TASKS.md for the current task.
-2. Mark the task per `specs/releases/AGENTS.md` §3, the one marker lifecycle, reserving before editing production.
+2. Mark the task per `specs/releases/AGENTS.md` §3, reserving before editing production.
 3. Write the failing test(s) first — red before any production code.
 4. Implement the minimum code to go green.
 5. Refactor with tests still green.

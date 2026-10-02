@@ -65,7 +65,6 @@ You return a verdict, not fixes — the implementing agent owns the fix, you own
 - Never write specs, PLAN.md, or TASKS.md.
 - Never write CI YAML.
 - Never run security exploits.
-- A `REJECTED` verdict keeps the task `[-]` and blocks the PR — never override that.
 
 If you receive a task outside your scope:
 ```

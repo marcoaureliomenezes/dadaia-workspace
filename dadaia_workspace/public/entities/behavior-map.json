@@ -84,7 +84,7 @@
         "dadaia_workspace/public/data/worktrees-AGENTS.md"
       ],
       "hash_tuple": {
-        "section": "sha256:1075b3c5364422172a6b11e3e718f994cd7fac84dc271cac068a977526900171",
+        "section": "sha256:7c011055a9cf8ff50a0d1163c987ab4805cdc05e033963a2db37014b95bfbe3b",
         "skill": "sha256:9b60f4a7592ec7298ba1d9f20655272c026ad71caee671435a907323533dad11",
         "scripts": "sha256:15553771c95bc98b7f84bfc4cb737192aa57aec9a9ce7553b8fd06f73eb938e4",
         "scoped": [
@@ -192,7 +192,7 @@
         "skill": "sha256:8b99a29bc45ab2c0c9e82ee339cd58fd8922bb0e4924e133542c4de588a8fcd7",
         "scripts": "sha256:0e15875d3590388de83f5dae06e7d55495e7c0d477a38b3aa8838b0dcfc03e7c",
         "scoped": [
-          "sha256:54c8d810001bf37b6d2b43cd6170f9dc1a870e39dce6658bafc5c1768cc52dd6"
+          "sha256:1482cee6a7492e8c6678d2b09494a65f8d35ad6814787e3ff881484053dc2b8d"
         ]
       },
       "recorded_by": "dd-software-engineer",

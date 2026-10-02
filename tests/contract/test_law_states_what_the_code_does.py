@@ -53,7 +53,9 @@ _SESSION_NAMES = ("DADAIA_SESSION_ID", "CLAUDE_CODE_SESSION_ID", "CODEX_SESSION_
                   "CODEX_THREAD_ID", "session_id")  # fmt: skip
 
 
-def _fail_open_rows(tmp: Path, monkeypatch: pytest.MonkeyPatch) -> dict[str, bool]:
+def _fail_open_rows(
+    law: dict[str, str], tmp: Path, monkeypatch: pytest.MonkeyPatch
+) -> dict[str, bool]:
     """One row per fail-open path, keyed by the evidence the law names, each read from code."""
     hooks = _REPO / "tests/integration/gate/test_hook_interpreter.py"
     (tmp / ".dadaia/states").mkdir(parents=True)
@@ -71,7 +73,7 @@ def _fail_open_rows(tmp: Path, monkeypatch: pytest.MonkeyPatch) -> dict[str, boo
     return {
         "ADR 0067": "def test_missing_venv_is_loud_and_fails_open_on_every_harness"
         in hooks.read_text("utf-8"),
-        "ADR 0118": hook_wrappers.TOOL_TIMEOUT_S == 10,
+        "ADR 0118": f"past {hook_wrappers.TOOL_TIMEOUT_S} s" in law["ADR 0118"],
         "ADRs 0096, 0103, 0133": sdd_gate.evaluate_payload(bash) is None,
         "ADR 0116": gate_policy.evaluate("worktrees/r/w/x.py", has_id=False, **worktree)[0]
         == gate_policy.Decision.ALLOW
@@ -89,8 +91,8 @@ def test_the_map_lists_every_fail_open_path_the_code_has(
     set-equal to the code's paths, each naming its evidence; no sentence pinned."""
     line = next(ln for ln in _MAP.read_text("utf-8").splitlines() if "fails open on:" in ln)
     items = line.split("fails open on:")[1].rstrip(".").split(";")
-    named = [m[1] for i in items if (m := re.search(r"\(([^()]+)\)\s*$", i))]
-    rows = _fail_open_rows(tmp_path, monkeypatch)
+    named = {m[1]: i for i in items if (m := re.search(r"\(([^()]+)\)\s*$", i))}
+    rows = _fail_open_rows(named, tmp_path, monkeypatch)
     assert len(named) == len(items) and sorted(named) == sorted(rows)
     assert [k for k, held in rows.items() if not held] == []
 
@@ -246,10 +248,15 @@ def test_commit_shapes_stage_the_kinds_allowed_set() -> None:
 
 def test_the_marker_lifecycle_is_stated_once_in_marks_order() -> None:
     """AC4.6 (DEL implementer-persona-states-a-second-task-marker-lifecycle; ADR 0141): the
-    releases law's transitions equal `_release_schema.MARKS` in order; no other law states one."""
+    releases law's transitions equal `_release_schema.MARKS` in order; no other law states one;
+    no persona names a marker, the implementer cites §3."""
     marks = _script("dd-release-implementation/scripts/_release_schema.py").MARKS
-    arrow = r"`?\[([ x-])\]`?\s*-+>\s*`?\[([ x-])\]"
+    arrow = r"`?\[([ x-])\]`?\s*(?:-+>|→|=>)\s*`?\[([ x-])\]"
     home = _PKG / "public/scaffold/releases/AGENTS.md"
     law = home.read_text("utf-8")
     assert re.findall(arrow, law) == list(zip(marks, marks[1:], strict=False))
     assert [p for p in _LAW if p != home and re.search(arrow, p.read_text("utf-8"))] == []
+    personas = sorted((_PKG / "public/agents").glob("*.md"))
+    assert [p.name for p in personas if re.search(r"\[[ x-]\]", p.read_text("utf-8"))] == []
+    implementer = _PKG / "public/agents/dd-software-engineer.md"
+    assert "`specs/releases/AGENTS.md` §3" in implementer.read_text("utf-8")
