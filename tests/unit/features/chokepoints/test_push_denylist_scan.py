@@ -251,7 +251,7 @@ def test_the_rewrite_fix_resets_to_the_oldest_unpublished_commit_and_amends(
     message = decision.message
     assert not decision.allowed and "update-ref" not in message
     if end is None:
-        assert "Operator action" in message and "\nfix: " not in message
+        assert "\nfix: Operator action: " in message and message.count("\nfix: ") == 1
     else:
         assert message.endswith(end.format(oldest=oldest)) and message.count("\nfix: ") == 1
         assert "reset" not in end or "commit --amend" in message

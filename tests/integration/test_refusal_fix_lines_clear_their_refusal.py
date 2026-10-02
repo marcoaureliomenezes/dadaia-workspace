@@ -510,6 +510,24 @@ def _no_junk(world: World) -> None:
     assert "specs/junk.md" not in world.git(world.repo, "ls-tree", "-r", "--name-only", tip)
 
 
+def _law_deleted(world: World) -> str:
+    """law-deletion-refusal-reuses-the-denylist-rewrite-fix: the tip deletes a published
+    law line citing no ADR — the uncommit-amend remedy loops; the reword clears it."""
+    _published(world)
+    world.commit("AGENTS.md", "- keep\n- drop\n", branch="feature/1.0.0")
+    world.git(world.repo, "push", "-q", "origin", "feature/1.0.0")
+    world.commit("AGENTS.md", "- keep\n")
+    return "git push -q origin feature/1.0.0"
+
+
+def _cite_adr(world: World) -> None:
+    """Plays the printed act: the refusal named HEAD's commit and its law file."""
+    shown = _single_fix(_gate(world, "git push -q origin feature/1.0.0"))
+    assert f"reword commit {world.git(world.repo, 'rev-parse', 'HEAD')[:12]} " in shown
+    assert shown.endswith("deletion of AGENTS.md"), shown
+    world.git(world.repo, "commit", "-q", "--amend", "-m", "drop a law line (ADR 0151)")
+
+
 def _denylisted_in_a_worktree(world: World) -> str:
     """Review H-B (P10): the pushing repo is a worktree under repos/<slug>/."""
     _published(world)
@@ -839,8 +857,8 @@ SITES: dict[str, tuple[Case | tuple[Case, ...] | Skip, ...]] = {
         Case(_mismatch, _work_pushed, then="git push -q origin feature/1.0.0"),
     ),
     "push_gate._rewrite_fix": (
-        Case(_denylisted_not_checked_out, _clean_publish, then=_CLEAN_COMMIT_PUSH),
         (
+            Case(_denylisted_not_checked_out, _clean_publish, then=_CLEAN_COMMIT_PUSH),
             Case(_denylisted, _clean_publish, operator=_drop_term, then=_COMMIT_PUSH),
             Case(
                 _denylisted_in_a_worktree,
@@ -862,6 +880,7 @@ SITES: dict[str, tuple[Case | tuple[Case, ...] | Skip, ...]] = {
     "push_gate._read_failure": (Skip("needs a corrupted object store; `git fsck` names it"),),
     "push_gate.push_gate_decision": (
         Case(_malformed, lambda w: _work_pushed(w, _work(w)), replaces=True),
+        Case(_law_deleted, _work_pushed, operator=_cite_adr),
     ),
     "ci._repo_root": (Skip("the pre-push hook always runs inside the repo it pushes"),),
     "ci.push_gate_check": (Skip("the gate's refusal: its fix is a branch_policy/push_gate site"),),
@@ -1068,8 +1087,7 @@ def test_a_denylisted_tag_from_a_detached_head_on_an_empty_origin_prints_no_comm
     world.git(world.repo, "checkout", "-q", "--detach", "v0.0.1")
     done = _hit(world, "git push -q origin v0.0.1")
     output = done.stdout + done.stderr
-    assert done.returncode != 0 and "Operator action" in output
-    assert "\nfix: " not in output
+    assert done.returncode != 0 and "\nfix: Operator action: " in output
     assert world.git(world.repo, "rev-parse", "HEAD") == world.git(
         world.repo, "rev-parse", "v0.0.1"
     )

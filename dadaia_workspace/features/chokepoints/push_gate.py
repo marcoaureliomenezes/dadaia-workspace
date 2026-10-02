@@ -98,14 +98,16 @@ def _notes(
 
 
 def _rewrite_fix(ref: PushRef, object_source: ObjectSource, repo: Path, fixes: GateFixes) -> str:
-    """The one fix for the first refused ref (R13: origin is never rewritten)."""
-    if ref.local_ref.startswith("refs/tags/") or not fixes.head:
-        return "Operator action: a tag or a detached HEAD has no branch to amend; push a branch."
+    """The uncommit-amend remedy for the first refused ref (R13: origin is never rewritten)."""
     branch = ref.local_ref.removeprefix(HEADS_PREFIX)
-    if branch != ref.local_ref and branch != fixes.head:
-        return f"fix: {git_line(fixes.repo, 'switch', branch)}"
-    oldest = object_source.unpublished(repo, ref.local_sha)[-1]
-    return f"fix: {git_line(fixes.repo, 'reset', '--soft', oldest)}"
+    if ref.local_ref.startswith("refs/tags/") or not fixes.head:
+        fix = "Operator action: a tag or a detached HEAD has no branch to amend; push a branch."
+    elif branch != ref.local_ref and branch != fixes.head:
+        fix = git_line(fixes.repo, "switch", branch)
+    else:
+        oldest = object_source.unpublished(repo, ref.local_sha)[-1]
+        fix = git_line(fixes.repo, "reset", "--soft", oldest)
+    return f"{_REWRITE}\nfix: {fix}"
 
 
 def _run_denylist_scan(
@@ -227,12 +229,18 @@ def push_gate_decision(
             ],
             "path(s)",
         )
+        fix = _rewrite_fix(canon[0][0], object_source, repo, fixes)
     elif laws:
         message = _refusal(
             f"{len(laws)} pushed commit(s) delete a law line citing no `ADR NNNN` (ADR 0151).",
             [f"  {r.local_ref}: commit {c[:12]} deletes a line of {p}" for r, c, p in laws],
             "commit(s)",
             "Cite the ADR that rules each deletion in that commit's message. ",
+        )
+        _, sha, path = laws[0]  # one act per refusal: the re-run names the next commit
+        fix = (
+            f"fix: Operator action: reword commit {sha[:12]} to cite the accepted ADR "
+            f"that rules its deletion of {path}"
         )
     elif hits:
         message = _refusal(
@@ -248,14 +256,13 @@ def push_gate_decision(
             "concatenation), never as a tracked literal. The range scope means "
             "already-published history never needs a rewrite. ",
         )
+        fix = _rewrite_fix(hits[0][0], object_source, repo, fixes)
     else:
-        message = ""
+        message = fix = ""
     decision = Decision(
         allowed=True,
         message="[pre-push] branch policy + specs-canon scan + denylist scan passed; allow.",
     )
     if message:
-        first = (canon or laws or hits)[0][0]
-        fix = _rewrite_fix(first, object_source, repo, fixes)
-        decision = Decision(allowed=False, message=f"{message}\n{_REWRITE}\n{fix}")
+        decision = Decision(allowed=False, message=f"{message}\n{fix}")
     return _notes(decision, binaries, oversized, masker)
