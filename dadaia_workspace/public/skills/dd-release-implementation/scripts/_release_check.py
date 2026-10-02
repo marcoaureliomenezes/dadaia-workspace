@@ -65,8 +65,7 @@ def state_findings(text: str, rel: str, root: Path = SPECS) -> list[dict[str, An
         return [_unwritten(rel, exc.lineno, message, root, at)]
     schema = load_schema("release-state-v1")
     messages = list(validate(document, schema, schema, "state")) or _log_errors(document)
-    at = _ledger.keys(messages, "state") if messages else ""
-    return [_unwritten(rel, 1, "; ".join(messages), root, at)] if messages else []
+    return [_unwritten(rel, 1, "; ".join(messages), root, _ledger.NAMED)] if messages else []
 
 
 def histo_findings(text: str, root: Path = SPECS) -> list[dict[str, Any]]:

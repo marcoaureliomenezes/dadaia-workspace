@@ -63,8 +63,7 @@ def document_findings(text: str, root: Path = SPECS) -> list[dict[str, Any]]:
                         f"its JSON syntax (line {exc.lineno})")]  # fmt: skip
     schema = load_schema("backlog-v1")
     if messages := list(validate(document, schema, schema, "document")):
-        label = _ledger.keys(messages, "document")
-        return [finding(LEDGER, 1, "; ".join(messages), root, label)]
+        return [finding(LEDGER, 1, "; ".join(messages), root, _ledger.NAMED)]
     findings: list[dict[str, Any]] = []
     seen: dict[str, int] = {}
     for index, item in enumerate(document["active"], start=1):
@@ -72,7 +71,9 @@ def document_findings(text: str, root: Path = SPECS) -> list[dict[str, Any]]:
         if (first := seen.setdefault(str(item["id"]), index)) != index:
             errors.append(f"duplicate active[] id {item['id']!r} (first at #{first})")
         if errors:
-            findings.append(finding(LEDGER, index, "; ".join(errors), root, f"active[{index - 1}]"))
+            findings.append(
+                finding(LEDGER, index, "; ".join(errors), root, f"entry {item['id']!r}")
+            )
     return findings
 
 

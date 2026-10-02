@@ -115,6 +115,10 @@ def finding(code: str, path: str, line: int, message: str, fix: str) -> dict[str
 SPECS = Path("specs")
 
 
+#: A whole-document finding's label: its message already names every key.
+NAMED = "the keys this finding names"
+
+
 def unwritten(file: Path, at: int | str, verbs: str, law: str) -> str:
     """The fix for content no verb wrote: no verb rewrites it and *law* forbids a hand edit.
     *at* is a JSONL line number, or a JSON document's entry/key label — a document has no
@@ -127,13 +131,6 @@ def unwritten(file: Path, at: int | str, verbs: str, law: str) -> str:
     return (f"Operator action: {what} — if {file} has uncommitted changes, discard them "
             f"(`git checkout -- {file}`); otherwise revert the commit that introduced it "
             f"({finder}), then redo the change through {verbs}")  # fmt: skip
-
-
-def keys(messages: list[str], root: str) -> str:
-    """The top-level keys (with an entry index) *messages* name under *root* — a document
-    finding's label."""
-    found = re.findall(rf"\b{root}\.(\w+(?:\[\d+\])?)", "; ".join(messages))
-    return ", ".join(dict.fromkeys(found)) or root
 
 
 def stamp(path: Path) -> tuple[int, int] | None:

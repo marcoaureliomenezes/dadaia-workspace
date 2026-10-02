@@ -93,7 +93,7 @@ def test_the_printed_fix_clears_its_finding(tmp_path: Path, code: str) -> None:
 _ENTRY = {"id": "a-entry", "title": "a", "opened": "2026-10-02", "status": "idea",
           "description": "d", "provenance": "operator request"}  # fmt: skip
 _PRETTY = json.dumps(
-    {"schema": "backlog-v1", "active": [_ENTRY, {**_ENTRY, "id": "b", "status": "resolved"}]},
+    {"schema": "backlog-v1", "active": [_ENTRY, {**_ENTRY, "id": "b-entry", "status": "resolved"}]},
     indent=2,
 )
 #: (code, file, committed, bad, where): a JSONL ledger names its line; a JSON document
@@ -102,7 +102,7 @@ _LEDGER_ROWS = [
     ("LEDGER-BUGS-SCHEMA", "specs/bugs/BUGS.jsonl", "", '{"id": "broken"}\n', 1),  # the bug's repro
     ("LEDGER-BUGS-SCHEMA", "specs/bugs/BUGS.jsonl", "{not json\n", "{not json\n", 1),  # invalid at HEAD too
     ("LEDGER-BACKLOG-SCHEMA", "specs/backlog/BACKLOG.json", '{"schema": "backlog-v1", "active": []}', "{not json\n", "its JSON syntax (line 1)"),
-    ("LEDGER-BACKLOG-SCHEMA", "specs/backlog/BACKLOG.json", "", _PRETTY, "active[1]"),
+    ("LEDGER-BACKLOG-SCHEMA", "specs/backlog/BACKLOG.json", "", _PRETTY, "entry 'b-entry'"),
     ("LEDGER-FINDINGS-SCHEMA", "specs/audits/20260101-x/FINDINGS.jsonl", "", "{not json\n", 1),
     ("LEDGER-RELEASE-SCHEMA", "specs/releases/1.0.0/_RELEASE.json", "{}\n", "{not json\n", "its JSON syntax (line 1)"),
 ]  # fmt: skip
