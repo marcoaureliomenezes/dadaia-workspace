@@ -753,6 +753,12 @@ def _associated_on_integration(world: World) -> list[str]:
     return ["context", "dead", "proj"]
 
 
+def _associated_dead(world: World) -> None:
+    """dead-holds-main-repo-before-associated-push: every repo pushed before any is held."""
+    assert "feature/1.0.0" in world.git(world.tmp / "lib.git", "branch")
+    assert not world.repo.exists() and not (world.ws / "repos" / "lib").exists()
+
+
 def _dead_denylisted(world: World) -> list[str]:
     _on_work(world)
     world.deny()
@@ -885,7 +891,10 @@ SITES: dict[str, tuple[Case | tuple[Case, ...] | Skip, ...]] = {
             Case(_commits_no_remote, _dead_done, operator=_origin),
         ),
         Case(_dead_no_identity, _dead_done, operator=_identity),
-        Case(_dirty_on_integration, _dead_via_work),
+        (
+            Case(_dirty_on_integration, _dead_via_work),
+            Case(_associated_on_integration, _associated_dead),
+        ),
     ),
     "service.SpecContextService.dead": (
         Case(_dead_twice, _dead_done),
@@ -1124,12 +1133,3 @@ def test_dead_commit_without_a_git_identity_refuses_and_removes_nothing(world: W
     assert world.remote_heads()["feature/1.0.0"] == published
     ctx = JsonContextStore(world.ws / ".dadaia" / "states").get("proj")
     assert ctx is not None and ctx.state == ContextState.ALIVE
-
-
-def test_dead_names_the_main_repos_work_branch_for_an_associated_repo(world: World) -> None:
-    """Intent: CONTRACT — T-050-151 review M4 (sa-live-work-branch-named-three-ways): an
-    associated repo off the work branch is sent to the main repo's live work branch, never
-    the fallback its own missing specs/ would give."""
-    done = world.cli(*_associated_on_integration(world))
-    lib = world.ws / "repos" / "lib"
-    assert _single_fix(done) == shell_line("git", "-C", str(lib), "checkout", "-b", "feature/1.0.0")

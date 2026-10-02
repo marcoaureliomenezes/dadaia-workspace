@@ -726,12 +726,11 @@ class SpecContextService:
         repo_paths = [(repo.slug, self._repo_path(repo.slug)) for repo in ctx.all_repos()]
         self._dead_preflight(name, ctx, commit=commit)
 
-        # Phase 2 — git sync + hold for every repo. Races are accepted by the
-        # NO-LOCKS doctrine.
+        # Phase 2 — sync every repo, then hold every repo: a push's gate reads the main
+        # repo's gitflow, so no repo is held before all are pushed. NO-LOCKS races.
+        present = [(slug, path) for slug, path in repo_paths if path.exists()]
         branch_before_sync: str | None = None
-        for slug, repo_path in repo_paths:
-            if not repo_path.exists():
-                continue
+        for slug, repo_path in present:
             if slug == ctx.repo_slug:
                 with contextlib.suppress(Exception):
                     branch_before_sync = self._git.current_branch(repo_path)
@@ -745,6 +744,7 @@ class SpecContextService:
                 except GitSyncError as exc:
                     lead = f"Git sync failed for context '{name}' repo '{slug}'; nothing was removed.\n"
                     raise GitSyncError(f"{lead}{exc}") from exc
+        for slug, repo_path in present:
             done = sweep.hold(self._workspace_root, repo_path, f"repos/{slug}")
             if isinstance(done, sweep.Skipped):  # the refusal, not success: nothing to hold is fine
                 raise ContextStateError(f"Context '{name}' stays ALIVE: {done}")
