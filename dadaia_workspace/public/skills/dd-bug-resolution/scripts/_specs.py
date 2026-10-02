@@ -81,11 +81,11 @@ def with_specs(fix: str, specs: Path | str) -> str:
 
 
 def _rerun(*drop: str) -> str:
-    """This invocation again, without ``--specs`` and *drop* (flags with their value, or
-    positional values)."""
-    argv, gone = sys.argv, ("--specs", *drop)
-    rest = [w for i, w in enumerate(argv) if i and w not in gone and w.split("=")[0] not in gone
-            and not (argv[i - 1].startswith("--") and argv[i - 1] in gone)]  # fmt: skip
+    """This invocation again, without ``--specs`` and *drop*: a flag with its value, or a
+    positional value (a token no flag precedes)."""
+    argv, flags = sys.argv, ("--specs", *(d for d in drop if d.startswith("-")))
+    rest = [w for i, w in enumerate(argv) if i and w.split("=")[0] not in flags
+            and argv[i - 1] not in flags and not (w in drop and not argv[i - 1].startswith("-"))]  # fmt: skip
     return " ".join((script(Path(argv[0])), *map(quote, rest)))
 
 

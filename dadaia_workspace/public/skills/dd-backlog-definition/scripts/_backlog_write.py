@@ -47,20 +47,20 @@ def new_entry(active: Items, slug: str, values: dict[str, Any]) -> Items:
     the one status exempt from the typed-intents requirement, so it is doctor-clean with
     no further edits."""
     if not _SLUG_RE.fullmatch(slug):
-        refusal = Refusal(f"invalid slug {slug!r}: must match ^[a-z][a-z0-9-]+$ (lowercase "
-                          "letters, digits and hyphens, starting with a letter)")  # fmt: skip
-        raise choice(refusal, "with a valid slug in its place", slug)
+        raise choice(Refusal(f"invalid slug {slug!r}: must match ^[a-z][a-z0-9-]+$ (lowercase "
+                     "letters, digits and hyphens, starting with a letter)"),
+                     "with a valid slug in its place", slug)  # fmt: skip
     if any(item.get("id") == slug for item in active):
-        refusal = Refusal(f"backlog slug {slug!r} is already a live active[] entry — an item is "
-                          "retained forever, so a second entry under this id would be a second "
-                          "identity for it")  # fmt: skip
-        raise choice(refusal, "with a slug no entry holds in its place", slug)
+        raise choice(Refusal(f"backlog slug {slug!r} is already a live active[] entry — an item is "
+                     "retained forever, so a second entry under this id would be a second "
+                     "identity for it"), "with a slug no entry holds in its place",
+                     slug)  # fmt: skip
     relates, live = values.get("relates"), [str(item.get("id")) for item in active]
     names = [] if relates in (None, "none") else str(relates).split(",")
     if not set(names) <= set(live) or live and relates is None:
-        refusal = Refusal("name the live entries this one updates, obsoletes or relates to "
-                          f"(ADR 0127): {', '.join(live) or 'none'}")  # fmt: skip
-        raise choice(refusal, "with --relates set to the comma-separated live entries, or none",
+        raise choice(Refusal("name the live entries this one updates, obsoletes or relates to "
+                     f"(ADR 0127): {', '.join(live) or 'none'}"),
+                     "with --relates set to the comma-separated live entries, or none",
                      "--relates")  # fmt: skip
     intents = parse_intents(values.get("intent"))
     entry: dict[str, Any] = {

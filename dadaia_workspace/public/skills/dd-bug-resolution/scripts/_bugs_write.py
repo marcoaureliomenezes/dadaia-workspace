@@ -49,29 +49,21 @@ def append(records: Records, values: dict[str, Any], dirs: set[str]) -> Records:
     its correlation (ADR 0127); the schema check does the rest."""
     bug_id = values["id"]
     if any(r.get("id") == bug_id for r in records):
-        refusal = Refusal(
-            f"bug id {bug_id!r} already exists — a reopen is a NEW record declaring "
-            "'caused_by: <prior-id>' at resolve, never a second record under this id"
-        )
-        raise choice(refusal, "with --bug-id set to an id no record holds", "--bug-id")
+        raise choice(Refusal(f"bug id {bug_id!r} already exists — a reopen is a NEW record declaring "
+                     "'caused_by: <prior-id>' at resolve, never a second record under this id"),
+                     "with --bug-id set to an id no record holds", "--bug-id")  # fmt: skip
     surface = str(values.get("surface"))
     if surface not in dirs:
         close = ", ".join(difflib.get_close_matches(surface, sorted(dirs), 5, 0)) or "none"
-        refusal = Refusal(
-            f"surface {surface!r} is not the name of a directory tracked in this repo"
-        )
-        raise choice(
-            refusal, f"with --surface set to a tracked directory (closest: {close})", "--surface"
-        )
+        raise choice(Refusal(f"surface {surface!r} is not the name of a directory tracked in this repo"),
+                     f"with --surface set to a tracked directory (closest: {close})",
+                     "--surface")  # fmt: skip
     correlates = values.get("correlates")
     ids = [] if correlates == "none" else str(correlates or "").split(",")
     if not set(ids) <= {r.get("id") for r in records}:
-        refusal = Refusal(
-            "name the ledger ids this bug correlates with — the candidates are listed above"
-        )
-        raise choice(
-            refusal, "with --correlates set to the comma-separated ids, or none", "--correlates"
-        )
+        raise choice(Refusal("name the ledger ids this bug correlates with — the candidates are listed above"),
+                     "with --correlates set to the comma-separated ids, or none",
+                     "--correlates")  # fmt: skip
     record = {key: values.get(key) for key in CORE} | {"correlates": ids}
     record.update({key: None for key in GOVERNANCE})
     record["status"] = "open"
@@ -86,9 +78,9 @@ def _set(record: dict[str, Any], key: str, value: Any) -> None:
             f"{_SCRIPT} status --all",
         )
     if key in CORE and record.get(key) != value:
-        refusal = Refusal(f"bug-record field {key!r} is immutable-core and cannot be changed",
-                          f"{_SCRIPT} append")  # fmt: skip
-        raise choice(refusal, "with a new --bug-id, filing the changed value as a new record")
+        raise choice(Refusal(f"bug-record field {key!r} is immutable-core and cannot be changed",
+                     f"{_SCRIPT} append"),
+                     "with a new --bug-id, filing the changed value as a new record")  # fmt: skip
     record[key] = value
 
 
@@ -98,9 +90,10 @@ def apply_update(records: Records, bug_id: str, changes: dict[str, str]) -> Reco
     for key in changes:
         if key in _VERB_OWNED:
             verb, *twins = _VERB_OWNED[key]
-            refusal = Refusal(f"bug-record field {key!r} is written only by {verb}"
-                              + "".join(f", {t}" for t in twins), f"{_SCRIPT} {verb} {bug_id}")  # fmt: skip
-            raise choice(refusal, f"or its {', '.join(twins)} twin, with the fields it requires"
+            raise choice(Refusal(f"bug-record field {key!r} is written only by {verb}"
+                         + "".join(f", {t}" for t in twins),
+                         f"{_SCRIPT} {verb} {bug_id}"),
+                         f"or its {', '.join(twins)} twin, with the fields it requires"
                          if twins else "with --by set to the bug superseding it")  # fmt: skip
         if key not in _MUTABILITY:
             raise Refusal(f"unknown bug-record field {key!r}", f"{_SCRIPT} update --help")

@@ -127,6 +127,16 @@ def test_new_refuses_a_duplicate_slug_with_one_fix_line(script: Path, tmp_path: 
     assert len(_active(specs)) == 1
 
 
+def test_a_refused_positional_drops_only_itself_never_an_equal_flag_value(
+    script: Path, tmp_path: Path
+) -> None:
+    """Intent: CONTRACT — AC4.4 (T-050-151 review LOW 1): the invalid slug leaves the quoted
+    command; a flag value spelled the same stays with its flag."""
+    done = _run(script, "new", "Bad", "--title", "Bad", "--specs", str(_specs(tmp_path)))
+    (fix,) = _fix_lines(done)
+    assert " new --title Bad --specs " in fix.split("`")[1], fix
+
+
 def test_new_names_the_live_entries_it_relates_to(script: Path, tmp_path: Path) -> None:
     """ADR 0127 / AC1.12: past the first entry, `new` refuses without `--relates`, listing
     the live entries, and always refuses a slug that is not one; the named ones are recorded."""

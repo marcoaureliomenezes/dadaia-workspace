@@ -46,20 +46,20 @@ def transition(records: Records, bug_id: str, verb: str, values: dict[str, Any],
     A resolve's seam is read under *root*, the repo the ledger belongs to."""
     missing = [name for name in REQUIRED_BY_VERB[verb] if not (values.get(name) or "").strip()]
     if missing:
-        refusal = Refusal(f"transition {verb!r} refused — {', '.join(map(repr, missing))} required")
-        raise choice(refusal, f"with {', '.join('--' + m.replace('_', '-') for m in missing)} set")
+        raise choice(Refusal(f"transition {verb!r} refused — {', '.join(map(repr, missing))} required"),
+                     f"with {', '.join('--' + m.replace('_', '-') for m in missing)} set")  # fmt: skip
     record = by_id(records, bug_id)
     updated = dict(record)
     if verb == "resolve":
         if not _EVIDENCE_DIFF_RE.match(values["evidence_diff"]):
-            refusal = Refusal("'evidence_diff' must match '^(net-negative|net-positive|"
-                              "net-neutral): <rationale>'")  # fmt: skip
-            raise choice(refusal, "with --evidence-diff set to net-negative, net-positive or "
+            raise choice(Refusal("'evidence_diff' must match '^(net-negative|net-positive|"
+                         "net-neutral): <rationale>'"),
+                         "with --evidence-diff set to net-negative, net-positive or "
                          "net-neutral, a colon and why", "--evidence-diff")  # fmt: skip
         if not _seam_exists(values["evidence_seam"], root):
-            refusal = Refusal(f"evidence_seam {values['evidence_seam']!r} names no file or "
-                              f"'def <name>' under {root}")  # fmt: skip
-            raise choice(refusal, f"with --evidence-seam set to a test file under {root}, :: "
+            raise choice(Refusal(f"evidence_seam {values['evidence_seam']!r} names no file or "
+                         f"'def <name>' under {root}"),
+                         f"with --evidence-seam set to a test file under {root}, :: "
                          "and its test name", "--evidence-seam")  # fmt: skip
         for key in REQUIRED_BY_VERB["resolve"]:
             _set(updated, key, values[key])

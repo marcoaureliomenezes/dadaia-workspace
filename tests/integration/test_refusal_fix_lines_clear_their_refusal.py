@@ -35,7 +35,7 @@ import sys
 import sysconfig
 from collections import Counter
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 
 import pytest
@@ -45,6 +45,7 @@ from dadaia_workspace.cli.main import app
 from dadaia_workspace.core.cli_line import cli_path, fix_line, shell_line
 from dadaia_workspace.core.gitflow import DEFAULT, work_branch
 from dadaia_workspace.core.models.spec_context import (
+    AssociatedRepo,
     ContextState,
     SpecContextProject,
 )
@@ -200,15 +201,19 @@ class World:
     def cli(self, *argv: str) -> subprocess.CompletedProcess[str]:
         return self.run([str(cli_path(self.ws)), *argv], self.elsewhere)
 
-    def seed(self, constitution: str | None = None, *branches: str) -> None:
+    def seed(self, constitution: str | None = None, *branches: str, live: str = "") -> None:
         """The bare remote carries *branches* (default ``main`` then ``develop``), each at
-        one commit holding a README and, when given, ``specs/constitution.md``."""
+        one commit holding a README and, when given, ``specs/constitution.md`` and the
+        *live* release's ``_RELEASE.json``."""
         src = self.tmp / "seed"
         self.git(self.tmp, "init", "-q", str(src))
         (src / "README.md").write_text("r\n", encoding="utf-8")
         if constitution is not None:
             (src / "specs").mkdir()
             (src / "specs" / "constitution.md").write_text(constitution, encoding="utf-8")
+        if live:
+            (src / "specs" / "releases" / live).mkdir(parents=True)
+            (src / "specs" / "releases" / live / "_RELEASE.json").write_text("{}\n")
         self.git(src, "add", "-A")
         self.git(src, "commit", "-qm", "seed")
         for branch in branches or ("main", "develop"):
@@ -338,6 +343,13 @@ def _published(world: World) -> None:
 
 
 @_template
+def _released(world: World) -> None:
+    """Published, with a live release: the work branch is the rule's, never its fallback."""
+    world.seed(_constitution(), live="1.0.0")
+    world.clone()
+
+
+@_template
 def _seeded(world: World) -> None:
     world.seed(_constitution())
 
@@ -405,7 +417,7 @@ def _baseline_done(
 
 
 def _malformed(world: World) -> str:
-    _published(world)
+    _released(world)
     world.commit("notes.md", "n\n", branch=_work(world))
     return f"printf 'not a ref line\\n' | {fix_line(world.ws, 'ci', 'push-gate-check')}"
 
@@ -706,7 +718,7 @@ def _commits_no_remote(world: World) -> list[str]:
 
 
 def _dirty_on_integration(world: World) -> list[str]:
-    _published(world)
+    _released(world)
     world.git(world.repo, "checkout", "-q", "develop")
     (world.repo / "README.md").write_text("edited\n", encoding="utf-8")
     return ["context", "dead", "proj"]
@@ -715,8 +727,30 @@ def _dirty_on_integration(world: World) -> list[str]:
 def _dead_via_work(world: World) -> None:
     heads = world.remote_heads()
     assert heads["develop"] == world.git(world.bare, "rev-parse", "main")
-    assert _work(world) in heads
+    assert "feature/1.0.0" in heads  # the planted live release's work branch
     assert not world.repo.exists()
+
+
+def _associated_on_integration(world: World) -> list[str]:
+    """Review M4: an associated repo has no specs/ — its work branch is the main repo's."""
+    _released(world)
+    world.git(world.repo, "checkout", "-q", "-b", "feature/1.0.0", "origin/develop")
+    world.git(world.repo, "push", "-q", "-u", "origin", "feature/1.0.0")
+    lib, lib_bare = world.ws / "repos" / "lib", world.tmp / "lib.git"
+    world.git(world.tmp, "init", "-q", "--bare", "-b", "main", str(lib_bare))
+    world.git(world.tmp, "clone", "-q", lib_bare.as_uri(), str(lib))
+    (lib / "README.md").write_text("r\n", encoding="utf-8")  # no specs/ of its own
+    world.git(lib, "add", "README.md")
+    world.git(lib, "commit", "-qm", "r")
+    world.git(lib, "push", "-q", "origin", "HEAD:main", "HEAD:develop")
+    world.git(lib, "checkout", "-q", "-b", "develop", "--track", "origin/develop")
+    install_git_hooks(lib)
+    (lib / "README.md").write_text("edited\n", encoding="utf-8")
+    store = JsonContextStore(world.ws / ".dadaia" / "states")
+    ctx = store.get("proj")
+    assert ctx is not None
+    store.update(replace(ctx, associated_repos=(AssociatedRepo("lib", lib_bare.as_uri()),)))
+    return ["context", "dead", "proj"]
 
 
 def _dead_denylisted(world: World) -> list[str]:
@@ -1090,3 +1124,12 @@ def test_dead_commit_without_a_git_identity_refuses_and_removes_nothing(world: W
     assert world.remote_heads()["feature/1.0.0"] == published
     ctx = JsonContextStore(world.ws / ".dadaia" / "states").get("proj")
     assert ctx is not None and ctx.state == ContextState.ALIVE
+
+
+def test_dead_names_the_main_repos_work_branch_for_an_associated_repo(world: World) -> None:
+    """Intent: CONTRACT — T-050-151 review M4 (sa-live-work-branch-named-three-ways): an
+    associated repo off the work branch is sent to the main repo's live work branch, never
+    the fallback its own missing specs/ would give."""
+    done = world.cli(*_associated_on_integration(world))
+    lib = world.ws / "repos" / "lib"
+    assert _single_fix(done) == shell_line("git", "-C", str(lib), "checkout", "-b", "feature/1.0.0")

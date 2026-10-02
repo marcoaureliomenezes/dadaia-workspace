@@ -46,16 +46,16 @@ def disposition(specs: Path, audit: str, finding_id: str, values: dict[str, Any]
     verdict = values["disposition"]
     directory = _live(specs, audit)
     if verdict not in DISPOSITIONS:
-        refusal = Refusal(f"unknown disposition {verdict!r}: a finding is dispositioned as one "
-                          f"of {'|'.join(DISPOSITIONS)}")  # fmt: skip
-        raise choice(refusal, f"with --disposition set to one of {', '.join(DISPOSITIONS)}",
+        raise choice(Refusal(f"unknown disposition {verdict!r}: a finding is dispositioned as one "
+                     f"of {'|'.join(DISPOSITIONS)}"),
+                     f"with --disposition set to one of {', '.join(DISPOSITIONS)}",
                      "--disposition")  # fmt: skip
     required = REQUIRED_EVIDENCE[verdict]
     if not (values.get(required) or "").strip():
         needed = "the release that fixed it" if required == "release" else "why it was not fixed"
-        refusal = Refusal(f"disposition {verdict!r} requires --{required}: the finding's "
-                          "governance triple is the only surviving record of how it was closed")  # fmt: skip
-        raise choice(refusal, f"with --{required} set to {needed}", f"--{required}")
+        raise choice(Refusal(f"disposition {verdict!r} requires --{required}: the finding's "
+                     "governance triple is the only surviving record of how it was closed"),
+                     f"with --{required} set to {needed}", f"--{required}")  # fmt: skip
     records = read_findings(directory)
     known = [str(record.get("id")) for record in records]
     if finding_id not in known:
@@ -80,10 +80,11 @@ def close(specs: Path, audit: str, sha: str) -> str:
     records = read_findings(directory)
     open_ids = [str(r.get("id")) for r in records if r.get("disposition") not in DISPOSITIONS]
     if open_ids:
-        refusal = Refusal(f"audit {audit!r} still carries {len(open_ids)} undispositioned "
-                          f"finding(s): {', '.join(open_ids)}. Every finding gets a disposition "
-                          "before the audit closes", f"{SCRIPT} disposition {audit} {open_ids[0]}")  # fmt: skip
-        raise choice(refusal, "with the --disposition it earned and the evidence that requires")
+        raise choice(Refusal(f"audit {audit!r} still carries {len(open_ids)} undispositioned "
+                     f"finding(s): {', '.join(open_ids)}. Every finding gets a disposition "
+                     "before the audit closes",
+                     f"{SCRIPT} disposition {audit} {open_ids[0]}"),
+                     "with the --disposition it earned and the evidence that requires")  # fmt: skip
     releases = sorted({str(r["release"]) for r in records if r.get("release")})
     if len(releases) > 1:
         other = next(r["id"] for r in records if r.get("release") and r["release"] != releases[0])

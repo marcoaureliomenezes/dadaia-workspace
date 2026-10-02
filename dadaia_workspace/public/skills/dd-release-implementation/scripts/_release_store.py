@@ -76,9 +76,8 @@ def live_release(specs: Path) -> Live:
     """Resolve the ONE live release and read its state, or refuse naming the reason."""
     ids = live_ids(specs)
     if not ids:
-        refusal = Refusal("no live release under specs/releases/ — nothing to operate on",
-                          f"{SCRIPT} new")  # fmt: skip
-        raise choice(refusal, "with the release version you choose")
+        raise choice(Refusal("no live release under specs/releases/ — nothing to operate on",
+                     f"{SCRIPT} new"), "with the release version you choose")  # fmt: skip
     if len(ids) > 1:
         raise Refusal(
             f"multiple live release directories carry {STATE}: {', '.join(ids)} — the "
@@ -94,9 +93,9 @@ def window_start(state: State) -> str:
     ends = [e["until"] for e in state.get("log") or []
             if isinstance(e, dict) and e.get("kind") == "memory" and e.get("until")]  # fmt: skip
     if not (start := ends[-1] if ends else (state.get("defined") or {}).get("sha")):
-        refusal = Refusal("the live release has no defined.sha to open the memory window at",
-                          f"{SCRIPT} phase IMPLEMENTATION --sha")  # fmt: skip
-        raise choice(refusal, "with the sha of the commit that approved the definition")
+        raise choice(Refusal("the live release has no defined.sha to open the memory window at",
+                     f"{SCRIPT} phase IMPLEMENTATION --sha"),
+                     "with the sha of the commit that approved the definition")  # fmt: skip
     return str(start)
 
 
