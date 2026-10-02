@@ -37,6 +37,12 @@ def root(tmp_path: Path) -> Path:
     return tmp_path
 
 
+def _argv(result: subprocess.CompletedProcess[str]) -> list[str]:
+    """The one fix line, split as the shell will: the expected argv is the oracle."""
+    (fix,) = fixes(result)
+    return shlex.split(fix.removeprefix("fix: "))
+
+
 def test_merge_fast_forwards_removes_and_reruns(root: Path) -> None:
     repo, tree = root / "repos/r", root / TREE
     sha = commit(tree, "src/a.py")
@@ -55,9 +61,8 @@ def test_merge_fast_forwards_removes_and_reruns(root: Path) -> None:
     git(repo, "worktree", "add", "-q", "-b", "wt/0.5.0a-impl", str(tree))
     commit(tree, "src/b.py")
     git(repo, "worktree", "remove", str(tree))  # interrupted: tree gone, its commit unmerged
-    assert fixes(run(root, "merge", TREE)) == [
-        "fix: "
-        + shlex.join(["git", "-C", str(repo), "worktree", "add", str(tree), "wt/0.5.0a-impl"])
+    assert _argv(run(root, "merge", TREE)) == [
+        *("git", "-C", str(repo), "worktree", "add", str(tree), "wt/0.5.0a-impl")
     ]
     assert git(repo, "branch", "--list", "wt/0.5.0a-impl").strip()  # never -D
 
@@ -67,13 +72,14 @@ def test_dirty_outside_set_and_conflict_each_refuse_with_one_fix(root: Path) -> 
     (tree / "wip.py").write_text("")
     _fix(root, dirty := run(root, "merge", TREE))
     assert "uncommitted" in dirty.stderr
-    commit(tree, "specs/backlog/BACKLOG.json", "{}")  # new: the undo removes it
+    commit(tree, "specs/backlog/BACKLOG copy.json", "{}")  # new: the undo removes it
     commit(tree, "specs/releases/0.5.0/rc-1/SPEC.md", "edited")  # on the work branch: restored
-    for rel, owner in (("specs/backlog/BACKLOG.json", "backlog"), ("SPEC.md", "release")):
+    for rel, owner in (("specs/backlog/BACKLOG copy.json", "backlog"), ("SPEC.md", "release")):
         outside = run(root, "merge", TREE)
         assert rel in outside.stderr and f"{owner} worktree" in outside.stderr
-        act = shlex.split(fixes(outside)[0].split("`")[1])  # Operator action: restore, commit
-        git(tree, *act[3:])
+        restore, then = fixes(outside)[0].split("`")[1::2]  # Operator action: restore, commit
+        subprocess.run(restore, shell=True, check=True)  # noqa: S602 — runs as printed
+        assert shlex.split(then) == ["git", "-C", str(tree), "commit"]
         git(tree, "commit", "-qm", f"revert: {rel}")
     commit(repo, "README.md", "- [ ] a\n")  # markers alone, but not TASKS: never replayed
     git(tree, "rebase", "-q", "feature/0.5.0")
@@ -81,9 +87,21 @@ def test_dirty_outside_set_and_conflict_each_refuse_with_one_fix(root: Path) -> 
     commit(tree, "README.md", "- [x] a\n")
     conflict = run(root, "merge", TREE)
     assert not (Path(git(tree, "rev-parse", "--git-dir").strip()) / "rebase-merge").exists()
-    assert fixes(conflict) == [
-        "fix: " + shlex.join(["git", "-C", str(tree), "rebase", "feature/0.5.0"])
-    ]
+    assert _argv(conflict) == ["git", "-C", str(tree), "rebase", "feature/0.5.0"]
+
+
+def test_work_branch_refusals_fix_runs_verbatim(tmp_path: Path) -> None:
+    (ws := tmp_path / "my ws").mkdir()
+    make_workspace(ws)
+    repo = ws / "repos/r"
+    git(repo, "branch", "feature/0.4.9", "feature/0.5.0")  # two work branches: the older goes
+    _fix(ws, two := run(ws, "new", "r", "--kind", "impl"))
+    assert "2 work branches" in two.stderr
+    assert not git(repo, "branch", "--list", "feature/0.4.9").strip()
+    git(repo, "branch", "-m", "feature/0.5.0", "dev")  # none: the fix cuts one from dev
+    _fix(ws, none := run(ws, "new", "r", "--kind", "impl"))
+    assert "no work branch" in none.stderr
+    assert git(repo, "branch", "--list", "feature/*").strip()
 
 
 @pytest.mark.parametrize(
@@ -103,9 +121,8 @@ def test_merge_needs_a_valid_approval_of_the_exact_head(
     )
     result = run(root, "merge", TREE)
     assert result.returncode == 1 and head in result.stderr
-    (fix,) = fixes(result)
     cli = str(root / ".dadaia/.venv/bin/dadaia")
-    assert shlex.split(fix.removeprefix("fix: ")) == [cli, "reports", "validate", str(target)]
+    assert _argv(result) == [cli, "reports", "validate", str(target)]
     assert git(root / "repos/r", "rev-parse", "feature/0.5.0").strip() != head
 
 
@@ -127,10 +144,7 @@ def test_failed_fast_forward_tells_a_stray_from_a_moved_work_branch(root: Path) 
     verdict = 'elif args[:2] == ["reports", "validate"]:\n'
     cli.write_text(cli.read_text().replace(verdict, f"{verdict}    import subprocess; {move}\n"))
     moved = run(root, "merge", TREE)
-    (fix,) = fixes(moved)
-    assert (
-        shlex.split(fix[5:]) == [sys.executable, str(SCRIPT), "merge", str(tree)] and tree.exists()
-    )
+    assert _argv(moved) == [sys.executable, str(SCRIPT), "merge", str(tree)] and tree.exists()
 
 
 def test_parallel_siblings_union_ledgers_and_replay_task_markers(root: Path) -> None:
@@ -147,7 +161,7 @@ def test_parallel_siblings_union_ledgers_and_replay_task_markers(root: Path) -> 
     approve(root, git(tree, "rev-parse", "HEAD").strip())
     assert run(root, "merge", TREE).returncode == 0
     assert (repo / tasks).read_text() == s + "- [x]**T-1**\n* [x] **T-2**\n+ [ ] **T-3** amended\n"
-    refused = ["fix: " + shlex.join(["git", "-C", str(tree), "rebase", "feature/0.5.0"])]
+    refused = ["git", "-C", str(tree), "rebase", "feature/0.5.0"]
     assert run(root, "new", "r", "--kind", "impl").returncode == 0
     t2, t3 = "* [x] **T-2**\n", "+ [ ] **T-3** amended\n"
     for mine, theirs in (  # the worktree adds a line; the work side rewrote the flipped one
@@ -156,12 +170,12 @@ def test_parallel_siblings_union_ledgers_and_replay_task_markers(root: Path) -> 
     ):
         commit(tree, tasks, s + mine)
         commit(repo, tasks, s + theirs)
-        assert fixes(run(root, "merge", TREE)) == refused
+        assert _argv(run(root, "merge", TREE)) == refused
         git(tree, "reset", "-q", "--hard", "feature/0.5.0")
     commit(tree, tasks, s + "- [x] **T-1**\n- [x] **T-2** amended\n")
     git(repo, "rm", "-q", tasks)
     git(repo, "commit", "-qm", "moved away")
-    assert fixes(run(root, "merge", TREE)) == refused  # modify/delete: no side to replay onto
+    assert _argv(run(root, "merge", TREE)) == refused  # modify/delete: no side to replay onto
     git(tree, "reset", "-q", "--hard", "feature/0.5.0")
     assert run(root, "clean", TREE).returncode == 0
     assert run(root, "new", "r", "--kind", "bug").returncode == 0
@@ -184,9 +198,7 @@ def test_merge_lists_ignored_files_and_keeps_them_by_its_fix(root: Path) -> None
     refused = run(root, "merge", TREE)
     assert "my notes.scratch" in refused.stderr and "__pycache__" not in refused.stderr
     wrong_branch = run(root, "merge", TREE, "--keep", "my notes.scratch")
-    assert fixes(wrong_branch) == [
-        "fix: " + shlex.join(["git", "-C", str(repo), "switch", "feature/0.5.0"])
-    ]
+    assert _argv(wrong_branch) == ["git", "-C", str(repo), "switch", "feature/0.5.0"]
     _fix(root, wrong_branch)
     _fix(root, refused)
     assert (repo / "my notes.scratch").read_text() == "keep me" and not tree.exists()
@@ -195,8 +207,7 @@ def test_merge_lists_ignored_files_and_keeps_them_by_its_fix(root: Path) -> None
 def test_clean_removes_only_an_empty_worktree_of_ours(root: Path) -> None:
     repo, tree = root / "repos/r", root / TREE
     commit(tree, "src/a.py")
-    (fix,) = fixes(run(root, "clean", TREE))
-    assert shlex.split(fix[5:]) == [sys.executable, str(SCRIPT), "merge", str(tree)]
+    assert _argv(run(root, "clean", TREE)) == [sys.executable, str(SCRIPT), "merge", str(tree)]
     git(tree, "reset", "-q", "--hard", "feature/0.5.0")
     assert run(root, "clean", TREE).returncode == 0 and not tree.exists()
     # ours is the canonical wt/ branch, locked or not (T-050-99 N2); a tree on another is not

@@ -14,6 +14,7 @@ from pathlib import Path
 
 sys.path.append(str(Path(__file__).resolve().parents[2] / "dd-bug-resolution" / "scripts"))
 
+from _specs import git_line as git_line  # noqa: E402
 from _specs import quote as quote  # noqa: E402  (`as`: re-exported to the worktree verbs)
 from _specs import script as script  # noqa: E402
 from _worktree_kinds import _NAME_RE, SCRIPT, Refusal  # noqa: E402
@@ -108,7 +109,7 @@ def work_version(repo: Path, flow: dict[str, str]) -> str:
     if versions:
         stale = sorted(versions, key=lambda v: tuple(map(int, v.split("."))))[0]
         raise Refusal(
-            f"{len(versions)} work branches", f"git -C {quote(str(repo))} branch -d {prefix}{stale}"
+            f"{len(versions)} work branches", git_line(repo, "branch", "-d", f"{prefix}{stale}")
         )
     tags = [
         tuple(map(int, m.groups())) for t in git(repo, "tag").split() if (m := _TAG_RE.match(t))
@@ -117,7 +118,7 @@ def work_version(repo: Path, flow: dict[str, str]) -> str:
     nxt = f"{major}.{minor}.{patch + 1}" if tags else "0.1.0"
     raise Refusal(
         f"no work branch {prefix}<M.m.p>",
-        f"git -C {quote(str(repo))} branch {prefix}{nxt} {flow['integration']}",
+        git_line(repo, "branch", f"{prefix}{nxt}", flow["integration"]),
     )
 
 

@@ -19,6 +19,7 @@ from pathlib import Path
 from typing import Any
 
 from _memory_schema import CATALOG
+from _specs import git_line
 
 CODE = frozenset(
     {".py", ".js", ".mjs", ".ts", ".tsx", ".jsx", ".go", ".rs", ".java", ".kt", ".rb", ".gd"}
@@ -40,7 +41,7 @@ def git(repo: Path, *argv: str) -> list[str]:
     if done.returncode != 0:  # the ONE history precondition: a shallow clone is named
         shallow = subprocess.run(["git", "rev-parse", "--is-shallow-repository"], cwd=repo, capture_output=True, text=True).stdout == "true\n"  # fmt: skip
         raise Refusal(f"git {' '.join(argv)} failed in {repo}: " + ("a shallow clone lacks the window's history" if shallow else done.stderr.strip()),
-                      f"git -C {repo} fetch --unshallow" if shallow else "Operator action: run this verb from a checkout whose history holds the --since commit")  # fmt: skip
+                      git_line(repo, "fetch", "--unshallow") if shallow else "Operator action: run this verb from a checkout whose history holds the --since commit")  # fmt: skip
     return [line for line in done.stdout.split("\n") if line]
 
 

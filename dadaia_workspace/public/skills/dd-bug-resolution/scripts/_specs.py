@@ -69,6 +69,11 @@ def quote(word: str) -> str:
     return word if word and not any(c in word for c in ' \t"') else f'"{word}"'
 
 
+def git_line(repo: Path | str, *argv: str) -> str:
+    """``git -C <repo> argv…`` quoted, as `core/cli_line.git_line` spells it."""
+    return " ".join(map(quote, ("git", "-C", str(repo), *argv)))
+
+
 def script(path: Path) -> str:
     """The ONE script-command prefix: this interpreter + *path*, absolute and quoted."""
     return f"{quote(sys.executable)} {quote(str(path.resolve()))}"

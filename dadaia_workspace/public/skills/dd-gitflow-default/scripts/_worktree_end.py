@@ -13,7 +13,7 @@ from pathlib import Path
 sys.path.append(str(Path(__file__).resolve().parents[2] / "dd-release-implementation" / "scripts"))
 
 from _release_schema import MARK_RE, MARKS  # noqa: E402
-from _worktree_git import cli, cli_line, flow_for, git, ours, quote, script  # noqa: E402
+from _worktree_git import cli, cli_line, flow_for, git, git_line, ours, quote, script  # noqa: E402
 from _worktree_kinds import _NAME_RE, REPLAY, SCRIPT, Refusal, allows, kind_holding  # noqa: E402
 
 REVIEWER = "dd-code-reviewer"
@@ -40,7 +40,7 @@ def _refuse_dirty(tree: Path) -> None:
     if git(tree, "status", "--porcelain").strip():
         raise Refusal(
             f"{tree} has uncommitted changes",
-            f"git -C {quote(str(tree))} stash push --include-untracked",
+            git_line(tree, "stash", "push", "--include-untracked"),
         )
 
 
@@ -81,8 +81,8 @@ def _remove(repo: Path, tree: Path, name: str, kept: list[str]) -> None:
 
 def _undo(tree: Path, work: str, rel: str) -> str:
     """The one act putting *rel* back to the work branch's version, absent included."""
-    return (f"Operator action: revert {rel} to {work} in one commit — `git -C {quote(str(tree))} restore "
-            f"-s {work} -SW -- {quote(rel)}` and `git -C {quote(str(tree))} commit`")  # fmt: skip
+    return (f"Operator action: revert {rel} to {work} in one commit — "
+            f"`{git_line(tree, 'restore', '-s', work, '-SW', '--', rel)}` and `{git_line(tree, 'commit')}`")  # fmt: skip
 
 
 def _check_allowed(tree: Path, work: str, name: str) -> None:
@@ -141,7 +141,7 @@ def _rebase(tree: Path, work: str) -> None:
                 git(tree, "rebase", "--abort", check=False)
                 raise Refusal(
                     f"rebase onto {work} conflicts: {error}",
-                    f"git -C {quote(str(tree))} rebase {work}",
+                    git_line(tree, "rebase", work),
                 ) from error
         for rel, lines in replay.items():
             (tree / rel).write_text("\n".join(lines) + "\n", encoding="utf-8")
@@ -188,7 +188,7 @@ def merge(root: Path, path: str, keep: list[str], drop: bool) -> str:
             except RuntimeError as error:
                 raise Refusal(
                     f"{branch} is unmerged: {error}",
-                    f"git -C {quote(str(repo))} worktree add {quote(str(tree))} {branch}",
+                    git_line(repo, "worktree", "add", str(tree), branch),
                 ) from error
         return f"{branch} merged into {work}"
     _refuse_dirty(tree)
@@ -197,9 +197,7 @@ def merge(root: Path, path: str, keep: list[str], drop: bool) -> str:
     _check_approved(root, git(tree, "rev-parse", "HEAD").strip())
     kept = _kept(tree, "merge", keep, drop)
     if git(repo, "branch", "--show-current").strip() != work:
-        raise Refusal(
-            f"repos/{repo.name} is not on {work}", f"git -C {quote(str(repo))} switch {work}"
-        )
+        raise Refusal(f"repos/{repo.name} is not on {work}", git_line(repo, "switch", work))
     try:
         git(repo, "merge", "-q", "--ff-only", branch)
     except RuntimeError as error:

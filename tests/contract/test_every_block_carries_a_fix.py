@@ -636,7 +636,8 @@ def _text_rows(rel: str) -> list[Callable[[str], object]]:
     """The scans a tracked text file's lines take, by where it ships: the law (the shipped
     surface, product memory, the glossary) names no retired verb; what ships names no
     `memory.py check` done criterion; consumer guidance no library toolchain (AC4.7);
-    `public/**/*.md` command lines spell the live CLI (AC4.8)."""
+    `public/**/*.md` command lines spell the live CLI (AC4.8); a script's git fix goes through
+    `_specs.git_line`, never a hand-spelled unquoted `git -C {…}`."""
     rows: list[Callable[[str], object]] = []
     if rel.startswith(("dadaia_workspace/public/", "specs/memory/")) or rel == "CONTEXT.md":
         rows.append(_DEAD_RELEASE_VOCABULARY.search)
@@ -646,6 +647,8 @@ def _text_rows(rel: str) -> list[Callable[[str], object]]:
         rows.append(re.compile("release-please").search)
     if rel.startswith("dadaia_workspace/public/") and rel.endswith(".md"):
         rows.append(lambda line: any(_bad_command(span) for span in _CODE_SPAN.findall(line)))
+    if rel.startswith("dadaia_workspace/public/") and rel.endswith(".py"):
+        rows.append(re.compile(r"git -C \{").search)
     return rows
 
 
@@ -716,6 +719,10 @@ def test_the_scans_bite() -> None:
         "`.dadaia/.venv/bin/dadaia doctor --context x` and a bare `dadaia`\n"
         "the `rc-archive` verb\n"
     )
+    script = 'fix = git_line(repo, "switch", work)\nfix = f"git -C {repo} switch {work}"\n'
+    assert _text_sites({"dadaia_workspace/public/s.py": script}) == [
+        "dadaia_workspace/public/s.py:2"
+    ]
     assert _text_sites({"dadaia_workspace/public/x.md": shipped}) == [
         f"dadaia_workspace/public/x.md:{n}" for n in (1, 2, 3, 5)
     ]
