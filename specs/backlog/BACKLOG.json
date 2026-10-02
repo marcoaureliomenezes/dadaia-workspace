@@ -26,14 +26,6 @@
       "provenance": "operator closure ruling 2026-09-28: the rest is mapped to the backlog; source rubric 0.5.0 at a5e9a2ee (.dadaia/tmp/general-purpose/20260928/rubric-050/RUBRIC.md)"
     },
     {
-      "id": "consumer-guidance-names-no-library-toolchain",
-      "title": "Consumer-facing guidance names no library-only tool",
-      "opened": "2026-09-28",
-      "status": "idea",
-      "description": "The installed pre-push hook comment still says run dadaia ci preflight, which refuses consumer repos; docs/getting-started.md step 7 names release-please; the develop/main push refusal's fix is gh pr create. Evidence: rubric 0.5.0 at a5e9a2ee (.dadaia/tmp/general-purpose/20260928/rubric-050/RUBRIC.md) J7; 0.4.7 blockers table, ci preflight and gitflow rows PARTIAL; public/scripts/pre-push-ci-gate.sh, features/chokepoints/branch_policy.py.",
-      "provenance": "operator closure ruling 2026-09-28: the rest is mapped to the backlog; source rubric 0.5.0 at a5e9a2ee (.dadaia/tmp/general-purpose/20260928/rubric-050/RUBRIC.md)"
-    },
-    {
       "id": "init-announces-codex-trust",
       "title": "init --harness codex announces the Codex project-trust step",
       "opened": "2026-09-28",
@@ -48,22 +40,6 @@
       "status": "idea",
       "description": "The scaffolded tests/AGENTS.md keeps <UNIT_TIMEOUT_S>, <PACKAGE>, <COVERAGE_FLOOR>; doctor warns AGENTS-PLACEHOLDER-1. Evidence: rubric 0.5.0 at a5e9a2ee (.dadaia/tmp/general-purpose/20260928/rubric-050/RUBRIC.md) J3; 0.4.7 blockers table, OPEN (surfaced); public/templates/tests-AGENTS.md.",
       "provenance": "operator closure ruling 2026-09-28: the rest is mapped to the backlog; source rubric 0.5.0 at a5e9a2ee (.dadaia/tmp/general-purpose/20260928/rubric-050/RUBRIC.md)"
-    },
-    {
-      "id": "task-line-grammar-one-reader",
-      "title": "One task-line grammar reads TASKS.md",
-      "opened": "2026-09-28",
-      "status": "idea",
-      "description": "_release_schema.UNFINISHED_RE accepts a + bullet before a task marker; doctor_release._TASK_BLOCK_RE accepts only - or *. Evidence: public/skills/dd-release-implementation/scripts/_release_schema.py UNFINISHED_RE, features/specs/doctor_release.py _TASK_BLOCK_RE.",
-      "provenance": "operator closure ruling 2026-09-28: the rest is mapped to the backlog; source the 0.5.0 closure review"
-    },
-    {
-      "id": "ledger-schema-one-engine",
-      "title": "Ledger schemas are validated by one JSON-Schema engine",
-      "opened": "2026-09-28",
-      "status": "idea",
-      "description": "The shipped ledger scripts validate with _ledger.validate, a stdlib JSON-Schema subset walker, while the doctor validates with jsonschema Draft202012Validator; the residue of resolved bug sa-json-schema-validated-by-two-engines. Evidence: public/skills/dd-bug-resolution/scripts/_ledger.py validate, features/specs/schemas.py validator_for.",
-      "provenance": "operator closure ruling 2026-09-28: the rest is mapped to the backlog; source the 0.5.0 closure review"
     },
     {
       "id": "preflight-ci-parity-derived",
@@ -106,15 +82,6 @@
       "provenance": "0.4.6 rc-3 SPEC Out of scope (specs/releases/_archive/0.4.6/rc-3/SPEC.md); inventory row A12 in reports/main-thread/20260929-050-rc1-audit/leftbehind/ (REPORT.md, inventory.json); operator order 2026-09-29"
     },
     {
-      "id": "structural-convergence-f053-f054-f057",
-      "title": "Commit shapes the worktree kinds do not enforce: F053, F054, F057 of 20260930-structural-convergence",
-      "opened": "2026-09-30",
-      "status": "idea",
-      "description": "Deferred at rc-5 G6 review (9cb15e8d) to rc-7 W3 (one grammar owner); the rc-5 SPEC W3 row does not list them, so this entry is their carrier until rc-6's SPEC maps them into the candidate map. F053: the bug kind admits code + BUGS.jsonl, nothing enforces a registration-only commit. F054: dd-gitflow-default/SKILL.md row 2 says 'decisions.jsonl alone' while the memory law pairs the ADR and its memory change in one commit. F057: closure commits match no \u00a73a shape.",
-      "provenance": "specs/audits/20260930-structural-convergence FINDINGS F053/F054/F057 (deferred 9cb15e8d); dd-code-reviewer review of 4fb16453 (2026-09-30)",
-      "relates": []
-    },
-    {
       "id": "worktree-rows-injected-not-monkeypatched",
       "title": "SpecContextService and DoctorService take worktree rows by constructor injection; the unit-tier autouse monkeypatch is deleted",
       "opened": "2026-10-01",
@@ -139,15 +106,6 @@
       "status": "idea",
       "description": "specs/AGENTS.md is rendered and ignored (.gitignore /specs/*), so a new worktree lacks it and doctor --specs-dir <wt>/specs reports TREE-5 plus a knock-on MEM-DRIFT-2. Decide whether worktree.py new renders it or doctor scopes TREE-5 to the main checkout. Destination: rc-8 W6.",
       "provenance": "dd-code-reviewer review of bdae61bb (2026-09-30) INFO 5; rc-6 PLAN \u00a74 carry",
-      "relates": []
-    },
-    {
-      "id": "seventh-fail-open-path-law-line",
-      "title": "The root map \u00a73 states the seventh fail-open path: an unreadable context registry judges nothing under repos/ or worktrees/",
-      "opened": "2026-10-01",
-      "status": "idea",
-      "description": "Operator ruling 2026-10-01: \"Aprovo AC2.8 = os 7 reais (Recomendado)\" \u2014 the law states every fail-open path the code has. core/context_registry.py registered_slugs returns ({\"*\"},{\"*\"}) on an unreadable registry, so the layout gate and doctor judge nothing under repos/ or worktrees/ (rc-6 PLAN \u00a72.2); the root map \u00a73 (dadaia_workspace/public/data/AGENTS.md), the single statement of fail-open paths, lists six and lacks this line. Add it there, pinned by tests/contract/test_law_states_what_the_code_does.py. Destination: rc-7 W4 (one text renderer / law statements). Cites: finding 20260930-structural-convergence-F080, ADR 0132, rc-6 PLAN \u00a72.2, the rc-7 SPEC draft.",
-      "provenance": "operator ruling 2026-10-01 on rc-6 AC2.8 (\"Aprovo AC2.8 = os 7 reais (Recomendado)\"); F080 reason carries the unreadable-registry law line to rc-7 W4",
       "relates": []
     }
   ]
