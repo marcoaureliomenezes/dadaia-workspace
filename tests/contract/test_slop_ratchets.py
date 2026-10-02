@@ -228,8 +228,8 @@ def _json_per_split_line(sources: dict[str, str]) -> set[str]:
             tainted = {
                 t.id
                 for a in ast.walk(scope)
-                if isinstance(a, ast.Assign) and split(a.value, set())
-                for t in a.targets
+                if isinstance(a, (ast.Assign, ast.AnnAssign)) and a.value and split(a.value, set())
+                for t in getattr(a, "targets", [getattr(a, "target", None)])
                 if isinstance(t, ast.Name)
             }
             for node in ast.walk(scope):
@@ -241,7 +241,7 @@ def _json_per_split_line(sources: dict[str, str]) -> set[str]:
                 elif attr(node) == "loads" or (
                     isinstance(node, ast.Call)
                     and getattr(node.func, "id", "") == "map"
-                    and getattr(node.args[0], "attr", "") == "loads"
+                    and getattr(node.args[:1] and node.args[0], "attr", "") == "loads"
                 ):
                     fed = node.args  # type: ignore[attr-defined]
                 else:
@@ -264,6 +264,7 @@ def test_v40_trips_on_a_planted_splitlines_reader() -> None:
         "enum.py": "for n, x in enumerate(t.splitlines(), 1):\n    json.loads(x)",
         "hop.py": "lines = t.splitlines()\nrows = [json.loads(x) for x in lines]",
         "index.py": "r = json.loads(t.splitlines()[0])",
+        "ann.py": "lines: list[str] = t.splitlines()\nrows = [json.loads(x) for x in lines]",
         "map.py": "rows = list(map(json.loads, t.splitlines()))",
         "good.py": "rows = [json.loads(x) for x in t.split('\\n')]",
     }
