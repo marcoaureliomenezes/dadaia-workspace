@@ -149,9 +149,9 @@ Each finding that cites a bug or an entry shares its destination; findings are `
   - Correlate: each `backlog.py exit` refusal's fix belongs to its own evidence row. A live entry's `delivered` or `superseded` exit without a picking `--release` is refused with the same disposition and the latest release whose candidate SPEC picked it; no picking release, `Operator action:` naming the Origin's `backlog:` clause.
   - Command: the AC4.1 harness.
 - AC4.5 Ledger fixes (DEL `ledger-finding-fix-line-orders-a-hand-edit-the-law-forbids`):
-  - Each ledger script's `check` emits its own fix naming its governance verb, one per invalid line; `ledger_scripts.py`'s hand-edit fallback is deleted. In the bug's repro the fix runs a `bugs.py` verb.
+  - Each ledger script's `check` emits one finding per invalid line; its fix is the governance verb with real values where one clears the finding, else `Operator action:` naming the file, the line and the law (0158); `check` is never a fix; `ledger_scripts.py`'s hand-edit fallback stays deleted. The bug's repro line's fix is that `Operator action:` (operator ruling 2026-10-01: "Verb, else Operator action").
 - AC4.6 One task-marker lifecycle and one closure ladder (DEL `implementer-persona-states-a-second-task-marker-lifecycle`; FR `rc-flow-asks-compliance-line-doctor-never-prints`; 0126, 0141):
-  - The scaffold `specs/releases/AGENTS.md` §3 states the lifecycle once (`[ ]→[-]` at the start, `[-]→[x]` in the impl commit, reviewed at the worktree merge); `dd-software-engineer`, `dd-manager-orchestration` and `RC-FLOW.md` cite it.
+  - The scaffold `specs/releases/AGENTS.md` §3 states the lifecycle once (`[ ]→[-]` at the start, `[-]→[x]` as `chore(tasks): done <id>` once the task's commit is green, reviewed at the worktree merge); `dd-software-engineer`, `dd-manager-orchestration` and `RC-FLOW.md` cite it (main-thread reconciliation 2026-10-01: §3a shape 7).
   - `RC-FLOW.md` loses "marker stays `[-]`", "no per-task reviewer gate" and the "two simultaneous `[-]`" recovery (0141).
   - RC-FLOW step 8 asks only for the doctor's findings and exit code.
   - Measured by `tests/contract/test_law_states_what_the_code_does.py`, by code-derived facts as AC3.13: the transitions the law states equal the marker states and order `_release_schema` defines; no sentence is pinned (S3d).
