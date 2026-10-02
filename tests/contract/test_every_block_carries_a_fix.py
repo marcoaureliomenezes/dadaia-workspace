@@ -489,10 +489,12 @@ def _callee(node: ast.Call) -> str:
     return getattr(node.func, "id", getattr(node.func, "attr", ""))
 
 
-def _render(node: Any, scope: dict[str, list[Any]], defs: dict[str, Any], depth: int = 0) -> str:
+def _render(
+    node: Any, scope: dict[str, list[Any]], returns: dict[str, list[Any]], depth: int = 0
+) -> str:
     """The text *node* can print; alternatives and unknown values join as `·`; a
     hand-built CLI name renders as the spelling it builds."""
-    again = lambda n: _render(n, scope, defs, depth + 1) if depth < 12 else "·"  # noqa: E731
+    again = lambda n: _render(n, scope, returns, depth + 1) if depth < 12 else "·"  # noqa: E731
     match node:
         case ast.Constant(value=str() as text):
             return text
@@ -520,8 +522,8 @@ def _render(node: Any, scope: dict[str, list[Any]], defs: dict[str, Any], depth:
             return again(table)
         case ast.Call(func=ast.Attribute(value=receiver)) if not isinstance(receiver, ast.Name):
             return again(receiver)
-        case ast.Call() if _callee(node) in defs:  # a local producer: what it returns
-            return "·".join(again(n.value) for n in ast.walk(defs[_callee(node)]) if isinstance(n, ast.Return) and n.value)  # fmt: skip
+        case ast.Call() if _callee(node) in returns:  # a local producer: what it returns
+            return "·".join(map(again, returns[_callee(node)]))
         case ast.Call() if _FIX_CALL_RE.search(_callee(node)) or _callee(node)[:1].isupper():
             return " ".join(map(again, [*node.args, *(k.value for k in node.keywords)]))
     return "·"
@@ -571,6 +573,7 @@ def _code_sites(trees: dict[str, ast.Module]) -> list[str]:
     for rel, tree in trees.items():
         fix_param = {**every, **local[rel]}  # a local `def` wins its name
         defs = {n.name: n for n in ast.walk(tree) if isinstance(n, ast.FunctionDef)}
+        returns = {name: [r.value for r in ast.walk(d) if isinstance(r, ast.Return) and r.value] for name, d in defs.items()}  # fmt: skip
         docs = {id(n.body[0].value) for n in ast.walk(tree)
                 if isinstance(n, ast.Module | ast.FunctionDef | ast.ClassDef) and n.body
                 and isinstance(n.body[0], ast.Expr)}  # fmt: skip
@@ -588,25 +591,25 @@ def _code_sites(trees: dict[str, ast.Module]) -> list[str]:
                                *(k.value for k in node.keywords if k.arg in ("fix", "fix_help"))]  # fmt: skip
                     if _FIX_CALL_RE.search(_callee(node)):
                         carried.append(node)
-                    fixes = [_render(c, scope, defs) for c in carried]
+                    fixes = [_render(c, scope, returns) for c in carried]
                 elif (
                     isinstance(node, ast.Constant | ast.JoinedStr | ast.BinOp)
                     and id(node) not in docs
                 ):
-                    fixes = _render(node, scope, defs).split("fix: ")[1:]
+                    fixes = _render(node, scope, returns).split("fix: ")[1:]
                 elif isinstance(node, ast.Assign | ast.AnnAssign) and node.value is not None:
                     names = [
                         ast.unparse(t)
                         for t in (node.targets if isinstance(node, ast.Assign) else [node.target])
                     ]
                     fixes = (
-                        [_render(node.value, scope, defs)]
+                        [_render(node.value, scope, returns)]
                         if any(map(_FIX_NAME.search, names))
                         else []
                     )
                 elif isinstance(node, ast.FunctionDef) and _FIX_NAME.search(node.name):
                     fixes = [
-                        _render(r.value, scope, defs)
+                        _render(r.value, scope, returns)
                         for r in ast.walk(node)
                         if isinstance(r, ast.Return) and r.value
                     ]
