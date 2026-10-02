@@ -107,7 +107,9 @@ def work_version(repo: Path, flow: dict[str, str]) -> str:
         return versions[0]
     if versions:
         stale = sorted(versions, key=lambda v: tuple(map(int, v.split("."))))[0]
-        raise Refusal(f"{len(versions)} work branches", f"git -C {repo} branch -d {prefix}{stale}")
+        raise Refusal(
+            f"{len(versions)} work branches", f"git -C {quote(str(repo))} branch -d {prefix}{stale}"
+        )
     tags = [
         tuple(map(int, m.groups())) for t in git(repo, "tag").split() if (m := _TAG_RE.match(t))
     ]
@@ -115,7 +117,7 @@ def work_version(repo: Path, flow: dict[str, str]) -> str:
     nxt = f"{major}.{minor}.{patch + 1}" if tags else "0.1.0"
     raise Refusal(
         f"no work branch {prefix}<M.m.p>",
-        f"git -C {repo} branch {prefix}{nxt} {flow['integration']}",
+        f"git -C {quote(str(repo))} branch {prefix}{nxt} {flow['integration']}",
     )
 
 

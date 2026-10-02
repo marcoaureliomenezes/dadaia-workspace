@@ -29,8 +29,8 @@ TREE = "worktrees/r/0.5.0a-impl"
 
 
 @pytest.fixture
-def root(tmp_path: Path, request: pytest.FixtureRequest) -> Path:
-    (tmp_path := tmp_path / getattr(request, "param", "ws")).mkdir()
+def root(tmp_path: Path) -> Path:
+    (tmp_path := tmp_path / "my ws").mkdir()  # every fix runs as printed: quoted
     make_workspace(tmp_path)
     git(tmp_path / "repos/r", "checkout", "-q", "feature/0.5.0")
     assert run(tmp_path, "new", "r", "--kind", "impl").returncode == 0
@@ -56,7 +56,8 @@ def test_merge_fast_forwards_removes_and_reruns(root: Path) -> None:
     commit(tree, "src/b.py")
     git(repo, "worktree", "remove", str(tree))  # interrupted: tree gone, its commit unmerged
     assert fixes(run(root, "merge", TREE)) == [
-        f"fix: git -C {repo} worktree add {tree} wt/0.5.0a-impl"
+        "fix: "
+        + shlex.join(["git", "-C", str(repo), "worktree", "add", str(tree), "wt/0.5.0a-impl"])
     ]
     assert git(repo, "branch", "--list", "wt/0.5.0a-impl").strip()  # never -D
 
@@ -80,7 +81,9 @@ def test_dirty_outside_set_and_conflict_each_refuse_with_one_fix(root: Path) -> 
     commit(tree, "README.md", "- [x] a\n")
     conflict = run(root, "merge", TREE)
     assert not (Path(git(tree, "rev-parse", "--git-dir").strip()) / "rebase-merge").exists()
-    assert fixes(conflict) == [f"fix: git -C {tree} rebase feature/0.5.0"]
+    assert fixes(conflict) == [
+        "fix: " + shlex.join(["git", "-C", str(tree), "rebase", "feature/0.5.0"])
+    ]
 
 
 @pytest.mark.parametrize(
@@ -88,7 +91,6 @@ def test_dirty_outside_set_and_conflict_each_refuse_with_one_fix(root: Path) -> 
     [(False, "APPROVED", True), (True, "REJECTED", True), (True, "APPROVED", False)],
     ids=["other-sha", "rejected", "invalid"],
 )
-@pytest.mark.parametrize("root", ["my ws"], indirect=True)  # its fix runs as printed: quoted
 def test_merge_needs_a_valid_approval_of_the_exact_head(
     root: Path, named: bool, verdict: str, valid: bool
 ) -> None:
@@ -125,7 +127,10 @@ def test_failed_fast_forward_tells_a_stray_from_a_moved_work_branch(root: Path) 
     verdict = 'elif args[:2] == ["reports", "validate"]:\n'
     cli.write_text(cli.read_text().replace(verdict, f"{verdict}    import subprocess; {move}\n"))
     moved = run(root, "merge", TREE)
-    assert fixes(moved) == [f"fix: {sys.executable} {SCRIPT} merge {tree}"] and tree.exists()
+    (fix,) = fixes(moved)
+    assert (
+        shlex.split(fix[5:]) == [sys.executable, str(SCRIPT), "merge", str(tree)] and tree.exists()
+    )
 
 
 def test_parallel_siblings_union_ledgers_and_replay_task_markers(root: Path) -> None:
@@ -142,7 +147,7 @@ def test_parallel_siblings_union_ledgers_and_replay_task_markers(root: Path) -> 
     approve(root, git(tree, "rev-parse", "HEAD").strip())
     assert run(root, "merge", TREE).returncode == 0
     assert (repo / tasks).read_text() == s + "- [x]**T-1**\n* [x] **T-2**\n+ [ ] **T-3** amended\n"
-    refused = [f"fix: git -C {tree} rebase feature/0.5.0"]
+    refused = ["fix: " + shlex.join(["git", "-C", str(tree), "rebase", "feature/0.5.0"])]
     assert run(root, "new", "r", "--kind", "impl").returncode == 0
     t2, t3 = "* [x] **T-2**\n", "+ [ ] **T-3** amended\n"
     for mine, theirs in (  # the worktree adds a line; the work side rewrote the flipped one
@@ -172,23 +177,26 @@ def test_parallel_siblings_union_ledgers_and_replay_task_markers(root: Path) -> 
 def test_merge_lists_ignored_files_and_keeps_them_by_its_fix(root: Path) -> None:
     repo, tree = root / "repos/r", root / TREE
     approve(root, commit(tree, "src/a.py"))
-    (tree / "notes.scratch").write_text("keep me")
+    (tree / "my notes.scratch").write_text("keep me")
     (tree / "__pycache__").mkdir()
     (tree / "__pycache__/a.pyc").write_bytes(b"")
     git(repo, "checkout", "-q", "main")
     refused = run(root, "merge", TREE)
-    assert "notes.scratch" in refused.stderr and "__pycache__" not in refused.stderr
-    wrong_branch = run(root, "merge", TREE, "--keep", "notes.scratch")
-    assert fixes(wrong_branch) == [f"fix: git -C {repo} switch feature/0.5.0"]
+    assert "my notes.scratch" in refused.stderr and "__pycache__" not in refused.stderr
+    wrong_branch = run(root, "merge", TREE, "--keep", "my notes.scratch")
+    assert fixes(wrong_branch) == [
+        "fix: " + shlex.join(["git", "-C", str(repo), "switch", "feature/0.5.0"])
+    ]
     _fix(root, wrong_branch)
     _fix(root, refused)
-    assert (repo / "notes.scratch").read_text() == "keep me" and not tree.exists()
+    assert (repo / "my notes.scratch").read_text() == "keep me" and not tree.exists()
 
 
 def test_clean_removes_only_an_empty_worktree_of_ours(root: Path) -> None:
     repo, tree = root / "repos/r", root / TREE
     commit(tree, "src/a.py")
-    assert fixes(run(root, "clean", TREE)) == [f"fix: {sys.executable} {SCRIPT} merge {tree}"]
+    (fix,) = fixes(run(root, "clean", TREE))
+    assert shlex.split(fix[5:]) == [sys.executable, str(SCRIPT), "merge", str(tree)]
     git(tree, "reset", "-q", "--hard", "feature/0.5.0")
     assert run(root, "clean", TREE).returncode == 0 and not tree.exists()
     # ours is the canonical wt/ branch, locked or not (T-050-99 N2); a tree on another is not

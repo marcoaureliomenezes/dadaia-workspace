@@ -39,15 +39,16 @@ def _target(root: Path, path: str) -> tuple[Path, Path, str, str]:
 def _refuse_dirty(tree: Path) -> None:
     if git(tree, "status", "--porcelain").strip():
         raise Refusal(
-            f"{tree} has uncommitted changes", f"git -C {tree} stash push --include-untracked"
+            f"{tree} has uncommitted changes",
+            f"git -C {quote(str(tree))} stash push --include-untracked",
         )
 
 
 def _kept(tree: Path, verb: str, keep: list[str], drop: bool) -> list[str]:
     """The ignored files to copy into the repo; refuses while one is neither kept nor dropped."""
-    ignored = [
+    ignored = [  # -z: a name with a blank arrives verbatim, never C-quoted
         line[3:].rstrip("/")
-        for line in git(tree, "status", "--porcelain", "--ignored").splitlines()
+        for line in git(tree, "status", "--porcelain", "-z", "--ignored").split("\0")
         if line.startswith("!! ")
     ]
     # disposable without asking (ADR 0130): a tool cache directory or a *.pyc
@@ -80,8 +81,8 @@ def _remove(repo: Path, tree: Path, name: str, kept: list[str]) -> None:
 
 def _undo(tree: Path, work: str, rel: str) -> str:
     """The one act putting *rel* back to the work branch's version, absent included."""
-    return (f"Operator action: revert {rel} to {work} in one commit — `git -C {tree} restore "
-            f"-s {work} -SW -- {rel}` and `git -C {tree} commit`")  # fmt: skip
+    return (f"Operator action: revert {rel} to {work} in one commit — `git -C {quote(str(tree))} restore "
+            f"-s {work} -SW -- {quote(rel)}` and `git -C {quote(str(tree))} commit`")  # fmt: skip
 
 
 def _check_allowed(tree: Path, work: str, name: str) -> None:
@@ -139,7 +140,8 @@ def _rebase(tree: Path, work: str) -> None:
             if not rels or len(replay) < len(rels):
                 git(tree, "rebase", "--abort", check=False)
                 raise Refusal(
-                    f"rebase onto {work} conflicts: {error}", f"git -C {tree} rebase {work}"
+                    f"rebase onto {work} conflicts: {error}",
+                    f"git -C {quote(str(tree))} rebase {work}",
                 ) from error
         for rel, lines in replay.items():
             (tree / rel).write_text("\n".join(lines) + "\n", encoding="utf-8")
@@ -185,7 +187,8 @@ def merge(root: Path, path: str, keep: list[str], drop: bool) -> str:
                 git(repo, "branch", "-d", branch)
             except RuntimeError as error:
                 raise Refusal(
-                    f"{branch} is unmerged: {error}", f"git -C {repo} worktree add {tree} {branch}"
+                    f"{branch} is unmerged: {error}",
+                    f"git -C {quote(str(repo))} worktree add {quote(str(tree))} {branch}",
                 ) from error
         return f"{branch} merged into {work}"
     _refuse_dirty(tree)
@@ -194,7 +197,9 @@ def merge(root: Path, path: str, keep: list[str], drop: bool) -> str:
     _check_approved(root, git(tree, "rev-parse", "HEAD").strip())
     kept = _kept(tree, "merge", keep, drop)
     if git(repo, "branch", "--show-current").strip() != work:
-        raise Refusal(f"repos/{repo.name} is not on {work}", f"git -C {repo} switch {work}")
+        raise Refusal(
+            f"repos/{repo.name} is not on {work}", f"git -C {quote(str(repo))} switch {work}"
+        )
     try:
         git(repo, "merge", "-q", "--ff-only", branch)
     except RuntimeError as error:
