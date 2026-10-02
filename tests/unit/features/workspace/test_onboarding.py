@@ -74,7 +74,7 @@ _CMD = "command"
 
 # fmt: off
 @pytest.mark.parametrize(("trees", "kwargs", "published", "expected", "command", "in_command"), [
-    pytest.param(lambda t: {}, {}, False, ("context", _CMD), None, ["Operator action: run ", "/dadaia context create with a context name and --main-repo set to the main repo's clone URL"], id="zero-contexts"),
+    pytest.param(lambda t: {}, {}, False, ("context", _CMD), None, ["Operator action: run ", "dadaia context create with a context name and --main-repo set to the main repo's clone URL"], id="zero-contexts"),
     pytest.param(_bare, {}, False, ("specs", _CMD), ("specs", "init", "--context", "app"), [], id="S1-no-identity-no-bind-step"),
     pytest.param(_bare, {"bound": False}, False, ("bind", _CMD), ("context", "bind", "app"), [], id="S1-unbound-session-binds"),
     pytest.param(_bare, {"bound": True}, False, ("specs", _CMD), ("specs", "init", "--context", "app"), [], id="S1-bound-is-past-bind"),

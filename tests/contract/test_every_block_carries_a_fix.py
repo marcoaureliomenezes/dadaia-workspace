@@ -132,7 +132,7 @@ def test_the_real_doctor_prints_every_fix_as_one_whole_runnable_line(tmp_path: P
     assert fixes, run.stdout
     for fix in fixes:  # two shapes, no third (sa-unfixable-doctor-findings-say-doctor-fix#S1)
         if fix.startswith("Operator action: "):
-            assert re.search(r"\s(/|\w:\\)\S", fix) and not re.search(r"<[^<>]+>", fix), fix
+            assert re.search(r"\s(/|\w:[\\/])\S", fix) and not re.search(r"<[^<>]+>", fix), fix
             continue
         argv0 = shlex.split(fix)[0]
         assert Path(argv0).is_file() or shutil.which(argv0), (

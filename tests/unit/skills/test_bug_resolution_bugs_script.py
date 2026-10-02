@@ -421,7 +421,9 @@ def test_an_operator_action_run_outside_the_tree_keeps_its_specs_and_known_argv(
                 "none", cwd=elsewhere)  # fmt: skip
     (fix,) = [ln for ln in done.stderr.splitlines() if ln.startswith("fix: ")]
     command = fix.split("`")[1]
-    assert fix.startswith("fix: Operator action: run `") and f"--specs {specs}" in command, fix
+    assert (
+        fix.startswith("fix: Operator action: run `") and f"--specs {specs.as_posix()}" in command
+    ), fix
     assert "--bug-id b" in command and "--correlates none" in command, fix
 
 
