@@ -90,10 +90,6 @@ def test_import_refuses_a_file_outside_the_contract(tmp_path: Path) -> None:
     assert result.exit_code == 1
     assert "Error" in result.output
 
-    bare = _runner.invoke(app, ["import", str(bogus), "--workspace", str(tmp_path / "bare")])
-    assert (bare.exit_code, bare.exception.__class__) == (1, SystemExit), bare.output
-    assert "fix: " in bare.output
-
 
 def _real_checkout(repo: Path, branch: str) -> None:
     for args in (
@@ -154,6 +150,7 @@ def test_explicit_workspace_pointing_at_an_uninitialized_dir_is_refused(
     argv = ["import", str(payload)] if verb == "import" else ["export"]
     result = _runner.invoke(app, [*argv, "--workspace", str(nested)])
 
-    assert result.exit_code != 0, result.output
+    assert (result.exit_code, result.exception.__class__) == (1, SystemExit), result.output
+    assert "fix: " in result.output
     assert registry.read_text("utf-8") == before
     assert not (live / ".dadaia" / "dist").exists()
