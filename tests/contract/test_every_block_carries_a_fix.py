@@ -147,6 +147,16 @@ def test_the_real_doctor_prints_every_fix_as_one_whole_runnable_line(tmp_path: P
 
 @pytest.fixture
 def workspace(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
+    return _workspace(tmp_path, monkeypatch)
+
+
+@pytest.fixture
+def blank_workspace(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
+    """A workspace whose root holds a blank, so the fix's executable path must be quoted."""
+    return _workspace(tmp_path / "my ws", monkeypatch)
+
+
+def _workspace(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     (tmp_path / ".dadaia" / "states").mkdir(parents=True)
     (tmp_path / ".dadaia" / "states" / "spec_contexts.json").write_text(
         '{"contexts": [{"repo_slug": "a", "state": "alive"}]}', encoding="utf-8"
@@ -246,15 +256,21 @@ def _shells() -> list[list[str]]:
     if sys.platform != "win32":
         return [["sh", "-c"]]
     git_bash = Path(os.environ.get("PROGRAMFILES", r"C:\Program Files"), "Git", "bin", "bash.exe")
-    return [["cmd", "/d", "/c"], ["powershell", "-NoProfile", "-Command"], [str(git_bash), "-c"]]
+    return [
+        ["cmd", "/d", "/s", "/c"],
+        ["powershell", "-NoProfile", "-Command"],
+        [str(git_bash), "-c"],
+    ]
 
 
 @pytest.mark.parametrize("shell", _shells(), ids=lambda argv: Path(argv[0]).stem)
-def test_a_fix_runs_verbatim_in_every_host_shell(workspace: Path, shell: list[str]) -> None:
+def test_a_fix_runs_verbatim_in_every_host_shell(blank_workspace: Path, shell: list[str]) -> None:
     """Review H5 (0.5.0 c3), sa-gate-allows-root-entries-the-reaper-moves#E7: the root
     BLOCK's fix and a CLI fix line run verbatim in each shell the host offers — POSIX
     ``sh``; on Windows cmd, PowerShell and Git Bash — the root fix from ``repos/demo``,
-    twice (the zone usually exists), never writing the exceptions file."""
+    twice (the zone usually exists), never writing the exceptions file; bug
+    windows-quoted-executable-fix-not-runnable-in-powershell: the root holds a blank."""
+    workspace = blank_workspace
     if shell[0].endswith("bash.exe") and not Path(shell[0]).is_file():
         pytest.skip(f"Git Bash is not installed at {shell[0]}")
     (workspace / ".dadaiaignore").unlink()
@@ -264,8 +280,9 @@ def test_a_fix_runs_verbatim_in_every_host_shell(workspace: Path, shell: list[st
     # exceeded 25 s (run 36269883321) while the line itself was fine.
     runs = [
         subprocess.run(
-            # cmd reads its raw command tail: list2cmdline's \" is not cmd syntax.
-            f"{subprocess.list2cmdline(shell)} {line}" if shell[0] == "cmd" else [*shell, line],
+            # cmd /s strips the outer quotes of its raw tail (Node's shell:true form);
+            # list2cmdline's \" is not cmd syntax.
+            f'{subprocess.list2cmdline(shell)} "{line}"' if shell[0] == "cmd" else [*shell, line],
             cwd=workspace / "repos" / "demo",
             capture_output=True,
             text=True,
