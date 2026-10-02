@@ -4,7 +4,7 @@ Every bug this workspace has is one line in `specs/bugs/BUGS.jsonl`: one record 
 bug, appended once, keyed by its id, with git history as that line's change log and no
 git-derived fact in the record. Each record names its `surface`, its `component`, the
 evidence of its red loop and its seam test, whether the fix left the feature smaller or
-larger (`diff_direction`), and its lineage: `caused_by`, the id of the bug whose fix
+larger (the direction prefix of `evidence_diff`), and its lineage: `caused_by`, the id of the bug whose fix
 made this one possible.
 
 That last field is why the ledger reads as a history rather than a pile. Follow
@@ -42,7 +42,7 @@ multi-owner slug already on disk.
 
 ## Lesson 2 — a per-measurement exclusion breeds the next measurement's bug
 
-<!-- derived-from: QUALITY sha256:9e621b2e0ae5 -->
+<!-- derived-from: QUALITY sha256:e101be9ccc61 -->
 
 When each measurement walks the tree itself and is fixed by its own special-case
 exclusion, the next measurement counts the same stray files. The structure that ends
@@ -54,7 +54,7 @@ construction, not by a list somebody has to remember to extend.
 ## Lesson 3 — a derived cache breeds a bug per environment that derives it
 
 <!-- derived-from: bug-ledger sha256:fee190b6d940 -->
-<!-- derived-from: QUALITY sha256:9e621b2e0ae5 -->
+<!-- derived-from: QUALITY sha256:e101be9ccc61 -->
 
 A record that caches a fact git already knows is wrong in every environment that
 derives it differently — a shallow checkout first among them. The structure that ends
@@ -63,7 +63,7 @@ history is that line's change log. No CI job fetches history for a bug record's 
 
 ## The standing order the lessons produced
 
-<!-- derived-from: QUALITY sha256:9e621b2e0ae5 -->
+<!-- derived-from: QUALITY sha256:e101be9ccc61 -->
 <!-- derived-from: bug-ledger sha256:fee190b6d940 -->
 
 The workspace is in a permanent state of architecture review, oriented by its bug
@@ -75,9 +75,8 @@ history:
   fixes is rebuilt, never patched a third time.
 - Prefer the deletion-shaped fix. A fix whose diff grows the touched feature is routed
   to the architecture lens before it lands.
-- Record the direction. Every resolution states `diff_direction`, and every review
-  verdict states the bug-surface delta from `bugs.py stats` — "tests green" is not a
-  verdict.
+- Record the direction. Every review verdict states the bug-surface delta from
+  `bugs.py stats` — "tests green" is not a verdict.
 - Let numbers refuse growth. Module size, complexity, nesting, private-symbol imports
   in tests and the slop counts are pinned at their measured values and move downward
   only.
