@@ -25,22 +25,22 @@ Rationale: these two surfaces absorbed every migration this product shipped.
 
 ### P-21 · We give every test a size tier with an enforced timeout applied at collection, and an explicit `@pytest.mark.timeout` is never overridden.
 Measured by: `pytest tests/contract/test_stewardship_mechanics.py -k "test_contract_tier_carries_30s_timeout or test_explicit_timeout_marker_is_never_overridden or test_tier_timeout_table_covers_all_four_layers"` (executed path: the marker on the test's own item; F041 — the bare `-k timeout` also matched the tier marker every contract item carries, collecting all 8 with 0 deselected).
-ADR: none
+ADR: 0167 (accepted)
 Rationale: a test needing more time than its tier is mis-tiered.
 
 ### P-22 · We gate quarantine on a registered bug: a `quarantine` mark without `bug=` refuses collection actionably, and every gating selector excludes the lane.
 Measured by: `pytest tests/contract/test_stewardship_mechanics.py -k quarantine`.
-ADR: none
+ADR: 0167 (accepted)
 Rationale: the registered id is what makes the lane temporary.
 
 ### P-23 · We ratchet private-symbol imports in `tests/**` downward only; a per-statement `# allow-private-import: <reason>` marker is the sole exception.
 Measured by: `pytest tests/contract/test_test_suite_ratchets.py -k v26` (AST-exact; the test module is the ceiling's numeric home).
-ADR: none
+ADR: 0167 (accepted)
 Rationale: a test reaching into a private symbol turns a safe refactor red.
 
 ### P-28 · We keep the pytest marker set closed and single-sourced: `pyproject.toml`'s `markers` equals `tests/conftest.py`'s `_KNOWN_MARKERS`, and `flaky`/`quarantine` are always among them.
 Measured by: `pytest tests/contract/test_stewardship_mechanics.py -k marker_set`.
-ADR: none
+ADR: 0167 (accepted)
 Rationale: a marker known to one file and unknown to the other is a silent exclusion lane.
 
 ### P-29 · We derive every human- and agent-facing document from a named memory atom under a content hash: each `## ` section of `README.md`, `llms.txt` and every `docs/*.md` names its atom and the atom's current sha256, and `docs/cli.md` is the committed output of `dadaia help tree`.
