@@ -31,10 +31,8 @@ from __future__ import annotations
 import json
 import os
 import re
-import shlex
 import shutil
 import subprocess
-import sys
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -556,7 +554,7 @@ def test_a_worktree_finding_is_cleared_by_its_merge_fix(tmp_path: Path) -> None:
         worktree_ws.approve(
             root, worktree_ws.git(root / "repos/r", "rev-parse", "wt/0.5.0a-impl").strip()
         )
-        command = found[0].fix.replace("python3", shlex.quote(sys.executable), 1)
+        command = found[0].fix
         done = subprocess.run(command, shell=True, cwd=root, capture_output=True, text=True)  # noqa: S602
         if done.returncode:
             (refix,) = worktree_ws.fixes(done)

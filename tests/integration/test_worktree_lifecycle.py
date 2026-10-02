@@ -29,7 +29,8 @@ TREE = "worktrees/r/0.5.0a-impl"
 
 
 @pytest.fixture
-def root(tmp_path: Path) -> Path:
+def root(tmp_path: Path, request: pytest.FixtureRequest) -> Path:
+    (tmp_path := tmp_path / getattr(request, "param", "ws")).mkdir()
     make_workspace(tmp_path)
     git(tmp_path / "repos/r", "checkout", "-q", "feature/0.5.0")
     assert run(tmp_path, "new", "r", "--kind", "impl").returncode == 0
@@ -87,6 +88,7 @@ def test_dirty_outside_set_and_conflict_each_refuse_with_one_fix(root: Path) -> 
     [(False, "APPROVED", True), (True, "REJECTED", True), (True, "APPROVED", False)],
     ids=["other-sha", "rejected", "invalid"],
 )
+@pytest.mark.parametrize("root", ["my ws"], indirect=True)  # its fix runs as printed: quoted
 def test_merge_needs_a_valid_approval_of_the_exact_head(
     root: Path, named: bool, verdict: str, valid: bool
 ) -> None:
@@ -99,7 +101,9 @@ def test_merge_needs_a_valid_approval_of_the_exact_head(
     )
     result = run(root, "merge", TREE)
     assert result.returncode == 1 and head in result.stderr
-    assert fixes(result) == [f"fix: {root / '.dadaia/.venv/bin/dadaia'} reports validate {target}"]
+    (fix,) = fixes(result)
+    cli = str(root / ".dadaia/.venv/bin/dadaia")
+    assert shlex.split(fix.removeprefix("fix: ")) == [cli, "reports", "validate", str(target)]
     assert git(root / "repos/r", "rev-parse", "feature/0.5.0").strip() != head
 
 
@@ -121,7 +125,7 @@ def test_failed_fast_forward_tells_a_stray_from_a_moved_work_branch(root: Path) 
     verdict = 'elif args[:2] == ["reports", "validate"]:\n'
     cli.write_text(cli.read_text().replace(verdict, f"{verdict}    import subprocess; {move}\n"))
     moved = run(root, "merge", TREE)
-    assert fixes(moved) == [f"fix: python3 {SCRIPT} merge {tree}"] and tree.exists()
+    assert fixes(moved) == [f"fix: {sys.executable} {SCRIPT} merge {tree}"] and tree.exists()
 
 
 def test_parallel_siblings_union_ledgers_and_replay_task_markers(root: Path) -> None:
@@ -184,7 +188,7 @@ def test_merge_lists_ignored_files_and_keeps_them_by_its_fix(root: Path) -> None
 def test_clean_removes_only_an_empty_worktree_of_ours(root: Path) -> None:
     repo, tree = root / "repos/r", root / TREE
     commit(tree, "src/a.py")
-    assert fixes(run(root, "clean", TREE)) == [f"fix: python3 {SCRIPT} merge {tree}"]
+    assert fixes(run(root, "clean", TREE)) == [f"fix: {sys.executable} {SCRIPT} merge {tree}"]
     git(tree, "reset", "-q", "--hard", "feature/0.5.0")
     assert run(root, "clean", TREE).returncode == 0 and not tree.exists()
     # ours is the canonical wt/ branch, locked or not (T-050-99 N2); a tree on another is not
@@ -239,5 +243,5 @@ def test_release_closure_waits_for_every_other_wt(tmp_path: Path) -> None:
     refused = subprocess.run(closure, cwd=root, capture_output=True, text=True)
     fix = refused.stderr.rsplit("fix: ", 1)[1].strip()
     assert "repos/r " in refused.stderr and fix.endswith(f"clean {root}/worktrees/r/0.5.0b-impl")
-    subprocess.run(fix.replace("python3", sys.executable, 1), shell=True, cwd=root, check=True)  # noqa: S602
+    subprocess.run(fix, shell=True, cwd=root, check=True)  # noqa: S602
     assert subprocess.run(closure, cwd=root, capture_output=True).returncode == 0

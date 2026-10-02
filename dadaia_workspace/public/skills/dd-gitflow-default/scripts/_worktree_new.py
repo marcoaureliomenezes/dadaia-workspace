@@ -10,7 +10,7 @@ from pathlib import Path
 sys.path.append(str(Path(__file__).resolve().parents[2] / "dd-release-implementation" / "scripts"))
 
 from _release_schema import candidate_number, extract_status  # noqa: E402
-from _worktree_git import flow_for, git, rows, work_version  # noqa: E402
+from _worktree_git import flow_for, git, quote, rows, script, work_version  # noqa: E402
 from _worktree_git import ours as our_trees  # noqa: E402
 from _worktree_kinds import CAPS, LOCK, SCRIPT, UNION, Refusal  # noqa: E402
 
@@ -40,7 +40,7 @@ def new(root: Path, repo_name: str, kind: str) -> Path:
             if extract_status(text) != "Approved":
                 raise Refusal(
                     f"impl needs an Approved trio; {doc}.md on {work} is not",
-                    f"python3 {SCRIPT} new {repo_name} --kind release",
+                    f"{script(SCRIPT)} new {quote(repo_name)} --kind release",
                 )
     ours = [row for row in our_trees(repo) if row["v"] == version]
     same = [row for row in ours if row["kind"] == kind]
@@ -57,7 +57,7 @@ def new(root: Path, repo_name: str, kind: str) -> Path:
     free = [letter for letter in string.ascii_lowercase if letter not in taken]
     if not free:
         target = (f"Operator action: choose one of the worktrees/{repo_name}/{version}?-* trees "
-                  f"and run `python3 {SCRIPT} clean` with it")  # fmt: skip
+                  f"and run `{script(SCRIPT)} clean` with it")  # fmt: skip
         raise Refusal(
             f"letters a-z exhausted for {version}", _exit(root, ours[0]["path"]) if ours else target
         )
@@ -81,6 +81,6 @@ def new(root: Path, repo_name: str, kind: str) -> Path:
         git(repo, "branch", "-D", branch, check=False)
         raise Refusal(
             f"rolled back {name}: {error}",
-            f"python3 {SCRIPT} new {repo_name} --kind {kind}",
+            f"{script(SCRIPT)} new {quote(repo_name)} --kind {kind}",
         ) from error
     return tree

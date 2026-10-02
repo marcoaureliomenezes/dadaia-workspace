@@ -13,7 +13,7 @@ from pathlib import Path
 sys.path.append(str(Path(__file__).resolve().parents[2] / "dd-release-implementation" / "scripts"))
 
 from _release_schema import MARK_RE, MARKS  # noqa: E402
-from _worktree_git import cli, flow_for, git, ours  # noqa: E402
+from _worktree_git import cli, cli_line, flow_for, git, ours, quote, script  # noqa: E402
 from _worktree_kinds import _NAME_RE, REPLAY, SCRIPT, Refusal, allows, kind_holding  # noqa: E402
 
 REVIEWER = "dd-code-reviewer"
@@ -30,7 +30,7 @@ def _target(root: Path, path: str) -> tuple[Path, Path, str, str]:
     match = _NAME_RE.match(parts[1]) if len(parts) == 2 else None
     if match is None:
         raise Refusal(
-            f"{path} is not a worktrees/<repo>/<M.m.p><l>-<kind> path", f"python3 {SCRIPT} list"
+            f"{path} is not a worktrees/<repo>/<M.m.p><l>-<kind> path", f"{script(SCRIPT)} list"
         )
     repo = root / "repos" / parts[0]
     return repo, tree, parts[1], f"{flow_for(root, repo)['work']}{match['v']}"
@@ -60,7 +60,7 @@ def _kept(tree: Path, verb: str, keep: list[str], drop: bool) -> list[str]:
     if left and not drop:
         raise Refusal(
             f"ignored files would be lost: {', '.join(left)}",
-            f"python3 {SCRIPT} {verb} {tree} --keep {' '.join(precious)}",
+            f"{script(SCRIPT)} {verb} {quote(str(tree))} --keep {' '.join(map(quote, precious))}",
         )
     return [p for p in precious if p in keep]
 
@@ -166,7 +166,7 @@ def _check_approved(root: Path, sha: str) -> None:
                 and cli(root, "reports", "validate", str(handoff)).returncode == 0
             ):
                 return
-    fix = f"{root / '.dadaia/.venv/bin/dadaia'} reports validate {named[-1] if named else '--all'}"
+    fix = cli_line(root, "reports", "validate", str(named[-1]) if named else "--all")
     raise Refusal(
         f"no valid APPROVED {REVIEWER} handoff names HEAD {sha} in its scope"
         " (the file comes from the reviewer's verdict)",
@@ -202,7 +202,7 @@ def merge(root: Path, path: str, keep: list[str], drop: bool) -> str:
             git(repo, "merge-base", "--is-ancestor", work, branch)
             fix = f"Operator action: commit or remove the paths above in {repo}"
         except RuntimeError:  # the work branch moved since the rebase
-            fix = f"python3 {SCRIPT} merge {tree}"
+            fix = f"{script(SCRIPT)} merge {quote(str(tree))}"
         raise Refusal(f"fast-forward failed: {error}", fix) from error
     _remove(repo, tree, name, kept)
     return f"{branch} merged into {work}"
@@ -211,11 +211,12 @@ def merge(root: Path, path: str, keep: list[str], drop: bool) -> str:
 def clean(root: Path, path: str, keep: list[str], drop: bool) -> str:
     repo, tree, name, work = _target(root, path)
     if not any(Path(row["path"]).resolve() == tree for row in ours(repo)):
-        raise Refusal(f"{tree} is not a dadaia:-locked worktree", f"python3 {SCRIPT} list")
+        raise Refusal(f"{tree} is not a dadaia:-locked worktree", f"{script(SCRIPT)} list")
     ahead = int(git(repo, "rev-list", "--count", f"{work}..wt/{name}"))
     if ahead:
         raise Refusal(
-            f"wt/{name} holds {ahead} unmerged commit(s)", f"python3 {SCRIPT} merge {tree}"
+            f"wt/{name} holds {ahead} unmerged commit(s)",
+            f"{script(SCRIPT)} merge {quote(str(tree))}",
         )
     _refuse_dirty(tree)
     _remove(repo, tree, name, _kept(tree, "clean", keep, drop))

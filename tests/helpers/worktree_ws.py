@@ -94,6 +94,6 @@ def approve(root: Path, sha: str, *, verdict: str = "APPROVED", valid: bool = Tr
 def run_fix(root: Path, result: subprocess.CompletedProcess[str]) -> None:
     """Run the refusal's one `fix:` line as an agent would, from the workspace root."""
     (fix,) = fixes(result)
-    command = fix.removeprefix("fix: ").replace("python3 ", f"{sys.executable} ", 1)
+    command = fix.removeprefix("fix: ")
     env = {"HOME": str(root), "PATH": "/usr/bin:/bin", "GIT_CONFIG_NOSYSTEM": "1"}
     subprocess.run(command, shell=True, cwd=root, env=env, check=True, capture_output=True)

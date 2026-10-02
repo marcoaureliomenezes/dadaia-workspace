@@ -58,7 +58,7 @@ def _imported_roots(path: Path) -> set[str]:
 #: reads the worktree kinds. No module imports back along its own edge.
 _CROSS_SKILL_EDGES = {
     "dd-release-implementation": {"_memory_drift", "_worktree_git", "_worktree_kinds"},
-    "dd-gitflow-default": {"_release_schema"},
+    "dd-gitflow-default": {"_release_schema", "_specs"},  # `_specs`: the fix-line quote
     "dd-backlog-definition": {"_release_schema", "_bugs_store"},
     "dd-bug-resolution": {"_worktree_kinds"},  # `_specs`: a write verb's kind (AC4.4)
 }

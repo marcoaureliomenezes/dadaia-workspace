@@ -75,8 +75,10 @@ def script(path: Path) -> str:
 
 
 def with_specs(fix: str, specs: Path | str) -> str:
-    """The ONE ledger fix-line builder: a :func:`script` command gains ``--specs`` once."""
-    named = fix.startswith(f"{quote(sys.executable)} ") and " --specs " not in fix
+    """The ONE ledger fix-line builder: a :func:`script` command gains ``--specs`` once;
+    ``worktree.py``, the one script resolving no specs tree, never does."""
+    ledger = not fix.startswith(script(_GITFLOW / "worktree.py"))
+    named = fix.startswith(f"{quote(sys.executable)} ") and ledger and " --specs " not in fix
     return f"{fix} --specs {quote(str(specs))}" if named else fix
 
 

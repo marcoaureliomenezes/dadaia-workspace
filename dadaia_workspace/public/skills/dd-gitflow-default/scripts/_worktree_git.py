@@ -7,12 +7,16 @@ from __future__ import annotations
 import json
 import os
 import re
-import shlex
 import subprocess
+import sys
 import time
 from pathlib import Path
 
-from _worktree_kinds import _NAME_RE, SCRIPT, Refusal
+sys.path.append(str(Path(__file__).resolve().parents[2] / "dd-bug-resolution" / "scripts"))
+
+from _specs import quote as quote  # noqa: E402  (`as`: re-exported to the worktree verbs)
+from _specs import script as script  # noqa: E402
+from _worktree_kinds import _NAME_RE, SCRIPT, Refusal  # noqa: E402
 
 _TAG_RE = re.compile(r"^v?(\d+)\.(\d+)\.(\d+)$")
 
@@ -39,17 +43,20 @@ def find_root() -> Path:
     raise Refusal("no workspace root above the cwd or this script", "uvx dadaia-workspace init")
 
 
+def _exe(root: Path) -> Path:
+    bins = (root / ".dadaia/.venv/bin/dadaia", root / ".dadaia/.venv/Scripts/dadaia.exe")
+    if exe := next((b for b in bins if b.exists()), None):
+        return exe
+    raise Refusal(
+        "no workspace CLI", " ".join(map(quote, ("uvx", "dadaia-workspace", "init", str(root))))
+    )
+
+
 def cli(root: Path, *args: str) -> subprocess.CompletedProcess[str]:
     """One read-only run of the workspace CLI — the owner of every package grammar."""
-    bins = (root / ".dadaia/.venv/bin/dadaia", root / ".dadaia/.venv/Scripts/dadaia.exe")
-    exe = next((b for b in bins if b.exists()), None)
-    if exe is None:
-        raise Refusal(
-            "no workspace CLI", shlex.join(["uvx", "dadaia-workspace", "init", str(root)])
-        )
     run = subprocess.run  # stdin closed: a CLI never waits on the caller's pipe
     return run(
-        [str(exe), *args],
+        [str(_exe(root)), *args],
         cwd=root,
         env=_env(),
         stdin=subprocess.DEVNULL,
@@ -58,8 +65,9 @@ def cli(root: Path, *args: str) -> subprocess.CompletedProcess[str]:
     )
 
 
-def doctor(root: Path) -> str:
-    return f"{root / '.dadaia/.venv/bin/dadaia'} doctor"
+def cli_line(root: Path, *args: str) -> str:
+    """The fix line running :func:`cli` with *args*, quoted for the host shell."""
+    return " ".join(map(quote, (str(_exe(root)), *args)))
 
 
 def gitflows(root: Path) -> dict[str, dict[str, str]]:
@@ -72,7 +80,8 @@ def gitflows(root: Path) -> dict[str, dict[str, str]]:
         listed = None
     if not isinstance(listed, list):
         raise Refusal(
-            f"context list failed: {done.stderr.strip() or done.stdout.strip()}", doctor(root)
+            f"context list failed: {done.stderr.strip() or done.stdout.strip()}",
+            cli_line(root, "doctor"),
         )
     return {
         repo: row["gitflow"]
@@ -85,7 +94,7 @@ def gitflows(root: Path) -> dict[str, dict[str, str]]:
 def flow_for(root: Path, repo: Path) -> dict[str, str]:
     flow = gitflows(root).get(repo.name)
     if flow is None:
-        raise Refusal(f"no context on disk owns repos/{repo.name}", doctor(root))
+        raise Refusal(f"no context on disk owns repos/{repo.name}", cli_line(root, "doctor"))
     return flow
 
 
@@ -133,7 +142,7 @@ def _row(repo: Path, path: str, state: str, age: float = 0.0, **facts: object) -
     """One worktree: WARN past a day or off-canon; `fix` shown only when ready or orphan;
     `exit`, the line a hold names — `clean` for an empty tree, else `merge` (ADR 0128)."""
     verb = "clean" if state == "empty" else "merge"
-    line = shlex.join(["python3", str(SCRIPT), verb, path])
+    line = f"{script(SCRIPT)} {verb} {quote(path)}"
     return {"repo": repo.name, "path": path, "state": state, "age_hours": age, **facts,
             "warn": state not in ("ready", "open", "empty") or age > 24,
             "fix": line if state in ("ready", "orphan") else "",

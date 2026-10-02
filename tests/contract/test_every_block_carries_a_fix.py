@@ -56,7 +56,7 @@ _NOT_ONE_COMMAND_RE = re.compile(rf"{_NOT_ONE_ACT_RE.pattern}| or | then ")
 _PREREQUISITES = {"uvx"}
 #: The executables a fix line opens with — a list, not `which`: a host may ship a binary
 #: named like a prose verb (`/usr/bin/write`), and the judgement must not move with it.
-_HEADS = {"chmod", "gh", "git", "grep", "ls", "mkdir", "python3", "rm", "sed", *_PREREQUISITES}
+_HEADS = {"chmod", "gh", "git", "grep", "ls", "mkdir", "rm", "sed", *_PREREQUISITES}
 
 
 def _defect(fix: str) -> bool:
