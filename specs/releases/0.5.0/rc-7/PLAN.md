@@ -54,7 +54,7 @@ As-is read at `wt/0.5.0a-release` e4c651b9; no code moved since 44d023e6, so the
 | fix sites: `hooks/root_whitelist.py:55`, `f/chokepoints/branch_policy.py:110-115`, `cli/commands/doctor.py`, `f/workspace/onboarding.py:101`, `f/spec_context/sweep.py:86-94`, `_specs.py:33-41` `_bound_tree` | mkdir of an existing dir; `<M.m.p>`; two lines for `--context nosuch`; a fixless skip; `repos/<r>/specs`, unwritable, or `repos/<context>/specs` | 17 fix-line records, 4 open | REBUILD | ≥ 2 bugs; each site renders one 0158 form with its real value |
 | `core/cli_line.py` ↔ `_specs.quote/script/with_specs` | two renderers, no parity test | 0159 | KEEP | the pinned pair; one harness case holds it |
 | `_ledger.validate` | no `allOf`, no `not`: decision-record-v1's accepted ⇒ `measured_by` + `ruling` and `ruling.words` ≠ `(?i)delega\|in session` would pass silently | ADR 0151 M1 | UPDATE | gains `allOf` (if/then) and `not` before `doctor_adr` moves onto it |
-| `_ledger.finding`; each `_*_check.py` | findings without `fix` | 1 open | UPDATE | `fix` required; each check names its verb |
+| `_ledger.finding`; each `_*_check.py` | findings without `fix` | 1 open | UPDATE | one finding per invalid line; fix = governance verb, else `Operator action:` (AC4.5) |
 | three fix-line contract files, 804 lines, 14 functions | three site lists for one invariant | F017; `every-block-fix-push-refspec-flaky-under-xdist` open | REBUILD | one harness (§2.9) |
 | `pub/scaffold/releases/AGENTS.md` §2–§3; `pub/agents/dd-software-engineer.md:79,127,146`; `S/dd-manager-orchestration/SKILL.md:65`; `S/dd-release-implementation/RC-FLOW.md:11-12,28,45,62-64` | two marker lifecycles; a compliance line the doctor never prints; `:20` cites SPEC-DOC-048 | 7, 4 open | REBUILD | ≥ 2 bugs; the lifecycle stated once, cited elsewhere |
 | `pub/data/AGENTS.md` §3 | six fail-open paths; one fix form | F080 | UPDATE | seventh path and judged scope; the two 0158 forms; existing bullets edited (8,188 B source) |
@@ -77,7 +77,7 @@ Bug-history lessons (audit of the fix chain):
 | question | authority | consults | deleted |
 |---|---|---|---|
 | what a SPEC Origin line says | `_release_schema.origin` (`release.py`) | `_release_tree.check`, `_backlog_exit.check_exit`, the doctor via `RELEASE_SCRIPT` | SPEC-DOC-048, `_backlog_exit._origin_cites` |
-| what a task line says (marker, order, `W:`) | `_release_schema` `MARKS`, `UNFINISHED_RE`, `writes` | `_release_phase`, `_release_tree`, `_release_plan`, `_worktree_end` replay | `_MARK`, `_TASK_BLOCK_RE`, `_release_plan`'s `W:` regex |
+| what a task line says (marker, order, `W:`) | `_release_schema` `MARKS`, `MARK_RE`, `writes` | `_release_phase`, `_release_tree`, `_release_plan`, `_worktree_end` replay | `_MARK`, `_TASK_BLOCK_RE`, `_release_plan`'s `W:` regex |
 | what a Status token says | `core/spec_status.extract_status` ⇄ `_release_schema.extract_status`, pinned by `tests/unit/core/test_spec_status.py` | the doctor, `_release_phase`, `_worktree_new` | — |
 | is a release ready, in any phase and at ship | `_release_tree.check` | `_ship`, `_release_phase`, the doctor | `_ship`'s own judgement; the DEFINITION skip |
 | how a JSONL ledger splits into records | `_ledger.records` | every script store, `_release_new`, the package via the loader | `jsonl_record_store`, the `splitlines()` reads |
@@ -113,7 +113,7 @@ Bug-history lessons (audit of the fix chain):
   - unreadable registry: `context_registry.registered_slugs` → `{"*"}`;
   - pre-gate timeout: `infrastructure/runtime_transforms/hook_wrappers.TOOL_TIMEOUT_S` (10);
   - missing venv: `tests/integration/gate/test_hook_interpreter.py::test_missing_venv_is_loud_and_fails_open_on_every_harness`.
-- M6, AC4.6 marker states and order: `_release_schema` holds none today (`UNFINISHED_RE` knows `[ ]`/`[-]`; the order lives in `_worktree_end._MARK`). T-050-137 adds `MARKS = (" ", "-", "x")`, the one ordered tuple `UNFINISHED_RE` and the replay derive from; the law test reads it.
+- M6, AC4.6 marker states and order: `_release_schema` holds none today (`UNFINISHED_RE` knows `[ ]`/`[-]`; the order lives in `_worktree_end._MARK`). T-050-137 adds `MARKS = (" ", "-", "x")`, the one ordered tuple `MARK_RE` and the replay derive from; the law test reads it.
 - M9, AC4.4 agent segment: the claude dialect's PreToolUse payload carries `agent_type` (and `agent_id`) inside a subagent (code.claude.com/docs/en/hooks); the recorded payloads under `tests/fixtures/hook_payloads/{claude,codex,copilot,cursor,devin,kimi-code}/` carry no agent field, so T-050-146 builds the subagent payload in `tests/unit/hooks/test_root_whitelist.py`. The root BLOCK segment is the payload's `agent_type` when it is a safe segment, else `main-thread` (operator ruling 2026-10-01). Safe segment: a string matching `[A-Za-z0-9._-]+` that is neither `.` nor `..`; a non-string, empty or other value falls back to `main-thread`, so the printed path always stays under `.dadaia/tmp/` (AC4.4, CWE-22). `main-thread`: both `main` and `main-thread` exist under `.dadaia/tmp/`; `main-thread` is the shipped law's name for that actor (`handoff-AGENTS.md:8`, `dd-grill-me` §6, the personas' `concurrency_relationship`), and `main` reads as a branch name.
 - M8: only tests rely on `JsonContextStore`'s absent branch. Every production constructor is behind `container._guard_initialized` or the resolver's sentinel (`hooks/ctx_inject.py:149`). The tests: `tests/fixtures/stores.py:15` (its docstring's "as `init` creates it" is false: no file), `tests/unit/test_json_context_store.py:40,91`, `tests/unit/infrastructure/test_io_encoding.py:44`, `tests/integration/test_context_baseline.py:77`. The fixture seeds init's document; the four sites use the fixture.
 - AC3.3, the rc-6 `W:` conflict: rc-6 impl commits widened their own `W:` lines (T-050-113 `1b0d9685`, T-050-117 `a386efc7`, as `specs/releases/AGENTS.md` §3 allows). T-050-113 put written fixtures in parentheses, so the checker reads them as named; T-050-117's nested `classify_path(...)` parentheses parse right only by a stray backtick. AC3.3 decides the parse: T-050-117's line yields its ten written paths. Who may widen stays as §3 states.
@@ -138,7 +138,7 @@ Bug-history lessons (audit of the fix chain):
 - Δ prod ≈ −43, tests ≈ −100.
 
 ### 2.3 Task line (AC3.3)
-- `_release_schema`: `MARKS = (" ", "-", "x")`; `UNFINISHED_RE` = `^\s*(?:[-*+]\s*)?\[( |-)\]`; `writes(line)` = the backticked paths of `W:` up to the first `·`, a parenthesized span (nesting counted) named, not written.
+- `_release_schema`: `MARKS = (" ", "-", "x")`; `MARK_RE` = `^([ \t]*(?:[-*+][ \t]*)?\[)([ x-])(\].*)$` (multiline), unfinished = a mark other than `MARKS[-1]`; `writes(line)` = the backticked paths of `W:` up to the first `·`, a parenthesized span (nesting counted) named, not written.
 - `_release_plan` and `_worktree_end`'s replay read them; `_MARK` leaves; "the most advanced state wins" stays in the replay.
 - SPEC-DOC-047 re-homes into `check`: a `W:` naming `specs/memory` is a finding; `test_doctor_memory_task.py` re-homes by name into `test_release_implementation_release_script.py`; RC-FLOW `:45` names `release.py check`.
 - Δ prod ≈ −37, tests ≈ −50.
@@ -176,8 +176,8 @@ Bug-history lessons (audit of the fix chain):
 - Floor messages: a mapping beside `CORE_FLOOR`; `evaluate` reads it; the session fix is `context bind <bound context>`, unbound `context list`; `classify_path`'s docstring states projected → floor → glob.
 - `DADAIA_BIN` and the `ci preflight` advice leave the hook; `venv_guard` and `ci_preflight` lose their arms; release-please leaves getting-started.
 - `--help`: each example renders through `cli_line`.
-- Sites: root BLOCK `mkdir_line(<ws>/.dadaia/tmp/<agent_type|main-thread>/<YYYYMMDD>)`; pre-push names the live work branch; `doctor --context nosuch` one `context list`; onboarding Next `Operator action:` with real values; `sweep.guarded` names the owner and `Operator action: remove <real path>`; `_bound_tree` names the open worktree of the ledger's kind, else `worktree.py new <r> --kind <kind>`.
-- `_ledger.finding(…, fix)` required; each check passes its governance verb; `_finding`'s fallback leaves.
+- Sites: root BLOCK `mkdir_line(<ws>/.dadaia/tmp/<agent_type|main-thread>/<YYYYMMDD>)`; pre-push names the live work branch; `doctor --context nosuch` one `context list`; onboarding Next `Operator action:` with real values; `sweep.remove` names its own target in the advice (`Operator action: remove <real path>`), its outcome arm `except OSError` (the Python 3.14 rmtree fix, 2155d001); `guarded` stays generic; `_bound_tree` names the open worktree of the ledger's kind, else `worktree.py new <r> --kind <kind>`.
+- Each ledger `check`: one finding per invalid line; fix = the governance verb with real values where one clears it, else `Operator action:` naming file, line and law; `check` is never a fix (AC4.5, operator ruling 2026-10-01); `_finding`'s fallback leaves.
 - Δ prod ≈ +4, tests ≈ +30.
 
 ### 2.9 One harness (AC4.1, AC4.7 fixture, AC4.8)
