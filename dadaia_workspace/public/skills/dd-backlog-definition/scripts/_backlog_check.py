@@ -34,7 +34,7 @@ def finding(
     path: str, line: int, message: str, root: Path, at: int | str | None = None
 ) -> dict[str, Any]:
     """*at* labels a BACKLOG.json finding (an entry or key); a histo finding is its line."""
-    verbs = "`backlog.py exit`" if path == HISTO else "`backlog.py new|exit`"
+    verbs = "`backlog.py exit`" if path == HISTO else "`backlog.py new` or `backlog.py exit`"
     law = "specs/backlog/AGENTS.md: never hand-edit BACKLOG.json"
     fix = _ledger.unwritten(root / path, line if at is None else at, verbs, law)
     return _ledger.finding(CODE, path, line, message, fix)

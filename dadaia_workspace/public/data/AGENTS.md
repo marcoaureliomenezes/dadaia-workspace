@@ -1,5 +1,5 @@
 > **AI agent rules.** This file is generated from
-> `dadaia_workspace/public/data/AGENTS.md` by `.dadaia/.venv/bin/dadaia public install`.
+> `dadaia_workspace/public/data/AGENTS.md` by `public install`.
 > Do not put project-specific instructions here. Put them in a scoped
 > `AGENTS.md` / `CLAUDE.md` inside the repo or directory they govern.
 

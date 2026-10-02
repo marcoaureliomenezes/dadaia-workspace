@@ -38,7 +38,7 @@ def _refuse_unapproved_trio(live: Live) -> Path:
         if not document.is_file():
             raise Refusal(
                 f"release {live.release_id} has no {document.relative_to(live.release_dir).as_posix()}",
-                f"write {document.resolve()} carrying '**Status:** {APPROVED}'",
+                f"Operator action: write {document.resolve()} carrying '**Status:** {APPROVED}'",
             )
         status = extract_status(document.read_text(encoding="utf-8"))
         if status != APPROVED:
@@ -46,7 +46,7 @@ def _refuse_unapproved_trio(live: Live) -> Path:
                 f"{document.relative_to(live.release_dir).as_posix()} of release {live.release_id} "
                 f"carries status {status!r} — SPEC, PLAN "
                 f"and TASKS must all be '**Status:** {APPROVED}' to enter IMPLEMENTATION",
-                f"set '**Status:** {APPROVED}' in {document.resolve()}",
+                f"Operator action: set '**Status:** {APPROVED}' in {document.resolve()}",
             )
     return candidate
 
@@ -81,6 +81,8 @@ def _refuse_open_worktrees(specs: Path) -> None:
 NEXT = {"DEFINITION": "phase IMPLEMENTATION", "IMPLEMENTATION": "phase CLOSURE", "CLOSURE": "ship"}
 #: `ship`'s one value no code knows: the promote PR's number exists once that PR is open.
 SHIP_PR = "with --pr set to the promote PR's number, once that PR is open"
+#: What the operator supplies to each NEXT verb that the code cannot fill (ADR 0158).
+SUPPLY = {"CLOSURE": SHIP_PR}
 
 
 def set_phase(specs: Path, phase: str, sha: str) -> tuple[str, str]:
@@ -98,7 +100,7 @@ def set_phase(specs: Path, phase: str, sha: str) -> tuple[str, str]:
             "IMPLEMENTATION after DEFINITION and CLOSURE after IMPLEMENTATION, once each",
             f"{SCRIPT} {NEXT.get(current, 'check')} --sha {sha}",
         )
-        raise choice(refusal, SHIP_PR) if current == "CLOSURE" else refusal
+        raise choice(refusal, SUPPLY.get(current, ""))
     ts, candidate = utc_now(), live.candidate
     if phase == "IMPLEMENTATION":
         candidate = _refuse_unapproved_trio(live)
@@ -109,7 +111,7 @@ def set_phase(specs: Path, phase: str, sha: str) -> tuple[str, str]:
         raise Refusal(
             f"TASKS.md still carries {len(unfinished)} open '[ ]'/reserved '[-]' marker(s) "
             f"— a candidate closes fully implemented: {unfinished[0]}",
-            f"finish and mark every task '[x]' in {(candidate / 'TASKS.md').resolve()}",
+            f"Operator action: finish and mark every task '[x]' in {(candidate / 'TASKS.md').resolve()}",
         )
     else:
         _refuse_open_worktrees(specs.resolve())

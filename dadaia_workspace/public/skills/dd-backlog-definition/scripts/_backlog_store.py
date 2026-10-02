@@ -105,7 +105,7 @@ def commit(
         if stamp(path) != before:
             raise Refusal(
                 f"{path.name} changed twice under this write — nothing was written",
-                "re-run this command",
+                "Operator action: re-run the same command, unchanged",
             )
     if line:
         replace(histo, candidate)

@@ -132,7 +132,7 @@ def commit(path: Path, rel: str, apply: Callable[[State], State]) -> State:
         if stamp(path) != before:
             raise Refusal(
                 f"{path.name} changed twice under this write — nothing was written",
-                "re-run this command",
+                "Operator action: re-run the same command, unchanged",
             )
     replace(path, text)
     return written

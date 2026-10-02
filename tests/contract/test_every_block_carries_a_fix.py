@@ -30,7 +30,7 @@ from typing import Any
 import pytest
 
 from dadaia_workspace.core import doctor_rules
-from dadaia_workspace.core.cli_line import cli_path, fix_line, shell_line, venv_line
+from dadaia_workspace.core.cli_line import cli_path, fix_line, shell_line
 from dadaia_workspace.core.gitflow import DEFAULT
 from dadaia_workspace.features.chokepoints import push_gate_decision
 from dadaia_workspace.features.chokepoints.branch_policy import parse_push_stdin
@@ -48,10 +48,27 @@ _REPO_ROOT = Path(__file__).resolve().parents[2]
 _PKG = _REPO_ROOT / "dadaia_workspace"
 _PUBLIC_SKILLS = _PKG / "public" / "skills"
 _FIX_LINE_RE = re.compile(r"^fix: (\S.*)$", re.MULTILINE)
-#: `<…>` (bar the `<specs>` `rule_fix` fills), an `&&` chain, an `a|b` menu of verbs.
-_NOT_ONE_COMMAND_RE = re.compile(r"<(?!specs>)[^<>\n]+>|&&|\w\|\w")
+#: Not one act (ADR 0158): a `<…>` (in source, bar the `<specs>` `rule_fix` fills), an `&&`
+#: chain, an `a|b` menu; a command also no ` or `/` then ` (sa-fix-lines-not-built-by-cli-line#S3).
+_NOT_ONE_ACT_RE = re.compile(r"<(?!specs>)[^<>\n]+>|&&|\w\|\w")
+_NOT_ONE_COMMAND_RE = re.compile(rf"{_NOT_ONE_ACT_RE.pattern}| or | then ")
 #: The installer a workspace is born from (getting-started Level 1), absent from CI runners.
 _PREREQUISITES = {"uvx"}
+
+
+def _defect(fix: str) -> bool:
+    """The ONE predicate: *fix* is `Operator action: <one act>`, or one command whose head is
+    no prose word (a lowercase word is an executable on PATH); `·` is a value the source
+    walk cannot know."""
+    if fix.startswith("Operator action: ") or "·" in fix:  # an act, or text half-known
+        return bool(_NOT_ONE_ACT_RE.search(fix))
+    head = fix.split(" ", 1)[0]
+    prose = re.fullmatch(r"[a-z][a-z-]*", head) and not (
+        shutil.which(head) or head in _PREREQUISITES
+    )
+    return bool(prose or _NOT_ONE_COMMAND_RE.search(fix))
+
+
 _SHA_B, _ZERO = "b" * 40, "0" * 40
 
 
@@ -61,12 +78,12 @@ def _the_fix(message: str | None) -> str:
     fixes = _FIX_LINE_RE.findall(message)
     assert len(fixes) == 1, f"expected exactly one 'fix:' line, got {fixes} in:\n{message}"
     fix = fixes[0]
-    if fix.startswith("Operator action: "):  # an act in words: its choices may read `a|b`
-        assert not re.search(r"<(?!specs>)[^<>\n]+>|&&", fix), f"not one act: {fix}"
+    assert not _defect(fix) and "<specs>" not in fix, f"not one act: {fix}"
+    if fix.startswith("Operator action: "):
         return fix
-    assert not _NOT_ONE_COMMAND_RE.search(fix), f"not one command: {fix}"
-    argv0 = shlex.split(fix)[0]
-    assert Path(argv0).is_file() or shutil.which(argv0) or argv0 in _PREREQUISITES, fix
+    argv0 = shlex.split(fix)[0]  # an absolute file, or a bare name on PATH — never cwd-relative
+    on_path = "/" not in argv0 and (shutil.which(argv0) or argv0 in _PREREQUISITES)
+    assert on_path or (Path(argv0).is_absolute() and Path(argv0).is_file()), fix
     block = pre_gate.evaluate_payload({"tool_name": "Bash", "tool_input": {"command": fix}})
     assert block is None, f"the fix command is itself BLOCKED (a Stall):\n{fix}\n{block}"
     return fix
@@ -116,7 +133,8 @@ def test_the_real_doctor_prints_every_fix_as_one_whole_runnable_line(tmp_path: P
     fixes = [line for line in lines if line.startswith("fix: ")]
     assert fixes, run.stdout
     for fix in fixes:  # two shapes, no third (sa-unfixable-doctor-findings-say-doctor-fix#S1)
-        _the_fix(fix)
+        if _the_fix(fix).startswith("Operator action: "):  # AC4.5: it names the file
+            assert re.search(r"\s(/|\w:[\\/])\S", fix), fix
     # Whole lines: a wrapped fix would leave a continuation line that is neither a finding
     # (`CODE verdict …`) nor a `fix:` line.
     assert [ln for ln in lines if ln and not re.match(r"(fix: |[A-Z][A-Za-z0-9-]+ )", ln)] == []
@@ -141,6 +159,14 @@ def workspace(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
 
 def _gate(ws: Path, rel: str) -> str | None:
     return pre_gate.evaluate_payload({"tool_name": "Write", "tool_input": {"file_path": str(ws / rel)}})  # fmt: skip
+
+
+def _scope_block(ws: Path, *, has_id: bool) -> str:
+    """A write into a repo another context owns, outside the bind's repos (AC4.4)."""
+    from dadaia_workspace.features.spec_context.gate_policy import evaluate
+
+    return evaluate("repos/b/x.py", root=ws, zone="repo", repo="b", owner="b",
+                    context="a", repos=frozenset({"a"}), has_id=has_id)[1]  # fmt: skip
 
 
 def _bare_cli(ws: Path) -> str | None:
@@ -184,6 +210,8 @@ _BLOCKS: dict[str, Callable[[Path], str | None]] = {
     "gate-protected-sessions": lambda ws: _gate(ws, ".dadaia/sessions/some-session.json"),
     "gate-protected-projected": lambda ws: _gate(ws, ".dadaia/states/install_ledger.json"),
     "gate-protected-glob-dec-11": lambda ws: _gate(ws, "repos/a/secrets/k"),
+    "gate-scope-names-the-bind": lambda ws: _scope_block(ws, has_id=True),
+    "gate-id-less-session-relaunch": lambda ws: _scope_block(ws, has_id=False),
     "venv-guard-bare-cli": _bare_cli,
     "hook-missing-venv": lambda ws: VENV_MISSING.replace("$ROOT", ws.as_posix()),
     "push-malformed-stdin": lambda ws: _push(ws, malformed_lines=1),
@@ -260,7 +288,7 @@ def test_cli_line_and_the_scripts_render_one_argv_as_one_line(tmp_path: Path) ->
     argv = ["git", "-C", str(tmp_path / "a b"), "commit", "-m", "it's $HOME"]
     assert " ".join(map(specs.quote, argv)) == shell_line(*argv)
     script = tmp_path / "s p" / "x.py"
-    assert specs.script(script) == venv_line(None, "python", str(script.resolve()))
+    assert specs.script(script) == shell_line(sys.executable, str(script.resolve()))
 
 
 # ── dadaia doctor rules: every fix rendered by `rule_fix` ───────────────────────
@@ -371,7 +399,7 @@ def test_every_doctor_fix_target_resolves_on_disk(codes: str, command: str) -> N
     guarantees; a ``dadaia`` fix walks the live command tree to a leaf; a skill-script fix
     (sa-fix-lines-not-built-by-cli-line#S8) runs the venv interpreter and a shipped script
     by absolute path, whose subcommand takes ``--help``."""
-    assert not _NOT_ONE_COMMAND_RE.search(command), command
+    assert not _defect(command) and "<specs>" not in command, command
     assert _unresolved_paths(command) == [], f"{codes}: {command!r}"
     tokens = shlex.split(command)
     if command.startswith(fix_line(Path())):
@@ -427,6 +455,10 @@ _FIX_CALL_RE = re.compile(r"(_line|_fix|^script)$")
 #: A hand-built CLI spelling in a fix (sa-fix-lines-not-built-by-cli-line, ADR 0045).
 _SPELLING = re.compile(r"\.dadaia[/\\]\.venv|(?<![\w./-])dadaia\s")
 _HAND_BUILT = {"DADAIA_BIN", "cli_path"}
+#: A fix's positional index in a constructor no `def` declares (onboarding `Step`, `Refusal`).
+_FIX_CTORS = {"Step": 3, "Refusal": 1}
+#: B1's other fix positions: a value bound to, or returned by, a `fix`-named name.
+_FIX_NAME = re.compile(r"(?i)(?:^|_)fix(?:es)?(?:$|_)")
 #: A builder spelling a command inside error prose with no `fix:` line (PLAN §2.8 not-sites).
 _PROSE = {"dadaia_workspace/cli/_specs_resolution.py:64", "dadaia_workspace/core/invocation.py:250"}
 #: The builder module: the one place the CLI is spelled by hand.
@@ -452,7 +484,7 @@ def _render(node: Any, scope: dict[str, list[Any]], defs: dict[str, Any], depth:
             return "·".join(map(again, parts))
         case ast.FormattedValue(value=v) | ast.Starred(value=v) | ast.Subscript(value=v):
             return again(v)
-        case ast.ListComp(elt=v) | ast.GeneratorExp(elt=v):
+        case ast.ListComp(elt=v) | ast.GeneratorExp(elt=v) | ast.Lambda(body=v):
             return again(v)
         case ast.BinOp(left=left, right=right):
             return again(left) + again(right)
@@ -468,10 +500,10 @@ def _render(node: Any, scope: dict[str, list[Any]], defs: dict[str, Any], depth:
             return again(table)
         case ast.Call(func=ast.Attribute(value=receiver)) if not isinstance(receiver, ast.Name):
             return again(receiver)
+        case ast.Call() if _callee(node) in defs:  # a local producer: what it returns
+            return "·".join(again(n.value) for n in ast.walk(defs[_callee(node)]) if isinstance(n, ast.Return) and n.value)  # fmt: skip
         case ast.Call() if _FIX_CALL_RE.search(_callee(node)) or _callee(node)[:1].isupper():
             return " ".join(map(again, [*node.args, *(k.value for k in node.keywords)]))
-        case ast.Call() if _callee(node) in defs:
-            return "·".join(again(n.value) for n in ast.walk(defs[_callee(node)]) if isinstance(n, ast.Return))  # fmt: skip
     return "·"
 
 
@@ -501,38 +533,68 @@ def _code_sites(trees: dict[str, ast.Module]) -> list[str]:
 
     verbs = "|".join(sorted({path[0] for path in command_paths() if path}))
     instruction = re.compile(rf"(?:['`]|\$\(|\b[Rr]e-?run:? |\b[Rr]un:? |\bwith |\buntil |\bthen )dadaia ({verbs})\b")  # fmt: skip
-    fix_param = {  # each callable taking `fix` (a class: its __init__), and its position
-        (owner.name if fn.name == "__init__" else fn.name): names.index("fix")
-        for owner in (n for t in trees.values() for n in ast.walk(t))
-        for fn in (owner.body if isinstance(owner, ast.ClassDef) else [owner])
-        if isinstance(fn, ast.FunctionDef)
-        and "fix" in (names := [a.arg for a in fn.args.args if a.arg != "self"])
-    }
+
+    def fix_params(owners: Any) -> dict[str, int]:
+        """Each callable taking `fix` (a class: its __init__), and its position."""
+        return {
+            (owner.name if fn.name == "__init__" else fn.name): names.index("fix")
+            for owner in owners
+            for fn in (owner.body if isinstance(owner, ast.ClassDef) else [owner])
+            if isinstance(fn, ast.FunctionDef)
+            and "fix" in (names := [a.arg for a in fn.args.args if a.arg != "self"])
+        }
+
+    every = {**_FIX_CTORS, **fix_params(n for t in trees.values() for n in ast.walk(t))}
+    every |= {f"{PurePosixPath(rel).stem}.{name}": at for rel, t in trees.items()
+              for name, at in fix_params(ast.walk(t)).items()}  # `module.func`, qualified  # fmt: skip
     sites: set[str] = set()
     for rel, tree in trees.items():
+        fix_param = {**every, **fix_params(ast.walk(tree))}  # a local `def` wins its name
         defs = {n.name: n for n in ast.walk(tree) if isinstance(n, ast.FunctionDef)}
         docs = {id(n.body[0].value) for n in ast.walk(tree)
                 if isinstance(n, ast.Module | ast.FunctionDef | ast.ClassDef) and n.body
                 and isinstance(n.body[0], ast.Expr)}  # fmt: skip
         spelled = rel == _BUILDER or "/public/" in rel  # stdlib scripts spell via `_specs`
-        bad = _NOT_ONE_COMMAND_RE if spelled else re.compile(f"{_NOT_ONE_COMMAND_RE.pattern}|{_SPELLING.pattern}")  # fmt: skip
         module = _scope(tree, {})
         for unit in [tree, *defs.values()]:
             scope = module if unit is tree else _scope(unit, module)
             for node in ast.walk(unit):
                 fixes: list[str] = []
                 if isinstance(node, ast.Call):
-                    at = fix_param.get(_callee(node), -1)
+                    owner = getattr(node.func, "value", None)
+                    qualified = f"{owner.id}.{_callee(node)}" if isinstance(owner, ast.Name) else ""
+                    at = fix_param.get(qualified, fix_param.get(_callee(node), -1))
                     carried = [*node.args[at : at + 1 if at >= 0 else 0],
                                *(k.value for k in node.keywords if k.arg in ("fix", "fix_help"))]  # fmt: skip
                     if _FIX_CALL_RE.search(_callee(node)):
                         carried.append(node)
                     fixes = [_render(c, scope, defs) for c in carried]
-                elif isinstance(node, ast.Constant | ast.JoinedStr | ast.BinOp):
+                elif (
+                    isinstance(node, ast.Constant | ast.JoinedStr | ast.BinOp)
+                    and id(node) not in docs
+                ):
                     fixes = _render(node, scope, defs).split("fix: ")[1:]
+                elif isinstance(node, ast.Assign | ast.AnnAssign) and node.value is not None:
+                    names = [
+                        ast.unparse(t)
+                        for t in (node.targets if isinstance(node, ast.Assign) else [node.target])
+                    ]
+                    fixes = (
+                        [_render(node.value, scope, defs)]
+                        if any(map(_FIX_NAME.search, names))
+                        else []
+                    )
+                elif isinstance(node, ast.FunctionDef) and _FIX_NAME.search(node.name):
+                    fixes = [
+                        _render(r.value, scope, defs)
+                        for r in ast.walk(node)
+                        if isinstance(r, ast.Return) and r.value
+                    ]
                 text = getattr(node, "value", None) if isinstance(node, ast.Constant) else None
                 told = isinstance(text, str) and id(node) not in docs and instruction.search(text)
-                if any(bad.search(fix) for fix in fixes) or (told and rel != _BUILDER):
+                alts = [fix.strip() for fix in fixes if fix.strip()]
+                hand = not spelled and any(_SPELLING.search(a) for a in alts)
+                if hand or any(map(_defect, alts)) or (told and rel != _BUILDER):
                     sites.add(f"{rel}:{node.lineno}")
     return sorted(sites - _PROSE)
 
@@ -591,7 +653,7 @@ def _text_sites(texts: dict[str, str]) -> list[str]:
         rows, fenced = _text_rows(rel), False
         for number, line in enumerate(text.splitlines(), start=1):
             fenced ^= line.startswith("```")
-            whole = fenced and rel.endswith(".md") and _bad_command(line)
+            whole = fenced and rel.startswith("dadaia_workspace/public/") and _bad_command(line)
             if whole or any(row(line) for row in rows):
                 sites.append(f"{rel}:{number}")
     return sites
@@ -612,7 +674,7 @@ def test_no_fix_or_shipped_line_bypasses_the_one_renderer() -> None:
     rendered = [
         f"{codes}: {fix}"
         for codes, rule in _every_doctor_rule()
-        if _NOT_ONE_COMMAND_RE.search(fix := doctor_rules.rule_fix(rule, Path(), Path("specs")))
+        if _defect(fix := doctor_rules.rule_fix(rule, Path(), Path("specs")))
     ]
     assert [*_code_sites(code), *_text_sites(texts), *rendered] == []
 
@@ -630,12 +692,19 @@ def test_the_scans_bite() -> None:
     ]
     source = (
         'X = f"fix: {DADAIA_BIN} doctor"\n'
-        'raise Refusal("m", fix=".dadaia/.venv/bin/dadaia doctor")\n'
+        'Step("r", "command", "why", ".dadaia/.venv/bin/dadaia doctor")\n'
         'Y = "fix: release.py ship --pr <n>"\n'
         'Z = "Run: dadaia doctor"\n'
+        'identity_fix = ".dadaia/.venv/bin/dadaia doctor"\n'
+        'def make_fix():\n    return "finish the task by hand"\n'
+        'raise Refusal("m", "git fetch origin then git push origin")\n'
+        'W = "fix: Operator action: run `bugs.py resolve|supersede` on it"\n'
         'OK = "fix: Operator action: open the PR"\n'
+        'raise Refusal("m", "git push origin")\n'
     )
-    assert _code_sites({"m.py": ast.parse(source)}) == ["m.py:1", "m.py:2", "m.py:3", "m.py:4"]
+    assert _code_sites({"m.py": ast.parse(source)}) == [
+        f"m.py:{n}" for n in (1, 2, 3, 4, 5, 6, 8, 9)
+    ]
     shipped = (
         "made by `dadaia public install`\n"
         "`.dadaia/.venv/bin/dadaia nosuchverb`\n"

@@ -102,7 +102,7 @@ def commit(
         if stamp(path) != before:
             raise Refusal(
                 f"{path.name} changed twice under this write — nothing was written",
-                "re-run this command",
+                "Operator action: re-run the same command, unchanged",
             )
     if archive:  # pre-v6 lines live there: only the moved records are new
         replace(histo, old + serialize([r for r in records if r not in written]))

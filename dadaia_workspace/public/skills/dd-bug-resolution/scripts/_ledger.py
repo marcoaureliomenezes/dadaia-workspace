@@ -211,5 +211,5 @@ def private_refusal(record: dict[str, Any], specs: Path) -> tuple[str, str] | No
         return None
     return (
         f"field {hit[0]!r} carries {hit[1]!r}, which the push refuses — nothing was written",
-        "re-run this command with that value rewritten without the private term",
+        "Operator action: re-run this command with that value rewritten without the private term",
     )

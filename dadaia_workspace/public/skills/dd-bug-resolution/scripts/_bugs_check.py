@@ -23,7 +23,10 @@ CODE = "LEDGER-BUGS-SCHEMA"
 LEDGER = "bugs/BUGS.jsonl"
 HISTO = "bugs/_archive/bugs_histo.jsonl"
 TERMINAL = ("resolved", "superseded", "deferred", "rejected")
-_VERBS, _LAW = "`bugs.py append|update`", "specs/bugs/AGENTS.md: never hand-edit BUGS.jsonl"
+_VERBS, _LAW = (
+    "`bugs.py append` or `bugs.py update`",
+    "specs/bugs/AGENTS.md: never hand-edit BUGS.jsonl",
+)
 
 
 def load_schema() -> dict[str, Any]:
