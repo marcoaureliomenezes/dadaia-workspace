@@ -313,9 +313,7 @@ class SpecContextService:
         --associated`` (``cli/commands/context.py``) reuses this method verbatim,
         so it inherits both refusals with no second code path.
         """
-        ctx = self._store.get(name)
-        if ctx is None:
-            raise ContextNotFoundError(f"Context '{name}' not found.")
+        ctx = self.show(name)
         if slug == ctx.repo_slug:
             raise AssociatedRepoConflictError(
                 f"'{slug}' is context '{name}''s own main repo slug (--repo at "
@@ -359,9 +357,7 @@ class SpecContextService:
         currently registered — including a second ``remove`` of the same slug,
         which is the loud-failure half of A17.1's idempotency, not a silent no-op.
         """
-        ctx = self._store.get(name)
-        if ctx is None:
-            raise ContextNotFoundError(f"Context '{name}' not found.")
+        ctx = self.show(name)
         if not any(r.slug == slug for r in ctx.associated_repos):
             raise AssociatedRepoNotFoundError(
                 f"Associated repo '{slug}' is not registered on context '{name}'."
@@ -767,13 +763,11 @@ class SpecContextService:
     # ------------------------------------------------------------------ delete
 
     def delete(self, name: str) -> None:
-        ctx = self._store.get(name)
-        if ctx is None:
-            raise ContextNotFoundError(f"Context '{name}' not found.")
+        ctx = self.show(name)
         if ctx.state == ContextState.ALIVE:
             raise ContextStateError(
-                f"Context '{name}' is active. Run "
-                f"'{fix_line(self._workspace_root, 'context', 'dead', name)}' before deleting."
+                f"Context '{name}' is active.\nfix: "
+                + fix_line(self._workspace_root, "context", "dead", name)
             )
         self._store.delete(name)
         # Bug context-delete-leaves-stale-session-bind: a session record pointing at a

@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -447,7 +448,13 @@ def test_every_refusal_carries_one_fix_that_is_not_itself_refused(
         if line.startswith("fix: ")
     ]
     assert len(fixes) == 1, result.stderr
-    command = fixes[0].replace("$(git rev-parse --short HEAD)", "abc1234").replace("<n>", "7")
+    # T-050-149 (AC4.4): no `<n>` — the PR number is the operator's act, supplied as it says.
+    act = re.fullmatch(
+        r"Operator action: run `(.+)` with --pr set to the promote PR's .+", fixes[0]
+    )
+    command = f"{act[1]} --pr 7" if act else fixes[0]
+    assert "<" not in fixes[0] and (act is not None) == (phase == "CLOSURE"), fixes[0]
+    command = command.replace("$(git rev-parse --short HEAD)", "abc1234")
     done = subprocess.run(command, shell=True, capture_output=True, text=True, check=False)
     assert done.returncode == 0, (command, done.stderr)
 

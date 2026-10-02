@@ -19,11 +19,11 @@ sys.path.append(str(Path(__file__).resolve().parents[2] / "dd-bug-resolution" / 
 
 from _release_check import histo_findings  # noqa: E402
 from _release_new import new_release  # noqa: E402
-from _release_phase import set_phase  # noqa: E402
+from _release_phase import SHIP_PR, set_phase  # noqa: E402
 from _release_schema import CODE, HISTO, SHA_RE, STATE, utc_now  # noqa: E402
 from _release_store import SCRIPT, Refusal, commit, live_release, window_start  # noqa: E402
 from _release_tree import check, drift, memory_errors, ship_findings  # noqa: E402
-from _specs import find_specs, refuse  # noqa: E402
+from _specs import choice, find_specs, refuse  # noqa: E402
 
 _HELP = {
     "new": "open the next candidate: its rc-<N+1>/SPEC.md stub and _RELEASE.json, in one act",
@@ -105,8 +105,9 @@ def _ship(args: argparse.Namespace, specs: Path) -> int:
     moved to `_archive/<v>/`, never deleted (ADR 0152 (1)); refused on any `ship_findings`."""
     live, ts = live_release(specs), utc_now()
     if not (SHA_RE.match(args.sha) and args.pr.isdigit() and int(args.pr) > 0):
-        raise Refusal(f"--sha {args.sha!r} / --pr {args.pr!r}: a hex sha and a PR number",
-                      f"{SCRIPT} ship --sha $(git rev-parse --short HEAD) --pr <n>")  # fmt: skip
+        sha = args.sha if SHA_RE.match(args.sha) else "$(git rev-parse --short HEAD)"
+        raise choice(Refusal(f"--sha {args.sha!r} / --pr {args.pr!r}: a hex sha and a PR number",
+                             f"{SCRIPT} ship --sha {sha}"), SHIP_PR)  # fmt: skip
     if found := ship_findings(specs):
         raise Refusal(found[0]["message"], found[0]["fix"])
     line = json.dumps({"id": live.release_id, "ts": ts, "disposition": "delivered",

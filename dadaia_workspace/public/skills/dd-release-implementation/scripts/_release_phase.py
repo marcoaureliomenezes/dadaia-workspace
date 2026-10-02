@@ -23,6 +23,7 @@ from _release_schema import (  # noqa: E402
     utc_now,
 )
 from _release_store import SCRIPT, Live, Refusal, State, commit, live_release  # noqa: E402
+from _specs import choice  # noqa: E402
 
 #: DEFINITION is `new`'s; each later phase has one predecessor (out-of-order = re-run).
 PREDECESSOR = {"IMPLEMENTATION": "DEFINITION", "CLOSURE": "IMPLEMENTATION"}
@@ -77,8 +78,9 @@ def _refuse_open_worktrees(specs: Path) -> None:
 
 #: The one verb that moves each phase forward — every refusal's fix names it, so a fix
 #: never names a verb that refuses in the same state.
-NEXT = {"DEFINITION": "phase IMPLEMENTATION", "IMPLEMENTATION": "phase CLOSURE",
-        "CLOSURE": "ship --pr <n>"}  # fmt: skip
+NEXT = {"DEFINITION": "phase IMPLEMENTATION", "IMPLEMENTATION": "phase CLOSURE", "CLOSURE": "ship"}
+#: `ship`'s one value no code knows: the promote PR's number exists once that PR is open.
+SHIP_PR = "with --pr set to the promote PR's number, once that PR is open"
 
 
 def set_phase(specs: Path, phase: str, sha: str) -> tuple[str, str]:
@@ -91,11 +93,12 @@ def set_phase(specs: Path, phase: str, sha: str) -> tuple[str, str]:
     live = live_release(specs)
     current = str(live.state.get("phase"))
     if PREDECESSOR.get(phase) != current:
-        raise Refusal(
+        refusal = Refusal(
             f"release {live.release_id} is in phase {current!r} — `phase` writes "
             "IMPLEMENTATION after DEFINITION and CLOSURE after IMPLEMENTATION, once each",
             f"{SCRIPT} {NEXT.get(current, 'check')} --sha {sha}",
         )
+        raise choice(refusal, SHIP_PR) if current == "CLOSURE" else refusal
     ts, candidate = utc_now(), live.candidate
     if phase == "IMPLEMENTATION":
         candidate = _refuse_unapproved_trio(live)

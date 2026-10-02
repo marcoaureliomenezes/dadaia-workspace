@@ -267,7 +267,7 @@ VENV_PYTHON = (
 )
 #: What every ctx-inject firing tells the agent until the venv is fixed (AC2.7).
 VENV_MISSING = (
-    "dadaia: no workspace venv at $ROOT/.dadaia/.venv — the gate is off. "
+    "dadaia: no workspace venv at $ROOT/.dadaia/.venv — the gate is off.\n"
     "fix: uvx dadaia-workspace init $ROOT\n"
 )
 
