@@ -702,9 +702,9 @@ def test_a_write_once_field_refuses_a_differing_second_write(script: Path, tmp_p
     assert _records(specs)[0]["solution"] == "one"
 
 
-@pytest.mark.parametrize("bad", ["smaller", "net-sideways: x", "net-negative:"])
+@pytest.mark.parametrize("bad", ["smaller", "net-zero: x", "net-negative:"])
 def test_resolve_refuses_a_malformed_evidence_diff(script: Path, tmp_path: Path, bad: str) -> None:
-    """`evidence_diff` must open with a `net-*:` direction and carry a rationale."""
+    """`evidence_diff` must open with `net-negative:`, `net-positive:` or `net-neutral:` and carry a rationale."""
     specs = _ledger(tmp_path, _OPEN_RECORD)
     argv = _resolve_argv()
     argv[argv.index("--evidence-diff") + 1] = bad

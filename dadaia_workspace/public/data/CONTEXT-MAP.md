@@ -67,7 +67,7 @@ One procedure each; a skill that touches a governed area opens its scoped law as
 | `dd-audit-project` | the three-pillar audit and its window | `specs/audits/AGENTS.md` | 6144 | 2834 |
 | `dd-backlog-definition` | backlog curation, the intake gate, dispositions | `specs/backlog/AGENTS.md` | 6144 | 3188 |
 | `dd-bug-registration` | classify-first bug proposal and its record | `specs/bugs/AGENTS.md` | 6144 | 2915 |
-| `dd-bug-resolution` | the seven-phase diagnosing method and the resolve record | `specs/bugs/AGENTS.md` | 6144 | 5203 |
+| `dd-bug-resolution` | the seven-phase diagnosing method and the resolve record | `specs/bugs/AGENTS.md` | 6144 | 5221 |
 | `dd-cli-library` | CLI idioms, CLI-owned state, the dev-server registry | `.dadaia/AGENTS.md` | 6144 | 5169 |
 | `dd-code-review` | the three review axes and the six lenses | `specs/memory/AGENTS.md` | 6144 | 5623 |
 | `dd-codebase-design` | the deep-module vocabulary and the deletion test | — | 6144 | 5540 |

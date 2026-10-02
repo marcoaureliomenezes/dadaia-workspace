@@ -69,7 +69,7 @@ python3 .agents/skills/dd-bug-resolution/scripts/bugs.py resolve <bug-id> --caus
   --solution … --evidence-loop … --evidence-seam … --evidence-diff 'net-negative: prod +a/-b, tests +c/-d'
 ```
 
-- The direction is `--evidence-diff`'s `net-*:` prefix; `--evidence-seam` must name an existing file and `def`.
+- `--evidence-diff` opens `net-negative:`, `net-positive:` or `net-neutral:`; `--evidence-seam` names an existing file and `def`.
 - `caused_by` names a live or archived record, or `none`, never a loop; writes refuse else.
 - Stage code + regression test + the `BUGS.jsonl` line together, the red loop quoted in the
   body — ONE commit, shape 3 of `dd-gitflow-default` §3a.
