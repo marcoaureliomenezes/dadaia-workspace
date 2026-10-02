@@ -117,7 +117,13 @@ def test_an_invalid_ledger_line_is_one_operator_action(
     found = _findings_before(tmp_path, "--specs-dir", "specs")
     (fix,) = [f["fix"] for f in found if f["code"] == code]
     assert fix.startswith("Operator action: ") and f"line 1 of {ledger.resolve()} " in fix, fix
-    assert "AGENTS.md" in fix and "<" not in fix, fix
+    assert "AGENTS.md" in fix and "<" not in fix and "by hand" not in fix, fix
+    remedy = (
+        "writes audit findings directly"
+        if "audits" in rel
+        else f"git log -L 1,1:{ledger.resolve()}"
+    )
+    assert remedy in fix, fix
 
 
 def _workspace(tmp_path: Path) -> Path:

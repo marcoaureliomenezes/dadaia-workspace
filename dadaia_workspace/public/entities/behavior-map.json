@@ -208,7 +208,7 @@
       "hash_tuple": {
         "section": "sha256:dd7fa02f42e51618b5d991954f1a5f379dad89210ba85ea93a940c247dd24a93",
         "skill": "sha256:35b3803817f4601ffeebc590ed1c98d5d779427ecb4e9de1034fab38e4958422",
-        "scripts": "sha256:b2b96cfa9599faaab0ee440785aa8fa776648d6387e0e6b0cf487191185d2d34",
+        "scripts": "sha256:1c5d4ee563a384f68bfe53bc095c9ee2ad0fe89a24d27f221f73678c3a455a45",
         "scoped": [
           "sha256:b49c2c7d74916bf1af3ba2c06ae1c8bb8b6ed72ee5b7a1d3caa9b98480ec6348"
         ]
@@ -274,7 +274,7 @@
       "hash_tuple": {
         "section": "sha256:2e1085fbf82116cafcf8fd7226e28f50606442dd4df32ead26e19320b106ec88",
         "skill": "sha256:7b7a428134c557d3a3d47a90df2688da671fff0cb33ba66087dba47b30dc9281",
-        "scripts": "sha256:5e25160339cd8cfed619df32b92eb60342f4b4046bc22f1686e5dc7ab9625d48",
+        "scripts": "sha256:3745965d673f9e633bd8c7899931869ad2afe2410057615bc5a82c2d1943b5ba",
         "scoped": []
       },
       "recorded_by": "dd-software-engineer",

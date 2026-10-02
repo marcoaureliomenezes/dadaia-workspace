@@ -43,8 +43,9 @@ def _finding(rel: str, line: int, messages: list[str], root: Path) -> Finding:
     in place; an archive line only `audit.py close` writes."""
     law = "specs/audits/AGENTS.md"
     fix = (_ledger.unwritten(root / rel, line, "`audit.py close`", law) if rel == HISTO else
-           f"Operator action: rewrite line {line} of {root / rel} as one finding-record-v1 "
-           f"record; a disposition moves only by `audit.py disposition` ({law})")  # fmt: skip
+           f"Operator action: write line {line} of {root / rel} as one finding-record-v1 "
+           f"record — a bound session writes audit findings directly; a disposition moves "
+           f"only by `audit.py disposition` ({law})")  # fmt: skip
     return _ledger.finding(CODE, rel, line, "; ".join(messages), fix)
 
 

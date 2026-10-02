@@ -117,8 +117,9 @@ SPECS = Path("specs")
 
 def unwritten(file: Path, line: int, verbs: str, law: str) -> str:
     """The fix for a line no verb wrote: no verb rewrites it and *law* forbids a hand edit."""
-    return (f"Operator action: line {line} of {file} was not written by {verbs} — revert "
-            f"the change that wrote it, then redo it through {verbs} ({law})")  # fmt: skip
+    return (f"Operator action: line {line} of {file} was not written by {verbs} — revert the "
+            f"commit that wrote it (`git log -L {line},{line}:{file}` finds it), then redo the "
+            f"change through {verbs} ({law})")  # fmt: skip
 
 
 def stamp(path: Path) -> tuple[int, int] | None:
