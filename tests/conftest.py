@@ -54,6 +54,9 @@ _CHECKOUT_ROOT = Path(__file__).resolve().parent.parent
 os.environ["PYTHONPATH"] = os.pathsep.join(
     [str(_CHECKOUT_ROOT), *[p for p in os.environ.get("PYTHONPATH", "").split(os.pathsep) if p]]
 )
+# A child CPython normalizes its own `sys.executable`; a `../` launch keeps the dots here, so
+# every spawn and every expected fix line reads the normalized path the child will print.
+sys.executable = os.path.normpath(sys.executable)
 
 # No process the suite runs or spawns may resolve the operator instance this checkout sits
 # in, nor the one owning the running venv (bug test-subprocesses-resolve-the-live-instance):
