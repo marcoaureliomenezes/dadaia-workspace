@@ -126,6 +126,24 @@ def test_an_invalid_ledger_line_is_one_operator_action(
     assert remedy in fix, fix
 
 
+def test_a_dangling_caused_by_is_cleared_by_bugs_update(tmp_path: Path) -> None:
+    """Intent: CONTRACT — AC4.5: a line a governance verb clears takes that verb with real
+    values; run from elsewhere, `bugs.py update <id> --set caused_by=none` clears it."""
+    from tests.unit.skills.test_bug_resolution_bugs_script import _OPEN_RECORD
+
+    subprocess.run(["git", "init", "-q", str(tmp_path)], check=True)  # noqa: S603, S607
+    ledger = tmp_path / "specs/bugs/BUGS.jsonl"
+    ledger.parent.mkdir(parents=True)
+    ledger.write_text(json.dumps({**_OPEN_RECORD, "caused_by": "a-ghost"}) + "\n")
+    found = _findings_before(tmp_path, "--specs-dir", "specs")
+    (fix,) = [f["fix"] for f in found if f["code"] == "LEDGER-BUGS-SCHEMA"]
+    assert " update a-bug --set caused_by=none --specs " in fix, fix
+    _run_from_elsewhere(tmp_path, fix)
+    assert "LEDGER-BUGS-SCHEMA" not in {
+        f["code"] for f in _findings(tmp_path, "--specs-dir", "specs")
+    }
+
+
 def _workspace(tmp_path: Path) -> Path:
     """A real ``init`` in tmp, its venv stubbed onto this interpreter (never a real venv)."""
     from dadaia_workspace.core.harness_registry import L1_ENTRY_HARNESSES

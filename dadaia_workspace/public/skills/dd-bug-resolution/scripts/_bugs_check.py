@@ -17,6 +17,7 @@ from typing import Any
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import _ledger  # noqa: E402
+from _specs import quote, script, with_specs  # noqa: E402
 
 CODE = "LEDGER-BUGS-SCHEMA"
 LEDGER = "bugs/BUGS.jsonl"
@@ -53,6 +54,7 @@ def findings_for(
     Lineage (AC3.8): a `caused_by` names a record of *text* or *archived*, and never loops."""
     schema = load_schema()
     lines: dict[int, list[str]] = {}
+    fixes: dict[int, str] = {}  # a line a governance verb clears
     seen: dict[str, int] = {}
     links: dict[str, object] = {}
 
@@ -85,10 +87,13 @@ def findings_for(
         if target not in known or at == bug_id:
             why = f"forms a cycle: {' -> '.join(chain)}" if at == bug_id else "names no record"
             add(seen[bug_id], f"{bug_id!r} caused_by {why}")
+            update = f"{script(Path(__file__).with_name('bugs.py'))} update {quote(bug_id)}"
+            fixes[seen[bug_id]] = with_specs(f"{update} --set caused_by=none", root)
     return [
-        _ledger.finding(CODE, rel, n, "; ".join(m), _ledger.unwritten(root / rel, n, _VERBS, _LAW))
+        _ledger.finding(CODE, rel, n, "; ".join(m),
+                        fixes.get(n) or _ledger.unwritten(root / rel, n, _VERBS, _LAW))
         for n, m in sorted(lines.items())
-    ]
+    ]  # fmt: skip
 
 
 def histo_findings(text: str, root: Path = _ledger.SPECS) -> list[dict[str, Any]]:
