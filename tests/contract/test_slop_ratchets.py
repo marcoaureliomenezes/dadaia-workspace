@@ -113,20 +113,14 @@ def _family_witnesses(texts: Iterable[str]) -> dict[str, set[tuple[str, int]]]:
 
 def _string_constants(source: str) -> list[str]:
     """Every non-empty string constant in *source* that is not a bare docstring statement."""
-    tree = ast.parse(source)
-    bare = {
-        id(node.value)
-        for node in ast.walk(tree)
-        if isinstance(node, ast.Expr) and isinstance(node.value, ast.Constant)
-    }
-    return [
-        node.value
-        for node in ast.walk(tree)
-        if isinstance(node, ast.Constant)
-        and isinstance(node.value, str)
-        and node.value
-        and id(node) not in bare
-    ]
+    bare: set[int] = set()
+    constants = []
+    for node in ast.walk(ast.parse(source)):  # breadth-first: an Expr precedes its value
+        if isinstance(node, ast.Expr):
+            bare.add(id(node.value))
+        elif isinstance(node, ast.Constant) and node.value and isinstance(node.value, str):
+            constants += [] if id(node) in bare else [node.value]
+    return constants
 
 
 def _reads_family(constant: str, prefix: str, witnesses: Iterable[tuple[str, int]]) -> bool:
@@ -210,7 +204,7 @@ def _package_sources() -> dict[str, str]:
 def _json_per_split_line(sources: dict[str, str]) -> set[str]:
     """``json.loads`` fed from ``.splitlines()`` — U+2028 splits a record. Reach: a loop,
     comprehension, ``map`` or ``loads`` argument holding the call, or a name assigned from
-    it in the same scope (one hop); data flow beyond one hop is out of reach."""
+    it anywhere in the module (one hop); data flow beyond one hop is out of reach."""
 
     def attr(node: ast.AST) -> str:
         return getattr(getattr(node, "func", None), "attr", "")
@@ -223,31 +217,32 @@ def _json_per_split_line(sources: dict[str, str]) -> set[str]:
 
     hits = set()
     for name, source in sources.items():
-        tree = ast.parse(source)
-        for scope in [tree, *(n for n in ast.walk(tree) if isinstance(n, ast.FunctionDef))]:
-            tainted = {
-                t.id
-                for a in ast.walk(scope)
-                if isinstance(a, (ast.Assign, ast.AnnAssign)) and a.value and split(a.value, set())
-                for t in getattr(a, "targets", [getattr(a, "target", None)])
-                if isinstance(t, ast.Name)
-            }
-            for node in ast.walk(scope):
-                loops = getattr(node, "generators", None) or (
-                    [node] if isinstance(node, ast.For) else []
-                )
-                if loops and any(attr(c) == "loads" for c in ast.walk(node)):
-                    fed = [loop.iter for loop in loops]
-                elif attr(node) == "loads" or (
-                    isinstance(node, ast.Call)
-                    and getattr(node.func, "id", "") == "map"
-                    and getattr(node.args[:1] and node.args[0], "attr", "") == "loads"
-                ):
-                    fed = node.args  # type: ignore[attr-defined]
-                else:
-                    continue
-                if any(split(x, tainted) for x in fed):
-                    hits.add(f"{name}:{node.lineno}")  # type: ignore[attr-defined]
+        if "splitlines" not in source:  # no taint source, no hit: skip the parse
+            continue
+        nodes = list(ast.walk(ast.parse(source)))
+        tainted = {
+            t.id
+            for a in nodes
+            if isinstance(a, (ast.Assign, ast.AnnAssign)) and a.value and split(a.value, set())
+            for t in getattr(a, "targets", [getattr(a, "target", None)])
+            if isinstance(t, ast.Name)
+        }
+        for node in nodes:
+            loops = getattr(node, "generators", None) or (
+                [node] if isinstance(node, ast.For) else []
+            )
+            if loops and any(attr(c) == "loads" for c in ast.walk(node)):
+                fed = [loop.iter for loop in loops]
+            elif attr(node) == "loads" or (
+                isinstance(node, ast.Call)
+                and getattr(node.func, "id", "") == "map"
+                and getattr(node.args[:1] and node.args[0], "attr", "") == "loads"
+            ):
+                fed = node.args  # type: ignore[attr-defined]
+            else:
+                continue
+            if any(split(x, tainted) for x in fed):
+                hits.add(f"{name}:{node.lineno}")  # type: ignore[attr-defined]
     return hits
 
 
