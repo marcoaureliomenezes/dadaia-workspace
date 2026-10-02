@@ -538,7 +538,9 @@ def _render(
     return "·"
 
 
-def _scope(node: Any, outer: dict[str, list[Any]]) -> dict[str, list[Any]]:
+def _scope(
+    node: Any, outer: dict[str, list[Any]], walk: Callable[[Any], tuple[Any, ...]]
+) -> dict[str, list[Any]]:
     """Every value a name is bound to in *node*: its defaults and assignments, then *outer*'s."""
     bound: dict[str, list[Any]] = {}
     if isinstance(node, ast.FunctionDef):
@@ -546,7 +548,7 @@ def _scope(node: Any, outer: dict[str, list[Any]]) -> dict[str, list[Any]]:
         named = [*args.args[len(args.args) - len(args.defaults) :], *args.kwonlyargs]
         for arg, default in zip(named, [*args.defaults, *args.kw_defaults], strict=True):
             bound[arg.arg] = [default]
-    for child in ast.walk(node):
+    for child in walk(node):
         if isinstance(child, ast.Assign):
             for name in (n for t in child.targets for n in ast.walk(t) if isinstance(n, ast.Name)):
                 bound.setdefault(name.id, []).append(child.value)
@@ -562,6 +564,8 @@ def _code_sites(trees: dict[str, ast.Module]) -> list[str]:
     arguments, and a returned dict literal."""
     from dadaia_workspace.cli.help_digest import command_paths
 
+    # `ast.walk` once per subtree for this call: the scan re-reads each module and `def`.
+    _walk: Callable[[Any], tuple[Any, ...]] = functools.cache(lambda n: tuple(ast.walk(n)))
     verbs = "|".join(sorted({path[0] for path in command_paths() if path}))
     instruction = re.compile(rf"(?:['`]|\$\(|\b[Rr]e-?run:? |\b[Rr]un:? |\bwith |\buntil |\bthen )dadaia ({verbs})\b")  # fmt: skip
 
@@ -575,22 +579,22 @@ def _code_sites(trees: dict[str, ast.Module]) -> list[str]:
             and "fix" in (names := [a.arg for a in fn.args.args if a.arg != "self"])
         }
 
-    local = {rel: fix_params(ast.walk(t)) for rel, t in trees.items()}
+    local = {rel: fix_params(_walk(t)) for rel, t in trees.items()}
     every = {**_FIX_CTORS, **{n: at for params in local.values() for n, at in params.items()}}
     every |= {f"{PurePosixPath(rel).stem}.{n}": at for rel, params in local.items() for n, at in params.items()}  # fmt: skip
     sites: set[str] = set()
     for rel, tree in trees.items():
         fix_param = {**every, **local[rel]}  # a local `def` wins its name
-        defs = {n.name: n for n in ast.walk(tree) if isinstance(n, ast.FunctionDef)}
-        returns = {name: [r.value for r in ast.walk(d) if isinstance(r, ast.Return) and r.value] for name, d in defs.items()}  # fmt: skip
-        docs = {id(n.body[0].value) for n in ast.walk(tree)
+        defs = {n.name: n for n in _walk(tree) if isinstance(n, ast.FunctionDef)}
+        returns = {name: [r.value for r in _walk(d) if isinstance(r, ast.Return) and r.value] for name, d in defs.items()}  # fmt: skip
+        docs = {id(n.body[0].value) for n in _walk(tree)
                 if isinstance(n, ast.Module | ast.FunctionDef | ast.ClassDef) and n.body
                 and isinstance(n.body[0], ast.Expr)}  # fmt: skip
         spelled = rel == _BUILDER or "/public/" in rel  # stdlib scripts spell via `_specs`
-        module = _scope(tree, {})
+        module = _scope(tree, {}, _walk)
         for unit in [tree, *defs.values()]:
-            scope = module if unit is tree else _scope(unit, module)
-            for node in ast.walk(unit):
+            scope = module if unit is tree else _scope(unit, module, _walk)
+            for node in _walk(unit):
                 fixes: list[str] = []
                 if isinstance(node, ast.Call):
                     owner = getattr(node.func, "value", None)
@@ -619,7 +623,7 @@ def _code_sites(trees: dict[str, ast.Module]) -> list[str]:
                 elif isinstance(node, ast.FunctionDef) and _FIX_NAME.search(node.name):
                     fixes = [
                         _render(r.value, scope, returns)
-                        for r in ast.walk(node)
+                        for r in _walk(node)
                         if isinstance(r, ast.Return) and r.value
                     ]
                 text = getattr(node, "value", None) if isinstance(node, ast.Constant) else None
