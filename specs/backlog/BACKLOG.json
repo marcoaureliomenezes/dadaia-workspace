@@ -143,6 +143,125 @@
       "description": "_ledger.parse (dd-bug-resolution/scripts/_ledger.py:92) raises LineError on the first bad line and returns no line numbers, so ten production loops split JSONL by hand beside it: _bugs_check.py:67,112,133; _backlog_check.py:86,126; _audit_check.py:53; _release_check.py:77; features/specs/doctor_adr.py:34,95; features/specs/doctor_governance.py:50, which splits itself and calls parse per line under suppress(LineError). All split on LF alone today. Wanted: one numbered, tolerant iterator in _ledger (line number, record or error), parse and records thin over it, the ten loops collapsed into it (deletion-shaped). Bug family, each a hand reader splitting a ledger its own way: bug-event-field-with-unicode-line-separator-silently-drops-the-event, bug-event-sanitation-strips-tab-lf-cr-from-free-text, specs-doctor-bug-lane-splits-ledger-on-unicode-line-separators, release-events-fold-splits-release-jsonl-with-splitlines, sa-git-output-split-by-unicode-line-breaks, release-new-crashes-on-a-unicode-line-separator-in-the-bug-ledger, test-ledger-readers-bypass-the-one-jsonl-reader. Destination: rc-8.",
       "provenance": "operator approval 2026-10-02 via the main thread's intake; source: review F3 of bug test-ledger-readers-bypass-the-one-jsonl-reader",
       "relates": []
+    },
+    {
+      "id": "bug-fix-commit-derived-by-grep",
+      "title": "A bug's fix commit is derived by grep, never stored",
+      "opened": "2026-10-02",
+      "status": "idea",
+      "description": "Measured: no field links a bug to its fix; LINEAGE.md's `git log -S<id> -- BUGS.jsonl` never finds it, because resolve rewrites the line in place. Change: `bugs.py` gains a read verb, `fix <id>`, resolving the fix sha from `^fix\\(bugs\\): .*<id>` (shape 3) or shape 4's `(<sha>)`, and printing the sha, the test files and the numstat; LINEAGE.md uses it in place of the `git log -S` recipe; no schema field is added (grill Q1). Done when: every resolved record since 2026-08-27 resolves to a sha or is listed as unlinked. Files: `dd-bug-resolution/scripts/bugs.py`, `LINEAGE.md`. ADR 0164 (proposed).",
+      "provenance": "operator demand 2026-10-02: test audit https://claude.ai/artifact/AMw3Ho2tqaAbftJUWuNhAT + grill Q1-Q9",
+      "relates": []
+    },
+    {
+      "id": "caused-by-proposed-by-blame",
+      "title": "resolve proposes caused_by from blame and refuses an unreasoned none",
+      "opened": "2026-10-02",
+      "status": "idea",
+      "description": "Measured: 74% of post-migration resolves declare caused_by `none` by judgment; `bc135641c` repaired 6 links (2 cycles, a task id). Change: `resolve` blames the lines the staged diff removes (pre-fix revision), maps the blamed commits to bug ids through the bug-fix-commit-derived-by-grep resolver, and skips regenerated files (CONTEXT-MAP, behavior-map, shipped-hashes, install goldens), squash `(#n)` commits and `refactor(T-\u2026)` commits; it refuses a `--caused-by` outside the candidates, or `none` when candidates exist, unless `--lineage-reason` is given, and stores that reason (grill Q2). One semantics, aligned in the schema, LINEAGE.md and `specs/bugs/AGENTS.md:23`: \"the fix of X wrote the lines this fix corrects\"; the schema's \"reopen\" wording is deleted. Plug-in points: `bugs.py:_write` resolve branch (l.137-139), `_bugs_transition.transition()` (l.53-65). Done when: resolve prints the blame candidates and refuses the two cases above without `--lineage-reason`. ADR 0164 (proposed).",
+      "provenance": "operator demand 2026-10-02: test audit https://claude.ai/artifact/AMw3Ho2tqaAbftJUWuNhAT + grill Q1-Q9",
+      "relates": [
+        "bug-fix-commit-derived-by-grep"
+      ]
+    },
+    {
+      "id": "focused-review-on-caused-by",
+      "title": "A declared caused_by makes the fix's review focused on the prior fix",
+      "opened": "2026-10-02",
+      "status": "idea",
+      "description": "Measured: declaring a cause triggers nothing; REBUILD fires only on \"\u22652 fixes on the surface\". Change: `caused_by != none` makes the fix's review focused: `dd-code-review` reads every code and test line the prior fix wrote, and the verdict states REBUILD of the unit or why not. Skill-taught (root map \u00a73), measured by the audit (`PILLAR-BUGS`), never gated. Done when: the `dd-code-review` skill carries the focused-review step and `PILLAR-BUGS` measures verdicts on caused_by fixes that state REBUILD or why not. Files: `dd-code-review` SKILL, `dd-audit-project` `PILLAR-BUGS`. ADR 0164 (proposed).",
+      "provenance": "operator demand 2026-10-02: test audit https://claude.ai/artifact/AMw3Ho2tqaAbftJUWuNhAT + grill Q1-Q9",
+      "relates": [
+        "caused-by-proposed-by-blame"
+      ]
+    },
+    {
+      "id": "bug-fix-adds-never-rewrites-asserts",
+      "title": "A bug fix adds a parametrize row and never rewrites an old assert",
+      "opened": "2026-10-02",
+      "status": "idea",
+      "description": "Measured: 113/183 (62%) `fix(bugs):` commits removed asserts, 111 without the text reappearing (e.g. `0ae560b68` copied new output into 5 asserts). The cause is in the law: Phase 5 \"existing test rewritten\" and Phase 6 \"production AND tests net \u2264 0\" (contradicts ADR 0142). Change: delete both clauses; the RED enters the owner file as a parametrize row with a literal expected value, named by behavior, never by the bug slug; rewriting a pre-existing assert is its own commit with a reason; review detects it with `git diff -U0 -- tests | grep -E '^-\\s*assert'`. Retire `evidence_seam` and `evidence_diff` for new records (optional in the schema, history intact) and keep `evidence_loop`; 40% of recorded seams are already stale (grill Q9). Done when: Phase 5/6 carry neither clause, `REQUIRED_BY_VERB` no longer requires the two retired fields, and the review step names the grep. Files: `dd-bug-resolution/SKILL.md` Ph5/6, schema `bug-record-v1`, `_bugs_transition.REQUIRED_BY_VERB`, `dd-gitflow-default` \u00a73a. ADRs 0163, 0164 (proposed).",
+      "provenance": "operator demand 2026-10-02: test audit https://claude.ai/artifact/AMw3Ho2tqaAbftJUWuNhAT + grill Q1-Q9",
+      "relates": [
+        "bug-fix-commit-derived-by-grep"
+      ]
+    },
+    {
+      "id": "delete-text-count-inventory-asserts",
+      "title": "Tests assert behavior: no prose, sentence or inventory-count asserts",
+      "opened": "2026-10-02",
+      "status": "idea",
+      "description": "Measured: ~600-900 string asserts; 53 files pin `dd-*` names; `len(depths)==13`, `len(on_disk)==13`, `_core_agents()==3`; \u22654 bugs born from stale rosters. Change: asserts on the prose of a doc, law or skill are deleted (the leak stays covered by the pre-push denylist and the review grep; the only pytest is the scanner's own fixture); a CLI output assert checks exit code + effect + stable id (finding code, slug, flag), never a sentence, and no new `--json` is added (grill Q8); an exception assert checks type/attribute, not text; `fix:` lines are executed (model: `test_refusal_fix_lines_clear_their_refusal.py`); inventory/count pins are deleted or derived from the source of truth. CONTEXT-MAP: delete the Measured column; the test asserts `bytes <= budget` live (grill Q6). Hotspots: `test_law_states_what_the_code_does.py`, `test_behavior_map.py`, `test_context_map.py`, `unit/skills/test_*_script.py`, `contract/cli/test_cli_context.py`. Done when: no test pins a sentence, a roster or a count that has a source of truth, and CONTEXT-MAP has no Measured column. ADR 0167 (proposed).",
+      "provenance": "operator demand 2026-10-02: test audit https://claude.ai/artifact/AMw3Ho2tqaAbftJUWuNhAT + grill Q1-Q9",
+      "relates": [
+        "preflight-ci-parity-derived"
+      ]
+    },
+    {
+      "id": "tests-tree-mirrors-the-package",
+      "title": "The tests tree mirrors the package, one owner file per module",
+      "opened": "2026-10-02",
+      "status": "idea",
+      "description": "Measured: integration 38/56 and contract 51/60 files sit loose at their root, named as slogans; ghost dirs `unit/features/{handoff,public_assets}`, empty `unit/{gate,scripts}`, `integration/features/public`; public_assets tests spread over 4 places. Change: `tests/<mirror of dadaia_workspace>/test_<module>.py`, one owner per module; `contract/` and `integration/` dissolve into the owners; `e2e/` keeps named journeys, each with `Owner:`; size is a marker derived in conftest from the fixture used (real git/subprocess \u21d2 medium), not the folder. Migration by `git mv` + merge, one feature per commit, no assert change (Tidy First). Owner map: the 2026-10-02 exploration \u00a74 table. Done when: every test file maps to one package module or one named e2e journey, and no ghost or empty test dir remains. ADR 0167 (proposed).",
+      "provenance": "operator demand 2026-10-02: test audit https://claude.ai/artifact/AMw3Ho2tqaAbftJUWuNhAT + grill Q1-Q9",
+      "relates": [
+        "windows-integration-coverage-gap"
+      ]
+    },
+    {
+      "id": "architecture-survey-flat-core-infrastructure",
+      "title": "Survey per-feature subpackages for the flat core/ and infrastructure/",
+      "opened": "2026-10-02",
+      "status": "idea",
+      "description": "Measured: `core/` holds 22 and `infrastructure/` 24 flat files; a feature (public assets: 6+ modules; handoff in core) has no folder, so tests cannot mirror it. Change: run `dd-architecture-survey` proposing per-feature subpackages inside each ring (the ring rule is unchanged), with the 2026-10-02 exploration \u00a74 concept map as input; the output feeds a later candidate. Done when: the survey's proposal exists with one subpackage per feature for both rings. ADR 0167 (proposed).",
+      "provenance": "operator demand 2026-10-02: test audit https://claude.ai/artifact/AMw3Ho2tqaAbftJUWuNhAT + grill Q1-Q9",
+      "relates": [
+        "tests-tree-mirrors-the-package"
+      ]
+    },
+    {
+      "id": "unit-tier-without-processes",
+      "title": "The unit tier spawns no processes",
+      "opened": "2026-10-02",
+      "status": "idea",
+      "description": "Measured: 19-44 unit files spawn processes; 534 unit items >100 ms, worst 10-18 s (`test_git_object_reader.py`, `test_ctx_inject.py`, `test_init_reinit_upgrade.py`); 188/261 items >1 s lack `slow`; conftest carries 473 lines of autouse guards. Change: per offender, extract the pure core (parse/decide) and test it pure, or admit it as medium through the derived marker (tests-tree-mirrors-the-package); one boundary fake module (`tests/fakes.py`) replaces the scattered monkeypatch; the autouse guards shrink accordingly. Done when: the readout shows \u226570% of items <100 ms. ADR 0167 (proposed).",
+      "provenance": "operator demand 2026-10-02: test audit https://claude.ai/artifact/AMw3Ho2tqaAbftJUWuNhAT + grill Q1-Q9",
+      "relates": [
+        "worktree-rows-injected-not-monkeypatched",
+        "tests-tree-mirrors-the-package"
+      ]
+    },
+    {
+      "id": "lib-test-guidance-dehydrated",
+      "title": "Test guidance leaves the library; the root map keeps the basics",
+      "opened": "2026-10-02",
+      "status": "idea",
+      "description": "Measured: ~330 lines of shipped test guidance in ~26 files, 9 contradictions, shipped files citing library-internal tests (SLOP S6, PILLAR-SPECS l.47, MEMORY-UPDATE l.16, CONTEXT-MAP l.5/11). Change: delete `public/skills/dd-test-stewardship/` and `public/templates/tests-AGENTS.md` and their wiring (persona `skills:` lists, `behavior-map.json` l.8/304-306, `data/AGENTS.md:82`, CONTEXT-MAP rows, `workspace_layout.REPO_LAW`, `canon.py:278-291`, `service.py:45 _ONBOARDING`, `doctor_memory.py:96`, dependent tests); delete the `Intent:` convention (docstrings, V31, V28) (grill Q4); `slop-tests.md`, the QUALITY scaffold and the persona shrink to the root-map basics (~8 lines): RED before the fix at the lowest level; behavior, not text; mock only at the boundary; literal expected value; a fix commit never rewrites an old assert. Consumers are pointed to their harness marketplace. Done when: no shipped file names dd-test-stewardship, the tests-AGENTS template or `Intent:`, and the basics live in the root map. On delivery this entry supersedes tests-agents-scaffold-without-placeholders and test-intent-docstring-backfill; they exit at that closure, not before. ADR 0166 (proposed).",
+      "provenance": "operator demand 2026-10-02: test audit https://claude.ai/artifact/AMw3Ho2tqaAbftJUWuNhAT + grill Q1-Q9",
+      "relates": [
+        "tests-agents-scaffold-without-placeholders",
+        "test-intent-docstring-backfill"
+      ]
+    },
+    {
+      "id": "meta-tests-leave-pytest",
+      "title": "Tests of the suite and the repo leave pytest for one CI job",
+      "opened": "2026-10-02",
+      "status": "idea",
+      "description": "Measured: ~20 tests test the suite or the repo; many of the 62 `surface: tests` bugs were born there. Change: delete the duplicates \u2014 `suite_cannot_reach_*` \u00d72 vs the conftest sessionfinish; `stewardship_mechanics` vs conftest; `repo_self_scan` vs gitleaks + pre-push; `source_repo_hygiene` vs the CI repo-hygiene job; mutation wiring \u00d73; V31/V28 (grill Q4, Q7). The remaining unique guards become scripts of one CI job, each proven to catch what it caught. Mutation removal (grill Q3) is owned here: delete `tests/scripts/run_mutation_baseline.sh`, its 2 wiring tests, `test_mutation_baseline_scope_stdlib_only.py`, `[tool.mutmut]` and its comment, and the optional group `mutation`; QUALITY.md:85 is rewritten to \"mutation evidence is operator tooling, outside the repo\". Done when: no pytest test inspects the suite or the repo, and each kept guard runs in the CI job. ADRs 0163, 0166, 0167 (proposed).",
+      "provenance": "operator demand 2026-10-02: test audit https://claude.ai/artifact/AMw3Ho2tqaAbftJUWuNhAT + grill Q1-Q9",
+      "relates": [
+        "delete-text-count-inventory-asserts"
+      ]
+    },
+    {
+      "id": "grill-one-question-with-options",
+      "title": "The grill asks one question at a time with three options and an open answer",
+      "opened": "2026-10-02",
+      "status": "idea",
+      "description": "Measured: `dd-grill-me/SKILL.md:29` says \"Ask the whole frontier in one round\" and its template carries one recommendation, no options and no open answer; ADR 0146(2) and `data/handoff-AGENTS.md:8` force a questionnaire `.md`; the harness question tool is never named. Change: one question at a time; always 3 closed options, each with its trade-off and one marked recommended, plus 1 open answer; use the harness question tool (AskUserQuestion in Claude Code; numbered text elsewhere); the record is the handoff JSON + ADR lines, no `.md` (grill Q5); fix the stale step refs in `EMISSION-FORMAT.md:3,10` and `PROBLEM-TAXONOMY.md:3,17`; budget 6144 bytes (live, per delete-text-count-inventory-asserts). Done when: the skill and `data/handoff-AGENTS.md` carry the one-question format and no questionnaire `.md`. ADR 0165 (proposed).",
+      "provenance": "operator demand 2026-10-02: test audit https://claude.ai/artifact/AMw3Ho2tqaAbftJUWuNhAT + grill Q1-Q9",
+      "relates": []
     }
   ]
 }
