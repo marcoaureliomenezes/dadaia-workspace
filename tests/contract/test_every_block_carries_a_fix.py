@@ -30,7 +30,7 @@ from typing import Any
 import pytest
 
 from dadaia_workspace.core import doctor_rules
-from dadaia_workspace.core.cli_line import cli_path, fix_line, shell_line
+from dadaia_workspace.core.cli_line import cli_path, fix_line, git_line, shell_line
 from dadaia_workspace.core.gitflow import DEFAULT
 from dadaia_workspace.features.chokepoints import push_gate_decision
 from dadaia_workspace.features.chokepoints.branch_policy import parse_push_stdin
@@ -288,8 +288,8 @@ def test_cli_line_and_the_scripts_render_one_argv_as_one_line(tmp_path: Path) ->
     assert loader and loader.loader
     specs = importlib.util.module_from_spec(loader)
     loader.loader.exec_module(specs)
-    argv = ["git", "-C", str(tmp_path / "a b"), "commit", "-m", "it's $HOME"]
-    assert " ".join(map(specs.quote, argv)) == shell_line(*argv)
+    rest = ["commit", "-m", "it's $HOME"]
+    assert specs.git_line(tmp_path / "a b", *rest) == git_line(tmp_path / "a b", *rest)
     script = tmp_path / "s p" / "x.py"
     assert specs.script(script) == shell_line(sys.executable, str(script.resolve()))
 

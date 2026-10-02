@@ -73,15 +73,16 @@ def _release_findings(specs: Path) -> list[object]:
 def test_a_shallow_clone_finding_names_the_history_and_its_fix_clears_it(
     tmp_path: Path,
 ) -> None:
-    clone = tmp_path / "ws" / "repos" / "checkout"
+    ws = tmp_path / "my ws"  # the fix quotes its spaced path
+    clone = ws / "repos" / "checkout"
     _git(tmp_path, "clone", "-q", "--depth", "1", f"file://{_origin(tmp_path)}", str(clone))
-    shutil.copytree(_SKILLS, tmp_path / "ws" / ".agents" / "skills")
-    (tmp_path / "ws" / ".dadaia").mkdir()
+    shutil.copytree(_SKILLS, ws / ".agents" / "skills")
+    (ws / ".dadaia").mkdir()
 
     findings = _release_findings(clone / "specs")
 
     assert len(findings) == 1, findings
     assert "shallow" in findings[0].message
-    assert findings[0].fix == f"git -C {clone} fetch --unshallow"
+    assert shlex.split(findings[0].fix) == ["git", "-C", str(clone), "fetch", "--unshallow"]
     subprocess.run(shlex.split(findings[0].fix), check=True, capture_output=True)
     assert _release_findings(clone / "specs") == []
