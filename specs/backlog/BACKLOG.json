@@ -262,6 +262,15 @@
       "description": "Measured: `dd-grill-me/SKILL.md:29` says \"Ask the whole frontier in one round\" and its template carries one recommendation, no options and no open answer; ADR 0146(2) and `data/handoff-AGENTS.md:8` force a questionnaire `.md`; the harness question tool is never named. Change: one question at a time; always 3 closed options, each with its trade-off and one marked recommended, plus 1 open answer; use the harness question tool (AskUserQuestion in Claude Code; numbered text elsewhere); the record is the handoff JSON + ADR lines, no `.md` (grill Q5); fix the stale step refs in `EMISSION-FORMAT.md:3,10` and `PROBLEM-TAXONOMY.md:3,17`; the skill's size is computed live as a readout, never asserted (delete-text-count-inventory-asserts, ADR 0143). Done when: the skill and `data/handoff-AGENTS.md` carry the one-question format and no questionnaire `.md`. ADR 0165 (proposed).",
       "provenance": "operator demand 2026-10-02: test audit https://claude.ai/artifact/AMw3Ho2tqaAbftJUWuNhAT + grill Q1-Q9",
       "relates": []
+    },
+    {
+      "id": "bug-terminal-transition-commit-shape",
+      "title": "dd-gitflow-default \u00a73a has no commit shape for a bug reject, defer or supersede",
+      "opened": "2026-10-02",
+      "status": "idea",
+      "description": "dd-gitflow-default/SKILL.md \u00a73a row 4 covers only 'Resolve of a bug a task fixed' (chore(bugs): resolve <id>[, <id>] \u2014 by <task-id> (<sha>)); a bugs.py reject, defer or supersede commit (e.g. 498da2b34, chore(bugs): reject worktree-merge-rewrites-the-branch-before-refusing) matches no row. Widen row 4, no new row: terminal transition without code (resolve, reject, defer, supersede), message chore(bugs): <verb> <id> \u2014 <reason or by task-id (sha)>. Destination: rc-8.",
+      "provenance": "operator approval 2026-10-02 via the main thread's intake; source: dd-code-reviewer review of 498da2b34 (rejection of worktree-merge-rewrites-the-branch-before-refusing), LOW",
+      "relates": []
     }
   ]
 }
