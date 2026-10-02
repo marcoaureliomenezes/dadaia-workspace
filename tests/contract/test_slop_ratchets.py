@@ -114,13 +114,13 @@ def _family_witnesses(texts: Iterable[str]) -> dict[str, set[tuple[str, int]]]:
 def _string_constants(source: str) -> list[str]:
     """Every non-empty string constant in *source* that is not a bare docstring statement."""
     bare: set[int] = set()
-    constants = []
-    for node in ast.walk(ast.parse(source)):  # breadth-first: an Expr precedes its value
+    candidates: list[ast.Constant] = []
+    for node in ast.walk(ast.parse(source)):
         if isinstance(node, ast.Expr):
             bare.add(id(node.value))
         elif isinstance(node, ast.Constant) and node.value and isinstance(node.value, str):
-            constants += [] if id(node) in bare else [node.value]
-    return constants
+            candidates.append(node)
+    return [node.value for node in candidates if id(node) not in bare]
 
 
 def _reads_family(constant: str, prefix: str, witnesses: Iterable[tuple[str, int]]) -> bool:
