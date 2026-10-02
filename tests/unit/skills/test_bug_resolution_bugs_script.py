@@ -19,7 +19,10 @@ from typing import Any
 
 import pytest
 
+from dadaia_workspace.infrastructure.ledger_scripts import load_owner
 from tests.helpers.skill_scripts import stage_skill_scripts
+
+_read = load_owner("dd-bug-resolution", "_ledger").records
 
 pytestmark = pytest.mark.unit
 
@@ -335,9 +338,8 @@ def _store(script: Path) -> Any:
     return store
 
 
-def _records(specs: Path) -> list[dict[str, object]]:
-    text = (specs / "bugs" / "BUGS.jsonl").read_text(encoding="utf-8")
-    return [json.loads(line) for line in text.splitlines() if line.strip()]
+def _records(specs: Path) -> list[dict[str, Any]]:
+    return _read(specs / "bugs/BUGS.jsonl")
 
 
 def _resolve_argv(bug_id: str = "a-bug", caused_by: str = "none") -> list[str]:
@@ -596,7 +598,7 @@ def test_an_archive_racing_an_archive_loses_no_record(script: Path, tmp_path: Pa
 
     store.commit(ledger, apply_a, archive=True)
     histo = specs / "bugs" / "_archive" / "bugs_histo.jsonl"
-    archived = [json.loads(line)["id"] for line in histo.read_text().splitlines()]
+    archived = [r["id"] for r in _read(histo)]
     assert [r["id"] for r in _records(specs)] == ["a-bug"]
     assert sorted(archived) == ["old-a", "old-b"]
 
@@ -752,8 +754,8 @@ def test_archive_moves_only_records_closed_past_the_threshold(script: Path, tmp_
     assert done.returncode == 0, done.stderr
     assert done.stdout.strip() == "[ok] archived 1 record(s), 2 kept."
     assert {r["id"] for r in _records(specs)} == {"a-bug", "fresh-bug"}
-    histo = (specs / "bugs" / "_archive" / "bugs_histo.jsonl").read_text(encoding="utf-8")
-    assert [json.loads(line)["id"] for line in histo.splitlines()] == ["old-bug"]
+    histo = _read(specs / "bugs" / "_archive" / "bugs_histo.jsonl")
+    assert [r["id"] for r in histo] == ["old-bug"]
 
 
 def test_archive_with_nothing_eligible_is_a_byte_identical_no_op(

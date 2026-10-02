@@ -12,6 +12,7 @@ from typer.testing import CliRunner
 
 from dadaia_workspace.cli.main import app
 from dadaia_workspace.features.specs.doctor_adr import adr_record_issues
+from dadaia_workspace.infrastructure.ledger_scripts import load_owner
 
 pytestmark = pytest.mark.contract
 
@@ -28,6 +29,7 @@ def _ledger(tmp_path: Path, ids: list[str], **fields: object) -> Path:
 
 def test_the_committed_ledger_is_clean_under_the_doctor_rule() -> None:
     """ADR 0151 M1: red until every committed accepted record carries its ruling."""
+    # The one exception to `_ledger.records`: the doctor reports a physical line number.
     ledger = (_REPO_ROOT / "specs" / "ADRs" / "decisions.jsonl").read_text("utf-8").split("\n")
     issues = [
         f"ADR {json.loads(ledger[int(i.message.rsplit(':', 1)[1][:-1]) - 1])['id']}: {i.message}"
@@ -241,10 +243,9 @@ def test_the_projected_law_names_the_doctor_and_no_measured_by_pattern() -> None
 
 def test_every_superseded_record_is_named_by_some_successor() -> None:
     """Every committed `superseded` record is named by some successor's `supersedes`."""
-    lines = (
-        (_REPO_ROOT / "specs" / "ADRs" / "decisions.jsonl").read_text(encoding="utf-8").splitlines()
+    records = load_owner("dd-bug-resolution", "_ledger").records(
+        _REPO_ROOT / "specs" / "ADRs" / "decisions.jsonl"
     )
-    records = [json.loads(line) for line in lines if line.strip()]
     named = {
         adr_id
         for record in records

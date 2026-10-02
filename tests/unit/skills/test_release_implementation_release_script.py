@@ -18,6 +18,7 @@ from unittest.mock import ANY
 
 import pytest
 
+from dadaia_workspace.infrastructure.ledger_scripts import load_owner
 from tests.helpers.release_state import PLAN
 from tests.helpers.skill_scripts import stage_skill_scripts
 
@@ -678,10 +679,9 @@ def test_ship_records_the_promote_and_new_births_the_next(script: Path, tmp_path
     archived = specs / "releases/_archive/0.5.0"
     assert not (specs / "releases/0.5.0").exists() and (archived / "rc-1/TASKS.md").is_file()
     assert _read(archived / "_RELEASE.json")["shipped"] == {"sha": "beef123", "pr": 261, "ts": ANY}
-    records = [
-        json.loads(x)
-        for x in (specs / "releases/_archive/releases_histo.jsonl").read_text("utf-8").splitlines()
-    ]
+    records = load_owner("dd-bug-resolution", "_ledger").records(
+        specs / "releases/_archive/releases_histo.jsonl"
+    )
     assert [(r["id"], r["disposition"], r["summary"]) for r in records] == [
         ("0.5.0", "delivered", None)
     ]

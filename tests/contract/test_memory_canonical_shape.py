@@ -19,7 +19,6 @@ heading — memory stays current-state. Each file carries its library-owned fixe
 
 from __future__ import annotations
 
-import json
 import re
 from pathlib import Path
 
@@ -27,6 +26,7 @@ import pytest
 
 from dadaia_workspace.core.fixed_sections import extract_fixed_section
 from dadaia_workspace.features.specs.memory_canon import MEMORY_TOPLEVEL_FILES
+from dadaia_workspace.infrastructure.ledger_scripts import load_owner
 
 pytestmark = pytest.mark.contract
 
@@ -89,23 +89,9 @@ def _block_violations(body: str) -> list[str]:
 
 
 def _adr_record_ids() -> frozenset[str]:
-    """Every ADR record id in ``decisions.jsonl`` — proposed/accepted/rejected/superseded
-    alike (a superseded record is retired in place). Malformed lines are skipped:
-    ``test_adr_canon.py`` owns the JSONL shape; here only the id set matters."""
-    ids: set[str] = set()
-    if not _ADR_DECISIONS_PATH.is_file():
-        return frozenset()
-    for line in _ADR_DECISIONS_PATH.read_text(encoding="utf-8").split("\n"):
-        stripped = line.strip()
-        if not stripped:
-            continue
-        try:
-            record = json.loads(stripped)
-        except json.JSONDecodeError:
-            continue
-        if isinstance(record, dict) and isinstance(record.get("id"), str):
-            ids.add(record["id"])
-    return frozenset(ids)
+    """Every ADR record id in ``decisions.jsonl``, superseded ones included."""
+    records = load_owner("dd-bug-resolution", "_ledger").records(_ADR_DECISIONS_PATH)
+    return frozenset(record["id"] for record in records)
 
 
 # ------------------------------------------------------------------ the canonical pair

@@ -15,6 +15,7 @@ from pathlib import Path
 
 import pytest
 
+from dadaia_workspace.infrastructure.ledger_scripts import load_owner
 from tests.helpers.skill_scripts import stage_skill_scripts
 
 pytestmark = pytest.mark.unit
@@ -67,10 +68,9 @@ def _run(script: Path, *argv: str) -> subprocess.CompletedProcess[str]:
 
 
 def _histo(specs: Path) -> list[dict[str, object]]:
-    path = specs / "audits" / "_archive" / "audits_histo.jsonl"
-    if not path.is_file():
-        return []
-    return [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines() if line]
+    return load_owner("dd-bug-resolution", "_ledger").records(
+        specs / "audits" / "_archive" / "audits_histo.jsonl"
+    )
 
 
 @pytest.mark.parametrize(
@@ -147,12 +147,10 @@ def test_disposition_refuses_a_verdict_without_its_evidence(script: Path, specs:
 
     assert result.returncode == 1
     assert "--reason" in result.stderr
-    assert (
-        json.loads(
-            (specs / "audits" / _AUDIT / "FINDINGS.jsonl").read_text("utf-8").split("\n")[0]
-        )["disposition"]
-        == "open"
+    findings = load_owner("dd-bug-resolution", "_ledger").records(
+        specs / "audits" / _AUDIT / "FINDINGS.jsonl"
     )
+    assert findings[0]["disposition"] == "open"
 
 
 def test_check_passes_on_a_valid_tree_and_fails_on_a_broken_record(

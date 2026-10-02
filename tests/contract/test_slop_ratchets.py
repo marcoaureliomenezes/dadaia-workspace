@@ -11,7 +11,6 @@ from __future__ import annotations
 
 import ast
 import io
-import json
 import re
 import tokenize
 from collections import defaultdict
@@ -20,6 +19,7 @@ from pathlib import Path
 
 import pytest
 
+from dadaia_workspace.infrastructure.ledger_scripts import load_owner
 from tests.helpers.suite_files import tracked_test_files
 
 pytestmark = pytest.mark.contract
@@ -207,9 +207,75 @@ def _package_sources() -> dict[str, str]:
     }
 
 
+def _json_per_split_line(sources: dict[str, str]) -> set[str]:
+    """``json.loads`` fed from ``.splitlines()`` — U+2028 splits a record. Reach: a loop,
+    comprehension, ``map`` or ``loads`` argument holding the call, or a name assigned from
+    it in the same scope (one hop); data flow beyond one hop is out of reach."""
+
+    def attr(node: ast.AST) -> str:
+        return getattr(getattr(node, "func", None), "attr", "")
+
+    def split(node: ast.AST, tainted: set[str]) -> bool:
+        return any(
+            attr(c) == "splitlines" or (isinstance(c, ast.Name) and c.id in tainted)
+            for c in ast.walk(node)
+        )
+
+    hits = set()
+    for name, source in sources.items():
+        tree = ast.parse(source)
+        for scope in [tree, *(n for n in ast.walk(tree) if isinstance(n, ast.FunctionDef))]:
+            tainted = {
+                t.id
+                for a in ast.walk(scope)
+                if isinstance(a, ast.Assign) and split(a.value, set())
+                for t in a.targets
+                if isinstance(t, ast.Name)
+            }
+            for node in ast.walk(scope):
+                loops = getattr(node, "generators", None) or (
+                    [node] if isinstance(node, ast.For) else []
+                )
+                if loops and any(attr(c) == "loads" for c in ast.walk(node)):
+                    fed = [loop.iter for loop in loops]
+                elif attr(node) == "loads" or (
+                    isinstance(node, ast.Call)
+                    and getattr(node.func, "id", "") == "map"
+                    and getattr(node.args[0], "attr", "") == "loads"
+                ):
+                    fed = node.args  # type: ignore[attr-defined]
+                else:
+                    continue
+                if any(split(x, tainted) for x in fed):
+                    hits.add(f"{name}:{node.lineno}")  # type: ignore[attr-defined]
+    return hits
+
+
+def test_v40_jsonl_is_read_by_the_one_reader() -> None:
+    """V40 — JSONL goes through ``_ledger.parse``; ``splitlines()`` breaks a U+2028 record."""
+    tests = {p.as_posix(): p.read_text("utf-8") for p in tracked_test_files(_REPO_ROOT, "*.py")}
+    assert _json_per_split_line({**_package_sources(), **tests}) == set()
+
+
+def test_v40_trips_on_a_planted_splitlines_reader() -> None:
+    """RED fixture: every splitlines-fed ``json.loads`` shape is flagged; a split("\\n") is not."""
+    planted = {
+        "comp.py": "rows = [json.loads(x) for x in t.splitlines()]",
+        "enum.py": "for n, x in enumerate(t.splitlines(), 1):\n    json.loads(x)",
+        "hop.py": "lines = t.splitlines()\nrows = [json.loads(x) for x in lines]",
+        "index.py": "r = json.loads(t.splitlines()[0])",
+        "map.py": "rows = list(map(json.loads, t.splitlines()))",
+        "good.py": "rows = [json.loads(x) for x in t.split('\\n')]",
+    }
+    assert {hit.split(":")[0] for hit in _json_per_split_line(planted)} == set(planted) - {
+        "good.py"
+    }
+
+
 def _open_bug_ids() -> set[str]:
-    ledger = _REPO_ROOT / "specs" / "bugs" / "BUGS.jsonl"
-    records = (json.loads(line) for line in ledger.read_text(encoding="utf-8").splitlines())
+    records = load_owner("dd-bug-resolution", "_ledger").records(
+        _REPO_ROOT / "specs/bugs/BUGS.jsonl"
+    )
     return {record["id"] for record in records if record.get("status") == "open"}
 
 
