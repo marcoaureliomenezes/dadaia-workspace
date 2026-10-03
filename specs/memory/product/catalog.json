@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-10-01T05:11:54Z",
+  "generated_at": "2026-10-03T03:27:19Z",
   "features": [
     {
       "rank": 1,
@@ -14,7 +14,7 @@
         "handoff",
         "schema"
       ],
-      "token_estimate": 455,
+      "token_estimate": 474,
       "depends_on": [
         "worktrees",
         "workspace-doctor",
@@ -41,7 +41,7 @@
         "dispatch",
         "sdd"
       ],
-      "token_estimate": 716,
+      "token_estimate": 747,
       "depends_on": [
         "agentic-entities",
         "agent-comms",
@@ -74,7 +74,7 @@
         "derivation",
         "governance"
       ],
-      "token_estimate": 1166,
+      "token_estimate": 1266,
       "depends_on": [
         "agent-orchestration",
         "sdd-gate-v3",
@@ -149,7 +149,7 @@
         "release",
         "packaging"
       ],
-      "token_estimate": 767,
+      "token_estimate": 786,
       "depends_on": [
         "release-lifecycle",
         "public-asset-distribution",
@@ -347,7 +347,7 @@
         "paradigm",
         "pillars"
       ],
-      "token_estimate": 774,
+      "token_estimate": 809,
       "depends_on": [
         "worktrees",
         "spec-context-project",
@@ -441,7 +441,7 @@
         "typecheck",
         "tests"
       ],
-      "token_estimate": 348,
+      "token_estimate": 355,
       "depends_on": [
         "sdd-gate-v3",
         "pypi-distribution",
@@ -497,7 +497,7 @@
         "session",
         "privacy"
       ],
-      "token_estimate": 2514,
+      "token_estimate": 2754,
       "depends_on": [
         "specs-migration",
         "workspace-doctor",
@@ -535,7 +535,7 @@
         "import",
         "portability"
       ],
-      "token_estimate": 321,
+      "token_estimate": 328,
       "depends_on": [
         "workspace-doctor",
         "context-management"
@@ -613,7 +613,7 @@
         "registry",
         "onboarding"
       ],
-      "token_estimate": 1237,
+      "token_estimate": 1278,
       "depends_on": [
         "public-asset-distribution",
         "sdd-gate-v3",
@@ -648,7 +648,7 @@
         "compliance",
         "privacy"
       ],
-      "token_estimate": 2394,
+      "token_estimate": 2632,
       "depends_on": [
         "public-asset-distribution",
         "sdd-gate-v3",
@@ -688,7 +688,7 @@
         "upgrade",
         "onboarding"
       ],
-      "token_estimate": 1706,
+      "token_estimate": 1828,
       "depends_on": [
         "context-management",
         "specs-migration",
@@ -696,8 +696,8 @@
         "workspace-doctor",
         "public-asset-distribution",
         "server-registry",
-        "harness-kimi-code",
         "sdd-gate-v3",
+        "harness-kimi-code",
         "cross-platform-portability"
       ],
       "sources": [
@@ -725,7 +725,7 @@
         "decisions",
         "governance"
       ],
-      "token_estimate": 1073,
+      "token_estimate": 1280,
       "depends_on": [
         "agent-orchestration",
         "sdd-gate-v3",
@@ -757,10 +757,11 @@
         "ledger",
         "governance"
       ],
-      "token_estimate": 587,
+      "token_estimate": 756,
       "depends_on": [
         "agent-orchestration",
         "worktrees",
+        "bug-ledger",
         "release-lifecycle",
         "workspace-doctor"
       ],
@@ -786,10 +787,12 @@
         "ledger",
         "governance"
       ],
-      "token_estimate": 1094,
+      "token_estimate": 1349,
       "depends_on": [
+        "sdd-gate-v3",
         "workspace-doctor",
         "agent-comms",
+        "backlog-ledger",
         "worktrees",
         "release-lifecycle",
         "agent-orchestration",
@@ -808,7 +811,7 @@
       "title": "release-lifecycle",
       "area": "sdd",
       "tldr": "Candidates, each in its own rc-<N>/, grow one live release; release.py writes _RELEASE.json; memory gates closure; promote merges a PR and archives it.",
-      "summary": "The release lifecycle — one live release directory whose _RELEASE.json state document is written by release.py (new, phase, drift, memory, ship, check), candidates that each review the as-is units their demand touches, then define, implement and close a SPEC/PLAN/TASKS trio in its own rc-<N>/ folder, the structural PLAN checks (As-is review, Authorities, Parallel schedule) at IMPLEMENTATION, the memory reconciliation gate at closure, and promotion by merging the release PR release-please opens, which ship records by archiving the release folder.",
+      "summary": "The release lifecycle — one live release directory whose _RELEASE.json state document is written by release.py (new, phase, drift, memory, ship, check), candidates that each review the as-is units their demand touches, then define, implement and close a SPEC/PLAN/TASKS trio in its own rc-<N>/ folder, the structural PLAN checks (As-is review, Authorities, Parallel schedule) at IMPLEMENTATION, release.py check as the one readiness judge in every phase and the one judge of the SPEC's Origin line and its trace back, the memory reconciliation gate at closure, and promotion by merging the release PR release-please opens, which ship records by archiving the release folder.",
       "path": "specs/memory/product/sdd/release-lifecycle.md",
       "tags": [
         "sdd",
@@ -818,16 +821,16 @@
         "memory",
         "as-is-review"
       ],
-      "token_estimate": 2160,
+      "token_estimate": 2580,
       "depends_on": [
         "sdd-gate-v3",
         "specs-migration",
         "backlog-ledger",
         "bug-ledger",
+        "audits-canon",
         "workspace-doctor",
         "worktrees",
         "agent-orchestration",
-        "audits-canon",
         "pypi-distribution"
       ],
       "sources": [
@@ -845,7 +848,7 @@
       "title": "sdd-gate-v3",
       "area": "sdd",
       "tldr": "No-lock enforcement — three gate blocks (root entry, non-venv command, PROTECTED or out-of-scope write; repos/<r> takes merges), one fix each, a push chokepoint",
-      "summary": "The merged PreToolUse gate blocks exactly three things and reads no SDD artifact; every refusal anywhere carries one executable fix line; the pre-push chokepoint enforces the branch contract read from the project gitflow, the specs canon, ADR-cited law deletions and one secret registry over every pushed object, with one rewrite formula as its fix, and no CI job calls a model API — the security review is the reviewer's lens before each pull request.",
+      "summary": "The merged PreToolUse gate blocks exactly three things and reads no SDD artifact; every refusal anywhere carries one fix line, a command or an operator action; the pre-push chokepoint enforces the branch contract read from the project gitflow, the specs canon, ADR-cited law deletions and one secret registry over every pushed object, with one rewrite formula as its fix, and no CI job calls a model API — the security review is the reviewer's lens before each pull request.",
       "path": "specs/memory/product/sdd/sdd-gate-v3.md",
       "tags": [
         "sdd",
@@ -855,14 +858,15 @@
         "no-locks",
         "privacy"
       ],
-      "token_estimate": 2225,
+      "token_estimate": 2550,
       "depends_on": [
         "workspace-doctor",
         "context-management",
         "worktrees",
-        "specs-migration",
-        "release-lifecycle",
         "agentic-entities",
+        "specs-migration",
+        "workspace-init",
+        "release-lifecycle",
         "ARCHITECTURE"
       ],
       "sources": [
@@ -886,7 +890,7 @@
       "title": "worktrees",
       "area": "sdd",
       "tldr": "Every agent change to a repo is made in a canonical worktree of one of four kinds and lands by worktree.py merge — reviewed, rebased, fast-forwarded.",
-      "summary": "Canonical worktrees worktrees/<repo>/<M.m.p><letter>-<kind> on wt/ branches cut from the work branch; four kinds, each an allowed set; worktree.py new, merge, clean and list, stdlib and read from git alone; the merge ritual — allowed set, rebase with ledger union and TASKS-marker replay, an APPROVED verdict on the rebased sha, fast-forward only — and the holds that keep closure and context dead waiting while one is open.",
+      "summary": "Canonical worktrees worktrees/<repo>/<M.m.p><letter>-<kind> on wt/ branches cut from the work branch; four kinds, each an allowed set; worktree.py new, merge, clean and list, stdlib and read from git alone; the merge ritual — allowed set, rebase with ledger union and TASKS-marker replay, an APPROVED verdict on the rebased sha or a patch-identical one of its reflog, fast-forward only — and the holds that keep closure and context dead waiting while one is open.",
       "path": "specs/memory/product/sdd/worktrees.md",
       "tags": [
         "worktrees",
@@ -895,13 +899,14 @@
         "merge",
         "review"
       ],
-      "token_estimate": 979,
+      "token_estimate": 1099,
       "depends_on": [
         "sdd-gate-v3",
         "public-asset-distribution",
         "workspace-doctor",
-        "context-management",
         "release-lifecycle",
+        "agent-comms",
+        "context-management",
         "bug-ledger",
         "agent-orchestration",
         "backlog-ledger"

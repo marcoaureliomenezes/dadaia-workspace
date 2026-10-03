@@ -8,6 +8,7 @@ import os
 from pathlib import Path
 
 from dadaia_workspace.core import invocation, workspace_layout, workspace_resolver
+from dadaia_workspace.core.exceptions import SchemaVersionError
 from dadaia_workspace.core.harness_registry import HARNESS_RECORDS
 from dadaia_workspace.features.spec_context import gate_policy
 from dadaia_workspace.hooks import _common
@@ -33,7 +34,12 @@ def _evaluate_target(workspace: Path | None, raw_path: str) -> tuple[gate_policy
     if effective_workspace is None:
         return gate_policy.Decision.ALLOW, ""  # fail-open: no root owns the target
     session_id = invocation.resolve_session_id(os.environ) or None
-    bind = invocation.resolve_bind(effective_workspace, session_id, os.environ)
+    repo, zone = invocation.scope(effective_workspace, fpath)
+    try:
+        bind = invocation.resolve_bind(effective_workspace, session_id, os.environ)
+        owner = invocation.context_name_for_repo_slug(effective_workspace, repo) if repo else None
+    except SchemaVersionError:  # an unreadable registry is no bind; the path-derived repo stays
+        bind, owner = invocation.Bind(), None
 
     try:
         rel_path = fpath.resolve().relative_to(effective_workspace.resolve()).as_posix()
@@ -46,7 +52,6 @@ def _evaluate_target(workspace: Path | None, raw_path: str) -> tuple[gate_policy
     projected |= _HOOK_WIRING | {
         JsonInstallLedgerStore.path(states).relative_to(effective_workspace).as_posix()
     }
-    repo, zone = invocation.scope(effective_workspace, fpath)
     return gate_policy.evaluate(
         rel_path,
         root=effective_workspace,
@@ -54,7 +59,7 @@ def _evaluate_target(workspace: Path | None, raw_path: str) -> tuple[gate_policy
         protected=workspace_layout.operator_globs(effective_workspace)[1],
         zone=zone,
         repo=repo,
-        owner=invocation.context_name_for_repo_slug(effective_workspace, repo) if repo else None,
+        owner=owner,
         context=bind.context_name,
         repos=bind.repos,
         has_id=session_id is not None,
@@ -70,7 +75,7 @@ def evaluate_payload(payload: dict[str, object]) -> str | None:
     if not raw_paths:
         return None
     # the cwd root only anchors a relative target
-    workspace = invocation.resolve(env=os.environ, cwd=Path.cwd()).workspace_root
+    workspace = invocation.resolve_root(cwd=Path.cwd(), target_path=None)
     for raw_path in raw_paths:
         decision, reason = _evaluate_target(workspace, raw_path)
         if decision == gate_policy.Decision.BLOCK:

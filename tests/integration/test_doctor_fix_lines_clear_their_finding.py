@@ -31,10 +31,8 @@ from __future__ import annotations
 import json
 import os
 import re
-import shlex
 import shutil
 import subprocess
-import sys
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -134,14 +132,6 @@ def _plant_status_line_gone(root: Path) -> None:
     release = root / "specs" / "releases" / _RELEASE / "rc-1"
     (release / "SPEC.md").write_text("# Spec\n\nContent.\n", encoding="utf-8")
     (release / "TASKS.md").write_text("# Tasks\n\n**Status:** approved\n" + "- t\n" * 170)
-
-
-def _plant_origin_line_gone(root: Path) -> None:
-    spec = root / "specs" / "releases" / _RELEASE / "rc-1" / "SPEC.md"
-    spec.write_text(
-        "# Spec\n\n**Status:** Approved\n**Opened:** 2026-09-21\n\nContent.\n",
-        encoding="utf-8",
-    )
 
 
 def _plant_oversized_plan(root: Path) -> None:
@@ -424,13 +414,11 @@ def _append(path: Path, text: str) -> None:
 OPERATOR_ACTION: dict[str, Callable[[Path], None]] = {
     "SPEC-DOC-002": _plant_headingless_memory_document,
     "SPEC-DOC-004": _plant_status_line_gone,
-    "SPEC-DOC-048": _plant_origin_line_gone,
     "TREE-8": _plant_stray_dotfile,
     "LINT-1": lambda r: _write(r / "specs" / "memory" / "product" / "testarea" / "x.md", "# X\n"),
     "SPEC-DOC-001": lambda r: (r / "specs" / "constitution.md").unlink(),
     "SPEC-DOC-024": lambda r: _write(r / f"specs/releases/{_RELEASE}/rc-1/TASKS.md", "# Tasks\n\n**Status:** Draft\n"),
     "SPEC-DOC-026": lambda r: _write(r / f"specs/releases/_archive/{_RELEASE}/SPEC.md", "# S\n"),
-    "SPEC-DOC-047": lambda r: _append(r / f"specs/releases/{_RELEASE}/rc-1/TASKS.md", "- [ ] T2 x\n  Write set: specs/memory/QUALITY.md\n"),
     "ADR-SUPERSEDED-CITATION": lambda r: (
         _write(r / "specs/ADRs/decisions.jsonl", '{"id": "0001", "status": "superseded"}\n'),
         _append(r / "specs/memory/QUALITY.md", "\nADR: 0001\n"),
@@ -457,6 +445,32 @@ def test_an_operator_action_names_the_file_to_change(code: str, repo: Path) -> N
     for finding in found:
         assert finding.fix.startswith("Operator action: "), finding.fix
         assert str(repo) in finding.fix and not re.search(r"<[^<>]+>", finding.fix)
+
+
+def test_an_untraced_origin_id_is_cleared_by_its_printed_fix(repo: Path) -> None:
+    """AC3.2 (review F4; SPEC-DOC-048's row re-homed): after the sweep, a carried entry with
+    no exit is an error on the real Origin line; its printed fix writes the pointer back."""
+    specs = repo / "specs"
+    _write(specs / "backlog/BACKLOG.json", json.dumps(
+        {"schema": "backlog-v1", "active": [_active_entry("carried", "c", "candidate")]}))  # fmt: skip
+    spec = specs / "releases" / _RELEASE / "rc-1" / "SPEC.md"
+    spec.write_text(spec.read_text("utf-8").replace("operator-demand", "backlog:carried"), "utf-8")
+
+    def origin_errors() -> list[SectionFinding]:
+        found = _ledgers_section(None, specs, str(repo), None).findings
+        rows = [f for f in found if "Origin" in f.message]
+        assert all(f.error for f in rows), rows  # a listing row never reaches the doctor
+        return rows
+
+    assert origin_errors() == []  # before the sweep the carried id is only listed
+    state = specs / "releases" / _RELEASE / "_RELEASE.json"
+    sweep = {"ts": "2026-01-01T00:00:00Z", "agent": "a", "kind": "dispositions", "text": "t"}
+    state.write_text(json.dumps({**json.loads(state.read_text("utf-8")), "log": [sweep]}))
+
+    [before] = origin_errors()
+    assert before.message.startswith(f"releases/{_RELEASE}/rc-1/SPEC.md:5 "), before.message
+    subprocess.run(["bash", "-c", before.fix], cwd=repo, check=True, capture_output=True)
+    assert origin_errors() == []
 
 
 def test_a_judgment_only_rule_never_makes_the_run_exit_1(repo: Path) -> None:
@@ -540,7 +554,7 @@ def test_a_worktree_finding_is_cleared_by_its_merge_fix(tmp_path: Path) -> None:
         worktree_ws.approve(
             root, worktree_ws.git(root / "repos/r", "rev-parse", "wt/0.5.0a-impl").strip()
         )
-        command = found[0].fix.replace("python3", shlex.quote(sys.executable), 1)
+        command = found[0].fix
         done = subprocess.run(command, shell=True, cwd=root, capture_output=True, text=True)  # noqa: S602
         if done.returncode:
             (refix,) = worktree_ws.fixes(done)

@@ -9,11 +9,12 @@ from the pair check the verb runs over its candidate bytes before writing.
 
 from __future__ import annotations
 
-import ast
 import hashlib
 import json
+import runpy
 import subprocess
 import sys
+from collections.abc import Iterator
 from pathlib import Path
 from typing import Any
 
@@ -104,6 +105,50 @@ def test_a_write_verb_over_an_invalid_document_refuses_with_the_pair_intact(
     assert _hashes(specs) == before, done.stderr
 
 
+_R = "releases"
+#: (script, {specs-relative file: text}) — together, every finding branch of every `check`.
+_BROKEN = [
+    ("dd-bug-resolution/scripts/bugs.py", {"bugs/BUGS.jsonl": '{x\n{"id": "a"}\n',
+                                           "bugs/_archive/bugs_histo.jsonl": '{x\n{"id": "h"}\n'}),
+    ("dd-backlog-definition/scripts/backlog.py", {"backlog/BACKLOG.json": "{x",
+                                                  "backlog/_archive/backlog_histo.jsonl": '{x\n{"id": "h"}\n'}),
+    ("dd-backlog-definition/scripts/backlog.py", {"backlog/BACKLOG.json": '{"active": 1}'}),
+    ("dd-backlog-definition/scripts/backlog.py", {"backlog/BACKLOG.json": json.dumps({
+        "schema": "backlog-v1", "active": [{"id": "a", "status": "resolved"}] * 2})}),
+    ("dd-audit-project/scripts/audit.py", {"audits/a1/FINDINGS.jsonl": '{x\n{"id": "f"}\n{"id": "f"}\n',
+                                           "audits/a2/AUDIT.md": "# A\n",
+                                           "audits/_archive/audits_histo.jsonl": '{x\n{"disposition": "open"}\n'}),
+    ("dd-release-implementation/scripts/release.py", {f"{_R}/1.0.0/rc-1/SPEC.md": "",
+                                                      f"{_R}/foo/_RELEASE.json": "{}",
+                                                      f"{_R}/_archive/0.9.0/_RELEASE.json": "{x",
+                                                      f"{_R}/_archive/0.8.0/_RELEASE.json": "{}",
+                                                      f"{_R}/_archive/releases_histo.jsonl": '{x\n{"id": "h"}\n'}),
+    ("dd-release-implementation/scripts/release.py", {f"{_R}/1.0.0/_RELEASE.json": "{x",
+                                                      f"{_R}/2.0.0/_RELEASE.json": "{}"}),
+    ("dd-spec-navigator/scripts/memory.py", {"memory/product/core/a.md": "no frontmatter\n"}),
+    ("dd-spec-navigator/scripts/memory.py", {"memory/product/core/a.md": "---\ntitle: a\ntldr: t\n---\n"}),
+]  # fmt: skip
+
+
+@pytest.mark.parametrize(("script", "files"), _BROKEN)
+def test_every_check_finding_carries_its_fix(
+    tmp_path: Path, script: str, files: dict[str, str]
+) -> None:
+    """Intent: CONTRACT — AC4.5: every record each ledger script's `check --json` emits
+    carries a non-empty fix (ADR 0158), so the doctor never invents one."""
+    skills, specs = _stage(tmp_path), tmp_path / "specs"
+    for rel, text in files.items():
+        (specs / rel).parent.mkdir(parents=True, exist_ok=True)
+        (specs / rel).write_text(text, encoding="utf-8")
+    done = subprocess.run(
+        [sys.executable, str(skills / script), "check", "--specs", str(specs), "--json"],
+        capture_output=True, text=True, check=False,
+    )  # fmt: skip
+    records = json.loads(done.stdout)
+    assert done.returncode == 1 and records, done.stderr
+    assert [r for r in records if not str(r.get("fix", "")).strip()] == [], records
+
+
 def test_the_one_ledger_writer_leaves_no_temp_and_writes_lf(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -129,13 +174,19 @@ def test_the_one_ledger_writer_leaves_no_temp_and_writes_lf(
     assert target.read_bytes() == b"a\nb\n"
 
 
-def _script_table(rel: str, name: str = "REQUIRED_EVIDENCE") -> Any:
-    tree = ast.parse((_PUBLIC / "skills" / rel).read_text(encoding="utf-8"))
-    [value] = [
-        n.value for n in tree.body
-        if isinstance(n, ast.Assign) and getattr(n.targets[0], "id", "") == name
-    ]  # fmt: skip
-    return ast.literal_eval(value)
+@pytest.fixture
+def script_table(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Iterator[Any]:
+    """A staged script's module-level name, read by running the script as `public stage`
+    ships it; the modules it imports leave with the test."""
+    skills, before = _stage(tmp_path), set(sys.modules)
+    sibling = [
+        str(skills / s / "scripts") for s in ("dd-bug-resolution", "dd-release-implementation")
+    ]
+    monkeypatch.setattr(sys, "path", [*sys.path, *sibling])  # as backlog.py appends them
+    monkeypatch.setattr(sys, "dont_write_bytecode", True)
+    yield lambda rel, name="REQUIRED_EVIDENCE": runpy.run_path(str(skills / rel))[name]
+    for module in set(sys.modules) - before:
+        del sys.modules[module]
 
 
 @pytest.mark.parametrize(
@@ -147,16 +198,23 @@ def _script_table(rel: str, name: str = "REQUIRED_EVIDENCE") -> Any:
         ("dd-audit-project/scripts/_audit_check.py", "DISPOSITIONS"),
     ],
 )
-def test_every_script_subset_is_drawn_from_the_one_vocabulary(rel: str, name: str) -> None:
-    subset = _script_table(rel, name)
-    assert subset == tuple(w for w in TERMINAL_DISPOSITIONS if w in subset)
+def test_every_script_subset_is_drawn_from_the_one_vocabulary(
+    script_table: Any, rel: str, name: str
+) -> None:
+    subset = script_table(rel, name)
+    assert set(subset) <= set(TERMINAL_DISPOSITIONS)
 
 
-def test_a_shared_disposition_requires_the_same_evidence_in_both_ledgers() -> None:
+def test_a_shared_disposition_requires_the_same_evidence_in_both_ledgers(
+    script_table: Any,
+) -> None:
     """sa-ledger-vocabulary-and-atomic-write-duplicated-in-scripts#48.1: the scripts' own
     tables are the only definition, core carries none, and a word both ledgers use
     requires the same evidence in each."""
-    backlog = _script_table("dd-backlog-definition/scripts/_backlog_exit.py")
-    audit = _script_table("dd-audit-project/scripts/_audit_check.py")
+    rows = script_table("dd-backlog-definition/scripts/_backlog_exit.py", "EVIDENCE")
+    dispositions = script_table("dd-backlog-definition/scripts/_backlog_schema.py", "DISPOSITIONS")
+    assert set(rows) == set(dispositions)
+    backlog = {word: flag for word, (flag, _verifier) in rows.items()}
+    audit = script_table("dd-audit-project/scripts/_audit_check.py")
     shared = {w: (backlog[w], audit[w]) for w in backlog.keys() & audit.keys()}
     assert shared == {"superseded": ("release",) * 2, "rejected": ("reason",) * 2}

@@ -80,16 +80,16 @@ def test_closure_memory_record_is_judged_by_the_script(
     tmp_path: Path, phase: str, log: list[Any], expected: str | None
 ) -> None:
     """The latest memory entry stamped at or after implemented.ts names its window and
-    opens at the ledger-derived start; ledger-fix-lines-drop-specs: its fix has --specs."""
+    opens at the ledger-derived start; its fix names the real script and --specs, and no
+    placeholder (ADR 0158)."""
     specs = _specs(tmp_path, phase, log)
     record = [f for f in _check(specs) if "`kind: memory`" in f["message"]]
-    fix = f"{sys.executable} {_SCRIPT} memory --reviewed <slugs> --changed <slugs> --specs {specs.resolve()}"
-    fix = fix.replace("\\", "/")
+    fix = f"Operator action: run `{sys.executable} {_SCRIPT} memory --specs {specs.resolve()}` "
     if expected is None:
         assert record == []
     else:
         assert len(record) == 1 and expected in record[0]["message"], record
-        assert record[0].get("fix", fix).replace("\\", "/") == fix
+        assert record[0]["fix"].replace("\\", "/").startswith(fix.replace("\\", "/")), record
 
 
 def test_a_live_release_in_implementation_missing_its_trio_is_one_finding(tmp_path: Path) -> None:

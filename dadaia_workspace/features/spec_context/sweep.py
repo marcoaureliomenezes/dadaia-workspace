@@ -94,6 +94,13 @@ def guarded(code: str, label: str, step: Callable[[], str | None]) -> list[str]:
     return [] if done is None else [f"{code}: {done}"]
 
 
+def _owner(path: Path) -> str:
+    try:
+        return path.owner()
+    except (NotImplementedError, KeyError, OSError):  # Windows; a uid with no account
+        return "another account"
+
+
 def _inside(workspace_root: Path, target: Path) -> bool:
     """True when *target*'s OWN location — its resolved parent plus its own name, so a
     symlink is judged where it sits, not where it points — is inside the workspace."""
@@ -159,15 +166,22 @@ def remove(workspace_root: Path, target: Path, label: str) -> str | None:
         return Skipped(_OUTSIDE.format(label=label))
     if linked_worktree(workspace_root, target):
         return Skipped(_WORKTREE.format(label=label))
-    if target.is_symlink() or target.is_file():
-        try:
-            target.unlink()
-        except PermissionError as exc:
-            _writable_retry(os.unlink, str(target), exc)
-    elif target.is_dir():
-        rmtree(target)
-    else:
-        return None
+    try:
+        if target.is_symlink() or target.is_file():
+            try:
+                target.unlink()
+            except PermissionError as exc:
+                _writable_retry(os.unlink, str(target), exc)
+        elif target.is_dir():
+            rmtree(target)
+        else:
+            return None
+    except OSError as exc:  # judged by outcome: the target survived the chmod retry
+        owner = _owner(Path(exc.filename or target).parent)
+        return Skipped(
+            f"skipped '{label}' (errno {exc.errno}: {exc.strerror}) — it holds an entry "
+            f"owned by {owner}; Operator action: remove {target}"
+        )
     return f"deleted '{label}'"
 
 
@@ -232,7 +246,8 @@ def move(
             shutil.copytree(target, destination, symlinks=True)
         else:
             shutil.copy2(target, destination)
-        remove(workspace_root, target, label)
+        if isinstance(kept := remove(workspace_root, target, label), Skipped):
+            return kept
     if not destination.is_symlink():  # a link is never followed to its target
         os.utime(destination)
     try:

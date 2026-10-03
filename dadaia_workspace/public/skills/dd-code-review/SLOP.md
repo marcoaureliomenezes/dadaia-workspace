@@ -16,7 +16,7 @@ labelled judgement call with the command that makes it verifiable in the diff.
 | S6 | Codes outside FR/AC/T- | the V33 family token of `tests/contract/test_slop_ratchets.py`, families outside FR/AC/T-; SPEC/TASKS size is a recommendation, never a finding (`specs/releases/AGENTS.md`) | MEDIUM | Rename to glossary terms |
 | S7 | Acronym or generic name | a term outside the repo's `CONTEXT.md`; `Manager\|Helper\|Utils\|data\|result\|temp` in a new name | LOW | A domain name |
 | S8 | File outside the canon | `git diff --name-status \| grep '^A'` against the root whitelist, the specs canon, the `.dadaia/` canon; `*.bak`, `SUMMARY.md`, `NOTES.md`; `find .dadaia/handoff -mtime +1` | HIGH | Delete, or move to its home |
-| S9 | Commit outside the six shapes; surviving branch | `git log --stat` against `dd-gitflow-default` §3a; `git branch -r --merged` | MEDIUM | Rewrite the series before the push; tag and delete |
+| S9 | Commit outside the §3a shapes; surviving branch | `git log --stat` against `dd-gitflow-default` §3a; `git branch -r --merged` | MEDIUM | Rewrite the series before the push; tag and delete |
 | S10 | Second authority: a question answered in two places | a symbol, command or rule answering a PLAN §1.1 question beside its authority; a ratchet allowance key added; an identical paragraph in two files (read — the behavior-map hashes, it never reads prose) | HIGH | Consult the authority; delete the second |
 
 ## Tests (S3)

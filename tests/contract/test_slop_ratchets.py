@@ -4,14 +4,13 @@ Repo-pure slop ratchets: measured at birth, pinned, ratcheting down only; every
 tree walk goes through the one tracked-files enumeration the other ratchets use.
 V37–V39 carry a keyed allowance (AC6.5): an unlisted hit fails, a vanished key fails
 stale, a value is an OPEN bug id (or ``parity:<test>`` / ``report-only`` where stated),
-and the allowance never outgrows its birth size (AC6.6).
+and the allowance only shrinks: its keys stay within its birth keys (AC6.6, AC3.16).
 """
 
 from __future__ import annotations
 
 import ast
 import io
-import json
 import re
 import tokenize
 from collections import defaultdict
@@ -20,6 +19,7 @@ from pathlib import Path
 
 import pytest
 
+from dadaia_workspace.infrastructure.ledger_scripts import load_owner
 from tests.helpers.suite_files import tracked_test_files
 
 pytestmark = pytest.mark.contract
@@ -113,20 +113,14 @@ def _family_witnesses(texts: Iterable[str]) -> dict[str, set[tuple[str, int]]]:
 
 def _string_constants(source: str) -> list[str]:
     """Every non-empty string constant in *source* that is not a bare docstring statement."""
-    tree = ast.parse(source)
-    bare = {
-        id(node.value)
-        for node in ast.walk(tree)
-        if isinstance(node, ast.Expr) and isinstance(node.value, ast.Constant)
-    }
-    return [
-        node.value
-        for node in ast.walk(tree)
-        if isinstance(node, ast.Constant)
-        and isinstance(node.value, str)
-        and node.value
-        and id(node) not in bare
-    ]
+    bare: set[int] = set()
+    candidates: list[ast.Constant] = []
+    for node in ast.walk(ast.parse(source)):
+        if isinstance(node, ast.Expr):
+            bare.add(id(node.value))
+        elif isinstance(node, ast.Constant) and node.value and isinstance(node.value, str):
+            candidates.append(node)
+    return [node.value for node in candidates if id(node) not in bare]
 
 
 def _reads_family(constant: str, prefix: str, witnesses: Iterable[tuple[str, int]]) -> bool:
@@ -207,17 +201,89 @@ def _package_sources() -> dict[str, str]:
     }
 
 
+def _json_per_split_line(sources: dict[str, str]) -> set[str]:
+    """``json.loads`` fed from ``.splitlines()`` — U+2028 splits a record. Reach: a loop,
+    comprehension, ``map`` or ``loads`` argument holding the call, or a name assigned from
+    it anywhere in the module (one hop); data flow beyond one hop is out of reach."""
+
+    def attr(node: ast.AST) -> str:
+        return getattr(getattr(node, "func", None), "attr", "")
+
+    def split(node: ast.AST, tainted: set[str]) -> bool:
+        return any(
+            attr(c) == "splitlines" or (isinstance(c, ast.Name) and c.id in tainted)
+            for c in ast.walk(node)
+        )
+
+    hits = set()
+    for name, source in sources.items():
+        if "splitlines" not in source:  # no taint source, no hit: skip the parse
+            continue
+        nodes = list(ast.walk(ast.parse(source)))
+        tainted = {
+            t.id
+            for a in nodes
+            if isinstance(a, (ast.Assign, ast.AnnAssign)) and a.value and split(a.value, set())
+            for t in getattr(a, "targets", [getattr(a, "target", None)])
+            if isinstance(t, ast.Name)
+        }
+        for node in nodes:
+            loops = getattr(node, "generators", None) or (
+                [node] if isinstance(node, ast.For) else []
+            )
+            if loops and any(attr(c) == "loads" for c in ast.walk(node)):
+                fed = [loop.iter for loop in loops]
+            elif attr(node) == "loads" or (
+                isinstance(node, ast.Call)
+                and getattr(node.func, "id", "") == "map"
+                and getattr(node.args[:1] and node.args[0], "attr", "") == "loads"
+            ):
+                fed = node.args  # type: ignore[attr-defined]
+            else:
+                continue
+            if any(split(x, tainted) for x in fed):
+                hits.add(f"{name}:{node.lineno}")  # type: ignore[attr-defined]
+    return hits
+
+
+def test_v40_jsonl_is_read_by_the_one_reader() -> None:
+    """V40 — JSONL goes through ``_ledger.parse``; ``splitlines()`` breaks a U+2028 record."""
+    tests = {p.as_posix(): p.read_text("utf-8") for p in tracked_test_files(_REPO_ROOT, "*.py")}
+    assert _json_per_split_line({**_package_sources(), **tests}) == set()
+
+
+def test_v40_trips_on_a_planted_splitlines_reader() -> None:
+    """RED fixture: every splitlines-fed ``json.loads`` shape is flagged; a split("\\n") is not."""
+    planted = {
+        "comp.py": "rows = [json.loads(x) for x in t.splitlines()]",
+        "enum.py": "for n, x in enumerate(t.splitlines(), 1):\n    json.loads(x)",
+        "hop.py": "lines = t.splitlines()\nrows = [json.loads(x) for x in lines]",
+        "index.py": "r = json.loads(t.splitlines()[0])",
+        "ann.py": "lines: list[str] = t.splitlines()\nrows = [json.loads(x) for x in lines]",
+        "map.py": "rows = list(map(json.loads, t.splitlines()))",
+        "good.py": "rows = [json.loads(x) for x in t.split('\\n')]",
+    }
+    assert {hit.split(":")[0] for hit in _json_per_split_line(planted)} == set(planted) - {
+        "good.py"
+    }
+
+
 def _open_bug_ids() -> set[str]:
-    ledger = _REPO_ROOT / "specs" / "bugs" / "BUGS.jsonl"
-    records = (json.loads(line) for line in ledger.read_text(encoding="utf-8").splitlines())
+    records = load_owner("dd-bug-resolution", "_ledger").records(
+        _REPO_ROOT / "specs/bugs/BUGS.jsonl"
+    )
     return {record["id"] for record in records if record.get("status") == "open"}
 
 
 def _allowance_violations(
-    hits: set[str], allowance: dict[str, str], *, birth: int, also: frozenset[str] = frozenset()
+    hits: set[str],
+    allowance: dict[str, str],
+    *,
+    birth: frozenset[str],
+    also: frozenset[str] = frozenset(),
 ) -> list[str]:
-    """AC6.5/AC6.6: unlisted hits, stale keys, values that are no open bug id, and an
-    allowance grown past its birth size — each one line, empty when the ratchet holds."""
+    """AC6.5/AC6.6: unlisted hits, stale keys, values that are no open bug id, and
+    keys absent at birth — each one line, empty when the ratchet holds."""
     open_bugs = _open_bug_ids()
     problems = [f"unlisted: {hit}" for hit in sorted(hits - allowance.keys())]
     problems += [f"stale key (delete it): {key}" for key in sorted(allowance.keys() - hits)]
@@ -232,8 +298,9 @@ def _allowance_violations(
             and not (_REPO_ROOT / value.removeprefix("parity:")).is_file()
         ):
             problems.append(f"{key} -> {value!r} names no test file")
-    if len(allowance) > birth:
-        problems.append(f"allowance grew to {len(allowance)} (birth {birth}) — it only shrinks")
+    problems += [
+        f"absent at birth (it only shrinks): {key}" for key in sorted(allowance.keys() - birth)
+    ]
     return problems
 
 
@@ -263,8 +330,20 @@ def _duplicate_definitions(sources: dict[str, str]) -> set[str]:
     return {f"{rel}:{name}" for (name, _), rels in homes.items() if len(rels) > 1 for rel in rels}
 
 
-#: V37 allowance, born 2026-09-27 at 65: each duplicate, keyed to the open bug deleting it.
-_V37_BIRTH = 65
+#: V37 allowance: each duplicate, keyed to its proof; birth keys pinned at T-050-135
+#: (added 2026-09-30 by T-050-109), re-based by rc-9 AC7.4.
+_V37_BIRTH = frozenset(
+    {
+        "core/gitflow.py:candidate_dir",
+        "core/gitflow.py:candidate_number",
+        "core/gitflow.py:next_candidate",
+        "core/release_state.py:CANDIDATE_RE",
+        "public/skills/dd-release-implementation/scripts/_release_schema.py:CANDIDATE_RE",
+        "public/skills/dd-release-implementation/scripts/_release_schema.py:candidate_dir",
+        "public/skills/dd-release-implementation/scripts/_release_schema.py:candidate_number",
+        "public/skills/dd-release-implementation/scripts/_release_schema.py:next_candidate",
+    }
+)  # its keys today; rc-9 re-bases V37 (AC7.4)
 #: The candidate-folder pair (ADR 0150): the stdlib scripts cannot import the package,
 #: so each side keeps its twin and one contract test pins them equal.
 _PAIR = "parity:tests/contract/test_release_script.py"
@@ -324,10 +403,25 @@ def _destructive_calls(sources: dict[str, str]) -> set[str]:
     return hits
 
 
-#: V38 allowance, born 2026-09-27 at 16. The install-ledger prune is PLAN §1.1's
+#: V38 allowance, born 2026-09-27. The install-ledger prune is PLAN §1.1's
 #: "who owns an entry under a harness dir" authority (`_reconcile_install_ledger`). Certify
 #: deletes its own disposable run; reconcile's rollback restores a state file to absent.
-_V38_BIRTH = 16
+# birth keys read at 1bcfdba8f (operator ruling 2026-10-01, AC3.16)
+_V38_BIRTH = frozenset(
+    {
+        "core/atomic_write.py:atomic_write",
+        "features/certification/service.py:certify",
+        "features/migrate/state_v2.py:execute_migration",
+        "features/reconcile/service.py:_restore_state",
+        "features/specs/doctor_memory.py:fix_placeholder_atom",
+        "infrastructure/projection.py:_clear",
+        "infrastructure/public_assets.py:_prune_empty_dirs",
+        "infrastructure/public_assets.py:_reconcile_install_ledger",
+        "infrastructure/public_assets.py:stage",
+        "public/skills/dd-bug-resolution/scripts/_ledger.py:replace",
+        "public/skills/dd-release-implementation/scripts/_release_new.py:new_release",
+    }
+)
 _V38_ALLOWANCE: dict[str, str] = {
     # a failed swap never leaves its temp sibling — pinned by each writer's own test
     "core/atomic_write.py:atomic_write": "parity:tests/unit/core/test_atomic_write.py",
@@ -401,10 +495,27 @@ def _doctor_codes() -> set[str]:
     )
 
 
-#: V39 allowance, born 2026-09-27 at 52: a code with no fix-clears case in
+#: V39 allowance, born 2026-09-27: a code with no fix-clears case in
 #: tests/integration/test_doctor_fix_lines_clear_their_finding.py; a code carrying a fix
 #: is keyed to the bug that says its fix may not clear, one with none is `report-only`.
-_V39_BIRTH = 52
+# birth keys read at 1bcfdba8f (operator ruling 2026-10-01, AC3.16)
+_V39_BIRTH = frozenset(
+    {
+        "ONBOARDING",
+        "RELEASE-TREE-ARCHIVED",
+        "RELEASE-TREE-MEMORY",
+        "RELEASE-TREE-PARSE",
+        "RELEASE-TREE-PHASE",
+        "RELEASE-TREE-SCHEMA",
+        "RELEASE-TREE-STATE-MISSING",
+        "RELEASE-TREE-TRIO",
+        "RELEASE-TREE-TS-ORDER",
+        "SPEC-DOC-002L",
+        "SPEC-DOC-035",
+        "TREE-7",
+        "WS-INVARIANT",
+    }
+)
 _V39_ALLOWANCE: dict[str, str] = {
     "ONBOARDING": "parity:tests/integration/test_onboarding_steps_property.py",
     "WS-INVARIANT": "parity:tests/integration/test_unfixable_findings_carry_their_own_fix.py",
@@ -439,6 +550,12 @@ def test_v39_every_doctor_code_has_a_fix_clears_case_or_a_key() -> None:
 
 
 def test_v39_trips_on_an_unlisted_code() -> None:
-    """RED fixture: a code with neither a plant nor a key is reported unlisted."""
-    problems = _allowance_violations(_uncovered({"ZZ-NEW-1", "ZZ-OK-1"}, {"ZZ-OK-1"}), {}, birth=0)
-    assert problems == ["unlisted: ZZ-NEW-1"]
+    """RED fixture: a code with neither a plant nor a key is reported unlisted; a key
+    absent at birth (AC3.16) is reported even when it covers a live code."""
+    problems = _allowance_violations(
+        _uncovered({"ZZ-NEW-1", "ZZ-LATE-1", "ZZ-OK-1"}, {"ZZ-OK-1"}),
+        {"ZZ-LATE-1": "report-only"},
+        birth=frozenset(),
+        also=frozenset({"report-only"}),
+    )
+    assert problems == ["unlisted: ZZ-NEW-1", "absent at birth (it only shrinks): ZZ-LATE-1"]

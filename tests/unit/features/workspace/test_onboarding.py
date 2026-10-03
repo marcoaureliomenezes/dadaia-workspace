@@ -74,7 +74,7 @@ _CMD = "command"
 
 # fmt: off
 @pytest.mark.parametrize(("trees", "kwargs", "published", "expected", "command", "in_command"), [
-    pytest.param(lambda t: {}, {}, False, ("context", _CMD), ("context", "create", "<name>", "--main-repo", "<clone-url>"), [], id="zero-contexts"),
+    pytest.param(lambda t: {}, {}, False, ("context", _CMD), None, ["Operator action: run {} with a context name and --main-repo set to the main repo's clone URL"], id="zero-contexts"),
     pytest.param(_bare, {}, False, ("specs", _CMD), ("specs", "init", "--context", "app"), [], id="S1-no-identity-no-bind-step"),
     pytest.param(_bare, {"bound": False}, False, ("bind", _CMD), ("context", "bind", "app"), [], id="S1-unbound-session-binds"),
     pytest.param(_bare, {"bound": True}, False, ("specs", _CMD), ("specs", "init", "--context", "app"), [], id="S1-bound-is-past-bind"),
@@ -102,7 +102,8 @@ def test_next_step_is_derived_from_the_workspace_state(
         return
     if command:
         assert step.command == fix_line(tmp_path, *command)
-    assert all(part in step.command.replace("\\", "/") for part in in_command)
+    create = fix_line(tmp_path, "context", "create")  # the binary every OS prints, {} in a row
+    assert all(part.format(create) in step.command.replace("\\", "/") for part in in_command)
 
 
 def test_the_specs_step_reports_state_and_the_doctor_has_no_specs_version_code(tmp_path: Path) -> None:

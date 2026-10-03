@@ -10,13 +10,15 @@ the drift the community asks CI to fail on; the successor lives in ``decisions.j
 
 from __future__ import annotations
 
-import json
 import re
+from collections.abc import Callable
+from contextlib import suppress
 from pathlib import Path
+from types import ModuleType
 
 from dadaia_workspace.core.doctor_rules import Rule, SectionFinding
 from dadaia_workspace.features.specs.doctor_types import Severity, specs_finding
-from dadaia_workspace.features.specs.schemas import schema_errors
+from dadaia_workspace.infrastructure.ledger_scripts import load_owner
 
 #: The ADR ledger, relative to a specs tree.
 LEDGER = "ADRs/decisions.jsonl"
@@ -25,18 +27,23 @@ LEDGER = "ADRs/decisions.jsonl"
 _ADR_CITATION_RE = re.compile(r"\bADR[:\s-]+(\d{4})\b")
 
 
-def _superseded_ids(ledger: Path) -> set[str]:
+def _ids(text: str, status: str) -> set[str]:
+    """An unreadable line names nothing here; it is `adr_record_issues`' finding."""
+    owner = load_owner("dd-bug-resolution", "_ledger")
     ids: set[str] = set()
-    for line in ledger.read_text(encoding="utf-8").splitlines():
-        if not line.strip():
-            continue
-        try:
-            record = json.loads(line)
-        except ValueError:
-            continue
-        if isinstance(record, dict) and record.get("status") == "superseded":
-            ids.add(str(record.get("id")))
+    for raw in text.split("\n"):
+        with suppress(owner.LineError):
+            ids |= {str(r.get("id")) for r in owner.parse(raw) if r.get("status") == status}
     return ids
+
+
+def cites_an_accepted_adr(ledger: str | None) -> Callable[[str], bool]:
+    """ADR 0151 M3: a message cites an ADR *ledger* accepts; no ledger (an unowned repo)
+    resolves no id, so any cited id stands."""
+    accepted = None if ledger is None else _ids(ledger, "accepted")
+    return lambda m: bool(
+        (cited := set(_ADR_CITATION_RE.findall(m))) and (accepted is None or cited & accepted)
+    )
 
 
 def superseded_adr_citations(specs_dir: Path, public_dir: Path | None) -> list[SectionFinding]:
@@ -45,7 +52,7 @@ def superseded_adr_citations(specs_dir: Path, public_dir: Path | None) -> list[S
     ledger = specs_dir / "ADRs" / "decisions.jsonl"
     if not ledger.is_file():
         return []
-    superseded = _superseded_ids(ledger)
+    superseded = _ids(ledger.read_text(encoding="utf-8"), "superseded")
     if not superseded:
         return []
     roots = [specs_dir / "memory"]
@@ -83,36 +90,50 @@ def adr_record_issues(specs_dir: Path) -> list[SectionFinding]:
         return []
     issues: list[SectionFinding] = []
     records: list[tuple[int, dict[str, object]]] = []
+    owner = load_owner("dd-bug-resolution", "_ledger")
+    schema = owner.load_schema("decision-record-v1")
     for number, raw in enumerate(ledger.read_text(encoding="utf-8").split("\n"), start=1):
-        if not raw.strip():
-            continue
         try:
-            record = json.loads(raw)
-        except ValueError as exc:
-            issues.append(_record_issue(number, f"line is not valid JSON: {exc}"))
+            parsed = owner.parse(raw)
+        except owner.LineError as exc:
+            issues.append(_record_issue(owner, ledger, number, f"line {exc}"))
             continue
-        records.append((number, record if isinstance(record, dict) else {}))
-        for message in schema_errors(record, "ADRs/decision-record-v1"):
-            issues.append(_record_issue(number, message))
+        for record in parsed:
+            records.append((number, record))
+            issues.extend(
+                _record_issue(owner, ledger, number, m)
+                for m in owner.validate(record, schema, schema, "record")
+            )
     for position, (number, record) in enumerate(records, start=1):
         if (adr_id := record.get("id")) != (want := f"{position:04d}"):
-            issues.append(_record_issue(number, f"id {adr_id!r} breaks 0001..N: expected {want}"))
+            issues.append(
+                _record_issue(
+                    owner, ledger, number, f"id {adr_id!r} breaks 0001..N: expected {want}"
+                )
+            )
             break
     accepted = {str(r.get("id")) for _, r in records if r.get("status") == "accepted"}
     for number, r in records:  # M2 (ADR 0151): only a ruled record changes a ruled one
         named = f"{r.get('supersedes') or ''},{r.get('amends') or ''}".split(",")
         ruled = r.get("status") == "accepted" and "ruling" in r
         if r.get("status") != "rejected" and not ruled and (hit := sorted(accepted & set(named))):
-            issues.append(_record_issue(number, f"changes accepted {hit} without a ruling"))
+            issues.append(
+                _record_issue(owner, ledger, number, f"changes accepted {hit} without a ruling")
+            )
     return issues
 
 
-def _record_issue(line: int, message: str) -> SectionFinding:
+#: Who writes an ADR record, and the law forbidding a hand edit of one.
+_VERBS, _LAW = "a `docs(adr)` propose or accept commit", "the ADR law, specs/ADRs/AGENTS.md"
+
+
+def _record_issue(owner: ModuleType, ledger: Path, line: int, message: str) -> SectionFinding:
     return specs_finding(
         code="LEDGER-ADR-SCHEMA",
         severity=Severity.ERROR,
         description=message,
         path=f"{LEDGER}:{line}",
+        fix=owner.unwritten(ledger, line, _VERBS, _LAW),
     )
 
 
@@ -121,6 +142,8 @@ LEDGER_RULES: tuple[Rule[Path], ...] = (
         ("LEDGER-ADR-SCHEMA",),
         "ledgers",
         adr_record_issues,
-        fix_help=f"sed -i '<line>s|.*|<the corrected record>|' specs/{LEDGER}",
+        fix_help=load_owner("dd-bug-resolution", "_ledger").unwritten(
+            Path("<specs>") / LEDGER, "the record named", _VERBS, _LAW
+        ),
     ),
 )

@@ -41,11 +41,12 @@ State = Literal["absent", "malformed", "foreign", "upgradable", "canonical"]
 
 
 def state(
-    specs_dir: Path, text: str | None = None, *, root: Path | None = None, context: str = "<ctx>"
+    specs_dir: Path, text: str | None = None, *, root: Path | None = None, context: str = ""
 ) -> tuple[State, str | None]:
     """The ONE reader of a specs tree's state and its one fix (``None`` when canonical) — of
     *text* when given (a pushed commit's constitution, ``""`` when it carries none), else
-    of the tree on disk. A constitution whose YAML or gitflow block fails is ``malformed``."""
+    of the tree on disk. A constitution whose YAML or gitflow block fails is ``malformed``.
+    The fix names *context* when given, else *specs_dir* itself."""
     if text is None and not specs_tree_exists(specs_dir):
         kind: State = "absent"
     elif reason := constitution_error(specs_dir, text):
@@ -58,4 +59,5 @@ def state(
             return "canonical", None
         kind = "upgradable" if stamp >= OLDEST_UPGRADABLE_VERSION else "foreign"
     consent = ("--replace-foreign",) if kind == "foreign" else ()
-    return kind, fix_line(root, "specs", "init", "--context", context, *consent)
+    target = ("--context", context) if context else ("--specs-dir", str(specs_dir))
+    return kind, fix_line(root, "specs", "init", *target, *consent)

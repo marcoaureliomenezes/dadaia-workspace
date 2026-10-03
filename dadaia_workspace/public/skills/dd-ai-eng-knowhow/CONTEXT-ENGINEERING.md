@@ -91,7 +91,7 @@ Five invariants MUST hold across all personas. Inconsistencies are bugs — file
 | I1 | Frontmatter schema | Same keys, same order (see below); no `tier`/`model` frontmatter key |
 | I2 | Body section order | The canonical 10-section spine of §2 |
 | I3 | `[SCOPE ERROR]` block format | Opener, one-line identity, explicit redirect per foreign domain |
-| I4 | TDD / task-manager reservation flow | Identical `[ ]`->`[-]`->`[x]` flow, referenced (not restated) |
+| I4 | TDD / task-manager reservation flow | The marker lifecycle, cited from `specs/releases/AGENTS.md` §3 (not restated) |
 | I5 | Handoff JSON contract | All agents emit via `dd-handoff-emitter` against the same schema version |
 
 - I1 reference key list (on-disk today): `name`, `description`, `dispatch_band`, `read_only`, `concurrency_relationship`.

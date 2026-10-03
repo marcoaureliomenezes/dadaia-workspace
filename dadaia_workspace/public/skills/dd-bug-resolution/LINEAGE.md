@@ -7,8 +7,9 @@ The audit's pillar 1 cites this section, never restates it — if the two disagr
 
 - The window runs from the newest archived audit to `HEAD`.
 - Read `specs/audits/_archive/audits_histo.jsonl` — an audit is not a release milestone.
-- Archived facts live in `releases/_archive/releases_histo.jsonl` (no per-release `_RELEASE.json` survives archiving).
+- A shipped release survives whole under `releases/_archive/<v>/` (ADR 0152 (1)); its `_RELEASE.json` `shipped` holds the sha and PR.
 - The window is `[newest archived audit's sha, HEAD]`; the whole file when that histo is empty.
+- An audit record missing its sha: recover it with `git log -S <audit-id> -- specs/audits`.
 
 ## The filter
 
@@ -25,7 +26,7 @@ The audit's pillar 1 cites this section, never restates it — if the two disagr
 ## Declare `caused_by`
 
 1. After reading the matching records, declare the link on this bug's own record — never on a prior one.
-2. `python3 .agents/skills/dd-bug-resolution/scripts/bugs.py resolve <id> --caused-by <prior-bug-id>|none` is the one writer; it is validated against the ledger or the literal `none`.
+2. `python3 .agents/skills/dd-bug-resolution/scripts/bugs.py resolve <id> --caused-by <prior-bug-id>|none` declares it, `bugs.py update <id> --set caused_by=…` repairs it; every write and `check` refuse a target naming no live or archived record, and a loop.
 3. `caused_by: none` carries the same evidentiary weight as naming a bug — the window was read, no link found.
 4. Echo the declaration in the fix commit body: `caused_by:`, `evidence:` (what the prior diff did), `prior diffs read:`.
 5. ≥ 2 prior fixes on the unit the bug lands in, within the window, make this fix a REBUILD of that unit — never a third patch.

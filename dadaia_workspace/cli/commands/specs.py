@@ -146,7 +146,10 @@ def init(
         try:
             ctx = resolve_context_for_cli(context)
         except ValueError as exc:
-            fail(f"{exc}\n{_init_fix('--context', '<name>')}")
+            init = fix_line(None, "specs", "init", "--context")
+            fail(
+                f"{exc}\nfix: Operator action: choose a registered context and run `{init}` with it"
+            )
         tree = resolve_context_specs_dir_for_cli(workspace := resolve_workspace_root(), ctx)
         if tree is None:  # a name the registry does not know owns no tree to write
             fail(f"no registered context {ctx!r}\nfix: {fix_line(workspace, 'context', 'list')}")

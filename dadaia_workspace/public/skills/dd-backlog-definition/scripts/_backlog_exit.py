@@ -9,7 +9,6 @@ exited must be told so rather than diagnosed for a status it no longer has.
 
 from __future__ import annotations
 
-import re
 import sys
 from pathlib import Path
 from typing import Any
@@ -19,26 +18,82 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from _backlog_schema import DISPOSITIONS  # noqa: E402
 from _backlog_store import SCRIPT, Items, Refusal  # noqa: E402
 from _backlog_write import today  # noqa: E402
-
-#: Which evidence flag each terminal word must carry — the histo record is the only
-#: surviving trace of why the item left.
-REQUIRED_EVIDENCE = {"delivered": "release", "superseded": "release", "rejected": "reason"}
+from _release_schema import origin  # noqa: E402
+from _specs import quote  # noqa: E402
 
 
-def _origin_cites(specs: Path, release: str, slug: str) -> bool:
-    """Whether a candidate SPEC of the release (``rc-<N>/``, ADR 0150) names *slug* on its
-    `**Origin:** backlog:` line — the pick."""
-    texts = (
-        s.read_text(encoding="utf-8") for s in (specs / "releases" / release).glob("rc-*/SPEC.md")
-    )
-    matches = (re.search(r"^\*\*Origin:\*\*\s*backlog:(.+)$", t, re.MULTILINE) for t in texts)
-    return any(m and slug in (s.strip() for s in m.group(1).split(",")) for m in matches)
+def _picks(specs: Path, slug: str) -> list[str]:
+    """Each release whose candidate SPEC (``rc-<N>/``, ADR 0150) carries *slug* in its
+    Origin's `backlog:` clause — read by `release.py`'s one parser (ADR 0161)."""
+    picks = []
+    for spec in (specs / "releases").glob("*/rc-*/SPEC.md"):
+        try:
+            if slug in origin(spec.read_text(encoding="utf-8")).get("backlog", []):
+                picks.append(spec.parents[1].name)
+        except ValueError:
+            continue  # a malformed Origin picks nothing; `release.py check` reports it
+    return sorted(set(picks), key=lambda v: [int(p) if p.isdigit() else -1 for p in v.split(".")])
+
+
+def _release(specs: Path, slug: str, disposition: str, release: str | None) -> None:
+    """A release whose candidate SPEC picked *slug*; the fix keeps the disposition."""
+    picks = _picks(specs, slug)
+    if release not in picks:
+        raise Refusal(
+            f"--release {release or '(none)'}: no releases/<v>/rc-<N>/SPEC.md first `**Origin:**` line "
+            f"picks {slug!r} — only a release that picked an item can exit it as {disposition!r}",
+            f"{SCRIPT} exit {slug} --disposition {disposition} --release {picks[-1]}" if picks
+            else f"Operator action: name {slug} in the `backlog:` clause of a candidate SPEC's "
+                 f"first `**Origin:**` line under {specs / 'releases'}, then rerun this exit.",
+        )  # fmt: skip
+
+
+def _reason(specs: Path, slug: str, disposition: str, reason: str | None) -> None:
+    """The one-line why of a rejection."""
+    if not (reason or "").strip():
+        raise Refusal(
+            f"{disposition!r} requires --reason: the histo record is the only trace of why {slug!r} left",
+            f"Operator action: rerun `{SCRIPT} exit {slug} --disposition {disposition} --specs "
+            f"{quote(str(specs))}` with a "
+            f"one-line --reason saying why {slug} is refused.",
+        )  # fmt: skip
+
+
+def _bug(specs: Path, slug: str, disposition: str, reason: str | None) -> None:
+    """The id of the BUGS.jsonl record the item is handed to (ADR 0137), read by the bug
+    skill's reader — imported here, so only this exit depends on that skill."""
+    from _bugs_store import Refusal as BugRefusal  # noqa: PLC0415
+    from _bugs_store import read_records  # noqa: PLC0415
+
+    bugs = specs / "bugs" / "BUGS.jsonl"
+    try:
+        ids = {record.get("id") for record in read_records(bugs)}
+    except BugRefusal as exc:  # translated at the seam: one Refusal type leaves this module
+        raise Refusal(str(exc), exc.fix) from exc
+    if reason not in ids:
+        raise Refusal(
+            f"--reason {reason!r} names no record of {bugs}: `to-bug` hands {slug!r} to a registered bug",
+            f"Operator action: register the bug {slug} becomes with bugs.py append "
+            f"(dd-bug-registration), then rerun `{SCRIPT} exit {slug} --disposition {disposition} "
+            f"--specs {quote(str(specs))}` "
+            "with its id as --reason.",
+        )  # fmt: skip
+
+
+#: Each terminal word -> the evidence flag it carries and its verifier; the histo record
+#: is the only surviving trace of why the item left.
+EVIDENCE = {
+    "delivered": ("release", _release),
+    "superseded": ("release", _release),
+    "rejected": ("reason", _reason),
+    "to-bug": ("reason", _bug),
+}
 
 
 def check_exit(specs: Path, active: Items, slug: str, values: dict[str, Any]) -> dict[str, Any]:
     """Refuse, before any write, an exit whose subject is not live or whose evidence does
     not match its disposition. Returns the entry the exit will remove."""
-    disposition, release, reason = values["disposition"], values["release"], values["reason"]
+    disposition = values["disposition"]
     entry = next((item for item in active if item.get("id") == slug), None)
     if entry is None:
         raise Refusal(
@@ -46,27 +101,14 @@ def check_exit(specs: Path, active: Items, slug: str, values: dict[str, Any]) ->
             "so a slug missing from active[] has already exited",
             f"grep {slug} specs/backlog/_archive/backlog_histo.jsonl",
         )
-    if disposition not in DISPOSITIONS:
+    if disposition not in EVIDENCE:
         raise Refusal(
             f"unknown disposition {disposition!r}: a backlog item exits as one of "
             f"{'|'.join(DISPOSITIONS)}",
-            f"{SCRIPT} exit {slug} --disposition rejected --reason '<why it was refused>'",
+            "Operator action: a postponed item stays in active[] and needs no exit.",
         )
-    required = REQUIRED_EVIDENCE[disposition]
-    supplied = {"release": release, "reason": reason}[required]
-    if not (supplied or "").strip():
-        example = "--release <release-id>" if required == "release" else "--reason '<why>'"
-        raise Refusal(
-            f"disposition {disposition!r} requires --{required}: the histo record is the "
-            f"only surviving trace of why {slug!r} left active[]",
-            f"{SCRIPT} exit {slug} --disposition {disposition} {example}",
-        )
-    if required == "release" and not _origin_cites(specs, str(release), slug):
-        raise Refusal(
-            f"no releases/{release}/rc-<N>/SPEC.md names {slug!r} on its `**Origin:** backlog:` "
-            f"line — only a release that picked an item can exit it as {disposition!r}",
-            f"{SCRIPT} exit {slug} --disposition {disposition} --release <the release whose Origin names {slug}>",
-        )
+    flag, verify = EVIDENCE[disposition]
+    verify(specs, slug, disposition, values[flag])
     return entry
 
 

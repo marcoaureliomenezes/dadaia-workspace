@@ -22,7 +22,7 @@ from _audit_check import (  # noqa: E402
     findings_findings,
     histo_findings,
 )
-from _ledger import replace  # noqa: E402
+from _ledger import parse, replace  # noqa: E402
 from _specs import script  # noqa: E402
 
 SCRIPT = script(Path(__file__).parent / "audit.py")
@@ -71,7 +71,7 @@ def read_findings(directory: Path) -> list[dict[str, Any]]:
             f"pass check ({problems[0]['message']}) — nothing was written",
             f"{SCRIPT} check",
         )
-    return [json.loads(line) for line in text.split("\n") if line.strip()]
+    return parse(text)
 
 
 def serialize(records: list[dict[str, Any]]) -> str:

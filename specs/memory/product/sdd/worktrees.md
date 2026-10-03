@@ -2,7 +2,7 @@
 slug: worktrees
 title: worktrees
 tldr: Every agent change to a repo is made in a canonical worktree of one of four kinds and lands by worktree.py merge — reviewed, rebased, fast-forwarded.
-summary: Canonical worktrees worktrees/<repo>/<M.m.p><letter>-<kind> on wt/ branches cut from the work branch; four kinds, each an allowed set; worktree.py new, merge, clean and list, stdlib and read from git alone; the merge ritual — allowed set, rebase with ledger union and TASKS-marker replay, an APPROVED verdict on the rebased sha, fast-forward only — and the holds that keep closure and context dead waiting while one is open.
+summary: Canonical worktrees worktrees/<repo>/<M.m.p><letter>-<kind> on wt/ branches cut from the work branch; four kinds, each an allowed set; worktree.py new, merge, clean and list, stdlib and read from git alone; the merge ritual — allowed set, rebase with ledger union and TASKS-marker replay, an APPROVED verdict on the rebased sha or a patch-identical one of its reflog, fast-forward only — and the holds that keep closure and context dead waiting while one is open.
 tags: [worktrees, gitflow, isolation, merge, review]
 sources:
   - dadaia_workspace/public/skills/dd-gitflow-default/scripts/worktree.py
@@ -24,16 +24,16 @@ sources:
 |---|---|---|
 | `impl` | any path outside `specs/`, plus `specs/releases/*/rc-*/TASKS.md` | 5 per repo and release |
 | `bug` | any path outside `specs/`, `specs/bugs/BUGS.jsonl`, `specs/bugs/_archive/*` | — |
-| `backlog` | `specs/backlog/*`, `specs/ADRs/decisions.jsonl` | — |
+| `backlog` | `specs/backlog/*`, `specs/ADRs/decisions.jsonl`, `specs/bugs/BUGS.jsonl` | — |
 | `release` | `specs/releases/*`, `specs/ADRs/decisions.jsonl`, `specs/memory/*`, `specs/*/AGENTS.md`, `specs/constitution.md` | 1 per repo and version |
 
-- `KINDS` in `_worktree_kinds.py` is the one table; the gate imports its `kind_holding` to name the kind a refused repo write belongs in, and a path no kind holds gets an `Operator action:` fix.
+- `KINDS` in `_worktree_kinds.py` is the one table, and a commit stages only paths its kind's allowed set holds (`dd-gitflow-default` §3a); the gate loads its `kind_holding` to name the kind a refused repo write belongs in, and a path no kind holds gets an `Operator action:` fix.
 
 ## `worktree.py`
 
 - `python3 .agents/skills/dd-gitflow-default/scripts/worktree.py <verb>` is stdlib only; every refusal prints one `fix:` line, it runs no other script's verb and imports only owner parsers.
 - `new <repo> --kind <kind>` derives the version from the repo's work branch; `impl` needs the live candidate's trio `Approved` on that branch, judged by `release.py`'s own status parser; a cap refusal, and letters past `z`, name an existing worktree's `merge` or `clean`; it locks the tree `dadaia:<kind>:<id>`, writes `*.jsonl merge=union` into `.git/info/attributes` once, refuses a symlinked `worktrees/` component and rolls back a half-made worktree.
-- `merge <path> [--keep <files>… | --drop]`, in order: refuse a dirty tree; refuse a file outside the kind's allowed set, the fix one command restoring it from the work branch and naming the kind that holds it; rebase onto the work branch, JSONL ledgers merging by union and a conflict confined to `TASKS.md` markers replayed — each flipped marker onto its one equal line at the most advanced state (`[ ]` < `[-]` < `[x]`) — any other conflict aborting with `git rebase <work>` as the fix; require a valid `APPROVED` `dd-code-reviewer` handoff naming the rebased HEAD in its `scope`; keep or drop ignored files (tool caches and `*.pyc` are disposable); fast-forward only.
+- `merge <path> [--keep <files>… | --drop]`, in order: refuse a dirty tree; refuse a file outside the kind's allowed set, naming the kind that holds it, the fix an `Operator action:` to revert that file to the work branch in one commit; rebase onto the work branch, JSONL ledgers merging by union and a conflict confined to `TASKS.md` markers replayed through the one task-line grammar ([[release-lifecycle]]) — each flipped marker onto its one equal line at the most advanced state (`[ ]` < `[-]` < `[x]`) — any other conflict aborting with `git rebase <work>` as the fix; require the newest `dd-code-reviewer` handoffs, by `produced_at`, naming in their `scope` the rebased HEAD or a sha of the branch's reflog whose (`git patch-id --stable`, full message) series over the work branch equals HEAD's, in order, to be valid `APPROVED` — a newer verdict overrules an older one, and a missing or unparseable `produced_at` ranks newest and refuses ([[agent-comms]]); keep or drop ignored files (tool caches and `*.pyc` are disposable); fast-forward only.
 - A failed fast-forward names its fix by ancestry: the work branch still an ancestor of the worktree branch means a stray change in the checkout, an `Operator action:`; otherwise the work branch moved and the fix is `merge` again.
 - After the fast-forward it removes the tree and `branch -d`s it, never `--force` or `-D`; a re-run after any stop finishes the job.
 - `clean <path>` removes only a `dadaia:`-locked, clean worktree with no commit ahead.
@@ -47,7 +47,7 @@ sources:
 ## The ritual
 
 - Only the main thread opens and merges worktrees; `impl` and `bug` worktrees run side by side only where the PLAN's Parallel schedule puts their tasks in one step with disjoint `W:`, and an Arm B fix no PLAN names is the only open `bug` worktree ([[release-lifecycle]], [[bug-ledger]]).
-- The reviewer reviews `git diff <work branch>...HEAD`; a rebase after review changes the sha, so the verdict is renewed ([[agent-orchestration]]).
+- The reviewer reviews `git diff <work branch>...HEAD`; a patch-identical rebase keeps the verdict, while a changed patch, a reworded message, an added or dropped commit or a marker replay that changes a patch needs a new review ([[agent-orchestration]]).
 
 ## Runtime state
 

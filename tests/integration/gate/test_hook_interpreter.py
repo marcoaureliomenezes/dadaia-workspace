@@ -88,7 +88,7 @@ def test_missing_venv_is_loud_and_fails_open_on_every_harness(
     done = [_run(f"sh {shlex.quote(str(hooks / lane))}", ws) for lane in lanes]
     assert all(d.returncode == 0 and ".dadaia/.venv" in d.stderr for d in done), done
     told = (
-        f"dadaia: no workspace venv at {ws}/.dadaia/.venv — the gate is off. "
+        f"dadaia: no workspace venv at {ws}/.dadaia/.venv — the gate is off.\n"
         f"fix: uvx dadaia-workspace init {ws}\n"
     )
     assert [d.stdout for d in done[1:]] == [envelope({"DADAIA_HOOK_OUTPUT": output}, told)] * 2

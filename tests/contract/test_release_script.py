@@ -1,6 +1,7 @@
 """Intent: CONTRACT — AC2.1–AC2.6, AC1.9 (release 0.5.0 candidate 2, ADR 0041 `measured_by`);
 AC5.2, AC5.3 (release 0.5.0 candidate 4, the Authorities table); AC1.17(3) (ADR 0150, the
-pinned pair resolving the live candidate).
+pinned pair resolving the live candidate); AC3.2 (candidate 7, ADR 0161: the one Origin
+parser and the trace, re-homed from SPEC-DOC-048).
 
 `release.py phase IMPLEMENTATION` admits a candidate only when PLAN.md carries the As-is
 review table — structure only — and the skeleton `dd-release-definition` teaches passes
@@ -11,6 +12,7 @@ from __future__ import annotations
 
 import json
 import re
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -56,7 +58,11 @@ def _specs(tmp_path: Path, plan: str, *, plan_status: str = "Approved") -> Path:
     specs = tmp_path / "specs"
     release = specs / "releases" / "0.5.0"
     (release / "rc-1").mkdir(parents=True)
-    for name, body in (("SPEC.md", ""), ("PLAN.md", plan), ("TASKS.md", "- [ ] T-1\n")):
+    for name, body in (
+        ("SPEC.md", "**Origin:** operator-demand\n"),
+        ("PLAN.md", plan),
+        ("TASKS.md", "- [ ] T-1\n"),
+    ):
         status = plan_status if name == "PLAN.md" else "Approved"
         (release / "rc-1" / name).write_text(f"# {name}\n\n**Status:** {status}\n\n{body}", "utf-8")
     state: dict[str, object] = {"schema": "release-state-v1", "release": "0.5.0", "phase": "DEFINITION",
@@ -322,3 +328,192 @@ def test_the_transition_and_check_judge_the_parallel_schedule_alike(
                            capture_output=True, text=True)  # fmt: skip
     assert (phase.returncode != 0, check.returncode != 0) == (bool(needle),) * 2, check.stdout
     assert needle is None or needle in phase.stderr and needle in check.stdout
+
+
+# --- the Origin line (ADR 0161; SPEC-DOC-048's cases re-homed by name) ---------------
+
+
+def _origin_rows(script: Path, specs: Path) -> list[dict[str, str]]:
+    done = subprocess.run([sys.executable, str(script), "check", "--json", "--specs", str(specs)],
+                          capture_output=True, text=True)  # fmt: skip
+    return [f for f in json.loads(done.stdout) if "Origin" in f["message"]]
+
+
+def _check(script: Path, specs: Path) -> list[str]:
+    return [f["message"] for f in _origin_rows(script, specs) if f["verdict"] == "error"]
+
+
+def _seed_ledgers(specs: Path, *, log: list[dict[str, object]] | None = None) -> None:
+    def jsonl(rel: str, *records: dict[str, object]) -> None:
+        (specs / rel).parent.mkdir(parents=True, exist_ok=True)
+        (specs / rel).write_text("".join(json.dumps(r) + "\n" for r in records), "utf-8")
+
+    active = {"schema": "backlog-v1", "active": [{"id": "a-real-entry"}]}
+    jsonl("backlog/BACKLOG.json", active)
+    jsonl("backlog/_archive/backlog_histo.jsonl",
+          {"id": "a-shipped-entry", "disposition": "delivered", "release": "0.5.0"},
+          {"id": "sent-to-a-bug", "disposition": "to-bug", "reason": "turned-down"})  # fmt: skip
+    jsonl("bugs/BUGS.jsonl", {"id": "still-broken", "status": "open"},
+          {"id": "already-fixed", "status": "resolved", "resolved_release": "0.5.0"},
+          {"id": "half-written", "severity": "BLOCKER"}, {"id": "turned-down", "status": "rejected"})  # fmt: skip
+    jsonl("audits/20260930-x/FINDINGS.jsonl", {"id": "20260930-x-F001", "release": "0.5.0"})
+    if log is not None:
+        state = specs / "releases/0.5.0/_RELEASE.json"
+        state.write_text(json.dumps({**json.loads(state.read_text("utf-8")), "log": log}), "utf-8")
+
+
+@pytest.mark.parametrize(
+    ("origin", "needles"),
+    [
+        pytest.param("", ["no `**Origin:**` line"], id="no-origin-line"),
+        pytest.param("**Origin:** backlog:a-real-entry,a-ghost", ["backlog:a-ghost"],
+                     id="unknown-backlog-id"),
+        pytest.param("**Origin:** backlog:a-shipped-entry", [], id="backlog-id-in-histo-only"),
+        pytest.param("**Origin:** bugs:still-broken,already-fixed,half-written", [],
+                     id="B4-bug-id-any-status-or-schema"),
+        pytest.param("**Origin:** bugs:still-broken,a-ghost", ["bugs:a-ghost"], id="unknown-bug-id"),
+        pytest.param("**Origin:** because I felt like it", ["not canonical"],
+                     id="non-canonical-value"),
+        pytest.param("**Origin:** backlog:a-shipped-entry; bugs:already-fixed; "
+                     "findings:20260930-x-F001", [], id="three-clauses-traced"),
+        pytest.param("**Origin:** bugs:a; bugs:b", ["not canonical"], id="a-kind-twice"),
+        pytest.param("**Origin:** findings:20260930-x-F009", ["findings:20260930-x-F009"],
+                     id="unknown-finding-id"),
+        pytest.param("**Origin:** backlog:sent-to-a-bug", ["backlog:sent-to-a-bug", "rejected"],
+                     id="a-to-bug-target-later-rejected"),
+    ],
+)  # fmt: skip
+def test_spec_origin(script: Path, tmp_path: Path, origin: str, needles: list[str]) -> None:
+    """sa-spec-doc-033-duplicates-bugs-check#B4: an Origin id resolves whatever its record's
+    status or schema; a finding names only the unresolved ids. A carried id whose record
+    does not point back yet is listed, not a finding, before the dispositions entry."""
+    specs = _specs(tmp_path, _GOOD + SCHEDULE)
+    _seed_ledgers(specs)
+    (specs / "releases/0.5.0/rc-1/SPEC.md").write_text(f"**Status:** Approved\n{origin}\n", "utf-8")
+
+    messages = _check(script, specs)
+
+    assert len(messages) == len(needles[:1]), messages
+    assert all(n in messages[0] for n in needles)
+    assert "a-real-entry" not in "".join(messages) and "still-broken" not in "".join(messages)
+
+
+def test_a_missing_pointer_is_a_finding_once_the_candidate_logs_its_dispositions(
+    script: Path, tmp_path: Path
+) -> None:
+    """AC3.2: a carried bug without `resolved_release` and a live entry with no exit are
+    listed (with whether they point back) until the live candidate's `dispositions` entry
+    exists; an older candidate's entry (before `defined.ts`) does not count. Once it does,
+    each is an error on the real Origin line whose fix writes the pointer."""
+    specs = _specs(tmp_path, _GOOD + SCHEDULE)
+    entry = {"ts": "2026-01-02T00:00:00Z", "agent": "a", "kind": "dispositions", "text": "t"}
+    state = specs / "releases/0.5.0/_RELEASE.json"
+    defined = {"sha": "abc1234", "ts": "2026-01-01T00:00:00Z"}
+    state.write_text(json.dumps({**json.loads(state.read_text("utf-8")), "phase": "CLOSURE",
+                                 "defined": defined}))  # fmt: skip
+    (specs / "releases/0.5.0/rc-1/SPEC.md").write_text(
+        "# S\n\n**Status:** Approved\n**Origin:** backlog:a-real-entry; bugs:still-broken,already-fixed\n", "utf-8")  # fmt: skip
+    _seed_ledgers(specs, log=[{**entry, "ts": "2025-12-31T00:00:00Z"}])
+    assert _origin_rows(script, specs) == []  # --json, the doctor's contract: errors only
+    listed = subprocess.run([sys.executable, str(script), "check", "--specs", str(specs)],
+                            capture_output=True, text=True)  # fmt: skip
+    assert [
+        ln.split(" ", 3)[3] for ln in listed.stdout.splitlines() if " info " in ln
+    ] == [  # fmt: skip
+        "Origin backlog:a-real-entry untraced",
+        "Origin bugs:still-broken untraced",
+        "Origin bugs:already-fixed traced",
+    ]
+
+    _seed_ledgers(specs, log=[entry])
+
+    errors = [f for f in _origin_rows(script, specs) if f["verdict"] == "error"]
+    assert [(f["line"], f["message"]) for f in errors] == [
+        (4, "Origin backlog:a-real-entry untraced"), (4, "Origin bugs:still-broken untraced")]  # fmt: skip
+    assert " exit a-real-entry --disposition delivered --release 0.5.0 --specs " in errors[0]["fix"]
+    assert errors[1]["fix"].startswith("Operator action: resolve bug still-broken in release 0.5.0")
+    assert "<" not in errors[1]["fix"]  # ADR 0158: a bug's resolve needs evidence no row holds
+
+
+def test_a_deferred_carried_bug_is_untraced_after_the_sweep(script: Path, tmp_path: Path) -> None:
+    """Operator ruling 2026-10-01: a carried bug `deferred` at the closing sweep stays
+    untraced, an error whose fix is the operator's act (resolve it here, or rule on scope)."""
+    specs = _specs(tmp_path, _GOOD + SCHEDULE)
+    state = specs / "releases/0.5.0/_RELEASE.json"
+    state.write_text(json.dumps({**json.loads(state.read_text("utf-8")), "phase": "CLOSURE"}))
+    _seed_ledgers(specs, log=[{"ts": "2026-01-02T00:00:00Z", "agent": "a", "kind": "dispositions",
+                               "text": "t"}])  # fmt: skip
+    with (specs / "bugs/BUGS.jsonl").open("a") as ledger:
+        ledger.write(json.dumps({"id": "parked", "status": "deferred", "reason": "later"}) + "\n")
+    (specs / "releases/0.5.0/rc-1/SPEC.md").write_text("**Origin:** bugs:parked\n", "utf-8")
+
+    [row] = _origin_rows(script, specs)
+
+    assert row["message"] == "Origin bugs:parked untraced"
+    assert row["fix"].startswith("Operator action: resolve bug parked in release 0.5.0")
+
+
+def test_a_carried_id_is_traced_through_its_owning_ledger_after_it_moves(
+    script: Path, tmp_path: Path
+) -> None:
+    """AC3.2 (review F1, F5): `audit.py close` deletes the audit and leaves one histo record
+    keyed by the audit id; `bugs.py archive` moves a record to the archive; `supersede`
+    writes `superseded_by` — each carried id still traces, asked of the ledger owning it."""
+    specs = _specs(tmp_path, _GOOD + SCHEDULE)
+    state = specs / "releases/0.5.0/_RELEASE.json"
+    log = [{"ts": "2026-01-02T00:00:00Z", "agent": "a", "kind": "dispositions", "text": "t"}]
+    state.write_text(json.dumps({**json.loads(state.read_text("utf-8")), "phase": "CLOSURE",
+                                 "defined": {"sha": "abc1234", "ts": "2026-01-01T00:00:00Z"}}))  # fmt: skip
+    _seed_ledgers(specs, log=log)
+    shutil.rmtree(specs / "audits/20260930-x")
+    (specs / "audits/_archive").mkdir(parents=True)
+    (specs / "audits/_archive/audits_histo.jsonl").write_text(
+        json.dumps({"id": "20260930-x", "disposition": "resolved", "release": "0.5.0"}) + "\n"
+    )
+    (specs / "bugs/_archive").mkdir()
+    (specs / "bugs/_archive/bugs_histo.jsonl").write_text(
+        json.dumps({"id": "gone-fixed", "status": "resolved", "resolved_release": "0.5.0"}) + "\n"
+    )
+    with (specs / "bugs/BUGS.jsonl").open("a") as ledger:
+        ledger.write(json.dumps({"id": "folded", "status": "superseded",
+                                 "superseded_by": "already-fixed"}) + "\n")  # fmt: skip
+    (specs / "releases/0.5.0/rc-1/SPEC.md").write_text(
+        "**Status:** Approved\n**Origin:** bugs:gone-fixed,folded; findings:20260930-x-F001\n"
+    )
+
+    assert _check(script, specs) == []
+
+
+def test_a_stacked_candidate_in_definition_lists_its_carried_ids(
+    script: Path, tmp_path: Path
+) -> None:
+    """AC3.2 (review F2): `new` keeps the closed candidate's `defined` and its logged
+    `dispositions`; the stacked candidate in DEFINITION has swept nothing yet."""
+    specs = _specs(tmp_path, _GOOD + SCHEDULE)
+    state = specs / "releases/0.5.0/_RELEASE.json"
+    state.write_text(json.dumps({**json.loads(state.read_text("utf-8")),
+                                 "defined": {"sha": "abc1234", "ts": "2026-01-01T00:00:00Z"},
+                                 "implemented": {"sha": "abc1235", "ts": "2026-01-02T00:00:00Z"}}))  # fmt: skip
+    _seed_ledgers(specs, log=[{"ts": "2026-01-03T00:00:00Z", "agent": "a", "kind": "dispositions",
+                               "text": "rc-1 sweep"}])  # fmt: skip
+    (specs / "releases/0.5.0/rc-2").mkdir()
+    (specs / "releases/0.5.0/rc-2/SPEC.md").write_text(
+        "**Status:** Draft\n**Origin:** backlog:a-real-entry\n", "utf-8"
+    )
+
+    assert _check(script, specs) == []
+
+
+def test_only_the_live_candidate_is_ranked(script: Path, tmp_path: Path) -> None:
+    """ADR 0150 (3): the highest rc-<N>/ is ranked; a closed rc-1 is history."""
+    specs = _specs(tmp_path, _GOOD + SCHEDULE)
+    (specs / "releases/0.5.0/rc-2").mkdir()
+    (specs / "releases/0.5.0/rc-2/SPEC.md").write_text("**Status:** Draft\n", "utf-8")
+
+    [row] = _origin_rows(script, specs)
+
+    assert row["path"].endswith("rc-2/SPEC.md") and "has no `**Origin:**`" in row["message"]
+
+
+def test_this_repos_live_spec_origin_passes(script: Path) -> None:
+    assert _check(script, Path(__file__).resolve().parents[2] / "specs") == []

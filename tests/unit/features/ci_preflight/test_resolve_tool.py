@@ -4,8 +4,7 @@
 environment* — never from the ambient PATH (no ``shutil.which``):
 
     1. venv sibling of ``sys.executable``  (``Path(sys.executable).parent / name``)
-    2. ``DADAIA_BIN``-derived bin dir       (``Path(DADAIA_BIN).parent / name``)
-    3. ``("poetry", "run", name)`` fallback ONLY when no sibling exists anywhere.
+    2. ``("poetry", "run", name)`` fallback ONLY when no sibling exists anywhere.
 
 The pinned order and the fail-soft poetry fallback are the bug fix: on a host
 where poetry is absent from PATH the venv sibling resolves first, so the gate no
@@ -34,17 +33,15 @@ def _make_exe(directory: Path, name: str) -> Path:
 
 
 # fmt: off
-@pytest.mark.parametrize(("venv", "dadaia", "dadaia_bin", "expected"), [
-    pytest.param(["ruff"], ["ruff", "dadaia"], True, "venv/bin/ruff", id="venv-sibling-wins"),
-    pytest.param([], ["ruff", "dadaia"], True, "dadaia/bin/ruff", id="fallback-to-dadaia-bin"),
-    pytest.param([], ["dadaia"], True, None, id="poetry-fallback-when-missing-everywhere"),
-    pytest.param([], [], False, None, id="poetry-fallback-when-dadaia-bin-unset"),
-    pytest.param(["ruff/"], [], False, None, id="dir-named-like-tool-not-executable"),
-    pytest.param(["ruff", "python->base"], [], False, "venv/bin/ruff", id="sibling-of-a-python-symlink-never-its-target"),
+@pytest.mark.parametrize(("venv", "expected"), [
+    pytest.param(["ruff"], "venv/bin/ruff", id="venv-sibling-wins"),
+    pytest.param([], None, id="poetry-fallback-when-missing"),
+    pytest.param(["ruff/"], None, id="dir-named-like-tool-not-executable"),
+    pytest.param(["ruff", "python->base"], "venv/bin/ruff", id="sibling-of-a-python-symlink-never-its-target"),
 ])
 # fmt: on
-def test_resolve_tool_precedence(tmp_path: Path, venv: list[str], dadaia: list[str], dadaia_bin: bool, expected: str | None) -> None:
-    """Bug B2: venv sibling of sys.executable (next to the SYMLINK, never its target) > DADAIA_BIN dir > poetry."""
+def test_resolve_tool_precedence(tmp_path: Path, venv: list[str], expected: str | None) -> None:
+    """Bug B2: venv sibling of sys.executable (next to the SYMLINK, never its target) > poetry."""
     venv_bin = tmp_path / "venv" / "bin"
     if "python->base" in venv:
         venv_bin.mkdir(parents=True)
@@ -56,10 +53,7 @@ def test_resolve_tool_precedence(tmp_path: Path, venv: list[str], dadaia: list[s
             (venv_bin / name[:-1]).mkdir()
         elif "->" not in name:
             _make_exe(venv_bin, name)
-    for name in dadaia:
-        _make_exe(tmp_path / "dadaia" / "bin", name)
-    bin_arg = str(tmp_path / "dadaia" / "bin" / "dadaia") if dadaia_bin else None
-    argv = _resolve_tool("ruff", python_executable=str(venv_bin / "python"), dadaia_bin=bin_arg)
+    argv = _resolve_tool("ruff", python_executable=str(venv_bin / "python"))
     assert argv == ((str(tmp_path / expected),) if expected else ("poetry", "run", "ruff"))
 
 
@@ -81,7 +75,7 @@ def test_resolve_tool_never_calls_shutil_which_and_wires_all_checks(
 
     venv_bin = tmp_path / "venv" / "bin"
     _make_exe(venv_bin, "python")
-    _resolve_tool("ruff", python_executable=str(venv_bin / "python"), dadaia_bin=None)
+    _resolve_tool("ruff", python_executable=str(venv_bin / "python"))
     assert sentinel_called is False
 
     ruff = _make_exe(venv_bin, "ruff")
@@ -90,8 +84,8 @@ def test_resolve_tool_never_calls_shutil_which_and_wires_all_checks(
     _make_exe(venv_bin, "dadaia")
     python = venv_bin / "python"
 
-    full = checks_for(quick=False, python_executable=str(python), dadaia_bin=None)
-    quick = checks_for(quick=True, python_executable=str(python), dadaia_bin=None)
+    full = checks_for(quick=False, python_executable=str(python))
+    quick = checks_for(quick=True, python_executable=str(python))
 
     by_name = {c.name: c.argv for c in full}
     assert by_name["ruff format --check"][0] == str(ruff)

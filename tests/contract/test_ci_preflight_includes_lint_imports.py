@@ -13,8 +13,7 @@ ruff/mypy/pytest. This contract pins two invariants:
       runner-derived tree, the check is NOT silently skipped — it surfaces an actionable
       error naming the missing binary AND the poetry group that provides it.
 
-Both are asserted at unit level by DI-faking tool resolution (`python_executable` /
-`dadaia_bin`), the established ci_preflight fake pattern — no subprocess is spawned.
+Both are asserted at unit level by DI-faking tool resolution (`python_executable`), the established ci_preflight fake pattern — no subprocess is spawned.
 
 AC-7(d) mutation-sanity: deleting the `lint-imports` Check from `checks_for()` makes the
 (a) assertion below FAIL (the check disappears from the returned tuple).
@@ -53,7 +52,7 @@ def test_lint_imports_check_argv_present_vs_fail_closed_absent(
     if lint_imports_present:
         lint_imports = _make_exe(venv_bin, "lint-imports")
         for quick in (False, True):
-            checks = checks_for(quick=quick, python_executable=str(python), dadaia_bin=None)
+            checks = checks_for(quick=quick, python_executable=str(python))
             names = [c.name for c in checks]
 
             # Present — never a silent skip.
@@ -73,8 +72,8 @@ def test_lint_imports_check_argv_present_vs_fail_closed_absent(
             assert names[-1].startswith("pytest"), names
         return
 
-    # Fake venv with python but NO lint-imports sibling; DADAIA_BIN-derived tree unset.
-    checks = checks_for(python_executable=str(python), dadaia_bin=None)
+    # Fake venv with python but NO lint-imports sibling.
+    checks = checks_for(python_executable=str(python))
     by_name = {c.name: c.argv for c in checks}
 
     # The check still exists — absence of the binary is NOT a silent skip.

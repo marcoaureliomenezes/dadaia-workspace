@@ -9,7 +9,6 @@ commit, so a writer/validator disagreement is unrepresentable. The schema is
 from __future__ import annotations
 
 import json
-import re
 import sys
 from collections.abc import Iterator
 from pathlib import Path
@@ -18,54 +17,20 @@ from typing import Any
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import _ledger  # noqa: E402
-from _ledger import JSON_TYPES  # noqa: E402
+from _specs import quote, script, with_specs  # noqa: E402
 
 CODE = "LEDGER-BUGS-SCHEMA"
 LEDGER = "bugs/BUGS.jsonl"
 HISTO = "bugs/_archive/bugs_histo.jsonl"
 TERMINAL = ("resolved", "superseded", "deferred", "rejected")
+_VERBS, _LAW = (
+    "`bugs.py append` or `bugs.py update`",
+    "specs/bugs/AGENTS.md: never hand-edit BUGS.jsonl",
+)
 
 
 def load_schema() -> dict[str, Any]:
     return _ledger.load_schema("bug-record-v1")
-
-
-def _field_errors(key: str, value: object, spec: dict[str, Any]) -> Iterator[str]:
-    declared = spec.get("type")
-    allowed: list[str] = declared if isinstance(declared, list) else [declared] if declared else []
-    if allowed and not any(isinstance(value, JSON_TYPES[name]) for name in allowed):
-        yield f"field {key!r} must be of type {declared}"
-        return
-    if not isinstance(value, str):
-        return
-    enum = spec.get("enum")
-    if enum and value not in enum:
-        yield f"field {key!r} must be one of {sorted(enum)}, got {value!r}"
-    pattern = spec.get("pattern")
-    if pattern is not None and re.search(pattern, value) is None:
-        yield f"field {key!r} value {value!r} does not match {pattern}"
-    minimum = spec.get("minLength")
-    if minimum is not None and len(value) < minimum:
-        yield f"field {key!r} is shorter than its minLength of {minimum}"
-
-
-def schema_errors(record: object, schema: dict[str, Any]) -> Iterator[str]:
-    """The subset bug-record-v1 uses: required, type, enum, pattern, minLength and
-    ``additionalProperties: false`` — the one that reports a retired key."""
-    if not isinstance(record, dict):
-        yield "record is not a JSON object"
-        return
-    properties: dict[str, Any] = schema["properties"]
-    for key in schema["required"]:
-        if key not in record:
-            yield f"missing required field {key!r}"
-    if schema.get("additionalProperties") is False:
-        for key in sorted(set(record) - set(properties)):
-            yield f"field {key!r} is not allowed by bug-record-v1 (unknown or retired key)"
-    for key, value in record.items():
-        spec = properties.get(key)
-        if spec is not None:
-            yield from _field_errors(key, value, spec)
 
 
 def invariant_errors(record: dict[str, Any]) -> Iterator[str]:
@@ -84,17 +49,20 @@ def invariant_errors(record: dict[str, Any]) -> Iterator[str]:
         yield f"record {record['id']!r} closed_at={closed_at!r} precedes its filing date ts={ts!r}"
 
 
-def findings_for(text: str, rel: str = LEDGER) -> list[dict[str, Any]]:
+def findings_for(
+    text: str, rel: str = LEDGER, archived: frozenset[str] = frozenset(), root: Path = _ledger.SPECS
+) -> list[dict[str, Any]]:
     """Every finding the ledger *text* carries — the ONE validation path, run both by
-    ``check`` over the committed file and by every write over its own candidate bytes."""
+    ``check`` over the committed file and by every write over its own candidate bytes.
+    Lineage (AC3.8): a `caused_by` names a record of *text* or *archived*, and never loops."""
     schema = load_schema()
-    findings: list[dict[str, Any]] = []
+    lines: dict[int, list[str]] = {}
+    fixes: dict[int, str] = {}  # a line a governance verb clears
     seen: dict[str, int] = {}
+    links: dict[str, object] = {}
 
     def add(line: int, message: str) -> None:
-        findings.append(
-            {"code": CODE, "verdict": "error", "path": rel, "line": line, "message": message}
-        )
+        lines.setdefault(line, []).append(message)
 
     for number, raw in enumerate(text.split("\n"), start=1):
         if not raw.strip():
@@ -104,20 +72,39 @@ def findings_for(text: str, rel: str = LEDGER) -> list[dict[str, Any]]:
         except json.JSONDecodeError as exc:
             add(number, f"line is not valid JSON: {exc.msg}")
             continue
-        messages = list(schema_errors(record, schema))
-        for message in messages:
+        messages = list(_ledger.validate(record, schema, schema, "record"))
+        for message in messages or invariant_errors(record):
             add(number, message)
         if messages:
             continue
-        for message in invariant_errors(record):
-            add(number, message)
         first = seen.setdefault(record["id"], number)
         if first != number:
             add(number, f"duplicate record id {record['id']!r} (first appended at line {first})")
-    return findings
+        links.setdefault(record["id"], record["caused_by"])
+    known = {None, "none", *links, *archived}
+    for bug_id, target in links.items():
+        chain, at = [bug_id], target
+        while at in links and at not in chain:
+            chain.append(str(at))
+            at = links[str(at)]
+        if target not in known or at == bug_id:
+            why = f"forms a cycle: {' -> '.join(chain)}" if at == bug_id else "names no record"
+            add(seen[bug_id], f"{bug_id!r} caused_by {why}")
+            bugs = script(Path(__file__).with_name("bugs.py"))
+            fixes[seen[bug_id]] = (  # a cycle's wrong link is a judgement; a dangling one is not
+                f"Operator action: decide which of {', '.join(chain)} names the wrong cause and "
+                f"set its caused_by to the real cause's id, or none, through `{bugs} update "
+                f"--specs {quote(str(root))}` ({_LAW})" if at == bug_id
+                else with_specs(f"{bugs} update {quote(bug_id)} --set caused_by=none", root)
+            )  # fmt: skip
+    return [
+        _ledger.finding(CODE, rel, n, "; ".join(m),
+                        fixes.get(n) or _ledger.unwritten(root / rel, n, _VERBS, _LAW))
+        for n, m in sorted(lines.items())
+    ]  # fmt: skip
 
 
-def histo_findings(text: str) -> list[dict[str, Any]]:
+def histo_findings(text: str, root: Path = _ledger.SPECS) -> list[dict[str, Any]]:
     """The archive's lines: each a bug-record-v1 record, or a pre-v6 ``event`` line that
     predates the record shape and is history, never rewritten."""
     schema = load_schema()
@@ -129,15 +116,37 @@ def histo_findings(text: str) -> list[dict[str, Any]]:
             record, messages = None, [f"line is not valid JSON: {exc.msg}"]
         else:
             legacy = isinstance(record, dict) and "event" in record
-            messages = [] if record is None or legacy else list(schema_errors(record, schema))
-        out += [{"code": CODE, "verdict": "error", "path": HISTO, "line": number,
-                 "message": m} for m in messages]  # fmt: skip
+            messages = (
+                []
+                if record is None or legacy
+                else list(_ledger.validate(record, schema, schema, "record"))
+            )
+        if messages:
+            fix = _ledger.unwritten(root / HISTO, number, "`bugs.py archive`", _LAW)
+            out.append(_ledger.finding(CODE, HISTO, number, "; ".join(messages), fix))
     return out
+
+
+def archived_ids(text: str) -> frozenset[str]:
+    """The record ids of the archive *text*; an unreadable line is `histo_findings`' to name."""
+    out = set()
+    for raw in text.split("\n"):
+        try:
+            record = json.loads(raw) if raw.strip() else None
+        except json.JSONDecodeError:
+            continue
+        if isinstance(record, dict) and "id" in record:
+            out.add(str(record["id"]))
+    return frozenset(out)
 
 
 def check(specs: Path) -> list[dict[str, Any]]:
     """Validate the committed ledger and its archive; a young specs tree with neither is
-    not a finding."""
+    not a finding. A union merge can join two valid writes into a cycle: check re-judges."""
     ledger, histo = specs / LEDGER, specs / HISTO
-    out = findings_for(ledger.read_text(encoding="utf-8")) if ledger.is_file() else []
-    return out + (histo_findings(histo.read_text(encoding="utf-8")) if histo.is_file() else [])
+    text = ledger.read_text(encoding="utf-8") if ledger.is_file() else ""
+    archived = histo.read_text(encoding="utf-8") if histo.is_file() else ""
+    root = specs.resolve()
+    return findings_for(text, archived=archived_ids(archived), root=root) + histo_findings(
+        archived, root
+    )

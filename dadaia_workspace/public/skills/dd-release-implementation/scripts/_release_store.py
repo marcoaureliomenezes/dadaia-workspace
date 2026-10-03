@@ -21,7 +21,7 @@ sys.path.append(str(Path(__file__).resolve().parents[2] / "dd-bug-resolution" / 
 from _ledger import replace, stamp  # noqa: E402
 from _release_check import state_findings  # noqa: E402
 from _release_schema import SEMVER_RE, STATE, candidate_dir  # noqa: E402
-from _specs import script  # noqa: E402
+from _specs import choice, script  # noqa: E402
 
 State = dict[str, Any]
 SCRIPT = script(Path(__file__).parent / "release.py")
@@ -76,10 +76,8 @@ def live_release(specs: Path) -> Live:
     """Resolve the ONE live release and read its state, or refuse naming the reason."""
     ids = live_ids(specs)
     if not ids:
-        raise Refusal(
-            "no live release under specs/releases/ — nothing to operate on",
-            f"{SCRIPT} new <M.m.p>",
-        )
+        raise choice(Refusal("no live release under specs/releases/ — nothing to operate on",
+                     f"{SCRIPT} new"), "with the release version you choose")  # fmt: skip
     if len(ids) > 1:
         raise Refusal(
             f"multiple live release directories carry {STATE}: {', '.join(ids)} — the "
@@ -95,8 +93,9 @@ def window_start(state: State) -> str:
     ends = [e["until"] for e in state.get("log") or []
             if isinstance(e, dict) and e.get("kind") == "memory" and e.get("until")]  # fmt: skip
     if not (start := ends[-1] if ends else (state.get("defined") or {}).get("sha")):
-        raise Refusal("the live release has no defined.sha to open the memory window at",
-                      f"{SCRIPT} phase IMPLEMENTATION --sha <sha>")  # fmt: skip
+        raise choice(Refusal("the live release has no defined.sha to open the memory window at",
+                     f"{SCRIPT} phase IMPLEMENTATION --sha"),
+                     "with the sha of the commit that approved the definition")  # fmt: skip
     return str(start)
 
 
@@ -133,7 +132,7 @@ def commit(path: Path, rel: str, apply: Callable[[State], State]) -> State:
         if stamp(path) != before:
             raise Refusal(
                 f"{path.name} changed twice under this write — nothing was written",
-                "re-run this command",
+                "Operator action: re-run the same command, unchanged",
             )
     replace(path, text)
     return written

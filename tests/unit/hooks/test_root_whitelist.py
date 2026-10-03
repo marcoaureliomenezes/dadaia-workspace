@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import json
 import os
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -157,3 +158,27 @@ def test_fail_open_table(tmp_path: Path, tool_name: str, tool_input: dict[str, A
     _ws(tmp_path)
     out, block = _run(tmp_path, {"tool_name": tool_name, "tool_input": tool_input})
     assert (out, block) == ("", None)
+
+
+@pytest.mark.parametrize(
+    ("extra", "segment"),
+    [
+        ({}, "main-thread"),
+        ({"agent_id": "a1", "agent_type": "dd-software-engineer"}, "dd-software-engineer"),
+        *(({"agent_type": bad}, "main-thread") for bad in ("../x", "a/b", "", "..", 3, None)),
+    ],
+)
+def test_the_fix_creates_the_agents_own_temp_dir(
+    tmp_path: Path, extra: dict[str, object], segment: str
+) -> None:
+    """Intent: CONTRACT — AC4.4 (fix-lines-are-not-one-runnable-command): the fix makes the
+    agent's own `.dadaia/tmp/<agent>/<YYYYMMDD>/`, never the existing `tmp/` (a no-op); a
+    subagent payload's `agent_type` names it, only as a plain name (CWE-22)."""
+    payload = {"tool_name": "Write", "tool_input": {"file_path": str(tmp_path / "junk.txt")}}
+    days = [datetime.now(UTC).strftime("%Y%m%d")]  # the call may cross UTC midnight
+    _out, block = _run(_ws(tmp_path), {**payload, **extra})
+    days.append(datetime.now(UTC).strftime("%Y%m%d"))
+    assert block is not None
+    fix = block["reason"].rsplit("fix: ", 1)[1]
+    tmp = tmp_path.resolve() / ".dadaia" / "tmp" / segment  # the hook prints it resolved, POSIX
+    assert any((tmp / day).as_posix() in fix for day in days)

@@ -24,7 +24,7 @@ Metrics 7 and 8 carry `target 0` and report their measured value even when it wo
 |---|---|---|---|
 | 1 | Registrations per session | `governance_events` rows with `verb == "bugs append"`, grouped by `session_id` | `session_id`; a session registering many is the ask-first rule breaking |
 | 2 | evidence-triple coverage | resolved records with the evidence triple all present | the triple; target 100% |
-| 3 | Fix-shape ratio | `net-negative / (net-neutral + net-positive)` | `diff_direction` |
+| 3 | Fix-shape ratio | `net-negative / (net-neutral + net-positive)` (`bugs.py stats`' `direction:` rows) | `evidence_diff`'s prefix |
 | 4 | Same-surface re-bug rate at 3d/14d | grouped on the `surface` enum, never free text | `surface` |
 | 5 | Hand-kept-list touch count | resolving commits touching the fixed path set below | fixed path set, below |
 | 6 | Test-layer bug share | records whose `surface == "tests"` or `component` starts with `tests/` | `surface` |
@@ -42,7 +42,7 @@ Metrics 7 and 8 carry `target 0` and report their measured value even when it wo
 ## Per-record checks (beyond the eight metrics)
 
 - A resolved record carrying no `cause`, or no `evidence_seam` (no regression seam).
-- A `diff_direction: net-positive` record whose resolving commit shows no architecture-lens routing evidence (`dd-code-review`).
+- A `net-positive:` `evidence_diff` record whose resolving commit shows no architecture-lens routing evidence (`dd-code-review`).
 - Bug-scoped commit-shape conformance: shapes 1 (registration) and 3 (fix) of `dd-gitflow-default` §3a, read from `git log`.
 - The full five-shape sweep is `PILLAR-SPECS.md`'s — never duplicated here.
 

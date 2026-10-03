@@ -10,12 +10,14 @@ from __future__ import annotations
 
 import json
 import os
+import shlex
 import subprocess
 import sys
 from pathlib import Path
 
 import pytest
 
+from dadaia_workspace.infrastructure.ledger_scripts import load_owner
 from tests.helpers.skill_scripts import stage_skill_scripts
 
 pytestmark = pytest.mark.unit
@@ -27,10 +29,12 @@ _SOURCE = _SCRIPTS / "backlog.py"
 
 @pytest.fixture
 def script(tmp_path: Path) -> Path:
-    """The staged shape: backlog.py with both schema copies beside it."""
-    return (
-        stage_skill_scripts("dd-backlog-definition", tmp_path / "staged" / "scripts") / "backlog.py"
-    )
+    """The staged shape: backlog.py with both schema copies beside it, and the release
+    and bug skills beside it, whose Origin parser and bug reader `exit` imports (ADR 0161)."""
+    for owner in ("dd-release-implementation", "dd-bug-resolution"):
+        stage_skill_scripts(owner, tmp_path / "skills" / owner / "scripts")
+    skill = tmp_path / "skills" / "dd-backlog-definition" / "scripts"
+    return stage_skill_scripts("dd-backlog-definition", skill) / "backlog.py"
 
 
 def _specs(root: Path, *active: dict[str, object]) -> Path:
@@ -60,10 +64,9 @@ def _active(specs: Path) -> list[dict[str, object]]:
 
 
 def _histo(specs: Path) -> list[dict[str, object]]:
-    path = specs / "backlog" / "_archive" / "backlog_histo.jsonl"
-    if not path.is_file():
-        return []
-    return [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines() if line]
+    return load_owner("dd-bug-resolution", "_ledger").records(
+        specs / "backlog" / "_archive" / "backlog_histo.jsonl"
+    )
 
 
 def _pick(specs: Path, origin: str = "backlog:an-idea") -> None:
@@ -122,6 +125,16 @@ def test_new_refuses_a_duplicate_slug_with_one_fix_line(script: Path, tmp_path: 
     assert len(_fix_lines(done)) == 1
     assert "backlog.py" in _fix_lines(done)[0]
     assert len(_active(specs)) == 1
+
+
+def test_a_refused_positional_drops_only_itself_never_an_equal_flag_value(
+    script: Path, tmp_path: Path
+) -> None:
+    """Intent: CONTRACT — AC4.4 (T-050-151 review LOW 1): the invalid slug leaves the quoted
+    command; a flag value spelled the same stays with its flag."""
+    done = _run(script, "new", "Bad", "--title", "Bad", "--specs", str(_specs(tmp_path)))
+    (fix,) = _fix_lines(done)
+    assert " new --title Bad --specs " in fix.split("`")[1], fix
 
 
 def test_new_names_the_live_entries_it_relates_to(script: Path, tmp_path: Path) -> None:
@@ -224,9 +237,52 @@ def test_delivered_outside_the_release_origin_is_refused(
         "--disposition", "delivered", "--release", release,
     )  # fmt: skip
     assert done.returncode == 1
-    assert len(_fix_lines(done)) == 1 and "rejected" not in _fix_lines(done)[0]
+    [fix] = _fix_lines(done)
+    assert "rejected" not in fix and "<" not in fix  # ADR 0158: no placeholder
     assert len(_active(specs)) == 1
     assert _histo(specs) == []
+
+
+def test_the_refusal_fix_names_the_latest_picking_release_by_version(
+    script: Path, tmp_path: Path
+) -> None:
+    """Review F8: 0.10.0 is later than 0.9.0, though it sorts before it as text."""
+    specs = _specs(tmp_path)
+    _run(script, "new", "an-idea", "--specs", str(specs))
+    for release in ("0.9.0", "0.10.0"):
+        (specs / f"releases/{release}/rc-1").mkdir(parents=True)
+        (specs / f"releases/{release}/rc-1/SPEC.md").write_text("**Origin:** backlog:an-idea\n")
+    done = _run(
+        script, "exit", "an-idea", "--specs", str(specs),
+        "--disposition", "delivered", "--release", "9.9.9",
+    )  # fmt: skip
+    [fix] = _fix_lines(done)
+    assert fix.split(" --specs ")[0].endswith("--disposition delivered --release 0.10.0")
+
+
+@pytest.mark.parametrize(
+    ("origin", "code"),
+    [
+        ("**Origin:** operator-demand\n**Origin:** backlog:an-idea", 1),
+        ("**Origin:** backlog:an-idea; bugs:a-bug", 0),
+    ],
+    ids=["a-second-origin-line-does-not-count", "a-multi-clause-line-parses"],
+)
+def test_exit_reads_origin_through_the_release_parser(
+    script: Path, tmp_path: Path, origin: str, code: int
+) -> None:
+    """spec-origin-line-has-two-readers: only the first Origin line counts, and a
+    clause line parses (ADR 0161) — `exit` asks `release.py`'s one parser."""
+    specs = _specs(tmp_path)
+    _run(script, "new", "an-idea", "--specs", str(specs))
+    _pick(specs, "operator-demand")
+    spec = specs / "releases/0.4.7/rc-1/SPEC.md"
+    spec.write_text(spec.read_text("utf-8").replace("**Origin:** operator-demand", origin), "utf-8")
+    done = _run(
+        script, "exit", "an-idea", "--specs", str(specs),
+        "--disposition", "delivered", "--release", "0.4.7",
+    )  # fmt: skip
+    assert done.returncode == code, done.stdout + done.stderr
 
 
 def test_rejected_requires_a_reason(script: Path, tmp_path: Path) -> None:
@@ -234,6 +290,8 @@ def test_rejected_requires_a_reason(script: Path, tmp_path: Path) -> None:
     _run(script, "new", "an-idea", "--specs", str(specs))
     done = _run(script, "exit", "an-idea", "--specs", str(specs), "--disposition", "rejected")
     assert done.returncode == 1
+    [fix] = _fix_lines(done)
+    assert fix.startswith("fix: Operator action:") and "--disposition rejected" in fix
     assert len(_active(specs)) == 1
     ok = _run(
         script, "exit", "an-idea", "--specs", str(specs),
@@ -243,17 +301,68 @@ def test_rejected_requires_a_reason(script: Path, tmp_path: Path) -> None:
     assert _histo(specs)[0]["reason"] == "no release ever took it"
 
 
-def test_exit_refuses_a_disposition_outside_the_backlog_vocabulary(
-    script: Path, tmp_path: Path
+@pytest.mark.parametrize(
+    ("disposition", "evidence"),
+    [("superseded", ["--release", "9.9.9"]), ("rejected", []), ("to-bug", [])],
+)
+def test_each_refusal_fix_keeps_the_chosen_disposition(
+    script: Path, tmp_path: Path, disposition: str, evidence: list[str]
 ) -> None:
+    """T-050-138 review F1: a picked entry refused for its evidence gets the fix of THAT
+    evidence row — never a `delivered` exit the operator did not choose (#B5 class).
+    A runnable fix runs as printed and exits under the chosen disposition (ADR 0158)."""
     specs = _specs(tmp_path)
     _run(script, "new", "an-idea", "--specs", str(specs))
+    _pick(specs)
     done = _run(
-        script, "exit", "an-idea", "--specs", str(specs), "--disposition", "resolved",
-        "--reason", "r",
-    )  # fmt: skip
+        script, "exit", "an-idea", "--specs", str(specs), "--disposition", disposition, *evidence
+    )
     assert done.returncode == 1
+    [fix] = _fix_lines(done)
+    assert "delivered" not in fix and "<" not in fix
+    if fix.startswith("fix: Operator action:"):
+        assert f"--disposition {disposition}" in fix
+        assert ("bugs.py append" in fix) == (disposition == "to-bug")
+        assert _histo(specs) == []
+        return
+    ran = subprocess.run(shlex.split(fix.removeprefix("fix: ")), capture_output=True, check=False)
+    assert ran.returncode == 0, ran.stderr
+    assert [r["disposition"] for r in _histo(specs)] == [disposition]
+
+
+def test_a_deferred_exit_is_refused_and_the_entry_stays_live(script: Path, tmp_path: Path) -> None:
+    """Operator ruling 2026-10-01 (T-050-138 review F4): `deferred` is no backlog word —
+    a postponed item stays in active[] and needs no exit; nothing is written."""
+    specs = _specs(tmp_path)
+    _run(script, "new", "an-idea", "--specs", str(specs))
+    _pick(specs)
+    done = _run(script, "exit", "an-idea", "--specs", str(specs), "--disposition", "deferred")
+    assert done.returncode == 1
+    assert _fix_lines(done) == [
+        "fix: Operator action: a postponed item stays in active[] and needs no exit."
+    ]
     assert len(_active(specs)) == 1
+    assert _histo(specs) == []
+
+
+@pytest.mark.parametrize(("bug", "code"), [("a-bug", 0), ("no-such-bug", 1)])
+def test_to_bug_exits_only_into_a_registered_bug(
+    script: Path, tmp_path: Path, bug: str, code: int
+) -> None:
+    """AC3.12 (ADR 0137): `to-bug` exits when --reason names a BUGS.jsonl record, an
+    unknown id is refused with nothing written, and `check` accepts the record."""
+    specs = _specs(tmp_path)
+    _run(script, "new", "an-idea", "--specs", str(specs))
+    (specs / "bugs").mkdir()
+    (specs / "bugs" / "BUGS.jsonl").write_text(json.dumps({"id": "a-bug"}) + "\n", "utf-8")
+    done = _run(
+        script, "exit", "an-idea", "--specs", str(specs), "--disposition", "to-bug",
+        "--reason", bug,
+    )  # fmt: skip
+    assert done.returncode == code, done.stdout + done.stderr
+    assert len(_active(specs)) == code
+    assert [r["reason"] for r in _histo(specs)] == [bug] * (1 - code)
+    assert _run(script, "check", "--specs", str(specs)).returncode == 0
 
 
 def test_new_and_exit_refuse_a_value_the_push_refuses(script: Path, tmp_path: Path) -> None:
@@ -293,21 +402,25 @@ def test_check_reports_a_duplicate_active_id(script: Path, tmp_path: Path) -> No
     assert "duplicate" in lines[0]
 
 
-def test_check_reports_a_terminal_status_in_active(script: Path, tmp_path: Path) -> None:
+@pytest.mark.parametrize("status", ["delivered", "to-bug"])
+def test_check_reports_a_terminal_status_in_active(
+    script: Path, tmp_path: Path, status: str
+) -> None:
+    """T-050-138 review F2: every disposition is terminal, `to-bug` included."""
     specs = _specs(
         tmp_path,
         {
             "id": "gone",
             "title": "t",
             "opened": "2026-09-20",
-            "status": "delivered",
+            "status": status,
             "description": "d",
             "provenance": "operator request",
         },  # fmt: skip
     )
     done = _run(script, "check", "--specs", str(specs))
     assert done.returncode == 1
-    assert "delivered" in done.stdout
+    assert status in done.stdout
 
 
 def test_check_reports_a_missing_required_field(script: Path, tmp_path: Path) -> None:

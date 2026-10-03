@@ -117,9 +117,16 @@ _SET_HOME: dict[str, str] = {
     "gitflow-role": "dadaia_workspace/core/gitflow.py",
 }
 
-#: AC6.5 allowance for the widened sets (born 2026-09-27 at 8): each second list,
+#: AC6.5 allowance for the widened sets (birth keys pinned at T-050-135): each second list,
 #: keyed ``file`` -> the open bug that deletes it.
-_SECOND_LIST_BIRTH = 8
+_SECOND_LIST_BIRTH = frozenset(  # its keys at T-050-135; the allowance only shrinks
+    {
+        "dadaia_workspace/public/skills/dd-audit-project/scripts/_audit_check.py",
+        "dadaia_workspace/public/skills/dd-backlog-definition/scripts/_backlog_schema.py",
+        "dadaia_workspace/public/skills/dd-bug-resolution/scripts/_bugs_check.py",
+        "dadaia_workspace/public/skills/dd-release-implementation/scripts/_release_schema.py",
+    }
+)
 _SECOND_LIST_ALLOWANCE: dict[str, str] = {
     "dadaia_workspace/public/skills/dd-audit-project/scripts/_audit_check.py": _PARITY,
     "dadaia_workspace/public/skills/dd-backlog-definition/scripts/_backlog_schema.py": _PARITY,
@@ -287,12 +294,6 @@ def test_a_planted_second_list_of_a_widened_set_trips() -> None:
     assert len(_second_list_hits(tree, zone_names(), frozenset({"gitflow-role", "trio"}))) == 0
 
 
-#: AC6.1 allowance (born 2026-09-27 at 16): law files restating a set, ``path:set`` ->
-#: the open bug that makes them cite the authority instead.
-_RESTATED_LAW_BIRTH = 16
-_RESTATED_LAW_ALLOWANCE: dict[str, str] = {}
-
-
 def _restating_law_files() -> set[str]:
     """``path:set`` for every ``public/**/*.md`` (archives aside) holding a line that
     restates a canonical set."""
@@ -310,11 +311,8 @@ def _restating_law_files() -> set[str]:
 def test_the_law_source_never_restates_a_canonical_set() -> None:
     """No law line spells out a canonical set: §5.1 (root), §5.3 (repo exclusions) and
     §6.2 (specs canon) carry placeholders ``public stage`` fills from the registry, and
-    every other ``public/**/*.md`` restatement is keyed to the bug that removes it."""
-    problems = _allowance_violations(
-        _restating_law_files(), _RESTATED_LAW_ALLOWANCE, birth=_RESTATED_LAW_BIRTH
-    )
-    assert problems == [], "\n".join(problems)
+    every other ``public/**/*.md`` restatement is gone (AC6.1's allowance drained)."""
+    assert _restating_law_files() == set()
 
 
 def test_a_planted_law_line_restating_a_small_set_trips() -> None:

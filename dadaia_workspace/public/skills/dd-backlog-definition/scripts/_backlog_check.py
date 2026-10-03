@@ -18,6 +18,7 @@ from typing import Any
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
+import _ledger  # noqa: E402
 from _backlog_schema import (  # noqa: E402
     CODE,
     DISPOSITIONS,
@@ -26,11 +27,17 @@ from _backlog_schema import (  # noqa: E402
     LEDGER,
     TERMINAL,
 )
-from _ledger import load_schema, validate  # noqa: E402
+from _ledger import SPECS, load_schema, validate  # noqa: E402
 
 
-def finding(path: str, line: int, message: str) -> dict[str, Any]:
-    return {"code": CODE, "verdict": "error", "path": path, "line": line, "message": message}
+def finding(
+    path: str, line: int, message: str, root: Path, at: int | str | None = None
+) -> dict[str, Any]:
+    """*at* labels a BACKLOG.json finding (an entry or key); a histo finding is its line."""
+    verbs = "`backlog.py exit`" if path == HISTO else "`backlog.py new` or `backlog.py exit`"
+    law = "specs/backlog/AGENTS.md: never hand-edit BACKLOG.json"
+    fix = _ledger.unwritten(root / path, line if at is None else at, verbs, law)
+    return _ledger.finding(CODE, path, line, message, fix)
 
 
 def _item_errors(item: dict[str, Any]) -> Iterator[str]:
@@ -46,30 +53,31 @@ def _item_errors(item: dict[str, Any]) -> Iterator[str]:
         yield f"entry {slug!r} is {status!r}, past 'idea', and binds no typed intents[]"
 
 
-def document_findings(text: str) -> list[dict[str, Any]]:
+def document_findings(text: str, root: Path = SPECS) -> list[dict[str, Any]]:
     """Every finding ``BACKLOG.json``'s *text* carries. ``line`` is the 1-based position
     in ``active[]`` for an entry finding, 1 for a whole-document one."""
     try:
         document = json.loads(text)
     except json.JSONDecodeError as exc:
-        return [finding(LEDGER, exc.lineno, f"document is not valid JSON: {exc.msg}")]
+        return [finding(LEDGER, exc.lineno, f"document is not valid JSON: {exc.msg}", root,
+                        f"its JSON syntax (line {exc.lineno})")]  # fmt: skip
     schema = load_schema("backlog-v1")
-    findings = [finding(LEDGER, 1, m) for m in validate(document, schema, schema, "document")]
-    if findings:
-        return findings
+    if messages := list(validate(document, schema, schema, "document")):
+        return [finding(LEDGER, 1, "; ".join(messages), root, _ledger.NAMED)]
+    findings: list[dict[str, Any]] = []
     seen: dict[str, int] = {}
     for index, item in enumerate(document["active"], start=1):
-        for message in _item_errors(item):
-            findings.append(finding(LEDGER, index, message))
-        first = seen.setdefault(str(item["id"]), index)
-        if first != index:
+        errors = list(_item_errors(item))
+        if (first := seen.setdefault(str(item["id"]), index)) != index:
+            errors.append(f"duplicate active[] id {item['id']!r} (first at #{first})")
+        if errors:
             findings.append(
-                finding(LEDGER, index, f"duplicate active[] id {item['id']!r} (first at #{first})")
+                finding(LEDGER, index, "; ".join(errors), root, f"entry {item['id']!r}")
             )
     return findings
 
 
-def histo_findings(text: str) -> list[dict[str, Any]]:
+def histo_findings(text: str, root: Path = SPECS) -> list[dict[str, Any]]:
     """Every finding the append-only exit ledger carries: the one histo-record-v1 shape,
     this ledger's terminal subset, and one line per id, ever."""
     schema = load_schema("histo-record-v1")
@@ -81,36 +89,26 @@ def histo_findings(text: str) -> list[dict[str, Any]]:
         try:
             record = json.loads(raw)
         except json.JSONDecodeError as exc:
-            findings.append(finding(HISTO, number, f"line is not valid JSON: {exc.msg}"))
+            findings.append(finding(HISTO, number, f"line is not valid JSON: {exc.msg}", root))
             continue
         messages = list(validate(record, schema, schema, "record"))
-        findings.extend(finding(HISTO, number, message) for message in messages)
+        if not messages and record["disposition"] not in DISPOSITIONS:
+            messages.append(f"disposition {record['disposition']!r} is not one of this "
+                            f"ledger's terminal words {list(DISPOSITIONS)}")  # fmt: skip
+        if not messages and (first := seen.setdefault(str(record["id"]), number)) != number:
+            messages.append(f"{record['id']!r} exits twice (first at line {first})")
         if messages:
-            continue
-        if record["disposition"] not in DISPOSITIONS:
-            findings.append(
-                finding(
-                    HISTO,
-                    number,
-                    f"disposition {record['disposition']!r} is not one of this ledger's "
-                    f"terminal words {list(DISPOSITIONS)}",
-                )
-            )
-        first = seen.setdefault(str(record["id"]), number)
-        if first != number:
-            findings.append(
-                finding(HISTO, number, f"{record['id']!r} exits twice (first at line {first})")
-            )
+            findings.append(finding(HISTO, number, "; ".join(messages), root))
     return findings
 
 
 def check(specs: Path) -> list[dict[str, Any]]:
     """Validate both committed files; a young specs tree with neither is not a finding."""
     document, histo = (p.read_text(encoding="utf-8") if p.is_file() else "" for p in (specs / LEDGER, specs / HISTO))  # fmt: skip
-    return pair_findings(document or None, histo)
+    return pair_findings(document or None, histo, specs.resolve())
 
 
-def pair_findings(document: str | None, histo: str) -> list[dict[str, Any]]:
+def pair_findings(document: str | None, histo: str, root: Path = SPECS) -> list[dict[str, Any]]:
     """The pair's findings — the check every write runs over its candidate bytes first.
 
     The cross-file invariant is the point of judging them together: a slug that already
@@ -119,11 +117,11 @@ def pair_findings(document: str | None, histo: str) -> list[dict[str, Any]]:
     findings: list[dict[str, Any]] = []
     live: dict[str, int] = {}
     if document is not None:
-        findings += document_findings(document)
+        findings += document_findings(document, root)
         if not findings:
             live = {str(i["id"]): n for n, i in enumerate(json.loads(document)["active"], start=1)}
     if histo:
-        broken = histo_findings(histo)
+        broken = histo_findings(histo, root)
         findings += broken
         for number, raw in enumerate([] if broken else histo.split("\n"), start=1):
             exited = json.loads(raw).get("id") if raw.strip() else None
@@ -134,6 +132,7 @@ def pair_findings(document: str | None, histo: str) -> list[dict[str, Any]]:
                         number,
                         f"{exited!r} exited at this line but is still live in active[] "
                         f"(#{live[exited]}) — an exit is once-only and terminal",
+                        root,
                     )
                 )
     return findings

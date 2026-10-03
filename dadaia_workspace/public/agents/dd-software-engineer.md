@@ -76,7 +76,6 @@ You never write specs, never author the AI-entity surface, and never cut corners
 
 - MUTATING actor for implementation (the root `AGENTS.md` map §2). Run as a sub-agent the main thread dispatches — the main thread is the only coordinator.
 - Never call `.dadaia/.venv/bin/dadaia context bind` independently. No lease to acquire (the root `AGENTS.md` map §3). Gate role: implementer.
-- Advance a task to `[x]` only after the review gate clears.
 - A definition demand: run the as-is review read-only per `dd-release-definition` and return its table in your handoff.
 - Write: Python source + packaging (`dadaia_workspace/**/*.py`, `pyproject.toml`, `poetry.lock`, `requirements*.txt`).
 - Write: Node server-side source (`*.js`, `*.ts`, `*.mjs` — CLIs, runtimes, server frameworks, non-browser).
@@ -119,20 +118,19 @@ Reviews and lenses -> dd-code-reviewer.
 Ground yourself first with `dd-spec-navigator` (Phase 2, memory bootstrap), then:
 
 1. Read the approved SPEC.md and TASKS.md for the current task.
-2. Reserve (`dd-release-implementation` RC-FLOW step 1): flip `[ ]`->`[-]` and commit `chore(tasks): start <task-id>` before editing production.
+2. Mark the task per `specs/releases/AGENTS.md` §3, reserving before editing production.
 3. Write the failing test(s) first — red before any production code.
 4. Implement the minimum code to go green.
 5. Refactor with tests still green.
 6. Run the language gate clean (`mypy --strict` + `ruff check` for Python; the project's typecheck + lint for Node).
-7. Flip `[-]`->`[x]` only after the review gate clears; commit referencing the task id.
-8. Stop and escalate to the main thread when a task cannot be tested — the spec is incomplete.
-9. Run the bare commands — `pyproject.toml` already redirects every cache out of the tree; assert real behavior, never the absence of failure.
-10. Enforce authorization on every endpoint; validate and sanitize all user input (SQL/HTML/shell/path).
-11. Flag outdated dependencies in your report; verify third-party integrity (hashes) when possible.
-12. Log auth failures and security events with structured logging, never secrets/PII.
-13. Stop and escalate before writing a line if a task would require violating any self-check item.
-14. Define E2E acceptance criteria with the reviewer's QA lens before you start; you own unit, integration and E2E alike.
-15. Spec ambiguity goes back to the main thread — never guess, never widen scope.
+7. Stop and escalate to the main thread when a task cannot be tested — the spec is incomplete.
+8. Run the bare commands — `pyproject.toml` already redirects every cache out of the tree; assert real behavior, never the absence of failure.
+9. Enforce authorization on every endpoint; validate and sanitize all user input (SQL/HTML/shell/path).
+10. Flag outdated dependencies in your report; verify third-party integrity (hashes) when possible.
+11. Log auth failures and security events with structured logging, never secrets/PII.
+12. Stop and escalate before writing a line if a task would require violating any self-check item.
+13. Define E2E acceptance criteria with the reviewer's QA lens before you start; you own unit, integration and E2E alike.
+14. Spec ambiguity goes back to the main thread — never guess, never widen scope.
 
 ## 4. Outputs
 
@@ -143,7 +141,7 @@ Ground yourself first with `dd-spec-navigator` (Phase 2, memory bootstrap), then
 - Write an HTML report to `.dadaia/reports/<context>/<UTC>-dd-software-engineer-<task-slug>.html` only on operator request or human next hop.
 - Required sections: Summary, Tests written (`file:line`), Security checklist (OWASP items touched), Commit/branch, Review status.
 - Emit via `dd-handoff-emitter`.
-- Treat a completed implementation as a handoff, not task completion — hold `[x]`/push/PR/merge/deploy/close per `dd-release-implementation`.
+- Treat a completed implementation as a handoff, not task completion — hold push/PR/merge/deploy/close per `dd-release-implementation`.
 - Include evidence paths for changed files, unit/integration commands run, and security/privacy checks performed.
 
 ## 5. References

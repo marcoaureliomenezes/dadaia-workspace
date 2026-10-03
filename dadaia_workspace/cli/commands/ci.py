@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import subprocess
 import sys
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable
 from dataclasses import replace
 from pathlib import Path
 
@@ -96,11 +96,13 @@ def _no_canon_violations(paths: Iterable[str]) -> list[str]:
     return []
 
 
-def _gate_inputs(repo_root: Path, head: str) -> tuple[Gitflow, GateFixes]:
+def _gate_inputs(repo_root: Path, head: str) -> tuple[Gitflow, GateFixes, Callable[[str], bool]]:
     """The gitflow through the ONE reader (ADR 0048: committed first, one warning on the
-    default; an associated repo reads its owner's main repo) and the fix inputs: the repo,
-    the live work branch by the ONE rule (cut locally or not) and HEAD's branch."""
+    default; an associated repo reads its owner's main repo), the fix inputs (the repo,
+    the live work branch by the ONE rule, cut locally or not, and HEAD's branch) and the
+    ADR 0151 M3 citation judge over the committed ADR ledger, resolved the same way."""
     from dadaia_workspace.container import build_git_client
+    from dadaia_workspace.features.specs.doctor_adr import cites_an_accepted_adr
 
     git = build_git_client()
     workspace = resolve_workspace_root_for_cli(repo_root)
@@ -111,7 +113,12 @@ def _gate_inputs(repo_root: Path, head: str) -> tuple[Gitflow, GateFixes]:
         typer.echo(f"[pre-push] WARNING: {warning}", err=True)
     work = work_branch(repo_root / "specs", gitflow)
     cut = bool(git.git(repo_root, "for-each-ref", "--format=%(refname)", f"refs/heads/{work}"))
-    return gitflow, GateFixes(repo=str(repo_root), work=work, cut=cut, head=head)
+    rel = "specs/ADRs/decisions.jsonl"
+    ledger = git.committed_text(repo_root, rel)
+    if ledger is None and main is not None:
+        ledger = git.committed_text(main, rel)
+    fixes = GateFixes(repo=str(repo_root), work=work, cut=cut, head=head)
+    return gitflow, fixes, cites_an_accepted_adr(ledger)
 
 
 @app.command("push-gate-check")
@@ -162,7 +169,7 @@ def push_gate_check() -> None:
         replace(r, local_ref=f"refs/heads/{branch}") if r.local_ref == "HEAD" and branch else r
         for r in refs
     ]
-    gitflow, fixes = _gate_inputs(repo_root, branch)
+    gitflow, fixes, cites = _gate_inputs(repo_root, branch)
     # The pushed commit's tree state, never the checkout's; foreign/v6 carry no v6 canon.
     sha = next((r.local_sha for r in refs if not r.is_deletion), "HEAD")
     canon_fn = canon_violations
@@ -179,6 +186,7 @@ def push_gate_check() -> None:
         object_source=build_git_object_reader(),
         repo=repo_root,
         canon_violations_fn=canon_fn,
+        cites_accepted_adr=cites,
         gitflow=gitflow,
         fixes=fixes,
         malformed_lines=malformed,

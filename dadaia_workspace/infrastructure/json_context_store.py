@@ -7,6 +7,7 @@ one — v3 only adds ``associated_repos``, which ``_from_dict`` defaults to empt
 import json
 from pathlib import Path
 
+from dadaia_workspace.core import context_registry
 from dadaia_workspace.core.atomic_write import atomic_write
 from dadaia_workspace.core.cli_line import fix_line
 from dadaia_workspace.core.exceptions import SchemaVersionError
@@ -41,14 +42,13 @@ def parse_schema_version(data: dict, path: Path) -> int:  # type: ignore[type-ar
 
 
 def _load(path: Path) -> dict:  # type: ignore[type-arg]
-    """Load spec_contexts.json; a v1 registry refuses with the one ``migrate --yes`` fix."""
-    if not path.exists():
-        return {"schema_version": str(_VERSION), "contexts": []}
-    data = json.loads(path.read_text(encoding="utf-8"))
+    """Load spec_contexts.json through the one parse; a v1 registry refuses with the one
+    ``migrate --yes`` fix."""
+    data = context_registry.read(path)
     if parse_schema_version(data, path) < 2:
         problem = "spec_contexts.json holds v1 rows (ativo/inativo or schema_version < 2)."
         raise SchemaVersionError(problem, fix_line(path.parents[2], "migrate", "--yes"))
-    return data  # type: ignore[no-any-return]
+    return data
 
 
 def _to_dict(ctx: SpecContextProject) -> dict:  # type: ignore[type-arg]

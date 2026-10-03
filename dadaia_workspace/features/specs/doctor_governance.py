@@ -1,8 +1,7 @@
-"""Governance validator: bug archive age, known bug ids.
+"""Governance validator: bug archive age.
 
 Single-responsibility sibling of the SpecsDoctor coordinator: the archive-overdue signal
-(SPEC-DOC-041) and the bug ids SPEC-DOC-048 cites. Leaf-only: imports the shared leaves + core, never a sibling
-validator.
+(SPEC-DOC-041). Leaf-only: imports the shared leaves + core, never a sibling validator.
 
 **Whether a bug record is valid is not asked here.** `bugs.py check` is the one
 validator (the doctor re-emits it as LEDGER-BUGS-SCHEMA); this module reads raw JSON
@@ -11,14 +10,13 @@ lines and skips any it cannot read.
 
 from __future__ import annotations
 
-import json
-from collections.abc import Iterator
+from contextlib import suppress
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from typing import Any
 
 from dadaia_workspace.core.doctor_rules import SectionFinding
 from dadaia_workspace.features.specs.doctor_types import Severity, specs_finding
+from dadaia_workspace.infrastructure.ledger_scripts import load_owner
 
 #: `bugs.py archive`'s own default ``--threshold-days``.
 _ARCHIVE_THRESHOLD_DAYS = 90
@@ -34,36 +32,25 @@ def _parse_ts(value: str) -> datetime | None:
 
 
 class GovernanceValidator:
-    """Bug governance: bug archive age, known bug ids."""
+    """Bug governance: bug archive age."""
 
     def __init__(self, specs_dir: Path, public_dir: Path | None = None) -> None:
         self.specs_dir = specs_dir
         self.public_dir = public_dir
         self._ledger = specs_dir / "bugs" / "BUGS.jsonl"
 
-    def _bug_lines(self) -> Iterator[dict[str, Any]]:
-        """Every ledger line that is a JSON object; the rest is `bugs.py check`'s."""
-        if not self._ledger.is_file():
-            return
-        for raw in self._ledger.read_text(encoding="utf-8").split("\n"):
-            try:
-                record = json.loads(raw)
-            except ValueError:
-                continue
-            if isinstance(record, dict):
-                yield record
-
-    def known_bug_ids(self) -> frozenset[str]:
-        """The id of every line, whatever its status or validity — SPEC-DOC-048 judges
-        membership in the ledger, never liveness."""
-        return frozenset(str(r["id"]) for r in self._bug_lines() if "id" in r)
-
     def check_bug_archive_overdue(self, *, now: datetime | None = None) -> list[SectionFinding]:
         """SPEC-DOC-041 — WARN when a record closed (``closed_at``, never the filing date
         ``ts``) longer ago than the archive threshold is still live. Never a block."""
         cutoff = (now or datetime.now(tz=UTC)) - timedelta(days=_ARCHIVE_THRESHOLD_DAYS)
         issues: list[SectionFinding] = []
-        for record in self._bug_lines():
+        owner = load_owner("dd-bug-resolution", "_ledger")
+        text = self._ledger.read_text(encoding="utf-8") if self._ledger.is_file() else ""
+        records = []
+        for raw in text.split("\n"):  # an unreadable line is `bugs.py check`'s finding
+            with suppress(owner.LineError):
+                records += owner.parse(raw)
+        for record in records:
             closed_at = record.get("closed_at")
             moment = _parse_ts(closed_at) if isinstance(closed_at, str) else None
             if moment is not None and moment < cutoff:

@@ -7,9 +7,9 @@ three verbs did not, and their fix lines failed review round after round, one si
 time. Each case below builds the triggering state over ``file://`` remotes and hits the
 refusal: a push-gate case feeds the ref lines git hands its hook to an in-process
 ``ci push-gate-check`` (80 columns, no TTY); a baseline/alive/dead case runs the real
-command as a child process. It takes the single ``fix:`` line, fills its documented
-``<placeholders>``, runs it with ``sh -c`` and runs the real command (the real push through
-the shipped hook) again. One line without a TTY — every family prints through
+command as a child process. It takes the single ``fix:`` line and runs it with ``sh -c`` —
+an ``Operator action:`` line is played by the case's *operator* instead (ADR 0158) — and
+runs the real command (the real push through the shipped hook) again. One line without a TTY — every family prints through
 ``cli/_fail.fail`` — is proven on a real child by
 :func:`test_every_fix_line_prints_on_one_line_without_a_tty`. Progress rule:
 the command then succeeds, or refuses with a DIFFERENT fix line (the next step), which is
@@ -35,7 +35,7 @@ import sys
 import sysconfig
 from collections import Counter
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 
 import pytest
@@ -43,13 +43,16 @@ from typer.testing import CliRunner
 
 from dadaia_workspace.cli.main import app
 from dadaia_workspace.core.cli_line import cli_path, fix_line, shell_line
+from dadaia_workspace.core.gitflow import DEFAULT, work_branch
 from dadaia_workspace.core.models.spec_context import (
+    AssociatedRepo,
     ContextState,
     SpecContextProject,
 )
 from dadaia_workspace.core.specs_version import CANONICAL_SPECS_VERSION
 from dadaia_workspace.features.spec_context.service import git_hooks_dir, install_git_hooks
 from dadaia_workspace.infrastructure.json_context_store import JsonContextStore
+from tests.conftest import GIT_QUIET_INCLUDE
 from tests.helpers.privacy_fixtures import aws_key_shape
 
 pytestmark = [
@@ -60,12 +63,6 @@ pytestmark = [
 
 _PKG = Path(__file__).resolve().parents[2] / "dadaia_workspace"
 _TERM = "zorblaxquux"
-_FILLS = {
-    "<M.m.p>": "1.0.0",
-    "<user.name>": "T",
-    "<user.email>": "t@example.invalid",
-    "<other-name>": "kept",
-}
 
 
 def _constitution(
@@ -83,7 +80,6 @@ _UNSET = (
     "LINES",
     "DADAIA_CONTEXT",
     "DADAIA_SESSION_ID",
-    "DADAIA_BIN",
     "GIT_AUTHOR_NAME",
     "GIT_AUTHOR_EMAIL",
     "GIT_COMMITTER_NAME",
@@ -141,6 +137,7 @@ class World:
         self.elsewhere.mkdir(parents=True)
         (self.ws / "repos").mkdir(parents=True)
         (self.ws / ".dadaia" / "states").mkdir(parents=True)
+        (self.ws / ".dadaia" / "states" / "spec_contexts.json").write_text('{"contexts": []}')
         self.env = {k: v for k, v in os.environ.items() if k not in _UNSET}
         self.env.update(
             GIT_CONFIG_GLOBAL=str(tmp / "gitconfig"),
@@ -148,7 +145,7 @@ class World:
             TERM="dumb",
         )
         (tmp / "gitconfig").write_text(
-            "[user]\n\tname = T\n\temail = t@example.invalid\n\tuseConfigOnly = true\n"
+            f"{GIT_QUIET_INCLUDE}[user]\n\tname = T\n\temail = t@example.invalid\n\tuseConfigOnly = true\n"
             "[init]\n\tdefaultBranch = main\n",
             encoding="utf-8",
         )
@@ -172,7 +169,6 @@ class World:
                 "proj", ContextState.ALIVE, "proj", self.bare.as_uri(), "2026-01-01T00:00:00+00:00"
             )
         )
-        self.fills = {**_FILLS, "<clone-url>": self.bare.as_uri(), "<keep-dir>": str(tmp / "kept")}
 
     def adopt(self, prefix: Callable[[World], None]) -> None:
         """Run *prefix* on this fresh world — as a copy of the module's template world when
@@ -206,15 +202,19 @@ class World:
     def cli(self, *argv: str) -> subprocess.CompletedProcess[str]:
         return self.run([str(cli_path(self.ws)), *argv], self.elsewhere)
 
-    def seed(self, constitution: str | None = None, *branches: str) -> None:
+    def seed(self, constitution: str | None = None, *branches: str, live: str = "") -> None:
         """The bare remote carries *branches* (default ``main`` then ``develop``), each at
-        one commit holding a README and, when given, ``specs/constitution.md``."""
+        one commit holding a README and, when given, ``specs/constitution.md`` and the
+        *live* release's ``_RELEASE.json``."""
         src = self.tmp / "seed"
         self.git(self.tmp, "init", "-q", str(src))
         (src / "README.md").write_text("r\n", encoding="utf-8")
         if constitution is not None:
             (src / "specs").mkdir()
             (src / "specs" / "constitution.md").write_text(constitution, encoding="utf-8")
+        if live:
+            (src / "specs" / "releases" / live).mkdir(parents=True)
+            (src / "specs" / "releases" / live / "_RELEASE.json").write_text("{}\n")
         self.git(src, "add", "-A")
         self.git(src, "commit", "-qm", "seed")
         for branch in branches or ("main", "develop"):
@@ -263,7 +263,7 @@ def _single_fix(done: subprocess.CompletedProcess[str]) -> str:
 class Case:
     """*build* plants the refusal and returns the command that hits it (argv, or a shell
     line run in the repo); *operator* is the documented human step the refusal text asks
-    for before its fix (an edit); *then* replaces the re-run when the fix renames what the
+    for before its fix (an edit), or the act an ``Operator action:`` fix names; *then* replaces the re-run when the fix renames what the
     refused command named; *done* asserts the published end state."""
 
     build: Callable[[World], list[str] | str]
@@ -318,14 +318,12 @@ def _drive(world: World, case: Case) -> None:
         fix = _single_fix(done)
         assert fix not in seen, f"no progress — the same fix line again:\n{fix}"
         seen.append(fix)
-        if step == 0 and case.operator is not None:
+        act = fix.startswith("Operator action: ")
+        if case.operator is not None and (act or step == 0):
             case.operator(world)
-        line = fix
-        for placeholder, value in world.fills.items():
-            line = line.replace(placeholder, value)
-        assert "<" not in line.replace("<<", ""), f"an undocumented placeholder: {line}"
-        ran = world.run(line, world.elsewhere)  # a fix line runs from any cwd
-        assert ran.returncode == 0, f"the fix does not run:\n{line}\n{ran.stdout}{ran.stderr}"
+        assert "<" not in fix.replace("<<", ""), f"a placeholder: {fix}"
+        ran = None if act else world.run(fix, world.elsewhere)  # a fix line runs from any cwd
+        assert ran is None or ran.returncode == 0, f"the fix does not run:\n{fix}\n{ran}"
         if case.replaces and step == 0:
             case.done(world)
             return
@@ -342,6 +340,13 @@ def _drive(world: World, case: Case) -> None:
 @_template
 def _published(world: World) -> None:
     world.seed(_constitution())
+    world.clone()
+
+
+@_template
+def _released(world: World) -> None:
+    """Published, with a live release: the work branch is the rule's, never its fallback."""
+    world.seed(_constitution(), live="1.0.0")
     world.clone()
 
 
@@ -413,15 +418,18 @@ def _baseline_done(
 
 
 def _malformed(world: World) -> str:
-    _published(world)
-    world.commit("notes.md", "n\n", branch="feature/1.0.0")
+    _released(world)
+    world.commit("notes.md", "n\n", branch=_work(world))
     return f"printf 'not a ref line\\n' | {fix_line(world.ws, 'ci', 'push-gate-check')}"
 
 
-def _work_pushed(world: World) -> None:
-    assert world.remote_heads().get("feature/1.0.0") == world.git(
-        world.repo, "rev-parse", "feature/1.0.0"
-    )
+def _work(world: World) -> str:
+    """The live work branch by the ONE rule (sa-live-work-branch-named-three-ways)."""
+    return work_branch(world.repo / "specs", DEFAULT)
+
+
+def _work_pushed(world: World, work: str = "feature/1.0.0") -> None:
+    assert world.remote_heads().get(work) == world.git(world.repo, "rev-parse", work)
 
 
 def _denylisted(world: World) -> str:
@@ -503,6 +511,58 @@ def _no_junk(world: World) -> None:
     assert "specs/junk.md" not in world.git(world.repo, "ls-tree", "-r", "--name-only", tip)
 
 
+def _law_deleted(world: World) -> str:
+    """law-deletion-refusal-reuses-the-denylist-rewrite-fix: the tip deletes a published
+    law line citing no ADR — the uncommit-amend remedy loops; the reword clears it."""
+    _published(world)
+    world.commit("AGENTS.md", "- keep\n- drop\n", branch="feature/1.0.0")
+    world.git(world.repo, "push", "-q", "origin", "feature/1.0.0")
+    world.commit("AGENTS.md", "- keep\n")
+    return "git push -q origin feature/1.0.0"
+
+
+def _cite_adr(world: World) -> None:
+    """Plays the printed act: the refusal named HEAD's commit and its law file."""
+    shown = _single_fix(_gate(world, "git push -q origin feature/1.0.0"))
+    assert f"reword commit {world.git(world.repo, 'rev-parse', 'HEAD')[:12]} " in shown
+    assert shown.endswith("deletion of AGENTS.md"), shown
+    world.git(world.repo, "commit", "-q", "--amend", "-m", "drop a law line (ADR 0151)")
+
+
+def _associated_law_deleted(world: World) -> list[str]:
+    """law-deletion-citation-accepts-any-adr-number: an associated repo (no specs/) cites
+    ADR 9999; its owner's committed ledger (a malformed line, 0001 accepted) refuses it —
+    through lib's real pre-push hook."""
+    _associated_on_integration(world)
+    world.commit("specs/ADRs/decisions.jsonl", 'not json\n{"id": "0001", "status": "accepted"}\n')
+    lib = world.ws / "repos" / "lib"
+    world.git(lib, "checkout", "-q", "--", ".")
+    world.git(lib, "checkout", "-q", "-b", "feature/1.0.0")
+    (lib / "AGENTS.md").write_text("- keep\n- drop\n", encoding="utf-8")
+    world.git(lib, "add", "AGENTS.md")
+    world.git(lib, "commit", "-qm", "law")
+    world.git(lib, "push", "-q", "origin", "feature/1.0.0")
+    (lib / "AGENTS.md").write_text("- keep\n", encoding="utf-8")
+    world.git(lib, "commit", "-qam", "drop (ADR 9999)")
+    return ["git", "-C", str(lib), "push", "-q", "origin", "feature/1.0.0"]
+
+
+def _cite_accepted_adr(world: World) -> None:
+    """Plays the printed act: the refusal named lib's HEAD and its law file."""
+    lib = world.ws / "repos" / "lib"
+    shown = _single_fix(world.run(["git", "push", "-q", "origin", "feature/1.0.0"], lib))
+    assert f"reword commit {world.git(lib, 'rev-parse', 'HEAD')[:12]} " in shown
+    assert shown.endswith("deletion of AGENTS.md"), shown
+    world.git(lib, "commit", "-q", "--amend", "-m", "drop (ADR 0001)")
+
+
+def _lib_pushed(world: World) -> None:
+    lib = world.ws / "repos" / "lib"
+    remote = world.git(world.tmp / "lib.git", "rev-parse", "feature/1.0.0")
+    assert remote == world.git(lib, "rev-parse", "HEAD")
+    assert "(ADR 0001)" in world.git(lib, "log", "-1", "--format=%s")
+
+
 def _denylisted_in_a_worktree(world: World) -> str:
     """Review H-B (P10): the pushing repo is a worktree under repos/<slug>/."""
     _published(world)
@@ -539,7 +599,9 @@ def _denylisted_no_context(world: World) -> str:
 def _no_identity(world: World) -> list[str]:
     world.clone()
     world.onboard()
-    (world.tmp / "gitconfig").write_text("[user]\n\tuseConfigOnly = true\n", encoding="utf-8")
+    (world.tmp / "gitconfig").write_text(
+        f"{GIT_QUIET_INCLUDE}[user]\n\tuseConfigOnly = true\n", encoding="utf-8"
+    )
     return ["context", "baseline", "proj"]
 
 
@@ -587,6 +649,25 @@ def _no_url_no_checkout(world: World) -> list[str]:
         SpecContextProject("proj", ContextState.DEAD, "proj", "", "2026-01-01T00:00:00+00:00")
     )
     return ["context", "alive", "proj"]
+
+
+def _identity(world: World) -> None:
+    for key, value in (("user.name", "T"), ("user.email", "t@example.invalid")):
+        world.git(world.repo, "config", key, value)
+
+
+def _origin(world: World) -> None:
+    world.git(world.repo, "remote", "add", "origin", world.bare.as_uri())
+
+
+def _clone(world: World) -> None:
+    world.git(world.tmp, "clone", "-q", world.bare.as_uri(), str(world.repo))
+
+
+def _create(world: World) -> None:
+    assert (
+        world.cli("context", "create", "proj", "--main-repo", world.bare.as_uri()).returncode == 0
+    )
 
 
 def _cloned(world: World) -> None:
@@ -692,7 +773,7 @@ def _commits_no_remote(world: World) -> list[str]:
 
 
 def _dirty_on_integration(world: World) -> list[str]:
-    _published(world)
+    _released(world)
     world.git(world.repo, "checkout", "-q", "develop")
     (world.repo / "README.md").write_text("edited\n", encoding="utf-8")
     return ["context", "dead", "proj"]
@@ -701,8 +782,36 @@ def _dirty_on_integration(world: World) -> list[str]:
 def _dead_via_work(world: World) -> None:
     heads = world.remote_heads()
     assert heads["develop"] == world.git(world.bare, "rev-parse", "main")
-    assert "feature/1.0.0" in heads
+    assert "feature/1.0.0" in heads  # the planted live release's work branch
     assert not world.repo.exists()
+
+
+def _associated_on_integration(world: World) -> list[str]:
+    """Review M4: an associated repo has no specs/ — its work branch is the main repo's."""
+    _released(world)
+    world.git(world.repo, "checkout", "-q", "-b", "feature/1.0.0", "origin/develop")
+    world.git(world.repo, "push", "-q", "-u", "origin", "feature/1.0.0")
+    lib, lib_bare = world.ws / "repos" / "lib", world.tmp / "lib.git"
+    world.git(world.tmp, "init", "-q", "--bare", "-b", "main", str(lib_bare))
+    world.git(world.tmp, "clone", "-q", lib_bare.as_uri(), str(lib))
+    (lib / "README.md").write_text("r\n", encoding="utf-8")  # no specs/ of its own
+    world.git(lib, "add", "README.md")
+    world.git(lib, "commit", "-qm", "r")
+    world.git(lib, "push", "-q", "origin", "HEAD:main", "HEAD:develop")
+    world.git(lib, "checkout", "-q", "-b", "develop", "--track", "origin/develop")
+    install_git_hooks(lib)
+    (lib / "README.md").write_text("edited\n", encoding="utf-8")
+    store = JsonContextStore(world.ws / ".dadaia" / "states")
+    ctx = store.get("proj")
+    assert ctx is not None
+    store.update(replace(ctx, associated_repos=(AssociatedRepo("lib", lib_bare.as_uri()),)))
+    return ["context", "dead", "proj"]
+
+
+def _associated_dead(world: World) -> None:
+    """dead-holds-main-repo-before-associated-push: every repo pushed before any is held."""
+    assert "feature/1.0.0" in world.git(world.tmp / "lib.git", "branch")
+    assert not world.repo.exists() and not (world.ws / "repos" / "lib").exists()
 
 
 def _dead_denylisted(world: World) -> list[str]:
@@ -716,7 +825,9 @@ def _dead_no_identity(world: World) -> list[str]:
     """SA-H3-2: dead's auto-sync commit needs git's identity — refused before any write."""
     _on_work(world)
     (world.repo / "README.md").write_text("edited\n", encoding="utf-8")
-    (world.tmp / "gitconfig").write_text("[user]\n\tuseConfigOnly = true\n", encoding="utf-8")
+    (world.tmp / "gitconfig").write_text(
+        f"{GIT_QUIET_INCLUDE}[user]\n\tuseConfigOnly = true\n", encoding="utf-8"
+    )
     return ["context", "dead", "proj"]
 
 
@@ -785,8 +896,8 @@ SITES: dict[str, tuple[Case | tuple[Case, ...] | Skip, ...]] = {
         Case(_mismatch, _work_pushed, then="git push -q origin feature/1.0.0"),
     ),
     "push_gate._rewrite_fix": (
-        Case(_denylisted_not_checked_out, _clean_publish, then=_CLEAN_COMMIT_PUSH),
         (
+            Case(_denylisted_not_checked_out, _clean_publish, then=_CLEAN_COMMIT_PUSH),
             Case(_denylisted, _clean_publish, operator=_drop_term, then=_COMMIT_PUSH),
             Case(
                 _denylisted_in_a_worktree,
@@ -806,17 +917,23 @@ SITES: dict[str, tuple[Case | tuple[Case, ...] | Skip, ...]] = {
         ),
     ),
     "push_gate._read_failure": (Skip("needs a corrupted object store; `git fsck` names it"),),
-    "push_gate.push_gate_decision": (Case(_malformed, _work_pushed, replaces=True),),
+    "push_gate.push_gate_decision": (
+        Case(_malformed, lambda w: _work_pushed(w, _work(w)), replaces=True),
+        (
+            Case(_law_deleted, _work_pushed, operator=_cite_adr),
+            Case(_associated_law_deleted, _lib_pushed, operator=_cite_accepted_adr),
+        ),
+    ),
     "ci._repo_root": (Skip("the pre-push hook always runs inside the repo it pushes"),),
     "ci.push_gate_check": (Skip("the gate's refusal: its fix is a branch_policy/push_gate site"),),
-    "service.SpecContextService.show": (Case(_unknown_context, _cloned),),
+    "service.SpecContextService.show": (Case(_unknown_context, _cloned, operator=_create),),
     "service.SpecContextService.alive": (
-        Case(_no_url_no_checkout, _cloned),
+        Case(_no_url_no_checkout, _cloned, operator=_clone),
         Case(_alive_remote_gone, _cloned, operator=_remote_back),
     ),
     "service.SpecContextService.baseline": (
         Case(_no_checkout, _cloned),
-        Case(_no_identity, _baseline_done),
+        Case(_no_identity, _baseline_done, operator=_identity),
         Case(_never_onboarded, _baseline_done),
         Case(_baseline_denylisted, _baseline_done, operator=_drop_draft_term, then=_AMEND_BASELINE),
     ),
@@ -829,10 +946,16 @@ SITES: dict[str, tuple[Case | tuple[Case, ...] | Skip, ...]] = {
     "service.SpecContextService._dead_preflight": (
         Case(_untracked, _dead_done, replaces=True),
         Case(_secret_untracked, _dead_done),
-        Case(_no_origin, _dead_done),
-        (Case(_unpushed_side_branch, _dead_done), Case(_commits_no_remote, _dead_done)),
-        Case(_dead_no_identity, _dead_done),
-        Case(_dirty_on_integration, _dead_via_work),
+        Case(_no_origin, _dead_done, operator=_origin),
+        (
+            Case(_unpushed_side_branch, _dead_done),
+            Case(_commits_no_remote, _dead_done, operator=_origin),
+        ),
+        Case(_dead_no_identity, _dead_done, operator=_identity),
+        (
+            Case(_dirty_on_integration, _dead_via_work),
+            Case(_associated_on_integration, _associated_dead),
+        ),
     ),
     "service.SpecContextService.dead": (
         Case(_dead_twice, _dead_done),
@@ -934,6 +1057,17 @@ def test_dead_leaves_a_clean_published_detached_head(world: World) -> None:
     _dead_done(world)
 
 
+def test_dead_pushes_an_associated_repo_while_its_main_repo_is_absent(world: World) -> None:
+    """pre-push-gate-crashes-when-owner-main-repo-absent: dead's preflight reads the gitflow
+    through the same reader — an absent main repo is the default, never a traceback."""
+    _associated_on_integration(world)
+    world.git(world.ws / "repos" / "lib", "checkout", "-q", "-b", "feature/1.0.0")
+    shutil.rmtree(world.repo)
+    done = world.cli("context", "dead", "proj")
+    assert done.returncode == 0, done.stdout + done.stderr
+    _associated_dead(world)
+
+
 @pytest.mark.parametrize("case", _CASES)
 def test_the_fix_line_clears_the_refusal(case: Case, world: World) -> None:
     _drive(world, case)
@@ -995,8 +1129,7 @@ def test_a_denylisted_tag_from_a_detached_head_on_an_empty_origin_prints_no_comm
     world.git(world.repo, "checkout", "-q", "--detach", "v0.0.1")
     done = _hit(world, "git push -q origin v0.0.1")
     output = done.stdout + done.stderr
-    assert done.returncode != 0 and "Operator action" in output
-    assert "\nfix: " not in output
+    assert done.returncode != 0 and "\nfix: Operator action: " in output
     assert world.git(world.repo, "rev-parse", "HEAD") == world.git(
         world.repo, "rev-parse", "v0.0.1"
     )
@@ -1062,10 +1195,12 @@ def test_dead_commit_without_a_git_identity_refuses_and_removes_nothing(world: W
     (world.repo / "README.md").write_text("edited\n", encoding="utf-8")
     head = world.git(world.repo, "rev-parse", "HEAD")
     published = world.remote_heads()["feature/1.0.0"]
-    (world.tmp / "gitconfig").write_text("[user]\n\tuseConfigOnly = true\n", encoding="utf-8")
+    (world.tmp / "gitconfig").write_text(
+        f"{GIT_QUIET_INCLUDE}[user]\n\tuseConfigOnly = true\n", encoding="utf-8"
+    )
     done = world.cli("context", "dead", "proj", "--commit")
     assert done.returncode != 0
-    assert _single_fix(done) == f"git -C {world.repo} config user.name '<user.name>'"
+    assert _single_fix(done) == f"Operator action: set git user.name in the config of {world.repo}"
     assert (world.repo / "README.md").read_text(encoding="utf-8") == "edited\n"
     assert world.git(world.repo, "rev-parse", "HEAD") == head
     assert world.remote_heads()["feature/1.0.0"] == published

@@ -9,6 +9,7 @@ from rich.console import Console
 from rich.table import Table
 
 from dadaia_workspace.cli.help_digest import command_paths
+from dadaia_workspace.core.cli_line import fix_line
 from dadaia_workspace.features.capabilities import build_capabilities
 
 console = Console()
@@ -36,5 +37,5 @@ def capabilities(
         "Contexts",
         ", ".join(payload["contexts"]["commands"]),
     )
-    table.add_row("Machine output", "dadaia capabilities --json")
+    table.add_row("Machine output", fix_line(None, "capabilities", "--json"))
     console.print(table)

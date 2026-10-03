@@ -37,11 +37,10 @@ def _make_ctx(name: str, repo_slug: str = "test-repo") -> object:
 def test_json_stores_roundtrip_non_ascii_and_valid_utf8(tmp_path: Path) -> None:
     """JsonContextStore round-trips non-ASCII data
     (names/paths) correctly and the on-disk file is valid UTF-8."""
-    from dadaia_workspace.infrastructure.json_context_store import JsonContextStore
+    from tests.fixtures.stores import context_store
 
     ctx_states_dir = tmp_path / "ctx-states"
-    ctx_states_dir.mkdir()
-    ctx_store = JsonContextStore(ctx_states_dir)
+    ctx_store = context_store(ctx_states_dir)
 
     name = "projet-café"
     ctx_store.save(_make_ctx(name))

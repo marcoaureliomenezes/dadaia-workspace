@@ -48,3 +48,15 @@ def test_no_superseded_record_means_silence(tmp_path: Path) -> None:
     (specs / "memory").mkdir()
     (specs / "memory" / "QUALITY.md").write_text("ADR: 0001 (accepted)\n", encoding="utf-8")
     assert superseded_adr_citations(specs, None) == []
+
+
+def test_a_record_holding_u2028_is_read_whole(tmp_path: Path) -> None:
+    """release-new-crashes-on-a-unicode-line-separator-in-the-bug-ledger (AC3.5): a U+2028
+    inside a superseded record's text keeps that record one line."""
+    specs = tmp_path / "specs"
+    (specs / "ADRs").mkdir(parents=True)
+    record = {"id": "0005", "title": "a\u2028b", "status": "superseded"}
+    (specs / "ADRs" / "decisions.jsonl").write_text(json.dumps(record, ensure_ascii=False), "utf-8")
+    (specs / "memory").mkdir()
+    (specs / "memory" / "QUALITY.md").write_text("ADR: 0005\n", encoding="utf-8")
+    assert [i.code for i in superseded_adr_citations(specs, None)] == ["ADR-SUPERSEDED-CITATION"]

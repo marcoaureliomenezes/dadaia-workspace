@@ -22,9 +22,9 @@ def test_posix_cli_path_and_fix_line(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 def test_windows_cli_path_and_fix_line(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Review H5: forward slashes, quoted only when a part holds a blank — one line Git
-    Bash, cmd and PowerShell all run (PowerShell needs `& ` before a quoted executable:
-    a workspace path with a blank is the documented limitation)."""
+    """Review H5, windows-quoted-executable-fix-not-runnable-in-powershell: forward slashes;
+    a part with a blank quoted whole, `-c` code one word; the executable's quote opens after
+    its drive letter, as a line opening with a quote is a PowerShell expression."""
     monkeypatch.setattr("dadaia_workspace.core.platform.PLATFORM", Capabilities.detect("win32"))
     root = PureWindowsPath(r"C:\ws\my ws")
     assert cli_line.cli_path(root) == PureWindowsPath(
@@ -32,7 +32,12 @@ def test_windows_cli_path_and_fix_line(monkeypatch: pytest.MonkeyPatch) -> None:
     )
     assert (
         cli_line.fix_line(root, "doctor", "--fix")
-        == '"C:/ws/my ws/.dadaia/.venv/Scripts/dadaia.exe" doctor --fix'
+        == 'C":/ws/my ws/.dadaia/.venv/Scripts/dadaia.exe" doctor --fix'
+    )
+    monkeypatch.setattr("sys.executable", r"C:\my ws\python.exe")
+    assert cli_line.mkdir_line(PureWindowsPath(r"C:\my ws\tmp")) == (
+        'C":/my ws/python.exe" -c "import pathlib; '
+        "pathlib.Path(r'C:/my ws/tmp').mkdir(parents=True, exist_ok=True)\""
     )
     assert (
         cli_line.shell_line("git", "-C", r"C:\ws\repos\app", "status")

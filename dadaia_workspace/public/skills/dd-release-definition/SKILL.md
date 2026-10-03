@@ -53,7 +53,7 @@ Call the Skill tool with `dd-grill-me` on the picked set — never skipped; a fu
 
 1. Author the SPEC (Draft) after the grill: the picked set, its acceptance, every `superseded_by` link.
 2. Definition runs on the work branch (`<work>M.m.p`, the constitution's `gitflow:`); the trio's place is the releases law's.
-3. Commit shape 5 (`dd-gitflow-default` §3a): SPEC + PLAN + TASKS + picked bugs, one commit; set the `defined` milestone in `_RELEASE.json`
+3. Commit shape 5 (`dd-gitflow-default` §3a); set the `defined` milestone in `_RELEASE.json`
    (`dd-release-implementation`'s `RELEASE-EVENTS.md`).
 4. PLAN opens with §1 As-is review (§2); SPEC carries `Replaces` — one bullet per current behaviour a
    DELETE/REBUILD row removes, or `none` with its reason.

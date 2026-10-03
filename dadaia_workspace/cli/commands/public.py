@@ -6,6 +6,7 @@ import typer
 from rich.console import Console
 
 from dadaia_workspace import container
+from dadaia_workspace.core.cli_line import fix_line
 from dadaia_workspace.core.models.doctor_report import DoctorStatus
 from dadaia_workspace.core.workspace_resolver import resolve_workspace_root
 
@@ -38,7 +39,10 @@ def stage() -> None:
         console.print("[dim]No assets to stage.[/dim]")
 
 
-@app.command(epilog="Recipe: dadaia public stage && dadaia public install && dadaia public doctor")
+@app.command(
+    epilog="Recipe: "
+    + " && ".join(fix_line(None, "public", v) for v in ("stage", "install", "doctor"))
+)
 def install(
     force: bool = typer.Option(False, "--force", help="Overwrite existing files"),
 ) -> None:
@@ -46,7 +50,7 @@ def install(
 
     Projects the shared authored set plus every harness registered in
     `.dadaia/states/harness_profile.json` — the roster of record. A harness enters
-    that roster through `dadaia harness add <name>`, never through a flag here.
+    that roster through `harness add <name>`, never through a flag here.
     """
     workspace_root = resolve_workspace_root()
     svc = container.build_public_service()

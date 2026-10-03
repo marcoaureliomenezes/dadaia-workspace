@@ -38,6 +38,7 @@ import os
 import sys
 import tempfile
 from collections.abc import Iterator, Sequence
+from hashlib import sha256
 from pathlib import Path
 from typing import Any
 
@@ -54,6 +55,9 @@ _CHECKOUT_ROOT = Path(__file__).resolve().parent.parent
 os.environ["PYTHONPATH"] = os.pathsep.join(
     [str(_CHECKOUT_ROOT), *[p for p in os.environ.get("PYTHONPATH", "").split(os.pathsep) if p]]
 )
+# A child CPython normalizes its own `sys.executable`; a `../` launch keeps the dots here, so
+# every spawn and every expected fix line reads the normalized path the child will print.
+sys.executable = os.path.normpath(sys.executable)
 
 # No process the suite runs or spawns may resolve the operator instance this checkout sits
 # in, nor the one owning the running venv (bug test-subprocesses-resolve-the-live-instance):
@@ -67,22 +71,39 @@ _FENCED_ROOTS: tuple[Path, ...] = tuple(
 )
 os.environ["DADAIA_FENCED_ROOTS"] = os.pathsep.join(map(str, _FENCED_ROOTS))
 
-# No git process the suite runs or spawns may start background maintenance: after a
-# commit git forks a detached `maintenance run --auto` that holds
-# .git/objects/maintenance.lock while a test snapshots the repo (a CI flake). One rule,
-# appended to any GIT_CONFIG_* pairs already in the environment, inherited by every child.
-_GIT_QUIET = {"maintenance.auto": "false", "gc.auto": "0"}
+# No git process that inherits the suite's environment may start background maintenance:
+# after a commit or a push git forks a detached `gc`/`maintenance run --auto` that holds
+# objects/maintenance.lock while a test copies the repo (a CI flake). A config FILE, never
+# GIT_CONFIG_* env: git strips those from the receive-pack a local push spawns. A test
+# writing its own global config opens it with GIT_QUIET_INCLUDE; a test building git's
+# env from scratch (no GIT_CONFIG_GLOBAL) is outside this rule.
+
+
+def _publish(stem: str, text: str) -> Path:
+    """*text* at a content-addressed ``$TMPDIR`` path: suites of any conftest version, run
+    side by side, never rewrite each other's file; the first writer publishes atomically."""
+    path = (
+        Path(tempfile.gettempdir()) / f"{stem}-{sha256(text.encode()).hexdigest()[:12]}.gitconfig"
+    )
+    if not path.exists():
+        tmp = path.with_name(f"{path.name}.{os.getpid()}")
+        tmp.write_text(text, encoding="utf-8")
+        os.replace(tmp, path)
+    return path
+
+
+_GIT_QUIET = _publish(
+    "dadaia-tests-quiet",
+    "[maintenance]\n\tauto = false\n[gc]\n\tauto = 0\n[receive]\n\tautogc = false\n",
+)
+GIT_QUIET_INCLUDE = f'[include]\n\tpath = "{_GIT_QUIET.as_posix()}"\n'
 # Every git process sees one GLOBAL config carrying a committer identity, never the
 # developer's (CI runners have none): global scope, so a repo's own `user.*` and a
 # test's own GIT_CONFIG_GLOBAL still win — a test about a missing identity sets its own.
-_GIT_GLOBAL = Path(tempfile.gettempdir()) / "dadaia-tests.gitconfig"
-_GIT_GLOBAL.write_text("[user]\n\tname = T\n\temail = t@example.invalid\n", encoding="utf-8")
+_GIT_GLOBAL = _publish(
+    "dadaia-tests", f"{GIT_QUIET_INCLUDE}[user]\n\tname = T\n\temail = t@example.invalid\n"
+)
 os.environ["GIT_CONFIG_GLOBAL"] = str(_GIT_GLOBAL)
-_GIT_BASE = int(os.environ.get("GIT_CONFIG_COUNT", "0"))
-for _n, (_key, _value) in enumerate(_GIT_QUIET.items(), start=_GIT_BASE):
-    os.environ[f"GIT_CONFIG_KEY_{_n}"] = _key
-    os.environ[f"GIT_CONFIG_VALUE_{_n}"] = _value
-os.environ["GIT_CONFIG_COUNT"] = str(_GIT_BASE + len(_GIT_QUIET))
 
 
 def _instance_fingerprint() -> dict[str, object]:

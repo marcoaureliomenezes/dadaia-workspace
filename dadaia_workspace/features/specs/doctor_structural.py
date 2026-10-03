@@ -5,11 +5,10 @@ Leaf-only: imports the shared leaves, never a sibling validator."""
 from __future__ import annotations
 
 import hashlib
-import shlex
 from pathlib import Path
 
 from dadaia_workspace.core.atomic_write import atomic_write
-from dadaia_workspace.core.cli_line import mkdir_line
+from dadaia_workspace.core.cli_line import mkdir_line, shell_line
 from dadaia_workspace.core.doctor_rules import SectionFinding
 from dadaia_workspace.core.template_history import was_shipped
 from dadaia_workspace.core.workspace_layout import SCOPED_LAW_AREAS, render_registry_tables
@@ -169,7 +168,7 @@ class StructuralValidator:
                 "changes manually — auto-overwrite is disabled to protect operator "
                 "customisations.",
                 str(dst),
-                fix=shlex.join(["git", "diff", "--no-index", "--", str(canonical_path), str(dst)]),
+                fix=shell_line("git", "diff", "--no-index", "--", str(canonical_path), str(dst)),
             )
         ]
 

@@ -162,6 +162,18 @@ _Avoid_: closed, dispositioned, done
 The one way a record changes status; refuses incomplete input.
 _Avoid_: update --set status, flip
 
+**Grammar**:
+A text shape more than one module reads (ADR 0135); a JSON Schema validates its records, and the grammar owner owns that check.
+_Avoid_: format, syntax, convention
+
+**Grammar owner**:
+The one module that parses a grammar; every other reader consults it.
+_Avoid_: parser (for a second reader), helper
+
+**Pinned pair**:
+One grammar or renderer kept on both sides of the package/script seam, one contract test asserting equal output (ADR 0159).
+_Avoid_: twin, copy, mirror
+
 **Release**:
 The open-scope publication unit, named last-published-PyPI + 1 patch — exactly one live, growing by stacked Candidates; its state is `_RELEASE.json`, its narrative is that file's `log`. The version increments only at operator-approved deploy (ADR 0021). _Avoid_: "release" for one closed scope — that is a Candidate.
 

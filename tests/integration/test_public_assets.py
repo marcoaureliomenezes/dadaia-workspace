@@ -14,7 +14,6 @@ from typer.testing import CliRunner
 
 from dadaia_workspace.core.exceptions import PublicAssetError
 from dadaia_workspace.core.model_registry import is_fable_model
-from dadaia_workspace.infrastructure.privacy_check import _PRIVACY_DENYLIST_ENV
 from dadaia_workspace.infrastructure.public_assets import FileSystemPublicAssetManager
 from tests.helpers import public_asset_roster
 from tests.helpers.harness_profile import register_all
@@ -172,7 +171,7 @@ def _seed_denylist_env(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     """Seed the denylist via env var (location-independent; avoids .dadaia/ in lib repo)."""
     source = tmp_path / "privacy_denylist.json"
     source.write_text(json.dumps({_PRIVACY_TEST_TERM: "test private IP"}), encoding="utf-8")
-    monkeypatch.setenv(_PRIVACY_DENYLIST_ENV, str(source))
+    monkeypatch.setenv("DADAIA_PRIVACY_DENYLIST", str(source))
 
 
 def test_public_privacy_gate_flags_identifiers(

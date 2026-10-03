@@ -14,6 +14,7 @@ from types import ModuleType, SimpleNamespace
 from typing import Any
 
 _HERE = Path(__file__).resolve().parent
+_STATES = Path(".dadaia") / "states"
 _OWN = _HERE / "_privacy.py"
 _SOURCE = _OWN if _OWN.is_file() else _HERE.parents[3] / "core" / "redaction.py"
 _privacy = ModuleType("_privacy")  # executed from source: no loader, no bytecode beside it
@@ -34,10 +35,14 @@ def load_schema(name: str) -> dict[str, Any]:
 
 def validate(value: object, spec: dict[str, Any], root: dict[str, Any], where: str) -> Any:
     """The JSON-Schema subset the ledgers use: ``$ref`` into ``$defs``, type, const, enum,
-    pattern, min/maxLength, minItems, items, required, ``additionalProperties: false``, if/then."""
+    pattern, min/maxLength, minItems, items, required, ``additionalProperties: false``,
+    if/then, allOf, not."""
     spec = root["$defs"][spec["$ref"].rsplit("/", 1)[-1]] if "$ref" in spec else spec
-    if "if" in spec and not any(validate(value, spec["if"], root, where)):
-        yield from validate(value, spec["then"], root, where)
+    for member in [spec, *spec.get("allOf", ())]:
+        if "if" in member and not any(validate(value, member["if"], root, where)):
+            yield from validate(value, member["then"], root, where)
+    if "not" in spec and not any(validate(value, spec["not"], root, where)):
+        yield f"{where} must not match {spec['not']}"
     declared = spec.get("type")
     allowed = declared if isinstance(declared, list) else [declared] if declared else []
     if allowed and not any(isinstance(value, JSON_TYPES[name]) for name in allowed):
@@ -71,8 +76,61 @@ def validate(value: object, spec: dict[str, Any], root: dict[str, Any], where: s
                 yield from validate(child, properties[key], root, f"{where}.{key}")
 
 
-def finding(code: str, path: str, line: int, message: str) -> dict[str, Any]:
-    return {"code": code, "verdict": "error", "path": path, "line": line, "message": message}
+class LineError(ValueError):
+    """Line *number* of a JSONL ledger is not a JSON object."""
+
+    def __init__(self, number: int, message: str) -> None:
+        super().__init__(message)
+        self.number = number
+
+
+def records(path: Path) -> list[dict[str, Any]]:
+    """Every JSON object of the JSONL ledger *path*, in file order; absent reads empty."""
+    return parse(path.read_text(encoding="utf-8")) if path.is_file() else []
+
+
+def parse(text: str) -> list[dict[str, Any]]:
+    """Every JSON object of JSONL *text*, split on ``\\n`` alone — ``splitlines()``
+    breaks a record holding U+2028."""
+    out: list[dict[str, Any]] = []
+    for number, line in enumerate(text.split("\n"), start=1):
+        if not line.strip():
+            continue
+        try:
+            record = json.loads(line)
+        except json.JSONDecodeError as exc:
+            raise LineError(number, f"is not valid JSON ({exc.msg})") from exc
+        if not isinstance(record, dict):
+            raise LineError(number, "is not a JSON object")
+        out.append(record)
+    return out
+
+
+def finding(code: str, path: str, line: int, message: str, fix: str) -> dict[str, Any]:
+    return {"code": code, "verdict": "error", "path": path, "line": line, "message": message,
+            "fix": fix}  # fmt: skip
+
+
+#: Where a fix names a ledger when no tree is given: a write's own candidate bytes.
+SPECS = Path("specs")
+
+
+#: A whole-document finding's label: its message already names every key.
+NAMED = "the keys this finding names"
+
+
+def unwritten(file: Path, at: int | str, verbs: str, law: str) -> str:
+    """The fix for content no verb wrote: no verb rewrites it and *law* forbids a hand edit.
+    *at* is a JSONL line number, or a JSON document's entry/key label — a document has no
+    line one commit owns, so its commits are listed whole."""
+    if isinstance(at, int):
+        what = f"line {at} of {file} was not written by {verbs} ({law})"
+        finder = f"`git log -L {at},{at}:{file}` finds it"
+    else:
+        what, finder = f"{file} fails at {at} ({law})", f"`git log -p -- {file}` lists them"
+    return (f"Operator action: {what} — if {file} has uncommitted changes, discard them "
+            f"(`git checkout -- {file}`); otherwise revert the commit that introduced it "
+            f"({finder}), then redo the change through {verbs}")  # fmt: skip
 
 
 def stamp(path: Path) -> tuple[int, int] | None:
@@ -112,28 +170,46 @@ def _baseline() -> list[SimpleNamespace]:
     ]  # fmt: skip
 
 
-def _terms() -> list[tuple[str, str]]:
-    """`$DADAIA_PRIVACY_DENYLIST`, else the nearest `.dadaia/states/privacy_denylist.json`."""
-    env, cwd = os.environ.get("DADAIA_PRIVACY_DENYLIST"), Path.cwd().resolve()
-    paths = [Path(env)] if env else []
-    paths += [d / ".dadaia" / "states" / "privacy_denylist.json" for d in (cwd, *cwd.parents)]
-    for path in paths:
+def workspace_of(path: Path) -> Path | None:
+    """The nearest ancestor of *path* holding ``.dadaia/states/spec_contexts.json``."""
+    path = path.resolve()
+    return next(
+        (d for d in (path, *path.parents) if (d / _STATES / "spec_contexts.json").is_file()), None
+    )
+
+
+def terms(root: Path | None) -> list[tuple[str, str]]:
+    """The operator denylist, ONE loader (ADR 0157): `$DADAIA_PRIVACY_DENYLIST`, else
+    ``<root>/.dadaia/states/privacy_denylist.json``. Absent is empty; a present file that is
+    not one ``{"<term>": "<reason>"}`` object refuses — never read as no terms."""
+    env = os.environ.get("DADAIA_PRIVACY_DENYLIST")
+    for path in [
+        *([Path(env)] if env else []),
+        *([root / _STATES / "privacy_denylist.json"] if root else []),
+    ]:
+        if not path.exists():
+            continue
         try:
             raw = json.loads(path.read_text(encoding="utf-8"))
         except (OSError, ValueError):
-            continue
+            raw = None
         if not isinstance(raw, dict):
-            raise SystemExit(f"error: privacy denylist {path} is not one JSON object")
+            raise SystemExit(
+                f"error: privacy denylist {path} is not one JSON object\n"
+                f"fix: Operator action: rewrite {path} as one JSON object mapping each term to "
+                "its reason"
+            )
         if raw:
             return [(str(term), str(reason)) for term, reason in raw.items()]
     return []
 
 
-def private_refusal(record: dict[str, Any]) -> tuple[str, str] | None:
-    """``(message, fix)`` for the first field of *record* the push refuses, else ``None``."""
-    if (hit := _privacy.first_private(record, _terms(), _baseline())) is None:
+def private_refusal(record: dict[str, Any], specs: Path) -> tuple[str, str] | None:
+    """``(message, fix)`` for the first field of *record* the push refuses, else ``None``;
+    the terms are the workspace's that holds *specs*, whatever the cwd."""
+    if (hit := _privacy.first_private(record, terms(workspace_of(specs)), _baseline())) is None:
         return None
     return (
         f"field {hit[0]!r} carries {hit[1]!r}, which the push refuses — nothing was written",
-        "re-run this command with that value rewritten without the private term",
+        "Operator action: re-run this command with that value rewritten without the private term",
     )

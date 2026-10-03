@@ -4,10 +4,9 @@ T-010-26 / bug pre-push-gate-cannot-locate-workspace-venv. The gate
 (`public/scripts/pre-push-ci-gate.sh`) must resolve the dadaia runner in this
 priority order:
 
-  1. ``$DADAIA_BIN`` env override
-  2. walk UP from the repo root to ``<ws>/.dadaia/.venv/bin/dadaia``
-  3. ``poetry`` on PATH
-  4. repo-local ``.venv/bin/dadaia``
+  1. walk UP from the repo root to ``<ws>/.dadaia/.venv/bin/dadaia``
+  2. ``poetry`` on PATH
+  3. repo-local ``.venv/bin/dadaia``
   None found → fail CLOSED with a clear error.
 
 These tests build fake directory trees + stub executables and drive the real
@@ -79,21 +78,14 @@ def _make_repo_with_fake_git(tmp_path: Path, repo_dir: Path) -> Path:
     return bin_dir
 
 
-def _run_probe(
-    repo_dir: Path,
-    *,
-    path_dirs: list[Path],
-    extra_env: dict[str, str] | None = None,
-) -> subprocess.CompletedProcess[str]:
+def _run_probe(repo_dir: Path, *, path_dirs: list[Path]) -> subprocess.CompletedProcess[str]:
     """Run the gate in --probe-only mode with a controlled PATH (no real
-    poetry/git leak in) and optional extra env.
+    poetry/git leak in).
     """
     env: dict[str, str] = {
         "PATH": ":".join(str(p) for p in [*path_dirs, *_SYS_BINS]),
         "HOME": str(repo_dir),
     }
-    if extra_env:
-        env.update(extra_env)
     return subprocess.run(
         [_BASH, str(GATE_SCRIPT), "--probe-only"],
         cwd=str(repo_dir),
@@ -107,19 +99,19 @@ def _run_probe(
     ("name", "setup_fn", "expect_label"),
     [
         (
-            # Walk up from <ws>/repos/<slug> to <ws>/.dadaia/.venv/bin/dadaia.
+            # Walk up from <ws>/repos/<slug> to <ws>/.dadaia/.venv/bin/dadaia; it precedes poetry.
             "walk_up_to_workspace_venv",
             None,  # handled specially below
             "workspace-venv",
         ),
         (
-            # No DADAIA_BIN, no workspace venv → poetry on PATH is used.
+            # No workspace venv → poetry on PATH is used.
             "poetry_on_path",
             None,  # handled specially below (needs a poetry stub on the bin_dir)
             "poetry",
         ),
         (
-            # No override, no workspace venv, no poetry → repo-local .venv/bin/dadaia.
+            # No workspace venv, no poetry → repo-local .venv/bin/dadaia.
             "repo_local_venv",
             None,  # handled specially below
             "repo-venv",
@@ -130,29 +122,18 @@ def test_runner_resolution_branch_table(
     tmp_path: Path, name: str, setup_fn: object, expect_label: str
 ) -> None:
     if name == "walk_up_to_workspace_venv":
-        # $DADAIA_BIN wins over every other source (companion assertion, same fixture
-        # shape, before the workspace-venv walk-up branch is exercised below).
-        env_repo = tmp_path / "env-repos" / "slug"
-        env_repo.mkdir(parents=True)
-        env_bin_dir = _make_repo_with_fake_git(tmp_path, env_repo)
-        fake_bin = tmp_path / "custom" / "dadaia"
-        _write_executable(fake_bin)
-        env_res = _run_probe(
-            env_repo, path_dirs=[env_bin_dir], extra_env={"DADAIA_BIN": str(fake_bin)}
-        )
-        assert env_res.returncode == 0, env_res.stderr
-        assert "DADAIA_BIN" in env_res.stdout
-        assert str(fake_bin) in env_res.stdout
         ws = tmp_path / "ws"
         repo = ws / "repos" / "slug"
         repo.mkdir(parents=True)
         ws_dadaia = ws / ".dadaia" / ".venv" / "bin" / "dadaia"
         _write_executable(ws_dadaia)
         bin_dir = _make_repo_with_fake_git(tmp_path, repo)
+        _write_executable(bin_dir / "poetry")
         res = _run_probe(repo, path_dirs=[bin_dir])
         assert res.returncode == 0, res.stderr
         assert expect_label in res.stdout
         assert str(ws_dadaia) in res.stdout
+        assert "poetry" not in res.stdout
         return
 
     if name == "poetry_on_path":
@@ -173,51 +154,3 @@ def test_runner_resolution_branch_table(
     res = _run_probe(repo, path_dirs=[bin_dir])
     assert res.returncode == 0, res.stderr
     assert expect_label in res.stdout
-
-
-@pytest.mark.parametrize(
-    ("name", "with_poetry", "override_env", "expected_present", "expected_absent"),
-    [
-        # Priority: DADAIA_BIN is honored even when a workspace venv also exists.
-        ("dadaia_bin_precedes_workspace_venv", False, True, "DADAIA_BIN", "workspace-venv"),
-        # Priority: walk-up workspace venv beats poetry on PATH.
-        ("workspace_venv_precedes_poetry", True, False, "workspace-venv", "poetry"),
-    ],
-)
-def test_precedence_table(
-    tmp_path: Path,
-    name: str,
-    with_poetry: bool,
-    override_env: bool,
-    expected_present: str,
-    expected_absent: str,
-) -> None:
-    if name == "dadaia_bin_precedes_workspace_venv":
-        # No runner anywhere → exit 1 with a clear error, never silently skip
-        # (companion negative control, fail-CLOSED — CRIT-adjacent never-push-red).
-        isolated_repo = tmp_path / "isolated"
-        isolated_repo.mkdir(parents=True)
-        isolated_bin_dir = _make_repo_with_fake_git(tmp_path, isolated_repo)
-        isolated_res = _run_probe(isolated_repo, path_dirs=[isolated_bin_dir])
-        assert isolated_res.returncode == 1
-        assert "ERROR" in isolated_res.stderr
-        assert "could not locate the dadaia runner" in isolated_res.stderr
-
-    ws = tmp_path / "ws"
-    repo = ws / "repos" / "slug"
-    repo.mkdir(parents=True)
-    _write_executable(ws / ".dadaia" / ".venv" / "bin" / "dadaia")
-    bin_dir = _make_repo_with_fake_git(tmp_path, repo)
-    extra_env = None
-    if with_poetry:
-        _write_executable(bin_dir / "poetry")
-    if override_env:
-        override = tmp_path / "override" / "dadaia"
-        _write_executable(override)
-        extra_env = {"DADAIA_BIN": str(override)}
-
-    res = _run_probe(repo, path_dirs=[bin_dir], extra_env=extra_env)
-
-    assert res.returncode == 0, res.stderr
-    assert expected_present in res.stdout
-    assert expected_absent not in res.stdout

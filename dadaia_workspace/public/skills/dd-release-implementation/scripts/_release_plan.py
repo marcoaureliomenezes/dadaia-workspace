@@ -7,13 +7,13 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
+from _release_schema import writes
+
 AS_IS = re.compile(r"^##[ \t].*\bas[- ]is review", re.IGNORECASE | re.MULTILINE)
 AUTHORITIES = re.compile(r"^###[ \t].*\bAuthorities\b", re.IGNORECASE | re.MULTILINE)
 SCHEDULE = re.compile(r"^##[ \t].*\bParallel schedule", re.IGNORECASE | re.MULTILINE)
 SKILL = Path(__file__).resolve().parents[2] / "dd-release-definition" / "SKILL.md"
-PLAN_FIX = (
-    f"copy the PLAN skeletons of {SKILL} — §1 As-is review, §5 Parallel schedule — into PLAN.md"
-)
+PLAN_FIX = f"Operator action: copy the PLAN skeletons of {SKILL} — §1 As-is review, §5 Parallel schedule — into PLAN.md"
 _ID = r"T-\d+(?:-\d+)*"
 
 
@@ -66,15 +66,14 @@ def _schedule_errors(plan: str, unfinished: list[str]) -> list[str]:
         ]
     derived = re.findall(r"\bderived `([^`]+)`", section, re.I)
     shared = ("/TASKS.md", ".jsonl", *(f"/{path}" for path in derived))
-    writes = {m[1]: set(re.findall(r"`([^`]+)`", re.sub(r"\([^)]*\)", "", m[2])))
-              for line in unfinished if (m := re.search(rf"({_ID})\b.*?`W:`([^·]*)", line))}  # fmt: skip
+    written = {m[0]: set(writes(line)) for line in unfinished if (m := re.search(_ID, line))}
     errors = [] if "Critical path" in section else ["the Parallel schedule states no critical path"]
     for step, cell, width, *_ in rows:
         ids, seen = re.findall(_ID, cell), dict[str, str]()
         if width != str(len(ids)):
             errors.append(f"step {step} declares width {width} for {len(ids)} task(s)")
         for task in ids:
-            for path in writes.get(task, set()):
+            for path in written.get(task, set()):
                 if not f"/{path}".endswith(shared) and seen.setdefault(path, task) != task:
                     errors.append(f"step {step}: {seen[path]} and {task} both write {path}")
     return errors

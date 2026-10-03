@@ -40,6 +40,7 @@ from typing import Any
 import pytest
 
 from dadaia_workspace.core.platform import PLATFORM
+from tests.conftest import GIT_QUIET_INCLUDE
 from tests.helpers.previous_release import previous_release, published_releases
 
 _UVX = shutil.which("uvx")
@@ -97,6 +98,7 @@ class Env:
             GIT_CONFIG_GLOBAL=str(self.home_dir / "gitconfig"),
             GIT_CONFIG_SYSTEM=os.devnull,
         )
+        (self.home_dir / "gitconfig").write_text(GIT_QUIET_INCLUDE, encoding="utf-8")
         self.git("config", "--global", "init.defaultBranch", "main", cwd=root)
         self._launchers: dict[str, Path] = {}
 

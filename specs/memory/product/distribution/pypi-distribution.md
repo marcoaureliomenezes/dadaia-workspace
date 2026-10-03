@@ -37,7 +37,7 @@ sources:
 ## Discovery surfaces
 
 - `pyproject.toml` `description` is the tagline, byte-equal to `README.md`'s first non-badge paragraph and to `llms.txt`'s `> ` line; `readme = "README.md"` makes the derived README the long description; `[tool.poetry.urls]` carries `Homepage`, `Repository`, `Documentation` (`https://github.com/marcoaureliomenezes/dadaia-workspace/tree/main/docs`, the repository's `docs/` folder — no separate site is published), `Changelog` and `Issues`; every README link is absolute, so it resolves on the PyPI page; every keyword names something the README says — pinned by `tests/contract/test_docs_derived_from_memory.py` ([[QUALITY]]).
-- Every command's `--help` states behaviour in the reader's words — no requirement, task, audit or ADR id and no code seam name (`tests/contract/test_cli_help_quality.py`); `docs/cli.md` is derived from it.
+- Every command's `--help` states behaviour in the reader's words — no requirement, task, audit or ADR id and no code seam name — and every example line spells the absolute venv CLI through the one renderer (`tests/contract/test_cli_help_quality.py`); `docs/cli.md` is derived from it.
 - The `Development Status` classifier stays `3 - Alpha` until a released wheel passes the consumer-validation recipe ([[consumer-agent-support]]).
 - Channels: PyPI; the GitHub repository description, topics and homepage, set from the same tagline and keywords; `llms.txt` at the repository root, an index whose every line links to a derived document, the law, the CLI reference or the memory catalog; the repository's `docs/` folder on `main`, with no build toolchain or site, every page derived under its markers. `docs/distribution.md` is derived from this list.
 

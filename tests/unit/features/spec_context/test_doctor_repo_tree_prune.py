@@ -31,6 +31,9 @@ class _Store:
 def _workspace(tmp_path: Path) -> Path:
     ws = tmp_path / "ws"
     (ws / ".dadaia" / "states").mkdir(parents=True)
+    (ws / ".dadaia" / "states" / "spec_contexts.json").write_text(
+        '{"contexts": [{"name": "demo", "repo_slug": "demo", "state": "alive"}]}'
+    )
     repo = ws / "repos" / "demo"
     (repo / ".venv" / "bin").mkdir(parents=True)
     (repo / ".venv" / "bin" / "python").write_text("#!/bin/sh\n", encoding="utf-8")

@@ -16,7 +16,8 @@ from typing import Any
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from _bugs_store import Records, Refusal, by_id  # noqa: E402
-from _bugs_write import _SCRIPT, _set, now_iso  # noqa: E402
+from _bugs_write import _set, now_iso  # noqa: E402
+from _specs import choice  # noqa: E402
 
 REQUIRED_BY_VERB = {
     "resolve": ("cause", "caused_by", "resolved_release", "solution",
@@ -24,38 +25,44 @@ REQUIRED_BY_VERB = {
     "supersede": ("by",), "defer": ("reason",), "reject": ("reason",),
 }  # fmt: skip
 _EVIDENCE_DIFF_RE = re.compile(r"^(net-negative|net-positive|net-neutral):\s*\S.*$")
+_SEAM_RE = re.compile(r"^([^\s:;]+)(?:::(?:\w+::)*(\w+))?")
 STATUS_BY_VERB = {"resolve": "resolved", "supersede": "superseded",
                   "defer": "deferred", "reject": "rejected"}  # fmt: skip
 
 
+def _seam_exists(seam: str, root: Path) -> bool:
+    """The seam's leading ``path[::…::name]`` names a file under *root* and, with a name,
+    a ``def <name>`` in it (ADR 0160) — judged once, here, never re-judged by ``check``."""
+    match = _SEAM_RE.match(seam)
+    if match is None or not (path := root / match[1]).is_file():
+        return False
+    return not match[2] or re.search(rf"\bdef {match[2]}\b", path.read_text("utf-8")) is not None
+
+
 def transition(records: Records, bug_id: str, verb: str, values: dict[str, Any],
-               known_ids: set[str]) -> Records:  # fmt: skip
+               root: Path) -> Records:  # fmt: skip
     """The ONE way a record reaches a terminal status. Every field the verb requires is
-    checked first and every problem named at once; the record is untouched on refusal."""
+    checked first and every problem named at once; the record is untouched on refusal.
+    A resolve's seam is read under *root*, the repo the ledger belongs to."""
     missing = [name for name in REQUIRED_BY_VERB[verb] if not (values.get(name) or "").strip()]
     if missing:
-        raise Refusal(
-            f"transition {verb!r} refused — {', '.join(repr(m) for m in missing)} required",
-            f"{_SCRIPT} {verb} {bug_id} "
-            + " ".join(f"--{m.replace('_', '-')} <{m}>" for m in missing),
-        )
+        raise choice(Refusal(f"transition {verb!r} refused — {', '.join(map(repr, missing))} required"),
+                     f"with {', '.join('--' + m.replace('_', '-') for m in missing)} set")  # fmt: skip
     record = by_id(records, bug_id)
     updated = dict(record)
     if verb == "resolve":
         if not _EVIDENCE_DIFF_RE.match(values["evidence_diff"]):
-            raise Refusal(
-                "'evidence_diff' must match '^(net-negative|net-positive|net-neutral): "
-                "<rationale>'",
-                f"{_SCRIPT} resolve {bug_id} --evidence-diff 'net-negative: <why>'",
-            )
-        if values["caused_by"] != "none" and values["caused_by"] not in known_ids:
-            raise Refusal(
-                f"caused_by {values['caused_by']!r} is not a record of this bug ledger",
-                f"{_SCRIPT} resolve {bug_id} --caused-by none",
-            )
+            raise choice(Refusal("'evidence_diff' must match '^(net-negative|net-positive|"
+                         "net-neutral): <rationale>'"),
+                         "with --evidence-diff set to net-negative, net-positive or "
+                         "net-neutral, a colon and why", "--evidence-diff")  # fmt: skip
+        if not _seam_exists(values["evidence_seam"], root):
+            raise choice(Refusal(f"evidence_seam {values['evidence_seam']!r} names no file or "
+                         f"'def <name>' under {root}"),
+                         f"with --evidence-seam set to a test file under {root}, :: "
+                         "and its test name", "--evidence-seam")  # fmt: skip
         for key in REQUIRED_BY_VERB["resolve"]:
             _set(updated, key, values[key])
-        _set(updated, "diff_direction", values["evidence_diff"].split(":", 1)[0])
     elif verb == "supersede":
         _set(updated, "superseded_by", values["by"])
     else:

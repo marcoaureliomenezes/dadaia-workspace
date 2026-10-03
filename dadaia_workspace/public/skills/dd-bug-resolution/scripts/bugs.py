@@ -24,9 +24,9 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import _bugs_transition as tr  # noqa: E402
 import _bugs_write as wr  # noqa: E402
-from _bugs_check import CODE, HISTO, LEDGER, check  # noqa: E402
+from _bugs_check import CODE, LEDGER, check  # noqa: E402
 from _bugs_store import Refusal, commit, read_records  # noqa: E402
-from _specs import find_specs, refuse, script  # noqa: E402
+from _specs import find_specs, refuse  # noqa: E402
 
 _OPTIONS: dict[str, tuple[str, ...]] = {
     "append": ("--bug-id", "--reported-by", "--ts", "--title", "--severity", "--surface",
@@ -38,7 +38,7 @@ _HELP = {
     "append": "register a brand-new open record",
     "status": "list records, open only by default",
     "stats": "aggregate counts by status and by severity",
-    "update": "write a governance field other than status/closed_at/caused_by",
+    "update": "write a governance field other than status/closed_at",
     "resolve": "close a record as resolved, with its lineage and evidence triple",
     "supersede": "close a record as superseded by another slug",
     "defer": "close a record as deferred, with a reason",
@@ -80,8 +80,12 @@ def _read(args: argparse.Namespace, specs: Path) -> int:
     records = read_records(specs / LEDGER)
     if args.verb == "stats":
         print(f"total\t{len(records)}")
-        for label, key in (("status", "status"), ("severity", "severity")):
-            counts = Counter(str(r[key]) for r in records if r.get(key))
+        for label, key in (
+            ("status", "status"),
+            ("severity", "severity"),
+            ("direction", "evidence_diff"),
+        ):
+            counts = Counter(str(r[key]).split(":")[0] for r in records if r.get(key))
             for value, count in sorted(counts.items()):
                 print(f"{label}:{value}\t{count}")
         return 0
@@ -98,7 +102,7 @@ def _archive(args: argparse.Namespace, specs: Path) -> int:
     ledger = specs / LEDGER
     moving = wr.archivable(read_records(ledger), cutoff.strftime("%Y-%m-%dT%H:%M:%SZ"))
     if moving:
-        kept = commit(ledger, lambda rs: [r for r in rs if r["id"] not in moving], archive=specs / HISTO)  # fmt: skip
+        kept = commit(ledger, lambda rs: [r for r in rs if r["id"] not in moving], archive=True)  # fmt: skip
     else:
         kept = read_records(ledger)
     print(f"[ok] archived {len(moving)} record(s), {len(kept)} kept.")
@@ -118,7 +122,7 @@ def _write(args: argparse.Namespace, specs: Path) -> int:
         except (OSError, subprocess.CalledProcessError) as exc:
             cause = getattr(exc, "stderr", "") or str(exc)
             raise Refusal(f"cannot list the repo's tracked directories: {cause.strip()}",
-                          f"cd <the context's git repo> && {script(Path(__file__))} append … --specs specs") from None  # fmt: skip
+                          "Operator action: point --specs at a specs tree inside a git repo") from None  # fmt: skip
         dirs = {part for path in listed.splitlines() for part in path.split("/")[:-1]}
         near = wr.candidates(read_records(ledger), values["surface"])
         print(f"correlation candidates on {values['surface']!r}: {', '.join(near) or 'none'}")
@@ -131,15 +135,15 @@ def _write(args: argparse.Namespace, specs: Path) -> int:
         print(f"[ok] updated {', '.join(sorted(changes))} for {args.bug_id}")
         return 0
     values = _values(args, _OPTIONS[args.verb])
-    known = {str(r["id"]) for r in read_records(ledger)}
-    commit(ledger, lambda records: tr.transition(records, args.bug_id, args.verb, values, known))
+    commit(ledger, lambda rs: tr.transition(rs, args.bug_id, args.verb, values, specs.parent))
     print(f"[ok] {tr.STATUS_BY_VERB[args.verb]} {args.bug_id}")
     return 0
 
 
 def main(argv: list[str] | None = None) -> int:
     args = _parser().parse_args(argv)
-    specs = find_specs(args.specs)
+    reads = args.verb in ("check", "status", "stats")
+    specs = find_specs(args.specs, ledger=None if reads else f"specs/{LEDGER}")
     if args.verb == "check":
         findings = check(specs)
         print(json.dumps(findings, indent=2)) if args.json else [

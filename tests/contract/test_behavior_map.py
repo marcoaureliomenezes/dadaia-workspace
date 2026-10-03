@@ -41,6 +41,7 @@ from dadaia_workspace.features.specs.citations import (
 from dadaia_workspace.infrastructure.public_assets import (
     _SKILL_SCRIPT_SCHEMAS,  # allow-private-import: the one staging table naming which shipped schema each skill script carries a copy of; a second table here is the fork this hash guards against
 )
+from dadaia_workspace.infrastructure.public_assets_common import iter_public_files
 from tests.helpers.scan_population import assert_populated
 
 pytestmark = pytest.mark.contract
@@ -178,13 +179,13 @@ def _sha256_file(path: Path) -> str:
 
 
 def _script_members(skill: str, skills_dir: Path, public_dir: Path) -> list[tuple[str, Path]]:
-    """Every source file under the skill's `scripts/` plus, as `schemas/<name>`, the shipped
+    """Every file `stage` copies from the skill's `scripts/` (its one walk) plus, as `schemas/<name>`, the shipped
     original of each schema `stage` copies beside them — so a schema fork is red on both sides."""
     scripts_dir = skills_dir / skill / "scripts"
     members = [
         (path.relative_to(scripts_dir).as_posix(), path)
-        for path in sorted(scripts_dir.rglob("*"))
-        if path.is_file() and "schemas" not in path.relative_to(scripts_dir).parts
+        for path in iter_public_files(scripts_dir)
+        if "schemas" not in path.relative_to(scripts_dir).parts
     ]
     return members + sorted(
         {
@@ -528,13 +529,22 @@ def test_an_oversized_skill_md_and_an_undeclared_overlap_turn_red(tmp_path: Path
 
 
 def test_mutation_fixture_f_edited_skill_script_turns_red(tmp_path: Path) -> None:
-    """A10.4 scripts side: one byte appended to a copied skill script is a stale scripts hash."""
+    """A10.4 scripts side: one byte appended to a copied skill script is a stale scripts hash;
+    planted bytecode is not (bug behavior-map-hash-reads-untracked-bytecode)."""
     skill = next(
         r["skill"]
         for r in _real_map()["rows"]
         if r["skill"] is not None and (_SKILLS_DIR / r["skill"] / "scripts").is_dir()
     )
     shutil.copytree(_SKILLS_DIR / skill, tmp_path / "skills" / skill)
+    pyc = tmp_path / "skills" / skill / "scripts" / "__pycache__" / "x.cpython-312.pyc"
+    pyc.parent.mkdir(exist_ok=True)
+    pyc.write_bytes(b"\xa7\r\r")
+    stale = f"row(skill={skill!r}): scripts hash stale"
+    planted = _find_stale_hash_tuples(
+        _real_map(), _law_section_bodies(), skills_dir=tmp_path / "skills"
+    )
+    assert not any(stale in v for v in planted), planted
     edited = sorted((tmp_path / "skills" / skill / "scripts").glob("*.py"))[0]
     edited.write_text(edited.read_text(encoding="utf-8") + "\n", encoding="utf-8")
 
@@ -542,7 +552,7 @@ def test_mutation_fixture_f_edited_skill_script_turns_red(tmp_path: Path) -> Non
         _real_map(), _law_section_bodies(), skills_dir=tmp_path / "skills"
     )
 
-    assert any(f"row(skill={skill!r}): scripts hash stale" in v for v in violations), violations
+    assert any(stale in v for v in violations), violations
 
 
 @functools.cache

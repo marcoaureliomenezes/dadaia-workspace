@@ -5,7 +5,7 @@ projects.
 
 ## The paradigm
 
-<!-- derived-from: product-vision sha256:7e335ffc3ee1 -->
+<!-- derived-from: product-vision sha256:19c972934e54 -->
 
 A workspace is one folder, and the agent session launches at its root, always.
 Projects live in repos inside it — `repos/<slug>/` — which take agent work only as
@@ -47,7 +47,7 @@ write a repo inside its worktrees and land them by `worktree.py merge`, audits a
 
 ## Ten repositories, one law
 
-<!-- derived-from: product-vision sha256:7e335ffc3ee1 -->
+<!-- derived-from: product-vision sha256:19c972934e54 -->
 <!-- derived-from: spec-context-project sha256:9690f09f679b -->
 
 A team with ten repositories does not maintain ten copies of anything:
@@ -62,7 +62,7 @@ A team with ten repositories does not maintain ten copies of anything:
   contexts. The specs tree follows the product, and the repositories it spans are
   declared as its associated repos.
 - **Boundaries are mechanical.** Path class, bind scope, root hygiene, venv-rooting and
-  the push gate refuse mechanically, each refusal carrying its own runnable fix. No
+  the push gate refuse mechanically, each refusal carrying one fix line. No
   phase and no mode is enforced.
 - **Concurrency stays visible.** Concurrent sessions never block each other; overlap
   surfaces through git, and nothing waits on a lock.

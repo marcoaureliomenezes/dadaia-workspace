@@ -9,6 +9,7 @@ from rich.markup import escape
 
 from dadaia_workspace import container
 from dadaia_workspace.cli._fail import fail
+from dadaia_workspace.core.cli_line import fix_line
 from dadaia_workspace.core.exceptions import DadaiaError
 from dadaia_workspace.core.workspace_resolver import resolve_cli_workspace_root
 
@@ -24,11 +25,12 @@ def import_workspace(
 ) -> None:
     """Register every context of an exported `spec-contexts.json` not known here as DEAD.
 
-    Known names are skipped; `.dadaia/.venv/bin/dadaia context alive <name>` clones each
+    Known names are skipped; `context alive <name>` clones each
     registered context.
     """
     try:
-        result = container.build_import_service(resolve_cli_workspace_root(workspace)).run(file)
+        root = resolve_cli_workspace_root(workspace)
+        result = container.build_import_service(root).run(file)
     except (DadaiaError, ValueError) as exc:
         fail(exc)
     for name, reason in result.skipped:
@@ -38,4 +40,4 @@ def import_workspace(
     if result.registered:
         console.print("\nRestore each context with:")
         for name in result.registered:
-            console.print(f"  dadaia context alive {name}", soft_wrap=True)
+            console.print(f"  {fix_line(root, 'context', 'alive', name)}", soft_wrap=True)

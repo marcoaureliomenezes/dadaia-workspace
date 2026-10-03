@@ -120,7 +120,10 @@ def next_step(
     """The first pending step — *focus* first, then every context in *trees*; *bound* is
     whether the caller's session is bound (``None``: no identity, so no ``bind`` step)."""
     if not trees:
-        create = fix_line(root, "context", "create", "<name>", "--main-repo", "<clone-url>")
+        create = (
+            f"Operator action: run {fix_line(root, 'context', 'create')} with a context name "
+            "and --main-repo set to the main repo's clone URL"
+        )
         return Step("context", "command", "no ALIVE Spec Context — create one", create)
     names = [focus] if focus is not None and focus in trees else []
     for name in [*names, *trees]:

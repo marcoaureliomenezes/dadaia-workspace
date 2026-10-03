@@ -5,7 +5,6 @@
 
 from __future__ import annotations
 
-import json
 import shutil
 import sys
 from pathlib import Path
@@ -13,7 +12,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 sys.path.append(str(Path(__file__).resolve().parents[2] / "dd-bug-resolution" / "scripts"))
 
-from _ledger import replace  # noqa: E402
+from _ledger import records, replace  # noqa: E402
 from _release_schema import SEMVER_RE, STATE, next_candidate, utc_now  # noqa: E402
 from _release_store import SCRIPT, Refusal, State, live_ids, read_state, validated  # noqa: E402
 from _release_tree import tree_findings  # noqa: E402
@@ -59,9 +58,7 @@ def seeded_scope(specs: Path, origin: str) -> str:
     """One scope clause per bug named by a `bugs:` origin, else the placeholder."""
     if not origin.startswith("bugs:"):
         return "(List the scope clusters / acceptance criteria.)"
-    ledger = specs / "bugs" / "BUGS.jsonl"
-    lines = ledger.read_text(encoding="utf-8").splitlines() if ledger.is_file() else []
-    known = {str(r.get("id")): r for r in (json.loads(x) for x in lines if x.strip())}
+    known = {str(r.get("id")): r for r in records(specs / "bugs" / "BUGS.jsonl")}
     bugs = [b.strip() for b in origin[5:].split(",") if b.strip()]
     return "\n".join(
         f"### FR{n} — {known.get(bug, {}).get('title', bug)}\n\n- Bug `{bug}`.\n"

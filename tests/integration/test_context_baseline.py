@@ -25,7 +25,8 @@ from dadaia_workspace.features.spec_context.service import (
     SpecContextService,
 )
 from dadaia_workspace.infrastructure.git_subprocess import GitSubprocessClient
-from dadaia_workspace.infrastructure.json_context_store import JsonContextStore
+from tests.conftest import GIT_QUIET_INCLUDE
+from tests.fixtures.stores import context_store
 from tests.helpers.privacy_fixtures import aws_key_shape
 
 _WORK = "feature/0.1.0"
@@ -48,6 +49,7 @@ def _identity(repo: Path) -> None:
 
 @pytest.fixture(autouse=True)
 def _no_global_git(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    (tmp_path / "gitconfig").write_text(GIT_QUIET_INCLUDE, encoding="utf-8")
     monkeypatch.setenv("GIT_CONFIG_GLOBAL", str(tmp_path / "gitconfig"))
     monkeypatch.setenv("GIT_CONFIG_NOSYSTEM", "1")
 
@@ -71,10 +73,9 @@ def _seed(bare: Path, work: Path, *branches: str, tag: str = "") -> None:
 def env(tmp_path: Path) -> tuple[SpecContextService, Path, Path]:
     root = tmp_path / "ws"
     (root / "repos").mkdir(parents=True)
-    (root / ".dadaia" / "states").mkdir(parents=True)
     bare = tmp_path / "proj.git"
     _git(tmp_path, "init", "-q", "--bare", "-b", "main", str(bare))
-    store = JsonContextStore(root / ".dadaia" / "states")
+    store = context_store(root / ".dadaia" / "states")
     store.save(SpecContextProject("proj", ContextState.ALIVE, "proj", bare.as_uri(), "2026-01-01"))
     svc = SpecContextService(
         store, GitSubprocessClient(), root, lambda _repo: None, scan_publish_candidates
@@ -216,19 +217,17 @@ def test_baseline_adopts_origin_and_publishes_the_draft(
 
 @pytest.mark.skipif(sys.platform == "win32", reason="the shipped pre-push hook is bash")
 @pytest.mark.parametrize("seeded", [(), ("main",)], ids=["empty", "principal-only"])
-def test_every_publish_passes_the_shipped_pre_push_gate(
-    env, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, seeded
-) -> None:
+def test_every_publish_passes_the_shipped_pre_push_gate(env, tmp_path: Path, seeded) -> None:
     """The real shipped pre-push gate (this interpreter's CLI) admits the first publish and
     the integration birth at the published principal."""
     svc, repo, bare = env
     if seeded:
         _seed(bare, tmp_path / "seed", *seeded)
     _clone_onboarded(bare, repo)
-    runner = tmp_path / "dadaia"
+    runner = tmp_path / ".dadaia" / ".venv" / "bin" / "dadaia"
+    runner.parent.mkdir(parents=True)
     runner.write_text(f'#!/bin/sh\nexec "{sys.executable}" -m dadaia_workspace "$@"\n')
     runner.chmod(0o755)
-    monkeypatch.setenv("DADAIA_BIN", str(runner))
     hook = repo / ".git" / "hooks" / "pre-push"
     shutil.copyfile(workspace_layout.public_scripts_dir() / "pre-push-ci-gate.sh", hook)
     hook.chmod(0o755)
@@ -265,11 +264,13 @@ def test_an_origin_without_the_principal_refuses_and_publishes_nothing(env, tmp_
     assert _git(repo, "branch", "--show-current") == "feature/0.1.0"
     assert _git(repo, "for-each-ref", "--format=%(refname:short)", "refs/heads") == "feature/0.1.0"
     anchor = _git(repo, "rev-parse", "HEAD")
-    assert anchor in str(refused.value) and "--principal '<principal>'" in str(refused.value)
+    assert anchor in str(refused.value) and "Operator action: choose the principal" in str(
+        refused.value
+    )
 
 
 def test_several_principal_candidates_are_listed_never_guessed(env, tmp_path: Path) -> None:
-    """Design review C6: two candidate heads — both listed, a `<principal>` placeholder."""
+    """Design review C6: two candidate heads — both listed, the choice the operator's."""
     svc, repo, bare = env
     _seed(bare, tmp_path / "seed", "trunk", "master")
     _git(bare, "symbolic-ref", "HEAD", "refs/heads/trunk")
@@ -277,7 +278,7 @@ def test_several_principal_candidates_are_listed_never_guessed(env, tmp_path: Pa
     with pytest.raises(ContextStateError) as refused:
         svc.baseline("proj")
     message = str(refused.value)
-    assert "master, trunk" in message and message.endswith("--principal '<principal>'")
+    assert "master, trunk" in message and message.endswith("--principal` with it")
 
 
 def test_a_never_onboarded_repo_is_refused_with_the_specs_init_fix(env, tmp_path: Path) -> None:
@@ -384,7 +385,9 @@ def test_a_draft_origin_tracks_is_never_stashed_away(env, tmp_path: Path) -> Non
 
 def test_a_tool_commit_never_falls_back_to_a_tool_identity(tmp_path: Path, monkeypatch) -> None:
     """SA-H3-2: one identity rule (git's own) — no hard-coded fallback author."""
-    (tmp_path / "gitconfig").write_text("[user]\n\tuseConfigOnly = true\n", encoding="utf-8")
+    (tmp_path / "gitconfig").write_text(
+        f"{GIT_QUIET_INCLUDE}[user]\n\tuseConfigOnly = true\n", encoding="utf-8"
+    )
     for var in ("NAME", "EMAIL"):
         monkeypatch.delenv(f"GIT_AUTHOR_{var}", raising=False)
         monkeypatch.delenv(f"GIT_COMMITTER_{var}", raising=False)
@@ -392,7 +395,9 @@ def test_a_tool_commit_never_falls_back_to_a_tool_identity(tmp_path: Path, monke
     _git(tmp_path, "init", "-q", str(repo))
     (repo / "a.md").write_text("a\n", encoding="utf-8")
     client = GitSubprocessClient()
-    assert client.identity_fix(repo).startswith("git -C")
+    assert (
+        client.identity_fix(repo) == f"Operator action: set git user.name in the config of {repo}"
+    )
     with pytest.raises(GitSyncError):
         client.commit_all(repo, "c")
 

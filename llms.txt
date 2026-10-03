@@ -4,28 +4,28 @@
 
 ## What it is
 
-<!-- derived-from: product-vision sha256:7e335ffc3ee1 -->
+<!-- derived-from: product-vision sha256:19c972934e54 -->
 
 - [README](README.md): one workspace folder, projects in repos inside it, governance outside every repo; the unit is the context (main repo + associated repos); documents are the lifecycle; boundaries are mechanical.
 
 ## Install
 
-<!-- derived-from: pypi-distribution sha256:92dbd2d7ed61 -->
-<!-- derived-from: workspace-init sha256:f158dffe2a7e -->
+<!-- derived-from: pypi-distribution sha256:cec6ab21a159 -->
+<!-- derived-from: workspace-init sha256:5a4a8bb1e91e -->
 
 - [PyPI project](https://pypi.org/project/dadaia-workspace/): three levels — `uvx dadaia-workspace init <dir> --harness <name> --repo <url>` (workspace + project: cloned and ALIVE; only `.dadaia/.venv/bin/dadaia context bind <slug>` binds a session), then `.dadaia/.venv/bin/dadaia specs init --context <slug>` (specs on the canon) and `.dadaia/.venv/bin/dadaia doctor`; every later command runs through `.dadaia/.venv/bin/dadaia`; re-running the `uvx` init line upgrades the workspace, then `.dadaia/.venv/bin/dadaia specs init --context <ctx>` refreshes each project's specs law.
 - [Changelog](CHANGELOG.md): written by release-please, one section per released version.
 
 ## The law
 
-<!-- derived-from: agentic-entities sha256:e74931cf1c40 -->
-<!-- derived-from: sdd-gate-v3 sha256:745061a2d4f7 -->
+<!-- derived-from: agentic-entities sha256:22f6bf181b40 -->
+<!-- derived-from: sdd-gate-v3 sha256:ed351120dcd1 -->
 
 - [AGENTS.md](dadaia_workspace/public/data/AGENTS.md): the always-on root map — flow, roles, gate invariants, where things live, the index of every scoped `AGENTS.md` and skill; projected once to the workspace root.
 
 ## Reference
 
-<!-- derived-from: pypi-distribution sha256:92dbd2d7ed61 -->
+<!-- derived-from: pypi-distribution sha256:cec6ab21a159 -->
 
 - [CLI reference](docs/cli.md): the committed output of `.dadaia/.venv/bin/dadaia help tree`.
 - [Concepts](docs/concepts.md): the vocabulary — context, release, candidate, gate, memory, ledgers, audits.
@@ -36,8 +36,8 @@
 
 ## The docs
 
-<!-- derived-from: pypi-distribution sha256:92dbd2d7ed61 -->
-<!-- derived-from: product-vision sha256:7e335ffc3ee1 -->
+<!-- derived-from: pypi-distribution sha256:cec6ab21a159 -->
+<!-- derived-from: product-vision sha256:19c972934e54 -->
 
 - [Documentation](https://github.com/marcoaureliomenezes/dadaia-workspace/tree/main/docs): the repository's `docs/` folder on `main`, every page derived under its markers.
 - [Landing](docs/index.md): the tagline, the paradigm and the two ways in.

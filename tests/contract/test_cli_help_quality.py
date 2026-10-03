@@ -21,11 +21,12 @@ from typer.testing import CliRunner
 
 from dadaia_workspace.cli.help_digest import command_paths
 from dadaia_workspace.cli.main import app
+from dadaia_workspace.core.cli_line import fix_line
 from dadaia_workspace.core.harness_registry import L1_ENTRY_HARNESSES
 from dadaia_workspace.features.capabilities import build_capabilities
 
 _PUBLIC = Path(__file__).resolve().parents[2] / "dadaia_workspace" / "public"
-_ENV = {"COLUMNS": "400", "NO_COLOR": "1", "TERM": "dumb"}
+_ENV = {"COLUMNS": "400", "NO_COLOR": "1"}
 
 
 def _tree() -> list[tuple[tuple[str, ...], Any]]:
@@ -164,3 +165,16 @@ def test_every_advertised_verb_and_harness_exists() -> None:
     assert {(group, verb) for group, verbs in surfaces.items() for verb in verbs} <= live
     assert "panel" not in surfaces
     assert payload["harnesses"]["layer_1"] == list(L1_ENTRY_HARNESSES)
+
+
+def test_every_help_example_renders_the_venv_cli() -> None:
+    """help-examples-spell-the-blocked-bare-cli: the gate blocks a bare `dadaia` first token,
+    so a command path in any --help follows only the `fix_line` rendering of the CLI."""
+    leaf = "|".join(r"\s+".join(p) for p in sorted(command_paths(), key=len, reverse=True) if p)
+    bare = re.compile(rf"(?<!Usage: )\bdadaia\s+(?:{leaf})(?=[\s'\"`]|$)")
+    hits = [
+        f"{' '.join(p) or '<root>'}: {m.group(0)!r}"
+        for p, _ in _tree()
+        for m in bare.finditer(_help(*p).replace(fix_line(None), "<cli>"))
+    ]
+    assert hits == [], "\n".join(hits)

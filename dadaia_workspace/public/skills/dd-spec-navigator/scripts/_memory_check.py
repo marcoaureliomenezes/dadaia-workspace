@@ -26,8 +26,13 @@ def check(specs: Path) -> list[Finding]:
     """The catalog and index as they would be regenerated, against what is on disk."""
     try:
         catalog = cat.generate(specs)
-    except (cat.Refusal, json.JSONDecodeError) as exc:
-        return [{"code": CODE, "path": CATALOG, "line": 0, "message": str(exc)}]
+    except (cat.Refusal, json.JSONDecodeError) as exc:  # the missing tree's fix makes it
+        fix = getattr(exc, "fix", "")
+        if not fix.startswith("mkdir"):
+            fix = (f"Operator action: correct the source atom — {exc} (specs/memory/AGENTS.md: "
+                   f"fix findings at the source atom, never in {CATALOG})")  # fmt: skip
+        return [{"code": CODE, "verdict": "error", "path": CATALOG, "line": 0,
+                 "message": str(exc), "fix": fix}]  # fmt: skip
     out: list[Finding] = []
     for name, rendered in ((CATALOG, cat.serialize(catalog)), (INDEX, cat.render(specs, catalog))):
         path = specs / name

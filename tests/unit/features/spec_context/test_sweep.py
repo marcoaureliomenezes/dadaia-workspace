@@ -12,7 +12,9 @@ through ``doctor-scan-raises-when-a-ttl-entry-vanishes-mid-walk`` and
 
 from __future__ import annotations
 
+import getpass
 import os
+import shutil
 from collections.abc import Callable
 from pathlib import Path
 
@@ -104,6 +106,38 @@ def test_remove_deletes_a_read_only_tree(
     assert isinstance(done, sweep.Skipped) is (message == _SKIP) and sweep.succeeded(done) is (message not in (None, _SKIP))
     assert not target.is_symlink() and (target.exists() == (survivor == rel))
     assert survivor is None or (tmp_path / survivor).exists()
+
+
+@pytest.mark.skipif(os.name == "nt" or os.geteuid() == 0, reason="POSIX dir permissions; root bypasses them")
+def test_an_expired_entry_another_account_holds_names_the_one_operator_act(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Intent: CONTRACT — doctor-tmp-expiry-foreign-owned-entry-never-clears: the TTL delete
+    act that cannot lift a permission (chmod refused: not the owner) skips naming the owner
+    and `Operator action: remove <the expired entry>`; once the operator removed it, the
+    act has nothing left to report, so the finding clears."""
+    entry = tmp_path / ".dadaia" / "tmp" / "a" / "20200101"
+    (held := entry / "x" / "dist").mkdir(parents=True)
+    (held / "f.whl").write_text("w", encoding="utf-8")
+    held.chmod(0o555)
+    monkeypatch.setattr(sweep.os, "chmod", _not_the_owner)
+
+    done = sweep.remove(tmp_path, entry, "tmp/a/20200101")
+
+    assert done.startswith("skipped 'tmp/a/20200101' (errno ")  # 13, or 39/66 on 3.14
+    assert done.endswith(
+        f"it holds an entry owned by {getpass.getuser()}; "
+        f"Operator action: remove {tmp_path}/.dadaia/tmp/a/20200101"
+    )
+    assert isinstance(done, sweep.Skipped) and entry.exists()
+    monkeypatch.undo()
+    held.chmod(0o755)
+    shutil.rmtree(entry)  # the operator's act
+    assert sweep.remove(tmp_path, entry, "tmp/a/20200101") is None
+
+
+def _not_the_owner(*_: object) -> None:
+    raise PermissionError(1, "Operation not permitted")
 
 
 def _exdev(a: object, b: object) -> None:

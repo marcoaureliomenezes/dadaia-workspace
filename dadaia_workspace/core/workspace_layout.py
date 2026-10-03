@@ -51,6 +51,8 @@ __all__ = [
     "parse_dadaiaignore",
     "protected_glob",
     "CORE_FLOOR",
+    "REFUSALS",
+    "FloorRefusal",
     "public_scripts_dir",
     "repo_excluded_display",
     "root_entries_display",
@@ -84,9 +86,45 @@ ROOT_ALLOWED_FILES: frozenset[str] = frozenset(
 )
 
 
+class FloorRefusal(StrEnum):
+    """Why a PROTECTED write is refused; its message is ``REFUSALS[refusal]``."""
+
+    LAW = "law"
+    OPERATOR = "operator"
+    GLOB = "glob"
+    SESSION = "session"
+
+
+_OPERATOR = (  # ADR 0092: the operator's file, or a path under an operator glob
+    "[GATE] '{path}' is the operator's ({why}; ADRs 0092, 0133): only the operator edits it "
+    "by hand. Draft your change under .dadaia/tmp/<agent>/<YYYYMMDD>/ and hand it over.\n"
+)
+#: Each refusal's message, formatted with ``path`` and ``match``; the gate appends its ``fix:``.
+REFUSALS: dict[FloorRefusal, str] = {
+    FloorRefusal.LAW: (
+        "[GATE] '{path}' is core workspace law or a projected file. In an "
+        "instantiated workspace only a human operator edits it by hand; "
+        "an agent changes the law at its source and re-projects.\n"
+        "The source is dadaia_workspace/public/; this re-projects it:\n"
+    ),
+    FloorRefusal.OPERATOR: _OPERATOR.replace("{why}", "its own file"),
+    FloorRefusal.GLOB: _OPERATOR.replace("{why}", "protected glob '{match}'"),
+    FloorRefusal.SESSION: (
+        "[GATE] .dadaia/sessions/ is protected CLI-owned bind state. Agents must not write "
+        "here via file tools. Blocked to preserve caller session identity integrity "
+        "(SEC-01 / CWE-284).\n"
+    ),
+}
+
 #: PROTECTED without any install ledger (ADR 0133): the root map, the operator's globs, and
-#: the CLI-owned ``.dadaia/`` zones; the ledger adds every projected path on top.
-CORE_FLOOR: tuple[str, ...] = ("AGENTS.md", DADAIAIGNORE, ".dadaia/states", ".dadaia/hooks", ".dadaia/sessions")  # fmt: skip
+#: the CLI-owned ``.dadaia/`` zones, each with its refusal; the ledger adds every projected path on top.
+CORE_FLOOR: dict[str, FloorRefusal] = {
+    "AGENTS.md": FloorRefusal.LAW,
+    DADAIAIGNORE: FloorRefusal.OPERATOR,
+    ".dadaia/states": FloorRefusal.LAW,
+    ".dadaia/hooks": FloorRefusal.LAW,
+    ".dadaia/sessions": FloorRefusal.SESSION,
+}
 
 
 class ZoneClass(StrEnum):

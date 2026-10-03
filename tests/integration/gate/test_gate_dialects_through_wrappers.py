@@ -10,7 +10,7 @@ documented event -> [{matcher, hooks}] shape; sa-gate-blind-on-cursor-copilot-de
 translated harnesses; sa-gate-blind-on-cursor-copilot-devin#B5 Kimi's shim prints the reason with real newlines, `fix:` at a
 line start, exit 2. AC1.2 (ADR 0103, ctx-inject-on-cursor-copilot): every harness's
 rendered ctx-inject wrapper answers on stdout, Cursor and Copilot in their vendor key, at
-every sessionStart.
+every sessionStart. AC3.9: a truncated registry under a live bind still BLOCKs in every dialect.
 Size: MEDIUM — runs the real generated wrappers/shim over the real pre_gate.
 """
 
@@ -21,10 +21,12 @@ import os
 import shutil
 import subprocess
 import sys
+from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
 
+from dadaia_workspace.core import session_store
 from dadaia_workspace.core.harness_registry import HARNESS_RECORDS
 from dadaia_workspace.core.workspace_layout import MARKER_DIR
 from dadaia_workspace.infrastructure.runtime_transforms.hook_wrappers import (
@@ -56,8 +58,11 @@ def ws(tmp_path: Path) -> Path:
     return tmp_path
 
 
-def _run(ws: Path, harness: str, case: str) -> subprocess.CompletedProcess[str]:
-    payload = (_FIXTURES / harness / f"{case}.json").read_text().replace("{ws}", str(ws))
+def _run(ws: Path, harness: str, case: str, **env_extra: str) -> subprocess.CompletedProcess[str]:
+    fixture, repos = (_FIXTURES / harness / f"{case}.json"), case == "repos"
+    fixture = fixture.with_name("scope.json") if repos else fixture  # the scope write, in repos/
+    payload = fixture.read_text().replace("{ws}", str(ws))
+    payload = payload.replace("worktrees/demo/0.5.0a-impl/", "repos/demo/") if repos else payload
     if harness == "claude":
         argv = [str(ws / ".dadaia/.venv/bin/python"), "-B", "-m", "dadaia_workspace.hooks.pre_gate"]
     else:
@@ -65,7 +70,7 @@ def _run(ws: Path, harness: str, case: str) -> subprocess.CompletedProcess[str]:
         body = hook_wrapper_contents(HARNESS_RECORDS[harness])[name]
         (ws / ".dadaia" / "hooks" / name).write_text(body)
         argv = ["sh", str(ws / ".dadaia" / "hooks" / name)]
-    env = {"PATH": os.environ["PATH"], "PYTHONPATH": os.environ.get("PYTHONPATH", "")}
+    env = {"PATH": os.environ["PATH"], "PYTHONPATH": os.environ.get("PYTHONPATH", ""), **env_extra}
     return subprocess.run(
         argv, input=payload, capture_output=True, text=True, cwd=ws, env=env, timeout=60
     )
@@ -84,6 +89,28 @@ def _verdict(harness: str, proc: subprocess.CompletedProcess[str]) -> str:
 @pytest.mark.parametrize("harness", sorted(HARNESS_RECORDS))
 def test_b8_every_harness_gets_claudes_verdict(ws: Path, harness: str, case: str) -> None:
     assert _verdict(harness, _run(ws, harness, case)) == _CLAUDE[case]
+
+
+@pytest.mark.parametrize(
+    "body",
+    ['{"contexts": [{"na', '{"contexts": ' + "[" * 100_000],
+    ids=["truncated", "deep-nesting"],
+)
+@pytest.mark.parametrize("case", ["protected", "new-root", "repos"])
+@pytest.mark.parametrize("harness", sorted(HARNESS_RECORDS))
+def test_ac3_9_a_bound_session_over_a_truncated_registry_still_blocks(
+    ws: Path, harness: str, case: str, body: str
+) -> None:
+    """AC3.9 (PLAN §2.6): a session bound by its live record, its registry truncated: an
+    unreadable registry is no bind, never a raise the pre-gate fails open on — a PROTECTED
+    write, a new root entry and a direct `repos/<r>/` write (ADR 0105) each BLOCK in every
+    dialect."""
+    now = datetime.now(tz=UTC).isoformat()
+    session_store.write_session(
+        ws, "s", {"session_id": "s", "last_seen_at": now, "context": "demo"}
+    )
+    (ws / ".dadaia" / "states" / "spec_contexts.json").write_text(body)
+    assert _verdict(harness, _run(ws, harness, case, DADAIA_SESSION_ID="s")) == "deny"
 
 
 @pytest.mark.parametrize(

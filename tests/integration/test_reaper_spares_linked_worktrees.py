@@ -11,7 +11,9 @@ from __future__ import annotations
 
 import os
 import re
+import shlex
 import subprocess
+import sys
 import time
 from pathlib import Path
 
@@ -19,6 +21,7 @@ import pytest
 
 from dadaia_workspace.features.spec_context.doctor import DoctorService
 from dadaia_workspace.infrastructure.git_subprocess import GitSubprocessClient
+from tests.conftest import _GIT_QUIET
 from tests.fixtures.stores import context_store
 from tests.helpers import worktree_ws
 
@@ -30,7 +33,7 @@ pytestmark = pytest.mark.slow(reason="real git init + worktree add subprocesses"
 def _git(cwd: Path, *args: str) -> str:
     env = {
         **os.environ,
-        "GIT_CONFIG_GLOBAL": os.devnull,
+        "GIT_CONFIG_GLOBAL": str(_GIT_QUIET),
         "GIT_CONFIG_SYSTEM": os.devnull,
         "GIT_AUTHOR_NAME": "t",
         "GIT_AUTHOR_EMAIL": "t@example.invalid",
@@ -46,6 +49,9 @@ def _git(cwd: Path, *args: str) -> str:
 def _workspace_with_worktree(root: Path, worktree_rel: str) -> tuple[Path, Path]:
     for zone in ("tmp", "states", "sessions", "reaped"):
         (root / ".dadaia" / zone).mkdir(parents=True, exist_ok=True)
+    (root / ".dadaia" / "states" / "spec_contexts.json").write_text(
+        '{"contexts": [{"name": "lib", "repo_slug": "lib", "state": "alive"}]}', encoding="utf-8"
+    )
     repo = root / "repos" / "lib"
     repo.mkdir(parents=True)
     _git(repo, "init", "-q", "-b", "main")
@@ -94,6 +100,7 @@ def test_doctor_fix_never_reaps_or_moves_a_linked_worktree(
 
 
 def test_doctor_lists_the_contexts_worktrees_from_git_and_touches_none(tmp_path: Path) -> None:
+    (tmp_path := tmp_path / "my ws").mkdir()  # the fix quotes its spaced path
     root = worktree_ws.make_workspace(tmp_path)
     repo = root / "repos/r"
     worktree_ws.git(repo, "checkout", "-q", "feature/0.5.0")
@@ -111,12 +118,16 @@ def test_doctor_lists_the_contexts_worktrees_from_git_and_touches_none(tmp_path:
     (root / "worktrees/r/stray").mkdir()
     doctor = worktree_ws.registered_doctor(root)
 
-    found = {f.message.split()[1]: f for f in doctor.check_worktrees("c")}
+    # a message is "<state> <path>  k=v…"
+    found = {f.message.split(" ", 1)[1].split("  ")[0]: f for f in doctor.check_worktrees("c")}
 
-    assert (found[str(ready)].verdict, found[str(ready)].fix) == (
-        "warning",
-        f"python3 {worktree_ws.SCRIPT} merge {ready}",
-    )
+    assert found[str(ready)].verdict == "warning"
+    assert shlex.split(found[str(ready)].fix) == [
+        sys.executable,
+        str(worktree_ws.SCRIPT),
+        "merge",
+        str(ready),
+    ]
     assert found[str(empty)].message.startswith("empty") and found[str(empty)].fix == ""
     assert found[str(foreign)].message.startswith("foreign")  # the expired TTL entry surfaces here
     assert not [f for f in doctor.scan_ttl() if "20200101" in f.path]

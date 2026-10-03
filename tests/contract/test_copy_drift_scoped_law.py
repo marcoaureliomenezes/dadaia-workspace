@@ -6,6 +6,8 @@ from __future__ import annotations
 
 import hashlib
 import json
+import shlex
+import subprocess
 from pathlib import Path
 
 import pytest
@@ -49,6 +51,7 @@ def _specs_tree(root: Path, memory_agents_md: str | None) -> Path:
 def _memory_issues(tmp_path: Path, content: str | None) -> list[str]:
     public = _public_tree(tmp_path)
     specs = _specs_tree(tmp_path / "tree", content)
+    subprocess.run(["git", "init", "-q", str(tmp_path)], check=True)  # the self-hosted case
     doctor = SpecsDoctor(specs, public_dir=public)
     return [
         f"{i.code} {i.verdict} {i.message}"
@@ -58,9 +61,16 @@ def _memory_issues(tmp_path: Path, content: str | None) -> list[str]:
 
 
 def test_a_prose_rewrite_of_the_memory_scaffold_is_a_copy_drift_finding(tmp_path: Path) -> None:
+    """Its fix, run as printed, shows the rewrite (tree5-copy-drift-fix-not-built-by-cli-line)."""
     issues = _memory_issues(tmp_path, _PROSE_REWRITE)
     assert len(issues) == 1, issues
     assert issues[0].startswith("TREE-5 warning copy-drift:"), issues[0]
+    doctor = SpecsDoctor(tmp_path / "tree" / "specs", public_dir=tmp_path / "public")
+    (fix,) = [i.fix for i in doctor.check() if "copy-drift" in i.message]
+    shown = subprocess.run(
+        shlex.split(fix), cwd=tmp_path, capture_output=True, text=True, check=False
+    )
+    assert shown.returncode == 1 and "+A prose rewrite nobody shipped." in shown.stdout, fix
 
 
 def test_the_scaffold_bytes_are_silent(tmp_path: Path) -> None:

@@ -80,7 +80,7 @@ def test_non_tty_missing_field_exits_1_with_one_fix(
     assert result.exit_code == 1, result.output
     fixes = [ln for ln in result.output.splitlines() if ln.startswith("fix: ")]
     assert len(fixes) == 1, result.output
-    assert fixes[0].startswith("fix: uvx dadaia-workspace init "), fixes
+    assert "uvx dadaia-workspace init " in fixes[0], fixes
     assert "--harness" in fixes[0]
     assert not list(tmp_path.iterdir())
 

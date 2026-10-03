@@ -96,7 +96,6 @@ def _refuse_branch(
 ) -> Decision:
     """Actionable refusal for a non-pushable ref (*branch* ``None``: not a branch head)."""
     role = gitflow.role_of(branch) if branch is not None else None
-    work = gitflow.work_pattern
     if role is not None and ref.remote_sha == ZERO_SHA:
         other = gitflow.integration if role == "principal" else gitflow.principal
         return _blocked(
@@ -107,14 +106,14 @@ def _refuse_branch(
     if role is None:
         return _blocked(
             f"ref '{ref.local_ref}' is outside the gitflow — principal '{gitflow.principal}', "
-            f"integration '{gitflow.integration}', work '{fixes.work or work}'; only a work "
+            f"integration '{gitflow.integration}', work '{fixes.work}'; only a work "
             f"branch is pushable: switch to it, merge {ref.local_sha} into it (never a "
             "rewrite), then push it",
             git_line(fixes.repo, "switch", fixes.work)
             if fixes.cut
-            else git_line(fixes.repo, "switch", "-c", fixes.work or work, ref.local_sha),
+            else git_line(fixes.repo, "switch", "-c", fixes.work, ref.local_sha),
         )
-    head = gitflow.integration if role == "principal" else work
+    head = gitflow.integration if role == "principal" else fixes.work
     return _blocked(
         f"the {role} branch '{branch}' is never pushed directly — it advances only via a PR "
         f"from '{head}'",

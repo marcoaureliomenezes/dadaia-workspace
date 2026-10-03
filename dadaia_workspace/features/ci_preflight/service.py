@@ -64,18 +64,15 @@ def _resolve_tool(
     name: str,
     *,
     python_executable: str | None = None,
-    dadaia_bin: str | None = None,
     require: bool = False,
 ) -> tuple[str, ...]:
     """The argv prefix for tool *name*, never from the ambient PATH (bug B2): the sibling
-    of the interpreter, else of ``DADAIA_BIN`` (neither ``resolve()``d: a venv python is a
-    symlink out of the venv), else ``poetry run`` — or, *require*d, a runnable command
+    of the interpreter (never ``resolve()``d: a venv python is a symlink out of the
+    venv), else ``poetry run`` — or, *require*d, a runnable command
     that fails closed naming the tool and its poetry group (architect A10)."""
     py = python_executable if python_executable is not None else sys.executable
-    bin_ptr = dadaia_bin if dadaia_bin is not None else os.environ.get("DADAIA_BIN")
-    for anchor in (py, bin_ptr):
-        if anchor and _is_executable_file(sibling := Path(os.path.abspath(anchor)).parent / name):
-            return (str(sibling),)
+    if _is_executable_file(sibling := Path(os.path.abspath(py)).parent / name):
+        return (str(sibling),)
     if not require:
         return ("poetry", "run", name)
     hint = f"{name} is not installed in the resolved environment. Install it with: poetry install --with dev"
@@ -87,7 +84,6 @@ def checks_for(
     quick: bool = False,
     *,
     python_executable: str | None = None,
-    dadaia_bin: str | None = None,
 ) -> tuple[Check, ...]:
     """The ordered checks; ``quick`` drops the e2e suite. A missing ``lint-imports``
     fails closed instead of taking its arguments."""
@@ -95,11 +91,7 @@ def checks_for(
     for name, tool, args in _TABLE:
         gated = tool == "lint-imports"
         prefix = (
-            _resolve_tool(
-                tool, python_executable=python_executable, dadaia_bin=dadaia_bin, require=gated
-            )
-            if tool
-            else ()
+            _resolve_tool(tool, python_executable=python_executable, require=gated) if tool else ()
         )
         if gated and len(prefix) > 1:
             args = ()  # the fail-closed command takes no arguments

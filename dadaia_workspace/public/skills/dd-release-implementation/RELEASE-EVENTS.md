@@ -13,9 +13,10 @@ Disclosed reference reached from `SKILL.md`/`RC-FLOW.md` wherever the arc says "
 - `phase` is rewritten in place on every transition — no history of prior values survives in the field.
 - A transition worth remembering becomes a `log` entry.
 - `defined`/`implemented`/`shipped` are the three sha-bearing milestone facts.
-- Each milestone is set at most once meaningfully (a later legitimate rewrite is a correction, not a duplicate), or `null` before that point.
+- `defined`/`implemented` hold the live candidate's stamp; each `phase` also appends a `kind: milestone` entry `{candidate, milestone, sha}`, the per-candidate history. Stamps older than these entries are the `Candidate defined at …`/`Candidate implemented at …` notes.
 - `log` is the one append-only array inside the document — oldest first, never rewritten once appended; each entry is `{ts, agent, kind, text}`.
-- `kind` is one of `note summary size drifts dispositions test-dispositions artifact-gc reviews merge memory`.
+- `kind` is one of `note summary size drifts dispositions test-dispositions artifact-gc reviews merge memory milestone`.
+- `release.py check` judges every phase: under DEFINITION, a `[-]`/`[x]` marker or a closure entry after the candidate's birth note is a finding.
 
 ## Who sets which milestone
 
@@ -24,7 +25,7 @@ Disclosed reference reached from `SKILL.md`/`RC-FLOW.md` wherever the arc says "
 | `phase` + `defined` | `python3 .agents/skills/dd-release-implementation/scripts/release.py phase IMPLEMENTATION --sha <sha>` | phase string, `{sha, ts}` |
 | `phase` + `implemented` | `python3 .agents/skills/dd-release-implementation/scripts/release.py phase CLOSURE --sha <sha>` | phase string, `{sha, ts}` |
 | `phase: DEFINITION` | `python3 .agents/skills/dd-release-implementation/scripts/release.py new <id>` | phase string |
-| `shipped`, then the directory leaves | `python3 .agents/skills/dd-release-implementation/scripts/release.py ship --sha <sha> --pr <n>` | `{sha, pr, ts}` + one `delivered` histo line |
+| `shipped`, then the directory moves to `_archive/<v>/` | `python3 .agents/skills/dd-release-implementation/scripts/release.py ship --sha <sha> --pr <n>`, refused on any `check` error | `{sha, pr, ts}` (`check` verifies it from 0.5.0 on) + one `delivered` histo line, `summary` null |
 
 
 ## `log` — the closure narrative's home

@@ -12,7 +12,6 @@ from pathlib import Path
 
 import pytest
 
-from dadaia_workspace.infrastructure.privacy_check import _PRIVACY_DENYLIST_ENV
 from dadaia_workspace.infrastructure.public_assets import FileSystemPublicAssetManager
 
 _PKG = Path(__file__).resolve().parents[3] / "dadaia_workspace"
@@ -39,7 +38,7 @@ def test_an_operator_term_is_shown_first_last(
     term = "zorb" + "lax"
     denylist = tmp_path / "denylist.json"
     denylist.write_text(json.dumps({term: "zz fixture term"}), encoding="utf-8")
-    monkeypatch.setenv(_PRIVACY_DENYLIST_ENV, str(denylist))
+    monkeypatch.setenv("DADAIA_PRIVACY_DENYLIST", str(denylist))
 
     lines = _lines(tmp_path, "made by Zorb" + "lax-Corp\n")
 
@@ -67,7 +66,7 @@ def test_a_baseline_match_is_shown_first_last(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, value: str, shown: str
 ) -> None:
     """sa-private-match-rendering-has-three-renderers#B2: a baseline match (IP, hostname, home path, email) shows as first…last."""
-    monkeypatch.delenv(_PRIVACY_DENYLIST_ENV, raising=False)
+    monkeypatch.delenv("DADAIA_PRIVACY_DENYLIST", raising=False)
     monkeypatch.chdir(tmp_path)
 
     lines = _lines(tmp_path, f"seen at {value} and more prose follows\n")

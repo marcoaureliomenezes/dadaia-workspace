@@ -530,6 +530,10 @@ class DoctorService:
         now costs a week of holding, not the operator's state. Every step on an entry runs
         through the ONE sweep guard: it reports what it did or that it skipped, never
         aborts, and never touches a location outside the workspace."""
+        try:  # an unreadable registry (REG-SCHEMA): every lane acts on nothing (AC3.9)
+            context_registry.entries(self._workspace_root)
+        except SchemaVersionError:
+            return []
         actions = self.expire()
         actions.extend(self._reap(self.scan()))  # judged after the seed: a new .dadaiaignore counts
         for ctx in self._contexts():
@@ -663,7 +667,7 @@ def workspace_rules(
             ("HOOKS-DRIFT-1",),
             SECTION,
             installed_hooks,
-            fix_help=("ci", "install-hook", "--force", "--repo", "<repo>"),
+            fix_help=("ci", "install-hook", "--force"),
         ),
         Rule(
             ("PROJECTION",),

@@ -18,14 +18,9 @@ def main() -> int:
     sess_id = invocation.resolve_session_id(os.environ)
     if not sess_id:
         return 0
-    try:
-        workspace = invocation.resolve(env=os.environ, cwd=Path.cwd()).workspace_root
-        if workspace is not None:
-            session_store.touch_last_seen_at(
-                workspace, sess_id, now=datetime.now(tz=UTC).isoformat()
-            )
-    except Exception:  # noqa: BLE001 — fail-open: never break the harness
-        pass
+    workspace = invocation.resolve_root(cwd=Path.cwd(), target_path=None)
+    if workspace is not None:  # touch_last_seen_at never raises: an unwritable record is None
+        session_store.touch_last_seen_at(workspace, sess_id, now=datetime.now(tz=UTC).isoformat())
     return 0
 
 

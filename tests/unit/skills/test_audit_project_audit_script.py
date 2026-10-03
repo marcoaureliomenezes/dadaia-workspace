@@ -15,6 +15,7 @@ from pathlib import Path
 
 import pytest
 
+from dadaia_workspace.infrastructure.ledger_scripts import load_owner
 from tests.helpers.skill_scripts import stage_skill_scripts
 
 pytestmark = pytest.mark.unit
@@ -67,10 +68,9 @@ def _run(script: Path, *argv: str) -> subprocess.CompletedProcess[str]:
 
 
 def _histo(specs: Path) -> list[dict[str, object]]:
-    path = specs / "audits" / "_archive" / "audits_histo.jsonl"
-    if not path.is_file():
-        return []
-    return [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines() if line]
+    return load_owner("dd-bug-resolution", "_ledger").records(
+        specs / "audits" / "_archive" / "audits_histo.jsonl"
+    )
 
 
 @pytest.mark.parametrize(
@@ -121,6 +121,8 @@ def test_disposition_then_close_appends_the_histo_and_removes_the_directory(
         )  # fmt: skip
         assert done.returncode == 0, done.stderr
 
+    # AC3.15 (F052): a histo record without its window-end sha is unrecordable.
+    assert _run(script, "close", _AUDIT, "--specs", str(specs)).returncode == 2
     result = _run(script, "close", _AUDIT, "--sha", "abc1234", "--specs", str(specs))
 
     assert result.returncode == 0, result.stderr
@@ -145,12 +147,10 @@ def test_disposition_refuses_a_verdict_without_its_evidence(script: Path, specs:
 
     assert result.returncode == 1
     assert "--reason" in result.stderr
-    assert (
-        json.loads(
-            (specs / "audits" / _AUDIT / "FINDINGS.jsonl").read_text("utf-8").split("\n")[0]
-        )["disposition"]
-        == "open"
+    findings = load_owner("dd-bug-resolution", "_ledger").records(
+        specs / "audits" / _AUDIT / "FINDINGS.jsonl"
     )
+    assert findings[0]["disposition"] == "open"
 
 
 def test_check_passes_on_a_valid_tree_and_fails_on_a_broken_record(
@@ -190,6 +190,8 @@ def test_close_without_a_resolved_finding_never_records_resolved(
         "".join(json.dumps(r) + "\n" for r in records), encoding="utf-8"
     )
 
+    # AC3.15 (F052): a histo record without its window-end sha is unrecordable.
+    assert _run(script, "close", _AUDIT, "--specs", str(specs)).returncode == 2
     result = _run(script, "close", _AUDIT, "--sha", "abc1234", "--specs", str(specs))
 
     assert result.returncode == 0, result.stderr
@@ -202,11 +204,9 @@ def test_close_without_a_resolved_finding_never_records_resolved(
 def test_the_doctor_neither_folds_findings_nor_recommends_close() -> None:
     """sa-audit-close-archives-without-validating#B43-2: no doctor rule recommends
     `audit.py close`. sa-audit-close-archives-without-validating#B43-5: features/specs
-    parses no finding record, and the record store has no write half."""
+    parses no finding record."""
     from dadaia_workspace.features.specs.rules import RULES
-    from dadaia_workspace.infrastructure.jsonl_record_store import JsonlRecordStore
 
     assert not [r.codes for r in RULES if "close" in str(r.fix_help)]
     specs_src = Path(__file__).resolve().parents[3] / "dadaia_workspace" / "features" / "specs"
     assert not [p for p in specs_src.glob("*.py") if "from_dict" in p.read_text("utf-8")]
-    assert not {"append", "update", "remove"} & set(vars(JsonlRecordStore))

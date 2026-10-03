@@ -20,7 +20,9 @@ import json
 import sys
 from collections.abc import Iterator, Sequence
 from dataclasses import dataclass
+from functools import cache
 from pathlib import Path
+from types import ModuleType
 from typing import Any, Protocol
 
 from dadaia_workspace.core.cli_line import fix_line, script_line
@@ -36,6 +38,7 @@ __all__ = [
     "MEMORY_SCRIPT",
     "RELEASE_SCRIPT",
     "LedgerScript",
+    "load_owner",
     "resolve_script",
     "script_findings",
     "script_repairs",
@@ -85,6 +88,17 @@ WORKTREE_SCRIPT = LedgerScript("WORKTREES", "dd-gitflow-default", "worktree.py")
 LEDGER_SCRIPTS = (BUGS_SCRIPT, BACKLOG_SCRIPT, RELEASE_SCRIPT, AUDIT_SCRIPT, MEMORY_SCRIPT)
 
 
+@cache
+def load_owner(skill: str, module: str) -> ModuleType:
+    """The packaged ``<skill>/scripts/<module>.py``, executed from source into a module —
+    the one package path into ``public/skills`` (ADR 0135); no bytecode lands beside it."""
+    path = _PACKAGE_SKILLS / skill / "scripts" / f"{module}.py"
+    owner = ModuleType(module)
+    owner.__file__ = str(path)
+    exec(compile(path.read_text(encoding="utf-8"), path, "exec"), owner.__dict__)
+    return owner
+
+
 class _Runner(Protocol):
     def run(
         self, argv: Sequence[str], *, cwd: Path | None = ..., timeout: float | None = ...
@@ -130,7 +144,7 @@ def _unrunnable(script: LedgerScript, reason: str) -> SectionFinding:
     )
 
 
-def _finding(script: LedgerScript, record: dict[str, Any], specs_dir: Path) -> SectionFinding:
+def _finding(script: LedgerScript, record: dict[str, Any]) -> SectionFinding:
     unit = f"{record.get('path', '')}:{record.get('line', 0)}".strip(":")
     return SectionFinding(
         code=str(record.get("code") or script.code),
@@ -138,11 +152,8 @@ def _finding(script: LedgerScript, record: dict[str, Any], specs_dir: Path) -> S
         message=f"{unit} {record.get('message', '')}".strip(),
         canonical=False,
         error=str(record.get("verdict") or "error") == "error",
-        fix=str(
-            record.get("fix")
-            or f"Operator action: {specs_dir.resolve() / record['path']} line "
-            f"{record.get('line', 0)} is invalid; repair that line by hand, then commit."
-        ),
+        # Every check record carries its fix; one without is an install older than this one.
+        fix=str(record.get("fix") or fix_line(None, "public", "install")),
     )
 
 
@@ -165,7 +176,7 @@ def script_findings(specs_dir: Path, runner: _Runner | None = None) -> list[Sect
         if records is None:
             findings.append(_unrunnable(script, f"check exited {result.returncode} with no JSON"))
             continue
-        findings.extend(_finding(script, record, specs_dir) for record in records)
+        findings.extend(_finding(script, record) for record in records)
     return findings
 
 

@@ -46,7 +46,7 @@ class InitPlan:
         repos = [f"--repo {self.repo}"] if self.repo else []
         repos += [f"--associated-repo {url}" for url in self.associated]
         target = self.directory if directory is None else directory
-        return " ".join([_INIT, str(target), "--harness", self.harness, *repos])
+        return " ".join(filter(None, [_INIT, str(target), "--harness", self.harness, *repos]))
 
 
 def _interactive() -> bool:
@@ -79,10 +79,16 @@ def _plan(directory: str, harness: str, repo: str, associated: tuple[str, ...]) 
         return InitPlan(directory, harness, repo, associated)
     first = harness_registry.L1_ENTRY_HARNESSES[0]
     if not _interactive():
+        fix = InitPlan(directory or "", harness or first, repo, associated).command()
         fail(
             "init needs DIR and --harness when no terminal can answer prompts; "
             f"harnesses: {', '.join(harness_registry.L1_ENTRY_HARNESSES)}.\nfix: "
-            + InitPlan(directory or "<dir>", harness or first, repo, associated).command()
+            + (
+                fix
+                if directory
+                else f"Operator action: run `{fix}` with the new workspace's "
+                "directory as its first argument"
+            )
         )
     directory = directory or str(Path.cwd() / typer.prompt("Workspace name"))
     harness = harness or typer.prompt(

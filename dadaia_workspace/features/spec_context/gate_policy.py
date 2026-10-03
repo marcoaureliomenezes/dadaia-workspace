@@ -21,12 +21,11 @@ documented way out was a bind flag that no longer exists.
 
 from __future__ import annotations
 
-import runpy
 from collections.abc import Callable
 from enum import Enum
 from functools import cache
 from itertools import chain
-from pathlib import Path, PurePath
+from pathlib import PurePath
 
 from dadaia_workspace.core import workspace_layout
 from dadaia_workspace.core.cli_line import fix_line, mkdir_line, script_line
@@ -35,27 +34,16 @@ __all__ = ["Decision", "PathClass", "classify_path", "evaluate"]
 
 # Derived from the zone registry (OUTPUT + EPHEMERAL zones) — never a second literal.
 _ADDITIVE_DADAIA_PREFIXES: tuple[str, ...] = workspace_layout.additive_prefixes()
-#: SEC-01 block reason emitted by the Python hook ``dadaia_workspace.hooks.sdd_gate``,
-#: which delegates here so PROTECTED has a single message source.
-_PROTECTED_MESSAGE = (
-    "[GATE] .dadaia/sessions/ is protected CLI-owned bind state. Agents must not write "
-    "here via file tools. Blocked to preserve caller session identity integrity "
-    "(SEC-01 / CWE-284).\n"
-)
-#: PROTECTED also holds the code floor and every path the install ledger records (the caller
-#: passes that set as *projected*) — the floor holds without a ledger (ADR 0133).
-_LAW_MESSAGE = (
-    "[GATE] '{path}' is core workspace law or a projected file. In an "
-    "instantiated workspace only a human operator edits it by hand; "
-    "an agent changes the law at its source and re-projects.\n"
-    "The source is dadaia_workspace/public/; this re-projects it:\n"
-)
-
-#: ``.dadaiaignore`` is the operator's alone (ADR 0092): an agent proposes a pattern, never writes it.
-_OPERATOR_MESSAGE = (
-    "[GATE] '{path}' is the operator's ({why}; ADRs 0092, 0133): only the operator edits it "
-    "by hand. Draft your change under .dadaia/tmp/<agent>/<YYYYMMDD>/ and hand it over.\n"
-)
+_R = workspace_layout.FloorRefusal
+_Fix = Callable[[PurePath, str | None], str]
+_DRAFT: _Fix = lambda root, _: mkdir_line(root / ".dadaia" / "tmp")  # noqa: E731
+#: One fix per refusal, total: a new ``FloorRefusal`` member fails here, as ``REFUSALS`` does.
+_FIXES: dict[workspace_layout.FloorRefusal, _Fix] = {
+    _R.LAW: lambda root, _: fix_line(root, "public", "install"),
+    _R.OPERATOR: _DRAFT,
+    _R.GLOB: _DRAFT,
+    _R.SESSION: lambda root, ctx: fix_line(root, "context", *(("bind", ctx) if ctx else ("list",))),
+}
 
 _SCOPE_MESSAGE = (
     "[GATE] '{rel_path}' writes into repo '{repo}', owned by context '{owner}' — this "
@@ -67,7 +55,6 @@ _MERGE_ONLY_MESSAGE = (
     "write it inside a worktree of {repo}.\n"
 )
 _WORKTREE_SCRIPT = ".agents/skills/dd-gitflow-default/scripts/worktree.py"
-_KINDS = Path(__file__).parents[2] / "public/skills/dd-gitflow-default/scripts/_worktree_kinds.py"
 
 
 class PathClass(Enum):
@@ -86,8 +73,13 @@ class Decision(Enum):
 
 @cache
 def _kind_holding() -> Callable[[str], str | None]:
-    """The KINDS grammar's owner (ADR 0135), run in place: no bytecode left beside it."""
-    holding: Callable[[str], str | None] = runpy.run_path(str(_KINDS))["kind_holding"]
+    """The KINDS grammar's owner (ADR 0135) through the one loader, imported on the first
+    merge-only BLOCK so the pre-gate's ALLOW path pays nothing."""
+    from dadaia_workspace.infrastructure.ledger_scripts import load_owner
+
+    holding: Callable[[str], str | None] = load_owner(
+        "dd-gitflow-default", "_worktree_kinds"
+    ).kind_holding
     return holding
 
 
@@ -100,14 +92,15 @@ def _worktree_fix(repo: str, repo_rel: str) -> str:
 
 def _protection(
     p: str, projected: frozenset[str], protected: tuple[str, ...]
-) -> tuple[str, str] | None:
-    """The one PROTECTED predicate, in precedence order: ``(source, match)`` — ``projected``
-    and the path, ``floor`` and its entry, ``glob`` and the matched protected glob — else ``None``."""
+) -> tuple[workspace_layout.FloorRefusal, str] | None:
+    """The one PROTECTED predicate, in precedence order: ``(refusal, match)`` — a *projected*
+    path (LAW), a ``CORE_FLOOR`` entry (its own refusal), a *protected* glob (GLOB) — else ``None``."""
+    floor = workspace_layout.CORE_FLOOR
     return next(
         chain(
-            [("projected", p)] if p in projected else [],
-            (("floor", f) for f in workspace_layout.CORE_FLOOR if p == f or p.startswith(f + "/")),
-            (("glob", g) for g in protected if workspace_layout.protected_glob(p, (g,))),
+            [(_R.LAW, p)] if p in projected else [],
+            ((floor[f], f) for f in floor if p == f or p.startswith(f + "/")),
+            ((_R.GLOB, g) for g in protected if workspace_layout.protected_glob(p, (g,))),
         ),
         None,
     )
@@ -115,9 +108,9 @@ def _protection(
 
 def classify_path(
     rel_path: str, projected: frozenset[str] = frozenset(), protected: tuple[str, ...] = ()
-) -> tuple[PathClass, tuple[str, str] | None]:
+) -> tuple[PathClass, tuple[workspace_layout.FloorRefusal, str] | None]:
     """(class, ``_protection`` hit) of a workspace-relative path; first match wins: PROTECTED
-    (floor, *projected*, a *protected* glob), ADDITIVE (the zone-registry ``.dadaia/``
+    (*projected*, then the floor, then a *protected* glob — ``_protection``'s order), ADDITIVE (the zone-registry ``.dadaia/``
     prefixes), else MUTATING — no ``repos/`` path is ever ADDITIVE (ADR 0124)."""
     p = rel_path.lstrip("/")
     if hit := _protection(p, projected, protected):
@@ -153,15 +146,9 @@ def evaluate(
     """
     cls, hit = classify_path(rel_path, projected, protected)
     if hit:
-        source, match = hit
-        if match == ".dadaia/sessions":
-            message, fix = _PROTECTED_MESSAGE, fix_line(root, "context", "bind", "<ctx>")
-        elif source == "glob" or match == workspace_layout.DADAIAIGNORE:
-            why = f"protected glob '{match}'" if source == "glob" else "its own file"
-            message = _OPERATOR_MESSAGE.format(path=rel_path, why=why)
-            fix = mkdir_line(root / ".dadaia" / "tmp")
-        else:  # re-projects the law from staging
-            message, fix = _LAW_MESSAGE.format(path=rel_path), fix_line(root, "public", "install")
+        refusal, match = hit
+        fix = _FIXES[refusal](root, context)
+        message = workspace_layout.REFUSALS[refusal].format(path=rel_path, match=match)
         return Decision.BLOCK, message + f"fix: {fix}"
     if cls == PathClass.ADDITIVE or repo is None:
         return Decision.ALLOW, ""

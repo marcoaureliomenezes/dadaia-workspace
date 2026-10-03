@@ -18,7 +18,7 @@ from dadaia_workspace.core.atomic_write import atomic_write
 from dadaia_workspace.core.frontmatter import FRONTMATTER_RE
 from dadaia_workspace.core.gitflow import candidate_dir, merge_frontmatter, next_candidate
 from dadaia_workspace.core.release_state import RELEASE_ID_RE
-from dadaia_workspace.core.spec_status import APPROVED, DRAFT, IN_REVIEW
+from dadaia_workspace.core.spec_status import APPROVED, DRAFT, IN_REVIEW, STATUS_LINE
 from dadaia_workspace.core.workspace_layout import CANDIDATE_DOCUMENTS
 
 
@@ -224,13 +224,7 @@ def rewrite_status_tokens(specs_dir: Path) -> list[Path]:
 
 
 def _rewrite_status_line(text: str) -> str:
-    """Translate the document's ``**Status:**`` declaration, and nothing else."""
-    lines = text.splitlines(keepends=True)
-    for index, line in enumerate(lines):
-        if "**Status:**" not in line:
-            continue
-        for retired, english in _RETIRED_STATUS_TOKENS.items():
-            if retired in line:
-                lines[index] = line.replace(retired, english)
-                break
-    return "".join(lines)
+    """Translate the owner's one ``**Status:**`` declaration (``STATUS_LINE``), and nothing else."""
+    return STATUS_LINE.sub(
+        lambda m: m[0].replace(m[1], _RETIRED_STATUS_TOKENS.get(m[1], m[1])), text, count=1
+    )

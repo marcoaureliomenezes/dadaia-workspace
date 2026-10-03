@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import shlex
 import sys
+from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
@@ -50,7 +51,9 @@ def test_gate_allows_iff_the_doctor_keeps_the_entry(
 ) -> None:
     for zone in ("tmp", "states", "sessions", "reaped"):
         (tmp_path / ".dadaia" / zone).mkdir(parents=True, exist_ok=True)
-    (tmp_path / ".dadaia" / "states" / "spec_contexts.json").write_text("{}", encoding="utf-8")
+    (tmp_path / ".dadaia" / "states" / "spec_contexts.json").write_text(
+        '{"contexts": []}', encoding="utf-8"
+    )
     if existing is not None:
         (tmp_path / existing).mkdir()
     if glob is not None:
@@ -58,17 +61,22 @@ def test_gate_allows_iff_the_doctor_keeps_the_entry(
     path = tmp_path / target
     payload = {"tool_name": "Write", "tool_input": {"file_path": str(path), "content": "x"}}
 
+    days = [datetime.now(UTC).strftime("%Y%m%d")]  # the call may cross UTC midnight
     gate = run_hook_subprocess("pre_gate", payload, claude_hook_env(tmp_path))
+    days.append(datetime.now(UTC).strftime("%Y%m%d"))
 
     block = gate.block_envelope()
     assert (block is None) is allows, gate.stdout
     if block is not None:  # #E1, #E4: the one fix names the owning zone, never the globs
         (fix,) = [ln for ln in block["reason"].splitlines() if ln.startswith("fix: ")]
-        zone = (tmp_path.resolve() / ".dadaia" / "tmp").as_posix()
-        assert shlex.split(fix[len("fix: ") :]) == [
-            Path(sys.executable).as_posix(),
-            "-c",
-            f"import pathlib; pathlib.Path(r'{zone}').mkdir(parents=True, exist_ok=True)",
+        tmp = tmp_path.resolve() / ".dadaia" / "tmp" / "main-thread"  # the agent's own day dir
+        assert shlex.split(fix[len("fix: ") :]) in [
+            [
+                Path(sys.executable).as_posix(),
+                "-c",
+                f"import pathlib; pathlib.Path(r'{(tmp / day).as_posix()}').mkdir(parents=True, exist_ok=True)",
+            ]
+            for day in days
         ]
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text("x", encoding="utf-8")

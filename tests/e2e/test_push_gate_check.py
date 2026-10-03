@@ -2,14 +2,15 @@
 driven as the pre-push hook drives it (git's ref lines on stdin, harness-free env, no
 handoff on disk). A work-branch push, a branch deletion and a tag push pass; the branch
 names come from the committed constitution's gitflow (custom, absent -> default + one
-warning, inherited by an associated repo). The integration-branch refusal and its fix are
-the refusal harness Case `birth_published`.
+warning, inherited by an associated repo; its main repo absent -> default + one warning).
+The integration-branch refusal and its fix are the refusal harness Case `birth_published`.
 """
 
 from __future__ import annotations
 
 import json
 import os
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -34,7 +35,9 @@ def _init_repo(workspace: Path, slug: str) -> tuple[Path, str]:
     closed as a genuine git-read failure (FR6 row 2), so tests use a REAL commit sha.
     """
     (workspace / ".dadaia" / "states").mkdir(parents=True, exist_ok=True)
-    (workspace / ".dadaia" / "states" / "spec_contexts.json").write_text("{}", encoding="utf-8")
+    (workspace / ".dadaia" / "states" / "spec_contexts.json").write_text(
+        '{"contexts": []}', encoding="utf-8"
+    )
     repo = workspace / "repos" / slug
     repo.mkdir(parents=True)
     subprocess.run(["git", "init", "-q"], cwd=repo, check=True)
@@ -148,6 +151,14 @@ def test_an_associated_repo_inherits_its_context_gitflow(tmp_path: Path) -> None
     assert result.returncode == 0, result.stderr
     assert "WARNING" not in result.stderr
     assert _run_push_gate(infra, tmp_path, _push("feature/0.0.1", sha)).returncode != 0
+    # pre-push-gate-crashes-when-owner-main-repo-absent: an absent main repo carries no
+    # committed text — ADR 0046's default plus one warning, never a traceback.
+    shutil.rmtree(main)
+    result = _run_push_gate(infra, tmp_path, _push("feature/0.0.1", sha))
+    assert result.returncode == 0 and result.stderr.count("WARNING") == 1, result.stderr
+    _write_constitution(infra, _CUSTOM_BLOCK)  # its own constitution is read first
+    result = _run_push_gate(infra, tmp_path, _push("work/0.0.1", sha))
+    assert result.returncode == 0 and "WARNING" not in result.stderr, result.stderr
 
 
 @pytest.mark.parametrize(

@@ -18,7 +18,7 @@ from dadaia_workspace.cli._specs_resolution import (
     own_bind_for_cli,
     resolve_session_id,
 )
-from dadaia_workspace.cli.redact import ContextRedactor, build_context_redactor
+from dadaia_workspace.cli.redact import build_context_redactor
 from dadaia_workspace.core import session_store
 from dadaia_workspace.core.cli_line import fix_line
 from dadaia_workspace.core.exceptions import (
@@ -127,18 +127,22 @@ def print_next_step(workspace_root: Path, focus: str | None = None) -> None:
 
 
 def create_fix(root: Path, error: Exception, name: str | None, urls: list[str]) -> str:
-    """The invocation, every ``--associated-repo`` kept (AC3.5), with what failed made a
-    placeholder — never the failing command repeated; an owned slug names its owner."""
+    """The invocation, every ``--associated-repo`` kept (AC3.5); what failed is the
+    operator's choice, named in words — never the failing command repeated; an owned slug
+    names its owner."""
     if isinstance(error, AssociatedRepoConflictError):
         return fix_line(root, "context", "list")
     if isinstance(error, ContextAlreadyExistsError):
-        name = "<another-name>"
-    failed = error.url if isinstance(error, GitCloneError) else None
-    urls = [u if u != failed else "<clone-url>" for u in urls]
+        name = None
     flags = [arg for u in urls[1:] for arg in ("--associated-repo", u)]
-    return fix_line(
+    fix = fix_line(
         root, "context", "create", *([name] if name else []), "--main-repo", urls[0], *flags
     )
+    if isinstance(error, ContextAlreadyExistsError):
+        return f"Operator action: choose a context name no context holds and run `{fix}` with it"
+    if isinstance(error, GitCloneError):
+        return f"Operator action: run `{fix}` with a reachable clone URL in place of {error.url}"
+    return fix
 
 
 @app.command()
@@ -158,6 +162,8 @@ def create(
         ctx = container.build_spec_context_service(ws).create(
             main_repo, name=name, associated_urls=tuple(associated)
         )
+    except SchemaVersionError as e:  # the registry's refusal carries its own one fix
+        fail(e)
     except (DadaiaError, OSError) as e:
         fail(f"{e}\nfix: {create_fix(ws, e, name, [main_repo, *associated])}")
     suffix = f", {len(ctx.associated_repos)} associated repo(s)" if ctx.associated_repos else ""
@@ -199,15 +205,8 @@ def list_all(
         )
         return
     if not contexts:
-        console.print(
-            "No contexts found. Create one: "
-            + fix_line(
-                resolve_workspace_root(),
-                *["context", "create", "<name>", "--main-repo", "<clone-url>"],
-            ),
-            markup=False,
-            soft_wrap=True,
-        )
+        console.print("No contexts found.")
+        print_next_step(resolve_workspace_root())
         return
 
     table = Table(title="Spec Context Projects")
@@ -248,20 +247,13 @@ def show(
 ) -> None:
     """Show details of a context."""
     svc = _ctx_service()
-    bound, session_id = own_bind_for_cli()  # name and session from ONE Bind
-    ctx, target = None, name or bound
     try:
-        ctx = svc.show(target) if target else None
-    except ContextNotFoundError as e:
+        bound, session_id = own_bind_for_cli()  # name and session from ONE Bind
+        ctx = svc.show(target) if (target := name or bound) else None
+    except (ContextNotFoundError, SchemaVersionError) as e:
         fail(e)
 
-    redactor: ContextRedactor | None = None
-    if redact:
-        try:
-            all_contexts = svc.list_all()
-        except SchemaVersionError:
-            all_contexts = [ctx] if ctx is not None else []
-        redactor = build_context_redactor(all_contexts)
+    redactor = build_context_redactor(svc.list_all()) if redact else None
 
     data = None if ctx is None else _ctx_to_dict(svc, ctx)
     if data is not None and json_output:
@@ -347,11 +339,9 @@ def dead(
         fail(e)
 
 
-@app.command(epilog="Examples: .dadaia/.venv/bin/dadaia context bind my-ctx")
+@app.command(epilog=f"Examples: {fix_line(None)} context bind my-ctx")
 def bind(name: str = typer.Argument(..., help="Context name to bind to")) -> None:
     """Bind this shell session to a context.
-
-    Run: dadaia context bind <name>
 
     The bind sets this session's write scope to the context's main repo plus its
     associated repos.
@@ -370,8 +360,8 @@ def bind(name: str = typer.Argument(..., help="Context name to bind to")) -> Non
     if not session_id:
         fail(
             "No session id in this shell: a bind needs one the gate and the hooks can see.\n"
-            "fix: Operator action: export DADAIA_SESSION_ID=<any-stable-id> before opening "
-            "the session"
+            "fix: Operator action: export DADAIA_SESSION_ID set to a stable id of your choice "
+            "before opening the session"
         )
     _sessions_dir(workspace_root).mkdir(parents=True, exist_ok=True)
     session_store.write_session(
@@ -403,8 +393,6 @@ def repo_add(
 ) -> None:
     """Register an associated repo on a context.
 
-    Run: dadaia context repo add <ctx> <slug> [--url <url>]
-
     Idempotent: re-adding the same slug with the same URL is a no-op success. The
     same slug with a DIFFERENT URL is refused — this verb is the one place an
     associated repo's URL is set, so the recovery path is 'context repo remove'
@@ -417,9 +405,8 @@ def repo_add(
         fail(e)
     except RepoUrlMissingError as e:
         ws = resolve_workspace_root()
-        fail(
-            f"{e}\nfix: {fix_line(ws, 'context', 'repo', 'add', ctx_name, slug, '--url', '<clone-url>')}"
-        )
+        add = fix_line(ws, "context", "repo", "add", ctx_name, slug, "--url")
+        fail(f"{e}\nfix: Operator action: run `{add}` with the repo's clone URL")
 
     if was_added:
         console.print(
@@ -440,12 +427,10 @@ def repo_remove(
 ) -> None:
     """Remove an associated repo from a context's registry.
 
-    Run: dadaia context repo remove <ctx> <slug>
-
     Registry-only: this NEVER deletes the on-disk checkout at
     'repos/<slug>' — it only drops the registry entry, and always states
     explicitly what it leaves behind on disk. To also remove the checkout, delete
-    it yourself, or run 'dadaia context dead <ctx>' first (which git-syncs and
+    it yourself, or run 'context dead <ctx>' first (which git-syncs and
     removes every repo in the set, including this one, before you unregister it).
     """
     try:

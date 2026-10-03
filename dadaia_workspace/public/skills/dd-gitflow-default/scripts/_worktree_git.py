@@ -7,12 +7,18 @@ from __future__ import annotations
 import json
 import os
 import re
-import shlex
 import subprocess
+import sys
 import time
 from pathlib import Path
 
-from _worktree_kinds import _NAME_RE, SCRIPT, Refusal
+sys.path.append(str(Path(__file__).resolve().parents[2] / "dd-bug-resolution" / "scripts"))
+
+from _specs import git_line as git_line  # noqa: E402
+from _specs import head  # noqa: E402
+from _specs import quote as quote  # noqa: E402  (`as`: re-exported to the worktree verbs)
+from _specs import script as script  # noqa: E402
+from _worktree_kinds import _NAME_RE, SCRIPT, Refusal  # noqa: E402
 
 _TAG_RE = re.compile(r"^v?(\d+)\.(\d+)\.(\d+)$")
 
@@ -21,9 +27,9 @@ def _env() -> dict[str, str]:
     return {k: v for k, v in os.environ.items() if not k.startswith("GIT_")}
 
 
-def git(repo: Path, *args: str, check: bool = True) -> str:
+def git(repo: Path, *args: str, check: bool = True, input: str | None = None) -> str:
     done = subprocess.run(
-        ["git", "-C", str(repo), *args], env=_env(), capture_output=True, text=True
+        ["git", "-C", str(repo), *args], env=_env(), capture_output=True, text=True, input=input
     )
     if check and done.returncode:
         raise RuntimeError(f"git {' '.join(args)}: {done.stderr.strip()}")
@@ -39,17 +45,20 @@ def find_root() -> Path:
     raise Refusal("no workspace root above the cwd or this script", "uvx dadaia-workspace init")
 
 
+def _exe(root: Path) -> Path:
+    bins = (root / ".dadaia/.venv/bin/dadaia", root / ".dadaia/.venv/Scripts/dadaia.exe")
+    if exe := next((b for b in bins if b.exists()), None):
+        return exe
+    raise Refusal(
+        "no workspace CLI", " ".join(map(quote, ("uvx", "dadaia-workspace", "init", str(root))))
+    )
+
+
 def cli(root: Path, *args: str) -> subprocess.CompletedProcess[str]:
     """One read-only run of the workspace CLI — the owner of every package grammar."""
-    bins = (root / ".dadaia/.venv/bin/dadaia", root / ".dadaia/.venv/Scripts/dadaia.exe")
-    exe = next((b for b in bins if b.exists()), None)
-    if exe is None:
-        raise Refusal(
-            "no workspace CLI", shlex.join(["uvx", "dadaia-workspace", "init", str(root)])
-        )
     run = subprocess.run  # stdin closed: a CLI never waits on the caller's pipe
     return run(
-        [str(exe), *args],
+        [str(_exe(root)), *args],
         cwd=root,
         env=_env(),
         stdin=subprocess.DEVNULL,
@@ -58,8 +67,9 @@ def cli(root: Path, *args: str) -> subprocess.CompletedProcess[str]:
     )
 
 
-def doctor(root: Path) -> str:
-    return f"{root / '.dadaia/.venv/bin/dadaia'} doctor"
+def cli_line(root: Path, *args: str) -> str:
+    """The fix line running :func:`cli` with *args*, quoted for the host shell."""
+    return " ".join((head(str(_exe(root))), *map(quote, args)))
 
 
 def gitflows(root: Path) -> dict[str, dict[str, str]]:
@@ -72,7 +82,8 @@ def gitflows(root: Path) -> dict[str, dict[str, str]]:
         listed = None
     if not isinstance(listed, list):
         raise Refusal(
-            f"context list failed: {done.stderr.strip() or done.stdout.strip()}", doctor(root)
+            f"context list failed: {done.stderr.strip() or done.stdout.strip()}",
+            cli_line(root, "doctor"),
         )
     return {
         repo: row["gitflow"]
@@ -85,7 +96,7 @@ def gitflows(root: Path) -> dict[str, dict[str, str]]:
 def flow_for(root: Path, repo: Path) -> dict[str, str]:
     flow = gitflows(root).get(repo.name)
     if flow is None:
-        raise Refusal(f"no context on disk owns repos/{repo.name}", doctor(root))
+        raise Refusal(f"no context on disk owns repos/{repo.name}", cli_line(root, "doctor"))
     return flow
 
 
@@ -98,7 +109,9 @@ def work_version(repo: Path, flow: dict[str, str]) -> str:
         return versions[0]
     if versions:
         stale = sorted(versions, key=lambda v: tuple(map(int, v.split("."))))[0]
-        raise Refusal(f"{len(versions)} work branches", f"git -C {repo} branch -d {prefix}{stale}")
+        raise Refusal(
+            f"{len(versions)} work branches", git_line(repo, "branch", "-d", f"{prefix}{stale}")
+        )
     tags = [
         tuple(map(int, m.groups())) for t in git(repo, "tag").split() if (m := _TAG_RE.match(t))
     ]
@@ -106,7 +119,7 @@ def work_version(repo: Path, flow: dict[str, str]) -> str:
     nxt = f"{major}.{minor}.{patch + 1}" if tags else "0.1.0"
     raise Refusal(
         f"no work branch {prefix}<M.m.p>",
-        f"git -C {repo} branch {prefix}{nxt} {flow['integration']}",
+        git_line(repo, "branch", f"{prefix}{nxt}", flow["integration"]),
     )
 
 
@@ -133,7 +146,7 @@ def _row(repo: Path, path: str, state: str, age: float = 0.0, **facts: object) -
     """One worktree: WARN past a day or off-canon; `fix` shown only when ready or orphan;
     `exit`, the line a hold names — `clean` for an empty tree, else `merge` (ADR 0128)."""
     verb = "clean" if state == "empty" else "merge"
-    line = shlex.join(["python3", str(SCRIPT), verb, path])
+    line = f"{script(SCRIPT)} {verb} {quote(path)}"
     return {"repo": repo.name, "path": path, "state": state, "age_hours": age, **facts,
             "warn": state not in ("ready", "open", "empty") or age > 24,
             "fix": line if state in ("ready", "orphan") else "",

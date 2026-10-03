@@ -26,10 +26,15 @@ APPROVED = "Approved"
 SEMVER_RE = re.compile(r"^\d+\.\d+\.\d+$")
 #: A shipped commit sha as a human pastes it from a merge: short (7) to full (40).
 SHA_RE = re.compile(r"^[0-9a-f]{7,40}$")
-#: Task markers that mean the candidate is NOT closed: open ``[ ]`` or reserved ``[-]``,
-#: under any Markdown bullet (``-``, ``*``, ``+``) or none — the ONE task-marker rule.
-UNFINISHED_RE = re.compile(r"^\s*(?:[-*+]\s+)?\[( |-)\]\s.*$", re.MULTILINE)
+#: The task markers in order — open < reserved < done (ADR 0111); the ONE task-line grammar.
+MARKS = (" ", "-", "x")
+#: A task line: indent and any Markdown bullet (``-``, ``*``, ``+``) or none, the marker, the rest.
+MARK_RE = re.compile(r"^([ \t]*(?:[-*+][ \t]*)?\[)([ x-])(\].*)$", re.MULTILINE)
 _STATUS_RE = re.compile(r"^\*\*Status:\*\*\s*(.+?)\s*$", re.MULTILINE)
+#: The Origin clause kinds, each at most once on the line (ADR 0161).
+ORIGIN_KINDS = ("backlog", "bugs", "findings")
+_ORIGIN_RE = re.compile(r"^\*\*Origin:\*\*[ \t]*(.*?)[ \t]*$", re.MULTILINE)
+_ORIGIN_GRAMMAR = "operator-demand | backlog:<ids>; bugs:<ids>; findings:<ids>, each kind once"
 
 
 def utc_now() -> str:
@@ -40,6 +45,28 @@ def extract_status(text: str) -> str | None:
     """The ``**Status:**`` token a trio document carries, or ``None``."""
     match = _STATUS_RE.search(text)
     return match.group(1) if match else None
+
+
+def origin(text: str) -> dict[str, list[str]]:
+    """The ids the first ``**Origin:**`` line carries, by kind; ``{}`` for operator-demand.
+    The ONE Origin parser (ADR 0161): raises ``ValueError`` saying what is wrong."""
+    match = _ORIGIN_RE.search(text)
+    if match is None:
+        raise ValueError(f"has no `**Origin:**` line ({_ORIGIN_GRAMMAR})")
+    carried: dict[str, list[str]] = {}
+    for clause in [] if match.group(1) == "operator-demand" else match.group(1).split(";"):
+        kind, _, ids = clause.strip().partition(":")
+        cited = [i.strip() for i in ids.split(",") if i.strip()]
+        if kind not in ORIGIN_KINDS or kind in carried or not cited:
+            raise ValueError(f"Origin {match.group(1)!r} is not canonical: {_ORIGIN_GRAMMAR}")
+        carried[kind] = cited
+    return carried
+
+
+def origin_line(text: str) -> int:
+    """The 1-based line :func:`origin` reads, 1 when there is none."""
+    match = _ORIGIN_RE.search(text)
+    return text.count("\n", 0, match.start()) + 1 if match else 1
 
 
 def candidate_number(names: Iterable[str]) -> int:
@@ -69,4 +96,14 @@ def unfinished_tasks(candidate: Path) -> list[str]:
     if not tasks.is_file():
         return []
     text = tasks.read_text(encoding="utf-8")
-    return [match.group(0).strip() for match in UNFINISHED_RE.finditer(text)]
+    return [m.group(0).strip() for m in MARK_RE.finditer(text) if m[2] != MARKS[-1]]
+
+
+def writes(line: str) -> list[str]:
+    """The backticked paths a task line's `W:` writes, up to the first ``·``; a path in a
+    parenthesized span (nesting counted) is named, not written."""
+    field, depth, kept = line.partition("`W:`")[2].split("·")[0], 0, ""
+    for char in field:
+        depth = max(0, depth + (char == "(") - (char == ")"))
+        kept += char if depth == 0 and char != ")" else ""
+    return re.findall(r"`([^`]+)`", kept)

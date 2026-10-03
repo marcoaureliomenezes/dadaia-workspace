@@ -214,3 +214,28 @@ def test_every_cited_statement_id_exists() -> None:
     planted = "sa-no-such-bug" + "#S99"  # composed, so this file cites nothing unknown
     unknown = [sorted(set(_CITATION.findall(t)) - known) for t in [*texts, planted]]
     assert len(known) > 280 and [u for u in unknown if u] == [[planted]]
+
+
+def test_a_push_to_a_local_bare_starts_no_background_gc(tmp_path: Path) -> None:
+    """test-git-quiet-config-lost-across-local-push: git strips GIT_CONFIG_* env from the
+    receive-pack a local push spawns, so the suite's quiet rule must reach it by file —
+    else its detached auto gc/maintenance races a test copying the bare repo."""
+    import os
+    import subprocess
+
+    def git(*args: str) -> None:
+        subprocess.run(["git", *args], cwd=tmp_path, check=True, capture_output=True)  # noqa: S603, S607
+
+    trace = tmp_path / "trace.json"
+    git("init", "-q", "--bare", "b.git")
+    git("init", "-q", "s")
+    (tmp_path / "s" / "f").write_text("f\n", encoding="utf-8")
+    git("-C", "s", "add", "f")
+    git("-C", "s", "commit", "-qm", "f")
+    subprocess.run(  # noqa: S603, S607
+        ["git", "-C", "s", "push", "-q", (tmp_path / "b.git").as_uri(), "HEAD:refs/heads/m"],
+        cwd=tmp_path, check=True, capture_output=True,
+        env={**os.environ, "GIT_TRACE2_EVENT": str(trace)},
+    )  # fmt: skip
+    spawned = re.findall(r'"argv":\[[^\]]*"(?:gc|maintenance)"', trace.read_text())
+    assert spawned == []

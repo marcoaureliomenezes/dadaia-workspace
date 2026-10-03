@@ -6,9 +6,9 @@ Also input: `.dadaia/.venv/bin/dadaia doctor` against every release the window t
 ## Commit-shape conformance
 
 1. Walk every commit in the window with `git log --format='%H%x09%s' --stat`.
-2. Classify each by its subject-line pattern and staged-path set against the five canonical shapes.
-3. The five shapes are defined once, at `dd-gitflow-default` §3a — this pillar reads that table, never restates it.
-4. Flag a commit matching none of the five shapes, or matching a message pattern while staging paths outside its set.
+2. Classify each by its subject-line pattern and staged-path set against the §3a shapes.
+3. The shapes are defined once, at `dd-gitflow-default` §3a — this pillar reads that table, never restates it.
+4. Flag a commit matching none of the shapes, or matching a message pattern while staging paths outside its set.
 5. Severity: registration/backlog/ADR isolation violations are MEDIUM.
 6. Severity: a bug fix that is not self-contained (code + regression test + `BUGS.jsonl` line alone) is HIGH.
 7. Report conformance per shape, never as one aggregate pass/fail — a finding must say which shape failed.
@@ -19,7 +19,7 @@ Also input: `.dadaia/.venv/bin/dadaia doctor` against every release the window t
 .dadaia/.venv/bin/dadaia doctor --context <ctx> --json
 ```
 
-1. `--json` gives the structured sections, findings and `compliance(...)` scores.
+1. `--json` gives the structured sections and findings.
 2. Each finding reads `<CODE> <verdict> <message>`; the message carries its own remediation.
 3. Every non-zero-severity issue inside the window becomes a `FINDINGS-FORMAT.md` record with `pillar: "specs"`.
 4. Record a WARN that `--fix` can repair mechanically as a finding too — this pillar measures, it never fixes.

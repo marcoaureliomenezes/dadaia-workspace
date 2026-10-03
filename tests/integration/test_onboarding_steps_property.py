@@ -2,8 +2,8 @@
 
 Over random real-state starts (remote unborn / principal only / both, a tag or not, a
 session identity or not), the loop takes the printed step, executes its fix line (the
-operator placeholders ``<name>``/``<clone-url>`` are the only substitutions; the ``agent``
-step runs a scripted stand-in that fills memory) and asserts I3 — the step is no longer
+``context`` step's operator action is played with a name and the bare remote's URL; the
+``agent`` step runs a scripted stand-in that fills memory) and asserts I3 — the step is no longer
 pending — and I4 — the printed step's index strictly increases, so the loop ends within
 ``len(STEP_IDS)`` iterations.
 
@@ -32,6 +32,7 @@ from dadaia_workspace.features.workspace.onboarding import STEP_IDS, Step, next_
 from dadaia_workspace.features.workspace.service import WorkspaceService
 from dadaia_workspace.infrastructure.public_assets import FileSystemPublicAssetManager
 from dadaia_workspace.infrastructure.python_env import VenvPythonEnvironmentManager
+from tests.conftest import GIT_QUIET_INCLUDE
 
 pytest.importorskip("fcntl")
 
@@ -73,9 +74,12 @@ def _run_fix(step: Step, root: Path, bare: Path) -> None:
     if step.kind == "agent":
         _fill_memory(root)
         return
-    argv = shlex.split(step.command)
-    assert Path(argv[0]).name.startswith("dadaia"), step.command
-    argv = [{"<name>": "proj", "<clone-url>": bare.as_uri()}.get(a, a) for a in argv[1:]]
+    if step.id == "context":  # the operator's act: a context name and the clone URL
+        argv = ["context", "create", "proj", "--main-repo", bare.as_uri()]
+    else:
+        argv = shlex.split(step.command)
+        assert Path(argv[0]).name.startswith("dadaia"), step.command
+        argv = argv[1:]
     done = _runner.invoke(app, argv)
     assert done.exit_code == 0, f"{step.command}\n{done.output}"
 
@@ -86,14 +90,15 @@ def _git_env(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     # its runner is stubbed out — the gate itself is proven by the push journeys.
     hooks = tmp_path / "hooks"
     hooks.mkdir()
-    runner = tmp_path / "dadaia-stub"
+    runner = tmp_path / ".dadaia" / ".venv" / "bin" / "dadaia"  # the hook's venv walk
+    runner.parent.mkdir(parents=True)
     runner.write_text("#!/bin/sh\ncat >/dev/null\n", encoding="utf-8")
     runner.chmod(0o755)
-    monkeypatch.setenv("DADAIA_BIN", str(runner))
     pairs = {"core.hooksPath": str(hooks), "user.name": "T", "user.email": "t@example.invalid"}
+    (tmp_path / "gitconfig").write_text(GIT_QUIET_INCLUDE, encoding="utf-8")
     monkeypatch.setenv("GIT_CONFIG_GLOBAL", str(tmp_path / "gitconfig"))
     monkeypatch.setenv("GIT_CONFIG_NOSYSTEM", "1")
-    base = int(os.environ.get("GIT_CONFIG_COUNT", "0"))  # keep conftest's pairs
+    base = int(os.environ.get("GIT_CONFIG_COUNT", "0"))
     monkeypatch.setenv("GIT_CONFIG_COUNT", str(base + len(pairs)))
     for n, (key, value) in enumerate(pairs.items(), start=base):
         monkeypatch.setenv(f"GIT_CONFIG_KEY_{n}", key)

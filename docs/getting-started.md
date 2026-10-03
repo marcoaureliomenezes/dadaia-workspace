@@ -5,8 +5,8 @@ the terms are defined in [concepts](concepts.md) and in [`CONTEXT.md`](../CONTEX
 
 ## Install
 
-<!-- derived-from: pypi-distribution sha256:92dbd2d7ed61 -->
-<!-- derived-from: workspace-init sha256:f158dffe2a7e -->
+<!-- derived-from: pypi-distribution sha256:cec6ab21a159 -->
+<!-- derived-from: workspace-init sha256:5a4a8bb1e91e -->
 
 ```bash
 uvx dadaia-workspace init <dir> --harness claude --repo <url>
@@ -27,7 +27,7 @@ refreshes each project's specs law.
 
 ## Level 1 — the workspace
 
-<!-- derived-from: workspace-init sha256:f158dffe2a7e -->
+<!-- derived-from: workspace-init sha256:5a4a8bb1e91e -->
 
 `uvx dadaia-workspace init <dir> --harness claude|codex|kimi-code|cursor|devin|copilot
 [--repo <url>] [--associated-repo <url>]… [--skip-assets]` is the only verb that works
@@ -43,8 +43,8 @@ invocation's `--repo` and `--associated-repo` flags. It lays down:
   `.dadaia/states/harness_profile.json`, the harness roster; a re-init with another
   harness merges into it, never narrowing it.
 - An absent root `.dadaiaignore`, seeded from the legacy
-  `states/instance_exceptions.txt` or a comment-only template, and an empty `prompt.md`;
-  each is the operator's file from then on.
+  `states/instance_exceptions.txt` or a comment-only template, and an absent `prompt.md`,
+  empty; each is the operator's file from then on.
 - Unless `--skip-assets`, the staged and installed public assets — the one writer of
   every hook wiring. With `--skip-assets` the output warns that the workspace is
   ungated until `.dadaia/.venv/bin/dadaia public install` runs.
@@ -55,7 +55,7 @@ harness later and `.dadaia/.venv/bin/dadaia harness list` reads the roster.
 ## Level 2 — the project
 
 <!-- derived-from: spec-context-project sha256:9690f09f679b -->
-<!-- derived-from: context-management sha256:4eca78be3c95 -->
+<!-- derived-from: context-management sha256:f9635e5c313c -->
 
 A context — a Spec Context Project — is the unit of work: one canonical `specs/` tree
 owned by one main repository, optionally spanning associated repositories that live and
@@ -97,7 +97,7 @@ branches; a re-run is a no-op.
 
 ## Check compliance — `doctor`
 
-<!-- derived-from: workspace-doctor sha256:ca5238a261e0 -->
+<!-- derived-from: workspace-doctor sha256:21e1298b4845 -->
 
 ```bash
 .dadaia/.venv/bin/dadaia doctor --context <ctx> [--json] [--fix] [--redact]
@@ -111,21 +111,22 @@ backlog document, the ADR ledger and the ledger scripts' own `check`).
 The `specs` and `ledgers` tree resolves from `--context`, `--specs-dir` or the bound
 context; with none, those sections are empty and `workspace` still runs. With no
 instance around — CI over a checkout — `.dadaia/.venv/bin/dadaia doctor --specs-dir specs --source-root .`
-runs the two tree sections; any other run outside a workspace exits 1 with one
-workspace-not-found error whose `fix:` is `cd <root>` of the running CLI's own workspace.
+runs the two tree sections; any other run outside a workspace exits 1 with the one
+workspace-not-found error.
 
 Every printed finding is one `<CODE> <verdict> <message>` line, every error-class
-finding carries one `fix: <command>` line, and any error-class finding exits 1. There
+finding carries one fix line (a command, or
+`Operator action: <one act>`), and any error-class finding exits 1. There
 is no score: the findings and the exit code are the run. `--json` mirrors it,
 `--redact` masks every foreign context name and repo slug, and `--fix` is the reaper —
-it moves slop to `.dadaia/reaped/<YYYYMMDD>/` under a 7-day hold and deletes only what
-a TTL expired.
+it moves slop to `.dadaia/reaped/<YYYYMMDD>/` under a 7-day hold; a TTL expiry acts by
+zone class, an OUTPUT entry held, an EPHEMERAL one deleted.
 
 ## Run the first candidate
 
-<!-- derived-from: release-lifecycle sha256:cf04bb23d3bd -->
-<!-- derived-from: backlog-ledger sha256:4bdc376c943d -->
-<!-- derived-from: bug-ledger sha256:fee190b6d940 -->
+<!-- derived-from: release-lifecycle sha256:e4c5ec1f9818 -->
+<!-- derived-from: backlog-ledger sha256:41b18393125f -->
+<!-- derived-from: bug-ledger sha256:11ce7d98680f -->
 
 A candidate is one closed-scope cycle inside the live release. Nothing drives it: the
 documents are the state, the ledger scripts move the records, and the markers in
@@ -154,7 +155,7 @@ After `context baseline`, each step writes inside a worktree that then merges: a
    `defined`.
 5. **Implement each task in its own `impl` worktree.** Reserve it `[-]` in its own
    commit, work test-first, run the local CI preflight, and land it by `worktree.py
-   merge` only after the reviewer's `APPROVED` on the rebased commit.
+   merge` only after the reviewer's `APPROVED`.
 6. **Close the candidate.** `release.py phase CLOSURE --sha <sha>` requires no `[ ]`
    or `[-]` marker and no other open `wt/*` worktree, and stamps `implemented`. Then,
    in the candidate's `release` worktree, in order: memory reconciliation, the
@@ -163,8 +164,7 @@ After `context baseline`, each step writes inside a worktree that then merges: a
    work -> integration PR merged green.
 7. **Continue or promote.** Continue: `release.py new` with the same id stacks the next
    candidate, reopening `DEFINITION`. Promote: merge the integration branch into the
-   principal, then merge the release PR release-please opens there — it owns the version, the CHANGELOG
-   section and the tag, and the publish jobs run on it; `release.py ship --sha <sha> --pr <n>`
+   principal by PR — that merge is the deploy; `release.py ship --sha <sha> --pr <n>`
    then records the merged promote PR and moves the release folder to `_archive/`.
 
 A bug needs none of this: register, lineage, RED test, root-cause fix, GREEN, `resolve`

@@ -1,6 +1,6 @@
 """Intent: CONTRACT — `specs upgrade` rewrites the retired Portuguese status tokens in the
 live candidate's trio (0.4.7 FR4 / T-047-58), never in a closed rc-<N>/ or published
-history (ADR 0150 (1)). Size: SMALL."""
+history (ADR 0150 (1)); only the owner's anchored line is a declaration (T-050-143). Size: SMALL."""
 
 from __future__ import annotations
 
@@ -22,11 +22,14 @@ from dadaia_workspace.features.specs.doctor import SpecsDoctor
 pytestmark = pytest.mark.unit
 
 
+_QUOTED = "a quoted `**Status:** Rascunho` is no declaration\n"
+
+
 def _trio(root: Path, status: str) -> None:
     root.mkdir(parents=True, exist_ok=True)
     (root.parent / "_RELEASE.json").write_text("{}", encoding="utf-8")
     for name in ("SPEC.md", "PLAN.md", "TASKS.md"):
-        (root / name).write_text(f"# doc\n\n> **Status:** {status}\n", encoding="utf-8")
+        (root / name).write_text(f"# doc\n\n**Status:** {status}\n{_QUOTED}", encoding="utf-8")
 
 
 # fmt: off
@@ -47,7 +50,7 @@ def test_upgrade_rewrites_retired_status_tokens_only_in_the_live_trio(tmp_path: 
     assert set(rewrite_status_tokens(tmp_path)) == touched
     for rel, status in dirs.items():
         text = (tmp_path / "releases" / rel / "PLAN.md").read_text(encoding="utf-8")
-        assert text.splitlines()[2] == f"> **Status:** {expected.get(rel, status)}"
+        assert text.splitlines()[2:] == [f"**Status:** {expected.get(rel, status)}", _QUOTED.strip()]
 
 
 def test_one_upgrade_run_folds_a_legacy_flat_tree_clean(tmp_path: Path) -> None:

@@ -42,6 +42,9 @@ _REF = "specs/memory/ARCHITECTURE.md"
 
 
 def _atom(root: Path) -> Path:
+    """*root* as a workspace: its registry, and the atom the default fixture self-pulls."""
+    (root / ".dadaia" / "states").mkdir(parents=True, exist_ok=True)
+    (root / ".dadaia" / "states" / "spec_contexts.json").write_text('{"contexts": []}')
     (root / _REF).parent.mkdir(parents=True, exist_ok=True)
     (root / _REF).write_text("# Architecture\n", encoding="utf-8")
     return root
@@ -137,15 +140,19 @@ def test_v12_requires_self_pull(tmp_path: Path) -> None:
     ]
 
 
-def test_real_fixture_v12_deepening_audit_self_pull_refs_and_hash_pass_schema_shape() -> None:
+def test_real_fixture_v12_deepening_audit_self_pull_refs_and_hash_pass_schema_shape(
+    tmp_path: Path,
+) -> None:
     """Real fixture: schema-shape + artifact.content_hash pattern are clean (proving the
     validator accepts genuine production output as-is); self_pull existence fails only
-    because the fixtures directory is not a real workspace tree — the SAME resolution
+    because the empty workspace holds none of them — the SAME resolution
     rule exercised end-to-end against real field values, not synthesized ones."""
     path = _FIXTURES / "v1.2-deepening-audit-self-pull.handoff.json"
     handoff = Handoff.load(path)
+    (tmp_path / ".dadaia" / "states").mkdir(parents=True)  # an empty workspace: its registry
+    (tmp_path / ".dadaia" / "states" / "spec_contexts.json").write_text('{"contexts": []}')
 
-    result = handoff.validate(workspace_root=path.parent, schema=_SCHEMA)
+    result = handoff.validate(workspace_root=tmp_path, schema=_SCHEMA)
 
     assert result.valid is False
     assert all(e.field_path.startswith("self_pull") for e in result.errors)

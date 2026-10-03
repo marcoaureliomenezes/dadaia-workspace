@@ -23,15 +23,10 @@ from _release_schema import (  # noqa: E402
     utc_now,
 )
 from _release_store import SCRIPT, Live, Refusal, State, commit, live_release  # noqa: E402
+from _specs import choice  # noqa: E402
 
 #: DEFINITION is `new`'s; each later phase has one predecessor (out-of-order = re-run).
 PREDECESSOR = {"IMPLEMENTATION": "DEFINITION", "CLOSURE": "IMPLEMENTATION"}
-
-
-def note(state: State, ts: str, text: str) -> None:
-    state.setdefault("log", []).append(
-        {"ts": ts, "agent": "release.py", "kind": "note", "text": text}
-    )
 
 
 def _refuse_unapproved_trio(live: Live) -> Path:
@@ -43,7 +38,7 @@ def _refuse_unapproved_trio(live: Live) -> Path:
         if not document.is_file():
             raise Refusal(
                 f"release {live.release_id} has no {document.relative_to(live.release_dir).as_posix()}",
-                f"write {document.resolve()} carrying '**Status:** {APPROVED}'",
+                f"Operator action: write {document.resolve()} carrying '**Status:** {APPROVED}'",
             )
         status = extract_status(document.read_text(encoding="utf-8"))
         if status != APPROVED:
@@ -51,7 +46,7 @@ def _refuse_unapproved_trio(live: Live) -> Path:
                 f"{document.relative_to(live.release_dir).as_posix()} of release {live.release_id} "
                 f"carries status {status!r} — SPEC, PLAN "
                 f"and TASKS must all be '**Status:** {APPROVED}' to enter IMPLEMENTATION",
-                f"set '**Status:** {APPROVED}' in {document.resolve()}",
+                f"Operator action: set '**Status:** {APPROVED}' in {document.resolve()}",
             )
     return candidate
 
@@ -83,8 +78,11 @@ def _refuse_open_worktrees(specs: Path) -> None:
 
 #: The one verb that moves each phase forward — every refusal's fix names it, so a fix
 #: never names a verb that refuses in the same state.
-NEXT = {"DEFINITION": "phase IMPLEMENTATION", "IMPLEMENTATION": "phase CLOSURE",
-        "CLOSURE": "ship --pr <n>"}  # fmt: skip
+NEXT = {"DEFINITION": "phase IMPLEMENTATION", "IMPLEMENTATION": "phase CLOSURE", "CLOSURE": "ship"}
+#: `ship`'s one value no code knows: the promote PR's number exists once that PR is open.
+SHIP_PR = "with --pr set to the promote PR's number, once that PR is open"
+#: What the operator supplies to each NEXT verb that the code cannot fill (ADR 0158).
+SUPPLY = {"CLOSURE": SHIP_PR}
 
 
 def set_phase(specs: Path, phase: str, sha: str) -> tuple[str, str]:
@@ -97,33 +95,37 @@ def set_phase(specs: Path, phase: str, sha: str) -> tuple[str, str]:
     live = live_release(specs)
     current = str(live.state.get("phase"))
     if PREDECESSOR.get(phase) != current:
-        raise Refusal(
+        refusal = Refusal(
             f"release {live.release_id} is in phase {current!r} — `phase` writes "
             "IMPLEMENTATION after DEFINITION and CLOSURE after IMPLEMENTATION, once each",
             f"{SCRIPT} {NEXT.get(current, 'check')} --sha {sha}",
         )
-    ts = utc_now()
+        raise choice(refusal, SUPPLY.get(current, ""))
+    ts, candidate = utc_now(), live.candidate
     if phase == "IMPLEMENTATION":
         candidate = _refuse_unapproved_trio(live)
         plan = (candidate / "PLAN.md").read_text(encoding="utf-8")
         if errors := plan_errors(plan, unfinished_tasks(candidate)):
             raise Refusal(errors[0], PLAN_FIX)
-    elif live.candidate and (unfinished := unfinished_tasks(live.candidate)):
+    elif candidate and (unfinished := unfinished_tasks(candidate)):
         raise Refusal(
             f"TASKS.md still carries {len(unfinished)} open '[ ]'/reserved '[-]' marker(s) "
             f"— a candidate closes fully implemented: {unfinished[0]}",
-            f"finish and mark every task '[x]' in {(live.candidate / 'TASKS.md').resolve()}",
+            f"Operator action: finish and mark every task '[x]' in {(candidate / 'TASKS.md').resolve()}",
         )
     else:
         _refuse_open_worktrees(specs.resolve())
 
+    milestone = "defined" if phase == "IMPLEMENTATION" else "implemented"
+    rc = {"candidate": candidate.name} if candidate else {}
+
     def apply(state: State) -> State:
-        if phase == "IMPLEMENTATION":
-            state["defined"] = {"sha": sha, "ts": ts}
-            note(state, ts, f"Candidate defined at {sha}; phase IMPLEMENTATION.")
-        else:
-            state["implemented"] = {"sha": sha, "ts": ts}
-            note(state, ts, f"Candidate implemented at {sha}; phase CLOSURE.")
+        # The slot is the live candidate's stamp; the `milestone` entry is its history (F061).
+        state[milestone] = {"sha": sha, "ts": ts}
+        state.setdefault("log", []).append({
+            "ts": ts, "agent": "release.py", "kind": "milestone", **rc,
+            "milestone": milestone, "sha": sha,
+            "text": f"Candidate {milestone} at {sha}; phase {phase}."})  # fmt: skip
         state["phase"] = phase
         return state
 

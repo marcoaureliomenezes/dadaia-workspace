@@ -4,12 +4,16 @@ from __future__ import annotations
 
 import typer
 
+from dadaia_workspace.core.cli_line import fix_line
 from dadaia_workspace.core.workspace_resolver import resolve_workspace_root
 
 app = typer.Typer(help="Derived help surfaces (docker-style; generated, never transcribed).")
 
 
-@app.command(name="tree")
+@app.command(
+    name="tree",
+    epilog=f"Examples:\n\n{fix_line(None)} help tree\n\n{fix_line(None)} help tree --digest",
+)
 def tree(
     digest: bool = typer.Option(
         False,
@@ -23,10 +27,6 @@ def tree(
     `--help` on any group remains the authoritative detail. With `--digest`, the
     rendered text is also written to `.dadaia/agentic/help-digest.md`, where
     ctx-inject attaches it to every session bootstrap.
-
-    Examples:
-      dadaia help tree
-      dadaia help tree --digest
     """
     from dadaia_workspace.cli.help_digest import render_digest, write_digest
 

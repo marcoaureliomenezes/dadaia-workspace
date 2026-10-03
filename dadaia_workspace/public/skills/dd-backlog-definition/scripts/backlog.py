@@ -23,6 +23,8 @@ sys.dont_write_bytecode = True
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 #: Source-tree fallback: before `public stage` copies `_ledger.py` in beside this file.
 sys.path.append(str(Path(__file__).resolve().parents[2] / "dd-bug-resolution" / "scripts"))
+#: `release.py`'s Origin parser, the line's one owner (ADR 0161).
+sys.path.append(str(Path(__file__).resolve().parents[2] / "dd-release-implementation" / "scripts"))
 
 import _backlog_exit as ex  # noqa: E402
 import _backlog_write as wr  # noqa: E402
@@ -101,7 +103,8 @@ def _subjects(args: argparse.Namespace, specs: Path) -> int:
 
 def main(argv: list[str] | None = None) -> int:
     args = _parser().parse_args(argv)
-    specs = find_specs(args.specs)
+    reads = args.verb in ("check", "subjects")
+    specs = find_specs(args.specs, ledger=None if reads else f"specs/{LEDGER}")
     if args.verb == "check":
         findings = check(specs)
         print(json.dumps(findings, indent=2)) if args.json else [

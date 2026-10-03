@@ -1,7 +1,7 @@
 """Wiring the push-range denylist scan into ``push_gate_decision`` (SPEC v0.9.0 FR1/FR2/FR5/FR6).
 
 Intent: CONTRACT — v0.9.0 A1.1-A1.4, A2.1-A2.4, A5.1-A5.4, A6.1; v0.11.0 A7.1-A7.3, A4.5,
-A6.1-A6.3, A6.6, A5.1; v0.4.3 A11.1
+A6.1-A6.3, A6.6, A5.1; v0.4.3 A11.1; 0.5.0 AC3.10
 
 Every range is a real git range (``PushRepo``) read by the real ``GitSubprocessObjectReader``
 (AC9.4). Only synthetic ``zz-`` terms ever appear here.
@@ -9,6 +9,7 @@ Every range is a real git range (``PushRepo``) read by the real ``GitSubprocessO
 
 from __future__ import annotations
 
+import json
 from collections.abc import Iterable
 from dataclasses import replace
 from pathlib import Path
@@ -16,12 +17,15 @@ from typing import Any
 
 import pytest
 
+from dadaia_workspace.container import load_denylist_terms
 from dadaia_workspace.core.gitflow import DEFAULT
 from dadaia_workspace.core.models.git_scan import GitObjectReadError, GitRunError, ScannedObject
 from dadaia_workspace.features.chokepoints import push_gate_decision
 from dadaia_workspace.features.chokepoints.branch_policy import parse_push_stdin
 from dadaia_workspace.features.specs.canon import canon_violations
+from dadaia_workspace.features.specs.doctor_adr import cites_an_accepted_adr
 from dadaia_workspace.infrastructure.git_objects import GitSubprocessObjectReader
+from dadaia_workspace.infrastructure.ledger_scripts import load_owner
 from tests.fakes import gate_fixes
 from tests.fixtures.real_git import ZERO, PushRepo, git
 
@@ -48,6 +52,7 @@ def _decide(repo: PushRepo, *lines: str, source: Any = None, **kw: Any) -> Any:
         object_source=source or GitSubprocessObjectReader(),
         repo=repo.path,
         canon_violations_fn=canon_violations,
+        cites_accepted_adr=cites_an_accepted_adr(None),
         **kw,
     )
 
@@ -248,7 +253,26 @@ def test_the_rewrite_fix_resets_to_the_oldest_unpublished_commit_and_amends(
     message = decision.message
     assert not decision.allowed and "update-ref" not in message
     if end is None:
-        assert "Operator action" in message and "\nfix: " not in message
+        assert "\nfix: Operator action: " in message and message.count("\nfix: ") == 1
     else:
         assert message.endswith(end.format(oldest=oldest)) and message.count("\nfix: ") == 1
         assert "reset" not in end or "commit --amend" in message
+
+
+def test_a_ledger_verb_outside_the_workspace_loads_the_pre_push_terms(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """AC3.10 / privacy-denylist-has-two-loaders (ADR 0157): run from a cwd outside the
+    workspace, the ledger write seam finds the terms from its `--specs` tree, as pre-push does."""
+    states = tmp_path / "ws" / ".dadaia" / "states"
+    states.mkdir(parents=True)
+    (states / "spec_contexts.json").write_text('{"contexts": []}')
+    (states / "privacy_denylist.json").write_text(json.dumps(dict(_TERMS)))
+    specs = tmp_path / "ws" / "repos" / "r" / "specs"
+    specs.mkdir(parents=True)
+    monkeypatch.delenv("DADAIA_PRIVACY_DENYLIST", raising=False)
+    monkeypatch.chdir(specs)
+    assert load_denylist_terms() == _TERMS
+    monkeypatch.chdir(tmp_path)
+    ledger = load_owner("dd-bug-resolution", "_ledger")
+    assert ledger.private_refusal({"title": f"a {_TERM} leak"}, specs) is not None

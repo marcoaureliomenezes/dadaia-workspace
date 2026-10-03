@@ -11,9 +11,9 @@ from __future__ import annotations
 CODE = "LEDGER-BACKLOG-SCHEMA"
 LEDGER = "backlog/BACKLOG.json"
 HISTO = "backlog/_archive/backlog_histo.jsonl"
-#: A backlog item is delivered, superseded or rejected — `resolved` is a bug's word.
-DISPOSITIONS = ("delivered", "superseded", "rejected")
+#: A backlog item is delivered, superseded, rejected or handed to a bug — `resolved` is a bug's word.
+DISPOSITIONS = ("delivered", "superseded", "rejected", "to-bug")
 #: The terminal words no LIVE active[] entry carries; a postponed item keeps any other status.
-TERMINAL = ("delivered", "resolved", "superseded", "rejected")
+TERMINAL = (*DISPOSITIONS, "resolved")
 #: The one status exempt from the typed-intents requirement (dd-backlog-definition §2).
 IDEA = "idea"
