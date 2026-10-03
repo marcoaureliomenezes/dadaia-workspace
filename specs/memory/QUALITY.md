@@ -77,9 +77,8 @@ Related: [[ARCHITECTURE]]
 
 <!-- dadaia:fixed slop-tests -->
 ### Slop — tests (fixed)
-- A test is born with `Intent:`, fails for a real regression and asserts a value that comes from outside the code under test.
-- A mock exists only at the system boundary (network, clock, randomness); an own module is tested through its interface.
-- A test name states current behavior; a tombstone (a test of an absence) and an expired SCAFFOLD die at closure.
+- A test follows the root `AGENTS.md` map §1 test basics; an own module is tested through its interface.
+- A test name states current behavior; a tombstone (a test of an absence) dies with its target.
 - Pruning is a `dd-code-reviewer` verdict executed by `dd-software-engineer`; a deletion cites its criterion and its replacement `file:line`.
 - Detection: `dd-code-review` SLOP.md S3.
 <!-- /dadaia:fixed slop-tests -->
