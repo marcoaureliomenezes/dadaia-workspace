@@ -1,6 +1,6 @@
 # SPEC — Release: 0.5.0, candidate 8 (W8: the test law and the library pipeline leave; W9: bug lineage derived; W10: the open bugs)
 
-**Status:** Draft
+**Status:** Approved
 **Release ID:** 0.5.0
 **Owner:** dd-product-engineer
 **Opened:** 2026-10-03
