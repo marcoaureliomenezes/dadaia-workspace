@@ -4,7 +4,7 @@
 **Release ID:** 0.5.0
 **Owner:** dd-software-engineer
 
-Candidate 8 — W8: the test law and the library pipeline leave; W9: bug lineage derived; W10: the open bugs (ADR 0140). SPEC AC8.1–AC8.10, AC9.1–AC9.5, AC10.1–AC10.13, Approved at 3f48e11dd and amended by operator ruling at 6ea03b0ff (AC8.9's second deletion list; AC8.10's P-07 and P-28 by their own tool; ADR 0176 edited at 6ec30315d); W11, AC11.0–AC11.7, folded by operator ruling at a6f3d0050 (agent-behavior evals, a parallel lane in `dadaia-evals`; AC11.7 is rc-12's). Paths are relative to `dadaia_workspace/` (`f/` = `features/`, `pub/` = `public/`, `S/` = `pub/skills/`) unless they start with `tests/`, `scripts/`, `specs/`, `docs/`, `.github/`, `README.md`, `AGENTS.md`, `CONTEXT.md`, `pyproject.toml`, `poetry.lock` or `setup.cfg`.
+Candidate 8 — W8: the test law and the library pipeline leave; W9: bug lineage derived; W10: the open bugs (ADR 0140). SPEC AC8.1–AC8.10, AC9.1–AC9.5, AC10.1–AC10.14, Approved at 3f48e11dd and amended by operator ruling at 6ea03b0ff (AC8.9's second deletion list; AC8.10's P-07 and P-28 by their own tool; ADR 0176 edited at 6ec30315d); W11, AC11.0–AC11.7, folded by operator ruling at a6f3d0050 (agent-behavior evals, a parallel lane in `dadaia-evals`; AC11.7 is rc-12's); amended at e64918789 (AC8.3's visibility rows to `specs-canon-tracked`, AC10.14, AC11.5 onto `dadaia-evals` `main`). Paths are relative to `dadaia_workspace/` (`f/` = `features/`, `pub/` = `public/`, `S/` = `pub/skills/`) unless they start with `tests/`, `scripts/`, `specs/`, `docs/`, `.github/`, `README.md`, `AGENTS.md`, `CONTEXT.md`, `pyproject.toml`, `poetry.lock` or `setup.cfg`.
 As-is read at `wt/0.5.0b-release` 6ec30315d; the G1 `<start>` readout equals the birth readout (8f4ed785f): 25,307 production lines / 1,233 test functions / 45,464 test lines / 0 guard lines / 0 guard checks.
 
 ## 1. As-is review
@@ -30,6 +30,7 @@ Ledger slice read here (735 records; title/id/component match; `bugs.py status` 
   - Structural cause: decided per call site, and in config resolved against the cwd (`../../` from a worktree root is `worktrees/`). Ruff and mypy have no `../../` entry at HEAD (`pyproject.toml` holds none; `QUALITY.md:63` says they do and is false): they are already redirected by `core/workspace_layout.TOOL_CACHE_ENV`, absolute from the workspace root and set once per harness by `infrastructure/runtime_config.py:69,135` (ADR 0080). Coverage joins that decider (§2.6).
 - Venv reuse, three bugs on one identity: `init-venv-installs-index-version-not-running-distribution` (the venv held other bytes than the running build; fix: always repack the running build); `reinit-with-unchanged-version-label-mixes-venv-and-projection` (ca16acd7b rebuilt `version_change` to compare `"<version> <digest>"`; 2d44e93f4 deleted its second pip step); the open `init-on-a-copied-workspace-leaves-a-cli-bound-to-the-original` (the copied entry scripts name the original interpreter, and `pip_executable` runs the original's `pip`). Each was a facet missing from what "this venv" means; §2.6 states the identity.
 - Hook equality: `install_git_hooks` (`f/spec_context/service.py:144-150`) compares text, `check_installed_hooks` (`f/spec_context/doctor.py:162-165`) compares bytes and folds absent into "differs": two deciders of one question. At 6ec30315d a second install returns `[]`, mtime kept: AC10.8's hook half is green, its scratch half the RED.
+- A memory-drift unit is a directory; a file at the repo root belongs to no unit (T-050-154 ruling).
 - `onboarding`, `ci_preflight`, `python_env`, the backlog anchors and the meta-tests each carry ≥ 2 prior fixes: every one leaves (DELETE) or is rebuilt below.
 
 | unit | today | bugs | verdict | why |
@@ -126,7 +127,7 @@ Ledger slice read here (735 records; title/id/component match; `bugs.py status` 
   - `suite.py` (156), 6 ids: `private-import-ratchet` (V26, P-23), `tracked-suite-only`, `tier-timeout` (P-21: contract 30 s, explicit marker kept, four tiers, one calibrated ceiling), `quarantine-needs-bug` (P-22: refusal without a bug, collection with one, actionable serial and xdist, and every `pytest` step's `-m` in `.github/workflows` carries `not quarantine`, `ci.yml:140,171,200,231,257,294`, planted with a selector lacking it), `statement-id-cited`, `push-starts-no-gc`.
   - `slop.py` (159), 9 ids: `v32`, `v33`, `v37`, `v38`, `v39`, `v40`, `doctor-section-subset`, `ignore-cap` (P-10), and the ADD `no-size-pin` (AC8.6). Its subject is a file's line or byte count against a constant, 0170's two keys excepted; hit counts (V26, V32, V33) and the Agent Skills field limits (`test_standalone_skills.py:29-30`) are not file sizes. 159 deletes `tests/helpers/suite_files.py`, whose four consumers 156, 159 and 160 delete.
   - `isolation.py` (160), 5 ids: `no-real-workspace` (cwd walk, start outside the checkout, bare doctor), `no-instance-reach` (fenced child, every enclosing instance fenced), `frozen-clock`, `harness-env-allowlist`, `hook-stdin-not-in-process`.
-  - `repo.py` (161), 10 ids: `no-model-api-in-ci` (P-33), `workflow-never-rules`, `release-workflow-canon` (P-30: main-only pinned release-please, publish chain, manifest and patch rule, pyproject version = CHANGELOG top), `memory-canonical-shape` (P-32, its nine rules), `adr-superseded-successor`, `ci-triggers-gitflow`, `pr-source-guard-release-pr`, `ci-checkout-history`, `required-checks-listed`, `onboarding-journey-uv`.
+  - `repo.py` (161), 11 ids: `no-model-api-in-ci` (P-33), `workflow-never-rules`, `release-workflow-canon` (P-30: main-only pinned release-please, publish chain, manifest and patch rule, pyproject version = CHANGELOG top), `memory-canonical-shape` (P-32, its nine rules), `adr-superseded-successor`, `ci-triggers-gitflow`, `pr-source-guard-release-pr`, `ci-checkout-history`, `required-checks-listed`, `onboarding-journey-uv`, `specs-canon-tracked` (AC8.3's visibility rows, the `gitignore-…-recurrence` chain: `git check-ignore` on one live canon path per specs area prints nothing; planted, a temp `.gitignore` hiding `specs/releases/**/TASKS.md`). `.gitignore:119,139` stop citing the deleted `test_source_repo_hygiene.py`.
 - Session checks (`tier-timeout`, `quarantine-needs-bug`'s collection rows, `push-starts-no-gc`, `no-real-workspace`, `no-instance-reach`) judge what `tests/conftest.py` does to a live session, never the guard's own process: `run.py` runs ONE pytest subprocess over a generated probe under the repo conftest (the pattern of `test_stewardship_mechanics.py:130-178`), its report read by every session check; its seconds count in G4.
 - CI: one job `guards` in `ci.yml` runs `run.py` then `run.py --planted`; lint and mypy jobs add `scripts/` (156). Pytest leaves `--cov` alone.
 - A guard module has no mutation run of its own: `--planted` turns each check red on its violation, which is the kill a mutant would prove. Its commit body predeclares that `mutation: skipped` line.
@@ -160,22 +161,25 @@ Ledger slice read here (735 records; title/id/component match; `bugs.py status` 
 | R7 | R6b | operator only: `docs(adr): accept meta-test-principles-guard-checks` with the nine `### P-NN` hunks, `amends: 0167` |
 | R8 | now (the fold) | `docs(adr): accept <0179's slug>` — the operator ruled "Accept as prepared" (SPEC §Decisions); the main thread writes it |
 | R9 | 161, R5 | operator only: `docs(adr): accept <0177's slug>`, `amends: 0025`, with P-33's re-scope hunk; its check `no-model-api-in-ci` exists from 161 |
+| R10 | `0.5.0d-bug` merge (the union fix; 0180's `measured_by` passes on the work branch) | operator only: `docs(adr): accept <0180's slug>`; unblocks T-050-189 |
 | W11 markers | each `dadaia-evals` merge | `chore(tasks): <verb> T-050-NNN — dadaia-evals <sha>` (§2.9) |
 
 - 0178 is accepted at closure, not here (SPEC §Decisions).
+- AC10.14's memory half (`worktrees.md:5,35,36`, `bug-ledger.md:32`, `catalog.json` regenerated) is the closure memory pass (0138 lane), beside R6b's lines; no task row. With 0180 still proposed at closure, 189 and that half wait for rc-9.
 - Each repair cites the merged task sha and runs before the chain's next task opens. R7's `measured_by` grep prints nothing before it is offered. T-050-180 re-derives `docs/bug-ledger-lessons.md` after R7 (precedent T-050-150).
 
 ### 2.8 G1 readout (ADR 0142), from the TASKS Δ
-- This repo's lines only (SPEC W11): 182 counts; 183 is Markdown, outside the `*.py` readout; 184–188 write `repos/dadaia-evals`.
+- This repo's lines only (SPEC W11): 182 counts; 183 and 189 are Markdown, outside the `*.py` readout; 184–188 write `repos/dadaia-evals`.
 - Production: 153 −280; 154 −236; 158 −40; 162 −9; 165 −25; 167 +22; 168 +35; 170 −10; 171 −2; 173 +2; 174 +2; 175 +3; 176 −1; 177 −2; 179 +2; 182 +10 → −529; 25,307 − 529 ≈ 24,778 ≤ 24,805, a 27-line margin on estimates; 181 measures, and a miss is logged at closure, not hidden.
-- Test functions: 153 −18, 154 −2, 155 −10, 156 −16, 158 −4, 159 −13, 160 −11, 161 −21, 162 −4, 163 −4, 164 −4, 165 −1, 167 +1, 168 +1, 182 0 (a parametrize row) → −106; checks 6 + 9 + 5 + 10 = 30; 1,233 − 106 + 30 ≈ 1,157 ≤ 1,167; 181 measures.
-- Test lines: Δ sum −4,964 (−5,139 +175, 182's +15 in); guard lines +260 +300 +250 +400 −10 = +1,200; 45,464 − 4,964 + 1,200 ≈ 41,700 ≤ 43,232.
+- Test functions: 153 −18, 154 −2, 155 −9 (measured at its merge), 156 −16, 158 −4, 159 −13, 160 −11, 161 −21, 162 −4, 163 −4, 164 −4, 165 −1, 167 +1, 168 +1, 182 0 (a parametrize row) → −105; checks 6 + 9 + 5 + 11 = 31; 1,233 − 105 + 31 ≈ 1,159 ≤ 1,167, an 8-line margin; 181 measures.
+- Test lines: Δ sum −4,964 (−5,139 +175, 182's +15 in); guard lines +260 +300 +250 +420 −10 = +1,220 (161's +20: `specs-canon-tracked`); 45,464 − 4,964 + 1,220 ≈ 41,720 ≤ 43,232, a 1,512-line margin.
 
 ### 2.9 W11 (T-050-182–188)
 - 182 (AC11.0), deletion first: `gitflows` already reads each row of `context list --json`; each repo's entry gains the row's `main_repo` as `flow["main"]`, and `new` reads the trio at `root/repos/<flow["main"]>` on `flow["work"]`, its Draft fix line naming `flow["main"]`. A main repo resolves to itself: one resolution, no second read, no branch on role. Δ ≈ +10 at most (one key, the read's path, the fix line). The case is a parametrize row on `test_impl_needs_an_approved_trio_in_the_live_candidate`, an associated repo under `make_workspace`'s registry.
 - 183 (AC11.1): text only; AI-entity change under `dd-ai-eng-knowhow` AUTHORING, `public stage && public install && public doctor`; the root map stays ≤ 8,293 B (rescope one line, no new line). The memory pass's `sdd-gate-v3` line is the product engineer's at closure.
 - 184–187 (AC11.2–AC11.5), one `impl` worktree of `dadaia-evals` each, `W:` disjoint by directory: 184 the repo law and ignores, 185 `tasks/t1-cold-onboarding/`, 186 `tasks/t2-seeded-bug/`, 187 `.github/workflows/eval.yml` and `scripts/`. Its commits: `<type>(T-050-NNN): …` there; no `specs/` in that repo.
-- 188 (AC11.6): one dispatch by the main thread, read back into a handoff; the `_RELEASE.json` log line is written at closure (181's lane).
+- 187 (AC11.5), after review, also reaches `dadaia-evals` `main` through that repo's PR edges `feature/0.5.0` → `develop` → `main`, each with CI green and an APPROVED verdict; GitHub dispatches only a default-branch workflow. Its `done` marker cites the `main` merge sha.
+- 188 (AC11.6): `gh workflow run eval.yml -f lib_ref=<tip of feature/0.5.0>` on `dadaia-evals`, once 187 is on its `main`; one dispatch by the main thread, read back into a handoff; the `_RELEASE.json` log line is written at closure (181's lane).
 - Markers (the releases law §3, ADR 0111): an `impl` worktree's allowed set holds its own repo's `TASKS.md` only, and `dadaia-evals` has none. `_worktree_kinds.KINDS["release"]` holds `specs/releases/*`, so this candidate's `release` worktree writes W11's markers: `start` before the main thread opens the `dadaia-evals` worktree, `done` after its `WT merge`, the merged `dadaia-evals` sha cited in the subject; they reach the work branch with the `release` worktree's next merge, like R1–R9. `dd-gitflow-default` §3a row 7 names `impl` as the marker kind and is silent on a cross-repo task: a gap the reviewer's audit lens may log, not a refusal (the allowed set is the merge's law, `worktrees/AGENTS.md` §1).
 
 ## 3. Test strategy
@@ -188,11 +192,11 @@ Ledger slice read here (735 records; title/id/component match; `bugs.py status` 
 
 - rc-8 opens on the work branch after this definition merges; rc-7 is merged.
 - `bug` worktrees open only in the steps below; none other is open while T-050-166 strips `Intent:` (239 files).
-- Margins (estimates): production 37, functions plus checks 10.
+- Margins (estimates): production 27, functions plus checks 8, test lines 1,512.
 - One absolute `COVERAGE_FILE` is shared by concurrent `--cov` runs; worktree tests run without `--cov` (repo `AGENTS.md`).
 - A bare terminal outside a harness carries no `TOOL_CACHE_ENV`: there, coverage, ruff and mypy write where the tool defaults, as today (ADR 0080's declared gap).
 - G4 baseline: rc-7's run, one runner class, median; only `guards` is added (this repo's CI; `eval.yml` is `dadaia-evals`').
-- 188 needs `eval.yml` dispatchable: GitHub dispatches a workflow only when its file is on the default branch, and `dadaia-evals` merges to `main` by promote. If `gh workflow run eval.yml --ref feature/0.5.0` refuses, 188 stops and escalates to the operator; nothing here pushes or promotes it.
+- 188 needs `eval.yml` on `dadaia-evals` `main` (187's PR edges, §2.9); a refused edge (CI red, no APPROVED) holds 188 and is fixed at its cause, never bypassed.
 
 ## 5. Parallel schedule
 
@@ -203,14 +207,15 @@ Ledger slice read here (735 records; title/id/component match; `bugs.py status` 
 | 3 | T-050-158, T-050-160, T-050-161 | 3 | one impl worktree each; R6a, R4, R5 follow |
 | 4 | T-050-162, T-050-163, T-050-164, T-050-165 | 4 | one impl worktree each |
 | 5 | T-050-159, T-050-167, T-050-182, T-050-183 | 4 | one impl worktree each; R3 follows 159; 182 after 164 and `0.5.0d-bug` merge, 183 after R9 |
-| 6 | T-050-166, T-050-168; T-050-184, T-050-185, T-050-186, T-050-187 | 6 | one impl worktree each, 184–187 in `dadaia-evals` (its own cap of 5); R6b, then R7, after 166 |
-| 7 | T-050-169, T-050-170, T-050-171, T-050-172; T-050-188 | 5 | one `bug` worktree each; 188 is a dispatch, no worktree |
+| 6 | T-050-166, T-050-168; T-050-184, T-050-185, T-050-186, T-050-187 | 6 | one impl worktree each, 184–187 in `dadaia-evals` (its own cap of 5); R6b, then R7, after 166; 187 then rides `dadaia-evals` `feature/0.5.0` → `develop` → `main`, CI green and APPROVED per edge |
+| 7 | T-050-169, T-050-170, T-050-171, T-050-172; T-050-188, T-050-189 | 6 | one `bug` worktree each; 188 is a dispatch once 187 is on `dadaia-evals` `main`, no worktree; 189 one impl worktree once R10 lands, else rc-9 |
 | 8 | T-050-173, T-050-174, T-050-175, T-050-176 | 4 | one `bug` worktree each |
 | 9 | T-050-177, T-050-178, T-050-179, T-050-180 | 4 | 177, 180 impl; 178, 179 `bug` |
 | 10 | T-050-181 | 1 | measure; closure in the release worktree |
 
 - Edges: each task's `blocked by:` (TASKS).
 - Critical path: T-050-153 → T-050-156 → T-050-158 → T-050-162 → T-050-159 → T-050-166 → T-050-169 → T-050-173 → T-050-178 → T-050-181 = 10 steps.
-- W11 is off the critical path: 182 → 184–187 → 188 ends at step 7.
+- W11 is off the critical path: 182 → 184–187 → 187 on `dadaia-evals` `main` → 188 ends at step 7. 189 waits only on R10, off the path.
+- Widened `W:` inside their own task commits stay sequential: 154's `test_doctor_fix_lines_clear_their_finding.py` precedes 158, 162, 169 (each blocked by 154 transitively), `test_backlog_models.py` is 154's alone; 156's `test_ci_workflow_hygiene.py` (161 deletes it) and `.github/required-checks.json` (161 reads it) precede 161 (blocked by 156); 161's `.gitignore` is its alone.
 - Overlap check: `dadaia-evals` paths are disjoint from every W8–W10 `W:`; 182 and 183 share only the derived files below with their step; disjoint in every step except `TASKS.md`, the `*.jsonl` ledgers, the derived `pub/entities/behavior-map.json` and `pub/templates/shipped-hashes.json`; no step shares `ci.yml` or `pyproject.toml` (153 takes both step-2 hunks).
 - Merge in ready order; open siblings rebase after each.
