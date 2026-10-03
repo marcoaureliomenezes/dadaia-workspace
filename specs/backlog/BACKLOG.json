@@ -10,27 +10,11 @@
       "provenance": "operator closure ruling 2026-09-28: the rest is mapped to the backlog; source rubric 0.5.0 at a5e9a2ee (.dadaia/tmp/general-purpose/20260928/rubric-050/RUBRIC.md)"
     },
     {
-      "id": "release-memory-idempotent",
-      "title": "release.py memory appends the closure's one kind: memory entry once",
-      "opened": "2026-09-28",
-      "status": "idea",
-      "description": "A second release.py memory call appends a second kind: memory log entry. Evidence: rubric 0.5.0 at a5e9a2ee (.dadaia/tmp/general-purpose/20260928/rubric-050/RUBRIC.md) J6, N5; the memory verb of dd-release-implementation/scripts/release.py.",
-      "provenance": "operator closure ruling 2026-09-28: the rest is mapped to the backlog; source rubric 0.5.0 at a5e9a2ee (.dadaia/tmp/general-purpose/20260928/rubric-050/RUBRIC.md)"
-    },
-    {
       "id": "guidance-messages-name-the-right-target",
       "title": "Guidance messages name the bound context and the real target",
       "opened": "2026-09-28",
       "status": "idea",
       "description": "SessionStart shows a session bound to invoicer the next step of payroll; the root-whitelist fix line proposes mkdir .dadaia/tmp instead of where the file belongs; HOOKS-DRIFT-1 says differs for an absent hook. Evidence: rubric 0.5.0 at a5e9a2ee (.dadaia/tmp/general-purpose/20260928/rubric-050/RUBRIC.md) N6, J8 S1; hooks/root_whitelist.py, features/spec_context/doctor.py HOOKS-DRIFT-1.",
-      "provenance": "operator closure ruling 2026-09-28: the rest is mapped to the backlog; source rubric 0.5.0 at a5e9a2ee (.dadaia/tmp/general-purpose/20260928/rubric-050/RUBRIC.md)"
-    },
-    {
-      "id": "init-announces-codex-trust",
-      "title": "init --harness codex announces the Codex project-trust step",
-      "opened": "2026-09-28",
-      "status": "idea",
-      "description": "init is silent on Codex project trust; only dd-ai-eng-knowhow/CODEX.md mentions it. Evidence: rubric 0.5.0 at a5e9a2ee (.dadaia/tmp/general-purpose/20260928/rubric-050/RUBRIC.md) J9; 0.4.7 blockers table, NEW-FR-12 PARTIAL.",
       "provenance": "operator closure ruling 2026-09-28: the rest is mapped to the backlog; source rubric 0.5.0 at a5e9a2ee (.dadaia/tmp/general-purpose/20260928/rubric-050/RUBRIC.md)"
     },
     {
