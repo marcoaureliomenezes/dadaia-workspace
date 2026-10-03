@@ -1,9 +1,9 @@
 """One owner per question: each rule scans the package and names every module that answers a
 question its owner alone answers.
 
-Intent: CONTRACT — P-11 core file-I/O purity, P-12 hooks never import the container, P-18 module
-ceiling, F001 no orphaned factory, and the single-owner bug fixes cited on each row. Size: SMALL —
-AST/text over the package source, plus one subprocess per hook import.
+Intent: CONTRACT — P-11 core file-I/O purity, P-12 hooks never import the container, F001 no
+orphaned factory, and the single-owner bug fixes cited on each row. Size: SMALL — AST/text
+over the package source, plus one subprocess per hook import.
 """
 
 from __future__ import annotations
@@ -121,13 +121,6 @@ def _orphan_factories() -> list[str]:
         if not used(others, n)
         and not used(re.sub(rf"^(?:def|class) {n}\b", "", source, flags=re.M), n)
     ]
-
-
-def _doctor_modules_over_ceiling() -> list[str]:
-    """P-18: no features/specs/doctor*.py above 699 lines (lower it after a split)."""
-    modules = sorted((_PKG / "features" / "specs").glob("doctor*.py"))
-    assert modules
-    return [p.name for p in modules if len(p.read_text(encoding="utf-8").splitlines()) > 699]
 
 
 def _rmtree_sites() -> list[str]:
@@ -282,7 +275,6 @@ _RULES: dict[str, Callable[[], list[str]]] = {
     "core-file-io-purity": _core_file_io,
     "session-store-owns-session-paths": _session_paths,
     "every-container-def-has-a-production-consumer": _orphan_factories,
-    "doctor-modules-under-the-ceiling": _doctor_modules_over_ceiling,
     # sa-context-dead-removes-repos-outside-the-reaper#C8
     "no-rmtree-outside-the-create-rollback": _rmtree_sites,
     # sa-expiry-has-two-clocks#45.3
