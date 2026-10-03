@@ -57,7 +57,7 @@ Every task runs in its own `worktree.py new` impl worktree, opened when its `blo
 
 ## Closure
 
-- [-] **T-050-150 — Measure and hand to closure.** `W:` handoff, `.github/workflows/ci.yml`, `tests/contract/test_slop_ratchets.py`, `tests/contract/test_every_block_carries_a_fix.py` (G4 rounds 1 and 2, operator order "Profile and cut it now": 314ea2ec1, 5519a53f5, d06c4e6a3, 4f2ea7b2a, 1a4eadc98), `docs/bug-ledger-lessons.md` (derived-docs step of the ADR 0163–0167 and 0169 acceptances, b9d7e4682; widened per `specs/releases/AGENTS.md`:32) · `blocked by:` T-050-131..149, T-050-151, T-050-152
+- [x] **T-050-150 — Measure and hand to closure.** `W:` handoff, `.github/workflows/ci.yml`, `tests/contract/test_slop_ratchets.py`, `tests/contract/test_every_block_carries_a_fix.py` (G4 rounds 1 and 2, operator order "Profile and cut it now": 314ea2ec1, 5519a53f5, d06c4e6a3, 4f2ea7b2a, 1a4eadc98), `docs/bug-ledger-lessons.md` (derived-docs step of the ADR 0163–0167 and 0169 acceptances, b9d7e4682; widened per `specs/releases/AGENTS.md`:32) · `blocked by:` T-050-131..149, T-050-151, T-050-152
   `delivers:` G1 readout; G2, G4 against run 36813899731 with the tolerance applied; G3 re-run of every open bug; the closure acts — `release` worktree: this SPEC's Origin rewritten in the 0161 form and traced clean, the 0.4.8 → 0.5.0 log note, the ADR 0019 drift logged, the `specs/*/AGENTS.md` re-render; `backlog` worktree: `backlog.py exit` of the four entries (`delivered`) and `task-line-grammar-one-reader` (`to-bug`); `bug` worktree: G3 resolve batch; planned vs measured width per step; inputs to the memory pass and G6 · `RED:` n/a.
 
 ## AC map
