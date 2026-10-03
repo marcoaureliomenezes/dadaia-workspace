@@ -32,6 +32,7 @@
 
 - These ADRs decide: 0071 (amended by 0163), 0104, 0118, 0119, 0122, 0123, 0138, 0140, 0142, 0143 (amended by 0166, 0170), 0146 (5), 0149, 0152 (2), 0158, 0160 (amended by 0164), 0162, 0163, 0164, 0166, 0167 (partly; the rest is rc-9's), 0170.
 - One new ADR: 0176 (proposed), AC8.10. The operator accepts it in the release worktree, in the commit carrying the nine `### P-NN` hunks (`specs/ADRs/AGENTS.md` §3); `amends: 0167` is written then (0151 M2). 0143's repair and AC8.10's repairs take the 0138 lane.
+- 0181 (proposed; operator 2026-10-03, "One ADR for rc-8's W8 law deletions (Recommended)") names every law line W8–W10 deletes or rewrites; every commit of this candidate deleting a law line cites it (0151 M3), T-050-183's cite 0177 and T-050-189's 0180. The operator accepts it before T-050-154's push.
 - Operator, 2026-10-03, verbatim:
   - Train: "you will only create now the RC8 ... we will wait till we finish the RC8"; rc-9..rc-12 are §Carried.
   - Q1 "Keep in 0.5.0 as rc-11 (Recommended)". Q2 "Yes, into rc-8 (Recommended)".
@@ -91,7 +92,7 @@
   - `source_repo_hygiene` splits (T-050-155 review F1; the CI repo-hygiene job checks only tracked projection files; the `gitignore-…-recurrence` chain, 10 bugs):
     - Visibility rows: moved to guard check `specs-canon-tracked` (T-050-161, `repo.py`), derived from the canon, never a hand-kept list (`additive-globs-hand-kept-beside-the-canon`):
       - Probes: one path per row of `canon.py`'s `CANON`, its `dest` or a sample its `pattern` matches, each judged by `git check-ignore --no-index` (plain `check-ignore` passes any tracked path).
-      - Expected not ignored, except a row whose `TEMPLATES` source carries a `workspace_layout._PLACEHOLDERS` key: it is rendered from the code registry and expected ignored. Today that is `AGENTS.md` alone (`.gitignore:132`); whether it gets tracked is backlog `doctor-in-a-fresh-worktree-lacks-rendered-specs-law`'s.
+      - Expected not ignored, except a row where rendering its `TEMPLATES` source through `workspace_layout.render_registry_tables` changes it: that row is expected ignored. Today that is `AGENTS.md` alone (`.gitignore:132`); whether it gets tracked is backlog `doctor-in-a-fresh-worktree-lacks-rendered-specs-law`'s.
       - The ignored half, kept from F-20: `releases/_archive/<v>/local-notes.md` and `releases/_archive/<v>/tmp/<f>` are ignored. `release.py ship` renames the live directory with its untracked files (`release.py:124`), and nothing refuses them.
       - Planted: a temp `.gitignore` hiding `specs/releases/**/TASKS.md`, and one re-including `_archive/**/local-notes.md`, each turn it red.
     - Hidden rows elsewhere (`local-notes.md`, `tmp/`): the canon scan's, `canon_violations` (`features/specs/canon.py:172`) at pre-push (`push_gate.py:216-232`) and doctor (`canon.py:194-206`).
@@ -178,7 +179,8 @@ After AC9.3 and AC8.1's `Intent:` strip merge. Each RED is a behaviour assert in
 - Operator prerequisites, the operator's GitHub acts on `dadaia-evals`:
   - an environment `evals` whose deployment-branch policy allows `main` only;
   - `claude setup-token`, stored as that environment's secret `CLAUDE_CODE_OAUTH_TOKEN`, never a repository secret;
-  - extra usage off on the plan.
+  - extra usage off on the plan;
+  - the `ci.yml` job required on `develop` and `main`.
   - Done: `main`, `develop` and `feature/0.5.0` on its origin (5c11f42).
 - AC11.0 An associated repo's `impl` reads the main repo's Approved trio (0174's slice, Q-W0):
   - `_worktree_new.new(kind="impl")` reads the trio from the context's main repo, which is `repo` itself for a main repo. It goes through the `context list --json` read `flow_for` already makes: no second read, no branch on repo role.
@@ -265,4 +267,4 @@ After AC9.3 and AC8.1's `Intent:` strip merge. Each RED is a behaviour assert in
 
 ## Open questions for the operator
 
-- None for W8–W11: the 2026-10-03 grill frontiers are empty. F4 is rc-12's (§Carried). Operator acts: 0176, 0177, 0178 and 0180's acceptances (§Decisions); W11's GitHub prerequisites (the `evals` environment and its secret).
+- None for W8–W11: the 2026-10-03 grill frontiers are empty. F4 is rc-12's (§Carried). Operator acts: 0176, 0177, 0178, 0180 and 0181's acceptances (§Decisions); W11's GitHub prerequisites (the `evals` environment, its secret, the required `ci.yml` job).
