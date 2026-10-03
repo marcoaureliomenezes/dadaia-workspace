@@ -200,8 +200,7 @@ _PATH_MARKERS: tuple[tuple[str, str], ...] = (
     ("tests/tmp/", "tmp"),
 )
 
-# Tier -> enforced timeout seconds (dd-test-stewardship, size tiers; values in its
-# PARAMETERS.md). A test that trips its tier ceiling is MIS-TIERED — fix the tier or
+# Tier -> enforced timeout seconds (tests/AGENTS.md size tiers). A test that trips its tier ceiling is MIS-TIERED — fix the tier or
 # declare an explicit justified @pytest.mark.timeout; never raise these defaults.
 _TIER_TIMEOUTS: dict[str, int] = {"unit": 10, "contract": 30, "integration": 60, "e2e": 120}
 
@@ -236,7 +235,7 @@ def _validate_quarantine_markers(items: list[pytest.Item]) -> None:
 
     Quarantine is a lane out of the gating selectors — usable ONLY with a live bug
     (`@pytest.mark.quarantine(bug="<bug-slug>")`). An unregistered quarantine would be
-    a silent green-with-exclusions, the exact failure the stewardship law forbids.
+    a silent green-with-exclusions.
     """
     for item in items:
         marker = item.get_closest_marker("quarantine")
@@ -247,7 +246,7 @@ def _validate_quarantine_markers(items: list[pytest.Item]) -> None:
             message = (
                 f"{item.nodeid}: @pytest.mark.quarantine requires a registered bug id — "
                 "use @pytest.mark.quarantine(bug='<bug-slug>') and register the bug via "
-                "`dadaia bugs append` first (dd-test-stewardship, flakes and quarantine)."
+                "`dadaia bugs append` first."
             )
             # Under xdist the UsageError kills the worker and surfaces as an opaque
             # INTERNALERROR on the controller (T-070-09 finding 2) — print the

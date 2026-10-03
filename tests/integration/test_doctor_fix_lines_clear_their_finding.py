@@ -147,14 +147,6 @@ def _plant_changelog_heading(root: Path) -> None:
     )
 
 
-def _plant_tests_agents_placeholder(root: Path) -> None:
-    tests_dir = root / "tests"
-    tests_dir.mkdir(exist_ok=True)
-    (tests_dir / "AGENTS.md").write_text(
-        "# Test Rules\n\nThe LARGE cap is `<LARGE_CAP>`.\n", encoding="utf-8"
-    )
-
-
 def _plant_dispositioned_audit(root: Path) -> None:
     audit = root / "specs" / "audits" / "20260101-lifecycle"
     audit.mkdir(parents=True)
@@ -216,7 +208,6 @@ PLANTS: dict[str, Plant] = {
     "FIXED-2": Plant(_plant_fixed_block_drifted),
     "SPEC-DOC-005": Plant(_plant_oversized_plan),
     "GITFLOW-1": Plant(_plant_gitflow_gone, {"<specs>": "specs"}),
-    "AGENTS-PLACEHOLDER-1": Plant(_plant_tests_agents_placeholder),
     "SPEC-DOC-041": Plant(
         lambda r: _write(
             r / "specs/bugs/BUGS.jsonl",
@@ -480,15 +471,14 @@ def test_a_judgment_only_rule_never_makes_the_run_exit_1(repo: Path) -> None:
     sa-memory-atom-has-two-grammars#B29-6: a history heading planted beside them is
     reported once, by LINT-1 — CAT-1 and SPEC-DOC-008 do not exist."""
     root = repo
-    for code in ("SPEC-DOC-005", "AGENTS-PLACEHOLDER-1"):
-        PLANTS[code].plant(root)
+    PLANTS["SPEC-DOC-005"].plant(root)
     _plant_changelog_heading(root)
     for plant in REPORT_ONLY.values():
         plant(root)
 
     report = _specs_section(_doctor(root), Path())
     fired = {f.code for f in report.printable}
-    assert {"SPEC-DOC-005", "AGENTS-PLACEHOLDER-1", *REPORT_ONLY} <= fired, fired
+    assert {"SPEC-DOC-005", *REPORT_ONLY} <= fired, fired
     assert not {"CAT-1", "SPEC-DOC-008", "SPEC-DOC-010"} & fired, fired
     history = [f for f in report.findings if "Changelog" in f.message]
     assert [(f.code, f.error) for f in history] == [("LINT-1", True)], history
@@ -512,7 +502,6 @@ _PLACEHOLDERS = (
     "<!-- zones -->",
     "<!-- canon -->",
     "<!-- root -->",
-    "<!-- repo-excluded -->",
     "<!-- specs-canon -->",
 )
 

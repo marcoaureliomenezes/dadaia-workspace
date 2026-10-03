@@ -1,7 +1,7 @@
 # Tests
 
-Architecture, size tiers and cost: `tests/AGENTS.md`; intent, admission and deletion: skill
-`dd-test-stewardship` — read both before adding or editing a test.
+Architecture, size tiers and cost: `tests/AGENTS.md`; test basics: the workspace root map §1 —
+read both before adding or editing a test.
 
 ## Commands
 

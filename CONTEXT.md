@@ -280,7 +280,7 @@ _Avoid_: injection state machine, hook branch
 _Avoid_: template hashes, drift allowlist
 
 **Scoped law**:
-A per-area `AGENTS.md` projected from `public/scaffold/<area>/` (or the repo/tests pair placed by `scoped_law.install_scoped_law`); governed by TREE-5's shipped-history discipline.
+A per-area `AGENTS.md` projected from `public/scaffold/<area>/` (or the repo's `AGENTS.md`, placed by `canon.scaffold_repo_law`); governed by TREE-5's shipped-history discipline.
 _Avoid_: sub-AGENTS, area rules file
 
 ## Workspace zones (0.4.6)
@@ -343,11 +343,28 @@ _Avoid_: fix (bare)
 A harm-ordered group of a candidate's bugs — data loss and gate holes first.
 _Avoid_: phase (a release's state), batch
 
+## Tests
+
+**Meta-test**:
+A check about the repository or its test suite, not about product behaviour; it runs as a guard script check in one CI job, never in pytest.
+_Avoid_: ratchet test, stewardship test
+
+**Guard script**:
+`scripts/guards/run.py` and its sibling modules — every meta-test check by id; `--planted` proves each id red on its own plant.
+_Avoid_: ratchet, lint test
+
+**Owner file**:
+The one test file that owns a behaviour; a task's `RED:` names it, and a new case lands there before any new file opens.
+_Avoid_: test home
+
+**Behaviour assert**:
+An assert on what the code does for its caller — an output, an exit code, a written file — against a literal expected value; never on source text, a count or an inventory.
+_Avoid_: text assert, snapshot
+
 ## Homonyms — one canonical sense
 
 **Scaffold**:
-The specs-tree renderer (`features/specs/canon.py` scaffold half) and its output under `public/scaffold/`. The test tier is always written SCAFFOLD (an undeclared test's expiring intent) — qualify on collision.
-_Avoid_: scaffold (bare) for the test tier
+The specs-tree renderer (`features/specs/canon.py` scaffold half) and its output under `public/scaffold/`.
 
 **Sentinel**:
 The ctx-inject exactly-once file (`.dadaia/tmp/ctx-inject-fired-<session>`), carrying the last injected slug. Any other marker file is a marker, not a sentinel.

@@ -184,9 +184,6 @@ _ADOPTIONS = [
     pytest.param((), "", "", lambda r: (r / "notes.md").write_text("operator\n"), _WORK,
         lambda r, b, s: (r / "notes.md").read_text() == "operator\n" and "notes.md" not in _tree(b, _WORK),
         id="unborn-clone-keeps-its-untracked-foreign-files"),
-    pytest.param((), "", "", lambda r: (r / "tests").mkdir() or (r / "tests/AGENTS.md").write_text("# t\n"), _WORK,
-        lambda r, b, s: _tree(b, "main") == [*_ONBOARDING, "tests/AGENTS.md"],
-        id="sa-public-install-writes-the-root-map-into-product-repos#K3-tests-law-published"),
 ]  # fmt: skip
 
 

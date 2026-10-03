@@ -60,7 +60,6 @@ SCOPED_SOURCE_BY_INSTALLED_PATH: dict[str, Path] = {
     # is an orphan below
     **{dst: _PUBLIC / "data" / src for src, dst, _ in _DADAIA_FAMILY_AGENTS_MD},
     "repos/<slug>/AGENTS.md": _PUBLIC / "templates" / "repo-AGENTS.md",
-    "tests/AGENTS.md": _PUBLIC / "templates" / "tests-AGENTS.md",
 }
 
 _FIRST_NUMBERED_STEP = re.compile(r"^1\. (?P<body>.+)$", re.MULTILINE)

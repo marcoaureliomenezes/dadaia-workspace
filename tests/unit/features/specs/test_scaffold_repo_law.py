@@ -13,7 +13,7 @@ from dadaia_workspace.features.specs import canon
 
 pytest.importorskip("fcntl")  # POSIX symlink + O_NOFOLLOW semantics
 
-_BODIES = {"repo-AGENTS.md": "# repo law\n", "tests-AGENTS.md": "# tests law\n"}
+_BODIES = {"repo-AGENTS.md": "# repo law\n"}
 
 
 @pytest.fixture
@@ -25,51 +25,32 @@ def public(tmp_path: Path) -> Path:
     return tmp_path / "public"
 
 
-def test_installs_every_absent_row_beside_an_existing_tests_tree(
-    tmp_path: Path, public: Path
-) -> None:
-    """sa-public-install-writes-the-root-map-into-product-repos#K5 sa-public-install-writes-the-root-map-into-product-repos#K3."""
+def test_installs_the_absent_repo_law(tmp_path: Path, public: Path) -> None:
+    """sa-public-install-writes-the-root-map-into-product-repos#K5."""
     repo = tmp_path / "repo"
-    (repo / "tests").mkdir(parents=True)
+    repo.mkdir()
     written = canon.scaffold_repo_law(repo, project_name="p", public_dir=public)
-    assert written == [repo / "AGENTS.md", repo / "tests" / "AGENTS.md"]
+    assert written == [repo / "AGENTS.md"]
     assert (repo / "AGENTS.md").read_text(encoding="utf-8") == "# repo law\n"
-    assert (repo / "tests" / "AGENTS.md").read_text(encoding="utf-8") == "# tests law\n"
 
 
-def test_present_rows_are_never_overwritten_and_no_tests_dir_is_invented(
-    tmp_path: Path, public: Path
-) -> None:
+def test_present_law_is_never_overwritten(tmp_path: Path, public: Path) -> None:
     """sa-public-install-writes-the-root-map-into-product-repos#K5."""
     repo = tmp_path / "repo"
     repo.mkdir()
     (repo / "AGENTS.md").write_text("mine\n", encoding="utf-8")
     assert canon.scaffold_repo_law(repo, project_name="p", public_dir=public) == []
     assert (repo / "AGENTS.md").read_text(encoding="utf-8") == "mine\n"
-    assert not (repo / "tests").exists()
-
-
-def test_symlinked_tests_dir_is_never_written_through(tmp_path: Path, public: Path) -> None:
-    """sa-public-install-writes-the-root-map-into-product-repos#K5."""
-    outside = tmp_path / "outside-tests"
-    outside.mkdir()
-    repo = tmp_path / "repo"
-    repo.mkdir()
-    (repo / "tests").symlink_to(outside, target_is_directory=True)
-    assert canon.scaffold_repo_law(repo, project_name="p", public_dir=public) == [
-        repo / "AGENTS.md"
-    ]
-    assert list(outside.iterdir()) == []
 
 
 def test_symlinked_repo_root_is_never_written_through(tmp_path: Path, public: Path) -> None:
     """sa-public-install-writes-the-root-map-into-product-repos#K5."""
     outside = tmp_path / "outside-repo"
-    (outside / "tests").mkdir(parents=True)
+    outside.mkdir()
     repo = tmp_path / "repo"
     repo.symlink_to(outside, target_is_directory=True)
     assert canon.scaffold_repo_law(repo, project_name="p", public_dir=public) == []
-    assert sorted(p.name for p in outside.rglob("*")) == ["tests"]
+    assert list(outside.iterdir()) == []
 
 
 @pytest.mark.parametrize("dangling", [True, False])

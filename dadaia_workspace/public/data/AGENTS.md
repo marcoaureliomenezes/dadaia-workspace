@@ -15,10 +15,10 @@
 
 - Classify every demand: Arm A (feature) or Arm B (bug); state the arm before acting.
 - Arm A: `demand -> backlog -> as-is review -> release candidate (SPEC/PLAN/TASKS) -> implementation + review -> memory -> closure -> promote by merging the release PR`.
-- Arm B: `propose -> operator confirms -> register -> RED test -> root-cause fix -> GREEN -> resolved`.
+- Arm B: `propose -> operator confirms -> register -> lowest-level RED test -> root-cause fix -> GREEN -> resolved`.
 - Test: does the tool break its own contract? Yes -> Arm B. No -> Arm A.
 - A feature enters only through the backlog or an operator demand recorded in the SPEC `Origin`; a confirmed bug is fixed per `worktrees/AGENTS.md` §2.
-- Every change minimizes code and tests: DELETE → REBUILD → UPDATE → KEEP → ADD last; verbose code, comments or tests that could be shorter are defects; every documented behavior keeps working.
+- Every change minimizes code and tests: DELETE → REBUILD → UPDATE → KEEP → ADD last; verbosity is a defect; documented behavior still works; tests assert behavior not text, mock only boundaries, expect literals; fixes never rewrite old asserts.
 - No workflow engine: the SDD documents (`specs/releases/AGENTS.md`) are the record of progress.
 
 ## 2. Who does what
@@ -79,7 +79,6 @@
 | `dd-release-implementation` | tasks, push green, closure order |
 | `dd-code-review` | three axes, six lenses, slop detection |
 | `dd-bug-registration`, `dd-bug-resolution` | Arm B end to end |
-| `dd-test-stewardship` | test intent, size, demotion, pruning |
 | `dd-gitflow-default` | branches, PRs, commit shapes |
 | `dd-handoff-emitter` | machine-readable completion records |
 | `dd-audit-project` | the periodic three-pillar audit |

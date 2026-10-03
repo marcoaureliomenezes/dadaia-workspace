@@ -56,7 +56,6 @@ def test_install_first_then_specs_init_leaves_the_repo_template(tmp_path: Path) 
 
     law = (repo / "AGENTS.md").read_text(encoding="utf-8")
     assert law.startswith("# zz-product")
-    assert (repo / "tests" / "AGENTS.md").is_file()
 
 
 @pytest.mark.parametrize("banner", [False, True], ids=["plain", "bannered"])
@@ -113,4 +112,4 @@ def test_repo_law_has_one_writer_and_the_root_map_one_source() -> None:
     rules = (pkg / "infrastructure" / "projection_rules.py").read_text(encoding="utf-8")
     assert 'plan.agentic_dir / "data" / "AGENTS.md"' in rules
     assert '"templates" / "AGENTS.md"' not in rules
-    assert service._ONBOARDING == ("specs", "specs-bkp", "AGENTS.md", "tests/AGENTS.md")
+    assert service._ONBOARDING == ("specs", "specs-bkp", "AGENTS.md")

@@ -69,11 +69,6 @@ Each step ends on a checkable criterion. Steps 5–8 are candidate-closure work.
 The arc ends here. Gate -> promote -> record -> branch cut: `dd-gitflow-default` steps
 9-12.
 
-## Test-stewardship touchpoints (reference)
-
-- Declare test intent at birth; pass the admission filter (`dd-test-stewardship`, intent and admission) before a test enters the suite.
-- Demotion and quarantine/SCAFFOLD expiry are candidate-closure work (step 6's `kind: test-dispositions` log entry).
-
 ## Out of scope for closure
 
 - Writing source code, tests, or pipelines (other agents) — the closer records test dispositions, never authors a test.

@@ -64,10 +64,7 @@ __all__ = [
 ]
 
 #: The main repo's scoped law, beside ``specs/``: ``templates/<name>`` -> ``<repo>/<dest>``.
-REPO_LAW: tuple[tuple[str, str], ...] = (
-    ("repo-AGENTS.md", "AGENTS.md"),
-    ("tests-AGENTS.md", "tests/AGENTS.md"),
-)
+REPO_LAW: tuple[tuple[str, str], ...] = (("repo-AGENTS.md", "AGENTS.md"),)
 
 #: Every ``specs/audits/`` directory is named ``<YYYYMMDD>-<slug>``.
 AUDIT_DIR_NAME_PATTERN: str = r"\d{8}-[a-z0-9][a-z0-9-]*"

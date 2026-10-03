@@ -10,7 +10,7 @@ labelled judgement call with the command that makes it verifiable in the diff.
 |---|---|---|---|---|
 | S1 | Comment or skill text narrating the what, the change or an id | `git diff -U0 \| grep -E '^\+\s*#.*(FR[0-9]\|T-[0-9]{3}\|ADR\|v[0-9]\.[0-9]\|added\|fixed\|changed)'`; a comment paraphrasing the next line; "renamed from", "formerly", `v0.` in a `SKILL.md` | LOW; MEDIUM above 5 hits | Delete; the why moves to the commit body or the ledger |
 | S2 | Docstring over 3 lines carrying history | `git diff \| grep -c '"""'`, then read; the words bug, release, resolved, previously | LOW | Reduce to the contract |
-| S3 | Test slop: no `Intent:`, tautology, own-module mock, tombstone | §Tests below, one check each | HIGH (a, b); MEDIUM (c, d) | Declare; literal from an independent source; mock at the frontier; delete at closure |
+| S3 | Test slop: tautology, own-module mock, tombstone | §Tests below, one check each | HIGH (b); MEDIUM (c, d) | Literal from an independent source; mock at the frontier; delete at closure |
 | S4 | Stub, unread parameter, port with one adapter | `grep -nE 'NotImplementedError\|^\s+pass$'`; ruff `ARG`; a Protocol with one implementer | HIGH | Delete until the second caller appears |
 | S5 | Layer over the old path; a second path | `--stat` adds only; `_v2\|_legacy\|_old`; `if legacy`; a swallowing `try/except`; a wrapper that delegates | HIGH (bug-surface) | Replace, don't layer; delete the old path in the same diff |
 | S6 | Codes outside FR/AC/T- | the V33 family token of `tests/contract/test_slop_ratchets.py`, families outside FR/AC/T-; SPEC/TASKS size is a recommendation, never a finding (`specs/releases/AGENTS.md`) | MEDIUM | Rename to glossary terms |
@@ -21,7 +21,6 @@ labelled judgement call with the command that makes it verifiable in the diff.
 
 ## Tests (S3)
 
-- S3a — no `Intent:`: `git diff --name-only -- tests | xargs grep -L 'Intent:'`; HIGH; declare, or refuse admission.
 - S3b — tautology: expected computed by the code's own expression, `assert f(x) == f(x)`, a constant vs itself; HIGH; an independent literal.
 - S3c — own-module mock: `patch\(.dadaia_workspace\.|MagicMock\(\)` in the diff, `assert_called` on own code; MEDIUM; mock at the frontier.
 - S3d — tombstone/change-detector: a `removed|retired|no_longer|legacy` name, an absence assertion, a grep over source; MEDIUM; dies at closure.

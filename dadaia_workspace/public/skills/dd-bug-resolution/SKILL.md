@@ -52,7 +52,7 @@ regressions: measure a baseline, then bisect — logs mislead.
 *Done when one hypothesis survives by observation, not by reading code.*
 
 **Phase 5 — Seam test.** The regression test at the correct seam, BEFORE the fix, is
-an existing test rewritten when one exists (the root map §1 work order), intent and size declared at birth (`dd-test-stewardship`, intent and admission); watch it fail,
+an existing test rewritten when one exists (the root map §1 work order), at the lowest level that detects it (the root map §1 test basics); watch it fail,
 fix the cause, watch it pass, re-run the Phase 1 loop on the original scenario. A
 correct seam exercises the real bug pattern at its call site (`dd-codebase-design`
 owns the seam vocabulary and the deletion test the fix must pass); when none exists, that

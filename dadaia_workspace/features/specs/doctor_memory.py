@@ -21,7 +21,6 @@ PRODUCT_INDEX_REL = "product/index.md"
 _PKG = "dadaia-workspace"  # a missing library fragment is repaired by reinstalling it
 _PLACEHOLDER_TOKENS = ("SLUG_PLACEHOLDER", "TITLE_PLACEHOLDER", "RELEASE_PLACEHOLDER")
 # An unfilled token is a tight code span around the token alone; a longer span only illustrates.
-_ANGLE_PLACEHOLDER_RE = re.compile(r"`<[A-Z_]+>`")
 _MD_HEADING_RE = re.compile(r"^#{1,6}\s+\S", re.MULTILINE)
 # Matched by shape, never by the package count: the count changes only at closure.
 _FEATURES_PKG_MAP_HEADING_RE = re.compile(
@@ -41,10 +40,6 @@ def _read_or_empty(path: Path) -> str:
 def is_placeholder_atom(path: Path) -> bool:
     """True when *path* is an unfilled placeholder memory atom (template artifact)."""
     return any(token in _read_or_empty(path) for token in _PLACEHOLDER_TOKENS)
-
-
-def has_unfilled_angle_placeholders(path: Path) -> bool:
-    return bool(_ANGLE_PLACEHOLDER_RE.search(_read_or_empty(path)))
 
 
 def _has_heading(path: Path) -> bool:
@@ -91,22 +86,6 @@ class MemoryValidator:
             )
             for path in sorted(mem_dir.rglob("*.md"))
             if is_placeholder_atom(path)
-        ]
-
-    def check_tests_agents_placeholder(self) -> list[SectionFinding]:
-        """AGENTS-PLACEHOLDER-1: the installed ``<repo>/tests/AGENTS.md`` still carries a
-        `<TOKEN>` placeholder (WARNING: no verb can fill project values). Never the template."""
-        installed = self.specs_dir.parent / "tests" / "AGENTS.md"
-        if not installed.is_file() or not has_unfilled_angle_placeholders(installed):
-            return []
-        return [
-            specs_finding(
-                "AGENTS-PLACEHOLDER-1",
-                Severity.WARNING,
-                f"{installed} still carries an unfilled `<TOKEN>` placeholder — replace every "
-                "project-specific value before relying on it (see the file's own banner).",
-                str(installed),
-            )
         ]
 
     def fix_placeholder_atom(self, issue: SectionFinding) -> None:

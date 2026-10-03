@@ -491,9 +491,9 @@ _PLANTED: dict[str, tuple[Callable[[], list[Any]], Callable[[list[Any]], bool]]]
     ),
     "8-flagged-skill-still-granted": (
         lambda: _find_flagged_but_granted(
-            _granted_to_any_model(_AGENTS_DIR, _SKILLS_DIR), {"dd-test-stewardship"}
+            _granted_to_any_model(_AGENTS_DIR, _SKILLS_DIR), {"dd-code-review"}
         ),
-        lambda v: v == ["dd-test-stewardship"],
+        lambda v: v == ["dd-code-review"],
     ),
 }
 

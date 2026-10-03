@@ -147,8 +147,8 @@ markers = [
     "e2e: full user journeys through the real CLI",
     "slow: tests over 1s or tests that start a server/subprocess",
     "tmp: temporary debugging tests excluded from default runs",
-    "flaky: observed pass+fail on identical code; being diagnosed (dd-test-stewardship, flakes and quarantine)",
-    "quarantine: out of gating selectors; requires bug= id and expires (dd-test-stewardship, flakes and quarantine)",
+    "flaky: observed pass+fail on identical code; being diagnosed",
+    "quarantine: out of gating selectors; requires bug= id",
 ]
 norecursedirs = [
     ".*",

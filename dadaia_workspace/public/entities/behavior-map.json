@@ -5,7 +5,6 @@
     "dd-grill-me",
     "dd-bug-resolution",
     "dd-code-review",
-    "dd-test-stewardship",
     "dd-codebase-design",
     "dd-domain-modeling",
     "dd-architecture-survey",
@@ -54,7 +53,7 @@
       "skill": "dd-codebase-design",
       "scoped_agents_md": [],
       "hash_tuple": {
-        "section": "sha256:dd7fa02f42e51618b5d991954f1a5f379dad89210ba85ea93a940c247dd24a93",
+        "section": "sha256:32febec70a2dcab7e065ac03249e1edbbbad2f605b1931df7ba7299911055593",
         "skill": "sha256:86ee4680e5d66595563797defe9614ef307fafd716551b3dce1e48045ac65f76",
         "scripts": null,
         "scoped": []
@@ -156,11 +155,11 @@
         "dadaia_workspace/public/scaffold/backlog/AGENTS.md"
       ],
       "hash_tuple": {
-        "section": "sha256:2e1085fbf82116cafcf8fd7226e28f50606442dd4df32ead26e19320b106ec88",
+        "section": "sha256:3e9a61792649223cbd58e9aa2c3b52df397556564caea25a42cbff2149a5ec11",
         "skill": "sha256:8f2f025be23cfdf5a31663f1af7edd87c83c701650278832962853edc3365320",
         "scripts": "sha256:a15b83b52d4e7787117e523d5a741dba918d773eaf82e7ff39c05e689c412e87",
         "scoped": [
-          "sha256:e6c75e8f35bc7c000c3554ebb4d1caca9715e1ee0b1d05c0cf07ab9b0a270a5a"
+          "sha256:54ae3f3a53306705630abd5a54c67cd6781718805ae5a4c1acc7256eefcd0744"
         ]
       },
       "recorded_by": "dd-software-engineer",
@@ -172,8 +171,8 @@
       "skill": "dd-release-definition",
       "scoped_agents_md": [],
       "hash_tuple": {
-        "section": "sha256:2e1085fbf82116cafcf8fd7226e28f50606442dd4df32ead26e19320b106ec88",
-        "skill": "sha256:527aaad90cf50078ef15d9422db102ce0abd0afa7d973530bf50dad68a237100",
+        "section": "sha256:3e9a61792649223cbd58e9aa2c3b52df397556564caea25a42cbff2149a5ec11",
+        "skill": "sha256:64e8e5b2ffbaec27f56c18afcd8a967d4026d32d8c68644fd14b828b6f4c0d70",
         "scripts": null,
         "scoped": []
       },
@@ -188,8 +187,8 @@
         "dadaia_workspace/public/scaffold/releases/AGENTS.md"
       ],
       "hash_tuple": {
-        "section": "sha256:2e1085fbf82116cafcf8fd7226e28f50606442dd4df32ead26e19320b106ec88",
-        "skill": "sha256:8b99a29bc45ab2c0c9e82ee339cd58fd8922bb0e4924e133542c4de588a8fcd7",
+        "section": "sha256:3e9a61792649223cbd58e9aa2c3b52df397556564caea25a42cbff2149a5ec11",
+        "skill": "sha256:5150687fa6b21cbc84566c899a335afd560be03716c4275bc3e5a9e7a9b9afc4",
         "scripts": "sha256:9bdc0695b43386dfeb0a370364b7e05dfa68c7c5f07b9f262ae4fe0b427dba7e",
         "scoped": [
           "sha256:1482cee6a7492e8c6678d2b09494a65f8d35ad6814787e3ff881484053dc2b8d"
@@ -206,7 +205,7 @@
         "dadaia_workspace/public/scaffold/audits/AGENTS.md"
       ],
       "hash_tuple": {
-        "section": "sha256:dd7fa02f42e51618b5d991954f1a5f379dad89210ba85ea93a940c247dd24a93",
+        "section": "sha256:32febec70a2dcab7e065ac03249e1edbbbad2f605b1931df7ba7299911055593",
         "skill": "sha256:35b3803817f4601ffeebc590ed1c98d5d779427ecb4e9de1034fab38e4958422",
         "scripts": "sha256:081ca34ad201b652f666abda16e4b15389926d86937f043a2c8bb1e141c99b17",
         "scoped": [
@@ -240,7 +239,7 @@
       "skill": "dd-grill-me",
       "scoped_agents_md": [],
       "hash_tuple": {
-        "section": "sha256:2e1085fbf82116cafcf8fd7226e28f50606442dd4df32ead26e19320b106ec88",
+        "section": "sha256:3e9a61792649223cbd58e9aa2c3b52df397556564caea25a42cbff2149a5ec11",
         "skill": "sha256:a8daeb9a0582ae3d5e72aaea66dfe48d3496a8f287f88e921e816851931e8924",
         "scripts": null,
         "scoped": []
@@ -272,8 +271,8 @@
       "skill": "dd-bug-resolution",
       "scoped_agents_md": [],
       "hash_tuple": {
-        "section": "sha256:2e1085fbf82116cafcf8fd7226e28f50606442dd4df32ead26e19320b106ec88",
-        "skill": "sha256:b1be93954363a8a008815d26bd446a1e5ea295c34eafff0841867d57fa7f1d18",
+        "section": "sha256:3e9a61792649223cbd58e9aa2c3b52df397556564caea25a42cbff2149a5ec11",
+        "skill": "sha256:0229613fc0b22475c52a4518576d5c87162b752f92c3becda2dae55095d4408d",
         "scripts": "sha256:27950930cd11b9dc4d0775ee86358cc7dbaaadea403bff449937552f6d8d862b",
         "scoped": []
       },
@@ -288,7 +287,7 @@
         "dadaia_workspace/public/scaffold/bugs/AGENTS.md"
       ],
       "hash_tuple": {
-        "section": "sha256:2e1085fbf82116cafcf8fd7226e28f50606442dd4df32ead26e19320b106ec88",
+        "section": "sha256:3e9a61792649223cbd58e9aa2c3b52df397556564caea25a42cbff2149a5ec11",
         "skill": "sha256:9baefd24820f71a9163dfd3758a7bb80d026e892561ddb1fe37598164ed41cce",
         "scripts": null,
         "scoped": [
@@ -297,24 +296,6 @@
       },
       "recorded_by": "dd-software-engineer",
       "recorded_at": "2026-09-20"
-    },
-    {
-      "section": "§6 Skills — `.agents/skills/dd-*`",
-      "anchor": null,
-      "skill": "dd-test-stewardship",
-      "scoped_agents_md": [
-        "dadaia_workspace/public/templates/tests-AGENTS.md"
-      ],
-      "hash_tuple": {
-        "section": "sha256:dd7fa02f42e51618b5d991954f1a5f379dad89210ba85ea93a940c247dd24a93",
-        "skill": "sha256:dd0798a07c55496b6f7b25c5452f5ae2989fc95e618be391c97ca8afa4482ab1",
-        "scripts": null,
-        "scoped": [
-          "sha256:a322bcbd2bb245ff80ef3196c9cc2e6cae693463cb0d3367d4b3ee23d772dcd0"
-        ]
-      },
-      "recorded_by": "dd-software-engineer",
-      "recorded_at": "2026-09-21"
     },
     {
       "section": "§5 Scoped law — open before acting there",
@@ -390,7 +371,7 @@
       "skill": "dd-architecture-survey",
       "scoped_agents_md": [],
       "hash_tuple": {
-        "section": "sha256:dd7fa02f42e51618b5d991954f1a5f379dad89210ba85ea93a940c247dd24a93",
+        "section": "sha256:32febec70a2dcab7e065ac03249e1edbbbad2f605b1931df7ba7299911055593",
         "skill": "sha256:6ae3958f5d0bc8b8eeedea455a66bc282962f49077f44a63b3b56cc37131038e",
         "scripts": null,
         "scoped": []
@@ -405,7 +386,7 @@
       "scoped_agents_md": [],
       "hash_tuple": {
         "section": "sha256:44c516a20de40d92bee3d0d4bdad3ea45448881fdc2be112ba8a7eb4d3619120",
-        "skill": "sha256:e10c6a65dd58b717c535f4a9726818abd05cfe3dfb81c29fc14bc7acebd095c7",
+        "skill": "sha256:570b6c4c0f233549ba647da428bd6b8e4346e49492f70a4d645f34a7561f532c",
         "scripts": null,
         "scoped": []
       },
@@ -418,7 +399,7 @@
       "skill": "dd-domain-modeling",
       "scoped_agents_md": [],
       "hash_tuple": {
-        "section": "sha256:dd7fa02f42e51618b5d991954f1a5f379dad89210ba85ea93a940c247dd24a93",
+        "section": "sha256:32febec70a2dcab7e065ac03249e1edbbbad2f605b1931df7ba7299911055593",
         "skill": "sha256:0f6c0323eadf99a721c2d80bb5f541b2579ea0800ffffada335a40b1502f7b6b",
         "scripts": null,
         "scoped": []
