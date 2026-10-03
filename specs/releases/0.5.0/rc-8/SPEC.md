@@ -4,7 +4,7 @@
 **Release ID:** 0.5.0
 **Owner:** dd-product-engineer
 **Opened:** 2026-10-03
-**Origin:** backlog:cli-ships-no-library-pipeline,lib-test-guidance-dehydrated,tests-agents-scaffold-without-placeholders,test-intent-docstring-backfill,meta-tests-leave-pytest,preflight-ci-parity-derived,delete-text-count-inventory-asserts,adr-0143-measured-by-checks-the-concept,skill-md-soft-hard-line-limit,memory-update-states-the-truth-correction-lane,bug-fix-adds-never-rewrites-asserts,bug-fix-commit-derived-by-grep,caused-by-proposed-by-blame,focused-review-on-caused-by,bug-terminal-transition-commit-shape,architecture-survey-flat-core-infrastructure,doctor-context-ignores-other-contexts,guidance-messages-name-the-right-target; bugs:test-suite-writes-outside-tmp,ci-preflight-writes-coverage-into-the-repo,hook-entrypoints-invisible-to-coverage,onboarding-next-step-names-another-context,init-on-a-copied-workspace-leaves-a-cli-bound-to-the-original,registry-row-missing-a-key-escapes-reg-schema,pre-push-warns-no-gitflow-block-for-an-absent-specs-tree,upgrade-leaves-reconcile-scratch-behind,bug-surface-schema-documents-the-deleted-regex,release-memory-appends-a-second-entry-on-rerun,init-states-no-codex-project-trust-step; findings:20260930-structural-convergence-F018,20260930-structural-convergence-F028,20260930-structural-convergence-F043,20260930-structural-convergence-F044,20260930-structural-convergence-F045,20260930-structural-convergence-F047,20260930-structural-convergence-F048,20260930-structural-convergence-F049,20260930-structural-convergence-F050,20260930-structural-convergence-F051,20260930-structural-convergence-F096,20260930-structural-convergence-F097,20260930-structural-convergence-F098,20260930-structural-convergence-F100,20260930-structural-convergence-F101,20260930-structural-convergence-F104,20260930-structural-convergence-F112,20260930-structural-convergence-F135,20260930-structural-convergence-F136
+**Origin:** backlog:cli-ships-no-library-pipeline,lib-test-guidance-dehydrated,tests-agents-scaffold-without-placeholders,test-intent-docstring-backfill,meta-tests-leave-pytest,preflight-ci-parity-derived,delete-text-count-inventory-asserts,adr-0143-measured-by-checks-the-concept,skill-md-soft-hard-line-limit,memory-update-states-the-truth-correction-lane,bug-fix-adds-never-rewrites-asserts,bug-fix-commit-derived-by-grep,caused-by-proposed-by-blame,focused-review-on-caused-by,bug-terminal-transition-commit-shape,architecture-survey-flat-core-infrastructure,doctor-context-ignores-other-contexts,guidance-messages-name-the-right-target; bugs:test-suite-writes-outside-tmp,ci-preflight-writes-coverage-into-the-repo,hook-entrypoints-invisible-to-coverage,onboarding-next-step-names-another-context,init-on-a-copied-workspace-leaves-a-cli-bound-to-the-original,registry-row-missing-a-key-escapes-reg-schema,pre-push-warns-no-gitflow-block-for-an-absent-specs-tree,upgrade-leaves-reconcile-scratch-behind,bug-surface-schema-documents-the-deleted-regex,release-memory-appends-a-second-entry-on-rerun; findings:20260930-structural-convergence-F018,20260930-structural-convergence-F028,20260930-structural-convergence-F043,20260930-structural-convergence-F044,20260930-structural-convergence-F045,20260930-structural-convergence-F047,20260930-structural-convergence-F048,20260930-structural-convergence-F049,20260930-structural-convergence-F050,20260930-structural-convergence-F051,20260930-structural-convergence-F096,20260930-structural-convergence-F097,20260930-structural-convergence-F098,20260930-structural-convergence-F100,20260930-structural-convergence-F101,20260930-structural-convergence-F104,20260930-structural-convergence-F112,20260930-structural-convergence-F135,20260930-structural-convergence-F136
 
 - Sources: grills of 2026-10-02 (rc-8, Q1–Q4) and 2026-10-03 (train, Q1–Q6); review B1–B11; PR #278 F1. Task ids start at T-050-153.
 - Left out: `dependabot-pyjwt-open-on-main`, which closes at the ship (rc-12); `removals-shipped-without-recorded-authority`, rejected (Q5).
@@ -14,7 +14,7 @@
 - The library ships no pipeline of its own: `ci preflight` and the pytest bootstrap leave first (Q2).
 - Test knowledge leaves the library (0166). Meta-tests leave pytest for one CI job, and tests assert behaviour (0163, 0167).
 - Bug lineage is derived from git, and a bug fix adds a case (0163, 0164). SKILL.md gets one size law (0170).
-- The eleven open bugs are fixed, and production and tests both end smaller (§G1).
+- The ten open bugs are fixed, and production and tests both end smaller (§G1).
 
 ## Terms
 
@@ -195,7 +195,7 @@ W10 opens after AC9.3 and AC8.1's `Intent:` strip merge. Each RED is a behaviour
 - AC10.9 Withdrawn: the bug was rejected (Q5), and F069 moves to rc-12.
 - AC10.10 `bug-record-v1.schema.json`'s `surface` description states the tracked-directory rule (DEL `bug-surface-schema-documents-the-deleted-regex`).
   - Command: `grep -c 'a-z0-9_-' dadaia_workspace/public/schemas/bugs/bug-record-v1.schema.json` prints `0`.
-- AC10.11 F050 resolves at closure, citing b5013bbfb. F047 resolves at closure, citing the rejection 330eaaca5.
+- AC10.11 Resolved at closure by citation: F050 by b5013bbfb; F047 by the commit `chore(bugs): reject removals-shipped-without-recorded-authority`; F100 by the commit exiting `init-announces-codex-trust` rejected (T-050-71 removed the trust INFO on purpose).
 - AC10.12 HOOKS-DRIFT-1 reports an absent hook as absent (FR `guidance-messages-name-the-right-target`, its HOOKS-DRIFT-1 part; F098):
   - An absent hook gets its own finding code, distinct from a differing hook.
   - Case: delete a projected hook; doctor prints the absent-hook code, and its fix line restores the hook when executed.
@@ -203,9 +203,6 @@ W10 opens after AC9.3 and AC8.1's `Intent:` strip merge. Each RED is a behaviour
 - AC10.13 A memory rerun appends nothing (DEL `release-memory-appends-a-second-entry-on-rerun`; F097):
   - A second `release.py memory` over an empty window is refused with a fix line, or exits 0 and leaves the log unchanged; the as-is review picks which.
   - Case: the log's `kind: memory` entries are unchanged after the rerun.
-- AC10.14 Codex project trust is stated (DEL `init-states-no-codex-project-trust-step`; F100):
-  - `init --harness codex` and the codex doctor line each carry one `Operator action:` line naming the project path to trust.
-  - Case: that line carries the workspace path, and the exit code is 0.
 
 ## Replaces
 
@@ -232,7 +229,7 @@ W10 opens after AC9.3 and AC8.1's `Intent:` strip merge. Each RED is a behaviour
 ## Carried — the 0.5.0 map (ADR 0140; one candidate at a time)
 
 - rc-9: the tests tree mirrors the package; the unit tier spawns no processes; `worktree-rows-injected-not-monkeypatched`; `windows-integration-coverage-gap`; `repo-ci-sast`. With this candidate, these complete 0167.
-- rc-10: `public-law-language-neutral`; `dd-ask-me-owned-questioning-skill`, which delivers 0165; `adr-born-at-release-with-options`; `adr-ledger-triage-process-rules`; `architecture-adr-section-generated`; F088, F089 and F139–F148.
+- rc-10: `public-law-language-neutral`; `dd-ask-me-owned-questioning-skill`, which delivers 0165; `adr-born-at-release-with-options`; `adr-ledger-triage-process-rules`; `architecture-adr-section-generated`; F088, F089 and F139–F148; dd-ask-me also covers `dd-ai-eng-knowhow/AUTHORING.md:134` ("asks the whole frontier at once"), which 0165's repaired `measured_by` catches.
 - rc-11: workspace replication (7 entries, ADRs 0171–0175) and F084.
 - rc-12, the promote:
   - docs site, clone detection and launch prep;
