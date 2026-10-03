@@ -56,7 +56,7 @@ A commit stages only paths its worktree kind's allowed set holds (`_worktree_kin
 | 2 | `backlog`, `release` | ADR proposal or in-place `measured_by` repair (ADR 0138): `specs/ADRs/decisions.jsonl` | `docs(adr): propose <slug>` / `chore(adrs): repair …` |
 | 2 | `release` | ADR acceptance with its canonical-memory hunk: `specs/ADRs/decisions.jsonl`, `specs/memory/*` | `docs(adr): accept <slug>` |
 | 3 | `bug` | Bug fix: `<code>` + regression test + its `specs/bugs/BUGS.jsonl` line, red loop quoted in the body | `fix(bugs): <id> — <cause>` |
-| 4 | `bug` | Resolve of a bug a task fixed: `specs/bugs/BUGS.jsonl` | `chore(bugs): resolve <id>[, <id>] — by <task-id> (<sha>)` |
+| 4 | `bug` | Terminal transition without code (`resolve` by a task, `supersede`, `defer`, `reject`): `specs/bugs/BUGS.jsonl` | `chore(bugs): <verb> <id> — <reason, or by <task-id> (<sha>)>` |
 | 5 | `release` | Release definition: the trio, one commit, `specs/releases/<v>/rc-<N>/*` | `feat(specs): define candidate …` |
 | 6 | `impl` | Task implementation: its `W:` (`<code>`) | `conventional-commit(task-id): description` — the auditable trace |
 | 7 | `impl` | Task marker (the releases law §3): `specs/releases/<v>/rc-<N>/TASKS.md` | `chore(tasks): <verb> <id>` |

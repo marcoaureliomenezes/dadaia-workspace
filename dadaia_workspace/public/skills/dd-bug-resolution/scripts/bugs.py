@@ -39,7 +39,7 @@ _HELP = {
     "status": "list records, open only by default",
     "stats": "aggregate counts by status and by severity",
     "update": "write a governance field other than status/closed_at",
-    "resolve": "close a record as resolved, with its lineage and evidence triple",
+    "resolve": "close a record as resolved, with its lineage and red loop",
     "supersede": "close a record as superseded by another slug",
     "defer": "close a record as deferred, with a reason",
     "reject": "close a record as rejected, with a reason",
@@ -135,7 +135,7 @@ def _write(args: argparse.Namespace, specs: Path) -> int:
         print(f"[ok] updated {', '.join(sorted(changes))} for {args.bug_id}")
         return 0
     values = _values(args, _OPTIONS[args.verb])
-    commit(ledger, lambda rs: tr.transition(rs, args.bug_id, args.verb, values, specs.parent))
+    commit(ledger, lambda rs: tr.transition(rs, args.bug_id, args.verb, values))
     print(f"[ok] {tr.STATUS_BY_VERB[args.verb]} {args.bug_id}")
     return 0
 

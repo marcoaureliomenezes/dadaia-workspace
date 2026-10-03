@@ -165,19 +165,19 @@
       "type": "string",
       "minLength": 5,
       "x-mutability": "write-once",
-      "description": "The FR23 evidence triple, restored (v0.4.4, not re-invented): the red-loop command that reproduced the bug on the executed path, before any hypothesis."
+      "description": "The red-loop command that reproduced the bug on the executed path, before any hypothesis."
     },
     "evidence_seam": {
       "type": "string",
       "minLength": 5,
       "x-mutability": "write-once",
-      "description": "The FR23 evidence triple: the test file/node (the regression seam) that pins the fix."
+      "description": "Optional: the test file/node (the regression seam) that pins the fix."
     },
     "evidence_diff": {
       "type": "string",
       "pattern": "^(net-negative|net-positive|net-neutral):\\s*\\S.*$",
       "x-mutability": "write-once",
-      "description": "The FR23 evidence triple: the diff direction on the touched feature, prefixed 'net-negative:'/'net-positive:'/'net-neutral:' with a checkable rationale."
+      "description": "Optional: the diff direction on the touched feature, prefixed 'net-negative:'/'net-positive:'/'net-neutral:' with a checkable rationale."
     },
     "superseded_by": {
       "type": "string",

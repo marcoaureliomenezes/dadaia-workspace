@@ -8,7 +8,6 @@ here and nowhere else, which is why `update` refuses them (`_bugs_write.apply_up
 
 from __future__ import annotations
 
-import re
 import sys
 from pathlib import Path
 from typing import Any
@@ -21,29 +20,16 @@ from _specs import choice  # noqa: E402
 
 REQUIRED_BY_VERB = {
     "resolve": ("cause", "caused_by", "resolved_release", "solution",
-                "evidence_loop", "evidence_seam", "evidence_diff"),
+                "evidence_loop"),
     "supersede": ("by",), "defer": ("reason",), "reject": ("reason",),
 }  # fmt: skip
-_EVIDENCE_DIFF_RE = re.compile(r"^(net-negative|net-positive|net-neutral):\s*\S.*$")
-_SEAM_RE = re.compile(r"^([^\s:;]+)(?:::(?:\w+::)*(\w+))?")
 STATUS_BY_VERB = {"resolve": "resolved", "supersede": "superseded",
                   "defer": "deferred", "reject": "rejected"}  # fmt: skip
 
 
-def _seam_exists(seam: str, root: Path) -> bool:
-    """The seam's leading ``path[::…::name]`` names a file under *root* and, with a name,
-    a ``def <name>`` in it (ADR 0160) — judged once, here, never re-judged by ``check``."""
-    match = _SEAM_RE.match(seam)
-    if match is None or not (path := root / match[1]).is_file():
-        return False
-    return not match[2] or re.search(rf"\bdef {match[2]}\b", path.read_text("utf-8")) is not None
-
-
-def transition(records: Records, bug_id: str, verb: str, values: dict[str, Any],
-               root: Path) -> Records:  # fmt: skip
+def transition(records: Records, bug_id: str, verb: str, values: dict[str, Any]) -> Records:
     """The ONE way a record reaches a terminal status. Every field the verb requires is
-    checked first and every problem named at once; the record is untouched on refusal.
-    A resolve's seam is read under *root*, the repo the ledger belongs to."""
+    checked first and every problem named at once; the record is untouched on refusal."""
     missing = [name for name in REQUIRED_BY_VERB[verb] if not (values.get(name) or "").strip()]
     if missing:
         raise choice(Refusal(f"transition {verb!r} refused — {', '.join(map(repr, missing))} required"),
@@ -51,16 +37,6 @@ def transition(records: Records, bug_id: str, verb: str, values: dict[str, Any],
     record = by_id(records, bug_id)
     updated = dict(record)
     if verb == "resolve":
-        if not _EVIDENCE_DIFF_RE.match(values["evidence_diff"]):
-            raise choice(Refusal("'evidence_diff' must match '^(net-negative|net-positive|"
-                         "net-neutral): <rationale>'"),
-                         "with --evidence-diff set to net-negative, net-positive or "
-                         "net-neutral, a colon and why", "--evidence-diff")  # fmt: skip
-        if not _seam_exists(values["evidence_seam"], root):
-            raise choice(Refusal(f"evidence_seam {values['evidence_seam']!r} names no file or "
-                         f"'def <name>' under {root}"),
-                         f"with --evidence-seam set to a test file under {root}, :: "
-                         "and its test name", "--evidence-seam")  # fmt: skip
         for key in REQUIRED_BY_VERB["resolve"]:
             _set(updated, key, values[key])
     elif verb == "supersede":

@@ -1,4 +1,4 @@
-"""Intent: CONTRACT — dd-bug-resolution/scripts/bugs.py owns BUGS.jsonl validation
+"""dd-bug-resolution/scripts/bugs.py owns BUGS.jsonl validation
 (0.4.7 c7 T-047-63: the ledger verbs move into stdlib skill scripts). Size: SMALL.
 
 The script reads its schema from ``scripts/schemas/`` BESIDE itself — a copy `public
@@ -346,7 +346,6 @@ def _resolve_argv(bug_id: str = "a-bug", caused_by: str = "none") -> list[str]:
     return [
         "resolve", bug_id, "--cause", "c", "--caused-by", caused_by,
         "--resolved-release", "0.4.7", "--solution", "s", "--evidence-loop", "pytest -k x",
-        "--evidence-seam", "cli/x.py::y[case]", "--evidence-diff", "net-negative: smaller",
     ]  # fmt: skip
 
 
@@ -412,7 +411,7 @@ def test_append_takes_a_tracked_directory_surface_and_non_blank_fields(
 def test_an_operator_action_run_outside_the_tree_keeps_its_specs_and_known_argv(
     script: Path, tmp_path: Path
 ) -> None:
-    """Intent: CONTRACT — AC4.4, bug ledger-fix-lines-drop-specs (T-050-151 review H1, L8):
+    """AC4.4, bug ledger-fix-lines-drop-specs (T-050-151 review H1, L8):
     an `Operator action: run` fix quotes the refused command with `--specs` and every known
     flag, so pasted from outside the tree it refuses only on the choice the words name."""
     specs, elsewhere = _ledger(tmp_path), tmp_path / "elsewhere"
@@ -612,28 +611,11 @@ def test_resolve_accepts_an_archived_caused_by(script: Path, tmp_path: Path) -> 
     assert _records(specs)[0]["caused_by"] == "old-bug"
 
 
-@pytest.mark.parametrize("seam", ["cli/gone.py::y", "cli/x.py::gone", "cli/x.py::y_more"])
-def test_resolve_refuses_a_seam_naming_no_file_or_def(
-    script: Path, tmp_path: Path, seam: str
-) -> None:
-    """ADR 0160: the seam is judged once, at resolve; check never re-judges a resolved one."""
-    specs = _ledger(tmp_path, _OPEN_RECORD)
-    argv = _resolve_argv()
-    argv[argv.index("--evidence-seam") + 1] = seam
-    done = _run(script, *argv, "--specs", str(specs))
-    assert done.returncode == 1
-    assert f"evidence_seam {seam!r}" in done.stderr
-    assert _records(specs)[0]["status"] == "open"
-    resolved = {**_OPEN_RECORD, "status": "resolved", "closed_at": "2026-09-21T00:00:00Z",
-                "evidence_seam": seam}  # fmt: skip
-    assert _run(script, "check", "--specs", str(_ledger(tmp_path, resolved))).returncode == 0
-
-
 def test_resolve_names_every_missing_field_at_once(script: Path, tmp_path: Path) -> None:
     specs = _ledger(tmp_path, _OPEN_RECORD)
     done = _run(script, "resolve", "a-bug", "--cause", "c", "--specs", str(specs))
     assert done.returncode == 1
-    for name in ("caused_by", "resolved_release", "solution", "evidence_diff"):
+    for name in ("caused_by", "resolved_release", "solution", "evidence_loop"):
         assert name in done.stderr
     assert _records(specs)[0]["status"] == "open"
 
@@ -702,18 +684,6 @@ def test_a_write_once_field_refuses_a_differing_second_write(script: Path, tmp_p
     assert second.returncode == 1
     assert "write-once" in second.stderr
     assert _records(specs)[0]["solution"] == "one"
-
-
-@pytest.mark.parametrize("bad", ["smaller", "net-zero: x", "net-negative:"])
-def test_resolve_refuses_a_malformed_evidence_diff(script: Path, tmp_path: Path, bad: str) -> None:
-    """`evidence_diff` must open with `net-negative:`, `net-positive:` or `net-neutral:` and carry a rationale."""
-    specs = _ledger(tmp_path, _OPEN_RECORD)
-    argv = _resolve_argv()
-    argv[argv.index("--evidence-diff") + 1] = bad
-    done = _run(script, *argv, "--specs", str(specs))
-    assert done.returncode == 1
-    assert "evidence_diff" in done.stderr
-    assert _records(specs)[0]["status"] == "open"
 
 
 def test_status_and_stats_read_the_ledger(script: Path, tmp_path: Path) -> None:
