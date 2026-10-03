@@ -842,6 +842,12 @@
       "agent": "dd-product-engineer",
       "kind": "drifts",
       "text": "Closure order inverted, against specs/releases/AGENTS.md section 2 (memory update -> closure narrative -> disposition sweep -> artifact GC) and MEMORY-UPDATE step 1 (phase CLOSURE before any memory write): the size and two drifts entries of 2026-10-03T00:41:04Z (b08c1ca1b) and the two dispositions entries of 01:13:31Z (d5e3f3a7b), with the G6 audit sweep f9afc5392 and the backlog exits aa332ebbe, landed while phase was IMPLEMENTATION and T-050-150 was [-] (started 9308e299a, authored 2026-10-02T16:20:40Z); phase CLOSURE came at 03:03:06Z (dc9000c69, implemented 22054713a) and the memory entry at 03:06:39Z (aeea358e7). Cause: the rc-7 TASKS AC map made G1-G4 and G6 deliverables of T-050-150, so the measure and the sweep ran inside the task, before its done marker (the 00:41:04Z schedule entry states it). The early entries stay as appended (the log is append-only); their facts were measured at 1a4eadc98, and the erratum note below corrects the one clause found false. The summary, test-dispositions, this entry and the erratum follow the memory entry, in law order; artifact-gc follows the operator's .vscode act. release.py check judges closure entries only under DEFINITION (RELEASE-EVENTS.md), so nothing flagged the inversion. Found by dd-code-reviewer rc7-closure-memory-final (MEDIUM)."
+    },
+    {
+      "ts": "2026-10-03T03:38:00Z",
+      "agent": "dd-product-engineer",
+      "kind": "note",
+      "text": "Erratum to the second log entry stamped 2026-10-03T01:13:31Z (kind dispositions, G6 and backlog), left as appended: its clause \"guidance-messages-name-the-right-target (root_whitelist's fix still proposes mkdir .dadaia/tmp)\" was already false when written. Since 29697909c (T-050-146, fix(T-050-146): root BLOCK names the agent's temp dir) the root BLOCK takes the agent from the payload's agent_type, else main-thread (dadaia_workspace/hooks/root_whitelist.py:27-29), and its one fix line is mkdir_line(<ws>/.dadaia/tmp/<agent>/<YYYYMMDD>), the agent's dated temp directory as an absolute path (root_whitelist.py:55-56). The backlog entry guidance-messages-name-the-right-target repeats the stale clause; its correction is a backlog-worktree write, not this log's. Found by dd-code-reviewer rc7-closure-memory-final (LOW)."
     }
   ]
 }
