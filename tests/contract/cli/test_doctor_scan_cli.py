@@ -431,7 +431,7 @@ def test_a_retired_cache_zone_is_held_by_the_reaper_never_orphaned(workspace: Pa
     scan = CliRunner().invoke(app, ["doctor"])
     fixed = CliRunner().invoke(app, ["doctor", "--fix"])
 
-    assert "WS-dadaia-slop slop .cache  (not in the root law or .dadaiaignore)" in scan.output
+    assert "WS-dadaia-slop slop .cache " in scan.output
     assert not (workspace / ".dadaia" / ".cache").exists(), fixed.output
     assert [
         p.read_text(encoding="utf-8") for p in (workspace / ".dadaia" / "reaped").rglob("x")

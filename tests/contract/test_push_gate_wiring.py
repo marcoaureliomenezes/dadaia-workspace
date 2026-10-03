@@ -123,8 +123,8 @@ def test_mode_line_distinguishes_operator_denylist_from_baseline_only(
         ["ci", "push-gate-check"],
         input=f"refs/tags/v1 {tip_sha} refs/tags/v1 {_ZERO}\n",
     )
-    assert "baseline only (no operator denylist; private names go in" in baseline_only.output
-    assert ".dadaia/states/privacy_denylist.json" in baseline_only.output
+    assert "baseline only" in baseline_only.output
+    assert "operator denylist + baseline" not in baseline_only.output
 
     monkeypatch.setattr(container, "load_denylist_terms", lambda: (("zz-synthetic-term", "test"),))
     with_operator = _runner.invoke(

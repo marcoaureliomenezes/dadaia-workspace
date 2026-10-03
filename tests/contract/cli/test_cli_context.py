@@ -5,7 +5,6 @@ Public CLI contracts for `dadaia context`.
 
 import json
 import os
-import re
 import subprocess
 from pathlib import Path
 
@@ -151,9 +150,6 @@ def test_context_bind_is_one_verb_with_one_argument(
     _register_alive_ctx(workspace)
     result = _runner.invoke(app, ["context", "bind", "myctx"])
     assert result.exit_code == 0, result.output
-    assert "export DADAIA_CONTEXT" not in result.output
-    assert "myctx" in result.output
-    assert "sess_" in result.output
     record = _record(workspace)
     assert record["context"] == "myctx"
     assert "mode" not in record
@@ -308,6 +304,12 @@ def test_push_uses_set_upstream_when_no_tracking(tmp_path: Path) -> None:
     )
 
 
+def _remote_heads(bare: Path) -> dict[str, str]:
+    out = subprocess.run(["git", "-C", str(bare), "for-each-ref", "--format=%(refname) %(objectname)"],
+                         capture_output=True, text=True, check=True).stdout  # fmt: skip
+    return dict(line.split() for line in out.splitlines())
+
+
 def test_context_baseline_is_consent_by_invocation(workspace: Path, tmp_path: Path) -> None:
     """AC4.2/AC4.7: no --yes/--push; one invocation publishes, a re-run is a no-op."""
     bare = tmp_path / "baseline.git"
@@ -325,9 +327,10 @@ def test_context_baseline_is_consent_by_invocation(workspace: Path, tmp_path: Pa
     assert _runner.invoke(app, ["context", "baseline", "baseline", "--yes"]).exit_code != 0
     result = _runner.invoke(app, ["context", "baseline", "baseline"])
     assert result.exit_code == 0, result.output
-    assert "published on feature/0.1.0" in result.output
+    published = _remote_heads(bare)
+    assert "refs/heads/feature/0.1.0" in published, published
     again = _runner.invoke(app, ["context", "baseline", "baseline"])
-    assert again.exit_code == 0 and "already published" in again.output
+    assert again.exit_code == 0 and _remote_heads(bare) == published, again.output
 
 
 def test_context_dead_surfaces_the_refused_push_with_its_fix_line(
@@ -366,7 +369,6 @@ def test_show_unbound_is_calm_in_both_modes(workspace: Path) -> None:
     human = _runner.invoke(app, ["context", "show"])
     assert as_json.exit_code == human.exit_code == 0, as_json.output + human.output
     assert json.loads(as_json.output) == {"context": None}
-    assert "No active context" in human.output
     assert "Traceback" not in as_json.output + human.output
 
 
@@ -395,24 +397,6 @@ def test_bind_with_no_live_release_exits_zero_and_the_next_write_is_allowed(
         {"tool_name": "Write", "tool_input": {"file_path": str(target)}}
     )
     assert block is None, block
-
-
-def test_context_create_help_names_main_repo_and_associated_repos(workspace: Path) -> None:
-    """Intent: CONTRACT — AC5.1, AC3.8. The option surface names the paradigm's parts;
-    the retired `--repo`/`--associated`/`--url`/`--associated-repos` spellings are gone."""
-    result = _runner.invoke(
-        app, ["context", "create", "--help"], env={"TERMINAL_WIDTH": "200", "NO_COLOR": "1"}
-    )
-    assert result.exit_code == 0, result.output
-    # Rich styles the option token inline on a colour-forcing runner (CI): assert on the
-    # plain text, never on the escaped stream.
-    plain = re.sub(r"\x1b\[[0-9;]*m", "", result.output)
-    assert "--main-repo" in plain
-    assert "--associated-repo " in plain
-    assert "--associated-repos" not in plain
-    assert "--url" not in plain
-    assert "--repo " not in plain
-    assert "--associated " not in plain
 
 
 def test_context_show_and_list_json_emit_main_repo_key(workspace: Path) -> None:

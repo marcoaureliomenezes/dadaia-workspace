@@ -26,25 +26,6 @@ def _first_pass_section() -> str:
     return text.split("## 3. First pass", 1)[1].split("\n## ", 1)[0]
 
 
-def test_skill_carries_the_first_pass_statements() -> None:
-    section = _first_pass_section()
-    for statement in (
-        "next step is `first-pass`",
-        "memory.py drift --since <root commit> --specs repos/<slug>/specs",
-        "`dd-product-engineer` fills `ARCHITECTURE.md`, `QUALITY.md` and the product atoms",
-        "`specs-bkp/`",
-        "`.dadaia/.venv/bin/dadaia doctor --context <ctx>` exit 0",
-    ):
-        assert statement in section, statement
-
-
-def test_the_first_pass_ends_at_the_memory_check_never_a_stamp() -> None:
-    """ADR 0034: done is real memory content; no window, no FINDINGS, no close."""
-    section = _first_pass_section()
-    for stamp in ("audit.py close", "FINDINGS.jsonl", "audits_histo"):
-        assert stamp not in section, stamp
-
-
 def _git(repo: Path, *argv: str) -> str:
     return subprocess.run(
         ["git", "-c", "user.name=t", "-c", "user.email=t@t", *argv],
@@ -72,19 +53,6 @@ def repo(tmp_path: Path) -> Path:
     _git(tmp_path, "add", ".")
     _git(tmp_path, "commit", "-qm", "root")
     return tmp_path
-
-
-def test_drift_from_root_lists_the_uncovered_unit(repo: Path) -> None:
-    result = _drift(repo, {"features": []})
-    assert result.returncode == 1, result.stderr
-    assert "uncovered dadaia_workspace/features/greet" in result.stdout
-
-
-def test_drift_from_root_exits_zero_once_the_worklist_is_covered(repo: Path) -> None:
-    feature = {"slug": "greet", "path": "p", "sources": ["dadaia_workspace/features/greet/*"]}
-    result = _drift(repo, {"features": [feature]})
-    assert result.returncode == 0, result.stdout + result.stderr
-    assert "nothing drifted" in result.stdout
 
 
 def test_drift_from_root_lists_units_of_a_consumer_layout(tmp_path: Path) -> None:

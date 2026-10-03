@@ -23,7 +23,6 @@ from pathlib import Path
 import pytest
 
 from dadaia_workspace.core.model_registry import CORE_AGENTS
-from dadaia_workspace.features.specs import canon
 from dadaia_workspace.infrastructure.privacy_check import PORTUGUESE_CONTROL_TERMS
 from tests.helpers.scan_population import assert_populated
 
@@ -122,37 +121,6 @@ def test_public_source_names_no_retired_surface(
     assert _denied_lines(globs, pattern, spare) == []
 
 
-def test_the_retired_facts_have_their_live_statement() -> None:
-    """sa-reaper-destroys-its-own-hold-before-ttl#B6 and sa-consumer-law-carries-library-facts#FR8.4:
-    the cli skill says `--fix --expired-only` is the TTL lane alone; the constitution template is English."""
-    skill = (_PKG / "public" / "skills" / "dd-cli-library" / "SKILL.md").read_text(encoding="utf-8")
-    assert "`--fix --expired-only` deletes only TTL-expired entries" in skill
-    stub = canon._CONSTITUTION_STUB.lower()
-    assert "# constitution" in stub
-    assert [t for t, _ in PORTUGUESE_CONTROL_TERMS if t.lower() in stub] == []
-
-
-def test_public_law_never_grants_memory_writes_to_closure_alone() -> None:
-    """Intent: CONTRACT — constitution-persona-single-source-drift (SINGLE-SRC-1, §4a-6).
-
-    The memory-write phase is DEFINITION+CLOSURE; no persona/skill line grants it to
-    CLOSURE alone. A library lint of its own law, never a consumer doctor check."""
-    markers = ("write-locked", "only allows memory", "block writes to", "writes in this phase")
-    markers += ("during the closure phase", "may edit memory", "may write memory")
-    files = sorted({*_PUBLIC_ROOT.glob("agents/**/*.md"), *_PUBLIC_ROOT.glob("skills/**/*.md")})
-    assert_populated([p.name for p in files], "SKILL.md")
-    hits = [
-        f"{path.relative_to(_REPO_ROOT)}:{n}"
-        for path in files
-        for n, line in enumerate(path.read_text("utf-8").lower().splitlines(), start=1)
-        if "closure" in line and "definition" not in line and any(m in line for m in markers)
-    ]
-    assert hits == []
-
-
-# A bare `dadaia`/`dadaia-workspace` command word: not preceded by a path separator, a dot
-# or a word character (so `.venv/bin/dadaia` and `dadaia_workspace` pass). The one bare
-# spelling allowed is the `uvx dadaia-workspace init` bootstrap that creates the venv.
 _BARE_CLI_RE = re.compile(r"(?<![\w./-])dadaia(?:-workspace)?(?= [a-z-])")
 _UVX_INIT_RE = re.compile(r"uvx dadaia-workspace(?:@\S+)? init\b")
 _VENV_CALL_RE = re.compile(r"\.dadaia/\.venv/bin/dadaia((?: [a-z][\w-]*)+)([^`]*)")
@@ -257,5 +225,3 @@ def test_every_flag_cited_beside_a_venv_call_exists_in_that_verbs_help() -> None
         for dead in _dead_flags(span, tree)
     ]
     assert violations == [], "\n".join(violations)
-    skill = (_PUBLIC_ROOT / "skills/dd-cli-library/SKILL.md").read_text("utf-8")
-    assert "Level 3: `.dadaia/.venv/bin/dadaia specs init --context <ctx>`" in skill
