@@ -14,7 +14,7 @@ Repository: <https://github.com/marcoaureliomenezes/dadaia-workspace>
 
 ## What it is
 
-<!-- derived-from: product-vision sha256:7e335ffc3ee1 -->
+<!-- derived-from: product-vision sha256:513639faabdc -->
 
 dadaia-workspace is the operating environment around repositories developed with AI
 agents, and its unit is the context.
@@ -34,7 +34,7 @@ What it rests on:
 - Documents are the lifecycle — backlog, SPEC, PLAN, TASKS, `_RELEASE.json` and
   `BUGS.jsonl` carry ordered work; no runtime drives agents through steps.
 - Deterministic boundaries — path class, bind scope, root hygiene, venv-rooting and
-  the push gate are mechanical, each refusal carrying its own runnable fix; what
+  the push gate are mechanical, each refusal carrying one fix line; what
   cannot be mechanical is written as law.
 - Visible concurrency — sessions may race, git exposes the overlap, and nothing waits
   on a lock.
@@ -46,15 +46,15 @@ What it rests on:
 
 ## Two ways in
 
-<!-- derived-from: product-vision sha256:7e335ffc3ee1 -->
+<!-- derived-from: product-vision sha256:513639faabdc -->
 
 A human drives it from a shell in three levels:
 `uvx dadaia-workspace init <dir> --harness <name> --repo <url>` provisions the
 workspace and its first project ALIVE (`context bind` binds),
 `.dadaia/.venv/bin/dadaia specs init --context <slug>` brings the project's `specs/`
 to the canon, the first pass fills memory, `context baseline` publishes it, and
-`.dadaia/.venv/bin/dadaia doctor` prints the next step and every finding with a
-runnable fix; `.dadaia/.venv/bin/dadaia context create --main-repo <url>` adds the next
+`.dadaia/.venv/bin/dadaia doctor` prints the next step and every finding with one
+fix line; `.dadaia/.venv/bin/dadaia context create --main-repo <url>` adds the next
 project, and re-running the `uvx` init line upgrades the workspace.
 
 An agent reads the root `AGENTS.md` map — flow, roles, gate invariants, where things

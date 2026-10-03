@@ -13,7 +13,7 @@ its **associated repos** are the others it owns.
 
 ## What it is and principles
 
-<!-- derived-from: product-vision sha256:7e335ffc3ee1 -->
+<!-- derived-from: product-vision sha256:513639faabdc -->
 
 dadaia-workspace is the operating environment around repositories developed with AI
 agents. Its unit is the context: one main repo, where `specs/` lives, plus its
@@ -24,7 +24,7 @@ associated repos; a single-repo context is the minimal case. Eight pillars:
 - **Documents are the lifecycle** — backlog, SPEC, PLAN, TASKS, `_RELEASE.json` and
   `BUGS.jsonl` carry ordered work; no runtime drives agents through steps.
 - **Deterministic boundaries** — path class, bind scope, root hygiene, venv-rooting and
-  the push gate are mechanical, each refusal carrying its own runnable fix; what cannot
+  the push gate are mechanical, each refusal carrying one fix line; what cannot
   be mechanical is written as law.
 - **Visible concurrency** — sessions may race, git exposes the overlap, and nothing
   waits on a lock.
@@ -44,16 +44,16 @@ memory atom under its content hash.
 
 ## A human installs and uses it
 
-<!-- derived-from: pypi-distribution sha256:92dbd2d7ed61 -->
-<!-- derived-from: workspace-init sha256:f158dffe2a7e -->
-<!-- derived-from: context-management sha256:4eca78be3c95 -->
-<!-- derived-from: workspace-doctor sha256:ca5238a261e0 -->
+<!-- derived-from: pypi-distribution sha256:cec6ab21a159 -->
+<!-- derived-from: workspace-init sha256:5a4a8bb1e91e -->
+<!-- derived-from: context-management sha256:f9635e5c313c -->
+<!-- derived-from: workspace-doctor sha256:21e1298b4845 -->
 
 ```bash
 uvx dadaia-workspace init demo --harness claude --repo <clone url>   # level 1 + 2
 cd demo
 .dadaia/.venv/bin/dadaia specs init --context <slug>                 # level 3
-.dadaia/.venv/bin/dadaia doctor --context <slug>   # findings, each with a runnable fix
+.dadaia/.venv/bin/dadaia doctor --context <slug>   # findings, each with one fix line
 ```
 
 Onboarding has three levels. **Workspace:** `uvx dadaia-workspace init <dir> --harness
@@ -87,23 +87,24 @@ into the session.
 
 `.dadaia/.venv/bin/dadaia doctor` is the one instance validator. Three sections run in fixed order —
 `workspace`, `specs`, `ledgers` — each finding one `<CODE> <verdict> <message>` line,
-every error-class finding with one `fix: <command>` line and exit 1; there is no score.
+every error-class finding with one fix line (a command, or `Operator action: <one act>`)
+and exit 1; there is no score.
 `--json` mirrors the run; `--fix` is the reaper: it moves slop to `.dadaia/reaped/`;
 a TTL expiry acts by zone class, an OUTPUT entry held, an EPHEMERAL one deleted.
 
 ## An agent reads AGENTS.md and uses it
 
-<!-- derived-from: agentic-entities sha256:e74931cf1c40 -->
-<!-- derived-from: sdd-gate-v3 sha256:745061a2d4f7 -->
-<!-- derived-from: release-lifecycle sha256:cf04bb23d3bd -->
-<!-- derived-from: bug-ledger sha256:fee190b6d940 -->
+<!-- derived-from: agentic-entities sha256:22f6bf181b40 -->
+<!-- derived-from: sdd-gate-v3 sha256:ed351120dcd1 -->
+<!-- derived-from: release-lifecycle sha256:e4c5ec1f9818 -->
+<!-- derived-from: bug-ledger sha256:11ce7d98680f -->
 <!-- derived-from: harness-claude-code sha256:68e07ea44a20 -->
 <!-- derived-from: harness-codex sha256:9218e747c24f -->
 <!-- derived-from: harness-kimi-code sha256:ac3c7be4e426 -->
 <!-- derived-from: harness-cursor sha256:f66b96a0ae77 -->
 <!-- derived-from: harness-devin sha256:a35113e51a30 -->
 <!-- derived-from: harness-copilot sha256:ed72a95f6297 -->
-<!-- derived-from: agent-comms sha256:5163f23bc794 -->
+<!-- derived-from: agent-comms sha256:bc966ad791cd -->
 
 The always-on law is the root `AGENTS.md` map; every governed area carries its own
 scoped `AGENTS.md`, and every `dd-` skill touching an area opens that file first. The
@@ -131,7 +132,7 @@ with a RED test. Completed work leaves as a `handoff-v1` record, validated by
 
 ## Documentation
 
-<!-- derived-from: pypi-distribution sha256:92dbd2d7ed61 -->
+<!-- derived-from: pypi-distribution sha256:cec6ab21a159 -->
 <!-- derived-from: public-asset-distribution sha256:9be8dd881241 -->
 
 The documentation is the repository's [docs folder](https://github.com/marcoaureliomenezes/dadaia-workspace/tree/main/docs):
@@ -147,7 +148,7 @@ The documentation is the repository's [docs folder](https://github.com/marcoaure
 
 ## Links
 
-<!-- derived-from: pypi-distribution sha256:92dbd2d7ed61 -->
+<!-- derived-from: pypi-distribution sha256:cec6ab21a159 -->
 
 - GitHub — <https://github.com/marcoaureliomenezes/dadaia-workspace>
 - PyPI — <https://pypi.org/project/dadaia-workspace/>
