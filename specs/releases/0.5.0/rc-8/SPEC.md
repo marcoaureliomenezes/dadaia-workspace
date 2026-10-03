@@ -32,7 +32,7 @@
 
 - These ADRs decide: 0071 (amended by 0163), 0104, 0118, 0119, 0122, 0123, 0138, 0140, 0142, 0143 (amended by 0166, 0170), 0146 (5), 0149, 0152 (2), 0158, 0160 (amended by 0164), 0162, 0163, 0164, 0166, 0167 (partly; the rest is rc-9's), 0170.
 - One new ADR: 0176 (proposed), AC8.10. The operator accepts it in the release worktree, in the commit carrying the nine `### P-NN` hunks (`specs/ADRs/AGENTS.md` §3); `amends: 0167` is written then (0151 M2). 0143's repair and AC8.10's repairs take the 0138 lane.
-- 0181 (proposed; operator 2026-10-03, "One ADR for rc-8's W8 law deletions (Recommended)") names every law line W8–W10 deletes or rewrites; every commit of this candidate deleting a law line cites it (0151 M3), T-050-183's cite 0177 and T-050-189's 0180. The operator accepts it before T-050-154's push.
+- 0181 (accepted 2026-10-03 at 1e1e9eee9; operator, "One ADR for rc-8's W8 law deletions (Recommended)") names every law line W8–W10 deletes or rewrites; every commit of this candidate deleting a law line cites it (0151 M3), T-050-183's cite 0177 and T-050-189's 0180. The operator accepts it before T-050-154's push.
 - Operator, 2026-10-03, verbatim:
   - Train: "you will only create now the RC8 ... we will wait till we finish the RC8"; rc-9..rc-12 are §Carried.
   - Q1 "Keep in 0.5.0 as rc-11 (Recommended)". Q2 "Yes, into rc-8 (Recommended)".
@@ -267,4 +267,4 @@ After AC9.3 and AC8.1's `Intent:` strip merge. Each RED is a behaviour assert in
 
 ## Open questions for the operator
 
-- None for W8–W11: the 2026-10-03 grill frontiers are empty. F4 is rc-12's (§Carried). Operator acts: 0176, 0177, 0178, 0180 and 0181's acceptances (§Decisions); W11's GitHub prerequisites (the `evals` environment, its secret, the required `ci.yml` job).
+- None for W8–W11: the 2026-10-03 grill frontiers are empty. F4 is rc-12's (§Carried). Operator acts: 0176, 0177, 0178 and 0180's acceptances (§Decisions); W11's GitHub prerequisites (the `evals` environment, its secret, the required `ci.yml` job).
