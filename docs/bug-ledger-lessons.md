@@ -42,7 +42,7 @@ multi-owner slug already on disk.
 
 ## Lesson 2 — a per-measurement exclusion breeds the next measurement's bug
 
-<!-- derived-from: QUALITY sha256:e101be9ccc61 -->
+<!-- derived-from: QUALITY sha256:1e6898e9e109 -->
 
 When each measurement walks the tree itself and is fixed by its own special-case
 exclusion, the next measurement counts the same stray files. The structure that ends
@@ -54,7 +54,7 @@ construction, not by a list somebody has to remember to extend.
 ## Lesson 3 — a derived cache breeds a bug per environment that derives it
 
 <!-- derived-from: bug-ledger sha256:fee190b6d940 -->
-<!-- derived-from: QUALITY sha256:e101be9ccc61 -->
+<!-- derived-from: QUALITY sha256:1e6898e9e109 -->
 
 A record that caches a fact git already knows is wrong in every environment that
 derives it differently — a shallow checkout first among them. The structure that ends
@@ -63,7 +63,7 @@ history is that line's change log. No CI job fetches history for a bug record's 
 
 ## The standing order the lessons produced
 
-<!-- derived-from: QUALITY sha256:e101be9ccc61 -->
+<!-- derived-from: QUALITY sha256:1e6898e9e109 -->
 <!-- derived-from: bug-ledger sha256:fee190b6d940 -->
 
 The workspace is in a permanent state of architecture review, oriented by its bug
@@ -77,9 +77,8 @@ history:
   to the architecture lens before it lands.
 - Record the direction. Every review verdict states the bug-surface delta from
   `bugs.py stats` — "tests green" is not a verdict.
-- Let numbers refuse growth. Module size, complexity, nesting, private-symbol imports
-  in tests and the slop counts are pinned at their measured values and move downward
-  only.
+- Let ratchets refuse growth. Private-symbol imports in tests (P-23) and the slop
+  counts are pinned at their measured values and move downward only.
 - Keep one home per number. Two homes for one parameter guarantee two different values.
 
 Next: [the bug loop](bug-loop.md) — register, RED, fix, resolve, in commands. Or start
