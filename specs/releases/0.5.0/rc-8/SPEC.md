@@ -4,7 +4,7 @@
 **Release ID:** 0.5.0
 **Owner:** dd-product-engineer
 **Opened:** 2026-10-03
-**Origin:** backlog:agent-behavior-evals,cli-ships-no-library-pipeline,lib-test-guidance-dehydrated,tests-agents-scaffold-without-placeholders,test-intent-docstring-backfill,meta-tests-leave-pytest,preflight-ci-parity-derived,delete-text-count-inventory-asserts,adr-0143-measured-by-checks-the-concept,skill-md-soft-hard-line-limit,memory-update-states-the-truth-correction-lane,bug-fix-adds-never-rewrites-asserts,bug-fix-commit-derived-by-grep,caused-by-proposed-by-blame,focused-review-on-caused-by,bug-terminal-transition-commit-shape,architecture-survey-flat-core-infrastructure,doctor-context-ignores-other-contexts,guidance-messages-name-the-right-target; bugs:test-suite-writes-outside-tmp,ci-preflight-writes-coverage-into-the-repo,hook-entrypoints-invisible-to-coverage,onboarding-next-step-names-another-context,init-on-a-copied-workspace-leaves-a-cli-bound-to-the-original,registry-row-missing-a-key-escapes-reg-schema,pre-push-warns-no-gitflow-block-for-an-absent-specs-tree,upgrade-leaves-reconcile-scratch-behind,bug-surface-schema-documents-the-deleted-regex,release-memory-appends-a-second-entry-on-rerun; findings:20260930-structural-convergence-F003,20260930-structural-convergence-F018,20260930-structural-convergence-F028,20260930-structural-convergence-F043,20260930-structural-convergence-F044,20260930-structural-convergence-F045,20260930-structural-convergence-F047,20260930-structural-convergence-F048,20260930-structural-convergence-F049,20260930-structural-convergence-F050,20260930-structural-convergence-F051,20260930-structural-convergence-F096,20260930-structural-convergence-F097,20260930-structural-convergence-F098,20260930-structural-convergence-F100,20260930-structural-convergence-F101,20260930-structural-convergence-F104,20260930-structural-convergence-F112,20260930-structural-convergence-F128,20260930-structural-convergence-F129,20260930-structural-convergence-F131,20260930-structural-convergence-F135,20260930-structural-convergence-F136
+**Origin:** backlog:agent-behavior-evals,cli-ships-no-library-pipeline,lib-test-guidance-dehydrated,tests-agents-scaffold-without-placeholders,test-intent-docstring-backfill,meta-tests-leave-pytest,preflight-ci-parity-derived,delete-text-count-inventory-asserts,adr-0143-measured-by-checks-the-concept,skill-md-soft-hard-line-limit,memory-update-states-the-truth-correction-lane,bug-fix-adds-never-rewrites-asserts,bug-fix-commit-derived-by-grep,caused-by-proposed-by-blame,focused-review-on-caused-by,bug-terminal-transition-commit-shape,architecture-survey-flat-core-infrastructure,doctor-context-ignores-other-contexts,guidance-messages-name-the-right-target,worktree-memory-states-plain-ledger-merge; bugs:test-suite-writes-outside-tmp,ci-preflight-writes-coverage-into-the-repo,hook-entrypoints-invisible-to-coverage,onboarding-next-step-names-another-context,init-on-a-copied-workspace-leaves-a-cli-bound-to-the-original,registry-row-missing-a-key-escapes-reg-schema,pre-push-warns-no-gitflow-block-for-an-absent-specs-tree,upgrade-leaves-reconcile-scratch-behind,bug-surface-schema-documents-the-deleted-regex,release-memory-appends-a-second-entry-on-rerun; findings:20260930-structural-convergence-F003,20260930-structural-convergence-F018,20260930-structural-convergence-F028,20260930-structural-convergence-F043,20260930-structural-convergence-F044,20260930-structural-convergence-F045,20260930-structural-convergence-F047,20260930-structural-convergence-F048,20260930-structural-convergence-F049,20260930-structural-convergence-F050,20260930-structural-convergence-F051,20260930-structural-convergence-F096,20260930-structural-convergence-F097,20260930-structural-convergence-F098,20260930-structural-convergence-F100,20260930-structural-convergence-F101,20260930-structural-convergence-F104,20260930-structural-convergence-F112,20260930-structural-convergence-F128,20260930-structural-convergence-F129,20260930-structural-convergence-F131,20260930-structural-convergence-F135,20260930-structural-convergence-F136
 
 - Sources: grills of 2026-10-02 (rc-8, Q1–Q4) and 2026-10-03 (train, Q1–Q6); reviews B1–B11, H1–L6 on fb8a29a75, then re-review 2 on 196f611aa; PR #278 F1; for W11, the grills and draft its Origin names. Task ids start at T-050-153.
 - Bug history read (permanent architecture review): PLAN §1, the as-is review.
@@ -38,6 +38,8 @@
   - Q3 "Register as bugs, fix in rc-8 W10 (Recommended)"; re-ruled for `init-announces-codex-trust`: "Not a bug: reject the entry (Recommended)".
   - Q4 "Derive it from `bugs.py fix` (Recommended)". Q5 "Reject; authority table goes to rc-12 notes (Recommended)". Q6 "rc-10 via dd-ask-me (Recommended)".
   - Amendment: "Amend AC8.9, delete them (Recommended)" (AC8.9's second deletion list); "Use the native tools (Recommended)" (AC8.10's P-07 and P-28).
+  - Amendment (AskUserQuestion): "Add to rc-8 (Recommended)" (backlog `worktree-memory-states-plain-ledger-merge` joins the Origin, AC10.14); "Land eval.yml on main early (Recommended)" (AC11.5, AC11.6).
+- 0180 (proposed): the operator accepts it once bug `worktree-merge-union-duplicates-ledger-records-on-in-place-mutation`'s fix merges and its `measured_by` passes on the work branch; AC10.14's law line waits on it (0151 M3).
 - Order (root map §1): AC8.9; the rest of W8; W9; W10, after AC9.3 and AC8.1's `Intent:` strip. Width: the PLAN's Parallel schedule (0149).
 - W11 (amendment, operator 2026-10-03, AskUserQuestion, verbatim):
   - Fold (grill 170932Z): "fold into rc-8. make sure to define that it can surely be implemented in parallel ... because it's on other repo".
@@ -86,7 +88,11 @@
   - At closure, `tests-agents-scaffold-without-placeholders` and `test-intent-docstring-backfill` exit `superseded --release 0.5.0`.
 - AC8.2 One answer for canonical memory at closure (FR `memory-update-states-the-truth-correction-lane`; 0138): `MEMORY-UPDATE.md` states no canonical-memory rule of its own and points at the memory law (a `### P-NN` changes only with its ADR, any other section under 0138); its step 7 names no library-internal test. Command: `grep -c 'QUALITY.md' dadaia_workspace/public/skills/dd-release-implementation/MEMORY-UPDATE.md` prints `1`; `grep -rn 'never touched at closure' dadaia_workspace/public` prints nothing.
 - AC8.3 Meta-tests leave pytest for one CI job (FR `meta-tests-leave-pytest`; 0163, 0166, 0167):
-  - Deleted as duplicates: `stewardship_mechanics` beyond AC8.10's checks (conftest); `repo_self_scan` (gitleaks, pre-push); `source_repo_hygiene` (the CI repo-hygiene job); `test_adr_canon`'s committed-ledger case (the CI doctor job). V28, V29, V31: AC8.1.
+  - Deleted as duplicates: `stewardship_mechanics` beyond AC8.10's checks (conftest); `repo_self_scan` (gitleaks, pre-push); `test_adr_canon`'s committed-ledger case (the CI doctor job). V28, V29, V31: AC8.1.
+  - `source_repo_hygiene` splits (T-050-155 review F1; the CI repo-hygiene job checks only tracked projection files; the `gitignore-…-recurrence` chain, 10 bugs):
+    - Visibility rows: moved to guard check `specs-canon-tracked` (T-050-161, `repo.py`), one live canon path per area not ignored per `git check-ignore`; planted, a temp `.gitignore` hiding `specs/releases/**/TASKS.md`.
+    - Hidden rows (`local-notes.md`, `tmp/`): the canon scan's, `canon_violations` (`features/specs/canon.py:172`) at pre-push (`push_gate.py:216-232`) and doctor (`canon.py:194-206`). Under the canon-open `releases/_archive/<v>/**` they are dropped: only `release.py ship` writes there, from a tree doctor's walk judged.
+    - Stale rows (`ACTIVE.md`, `GRILL.md`, `OQ-DECISIONS.md`, `ALPHA-*-QA.md`, `PRE-PR-REVIEW.md`, `reviews/`, `specs/_archive/releases/`, `backlog/candidates.md`): dropped; the canon refuses those paths.
   - Deleted: the mutation tooling (`tests/scripts/run_mutation_baseline.sh`, its wiring tests, `test_mutation_baseline_scope_stdlib_only.py`, `[tool.mutmut]`, the `mutation` group); the memory pass states mutation evidence is operator tooling.
   - Moved to guard checks, each red on a planted violation: V26 (`test_test_suite_ratchets.py`); V32, V33, V37–V40 (`test_slop_ratchets.py`; V32's twin in `test_import_linter_ignore_cap.py`); `suite_cannot_reach_a_real_workspace`, `suite_cannot_reach_the_instance`; `test_ci_workflow_hygiene.py`, `test_memory_canonical_shape.py`; `test_release_semver_canon`'s release-please cases and `test_version_lineage_consistency.py` (P-30's check); `test_adr_canon`'s superseded-successor case; AC8.6's check; `test_frozen_clock_aging_ratchet.py` and `test_harness_env_contract.py` (the suite is their subject; no principle names either; 0020 is repaired, AC8.10).
   - Not meta-tests (package subject): `test_core_file_io_purity` (package AST), `test_behavior_map` (shipped `behavior-map.json`), `test_public_source_hygiene` (shipped text, wheel), `test_console_scripts` (the shipped entry-point table), `test_release_semver_canon`'s id-grammar case; `test_law_states_what_the_code_does` is AC8.4's. `test_docs_derived_from_memory.py` stays until rc-12 (AC8.10).
@@ -152,6 +158,11 @@ After AC9.3 and AC8.1's `Intent:` strip merge. Each RED is a behaviour assert in
 - AC10.11 Resolved at closure by citation: F050 by b5013bbfb; F129 by bdb24bc64; F047 by `chore(bugs): reject removals-shipped-without-recorded-authority`; F100 by the commit exiting `init-announces-codex-trust` rejected (T-050-71 removed the trust INFO on purpose).
 - AC10.12 HOOKS-DRIFT-1 states what it observed (FR `guidance-messages-name-the-right-target`, HOOKS-DRIFT-1 part; F098): one code, its message naming the observed state (absent or differing); the fix line (`ci install-hook --force`) serves both. Case: delete a projected hook; the message says absent, and its fix line, executed, restores it. T-050-146 delivered the root-whitelist clause.
 - AC10.13 `release.py memory` is idempotent (DEL `release-memory-appends-a-second-entry-on-rerun`; F097): a rerun over the same window exits 0 and leaves the log unchanged. Case: the `kind: memory` entries are byte-equal after the rerun.
+- AC10.14 Law and memory state the plain ledger merge (FR `worktree-memory-states-plain-ledger-merge`; 0180), after the union bug's fix merges:
+  - Law, after 0180's acceptance, cited in the commit (0151 M3): `public/data/worktrees-AGENTS.md:30` (step 7) states 0180's writer re-run, in an `impl` worktree, then `public stage`, `install`, `doctor`.
+  - Memory, the closure pass (0138 lane, no `### P-NN`): `worktrees.md:5,35,36` and `bug-ledger.md:32` drop the union merge, citing the fix commit; `catalog.json` is regenerated by `memory.py catalog generate`.
+  - Check: `grep -rniw union specs/memory` states no union merge; `memory.py check` is clean; `public doctor` reports no drift.
+  - At closure, the entry exits `delivered --release 0.5.0`; with 0180 still proposed, it stays active for rc-9.
 
 ## W11 — agent-behavior evals, a parallel lane in `dadaia-evals`: acceptance
 
@@ -160,7 +171,7 @@ After AC9.3 and AC8.1's `Intent:` strip merge. Each RED is a behaviour assert in
   - AC11.2–AC11.6 write only in `repos/dadaia-evals`; no W8–W10 `W:` holds a path there. They run beside W8–W10, one `impl` worktree each, once AC11.0 merges.
   - AC11.0 and AC11.1 write here and queue like any task. AC11.0 shares `_worktree_new.py` and `test_worktree_new.py` with the open `0.5.0d-bug` worktree and T-050-164. AC11.1 shares the root map and `CONTEXT.md` with T-050-158, and `dd-gitflow-default/SKILL.md` with T-050-165.
   - W11's task markers live in this repo's `TASKS.md`, which a `dadaia-evals` worktree cannot stage; the PLAN names where they are written.
-- Order (root map §3, "no CI job calls a model API", binds until 0177 is accepted and shipped): T-050-161 merges → the operator accepts 0177 → AC11.1 and AC11.5 merge → AC11.6. Before that, `dadaia-evals` holds no workflow that reads a model secret.
+- Order (root map §3, "no CI job calls a model API", binds until 0177 is accepted and shipped): T-050-161 merges → the operator accepts 0177 → AC11.1 and AC11.5 merge, AC11.5 also onto `dadaia-evals` `main` → AC11.6. Before that, `dadaia-evals` holds no workflow that reads a model secret.
 - G1 counts this repo only: AC11.0 (one function body and its case) and AC11.1's text. `dadaia-evals` lines are outside the readout; G4's "only job added" is this repo's CI.
 - Operator prerequisites, outside the repo: `claude setup-token`, stored as the `dadaia-evals` secret `CLAUDE_CODE_OAUTH_TOKEN`; extra usage off on the plan. Done: `main`, `develop` and `feature/0.5.0` on its origin (5c11f42).
 - AC11.0 An associated repo's `impl` reads the main repo's Approved trio (0174's slice, Q-W0):
@@ -196,7 +207,7 @@ After AC9.3 and AC8.1's `Intent:` strip merge. Each RED is a behaviour assert in
     - the RED test fails on the pre-fix sha and passes on the fix;
     - `git diff -U0 -- tests | grep '^-\s*assert'` prints nothing.
   - Check: as AC11.3's, on both versions, with one planted pass and one planted fail.
-- AC11.5 `eval.yml` (0177, 0178), merged after 0177's acceptance:
+- AC11.5 `eval.yml` (0177, 0178), merged after 0177's acceptance and review to the `dadaia-evals` work branch and, through its PR edges, to its `main` ahead of rc-12 (§Decisions): GitHub dispatches only a workflow on the default branch.
   - Trigger: `workflow_dispatch` with the one input `lib_ref`; `permissions: contents: read`; a GitHub-hosted runner.
   - It stamps `release-please-config.json`'s `release-as` into `pyproject.toml`'s version line before `uv build`, and fails closed when `release-as` is missing.
   - `uv tool install harbor==0.23.0`, then `harbor run -p tasks -a claude-code -m anthropic/claude-sonnet-5 --ak version=<pinned> -k 3 -n ≤2`, on PyPI 0.4.7 and on the candidate wheel.
@@ -208,7 +219,7 @@ After AC9.3 and AC8.1's `Intent:` strip merge. Each RED is a behaviour assert in
     - The scan exits non-zero on a fixture holding a planted token.
     - `compare.py` is red on a planted drop and on T1 at 2/3.
 - AC11.6 The first run, as evidence:
-  - One `eval.yml` run on the tip of `feature/0.5.0`, against 0.4.7, after AC11.1 and AC11.5 merge.
+  - One `eval.yml` run, `gh workflow run eval.yml -f lib_ref=<tip of feature/0.5.0>` on `dadaia-evals`, against 0.4.7, after AC11.1 merges and AC11.5 is on its `main`.
   - It confirms that the trial runs the candidate wheel: `dadaia capabilities --json` names the stamped version.
   - It confirms that `-n` ≤ 2 stays inside the plan's rate limit: no rate-limit error appears in `jobs/`.
   - A failing grader, unlike a failing agent, is fixed in the grader before closure.
@@ -229,7 +240,7 @@ After AC9.3 and AC8.1's `Intent:` strip merge. Each RED is a behaviour assert in
 - Prose, roster and count asserts; CONTEXT-MAP's `Measured` and skills `Budget` columns; 0143's symbol-list `measured_by`.
 - Phase 5's "rewritten", Phase 6's "net ≤ 0"; required `evidence_seam`/`evidence_diff`, their verification, metric 2 over them, direction from `evidence_diff`; the `git log -S` recipe; an unreasoned `none`; the "reopen" wording; §3a row 4's resolve-only wording.
 - Ad-hoc child envs, `COVERAGE_FILE` redirects; the cross-context walk; build-identity venv reuse; the bare `KeyError`; the no-block warning for an absent constitution; HOOKS-DRIFT-1's fixed "differs"; the reconcile scratch and unconditional hook rewrite; the deleted surface regex; the second `kind: memory` append.
-- The map's unscoped "no CI job calls a model API", in the root map, SKILL.md §3b and `CICD-AUTOMATION.md` (0177); an `impl` worktree reading the trio from its own repo (AC11.0).
+- The map's unscoped "no CI job calls a model API", in the root map, SKILL.md §3b and `CICD-AUTOMATION.md` (0177); an `impl` worktree reading the trio from its own repo (AC11.0); memory's ledger union merge and step 7's bare conflict line (AC10.14).
 
 ## Risks
 
@@ -250,4 +261,4 @@ After AC9.3 and AC8.1's `Intent:` strip merge. Each RED is a behaviour assert in
 
 ## Open questions for the operator
 
-- None for W8–W11: the 2026-10-03 grill frontiers are empty. F4 is rc-12's (§Carried).
+- None for W8–W11: the 2026-10-03 grill frontiers are empty. F4 is rc-12's (§Carried). Operator acts: 0176, 0177, 0178 and 0180's acceptances, at the points §Decisions names.
