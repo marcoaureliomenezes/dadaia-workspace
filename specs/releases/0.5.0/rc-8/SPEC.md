@@ -39,13 +39,12 @@
   - Q4 "Derive it from `bugs.py fix` (Recommended)". Q5 "Reject; authority table goes to rc-12 notes (Recommended)". Q6 "rc-10 via dd-ask-me (Recommended)".
   - Amendment: "Amend AC8.9, delete them (Recommended)" (AC8.9's second deletion list); "Use the native tools (Recommended)" (AC8.10's P-07 and P-28).
   - Amendment (AskUserQuestion): "Add to rc-8 (Recommended)" (backlog `worktree-memory-states-plain-ledger-merge` joins the Origin, AC10.14); "Land eval.yml on main early (Recommended)" (AC11.5, AC11.6).
-- 0180 (proposed): the operator accepts it once bug `worktree-merge-union-duplicates-ledger-records-on-in-place-mutation`'s fix merges and its `measured_by` passes on the work branch; AC10.14's law line waits on it (0151 M3).
 - Order (root map §1): AC8.9; the rest of W8; W9; W10, after AC9.3 and AC8.1's `Intent:` strip. Width: the PLAN's Parallel schedule (0149).
 - W11 (amendment, operator 2026-10-03, AskUserQuestion, verbatim):
   - Fold (grill 170932Z): "fold into rc-8. make sure to define that it can surely be implemented in parallel ... because it's on other repo".
   - Q-W0: "Yes, only that slice (Recommended)". AC11.0 carries only "an associated repo's impl reads the main repo's Approved trio" of proposed 0174; the rest stays rc-11's.
-  - 0179: "Accept as prepared (Recommended)"; the main thread writes the accept at the fold.
-- W11's ADRs and accept points: 0179 at the fold; 0177 (`amends: 0025`) after T-050-161 merges, its check `no-model-api-in-ci` then existing, its accept commit carrying P-33's re-scope; 0178 (`amends: 0122`) at closure, since it governs rc-12's promote.
+  - 0179: "Accept as prepared (Recommended)".
+- Accept points of 0176, 0177, 0179 and 0180: PLAN R7–R10. 0178 (`amends: 0122`) is accepted at closure, since it governs rc-12's promote.
 
 ## Gate — G1–G6, applied to W8–W10
 
@@ -59,7 +58,7 @@
 - G3 Each open bug is re-run at `<end>`; one not reproducing is resolved, citing the commit that removed its cause.
 - G4 CI green on the three OSes; `.dadaia/.venv/bin/dadaia doctor --context dadaia-workspace` exits 0. Wall-clock vs rc-7: one runner class, the median. The guard-script job is the only job added.
 - G5 A test a DEL leaves dead leaves in the same commit. A new test follows the root-map test basics (AC8.1).
-- G6 At closure, findings and `active[]` are re-audited; rc-9 is defined from §Carried; one `dispositions` entry logs open before, resolved, open after.
+- G6 At closure, findings and `active[]` are re-audited; rc-9 is defined from §Carried; one `dispositions` entry logs open before, resolved, open after. Closure never waits on a ruling: a task still pending on an operator accept at closure (T-050-183, T-050-187, T-050-188 on 0177's; T-050-189 on 0180's) leaves T-050-181's `blocked by:` once §Carried rc-9 records it.
 
 ## W8 — the test law and the library pipeline leave: acceptance
 
@@ -90,8 +89,12 @@
 - AC8.3 Meta-tests leave pytest for one CI job (FR `meta-tests-leave-pytest`; 0163, 0166, 0167):
   - Deleted as duplicates: `stewardship_mechanics` beyond AC8.10's checks (conftest); `repo_self_scan` (gitleaks, pre-push); `test_adr_canon`'s committed-ledger case (the CI doctor job). V28, V29, V31: AC8.1.
   - `source_repo_hygiene` splits (T-050-155 review F1; the CI repo-hygiene job checks only tracked projection files; the `gitignore-…-recurrence` chain, 10 bugs):
-    - Visibility rows: moved to guard check `specs-canon-tracked` (T-050-161, `repo.py`), one live canon path per area not ignored per `git check-ignore`; planted, a temp `.gitignore` hiding `specs/releases/**/TASKS.md`.
-    - Hidden rows (`local-notes.md`, `tmp/`): the canon scan's, `canon_violations` (`features/specs/canon.py:172`) at pre-push (`push_gate.py:216-232`) and doctor (`canon.py:194-206`). Under the canon-open `releases/_archive/<v>/**` they are dropped: only `release.py ship` writes there, from a tree doctor's walk judged.
+    - Visibility rows: moved to guard check `specs-canon-tracked` (T-050-161, `repo.py`), derived from the canon, never a hand-kept list (`additive-globs-hand-kept-beside-the-canon`):
+      - Probes: one path per row of `canon.py`'s `CANON`, its `dest` or a sample its `pattern` matches, each judged by `git check-ignore --no-index` (plain `check-ignore` passes any tracked path).
+      - Expected not ignored, except a row whose `TEMPLATES` source carries a `workspace_layout._PLACEHOLDERS` key: it is rendered from the code registry and expected ignored. Today that is `AGENTS.md` alone (`.gitignore:132`); whether it gets tracked is backlog `doctor-in-a-fresh-worktree-lacks-rendered-specs-law`'s.
+      - The ignored half, kept from F-20: `releases/_archive/<v>/local-notes.md` and `releases/_archive/<v>/tmp/<f>` are ignored. `release.py ship` renames the live directory with its untracked files (`release.py:124`), and nothing refuses them.
+      - Planted: a temp `.gitignore` hiding `specs/releases/**/TASKS.md`, and one re-including `_archive/**/local-notes.md`, each turn it red.
+    - Hidden rows elsewhere (`local-notes.md`, `tmp/`): the canon scan's, `canon_violations` (`features/specs/canon.py:172`) at pre-push (`push_gate.py:216-232`) and doctor (`canon.py:194-206`).
     - Stale rows (`ACTIVE.md`, `GRILL.md`, `OQ-DECISIONS.md`, `ALPHA-*-QA.md`, `PRE-PR-REVIEW.md`, `reviews/`, `specs/_archive/releases/`, `backlog/candidates.md`): dropped; the canon refuses those paths.
   - Deleted: the mutation tooling (`tests/scripts/run_mutation_baseline.sh`, its wiring tests, `test_mutation_baseline_scope_stdlib_only.py`, `[tool.mutmut]`, the `mutation` group); the memory pass states mutation evidence is operator tooling.
   - Moved to guard checks, each red on a planted violation: V26 (`test_test_suite_ratchets.py`); V32, V33, V37–V40 (`test_slop_ratchets.py`; V32's twin in `test_import_linter_ignore_cap.py`); `suite_cannot_reach_a_real_workspace`, `suite_cannot_reach_the_instance`; `test_ci_workflow_hygiene.py`, `test_memory_canonical_shape.py`; `test_release_semver_canon`'s release-please cases and `test_version_lineage_consistency.py` (P-30's check); `test_adr_canon`'s superseded-successor case; AC8.6's check; `test_frozen_clock_aging_ratchet.py` and `test_harness_env_contract.py` (the suite is their subject; no principle names either; 0020 is repaired, AC8.10).
@@ -158,11 +161,11 @@ After AC9.3 and AC8.1's `Intent:` strip merge. Each RED is a behaviour assert in
 - AC10.11 Resolved at closure by citation: F050 by b5013bbfb; F129 by bdb24bc64; F047 by `chore(bugs): reject removals-shipped-without-recorded-authority`; F100 by the commit exiting `init-announces-codex-trust` rejected (T-050-71 removed the trust INFO on purpose).
 - AC10.12 HOOKS-DRIFT-1 states what it observed (FR `guidance-messages-name-the-right-target`, HOOKS-DRIFT-1 part; F098): one code, its message naming the observed state (absent or differing); the fix line (`ci install-hook --force`) serves both. Case: delete a projected hook; the message says absent, and its fix line, executed, restores it. T-050-146 delivered the root-whitelist clause.
 - AC10.13 `release.py memory` is idempotent (DEL `release-memory-appends-a-second-entry-on-rerun`; F097): a rerun over the same window exits 0 and leaves the log unchanged. Case: the `kind: memory` entries are byte-equal after the rerun.
-- AC10.14 Law and memory state the plain ledger merge (FR `worktree-memory-states-plain-ledger-merge`; 0180), after the union bug's fix merges:
-  - Law, after 0180's acceptance, cited in the commit (0151 M3): `public/data/worktrees-AGENTS.md:30` (step 7) states 0180's writer re-run, in an `impl` worktree, then `public stage`, `install`, `doctor`.
-  - Memory, the closure pass (0138 lane, no `### P-NN`): `worktrees.md:5,35,36` and `bug-ledger.md:32` drop the union merge, citing the fix commit; `catalog.json` is regenerated by `memory.py catalog generate`.
+- AC10.14 Law and memory state the plain ledger merge (FR `worktree-memory-states-plain-ledger-merge`; 0180):
+  - Memory, the closure pass (0138 lane, no `### P-NN`), once the `0.5.0d-bug` union fix merges, whatever 0180's status: `worktrees.md:5,35,36` and `bug-ledger.md:32` drop the union merge, citing the fix commit. In the same pass, `worktrees.md:35` ("trio `Approved` on that branch") states AC11.0's main-repo read. `catalog.json` is regenerated by `memory.py catalog generate`.
+  - Law, only after 0180's acceptance, cited in the commit (0151 M3): `public/data/worktrees-AGENTS.md:30` (step 7) states 0180's writer re-run, in an `impl` worktree, then `public stage`, `install`, `doctor`.
   - Check: `grep -rniw union specs/memory` states no union merge; `memory.py check` is clean; `public doctor` reports no drift.
-  - At closure, the entry exits `delivered --release 0.5.0`; with 0180 still proposed, it stays active for rc-9.
+  - At closure, the entry exits `delivered --release 0.5.0`; with 0180 still proposed, it stays active and rc-9 carries the law line alone.
 
 ## W11 — agent-behavior evals, a parallel lane in `dadaia-evals`: acceptance
 
@@ -170,10 +173,13 @@ After AC9.3 and AC8.1's `Intent:` strip merge. Each RED is a behaviour assert in
 - Parallel lane (0149):
   - AC11.2–AC11.6 write only in `repos/dadaia-evals`; no W8–W10 `W:` holds a path there. They run beside W8–W10, one `impl` worktree each, once AC11.0 merges.
   - AC11.0 and AC11.1 write here and queue like any task. AC11.0 shares `_worktree_new.py` and `test_worktree_new.py` with the open `0.5.0d-bug` worktree and T-050-164. AC11.1 shares the root map and `CONTEXT.md` with T-050-158, and `dd-gitflow-default/SKILL.md` with T-050-165.
-  - W11's task markers live in this repo's `TASKS.md`, which a `dadaia-evals` worktree cannot stage; the PLAN names where they are written.
-- Order (root map §3, "no CI job calls a model API", binds until 0177 is accepted and shipped): T-050-161 merges → the operator accepts 0177 → AC11.1 and AC11.5 merge, AC11.5 also onto `dadaia-evals` `main` → AC11.6. Before that, `dadaia-evals` holds no workflow that reads a model secret.
+- Order (root map §3, "no CI job calls a model API", binds until 0177 is accepted and AC11.1 merged): T-050-161 merges → the operator accepts 0177 → AC11.1 and AC11.5 merge, AC11.5 also onto `dadaia-evals` `main` → AC11.6. Before that, `dadaia-evals` holds no workflow that reads a model secret.
 - G1 counts this repo only: AC11.0 (one function body and its case) and AC11.1's text. `dadaia-evals` lines are outside the readout; G4's "only job added" is this repo's CI.
-- Operator prerequisites, outside the repo: `claude setup-token`, stored as the `dadaia-evals` secret `CLAUDE_CODE_OAUTH_TOKEN`; extra usage off on the plan. Done: `main`, `develop` and `feature/0.5.0` on its origin (5c11f42).
+- Operator prerequisites, the operator's GitHub acts on `dadaia-evals`:
+  - an environment `evals` whose deployment-branch policy allows `main` only;
+  - `claude setup-token`, stored as that environment's secret `CLAUDE_CODE_OAUTH_TOKEN`, never a repository secret;
+  - extra usage off on the plan.
+  - Done: `main`, `develop` and `feature/0.5.0` on its origin (5c11f42).
 - AC11.0 An associated repo's `impl` reads the main repo's Approved trio (0174's slice, Q-W0):
   - `_worktree_new.new(kind="impl")` reads the trio from the context's main repo, which is `repo` itself for a main repo. It goes through the `context list --json` read `flow_for` already makes: no second read, no branch on repo role.
   - Case, a parametrize row in the owner file `test_worktree_new.py`: an associated repo has `feature/<v>` and the main repo's trio is Approved. `worktree.py new <assoc> --kind impl` exits 0 and prints `[ok]` with `worktrees/<assoc>/<v><l>-impl`. With the main repo's PLAN Draft it exits 1, and its one fix line names `new <main> --kind release`.
@@ -207,28 +213,26 @@ After AC9.3 and AC8.1's `Intent:` strip merge. Each RED is a behaviour assert in
     - the RED test fails on the pre-fix sha and passes on the fix;
     - `git diff -U0 -- tests | grep '^-\s*assert'` prints nothing.
   - Check: as AC11.3's, on both versions, with one planted pass and one planted fail.
-- AC11.5 `eval.yml` (0177, 0178), merged after 0177's acceptance and review to the `dadaia-evals` work branch and, through its PR edges, to its `main` ahead of rc-12 (§Decisions): GitHub dispatches only a workflow on the default branch.
-  - Trigger: `workflow_dispatch` with the one input `lib_ref`; `permissions: contents: read`; a GitHub-hosted runner.
-  - It stamps `release-please-config.json`'s `release-as` into `pyproject.toml`'s version line before `uv build`, and fails closed when `release-as` is missing.
-  - `uv tool install harbor==0.23.0`, then `harbor run -p tasks -a claude-code -m anthropic/claude-sonnet-5 --ak version=<pinned> -k 3 -n ≤2`, on PyPI 0.4.7 and on the candidate wheel.
-  - Auth: `CLAUDE_CODE_OAUTH_TOKEN` + `CLAUDE_FORCE_OAUTH=1`, at job level, in the model job only. Agent models use the economy template (0022).
-  - `scripts/compare.py` blocks when a task passing ≥2/3 on 0.4.7 passes ≤1/3 on the candidate, or T1 is below 3/3 on the candidate. Anything else is readout.
-  - A secret scan runs over `jobs/` and the summary before any upload or summary write, with the token's value among its patterns. It fails closed.
-  - Check (0177's `measured_by`):
-    - A check job runs ahead of the model job, without the secret. It fails on a secret-reading workflow with any of: another trigger, a non GitHub-hosted `runs-on`, the secret at workflow level, or an upload or summary write not preceded by the scan.
+- AC11.5 The two workflows (0177, 0178), merged after 0177's acceptance and review to the `dadaia-evals` work branch, then through its PR edges to its `main` ahead of rc-12, since GitHub dispatches only a default-branch workflow. A PR edge carries every commit on its branch, so AC11.2–AC11.4 reach `main` too: "early" is before rc-12, not `eval.yml` alone (§Decisions).
+  - `ci.yml` makes "CI green per PR edge" real: on `push` and `pull_request`, a GitHub-hosted runner, no secret, no environment. It runs the three checks below.
+  - `eval.yml`:
+    - Trigger: `workflow_dispatch` with the one input `lib_ref`; `permissions: contents: read`; a GitHub-hosted runner.
+    - It stamps `release-please-config.json`'s `release-as` into `pyproject.toml`'s version line before `uv build`, and fails closed when `release-as` is missing.
+    - harbor's `claude-code` agent runs three trials per task, at most two at once, on PyPI 0.4.7 and on the candidate wheel; pins and flags are the PLAN's; the model follows the economy template (0022).
+    - Auth: the model job alone declares `environment: evals` and reads `CLAUDE_CODE_OAUTH_TOKEN` + `CLAUDE_FORCE_OAUTH=1` at job level.
+    - `scripts/compare.py` blocks when a task passing ≥2/3 on 0.4.7 passes ≤1/3 on the candidate, or T1 is below 3/3 on the candidate. Anything else is readout.
+    - A secret scan runs over `jobs/` and the summary before any upload or summary write, with the token's value among its patterns. It fails closed.
+  - Check (0177's `measured_by`), run by `ci.yml` and by `eval.yml`'s first job, neither holding the secret:
+    - The workflow check fails on a workflow that reads the secret or declares `evals`, if it has any of: a trigger other than `workflow_dispatch` or `schedule`, a non GitHub-hosted `runs-on`, the secret at workflow level, or an upload or summary write not preceded by the scan.
     - The scan exits non-zero on a fixture holding a planted token.
     - `compare.py` is red on a planted drop and on T1 at 2/3.
 - AC11.6 The first run, as evidence:
-  - One `eval.yml` run, `gh workflow run eval.yml -f lib_ref=<tip of feature/0.5.0>` on `dadaia-evals`, against 0.4.7, after AC11.1 merges and AC11.5 is on its `main`.
+  - One `eval.yml` run, `gh workflow run eval.yml -f lib_ref=<tip of feature/0.5.0>` on `dadaia-evals`, against 0.4.7, after AC11.1 merges and AC11.5 reaches `main` with the whole lane.
   - It confirms that the trial runs the candidate wheel: `dadaia capabilities --json` names the stamped version.
-  - It confirms that `-n` ≤ 2 stays inside the plan's rate limit: no rate-limit error appears in `jobs/`.
+  - It confirms that two trials at once stay inside the plan's rate limit: no rate-limit error appears in `jobs/`.
   - A failing grader, unlike a failing agent, is fixed in the grader before closure.
   - Check: a `_RELEASE.json` log entry names the run URL, verdict, tokens and wall time.
-- AC11.7 The gate at the promote (0178), checked at rc-12:
-  - The promote PR head is evaluated, and the run is logged on the work branch before the promote merges.
-  - At `approve`, `git diff --name-only <evaluated>..<tag>` lists only `CHANGELOG.md`, `.release-please-manifest.json` and `pyproject.toml`, the last changed in its version line only.
-  - Otherwise `eval.yml` runs on the tag sha first, and only a non-blocking verdict approves.
-- At closure, `agent-behavior-evals` exits `delivered --release 0.5.0`: that needs AC11.6 logged and 0177–0179 ruled (its done-when). AC11.7 is rc-12's.
+- At closure, `agent-behavior-evals` exits `delivered --release 0.5.0`: that needs AC11.6 logged and 0177–0179 ruled (its done-when). The promote gate is rc-12's (§Carried).
 
 ## Replaces
 
@@ -254,11 +258,11 @@ After AC9.3 and AC8.1's `Intent:` strip merge. Each RED is a behaviour assert in
 
 ## Carried — the 0.5.0 map (ADR 0140; one candidate at a time)
 
-- rc-9: the tests tree mirrors the package, except `tests/contract/test_docs_derived_from_memory.py`, which P-29 names, until check #7 rules; the unit tier spawns no processes, carrying rc-7's slow-class G4 growth (operator 2026-10-02: "Same-runner-class rule; slow-class growth to rc-8 (Recommended)", tied to `unit-tier-without-processes`); the production-faithful hook harness (0163); `worktree-rows-injected-not-monkeypatched`; `windows-integration-coverage-gap`; `repo-ci-sast`. With rc-8, they complete 0167.
+- rc-9: the tests tree mirrors the package, except `tests/contract/test_docs_derived_from_memory.py`, which P-29 names, until check #7 rules; the unit tier spawns no processes, carrying rc-7's slow-class G4 growth (operator 2026-10-02: "Same-runner-class rule; slow-class growth to rc-8 (Recommended)", tied to `unit-tier-without-processes`); the production-faithful hook harness (0163); `worktree-rows-injected-not-monkeypatched`; `windows-integration-coverage-gap`; `repo-ci-sast`. With rc-8, they complete 0167. If pending at rc-8's closure (G6): T-050-183, T-050-187, T-050-188 (0177's accept) and T-050-189 (0180's), with `agent-behavior-evals` or AC10.14's law line.
 - rc-10: `public-law-language-neutral`; `dd-ask-me-owned-questioning-skill`, delivering 0165 and `dd-ai-eng-knowhow/AUTHORING.md:134` ("asks the whole frontier at once"), caught by 0165's repaired `measured_by`; `adr-born-at-release-with-options`; `adr-ledger-triage-process-rules`; `architecture-adr-section-generated`; F088, F089, F139–F148.
 - rc-11: workspace replication (7 entries, ADRs 0171–0175, 0174 less AC11.0's slice); F084.
-- rc-12, the promote: docs site F109, clone detection F110, launch prep F111; the residue (`spec-context-refusals-print-prose`, `privacy-baseline-one-parser`, `ledger-refusals-guess-specs-from-command-shape`, `ledger-reader-one-numbered-tolerant-iterator`, `doctor-in-a-fresh-worktree-lacks-rendered-specs-law`, F060); memory drift F123–F127; bug metrics F001, F004, F005, F009 (re-measured over AC9.3's links); the publish gate F067; `test_docs_derived_from_memory.py` leaves pytest after check #7 rules, `meta-tests-leave-pytest` exits delivered then; the audit checks never run, F137; the removal-authority notes (F069); PyJWT, closing at the ship; AC11.7's gate run (0178). Open, the operator's before the promote (F4): ADR 0122's zero active backlog against the four post-0.5.0 evals follow-ups, `evals-release-gate-status`, `evals-harness-lanes-and-benchmark`, `evals-windows-smoke` and `devin-subagent-projection`.
+- rc-12, the promote: docs site F109, clone detection F110, launch prep F111; the residue (`spec-context-refusals-print-prose`, `privacy-baseline-one-parser`, `ledger-refusals-guess-specs-from-command-shape`, `ledger-reader-one-numbered-tolerant-iterator`, `doctor-in-a-fresh-worktree-lacks-rendered-specs-law`, F060); memory drift F123–F127; bug metrics F001, F004, F005, F009 (re-measured over AC9.3's links); the publish gate F067; `test_docs_derived_from_memory.py` leaves pytest after check #7 rules, `meta-tests-leave-pytest` exits delivered then; the audit checks never run, F137; the removal-authority notes (F069); PyJWT, closing at the ship; the evals gate at the promote (0178): the promote PR head is evaluated and its run logged on the work branch before the merge; at `approve`, `git diff --name-only <evaluated>..<tag>` lists only `CHANGELOG.md`, `.release-please-manifest.json` and `pyproject.toml` (its version line), else `eval.yml` runs on the tag sha first and only a non-blocking verdict approves. Open, the operator's before the promote (F4): ADR 0122's zero active backlog against the four post-0.5.0 evals follow-ups, `evals-release-gate-status`, `evals-harness-lanes-and-benchmark`, `evals-windows-smoke` and `devin-subagent-projection`.
 
 ## Open questions for the operator
 
-- None for W8–W11: the 2026-10-03 grill frontiers are empty. F4 is rc-12's (§Carried). Operator acts: 0176, 0177, 0178 and 0180's acceptances, at the points §Decisions names.
+- None for W8–W11: the 2026-10-03 grill frontiers are empty. F4 is rc-12's (§Carried). Operator acts: 0176, 0177, 0178 and 0180's acceptances (§Decisions); W11's GitHub prerequisites (the `evals` environment and its secret).
