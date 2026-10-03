@@ -1,7 +1,7 @@
 {
   "schema": "release-state-v1",
   "release": "0.5.0",
-  "phase": "CLOSURE",
+  "phase": "DEFINITION",
   "defined": {
     "sha": "79fe0eccc8fa57cad6cc5694e33ec88950ea4a9e",
     "ts": "2026-10-01T12:44:44Z"
@@ -860,6 +860,12 @@
       "agent": "main-thread",
       "kind": "note",
       "text": "Candidate 7 closure merged into develop by PR #278 (merge c80bfe63, head c9464dde, every check green, dd-code-reviewer APPROVED c9464dde; develop CI run 37097495370 green). Gate: continue — operator ruling \"Continue: rc-8 (Recommended)\": rc-8 is the test/bug candidate (ADRs 0163-0167 and 0170, the open backlog and bugs, task ids from T-050-153); 0 open bugs and 0 open backlog precede the promote."
+    },
+    {
+      "ts": "2026-10-03T12:28:01Z",
+      "agent": "release.py new",
+      "kind": "note",
+      "text": "Candidate born on 0.5.0 (prior candidate closed at 22054713a)"
     }
   ]
 }
