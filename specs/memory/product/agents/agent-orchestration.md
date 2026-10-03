@@ -28,11 +28,11 @@ The main thread — the operator's own session — coordinates: intake, the gril
 
 - No runtime drives agents through steps; the main thread classifies the demand (feature or bug) and dispatches the owning persona per artifact.
 - Sequencing evidence is the artifacts themselves: `_RELEASE.json`'s `phase`, `**Status:** Approved` markers, the `[ ] [-] [x]` task markers and handoffs ([[agent-comms]]).
-- An agent grounds itself with `dd-spec-navigator` (context, constitution, [[ARCHITECTURE]], the catalog, the relevant atoms, the live release), reserves a task `[ ] -> [-]`, validates, marks `[x]`, and emits a handoff; a record change goes through its governance script, never a hand edit ([[release-lifecycle]]).
+- An agent grounds itself with `dd-spec-navigator` (context, constitution, [[ARCHITECTURE]], the catalog, the relevant atoms, the live release), moves a task's marker as `specs/releases/AGENTS.md` §3 states — `[ ] -> [-]` before the first write, `[-] -> [x]` once its commit is green — and emits a handoff; a record change goes through its governance script, never a hand edit ([[release-lifecycle]]).
 - Work happens inside a worktree of the kind that holds its files; only the main thread opens and merges worktrees, and a sub-agent works only inside the path it was given ([[worktrees]]).
 - Only the operator accepts a decision: no role agent writes `accepted` or `ruling` in an ADR record ([[audits-canon]]).
 - Concurrent sessions are allowed and never locked: no agent acquires, holds or releases a lock; races surface through git.
-- The reviewer's `APPROVED` is required before a candidate's PR; a `REJECTED` keeps the task `[-]` and blocks the PR, and every verdict states the bug-surface delta from the bug ledger ([[QUALITY]]).
+- The reviewer's `APPROVED` is required at each worktree merge and before a candidate's PR; a `REJECTED` blocks the merge, push, PR, deploy, closure and memory updates, and every verdict states the bug-surface delta from the bug ledger ([[QUALITY]]).
 - The reviewer's spec axis confronts PLAN §1's As-is verdicts with the diff: a DELETE or REBUILD unit left unchanged is HIGH, a KEEP unit that grew is a finding ([[release-lifecycle]]).
 - A merge further requires CI green and a `dd-code-reviewer` APPROVED verdict, security lens included, on the PR head ([[sdd-gate-v3]]).
 

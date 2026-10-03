@@ -16,7 +16,7 @@ sources:
 - `handoff-v1` is the JSON record every agent emits, written to `.dadaia/handoff/<context>/<UTC>-<agent>-<slug>.handoff.json`.
 - An optional HTML report at `.dadaia/reports/<context>/<UTC>-<agent>-<slug>.html` — an output zone never reaped or committed — is referenced by `artifact.path` plus `artifact.content_hash`.
 - `schema_version` accepts `handoff-v1`, `handoff-v1.1` and `handoff-v1.2`; `handoff-v1.2` carries `self_pull.refs` — the `specs/`-prefixed atoms the session read — and `handoff-v1.1` is the emission for a session that read none.
-- An optional `verdict` (`APPROVED`/`REJECTED`) records `dd-code-reviewer`'s recommendation; `worktree.py merge` lands a worktree only when a valid `APPROVED` handoff names its rebased HEAD in `scope` ([[worktrees]]).
+- An optional `verdict` (`APPROVED`/`REJECTED`) records `dd-code-reviewer`'s recommendation; `worktree.py merge` lands a worktree only when the newest verdict naming its rebased HEAD, or a reflog sha of the same patch and message series, in `scope` is a valid `APPROVED` ([[worktrees]]).
 - `dadaia_workspace/public/schemas/handoff-v1.schema.json` is the single source of field semantics, staged to `.dadaia/agentic/schemas/` and never projected into a harness root; only the CLI reads it.
 
 ## Validation
