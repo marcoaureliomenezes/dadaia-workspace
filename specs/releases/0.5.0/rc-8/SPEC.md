@@ -1,12 +1,12 @@
-# SPEC — Release: 0.5.0, candidate 8 (W8: the test law and the library pipeline leave; W9: bug lineage derived; W10: the open bugs)
+# SPEC — Release: 0.5.0, candidate 8 (W8: the test law and the library pipeline leave; W9: bug lineage derived; W10: the open bugs; W11: agent-behavior evals, a parallel lane)
 
 **Status:** Approved
 **Release ID:** 0.5.0
 **Owner:** dd-product-engineer
 **Opened:** 2026-10-03
-**Origin:** backlog:cli-ships-no-library-pipeline,lib-test-guidance-dehydrated,tests-agents-scaffold-without-placeholders,test-intent-docstring-backfill,meta-tests-leave-pytest,preflight-ci-parity-derived,delete-text-count-inventory-asserts,adr-0143-measured-by-checks-the-concept,skill-md-soft-hard-line-limit,memory-update-states-the-truth-correction-lane,bug-fix-adds-never-rewrites-asserts,bug-fix-commit-derived-by-grep,caused-by-proposed-by-blame,focused-review-on-caused-by,bug-terminal-transition-commit-shape,architecture-survey-flat-core-infrastructure,doctor-context-ignores-other-contexts,guidance-messages-name-the-right-target; bugs:test-suite-writes-outside-tmp,ci-preflight-writes-coverage-into-the-repo,hook-entrypoints-invisible-to-coverage,onboarding-next-step-names-another-context,init-on-a-copied-workspace-leaves-a-cli-bound-to-the-original,registry-row-missing-a-key-escapes-reg-schema,pre-push-warns-no-gitflow-block-for-an-absent-specs-tree,upgrade-leaves-reconcile-scratch-behind,bug-surface-schema-documents-the-deleted-regex,release-memory-appends-a-second-entry-on-rerun; findings:20260930-structural-convergence-F003,20260930-structural-convergence-F018,20260930-structural-convergence-F028,20260930-structural-convergence-F043,20260930-structural-convergence-F044,20260930-structural-convergence-F045,20260930-structural-convergence-F047,20260930-structural-convergence-F048,20260930-structural-convergence-F049,20260930-structural-convergence-F050,20260930-structural-convergence-F051,20260930-structural-convergence-F096,20260930-structural-convergence-F097,20260930-structural-convergence-F098,20260930-structural-convergence-F100,20260930-structural-convergence-F101,20260930-structural-convergence-F104,20260930-structural-convergence-F112,20260930-structural-convergence-F128,20260930-structural-convergence-F129,20260930-structural-convergence-F131,20260930-structural-convergence-F135,20260930-structural-convergence-F136
+**Origin:** backlog:agent-behavior-evals,cli-ships-no-library-pipeline,lib-test-guidance-dehydrated,tests-agents-scaffold-without-placeholders,test-intent-docstring-backfill,meta-tests-leave-pytest,preflight-ci-parity-derived,delete-text-count-inventory-asserts,adr-0143-measured-by-checks-the-concept,skill-md-soft-hard-line-limit,memory-update-states-the-truth-correction-lane,bug-fix-adds-never-rewrites-asserts,bug-fix-commit-derived-by-grep,caused-by-proposed-by-blame,focused-review-on-caused-by,bug-terminal-transition-commit-shape,architecture-survey-flat-core-infrastructure,doctor-context-ignores-other-contexts,guidance-messages-name-the-right-target; bugs:test-suite-writes-outside-tmp,ci-preflight-writes-coverage-into-the-repo,hook-entrypoints-invisible-to-coverage,onboarding-next-step-names-another-context,init-on-a-copied-workspace-leaves-a-cli-bound-to-the-original,registry-row-missing-a-key-escapes-reg-schema,pre-push-warns-no-gitflow-block-for-an-absent-specs-tree,upgrade-leaves-reconcile-scratch-behind,bug-surface-schema-documents-the-deleted-regex,release-memory-appends-a-second-entry-on-rerun; findings:20260930-structural-convergence-F003,20260930-structural-convergence-F018,20260930-structural-convergence-F028,20260930-structural-convergence-F043,20260930-structural-convergence-F044,20260930-structural-convergence-F045,20260930-structural-convergence-F047,20260930-structural-convergence-F048,20260930-structural-convergence-F049,20260930-structural-convergence-F050,20260930-structural-convergence-F051,20260930-structural-convergence-F096,20260930-structural-convergence-F097,20260930-structural-convergence-F098,20260930-structural-convergence-F100,20260930-structural-convergence-F101,20260930-structural-convergence-F104,20260930-structural-convergence-F112,20260930-structural-convergence-F128,20260930-structural-convergence-F129,20260930-structural-convergence-F131,20260930-structural-convergence-F135,20260930-structural-convergence-F136
 
-- Sources: grills of 2026-10-02 (rc-8, Q1–Q4) and 2026-10-03 (train, Q1–Q6); reviews B1–B11, H1–L6 on fb8a29a75, then re-review 2 on 196f611aa; PR #278 F1. Task ids start at T-050-153.
+- Sources: grills of 2026-10-02 (rc-8, Q1–Q4) and 2026-10-03 (train, Q1–Q6); reviews B1–B11, H1–L6 on fb8a29a75, then re-review 2 on 196f611aa; PR #278 F1; for W11, the grills and draft its Origin names. Task ids start at T-050-153.
 - Bug history read (permanent architecture review): PLAN §1, the as-is review.
 - Left out: `dependabot-pyjwt-open-on-main`, closing at the ship (rc-12); `removals-shipped-without-recorded-authority`, rejected (Q5).
 
@@ -16,14 +16,16 @@
 - Test knowledge leaves the library (0166); meta-tests leave pytest for one CI job; tests assert behaviour (0163, 0167).
 - Bug lineage is derived from git, and a bug fix adds a case (0163, 0164). SKILL.md gets one size law (0170).
 - The open bugs are fixed; production and tests end smaller (§G1).
+- Agent behaviour is measured on the shipped wheel, from the associated repo `dadaia-evals`, beside W8–W10 (W11; 0177–0179).
 
 ## Terms
 
-- `CONTEXT.md` holds the terms. **W8**–**W10** are this candidate; **DEL** and **FR** keep rc-5's meaning.
+- `CONTEXT.md` holds the terms. **W8**–**W11** are this candidate; **DEL** and **FR** keep rc-5's meaning.
 - **Meta-test**: a test whose subject is the suite or the repository (files outside the package, CI, ledgers), not a package module or shipped asset.
 - **Guard script**: a meta-test's unique check, moved into a script the one CI job runs.
 - **Owner file**: the one test file owning a module's behaviour; a RED enters it as a new case (0146 (5)).
 - **Behaviour assert**: an assert on an exit code, an effect, or a stable id (finding code, slug, flag); a sentence, roster, or count with a source of truth is not one.
+- **Evals repo**: AC11.1's `CONTEXT.md` entry. `eval.yml` is a workflow in that file's one sense.
 - SCAFFOLD here is the test tier (V28), never the specs scaffold. Bare `preflight` is a homonym: `ctx_inject`'s generic preflight, `_dead_preflight` and `_ownership_preflight` stay.
 
 ## Decisions
@@ -37,6 +39,11 @@
   - Q4 "Derive it from `bugs.py fix` (Recommended)". Q5 "Reject; authority table goes to rc-12 notes (Recommended)". Q6 "rc-10 via dd-ask-me (Recommended)".
   - Amendment: "Amend AC8.9, delete them (Recommended)" (AC8.9's second deletion list); "Use the native tools (Recommended)" (AC8.10's P-07 and P-28).
 - Order (root map §1): AC8.9; the rest of W8; W9; W10, after AC9.3 and AC8.1's `Intent:` strip. Width: the PLAN's Parallel schedule (0149).
+- W11 (amendment, operator 2026-10-03, AskUserQuestion, verbatim):
+  - Fold (grill 170932Z): "fold into rc-8. make sure to define that it can surely be implemented in parallel ... because it's on other repo".
+  - Q-W0: "Yes, only that slice (Recommended)". AC11.0 carries only "an associated repo's impl reads the main repo's Approved trio" of proposed 0174; the rest stays rc-11's.
+  - 0179: "Accept as prepared (Recommended)"; the main thread writes the accept at the fold.
+- W11's ADRs and accept points: 0179 at the fold; 0177 (`amends: 0025`) after T-050-161 merges, its check `no-model-api-in-ci` then existing, its accept commit carrying P-33's re-scope; 0178 (`amends: 0122`) at closure, since it governs rc-12's promote.
 
 ## Gate — G1–G6, applied to W8–W10
 
@@ -146,6 +153,72 @@ After AC9.3 and AC8.1's `Intent:` strip merge. Each RED is a behaviour assert in
 - AC10.12 HOOKS-DRIFT-1 states what it observed (FR `guidance-messages-name-the-right-target`, HOOKS-DRIFT-1 part; F098): one code, its message naming the observed state (absent or differing); the fix line (`ci install-hook --force`) serves both. Case: delete a projected hook; the message says absent, and its fix line, executed, restores it. T-050-146 delivered the root-whitelist clause.
 - AC10.13 `release.py memory` is idempotent (DEL `release-memory-appends-a-second-entry-on-rerun`; F097): a rerun over the same window exits 0 and leaves the log unchanged. Case: the `kind: memory` entries are byte-equal after the rerun.
 
+## W11 — agent-behavior evals, a parallel lane in `dadaia-evals`: acceptance
+
+- Origin: backlog `agent-behavior-evals` and the operator's fold (§Decisions). Detail lives in `.dadaia/handoff/dadaia-workspace/`: grills `2026-10-03T163043Z-main-thread-grill-evals-050` and `2026-10-03T170932Z-main-thread-grill-evals-format`, and draft `2026-10-03T173359Z-evals-enrichment-workflow-rc8-fr-draft` (finding 1).
+- Parallel lane (0149):
+  - AC11.2–AC11.6 write only in `repos/dadaia-evals`; no W8–W10 `W:` holds a path there. They run beside W8–W10, one `impl` worktree each, once AC11.0 merges.
+  - AC11.0 and AC11.1 write here and queue like any task. AC11.0 shares `_worktree_new.py` and `test_worktree_new.py` with the open `0.5.0d-bug` worktree and T-050-164. AC11.1 shares the root map and `CONTEXT.md` with T-050-158, and `dd-gitflow-default/SKILL.md` with T-050-165.
+  - W11's task markers live in this repo's `TASKS.md`, which a `dadaia-evals` worktree cannot stage; the PLAN names where they are written.
+- Order (root map §3, "no CI job calls a model API", binds until 0177 is accepted and shipped): T-050-161 merges → the operator accepts 0177 → AC11.1 and AC11.5 merge → AC11.6. Before that, `dadaia-evals` holds no workflow that reads a model secret.
+- G1 counts this repo only: AC11.0 (one function body and its case) and AC11.1's text. `dadaia-evals` lines are outside the readout; G4's "only job added" is this repo's CI.
+- Operator prerequisites, outside the repo: `claude setup-token`, stored as the `dadaia-evals` secret `CLAUDE_CODE_OAUTH_TOKEN`; extra usage off on the plan. Done: `main`, `develop` and `feature/0.5.0` on its origin (5c11f42).
+- AC11.0 An associated repo's `impl` reads the main repo's Approved trio (0174's slice, Q-W0):
+  - `_worktree_new.new(kind="impl")` reads the trio from the context's main repo, which is `repo` itself for a main repo. It goes through the `context list --json` read `flow_for` already makes: no second read, no branch on repo role.
+  - Case, a parametrize row in the owner file `test_worktree_new.py`: an associated repo has `feature/<v>` and the main repo's trio is Approved. `worktree.py new <assoc> --kind impl` exits 0 and prints `[ok]` with `worktrees/<assoc>/<v><l>-impl`. With the main repo's PLAN Draft it exits 1, and its one fix line names `new <main> --kind release`.
+- AC11.1 The model-API law is scoped by repo role (0177), shipped from `public/`:
+  - The root map line (`public/data/AGENTS.md:43`) changes. No CI job of a context's repos calls a model API, except an evals repo's, and only in `workflow_dispatch` or `schedule` jobs (0177 (2)–(6)).
+  - `dd-gitflow-default/SKILL.md` §3b and `CICD-AUTOMATION.md:17` state the same.
+  - `CONTEXT.md` gains **Evals repo**: an associated repo whose one role is to measure agent behaviour against the distribution its context ships, and whose CI calls a model only under 0177. It sits beside **Scope** (`CONTEXT.md:102`, today the only entry naming associated repos).
+  - The memory pass aligns `sdd-gate-v3`'s model-API line.
+  - Check:
+    - `grep -rl 'calls a model API' dadaia_workspace/public` and `grep -rl 'evals repo' dadaia_workspace/public` print the same three files.
+    - `grep -r dadaia-evals dadaia_workspace/` prints nothing (0179).
+    - The root map stays ≤ 8,293 B.
+    - `public stage`, `install` and `doctor` are clean, and `no-model-api-in-ci` is green here.
+- AC11.2 The `dadaia-evals` skeleton:
+  - `AGENTS.md`: what lives here, how to run, `jobs/` never committed, no `push` or `pull_request` trigger calls a model.
+  - `README.md`, and `.gitignore` (`jobs/`).
+  - `tasks/t1-cold-onboarding/` and `tasks/t2-seeded-bug/`, each holding `instruction.md`, `task.toml`, `environment/Dockerfile`, `tests/test.sh` and `tests/test_grade.py`.
+  - `scripts/compare.py`.
+  - A Dockerfile holds the environment only (python, uv, git, Node, the Claude CLI pinned). The lib is its last layer, a wheel or a PyPI release (0179). No registry.
+  - Check: each task's image builds with the 0.4.7 layer, and `git ls-files jobs` prints nothing.
+- AC11.3 T1, cold onboarding:
+  - `environment/` builds a `file://` bare repo with one commit, as `bare` does at `tests/e2e/test_onboarding_journey.py:136`.
+  - `instruction.md` asks the agent to onboard it following only what `dadaia` prints.
+  - `tests/test.sh` runs `uvx pytest tests/test_grade.py` and writes `/logs/verifier/reward.txt`.
+  - It passes when `dadaia doctor --json` reports 0 errors, the context is ALIVE and specs are initialized.
+  - Check: the unchanged grader passes on a hand-onboarded workspace of 0.4.7 and of the candidate, and fails on an empty one.
+- AC11.4 T2, a seeded bug (Arm B):
+  - `environment/` builds a small onboarded project with one planted contract break; the instruction gives the operator's confirmation.
+  - It passes when:
+    - a `BUGS.jsonl` record precedes the fix commit;
+    - the RED test fails on the pre-fix sha and passes on the fix;
+    - `git diff -U0 -- tests | grep '^-\s*assert'` prints nothing.
+  - Check: as AC11.3's, on both versions, with one planted pass and one planted fail.
+- AC11.5 `eval.yml` (0177, 0178), merged after 0177's acceptance:
+  - Trigger: `workflow_dispatch` with the one input `lib_ref`; `permissions: contents: read`; a GitHub-hosted runner.
+  - It stamps `release-please-config.json`'s `release-as` into `pyproject.toml`'s version line before `uv build`, and fails closed when `release-as` is missing.
+  - `uv tool install harbor==0.23.0`, then `harbor run -p tasks -a claude-code -m anthropic/claude-sonnet-5 --ak version=<pinned> -k 3 -n ≤2`, on PyPI 0.4.7 and on the candidate wheel.
+  - Auth: `CLAUDE_CODE_OAUTH_TOKEN` + `CLAUDE_FORCE_OAUTH=1`, at job level, in the model job only. Agent models use the economy template (0022).
+  - `scripts/compare.py` blocks when a task passing ≥2/3 on 0.4.7 passes ≤1/3 on the candidate, or T1 is below 3/3 on the candidate. Anything else is readout.
+  - A secret scan runs over `jobs/` and the summary before any upload or summary write, with the token's value among its patterns. It fails closed.
+  - Check (0177's `measured_by`):
+    - A check job runs ahead of the model job, without the secret. It fails on a secret-reading workflow with any of: another trigger, a non GitHub-hosted `runs-on`, the secret at workflow level, or an upload or summary write not preceded by the scan.
+    - The scan exits non-zero on a fixture holding a planted token.
+    - `compare.py` is red on a planted drop and on T1 at 2/3.
+- AC11.6 The first run, as evidence:
+  - One `eval.yml` run on the tip of `feature/0.5.0`, against 0.4.7, after AC11.1 and AC11.5 merge.
+  - It confirms that the trial runs the candidate wheel: `dadaia capabilities --json` names the stamped version.
+  - It confirms that `-n` ≤ 2 stays inside the plan's rate limit: no rate-limit error appears in `jobs/`.
+  - A failing grader, unlike a failing agent, is fixed in the grader before closure.
+  - Check: a `_RELEASE.json` log entry names the run URL, verdict, tokens and wall time.
+- AC11.7 The gate at the promote (0178), checked at rc-12:
+  - The promote PR head is evaluated, and the run is logged on the work branch before the promote merges.
+  - At `approve`, `git diff --name-only <evaluated>..<tag>` lists only `CHANGELOG.md`, `.release-please-manifest.json` and `pyproject.toml`, the last changed in its version line only.
+  - Otherwise `eval.yml` runs on the tag sha first, and only a non-blocking verdict approves.
+- At closure, `agent-behavior-evals` exits `delivered --release 0.5.0`: that needs AC11.6 logged and 0177–0179 ruled (its done-when). AC11.7 is rc-12's.
+
 ## Replaces
 
 - `ci preflight`, its scope error, runner and pytest bootstrap; the Python-only anchors, reaping list, tool names, extension list and `TOOL_CACHE_ENV` list (AC8.9).
@@ -156,6 +229,7 @@ After AC9.3 and AC8.1's `Intent:` strip merge. Each RED is a behaviour assert in
 - Prose, roster and count asserts; CONTEXT-MAP's `Measured` and skills `Budget` columns; 0143's symbol-list `measured_by`.
 - Phase 5's "rewritten", Phase 6's "net ≤ 0"; required `evidence_seam`/`evidence_diff`, their verification, metric 2 over them, direction from `evidence_diff`; the `git log -S` recipe; an unreasoned `none`; the "reopen" wording; §3a row 4's resolve-only wording.
 - Ad-hoc child envs, `COVERAGE_FILE` redirects; the cross-context walk; build-identity venv reuse; the bare `KeyError`; the no-block warning for an absent constitution; HOOKS-DRIFT-1's fixed "differs"; the reconcile scratch and unconditional hook rewrite; the deleted surface regex; the second `kind: memory` append.
+- The map's unscoped "no CI job calls a model API", in the root map, SKILL.md §3b and `CICD-AUTOMATION.md` (0177); an `impl` worktree reading the trio from its own repo (AC11.0).
 
 ## Risks
 
@@ -165,14 +239,15 @@ After AC9.3 and AC8.1's `Intent:` strip merge. Each RED is a behaviour assert in
 | The `Intent:` strip (about 239 files) conflicts with `bug` worktrees. | W10 waits on it. |
 | The root map passes its soft budget (8,293 of 8,192 B). | Basics rewrite existing bullets. |
 | The deletion goal is missed. | Planned row by row; the closure logs it. |
+| A grader keyed on one version fakes a drop. | AC11.3 and AC11.4 run each grader on both versions. |
 
 ## Carried — the 0.5.0 map (ADR 0140; one candidate at a time)
 
 - rc-9: the tests tree mirrors the package, except `tests/contract/test_docs_derived_from_memory.py`, which P-29 names, until check #7 rules; the unit tier spawns no processes, carrying rc-7's slow-class G4 growth (operator 2026-10-02: "Same-runner-class rule; slow-class growth to rc-8 (Recommended)", tied to `unit-tier-without-processes`); the production-faithful hook harness (0163); `worktree-rows-injected-not-monkeypatched`; `windows-integration-coverage-gap`; `repo-ci-sast`. With rc-8, they complete 0167.
 - rc-10: `public-law-language-neutral`; `dd-ask-me-owned-questioning-skill`, delivering 0165 and `dd-ai-eng-knowhow/AUTHORING.md:134` ("asks the whole frontier at once"), caught by 0165's repaired `measured_by`; `adr-born-at-release-with-options`; `adr-ledger-triage-process-rules`; `architecture-adr-section-generated`; F088, F089, F139–F148.
-- rc-11: workspace replication (7 entries, ADRs 0171–0175); F084.
-- rc-12, the promote: docs site F109, clone detection F110, launch prep F111; the residue (`spec-context-refusals-print-prose`, `privacy-baseline-one-parser`, `ledger-refusals-guess-specs-from-command-shape`, `ledger-reader-one-numbered-tolerant-iterator`, `doctor-in-a-fresh-worktree-lacks-rendered-specs-law`, F060); memory drift F123–F127; bug metrics F001, F004, F005, F009 (re-measured over AC9.3's links); the publish gate F067; `test_docs_derived_from_memory.py` leaves pytest after check #7 rules, `meta-tests-leave-pytest` exits delivered then; the audit checks never run, F137; the removal-authority notes (F069); PyJWT, closing at the ship.
+- rc-11: workspace replication (7 entries, ADRs 0171–0175, 0174 less AC11.0's slice); F084.
+- rc-12, the promote: docs site F109, clone detection F110, launch prep F111; the residue (`spec-context-refusals-print-prose`, `privacy-baseline-one-parser`, `ledger-refusals-guess-specs-from-command-shape`, `ledger-reader-one-numbered-tolerant-iterator`, `doctor-in-a-fresh-worktree-lacks-rendered-specs-law`, F060); memory drift F123–F127; bug metrics F001, F004, F005, F009 (re-measured over AC9.3's links); the publish gate F067; `test_docs_derived_from_memory.py` leaves pytest after check #7 rules, `meta-tests-leave-pytest` exits delivered then; the audit checks never run, F137; the removal-authority notes (F069); PyJWT, closing at the ship; AC11.7's gate run (0178). Open, the operator's before the promote (F4): ADR 0122's zero active backlog against the four post-0.5.0 evals follow-ups, `evals-release-gate-status`, `evals-harness-lanes-and-benchmark`, `evals-windows-smoke` and `devin-subagent-projection`.
 
 ## Open questions for the operator
 
-- None: the 2026-10-03 grill frontier is empty.
+- None for W8–W11: the 2026-10-03 grill frontiers are empty. F4 is rc-12's (§Carried).
