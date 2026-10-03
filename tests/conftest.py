@@ -231,13 +231,6 @@ def tier_timeout_seconds(
     return base * factor
 
 
-#: The closed marker set — must stay set-equal with pyproject.toml's markers block
-#: (pinned by tests/contract/test_stewardship_mechanics.py).
-_KNOWN_MARKERS: frozenset[str] = frozenset(
-    {"unit", "contract", "integration", "e2e", "slow", "tmp", "flaky", "quarantine"}
-)
-
-
 def _validate_quarantine_markers(items: list[pytest.Item]) -> None:
     """S-20/S-21: a quarantined test without a registered bug id refuses collection.
 
@@ -433,9 +426,8 @@ def _repo_root_write_guard() -> object:
 # the session, never on ones that were already present at session start.
 #
 # Why a diff and not an existence check: ruff and mypy run before pytest and may
-# leave cache dirs at the repo root; an existence check would trip on them.  Detecting whether those dirs should exist *at all* is the job of
-# ``tests/contract/test_source_repo_hygiene.py`` and CI repo-hygiene — not this
-# session guard, whose only job is to catch tests that pollute the root.
+# leave cache dirs at the repo root; an existence check would trip on them. Whether
+# those dirs should exist at all is the CI repo-hygiene job's question.
 _PREEXISTING_POLLUTION: set[str] = set()
 _INSTANCE_AT_START: dict[str, object] = {}
 
@@ -454,8 +446,7 @@ def pytest_sessionfinish(session: pytest.Session, exitstatus: int) -> None:
     Fails the session (exit code 1) if any tool-generated cache or state
     directory was *created during the test run* at the repo root.  Dirs that
     already existed at session start are ignored — flagging their existence at
-    all is the job of ``tests/contract/test_source_repo_hygiene.py`` and CI, not
-    this guard.  This catches misconfigured tool invocations (wrong CWD, missing
+    all is the CI repo-hygiene job's.  This catches misconfigured tool invocations (wrong CWD, missing
     --no-cache flags, etc.) that the per-test _repo_root_write_guard cannot catch
     (e.g. directories created by pytest plugins that run outside fixture scope).
 

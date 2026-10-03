@@ -77,10 +77,10 @@ jobs:
       - name: Install dev deps
         run: poetry install --no-interaction --no-ansi --with dev
       - name: ruff format --check
-        run: poetry run ruff format --check dadaia_workspace/ tests/
+        run: poetry run ruff format --check dadaia_workspace/ tests/ scripts/
       - name: ruff check
         # Redirect ruff's cache outside the checkout (pyproject cache-dir removed in T-018-07).
-        run: RUFF_CACHE_DIR="$RUNNER_TEMP/ruff" poetry run ruff check dadaia_workspace/ tests/
+        run: RUFF_CACHE_DIR="$RUNNER_TEMP/ruff" poetry run ruff check dadaia_workspace/ tests/ scripts/
       - name: lint-imports (import-boundary contracts)
         # Enforce the setup.cfg import-linter contracts (FR4). --no-cache keeps
         # .import_linter_cache/ out of the checkout (repo-cleanliness law). No extra
@@ -112,7 +112,35 @@ jobs:
       - name: mypy --strict
         # Redirect mypy's cache outside the checkout (pyproject cache_dir removed in T-018-07).
         # 0.4.7 FR3: the cache is redirected by [tool.mypy] cache_dir in pyproject.toml.
-        run: poetry run mypy --strict dadaia_workspace/
+        run: poetry run mypy --strict dadaia_workspace/ scripts/
+
+  guards:
+    name: Guards (scripts/guards)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97  # v7.0.0
+        with:
+          python-version: "3.12"
+      - name: Install Poetry
+        run: pipx install poetry==1.8.3
+      - name: Cache poetry deps
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # v6.1.0
+        with:
+          path: |
+            ~/.cache/pypoetry
+            ~/.cache/pip
+          key: poetry-${{ runner.os }}-${{ hashFiles('poetry.lock') }}
+      - name: Install
+        run: poetry install --no-interaction --no-ansi --with dev
+      # The log names each check id; --planted turns each red on its planted violation.
+      - name: guards
+        run: poetry run python scripts/guards/run.py
+      - name: guards over their plants
+        run: poetry run python scripts/guards/run.py --planted
 
   unit-fast:
     name: Unit fast (pytest)

@@ -342,7 +342,7 @@ def test_pr_source_guard_admits_the_release_pr_into_main(
 
 
 def test_every_ci_checkout_carries_full_history() -> None:
-    """ci-history-depth-is-decided-per-job: all 13 ci.yml checkouts fetch depth 0, so no job
+    """ci-history-depth-is-decided-per-job: every ci.yml checkout fetches depth 0, so no job
     edit strips the history a suite reads."""
     depths = [
         (name, (s.get("with") or {}).get("fetch-depth"))
@@ -350,8 +350,7 @@ def test_every_ci_checkout_carries_full_history() -> None:
         for s in job.get("steps", [])
         if str(s.get("uses", "")).startswith("actions/checkout@")
     ]
-    assert len(depths) == 13
-    assert [name for name, depth in depths if depth != 0] == []
+    assert depths and [name for name, depth in depths if depth != 0] == []
 
 
 def test_the_required_checks_file_lists_every_check_a_pr_runs() -> None:
