@@ -36,7 +36,7 @@ not restate the number.
 
 `flaky` and `quarantine` markers are registered in `pyproject.toml`; a
 `quarantine` marker without `bug="<bug-slug>"` refuses collection, and every
-gating selector (CI jobs, release jobs, the pre-push preflight) excludes the
+gating selector (CI jobs, release jobs) excludes the
 quarantine lane. Diagnosis runs use `-m quarantine` explicitly.
 
 ## Markers and cost

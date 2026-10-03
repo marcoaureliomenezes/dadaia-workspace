@@ -454,7 +454,6 @@ class VenvPythonEnvironmentManager:
                         "workspace venv resolves its dependencies from PyPI (network "
                         f"required). Installer output:\n{_tail_lines(exc)}"
                     ) from exc
-            self._ensure_ci_toolchain(pip)
             # Success is only reported after the venv provider VERIFIES independently
             # (clean env, no inherited PYTHONPATH). The re-packed path IS the running
             # distribution, so its exact version is required; an operator-chosen wheel
@@ -601,29 +600,6 @@ class VenvPythonEnvironmentManager:
                 "this requirement (delete the venv directory and re-run 'uvx "
                 "dadaia-workspace init <dir>', or point DADAIA_BOOTSTRAP_PACKAGE at a matching build) and "
                 "retry."
-            )
-
-    @staticmethod
-    def _ensure_ci_toolchain(pip: str) -> None:
-        """Best-effort install of the CI/validation toolchain the product promises.
-
-        Bug implementation-review-approves-unexecuted-validation: the generated venv
-        could not even run ``python -m pytest`` — yet ``dadaia ci preflight`` and the
-        executed-test close gate both depend on it. pytest ships with every bootstrap;
-        failure to fetch it is a clean one-line warning, never a bootstrap failure (the
-        close gate reports loudly when tests cannot run).
-        """
-        try:
-            subprocess.run(
-                [pip, "install", "--quiet", "pytest"],
-                check=True,
-                capture_output=True,
-                text=True,
-            )
-        except subprocess.CalledProcessError:
-            print(
-                "[bootstrap] warning: could not install pytest into the workspace venv; "
-                "test validation (ci preflight, closure gate) will report it missing"
             )
 
     @staticmethod

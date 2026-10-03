@@ -1,4 +1,4 @@
-"""CLI command group: `dadaia ci <verb>` — local CI-equivalent preflight gate + chokepoints."""
+"""CLI command group: `dadaia ci <verb>` — the git-hook chokepoints."""
 
 from __future__ import annotations
 
@@ -12,21 +12,12 @@ import typer
 
 from dadaia_workspace.cli._fail import fail
 from dadaia_workspace.cli._specs_resolution import repo_owner, resolve_workspace_root_for_cli
-from dadaia_workspace.container import is_source_repo_root as _is_source_repo_root
 from dadaia_workspace.core.cli_line import fix_line
-from dadaia_workspace.core.exceptions import CiPreflightScopeError
 from dadaia_workspace.core.gitflow import Gitflow, work_branch
 from dadaia_workspace.features.chokepoints.branch_policy import GateFixes
-from dadaia_workspace.features.ci_preflight import (
-    all_passed,
-    checks_for,
-    failed_names,
-    run_preflight,
-    subprocess_runner,
-)
 from dadaia_workspace.features.spec_context.service import install_git_hooks
 
-app = typer.Typer(help="Local CI-equivalent preflight gate + git-hook chokepoints.")
+app = typer.Typer(help="Git-hook chokepoints: the pre-push gate and its installer.")
 
 
 def _repo_root() -> Path:
@@ -41,53 +32,6 @@ def _repo_root() -> Path:
     except (subprocess.CalledProcessError, FileNotFoundError) as exc:
         raise typer.BadParameter("not inside a git repository") from exc
     return Path(out.stdout.strip())
-
-
-@app.command()
-def preflight(
-    quick: bool = typer.Option(False, "--quick", help="Skip the slow e2e suite."),
-    fail_fast: bool = typer.Option(
-        True, "--fail-fast/--no-fail-fast", help="Stop at the first failing check."
-    ),
-) -> None:
-    """Run the library's locally runnable ci.yml checks; exit non-zero if any fail.
-
-    In order: ruff format --check, ruff check, mypy --strict, repo hygiene, dadaia
-    doctor, lint-imports, pytest (coverage floor). Run it before pushing — locally-solvable
-    failures must never reach a push.
-    """
-    root = _repo_root()
-    # The checks are structurally bound to this repo: they lint `dadaia_workspace/` and
-    # `tests/`, type-check `dadaia_workspace/`, and read this repo's setup.cfg. In a
-    # consumer repo none of those paths exist and the consumer venv has no ruff/mypy, so
-    # the gate reported a phantom lint FAIL and blamed a missing poetry — sending the
-    # operator to install a tool that would not have helped
-    # (bug ci-preflight-unusable-outside-the-source-repo). Refuse honestly instead. The
-    # source-repo test is the existing one, not a second definition.
-    if not _is_source_repo_root(root):
-        raise CiPreflightScopeError(
-            f"`{fix_line(None, 'ci', 'preflight')}` targets the dadaia-workspace source repo; "
-            f"{str(root)!r} is not it. The gate lints and type-checks the library's own "
-            "paths, which do not exist here. Run your repo's own CI checks instead."
-        )
-    checks = checks_for(quick=quick)
-    typer.echo(f"Running {len(checks)} preflight check(s){' (quick)' if quick else ''}…")
-    results = run_preflight(checks, subprocess_runner(root), fail_fast=fail_fast)
-
-    for result in results:
-        marker = "PASS" if result.passed else "FAIL"
-        typer.echo(f"  [{marker}] {result.name}")
-
-    if not all_passed(results):
-        typer.echo(f"\nPre-push gate FAILED: {', '.join(failed_names(results))}", err=True)
-        for result in results:
-            if not result.passed:
-                tail = "\n".join(result.output.strip().split("\n")[-20:])
-                if tail:
-                    typer.echo(f"\n--- {result.name} ---\n{tail}", err=True)
-        raise typer.Exit(1)
-
-    typer.echo("\nAll preflight checks passed.")
 
 
 def _no_canon_violations(paths: Iterable[str]) -> list[str]:

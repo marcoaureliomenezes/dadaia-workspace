@@ -17,7 +17,8 @@ def test_the_default_names_live_only_in_default_and_work_is_cut_from_integration
     literal = re.compile(r'principal: main|"--principal", "main"|else "main"')
     assert [p.name for p in pkg.rglob("*.py") if literal.search(p.read_text("utf-8"))] == []
     skill = (pkg / "public/skills/dd-gitflow-default/SKILL.md").read_text("utf-8")
-    assert "| Yes — local CI preflight + valid name | integration |" in skill
+    work_row = next(r for r in skill.splitlines() if r.startswith("| work `"))
+    assert work_row.split("|")[3].strip() == "integration"
 
 
 def test_one_live_release_reader_and_no_verb_mints_a_version() -> None:

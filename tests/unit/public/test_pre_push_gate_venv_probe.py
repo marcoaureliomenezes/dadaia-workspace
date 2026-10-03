@@ -48,7 +48,7 @@ _BASH = shutil.which("bash") or "/usr/bin/bash"
 # or dadaia elsewhere (workspace venv, ~/.local/bin, poetry env) cannot leak
 # in. Only a real runner inside the system bin dirs themselves could — guard
 # exactly that, not the host PATH (asserting on the host PATH broke collection
-# under the canonical `poetry run dadaia ci preflight` invocation).
+# under a `poetry run` invocation).
 _SYS_BINS = [Path("/usr/bin"), Path("/bin")]
 for _tool in ("poetry", "dadaia"):
     for _bin in _SYS_BINS:

@@ -48,7 +48,7 @@ path or entity as it appears in an installed workspace.
 | `specs/memory/AGENTS.md` | current product truth and who writes it | atoms, ownership | 4096 | 3982 |
 | `specs/ADRs/AGENTS.md` | the decision record | `decisions.jsonl` shape, acceptance | 4096 | 3646 |
 | `specs/audits/AGENTS.md` | the periodic three-pillar review | audit procedure, findings, closure | 4096 | 1832 |
-| `.dadaia/AGENTS.md` | the runtime tree: zones, doctor, reprojection, context | zone registry rules, chokepoints | 4096 | 4088 |
+| `.dadaia/AGENTS.md` | the runtime tree: zones, doctor, reprojection, context | zone registry rules, chokepoints | 4096 | 4077 |
 | `.dadaia/handoff/AGENTS.md` | the handoff lane | emission, schema, ack-on-consume | 4096 | 1757 |
 | `.dadaia/tmp/AGENTS.md` | the TTL scratch lane | what may be written there and for how long | 4096 | 1233 |
 | `.dadaia/states/AGENTS.md` | CLI-owned state files | who writes them and by which verb | 4096 | 1397 |
@@ -72,7 +72,7 @@ One procedure each; a skill that touches a governed area opens its scoped law as
 | `dd-code-review` | the three review axes and the six lenses | `specs/memory/AGENTS.md` | 6144 | 5623 |
 | `dd-codebase-design` | the deep-module vocabulary and the deletion test | — | 6144 | 5540 |
 | `dd-domain-modeling` | the repo's domain terms and their one home | — | 6144 | 3766 |
-| `dd-gitflow-default` | the branch contract, commit shapes, the PR gate | — | 6144 | 5467 |
+| `dd-gitflow-default` | the branch contract, commit shapes, the PR gate | — | 6144 | 5479 |
 | `dd-grill-me` | the operator grill that precedes a candidate | — | 6144 | 3367 |
 | `dd-handoff-emitter` | handoff-first emission and ack-on-consume | `.dadaia/handoff/AGENTS.md` | 6144 | 2193 |
 | `dd-manager-orchestration` | intake, dispatch and the closure pass | — | 6144 | 3774 |

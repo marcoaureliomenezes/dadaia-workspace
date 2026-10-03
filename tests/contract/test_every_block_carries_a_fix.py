@@ -194,13 +194,12 @@ def _bare_cli(ws: Path) -> str | None:
 
 def _push(ws: Path, line: str = "", files: dict[str, str] | None = None, **kwargs: Any) -> str:
     """A consumer work clone (``main`` published, one unpublished commit, the installed
-    pre-push hook — AC4.7: it names no library toolchain), pushing *line*."""
+    pre-push hook), pushing *line*."""
     (ws / "clone").mkdir()
     repo = PushRepo(ws / "clone")
     repo.commit({"README.md": "r\n"})
     repo.publish("main")
-    for hook in install_git_hooks(repo.path):
-        assert "ci preflight" not in hook.read_text(encoding="utf-8"), hook
+    install_git_hooks(repo.path)
     sha = repo.commit(files or {"a.md": "a\n"})
     fields = {"sha": sha, "other": _SHA_B, "zero": _ZERO, "a": "a" * 40}
     decision = push_gate_decision(

@@ -342,7 +342,7 @@ jobs:
       # `specs` section the SPEC-DOC + RELEASE-TREE rules over committed repository truth;
       # any error-class finding fails the job. An absent document is trivially clean.
       - name: dadaia doctor
-        run: dadaia doctor --specs-dir specs --source-root .
+        run: dadaia doctor --specs-dir specs
 
   pr-source-guard:
     name: PR source guard (both gitflow edges, one job)

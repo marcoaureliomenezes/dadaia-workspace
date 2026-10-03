@@ -18,4 +18,4 @@ Four checks turn the branch contract from a convention into a machine boundary. 
 - A job newly added on a feature branch does not run on the PR that introduces it — mark it required only from the following PR onward.
 - `gh api PATCH .../required_status_checks` clobbers the existing list — always re-supply the full set, never a delta.
 - The denylist scan and the CI trigger on `<work>**` pushes belong to the same pipeline stage as the branch-name guard.
-- Keep all three in one preflight job so a single failure names the actual rule that fired.
+- Keep all three in one job so a single failure names the actual rule that fired.

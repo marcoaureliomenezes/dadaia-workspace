@@ -7,8 +7,7 @@ only — NO general shell parsing. It blocks `dadaia` and `python -m dadaia_work
 invocations NOT rooted in `.dadaia/.venv/bin/` (or the workspace-absolute equivalent),
 emitting a block message that contains the corrected command.
 ``pip``/``pip3`` are never judged (ADR 0134). pytest, ruff, and mypy are never matched — their
-caches are redirected by `pyproject.toml` configuration, so no flag is enforced here
-(tests/unit/features/ci_preflight/test_no_pollution.py proves the bare commands clean).
+caches are redirected by `pyproject.toml` configuration, so no flag is enforced here.
 The false-block law (ADR-G1) requires that quoted strings, in-repo paths like
 ``repos/x/dadaia``, and another venv's explicit bin path are never blocked — covered by
 the negative matrix below.

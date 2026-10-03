@@ -82,22 +82,22 @@ def _wheel_install(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
 def test_fresh_bootstrap_creates_venv_and_installs_package(
     tmp_path: Path, recorder: _Recorder
 ) -> None:
-    """Resolved interpreter creates the venv, then the editable checkout, then pytest."""
+    """Resolved interpreter creates the venv, then the editable checkout; no dev tool."""
     mgr = VenvPythonEnvironmentManager()
     assert mgr.ensure_workspace_venv(str(tmp_path)) == _venv(tmp_path)
 
-    create, install, toolchain = recorder.commands
+    create, install = recorder.commands
     assert create[:3] == ["fake-interpreter", "-m", "venv"] and create[-1] == _venv(tmp_path)
     assert install[:2] == [mgr.pip_executable(str(tmp_path)), "install"]
     assert "--editable" in install and (Path(install[-1]) / "pyproject.toml").is_file()
-    assert toolchain[-1] == "pytest"
+    assert not any("pytest" in argv for argv in recorder.commands)
 
 
 def test_existing_bare_venv_is_repaired_not_skipped(tmp_path: Path, recorder: _Recorder) -> None:
     """The VENV-1 state: venv dir present, entrypoint missing -> install, no re-create."""
     (Path(_venv(tmp_path)) / PLATFORM.venv_scripts_dir).mkdir(parents=True)
     VenvPythonEnvironmentManager().ensure_workspace_venv(str(tmp_path))
-    assert (recorder.venv_created, len(recorder.commands)) == ([], 2)
+    assert (recorder.venv_created, len(recorder.commands)) == ([], 1)
 
 
 def test_healthy_venv_is_a_noop(tmp_path: Path, recorder: _Recorder) -> None:
@@ -209,7 +209,7 @@ def test_bootstrap_installs_the_repacked_running_distribution(
     ws = tmp_path / "ws"
     VenvPythonEnvironmentManager().ensure_workspace_venv(str(ws))
 
-    assert [c[-1] for c in recorder.commands[1:]] == [str(written[0]), "pytest"]
+    assert [c[-1] for c in recorder.commands[1:]] == [str(written[0])]
     assert not any("==" in token for call in recorder.commands for token in call)
     assert not written[0].exists() and not (ws / ".dadaia" / "tmp").exists()
 

@@ -432,12 +432,8 @@ def _repo_root_write_guard() -> object:
 # The pollution guard is a pre/post DIFF: it fails only on dirs CREATED during
 # the session, never on ones that were already present at session start.
 #
-# Why a diff and not an existence check (bug
-# ``ci-preflight-self-pollution-gate-never-passes``, T-010-25): the
-# ``dadaia ci preflight`` gate runs ruff + mypy BEFORE the pytest check.  When
-# those earlier checks created cache dirs at the repo root, the existence-based
-# guard tripped on the gate's OWN artifacts and the gate could never pass on a
-# clean tree.  Detecting whether those dirs should exist *at all* is the job of
+# Why a diff and not an existence check: ruff and mypy run before pytest and may
+# leave cache dirs at the repo root; an existence check would trip on them.  Detecting whether those dirs should exist *at all* is the job of
 # ``tests/contract/test_source_repo_hygiene.py`` and CI repo-hygiene — not this
 # session guard, whose only job is to catch tests that pollute the root.
 _PREEXISTING_POLLUTION: set[str] = set()

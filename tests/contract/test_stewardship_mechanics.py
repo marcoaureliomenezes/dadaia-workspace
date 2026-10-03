@@ -110,22 +110,6 @@ def test_marker_set_is_pinned_across_pyproject_and_conftest() -> None:
     assert {"flaky", "quarantine"} <= declared
 
 
-# ---------------------------------------------------------------------------
-# Gating invocation: quarantine excluded; the dead performance ignore is gone
-# ---------------------------------------------------------------------------
-
-
-def test_preflight_pytest_excludes_quarantine_and_drops_dead_ignore() -> None:
-    from dadaia_workspace.features.ci_preflight.service import checks_for
-
-    command = checks_for(quick=True)[-1].argv
-    assert "--ignore=tests/performance" not in command, (
-        "dead ignore: tests/performance no longer exists"
-    )
-    joined = " ".join(command)
-    assert "not quarantine" in joined, "the gating invocation must exclude quarantined tests"
-
-
 @pytest.mark.timeout(120)
 def test_naked_quarantine_refusal_is_actionable_serial_and_xdist() -> None:
     """T-070-09 finding 2: the refusal must reach the operator readably in BOTH modes.

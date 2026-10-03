@@ -123,19 +123,6 @@ def scan_publish_candidates(repo: Path, rels: list[str]) -> dict[str, str]:
     return {h.path: f"{h.source_layer} '{h.masked_term}' (line {h.line})" for h in outcome.hits}
 
 
-def is_source_repo_root(path: Path) -> bool:
-    """Composition-root seam for the source-repo test (``cli`` may not import ``infrastructure``).
-
-    ``ci preflight`` refuses outside the library checkout, and the test it uses must be the
-    EXISTING one in ``infrastructure.workspace_guardrail`` — a second definition is how the
-    two drift. The CLI reaches it here instead of importing infrastructure directly
-    (``cli-no-infrastructure``).
-    """
-    from dadaia_workspace.infrastructure.workspace_guardrail import _is_source_repo_root
-
-    return _is_source_repo_root(path)
-
-
 def build_doctor_service(workspace_root: Path) -> DoctorService:
     _guard_initialized(workspace_root)
     states = states_dir(workspace_root)

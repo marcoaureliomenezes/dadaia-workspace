@@ -36,7 +36,7 @@ The branch contract by role; the names are `specs/constitution.md`'s `gitflow:` 
 
 | Branch | Pushable | Cut from | Advances by |
 |---|---|---|---|
-| work `<work>M.m.p` | Yes — local CI preflight + valid name | integration | the PR below |
+| work `<work>M.m.p` | Yes — the repo's own CI checks green + valid name | integration | the PR below |
 | integration | No — never a direct push | principal (bootstrap only) | PR from the row above, at definition `Approved` and at each `rc` merge |
 | principal | No — never a direct push | — | PR from the integration branch, at the final `rc` |
 

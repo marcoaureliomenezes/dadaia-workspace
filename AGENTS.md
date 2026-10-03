@@ -17,3 +17,5 @@ into the source tree it projects from, so nothing here is regenerated.
   run tests from its root: `../../../.dadaia/.venv/bin/python -m pytest`.
 - Versioning here: release-please owns the version, tag and CHANGELOG; the work branch
   is named for the live release (`_RELEASE.json`).
+- Dev tools (pytest, ruff, mypy, lint-imports) come from the `dev` group, installed into
+  the workspace venv from this repo's root: `VIRTUAL_ENV=../../.dadaia/.venv poetry install --no-root --with dev`.

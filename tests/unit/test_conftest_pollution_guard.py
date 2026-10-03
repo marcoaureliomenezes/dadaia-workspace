@@ -20,7 +20,7 @@ import pytest
 
 def _load_root_conftest() -> ModuleType:
     """Load the workspace root conftest.py by path (it is not an importable name)."""
-    root_conftest_path = Path(__file__).resolve().parents[3] / "conftest.py"
+    root_conftest_path = Path(__file__).resolve().parents[1] / "conftest.py"
     spec = importlib.util.spec_from_file_location("_root_conftest_under_test", root_conftest_path)
     assert spec is not None and spec.loader is not None
     module = importlib.util.module_from_spec(spec)
@@ -56,7 +56,7 @@ def _run_guard_cycle(
     session = _FakeSession()
     root_conftest.pytest_sessionstart(session)
 
-    # The gate's own ruff/mypy checks "create" these mid-session.
+    # A tool run mid-session creates these.
     for name in created_during:
         (fake_root / name).mkdir(parents=True, exist_ok=True)
 

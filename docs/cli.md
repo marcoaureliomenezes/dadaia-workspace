@@ -6,9 +6,8 @@
 
 ## dadaia certify — Certify assembled public features in a disposable local workspace.
 
-## dadaia ci — Local CI-equivalent preflight gate + git-hook chokepoints.
+## dadaia ci — Git-hook chokepoints: the pre-push gate and its installer.
 - ci install-hook — Install the pre-push CI/security gate.
-- ci preflight — Run the library's locally runnable ci.yml checks; exit non-zero if any fail.
 - ci push-gate-check — Pre-push gate: branch policy by the project gitflow + the range-scoped denylist scan.
 
 ## dadaia context — Manage Spec Context Projects.

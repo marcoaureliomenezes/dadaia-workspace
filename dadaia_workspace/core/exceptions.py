@@ -137,12 +137,3 @@ class BootstrapPackageError(DadaiaError, ValueError):
             "It must be a path to an existing .whl file; unset it to resolve the "
             "distribution normally instead."
         )
-
-
-class CiPreflightScopeError(DadaiaError):
-    """``ci preflight`` was invoked outside the dadaia-workspace source tree.
-
-    Its checks target the library's own paths, so anywhere else it could only report a
-    lint failure for a path that does not exist
-    (bug ci-preflight-unusable-outside-the-source-repo).
-    """

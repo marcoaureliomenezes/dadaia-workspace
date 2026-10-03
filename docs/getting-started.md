@@ -110,7 +110,7 @@ backlog document, the ADR ledger and the ledger scripts' own `check`).
 
 The `specs` and `ledgers` tree resolves from `--context`, `--specs-dir` or the bound
 context; with none, those sections are empty and `workspace` still runs. With no
-instance around — CI over a checkout — `.dadaia/.venv/bin/dadaia doctor --specs-dir specs --source-root .`
+instance around — CI over a checkout — `.dadaia/.venv/bin/dadaia doctor --specs-dir specs`
 runs the two tree sections; any other run outside a workspace exits 1 with the one
 workspace-not-found error.
 
@@ -154,7 +154,7 @@ After `context baseline`, each step writes inside a worktree that then merges: a
    schedule tables, and stamps
    `defined`.
 5. **Implement each task in its own `impl` worktree.** Reserve it `[-]` in its own
-   commit, work test-first, run the local CI preflight, and land it by `worktree.py
+   commit, work test-first, run the repo's own CI checks, and land it by `worktree.py
    merge` only after the reviewer's `APPROVED`.
 6. **Close the candidate.** `release.py phase CLOSURE --sha <sha>` requires no `[ ]`
    or `[-]` marker and no other open `wt/*` worktree, and stamps `implemented`. Then,

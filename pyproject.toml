@@ -96,7 +96,7 @@ pytest-xdist = "^3.8.0"
 pytest-timeout = "^2.3.1"
 
 # Optional, non-default dependency group — mutation testing (FR20, T-043-28). A plain
-# `poetry install` (what CI, the push preflight, and every consumer install already run)
+# `poetry install` (what CI and every consumer install already run)
 # never pulls this group: it requires an explicit `poetry install --with mutation`.
 # Selection verdict: qa-engineer, .dadaia/tmp/qa-engineer/20260817/
 # v0.4.3-T-043-28-mutation-tool-verdict.md. Exact pin per FR1 (T-043-03's pin rule).
@@ -150,7 +150,7 @@ incremental = false
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-addopts = "-ra -p no:cacheprovider"
+addopts = "-ra -p no:cacheprovider --strict-markers"
 markers = [
     "unit: pure or near-pure fast tests",
     "contract: public API/schema/security contracts",

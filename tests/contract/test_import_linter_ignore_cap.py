@@ -62,7 +62,7 @@ def test_cross_feature_contract_modules_equals_disk_and_contract_count_is_pinned
         for p in features_dir.iterdir()
         if p.is_dir() and (p / "__init__.py").is_file()
     }
-    assert len(on_disk) == 13
+    assert len(on_disk) == 12
     parser = _setup_cfg()
     raw = parser["importlinter:contract:features-no-cross-feature"]["modules"]
     declared = {line.strip() for line in raw.splitlines() if line.strip()}

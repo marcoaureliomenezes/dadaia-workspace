@@ -1,4 +1,4 @@
-"""Intent: CONTRACT — DADAIA §3.4 git chokepoints (dadaia ci preflight / install-hook)
+"""Intent: CONTRACT — DADAIA §3.4 git chokepoints (dadaia ci install-hook)
 
 Public CLI contracts for `dadaia ci` (pre-push gate, T-GATE-01).
 
@@ -11,52 +11,14 @@ duplicate was removed; the ``metrics.commit_sha`` keying coverage lives wholly t
 from __future__ import annotations
 
 import subprocess
-from collections.abc import Sequence
 from pathlib import Path
 
-import pytest
 from typer.testing import CliRunner
 
 from dadaia_workspace.cli.commands import ci
 from dadaia_workspace.cli.main import app
 
 _runner = CliRunner()
-
-
-@pytest.mark.parametrize("all_pass", [True, False], ids=["pass", "fail"])
-def test_preflight_pass_and_fail(monkeypatch, tmp_path: Path, all_pass: bool) -> None:
-    monkeypatch.setattr(ci, "_repo_root", lambda: tmp_path)
-    # The verb refuses outside the dadaia-workspace source tree
-    # (bug ci-preflight-unusable-outside-the-source-repo), and this test's repo root is a
-    # tmp_path. Stub that precondition so these cases keep asserting what they are about —
-    # how the gate renders pass and fail. The guard itself is covered by
-    # tests/integration/cli/test_ci_preflight_repo_scope.py.
-    monkeypatch.setattr(ci, "_is_source_repo_root", lambda _root: True)
-
-    if all_pass:
-        monkeypatch.setattr(ci, "subprocess_runner", lambda root: lambda argv: (0, "ok"))
-        result = _runner.invoke(app, ["ci", "preflight"])
-        assert result.exit_code == 0
-        assert "All preflight checks passed" in result.output
-        return
-
-    def factory(root: Path):
-        def run(argv: Sequence[str]) -> tuple[int, str]:
-            # argv may carry absolute tool paths (runner-derived resolution,
-            # T-011-06) — match by substring, not exact element.
-            if any("mypy" in part for part in argv):
-                return (1, "type error on line 1")
-            return (0, "ok")
-
-        return run
-
-    monkeypatch.setattr(ci, "subprocess_runner", factory)
-
-    result = _runner.invoke(app, ["ci", "preflight", "--no-fail-fast"])
-
-    assert result.exit_code == 1
-    assert "Pre-push gate FAILED" in result.output
-    assert "mypy --strict" in result.output
 
 
 def test_install_hook_writes_and_refuses_overwrite_without_force(
@@ -75,10 +37,6 @@ def test_install_hook_writes_and_refuses_overwrite_without_force(
     pre_push = tmp_path / ".husky" / "pre-push"
     assert pre_push.exists()
     pre_push_text = pre_push.read_text()
-    # v0.5.0 FR9/D9: the installed pre-push hook no longer INVOKES `ci preflight` — it
-    # only documents the always-on manual rule; `ci push-gate-check` (branch-name +
-    # denylist scan) is the only verb this hook actually runs.
-    assert "ci preflight --quick" not in pre_push_text
     assert "ci push-gate-check" in pre_push_text
 
     # second call without --force is refused (pre-push already present).

@@ -43,9 +43,6 @@ pytestmark = [pytest.mark.integration]
 
 _SCRIPT = Path(__file__).resolve().parent.parent.parent / "scripts" / "run_mutation_baseline.sh"
 _REPO_ROOT = _SCRIPT.parent.parent.parent
-_CI_YML = _REPO_ROOT / ".github" / "workflows" / "ci.yml"
-_RELEASE_YML = _REPO_ROOT / ".github" / "workflows" / "release.yml"
-_CI_PREFLIGHT_SERVICE = _REPO_ROOT / "dadaia_workspace" / "features" / "ci_preflight" / "service.py"
 
 
 def _repo_porcelain_excluding_additive() -> str:
@@ -135,12 +132,3 @@ def test_staging_step_copies_scoped_subset_without_touching_repo_git_tree(
     assert 'pytest_add_cli_args_test_selection = ["tests/unit/core/models"]' in config_text
     assert "mutate_only_covered_lines = true" in config_text
     assert "use_git_change_detection = false" in config_text
-
-
-def test_script_never_referenced_from_a_push_path_selector() -> None:
-    """A20.3: the tool is absent from every push-path selector; CI push timing unchanged."""
-    for path in (_CI_YML, _RELEASE_YML, _CI_PREFLIGHT_SERVICE):
-        assert path.is_file(), f"expected push-path file at {path}"
-        text = path.read_text("utf-8")
-        assert "run_mutation_baseline" not in text, f"{path} must not reference the runner"
-        assert "mutmut" not in text, f"{path} must not reference mutmut"
