@@ -30,6 +30,7 @@ def _git(cwd: Path, *args: str) -> None:
         pytest.param("ruff", ("check", "probe.py"), id="ruff-check"),
         pytest.param("ruff", ("format", "--check", "probe.py"), id="ruff-format-check"),
         pytest.param("mypy", ("--strict", "probe.py"), id="mypy-strict"),
+        pytest.param("pytest", ("-q", "probe.py"), id="pytest"),
     ],
 )
 def test_the_bare_command_writes_no_cache_into_the_tree(

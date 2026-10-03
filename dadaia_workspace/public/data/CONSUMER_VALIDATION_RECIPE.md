@@ -33,7 +33,7 @@
 
 ## Real-use checks (R-) — required with the F- checks, never optional
 
-- R-02 `python3 $S/dd-backlog-definition/scripts/backlog.py new <slug> --specs <specs>`, fill its intents; `backlog.py subjects --specs <specs>`; `$D doctor --specs-dir <specs>` accepts every ref.
+- R-02 `python3 $S/dd-backlog-definition/scripts/backlog.py new <slug> --specs <specs>`, fill its intents; `$D doctor --specs-dir <specs>` accepts every ref.
 - R-03 `$D specs init --specs-dir /tmp/r03/specs`; `$D doctor --specs-dir /tmp/r03/specs` → 0 errors, 0 warnings.
 - R-04 a placeholder atom in a fresh tree: `$D doctor --fix --specs-dir <specs>` → 0/0; `$D specs upgrade --specs-dir <specs>` repairs it; filled atoms untouched.
 - R-06 `bugs.py append`, then `bugs.py resolve <id>` with its evidence flags, then `bugs.py status` → the record reads resolved; `bugs.py check --specs <specs>` → exit 0.

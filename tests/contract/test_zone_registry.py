@@ -35,12 +35,10 @@ from dadaia_workspace.core.gitflow import Role
 from dadaia_workspace.core.workspace_layout import (
     CANON_ROOT_MEMBERS,
     DADAIA_ZONES,
-    REPO_TREE_EXCLUDED,
     ROOT_ALLOWED_DIRS,
     ROOT_ALLOWED_FILES,
     STATES_CANON,
     Creator,
-    repo_excluded_display,
     root_entries_display,
     specs_canon_table_rows,
     zone_names,
@@ -94,7 +92,6 @@ _CANONICAL_SETS: dict[str, frozenset[str]] = {
     "zone": zone_names(),
     "root": ROOT_ALLOWED_DIRS | ROOT_ALLOWED_FILES,
     "specs-canon": CANON_ROOT_MEMBERS,
-    "repo-excluded": frozenset(REPO_TREE_EXCLUDED),
     "phase": frozenset(
         json.loads((_SCHEMAS / "releases/release-state-v1.schema.json").read_text("utf-8"))[
             "properties"
@@ -343,8 +340,7 @@ def test_staged_law_canon_tables_equal_the_registry(staged_data: Path) -> None:
     assert rendered == expected
 
     assert f"- Root holds only: `{root_entries_display()}`" in text
-    assert f"- These never appear in the tree: `{repo_excluded_display()}`." in repo_law
-    for placeholder in ("<!-- root -->", "<!-- repo-excluded -->", "<!-- specs-canon -->"):
+    for placeholder in ("<!-- root -->", "<!-- specs-canon -->"):
         for rendered in (text, specs_law, repo_law):
             assert placeholder not in rendered, f"{placeholder} was left unrendered"
 

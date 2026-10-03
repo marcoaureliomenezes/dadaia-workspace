@@ -36,7 +36,6 @@ _SPEC_STATES_CANON = {
     "agent_model_policy.json",
     "agent_model_policy.json.last-good.json",
     "privacy_denylist.json",
-    "backlog_subject_aliases.txt",
     "harness_profile.json",
     "AGENTS.md",
 }

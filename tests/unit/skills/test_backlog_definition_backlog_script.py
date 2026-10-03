@@ -480,28 +480,23 @@ def test_a_refused_write_leaves_the_document_byte_identical(script: Path, tmp_pa
     assert (specs / "backlog" / "BACKLOG.json").read_bytes() == before
 
 
-# --- subjects ------------------------------------------------------------------------
+# --- kinds -----------------------------------------------------------------------------
 
 
-def _aliases(root: Path, *lines: str) -> Path:
-    path = root / ".dadaia" / "states" / "backlog_subject_aliases.txt"
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text("# a comment\n\n" + "\n".join(lines) + "\n", encoding="utf-8")
-    return path
-
-
-def test_subjects_lists_the_alias_map_and_never_resolves(script: Path, tmp_path: Path) -> None:
-    """sa-subjects-resolve-is-circular#B3: `subjects --resolve` no longer exists (argparse
-    error). sa-subjects-resolve-is-circular#B4: `new` refuses the 'panel' kind, nothing written."""
+@pytest.mark.parametrize("kind", ["panel", "api", "cli"])
+def test_new_refuses_a_retired_kind_and_its_fix_lists_the_kinds(
+    script: Path, tmp_path: Path, kind: str
+) -> None:
+    """sa-subjects-resolve-is-circular#B4: `new` refuses a kind outside the four, nothing
+    written; T-050-154: its fix line `new --help` lists every kind, and `subjects` is gone."""
     specs = _specs(tmp_path)
-    aliases = _aliases(tmp_path, "the widgets -> api:/v1/widgets")
-    done = _run(script, "subjects", "--specs", str(specs), "--alias-map", str(aliases))
-    assert done.returncode == 0, done.stdout + done.stderr
-    assert "api:/v1/widgets" in done.stdout
-    resolve = _run(script, "subjects", "--specs", str(specs), "--resolve", "INV-DOES-NOT-EXIST")
-    assert resolve.returncode == 2 and "unrecognized arguments: --resolve" in resolve.stderr
-    panel = _run(script, "new", "x-item", "--specs", str(specs), "--intent", "panel:kanban-board=x")
-    assert panel.returncode == 1 and _active(specs) == []
+    done = _run(script, "new", "x-item", "--specs", str(specs), "--intent", f"{kind}:x=y")
+    fix = [line for line in (done.stdout + done.stderr).splitlines() if line.startswith("fix:")]
+    assert done.returncode == 1 and _active(specs) == [] and fix, done.stdout + done.stderr
+    assert " new --help" in fix[0]
+    usage = " ".join(_run(script, "new", "--help").stdout.split())
+    assert "code|doc|invariant|catalog" in usage
+    assert _run(script, "subjects", "--specs", str(specs)).returncode == 2
 
 
 def _pair(specs: Path) -> list[bytes]:

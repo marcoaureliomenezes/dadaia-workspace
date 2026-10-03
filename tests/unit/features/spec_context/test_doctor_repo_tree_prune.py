@@ -2,8 +2,8 @@
 
 ``.venv``, ``.git`` and ``node_modules`` end the repo-tree walk. They are pruned
 BEFORE anything is classified, so the unattended reaper can never move a virtualenv
-(absolute interpreter paths die with the move). A cache directory beside it is still
-reported and still moved.
+(absolute interpreter paths die with the move). A nested ``.dadaia`` beside it is still
+reported and still moved; a tool cache is the repo's own (T-050-154).
 
 size: SMALL.
 """
@@ -37,7 +37,8 @@ def _workspace(tmp_path: Path) -> Path:
     repo = ws / "repos" / "demo"
     (repo / ".venv" / "bin").mkdir(parents=True)
     (repo / ".venv" / "bin" / "python").write_text("#!/bin/sh\n", encoding="utf-8")
-    (repo / ".venv" / ".pytest_cache").mkdir()
+    (repo / ".venv" / ".dadaia").mkdir()
+    (repo / ".dadaia").mkdir()
     (repo / ".pytest_cache").mkdir()
     (repo / "src").mkdir()
     return ws
@@ -64,9 +65,10 @@ def test_a_repo_local_venv_is_never_a_finding_and_is_never_moved(tmp_path: Path)
 
     paths = {finding.path for finding in doctor.scan()}
     assert not any(".venv" in path for path in paths), paths
-    assert "repos/demo/.pytest_cache" in paths, paths
+    assert "repos/demo/.dadaia" in paths and "repos/demo/.pytest_cache" not in paths, paths
 
     doctor.fix()
 
     assert (ws / "repos" / "demo" / ".venv" / "bin" / "python").exists()
-    assert not (ws / "repos" / "demo" / ".pytest_cache").exists()
+    assert not (ws / "repos" / "demo" / ".dadaia").exists()
+    assert (ws / "repos" / "demo" / ".pytest_cache").exists()

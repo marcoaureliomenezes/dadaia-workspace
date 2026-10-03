@@ -37,7 +37,7 @@ def _run(*args: str) -> Any:
 def test_every_human_line_is_a_finding_or_its_fix() -> None:
     """Every stdout line is `<CODE> <verdict> <message>` or a `fix: <command>` line —
     no score line, no header, nothing else."""
-    result = _run("--specs-dir", str(_REPO_ROOT / "specs"), "--source-root", str(_REPO_ROOT))
+    result = _run("--specs-dir", str(_REPO_ROOT / "specs"))
     for line in result.stdout.splitlines():
         if not line.strip():
             continue
@@ -45,9 +45,7 @@ def test_every_human_line_is_a_finding_or_its_fix() -> None:
 
 
 def test_json_carries_every_section() -> None:
-    result = _run(
-        "--specs-dir", str(_REPO_ROOT / "specs"), "--source-root", str(_REPO_ROOT), "--json"
-    )
+    result = _run("--specs-dir", str(_REPO_ROOT / "specs"), "--json")
     payload = json.loads(result.stdout)
     assert set(payload["sections"]) == set(_SECTIONS)
     for name in _SECTIONS:
@@ -69,11 +67,8 @@ def _live_release(specs: Path, **over: Any) -> Path:
 
 
 def _release_findings(specs: Path) -> tuple[list[dict[str, Any]], list[str]]:
-    """(the doctor's findings naming the release state, every specs-section code) — the
-    source root is the tmp tree: walking this checkout costs 3 s and names no release."""
-    payload = json.loads(
-        _run("--specs-dir", str(specs), "--source-root", str(specs.parent), "--json").stdout
-    )
+    """(the doctor's findings naming the release state, every specs-section code)."""
+    payload = json.loads(_run("--specs-dir", str(specs), "--json").stdout)
     sections = payload["sections"]
     named = [f for s in sections.values() for f in s["findings"] if "_RELEASE.json" in f["message"]]
     return named, [f["code"] for f in sections["specs"]["findings"]]

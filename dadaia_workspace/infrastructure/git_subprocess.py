@@ -368,6 +368,13 @@ class GitSubprocessClient:
         result = _run(["git", "ls-files", "--others", "--exclude-standard", "-z"], cwd=path)
         return [rel for rel in result.stdout.split("\0") if rel]
 
+    def tracked(self, path: Path) -> frozenset[str]:
+        """Tracked plus untracked-unignored paths under *path*, *path*-relative; empty outside a repo."""
+        result = _run(
+            ["git", "ls-files", "-z", "--cached", "--others", "--exclude-standard"], cwd=path
+        )
+        return frozenset(rel for rel in result.stdout.split("\0") if rel)
+
     def remote_url(self, path: Path) -> str:
         """Return the URL of the ``origin`` remote, or ``""`` if none is configured.
 

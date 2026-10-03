@@ -49,15 +49,12 @@ Scope: this file governs only `specs/backlog/`.
 
 | kind | ref shape | derived from |
 |---|---|---|
-| `code` | `path/to/module.py#Symbol` | Python sources (auto-derived) |
-| `cli` | `dadaia <command>` | the CLI command tree |
+| `code` | `path/to/file[#word]`, any language | the repo's git paths; `#word` must occur in the file |
 | `catalog` | a `catalog.json` feature slug | `specs/memory/product/catalog.json` |
 | `doc` | a SPEC-DOC id or memory heading | `specs/memory/**/*.md` |
 | `invariant` | an `INV-*` identifier | invariant declarations |
-| `api` | an alias-map synonym | the operator alias map only |
 
-- `BACKLOG_PY subjects` lists the alias map; every ref is judged only by the doctor's `BL-SCHEMA`, which names the ref it cannot resolve.
-- A repo with no Python sources has no `code` anchors — bind `catalog`, `doc` or `invariant`.
+- Every ref is judged only by the doctor's `BL-SCHEMA`, which names the ref it cannot resolve.
 
 ## 5. Relationship to releases
 

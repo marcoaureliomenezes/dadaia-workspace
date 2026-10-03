@@ -3,18 +3,13 @@
 **Auto-derived, recomputed from live truth on every ``build_registry`` call.** It is derived,
 never a stored file that can itself go stale (the meta-version of the bug we are fixing).
 
-R1 auto-derives exactly **five** anchor kinds, each backed by a real registry of truth in the
-live tree:
+Four anchor kinds, each backed by a real registry of truth in the live tree:
 
-1. ``code`` — module-relative ``path#symbol``, validated via ``ast`` (grep fallback) of the
-   injected source root;
-2. ``cli`` — Typer command ids (the ``dadaia <group> <verb>`` surface walked from the app tree);
-3. ``catalog`` — ``catalog.json`` slugs (and product-atom ids);
-4. ``doc`` — spec-doc ids (``SPEC-DOC-NNN``) + memory heading anchors (``file.md#heading``);
-5. ``invariant`` — named invariants (``INV-*``).
-
-``api`` ids bind via the **operator alias map only** (no route registry exists). The alias map path is injected, never a cwd lookup
-(SPEC §3.8 #6).
+1. ``code`` — a tracked repo path, any language, ``#word`` optional: the word must occur in
+   that file (a word grep, no parser);
+2. ``catalog`` — ``catalog.json`` slugs (and product-atom ids);
+3. ``doc`` — spec-doc ids (``SPEC-DOC-NNN``) + memory heading anchors (``file.md#heading``);
+4. ``invariant`` — named invariants (``INV-*``).
 
 **Binding contract:** the model *proposes* a subject string; Python *normalizes + binds* it to
 a single registry anchor, and **HALTs (rejects, not silent NEW)** any subject that resolves to
@@ -24,7 +19,6 @@ actionable (acceptance §3.7.1).
 
 from __future__ import annotations
 
-import ast
 import json
 import re
 from dataclasses import dataclass
@@ -39,7 +33,6 @@ __all__ = [
     "BindStatus",
     "Registry",
     "build_registry",
-    "load_alias_map",
 ]
 
 
@@ -53,7 +46,7 @@ class BindStatus(StrEnum):
 
 @dataclass(frozen=True)
 class Anchor:
-    """One canonical subject anchor derived from live truth (or an alias target).
+    """One canonical subject anchor derived from live truth.
 
     ``id`` is the canonical, stable identity used for set-intersection in the classifier.
     """
@@ -75,100 +68,6 @@ class BindResult:
     anchor: Anchor | None = None
     message: str = ""
     candidates: tuple[str, ...] = ()
-
-
-# ── alias map ────────────────────────────────────────────────────────────────────
-
-_ALIAS_RE = re.compile(r"^(?P<synonym>.+?)\s*->\s*(?P<anchor>.+?)\s*$")
-
-
-def load_alias_map(alias_map_path: Path) -> dict[str, str]:
-    """Read ``synonym -> canonical-anchor`` lines from the injected alias-map path.
-
-    Blank lines and ``#`` comments are skipped. Tolerates an absent file (returns ``{}``) —
-    the alias map is optional. Synonyms are matched case-insensitively (normalized to lower).
-    """
-    aliases: dict[str, str] = {}
-    try:
-        text = alias_map_path.read_text(encoding="utf-8")
-    except (OSError, ValueError):
-        return aliases
-    for raw in text.splitlines():
-        line = raw.strip()
-        if not line or line.startswith("#"):
-            continue
-        match = _ALIAS_RE.match(line)
-        if match is None:
-            continue
-        synonym = match.group("synonym").strip().lower()
-        anchor = match.group("anchor").strip()
-        if synonym and anchor:
-            aliases[synonym] = anchor
-    return aliases
-
-
-# ── code anchors (AST + grep fallback) ──────────────────────────────────────────
-
-_PY_SYMBOL_RE = re.compile(r"^\s*(?:class|def|async\s+def)\s+(?P<name>[A-Za-z_]\w*)")
-_PY_ASSIGN_RE = re.compile(r"^(?P<name>[A-Za-z_]\w*)\s*(?::[^=]+)?=")
-
-
-def _module_top_level_symbols(source: str) -> set[str]:
-    """Top-level symbol names in ``source`` via ``ast`` (grep fallback on SyntaxError)."""
-    try:
-        tree = ast.parse(source)
-    except SyntaxError:
-        return _grep_top_level_symbols(source)
-    names: set[str] = set()
-    for node in tree.body:
-        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
-            names.add(node.name)
-        elif isinstance(node, ast.Assign):
-            for target in node.targets:
-                if isinstance(target, ast.Name):
-                    names.add(target.id)
-        elif isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name):
-            names.add(node.target.id)
-    return names
-
-
-def _grep_top_level_symbols(source: str) -> set[str]:
-    """Line-oriented fallback when a file does not parse (SPEC §6 grep fallback)."""
-    names: set[str] = set()
-    for line in source.splitlines():
-        sym = _PY_SYMBOL_RE.match(line)
-        if sym:
-            names.add(sym.group("name"))
-            continue
-        if line and not line[0].isspace():
-            assign = _PY_ASSIGN_RE.match(line)
-            if assign:
-                names.add(assign.group("name"))
-    return names
-
-
-def _derive_code_anchors(source_root: Path) -> set[str]:
-    """Derive ``path#symbol`` anchor ids for every top-level symbol under ``source_root``."""
-    anchors: set[str] = set()
-    if not source_root.is_dir():
-        return anchors
-    for py in sorted(source_root.rglob("*.py")):
-        try:
-            source = py.read_text(encoding="utf-8")
-        except (OSError, ValueError):
-            continue
-        rel = py.relative_to(source_root).as_posix()
-        for symbol in _module_top_level_symbols(source):
-            anchors.add(f"{rel}#{symbol}")
-    return anchors
-
-
-# ── cli anchors ──────────────────────────────────────────────────────────────────
-#
-# The ``cli``-kind anchor set (``<group> <verb>`` command ids) is derived at each
-# composition boundary by :func:`dadaia_workspace.cli.help_digest.command_paths` and threaded
-# in as ``cli_anchors`` — the Typer-tree walk lives in ``cli/`` so this feature never imports
-# ``cli.main`` (FR1b: the ``subject_registry -> cli.main`` red chain is removed).
 
 
 # ── catalog anchors ──────────────────────────────────────────────────────────────
@@ -259,27 +158,22 @@ def _derive_invariant_anchors(specs_dir: Path) -> set[str]:
 
 
 class Registry:
-    """An immutable snapshot of the canonical-subject anchor set + the alias map.
+    """An immutable snapshot of the canonical-subject anchor set over one repo.
 
     Built by :func:`build_registry`; every call recomputes from live truth (SPEC §3.2). The
     classifier and doctor consume :meth:`bind` and :meth:`list_anchors`.
     """
 
-    def __init__(self, anchors: dict[SubjectKind, set[str]], aliases: dict[str, str]) -> None:
+    def __init__(self, anchors: dict[SubjectKind, set[str]], repo: Path) -> None:
         self._anchors = anchors
-        self._aliases = aliases
-        # Reverse index: anchor-id -> kinds it belongs to (for alias-target classification).
-        self._by_id: dict[str, set[SubjectKind]] = {}
-        for kind, ids in anchors.items():
-            for anchor_id in ids:
-                self._by_id.setdefault(anchor_id, set()).add(kind)
+        self._repo = repo
 
     def _resolve_in_kind(self, raw_ref: str, kind: SubjectKind) -> BindResult:
-        """Resolve ``raw_ref`` as a direct (non-alias) anchor of ``kind``.
+        """Resolve ``raw_ref`` as a direct anchor of ``kind``.
 
         A ref that is not an exact anchor id still binds when it suffix-matches
         EXACTLY ONE known anchor of the kind on a path boundary (e.g. a worker
-        writing ``snake.py#move`` for the canonical ``src/snake.py#move`` — the
+        writing ``snake.py`` for the canonical ``src/snake.py`` — the
         common weak-model slip of dropping the leading directories). Zero matches
         stay UNRESOLVED; more than one is AMBIGUOUS with the candidates named —
         the unique-suffix rule can never bind the wrong anchor silently.
@@ -305,76 +199,42 @@ class Registry:
             status=BindStatus.UNRESOLVED,
             message=(
                 f"subject ref {raw_ref!r} (kind={kind.value}) resolves to no known anchor; "
-                f"add it as an alias in the operator alias map, or correct the ref."
+                "correct the ref."
             ),
         )
 
     def bind(self, raw_ref: str, kind: SubjectKind) -> BindResult:
-        """Normalize + bind ``raw_ref`` of ``kind`` to a canonical anchor, or HALT.
-
-        Resolution order:
-
-        1. **alias map** — a ``synonym -> canonical-anchor`` entry collapses the proposed ref
-           to its canonical anchor (case-insensitive) — the only path for ``api``.
-        2. **direct anchor** — the ref is itself a derived anchor of ``kind`` (auto-derived
-           kinds only: code/cli/catalog/doc/invariant).
-
-        Returns ``UNRESOLVED`` (HALT) when nothing matches; the message names the ref.
-        """
+        """Bind ``raw_ref`` of ``kind`` to a canonical anchor, or HALT (``UNRESOLVED``,
+        the message naming the ref). A ``code`` ref is ``path[#word]``: the path binds
+        against the tracked paths, then the word must occur in that file."""
         ref = raw_ref.strip()
-        if not ref:
-            return BindResult(
-                status=BindStatus.UNRESOLVED, message="empty subject ref cannot be bound"
-            )
-
-        # (1) alias map — collapse a known synonym to its canonical anchor.
-        alias_target = self._aliases.get(ref.lower())
-        if alias_target is not None:
-            target_kinds = self._by_id.get(alias_target)
-            # An alias to an auto-derived anchor: classify it under that anchor's real kind.
-            if target_kinds:
-                resolved_kind = kind if kind in target_kinds else next(iter(sorted(target_kinds)))
-                return BindResult(
-                    status=BindStatus.RESOLVED,
-                    anchor=Anchor(kind=resolved_kind, id=alias_target),
-                )
-            # An alias to an opaque target (an api id): bind to the requested kind.
-            return BindResult(status=BindStatus.RESOLVED, anchor=Anchor(kind=kind, id=alias_target))
-
-        if kind is SubjectKind.API:
+        if kind is not SubjectKind.CODE or not ref:
+            return self._resolve_in_kind(ref, kind)
+        path, _, word = ref.partition("#")
+        result = self._resolve_in_kind(path, kind)
+        if result.anchor is None or not word:
+            return result
+        try:
+            text = (self._repo / result.anchor.id).read_text(encoding="utf-8")
+        except (OSError, ValueError):
+            text = ""
+        if re.search(rf"(?<!\w){re.escape(word)}(?!\w)", text) is None:
             return BindResult(
                 status=BindStatus.UNRESOLVED,
-                message=f"subject ref {ref!r} (kind=api) has no alias-map entry; api subjects bind via the alias map only.",
+                message=f"subject ref {ref!r} (kind=code): {word!r} does not occur in {result.anchor.id}; correct the ref.",
             )
-        # The law spells a cli ref `dadaia <command>`; the command tree carries the bare id.
-        return self._resolve_in_kind(
-            ref.removeprefix("dadaia ") if kind is SubjectKind.CLI else ref, kind
-        )
+        return BindResult(BindStatus.RESOLVED, Anchor(kind, f"{result.anchor.id}#{word}"))
 
 
-def build_registry(
-    *,
-    source_root: Path,
-    catalog_path: Path,
-    alias_map_path: Path,
-    specs_dir: Path,
-    cli_anchors: frozenset[str],
-) -> Registry:
-    """Build the canonical-subject registry from live truth (SPEC §3.2).
-
-    All roots are **injected** — never ``os.getcwd()`` (SPEC §3.8 #6). ``cli_anchors`` is the
-    pre-derived ``cli``-kind anchor set (``<group> <verb>`` command ids), threaded in from the
-    composition boundary via :func:`dadaia_workspace.cli.help_digest.command_paths`; this
-    feature never imports ``cli.main`` (FR1b). Every call recomputes the auto-derived anchor
-    kinds (code/catalog/doc/invariant), so a symbol added/removed in source changes resolution
-    with no stored file (acceptance §3.7.5).
-    """
+def build_registry(*, specs_dir: Path, tracked: frozenset[str]) -> Registry:
+    """Build the canonical-subject registry from live truth (SPEC §3.2): ``tracked`` is
+    the repo's tracked paths (``specs_dir.parent``-relative), handed in by the caller."""
     anchors: dict[SubjectKind, set[str]] = {
-        SubjectKind.CODE: _derive_code_anchors(source_root),
-        SubjectKind.CLI: set(cli_anchors),
-        SubjectKind.CATALOG: _derive_catalog_anchors(catalog_path),
+        SubjectKind.CODE: set(tracked),
+        SubjectKind.CATALOG: _derive_catalog_anchors(
+            specs_dir / "memory" / "product" / "catalog.json"
+        ),
         SubjectKind.DOC: _derive_doc_anchors(specs_dir),
         SubjectKind.INVARIANT: _derive_invariant_anchors(specs_dir),
     }
-    aliases = load_alias_map(alias_map_path)
-    return Registry(anchors=anchors, aliases=aliases)
+    return Registry(anchors, specs_dir.parent)

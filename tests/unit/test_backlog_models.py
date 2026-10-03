@@ -1,6 +1,6 @@
 """Intent: CONTRACT — sa-backlog-intents-have-two-grammars: the backlog-v1 schema is the
-one intents grammar — its kind enum is the model's, and a code ref is module-relative
-``path#symbol`` (privacy: no absolute, ``~``, drive or ``..`` path is ever committed).
+one intents grammar — its kind enum is the model's, and a code ref is repo-relative
+``path[#word]`` (privacy: no absolute, ``~``, drive or ``..`` path is ever committed).
 """
 
 from __future__ import annotations
@@ -37,10 +37,11 @@ def test_the_model_kinds_are_the_schema_kinds() -> None:
         ("code", "~/secret/foo.py#Bar", False),
         ("code", "../other-repo/foo.py#Bar", False),
         ("code", "C:/x/foo.py#Bar", False),
-        ("code", "pkg/m.py", False),
+        ("code", "pkg/m.py", True),
+        ("code", "cmd/w.go#Widget", True),
         ("code", "pkg/m.py#", False),
-        ("cli", "   ", False),
-        ("cli", "dadaia context bind", True),
+        ("doc", "   ", False),
+        ("api", "x", False),
     ],
 )
 def test_the_schema_judges_a_subject_ref(kind: str, ref: str, valid: bool) -> None:

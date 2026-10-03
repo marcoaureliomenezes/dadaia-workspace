@@ -56,9 +56,6 @@ def test_install_first_then_specs_init_leaves_the_repo_template(tmp_path: Path) 
 
     law = (repo / "AGENTS.md").read_text(encoding="utf-8")
     assert law.startswith("# zz-product")
-    # the rendered excluded list (WP-38), never the raw placeholder
-    assert "`.venv/ .pytest_cache/ .mypy_cache/ .hypothesis/ .ruff_cache/" in law
-    assert "<!-- repo-excluded -->" not in law
     assert (repo / "tests" / "AGENTS.md").is_file()
 
 

@@ -439,7 +439,7 @@ def test_an_operator_action_names_the_file_to_change(code: str, repo: Path) -> N
     `Operator action:` line naming the finding's own file — never a placeholder."""
     root = repo
     OPERATOR_ACTION[code](root)
-    ledgers = _ledgers_section(None, root / "specs", str(root), None)
+    ledgers = _ledgers_section(None, root / "specs")
     found = [f for f in (*_specs_section(_doctor(root), None).findings, *ledgers.findings) if f.code == code]  # fmt: skip
     assert found, f"{code}: the fixture did not make the rule fire"
     for finding in found:
@@ -457,7 +457,7 @@ def test_an_untraced_origin_id_is_cleared_by_its_printed_fix(repo: Path) -> None
     spec.write_text(spec.read_text("utf-8").replace("operator-demand", "backlog:carried"), "utf-8")
 
     def origin_errors() -> list[SectionFinding]:
-        found = _ledgers_section(None, specs, str(repo), None).findings
+        found = _ledgers_section(None, specs).findings
         rows = [f for f in found if "Origin" in f.message]
         assert all(f.error for f in rows), rows  # a listing row never reaches the doctor
         return rows

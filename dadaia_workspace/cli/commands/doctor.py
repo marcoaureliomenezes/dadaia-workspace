@@ -24,7 +24,6 @@ from pathlib import Path
 import typer
 
 from dadaia_workspace import container
-from dadaia_workspace.cli._backlog_roots import resolve_backlog_roots
 from dadaia_workspace.cli._specs_resolution import (
     alive_context_trees,
     own_bind_for_cli,
@@ -101,8 +100,6 @@ def _specs_section(doctor: SpecsDoctor | None, root: Path | None) -> SectionRepo
 def _ledgers_section(
     root: Path | None,
     specs_dir: Path | None,
-    source_root: str | None,
-    alias_map: str | None,
 ) -> SectionReport:
     """The `ledgers` section — three contributors, one name.
 
@@ -111,20 +108,13 @@ def _ledgers_section(
     `check`, run as a subprocess here. The doctor holds no second implementation of any
     ledger schema — this is the one delegation point.
     """
-    from dadaia_workspace.cli.help_digest import command_paths
     from dadaia_workspace.infrastructure.ledger_scripts import script_findings
 
     if specs_dir is None:
         return _empty_section("ledgers")
 
-    src, catalog_path, alias_map_path = resolve_backlog_roots(specs_dir, source_root, alias_map)
-    context = backlog_doctor.build_context(
-        specs_dir=specs_dir,
-        source_root=src,
-        catalog_path=catalog_path,
-        alias_map_path=alias_map_path,
-        cli_anchors=frozenset(" ".join(p) for p in command_paths() if p),
-    )
+    tracked = container.build_git_client().tracked(specs_dir.parent)
+    context = backlog_doctor.build_context(specs_dir, tracked)
     return merge_sections(
         [
             run_section("ledgers", backlog_doctor.RULES, context, root, specs_dir),
@@ -275,16 +265,6 @@ def doctor(
             "checks. Default: auto-detected from specs_dir/../dadaia_workspace/public/."
         ),
     ),
-    source_root: str | None = typer.Option(
-        None,
-        "--source-root",
-        help="Source root for the ledgers section's code-anchor derivation. Default: the repo root.",
-    ),
-    alias_map: str | None = typer.Option(
-        None,
-        "--alias-map",
-        help="Alias-map path for the ledgers section. Default: workspace .dadaia/states/.",
-    ),
     fix: bool = typer.Option(False, "--fix", help=render_fix_help()),
     expired_only: bool = typer.Option(
         False,
@@ -316,9 +296,7 @@ def doctor(
     workspace_root, service, scope, target = _resolve_run(specs_dir, context)
     specs_doctor = _build_specs_doctor(target, public_dir)
 
-    fixed = _apply_fixes(
-        service, specs_doctor, target, source_root, alias_map, fix=fix, expired_only=expired_only
-    )
+    fixed = _apply_fixes(service, specs_doctor, fix=fix, expired_only=expired_only)
     render = _render_for(workspace_root, redact=redact)
     if quiet:
         for action in fixed:
@@ -332,7 +310,7 @@ def doctor(
             ]
         ),
         _specs_section(specs_doctor, workspace_root),
-        _ledgers_section(workspace_root, target, source_root, alias_map),
+        _ledgers_section(workspace_root, target),
     ]
     # Render boundary ONLY: no doctor ever sees the redactor; every finding and fix action
     # keeps carrying true names inside the sections themselves.
@@ -352,9 +330,6 @@ def _identity(text: str) -> str:
 def _apply_fixes(
     service: DoctorService | None,
     specs_doctor: SpecsDoctor | None,
-    specs_dir: Path | None,
-    source_root: str | None,
-    alias_map: str | None,
     *,
     fix: bool,
     expired_only: bool,

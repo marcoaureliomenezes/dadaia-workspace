@@ -4,9 +4,8 @@ append-only exit ledger, stdlib only.
 
 ``backlog.py <verb> --specs <path>``. Every write builds the new document bytes, runs
 `check` over them, and only then replaces the file atomically — so this script's writer
-and its validator cannot disagree about what a valid backlog is.
-
-``subjects`` lists the operator alias map; resolving a subject is the doctor's alone.
+and its validator cannot disagree about what a valid backlog is; resolving a subject is the
+doctor's alone.
 """
 
 from __future__ import annotations
@@ -36,10 +35,8 @@ from _specs import find_specs, refuse  # noqa: E402
 _HELP = {
     "new": "append one brand-new active[] entry, born at status 'idea'",
     "exit": "retire one live entry and append its one terminal histo record",
-    "subjects": "list the operator alias map's anchors",
     "check": "validate BACKLOG.json and backlog_histo.jsonl",
 }
-_ALIAS_DEFAULT = ".dadaia/states/backlog_subject_aliases.txt"
 
 
 def _parser() -> argparse.ArgumentParser:
@@ -54,16 +51,12 @@ def _parser() -> argparse.ArgumentParser:
             for option in ("--title", "--description", "--provenance", "--relates"):
                 command.add_argument(option)
             command.add_argument("--intent", action="append", metavar="KIND:REF=CHANGE",
-                                 help="one typed intent (repeatable)")  # fmt: skip
+                                 help=f"one typed intent (repeatable); KIND is one of {'|'.join(wr.KINDS)}")  # fmt: skip
         if verb == "exit":
             command.add_argument("--disposition", required=True,
                                  help=f"one of {'|'.join(DISPOSITIONS)}")  # fmt: skip
             for option in ("--release", "--reason", "--summary", "--ts"):
                 command.add_argument(option)
-        if verb == "subjects":
-            command.add_argument("--alias-map", type=Path, default=None,
-                                 help=f"alias map (default: <workspace>/{_ALIAS_DEFAULT})")  # fmt: skip
-            command.add_argument("--kind", help="filter to one subject kind")
         if verb == "check":
             command.add_argument("--json", action="store_true", help="emit findings as JSON")
     return parser
@@ -90,21 +83,9 @@ def _exit(args: argparse.Namespace, specs: Path) -> int:
     return 0
 
 
-def _subjects(args: argparse.Namespace, specs: Path) -> int:
-    """List the alias map's anchors, optionally one kind; resolving a ref is the doctor's."""
-    alias_map = args.alias_map if args.alias_map is not None else specs.parent / _ALIAS_DEFAULT
-    text = alias_map.read_text(encoding="utf-8") if alias_map.is_file() else ""
-    anchors = sorted({line.split("->", 1)[1].strip() for line in text.splitlines()
-                      if "->" in line and not line.lstrip().startswith("#")})  # fmt: skip
-    listed = [a for a in anchors if args.kind is None or a.startswith(f"{args.kind}:")]
-    print(*listed, f"\n[ok] {len(listed)} anchor(s).", sep="\n")
-    return 0
-
-
 def main(argv: list[str] | None = None) -> int:
     args = _parser().parse_args(argv)
-    reads = args.verb in ("check", "subjects")
-    specs = find_specs(args.specs, ledger=None if reads else f"specs/{LEDGER}")
+    specs = find_specs(args.specs, ledger=None if args.verb == "check" else f"specs/{LEDGER}")
     if args.verb == "check":
         findings = check(specs)
         print(json.dumps(findings, indent=2)) if args.json else [
@@ -112,8 +93,6 @@ def main(argv: list[str] | None = None) -> int:
         ]
         return 1 if findings else 0
     try:
-        if args.verb == "subjects":
-            return _subjects(args, specs)
         return _new(args, specs) if args.verb == "new" else _exit(args, specs)
     except Refusal as refusal:
         return refuse(refusal, specs)
