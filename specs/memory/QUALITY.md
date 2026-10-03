@@ -8,21 +8,6 @@ tags: [testing, pytest, ci, quality, test-architecture, flake, quarantine, priva
 
 ## Principles
 
-### P-18 · We hold decomposed modules under a line-count ceiling that only decreases, and a deleted god module stays deleted.
-Measured by: `pytest tests/contract/test_module_size_ceiling.py` — the test module is the ceilings' one numeric home.
-ADR: none
-Rationale: split modules grow back one helper at a time unless a number refuses it.
-
-### P-19 · We pin cyclomatic complexity and nesting at their measured maxima and move them only downward, with the justification in the reducing release's closure record.
-Measured by: `ruff check dadaia_workspace/` (`C901`, `PLR1702`; ceilings pinned in `pyproject.toml`), run by `dadaia ci preflight` and the CI lint job.
-ADR: none
-Rationale: a ceiling measured first and pinned second is red only on growth.
-
-### P-20 · We do not grow `specs upgrade` / `dadaia doctor`: their complexity is pinned and the migration module changes only with a same-commit justification.
-Measured by: `pytest tests/contract/test_specs_cli_complexity_ratchet.py` (radon complexity of `cli/commands/specs.py#upgrade` and `cli/commands/doctor.py#doctor` plus a pinned hash of `features/migrate/upgrade.py`).
-ADR: none
-Rationale: these two surfaces absorbed every migration this product shipped.
-
 ### P-21 · We give every test a size tier with an enforced timeout applied at collection, and an explicit `@pytest.mark.timeout` is never overridden.
 Measured by: `pytest tests/contract/test_stewardship_mechanics.py -k "test_contract_tier_carries_30s_timeout or test_explicit_timeout_marker_is_never_overridden or test_tier_timeout_table_covers_all_four_layers"` (executed path: the marker on the test's own item; F041 — the bare `-k timeout` also matched the tier marker every contract item carries, collecting all 8 with 0 deselected).
 ADR: 0167 (accepted)
@@ -75,7 +60,6 @@ Rationale: a CI job that needs a paid model key fails closed on every PR without
 - Push triggers are `main`, `develop` and `feature/**`; PRs to `develop` or `main` run the same matrix as the local preflight.
 - `pr-source-guard` is fail-closed; the security review of both PR edges is the `dd-code-reviewer` security lens on the PR head, run by the main thread before the PR.
 - Every review verdict states the bug-surface delta from `bugs.py stats`, and no deploy is approved without the consumer-side matrix.
-- Ruff `C901` and `PLR1702` are scoped to `dadaia_workspace/` with ceilings pinned in `pyproject.toml` against the enforcing tool; `radon cc` reports and never gates.
 - Caches redirect by configuration, never by a remembered flag: `[tool.pytest.ini_options] addopts` (`-p no:cacheprovider`), `[tool.ruff] cache-dir` and `[tool.mypy] cache_dir` (`../../.dadaia/tmp/<tool>-cache`, relative on every OS), hypothesis `database = None`; a bare `pytest`, `ruff check`, `ruff format --check`, `mypy --strict` from the repo root leaves the tree clean (`tests/unit/features/ci_preflight/test_no_pollution.py`), so `dadaia ci preflight` runs exactly the bare commands.
 - The forbidden repo-local set is `core/workspace_layout.REPO_TREE_EXCLUDED`, measured by `tests/contract/test_source_repo_hygiene.py` and swept at every ALIVE repo by `dadaia doctor`.
 - Memory-vs-code drift is a `dadaia doctor` `specs`-section WARNING (`MEM-DRIFT-1` for the features package map, `MEM-DRIFT-2` for a dead `dadaia <verb>` or path an atom cites), never a push-gated test: a package added or a verb deleted mid-implementation is memory drift to fix at the next closure, not a red build.
