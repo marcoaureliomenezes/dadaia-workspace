@@ -44,8 +44,9 @@ Usage
     result = run_hook_subprocess("sdd_gate", payload, env)
     assert result.returncode == 0
 
-The behavior of every hook/gate test must flow through these helpers: a contract
-test (``tests/contract/test_harness_env_contract.py``) HARD-FAILS (no baseline) any test
+The behavior of every hook/gate test must flow through these helpers: the guard checks
+``harness-env-allowlist`` and ``hook-stdin-not-in-process`` (``scripts/guards/isolation.py``,
+which reads this module's two ``frozenset({...})`` literals) fail any test
 that ``setenv``s a non-allowlisted ``DADAIA_*`` outside this module, or imports a hook
 behavior module AND patches ``sys.stdin`` in-process to drive its ``main()`` instead of
 using :func:`run_hook_subprocess`. Pure-helper unit tests (e.g. ``sdd_gate._resolve_mode``)
@@ -196,7 +197,7 @@ HARNESS_CONTROL_DADAIA_ENV: Final[frozenset[str]] = frozenset(
 
 #: ``DADAIA_*`` / persona / mode vars that the harness NEVER provides to a hook and that
 #: therefore must be scrubbed from any inherited environment before a hook runs. Tests
-#: must never re-plant these (the contract test enforces it for the ``DADAIA_*`` half).
+#: must never re-plant these (``harness-env-allowlist`` enforces the ``DADAIA_*`` half).
 _FORBIDDEN_HOOK_ENV: Final[tuple[str, ...]] = (
     "DADAIA_SESSION_ID",
     "DADAIA_PERSONA",
@@ -211,7 +212,7 @@ _FORBIDDEN_HOOK_ENV: Final[tuple[str, ...]] = (
 #: The dadaia hook modules invocable as ``python -m dadaia_workspace.hooks.<name>``.
 #: ``_common`` is intentionally absent — it is a shared-primitives library (pure helpers
 #: like ``sanitize_session_id``), not a hook entrypoint, so unit-testing it directly is
-#: legitimate. The behavior-import contract test uses this same list.
+#: legitimate. The ``hook-stdin-not-in-process`` guard check reads this same literal.
 
 HOOK_MODULES: Final[frozenset[str]] = frozenset(
     {"sdd_gate", "sdd_post_gate", "ctx_inject", "root_whitelist", "pre_gate"}
