@@ -95,17 +95,6 @@ hypothesis = ">=6.165.2"
 pytest-xdist = "^3.8.0"
 pytest-timeout = "^2.3.1"
 
-# Optional, non-default dependency group — mutation testing (FR20, T-043-28). A plain
-# `poetry install` (what CI and every consumer install already run)
-# never pulls this group: it requires an explicit `poetry install --with mutation`.
-# Selection verdict: qa-engineer, .dadaia/tmp/qa-engineer/20260817/
-# v0.4.3-T-043-28-mutation-tool-verdict.md. Exact pin per FR1 (T-043-03's pin rule).
-[tool.poetry.group.mutation]
-optional = true
-
-[tool.poetry.group.mutation.dependencies]
-mutmut = "3.7.0"
-
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
@@ -188,26 +177,3 @@ exclude_lines = [
   "raise NotImplementedError",
   "if __name__ == .__main__.:",
 ]
-
-# Mutation-testing config (FR20, T-043-28). This table is INERT here — mutmut's own
-# `mutants/` sandbox directory is hardcoded relative to its invocation cwd with no
-# config key to redirect it (mutmut configuration.py:107), which collides with this
-# repo's "no caches in the repo tree" law (DADAIA.md §4) if invoked with cwd = repo
-# root. mutmut is therefore never invoked against THIS file: the actual execution cwd
-# is a staged copy under `.dadaia/tmp/software-engineer/<date>/mutation-run/` (see
-# `tests/scripts/run_mutation_baseline.sh`), which carries its own generated
-# `pyproject.toml` with these same keys. This copy is the single documented source of
-# truth for what those keys should be, kept in sync by hand at each release's run.
-#
-# Scope is `core/models/` (the verdict's own already-validated smoke-trial sub-slice),
-# not the wider `core/` the verdict recommended for the first baseline: mutmut's
-# `mutants/` sandbox mirrors ONLY `source_paths` on disk, and `tests/unit/core/` (flat)
-# contains real cross-layer architecture tests (e.g. tests reading
-# `dadaia_workspace/features/**` by path) that cannot run inside any sandbox narrower than the whole
-# package. Widening this scope is real follow-up work, not done here — see the runner
-# script's header for the full narrowing rationale.
-[tool.mutmut]
-source_paths = ["dadaia_workspace/core/models"]
-pytest_add_cli_args_test_selection = ["tests/unit/core/models"]
-mutate_only_covered_lines = true
-use_git_change_detection = false

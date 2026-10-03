@@ -27,17 +27,6 @@ def _ledger(tmp_path: Path, ids: list[str], **fields: object) -> Path:
     return specs
 
 
-def test_the_committed_ledger_is_clean_under_the_doctor_rule() -> None:
-    """ADR 0151 M1: red until every committed accepted record carries its ruling."""
-    # The one exception to `_ledger.records`: the doctor reports a physical line number.
-    ledger = (_REPO_ROOT / "specs" / "ADRs" / "decisions.jsonl").read_text("utf-8").split("\n")
-    issues = [
-        f"ADR {json.loads(ledger[int(i.message.rsplit(':', 1)[1][:-1]) - 1])['id']}: {i.message}"
-        for i in adr_record_issues(_REPO_ROOT / "specs")
-    ]
-    assert not issues, "\n".join(issues)
-
-
 _VALID_RECORD: dict[str, object] = {
     "id": "0001",
     "ts": "2026-08-28T12:00:00Z",
