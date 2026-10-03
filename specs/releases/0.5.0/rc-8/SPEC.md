@@ -35,6 +35,7 @@
   - Q1 "Keep in 0.5.0 as rc-11 (Recommended)". Q2 "Yes, into rc-8 (Recommended)".
   - Q3 "Register as bugs, fix in rc-8 W10 (Recommended)"; re-ruled for `init-announces-codex-trust`: "Not a bug: reject the entry (Recommended)".
   - Q4 "Derive it from `bugs.py fix` (Recommended)". Q5 "Reject; authority table goes to rc-12 notes (Recommended)". Q6 "rc-10 via dd-ask-me (Recommended)".
+  - Amendment: "Amend AC8.9, delete them (Recommended)" (AC8.9's second deletion list); "Use the native tools (Recommended)" (AC8.10's P-07 and P-28).
 - Order (root map §1): AC8.9; the rest of W8; W9; W10, after AC9.3 and AC8.1's `Intent:` strip. Width: the PLAN's Parallel schedule (0149).
 
 ## Gate — G1–G6, applied to W8–W10
@@ -58,9 +59,15 @@
   - With them: `setup.cfg` `features.ci_preflight`, `docs/cli.md`, `docs/getting-started.md`, `tests/conftest.py:436`, `tests/contract/README.md`, `test_preflight_doctor_scope.py`, `test_cli_ci.py`'s preflight cases, and every other line the grep below names; the preflight lines of `dd-gitflow-default/SKILL.md`, `RC-FLOW.md`, and, beyond the grep, `dadaia-AGENTS.md:14`, `tests/AGENTS.md:39`, `setup.cfg:59`, `pyproject.toml:99`, `core/workspace_resolver.py:26`, `test_cli_help_quality.py`'s case.
   - `ci push-gate-check` and `ci install-hook` (the pre-push chokepoint) stay; their cases (`test_cli_ci.py:62`, `test_push_gate_check.py:86`) stay green, no new test.
   - `code` anchors resolve any tracked path, the symbol optional. The `cli` anchor kind, `REPO_TREE_ARTIFACTS` reaping (and its consumers `privacy_check._PUBLIC_ASSET_IGNORED_DIRS`, `REPO_TREE_EXCLUDED`), `venv_guard`'s tool names and `_memory_drift`'s extension list turn language-neutral or leave (as-is review; deletion preferred). `public/scaffold/backlog/AGENTS.md` §4.1's `code` and `cli` rows and "no Python sources" bullet are rewritten.
+  - Also deleted, for G1 (no backlog or histo record binds `api`; ledger: `sa-subjects-resolve-is-circular`, `backlog-doctor-default-alias-map-unresolved-from-repo-subdir`, `backlog-subjects-readme-uses-unsupported-positional-resolve`, `backlog-subject-registry-lacks-top-level-doctor-cli-anchor`):
+    - the `api` anchor kind and its alias map: `subject_registry.py:80-107,330-348`, `SubjectKind.API`, the `api` of the backlog schema enum and `_backlog_write._KINDS`, `STATES_CANON`'s `backlog_subject_aliases.txt`;
+    - `doctor --alias-map` and `--source-root` with their threading (`cli/commands/doctor.py:104-105,278-287,320,335,356-357`, `build_context`, `build_registry`); `cli/_backlog_roots.py` leaves whole. `code` anchors come from the repo's tracked paths through the process adapter;
+    - `backlog.py subjects` (`backlog.py:93-101` and its wiring; `_backlog_write`'s kind refusal stops naming it);
+    - SPEC-DOC-005: `PLAN_MAX_LINES`, `features/specs/doctor_release.py:33,108-128`, `rules.py:69-74` (0143, 0152 (2)).
+  - With them: `public/scaffold/backlog/AGENTS.md` §4.1's `api` row and `subjects` bullet, `dd-backlog-definition/SKILL.md:62`, `CONSUMER_VALIDATION_RECIPE.md:37`, the `--source-root .` of `.github/workflows/ci.yml:345` and `docs/getting-started.md:113`, `tests/contract/README.md:91`, and the cases the grep below names. `test_backlog_definition_backlog_script.py:493`'s `panel` refusal (B4) stays, gaining an `api` row. The memory pass rewrites `backlog-ledger.md:30,41` and `workspace-doctor.md:28-29,56`; `QUALITY.md:71` is AC8.10's.
   - `TOOL_CACHE_ENV` stays (0080), language-neutral; the no-cache-in-tree case `test_tool_caches_stay_in_the_tmp_zone.py` stays green and gains a `pytest` parametrize row, not a new test.
   - This repo's `AGENTS.md` gains a line installing the `dev` group into the workspace venv; its CI equivalent lives there and in `.github/`.
-  - Command: `git grep -niE 'ci.?preflight|CiPreflight|_ensure_ci_toolchain|subprocess_runner_for_ci|[^_]is_source_repo_root' -- . ':!specs' ':!CHANGELOG.md'` prints nothing; `.dadaia/.venv/bin/dadaia ci preflight` exits 2.
+  - Command: `git grep -niE 'ci.?preflight|CiPreflight|_ensure_ci_toolchain|subprocess_runner_for_ci|[^_]is_source_repo_root|alias.?map|backlog_subject_aliases|SubjectKind\.API|kind=api|"code", "api"|py subjects|SCRIPT\} subjects|"subjects":|--source-root|source_root[:=]|"source_root"|SPEC-DOC-005|PLAN_MAX_LINES|check_plan_line_limit' -- . ':!specs' ':!CHANGELOG.md'` prints nothing; `.dadaia/.venv/bin/dadaia ci preflight`, `.dadaia/.venv/bin/dadaia doctor --source-root .` and `backlog.py subjects` exit 2.
   - Case: `test_python_env.py:85-93` asserts no `pytest` install; CI's `dev`-group install proves the line; no new venv.
   - Case: a backlog `code` anchor to a `.go` file passes BL-SCHEMA.
   - At closure, `preflight-ci-parity-derived` exits `superseded --release 0.5.0`; the memory pass deletes the `ci-preflight` atom.
@@ -80,8 +87,12 @@
   - Command: `git ls-files tests | grep -E 'suite_cannot_reach|stewardship_mechanics|repo_self_scan|source_repo_hygiene|test_suite_ratchets|mutation_baseline|slop_ratchets|import_linter_ignore_cap|preflight|ci_workflow_hygiene|memory_canonical_shape|version_lineage|frozen_clock_aging|harness_env_contract'` prints nothing; the CI job's log names each moved guard.
   - At closure, `meta-tests-leave-pytest` stays active: `test_docs_derived_from_memory.py` is its one leftover (AC8.10), so its done-when is unmet.
 - AC8.10 Every principle whose test leaves pytest keeps a check (0176):
-  - QUALITY P-21 `tier-timeout`, P-22 `quarantine-needs-bug`, P-23 `private-import-ratchet`, P-28 `marker-set-closed`, P-33 `no-model-api-in-ci`; ARCHITECTURE P-07 `features-modules-equal-packages`, P-10 `ignore-cap`, P-30 `release-workflow-canon`, P-32 `memory-canonical-shape`.
-  - Each is a guard check with a planted violation, named by its `Measured by` in 0176's accept commit, which drops `RELEASE-TREE-MEMORY` (F128) and `-k model_api` (F131) and strikes P-30's archive clause, false under 0152 (1) (`release.py ship`). Command: 0176's `measured_by` grep prints nothing.
+  - QUALITY P-21 `tier-timeout`, P-22 `quarantine-needs-bug`, P-23 `private-import-ratchet`, P-28, P-33 `no-model-api-in-ci`; ARCHITECTURE P-07, P-10 `ignore-cap`, P-30 `release-workflow-canon`, P-32 `memory-canonical-shape`.
+  - The seven named are guard checks with a planted violation. Each check is named by its `Measured by` in 0176's accept commit. That commit drops `RELEASE-TREE-MEMORY` (F128) and `-k model_api` (F131), and strikes P-30's archive clause, false under 0152 (1) (`release.py ship`).
+  - P-07 and P-28 are measured by the tool itself:
+    - P-07 by `lint-imports`: contract `features-no-cross-feature` lists `modules = dadaia_workspace.features.*`, which import-linter 2.13 expands (verified 2026-10-03: kept on the tree, broken by a planted sibling import). `setup.cfg:97-109`'s hand-kept list and `test_import_linter_ignore_cap.py:57` leave.
+    - P-28 by pytest's `--strict-markers`, added to `pyproject.toml:153` `addopts` (absent today; the suite collects under it, and a planted unregistered mark fails collection). `_KNOWN_MARKERS` (`tests/conftest.py:234-238`) and `test_stewardship_mechanics.py:100` leave; P-28's statement drops `_KNOWN_MARKERS`.
+  - Command: 0176's `measured_by` grep prints nothing; `git grep -nE '_KNOWN_MARKERS|modules_equals_disk|marker_set_is_pinned' -- . ':!specs' ':!CHANGELOG.md'` prints nothing; `lint-imports --config setup.cfg --no-cache` and `pytest --collect-only -q` exit 0.
   - P-29 stays outside 0176, its test file too: its record 0012 is rejected, publish-gate check #7 (rc-12) rules on it, and a `### P-NN` line never takes the 0138 lane.
   - Repaired in place (0138), each by a `chore(adrs): repair …` commit in the release worktree right after its moving task merges (`impl` cannot stage `decisions.jsonl`; a6bca8d52): 0016, 0017, 0020, 0021, 0023, 0025, 0049, 0052, 0070, 0071, 0078, 0080, 0088. 0080 keeps `test_workspace_layout_zones.py` (it asserts no `.cache` zone) and swaps `test_no_pollution.py` for AC8.9's no-cache case.
   - Truth corrections (0138), at or before the accept commit, after the removing task: `QUALITY.md:46` (`suite_files`, the xdist reason), `47, 51-53, 55, 59-60, 63-64, 69, 71`, `72` ("sits beside the ratchets"); `ARCHITECTURE.md:102, 110`, `134` (13 packages become 12), `139`; `ARCHITECTURE.md:130` ("seven" import-linter contracts; `setup.cfg` holds six) is already false.
@@ -138,8 +149,10 @@ After AC9.3 and AC8.1's `Intent:` strip merge. Each RED is a behaviour assert in
 ## Replaces
 
 - `ci preflight`, its scope error, runner and pytest bootstrap; the Python-only anchors, reaping list, tool names, extension list and `TOOL_CACHE_ENV` list (AC8.9).
+- The `api` anchor kind and its alias map, `backlog.py subjects`, `doctor --alias-map` and `--source-root`, SPEC-DOC-005 (AC8.9).
 - `dd-test-stewardship`, the tests-AGENTS template, the `Intent:` convention, V28, V29, V31; MEMORY-UPDATE's own canonical-memory rule.
 - Duplicate meta-tests, the mutation tooling, meta-test pytest files; nine principles' pytest `Measured by` and P-30's archive clause (0176).
+- The hand-kept `features-no-cross-feature` module list and `_KNOWN_MARKERS`, with their equality checks (0176).
 - Prose, roster and count asserts; CONTEXT-MAP's `Measured` and skills `Budget` columns; 0143's symbol-list `measured_by`.
 - Phase 5's "rewritten", Phase 6's "net ≤ 0"; required `evidence_seam`/`evidence_diff`, their verification, metric 2 over them, direction from `evidence_diff`; the `git log -S` recipe; an unreasoned `none`; the "reopen" wording; §3a row 4's resolve-only wording.
 - Ad-hoc child envs, `COVERAGE_FILE` redirects; the cross-context walk; build-identity venv reuse; the bare `KeyError`; the no-block warning for an absent constitution; HOOKS-DRIFT-1's fixed "differs"; the reconcile scratch and unconditional hook rewrite; the deleted surface regex; the second `kind: memory` append.
