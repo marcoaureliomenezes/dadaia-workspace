@@ -1,14 +1,14 @@
 {
   "schema": "release-state-v1",
   "release": "0.5.0",
-  "phase": "IMPLEMENTATION",
+  "phase": "CLOSURE",
   "defined": {
     "sha": "79fe0eccc8fa57cad6cc5694e33ec88950ea4a9e",
     "ts": "2026-10-01T12:44:44Z"
   },
   "implemented": {
-    "sha": "3699adfe",
-    "ts": "2026-10-01T04:51:52Z"
+    "sha": "22054713a",
+    "ts": "2026-10-03T03:03:06Z"
   },
   "shipped": null,
   "log": [
@@ -777,6 +777,15 @@
       "agent": "dd-product-engineer",
       "kind": "dispositions",
       "text": "G6 - audit 20260930-structural-convergence: open before 81 (13 HIGH, 42 MEDIUM, 26 LOW); 29 resolved --release 0.5.0 by f9afc5392 (specs/audits direct write), each reason naming its rc-7 AC and task commits: F002 F007 F010 F012 F013 F016 F017 F024 F029-F041 F052 F058 F059 F061 F063 F099 F102 F103; open after 52 (11 HIGH, 22 MEDIUM, 19 LOW); deferred F053 F054 F057 F080 stay traced. Backlog active[] re-audited against W3/W4 as merged: 29 entries, all idea; none is delivered by W3/W4 (the four delivered picks exited at aa332ebbe, task-line-grammar-one-reader to-bug). Re-scope, recorded as a note only (rc-8 is not defined): the operator's rc-8 test-candidate grill of 2026-10-02 (handoff 2026-10-02T204839Z-main-thread-grill-rc8-test-candidate) makes the new rc-8 the test/bug candidate built from ADRs 0163-0167, task ids from T-050-153 - bug-fix-adds-never-rewrites-asserts and meta-tests-leave-pytest (0163); bug-fix-commit-derived-by-grep, caused-by-proposed-by-blame, focused-review-on-caused-by (0164); grill-one-question-with-options (0165); lib-test-guidance-dehydrated (0166, superseding tests-agents-scaffold-without-placeholders and test-intent-docstring-backfill on delivery); tests-tree-mirrors-the-package, delete-text-count-inventory-asserts, unit-tier-without-processes (0167; it also carries rc-7's slow-class G4 growth); architecture-survey-flat-core-infrastructure runs alongside it. The old rc-8 residue folds into the promote candidate rc-9: spec-context-refusals-print-prose, privacy-baseline-one-parser, ledger-refusals-guess-specs-from-command-shape, ledger-reader-one-numbered-tolerant-iterator and its drafted tasks. Destinations to restate at definition: worktree-rows-injected-not-monkeypatched and doctor-in-a-fresh-worktree-lacks-rendered-specs-law (old 'rc-8 W6'), windows-integration-coverage-gap (old 'rc-8 W5'), bug-terminal-transition-commit-shape ('rc-8'). No destination: doctor-context-ignores-other-contexts, release-memory-idempotent, guidance-messages-name-the-right-target (root_whitelist's fix still proposes mkdir .dadaia/tmp), init-announces-codex-trust, preflight-ci-parity-derived, docs-site-zensical-pages, clone-detection, launch-operator-acts."
+    },
+    {
+      "ts": "2026-10-03T03:03:06Z",
+      "agent": "release.py",
+      "kind": "milestone",
+      "candidate": "rc-7",
+      "milestone": "implemented",
+      "sha": "22054713a",
+      "text": "Candidate implemented at 22054713a; phase CLOSURE."
     }
   ]
 }
