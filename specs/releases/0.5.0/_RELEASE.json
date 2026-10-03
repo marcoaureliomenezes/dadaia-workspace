@@ -854,6 +854,12 @@
       "agent": "dd-product-engineer",
       "kind": "artifact-gc",
       "text": "RC-FLOW step 8, dadaia doctor --context dadaia-workspace. Operator act first: .vscode entered .dadaiaignore (line 15) before any --fix, so it was held by the operator's pattern, not reaped. 2026-10-03 doctor --fix --expired-only, two passes (about 04:14Z and 04:20Z): six expired dd-code-reviewer handoffs moved to .dadaia/reaped/20261003/.dadaia/handoff/dadaia-workspace/ under the 7-day hold (T-050-146-final, T-050-146-cifix-final, T-050-143-final, rc7-release-ac45-final, T-050-148-final, T-050-147-final; verified on disk); two expired tmp/hooks ctx-inject-fired markers deleted (EPHEMERAL); tmp/general-purpose skipped with errno 13 (a root-owned 0.4.7 wheel left by the 2026-09-28 docker probe, bug doctor-tmp-expiry-foreign-owned-entry-never-clears) under its Operator action line, and the operator removed it by hand (absent on disk now). Dry doctor after: exit 0 at 2026-10-03T04:20:09Z, re-run exit 0 at 04:20:25Z with no error or warning line and no newly expired handoff - only info lines: 15 WS-reaped-reaped countdowns across 8 day directories (reaped/ holds 48M, oldest entries 1 day left), WORKTREE info for this empty release worktree, and ONBOARDING info naming the dadaia-agents context's foreign specs tree (another context's next step, not a dadaia-workspace finding). G4's doctor exit 0 clause, open in the 00:41:04Z drifts entry, is met."
+    },
+    {
+      "ts": "2026-10-03T04:58:00Z",
+      "agent": "main-thread",
+      "kind": "note",
+      "text": "Candidate 7 closure merged into develop by PR #278 (merge c80bfe63, head c9464dde, every check green, dd-code-reviewer APPROVED c9464dde; develop CI run 37097495370 green). Gate: continue — operator ruling \"Continue: rc-8 (Recommended)\": rc-8 is the test/bug candidate (ADRs 0163-0167 and 0170, the open backlog and bugs, task ids from T-050-153); 0 open bugs and 0 open backlog precede the promote."
     }
   ]
 }
