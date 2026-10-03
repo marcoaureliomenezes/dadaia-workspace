@@ -137,13 +137,13 @@ def _frozen_kind(name: str, value: ast.expr) -> str | None:
     """A constructed ``datetime``/``date`` is frozen whatever its name; a number or an ISO
     string only under a clock-marked name (``_TIMEOUT_S = 60`` is no clock)."""
     if isinstance(value, ast.Call):
-        return "datetime-literal" if _tail(value.func) in ("datetime", "date") else None
-    if not any(m in name for m in _CLOCK_MARKERS) or not isinstance(value, ast.Constant):
+        callee = _tail(value.func)
+        return f"{callee}-call" if callee in ("datetime", "date") else None
+    v = value.value if isinstance(value, ast.Constant) else None
+    number = isinstance(v, (int, float)) and not isinstance(v, bool)
+    if not (number or (isinstance(v, str) and _ISO_DATE.match(v))):
         return None
-    v = value.value
-    if isinstance(v, (int, float)) and not isinstance(v, bool):
-        return "marked-number"
-    return "marked-iso" if isinstance(v, str) and _ISO_DATE.match(v) else None
+    return next((f"{m.lower()}-name" for m in _CLOCK_MARKERS if m in name), None)
 
 
 def _frozen(module: ast.Module) -> list[tuple[str, str, int]]:
@@ -380,6 +380,10 @@ def age(monkeypatch, path):
     os.environ["HOME"] = "/h"
     os.environ.update({"DADAIA_MODE": "read"})
     monkeypatch.setattr(sys, "argv", [])
+    clock.now()
+    datetime.fromtimestamp(0)
+    monkeypatch.setitem(config, "DADAIA_X", 1)
+    config.update({"DADAIA_X": 1})
 """
 
 _CONTROL_CLOCK = """
@@ -418,9 +422,9 @@ def CONTROL(root: Path) -> Session:
     only in an untracked, gitignored ``tests/tmp/x.py`` (bugs 465, 467) or in the fixture
     itself, the one module that may write any ``DADAIA_*``."""
     _write(root, ".gitignore", "tests/tmp/*\n")
-    _write(root, "tests/tmp/x.py", _VIOLATOR.replace("HOOK", _HOOK))
+    _write(root, "tests/tmp/x.py", _VIOLATOR.replace("HOOK", _hook()))
     _fixture_copy(root, tail='\nos.environ["DADAIA_PERSONA"] = "x"\n')
-    _write(root, "tests/unit/test_frozen_alone.py", _CONTROL_TEST.replace("HOOK", _HOOK))
+    _write(root, "tests/unit/test_frozen_alone.py", _CONTROL_TEST.replace("HOOK", _hook()))
     _write(root, "tests/unit/test_clock_alone.py", _CONTROL_CLOCK)
     _write(root, "tests/unit/test_stdin_common.py", _CONTROL_STDIN)
     return _healthy()
@@ -429,7 +433,7 @@ def CONTROL(root: Path) -> Session:
 def _plant(rel: str, text: str) -> Callable[[Path], Session]:
     def plant(root: Path) -> Session:
         session = CONTROL(root)
-        _write(root, rel, text)
+        _write(root, rel, text.replace("HOOK", _hook()) if "HOOK" in text else text)
         return session
 
     return plant
@@ -447,6 +451,11 @@ def _hooks_literal() -> tuple[str, ast.expr]:
     )
 
 
+def _hook() -> str:
+    """Any member of the real ``HOOK_MODULES``, read at plant time, never at import."""
+    return str(min(ast.literal_eval(_hooks_literal()[1])))
+
+
 def _plant_hooks(rewrite: Callable[[str], str]) -> Callable[[Path], Session]:
     """The real fixture with only ``HOOK_MODULES``'s set literal rewritten, wherever ruff
     lays it out: the guard names no hook member."""
@@ -461,11 +470,14 @@ def _plant_hooks(rewrite: Callable[[str], str]) -> Callable[[Path], Session]:
     return plant
 
 
+def _clock(frozen: str, call: str = "time.time()") -> Callable[[Path], Session]:
+    return _plant("tests/unit/test_p.py", f"import time\n{frozen}\ndef age():\n    return {call}\n")
+
+
 def _env(write: str) -> Callable[[Path], Session]:
     return _plant("tests/unit/test_env.py", f"import os\ndef t(monkeypatch):\n    {write}\n")
 
 
-_HOOK = min(ast.literal_eval(_hooks_literal()[1]))  # any member: the fixture decides
 _UNREADABLE = _plant_hooks(lambda s: f"[{s[1:-1]}]")
 
 CHECKS: dict[str, Check] = {
@@ -493,20 +505,14 @@ CHECKS: dict[str, Check] = {
     "frozen-clock": (
         frozen_clock,
         {
-            "datetime-literal": _plant(
-                "tests/unit/test_p.py",
-                "import datetime as dt\n_FROZEN_NOW = dt.datetime(2026, 1, 1)\n"
-                "def age():\n    return dt.datetime.now().timestamp()\n",
+            "datetime-call": _clock(
+                "import datetime as dt\n_X = dt.datetime(2026, 1, 1)", "dt.datetime.now()"
             ),
-            "marked-number": _plant(
-                "tests/unit/test_p.py",
-                "import time as _time\n_FROZEN_TS: float = 1.7e9\n"
-                "def age():\n    return _time.time() - 86400\n",
-            ),
-            "marked-iso": _plant(
-                "tests/unit/test_p.py",
-                "import time\n_NOW = '2026-01-01T00:00Z'\ndef age():\n    return time.time()\n",
-            ),
+            "date-call": _clock("from datetime import date\n_X = date(2026, 1, 1)"),
+            "now-name": _clock("_NOW = '2026-01-01T00:00Z'"),
+            "frozen-name": _clock("_FROZEN_TS: float = 1.7e9"),
+            "epoch-name": _clock("_EPOCH_S = 0"),
+            "timestamp-name": _clock("_START_TIMESTAMP = '2026-01-01'"),
         },
     ),
     "harness-env-allowlist": (
@@ -527,12 +533,12 @@ CHECKS: dict[str, Check] = {
             "fixture-unreadable": _UNREADABLE,
             "from-import": _plant(
                 "tests/unit/test_h.py",
-                f"import io\nfrom dadaia_workspace.hooks import {_HOOK}\n"
+                "import io\nfrom dadaia_workspace.hooks import HOOK\n"
                 "def t(m):\n    m.setattr('sys.stdin', io.StringIO())\n",
             ),
             "module-import": _plant(
                 "tests/unit/test_h.py",
-                f"import io, sys\nimport dadaia_workspace.hooks.{_HOOK}\n"
+                "import io, sys\nimport dadaia_workspace.hooks.HOOK\n"
                 "def t(m):\n    m.setattr(sys, 'stdin', io.StringIO())\n",
             ),
         },
