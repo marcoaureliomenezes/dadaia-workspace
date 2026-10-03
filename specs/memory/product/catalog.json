@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-10-03T03:27:19Z",
+  "generated_at": "2026-10-03T17:25:31Z",
   "features": [
     {
       "rank": 1,
@@ -428,33 +428,6 @@
     },
     {
       "rank": 15,
-      "slug": "ci-preflight",
-      "title": "ci-preflight",
-      "area": "platform",
-      "tldr": "dadaia ci preflight runs the library's seven CI checks locally, fenced like a bare checkout, and refuses outside the source repo.",
-      "summary": "The local CI-equivalent run a contributor makes before every push of the dadaia-workspace source repo: seven ordered checks resolved from the running venv, run in a fenced bare checkout as CI runs them, fail-fast by default, exit 1 with each failing check's output tail; any other repo is refused with a message pointing at its own CI.",
-      "path": "specs/memory/product/platform/ci-preflight.md",
-      "tags": [
-        "ci",
-        "preflight",
-        "lint",
-        "typecheck",
-        "tests"
-      ],
-      "token_estimate": 355,
-      "depends_on": [
-        "sdd-gate-v3",
-        "pypi-distribution",
-        "QUALITY"
-      ],
-      "sources": [
-        "dadaia_workspace/features/ci_preflight/**",
-        "dadaia_workspace/cli/commands/ci.py",
-        "dadaia_workspace/infrastructure/subprocess_runner.py"
-      ]
-    },
-    {
-      "rank": 16,
       "slug": "consumer-agent-support",
       "title": "Consumer validation gate",
       "area": "platform",
@@ -484,7 +457,7 @@
       ]
     },
     {
-      "rank": 17,
+      "rank": 16,
       "slug": "context-management",
       "title": "context-management",
       "area": "platform",
@@ -522,7 +495,7 @@
       ]
     },
     {
-      "rank": 18,
+      "rank": 17,
       "slug": "context-portability",
       "title": "context-portability",
       "area": "platform",
@@ -548,7 +521,7 @@
       ]
     },
     {
-      "rank": 19,
+      "rank": 18,
       "slug": "cross-platform-portability",
       "title": "cross-platform-portability",
       "area": "platform",
@@ -576,7 +549,7 @@
       ]
     },
     {
-      "rank": 20,
+      "rank": 19,
       "slug": "server-registry",
       "title": "server-registry",
       "area": "platform",
@@ -599,7 +572,7 @@
       ]
     },
     {
-      "rank": 21,
+      "rank": 20,
       "slug": "specs-migration",
       "title": "specs-migration",
       "area": "platform",
@@ -630,7 +603,7 @@
       ]
     },
     {
-      "rank": 22,
+      "rank": 21,
       "slug": "workspace-doctor",
       "title": "workspace-doctor",
       "area": "platform",
@@ -674,7 +647,7 @@
       ]
     },
     {
-      "rank": 23,
+      "rank": 22,
       "slug": "workspace-init",
       "title": "workspace-init",
       "area": "platform",
@@ -710,7 +683,7 @@
       ]
     },
     {
-      "rank": 24,
+      "rank": 23,
       "slug": "audits-canon",
       "title": "audits-canon",
       "area": "sdd",
@@ -744,7 +717,7 @@
       ]
     },
     {
-      "rank": 25,
+      "rank": 24,
       "slug": "backlog-ledger",
       "title": "backlog-ledger",
       "area": "sdd",
@@ -774,7 +747,7 @@
       ]
     },
     {
-      "rank": 26,
+      "rank": 25,
       "slug": "bug-ledger",
       "title": "bug-ledger",
       "area": "sdd",
@@ -806,7 +779,7 @@
       ]
     },
     {
-      "rank": 27,
+      "rank": 26,
       "slug": "release-lifecycle",
       "title": "release-lifecycle",
       "area": "sdd",
@@ -843,7 +816,7 @@
       ]
     },
     {
-      "rank": 28,
+      "rank": 27,
       "slug": "sdd-gate-v3",
       "title": "sdd-gate-v3",
       "area": "sdd",
@@ -885,7 +858,7 @@
       ]
     },
     {
-      "rank": 29,
+      "rank": 28,
       "slug": "worktrees",
       "title": "worktrees",
       "area": "sdd",
