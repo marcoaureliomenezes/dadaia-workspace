@@ -27,7 +27,6 @@ KINDS: dict[str, tuple[str, ...]] = {
     ),
 }
 CAPS = {"impl": 5, "release": 1}
-UNION = "*.jsonl merge=union"
 LOCK = "dadaia:"
 _NAME_RE = re.compile(r"^(?P<v>\d+\.\d+\.\d+)(?P<l>[a-z])-(?P<k>" + "|".join(KINDS) + r")$")
 

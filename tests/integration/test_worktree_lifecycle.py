@@ -2,7 +2,7 @@
 removes and `branch -d`s a reviewed worktree, re-runnable; every refusal (dirty, outside the
 kind's allowed set, conflicting rebase, no APPROVED verdict for HEAD, ignored files, wrong
 branch, failed fast-forward: a stray or a moved work branch) carries one `fix:` that clears it; `clean`
-removes only an empty `dadaia:` worktree. AC1.9 (T-050-98): ledgers union, TASKS markers replay.
+removes only an empty `dadaia:` worktree. AC1.9 (T-050-98): TASKS markers replay.
 Size: MEDIUM (real git, tmp workspace).
 """
 
@@ -180,10 +180,10 @@ def test_failed_fast_forward_tells_a_stray_from_a_moved_work_branch(root: Path) 
     assert _argv(moved) == [sys.executable, str(SCRIPT), "merge", str(tree)] and tree.exists()
 
 
-def test_parallel_siblings_union_ledgers_and_replay_task_markers(root: Path) -> None:
+def test_parallel_siblings_replay_task_markers(root: Path) -> None:
     """AC1.9 (ADR 0111): the worktree's TASKS marker flips replay onto the sibling-advanced work
     side, most advanced state winning; any worktree change beyond markers, or a missing side,
-    refuses; JSONL ledgers merge by union."""
+    refuses."""
     repo, tree, tasks = root / "repos/r", root / TREE, "specs/releases/0.5.0/rc-1/TASKS.md"
     s = "**Status:** Approved\n"  # the trio stays Approved for the next `new`
     commit(repo, tasks, s + "- [ ]**T-1**\n* [ ] **T-2**\n+ [ ] **T-3**\n")  # AC3.3 spellings
@@ -219,14 +219,6 @@ def test_parallel_siblings_union_ledgers_and_replay_task_markers(root: Path) -> 
     assert _argv(run(root, "merge", TREE)) == refused  # modify/delete: no side to replay onto
     git(tree, "reset", "-q", "--hard", "feature/0.5.0")
     assert run(root, "clean", TREE).returncode == 0
-    assert run(root, "new", "r", "--kind", "bug").returncode == 0
-    bug, ledger = root / "worktrees/r/0.5.0a-bug", "specs/bugs/BUGS.jsonl"
-    commit(repo, ledger, '{"id": "a"}\n')
-    git(bug, "rebase", "-q", "feature/0.5.0")
-    commit(bug, ledger, '{"id": "a"}\n{"id": "b"}\n')
-    commit(repo, ledger, '{"id": "a"}\n{"id": "c"}\n')
-    run(root, "merge", "worktrees/r/0.5.0a-bug")
-    assert (bug / ledger).read_text() == '{"id": "a"}\n{"id": "c"}\n{"id": "b"}\n'
 
 
 def test_merge_lists_ignored_files_and_keeps_them_by_its_fix(root: Path) -> None:

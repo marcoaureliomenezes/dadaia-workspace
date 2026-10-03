@@ -127,8 +127,8 @@ def _replayed(tree: Path, rel: str) -> list[str] | None:
 
 
 def _rebase(tree: Path, work: str) -> None:
-    """Rebase onto *work*: JSONL ledgers union (the `new` attributes); a conflict in TASKS
-    markers alone replays; anything else aborts and refuses."""
+    """Rebase onto *work*: a conflict in TASKS markers alone replays; anything else, a JSONL
+    ledger included, aborts and refuses — re-run the ledger's writer on the rebased tree."""
     step: tuple[str, ...] = ("rebase", "-q", work)
     while True:
         try:

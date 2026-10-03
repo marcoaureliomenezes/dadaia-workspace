@@ -24,19 +24,21 @@ def root(tmp_path: Path) -> Path:
     return make_workspace(tmp_path)
 
 
-def test_new_branches_locks_and_marks_union_idempotently(root: Path) -> None:
+def test_new_branches_and_locks(root: Path) -> None:
     repo = root / "repos/r"
+    ahead = _git(repo, "commit-tree", "HEAD^{tree}", "-p", "HEAD", "-m", "ahead").strip()
+    _git(repo, "branch", "-f", "feature/0.5.0", ahead)  # the start point is the work branch
     assert _run(root, "new", "r", "--kind", "impl").returncode == 0
     second = _run(root, "new", "r", "--kind", "backlog")
     assert second.returncode == 0, second.stderr
     assert (root / "worktrees/r/0.5.0a-impl").is_dir()
     assert (root / "worktrees/r/0.5.0b-backlog").is_dir()
-    assert _git(repo, "rev-parse", "wt/0.5.0a-impl") == _git(repo, "rev-parse", "feature/0.5.0")
-    porcelain = _git(repo, "worktree", "list", "--porcelain")
-    assert "locked dadaia:impl:0.5.0a" in porcelain
-    assert "locked dadaia:backlog:0.5.0b" in porcelain
-    attributes = (repo / ".git/info/attributes").read_text().splitlines()
-    assert attributes.count("*.jsonl merge=union") == 1
+    assert _git(repo, "rev-parse", "wt/0.5.0a-impl").strip() == ahead
+    porcelain = _git(repo, "worktree", "list", "--porcelain").splitlines()
+    assert [x for x in porcelain if x.startswith("locked")] == [
+        "locked dadaia:impl:0.5.0a",
+        "locked dadaia:backlog:0.5.0b",
+    ]
 
 
 def test_no_work_branch_refuses_with_a_fix_that_creates_it(root: Path) -> None:
@@ -101,16 +103,6 @@ def test_symlinked_worktrees_component_refuses(
     result = _run(root, "new", "r", "--kind", "bug")
     assert result.returncode == 1 and len(_fixes(result)) == 1
     assert "symlink" in result.stderr
-
-
-def test_failure_after_add_rolls_back(root: Path) -> None:
-    repo = root / "repos/r"
-    (repo / ".git/info/attributes").mkdir(parents=True)
-    result = _run(root, "new", "r", "--kind", "bug")
-    assert result.returncode == 1 and len(_fixes(result)) == 1
-    assert not (root / "worktrees/r/0.5.0a-bug").exists()
-    assert "wt/" not in _git(repo, "branch", "--list", "wt/*")
-    assert "0.5.0a-bug" not in _git(repo, "worktree", "list")
 
 
 def test_list_reports_ours_with_ahead_and_dirty_and_a_native_one_as_foreign(root: Path) -> None:

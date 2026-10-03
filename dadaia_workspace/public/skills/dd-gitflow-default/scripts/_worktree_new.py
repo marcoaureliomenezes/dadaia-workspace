@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""`worktree.py new`: derive, lock and mark one canonical worktree, or roll it back."""
+"""`worktree.py new`: derive and lock one canonical worktree."""
 
 from __future__ import annotations
 
@@ -12,7 +12,7 @@ sys.path.append(str(Path(__file__).resolve().parents[2] / "dd-release-implementa
 from _release_schema import candidate_number, extract_status  # noqa: E402
 from _worktree_git import flow_for, git, quote, rows, script, work_version  # noqa: E402
 from _worktree_git import ours as our_trees  # noqa: E402
-from _worktree_kinds import CAPS, LOCK, SCRIPT, UNION, Refusal  # noqa: E402
+from _worktree_kinds import CAPS, LOCK, SCRIPT, Refusal  # noqa: E402
 
 
 def _refuse_symlink(root: Path, repo_name: str) -> None:
@@ -63,24 +63,6 @@ def new(root: Path, repo_name: str, kind: str) -> Path:
         )
     name = f"{version}{free[0]}-{kind}"
     tree, branch = root / "worktrees" / repo_name / name, f"wt/{name}"
-    git(repo, "worktree", "add", "-q", "-b", branch, str(tree), work)
-    try:
-        git(repo, "worktree", "lock", "--reason", f"{LOCK}{kind}:{version}{free[0]}", str(tree))
-        attributes = Path(
-            git(repo, "rev-parse", "--path-format=absolute", "--git-common-dir").strip()
-        )
-        attributes = attributes / "info" / "attributes"
-        lines = attributes.read_text(encoding="utf-8").splitlines() if attributes.exists() else []
-        if UNION not in lines:
-            attributes.parent.mkdir(parents=True, exist_ok=True)
-            attributes.write_text("\n".join([*lines, UNION]) + "\n", encoding="utf-8")
-    except (OSError, RuntimeError) as error:
-        # --force and -D only here: this call made the tree and branch, both hold nothing.
-        git(repo, "worktree", "unlock", str(tree), check=False)
-        git(repo, "worktree", "remove", "--force", str(tree), check=False)
-        git(repo, "branch", "-D", branch, check=False)
-        raise Refusal(
-            f"rolled back {name}: {error}",
-            f"{script(SCRIPT)} new {quote(repo_name)} --kind {kind}",
-        ) from error
+    reason = f"{LOCK}{kind}:{version}{free[0]}"
+    git(repo, "worktree", "add", "-q", "--lock", "--reason", reason, "-b", branch, str(tree), work)
     return tree

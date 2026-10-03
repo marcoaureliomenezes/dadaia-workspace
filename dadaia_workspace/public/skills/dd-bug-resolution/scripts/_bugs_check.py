@@ -142,7 +142,7 @@ def archived_ids(text: str) -> frozenset[str]:
 
 def check(specs: Path) -> list[dict[str, Any]]:
     """Validate the committed ledger and its archive; a young specs tree with neither is
-    not a finding. A union merge can join two valid writes into a cycle: check re-judges."""
+    not a finding. A merge can join two valid writes into a cycle: check re-judges."""
     ledger, histo = specs / LEDGER, specs / HISTO
     text = ledger.read_text(encoding="utf-8") if ledger.is_file() else ""
     archived = histo.read_text(encoding="utf-8") if histo.is_file() else ""
