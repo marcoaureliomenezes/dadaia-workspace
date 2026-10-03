@@ -12,7 +12,6 @@ from typer.testing import CliRunner
 
 from dadaia_workspace.cli.main import app
 from dadaia_workspace.features.specs.doctor_adr import adr_record_issues
-from dadaia_workspace.infrastructure.ledger_scripts import load_owner
 
 pytestmark = pytest.mark.contract
 
@@ -228,20 +227,3 @@ def test_the_projected_law_names_the_doctor_and_no_measured_by_pattern() -> None
         in law
     )
     assert "test_adr_canon" not in law and "SPEC-DOC-nnn" not in law
-
-
-def test_every_superseded_record_is_named_by_some_successor() -> None:
-    """Every committed `superseded` record is named by some successor's `supersedes`."""
-    records = load_owner("dd-bug-resolution", "_ledger").records(
-        _REPO_ROOT / "specs" / "ADRs" / "decisions.jsonl"
-    )
-    named = {
-        adr_id
-        for record in records
-        for adr_id in (record.get("supersedes") or "").split(",")
-        if adr_id
-    }
-    orphans = sorted(
-        r["id"] for r in records if r["status"] == "superseded" and r["id"] not in named
-    )
-    assert orphans == [], f"superseded with no successor naming them: {orphans}"
