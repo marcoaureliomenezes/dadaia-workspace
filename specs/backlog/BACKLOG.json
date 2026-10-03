@@ -434,6 +434,76 @@
       "relates": [
         "adr-born-at-release-with-options"
       ]
+    },
+    {
+      "id": "agent-behavior-evals",
+      "title": "Agent-behavior evals gate the 0.5.0 publish: Claude Code runs T1 and T2 under Harbor, k=3, on 0.4.7 and on the candidate wheel, in dadaia-evals",
+      "opened": "2026-10-03",
+      "status": "idea",
+      "description": "Why: 0.5.0 changes agent-facing behaviour across seven candidates (rc-1 rewrote onboarding) and 0.4.7 downloads doubled; today only deterministic layers exist (tests/e2e/test_onboarding_journey.py, tests/fixtures/hook_payloads/, the projection contract tests) - nothing measures what an agent does with the shipped law. Where: the associated repo dadaia-evals (github marcoaureliomenezes/dadaia-evals, public, registered by context repo add + context alive); its backlog, ADRs and release stay in this specs tree. Destination: an FR group of 0.5.0 candidate rc-8, explicitly implemented in parallel with rc-8's library tasks (ADR 0149) because its write set is another repo (repos/dadaia-evals); not a separate candidate (round-2 ruling, replacing the parallel-candidate ruling release.py refused). Prerequisites, before any model-calling job: (a) the operator runs claude setup-token and stores it as the dadaia-evals repo secret CLAUDE_CODE_OAUTH_TOKEN, extra usage off on the plan (Q14); (b) ADR 0177 accepted; (c) dadaia-evals carries the gitflow branches main, develop and feature/0.5.0; (d) every grader is valid on both dadaia-workspace 0.4.7 and the 0.5.0 candidate - a grader keyed on a path or name only one version has fakes a drop. Repo format (agreed): tasks/<t>/{instruction.md, task.toml, environment/Dockerfile, tests/test.sh + test_grade.py}, scripts/compare.py (the paired verdict over both versions), .github/workflows/eval.yml, AGENTS.md, README.md; jobs/ (the runner's output) never committed. Image: environment only (python, uv, git, the Claude CLI), defined in dadaia-evals; the lib under test - the wheel uv build makes from a lib ref after eval.yml stamps release-please-config.json's release-as version into pyproject.toml's version line (ADR 0178 (1)), or dadaia-workspace==0.4.7 from PyPI - is installed as the last layer per version, so a new release rebuilds no base; no registry in v1. Runner: Harbor, harbor==0.23.0 pinned (Apache-2.0), its built-in claude-code agent, auth CLAUDE_CODE_OAUTH_TOKEN with CLAUDE_FORCE_OAUTH=1, -k 3, --ak version=<cc> pins the Claude CLI, -m anthropic/<model> pins the model (Sonnet 5, main-thread assumption, operator may override), local docker compose on a GitHub-hosted ubuntu runner; it replaces the own Docker + claude -p + pytest runner (Q10/Q24); rejected: Inspect AI, claude plugin eval, Docker Sandboxes. The first run confirms the wheel layer is injected and reads the plan's rate limit at -n 1 and -n 2. Tasks: T1 cold onboarding (empty folder to a bound context with specs and a clean doctor); T2 seeded bug in Arm B (a synthetic project with a planted contract break, the operator's confirmation given in the instruction, ending resolved with its RED test); T3 Snake (Arm A) readout only, only if the budget fits. Graders: tests/test.sh runs test_grade.py (pytest) over the trial's final state (files, ledgers, exit codes), no model judge. eval.yml: workflow_dispatch only, input = lib ref; runs both versions, k=3 per task per version; the verdict in the job summary plus an uploaded artifact (per-trial grades and transcripts of synthetic projects only, token-scanned before upload, ADR 0177 (6)). Block rule (ADR 0178): a task passing >=2/3 on 0.4.7 and <=1/3 on the candidate, or T1 below 3/3 on the candidate; everything else readout; the evaluated sha is the promote PR head, logged in _RELEASE.json before the promote PR merges; release.yml does not change in 0.5.0. Model economy: the ADR 0022 economy template applied in the trial workspace before each trial (no CLI verb applies a template today - the PLAN names the seam). Model-API law (ADR 0177): the map section 3 line ships from dadaia_workspace/public/data/AGENTS.md (plus dd-gitflow-default SKILL.md and CICD-AUTOMATION.md, QUALITY.md P-33, the sdd-gate-v3 atom, and the term evals repo in CONTEXT.md) - a lib text change rc-8 carries; the lib's own workflow scan, check no-model-api-in-ci of the guard-script CI job (ADR 0176), stays as is. Reopens the 2026-09-20 rejection of plugin-packaging-and-skill-evals without the plugin (ADR 0179). Out (separate entries): evals-release-gate-status, evals-harness-lanes-and-benchmark, evals-windows-smoke, devin-subagent-projection. Done when: one eval.yml run on an rc-8 lib ref publishes a verdict over 12 trials (2 tasks x 2 versions x k=3) and ADRs 0177-0179 are ruled, at rc-8 closure; the gate read itself (ADR 0178) happens at the promote.",
+      "provenance": "operator demand 2026-10-03 ('go', evals gate 0.5.0 before PyPI); grill handoff 2026-10-03T163043Z-main-thread-grill-evals-050 (final, frontier empty) over grills Q1-Q17 of 2026-10-03 (Q9 superseded; Q11 'private' replaced by public with conditions); grill round 2, handoff 2026-10-03T170932Z-main-thread-grill-evals-format (destination rc-8 in parallel, repo format, Docker image, Harbor runner), and the dd-code-reviewer conditions on e9007d5a9",
+      "intents": [
+        {
+          "subject": {
+            "kind": "catalog",
+            "ref": "pypi-distribution"
+          },
+          "change": "change - before the 0.5.0 publish the operator reads the dadaia-evals eval.yml verdict on the promote PR head; a paired drop against 0.4.7 or T1 below 3/3 blocks it (ADR 0178); release.yml unchanged in 0.5.0"
+        },
+        {
+          "subject": {
+            "kind": "doc",
+            "ref": "memory/QUALITY.md#p-33-we-run-no-model-api-in-ci-no-workflow-uses-an-anthropics-action-or-references-a-model-api-secret-the-security-review-is-the-local-dd-code-reviewer-lens"
+          },
+          "change": "change - a context's main repo and its associated repos never call a model in CI except an evals repo (term defined in CONTEXT.md), only in workflow_dispatch/schedule jobs, no self-hosted runner, the secret only in those jobs, artifacts from synthetic projects only and token-scanned before upload (ADR 0177); the check stays the same scan"
+        }
+      ],
+      "relates": []
+    },
+    {
+      "id": "evals-release-gate-status",
+      "title": "release.yml approve requires the evals/gate commit status that dadaia-evals posts on the lib sha",
+      "opened": "2026-10-03",
+      "status": "idea",
+      "description": "Follow-up of agent-behavior-evals, after 0.5.0 (grill Q-gate: 'evals/gate status required by approve moves to 0.5.1'; Q16). eval.yml posts the commit status evals/gate on the lib sha it evaluated (a token scoped to statuses on dadaia-workspace, held by dadaia-evals - an operator act); the release.yml approve job requires that status on its sha; a weekly schedule runs a one-task smoke. Replaces ADR 0178's manual read and its evaluated-sha-to-tag diff check, and closes its 'deferred to 0.5.1' clause. Needs its own ADR at definition (a release.yml gate change). Done when: approve refuses a sha with no evals/gate success, and the smoke runs weekly.",
+      "provenance": "operator ruling in the grill handoff 2026-10-03T163043Z-main-thread-grill-evals-050 (final, frontier empty) over grills Q1-Q17 of 2026-10-03 (Q9 superseded; Q11 'private' replaced by public with conditions): the evals/gate status required by approve is deferred to 0.5.1; grill round 2, handoff 2026-10-03T170932Z-main-thread-grill-evals-format (destination rc-8 in parallel, repo format, Docker image, Harbor runner), and the dd-code-reviewer conditions on e9007d5a9",
+      "relates": [
+        "agent-behavior-evals"
+      ]
+    },
+    {
+      "id": "evals-harness-lanes-and-benchmark",
+      "title": "Evals grow past Claude Code: Devin joins the gate; Copilot and Codex join a monthly benchmark.yml",
+      "opened": "2026-10-03",
+      "status": "idea",
+      "description": "Follow-up of agent-behavior-evals, after 0.5.0 (grill: Q12-Q17 become the expansion path). Q12: gate = Claude Code + Devin; benchmark = Claude Code + Devin + Copilot + Codex; Cursor and Kimi stay deterministic-contract only. Q13: Sonnet 5 pinned on Claude Code, Devin and Copilot (isolates the harness effect); Codex on its native model; a cheap-model column in the benchmark only. Q14 billing: Devin Pro US$20/month; Copilot Pro US$10/month with a 'Copilot Requests' PAT in COPILOT_GITHUB_TOKEN; Codex an API key with a console budget; total <= US$70/month, a gate run <= US$30. Q15: Devin CLI login in CI starts with a spike - one month of Pro, credentials.toml as a secret, 5 tasks on a hosted runner, quota read with /usage; Q15's self-hosted fallback is void under ADR 0177 (public repo, no self-hosted runner), so a failed spike leaves Devin benchmark-only, run locally. Q16: eval.yml and benchmark.yml call one reusable run-task.yml (harness x task); benchmark.yml runs monthly plus dispatch, k=3, readout only, its trend recorded in the repo. Q17: gate graders stay code-only (T3 Snake by a scripted Playwright play); the benchmark adds a vision LLM judge, readout only. Runner: Harbor, as agent-behavior-evals pins it (round 2 rejected Inspect AI); a harness with no Harbor built-in agent needs a custom agent adapter, checked per lane when it is picked. Depends on devin-subagent-projection for the Devin lane. Done when: eval.yml runs both gate harnesses and benchmark.yml has one monthly trend point over the four.",
+      "provenance": "operator ruling in the grill handoff 2026-10-03T163043Z-main-thread-grill-evals-050 (final, frontier empty) over grills Q1-Q17 of 2026-10-03 (Q9 superseded; Q11 'private' replaced by public with conditions): Devin, Copilot, Codex, benchmark.yml and the vision judge move to the backlog after 0.5.0, keeping Q12-Q17 as their origin; grill round 2, handoff 2026-10-03T170932Z-main-thread-grill-evals-format (destination rc-8 in parallel, repo format, Docker image, Harbor runner), and the dd-code-reviewer conditions on e9007d5a9",
+      "relates": [
+        "agent-behavior-evals"
+      ]
+    },
+    {
+      "id": "evals-windows-smoke",
+      "title": "One Windows smoke: T1 with Claude Code on a Windows runner, at release only",
+      "opened": "2026-10-03",
+      "status": "idea",
+      "description": "Follow-up of agent-behavior-evals, after 0.5.0 (grill Q7: behaviour evals run on Linux; Windows keeps its deterministic coverage and gains one Claude Code smoke at release). The PowerShell vs bash risk is real; windows-integration-coverage-gap names the deterministic side. Conditional on ADR 0177 being accepted: the smoke is a model-calling job of dadaia-evals and runs under its conditions (2)-(6). T1 cold onboarding on windows-latest, k=1, readout, only if the first gate rounds show slack in the budget and the Actions minutes. First act: check whether Harbor's docker environment runs on windows-latest (GitHub's Windows runners run Windows containers only); if not, the definition names the smoke's runner. Done when: an eval.yml dispatch input runs T1 on Windows and its result sits in the verdict as readout.",
+      "provenance": "operator ruling in the grill handoff 2026-10-03T163043Z-main-thread-grill-evals-050 (final, frontier empty) over grills Q1-Q17 of 2026-10-03 (Q9 superseded; Q11 'private' replaced by public with conditions): the Windows smoke moves to the backlog after 0.5.0 (Q7 carried); grill round 2, handoff 2026-10-03T170932Z-main-thread-grill-evals-format (destination rc-8 in parallel, repo format, Docker image, Harbor runner), and the dd-code-reviewer conditions on e9007d5a9",
+      "relates": [
+        "agent-behavior-evals",
+        "windows-integration-coverage-gap"
+      ]
+    },
+    {
+      "id": "devin-subagent-projection",
+      "title": "Verify whether Devin reads the three personas from .agents/agents; project them if it does not",
+      "opened": "2026-10-03",
+      "status": "idea",
+      "description": "Two sources disagree: the evals study (report section 11) says the Devin CLI reads sub-agents from .devin/agents/<name>.md and the lib maps AgentTranscode.DEVIN_MD to no_rules (dadaia_workspace/infrastructure/agent_transcodes.py:240), so a Devin session would run without dd-product-engineer, dd-software-engineer and dd-code-reviewer; the memory atom harness-devin says Devin reads .agents/agents natively, so no persona copy is projected. First act: check the Devin CLI documentation and a live devin session against .agents/agents. If memory is right, this entry exits rejected with that evidence. If not, the library breaks the harness-devin contract (Arm B): the finding is proposed as a bug (dd-bug-registration); once the operator confirms, it is registered and this entry exits --disposition to-bug naming that BUGS.jsonl id, both in one backlog worktree (ADR 0137); the fix - the DEVIN_MD transcode projecting the three personas into .devin/agents with a projection contract test, harness-devin corrected - follows dd-bug-resolution. Blocks the Devin lane of evals-harness-lanes-and-benchmark.",
+      "provenance": "operator ruling in the grill handoff 2026-10-03T163043Z-main-thread-grill-evals-050 (final, frontier empty) over grills Q1-Q17 of 2026-10-03 (Q9 superseded; Q11 'private' replaced by public with conditions) (Devin lane after 0.5.0); gap measured by the evals study report section 11; grill round 2, handoff 2026-10-03T170932Z-main-thread-grill-evals-format (destination rc-8 in parallel, repo format, Docker image, Harbor runner), and the dd-code-reviewer conditions on e9007d5a9",
+      "relates": [
+        "evals-harness-lanes-and-benchmark"
+      ]
     }
   ]
 }
