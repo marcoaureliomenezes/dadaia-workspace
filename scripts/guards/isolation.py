@@ -370,7 +370,7 @@ def _fixture_copy(root: Path, old: str = "", new: str = "", tail: str = "") -> N
 _CONTROL_TEST = """
 import os, sys, time
 from datetime import datetime
-from dadaia_workspace.hooks import _common, sdd_gate
+from dadaia_workspace.hooks import _common, HOOK
 
 _NOW = datetime(2026, 8, 18)
 
@@ -405,7 +405,7 @@ def test(monkeypatch):
 _VIOLATOR = """
 import io, os, time
 from datetime import datetime
-from dadaia_workspace.hooks import sdd_gate
+from dadaia_workspace.hooks import HOOK
 _NOW = datetime(2026, 1, 1)
 os.environ["DADAIA_PERSONA"] = time.time()
 def t(m):
@@ -418,9 +418,9 @@ def CONTROL(root: Path) -> Session:
     only in an untracked, gitignored ``tests/tmp/x.py`` (bugs 465, 467) or in the fixture
     itself, the one module that may write any ``DADAIA_*``."""
     _write(root, ".gitignore", "tests/tmp/*\n")
-    _write(root, "tests/tmp/x.py", _VIOLATOR)
+    _write(root, "tests/tmp/x.py", _VIOLATOR.replace("HOOK", _HOOK))
     _fixture_copy(root, tail='\nos.environ["DADAIA_PERSONA"] = "x"\n')
-    _write(root, "tests/unit/test_frozen_alone.py", _CONTROL_TEST)
+    _write(root, "tests/unit/test_frozen_alone.py", _CONTROL_TEST.replace("HOOK", _HOOK))
     _write(root, "tests/unit/test_clock_alone.py", _CONTROL_CLOCK)
     _write(root, "tests/unit/test_stdin_common.py", _CONTROL_STDIN)
     return _healthy()
@@ -435,10 +435,27 @@ def _plant(rel: str, text: str) -> Callable[[Path], Session]:
     return plant
 
 
-def _plant_fixture(old: str, new: str) -> Callable[[Path], Session]:
+def _hooks_literal() -> tuple[str, ast.expr]:
+    """The real fixture's text and its ``HOOK_MODULES`` set literal."""
+    text = (_ROOT / FIXTURE).read_text(encoding="utf-8")
+    return text, next(
+        n.value.args[0]
+        for n in ast.parse(text).body
+        if isinstance(n, ast.AnnAssign)
+        and _tail(n.target) == "HOOK_MODULES"
+        and isinstance(n.value, ast.Call)
+    )
+
+
+def _plant_hooks(rewrite: Callable[[str], str]) -> Callable[[Path], Session]:
+    """The real fixture with only ``HOOK_MODULES``'s set literal rewritten, wherever ruff
+    lays it out: the guard names no hook member."""
+
     def plant(root: Path) -> Session:
         session = CONTROL(root)
-        _fixture_copy(root, old, new)
+        text, literal = _hooks_literal()
+        segment = ast.get_source_segment(text, literal) or ""
+        _fixture_copy(root, segment, rewrite(segment))
         return session
 
     return plant
@@ -448,8 +465,8 @@ def _env(write: str) -> Callable[[Path], Session]:
     return _plant("tests/unit/test_env.py", f"import os\ndef t(monkeypatch):\n    {write}\n")
 
 
-_HOOKS = '"sdd_gate", "sdd_post_gate", "ctx_inject", "root_whitelist", "pre_gate"'
-_UNREADABLE = _plant_fixture(f"frozenset(\n    {{{_HOOKS}}}\n)", f"frozenset([{_HOOKS}])")
+_HOOK = min(ast.literal_eval(_hooks_literal()[1]))  # any member: the fixture decides
+_UNREADABLE = _plant_hooks(lambda s: f"[{s[1:-1]}]")
 
 CHECKS: dict[str, Check] = {
     "no-real-workspace": (
@@ -496,7 +513,7 @@ CHECKS: dict[str, Check] = {
         harness_env_allowlist,
         {
             "fixture-unreadable": _UNREADABLE,
-            "stale-hook-module": _plant_fixture('"pre_gate"}', '"pre_gate", "gone_hook"}'),
+            "stale-hook-module": _plant_hooks(lambda s: '{"gone_hook", ' + s[1:]),
             "environ-item": _env('os.environ["DADAIA_PERSONA"] = "x"'),
             "setenv": _env('monkeypatch.setenv("DADAIA_PERSONA", "x")'),
             "setdefault": _env('os.environ.setdefault("DADAIA_PERSONA", "x")'),
@@ -510,12 +527,12 @@ CHECKS: dict[str, Check] = {
             "fixture-unreadable": _UNREADABLE,
             "from-import": _plant(
                 "tests/unit/test_h.py",
-                "import io\nfrom dadaia_workspace.hooks import sdd_gate\n"
+                f"import io\nfrom dadaia_workspace.hooks import {_HOOK}\n"
                 "def t(m):\n    m.setattr('sys.stdin', io.StringIO())\n",
             ),
             "module-import": _plant(
                 "tests/unit/test_h.py",
-                "import io, sys\nimport dadaia_workspace.hooks.ctx_inject\n"
+                f"import io, sys\nimport dadaia_workspace.hooks.{_HOOK}\n"
                 "def t(m):\n    m.setattr(sys, 'stdin', io.StringIO())\n",
             ),
         },

@@ -31,23 +31,6 @@ the three files of that shape). A `*_residue.py`-style file is compliant only wh
 asserts a live invariant (a required kwarg threaded at every call site, a governance
 contract over public assets). An undocumented asymmetric path is a gap, not coverage.
 
-## Active contracts (inventory)
-
-| File | Pins |
-|---|---|
-| `test_import_linter_ignore_cap.py` | **Cap**: total `setup.cfg` import-linter `ignore_imports` edges ≤ recorded cap (17); fails on growth (arch F10) |
-| `test_harness_env_contract.py` | **Hard-fail (no baseline)**: any non-allowlisted `DADAIA_*` setenv outside the fixture; any test that imports a hook behavior module AND simulates `sys.stdin` in-process to drive its `main()` |
-| `test_public_source_hygiene.py` | No bytecode under `public/` (at rest, on script runs, in builds); the SINGLE explicit ship assertion that `pre-push-ci-gate.sh` is in the `public/scripts/` listing (v0.1.51 FR3 — execution-based tests are behavior tests, not ship assertions) |
-| `test_session_store_ownership.py` | Session-store ownership residue (retired multi-store model) |
-| `test_handoff_schema_contract.py` | Public handoff sidecar schema (`handoff-v1.2`) |
-| `test_platform_classifier.py` | `pyproject.toml` OS classifiers |
-| `test_install_skip_idempotent.py` | `write_generated` idempotent across newline conventions |
-| `test_codex_reference_only_wording.py` | Codex orchestration wording (agents vs workflow docs) |
-| `test_workflow_review_gate_contract.py` | Implementation-review-QA done gate |
-| `cli/` | CLI output/status contracts |
-
-When you add a contract, add a row here in the same change.
-
 ## Lifecycle-asymmetry coverage map
 
 This map discharges the "Lifecycle-asymmetry coverage" policy above for **every**
