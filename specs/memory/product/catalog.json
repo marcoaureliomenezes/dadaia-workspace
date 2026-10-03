@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-10-03T03:02:17Z",
+  "generated_at": "2026-10-03T03:27:19Z",
   "features": [
     {
       "rank": 1,
@@ -347,7 +347,7 @@
         "paradigm",
         "pillars"
       ],
-      "token_estimate": 792,
+      "token_estimate": 809,
       "depends_on": [
         "worktrees",
         "spec-context-project",

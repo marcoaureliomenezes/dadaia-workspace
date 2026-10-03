@@ -22,7 +22,7 @@ sources:
 - dadaia-workspace is the operating environment around repositories developed with AI agents; its unit is the context.
 - Current context — agents bind explicitly and receive only the relevant project, memory, release and task state.
 - Documents are the lifecycle — backlog, SPEC, PLAN, TASKS, `_RELEASE.json` and `BUGS.jsonl` carry ordered work; no runtime drives agents through steps ([[release-lifecycle]], [[bug-ledger]], [[backlog-ledger]]).
-- Deterministic boundaries — path class, bind scope, root hygiene, venv-rooting and the push gate are mechanical, each refusal carrying its own runnable fix; what cannot be mechanical is written as law ([[sdd-gate-v3]]).
+- Deterministic boundaries — path class, bind scope, root hygiene, venv-rooting and the push gate are mechanical, each refusal carrying one fix line — a command, or an `Operator action:` when only the operator can choose; what cannot be mechanical is written as law ([[sdd-gate-v3]]).
 - Visible concurrency — sessions may race, git exposes overlap, and nothing waits on a lock.
 - No mechanism without a demand — a capability exists only while it earns its maintenance cost, and deleted surface beats accreted surface.
 - No slop — runtime state, reports, handoffs, caches, projections and temporary files have canonical homes and never leak into repositories.
