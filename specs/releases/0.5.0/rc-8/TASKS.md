@@ -3,7 +3,7 @@
 **Status:** Approved
 **Owner:** dd-software-engineer
 
-Candidate 8 — W8, W9, W10 (ADR 0140). Paths as in PLAN. Each `W:` includes its tests; a DEL's dead tests leave in its commit (G5). Impl tasks run in their own `worktree.py new` impl worktree, bug tasks in one `bug` worktree each (`worktrees/AGENTS.md` §2), opened when `blocked by:` is merged and landed by `worktree.py merge`; PLAN §5 is the schedule, §2.7 the release-worktree steps R1–R7. Commit shapes: impl `<type>(T-050-NNN): …`, bug `fix(bugs): <id> — <cause>` with its `BUGS.jsonl` line. No task after T-050-158 writes `Intent:`. `Δ` = prod / test lines / test functions.
+Candidate 8 — W8, W9, W10 (ADR 0140); W11, a parallel lane in `dadaia-evals` (PLAN §2.9). Paths as in PLAN. Each `W:` includes its tests; a DEL's dead tests leave in its commit (G5). Impl tasks run in their own `worktree.py new` impl worktree, bug tasks in one `bug` worktree each (`worktrees/AGENTS.md` §2), opened when `blocked by:` is merged and landed by `worktree.py merge`; PLAN §5 is the schedule, §2.7 the release-worktree steps R1–R9. Commit shapes: impl `<type>(T-050-NNN): …`, bug `fix(bugs): <id> — <cause>` with its `BUGS.jsonl` line. No task after T-050-158 writes `Intent:`. `Δ` = prod / test lines / test functions.
 
 ## W8 — the test law and the library pipeline leave
 
@@ -41,7 +41,7 @@ Candidate 8 — W8, W9, W10 (ADR 0140). Paths as in PLAN. Each `W:` includes its
 - [ ] **T-050-168 — `caused_by` is proposed by blame.** `W:` `S/dd-bug-resolution/scripts/bugs.py`, `S/dd-bug-resolution/scripts/_bugs_transition.py`, `S/dd-bug-resolution/LINEAGE.md`, `pub/schemas/bugs/bug-record-v1.schema.json`, `pub/scaffold/bugs/AGENTS.md`, `S/dd-code-review/SKILL.md`, `tests/unit/skills/test_bug_resolution_bugs_script.py`, `pub/templates/shipped-hashes.json`, `pub/entities/behavior-map.json`
   `blocked by:` T-050-167 · `delivers:` AC9.3, AC9.4; FR `caused-by-proposed-by-blame`, `focused-review-on-caused-by`; `--lineage-reason` (PLAN §1 ADD row, netted against `evidence_seam`'s verification) · `RED:` the owner file: `none` with candidates exits non-zero; with `--lineage-reason` it passes and stores it · Δ +35 / +40 / +1.
 - [ ] **T-050-166 — The `Intent:` convention leaves the tests.** `W:` `tests/**/*.py` (every tracked file carrying `Intent:` at its base, except `tests/unit/skills/test_bug_resolution_bugs_script.py`)
-  `blocked by:` T-050-155 … T-050-165 · `delivers:` AC8.1 test half; `git grep -n 'Intent:' -- tests` empty after 165 merges; FR `test-intent-docstring-backfill` superseded; R6b follows · `RED:` deletion proof: that grep; `pytest` green · Δ 0 / −317 / 0.
+  `blocked by:` T-050-155 … T-050-165, T-050-182 · `delivers:` AC8.1 test half; `git grep -n 'Intent:' -- tests` empty after 165 merges; FR `test-intent-docstring-backfill` superseded; R6b follows · `RED:` deletion proof: that grep; `pytest` green · Δ 0 / −317 / 0.
 
 ## W10 — the open bugs (Arm B), MEDIUMs first
 
@@ -70,16 +70,36 @@ Each: `blocked by:` T-050-166, T-050-168 plus the edge named; RED a parametrize 
 - [ ] **T-050-179 — `release.py memory` is idempotent.** `W:` `S/dd-release-implementation/scripts/release.py`, `tests/unit/skills/test_release_implementation_release_script.py`, `pub/entities/behavior-map.json`, `specs/bugs/BUGS.jsonl`
   `delivers:` AC10.13; DEL `release-memory-appends-a-second-entry-on-rerun`; F097; `behavior-map.json` re-hashes `dd-release-implementation`'s scripts · `RED:` the owner file (rerun exits 0; `kind: memory` entries byte-equal) · Δ +2 / +5 / 0.
 
+## W11 — agent-behavior evals, a parallel lane in `dadaia-evals`
+
+T-050-184 … T-050-188 write only `repos/dadaia-evals` (paths below relative to it), one `impl` worktree each, commits `<type>(T-050-NNN): …` there. Their markers are written in this candidate's `release` worktree, `chore(tasks): <verb> T-050-NNN — dadaia-evals <sha>` (PLAN §2.9).
+
+- [ ] **T-050-182 — An associated repo's `impl` reads the main repo's trio.** `W:` `S/dd-gitflow-default/scripts/_worktree_new.py`, `S/dd-gitflow-default/scripts/_worktree_git.py`, `tests/integration/test_worktree_new.py`, `tests/helpers/worktree_ws.py`, `pub/entities/behavior-map.json`
+  `blocked by:` T-050-164, the `0.5.0d-bug` worktree's merge · `delivers:` AC11.0 (0174's slice, Q-W0); `gitflows` carries `main_repo` as `flow["main"]`, the one trio read and its Draft fix line name it; no second read, no branch on repo role (PLAN §2.9) · `RED:` `pytest tests/integration/test_worktree_new.py` row: an associated repo with `feature/0.5.0` and the main repo's trio Approved, `new <assoc> --kind impl` exits 0 and prints `[ok]` with `worktrees/<assoc>/0.5.0a-impl`; with the main repo's PLAN Draft, exit 1 and its one fix line names `new <main> --kind release` · Δ +10 / +15 / 0.
+- [ ] **T-050-183 — The model-API law is scoped by repo role.** `W:` `pub/data/AGENTS.md`, `S/dd-gitflow-default/SKILL.md`, `S/dd-gitflow-default/CICD-AUTOMATION.md`, `CONTEXT.md`, `pub/templates/shipped-hashes.json`, `pub/entities/behavior-map.json`
+  `blocked by:` T-050-158, T-050-165, R9 (0177 accepted) · `delivers:` AC11.1; root map ≤ 8,293 B; AI-surface lens; `public stage`, `install`, `doctor` clean; `no-model-api-in-ci` green · `RED:` `grep -rl 'evals repo' dadaia_workspace/public` prints nothing today, then the same three files as `grep -rl 'calls a model API' dadaia_workspace/public`; `grep -r dadaia-evals dadaia_workspace/` prints nothing · Δ 0 / 0 / 0.
+- [ ] **T-050-184 — The `dadaia-evals` repo law.** `W:` `AGENTS.md`, `README.md`, `.gitignore`
+  `blocked by:` T-050-182 · `delivers:` AC11.2 law half: what lives here, how to run, `jobs/` never committed, no `push` or `pull_request` trigger calls a model · `RED:` `mkdir -p jobs && touch jobs/x && git add -A && git ls-files jobs` prints nothing · Δ outside G1.
+- [ ] **T-050-185 — T1, cold onboarding.** `W:` `tasks/t1-cold-onboarding/` (`instruction.md`, `task.toml`, `environment/Dockerfile`, `tests/test.sh`, `tests/test_grade.py`)
+  `blocked by:` T-050-182 · `delivers:` AC11.2 (its task dir; the image builds with the 0.4.7 layer, the lib its last layer, 0179), AC11.3 · `RED:` the unchanged grader fails on an empty workspace and passes on a hand-onboarded one, of 0.4.7 and of the candidate wheel · Δ outside G1.
+- [ ] **T-050-186 — T2, a seeded bug.** `W:` `tasks/t2-seeded-bug/` (as 185)
+  `blocked by:` T-050-182 · `delivers:` AC11.2 (its task dir), AC11.4 · `RED:` on both versions, one planted pass passes and one planted fail fails (a record after the fix commit, or a `-assert` line) · Δ outside G1.
+- [ ] **T-050-187 — `eval.yml`.** `W:` `.github/workflows/eval.yml`, `scripts/compare.py`, `scripts/` (the check and the scan)
+  `blocked by:` T-050-182, R9 (0177 accepted) · `delivers:` AC11.2 `scripts/compare.py`, AC11.5; 0177's `measured_by` check job without the secret ahead of the model job · `RED:` the check job red on each planted workflow (another trigger, a self-hosted `runs-on`, a workflow-level secret, an unscanned upload); the scan non-zero on a planted token; `compare.py` red on a planted drop and on T1 at 2/3 · Δ outside G1.
+- [ ] **T-050-188 — The first run, as evidence.** `W:` handoff
+  `blocked by:` T-050-183, T-050-187, R9 · `delivers:` AC11.6: one dispatch on the tip of `feature/0.5.0` against 0.4.7; `dadaia capabilities --json` names the stamped version; no rate-limit error in `jobs/`; run URL, verdict, tokens and wall time handed to 181 for the `_RELEASE.json` log; a failing grader is fixed in its task (185, 186) before closure; dispatch refused off the default branch: stop and escalate (PLAN §4) · `RED:` none (evidence) · Δ 0 / 0 / 0.
+
 ## Closure
 
 - [ ] **T-050-180 — Re-derive the QUALITY markers.** `W:` `docs/bug-ledger-lessons.md`
   `blocked by:` R7, T-050-165, T-050-167, T-050-168 · `delivers:` AC8.10 last bullet (lines 45, 57, 66; precedent `b9d7e4682`, `0800ec554`) · `RED:` `pytest tests/contract/test_docs_derived_from_memory.py` · Δ 0 / 0 / 0.
 - [ ] **T-050-181 — Measure and hand to closure.** `W:` handoff
-  `blocked by:` T-050-153 … T-050-180 · `delivers:` G1 readout (PLAN §2.8); the full AC8.9 grep empty; G2; G3 re-run of every open bug; G4 vs rc-7, the `guards` job only added; AC10.11 resolves by citation; AC9.2's counts and F003 logged; AC10.3 coverage JSON; the reaped alias file logged; closure exits per SPEC · `RED:` none · Δ 0 / 0 / 0.
+  `blocked by:` T-050-153 … T-050-180, T-050-182 … T-050-188 · `delivers:` G1 readout (PLAN §2.8); AC11.6's log line; the full AC8.9 grep empty; G2; G3 re-run of every open bug; G4 vs rc-7, the `guards` job only added; AC10.11 resolves by citation; AC9.2's counts and F003 logged; AC10.3 coverage JSON; the reaped alias file logged; closure exits per SPEC · `RED:` none · Δ 0 / 0 / 0.
 
 ## AC map
 
 - AC8.9 153, 154, 162 · AC8.1 158, 166 · AC8.2 158 · AC8.3 155, 156, 159–161 · AC8.10 156, 159–161, R1–R7, 180 · AC8.4 162–164 · AC8.5 162 · AC8.6 159, 162, R3 · AC8.7 158 · AC8.8 157.
 - AC9.1, AC9.5 165 · AC9.2 167 · AC9.3, AC9.4 168.
 - AC10.1 169 · AC10.2 173 · AC10.3 178 · AC10.4 170 · AC10.5 171 · AC10.6 174 · AC10.7 175 · AC10.8 176 · AC10.10 172 · AC10.11, AC10.9 181 · AC10.12 177 · AC10.13 179.
+- AC11.0 182 · AC11.1 183, R9 · AC11.2 184–187 · AC11.3 185 · AC11.4 186 · AC11.5 187 · AC11.6 188, 181 · AC11.7 rc-12 (no rc-8 task).
 - G1–G4, G6 181 · G5 every task.

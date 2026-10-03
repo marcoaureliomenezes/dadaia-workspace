@@ -4,7 +4,7 @@
 **Release ID:** 0.5.0
 **Owner:** dd-software-engineer
 
-Candidate 8 — W8: the test law and the library pipeline leave; W9: bug lineage derived; W10: the open bugs (ADR 0140). SPEC AC8.1–AC8.10, AC9.1–AC9.5, AC10.1–AC10.13, Approved at 3f48e11dd and amended by operator ruling at 6ea03b0ff (AC8.9's second deletion list; AC8.10's P-07 and P-28 by their own tool; ADR 0176 edited at 6ec30315d). Paths are relative to `dadaia_workspace/` (`f/` = `features/`, `pub/` = `public/`, `S/` = `pub/skills/`) unless they start with `tests/`, `scripts/`, `specs/`, `docs/`, `.github/`, `README.md`, `AGENTS.md`, `CONTEXT.md`, `pyproject.toml`, `poetry.lock` or `setup.cfg`.
+Candidate 8 — W8: the test law and the library pipeline leave; W9: bug lineage derived; W10: the open bugs (ADR 0140). SPEC AC8.1–AC8.10, AC9.1–AC9.5, AC10.1–AC10.13, Approved at 3f48e11dd and amended by operator ruling at 6ea03b0ff (AC8.9's second deletion list; AC8.10's P-07 and P-28 by their own tool; ADR 0176 edited at 6ec30315d); W11, AC11.0–AC11.7, folded by operator ruling at a6f3d0050 (agent-behavior evals, a parallel lane in `dadaia-evals`; AC11.7 is rc-12's). Paths are relative to `dadaia_workspace/` (`f/` = `features/`, `pub/` = `public/`, `S/` = `pub/skills/`) unless they start with `tests/`, `scripts/`, `specs/`, `docs/`, `.github/`, `README.md`, `AGENTS.md`, `CONTEXT.md`, `pyproject.toml`, `poetry.lock` or `setup.cfg`.
 As-is read at `wt/0.5.0b-release` 6ec30315d; the G1 `<start>` readout equals the birth readout (8f4ed785f): 25,307 production lines / 1,233 test functions / 45,464 test lines / 0 guard lines / 0 guard checks.
 
 ## 1. As-is review
@@ -70,6 +70,8 @@ Ledger slice read here (735 records; title/id/component match; `bugs.py status` 
 | `bugs.py resolve --lineage-reason` (stored, optional schema property) | — | — | ADD | AC9.3; nets against `evidence_seam`, `_SEAM_RE`, `_seam_exists` (T-050-165) |
 | `pub/entities/behavior-map.json` `skill_md_line_soft`, doctor `SKILL-MD-LENGTH` | — | — | ADD | 0170; nets against CONTEXT-MAP's Budget and Measured columns and SPEC-DOC-005 |
 | `CONTEXT.md` four terms | — | — | ADD | AC8.7; nets against the SCAFFOLD homonym entry |
+| `S/dd-gitflow-default/scripts/_worktree_new.new` impl trio read; `_worktree_git.gitflows` | reads the trio from `repo` itself, so an associated repo has none; the Draft fix line names `repo_name` | 0 on the trio read (3 records name `worktree new`, all resolved, none on it) | UPDATE | AC11.0: the one read names the main repo (§2.9); no second read, no branch on role |
+| root map `:43`, `S/dd-gitflow-default/SKILL.md` §3b, `CICD-AUTOMATION.md:17`; `CONTEXT.md` **Evals repo** | "no CI job calls a model API", unscoped | — | UPDATE | AC11.1, 0177: three existing lines rescoped; one term beside **Scope** |
 
 ### 1.1 Authorities
 
@@ -156,13 +158,25 @@ Ledger slice read here (735 records; title/id/component match; `bugs.py status` 
 | R6a | 158 | `docs(memory): re-render the slop-tests fixed block from 158's source` |
 | R6b | 166 | `docs(memory): … (ADR 0138)` truth corrections, SPEC AC8.10's lines: `QUALITY.md:46, 47` (after 166's strip), `51-53, 55, 59-60, 63` (names `TOOL_CACHE_ENV`, no `../../`), `64, 69, 71, 72` (drops the 10 KB README budget, 162); `ARCHITECTURE.md:102, 110, 130, 134, 139` |
 | R7 | R6b | operator only: `docs(adr): accept meta-test-principles-guard-checks` with the nine `### P-NN` hunks, `amends: 0167` |
+| R8 | now (the fold) | `docs(adr): accept <0179's slug>` — the operator ruled "Accept as prepared" (SPEC §Decisions); the main thread writes it |
+| R9 | 161, R5 | operator only: `docs(adr): accept <0177's slug>`, `amends: 0025`, with P-33's re-scope hunk; its check `no-model-api-in-ci` exists from 161 |
+| W11 markers | each `dadaia-evals` merge | `chore(tasks): <verb> T-050-NNN — dadaia-evals <sha>` (§2.9) |
 
+- 0178 is accepted at closure, not here (SPEC §Decisions).
 - Each repair cites the merged task sha and runs before the chain's next task opens. R7's `measured_by` grep prints nothing before it is offered. T-050-180 re-derives `docs/bug-ledger-lessons.md` after R7 (precedent T-050-150).
 
 ### 2.8 G1 readout (ADR 0142), from the TASKS Δ
-- Production: 153 −280; 154 −236; 158 −40; 162 −9; 165 −25; 167 +22; 168 +35; 170 −10; 171 −2; 173 +2; 174 +2; 175 +3; 176 −1; 177 −2; 179 +2 → −539; 25,307 − 539 ≈ 24,768 ≤ 24,805, a 37-line margin on estimates; 181 measures, and a miss is logged at closure, not hidden.
-- Test functions: 153 −18, 154 −2, 155 −10, 156 −16, 158 −4, 159 −13, 160 −11, 161 −21, 162 −4, 163 −4, 164 −4, 165 −1, 167 +1, 168 +1 → −106; checks 6 + 9 + 5 + 10 = 30; 1,233 − 106 + 30 ≈ 1,157 ≤ 1,167; 181 measures.
-- Test lines: Δ sum −4,979 (−5,139 +160); guard lines +260 +300 +250 +400 −10 = +1,200; 45,464 − 4,979 + 1,200 ≈ 41,685 ≤ 43,232.
+- This repo's lines only (SPEC W11): 182 counts; 183 is Markdown, outside the `*.py` readout; 184–188 write `repos/dadaia-evals`.
+- Production: 153 −280; 154 −236; 158 −40; 162 −9; 165 −25; 167 +22; 168 +35; 170 −10; 171 −2; 173 +2; 174 +2; 175 +3; 176 −1; 177 −2; 179 +2; 182 +10 → −529; 25,307 − 529 ≈ 24,778 ≤ 24,805, a 27-line margin on estimates; 181 measures, and a miss is logged at closure, not hidden.
+- Test functions: 153 −18, 154 −2, 155 −10, 156 −16, 158 −4, 159 −13, 160 −11, 161 −21, 162 −4, 163 −4, 164 −4, 165 −1, 167 +1, 168 +1, 182 0 (a parametrize row) → −106; checks 6 + 9 + 5 + 10 = 30; 1,233 − 106 + 30 ≈ 1,157 ≤ 1,167; 181 measures.
+- Test lines: Δ sum −4,964 (−5,139 +175, 182's +15 in); guard lines +260 +300 +250 +400 −10 = +1,200; 45,464 − 4,964 + 1,200 ≈ 41,700 ≤ 43,232.
+
+### 2.9 W11 (T-050-182–188)
+- 182 (AC11.0), deletion first: `gitflows` already reads each row of `context list --json`; each repo's entry gains the row's `main_repo` as `flow["main"]`, and `new` reads the trio at `root/repos/<flow["main"]>` on `flow["work"]`, its Draft fix line naming `flow["main"]`. A main repo resolves to itself: one resolution, no second read, no branch on role. Δ ≈ +10 at most (one key, the read's path, the fix line). The case is a parametrize row on `test_impl_needs_an_approved_trio_in_the_live_candidate`, an associated repo under `make_workspace`'s registry.
+- 183 (AC11.1): text only; AI-entity change under `dd-ai-eng-knowhow` AUTHORING, `public stage && public install && public doctor`; the root map stays ≤ 8,293 B (rescope one line, no new line). The memory pass's `sdd-gate-v3` line is the product engineer's at closure.
+- 184–187 (AC11.2–AC11.5), one `impl` worktree of `dadaia-evals` each, `W:` disjoint by directory: 184 the repo law and ignores, 185 `tasks/t1-cold-onboarding/`, 186 `tasks/t2-seeded-bug/`, 187 `.github/workflows/eval.yml` and `scripts/`. Its commits: `<type>(T-050-NNN): …` there; no `specs/` in that repo.
+- 188 (AC11.6): one dispatch by the main thread, read back into a handoff; the `_RELEASE.json` log line is written at closure (181's lane).
+- Markers (the releases law §3, ADR 0111): an `impl` worktree's allowed set holds its own repo's `TASKS.md` only, and `dadaia-evals` has none. `_worktree_kinds.KINDS["release"]` holds `specs/releases/*`, so this candidate's `release` worktree writes W11's markers: `start` before the main thread opens the `dadaia-evals` worktree, `done` after its `WT merge`, the merged `dadaia-evals` sha cited in the subject; they reach the work branch with the `release` worktree's next merge, like R1–R9. `dd-gitflow-default` §3a row 7 names `impl` as the marker kind and is silent on a cross-repo task: a gap the reviewer's audit lens may log, not a refusal (the allowed set is the merge's law, `worktrees/AGENTS.md` §1).
 
 ## 3. Test strategy
 
@@ -177,7 +191,8 @@ Ledger slice read here (735 records; title/id/component match; `bugs.py status` 
 - Margins (estimates): production 37, functions plus checks 10.
 - One absolute `COVERAGE_FILE` is shared by concurrent `--cov` runs; worktree tests run without `--cov` (repo `AGENTS.md`).
 - A bare terminal outside a harness carries no `TOOL_CACHE_ENV`: there, coverage, ruff and mypy write where the tool defaults, as today (ADR 0080's declared gap).
-- G4 baseline: rc-7's run, one runner class, median; only `guards` is added.
+- G4 baseline: rc-7's run, one runner class, median; only `guards` is added (this repo's CI; `eval.yml` is `dadaia-evals`').
+- 188 needs `eval.yml` dispatchable: GitHub dispatches a workflow only when its file is on the default branch, and `dadaia-evals` merges to `main` by promote. If `gh workflow run eval.yml --ref feature/0.5.0` refuses, 188 stops and escalates to the operator; nothing here pushes or promotes it.
 
 ## 5. Parallel schedule
 
@@ -187,14 +202,15 @@ Ledger slice read here (735 records; title/id/component match; `bugs.py status` 
 | 2 | T-050-154, T-050-155, T-050-156, T-050-157 | 4 | one impl worktree each; R1 after 153, R2 after 156 |
 | 3 | T-050-158, T-050-160, T-050-161 | 3 | one impl worktree each; R6a, R4, R5 follow |
 | 4 | T-050-162, T-050-163, T-050-164, T-050-165 | 4 | one impl worktree each |
-| 5 | T-050-159, T-050-167 | 2 | one impl worktree each; R3 follows 159 |
-| 6 | T-050-166, T-050-168 | 2 | one impl worktree each; R6b, then R7, after 166 |
-| 7 | T-050-169, T-050-170, T-050-171, T-050-172 | 4 | one `bug` worktree each |
+| 5 | T-050-159, T-050-167, T-050-182, T-050-183 | 4 | one impl worktree each; R3 follows 159; 182 after 164 and `0.5.0d-bug` merge, 183 after R9 |
+| 6 | T-050-166, T-050-168; T-050-184, T-050-185, T-050-186, T-050-187 | 6 | one impl worktree each, 184–187 in `dadaia-evals` (its own cap of 5); R6b, then R7, after 166 |
+| 7 | T-050-169, T-050-170, T-050-171, T-050-172; T-050-188 | 5 | one `bug` worktree each; 188 is a dispatch, no worktree |
 | 8 | T-050-173, T-050-174, T-050-175, T-050-176 | 4 | one `bug` worktree each |
 | 9 | T-050-177, T-050-178, T-050-179, T-050-180 | 4 | 177, 180 impl; 178, 179 `bug` |
 | 10 | T-050-181 | 1 | measure; closure in the release worktree |
 
 - Edges: each task's `blocked by:` (TASKS).
 - Critical path: T-050-153 → T-050-156 → T-050-158 → T-050-162 → T-050-159 → T-050-166 → T-050-169 → T-050-173 → T-050-178 → T-050-181 = 10 steps.
-- Overlap check: disjoint in every step except `TASKS.md`, the `*.jsonl` ledgers, the derived `pub/entities/behavior-map.json` and `pub/templates/shipped-hashes.json`; no step shares `ci.yml` or `pyproject.toml` (153 takes both step-2 hunks).
+- W11 is off the critical path: 182 → 184–187 → 188 ends at step 7.
+- Overlap check: `dadaia-evals` paths are disjoint from every W8–W10 `W:`; 182 and 183 share only the derived files below with their step; disjoint in every step except `TASKS.md`, the `*.jsonl` ledgers, the derived `pub/entities/behavior-map.json` and `pub/templates/shipped-hashes.json`; no step shares `ci.yml` or `pyproject.toml` (153 takes both step-2 hunks).
 - Merge in ready order; open siblings rebase after each.
