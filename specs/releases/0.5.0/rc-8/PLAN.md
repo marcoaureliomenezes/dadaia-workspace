@@ -19,7 +19,7 @@ Bug history read (permanent architecture review), copied from the product engine
 - T-050-133 verifies `evidence_seam`/`evidence_diff`, 40% stale; 0164 (4) retires both.
 
 Ledger slice read here (735 records; title/id/component match; `bugs.py status` lists 11 open):
-- preflight 28 records, 1 open; meta-test/ratchet 16, 0 open, 5 naming a prior bug (`frozen-clock-ratchet-scans-tests-tmp-scratch-dir` after its own ratchet; `mutation-baseline-wiring-test-flakes…`, `…-cannot-collect` after the mutation tooling); child env 10, 1 open, 4 linked; next-step 14, 1 open, 3 linked; registry schema 5, 1 open; reconcile/pre-push 16, 1 open; backlog anchor 10, 0 open (`sa-subjects-resolve-is-circular`, `backlog-doctor-default-alias-map-unresolved-from-repo-subdir`, `backlog-subjects-readme-uses-unsupported-positional-resolve`, `backlog-subject-registry-lacks-top-level-doctor-cli-anchor` are the alias map's and `subjects`' own); release memory 3, 1 open.
+- preflight 28 records, 1 open; meta-test/ratchet 16, 0 open, 5 naming a prior bug (`frozen-clock-ratchet-scans-tests-tmp-scratch-dir` after its own ratchet; `mutation-baseline-wiring-test-flakes…`, `…-cannot-collect` after the mutation tooling); child env 10, 1 open, 4 linked; next-step 14, 1 open, 3 linked; registry schema 5, 1 open; reconcile/pre-push 16, 1 open; backlog anchor 10, 0 open (4 are the alias map's and `subjects`'); release memory 3, 1 open.
 - The cross-context walk was not introduced by a fix: `next_step`'s `for name in [*names, *trees]` is T-050-17's (97784f9ef); T-048-07's fix (27eadade4) put the focus first and kept the walk, a symptom patch. AC10.4 deletes the walk.
 - Coverage location, five steps, one cause:
   - 0ce8e20c0 (T-SANI-03, 2026-06-04): `data_file = ".dadaia/.cache/coverage/.coverage"`, resolved against the cwd, created `.dadaia/` inside the repo;
@@ -27,15 +27,15 @@ Ledger slice read here (735 records; title/id/component match; `bugs.py status` 
   - T-018-07 (in db7aecbe0, 2026-06-09): removed as non-portable; each CI job sets its own `COVERAGE_FILE` (today `ci.yml:167,229`);
   - `release-workflow-coverage-file-in-checkout` (d533fbcf5): `release.yml` lacked the per-job line, so another call site got one;
   - `ci-preflight-writes-coverage-into-the-repo` (open): `ci preflight` and the documented `pytest --cov` (`tests/README.md:11`, `tests/AGENTS.md:57`) have no line at all.
-  - Structural cause: the location is decided per call site, and when it lives in config it resolves against the working directory. The Draft's `data_file = "../../.dadaia/tmp/…"` repeated step 1: from a worktree root (`worktrees/<repo>/<name>/`) `../../` is `worktrees/`. Ruff and mypy have no `../../` entry at HEAD (`pyproject.toml` holds none; `QUALITY.md:63` says they do and is false): they are already redirected by `core/workspace_layout.TOOL_CACHE_ENV`, absolute from the workspace root and set once per harness by `infrastructure/runtime_config.py:69,135` (ADR 0080). Coverage joins that decider (§2.6).
+  - Structural cause: decided per call site, and in config resolved against the cwd (`../../` from a worktree root is `worktrees/`). Ruff and mypy have no `../../` entry at HEAD (`pyproject.toml` holds none; `QUALITY.md:63` says they do and is false): they are already redirected by `core/workspace_layout.TOOL_CACHE_ENV`, absolute from the workspace root and set once per harness by `infrastructure/runtime_config.py:69,135` (ADR 0080). Coverage joins that decider (§2.6).
 - Venv reuse, three bugs on one identity: `init-venv-installs-index-version-not-running-distribution` (the venv held other bytes than the running build; fix: always repack the running build); `reinit-with-unchanged-version-label-mixes-venv-and-projection` (ca16acd7b rebuilt `version_change` to compare `"<version> <digest>"`; 2d44e93f4 deleted its second pip step); the open `init-on-a-copied-workspace-leaves-a-cli-bound-to-the-original` (the copied entry scripts name the original interpreter, and `pip_executable` runs the original's `pip`). Each was a facet missing from what "this venv" means; §2.6 states the identity.
-- Hook equality: `install_git_hooks` (`f/spec_context/service.py:144-150`) compares text, `check_installed_hooks` (`f/spec_context/doctor.py:162-165`) compares bytes and folds absent into "differs": two deciders of one question. Reproduced at 6ec30315d: a second `install_git_hooks` on an equal hook returns `[]` and keeps the mtime; AC10.8's "second `init` keeps the hook bytes" is already green, its scratch half is the RED.
+- Hook equality: `install_git_hooks` (`f/spec_context/service.py:144-150`) compares text, `check_installed_hooks` (`f/spec_context/doctor.py:162-165`) compares bytes and folds absent into "differs": two deciders of one question. At 6ec30315d a second install returns `[]`, mtime kept: AC10.8's hook half is green, its scratch half the RED.
 - `onboarding`, `ci_preflight`, `python_env`, the backlog anchors and the meta-tests each carry ≥ 2 prior fixes: every one leaves (DELETE) or is rebuilt below.
 
 | unit | today | bugs | verdict | why |
 |---|---|---|---|---|
 | `f/ci_preflight/` (165 lines); `cli/commands/ci.py` `preflight`; `core/exceptions.CiPreflightScopeError`; `container.is_source_repo_root`; `infrastructure/subprocess_runner.subprocess_runner_for_ci`; `infrastructure/python_env._ensure_ci_toolchain` | runs this repo's CI ladder from the shipped CLI; bootstraps pytest into every workspace venv | 28, 1 open | DELETE | AC8.9; `workspace_guardrail._is_source_repo_root` stays (`public_assets`) |
-| `f/backlog/subject_registry.py:80-108` `load_alias_map`, `:330-348` alias and `api` binding, `Registry._aliases`/`_by_id`; `core/models/backlog.SubjectKind.API`; schema enum and `_backlog_write._KINDS` `api` | `api` binds through an operator alias map only | 4 (above) | DELETE | AC8.9; no backlog or histo record binds `api` |
+| `f/backlog/subject_registry.py:80-108` `load_alias_map`, `:330-348` alias and `api` binding, `Registry._aliases`/`_by_id`; `core/models/backlog.SubjectKind.API`; schema enum and `_backlog_write._KINDS` `api` | `api` binds through an operator alias map only | 4 | DELETE | AC8.9; no backlog or histo record binds `api` |
 | `cli/_backlog_roots.py` (41 lines); `cli/commands/doctor.py` `--source-root`, `--alias-map` (`:104-105,120,278-287,320,335,356-357`); `f/backlog/doctor.build_context` `source_root`/`alias_map_path` | threads two roots the doctor never needs from the operator | 1 (`…-default-alias-map-unresolved-from-repo-subdir`) | DELETE | AC8.9; `_apply_fixes` never read either |
 | `S/dd-backlog-definition/scripts/backlog.py:93-101` `subjects` and wiring (`:9,39,42,63-65,106,115-116`) | lists the alias map | 2 | DELETE | AC8.9 |
 | `core/workspace_layout.STATES_CANON` `backlog_subject_aliases.txt` | canon entry for the alias file | — | DELETE | AC8.9; the instance's 7-line file is reaped by `doctor --fix` |
@@ -98,7 +98,7 @@ Ledger slice read here (735 records; title/id/component match; `bugs.py status` 
 
 ### 1.2 Reviewer INFO notes, resolved
 
-- `ALLOWLISTED_DADAIA_ENV` and `HOOK_MODULES` stay in `tests/fixtures/harness_env.py`, their one owner. Both are `frozenset({...})` calls (`:154,216`), which `ast.literal_eval` refuses; the guard reads the annotated assignment's call node and evaluates its one argument, the set literal, imports nothing from `tests/`, and checks `HOOK_MODULES` against `dadaia_workspace/hooks/*.py`. The planted case copies the fixture's real `frozenset({...})` shape with one stale module.
+- `ALLOWLISTED_DADAIA_ENV` and `HOOK_MODULES` stay in `tests/fixtures/harness_env.py`; both are `frozenset({...})` (`:154,216`), so the guard `literal_eval`s the call's set-literal argument, imports nothing from `tests/`, and checks `HOOK_MODULES` against `hooks/*.py`; the plant keeps that shape.
 - The frozen-clock and V26 checks keep "tracked files only": `run.tracked()` is the one enumerator (bugs 465, 467); a planted untracked `tests/tmp/x.py` stays out.
 - 0020's repair drops `tests/contract/test_harness_env_contract.py`.
 - `tests/helpers/scan_population.py:17-18,40-42` loses the moved files in T-050-160; `tests/fixtures/harness_env.py:48` names the guard check id; `tests/contract/README.md:39,91` are rewritten in T-050-153 and T-050-154, its inventory table deleted.
@@ -106,12 +106,12 @@ Ledger slice read here (735 records; title/id/component match; `bugs.py status` 
 ## 2. Design
 
 ### 2.1 AC8.9 first: the CLI ships no pipeline (T-050-153, T-050-154)
-- 153 deletes every unit of the first row, its tests (9 files, 837 lines, 17 functions, plus `test_cli_ci.py`'s preflight case) and every line the preflight half of the AC8.9 grep names, except files a later task deletes whole (`test_stewardship_mechanics.py`: 156; the mutation script and its wiring test: 155). `docs/cli.md` is re-rendered by `dadaia help tree`. `test_python_env.py:85-93` asserts no pytest install. Repo `AGENTS.md` gains `poetry install --with dev` into the workspace venv (nets against `_ensure_ci_toolchain`).
+- 153 deletes every unit of the first row, its tests (9 files, 837 lines, 17 functions, plus `test_cli_ci.py`'s preflight case) and every line the preflight half of the AC8.9 grep names, except files a later task deletes whole (`test_stewardship_mechanics.py`: 156; the mutation script and its wiring test: 155). `docs/cli.md` is re-rendered by `dadaia help tree`. `test_python_env.py:85-93` asserts no pytest install. Repo `AGENTS.md` gains `poetry install --with dev` into the workspace venv (nets against `_ensure_ci_toolchain`). 153 also drops `--source-root .` (`ci.yml:345`, `docs/getting-started.md:113`; behaviour-neutral, `_backlog_roots.py:28` defaults to `specs_dir.parent`) and adds `--strict-markers` to `addopts`, so no step-2 task shares `ci.yml` or `pyproject.toml`.
 - 154 deletes AC8.9's second list but SPEC-DOC-005 (§1 rows 2–5) and rebuilds anchors and the repo-tree list:
   - `build_context(specs_dir, tracked)`: `cli/commands/doctor.py` gets `tracked` from a `container` seam over `GitSubprocessClient` (`git ls-files` of `specs_dir`'s repo; `cli` may not import infrastructure); the registry reads a word from `<repo>/<path>` only when the ref carries `#word`;
-  - the schema's `code` pattern drops the mandatory `#symbol` and its `api` enum value; scaffold backlog law §4.1's `code`, `cli`, `api` rows and `subjects` bullet are rewritten; `test_backlog_definition_backlog_script.py:493` becomes the kind refusal with an `api` row;
-  - `.github/workflows/ci.yml:345` and `docs/getting-started.md:113` drop `--source-root .`; `test_tool_caches_stay_in_the_tmp_zone.py` gains the `pytest` row.
-  - After the instance is reinstalled, its stray `.dadaia/states/backlog_subject_aliases.txt` (7 legacy lines) is slop, moved to `.dadaia/reaped/` by `.dadaia/.venv/bin/dadaia doctor --fix`; noted at closure.
+  - the schema's `code` pattern drops the mandatory `#symbol` and its `api` enum value; scaffold backlog law §4.1's `code`, `cli`, `api` rows and `subjects` bullet are rewritten; `test_backlog_definition_backlog_script.py:493` becomes the kind refusal with an `api` row, whose fix line (`_backlog_write.py:34`, today `{SCRIPT} subjects`) becomes `{SCRIPT} new --help`, which lists the kinds;
+  - `test_tool_caches_stay_in_the_tmp_zone.py` gains the `pytest` row.
+  - The instance's stray `.dadaia/states/backlog_subject_aliases.txt` is then reaped by `doctor --fix`; logged at closure.
 - Δ prod: 153 ≈ −280; 154 ≈ −110 (first list) −138 (second list: registry −62, `API` −2, `STATES_CANON` −1, `_backlog_roots` −41, doctor threading −15, `subjects` −17) +12 (tracked-path adapter and seam) = −236.
 
 ### 2.2 W8 law and sizes (T-050-158, T-050-162)
@@ -120,11 +120,12 @@ Ledger slice read here (735 records; title/id/component match; `bugs.py status` 
 
 ### 2.3 Guard scripts (T-050-155, 156, 159–161)
 - Glob for G1: `scripts/guards/*.py`. `run.py` holds `tracked()`, the `CHECKS` registry built from every sibling module's `CHECKS` dict, `python scripts/guards/run.py` (all, exit 1 on any red, the log names each check id) and `--planted` (each check over its planted violation in a temp tree, red required). No path or id contains `test_` + an old name or `model_api`.
-- One check id per moved test function; a function that only plants a violation for its sibling (`*_trips_on_*`, the frozen-clock mutation and control fixtures) is that sibling's `--planted` row, not an id. Deleted, never moved: V28, V29, V31, `test_marker_set_is_pinned…` (P-28: `--strict-markers`), `test_preflight_pytest_excludes_quarantine…` (AC8.9), `test_cross_feature_contract_modules_equals_disk…` (P-07: `lint-imports`).
-  - `suite.py` (156), 11 ids: `private-import-ratchet` (V26, P-23), `tracked-suite-only`, `tier-timeout` (P-21), `tier-timeout-explicit-kept`, `tier-timeout-four-tiers`, `tier-ceiling-one-home`, `quarantine-needs-bug` (P-22), `quarantine-with-bug-collects`, `quarantine-refusal-actionable`, `statement-id-cited`, `push-starts-no-gc`.
-  - `slop.py` (159), 9 ids: `v32`, `v33`, `v37`, `v38`, `v39`, `v40`, `doctor-section-subset`, `ignore-cap` (P-10), and the ADD `no-size-pin` (AC8.6). Its subject is a file's line or byte count compared against a constant, 0170's two keys excepted; hit counts (V26, V32, V33) and the Agent Skills field limits (`test_standalone_skills.py:29-30`) are not file sizes.
-  - `isolation.py` (160), 8 ids: `cwd-walk-resolves-none`, `test-starts-outside-checkout`, `bare-doctor-no-instance`, `fenced-child-cannot-resolve`, `suite-fences-every-instance`, `frozen-clock`, `harness-env-allowlist`, `hook-stdin-not-in-process`.
-  - `repo.py` (161), 22 ids: `workflow-never-rules` (the `_NEVER` rows but `model-api-call`) and `no-model-api-in-ci` (P-33), `release-workflow-canon` (P-30), `publish-one-gated-path`, `onboarding-journey-uv`, `ci-triggers-gitflow`, `pr-source-guard-release-pr`, `ci-checkout-history`, `required-checks-listed`; nine memory ids led by `memory-canonical-shape` (P-32); `version-equals-changelog`; `release-please-manifest`, `release-please-patch-below-1`; `adr-superseded-successor`.
+- Checks at ADR 0176's granularity: one id per principle or rule; every moved function survives as a `--planted` row of its id, and the violation message names the sub-rule. Deleted, never moved: V28, V29, V31, `test_marker_set_is_pinned…` (P-28: `--strict-markers`), `test_preflight_pytest_excludes_quarantine…` (AC8.9), `test_cross_feature_contract_modules_equals_disk…` (P-07: `lint-imports`).
+  - `suite.py` (156), 6 ids: `private-import-ratchet` (V26, P-23), `tracked-suite-only`, `tier-timeout` (P-21: contract 30 s, explicit marker kept, four tiers, one calibrated ceiling), `quarantine-needs-bug` (P-22: refusal without a bug, collection with one, actionable serial and xdist, and every `pytest` step's `-m` in `.github/workflows` carries `not quarantine`, `ci.yml:140,171,200,231,257,294`, planted with a selector lacking it), `statement-id-cited`, `push-starts-no-gc`.
+  - `slop.py` (159), 9 ids: `v32`, `v33`, `v37`, `v38`, `v39`, `v40`, `doctor-section-subset`, `ignore-cap` (P-10), and the ADD `no-size-pin` (AC8.6). Its subject is a file's line or byte count against a constant, 0170's two keys excepted; hit counts (V26, V32, V33) and the Agent Skills field limits (`test_standalone_skills.py:29-30`) are not file sizes. 159 deletes `tests/helpers/suite_files.py`, whose four consumers 156, 159 and 160 delete.
+  - `isolation.py` (160), 5 ids: `no-real-workspace` (cwd walk, start outside the checkout, bare doctor), `no-instance-reach` (fenced child, every enclosing instance fenced), `frozen-clock`, `harness-env-allowlist`, `hook-stdin-not-in-process`.
+  - `repo.py` (161), 11 ids: `no-model-api-in-ci` (P-33), `workflow-never-rules`, `release-workflow-canon` (P-30: publish chain, release-please manifest and patch rule), `version-equals-changelog`, `memory-canonical-shape` (P-32, its nine rules), `adr-superseded-successor`, `ci-triggers-gitflow`, `pr-source-guard-release-pr`, `ci-checkout-history`, `required-checks-listed`, `onboarding-journey-uv`.
+- Session checks (`tier-timeout`, `quarantine-needs-bug`'s collection rows, `push-starts-no-gc`, `no-real-workspace`, `no-instance-reach`) judge what `tests/conftest.py` does to a live session, never the guard's own process: `run.py` runs ONE pytest subprocess over a generated probe under the repo conftest (the pattern of `test_stewardship_mechanics.py:130-178`), its report read by every session check; its seconds count in G4.
 - CI: one job `guards` in `ci.yml` runs `run.py` then `run.py --planted`; lint and mypy jobs add `scripts/` (156). Pytest leaves `--cov` alone.
 - A guard module has no mutation run of its own: `--planted` turns each check red on its violation, which is the kill a mutant would prove. Its commit body predeclares that `mutation: skipped` line.
 
@@ -139,15 +140,15 @@ Ledger slice read here (735 records; title/id/component match; `bugs.py status` 
 
 ### 2.6 W10 (T-050-169–179)
 - A bug task: one `bug` worktree, one `fix(bugs): <id> — <cause>` commit, its RED a parametrize row in the owner file, red loop in the body, `--caused-by` from 168's candidates. T-050-177 has no bug record: `impl` worktree, `fix(T-050-177): …`. AC10.11 resolves by citation at 181.
-- 171 (AC10.5), REBUILD of the identity, not a third branch: a venv is reusable when its build (`"<version> <digest>"`) AND its `dadaia` entrypoint's interpreter (the entrypoint's bytes carry `DIR/.dadaia/.venv`'s python path; POSIX shebang and Windows launcher alike) equal the running side's; `provider_build` and `installed_build` both return that one string, `version_change` still compares once. A mismatch is `upgrade`; the reinstall runs `<venv python> -m pip install --force-reinstall` (2d44e93f4's one transaction), which rewrites every entry script for `DIR`; `pip_executable` and its fake leave. Why not a new venv: `--force-reinstall` through the copy's own interpreter already rebinds the scripts and keeps pip's rollback; a fresh venv would add a second install path.
-- 173 (AC10.2): `TOOL_CACHE_ENV` gains `COVERAGE_FILE` (`.dadaia/tmp/coverage-cache/.coverage`, absolute, created by coverage), so every harness session places it as it places ruff's and mypy's; `ci.yml`'s two step lines become one workflow-level `COVERAGE_FILE: ${{ github.workspace }}/../coverage/.coverage` (`release.yml` reuses `ci.yml`, ADR 0078); no `data_file` in `pyproject.toml`; `repo.py`'s `workflow-never-rules` drops its coverage row. The case runs `pytest --cov` from the repo root, a subdirectory and a worktree root under the builder's env.
+- 171 (AC10.5), REBUILD of the identity, not a third branch: a venv is reusable when its build (`"<version> <digest>"`) AND its `dadaia` entrypoint's interpreter (the entrypoint's bytes carry `DIR/.dadaia/.venv`'s python path; POSIX shebang and Windows launcher alike) equal the running side's; `version_change` composes the running side as `provider_build()` plus `python_executable(DIR)` and `installed_build` adds the interpreter the entrypoint names, then compares once; `_verify_venv_provider` keeps `provider_build()` (it checks bytes, not binding). A mismatch is `upgrade`; the reinstall runs `<venv python> -m pip install --force-reinstall` (2d44e93f4's one transaction), which rewrites every entry script for `DIR`; `pip_executable` and its fake leave. No fresh venv: that would be a second install path.
+- 173 (AC10.2): `TOOL_CACHE_ENV` gains `COVERAGE_FILE` as its last key, so the Codex `[shell_environment_policy.set]` pin (`test_core_file_io_purity.py:369-380`) holds (`.dadaia/tmp/coverage-cache/.coverage`, absolute, created by coverage), so every harness session places it as it places ruff's and mypy's; `ci.yml`'s two step lines become one workflow-level `COVERAGE_FILE: ${{ github.workspace }}/../coverage/.coverage` (`release.yml` reuses `ci.yml`, ADR 0078); no `data_file` in `pyproject.toml`; `repo.py`'s `workflow-never-rules` drops its coverage row. The case runs `pytest --cov` from the repo root, a subdirectory and a worktree root under the builder's env.
 - 176 (AC10.8): the snapshot is held in memory and the scratch directory deleted; `hook_state(installed, shipped)` returns absent, differing or equal, and `install_git_hooks` writes on absent, on force, or on differing and shipped. 177 (AC10.12) makes HOOKS-DRIFT-1 consume `hook_state`, its message naming the state.
 - 178 (AC10.3): `patch = ["subprocess"]`; the dead `parallel = false` (`pyproject.toml:183`) leaves. The cost case is `test_doctor_scan_cli.py:168` rebuilt: parametrized over the hook lanes (the SessionStart `doctor --fix --expired-only --quiet`, `ctx_inject`, `sdd_post_gate`, `pre_gate`), filesystem calls counted at two workspace sizes (2 and 20 contexts, 10 and 1,000 files), equal. No new test function.
 
 ### 2.7 Release-worktree steps (serial, `release` kind)
 | step | after | commit |
 |---|---|---|
-| R1 | 154 | `chore(adrs): repair measured_by of 0080 — test_tool_caches_stay_in_the_tmp_zone.py for test_no_pollution.py` |
+| R1 | 153 | `chore(adrs): repair measured_by of 0080 — test_tool_caches_stay_in_the_tmp_zone.py for test_no_pollution.py` |
 | R2 | 156 | `chore(adrs): repair measured_by of 0070` (guard `private-import-ratchet`) |
 | R3 | 159 | `chore(adrs): repair measured_by of 0016, 0017, 0052, 0071, 0143` (0143: `no-size-pin`, AC8.6) |
 | R4 | 160 | `chore(adrs): repair measured_by of 0020, 0088` (0020 drops `test_harness_env_contract.py`) |
@@ -156,11 +157,11 @@ Ledger slice read here (735 records; title/id/component match; `bugs.py status` 
 | R6b | 166 | `docs(memory): … (ADR 0138)` truth corrections, SPEC AC8.10's lines: `QUALITY.md:46, 47` (after 166's strip), `51-53, 55, 59-60, 63` (names `TOOL_CACHE_ENV`, no `../../`), `64, 69, 71, 72` (drops the 10 KB README budget, 162); `ARCHITECTURE.md:102, 110, 130, 134, 139` |
 | R7 | R6b | operator only: `docs(adr): accept meta-test-principles-guard-checks` with the nine `### P-NN` hunks, `amends: 0167` |
 
-- Each repair commit cites the merged task sha; each runs before the next task in that chain opens. R7's `measured_by` grep prints nothing before it is offered. T-050-180 re-derives `docs/bug-ledger-lessons.md` after R7 (precedent T-050-150).
+- Each repair cites the merged task sha and runs before the chain's next task opens. R7's `measured_by` grep prints nothing before it is offered. T-050-180 re-derives `docs/bug-ledger-lessons.md` after R7 (precedent T-050-150).
 
 ### 2.8 G1 readout (ADR 0142), from the TASKS Δ
 - Production: 153 −280; 154 −236; 158 −40; 162 −9; 165 −25; 167 +22; 168 +35; 170 −10; 171 −2; 173 +2; 174 +2; 175 +3; 176 −1; 177 −2; 179 +2 → −539; 25,307 − 539 ≈ 24,768 ≤ 24,805, a 37-line margin on estimates; 181 measures, and a miss is logged at closure, not hidden.
-- Test functions: 153 −18, 154 −2, 155 −10, 156 −16, 158 −4, 159 −13, 160 −11, 161 −21, 162 −4, 163 −4, 164 −4, 165 −1, 167 +1, 168 +1 → −106; checks +11 +9 +8 +22 = +50; 1,233 − 106 + 50 ≈ 1,177, 10 over the ≤ 1,167 target. Not hidden: one id per moved function costs the grouping the Draft assumed; 163 and 164 are where further prose-only functions leave, and 181 measures.
+- Test functions: 153 −18, 154 −2, 155 −10, 156 −16, 158 −4, 159 −13, 160 −11, 161 −21, 162 −4, 163 −4, 164 −4, 165 −1, 167 +1, 168 +1 → −106; checks 6 + 9 + 5 + 11 = 31; 1,233 − 106 + 31 ≈ 1,158 ≤ 1,167; 181 measures.
 - Test lines: Δ sum −4,979 (−5,139 +160); guard lines +260 +300 +250 +400 −10 = +1,200; 45,464 − 4,979 + 1,200 ≈ 41,685 ≤ 43,232.
 
 ## 3. Test strategy
@@ -173,16 +174,17 @@ Ledger slice read here (735 records; title/id/component match; `bugs.py status` 
 
 - rc-8 opens on the work branch after this definition merges; rc-7 is merged.
 - `bug` worktrees open only in the steps below; none other is open while T-050-166 strips `Intent:` (239 files).
-- Production margin is 37 lines on estimates; functions plus checks miss by about 10 (§2.8).
+- Margins (estimates): production 37, functions plus checks 9.
+- One absolute `COVERAGE_FILE` is shared by concurrent `--cov` runs; worktree tests run without `--cov` (repo `AGENTS.md`).
 - A bare terminal outside a harness carries no `TOOL_CACHE_ENV`: there, coverage, ruff and mypy write where the tool defaults, as today (ADR 0080's declared gap).
-- G4 baseline: rc-7's run, one runner class, median; the `guards` job is the only job added.
+- G4 baseline: rc-7's run, one runner class, median; only `guards` is added.
 
 ## 5. Parallel schedule
 
 | step | tasks open together | width | how |
 |---|---|---|---|
 | 1 | T-050-153 | 1 | one impl worktree; AC8.9 lands first |
-| 2 | T-050-154, T-050-155, T-050-156, T-050-157 | 4 | one impl worktree each; R1, R2 follow |
+| 2 | T-050-154, T-050-155, T-050-156, T-050-157 | 4 | one impl worktree each; R1 after 153, R2 after 156 |
 | 3 | T-050-158, T-050-160, T-050-161 | 3 | one impl worktree each; R6a, R4, R5 follow |
 | 4 | T-050-162, T-050-163, T-050-164, T-050-165 | 4 | one impl worktree each |
 | 5 | T-050-159, T-050-167 | 2 | one impl worktree each; R3 follows 159 |
@@ -194,5 +196,5 @@ Ledger slice read here (735 records; title/id/component match; `bugs.py status` 
 
 - Edges: each task's `blocked by:` (TASKS).
 - Critical path: T-050-153 → T-050-156 → T-050-158 → T-050-162 → T-050-159 → T-050-166 → T-050-169 → T-050-173 → T-050-178 → T-050-181 = 10 steps.
-- Overlap check: disjoint in every step except `TASKS.md`, the `*.jsonl` ledgers, the derived `pub/entities/behavior-map.json` and `pub/templates/shipped-hashes.json`, and two disjoint-hunk pairs in step 2: `.github/workflows/ci.yml` (154 `:345`, 156 the `guards` job) and `pyproject.toml` (155 `[tool.mutmut]` and the `mutation` group, 156 `addopts`).
-- Merge order inside a step: ready order; after each merge every open sibling rebases onto the work branch.
+- Overlap check: disjoint in every step except `TASKS.md`, the `*.jsonl` ledgers, the derived `pub/entities/behavior-map.json` and `pub/templates/shipped-hashes.json`; no step shares `ci.yml` or `pyproject.toml` (153 takes both step-2 hunks).
+- Merge in ready order; open siblings rebase after each.
