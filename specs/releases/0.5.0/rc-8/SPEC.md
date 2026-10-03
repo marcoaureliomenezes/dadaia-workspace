@@ -6,7 +6,8 @@
 **Opened:** 2026-10-03
 **Origin:** backlog:cli-ships-no-library-pipeline,lib-test-guidance-dehydrated,tests-agents-scaffold-without-placeholders,test-intent-docstring-backfill,meta-tests-leave-pytest,preflight-ci-parity-derived,delete-text-count-inventory-asserts,adr-0143-measured-by-checks-the-concept,skill-md-soft-hard-line-limit,memory-update-states-the-truth-correction-lane,bug-fix-adds-never-rewrites-asserts,bug-fix-commit-derived-by-grep,caused-by-proposed-by-blame,focused-review-on-caused-by,bug-terminal-transition-commit-shape,architecture-survey-flat-core-infrastructure,doctor-context-ignores-other-contexts,guidance-messages-name-the-right-target; bugs:test-suite-writes-outside-tmp,ci-preflight-writes-coverage-into-the-repo,hook-entrypoints-invisible-to-coverage,onboarding-next-step-names-another-context,init-on-a-copied-workspace-leaves-a-cli-bound-to-the-original,registry-row-missing-a-key-escapes-reg-schema,pre-push-warns-no-gitflow-block-for-an-absent-specs-tree,upgrade-leaves-reconcile-scratch-behind,bug-surface-schema-documents-the-deleted-regex,release-memory-appends-a-second-entry-on-rerun; findings:20260930-structural-convergence-F003,20260930-structural-convergence-F018,20260930-structural-convergence-F028,20260930-structural-convergence-F043,20260930-structural-convergence-F044,20260930-structural-convergence-F045,20260930-structural-convergence-F047,20260930-structural-convergence-F048,20260930-structural-convergence-F049,20260930-structural-convergence-F050,20260930-structural-convergence-F051,20260930-structural-convergence-F096,20260930-structural-convergence-F097,20260930-structural-convergence-F098,20260930-structural-convergence-F100,20260930-structural-convergence-F101,20260930-structural-convergence-F104,20260930-structural-convergence-F112,20260930-structural-convergence-F128,20260930-structural-convergence-F129,20260930-structural-convergence-F131,20260930-structural-convergence-F135,20260930-structural-convergence-F136
 
-- Sources: grills of 2026-10-02 (rc-8, Q1–Q4) and 2026-10-03 (train, Q1–Q6); reviews B1–B11, then H1–L6 on fb8a29a75; PR #278 F1. Task ids start at T-050-153.
+- Sources: grills of 2026-10-02 (rc-8, Q1–Q4) and 2026-10-03 (train, Q1–Q6); reviews B1–B11, H1–L6 on fb8a29a75, then re-review 2 on 196f611aa; PR #278 F1. Task ids start at T-050-153.
+- Bug history read (permanent architecture review): PLAN §1, the as-is review.
 - Left out: `dependabot-pyjwt-open-on-main`, closing at the ship (rc-12); `removals-shipped-without-recorded-authority`, rejected (Q5).
 
 ## Objective
@@ -25,21 +26,10 @@
 - **Behaviour assert**: an assert on an exit code, an effect, or a stable id (finding code, slug, flag); a sentence, roster, or count with a source of truth is not one.
 - SCAFFOLD here is the test tier (V28), never the specs scaffold. Bare `preflight` is a homonym: `ctx_inject`'s generic preflight, `_dead_preflight` and `_ownership_preflight` stay.
 
-## Bug history read (permanent architecture review)
-
-- Preflight fix chain: `ci-preflight-unusable-outside-the-source-repo` got a refusal (symptom patch), then `preflight-doctor-judges-instance-state-ci-never-sees`; `ci-preflight-writes-coverage-into-the-repo` is open. Cause: a verb serving only this repo; AC8.9 deletes it.
-- `surface: tests`: 67 records, 14 naming a prior bug; F018: 22% fix-induced, many from meta-tests.
-- 128 of 237 `fix(bugs):` commits, 2026-08-23..2026-10-02, remove an assert (`git log -E --grep='^fix\(bugs\): ' fb8a29a75`, each through `git show -U0 -- tests | grep -E '^-\s*assert'`). Cause: `dd-bug-resolution` Phases 5–6, which W9 deletes.
-- 160 of 211 resolves since 2026-09-15 judge `caused_by: none`; `bc135641c` repaired 6.
-- Size ceilings outlived 0143 twice (a89a557ce; `skill_md_line_ceiling`): its `measured_by` greps symbols.
-- 7 resolved records on test-child env; `harness_env.py` is not the only builder (AC10.1).
-- `session-start-bound-session-omits-onboarding-next-step` preceded `onboarding-next-step-names-another-context`; the as-is review undoes the cross-context walk if it introduced it.
-- T-050-133 verifies `evidence_seam`/`evidence_diff`, 40% stale; 0164 (4) retires both.
-
 ## Decisions
 
 - These ADRs decide: 0071 (amended by 0163), 0104, 0118, 0119, 0122, 0123, 0138, 0140, 0142, 0143 (amended by 0166, 0170), 0146 (5), 0149, 0152 (2), 0158, 0160 (amended by 0164), 0162, 0163, 0164, 0166, 0167 (partly; the rest is rc-9's), 0170.
-- One new ADR: 0176 (proposed), AC8.10. The operator accepts it in the release worktree, in the commit carrying the ten `### P-NN` hunks (`specs/ADRs/AGENTS.md` §3); `amends: 0167` is written then (0151 M2). 0143's repair, and each accepted `measured_by` naming a moved test file, take the 0138 lane.
+- One new ADR: 0176 (proposed), AC8.10. The operator accepts it in the release worktree, in the commit carrying the nine `### P-NN` hunks (`specs/ADRs/AGENTS.md` §3); `amends: 0167` is written then (0151 M2). 0143's repair and AC8.10's repairs take the 0138 lane.
 - Operator, 2026-10-03, verbatim:
   - Train: "you will only create now the RC8 ... we will wait till we finish the RC8"; rc-9..rc-12 are §Carried.
   - Q1 "Keep in 0.5.0 as rc-11 (Recommended)". Q2 "Yes, into rc-8 (Recommended)".
@@ -66,12 +56,12 @@
 - AC8.9 (first) The CLI ships no library pipeline (FR `cli-ships-no-library-pipeline`; supersedes FR `preflight-ci-parity-derived`, F104):
   - Deleted: the `preflight` verb and its imports in `cli/commands/ci.py` (group help reworded); `features/ci_preflight/`; `CiPreflightScopeError`; `container.is_source_repo_root`; `subprocess_runner_for_ci`; `_ensure_ci_toolchain`. `workspace_guardrail._is_source_repo_root` stays (`public_assets` guards `public install`).
   - With them: `setup.cfg` `features.ci_preflight`, `docs/cli.md`, `docs/getting-started.md`, `tests/conftest.py:436`, `tests/contract/README.md`, `test_preflight_doctor_scope.py`, `test_cli_ci.py`'s preflight cases, and every other line the grep below names; the preflight lines of `dd-gitflow-default/SKILL.md`, `RC-FLOW.md`, and, beyond the grep, `dadaia-AGENTS.md:14`, `tests/AGENTS.md:39`, `setup.cfg:59`, `pyproject.toml:99`, `core/workspace_resolver.py:26`, `test_cli_help_quality.py`'s case.
-  - `ci push-gate-check` and `ci install-hook` (the pre-push chokepoint) stay. Case: `push-gate-check` refuses a non-work-branch push; `install-hook` installs the hook.
+  - `ci push-gate-check` and `ci install-hook` (the pre-push chokepoint) stay; their cases (`test_cli_ci.py:62`, `test_push_gate_check.py:86`) stay green, no new test.
   - `code` anchors resolve any tracked path, the symbol optional. The `cli` anchor kind, `REPO_TREE_ARTIFACTS` reaping (and its consumers `privacy_check._PUBLIC_ASSET_IGNORED_DIRS`, `REPO_TREE_EXCLUDED`), `venv_guard`'s tool names and `_memory_drift`'s extension list turn language-neutral or leave (as-is review; deletion preferred). `public/scaffold/backlog/AGENTS.md` §4.1's `code` and `cli` rows and "no Python sources" bullet are rewritten.
-  - `TOOL_CACHE_ENV` stays (0080), language-neutral. Case: ruff, mypy and pytest run in a worktree leave no cache in its tree.
+  - `TOOL_CACHE_ENV` stays (0080), language-neutral; the no-cache-in-tree case `test_tool_caches_stay_in_the_tmp_zone.py` stays green.
   - This repo's `AGENTS.md` gains a line installing the `dev` group into the workspace venv; its CI equivalent lives there and in `.github/`.
   - Command: `git grep -niE 'ci.?preflight|CiPreflight|_ensure_ci_toolchain|subprocess_runner_for_ci|[^_]is_source_repo_root' -- . ':!specs' ':!CHANGELOG.md'` prints nothing; `.dadaia/.venv/bin/dadaia ci preflight` exits 2.
-  - Case, in the existing `tests/e2e/test_one_line_bootstrap.py` (no new real venv): a fresh `init` venv fails `import pytest`; after the dev-group line, `python -m pytest --version` exits 0.
+  - Case: `test_python_env.py:85-93` asserts no `pytest` install; CI's `dev`-group install proves the line; no new venv.
   - Case: a backlog `code` anchor to a `.go` file passes BL-SCHEMA.
   - At closure, `preflight-ci-parity-derived` exits `superseded --release 0.5.0`; the memory pass deletes the `ci-preflight` atom.
 - AC8.1 Test knowledge leaves the library (FR `lib-test-guidance-dehydrated`; 0166; F112, F101):
@@ -84,15 +74,18 @@
 - AC8.3 Meta-tests leave pytest for one CI job (FR `meta-tests-leave-pytest`; 0163, 0166, 0167):
   - Deleted as duplicates: `stewardship_mechanics` beyond AC8.10's checks (conftest); `repo_self_scan` (gitleaks, pre-push); `source_repo_hygiene` (the CI repo-hygiene job); `test_adr_canon`'s committed-ledger case (the CI doctor job). V28, V29, V31: AC8.1.
   - Deleted: the mutation tooling (`tests/scripts/run_mutation_baseline.sh`, its wiring tests, `test_mutation_baseline_scope_stdlib_only.py`, `[tool.mutmut]`, the `mutation` group); the memory pass states mutation evidence is operator tooling.
-  - Moved to guard checks, each red on a planted violation: V26 (`test_test_suite_ratchets.py`); V32, V33, V37–V40 (`test_slop_ratchets.py`; V32's twin in `test_import_linter_ignore_cap.py`); `suite_cannot_reach_a_real_workspace`, `suite_cannot_reach_the_instance`; `test_ci_workflow_hygiene.py`, `test_memory_canonical_shape.py`, `test_docs_derived_from_memory.py`; `test_adr_canon`'s superseded-successor case; AC8.6's check.
-  - Not meta-tests (package subject): `test_core_file_io_purity` (package AST), `test_behavior_map` (shipped `behavior-map.json`), `test_public_source_hygiene` (shipped text, wheel); `test_law_states_what_the_code_does` is AC8.4's.
+  - Moved to guard checks, each red on a planted violation: V26 (`test_test_suite_ratchets.py`); V32, V33, V37–V40 (`test_slop_ratchets.py`; V32's twin in `test_import_linter_ignore_cap.py`); `suite_cannot_reach_a_real_workspace`, `suite_cannot_reach_the_instance`; `test_ci_workflow_hygiene.py`, `test_memory_canonical_shape.py`; `test_release_semver_canon`'s release-please cases and `test_version_lineage_consistency.py` (P-30's check); `test_adr_canon`'s superseded-successor case; AC8.6's check.
+  - Not meta-tests (package subject): `test_core_file_io_purity` (package AST), `test_behavior_map` (shipped `behavior-map.json`), `test_public_source_hygiene` (shipped text, wheel), `test_console_scripts` (the shipped entry-point table), `test_release_semver_canon`'s id-grammar case; `test_law_states_what_the_code_does` is AC8.4's. `test_docs_derived_from_memory.py` stays until rc-12 (AC8.10).
   - The as-is review may add files, never remove one; no unique guard is lost; the parity check dies with preflight.
-  - Command: `git ls-files tests | grep -E 'suite_cannot_reach|stewardship_mechanics|repo_self_scan|source_repo_hygiene|test_suite_ratchets|mutation_baseline|slop_ratchets|import_linter_ignore_cap|preflight|ci_workflow_hygiene|memory_canonical_shape|docs_derived_from_memory'` prints nothing; the CI job's log names each moved guard.
+  - Command: `git ls-files tests | grep -E 'suite_cannot_reach|stewardship_mechanics|repo_self_scan|source_repo_hygiene|test_suite_ratchets|mutation_baseline|slop_ratchets|import_linter_ignore_cap|preflight|ci_workflow_hygiene|memory_canonical_shape|version_lineage'` prints nothing; the CI job's log names each moved guard.
   - At closure, `meta-tests-leave-pytest` exits `delivered --release 0.5.0`.
 - AC8.10 Every principle whose test leaves pytest keeps a check (0176):
-  - QUALITY P-21 `tier-timeout`, P-22 `quarantine-needs-bug`, P-23 `private-import-ratchet`, P-28 `marker-set-closed`, P-29 `docs-derived-from-memory`, P-33 `no-model-api-in-ci`; ARCHITECTURE P-07 `features-modules-equal-packages`, P-10 `ignore-cap`, P-30 `release-workflow-canon`, P-32 `memory-canonical-shape`.
-  - Each is a guard check with a planted violation; its `Measured by` names it in 0176's accept commit, dropping P-32's retired `RELEASE-TREE-MEMORY` (F128) and P-33's dead `-k model_api` (F131). Command: 0176's `measured_by` grep prints nothing.
-  - Each accepted ADR whose `measured_by` names a moved or deleted test file is repaired in place (0138) by the task moving it.
+  - QUALITY P-21 `tier-timeout`, P-22 `quarantine-needs-bug`, P-23 `private-import-ratchet`, P-28 `marker-set-closed`, P-33 `no-model-api-in-ci`; ARCHITECTURE P-07 `features-modules-equal-packages`, P-10 `ignore-cap`, P-30 `release-workflow-canon`, P-32 `memory-canonical-shape`.
+  - Each is a guard check with a planted violation, named by its `Measured by` in 0176's accept commit, which drops `RELEASE-TREE-MEMORY` (F128) and `-k model_api` (F131) and strikes P-30's archive clause, false under 0152 (1) (`release.py ship`). Command: 0176's `measured_by` grep prints nothing.
+  - P-29 stays outside 0176, its test file too: its record 0012 is rejected, publish-gate check #7 (rc-12) rules on it, and a `### P-NN` line never takes the 0138 lane.
+  - Repaired in place (0138), each by a `chore(adrs): repair …` commit in the release worktree right after its moving task merges (`impl` cannot stage `decisions.jsonl`; a6bca8d52): 0016, 0017, 0021, 0023, 0025, 0049, 0052, 0070, 0071, 0078, 0080 (to AC8.9's no-cache case), 0088.
+  - Truth corrections (0138), at or before the accept commit, after the removing task: `QUALITY.md:47, 51-53, 55, 59-60, 63-64, 69, 71`; `ARCHITECTURE.md:102, 110, 139`.
+  - After the last `QUALITY.md` edit, an `impl` task re-derives `docs/bug-ledger-lessons.md`'s markers (lines 45, 57, 66; T-050-150: `b9d7e4682`, `0800ec554`).
 - AC8.4 Tests assert behaviour (FR `delete-text-count-inventory-asserts`; 0167):
   - No test pins a value owned elsewhere (a law sentence, a code roster or count); prose asserts on a doc, law or skill are deleted.
   - A CLI assert checks exit code, effect and stable id; an exception assert, type or attribute; a `fix:` line is executed. No new `--json`.
@@ -146,7 +139,7 @@ After AC9.3 and AC8.1's `Intent:` strip merge. Each RED is a behaviour assert in
 
 - `ci preflight`, its scope error, runner and pytest bootstrap; the Python-only anchors, reaping list, tool names, extension list and `TOOL_CACHE_ENV` list (AC8.9).
 - `dd-test-stewardship`, the tests-AGENTS template, the `Intent:` convention, V28, V29, V31; MEMORY-UPDATE's own canonical-memory rule.
-- Duplicate meta-tests, the mutation tooling, meta-test pytest files; ten principles' pytest `Measured by` (0176).
+- Duplicate meta-tests, the mutation tooling, meta-test pytest files; nine principles' pytest `Measured by` and P-30's archive clause (0176).
 - Prose, roster and count asserts; CONTEXT-MAP's `Measured` and skills `Budget` columns; 0143's symbol-list `measured_by`.
 - Phase 5's "rewritten", Phase 6's "net ≤ 0"; required `evidence_seam`/`evidence_diff`, their verification, metric 2 over them, direction from `evidence_diff`; the `git log -S` recipe; an unreasoned `none`; the "reopen" wording; §3a row 4's resolve-only wording.
 - Ad-hoc child envs, `COVERAGE_FILE` redirects; the cross-context walk; build-identity venv reuse; the bare `KeyError`; the no-block warning for an absent constitution; HOOKS-DRIFT-1's fixed "differs"; the reconcile scratch and unconditional hook rewrite; the deleted surface regex; the second `kind: memory` append.
