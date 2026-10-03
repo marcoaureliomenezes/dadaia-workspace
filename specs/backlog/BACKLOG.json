@@ -271,6 +271,30 @@
       "description": "dd-gitflow-default/SKILL.md \u00a73a row 4 covers only 'Resolve of a bug a task fixed' (chore(bugs): resolve <id>[, <id>] \u2014 by <task-id> (<sha>)); a bugs.py reject, defer or supersede commit (e.g. 498da2b34, chore(bugs): reject worktree-merge-rewrites-the-branch-before-refusing) matches no row. Widen row 4, no new row: terminal transition without code (resolve, reject, defer, supersede), message chore(bugs): <verb> <id> \u2014 <reason or by task-id (sha)>. Destination: rc-8.",
       "provenance": "operator approval 2026-10-02 via the main thread's intake; source: dd-code-reviewer review of 498da2b34 (rejection of worktree-merge-rewrites-the-branch-before-refusing), LOW",
       "relates": []
+    },
+    {
+      "id": "skill-md-soft-hard-line-limit",
+      "title": "SKILL.md soft 333 doctor WARNING with a split fix line; hard 500 stays the contract row; the skills byte budget retires (ADR 0170)",
+      "opened": "2026-10-03",
+      "status": "idea",
+      "description": "Deliver ADR 0170 (proposed; the operator's accept sets amends 0143). (1) dadaia doctor: every projected skill's SKILL.md over behavior-map.json skill_md_line_soft (333) emits Severity.WARNING SKILL-MD-LENGTH naming the skill and its line count; its one fix line takes ADR 0158's 'Operator action: <one act>' form with the real SKILL.md path (no placeholder): split it into that skill's references/*.md and/or scripts/; never a gate failure. Existing skill-asset checks live in dadaia_workspace/infrastructure/entity_doctor.py. Test row skill-md-over-the-soft-limit-warns plants skill_md_line_soft + 1 lines, the value read from the map. (2) dadaia_workspace/public/entities/behavior-map.json gains skill_md_line_soft 333 beside skill_md_line_ceiling 500; dadaia_workspace/public/schemas/behavior-map-v1.schema.json (additionalProperties false) declares the new key; row every-skill-md-is-within-the-declared-line-ceiling in tests/contract/test_behavior_map.py keeps the hard 500 over dadaia_workspace/public/skills. (3) Delete the skills Budget column (6144 B per skill) from dadaia_workspace/public/data/CONTEXT-MAP.md \u00a73, and the _SKILL_BUDGET readout in tests/contract/test_context_map.py if it then has no reader. (4) specs/memory/product/agents/agentic-entities.md: the skill_md_line_ceiling bullet (line 48) states both limits; the CONTEXT-MAP bullet (line 42) drops the SKILL.md 6144 B budget. Scope SKILL.md only; no other size limit returns (ADR 0143). Destination: rc-8 (test/bug candidate).",
+      "provenance": "operator demand 2026-10-02 (verbatim: 'criamos um soft-limit e um hard-limit que \u00e9 50% a mais do soft-limit. E isso vir\u00e1 uma lei'); rulings 'soft 333 / hard 500 (Recommended)', 'S\u00f3 SKILL.md (Recommended)', 'ADR proposed agora + backlog \u2192 rc-8 (Recommended)'; review rulings 2026-10-03 'Retire the skills byte budget (Recommended)', 'Fix while proposed, then accept (Recommended)'; ADR 0170; supersedes reviewer F3 bug-proposal skill-md-line-ceiling-survives-adr-0143 (not registered)",
+      "relates": [
+        "tests-tree-mirrors-the-package",
+        "meta-tests-leave-pytest"
+      ]
+    },
+    {
+      "id": "adr-0143-measured-by-checks-the-concept",
+      "title": "Repair ADR 0143 measured_by to check the concept, not a symbol list (ADR 0138 lane)",
+      "opened": "2026-10-03",
+      "status": "idea",
+      "description": "Problem: ADR 0143's measured_by greps a symbol list (_V3[456]_|_OWNER_SCRIPT_MAX_LINES|max-complexity|max-nested-blocks), so a ceiling under a new name passed it: the '> 699' doctor-module row in tests/contract/test_core_file_io_purity.py (bug size-ceiling-survives-adr-0143-in-core-file-io-purity, fixed a89a557ce) and behavior-map skill_md_line_ceiling both survived. Repair in place through the ADR 0138 lane (chore(adrs): repair \u2026) so measured_by names a check of the concept: no row compares a file's line or byte count against a constant, except a declared law (ADR 0170's SKILL.md hard 500). Where and how that check lives is rc-8's as-is review, bound by ADR 0167. Destination: rc-8.",
+      "provenance": "operator ruling 2026-10-02 'Repair in rc-8 (Recommended)'; source: dd-code-reviewer finding F4 and bug size-ceiling-survives-adr-0143-in-core-file-io-purity",
+      "relates": [
+        "meta-tests-leave-pytest",
+        "skill-md-soft-hard-line-limit"
+      ]
     }
   ]
 }
