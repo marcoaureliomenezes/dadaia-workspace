@@ -23,6 +23,7 @@
   - Answered via inspection, from Q18 and the root map's "fixes never rewrite old asserts": T-050-168's REBUILD (AC12.9) covers rows 10 and 12; row 11's repair is kept.
   - Answered via inspection, from Q1, Q2 and Q20: the REBUILD mechanics of AC12.2 and AC12.12; `bugs.py fix` and blame read the `refactor(bugs)` shape like shape 3.
   - Answered via inspection, from the bugs law §1: the operator's approval of this SPEC confirms AC12.4 row 19.
+  - Answered via inspection, from Q18 and the rows 10 and 12 precedent: row 6 stays open until AC12.13, which reverts b9b28202d's OSError arm; its diagnosis was never reproduced on CI's 3.12 (audit F-QA-1).
 - Bug history read (permanent architecture review): PLAN §1, the as-is review; for W12, the audit above.
 - Left out: `dependabot-pyjwt-open-on-main`, closing at the ship (rc-12); `removals-shipped-without-recorded-authority`, rejected (Q5).
 
@@ -293,7 +294,7 @@ After AC9.3 and AC8.1's `Intent:` strip merge. Each RED is a behaviour assert in
 | 3 | `gate-path-purity-child-env-drops-pythonpath` | MEDIUM | `T-050-97` | e06583a46 |
 | 4 | `dadaiaignore-doctor-breaks-bind-resolution-import-contract` | MEDIUM | `T-050-116` | a34f3b738 |
 | 5 | `help-quality-mask-misses-folded-venv-path-on-ci` | LOW | `T-050-145` | c370b0c3a, bf5ffde97 |
-| 6 | `sweep-remove-misses-oserror-on-python-3-14` | MEDIUM | `T-050-146` | b9b28202d |
+| 6 | `sweep-remove-misses-oserror-on-python-3-14` | MEDIUM | `T-050-146` | AC12.13 |
 | 7 | `host-shell-cmd-test-escapes-fix-line-quotes` | LOW | `T-050-149` | 013c37d0d |
 | 8 | `windows-quoted-fix-left-behavior-map-hash-stale` | LOW | `windows-quoted-executable-fix-not-runnable-in-powershell` | 582535466 |
 | 9 | `bugs-fix-nonrepo-test-not-portable` | LOW | `T-050-167` | f6d04aa56 |
@@ -354,7 +355,7 @@ After AC9.3 and AC8.1's `Intent:` strip merge. Each RED is a behaviour assert in
   - Every REBUILD: `refactor(<task-id>): REBUILD <unit> — …` in a task worktree; `refactor(bugs): <bug-id> — REBUILD <unit>: …` in a bug worktree.
   - `bugs.py fix` finds `refactor(bugs): .*<id>` beside shape 3.
   - `dd-code-review`: no APPROVED on a `refactor(...)` commit deleting tests without an approved REBUILD verdict in the SPEC.
-- AC12.13 `sweep.py`'s delete path and result protocol are rebuilt (Q23; REBUILD U1, U2; rows 21–23, 27):
+- AC12.13 `sweep.py`'s delete path and result protocol are rebuilt (Q23; REBUILD U1, U2; rows 6, 21–23, 27):
   - U1 (`sweep.py:97-101, 142-185`): `onexc` never raises; it chmods, retries once and records the first failing path; file unlinks go through the same helper.
   - U1: `remove` judges by outcome (`occupied(target)`) and refuses naming the recorded entry and its parent's owner.
   - U1 culprits reverted: 8f329db3a's `_owner` leftover; af2154d5a's try/except arm and owner text, keeping its EXDEV `kept` return; b9b28202d's OSError arm.
