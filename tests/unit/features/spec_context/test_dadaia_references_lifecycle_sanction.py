@@ -23,15 +23,7 @@ from dadaia_workspace.core import invocation  # noqa: E402
 from dadaia_workspace.features.spec_context.doctor import DoctorService  # noqa: E402
 from dadaia_workspace.infrastructure.git_subprocess import GitSubprocessClient
 from dadaia_workspace.infrastructure.json_context_store import JsonContextStore
-from tests.fixtures.harness_env import scrub_context_resolution_env  # noqa: E402
 from tests.fixtures.stores import context_store
-
-
-@pytest.fixture(autouse=True)
-def _clean_env(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Every rung-0/1/2 env var neutralized — see ``test_specs_resolver_resolve_context.py``
-    for why (ambient session leaks make this suite flaky otherwise)."""
-    scrub_context_resolution_env(monkeypatch)
 
 
 def _init_workspace(root: Path) -> None:

@@ -68,7 +68,6 @@ __all__ = [
     "ALLOWLISTED_DADAIA_ENV",
     "CLAUDE_SESSION_ENV_VAR",
     "CODEX_SESSION_ENV_VAR",
-    "CONTEXT_RESOLUTION_ENV_VARS",
     "ENTRY_SIGNAL_ENV_VARS",
     "HARNESS_CONTROL_DADAIA_ENV",
     "HOOK_MODULES",
@@ -80,8 +79,8 @@ __all__ = [
     "kimi_hook_env",
     "pin_child_env",
     "run_hook_subprocess",
-    "scrub_context_resolution_env",
-    "scrub_entry_signal_env",
+    "SUITE_DADAIA_ENV",
+    "drop_operator_env",
 ]
 
 #: The native session-id env var Claude Code provides to a hook subprocess.
@@ -92,9 +91,7 @@ CODEX_SESSION_ENV_VAR: Final[str] = "CODEX_SESSION_ID"
 
 #: The harness session-id env vars a developer's shell may legitimately carry (a codex
 #: TUI exports ``CODEX_SESSION_ID`` or ``CODEX_THREAD_ID``; Claude Code exports
-#: ``CLAUDE_CODE_SESSION_ID``). The test envelope scrubs them so session-id resolution
-#: stays hermetic; the autouse scrub (:func:`scrub_entry_signal_env`) inherits this
-#: list automatically.
+#: ``CLAUDE_CODE_SESSION_ID``); :func:`drop_operator_env` removes them for the session.
 ENTRY_SIGNAL_ENV_VARS: Final[tuple[str, ...]] = (
     CODEX_SESSION_ENV_VAR,
     "CODEX_THREAD_ID",
@@ -102,37 +99,18 @@ ENTRY_SIGNAL_ENV_VARS: Final[tuple[str, ...]] = (
 )
 
 
-def scrub_entry_signal_env(monkeypatch: Any) -> None:
-    """Delete the harness session-id vars from ``os.environ`` for the current test.
-
-    The autouse fixture in the root ``tests/conftest.py`` applies this over the whole
-    suite (hermeticity envelope); tests that exercise session-id resolution set the
-    vars explicitly AFTER the scrub via their own ``monkeypatch.setenv``.
-    """
-    for name in ENTRY_SIGNAL_ENV_VARS:
-        monkeypatch.delenv(name, raising=False)
+#: The suite's own ``DADAIA_*`` knobs, kept by :func:`drop_operator_env`: the fence
+#: (tests/conftest.py) and CI's E2E switch (read at import by test_onboarding_journey).
+SUITE_DADAIA_ENV: Final[frozenset[str]] = frozenset({"DADAIA_FENCED_ROOTS", "DADAIA_REQUIRE_UVX"})
 
 
-#: Every ambient var context resolution consults — the harness session ids plus the
-#: operator's ``DADAIA_CONTEXT``/``DADAIA_SESSION_ID``; the one place a context-resolution
-#: test isolates itself (bug ``specs-resolver-context-tests-flaky-under-xdist-full-suite``).
-CONTEXT_RESOLUTION_ENV_VARS: Final[tuple[str, ...]] = (
-    *ENTRY_SIGNAL_ENV_VARS,
-    "DADAIA_CONTEXT",
-    "DADAIA_SESSION_ID",
-)
-
-
-def scrub_context_resolution_env(monkeypatch: Any) -> None:
-    """Delete every ambient var ``resolve_context()`` consults, for the current test.
-
-    Use this (instead of, or in addition to, :func:`scrub_entry_signal_env`) in any
-    fixture that isolates a ``core.specs_resolver.resolve_context`` /
-    ``cli._specs_resolution.resolve_context_for_cli`` / ``container.resolve_context``
-    scenario.
-    """
-    for name in CONTEXT_RESOLUTION_ENV_VARS:
-        monkeypatch.delenv(name, raising=False)
+def drop_operator_env() -> None:
+    """Remove the operator's session from the session env, once, before collection (bug
+    suite-fails-under-an-operator-dadaia-context): the harness session ids and every
+    ``DADAIA_*`` but :data:`SUITE_DADAIA_ENV`. A test that needs one sets it itself."""
+    for name in [*ENTRY_SIGNAL_ENV_VARS, *(k for k in os.environ if k.startswith("DADAIA_"))]:
+        if name not in SUITE_DADAIA_ENV:
+            os.environ.pop(name, None)
 
 
 #: ``DADAIA_*`` env vars a test MAY ``setenv`` in-process without tripping the env-contract

@@ -6,11 +6,13 @@ real repo root, so the test itself can never pollute the working tree.
 Behavior pinned (T-010-25, AC-R8-02):
   * a pollution dir that already existed at session start → guard does NOT fail
   * a pollution dir CREATED during the session → guard fails (exitstatus = 1)
+  * the envelope scrub (harness_env.drop_operator_env) drops the operator's session
 """
 
 from __future__ import annotations
 
 import importlib.util
+import os
 from pathlib import Path
 from types import ModuleType, SimpleNamespace
 from typing import Any
@@ -94,3 +96,32 @@ def test_preexisting_pollution_handling(
         capsys=capsys,
     )
     assert status == expect_status
+
+
+@pytest.mark.parametrize(
+    ("planted", "after"),
+    [
+        pytest.param(
+            {
+                "DADAIA_CONTEXT": "ghost",
+                "DADAIA_SESSION_ID": "sess-op",
+                "DADAIA_FENCED_ROOTS": "/fence",
+            },
+            {"DADAIA_CONTEXT": None, "DADAIA_SESSION_ID": None, "DADAIA_FENCED_ROOTS": "/fence"},
+            id="operator-session-dropped-fence-kept",
+        ),
+    ],
+)
+def test_the_scrub_drops_the_operator_session(
+    monkeypatch: pytest.MonkeyPatch, planted: dict[str, str], after: dict[str, str | None]
+) -> None:
+    """Bug suite-fails-under-an-operator-dadaia-context: the root conftest's
+    pytest_configure drops the operator's session from the session env."""
+    for key, value in planted.items():
+        monkeypatch.setenv(key, value)
+    for key in ("HOME", "USERPROFILE", "XDG_CACHE_HOME", "LOCALAPPDATA"):
+        monkeypatch.setenv(key, os.environ.get(key, ""))  # undo restores what the pin writes
+    config = SimpleNamespace()
+    root_conftest.pytest_configure(config)
+    root_conftest.pytest_unconfigure(config)
+    assert {key: os.environ.get(key) for key in planted} == after

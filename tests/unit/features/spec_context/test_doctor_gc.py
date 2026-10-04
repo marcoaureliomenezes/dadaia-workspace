@@ -87,7 +87,7 @@ def test_gc_deletion_matrix(tmp_path: Path) -> None:
     assert any("GRAVEYARD-GC" in a and "old-sess-001.json" in a for a in actions), actions
 
 
-def _post_gate_heartbeat(ws: Path, sess_id: str) -> None:
+def _post_gate_heartbeat(ws: Path, sess_id: str, monkeypatch: pytest.MonkeyPatch) -> None:
     """Invoke the REAL PostToolUse heartbeat (refreshes last_seen_at) for ``sess_id``.
 
     The harness session id is the hook env's, exactly as the production hook resolves it
@@ -99,27 +99,12 @@ def _post_gate_heartbeat(ws: Path, sess_id: str) -> None:
 
     from dadaia_workspace.hooks import sdd_post_gate
 
-    override_vars = (
-        "DADAIA_SESSION_ID",
-        "CLAUDE_CODE_SESSION_ID",
-        "CODEX_SESSION_ID",
-        "CODEX_THREAD_ID",
-    )
-    saved_env = {k: os.environ.pop(k, None) for k in override_vars}
-    os.environ["CLAUDE_CODE_SESSION_ID"] = sess_id
-    saved_cwd = Path.cwd()
-    old_stdin = sys.stdin
-    sys.stdin = io.StringIO(json.dumps({"session_id": sess_id}))
-    os.chdir(ws)
-    try:
-        assert sdd_post_gate.main() == 0
-    finally:
-        sys.stdin = old_stdin
-        os.chdir(saved_cwd)
-        os.environ.pop("CLAUDE_CODE_SESSION_ID")
-        for k, v in saved_env.items():
-            if v is not None:
-                os.environ[k] = v
+    for var in ("DADAIA_SESSION_ID", "CODEX_SESSION_ID", "CODEX_THREAD_ID"):
+        monkeypatch.delenv(var, raising=False)
+    monkeypatch.setenv("CLAUDE_CODE_SESSION_ID", sess_id)
+    monkeypatch.setattr(sys, "stdin", io.StringIO(json.dumps({"session_id": sess_id})))
+    monkeypatch.chdir(ws)
+    assert sdd_post_gate.main() == 0
 
 
 @pytest.mark.parametrize(
@@ -132,7 +117,12 @@ def _post_gate_heartbeat(ws: Path, sess_id: str) -> None:
     ],
 )  # fmt: skip
 def test_no_stale_records(
-    tmp_path: Path, idle: int | None, renew: bool, sessions_outside: bool, survives: bool
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    idle: int | None,
+    renew: bool,
+    sessions_outside: bool,
+    survives: bool,
 ) -> None:
     """T-011-04, bind-lost-silently-after-five-idle-minutes: another session's
     SessionStart lane collects a bind only past a dead session's TTL (a day), measured against
@@ -152,7 +142,7 @@ def test_no_stale_records(
         expired.parent.mkdir(parents=True, exist_ok=True)
         expired.touch()
         os.utime(expired, (0, 0))
-        _post_gate_heartbeat(ws, sid)
+        _post_gate_heartbeat(ws, sid, monkeypatch)
         assert expired.exists(), "a tool call must never run the reaper"
 
     actions = _make_doctor(ws).expire()

@@ -56,7 +56,7 @@ sys.dont_write_bytecode = True
 os.environ["PYTHONDONTWRITEBYTECODE"] = "1"
 
 from dadaia_workspace.infrastructure.subprocess_runner import ProcessResult  # noqa: E402
-from tests.fixtures.harness_env import pin_child_env  # noqa: E402
+from tests.fixtures.harness_env import drop_operator_env, pin_child_env  # noqa: E402
 
 # Every subprocess a test spawns (`python -m dadaia_workspace...`: CLI verbs, hooks) must
 # import THIS checkout, whatever the venv's install mode or the worktree it runs in — bugs
@@ -379,19 +379,6 @@ def _hermetic_cwd(
     monkeypatch.chdir(tmp_path_factory.mktemp("cwd"))
 
 
-@pytest.fixture(autouse=True)
-def _scrub_entry_signal_env(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Hermeticity envelope: scrub the harness session-id vars.
-
-    A developer running pytest inside a codex TUI carries ``CODEX_SESSION_ID``. An
-    unscrubbed suite would leak that real session identity into tests resolving
-    session ids. This scrub keeps every test hermetic unless it sets a var explicitly.
-    """
-    from tests.fixtures.harness_env import scrub_entry_signal_env
-
-    scrub_entry_signal_env(monkeypatch)
-
-
 @pytest.fixture(autouse=True, scope="session")
 def _no_real_kimi_home_in_tests(tmp_path_factory: pytest.TempPathFactory) -> None:
     """Disk/user-config guard: never write the real ``~/.kimi-code`` during the suite.
@@ -459,6 +446,7 @@ def pytest_configure(config: pytest.Config) -> None:
     """Before collection, every child and in-process ``Path.home()`` see a tmp home."""
     _CHILD_HOME[:] = [Path(tempfile.mkdtemp(prefix="dadaia-test-home-"))]
     pin_child_env(_CHILD_HOME[0])
+    drop_operator_env()
 
 
 def pytest_unconfigure(config: pytest.Config) -> None:

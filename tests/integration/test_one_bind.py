@@ -24,7 +24,6 @@ from tests.fixtures.harness_env import (
     claude_hook_env,
     kimi_hook_env,
     run_hook_subprocess,
-    scrub_context_resolution_env,
 )
 from tests.fixtures.stores import workspace_cli
 
@@ -85,7 +84,6 @@ def test_the_readers_agree_on_the_bind(
     ws = _workspace(tmp_path, "alpha", "beta")
     for specs in ("repos/alpha/specs", "repos/beta/specs", "specs"):
         (ws / specs).mkdir()
-    scrub_context_resolution_env(monkeypatch)
     monkeypatch.chdir(ws)
     if sid_var:
         monkeypatch.setenv(sid_var, sid)
@@ -210,7 +208,6 @@ def test_bind_refuses_with_its_fix_and_writes_no_record(
     """sa-bind-has-two-stores#S9; AC1.2: with no native id and no DADAIA_SESSION_ID the
     bind exits non-zero with the export fix instead of minting an id no hook can see."""
     ws = _workspace(tmp_path, "gamma", "alpha", dead=("gamma",))
-    scrub_context_resolution_env(monkeypatch)
     monkeypatch.chdir(ws)
     if sid:
         monkeypatch.setenv(_CLAUDE, sid)
