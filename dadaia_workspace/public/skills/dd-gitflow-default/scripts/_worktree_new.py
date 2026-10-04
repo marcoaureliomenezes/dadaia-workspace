@@ -34,13 +34,14 @@ def new(root: Path, repo_name: str, kind: str) -> Path:
     work = f"{flow['work']}{version}"
     if kind == "impl":
         release = f"{work}:specs/releases/{version}"
-        rc = candidate_number(git(repo, "ls-tree", "--name-only", release, check=False).split())
+        main = root / "repos" / flow["main"]  # the context's trio lives in its main repo
+        rc = candidate_number(git(main, "ls-tree", "--name-only", release, check=False).split())
         for doc in ("SPEC", "PLAN", "TASKS"):
-            text = git(repo, "show", f"{release}/rc-{rc}/{doc}.md", check=False)
+            text = git(main, "show", f"{release}/rc-{rc}/{doc}.md", check=False)
             if extract_status(text) != "Approved":
                 raise Refusal(
                     f"impl needs an Approved trio; {doc}.md on {work} is not",
-                    f"{script(SCRIPT)} new {quote(repo_name)} --kind release",
+                    f"{script(SCRIPT)} new {quote(flow['main'])} --kind release",
                 )
     ours = [row for row in our_trees(repo) if row["v"] == version]
     same = [row for row in ours if row["kind"] == kind]

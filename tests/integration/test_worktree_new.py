@@ -11,9 +11,9 @@ from pathlib import Path
 
 import pytest
 
+from tests.helpers.worktree_ws import associate, make_workspace
 from tests.helpers.worktree_ws import fixes as _fixes
 from tests.helpers.worktree_ws import git as _git
-from tests.helpers.worktree_ws import make_workspace
 from tests.helpers.worktree_ws import run as _run
 
 pytestmark = pytest.mark.integration
@@ -65,6 +65,22 @@ def test_impl_needs_an_approved_trio_in_the_live_candidate(root: Path) -> None:
     assert result.returncode == 1 and len(_fixes(result)) == 1
     assert "PLAN" in result.stderr
     assert _run(root, "new", "r", "--kind", "bug").returncode == 0
+
+
+@pytest.mark.parametrize(
+    ("plan", "code", "out"),
+    [("Approved", 0, "[ok] {root}/worktrees/a/0.5.0a-impl"), ("Draft", 1, "")],
+)
+def test_an_associated_impl_reads_the_main_repos_trio(
+    root: Path, plan: str, code: int, out: str
+) -> None:
+    """AC11.0: `a` carries no specs; its `impl` is gated by `r`'s trio on `r`'s work branch."""
+    associate(root, plan)
+    result = _run(root, "new", "a", "--kind", "impl")
+    assert (result.returncode, result.stdout.strip()) == (code, out.format(root=root))
+    assert [f.split(" new ")[-1] for f in _fixes(result)] == (
+        [] if code == 0 else ["r --kind release"]
+    )
 
 
 def test_caps_refuse_naming_an_existing_worktree(root: Path) -> None:

@@ -50,6 +50,19 @@ def make_workspace(root: Path) -> Path:
     return root
 
 
+def associate(root: Path, plan: str) -> None:
+    """Repo `a` joins `r`'s context with `feature/0.5.0` and no specs; `r`'s PLAN is *plan*."""
+    workspace_cli(root, {"main_repo": "r", "associated_repos": [{"slug": "a"}], "gitflow": FLOW})
+    (repo := root / "repos/a").mkdir()
+    git(repo, "init", "-q")
+    git(repo, "commit", "-q", "--allow-empty", "-m", "init")
+    git(repo, "branch", "feature/0.5.0")
+    plan_md = root / "repos/r/specs/releases/0.5.0/rc-1/PLAN.md"
+    plan_md.write_text(f"**Status:** {plan}\n")
+    git(root / "repos/r", "commit", "-qam", "plan")
+    git(root / "repos/r", "branch", "-f", "feature/0.5.0")
+
+
 def run(root: Path, *args: str) -> subprocess.CompletedProcess[str]:
     env = {
         "HOME": str(root),
