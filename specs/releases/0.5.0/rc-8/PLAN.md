@@ -15,7 +15,7 @@ Bug history read (permanent architecture review), from handoff `2026-10-03T13550
 - 128 of 237 `fix(bugs):` commits, 2026-08-23..2026-10-02, remove an assert (`git log -E --grep='^fix\(bugs\): ' fb8a29a75`, each through `git show -U0 -- tests | grep -E '^-\s*assert'`). Cause: `dd-bug-resolution` Phases 5-6, which W9 deletes.
 - 160 of 211 resolves closed 2026-09-15..2026-10-03T01:46:48Z judge `caused_by: none`; `bc135641c` repaired 6. Command: `git show fb8a29a75:specs/bugs/BUGS.jsonl | jq -s '[.[]|select(.status=="resolved" and .closed_at>="2026-09-15")] | length, ([.[]|select(.caused_by=="none")]|length)'` prints 211 then 160.
 - Size ceilings outlived 0143 twice (a89a557ce; `skill_md_line_ceiling`): its `measured_by` greps symbols.
-- 7 resolved records on test-child env; `harness_env.py` is not the only builder (AC10.1).
+- 7 resolved records on test-child env; 15 ad-hoc copies bypass `harness_env.py`, so no opt-in builder holds; the conftest session env does (AC10.1).
 - T-050-133 verifies `evidence_seam`/`evidence_diff`, 40% stale; 0164 (4) retires both.
 
 Ledger slice read here (735 records; title/id/component match; `bugs.py status` lists 11 open):
@@ -51,7 +51,7 @@ Ledger slice read here (735 records; title/id/component match; `bugs.py status` 
 | `test_context_map.py:105-107,119` budgets and Measured column; `test_docs_derived_from_memory.py:34,247-252` README 10 KB budget | size pins on shipped files | — | DELETE | 0143, AC8.4/AC8.6; before `no-size-pin` lands |
 | `test_slop_ratchets.py`, `test_import_linter_ignore_cap.py`, `test_suite_cannot_reach_a_real_workspace.py`, `test_suite_cannot_reach_the_instance.py`, `test_frozen_clock_aging_ratchet.py`, `test_harness_env_contract.py`, `test_ci_workflow_hygiene.py`, `test_memory_canonical_shape.py`, `test_version_lineage_consistency.py`, `test_release_semver_canon.py` release-please cases, `test_adr_canon.py` superseded-successor case | meta-tests in pytest | 5 linked | REBUILD | ≥ 2 bugs (xdist races 465, 467): guard checks at 0176's granularity (§2.3), tracked files only |
 | `S/dd-bug-resolution/scripts/_bugs_transition.py` `REQUIRED_BY_VERB`, `_EVIDENCE_DIFF_RE`, `_SEAM_RE`, `_seam_exists`; `bugs.py` stats `direction`; schema `evidence_*`; SKILL Phases 5–6; `LINEAGE.md`; `S/dd-audit-project/PILLAR-BUGS.md` rows 26, 27, 44, 45 | verifies two hand-written evidence fields, 40% stale; direction from prose | `bugs-check-trusts-evidence-fields-unverified` and the 160/211 `none` | REBUILD | 0164: the fix commit and its numstat come from git; `caused_by` proposed by blame |
-| `tests/fixtures/harness_env.py` + 15 ad-hoc env copies; `tests/conftest.py` bytecode | children inherit HOME and write bytecode | 10, 1 open | REBUILD | one builder |
+| `tests/fixtures/harness_env.py` + 15 ad-hoc env copies; `tests/conftest.py` bytecode | children inherit HOME and write bytecode | 10, 1 open | REBUILD | one authority: `tests/conftest.py` sets the session env (`PYTHONDONTWRITEBYTECODE=1` at import; `HOME`/`USERPROFILE`/`XDG_CACHE_HOME`/`LOCALAPPDATA` under pytest's tmp root at sessionstart); `child_env` deleted; `base_env()` stays the hook-child scrub |
 | `ci.yml:167,229` `COVERAGE_FILE`; documented `pytest --cov`; hook subprocesses | per-call-site location; hooks never measured | 8, 2 open | REBUILD | `TOOL_CACHE_ENV` decides for every workspace session, one workflow-level line for CI; `patch = ["subprocess"]` |
 | `f/workspace/onboarding.next_step`; callers `cli/commands/context.py`, `cli/commands/doctor.py`, `hooks/ctx_inject.py` | walks every ALIVE context after the focus | 14, 1 open | REBUILD | one context judged |
 | `infrastructure/python_env.version_change`, `provider_build`, `installed_build`, `pip_executable` | identity is version and payload digest; pip runs through a script | 3, 1 open | REBUILD | identity gains the entrypoint's interpreter; `python -m pip`; `pip_executable` leaves |
@@ -87,7 +87,7 @@ Ledger slice read here (735 records; title/id/component match; `bugs.py status` 
 | whether a size is pinned | guard check `no-size-pin` | 0143's repaired `measured_by` | 0143's symbol grep |
 | which commit fixed a bug, and its direction | `bugs.py fix` (git grep of shapes 3/4, numstat) | `stats`, LINEAGE.md, PILLAR-BUGS rows 27, 45 | `evidence_diff` direction, `git log -S` recipe |
 | which bug caused this one | `bugs.py resolve` blame candidates | LINEAGE.md, bugs law, schema | an unreasoned `none`, `evidence_seam` verification |
-| a test child's environment | `tests/fixtures/harness_env.py` builder | every subprocess test | `os.environ.copy()` copies |
+| a test child's environment | `tests/conftest.py` session env | every subprocess test | the `child_env` builder; the env copies' role as authority |
 | where a tool cache or coverage data lands | `COVERAGE_FILE`/`RUFF_CACHE_DIR`/`MYPY_CACHE_DIR`, absolute: `workspace_layout.TOOL_CACHE_ENV` in a workspace, one `ci.yml` workflow-level line in CI | `runtime_config`, the harness env, `tests/README.md`, `tests/AGENTS.md` | the two per-job `COVERAGE_FILE` lines |
 | which context a run judges | the bound context or `--context` (`onboarding.next_step` one tree) | doctor, SessionStart, `context` CLI | the cross-context walk |
 | whether a workspace venv is reusable | `python_env.version_change` over one identity | `init` | `pip_executable` |
