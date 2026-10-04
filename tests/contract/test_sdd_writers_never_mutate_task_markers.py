@@ -1,4 +1,4 @@
-"""A "post-write linter" was reported (re-filed from a consumer repo's ledger) to mutate
+"""sdd-artifact-linter-mutates-task-markers: a "post-write linter" was reported (re-filed from a consumer repo's ledger) to mutate
 ``[ ]``/``[-]``/``[x]`` task markers, ``**Status:**`` tokens, and body content of
 ``specs/releases/**/*.md`` between an agent's ``Read`` and its next ``Edit``. The bug's
 own ``expected`` clause: a linter on SDD markdown may normalize whitespace ONLY — it must

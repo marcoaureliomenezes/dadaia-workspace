@@ -10,12 +10,12 @@ from dadaia_workspace.core.fixed_sections import (
     render_fixed_section,
 )
 
-_FRAGMENT = "### Slop — tests (fixed)\n- A test is born with `Intent:`.\n- A mock exists only at the boundary.\n"
-_UPDATED = "### Slop — tests (fixed)\n- A test is born with `Intent:`.\n"
+_FRAGMENT = "### Slop — tests (fixed)\n- Assert behaviour.\n- A mock exists only at the boundary.\n"
+_UPDATED = "### Slop — tests (fixed)\n- Assert behaviour.\n"
 _BLOCK = (
     "<!-- dadaia:fixed slop-tests -->\n"
     "### Slop — tests (fixed)\n"
-    "- A test is born with `Intent:`.\n"
+    "- Assert behaviour.\n"
     "- A mock exists only at the boundary.\n"
     "<!-- /dadaia:fixed slop-tests -->\n"
 )

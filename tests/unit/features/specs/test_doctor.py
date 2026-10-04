@@ -1,4 +1,6 @@
-"""A release dir's name is TREE-8's (sa-release-dir-placement-judged-by-tree8-and-spec-doc-027)."""
+"""SpecsDoctor structural checks: one row per code (fires or silent).
+
+A release dir's name is TREE-8's (sa-release-dir-placement-judged-by-tree8-and-spec-doc-027)."""
 
 from __future__ import annotations
 

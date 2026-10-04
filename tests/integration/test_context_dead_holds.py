@@ -1,4 +1,6 @@
-"""- sa-context-dead-removes-repos-outside-the-reaper#C3 /
+"""`context alive`/`context dead` over the whole repo set (main + associated).
+
+sa-context-dead-removes-repos-outside-the-reaper#C3 /
   sa-context-dead-removes-repos-outside-the-reaper#C4: a local branch carrying a commit origin lacks,
   in ANY repo of the set, refuses dead; sa-context-dead-removes-repos-outside-the-reaper#C2: a linked
   worktree registered by the repo or nested inside it refuses dead; AC1.10: any `wt/*`

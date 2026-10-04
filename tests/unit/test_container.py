@@ -1,4 +1,4 @@
-"""the container builders guard initialization and wire production
+"""The container builders guard initialization and wire production
 collaborators; ``build_doctor_service`` reaps retired lock state (``states/ctx_locks``)
 whatever its recorded holder pid — liveness is never consulted (NO-LOCKS)."""
 

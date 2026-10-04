@@ -100,7 +100,7 @@ def _plan_fix(script: Path) -> str:
         mp.syspath_prepend(str(script.parent))
         mp.delitem(sys.modules, "_release_schema", raising=False)
         spec.loader.exec_module(module)
-        mp.delitem(sys.modules, "_release_schema")
+        sys.modules.pop("_release_schema", None)
     return str(module.PLAN_FIX)
 
 
