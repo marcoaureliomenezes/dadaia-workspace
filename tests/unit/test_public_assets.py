@@ -136,7 +136,7 @@ def test_shipped_baseline_header_and_single_line_documented_carve_outs() -> None
             / "privacy_baseline.json"
         ).read_text(encoding="utf-8")
     )
-    assert raw["_header"]["version"] == 15
+    assert raw["_header"]["version"] == 16
     excludes = " ".join(raw["_header"]["excludes"])
     assert all(word in excludes for word in ("/root", "Users", "FR12/A12.3", "FR12/A12.4"))
     for pattern in raw["patterns"]:
