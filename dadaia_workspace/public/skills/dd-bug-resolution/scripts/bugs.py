@@ -14,6 +14,7 @@ import json
 import re
 import subprocess
 import sys
+import tempfile
 from collections import Counter
 from pathlib import Path
 from typing import Any
@@ -32,7 +33,7 @@ from _specs import find_specs, refuse  # noqa: E402
 _OPTIONS: dict[str, tuple[str, ...]] = {
     "append": ("--bug-id", "--reported-by", "--ts", "--title", "--severity", "--surface",
                "--component", "--context", "--symptom", "--repro", "--expected", "--correlates"),
-    "resolve": tuple(f"--{name.replace('_', '-')}" for name in tr.REQUIRED_BY_VERB["resolve"]),
+    "resolve": (*(f"--{name.replace('_', '-')}" for name in tr.REQUIRED_BY_VERB["resolve"]), "--lineage-reason"),
     "supersede": ("--by",), "defer": ("--reason",), "reject": ("--reason",),
 }  # fmt: skip
 _HELP = {
@@ -51,9 +52,8 @@ _HELP = {
 #: Shapes 3 and 4 share one id list; shape 4 names its task commit(s) as `(<sha>[, <sha>])` (ADR 0164 (1)).
 _SHAPE = re.compile(r"@(\w+) (fix\(bugs\): |chore\(bugs\): resolve )(.+?) — (.*)$")
 _TASK_SHAS = re.compile(r"\((\w+(?:, \w+)*)\)$")
-#: Not the fix's direction: tests (metric 6), specs, and the regenerated files ADR 0164 (2) names.
+#: Never a fix's own lines: tests (metric 6) and specs; `_own` adds the generated files.
 _NOT_PRODUCTION = ("tests/", "specs/")
-_REGENERATED = ("behavior-map.json", "shipped-hashes.json")
 
 
 def _parser() -> argparse.ArgumentParser:
@@ -113,13 +113,47 @@ def _fixes(specs: Path) -> dict[str, dict[str, list[list[str]] | None]]:
     return found
 
 
-def _direction(commits: dict[str, list[list[str]] | None]) -> str:
+def _git(cwd: Path | str, *argv: str, stdin: str | None = None) -> str:
+    return subprocess.run(["git", "-C", str(cwd), *argv], input=stdin, capture_output=True, encoding="utf-8",
+                          errors="replace", check=True).stdout  # fmt: skip
+
+
+def _own(specs: Path, paths: set[str]) -> set[str]:
+    """The paths a fix writes: not tests (metric 6), not specs, not a file `.gitattributes`
+    marks `dadaia-generated` (ADR 0183) — one predicate for the blame and the direction."""
+    top = _git(specs, "rev-parse", "--show-toplevel").strip()
+    out = _git(top, "check-attr", "--stdin", "dadaia-generated", stdin="\n".join(paths))
+    generated = {path for path, _, value in (ln.rsplit(": ", 2) for ln in out.splitlines()) if value == "set"}  # fmt: skip
+    return {p for p in paths if not p.startswith(_NOT_PRODUCTION)} - generated
+
+
+def _candidates(specs: Path, bug_id: str) -> list[str]:
+    """The bugs whose fix wrote a line the staged diff removes: `git blame` past `(#n)`-subject
+    squashes and `refactor(T-…)` commits, over `_own` paths only (ADR 0164 (2))."""
+    fixes, blamed = _fixes(specs), set[str]()
+    if not fixes:
+        return []
+    top = Path(_git(specs, "rev-parse", "--show-toplevel").strip())
+    staged = set(_git(top, "diff", "--cached", "--name-only", "--diff-filter=MD").splitlines())
+    subjects = (ln.partition(" ") for ln in _git(top, "log", "--format=%H %s").splitlines())
+    skip = [h for h, _, s in subjects if re.search(r"\(#\d+\)$", s) or s.startswith("refactor(T-")]
+    with tempfile.TemporaryDirectory() as tmp:
+        (revs := Path(tmp) / "revs").write_text("\n".join(skip), encoding="utf-8")
+        for path in _own(top, staged):
+            hunks = [ln.split()[1][1:].partition(",") for ln in _git(top, "diff", "--cached", "-U0", "--", path).splitlines() if ln.startswith("@@ ")]  # fmt: skip
+            ranges = [arg for start, _, n in hunks if n != "0" for arg in ("-L", f"{start},+{n or 1}")]  # fmt: skip
+            blame = _git(top, "blame", "--porcelain", "--ignore-revs-file", str(revs), *ranges, "HEAD", "--", path) if ranges else ""  # fmt: skip
+            blamed |= {ln[:40] for ln in blame.splitlines()}
+    return sorted({bug for bug, shas in fixes.items() for sha in shas for b in blamed if b.startswith(sha)} - {bug_id})  # fmt: skip
+
+
+def _direction(commits: dict[str, list[list[str]] | None], own: set[str]) -> str:
     if all(rs is None for rs in commits.values()):
         return "-"
     rows = [r for rs in commits.values() for r in rs or []]
     net = sum(
         int(a) - int(d) for a, d, path in rows
-        if a != "-" and not path.startswith(_NOT_PRODUCTION) and Path(path).name not in _REGENERATED
+        if a != "-" and path in own
     )  # fmt: skip
     return "net-negative" if net < 0 else "net-positive" if net > 0 else "net-neutral"
 
@@ -127,11 +161,12 @@ def _direction(commits: dict[str, list[list[str]] | None]) -> str:
 def _read(args: argparse.Namespace, specs: Path) -> int:
     records = read_records(specs / LEDGER)
     fixes = _fixes(specs) if args.verb in ("fix", "stats") else {}
+    own = _own(specs, {r[2] for c in fixes.values() for rs in c.values() for r in rs or []}) if fixes else set()  # fmt: skip
     if args.verb == "fix":
         ids = args.bug_ids or [str(r["id"]) for r in records if r["status"] == "resolved"]
         for bug in ids:
             commits = fixes.get(bug, {})
-            print(f"{bug}\t{','.join(commits)}\t{_direction(commits)}" if commits else f"{bug}\tunlinked")  # fmt: skip
+            print(f"{bug}\t{','.join(commits)}\t{_direction(commits, own)}" if commits else f"{bug}\tunlinked")  # fmt: skip
             for row in (r for rows in commits.values() for r in rows or []):
                 print("\t" + "\t".join(row))
         linked = sum(b in fixes for b in ids)
@@ -139,7 +174,7 @@ def _read(args: argparse.Namespace, specs: Path) -> int:
         return 0
     if args.verb == "stats":
         print(f"total\t{len(records)}")
-        directions = [_direction(fixes[r["id"]]) for r in records if r["id"] in fixes]
+        directions = [_direction(fixes[r["id"]], own) for r in records if r["id"] in fixes]
         for label, values in (
             ("status", [r["status"] for r in records]),
             ("severity", [r["severity"] for r in records if r.get("severity")]),
@@ -194,7 +229,9 @@ def _write(args: argparse.Namespace, specs: Path) -> int:
         print(f"[ok] updated {', '.join(sorted(changes))} for {args.bug_id}")
         return 0
     values = _values(args, _OPTIONS[args.verb])
-    commit(ledger, lambda rs: tr.transition(rs, args.bug_id, args.verb, values))
+    near = _candidates(specs, args.bug_id) if args.verb == "resolve" else []
+    print(f"blame candidates: {', '.join(near)}") if near else None
+    commit(ledger, lambda rs: tr.transition(rs, args.bug_id, args.verb, values, near))
     print(f"[ok] {tr.STATUS_BY_VERB[args.verb]} {args.bug_id}")
     return 0
 

@@ -128,7 +128,7 @@
         "null"
       ],
       "x-mutability": "mutable-governance",
-      "description": "The prior bug id this one was caused by, when this record is itself a reopen (a new id declaring `caused_by`)."
+      "description": "The bug X such that the fix of X wrote the lines this fix corrects, or `none` (ADR 0164 (3)); `bugs.py resolve` proposes the candidates by blame."
     },
     "resolved_release": {
       "type": [
@@ -166,6 +166,12 @@
       "minLength": 5,
       "x-mutability": "write-once",
       "description": "The red-loop command that reproduced the bug on the executed path, before any hypothesis."
+    },
+    "lineage_reason": {
+      "type": "string",
+      "minLength": 1,
+      "x-mutability": "write-once",
+      "description": "Optional: why `caused_by` departs from the blame candidates `bugs.py resolve` printed (ADR 0164 (2))."
     },
     "evidence_seam": {
       "type": "string",

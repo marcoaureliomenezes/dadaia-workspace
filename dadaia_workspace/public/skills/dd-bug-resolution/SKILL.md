@@ -63,6 +63,8 @@ gap is registered first).*
 
 **Phase 6 — Cleanup + resolve.** Grep the probe prefix to zero; rewriting an old assert is its own commit, with a reason:
 
+- Stage the code and its test first: `resolve` blames the lines the staged diff removes.
+
 ```
 python3 .agents/skills/dd-bug-resolution/scripts/bugs.py resolve <bug-id> --cause … --caused-by … --resolved-release …
   --solution … --evidence-loop …

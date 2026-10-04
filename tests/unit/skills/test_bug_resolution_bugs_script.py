@@ -76,16 +76,13 @@ def _ledger(root: Path, *records: dict[str, object]) -> Path:
     return specs
 
 
-def _run(
-    script: Path, *argv: str, cwd: Path | None = None, env: dict[str, str] | None = None
-) -> subprocess.CompletedProcess[str]:
+def _run(script: Path, *argv: str, cwd: Path | None = None) -> subprocess.CompletedProcess[str]:
     return subprocess.run(
         [sys.executable, str(script), *argv],
         capture_output=True,
         text=True,
         check=False,
         cwd=str(cwd) if cwd else None,
-        env=env,
     )
 
 
@@ -537,7 +534,7 @@ def test_resolve_closes_the_record_at_its_own_instant(script: Path, tmp_path: Pa
         ["update", "a-bug", "--set", "caused_by=never-filed"],
         ["update", "a-bug", "--set", "caused_by="],
         ["update", "a-bug", "--set", "caused_by=b-bug"],  # b-bug -> a-bug: a cycle
-        _resolve_argv(caused_by="never-filed"),
+        [*_resolve_argv(caused_by="never-filed"), "--lineage-reason", "r"],
     ],
 )
 def test_a_write_refuses_the_lineage_check_refuses(
@@ -608,7 +605,11 @@ def test_resolve_accepts_an_archived_caused_by(script: Path, tmp_path: Path) -> 
     """An archived record is a record: `resolve` and `check` agree on it."""
     specs = _ledger(tmp_path, _OPEN_RECORD)
     _archive(specs, "old-bug")
-    done = _run(script, *_resolve_argv(caused_by="old-bug"), "--specs", str(specs))
+    refused = _run(script, *_resolve_argv(caused_by="old-bug"), "--specs", str(specs)).stderr
+    assert refused.splitlines()[0] == "[error] caused_by 'old-bug' is not a blame candidate (none)"
+    done = _run(
+        script, *_resolve_argv(caused_by="old-bug"), "--lineage-reason", "r", "--specs", str(specs)
+    )
     assert done.returncode == 0, done.stderr
     assert _records(specs)[0]["caused_by"] == "old-bug"
 
@@ -729,7 +730,10 @@ def test_fix_derives_each_fix_commit_and_its_direction(script: Path, tmp_path: P
         return subprocess.run([*git, "rev-parse", sha], capture_output=True, text=True,
                               check=True).stdout.strip()  # fmt: skip
 
-    commit("chore: seed", {"README": ""})
+    commit(
+        "chore: seed",
+        {"README": "", ".gitattributes": "behavior-map.json dadaia-generated\n"},
+    )
     fix_a = commit("fix(bugs): a-bug — cause", {"tests/test_a.py": "x\ny\n", "cli/a.py": "1\n"})
     t1 = commit("feat(T-1): task", {"cli/x.py": "z\n"})
     t2 = commit("feat(T-1): more", {"cli/z.py": "q\n"})
@@ -761,21 +765,86 @@ def test_fix_derives_each_fix_commit_and_its_direction(script: Path, tmp_path: P
     ]  # fmt: skip
     one = _run(script, "fix", "c-bug", "--specs", str(specs)).stdout.splitlines()
     assert one == ["c-bug\tunlinked", "[ok] 0 linked, 1 unlinked."]
+    fix_h = commit("fix(bugs): h-bug — cause", {"cli/h.py": "h\n"})
+    t3 = commit("feat(T-3): task", {"cli/t3.py": "t\n"})
+    commit(f"chore(bugs): resolve h-bug — by T-3 ({t3})", {"specs/n": "h\n"})
+    both = _run(script, "fix", "h-bug", "--specs", str(specs)).stdout.splitlines()
+    assert both == [f"h-bug\t{t3},{full(fix_h)}\tnet-positive", "\t1\t0\tcli/h.py",
+                    "[ok] 1 linked, 0 unlinked."]  # fmt: skip
 
 
-@pytest.mark.parametrize(("git_init", "code", "last"), [
-    (True, 0, "[ok] 0 linked, 1 unlinked."),  # no commit yet: nothing links
-    (False, 1, "fix: Operator action: point --specs at a specs tree inside a git repo"),
+_WHY = "the blamed fix wrote the line, not its defect"
+
+
+@pytest.mark.parametrize(("caused_by", "reason", "refusal"), [
+    ("none", None, "[error] caused_by 'none' is not a blame candidate (b-bug)"),  # AC9.3
+    ("none", _WHY, None),
+    ("b-bug", None, None),
+    ("c-bug", None, "[error] caused_by 'c-bug' is not a blame candidate (b-bug)"),  # its lines: generated, specs, kept
+])  # fmt: skip
+def test_resolve_proposes_caused_by_by_blame(
+    script: Path, tmp_path: Path, caused_by: str, reason: str | None, refusal: str | None
+) -> None:
+    """AC9.3: candidates are the bugs whose fix wrote a line the staged diff removes, blamed past
+    `(#n)`-subject squashes and `refactor(T-…)` commits, never in specs or a generated file;
+    the bug being resolved is never its own. The removed lines carry a Latin-1 byte and a
+    `-- ` hunk ahead of the blamed one."""
+    closed = {**_OPEN_RECORD, "status": "resolved", "closed_at": "2026-09-21T00:00:00Z"}
+    specs = _ledger(tmp_path, _OPEN_RECORD, {**closed, "id": "b-bug"}, {**closed, "id": "c-bug"})
+    git = ["git", "-C", str(tmp_path), "-c", "user.name=t", "-c", "user.email=t@t"]
+    sha, lines = "", "-- note\nx1\nx2\nx3\n{}\xe9\n"
+    for message, files in [
+        ("chore: seed", {".gitattributes": "behavior-map.json dadaia-generated\ncli/a.py -dadaia-generated\n",
+                         "cli/a.py": lines.format("old")}),
+        ("fix(bugs): a-bug — first try", {"cli/s.py": "1\n"}),
+        ("feat(T-5): fix\n\nfollows the review (#12)", {"cli/a.py": lines.format("bad")}),
+        ("chore(bugs): resolve b-bug — by T-5 ({sha})", {"specs/n": "b\n"}),  # shape 4, short sha
+        ("fix(bugs): c-bug — cause", {"cli/behavior-map.json": "{}\n", "cli/s.py": "1\nz\n", "cli/c.py": "c\n",
+                                      "specs/n": "c\n"}),
+        ("refactor(T-9): rename", {"cli/a.py": lines.format("bad2")}),
+        ("feat: release (#7)", {"cli/a.py": lines.format("bad3")}),
+    ]:  # fmt: skip
+        for path, text in files.items():
+            (tmp_path / path).write_bytes(text.encode("latin-1"))
+        subprocess.run([*git, "add", "-A"], check=True)
+        subprocess.run([*git, "commit", "-qm", message.format(sha=sha)], check=True)
+        sha = subprocess.run([*git, "rev-parse", "--short=9", "HEAD"], capture_output=True,
+                             text=True, check=True).stdout.strip()  # fmt: skip
+    for path, text in [("cli/a.py", "x1\nx2\nx3\n"), ("cli/s.py", "z\n"), ("cli/c.py", "c\nadded\n"),
+                       ("cli/behavior-map.json", ""), ("specs/n", "")]:  # fmt: skip
+        (tmp_path / path).write_text(text, encoding="utf-8")
+    subprocess.run([*git, "add", "-A"], check=True)
+    done = _run(script, *_resolve_argv(caused_by=caused_by), *(["--lineage-reason", reason] if reason else []),
+                "--specs", str(specs))  # fmt: skip
+    assert done.stdout.splitlines()[0] == "blame candidates: b-bug"
+    rerun = f"{sys.executable} {script} resolve a-bug --cause c --resolved-release 0.4.7 --solution s --evidence-loop 'pytest -k x' --specs {specs.resolve()}"  # fmt: skip
+    fix = f"fix: Operator action: run `{rerun}` with --caused-by b-bug, or --lineage-reason saying why not"
+    assert done.stderr.splitlines() == ([refusal, fix] if refusal else []), done.stderr
+    assert done.returncode == (1 if refusal else 0)
+    assert _records(specs)[0].get("lineage_reason") == reason
+    assert _records(specs)[0]["status"] == ("open" if refusal else "resolved")
+
+
+@pytest.mark.parametrize(("verb", "git_init", "code", "last"), [
+    ("fix", True, 0, "[ok] 0 linked, 1 unlinked."),  # no commit yet: nothing links
+    ("fix", False, 1, "fix: Operator action: point --specs at a specs tree inside a git repo"),
+    ("status", False, 0, "[ok] 0 open bug(s)."),  # status reads no history
 ])  # fmt: skip
 def test_fix_refuses_a_history_it_cannot_read(
-    script: Path, tmp_path: Path, git_init: bool, code: int, last: str
+    script: Path,
+    tmp_path: Path,
+    verb: str,
+    git_init: bool,
+    code: int,
+    last: str,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     record = {**_OPEN_RECORD, "status": "resolved", "closed_at": "2026-09-21T00:00:00Z"}
     specs = _ledger(tmp_path, record)
     if not git_init:
         (tmp_path / ".git").rename(tmp_path / "git-gone")  # read-only objects: no rmtree on Windows
-    env = {**os.environ, "GIT_CEILING_DIRECTORIES": str(tmp_path.parent)}  # never a parent repo
-    done = _run(script, "fix", "--specs", str(specs), env=env)
+    monkeypatch.setenv("GIT_CEILING_DIRECTORIES", str(tmp_path.parent))  # never a parent repo
+    done = _run(script, verb, "--specs", str(specs))
     assert done.returncode == code
     assert (done.stdout if code == 0 else done.stderr).splitlines()[-1] == last
 
