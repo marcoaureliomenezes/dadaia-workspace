@@ -144,3 +144,24 @@ def test_delete_removes_dead_context_not_found_and_alive_raises(
 
     service.delete("proj2")
     assert store.get("proj2") is None
+
+
+def test_dead_refuses_to_drop_a_stash_the_repo_holds(
+    service: SpecContextService, remote: str, workspace_root: Path
+) -> None:
+    """A stash entry lives only in the checkout dead() removes: dead() refuses it."""
+    from dadaia_workspace.features.spec_context.service import DeadUnpushedCommitsError
+
+    register_dead(service, "proj", "my-repo", remote)
+    service.alive("proj")
+    repo = workspace_root / "repos" / "my-repo"
+    (repo / "config.env").write_text(f"AWS_ACCESS_KEY_ID={aws_key_shape()}\n")
+    git(repo, "stash", "push", "-u", "--", "config.env")
+
+    with pytest.raises(DeadUnpushedCommitsError) as exc:
+        service.dead("proj", commit=True)
+
+    assert repo.exists()
+    assert str(exc.value).endswith(
+        f"fix: Operator action: pop or drop the 1 stash entry(ies) of {repo}"
+    )

@@ -673,8 +673,8 @@ class SpecContextService:
                 raise DeadSecretFoundError(
                     f"{lead} secret scan blocked dead() --commit. {len(flagged)} untracked "
                     f"file(s) match a secret/identifier rule (values redacted):\n{report}\n"
-                    "Nothing was pushed.\nfix: "
-                    + git_line(path, "stash", "push", "-u", "--", *flagged)
+                    "Nothing was pushed.\nfix: Operator action: remove each value, or move "
+                    "the file out of the workspace"
                 )
             held = [r for r in trees if r["repo"] == slug and r["exit"]]  # the owner's exits
             lost = [refix] if failed else [r["exit"] for r in held]
