@@ -13,6 +13,8 @@ import sys
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+from run import _CI
+
 if TYPE_CHECKING:
     from collections.abc import Callable
 
@@ -39,7 +41,6 @@ CALIBRATION = {
 _CITATION = re.compile(r"\b[a-z0-9]+(?:-[a-z0-9]+)+#[A-Za-z]*\d+(?:[.-]\d+)?")
 _RUN_PYTEST = re.compile(r"^\s*(?:-\s*)?run:\s*(.*\bpytest\s.*)$", re.M)
 _SELECTOR = re.compile(r"""-m\s+(["'])(.*?)\1""")
-_CI = "scripts/ci.py"
 _REAL_CI = Path(__file__).resolve().parents[2] / _CI
 
 PROBE = (

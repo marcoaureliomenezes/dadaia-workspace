@@ -23,7 +23,7 @@ import yaml
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 
-from run import tracked  # noqa: E402
+from run import _CI, tracked  # noqa: E402
 
 from dadaia_workspace.core.fixed_sections import extract_fixed_section  # noqa: E402
 from dadaia_workspace.core.gitflow import read_gitflow  # noqa: E402
@@ -36,7 +36,6 @@ if TYPE_CHECKING:
 
 _WF = ".github/workflows"
 _RELEASE = f"{_WF}/release.yml"
-_CI = "scripts/ci.py"  # the Linux jobs' commands (T-050-190)
 _ACTION = "googleapis/release-please-action"
 _GATE = "needs.release-please.outputs.release_created == 'true'"
 _MODEL_SECRET = re.compile(r"CLAUDE_API_KEY|ANTHROPIC_(?:API_)?KEY|api\.anthropic\.com", re.I)
@@ -122,13 +121,6 @@ def workflow_never_rules(tree: Tree) -> list[str]:
         )
     ]
     jobs, ci_yml = tree.ci_jobs(), _jobs(wfs.get(_G, {}))
-    cov += [
-        f"{_CI}:{name}"
-        for steps in jobs.values()
-        for name, cmd, env in steps
-        if any(a.startswith("--cov") for a in cmd)
-        and not env.get("COVERAGE_FILE", "").startswith("{tmp}")
-    ]
     release_runs = [
         line.strip()
         for p, _, s in steps
@@ -580,7 +572,7 @@ CHECKS: dict[str, Check] = {
             "workflow-expression-in-a-run-body": _workflow(
                 "      - run: echo ${{ github.head_ref }}\n"
             ),
-            "coverage-file-in-the-checkout": _edit(_CI, '"{tmp}/.coverage"', '".coverage"'),
+            "coverage-file-in-the-checkout": _workflow("      - run: pytest --cov x\n"),
             "job-bypasses-ci-script": _edit(_G, "scripts/ci.py e2e-python", "pytest tests/e2e"),
             "release-please-outside-release-yml": _workflow(f"      - uses: {_ACTION}@v5\n"),
             "pypi-publisher-outside-release-yml": _workflow(

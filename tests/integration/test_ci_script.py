@@ -108,3 +108,19 @@ def test_doctor_judges_no_instance(tmp_path: Path, owner: str) -> None:
     assert "doctor --specs-dir specs" in done.stdout
     # The workspace section (WS-*) judges a resolved instance; the fenced run resolves none.
     assert [ln for ln in done.stdout.splitlines() if ln.startswith("WS-")] == []
+
+
+def test_contract_coverage_writes_no_coverage_file_into_the_checkout(tmp_path: Path) -> None:
+    files = {
+        "dadaia_workspace/__init__.py": "",
+        "dadaia_workspace/m.py": "def one() -> int:\n    return 1\n",
+        "tests/unit/test_m.py": (
+            "import pytest\n\nfrom dadaia_workspace.m import one\n\n\n"
+            "@pytest.mark.unit\ndef test_one() -> None:\n    assert one() == 1\n"
+        ),
+    }
+    checkout = _checkout(tmp_path, files)
+    (checkout / "tests" / "contract").mkdir()
+    done = _ci(checkout, "contract-coverage")
+    assert done.returncode == 0
+    assert list(tmp_path.rglob("*coverage*")) == []

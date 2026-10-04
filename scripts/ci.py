@@ -50,7 +50,7 @@ JOBS: dict[str, list[Step]] = {
                 "tests/unit",
                 "tests/contract",
             ],
-            {"COVERAGE_FILE": "{tmp}/.coverage"},  # the run's own temp dir, removed at exit
+            {},
         ),
     ],
     "integration": [
@@ -84,17 +84,18 @@ def main(argv: list[str]) -> int:
     # importing it would judge whichever ``dadaia_workspace`` is importable).
     fence = [os.environ.get("DADAIA_FENCED_ROOTS", ""), *map(str, ROOT.parents)]
     fence.append(str(Path(sys.prefix).resolve().parent.parent))
-    base = {
-        **os.environ,
-        "PYTHONDONTWRITEBYTECODE": "1",
-        "DADAIA_FENCED_ROOTS": os.pathsep.join(p for p in fence if p),
-    }
     failed = []
     with tempfile.TemporaryDirectory(prefix="dadaia-ci-") as tmp:
+        base = {
+            **os.environ,
+            "PYTHONDONTWRITEBYTECODE": "1",
+            "DADAIA_FENCED_ROOTS": os.pathsep.join(p for p in fence if p),
+            "COVERAGE_FILE": f"{tmp}/.coverage",  # the run's own temp dir, removed at exit
+        }
         for job in argv or list(JOBS):
             for name, cmd, env in JOBS[job]:
                 print(f"--- {job}: {name}", flush=True)
-                step_env = {**base, **{k: v.replace("{tmp}", tmp) for k, v in env.items()}}
+                step_env = {**base, **env}
                 code = subprocess.run(cmd, cwd=ROOT, env=step_env, check=False).returncode
                 print(f"{'FAIL' if code else 'PASS'} {name}: {' '.join(cmd)}", flush=True)
                 failed += [name] if code else []
