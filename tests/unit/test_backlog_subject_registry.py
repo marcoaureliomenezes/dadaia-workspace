@@ -32,7 +32,7 @@ const WidgetConst = 1
 
 func MakeWidget() int { return WidgetConst }
 
-// call foo()
+// call foo() with $env
 """
 
 MINIMAL_CATALOG = {"features": [{"slug": "alpha-feature"}, {"slug": "beta-feature"}]}
@@ -72,6 +72,7 @@ def _build(repo: Path, tracked: frozenset[str] = TRACKED) -> Registry:
         ("widget.go#WidgetConst", BindStatus.RESOLVED, "pkg/widget.go#WidgetConst"),
         ("pkg/widget.go#Make", BindStatus.UNRESOLVED, None),  # a word, never a substring
         ("pkg/widget.go#foo()", BindStatus.RESOLVED, "pkg/widget.go#foo()"),
+        ("pkg/widget.go#$env", BindStatus.RESOLVED, "pkg/widget.go#$env"),
         ("pkg/ghost.go", BindStatus.UNRESOLVED, None),
         ("pkg/api", BindStatus.UNRESOLVED, None),  # a directory is not a tracked path
     ],
