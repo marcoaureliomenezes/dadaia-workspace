@@ -1,6 +1,6 @@
 # SPEC — Release: 0.5.0, candidate 8 (W8: the test law and the library pipeline leave; W9: bug lineage derived; W10: the open bugs; W11: agent-behavior evals, a parallel lane; W12: the bug loop stops)
 
-**Status:** In review
+**Status:** Approved
 **Release ID:** 0.5.0
 **Owner:** dd-product-engineer
 **Opened:** 2026-10-03
