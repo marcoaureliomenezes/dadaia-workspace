@@ -36,6 +36,7 @@ if TYPE_CHECKING:
 
 _WF = ".github/workflows"
 _RELEASE = f"{_WF}/release.yml"
+_CI = "scripts/ci.py"  # the Linux jobs' commands (T-050-190)
 _ACTION = "googleapis/release-please-action"
 _GATE = "needs.release-please.outputs.release_created == 'true'"
 _MODEL_SECRET = re.compile(r"CLAUDE_API_KEY|ANTHROPIC_(?:API_)?KEY|api\.anthropic\.com", re.I)
@@ -120,6 +121,8 @@ def workflow_never_rules(tree: Tree) -> list[str]:
             (s.get("env") or {}).get("COVERAGE_FILE") or (job.get("env") or {}).get("COVERAGE_FILE")
         )
     ]
+    script = tree.read(_CI)
+    cov += [_CI] if "--cov" in script and '"COVERAGE_FILE"' not in script else []
     release_runs = [
         line.strip()
         for p, _, s in steps
@@ -423,6 +426,7 @@ def onboarding_journey_uv(tree: Tree) -> list[str]:
         return "\n".join(f"{s.get('run', '')}\n{s.get('env', '')}" for s in steps)
 
     e2e, smoke = texts("ci.yml", "e2e-python"), texts("release.yml", "smoke-test")
+    script = tree.read(_CI)
     needles = (
         'uvx "dadaia-workspace==$VERSION" init',
         "--repo",
@@ -431,8 +435,8 @@ def onboarding_journey_uv(tree: Tree) -> list[str]:
     )
     e2e_rules = {
         "e2e-installs-uv": "install uv==" in e2e,
-        "e2e-uv": "'DADAIA_REQUIRE_UVX': '1'" in e2e,
-        "e2e-runs-journey": bool(re.search(r"tests/e2e(?:\s|$|/test_onboarding_journey\.py)", e2e)),
+        "e2e-uv": '"DADAIA_REQUIRE_UVX": "1"' in script,
+        "e2e-runs-journey": '"tests/e2e"' in script,
     }
     out = [f"{r}: the e2e job breaks the uvx journey" for r, ok in e2e_rules.items() if not ok]
     return out + [f"smoke-greenfield: smoke-test lacks {n!r}" for n in needles if n not in smoke]
@@ -471,7 +475,7 @@ def specs_canon_tracked(tree: Tree) -> list[str]:
 
 _COPIED = (".github", ".gitignore", "specs/constitution.md", "specs/memory", "specs/ADRs",
            "pyproject.toml", "CHANGELOG.md", ".release-please-manifest.json",
-           "release-please-config.json", "README.md", "llms.txt", "docs")  # fmt: skip
+           "release-please-config.json", "README.md", "llms.txt", "docs", "scripts/ci.py")  # fmt: skip
 _ROGUE = (
     "on: push\njobs:\n  x:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: anthropics/a@v1\n"
 )
@@ -563,7 +567,7 @@ CHECKS: dict[str, Check] = {
             "workflow-expression-in-a-run-body": _workflow(
                 "      - run: echo ${{ github.head_ref }}\n"
             ),
-            "coverage-file-in-the-checkout": _workflow("      - run: pytest --cov x\n"),
+            "coverage-file-in-the-checkout": _edit(_CI, '"COVERAGE_FILE"', '"COVERAGE_PATH"'),
             "release-please-outside-release-yml": _workflow(f"      - uses: {_ACTION}@v5\n"),
             "pypi-publisher-outside-release-yml": _workflow(
                 "      - uses: pypa/gh-action-pypi-publish@v1\n"
@@ -720,9 +724,9 @@ CHECKS: dict[str, Check] = {
     "onboarding-journey-uv": (
         onboarding_journey_uv,
         {
-            "e2e-uv": _edit(_G, 'DADAIA_REQUIRE_UVX: "1"', 'DADAIA_REQUIRE_UVX: "0"'),
+            "e2e-uv": _edit(_CI, '"DADAIA_REQUIRE_UVX": "1"', '"DADAIA_REQUIRE_UVX": "0"'),
             "e2e-installs-uv": _edit(_G, "pipx install uv==", "pipx install uvx=="),
-            "e2e-runs-journey": _edit(_G, "tests/e2e --durations", "tests/e2x --durations"),
+            "e2e-runs-journey": _edit(_CI, '"tests/e2e"', '"tests/e2x"'),
             "smoke-greenfield": _edit(_RELEASE, "specs init --context", "specs init"),
         },
     ),
