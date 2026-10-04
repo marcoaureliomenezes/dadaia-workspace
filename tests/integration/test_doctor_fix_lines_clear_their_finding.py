@@ -54,7 +54,6 @@ from dadaia_workspace.features.specs.citations import dead_verb_citations
 from dadaia_workspace.features.specs.doctor import SpecsDoctor
 from dadaia_workspace.features.specs.rules import RULES as SPECS_RULES
 from dadaia_workspace.infrastructure.git_subprocess import GitSubprocessClient
-from tests.fixtures.harness_env import session_home
 from tests.fixtures.stores import context_store
 from tests.helpers import worktree_ws
 
@@ -304,7 +303,6 @@ def test_the_fix_line_clears_the_finding_it_was_stamped_on(
     done = subprocess.run(
         ["bash", "-c", command],
         cwd=root,
-        env={**os.environ, "HOME": str(session_home())},
         capture_output=True,
         text=True,
         check=False,

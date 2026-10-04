@@ -41,6 +41,7 @@ import pytest
 
 from dadaia_workspace.core.platform import PLATFORM
 from tests.conftest import GIT_QUIET_INCLUDE
+from tests.fixtures.harness_env import base_env
 from tests.helpers.previous_release import previous_release, published_releases
 
 _UVX = shutil.which("uvx")
@@ -80,9 +81,8 @@ class Env:
         self.home_dir.mkdir(parents=True)
         self.fixtures.mkdir()
         # No inherited session identity: a scenario that wants one sets DADAIA_SESSION_ID.
-        harness_ids = ("CLAUDE_CODE_SESSION_ID", "CODEX_SESSION_ID", "CODEX_THREAD_ID")
-        self.env = {k: v for k, v in os.environ.items()
-                    if not k.startswith("DADAIA_") and k not in harness_ids}  # fmt: skip
+        self.env = {k: v for k, v in base_env().items()
+                    if not k.startswith("DADAIA_") or k == "DADAIA_FENCED_ROOTS"}  # fmt: skip
         # The journey is a consumer: it must import the uvx-installed wheel, never this checkout.
         self.env.pop("PYTHONPATH", None)
         self.env.pop("VIRTUAL_ENV", None)
@@ -225,7 +225,7 @@ def wheel(tmp_path_factory: pytest.TempPathFactory) -> Path:
         capture_output=True,
         text=True,
         timeout=_TIMEOUT,
-        env={**os.environ, "PIP_NO_INDEX": "1"},
+        env=base_env() | {"PIP_NO_INDEX": "1"},
     )
     (built,) = dist.glob("dadaia_workspace-*.whl")
     assert "+e2e" in built.name, built.name

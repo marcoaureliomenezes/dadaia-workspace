@@ -14,6 +14,7 @@ from pathlib import Path
 from dadaia_workspace.core.models.spec_context import ContextState, SpecContextProject
 from dadaia_workspace.features.spec_context.doctor import DoctorService
 from dadaia_workspace.infrastructure.git_subprocess import GitSubprocessClient
+from tests.fixtures.harness_env import child_keys
 from tests.fixtures.stores import context_store, workspace_cli
 
 SCRIPT = (
@@ -24,7 +25,12 @@ FLOW = {"principal": "trunk", "integration": "dev", "work": "feature/"}
 
 
 def git(repo: Path, *args: str) -> str:
-    env = {"HOME": str(repo), "PATH": os.environ["PATH"], "GIT_CONFIG_NOSYSTEM": "1"}
+    env = {
+        **child_keys(),
+        "HOME": str(repo),
+        "PATH": os.environ["PATH"],
+        "GIT_CONFIG_NOSYSTEM": "1",
+    }
     ident = ["-c", "user.name=t", "-c", "user.email=t@t", "-c", "init.defaultBranch=main"]
     out = subprocess.run(
         ["git", *ident, "-C", str(repo), *args], env=env, check=True, capture_output=True, text=True
@@ -65,6 +71,7 @@ def associate(root: Path, plan: str) -> None:
 
 def run(root: Path, *args: str) -> subprocess.CompletedProcess[str]:
     env = {
+        **child_keys(),
         "HOME": str(root),
         "PATH": os.environ["PATH"],
         "GIT_DIR": "/nonexistent",

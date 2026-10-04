@@ -9,7 +9,6 @@ from __future__ import annotations
 import ast
 import configparser
 import importlib.util
-import os
 import re
 import subprocess
 import sys
@@ -39,7 +38,7 @@ def _fail_open_rows(
     (tmp / ".dadaia/states/spec_contexts.json").write_text("{trunc", "utf-8")
     gate = [sys.executable, "-m", "dadaia_workspace.hooks.pre_gate"]
     unreadable = subprocess.run(gate, input="not json", capture_output=True, text=True,
-                                cwd=tmp, env={**os.environ, "PYTHONPATH": str(_REPO)})  # fmt: skip
+                                cwd=tmp)  # fmt: skip
 
     def raises(_: dict[str, object]) -> str:
         raise RuntimeError

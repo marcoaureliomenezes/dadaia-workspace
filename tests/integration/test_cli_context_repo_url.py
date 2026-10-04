@@ -50,22 +50,12 @@ def workspace(tmp_path: Path, monkeypatch) -> Path:  # type: ignore[no-untyped-d
 
 
 def _git(args: list[str], cwd: Path) -> None:
-    import os
-
     subprocess.run(
         ["git", *args],
         cwd=cwd,
         check=True,
         capture_output=True,
         text=True,
-        env={
-            "GIT_AUTHOR_NAME": "t",
-            "GIT_AUTHOR_EMAIL": "t@e",
-            "GIT_COMMITTER_NAME": "t",
-            "GIT_COMMITTER_EMAIL": "t@e",
-            "PATH": os.environ.get("PATH", ""),
-            "HOME": str(cwd),
-        },
     )
 
 

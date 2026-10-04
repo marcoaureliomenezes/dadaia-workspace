@@ -18,9 +18,7 @@ _LAW = "Sessions launch at the workspace root."
 
 
 def _git(*args: str, cwd: Path) -> None:
-    env = {**os.environ, "GIT_AUTHOR_NAME": "t", "GIT_AUTHOR_EMAIL": "t@example.invalid"}
-    env |= {"GIT_COMMITTER_NAME": "t", "GIT_COMMITTER_EMAIL": "t@example.invalid"}
-    subprocess.run(["git", *args], cwd=cwd, check=True, capture_output=True, text=True, env=env)
+    subprocess.run(["git", *args], cwd=cwd, check=True, capture_output=True, text=True)
 
 
 def _seed(bare: Path, text: str) -> Path:

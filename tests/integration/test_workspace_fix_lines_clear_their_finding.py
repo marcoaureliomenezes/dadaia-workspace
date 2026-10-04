@@ -22,23 +22,28 @@ from dadaia_workspace.cli.main import app
 
 _REPO = Path(__file__).resolve().parents[2]
 _UNSET = ("DADAIA_CONTEXT", "DADAIA_SESSION_ID", "CLAUDE_CODE_SESSION_ID")
-_ENV = {k: v for k, v in os.environ.items() if k not in _UNSET} | {"PYTHONPATH": str(_REPO)}
+
+
+def _env() -> dict[str, str]:
+    """The session env, read per call, without an ambient context or session."""
+    return {k: v for k, v in os.environ.items() if k not in _UNSET}
+
+
 _GIT = ["git", "-c", "user.name=t", "-c", "user.email=t@t"]
 
 
 def _findings(root: Path, *scope: str) -> list[dict[str, str]]:
     """The real CLI's ``doctor --json`` — the run judging a fix."""
     argv = [sys.executable, "-m", "dadaia_workspace", "doctor", *scope, "--json"]
-    run = subprocess.run(argv, cwd=root, env=_ENV, capture_output=True, text=True, check=False)  # noqa: S603
+    run = subprocess.run(argv, cwd=root, env=_env(), capture_output=True, text=True, check=False)  # noqa: S603
     return _parse(run.stdout, scope)
 
 
 def _findings_before(root: Path, *scope: str) -> list[dict[str, str]]:
     """The same ``doctor --json`` in-process — the planted finding and its printed fix,
     before any child runs; the fix and the re-run doctor stay real processes."""
-    env = {**_ENV, **dict.fromkeys(_UNSET)}
     with contextlib.chdir(root):
-        run = CliRunner().invoke(app, ["doctor", *scope, "--json"], env=env)
+        run = CliRunner().invoke(app, ["doctor", *scope, "--json"], env=dict.fromkeys(_UNSET))
     return _parse(run.stdout, scope)
 
 
@@ -53,7 +58,7 @@ def _run_from_elsewhere(root: Path, fix: str) -> None:
     elsewhere = root / "repos" / "alpha"  # WP-17 #S2: a fix runs from any cwd
     elsewhere.mkdir(parents=True, exist_ok=True)
     ran = subprocess.run(
-        ["bash", "-c", fix], cwd=elsewhere, env=_ENV, capture_output=True, text=True
+        ["bash", "-c", fix], cwd=elsewhere, env=_env(), capture_output=True, text=True
     )  # noqa: S603, S607
     assert ran.returncode == 0, ran.stdout + ran.stderr
 

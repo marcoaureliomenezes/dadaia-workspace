@@ -56,12 +56,10 @@ and fault-injection tests that monkeypatch a production internal without simulat
 
 from __future__ import annotations
 
-import functools
 import json
 import os
 import subprocess
 import sys
-import tempfile
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Final
@@ -75,9 +73,12 @@ __all__ = [
     "HARNESS_CONTROL_DADAIA_ENV",
     "HOOK_MODULES",
     "HookResult",
+    "base_env",
+    "child_keys",
     "claude_hook_env",
     "codex_hook_env",
     "kimi_hook_env",
+    "pin_child_env",
     "run_hook_subprocess",
     "scrub_context_resolution_env",
     "scrub_entry_signal_env",
@@ -207,6 +208,7 @@ _FORBIDDEN_HOOK_ENV: Final[tuple[str, ...]] = (
     "CODEX_AGENT_PERSONA",
     CLAUDE_SESSION_ENV_VAR,
     CODEX_SESSION_ENV_VAR,
+    "CODEX_THREAD_ID",
 )
 
 #: The dadaia hook modules invocable as ``python -m dadaia_workspace.hooks.<name>``.
@@ -234,32 +236,31 @@ _POLICY_DRIVER: Final[str] = (
 )
 
 
-def _base_env() -> dict[str, str]:
-    """A copy of the operator shell env with every harness-never-set var scrubbed.
+#: The keys tests/conftest.py pins on the session env, so no child writes outside tmp
+#: (bug test-suite-writes-outside-tmp): a tmp home and cache roots (pip's included on
+#: every OS); PYTHONDONTWRITEBYTECODE is set at conftest import. An inheriting child
+#: gets them free; a from-scratch env starts from :func:`child_keys`.
+def pin_child_env(home: Path) -> None:
+    os.environ.update(
+        HOME=str(home),
+        USERPROFILE=str(home),
+        XDG_CACHE_HOME=str(home / ".cache"),
+        LOCALAPPDATA=str(home / "AppData" / "Local"),
+    )
 
-    This models the real spawn: the operator shell is inherited, but the variables the
-    harness does not actually deliver (and that a stray prior test might have leaked into
-    ``os.environ``) are removed so a hook can never accidentally observe them.
-    """
+
+def child_keys() -> dict[str, str]:
+    keys = ("HOME", "USERPROFILE", "XDG_CACHE_HOME", "LOCALAPPDATA", "PYTHONDONTWRITEBYTECODE")
+    return {k: os.environ[k] for k in keys if k in os.environ}
+
+
+def base_env() -> dict[str, str]:
+    """The session env with every harness-never-set var scrubbed — the real spawn: the
+    operator shell is inherited, the vars no harness delivers are removed."""
     env = dict(os.environ)
     for key in _FORBIDDEN_HOOK_ENV:
         env.pop(key, None)
-    env["HOME"] = str(session_home())
     return env
-
-
-@functools.lru_cache(maxsize=1)
-def session_home() -> Path:
-    """The tmp ``HOME`` every test subprocess spawned through this module inherits.
-
-    A child process cannot see the in-process telemetry seam
-    (``container.telemetry_state_dir`` routed by ``tests/conftest.py``): it resolves
-    ``Path.home()`` itself. Inheriting the operator's ``HOME`` is how governance-verb
-    subprocesses wrote synthetic events into the operator's real
-    ``~/.dadaia/state/telemetry/telemetry.sqlite``. This is the same guard at the
-    process boundary, in the ONE env builder every test subprocess goes through.
-    """
-    return Path(tempfile.mkdtemp(prefix="dadaia-test-home-"))
 
 
 def _harness_env(
@@ -269,7 +270,7 @@ def _harness_env(
     session_id: str,
     extra: dict[str, str] | None = None,
 ) -> dict[str, str]:
-    env = _base_env()
+    env = base_env()
     env["PWD"] = str(workspace)  # the harness spawns the hook in its session cwd
     env[session_env_var] = session_id
     if extra:
@@ -343,7 +344,7 @@ def kimi_hook_env(
     wiring vars (``DADAIA_RUNTIME``/``DADAIA_HOOK_EVENT``) or operator-shell vars — a
     non-allowlisted ``DADAIA_*`` raises ``ValueError``.
     """
-    env = _base_env()
+    env = base_env()
     env["PWD"] = str(workspace)
     if extra:
         for key, value in extra.items():

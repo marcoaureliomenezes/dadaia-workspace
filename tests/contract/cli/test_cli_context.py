@@ -1,5 +1,4 @@
 import json
-import os
 import subprocess
 from pathlib import Path
 
@@ -205,7 +204,7 @@ def test_bind_records_dadaia_runtime_env(workspace: Path, monkeypatch: pytest.Mo
     record = _record(workspace)
     assert record["runtime"] == "unknown"
 
-    env_real = {**os.environ, "DADAIA_RUNTIME": "kimi-code"}
+    env_real = {"DADAIA_RUNTIME": "kimi-code"}
     result2 = _runner.invoke(app, ["context", "bind", "myctx"], env=env_real)
     assert result2.exit_code == 0, result2.output
     record2 = _record(workspace)
@@ -218,15 +217,14 @@ def test_context_show_json_session_null_then_populated_when_bound(workspace: Pat
     is fresh."""
     _register_alive_ctx(workspace)
 
-    env_no_session = {k: v for k, v in os.environ.items() if k != "DADAIA_SESSION_ID"}
-    result = _runner.invoke(app, ["context", "show", "myctx", "--json"], env=env_no_session)
+    result = _runner.invoke(app, ["context", "show", "myctx", "--json"])
     assert result.exit_code == 0, result.output
     data = json.loads(result.stdout)
     assert "session" in data
     assert data["session"] is None
 
     session_id = "sess_t1"
-    env = {**os.environ, "DADAIA_SESSION_ID": session_id}
+    env = {"DADAIA_SESSION_ID": session_id}
     bind_result = _runner.invoke(app, ["context", "bind", "myctx"], env=env)
     assert bind_result.exit_code == 0, bind_result.output
     show_result = _runner.invoke(app, ["context", "show", "--json"], env=env)

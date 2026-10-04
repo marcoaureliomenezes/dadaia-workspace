@@ -44,7 +44,18 @@ from typing import Any
 
 import pytest
 
-from dadaia_workspace.infrastructure.subprocess_runner import ProcessResult
+# Repo-cleanliness law: the test run must never materialize bytecode caches inside
+# the working tree. Import-time compilation happens BEFORE any in-script
+# ``sys.dont_write_bytecode`` guard can run (e.g. tests importing the
+# ``public/scripts/*.py`` sources), so the suite-wide switch is the only reliable
+# enforcement point (AC-W5-01).
+sys.dont_write_bytecode = True
+# No child writes bytecode (bug test-suite-writes-outside-tmp): set here, before xdist
+# spawns its workers; the tmp home joins the session env at pytest_sessionstart.
+os.environ["PYTHONDONTWRITEBYTECODE"] = "1"
+
+from dadaia_workspace.infrastructure.subprocess_runner import ProcessResult  # noqa: E402
+from tests.fixtures.harness_env import pin_child_env  # noqa: E402
 
 # Every subprocess a test spawns (`python -m dadaia_workspace...`: CLI verbs, hooks) must
 # import THIS checkout, whatever the venv's install mode or the worktree it runs in — bugs
@@ -104,6 +115,7 @@ _GIT_GLOBAL = _publish(
     "dadaia-tests", f"{GIT_QUIET_INCLUDE}[user]\n\tname = T\n\temail = t@example.invalid\n"
 )
 os.environ["GIT_CONFIG_GLOBAL"] = str(_GIT_GLOBAL)
+_PARENT_CACHE = Path(os.environ.get("HOME", Path.home())) / ".cache"
 
 
 def _instance_fingerprint() -> dict[str, object]:
@@ -117,13 +129,6 @@ def _instance_fingerprint() -> dict[str, object]:
         if (root / _INSTANCE_SENTINEL).is_file()
     }
 
-
-# Repo-cleanliness law: the test run must never materialize bytecode caches inside
-# the working tree. Import-time compilation happens BEFORE any in-script
-# ``sys.dont_write_bytecode`` guard can run (e.g. tests importing the
-# ``public/scripts/*.py`` sources), so the suite-wide switch is the only reliable
-# enforcement point (AC-W5-01).
-sys.dont_write_bytecode = True
 
 # ---------------------------------------------------------------------------
 # Hypothesis: redirect storage dir and disable the on-disk database so
@@ -429,6 +434,20 @@ def _repo_root_write_guard() -> object:
 # those dirs should exist at all is the CI repo-hygiene job's question.
 _PREEXISTING_POLLUTION: set[str] = set()
 _INSTANCE_AT_START: dict[str, object] = {}
+_OUTSIDE_TMP_AT_START: set[str] = set()
+
+
+# ponytail: top-level .cache entries only; a write inside an existing ~/.cache/pip is unseen.
+def _outside_tmp() -> set[str]:
+    """What a child writing outside tmp leaves: bytecode in the checkout, a parent-HOME cache."""
+    pycache = {
+        p.as_posix()
+        for d in ("dadaia_workspace", "tests")
+        for p in (_REPO_ROOT / d).rglob("__pycache__")
+    }
+    return pycache | (
+        {f"~/.cache/{p.name}" for p in _PARENT_CACHE.iterdir()} if _PARENT_CACHE.is_dir() else set()
+    )
 
 
 def pytest_sessionstart(session: pytest.Session) -> None:
@@ -437,6 +456,11 @@ def pytest_sessionstart(session: pytest.Session) -> None:
     _PREEXISTING_POLLUTION.update(d for d in _POLLUTION_DIRS if (_REPO_ROOT / d).exists())
     _INSTANCE_AT_START.clear()
     _INSTANCE_AT_START.update(_instance_fingerprint())
+    _OUTSIDE_TMP_AT_START.clear()
+    _OUTSIDE_TMP_AT_START.update(_outside_tmp())
+    home = session.config._tmp_path_factory.getbasetemp() / "home"  # type: ignore[attr-defined]
+    home.mkdir(exist_ok=True)
+    pin_child_env(home)
 
 
 def pytest_sessionfinish(session: pytest.Session, exitstatus: int) -> None:
@@ -458,6 +482,10 @@ def pytest_sessionfinish(session: pytest.Session, exitstatus: int) -> None:
             f"changed during the session: {', '.join(_INSTANCE_AT_START)}. A test process "
             "resolved the live instance (bug test-subprocesses-resolve-the-live-instance)."
         )
+        session.exitstatus = 1
+    gained = sorted(_outside_tmp() - _OUTSIDE_TMP_AT_START)
+    if gained or Path.home() == _PARENT_CACHE.parent:
+        print(f"\n\n[OUTSIDE TMP] home {Path.home()}; gained: {gained}")  # noqa: T201
         session.exitstatus = 1
     offenders = [
         d for d in _POLLUTION_DIRS if (_REPO_ROOT / d).exists() and d not in _PREEXISTING_POLLUTION

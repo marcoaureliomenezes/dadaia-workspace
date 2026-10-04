@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import json
-import os
 import subprocess
 from pathlib import Path
 
@@ -27,12 +26,6 @@ from dadaia_workspace.infrastructure.python_env import (  # noqa: E402
 
 _runner = CliRunner()
 _SID = "sess_create01"
-_GIT_ENV = {
-    "GIT_AUTHOR_NAME": "t",
-    "GIT_AUTHOR_EMAIL": "t@e",
-    "GIT_COMMITTER_NAME": "t",
-    "GIT_COMMITTER_EMAIL": "t@e",
-}
 
 
 def _git(*args: str, cwd: Path | None = None) -> str:
@@ -42,7 +35,6 @@ def _git(*args: str, cwd: Path | None = None) -> str:
         check=True,
         capture_output=True,
         text=True,
-        env={**os.environ, **_GIT_ENV},
     ).stdout.strip()
 
 

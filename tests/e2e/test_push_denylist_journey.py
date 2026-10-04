@@ -10,12 +10,13 @@ Size: LARGE — real git hooks.
 from __future__ import annotations
 
 import json
-import os
 import subprocess
 import sys
 from pathlib import Path
 
 import pytest
+
+from tests.fixtures.harness_env import base_env
 
 pytestmark = pytest.mark.e2e
 
@@ -54,15 +55,6 @@ def _write_dadaia_stub(workspace: Path, python_exe: str) -> None:
         f'#!/bin/sh\nexec "{python_exe}" -m dadaia_workspace.cli.main "$@"\n', encoding="utf-8"
     )
     stub.chmod(0o755)
-
-
-def _hook_env(workspace: Path, *, denylist_file: Path) -> dict[str, str]:
-    """A harness-FREE env mirroring the installed pre-push hook's real child env."""
-    env = dict(os.environ)
-    for bad in ("CLAUDE_CODE_SESSION_ID", "CODEX_SESSION_ID", "CODEX_THREAD_ID", "DADAIA_MODE"):
-        env.pop(bad, None)
-    env["DADAIA_PRIVACY_DENYLIST"] = str(denylist_file)
-    return env
 
 
 def _write_denylist_file(workspace: Path) -> Path:
@@ -112,7 +104,7 @@ def test_the_gate_runs_where_core_hookspath_points(tmp_path: Path) -> None:
     assert (repo / ".husky" / "pre-push").is_file()
 
     _write_dadaia_stub(tmp_path, sys.executable)
-    env = _hook_env(tmp_path, denylist_file=_write_denylist_file(tmp_path))
+    env = base_env() | {"DADAIA_PRIVACY_DENYLIST": str(_write_denylist_file(tmp_path))}
     refused = _push(repo, env)
 
     assert refused.returncode != 0, refused.stdout + refused.stderr

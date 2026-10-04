@@ -6,13 +6,14 @@ sa-tool-caches-land-outside-the-cache-zone#B40-1, #B40-2, #B40-3; AC2.14 (T-050-
 
 from __future__ import annotations
 
-import os
 import shutil
 import subprocess
 import sys
 from pathlib import Path
 
 import pytest
+
+from tests.fixtures.harness_env import base_env
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
 _CACHE_DIRS = (".ruff_cache", ".mypy_cache", ".pytest_cache")
@@ -66,7 +67,7 @@ def test_the_bare_command_writes_no_cache_into_the_tree(
     projected = merge_claude_settings({"env": {"OPERATOR": "kept"}}, workspace)["env"]
     assert projected["OPERATOR"] == "kept"  # type: ignore[index]  # AC2.14: operator keys kept
     assert projected["PLAYWRIGHT_MCP_OUTPUT_DIR"] == f"{workspace}/.dadaia/mcps/playwright"  # type: ignore[index]
-    env = {**os.environ, **projected}  # type: ignore[dict-item]
+    env = base_env() | projected  # type: ignore[operator]
 
     for cwd in (repo, repo / "pkg" / "sub", worktree):
         subprocess.run([str(binary), *argv], cwd=cwd, env=env, capture_output=True, check=False)

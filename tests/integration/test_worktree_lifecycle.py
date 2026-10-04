@@ -10,7 +10,6 @@ from __future__ import annotations
 
 import importlib.util
 import json
-import os
 import shlex
 import shutil
 import subprocess
@@ -19,6 +18,7 @@ from pathlib import Path
 
 import pytest
 
+from tests.fixtures.harness_env import base_env
 from tests.helpers.release_state import write_release_phase
 from tests.helpers.skill_scripts import stage_skill_scripts
 from tests.helpers.worktree_ws import SCRIPT, approve, commit, fixes, git, make_workspace, run
@@ -149,7 +149,7 @@ def test_merge_needs_a_valid_approval_of_the_exact_head(
     copy = subprocess.run(  # head's tree, parent and message, outside wt/<name>'s reflog
         ["git", "-C", str(root / TREE), "commit-tree", f"{head}^{{tree}}", "-p", f"{head}~"],
         input="src/b.py\n",
-        env={**os.environ, "GIT_COMMITTER_DATE": "2001-01-01T00:00:00"},
+        env=base_env() | {"GIT_COMMITTER_DATE": "2001-01-01T00:00:00"},
         capture_output=True,
         text=True,
         check=True,
