@@ -2,7 +2,7 @@
 slug: QUALITY
 title: quality-assurance
 tldr: The measured quality principles, the test architecture (tiers, flake and quarantine policy) and the CI gate set with its slop ratchets.
-summary: Canonical memory — statements and laws of testing and quality; changed only in the commit that carries an accepted ADR.
+summary: Canonical memory — statements and laws of testing and quality; a `### P-NN` principle changes with its accepted ADR, any other section under the ADR 0138 lane.
 tags: [testing, pytest, ci, quality, test-architecture, flake, quarantine, privacy]
 ---
 
@@ -47,7 +47,9 @@ Rationale: a CI job that needs a paid model key fails closed on every PR without
 - Output naming a foreign Spec Context is `--redact`ed before entering evidence.
 
 - `flaky` marks a pass-and-fail on identical code; `quarantine` leaves every gating selector, is bug-gated by P-22, and the lane is empty.
+- Growth past the per-job wall-clock budget frozen by ADR 0119 is a budget breach, judged by `dd-code-reviewer` reading the CI job durations (`gh run view`, per job; ADR 0166).
 - Curation is a `code-reviewer` verdict (QA lens); `software-engineer` executes.
+- Mutation evidence is operator tooling, outside the repo (ADR 0166).
 
 ## Gates
 
