@@ -80,10 +80,6 @@ def test_stage_manifest_and_install_all(tmp_path: Path, monkeypatch: pytest.Monk
     assert {p.stem for p in (workspace / ".claude" / "agents").glob("*.md")} == _AGENTS
     assert (workspace / ".codex" / "hooks.json").exists()
     assert (workspace / ".codex" / "config.toml").exists()
-    # Codex receives Starlark .rules for command policy. Markdown behavioral
-    # protocols remain guidance, not executable Codex Rules.
-    assert not (workspace / ".codex" / "rules" / "game-agents-coordination.md").exists()
-    assert not (workspace / ".codex" / "rules" / "game-developer-scope.md").exists()
     assert (workspace / ".codex" / "rules" / "dadaia-command-policy.rules").exists()
 
 

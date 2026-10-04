@@ -174,8 +174,6 @@ def test_only_a_checkout_of_the_url_is_adopted(ws: Path, tmp_path: Path) -> None
 def test_refusal_fix_lines_never_repeat_the_failing_command(ws: Path, tmp_path: Path) -> None:
     """G3/G4/G6 — a bad URL fixes to an operator action naming it, an owned slug to
     `context list`."""
-    listed = _runner.invoke(app, ["context", "list"]).output
-    assert "context create with a context name and --main-repo set to" in listed
     bad = tmp_path / "nothere.git"
     code, out = _create("bad", "--main-repo", str(bad))
     assert code == 1

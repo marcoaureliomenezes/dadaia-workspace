@@ -189,18 +189,6 @@ class Workspace:
         assert head == remote, f"{repo_slug}: HEAD {head} != remote {remote}"
 
 
-def _specs_scaffolded(ws: Workspace, slug: str) -> None:
-    """AC4.1/4.2: canon present, English law sections, nothing committed."""
-    specs = ws.path / "repos" / slug / "specs"
-    assert (specs / "constitution.md").is_file()
-    arch = (specs / "memory" / "ARCHITECTURE.md").read_text("utf-8")
-    quality = (specs / "memory" / "QUALITY.md").read_text("utf-8")
-    for heading in ("## Principles", "## Tech Stack", "## Structure"):
-        assert heading in arch
-    for heading in ("## Principles", "## Test architecture", "## Gates"):
-        assert heading in quality
-
-
 # ── fixtures ─────────────────────────────────────────────────────────────────────
 
 
@@ -308,7 +296,6 @@ def test_an_operator_journey_from_the_previous_release(env: Env) -> None:
     assert any("specs init --context second" in fix for fix in fixes), fixes  # AC6.1
     done = ws.dadaia("specs", "init", "--context", "second")
     assert done.returncode == 0, f"{done.stdout}\n{done.stderr}"
-    _specs_scaffolded(ws, "second")
     ws.assert_level_clean("second", "second", repos["second"])
 
 

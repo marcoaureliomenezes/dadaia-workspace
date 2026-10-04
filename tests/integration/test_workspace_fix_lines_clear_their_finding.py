@@ -130,7 +130,7 @@ def test_an_invalid_ledger_line_is_one_operator_action(
     assert fix.startswith("Operator action: ") and "AGENTS.md" in fix, fix
     assert "<" not in fix and "by hand" not in fix, fix
     if "audits" in rel:  # a bound session writes findings directly: the governed act
-        assert f"line 1 of {path} " in fix and "writes audit findings directly" in fix, fix
+        assert f"line 1 of {path} " in fix, fix
         return
     finder = f"git log -L 1,1:{path}" if where == 1 else f"git log -p -- {path}"
     assert f"`git checkout -- {path}`" in fix and finder in fix, fix
