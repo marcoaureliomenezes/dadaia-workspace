@@ -375,7 +375,7 @@ After AC9.3 and AC8.1's `Intent:` strip merge. Each RED is a behaviour assert in
   - Row 25: the expire lane walks each expired entry once; the linked-worktree decision is made once.
   - Row 26: a root-level held symlink keeps its hold clock (0074).
 - Order (Q5); every other open rc-8 task, W11's lane included (Q21), stays paused until step 3 lands:
-  1. Gate 1 and its script, before any other Python lands ("script first"): AC12.5, then AC12.7 with T-050-189 folded in (they share `_worktree_end.py`, the merge ADR and the law file), AC12.6.
+  1. The script, then gate 1, before any other Python lands ("script first", Q5): AC12.6 lands through today's merge; then one task for AC12.5 and AC12.7, T-050-189 folded in (they share `_worktree_end.py`, the merge ADR and the law file), declaring the script in its own commit (AC12.5's self-declaring case).
   2. The law and the lineage data: AC12.1–AC12.3, AC12.12, AC9.3, AC9.4, then AC12.4; every `dd-code-review` edit (AC9.4, AC12.6, AC12.12) in one task.
   3. The REBUILDs: AC10.1, AC12.8, AC12.13; then AC12.9, AC12.10, AC12.14.
   4. Only then the paused tasks: T-050-172 … T-050-181, T-050-185, T-050-186, T-050-188.
