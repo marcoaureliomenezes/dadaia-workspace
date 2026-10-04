@@ -32,7 +32,7 @@ class _StubDoctor:
 
     check_projection = check_worktrees = check_skill_md_length = check_installed_hooks
 
-    def scan(self):
+    def scan(self, context=None):
         return ()
 
 
