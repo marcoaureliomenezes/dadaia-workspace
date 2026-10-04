@@ -352,3 +352,42 @@ def test_a_moved_work_branch_refuses_and_its_fix_rebase_keeps_only_an_identical_
         assert git(repo, "rev-parse", "feature/0.5.0~").strip() == work != landed
     else:
         assert _argv(result)[1:] == ["reports", "validate", "--all"] and landed == work
+
+
+@pytest.mark.parametrize(
+    ("base", "mine", "lands"),
+    [
+        (None, "verify: false\n", False),
+        (None, None, True),
+        (None, "verify: git rev-parse HEAD\n", True),
+        ("# a prose verify: mention declares nothing\n", None, False),
+        ("# a prose verify: mention declares nothing\n", "verify: true\n", True),
+    ],
+    ids=["exits-1", "exits-0", "prints-head", "undeclared", "declared-by-the-worktree"],
+)
+def test_merge_lands_only_what_the_declared_verify_command_passes(
+    root: Path, base: str | None, mine: str | None, lands: bool
+) -> None:
+    """AC12.5 (ADR 0185): `merge` runs HEAD's `AGENTS.md` `verify:` line in the tree before
+    the fast-forward; a failure or no declaration lands nothing."""
+    repo, tree = root / "repos/r", root / TREE
+    if base:  # the work branch declares nothing
+        commit(repo, "AGENTS.md", base)
+        git(tree, "reset", "-q", "--hard", "feature/0.5.0")
+    head = commit(tree, "AGENTS.md", mine) if mine else commit(tree, "src/a.py")
+    approve(root, head)
+    work = git(repo, "rev-parse", "feature/0.5.0").strip()
+    result = run(root, "merge", TREE)
+    assert git(repo, "rev-parse", "feature/0.5.0").strip() == (head if lands else work)
+    assert (result.returncode, tree.exists()) == ((0, False) if lands else (1, True))
+    if mine == "verify: git rev-parse HEAD\n":
+        assert head in result.stdout.splitlines()
+    if mine == "verify: false\n":
+        assert fixes(result) == [
+            f"fix: Operator action: make `false` exit 0 in {tree} and commit the fix in this worktree"
+        ]
+    if base and not mine:
+        assert fixes(result) == [
+            "fix: Operator action: declare this repo's check command as a verify: line in"
+            f" {tree}/AGENTS.md and commit it in this worktree"
+        ]

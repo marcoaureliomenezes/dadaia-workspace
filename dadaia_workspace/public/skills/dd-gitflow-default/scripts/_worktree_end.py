@@ -6,10 +6,21 @@ from __future__ import annotations
 
 import json
 import shutil
+import subprocess
 from datetime import datetime
 from pathlib import Path
 
-from _worktree_git import cli, cli_line, flow_for, git, git_line, ours, quote, script  # noqa: E402
+from _worktree_git import (  # noqa: E402
+    _env,
+    cli,
+    cli_line,
+    flow_for,
+    git,
+    git_line,
+    ours,
+    quote,
+    script,
+)
 from _worktree_kinds import _NAME_RE, SCRIPT, Refusal, allows, kind_holding  # noqa: E402
 
 REVIEWER = "dd-code-reviewer"
@@ -105,6 +116,28 @@ def _check_ancestor(tree: Path, work: str) -> None:
         ) from error
 
 
+def _verify(tree: Path) -> None:
+    """Gate 1 (ADR 0185): run the `verify:` line of HEAD's `AGENTS.md` in *tree*; its
+    output, passed through, is the evidence for the landed sha."""
+    agents = git(tree, "show", "HEAD:AGENTS.md", check=False).splitlines()
+    command = next(
+        (x.removeprefix("verify:").strip() for x in agents if x.startswith("verify:")), ""
+    )
+    if not command:
+        raise Refusal(
+            "this repo declares no verify: command",
+            f"Operator action: declare this repo's check command as a verify: line in"
+            f" {tree / 'AGENTS.md'} and commit it in this worktree",
+        )
+    # S602: the command is a tracked line of the HEAD being landed, trusted as its code is
+    done = subprocess.run(command, shell=True, cwd=tree, env=_env())  # noqa: S602
+    if done.returncode:
+        raise Refusal(
+            f"verify: {command} exited {done.returncode}",
+            f"Operator action: make `{command}` exit 0 in {tree} and commit the fix in this worktree",
+        )
+
+
 def _series(tree: Path, work: str, tip: str) -> list[tuple[str, str]]:
     """(patch-id, full message) per commit of *work*..*tip*, oldest first, keyed by commit id:
     an empty commit has no patch-id (""); a changed one without a patch-id never matches."""
@@ -192,6 +225,7 @@ def merge(root: Path, path: str, keep: list[str], drop: bool) -> str:
     kept = _kept(tree, "merge", keep, drop)
     if git(repo, "branch", "--show-current").strip() != work:
         raise Refusal(f"repos/{repo.name} is not on {work}", git_line(repo, "switch", work))
+    _verify(tree)
     try:
         git(repo, "merge", "-q", "--ff-only", branch)
     except RuntimeError as error:

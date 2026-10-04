@@ -50,6 +50,7 @@ def make_workspace(root: Path) -> Path:
     for doc in ("SPEC", "PLAN", "TASKS"):
         (rel / f"{doc}.md").write_text(f"# {doc}\n\n**Status:** Approved\n")
     (repo / ".gitignore").write_text("*.scratch\n__pycache__/\n")
+    (repo / "AGENTS.md").write_text("verify: true\n")  # gate 1 (ADR 0185)
     git(repo, "add", "-A")
     git(repo, "commit", "-qm", "init")
     git(repo, "branch", "feature/0.5.0")
