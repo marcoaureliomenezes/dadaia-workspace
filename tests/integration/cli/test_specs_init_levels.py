@@ -1,4 +1,4 @@
-"""Intent: CONTRACT — T-048-05 (SPEC 0.4.8 FR4 AC4.1, AC4.3–AC4.5): ``specs init --context``
+"""T-048-05 (SPEC 0.4.8 FR4 AC4.1, AC4.3–AC4.5): ``specs init --context``
 on the three tree kinds — absent scaffolds, dadaia upgrades, foreign moves to ``specs-bkp/``
 only when confirmed — never committing. Size: MEDIUM (real git repo on disk)."""
 

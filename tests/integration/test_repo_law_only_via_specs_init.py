@@ -1,7 +1,7 @@
 """Repo law has one writer: ``specs init`` (canon.REPO_LAW), once; ``public install``
 never writes under ``repos/``.
 
-Intent: CONTRACT — sa-public-install-writes-the-root-map-into-product-repos (WP-07);
+sa-public-install-writes-the-root-map-into-product-repos (WP-07);
 size: MEDIUM (real public tree, real install).
 
 Statements: sa-public-install-writes-the-root-map-into-product-repos#K1, #K2, #K6. The ledger-forget test is K6's upgrade

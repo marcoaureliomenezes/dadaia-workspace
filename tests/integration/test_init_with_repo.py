@@ -1,7 +1,4 @@
-"""`dadaia init <dir> --harness <name> --repo <url>` clones, creates and alives one context.
-
-Intent: CONTRACT — 0.4.7 FR1 / AC1.1. Doctor exit 0 lives in tests/e2e/test_one_line_bootstrap.py.
-"""
+"""`dadaia init <dir> --harness <name> --repo <url>` clones, creates and alives one context."""
 
 from __future__ import annotations
 

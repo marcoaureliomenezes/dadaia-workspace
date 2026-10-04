@@ -1,7 +1,5 @@
 """JsonInstallLedgerStore: round-trip, idempotent write, and every unreadable ledger reads
 as None (bootstrap: prune nothing), never a raise.
-
-Intent: CONTRACT — install ledger FR3 item 1
 """
 
 from __future__ import annotations

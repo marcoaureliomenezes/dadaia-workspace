@@ -1,6 +1,6 @@
 """Path taxonomy and bind scope of the SDD gate (v0.4.5 A1.2; 0.4.7 FR1, FR3 AC3.1).
 
-Intent: CONTRACT — T-050-97 (AC1.1): no repos/ path is ADDITIVE; LAW is decided by origin (the
+T-050-97 (AC1.1): no repos/ path is ADDITIVE; LAW is decided by origin (the
 projected set), never by basename; a write out of the bind's scope names `context bind`, and
 every write under repos/<r>/ outside specs/audits/ names the worktree of the right kind.
 """

@@ -1,7 +1,7 @@
 """F009 (20260830-design-bug-surface-audit): the ctx-inject decision is PURE policy
 (``injection_policy.decide_injection``) — a decision table, no stdin, env or files.
 
-Intent: CONTRACT — rows encode kimi-postcompact-omits-bound-context-bootstrap (recorded-slug
+rows encode kimi-postcompact-omits-bound-context-bootstrap (recorded-slug
 fallback), claude-compact-reinjection-missing (session_restart re-emits AND restamps),
 ctx-inject-newest-bind-epoch-steals-other-sessions-context (self-keyed rebind), the
 compact-marker trigger, sa-bind-has-two-stores#S7, bind-lost-silently-after-five-idle-minutes and

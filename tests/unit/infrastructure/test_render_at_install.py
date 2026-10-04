@@ -1,8 +1,6 @@
 """The render-at-install seam (v0.1.65 FR5) at its K3 (v0.5.1) pure-render interface:
 ``render_claude_agent``, ``resolve_codex_agent_model``, ``codex_agent_toml_bytes`` and the
 one ``ProjectionRule``/``install_rules`` seam.
-
-Intent: CONTRACT — v0.1.65 F-3/F-5/F-6/D-3/D-6; sa-staged-assets-without-consumers#44.4
 """
 
 from __future__ import annotations

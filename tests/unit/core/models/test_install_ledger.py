@@ -1,6 +1,4 @@
-"""Intent: CONTRACT — install-ledger relpath (CWE-22 class), FR3 item 1.
-
-``LedgerEntry.__post_init__`` is the one relpath-validation authority: a malformed relpath
+"""``LedgerEntry.__post_init__`` is the one relpath-validation authority: a malformed relpath
 never reaches a ledger through direct construction or ``InstallLedger.from_dict``.
 """
 

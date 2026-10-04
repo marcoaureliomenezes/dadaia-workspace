@@ -1,7 +1,5 @@
 """JsonAgentModelPolicyStore (v0.1.65 FR3/D-7): the shared store contract once, then the
 store's own FR3 parse-rejection matrix and the D-7 Fable guard.
-
-Intent: CONTRACT — v0.1.65 FR3, D-7
 """
 
 from __future__ import annotations

@@ -1,4 +1,4 @@
-"""Intent: CONTRACT — v0.2.9 T2 — placeholder-atom repair (bug scaffold-repair-cannot-remediate-invalid-
+"""v0.2.9 T2 — placeholder-atom repair (bug scaffold-repair-cannot-remediate-invalid-
 placeholder-atom).
 
 Old scaffolds shipped a raw ``memory/product/feature.md`` template

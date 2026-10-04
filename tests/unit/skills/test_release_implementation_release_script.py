@@ -1,4 +1,4 @@
-"""Intent: CONTRACT — dd-release-implementation/scripts/release.py owns _RELEASE.json,
+"""dd-release-implementation/scripts/release.py owns _RELEASE.json,
 the candidate trio and releases_histo.jsonl (0.4.7 c7 T-047-66: the release ledger verbs
 move into a stdlib skill script). Size: SMALL.
 

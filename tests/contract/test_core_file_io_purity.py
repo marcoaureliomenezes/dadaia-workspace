@@ -1,7 +1,7 @@
 """One owner per question: each rule scans the package and names every module that answers a
 question its owner alone answers.
 
-Intent: CONTRACT — P-11 core file-I/O purity, P-12 hooks never import the container, F001 no
+P-11 core file-I/O purity, P-12 hooks never import the container, F001 no
 orphaned factory, and the single-owner bug fixes cited on each row. Size: SMALL — AST/text
 over the package source, plus one subprocess per hook import.
 """

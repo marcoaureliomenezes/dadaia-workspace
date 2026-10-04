@@ -1,6 +1,4 @@
-"""Intent: CONTRACT — T-047-53/T-047-54 (SPEC 0.4.7 FR2, AC2.1); size: SMALL (contract).
-
-The context balance of a dadaia-workspace, pinned from the library source:
+"""The context balance of a dadaia-workspace, pinned from the library source:
 
 1. every dd- skill that touches a governed area opens that area's scoped `AGENTS.md`
    as the FIRST numbered step of its procedure, naming the workspace-relative path;

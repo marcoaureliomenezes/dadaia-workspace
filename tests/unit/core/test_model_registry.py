@@ -21,7 +21,7 @@ from dadaia_workspace.core.model_registry import (
 
 
 def test_registry_invariant_sweep_with_content_pins() -> None:
-    """Intent: CONTRACT — agent-model-templates-pin-superseded-opus-and-lack-the-economy-template.
+    """agent-model-templates-pin-superseded-opus-and-lack-the-economy-template.
 
     No duplicate claude_ids; every codex_id lacks the claude- prefix (ADR-5). Pins: the
     haiku-4-5 id, sonnet-5 -> gpt-5.6-terra/standard, opus-5-5 on dispatch with opus-5's

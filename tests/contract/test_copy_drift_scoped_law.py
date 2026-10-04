@@ -1,4 +1,4 @@
-"""Intent: CONTRACT — bug scoped-memory-agents-md-prose-rewrite-undetected-by-doctor: the ONE TREE-5
+"""bug scoped-memory-agents-md-prose-rewrite-undetected-by-doctor: the ONE TREE-5
 comparator checks every scaffolded `specs/<area>/AGENTS.md` against its source and shipped history;
 matching neither is a `copy-drift` WARNING, absence a finding, scaffold bytes silent."""
 

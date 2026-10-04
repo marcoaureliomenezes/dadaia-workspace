@@ -1,6 +1,4 @@
-"""Intent: CONTRACT — AC11 (FR13, T-046-31): `dadaia export` writes one `spec-contexts.json`.
-
-Size: SMALL — fakes at the store and git seams; the expected records are the SPEC FR13
+"""Size: SMALL — fakes at the store and git seams; the expected records are the SPEC FR13
 worked example, never derived from the service.
 """
 

@@ -1,6 +1,6 @@
 """Wiring the push-range denylist scan into ``push_gate_decision`` (SPEC v0.9.0 FR1/FR2/FR5/FR6).
 
-Intent: CONTRACT — v0.9.0 A1.1-A1.4, A2.1-A2.4, A5.1-A5.4, A6.1; v0.11.0 A7.1-A7.3, A4.5,
+v0.9.0 A1.1-A1.4, A2.1-A2.4, A5.1-A5.4, A6.1; v0.11.0 A7.1-A7.3, A4.5,
 A6.1-A6.3, A6.6, A5.1; v0.4.3 A11.1; 0.5.0 AC3.10
 
 Every range is a real git range (``PushRepo``) read by the real ``GitSubprocessObjectReader``
@@ -193,7 +193,7 @@ def test_refusal_path_with_no_matching_segment_is_byte_identical(repo: PushRepo)
 
 @pytest.mark.parametrize("sep", ["\x9b", " "])
 def test_refusal_path_segment_uppercase_hyphenated_variant_of_term_is_masked(repo: PushRepo, sep: str) -> None:
-    """Intent: sa-path-segment-judged-by-two-matchers, sa-git-output-split-by-unicode-line-breaks — a segment split by U+009B or U+2028 is read whole (git output split on \\n only) and masked (A4.1)."""
+    """sa-path-segment-judged-by-two-matchers, sa-git-output-split-by-unicode-line-breaks — a segment split by U+009B or U+2028 is read whole (git output split on \\n only) and masked (A4.1)."""
     sha = repo.commit({f"repos/Zz-A{sep}cme-Corp/notes.md": "contains zz-acme here\n"})
     decision = _decide(repo, _branch(sha), denylist_terms=(("zz-acme", "synthetic"),))
     assert not decision.allowed
@@ -224,7 +224,7 @@ class _Raising:
 def test_a_git_read_failure_refuses_with_its_own_fix(
     repo: PushRepo, exc: GitObjectReadError, in_message: list[str], last_line: str
 ) -> None:
-    """Intent: sa-fix-lines-not-built-by-cli-line#S5 — corruption's fix is `git -C <repo> fsck`; a git that cannot run is no corruption.
+    """sa-fix-lines-not-built-by-cli-line#S5 — corruption's fix is `git -C <repo> fsck`; a git that cannot run is no corruption.
 
     The stub injects the one failure real git cannot produce on demand (a desynced cat-file stream).
     """

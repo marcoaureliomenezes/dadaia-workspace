@@ -1,7 +1,5 @@
 """The rendered ``.dadaia/**`` law fragments (0.4.6 AC12) and no ``.dadaia/scripts``
 projection (0.4.6 AC10).
-
-Intent: CONTRACT — 0.4.6 AC12 (FR14) + 0.4.6 AC10 (FR12); size: MEDIUM.
 """
 
 from __future__ import annotations

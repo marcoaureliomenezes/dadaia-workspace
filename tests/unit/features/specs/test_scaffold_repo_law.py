@@ -1,4 +1,4 @@
-"""Intent: CONTRACT — T-048-05 review finding 3 (CWE-59/CWE-367); ports v0.4.3 A17.1/A17.2,
+"""T-048-05 review finding 3 (CWE-59/CWE-367); ports v0.4.3 A17.1/A17.2,
 v0.7.0 FR3 and 0.4.6 AC7 from the deleted ``scoped_law`` tests onto the one write path
 ``canon._write_absent`` behind ``scaffold_repo_law``. Size: SMALL (tmp filesystem only)."""
 

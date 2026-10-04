@@ -1,4 +1,4 @@
-"""Intent: CONTRACT — sa-release-id-has-three-grammars: a release id has ONE grammar, the
+"""sa-release-id-has-three-grammars: a release id has ONE grammar, the
 script's bare M.m.p (`_release_schema.SEMVER_RE`); core consults it; archived dirs are
 exempt by location. Size: SMALL.
 """

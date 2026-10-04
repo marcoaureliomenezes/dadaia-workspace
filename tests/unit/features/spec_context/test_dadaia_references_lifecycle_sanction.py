@@ -1,6 +1,4 @@
-"""Intent: CONTRACT — SPEC v0.4.5 FR10, A10.1-A10.4; operator ruling O4 (T-045-23).
-
-``.dadaia/references/<clone>/`` holds operator-placed reference clones. A10.1: the doctor's
+"""``.dadaia/references/<clone>/`` holds operator-placed reference clones. A10.1: the doctor's
 zone walk never flags one (``references`` is an OPERATOR zone, never walked). A10.2: no
 lifecycle verb resolves, binds or GCs one — proven at the shared resolution seam, on the real
 bind/show resolution path, and on the whole ``DoctorService.fix()`` sweep. A10.4: nothing here

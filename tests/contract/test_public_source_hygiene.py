@@ -1,6 +1,4 @@
-"""Intent: CONTRACT — DADAIA §8.3 public asset hygiene (no bytecode under public/, build excludes)
-
-Public-source hygiene contract (FR-W5-01 / AC-W5-01, release v0.1.11).
+"""Public-source hygiene contract (FR-W5-01 / AC-W5-01, release v0.1.11).
 
 Residual R7: ``dadaia_workspace/public/scripts/__pycache__/`` had been committed —
 compiled bytecode leaking into the canonical public asset tree, which is source-of-truth
@@ -161,7 +159,7 @@ def _shipped_text() -> list[Path]:
 
 
 def test_all_shipped_text_invokes_the_cli_by_its_venv_path() -> None:
-    """Intent: CONTRACT — shipped-text-cites-bare-dadaia-the-gate-blocks,
+    """shipped-text-cites-bare-dadaia-the-gate-blocks,
     shipped-text-bare-cli-guard-deleted-with-its-test. The venv-guard gate blocks a bare
     `dadaia`, so no copyable span in shipped text may spell one. Zero tolerance."""
     paths = _shipped_text()
@@ -214,7 +212,7 @@ def _dead_flags(span: str, tree: dict[str, set[str]]) -> list[str]:
 
 
 def test_every_flag_cited_beside_a_venv_call_exists_in_that_verbs_help() -> None:
-    """Intent: CONTRACT — dd-cli-library-cites-a-dead-flag-and-omits-level-3,
+    """dd-cli-library-cites-a-dead-flag-and-omits-level-3,
     shipped-text-bare-cli-guard-deleted-with-its-test. A flag cited next to
     `.dadaia/.venv/bin/dadaia <verb>` in shipped text is one that verb takes."""
     tree = _cli_tree()

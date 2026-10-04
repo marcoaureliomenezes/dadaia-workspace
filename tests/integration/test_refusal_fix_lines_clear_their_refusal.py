@@ -1,4 +1,4 @@
-"""Intent: CONTRACT — 0.5.0 c3 re-review (C1, H1-H4, M1): every refusal of the pre-push
+"""0.5.0 c3 re-review (C1, H1-H4, M1): every refusal of the pre-push
 gate (`ci push-gate-check`), `context baseline` and `context dead` prints ONE fix line
 that, executed verbatim, clears the refusal.
 

@@ -1,7 +1,4 @@
-"""The doctor's `ledgers` section delegates to each ledger's skill script.
-
-Intent: CONTRACT — 0.4.7 AC3.1.
-"""
+"""The doctor's `ledgers` section delegates to each ledger's skill script."""
 
 from __future__ import annotations
 

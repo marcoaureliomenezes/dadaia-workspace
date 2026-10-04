@@ -1,6 +1,6 @@
 """FR17 (v0.4.4, T-044-28) — the `SpecContextService` create/add/remove-repo methods.
 
-Intent: CONTRACT — A17.1 (idempotent, fails loudly on unknown context/slug), A17.3
+A17.1 (idempotent, fails loudly on unknown context/slug), A17.3
 (refuses the main repo's own slug as associated), context-repo-add-accepts-foreign-
 context-slug (T-044-45 F-1: refuses a slug already owned by ANOTHER context, as its
 main repo or an associated repo) and its `create`-seam mirror

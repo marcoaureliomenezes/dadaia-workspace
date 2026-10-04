@@ -1,6 +1,6 @@
 """codex-live-probe boundary — certify() exercises the INSTALLED Codex, not statics.
 
-Intent: CONTRACT — v0.4.3 A22.4; codex-live-probe-gate-checks-presence-not-usability (an
+v0.4.3 A22.4; codex-live-probe-gate-checks-presence-not-usability (an
 installed-but-unentitled Codex is the same honest SKIP as an absent one);
 certify-skip-detail-leaks-full-codex-output (CWE-532: SKIP/FAIL detail carries only the parsed
 upstream message, length-capped — never the banner's workdir/session id, never a raw blob).

@@ -1,4 +1,4 @@
-"""Intent: CONTRACT — K1 ("One Invocation") + F002 (20260830 audit): ``core.session_store``
+"""K1 ("One Invocation") + F002 (20260830 audit): ``core.session_store``
 owns the session-binding record — its path, schema, liveness rule and stale selection."""
 
 from __future__ import annotations
@@ -76,7 +76,7 @@ def test_new_binding_record_authors_the_schema_and_retired_keys_still_parse() ->
     ],
 )
 def test_is_live_is_the_one_liveness_rule(record: dict[str, object], live: bool) -> None:
-    """Intent: CONTRACT — sa-session-liveness-has-two-rules, bind-lost-silently-after-five-idle-
+    """sa-session-liveness-has-two-rules, bind-lost-silently-after-five-idle-
     minutes: ``last_seen_at`` younger than a day (boundary stale) is live, minutes idle included; a record without it (``bound_at`` only, the
     retired creation-time fallback, §4a item 13) or with a corrupt clock is not."""
     assert si.is_live(record, clock=lambda: datetime(2026, 6, 6, 12, tzinfo=UTC)) is live

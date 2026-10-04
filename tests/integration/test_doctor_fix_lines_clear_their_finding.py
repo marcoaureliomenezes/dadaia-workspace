@@ -1,6 +1,4 @@
-"""Intent: CONTRACT — 0.4.7 FR2 (T-047-14), doctor-messages-cite-dead-verbs.
-
-A doctor fix line CLEARS its own finding.
+"""A doctor fix line CLEARS its own finding.
 
 ``tests/contract/test_every_block_carries_a_fix.py`` proves the fix line is one
 executable command that the gate lets through. That grammar says nothing about what the
@@ -567,7 +565,7 @@ def test_the_session_lane_re_creates_missing_core_and_rewrites_none(
     present: str,
     plant: Callable[[Path, Path], None],
 ) -> None:
-    """Intent: CONTRACT — AC2.4 (ADR 0096): the SessionStart lane re-creates a missing level-1
+    """AC2.4 (ADR 0096): the SessionStart lane re-creates a missing level-1
     entry (`.dadaiaignore`, `prompt.md`, every provisioned zone) and rewrites no present one —
     a dangling link is present, never written through."""
     (tmp_path / ".dadaia" / "states").mkdir(parents=True)

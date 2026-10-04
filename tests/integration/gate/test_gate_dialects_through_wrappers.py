@@ -1,6 +1,4 @@
-"""Intent: CONTRACT — sa-gate-blind-on-cursor-copilot-devin (0.5.0 WP-12, AC1.4, ADR 0054).
-
-sa-gate-blind-on-cursor-copilot-devin#B8: for every registry harness, a payload fixture in the harness's native shape
+"""sa-gate-blind-on-cursor-copilot-devin#B8: for every registry harness, a payload fixture in the harness's native shape
 (``tests/fixtures/hook_payloads/<harness>/``, shapes from the bug record's vendor-doc
 citations — authored, not recorded) through its rendered hook gets Claude's verdict for
 a bare `dadaia` / a new root entry / a PROTECTED file / a worktree write of an unregistered slug (scope: allowed).

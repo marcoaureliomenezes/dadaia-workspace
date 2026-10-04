@@ -1,4 +1,4 @@
-"""Intent: CONTRACT — 0.4.6 AC8 (FR7, bug doctor-root1-flags-env-that-dadaia-md-9-declares-canonical)
+"""0.4.6 AC8 (FR7, bug doctor-root1-flags-env-that-dadaia-md-9-declares-canonical)
 and AC7 (FR6, the ``.dadaiaignore`` reader); size: SMALL.
 
 Harness-real behavior tests for dadaia_workspace.hooks.root_whitelist.
@@ -171,7 +171,7 @@ def test_fail_open_table(tmp_path: Path, tool_name: str, tool_input: dict[str, A
 def test_the_fix_creates_the_agents_own_temp_dir(
     tmp_path: Path, extra: dict[str, object], segment: str
 ) -> None:
-    """Intent: CONTRACT — AC4.4 (fix-lines-are-not-one-runnable-command): the fix makes the
+    """AC4.4 (fix-lines-are-not-one-runnable-command): the fix makes the
     agent's own `.dadaia/tmp/<agent>/<YYYYMMDD>/`, never the existing `tmp/` (a no-op); a
     subagent payload's `agent_type` names it, only as a plain name (CWE-22)."""
     payload = {"tool_name": "Write", "tool_input": {"file_path": str(tmp_path / "junk.txt")}}

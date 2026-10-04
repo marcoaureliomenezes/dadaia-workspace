@@ -1,4 +1,4 @@
-"""Intent: CONTRACT — 0.4.7 FR1 (ADR 0018 measured_by): skill owner scripts; AC3.1 (ADR 0135):
+"""0.4.7 FR1 (ADR 0018 measured_by): skill owner scripts; AC3.1 (ADR 0135):
 one loader, one owner per grammar. Size: SMALL.
 
 A ``public/skills/*/scripts/`` script OWNS its logic, so it must be self-contained:

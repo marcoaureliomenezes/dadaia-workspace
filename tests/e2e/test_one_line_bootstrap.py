@@ -1,6 +1,6 @@
 """``dadaia init <dir> --harness claude --repo <url>`` end to end, through the console script.
 
-Intent: CONTRACT — 0.4.7 FR1 / AC1.1 (T-047-79); 0.4.8 AC1.1/AC1.4 closing (T-048-04);
+0.4.7 FR1 / AC1.1 (T-047-79); 0.4.8 AC1.1/AC1.4 closing (T-048-04);
 0.4.8 AC3.6/AC8.2 (bug test-suite-wall-clock-doubled-past-its-frozen-budget).
 
 Size: LARGE, justified — AC1.1 is a statement about the *installed* distribution, not
@@ -273,7 +273,7 @@ def _decoy_source(tmp_path: Path) -> Path:
     reason=f"the dadaia console script is not installed next to {sys.executable}",
 )
 def test_the_workspace_venv_carries_the_bootstrappers_own_bytes(tmp_path: Path, home: Path) -> None:
-    """Intent: CONTRACT — bug init-venv-installs-index-version-not-running-distribution.
+    """bug init-venv-installs-index-version-not-running-distribution.
 
     The consumer shape, end to end and hermetic: a NON-checkout install of this
     distribution (a wheel in its own venv — pipx/uvx/a git bootstrap) runs ``init``, and

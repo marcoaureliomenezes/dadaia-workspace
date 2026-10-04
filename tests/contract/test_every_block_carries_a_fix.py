@@ -1,4 +1,4 @@
-"""Intent: CONTRACT — 0.4.7 FR2 (T-047-14); AC4.1, AC4.4, AC4.7, AC4.8 (T-050-149): every
+"""0.4.7 FR2 (T-047-14); AC4.1, AC4.4, AC4.7, AC4.8 (T-050-149): every
 BLOCK carries one fix line, in an ADR 0158 form, through the one renderer (ADR 0159).
 
 The anti-stall invariant. A BLOCK that does not say, in one line, the exact act that clears
@@ -699,7 +699,7 @@ def _text_sites(texts: dict[str, str]) -> list[str]:
 
 
 def test_no_fix_or_shipped_line_bypasses_the_one_renderer() -> None:
-    """Intent: CONTRACT — AC4.1, AC4.4 (DEL fix-lines-are-not-one-runnable-command, ADR
+    """AC4.1, AC4.4 (DEL fix-lines-are-not-one-runnable-command, ADR
     0158), AC4.7, AC4.8, sa-fix-lines-not-built-by-cli-line#S1: one walk over every package
     module and `public/skills` script, every doctor rule's `rule_fix`, and every tracked
     law, docs and shipped text file (bug law-file-scan-reads-untracked-bytecode)."""

@@ -1,6 +1,4 @@
-"""Intent: CONTRACT — AC3.2 / T-047-56: the three personas carry their dd- names everywhere.
-
-The roster and the persona files agree; the retired-name greps are rows of
+"""The roster and the persona files agree; the retired-name greps are rows of
 test_public_source_hygiene::test_public_source_names_no_retired_surface.
 """
 

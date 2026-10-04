@@ -1,6 +1,6 @@
 """GitSubprocessClient against real git.
 
-Intent: CONTRACT — Bug 1 (commit_all never engulfs an embedded repo); Bug 4 (first push sets
+Bug 1 (commit_all never engulfs an embedded repo); Bug 4 (first push sets
 upstream, a mismatched upstream pushes by explicit refspec, v0.1.50 FR3); v0.4.3 A10.2
 (commit_paths ignores pre-staged content); SA-H3-2 (the operator's own identity, never a
 fallback); review 6 N2 (a failed step carries git's stdout).

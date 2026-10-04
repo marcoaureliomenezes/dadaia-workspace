@@ -1,8 +1,3 @@
-"""Intent: CONTRACT — dadaia context CLI (P-09 one Invocation; DADAIA §3.3 context resolution)
-
-Public CLI contracts for `dadaia context`.
-"""
-
 import json
 import os
 import subprocess
@@ -402,7 +397,7 @@ def test_bind_with_no_live_release_exits_zero_and_the_next_write_is_allowed(
 
 
 def test_context_show_and_list_json_emit_main_repo_key(workspace: Path) -> None:
-    """Intent: CONTRACT — AC5.1. `show --json` / `list --json` carry `main_repo`;
+    """AC5.1. `show --json` / `list --json` carry `main_repo`;
     the retired output key `repo_slug` is absent (the state-file schema keeps it)."""
     from dadaia_workspace.core.models.spec_context import AssociatedRepo
 

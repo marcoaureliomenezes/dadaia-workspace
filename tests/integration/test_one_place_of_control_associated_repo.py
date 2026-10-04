@@ -1,8 +1,6 @@
 """FR19 (v0.4.4, T-044-30) A19.2 — one place of control: ``dadaia doctor``'s specs and ledgers sections, ``backlog
 doctor`` and the SDD gate see exactly ONE ``specs/`` tree per context — the main repo's.
 
-Intent: CONTRACT — A19.2
-
 G13 (v0.4.4 grill ADR, ratified): a Spec Context's associated repos are cloned clean and
 their OWN ``specs/`` (if any) are **ignored** by the spec context. This suite builds the
 adversarial fixture the acceptance criterion calls for: the associated repo carries its

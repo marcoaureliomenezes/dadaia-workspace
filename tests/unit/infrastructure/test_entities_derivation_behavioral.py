@@ -1,7 +1,5 @@
 """ENT-DERIVE-1 behavioral fidelity: each drift class, mutated alone into a clean scratch
 tree, is reported as a BLOCKING line (v0.4.3 T-043-35).
-
-Intent: CONTRACT — v0.4.3 A22.5
 """
 
 from __future__ import annotations

@@ -1,4 +1,4 @@
-"""Intent: CONTRACT — `specs upgrade` rewrites the retired Portuguese status tokens in the
+"""`specs upgrade` rewrites the retired Portuguese status tokens in the
 live candidate's trio (0.4.7 FR4 / T-047-58), never in a closed rc-<N>/ or published
 history (ADR 0150 (1)); only the owner's anchored line is a declaration (T-050-143). Size: SMALL."""
 

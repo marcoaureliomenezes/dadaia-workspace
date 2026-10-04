@@ -1,4 +1,4 @@
-"""Intent: CONTRACT — sa-backlog-status-has-no-single-authority#B1, #B2, #B3, #B8: the
+"""sa-backlog-status-has-no-single-authority#B1, #B2, #B3, #B8: the
 `ledgers` section judges a live entry through `backlog.py check` alone (it carries no
 status list); the doctor keeps only anchor resolution (BL-SCHEMA) and BL-CONFLICT.
 sa-backlog-intents-have-two-grammars: the schema is the one intents grammar; the doctor

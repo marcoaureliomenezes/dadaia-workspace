@@ -1,4 +1,4 @@
-"""Intent: CONTRACT — ADR-SUPERSEDED-CITATION (0.4.7 c5 FR4): a memory atom, skill or rule
+"""ADR-SUPERSEDED-CITATION (0.4.7 c5 FR4): a memory atom, skill or rule
 citing a superseded decision is an error; accepted and proposed citations are silent.
 Size: SMALL."""
 

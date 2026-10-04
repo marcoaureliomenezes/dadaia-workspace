@@ -1,6 +1,4 @@
-"""Intent: CONTRACT — v0.4.2 A10.1-A10.4, CR-2; v0.4.3 A12.1-A12.5, T-043-23; 0.4.7 FR4/FR7.
-
-CRIT public-privacy gate (the repo went public and was reverted for an infra leak once —
+"""CRIT public-privacy gate (the repo went public and was reverted for an infra leak once —
 never weaken). Operator terms are private, so every test runs with no operator denylist.
 Hostname, home-path and trailer literals are composed at runtime, never contiguous in this
 tracked blob (push-gate-refuses-its-own-privacy-baseline-fixtures; T-043-23 HIGH CWE-532).

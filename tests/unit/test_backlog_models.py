@@ -1,4 +1,4 @@
-"""Intent: CONTRACT — sa-backlog-intents-have-two-grammars: the backlog-v1 schema is the
+"""sa-backlog-intents-have-two-grammars: the backlog-v1 schema is the
 one intents grammar — its kind enum is the model's, and a code ref is repo-relative
 ``path[#word]`` (privacy: no absolute, ``~``, drive or ``..`` path is ever committed).
 """

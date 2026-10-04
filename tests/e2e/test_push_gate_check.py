@@ -1,4 +1,4 @@
-"""Intent: CONTRACT — v0.4.4 A3.1; 0.5.0 AC6.4, AC6.5 (T-050-12): `ci push-gate-check`
+"""v0.4.4 A3.1; 0.5.0 AC6.4, AC6.5 (T-050-12): `ci push-gate-check`
 driven as the pre-push hook drives it (git's ref lines on stdin, harness-free env, no
 handoff on disk). A work-branch push, a branch deletion and a tag push pass; the branch
 names come from the committed constitution's gitflow (custom, absent -> default + one

@@ -1,6 +1,6 @@
 """Tool caches land in the workspace's tmp zone from any cwd — never in the tree.
 
-Intent: CONTRACT — sa-tool-caches-land-outside-the-cache-zone#B40-1, #B40-2, #B40-3; AC2.14 (T-050-119). Size: MEDIUM
+sa-tool-caches-land-outside-the-cache-zone#B40-1, #B40-2, #B40-3; AC2.14 (T-050-119). Size: MEDIUM
 (real ruff/mypy subprocesses and a real git worktree in tmp_path).
 """
 

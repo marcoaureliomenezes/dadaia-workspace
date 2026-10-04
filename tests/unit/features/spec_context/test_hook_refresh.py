@@ -1,4 +1,4 @@
-"""Intent: CONTRACT — T-050 CI defect (HOOKS-DRIFT-1 after re-init upgrade): an installed
+"""T-050 CI defect (HOOKS-DRIFT-1 after re-init upgrade): an installed
 hook byte-identical to a previously shipped pre-push-ci-gate.sh is ours and is refreshed;
 an operator's own hook (review M3: undecodable included) stays untouched."""
 

@@ -1,6 +1,6 @@
 """``core.invocation`` — the single session/context/root/Bind resolution authority.
 
-Intent: CONTRACT — 0.5.1 K1 ("One Invocation"): the rung table asserts observable outcomes
+0.5.1 K1 ("One Invocation"): the rung table asserts observable outcomes
 through :func:`invocation.resolve`, never internal ladder state. Also covers
 ``sdd-gate-memory-phase-resolves-empty-when-cwd-is-a-linked-worktree-outside-repos``: a nested
 sentinel-bearing sandbox under cwd never shadows the workspace that owns the write target.

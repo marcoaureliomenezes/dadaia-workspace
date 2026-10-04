@@ -1,7 +1,5 @@
 """`dadaia harness add` — the verb that replaced `public install --target`.
 
-Intent: CONTRACT — 0.4.7 AC2.1 (T-047-72); size: MEDIUM (integration).
-
 A Claude-only workspace is scaffolded through the real `dadaia init` CLI (the
 conftest autouse fixture fakes venv creation, so no real venv is built), then
 `harness add codex` — run, as in a real workspace, by a CLI installed inside

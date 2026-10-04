@@ -1,6 +1,6 @@
 """`certify` over a real journey: its `dadaia` and `git` children run for real.
 
-Intent: CONTRACT — T-050-50; 0.4.7 FR4/T-047-16 (every verb certify shells exists: its
+T-050-50; 0.4.7 FR4/T-047-16 (every verb certify shells exists: its
 check PASSes). Size: MEDIUM — only `init` (a venv build) and harness binaries are faked.
 """
 

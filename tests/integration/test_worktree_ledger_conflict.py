@@ -1,4 +1,4 @@
-"""Intent: CONTRACT — worktree-merge-union-duplicates-ledger-records-on-in-place-mutation:
+"""worktree-merge-union-duplicates-ledger-records-on-in-place-mutation:
 a ledger record changed in place in a worktree, while the work branch appended another, refuses
 at rebase like any file — never lands the record twice.
 Size: MEDIUM (real git, tmp workspace).

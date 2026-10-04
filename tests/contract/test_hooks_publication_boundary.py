@@ -29,7 +29,7 @@ and ``tests/e2e/test_push_denylist_journey.py::
 test_planted_term_refused_then_clean_push_after_amend`` respectively; this module adds
 no duplicate coverage of those two.
 
-Intent: CONTRACT — v0.5.0 A9.1, A9.2, A9.3
+v0.5.0 A9.1, A9.2, A9.3
 Owner: dd-software-engineer
 """
 

@@ -1,7 +1,5 @@
 """`ci push-gate-check` CLI wiring for the v0.9.0 range-scoped denylist scan.
 
-Intent: CONTRACT — v0.9.0 A3.5, A6.3; 0.5.0 AC5.1, AC5.4 (T-050-14)
-
 Pins two composition-root guarantees:
 
 * A6.3 — ``push-gate-check`` ALWAYS builds and passes a real ``GitObjectReader`` into
@@ -138,7 +136,7 @@ def test_mode_line_distinguishes_operator_denylist_from_baseline_only(
 def test_a_sibling_repo_name_that_is_an_english_word_does_not_block_the_push(
     monkeypatch, tmp_path: Path
 ) -> None:
-    """Intent: CONTRACT — bug ``push-gate-foreign-slug-layer-blocks-onboarded-specs-push``.
+    """bug ``push-gate-foreign-slug-layer-blocks-onboarded-specs-push``.
 
     A context ``shop`` whose associated repo is ``docs``: the pushed blob uses the
     English word "docs". Names are private only through the operator denylist and the

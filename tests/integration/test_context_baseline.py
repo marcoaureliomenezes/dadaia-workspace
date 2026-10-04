@@ -1,4 +1,4 @@
-"""Intent: CONTRACT — AC4.2-AC4.6 (T-050-15, T-050-40 R13 append-only model): `context
+"""AC4.2-AC4.6 (T-050-15, T-050-40 R13 append-only model): `context
 baseline` adopts what origin holds, publishes the local principal as it is on an empty
 origin, never rewrites or deletes a branch, and every refusal leaves the repo and the
 remote unchanged with the fix for its own cause.

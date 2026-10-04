@@ -1,4 +1,4 @@
-"""Intent: CONTRACT — sa-editable-install-reports-a-frozen-version: one provider_version()
+"""sa-editable-install-reports-a-frozen-version: one provider_version()
 answers "which version is running", for every verb. Size: SMALL — the importlib.metadata
 boundary is faked; every reader above it runs for real."""
 

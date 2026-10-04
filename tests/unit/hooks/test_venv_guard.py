@@ -58,7 +58,7 @@ def test_bare_dadaia_is_corrected_to_the_cli_fix_line(args: str) -> None:
     ],
 )
 def test_blocks_bare_workspace_invocation(command: str, tool: str, args: str) -> None:
-    """Intent: sa-fix-lines-not-built-by-cli-line#S4 — the python fix is the absolute venv tool."""
+    """sa-fix-lines-not-built-by-cli-line#S4 — the python fix is the absolute venv tool."""
     reason = venv_guard.evaluate_payload(_bash(command))
     assert reason is not None, f"expected block for {command!r}"
     fix = reason.splitlines()[-1]
@@ -161,7 +161,7 @@ def test_every_shell_alias_is_judged_like_bash(
 
 
 def test_the_block_fix_runs_verbatim_from_a_repo_subdirectory(tmp_path: Path) -> None:
-    """Intent: sa-fix-lines-not-built-by-cli-line#S2 — the fix runs as printed from repos/alpha."""
+    """sa-fix-lines-not-built-by-cli-line#S2 — the fix runs as printed from repos/alpha."""
     import subprocess
 
     cwd = tmp_path / "repos" / "alpha"

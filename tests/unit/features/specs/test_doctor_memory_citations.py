@@ -6,7 +6,7 @@ memory drift is a closure finding (QUALITY.md), never a red build or a push gate
 The command tree arrives as plain data, exactly as `live_shas` does; `features` never
 imports `cli`.
 
-Intent: CONTRACT — 0.4.7 T-047-35 (FR2, AC: a fixture atom citing `dadaia fixture-verb`
+0.4.7 T-047-35 (FR2, AC: a fixture atom citing `dadaia fixture-verb`
 yields one MEM-DRIFT-2 line and exit 0).
 """
 

@@ -1,6 +1,4 @@
-"""Intent: CONTRACT — AC1.3, AC1.4, AC7.3 (T-050-18): no onboarding step can stall.
-
-Over random real-state starts (remote unborn / principal only / both, a tag or not, a
+"""Over random real-state starts (remote unborn / principal only / both, a tag or not, a
 session identity or not), the loop takes the printed step, executes its fix line (the
 ``context`` step's operator action is played with a name and the bare remote's URL; the
 ``agent`` step runs a scripted stand-in that fills memory) and asserts I3 — the step is no longer

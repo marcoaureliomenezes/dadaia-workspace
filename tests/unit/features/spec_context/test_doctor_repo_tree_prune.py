@@ -1,6 +1,4 @@
-"""Intent: CONTRACT — 0.4.7 FR6: the reaper never touches a repo-local virtualenv.
-
-``.venv``, ``.git`` and ``node_modules`` end the repo-tree walk. They are pruned
+"""``.venv``, ``.git`` and ``node_modules`` end the repo-tree walk. They are pruned
 BEFORE anything is classified, so the unattended reaper can never move a virtualenv
 (absolute interpreter paths die with the move). A nested ``.dadaia`` beside it is still
 reported and still moved; a tool cache is the repo's own (T-050-154).

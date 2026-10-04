@@ -1,6 +1,6 @@
 """ctx_inject driven as a real harness does: a subprocess, the session id on stdin.
 
-Intent: CONTRACT — bind-driven injection (FR-W2-01/02, T-50-03), compaction re-entry
+bind-driven injection (FR-W2-01/02, T-50-03), compaction re-entry
 (claude-compact-reinjection-missing, kimi-postcompact-omits-bound-context-bootstrap),
 the catalog digest (AC-W4-03), A19.1 (associated repos inject nothing), A30.1,
 bind-lost-silently-after-five-idle-minutes (a lost bind is told once); AC1.2 Cursor/Copilot

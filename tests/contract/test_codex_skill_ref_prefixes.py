@@ -1,8 +1,6 @@
 """Contract — D-CX-7 stays live for the ``dd-`` skill family (SPEC v0.10.0 FR13(b)),
 and every ``_CODEX_SKILL_REF_PREFIXES`` entry binds to a real asset (v0.4.3 A22.6).
 
-Intent: CONTRACT — v0.10.0 A13.3; v0.4.3 A22.6
-
 ``_CODEX_SKILL_REF_PREFIXES`` (``codex_assets.py``) gates which backtick-quoted
 skill references a projected Codex persona's ``developer_instructions`` are even
 checked for existence (``codex_doctor.py``, ``dcx7_codex_skill_refs``). The tuple

@@ -17,7 +17,7 @@ def _scaffold(specs_dir: Path, *, name: str = "p", force: bool = False) -> list[
 
 
 def test_scaffold_emits_exactly_the_v6_birth_set(tmp_path: Path) -> None:
-    """Intent: CONTRACT — A1.1 (T-050-05): the written set is every file on disk, the tree
+    """A1.1 (T-050-05): the written set is every file on disk, the tree
     meets the canon (``check_tree`` empty) and the doctor finds nothing, the root is exactly
     the eight v6 members, no release is live, and the stubs carry frontmatter and the
     current pattern version."""

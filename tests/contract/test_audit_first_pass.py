@@ -1,4 +1,4 @@
-"""Intent: CONTRACT — T-048-08 (FR5 AC5.1, AC5.2), T-050-20 (AC3.4): `memory.py drift
+"""T-048-08 (FR5 AC5.1, AC5.2), T-050-20 (AC3.4): `memory.py drift
 --since <root commit>` is a runnable worklist on a consumer layout. Size: SMALL.
 """
 

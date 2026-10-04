@@ -1,7 +1,7 @@
 """0.4.7 FR7 contract (T-047-05), bug
 ``provisional-consumed-histo-records-never-finalized-no-writer-no-check``.
 
-Intent: CONTRACT — 0.4.7 FR7 / T-047-05. A picked backlog item stays ``picked`` in
+0.4.7 FR7 / T-047-05. A picked backlog item stays ``picked`` in
 ``active[]`` and exits ONCE, at closure. The provisional ``CONSUMED`` token invented a
 second, pick-time exit whose finalizer was never written: 27 records stalled in
 ``consumed_backlog_histo.jsonl`` forever, and two independent staleness checks

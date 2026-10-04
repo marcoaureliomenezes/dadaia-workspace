@@ -5,7 +5,7 @@ Table-driven over :func:`parse`'s outcome shapes: valid, missing delimiter, inva
 ``memory-lint-blames-missing-delimiter-for-a-yaml-parse-error`` (kind distinguishes
 "no block" from "block present, invalid YAML").
 
-Intent: CONTRACT — v0.5.1 A10.2/A10.3.
+v0.5.1 A10.2/A10.3.
 Size: SMALL — pure-function unit tests, no I/O.
 """
 

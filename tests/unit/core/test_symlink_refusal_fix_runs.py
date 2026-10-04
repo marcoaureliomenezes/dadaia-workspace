@@ -1,6 +1,6 @@
 """The symlink refusal's fix, run verbatim in the host shell, clears the refusal.
 
-Intent: CONTRACT — sa-specs-upgrade-writes-through-symlinks#B1 (the refusal's one fix is
+sa-specs-upgrade-writes-through-symlinks#B1 (the refusal's one fix is
 runnable on every supported OS: POSIX sh, Windows cmd). Size: SMALL (CliRunner + one shell
 call).
 """

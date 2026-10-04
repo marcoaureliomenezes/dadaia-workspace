@@ -1,4 +1,4 @@
-"""Intent: CONTRACT — sa-ledger-verbs-append-histo-before-validating-the-pair#J4: "Given
+"""sa-ledger-verbs-append-histo-before-validating-the-pair#J4: "Given
 any write verb of bugs.py, backlog.py, audit and release scripts and an injected invalid
 document, when the verb exits non-zero, then no file of its pair changed (hash before =
 after)." Size: SMALL — each ledger script as a child process over a tmp specs tree.
@@ -134,7 +134,7 @@ _BROKEN = [
 def test_every_check_finding_carries_its_fix(
     tmp_path: Path, script: str, files: dict[str, str]
 ) -> None:
-    """Intent: CONTRACT — AC4.5: every record each ledger script's `check --json` emits
+    """AC4.5: every record each ledger script's `check --json` emits
     carries a non-empty fix (ADR 0158), so the doctor never invents one."""
     skills, specs = _stage(tmp_path), tmp_path / "specs"
     for rel, text in files.items():

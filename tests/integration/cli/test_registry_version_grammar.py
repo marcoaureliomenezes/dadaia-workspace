@@ -1,6 +1,4 @@
-"""Intent: CONTRACT — sa-registry-schema-version-has-three-grammars.
-
-The store, ``migrate`` and the doctor ask ONE grammar (``parse_schema_version``), so a
+"""The store, ``migrate`` and the doctor ask ONE grammar (``parse_schema_version``), so a
 registry the context verbs read is exactly one ``migrate --yes`` leaves untouched.
 Supersedes test_cli_migrate_state.py and the store's legacy-refusal table. AC3.9: an
 unreadable registry (truncated, `{}`) is REG-SCHEMA at every reader.

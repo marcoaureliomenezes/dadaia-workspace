@@ -1,4 +1,4 @@
-"""Intent: CONTRACT — T-047-95: `memory.py drift --since <sha>` is the worklist a closure
+"""T-047-95: `memory.py drift --since <sha>` is the worklist a closure
 reconciles from. Size: SMALL.
 
 The fixture is a real, tiny git repository rather than the live tree: the verb's answer is

@@ -1,4 +1,4 @@
-"""Intent: CONTRACT — AC1.8 (T-050-96, T-050-108, T-050-98): `worktree.py merge` fast-forwards,
+"""AC1.8 (T-050-96, T-050-108, T-050-98): `worktree.py merge` fast-forwards,
 removes and `branch -d`s a reviewed worktree, re-runnable; every refusal (dirty, outside the
 kind's allowed set, conflicting rebase, no APPROVED verdict for HEAD, ignored files, wrong
 branch, failed fast-forward: a stray or a moved work branch) carries one `fix:` that clears it; `clean`

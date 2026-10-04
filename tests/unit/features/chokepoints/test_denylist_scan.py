@@ -1,6 +1,6 @@
 """Pure push-range denylist matcher (SPEC v0.9.0 FR3/FR5/FR6).
 
-Intent: CONTRACT — v0.9.0 A3.1, A3.4, A5.2, A6.2; v0.11.0 A1.1-A1.4, A4.1, A4.4, A4.6;
+v0.9.0 A3.1, A3.4, A5.2, A6.2; v0.11.0 A1.1-A1.4, A4.1, A4.4, A4.6;
 sa-private-match-rendering-has-three-renderers#B3.
 
 Synthetic ``zz-`` terms only; baseline positives are composed at run time so this

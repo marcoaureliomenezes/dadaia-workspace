@@ -1,6 +1,4 @@
-"""Intent: CONTRACT — AC3.1 / T-047-71: one harness record, no per-harness branch.
-
-One ``HarnessRecord`` row per harness; the projection table carries no harness-named
+"""One ``HarnessRecord`` row per harness; the projection table carries no harness-named
 literal, so the per-harness-branch bug family (public-install / init --harness /
 harness-profile disagreements) cannot reappear by construction.
 """

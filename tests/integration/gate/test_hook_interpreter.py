@@ -1,6 +1,4 @@
-"""Intent: CONTRACT — sa-hook-parity-claims-false-and-interpreter-rules-diverge (WP-36, AC3.3).
-
-One interpreter rule for every hook: the workspace's own self-locating wrapper (Kimi's
+"""One interpreter rule for every hook: the workspace's own self-locating wrapper (Kimi's
 user-level shim: the nearest `.dadaia/states/spec_contexts.json` sentinel), and one
 missing-venv posture — a loud stderr warning and exit 0 (DEC-10 (a)), told to the agent by
 every ctx-inject firing (missing-venv-hook-disarms-the-gate-invisibly, AC2.7).

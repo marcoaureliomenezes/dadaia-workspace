@@ -1,6 +1,6 @@
 """E2E handoff pipeline journey via the real CLI process.
 
-Intent: CONTRACT — T-AC-10 (handoff emit+validate pipeline)
+T-AC-10 (handoff emit+validate pipeline)
 Owner: dd-software-engineer
 """
 

@@ -1,4 +1,4 @@
-"""Intent: CONTRACT — 0.4.6 AC1 (FR2: the three ratchets born with the zone registry); 0.5.0 AC6.1
+"""0.4.6 AC1 (FR2: the three ratchets born with the zone registry); 0.5.0 AC6.1
 (the canonical sets widened to ledger vocabularies, phases, trio names, gitflow roles; every
 ``public/**/*.md`` law file scanned); size: SMALL.
 

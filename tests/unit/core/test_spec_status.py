@@ -1,4 +1,4 @@
-"""Intent: CONTRACT — sa-status-line-has-two-parsers; 0.4.7 FR4 (T-047-58)."""
+"""sa-status-line-has-two-parsers; 0.4.7 FR4 (T-047-58)."""
 
 from __future__ import annotations
 

@@ -1,4 +1,4 @@
-"""Intent: CONTRACT — sa-release-json-validated-three-times#B7: core/release_state exposes
+"""sa-release-json-validated-three-times#B7: core/release_state exposes
 phase reading only; no package module outside the release script validates a state
 document. Size: SMALL.
 """

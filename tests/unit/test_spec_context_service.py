@@ -1,4 +1,4 @@
-"""Intent: CONTRACT — SpecContextService ALIVE/DEAD transitions (lock-free) and the
+"""SpecContextService ALIVE/DEAD transitions (lock-free) and the
 ``dead --commit`` redaction gate: a finding blocks the push and never echoes the secret."""
 
 from __future__ import annotations

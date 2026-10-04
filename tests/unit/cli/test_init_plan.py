@@ -1,6 +1,4 @@
-"""Intent: CONTRACT — 0.4.8 FR1 AC1.1–AC1.4 (T-048-04): one ``InitPlan``, quiet output.
-
-Flags and TTY prompts fill the SAME plan object, so both produce the same tree; the
+"""Flags and TTY prompts fill the SAME plan object, so both produce the same tree; the
 output is at most 12 lines (asset count, absolute venv CLI path, next step); ``DIR`` and
 ``--harness`` are optional in ``--help``; a non-TTY missing either exits 2 with one fix.
 

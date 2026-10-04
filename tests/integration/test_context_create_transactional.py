@@ -1,7 +1,4 @@
-"""`dadaia context create` is one transactional step, proved against real bare remotes.
-
-Intent: CONTRACT — AC3.1, AC3.2, AC3.3, AC3.4, AC3.5, AC3.6, AC3.8.
-"""
+"""`dadaia context create` is one transactional step, proved against real bare remotes."""
 
 from __future__ import annotations
 

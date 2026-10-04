@@ -1,7 +1,5 @@
 """The upgrade journey starts from a release that is really on the index.
 
-Intent: CONTRACT — e2e-upgrade-previous-version-equals-source-version.
-
 Owner: dd-software-engineer.
 """
 

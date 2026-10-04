@@ -1,4 +1,4 @@
-"""Intent: CONTRACT — v0.4.4 FR17 A17.1-A17.3 (T-044-28): `context repo add/remove` are
+"""v0.4.4 FR17 A17.1-A17.3 (T-044-28): `context repo add/remove` are
 idempotent, refuse loudly (unknown context or slug, a conflicting URL, the main repo's own
 slug) leaving the record unchanged, and `remove` never deletes an on-disk checkout — it
 says what it leaves behind.

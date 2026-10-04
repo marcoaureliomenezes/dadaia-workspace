@@ -1,4 +1,4 @@
-"""Intent: CONTRACT — AC6.1 (T-050-11): the project gitflow value — roles fixed, names free."""
+"""AC6.1 (T-050-11): the project gitflow value — roles fixed, names free."""
 
 from __future__ import annotations
 

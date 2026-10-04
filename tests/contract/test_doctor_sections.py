@@ -1,6 +1,6 @@
 """One `dadaia doctor`: three sections over one rule registry (0.4.7 FR5 / T-047-02).
 
-Intent: CONTRACT — T-047-02: `dadaia doctor` renders `workspace`, `specs` and
+T-047-02: `dadaia doctor` renders `workspace`, `specs` and
 `ledgers` in that order, one line `<CODE> <verdict> <message>` per finding; a release
 state defect is release.py check's one finding (ADR 0077); and the two commands this one
 replaces (`specs doctor`, `backlog doctor`) no longer exist.

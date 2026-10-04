@@ -1,6 +1,6 @@
 """The derived onboarding step list — one fixture per step, plus I1.
 
-Intent: CONTRACT — AC1.1, AC1.2, AC3.1, AC4.1, AC7.2 (T-050-17). Size: SMALL (unit): the
+AC1.1, AC1.2, AC3.1, AC4.1, AC7.2 (T-050-17). Size: SMALL (unit): the
 one git read is patched at the adapter; the real-git behaviour is the property test's.
 """
 

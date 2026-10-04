@@ -1,4 +1,4 @@
-"""Intent: CONTRACT — pre-push-gate-never-runs-under-core-hookspath: the real `ci
+"""pre-push-gate-never-runs-under-core-hookspath: the real `ci
 install-hook` + a real `git push` to a local bare remote. The planted-term refuse ->
 amend -> push journey is the refusal harness Case `denylisted`
 (test_refusal_fix_lines_clear_their_refusal.py); the refusal message shape (A5.1-A5.3,

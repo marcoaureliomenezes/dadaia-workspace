@@ -1,4 +1,4 @@
-"""Intent: CONTRACT — 0.4.6 AC12 (FR14/D14: the zone and canon tables are rendered from the
+"""0.4.6 AC12 (FR14/D14: the zone and canon tables are rendered from the
 registry at ``public stage``); size: SMALL.
 
 The two ``.dadaia/**`` law fragments carry placeholders; ``stage`` fills them from

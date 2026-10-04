@@ -1,7 +1,5 @@
 """Unit tests for ``features.specs.memory_lint`` — the ONE canonical LINT-1 implementation
 (v0.4.3 T-043-20/FR16), imported directly by ``doctor_memory``.
-
-Intent: CONTRACT — v0.4.3 A16.1.
 """
 
 from __future__ import annotations
@@ -170,7 +168,7 @@ def test_wikilink_resolution_valid_and_broken(tmp_path: Path) -> None:
 
 @pytest.mark.parametrize("stem", ["ARCHITECTURE", "TECHSTACK", "QUALITY"])
 def test_toplevel_trio_slug_is_its_filename_stem(tmp_path: Path, stem: str) -> None:
-    """Intent: CONTRACT — 0.4.7 FR9. ONE rule, no exception table: a `slug` equals its
+    """0.4.7 FR9. ONE rule, no exception table: a `slug` equals its
     filename stem, the top-level trio included. The alias table that mapped
     `architecture` -> `ARCHITECTURE.md` was a second slug-resolution mechanism whose
     third copy (panel `_md_render`) already caused `panel-wikilink-slug-hardcoded`."""
@@ -183,7 +181,7 @@ def test_toplevel_trio_slug_is_its_filename_stem(tmp_path: Path, stem: str) -> N
 
 
 def test_the_retired_alias_slug_is_now_a_stem_mismatch(tmp_path: Path) -> None:
-    """Intent: CONTRACT — 0.4.7 FR9. `slug: architecture` on `ARCHITECTURE.md` was the
+    """0.4.7 FR9. `slug: architecture` on `ARCHITECTURE.md` was the
     ONE named exception; with the alias table deleted it is an ordinary mismatch."""
     schema = load_frontmatter_schema()
     path = _make_atom(tmp_path, slug="architecture", filename="ARCHITECTURE.md")
@@ -204,7 +202,7 @@ def test_slug_stem_mismatch_errors(tmp_path: Path) -> None:
 
 @pytest.mark.parametrize("stem", ["ARCHITECTURE", "TECHSTACK", "QUALITY"])
 def test_wikilink_resolves_iff_the_named_file_exists(tmp_path: Path, stem: str) -> None:
-    """Intent: CONTRACT — 0.4.7 FR9. `[[x]]` resolves iff `x.md` exists under memory/ —
+    """0.4.7 FR9. `[[x]]` resolves iff `x.md` exists under memory/ —
     the trio is linkable by its stem, and by nothing else."""
     schema = load_frontmatter_schema()
     _make_atom(tmp_path, slug=stem, filename=f"{stem}.md")
@@ -361,13 +359,13 @@ def _body_line(path_text: str, needle: str) -> int:
 
 
 def test_narrative_exempts_the_principle_adr_line(tmp_path: Path) -> None:
-    """Intent: CONTRACT — T-047-98. `ADR: NNNN (accepted)` names the decision that
+    """T-047-98. `ADR: NNNN (accepted)` names the decision that
     governs a principle — it is current truth, not history."""
     assert _canonical(tmp_path, "## Principles\n\nADR: 0023 (accepted)\n") == []
 
 
 def test_narrative_exempts_code_fences(tmp_path: Path) -> None:
-    """Intent: CONTRACT — T-047-98. A fenced example may carry any token."""
+    """T-047-98. A fenced example may carry any token."""
     body = "## Purpose\n\n```\nrelease 0.4.7 on 2026-09-22 for T-047-98\n```\n"
     assert _canonical(tmp_path, body) == []
 
@@ -385,7 +383,7 @@ def test_narrative_exempts_code_fences(tmp_path: Path) -> None:
     ids=["iso-date", "release-id", "candidate", "rc", "task-id", "fr-id"],
 )
 def test_narrative_token_in_any_memory_file_names_its_line(tmp_path: Path, line: str) -> None:
-    """Intent: CONTRACT — T-047-98. Each token class is history in every memory file."""
+    """T-047-98. Each token class is history in every memory file."""
     body = f"## Purpose\n\nCurrent truth.\n{line}\n"
     path = _make_atom(tmp_path, slug="QUALITY", filename="QUALITY.md", body=body)
     errors = _narrative(lint_atom(path, tmp_path, load_frontmatter_schema()).errors)
@@ -395,12 +393,12 @@ def test_narrative_token_in_any_memory_file_names_its_line(tmp_path: Path, line:
 
 
 def test_narrative_ignores_versions_that_are_not_release_ids(tmp_path: Path) -> None:
-    """Intent: CONTRACT — T-047-98. A loopback address or a two-part version is no release."""
+    """T-047-98. A loopback address or a two-part version is no release."""
     assert _canonical(tmp_path, "## Purpose\n\nBinds 127.0.0.1 on Python 3.12.\n") == []
 
 
 def test_narrative_ignores_a_pinned_dependency_version(tmp_path: Path) -> None:
-    """Intent: CONTRACT — T-047-98. `tool==x.y.z` is a dependency pin, a fact of the stack."""
+    """T-047-98. `tool==x.y.z` is a dependency pin, a fact of the stack."""
     assert _canonical(tmp_path, "## Purpose\n\nMutation runs `mutmut==3.7.0`.\n") == []
 
 
@@ -420,7 +418,7 @@ def test_narrative_ignores_a_pinned_dependency_version(tmp_path: Path) -> None:
     ],
 )
 def test_narrative_history_phrase_in_a_product_atom(tmp_path: Path, phrase: str) -> None:
-    """Intent: CONTRACT — T-047-98. A history phrase is an ERROR in a product atom."""
+    """T-047-98. A history phrase is an ERROR in a product atom."""
     line = f"The verb {phrase} here."
     errors = _product(tmp_path, f"## Purpose\n\nCurrent truth.\n{line}\n")
     atom = tmp_path / "specs" / "memory" / "product" / "area" / "atom.md"
@@ -430,5 +428,5 @@ def test_narrative_history_phrase_in_a_product_atom(tmp_path: Path, phrase: str)
 
 
 def test_narrative_history_phrase_outside_product_is_not_flagged(tmp_path: Path) -> None:
-    """Intent: CONTRACT — T-047-98. The phrase table applies to product atoms only."""
+    """T-047-98. The phrase table applies to product atoms only."""
     assert _canonical(tmp_path, "## Principles\n\nA retired path is no longer read.\n") == []

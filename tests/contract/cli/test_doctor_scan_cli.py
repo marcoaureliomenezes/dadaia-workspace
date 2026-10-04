@@ -1,4 +1,4 @@
-"""Intent: CONTRACT — 0.4.6 AC2, AC4 (`dadaia doctor` workspace section: finding lines, exit code,
+"""0.4.6 AC2, AC4 (`dadaia doctor` workspace section: finding lines, exit code,
 `--json`, `--fix --expired-only --quiet`, holds in reaped/, expiry); size: SMALL.
 """
 

@@ -1,6 +1,4 @@
-"""Intent: CONTRACT — sa-unfixable-doctor-findings-say-doctor-fix (the non-specs codes).
-
-The real CLI doctor runs on a tmp tree with one planted finding; the printed ``fix:``
+"""The real CLI doctor runs on a tmp tree with one planted finding; the printed ``fix:``
 runs from ``repos/alpha`` and the re-run doctor no longer emits it. The suite fence
 (``DADAIA_FENCED_ROOTS``, inherited) keeps every child off the live instance.
 
@@ -72,7 +70,7 @@ _SPECS_PLANTS = {"LEDGER-MEMORY-SCHEMA": _plant_memory}
 
 @pytest.mark.parametrize("code", sorted(_SPECS_PLANTS))
 def test_the_printed_fix_clears_its_finding(tmp_path: Path, code: str) -> None:
-    """Intent: sa-unfixable-doctor-findings-say-doctor-fix#S2 — run the printed fix, re-run
+    """sa-unfixable-doctor-findings-say-doctor-fix#S2 — run the printed fix, re-run
     the whole doctor: the finding is gone and no new error finding appears."""
     subprocess.run(["git", "init", "-q", str(tmp_path)], check=True)  # noqa: S603, S607
     (tmp_path / "specs").mkdir()
@@ -112,7 +110,7 @@ _LEDGER_ROWS = [
 def test_an_invalid_ledger_line_is_one_operator_action(
     tmp_path: Path, code: str, rel: str, committed: str, bad: str, where: int | str
 ) -> None:
-    """Intent: CONTRACT — AC4.5, sa-unfixable-doctor-findings-say-doctor-fix#S1: an
+    """AC4.5, sa-unfixable-doctor-findings-say-doctor-fix#S1: an
     invalid line is ONE finding whose fix is ADR 0158's `Operator action:` naming the
     file, where in it, and the ledger's law; uncommitted content is discarded, else the
     commit that introduced it is reverted — never a hand edit."""
@@ -154,7 +152,7 @@ def _bugs(tmp_path: Path, *records: dict[str, object]) -> str:
 
 
 def test_a_dangling_caused_by_is_cleared_by_bugs_update(tmp_path: Path) -> None:
-    """Intent: CONTRACT — AC4.5: a line a governance verb clears takes that verb with real
+    """AC4.5: a line a governance verb clears takes that verb with real
     values; run from elsewhere, `bugs.py update <id> --set caused_by=none` clears it."""
     fix = _bugs(tmp_path, {**_RECORD, "caused_by": "a-ghost"})
     assert " update a-bug --set caused_by=none --specs " in fix, fix
@@ -165,7 +163,7 @@ def test_a_dangling_caused_by_is_cleared_by_bugs_update(tmp_path: Path) -> None:
 
 
 def test_a_caused_by_cycle_is_an_operator_decision(tmp_path: Path) -> None:
-    """Intent: CONTRACT — AC4.5 (operator ruling 2026-10-02): which link of a cycle is wrong
+    """AC4.5 (operator ruling 2026-10-02): which link of a cycle is wrong
     is a judgement; the fix names the cycle's records and the law, and sets no value."""
     fix = _bugs(
         tmp_path,
@@ -243,7 +241,7 @@ WORKSPACE_PLANTS = {
 @pytest.mark.skipif(sys.platform == "win32", reason="the stub CLI is a POSIX shell script")
 @pytest.mark.parametrize("plant", [_plant_root_slop, _plant_drifted_hook, _plant_disarmed_gate])
 def test_a_workspace_finding_is_cleared_by_its_printed_fix(tmp_path: Path, plant: object) -> None:
-    """Intent: sa-unfixable-doctor-findings-say-doctor-fix#S2 — in an initialized tmp
+    """sa-unfixable-doctor-findings-say-doctor-fix#S2 — in an initialized tmp
     workspace the printed fix, run from repos/alpha, clears the workspace finding."""
     ws = _workspace(tmp_path)
     code = plant(ws)  # type: ignore[operator]

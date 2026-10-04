@@ -3,7 +3,7 @@ creates an entry at a judged level (the root, ``.dadaia/``, ``repos/<r>``, ``wor
 ADR 0132) iff the doctor does not judge that entry SLOP. Scope inside a registered repo is
 test_sdd_gate's, not this table's.
 
-Intent: CONTRACT — sa-gate-allows-root-entries-the-reaper-moves#E6 (every row), #E1
+sa-gate-allows-root-entries-the-reaper-moves#E6 (every row), #E1
 (notes/ without a glob), #E2 (with one), sa-gate-allows-root-entries-the-reaper-moves#E3 (wrong type), #E4 (.dadaia non-zone and
 non-canon states), #E5 (root specs/), #E8 (law files) — ADR 0058.
 Size: MEDIUM (integration: the real ``pre_gate`` subprocess, then ``DoctorService.scan``).

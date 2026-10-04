@@ -1,4 +1,4 @@
-"""Intent: CONTRACT — sa-text-restates-rules-the-code-contradicts: a law or docstring
+"""sa-text-restates-rules-the-code-contradicts: a law or docstring
 sentence that restates a rule states what the code does, or cites the code instead.
 Size: SMALL — text reads, one AST walk, in-process gate calls; one pre-gate subprocess, as
 stdin is the only way an unreadable payload reaches the hook.

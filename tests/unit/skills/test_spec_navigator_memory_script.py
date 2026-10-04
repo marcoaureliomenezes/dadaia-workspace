@@ -1,4 +1,4 @@
-"""Intent: CONTRACT — dd-spec-navigator/scripts/memory.py owns specs/memory/product/
+"""dd-spec-navigator/scripts/memory.py owns specs/memory/product/
 {index.md,catalog.json} and NOTHING else: its grammar is the atoms' one grammar, the
 schema is the library lint's (LINT-1), so `check` compares the generated pair against
 the atoms and there is no atom generator. Size: SMALL.

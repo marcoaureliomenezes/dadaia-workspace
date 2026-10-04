@@ -1,7 +1,7 @@
 """``dadaia init`` closes with the root-launch law exactly once and prints no harness
 settings advice.
 
-Intent: CONTRACT — 0.4.7 FR3c (T-047-57) + bug init-claude-note-cites-a-wrong-settings-key.
+0.4.7 FR3c (T-047-57) + bug init-claude-note-cites-a-wrong-settings-key.
 Size: SMALL.
 
 Claude Code reads the root ``AGENTS.md`` natively, so init has no settings key to

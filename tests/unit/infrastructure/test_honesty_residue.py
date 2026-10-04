@@ -4,8 +4,6 @@
   delegates instead of hand-rolling a second subprocess with different error modes.
 - gate_policy reads no mode token that no writer mints (BOUND_READ retired).
 - python_env never re-narrates a failed repack-INSTALL as a failed repack.
-
-Intent: contract; size: unit.
 """
 
 from __future__ import annotations

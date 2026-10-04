@@ -1,6 +1,4 @@
-"""Intent: CONTRACT — 0.4.6 AC1 (FR1: the zone registry's rows and its derived views); size: SMALL.
-
-Expected values come from SPEC §3/§4 (FR1, FR5, FR8) and architect A, never from the
+"""Expected values come from SPEC §3/§4 (FR1, FR5, FR8) and architect A, never from the
 module under test: the 12 rows in order (ADRs 0147 (1), 0148 (6)), the three TTL zones
 (handoff and tmp a day, reaped seven days), the three closed canons, the creators per zone, and the pure exception-glob parser.
 """

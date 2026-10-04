@@ -1,4 +1,4 @@
-"""Intent: CONTRACT — `dadaia doctor` over an explicit ``--specs-dir`` needs no
+"""`dadaia doctor` over an explicit ``--specs-dir`` needs no
 instance around it.
 
 CI runs the doctor over a bare checkout (``dadaia doctor --specs-dir specs``): there

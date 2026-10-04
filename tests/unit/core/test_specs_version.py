@@ -1,4 +1,4 @@
-"""Intent: CONTRACT — AC6.2 (T-050-11): the constitution gitflow reads back; one merge-writer
+"""AC6.2 (T-050-11): the constitution gitflow reads back; one merge-writer
 keeps every other key and the body byte-identical. Bug
 upgrade-leaves-project-specs-unmigrated-and-silent: the canon a tree must meet is pinned
 to ``CANONICAL_SPECS_VERSION``."""

@@ -1,6 +1,4 @@
-"""Intent: CONTRACT — sa-codex-policy-allows-write-capable-commands, codex-policy-allows-sed-and-rg-exec-and-write-forms (AC1.5).
-
-The rendered Codex ``.rules`` auto-allows only argv-closed readers (``ls cat``); interpreter-capable
+"""The rendered Codex ``.rules`` auto-allows only argv-closed readers (``ls cat``); interpreter-capable
 sed/rg (``1e``, ``w``, ``-i``, ``--pre``) prompt (#B1-#B3); registry.json says so (#B4).
 Size: SMALL; #B1 also asks the real ``codex execpolicy`` when the binary is on PATH.
 """

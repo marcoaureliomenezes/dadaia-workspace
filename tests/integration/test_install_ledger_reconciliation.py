@@ -1,7 +1,4 @@
-"""Projection reconciliation diffs against the install ledger: prune only a pristine orphan.
-
-Intent: CONTRACT — retired-lib-asset-leaves-orphan-projection.
-"""
+"""Projection reconciliation diffs against the install ledger: prune only a pristine orphan."""
 
 from __future__ import annotations
 

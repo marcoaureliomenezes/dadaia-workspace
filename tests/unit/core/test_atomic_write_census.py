@@ -1,6 +1,4 @@
-"""Intent: CONTRACT — v0.4.5 A2.2; size: SMALL.
-
-The census of every atomic write in the package is DERIVED by scan, never a hand-kept list:
+"""The census of every atomic write in the package is DERIVED by scan, never a hand-kept list:
 a function that writes content to a local name (``.write_text``/``.write_bytes``) and then
 swaps that same name into place (``os.replace``/``Path.replace``). Plain renames of an
 existing file (log rotation, DB quarantine) never write first, so they never match.

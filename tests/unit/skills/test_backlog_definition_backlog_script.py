@@ -1,4 +1,4 @@
-"""Intent: CONTRACT — dd-backlog-definition/scripts/backlog.py owns BACKLOG.json and its
+"""dd-backlog-definition/scripts/backlog.py owns BACKLOG.json and its
 histo (0.4.7 c7 T-047-65: the backlog ledger verbs move into a stdlib skill script).
 Size: SMALL.
 
@@ -130,7 +130,7 @@ def test_new_refuses_a_duplicate_slug_with_one_fix_line(script: Path, tmp_path: 
 def test_a_refused_positional_drops_only_itself_never_an_equal_flag_value(
     script: Path, tmp_path: Path
 ) -> None:
-    """Intent: CONTRACT — AC4.4 (T-050-151 review LOW 1): the invalid slug leaves the quoted
+    """AC4.4 (T-050-151 review LOW 1): the invalid slug leaves the quoted
     command; a flag value spelled the same stays with its flag."""
     done = _run(script, "new", "Bad", "--title", "Bad", "--specs", str(_specs(tmp_path)))
     (fix,) = _fix_lines(done)

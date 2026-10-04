@@ -1,7 +1,4 @@
-"""Intent: CONTRACT — 0.4.6 AC11 (fixed law sections: marker grammar, render, extract).
-
-Size: SMALL. The leaf is pure: text in, text out; every expected value is a literal.
-"""
+"""Size: SMALL. The leaf is pure: text in, text out; every expected value is a literal."""
 
 from __future__ import annotations
 

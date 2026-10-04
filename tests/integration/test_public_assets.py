@@ -1,4 +1,4 @@
-"""Intent: CONTRACT — v0.4.5 A4.1-4.3: the authority for public stage, install and drift
+"""v0.4.5 A4.1-4.3: the authority for public stage, install and drift
 (rosters, the source-root refusal, hash-compare overwrite/skip/force, the privacy gate,
 model-policy rendering, single-place skill rename). Size: MEDIUM — real projection I/O.
 """
@@ -397,7 +397,7 @@ def test_model_policy_overlay_lockstep_rendering_invalid_fails_loud_and_doctor_r
 def test_a_single_skill_rename_is_green_everywhere_after_one_place(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Intent: CONTRACT — v0.4.5 A4.1, A4.2, A4.3
+    """v0.4.5 A4.1, A4.2, A4.3
 
     Executed proof (not reasoning) that ``tests.helpers.skill_inventory_oracle`` is the
     ONE shared source every former hand-kept inventory now reads. This seam produced

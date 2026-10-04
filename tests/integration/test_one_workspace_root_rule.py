@@ -1,7 +1,4 @@
-"""One workspace-root rule: the CLI's own venv workspace, else the nearest sentinel ancestor.
-
-Intent: CONTRACT — sa-seven-workspace-root-rules (AC9.5).
-"""
+"""One workspace-root rule: the CLI's own venv workspace, else the nearest sentinel ancestor."""
 
 from __future__ import annotations
 

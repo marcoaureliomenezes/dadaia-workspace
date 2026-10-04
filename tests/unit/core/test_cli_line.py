@@ -1,4 +1,4 @@
-"""Intent: CONTRACT — AC2.1 (T-050-07): one CLI spelling, both platform forms pinned."""
+"""AC2.1 (T-050-07): one CLI spelling, both platform forms pinned."""
 
 from __future__ import annotations
 

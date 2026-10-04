@@ -1,6 +1,6 @@
 """The onboarding journey in three levels, driven through ``uvx`` over file:// bare repos.
 
-Intent: CONTRACT — 0.4.8 FR8 / AC8.1, AC8.2 (T-048-01); 0.5.0 FR10 / AC10.1–AC10.3
+0.4.8 FR8 / AC8.1, AC8.2 (T-048-01); 0.5.0 FR10 / AC10.1–AC10.3
 (T-050-21: the autopilot loop executes only printed fix lines).
 
 Owner: dd-software-engineer (LARGE-tier e2e; tests/AGENTS.md "every file names an owner").

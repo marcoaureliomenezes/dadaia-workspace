@@ -1,6 +1,4 @@
-"""Intent: CONTRACT — the specs doctor's ledger invariants SPEC-DOC-024/026/030/041.
-
-Bugs: spec-doc-030-audit-dir-rule-contradicts-dadaia-6-8-canon (audit dirs are
+"""Bugs: spec-doc-030-audit-dir-rule-contradicts-dadaia-6-8-canon (audit dirs are
 ``<YYYYMMDD>-<slug>``), doctor-reads-phantom-specs-archive-releases-root (archived
 releases live under ``specs/releases/_archive/``), sa-promote-has-no-verb#B25-6 (an open task in
 CLOSURE is release.py's refusal, never a doctor code),

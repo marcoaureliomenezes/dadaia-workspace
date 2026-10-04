@@ -1,7 +1,5 @@
 """Re-init is the upgrade: ``init <existing ws>`` compares the venv with the running version.
 
-Intent: CONTRACT — 0.4.8 FR2 AC2.1-AC2.3 (T-048-06).
-
 The venv is fake (the conftest backstop no-ops the builder): its reported version is the
 ``installed_build`` seam, and the running distribution is ``provider_build`` — the one
 ``version_change`` decider reads both, for the install and for the report.

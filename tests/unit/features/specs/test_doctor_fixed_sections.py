@@ -1,6 +1,4 @@
-"""Intent: CONTRACT — 0.4.6 AC11 (specs doctor FIXED-1/FIXED-2 check and --fix).
-
-Size: SMALL. A throwaway public dir carries literal fragments; the doctor is driven
+"""Size: SMALL. A throwaway public dir carries literal fragments; the doctor is driven
 through its registry (check + fix) and the validator's own interface.
 """
 

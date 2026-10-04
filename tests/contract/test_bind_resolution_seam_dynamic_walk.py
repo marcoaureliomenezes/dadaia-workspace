@@ -1,6 +1,4 @@
-"""Intent: CONTRACT — P-09 one Invocation (bind-resolution seam, recurrence family F2)
-
-Every leaf verb of the real Typer app, walked dynamically, resolves ``--context``/``--specs-dir``
+"""Every leaf verb of the real Typer app, walked dynamically, resolves ``--context``/``--specs-dir``
 through the seam: no literal default, and the value reaches a seam call (module-local AST reachability).
 """
 

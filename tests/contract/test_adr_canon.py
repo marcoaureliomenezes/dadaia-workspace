@@ -1,4 +1,4 @@
-"""Intent: CONTRACT — ADR canon: records validate ``decision-record-v1`` and ids run 0001..N, judged by the
+"""ADR canon: records validate ``decision-record-v1`` and ids run 0001..N, judged by the
 doctor's LEDGER-ADR-SCHEMA rule (``features/specs/doctor_adr``), the one ADR authority. Size: SMALL.
 """
 

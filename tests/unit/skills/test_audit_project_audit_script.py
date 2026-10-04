@@ -1,4 +1,4 @@
-"""Intent: CONTRACT — dd-audit-project/scripts/audit.py owns specs/audits/<dir>/
+"""dd-audit-project/scripts/audit.py owns specs/audits/<dir>/
 FINDINGS.jsonl and audits_histo.jsonl (0.4.7 c7 T-047-67: the audit ledger verbs move
 into a stdlib skill script). Size: SMALL.
 

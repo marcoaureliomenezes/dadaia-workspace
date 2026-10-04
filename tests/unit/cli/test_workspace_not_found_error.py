@@ -2,8 +2,6 @@
 run from any cwd); with none, it names the searched directory and prints ONE runnable
 ``fix:`` line — the uvx bootstrap.
 
-Intent: CONTRACT — bug workspace-not-found-error-is-false-and-fixless. Size: SMALL.
-
 The CLI's own workspace is derived from ``sys.prefix`` (the venv lives at
 ``<root>/.dadaia/.venv``) — patched here as the interpreter boundary.
 """

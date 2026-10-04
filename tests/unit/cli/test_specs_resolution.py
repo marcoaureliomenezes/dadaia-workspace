@@ -1,6 +1,6 @@
 """Caller-owned ``resolve_context_for_cli`` resolution and its context-NAME allowlist (v0.1.80 FR3).
 
-Intent: CONTRACT — the seam never borrows a foreign first-ALIVE context; a traversal-shaped
+the seam never borrows a foreign first-ALIVE context; a traversal-shaped
 ``explicit`` (deliberate input) raises naming the value, a traversal-shaped ``DADAIA_CONTEXT``
 (ambient) is treated as unset; sa-bind-has-two-stores#S1, #S2, #S3; T-50-02 rung 3 (the repo
 containing cwd) resolves any registered ``repos/<slug>``.

@@ -1,4 +1,4 @@
-"""Intent: CONTRACT — reaper-deletes-linked-git-worktrees: `sweep.remove`/`sweep.move`,
+"""reaper-deletes-linked-git-worktrees: `sweep.remove`/`sweep.move`,
 the one chokepoint of every reaper deletion and slop move, never touches a registered
 linked worktree — an expired one under `.dadaia/tmp/` or one at an unlisted root entry.
 AC1.10: the doctor lists the context's worktrees from git and touches none — a canonical one

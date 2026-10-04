@@ -1,4 +1,4 @@
-"""Intent: CONTRACT — sa-release-json-validated-three-times: `release.py check` is the ONE
+"""sa-release-json-validated-three-times: `release.py check` is the ONE
 release validator (ADR 0077); the doctor delegates to it. Size: SMALL (script subprocess
 over tmp trees; the repo's own tree once).
 """

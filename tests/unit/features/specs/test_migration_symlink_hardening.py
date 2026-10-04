@@ -1,11 +1,11 @@
 """Security review of the 0.4.3 mint — the write sites must never follow a link, and
 a corrupt/oversized shipped-hashes history must degrade rather than crash the doctor.
 
-Intent: CONTRACT (security-reviewer findings on the 0.4.3 develop delta: CWE-59/CWE-61
+Security-reviewer findings on the 0.4.3 develop delta: CWE-59/CWE-61
 link following, CWE-73 externally supplied path, CWE-703 unchecked exceptional condition,
 CWE-674 uncontrolled recursion; bug
 ``atomic-writer-drift-guard-is-brittle-and-covers-only-two-of-eight-writers`` — T-044-35;
-the two TREE-5 symlink tests also cite sa-specs-upgrade-writes-through-symlinks#B2).
+the two TREE-5 symlink tests also cite sa-specs-upgrade-writes-through-symlinks#B2.
 Size: SMALL.
 
 v0.5.1 T-051-16 (K10): the six ``test_migrations_never_write_through_*``/

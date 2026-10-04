@@ -1,4 +1,4 @@
-"""Intent: CONTRACT — sa-reconcile-certify-skip-the-workspace-walk: the consumer recipe cites
+"""sa-reconcile-certify-skip-the-workspace-walk: the consumer recipe cites
 only commands, flags and certify checks the wheel has (certify's own invocations run for
 real in tests/integration/features/certification/test_certify_journey.py).
 

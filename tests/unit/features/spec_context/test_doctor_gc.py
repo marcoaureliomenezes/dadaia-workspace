@@ -134,7 +134,7 @@ def _post_gate_heartbeat(ws: Path, sess_id: str) -> None:
 def test_no_stale_records(
     tmp_path: Path, idle: int | None, renew: bool, sessions_outside: bool, survives: bool
 ) -> None:
-    """Intent: CONTRACT — T-011-04, bind-lost-silently-after-five-idle-minutes: another session's
+    """T-011-04, bind-lost-silently-after-five-idle-minutes: another session's
     SessionStart lane collects a bind only past a dead session's TTL (a day), measured against
     ``last_seen_at`` renewed through the REAL PostToolUse path; idle minutes never unbind. A
     sessions dir resolving outside the workspace is refused, never reported deleted."""
@@ -179,7 +179,7 @@ def test_no_stale_records(
 def test_a_ttl_expiry_is_its_zone_class_act(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, lane: str, rel: str, past_ttl: int, after: str
 ) -> None:
-    """Intent: CONTRACT — AC2.10, AC2.12 (the one expiry table; bugs
+    """AC2.10, AC2.12 (the one expiry table; bugs
     bug-proposal-handoff-reaped-without-a-hold, reaper-judges-ttl-by-walking-every-file,
     doctor-scan-raises-when-a-ttl-entry-vanishes-mid-walk finding 2): an expired entry is one
     finding; both lanes take it by its zone class — EPHEMERAL deleted, OUTPUT held in reaped/

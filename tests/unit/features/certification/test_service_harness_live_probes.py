@@ -1,7 +1,5 @@
 """Per-record live probes — one `<harness>-live-probe` for every registered record.
 
-Intent: CONTRACT — 0.4.7 FR3 / T-047-76; size: SMALL (unit).
-
 `dadaia certify` probes the INSTALLED runtime of every harness the registry knows, by
 iteration and never by a hand-written line per harness. The probe carries NO version
 floor: the workspace derives the same four behaviours into every harness and pins no

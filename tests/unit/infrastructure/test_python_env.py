@@ -1,6 +1,6 @@
 """VenvPythonEnvironmentManager — the workspace venv bootstrap, over a faked subprocess.
 
-Intent: CONTRACT — bug init-venv-never-installs-dadaia-workspace (VENV-1 coherence);
+bug init-venv-never-installs-dadaia-workspace (VENV-1 coherence);
 bug init-venv-installs-index-version-not-running-distribution; bug
 certify-cannot-install-installed-provider; bug init-succeeds-after-provider-bootstrap-failure;
 bug init-venv-bootstrap-inherits-degraded-base-python; 0.4.8 AC1.6, AC2.1-AC2.3; v0.4.3 A9.1-A9.3.

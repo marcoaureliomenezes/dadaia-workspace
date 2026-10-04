@@ -1,7 +1,7 @@
 """One bind: the gate, ctx_inject, onboarding and `context show` read the same Bind — the
 session's own record when it has an id, else a registered DADAIA_CONTEXT.
 
-Intent: CONTRACT — sa-bind-has-two-stores (WP-16); size: MEDIUM (hook and CLI subprocess
+sa-bind-has-two-stores (WP-16); size: MEDIUM (hook and CLI subprocess
 boundaries over a tmp workspace).
 """
 

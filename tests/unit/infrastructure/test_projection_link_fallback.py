@@ -1,6 +1,4 @@
-"""Intent: CONTRACT — AC3.2 / T-047-56: a link rule falls back to a verified copy.
-
-Windows without Developer Mode raises ``OSError`` from ``os.symlink``. The projection
+"""Windows without Developer Mode raises ``OSError`` from ``os.symlink``. The projection
 must still deliver the content — and the ledger must still be able to tell that entry
 apart from a real link, which ``read_bytes()`` never can: it follows the link.
 """
@@ -107,7 +105,7 @@ def test_a_pre_kind_ledger_entry_migrates_as_file() -> None:
 
 
 def test_prune_never_follows_a_link_into_the_authored_tree(tmp_path: Path) -> None:
-    """Intent: CONTRACT — T-047-56: the ledger's prune stops at a symlinked parent.
+    """T-047-56: the ledger's prune stops at a symlinked parent.
 
     An instance upgrading to the link projection carries ledger entries like
     ``.claude/skills/dd-x/SKILL.md`` whose parent is now a symlink onto

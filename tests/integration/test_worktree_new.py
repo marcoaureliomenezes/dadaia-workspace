@@ -1,4 +1,4 @@
-"""Intent: CONTRACT — AC1.7 (T-050-95): `worktree.py new` and `list`; AC1.11 (T-050-101):
+"""AC1.7 (T-050-95): `worktree.py new` and `list`; AC1.11 (T-050-101):
 the one venv. Size: MEDIUM (real git in a tmp workspace, never the live instance).
 """
 

@@ -1,4 +1,4 @@
-"""Intent: CONTRACT — AC2.1–AC2.6, AC1.9 (release 0.5.0 candidate 2, ADR 0041 `measured_by`);
+"""AC2.1–AC2.6, AC1.9 (release 0.5.0 candidate 2, ADR 0041 `measured_by`);
 AC5.2, AC5.3 (release 0.5.0 candidate 4, the Authorities table); AC1.17(3) (ADR 0150, the
 pinned pair resolving the live candidate); AC3.2 (candidate 7, ADR 0161: the one Origin
 parser and the trace, re-homed from SPEC-DOC-048).
@@ -91,13 +91,16 @@ def _admits(
 
 def _plan_fix(script: Path) -> str:
     """`_release_plan.PLAN_FIX` as the staged script computes it (its SKILL path is staged)."""
-    sys.path.insert(0, str(script.parent))
     spec = importlib.util.spec_from_file_location(
         "_release_plan", script.parent / "_release_plan.py"
     )
     assert spec and spec.loader
     module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
+    with pytest.MonkeyPatch.context() as mp:
+        mp.syspath_prepend(str(script.parent))
+        mp.delitem(sys.modules, "_release_schema", raising=False)
+        spec.loader.exec_module(module)
+        mp.delitem(sys.modules, "_release_schema")
     return str(module.PLAN_FIX)
 
 
