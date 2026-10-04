@@ -11,11 +11,11 @@ from pathlib import Path
 SCRIPT = Path(__file__).parent / "worktree.py"
 #: Any path outside `specs/` — code, tests, repo docs.
 CODE = "<code>"
-#: The TASKS files whose markers replay on a rebase conflict (ADR 0111).
-REPLAY = "specs/releases/*/rc-*/TASKS.md"
+#: The candidate TASKS files an `impl` worktree marks.
+TASKS_GLOB = "specs/releases/*/rc-*/TASKS.md"
 #: Each kind's allowed set (ADRs 0106, 0124, 0148 (7), 0153), fnmatch globs from the repo root.
 KINDS: dict[str, tuple[str, ...]] = {
-    "impl": (CODE, REPLAY),
+    "impl": (CODE, TASKS_GLOB),
     "bug": (CODE, "specs/bugs/BUGS.jsonl", "specs/bugs/_archive/*"),
     "backlog": ("specs/backlog/*", "specs/ADRs/decisions.jsonl", "specs/bugs/BUGS.jsonl"),
     "release": (

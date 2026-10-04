@@ -1,8 +1,8 @@
-"""AC1.8 (T-050-96, T-050-108, T-050-98): `worktree.py merge` fast-forwards,
-removes and `branch -d`s a reviewed worktree, re-runnable; every refusal (dirty, outside the
-kind's allowed set, conflicting rebase, no APPROVED verdict for HEAD, ignored files, wrong
-branch, failed fast-forward: a stray or a moved work branch) carries one `fix:` that clears it; `clean`
-removes only an empty `dadaia:` worktree. AC1.9 (T-050-98): TASKS markers replay.
+"""AC1.8 (T-050-96, T-050-108), AC12.7 (ADR 0185): `worktree.py merge` fast-forwards the
+approved HEAD as it is, removes and `branch -d`s the worktree, re-runnable; every refusal (dirty,
+outside the kind's allowed set, a moved work branch, no APPROVED verdict for HEAD, ignored files,
+wrong branch, a stray blocking the fast-forward) carries one `fix:` that clears it; `clean`
+removes only an empty `dadaia:` worktree.
 Size: MEDIUM (real git, tmp workspace).
 """
 
@@ -53,11 +53,9 @@ def test_merge_fast_forwards_removes_and_reruns(root: Path) -> None:
     (other := root / ".dadaia/handoff/z").mkdir()  # another context and a non-UTC name:
     rejected.rename(other / "a.handoff.json")  # produced_at orders, never the path
     approve(root, sha)
-    git(repo, "config", "color.ui", "always")  # patch-ids still read through a colored config
-    z = commit(repo, "src/z.py")  # the work branch moves: the rebase keeps every patch (ADR 0168)
     result = run(root, "merge", TREE)
     assert result.returncode == 0, result.stderr
-    assert git(repo, "rev-parse", "feature/0.5.0~").strip() == z  # landed rebased, no new verdict
+    assert git(repo, "rev-parse", "feature/0.5.0").strip() == sha  # HEAD as approved
     assert not tree.exists() and not git(repo, "branch", "--list", "wt/*").strip()
     assert run(root, "merge", TREE).returncode == 0  # a finished merge re-runs clean
     assert run(root, "new", "r", "--kind", "impl").returncode == 0
@@ -76,7 +74,7 @@ def test_merge_fast_forwards_removes_and_reruns(root: Path) -> None:
 
 
 def test_dirty_outside_set_and_conflict_each_refuse_with_one_fix(root: Path) -> None:
-    repo, tree = root / "repos/r", root / TREE
+    tree = root / TREE
     (tree / "wip").mkdir()  # an untracked directory, and a tracked edit staged:
     (tree / "wip/x.py").write_text("")
     (tree / "specs/releases/0.5.0/rc-1/SPEC.md").write_text("dirty")
@@ -102,13 +100,6 @@ def test_dirty_outside_set_and_conflict_each_refuse_with_one_fix(root: Path) -> 
         subprocess.run(restore, shell=True, check=True)  # noqa: S602 — runs as printed
         assert shlex.split(then) == ["git", "-C", str(tree), "commit"]
         git(tree, "commit", "-qm", f"revert: {rel}")
-    commit(repo, "README.md", "- [ ] a\n")  # markers alone, but not TASKS: never replayed
-    git(tree, "rebase", "-q", "feature/0.5.0")
-    commit(repo, "README.md", "- [-] a\n")
-    commit(tree, "README.md", "- [x] a\n")
-    conflict = run(root, "merge", TREE)
-    assert not (Path(git(tree, "rev-parse", "--git-dir").strip()) / "rebase-merge").exists()
-    assert _argv(conflict) == ["git", "-C", str(tree), "rebase", "feature/0.5.0"]
 
 
 def test_work_branch_refusals_fix_runs_verbatim(tmp_path: Path) -> None:
@@ -164,6 +155,7 @@ def test_merge_needs_a_valid_approval_of_the_exact_head(
         else (approve(root, copy), "--all")[1]
     )
     commit(root / "repos/r", "src/z.py")  # moved: only an identical series in the reflog counts
+    git(root / TREE, "rebase", "-q", "feature/0.5.0")
     result = run(root, "merge", TREE)
     head = git(root / TREE, "rev-parse", "HEAD").strip()
     assert result.returncode == 1 and head in result.stderr
@@ -190,54 +182,12 @@ def test_failed_fast_forward_tells_a_stray_from_a_moved_work_branch(root: Path) 
     verdict = 'elif args[:2] == ["reports", "validate"]:\n'
     cli.write_text(cli.read_text().replace(verdict, f"{verdict}    import subprocess; {move}\n"))
     moved = run(root, "merge", TREE)
-    assert _argv(moved) == [sys.executable, str(SCRIPT), "merge", str(tree)] and tree.exists()
-
-
-def test_parallel_siblings_replay_task_markers(root: Path) -> None:
-    """AC1.9 (ADR 0111): the worktree's TASKS marker flips replay onto the sibling-advanced work
-    side, most advanced state winning; any worktree change beyond markers, or a missing side,
-    refuses."""
-    repo, tree, tasks = root / "repos/r", root / TREE, "specs/releases/0.5.0/rc-1/TASKS.md"
-    s = "**Status:** Approved\n"  # the trio stays Approved for the next `new`
-    commit(repo, tasks, s + "- [ ]**T-1**\n* [ ] **T-2**\n+ [ ] **T-3**\n")  # AC3.3 spellings
-    git(tree, "rebase", "-q", "feature/0.5.0")
-    approve(root, commit(tree, tasks, s + "- [x]**T-1**\n* [-] **T-2**\n+ [ ] **T-3**\n"))
-    commit(repo, tasks, s + "- [ ]**T-1**\n* [x] **T-2**\n+ [ ] **T-3** amended\n")
-    work = git(repo, "rev-parse", "feature/0.5.0")
-    replayed = run(root, "merge", TREE)  # the replay changed the patch: the series differs
-    assert _argv(replayed) == [
-        str(root / ".dadaia/.venv/bin/dadaia"),
-        "reports",
-        "validate",
-        "--all",
-    ]
-    assert git(repo, "rev-parse", "feature/0.5.0") == work
-    approve(root, git(tree, "rev-parse", "HEAD").strip())
-    assert run(root, "merge", TREE).returncode == 0
-    assert (repo / tasks).read_text() == s + "- [x]**T-1**\n* [x] **T-2**\n+ [ ] **T-3** amended\n"
-    refused = ["git", "-C", str(tree), "rebase", "feature/0.5.0"]
-    assert run(root, "new", "r", "--kind", "impl").returncode == 0
-    t2, t3 = "* [x] **T-2**\n", "+ [ ] **T-3** amended\n"
-    for mine, theirs in (  # the worktree adds a line; the work side rewrote the flipped one
-        ("- [-]**T-1**\n" + t2 + t3 + "- [ ] **T-4**\n", "- [ ]**T-1**\n" + t2 + t3),
-        ("- [-]**T-1**\n" + t2 + t3, "- [x]**T-1** moved\n" + t2 + t3),
-    ):
-        commit(tree, tasks, s + mine)
-        commit(repo, tasks, s + theirs)
-        assert _argv(run(root, "merge", TREE)) == refused
-        git(tree, "reset", "-q", "--hard", "feature/0.5.0")
-    commit(tree, tasks, s + "- [x] **T-1**\n- [x] **T-2** amended\n")
-    git(repo, "rm", "-q", tasks)
-    git(repo, "commit", "-qm", "moved away")
-    assert _argv(run(root, "merge", TREE)) == refused  # modify/delete: no side to replay onto
-    git(tree, "reset", "-q", "--hard", "feature/0.5.0")
-    assert run(root, "clean", TREE).returncode == 0
+    assert _argv(moved) == ["git", "-C", str(tree), "rebase", "feature/0.5.0"] and tree.exists()
 
 
 def test_merge_lists_ignored_files_and_keeps_them_by_its_fix(root: Path) -> None:
     repo, tree = root / "repos/r", root / TREE
     approve(root, commit(tree, "src/a.py"))
-    commit(repo, "src/z.py")  # rebased by the refused run: the re-run still carries the verdict
     (tree / "my notes.scratch").write_text("keep me")
     (tree / "__pycache__").mkdir()
     (tree / "__pycache__/a.pyc").write_bytes(b"")
@@ -300,7 +250,12 @@ def test_release_closure_waits_for_every_other_wt(tmp_path: Path) -> None:
     (specs / "releases/_archive").mkdir()
     (specs / "releases/_archive/releases_histo.jsonl").write_text("")
     assert run(root, "new", "r", "--kind", "impl").returncode == 0  # empty
-    for skill in ("dd-spec-navigator", "dd-gitflow-default", "dd-release-implementation"):
+    for skill in (
+        "dd-spec-navigator",
+        "dd-gitflow-default",
+        "dd-release-implementation",
+        "dd-bug-resolution",
+    ):
         stage_skill_scripts(skill, tmp_path / "skills" / skill / "scripts")
     script = tmp_path / "skills/dd-release-implementation/scripts/release.py"
     closure = [sys.executable, str(script), "phase", "CLOSURE", "--sha", "beef123"]
@@ -338,6 +293,7 @@ def test_a_verdict_carries_over_only_an_identical_patch_and_message_series(root:
         git(tree, "reset", "-q", "--hard", approved)
         for step in change:
             git(tree, *step)
+        git(tree, "rebase", "-q", "feature/0.5.0")
         assert _argv(run(root, "merge", TREE)) == refusal, change
         assert git(repo, "rev-parse", "feature/0.5.0") == work
     git(repo, "config", "diff.ignoreSubmodules", "all")  # a gitlink change shows no diff
@@ -355,11 +311,12 @@ def test_a_verdict_carries_over_only_an_identical_patch_and_message_series(root:
         )
         if sha == approved:
             approve(root, git(tree, "rev-parse", "HEAD").strip())
+    git(tree, "rebase", "-q", "feature/0.5.0")
     assert _argv(run(root, "merge", TREE)) == refusal
     assert git(repo, "rev-parse", "feature/0.5.0") == work
     git(tree, "reset", "-q", "--hard", approved)
     work = commit(repo, "src/a.py", "theirs\n") + "\n"
-    assert run(root, "merge", TREE).returncode == 1  # the rebase conflicts; resolved by hand
+    assert run(root, "merge", TREE).returncode == 1  # moved; the agent's rebase conflicts
     subprocess.run(["git", "-C", str(tree), "rebase", "feature/0.5.0"], capture_output=True)
     (tree / "src/a.py").write_text("resolved\n")
     git(tree, "add", "src/a.py")
@@ -368,13 +325,30 @@ def test_a_verdict_carries_over_only_an_identical_patch_and_message_series(root:
     assert git(repo, "rev-parse", "feature/0.5.0") == work
 
 
-def test_a_branch_that_merged_the_work_branch_lands_as_is(root: Path) -> None:
+@pytest.mark.parametrize("change", ["same-patch", "new-patch"])
+def test_a_moved_work_branch_refuses_and_its_fix_rebase_keeps_only_an_identical_patch(
+    root: Path, change: str
+) -> None:
+    """AC12.7 (ADR 0185): a moved work branch refuses with the rebase fix line, both branches
+    unchanged; after it, a patch-identical rebase lands under the old verdict (ADR 0168),
+    a changed patch refuses for review."""
     repo, tree = root / "repos/r", root / TREE
-    commit(tree, "src/c.py", "x = 1\n")
-    commit(repo, "src/c.py", "x = 2\n")  # the work branch moves on the same line
-    subprocess.run(["git", "-C", str(tree), "merge", "-q", "feature/0.5.0"], capture_output=True)
-    head = commit(tree, "src/c.py", "x = 3\n")  # the conflict resolved by a merge commit
-    approve(root, head)
+    approve(root, mine := commit(tree, "src/a.py"))
+    work = commit(repo, "src/z.py")
+    moved = run(root, "merge", TREE)
+    assert _argv(moved) == ["git", "-C", str(tree), "rebase", "feature/0.5.0"]
+    assert [
+        git(repo, "rev-parse", "feature/0.5.0").strip(),
+        git(tree, "rev-parse", "HEAD").strip(),
+    ] == [work, mine]
+    _fix(root, moved)
+    if change == "new-patch":
+        (tree / "src/a.py").write_text("x = 2\n")
+        git(tree, "commit", "-q", "--amend", "-C", "HEAD", "-a")
     result = run(root, "merge", TREE)
-    assert result.returncode == 0, result.stderr
-    assert git(repo, "rev-parse", "feature/0.5.0").strip() == head
+    landed = git(repo, "rev-parse", "feature/0.5.0").strip()
+    if change == "same-patch":
+        assert result.returncode == 0, result.stderr
+        assert git(repo, "rev-parse", "feature/0.5.0~").strip() == work != landed
+    else:
+        assert _argv(result)[1:] == ["reports", "validate", "--all"] and landed == work

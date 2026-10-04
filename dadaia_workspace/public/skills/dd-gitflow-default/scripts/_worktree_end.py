@@ -4,18 +4,13 @@ branch, or drop an empty one — never with `--force` or `-D`, re-runnable after
 
 from __future__ import annotations
 
-import fnmatch
 import json
 import shutil
-import sys
 from datetime import datetime
 from pathlib import Path
 
-sys.path.append(str(Path(__file__).resolve().parents[2] / "dd-release-implementation" / "scripts"))
-
-from _release_schema import MARK_RE, MARKS  # noqa: E402
 from _worktree_git import cli, cli_line, flow_for, git, git_line, ours, quote, script  # noqa: E402
-from _worktree_kinds import _NAME_RE, REPLAY, SCRIPT, Refusal, allows, kind_holding  # noqa: E402
+from _worktree_kinds import _NAME_RE, SCRIPT, Refusal, allows, kind_holding  # noqa: E402
 
 REVIEWER = "dd-code-reviewer"
 
@@ -100,59 +95,14 @@ def _check_allowed(tree: Path, work: str, name: str) -> None:
             )
 
 
-def _bare(line: str) -> str:
-    return MARK_RE.sub(r"\1 \3", line)
-
-
-def _rank(line: str) -> int:
-    return MARKS.index(m[2]) if (m := MARK_RE.match(line)) else -1
-
-
-def _replayed(tree: Path, rel: str) -> list[str] | None:
-    """The work side of *rel* with each marker the worktree flipped carried onto its one
-    equal line at the most advanced state (` ` < `-` < `x`, ADR 0111); ``None`` when the
-    worktree changed more than markers, a stage is missing, or a line has no unique match."""
+def _check_ancestor(tree: Path, work: str) -> None:
+    """*work* must be an ancestor of HEAD: `merge` lands HEAD as it is, never rebased."""
     try:
-        base, work, mine = (git(tree, "show", f":{n}:{rel}").splitlines() for n in "123")
-    except RuntimeError:  # modify/delete or add/add
-        return None
-    bare = [_bare(line) for line in work]
-    if [_bare(line) for line in base] != [_bare(line) for line in mine]:
-        return None
-    for old, new in zip(base, mine, strict=True):
-        if old != new:
-            if bare.count(_bare(new)) != 1:
-                return None
-            i = bare.index(_bare(new))
-            work[i] = max(work[i], new, key=_rank)
-    return work
-
-
-def _rebase(tree: Path, work: str) -> None:
-    """Rebase onto *work*: a conflict in TASKS markers alone replays; anything else, a JSONL
-    ledger included, aborts and refuses — re-run the ledger's writer on the rebased tree.
-    A branch already holding *work* (a merge of it included) fast-forwards as it is."""
-    if git(tree, "rev-list", "--count", f"HEAD..{work}").strip() == "0":
-        return
-    step: tuple[str, ...] = ("rebase", "-q", work)
-    while True:
-        try:
-            git(tree, *step)
-            return
-        except RuntimeError as error:
-            rels = git(tree, "diff", "--name-only", "--diff-filter=U").split()
-            replayed = {r: _replayed(tree, r) for r in rels if fnmatch.fnmatch(r, REPLAY)}
-            replay = {r: lines for r, lines in replayed.items() if lines is not None}
-            if not rels or len(replay) < len(rels):
-                git(tree, "rebase", "--abort", check=False)
-                raise Refusal(
-                    f"rebase onto {work} conflicts: {error}",
-                    git_line(tree, "rebase", work),
-                ) from error
-        for rel, lines in replay.items():
-            (tree / rel).write_text("\n".join(lines) + "\n", encoding="utf-8")
-            git(tree, "add", rel)
-        step = ("-c", "core.editor=true", "rebase", "--continue")
+        git(tree, "merge-base", "--is-ancestor", work, "HEAD")
+    except RuntimeError as error:
+        raise Refusal(
+            f"{work} moved past this branch's base", git_line(tree, "rebase", work)
+        ) from error
 
 
 def _series(tree: Path, work: str, tip: str) -> list[tuple[str, str]]:
@@ -237,7 +187,7 @@ def merge(root: Path, path: str, keep: list[str], drop: bool) -> str:
         return f"{branch} merged into {work}"
     _refuse_dirty(tree)
     _check_allowed(tree, work, name)
-    _rebase(tree, work)
+    _check_ancestor(tree, work)
     _check_approved(root, tree, work, name)
     kept = _kept(tree, "merge", keep, drop)
     if git(repo, "branch", "--show-current").strip() != work:
@@ -245,11 +195,8 @@ def merge(root: Path, path: str, keep: list[str], drop: bool) -> str:
     try:
         git(repo, "merge", "-q", "--ff-only", branch)
     except RuntimeError as error:
-        try:  # the work branch did not move: a stray change the operator owns blocks
-            git(repo, "merge-base", "--is-ancestor", work, branch)
-            fix = f"Operator action: commit or remove the paths above in {repo}"
-        except RuntimeError:  # the work branch moved since the rebase
-            fix = f"{script(SCRIPT)} merge {quote(str(tree))}"
+        _check_ancestor(tree, work)  # moved while merge ran; else a stray the operator owns
+        fix = f"Operator action: commit or remove the paths above in {repo}"
         raise Refusal(f"fast-forward failed: {error}", fix) from error
     _remove(repo, tree, name, kept)
     return f"{branch} merged into {work}"
