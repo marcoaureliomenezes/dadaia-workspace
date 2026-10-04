@@ -304,9 +304,8 @@ def doctor_section_subset(tree: Tree) -> list[str]:
     """No code selects a subset of doctor sections, named by each module's ``SECTION``."""
     modules = {rel: ast.parse(text) for rel, text in _files(tree, PKG, py=True).items()}
     found = [n for m in modules.values() for n in m.body if isinstance(n, ast.Assign)]
-    sections = {
-        getattr(n.value, "value", "") for n in found if getattr(n.targets[0], "id", "") == "SECTION"
-    }
+    found = [n for n in found if getattr(n.targets[0], "id", "") == "SECTION"]
+    sections = {v for n in found if isinstance(v := getattr(n.value, "value", None), str)}
     out = [] if len(sections) >= 2 else [f"no-sections: {len(sections)} SECTION constants, < 2"]
     for rel, module in modules.items():
         for n in ast.walk(module):
@@ -524,6 +523,10 @@ def _plant(edit: Callable[[Path], object]) -> Plant:
     return plant
 
 
+def _edit(rel: str, old: str, new: str) -> Plant:
+    return _plant(lambda r: (r / rel).write_text((r / rel).read_text("utf-8").replace(old, new)))
+
+
 def _add(rel: str, text: str | Callable[[], str]) -> Plant:
     return _plant(lambda root: _write(root, rel, text if isinstance(text, str) else text()))
 
@@ -615,7 +618,7 @@ _PLANTS: dict[str, dict[str, Plant]] = {
     },
     "v40": {},
     "doctor-section-subset": {
-        "no-sections": _plant(lambda r: (r / PKG / "zz/near2.py").write_text(""))
+        "no-sections": _edit(f"{PKG}/zz/near2.py", '"ledgers"', "Section.LEDGERS")
     },
     "ignore-cap": {
         "edge-cap": _cfg(lambda t, e: t.replace(e, f"{e}\n    {_EDGE}", 1)),
