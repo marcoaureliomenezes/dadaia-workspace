@@ -85,7 +85,10 @@ _CMD = "command"
                  [".agents/skills/dd-audit-project/SKILL.md §first pass", "memory/QUALITY.md", "no atom"], id="shipped-stubs-first-pass"),
     pytest.param(lambda t: {"app": _specs(t, audited=True)}, {}, False, ("publish", _CMD), ("context", "baseline", "app"), [], id="publish-until-on-a-remote"),
     pytest.param(lambda t: {"app": _specs(t, audited=True)}, {}, True, None, None, [], id="published-is-done"),
-    pytest.param(lambda t: {"new": t / "repos" / "new" / "specs", "app": _specs(t)}, {}, False, ("specs", _CMD), ("specs", "init", "--context", "new"), [], id="first-context-answers-first"),
+    pytest.param(lambda t: {"app": _specs(t, audited=True), "other": t / "repos" / "other" / "specs"}, {"focus": "app", "bound": True}, True, None, None, [], id="onboarding-next-step-names-another-context"),
+    pytest.param(lambda t: {"new": t / "repos" / "new" / "specs", "app": _specs(t)}, {}, False, None, None, [], id="two-contexts-no-focus-judges-none"),
+    pytest.param(lambda t: {"new": t / "repos" / "new" / "specs", "app": _specs(t)}, {"bound": False}, False, None, None, [], id="two-contexts-unbound-names-no-bind-target"),
+    pytest.param(lambda t: {"y": _specs(t, "y")}, {"focus": "x"}, False, None, None, [], id="missing-focus-never-falls-back"),
     pytest.param(lambda t: {"new": t / "repos" / "new" / "specs", "app": _specs(t)}, {"focus": "app"}, False, ("first-pass", "agent"), None, [], id="focus-context-answers-first"),
 ])
 # fmt: on

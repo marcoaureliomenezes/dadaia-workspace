@@ -18,7 +18,10 @@ from dadaia_workspace.core.models.spec_context import (  # noqa: E402
     SpecContextProject,
 )
 from dadaia_workspace.core.platform import PLATFORM  # noqa: E402
-from dadaia_workspace.features.spec_context.doctor import DoctorService  # noqa: E402
+from dadaia_workspace.features.spec_context.doctor import (  # noqa: E402
+    DoctorService,
+    workspace_rules,
+)
 from dadaia_workspace.infrastructure.git_subprocess import GitSubprocessClient
 from dadaia_workspace.infrastructure.json_context_store import JsonContextStore
 from tests.fixtures.stores import context_store
@@ -101,6 +104,24 @@ def test_inv4_names_a_missing_main_or_associated_repo_with_the_alive_fix(
         (f"Context 'missing' is alive but repo '{missing}' not on disk", False)
     ]
     assert inv4[0].fix.endswith("dadaia context alive missing")
+
+
+@pytest.mark.parametrize(
+    ("context", "expected"),
+    [("alpha", ["repos/alpha/.dadaia"]), (None, ["repos/alpha/.dadaia", "repos/beta/.dadaia"])],
+)
+def test_the_repo_tree_walk_judges_only_the_run_context(
+    tmp_path: Path, context: str | None, expected: list[str]
+) -> None:
+    """AC10.4: slop only in another context's repo is neither reported nor reaped."""
+    for name in ("alpha", "beta"):
+        (tmp_path / "repos" / name / ".dadaia").mkdir(parents=True)
+    svc, _ = _make_doctor(tmp_path, [_ctx(n, state=ContextState.ALIVE) for n in ("alpha", "beta")])
+    found = [f.message.split()[0] for r in workspace_rules(context=context) for f in r.run(svc)]
+    assert sorted(path for path in found if path.endswith("/.dadaia")) == expected
+    svc.fix(context)
+    left = sorted(p.parent.name for p in (tmp_path / "repos").glob("*/.dadaia"))
+    assert left == ([] if context is None else ["beta"])
 
 
 # ---------------------------------------------------------------------------

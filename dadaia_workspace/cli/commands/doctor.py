@@ -296,7 +296,7 @@ def doctor(
     workspace_root, service, scope, target = _resolve_run(specs_dir, context)
     specs_doctor = _build_specs_doctor(target, public_dir)
 
-    fixed = _apply_fixes(service, specs_doctor, fix=fix, expired_only=expired_only)
+    fixed = _apply_fixes(service, specs_doctor, scope, fix=fix, expired_only=expired_only)
     render = _render_for(workspace_root, redact=redact)
     if quiet:
         for action in fixed:
@@ -330,6 +330,7 @@ def _identity(text: str) -> str:
 def _apply_fixes(
     service: DoctorService | None,
     specs_doctor: SpecsDoctor | None,
+    scope: str | None,
     *,
     fix: bool,
     expired_only: bool,
@@ -342,7 +343,7 @@ def _apply_fixes(
     specs and ledgers repairs: the SessionStart lane costs one lstat per zone entry."""
     if not fix:
         return []
-    fixed = [] if service is None else service.expire() if expired_only else service.fix()
+    fixed = [] if service is None else service.expire() if expired_only else service.fix(scope)
     if not expired_only and specs_doctor is not None:
         fixed.extend(f"[specs] {issue.code}: {finding_path(issue)}" for issue in specs_doctor.fix())
     return fixed

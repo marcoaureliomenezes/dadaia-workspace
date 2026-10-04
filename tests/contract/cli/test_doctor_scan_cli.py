@@ -18,6 +18,7 @@ from dadaia_workspace import container
 from dadaia_workspace.cli.main import app
 from dadaia_workspace.core.cli_line import fix_line
 from dadaia_workspace.core.harness_registry import HARNESS_PROJECTION_DIRS, L1_ENTRY_HARNESSES
+from dadaia_workspace.core.models.spec_context import ContextState, SpecContextProject
 from dadaia_workspace.core.platform import PLATFORM
 from dadaia_workspace.core.workspace_layout import (
     LEVEL1_SEEDS,
@@ -436,3 +437,28 @@ def test_a_retired_cache_zone_is_held_by_the_reaper_never_orphaned(workspace: Pa
     assert [
         p.read_text(encoding="utf-8") for p in (workspace / ".dadaia" / "reaped").rglob("x")
     ] == ["x"]
+
+
+def test_a_context_run_neither_reports_nor_reaps_another_contexts_repo(workspace: Path) -> None:
+    """AC10.4: slop only in repos/beta; `--context alpha` judges and repairs alpha alone."""
+    store = context_store(workspace / ".dadaia" / "states")
+    for name in ("alpha", "beta"):
+        store.save(
+            SpecContextProject(
+                name=name,
+                state=ContextState.ALIVE,
+                repo_slug=name,
+                repo_url=f"https://example.test/{name}",
+                created_at="2026-01-01T00:00:00",
+                alive_since="2026-06-01T00:00:00Z",
+                dead_since=None,
+                current_branch="main",
+            )
+        )
+        (workspace / "repos" / name).mkdir()
+    (workspace / "repos" / "beta" / ".dadaia").mkdir()
+
+    report = CliRunner().invoke(app, ["doctor", "--context", "alpha"])
+    assert report.exit_code == 0, report.output
+    CliRunner().invoke(app, ["doctor", "--fix", "--context", "alpha"])
+    assert (workspace / "repos" / "beta" / ".dadaia").is_dir()

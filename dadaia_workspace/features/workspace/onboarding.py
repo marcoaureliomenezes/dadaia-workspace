@@ -3,8 +3,8 @@
 ``STEPS`` is ordered: ``context`` (no ALIVE context), ``bind`` (a resolvable session is
 unbound), ``constitution`` (frontmatter unparseable, ADR 0047), ``specs`` (3a),
 ``first-pass`` (3b), ``publish`` (3c). Every predicate reads real state — files, git,
-the session registry — never a stamp, and no network. The next step is the focus context's first pending one, else the first pending across *trees*
-(every ALIVE context name -> its ``specs/`` dir; the registry read is the caller's).
+the session registry — never a stamp, and no network. One context is judged: the focus,
+else the only one in *trees* (every ALIVE name -> its ``specs/`` dir; the caller's read).
 ``doctor``, ``init``, ``context create`` and SessionStart all print :meth:`Step.text`.
 """
 
@@ -117,7 +117,7 @@ STEP_IDS = ("context", *(step[0] for step in STEPS))
 def next_step(
     root: Path, trees: Mapping[str, Path], focus: str | None = None, bound: bool | None = None
 ) -> Step | None:
-    """The first pending step — *focus* first, then every context in *trees*; *bound* is
+    """The judged context's first pending step, or ``None``; *bound* is
     whether the caller's session is bound (``None``: no identity, so no ``bind`` step)."""
     if not trees:
         create = (
@@ -125,10 +125,12 @@ def next_step(
             "and --main-repo set to the main repo's clone URL"
         )
         return Step("context", "command", "no ALIVE Spec Context — create one", create)
-    names = [focus] if focus is not None and focus in trees else []
-    for name in [*names, *trees]:
-        c = _Ctx(root, name, trees[name], bound)
-        for step_id, kind, pending, fix in STEPS:
-            if (reason := pending(c)) is not None:
-                return Step(step_id, kind, reason, fix(c))
+    if focus is None and len(trees) == 1:
+        focus = next(iter(trees))
+    if focus is None or focus not in trees:
+        return None
+    c = _Ctx(root, focus, trees[focus], bound)
+    for step_id, kind, pending, fix in STEPS:
+        if (reason := pending(c)) is not None:
+            return Step(step_id, kind, reason, fix(c))
     return None
