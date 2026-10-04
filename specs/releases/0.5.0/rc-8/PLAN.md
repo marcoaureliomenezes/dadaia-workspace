@@ -228,7 +228,7 @@ As-is read at `wt/0.5.0b-release` 6b84527bc (= feature/0.5.0). Bug history: the 
 1. T-050-190 (AC12.6, the script), landed by today's `WT merge`; then T-050-191 (AC12.5, AC12.7, T-050-189 folded), also landed by the old code, because `worktree.py merge` runs from the instance projection. R14 re-projects the library (`public stage`, `public install`, `public doctor`) before T-050-192 opens, so T-050-192's merge is the first gated one.
 2. T-050-192 (AC9.3 and AC12.12's code); one task per law file: T-050-193 `AUTHORING.md` (rule 9 first: the bar the others meet), 194 bugs law, 195 `dd-bug-resolution`, 196 `dd-release-implementation`, 197 `dd-gitflow-default`, 198 `dd-code-review` (every edit: AC9.4, AC12.6, AC12.12); then T-050-199 (AC12.4).
 3. REBUILDs T-050-200 (AC10.1), 201 (AC12.8), 202 (AC12.13); then 203 (AC12.9), 204 (AC12.10); then AC12.14's own fixes 205–208.
-4. Paused, no marker (the releases law §3 has none): T-050-172 … T-050-181, T-050-185, T-050-186, T-050-188. Each stays `[ ]` and opens only after T-050-208 merges; T-050-181 is blocked by every W12 task. Their `W:` are re-read against §6 before they open (T-050-173 now writes `scripts/ci.py`, not the pytest lines of `ci.yml`).
+4. Paused, no marker (the releases law §3 has none): T-050-172 … T-050-181, T-050-185, T-050-186, T-050-188. Each stays `[ ]` and opens only after T-050-208 merges; T-050-181 is blocked by every W12 task. Their `W:` are re-read against §6 before they open (T-050-173 now writes `scripts/ci.py`, not the pytest lines of `ci.yml`). Worktree `0.5.0a-bug` holds T-050-173's uncommitted RED from before the pause; it stays untouched until T-050-173 opens, and its `W:` re-read covers that RED.
 
 ### 6.2 The verification command (AC12.5, AC12.6)
 
@@ -335,8 +335,9 @@ As-is read at `wt/0.5.0b-release` 6b84527bc (= feature/0.5.0). Bug history: the 
 |---|---|---|---|
 | W1 | T-050-190 | 1 | impl; today's merge |
 | W2 | T-050-191 | 1 | impl; old merge code; R14 follows |
-| W3 | T-050-192; the text batch T-050-193, T-050-196, T-050-197, T-050-198 | 2 | 192 impl; the batch is one impl worktree opened beside T-050-191 (prepared ahead), one commit per task with 193's first, one review; its merge follows T-050-191 and R14 (`blocked by:` orders the merges) |
+| W3 | T-050-192, then T-050-193; T-050-197, T-050-198 | 2 | impl each, opened as `blocked by:` merges (releases law §31); 192 merges first (the first gated merge, §6.1); 193, 197 and 198 are drafted ahead under `.dadaia/tmp/dd-software-engineer/` beside T-050-191, no worktree, and each worktree copies its draft onto the tip it opens on (no rebase); one reviewer dispatch may judge 197 and 198 together |
 | W4 | T-050-194, T-050-195 | 2 | impl each; R11 and R13 after both |
+| W5 | T-050-196 | 1 | impl; held until the operator rules the bug-handling strategy (2026-10-04 demand, under research), its text depends on it; T-050-199 waits on its merge |
 | W7 | T-050-199 | 1 | bug; ledger only |
 | W8 | T-050-200 | 1 | impl; alone (its `W:` spans the suite) |
 | W9 | T-050-201 | 1 | impl; then its rows' shape-4 tail |
@@ -346,16 +347,17 @@ As-is read at `wt/0.5.0b-release` 6b84527bc (= feature/0.5.0). Bug history: the 
 | W13 | T-050-207 | 1 | bug |
 | W14 | T-050-208 | 1 | bug |
 
-- Review method from T-050-192 on (operator 2026-10-04: "Revisor sem rodar a suíte inteira (Recommended)"): `worktree.py merge` runs `scripts/ci.py` on the exact HEAD (gate 1, T-050-191), so the reviewer runs the touched tests and the mutants, never the full suite; the full suite runs once in the engineer's worktree and once at the merge. The text batch (operator 2026-10-04: "Adiantar as tasks de texto (Recommended)") replaces W5 and W6.
+- Review method from T-050-192 on (operator 2026-10-04: "Revisor sem rodar a suíte inteira (Recommended)"): `worktree.py merge` runs `scripts/ci.py` on the exact HEAD (gate 1, T-050-191); the reviewer runs the touched tests and the mutants, never the full suite, and the verdict cites the engineer's `scripts/ci.py` output for the reviewed sha (AC12.6: no output, no APPROVED); a fold commit re-runs `scripts/ci.py` before its review. Drafting the text tasks ahead (operator 2026-10-04: "Adiantar as tasks de texto (Recommended)") replaces W6; no worktree opens before its `blocked by:` merges.
 - Every `WT merge` now runs the full Linux suite (§6.3), so merges land one at a time. Two worktrees are open together only where their `W:` are disjoint except for the derived `behavior-map.json`/`shipped-hashes.json` and the ledgers.
 - Docker work (T-050-185, T-050-186 image builds) runs alone, with no other test-running agent, once the pause lifts. The paused tasks then follow §5 steps 7–10 at width ≤ 2.
 - Each REBUILD's AC rows resolve in one `bug` worktree after its merge (shape 4, `by T-050-NNN (<sha>)`): 200 → 14, 16, 17; 202 → 6, 21, 22, 23, 27; 203 → 10, 12; 204 → 13.
 - Release-worktree steps added to §2.7:
   - R11: `docs(specs): re-render specs/*/AGENTS.md from the scaffold — T-050-194`; the repo copy already drifts at `specs/bugs/AGENTS.md:23,49`.
   - R12: `chore(adrs): repair measured_by of 0180`, only if T-050-191 renames `test_in_place_ledger_change_refuses_at_rebase`.
+  - R15, after T-050-191 merges: `chore(adrs): repair measured_by of 0111`; its `measured_by` names `test_parallel_siblings_replay_task_markers`, which the REBUILD deletes (the 0138 lane; T-050-191's engineer, 2026-10-04).
   - R13: `chore(specs): restamp the tree to v10 — T-050-194` (precedent c4471aee8).
   - R14, after T-050-191 merges and before T-050-192 opens: `.dadaia/.venv/bin/dadaia public stage`, `public install`, `public doctor` clean, re-projecting gate 1 into the instance. No commit (instance only); its doctor output is logged in the next handoff.
-- Critical path: 190 → 191 → 192 → 194 → 199 → 200 → 201 → 202 → 203 → 206 → 207 → 208 = 12 merges, each ≈ 8–10 min of verification.
+- Critical path: 190 → 191 → 192 → 194 → 196 → 199 → 200 → 201 → 202 → 203 → 206 → 207 → 208 = 13 merges, each ≈ 8–10 min of verification.
 
 ### 6.7 Points answered via inspection (main thread, 2026-10-04)
 
