@@ -825,9 +825,15 @@ def test_resolve_proposes_caused_by_by_blame(
     done = _run(script, *_resolve_argv(caused_by=caused_by), *(["--lineage-reason", reason] if reason else []),
                 "--specs", str(specs))  # fmt: skip
     assert done.stdout.splitlines()[0] == "blame candidates: b-bug, d-bug, e-bug"
-    rerun = f"{sys.executable} {script} resolve a-bug --cause c --resolved-release 0.4.7 --solution s --evidence-loop 'pytest -k x' --specs {specs.resolve()}"  # fmt: skip
-    fix = f"fix: Operator action: run `{rerun}` with --caused-by b-bug or d-bug or e-bug, or --lineage-reason saying why not"
-    assert done.stderr.splitlines() == ([refusal, fix] if refusal else []), done.stderr
+    errors = done.stderr.splitlines()
+    assert errors[:1] == ([refusal] if refusal else []), done.stderr
+    if refusal:  # the fix reruns this command without the refused --caused-by (ADR 0158)
+        fix, command = errors[1], errors[1].split("`")[1]
+        assert fix.startswith("fix: Operator action: run `") and fix.endswith(
+            "` with --caused-by b-bug or d-bug or e-bug, or --lineage-reason saying why not"
+        ), fix
+        assert "resolve a-bug" in command and f"--specs {specs.as_posix()}" in command, fix
+        assert "--caused-by" not in command and len(errors) == 2, fix
     assert done.returncode == (1 if refusal else 0)
     assert _records(specs)[0].get("lineage_reason") == reason
     assert _records(specs)[0]["status"] == ("open" if refusal else "resolved")
