@@ -19,6 +19,9 @@
   - Q21 "Parada até os REBUILDs (Recommended)". Q22 "Auditar sweep + registrar o guard (Recommended)"; the `sweep.py` audit runs read-only, outside this SPEC.
   - Earlier, for the `-B` provider probe (AC10.1): "Part of 169 (Recommended)".
   - Main thread, 2026-10-04: ff5245e08 gets its own retro record (AC12.4 row 19); Q13, the newer ruling, amends `AUTHORING.md` rule 9 here (AC12.11).
+  - Answered via inspection, from Q1: a REBUILD's own lines stay blamable; AC9.3 exempts `refactor(<task-id>): REBUILD` from the refactor skip.
+  - Answered via inspection, from Q18: T-050-97 carries two induced bugs (AC12.4 rows 2, 3); its REBUILD is AC10.1, which removes row 3's cause, a hand-built child env.
+  - Answered via inspection, from Q18 and the root map's "fixes never rewrite old asserts": T-050-168's REBUILD (AC12.9) covers rows 10–12.
 - Bug history read (permanent architecture review): PLAN §1, the as-is review; for W12, the audit above.
 - Left out: `dependabot-pyjwt-open-on-main`, closing at the ship (rc-12); `removals-shipped-without-recorded-authority`, rejected (Q5).
 
@@ -154,7 +157,7 @@
   - Command: for every record resolved since 2026-08-27, `bugs.py fix` prints a sha or lists it unlinked; both counts are logged.
 - AC9.3 `caused_by` names a bug or a task, proposed by blame (FR `caused-by-proposed-by-blame`; 0164 (2), (3); 0183; Q9):
   - `caused_by` accepts a bug id or a task id such as `T-050-97` (`bug-record-v1`, `bugs.py`); every write and `check` refuse a task id no `TASKS.md` under `specs/releases/`, `_archive/` included, carries.
-  - `resolve` blames the lines the staged diff removes, `tests/` included, and prints the candidates: the bug of a shape-3 subject, the task of a `<type>(<task-id>)` subject. It skips files `.gitattributes` marks `dadaia-generated`, squash `(#n)` and `refactor(T-…)` commits.
+  - `resolve` blames the lines the staged diff removes, `tests/` included, and prints the candidates: the bug of a shape-3 subject, the task of a `<type>(<task-id>)` subject. It skips files `.gitattributes` marks `dadaia-generated`, squash `(#n)` and `refactor(T-…)` commits, except `refactor(<task-id>): REBUILD …`, whose lines stay blamable (Q1); `LINEAGE.md` step 2 states the same.
   - It refuses a `--caused-by` outside the candidates, and `none` when candidates exist, unless `--lineage-reason` is given and stored.
   - One semantics in the schema, `LINEAGE.md` and the bugs law: "the fix of X, a bug or a task, wrote the lines this fix corrects".
   - Cases: `none` with candidates exits non-zero, with `--lineage-reason` it passes; a staged diff removing a `tests/` line a `fix(T-050-168)` commit wrote lists `T-050-168`; `--caused-by T-999-999` exits non-zero.
@@ -167,6 +170,7 @@ After AC9.3 and AC8.1's `Intent:` strip merge. Each RED is a behaviour assert in
 
 - AC10.1 One test session env, one owner (REBUILD, audit surface 1; DEL `test-suite-writes-outside-tmp`; F018, F049, F135, F136), re-cut 2026-10-04 (Q3, Q5):
   - Owner: a pure `suite_env(parent, home)` returning the suite's whole env; `tests/conftest.py`'s `pytest_configure` applies it once per process, the xdist controller and each worker; every child env is `suite_env(...) | overrides`.
+  - Every child env derives from `suite_env`, `tests/contract/test_core_file_io_purity.py`'s gate-path purity child included (T-050-97's REBUILD).
   - Deleted: every env write outside that one apply (conftest import time, session fixtures, per-helper builders); `pin_child_env`, `child_keys`, `drop_operator_env`, `_CHILD_HOME`, `TESTS_PARENT_HOME`, and every env-name set but `suite_env`'s.
   - Reverted, then the smallest correct redo: 09d259133's pin and trio, 4ca3d7136's hunks (i, ii), b69ee15b9's in-process line, 76d7af604's conftest hunk.
   - Kept: the deleted ad-hoc copies and scrubs, the heartbeat as a hook subprocess, the provider probe's `-B`.
@@ -281,8 +285,8 @@ After AC9.3 and AC8.1's `Intent:` strip merge. Each RED is a behaviour assert in
 | # | slug | sev | `caused_by` | resolution |
 |---|---|---|---|---|
 | 1 | `bootstrap-e2e-closure-walk-ignores-requirement-markers` | LOW | `bootstrap-e2e-mirror-seeded-from-stale-editable-metadata` | ef7262879 |
-| 2 | `gate-path-purity-test-premise-died-with-t097` | LOW | `T-050-97` | 23d678b4f |
-| 3 | `gate-path-purity-child-env-drops-pythonpath` | MEDIUM | `T-050-97` | e06583a46 |
+| 2 | `gate-path-purity-test-premise-died-with-t097` | LOW | `T-050-97` | AC10.1 |
+| 3 | `gate-path-purity-child-env-drops-pythonpath` | MEDIUM | `T-050-97` | AC10.1 |
 | 4 | `dadaiaignore-doctor-breaks-bind-resolution-import-contract` | MEDIUM | `T-050-116` | a34f3b738 |
 | 5 | `help-quality-mask-misses-folded-venv-path-on-ci` | LOW | `T-050-145` | c370b0c3a, bf5ffde97 |
 | 6 | `sweep-remove-misses-oserror-on-python-3-14` | MEDIUM | `T-050-146` | b9b28202d |
@@ -290,8 +294,8 @@ After AC9.3 and AC8.1's `Intent:` strip merge. Each RED is a behaviour assert in
 | 8 | `windows-quoted-fix-left-behavior-map-hash-stale` | LOW | `windows-quoted-executable-fix-not-runnable-in-powershell` | 582535466 |
 | 9 | `bugs-fix-nonrepo-test-not-portable` | LOW | `T-050-167` | f6d04aa56 |
 | 10 | `t168-canon-change-without-stamp-bump` | MEDIUM | `T-050-168` | AC12.9 |
-| 11 | `bugs-own-check-attr-keeps-cr-on-windows` | MEDIUM | `T-050-168` | d66e50c66 |
-| 12 | `blame-refusal-test-asserts-a-posix-fix-line` | LOW | `T-050-168` | 7196e1473 |
+| 11 | `bugs-own-check-attr-keeps-cr-on-windows` | MEDIUM | `T-050-168` | AC12.9 |
+| 12 | `blame-refusal-test-asserts-a-posix-fix-line` | LOW | `T-050-168` | AC12.9 |
 | 13 | `doctor-stub-drifts-from-doctorservice-signature` | LOW | `onboarding-next-step-names-another-context` | AC12.10 |
 | 14 | `outside-tmp-home-pin-coupled-to-session-hooks` | MEDIUM | `test-suite-writes-outside-tmp` | AC10.1 |
 | 15 | `workspace-venv-probe-writes-bytecode-into-editable-checkout` | LOW | `test-suite-writes-outside-tmp` | AC10.1 |
@@ -322,10 +326,11 @@ After AC9.3 and AC8.1's `Intent:` strip merge. Each RED is a behaviour assert in
   - Kept: `unrecoverable()`'s stash count.
   - A dirty checkout refuses with one fix line per file and leaves tree and origin untouched; each 0154 direct writer commits its own output in the act.
   - Cases: 0172's `measured_by`; `context dead <ctx> --commit` exits 2.
-- AC12.9 T-050-168's stamp hunk is redone (audit):
-  - Reverted: a41c69967's re-pin and aed2ac322's rule-comment rewrite in `tests/unit/core/test_specs_version.py`; the test's rule stands as first written.
-  - Then, the PLAN's pick: a real `CANONICAL_SPECS_VERSION` bump, or an ADR recording "stamp 9 never shipped". Never a test comment.
-  - Case: `test_a_canon_change_bumps_the_stamp` passes with its original assert and rule.
+- AC12.9 T-050-168 is rebuilt (audit; Q18), AC12.4 rows 10–12:
+  - Row 10: a41c69967's re-pin and aed2ac322's rule-comment rewrite in `tests/unit/core/test_specs_version.py` are reverted; then, the PLAN's pick: a real `CANONICAL_SPECS_VERSION` bump, or an ADR recording "stamp 9 never shipped", never a test comment.
+  - Row 11: KEEP d66e50c66's NUL-delimited (`-z`) check-attr read.
+  - Row 12: 7196e1473's `startswith`/`endswith`/`in` predicates go; the refusal test asserts the exact fix line again, its expected literal built per platform.
+  - Cases: `test_a_canon_change_bumps_the_stamp` passes with its original assert and rule; the refusal row compares `stderr` lines for equality on every OS.
 - AC12.10 `_StubDoctor` leaves (audit; 2 repairs in 2 days): `tests/unit/cli/test_exitcode_truthfulness.py` drives the real `DoctorService` over a tmp workspace; its cases keep their expected exit codes.
 - AC12.11 The law files rc-8 rewrites meet one authoring bar (Q12–Q14):
   - Files: `pub/scaffold/bugs/AGENTS.md`, `S/dd-bug-resolution/SKILL.md` and `LINEAGE.md`, `S/dd-gitflow-default/SKILL.md`, `pub/data/worktrees-AGENTS.md`, `S/dd-release-implementation/SKILL.md`, `S/dd-code-review/SKILL.md`, `S/dd-ai-eng-knowhow/AUTHORING.md`; each rewritten once, in the task changing its law.
@@ -354,7 +359,7 @@ After AC9.3 and AC8.1's `Intent:` strip merge. Each RED is a behaviour assert in
 - The test env written at import, in session fixtures and per helper; `pin_child_env`, `child_keys`, `drop_operator_env`, `TESTS_PARENT_HOME`, their name sets; the conftest re-execution tests (AC10.1).
 - "Own mistake" covering a merged fix's break; the follow-up commit for a fix-induced red; "state REBUILD or why not"; `caused_by` bugs only; blame blind to `tests/` (AC12.1–AC12.3, AC9.3, AC9.4).
 - An unverified merge; merge's rebase, TASKS-marker replay, already-contains return and `sys.path` reach-in; 0111's marker clause (AC12.5, AC12.7).
-- `dead --commit`, `commit_all`, dead's consent, secret and identity refusals, certification's `dead --commit` call (AC12.8); the stamp-9 re-pin and its rewritten rule; `_StubDoctor` (AC12.9, AC12.10).
+- `dead --commit`, `commit_all`, dead's consent, secret and identity refusals, certification's `dead --commit` call (AC12.8); the stamp-9 re-pin and its rewritten rule; 7196e1473's loosened assert; `_StubDoctor` (AC12.9, AC12.10).
 - The map's unscoped "no CI job calls a model API", in the root map, SKILL.md §3b and `CICD-AUTOMATION.md` (0177); an `impl` worktree reading the trio from its own repo (AC11.0); memory's ledger union merge and step 7's bare conflict line (AC10.14).
 
 ## Risks
@@ -380,7 +385,4 @@ After AC9.3 and AC8.1's `Intent:` strip merge. Each RED is a behaviour assert in
 
 ## Open questions for the operator
 
-- W12, to the main thread before approval:
-  1. AC9.3's blame skips `refactor(T-…)` commits, so a REBUILD's lines (AC12.12's shape) yield no `caused_by` candidates: keep the skip, or exempt `refactor(<task-id>): REBUILD`?
-  2. Q18's detail sets the REBUILD bar at 2 or more induced bugs on a unit; T-050-97 has two (AC12.4 rows 2, 3) and gets none here: exception, or a REBUILD?
-- None for W8–W11: the 2026-10-03 grill frontiers are empty. F4 is rc-12's (§Carried). Operator acts: 0176, 0177, 0178 and 0180's acceptances (§Decisions); W11's GitHub prerequisites (the `evals` environment, its secret, the required `ci.yml` job).
+- None for W8–W12: the 2026-10-03 and 2026-10-04 grill frontiers are empty. F4 is rc-12's (§Carried). Operator acts: 0176, 0177, 0178 and 0180's acceptances (§Decisions); W11's GitHub prerequisites (the `evals` environment, its secret, the required `ci.yml` job).
