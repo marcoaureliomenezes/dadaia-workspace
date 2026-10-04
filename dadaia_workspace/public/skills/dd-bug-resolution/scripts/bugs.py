@@ -123,12 +123,8 @@ def _own(specs: Path, paths: set[str]) -> set[str]:
     marks `dadaia-generated` (ADR 0183) — one predicate for the blame and the direction."""
     top = _git(specs, "rev-parse", "--show-toplevel").strip()
     # -z: NUL never meets Windows' text-mode \n -> \r\n stdin translation, nor path quoting
-    out = _git(
-        top, "check-attr", "-z", "--stdin", "dadaia-generated", stdin="\0".join(paths)
-    ).split("\0")
-    generated = {
-        path for path, value in zip(out[0::3], out[2::3], strict=False) if value in ("set", "true")
-    }
+    out = _git(top, "check-attr", "-z", "--stdin", "dadaia-generated", stdin="\0".join(paths)).split("\0")  # fmt: skip
+    generated = {p for p, v in zip(out[0::3], out[2::3], strict=False) if v in ("set", "true")}  # fmt: skip
     return {p for p in paths if not p.startswith(_NOT_PRODUCTION)} - generated
 
 
