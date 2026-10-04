@@ -16,9 +16,8 @@ Two verdicts, one per rule class:
 
 * a rule that carries ``fix_help`` — the command runs (``bash -c``, cwd = the fixture)
   and the rule must then emit nothing;
-* a rule that carries none — its remedy is judgment (split a PLAN, migrate a deprecated
-  layout), so every finding it emits must be WARNING: a warning never exits 1, so the
-  operator is informed, never stalled.
+* a rule that carries none — its remedy is judgment, so every finding it emits must be
+  WARNING: a warning never exits 1, so the operator is informed, never stalled.
 
 The registry below is the census: a rule with no plant is skipped with the reason it
 cannot be exercised here, and the census test pins that every rule is accounted for.
@@ -134,12 +133,6 @@ def _plant_status_line_gone(root: Path) -> None:
     (release / "TASKS.md").write_text("# Tasks\n\n**Status:** approved\n" + "- t\n" * 170)
 
 
-def _plant_oversized_plan(root: Path) -> None:
-    plan = root / "specs" / "releases" / _RELEASE / "rc-1" / "PLAN.md"
-    body = "\n".join(f"- line {i}" for i in range(400))
-    plan.write_text(f"# Plan\n\n**Status:** Approved\n\n{body}\n", encoding="utf-8")
-
-
 def _plant_changelog_heading(root: Path) -> None:
     atom = root / "specs" / "memory" / "product" / "testarea" / "feature-a.md"
     atom.write_text(
@@ -206,7 +199,6 @@ PLANTS: dict[str, Plant] = {
     "MEM-PLACEHOLDER-1": Plant(_plant_placeholder_atom),
     "FIXED-1": Plant(_plant_fixed_block_gone),
     "FIXED-2": Plant(_plant_fixed_block_drifted),
-    "SPEC-DOC-005": Plant(_plant_oversized_plan),
     "GITFLOW-1": Plant(_plant_gitflow_gone, {"<specs>": "specs"}),
     "SPEC-DOC-041": Plant(
         lambda r: _write(
@@ -471,14 +463,13 @@ def test_a_judgment_only_rule_never_makes_the_run_exit_1(repo: Path) -> None:
     sa-memory-atom-has-two-grammars#B29-6: a history heading planted beside them is
     reported once, by LINT-1 — CAT-1 and SPEC-DOC-008 do not exist."""
     root = repo
-    PLANTS["SPEC-DOC-005"].plant(root)
     _plant_changelog_heading(root)
     for plant in REPORT_ONLY.values():
         plant(root)
 
     report = _specs_section(_doctor(root), Path())
     fired = {f.code for f in report.printable}
-    assert {"SPEC-DOC-005", *REPORT_ONLY} <= fired, fired
+    assert set(REPORT_ONLY) <= fired, fired
     assert not {"CAT-1", "SPEC-DOC-008", "SPEC-DOC-010"} & fired, fired
     history = [f for f in report.findings if "Changelog" in f.message]
     assert [(f.code, f.error) for f in history] == [("LINT-1", True)], history

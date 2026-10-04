@@ -15,6 +15,7 @@ lists and disagreed with what init/install create. Nothing here spells a zone na
 allow set, TTL and canon is a view of the registry.
 """
 
+import json
 import os
 import stat
 import time
@@ -108,6 +109,9 @@ class Finding:
         return self.verdict is not FindingVerdict.REAPED
 
 
+_BEHAVIOR_MAP = Path(__file__).resolve().parents[2] / "public" / "entities" / "behavior-map.json"
+
+
 def _worktree(verdict: str, message: str, fix: str = "") -> SectionFinding:
     """A worktree finding: printed, never an error, never acted on by ``--fix`` (AC1.10)."""
     return SectionFinding("WORKTREE", verdict, message, False, False, fix, fixable=False)
@@ -145,6 +149,22 @@ class DoctorService:
         lines, fix = self._projection(self._workspace_root) if self._projection else ([], "")
         message = "; ".join(line.render() for line in lines if line.status.blocking)
         return [SectionFinding("PROJECTION", "drift", message, False, True, fix)] if fix else []
+
+    def check_skill_md_length(self) -> list[SectionFinding]:
+        """SKILL-MD-LENGTH (ADR 0170): a projected SKILL.md over the soft limit, a warning."""
+        soft = json.loads(_BEHAVIOR_MAP.read_bytes())["skill_md_line_soft"]
+        return [
+            SectionFinding(
+                "SKILL-MD-LENGTH",
+                "warning",
+                f"{md.parent.name}/SKILL.md has {n} lines > soft limit {soft}",
+                False,
+                False,
+                f"Operator action: split {md} into its references/*.md and/or scripts/",
+            )
+            for md in sorted((self._workspace_root / ".agents" / "skills").glob("*/SKILL.md"))
+            if (n := md.read_bytes().count(b"\n")) > soft
+        ]
 
     def check_installed_hooks(self, context: str | None = None) -> list[SectionFinding]:
         """HOOKS-DRIFT-1: an ALIVE repo's hook where git runs hooks is not byte-for-byte the
@@ -679,6 +699,11 @@ def workspace_rules(
             ("WORKTREE",),
             SECTION,
             lambda service: [] if expired_only else service.check_worktrees(context),
+        ),
+        Rule(
+            ("SKILL-MD-LENGTH",),
+            SECTION,
+            lambda service: [] if expired_only else service.check_skill_md_length(),
         ),
         Rule(
             ("WS-ENTRY",),

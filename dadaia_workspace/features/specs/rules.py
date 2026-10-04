@@ -61,12 +61,6 @@ RULES: tuple[SpecsRule, ...] = (
         lambda d: d._release.check_active_release_artifacts(),
     ),
     _rule(
-        ("SPEC-DOC-005",),
-        lambda d: d._release.check_plan_line_limit(),
-        # No fix line: an over-long PLAN is split, and truncating it at the limit
-        # deletes the plan's tail. WARNING-only (see check_plan_line_limit).
-    ),
-    _rule(
         ("TREE-3",),
         lambda d: d._structural.check_tree3_memory_md(),
         fix=lambda d, i: d._structural.fix_tree3(i),

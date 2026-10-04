@@ -221,6 +221,14 @@ def _plant_disarmed_gate(ws: Path) -> str:
     return "PROJECTION"
 
 
+def _plant_long_skill(ws: Path) -> str:
+    skill = ws / ".agents" / "skills" / "long" / "SKILL.md"
+    skill.parent.mkdir(parents=True)
+    soft = json.loads((_REPO / "dadaia_workspace/public/entities/behavior-map.json").read_bytes())
+    skill.write_text("l\n" * (soft["skill_md_line_soft"] + 1))
+    return "SKILL-MD-LENGTH"
+
+
 #: Every code this module proves: cleared by its printed fix, or an operator action (V39).
 WORKSPACE_PLANTS = {
     **_SPECS_PLANTS,
@@ -228,6 +236,7 @@ WORKSPACE_PLANTS = {
     "WS-ENTRY": _plant_root_slop,  # the fixable sub-rule (S5)
     "HOOKS-DRIFT-1": _plant_drifted_hook,
     "PROJECTION": _plant_disarmed_gate,
+    "SKILL-MD-LENGTH": _plant_long_skill,
 }
 
 
@@ -241,3 +250,14 @@ def test_a_workspace_finding_is_cleared_by_its_printed_fix(tmp_path: Path, plant
     fix = next(f["fix"] for f in _findings_before(ws) if f["code"] == code)
     _run_from_elsewhere(ws, shlex.join(shlex.split(fix)))
     assert code not in {f["code"] for f in _findings(ws)}
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="the stub CLI is a POSIX shell script")
+def test_a_long_skill_md_is_a_warning_naming_its_file(tmp_path: Path) -> None:
+    """ADR 0170: the real doctor run prints one non-error SKILL-MD-LENGTH whose
+    `Operator action:` names the projected SKILL.md."""
+    ws = _workspace(tmp_path)
+    code = _plant_long_skill(ws)
+    [found] = [f for f in _findings_before(ws) if f["code"] == code]
+    assert found["verdict"] == "warning"
+    assert found["fix"].startswith(f"Operator action: split {ws}/.agents/skills/long/SKILL.md ")

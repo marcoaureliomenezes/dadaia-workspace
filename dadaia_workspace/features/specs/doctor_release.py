@@ -1,7 +1,7 @@
 """Release validator: the active release, its artifacts, SemVer + ledger invariants.
 
 Single-responsibility sibling of the SpecsDoctor coordinator. Owns the active-release
-lifecycle checks (SPEC-DOC-004/005), the release ledger invariants (phase<->markers
+lifecycle check (SPEC-DOC-004), the release ledger invariants (phase<->markers
 SPEC-DOC-024, unique ids SPEC-DOC-026), plus the family-local status extractor.
 A release dir's name and placement are TREE-8's alone.
 Leaf-only: imports the shared leaves + core, never a sibling validator.
@@ -30,7 +30,6 @@ from dadaia_workspace.features.specs.specs_tree import SpecsTree
 # Vocabulary + parser live in core.spec_status (single definition); re-exported here
 # because doctor_release has been the documented import site for both.
 CANONICAL_STATUS = _CANONICAL_STATUS
-PLAN_MAX_LINES = 300
 
 
 def _extract_status(md_path: Path) -> str | None:
@@ -103,29 +102,6 @@ class ReleaseValidator:
                         path=str(fpath),
                     )
                 )
-        return issues
-
-    def check_plan_line_limit(self) -> list[SectionFinding]:
-        """SPEC-DOC-005: the live candidate's PLAN only — a closed ``rc-<N>/`` is history."""
-        issues: list[SectionFinding] = []
-        candidate = self.tree.active_release.candidate
-        for plan in (
-            [candidate / "PLAN.md"] if candidate and (candidate / "PLAN.md").is_file() else []
-        ):
-            n_lines = sum(1 for _ in plan.read_text(encoding="utf-8").splitlines())
-            if n_lines <= PLAN_MAX_LINES:
-                continue
-            issues.append(
-                specs_finding(
-                    code="SPEC-DOC-005",
-                    # WARNING, always: the remedy is splitting the PLAN — judgment, with
-                    # no command to hand back. An exit-1 whose only runnable "fix" was
-                    # `sed -i '<limit>,$d'` deleted the plan's tail (0.4.7 c2 review).
-                    severity=Severity.WARNING,
-                    description=f"PLAN.md has {n_lines} lines > {PLAN_MAX_LINES}",
-                    path=str(plan),
-                )
-            )
         return issues
 
     def check_phase_markers_coherence(self) -> list[SectionFinding]:

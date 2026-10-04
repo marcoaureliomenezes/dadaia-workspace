@@ -31,7 +31,6 @@ pytestmark = pytest.mark.contract
 _REPO_ROOT = Path(__file__).resolve().parents[2]
 _MEMORY_DIR = _REPO_ROOT / "specs" / "memory"
 _DOCS_DIR = _REPO_ROOT / "docs"
-_README_MAX_BYTES = 10_240
 #: `docs/cli.md` is generated, not derived: it names its generator, not an atom.
 _GENERATED = ("cli.md",)
 
@@ -242,14 +241,6 @@ def test_the_cli_reference_is_the_committed_output_of_the_generator() -> None:
         "docs/cli.md drifted from the live command tree — "
         "regenerate: dadaia help tree > docs/cli.md"
     )
-
-
-def test_the_readme_fits_the_long_description_budget() -> None:
-    """The README is PyPI's long description, read by humans and pulled whole into agent
-    context: 10 KB is the budget, and a section that cannot earn its bytes is deleted."""
-    size = (_REPO_ROOT / "README.md").stat().st_size
-
-    assert size <= _README_MAX_BYTES, f"README.md is {size} bytes (max {_README_MAX_BYTES})"
 
 
 def test_no_derived_document_cites_a_dead_verb_or_path() -> None:

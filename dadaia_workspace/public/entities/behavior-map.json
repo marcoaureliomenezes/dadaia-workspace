@@ -1,5 +1,6 @@
 {
   "schema_version": "behavior-map-v1",
+  "skill_md_line_soft": 333,
   "skill_md_line_ceiling": 500,
   "standalone_skills": [
     "dd-grill-me",
