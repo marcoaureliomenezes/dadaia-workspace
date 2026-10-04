@@ -60,14 +60,6 @@ class FakePythonEnvironmentManager:
             f"/{PLATFORM.venv_scripts_dir}/python{PLATFORM.venv_exe_suffix}"
         )
 
-    def pip_executable(self, workspace_root: str) -> str:
-        from dadaia_workspace.core.platform import PLATFORM
-
-        return (
-            f"{workspace_root}/.dadaia/.venv"
-            f"/{PLATFORM.venv_scripts_dir}/pip{PLATFORM.venv_exe_suffix}"
-        )
-
 
 def register_dead(
     service: Any,
