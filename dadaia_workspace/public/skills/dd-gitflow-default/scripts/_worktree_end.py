@@ -128,7 +128,10 @@ def _replayed(tree: Path, rel: str) -> list[str] | None:
 
 def _rebase(tree: Path, work: str) -> None:
     """Rebase onto *work*: a conflict in TASKS markers alone replays; anything else, a JSONL
-    ledger included, aborts and refuses — re-run the ledger's writer on the rebased tree."""
+    ledger included, aborts and refuses — re-run the ledger's writer on the rebased tree.
+    A branch already holding *work* (a merge of it included) fast-forwards as it is."""
+    if git(tree, "rev-list", "--count", f"HEAD..{work}").strip() == "0":
+        return
     step: tuple[str, ...] = ("rebase", "-q", work)
     while True:
         try:

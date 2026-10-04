@@ -353,3 +353,15 @@ def test_a_verdict_carries_over_only_an_identical_patch_and_message_series(root:
     git(tree, "-c", "core.editor=true", "rebase", "--continue")
     assert _argv(run(root, "merge", TREE)) == refusal
     assert git(repo, "rev-parse", "feature/0.5.0") == work
+
+
+def test_a_branch_that_merged_the_work_branch_lands_as_is(root: Path) -> None:
+    repo, tree = root / "repos/r", root / TREE
+    commit(tree, "src/c.py", "x = 1\n")
+    commit(repo, "src/c.py", "x = 2\n")  # the work branch moves on the same line
+    subprocess.run(["git", "-C", str(tree), "merge", "-q", "feature/0.5.0"], capture_output=True)
+    head = commit(tree, "src/c.py", "x = 3\n")  # the conflict resolved by a merge commit
+    approve(root, head)
+    result = run(root, "merge", TREE)
+    assert result.returncode == 0, result.stderr
+    assert git(repo, "rev-parse", "feature/0.5.0").strip() == head
