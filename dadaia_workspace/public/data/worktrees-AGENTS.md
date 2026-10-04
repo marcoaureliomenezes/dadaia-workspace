@@ -26,7 +26,7 @@ a skill points here, never restates them.
 3. Commit per the commit shapes of `dd-gitflow-default`; a dirty tree is refused at merge.
 4. Run the kind's checks inside the worktree: the ledger script's `check`, and for `impl`/`bug` the tests.
 5. `dd-code-reviewer` reviews `git diff <work branch>...HEAD`; the main thread writes its verdict as a handoff with `agent` `dd-code-reviewer` and `scope` `wt/<name>@<HEAD sha>`.
-6. `WT merge <path>` lands only a clean tree inside its allowed set, rebased, with a valid APPROVED verdict naming the rebased sha or a sha of its branch reflog with the same patch-id and message series (ADR 0168), by fast-forward; then removes the tree and `branch -d`s it.
+6. `WT merge <path>` lands only a clean tree inside its allowed set, on top of the work branch (rebased only when behind), with a valid APPROVED verdict naming the rebased sha or a sha of its branch reflog with the same patch-id and message series (ADR 0168), by fast-forward; then removes the tree and `branch -d`s it.
 7. A conflict is resolved inside the worktree, never in `repos/<repo>`; `WT merge` re-runs cleanly after any stop.
 8. Inside a PLAN step, merges land in ready order; only a true `blocked by:` edge holds one back.
 
@@ -34,6 +34,7 @@ a skill points here, never restates them.
 - A bug a task fixed is resolved in a `bug` worktree holding `specs/bugs/BUGS.jsonl` alone (`dd-gitflow-default` §3a).
 - Candidate closure runs in its `release` worktree.
 
+- Never `git stash` in a worktree: every worktree of a repo shares one stash stack; set work aside as a WIP commit, and read a baseline by `git archive <sha> | tar -x -C .dadaia/tmp/<agent>/<YYYYMMDD>/`.
 - Never merge by hand, never `git worktree remove --force`, never `git branch -D` a `wt/` branch.
 - An empty or merged worktree leaves by `WT clean <path>`; ignored files are kept (`--keep`) or dropped (`--drop`) by the operator's word.
 

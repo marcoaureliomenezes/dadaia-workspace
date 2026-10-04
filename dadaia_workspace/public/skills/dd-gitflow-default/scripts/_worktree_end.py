@@ -41,7 +41,9 @@ def _refuse_dirty(tree: Path) -> None:
     if git(tree, "status", "--porcelain").strip():
         raise Refusal(
             f"{tree} has uncommitted changes",
-            git_line(tree, "stash", "push", "--include-untracked"),
+            f"Operator action: commit them in the kind's commit shape (`{git_line(tree, 'add', '-A')}`"
+            f" and `{git_line(tree, 'commit')}`) or remove them (`{git_line(tree, 'clean', '-fd')}`"
+            f" and `{git_line(tree, 'restore', '-SW', '.')}`) — never a stash every worktree shares",
         )
 
 

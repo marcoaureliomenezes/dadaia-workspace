@@ -77,9 +77,22 @@ def test_merge_fast_forwards_removes_and_reruns(root: Path) -> None:
 
 def test_dirty_outside_set_and_conflict_each_refuse_with_one_fix(root: Path) -> None:
     repo, tree = root / "repos/r", root / TREE
-    (tree / "wip.py").write_text("")
-    _fix(root, dirty := run(root, "merge", TREE))
+    (tree / "wip").mkdir()  # an untracked directory, and a tracked edit staged:
+    (tree / "wip/x.py").write_text("")
+    (tree / "specs/releases/0.5.0/rc-1/SPEC.md").write_text("dirty")
+    git(tree, "add", "specs/releases/0.5.0/rc-1/SPEC.md")
+    dirty = run(root, "merge", TREE)
     assert "uncommitted" in dirty.stderr
+    add, then, *remove = fixes(dirty)[0].split("`")[1::2]  # Operator action: commit or remove
+    assert [shlex.split(add), shlex.split(then)] == [  # the commit takes the kind's own message
+        ["git", "-C", str(tree), "add", "-A"],
+        ["git", "-C", str(tree), "commit"],
+    ]
+    for step in remove:
+        subprocess.run(step, shell=True, check=True, capture_output=True)  # noqa: S602
+    assert git(tree, "status", "--porcelain") == ""  # removed, clean,
+    assert not (tree / "wip").exists()
+    assert git(tree, "stash", "list") == ""  # never in the stack every worktree shares
     commit(tree, "specs/backlog/BACKLOG copy.json", "{}")  # new: the undo removes it
     commit(tree, "specs/releases/0.5.0/rc-1/SPEC.md", "edited")  # on the work branch: restored
     for rel, owner in (("specs/backlog/BACKLOG copy.json", "backlog"), ("SPEC.md", "release")):
