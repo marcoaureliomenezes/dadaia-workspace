@@ -108,7 +108,7 @@ def _check_ancestor(tree: Path, work: str) -> None:
 
 def _verify(tree: Path) -> None:
     """Gate 1 (ADR 0185): run the `verify:` line of HEAD's `AGENTS.md` in *tree*; its
-    output, on stdout alone (one `fix:` per refusal, ADR 0158), is the landed sha's evidence;
+    output, on stdout alone (one `fix:` per refusal), is the landed sha's evidence;
     stdin is closed: a verify reading it never blocks merge."""
     agents = git(tree, "show", "HEAD:AGENTS.md", check=False).splitlines()
     command = next(
