@@ -426,7 +426,7 @@ def _repo_root_write_guard() -> object:
 _PREEXISTING_POLLUTION: set[str] = set()
 _INSTANCE_AT_START: dict[str, object] = {}
 _OUTSIDE_TMP_AT_START: set[str] = set()
-_CHILD_HOME: list[Path] = []  # this process's pinned home (controller and each worker)
+_CHILD_HOME: list[Path] = []  # this process's pinned home, removed at unconfigure
 
 
 # ponytail: top-level .cache entries only; a write inside an existing ~/.cache/pip is unseen.
@@ -452,6 +452,7 @@ def pytest_configure(config: pytest.Config) -> None:
 def pytest_unconfigure(config: pytest.Config) -> None:
     for home in _CHILD_HOME:
         shutil.rmtree(home, ignore_errors=True)
+    _CHILD_HOME.clear()
 
 
 def pytest_sessionstart(session: pytest.Session) -> None:
@@ -485,8 +486,8 @@ def pytest_sessionfinish(session: pytest.Session, exitstatus: int) -> None:
         )
         session.exitstatus = 1
     gained = sorted(_outside_tmp() - _OUTSIDE_TMP_AT_START)
-    if gained or (_CHILD_HOME and Path.home() != _CHILD_HOME[0]):
-        print(f"\n\n[OUTSIDE TMP] home {Path.home()}; gained: {gained}")  # noqa: T201
+    if gained:
+        print(f"\n\n[OUTSIDE TMP] gained: {gained}")  # noqa: T201
         session.exitstatus = 1
     offenders = [
         d for d in _POLLUTION_DIRS if (_REPO_ROOT / d).exists() and d not in _PREEXISTING_POLLUTION

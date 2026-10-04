@@ -23,6 +23,7 @@ from dadaia_workspace.features.spec_context.doctor import DoctorService, Finding
 from dadaia_workspace.infrastructure.git_subprocess import GitSubprocessClient
 from dadaia_workspace.infrastructure.json_context_store import JsonContextStore
 from dadaia_workspace.infrastructure.json_harness_profile_store import JsonHarnessProfileStore
+from tests.fixtures.harness_env import claude_hook_env, run_hook_subprocess
 from tests.fixtures.stores import context_store
 
 
@@ -87,24 +88,13 @@ def test_gc_deletion_matrix(tmp_path: Path) -> None:
     assert any("GRAVEYARD-GC" in a and "old-sess-001.json" in a for a in actions), actions
 
 
-def _post_gate_heartbeat(ws: Path, sess_id: str, monkeypatch: pytest.MonkeyPatch) -> None:
-    """Invoke the REAL PostToolUse heartbeat (refreshes last_seen_at) for ``sess_id``.
-
-    The harness session id is the hook env's, exactly as the production hook resolves it
-    (resolve_session_id, env only). This is the renewal path the operator's live sessions
-    actually take — not a planted timestamp.
+def _post_gate_heartbeat(ws: Path, sess_id: str) -> None:
+    """Invoke the REAL PostToolUse heartbeat (refreshes last_seen_at) for ``sess_id``, as the
+    harness does: a child process whose env carries the native session id (resolve_session_id,
+    env only). The renewal path the operator's live sessions take — not a planted timestamp.
     """
-    import io
-    import sys
-
-    from dadaia_workspace.hooks import sdd_post_gate
-
-    for var in ("DADAIA_SESSION_ID", "CODEX_SESSION_ID", "CODEX_THREAD_ID"):
-        monkeypatch.delenv(var, raising=False)
-    monkeypatch.setenv("CLAUDE_CODE_SESSION_ID", sess_id)
-    monkeypatch.setattr(sys, "stdin", io.StringIO(json.dumps({"session_id": sess_id})))
-    monkeypatch.chdir(ws)
-    assert sdd_post_gate.main() == 0
+    env = claude_hook_env(ws, session_id=sess_id)
+    assert run_hook_subprocess("sdd_post_gate", {"session_id": sess_id}, env).returncode == 0
 
 
 @pytest.mark.parametrize(
@@ -117,12 +107,7 @@ def _post_gate_heartbeat(ws: Path, sess_id: str, monkeypatch: pytest.MonkeyPatch
     ],
 )  # fmt: skip
 def test_no_stale_records(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-    idle: int | None,
-    renew: bool,
-    sessions_outside: bool,
-    survives: bool,
+    tmp_path: Path, idle: int | None, renew: bool, sessions_outside: bool, survives: bool
 ) -> None:
     """T-011-04, bind-lost-silently-after-five-idle-minutes: another session's
     SessionStart lane collects a bind only past a dead session's TTL (a day), measured against
@@ -142,7 +127,7 @@ def test_no_stale_records(
         expired.parent.mkdir(parents=True, exist_ok=True)
         expired.touch()
         os.utime(expired, (0, 0))
-        _post_gate_heartbeat(ws, sid, monkeypatch)
+        _post_gate_heartbeat(ws, sid)
         assert expired.exists(), "a tool call must never run the reaper"
 
     actions = _make_doctor(ws).expire()
