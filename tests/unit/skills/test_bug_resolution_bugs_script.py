@@ -777,10 +777,10 @@ _WHY = "the blamed fix wrote the line, not its defect"
 
 
 @pytest.mark.parametrize(("caused_by", "reason", "refusal"), [
-    ("none", None, "[error] caused_by 'none' is not a blame candidate (b-bug)"),  # AC9.3
+    ("none", None, "[error] caused_by 'none' is not a blame candidate (b-bug, d-bug, e-bug)"),  # AC9.3
     ("none", _WHY, None),
     ("b-bug", None, None),
-    ("c-bug", None, "[error] caused_by 'c-bug' is not a blame candidate (b-bug)"),  # its lines: generated, specs, kept
+    ("c-bug", None, "[error] caused_by 'c-bug' is not a blame candidate (b-bug, d-bug, e-bug)"),  # its lines: generated, specs, kept
 ])  # fmt: skip
 def test_resolve_proposes_caused_by_by_blame(
     script: Path, tmp_path: Path, caused_by: str, reason: str | None, refusal: str | None
@@ -790,17 +790,22 @@ def test_resolve_proposes_caused_by_by_blame(
     the bug being resolved is never its own. The removed lines carry a Latin-1 byte and a
     `-- ` hunk ahead of the blamed one."""
     closed = {**_OPEN_RECORD, "status": "resolved", "closed_at": "2026-09-21T00:00:00Z"}
-    specs = _ledger(tmp_path, _OPEN_RECORD, {**closed, "id": "b-bug"}, {**closed, "id": "c-bug"})
+    specs = _ledger(
+        tmp_path, _OPEN_RECORD, *({**closed, "id": i} for i in ("b-bug", "c-bug", "d-bug", "e-bug"))
+    )
     git = ["git", "-C", str(tmp_path), "-c", "user.name=t", "-c", "user.email=t@t"]
     sha, lines = "", "-- note\nx1\nx2\nx3\n{}\xe9\n"
     for message, files in [
-        ("chore: seed", {".gitattributes": "behavior-map.json dadaia-generated\ncli/a.py -dadaia-generated\n",
+        ("chore: seed", {".gitattributes": "behavior-map.json dadaia-generated=true\ncli/a.py -dadaia-generated\n",
                          "cli/a.py": lines.format("old")}),
         ("fix(bugs): a-bug — first try", {"cli/s.py": "1\n"}),
         ("feat(T-5): fix\n\nfollows the review (#12)", {"cli/a.py": lines.format("bad")}),
         ("chore(bugs): resolve b-bug — by T-5 ({sha})", {"specs/n": "b\n"}),  # shape 4, short sha
         ("fix(bugs): c-bug — cause", {"cli/behavior-map.json": "{}\n", "cli/s.py": "1\nz\n", "cli/c.py": "c\n",
                                       "specs/n": "c\n"}),
+        ("fix(bugs): d-bug — cause", {"cli/dé.py": "d\n"}),  # deleted below, a non-ASCII name
+        ("fix(bugs): e-bug — cause", {"cli/r.py": "r1\nr2\nr3\nr4\n"}),  # renamed and edited below
+        ("fix(bugs): c-bug — rework", {"cli/r.py": "r1\nr2\nr3\nr4\nr5\n"}),  # kept across the rename
         ("refactor(T-9): rename", {"cli/a.py": lines.format("bad2")}),
         ("feat: release (#7)", {"cli/a.py": lines.format("bad3")}),
     ]:  # fmt: skip
@@ -811,14 +816,17 @@ def test_resolve_proposes_caused_by_by_blame(
         sha = subprocess.run([*git, "rev-parse", "--short=9", "HEAD"], capture_output=True,
                              text=True, check=True).stdout.strip()  # fmt: skip
     for path, text in [("cli/a.py", "x1\nx2\nx3\n"), ("cli/s.py", "z\n"), ("cli/c.py", "c\nadded\n"),
-                       ("cli/behavior-map.json", ""), ("specs/n", "")]:  # fmt: skip
+                       ("cli/behavior-map.json", ""), ("specs/n", ""),
+                       ("cli/r2.py", "r1\nr2\nr3\nR4\nr5\n")]:  # fmt: skip
         (tmp_path / path).write_text(text, encoding="utf-8")
+    (tmp_path / "cli/dé.py").unlink()
+    (tmp_path / "cli/r.py").unlink()
     subprocess.run([*git, "add", "-A"], check=True)
     done = _run(script, *_resolve_argv(caused_by=caused_by), *(["--lineage-reason", reason] if reason else []),
                 "--specs", str(specs))  # fmt: skip
-    assert done.stdout.splitlines()[0] == "blame candidates: b-bug"
+    assert done.stdout.splitlines()[0] == "blame candidates: b-bug, d-bug, e-bug"
     rerun = f"{sys.executable} {script} resolve a-bug --cause c --resolved-release 0.4.7 --solution s --evidence-loop 'pytest -k x' --specs {specs.resolve()}"  # fmt: skip
-    fix = f"fix: Operator action: run `{rerun}` with --caused-by b-bug, or --lineage-reason saying why not"
+    fix = f"fix: Operator action: run `{rerun}` with --caused-by b-bug or d-bug or e-bug, or --lineage-reason saying why not"
     assert done.stderr.splitlines() == ([refusal, fix] if refusal else []), done.stderr
     assert done.returncode == (1 if refusal else 0)
     assert _records(specs)[0].get("lineage_reason") == reason

@@ -274,7 +274,7 @@
       "hash_tuple": {
         "section": "sha256:3e9a61792649223cbd58e9aa2c3b52df397556564caea25a42cbff2149a5ec11",
         "skill": "sha256:8394619213bb89805ae1887259e11ac6d762d21fcb365abf85421fa96cbb339b",
-        "scripts": "sha256:eb0fd79d262eb5d93da3b44bbeadfc1bd820697c32effe9922ef4382868e151d",
+        "scripts": "sha256:d31c492eddc6f4d2f6eba782b6451656409ac111263edc6c1440bf6b58996237",
         "scoped": []
       },
       "recorded_by": "dd-software-engineer",

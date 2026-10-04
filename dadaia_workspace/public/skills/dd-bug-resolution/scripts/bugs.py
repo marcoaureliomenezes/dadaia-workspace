@@ -114,7 +114,7 @@ def _fixes(specs: Path) -> dict[str, dict[str, list[list[str]] | None]]:
 
 
 def _git(cwd: Path | str, *argv: str, stdin: str | None = None) -> str:
-    return subprocess.run(["git", "-C", str(cwd), *argv], input=stdin, capture_output=True, encoding="utf-8",
+    return subprocess.run(["git", "-c", "core.quotePath=false", "-C", str(cwd), *argv], input=stdin, capture_output=True, encoding="utf-8",
                           errors="replace", check=True).stdout  # fmt: skip
 
 
@@ -123,7 +123,7 @@ def _own(specs: Path, paths: set[str]) -> set[str]:
     marks `dadaia-generated` (ADR 0183) — one predicate for the blame and the direction."""
     top = _git(specs, "rev-parse", "--show-toplevel").strip()
     out = _git(top, "check-attr", "--stdin", "dadaia-generated", stdin="\n".join(paths))
-    generated = {path for path, _, value in (ln.rsplit(": ", 2) for ln in out.splitlines()) if value == "set"}  # fmt: skip
+    generated = {path for path, _, value in (ln.rsplit(": ", 2) for ln in out.splitlines()) if value in ("set", "true")}  # fmt: skip
     return {p for p in paths if not p.startswith(_NOT_PRODUCTION)} - generated
 
 
@@ -134,13 +134,13 @@ def _candidates(specs: Path, bug_id: str) -> list[str]:
     if not fixes:
         return []
     top = Path(_git(specs, "rev-parse", "--show-toplevel").strip())
-    staged = set(_git(top, "diff", "--cached", "--name-only", "--diff-filter=MD").splitlines())
+    staged = {f[1]: f[1:] for f in (ln.split("\t") for ln in _git(top, "diff", "--cached", "--name-status", "--diff-filter=MDR").splitlines())}  # fmt: skip
     subjects = (ln.partition(" ") for ln in _git(top, "log", "--format=%H %s").splitlines())
     skip = [h for h, _, s in subjects if re.search(r"\(#\d+\)$", s) or s.startswith("refactor(T-")]
     with tempfile.TemporaryDirectory() as tmp:
         (revs := Path(tmp) / "revs").write_text("\n".join(skip), encoding="utf-8")
-        for path in _own(top, staged):
-            hunks = [ln.split()[1][1:].partition(",") for ln in _git(top, "diff", "--cached", "-U0", "--", path).splitlines() if ln.startswith("@@ ")]  # fmt: skip
+        for path in _own(top, set(staged)):  # a rename is blamed at its old path
+            hunks = [ln.split()[1][1:].partition(",") for ln in _git(top, "diff", "--cached", "-U0", "--", *staged[path]).splitlines() if ln.startswith("@@ ")]  # fmt: skip
             ranges = [arg for start, _, n in hunks if n != "0" for arg in ("-L", f"{start},+{n or 1}")]  # fmt: skip
             blame = _git(top, "blame", "--porcelain", "--ignore-revs-file", str(revs), *ranges, "HEAD", "--", path) if ranges else ""  # fmt: skip
             blamed |= {ln[:40] for ln in blame.splitlines()}
@@ -230,7 +230,8 @@ def _write(args: argparse.Namespace, specs: Path) -> int:
         return 0
     values = _values(args, _OPTIONS[args.verb])
     near = _candidates(specs, args.bug_id) if args.verb == "resolve" else []
-    print(f"blame candidates: {', '.join(near)}") if near else None
+    if near:
+        print(f"blame candidates: {', '.join(near)}")
     commit(ledger, lambda rs: tr.transition(rs, args.bug_id, args.verb, values, near))
     print(f"[ok] {tr.STATUS_BY_VERB[args.verb]} {args.bug_id}")
     return 0
