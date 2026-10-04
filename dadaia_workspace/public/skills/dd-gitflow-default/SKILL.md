@@ -70,11 +70,15 @@ A commit stages only paths its worktree kind's allowed set holds (`_worktree_kin
   `dd-code-reviewer` APPROVED verdict, security lens included, on the PR head. The ruleset
   is the operator's.
 - No CI job of a context's main repo or associated repos calls a model API, except an
-  evals repo's: only in `workflow_dispatch` or `schedule` jobs, never `push`,
-  `pull_request` or `pull_request_target`; on no self-hosted runner; the model secret
-  read only by those jobs, at job level; artifacts only from synthetic projects built in
-  the run; every artifact and the job summary secret-scanned, the model secret's value
-  included, before any upload — a hit fails the job and uploads nothing.
+  evals repo's, under every clause below:
+  - a model-calling job runs only on `workflow_dispatch` or `schedule`, never `push`,
+    `pull_request` or `pull_request_target`;
+  - no workflow of an evals repo runs on a self-hosted runner;
+  - the model secret is read only by those jobs, at job level;
+  - artifacts and transcripts come only from synthetic projects built in the run;
+  - every artifact and the job summary pass a secret scan, the model secret's value
+    included, before any upload and before the summary is written; a hit fails the job
+    and uploads nothing.
 
 ## 4. Done when
 
