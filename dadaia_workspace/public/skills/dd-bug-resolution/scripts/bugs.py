@@ -122,8 +122,13 @@ def _own(specs: Path, paths: set[str]) -> set[str]:
     """The paths a fix writes: not tests (metric 6), not specs, not a file `.gitattributes`
     marks `dadaia-generated` (ADR 0183) — one predicate for the blame and the direction."""
     top = _git(specs, "rev-parse", "--show-toplevel").strip()
-    out = _git(top, "check-attr", "--stdin", "dadaia-generated", stdin="\n".join(paths))
-    generated = {path for path, _, value in (ln.rsplit(": ", 2) for ln in out.splitlines()) if value in ("set", "true")}  # fmt: skip
+    # -z: NUL never meets Windows' text-mode \n -> \r\n stdin translation, nor path quoting
+    out = _git(
+        top, "check-attr", "-z", "--stdin", "dadaia-generated", stdin="\0".join(paths)
+    ).split("\0")
+    generated = {
+        path for path, value in zip(out[0::3], out[2::3], strict=False) if value in ("set", "true")
+    }
     return {p for p in paths if not p.startswith(_NOT_PRODUCTION)} - generated
 
 
