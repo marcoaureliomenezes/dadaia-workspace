@@ -12,6 +12,10 @@ _Avoid_: root (bare), instance root, ws dir
 One checked-out repository under `repos/<repo_slug>/`. Its path is the `repo_root`.
 _Avoid_: project, root
 
+**Evals repo**:
+An associated repo whose one role is to measure agent behaviour against the distribution its context ships; the only repo whose CI may call a model API, under `dd-gitflow-default` §3b.
+_Avoid_: eval harness, benchmark repo
+
 **Context**:
 One `specs/` tree governed by the law — the workspace's own or a repo's — registered under a `context_name`, living at `specs_dir`.
 _Avoid_: spec context project, registry row, slug (for the name)
