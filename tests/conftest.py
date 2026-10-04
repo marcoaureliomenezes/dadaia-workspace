@@ -35,6 +35,7 @@ Session-level pollution guard (_session_root_pollution_guard):
 from __future__ import annotations
 
 import os
+import shutil
 import sys
 import tempfile
 from collections.abc import Iterator, Sequence
@@ -115,7 +116,10 @@ _GIT_GLOBAL = _publish(
     "dadaia-tests", f"{GIT_QUIET_INCLUDE}[user]\n\tname = T\n\temail = t@example.invalid\n"
 )
 os.environ["GIT_CONFIG_GLOBAL"] = str(_GIT_GLOBAL)
-_PARENT_CACHE = Path(os.environ.get("HOME", Path.home())) / ".cache"
+# The parent's home, read once per process tree: a repeated in-process session and an
+# xdist worker both inherit it, never a home an earlier session pinned.
+os.environ.setdefault("TESTS_PARENT_HOME", str(Path.home()))
+_PARENT_CACHE = Path(os.environ["TESTS_PARENT_HOME"]) / ".cache"
 
 
 def _instance_fingerprint() -> dict[str, object]:
@@ -435,6 +439,7 @@ def _repo_root_write_guard() -> object:
 _PREEXISTING_POLLUTION: set[str] = set()
 _INSTANCE_AT_START: dict[str, object] = {}
 _OUTSIDE_TMP_AT_START: set[str] = set()
+_CHILD_HOME: list[Path] = []  # this process's pinned home (controller and each worker)
 
 
 # ponytail: top-level .cache entries only; a write inside an existing ~/.cache/pip is unseen.
@@ -450,6 +455,17 @@ def _outside_tmp() -> set[str]:
     )
 
 
+def pytest_configure(config: pytest.Config) -> None:
+    """Before collection, every child and in-process ``Path.home()`` see a tmp home."""
+    _CHILD_HOME[:] = [Path(tempfile.mkdtemp(prefix="dadaia-test-home-"))]
+    pin_child_env(_CHILD_HOME[0])
+
+
+def pytest_unconfigure(config: pytest.Config) -> None:
+    for home in _CHILD_HOME:
+        shutil.rmtree(home, ignore_errors=True)
+
+
 def pytest_sessionstart(session: pytest.Session) -> None:
     """Record which pollution dirs already existed before any test ran."""
     _PREEXISTING_POLLUTION.clear()
@@ -458,9 +474,6 @@ def pytest_sessionstart(session: pytest.Session) -> None:
     _INSTANCE_AT_START.update(_instance_fingerprint())
     _OUTSIDE_TMP_AT_START.clear()
     _OUTSIDE_TMP_AT_START.update(_outside_tmp())
-    home = session.config._tmp_path_factory.getbasetemp() / "home"  # type: ignore[attr-defined]
-    home.mkdir(exist_ok=True)
-    pin_child_env(home)
 
 
 def pytest_sessionfinish(session: pytest.Session, exitstatus: int) -> None:
@@ -484,7 +497,7 @@ def pytest_sessionfinish(session: pytest.Session, exitstatus: int) -> None:
         )
         session.exitstatus = 1
     gained = sorted(_outside_tmp() - _OUTSIDE_TMP_AT_START)
-    if gained or Path.home() == _PARENT_CACHE.parent:
+    if gained or (_CHILD_HOME and Path.home() != _CHILD_HOME[0]):
         print(f"\n\n[OUTSIDE TMP] home {Path.home()}; gained: {gained}")  # noqa: T201
         session.exitstatus = 1
     offenders = [

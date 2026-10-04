@@ -501,6 +501,7 @@ class VenvPythonEnvironmentManager:
         return subprocess.run(
             [
                 self.python_executable(workspace_root),
+                "-B",  # this probe writes no .pyc into an editable install's checkout
                 "-c",
                 f"{inspect.getsource(build_digest)}"
                 "import dadaia_workspace, importlib.metadata as m\n"
