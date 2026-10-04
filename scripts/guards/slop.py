@@ -307,7 +307,7 @@ def doctor_section_subset(tree: Tree) -> list[str]:
     sections = {
         getattr(n.value, "value", "") for n in found if getattr(n.targets[0], "id", "") == "SECTION"
     }
-    out = []
+    out = [] if len(sections) >= 2 else [f"no-sections: {len(sections)} SECTION constants, < 2"]
     for rel, module in modules.items():
         for n in ast.walk(module):
             named = {getattr(e, "value", "") for e in getattr(n, "elts", [])}
@@ -614,7 +614,9 @@ _PLANTS: dict[str, dict[str, Plant]] = {
         **_rows("v39", "zz-unknown"),
     },
     "v40": {},
-    "doctor-section-subset": {},
+    "doctor-section-subset": {
+        "no-sections": _plant(lambda r: (r / PKG / "zz/near2.py").write_text(""))
+    },
     "ignore-cap": {
         "edge-cap": _cfg(lambda t, e: t.replace(e, f"{e}\n    {_EDGE}", 1)),
         "off-family": _cfg(
