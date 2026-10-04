@@ -1,7 +1,7 @@
 ---
 slug: QUALITY
 title: quality-assurance
-tldr: The measured quality principles, the test architecture (tiers, intent, flake and quarantine policy) and the CI gate set with its slop ratchets.
+tldr: The measured quality principles, the test architecture (tiers, flake and quarantine policy) and the CI gate set with its slop ratchets.
 summary: Canonical memory — statements and laws of testing and quality; changed only in the commit that carries an accepted ADR.
 tags: [testing, pytest, ci, quality, test-architecture, flake, quarantine, privacy]
 ---
@@ -43,33 +43,28 @@ Rationale: a CI job that needs a paid model key fails closed on every PR without
 - Size tiers: unit and contract SMALL, integration MEDIUM, E2E LARGE (Python journeys), live Codex-binary validation opt-in outside CI.
 - The suite is hermetic; `tests/conftest.py` blocks a real Codex call without its live flag and fakes `ensure_workspace_venv`.
 - `tests/conftest.py` prepends this checkout to `PYTHONPATH` once for the whole session, so every spawned CLI/hook subprocess imports the worktree under test, never the venv's installed package.
-- Every suite ratchet enumerates the same set — `tests/helpers/suite_files.tracked_test_files()` over `git ls-files -- tests` — so scratch files a concurrent xdist worker writes are outside the measurement by construction.
-- Module docstrings declare `Intent: <KIND> — <ref>` over CONTRACT, SENTINEL, SCAFFOLD and QUARANTINE; an undeclared test is SCAFFOLD, and intent is never a marker.
+- Every guard check enumerates one set — `scripts/guards/run.py`'s `tracked()` over `git ls-files` — so a scratch file another process writes is outside the measurement by construction.
 - Output naming a foreign Spec Context is `--redact`ed before entering evidence.
 
 - `flaky` marks a pass-and-fail on identical code; `quarantine` leaves every gating selector, is bug-gated by P-22, and the lane is empty.
-- Quarantine cap, escalation clock, diagnostic reruns, flake-rate target and the LARGE cap have one home each in `dd-test-stewardship`'s `PARAMETERS.md`.
-- The structural audit fires when a `PARAMETERS.md` ceiling is crossed — flake rate, LARGE count, quarantine cap, and the per-job wall-clock budget frozen by ADR 0119 (growth past it is a budget breach).
-- Every LARGE test carries a demotion, supersession or keep-justification, and the tree misses the LARGE cap.
 - Curation is a `code-reviewer` verdict (QA lens); `software-engineer` executes.
-- Mutation testing runs once per release off the push path (`mutmut==3.7.0`); its score is evidence, never a gate, and the `core/models/` score ratchets upward only.
 
 ## Gates
 
-- CI runs the preflight ladder plus cross-OS subsets, integration, Python E2E, repo hygiene, `dadaia doctor` over the checked-out tree, PR governance and gitleaks — every job a required status check on `develop`, gitleaks included; no job calls a model API (P-33).
-- Push triggers are `main`, `develop` and `feature/**`; PRs to `develop` or `main` run the same matrix as the local preflight.
+- CI runs ruff and `lint-imports`, mypy `--strict`, the guards (`scripts/guards/run.py`, plain and `--planted`), unit and contract tiers with Windows/macOS subsets and an importability smoke, integration, Python E2E, repo hygiene, `dadaia doctor` over the checked-out tree, PR governance and gitleaks — every PR job a required status check listed in `.github/required-checks.json` (`required-checks-listed`), gitleaks included; no job calls a model API (P-33).
+- Push triggers are `main`, `develop` and `feature/**`; PRs to `develop` or `main` run the same matrix.
 - `pr-source-guard` is fail-closed; the security review of both PR edges is the `dd-code-reviewer` security lens on the PR head, run by the main thread before the PR.
 - Every review verdict states the bug-surface delta from `bugs.py stats`, and no deploy is approved without the consumer-side matrix.
-- Caches redirect by configuration, never by a remembered flag: `[tool.pytest.ini_options] addopts` (`-p no:cacheprovider`), `[tool.ruff] cache-dir` and `[tool.mypy] cache_dir` (`../../.dadaia/tmp/<tool>-cache`, relative on every OS), hypothesis `database = None`; a bare `pytest`, `ruff check`, `ruff format --check`, `mypy --strict` from the repo root leaves the tree clean (`tests/unit/features/ci_preflight/test_no_pollution.py`), so `dadaia ci preflight` runs exactly the bare commands.
-- The forbidden repo-local set is `core/workspace_layout.REPO_TREE_EXCLUDED`, measured by `tests/contract/test_source_repo_hygiene.py` and swept at every ALIVE repo by `dadaia doctor`.
+- Caches redirect by configuration, never by a remembered flag: `[tool.pytest.ini_options] addopts` (`-p no:cacheprovider`), hypothesis `database = None`, and ruff and mypy write to the absolute `.dadaia/tmp/<tool>-cache` that every harness env exports (`workspace_layout.TOOL_CACHE_ENV`); a bare `pytest`, `ruff check`, `ruff format --check`, `mypy --strict` from any cwd leaves the tree clean (`tests/integration/test_tool_caches_stay_in_the_tmp_zone.py`).
+- The forbidden repo-local set is `core/workspace_layout.REPO_TREE_EXCLUDED`, measured here by `ci.yml`'s `repo-hygiene` job and swept at every ALIVE repo by `dadaia doctor`.
 - Memory-vs-code drift is a `dadaia doctor` `specs`-section WARNING (`MEM-DRIFT-1` for the features package map, `MEM-DRIFT-2` for a dead `dadaia <verb>` or path an atom cites), never a push-gated test: a package added or a verb deleted mid-implementation is memory drift to fix at the next closure, not a red build.
 - A citation of a superseded decision is an ERROR (`ADR-SUPERSEDED-CITATION`): a rule pointing at a dead ADR fails the build.
 - A doctor fix is proven on the executed path: `tests/integration/test_doctor_fix_lines_clear_their_finding.py` executes every specs rule's fix line against a planted finding and re-runs the rule, which must then emit nothing, never the fixer's return value; the `ledgers` section delegates to each ledger's skill script (`tests/integration/test_doctor_ledgers_delegate_to_scripts.py`); a schema drop ships with its repair and its test in the same change.
 - The closed pytest marker set is eight — unit, contract, integration, e2e, slow, tmp, flaky, quarantine (P-28).
-- `ci.yml`'s `doctor` (Compliance) job fetches full history, because the CLOSURE memory-window check diffs git history (`tests/contract/test_ci_workflow_hygiene.py`); every other `ci.yml` job checks out at the default depth; `release.yml` and `secret-scan.yml` fetch full history; no job fetches history for a bug record's sake.
+- Every `ci.yml` checkout fetches full history (`ci-checkout-history`); `release.yml`'s build and `secret-scan.yml` fetch full history; no job fetches history for a bug record's sake.
 
-- Repo-pure ratchets move only downward. `tests/contract/test_test_suite_ratchets.py` holds V26 (private-symbol imports, P-23), V28 (an `Intent: SCAFFOLD` test names a release not yet archived), V29 (the LARGE cap has one literal source) and V31 (intent-less test files per tier); `tests/contract/test_slop_ratchets.py` holds V32 (governance ids in production comments and docstrings) and V33 (`PREFIX-NN` families without a mechanical reader) as pinned counts, V37 (one home per definition), V38 (deletes only in `features/spec_context/sweep.py`) and V39 (every doctor code has a fix-clears case) as keyed allowances whose keys stay within their birth keys, and V40 (every JSONL ledger read through the one reader) at zero; no SPEC, PLAN or TASKS byte ratchet exists (`SPEC-DOC-005` is advisory).
-- The derived-docs contract sits beside the ratchets: `tests/contract/test_docs_derived_from_memory.py` (P-29) checks every `<!-- derived-from: <slug> sha256:<12 hex> -->` marker's slug and hash over `README.md`, `llms.txt` and `docs/*.md`, the `docs/cli.md` body against `render_digest()`, the 10 KB README budget, the one tagline across `README.md`, `pyproject.toml` and `llms.txt`, the five `[tool.poetry.urls]` keys, and runs `dead_citations` over the same set; a red row is closure work — after the memory merge, in an `impl` worktree (the `release` kind holds no `docs/`), re-read the atom, re-derive the section and re-record the hash (`dd-release-implementation` MEMORY-UPDATE).
+- Repo-pure ratchets move only downward and run as `scripts/guards/run.py` checks: `suite.py` holds `private-import-ratchet` (V26, P-23); `slop.py` holds V32 (governance ids in production comments and docstrings), V33 (`PREFIX-NN` families without a mechanical reader) and `ignore-cap` (suppressed layering edges, P-10) as pinned counts, V37 (one home per definition), V38 (deletes only in `features/spec_context/sweep.py`) and V39 (every doctor code has a fix-clears case) as keyed allowances whose keys stay within their birth keys, and V40 (every JSONL ledger read through the one reader) at zero; no check pins a file's line or byte count (`no-size-pin`, ADR 0143).
+- The derived-docs contract `tests/contract/test_docs_derived_from_memory.py` (P-29) checks every `<!-- derived-from: <slug> sha256:<12 hex> -->` marker's slug and hash over `README.md`, `llms.txt` and `docs/*.md`, the `docs/cli.md` body against `render_digest()`, the one tagline across `README.md`, `pyproject.toml` and `llms.txt`, the five `[tool.poetry.urls]` keys, and runs `dead_citations` over the same set; a red row is closure work — after the memory merge, in an `impl` worktree (the `release` kind holds no `docs/`), re-read the atom, re-derive the section and re-record the hash (`dd-release-implementation` MEMORY-UPDATE).
 - Stale handoffs and scratch are a closure readout, never a ratchet: `dd-release-implementation` RC-FLOW step 8 runs `dadaia doctor` dry, then `dadaia doctor --fix` (slop moved to `reaped/`, expired entries deleted), and the `kind: artifact-gc` log entry records the `compliance(total)` line and what the reaper holds.
 - `dd-audit-project` pillar 2 re-measures the ratchets over the audit window and applies `dd-code-review` SLOP.md S1–S10 to a commit sample; the fixed law sections are kept byte-exact by `dadaia doctor` FIXED-1/2.
 
