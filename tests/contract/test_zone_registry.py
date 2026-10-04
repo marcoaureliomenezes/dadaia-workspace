@@ -48,7 +48,6 @@ from dadaia_workspace.infrastructure.public_assets import (
     FileSystemPublicAssetManager,
     render_registry_tables,
 )
-from tests.contract.test_slop_ratchets import _allowance_violations
 from tests.helpers.scan_population import assert_populated
 
 pytestmark = pytest.mark.contract
@@ -115,7 +114,7 @@ _SET_HOME: dict[str, str] = {
 }
 
 #: AC6.5 allowance for the widened sets (birth keys pinned at T-050-135): each second list,
-#: keyed ``file`` -> the open bug that deletes it.
+#: keyed ``file`` -> ``parity:<test file>``, the test proving its set.
 _SECOND_LIST_BIRTH = frozenset(  # its keys at T-050-135; the allowance only shrinks
     {
         "dadaia_workspace/public/skills/dd-audit-project/scripts/_audit_check.py",
@@ -133,6 +132,22 @@ _SECOND_LIST_ALLOWANCE: dict[str, str] = {
         "parity:tests/unit/features/specs/test_release_tree.py"
     ),
 }
+
+
+def _allowance_violations(
+    hits: set[str], allowance: dict[str, str], *, birth: frozenset[str]
+) -> list[str]:
+    """Unlisted hits, stale keys, a value naming no test file, keys absent at birth."""
+    problems = [f"unlisted: {hit}" for hit in sorted(hits - allowance.keys())]
+    problems += [f"stale key (delete it): {key}" for key in sorted(allowance.keys() - hits)]
+    problems += [
+        f"{key} -> {value!r} names no test file"
+        for key, value in sorted(allowance.items())
+        if not value.startswith("parity:")
+        or not (_REPO_ROOT / value.removeprefix("parity:")).is_file()
+    ]
+    return problems + [f"absent at birth: {key}" for key in sorted(allowance.keys() - birth)]
+
 
 #: Literals whose names coincide with a canonical set by accident, not by restatement,
 #: each with the evidence that it is not a canon list. An entry whose file no longer

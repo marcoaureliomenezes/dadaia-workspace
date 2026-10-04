@@ -49,7 +49,7 @@ _HELP = {
     "check": "validate every BUGS.jsonl record",
     "fix": "derive each resolved record's fix commit, numstat and direction",
 }
-#: Shapes 3 and 4 share one id list; shape 4 names its task commit(s) as `(<sha>[, <sha>])` (ADR 0164 (1)).
+#: Shapes 3 and 4 share one id list; shape 4 names its task commit(s) as `(<sha>[, <sha>])`.
 _SHAPE = re.compile(r"@(\w+) (fix\(bugs\): |chore\(bugs\): resolve )(.+?) — (.*)$")
 _TASK_SHAS = re.compile(r"\((\w+(?:, \w+)*)\)$")
 #: Never a fix's own lines: tests (metric 6) and specs; `_own` adds the generated files.
@@ -120,7 +120,7 @@ def _git(cwd: Path | str, *argv: str, stdin: str | None = None) -> str:
 
 def _own(specs: Path, paths: set[str]) -> set[str]:
     """The paths a fix writes: not tests (metric 6), not specs, not a file `.gitattributes`
-    marks `dadaia-generated` (ADR 0183) — one predicate for the blame and the direction."""
+    marks `dadaia-generated` — one predicate for the blame and the direction."""
     top = _git(specs, "rev-parse", "--show-toplevel").strip()
     # -z: NUL never meets Windows' text-mode \n -> \r\n stdin translation, nor path quoting
     out = _git(top, "check-attr", "-z", "--stdin", "dadaia-generated", stdin="\0".join(paths)).split("\0")  # fmt: skip
@@ -130,7 +130,7 @@ def _own(specs: Path, paths: set[str]) -> set[str]:
 
 def _candidates(specs: Path, bug_id: str) -> list[str]:
     """The bugs whose fix wrote a line the staged diff removes: `git blame` past `(#n)`-subject
-    squashes and `refactor(T-…)` commits, over `_own` paths only (ADR 0164 (2))."""
+    squashes and `refactor(T-…)` commits, over `_own` paths only."""
     fixes, blamed = _fixes(specs), set[str]()
     if not fixes:
         return []

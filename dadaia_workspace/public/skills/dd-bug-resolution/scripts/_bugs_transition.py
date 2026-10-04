@@ -33,7 +33,7 @@ def transition(
     """The ONE way a record reaches a terminal status. Every field the verb requires is
     checked first and every problem named at once; the record is untouched on refusal.
     `resolve`'s `caused_by` is one of the blame *candidates*, or `none` when there are none,
-    unless a `lineage_reason` says why not (ADR 0164 (2))."""
+    unless a `lineage_reason` says why not."""
     missing = [name for name in REQUIRED_BY_VERB[verb] if not (values.get(name) or "").strip()]
     if missing:
         raise choice(Refusal(f"transition {verb!r} refused — {', '.join(map(repr, missing))} required"),

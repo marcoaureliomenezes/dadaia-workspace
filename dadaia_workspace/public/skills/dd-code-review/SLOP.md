@@ -13,7 +13,7 @@ labelled judgement call with the command that makes it verifiable in the diff.
 | S3 | Test slop: tautology, own-module mock, tombstone | §Tests below, one check each | HIGH (b); MEDIUM (c, d) | Literal from an independent source; mock at the frontier; delete at closure |
 | S4 | Stub, unread parameter, port with one adapter | `grep -nE 'NotImplementedError\|^\s+pass$'`; ruff `ARG`; a Protocol with one implementer | HIGH | Delete until the second caller appears |
 | S5 | Layer over the old path; a second path | `--stat` adds only; `_v2\|_legacy\|_old`; `if legacy`; a swallowing `try/except`; a wrapper that delegates | HIGH (bug-surface) | Replace, don't layer; delete the old path in the same diff |
-| S6 | Codes outside FR/AC/T- | the V33 family token of `tests/contract/test_slop_ratchets.py`, families outside FR/AC/T-; SPEC/TASKS size is a recommendation, never a finding (`specs/releases/AGENTS.md`) | MEDIUM | Rename to glossary terms |
+| S6 | Codes outside FR/AC/T- | the V33 family check of `scripts/guards/slop.py`, families outside FR/AC/T-; SPEC/TASKS size is a recommendation, never a finding (`specs/releases/AGENTS.md`) | MEDIUM | Rename to glossary terms |
 | S7 | Acronym or generic name | a term outside the repo's `CONTEXT.md`; `Manager\|Helper\|Utils\|data\|result\|temp` in a new name | LOW | A domain name |
 | S8 | File outside the canon | `git diff --name-status \| grep '^A'` against the root whitelist, the specs canon, the `.dadaia/` canon; `*.bak`, `SUMMARY.md`, `NOTES.md`; `find .dadaia/handoff -mtime +1` | HIGH | Delete, or move to its home |
 | S9 | Commit outside the §3a shapes; surviving branch | `git log --stat` against `dd-gitflow-default` §3a; `git branch -r --merged` | MEDIUM | Rewrite the series before the push; tag and delete |

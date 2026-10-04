@@ -44,7 +44,7 @@ Also input: `.dadaia/.venv/bin/dadaia doctor` against every release the window t
 Input: the ratchet modules and the window `from-sha..HEAD`. Output: the "Slop readout" table in `AUDIT.md`
 (ratchet, baseline, HEAD, trend, verdict). Definition and signals: `dd-code-review`'s `SLOP.md`.
 
-1. Run `pytest tests/contract/test_slop_ratchets.py tests/contract/test_test_suite_ratchets.py`; record each count beside its pinned ceiling.
+1. Run the repo's own ratchet checks; record each count beside its ceiling.
 2. Trend each ratchet over the window: the count at the from-sha against HEAD, read-only: `git archive <from-sha>` under `.dadaia/tmp/<agent>/<YYYYMMDD>/` or `git show <sha>:<path>` — never a worktree or a stash.
 3. Read the density of every SPEC in the window: bytes, words, codes per 1,000 words, numbered families outside FR/AC/T-.
 4. Read the GC: each closure's recorded `.dadaia/.venv/bin/dadaia doctor` score line, `archive/` tags whose branch survives.
