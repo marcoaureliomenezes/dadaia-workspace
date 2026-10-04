@@ -15,7 +15,10 @@
   - Q10, a free-text demand (handoff finding 10): audit the instruction corpus with a private command. Q11 "Aprovar como desenhado (Recommended)".
   - Q12 "rc-8 nos arquivos que ele já toca; resto no rc-10 (Recommended)". Q13 "Motivo curto só nas proibições (Recommended)". Q14 "Positivo por padrão; proibição só com falha real (Recommended)".
   - Q15 "Merge na lib; hooks 2 e 3 privados (Recommended)". Q16 "Recusa com fix: declarar (Recommended)". Q17 "Reescrever (Recommended)" (a private rule, outside the library).
+  - Q18 "Prospectivo + exceções (Recommended)". Q19 "Manter a 0168 (Recommended)". Q20 "Shape refactor(T-NNN): REBUILD (Recommended)".
+  - Q21 "Parada até os REBUILDs (Recommended)". Q22 "Auditar sweep + registrar o guard (Recommended)"; the `sweep.py` audit runs read-only, outside this SPEC.
   - Earlier, for the `-B` provider probe (AC10.1): "Part of 169 (Recommended)".
+  - Main thread, 2026-10-04: ff5245e08 gets its own retro record (AC12.4 row 19); Q13, the newer ruling, amends `AUTHORING.md` rule 9 here (AC12.11).
 - Bug history read (permanent architecture review): PLAN §1, the as-is review; for W12, the audit above.
 - Left out: `dependabot-pyjwt-open-on-main`, closing at the ship (rc-12); `removals-shipped-without-recorded-authority`, rejected (Q5).
 
@@ -54,7 +57,7 @@
   - Amendment (AskUserQuestion, 2026-10-04): "Run pytest with -B (Recommended)" (AC10.1).
   - Amendment (AskUserQuestion, 2026-10-04): "Global test setup (Recommended)" (AC10.1; T-050-169 uses `tests/conftest.py`'s session env, not a per-test env builder).
 - Order (root map §1): AC8.9; the rest of W8; W9; W10, after AC9.3 and AC8.1's `Intent:` strip. Width: the PLAN's Parallel schedule (0149). From 2026-10-04, W12's order (Q5) governs every open task.
-- W12 (amendment 2026-10-04): two new ADRs, proposed in the release worktree: the merge ADR (AC12.7; its ruling Q7's words) and the bug-loop law ADR (AC12.1–AC12.3, AC12.6's reviewer line, AC12.11; its ruling Q1, Q2, Q12–Q14's words). 0172 is ruled by Q8's words (AC12.8). The main thread writes every acceptance.
+- W12 (amendment 2026-10-04): two new ADRs, proposed in the release worktree: the merge ADR (AC12.7; its ruling Q7's and Q19's words; 0168 cited as standing) and the bug-loop law ADR (AC12.1–AC12.3, AC12.6's reviewer line, AC12.11, AC12.12; its ruling Q1, Q2, Q12–Q14, Q18 and Q20's words). 0172 is ruled by Q8's words (AC12.8). The main thread writes every acceptance.
 - W11 (amendment, operator 2026-10-03, AskUserQuestion, verbatim):
   - Fold (grill 170932Z): "fold into rc-8. make sure to define that it can surely be implemented in parallel ... because it's on other repo".
   - Q-W0: "Yes, only that slice (Recommended)". AC11.0 carries only "an associated repo's impl reads the main repo's Approved trio" of proposed 0174; the rest stays rc-11's.
@@ -264,36 +267,39 @@ After AC9.3 and AC8.1's `Intent:` strip merge. Each RED is a behaviour assert in
 
 - Not in scope: gate 2 (a red work branch takes only a revert or a registered bug) and gate 3 (a `fix(...)` commit keeps old asserts) are private developer hooks (Q15), outside the library.
 - AC12.1 A break a merged fix caused is a bug (Q1): `specs/bugs/AGENTS.md` §1's "own mistake" exclusion covers only unmerged rework inside a worktree; a break an already-merged fix caused is registered with `caused_by` (source `pub/scaffold/bugs/AGENTS.md`).
-- AC12.2 One fix-induced bug triggers a REBUILD at once (Q2), in `LINEAGE.md`:
+- AC12.2 One fix-induced bug triggers a REBUILD at once (Q2), going forward (Q18), in `LINEAGE.md`:
   - A REBUILD reverts the culprit commits, then lands the smallest correct redo; never a large rewrite, since larger fixes induce more bugs (audit, research).
   - Work in flight on that unit stops until the REBUILD lands; the ≥ 2 prior fixes trigger stays.
   - Observable: the REBUILD's range holds a `git revert` of each culprit before the redo, and its body's `rebuild:` line names them.
 - AC12.3 A red a merged fix caused is Arm B (Q1, Q2): `dd-release-implementation` §2a routes it to registration, revert and redo (AC12.2), never a follow-up commit; a flaky red is quarantined with a bug. Measured by the next audit's `PILLAR-BUGS` readout.
-- AC12.4 The hidden breaks are registered (Q3, Q9), after AC9.3's task-id half merges:
-  - One `chore(bugs): report …` commit appends the 18 below with their true `caused_by`; a `bugs.py update` repairs `dead-holds-main-repo-before-associated-push` to `caused_by: sa-context-dead-removes-repos-outside-the-reaper`.
-  - Rows 10, 13 and 14–17 stay open until the AC redoing their cause lands (AC12.9, AC12.10, AC10.1) and resolve by its commit; the other twelve: Open questions.
-  - Check: `bugs.py status` lists the 18; `bugs.py check` is clean.
+- AC12.4 The hidden breaks are registered (Q3, Q9, Q18, Q22), after AC9.3's task-id half merges:
+  - One `chore(bugs): report …` commit appends the 20 below with their true `caused_by`; a `bugs.py update` repairs `dead-holds-main-repo-before-associated-push` to `caused_by: sa-context-dead-removes-repos-outside-the-reaper`.
+  - A row naming a sha resolves by that already-landed repair (shape 4); a row naming an AC stays open until it lands and resolves by its commit.
+  - Row 20's fix: the hook-stdin guard turns red on a planted raw `sys.stdin` assignment.
+  - Check: `bugs.py status` lists the 20; `bugs.py check` is clean.
 
-| # | slug | sev | `caused_by` |
-|---|---|---|---|
-| 1 | `bootstrap-e2e-closure-walk-ignores-requirement-markers` | LOW | `none`, reason ff5245e08 (no id) |
-| 2 | `gate-path-purity-test-premise-died-with-t097` | LOW | `T-050-97` |
-| 3 | `gate-path-purity-child-env-drops-pythonpath` | MEDIUM | `T-050-97` |
-| 4 | `dadaiaignore-doctor-breaks-bind-resolution-import-contract` | MEDIUM | `T-050-116` |
-| 5 | `help-quality-mask-misses-folded-venv-path-on-ci` | LOW | `T-050-145` |
-| 6 | `sweep-remove-misses-oserror-on-python-3-14` | MEDIUM | `T-050-146` |
-| 7 | `host-shell-cmd-test-escapes-fix-line-quotes` | LOW | `T-050-149` |
-| 8 | `windows-quoted-fix-left-behavior-map-hash-stale` | LOW | `windows-quoted-executable-fix-not-runnable-in-powershell` |
-| 9 | `bugs-fix-nonrepo-test-not-portable` | LOW | `T-050-167` |
-| 10 | `t168-canon-change-without-stamp-bump` | MEDIUM | `T-050-168` |
-| 11 | `bugs-own-check-attr-keeps-cr-on-windows` | MEDIUM | `T-050-168` |
-| 12 | `blame-refusal-test-asserts-a-posix-fix-line` | LOW | `T-050-168` |
-| 13 | `doctor-stub-drifts-from-doctorservice-signature` | LOW | `onboarding-next-step-names-another-context` |
-| 14 | `outside-tmp-home-pin-coupled-to-session-hooks` | MEDIUM | `test-suite-writes-outside-tmp` |
-| 15 | `workspace-venv-probe-writes-bytecode-into-editable-checkout` | LOW | `test-suite-writes-outside-tmp` |
-| 16 | `heartbeat-test-drives-hook-in-process` | LOW | `suite-fails-under-an-operator-dadaia-context` |
-| 17 | `operator-env-scrub-row-leaves-stale-pinned-home` | MEDIUM | `suite-fails-under-an-operator-dadaia-context` |
-| 18 | `t151-fix-line-tests-compare-os-separator-paths` | LOW | `T-050-151` |
+| # | slug | sev | `caused_by` | resolution |
+|---|---|---|---|---|
+| 1 | `bootstrap-e2e-closure-walk-ignores-requirement-markers` | LOW | `bootstrap-e2e-mirror-seeded-from-stale-editable-metadata` | ef7262879 |
+| 2 | `gate-path-purity-test-premise-died-with-t097` | LOW | `T-050-97` | 23d678b4f |
+| 3 | `gate-path-purity-child-env-drops-pythonpath` | MEDIUM | `T-050-97` | e06583a46 |
+| 4 | `dadaiaignore-doctor-breaks-bind-resolution-import-contract` | MEDIUM | `T-050-116` | a34f3b738 |
+| 5 | `help-quality-mask-misses-folded-venv-path-on-ci` | LOW | `T-050-145` | c370b0c3a, bf5ffde97 |
+| 6 | `sweep-remove-misses-oserror-on-python-3-14` | MEDIUM | `T-050-146` | b9b28202d |
+| 7 | `host-shell-cmd-test-escapes-fix-line-quotes` | LOW | `T-050-149` | 013c37d0d |
+| 8 | `windows-quoted-fix-left-behavior-map-hash-stale` | LOW | `windows-quoted-executable-fix-not-runnable-in-powershell` | 582535466 |
+| 9 | `bugs-fix-nonrepo-test-not-portable` | LOW | `T-050-167` | f6d04aa56 |
+| 10 | `t168-canon-change-without-stamp-bump` | MEDIUM | `T-050-168` | AC12.9 |
+| 11 | `bugs-own-check-attr-keeps-cr-on-windows` | MEDIUM | `T-050-168` | d66e50c66 |
+| 12 | `blame-refusal-test-asserts-a-posix-fix-line` | LOW | `T-050-168` | 7196e1473 |
+| 13 | `doctor-stub-drifts-from-doctorservice-signature` | LOW | `onboarding-next-step-names-another-context` | AC12.10 |
+| 14 | `outside-tmp-home-pin-coupled-to-session-hooks` | MEDIUM | `test-suite-writes-outside-tmp` | AC10.1 |
+| 15 | `workspace-venv-probe-writes-bytecode-into-editable-checkout` | LOW | `test-suite-writes-outside-tmp` | AC10.1 |
+| 16 | `heartbeat-test-drives-hook-in-process` | LOW | `suite-fails-under-an-operator-dadaia-context` | AC10.1 |
+| 17 | `operator-env-scrub-row-leaves-stale-pinned-home` | MEDIUM | `suite-fails-under-an-operator-dadaia-context` | AC10.1 |
+| 18 | `t151-fix-line-tests-compare-os-separator-paths` | LOW | `T-050-151` | b78e8fd68, c0b9989de |
+| 19 | `bootstrap-e2e-mirror-seeded-from-stale-editable-metadata` | LOW | `none` | ff5245e08 |
+| 20 | `hook-stdin-guard-misses-raw-assignment` | LOW | from `resolve`'s blame | the guard fix above |
 
 - AC12.5 `worktree.py merge` lands only a verified HEAD (Q6 gate 1, Q15, Q16):
   - Every kind: `merge` runs the repo's declared verification command inside the worktree, at the HEAD it lands, before the fast-forward; a non-zero exit lands nothing and leaves the work branch and the tree unchanged.
@@ -305,11 +311,12 @@ After AC9.3 and AC8.1's `Intent:` strip merge. Each RED is a behaviour assert in
   - pytest runs with at most `-n 2`, in random order (`pytest-randomly` on).
   - It prints each step's verdict and exits non-zero when any step fails. Case: a planted ruff violation, and a planted failing test, each turn it non-zero.
   - Every `dd-code-reviewer` verdict carries this script's output for its sha, and names Windows-only and macOS-only risk unverified; no output, no APPROVED (`dd-code-review`).
-- AC12.7 `worktree.py merge` never rewrites (REBUILD, audit surface 2a; Q7):
+- AC12.7 `worktree.py merge` never rewrites (REBUILD, audit surface 2a; Q7, Q19):
   - `merge` lands exactly the approved HEAD by fast-forward; when the work branch moved, it refuses with `fix: git -C <tree> rebase <work>` and changes nothing.
+  - The agent rebases inside the worktree; a patch-identical result keeps its verdict by 0168's deterministic check; any other change goes back to the reviewer.
   - Deleted: the in-merge rebase (820bee3b0's step), the TASKS-marker replay (36ce79d7d), the already-contains early return (1cfc3b72d), `_worktree_end.py`'s `sys.path` reach-in to `dd-release-implementation`; 0111's replay case leaves with it.
-  - The merge ADR amends `worktrees/AGENTS.md` §2 step 6 and 0111's TASKS clause; its ruling is Q7's words. `pub/data/worktrees-AGENTS.md` step 6 is rewritten citing it.
-  - Case: with the work branch moved, `merge` exits non-zero and both branches are unchanged; after the fix line and a verdict on the new HEAD, `merge` lands.
+  - The merge ADR amends `worktrees/AGENTS.md` §2 step 6 and 0111's TASKS clause and cites 0168 as standing; `pub/data/worktrees-AGENTS.md` step 6 is rewritten citing it.
+  - Cases: with the work branch moved, `merge` exits non-zero and both branches are unchanged; after the fix line, a patch-identical rebase lands under the old verdict, and one changing a patch refuses for review.
 - AC12.8 `context dead` never commits (REBUILD per 0172, audit surface 2b; Q8):
   - Deleted: `dead --commit`, `commit_all`, dead's untracked-consent, secret and identity refusals, 1ee8aa30f's secret-refusal hunk.
   - Kept: `unrecoverable()`'s stash count.
@@ -321,11 +328,15 @@ After AC9.3 and AC8.1's `Intent:` strip merge. Each RED is a behaviour assert in
   - Case: `test_a_canon_change_bumps_the_stamp` passes with its original assert and rule.
 - AC12.10 `_StubDoctor` leaves (audit; 2 repairs in 2 days): `tests/unit/cli/test_exitcode_truthfulness.py` drives the real `DoctorService` over a tmp workspace; its cases keep their expected exit codes.
 - AC12.11 The law files rc-8 rewrites meet one authoring bar (Q12–Q14):
-  - Files: `pub/scaffold/bugs/AGENTS.md`, `S/dd-bug-resolution/SKILL.md` and `LINEAGE.md`, `S/dd-gitflow-default/SKILL.md`, `pub/data/worktrees-AGENTS.md`, `S/dd-release-implementation/SKILL.md`, `S/dd-code-review/SKILL.md`; each rewritten once, in the task changing its law.
+  - Files: `pub/scaffold/bugs/AGENTS.md`, `S/dd-bug-resolution/SKILL.md` and `LINEAGE.md`, `S/dd-gitflow-default/SKILL.md`, `pub/data/worktrees-AGENTS.md`, `S/dd-release-implementation/SKILL.md`, `S/dd-code-review/SKILL.md`, `S/dd-ai-eng-knowhow/AUTHORING.md`; each rewritten once, in the task changing its law.
+  - `AUTHORING.md` rule 9: a prohibition carries a short reason or a bug or ADR id (Q13 supersedes its "provenance … never in the skill").
   - Bar: positive by default; a prohibition stays only with a demonstrated failure and its short reason (a bug or ADR id); one line per instruction.
   - Measured by the operator's private `/corpus-audit` (developer tooling, not product): 0 conflict, stale-ref and unprovenanced-prohibition findings on those files; `public stage`, `install`, `doctor` clean.
-- Order (Q5); every other open rc-8 task stays paused until step 3 lands:
-  1. The law and the lineage data: AC12.1–AC12.3, AC9.3's rewrite, then AC12.4.
+- AC12.12 A REBUILD has its own commit shape (Q20):
+  - `dd-gitflow-default` §3a: a REBUILD that deletes or replaces tests commits as `refactor(<task-id>): REBUILD <unit> — …`.
+  - `dd-code-review`: no APPROVED on a `refactor(...)` commit deleting tests without an approved REBUILD verdict in the SPEC.
+- Order (Q5); every other open rc-8 task, W11's lane included (Q21), stays paused until step 3 lands:
+  1. The law and the lineage data: AC12.1–AC12.3, AC12.12, AC9.3's rewrite, then AC12.4.
   2. Gate 1 and its script: AC12.5, AC12.6.
   3. The REBUILDs: AC10.1, AC12.7, AC12.8; then AC12.9, AC12.10.
   4. Only then the paused tasks: T-050-172 … T-050-181, T-050-185, T-050-186, T-050-188, T-050-189.
@@ -363,16 +374,13 @@ After AC9.3 and AC8.1's `Intent:` strip merge. Each RED is a behaviour assert in
 ## Carried — the 0.5.0 map (ADR 0140; one candidate at a time)
 
 - rc-9: the tests tree mirrors the package, except `tests/contract/test_docs_derived_from_memory.py`, which P-29 names, until check #7 rules; the unit tier spawns no processes, carrying rc-7's slow-class G4 growth (operator 2026-10-02: "Same-runner-class rule; slow-class growth to rc-8 (Recommended)", tied to `unit-tier-without-processes`); the production-faithful hook harness (0163); `worktree-rows-injected-not-monkeypatched`; `windows-integration-coverage-gap`; `repo-ci-sast`. With rc-8, they complete 0167. If pending at rc-8's closure (G6): T-050-183, T-050-187, T-050-188 (0177's accept) and T-050-189 (0180's), with `agent-behavior-evals` or AC10.14's law line.
-- rc-10: the rest of the instruction corpus to AC12.11's bar, `dd-ai-eng-knowhow/AUTHORING.md` included (Q12, Q13); `public-law-language-neutral`; `dd-ask-me-owned-questioning-skill`, delivering 0165 and `dd-ai-eng-knowhow/AUTHORING.md:134` ("asks the whole frontier at once"), caught by 0165's repaired `measured_by`; `adr-born-at-release-with-options`; `adr-ledger-triage-process-rules`; `architecture-adr-section-generated`; F088, F089, F139–F148.
+- rc-10: the rest of the instruction corpus to AC12.11's bar (Q12); `public-law-language-neutral`; `dd-ask-me-owned-questioning-skill`, delivering 0165 and `dd-ai-eng-knowhow/AUTHORING.md:134` ("asks the whole frontier at once"), caught by 0165's repaired `measured_by`; `adr-born-at-release-with-options`; `adr-ledger-triage-process-rules`; `architecture-adr-section-generated`; F088, F089, F139–F148.
 - rc-11: workspace replication (7 entries, ADRs 0171–0175, 0174 less AC11.0's slice); F084.
 - rc-12, the promote: docs site F109, clone detection F110, launch prep F111; the residue (`spec-context-refusals-print-prose`, `privacy-baseline-one-parser`, `ledger-refusals-guess-specs-from-command-shape`, `ledger-reader-one-numbered-tolerant-iterator`, `doctor-in-a-fresh-worktree-lacks-rendered-specs-law`, F060); memory drift F123–F127; bug metrics F001, F004, F005, F009 (re-measured over AC9.3's links); the publish gate F067; `test_docs_derived_from_memory.py` leaves pytest after check #7 rules, `meta-tests-leave-pytest` exits delivered then; the audit checks never run, F137; the removal-authority notes (F069); PyJWT, closing at the ship; the evals gate at the promote (0178): the promote PR head is evaluated and its run logged on the work branch before the merge; at `approve`, `git diff --name-only <evaluated>..<tag>` lists only `CHANGELOG.md`, `.release-please-manifest.json` and `pyproject.toml` (its version line), else `eval.yml` runs on the tag sha first and only a non-blocking verdict approves. Open, the operator's before the promote (F4): ADR 0122's zero active backlog against the four post-0.5.0 evals follow-ups, `evals-release-gate-status`, `evals-harness-lanes-and-benchmark`, `evals-windows-smoke` and `devin-subagent-projection`.
 
 ## Open questions for the operator
 
 - W12, to the main thread before approval:
-  1. 0168's patch-id carry: does a conflict-free, agent-side rebase keep the verdict, or does the merge ADR supersede 0168, so every rebase takes a fresh verdict and the reflog search leaves?
-  2. Rows 1–9, 11, 12 and 18 of AC12.4, whose cause no REBUILD here redoes: does Q2 apply retroactively (a REBUILD of T-050-97, -116, -145, -146, -149, -151, -167 and T-050-168's other hunks), or do they resolve citing their landed repair?
-  3. Row 1's culprit ff5245e08 has no bug or task id: is `none` with `--lineage-reason` its true `caused_by`?
-  4. W11's `dadaia-evals` lane (T-050-185, -186, -188) touches neither surface: paused with the rest, as written, or kept parallel?
-  5. `AUTHORING.md` rule 9 ("provenance and history live in git, never in the skill") contradicts Q13 until rc-10: move rules 8–9 into AC12.11?
+  1. AC9.3's blame skips `refactor(T-…)` commits, so a REBUILD's lines (AC12.12's shape) yield no `caused_by` candidates: keep the skip, or exempt `refactor(<task-id>): REBUILD`?
+  2. Q18's detail sets the REBUILD bar at 2 or more induced bugs on a unit; T-050-97 has two (AC12.4 rows 2, 3) and gets none here: exception, or a REBUILD?
 - None for W8–W11: the 2026-10-03 grill frontiers are empty. F4 is rc-12's (§Carried). Operator acts: 0176, 0177, 0178 and 0180's acceptances (§Decisions); W11's GitHub prerequisites (the `evals` environment, its secret, the required `ci.yml` job).
