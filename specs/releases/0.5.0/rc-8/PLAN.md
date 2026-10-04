@@ -335,10 +335,8 @@ As-is read at `wt/0.5.0b-release` 6b84527bc (= feature/0.5.0). Bug history: the 
 |---|---|---|---|
 | W1 | T-050-190 | 1 | impl; today's merge |
 | W2 | T-050-191 | 1 | impl; old merge code; R14 follows |
-| W3 | T-050-192, T-050-193 | 2 | impl each |
+| W3 | T-050-192; the text batch T-050-193, T-050-196, T-050-197, T-050-198 | 2 | 192 impl; the batch is one impl worktree opened beside T-050-191 (prepared ahead), one commit per task with 193's first, one review; its merge follows T-050-191 and R14 (`blocked by:` orders the merges) |
 | W4 | T-050-194, T-050-195 | 2 | impl each; R11 and R13 after both |
-| W5 | T-050-196, T-050-197 | 2 | impl each |
-| W6 | T-050-198 | 1 | impl |
 | W7 | T-050-199 | 1 | bug; ledger only |
 | W8 | T-050-200 | 1 | impl; alone (its `W:` spans the suite) |
 | W9 | T-050-201 | 1 | impl; then its rows' shape-4 tail |
@@ -348,6 +346,7 @@ As-is read at `wt/0.5.0b-release` 6b84527bc (= feature/0.5.0). Bug history: the 
 | W13 | T-050-207 | 1 | bug |
 | W14 | T-050-208 | 1 | bug |
 
+- Review method from T-050-192 on (operator 2026-10-04: "Revisor sem rodar a suíte inteira (Recommended)"): `worktree.py merge` runs `scripts/ci.py` on the exact HEAD (gate 1, T-050-191), so the reviewer runs the touched tests and the mutants, never the full suite; the full suite runs once in the engineer's worktree and once at the merge. The text batch (operator 2026-10-04: "Adiantar as tasks de texto (Recommended)") replaces W5 and W6.
 - Every `WT merge` now runs the full Linux suite (§6.3), so merges land one at a time. Two worktrees are open together only where their `W:` are disjoint except for the derived `behavior-map.json`/`shipped-hashes.json` and the ledgers.
 - Docker work (T-050-185, T-050-186 image builds) runs alone, with no other test-running agent, once the pause lifts. The paused tasks then follow §5 steps 7–10 at width ≤ 2.
 - Each REBUILD's AC rows resolve in one `bug` worktree after its merge (shape 4, `by T-050-NNN (<sha>)`): 200 → 14, 16, 17; 202 → 6, 21, 22, 23, 27; 203 → 10, 12; 204 → 13.
@@ -356,7 +355,7 @@ As-is read at `wt/0.5.0b-release` 6b84527bc (= feature/0.5.0). Bug history: the 
   - R12: `chore(adrs): repair measured_by of 0180`, only if T-050-191 renames `test_in_place_ledger_change_refuses_at_rebase`.
   - R13: `chore(specs): restamp the tree to v10 — T-050-194` (precedent c4471aee8).
   - R14, after T-050-191 merges and before T-050-192 opens: `.dadaia/.venv/bin/dadaia public stage`, `public install`, `public doctor` clean, re-projecting gate 1 into the instance. No commit (instance only); its doctor output is logged in the next handoff.
-- Critical path: 190 → 191 → 192 → 194 → 198 → 199 → 200 → 201 → 202 → 203 → 206 → 207 → 208 = 13 merges, each ≈ 8–10 min of verification.
+- Critical path: 190 → 191 → 192 → 194 → 199 → 200 → 201 → 202 → 203 → 206 → 207 → 208 = 12 merges, each ≈ 8–10 min of verification.
 
 ### 6.7 Points answered via inspection (main thread, 2026-10-04)
 
