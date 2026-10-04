@@ -16,7 +16,6 @@ PY = sys.executable
 SRC = ["dadaia_workspace/", "tests/", "scripts/"]
 # -n 2 caps the workers (machine limit); pytest-randomly, in the dev group, shuffles the order.
 PYTEST = [PY, "-m", "pytest", "-q", "-n", "2", "--durations=25"]
-COVERAGE = {"COVERAGE_FILE": str(Path(tempfile.gettempdir()) / "dadaia-ci.coverage")}
 
 Step = tuple[str, list[str], dict[str, str]]
 JOBS: dict[str, list[Step]] = {
@@ -51,7 +50,7 @@ JOBS: dict[str, list[Step]] = {
                 "tests/unit",
                 "tests/contract",
             ],
-            COVERAGE,
+            {"COVERAGE_FILE": "{tmp}/.coverage"},  # the run's own temp dir, removed at exit
         ),
     ],
     "integration": [
@@ -68,31 +67,37 @@ JOBS: dict[str, list[Step]] = {
     "repo-hygiene": [
         ("repo-hygiene", ["bash", ".github/scripts/check_no_repo_local_claude.sh"], {})
     ],
-    # PYTHONPATH: the checkout's package is judged, never an installed one; every root above
-    # the checkout is fenced (ADR 0088), so a local run judges what CI sees, never an instance.
+    # PYTHONPATH: the checkout's package is judged, never an installed one.
     "doctor": [
         (
             "doctor",
             [PY, "-m", "dadaia_workspace", "doctor", "--specs-dir", "specs"],
-            {
-                "PYTHONPATH": str(ROOT),
-                "DADAIA_FENCED_ROOTS": os.pathsep.join(map(str, ROOT.parents)),
-            },
+            {"PYTHONPATH": str(ROOT)},
         ),
     ],
 }
 
 
 def main(argv: list[str]) -> int:
+    # The fence (ADR 0088) mirrors the resolver's rungs: the inherited fence, every root above
+    # the checkout, and the instance owning this venv (``fenced_env`` omits that last one, and
+    # importing it would judge whichever ``dadaia_workspace`` is importable).
+    fence = [os.environ.get("DADAIA_FENCED_ROOTS", ""), *map(str, ROOT.parents)]
+    fence.append(str(Path(sys.prefix).resolve().parent.parent))
+    base = {
+        **os.environ,
+        "PYTHONDONTWRITEBYTECODE": "1",
+        "DADAIA_FENCED_ROOTS": os.pathsep.join(p for p in fence if p),
+    }
     failed = []
-    for job in argv or list(JOBS):
-        for name, cmd, env in JOBS[job]:
-            print(f"--- {job}: {name}", flush=True)
-            code = subprocess.run(cmd, cwd=ROOT, env={**os.environ, **env}, check=False).returncode
-            verdict = "PASS" if code == 0 else "FAIL"
-            print(f"{verdict} {name}: {' '.join(cmd)}", flush=True)
-            if code:
-                failed.append(name)
+    with tempfile.TemporaryDirectory(prefix="dadaia-ci-") as tmp:
+        for job in argv or list(JOBS):
+            for name, cmd, env in JOBS[job]:
+                print(f"--- {job}: {name}", flush=True)
+                step_env = {**base, **{k: v.replace("{tmp}", tmp) for k, v in env.items()}}
+                code = subprocess.run(cmd, cwd=ROOT, env=step_env, check=False).returncode
+                print(f"{'FAIL' if code else 'PASS'} {name}: {' '.join(cmd)}", flush=True)
+                failed += [name] if code else []
     print(f"FAILED: {', '.join(failed)}" if failed else "ALL PASS", flush=True)
     return 1 if failed else 0
 

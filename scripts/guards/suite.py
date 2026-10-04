@@ -38,9 +38,9 @@ CALIBRATION = {
 
 _CITATION = re.compile(r"\b[a-z0-9]+(?:-[a-z0-9]+)+#[A-Za-z]*\d+(?:[.-]\d+)?")
 _RUN_PYTEST = re.compile(r"^\s*(?:-\s*)?run:\s*(.*\bpytest\s.*)$", re.M)
-_SELECTOR = re.compile(r"""-m["']?,?\s+(["'])(.*?)\1""")
-# scripts/ci.py's pytest steps (T-050-190): the argv after each ``*PYTEST,``.
-_CI, _CI_PYTEST = "scripts/ci.py", re.compile(r"\*PYTEST,([^\]]*)")
+_SELECTOR = re.compile(r"""-m\s+(["'])(.*?)\1""")
+_CI = "scripts/ci.py"
+_REAL_CI = Path(__file__).resolve().parents[2] / _CI
 
 PROBE = (
     f"KEYS = {list(CALIBRATION)!r}\n"
@@ -157,16 +157,17 @@ def quarantine_needs_bug(tree: Tree) -> list[str]:
         out.append(f"refused-without-bug: a bare quarantine mark was collected ({refusal!r})")
     if "[quarantine-discipline]" not in s.get("stderr", ""):
         out.append("actionable-on-stderr: the refusal is not printed to stderr before it raises")
-    runs = [
-        (p, cmd)
-        for p in tree.tracked(".github/workflows")
-        for cmd in _RUN_PYTEST.findall(tree.read(p))
-    ]
-    runs += [(p, cmd) for p in tree.tracked(_CI) for cmd in _CI_PYTEST.findall(tree.read(p))]
-    for src, cmd in runs:
-        selector = _SELECTOR.search(cmd)
-        if not selector or "not quarantine" not in selector.group(2):
-            out.append(f"selector-lacks-not-quarantine: {src} runs `{cmd.strip()}`")
+    for wf in tree.tracked(".github/workflows"):
+        for cmd in _RUN_PYTEST.findall(tree.read(wf)):
+            selector = _SELECTOR.search(cmd)
+            if not selector or "not quarantine" not in selector.group(2):
+                out.append(f"selector-lacks-not-quarantine: {wf} runs `{cmd.strip()}`")
+    # scripts/ci.py's pytest steps, [python, -m, pytest, ...]: the selector is the next -m's
+    # (no step at all: onboarding-journey-uv's e2e-runs-journey is red)
+    steps = [s for job in tree.ci_jobs().values() for s in job if "pytest" in s[1]]
+    for name, cmd, _ in steps:
+        if "not quarantine" not in (cmd[cmd.index("-m", 3) + 1] if "-m" in cmd[3:] else ""):
+            out.append(f"selector-lacks-not-quarantine: {_CI} step {name}")
     return out
 
 
@@ -220,7 +221,7 @@ def CONTROL(root: Path) -> Session:
     _write(root, "specs/memory/QUALITY.md", "cites sa-quality-bug#Q1\n")
     _write(root, "tests/unit/test_c.py", "# sa-known-bug#S1 sa-quality-bug#Q1\n" + _ALLOWED * 99)
     _write(root, ".github/workflows/ci.yml", 'run: pytest -m "unit and not quarantine"\n')
-    _write(root, _CI, '[*PYTEST, "-m", "unit and not quarantine", "tests/unit"]\n')
+    _write(root, _CI, _REAL_CI.read_text("utf-8"))
     return _healthy()
 
 
@@ -239,7 +240,7 @@ def _plant_scratch(root: Path) -> None:
 
 def _plant_selector(root: Path) -> Session:
     session = CONTROL(root)
-    _write(root, _CI, '[*PYTEST, "-m", "unit or quarantine", "tests"]\n')
+    _write(root, _CI, _REAL_CI.read_text("utf-8").replace("slow and not quarantine", "slow"))
     return session
 
 

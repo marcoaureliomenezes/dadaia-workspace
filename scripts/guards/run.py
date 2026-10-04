@@ -14,6 +14,7 @@ from __future__ import annotations
 import importlib
 import json
 import os
+import runpy
 import subprocess
 import sys
 import tempfile
@@ -29,6 +30,8 @@ TIERS = ("unit", "contract", "integration", "e2e")
 Session = dict[str, Any]
 Plant = Callable[[Path], Session | None]
 Check = tuple[Callable[["Tree"], list[str]], dict[str, Plant]]
+
+_CI = "scripts/ci.py"  # the Linux CI jobs (T-050-190)
 
 
 def tracked(root: Path, *spec: str) -> list[str]:
@@ -134,6 +137,10 @@ class Tree:
 
     def read(self, rel: str) -> str:
         return (self.root / rel).read_text(encoding="utf-8")
+
+    def ci_jobs(self) -> dict[str, list[Any]]:
+        """``scripts/ci.py``'s ``JOBS`` (stdlib-only, loads without running); none untracked."""
+        return runpy.run_path(str(self.root / _CI))["JOBS"] if self.tracked(_CI) else {}
 
     @property
     def session(self) -> Session:

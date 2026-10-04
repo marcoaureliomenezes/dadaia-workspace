@@ -121,8 +121,14 @@ def workflow_never_rules(tree: Tree) -> list[str]:
             (s.get("env") or {}).get("COVERAGE_FILE") or (job.get("env") or {}).get("COVERAGE_FILE")
         )
     ]
-    script = tree.read(_CI)
-    cov += [_CI] if "--cov" in script and '"COVERAGE_FILE"' not in script else []
+    jobs, ci_yml = tree.ci_jobs(), _jobs(wfs.get(_G, {}))
+    cov += [
+        f"{_CI}:{name}"
+        for steps in jobs.values()
+        for name, cmd, env in steps
+        if any(a.startswith("--cov") for a in cmd)
+        and not env.get("COVERAGE_FILE", "").startswith("{tmp}")
+    ]
     release_runs = [
         line.strip()
         for p, _, s in steps
@@ -145,6 +151,13 @@ def workflow_never_rules(tree: Tree) -> list[str]:
             if "${{" in line
         ],
         "coverage-file-in-the-checkout": cov,
+        # T-050-190: every Linux job runs `scripts/ci.py <job>`, the one source of its steps
+        "job-bypasses-ci-script": [
+            j
+            for j in jobs
+            if f"scripts/ci.py {j}"
+            not in "".join(s.get("run") or "" for s in ci_yml.get(j, {}).get("steps") or [])
+        ],
         "release-please-outside-release-yml": [
             p for p in wfs if _ACTION in text[p] and p != _RELEASE
         ],
@@ -426,7 +439,7 @@ def onboarding_journey_uv(tree: Tree) -> list[str]:
         return "\n".join(f"{s.get('run', '')}\n{s.get('env', '')}" for s in steps)
 
     e2e, smoke = texts("ci.yml", "e2e-python"), texts("release.yml", "smoke-test")
-    script = tree.read(_CI)
+    steps = tree.ci_jobs().get("e2e-python", [])
     needles = (
         'uvx "dadaia-workspace==$VERSION" init',
         "--repo",
@@ -435,8 +448,8 @@ def onboarding_journey_uv(tree: Tree) -> list[str]:
     )
     e2e_rules = {
         "e2e-installs-uv": "install uv==" in e2e,
-        "e2e-uv": '"DADAIA_REQUIRE_UVX": "1"' in script,
-        "e2e-runs-journey": '"tests/e2e"' in script,
+        "e2e-uv": all(e.get("DADAIA_REQUIRE_UVX") == "1" for _, _, e in steps),
+        "e2e-runs-journey": any("tests/e2e" in cmd for _, cmd, _ in steps),
     }
     out = [f"{r}: the e2e job breaks the uvx journey" for r, ok in e2e_rules.items() if not ok]
     return out + [f"smoke-greenfield: smoke-test lacks {n!r}" for n in needles if n not in smoke]
@@ -567,7 +580,8 @@ CHECKS: dict[str, Check] = {
             "workflow-expression-in-a-run-body": _workflow(
                 "      - run: echo ${{ github.head_ref }}\n"
             ),
-            "coverage-file-in-the-checkout": _edit(_CI, '"COVERAGE_FILE"', '"COVERAGE_PATH"'),
+            "coverage-file-in-the-checkout": _edit(_CI, '"{tmp}/.coverage"', '".coverage"'),
+            "job-bypasses-ci-script": _edit(_G, "scripts/ci.py e2e-python", "pytest tests/e2e"),
             "release-please-outside-release-yml": _workflow(f"      - uses: {_ACTION}@v5\n"),
             "pypi-publisher-outside-release-yml": _workflow(
                 "      - uses: pypa/gh-action-pypi-publish@v1\n"
@@ -726,7 +740,7 @@ CHECKS: dict[str, Check] = {
         {
             "e2e-uv": _edit(_CI, '"DADAIA_REQUIRE_UVX": "1"', '"DADAIA_REQUIRE_UVX": "0"'),
             "e2e-installs-uv": _edit(_G, "pipx install uv==", "pipx install uvx=="),
-            "e2e-runs-journey": _edit(_CI, '"tests/e2e"', '"tests/e2x"'),
+            "e2e-runs-journey": _edit(_CI, '"tests/e2e"]', '"tests/e2e/features"]'),
             "smoke-greenfield": _edit(_RELEASE, "specs init --context", "specs init"),
         },
     ),
