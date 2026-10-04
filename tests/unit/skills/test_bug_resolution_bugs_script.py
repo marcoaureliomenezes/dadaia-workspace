@@ -11,6 +11,7 @@ from __future__ import annotations
 import importlib.util
 import json
 import os
+import shutil
 import subprocess
 import sys
 import time
@@ -511,7 +512,7 @@ def test_every_ledger_skill_stages_a_byte_identical_privacy_pair(tmp_path: Path)
         ).read_bytes()
 
 
-def test_resolve_closes_the_record_and_stores_one_direction(script: Path, tmp_path: Path) -> None:
+def test_resolve_closes_the_record_at_its_own_instant(script: Path, tmp_path: Path) -> None:
     deferred = {
         **_OPEN_RECORD,
         "status": "deferred",
@@ -524,7 +525,6 @@ def test_resolve_closes_the_record_and_stores_one_direction(script: Path, tmp_pa
     assert done.stdout.strip() == "[ok] resolved a-bug"
     [record] = _records(specs)
     assert record["status"] == "resolved"
-    assert "diff_direction" not in record  # ADR 0160: evidence_diff's prefix is the one source
     assert record["closed_at"] > deferred["closed_at"]  # the transition's own instant
     assert _run(script, "check", "--specs", str(specs)).returncode == 0
 
@@ -701,7 +701,80 @@ def test_status_and_stats_read_the_ledger(script: Path, tmp_path: Path) -> None:
     assert "total\t2" in stats.stdout
     assert "status:resolved\t1" in stats.stdout
     assert "severity:HIGH\t1" in stats.stdout
-    assert "direction:net-positive\t1" in stats.stdout  # ADR 0160: read from evidence_diff
+    assert not [ln for ln in stats.stdout.splitlines() if ln.startswith("direction:")]  # AC9.2
+
+
+def test_fix_derives_each_fix_commit_and_its_direction(script: Path, tmp_path: Path) -> None:
+    """AC9.2: shape 3 or 4 names the ids; shape 4's task commits are counted, never diffed;
+    the direction nets production rows only, never a stored field."""
+    resolved = {**_OPEN_RECORD, "status": "resolved", "closed_at": "2026-09-21T00:00:00Z"}
+    ids = ("a-bug", "b-bug", "c-bug", "d-bug", "e-bug", "f-bug", "g-bug")
+    specs = _ledger(
+        tmp_path, *({**resolved, "id": i} for i in ids), {**_OPEN_RECORD, "id": "z-bug"}
+    )
+    git = ["git", "-C", str(tmp_path), "-c", "user.name=t", "-c", "user.email=t@t"]
+
+    def commit(message: str, files: dict[str, str]) -> str:
+        for path, text in files.items():
+            (tmp_path / path).parent.mkdir(parents=True, exist_ok=True)
+            (tmp_path / path).write_text(text, encoding="utf-8")
+        subprocess.run([*git, "add", "-A"], check=True)
+        subprocess.run([*git, "commit", "-qm", message], check=True)
+        return subprocess.run([*git, "rev-parse", "--short=9", "HEAD"], capture_output=True,
+                              text=True, check=True).stdout.strip()  # fmt: skip
+
+    def full(sha: str) -> str:
+        return subprocess.run([*git, "rev-parse", sha], capture_output=True, text=True,
+                              check=True).stdout.strip()  # fmt: skip
+
+    commit("chore: seed", {"README": ""})
+    fix_a = commit("fix(bugs): a-bug — cause", {"tests/test_a.py": "x\ny\n", "cli/a.py": "1\n"})
+    t1 = commit("feat(T-1): task", {"cli/x.py": "z\n"})
+    t2 = commit("feat(T-1): more", {"cli/z.py": "q\n"})
+    commit(f"chore(bugs): resolve b-bug, d-bug — by T-1 ({t1}, {t2})", {"specs/n": "z\n"})
+    commit("chore(bugs): resolve c-bug — by T-2", {"specs/n": "w\n"})
+    rework_a = commit("fix(bugs): a-bug — rework — (once)", {"cli/b.bin": "\0"})
+    fix_e = commit("fix(bugs): e-bug, f-bug — cause", {
+        "cli/a.py": "", "tests/test_a.py": "x\ny\nz\n", "specs/x": "1\n", "p/behavior-map.json": "1\n",
+    })  # fmt: skip
+    fix_g = commit("fix(bugs): g-bug — cause", {"cli/x.py": "y\n"})
+    e_rows = ["\t0\t1\tcli/a.py", "\t1\t0\tp/behavior-map.json", "\t1\t0\tspecs/x",
+              "\t1\t0\ttests/test_a.py"]  # fmt: skip
+    done = _run(script, "fix", "--specs", str(specs))
+    assert done.returncode == 0, done.stderr
+    assert done.stdout.splitlines() == [
+        f"a-bug\t{full(rework_a)},{full(fix_a)}\tnet-positive", "\t-\t-\tcli/b.bin",
+        "\t1\t0\tcli/a.py", "\t2\t0\ttests/test_a.py",
+        f"b-bug\t{t1},{t2}\t-",
+        "c-bug\tunlinked",
+        f"d-bug\t{t1},{t2}\t-",
+        f"e-bug\t{full(fix_e)}\tnet-negative", *e_rows,
+        f"f-bug\t{full(fix_e)}\tnet-negative", *e_rows,
+        f"g-bug\t{full(fix_g)}\tnet-neutral", "\t1\t1\tcli/x.py",
+        "[ok] 6 linked, 1 unlinked.",
+    ]  # fmt: skip
+    stats = _run(script, "stats", "--specs", str(specs)).stdout.splitlines()
+    assert [ln for ln in stats if ln.startswith("direction:")] == [
+        "direction:net-negative\t2", "direction:net-neutral\t1", "direction:net-positive\t1",
+    ]  # fmt: skip
+    one = _run(script, "fix", "c-bug", "--specs", str(specs)).stdout.splitlines()
+    assert one == ["c-bug\tunlinked", "[ok] 0 linked, 1 unlinked."]
+
+
+@pytest.mark.parametrize(("git_init", "code", "last"), [
+    (True, 0, "[ok] 0 linked, 1 unlinked."),  # no commit yet: nothing links
+    (False, 1, "fix: Operator action: point --specs at a specs tree inside a git repo"),
+])  # fmt: skip
+def test_fix_refuses_a_history_it_cannot_read(
+    script: Path, tmp_path: Path, git_init: bool, code: int, last: str
+) -> None:
+    record = {**_OPEN_RECORD, "status": "resolved", "closed_at": "2026-09-21T00:00:00Z"}
+    specs = _ledger(tmp_path, record)
+    if not git_init:
+        shutil.rmtree(tmp_path / ".git")
+    done = _run(script, "fix", "--specs", str(specs))
+    assert done.returncode == code
+    assert (done.stdout if code == 0 else done.stderr).splitlines()[-1] == last
 
 
 def test_archive_moves_only_records_closed_past_the_threshold(script: Path, tmp_path: Path) -> None:

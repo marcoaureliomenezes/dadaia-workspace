@@ -11,6 +11,7 @@ from __future__ import annotations
 import argparse
 import datetime as _dt
 import json
+import re
 import subprocess
 import sys
 from collections import Counter
@@ -45,7 +46,14 @@ _HELP = {
     "reject": "close a record as rejected, with a reason",
     "archive": "move long-closed terminal records into bugs_histo.jsonl",
     "check": "validate every BUGS.jsonl record",
+    "fix": "derive each resolved record's fix commit, numstat and direction",
 }
+#: Shapes 3 and 4 share one id list; shape 4 names its task commit(s) as `(<sha>[, <sha>])` (ADR 0164 (1)).
+_SHAPE = re.compile(r"@(\w+) (fix\(bugs\): |chore\(bugs\): resolve )(.+?) — (.*)$")
+_TASK_SHAS = re.compile(r"\((\w+(?:, \w+)*)\)$")
+#: Not the fix's direction: tests (metric 6), specs, and the regenerated files ADR 0164 (2) names.
+_NOT_PRODUCTION = ("tests/", "specs/")
+_REGENERATED = ("behavior-map.json", "shipped-hashes.json")
 
 
 def _parser() -> argparse.ArgumentParser:
@@ -66,6 +74,8 @@ def _parser() -> argparse.ArgumentParser:
         if verb == "archive":
             command.add_argument("--now", help="ISO-8601 UTC instant to treat as now")
             command.add_argument("--threshold-days", type=int, default=90)
+        if verb == "fix":
+            command.add_argument("bug_ids", nargs="*", help="default: every resolved record")
         if verb == "check":
             command.add_argument("--json", action="store_true", help="emit findings as JSON")
     return parser
@@ -76,17 +86,66 @@ def _values(args: argparse.Namespace, names: tuple[str, ...]) -> dict[str, Any]:
     return {key: getattr(args, key) for key in keys}
 
 
+def _fixes(specs: Path) -> dict[str, dict[str, list[list[str]] | None]]:
+    """Bug id -> {fix sha: numstat rows}, grepped from history, never stored; a shape-4
+    task commit is counted, never diffed (rows None)."""
+    git = ["git", "-C", str(specs)]
+    head = subprocess.run([*git, "rev-parse", "-q", "--verify", "HEAD"], stdout=subprocess.DEVNULL, check=False)  # fmt: skip
+    if head.returncode == 1:  # a repo with no commit yet links nothing
+        return {}
+    log = subprocess.run([*git, "log", "-E", r"--grep=^(fix|chore)\(bugs\): ", "--numstat", "--format=@%H %s"],
+                         stdout=subprocess.PIPE, text=True, check=False)  # fmt: skip
+    if log.returncode:
+        raise Refusal("cannot read the repo's history", "Operator action: point --specs at a specs tree inside a git repo")  # fmt: skip
+    found: dict[str, dict[str, list[list[str]] | None]] = {}
+    rows: list[list[str]] = []
+    for line in log.stdout.splitlines():
+        if not line.startswith("@"):
+            rows += [line.split("\t")] if line else []
+            continue
+        rows, shape = [], _SHAPE.match(line)
+        task = _TASK_SHAS.search(shape[4]) if shape and shape[2].startswith("chore") else None
+        if shape is None or (task is None and shape[2].startswith("chore")):
+            continue
+        for bug in shape[3].split(", "):
+            for sha in task[1].split(", ") if task else [shape[1]]:
+                found.setdefault(bug, {})[sha] = None if task else rows
+    return found
+
+
+def _direction(commits: dict[str, list[list[str]] | None]) -> str:
+    if all(rs is None for rs in commits.values()):
+        return "-"
+    rows = [r for rs in commits.values() for r in rs or []]
+    net = sum(
+        int(a) - int(d) for a, d, path in rows
+        if a != "-" and not path.startswith(_NOT_PRODUCTION) and Path(path).name not in _REGENERATED
+    )  # fmt: skip
+    return "net-negative" if net < 0 else "net-positive" if net > 0 else "net-neutral"
+
+
 def _read(args: argparse.Namespace, specs: Path) -> int:
     records = read_records(specs / LEDGER)
+    fixes = _fixes(specs) if args.verb in ("fix", "stats") else {}
+    if args.verb == "fix":
+        ids = args.bug_ids or [str(r["id"]) for r in records if r["status"] == "resolved"]
+        for bug in ids:
+            commits = fixes.get(bug, {})
+            print(f"{bug}\t{','.join(commits)}\t{_direction(commits)}" if commits else f"{bug}\tunlinked")  # fmt: skip
+            for row in (r for rows in commits.values() for r in rows or []):
+                print("\t" + "\t".join(row))
+        linked = sum(b in fixes for b in ids)
+        print(f"[ok] {linked} linked, {len(ids) - linked} unlinked.")
+        return 0
     if args.verb == "stats":
         print(f"total\t{len(records)}")
-        for label, key in (
-            ("status", "status"),
-            ("severity", "severity"),
-            ("direction", "evidence_diff"),
+        directions = [_direction(fixes[r["id"]]) for r in records if r["id"] in fixes]
+        for label, values in (
+            ("status", [r["status"] for r in records]),
+            ("severity", [r["severity"] for r in records if r.get("severity")]),
+            ("direction", [d for d in directions if d != "-"]),
         ):
-            counts = Counter(str(r[key]).split(":")[0] for r in records if r.get(key))
-            for value, count in sorted(counts.items()):
+            for value, count in sorted(Counter(values).items()):
                 print(f"{label}:{value}\t{count}")
         return 0
     selected = [r for r in records if args.include_closed or r.get("status") == "open"]
@@ -142,7 +201,7 @@ def _write(args: argparse.Namespace, specs: Path) -> int:
 
 def main(argv: list[str] | None = None) -> int:
     args = _parser().parse_args(argv)
-    reads = args.verb in ("check", "status", "stats")
+    reads = args.verb in ("check", "status", "stats", "fix")
     specs = find_specs(args.specs, ledger=None if reads else f"specs/{LEDGER}")
     if args.verb == "check":
         findings = check(specs)
@@ -151,7 +210,7 @@ def main(argv: list[str] | None = None) -> int:
         ]
         return 1 if findings else 0
     try:
-        if args.verb in ("status", "stats"):
+        if args.verb in ("status", "stats", "fix"):
             return _read(args, specs)
         return _archive(args, specs) if args.verb == "archive" else _write(args, specs)
     except Refusal as refusal:
