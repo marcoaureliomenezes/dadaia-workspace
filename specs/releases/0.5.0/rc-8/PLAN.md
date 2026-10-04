@@ -264,7 +264,7 @@ As-is read at `wt/0.5.0b-release` 6b84527bc (= feature/0.5.0). Bug history: the 
 | stdin guard | `scripts/guards/isolation.py:301-318` `_patches_stdin` sees only `setattr("sys.stdin", …)` and `setattr(sys, "stdin", …)`, not `sys.stdin = …` | row 20 (ae8d5b056 wrote the check) | own fix (AC12.14) | +3 guard / plant row |
 | sweep rows 24–26 | `linked_worktree` `sweep.py:119-132` takes any gitfile `.git`, so a submodule counts, and `:10` says "(or submodule)"; the expire lane decides linked-worktree in `doctor.py:509` and again in `remove` `sweep.py:167`; `hold` stamps only `len(rel.parts) > 1` `:206-207` and `move` skips `utime` on a link `:248` | rows 24, 25, 26 | own fixes (AC12.14) | ≈ +1, −3, +1 |
 
-- Ambiguity named, not decided (§6.7 O2): AC10.1 deletes "every env-name set but `suite_env`'s". Read here as the scrub sets `SUITE_DADAIA_ENV` and `ENTRY_SIGNAL_ENV_VARS` and `child_keys`'s tuple. `ALLOWLISTED_DADAIA_ENV`, `HARNESS_CONTROL_DADAIA_ENV` and `_FORBIDDEN_HOOK_ENV` stay: they are the hook-env contract, which guard `harness-env-allowlist` (`isolation.py:23,270`) reads (§1.2).
+- AC10.1 (§6.7 O2): AC10.1 deletes "every env-name set but `suite_env`'s". Read here as the scrub sets `SUITE_DADAIA_ENV` and `ENTRY_SIGNAL_ENV_VARS` and `child_keys`'s tuple. `ALLOWLISTED_DADAIA_ENV`, `HARNESS_CONTROL_DADAIA_ENV` and `_FORBIDDEN_HOOK_ENV` stay: they are the hook-env contract, which guard `harness-env-allowlist` (`isolation.py:23,270`) reads (§1.2).
 
 ### 6.5 Per AC: DELETE → REBUILD → UPDATE → KEEP → ADD
 
@@ -285,7 +285,7 @@ As-is read at `wt/0.5.0b-release` 6b84527bc (= feature/0.5.0). Bug history: the 
   - `_bugs_check.py` accepts a task id that some `specs/releases/**/TASKS.md`, `_archive/` included, carries; the schema's `caused_by` description becomes AC9.3's one semantics.
   - Cases (owner file): AC9.3's four, plus a `refactor(bugs): x — REBUILD u: …` commit that `bugs.py fix x` prints. `feat(T-050-192): …`. Δ ≈ +18 / ≈ +40.
 - **AC12.11** (T-050-193). UPDATE `AUTHORING.md` rule 9 (`:20`, `:107`): a prohibition carries a short reason or a bug/ADR id. Δ 0.
-- **AC12.1, AC9.3 law** (T-050-194). UPDATE `pub/scaffold/bugs/AGENTS.md:14` ("own mistake" covers only unmerged rework inside a worktree) and `:23`'s `caused_by` semantics (bug or task). The scaffold law is in the stamp canon, so `test_specs_version.py`'s key 9 moves (§6.7 O1). Δ 0.
+- **AC12.1, AC9.3 law** (T-050-194). UPDATE `pub/scaffold/bugs/AGENTS.md:14` ("own mistake" covers only unmerged rework inside a worktree) and `:23`'s `caused_by` semantics (bug or task). The scaffold law is in the stamp canon, so the same commit bumps `CANONICAL_SPECS_VERSION` 9 → 10 (`core/specs_version.py:35`, a `v10 =` line) and pins key 10 (§6.7 O1). Δ +1.
 - **AC12.2, AC9.3 law** (T-050-195). UPDATE `LINEAGE.md:29` (blame skips only `(#n)` and `dadaia-generated`; `tests/` included) and `:33-34` (one fix-induced bug triggers a REBUILD: revert plus the smallest redo, one commit; work in flight stops; the ≥ 2 trigger stays; the body names each culprit sha). Phase 0 of `S/dd-bug-resolution/SKILL.md` follows it. Δ 0.
 - **AC12.3** (T-050-196). UPDATE `S/dd-release-implementation/SKILL.md:38`: a red that a merged fix caused goes to registration, revert and redo; a flaky red is quarantined with a bug. Δ 0.
 - **AC12.12 law** (T-050-197). ADD one §3a row to `S/dd-gitflow-default/SKILL.md`: `refactor(<task-id>): REBUILD <unit> — …` in `impl`, `refactor(bugs): <bug-id> — REBUILD <unit>: …` in `bug`. Δ 0.
@@ -308,7 +308,7 @@ As-is read at `wt/0.5.0b-release` 6b84527bc (= feature/0.5.0). Bug history: the 
   - DELETE: `commit_all` (`git_subprocess.py:192`) and its call; `--commit` and `dead(commit=…)`; `DeadSecretFoundError`; the untracked-consent and identity refusals; the `--commit` that `certification/service.py:407` passes.
   - Redo: a dirty or untracked repo refuses with one fix line per file (`git_line` of `git -C <tree> checkout -- <f>` or `rm`, per 0172: move it into a worktree or discard it) and touches nothing. The non-work-branch refusal stays only for unpushed commits on HEAD (0056 g, as 0172 amends it).
   - KEEP: `unrecoverable()`'s stash count, `identity_fix` for baseline, and the push through the pre-push hook.
-  - The 0154 writers: `context create` clones; the first `specs init`'s output is committed by `context baseline` (`service.py:575` `commit_paths`) in the same onboarding act; `specs/audits/` is committed by its skill. No writer is added here (§6.7 O3).
+  - The 0154 writers (§6.7 O3): `context create` clones. `specs init` (`cli/commands/specs.py:175-176`) commits the files it wrote via `commit_paths` in its own act. The audits writer, `S/dd-audit-project/scripts/audit.py` with `_audit_store.py`, commits the `specs/audits/<dir>/FINDINGS.jsonl` it writes. `context baseline`'s `commit_paths` (`service.py:575`) is then left with only what neither of those wrote.
   - `docs/cli.md` is re-rendered by `help tree`. Case: 0172's `measured_by`. Δ ≈ −65 / ≈ −80.
 - **AC12.13** (T-050-202). One REBUILD commit: `refactor(T-050-202): REBUILD sweep delete path and result protocol — judged by outcome, a refusal is falsy`.
   - Culprits reverted: 8f329db3a's `_owner` leftover; af2154d5a's try/except arm and owner text, keeping its EXDEV `kept` return; b9b28202d's `OSError` arm.
@@ -318,16 +318,16 @@ As-is read at `wt/0.5.0b-release` 6b84527bc (= feature/0.5.0). Bug history: the 
   - KEEP: the TTL walk, `-N`, `_inside`, `walk`, `lstat`.
   - Cases: SPEC AC12.13's seven. Δ ≈ −20 / ≈ +15.
 - **AC12.9** (T-050-203). One REBUILD commit: `refactor(T-050-203): REBUILD T-050-168's tests — the stamp bumps, the refusal line is compared whole`.
-  - Culprits: a41c69967 and aed2ac322 (reverted: key-9 pin and comment), 7196e1473 (reverted: the predicates).
-  - Redo: `CANONICAL_SPECS_VERSION` 9 → 10 (`core/specs_version.py:35`, with a `v10 =` line), pinned under key 10; the refusal row builds its expected fix line per platform and compares `stderr` lines for equality.
-  - KEEP: d66e50c66. Δ +1 / ≈ −4. R13 restamps this repo's tree.
+  - Culprits: a41c69967 and aed2ac322 (reverted: key 9 goes back to its original fingerprint `bf25e8106cf60674` beside key 10, and the rule comment "re-pinned only together with a stamp bump" returns), 7196e1473 (reverted: the predicates).
+  - Redo: the refusal row builds its expected fix line per platform and compares `stderr` lines for equality. The real bump is T-050-194's commit (§6.7 O1).
+  - KEEP: d66e50c66. Δ 0 / ≈ −4. R13, after T-050-194, restamps this repo's tree.
 - **AC12.10** (T-050-204). One REBUILD commit: `refactor(T-050-204): REBUILD the doctor exit-code test — the real DoctorService`.
   - Culprits: 686ec7b40, a88d849c4.
   - DELETE: `_StubDoctor` and the monkeypatch.
   - Redo: the tmp workspace the test already writes gets a real `.dadaia/nonsense` (ROOT-4), so the cases keep their expected exit codes.
   - Δ 0 / ≈ −5.
 - **AC12.14** (T-050-205 … 208). Shape 3 each, RED first. Row 20: a planted `sys.stdin = io.StringIO()` row in `isolation.py`'s plants, then `_patches_stdin` matches the `Assign`. Row 24: `linked_worktree` requires the gitdir to resolve under `<common>/worktrees/`, and `:10` drops "(or submodule)". Row 25: the lane passes its one decision to `remove`, and the second walk leaves. Row 26: `hold` stamps a root-level link with `os.utime(…, follow_symlinks=False)`. Δ ≈ +2 prod, +3 guard.
-- W12 production Δ ≈ −37 + 18 − 65 − 20 + 1 + 2 ≈ −101, which widens §2.8's 57-line margin to ≈ 158. Test lines ≈ −84. `scripts/ci.py` counts with the guard lines (+75).
+- W12 production Δ ≈ −37 + 18 − 65 − 20 + 1 + 2 ≈ −101 (O3's two commits are counted in T-050-201's Δ), which widens §2.8's 57-line margin to ≈ 158. Test lines ≈ −84. `scripts/ci.py` counts with the guard lines (+75).
 
 ### 6.6 Schedule (machine limit: ≤ 2 test-running agents, `-n 2`; ADR 0149)
 
@@ -336,14 +336,14 @@ As-is read at `wt/0.5.0b-release` 6b84527bc (= feature/0.5.0). Bug history: the 
 | W1 | T-050-190 | 1 | impl; today's merge |
 | W2 | T-050-191 | 1 | impl; its own merge runs the script |
 | W3 | T-050-192, T-050-193 | 2 | impl each |
-| W4 | T-050-194, T-050-195 | 2 | impl each; R11 after both |
+| W4 | T-050-194, T-050-195 | 2 | impl each; R11 and R13 after both |
 | W5 | T-050-196, T-050-197 | 2 | impl each |
 | W6 | T-050-198 | 1 | impl |
 | W7 | T-050-199 | 1 | bug; ledger only |
 | W8 | T-050-200 | 1 | impl; alone (its `W:` spans the suite) |
 | W9 | T-050-201 | 1 | impl; then its rows' shape-4 tail |
 | W10 | T-050-202 | 1 | impl (`service.py` after 201) |
-| W11 | T-050-203, T-050-204 | 2 | impl each; R13 after 203 |
+| W11 | T-050-203, T-050-204 | 2 | impl each |
 | W12 | T-050-205, T-050-206 | 2 | bug each |
 | W13 | T-050-207 | 1 | bug |
 | W14 | T-050-208 | 1 | bug |
@@ -354,12 +354,12 @@ As-is read at `wt/0.5.0b-release` 6b84527bc (= feature/0.5.0). Bug history: the 
 - Release-worktree steps added to §2.7:
   - R11: `docs(specs): re-render specs/*/AGENTS.md from the scaffold — T-050-194`; the repo copy already drifts at `specs/bugs/AGENTS.md:23,49`.
   - R12: `chore(adrs): repair measured_by of 0180`, only if T-050-191 renames `test_in_place_ledger_change_refuses_at_rebase`.
-  - R13: `chore(specs): restamp the tree to v10 — T-050-203` (precedent c4471aee8).
+  - R13: `chore(specs): restamp the tree to v10 — T-050-194` (precedent c4471aee8).
 - Critical path: 190 → 191 → 192 → 194 → 198 → 199 → 200 → 201 → 202 → 203 → 206 → 207 → 208 = 13 merges, each ≈ 8–10 min of verification.
 
-### 6.7 Open for the operator (SPEC contradictions, not decided here)
+### 6.7 Points answered via inspection (main thread, 2026-10-04)
 
-- O1, the stamp vs the order. `pub/scaffold/bugs/AGENTS.md` is in the stamp canon (`test_specs_version.py:28-46`), so T-050-194 (step 2) moves the digest before T-050-203 (step 3) restores the rule "re-pinned only together with a stamp bump". Under gate 1, T-050-194 cannot land red. What is written here: T-050-194 re-pins key 9 under the rule in force at its merge (aed2ac322's comment), and T-050-203 then reverts the rule and bumps to 10. That is one more re-pin of the kind AC12.9 condemns. The alternatives are T-050-203 ahead of T-050-194 (a change to the SPEC's step order), or T-050-194 bumping to 10 itself (AC12.9's bump moved one step earlier).
-- O2, AC10.1's "every env-name set but `suite_env`'s". Read here as the scrub sets only (§6.4). Deleting `ALLOWLISTED_DADAIA_ENV`, `HARNESS_CONTROL_DADAIA_ENV` and `_FORBIDDEN_HOOK_ENV` as well would break guard `harness-env-allowlist` (0176), which reads them.
-- O3, AC12.8's "each 0154 direct writer commits its own output in the act". 0172 says that `specs init` leaves its output for `context baseline`. Read here as the onboarding act already committing it, so no writer is added. If the operator means `specs init` must commit itself, T-050-201's `W:` widens to that writer.
-- O4, AC12.14 vs AC9.4/AC12.2. Rows 24–26 carry a `caused_by` other than `none` and are fixed after AC12.2 lands, which would make each a REBUILD of its causing fix. The SPEC rules them "own fixes" (Q24), so they are planned as shape 3 with `rebuild: none — AC12.14 (Q24)` in the body.
+- O1, stamp vs order. Answered via inspection: the stamp rule "re-pinned only together with a stamp bump" predates T-050-168 (aed2ac322 rewrote it), so a canon change bumps. T-050-194 bumps to 10 in the same commit as its canon change; no reorder and no re-pin are needed. T-050-203 only reverts a41c69967's re-pin and aed2ac322's comment, so key 9 returns to its original fingerprint and key 10 pins the new canon. AC12.9's bump is delivered by T-050-194's commit.
+- O2, AC10.1's name sets. Answered via inspection: only the scrub sets leave (`SUITE_DADAIA_ENV`, `ENTRY_SIGNAL_ENV_VARS`, `child_keys`'s tuple). `ALLOWLISTED_DADAIA_ENV`, `HARNESS_CONTROL_DADAIA_ENV` and `_FORBIDDEN_HOOK_ENV` stay, because guard `harness-env-allowlist` (0176, `isolation.py:23,270`) reads them.
+- O3, the 0154 writers. Answered via inspection from the accepted ADR 0172. Its decision says "Each sanctioned direct writer of ADR 0154 leaves its output committed in the act that writes it", and its consequences say "specs init and the audits writer each gain the commit of their own output". T-050-201 adds both: `specs init` and the audits writer (`S/dd-audit-project/scripts/audit.py`, which exists as code) commit their own output.
+- O4, AC12.14 vs AC12.2. Answered via inspection from Q24 ("H4, H5 e H6 ganham correção própria no rc-8, cada uma com teste vermelho primeiro") and Q18 (prospective: AC12.2 binds only after it merges). Rows 24–26 are shape-3 fixes whose body says `rebuild: none — AC12.14`.
