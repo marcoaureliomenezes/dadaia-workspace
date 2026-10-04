@@ -13,7 +13,9 @@ into the source tree it projects from, so nothing here is regenerated.
   projected instance file to fake the result.
 - Any failure of a workspace operation here is a product bug of this library:
   register it in `specs/bugs/`.
+
 verify: ../../../.dadaia/.venv/bin/python scripts/ci.py
+
 - Versioning here: release-please owns the version, tag and CHANGELOG; the work branch
   is named for the live release (`_RELEASE.json`).
 - Dev tools (pytest, ruff, mypy, lint-imports) come from the `dev` group, installed into

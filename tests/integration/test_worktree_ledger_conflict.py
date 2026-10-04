@@ -1,12 +1,14 @@
 """worktree-merge-union-duplicates-ledger-records-on-in-place-mutation:
-a ledger record changed in place in a worktree, while the work branch appended another, refuses
-at rebase like any file — never lands the record twice.
+a ledger record changed in place in a worktree, while the work branch appended another: merge
+refuses with the rebase fix line, and that rebase stops on the ledger conflicted like any file
+(no union merge, ADR 0180) — the record never lands twice.
 Size: MEDIUM (real git, tmp workspace).
 """
 
 from __future__ import annotations
 
 import shlex
+import subprocess
 from pathlib import Path
 
 import pytest
@@ -29,3 +31,8 @@ def test_in_place_ledger_change_refuses_at_rebase(tmp_path: Path) -> None:
     assert shlex.split(fix.removeprefix("fix: ")) == [
         *("git", "-C", str(tree), "rebase", "feature/0.5.0")
     ]
+    env = {"HOME": str(root), "PATH": "/usr/bin:/bin", "GIT_CONFIG_NOSYSTEM": "1"}
+    rebase = subprocess.run(shlex.split(fix.removeprefix("fix: ")), env=env, capture_output=True)
+    assert rebase.returncode == 1
+    assert git(tree, "diff", "--name-only", "--diff-filter=U").split() == [ledger]
+    assert git(tree, "show", f"HEAD:{ledger}").count('"id": "2"') == 1

@@ -73,7 +73,7 @@ def test_merge_fast_forwards_removes_and_reruns(root: Path) -> None:
     assert git(repo, "branch", "--list", "wt/0.5.0a-impl").strip()  # never -D
 
 
-def test_dirty_outside_set_and_conflict_each_refuse_with_one_fix(root: Path) -> None:
+def test_dirty_and_outside_set_each_refuse_with_one_fix(root: Path) -> None:
     tree = root / TREE
     (tree / "wip").mkdir()  # an untracked directory, and a tracked edit staged:
     (tree / "wip/x.py").write_text("")
@@ -357,13 +357,18 @@ def test_a_moved_work_branch_refuses_and_its_fix_rebase_keeps_only_an_identical_
 @pytest.mark.parametrize(
     ("base", "mine", "lands"),
     [
-        (None, "verify: false\n", False),
-        (None, None, True),
+        (None, "verify: echo 'fix: mine' >&2; false\n", False),
+        (None, "verify: cat\n", True),
         (None, "verify: git rev-parse HEAD\n", True),
+        (None, "verify: git -C ../../../repos/r switch -q main\n", False),  # checked after it
         ("# a prose verify: mention declares nothing\n", None, False),
+        ("", None, False),
         ("# a prose verify: mention declares nothing\n", "verify: true\n", True),
     ],
-    ids=["exits-1", "exits-0", "prints-head", "undeclared", "declared-by-the-worktree"],
+    ids=[
+        *("exits-1", "exits-0-stdin-closed", "prints-head", "switches-the-repo", "undeclared"),
+        *("no-agents-md", "declared-by-the-worktree"),
+    ],
 )
 def test_merge_lands_only_what_the_declared_verify_command_passes(
     root: Path, base: str | None, mine: str | None, lands: bool
@@ -371,22 +376,30 @@ def test_merge_lands_only_what_the_declared_verify_command_passes(
     """AC12.5 (ADR 0185): `merge` runs HEAD's `AGENTS.md` `verify:` line in the tree before
     the fast-forward; a failure or no declaration lands nothing."""
     repo, tree = root / "repos/r", root / TREE
-    if base:  # the work branch declares nothing
-        commit(repo, "AGENTS.md", base)
+    if base is not None:  # the work branch declares nothing, or has no AGENTS.md
+        if base:
+            commit(repo, "AGENTS.md", base)
+        else:
+            git(repo, "rm", "-q", "AGENTS.md")
+            git(repo, "commit", "-qm", "no AGENTS.md")
         git(tree, "reset", "-q", "--hard", "feature/0.5.0")
     head = commit(tree, "AGENTS.md", mine) if mine else commit(tree, "src/a.py")
     approve(root, head)
     work = git(repo, "rev-parse", "feature/0.5.0").strip()
-    result = run(root, "merge", TREE)
+    result = run(root, "merge", TREE, input="stdin leak\n")  # a closed stdin: `cat` reads none
+    assert "stdin leak" not in result.stdout
     assert git(repo, "rev-parse", "feature/0.5.0").strip() == (head if lands else work)
+    if not lands:
+        assert git(tree, "rev-parse", "HEAD").strip() == head
     assert (result.returncode, tree.exists()) == ((0, False) if lands else (1, True))
     if mine == "verify: git rev-parse HEAD\n":
         assert head in result.stdout.splitlines()
-    if mine == "verify: false\n":
+    if mine and "false" in mine:  # the verify's own `fix:` line never reaches stderr
         assert fixes(result) == [
-            f"fix: Operator action: make `false` exit 0 in {tree} and commit the fix in this worktree"
+            f"fix: Operator action: make `echo 'fix: mine' >&2; false` exit 0 in {tree}"
+            " and commit the fix in this worktree"
         ]
-    if base and not mine:
+    if base is not None and not mine:
         assert fixes(result) == [
             "fix: Operator action: declare this repo's check command as a verify: line in"
             f" {tree}/AGENTS.md and commit it in this worktree"

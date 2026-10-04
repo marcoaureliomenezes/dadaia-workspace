@@ -70,7 +70,7 @@ def associate(root: Path, plan: str) -> None:
     git(root / "repos/r", "branch", "-f", "feature/0.5.0")
 
 
-def run(root: Path, *args: str) -> subprocess.CompletedProcess[str]:
+def run(root: Path, *args: str, input: str | None = None) -> subprocess.CompletedProcess[str]:
     env = {
         **child_keys(),
         "HOME": str(root),
@@ -80,7 +80,12 @@ def run(root: Path, *args: str) -> subprocess.CompletedProcess[str]:
         "TZ": "Asia/Tokyo",  # a naive produced_at never orders by the local zone
     }
     return subprocess.run(
-        [sys.executable, str(SCRIPT), *args], cwd=root, env=env, capture_output=True, text=True
+        [sys.executable, str(SCRIPT), *args],
+        cwd=root,
+        env=env,
+        capture_output=True,
+        text=True,
+        input=input,
     )
 
 

@@ -10,18 +10,8 @@ import subprocess
 from datetime import datetime
 from pathlib import Path
 
-from _worktree_git import (  # noqa: E402
-    _env,
-    cli,
-    cli_line,
-    flow_for,
-    git,
-    git_line,
-    ours,
-    quote,
-    script,
-)
-from _worktree_kinds import _NAME_RE, SCRIPT, Refusal, allows, kind_holding  # noqa: E402
+from _worktree_git import _env, cli, cli_line, flow_for, git, git_line, ours, quote, script
+from _worktree_kinds import _NAME_RE, SCRIPT, Refusal, allows, kind_holding
 
 REVIEWER = "dd-code-reviewer"
 
@@ -118,7 +108,8 @@ def _check_ancestor(tree: Path, work: str) -> None:
 
 def _verify(tree: Path) -> None:
     """Gate 1 (ADR 0185): run the `verify:` line of HEAD's `AGENTS.md` in *tree*; its
-    output, passed through, is the evidence for the landed sha."""
+    output, on stdout alone (one `fix:` per refusal, ADR 0158), is the landed sha's evidence;
+    stdin is closed: a verify reading it never blocks merge."""
     agents = git(tree, "show", "HEAD:AGENTS.md", check=False).splitlines()
     command = next(
         (x.removeprefix("verify:").strip() for x in agents if x.startswith("verify:")), ""
@@ -130,7 +121,14 @@ def _verify(tree: Path) -> None:
             f" {tree / 'AGENTS.md'} and commit it in this worktree",
         )
     # S602: the command is a tracked line of the HEAD being landed, trusted as its code is
-    done = subprocess.run(command, shell=True, cwd=tree, env=_env())  # noqa: S602
+    done = subprocess.run(  # noqa: S602
+        command,
+        shell=True,
+        cwd=tree,
+        env=_env(),
+        stdin=subprocess.DEVNULL,
+        stderr=subprocess.STDOUT,
+    )
     if done.returncode:
         raise Refusal(
             f"verify: {command} exited {done.returncode}",
@@ -222,10 +220,10 @@ def merge(root: Path, path: str, keep: list[str], drop: bool) -> str:
     _check_allowed(tree, work, name)
     _check_ancestor(tree, work)
     _check_approved(root, tree, work, name)
+    _verify(tree)
     kept = _kept(tree, "merge", keep, drop)
     if git(repo, "branch", "--show-current").strip() != work:
         raise Refusal(f"repos/{repo.name} is not on {work}", git_line(repo, "switch", work))
-    _verify(tree)
     try:
         git(repo, "merge", "-q", "--ff-only", branch)
     except RuntimeError as error:
