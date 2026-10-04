@@ -11,7 +11,6 @@ from __future__ import annotations
 import importlib.util
 import json
 import os
-import shutil
 import subprocess
 import sys
 import time
@@ -77,13 +76,16 @@ def _ledger(root: Path, *records: dict[str, object]) -> Path:
     return specs
 
 
-def _run(script: Path, *argv: str, cwd: Path | None = None) -> subprocess.CompletedProcess[str]:
+def _run(
+    script: Path, *argv: str, cwd: Path | None = None, env: dict[str, str] | None = None
+) -> subprocess.CompletedProcess[str]:
     return subprocess.run(
         [sys.executable, str(script), *argv],
         capture_output=True,
         text=True,
         check=False,
         cwd=str(cwd) if cwd else None,
+        env=env,
     )
 
 
@@ -771,8 +773,9 @@ def test_fix_refuses_a_history_it_cannot_read(
     record = {**_OPEN_RECORD, "status": "resolved", "closed_at": "2026-09-21T00:00:00Z"}
     specs = _ledger(tmp_path, record)
     if not git_init:
-        shutil.rmtree(tmp_path / ".git")
-    done = _run(script, "fix", "--specs", str(specs))
+        (tmp_path / ".git").rename(tmp_path / "git-gone")  # read-only objects: no rmtree on Windows
+    env = {**os.environ, "GIT_CEILING_DIRECTORIES": str(tmp_path.parent)}  # never a parent repo
+    done = _run(script, "fix", "--specs", str(specs), env=env)
     assert done.returncode == code
     assert (done.stdout if code == 0 else done.stderr).splitlines()[-1] == last
 
