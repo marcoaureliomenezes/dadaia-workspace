@@ -30,7 +30,7 @@
 
 ## Decisions
 
-- These ADRs decide: 0071 (amended by 0163), 0104, 0118, 0119, 0122, 0123, 0138, 0140, 0142, 0143 (amended by 0166, 0170), 0146 (5), 0149, 0152 (2), 0158, 0160 (amended by 0164), 0162, 0163, 0164, 0166, 0167 (partly; the rest is rc-9's), 0170.
+- These ADRs decide: 0071 (amended by 0163), 0104, 0118, 0119, 0122, 0123, 0138, 0140, 0142, 0143 (amended by 0166, 0170), 0146 (5), 0149, 0152 (2), 0158, 0160 (amended by 0164), 0162, 0163, 0164 (amended by 0183), 0166, 0167 (partly; the rest is rc-9's), 0170.
 - One new ADR: 0176 (proposed), AC8.10. The operator accepts it in the release worktree, in the commit carrying the nine `### P-NN` hunks (`specs/ADRs/AGENTS.md` §3); `amends: 0167` is written then (0151 M2). 0143's repair and AC8.10's repairs take the 0138 lane.
 - 0181 (accepted 2026-10-03 at 1e1e9eee9; operator, "One ADR for rc-8's W8 law deletions (Recommended)") names every law line W8–W10 deletes or rewrites; every commit of this candidate deleting a law line cites it (0151 M3), T-050-183's cite 0177 and T-050-189's 0180. The operator accepts it before T-050-154's push.
 - Operator, 2026-10-03, verbatim:
@@ -135,8 +135,8 @@
   - `bugs.py fix <id>` prints the fix sha, test files and numstat, found through shape 3's `^fix\(bugs\): .*<id>` or shape 4's `(<sha>)`; no schema field is added; `LINEAGE.md` uses it in place of `git log -S`.
   - `bugs.py stats`' `direction:` rows and `PILLAR-BUGS` rows 27 (metric 3) and 45 read that numstat, never `evidence_diff`; F003 is re-measured by it and logged.
   - Command: for every record resolved since 2026-08-27, `bugs.py fix` prints a sha or lists it unlinked; both counts are logged.
-- AC9.3 `caused_by` is proposed by blame (FR `caused-by-proposed-by-blame`; 0164 (2), (3)):
-  - `resolve` blames the lines the staged diff removes and prints the candidates, skipping the regenerated files the projection declares, squash `(#n)` and `refactor(T-…)` commits.
+- AC9.3 `caused_by` is proposed by blame (FR `caused-by-proposed-by-blame`; 0164 (2), (3); 0183):
+  - `resolve` blames the lines the staged diff removes and prints the candidates, skipping the files the repo's `.gitattributes` marks `dadaia-generated`, squash `(#n)` and `refactor(T-…)` commits.
   - It refuses a `--caused-by` outside the candidates, and `none` when candidates exist, unless `--lineage-reason` is given and stored.
   - One semantics in the schema, `LINEAGE.md` and the bugs law: "the fix of X wrote the lines this fix corrects".
   - Case: `none` with candidates exits non-zero; with `--lineage-reason` it passes.
