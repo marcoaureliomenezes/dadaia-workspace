@@ -1,13 +1,22 @@
-# SPEC — Release: 0.5.0, candidate 8 (W8: the test law and the library pipeline leave; W9: bug lineage derived; W10: the open bugs; W11: agent-behavior evals, a parallel lane)
+# SPEC — Release: 0.5.0, candidate 8 (W8: the test law and the library pipeline leave; W9: bug lineage derived; W10: the open bugs; W11: agent-behavior evals, a parallel lane; W12: the bug loop stops)
 
-**Status:** Approved
+**Status:** In review
 **Release ID:** 0.5.0
 **Owner:** dd-product-engineer
 **Opened:** 2026-10-03
 **Origin:** backlog:agent-behavior-evals,cli-ships-no-library-pipeline,lib-test-guidance-dehydrated,tests-agents-scaffold-without-placeholders,test-intent-docstring-backfill,meta-tests-leave-pytest,preflight-ci-parity-derived,delete-text-count-inventory-asserts,adr-0143-measured-by-checks-the-concept,skill-md-soft-hard-line-limit,memory-update-states-the-truth-correction-lane,bug-fix-adds-never-rewrites-asserts,bug-fix-commit-derived-by-grep,caused-by-proposed-by-blame,focused-review-on-caused-by,bug-terminal-transition-commit-shape,architecture-survey-flat-core-infrastructure,doctor-context-ignores-other-contexts,guidance-messages-name-the-right-target,worktree-memory-states-plain-ledger-merge; bugs:test-suite-writes-outside-tmp,ci-preflight-writes-coverage-into-the-repo,hook-entrypoints-invisible-to-coverage,onboarding-next-step-names-another-context,init-on-a-copied-workspace-leaves-a-cli-bound-to-the-original,registry-row-missing-a-key-escapes-reg-schema,pre-push-warns-no-gitflow-block-for-an-absent-specs-tree,upgrade-leaves-reconcile-scratch-behind,bug-surface-schema-documents-the-deleted-regex,release-memory-appends-a-second-entry-on-rerun; findings:20260930-structural-convergence-F003,20260930-structural-convergence-F018,20260930-structural-convergence-F028,20260930-structural-convergence-F043,20260930-structural-convergence-F044,20260930-structural-convergence-F045,20260930-structural-convergence-F047,20260930-structural-convergence-F048,20260930-structural-convergence-F049,20260930-structural-convergence-F050,20260930-structural-convergence-F051,20260930-structural-convergence-F096,20260930-structural-convergence-F097,20260930-structural-convergence-F098,20260930-structural-convergence-F100,20260930-structural-convergence-F101,20260930-structural-convergence-F104,20260930-structural-convergence-F112,20260930-structural-convergence-F128,20260930-structural-convergence-F129,20260930-structural-convergence-F131,20260930-structural-convergence-F135,20260930-structural-convergence-F136
 
 - Sources: grills of 2026-10-02 (rc-8, Q1–Q4) and 2026-10-03 (train, Q1–Q6); reviews B1–B11, H1–L6 on fb8a29a75, then re-review 2 on 196f611aa; PR #278 F1; for W11, the grills and draft its Origin names. Task ids start at T-050-153.
-- Bug history read (permanent architecture review): PLAN §1, the as-is review.
+- Amendment 2026-10-04 (W12): grill `.dadaia/handoff/dadaia-workspace/2026-10-04T190000Z-main-thread-grill-fix-induced-bugs.handoff.json`, and the read-only audit at 76d7af604 (18 unregistered fix-induced breaks; surface verdicts). Operator words, verbatim (AskUserQuestion):
+  - Q1 "Sempre bug, com caused_by (Recommended)". Q2 "Para e refaz a anterior (Recommended)". Q3 "Registrar + auditar 2 superfícies (Recommended)".
+  - Q4 "Um comando = o CI Linux (Recommended)". Q5 "Auditoria → emenda rc-8 → script → REBUILDs (Recommended)".
+  - Q6 "1. Merge roda o CI-local", "2. Hook: vermelho → só revert ou bug", "3. Hook: protege asserts".
+  - Q7 "Sim, nunca reescreve (Recommended)". Q8 "Aceitar 0172, fazer no rc-8 (Recommended)". Q9 "Schema aceita task, depois 18 (Recommended)".
+  - Q10, a free-text demand (handoff finding 10): audit the instruction corpus with a private command. Q11 "Aprovar como desenhado (Recommended)".
+  - Q12 "rc-8 nos arquivos que ele já toca; resto no rc-10 (Recommended)". Q13 "Motivo curto só nas proibições (Recommended)". Q14 "Positivo por padrão; proibição só com falha real (Recommended)".
+  - Q15 "Merge na lib; hooks 2 e 3 privados (Recommended)". Q16 "Recusa com fix: declarar (Recommended)". Q17 "Reescrever (Recommended)" (a private rule, outside the library).
+  - Earlier, for the `-B` provider probe (AC10.1): "Part of 169 (Recommended)".
+- Bug history read (permanent architecture review): PLAN §1, the as-is review; for W12, the audit above.
 - Left out: `dependabot-pyjwt-open-on-main`, closing at the ship (rc-12); `removals-shipped-without-recorded-authority`, rejected (Q5).
 
 ## Objective
@@ -17,12 +26,14 @@
 - Bug lineage is derived from git, and a bug fix adds a case (0163, 0164). SKILL.md gets one size law (0170).
 - The open bugs are fixed; production and tests end smaller (§G1).
 - Agent behaviour is measured on the shipped wheel, from the associated repo `dadaia-evals`, beside W8–W10 (W11; 0177–0179).
+- A fix that breeds a bug is reverted and redone, never patched forward; a worktree merge lands only a verified, unrewritten HEAD (W12).
 
 ## Terms
 
-- `CONTEXT.md` holds the terms. **W8**–**W11** are this candidate; **DEL** and **FR** keep rc-5's meaning.
+- `CONTEXT.md` holds the terms. **W8**–**W12** are this candidate; **DEL** and **FR** keep rc-5's meaning.
 - **Meta-test**: a test whose subject is the suite or the repository (files outside the package, CI, ledgers), not a package module or shipped asset.
 - **Guard script**: a meta-test's unique check, moved into a script the one CI job runs.
+- **Fix-induced bug**: a break an already-merged fix caused; its `caused_by` names that fix's bug or task.
 - **Owner file**: the one test file owning a module's behaviour; a RED enters it as a new case (0146 (5)).
 - **Behaviour assert**: an assert on an exit code, an effect, or a stable id (finding code, slug, flag); a sentence, roster, or count with a source of truth is not one.
 - **Evals repo**: AC11.1's `CONTEXT.md` entry. `eval.yml` is a workflow in that file's one sense.
@@ -42,7 +53,8 @@
   - Amendment (AskUserQuestion): "Add to rc-8 (Recommended)" (backlog `worktree-memory-states-plain-ledger-merge` joins the Origin, AC10.14); "Land eval.yml on main early (Recommended)" (AC11.5, AC11.6).
   - Amendment (AskUserQuestion, 2026-10-04): "Run pytest with -B (Recommended)" (AC10.1).
   - Amendment (AskUserQuestion, 2026-10-04): "Global test setup (Recommended)" (AC10.1; T-050-169 uses `tests/conftest.py`'s session env, not a per-test env builder).
-- Order (root map §1): AC8.9; the rest of W8; W9; W10, after AC9.3 and AC8.1's `Intent:` strip. Width: the PLAN's Parallel schedule (0149).
+- Order (root map §1): AC8.9; the rest of W8; W9; W10, after AC9.3 and AC8.1's `Intent:` strip. Width: the PLAN's Parallel schedule (0149). From 2026-10-04, W12's order (Q5) governs every open task.
+- W12 (amendment 2026-10-04): two new ADRs, proposed in the release worktree: the merge ADR (AC12.7; its ruling Q7's words) and the bug-loop law ADR (AC12.1–AC12.3, AC12.6's reviewer line, AC12.11; its ruling Q1, Q2, Q12–Q14's words). 0172 is ruled by Q8's words (AC12.8). The main thread writes every acceptance.
 - W11 (amendment, operator 2026-10-03, AskUserQuestion, verbatim):
   - Fold (grill 170932Z): "fold into rc-8. make sure to define that it can surely be implemented in parallel ... because it's on other repo".
   - Q-W0: "Yes, only that slice (Recommended)". AC11.0 carries only "an associated repo's impl reads the main repo's Approved trio" of proposed 0174; the rest stays rc-11's.
@@ -57,7 +69,7 @@
   - At birth (8f4ed785f): 25,307 / 1,233 / 45,464 / 0 / 0.
   - Production: rc-7 planned −160, measured +342 (PR #278 F1); rc-8 carries the 502-line miss and ends at or below 24,805, its ADDs counted; the PLAN names the DELETE rows, AC8.9 the largest.
   - Tests, guard scripts counted in (the c4 target): functions plus guard checks ≤ 1,167; test lines plus guard-script lines ≤ 43,232.
-- G2 `bugs.py status` lists no open record whose `caused_by` names a W8–W10 record or commit.
+- G2 `bugs.py status` lists no open record whose `caused_by` names a W8–W12 bug or task.
 - G3 Each open bug is re-run at `<end>`; one not reproducing is resolved, citing the commit that removed its cause.
 - G4 CI green on the three OSes; `.dadaia/.venv/bin/dadaia doctor --context dadaia-workspace` exits 0. Wall-clock vs rc-7: one runner class, the median. The guard-script job is the only job added.
 - G5 A test a DEL leaves dead leaves in the same commit. A new test follows the root-map test basics (AC8.1).
@@ -137,25 +149,31 @@
   - `bugs.py fix <id>` prints the fix sha, test files and numstat, found through shape 3's `^fix\(bugs\): .*<id>` or shape 4's `(<sha>)`; no schema field is added; `LINEAGE.md` uses it in place of `git log -S`.
   - `bugs.py stats`' `direction:` rows and `PILLAR-BUGS` rows 27 (metric 3) and 45 read that numstat, never `evidence_diff`; F003 is re-measured by it and logged.
   - Command: for every record resolved since 2026-08-27, `bugs.py fix` prints a sha or lists it unlinked; both counts are logged.
-- AC9.3 `caused_by` is proposed by blame (FR `caused-by-proposed-by-blame`; 0164 (2), (3); 0183):
-  - `resolve` blames the lines the staged diff removes and prints the candidates, skipping the files the repo's `.gitattributes` marks `dadaia-generated`, squash `(#n)` and `refactor(T-…)` commits.
+- AC9.3 `caused_by` names a bug or a task, proposed by blame (FR `caused-by-proposed-by-blame`; 0164 (2), (3); 0183; Q9):
+  - `caused_by` accepts a bug id or a task id such as `T-050-97` (`bug-record-v1`, `bugs.py`); every write and `check` refuse a task id no `TASKS.md` under `specs/releases/`, `_archive/` included, carries.
+  - `resolve` blames the lines the staged diff removes, `tests/` included, and prints the candidates: the bug of a shape-3 subject, the task of a `<type>(<task-id>)` subject. It skips files `.gitattributes` marks `dadaia-generated`, squash `(#n)` and `refactor(T-…)` commits.
   - It refuses a `--caused-by` outside the candidates, and `none` when candidates exist, unless `--lineage-reason` is given and stored.
-  - One semantics in the schema, `LINEAGE.md` and the bugs law: "the fix of X wrote the lines this fix corrects".
-  - Case: `none` with candidates exits non-zero; with `--lineage-reason` it passes.
-- AC9.4 `caused_by` other than `none` makes the review read every line the prior fix wrote and state REBUILD or why not (FR `focused-review-on-caused-by`; 0164 (5)); it lives in `dd-code-review`, measured by `PILLAR-BUGS`, never gated.
+  - One semantics in the schema, `LINEAGE.md` and the bugs law: "the fix of X, a bug or a task, wrote the lines this fix corrects".
+  - Cases: `none` with candidates exits non-zero, with `--lineage-reason` it passes; a staged diff removing a `tests/` line a `fix(T-050-168)` commit wrote lists `T-050-168`; `--caused-by T-999-999` exits non-zero.
+- AC9.4 `caused_by` other than `none` makes the fix a REBUILD of the causing fix (AC12.2): the review reads every line the prior fix wrote and checks the revert (FR `focused-review-on-caused-by`; 0164 (5); Q2); it lives in `dd-code-review`, measured by `PILLAR-BUGS`, never gated.
 - AC9.5 `dd-gitflow-default` §3a row 4 widens to every terminal transition without code: `chore(bugs): <verb> <id> — <reason, or by <task-id> (<sha>)>`, one edit with AC9.1's (FR `bug-terminal-transition-commit-shape`).
 
 ## W10 — the open bugs, harm-ordered (Arm B)
 
-After AC9.3 and AC8.1's `Intent:` strip merge. Each RED is a behaviour assert in its owner file, except AC10.1's, which is a session hook, because no per-test assert can see other tests' children; MEDIUMs first.
+After AC9.3 and AC8.1's `Intent:` strip merge. Each RED is a behaviour assert in its owner file, except AC10.1's, an inner `pytester` session, because no per-test assert can see other tests' children; MEDIUMs first.
 
-- AC10.1 One test child-env authority (DEL `test-suite-writes-outside-tmp`; F018, F049, F135, F136), re-cut on AC8.9:
-  - One authority, `tests/conftest.py`'s session env (operator 2026-10-04: "Global test setup (Recommended)"): `PYTHONDONTWRITEBYTECODE=1` and `DADAIA_FENCED_ROOTS` at import, so they reach xdist workers; `HOME`, `USERPROFILE`, `XDG_CACHE_HOME` and `LOCALAPPDATA` under a `tempfile.mkdtemp(prefix="dadaia-test-home-")` home at `pytest_configure`, before collection and in every process (the xdist controller and each worker pin their own), pinned by `harness_env.py`'s `pin_child_env()` and removed at `pytest_unconfigure`. An inheriting child gets them as they are; an env built from scratch starts from `child_keys()`. The parent's `COVERAGE_FILE`, `COVERAGE_PROCESS_START` and `COVERAGE_PROCESS_CONFIG` cross it (AC10.2, AC10.3).
-  - Leaves: `session_home()`, the `HOME` pin in the private `_base_env()`, the `_hook_env` helpers of `tests/e2e/test_push_gate_check.py` and `tests/e2e/test_push_denylist_journey.py`, the ad-hoc copies that rebuilt child keys, and module-level env snapshots taken before the pin; per-call filtered reads of the session env stay. Stays: `base_env()`, now public, the session env minus the vars no harness sets, for hook and non-hook children; `child_keys()`, the base of a from-scratch env; `pin_child_env()`, the `pytest_configure` pin.
-  - `tests/README.md`'s run and `ci.yml` run pytest with `-B` / `PYTHONDONTWRITEBYTECODE=1`, by T-050-173 (amendment, operator 2026-10-04: "Run pytest with -B (Recommended)"); measured: `-B` alone does not reach xdist workers, so the session env carries the switch to them; `-B` covers the controller's imports of `tests/__init__.py` and `tests/conftest.py`, which write bytecode before any conftest line runs, and the session env covers the workers, so the run needs both.
-  - Tripwire: a `pytest_sessionfinish` check compares against a sessionstart snapshot and exits the run 1 on a gained `__pycache__` directory under `dadaia_workspace/` or `tests/`, or on a gained top-level entry under the parent `HOME`'s `.cache`. RED (the loop run, no plant test in the suite): with the pin removed, the run exits 1 on a gained `__pycache__`.
-  - Acceptance: on a checkout with no `__pycache__`, after `env -u PYTHONDONTWRITEBYTECODE HOME=<tmp> python -B -m pytest -q -n 3 -p no:randomly`, the run exits 0, `find dadaia_workspace tests -name __pycache__` prints nothing and `<tmp>/.cache/pip` is absent. F136 is scored from a CI E2E run.
-  - A product writer the tripwire caught in E2E is fixed at its cause: `python_env.py`'s provider probe runs the workspace venv's python with `-B`, so `dadaia init` writes no `__pycache__` into an editable install's checkout (4ca3d7136).
+- AC10.1 One test session env, one owner (REBUILD, audit surface 1; DEL `test-suite-writes-outside-tmp`; F018, F049, F135, F136), re-cut 2026-10-04 (Q3, Q5):
+  - Owner: a pure `suite_env(parent, home)` returning the suite's whole env; `tests/conftest.py`'s `pytest_configure` applies it once per process, the xdist controller and each worker; every child env is `suite_env(...) | overrides`.
+  - Deleted: every env write outside that one apply (conftest import time, session fixtures, per-helper builders); `pin_child_env`, `child_keys`, `drop_operator_env`, `_CHILD_HOME`, `TESTS_PARENT_HOME`, and every env-name set but `suite_env`'s.
+  - Reverted, then the smallest correct redo: 09d259133's pin and trio, 4ca3d7136's hunks (i, ii), b69ee15b9's in-process line, 76d7af604's conftest hunk.
+  - Kept: the deleted ad-hoc copies and scrubs, the heartbeat as a hook subprocess, the provider probe's `-B`.
+  - `test_conftest_pollution_guard.py`'s conftest re-execution (`SimpleNamespace` configs) leaves; the tripwire is tested by a real inner session (`pytester`).
+  - Case, `suite_env`'s owner file: a parametrize row with a literal parent env and a literal expected env (the operator's `DADAIA_*` and `HOME` out, the temp home and the suite keys in).
+  - Case, `pytester`: an inner run under an operator `DADAIA_CONTEXT` and a foreign `HOME` passes, its child seeing the temp `HOME`; an inner run that writes a watched `__pycache__` exits 1.
+  - Tripwire: `pytest_sessionfinish` exits the run 1 on a gained `__pycache__` under `dadaia_workspace/` or `tests/`, or a gained top-level entry under the `.cache` of the parent `HOME` `suite_env` received.
+  - `-B`: `tests/README.md`'s run and `ci.yml` run pytest with `-B` (T-050-173; "Run pytest with -B (Recommended)"), covering the controller's imports before any conftest line; `suite_env` carries `PYTHONDONTWRITEBYTECODE=1` to the workers.
+  - Acceptance: on a checkout with no `__pycache__`, after `env -u PYTHONDONTWRITEBYTECODE HOME=<tmp> python -B -m pytest -q -n 2`, the run exits 0, `find dadaia_workspace tests -name __pycache__` prints nothing and `<tmp>/.cache/pip` is absent. F136 is scored from a CI E2E run.
+  - Product writer: `python_env.py`'s provider probe runs the workspace venv's python with `-B`, so `dadaia init` writes no `__pycache__` into an editable checkout (4ca3d7136; "Part of 169 (Recommended)").
 - AC10.2 Coverage data lands outside the repo (DEL `ci-preflight-writes-coverage-into-the-repo`; F048), re-cut on AC8.9: on every documented path (CI, the `pytest --cov` lines of `tests/README.md` and `tests/AGENTS.md`) no coverage file appears in the checkout; one decider, placed by the as-is review. Case: after each path, `git status --porcelain --ignored | grep -c coverage` prints `0`.
 - AC10.3 Hooks are visible to coverage and bounded in cost (DEL `hook-entrypoints-invisible-to-coverage`; F051; 0118): `hooks/ctx_inject.py` and `sdd_post_gate` are above 0 in CI's coverage JSON. One case, parametrized over the hook lanes, counts operations at the boundary seam (the filesystem or subprocess fake), no counter in production code; it does not grow with workspace size.
 - AC10.4 A run judges only its own context (DEL `onboarding-next-step-names-another-context`; FR `doctor-context-ignores-other-contexts`; FR `guidance-messages-name-the-right-target`, SessionStart part; F028, F096, F098): one decider, the bound context or the one `--context` names; the cross-context walk is deleted. Case: bound to X with two contexts, the next step's `step_id` and slug are X's. Case: with slop only in another context's repo, `doctor --context X` exits 0.
@@ -242,6 +260,76 @@ After AC9.3 and AC8.1's `Intent:` strip merge. Each RED is a behaviour assert in
   - Check: a `_RELEASE.json` log entry names the run URL, verdict, tokens and wall time.
 - At closure, `agent-behavior-evals` exits `delivered --release 0.5.0`: that needs AC11.6 logged and 0177–0179 ruled (its done-when). The promote gate is rc-12's (§Carried).
 
+## W12 — the bug loop stops (amendment, grill 2026-10-04): acceptance
+
+- Not in scope: gate 2 (a red work branch takes only a revert or a registered bug) and gate 3 (a `fix(...)` commit keeps old asserts) are private developer hooks (Q15), outside the library.
+- AC12.1 A break a merged fix caused is a bug (Q1): `specs/bugs/AGENTS.md` §1's "own mistake" exclusion covers only unmerged rework inside a worktree; a break an already-merged fix caused is registered with `caused_by` (source `pub/scaffold/bugs/AGENTS.md`).
+- AC12.2 One fix-induced bug triggers a REBUILD at once (Q2), in `LINEAGE.md`:
+  - A REBUILD reverts the culprit commits, then lands the smallest correct redo; never a large rewrite, since larger fixes induce more bugs (audit, research).
+  - Work in flight on that unit stops until the REBUILD lands; the ≥ 2 prior fixes trigger stays.
+  - Observable: the REBUILD's range holds a `git revert` of each culprit before the redo, and its body's `rebuild:` line names them.
+- AC12.3 A red a merged fix caused is Arm B (Q1, Q2): `dd-release-implementation` §2a routes it to registration, revert and redo (AC12.2), never a follow-up commit; a flaky red is quarantined with a bug. Measured by the next audit's `PILLAR-BUGS` readout.
+- AC12.4 The hidden breaks are registered (Q3, Q9), after AC9.3's task-id half merges:
+  - One `chore(bugs): report …` commit appends the 18 below with their true `caused_by`; a `bugs.py update` repairs `dead-holds-main-repo-before-associated-push` to `caused_by: sa-context-dead-removes-repos-outside-the-reaper`.
+  - Rows 10, 13 and 14–17 stay open until the AC redoing their cause lands (AC12.9, AC12.10, AC10.1) and resolve by its commit; the other twelve: Open questions.
+  - Check: `bugs.py status` lists the 18; `bugs.py check` is clean.
+
+| # | slug | sev | `caused_by` |
+|---|---|---|---|
+| 1 | `bootstrap-e2e-closure-walk-ignores-requirement-markers` | LOW | `none`, reason ff5245e08 (no id) |
+| 2 | `gate-path-purity-test-premise-died-with-t097` | LOW | `T-050-97` |
+| 3 | `gate-path-purity-child-env-drops-pythonpath` | MEDIUM | `T-050-97` |
+| 4 | `dadaiaignore-doctor-breaks-bind-resolution-import-contract` | MEDIUM | `T-050-116` |
+| 5 | `help-quality-mask-misses-folded-venv-path-on-ci` | LOW | `T-050-145` |
+| 6 | `sweep-remove-misses-oserror-on-python-3-14` | MEDIUM | `T-050-146` |
+| 7 | `host-shell-cmd-test-escapes-fix-line-quotes` | LOW | `T-050-149` |
+| 8 | `windows-quoted-fix-left-behavior-map-hash-stale` | LOW | `windows-quoted-executable-fix-not-runnable-in-powershell` |
+| 9 | `bugs-fix-nonrepo-test-not-portable` | LOW | `T-050-167` |
+| 10 | `t168-canon-change-without-stamp-bump` | MEDIUM | `T-050-168` |
+| 11 | `bugs-own-check-attr-keeps-cr-on-windows` | MEDIUM | `T-050-168` |
+| 12 | `blame-refusal-test-asserts-a-posix-fix-line` | LOW | `T-050-168` |
+| 13 | `doctor-stub-drifts-from-doctorservice-signature` | LOW | `onboarding-next-step-names-another-context` |
+| 14 | `outside-tmp-home-pin-coupled-to-session-hooks` | MEDIUM | `test-suite-writes-outside-tmp` |
+| 15 | `workspace-venv-probe-writes-bytecode-into-editable-checkout` | LOW | `test-suite-writes-outside-tmp` |
+| 16 | `heartbeat-test-drives-hook-in-process` | LOW | `suite-fails-under-an-operator-dadaia-context` |
+| 17 | `operator-env-scrub-row-leaves-stale-pinned-home` | MEDIUM | `suite-fails-under-an-operator-dadaia-context` |
+| 18 | `t151-fix-line-tests-compare-os-separator-paths` | LOW | `T-050-151` |
+
+- AC12.5 `worktree.py merge` lands only a verified HEAD (Q6 gate 1, Q15, Q16):
+  - Every kind: `merge` runs the repo's declared verification command inside the worktree, at the HEAD it lands, before the fast-forward; a non-zero exit lands nothing and leaves the work branch and the tree unchanged.
+  - The command is declared once per repo, in any language, opaque to `merge`; where it is declared is the PLAN's.
+  - No declaration: `merge` refuses with one `fix:` line naming where to declare it.
+  - Cases, `test_worktree_lifecycle.py`: a command exiting 1 refuses and the work branch tip is unchanged; one exiting 0 lands; one printing `git rev-parse HEAD` prints the landed sha; no declaration refuses, its fix line naming the place.
+- AC12.6 This repo declares one script running every Linux job of `.github/workflows/ci.yml` locally (Q4):
+  - Steps: `ruff format --check`, `ruff check`, `lint-imports`, `mypy --strict`, `scripts/guards/run.py` and `--planted`, unit, the unit-plus-contract coverage run, integration, e2e, repo-hygiene, `doctor`. PR-event and Windows/macOS jobs are out.
+  - pytest runs with at most `-n 2`, in random order (`pytest-randomly` on).
+  - It prints each step's verdict and exits non-zero when any step fails. Case: a planted ruff violation, and a planted failing test, each turn it non-zero.
+  - Every `dd-code-reviewer` verdict carries this script's output for its sha, and names Windows-only and macOS-only risk unverified; no output, no APPROVED (`dd-code-review`).
+- AC12.7 `worktree.py merge` never rewrites (REBUILD, audit surface 2a; Q7):
+  - `merge` lands exactly the approved HEAD by fast-forward; when the work branch moved, it refuses with `fix: git -C <tree> rebase <work>` and changes nothing.
+  - Deleted: the in-merge rebase (820bee3b0's step), the TASKS-marker replay (36ce79d7d), the already-contains early return (1cfc3b72d), `_worktree_end.py`'s `sys.path` reach-in to `dd-release-implementation`; 0111's replay case leaves with it.
+  - The merge ADR amends `worktrees/AGENTS.md` §2 step 6 and 0111's TASKS clause; its ruling is Q7's words. `pub/data/worktrees-AGENTS.md` step 6 is rewritten citing it.
+  - Case: with the work branch moved, `merge` exits non-zero and both branches are unchanged; after the fix line and a verdict on the new HEAD, `merge` lands.
+- AC12.8 `context dead` never commits (REBUILD per 0172, audit surface 2b; Q8):
+  - Deleted: `dead --commit`, `commit_all`, dead's untracked-consent, secret and identity refusals, 1ee8aa30f's secret-refusal hunk.
+  - Kept: `unrecoverable()`'s stash count.
+  - A dirty checkout refuses with one fix line per file and leaves tree and origin untouched; each 0154 direct writer commits its own output in the act.
+  - Cases: 0172's `measured_by`; `context dead <ctx> --commit` exits 2.
+- AC12.9 T-050-168's stamp hunk is redone (audit):
+  - Reverted: a41c69967's re-pin and aed2ac322's rule-comment rewrite in `tests/unit/core/test_specs_version.py`; the test's rule stands as first written.
+  - Then, the PLAN's pick: a real `CANONICAL_SPECS_VERSION` bump, or an ADR recording "stamp 9 never shipped". Never a test comment.
+  - Case: `test_a_canon_change_bumps_the_stamp` passes with its original assert and rule.
+- AC12.10 `_StubDoctor` leaves (audit; 2 repairs in 2 days): `tests/unit/cli/test_exitcode_truthfulness.py` drives the real `DoctorService` over a tmp workspace; its cases keep their expected exit codes.
+- AC12.11 The law files rc-8 rewrites meet one authoring bar (Q12–Q14):
+  - Files: `pub/scaffold/bugs/AGENTS.md`, `S/dd-bug-resolution/SKILL.md` and `LINEAGE.md`, `S/dd-gitflow-default/SKILL.md`, `pub/data/worktrees-AGENTS.md`, `S/dd-release-implementation/SKILL.md`, `S/dd-code-review/SKILL.md`; each rewritten once, in the task changing its law.
+  - Bar: positive by default; a prohibition stays only with a demonstrated failure and its short reason (a bug or ADR id); one line per instruction.
+  - Measured by the operator's private `/corpus-audit` (developer tooling, not product): 0 conflict, stale-ref and unprovenanced-prohibition findings on those files; `public stage`, `install`, `doctor` clean.
+- Order (Q5); every other open rc-8 task stays paused until step 3 lands:
+  1. The law and the lineage data: AC12.1–AC12.3, AC9.3's rewrite, then AC12.4.
+  2. Gate 1 and its script: AC12.5, AC12.6.
+  3. The REBUILDs: AC10.1, AC12.7, AC12.8; then AC12.9, AC12.10.
+  4. Only then the paused tasks: T-050-172 … T-050-181, T-050-185, T-050-186, T-050-188, T-050-189.
+
 ## Replaces
 
 - `ci preflight`, its scope error, runner and pytest bootstrap; the Python-only anchors, reaping list, tool names, extension list and `TOOL_CACHE_ENV` list (AC8.9).
@@ -252,6 +340,10 @@ After AC9.3 and AC8.1's `Intent:` strip merge. Each RED is a behaviour assert in
 - Prose, roster and count asserts; CONTEXT-MAP's `Measured` and skills `Budget` columns; 0143's symbol-list `measured_by`.
 - Phase 5's "rewritten", Phase 6's "net ≤ 0"; required `evidence_seam`/`evidence_diff`, their verification, metric 2 over them, direction from `evidence_diff`; the `git log -S` recipe; an unreasoned `none`; the "reopen" wording; §3a row 4's resolve-only wording.
 - Ad-hoc child envs, `COVERAGE_FILE` redirects; the cross-context walk; build-identity venv reuse; the bare `KeyError`; the no-block warning for an absent constitution; HOOKS-DRIFT-1's fixed "differs"; the reconcile scratch and unconditional hook rewrite; the deleted surface regex; the second `kind: memory` append.
+- The test env written at import, in session fixtures and per helper; `pin_child_env`, `child_keys`, `drop_operator_env`, `TESTS_PARENT_HOME`, their name sets; the conftest re-execution tests (AC10.1).
+- "Own mistake" covering a merged fix's break; the follow-up commit for a fix-induced red; "state REBUILD or why not"; `caused_by` bugs only; blame blind to `tests/` (AC12.1–AC12.3, AC9.3, AC9.4).
+- An unverified merge; merge's rebase, TASKS-marker replay, already-contains return and `sys.path` reach-in; 0111's marker clause (AC12.5, AC12.7).
+- `dead --commit`, `commit_all`, dead's consent, secret and identity refusals, certification's `dead --commit` call (AC12.8); the stamp-9 re-pin and its rewritten rule; `_StubDoctor` (AC12.9, AC12.10).
 - The map's unscoped "no CI job calls a model API", in the root map, SKILL.md §3b and `CICD-AUTOMATION.md` (0177); an `impl` worktree reading the trio from its own repo (AC11.0); memory's ledger union merge and step 7's bare conflict line (AC10.14).
 
 ## Risks
@@ -263,14 +355,24 @@ After AC9.3 and AC8.1's `Intent:` strip merge. Each RED is a behaviour assert in
 | The root map passes its soft budget (8,293 of 8,192 B). | Basics rewrite existing bullets. |
 | The deletion goal is missed. | Planned row by row; the closure logs it. |
 | A grader keyed on one version fakes a drop. | AC11.3 and AC11.4 run each grader on both versions. |
+| Each merge now runs the Linux suite, and the reviewer runs it too. | The cost Q4 and Q6 chose; the PLAN measures one run's wall time. |
+| AC12.6's script drifts from `ci.yml`, reopening the escape path. | The PLAN names one source for both, or a guard check compares them. |
+| A revert reintroduces the bug the culprit fixed. | The revert and its redo land in one merge, gate 1 green. |
+| The SPEC is past its 24 KiB recommendation (0152 (2)). | Q5 placed the amendment in rc-8; W12 lines stay one line each. |
 
 ## Carried — the 0.5.0 map (ADR 0140; one candidate at a time)
 
 - rc-9: the tests tree mirrors the package, except `tests/contract/test_docs_derived_from_memory.py`, which P-29 names, until check #7 rules; the unit tier spawns no processes, carrying rc-7's slow-class G4 growth (operator 2026-10-02: "Same-runner-class rule; slow-class growth to rc-8 (Recommended)", tied to `unit-tier-without-processes`); the production-faithful hook harness (0163); `worktree-rows-injected-not-monkeypatched`; `windows-integration-coverage-gap`; `repo-ci-sast`. With rc-8, they complete 0167. If pending at rc-8's closure (G6): T-050-183, T-050-187, T-050-188 (0177's accept) and T-050-189 (0180's), with `agent-behavior-evals` or AC10.14's law line.
-- rc-10: `public-law-language-neutral`; `dd-ask-me-owned-questioning-skill`, delivering 0165 and `dd-ai-eng-knowhow/AUTHORING.md:134` ("asks the whole frontier at once"), caught by 0165's repaired `measured_by`; `adr-born-at-release-with-options`; `adr-ledger-triage-process-rules`; `architecture-adr-section-generated`; F088, F089, F139–F148.
+- rc-10: the rest of the instruction corpus to AC12.11's bar, `dd-ai-eng-knowhow/AUTHORING.md` included (Q12, Q13); `public-law-language-neutral`; `dd-ask-me-owned-questioning-skill`, delivering 0165 and `dd-ai-eng-knowhow/AUTHORING.md:134` ("asks the whole frontier at once"), caught by 0165's repaired `measured_by`; `adr-born-at-release-with-options`; `adr-ledger-triage-process-rules`; `architecture-adr-section-generated`; F088, F089, F139–F148.
 - rc-11: workspace replication (7 entries, ADRs 0171–0175, 0174 less AC11.0's slice); F084.
 - rc-12, the promote: docs site F109, clone detection F110, launch prep F111; the residue (`spec-context-refusals-print-prose`, `privacy-baseline-one-parser`, `ledger-refusals-guess-specs-from-command-shape`, `ledger-reader-one-numbered-tolerant-iterator`, `doctor-in-a-fresh-worktree-lacks-rendered-specs-law`, F060); memory drift F123–F127; bug metrics F001, F004, F005, F009 (re-measured over AC9.3's links); the publish gate F067; `test_docs_derived_from_memory.py` leaves pytest after check #7 rules, `meta-tests-leave-pytest` exits delivered then; the audit checks never run, F137; the removal-authority notes (F069); PyJWT, closing at the ship; the evals gate at the promote (0178): the promote PR head is evaluated and its run logged on the work branch before the merge; at `approve`, `git diff --name-only <evaluated>..<tag>` lists only `CHANGELOG.md`, `.release-please-manifest.json` and `pyproject.toml` (its version line), else `eval.yml` runs on the tag sha first and only a non-blocking verdict approves. Open, the operator's before the promote (F4): ADR 0122's zero active backlog against the four post-0.5.0 evals follow-ups, `evals-release-gate-status`, `evals-harness-lanes-and-benchmark`, `evals-windows-smoke` and `devin-subagent-projection`.
 
 ## Open questions for the operator
 
+- W12, to the main thread before approval:
+  1. 0168's patch-id carry: does a conflict-free, agent-side rebase keep the verdict, or does the merge ADR supersede 0168, so every rebase takes a fresh verdict and the reflog search leaves?
+  2. Rows 1–9, 11, 12 and 18 of AC12.4, whose cause no REBUILD here redoes: does Q2 apply retroactively (a REBUILD of T-050-97, -116, -145, -146, -149, -151, -167 and T-050-168's other hunks), or do they resolve citing their landed repair?
+  3. Row 1's culprit ff5245e08 has no bug or task id: is `none` with `--lineage-reason` its true `caused_by`?
+  4. W11's `dadaia-evals` lane (T-050-185, -186, -188) touches neither surface: paused with the rest, as written, or kept parallel?
+  5. `AUTHORING.md` rule 9 ("provenance and history live in git, never in the skill") contradicts Q13 until rc-10: move rules 8–9 into AC12.11?
 - None for W8–W11: the 2026-10-03 grill frontiers are empty. F4 is rc-12's (§Carried). Operator acts: 0176, 0177, 0178 and 0180's acceptances (§Decisions); W11's GitHub prerequisites (the `evals` environment, its secret, the required `ci.yml` job).
