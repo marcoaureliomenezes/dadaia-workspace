@@ -64,7 +64,7 @@
       "type": "string",
       "minLength": 1,
       "x-mutability": "immutable-core",
-      "description": "The directory of the context's own repo whose tooling broke — one name matching ^[a-z0-9_-]+$, tracked at any depth (F011); `bugs.py append` refuses anything else. Records born before carry free text or the legacy `unknown`, valid as written."
+      "description": "A directory name tracked in the repo; `bugs.py append` refuses any other. Records born before carry free text or the legacy `unknown`, valid as written."
     },
     "correlates": {
       "type": "array",
