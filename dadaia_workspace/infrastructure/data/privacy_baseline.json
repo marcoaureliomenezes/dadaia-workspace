@@ -67,7 +67,7 @@
     },
     {
       "id": "email-address",
-      "regex": "(?<![\\w.+-])[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}(?![\\w.-])",
+      "regex": "(?:(?<![\\w.+-])(?!(?<=\\\\)[ntr])|(?<=\\\\[ntr]))[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}(?![\\w.-])",
       "reason": "email address",
       "exclude_regex": "^noreply@anthropic\\.com$|@(?:example\\.(?:com|org|net)|noreply\\.anthropic\\.com|users\\.noreply\\.github\\.com|workspace\\.local|(?:[A-Za-z0-9-]+\\.)*(?:invalid|test|example|localhost))$",
       "exclude_rationale": "example.com/.org/.net, *.example, RFC-2606 reserved TLDs (.invalid/.test/.example/.localhost), workspace.local, GitHub's users.noreply.github.com, and the law-mandated noreply@anthropic.com Co-Authored-By trailer address (local-part-anchored, exact literal only) — all conventional non-identifying addresses, never a real operator mailbox."

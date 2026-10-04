@@ -51,6 +51,9 @@ def _manager(public_dir: Path) -> FileSystemPublicAssetManager:
         pytest.param("windows-users-path", "at C:\\Users\\Public.", "C:\\Users\\Public.", True, id="a12.3-trailing-period-placeholder"),
         pytest.param("email-address", _NOREPLY, _NOREPLY, True, id="privacy-baseline-noreply-local-part-not-carved-out"),
         pytest.param("email-address", _OTHER_MAILBOX, _OTHER_MAILBOX, False, id="a12.2-other-local-part-fires"),
+        pytest.param("email-address", chr(92) + "n" + _OTHER_MAILBOX, _OTHER_MAILBOX, False, id="address-after-escape-n-fires"),
+        pytest.param("email-address", chr(92) + "t" + _OTHER_MAILBOX, _OTHER_MAILBOX, False, id="address-after-escape-t-fires"),
+        pytest.param("email-address", chr(92) + "r" + _OTHER_MAILBOX, _OTHER_MAILBOX, False, id="address-after-escape-r-fires"),
         pytest.param("home-abs-path", "/hom" + "e/jdoe42", "/hom" + "e/jdoe42", False, id="fr7-realistic-home-fires"),
         pytest.param("internal-hostname", f"call {_host('Path', 'home')}()", _host("Path", "home"), True, id="path-home"),
         pytest.param("internal-hostname", f"call {_host('pathlib', 'Path', 'home')}()", _host("pathlib", "Path", "home"), True, id="pathlib-path-home"),
@@ -74,6 +77,16 @@ def test_baseline_pattern_matches_and_carve_out(
     assert match is not None and match.group(0) == hit
     assert pattern.exclude is not None
     assert bool(pattern.exclude.search(hit)) is excluded
+
+
+@pytest.mark.parametrize("letter", ["n", "t", "r"])
+def test_email_pattern_never_reads_an_escape_letter_as_local_part(letter: str) -> None:
+    """privacy-email-pattern-reads-escape-as-local-part: a source escape then a decorator is no address."""
+    pattern = {p.id: p for p in _load_privacy_baseline()}["email-address"]
+    assert (
+        pattern.regex.search("'" + chr(92) + letter + "@" + _host("pytest", "mark", "unit") + "'")
+        is None
+    )
 
 
 @pytest.mark.parametrize(
