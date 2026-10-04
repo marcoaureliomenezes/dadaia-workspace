@@ -1,6 +1,6 @@
 # TASKS — Release: 0.5.0
 
-**Status:** In review
+**Status:** Approved
 **Owner:** dd-software-engineer
 
 Candidate 8 — W8, W9, W10 (ADR 0140); W11, a parallel lane in `dadaia-evals` (PLAN §2.9). Paths as in PLAN. Each `W:` includes its tests; a DEL's dead tests leave in its commit (G5). Impl tasks run in their own `worktree.py new` impl worktree, bug tasks in one `bug` worktree each (`worktrees/AGENTS.md` §2), opened when `blocked by:` is merged and landed by `worktree.py merge`; PLAN §5 is the schedule, §2.7 the release-worktree steps R1–R10. Commit shapes: impl `<type>(T-050-NNN): …`, bug `fix(bugs): <id> — <cause>` with its `BUGS.jsonl` line; a commit deleting a law line cites ADR 0181 (T-050-183: 0177; T-050-189: 0180). No task after T-050-158 writes `Intent:`. `Δ` = prod / test lines / test functions.

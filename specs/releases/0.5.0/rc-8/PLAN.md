@@ -1,6 +1,6 @@
 # PLAN — Release: 0.5.0
 
-**Status:** In review
+**Status:** Approved
 **Release ID:** 0.5.0
 **Owner:** dd-software-engineer
 
