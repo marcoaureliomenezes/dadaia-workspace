@@ -33,9 +33,9 @@ Measured by: `pytest tests/contract/test_docs_derived_from_memory.py`.
 ADR: 0012 (accepted)
 Rationale: a document written beside memory rots; one that names its source is red the moment the source moves.
 
-### P-33 · We run no model API in CI: no workflow uses an `anthropics/*` action or references a model API secret; the security review is the local `dd-code-reviewer` lens.
-Measured by: `pytest tests/contract/test_ci_workflow_hygiene.py -k model_api`.
-ADR: 0025 (accepted)
+### P-33 · No CI job of a context's main repo or associated repos calls a model API, except an evals repo's, only in `workflow_dispatch` or `schedule` jobs (ADR 0177); no library workflow uses an `anthropics/*` action or references a model API secret; the security review is the local `dd-code-reviewer` lens.
+Measured by: `poetry run python scripts/guards/run.py` prints `PASS no-model-api-in-ci`.
+ADR: 0177 (accepted)
 Rationale: a CI job that needs a paid model key fails closed on every PR without it and forces admin merges.
 
 ## Test architecture
