@@ -42,19 +42,19 @@ multi-owner slug already on disk.
 
 ## Lesson 2 — a per-measurement exclusion breeds the next measurement's bug
 
-<!-- derived-from: QUALITY sha256:1530a3446bd6 -->
+<!-- derived-from: QUALITY sha256:f96b10f118ed -->
 
 When each measurement walks the tree itself and is fixed by its own special-case
 exclusion, the next measurement counts the same stray files. The structure that ends
-the family is one enumeration: every suite ratchet enumerates the same set —
-`tests/helpers/suite_files.tracked_test_files()` over `git ls-files -- tests` — so
-scratch files a concurrent xdist worker writes are outside the measurement by
-construction, not by a list somebody has to remember to extend.
+the family is one enumeration: every guard check enumerates the same set —
+`scripts/guards/run.py`'s `tracked()` over `git ls-files` — so a scratch file another
+process writes is outside the measurement by construction, not by a list somebody has
+to remember to extend.
 
 ## Lesson 3 — a derived cache breeds a bug per environment that derives it
 
 <!-- derived-from: bug-ledger sha256:11ce7d98680f -->
-<!-- derived-from: QUALITY sha256:1530a3446bd6 -->
+<!-- derived-from: QUALITY sha256:f96b10f118ed -->
 
 A record that caches a fact git already knows is wrong in every environment that
 derives it differently — a shallow checkout first among them. The structure that ends
@@ -63,7 +63,7 @@ history is that line's change log. No CI job fetches history for a bug record's 
 
 ## The standing order the lessons produced
 
-<!-- derived-from: QUALITY sha256:1530a3446bd6 -->
+<!-- derived-from: QUALITY sha256:f96b10f118ed -->
 <!-- derived-from: bug-ledger sha256:11ce7d98680f -->
 
 The workspace is in a permanent state of architecture review, oriented by its bug
@@ -79,7 +79,7 @@ history:
   `bugs.py stats` — "tests green" is not a verdict.
 - Let ratchets refuse growth. Private-symbol imports in tests (P-23) and the slop
   counts are pinned at their measured values and move downward only.
-- Keep one home per number.
+- Keep one home per definition (V37).
 
 Next: [the bug loop](bug-loop.md) — register, RED, fix, resolve, in commands. Or start
 at the [quickstart](quickstart.md).
