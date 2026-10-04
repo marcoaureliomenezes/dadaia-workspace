@@ -10,6 +10,7 @@ it, so the teaching and the gate cannot drift. Size: SMALL.
 
 from __future__ import annotations
 
+import importlib.util
 import json
 import re
 import shutil
@@ -88,6 +89,18 @@ def _admits(
     assert len(state["log"]) == 1
 
 
+def _plan_fix(script: Path) -> str:
+    """`_release_plan.PLAN_FIX` as the staged script computes it (its SKILL path is staged)."""
+    sys.path.insert(0, str(script.parent))
+    spec = importlib.util.spec_from_file_location(
+        "_release_plan", script.parent / "_release_plan.py"
+    )
+    assert spec and spec.loader
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return str(module.PLAN_FIX)
+
+
 def _refuses(script: Path, tmp_path: Path, plan: str, *needles: str) -> str:
     specs = _specs(tmp_path, plan)
     before = (specs / "releases/0.5.0/_RELEASE.json").read_bytes()
@@ -95,7 +108,7 @@ def _refuses(script: Path, tmp_path: Path, plan: str, *needles: str) -> str:
     assert result.returncode != 0
     assert (specs / "releases/0.5.0/_RELEASE.json").read_bytes() == before
     fixes = [line for line in result.stderr.splitlines() if line.lstrip().startswith("fix:")]
-    assert len(fixes) == 1, result.stderr
+    assert [f.strip() for f in fixes] == [f"fix: {_plan_fix(script)}"], result.stderr
     for needle in needles:
         assert needle in result.stderr
     return result.stderr

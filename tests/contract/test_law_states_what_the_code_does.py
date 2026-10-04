@@ -129,9 +129,9 @@ def test_commit_shapes_stage_the_kinds_allowed_set() -> None:
     assert outside == []
 
 
-def test_the_marker_lifecycle_is_stated_once_in_marks_order() -> None:
-    """AC4.6 (DEL implementer-persona-states-a-second-task-marker-lifecycle; ADR 0141): the
-    releases law's transitions equal `_release_schema.MARKS` in order."""
+def test_the_releases_law_transitions_equal_marks() -> None:
+    """AC4.6 (ADR 0141): the releases law's marker transitions equal `_release_schema.MARKS`
+    in order."""
     marks = _script("dd-release-implementation/scripts/_release_schema.py").MARKS
     arrow = r"`?\[([ x-])\]`?\s*(?:-+>|→|=>)\s*`?\[([ x-])\]"
     law = (_PKG / "public/scaffold/releases/AGENTS.md").read_text("utf-8")

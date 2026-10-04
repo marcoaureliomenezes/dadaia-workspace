@@ -15,8 +15,6 @@ from dadaia_workspace.features.specs.doctor_adr import adr_record_issues
 
 pytestmark = pytest.mark.contract
 
-_REPO_ROOT = Path(__file__).resolve().parents[2]
-
 
 def _ledger(tmp_path: Path, ids: list[str], **fields: object) -> Path:
     specs = tmp_path / "specs"

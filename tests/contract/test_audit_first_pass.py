@@ -1,7 +1,5 @@
-"""Intent: CONTRACT — T-048-08 (FR5 AC5.1, AC5.2), T-050-20 (AC3.4): dd-audit-project carries
-the first-pass section — it applies while doctor's next step is `first-pass` and ends at
-`dadaia doctor` exit 0, never at a stamp — and `memory.py drift --since <root commit>` is a
-runnable worklist. Size: SMALL.
+"""Intent: CONTRACT — T-048-08 (FR5 AC5.1, AC5.2), T-050-20 (AC3.4): `memory.py drift
+--since <root commit>` is a runnable worklist on a consumer layout. Size: SMALL.
 """
 
 from __future__ import annotations
@@ -17,13 +15,7 @@ pytestmark = pytest.mark.contract
 
 _REPO = Path(__file__).resolve().parents[2]
 _SKILLS = _REPO / "dadaia_workspace" / "public" / "skills"
-_SKILL = _SKILLS / "dd-audit-project" / "SKILL.md"
 _MEMORY = _SKILLS / "dd-spec-navigator" / "scripts" / "memory.py"
-
-
-def _first_pass_section() -> str:
-    text = _SKILL.read_text(encoding="utf-8")
-    return text.split("## 3. First pass", 1)[1].split("\n## ", 1)[0]
 
 
 def _git(repo: Path, *argv: str) -> str:
@@ -42,17 +34,6 @@ def _drift(repo: Path, catalog: dict[str, object]) -> subprocess.CompletedProces
         [sys.executable, str(_MEMORY), "drift", "--since", root, "--specs", str(repo / "specs")],
         capture_output=True, text=True, check=False,
     )  # fmt: skip
-
-
-@pytest.fixture
-def repo(tmp_path: Path) -> Path:
-    unit = tmp_path / "dadaia_workspace" / "features" / "greet"
-    unit.mkdir(parents=True)
-    (unit / "core.py").write_text("X = 1\n", encoding="utf-8")
-    _git(tmp_path, "init", "-q")
-    _git(tmp_path, "add", ".")
-    _git(tmp_path, "commit", "-qm", "root")
-    return tmp_path
 
 
 def test_drift_from_root_lists_units_of_a_consumer_layout(tmp_path: Path) -> None:

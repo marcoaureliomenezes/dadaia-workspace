@@ -30,7 +30,7 @@ failures after two local-green runs):
    replaces every ISO-8601 timestamp with ``<TS>``.
 5. **Rich-width** — Typer/Rich renders usage errors with ANSI colour + a box wrapped at
    an env-dependent terminal width, splitting asserted substrings across borders on CI
-   while staying plain locally (the v0.1.57 QA-atom law). → :func:`norm_stderr`.
+   while staying plain locally (the v0.1.57 QA-atom law).
 
 Regen discipline: :func:`assert_golden` regenerates a golden ONLY under its update env
 flag (default ``UPDATE_INSTALL_GOLDENS``). A byte diff without that flag is a behaviour
@@ -53,7 +53,6 @@ __all__ = [
     "assert_golden",
     "is_env_doctor_line",
     "norm_path_line",
-    "norm_stderr",
     "sort_line_lists",
 ]
 
@@ -155,25 +154,3 @@ def assert_golden(
         f"{what} diverged from the committed golden — the change altered observable "
         "behaviour. Fix the consumer, never the golden."
     )
-
-
-def norm_stderr(output: str, *, wide_glyphs: bool = False) -> str:
-    """Width-independent normalization of Typer/Rich error output (leak class 6).
-
-    On CI Rich renders the usage error with ANSI colour + a box wrapped at an
-    env-dependent width, splitting asserted substrings across borders; locally
-    (non-tty) it stays plain. Strip ANSI + box glyphs, collapse whitespace so a
-    substring assert holds on any terminal width (the v0.1.57 QA-atom law).
-
-    ``wide_glyphs=False`` (default) reproduces the 7-site character-set variant:
-    replace ``│╭╮╰╯─`` with spaces, then ``re.sub(r"\\s+", " ", ...)`` (edge whitespace
-    collapses to a single space, not stripped). ``wide_glyphs=True`` reproduces the
-    ``test_lifecycle_policy_cli`` variant: replace the whole box-drawing block plus
-    smart quotes by regex, then ``" ".join(text.split())`` (stripped).
-    """
-    text = _ANSI_RE.sub("", output)
-    if wide_glyphs:
-        text = _WIDE_GLYPH_RE.sub(" ", text)
-        return " ".join(text.split())
-    text = "".join(" " if ch in _BOX_CHARS else ch for ch in text)
-    return re.sub(r"\s+", " ", text)

@@ -150,6 +150,8 @@ def test_context_bind_is_one_verb_with_one_argument(
     _register_alive_ctx(workspace)
     result = _runner.invoke(app, ["context", "bind", "myctx"])
     assert result.exit_code == 0, result.output
+    assert "myctx" in result.output
+    assert "sess_" in result.output
     record = _record(workspace)
     assert record["context"] == "myctx"
     assert "mode" not in record
