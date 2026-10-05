@@ -16,7 +16,8 @@ Disclosed reference reached from `SKILL.md`/`RC-FLOW.md` wherever the arc says "
 - `defined`/`implemented` hold the live candidate's stamp; each `phase` also appends a `kind: milestone` entry `{candidate, milestone, sha}`, the per-candidate history. Stamps older than these entries are the `Candidate defined at …`/`Candidate implemented at …` notes.
 - `log` is the one append-only array inside the document — oldest first, never rewritten once appended; each entry is `{ts, agent, kind, text}`.
 - `kind` is one of `note summary size drifts dispositions test-dispositions artifact-gc reviews merge memory milestone`.
-- `release.py check` judges every phase: under DEFINITION, a `[-]`/`[x]` marker or a closure entry after the candidate's birth note is a finding.
+- `release.py check` judges every phase: under DEFINITION, a closure entry after the candidate's birth note is a finding (a job's `kind: merge` entry is not one); every job file is judged (`dd-release-definition` §5).
+- A merged job appends one `kind: merge` entry, Read-then-Edit (no verb writes it), text `job: <name>; start: <UTC>; end: <UTC>; wall: <min>; ritual_wait: <min>; dispatches: <n>` — `start` the committer time of the job branch's first commit, `end` the `createdAt` of the push CI run that lands it; `release.py check` validates the shape.
 
 ## Who sets which milestone
 
@@ -32,7 +33,7 @@ Disclosed reference reached from `SKILL.md`/`RC-FLOW.md` wherever the arc says "
 
 - Every closure-narrative class lands as one `log` entry whose `kind` names it — `summary`, `size`, `drifts`, `artifact-gc`, `test-dispositions`, `dispositions`, `memory`, `reviews`, `merge`.
 - The `memory` entry is written only by `release.py memory`; it adds `since`, `until`, `reviewed`, `changed` to `{ts, agent, kind, text}` — the ledger-derived window (previous entry's `until`, else `defined.sha`) and the HEAD it closed at, the atoms read and left byte-identical, the atoms rewritten or created; `dispositions` records the sweep.
-- Already-native facts need no entry: tasks completed (`TASKS.md` `[x]` + sha) and the trio `APPROVED` handoffs.
+- Already-native facts need no entry: tasks completed (their commits, under their ids) and the `APPROVED` handoffs.
 
 ## Write seam
 

@@ -8,7 +8,7 @@ description: >
 
 # dd-release-implementation
 
-> Not hook-enforced. No engine advances gates, drives closure, or reads `TASKS.md` — implementers, the reviewer, `dd-product-engineer` and the main thread uphold it directly.
+> Not hook-enforced. No engine advances gates, drives closure, or reads a job file — implementers, the reviewer, `dd-product-engineer` and the main thread uphold it directly.
 
 ## 1. When
 
@@ -20,14 +20,14 @@ description: >
 
 1. Open `specs/releases/AGENTS.md` (the area's scoped law) and follow it.
 2. Resolve the live release by reading `_RELEASE.json`'s `phase` field directly.
-3. The live candidate's `TASKS.md` sits at `releases/<v>/rc-<N>/TASKS.md`, the highest `rc-<N>/`; a lower one is closed history.
+3. The live candidate's job files sit at `releases/<v>/rc-<N>/tasks/<job>.md`, the highest `rc-<N>/`; a lower one is closed history (a closed rc keeps its `TASKS.md`).
 4. Full navigation protocol: `dd-spec-navigator`.
 5. Read `RC-FLOW.md` for the candidate arc and gate cadence before acting past reservation.
 6. Update `_RELEASE.json` per `RELEASE-EVENTS.md`'s shape and `log` conventions.
 7. At `RC-FLOW.md` step 5, run `MEMORY-UPDATE.md`'s full protocol before touching any memory atom.
 8. A test enters the suite only under the root map §1 test basics.
 9. Before growing any module, run the deletion test and speak the seam vocabulary (`dd-codebase-design`) — a diff that only adds justifies itself against replace-don't-layer.
-10. Implement inside the task's `impl` worktree, opened per `worktrees/AGENTS.md` §2.
+10. Implement inside the job's one worktree, opened per `worktrees/AGENTS.md` §1; its tasks share it.
 
 ## 2a. Push green
 
@@ -41,10 +41,10 @@ description: >
 ## 3. Done when
 
 - Live release resolved by reading `_RELEASE.json` directly.
-- Task reserved (`[-]`) with an isolated `chore(tasks): start <id>` commit (`RC-FLOW.md` step 1).
+- Task committed under its id after its task gate; the stage closed on its stage gate (`RC-FLOW.md` step 2).
 - Current step (`RC-FLOW.md`) identified before attempting its unlock action.
 - CI green before any push; trio `APPROVED` before the candidate's integration-branch PR.
-- At candidate closure: memory update -> closure narrative -> disposition sweep -> artifact GC -> merge -> the promote-or-continue gate.
+- At candidate closure: the Reconciliation job merged (`RC-FLOW.md` step 4) -> candidate PR -> the promote-or-continue gate.
 
 ## 4. References
 

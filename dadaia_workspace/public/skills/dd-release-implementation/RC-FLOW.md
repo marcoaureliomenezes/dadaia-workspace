@@ -8,61 +8,42 @@ candidates.
 
 | Boundary | Who validates | What unlocks |
 |---|---|---|
-| Per task | implementer discipline (TDD, tests, the repo's own CI checks, handoff); `dd-code-reviewer` at the worktree merge | the merge |
-| Candidate close | `dd-code-reviewer` `APPROVED` (three axes, six lenses) on the same commit | the candidate's work -> integration PR |
+| Task | the implementer: `scripts/ci.py task <files>` | the task's commit |
+| Stage | the implementer: `scripts/ci.py stage` | the next stage |
+| Job | `dd-code-reviewer` `APPROVED` naming the job's green CI-matrix run; `scripts/ci.py job` at `WT merge` | the job's merge |
+| Candidate close | the Reconciliation job's merge | the candidate's work -> integration PR |
 | Promote (ship) | pre-staged security verdict naming the integration tip | the integration -> principal PR |
 
-- Any `REJECTED`, CRITICAL/HIGH finding, failed E2E, or missing evidence sends the work back to implementation.
-- Rework continues until every required validator approves the same commit, or the operator stops the candidate.
-- Order per candidate: review -> closure -> merge -> gate.
-- The pre-PR three-axis code review (`dd-code-review`) runs before the merge, never after.
+- Any `REJECTED`, CRITICAL/HIGH finding, failed E2E, or missing evidence sends the job back to its tree.
+- One review per job, never per task (`worktrees/AGENTS.md` §2).
 
 ## The candidate arc, step by step
 
-Each step ends on a checkable criterion. Steps 5–8 are candidate-closure work.
+An rc is an Implement: a DAG of jobs the PLAN draws, Job 1 first, the Reconciliation job last.
 
-**Step 1 — Reserve.**
-- Mark the live candidate's `TASKS.md` per `specs/releases/AGENTS.md` §3.
-- Dispatching a shell-less sub-agent: commit its flip before relaying the work item — one flip per dispatch, never batched.
-- Recovery — a foreign `[-]` from another session: read `git log`, report to the operator, never transition it yourself.
-- Recovery — a gate block: run the block's own one `fix:` line; a BLOCK whose fix is itself blocked is a Stall, reported at once.
-- Done when: the reservation commit exists.
+**Step 1 — Open a job.**
+- `WT new <repo> <M.m.p>-rc<N>-<job>` once its PLAN edges are merged; its tasks live in `rc-<N>/tasks/<job>.md` (`dd-release-definition` §5).
+- A task is `running` while its job's tree exists and its commit does not; there is no reservation commit.
+- Done when: the tree exists.
 
-**Step 2 — TDD loop.**
-- Implement with tests; run the repo's own CI checks.
-- Done when: the suite is green and an `implementation-complete` handoff is emitted.
+**Step 2 — Stages and tasks.**
+- Stage 1 writes every acceptance test RED, as a strict xfail; each later stage turns its rows green.
+- Each task runs its task gate and commits under its id; each stage closes on its stage gate.
+- Done when: the last stage closed green and the close task wrote the job file's `done`.
 
-**Step 3 — Scope-complete.**
-- All the candidate's tasks are `[x]`; the architecture lens runs `dd-architecture-survey` before the review closes.
-- Done when: `TASKS.md` carries zero `[ ]`/`[-]` rows.
+**Step 3 — Job merge.**
+- Push the job branch; the reviewer's one verdict names its green CI-matrix run; `WT merge` runs the job gate and fast-forwards.
+- Append the job's `kind: merge` entry to `_RELEASE.json`'s `log` (`RELEASE-EVENTS.md`).
+- Done when: the job is on the work branch and its entry passes `release.py check`.
 
-**Step 4 — Candidate trio review.**
-- `dd-code-reviewer` `APPROVED` on the same commit.
-- Done when: the verdict is `APPROVED` on that sha.
+**Step 4 — The Reconciliation job.**
+- The last job, one tree (`<M.m.p>-rc<N>-reconcile`): memory (`MEMORY-UPDATE.md`), the derived docs in the same merge, `measured_by` repairs, the rc's measurement, the closure narrative, the disposition sweep, the artifact GC.
+- Closure narrative: the `log` entries `RELEASE-EVENTS.md` describes — `summary`, `size`, `drifts`, `artifact-gc`, `test-dispositions`, `dispositions`.
+- Disposition sweep: a picked backlog entry exits by `python3 .agents/skills/dd-backlog-definition/scripts/backlog.py exit <slug> --disposition …`, once; an audit finding moves by `python3 .agents/skills/dd-audit-project/scripts/audit.py disposition <dir> <finding> --disposition …`, and `audit.py close <dir> --sha <window-end>` closes an audit with none `open`; a bug is never silently dropped; `python3 .agents/skills/dd-bug-resolution/scripts/bugs.py archive` ages the ledger once the sweep is terminal.
+- Artifact GC: `.dadaia/.venv/bin/dadaia doctor` dry, then `--fix`; the `kind: artifact-gc` entry records the exit code and what the operator holds.
+- Done when: the Reconciliation job merged; `.dadaia/.venv/bin/dadaia doctor` is clean.
 
-**Step 5 — Memory update (`dd-product-engineer`).**
-- Memory is closure procedure, never a task: a TASKS.md task whose write set names `specs/memory` is a `release.py check` finding.
-- Reconcile product atoms from the code diff — `release.py drift`, per-atom `git diff`, DELETE → UPDATE → ADD, `catalog generate`, `release.py memory`, then derived docs in an `impl` worktree — protocol: `MEMORY-UPDATE.md`.
-- Done when: one `kind: memory` log entry covers every worklist entry as reviewed or changed, `.dadaia/.venv/bin/dadaia doctor` is clean and the derived-docs test is green.
-
-**Step 6 — Record the candidate's closure narrative.**
-- Append the `log` entries `RELEASE-EVENTS.md` describes, each with its `kind`: `summary`, `size`, `drifts`, `artifact-gc`, `test-dispositions`, `dispositions`.
-- Done when: every narrative class has a `log` entry or its named native home.
-
-**Step 7 — Disposition sweep.**
-- Flip every bug/backlog item picked into (or superseded by) this candidate to a terminal token.
-- A picked backlog entry exits by `python3 .agents/skills/dd-backlog-definition/scripts/backlog.py exit <slug> --disposition …`, once.
-- An audit finding moves by `python3 .agents/skills/dd-audit-project/scripts/audit.py disposition <dir> <finding> --disposition …`; when none is `open`, `python3 .agents/skills/dd-audit-project/scripts/audit.py close <dir> --sha <window-end>` appends the histo record and deletes the directory.
-- A bug is never silently dropped — `python3 .agents/skills/dd-bug-resolution/scripts/bugs.py resolve` already closed it, or a superseder covers it.
-- Age the ledger once the sweep is terminal: `python3 .agents/skills/dd-bug-resolution/scripts/bugs.py archive` — a numbered step here, never a call another script makes (scripts never call each other).
-- Done when: `python3 .agents/skills/dd-bug-resolution/scripts/bugs.py stats` and `.dadaia/.venv/bin/dadaia doctor`'s `ledgers` section show zero non-terminal picked items.
-
-**Step 8 — Artifact GC sweep.**
-- `.dadaia/.venv/bin/dadaia doctor` dry: read its findings and its exit code.
-- `.dadaia/.venv/bin/dadaia doctor --fix` runs the reaper (slop MOVED to `.dadaia/reaped/`, 7-day hold) then the specs repairs; list what it held for the operator.
-- Done when: the `kind: artifact-gc` log entry records doctor's exit code and findings, or names the slop the operator holds.
-
-**Step 9 — Candidate PR.**
+**Step 5 — Candidate PR.**
 - Open the work -> integration PR (branch names: the constitution's `gitflow:`) (security verdict covering the head, `dd-gitflow-default` §2a); watch CI to green; merge.
 - Done when: it merges green.
 
