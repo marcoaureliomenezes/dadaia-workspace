@@ -64,5 +64,7 @@ The stages and task ids are the approved SPEC's (ad9c60c6b, Job 1 `Stages:`); th
 | J1.S3.T8 | AC1.8 | quickstart and journey use the nested grammar (500571da7) | no test |
 | J1.S3.T9 | AC1.3 | `caused_by` accepts a job task id — one id reader (cba607aa0) | `test_bug_resolution_bugs_script.py` |
 | J1.S3.T10 | — | close task, pending: mutation-diff over the job diff, test-audit, the close lines | — |
+| J1.S3.T11 | AC1.3 | REBUILD dead-holds fixtures to the nested grammar; stage S3 red #1 (32777ddc8) | `test_context_dead_holds.py` |
+| J1.S3.T12 | AC1.3 | REBUILD orphan-wt fixture onto the task-merge model; stage S3 red #1 (6417b618c) | `test_doctor_fix_lines_clear_their_finding.py` |
 
 - Rework round recorded: the commits subjected J1.S2.T2 (567f13339), T4 (ca0137c51), T5 (19d3b50b3), T6 (d464edb7e) and T9 (d0698dbf7) after the job close (40dca7fc9), and `docs(J1.S2.T2)` 0fb5d7ad0 (quickstart `--kind` fix), answer review findings HIGH 1–2, MEDIUM 3–5; they are S3 rework under S2 ids.
