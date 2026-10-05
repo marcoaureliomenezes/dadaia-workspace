@@ -1,6 +1,6 @@
 # SPEC — Release: 0.5.0, candidate 8 (W8: the test law and the library pipeline leave; W9: bug lineage derived; W10: the open bugs; W11: agent-behavior evals, a parallel lane; W12: the bug loop stops; W13: the bug strategy)
 
-**Status:** In review
+**Status:** Approved
 **Release ID:** 0.5.0
 **Owner:** dd-product-engineer
 **Opened:** 2026-10-03
@@ -420,7 +420,7 @@ After AC9.3 and AC8.1's `Intent:` strip merge. Each RED is a behaviour assert in
   - Files: the root map's Arm B line (≤ 8,293 B), `pub/templates/specs-AGENTS.md` §6, `dd-bug-resolution` §1, `dd-release-implementation` §2a and `RC-FLOW.md`, `dd-gitflow-default` §2a, §3a.
   - Check: `grep -rnE 'bug[^.]*in any phase' dadaia_workspace/public` prints nothing; `grep -rl 'data loss or corruption' dadaia_workspace/public` names only `scaffold/bugs/AGENTS.md`; `/corpus-audit` clean.
 - AC13.3 A review of the bug window opens every rc's first SPEC (G3):
-  - The bug window, keyed on the release: every record whose `found_in` or `introduced_in` release is the live one or the previous published one, `rc` `unknown` included, any status, archived ones included; it moves with each rc.
+  - The bug window, keyed on the release: every record whose `found_in` or `introduced_in` release is the live one or the previous published one, `rc` `unknown` included, any status, archived ones included; it moves with each rc. Records whose `release` is `unknown` are listed apart and ruled at each review's triage.
   - One read verb, `bugs.py window`, lists the records in it; Phase 0 of `dd-bug-resolution` and `LINEAGE.md` rule 6 read it; the audit window stays the audit's.
   - `dd-release-definition` §1's first step: `dd-software-engineer` reads the window, each cited test included, and hands its clusters to the grill with the as-is review.
   - The SPEC's first section, `## Bug window review` ("Revisão de bugs"), by `dd-product-engineer`: per cluster, its records, cause, verdict (DELETE, REBUILD, UPDATE, KEEP) and AC.
@@ -429,8 +429,8 @@ After AC9.3 and AC8.1's `Intent:` strip merge. Each RED is a behaviour assert in
   - Cases: `bugs.py window` lists a record found in the live release, one introduced in the previous published version, an `rc` `unknown` one inside them, and an archived one, and omits one of an older version; `release.py new` writes the heading first; `check` on a live SPEC lacking it exits non-zero with one fix line (`test_release_implementation_release_script.py`).
 - AC13.4 rc-8's first window review (G4, G12):
   - One task after AC13.1, AC13.6's verb and restore, and the backfill; T-050-199 … T-050-208 stay frozen until its verdict.
-  - Window: 0.5.0 and 0.4.7, by release; `release` `unknown` records (≤ 2026-08-27, 2026-09-06 → 09-12, 2026-09-23T03:43 → 09-24T05:07) are listed apart and ruled at its triage.
-  - The verdict names each restored record on a retired surface and its retiring ADR, retroactive where missing (exactly the bind/session-TTL surfaces retired; the reaper's live TTL is out); the rest stay live.
+  - Window: 0.5.0 and 0.4.7, by release; its `release` `unknown` gaps: ≤ 2026-08-27, 2026-09-06 → 09-12, 2026-09-23T03:43 → 09-24T05:07.
+  - The 179 restored records are read with the whole window; the verdict names each on a retired surface and its retiring ADR, retroactive where missing (exactly the bind/session-TTL surfaces retired; the reaper's live TTL is out); the rest stay live.
   - The 205 non-product records, by class, through `bugs.py` in a `bug` worktree, one shape-4 commit per class, `chore(bugs): <verb> class <class> — <reason>`, one id per body line:
     - agent error (15): `reject` with its reason;
     - born in the release (89): stays a bug; only never-merged rework is rejected; once ruled, the class commit stores `introduced_in` = `found_in` on its terminal records that no culprit derives (AC13.1);
@@ -439,7 +439,7 @@ After AC9.3 and AC8.1's `Intent:` strip merge. Each RED is a behaviour assert in
     - doubtful (35): each ruled in the review.
   - Verdict: rc-8's SPEC gains `## Bug window review` and its cluster ACs (shape 8) for the operator's approval; PLAN §6.6 re-plans T-050-199 … T-050-208 and the cluster ACs in one Parallel schedule.
   - Re-archiving follows each ADR's acceptance, by `archive --adr`.
-  - Check: one `_RELEASE.json` log entry names the per-class counts before and after and the records re-archived; `bugs.py stats` agrees.
+  - Check: one `_RELEASE.json` log entry names the per-class counts before and after and the records re-archived and kept live; `bugs.py stats` agrees.
 - AC13.5 Moved to rc-9 (scope ruling): `evidence_seam` at resolve (G5, G10).
 - AC13.6 A record leaves the ledger only by an accepted ADR (G6, G12):
   - `bugs.py archive --adr <id>` moves the named terminal records into `_archive/bugs_histo.jsonl`, each carrying the ADR id; an id not `accepted` in `decisions.jsonl` is refused.
@@ -448,7 +448,7 @@ After AC9.3 and AC8.1's `Intent:` strip merge. Each RED is a behaviour assert in
   - Cases: `--adr` naming a proposed record exits non-zero, ledger unchanged; an accepted one moves exactly the named records; `--threshold-days` exits 2.
   - Check: every `_archive/bugs_histo.jsonl` record carries an accepted ADR id; `git grep -n 'threshold-days\|archivable' -- dadaia_workspace` prints nothing.
 - AC13.7 The worktree merge is the boundary between an agent's error and a bug (G7, G9):
-  - `specs/bugs/AGENTS.md` §1: a bug exists once a merged change breaks a documented contract; a failure inside an unmerged worktree (a wrong command, the agent's own failing test, review rework) is rework, no record; gate 1 (0185) holds the line. AC12.1's line agrees.
+  - `specs/bugs/AGENTS.md` §1: a bug exists once a merged change breaks a documented contract; a failure inside an unmerged worktree (a wrong command, a stray quote, the agent's own failing test, review rework) is rework, no record; gate 1 (0185) keeps a red from crossing the merge. AC12.1's line agrees.
   - `dd-bug-registration` §2 step 4 keeps its not-a-bug arms and adds the work-branch sha that reproduces the bug; the culprit is required only for a born-in-rc claim.
   - Check: `/corpus-audit` clean on both files.
 - AC13.8 The `bug` worktree kind follows the pile (G9):
