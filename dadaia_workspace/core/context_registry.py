@@ -9,10 +9,6 @@ from typing import cast
 
 from dadaia_workspace.core.exceptions import SchemaVersionError
 
-# The keys every ``contexts`` row carries for the store to build its model from; the
-# tolerant readers (:func:`entries`) ask none of them.
-ROW_KEYS = ("name", "state", "repo_slug", "repo_url", "created_at")
-
 
 def read(path: Path) -> dict[str, object]:
     """THE registry parse: the ``{"contexts": [...]}`` object at *path*. Absent, unparseable
