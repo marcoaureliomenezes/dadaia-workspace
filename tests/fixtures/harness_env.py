@@ -72,7 +72,6 @@ __all__ = [
     "HARNESS_CONTROL_DADAIA_ENV",
     "HOOK_MODULES",
     "HookResult",
-    "base_env",
     "claude_hook_env",
     "codex_hook_env",
     "kimi_hook_env",
@@ -202,12 +201,6 @@ _POLICY_DRIVER: Final[str] = (
     "if r is not None:\n"
     "    _common.emit_block(r)\n"
 )
-
-
-def base_env() -> dict[str, str]:
-    """:func:`suite_env` of the session env — kept for two callers outside Job 3 (rc-9 Job 2
-    switches them and deletes it)."""
-    return suite_env(os.environ, Path.home())
 
 
 def _harness_env(
