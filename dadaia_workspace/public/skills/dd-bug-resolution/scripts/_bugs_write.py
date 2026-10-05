@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import datetime as _dt
 import difflib
+import json
 import sys
 from pathlib import Path
 from typing import Any
@@ -22,6 +23,7 @@ from _bugs_store import Records, Refusal, by_id  # noqa: E402
 from _specs import choice, script  # noqa: E402
 
 _MUTABILITY = {k: v["x-mutability"] for k, v in load_schema()["properties"].items()}
+_OBJECTS = frozenset(k for k, v in load_schema()["properties"].items() if v.get("type") == "object")
 CORE = tuple(k for k, v in _MUTABILITY.items() if v == "immutable-core")
 GOVERNANCE = tuple(k for k, v in _MUTABILITY.items() if v == "mutable-governance")
 WRITE_ONCE = tuple(k for k, v in _MUTABILITY.items() if v == "write-once")
@@ -64,7 +66,10 @@ def append(records: Records, values: dict[str, Any], dirs: set[str]) -> Records:
         raise choice(Refusal("name the ledger ids this bug correlates with — the candidates are listed above"),
                      "with --correlates set to the comma-separated ids, or none",
                      "--correlates")  # fmt: skip
-    record = {key: values.get(key) for key in CORE} | {"correlates": ids}
+    record = {key: values.get(key) for key in CORE} | {
+        "correlates": ids,
+        "found_in": values["found_in"],
+    }
     record.update({key: None for key in GOVERNANCE})
     record["status"] = "open"
     return [*records, record]
@@ -100,8 +105,20 @@ def apply_update(records: Records, bug_id: str, changes: dict[str, str]) -> Reco
     record = by_id(records, bug_id)
     updated = dict(record)
     for key, value in changes.items():
-        _set(updated, key, value)
+        _set(updated, key, _parsed(key, value))
     return [updated if r is record else r for r in records]
+
+
+def _parsed(key: str, value: str) -> Any:
+    """*value* as its field's type: JSON for an object-typed field, else the string."""
+    if key not in _OBJECTS:
+        return value
+    try:
+        return json.loads(value)
+    except json.JSONDecodeError as exc:
+        raise Refusal(
+            f"--set {key}= must be a JSON object ({exc.msg})", f"{_SCRIPT} update --help"
+        ) from None
 
 
 def archivable(records: Records, cutoff: str) -> set[str]:

@@ -19,8 +19,7 @@ from _bugs_write import _set, now_iso  # noqa: E402
 from _specs import choice  # noqa: E402
 
 REQUIRED_BY_VERB = {
-    "resolve": ("cause", "caused_by", "resolved_release", "solution",
-                "evidence_loop"),
+    "resolve": ("cause", "caused_by", "solution", "evidence_loop"),
     "supersede": ("by",), "defer": ("reason",), "reject": ("reason",),
 }  # fmt: skip
 STATUS_BY_VERB = {"resolve": "resolved", "supersede": "superseded",
@@ -46,7 +45,7 @@ def transition(
     record = by_id(records, bug_id)
     updated = dict(record)
     if verb == "resolve":
-        for key in REQUIRED_BY_VERB["resolve"]:
+        for key in (*REQUIRED_BY_VERB["resolve"], "resolved_release"):  # the last derived, ADR 0187
             _set(updated, key, values[key])
         if reason:
             _set(updated, "lineage_reason", reason)

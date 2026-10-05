@@ -3,7 +3,10 @@
 
 ``bugs.py <verb> --specs <path>``. Every write builds the new ledger bytes, runs
 `check` over them, and only then replaces the file atomically — so this script's writer
-and its validator cannot disagree about what a valid record is.
+and its validator cannot disagree about what a valid record is. `append`, `resolve` and
+`window` read which candidate held an instant from `dd-release-implementation`'s
+`_release_schema.candidate_at` (ADR 0187), a skill-level dependency as `_specs` has on
+`dd-gitflow-default`.
 """
 
 from __future__ import annotations
@@ -23,12 +26,14 @@ from typing import Any
 # import without leaving a `__pycache__` beside them.
 sys.dont_write_bytecode = True
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+sys.path.append(str(Path(__file__).resolve().parents[2] / "dd-release-implementation" / "scripts"))
 
 import _bugs_transition as tr  # noqa: E402
 import _bugs_write as wr  # noqa: E402
-from _bugs_check import CODE, LEDGER, check, tasks  # noqa: E402
+from _bugs_check import CODE, HISTO, LEDGER, check, tasks  # noqa: E402
 from _bugs_store import Refusal, commit, read_records  # noqa: E402
-from _specs import find_specs, refuse  # noqa: E402
+from _release_schema import candidate_at, releases  # noqa: E402
+from _specs import find_specs, git_line, refuse  # noqa: E402
 
 _OPTIONS: dict[str, tuple[str, ...]] = {
     "append": ("--bug-id", "--reported-by", "--ts", "--title", "--severity", "--surface",
@@ -48,6 +53,7 @@ _HELP = {
     "archive": "move long-closed terminal records into bugs_histo.jsonl",
     "check": "validate every BUGS.jsonl record",
     "fix": "derive each resolved record's fix commit, numstat and direction",
+    "window": "list the records found in or born in the live or the last shipped release",
 }
 #: Shapes 3, 4 and a REBUILD share one id list; shape 4 names its task commit(s) as `(<sha>[, <sha>])`.
 _SHAPE = re.compile(
@@ -163,6 +169,48 @@ def _direction(commits: dict[str, list[list[str]] | None], own: set[str]) -> str
     return "net-negative" if net < 0 else "net-positive" if net > 0 else "net-neutral"
 
 
+def _held_at(specs: Path, instant: str) -> dict[str, str]:
+    try:
+        return candidate_at(specs, instant)
+    except ValueError as exc:
+        raise Refusal(str(exc), git_line(specs, "fetch", "--unshallow")) from None
+
+
+def _introduced(specs: Path, record: dict[str, Any], fixes: dict[str, dict[str, Any]]) -> Any:
+    """Read from `caused_by`'s culprit, its oldest fix or `<type>(<task-id>)` commit, else
+    the stored value: a `caused_by` repair needs no second write (ADR 0187)."""
+    cause = record.get("caused_by")
+    grep = ("log", "--all", "-E", f"--grep=^[a-z]+\\({cause}\\)", "--format=%H")
+    shas = (
+        [] if cause in (None, "none") else list(fixes.get(cause, ())) or _git(specs, *grep).split()
+    )
+    return _held_at(specs, _git(specs, "show", "-s", "--format=%cI", shas[-1]).strip()) if shas else record.get("introduced_in")  # fmt: skip
+
+
+def _window(specs: Path) -> int:
+    """Every live and archived record found in or born in the live or the last shipped
+    release; a `release` `unknown` one apart (AC13.3)."""
+    live = _held_at(specs, wr.now_iso())["release"]
+    shipped = sorted((end, r) for r, (_, end) in releases(specs).items() if end)
+    keys = sorted({live, *(r for _, r in shipped[-1:])} - {"unknown"})
+    fixes, rows, apart = _fixes(specs), [], []
+    for record in [
+        *read_records(specs / LEDGER),
+        *(r for r in read_records(specs / HISTO) if "id" in r),
+    ]:
+        found, born = record.get("found_in"), _introduced(specs, record, fixes)
+        seen = [c for c in (found, born) if c]
+        cells = (f"{c['release']}/{c['rc']}" if c else "-" for c in (found, born))
+        line = "\t".join((record["id"], record["status"], *cells))
+        if any(c["release"] in keys for c in seen):
+            rows.append(line)
+        elif any(c["release"] == "unknown" for c in seen):
+            apart.append(line)
+    print(*sorted(rows), "release unknown:", *sorted(apart), sep="\n")
+    print(f"[ok] {len(rows)} in the window ({', '.join(keys)}), {len(apart)} release unknown.")
+    return 0
+
+
 def _read(args: argparse.Namespace, specs: Path) -> int:
     records = read_records(specs / LEDGER)
     fixes = _fixes(specs) if args.verb in ("fix", "stats") else {}
@@ -223,6 +271,7 @@ def _write(args: argparse.Namespace, specs: Path) -> int:
             raise Refusal(f"cannot list the repo's tracked directories: {cause.strip()}",
                           "Operator action: point --specs at a specs tree inside a git repo") from None  # fmt: skip
         dirs = {part for path in listed.splitlines() for part in path.split("/")[:-1]}
+        values["found_in"] = _held_at(specs, values["ts"])
         near = wr.candidates(read_records(ledger), values["surface"])
         print(f"correlation candidates on {values['surface']!r}: {', '.join(near) or 'none'}")
         commit(ledger, lambda records: wr.append(records, values, dirs))
@@ -234,6 +283,8 @@ def _write(args: argparse.Namespace, specs: Path) -> int:
         print(f"[ok] updated {', '.join(sorted(changes))} for {args.bug_id}")
         return 0
     values = _values(args, _OPTIONS[args.verb])
+    if args.verb == "resolve":
+        values["resolved_release"] = _held_at(specs, wr.now_iso())["release"]
     near = _candidates(specs, args.bug_id) if args.verb == "resolve" else []
     if near:
         print(f"blame candidates: {', '.join(near)}")
@@ -244,7 +295,7 @@ def _write(args: argparse.Namespace, specs: Path) -> int:
 
 def main(argv: list[str] | None = None) -> int:
     args = _parser().parse_args(argv)
-    reads = args.verb in ("check", "status", "stats", "fix")
+    reads = args.verb in ("check", "status", "stats", "fix", "window")
     specs = find_specs(args.specs, ledger=None if reads else f"specs/{LEDGER}")
     if args.verb == "check":
         findings = check(specs)
@@ -255,6 +306,8 @@ def main(argv: list[str] | None = None) -> int:
     try:
         if args.verb in ("status", "stats", "fix"):
             return _read(args, specs)
+        if args.verb == "window":
+            return _window(specs)
         return _archive(args, specs) if args.verb == "archive" else _write(args, specs)
     except Refusal as refusal:
         return refuse(refusal, specs)

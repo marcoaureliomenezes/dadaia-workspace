@@ -2,9 +2,20 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "bug-record-v1",
   "title": "Bug Record v1",
-  "description": "One record per bug, appended once — no event stream, no fold (v0.5.0 FR2, D11, AR-1). Each line of specs/bugs/BUGS.jsonl is one object validating this schema, keyed by `id`. Every property carries a custom `x-mutability` keyword — `immutable-core` (never rewritten through the record-store update seam once appended), `write-once` (legitimately absent from a freshly registered record; settable exactly once from absent, then immutable), or `mutable-governance` (rewritten in place through the atomic in-place update seam, `core/atomic_write.py` + refuse-stale) — THIS is the one place the three-category split is declared; bugs.py reads it from here. bugs.py refuses a write carrying a value the push would refuse; it never rewrites one. 0.4.7 FR1 retired the seven derived-provenance keys (lineage_source, registration_commit/_granularity, resolved_commit/resolution_granularity, root_cause, migration_note): a git-derived cache stored in the record. `additionalProperties: false` refuses them. `status` has NO `picked` value (v0.5.0 FR2): the pick is the bundled definition commit, readable by pillar 2 (FR8 shape 5).",
+  "description": "One record per bug, appended once — no event stream, no fold (v0.5.0 FR2, D11, AR-1). Each line of specs/bugs/BUGS.jsonl is one object validating this schema, keyed by `id`. Every property carries a custom `x-mutability` keyword — `immutable-core` (never rewritten through the record-store update seam once appended), `write-once` (set once, at registration or later, then immutable), or `mutable-governance` (rewritten in place through the atomic in-place update seam, `core/atomic_write.py` + refuse-stale) — THIS is the one place the three-category split is declared; bugs.py reads it from here. bugs.py refuses a write carrying a value the push would refuse; it never rewrites one. 0.4.7 FR1 retired the seven derived-provenance keys (lineage_source, registration_commit/_granularity, resolved_commit/resolution_granularity, root_cause, migration_note): a git-derived cache stored in the record. `additionalProperties: false` refuses them. `status` has NO `picked` value (v0.5.0 FR2): the pick is the bundled definition commit, readable by pillar 2 (FR8 shape 5).",
   "type": "object",
   "additionalProperties": false,
+  "$defs": {
+    "candidate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["release", "rc"],
+      "properties": {
+        "release": { "type": "string", "minLength": 1 },
+        "rc": { "type": "string", "pattern": "^(rc-[1-9][0-9]*|unknown)$" }
+      }
+    }
+  },
   "required": [
     "id",
     "ts",
@@ -136,7 +147,19 @@
         "null"
       ],
       "x-mutability": "mutable-governance",
-      "description": "The release id that shipped the fix."
+      "description": "The release whose span holds the resolve instant, `unknown` outside every span; derived by `bugs.py resolve`, never typed (ADR 0187)."
+    },
+    "found_in": {
+      "$ref": "#/$defs/candidate",
+      "type": "object",
+      "x-mutability": "write-once",
+      "description": "The candidate holding the registration instant, stamped by `bugs.py append` (ADR 0187); absent on records born before it until the backfill."
+    },
+    "introduced_in": {
+      "$ref": "#/$defs/candidate",
+      "type": "object",
+      "x-mutability": "write-once",
+      "description": "Stored only by a class ruling where no culprit derives it; `bugs.py window` reads it from `caused_by`'s culprit commit first (ADR 0187)."
     },
     "audited": {
       "type": [
