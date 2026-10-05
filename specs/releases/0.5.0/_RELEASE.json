@@ -926,6 +926,34 @@
       "agent": "dd-product-engineer",
       "kind": "artifact-gc",
       "text": "RC-FLOW step 8, .dadaia/.venv/bin/dadaia doctor from the workspace root, 2026-10-05. Dry: exit 1 - PROJECTION drift (11 staged files: the instance lags the work branch; fix: worktree.py merge of this release worktree, then public install); WS-states-slop states/backlog_subject_aliases.txt (the alias file AC8.9 retires); one WS-sessions-slop .tmp; 11 WS-tmp-expired; 47 WS-handoff-expired; WS-reaped-expired reaped/20260928; TREE-5 warnings on specs/backlog/AGENTS.md and specs/bugs/AGENTS.md (superseded templates); LEDGER-BUGS-SCHEMA error BUGS.jsonl:743 (the stale instance checker, see this candidate's drifts entry). doctor --fix: exit 1, 63 repairs - 11 tmp entries and reaped/20260928 deleted (TTL expired), 47 expired handoffs moved to reaped/, states/backlog_subject_aliases.txt and the sessions .tmp moved to .dadaia/reaped/20261005/ (7-day hold), and TREE-5 refreshed specs/backlog/AGENTS.md and specs/bugs/AGENTS.md in the repos/dadaia-workspace checkout of feature/0.5.0, left uncommitted there (+5/-8). Left after --fix: PROJECTION drift and LEDGER-BUGS-SCHEMA (both clear when this worktree merges and the instance is reprojected). Held for the operator: reaped/ 20260929..20261005 under the 7-day hold (1-7 days left), and the two uncommitted TREE-5 template refreshes in the main checkout."
+    },
+    {
+      "ts": "2026-10-05T14:24:47Z",
+      "agent": "release.py memory",
+      "kind": "memory",
+      "text": "Memory reconciled over 3e558855963a3ead613fbe5e5acf749e71c5084b..703efc1c5e5b: 6 reviewed, 10 changed.",
+      "since": "3e558855963a3ead613fbe5e5acf749e71c5084b",
+      "until": "703efc1c5e5bd421c844a8ac9e30b6699f468ee9",
+      "reviewed": [
+        "agent-orchestration",
+        "product-vision",
+        "spec-context-project",
+        "consumer-agent-support",
+        "audits-canon",
+        "sdd-gate-v3"
+      ],
+      "changed": [
+        "bug-ledger",
+        "workspace-doctor",
+        "workspace-init",
+        "context-management",
+        "worktrees",
+        "release-lifecycle",
+        "backlog-ledger",
+        "public-asset-distribution",
+        "agentic-entities",
+        "pypi-distribution"
+      ]
     }
   ]
 }
