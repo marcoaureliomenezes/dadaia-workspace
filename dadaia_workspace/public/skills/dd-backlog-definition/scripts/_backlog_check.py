@@ -37,7 +37,7 @@ def finding(
     verbs = "`backlog.py exit`" if path == HISTO else "`backlog.py new` or `backlog.py exit`"
     law = "specs/backlog/AGENTS.md: never hand-edit BACKLOG.json"
     fix = _ledger.unwritten(root / path, line if at is None else at, verbs, law)
-    return _ledger.finding(CODE, path, line, message, fix)
+    return dict(_ledger.finding(CODE, path, line, message, fix))
 
 
 def _item_errors(item: dict[str, Any]) -> Iterator[str]:
