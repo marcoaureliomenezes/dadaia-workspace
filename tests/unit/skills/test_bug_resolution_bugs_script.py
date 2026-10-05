@@ -1203,7 +1203,7 @@ def test_a_candidate_read_refuses_what_it_cannot_place(
     path = specs / "releases" / "9.9.9" / "_RELEASE.json"
     want = last.format(
         release=f"{Path(sys.executable).as_posix()} {release.as_posix()}",
-        state=path.as_posix(),
+        state=path,  # `releases` prints its act's path natively, never through `_specs.quote`
         py=Path(sys.executable).as_posix(),
         script=script.as_posix(),
         specs=specs.as_posix(),
