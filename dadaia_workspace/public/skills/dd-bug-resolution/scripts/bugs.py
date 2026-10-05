@@ -26,7 +26,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import _bugs_transition as tr  # noqa: E402
 import _bugs_write as wr  # noqa: E402
-from _bugs_check import CODE, LEDGER, check  # noqa: E402
+from _bugs_check import CODE, LEDGER, TASK_ID, check  # noqa: E402
 from _bugs_store import Refusal, commit, read_records  # noqa: E402
 from _specs import find_specs, refuse  # noqa: E402
 
@@ -49,8 +49,10 @@ _HELP = {
     "check": "validate every BUGS.jsonl record",
     "fix": "derive each resolved record's fix commit, numstat and direction",
 }
-#: Shapes 3 and 4 share one id list; shape 4 names its task commit(s) as `(<sha>[, <sha>])`.
-_SHAPE = re.compile(r"@(\w+) (fix\(bugs\): |chore\(bugs\): resolve )(.+?) — (.*)$")
+#: Shapes 3, 4 and a REBUILD share one id list; shape 4 names its task commit(s) as `(<sha>[, <sha>])`.
+_SHAPE = re.compile(
+    r"@(\w+) (fix\(bugs\): |chore\(bugs\): resolve |refactor\(bugs\): )(.+?) — (.*)$"
+)
 _TASK_SHAS = re.compile(r"\((\w+(?:, \w+)*)\)$")
 #: Never a fix's own lines: tests (metric 6) and specs; `_own` adds the generated files.
 _NOT_PRODUCTION = ("tests/", "specs/")
@@ -93,7 +95,7 @@ def _fixes(specs: Path) -> dict[str, dict[str, list[list[str]] | None]]:
     head = subprocess.run([*git, "rev-parse", "-q", "--verify", "HEAD"], stdout=subprocess.DEVNULL, check=False)  # fmt: skip
     if head.returncode == 1:  # a repo with no commit yet links nothing
         return {}
-    log = subprocess.run([*git, "log", "-E", r"--grep=^(fix|chore)\(bugs\): ", "--numstat", "--format=@%H %s"],
+    log = subprocess.run([*git, "log", "-E", r"--grep=^(fix|chore|refactor)\(bugs\): ", "--numstat", "--format=@%H %s"],
                          stdout=subprocess.PIPE, text=True, check=False)  # fmt: skip
     if log.returncode:
         raise Refusal("cannot read the repo's history", "Operator action: point --specs at a specs tree inside a git repo")  # fmt: skip
@@ -118,34 +120,33 @@ def _git(cwd: Path | str, *argv: str, stdin: str | None = None) -> str:
                           errors="replace", check=True).stdout  # fmt: skip
 
 
-def _own(specs: Path, paths: set[str]) -> set[str]:
-    """The paths a fix writes: not tests (metric 6), not specs, not a file `.gitattributes`
-    marks `dadaia-generated` — one predicate for the blame and the direction."""
+def _own(specs: Path, paths: set[str], skip: tuple[str, ...] = _NOT_PRODUCTION) -> set[str]:
+    """The paths a fix writes: not under *skip* (the direction: tests, metric 6, and specs;
+    the blame: specs only), not a file `.gitattributes` marks `dadaia-generated`."""
     top = _git(specs, "rev-parse", "--show-toplevel").strip()
     # -z: NUL never meets Windows' text-mode \n -> \r\n stdin translation, nor path quoting
     out = _git(top, "check-attr", "-z", "--stdin", "dadaia-generated", stdin="\0".join(paths)).split("\0")  # fmt: skip
     generated = {p for p, v in zip(out[0::3], out[2::3], strict=False) if v in ("set", "true")}  # fmt: skip
-    return {p for p in paths if not p.startswith(_NOT_PRODUCTION)} - generated
+    return {p for p in paths if not p.startswith(skip)} - generated
 
 
 def _candidates(specs: Path, bug_id: str) -> list[str]:
-    """The bugs whose fix wrote a line the staged diff removes: `git blame` past `(#n)`-subject
-    squashes and `refactor(T-…)` commits, over `_own` paths only."""
+    """The bugs whose fix, and the tasks whose `<type>(<task-id>)` commit, wrote a line the
+    staged diff removes: `git blame` past `(#n)`-subject squashes, `tests/` included (ADR 0186)."""
     fixes, blamed = _fixes(specs), set[str]()
-    if not fixes:
-        return []
     top = Path(_git(specs, "rev-parse", "--show-toplevel").strip())
     staged = {f[1]: f[1:] for f in (ln.split("\t") for ln in _git(top, "diff", "--cached", "--name-status", "--diff-filter=MDR").splitlines())}  # fmt: skip
-    subjects = (ln.partition(" ") for ln in _git(top, "log", "--format=%H %s").splitlines())
-    skip = [h for h, _, s in subjects if re.search(r"\(#\d+\)$", s) or s.startswith("refactor(T-")]
+    subjects = {h: s for h, _, s in (ln.partition(" ") for ln in _git(top, "log", "--all", "--format=%H %s").splitlines())}  # fmt: skip
+    skip = [h for h, s in subjects.items() if re.search(r"\(#\d+\)$", s)]
     with tempfile.TemporaryDirectory() as tmp:
         (revs := Path(tmp) / "revs").write_text("\n".join(skip), encoding="utf-8")
-        for path in _own(top, set(staged)):  # a rename is blamed at its old path
+        for path in _own(top, set(staged), skip=("specs/",)):  # a rename is blamed at its old path
             hunks = [ln.split()[1][1:].partition(",") for ln in _git(top, "diff", "--cached", "-U0", "--", *staged[path]).splitlines() if ln.startswith("@@ ")]  # fmt: skip
             ranges = [arg for start, _, n in hunks if n != "0" for arg in ("-L", f"{start},+{n or 1}")]  # fmt: skip
             blame = _git(top, "blame", "--porcelain", "--ignore-revs-file", str(revs), *ranges, "HEAD", "--", path) if ranges else ""  # fmt: skip
             blamed |= {ln[:40] for ln in blame.splitlines()}
-    return sorted({bug for bug, shas in fixes.items() for sha in shas for b in blamed if b.startswith(sha)} - {bug_id})  # fmt: skip
+    tasks = {m[1] for b in blamed if (m := re.match(rf"\w+\(({TASK_ID})\)", subjects.get(b, "")))}
+    return sorted(({bug for bug, shas in fixes.items() for sha in shas for b in blamed if b.startswith(sha)} | tasks) - {bug_id})  # fmt: skip
 
 
 def _direction(commits: dict[str, list[list[str]] | None], own: set[str]) -> str:

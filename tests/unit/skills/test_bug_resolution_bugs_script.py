@@ -771,22 +771,29 @@ def test_fix_derives_each_fix_commit_and_its_direction(script: Path, tmp_path: P
     both = _run(script, "fix", "h-bug", "--specs", str(specs)).stdout.splitlines()
     assert both == [f"h-bug\t{t3},{full(fix_h)}\tnet-positive", "\t1\t0\tcli/h.py",
                     "[ok] 1 linked, 0 unlinked."]  # fmt: skip
+    rebuild = commit("refactor(bugs): c-bug — REBUILD u: revert and redo", {"cli/u.py": "u\n"})
+    found = _run(script, "fix", "c-bug", "--specs", str(specs)).stdout.splitlines()  # AC12.12
+    assert found == [f"c-bug\t{full(rebuild)}\tnet-positive", "\t1\t0\tcli/u.py",
+                     "[ok] 1 linked, 0 unlinked."]  # fmt: skip
 
 
 _WHY = "the blamed fix wrote the line, not its defect"
+_NEAR = "T-050-168, T-5, T-9, b-bug, d-bug, e-bug"
 
 
 @pytest.mark.parametrize(("caused_by", "reason", "refusal"), [
-    ("none", None, "[error] caused_by 'none' is not a blame candidate (b-bug, d-bug, e-bug)"),  # AC9.3
+    ("none", None, f"[error] caused_by 'none' is not a blame candidate ({_NEAR})"),  # AC9.3
     ("none", _WHY, None),
     ("b-bug", None, None),
-    ("c-bug", None, "[error] caused_by 'c-bug' is not a blame candidate (b-bug, d-bug, e-bug)"),  # its lines: generated, specs, kept
+    ("T-050-168", None, None),  # a task named by its own commit's subject (ADR 0186)
+    ("c-bug", None, f"[error] caused_by 'c-bug' is not a blame candidate ({_NEAR})"),  # its lines: generated, specs, kept
 ])  # fmt: skip
 def test_resolve_proposes_caused_by_by_blame(
     script: Path, tmp_path: Path, caused_by: str, reason: str | None, refusal: str | None
 ) -> None:
-    """AC9.3: candidates are the bugs whose fix wrote a line the staged diff removes, blamed past
-    `(#n)`-subject squashes and `refactor(T-…)` commits, never in specs or a generated file;
+    """AC9.3: candidates are the bugs whose fix, and the tasks whose commit, wrote a line the
+    staged diff removes, `tests/` and `refactor(T-…)` included, blamed past `(#n)`-subject
+    squashes, never in specs or a generated file;
     the bug being resolved is never its own. The removed lines carry a Latin-1 byte and a
     `-- ` hunk ahead of the blamed one."""
     closed = {**_OPEN_RECORD, "status": "resolved", "closed_at": "2026-09-21T00:00:00Z"}
@@ -797,7 +804,7 @@ def test_resolve_proposes_caused_by_by_blame(
     sha, lines = "", "-- note\nx1\nx2\nx3\n{}\xe9\n"
     for message, files in [
         ("chore: seed", {".gitattributes": "behavior-map.json dadaia-generated=true\ncli/a.py -dadaia-generated\n",
-                         "cli/a.py": lines.format("old")}),
+                         "cli/a.py": lines.format("old"), "cli/t9.py": "t0\n"}),
         ("fix(bugs): a-bug — first try", {"cli/s.py": "1\n"}),
         ("feat(T-5): fix\n\nfollows the review (#12)", {"cli/a.py": lines.format("bad")}),
         ("chore(bugs): resolve b-bug — by T-5 ({sha})", {"specs/n": "b\n"}),  # shape 4, short sha
@@ -806,10 +813,12 @@ def test_resolve_proposes_caused_by_by_blame(
         ("fix(bugs): d-bug — cause", {"cli/dé.py": "d\n"}),  # deleted below, a non-ASCII name
         ("fix(bugs): e-bug — cause", {"cli/r.py": "r1\nr2\nr3\nr4\n"}),  # renamed and edited below
         ("fix(bugs): c-bug — rework", {"cli/r.py": "r1\nr2\nr3\nr4\nr5\n"}),  # kept across the rename
-        ("refactor(T-9): rename", {"cli/a.py": lines.format("bad2")}),
+        ("refactor(T-9): rename", {"cli/t9.py": "t9\n"}),
+        ("fix(T-050-168): review", {"tests/t.py": "t1\nt2\n"}),
         ("feat: release (#7)", {"cli/a.py": lines.format("bad3")}),
     ]:  # fmt: skip
         for path, text in files.items():
+            (tmp_path / path).parent.mkdir(exist_ok=True)
             (tmp_path / path).write_bytes(text.encode("latin-1"))
         subprocess.run([*git, "add", "-A"], check=True)
         subprocess.run([*git, "commit", "-qm", message.format(sha=sha)], check=True)
@@ -817,20 +826,22 @@ def test_resolve_proposes_caused_by_by_blame(
                              text=True, check=True).stdout.strip()  # fmt: skip
     for path, text in [("cli/a.py", "x1\nx2\nx3\n"), ("cli/s.py", "z\n"), ("cli/c.py", "c\nadded\n"),
                        ("cli/behavior-map.json", ""), ("specs/n", ""),
-                       ("cli/r2.py", "r1\nr2\nr3\nR4\nr5\n")]:  # fmt: skip
+                       ("cli/r2.py", "r1\nr2\nr3\nR4\nr5\n"), ("cli/t9.py", ""), ("tests/t.py", "t1\n"),
+                       ("specs/releases/_archive/0.1/TASKS.md", "- [x] **T-050-168 — a task.**\n")]:  # fmt: skip
+        (tmp_path / path).parent.mkdir(parents=True, exist_ok=True)
         (tmp_path / path).write_text(text, encoding="utf-8")
     (tmp_path / "cli/dé.py").unlink()
     (tmp_path / "cli/r.py").unlink()
     subprocess.run([*git, "add", "-A"], check=True)
     done = _run(script, *_resolve_argv(caused_by=caused_by), *(["--lineage-reason", reason] if reason else []),
                 "--specs", str(specs))  # fmt: skip
-    assert done.stdout.splitlines()[0] == "blame candidates: b-bug, d-bug, e-bug"
+    assert done.stdout.splitlines()[0] == f"blame candidates: {_NEAR}"
     errors = done.stderr.splitlines()
     assert errors[:1] == ([refusal] if refusal else []), done.stderr
     if refusal:  # the fix reruns this command without the refused --caused-by (ADR 0158)
         fix, command = errors[1], errors[1].split("`")[1]
         assert fix.startswith("fix: Operator action: run `") and fix.endswith(
-            "` with --caused-by b-bug or d-bug or e-bug, or --lineage-reason saying why not"
+            f"` with --caused-by {_NEAR.replace(', ', ' or ')}, or --lineage-reason saying why not"
         ), fix
         assert "resolve a-bug" in command and f"--specs {specs.as_posix()}" in command, fix
         assert "--caused-by" not in command and len(errors) == 2, fix
@@ -974,3 +985,24 @@ def test_a_refused_archive_leaves_both_ledger_files_byte_intact(
         )  # fmt: skip
         assert done.returncode == 1, done.stdout
         assert [(specs / "bugs" / "BUGS.jsonl").read_bytes(), histo.read_bytes()] == before
+
+
+@pytest.mark.parametrize(("task", "code"), [("T-050-168", 0), ("T-999-999", 1)])
+def test_caused_by_names_a_task_some_tasks_file_carries(
+    script: Path, tmp_path: Path, task: str, code: int
+) -> None:
+    """AC9.3: a write and check accept a task id a TASKS.md under releases/, `_archive/`
+    included, carries, and refuse one none carries."""
+    specs = _ledger(tmp_path, _OPEN_RECORD)
+    (specs / "releases" / "_archive" / "0.1").mkdir(parents=True)
+    (specs / "releases" / "_archive" / "0.1" / "TASKS.md").write_text(
+        "- [x] **T-050-168 — a task.**\n"
+    )
+    written = _run(script, "update", "a-bug", "--set", f"caused_by={task}", "--specs", str(specs))
+    assert written.returncode == code, written.stderr
+    assert _records(specs)[0].get("caused_by") == (task if code == 0 else None)
+    (specs / "bugs" / "BUGS.jsonl").write_text(
+        json.dumps({**_OPEN_RECORD, "caused_by": task}) + "\n"
+    )
+    checked = _run(script, "check", "--specs", str(specs))
+    assert checked.returncode == code, checked.stdout
