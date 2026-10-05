@@ -145,20 +145,22 @@ def linked_worktree(workspace_root: Path, target: Path) -> Path | None:
 
 def rmtree(target: Path) -> OSError | None:
     """Delete *target* — a file, a symlink or a tree, read-only entries included: a failing
-    entry gets owner write on itself (never through a symlink) and on its parent, where
-    unlink permission lives, then one retry. Answers the first failure that retry could
-    not lift, recorded for this call only, else ``None``; it never raises."""
+    entry gets owner rwx on itself (never through a symlink) and on its parent, where
+    unlink permission lives, then one retry of a delete; a failed open or scan is only
+    recorded. Answers the first failure recorded for this call, else ``None``; it never raises."""
     failed: list[OSError] = []
 
-    def retry(func: Callable[[str], object], path: str, _exc: BaseException) -> None:
+    def retry(func: Callable[[str], object], path: str, exc: BaseException) -> None:
         entry = Path(path)
         for each in (entry.parent, *(() if entry.is_symlink() else (entry,))):
             with contextlib.suppress(OSError):
                 os.chmod(each, each.stat().st_mode | stat.S_IWUSR | stat.S_IRUSR | stat.S_IXUSR)
         try:
+            if func not in (os.unlink, os.rmdir):  # the walk names it relative to its dirfd
+                raise OSError(*exc.args[:2], path)
             func(path)
-        except OSError as exc:
-            failed.append(exc)
+        except OSError as error:
+            failed.append(error)
 
     if target.is_symlink() or not target.is_dir():
         try:
