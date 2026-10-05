@@ -437,7 +437,9 @@ def test_a_task_lands_on_its_job_branch_after_the_task_gate_with_no_verdict(root
     assert git(job, "rev-parse", "HEAD").strip() != red
     git(task, "rm", "-q", "RED-task")
     git(task, "commit", "-qm", "green")
-    sha = commit(task, "src/a.py")
+    commit(task, "src/a.py")
+    git(task, "commit", "-q", "--amend", "--no-edit", "--trailer", "Owner-tests: src/a.py")
+    sha = git(task, "rev-parse", "HEAD").strip()
     landed = run(root, "merge", str(task))
     assert landed.returncode == 0, landed.stderr
     assert git(job, "rev-parse", "HEAD").strip() == sha and not task.exists()
@@ -490,6 +492,33 @@ def test_a_task_cannot_rewrite_its_own_gate(root: Path) -> None:
     landed = run(root, "merge", f"worktrees/r/{TASK}")
     assert landed.returncode == 0, landed.stderr
     assert "ci task AGENTS.md" in landed.stdout.splitlines()
+
+
+@pytest.mark.parametrize(
+    ("add", "trailers", "code"),
+    [("src/b.py", (), 1), ("tests/test_b.py", (), 0), ("docs/b.md", (), 0),
+     ("src/b.py", ("Owner-tests: src/b.py",), 0)],
+)  # fmt: skip
+def test_a_code_task_without_owner_tests_refuses_with_one_fix_line(
+    root: Path, add: str, trailers: tuple[str, ...], code: int
+) -> None:
+    """LOW 2: a task touching non-test `.py` with no `Owner-tests:` trailer runs no tests."""
+    task = _task_commit(root, *trailers, add=add)
+    result = run(root, "merge", f"worktrees/r/{TASK}")
+    assert result.returncode == code, result.stderr
+    if code:
+        assert fixes(result) == [
+            f"fix: Operator action: name the task's owner tests in an Owner-tests: trailer on its commits in {task}"
+        ]
+
+
+def test_the_stage_gate_runs_the_work_branch_verify_stage_line(root: Path) -> None:
+    """LOW 3: a task that rewrote `verify-stage:` on the job branch does not choose its gate."""
+    line = "verify: python scripts/ci.py job\nverify-stage: python scripts/ci.py task\n"
+    land(root, "AGENTS.md", line)
+    staged = run(root, "stage", TREE)
+    assert staged.returncode == 0, staged.stderr
+    assert staged.stdout.splitlines()[0] == "ci stage"
 
 
 def test_a_stray_job_branch_commit_refuses(root: Path) -> None:

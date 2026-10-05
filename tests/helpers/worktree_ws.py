@@ -160,7 +160,9 @@ def run_fix(root: Path, result: subprocess.CompletedProcess[str]) -> None:
 def land(root: Path, rel: str, text: str = "x = 1\n") -> str:
     """Commit *rel* in task `TASK` of `JOB` and merge it: a job branch takes code only so."""
     assert run(root, "new", "r", TASK).returncode == 0
-    sha = commit(root / "worktrees/r" / TASK, rel, text)
+    commit(tree := root / "worktrees/r" / TASK, rel, text)
+    git(tree, "commit", "-q", "--amend", "--no-edit", "--trailer", f"Owner-tests: {rel}")
+    sha = git(tree, "rev-parse", "HEAD").strip()
     merged = run(root, "merge", f"worktrees/r/{TASK}")
     assert merged.returncode == 0, merged.stderr
     return sha
