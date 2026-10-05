@@ -20,7 +20,7 @@ Scope: this file governs only `specs/bugs/`.
 ## 2. Resolution
 
 - Close with the fix: `bugs.py resolve`, with the flags `dd-bug-resolution` Phase 6 names; a bug a task fixed resolves in its own `bug` worktree (`dd-gitflow-default` §3a).
-- Check prior resolutions on the same component first; declare `caused_by: <bug_id>|none`.
+- Check prior resolutions on the same component first; `caused_by: X` means the fix of X wrote the lines this fix corrects, picked from `bugs.py resolve`'s blame candidates, `none` only when there are none or with `--lineage-reason`.
 - Commit exactly what the fix touched, never a blanket `-A`; a net-positive diff passes the architecture lens first.
 
 ## 3. Field classes (D11)
@@ -46,7 +46,7 @@ Scope: this file governs only `specs/bugs/`.
 - Diagnosing method, lineage first: `dd-bug-resolution` — window, cap, diff-trust rule, stated once there.
 - Commit shapes for a registration and a resolution: `dd-gitflow-default`.
 - CLI reference for filing: `dd-bug-registration`.
-- The rest of Arm B (branch, concurrency, the `resolved` write, evidence triple): `dd-bug-resolution`.
+- The rest of Arm B (branch, concurrency, the `resolved` write): `dd-bug-resolution`.
 
 ## 6. Relationship to sessions
 

@@ -4,7 +4,7 @@ Scope: this file governs only `specs/backlog/`.
 
 - The backlog is the operator's demand queue: only the operator creates demand, `dd-product-engineer` curates `active[]`.
 - An entry materializes only through the main thread's operator-facing intake report; an operator-ratified in-release deferral already counts as intake.
-- Retention covers bugs and backlog only — tests are prunable under the stewardship criteria (`dd-test-stewardship`).
+- Retention covers bugs and backlog only — a test is pruned by a `dd-code-reviewer` verdict.
 - The backlog is a single JSON document: `specs/backlog/BACKLOG.json`, `{schema: "backlog-v1", active: [...]}`.
 - No per-entry file per backlog item — every live candidate/idea is one `active[]` object (ADR #14).
 - Full schema: `dd-backlog-definition` (The document), `schemas/backlog/backlog-v1.schema.json`.
@@ -49,15 +49,12 @@ Scope: this file governs only `specs/backlog/`.
 
 | kind | ref shape | derived from |
 |---|---|---|
-| `code` | `path/to/module.py#Symbol` | Python sources (auto-derived) |
-| `cli` | `dadaia <command>` | the CLI command tree |
+| `code` | `path/to/file[#word]`, any language | the repo's git paths; `#word` must occur in the file |
 | `catalog` | a `catalog.json` feature slug | `specs/memory/product/catalog.json` |
 | `doc` | a SPEC-DOC id or memory heading | `specs/memory/**/*.md` |
 | `invariant` | an `INV-*` identifier | invariant declarations |
-| `api` | an alias-map synonym | the operator alias map only |
 
-- `BACKLOG_PY subjects` lists the alias map; every ref is judged only by the doctor's `BL-SCHEMA`, which names the ref it cannot resolve.
-- A repo with no Python sources has no `code` anchors — bind `catalog`, `doc` or `invariant`.
+- Every ref is judged only by the doctor's `BL-SCHEMA`, which names the ref it cannot resolve.
 
 ## 5. Relationship to releases
 
