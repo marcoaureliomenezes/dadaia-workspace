@@ -413,3 +413,68 @@ def test_check_validates_a_jobs_merge_entry(
                           capture_output=True, text=True)  # fmt: skip
     hits = [f for f in json.loads(done.stdout) if "kind merge" in f["message"]]
     assert len(hits) == int(bad)
+
+
+def _dag(*rows: tuple[str, str]) -> str:
+    """A PLAN in the rc-9 shape: `## DAG` table (job | waits on | why), then `### Hot files`."""
+    table = "".join(f"| {job} | {waits} | x |\n" for job, waits in rows)
+    return (f"{_GOOD}\n## DAG\n\n| job | waits on | why |\n|---|---|---|\n{table}"
+            "\n### Hot files\n\n- `scripts/ci.py`: Job 1, then Job 2.\n")  # fmt: skip
+
+
+_CHAIN = [("Job 1", "—"), *((f"Job {n}", f"Job {n - 1}") for n in range(2, 9))]
+_RECON = ("Reconciliation", "Jobs 1–8")
+_RED = pytest.mark.xfail(strict=True, reason="J4.S2.T1: release.py check lacks the row")
+
+
+@pytest.mark.parametrize(
+    ("plan", "job", "needle"),
+    [
+        pytest.param(_dag(*_CHAIN, _RECON), _JOB, None, id="valid-8-jobs-plus-reconciliation"),
+        pytest.param(_dag(("Job 1", "Job 2"), ("Job 2", "Job 1")), _JOB, "cyclic",
+                     id="cyclic-dag", marks=_RED),
+        pytest.param(_dag(("Job 2", "—"), ("Job 3", "Job 2")), _JOB, "Job 1",
+                     id="no-job-1", marks=_RED),
+        pytest.param(_dag(*_CHAIN, ("Job 9", "Job 8"), _RECON), _JOB, "8 jobs",
+                     id="nine-jobs", marks=_RED),
+        pytest.param(_dag(*_CHAIN[:2]),
+                     _JOB + "- J2.S2.T2 — AC2.1 · `W:` `src/x.py` · owner `tests/unit/test_x.py`\n",
+                     "src/x.py", id="overlapping-w-in-a-stage", marks=_RED),
+    ],
+)  # fmt: skip
+def test_check_refuses_each_trio_row(
+    script: Path, tmp_path: Path, plan: str, job: str, needle: str | None
+) -> None:
+    """AC4.2: one trio per refusal, one fix line each; the valid trio exits 0."""
+    specs = _specs(tmp_path, plan)
+    (tasks := specs / "releases/0.5.0/rc-1/tasks").mkdir()
+    (tasks / "j2.md").write_text(job, "utf-8")
+    done = subprocess.run([sys.executable, str(script), "check", "--json", "--specs", str(specs)],
+                          capture_output=True, text=True)  # fmt: skip
+    errors = [f for f in json.loads(done.stdout) if f["verdict"] == "error"]
+    assert (done.returncode, len(errors)) == ((1, 1) if needle else (0, 0))
+    for error in errors:
+        assert needle in error["message"]
+        assert error["fix"].startswith(("fix: ", "Operator action: ")) and "\n" not in error["fix"]
+
+
+@pytest.mark.xfail(
+    strict=True, reason="J4.S2.T2: phase IMPLEMENTATION does not read the PLAN's DAG/hot files"
+)
+@pytest.mark.parametrize(
+    ("plan", "needle"),
+    [
+        pytest.param(_dag(*_CHAIN[:2]).replace("## DAG", "## Jobs"), "DAG", id="no-dag"),
+        pytest.param(_dag(*_CHAIN[:2]).replace("### Hot files", "### Notes"), "Hot files",
+                     id="no-hot-files"),
+    ],
+)  # fmt: skip
+def test_phase_implementation_refuses_a_plan_without_dag_or_hot_files(
+    script: Path, tmp_path: Path, plan: str, needle: str
+) -> None:
+    """AC4.3: the PLAN carries `## DAG` and `### Hot files`; one fix line each."""
+    result = _phase(script, _specs(tmp_path, plan))
+    fixes = [
+        ln for ln in result.stderr.splitlines() if ln.startswith(("fix: ", "Operator action: "))
+    ]
+    assert (result.returncode, needle in result.stderr, len(fixes)) == (1, True, 1)
