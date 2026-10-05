@@ -1,0 +1,55 @@
+# TASKS — 0.5.0 rc-9, Job 1 — the demolition
+
+**Status:** Draft
+
+Paths are relative to `dadaia_workspace/` unless they start with `scripts/`, `tests/`, `specs/`, `.github/`, `pyproject.toml` or `CONTEXT.md`; `gitflow/` is `public/skills/dd-gitflow-default/`, `relimpl/` is `public/skills/dd-release-implementation/`, `bugres/` is `public/skills/dd-bug-resolution/`.
+
+As built on `wt/0.5.0-rc9/job1` (its PLAN.md §2, carried here; it wins over the PE draft — SPEC §How rc-9 runs, Deviation). Path aliases on this file: `f/` = `features/`, `pub/` = `public/`, `S/` = `pub/skills/`, `GF/` = `S/dd-gitflow-default/scripts/`.
+
+One worktree (`worktrees/dadaia-workspace/0.5.0-rc9-job1`, operator-authorized `git worktree add`); every task runs inside it. One review at its end, `scripts/ci.py` once on the result, one manual merge. No markers, no start or done commits; a task's commit subject starts with its id; a stage closes with a commit whose body carries `stage: J1.S<m> — unit+integration green`. REBUILD commits name the SPEC's Job 1 as the verdict for the demolished kinds and gate-1 code.
+
+- Gates: task — `ruff` and `mypy` on the touched files plus its owner tests (`-n 2`); stage — unit + integration (`-n 2`), green before the next stage opens; job — `scripts/ci.py` once, at the end.
+- AC1.3, operator order 2026-10-05, verbatim: "a release ja tem que começar fazendo ... vocÊ está proibio de rodar 1 worktree para cada tasks ou rodar CI para cada teste ... não podemos perder mais tempo". The `<job>--<task-id>` shape and the ≤ 5 task-worktree counter leave: a job's tasks share its tree, a stage is the barrier. The SPEC delta lands at Reconciliation (main thread).
+- Deviation, recorded: J1.S2.T3 (`ci.py` levels) and the first cut of J1.S2.T1 were written before the stage order arrived; J1.S2.T3's tests landed with its code in 0fce6c788, not as an S1 xfail.
+
+The stages and task ids are the approved SPEC's (ad9c60c6b, Job 1 `Stages:`); the rows below refine their `W:` where the code demanded it.
+
+- Commit ids, recorded: before the SPEC's ids existed, commits used an earlier numbering. `J1.S2.T1` of bb4ca7638 and 8aa97f23b is the SPEC's T2 + T3; `J1.S2.T3` of 0fce6c788 (as `J1-1`) is T1; `J1.S2.T5` of 9af5ec8e1 and `J1.S2.T6` of e0d1f0e5a are T5 (+ T10); `J1.S1` of 11b8a93d8 carries T3 and T4's rows; T1 and T2's tests landed with their code.
+
+## S1 — RED (tests only)
+
+- Contract: exit tests are each AC's acceptance test as a strict xfail; envelope `tests/**`.
+
+| id | AC | `W:` | owner tests |
+|---|---|---|---|
+| J1.S1.T1 | AC1.1 | `tests/integration/test_ci_script.py` | same |
+| J1.S1.T2 | AC1.2–AC1.5 | `tests/integration/test_worktree_lifecycle.py`, `tests/integration/test_worktree_new.py`, `tests/helpers/worktree_ws.py` | same |
+| J1.S1.T3 | AC1.2 | `tests/unit/features/chokepoints/test_push_branch_policy.py` | same |
+| J1.S1.T4 | AC1.9, AC1.10, the phase move | `tests/unit/features/specs/test_canon.py`, `tests/contract/test_release_script.py`, `tests/helpers/release_state.py` | same |
+
+## S2 — code and law
+
+- Contract: exit tests are J1.S1's, passing, plus unit + integration; ACs AC1.1–AC1.10.
+
+| id | AC | `W:` | owner tests |
+|---|---|---|---|
+| J1.S2.T1 | AC1.1 | `scripts/ci.py` | `test_ci_script.py` |
+| J1.S2.T2 | AC1.3 | `GF/_worktree_new.py`, `GF/_worktree_names.py` (was `_worktree_kinds.py`), `f/spec_context/gate_policy.py`, `core/workspace_layout.py` `protected_glob`, `S/dd-bug-resolution/scripts/_specs.py`, the two contract tests | `test_worktree_new.py`, `test_gate_policy.py`, `test_pre_gate.py` |
+| J1.S2.T3 | AC1.2, AC1.4, AC1.5 | `GF/worktree.py`, `GF/_worktree_end.py`, `GF/_worktree_git.py`, `f/spec_context/doctor.py`, `AGENTS.md` | `test_worktree_lifecycle.py` |
+| J1.S2.T4 | AC1.2 | `core/gitflow.py`, `f/chokepoints/branch_policy.py`, `.github/workflows/ci.yml`, `scripts/guards/repo.py` | `test_push_branch_policy.py`, guard plant `job-trigger` |
+| J1.S2.T5 | AC1.8, AC1.9, AC1.10, the phase move | `core/workspace_layout.py` `SPECS_CANON` (the canon rows live there, not in `canon.py`), `S/dd-release-implementation/scripts/{_release_schema,_release_tree,_release_phase}.py`, `_release_plan.py` (deleted) | `test_canon.py`, `test_release_script.py` |
+| J1.S2.T6 | AC1.8 | `pub/data/worktrees-AGENTS.md`, `S/dd-gitflow-default/SKILL.md` | no test |
+| J1.S2.T7 | AC1.8 | `S/dd-release-implementation/{RC-FLOW,MEMORY-UPDATE,SKILL}.md` | no test |
+| J1.S2.T8 | AC1.6, AC1.8 | `S/dd-manager-orchestration/SKILL.md`, `S/dd-release-definition/SKILL.md`, `S/dd-audit-project/PILLAR-SPECS.md` | no test |
+| J1.S2.T9 | AC1.8 (hit lines) | `pub/scaffold/{releases,bugs,ADRs}/AGENTS.md`, `S/dd-bug-resolution/SKILL.md`, `S/dd-bug-registration/SKILL.md`, `S/dd-code-review/SKILL.md` | no test |
+| J1.S2.T10 | AC1.7 | `S/dd-release-implementation/scripts/_release_check.py` | `test_release_script.py` |
+
+- The canon and law changes move the `specs_version` canon pin and the shipped template hashes; they are re-recorded with T6–T9 (stamp 9 is unshipped).
+- AC1.7's own `kind: merge` entry is appended to `_RELEASE.json` at the end, after the merge times exist.
+
+## S3 — review rework
+
+- Contract: tasks are born from the job review's findings; the driver (main thread) appends each row as it is born (R1, R8); exit tests: unit + integration green, then `scripts/ci.py` once.
+
+| id | AC | `W:` | owner tests |
+|---|---|---|---|
