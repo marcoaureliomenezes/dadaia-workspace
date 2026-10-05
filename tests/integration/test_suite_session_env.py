@@ -31,6 +31,13 @@ def test_inner():
     assert child.stdout == f"{Path.home()}\\n"
 """
 
+_CREATES_A_RUFF_CACHE = f"""
+from pathlib import Path
+
+def test_inner():
+    Path({str(_CHECKOUT / ".ruff_cache")!r}).mkdir(exist_ok=True)
+"""
+
 _WRITES_A_PYCACHE = """
 from pathlib import Path
 
@@ -49,11 +56,15 @@ def inner(request: pytest.FixtureRequest) -> Iterator[Path]:
     shutil.rmtree(where, ignore_errors=True)
 
 
-def test_an_inner_run_under_an_operator_context_sees_the_temp_home_and_a_pycache_fails_it(
+def test_inner_runs_see_the_temp_home_and_fail_on_a_pycache_or_a_created_root_cache(
     pytester: pytest.Pytester, monkeypatch: pytest.MonkeyPatch, inner: Path, tmp_path: Path
 ) -> None:
-    """One test, two inner runs in order: the pycache run's watched write would fail any
-    inner session running beside it (the tripwire watches the whole ``tests/`` tree)."""
+    """One test, inner runs in order: each one's watched write would fail any inner session
+    running beside it (the tripwires watch the ``tests/`` tree and the checkout root).
+    The last two pin T-010-25 / AC-R8-02: a root cache dir the session creates fails it;
+    one present before the session is ignored."""
+    cache = _CHECKOUT / ".ruff_cache"
+    assert not cache.exists()
     foreign = tmp_path / "foreign"
     foreign.mkdir()
     monkeypatch.setenv("DADAIA_CONTEXT", "ghost")
@@ -64,7 +75,19 @@ def test_an_inner_run_under_an_operator_context_sees_the_temp_home_and_a_pycache
 
     home = pytester.runpytest_subprocess(str(inner / "test_home.py"), "-p", "no:randomly")
     pycache = pytester.runpytest_subprocess(str(inner / "test_pycache.py"), "-p", "no:randomly")
+    (inner / "test_ruff.py").write_text(_CREATES_A_RUFF_CACHE, encoding="utf-8")
+    try:
+        created = pytester.runpytest_subprocess(str(inner / "test_ruff.py"), "-p", "no:randomly")
+        preexisting = pytester.runpytest_subprocess(
+            str(inner / "test_ruff.py"), "-p", "no:randomly"
+        )
+    finally:
+        shutil.rmtree(cache, ignore_errors=True)
 
     assert home.ret == 0, home.stdout.str()
     assert pycache.ret == 1
     pycache.stdout.fnmatch_lines(["*[[]OUTSIDE TMP[]] gained: *__pycache__*"])
+    assert created.ret == 1
+    created.stdout.fnmatch_lines(["*[[]SESSION POLLUTION[]]*", "  .ruff_cache"])
+    assert preexisting.ret == 0, preexisting.stdout.str()
+    preexisting.stdout.no_fnmatch_line("*[[]SESSION POLLUTION[]]*")
