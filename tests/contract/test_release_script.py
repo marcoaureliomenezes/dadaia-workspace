@@ -77,7 +77,7 @@ def test_an_approved_spec_and_plan_enter_implementation_with_no_tasks_file(
     script: Path, tmp_path: Path
 ) -> None:
     """AC1.9 (ADR 0194): the job files carry the tasks; no `TASKS.md`, no PLAN table judge."""
-    _admits(script, tmp_path, _GOOD)
+    _admits(script, tmp_path, _dag(*_CHAIN[:2]))
 
 
 def test_an_unapproved_plan_refuses(script: Path, tmp_path: Path) -> None:
@@ -355,7 +355,7 @@ def test_check_judges_each_job_file(
     script: Path, tmp_path: Path, job: str, needle: str | None
 ) -> None:
     """AC1.10 (ADR 0194, 0196): a job file parses into stages; stage 1 writes tests only."""
-    specs = _specs(tmp_path, _GOOD)
+    specs = _specs(tmp_path, _dag(*_CHAIN[:2]))
     (tasks := specs / "releases/0.5.0/rc-1/tasks").mkdir()
     (tasks / "j2.md").write_text(job, "utf-8")
     done = subprocess.run([sys.executable, str(script), "check", "--json", "--specs", str(specs)],
