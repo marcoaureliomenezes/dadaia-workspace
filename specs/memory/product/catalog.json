@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-10-05T14:24:40Z",
+  "generated_at": "2026-10-05T21:08:40Z",
   "features": [
     {
       "rank": 1,
@@ -764,7 +764,7 @@
         "ledger",
         "governance"
       ],
-      "token_estimate": 1596,
+      "token_estimate": 1640,
       "depends_on": [
         "sdd-gate-v3",
         "workspace-doctor",
@@ -779,7 +779,7 @@
         "dadaia_workspace/public/skills/dd-bug-resolution/**",
         "dadaia_workspace/public/skills/dd-bug-registration/**",
         "dadaia_workspace/public/schemas/bugs/**",
-        "dadaia_workspace/features/specs/doctor_governance.py"
+        "dadaia_workspace/public/skills/dd-bug-resolution/scripts/_bugs_check.py"
       ]
     },
     {
