@@ -258,8 +258,11 @@ def resolve_context_specs_dir(workspace_root: Path, context: str) -> Path | None
 
 
 def alive_context_trees(workspace_root: Path) -> dict[str, Path]:
-    """Every ALIVE context name -> its ``specs/`` tree, in registry order."""
-    trees = {
-        n: resolve_context_specs_dir(workspace_root, n) for n in alive_context_names(workspace_root)
+    """Every ALIVE context name -> its ``specs/`` tree, in registry order: one registry read
+    (a hook's cost never grows with the registry, ADR 0118)."""
+    return {
+        str(e["name"]): workspace_root / "repos" / slug / "specs"
+        for e in context_registry.entries(workspace_root)
+        if str(e.get("state", "")).lower() == "alive" and e.get("name")
+        if isinstance(slug := context_registry.entry_slugs(e)[0], str) and slug
     }
-    return {name: tree for name, tree in trees.items() if tree is not None}

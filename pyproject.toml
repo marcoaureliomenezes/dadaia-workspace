@@ -170,6 +170,7 @@ tmp_path_retention_policy = "failed"
 [tool.coverage.run]
 source = ["dadaia_workspace"]
 parallel = false
+patch = ["subprocess"]
 
 [tool.coverage.report]
 exclude_lines = [

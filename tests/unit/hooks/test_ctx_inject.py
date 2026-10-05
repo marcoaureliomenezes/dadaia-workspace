@@ -402,13 +402,11 @@ def _ops(root: Path, hook: str, bound: bool) -> int:
             "ctx_inject",
             False,
             id="ctx_inject-unbound",
-            marks=pytest.mark.xfail(strict=True, reason="J2.S3.T2: AC2.2"),
         ),
         pytest.param(
             "ctx_inject",
             True,
             id="ctx_inject-bound",
-            marks=pytest.mark.xfail(strict=True, reason="J2.S3.T2: AC2.2"),
         ),
         pytest.param("sdd_post_gate", True, id="sdd_post_gate"),
     ],
