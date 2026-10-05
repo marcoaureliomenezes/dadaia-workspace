@@ -539,13 +539,13 @@ After AC9.3 and AC8.1's `Intent:` strip merge. Each RED is a behaviour assert in
   - AC12.10 — T-050-204; carried to rc-9 — grill 2026-10-05 Q21.
   - AC12.14 rows 20, 24, 25, 26 — T-050-205, T-050-206, T-050-207, T-050-208; carried to rc-9 — grill 2026-10-05 Q21.
   - AC12.1 as AC13.7 words it; AC13.7's registration step; AC13.1's §3 class; AC13.2's block list; AC13.6's law line; AC13.3's lifecycle order; AC9.3's bugs-law semantics; AC12.9's real bump, `CANONICAL_SPECS_VERSION` 9 → 10 — T-050-194; carried to rc-9 — grill 2026-10-05 Q21.
-  - AC12.2 as AC13.2 narrows it; AC13.2 in `dd-bug-resolution` §1; AC9.3's LINEAGE step 2 — T-050-195; carried to rc-9 — grill 2026-10-05 Q21.
+  - AC12.2 as AC13.2 narrows it; AC13.2 in `dd-bug-resolution` §1; AC13.3's Phase 0 and `LINEAGE.md` rule 6 reading `bugs.py window`; AC9.3's LINEAGE step 2 — T-050-195; carried to rc-9 — grill 2026-10-05 Q21.
   - AC12.3; AC13.6's `RC-FLOW.md` line; the root map's Arm B line; AC13.11 — T-050-196; carried to rc-9 — grill 2026-10-05 Q21.
-  - AC12.12's law row; AC13.8; AC13.4's per-class and archive shapes — T-050-197; carried to rc-9 — grill 2026-10-05 Q21.
+  - AC12.12's law row; AC13.2 in `dd-gitflow-default` §2a (a block-list fix opens its `bug` worktree at once) and §3a shape 3's `block: <item>` / `born-in-rc: <culprit>` body tag; AC13.8; AC13.4's per-class and archive shapes — T-050-197; carried to rc-9 — grill 2026-10-05 Q21.
   - AC9.4's REBUILD read; AC12.6's and AC12.12's reviewer lines — T-050-198; carried to rc-9 — grill 2026-10-05 Q21.
-  - AC12.11's and AC13.12's bars on those law files — T-050-194 … T-050-198; carried to rc-9 — grill 2026-10-05 Q21.
-  - AC13.3 — T-050-216; carried to rc-9 — grill 2026-10-05 Q21.
-  - AC13.2's in-rc pile and cause groups — T-050-195, T-050-196, T-050-197; carried to rc-9 — grill 2026-10-05 Q21; moot there: Q19 retires the in-rc pile (scope I1).
+  - AC12.11's and AC13.12's bars on those law files — T-050-194 … T-050-198; AC13.12's bar on `dd-release-definition/SKILL.md` — T-050-216; carried to rc-9 — grill 2026-10-05 Q21.
+  - AC13.3's `release.py new` heading, `release.py check` refusal and `dd-release-definition` §1 first step — T-050-216; carried to rc-9 — grill 2026-10-05 Q21; its `bugs.py window` was delivered in rc-8 by T-050-209 (`[x]`), its Phase 0 and `LINEAGE.md` read rides T-050-195, its lifecycle order T-050-194.
+  - AC13.2's in-rc pile and cause groups, the `cause: <group>` body tag included — T-050-195, T-050-196, T-050-197; carried to rc-9 — grill 2026-10-05 Q21; moot there: Q19 retires the in-rc pile (scope I1).
   - AC10.12 (F098, FR `guidance-messages-name-the-right-target`, HOOKS-DRIFT-1) — T-050-177; carried to rc-9 — grill 2026-10-05 Q21; scope Q3 routes it to the backlog (`BACKLOG.json:13`), then rc-10.
   - AC11.2's T1 and T2 task dirs; AC11.3; AC11.4; AC11.6, its log line included — T-050-185, T-050-186, T-050-188, T-050-181; carried to rc-9 — grill 2026-10-05 Q21; scope Q1 routes the evals to rc-10, with G6's 0177 acceptance edge.
   - AC8.10's last bullet — T-050-180; carried to rc-9 — grill 2026-10-05 Q21; scope Q1 routes QUALITY to rc-10, with the rc-9 line's AC13.5, AC13.9, AC13.10 and 0176's acceptance (scope I3).
