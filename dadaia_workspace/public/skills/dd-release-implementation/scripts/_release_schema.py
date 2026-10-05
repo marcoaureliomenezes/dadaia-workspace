@@ -229,7 +229,7 @@ def job_errors(text: str, rel: str) -> list[str]:
             errors.append(f"{rel} stage {stage} has no '- Contract:' line")
         flat = [path for paths in tasks for path in set(paths)]
         errors += [f"{rel} stage {stage}: two tasks write {path} — `W:` sets overlap"
-                   for path in sorted({p for p in flat if flat.count(p) > 1 and "/" in p})]  # fmt: skip
+                   for path in sorted({p for p in flat if flat.count(p) > 1})]  # fmt: skip
         errors += [
             f"{rel} stage {stage} writes {path} — stage 1 writes tests only"
             for path in (flat if index == 0 else [])

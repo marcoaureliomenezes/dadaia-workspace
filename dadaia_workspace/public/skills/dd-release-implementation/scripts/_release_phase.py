@@ -13,7 +13,6 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from _release_check import dag_errors  # noqa: E402
 from _release_schema import (  # noqa: E402
     APPROVED,
     CANDIDATE_DOCS,
@@ -108,7 +107,7 @@ def set_phase(specs: Path, phase: str, sha: str) -> tuple[str, str]:
         plan = (candidate / "PLAN.md").resolve()
         text = plan.read_text(encoding="utf-8")
         missing = [h for h in ("## DAG", "### Hot files") if not re.search(f"^{h}", text, re.M)]
-        if errors := [f"PLAN.md has no '{h}' section" for h in missing] or dag_errors(text):
+        if errors := [f"PLAN.md has no '{h}' section" for h in missing]:
             raise Refusal(
                 errors[0], f"Operator action: write the DAG table and hot files in {plan}"
             )

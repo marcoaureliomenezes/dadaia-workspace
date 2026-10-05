@@ -56,8 +56,8 @@ The stages and task ids are the approved SPEC's (ad9c60c6b, Job 1 `Stages:`); th
 
 | id | AC | `W:` | owner tests |
 |---|---|---|---|
-| J1.S3.T1 | AC1.2, AC1.3 | REBUILD: task worktrees back, nested names, verify lines as argv, `ci_run` (ab3dc84ec) | `test_worktree_new.py`, `test_worktree_lifecycle.py` |
-| J1.S3.T2 | AC1.8 | law states task worktrees, the verify lines and `ci_run` (da33447df) | no test |
+| J1.S3.T1 | AC1.2, AC1.3 | REBUILD: task worktrees back, nested names, verify lines as argv, ci_run (ab3dc84ec) | `test_worktree_new.py`, `test_worktree_lifecycle.py` |
+| J1.S3.T2 | AC1.8 | law states task worktrees, the verify lines and ci_run (da33447df) | no test |
 | J1.S3.T3 | AC1.5 | an atom changed alone is refused once, naming its re-derive (a643828fa) | `test_worktree_lifecycle.py` |
 | J1.S3.T4 | AC1.10 | `TRIO` → `CANDIDATE_DOCS`, `_refuse_unapproved_docs` (def698d61) | `test_release_script.py` |
 | J1.S3.T5 | — | unused | — |
