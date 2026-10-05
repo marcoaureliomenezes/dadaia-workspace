@@ -10,13 +10,14 @@
 - No old ritual in rc-9 ("rc-9 não deve ter ritual velho, nada dele"; supersedes Q21, I4): Job 1 demolishes it ("no primeiro minuto da rc9"); Jobs 2 on run the new model.
 - Scope ("Lean: J1 + REBUILDs + mechanism + laws"), demolition first: Jobs 1–5 and Reconciliation; 5 of 8 jobs (Q18).
 - Job 2–3 bugs stay out of Origin (0161: no `operator-demand` plus clauses).
-- Aggregated from rc-8 (Q21): T-050-173 … 176, 178, 179, 194 … 208, 214 … 216; T-050-213 is §1 (scope I1); T-050-209's REBUILD stays in rc-8.
+- Aggregated from rc-8 (Q21): T-050-173 … 176, 178, 179, 194 … 208, 214 … 216; T-050-213 is §1 (scope I1). T-050-209's REBUILD landed in rc-8: 0844e518e + af924c09f, done db82dc7bf.
+- Carried-in, T-050-210 … 212 (AC2.8): rc-8 closed (767ba1d4f) without them. They sit only on `refs/backup/0.5.0b-impl-full`, with their atom and docs commits. AC2.10, AC2.11, AC5.4 and 0199 rest on them: the archive-by-ADR verb (210), the restored records (211) and `found_in` (212).
 
 ## Bug window review
 
-**Job 1 (the demolition) runs before this window's fixes; the window runs as Job 2.** Provisional until rc-8 closes (Q20): re-read by `bugs.py window` then (AC2.11).
+**Job 1 (the demolition) runs before this window's fixes; the window runs as Job 2.** Re-read at rc-8's close (767ba1d4f) by `bugs.py stats` and `window` on this tree.
 
-- Window (rc-8 AC13.3): `found_in` or `introduced_in` in 0.5.0 or 0.4.7. Today no record carries `found_in`: T-050-209 was reverted (9018fdadb), T-050-210 … T-050-212 are open. By `ts`: 236 records since 0.4.7 opened; 9 open.
+- Window (rc-8 AC13.3): `found_in` or `introduced_in` in 0.5.0 or 0.4.7. No record carries `found_in` until AC2.8 lands T-050-212's backfill. `bugs.py window`: 39 in the window, 12 release unknown. By `ts`: 236 records since 0.4.7 opened. 8 are open: AC2.1–AC2.7's seven, and `dependabot-pyjwt-open-on-main` (§Carried).
 - rc-8's fixes, by `bugs.py fix` (10 linked, 0 unlinked):
 
 | bug | fix | direction | what followed | verdict |
@@ -28,14 +29,14 @@
 | `worktree-merge-linearizes-a-branch-already-containing-work` | 1cfc3b72d | positive | reverted (T-050-191) | done |
 
 - Held, nothing followed (KEEP): 5, both net-negative fixes among them (`bugs.py fix`). Readout: 5 of the 8 others bred a bug or were reverted.
-- T-050-209, a task, bred `bug-window-tests-assume-posix-paths` (MEDIUM): rc-8's REBUILD, else AC2.11.
+- T-050-209, a task, bred `bug-window-tests-assume-posix-paths` (MEDIUM). rc-8's REBUILD (0844e518e) resolved it.
 - Clusters:
   - Job 3's REBUILDs: C1 test session env (3 fixes, rows 14–17); C3 `sweep.py`'s except arm (rows 6, 21–23, 27, three culprits); C4 `context dead` (AC12.8's culprits, row 24); C5 T-050-168's tests (rows 10, 12); C6 `_StubDoctor` (row 13, two repairs in 2 days).
   - C2 Tests assume the host's paths: rows 5, 8, 9, 11, 12, 18 and `bug-window-tests-assume-posix-paths`, 7 records, each red only on post-merge CI. Cause: the merge gate runs local Linux only (rc-8 AC12.6). Verdict: the CI matrix at the job gate (R9, AC1.2); no per-test rule. Row 12 is Job 3's.
   - C7 The ledger privacy seam: the open HIGH and its 4 `--correlates` (`sa-ledger-write-seam-redacts-less-than-push-refuses`: fix 1bcfdba8f created the seam). Cause: two deciders of "what the push refuses"; the seam judges a value alone, the push against published prior text. REBUILD, AC2.7.
   - C8 rc-8's six single W10 records: UPDATE, RED first, AC2.1–AC2.6; a unit the as-is review finds with ≥ 2 prior fixes turns REBUILD.
-  - C9 rc-8's 27 unregistered hidden breaks (AC12.4) → AC2.8.
-  - C10 Non-product records (2026-10-05: 15 agent error, 89 release-born, 66 dev-tooling, 35 doubtful) and the 65 restored records on retired surfaces → AC2.9, AC2.10, counts re-read at rc-8's close.
+  - C9 rc-8's 27 unregistered hidden breaks (AC12.4) → AC2.9.
+  - C10 Non-product records (2026-10-05: 15 agent error, 89 release-born, 66 dev-tooling, 35 doubtful) and the 65 restored records on retired surfaces → AC2.10, AC2.11. Their counts are re-read after AC2.8.
 
 ## Terms
 
@@ -52,18 +53,35 @@
 
 ## Job 1 — the demolition
 
-Lands as one merge ("Um merge só, autorizado"): one worktree, one review at its end, `scripts/ci.py` once on the result, the main thread's authorized manual merge, one push. RED first in the owner file.
+Lands as one merge ("Um merge só, autorizado"). RED first in the owner file. The old `worktree.py new` kinds refuse a tree holding code, law and specs together, so Job 1 runs outside them:
+
+- One worktree: `worktrees/dadaia-workspace/0.5.0-rc9-job1` on branch `wt/0.5.0-rc9/job1`, cut from the work branch. It is opened by an operator-authorized `git worktree add`.
+- Its task list lives in the PLAN. There are no TASKS markers and no start or done commits.
+- One review, at its end.
+- `../../../.dadaia/.venv/bin/python scripts/ci.py`, run once inside the worktree on the result.
+- One manual merge, authorized by the operator, then one push.
 
 - AC1.1 (a) Gates per task and stage; the full `scripts/ci.py` at every `worktree.py merge` leaves (gate 1, 0185, T-050-191; Q6, R4). Three `scripts/ci.py` levels (root `AGENTS.md`): task (ruff, mypy on touched files, owner tests), stage (lint, mypy, guards but drift, unit, integration; R6), job (the full command). A task fast-forwards onto its job branch after its gate; a stage closes only with no task worktree open and its gate green. **Unit** (`test_ci_script.py`): each level runs only its steps; a planted failing step turns it non-zero. **Integration**: a red task gate lands nothing, a green one lands; a stage with an open task worktree cannot close.
-- AC1.2 (a) The job gate runs the CI matrix once (Q2, Q11, R7, R9, Q13, Q14): a job's merge runs the job level on HEAD, requires an APPROVED verdict naming its green CI-matrix run, and fast-forwards; a moved work branch refuses with a rebase fix line; 0168's carry stands. `pre-push` accepts and scans `wt/<M.m.p>-rc<N>/<job>` only of `wt/`; `ci.yml` triggers on `wt/**`. A non-code merge (`define/`, `backlog/`) runs the ledger, trio and ADR validators only. **Unit**: branch-policy rows. **Integration**: a verdict without the matrix run refuses; a second job's merge refuses until rebased; an invalid ledger refuses, a valid one lands with no test run. **Guard**: `ci-triggers-gitflow` pins `wt/**`.
-- AC1.3 (b) One tree per job; the worktree-kind split leaves (0106, 0124, 0148; Q4, Q5, Q8, R3, Q11): `worktrees/<repo>/<M.m.p>-rc<N>/{define,reconcile,<job>,<job>--<task-id>}/`, branches `wt/<M.m.p>-rc<N>/<job>[--<task-id>]`; outside an rc only `backlog/<slug>/`; a bug is a job. The per-kind allowed sets leave: code, tests, specs, memory and derived docs of one change are one job. A job branch takes only task merges and its rc's specs edits (R8). The gate, doctor, reaper and `WT` read a worktree path's repo-relative tail through one function. ≤ 5 task worktrees per rc. **Integration**: `WT new` makes each shape, refuses an old-grammar name and a 6th task worktree; a PROTECTED write in a task worktree is blocked; one job commits a code file and a `specs/memory/` atom together; a stray job-branch commit refuses.
-- AC1.4 (c) One review per job; none per worktree (Q2, Q12, Q14; rc-8 AC9.4, AC12.6, AC12.12): none at a task or stage merge; one per job, plus one per stage past ~400 new lines; a non-code merge one pass; one definition round per document, again only on a HIGH; the verdict carries the job command's output and CI-matrix run; a REBUILD read covers every line the prior fix wrote; no APPROVED on a test-deleting `refactor(...)` without a SPEC REBUILD verdict. **Integration**: a task merge lands with no verdict; a job merge without one refuses.
+- AC1.2 (a) The job gate runs the CI matrix once (Q2, Q11, R7, R9, Q13, Q14): a job's merge runs the job level on HEAD, requires an APPROVED verdict naming its green CI-matrix run, and fast-forwards; a moved work branch refuses with a rebase fix line; 0168's carry stands. `pre-push` accepts and scans `wt/<M.m.p>-rc<N>/<job>` only of `wt/`; `ci.yml` triggers on `wt/**`. A non-code merge (`define/`, `backlog/`) runs the ledger, trio and ADR validators only. The repo's `verify:` line and its `shell=True` run leave (`_worktree_end.py:124-131`, CWE-78): the job level is one argv list, `shell=False`. Check: `grep -c 'shell=True' dadaia_workspace/public/skills/dd-gitflow-default/scripts/_worktree_end.py` prints `0`. **Unit**: branch-policy rows. **Integration**: a verdict without the matrix run refuses; a second job's merge refuses until rebased; an invalid ledger refuses, a valid one lands with no test run. **Guard**: `ci-triggers-gitflow` pins `wt/**`.
+- AC1.3 (b) One tree per job; the worktree-kind split leaves (0106, 0124, 0148; Q4, Q5, Q8, R3, Q11): `worktrees/<repo>/<M.m.p>-rc<N>/{define,reconcile,<job>,<job>--<task-id>}/`, branches `wt/<M.m.p>-rc<N>/<job>[--<task-id>]`; outside an rc only `backlog/<slug>/`; a bug is a job. The per-kind allowed sets leave: code, tests, specs, memory and derived docs of one change are one job. A job branch takes only task merges and its rc's specs edits (R8). The job driver's own edit (AC1.6) lands as a task too, never as a direct job-branch commit. The gate, doctor, reaper and `WT` read a worktree path's repo-relative tail through one function. ≤ 5 task worktrees per rc. **Integration**: `WT new` makes each shape, refuses an old-grammar name and a 6th task worktree; a PROTECTED write in a task worktree is blocked; one job commits a code file and a `specs/memory/` atom together; a stray job-branch commit refuses.
+- AC1.4 (c) One review per job; none per worktree (Q2, Q12, Q14; rc-8 AC9.4, AC12.6, AC12.12): none at a task or stage merge. One per job, plus one per stage past 400 added lines (operator Q2). Added lines are the sum of `git diff --numstat` column 1 over the stage range; deletions are excluded. a non-code merge one pass; one definition round per document, again only on a HIGH; the verdict carries the job command's output and CI-matrix run; a REBUILD read covers every line the prior fix wrote; no APPROVED on a test-deleting `refactor(...)` without a SPEC REBUILD verdict. **Integration**: a task merge lands with no verdict; a job merge without one refuses.
 - AC1.5 (d) The 9-step closure leaves; Reconciliation is the last job (Q10): memory, derived docs, `measured_by` repairs, the rc's measurement, closure, one worktree. An atom and its derived sections land in one merge; the atom ↔ derived-docs hash check runs on that merge. The rejected 0189 (release kind carries derived docs) does not return. **Integration**: one merge changing an atom and its derived section passes the job gate and the drift guard; the atom alone is refused with one fix line naming the regenerating command.
-- AC1.6 (e) No micro-dispatch: the main thread dispatches a job or a task; a smaller edit inside an open job is the job driver's own (`dd-manager-orchestration`). **No test** (law text, AC1.8); AC1.7 counts dispatches per job.
-- AC1.7 Ritual wait is measured per job: each merged job, Job 1 included, logs in `_RELEASE.json` its wall time, ritual wait and dispatch count; AC6.2 compares rc-9's per-job ritual wait with rc-8's per-merge 25–35 min, the rc total with rc-8's ~12–15 h (~30 merges). Target ~75–80 % less ritual wait: an estimate, not a promise. **No test** (log data).
-- AC1.8 The law follows in the same merge, each file rewritten once to rc-8 AC12.11's bar: `worktrees/AGENTS.md` (the tree, three gates, one review, hotfix, caps), `dd-gitflow-default` §3a's kind column, `RC-FLOW.md`'s closure steps, `MEMORY-UPDATE.md`, `dd-manager-orchestration`. **No test** (law text): `public stage`, `install`, `doctor` clean; `/corpus-audit` clean.
+- AC1.6 (e) No micro-dispatch: the main thread dispatches a job or a task; a smaller edit inside an open job is the job driver's own (`dd-manager-orchestration`), landing as a task (AC1.3). **No test** (law text, AC1.8). Check: each job's `kind: merge` log entry (AC1.7) carries `dispatches: <n>`. It is a log line, not a gate.
+- AC1.7 Ritual wait is measured per job. Each merged job, Job 1 included, appends one `kind: merge` entry to `_RELEASE.json`'s `log`: `job: <name>; wall: <min>; ritual_wait: <min>; dispatches: <n>`. `release.py` has no log verb, so the job driver writes it by Read-then-Edit (`RELEASE-EVENTS.md` §log); `release.py check` validates it. **No test** (log data).
+  - Formula, over whole rcs: `1 − Σritual_wait(rc-9) / Σritual_wait(rc-8)`.
+  - The rc-8 baseline comes from rc-8's git history. Per landing, take the committer time of its `chore(tasks): done <id>` minus the committer time of that task's last code commit. Reconciliation computes it once (AC6.2), anchored to `T040135Z`'s readout: gate 1 ~6 min on 67 landings, ~81 review rounds in 26 h.
+  - Estimates, not targets: 25–35 min per rc-8 merge, ~12–15 h over ~30 merges, and ~75–80 % less ritual wait.
+- AC1.8 The law follows in the same merge. Each file is rewritten once to rc-8 AC12.11's bar: `worktrees/AGENTS.md` (the tree, three gates, one review, hotfix, caps), `dd-gitflow-default` §3a's kind column, `RC-FLOW.md`'s closure steps, `MEMORY-UPDATE.md`, `dd-manager-orchestration`, and `dd-release-definition` §4–§5 (the job, stage and task shape; the Parallel schedule leaves, its `_release_plan.py` check and test with it).
+  - Old-ritual lines also leave from the files Job 5 owns. Job 1 deletes only the hit lines there; Job 5 rewrites those files:
+    - `scaffold/releases/AGENTS.md`, `scaffold/bugs/AGENTS.md` and `scaffold/ADRs/AGENTS.md`;
+    - `skills/dd-bug-resolution/SKILL.md`, `skills/dd-release-implementation/SKILL.md` and `skills/dd-release-implementation/scripts/_release_plan.py`;
+    - `dd-bug-registration` §3 and `dd-code-review` §3.
+  - Today the grep also hits `data/worktrees-AGENTS.md`, `dd-gitflow-default/SKILL.md`, `_worktree_kinds.py`, `_worktree_new.py`, `RC-FLOW.md` and `MEMORY-UPDATE.md` (AC1.3 and the files above).
+  - **No test** (law text). `public stage`, `install`, `doctor` and `/corpus-audit` are clean, and both checks print `0`:
+    - ``grep -rnE -- '--kind (impl|bug|release|backlog)|`(impl|bug|release)` worktree|chore\(tasks\): start|Parallel schedule|Candidate closure order' dadaia_workspace/public | wc -l``.
+    - The grep misses two lines, so a second check covers them: ``grep -hcE "\`bug\` or \`backlog\` worktree|its kind's" dadaia_workspace/public/skills/dd-bug-registration/SKILL.md dadaia_workspace/public/skills/dd-code-review/SKILL.md`` prints `0` per file.
 - AC1.9 One TASKS file per job (R8): `rc-<N>/tasks/<job>.md`; the canon admits `tasks/`; `TASKS.md` and its `[-]` marker and start commits leave from Job 2 on, closed rcs unchanged. **Unit**: canon rows for a job file, a stray `tasks/` file, a closed rc's `TASKS.md`.
-- AC1.10 The job file (Q8, Q9, R1, R5, R10, I2): per stage its contract (exit tests by level, envelope, ACs served) and its tasks (id, AC, `W:`, owner tests, RED tests); stage 1 is test-only, every acceptance test RED as strict xfail; `running` is derived (the worktree exists), `done` written once per job by its close task; a cancelled task stays with its reason, a born one cites its AC. **Unit**: one valid job file parses; a stage-1 non-test file and a cancelled task without a reason refuse.
+- AC1.10 The job file (Q8, Q9, R1, R5, R10, I2): per stage its contract (exit tests by level, envelope, ACs served) and its tasks (id, AC, `W:`, owner tests, RED tests); stage 1 is test-only, every acceptance test RED as strict xfail; `running` is derived (the worktree exists), `done` written once per job by its close task; a cancelled task stays with its reason, a born one cites its AC. **Unit**: one valid job file parses; a stage-1 non-test file refuses. A cancelled task's reason is skill-taught and audit-measured.
 
 ## Job 2 — the bug window, executed
 
@@ -76,14 +94,20 @@ RED first in the owner file. Job 2's close logs Δ production lines, Δ test fun
 - AC2.5 An upgrade leaves no scratch and no silent rewrite (`upgrade-leaves-reconcile-scratch-behind`; F044; 0104): `.dadaia/tmp/reconcile/` absent after `init`; `pre-push` rewritten only when its bytes differ. **Integration**: a second `init` leaves the hook's bytes untouched; a differing hook is refreshed.
 - AC2.6 `release.py memory` is idempotent (`release-memory-appends-a-second-entry-on-rerun`; F097). **Unit**: a rerun over the same window exits 0, the `kind: memory` entries byte-equal.
 - AC2.7 The ledger seam refuses exactly what the push refuses (`ledger-denylist-term-inside-context-slug-blocks-registration`, HIGH; **REBUILD verdict, approved with this SPEC**: unit, the ledger privacy seam; trigger ≥ 2 bugs and two deciders, C7). The seam asks the push gate's own question, published-prior-text amnesty included; its own matcher leaves. **Unit**: a table of values, seam verdict equal to push verdict per row; a context value already published in the ledger is accepted, an unpublished term is refused. **Integration**: the registered record pushes through `pre-push`.
-- AC2.8 The 27 hidden breaks are registered (C9; rc-8 AC12.4's table unchanged): one `chore(bugs): report …` with the two `caused_by` repairs; sha rows resolved retro, one shape-4 commit each; AC rows stay open for Job 3. **No test** (ledger data): `bugs.py status --all`'s open set is the Job 3 rows; `bugs.py fix <slug>` prints each sha row's shas.
-- AC2.9 Non-product records ruled by class (C10; rc-8 AC13.4's classes and shape-4 commits). **No test**: `bugs.py check` exits 0; `bugs.py stats` matches the logged per-class counts.
-- AC2.10 Records on retired surfaces leave by `bugs.py archive --adr <id>`, an accepted ADR each, retroactive where missing (C10; 0187 (3)). **No test**: `bugs.py window` omits them; the histo carries `archived_by`.
-- AC2.11 Provisional: `bug-window-tests-assume-posix-paths` if open at rc-8's close, and each fix-induced record of rc-8's tail, each given an AC and level before approval.
+- AC2.8 The rc-8 carried T-050-210 … 212 land from `refs/backup/0.5.0b-impl-full` (Carried-in). Each sha lands as-is, or gets a REBUILD verdict in this SPEC before it lands:
+  - 210: 8de093db9 (a record leaves the ledger only by an accepted ADR), a98e9a5e1 (fold `ci.py`), e6c117c0e (bug-ledger atom sources) and a01a28e9b (re-derived docs). They land as-is.
+  - 211: 8921dd17d restores 65 age-archived records under 0187 and sets 4 `caused_by` to none. It is a **REBUILD candidate**: restore the records with their `caused_by` intact.
+  - 211: e47e6d257 raises the v33 orphan ratchet from 31 to 33. That contradicts "ratchet DOWN ONLY", so it is a **REBUILD candidate**: the restore lands with no ratchet raise.
+  - 212: 0d9fba147 backfills `found_in`. It lands as-is.
+  - 798250d4a (T-050-209's backup REBUILD) does not land. 0844e518e + af924c09f supersede it in rc-8.
+  - **No test** (cherry-picks and ledger data). Checks: `git cherry <work branch> refs/backup/0.5.0b-impl-full | grep -cE '^\+ (8de093db9|a98e9a5e1|e6c117c0e|a01a28e9b|0d9fba147)'` prints `0`; `bugs.py check` exits 0; `V33_ORPHANS` in `scripts/guards/slop.py` stays ≤ 31.
+- AC2.9 The 27 hidden breaks are registered (C9; rc-8 AC12.4's table unchanged): one `chore(bugs): report …` with the two `caused_by` repairs; sha rows resolved retro, one shape-4 commit each; AC rows stay open for Job 3. **No test** (ledger data): `bugs.py status --all`'s open set is the Job 3 rows; `bugs.py fix <slug>` prints each sha row's shas.
+- AC2.10 Non-product records ruled by class (C10; rc-8 AC13.4's classes and shape-4 commits). **No test**: `bugs.py check` exits 0; `bugs.py stats` matches the logged per-class counts.
+- AC2.11 Records on retired surfaces leave by `bugs.py archive --adr <id>`, an accepted ADR each, retroactive where missing (C10; 0187 (3)). **No test**: `bugs.py window` omits them; the histo carries `archived_by`.
 
 ## Job 3 — the REBUILDs
 
-Each **REBUILD** below is an approved REBUILD verdict once this SPEC is Approved: one commit `refactor(<task-id>): REBUILD <unit> — …`, the culprits' revert plus the smallest correct redo, culprit shas in the body (rc-8 AC12.2, AC12.12). After AC2.8.
+Each **REBUILD** below is an approved REBUILD verdict once this SPEC is Approved: one commit `refactor(<task-id>): REBUILD <unit> — …`, the culprits' revert plus the smallest correct redo, culprit shas in the body (rc-8 AC12.2, AC12.12). After AC2.9.
 
 - AC3.1 One test session env, one owner (**REBUILD**: unit, the test session env; culprits 09d259133, 4ca3d7136 (i, ii), b69ee15b9's in-process line, 76d7af604's conftest hunk; trigger ≥ 2 fixes, C1; rows 14, 16, 17; rc-8 AC10.1 re-cut):
   - A pure `suite_env(parent, home)`, applied once per process by `pytest_configure`; every child env is `suite_env(...) | overrides`; every other env write and helper leaves (rc-8 AC10.1's list).
@@ -97,10 +121,16 @@ Each **REBUILD** below is an approved REBUILD verdict once this SPEC is Approved
 
 ## Job 4 — the PLAN and the trio validator
 
-- AC4.1 The PLAN (Q8, R6): §1 as-is review; the DAG of jobs, each job's envelope, edges, the critical path; the hot-file list. The Parallel schedule leaves. **Unit**: AC4.2's rows.
-- AC4.2 `release.py check` refuses, one fix line each (Q8, Q18, R1, R5–R8, I2): a cyclic DAG; no Job 1; > 8 jobs (Reconciliation uncounted); edge-free jobs with overlapping envelopes; overlapping `W:` in one stage; a `W:` outside its stage envelope; a hand-edited hot file twice in one stage; a generated hot file in any `W:`; a born task without an AC; a cancelled one without a reason; non-test files in stage 1; a SPEC AC without a test level; a SPEC or PLAN changed after approval; a stage contract changed after it opened. **Unit**: one table, a trio per refusal, one valid trio exiting 0.
+- AC4.1 The PLAN (Q8, R6): §1 as-is review; the DAG of jobs, each job's envelope, edges, the critical path; the hot-file list. The Parallel schedule already left in Job 1 (AC1.8). **Unit**: AC4.2's rows.
+- AC4.2 `release.py check` refuses only the rows a grill ruled with evidence, one fix line each:
+  - a cyclic DAG (`T040135Z` Q8);
+  - no Job 1 (Q18);
+  - more than 8 jobs, Reconciliation uncounted (Q18);
+  - non-test files in stage 1 (`T045010Z` R10);
+  - overlapping `W:` in one stage (Q8).
+  - Everything else is skill-taught and audit-measured, never refused: envelopes, hot files, a born task's AC, a cancelled task's reason, AC test levels, post-approval changes.
+  - **Unit**: one table, a trio per refusal, one valid trio exiting 0.
 - AC4.3 `release.py phase IMPLEMENTATION` refuses a PLAN without the DAG or the hot-file list. **Unit**.
-- AC4.4 `dd-release-definition` §4–§5 state the job/stage/task shape once, to AC12.11's bar. **No test** (law text, as Job 5).
 
 ## Job 5 — the bugs law and the closed rc
 
@@ -110,16 +140,27 @@ Each **REBUILD** below is an approved REBUILD verdict once this SPEC is Approved
 - AC5.2 The block list, closed, stated once in the bugs law §2 (rc-8 AC13.2): (1) the work branch's CI is red; (2) a Stall; (3) the running task cannot deliver its AC; (4) a security finding or an open dependency-vulnerability alert; (5) data loss or corruption. Every other file points there.
 - AC5.3 A block-list bug is a hotfix (Q17): registered with `caused_by`; job gate and one review; lands before any other job merge; body names `block: <item>`; no SPEC amendment.
 - AC5.4 Every other bug is only registered, `found_in` its rc; the next rc's §1 reads it and its Job 1 resolves it (Q19). A fix-induced bug outside the block list is REBUILT by the next Job 1 (rc-8 AC12.2 narrowed; AC12.3 stands as block item 1). The pile, cause groups and "fixed in any phase" leave.
-- AC5.5 The rc is closed (Q16, R1, R2, Q20): created, implemented, or cancelled into the next; no amendment (shape 8 keeps approval only); a new AC goes to the next rc; a red outside the envelope appends a new stage; a stage's third red gate stops the job for the operator; rc N+1 is defined while rc N implements, its §1 and Job 1 closing with rc N; one rc implements at a time.
+- AC5.5 The rc is closed (Q16, R1, R2, Q20): created, implemented, or cancelled into the next; no amendment (shape 8 keeps approval only); a new AC goes to the next rc; a red outside the envelope appends a new stage; a stage's third red gate stops the job for the operator, and the driver appends one `kind: note` log entry `stop: <job> stage <n> — third red gate` (a log line, not a gate); rc N+1 is defined while rc N implements, its §1 and Job 1 closing with rc N; one rc implements at a time.
 - AC5.6 Every rc's first SPEC opens with `## Bug window review` (T-050-216; rc-8 AC13.3): `release.py new` writes the heading first; `check` refuses a live SPEC lacking it; `dd-release-definition` §1 reads `bugs.py window` and each cited test. **Unit** (`test_release_implementation_release_script.py`): `new 9.9.9`'s first `## ` is the heading; a SPEC without it exits non-zero with one fix line.
 - AC5.7 §3a: the REBUILD shapes (rc-8 AC12.12), shape 3's `block: <item>`, the per-class shape 4, the archive shape. **Unit**: `bugs.py fix` finds `refactor(bugs): <id> — REBUILD`.
 - AC5.8 `CONTEXT.md` gains this SPEC's Terms and Bug window; **Wave**, Pile and Cause group are absent. **No test**: `grep -cE '^\*\*(Wave|Pile|Cause group)\*\*:' CONTEXT.md` prints `0`.
+- AC5.9 A bug fix adds a case (backlog `bug-fix-adds-never-rewrites-asserts`; rc-8 AC9.1's review half, carried by T-050-198):
+  - `dd-code-review` names `git diff -U0 -- tests | grep -E '^-\s*assert'`.
+  - The `<bug-id>#<id>` citation clause at `dd-code-review/SKILL.md:76` leaves; accepted 0163 retired it.
+  - Check: `grep -rn '<bug-id>#<id>' dadaia_workspace/public | wc -l` prints `0`, so 0163's `measured_by` turns green. The entry exits `delivered` at closure by citation (no Origin clause, 0161).
 
 ## Reconciliation
 
 **No test**: each AC is observed by the command it names or a `_RELEASE.json` log line.
 
 - AC6.1 Each atom Jobs 1–5 make stale (`worktrees.md`, `bug-ledger.md`, release atoms) states the code, citing its commit, in the merge that regenerates its derived sections (AC1.5), never hand-merged; drift guard and `memory.py check` clean; catalog regenerated; a `### P-NN` change rides its accepted ADR.
+  - Also rc-8's closure memory items. Each has a numeric check:
+    - AC10.14's memory half: `grep -rniw union specs/memory | wc -l` prints `0`, and `worktrees.md:36` states the main-repo trio read.
+    - The `ci-preflight` atom is deleted: `find specs/memory -name 'ci-preflight*' | wc -l` prints `0`. It is already 0 since 93a0154e2.
+    - `AGENTS-PLACEHOLDER-1` leaves `public-asset-distribution.md:50`; the code dropped it in 7502fa4c7. Check: `grep -c AGENTS-PLACEHOLDER-1 specs/memory/product/distribution/public-asset-distribution.md` prints `0`.
+    - `bug-ledger.md:5,16` (and `catalog.json`'s summary) qualify "no git-derived": the record stores none, while `bugs.py fix` and `window` derive them on read. Check: `grep -E 'git-derived' specs/memory/product/sdd/bug-ledger.md | grep -vc 'bugs.py fix'` prints `0`. `bug-ledger-lessons.md` does not exist at this head.
+    - F131 is re-dispositioned `resolved` by `audit.py disposition`, citing 995a39897 and 0177; its deferral reason was false. Check: `grep 'F131"' specs/audits/20260930-structural-convergence/FINDINGS.jsonl | grep -c '"disposition": "deferred"'` prints `0`.
+    - rc-8 TASKS' AC map omits AC9.1 → 198. rc-8 stays closed (0150), so the carry mark lives here, in AC5.9. Check: `git diff 767ba1d4f -- specs/releases/0.5.0/rc-8 | wc -l` prints `0`.
 - AC6.2 `_RELEASE.json` logs rc-8 G1's readouts at start and end, each job's bug-surface delta, and throughput against the grill's rc-8 baseline (75 % process commits, parallelism 1.3, median task lead 1.1 h, ~81 review rounds in 26 h, gate 1 ~6 min); AC1.7's comparison, met or missed, gating nothing.
 - AC6.3 Each proposed ADR below is accepted or rejected by the operator; its `measured_by` names a check this rc built, repaired in the 0138 lane where a name moved.
 - AC6.4 Closure per the releases law; rc-10 defined beside it (Q20).
@@ -134,7 +175,7 @@ Each is accepted before a push deletes a law line it governs (0151 M3): 0190–0
 - 0193 "An rc is an Implement: a DAG of ≤ 8 jobs, Job 1 fixed; jobs hold stages, stages hold tasks". Amends 0152 (2): ≤ 8 jobs; the 12 KiB TASKS recommendation reads per job file. `measured_by`: AC4.2's job-count and Job 1 rows.
 - 0194 "SPEC says what, PLAN draws the DAG, TASKS runs per job; task state derived, done once per job". Supersedes 0141. `measured_by`: AC1.9, AC1.10, AC4.1–AC4.3 cases.
 - 0195 "An rc has closed scope; a block-list bug is a hotfix; any other waits for the next Job 1". Amends 0019: no bug fixed "at once" off the block list; rc N+1 defined while rc N implements. `measured_by`: AC5.6's cases; every `fix(bugs)` body names `block:`.
-- 0196 "Closed stage contract, live tasks; each AC names its test level; stage 1 writes every RED". `measured_by`: AC4.2's level, stage-1 and contract rows; AC1.2's branch-policy rows.
+- 0196 "Closed stage contract, live tasks; each AC names its test level; stage 1 writes every RED". `measured_by`: AC4.2's stage-1 row; AC1.2's branch-policy rows.
 - 0197 Amends 0149: tasks run parallel inside one stage with disjoint `W:`; jobs with disjoint envelopes or an edge; (3) becomes the hotfix. `measured_by`: AC4.2's overlap rows.
 - 0198 Amends 0186 (2), (5): a fix-induced bug stops work only on the block list; the verdict per 0190. `measured_by`: AC1.2's matrix case; the next audit's `PILLAR-BUGS`.
 - 0199 Amends 0187 (1): a Draft `rc-<N+1>/SPEC.md` added while rc N implements does not move `found_in`. `measured_by`: an append after rc-10's Draft add, before rc-9 closes, stamps `rc-9`.
@@ -142,9 +183,9 @@ Each is accepted before a push deletes a law line it governs (0151 M3): 0190–0
 ## Replaces
 
 - Gate 1 (the full `ci.py` per merge); a review per merge; one `verify:` for every kind (AC1.1–AC1.4).
-- Kinds `release`, `impl`, `bug`, their allowed sets and `<M.m.p><letter>-<kind>` grammar; fixed-depth path readers; unpushed worktree branches (AC1.2, AC1.3).
+- Kinds `release`, `impl`, `bug`, their allowed sets and `<M.m.p><letter>-<kind>` grammar; fixed-depth path readers; unpushed worktree branches; the `verify:` line's `shell=True` run (AC1.2, AC1.3).
 - The 9-step closure and its cross-worktree atom ↔ derived-docs coupling (AC1.5); micro-dispatch (AC1.6).
-- One `TASKS.md` per rc, `[-]`, start and per-task done commits, the Parallel schedule (AC1.9, AC1.10, AC4.1).
+- One `TASKS.md` per rc, `[-]`, start and per-task done commits, the Parallel schedule (AC1.8–AC1.10).
 - SPEC amendments; the pile, cause groups; any-phase bug fixes; a fix-induced bug stopping the line in any rc (AC5.3–AC5.5).
 - The ledger seam's own matcher (AC2.7); Job 3's units; **Wave** (AC5.8).
 
