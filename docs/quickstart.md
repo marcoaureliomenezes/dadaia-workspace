@@ -35,7 +35,7 @@ git -C "$B" commit -qam "chore(backlog): new my-first-idea"
 ```
 
 After an APPROVED `dd-code-reviewer` verdict, `worktree.py merge "$B"` lands it; the
-release is born the same way in its `<M.m.p>-rc<N>-define` worktree:
+release is born the same way in its `<M.m.p>-rc<N>/define` worktree:
 `release.py new 0.1.0 --specs "$R/specs" --origin backlog:my-first-idea`.
 
 - **Level 1 — workspace.** `uvx dadaia-workspace init` provisions `demo/` with its own
