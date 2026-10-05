@@ -115,7 +115,7 @@ def adr_record_issues(specs_dir: Path) -> list[SectionFinding]:
     accepted = {str(r.get("id")) for _, r in records if r.get("status") == "accepted"}
     for number, r in records:  # M2 (ADR 0151): only a ruled record changes a ruled one
         named = f"{r.get('supersedes') or ''},{r.get('amends') or ''}".split(",")
-        ruled = r.get("status") == "accepted" and "ruling" in r
+        ruled = r.get("status") in ("accepted", "superseded") and "ruling" in r
         if r.get("status") != "rejected" and not ruled and (hit := sorted(accepted & set(named))):
             issues.append(
                 _record_issue(owner, ledger, number, f"changes accepted {hit} without a ruling")
