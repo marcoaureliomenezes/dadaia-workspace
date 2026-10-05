@@ -79,7 +79,9 @@ def test_an_absent_specs_tree_is_reported_as_absent_with_the_specs_init_fix(
     ci._gate_inputs(app, "")
     err = capsys.readouterr().err
     assert "no specs/constitution.md" in err
-    assert "fix: .dadaia/.venv/bin/dadaia specs init --context app" in err
+    fixes = [line for line in err.splitlines() if line.startswith("fix: /")]
+    tail = ".dadaia/.venv/bin/dadaia specs init --context app"
+    assert [f.endswith(tail) for f in fixes] == [True]
 
 
 def test_a_committed_constitution_without_a_block_keeps_the_no_block_warning(
