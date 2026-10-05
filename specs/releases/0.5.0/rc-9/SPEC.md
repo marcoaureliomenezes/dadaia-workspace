@@ -40,54 +40,39 @@
 
 ## How rc-9 runs (from its first minute)
 
-Operator, 2026-10-05: "Não será autorizado se não seguir o padrão job stage tasks, gates onde deveriam ... DESDE JA"; "proibido de rodar 1 worktree para cada tasks ou rodar CI para cada teste", which banned the old per-merge gates, not task worktrees (operator correction, 2026-10-05: "temos sim 1 worktree para cada task. paralelizaveis. o que alteramos foram os gates, em tasks sub-agents trabalham em paralelo com worktrees de tasks. Isso definimos claramente ontem."). rc-9 runs jobs → stages → tasks from its first commit, Job 1 included. No old ritual: no `worktree.py` kinds, no `WT merge` gate 1, no `TASKS.md`, no `[-]` markers, no start or done commits. Job 1 deletes them from the code; rc-9 never uses them, even before Job 1 lands.
+Operator, 2026-10-05: "Não será autorizado se não seguir o padrão job stage tasks, gates onde deveriam ... DESDE JA"; "temos sim 1 worktree para cada task. paralelizaveis. o que alteramos foram os gates, em tasks sub-agents trabalham em paralelo com worktrees de tasks. Isso definimos claramente ontem." The model is the grill's (`T040135Z` Q1–Q23, `T045010Z` R1–R10; report "Release como Spark"). No old ritual: no `worktree.py` kinds, no `WT merge` gate 1, no `TASKS.md`, no `[-]` markers, no start or done commits. Job 1 deletes them from the code; rc-9 never uses them, even before Job 1 lands.
 
-**Job DAG.** The edges come from file overlap; jobs without an edge have disjoint envelopes.
+**Documents (Q8).** This SPEC says what: one section per job, its ACs, each naming its test level (R5). `PLAN.md` holds the as-is review and the DAG of jobs: edges, lanes, critical path, hot files (R6). `tasks/<job>.md`, one per job (R8, AC1.9), holds per stage its contract (exit tests by level, envelope, ACs served; R1) and its tasks (id `J<n>.S<m>.T<k>`, AC, `W:`, owner tests, RED tests). Stage 1 writes every RED as strict xfail, test files only (R10).
 
-| job | waits on | why |
-|---|---|---|
-| Job 1 | — | runs from minute 1 |
-| Job 3 | — | runs from minute 1; its envelope is disjoint from Job 1's (`test_worktree_lifecycle.py`'s `base_env` call stays Job 2's, below) |
-| Job 2 | Jobs 1, 3 | Job 1: both touch `scripts/ci.py` and `bugs.py` (AC2.8's 210 commits). Job 3: `base_env`'s last two callers, `test_worktree_lifecycle.py` and `test_registry_version_grammar.py`, switch to `suite_env` in Job 2 (J2.S3.T3, J2.S3.T8) |
-| Job 4 | Job 1 | both touch `release.py`, `_release_check.py`, `tests/contract/test_release_script.py`, `dd-gitflow-default` and the releases law |
-| Job 5 | Jobs 1, 2, 4 | Job 1: as Job 4. Job 2: `bugs.py` and `test_bug_resolution_bugs_script.py` (AC2.7, AC2.8 vs AC5.7). Job 4: `_release_check.py` (AC4.2 vs AC5.6) |
-| Reconciliation | Jobs 1–5 | memory and derived docs of every job (AC1.5, AC6.1) |
+**Levels.** An rc is an Implement: a DAG of ≤ 8 jobs plus Reconciliation (Q1, Q18). A job holds stages; a stage is a barrier on the job branch over parallel tasks (Q4). Jobs with no DAG edge have disjoint envelopes, checked before they start; otherwise the PLAN adds an edge (R7).
 
-- Lanes: A, Job 1 → Job 2 ∥ Job 4 → Job 5 → Reconciliation; B, Job 3 → Job 2.
-- Critical path: Job 1 → Job 2 → Job 5 → Reconciliation.
-- Cap (operator rule): at most 2 agents run `pytest` at any moment. A task sub-agent runs its owner tests when it holds a slot; the others write code and queue. Law-text tasks need no slot.
-- Shared by design: `specs/bugs/BUGS.jsonl` (Jobs 2, 3) is written only by `bugs.py`, and a rebase conflict is redone by its writer (ADR 0180). `PLAN.md` holds one section per job, and only that job writes it.
-
-**Phase.** `_RELEASE.json` stays in DEFINITION until Job 1 lands: today `release.py phase` needs an Approved `TASKS.md`, runs the Parallel schedule check and reads TASKS markers (`_release_phase.py`). Job 1's merge moves the phase to IMPLEMENTATION under Job 1's new check (job files, no `TASKS.md`, no Parallel schedule; J1.S2.T5). The phase is a record, not a gate on starting work: a job that runs before then, Job 3 included, is not blocked by it.
-
-**Worktrees.** One per job: `worktrees/dadaia-workspace/0.5.0-rc9-<job>` (`job1` … `job5`, `reconcile`), branch `wt/0.5.0-rc9/<job>`, cut from the work branch. Plus one per parallel task (operator: "temos sim 1 worktree para cada task. paralelizaveis. o que alteramos foram os gates, em tasks sub-agents trabalham em paralelo com worktrees de tasks. Isso definimos claramente ontem."): `worktrees/dadaia-workspace/0.5.0-rc9-<job>--<task-id>`, branch `wt/0.5.0-rc9/<job>--<task-id>`, cut from its job branch and opened by the task's sub-agent; at most 5 task worktrees open at once per rc. Each job's Stages block stays as written: the tasks of a stage run in parallel task worktrees, with disjoint `W:`. Before Job 1 lands, job and task worktrees open by an operator-authorized `git worktree add` (flat path), and a task merges into its job branch by fast-forward after its task gate. A job's PLAN section is written in its own worktree; every other SPEC edit goes in `0.5.0-rc9-define`.
-
-**Deviation.** Jobs 1 and 3 started without task worktrees, from the main thread's misreading of the operator's ban; the operator's correction above restores them. Their history stands as committed; their remaining stages run task worktrees.
-
-**Gates and tests per level.** Until Job 1 lands AC1.1's levels, the driver runs these commands by hand.
+**Gates and tests per level (Q6, R4).** Until Job 1 lands AC1.1's levels, the driver runs these commands by hand.
 
 | Level | Gate | Tests |
 |---|---|---|
 | Task | `ruff` and `mypy` on the touched files | that task's owner tests, `pytest <owner files> -n 2` |
 | Stage | AC1.1's stage list: lint, mypy, guards but drift; the barrier | unit + integration (`-n 2`); green before the next stage opens |
-| Job | `scripts/ci.py` full, run ONCE on the job HEAD; CI matrix green on the push | everything `ci.py` runs; the matrix |
+| Job | `scripts/ci.py` full, run ONCE on the job HEAD; CI matrix green on the push (R9) | everything `ci.py` runs; the matrix |
 
-- Never run the full suite or `ci.py` per task, per test or per edit.
+- Never run the full suite or `ci.py` per task, per test or per edit. A stage's third red gate stops the job for the operator (R2, AC5.5).
 
-**Review.** One `dd-code-reviewer` review per job, at its end. None per task or stage, except a stage past 400 added lines (operator Q2; AC1.4).
+**Review.** One `dd-code-reviewer` review per job, at its end. None per task or stage, except a stage past 400 added lines (Q2; AC1.4).
 
-**Merge.** One sentence per era; a later job rebases onto the landed one; no `worktree.py merge` gate 1, no kinds.
+**Worktrees (Q4, Q5).** Folder per rc, siblings inside it: `worktrees/<repo>/<M.m.p>-rc<N>/{define,<job>,<job>--<task-id>,reconcile}/`; outside an rc `worktrees/<repo>/backlog/<slug>/`. Branches `wt/<M.m.p>-rc<N>/<job>[--<task-id>]` and `wt/backlog/<slug>`. One worktree per job and one per parallel task, cut from its job branch; at most 5 task worktrees open at once per rc. Before Job 1 lands, worktrees open by an operator-authorized `git worktree add`. SPEC edits go in `define/`.
+
+**Slots and agents (Q11).** 2 test slots machine-wide: at most 2 agents run `pytest` at any moment, a task sub-agent runs its owner tests when it holds a slot, the others write code and queue. At most 5 writing agents at once across all jobs. Job merges land into the work branch one at a time; the critical path has priority.
+
+**The driver (R3, R8).** The main thread drives each job: it dispatches one sub-agent per task into the task's worktree, and a stage's tasks run in parallel. The job worktree receives only task merges, done by the driver, each a fast-forward after the task gate; closing (test-audit and mutation over the job diff, `done`), a review fold and a rebase are tasks too. The engineer writes only in task worktrees and in `define/`. The driver edits only its job's `tasks/<job>.md`, when a task is born or cancelled or a stage is appended (R1). The main thread dispatches a job or a task, never a smaller step (AC1.6).
+
+**Merge.**
 - Before Job 1 lands: one manual merge onto `feature/0.5.0`, one push, and the CI matrix runs on that push.
-- After Job 1 lands (AC1.2): the job branch is pushed once (`wt/**` runs the matrix), the verdict names that run, the merge fast-forwards `feature/0.5.0`, and its push is the same sha.
+- After Job 1 lands (AC1.2): the job branch is pushed once (`wt/**` runs the matrix), the verdict names that run, the merge fast-forwards `feature/0.5.0`, and its push is the same sha. A later job rebases onto it by a rebase task (R7).
 
-**Dispatch.** The main thread dispatches a job (to its driver) or a task, never a smaller step (AC1.6).
+**Phase.** `_RELEASE.json` stays in DEFINITION until Job 1 lands: today `release.py phase` needs an Approved `TASKS.md`, runs the Parallel schedule check and reads TASKS markers (`_release_phase.py`). Job 1's merge moves the phase to IMPLEMENTATION under its new check (job files, no `TASKS.md`, no Parallel schedule). The phase is a record, not a gate on starting work.
 
-**Job files.** Each job's section below lists its stages and tasks. The job driver refines them in that job's `PLAN.md` section.
-- Stage 1 writes the RED tests as strict xfail, and touches test files only. A job with no tests has no RED stage.
-- A task line is `J<n>.S<m>.T<k> AC — W: … — owner test`; Reconciliation's `<n>` is `R`. Paths are relative to `dadaia_workspace/` unless they start with `scripts/`, `tests/`, `specs/`, `.github/`, `pyproject.toml` or `CONTEXT.md`; `gitflow/` is `public/skills/dd-gitflow-default/`, `relimpl/` is `public/skills/dd-release-implementation/` and `bugres/` is `public/skills/dd-bug-resolution/`.
-- Inside one stage, `W:` sets are disjoint, so a hot file has exactly one owning task per stage.
+**Deviation, recorded.** Jobs 1 and 3 ran with one agent each, sequentially, without task worktrees and on flat paths (`0.5.0-rc9-job1`, `0.5.0-rc9-job3`, and `0.5.0-rc9-define`), from the main thread's misreading of the operator. Q21 allowed sequential tasks only until the mechanism lands; the operator overrode it ("DESDE JA"). Jobs 1 and 3 also started without a DAG edge while their envelopes overlapped on 8 files (R7); the PLAN records the Job 1 → Job 3 edge now. Their history stands as committed. Jobs 2, 4 and 5 and Reconciliation run the full model.
 
-**Parallelism**, rc-wide.
+**Parallelism.**
 - Measure, rc-wide: `Σ wall(job) / (last job's end − first job's start)`, from the `kind: merge` entries (AC1.7). `start` is the job branch's first commit's committer time; `end` is the `createdAt` of the push CI run that lands it.
 - Baseline: rc-8's 1.3 (AC6.2). Target: above 1.3; ~2 is an estimate, not a gate.
 - Observed, not targeted: task parallelism inside a stage, `Σ wall(task) / wall(stage)`, from the task branches' first commit to their fast-forward onto the job branch.
@@ -97,7 +82,7 @@ Operator, 2026-10-05: "Não será autorizado se não seguir o padrão job stage 
 - **Implement**: one rc's run, a DAG of jobs; not a file (Q1, Q7).
 - **Job**: one measured feature, one worktree, one review and gate at its merge (Q2, Q3); **Job 1** executes §1 (Q18); in rc-9 only, Job 1 is the demolition and §1 is Job 2. A GitHub job is always "CI job".
 - **Stage**: a barrier on the job branch over parallel tasks; no worktree (Q4).
-- **Task**: one owner (module or law file plus its owner test file), one session (~1 h), ~100 new code lines, deletions uncounted (Q15); one worktree, `<M.m.p>-rc<N>-<job>--<task-id>`; sub-agents run parallel tasks of a stage in parallel task worktrees; the unit of dispatch.
+- **Task**: one owner (module or law file plus its owner test file), one session (~1 h), ~100 new code lines, deletions uncounted (Q15); one worktree, `<M.m.p>-rc<N>/<job>--<task-id>/`; sub-agents run parallel tasks of a stage in parallel task worktrees; the unit of dispatch.
 - **Envelope**: the `W:` union a job or stage may touch (R1, R7).
 - **Closed stage contract**: exit tests, envelope and ACs served, fixed when the stage opens (R1).
 - **Live task**: born, split or cancelled inside an open stage, unreviewed (R1).
@@ -107,37 +92,15 @@ Operator, 2026-10-05: "Não será autorizado se não seguir o padrão job stage 
 
 ## Job 1 — the demolition
 
-Job 1 runs exactly the model in §How rc-9 runs, like every job. "Um merge só, autorizado" still holds: one job, one merge. RED first in the owner file.
-
-- Worktree `worktrees/dadaia-workspace/0.5.0-rc9-job1`, branch `wt/0.5.0-rc9/job1`, opened by an operator-authorized `git worktree add`.
-- Gates by level. `../../../.dadaia/.venv/bin/python scripts/ci.py` runs once, on the job HEAD.
-- One review at the end, then one manual merge authorized by the operator, then one push.
-
-Stages:
-- S1 RED (AC1.1–AC1.5, AC1.9, AC1.10):
-  - J1.S1.T1 AC1.1 — W: `tests/integration/test_ci_script.py`.
-  - J1.S1.T2 AC1.2–AC1.5 — W: `tests/integration/test_worktree_lifecycle.py`, `tests/integration/test_worktree_new.py`.
-  - J1.S1.T3 AC1.2 — W: `tests/unit/features/chokepoints/test_push_branch_policy.py`.
-  - J1.S1.T4 AC1.9, AC1.10, the phase move — W: `tests/unit/features/specs/test_canon.py`, `tests/unit/features/specs/test_release_tree.py`, `tests/contract/test_release_script.py`.
-- S2 code and law (AC1.1–AC1.10); envelope: `scripts/ci.py`, `scripts/guards/repo.py`, `.github/workflows/ci.yml`, `gitflow/`, `relimpl/scripts/`, `core/invocation.py`, `features/chokepoints/branch_policy.py`, `features/specs/canon.py` and AC1.8's law files:
-  - J1.S2.T1 AC1.1 — W: `scripts/ci.py` — `test_ci_script.py`.
-  - J1.S2.T2 AC1.3 — W: `gitflow/scripts/_worktree_new.py`, `_worktree_kinds.py` (deleted) and its importers outside `gitflow/scripts/` and `relimpl/scripts/`: `features/spec_context/gate_policy.py`, `bugres/scripts/_specs.py`, `tests/contract/test_law_states_what_the_code_does.py`, `tests/contract/test_public_scripts_thin_wrapper.py`; `core/invocation.py` — `test_worktree_new.py`.
-  - J1.S2.T3 AC1.2, AC1.4, AC1.5 — W: `gitflow/scripts/worktree.py`, `_worktree_end.py`, `_worktree_git.py` — `test_worktree_lifecycle.py`.
-  - J1.S2.T4 AC1.2 — W: `features/chokepoints/branch_policy.py`, `.github/workflows/ci.yml`, `scripts/guards/repo.py` — `test_push_branch_policy.py`.
-  - J1.S2.T5 AC1.8 (the Parallel schedule's code), AC1.9, AC1.10, the phase move (§How rc-9 runs) — W: `features/specs/canon.py`, `relimpl/scripts/_release_tree.py`, `_release_phase.py` (also a `_worktree_kinds` importer), `_release_plan.py` (deleted), `tests/contract/test_release_script.py` — `test_canon.py`, `test_release_tree.py`, `test_release_script.py`.
-  - J1.S2.T6 AC1.8 — W: `public/data/worktrees-AGENTS.md`, `gitflow/SKILL.md` — no test.
-  - J1.S2.T7 AC1.8 — W: `relimpl/RC-FLOW.md`, `relimpl/MEMORY-UPDATE.md`, `relimpl/SKILL.md` — no test.
-  - J1.S2.T8 AC1.6, AC1.8 — W: `public/skills/dd-manager-orchestration/SKILL.md`, `public/skills/dd-release-definition/SKILL.md` — no test.
-  - J1.S2.T9 AC1.8 (hit lines only) — W: `public/scaffold/{releases,bugs,ADRs}/AGENTS.md`, `bugres/SKILL.md`, `public/skills/dd-bug-registration/SKILL.md`, `public/skills/dd-code-review/SKILL.md` — no test.
-  - J1.S2.T10 AC1.7 — W: `relimpl/scripts/_release_check.py` (`check` validates the `kind: merge` entry) — no test (AC1.7).
+Job 1 runs the model in §How rc-9 runs, like every job. "Um merge só, autorizado" still holds: one job, one merge, authorized by the operator, then one push. RED first in the owner file.
 
 - AC1.1 (a) Gates per task and stage; the full `scripts/ci.py` at every `worktree.py merge` leaves (gate 1, 0185, T-050-191; Q6, R4). Three `scripts/ci.py` levels (root `AGENTS.md`): task (ruff, mypy on touched files, owner tests), stage (lint, mypy, guards but drift, unit, integration; R6), job (the full command). A task fast-forwards onto its job branch after its gate, with no verdict; a task branch behind its job branch rebases first (disjoint `W:` keeps it conflict-free) and reruns its task gate on its owner tests only; a stage closes only with no task worktree open and its gate green. **Unit** (`test_ci_script.py`): each level runs only its steps; a planted failing step turns it non-zero. **Integration**: a red task gate lands nothing, a green one lands; a stage with an open task worktree cannot close.
-- AC1.2 (a) The job gate runs the CI matrix once (Q2, Q11, R7, R9, Q13, Q14): the job branch is pushed once (`wt/**` runs the matrix); the job's merge runs the job level on HEAD, requires an APPROVED verdict naming that run, and fast-forwards the work branch, whose push is the same sha; a moved work branch refuses with a rebase fix line; 0168's carry stands. `pre-push` accepts and scans only `wt/<M.m.p>-rc<N>/<job>` and `wt/backlog/<slug>` of `wt/`; `ci.yml` triggers on `wt/**`. A non-code merge (`-define`, `backlog-`) runs the ledger, trio and ADR validators only. The `shell=True` run leaves (`_worktree_end.py:124-131`, CWE-78): the job command is the `verify:` line of the repo's tracked `AGENTS.md`, run as `shlex.split` argv with `shell=False`; only the `shell=True` run leaves. A consumer in any language keeps its declared command; dadaia-workspace declares its `scripts/ci.py` job level. Check: `grep -c 'shell=True' dadaia_workspace/public/skills/dd-gitflow-default/scripts/_worktree_end.py` prints `0`. **Unit**: branch-policy rows. **Integration**: a verdict without the matrix run refuses; a second job's merge refuses until rebased; a declared command holding a shell metacharacter (`;`, `$(…)`) runs as argv, never interpreted by a shell; an invalid ledger refuses, a valid one lands with no test run. **Guard**: `ci-triggers-gitflow` pins `wt/**`.
-- AC1.3 (b) One worktree per job, one per parallel task; the worktree-kind split leaves (0106, 0124, 0148; Q4, Q5, Q8, R3, Q11; operator correction, 2026-10-05: "temos sim 1 worktree para cada task. paralelizaveis. o que alteramos foram os gates, em tasks sub-agents trabalham em paralelo com worktrees de tasks. Isso definimos claramente ontem."): `worktrees/<repo>/<M.m.p>-rc<N>-{define,reconcile,<job>,<job>--<task-id>}` and `backlog-<slug>` (flat: the single-venv `../../../` depth holds); branches `wt/<M.m.p>-rc<N>/<job>[--<task-id>]` and `wt/backlog/<slug>`; Job 1 builds this form into `WT new`; a bug is a job. The per-kind allowed sets leave: code, tests, specs, memory and derived docs of one change are one job. A job branch takes only task merges and its rc's specs edits (R8). The job driver's own edit (AC1.6) lands as a task too, never as a direct job-branch commit. The gate, doctor, reaper and `WT` read a worktree path's repo-relative tail through one function (`core/invocation.py`). ≤ 5 task worktrees open at once per rc. **Integration**: `WT new` makes each shape, refuses an old-grammar name and a 6th task worktree; a PROTECTED write in a task worktree is blocked; one job commits a code file and a `specs/memory/` atom together; a stray job-branch commit refuses.
+- AC1.2 (a) The job gate runs the CI matrix once (Q2, Q11, R7, R9, Q13, Q14): the job branch is pushed once (`wt/**` runs the matrix); the job's merge runs the job level on HEAD, requires an APPROVED verdict naming that run, and fast-forwards the work branch, whose push is the same sha; a moved work branch refuses with a rebase fix line; 0168's carry stands. `pre-push` accepts and scans only `wt/<M.m.p>-rc<N>/<job>` and `wt/backlog/<slug>` of `wt/`; `ci.yml` triggers on `wt/**`. A non-code merge (`define/`, `backlog/`) runs the ledger, trio and ADR validators only. The `shell=True` run leaves (`_worktree_end.py:124-131`, CWE-78): the job command is the `verify:` line of the repo's tracked `AGENTS.md`, run as `shlex.split` argv with `shell=False`; only the `shell=True` run leaves. A consumer in any language keeps its declared command; dadaia-workspace declares its `scripts/ci.py` job level. Check: `grep -c 'shell=True' dadaia_workspace/public/skills/dd-gitflow-default/scripts/_worktree_end.py` prints `0`. **Unit**: branch-policy rows. **Integration**: a verdict without the matrix run refuses; a second job's merge refuses until rebased; a declared command holding a shell metacharacter (`;`, `$(…)`) runs as argv, never interpreted by a shell; an invalid ledger refuses, a valid one lands with no test run. **Guard**: `ci-triggers-gitflow` pins `wt/**`.
+- AC1.3 (b) One worktree per job, one per parallel task; the worktree-kind split leaves (0106, 0124, 0148; Q4, Q5, Q8, R3, Q11; operator correction, 2026-10-05: "temos sim 1 worktree para cada task. paralelizaveis. o que alteramos foram os gates, em tasks sub-agents trabalham em paralelo com worktrees de tasks. Isso definimos claramente ontem."): `worktrees/<repo>/<M.m.p>-rc<N>/{define,<job>,<job>--<task-id>,reconcile}/` and `worktrees/<repo>/backlog/<slug>/` (folder per rc, siblings; Q4, Q5); branches `wt/<M.m.p>-rc<N>/<job>[--<task-id>]` and `wt/backlog/<slug>`; Job 1 builds this form into `WT new`; a bug is a job. The per-kind allowed sets leave: code, tests, specs, memory and derived docs of one change are one job. A job branch takes only task merges and its rc's specs edits (R8). The job driver's own edit (AC1.6) lands as a task too, never as a direct job-branch commit. The gate, doctor, reaper and `WT` read a worktree path's repo-relative tail through one function (`core/invocation.py`). ≤ 5 task worktrees open at once per rc. **Integration**: `WT new` makes each shape, refuses an old-grammar name and a 6th task worktree; a PROTECTED write in a task worktree is blocked; one job commits a code file and a `specs/memory/` atom together; a stray job-branch commit refuses.
 - AC1.4 (c) One review per job; none per worktree (Q2, Q12, Q14; rc-8 AC9.4, AC12.6, AC12.12): none at a task or stage merge. One per job, plus one per stage past 400 added lines (operator Q2). Added lines are the sum of `git diff --numstat` column 1 over the stage range; deletions are excluded. A non-code merge gets one pass; one definition round per document, again only on a HIGH; the verdict carries the job command's output and CI-matrix run; a REBUILD read covers every line the prior fix wrote; no APPROVED on a test-deleting `refactor(...)` without a SPEC REBUILD verdict. **Integration**: a task merge lands with no verdict; a job merge without one refuses.
 - AC1.5 (d) The 9-step closure leaves; Reconciliation is the last job (Q10): memory, derived docs, `measured_by` repairs, the rc's measurement, closure, one worktree. An atom and its derived sections land in one merge; the atom ↔ derived-docs hash check runs on that merge. The rejected 0189 (release kind carries derived docs) does not return. **Integration**: one merge changing an atom and its derived section passes the job gate and the drift guard; the atom alone is refused with one fix line naming the regenerating command.
 - AC1.6 (e) No micro-dispatch: the main thread dispatches a job or a task; a smaller edit inside an open job is the job driver's own (`dd-manager-orchestration`), landing as a task (AC1.3). **No test** (law text, AC1.8). Check: each job's `kind: merge` log entry (AC1.7) carries `dispatches: <n>`. It is a log line, not a gate.
-- AC1.7 Ritual wait is measured per job. Each merged job, Job 1 included, appends one `kind: merge` entry to `_RELEASE.json`'s `log`: `job: <name>; start: <UTC>; end: <UTC>; wall: <min>; ritual_wait: <min>; dispatches: <n>`. `start` is the committer time of the job branch's first commit; `end` is the `createdAt` of the push CI run that lands it (the pushed merge's time, below). `release.py` has no log verb, so the job driver writes it by Read-then-Edit (`RELEASE-EVENTS.md` §log); `release.py check` validates it (J1.S2.T10). **No test** (log data).
+- AC1.7 Ritual wait is measured per job. Each merged job, Job 1 included, appends one `kind: merge` entry to `_RELEASE.json`'s `log`: `job: <name>; start: <UTC>; end: <UTC>; wall: <min>; ritual_wait: <min>; dispatches: <n>`. `start` is the committer time of the job branch's first commit; `end` is the `createdAt` of the push CI run that lands it (the pushed merge's time, below). `release.py` has no log verb, so the job driver writes it by Read-then-Edit (`RELEASE-EVENTS.md` §log); `release.py check` validates it. **No test** (log data).
   - Formula, over whole rcs: `1 − Σritual_wait(rc-9) / Σritual_wait(rc-8)`.
   - The rc-8 baseline comes from rc-8's git history. Both rcs use the same endpoints: the last task commit's committer time to the pushed merge. The pushed merge's time is the `createdAt` of the first push CI run (`gh run list --branch <work branch>`) whose head contains the landing. Reconciliation computes it once (AC6.2), anchored to `T040135Z`'s readout: gate 1 ~6 min on 67 landings, ~81 review rounds in 26 h.
   - Estimates, not targets: 25–35 min per rc-8 merge, ~12–15 h over ~30 merges, and ~75–80 % less ritual wait.
@@ -156,31 +119,6 @@ Stages:
 ## Job 2 — the bug window, executed
 
 RED first in the owner file. Job 2's close logs Δ production lines, Δ test functions and each cluster's bug-surface delta with ledger evidence (root map §1).
-
-Stages:
-- S1 RED (AC2.1–AC2.7):
-  - J2.S1.T1 AC2.1 — W: `tests/integration/test_ci_script.py`.
-  - J2.S1.T2 AC2.2 — W: `tests/unit/hooks/test_ctx_inject.py`.
-  - J2.S1.T3 AC2.3 — W: `tests/integration/cli/test_registry_version_grammar.py`.
-  - J2.S1.T4 AC2.4 — W: `tests/integration/cli/test_push_gate_gitflow_resolution.py`.
-  - J2.S1.T5 AC2.5 — W: `tests/integration/test_cli_init.py`.
-  - J2.S1.T6 AC2.6 — W: `tests/unit/skills/test_release_implementation_release_script.py`.
-  - J2.S1.T7 AC2.7 — W: `tests/unit/skills/test_bug_resolution_bugs_script.py`.
-- S2 carried-in code (AC2.8: 210 and 212 as-is):
-  - J2.S2.T1 AC2.8 — W: the five shas' own paths (`bugres/scripts/`, `scripts/ci.py`, `bug-ledger.md`, its derived docs, `BUGS.jsonl`) — no test.
-- S3 fixes (AC2.1–AC2.7; AC3.1's last `base_env` callers):
-  - J2.S3.T1 AC2.1 — W: `scripts/ci.py`, `tests/README.md`, `tests/AGENTS.md` — `test_ci_script.py`.
-  - J2.S3.T2 AC2.2 — W: `hooks/ctx_inject.py`, `hooks/sdd_post_gate.py`, `pyproject.toml` — `test_ctx_inject.py`.
-  - J2.S3.T3 AC2.3, AC3.1 (`base_env` caller) — W: `core/context_registry.py`, `tests/integration/cli/test_registry_version_grammar.py` — `test_registry_version_grammar.py`.
-  - J2.S3.T4 AC2.4 — W: `cli/commands/ci.py` — `test_push_gate_gitflow_resolution.py`.
-  - J2.S3.T5 AC2.5 — W: `features/reconcile/service.py`, `cli/commands/init.py` — `test_cli_init.py`.
-  - J2.S3.T6 AC2.6 — W: `relimpl/scripts/release.py` — `test_release_implementation_release_script.py`.
-  - J2.S3.T7 AC2.7 — W: `bugres/scripts/_ledger.py` — `test_bug_resolution_bugs_script.py`.
-  - J2.S3.T8 AC3.1 (contract) — W: `tests/integration/test_worktree_lifecycle.py`, `tests/fixtures/harness_env.py` (`base_env` deleted) — `test_worktree_lifecycle.py`.
-- S4 ledger and ADR proposals (AC2.9–AC2.11):
-  - J2.S4.T1 AC2.9–AC2.11 — W: `specs/bugs/BUGS.jsonl`, `specs/bugs/_archive/`, `specs/ADRs/decisions.jsonl` (`proposed` only) — no test.
-- S5 the 211 REBUILD and the archive (AC2.8's 211, AC2.11); opens only after the operator accepts S4's ADRs, since `bugs.py archive --adr` needs an accepted one:
-  - J2.S5.T1 AC2.8, AC2.11 — W: `specs/bugs/BUGS.jsonl`, `specs/bugs/_archive/` — no test; `V33_ORPHANS ≤ 31` after the stage.
 
 - AC2.1 Coverage data lands outside the repo (`ci-preflight-writes-coverage-into-the-repo`; F048; rc-8 AC10.2): on CI, `scripts/ci.py` and every `pytest --cov` line of `tests/README.md` and `tests/AGENTS.md`, no coverage file appears in the checkout; one decider; pytest runs with `-B` there. **Integration**: after each path, `git status --porcelain --ignored | grep -c coverage` prints `0`.
 - AC2.2 Hooks are visible to coverage and bounded in cost (`hook-entrypoints-invisible-to-coverage`; F051; 0118): `hooks/ctx_inject.py` and `sdd_post_gate` above 0 in CI's coverage JSON. **Unit**: one case over the hook lanes counts operations at the filesystem or subprocess seam, equal at 2 and 20 contexts; no production counter.
@@ -202,20 +140,7 @@ Stages:
 
 ## Job 3 — the REBUILDs
 
-Each **REBUILD** below is an approved REBUILD verdict once this SPEC is Approved: one commit `refactor(<task-id>): REBUILD <unit> — …`, the culprits' revert plus the smallest correct redo, culprit shas in the body (rc-8 AC12.2, AC12.12). Job 3 runs beside Job 1 from minute 1, not after AC2.9; a row AC2.9 registers after Job 3's merge is resolved retro, citing Job 3's sha.
-
-Stages:
-- S1 RED (AC3.1–AC3.3, AC3.6 rows 24–26):
-  - J3.S1.T1 AC3.1 — W: `tests/unit/test_conftest_pollution_guard.py`.
-  - J3.S1.T2 AC3.2, AC3.6 row 24 — W: `tests/integration/test_context_dead_holds.py`.
-  - J3.S1.T3 AC3.3, AC3.6 rows 25, 26 — W: `tests/unit/features/spec_context/test_sweep.py`.
-- S2 the REBUILDs (AC3.1–AC3.6); AC3.4 and AC3.5 rebuild test files, so they have no RED:
-  - J3.S2.T1 AC3.1 — W: `tests/conftest.py`, `tests/fixtures/harness_env.py`, `tests/helpers/worktree_ws.py`, `tests/unit/test_conftest_pollution_guard.py`, `tests/contract/test_core_file_io_purity.py`, `tests/e2e/test_onboarding_journey.py`, `tests/e2e/test_one_line_bootstrap.py`, `tests/e2e/test_push_denylist_journey.py`, `tests/e2e/test_push_gate_check.py`, `tests/integration/gate/test_gate_dialects_through_wrappers.py`, `tests/integration/gate/test_hook_interpreter.py`, `tests/integration/test_tool_caches_stay_in_the_tmp_zone.py` — `test_conftest_pollution_guard.py`. Expand–contract: `base_env` stays, built on `suite_env`, for its two callers in Jobs 1 and 2; J2.S3.T3 and J2.S3.T8 switch them and delete it.
-  - J3.S2.T2 AC3.2, row 24 — W: `features/spec_context/service.py`, `infrastructure/git_subprocess.py`, `cli/commands/context.py` — `test_context_dead_holds.py`.
-  - J3.S2.T3 AC3.3, rows 25, 26 — W: `features/spec_context/sweep.py` — `test_sweep.py`.
-  - J3.S2.T4 AC3.4 — W: `tests/unit/core/test_specs_version.py`.
-  - J3.S2.T5 AC3.5 — W: `tests/unit/cli/test_exitcode_truthfulness.py`.
-  - J3.S2.T6 AC3.6 row 20 — W: `scripts/guards/isolation.py` — `run.py --planted`.
+Each **REBUILD** below is an approved REBUILD verdict once this SPEC is Approved: one commit `refactor(<task-id>): REBUILD <unit> — …`, the culprits' revert plus the smallest correct redo, culprit shas in the body (rc-8 AC12.2, AC12.12). Job 3 does not wait on AC2.9; a row AC2.9 registers after Job 3's merge is resolved retro, citing Job 3's sha.
 
 - AC3.1 One test session env, one owner (**REBUILD**: unit, the test session env; culprits 09d259133, 4ca3d7136 (i, ii), b69ee15b9's in-process line, 76d7af604's conftest hunk; trigger ≥ 2 fixes, C1; rows 14, 16, 17; rc-8 AC10.1 re-cut):
   - A pure `suite_env(parent, home)`, applied once per process by `pytest_configure`; every child env is `suite_env(...) | overrides`; every other env write and helper leaves (rc-8 AC10.1's list).
@@ -228,14 +153,6 @@ Stages:
 - AC3.6 Own fixes, not REBUILDs (rc-8 AC12.14; body `rebuild: none — Q24`): row 20 (**unit**: `run.py --planted` turns red on a raw `sys.stdin` assignment); row 24 (**integration**: dead holds a submodule, its relative gitdir resolves after the move); row 25 (**unit**: one walk per expired entry at the filesystem seam); row 26 (**unit**: a root-level held symlink keeps its hold clock, 0074).
 
 ## Job 4 — the PLAN and the trio validator
-
-Stages:
-- S1 RED (AC4.2, AC4.3):
-  - J4.S1.T1 AC4.2, AC4.3 — W: `tests/contract/test_release_script.py`.
-- S2 (AC4.1–AC4.3):
-  - J4.S2.T1 AC4.2 — W: `relimpl/scripts/_release_check.py` — `test_release_script.py`.
-  - J4.S2.T2 AC4.3 — W: `relimpl/scripts/_release_phase.py` — `test_release_script.py`.
-  - J4.S2.T3 AC4.2 (the four rows taught and audited) — W: `public/skills/dd-audit-project/PILLAR-SPECS.md` — no test.
 
 - AC4.1 The PLAN (Q8, R6): §1 as-is review; the DAG of jobs, each job's envelope, edges, the critical path; the hot-file list. The Parallel schedule already left in Job 1 (AC1.8). **Unit**: AC4.2's rows.
 - AC4.2 `release.py check` refuses only the rows a grill ruled with evidence, one fix line each:
@@ -255,28 +172,15 @@ Stages:
 
 **No test** unless a level is named (law text; tests assert behaviour, not text): each file rewritten once to rc-8 AC12.11's bar; `public stage`, `install`, `doctor` and `/corpus-audit` clean.
 
-Stages:
-- S1 RED (AC5.6, AC5.7):
-  - J5.S1.T1 AC5.6 — W: `tests/unit/skills/test_release_implementation_release_script.py`.
-  - J5.S1.T2 AC5.7 — W: `tests/unit/skills/test_bug_resolution_bugs_script.py`.
-- S2 code and law (AC5.1–AC5.9):
-  - J5.S2.T1 AC5.6 — W: `relimpl/scripts/_release_new.py`, `_release_check.py` — `test_release_implementation_release_script.py`.
-  - J5.S2.T2 AC5.7 — W: `bugres/scripts/bugs.py` — `test_bug_resolution_bugs_script.py`.
-  - J5.S2.T3 AC5.1–AC5.4 — W: `public/scaffold/bugs/AGENTS.md`, `bugres/SKILL.md`, `public/skills/dd-bug-registration/SKILL.md` — no test.
-  - J5.S2.T4 AC5.5 — W: `public/scaffold/releases/AGENTS.md`, `public/scaffold/ADRs/AGENTS.md`, `relimpl/SKILL.md` — no test.
-  - J5.S2.T5 AC5.7 (§3a) — W: `gitflow/SKILL.md` — no test.
-  - J5.S2.T6 AC5.8 — W: `CONTEXT.md` — no test.
-  - J5.S2.T7 AC5.9 — W: `public/skills/dd-code-review/SKILL.md` — no test.
-
-- AC5.1 The merge is the boundary (rc-8 AC12.1 as AC13.7): a bug exists once a merged change breaks a documented contract; a failure inside an unmerged worktree is rework, no record. `dd-bug-registration` §2 step 4 adds the work-branch sha that reproduces it.
-- AC5.2 The block list, closed, stated once in the bugs law §2 (rc-8 AC13.2): (1) the work branch's CI is red; (2) a Stall; (3) the running task cannot deliver its AC; (4) a security finding or an open dependency-vulnerability alert; (5) data loss or corruption. Every other file points there.
-- AC5.3 A block-list bug is a hotfix (Q17): registered with `caused_by`; job gate and one review; lands before any other job merge; body names `block: <item>`; no SPEC amendment.
-- AC5.4 Every other bug is only registered, `found_in` its rc; the next rc's §1 reads it and its Job 1 resolves it (Q19). A fix-induced bug outside the block list is REBUILT by the next Job 1 (rc-8 AC12.2 narrowed; AC12.3 stands as block item 1). The pile, cause groups and "fixed in any phase" leave.
-- AC5.5 The rc is closed (Q16, R1, R2, Q20): created, implemented, or cancelled into the next; no amendment (shape 8 keeps approval only); a new AC goes to the next rc; a red outside the envelope appends a new stage; a stage's third red gate stops the job for the operator, and the driver appends one `kind: note` log entry `stop: <job> stage <n> — third red gate` (a log line, not a gate); rc N+1 is defined while rc N implements, its §1 and Job 1 closing with rc N; one rc implements at a time.
+- AC5.1 The merge is the boundary (rc-8 AC12.1 as AC13.7): a bug exists once a merged change breaks a documented contract; a failure inside an unmerged worktree is rework, no record. `dd-bug-registration` §2 step 4 adds the work-branch sha that reproduces it. **No test** (law text).
+- AC5.2 The block list, closed, stated once in the bugs law §2 (rc-8 AC13.2): (1) the work branch's CI is red; (2) a Stall; (3) the running task cannot deliver its AC; (4) a security finding or an open dependency-vulnerability alert; (5) data loss or corruption. Every other file points there. **No test** (law text).
+- AC5.3 A block-list bug is a hotfix (Q17): registered with `caused_by`; job gate and one review; lands before any other job merge; body names `block: <item>`; no SPEC amendment. **No test** (law text).
+- AC5.4 Every other bug is only registered, `found_in` its rc; the next rc's §1 reads it and its Job 1 resolves it (Q19). A fix-induced bug outside the block list is REBUILT by the next Job 1 (rc-8 AC12.2 narrowed; AC12.3 stands as block item 1). The pile, cause groups and "fixed in any phase" leave. **No test** (law text).
+- AC5.5 The rc is closed (Q16, R1, R2, Q20): created, implemented, or cancelled into the next; no amendment (shape 8 keeps approval only); a new AC goes to the next rc; a red outside the envelope appends a new stage; a stage's third red gate stops the job for the operator, and the driver appends one `kind: note` log entry `stop: <job> stage <n> — third red gate` (a log line, not a gate); rc N+1 is defined while rc N implements, its §1 and Job 1 closing with rc N; one rc implements at a time. **No test** (law text).
 - AC5.6 Every rc's first SPEC opens with `## Bug window review` (T-050-216; rc-8 AC13.3): `release.py new` writes the heading first; `check` refuses a live SPEC lacking it; `dd-release-definition` §1 reads `bugs.py window` and each cited test. **Unit** (`test_release_implementation_release_script.py`): `new 9.9.9`'s first `## ` is the heading; a SPEC without it exits non-zero with one fix line.
 - AC5.7 §3a: the REBUILD shapes (rc-8 AC12.12), shape 3's `block: <item>`, the per-class shape 4, the archive shape. **Unit**: `bugs.py fix` finds `refactor(bugs): <id> — REBUILD`.
 - AC5.8 `CONTEXT.md` gains this SPEC's Terms and Bug window; **Wave**, Pile and Cause group are absent. **No test**: `grep -cE '^\*\*(Wave|Pile|Cause group)\*\*:' CONTEXT.md` prints `0`.
-- AC5.9 A bug fix adds a case (backlog `bug-fix-adds-never-rewrites-asserts`; rc-8 AC9.1's review half, carried by T-050-198):
+- AC5.9 A bug fix adds a case (backlog `bug-fix-adds-never-rewrites-asserts`; rc-8 AC9.1's review half, carried by T-050-198): **No test** (law text; the checks below).
   - `dd-code-review` names `git diff -U0 -- tests | grep -E '^-\s*assert'`.
   - The `<bug-id>#<id>` citation clause at `dd-code-review/SKILL.md:76` leaves; accepted 0163 retired it.
   - Check: `grep -rn '<bug-id>#<id>' dadaia_workspace/public | wc -l` prints `0`, so 0163's `measured_by` turns green. The entry exits `delivered` at closure by citation (no Origin clause, 0161).
@@ -287,16 +191,7 @@ Stages:
 
 - Note: the accepted 0190 text says the `verify:` line leaves and 0191 nests paths; both wording deltas go to the operator at Reconciliation.
 
-Stages (no RED stage):
-- S1 (AC6.1–AC6.3):
-  - JR.S1.T1 AC6.1 — W: `specs/memory/**`, its derived docs and `catalog.json`, in one merge (AC1.5).
-  - JR.S1.T2 AC6.1 (F131) — W: `specs/audits/20260930-structural-convergence/FINDINGS.jsonl`.
-  - JR.S1.T3 AC6.2 — W: `specs/releases/0.5.0/_RELEASE.json` (`log`).
-  - JR.S1.T4 AC6.3 — W: `specs/ADRs/decisions.jsonl` (`measured_by` repairs; acceptance is the operator's).
-- S2 (AC6.4):
-  - JR.S2.T1 AC6.4 — W: `_RELEASE.json` (phase); rc-10's Draft SPEC goes in `0.5.0-rc10-define`.
-
-- AC6.1 Each atom Jobs 1–5 make stale (`worktrees.md`, `bug-ledger.md`, release atoms) states the code, citing its commit, in the merge that regenerates its derived sections (AC1.5), never hand-merged; drift guard and `memory.py check` clean; catalog regenerated; a `### P-NN` change rides its accepted ADR.
+- AC6.1 Each atom Jobs 1–5 make stale (`worktrees.md`, `bug-ledger.md`, release atoms) states the code, citing its commit, in the merge that regenerates its derived sections (AC1.5), never hand-merged; drift guard and `memory.py check` clean; catalog regenerated; a `### P-NN` change rides its accepted ADR. **No test** (observed).
   - Also rc-8's closure memory items. Each has a numeric check:
     - AC10.14's memory half: `grep -rniw union specs/memory | wc -l` prints `0`, and `worktrees.md:36` states the main-repo trio read.
     - The `ci-preflight` atom is deleted: `find specs/memory -name 'ci-preflight*' | wc -l` prints `0`. It is already 0 since 93a0154e2.
@@ -304,9 +199,9 @@ Stages (no RED stage):
     - `bug-ledger.md:5,16` (and `catalog.json`'s summary) qualify "no git-derived": the record stores none, while `bugs.py fix` and `window` derive them on read. Check: `grep -E 'git-derived' specs/memory/product/sdd/bug-ledger.md | grep -vc 'bugs.py fix'` prints `0`. `bug-ledger-lessons.md` does not exist at this head.
     - F131 is re-dispositioned `resolved` by `audit.py disposition`, citing 995a39897 and 0177; its deferral reason was false. Check: `grep 'F131"' specs/audits/20260930-structural-convergence/FINDINGS.jsonl | grep -c '"disposition": "deferred"'` prints `0`.
     - rc-8 TASKS' AC map omits AC9.1 → 198. rc-8 stays closed (0150), so the carry mark lives here, in AC5.9. Check: `git diff 767ba1d4f -- specs/releases/0.5.0/rc-8 | wc -l` prints `0`.
-- AC6.2 `_RELEASE.json` logs rc-8 G1's readouts at start and end, each job's bug-surface delta, and throughput against the grill's rc-8 baseline (75 % process commits, parallelism 1.3, median task lead 1.1 h, ~81 review rounds in 26 h, gate 1 ~6 min); AC1.7's comparison and the rc-wide parallelism of §How rc-9 runs (against 1.3), met or missed, gating nothing.
-- AC6.3 Each proposed ADR below is accepted or rejected by the operator; its `measured_by` names a check this rc built, repaired in the 0138 lane where a name moved.
-- AC6.4 Closure per the releases law; rc-10 defined beside it (Q20).
+- AC6.2 `_RELEASE.json` logs rc-8 G1's readouts at start and end, each job's bug-surface delta, and throughput against the grill's rc-8 baseline (75 % process commits, parallelism 1.3, median task lead 1.1 h, ~81 review rounds in 26 h, gate 1 ~6 min); AC1.7's comparison and the rc-wide parallelism of §How rc-9 runs (against 1.3), met or missed, gating nothing. **No test** (observed).
+- AC6.3 Each proposed ADR below is accepted or rejected by the operator; its `measured_by` names a check this rc built, repaired in the 0138 lane where a name moved. **No test** (observed).
+- AC6.4 Closure per the releases law; rc-10 defined beside it (Q20). **No test** (observed).
 
 ## Proposed ADRs (`proposed`; ids from 0190, tentative)
 
