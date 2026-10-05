@@ -612,6 +612,21 @@ def test_memory_opens_the_next_window_at_the_previous_until(script: Path, tmp_pa
     assert _log(specs)[-1]["since"] == until
 
 
+def test_a_rerun_after_the_second_reconciliation_appends_nothing(
+    script: Path, tmp_path: Path
+) -> None:
+    """J2.S6.T5: the no-op reads the LAST memory record's until, not the first one's."""
+    root, specs, _ = _memory_repo(tmp_path, script)
+    assert _memory(script, root, specs, reviewed="alpha", changed="").returncode == 0
+    _git(root, "commit", "-qam", "memory entry")
+    assert _memory(script, root, specs, reviewed="", changed="").returncode == 0
+
+    result = _memory(script, root, specs, reviewed="", changed="")
+
+    assert result.returncode == 0, result.stderr
+    assert len([e for e in _log(specs) if e["kind"] == "memory"]) == 2
+
+
 def test_memory_refuses_any_phase_but_closure(script: Path, tmp_path: Path) -> None:
     root, specs, _ = _memory_repo(tmp_path, script)
     state = specs / "releases" / "0.5.0" / "_RELEASE.json"

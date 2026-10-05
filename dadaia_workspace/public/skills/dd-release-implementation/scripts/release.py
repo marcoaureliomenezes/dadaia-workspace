@@ -85,7 +85,8 @@ def _memory(args: argparse.Namespace, specs: Path) -> int:
     lists = [[s for s in getattr(args, n).split(",") if s] for n in ("reviewed", "changed")]
     try:
         until = drift.git(specs.parent, "rev-parse", "HEAD")[0]
-        if until == since:  # the last record already reaches HEAD: a rerun appends nothing
+        records = [e for e in live.state.get("log") or [] if isinstance(e, dict) and e.get("kind") == "memory"]  # fmt: skip
+        if records and records[-1].get("until") == until:  # a rerun at HEAD appends nothing
             print(f"[ok] release {live.release_id} memory already reconciled to {until[:12]}")
             return 0
         entry = {"ts": ts, "agent": "release.py memory", "kind": "memory",
