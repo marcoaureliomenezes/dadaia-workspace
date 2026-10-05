@@ -1,5 +1,5 @@
-"""AC1.3 (rc-9, ADR 0191): `worktree.py new` opens one tree per job — each name shape; an
-old-grammar or task-shaped name refused — and `list`; AC1.11 (T-050-101): the
+"""AC1.3 (rc-9, ADR 0191): `worktree.py new` opens one tree per job or task — each name shape;
+an old-grammar name refused — and `list`; AC1.11 (T-050-101): the
 one venv. Size: MEDIUM (real git in a tmp workspace, never the live instance).
 """
 
