@@ -1,11 +1,12 @@
 # TASKS — 0.5.0 rc-9, Job 5 — the bugs law and the closed rc
 
-**Status:** Draft
+**Status:** Approved — operator ruling 2026-10-05 (AskUserQuestion): "Aprovo (Recommended)", on 700217aa3 (recorded in baf8fe6aa).
 
 Paths are relative to `dadaia_workspace/` unless they start with `scripts/`, `tests/`, `specs/`, `.github/`, `pyproject.toml` or `CONTEXT.md`; `gitflow/` is `public/skills/dd-gitflow-default/`, `relimpl/` is `public/skills/dd-release-implementation/`, `bugres/` is `public/skills/dd-bug-resolution/`.
 
-## S1 — RED (AC5.6, AC5.7)
+## Stage J5.S1 — RED (AC5.6, AC5.7)
 
+- Contract: exit tests every acceptance test of the ACs served RED as strict xfail; test files only (R10); envelope `tests/unit/skills/test_release_implementation_release_script.py`, `tests/unit/skills/test_bug_resolution_bugs_script.py`; ACs AC5.6, AC5.7
 - ACs served: AC5.6, AC5.7.
 - Envelope: `tests/unit/skills/test_release_implementation_release_script.py`, `tests/unit/skills/test_bug_resolution_bugs_script.py`.
 - Exit tests: every acceptance test of the ACs served RED as strict xfail; test files only (R10).
@@ -15,8 +16,9 @@ Paths are relative to `dadaia_workspace/` unless they start with `scripts/`, `te
 | J5.S1.T1 | AC5.6 | `tests/unit/skills/test_release_implementation_release_script.py` | RED: the ACs' acceptance tests |
 | J5.S1.T2 | AC5.7 | `tests/unit/skills/test_bug_resolution_bugs_script.py` | RED: the ACs' acceptance tests |
 
-## S2 — code and law (AC5.1–AC5.9)
+## Stage J5.S2 — code and law (AC5.1–AC5.9)
 
+- Contract: exit tests the stage's owner tests green at the task gates; unit + integration green at the stage gate; no xfail left for the ACs served (R5); envelope `relimpl/scripts/_release_new.py`, `_release_check.py`, `bugres/scripts/bugs.py`, `public/scaffold/bugs/AGENTS.md`, `bugres/SKILL.md`, `public/skills/dd-bug-registration/SKILL.md`, `public/scaffold/releases/AGENTS.md`, `public/scaffold/ADRs/AGENTS.md`, `relimpl/SKILL.md`, `gitflow/SKILL.md`, `CONTEXT.md`, `public/skills/dd-code-review/SKILL.md`; ACs AC5.1–AC5.9
 - ACs served: AC5.1–AC5.9.
 - Envelope: `relimpl/scripts/_release_new.py`, `_release_check.py`, `bugres/scripts/bugs.py`, `public/scaffold/bugs/AGENTS.md`, `bugres/SKILL.md`, `public/skills/dd-bug-registration/SKILL.md`, `public/scaffold/releases/AGENTS.md`, `public/scaffold/ADRs/AGENTS.md`, `relimpl/SKILL.md`, `gitflow/SKILL.md`, `CONTEXT.md`, `public/skills/dd-code-review/SKILL.md`.
 - Exit tests: the stage's owner tests green at the task gates; unit + integration green at the stage gate; no xfail left for the ACs served (R5).
