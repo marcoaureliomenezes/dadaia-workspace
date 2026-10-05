@@ -522,6 +522,50 @@ def test_the_seam_refuses_exactly_what_the_push_refuses(
         assert (specs / "bugs" / "BUGS.jsonl").read_bytes() == before
 
 
+_SLUG = {**_OPEN_RECORD, "context": "acme-games"}
+
+
+# fmt: off
+@pytest.mark.parametrize(("published", "context", "pushed"), [
+    pytest.param((_SLUG,), "acme-games", False, id="published-context-accepted",
+                 marks=pytest.mark.xfail(strict=True, reason="J2.S3.T7: AC2.7")),
+    pytest.param((_OPEN_RECORD,), "acme-games", True, id="unpublished-term-refused"),
+    pytest.param((_OPEN_RECORD,), "ctx", False, id="no-term-accepted"),
+])
+# fmt: on
+def test_the_seam_verdict_equals_the_push_verdict_over_the_published_ledger(
+    script: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+    published: tuple[dict[str, object], ...], context: str, pushed: bool,
+) -> None:
+    from dadaia_workspace.core.models.git_scan import ScannedObject
+    from dadaia_workspace.features.chokepoints.denylist_scan import scan_objects
+    from dadaia_workspace.infrastructure.privacy_check import load_baseline_patterns
+
+    denylist = tmp_path / "denylist.json"
+    denylist.write_text(json.dumps({"acme": "client"}), encoding="utf-8")
+    monkeypatch.setenv("DADAIA_PRIVACY_DENYLIST", str(denylist))
+    root = tmp_path / "repo"
+    ledger = _ledger(root, *published) / "bugs" / "BUGS.jsonl"
+    prior = ledger.read_text(encoding="utf-8")
+    subprocess.run(["git", "-C", str(root), "add", "-A"], check=True)
+    subprocess.run(["git", "-C", str(root), "-c", "user.name=t", "-c",
+                    "user.email=t@t.invalid", "commit", "-qm", "published"], check=True)  # fmt: skip
+
+    done = _run(
+        script, "append", "--specs", str(root / "specs"), "--bug-id", "new-bug", "--title",
+        "t", "--severity", "LOW", "--surface", "cli", "--component", "c", "--context",
+        context, "--symptom", "s", "--repro", "r", "--expected", "e", "--correlates", "none",
+    )  # fmt: skip
+
+    blob = ScannedObject(path="specs/bugs/BUGS.jsonl", sha="", decodable=True,
+                         text=ledger.read_text(encoding="utf-8") if done.returncode == 0
+                         else prior + json.dumps({"context": context}) + "\n",
+                         prior_text=prior)  # fmt: skip
+    push_refuses = bool(scan_objects([blob], [("acme", "client")], load_baseline_patterns()).hits)
+    assert push_refuses is pushed
+    assert (done.returncode == 1) is pushed, done.stderr
+
+
 def test_every_ledger_skill_stages_a_byte_identical_privacy_pair(tmp_path: Path) -> None:
     """sa-ledger-write-seam-redacts-less-than-push-refuses#B6: every ledger skill carries a
     byte-identical _privacy.py (the push matcher's module) and baseline copy."""
