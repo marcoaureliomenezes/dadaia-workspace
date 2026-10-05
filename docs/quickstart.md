@@ -23,12 +23,12 @@ cd demo
 ```
 
 After the 3b first pass (below), publish and file the first entry in a `backlog`
-worktree (`backlog-<slug>`) — only `context create` (the `--repo` clone) and the first `specs init` write
+worktree (`backlog/<slug>`) — only `context create` (the `--repo` clone) and the first `specs init` write
 `specs/` directly (ADR 0154):
 
 ```bash
 .dadaia/.venv/bin/dadaia context baseline "$SLUG"
-B=$(python3 .agents/skills/dd-gitflow-default/scripts/worktree.py new "$SLUG" backlog-my-first-idea | sed 's/^\[ok\] //')
+B=$(python3 .agents/skills/dd-gitflow-default/scripts/worktree.py new "$SLUG" backlog/my-first-idea | sed 's/^\[ok\] //')
 python3 .agents/skills/dd-backlog-definition/scripts/backlog.py new my-first-idea \
   --specs "$B/specs" --title "What I want" --description "Why I want it"
 git -C "$B" commit -qam "chore(backlog): new my-first-idea"
@@ -113,7 +113,7 @@ entry held, an EPHEMERAL one deleted.
 `active[]` — the operator's demand queue; from the workspace root `--specs` names the
 context's specs tree, since no `specs/` sits at or above the cwd. The script is the
 document's one writer and validator: every write validates the bytes it is about to
-commit. Only the operator creates demand, and the document is written in a `backlog-<slug>`
+commit. Only the operator creates demand, and the document is written in a `backlog/<slug>`
 worktree.
 
 ## 6. The first release

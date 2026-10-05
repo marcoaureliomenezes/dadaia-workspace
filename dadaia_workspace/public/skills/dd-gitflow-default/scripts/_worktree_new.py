@@ -9,14 +9,19 @@ from pathlib import Path
 sys.path.append(str(Path(__file__).resolve().parents[2] / "dd-release-implementation" / "scripts"))
 
 from _release_schema import extract_status  # noqa: E402
-from _worktree_git import flow_for, git, quote, script, work_version  # noqa: E402
-from _worktree_names import LOCK, NAME_RE, SCRIPT, Refusal, branch  # noqa: E402
+from _worktree_git import flow_for, git, ours, quote, rows, script, work_version  # noqa: E402
+from _worktree_names import LOCK, NAME_RE, SCRIPT, TASK_CAP, Refusal, base, branch  # noqa: E402
 
 
 def _refuse_symlink(root: Path, repo_name: str) -> None:
     for part in (root / "worktrees", root / "worktrees" / repo_name):
         if part.is_symlink():
             raise Refusal(f"{part} is a symlink", f"rm {part}")
+
+
+def _exit(root: Path, path: str) -> str:
+    """The worktree's one exit, `clean` or `merge`, as `rows()` rules it."""
+    return next(str(row["exit"]) for row in rows(root) if row["path"] == path)
 
 
 def new(root: Path, repo_name: str, name: str) -> Path:
@@ -27,9 +32,9 @@ def new(root: Path, repo_name: str, name: str) -> Path:
     work = f"{flow['work']}{version}"
     match = NAME_RE.match(name)
     if match is None or match["v"] not in (None, version):
-        shape = f"{version}-rc<N>-<job>"
+        shape = f"{version}-rc<N>/<job>[--<task-id>]"
         raise Refusal(
-            f"{name!r} is not a worktree name: {shape}, {version}-rc<N>-define or backlog-<slug>",
+            f"{name!r} is not a worktree name: {shape}, {version}-rc<N>/define or backlog/<slug>",
             f"{script(SCRIPT)} list",
         )
     if match["rc"] and match["job"] != "define":  # a job runs only under an Approved SPEC
@@ -39,11 +44,23 @@ def new(root: Path, repo_name: str, name: str) -> Path:
         if extract_status(spec) != "Approved":
             raise Refusal(
                 f"a job needs an Approved rc-{rc}/SPEC.md on {work}",
-                f"{script(SCRIPT)} new {quote(flow['main'])} {match['rc']}-define",
+                f"{script(SCRIPT)} new {quote(flow['main'])} {match['rc']}/define",
+            )
+    start = base(name, work)
+    if match["task"]:  # cut from its job branch; at most TASK_CAP open per rc
+        tasks = [r for r in ours(repo) if (m := NAME_RE.match(r["name"])) and m["task"]
+                 and m["rc"] == match["rc"]]  # fmt: skip
+        if len(tasks) >= TASK_CAP:
+            raise Refusal(f"{TASK_CAP} task worktrees are open in {match['rc']}",
+                          _exit(root, tasks[0]["path"]))  # fmt: skip
+        if not git(repo, "branch", "--list", start).strip():
+            job = f"{match['rc']}/{match['job']}"
+            raise Refusal(
+                f"no job branch {start}", f"{script(SCRIPT)} new {quote(repo_name)} {job}"
             )
     tree = root / "worktrees" / repo_name / name
     if git(repo, "branch", "--list", branch(name)).strip():
         raise Refusal(f"{branch(name)} exists", f"{script(SCRIPT)} list")
     git(repo, "worktree", "add", "-q", "--lock", "--reason", f"{LOCK}{name}", "-b", branch(name),
-        str(tree), work)  # fmt: skip
+        str(tree), start)  # fmt: skip
     return tree

@@ -143,6 +143,11 @@
     "verdict_reason": {
       "type": "string",
       "description": "Optional human-readable summary explaining the verdict."
+    },
+    "ci_run": {
+      "type": "string",
+      "pattern": "^https://github\\.com/[^/]+/[^/]+/actions/runs/[0-9]+$",
+      "description": "The green CI-matrix run of the job branch HEAD a reviewer verdict approves; worktree.py merge requires it on a job's verdict."
     }
   }
 }

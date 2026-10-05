@@ -14,8 +14,12 @@ into the source tree it projects from, so nothing here is regenerated.
 - Any failure of a workspace operation here is a product bug of this library:
   register it in `specs/bugs/`.
 
-- Gates (ADR 0190): `scripts/ci.py task <files>` per task, `stage` per stage, `job` (the full run) once per job;
-  `worktree.py merge` runs the job level of a job's HEAD, as one argv list.
+Gates, declared once and run by `worktree.py` as argv (never a shell) from the worktree root, the
+workspace venv first on `PATH`:
+
+verify: python scripts/ci.py job
+verify-stage: python scripts/ci.py stage
+verify-task: python scripts/ci.py task
 
 - Versioning here: release-please owns the version, tag and CHANGELOG; the work branch
   is named for the live release (`_RELEASE.json`).

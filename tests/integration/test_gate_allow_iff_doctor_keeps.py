@@ -40,7 +40,7 @@ _TABLE = [
     ("prompt.md", None, None, True),
     ("specs/bugs/x.md", None, None, False),
     (".dadaia/newzone/x.txt", None, None, False),
-    ("worktrees/x/0.5.0-rc1-j1/f.py", None, None, False),  # x: no registered slug (ADR 0132)
+    ("worktrees/x/0.5.0-rc1/j1/f.py", None, None, False),  # x: no registered slug (ADR 0132)
     (".dadaia/tmp/agent/20260927/x.txt", None, None, True),
 ]
 

@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""The worktree name grammar and its one path reader — module data the gate
-imports: `worktrees/<repo>/<M.m.p>-rc<N>-{define,reconcile,<job>}` inside an rc (a job's tasks
-share its tree), `backlog-<slug>` outside one — flat, so every tree sits at the one venv's
-`../../../` depth; on the branch `wt/<M.m.p>-rc<N>/<job>` or `wt/backlog/<slug>`."""
+"""The worktree name grammar and its one path reader — module data the gate imports: a folder
+per rc holding sibling trees, `worktrees/<repo>/<M.m.p>-rc<N>/{define,reconcile,<job>,
+<job>--<task-id>}`, and `worktrees/<repo>/backlog/<slug>` outside one; tree name `<a>/<b>` is
+on the branch `wt/<a>/<b>`. A task tree is cut from its job branch and lands back on it."""
 
 from __future__ import annotations
 
@@ -11,11 +11,13 @@ from pathlib import Path, PurePosixPath
 
 SCRIPT = Path(__file__).parent / "worktree.py"
 LOCK = "dadaia:"
-_WORD = r"[a-z0-9]+(?:-[a-z0-9]+)*"
+#: Task worktrees open at once per rc.
+TASK_CAP = 5
+_WORD = r"[a-z0-9]+(?:-[a-z0-9]+)*"  # single hyphens: `--` separates a job from its task
+_TASK = r"(?:--(?P<task>[A-Za-z0-9]+(?:[.-][A-Za-z0-9]+)*))?"
 NAME_RE = re.compile(
-    rf"^(?:(?P<rc>(?P<v>\d+\.\d+\.\d+)-rc\d+)-(?P<job>{_WORD})|backlog-(?P<slug>{_WORD}))$"
+    rf"^(?:(?P<rc>(?P<v>\d+\.\d+\.\d+)-rc\d+)/(?P<job>{_WORD}){_TASK}|backlog/(?P<slug>{_WORD}))$"
 )
-_BRANCH_RE = re.compile(rf"^wt/(?:(\d+\.\d+\.\d+-rc\d+)/({_WORD})|(backlog)/({_WORD}))$")
 
 
 class Refusal(Exception):
@@ -26,28 +28,30 @@ class Refusal(Exception):
 
 def locate(rel: str) -> tuple[str, str | None, tuple[str, ...]] | None:
     """`(repo, tree name, repo-relative tail)` of a workspace-relative path under `repos/<r>/`
-    (name `None`) or `worktrees/<r>/<name>/` at its fixed depth, whatever the name — whether
-    the name is canonical is `NAME_RE`'s question, not this one; `None` elsewhere. The gate,
-    the doctor and reaper (through `list`) and every verb read a worktree path here alone."""
+    (name `None`) or `worktrees/<r>/<a>/<b>/` at its fixed depth, whatever the name — whether
+    it is canonical is `NAME_RE`'s question, not this one; `None` elsewhere. The gate, the
+    doctor and reaper (through `list`) and every verb read a worktree path here alone."""
     parts = PurePosixPath(rel.replace("\\", "/")).parts
     if len(parts) >= 2 and parts[0] == "repos":
         return parts[1], None, parts[2:]
-    if len(parts) >= 3 and parts[0] == "worktrees":
-        return parts[1], parts[2], parts[3:]
+    if len(parts) >= 4 and parts[0] == "worktrees":
+        return parts[1], f"{parts[2]}/{parts[3]}", parts[4:]
     return None
 
 
 def branch(name: str) -> str:
-    """The branch of tree *name*: its first `-` after the rc (or `backlog`) becomes `/`."""
-    match = NAME_RE.match(name)
-    head = match["rc"] if match and match["rc"] else "backlog"
-    return f"wt/{head}/{name[len(head) + 1 :]}"
+    return f"wt/{name}"
 
 
 def name_of(ref: str) -> str | None:
     """The tree name a `wt/` branch *ref* belongs to, `None` for any other branch."""
-    match = _BRANCH_RE.match(ref)
-    return "-".join(g for g in match.groups() if g) if match else None
+    return ref[3:] if ref.startswith("wt/") and NAME_RE.match(ref[3:]) else None
+
+
+def base(name: str, work: str) -> str:
+    """The branch tree *name* is cut from and lands on: its job branch for a task, else *work*."""
+    match = NAME_RE.match(name)
+    return branch(f"{match['rc']}/{match['job']}") if match and match["task"] else work
 
 
 def non_code(name: str) -> bool:
@@ -58,6 +62,6 @@ def non_code(name: str) -> bool:
 
 def pushable(ref: str) -> bool:
     """A `wt/` branch pre-push accepts: a job's (its push runs the CI matrix) or a backlog
-    tree's; never `define`'s or any other `wt/` branch."""
+    tree's; never a task's, `define`'s or any other `wt/` branch."""
     match = NAME_RE.match(name_of(ref) or "")
-    return match is not None and match["job"] != "define"
+    return match is not None and match["job"] != "define" and not match["task"]

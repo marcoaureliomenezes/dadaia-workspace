@@ -93,8 +93,8 @@ def test_doctor_lists_the_contexts_worktrees_from_git_and_touches_none(tmp_path:
     repo = root / "repos/r"
     worktree_ws.git(repo, "checkout", "-q", "feature/0.5.0")
     for job in ("j1", "j2"):
-        assert worktree_ws.run(root, "new", "r", f"0.5.0-rc1-{job}").returncode == 0
-    ready, empty = root / "worktrees/r/0.5.0-rc1-j1", root / "worktrees/r/0.5.0-rc1-j2"
+        assert worktree_ws.run(root, "new", "r", f"0.5.0-rc1/{job}").returncode == 0
+    ready, empty = root / "worktrees/r/0.5.0-rc1/j1", root / "worktrees/r/0.5.0-rc1/j2"
     worktree_ws.commit(ready, "src/a.py")
     log = repo / ".git/logs/refs/heads/wt/0.5.0-rc1/j1"  # age is the branch's birth (ADR 0108)
     log.write_text(re.sub(r"> \d+ ", f"> {int(_TWO_DAYS_AGO)} ", log.read_text(), count=1))
@@ -103,7 +103,7 @@ def test_doctor_lists_the_contexts_worktrees_from_git_and_touches_none(tmp_path:
     worktree_ws.git(repo, "worktree", "add", "-q", "-b", "wt/0.5.0-rc1/j4", str(foreign))
     _age_tree(root / ".dadaia/tmp/claude")
     worktree_ws.git(repo, "branch", "wt/0.5.0-rc1/j3")
-    (root / "worktrees/r/0.5.0-rc1-stray").mkdir()
+    (root / "worktrees/r/0.5.0-rc1/stray").mkdir()
     doctor = worktree_ws.registered_doctor(root)
 
     # a message is "<state> <path>  k=v…"
@@ -119,8 +119,8 @@ def test_doctor_lists_the_contexts_worktrees_from_git_and_touches_none(tmp_path:
     assert found[str(empty)].message.startswith("empty") and found[str(empty)].fix == ""
     assert found[str(foreign)].message.startswith("foreign")  # the expired TTL entry surfaces here
     assert not [f for f in doctor.scan_ttl() if "20200101" in f.path]
-    assert found[str(root / "worktrees/r/0.5.0-rc1-j3")].message.startswith("orphan")
-    assert found[str(root / "worktrees/r/0.5.0-rc1-stray")].message.startswith("unregistered")
+    assert found[str(root / "worktrees/r/0.5.0-rc1/j3")].message.startswith("orphan")
+    assert found[str(root / "worktrees/r/0.5.0-rc1/stray")].message.startswith("unregistered")
     (ready / "wip.txt").write_text("x")
     assert [f.fix for f in doctor.check_worktrees("c") if str(ready) in f.message] == [""]  # dirty
     doctor.fix()

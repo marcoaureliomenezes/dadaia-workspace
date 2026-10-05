@@ -121,7 +121,7 @@ def _worktree(repo: Path) -> None:
 def _wt(repo: Path, *, checked_out: bool) -> None:
     """An UNPUSHED `wt/0.5.0-rc1/j1` carrying a commit — `dadaia:`-locked in its canonical
     tree, or an orphan with none."""
-    tree = repo.parents[1] / "worktrees" / repo.name / "0.5.0-rc1-j1"
+    tree = repo.parents[1] / "worktrees" / repo.name / "0.5.0-rc1/j1"
     _git("branch", "feature/0.5.0", cwd=repo)  # the work branch it is ahead of
     _git("worktree", "add", "-b", "wt/0.5.0-rc1/j1", str(tree), cwd=repo)
     (tree / "w.txt").write_text("w\n")

@@ -1,6 +1,6 @@
 """A tmp workspace for `worktree.py` tests: one repo `r` on `main` with an Approved 0.5.0 rc-1
 trio, a valid `_RELEASE.json`, a `scripts/ci.py` whose level L fails iff the tree holds
-`RED-<L>`, and `feature/0.5.0`; the venv's python is this interpreter, and a stub CLI at `.dadaia/.venv/bin/dadaia` standing for the two
+`RED-<L>`, and `feature/0.5.0`; its `verify:` lines declare it, and a stub CLI at `.dadaia/.venv/bin/dadaia` standing for the two
 reads the script makes — `context list --json` (gitflow `dev` as integration, so a
 hardcoded `main`/`develop` fails) and `reports validate` (valid iff `schema_version`)."""
 
@@ -25,7 +25,7 @@ SCRIPT = (
 FLOW = {"principal": "trunk", "integration": "dev", "work": "feature/"}
 #: The repo's gate (ADR 0190): prints its argv; level L fails iff the tree holds `RED-<L>`.
 CI = 'import pathlib, sys\nprint("ci", *sys.argv[1:])\nsys.exit(pathlib.Path("RED-" + sys.argv[1]).exists())\n'
-JOB = "0.5.0-rc1-j1"
+JOB, TASK = "0.5.0-rc1/j1", "0.5.0-rc1/j1--J1.S1.T1"
 
 
 def git(repo: Path, *args: str) -> str:
@@ -61,7 +61,11 @@ def make_workspace(root: Path) -> Path:
     (repo / ".gitignore").write_text("*.scratch\n__pycache__/\n")
     (repo / "scripts").mkdir()
     (repo / "scripts/ci.py").write_text(CI)
-    (root / ".dadaia/.venv/bin/python").symlink_to(sys.executable)
+    (repo / "AGENTS.md").write_text(
+        "verify: python scripts/ci.py job\n"
+        + "".join(f"verify-{lv}: python scripts/ci.py {lv}\n" for lv in ("task", "stage"))
+    )
+    (root / ".dadaia/.venv/bin/python").symlink_to(sys.executable)  # the gate's bare `python`
     git(repo, "add", "-A")
     git(repo, "commit", "-qm", "init")
     git(repo, "branch", "feature/0.5.0")
@@ -139,9 +143,7 @@ def approve(
         "verdict": verdict,
         "scope": f"wt/0.5.0-rc1/j1@{sha}",
         "produced_at": f"2026-10-02{at}",
-        "verdict_reason": "CI matrix green: https://github.com/o/r/actions/runs/7"
-        if ci_run
-        else "",
+        **({"ci_run": "https://github.com/o/r/actions/runs/7"} if ci_run else {}),
     }
     handoff.write_text(json.dumps({**body, **({"schema_version": "1.2"} if valid else {})}))
     return handoff
@@ -153,3 +155,12 @@ def run_fix(root: Path, result: subprocess.CompletedProcess[str]) -> None:
     command = fix.removeprefix("fix: ")
     env = {"HOME": str(root), "PATH": "/usr/bin:/bin", "GIT_CONFIG_NOSYSTEM": "1"}
     subprocess.run(command, shell=True, cwd=root, env=env, check=True, capture_output=True)
+
+
+def land(root: Path, rel: str, text: str = "x = 1\n") -> str:
+    """Commit *rel* in task `TASK` of `JOB` and merge it: a job branch takes code only so."""
+    assert run(root, "new", "r", TASK).returncode == 0
+    sha = commit(root / "worktrees/r" / TASK, rel, text)
+    merged = run(root, "merge", f"worktrees/r/{TASK}")
+    assert merged.returncode == 0, merged.stderr
+    return sha

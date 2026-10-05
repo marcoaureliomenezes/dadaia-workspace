@@ -41,7 +41,7 @@ def _bound_fix(here: Path, rerun: str, ledger: str | None) -> tuple[str, str]:
                 return f"{head(cli)} context list", ""
             if ledger is None or ledger.startswith("specs/audits/"):  # rc-5 AC1.1
                 return with_specs(rerun, root / "repos" / repo / "specs"), ""
-            if trees := sorted(p for p in (root / "worktrees" / repo).glob("*") if p.is_dir()):
+            if trees := sorted(p for p in (root / "worktrees" / repo).glob("*/*") if p.is_dir()):
                 many = f"; the first by name of {len(trees)} open worktrees"
                 return with_specs(rerun, trees[0] / "specs"), many if trees[1:] else ""
             return f"{script(_GITFLOW / 'worktree.py')} list", ""

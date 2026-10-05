@@ -22,7 +22,18 @@ import pytest
 from tests.fixtures.harness_env import base_env
 from tests.helpers.release_state import write_release_phase
 from tests.helpers.skill_scripts import stage_skill_scripts
-from tests.helpers.worktree_ws import JOB, SCRIPT, approve, commit, fixes, git, make_workspace, run
+from tests.helpers.worktree_ws import (
+    JOB,
+    SCRIPT,
+    TASK,
+    approve,
+    commit,
+    fixes,
+    git,
+    land,
+    make_workspace,
+    run,
+)
 from tests.helpers.worktree_ws import run_fix as _fix
 
 pytestmark = pytest.mark.integration
@@ -47,7 +58,7 @@ def _argv(result: subprocess.CompletedProcess[str]) -> list[str]:
 
 def test_merge_fast_forwards_removes_and_reruns(root: Path) -> None:
     repo, tree = root / "repos/r", root / TREE
-    sha = commit(tree, "src/a.py")
+    sha = land(root, "src/a.py")
     rejected = approve(
         root, sha, verdict="REJECTED", at="T09:00:00Z"
     )  # the newer APPROVED overrules
@@ -74,7 +85,7 @@ def test_merge_fast_forwards_removes_and_reruns(root: Path) -> None:
     assert git(repo, "branch", "--list", "wt/0.5.0-rc1/j1").strip()  # never -D
 
 
-def test_dirty_and_outside_set_each_refuse_with_one_fix(root: Path) -> None:
+def test_a_dirty_tree_refuses_with_one_fix_that_commits_or_removes(root: Path) -> None:
     tree = root / TREE
     (tree / "wip").mkdir()  # an untracked directory, and a tracked edit staged:
     (tree / "wip/x.py").write_text("")
@@ -83,7 +94,7 @@ def test_dirty_and_outside_set_each_refuse_with_one_fix(root: Path) -> None:
     dirty = run(root, "merge", TREE)
     assert "uncommitted" in dirty.stderr
     add, then, *remove = fixes(dirty)[0].split("`")[1::2]  # Operator action: commit or remove
-    assert [shlex.split(add), shlex.split(then)] == [  # the commit takes the kind's own message
+    assert [shlex.split(add), shlex.split(then)] == [  # the commit takes its own message
         ["git", "-C", str(tree), "add", "-A"],
         ["git", "-C", str(tree), "commit"],
     ]
@@ -97,8 +108,8 @@ def test_dirty_and_outside_set_each_refuse_with_one_fix(root: Path) -> None:
 def test_a_define_tree_lands_specs_only_through_the_ledger_checks(root: Path) -> None:
     """AC1.2 (ADR 0190): a `define` merge runs the ledger, trio and release checks alone — an
     invalid ledger refuses, a valid one lands with no test run; code refuses with its undo."""
-    repo, tree = root / "repos/r", root / "worktrees/r/0.5.0-rc1-define"
-    assert run(root, "new", "r", "0.5.0-rc1-define").returncode == 0
+    repo, tree = root / "repos/r", root / "worktrees/r/0.5.0-rc1/define"
+    assert run(root, "new", "r", "0.5.0-rc1/define").returncode == 0
     commit(tree, "specs/bugs/BUGS.jsonl", '{"id": "half"}\n')
     approve(root, git(tree, "rev-parse", "HEAD").strip(), ci_run=False)
     invalid = run(root, "merge", str(tree))
@@ -152,8 +163,8 @@ def test_work_branch_refusals_fix_runs_verbatim(tmp_path: Path) -> None:
 def test_merge_needs_a_valid_approval_of_the_exact_head(
     root: Path, named: bool, verdict: str, valid: bool, older: str | None, at: str
 ) -> None:
-    commit(root / TREE, "src/a.py")
-    head = commit(root / TREE, "src/b.py")
+    land(root, "src/a.py")
+    head = land(root, "src/b.py")
     copy = subprocess.run(  # head's tree, parent and message, outside wt/<name>'s reflog
         ["git", "-C", str(root / TREE), "commit-tree", f"{head}^{{tree}}", "-p", f"{head}~"],
         input="src/b.py\n",
@@ -183,7 +194,7 @@ def test_merge_needs_a_valid_approval_of_the_exact_head(
 
 def test_failed_fast_forward_tells_a_stray_from_a_moved_work_branch(root: Path) -> None:
     repo, tree = root / "repos/r", root / TREE
-    sha = commit(tree, "src/a.py")
+    sha = land(root, "src/a.py")
     approve(root, sha)
     (repo / "src").mkdir()
     (repo / "src/a.py").write_text(
@@ -204,7 +215,7 @@ def test_failed_fast_forward_tells_a_stray_from_a_moved_work_branch(root: Path) 
 
 def test_merge_lists_ignored_files_and_keeps_them_by_its_fix(root: Path) -> None:
     repo, tree = root / "repos/r", root / TREE
-    approve(root, commit(tree, "src/a.py"))
+    approve(root, land(root, "src/a.py"))
     (tree / "my notes.scratch").write_text("keep me")
     (tree / "__pycache__").mkdir()
     (tree / "__pycache__/a.pyc").write_bytes(b"")
@@ -225,9 +236,9 @@ def test_clean_removes_only_an_empty_worktree_of_ours(root: Path) -> None:
     git(tree, "reset", "-q", "--hard", "feature/0.5.0")
     assert run(root, "clean", TREE).returncode == 0 and not tree.exists()
     # ours is the canonical wt/ branch, locked or not (T-050-99 N2); a tree on another is not
-    git(repo, "worktree", "add", "-q", "-b", "side", str(root / "worktrees/r/0.5.0-rc1-j2"))
-    foreign = run(root, "clean", "worktrees/r/0.5.0-rc1-j2")
-    assert foreign.returncode == 1 and (root / "worktrees/r/0.5.0-rc1-j2").exists()
+    git(repo, "worktree", "add", "-q", "-b", "side", str(root / "worktrees/r/0.5.0-rc1/j2"))
+    foreign = run(root, "clean", "worktrees/r/0.5.0-rc1/j2")
+    assert foreign.returncode == 1 and (root / "worktrees/r/0.5.0-rc1/j2").exists()
 
 
 def test_release_closure_waits_for_every_other_wt(tmp_path: Path) -> None:
@@ -237,8 +248,8 @@ def test_release_closure_waits_for_every_other_wt(tmp_path: Path) -> None:
     (root := tmp_path / "ws").mkdir()
     make_workspace(root)
     git(root / "repos/r", "checkout", "-q", "feature/0.5.0")
-    assert run(root, "new", "r", "0.5.0-rc1-reconcile").returncode == 0
-    specs = root / "worktrees/r/0.5.0-rc1-reconcile/specs"
+    assert run(root, "new", "r", "0.5.0-rc1/reconcile").returncode == 0
+    specs = root / "worktrees/r/0.5.0-rc1/reconcile/specs"
     write_release_phase(specs, "0.5.0", "IMPLEMENTATION")
     (specs / "releases/_archive").mkdir()
     (specs / "releases/_archive/releases_histo.jsonl").write_text("")
@@ -266,7 +277,7 @@ def test_a_verdict_carries_over_only_an_identical_patch_and_message_series(root:
     commit, a reorder, code amended under the same message (a colored config included), a gitlink
     amended under the same message (diff.ignoreSubmodules=all), or a hand-resolved conflict each change the approved series and refuse for review."""
     repo, tree = root / "repos/r", root / TREE
-    commit(tree, "src/a.py")
+    land(root, "src/a.py")
     git(tree, "commit", "-q", "--allow-empty", "-m", "empty")
     approve(root, approved := git(tree, "rev-parse", "HEAD").strip())
     commit(repo, "src/z.py")
@@ -326,7 +337,7 @@ def test_a_moved_work_branch_refuses_and_its_fix_rebase_keeps_only_an_identical_
     unchanged; after it, a patch-identical rebase lands under the old verdict (ADR 0168),
     a changed patch refuses for review."""
     repo, tree = root / "repos/r", root / TREE
-    approve(root, mine := commit(tree, "src/a.py"))
+    approve(root, mine := land(root, "src/a.py"))
     work = commit(repo, "src/z.py")
     moved = run(root, "merge", TREE)
     assert _argv(moved) == ["git", "-C", str(tree), "rebase", "feature/0.5.0"]
@@ -354,7 +365,7 @@ def test_the_job_gate_runs_scripts_ci_job_as_argv_on_the_head_it_lands(
     """AC1.2 (ADR 0190): a job merge runs `scripts/ci.py job` of HEAD, one argv list with
     stdin closed, its output on stdout; a red gate lands nothing."""
     repo, tree = root / "repos/r", root / TREE
-    head = commit(tree, "RED-job" if red else "src/a.py", "")
+    head = land(root, "RED-job" if red else "src/a.py", "")
     approve(root, head)
     work = git(repo, "rev-parse", "feature/0.5.0").strip()
     result = run(root, "merge", TREE, input="stdin leak\n")
@@ -365,8 +376,8 @@ def test_the_job_gate_runs_scripts_ci_job_as_argv_on_the_head_it_lands(
         act, line, where = fixes(result)[0].split("`")
         assert act == "fix: Operator action: make "
         assert shlex.split(line) == [
-            str(root / ".dadaia/.venv/bin/python"),
-            str(tree / "scripts/ci.py"),
+            "python",
+            "scripts/ci.py",
             "job",
         ]
         assert where == f" exit 0 in {tree} and commit the fix in this worktree"
@@ -376,13 +387,13 @@ def test_a_job_merge_needs_a_verdict_naming_its_ci_matrix_run(root: Path) -> Non
     """AC1.2, AC1.4: no verdict refuses; an APPROVED naming no CI-matrix run refuses with the
     operator's act; one naming the run lands."""
     repo = root / "repos/r"
-    head = commit(root / TREE, "src/a.py")
+    head = land(root, "src/a.py")
     assert _argv(run(root, "merge", TREE))[1:] == ["reports", "validate", "--all"]
     approve(root, head, ci_run=False)
     unrun = run(root, "merge", TREE)
     assert fixes(unrun) == [
         "fix: Operator action: push wt/0.5.0-rc1/j1, wait for its CI run to pass, and have "
-        "dd-code-reviewer's verdict name that run's actions/runs URL"
+        "dd-code-reviewer's verdict carry that run's URL as ci_run"
     ]
     approve(root, head, at="T11:00:00Z")
     assert run(root, "merge", TREE).returncode == 0
@@ -392,10 +403,58 @@ def test_a_job_merge_needs_a_verdict_naming_its_ci_matrix_run(root: Path) -> Non
 def test_one_job_lands_code_an_atom_and_its_derived_section_together(root: Path) -> None:
     """AC1.3, AC1.5 (ADRs 0191, 0192): no allowed set splits one change — code, an atom and its
     derived section land in one job merge."""
-    repo, tree = root / "repos/r", root / TREE
-    commit(tree, "src/a.py")
-    commit(tree, "specs/memory/product/x/atom.md", "# atom\n")
-    approve(root, commit(tree, "README.md", "## A\n<!-- derived-from: atom sha256:0 -->\n"))
+    repo = root / "repos/r"
+    land(root, "src/a.py")
+    land(root, "specs/memory/product/x/atom.md", "# atom\n")
+    approve(root, land(root, "README.md", "## A\n<!-- derived-from: atom sha256:0 -->\n"))
     assert run(root, "merge", TREE).returncode == 0
     landed = git(repo, "diff", "--name-only", "HEAD~3", "HEAD").split()
     assert landed == ["README.md", "specs/memory/product/x/atom.md", "src/a.py"]
+
+
+def test_a_declared_verify_line_runs_as_argv_never_through_a_shell(root: Path) -> None:
+    """AC1.2: the `verify:` line is split by shlex and run as argv: `;` and `$(...)` are words."""
+    line = "verify: python scripts/ci.py job ; touch PWNED $(touch PWNED2)\n"
+    head = land(root, "AGENTS.md", line + "verify-task: python scripts/ci.py task\n")
+    approve(root, head)
+    result = run(root, "merge", TREE)
+    assert result.returncode == 0, result.stderr
+    assert "ci job ; touch PWNED $(touch PWNED2)" in result.stdout.splitlines()
+    assert not list(root.rglob("PWNED*"))
+
+
+def test_a_task_lands_on_its_job_branch_after_the_task_gate_with_no_verdict(root: Path) -> None:
+    """AC1.1, AC1.4: a red task gate lands nothing; a green one fast-forwards the job branch
+    in the job's tree, unreviewed; a stage with an open task cannot close, nor a job land."""
+    job, task = root / TREE, root / "worktrees/r" / TASK
+    assert run(root, "new", "r", TASK).returncode == 0
+    held = run(root, "stage", TREE)
+    assert held.returncode == 1 and _argv(held)[-2:] == ["merge", str(task)]
+    assert _argv(run(root, "merge", TREE))[-2:] == ["merge", str(task)]
+    red = commit(task, "RED-task", "")
+    refused = run(root, "merge", str(task))
+    assert refused.returncode == 1 and "ci task RED-task" in refused.stdout.splitlines()
+    assert git(job, "rev-parse", "HEAD").strip() != red
+    git(task, "rm", "-q", "RED-task")
+    git(task, "commit", "-qm", "green")
+    sha = commit(task, "src/a.py")
+    landed = run(root, "merge", str(task))
+    assert landed.returncode == 0, landed.stderr
+    assert git(job, "rev-parse", "HEAD").strip() == sha and not task.exists()
+    assert not git(root / "repos/r", "branch", "--list", "wt/0.5.0-rc1/j1--J1.S1.T1").strip()
+    staged = run(root, "stage", TREE)
+    assert (staged.returncode, staged.stdout.splitlines()) == (
+        0, ["ci stage", f"[ok] stage gate green on wt/0.5.0-rc1/j1@{sha}"]
+    )  # fmt: skip
+
+
+def test_a_stray_job_branch_commit_refuses(root: Path) -> None:
+    """AC1.3: a job branch takes code only through a task merge; specs edits land directly."""
+    tree = root / TREE
+    commit(tree, "specs/releases/0.5.0/rc-1/PLAN.md", "**Status:** Approved\n")
+    approve(root, stray := commit(tree, "src/stray.py"))
+    refused = run(root, "merge", TREE)
+    assert refused.returncode == 1 and stray in refused.stderr
+    git(tree, "reset", "-q", "--hard", "HEAD~")
+    approve(root, git(tree, "rev-parse", "HEAD").strip(), at="T11:00:00Z")
+    assert run(root, "merge", TREE).returncode == 0

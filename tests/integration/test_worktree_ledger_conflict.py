@@ -20,11 +20,11 @@ pytestmark = pytest.mark.integration
 
 def test_in_place_ledger_change_refuses_at_rebase(tmp_path: Path) -> None:
     root, ledger = make_workspace(tmp_path), "specs/ADRs/decisions.jsonl"
-    repo, tree = root / "repos/r", root / "worktrees/r/backlog-x"
+    repo, tree = root / "repos/r", root / "worktrees/r/backlog/x"
     git(repo, "checkout", "-q", "feature/0.5.0")
     one, two = '{"id": "1", "status": "accepted"}\n', '{"id": "2", "status": "proposed"}\n'
     commit(repo, ledger, one + two)
-    assert run(root, "new", "r", "backlog-x").returncode == 0
+    assert run(root, "new", "r", "backlog/x").returncode == 0
     commit(tree, ledger, one + two.replace("proposed", "accepted"))
     commit(repo, ledger, one + two + '{"id": "3", "status": "proposed"}\n')
     (fix,) = fixes(run(root, "merge", str(tree.relative_to(root))))

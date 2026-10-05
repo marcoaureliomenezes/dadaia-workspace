@@ -17,7 +17,7 @@ import pytest
 from dadaia_workspace.hooks import pre_gate
 from tests.fixtures.harness_env import claude_hook_env, run_hook_subprocess
 
-_PATCH = "*** Begin Patch\n*** Update File: worktrees/a/0.5.0-rc1-j1/README.md\n+ok\n*** Update File: {}\n+x\n*** End Patch"
+_PATCH = "*** Begin Patch\n*** Update File: worktrees/a/0.5.0-rc1/j1/README.md\n+ok\n*** Update File: {}\n+x\n*** End Patch"
 
 
 def _spawn(ws: Path, payload: dict[str, Any]) -> Any:
@@ -40,9 +40,9 @@ def _spawn(ws: Path, payload: dict[str, Any]) -> Any:
         ("apply_patch", {"command": _PATCH.format(".dadaia/sessions/a.json")}, "SEC-01"),
         *[("Write", {"file_path": p}, "[GATE]") for p in ("AGENTS.md", ".dadaiaignore", ".claude/settings.json", ".dadaia/hooks/w.sh", ".dadaia/states/spec_contexts.json")],
         ("Edit", {"file_path": "repos/a/secrets/k"}, "protected glob 'secrets'"),
-        ("apply_patch", {"command": _PATCH.format("worktrees/a/0.5.0-rc1-j1/secrets/k")}, "protected glob 'secrets'"),
-        ("Write", {"file_path": "worktrees/a/0.5.0-rc1-j1/src/ok.py"}, None),
-        ("Write", {"file_path": "worktrees/a/scratch/secrets/k"}, "protected glob 'secrets'"),  # any tree name
+        ("apply_patch", {"command": _PATCH.format("worktrees/a/0.5.0-rc1/j1/secrets/k")}, "protected glob 'secrets'"),
+        ("Write", {"file_path": "worktrees/a/0.5.0-rc1/j1/src/ok.py"}, None),
+        ("Write", {"file_path": "worktrees/a/scratch/any/secrets/k"}, "protected glob 'secrets'"),  # any tree name
     ],
     ids=[
         "in-repo-write-is-merge-only",
