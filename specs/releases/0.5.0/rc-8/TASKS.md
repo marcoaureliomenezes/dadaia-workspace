@@ -103,13 +103,14 @@ Shapes per task; a REBUILD body names each culprit sha (AC12.2); a law commit ci
 ## Closure
 
 - Notes for the closure memory pass (R6b and beside it): W13's T-050-209, 210 leave `docs/bug-loop.md:71` (`--resolved-release`), `:93` (SPEC-DOC-041), `specs/memory/product/sdd/bug-ledger.md:31,34`, `specs/memory/product/platform/workspace-doctor.md:58` stale; AC10.14's memory half, after the `0.5.0d-bug` merge only (PLAN §2.7); `QUALITY.md:64` names the real measure (the doctor sweep plus the repo-hygiene job), not just the file name dropped.
+- The closure readout (once T-050-181's): G1 readout (PLAN §2.8); G2; G3 re-run of every open bug; G4 vs rc-7, the `guards` job only added; G6's operator-gated edges; the full AC8.9 grep empty; AC9.2's counts and F003 logged; AC10.11 resolves by citation; the reaped alias file logged; closure exits per SPEC.
 
 ## AC map
 
-- AC8.9 153, 154, 162 · AC8.1 158, 166 · AC8.2 158 · AC8.3 155, 156, 159–161 · AC8.10 156, 159–161, R1–R7, 180 · AC8.4 162–164 · AC8.5 162 · AC8.6 159, 162, R3 · AC8.7 158 · AC8.8 157.
+- AC8.9 153, 154, 162 · AC8.1 158, 166 · AC8.2 158 · AC8.3 155, 156, 159–161 · AC8.10 156, 159–161, R1–R7, 180 → rc-10 · AC8.4 162–164 · AC8.5 162 · AC8.6 159, 162, R3 · AC8.7 158 · AC8.8 157.
 - AC9.1, AC9.5 165 · AC9.2 167 · AC9.3, AC9.4 168.
-- AC10.1 169, 173, 200 · AC10.2 173 · AC10.3 178 · AC10.4 170 · AC10.5 171 · AC10.6 174 · AC10.7 175 · AC10.8 176 · AC10.10 172 · AC10.11, AC10.9 181 · AC10.12 177 · AC10.13 179 · AC10.14 189 (by 191), closure memory pass.
-- AC11.0 182 · AC11.1 183, R9 · AC11.2 184–187 · AC11.3 185 · AC11.4 186 · AC11.5 187 · AC11.6 188, 181. AC11.0–AC11.6 only: the evals gate at the promote is SPEC §Carried rc-12's (0178), no rc-8 task.
-- AC13.1 209, 212 · AC13.2 194–197 · AC13.3 209, 194, 195, 216 · AC13.4 213–215, R19, R20 · AC13.6 210, 211, 215, 194, 196 · AC13.7 194 · AC13.8 197 · AC13.11 196 · AC13.12 194–198.
-- AC12.1 194 · AC12.2 195 · AC12.3 196 · AC12.4 199 · AC12.5, AC12.7 191 · AC12.6 190, 198 · AC12.8 201 · AC12.9 203 · AC12.10 204 · AC12.11 191, 193–198 · AC12.12 192, 197, 198 · AC12.13 202 · AC12.14 205–208 · AC9.3 192, 194, 195 · AC9.4 198.
-- G1–G4, G6 181 · G5 every task.
+- AC10.1 169, 173, 200 (173, 200 → rc-9 §Carried) · AC10.2 173 → rc-9 §Carried · AC10.3 178 → rc-9 §Carried · AC10.4 170 · AC10.5 171 · AC10.6 174 → rc-9 §Carried · AC10.7 175 → rc-9 §Carried · AC10.8 176 → rc-9 §Carried · AC10.10 172 · AC10.11, AC10.9 181 → closure · AC10.12 177 → backlog · AC10.13 179 → rc-9 §Carried · AC10.14 189 (by 191) → closure, closure memory pass.
+- AC11.0 182 · AC11.1 183, R9 · AC11.2 184–187 (185, 186 → rc-10) · AC11.3 185 → rc-10 · AC11.4 186 → rc-10 · AC11.5 187 · AC11.6 188, 181 → rc-10. AC11.0–AC11.6 only: the evals gate at the promote is SPEC §Carried rc-12's (0178), no rc-8 task.
+- AC13.1 209, 212 · AC13.2 194–197 → rc-9 §Carried · AC13.3 209, 194, 195, 216 (194, 195, 216 → rc-9 §Carried) · AC13.4 213–215, R19, R20 → rc-9 §Carried · AC13.6 210, 211, 215, 194, 196 (215, 194, 196 → rc-9 §Carried) · AC13.7 194 → rc-9 §Carried · AC13.8 197 → rc-9 §Carried · AC13.11 196 → rc-9 §Carried · AC13.12 194–198 → rc-9 §Carried.
+- AC12.1 194 → rc-9 §Carried · AC12.2 195 → rc-9 §Carried · AC12.3 196 → rc-9 §Carried · AC12.4 199 → rc-9 §Carried · AC12.5, AC12.7 191 · AC12.6 190, 198 (198 → rc-9 §Carried) · AC12.8 201 → rc-9 §Carried · AC12.9 203 → rc-9 §Carried · AC12.10 204 → rc-9 §Carried · AC12.11 191, 193–198 (194–198 → rc-9 §Carried) · AC12.12 192, 197, 198 (197, 198 → rc-9 §Carried) · AC12.13 202 → rc-9 §Carried · AC12.14 205–208 → rc-9 §Carried · AC9.3 192, 194, 195 (194, 195 → rc-9 §Carried) · AC9.4 198 → rc-9 §Carried.
+- G1–G4, G6 181 → closure · G5 every task.
