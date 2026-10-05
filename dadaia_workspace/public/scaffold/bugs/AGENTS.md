@@ -19,7 +19,7 @@ Scope: this file governs only `specs/bugs/`.
 
 ## 2. Resolution
 
-- Close with the fix: `bugs.py resolve`, with the flags `dd-bug-resolution` Phase 6 names; a bug a task fixed resolves in its own `bug` worktree (`dd-gitflow-default` §3a).
+- Close with the fix: `bugs.py resolve`, with the flags `dd-bug-resolution` Phase 6 names.
 - Check prior resolutions on the same component first; `caused_by: X` means the fix of X wrote the lines this fix corrects, picked from `bugs.py resolve`'s blame candidates, `none` only when there are none or with `--lineage-reason`.
 - Commit exactly what the fix touched, never a blanket `-A`; a net-positive diff passes the architecture lens first.
 

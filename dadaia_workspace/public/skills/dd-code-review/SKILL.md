@@ -43,7 +43,7 @@ axes are reported side by side — an axis never outranks another.
 - Acceptance criteria without corresponding evidence (test/assertion) is a finding.
 - Read PLAN §1 (As-is review) beside SPEC/TASKS: a DELETE or REBUILD unit the range leaves unchanged is HIGH.
 - A KEEP unit the range grew is a finding.
-- A worktree's (`worktrees/AGENTS.md`) commits follow its kind's `dd-gitflow-default` §3a rows; an `impl` widening named in the feat-commit body is judged, never a finding by itself.
+- A worktree's (`worktrees/AGENTS.md`) commits follow the `dd-gitflow-default` §3a rows of what they write.
 
 ## 4. Axis 3 — Bug-surface
 
