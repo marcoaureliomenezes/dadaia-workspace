@@ -80,7 +80,7 @@ def test_an_absent_specs_tree_is_reported_as_absent_with_the_specs_init_fix(
     err = capsys.readouterr().err
     assert "no specs/constitution.md" in err
     fixes = [line for line in err.splitlines() if line.startswith("fix: /")]
-    tail = ".dadaia/.venv/bin/dadaia specs init --context app"
+    tail = f"/bin/dadaia specs init --specs-dir {app / 'specs'}"
     assert [f.endswith(tail) for f in fixes] == [True]
 
 
