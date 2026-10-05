@@ -55,7 +55,8 @@ def publication_boundaries(
     git: Callable[[list[str]], list[str]], tip: str, exclusions: Sequence[str] = (PUBLISHED,)
 ) -> tuple[str, ...]:
     """Where *tip*'s history re-joins published history: the commits whose text at a path is
-    that path's published text. *git* runs one git subcommand and returns its output lines.
+    that path's published text. *git* runs one git subcommand and returns its output lines,
+    and RAISES on a failed run — empty output means "nothing outside published history".
     *tip* already published: *tip* itself. No shared history (bootstrap): none."""
     lines = git(["rev-list", "--boundary", tip, "--not", *exclusions, "--"])
     return tuple(line[1:] for line in lines if line.startswith("-")) if lines else (tip,)

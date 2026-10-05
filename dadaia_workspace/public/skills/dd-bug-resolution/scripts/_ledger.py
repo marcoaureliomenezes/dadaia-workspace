@@ -207,21 +207,22 @@ def terms(root: Path | None) -> list[tuple[str, str]]:
 
 def _published_text(path: Path) -> str | None:
     """*path*'s text at the first publication boundary carrying it (the push's prior text,
-    ``_privacy.publication_boundaries``); ``None`` outside git or when none carries it."""
+    ``_privacy.publication_boundaries``); ``None`` outside git, when none carries it, or when
+    git fails — no amnesty, as the push's adapter raises on the same failure."""
 
-    def git(args: list[str]) -> list[str]:
-        done = subprocess.run(["git", "-C", str(path.parent), *args],
-                              capture_output=True, text=True, encoding="utf-8")  # fmt: skip
-        return done.stdout.splitlines() if done.returncode == 0 else []
+    def run(*args: str) -> str:
+        return subprocess.run(["git", "-C", str(path.parent), *args], capture_output=True,
+                              text=True, encoding="utf-8", check=True).stdout  # fmt: skip
 
-    if not (top := git(["rev-parse", "--show-toplevel"])):
-        return None
-    rel = path.resolve().relative_to(Path(top[0]).resolve()).as_posix()
-    for base in _privacy.publication_boundaries(git, "HEAD"):
-        done = subprocess.run(["git", "-C", top[0], "cat-file", "blob", f"{base}:{rel}"],
-                              capture_output=True, text=True, encoding="utf-8")  # fmt: skip
-        if done.returncode == 0:
-            return done.stdout
+    try:
+        rel = path.resolve().relative_to(
+            Path(run("rev-parse", "--show-toplevel").strip()).resolve()
+        )
+        for base in _privacy.publication_boundaries(lambda a: run(*a).splitlines(), "HEAD"):
+            with contextlib.suppress(subprocess.CalledProcessError):
+                return run("cat-file", "blob", f"{base}:{rel.as_posix()}")
+    except (subprocess.CalledProcessError, OSError):
+        pass
     return None
 
 

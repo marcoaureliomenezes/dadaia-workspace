@@ -539,8 +539,7 @@ _SLUG = {**_OPEN_RECORD, "context": "acme-games"}
     pytest.param((_SLUG,), "acme-games", False, False, id="published-context-accepted"),
     pytest.param((_OPEN_RECORD,), "acme-games", True, False, id="unpublished-term-refused"),
     pytest.param((_OPEN_RECORD,), "ctx", False, False, id="no-term-accepted"),
-    pytest.param((_SLUG,), "acme-games", True, True, id="failed-rev-list-amnesties-nothing",
-                 marks=pytest.mark.xfail(strict=True, reason="J2.S6.T1: F2")),
+    pytest.param((_SLUG,), "acme-games", True, True, id="failed-rev-list-amnesties-nothing"),
 ])
 # fmt: on
 def test_the_seam_verdict_equals_the_push_verdict_over_the_published_ledger(
