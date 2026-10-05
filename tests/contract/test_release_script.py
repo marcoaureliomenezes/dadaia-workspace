@@ -526,3 +526,36 @@ def test_only_the_live_candidate_is_ranked(script: Path, tmp_path: Path) -> None
 
 def test_this_repos_live_spec_origin_passes(script: Path) -> None:
     assert _check(script, Path(__file__).resolve().parents[2] / "specs") == []
+
+
+_JOB = (
+    "# Job 2 — the bug window\n\n## Stage J2.S1 — RED\n\n"
+    "- Contract: exit tests `tests/unit/test_x.py` strict xfail; envelope `tests/**`; ACs AC2.1\n"
+    "- J2.S1.T1 — AC2.1 · `W:` `tests/unit/test_x.py` · owner `tests/unit/test_x.py`\n\n"
+    "## Stage J2.S2 — fix\n\n"
+    "- Contract: exit tests unit + integration; envelope `src/**`; ACs AC2.1\n"
+    "- J2.S2.T1 — AC2.1 · `W:` `src/x.py` · owner `tests/unit/test_x.py`\n"
+)
+
+
+@pytest.mark.parametrize(
+    ("job", "needle"),
+    [
+        pytest.param(_JOB, None, id="valid"),
+        pytest.param(_JOB.replace("`W:` `tests/unit/test_x.py`", "`W:` `src/y.py`"),
+                     "tasks/j2.md stage J2.S1 writes src/y.py — stage 1 writes tests only",
+                     id="stage-1-non-test",
+                     marks=pytest.mark.xfail(strict=True, reason="J1.S1 RED: AC1.10 (J1.S2.T6)")),
+    ],
+)  # fmt: skip
+def test_check_judges_each_job_file(
+    script: Path, tmp_path: Path, job: str, needle: str | None
+) -> None:
+    """AC1.10 (ADR 0194, 0196): a job file parses into stages; stage 1 writes tests only."""
+    specs = _specs(tmp_path, _GOOD)
+    (tasks := specs / "releases/0.5.0/rc-1/tasks").mkdir()
+    (tasks / "j2.md").write_text(job, "utf-8")
+    done = subprocess.run([sys.executable, str(script), "check", "--json", "--specs", str(specs)],
+                          capture_output=True, text=True)  # fmt: skip
+    messages = [f["message"] for f in json.loads(done.stdout) if "tasks/" in f["path"]]
+    assert messages == ([needle] if needle else [])

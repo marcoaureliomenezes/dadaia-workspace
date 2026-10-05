@@ -187,3 +187,23 @@ def test_an_outside_ref_is_carried_onto_the_live_work_branch() -> None:
     assert decision is not None and "'work/1.2.3'" in decision.message
     assert f"merge {_A}" in decision.message
     assert _fix(decision) == ["git", "-C", "/repo", "switch", "work/1.2.3"]
+
+
+_RED = pytest.mark.xfail(strict=True, reason="J1.S1 RED: AC1.2 job branches (J1.S2.T4)")
+
+
+@pytest.mark.parametrize(
+    ("branch", "allowed"),
+    [
+        pytest.param("wt/0.5.0-rc9/job2", True, marks=_RED),
+        ("wt/0.5.0-rc9/define", False),
+        ("wt/backlog/an-idea", False),
+        ("wt/0.5.0-rc9/job2--T-1", False),
+        ("wt/0.5.0a-impl", False),
+    ],
+)
+def test_only_a_job_branch_of_wt_is_pushable(branch: str, allowed: bool) -> None:
+    """AC1.2 (ADR 0190): pre-push accepts `wt/<M.m.p>-rc<N>/<job>` and no other `wt/` branch."""
+    refs, _ = parse_push_stdin(_line(branch))
+    decision = check_branch_policy(refs, DEFAULT, replace(gate_fixes(), work="feature/0.5.0"))
+    assert (decision is None) is allowed

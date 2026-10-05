@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import pytest
+
 from dadaia_workspace.features.specs.canon import (
     canon_violations,
     is_canon_path,
@@ -74,3 +76,17 @@ def test_canon_violations_keeps_only_the_bad_paths_in_order() -> None:
     assert canon_violations(mixed) == [".gitkeep", "SPEC.md"]
     assert canon_violations(_CANON_PATHS) == []
     assert canon_violations(_NON_CANON_PATHS) == list(_NON_CANON_PATHS)
+
+
+@pytest.mark.xfail(strict=True, reason="J1.S1 RED: AC1.9 job files (J1.S2.T5)")
+def test_a_job_file_is_canon_beside_a_closed_rcs_tasks_file() -> None:
+    """AC1.9 (ADR 0194): `rc-<N>/tasks/<job>.md` is canon; a stray `tasks/` file is not; a
+    closed rc's `TASKS.md` still is."""
+    assert canon_violations(
+        [
+            "releases/0.5.0/rc-9/tasks/job2.md",
+            "releases/0.5.0/rc-8/TASKS.md",
+            "releases/0.5.0/rc-9/tasks/notes.txt",
+            "releases/0.5.0/rc-9/tasks/job2/extra.md",
+        ]
+    ) == ["releases/0.5.0/rc-9/tasks/notes.txt", "releases/0.5.0/rc-9/tasks/job2/extra.md"]
