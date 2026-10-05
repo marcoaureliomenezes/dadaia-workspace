@@ -448,6 +448,50 @@ def test_a_task_lands_on_its_job_branch_after_the_task_gate_with_no_verdict(root
     )  # fmt: skip
 
 
+def _task_commit(root: Path, *trailers: str, rm: str = "", add: str = "src/b.py") -> Path:
+    """Open `TASK`, delete *rm*, write *add*, commit with *trailers*; return the task tree."""
+    task = root / "worktrees/r" / TASK
+    assert run(root, "new", "r", TASK).returncode == 0
+    if rm:
+        git(task, "rm", "-q", rm)
+    (task / add).parent.mkdir(parents=True, exist_ok=True)
+    (task / add).write_text("y = 1\n")
+    git(task, "add", add)
+    git(task, "commit", "-qm", "J1.S1.T1 work", *(a for t in trailers for a in ("--trailer", t)))
+    return task
+
+
+def test_the_task_gate_skips_deleted_files_and_appends_owner_tests(root: Path) -> None:
+    """J1.S3.T14: a deleted path never reaches `verify-task:`; `Owner-tests:` trailer paths do."""
+    land(root, "src/a.py")
+    land(root, "tests/test_a.py", "")
+    _task_commit(root, "Owner-tests: tests/test_a.py src/b.py", rm="src/a.py")
+    landed = run(root, "merge", f"worktrees/r/{TASK}")
+    assert landed.returncode == 0, landed.stderr
+    assert "ci task src/b.py tests/test_a.py" in landed.stdout.splitlines()
+
+
+def test_a_missing_owner_test_refuses_with_one_fix_line(root: Path) -> None:
+    """J1.S3.T14: an `Owner-tests:` path absent from the tree refuses, one fix line."""
+    _task_commit(root, "Owner-tests: tests/test_gone.py")
+    refused = run(root, "merge", f"worktrees/r/{TASK}")
+    assert refused.returncode == 1 and "tests/test_gone.py" in refused.stderr
+    lines = refused.stderr.splitlines()
+    assert len([ln for ln in lines if ln.startswith(("fix: ", "Operator action: "))]) == 1
+
+
+def test_a_task_cannot_rewrite_its_own_gate(root: Path) -> None:
+    """J1.S3.T14: the task gate runs the job branch's `verify-task:`, not the task's."""
+    line = "verify: python scripts/ci.py job\nverify-task: python scripts/ci.py stage\n"
+    _task_commit(root, add="AGENTS.md")
+    task = root / "worktrees/r" / TASK
+    (task / "AGENTS.md").write_text(line)
+    git(task, "commit", "-qam", "J1.S1.T1 gate")
+    landed = run(root, "merge", f"worktrees/r/{TASK}")
+    assert landed.returncode == 0, landed.stderr
+    assert "ci task AGENTS.md" in landed.stdout.splitlines()
+
+
 def test_a_stray_job_branch_commit_refuses(root: Path) -> None:
     """AC1.3: a job branch takes code only through a task merge; specs edits land directly."""
     tree = root / TREE
