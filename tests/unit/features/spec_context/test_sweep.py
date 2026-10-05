@@ -317,8 +317,10 @@ def test_an_unopenable_subdirectory_is_refused_never_raised(tmp_path: Path) -> N
     (locked := entry / "x").mkdir(parents=True)
     _file(locked / "f.txt")
     locked.chmod(0o000)
-
-    done = sweep.remove(tmp_path, entry, "tmp/a/20200101")
+    try:
+        done = sweep.remove(tmp_path, entry, "tmp/a/20200101")
+    finally:
+        locked.chmod(0o700)  # the tmp tree stays removable
 
     assert str(done) == (
         f"skipped 'tmp/a/20200101' (errno 13: Permission denied) — {locked} sits in a "
