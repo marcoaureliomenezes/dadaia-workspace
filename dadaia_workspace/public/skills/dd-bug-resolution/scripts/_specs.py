@@ -41,7 +41,7 @@ def _bound_fix(here: Path, rerun: str, ledger: str | None) -> tuple[str, str]:
                 return f"{head(cli)} context list", ""
             if ledger is None or ledger.startswith("specs/audits/"):  # rc-5 AC1.1
                 return with_specs(rerun, root / "repos" / repo / "specs"), ""
-            if trees := sorted(p for p in (root / "worktrees" / repo).glob("*/*") if p.is_dir()):
+            if trees := sorted(p for p in (root / "worktrees" / repo).glob("*/*") if _job(p)):
                 many = f"; the first by name of {len(trees)} open worktrees"
                 return with_specs(rerun, trees[0] / "specs"), many if trees[1:] else ""
             return f"{script(_GITFLOW / 'worktree.py')} list", ""
@@ -49,6 +49,20 @@ def _bound_fix(here: Path, rerun: str, ledger: str | None) -> tuple[str, str]:
 
 
 _GITFLOW = Path(__file__).resolve().parents[2] / "dd-gitflow-default" / "scripts"
+
+
+def _job(tree: Path) -> bool:
+    """*tree* is a job worktree by the one name grammar (`_worktree_names.NAME_RE`)."""
+    sys.path.append(str(_GITFLOW))
+    from _worktree_names import NAME_RE
+
+    match = NAME_RE.match(f"{tree.parent.name}/{tree.name}")
+    return (
+        tree.is_dir()
+        and match is not None
+        and match["job"] not in (None, "define", "reconcile")
+        and not match["task"]
+    )
 
 
 def quote(word: str) -> str:
