@@ -332,12 +332,13 @@ def ci_triggers_gitflow(tree: Tree) -> list[str]:
     ci, release = _on(_yaml(tree, f"{_WF}/ci.yml")), _on(_yaml(tree, _RELEASE))
     scan = _yaml(tree, f"{_WF}/secret-scan.yml")
     edges = [flow.principal, flow.integration]
+    work = len(edges) + 1  # the PR edges, then the work branch, then the jobs' `wt/**`
     bot = _yaml(tree, ".github/dependabot.yml").get("updates") or []
     clauses = {
         "gitflow-unread": warning is None,
-        "ci-triggers": ci["push"]["branches"][:3] == [*edges, f"{flow.work_prefix}**"]
+        "ci-triggers": ci["push"]["branches"][:work] == [*edges, f"{flow.work_prefix}**"]
         and ci["pull_request"]["branches"] == edges,
-        "job-trigger": ci["push"]["branches"][3:] == ["wt/**"],  # ADR 0190: the job's matrix
+        "job-trigger": ci["push"]["branches"][work:] == ["wt/**"],  # ADR 0190: the job's matrix
         "release-trigger": release["push"]["branches"] == [flow.principal],
         # A-12.1/A-12.2: the required gitleaks context reports on both PR edges
         "secret-scan-edges": _on(scan)["pull_request"]["branches"] == edges,
