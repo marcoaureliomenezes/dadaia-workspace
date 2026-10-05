@@ -191,7 +191,6 @@ def test_ac3_9_doctor_fix_acts_on_nothing_over_an_unreadable_registry(ws: Path) 
     assert (ws / "junk.txt").read_text(encoding="utf-8") == "slop"
 
 
-@pytest.mark.xfail(strict=True, reason="J2.S3.T3: AC2.3")
 def test_a_registry_row_missing_a_key_is_reg_schema(ws: Path) -> None:
     """AC2.3 (0162): a row without ``created_at`` is unreadable, never a ``KeyError``:
     `context list` exits 1 with one ``Operator action:`` fix line, and doctor gives one

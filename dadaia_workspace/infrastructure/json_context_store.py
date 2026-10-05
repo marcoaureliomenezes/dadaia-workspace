@@ -65,7 +65,13 @@ def _to_dict(ctx: SpecContextProject) -> dict:  # type: ignore[type-arg]
     }
 
 
-def _from_dict(d: dict) -> SpecContextProject:  # type: ignore[type-arg]
+def _from_dict(d: dict, path: Path) -> SpecContextProject:  # type: ignore[type-arg]
+    """THE row parse: a row missing a :data:`context_registry.ROW_KEYS` key is unreadable."""
+    if missing := [k for k in context_registry.ROW_KEYS if k not in d]:
+        raise SchemaVersionError(
+            f"{path}: context row {d.get('name')!r} has no {', '.join(missing)}.",
+            f"Operator action: add {', '.join(missing)} to that row of {path}",
+        )
     return SpecContextProject(
         name=d["name"],
         state=ContextState(d["state"]),
@@ -97,11 +103,12 @@ class JsonContextStore:
 
     def get(self, name: str) -> SpecContextProject | None:
         return next(
-            (_from_dict(c) for c in _load(self._path)["contexts"] if c["name"] == name), None
+            (_from_dict(c, self._path) for c in _load(self._path)["contexts"] if c["name"] == name),
+            None,
         )
 
     def list_all(self) -> list[SpecContextProject]:
-        return [_from_dict(c) for c in _load(self._path)["contexts"]]
+        return [_from_dict(c, self._path) for c in _load(self._path)["contexts"]]
 
     def delete(self, name: str) -> None:
         data = _load(self._path)
