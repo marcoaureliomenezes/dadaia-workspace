@@ -539,6 +539,23 @@ def test_a_memory_rerun_over_the_same_window_appends_nothing(script: Path, tmp_p
     assert after == before
 
 
+def test_the_first_memory_run_at_the_definition_sha_records_its_entry(
+    script: Path, tmp_path: Path
+) -> None:
+    """J2.S6.T5 (review F9): with HEAD at defined.sha and no memory entry yet, the run is
+    the first reconciliation, never "already reconciled": it records since == until."""
+    root, specs, _ = _memory_repo(tmp_path, script)
+    head = _git(root, "rev-parse", "HEAD")
+    _release(specs, "0.5.0", phase="CLOSURE", defined={"sha": head, "ts": _TS},
+             implemented={"sha": head, "ts": _TS})  # fmt: skip
+
+    result = _memory(script, root, specs, reviewed="", changed="")
+
+    assert result.returncode == 0, result.stderr
+    entries = [e for e in _log(specs) if e["kind"] == "memory"]
+    assert [(e["since"], e["until"]) for e in entries] == [(head, head)]
+
+
 def test_memory_takes_no_caller_chosen_window_or_worklist(script: Path, tmp_path: Path) -> None:
     """H1: `--since`/`--worklist` were the caller choosing an empty window; they are gone."""
     root, specs, base = _memory_repo(tmp_path, script)
