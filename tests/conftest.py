@@ -45,6 +45,8 @@ from typing import Any
 
 import pytest
 
+pytest_plugins = ("pytester",)
+
 # Repo-cleanliness law: the test run must never materialize bytecode caches inside
 # the working tree. Import-time compilation happens BEFORE any in-script
 # ``sys.dont_write_bytecode`` guard can run (e.g. tests importing the
