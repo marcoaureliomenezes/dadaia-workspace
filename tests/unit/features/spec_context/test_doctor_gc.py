@@ -210,13 +210,14 @@ def test_the_expire_lane_walks_each_expired_entry_once(
     for path in (entry / "deep" / "f.txt", entry / "deep", entry):
         os.utime(path, (0, 0))
     walked: list[Path] = []
-    real_walk = os.walk
+    real_question = sweep.linked_worktree
 
-    def _counting_walk(top: Path, *args: object, **kwargs: object) -> object:
-        walked.append(Path(top))
-        return real_walk(top, *args, **kwargs)  # type: ignore[call-overload]
+    def _counting_question(root: Path, target: Path) -> Path | None:
+        walked.append(target)
+        return real_question(root, target)
 
-    monkeypatch.setattr(sweep.os, "walk", _counting_walk)
+    # shutil.rmtree's own os.walk (3.12.10+, Windows) is no question of ours
+    monkeypatch.setattr(sweep, "linked_worktree", _counting_question)
 
     _make_doctor(ws).expire()
 

@@ -202,11 +202,12 @@ def test_a_live_bind_record_survives_a_full_doctor_fix_pass(tmp_path: Path) -> N
 
 def _rmtree_leaving(error: OSError | None) -> Callable[..., None]:
     """``shutil.rmtree`` that deletes nothing: silent, as 3.14's swallowed retry (row 6), or
-    reporting *error* to its ``onexc`` (row 22)."""
+    reporting *error* to its ``onexc`` as a failed scan (row 22): recorded as injected, never
+    replaced by a real retry's platform errno."""
 
     def rmtree(path: str, *, onexc: Callable[..., object]) -> None:
         if error is not None:
-            onexc(os.rmdir, path, error)
+            onexc(os.scandir, path, error)
 
     return rmtree
 
