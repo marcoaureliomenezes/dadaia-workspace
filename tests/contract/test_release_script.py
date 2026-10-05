@@ -346,16 +346,19 @@ def test_check_judges_each_job_file(
     ("text", "bad"),
     [
         ("job: job1; start: 2026-10-05T12:00Z; end: 2026-10-05T18:00Z; wall: 360; "
-         "ritual_wait: 20; dispatches: 4", False),
+         "ritual_wait: 20; dispatches: 4; job_gate_runs: 2", False),
+        ("job: job1; start: 2026-10-05T12:00Z; end: 2026-10-05T18:00Z; wall: 360; "
+         "ritual_wait: 20; dispatches: 4", True),
         ("job: job1; wall: 360; ritual_wait: 20; dispatches: 4", True),
         ("Merged PR #9 into develop.", False),  # a closure merge note, not a job's
     ],
-    ids=["job-merge", "job-merge-without-start-end", "closure-merge"],
+    ids=["job-merge", "job-merge-without-job-gate-runs", "job-merge-without-start-end",
+         "closure-merge"],
 )  # fmt: skip
 def test_check_validates_a_jobs_merge_entry(
     script: Path, tmp_path: Path, text: str, bad: bool
 ) -> None:
-    """AC1.7: a job's `kind: merge` entry carries start, end, wall, ritual wait, dispatches."""
+    """AC1.7: a job's `kind: merge` entry carries its six measurements (start..job_gate_runs)."""
     specs = _specs(tmp_path, _GOOD)
     state = specs / "releases/0.5.0/_RELEASE.json"
     entry = {"ts": "2026-10-05T18:00:00Z", "agent": "j", "kind": "merge", "text": text}
