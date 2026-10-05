@@ -49,28 +49,22 @@ def inner(request: pytest.FixtureRequest) -> Iterator[Path]:
     shutil.rmtree(where, ignore_errors=True)
 
 
-@pytest.mark.xfail(strict=True, reason="RED until J3.S2.T1")
-def test_an_inner_run_under_an_operator_context_sees_the_temp_home(
+def test_an_inner_run_under_an_operator_context_sees_the_temp_home_and_a_pycache_fails_it(
     pytester: pytest.Pytester, monkeypatch: pytest.MonkeyPatch, inner: Path, tmp_path: Path
 ) -> None:
+    """One test, two inner runs in order: the pycache run's watched write would fail any
+    inner session running beside it (the tripwire watches the whole ``tests/`` tree)."""
     foreign = tmp_path / "foreign"
     foreign.mkdir()
     monkeypatch.setenv("DADAIA_CONTEXT", "ghost")
     monkeypatch.setenv("HOME", str(foreign))
     monkeypatch.setenv("OUTER_FOREIGN_HOME", str(foreign))
     (inner / "test_home.py").write_text(_SEES_THE_TEMP_HOME, encoding="utf-8")
-
-    result = pytester.runpytest_subprocess(str(inner / "test_home.py"), "-p", "no:randomly")
-
-    assert result.ret == 0, result.stdout.str()
-
-
-def test_an_inner_run_writing_a_watched_pycache_exits_1(
-    pytester: pytest.Pytester, inner: Path
-) -> None:
     (inner / "test_pycache.py").write_text(_WRITES_A_PYCACHE, encoding="utf-8")
 
-    result = pytester.runpytest_subprocess(str(inner / "test_pycache.py"), "-p", "no:randomly")
+    home = pytester.runpytest_subprocess(str(inner / "test_home.py"), "-p", "no:randomly")
+    pycache = pytester.runpytest_subprocess(str(inner / "test_pycache.py"), "-p", "no:randomly")
 
-    assert result.ret == 1
-    result.stdout.fnmatch_lines(["*[[]OUTSIDE TMP[]] gained: *__pycache__*"])
+    assert home.ret == 0, home.stdout.str()
+    assert pycache.ret == 1
+    pycache.stdout.fnmatch_lines(["*[[]OUTSIDE TMP[]] gained: *__pycache__*"])

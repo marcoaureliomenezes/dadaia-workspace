@@ -26,7 +26,6 @@ _HOME = "/tmp/h"
     ),
 ])
 # fmt: on
-@pytest.mark.xfail(strict=True, reason="RED until J3.S2.T1")
 def test_suite_env(parent: dict[str, str], expected: dict[str, str]) -> None:
     from tests.fixtures.harness_env import suite_env
 

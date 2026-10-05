@@ -53,37 +53,29 @@ pytest_plugins = ("pytester",)
 # ``public/scripts/*.py`` sources), so the suite-wide switch is the only reliable
 # enforcement point (AC-W5-01).
 sys.dont_write_bytecode = True
-# No child writes bytecode (bug test-suite-writes-outside-tmp): set here, before xdist
-# spawns its workers; the tmp home joins the session env at pytest_sessionstart.
-os.environ["PYTHONDONTWRITEBYTECODE"] = "1"
 
 from dadaia_workspace.infrastructure.subprocess_runner import ProcessResult  # noqa: E402
-from tests.fixtures.harness_env import drop_operator_env, pin_child_env  # noqa: E402
+from tests.fixtures.harness_env import suite_env  # noqa: E402
 
 # Every subprocess a test spawns (`python -m dadaia_workspace...`: CLI verbs, hooks) must
 # import THIS checkout, whatever the venv's install mode or the worktree it runs in — bugs
 # hook-subprocess-tests-import-the-installed-package-not-the-checkout and
 # worktree-subprocess-cli-tests-import-the-shared-venvs-editable-install-not-the-worktree.
-# One rule, set once for the whole session; never a per-helper copy.
+# One rule, in the suite env (pytest_configure); never a per-helper copy.
 _CHECKOUT_ROOT = Path(__file__).resolve().parent.parent
-os.environ["PYTHONPATH"] = os.pathsep.join(
-    [str(_CHECKOUT_ROOT), *[p for p in os.environ.get("PYTHONPATH", "").split(os.pathsep) if p]]
-)
 # A child CPython normalizes its own `sys.executable`; a `../` launch keeps the dots here, so
 # every spawn and every expected fix line reads the normalized path the child will print.
 sys.executable = os.path.normpath(sys.executable)
 
 # No process the suite runs or spawns may resolve the operator instance this checkout sits
 # in, nor the one owning the running venv (bug test-subprocesses-resolve-the-live-instance):
-# the fence is set once, in the environment every child inherits, and the one resolver
-# honours it. The instance's registry and repos/ are fingerprinted around the session.
+# the fence is in the suite env every child inherits, and the one resolver honours it. The instance's registry and repos/ are fingerprinted around the session.
 _INSTANCE_SENTINEL = Path(".dadaia") / "states" / "spec_contexts.json"
 _FENCED_ROOTS: tuple[Path, ...] = tuple(
     p
     for p in dict.fromkeys([*_CHECKOUT_ROOT.parents, Path(sys.prefix).resolve().parent.parent])
     if (p / _INSTANCE_SENTINEL).is_file()
 )
-os.environ["DADAIA_FENCED_ROOTS"] = os.pathsep.join(map(str, _FENCED_ROOTS))
 
 # No git process that inherits the suite's environment may start background maintenance:
 # after a commit or a push git forks a detached `gc`/`maintenance run --auto` that holds
@@ -117,11 +109,15 @@ GIT_QUIET_INCLUDE = f'[include]\n\tpath = "{_GIT_QUIET.as_posix()}"\n'
 _GIT_GLOBAL = _publish(
     "dadaia-tests", f"{GIT_QUIET_INCLUDE}[user]\n\tname = T\n\temail = t@example.invalid\n"
 )
-os.environ["GIT_CONFIG_GLOBAL"] = str(_GIT_GLOBAL)
-# The parent's home, read once per process tree: a repeated in-process session and an
-# xdist worker both inherit it, never a home an earlier session pinned.
-os.environ.setdefault("TESTS_PARENT_HOME", str(Path.home()))
-_PARENT_CACHE = Path(os.environ["TESTS_PARENT_HOME"]) / ".cache"
+#: What the suite env adds to the parent's: the checkout first on every child's import path,
+#: the fence, and the quiet git config.
+_SUITE_KEYS = {
+    "PYTHONPATH": os.pathsep.join(
+        [str(_CHECKOUT_ROOT), *[p for p in os.environ.get("PYTHONPATH", "").split(os.pathsep) if p]]
+    ),
+    "DADAIA_FENCED_ROOTS": os.pathsep.join(map(str, _FENCED_ROOTS)),
+    "GIT_CONFIG_GLOBAL": str(_GIT_GLOBAL),
+}
 
 
 def _instance_fingerprint() -> dict[str, object]:
@@ -381,22 +377,6 @@ def _hermetic_cwd(
     monkeypatch.chdir(tmp_path_factory.mktemp("cwd"))
 
 
-@pytest.fixture(autouse=True, scope="session")
-def _no_real_kimi_home_in_tests(tmp_path_factory: pytest.TempPathFactory) -> None:
-    """Disk/user-config guard: never write the real ``~/.kimi-code`` during the suite.
-
-    v0.2.8 (kimi-code): ``harness add kimi-code`` (and therefore
-    ``--target all`` and ``dadaia init``) upserts the managed hook block into
-    ``$KIMI_CODE_HOME/config.toml`` and writes shims under ``$KIMI_CODE_HOME/hooks/``.
-    Unredirected, every all-target install test would mutate the developer's real Kimi
-    Code user config. Point ``KIMI_CODE_HOME`` at a session tmp dir; tests that assert
-    on the wiring re-point it themselves (function scope wins over this default).
-    """
-    import os
-
-    os.environ["KIMI_CODE_HOME"] = str(tmp_path_factory.mktemp("kimi-home"))
-
-
 @pytest.fixture(autouse=True)
 def _repo_root_write_guard() -> object:
     """Assert no new files appear in protected lib-repo paths during a test.
@@ -428,33 +408,34 @@ def _repo_root_write_guard() -> object:
 _PREEXISTING_POLLUTION: set[str] = set()
 _INSTANCE_AT_START: dict[str, object] = {}
 _OUTSIDE_TMP_AT_START: set[str] = set()
-_CHILD_HOME: list[Path] = []  # this process's pinned home, removed at unconfigure
+#: (the HOME the process received, the temp home its suite env carries)
+_HOMES = pytest.StashKey[tuple[Path, Path]]()
 
 
 # ponytail: top-level .cache entries only; a write inside an existing ~/.cache/pip is unseen.
-def _outside_tmp() -> set[str]:
+def _outside_tmp(parent_home: Path) -> set[str]:
     """What a child writing outside tmp leaves: bytecode in the checkout, a parent-HOME cache."""
     pycache = {
         p.as_posix()
         for d in ("dadaia_workspace", "tests")
         for p in (_REPO_ROOT / d).rglob("__pycache__")
     }
-    return pycache | (
-        {f"~/.cache/{p.name}" for p in _PARENT_CACHE.iterdir()} if _PARENT_CACHE.is_dir() else set()
-    )
+    cache = parent_home / ".cache"
+    return pycache | ({f"~/.cache/{p.name}" for p in cache.iterdir()} if cache.is_dir() else set())
 
 
 def pytest_configure(config: pytest.Config) -> None:
-    """Before collection, every child and in-process ``Path.home()`` see a tmp home."""
-    _CHILD_HOME[:] = [Path(tempfile.mkdtemp(prefix="dadaia-test-home-"))]
-    pin_child_env(_CHILD_HOME[0])
-    drop_operator_env()
+    """The suite env, applied once per process (the xdist controller and each worker), before
+    collection: every child and in-process ``Path.home()`` see a temp home."""
+    homes = Path.home(), Path(tempfile.mkdtemp(prefix="dadaia-test-home-"))
+    config.stash[_HOMES] = homes
+    env = suite_env(os.environ | _SUITE_KEYS, homes[1])
+    os.environ.clear()
+    os.environ.update(env)
 
 
 def pytest_unconfigure(config: pytest.Config) -> None:
-    for home in _CHILD_HOME:
-        shutil.rmtree(home, ignore_errors=True)
-    _CHILD_HOME.clear()
+    shutil.rmtree(config.stash[_HOMES][1], ignore_errors=True)
 
 
 def pytest_sessionstart(session: pytest.Session) -> None:
@@ -464,7 +445,7 @@ def pytest_sessionstart(session: pytest.Session) -> None:
     _INSTANCE_AT_START.clear()
     _INSTANCE_AT_START.update(_instance_fingerprint())
     _OUTSIDE_TMP_AT_START.clear()
-    _OUTSIDE_TMP_AT_START.update(_outside_tmp())
+    _OUTSIDE_TMP_AT_START.update(_outside_tmp(session.config.stash[_HOMES][0]))
 
 
 def pytest_sessionfinish(session: pytest.Session, exitstatus: int) -> None:
@@ -487,7 +468,7 @@ def pytest_sessionfinish(session: pytest.Session, exitstatus: int) -> None:
             "resolved the live instance (bug test-subprocesses-resolve-the-live-instance)."
         )
         session.exitstatus = 1
-    gained = sorted(_outside_tmp() - _OUTSIDE_TMP_AT_START)
+    gained = sorted(_outside_tmp(session.config.stash[_HOMES][0]) - _OUTSIDE_TMP_AT_START)
     if gained:
         print(f"\n\n[OUTSIDE TMP] gained: {gained}")  # noqa: T201
         session.exitstatus = 1

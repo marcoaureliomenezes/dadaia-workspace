@@ -9,6 +9,7 @@ The integration-branch refusal and its fix are the refusal harness Case `birth_p
 from __future__ import annotations
 
 import json
+import os
 import shutil
 import subprocess
 import sys
@@ -18,7 +19,7 @@ import pytest
 
 from dadaia_workspace.core.cli_line import shell_line
 from dadaia_workspace.core.specs_version import CANONICAL_SPECS_VERSION
-from tests.fixtures.harness_env import base_env
+from tests.fixtures.harness_env import suite_env
 
 pytestmark = pytest.mark.e2e
 
@@ -62,7 +63,7 @@ def _run_push_gate(
         input=stdin_text,
         capture_output=True,
         text=True,
-        env=base_env(),  # harness-free, as the pre-push hook's child
+        env=suite_env(os.environ, Path.home()),  # harness-free, as the pre-push hook's child
         timeout=_EXIT_DEADLINE,
     )
 

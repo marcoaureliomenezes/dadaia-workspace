@@ -15,7 +15,7 @@ from pathlib import Path
 from dadaia_workspace.core.models.spec_context import ContextState, SpecContextProject
 from dadaia_workspace.features.spec_context.doctor import DoctorService
 from dadaia_workspace.infrastructure.git_subprocess import GitSubprocessClient
-from tests.fixtures.harness_env import child_keys
+from tests.fixtures.harness_env import suite_env
 from tests.fixtures.stores import context_store, workspace_cli
 
 SCRIPT = (
@@ -30,7 +30,7 @@ JOB, TASK = "0.5.0-rc1/j1", "0.5.0-rc1/j1--J1.S1.T1"
 
 def git(repo: Path, *args: str) -> str:
     env = {
-        **child_keys(),
+        **suite_env(os.environ, Path.home()),
         "HOME": str(repo),
         "PATH": os.environ["PATH"],
         "GIT_CONFIG_NOSYSTEM": "1",
@@ -87,7 +87,7 @@ def associate(root: Path, spec: str) -> None:
 
 def run(root: Path, *args: str, input: str | None = None) -> subprocess.CompletedProcess[str]:
     env = {
-        **child_keys(),
+        **suite_env(os.environ, Path.home()),
         "HOME": str(root),
         "PATH": os.environ["PATH"],
         "GIT_DIR": "/nonexistent",

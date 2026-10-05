@@ -10,13 +10,14 @@ Size: LARGE — real git hooks.
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 import sys
 from pathlib import Path
 
 import pytest
 
-from tests.fixtures.harness_env import base_env
+from tests.fixtures.harness_env import suite_env
 
 pytestmark = pytest.mark.e2e
 
@@ -104,7 +105,9 @@ def test_the_gate_runs_where_core_hookspath_points(tmp_path: Path) -> None:
     assert (repo / ".husky" / "pre-push").is_file()
 
     _write_dadaia_stub(tmp_path, sys.executable)
-    env = base_env() | {"DADAIA_PRIVACY_DENYLIST": str(_write_denylist_file(tmp_path))}
+    env = suite_env(os.environ, Path.home()) | {
+        "DADAIA_PRIVACY_DENYLIST": str(_write_denylist_file(tmp_path))
+    }
     refused = _push(repo, env)
 
     assert refused.returncode != 0, refused.stdout + refused.stderr
