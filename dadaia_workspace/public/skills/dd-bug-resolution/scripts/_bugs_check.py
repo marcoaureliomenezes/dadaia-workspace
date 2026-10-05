@@ -50,12 +50,11 @@ def invariant_errors(record: dict[str, Any]) -> Iterator[str]:
         yield f"record {record['id']!r} closed_at={closed_at!r} precedes its filing date ts={ts!r}"
 
 
-def tasks(root: Path) -> dict[str, Path]:
-    """Task id -> the `TASKS.md` under *root*`/releases/`, `_archive/` included, that carries it;
-    bounded, so a code such as `MEM-DRIFT-2` carries no `T-2`."""
-    # ponytail: an id cited by a later TASKS.md maps to the last file read; key on the defining row if introduced_in needs it
+def tasks(root: Path) -> set[str]:
+    """Every task id a `TASKS.md` under *root*`/releases/`, `_archive/` included, carries;
+    bounded: an id glued to a word or a hyphen (a doctor code, a placeholder) is no task."""
     bounded = re.compile(r"(?<![\w-])T-\d+(?:-\d+)*(?![\w-])")
-    return {t: f for f in sorted(root.glob("releases/**/TASKS.md")) for t in bounded.findall(f.read_text(encoding="utf-8"))}  # fmt: skip
+    return {t for f in root.glob("releases/**/TASKS.md") for t in bounded.findall(f.read_text(encoding="utf-8"))}  # fmt: skip
 
 
 def findings_for(

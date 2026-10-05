@@ -988,17 +988,18 @@ def test_a_refused_archive_leaves_both_ledger_files_byte_intact(
 
 
 @pytest.mark.parametrize(
-    ("task", "code"), [("T-050-168", 0), ("T-999-999", 1), ("T-2", 1), ("T-3", 1)]
+    ("task", "code"),
+    [("T-050-168", 0), ("T-999-999", 1), ("T-2", 1), ("T-3", 1), ("T-050", 1), ("T-5", 1)],
 )
 def test_caused_by_names_a_task_some_tasks_file_carries(
     script: Path, tmp_path: Path, task: str, code: int
 ) -> None:
     """AC9.3: a write and check accept a task id a TASKS.md under releases/, `_archive/`
-    included, carries, and refuse one none carries, or one only inside a code (`MEM-DRIFT-2`, `T-3b`)."""
+    included, carries, and refuse one none carries, or one only inside a code (`MEM-DRIFT-2`, `T-3b`, `T-050-NNN`, `x-T-5`)."""
     specs = _ledger(tmp_path, _OPEN_RECORD)
     (specs / "releases" / "_archive" / "0.1").mkdir(parents=True)
     (specs / "releases" / "_archive" / "0.1" / "TASKS.md").write_text(
-        "- [x] **T-050-168 — a task.** codes MEM-DRIFT-2 and T-3b carry no task\n"
+        "- [x] **T-050-168 — a task.** codes MEM-DRIFT-2, T-3b, T-050-NNN, x-T-5 carry no task\n"
     )
     written = _run(script, "update", "a-bug", "--set", f"caused_by={task}", "--specs", str(specs))
     assert written.returncode == code, written.stderr
