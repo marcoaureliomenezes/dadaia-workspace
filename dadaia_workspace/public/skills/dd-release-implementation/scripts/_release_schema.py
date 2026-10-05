@@ -69,8 +69,8 @@ def releases(specs: Path) -> dict[str, tuple[_dt.datetime, _dt.datetime | None]]
 
 @functools.cache
 def _candidate_adds(specs: Path) -> list[tuple[_dt.datetime, str, str]]:
-    """``(instant, release, rc)`` of each commit adding exactly one ``rc-N/SPEC.md`` whose
-    status reads non-Approved — a candidate's birth; a shallow history is refused (ADR 0187)."""
+    """Each candidate's birth as (instant, release, rc): a commit adding exactly one
+    rc-<N>/SPEC.md whose status reads non-Approved; a shallow history is refused."""
     git = ["git", "-C", str(specs)]
     shallow = subprocess.run([*git, "rev-parse", "--is-shallow-repository"], capture_output=True, text=True, check=False)  # fmt: skip
     if shallow.stdout.strip() == "true":
@@ -91,7 +91,7 @@ def _candidate_adds(specs: Path) -> list[tuple[_dt.datetime, str, str]]:
 
 
 def candidate_at(specs: Path, instant: str) -> dict[str, str]:
-    """The ONE answer to "which candidate held *instant*" (ADR 0187): the release whose span
+    """The ONE answer to "which candidate held *instant*": the release whose span
     holds it, the rc born last before it in that release, else ``unknown``; raises
     ``ValueError`` in a shallow clone."""
     adds, when = _candidate_adds(specs), _utc(instant)

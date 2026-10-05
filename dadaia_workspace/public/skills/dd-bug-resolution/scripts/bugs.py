@@ -5,7 +5,7 @@
 `check` over them, and only then replaces the file atomically — so this script's writer
 and its validator cannot disagree about what a valid record is. `append`, `resolve` and
 `window` read which candidate held an instant from `dd-release-implementation`'s
-`_release_schema.candidate_at` (ADR 0187), a skill-level dependency as `_specs` has on
+`_release_schema.candidate_at`, a skill-level dependency as `_specs` has on
 `dd-gitflow-default`.
 """
 
@@ -178,7 +178,7 @@ def _held_at(specs: Path, instant: str) -> dict[str, str]:
 
 def _introduced(specs: Path, record: dict[str, Any], fixes: dict[str, dict[str, Any]]) -> Any:
     """Read from `caused_by`'s culprit, its oldest fix or `<type>(<task-id>)` commit, else
-    the stored value: a `caused_by` repair needs no second write (ADR 0187)."""
+    the stored value: a `caused_by` repair needs no second write."""
     cause = record.get("caused_by")
     grep = ("log", "--all", "-E", f"--grep=^[a-z]+\\({cause}\\)", "--format=%H")
     shas = (
