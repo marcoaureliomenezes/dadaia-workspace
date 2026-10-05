@@ -34,7 +34,6 @@ def _restore_state(snapshots: dict[Path, bytes | None]) -> None:
         if content is None:
             target.unlink(missing_ok=True)
         else:
-            target.parent.mkdir(parents=True, exist_ok=True)
             target.write_bytes(content)
 
 
