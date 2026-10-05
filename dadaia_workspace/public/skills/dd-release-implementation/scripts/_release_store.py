@@ -20,7 +20,8 @@ sys.path.append(str(Path(__file__).resolve().parents[2] / "dd-bug-resolution" / 
 
 from _ledger import replace, stamp  # noqa: E402
 from _release_check import state_findings  # noqa: E402
-from _release_schema import SEMVER_RE, STATE, candidate_dir  # noqa: E402
+from _release_schema import STATE, Unreadable, candidate_dir, live_id  # noqa: E402
+from _release_schema import live_ids as live_ids  # noqa: E402 — re-exported for the verbs
 from _specs import choice, script  # noqa: E402
 
 State = dict[str, Any]
@@ -45,19 +46,6 @@ class Live:
     candidate: Path | None
 
 
-def live_ids(specs: Path) -> list[str]:
-    """Every SemVer-named release directory directly under ``releases/`` carrying a state
-    document — `_archive` is not live."""
-    releases = specs / "releases"
-    if not releases.is_dir():
-        return []
-    return sorted(
-        d.name
-        for d in releases.iterdir()
-        if d.is_dir() and SEMVER_RE.match(d.name) and (d / STATE).is_file()
-    )
-
-
 def read_state(path: Path) -> State:
     """One state document, refusing anything this script cannot read in full."""
     try:
@@ -74,18 +62,13 @@ def read_state(path: Path) -> State:
 
 def live_release(specs: Path) -> Live:
     """Resolve the ONE live release and read its state, or refuse naming the reason."""
-    ids = live_ids(specs)
-    if not ids:
-        raise choice(Refusal("no live release under specs/releases/ — nothing to operate on",
-                     f"{SCRIPT} new"), "with the release version you choose")  # fmt: skip
-    if len(ids) > 1:
-        raise Refusal(
-            f"multiple live release directories carry {STATE}: {', '.join(ids)} — the "
-            "release-candidates model allows exactly one",
-            f"{SCRIPT} check",
-        )
-    release_dir = specs / "releases" / ids[0]
-    return Live(ids[0], release_dir, read_state(release_dir / STATE), candidate_dir(release_dir))
+    try:
+        live = live_id(specs)
+    except Unreadable as exc:
+        vars(refusal := Refusal(*exc.args)).update(vars(exc))  # the act's choice, if any
+        raise refusal from None
+    release_dir = specs / "releases" / live
+    return Live(live, release_dir, read_state(release_dir / STATE), candidate_dir(release_dir))
 
 
 def window_start(state: State) -> str:
