@@ -4,10 +4,7 @@
 from __future__ import annotations
 
 import datetime as _dt
-import functools
-import json
 import re
-import subprocess
 from collections.abc import Iterable
 from pathlib import Path
 
@@ -48,88 +45,6 @@ def extract_status(text: str) -> str | None:
     """The ``**Status:**`` token a trio document carries, or ``None``."""
     match = _STATUS_RE.search(text)
     return match.group(1) if match else None
-
-
-class ShallowClone(ValueError):
-    """*specs* sits in a shallow clone: no instant can be placed in its cut history."""
-
-
-class Unreadable(ValueError):
-    """A release state or the history `candidate_at` reads is unreadable; ``args[1]`` is the act."""
-
-
-def live_ids(specs: Path) -> list[str]:
-    """Every SemVer-named release directory directly under ``releases/`` carrying a state
-    document — `_archive` is not live."""
-    releases = specs / "releases"
-    if not releases.is_dir():
-        return []
-    return sorted(
-        d.name
-        for d in releases.iterdir()
-        if d.is_dir() and SEMVER_RE.match(d.name) and (d / STATE).is_file()
-    )
-
-
-def _utc(ts: str) -> _dt.datetime:
-    return _dt.datetime.fromisoformat(ts.replace("Z", "+00:00")).astimezone(_dt.UTC)
-
-
-@functools.cache
-def releases(specs: Path) -> dict[str, tuple[_dt.datetime, _dt.datetime | None]]:
-    """Each release id, live or archived -> its span: first `log` ts, `shipped.ts` or None."""
-    spans: dict[str, tuple[_dt.datetime, _dt.datetime | None]] = {}
-    for path in [*(specs / "releases").glob(f"*/{STATE}"), *(specs / "releases/_archive").glob(f"*/{STATE}")]:  # fmt: skip
-        try:
-            state = json.loads(path.read_text(encoding="utf-8"))
-            shipped = (state.get("shipped") or {}).get("ts")
-            spans[path.parent.name] = (
-                _utc(state["log"][0]["ts"]),
-                _utc(shipped) if shipped else None,
-            )
-        except (OSError, ValueError, LookupError, TypeError, AttributeError) as exc:
-            raise Unreadable(f"{path} has no readable first log ts and shipped ts ({exc})",
-                             f"Operator action: repair {path} until `release.py check` passes") from None  # fmt: skip
-    return spans
-
-
-@functools.cache
-def _candidate_adds(specs: Path) -> list[tuple[_dt.datetime, str, str]]:
-    """Each candidate's birth as (instant, release, rc): a commit adding exactly one
-    rc-<N>/SPEC.md whose status reads non-Approved; a shallow history is refused."""
-    git = ["git", "-C", str(specs)]
-    shallow = subprocess.run([*git, "rev-parse", "--is-shallow-repository"], capture_output=True, text=True, check=False)  # fmt: skip
-    if shallow.stdout.strip() == "true":
-        raise ShallowClone(f"{specs} is in a shallow clone: a release candidate read from a cut history "
-                           "would be stamped wrong for good (ADR 0187)")  # fmt: skip
-    head = subprocess.run([*git, "rev-parse", "-q", "--verify", "HEAD"], capture_output=True, check=False)  # fmt: skip
-    log = subprocess.run([*git, "log", "--diff-filter=A", "--name-only", "--format=%x00%H %cI", "--",
-                          ":(glob)releases/**/rc-*/SPEC.md"], capture_output=True, text=True, check=False)  # fmt: skip
-    if head.returncode == 0 and log.returncode:  # a repo with no commit yet holds no birth
-        raise Unreadable(f"cannot read the history of {specs}: {log.stderr.strip()}",
-                         "Operator action: point --specs at a specs tree inside a git repo")  # fmt: skip
-    adds = []
-    for commit in log.stdout.split("\0")[1:] if head.returncode == 0 else []:
-        sha, *paths = commit.split()
-        if len(paths) != 2:  # the instant, then exactly one added SPEC.md
-            continue
-        show = subprocess.run([*git, "show", f"{sha}:{paths[1]}"], capture_output=True, text=True, check=False)  # fmt: skip
-        if extract_status(show.stdout) != APPROVED:
-            parts = paths[1].split("/")
-            adds.append((_utc(paths[0]), parts[-3], parts[-2]))
-    return adds
-
-
-def candidate_at(specs: Path, instant: str) -> dict[str, str]:
-    """The ONE answer to "which candidate held *instant*": the release whose half-open span
-    holds it, the rc born last before it in that release, else ``unknown``; raises
-    :class:`ShallowClone`, :class:`Unreadable`, or ``ValueError`` for a bad *instant*."""
-    when = _utc(instant)
-    adds = _candidate_adds(specs)
-    held = (r for r, (start, end) in releases(specs).items() if start <= when and (end is None or when < end))  # fmt: skip
-    release = next(held, "unknown")
-    born = [(t, rc) for t, r, rc in adds if r == release and t <= when]
-    return {"release": release, "rc": max(born)[1] if born else "unknown"}
 
 
 def origin(text: str) -> dict[str, list[str]]:
