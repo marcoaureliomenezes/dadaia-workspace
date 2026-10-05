@@ -513,6 +513,14 @@ def test_a_code_task_without_owner_tests_refuses_with_one_fix_line(
         ]
 
 
+def test_a_code_task_whose_touched_test_feeds_its_gate_lands(root: Path) -> None:
+    """LOW 4: a touched `test_` file is in the gate's argv, so no trailer is needed."""
+    commit(_task_commit(root, add="tests/test_b.py"), "src/b.py")
+    landed = run(root, "merge", f"worktrees/r/{TASK}")
+    assert landed.returncode == 0, landed.stderr
+    assert "ci task src/b.py tests/test_b.py" in landed.stdout.splitlines()
+
+
 def test_the_stage_gate_runs_the_work_branch_verify_stage_line(root: Path) -> None:
     """LOW 3: a task that rewrote `verify-stage:` on the job branch does not choose its gate."""
     line = "verify: python scripts/ci.py job\nverify-stage: python scripts/ci.py task\n"
