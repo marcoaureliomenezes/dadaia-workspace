@@ -4,6 +4,7 @@ the planted files."""
 
 from __future__ import annotations
 
+import importlib.util
 import os
 import shutil
 import subprocess
@@ -124,3 +125,49 @@ def test_contract_coverage_writes_no_coverage_file_into_the_checkout(tmp_path: P
     done = _ci(checkout, "contract-coverage")
     assert done.returncode == 0
     assert list(tmp_path.rglob("*coverage*")) == []
+
+
+def _plan(*argv: str) -> list[str]:
+    """``ci.py``'s step plan for *argv*, read without running a step."""
+    spec = importlib.util.spec_from_file_location("ci", _REPO / "scripts" / "ci.py")
+    assert spec and spec.loader
+    ci = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(ci)
+    return [f"{job}: {name}" for job, (name, _, _) in ci.plan(list(argv))]
+
+
+def test_each_level_runs_only_its_steps() -> None:
+    """AC1.1 (ADR 0190): the task level runs ruff and mypy on the touched files and the owner
+    tests; the stage level runs lint, mypy, guards, unit and integration; the job level all."""
+    files = ("dadaia_workspace/m.py", "tests/unit/test_m.py", "README.md")
+    assert _plan("task", *files) == [
+        "task: ruff format", "task: ruff check", "task: mypy", "task: owner tests"
+    ]  # fmt: skip
+    assert _plan("task", "README.md") == []
+    assert _plan("stage") == [
+        "lint: ruff format", "lint: ruff check", "lint: lint-imports", "typecheck: mypy",
+        "guards: guards", "guards: guards --planted", "unit-fast: unit-fast",
+        "integration: integration",
+    ]  # fmt: skip
+    assert _plan("job") == _plan() == [
+        *_plan("stage")[:7], "contract-coverage: contract-coverage", "integration: integration",
+        "e2e-python: e2e-python", "repo-hygiene: repo-hygiene", "doctor: doctor",
+    ]  # fmt: skip
+
+
+@pytest.mark.parametrize(("check", "code"), [("1 == 2", 1), ("1 == 1", 0)])
+def test_a_planted_failing_step_turns_its_level_red(tmp_path: Path, check: str, code: int) -> None:
+    """AC1.1: the task level's owner tests decide its exit; no other step runs."""
+    test = f"def test_one() -> None:\n    assert {check}\n"
+    checkout = _checkout(tmp_path, {"tests/unit/test_one.py": test})
+    done = subprocess.run(
+        [sys.executable, str(checkout / "scripts" / "ci.py"), "task", "tests/unit/test_one.py"],
+        cwd=checkout, capture_output=True, text=True, check=False,
+    )  # fmt: skip
+    ran = [ln.split(":")[0] for ln in done.stdout.splitlines() if ln.startswith(("PASS ", "FAIL "))]
+    assert ran == [
+        "PASS ruff format",
+        "PASS ruff check",
+        f"{'FAIL' if code else 'PASS'} owner tests",
+    ]
+    assert done.returncode == code
