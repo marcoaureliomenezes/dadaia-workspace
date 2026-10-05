@@ -5,7 +5,7 @@ import subprocess
 from collections.abc import Sequence
 from pathlib import Path
 
-from dadaia_workspace.core.cli_line import git_line
+from dadaia_workspace.core.cli_line import fix_line, git_line
 from dadaia_workspace.core.exceptions import GitCloneError, GitSyncError
 from dadaia_workspace.core.gitflow import DEFAULT, Gitflow, read_gitflow
 from dadaia_workspace.core.models.git_scan import GitObjectReadError
@@ -234,7 +234,7 @@ class GitSubprocessClient:
         if text is None:
             return DEFAULT, (
                 f"{repo}: no specs/constitution.md — using the default gitflow\n"
-                f"fix: .dadaia/.venv/bin/dadaia specs init --context {repo.name}"
+                f"fix: {fix_line(None, 'specs', 'init', '--context', repo.name)}"
             )
         return read_gitflow(repo / "specs", text)
 
