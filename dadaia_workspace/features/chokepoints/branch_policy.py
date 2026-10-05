@@ -8,7 +8,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from dadaia_workspace.core.cli_line import git_line, shell_line
-from dadaia_workspace.core.gitflow import Gitflow
+from dadaia_workspace.core.gitflow import JOB_BRANCH_RE, Gitflow
 from dadaia_workspace.core.models.git_scan import SHA_SHAPE_RE, ZERO_SHA
 
 __all__ = [
@@ -127,7 +127,7 @@ def check_branch_policy(
     fixes: GateFixes,
     births: frozenset[str] = frozenset(),
 ) -> Decision | None:
-    """The first refusal, or ``None``: each ref lands on a work branch from the
+    """The first refusal, or ``None``: each ref lands on a work or job branch from the
     same-named local head, or births the principal/integration at a sha in *births*
     (ADR 0036; R13); those two are otherwise PR-only."""
     for ref in refs:
@@ -137,7 +137,7 @@ def check_branch_policy(
         role = gitflow.role_of(branch)
         if role in ("principal", "integration") and ref.local_sha in births:
             continue
-        if role != "work":
+        if role != "work" and not JOB_BRANCH_RE.fullmatch(branch):
             return _refuse_branch(ref, branch, gitflow, fixes)
         if not ref.local_ref.startswith(HEADS_PREFIX):
             return _refuse_branch(ref, None, gitflow, fixes)

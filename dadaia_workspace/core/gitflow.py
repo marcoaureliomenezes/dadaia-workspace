@@ -14,6 +14,7 @@ from dadaia_workspace.core.frontmatter import FRONTMATTER_RE, FrontmatterError, 
 from dadaia_workspace.core.release_state import CANDIDATE_RE, RELEASE_ID_RE, RELEASE_STATE_FILENAME
 
 __all__ = [
+    "JOB_BRANCH_RE",
     "DEFAULT",
     "candidate_dir",
     "candidate_number",
@@ -34,6 +35,8 @@ __all__ = [
 Role = Literal["principal", "integration", "work"]
 
 _VERSION_RE = re.compile(r"\d+\.\d+\.\d+")
+#: A job branch, the one pushable `wt/` branch: its push runs the CI matrix.
+JOB_BRANCH_RE = re.compile(r"wt/\d+\.\d+\.\d+-rc\d+/(?!define$)[a-z0-9]+(?:-[a-z0-9]+)*")
 # git check-ref-format's refusals, for one branch name (a prefix may end in "/").
 _BAD_REF_RE = re.compile(r"[\x00-\x20\x7f~^:?*\[\\]|\.\.|//|@\{|^[/.]|\.$|\.lock(/|$)|/\.|^@$")
 

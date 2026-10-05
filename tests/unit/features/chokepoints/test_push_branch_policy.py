@@ -189,13 +189,10 @@ def test_an_outside_ref_is_carried_onto_the_live_work_branch() -> None:
     assert _fix(decision) == ["git", "-C", "/repo", "switch", "work/1.2.3"]
 
 
-_RED = pytest.mark.xfail(strict=True, reason="J1.S1 RED: AC1.2 job branches (J1.S2.T4)")
-
-
 @pytest.mark.parametrize(
     ("branch", "allowed"),
     [
-        pytest.param("wt/0.5.0-rc9/job2", True, marks=_RED),
+        pytest.param("wt/0.5.0-rc9/job2", True),
         ("wt/0.5.0-rc9/define", False),
         ("wt/backlog/an-idea", False),
         ("wt/0.5.0-rc9/job2--T-1", False),
