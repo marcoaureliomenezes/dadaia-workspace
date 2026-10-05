@@ -52,10 +52,9 @@ def serialize(records: Records) -> str:
 def _validated(
     path: Path, records: Records, rel: str, before: Records, known: frozenset[str]
 ) -> str:
-    for record in records:
-        why = None if record in before else private_refusal(record, path)
-        if why is not None:
-            raise Refusal(*why)
+    why = private_refusal((r for r in records if r not in before), path)
+    if why is not None:
+        raise Refusal(*why)
     text = serialize(records)
     findings = findings_for(text, rel, known, path.parents[1])
     if findings:

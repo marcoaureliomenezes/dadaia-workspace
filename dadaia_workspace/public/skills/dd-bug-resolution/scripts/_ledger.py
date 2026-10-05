@@ -10,6 +10,7 @@ import os
 import re
 import subprocess
 import time
+from collections.abc import Iterable
 from pathlib import Path
 from types import ModuleType, SimpleNamespace
 from typing import Any
@@ -226,13 +227,14 @@ def _published_text(path: Path) -> str | None:
     return None
 
 
-def private_refusal(record: dict[str, Any], path: Path) -> tuple[str, str] | None:
-    """``(message, fix)`` for the first field of *record* the push refuses — a match the
-    published text of *path* (the ledger file) does not already carry — else ``None``;
-    the terms are the workspace's that holds *path*, whatever the cwd."""
+def private_refusal(records: Iterable[dict[str, Any]], path: Path) -> tuple[str, str] | None:
+    """``(message, fix)`` for the first field of the write's *records* the push refuses — a
+    match the published text of *path* (the ledger file) does not already carry — else
+    ``None``; terms and published text are read once per write, from the workspace holding
+    *path*, whatever the cwd."""
     found, patterns = terms(workspace_of(path)), _baseline()
     published = _privacy.published_matches(_published_text(path), found, patterns)
-    for key, value in record.items():
+    for key, value in (item for record in records for item in record.items()):
         text = json.dumps(value, ensure_ascii=False)
         for hit, _source, _reason in _privacy.fresh_matches(text, published, found, patterns):
             return (

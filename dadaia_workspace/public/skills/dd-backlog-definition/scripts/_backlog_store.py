@@ -65,10 +65,11 @@ def serialize(active: Items) -> str:
 def _validated(
     specs: Path, active: Items, histo: str, before: Items, record: dict[str, Any] | None
 ) -> str:
-    for item in [*(i for i in active if i not in before), *([record] if record else [])]:
-        why = private_refusal(item, specs)
-        if why is not None:
-            raise Refusal(*why)
+    why = private_refusal(
+        [*(i for i in active if i not in before), *([record] if record else [])], specs
+    )
+    if why is not None:
+        raise Refusal(*why)
     text = serialize(active)
     findings = pair_findings(text, histo)
     if findings:
