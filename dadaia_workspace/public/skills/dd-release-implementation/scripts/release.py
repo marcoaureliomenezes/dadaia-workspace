@@ -147,7 +147,7 @@ def main(argv: list[str] | None = None) -> int:
     try:
         return _VERBS[args.verb](args, specs)
     except (Refusal, drift.Refusal) as refusal:
-        return refuse(refusal, specs)
+        return int(refuse(refusal, specs))
 
 
 if __name__ == "__main__":
