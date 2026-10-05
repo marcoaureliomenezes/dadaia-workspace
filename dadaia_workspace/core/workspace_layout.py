@@ -446,7 +446,8 @@ SPECS_CANON: tuple[CanonEntry, ...] = (
     CanonEntry("releases/<M.m.p>/RELEASE.json", "releases"),
     CanonEntry("releases/<M.m.p>/rc-<N>/SPEC.md", "releases"),
     CanonEntry("releases/<M.m.p>/rc-<N>/PLAN.md", "releases"),
-    CanonEntry("releases/<M.m.p>/rc-<N>/TASKS.md", "releases"),
+    CanonEntry("releases/<M.m.p>/rc-<N>/TASKS.md", "releases"),  # a closed rc's
+    CanonEntry("releases/<M.m.p>/rc-<N>/tasks/<slug>.md", "releases"),  # one per job
     CanonEntry("backlog/AGENTS.md", "backlog", True),
     CanonEntry("backlog/BACKLOG.json", "backlog", True),
     CanonEntry("backlog/_archive/backlog_histo.jsonl", "backlog", True),
@@ -463,7 +464,9 @@ SPECS_CANON: tuple[CanonEntry, ...] = (
 
 #: One candidate's documents (ADR 0150), read off the canon rows.
 CANDIDATE_DOCUMENTS: tuple[str, ...] = tuple(
-    e.shape.rsplit("/", 1)[1] for e in SPECS_CANON if e.shape.startswith("releases/<M.m.p>/rc-<N>/")
+    e.shape.rsplit("/", 1)[1]
+    for e in SPECS_CANON
+    if e.shape.startswith("releases/<M.m.p>/rc-<N>/") and e.shape.count("/") == 3
 )
 
 #: Every entry permitted directly under ``specs/``.
