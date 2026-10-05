@@ -38,3 +38,6 @@ AC: AC3.2.
 |---|---|---|---|
 | J3.S3.T1 | AC3.2 | `features/spec_context/service.py`, `infrastructure/git_subprocess.py`, `cli/commands/context.py`, `features/certification/service.py`, `container.py`; dead's, `commit_all`'s and the refusal harness's tests | `test_context_dead_holds.py`, `test_refusal_fix_lines_clear_their_refusal.py`, `test_spec_context_service.py`, `test_one_secret_matcher.py`, the git-subprocess tests |
 | J3.S3.T2 | — | generated only: the behavior-map hashes and derived docs | close task: test-audit + mutation-diff over the job diff (Q23), regenerate the behavior map and derived docs (R6), write `done` (Q9) |
+
+- As-built deviation (R6): `tests/contract/test_core_file_io_purity.py` was written by both J3.S2.T1 and J3.S2.T3 in one stage; J3.S2.T1 owns it, the double write is recorded, not repeated.
+- The close task runs last, after every other task of its stage has fast-forwarded onto the job branch; its mutation-diff and test-audit run even in a stage whose gate is validators only (Q23).

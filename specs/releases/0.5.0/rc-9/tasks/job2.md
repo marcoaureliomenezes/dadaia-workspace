@@ -67,3 +67,4 @@ Paths are relative to `dadaia_workspace/` unless they start with `scripts/`, `te
 |---|---|---|---|
 | J2.S5.T1 | AC2.8, AC2.11 | `specs/bugs/BUGS.jsonl`, `specs/bugs/_archive/` | no test; `V33_ORPHANS ≤ 31` after the stage |
 | J2.S5.T2 | — | generated only: the behavior-map hashes and derived docs | close task: test-audit + mutation-diff over the job diff (Q23), regenerate the behavior map and derived docs (R6), write `done` (Q9) |
+- The close task runs last, after every other task of its stage has fast-forwarded onto the job branch; its mutation-diff and test-audit run even in a stage whose gate is validators only (Q23).

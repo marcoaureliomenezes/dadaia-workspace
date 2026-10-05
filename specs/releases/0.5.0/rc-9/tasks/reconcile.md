@@ -7,7 +7,7 @@ Paths are relative to `dadaia_workspace/` unless they start with `scripts/`, `te
 ## S1 — (AC6.1–AC6.3)
 
 - ACs served: AC6.1–AC6.3.
-- Envelope: `specs/memory/**`, `catalog.json`, `specs/audits/20260930-structural-convergence/FINDINGS.jsonl`, `specs/releases/0.5.0/_RELEASE.json`, `specs/ADRs/decisions.jsonl`.
+- Envelope: `specs/memory/**`, `specs/memory/product/catalog.json`, `specs/audits/20260930-structural-convergence/FINDINGS.jsonl`, `specs/releases/0.5.0/_RELEASE.json`, `specs/ADRs/decisions.jsonl`.
 - Exit tests: `bugs.py check`, `backlog.py check`, `release.py check` and `dadaia doctor` (ADR) clean at the stage gate; no test run (ledger, ADR and memory only).
 
 | task | AC | `W:` | owner tests / RED |
@@ -27,3 +27,4 @@ Paths are relative to `dadaia_workspace/` unless they start with `scripts/`, `te
 |---|---|---|---|
 | JR.S2.T1 | AC6.4 | `specs/releases/0.5.0/_RELEASE.json` (phase), `specs/releases/0.5.0/rc-10/SPEC.md` (Draft, in the `0.5.0-rc10/define` tree) |  |
 | JR.S2.T2 | — | generated only: the behavior-map hashes and derived docs | close task: test-audit + mutation-diff over the job diff (Q23), regenerate the behavior map and derived docs (R6), write `done` (Q9) |
+- The close task runs last, after every other task of its stage has fast-forwarded onto the job branch; its mutation-diff and test-audit run even in a stage whose gate is validators only (Q23).

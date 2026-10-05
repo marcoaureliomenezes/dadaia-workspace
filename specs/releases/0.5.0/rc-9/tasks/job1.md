@@ -43,6 +43,7 @@ The stages and task ids are the approved SPEC's (ad9c60c6b, Job 1 `Stages:`); th
 | J1.S2.T8 | AC1.6, AC1.8 | `S/dd-manager-orchestration/SKILL.md`, `S/dd-release-definition/SKILL.md`, `S/dd-audit-project/PILLAR-SPECS.md` | no test |
 | J1.S2.T9 | AC1.8 (hit lines) | `pub/scaffold/{releases,bugs,ADRs}/AGENTS.md`, `S/dd-bug-resolution/SKILL.md`, `S/dd-bug-registration/SKILL.md`, `S/dd-code-review/SKILL.md` | no test |
 | J1.S2.T10 | AC1.7 | `S/dd-release-implementation/scripts/_release_check.py` | `test_release_script.py` |
+| J1.S2.T11 | AC1.8 | `dadaia_workspace/features/specs/doctor_adr.py` — a ruled superseded record changes an accepted one (d8c01c5df) | `tests/contract/test_adr_canon.py` |
 
 - The canon and law changes move the `specs_version` canon pin and the shipped template hashes; they are re-recorded with T6–T9 (stamp 9 is unshipped).
 - AC1.7's own `kind: merge` entry is appended to `_RELEASE.json` at the end, after the merge times exist.
@@ -64,4 +65,4 @@ The stages and task ids are the approved SPEC's (ad9c60c6b, Job 1 `Stages:`); th
 | J1.S3.T9 | AC1.3 | `caused_by` accepts a job task id — one id reader (cba607aa0) | `test_bug_resolution_bugs_script.py` |
 | J1.S3.T10 | — | close task, pending: mutation-diff over the job diff, test-audit, the close lines | — |
 
-- Rework round recorded: the commits subjected J1.S2.T2 (567f13339), T4 (ca0137c51), T5 (19d3b50b3), T6 (d464edb7e) and T9 (d0698dbf7) after the job close (40dca7fc9) answer review findings HIGH 1–2, MEDIUM 3–5; they are S3 rework under S2 ids.
+- Rework round recorded: the commits subjected J1.S2.T2 (567f13339), T4 (ca0137c51), T5 (19d3b50b3), T6 (d464edb7e) and T9 (d0698dbf7) after the job close (40dca7fc9), and `docs(J1.S2.T2)` 0fb5d7ad0 (quickstart `--kind` fix), answer review findings HIGH 1–2, MEDIUM 3–5; they are S3 rework under S2 ids.

@@ -31,3 +31,4 @@ Paths are relative to `dadaia_workspace/` unless they start with `scripts/`, `te
 | J5.S2.T6 | AC5.8 | `CONTEXT.md` | no test |
 | J5.S2.T7 | AC5.9 | `public/skills/dd-code-review/SKILL.md` | no test |
 | J5.S2.T8 | — | generated only: the behavior-map hashes and derived docs | close task: test-audit + mutation-diff over the job diff (Q23), regenerate the behavior map and derived docs (R6), write `done` (Q9) |
+- The close task runs last, after every other task of its stage has fast-forwarded onto the job branch; its mutation-diff and test-audit run even in a stage whose gate is validators only (Q23).
