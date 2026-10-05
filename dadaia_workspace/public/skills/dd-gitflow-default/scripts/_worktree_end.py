@@ -284,6 +284,9 @@ def merge(root: Path, path: str, keep: list[str], drop: bool) -> str:
             raise Refusal(f"Owner-tests: {' '.join(missing)} not in the tree",
                           f"Operator action: fix the Owner-tests: trailer of the task's commits in {tree}")  # fmt: skip
         touched = git(tree, "diff", "--name-only", "--diff-filter=d", f"{onto}...HEAD").split()
+        if not owners and any(p.endswith(".py") and not p.startswith("tests/") for p in touched):
+            raise Refusal("a code task names no Owner-tests: its gate runs no tests",
+                          f"Operator action: name the task's owner tests in an Owner-tests: trailer on its commits in {tree}")  # fmt: skip
         _gate(tree, "task", *dict.fromkeys(touched + owners), ref=onto)
         _refuse_dirty(into)
     elif non_code(name):
@@ -312,12 +315,12 @@ def merge(root: Path, path: str, keep: list[str], drop: bool) -> str:
 
 def stage(root: Path, path: str) -> str:
     """Close a stage of a job: no task worktree of it open, the stage gate green."""
-    repo, tree, name, _ = _target(root, path)
+    repo, tree, name, onto = _target(root, path)
     match = NAME_RE.match(name)
     if not (match and match["rc"] and not match["task"]) or non_code(name) or not tree.exists():
         raise Refusal(f"{path} is not an open job worktree", f"{script(SCRIPT)} list")
     _open_tasks(repo, name)
-    _gate(tree, "stage")
+    _gate(tree, "stage", ref=onto)
     return f"stage gate green on {branch(name)}@{git(tree, 'rev-parse', 'HEAD').strip()}"
 
 
