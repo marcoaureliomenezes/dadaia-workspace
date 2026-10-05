@@ -34,7 +34,7 @@
   - G7 "se o agente tentou fazer algo e deu erro, ou ele criou um teste e não passou é um erro dele, não é um bug do workspace".
   - G8 "Bugs devem ser consolidados em QUALITY.md"; "o ledger é as transações e o saldo (balance) é a soma"; "Mapa gerado + revisão escrita"; "Revisão a cada rc, consolidação por release (Recommended)".
   - G9 "é isso mesmo" (the merge as the boundary; the `bug` kind follows the pile). Summary: "Confirmo (Recommended)".
-  - G10 "Conferido no resolve (Recommended)" (rc-9, with AC13.5). G11 "Vai para a pilha (Recommended)". G12 "Voltam e são rearquivados por ADR (Recommended)". Scope: "Dividir: balanço vai p/ rc-9 (Recommended)". Rc labels: "Release certa, rc 'unknown' (Recommended)".
+  - G10 "Conferido no resolve (Recommended)" (rc-9, with AC13.5). G11 "Vai para a pilha (Recommended)". G12 "Voltam e são rearquivados por ADR (Recommended)". Scope: "Dividir: balanço vai p/ rc-9 (Recommended)". Rc labels: "Release certa, rc 'unknown' (Recommended)". Archive: "Ficam arquivadas, ADR retroativa (Recommended)" (the archive holds 65 v1 records, 114 retired event-format lines).
   - New demand for rc-9 (2026-10-05): "na consolidação do QUALITY.md … Deve ter um indicador ao final que mede uma taxa de se estamos convergindo ou não. Convergir significará estarmos tornando o dadaia-workspace mais saudavel, ou seja, bugs de features amadurecidas para de ser reportados e solução fica segura." On the W11 evals: "Eles serão de grande ajuda na identificação dos bugs."
   - Answered via inspection (main thread): the review names the retired bind/session-TTL surfaces, their ADR citing only those; window by `found_in` or `introduced_in`; born-in-rc judged at triage; heading `## Bug window review`; item 4 "an open dependency-vulnerability alert".
 - Bug history read (permanent architecture review): PLAN §1, the as-is review; for W12, the audit above; for W13, the 2026-10-05 ledger scan.
@@ -80,8 +80,8 @@
 - W12 (amendment 2026-10-04): two new ADRs, proposed in the release worktree: the merge ADR (AC12.5, AC12.7; its ruling Q6, Q7, Q15, Q16 and Q19's words; 0168 cited as standing) and the bug-loop law ADR (AC9.3's Q26 line, AC12.1–AC12.3, AC12.6's reviewer line, AC12.11, AC12.12; its ruling Q1, Q2, Q9, Q12–Q14, Q18, Q20 and Q26's words; it cites 0164 (2), whose skip set Q26 amends after 0183, and 0164 (3) as amended). 0172 is ruled by Q8's words (AC12.8). The main thread writes every acceptance.
 - W13 (amendment 2026-10-05): candidate ADRs; the main thread proposes and accepts each with the operator's words; nothing here touches `decisions.jsonl`:
   - A, "Per-rc bug window and pile" (G2, G3, G4, G7, G9, G11): the block list; the pile and its cause groups, harm-ordered and re-evaluated after each (0123); a cause needing more than one task becomes an ADR and a next-rc AC ("more than one task" is the main thread's reading of the redesign clause, for the operator to accept); window membership by `found_in` or `introduced_in`; a harness rule for a repeated agent error lives outside the library (main thread's reading, for the operator to accept); the window review opening every rc's first SPEC; the merge as the boundary; the `bug` kind; a block-list fix opens at once and pauses the overlapping task; the per-class shape-4 subject. Amends 0019 ("a confirmed bug is still fixed at once"), 0149 (3) and 0186 (2); implements 0123; cites 0136, 0185. `measured_by`: every `fix(bugs)` body carries `block:`, `born-in-rc:` or `cause:` (a `git log --grep '^fix(bugs)'` readout), and AC13.2's and AC13.3's checks. Accept point: before the first of T-050-194 … T-050-198 merges.
-  - B, "The bug record's lineage and lifecycle" (G1, G6, G12): `found_in` stamped and `resolved_release` derived by one instant → candidate function, `introduced_in` derived on read, never typed (the main thread's reading of "derived at resolution", for the operator to accept); a record leaves the ledger only by an accepted ADR; the age archive deleted; the restore as its one-time writer exception. `measured_by`: AC13.1's and AC13.6's cases. Accept point: before AC13.1's task merges.
-  - Retroactive (G6, G12): one per retired surface AC13.4 names (ENGINE/headless workflows; the named bind/session-TTL surfaces), each accepted before its `archive --adr` runs.
+  - B, "The bug record's lineage and lifecycle" (G1, G6, G12): `found_in` stamped and `resolved_release` derived by one instant → candidate function, `introduced_in` derived on read, never typed (the main thread's reading of "derived at resolution", for the operator to accept); a record leaves the ledger only by an accepted ADR; the age path deleted, its 65 records restored as the one-time writer exception; the archive shape `chore(bugs): archive <ids> — ADR <id>`. `measured_by`: AC13.1's and AC13.6's cases. Accept point: before AC13.1's task merges.
+  - Retroactive (G6, G12): one per retired surface AC13.4 names (ENGINE/headless workflows; the named bind/session-TTL surfaces), each accepted before its `archive --adr` runs; one for the event-format ledger retired at v0.1.73, covering the 114 event lines that stay, unread.
   - C (the `QUALITY.md` balance) moves to rc-9 with AC13.5, AC13.9 and AC13.10.
   - Every W13 commit deleting a law line cites A or B once accepted (0151 M3).
 - W11 (amendment, operator 2026-10-03, AskUserQuestion, verbatim):
@@ -430,7 +430,7 @@ After AC9.3 and AC8.1's `Intent:` strip merge. Each RED is a behaviour assert in
 - AC13.4 rc-8's first window review (G4, G12):
   - One task after AC13.1, AC13.6's verb and restore, and the backfill; T-050-199 … T-050-208 stay frozen until its verdict.
   - Window: 0.5.0 and 0.4.7, by release; its `release` `unknown` gaps: ≤ 2026-08-27, 2026-09-06 → 09-12, 2026-09-23T03:43 → 09-24T05:07.
-  - The 179 restored records are read with the whole window; the verdict names each on a retired surface and its retiring ADR, retroactive where missing (exactly the bind/session-TTL surfaces retired; the reaper's live TTL is out); the rest stay live.
+  - The 65 restored records are read with the whole window; the verdict names each on a retired surface and its retiring ADR, retroactive where missing (exactly the bind/session-TTL surfaces retired; the reaper's live TTL is out); the rest stay live.
   - The 205 non-product records, by class, through `bugs.py` in a `bug` worktree, one shape-4 commit per class, `chore(bugs): <verb> class <class> — <reason>`, one id per body line:
     - agent error (15): `reject` with its reason;
     - born in the release (89): stays a bug; only never-merged rework is rejected; once ruled, the class commit stores `introduced_in` = `found_in` on its terminal records that no culprit derives (AC13.1);
@@ -439,14 +439,14 @@ After AC9.3 and AC8.1's `Intent:` strip merge. Each RED is a behaviour assert in
     - doubtful (35): each ruled in the review.
   - Verdict: rc-8's SPEC gains `## Bug window review` and its cluster ACs (shape 8) for the operator's approval; PLAN §6.6 re-plans T-050-199 … T-050-208 and the cluster ACs in one Parallel schedule.
   - Re-archiving follows each ADR's acceptance, by `archive --adr`.
-  - Check: one `_RELEASE.json` log entry names the per-class counts before and after and the records re-archived and kept live; `bugs.py stats` agrees.
+  - Check: one `_RELEASE.json` log entry names the per-class counts before and after and which of the 65 are re-archived or kept live; `bugs.py stats` agrees.
 - AC13.5 Moved to rc-9 (scope ruling): `evidence_seam` at resolve (G5, G10).
 - AC13.6 A record leaves the ledger only by an accepted ADR (G6, G12):
   - `bugs.py archive --adr <id>` moves the named terminal records into `_archive/bugs_histo.jsonl`, each carrying the ADR id; an id not `accepted` in `decisions.jsonl` is refused.
-  - Deleted, from code and law: the age path (`--threshold-days`, `--now`, the `closed_at` cutoff, `archivable`), `RC-FLOW.md` step 7's "Age the ledger" line, the bugs law's "ages by `closed_at`".
-  - The 179 age-archived records return to `BUGS.jsonl` in one `chore(bugs): restore age-archived records` commit, in a `bug` worktree (0124), through the ledger's store: ADR B's one-time writer exception, no lasting verb.
+  - Deleted, from code and law (G12's "age archive" is this path and its 65 records, never the file): the age path (`--threshold-days`, `--now`, the `closed_at` cutoff, `archivable`), `RC-FLOW.md` step 7's "Age the ledger" line, the bugs law's "ages by `closed_at`".
+  - The 65 v1 records age-archived at the 0.4.7 ship return to `BUGS.jsonl` in one `chore(bugs): restore 65 age-archived records — ADR B` commit, in a `bug` worktree (0124), through the ledger's store: ADR B's one-time writer exception, no lasting verb; the 114 event lines stay, no reader added.
   - Cases: `--adr` naming a proposed record exits non-zero, ledger unchanged; an accepted one moves exactly the named records; `--threshold-days` exits 2.
-  - Check: every `_archive/bugs_histo.jsonl` record carries an accepted ADR id; `git grep -n 'threshold-days\|archivable' -- dadaia_workspace` prints nothing.
+  - Check: 65 records restored; every v1 record left in `_archive/bugs_histo.jsonl` carries an accepted ADR id; `git grep -n 'threshold-days\|archivable' -- dadaia_workspace` prints nothing.
 - AC13.7 The worktree merge is the boundary between an agent's error and a bug (G7, G9):
   - `specs/bugs/AGENTS.md` §1: a bug exists once a merged change breaks a documented contract; a failure inside an unmerged worktree (a wrong command, a stray quote, the agent's own failing test, review rework) is rework, no record; gate 1 (0185) keeps a red from crossing the merge. AC12.1's line agrees.
   - `dd-bug-registration` §2 step 4 keeps its not-a-bug arms and adds the work-branch sha that reproduces the bug; the culprit is required only for a born-in-rc claim.
@@ -463,13 +463,13 @@ After AC9.3 and AC8.1's `Intent:` strip merge. Each RED is a behaviour assert in
   - T-050-194: AC12.1 as AC13.7 words it; AC13.1's §3 class; AC13.2's block list; AC13.6's law line.
   - T-050-195: AC12.2 as narrowed; AC13.2 in `dd-bug-resolution` §1; Phase 0 and `LINEAGE.md` rule 6 ("≥ 2 prior fixes … within the window") read `bugs.py window`.
   - T-050-196: AC12.3 stands (CI red is block item 1); AC13.2's cause groups in §2a and `RC-FLOW.md`, with AC13.6's line; `W:` widens to `RC-FLOW.md`.
-  - T-050-197: AC12.12 stands; AC13.2, AC13.8 in §2a; in §3a, shape 3's body line, AC13.4's per-class shape 4, row 7's `release` kind, and a group's N ids in shape 3 and `refactor(bugs)`, each found by `bugs.py fix`.
+  - T-050-197: AC12.12 stands; AC13.2, AC13.8 in §2a; in §3a, shape 3's body line, AC13.4's per-class shape 4, B's archive and restore shapes, row 7's `release` kind, and a group's N ids in shape 3 and `refactor(bugs)`, each found by `bugs.py fix`.
   - T-050-198: AC9.4's REBUILD read applies when the fix lands, at once or in its group; a group's worktree holds one cause and exactly its bugs' resolve lines (0136).
   - T-050-199 … T-050-208: frozen until AC13.4's verdict, then re-planned in PLAN §6.6.
   - Every other W13 file has no task yet; the PLAN adds it.
 - Order (W13), inside W12's step 2, after T-050-192 and before T-050-199:
   1. AC13.1: the schema, the stamp, the derivation, and `bugs.py window` (AC13.3).
-  2. AC13.6: `archive --adr` and the age path's deletion, then the restore of the 179.
+  2. AC13.6: `archive --adr` and the age path's deletion, then the restore of the 65.
   3. AC13.1's `found_in` backfill.
   4. AC13.4; T-050-193 … T-050-198 proceed beside it; its re-archive follows each ADR's acceptance.
   5. AC13.3's SPEC heading check; then T-050-199 … T-050-208 and the cluster ACs, in the PLAN's one Parallel schedule (0149).
@@ -492,7 +492,7 @@ After AC9.3 and AC8.1's `Intent:` strip merge. Each RED is a behaviour assert in
 - `sweep.py`'s except-arm delete path, `succeeded`, `deleter`, the str refusal, `move`'s raise, `worktree_git_dir` there; a submodule read as a linked worktree (AC12.13, AC12.14).
 - The map's unscoped "no CI job calls a model API", in the root map, SKILL.md §3b and `CICD-AUTOMATION.md` (0177); an `impl` worktree reading the trio from its own repo (AC11.0); memory's ledger union merge and step 7's bare conflict line (AC10.14).
 - A confirmed bug fixed at once in any phase, the `bug` kind's "one fix", and a fix-induced bug stopping the line whatever its rc (AC13.2, AC13.8; 0019, 0149 (3), 0186 (2)).
-- The age archive (`--threshold-days`, `--now`, the `closed_at` cutoff, `archivable`, RC-FLOW's "Age the ledger") and the 179 records it archived; the hand-typed `--resolved-release` (AC13.1, AC13.6).
+- The age archive (`--threshold-days`, `--now`, the `closed_at` cutoff, `archivable`, RC-FLOW's "Age the ledger") and its 65 records' place in the archive; the hand-typed `--resolved-release` (AC13.1, AC13.6).
 - Phase 0's own window read; it reads `bugs.py window` (AC13.3).
 - The agent's own judgement of "own mistake", in place of the merge boundary; `dd-release-definition` §1's bare `status`/`stats` read (AC13.3, AC13.7).
 - CONTEXT's evidence-triple **Resolution contract** (AC13.11).
