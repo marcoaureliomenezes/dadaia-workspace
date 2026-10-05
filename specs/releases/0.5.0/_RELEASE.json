@@ -1,7 +1,7 @@
 {
   "schema": "release-state-v1",
   "release": "0.5.0",
-  "phase": "CLOSURE",
+  "phase": "DEFINITION",
   "defined": {
     "sha": "407c28bdb",
     "ts": "2026-10-03T16:53:34Z"
@@ -954,6 +954,12 @@
         "agentic-entities",
         "pypi-distribution"
       ]
+    },
+    {
+      "ts": "2026-10-05T14:48:54Z",
+      "agent": "release.py new",
+      "kind": "note",
+      "text": "Candidate born on 0.5.0 (prior candidate closed at 7f5fea2f0)"
     }
   ]
 }
