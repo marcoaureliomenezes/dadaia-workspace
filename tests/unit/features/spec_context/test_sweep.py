@@ -222,3 +222,96 @@ def test_a_live_bind_record_survives_a_full_doctor_fix_pass(tmp_path: Path) -> N
 
     assert session_store.live_session(tmp_path, "sess-1") is not None
     assert session_store.read_session(tmp_path, "sess-1") == record
+
+
+# ═════════════════════════════════════════════════════════════════════════════════
+# rc-9 AC3.3: the delete act is judged by its outcome; a refusal is falsy (rows 6, 21, 22).
+# ═════════════════════════════════════════════════════════════════════════════════
+
+
+def _rmtree_leaving(error: OSError | None) -> Callable[..., None]:
+    """``shutil.rmtree`` that deletes nothing: silent, as 3.14's swallowed retry (row 6), or
+    reporting *error* to its ``onexc`` (row 22)."""
+
+    def rmtree(path: str, *, onexc: Callable[..., object]) -> None:
+        if error is not None:
+            onexc(os.rmdir, path, error)
+
+    return rmtree
+
+
+# fmt: off
+@pytest.mark.parametrize(("error", "line"), [
+    pytest.param(None, "skipped 'tmp/x'", id="row6-silent-failure-judged-by-occupied"),
+    pytest.param(OSError(39, "Directory not empty"), "skipped 'tmp/x' (errno 39: Directory not empty)", id="row22-no-operator-act-off-a-permission"),
+])
+# fmt: on
+@pytest.mark.xfail(strict=True, reason="RED until J3.S2.T3")
+def test_a_surviving_target_is_refused_by_its_outcome(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, error: OSError | None, line: str
+) -> None:
+    target = _file(tmp_path / "tmp" / "x" / "f.txt").parent
+    monkeypatch.setattr(sweep.shutil, "rmtree", _rmtree_leaving(error))
+
+    done = sweep.remove(tmp_path, target, "tmp/x")
+
+    assert done == sweep.Skipped(line) and not done
+    assert target.is_dir()
+
+
+@pytest.mark.xfail(strict=True, reason="RED until J3.S2.T3")
+def test_a_refusal_is_falsy_and_no_str(tmp_path: Path) -> None:
+    """U2: no caller can read a refusal as an act — not by truth value, not as a ``str``."""
+    workspace = _outside_link(tmp_path)
+
+    done = sweep.remove(workspace, tmp_path / "outside" / "treasure.txt", "treasure")
+
+    assert done == sweep.Skipped("skipped 'treasure' (outside the workspace)")
+    assert not done and not isinstance(done, str)
+
+
+@pytest.mark.xfail(strict=True, reason="RED until J3.S2.T3")
+def test_move_returns_its_failure_as_a_refusal(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """U2 / row 27: a failed ``os.replace`` (not EXDEV) is the act's refusal, never raised."""
+    source = _file(tmp_path / "slop.txt")
+    monkeypatch.setattr(sweep.os, "replace", _not_the_owner)
+
+    done = sweep.move(tmp_path, source, tmp_path / "reaped" / "slop.txt", "slop.txt")
+
+    assert done == sweep.Skipped("skipped 'slop.txt' (errno 1: Operation not permitted)")
+    assert source.read_text() == "x"
+
+
+@pytest.mark.skipif(os.name == "nt" or os.geteuid() == 0, reason="POSIX dir permissions; root bypasses them")
+@pytest.mark.xfail(strict=True, reason="RED until J3.S2.T3")
+def test_a_permission_failure_names_the_recorded_entry(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Row 21: the refusal names the entry the retry could not lift, recorded by this call."""
+    entry = tmp_path / ".dadaia" / "tmp" / "a" / "20200101"
+    (held := entry / "x" / "dist").mkdir(parents=True)
+    (held / "f.whl").write_text("w", encoding="utf-8")
+    held.chmod(0o555)
+    monkeypatch.setattr(sweep.os, "chmod", _not_the_owner)
+    try:
+        done = sweep.remove(tmp_path, entry, "tmp/a/20200101")
+    finally:
+        monkeypatch.undo()
+        held.chmod(0o755)
+
+    assert str(done) == (
+        f"skipped 'tmp/a/20200101' (errno 13: Permission denied) — {held}/f.whl sits in a "
+        f"directory owned by {held.owner()}; Operator action: remove {entry}"
+    )
+    assert not done and (held / "f.whl").exists()
+
+
+@pytest.mark.skipif(os.utime not in os.supports_follow_symlinks, reason="a link's own mtime is POSIX-only")
+@pytest.mark.xfail(strict=True, reason="RED until J3.S2.T3")
+def test_a_root_level_held_symlink_keeps_its_hold_clock(tmp_path: Path) -> None:
+    """Row 26 (ADR 0074): a root-level hold is its own clock, a symlink's included."""
+    (tmp_path / "link").symlink_to(tmp_path / "nowhere")
+    os.utime(tmp_path / "link", (0, 0), follow_symlinks=False)
+
+    sweep.hold(tmp_path, tmp_path / "link", "link")
+
+    [held] = (tmp_path / ".dadaia" / "reaped").glob("*/link")
+    assert held.lstat().st_mtime > 1_000_000_000

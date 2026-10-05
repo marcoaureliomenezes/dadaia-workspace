@@ -194,3 +194,31 @@ def test_a_ttl_expiry_is_its_zone_class_act(
 
 def _denied(*_: object, **__: object) -> None:
     raise PermissionError(13, "Permission denied")
+
+
+@pytest.mark.xfail(strict=True, reason="RED until J3.S2.T3")
+def test_the_expire_lane_walks_each_expired_entry_once(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """rc-9 AC3.6 row 25 (ttl-expire-lane-walks-each-expired-entry-content-twice): the
+    linked-worktree question is asked once per expired entry, at the filesystem seam."""
+    from dadaia_workspace.features.spec_context import sweep
+
+    ws = _make_workspace(tmp_path)
+    entry = ws / ".dadaia" / "tmp" / "agent" / "20200101"
+    (entry / "deep").mkdir(parents=True)
+    (entry / "deep" / "f.txt").write_text("x", encoding="utf-8")
+    for path in (entry / "deep" / "f.txt", entry / "deep", entry):
+        os.utime(path, (0, 0))
+    walked: list[Path] = []
+    real_walk = os.walk
+
+    def _counting_walk(top: Path, *args: object, **kwargs: object) -> object:
+        walked.append(Path(top))
+        return real_walk(top, *args, **kwargs)  # type: ignore[call-overload]
+
+    monkeypatch.setattr(sweep.os, "walk", _counting_walk)
+
+    _make_doctor(ws).expire()
+
+    assert walked == [entry.parent] and not entry.parent.exists()  # reaped whole: all below expired
