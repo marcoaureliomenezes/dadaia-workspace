@@ -51,10 +51,12 @@ def invariant_errors(record: dict[str, Any]) -> Iterator[str]:
 
 
 def tasks(root: Path) -> set[str]:
-    """Every task id a `TASKS.md` under *root*`/releases/`, `_archive/` included, carries;
+    """Every task id under *root*`/releases/`, `_archive/` included: a closed rc's `TASKS.md`
+    carries `T-…`, a job rc's `tasks/<job>.md` carries `J<n>.S<m>.T<k>` (`JR.…`);
     bounded: an id glued to a word or a hyphen (a doctor code, a placeholder) is no task."""
-    bounded = re.compile(r"(?<![\w-])T-\d+(?:-\d+)*(?![\w-])")
-    return {t for f in root.glob("releases/**/TASKS.md") for t in bounded.findall(f.read_text(encoding="utf-8"))}  # fmt: skip
+    bounded = re.compile(r"(?<![\w-])(?:T-\d+(?:-\d+)*|J(?:\d+|R)\.S\d+\.T\d+)(?![\w-])")
+    files = [*root.glob("releases/**/TASKS.md"), *root.glob("releases/**/tasks/*.md")]
+    return {t for f in files for t in bounded.findall(f.read_text(encoding="utf-8"))}
 
 
 def findings_for(
