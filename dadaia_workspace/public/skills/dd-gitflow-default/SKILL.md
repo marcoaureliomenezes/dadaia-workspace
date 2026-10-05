@@ -54,9 +54,9 @@ A job and its task trees hold code, tests, specs, memory and derived docs alike 
 
 | # | Tree | Write | Message |
 |---|---|---|---|
-| 1 | a job, `backlog-<slug>` | Bug registration: `specs/bugs/BUGS.jsonl` | `chore(bugs): report <id>` |
-| 2 | `backlog-<slug>` | Backlog entry or exit: `specs/backlog/BACKLOG.json`, `specs/backlog/_archive/backlog_histo.jsonl` | `chore(backlog): …` |
-| 2 | `backlog-<slug>`, `define` | ADR proposal or in-place `measured_by` repair (ADR 0138): `specs/ADRs/decisions.jsonl` | `docs(adr): propose <slug>` / `chore(adrs): repair …` |
+| 1 | a job, `backlog/<slug>` | Bug registration: `specs/bugs/BUGS.jsonl` | `chore(bugs): report <id>` |
+| 2 | `backlog/<slug>` | Backlog entry or exit: `specs/backlog/BACKLOG.json`, `specs/backlog/_archive/backlog_histo.jsonl` | `chore(backlog): …` |
+| 2 | `backlog/<slug>`, `define` | ADR proposal or in-place `measured_by` repair (ADR 0138): `specs/ADRs/decisions.jsonl` | `docs(adr): propose <slug>` / `chore(adrs): repair …` |
 | 2 | `define`, `reconcile` | ADR acceptance with its canonical-memory hunk: `specs/ADRs/decisions.jsonl`, `specs/memory/*` | `docs(adr): accept <slug>` |
 | 3 | a job | Bug fix: `<code>` + regression test + its `specs/bugs/BUGS.jsonl` line, red loop quoted in the body | `fix(bugs): <id> — <cause>` |
 | 4 | a job | Terminal transition without code (`resolve` by a task, `supersede`, `defer`, `reject`): `specs/bugs/BUGS.jsonl` | `chore(bugs): <verb> <id> — <reason, or by <task-id> (<sha>)>` |

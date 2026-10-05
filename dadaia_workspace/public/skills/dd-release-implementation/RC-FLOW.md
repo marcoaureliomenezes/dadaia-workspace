@@ -22,8 +22,8 @@ candidates.
 An rc is an Implement: a DAG of jobs the PLAN draws, Job 1 first, the Reconciliation job last.
 
 **Step 1 — Open a job.**
-- `WT new <repo> <M.m.p>-rc<N>-<job>` once its PLAN edges are merged; its tasks live in `rc-<N>/tasks/<job>.md` (`dd-release-definition` §5).
-- Each task opens `WT new <repo> <M.m.p>-rc<N>-<job>--<task-id>` from the job branch; a sub-agent works it; it is `running` while its tree exists; there is no reservation commit.
+- `WT new <repo> <M.m.p>-rc<N>/<job>` once its PLAN edges are merged; its tasks live in `rc-<N>/tasks/<job>.md` (`dd-release-definition` §5).
+- Each task opens `WT new <repo> <M.m.p>-rc<N>/<job>--<task-id>` from the job branch; a sub-agent works it; it is `running` while its tree exists; there is no reservation commit.
 - Done when: the tree exists.
 
 **Step 2 — Stages and tasks.**
@@ -37,7 +37,7 @@ An rc is an Implement: a DAG of jobs the PLAN draws, Job 1 first, the Reconcilia
 - Done when: the job is on the work branch and its entry passes `release.py check`.
 
 **Step 4 — The Reconciliation job.**
-- The last job, one tree (`<M.m.p>-rc<N>-reconcile`): memory (`MEMORY-UPDATE.md`), the derived docs in the same merge, `measured_by` repairs, the rc's measurement, the closure narrative, the disposition sweep, the artifact GC.
+- The last job, one tree (`<M.m.p>-rc<N>/reconcile`): memory (`MEMORY-UPDATE.md`), the derived docs in the same merge, `measured_by` repairs, the rc's measurement, the closure narrative, the disposition sweep, the artifact GC.
 - Closure narrative: the `log` entries `RELEASE-EVENTS.md` describes — `summary`, `size`, `drifts`, `artifact-gc`, `test-dispositions`, `dispositions`.
 - Disposition sweep: a picked backlog entry exits by `python3 .agents/skills/dd-backlog-definition/scripts/backlog.py exit <slug> --disposition …`, once; an audit finding moves by `python3 .agents/skills/dd-audit-project/scripts/audit.py disposition <dir> <finding> --disposition …`, and `audit.py close <dir> --sha <window-end>` closes an audit with none `open`; a bug is never silently dropped; `python3 .agents/skills/dd-bug-resolution/scripts/bugs.py archive` ages the ledger once the sweep is terminal.
 - Artifact GC: `.dadaia/.venv/bin/dadaia doctor` dry, then `--fix`; the `kind: artifact-gc` entry records the exit code and what the operator holds.
