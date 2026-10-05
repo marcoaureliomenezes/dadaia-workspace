@@ -317,11 +317,26 @@ _JOB = (
     "- J2.S2.T1 — AC2.1 · `W:` `src/x.py` · owner `tests/unit/test_x.py`\n"
 )
 
+_JOB1 = (  # the rc-9 job1 file's shape: titled stages, prose contracts, AC ranges
+    "# TASKS — 0.5.0 rc-9, Job 1 — the demolition\n\n## Stage J1.S1 — RED (tests only)\n\n"
+    "- Contract: exit tests are each AC's acceptance test as a strict xfail; envelope `tests/**`.\n\n"
+    "- J1.S1.T1 — AC1.1 · `W:` `tests/integration/test_ci_script.py` · owner same\n"
+    "- J1.S1.T2 — AC1.2–AC1.5 · `W:` `tests/integration/test_worktree_new.py`, "
+    "`tests/helpers/worktree_ws.py` · owner same\n\n"
+    "## Stage J1.S2 — code and law\n\n"
+    "- Contract: exit tests are J1.S1's, passing, plus unit + integration; ACs AC1.1–AC1.10.\n\n"
+    "- J1.S2.T1 — AC1.1 · `W:` `scripts/ci.py` · owner `test_ci_script.py`\n"
+)
+
 
 @pytest.mark.parametrize(
     ("job", "needle"),
     [
         pytest.param(_JOB, None, id="valid"),
+        pytest.param(_JOB1, None, id="rc9-job1-shape"),
+        pytest.param(_JOB1.replace("`tests/helpers/worktree_ws.py`", "`scripts/ci.py`"),
+                     "tasks/j2.md stage J1.S1 writes scripts/ci.py — stage 1 writes tests only",
+                     id="rc9-job1-shape-stage-1-source"),
         pytest.param(_JOB.replace("`W:` `tests/unit/test_x.py`", "`W:` `src/y.py`"),
                      "tasks/j2.md stage J2.S1 writes src/y.py — stage 1 writes tests only",
                      id="stage-1-non-test"),
