@@ -23,7 +23,6 @@ from _specs import quote, script, with_specs  # noqa: E402
 CODE = "LEDGER-BUGS-SCHEMA"
 LEDGER = "bugs/BUGS.jsonl"
 HISTO = "bugs/_archive/bugs_histo.jsonl"
-TASK_ID = r"T-\d+(?:-\d+)*"
 TERMINAL = ("resolved", "superseded", "deferred", "rejected")
 _VERBS, _LAW = (
     "`bugs.py append` or `bugs.py update`",
@@ -49,6 +48,14 @@ def invariant_errors(record: dict[str, Any]) -> Iterator[str]:
         )
     if isinstance(closed_at, str) and closed_at < ts:
         yield f"record {record['id']!r} closed_at={closed_at!r} precedes its filing date ts={ts!r}"
+
+
+def tasks(root: Path) -> dict[str, Path]:
+    """Task id -> the `TASKS.md` under *root*`/releases/`, `_archive/` included, that carries it;
+    bounded, so a code such as `MEM-DRIFT-2` carries no `T-2`."""
+    # ponytail: an id cited by a later TASKS.md maps to the last file read; key on the defining row if introduced_in needs it
+    bounded = re.compile(r"(?<![\w-])T-\d+(?:-\d+)*(?![\w-])")
+    return {t: f for f in sorted(root.glob("releases/**/TASKS.md")) for t in bounded.findall(f.read_text(encoding="utf-8"))}  # fmt: skip
 
 
 def findings_for(
@@ -84,8 +91,7 @@ def findings_for(
         if first != number:
             add(number, f"duplicate record id {record['id']!r} (first appended at line {first})")
         links.setdefault(record["id"], record["caused_by"])
-    tasks = {t for f in root.glob("releases/**/TASKS.md") for t in re.findall(TASK_ID, f.read_text(encoding="utf-8"))}  # fmt: skip
-    known = {None, "none", *links, *archived, *tasks}
+    known = {None, "none", *links, *archived, *tasks(root)}
     for bug_id, target in links.items():
         chain, at = [bug_id], target
         while at in links and at not in chain:

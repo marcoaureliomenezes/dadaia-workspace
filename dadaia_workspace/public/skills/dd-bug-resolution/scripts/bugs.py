@@ -26,7 +26,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import _bugs_transition as tr  # noqa: E402
 import _bugs_write as wr  # noqa: E402
-from _bugs_check import CODE, LEDGER, TASK_ID, check  # noqa: E402
+from _bugs_check import CODE, LEDGER, check, tasks  # noqa: E402
 from _bugs_store import Refusal, commit, read_records  # noqa: E402
 from _specs import find_specs, refuse  # noqa: E402
 
@@ -137,6 +137,7 @@ def _candidates(specs: Path, bug_id: str) -> list[str]:
     top = Path(_git(specs, "rev-parse", "--show-toplevel").strip())
     staged = {f[1]: f[1:] for f in (ln.split("\t") for ln in _git(top, "diff", "--cached", "--name-status", "--diff-filter=MDR").splitlines())}  # fmt: skip
     subjects = {h: s for h, _, s in (ln.partition(" ") for ln in _git(top, "log", "--all", "--format=%H %s").splitlines())}  # fmt: skip
+    # --all, not HEAD: a repo with no commit yet lists nothing instead of failing
     skip = [h for h, s in subjects.items() if re.search(r"\(#\d+\)$", s)]
     with tempfile.TemporaryDirectory() as tmp:
         (revs := Path(tmp) / "revs").write_text("\n".join(skip), encoding="utf-8")
@@ -145,8 +146,10 @@ def _candidates(specs: Path, bug_id: str) -> list[str]:
             ranges = [arg for start, _, n in hunks if n != "0" for arg in ("-L", f"{start},+{n or 1}")]  # fmt: skip
             blame = _git(top, "blame", "--porcelain", "--ignore-revs-file", str(revs), *ranges, "HEAD", "--", path) if ranges else ""  # fmt: skip
             blamed |= {ln[:40] for ln in blame.splitlines()}
-    tasks = {m[1] for b in blamed if (m := re.match(rf"\w+\(({TASK_ID})\)", subjects.get(b, "")))}
-    return sorted(({bug for bug, shas in fixes.items() for sha in shas for b in blamed if b.startswith(sha)} | tasks) - {bug_id})  # fmt: skip
+    # check's one answer to "what is a task": never propose a task check refuses
+    known = tasks(specs)
+    named = {m[1] for b in blamed if (m := re.match(r"\w+\(([^)]+)\)", subjects.get(b, ""))) and m[1] in known}  # fmt: skip
+    return sorted(({bug for bug, shas in fixes.items() for sha in shas for b in blamed if b.startswith(sha)} | named) - {bug_id})  # fmt: skip
 
 
 def _direction(commits: dict[str, list[list[str]] | None], own: set[str]) -> str:

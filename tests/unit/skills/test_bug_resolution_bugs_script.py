@@ -778,7 +778,7 @@ def test_fix_derives_each_fix_commit_and_its_direction(script: Path, tmp_path: P
 
 
 _WHY = "the blamed fix wrote the line, not its defect"
-_NEAR = "T-050-168, T-5, T-9, b-bug, d-bug, e-bug"
+_NEAR = "T-050-168, T-9, b-bug, d-bug, e-bug"  # T-5 is in no TASKS.md: never proposed
 
 
 @pytest.mark.parametrize(("caused_by", "reason", "refusal"), [
@@ -827,7 +827,7 @@ def test_resolve_proposes_caused_by_by_blame(
     for path, text in [("cli/a.py", "x1\nx2\nx3\n"), ("cli/s.py", "z\n"), ("cli/c.py", "c\nadded\n"),
                        ("cli/behavior-map.json", ""), ("specs/n", ""),
                        ("cli/r2.py", "r1\nr2\nr3\nR4\nr5\n"), ("cli/t9.py", ""), ("tests/t.py", "t1\n"),
-                       ("specs/releases/_archive/0.1/TASKS.md", "- [x] **T-050-168 — a task.**\n")]:  # fmt: skip
+                       ("specs/releases/_archive/0.1/TASKS.md", "- [x] **T-050-168 — a task.**\n- [x] **T-9 — a refactor.**\n")]:  # fmt: skip
         (tmp_path / path).parent.mkdir(parents=True, exist_ok=True)
         (tmp_path / path).write_text(text, encoding="utf-8")
     (tmp_path / "cli/dé.py").unlink()
@@ -987,16 +987,18 @@ def test_a_refused_archive_leaves_both_ledger_files_byte_intact(
         assert [(specs / "bugs" / "BUGS.jsonl").read_bytes(), histo.read_bytes()] == before
 
 
-@pytest.mark.parametrize(("task", "code"), [("T-050-168", 0), ("T-999-999", 1)])
+@pytest.mark.parametrize(
+    ("task", "code"), [("T-050-168", 0), ("T-999-999", 1), ("T-2", 1), ("T-3", 1)]
+)
 def test_caused_by_names_a_task_some_tasks_file_carries(
     script: Path, tmp_path: Path, task: str, code: int
 ) -> None:
     """AC9.3: a write and check accept a task id a TASKS.md under releases/, `_archive/`
-    included, carries, and refuse one none carries."""
+    included, carries, and refuse one none carries, or one only inside a code (`MEM-DRIFT-2`, `T-3b`)."""
     specs = _ledger(tmp_path, _OPEN_RECORD)
     (specs / "releases" / "_archive" / "0.1").mkdir(parents=True)
     (specs / "releases" / "_archive" / "0.1" / "TASKS.md").write_text(
-        "- [x] **T-050-168 — a task.**\n"
+        "- [x] **T-050-168 — a task.** codes MEM-DRIFT-2 and T-3b carry no task\n"
     )
     written = _run(script, "update", "a-bug", "--set", f"caused_by={task}", "--specs", str(specs))
     assert written.returncode == code, written.stderr
