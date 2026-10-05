@@ -69,9 +69,10 @@ The stages and task ids are the approved SPEC's (ad9c60c6b, Job 1 `Stages:`); th
 | J1.S3.T11 | AC1.3 | REBUILD dead-holds fixtures to the nested grammar; stage S3 red #1 (32777ddc8) | `test_context_dead_holds.py` |
 | J1.S3.T12 | AC1.3 | REBUILD orphan-wt fixture onto the task-merge model; stage S3 red #1 (6417b618c) | `test_doctor_fix_lines_clear_their_finding.py` |
 | J1.S3.T13 | AC1.9 | re-record the dd-bug-resolution scripts hash after T9; job gate red #1 (caa074803) | `test_behavior_map.py` |
-| J1.S3.T14 | AC1.1, AC1.3 | review HIGH 1, MEDIUM 4, MEDIUM 5: task gate drops deleted paths, runs `Owner-tests:` trailer tests, reads the gate line from the job branch (pending) | `test_worktree_lifecycle.py` |
-| J1.S3.T15 | AC1.7, AC1.9, AC1.3 | review HIGH 3, HIGH 2 test, MEDIUM 6, LOW 7, LOW 8: `job_gate_runs` in the merge entry, a real job-file row, `_specs.py` through the one grammar (pending) | `test_release_script.py`, owner of `_specs.py` |
-| J1.S3.T16 | AC1.9 | review HIGH 2 docs: the six job files in the law's grammar, Status Approved (this commit) | `release.py check` |
+| J1.S3.T14 | AC1.1, AC1.3 | review HIGH 1, MEDIUM 4, MEDIUM 5: task gate drops deleted paths, runs `Owner-tests:` trailer tests, reads the gate line from the job branch (9a991640e, 3ee23a50c) | `test_worktree_lifecycle.py` |
+| J1.S3.T15 | AC1.7, AC1.9, AC1.3 | review HIGH 3, HIGH 2 test, MEDIUM 6, LOW 7, LOW 8: `job_gate_runs` in the merge entry, a real job-file row, `_specs.py` through the one grammar (6806b5c70..79cb8e01f; the last commit re-records the hashes T14 moved) | `test_release_script.py`, owner of `_specs.py` |
+| J1.S3.T16 | AC1.9 | review HIGH 2 docs: the six job files in the law's grammar, Status Approved (dfb1c4880) | `release.py check` |
+| J1.S3.T17 | AC1.9 | `job_errors` reads a task table's `W:` column through `writes()`; the rework close: test-audit and mutation (pending) | `test_release_script.py` |
 
 - Rework round recorded: the commits subjected J1.S2.T2 (567f13339), T4 (ca0137c51), T5 (19d3b50b3), T6 (d464edb7e) and T9 (d0698dbf7) after the job close (40dca7fc9), and `docs(J1.S2.T2)` 0fb5d7ad0 (quickstart `--kind` fix), answer review findings HIGH 1–2, MEDIUM 3–5; they are S3 rework under S2 ids.
 - Carried to Reconciliation: review LOW 12 (trees opened under the one-level grammar lose `[protected]` glob checks; no `[protected]` section in this instance, so no exposure here) and INFO 13 (no §3a commit row for the driver's job-file edits; Job 4 or 5).
