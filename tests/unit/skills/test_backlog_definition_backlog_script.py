@@ -552,3 +552,37 @@ def test_new_refuses_a_slug_that_already_exited_and_writes_nothing(
     assert "'gone' exited at this line" in done.stderr
     assert _pair(specs) == before
     assert _run(script, "check", "--specs", str(specs)).returncode == 0
+
+
+# fmt: off
+@pytest.mark.parametrize(("first", "refused"), [
+    pytest.param("an acme idea", False, id="published-term-accepted",
+                 marks=pytest.mark.xfail(strict=True, reason="J2.S6.T7: M1")),
+    pytest.param("an idea", True, id="unpublished-term-refused"),
+])
+# fmt: on
+def test_the_backlog_seam_amnesties_a_term_origin_already_holds(
+    script: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, first: str, refused: bool
+) -> None:
+    """AC2.7 on the second ledger caller: a denylisted term BACKLOG.json already holds on
+    origin is accepted by `new`, as the push accepts it; an unpublished one is refused."""
+    root = tmp_path / "repo"
+    specs = _specs(root)
+    git = ["git", "-C", str(root), "-c", "user.name=t", "-c", "user.email=t@t.invalid"]
+    subprocess.run([*git, "init", "-q"], check=True)
+    assert _run(script, "new", "first", "--specs", str(specs), "--description", first).returncode == 0
+    subprocess.run([*git, "add", "-A"], check=True)
+    subprocess.run([*git, "commit", "-qm", "published"], check=True)
+    origin = tmp_path / "origin.git"
+    subprocess.run(["git", "init", "-q", "--bare", str(origin)], check=True)
+    subprocess.run([*git, "remote", "add", "origin", str(origin)], check=True)
+    subprocess.run([*git, "push", "-q", "origin", "HEAD"], check=True)
+    denylist = tmp_path / "denylist.json"
+    denylist.write_text(json.dumps({"acme": "client"}), encoding="utf-8")
+    monkeypatch.setenv("DADAIA_PRIVACY_DENYLIST", str(denylist))
+
+    done = _run(script, "new", "second", "--specs", str(specs), "--relates", "first",
+                "--description", "acme again")  # fmt: skip
+
+    assert (done.returncode == 1) is refused, done.stderr
+    assert ("field 'description' carries" in done.stderr) is refused
