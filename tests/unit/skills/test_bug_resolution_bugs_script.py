@@ -188,9 +188,17 @@ def test_check_resolves_a_job_task_id_against_the_rc_tasks_folder(
                      if code else []), fixes  # fmt: skip
 
 
+def _accept_adr(specs: Path, adr: str = "0999") -> None:
+    (specs / "ADRs").mkdir(exist_ok=True)
+    (specs / "ADRs" / "decisions.jsonl").write_text(
+        json.dumps({"id": adr, "status": "accepted"}) + "\n"
+    )
+
+
 def _archive(specs: Path, bug_id: str) -> None:
     archived = {**_OPEN_RECORD, "id": bug_id, "status": "rejected", "cause": "c",
-                "closed_at": "2026-09-21T00:00:00Z"}  # fmt: skip
+                "closed_at": "2026-09-21T00:00:00Z", "archived_by": "0999"}  # fmt: skip
+    _accept_adr(specs)
     (specs / "bugs" / "_archive").mkdir()
     (specs / "bugs" / "_archive" / "bugs_histo.jsonl").write_text(json.dumps(archived) + "\n")
 
@@ -635,7 +643,14 @@ def test_only_an_archived_drop_keeps_its_id_known(
     other = {**_OPEN_RECORD, "id": "b-bug", "caused_by": "a-bug"}
     specs = _ledger(tmp_path, _OPEN_RECORD, other)
     ledger = specs / "bugs" / "BUGS.jsonl"
-    drop = lambda rs: [r for r in rs if r["id"] != "a-bug"]  # noqa: E731
+    _accept_adr(specs)
+
+    def drop(rs: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        for r in rs:
+            if r["id"] == "a-bug":  # as `archive --adr` stamps it
+                r["archived_by"] = "0999"
+        return [r for r in rs if r["id"] != "a-bug"]
+
     if archive:
         store.commit(ledger, drop, archive=True)
         assert _run(script, "check", "--specs", str(specs)).returncode == 0
@@ -944,40 +959,67 @@ def test_fix_refuses_a_history_it_cannot_read(
     assert (done.stdout if code == 0 else done.stderr).splitlines()[-1] == last
 
 
-def test_archive_moves_only_records_closed_past_the_threshold(script: Path, tmp_path: Path) -> None:
-    """sa-ledger-verbs-append-histo-before-validating-the-pair#J5: "Given a valid pair, when
-    `exit`/`archive` succeed, then the record leaves the document and appears exactly once
-    in the histo, written atomically as a pair." (`archive` half)"""
-    old = {
-        **_OPEN_RECORD, "id": "old-bug", "ts": "2025-12-01T00:00:00Z",
-        "status": "resolved", "closed_at": "2026-01-01T00:00:00Z",
-    }  # fmt: skip
-    fresh = {
-        **_OPEN_RECORD, "id": "fresh-bug", "ts": "2026-09-01T00:00:00Z",
-        "status": "resolved", "closed_at": "2026-09-19T00:00:00Z",
-    }  # fmt: skip
-    specs = _ledger(tmp_path, _OPEN_RECORD, old, fresh)
-    done = _run(
-        script, "archive", "--specs", str(specs), "--now", "2026-09-20T00:00:00Z",
-        "--threshold-days", "90",
-    )  # fmt: skip
-    assert done.returncode == 0, done.stderr
-    assert done.stdout.strip() == "[ok] archived 1 record(s), 2 kept."
-    assert {r["id"] for r in _records(specs)} == {"a-bug", "fresh-bug"}
-    histo = _read(specs / "bugs" / "_archive" / "bugs_histo.jsonl")
-    assert [r["id"] for r in histo] == ["old-bug"]
+def _closed(bug_id: str) -> dict[str, object]:
+    return {**_OPEN_RECORD, "id": bug_id, "status": "rejected", "cause": "c",
+            "closed_at": "2026-09-21T00:00:00Z"}  # fmt: skip
 
 
-def test_archive_with_nothing_eligible_is_a_byte_identical_no_op(
-    script: Path, tmp_path: Path
+@pytest.mark.parametrize(("adr_status", "argv", "code"), [
+    ("proposed", ["--adr", "0999", "old-a", "old-b"], 1),
+    ("accepted", ["--adr", "0999", "old-a", "old-b"], 0),
+    ("accepted", ["--adr", "0999", "old-a", "a-bug"], 1),  # an open record never leaves
+    ("accepted", ["--threshold-days", "90"], 2),  # the age path is gone
+    ("accepted", ["--adr", "0999"], 2),  # no record named: nothing to move
+    ("accepted", ["old-a", "old-b"], 2),  # no ADR named
+])  # fmt: skip
+def test_a_record_leaves_the_ledger_only_by_an_accepted_adr(
+    script: Path, tmp_path: Path, adr_status: str, argv: list[str], code: int
 ) -> None:
+    """AC13.6, ADR 0187 (4): `archive --adr` moves exactly the named terminal records, each
+    carrying the ADR id; anything else leaves both ledger files byte-identical."""
+    specs = _ledger(tmp_path, _OPEN_RECORD, _closed("old-a"), _closed("old-b"), _closed("old-c"))
+    (specs / "ADRs").mkdir()
+    (specs / "ADRs" / "decisions.jsonl").write_text(
+        json.dumps({"id": "0999", "status": adr_status}) + "\n"
+    )
+    histo = specs / "bugs" / "_archive" / "bugs_histo.jsonl"
+    histo.parent.mkdir()
+    histo.write_text(json.dumps({"event": "archived", "data": {}}) + "\n", encoding="utf-8")
+    before = [(specs / "bugs" / "BUGS.jsonl").read_bytes(), histo.read_bytes()]
+    done = _run(script, "archive", *argv, "--specs", str(specs))
+    assert done.returncode == code, done.stderr
+    if code:
+        assert [(specs / "bugs" / "BUGS.jsonl").read_bytes(), histo.read_bytes()] == before
+        return
+    assert [r["id"] for r in _records(specs)] == ["a-bug", "old-c"]
+    assert [(r["id"], r["archived_by"]) for r in _read(histo)[1:]] == [
+        ("old-a", "0999"),
+        ("old-b", "0999"),
+    ]
+
+
+@pytest.mark.parametrize(("archived_by", "adr_status", "ok"), [
+    ({"archived_by": "0999"}, "accepted", True),
+    ({"archived_by": "0999"}, "proposed", False),
+    ({}, "accepted", False),
+])  # fmt: skip
+def test_check_holds_each_archived_record_to_an_accepted_adr(
+    script: Path, tmp_path: Path, archived_by: dict[str, str], adr_status: str, ok: bool
+) -> None:
+    """ADR 0187 (4): an archived v1 record names the accepted ADR that moved it; a pre-v6
+    event line (ADR 0188) is history and passes as it is."""
     specs = _ledger(tmp_path, _OPEN_RECORD)
-    before = (specs / "bugs" / "BUGS.jsonl").read_bytes()
-    done = _run(script, "archive", "--specs", str(specs), "--threshold-days", "90")
-    assert done.returncode == 0, done.stderr
-    assert done.stdout.strip() == "[ok] archived 0 record(s), 1 kept."
-    assert (specs / "bugs" / "BUGS.jsonl").read_bytes() == before
-    assert not (specs / "bugs" / "_archive").exists()
+    (specs / "ADRs").mkdir()
+    (specs / "ADRs" / "decisions.jsonl").write_text(
+        json.dumps({"id": "0999", "status": adr_status}) + "\n"
+    )
+    histo = specs / "bugs" / "_archive" / "bugs_histo.jsonl"
+    histo.parent.mkdir()
+    lines = [{"event": "archived", "data": {}}, {**_closed("old-a"), **archived_by}]
+    histo.write_text("".join(json.dumps(r) + "\n" for r in lines), encoding="utf-8")
+    done = _run(script, "check", "--specs", str(specs))
+    wrong = f"LEDGER-BUGS-SCHEMA error bugs/_archive/bugs_histo.jsonl:2 archived_by {archived_by.get('archived_by')!r} names no accepted ADR\n"  # fmt: skip
+    assert (done.returncode, done.stdout) == ((0, "") if ok else (1, wrong))
 
 
 def test_a_concurrent_write_is_re_read_and_re_applied_once(script: Path, tmp_path: Path) -> None:
@@ -1043,16 +1085,15 @@ def test_a_refused_archive_leaves_both_ledger_files_byte_intact(
         "status": "resolved", "closed_at": "2026-01-01T00:00:00Z",
     }  # fmt: skip
     specs = _ledger(tmp_path, {**_OPEN_RECORD, "severity": "SEVERE"}, old)
+    (specs / "ADRs").mkdir()  # accepted: the refusal is the invalid ledger's alone
+    (specs / "ADRs" / "decisions.jsonl").write_text('{"id": "0999", "status": "accepted"}\n')
     histo = specs / "bugs" / "_archive" / "bugs_histo.jsonl"
     histo.parent.mkdir(parents=True)
     histo.write_text("", encoding="utf-8")
     before = [(specs / "bugs" / "BUGS.jsonl").read_bytes(), histo.read_bytes()]
 
     for _ in range(2):
-        done = _run(
-            script, "archive", "--specs", str(specs), "--now", "2026-09-20T00:00:00Z",
-            "--threshold-days", "90",
-        )  # fmt: skip
+        done = _run(script, "archive", "--adr", "0999", "old-bug", "--specs", str(specs))
         assert done.returncode == 1, done.stdout
         assert [(specs / "bugs" / "BUGS.jsonl").read_bytes(), histo.read_bytes()] == before
 

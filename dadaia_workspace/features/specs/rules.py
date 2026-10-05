@@ -14,9 +14,6 @@ from typing import TYPE_CHECKING
 
 from dadaia_workspace.core.doctor_rules import Rule, SectionFinding
 from dadaia_workspace.features.specs import doctor_adr
-from dadaia_workspace.infrastructure.ledger_scripts import (
-    BUGS_SCRIPT,
-)
 
 if TYPE_CHECKING:
     from dadaia_workspace.features.specs.doctor import SpecsDoctor
@@ -133,11 +130,6 @@ RULES: tuple[SpecsRule, ...] = (
         lambda d: d._closure_audit.check_archive_dirs_exist(),
         fix=lambda d, i: d._closure_audit.fix_archive_dir(i),
         fix_help=("doctor", "--fix"),
-    ),
-    _rule(
-        ("SPEC-DOC-041",),
-        lambda d: d._governance.check_bug_archive_overdue(),
-        fix_help=f"{BUGS_SCRIPT.invocation} archive --specs <specs>",
     ),
 )
 

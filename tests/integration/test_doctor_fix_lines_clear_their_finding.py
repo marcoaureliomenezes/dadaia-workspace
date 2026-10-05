@@ -202,13 +202,6 @@ PLANTS: dict[str, Plant] = {
     "FIXED-1": Plant(_plant_fixed_block_gone),
     "FIXED-2": Plant(_plant_fixed_block_drifted),
     "GITFLOW-1": Plant(_plant_gitflow_gone, {"<specs>": "specs"}),
-    "SPEC-DOC-041": Plant(
-        lambda r: _write(
-            r / "specs/bugs/BUGS.jsonl",
-            json.dumps({"id": "old", "status": "resolved", "closed_at": "2020-01-02T00:00:00Z"})
-            + "\n",
-        )
-    ),
     "TREE-3": Plant(_plant_missing_memory_document),
     "SPEC-DOC-046": Plant(_plant_legacy_state_name),
 }

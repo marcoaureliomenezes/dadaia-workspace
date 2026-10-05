@@ -115,10 +115,18 @@ def findings_for(
     ]  # fmt: skip
 
 
+def accepted_adrs(root: Path) -> set[str]:
+    """The ids of every accepted ADR in *root*'s ``ADRs/decisions.jsonl``."""
+    decisions = root / "ADRs" / "decisions.jsonl"
+    rows = _ledger.records(decisions) if decisions.is_file() else []
+    return {str(r.get("id")) for r in rows if r.get("status") == "accepted"}
+
+
 def histo_findings(text: str, root: Path = _ledger.SPECS) -> list[dict[str, Any]]:
-    """The archive's lines: each a bug-record-v1 record, or a pre-v6 ``event`` line that
-    predates the record shape and is history, never rewritten."""
-    schema = load_schema()
+    """The archive's lines: each a bug-record-v1 record moved by an accepted ADR (its
+    ``archived_by``, ADR 0187 (4)), or a pre-v6 ``event`` line that predates the record
+    shape and is history, never rewritten (ADR 0188)."""
+    schema, accepted = load_schema(), accepted_adrs(root)
     out: list[dict[str, Any]] = []
     for number, raw in enumerate(text.split("\n"), start=1):
         try:
@@ -132,6 +140,8 @@ def histo_findings(text: str, root: Path = _ledger.SPECS) -> list[dict[str, Any]
                 if record is None or legacy
                 else list(_ledger.validate(record, schema, schema, "record"))
             )
+            if record is not None and not legacy and record.get("archived_by") not in accepted:
+                messages.append(f"archived_by {record.get('archived_by')!r} names no accepted ADR")
         if messages:
             fix = _ledger.unwritten(root / HISTO, number, "`bugs.py archive`", _LAW)
             out.append(_ledger.finding(CODE, HISTO, number, "; ".join(messages), fix))
