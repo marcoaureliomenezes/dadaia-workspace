@@ -31,11 +31,11 @@ def test_inner():
     assert child.stdout == f"{Path.home()}\\n"
 """
 
-_CREATES_A_RUFF_CACHE = f"""
-from pathlib import Path
+_CREATES_A_RUFF_CACHE = """
+import pytest
 
-def test_inner():
-    Path({str(_CHECKOUT / ".ruff_cache")!r}).mkdir(exist_ok=True)
+def test_inner(request: pytest.FixtureRequest):
+    (request.config.rootpath / ".ruff_cache").mkdir(exist_ok=True)
 """
 
 _WRITES_A_PYCACHE = """
@@ -60,11 +60,10 @@ def test_inner_runs_see_the_temp_home_and_fail_on_a_pycache_or_a_created_root_ca
     pytester: pytest.Pytester, monkeypatch: pytest.MonkeyPatch, inner: Path, tmp_path: Path
 ) -> None:
     """One test, inner runs in order: each one's watched write would fail any inner session
-    running beside it (the tripwires watch the ``tests/`` tree and the checkout root).
-    The last two pin T-010-25 / AC-R8-02: a root cache dir the session creates fails it;
-    one present before the session is ignored."""
-    cache = _CHECKOUT / ".ruff_cache"
-    assert not cache.exists()
+    running beside it (the tripwires watch the ``tests/`` tree and the checkout).
+    The last two pin T-010-25 / AC-R8-02 against the inner session's own rootdir (the
+    pytester dir): a root cache dir the session creates fails it; one present before is
+    ignored."""
     foreign = tmp_path / "foreign"
     foreign.mkdir()
     monkeypatch.setenv("DADAIA_CONTEXT", "ghost")
@@ -76,13 +75,9 @@ def test_inner_runs_see_the_temp_home_and_fail_on_a_pycache_or_a_created_root_ca
     home = pytester.runpytest_subprocess(str(inner / "test_home.py"), "-p", "no:randomly")
     pycache = pytester.runpytest_subprocess(str(inner / "test_pycache.py"), "-p", "no:randomly")
     (inner / "test_ruff.py").write_text(_CREATES_A_RUFF_CACHE, encoding="utf-8")
-    try:
-        created = pytester.runpytest_subprocess(str(inner / "test_ruff.py"), "-p", "no:randomly")
-        preexisting = pytester.runpytest_subprocess(
-            str(inner / "test_ruff.py"), "-p", "no:randomly"
-        )
-    finally:
-        shutil.rmtree(cache, ignore_errors=True)
+    ruff = (str(inner / "test_ruff.py"), "-p", "no:randomly", f"--rootdir={pytester.path}")
+    created = pytester.runpytest_subprocess(*ruff)
+    preexisting = pytester.runpytest_subprocess(*ruff)
 
     assert home.ret == 0, home.stdout.str()
     assert pycache.ret == 1

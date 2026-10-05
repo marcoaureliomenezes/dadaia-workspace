@@ -441,7 +441,8 @@ def pytest_unconfigure(config: pytest.Config) -> None:
 def pytest_sessionstart(session: pytest.Session) -> None:
     """Record which pollution dirs already existed before any test ran."""
     _PREEXISTING_POLLUTION.clear()
-    _PREEXISTING_POLLUTION.update(d for d in _POLLUTION_DIRS if (_REPO_ROOT / d).exists())
+    root = session.config.rootpath
+    _PREEXISTING_POLLUTION.update(d for d in _POLLUTION_DIRS if (root / d).exists())
     _INSTANCE_AT_START.clear()
     _INSTANCE_AT_START.update(_instance_fingerprint())
     _OUTSIDE_TMP_AT_START.clear()
@@ -472,13 +473,14 @@ def pytest_sessionfinish(session: pytest.Session, exitstatus: int) -> None:
     if gained:
         print(f"\n\n[OUTSIDE TMP] gained: {gained}")  # noqa: T201
         session.exitstatus = 1
+    root = session.config.rootpath
     offenders = [
-        d for d in _POLLUTION_DIRS if (_REPO_ROOT / d).exists() and d not in _PREEXISTING_POLLUTION
+        d for d in _POLLUTION_DIRS if (root / d).exists() and d not in _PREEXISTING_POLLUTION
     ]
     if offenders:
         msg = (
             "\n\n[SESSION POLLUTION] The following cache/state directories were found at "
-            f"the repo root ({_REPO_ROOT}) after the test session:\n"
+            f"the repo root ({root}) after the test session:\n"
             + "".join(f"  {d}\n" for d in offenders)
             + "\nThis means a tool was invoked with the wrong working directory or without "
             "the appropriate no-cache flags.  Fix the root cause:\n"
