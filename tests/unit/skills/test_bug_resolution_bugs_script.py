@@ -231,6 +231,11 @@ _APPEND = ["append", "--bug-id", "x", "--title", "t", "--severity", "LOW", "--su
         (_APPEND, ("0.5.0-rc1/j1",), "{rerun} --specs {ws}/worktrees/demo/0.5.0-rc1/j1/specs", ""),
         (_APPEND, ("0.5.0-rc1/j7", "0.5.0-rc1/j6"), "{rerun} --specs {ws}/worktrees/demo/0.5.0-rc1/j6/specs",
          "; the first by name of 2 open worktrees"),
+        (_APPEND, ("0.5.0-rc1/define", "0.5.0-rc1/j6--J1.S1.T1", "0.5.0-rc1-define/.agents",
+                   "backlog/b", "0.5.0-rc1/j7"),
+         "{rerun} --specs {ws}/worktrees/demo/0.5.0-rc1/j7/specs", ""),
+        (_APPEND, ("0.5.0-rc1/define", "0.5.0-rc1-define/.agents"),
+         "{py} {ws}/dd-gitflow-default/scripts/worktree.py list", ""),
         (_APPEND, (), "{py} {ws}/dd-gitflow-default/scripts/worktree.py list", ""),
     ],
 )  # fmt: skip
@@ -239,7 +244,7 @@ def test_a_missing_specs_tree_is_refused_never_created(
 ) -> None:
     """bug-law-spelling-registers-into-a-reaped-root-specs-tree; AC4.4 `_bound_tree`: a read
     verb reruns on the bound repo tree (and runs as printed); a write verb's fix names the
-    repo's first open worktree (ADR 0191), else the command listing them — never
+    repo's first open job worktree (ADR 0191), else the command listing them — never
     `repos/<r>/specs`, which only `specs/audits/` may write."""
     (cli := tmp_path / ".dadaia/.venv/bin/dadaia").parent.mkdir(parents=True)
     cli.write_text(f'#!{sys.executable}\nprint(\'{{"main_repo": "demo"}}\')\n', "utf-8")
