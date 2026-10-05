@@ -29,7 +29,7 @@ ACs: AC3.1, AC3.3–AC3.6.
 | Task | AC | `W:` | Owner tests |
 |---|---|---|---|
 | J3.S2.T1 | AC3.1 | `tests/conftest.py`, `tests/fixtures/harness_env.py` (`base_env` kept as a wrapper on `suite_env` for Jobs 1 and 2), `tests/helpers/worktree_ws.py`, `tests/unit/test_conftest_pollution_guard.py` (deleted), `tests/contract/test_core_file_io_purity.py`, `tests/e2e/{test_onboarding_journey,test_one_line_bootstrap,test_push_denylist_journey,test_push_gate_check}.py`, `tests/integration/gate/{test_gate_dialects_through_wrappers,test_hook_interpreter}.py`, `tests/integration/test_tool_caches_stay_in_the_tmp_zone.py`, the two S1.T1 files | `test_suite_env.py`, `test_suite_session_env.py` |
-| J3.S2.T3 | AC3.3, AC3.6 r24, r25, r26 | `features/spec_context/{sweep,doctor}.py`, `features/spec_context/service.py` (hold loop, `worktree_git_dir`), `features/workspace/service.py`, `features/migrate/upgrade.py`, `cli/commands/specs.py`; the S1.T3 files, `test_context_dead_holds.py` (r27 and the AC2.11 row), `test_context_dead_submodule.py`, `tests/contract/test_core_file_io_purity.py`, `tests/integration/test_install_deletes_only_what_its_ledger_owns.py`, `tests/unit/features/migrate/{test_upgrade_ideas_lane,test_upgrade_refuses_symlinks}.py` | `test_sweep.py`, `test_doctor_gc.py`, `test_workspace_service.py`, `test_context_dead_holds.py`, `test_context_dead_submodule.py`, `tests/unit/features/migrate` |
+| J3.S2.T3 | AC3.3, AC3.6 r24, r25, r26 | `features/spec_context/{sweep,doctor}.py`, `features/spec_context/service.py` (hold loop, `worktree_git_dir`), `features/workspace/service.py`, `features/migrate/upgrade.py`, `cli/commands/specs.py`; the S1.T3 files, `test_context_dead_holds.py` (r27 and the AC2.11 row), `test_context_dead_submodule.py`, (`tests/contract/test_core_file_io_purity.py` also written: the recorded double write, owner J3.S2.T1), `tests/integration/test_install_deletes_only_what_its_ledger_owns.py`, `tests/unit/features/migrate/{test_upgrade_ideas_lane,test_upgrade_refuses_symlinks}.py` | `test_sweep.py`, `test_doctor_gc.py`, `test_workspace_service.py`, `test_context_dead_holds.py`, `test_context_dead_submodule.py`, `tests/unit/features/migrate` |
 | J3.S2.T4 | AC3.4 | `core/specs_version.py`, `specs/constitution.md`, `tests/unit/core/test_specs_version.py`, `tests/unit/skills/test_bug_resolution_bugs_script.py` | those two |
 | J3.S2.T5 | AC3.5 | `tests/unit/cli/test_exitcode_truthfulness.py` | itself |
 | J3.S2.T6 | AC3.6 r20 | `scripts/guards/isolation.py` | `scripts/guards/run.py --planted` |
@@ -47,3 +47,15 @@ AC: AC3.2.
 
 - As-built deviation (R6): `tests/contract/test_core_file_io_purity.py` was written by both J3.S2.T1 and J3.S2.T3 in one stage; J3.S2.T1 owns it, the double write is recorded, not repeated.
 - The close task runs last, after every other task of its stage has fast-forwarded onto the job branch; its mutation-diff and test-audit run even in a stage whose gate is validators only (Q23).
+
+## Stage J3.S4 — review rework
+
+- Contract: exit tests the owner tests below, then unit + integration (`-n 2`); envelope the S4 `W:` union; ACs AC3.3, AC3.6 (the Job 3 review, REJECTED on deaa14d8e: H2 and the LOWs)
+
+| Task | AC | `W:` | Owner tests |
+|---|---|---|---|
+| J3.S4.T1 | AC3.3, AC3.6 r22, r25 | `features/spec_context/sweep.py`, `tests/unit/features/spec_context/test_sweep.py`, `tests/unit/features/spec_context/test_doctor_gc.py` (bb8adb26a..bde12c2f4) | `test_sweep.py`, `test_doctor_gc.py` |
+| J3.S4.T2 | AC3.1 | the hermetic pollution guard (8de6703b3, 55a01fd03) | `test_suite_env.py`, `test_suite_session_env.py` |
+| J3.S4.T3 | AC3.2, AC3.6 | `scripts/guards/isolation.py` (a plant), `core/specs_version.py`, (`tests/unit/features/spec_context/test_doctor_gc.py` also written: one row after J3.S4.T1 merged, owner J3.S4.T1), `tests/integration/test_context_dead_holds.py`, `tests/unit/test_spec_context_service.py`, `tests/contract/test_public_scripts_thin_wrapper.py`, this file | `test_doctor_gc.py`, `test_context_dead_holds.py`, `scripts/guards/run.py --planted` |
+
+- Done: Job 3 closed by J3.S4.T3 (2026-10-05).
