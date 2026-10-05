@@ -231,7 +231,12 @@ class GitSubprocessClient:
         text = self.committed_text(repo, "specs/constitution.md")
         if text is None and main_repo is not None and main_repo.resolve() != repo.resolve():
             return self.gitflow(main_repo)
-        return read_gitflow(repo / "specs", text or "")
+        if text is None:
+            return DEFAULT, (
+                f"{repo}: no specs/constitution.md — using the default gitflow\n"
+                f"fix: .dadaia/.venv/bin/dadaia specs init --context {repo.name}"
+            )
+        return read_gitflow(repo / "specs", text)
 
     def published(self, path: Path) -> bool:
         """Whether the project is published (local, offline, AC4.1): ``origin/<integration>``
