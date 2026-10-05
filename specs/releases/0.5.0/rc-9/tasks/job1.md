@@ -9,7 +9,7 @@ As built on `wt/0.5.0-rc9/job1` (its PLAN.md §2, carried here; it wins over the
 One worktree (`worktrees/dadaia-workspace/0.5.0-rc9-job1`, operator-authorized `git worktree add`); every task runs inside it. One review at its end, `scripts/ci.py` once on the result, one manual merge. No markers, no start or done commits; a task's commit subject starts with its id; a stage closes with a commit whose body carries `stage: J1.S<m> — unit+integration green`. REBUILD commits name the SPEC's Job 1 as the verdict for the demolished kinds and gate-1 code.
 
 - Gates: task — `ruff` and `mypy` on the touched files plus its owner tests (`-n 2`); stage — unit + integration (`-n 2`), green before the next stage opens; job — `scripts/ci.py` once, at the end.
-- AC1.3, operator order 2026-10-05, verbatim: "a release ja tem que começar fazendo ... vocÊ está proibio de rodar 1 worktree para cada tasks ou rodar CI para cada teste ... não podemos perder mais tempo". The `<job>--<task-id>` shape and the ≤ 5 task-worktree counter leave: a job's tasks share its tree, a stage is the barrier. The SPEC delta lands at Reconciliation (main thread).
+- AC1.3, operator order 2026-10-05, verbatim: "a release ja tem que começar fazendo ... vocÊ está proibio de rodar 1 worktree para cada tasks ou rodar CI para cada teste ... não podemos perder mais tempo". Corrected the same day (AC1.3): one tree per job plus one `<job>--<task-id>` tree per parallel task, ≤ 5 task trees open per rc; `WT stage` opens a stage's task trees; the verify lines stay as argv (`verify:`, `verify-stage:`, `verify-task:`). As built in J1.S3.T1 (ab3dc84ec).
 - Deviation, recorded: J1.S2.T3 (`ci.py` levels) and the first cut of J1.S2.T1 were written before the stage order arrived; J1.S2.T3's tests landed with its code in 0fce6c788, not as an S1 xfail.
 
 The stages and task ids are the approved SPEC's (ad9c60c6b, Job 1 `Stages:`); the rows below refine their `W:` where the code demanded it.
@@ -34,10 +34,10 @@ The stages and task ids are the approved SPEC's (ad9c60c6b, Job 1 `Stages:`); th
 | id | AC | `W:` | owner tests |
 |---|---|---|---|
 | J1.S2.T1 | AC1.1 | `scripts/ci.py` | `test_ci_script.py` |
-| J1.S2.T2 | AC1.3 | `GF/_worktree_new.py`, `GF/_worktree_names.py` (was `_worktree_kinds.py`), `f/spec_context/gate_policy.py`, `core/workspace_layout.py` `protected_glob`, `S/dd-bug-resolution/scripts/_specs.py`, the two contract tests | `test_worktree_new.py`, `test_gate_policy.py`, `test_pre_gate.py` |
+| J1.S2.T2 | AC1.3 | `GF/_worktree_new.py`, `GF/_worktree_names.py` (was `_worktree_kinds.py`), `f/spec_context/gate_policy.py`, `S/dd-bug-resolution/scripts/_specs.py` (`core/workspace_layout.py` is T5's: recorded as-built deviation, both commits wrote it), the two contract tests | `test_worktree_new.py`, `test_gate_policy.py`, `test_pre_gate.py` |
 | J1.S2.T3 | AC1.2, AC1.4, AC1.5 | `GF/worktree.py`, `GF/_worktree_end.py`, `GF/_worktree_git.py`, `f/spec_context/doctor.py`, `AGENTS.md` | `test_worktree_lifecycle.py` |
 | J1.S2.T4 | AC1.2 | `core/gitflow.py`, `f/chokepoints/branch_policy.py`, `.github/workflows/ci.yml`, `scripts/guards/repo.py` | `test_push_branch_policy.py`, guard plant `job-trigger` |
-| J1.S2.T5 | AC1.8, AC1.9, AC1.10, the phase move | `core/workspace_layout.py` `SPECS_CANON` (the canon rows live there, not in `canon.py`), `S/dd-release-implementation/scripts/{_release_schema,_release_tree,_release_phase}.py`, `_release_plan.py` (deleted) | `test_canon.py`, `test_release_script.py` |
+| J1.S2.T5 | AC1.8, AC1.9, AC1.10, the phase move | `core/workspace_layout.py` `SPECS_CANON` and `protected_glob` (the canon rows live there, not in `canon.py`), `S/dd-release-implementation/scripts/{_release_schema,_release_tree,_release_phase}.py`, `_release_plan.py` (deleted) | `test_canon.py`, `test_release_script.py` |
 | J1.S2.T6 | AC1.8 | `pub/data/worktrees-AGENTS.md`, `S/dd-gitflow-default/SKILL.md` | no test |
 | J1.S2.T7 | AC1.8 | `S/dd-release-implementation/{RC-FLOW,MEMORY-UPDATE,SKILL}.md` | no test |
 | J1.S2.T8 | AC1.6, AC1.8 | `S/dd-manager-orchestration/SKILL.md`, `S/dd-release-definition/SKILL.md`, `S/dd-audit-project/PILLAR-SPECS.md` | no test |
@@ -53,3 +53,15 @@ The stages and task ids are the approved SPEC's (ad9c60c6b, Job 1 `Stages:`); th
 
 | id | AC | `W:` | owner tests |
 |---|---|---|---|
+| J1.S3.T1 | AC1.2, AC1.3 | REBUILD: task worktrees back, nested names, verify lines as argv, `ci_run` (ab3dc84ec) | `test_worktree_new.py`, `test_worktree_lifecycle.py` |
+| J1.S3.T2 | AC1.8 | law states task worktrees, the verify lines and `ci_run` (da33447df) | no test |
+| J1.S3.T3 | AC1.5 | an atom changed alone is refused once, naming its re-derive (a643828fa) | `test_worktree_lifecycle.py` |
+| J1.S3.T4 | AC1.10 | `TRIO` → `CANDIDATE_DOCS`, `_refuse_unapproved_docs` (def698d61) | `test_release_script.py` |
+| J1.S3.T5 | — | unused | — |
+| J1.S3.T6 | — | re-record behavior map, shipped law hashes, stamp-9 canon pin (0a8efbdb6) | generated |
+| J1.S3.T7 | AC1.8 | the law states the nested grammar (1135896b4) | no test |
+| J1.S3.T8 | AC1.8 | quickstart and journey use the nested grammar (500571da7) | no test |
+| J1.S3.T9 | AC1.3 | `caused_by` accepts a job task id — one id reader (cba607aa0) | `test_bug_resolution_bugs_script.py` |
+| J1.S3.T10 | — | close task, pending: mutation-diff over the job diff, test-audit, the close lines | — |
+
+- Rework round recorded: the commits subjected J1.S2.T2 (567f13339), T4 (ca0137c51), T5 (19d3b50b3), T6 (d464edb7e) and T9 (d0698dbf7) after the job close (40dca7fc9) answer review findings HIGH 1–2, MEDIUM 3–5; they are S3 rework under S2 ids.

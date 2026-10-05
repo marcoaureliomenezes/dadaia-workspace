@@ -33,7 +33,7 @@ Paths are relative to `dadaia_workspace/` unless they start with `scripts/`, `te
 ## S3 — fixes (AC2.1–AC2.7; AC3.1's last `base_env` callers)
 
 - ACs served: AC2.1–AC2.7; AC3.1's last `base_env` callers.
-- Envelope: `scripts/ci.py`, `tests/README.md`, `tests/AGENTS.md`, `hooks/ctx_inject.py`, `hooks/sdd_post_gate.py`, `pyproject.toml`, `core/context_registry.py`, `tests/integration/cli/test_registry_version_grammar.py`, `cli/commands/ci.py`, `features/reconcile/service.py`, `cli/commands/init.py`, `relimpl/scripts/release.py`, `bugres/scripts/_ledger.py`, `tests/integration/test_worktree_lifecycle.py`, `tests/fixtures/harness_env.py`, `base_env`.
+- Envelope: `scripts/ci.py`, `tests/README.md`, `tests/AGENTS.md`, `hooks/ctx_inject.py`, `hooks/sdd_post_gate.py`, `pyproject.toml`, `core/context_registry.py`, `tests/integration/cli/test_registry_version_grammar.py`, `cli/commands/ci.py`, `features/reconcile/service.py`, `cli/commands/init.py`, `relimpl/scripts/release.py`, `bugres/scripts/_ledger.py`, `tests/integration/test_worktree_lifecycle.py`, `tests/fixtures/harness_env.py`.
 - Exit tests: the stage's owner tests green at the task gates; unit + integration green at the stage gate; no xfail left for the ACs served (R5).
 
 | task | AC | `W:` | owner tests / RED |
@@ -50,8 +50,8 @@ Paths are relative to `dadaia_workspace/` unless they start with `scripts/`, `te
 ## S4 — ledger and ADR proposals (AC2.9–AC2.11)
 
 - ACs served: AC2.9–AC2.11.
-- Envelope: `specs/bugs/BUGS.jsonl`, `specs/bugs/_archive/`, `specs/ADRs/decisions.jsonl`, `proposed`.
-- Exit tests: the stage's owner tests green at the task gates; unit + integration green at the stage gate; no xfail left for the ACs served (R5).
+- Envelope: `specs/bugs/BUGS.jsonl`, `specs/bugs/_archive/`, `specs/ADRs/decisions.jsonl`.
+- Exit tests: `bugs.py check`, `backlog.py check`, `release.py check` and `dadaia doctor` (ADR) clean at the stage gate; no test run (ledger, ADR and memory only).
 
 | task | AC | `W:` | owner tests / RED |
 |---|---|---|---|
@@ -61,8 +61,9 @@ Paths are relative to `dadaia_workspace/` unless they start with `scripts/`, `te
 
 - ACs served: AC2.8's 211, AC2.11.
 - Envelope: `specs/bugs/BUGS.jsonl`, `specs/bugs/_archive/`.
-- Exit tests: the stage's owner tests green at the task gates; unit + integration green at the stage gate; no xfail left for the ACs served (R5).
+- Exit tests: `bugs.py check`, `backlog.py check`, `release.py check` and `dadaia doctor` (ADR) clean at the stage gate; no test run (ledger, ADR and memory only).
 
 | task | AC | `W:` | owner tests / RED |
 |---|---|---|---|
 | J2.S5.T1 | AC2.8, AC2.11 | `specs/bugs/BUGS.jsonl`, `specs/bugs/_archive/` | no test; `V33_ORPHANS ≤ 31` after the stage |
+| J2.S5.T2 | — | generated only: the behavior-map hashes and derived docs | close task: test-audit + mutation-diff over the job diff (Q23), regenerate the behavior map and derived docs (R6), write `done` (Q9) |

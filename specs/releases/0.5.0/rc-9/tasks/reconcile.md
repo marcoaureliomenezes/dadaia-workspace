@@ -7,8 +7,8 @@ Paths are relative to `dadaia_workspace/` unless they start with `scripts/`, `te
 ## S1 — (AC6.1–AC6.3)
 
 - ACs served: AC6.1–AC6.3.
-- Envelope: `specs/memory/**`, `catalog.json`, `specs/audits/20260930-structural-convergence/FINDINGS.jsonl`, `specs/releases/0.5.0/_RELEASE.json`, `log`, `specs/ADRs/decisions.jsonl`, `measured_by`.
-- Exit tests: the stage's owner tests green at the task gates; unit + integration green at the stage gate; no xfail left for the ACs served (R5).
+- Envelope: `specs/memory/**`, `catalog.json`, `specs/audits/20260930-structural-convergence/FINDINGS.jsonl`, `specs/releases/0.5.0/_RELEASE.json`, `specs/ADRs/decisions.jsonl`.
+- Exit tests: `bugs.py check`, `backlog.py check`, `release.py check` and `dadaia doctor` (ADR) clean at the stage gate; no test run (ledger, ADR and memory only).
 
 | task | AC | `W:` | owner tests / RED |
 |---|---|---|---|
@@ -20,9 +20,10 @@ Paths are relative to `dadaia_workspace/` unless they start with `scripts/`, `te
 ## S2 — (AC6.4)
 
 - ACs served: AC6.4.
-- Envelope: `_RELEASE.json`, `0.5.0-rc10-define`.
-- Exit tests: the stage's owner tests green at the task gates; unit + integration green at the stage gate; no xfail left for the ACs served (R5).
+- Envelope: `specs/releases/0.5.0/_RELEASE.json`, `specs/releases/0.5.0/rc-10/SPEC.md`.
+- Exit tests: `bugs.py check`, `backlog.py check`, `release.py check` and `dadaia doctor` (ADR) clean at the stage gate; no test run (ledger, ADR and memory only).
 
 | task | AC | `W:` | owner tests / RED |
 |---|---|---|---|
-| JR.S2.T1 | AC6.4 | `_RELEASE.json` (phase); rc-10's Draft SPEC goes in `0.5.0-rc10-define` |  |
+| JR.S2.T1 | AC6.4 | `specs/releases/0.5.0/_RELEASE.json` (phase), `specs/releases/0.5.0/rc-10/SPEC.md` (Draft, in the `0.5.0-rc10/define` tree) |  |
+| JR.S2.T2 | — | generated only: the behavior-map hashes and derived docs | close task: test-audit + mutation-diff over the job diff (Q23), regenerate the behavior map and derived docs (R6), write `done` (Q9) |

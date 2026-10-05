@@ -11,7 +11,7 @@ The SPEC says what; this PLAN holds the as-is review and the DAG; `tasks/<job>.m
 - Job 1 — the demolition (bug history at 13269b5c9; unit and authorities tables below, from `wt/0.5.0-rc9/job1`):
   - `worktree.py merge` carries five records in nine days, each patched in place: one merge holds four jobs (allowed sets, verdict, the `verify:` run, the fast-forward) for every kind. REBUILD (0190).
   - The `release`/`impl` kind split made an atom and its derived section unlandable together (`memory-update-same-commit-docs-unsatisfiable-under-the-release-kind`); 0189 layered on it and was rejected. The kinds leave (0191): `_worktree_kinds.py` becomes `_worktree_names.py`, one grammar and one tail reader.
-  - `_worktree_end._verify` runs the tracked `verify:` line with `shell=True` and the full `scripts/ci.py` at every merge (gate 1, ~6 min over 67 landings). The line leaves; `ci.py` gains `task`/`stage`/`job` levels (AC1.1, AC1.2).
+  - `_worktree_end._verify` runs the tracked `verify:` line with `shell=True` and the full `scripts/ci.py` at every merge (gate 1, ~6 min over 67 landings). The line stays as argv (`shell=False`) with `verify-stage:`/`verify-task:` beside it; `ci.py` gains `task`/`stage`/`job` levels (AC1.1, AC1.2).
   - Fixed-depth path readers (`protected_glob`, `_worktree_end._target`, `_worktree_git.rows`) misread a two-level tree name; they read the grammar module.
   - `_release_plan._schedule_errors` (the Parallel schedule) has no bug of its own and leaves with its law (AC1.8); `job_errors` and `SPECS_CANON`'s `rc-<N>/tasks/<job>.md` row are added (AC1.9, AC1.10).
 
@@ -20,12 +20,12 @@ The SPEC says what; this PLAN holds the as-is review and the DAG; `tasks/<job>.m
 | unit | today | bugs | verdict | why |
 |---|---|---|---|---|
 | `GF/_worktree_kinds.py` `KINDS`, `CAPS`, `allows`, `kind_holding`, `kind_for`, `_NAME_RE` | four kinds, their allowed sets, the `<M.m.p><l>-<kind>` grammar | 1 (`memory-update-same-commit-…`) | REBUILD | 0191: one tree per job; becomes `_worktree_names.py`, the one grammar and the one tail reader |
-| `GF/_worktree_new.py` `new` | derives a letter and a kind, caps per kind, needs the trio for `impl` | 0 | REBUILD | the name is given (`<M.m.p>-rc<N>/<job>`, `backlog/<slug>`); a job needs its rc's Approved SPEC; no caps, no task trees (operator order, §2) |
+| `GF/_worktree_new.py` `new` | derives a letter and a kind, caps per kind, needs the trio for `impl` | 0 | REBUILD | the name is given (`<M.m.p>-rc<N>/<job>`, `backlog/<slug>`); a job needs its rc's Approved SPEC; task trees `<job>--<task-id>` stay, ≤ 5 open per rc (AC1.3, operator correction 2026-10-05); `WT stage` opens a stage's task trees |
 | `GF/_worktree_end.py` `merge`, `_check_allowed`, `_verify` | one merge for every kind: allowed set, verdict, `verify:` (`shell=True`), ff | 5 | REBUILD | 0190: a job merge needs the verdict naming its CI-matrix run and runs the job gate; a `define`/`backlog` merge lands `specs/` only and runs the ledger checks only; argv, `shell=False` |
 | `GF/_worktree_end.py` `_check_approved`, `_series` | verdict carry-over by patch and message series | 1 | KEEP | 0168's carry stands (AC1.2) |
 | `GF/_worktree_git.py` `ours`, `rows` | reads `_NAME_RE`, globs one level | 0 | UPDATE | read the tree name through the grammar module |
 | `scripts/ci.py` `JOBS`, `main` | one level: every named CI job | 0 | UPDATE | AC1.1: `task FILE…`, `stage`, `job` levels over the same steps |
-| `AGENTS.md` `verify:` line | the merge's shell command | 0 | DELETE | AC1.2 |
+| `AGENTS.md` `verify:` line | the merge's shell command | 0 | UPDATE | AC1.2: kept as argv (`shlex.split`, `shell=False`), plus `verify-stage:` and `verify-task:` lines naming `scripts/ci.py` levels |
 | `core/workspace_layout.protected_glob` | computes the repo tail at a fixed depth | 0 | UPDATE | takes the tail; the gate gets it from the grammar module |
 | `f/spec_context/gate_policy._kind_holding`, `_worktree_fix` | names a kind in the merge-only BLOCK's fix | 0 | DELETE | no kind left; the fix is `worktree.py list` |
 | `S/dd-bug-resolution/scripts/_specs._kind`, `_bound_fix` kind glob | sends a ledger write to a `*-<kind>` tree | 0 | UPDATE | any open tree of the repo |
@@ -42,7 +42,7 @@ Job 1 authorities:
 | question | authority | consults | deleted |
 |---|---|---|---|
 | is this a canonical worktree name, and what is a path's repo-relative tail | `GF/_worktree_names.locate` | `GF/_worktree_git`, `GF/_worktree_end`, `GF/_worktree_new`, `f/spec_context/gate_policy`, doctor and reaper through `worktree.py list` | `_worktree_kinds._NAME_RE`, `kind_for`, `protected_glob`'s fixed depth |
-| what a gate level runs | `scripts/ci.py` `LEVELS` | `GF/_worktree_end` (argv) | the `verify:` line, `_verify` |
+| what a gate level runs | verify lines → `_worktree_end` argv | `scripts/ci.py` `LEVELS` | the `shell=True` run |
 | which `wt/` branch is pushable | `core/gitflow.Gitflow.role_of` | `f/chokepoints/branch_policy` | — |
 | is a job file well formed | `_release_plan.job_errors` | `_release_tree` (`release.py check`) | `_schedule_errors` |
 
@@ -82,4 +82,9 @@ The edges come from file overlap; jobs without an edge have disjoint envelopes.
 - `tests/contract/test_release_script.py`: Job 1, then Job 4.
 - `tests/unit/skills/test_bug_resolution_bugs_script.py`: Job 2, then Job 5.
 - `tests/unit/skills/test_release_implementation_release_script.py`: Job 2 (AC2.6), then Job 5 (AC5.6).
+- `S/dd-audit-project/PILLAR-SPECS.md`: Job 1 (J1.S2.T8), then Job 4 (J4.S2.T3).
+- `S/dd-gitflow-default/SKILL.md`: Job 1 (J1.S2.T6), then Job 5 (J5.S2.T5).
+- `pub/scaffold/{releases,bugs,ADRs}/AGENTS.md`: Job 1 (J1.S2.T9), then Job 5 (J5.S2.T3, T4).
+- `S/dd-code-review/SKILL.md`: Job 1 (J1.S2.T9), then Job 5 (J5.S2.T7).
+- `tests/unit/skills/test_bug_resolution_bugs_script.py` also Job 3 (J3.S2.T4), before Job 2.
 - Generated, in no `W:` (R6): the behavior-map hash and the derived docs; each job's close task regenerates them.
