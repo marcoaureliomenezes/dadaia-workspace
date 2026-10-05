@@ -39,6 +39,16 @@ Also input: `.dadaia/.venv/bin/dadaia doctor` against every release the window t
 2. Confirm each picked entry left `active[]` exactly once, at that release's closure, as one `backlog_histo.jsonl` record.
 3. Flag a consumed entry with no histo record, or with two — the one-exit contract is unmet.
 
+## Job files — the checks the code leaves to the audit
+
+Input: every `rc-<N>/tasks/<job>.md` the window touches and the job commits behind it (`dd-release-definition` §5 teaches the rules).
+
+1. Disjoint envelopes: two jobs that ran in parallel without a PLAN edge must have disjoint envelopes, and two tasks of one stage disjoint `W:`; an overlap is MEDIUM.
+2. A born task cites its AC: a task added after its stage opened names the AC it serves; one that names none is MEDIUM.
+3. A cancelled task carries its reason: a task struck out of a stage keeps its line and states why; one deleted, or kept without a reason, is MEDIUM.
+4. Hot files: a file two tasks wrote, by hand or by generator, is listed in the job file as hot and given one owner task; an unlisted one is LOW.
+5. Each AC names its test level (unit, integration, E2E, or no test with its reason); one that names none is LOW.
+
 ## Slop readout
 
 Input: the ratchet modules and the window `from-sha..HEAD`. Output: the "Slop readout" table in `AUDIT.md`
