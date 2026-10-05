@@ -438,7 +438,7 @@ def test_a_task_lands_on_its_job_branch_after_the_task_gate_with_no_verdict(root
     git(task, "rm", "-q", "RED-task")
     git(task, "commit", "-qm", "green")
     commit(task, "src/a.py")
-    git(task, "commit", "-q", "--amend", "--no-edit", "--trailer", "Owner-tests: src/a.py")
+    git(task, "commit", "-q", "--amend", "--no-edit", "--trailer", "Owner-tests: tests/test_r.py")
     sha = git(task, "rev-parse", "HEAD").strip()
     landed = run(root, "merge", str(task))
     assert landed.returncode == 0, landed.stderr
@@ -497,7 +497,8 @@ def test_a_task_cannot_rewrite_its_own_gate(root: Path) -> None:
 @pytest.mark.parametrize(
     ("add", "trailers", "code"),
     [("src/b.py", (), 1), ("tests/test_b.py", (), 0), ("docs/b.md", (), 0),
-     ("src/b.py", ("Owner-tests: src/b.py",), 0)],
+     ("src/b.py", ("Owner-tests: src/b.py",), 1),
+     ("src/b.py", ("Owner-tests: tests/test_r.py",), 0)],
 )  # fmt: skip
 def test_a_code_task_without_owner_tests_refuses_with_one_fix_line(
     root: Path, add: str, trailers: tuple[str, ...], code: int

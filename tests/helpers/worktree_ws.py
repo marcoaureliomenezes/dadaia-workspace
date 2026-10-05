@@ -61,6 +61,8 @@ def make_workspace(root: Path) -> Path:
     (repo / ".gitignore").write_text("*.scratch\n__pycache__/\n")
     (repo / "scripts").mkdir()
     (repo / "scripts/ci.py").write_text(CI)
+    (repo / "tests").mkdir()
+    (repo / "tests/test_r.py").write_text("")  # the owner test `land` names
     (repo / "AGENTS.md").write_text(
         "verify: python scripts/ci.py job\n"
         + "".join(f"verify-{lv}: python scripts/ci.py {lv}\n" for lv in ("task", "stage"))
@@ -161,7 +163,7 @@ def land(root: Path, rel: str, text: str = "x = 1\n") -> str:
     """Commit *rel* in task `TASK` of `JOB` and merge it: a job branch takes code only so."""
     assert run(root, "new", "r", TASK).returncode == 0
     commit(tree := root / "worktrees/r" / TASK, rel, text)
-    git(tree, "commit", "-q", "--amend", "--no-edit", "--trailer", f"Owner-tests: {rel}")
+    git(tree, "commit", "-q", "--amend", "--no-edit", "--trailer", "Owner-tests: tests/test_r.py")
     sha = git(tree, "rev-parse", "HEAD").strip()
     merged = run(root, "merge", f"worktrees/r/{TASK}")
     assert merged.returncode == 0, merged.stderr
