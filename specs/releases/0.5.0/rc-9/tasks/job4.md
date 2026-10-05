@@ -27,5 +27,7 @@ Paths are relative to `dadaia_workspace/` unless they start with `scripts/`, `te
 | J4.S2.T1 | AC4.2 | `relimpl/scripts/_release_check.py` | `test_release_script.py` |
 | J4.S2.T2 | AC4.3 | `relimpl/scripts/_release_phase.py` | `test_release_script.py` |
 | J4.S2.T3 | AC4.2 (the four rows taught and audited) | `public/skills/dd-audit-project/PILLAR-SPECS.md` | no test |
+| J4.S2.T5 | AC4.2 (born: Job 1 review MEDIUM 1) | `relimpl/scripts/_release_schema.py`, `public/skills/dd-release-definition/SKILL.md`, `specs/releases/0.5.0/rc-9/tasks/reconcile.md` | `test_release_script.py`: Reconciliation gets an empty `## Stage JR.S1 — RED (none: AC6.1–AC6.4 have no test)`, work stages from S2; delete the `reconcile.md` exemption, its row pair and the §5 clause |
+| J4.S2.T6 | AC1.1, AC1.3 (born: Job 1 review LOW 2, LOW 3) | `gitflow/scripts/_worktree_end.py` | `test_worktree_lifecycle.py`: a task touching non-test `.py` with no `Owner-tests:` trailer refuses; the stage gate reads `verify-stage:` from the work branch |
 | J4.S2.T4 | — | generated only: the behavior-map hashes and derived docs | close task: test-audit + mutation-diff over the job diff (Q23), regenerate the behavior map and derived docs (R6), write `done` (Q9) |
 - The close task runs last, after every other task of its stage has fast-forwarded onto the job branch; its mutation-diff and test-audit run even in a stage whose gate is validators only (Q23).
