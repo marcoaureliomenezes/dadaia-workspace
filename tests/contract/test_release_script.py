@@ -417,6 +417,13 @@ _RECON = ("Reconciliation", "Jobs 1–8")
         pytest.param(_dag(*_CHAIN[:2]),
                      _JOB + "- J2.S2.T2 — AC2.1 · `W:` `src/x.py` · owner `tests/unit/test_x.py`\n",
                      "src/x.py", id="overlapping-w-in-a-stage"),
+        pytest.param(_dag(*_CHAIN[:2]),
+                     _JOB + "- J2.S2.T2 — AC2.1 · `W:` `pyproject.toml` · owner same\n"
+                     "- J2.S2.T3 — AC2.1 · `W:` `pyproject.toml` · owner same\n",
+                     "pyproject.toml", id="overlapping-root-file-in-a-stage",
+                     marks=pytest.mark.xfail(strict=True, reason="J4.S3.T1: root files unjudged")),
+        pytest.param(_dag(), _JOB, "Job 1", id="empty-dag",
+                     marks=pytest.mark.xfail(strict=True, reason="J4.S3.T1: empty DAG passes")),
     ],
 )  # fmt: skip
 def test_check_refuses_each_trio_row(
