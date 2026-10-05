@@ -39,13 +39,13 @@ The one enumeration; every harness atom links here.
 
 - The root `AGENTS.md` map, the scoped `AGENTS.md` files, `.agents/skills/dd-*` and `.agents/agents/dd-*.md` are authored once and read natively or through per-entry symlinks and transcodes, so they carry no per-harness derivation.
 - Every `dd-` skill touching a governed area opens that area's scoped `AGENTS.md` as step 1 — how scoped law reaches a harness that loads only the root->cwd chain.
-- `dadaia_workspace/public/data/CONTEXT-MAP.md` records every surface's soft byte budget, measured installed size and per-harness load trigger: the always-on root map 8192 B, each scoped file 4096 B, each `SKILL.md` 6144 B, budgets a surface may exceed (ADR 0143); `tests/contract/test_context_map.py` pins the Measured column to the installed bytes.
+- `dadaia_workspace/public/data/CONTEXT-MAP.md` records every surface's purpose, what belongs in it and its per-harness load trigger; a surface's size is a soft review signal, never a build failure (ADR 0143), and a `SKILL.md`'s line limits are the behavior map's.
 
 ## The behavior map
 
-- `dadaia_workspace/public/entities/behavior-map.json` declares which skill and which scoped rule file operate which section of the root map: `rows` of `{section, anchor, skill, scoped_agents_md[], hash_tuple, recorded_by, recorded_at}`, plus `skill_md_line_ceiling`, `declared_overlaps` and `standalone_skills` (the skills that stand without a workspace, pinned by `tests/contract/test_standalone_skills.py`).
+- `dadaia_workspace/public/entities/behavior-map.json` declares which skill and which scoped rule file operate which section of the root map: `rows` of `{section, anchor, skill, scoped_agents_md[], hash_tuple, recorded_by, recorded_at}`, plus `skill_md_line_soft`, `skill_md_line_ceiling`, `declared_overlaps` and `standalone_skills` (the skills that stand without a workspace, pinned by `tests/contract/test_standalone_skills.py`).
 - Every skill and scoped `AGENTS.md` source has exactly one row, every law section at least one owner; several skills may own one section.
-- The corpus is 18 `dd-*` skill directories; a `SKILL.md` longer than the map's `skill_md_line_ceiling` turns `tests/contract/test_behavior_map.py` red ([[QUALITY]]).
+- The corpus is 17 `dd-*` skill directories; a projected `SKILL.md` longer than `skill_md_line_soft` is a doctor `SKILL-MD-LENGTH` warning ([[workspace-doctor]]), and one longer than `skill_md_line_ceiling` turns `tests/contract/test_behavior_map.py` red ([[QUALITY]]).
 
 ## Enforcement
 
@@ -57,4 +57,4 @@ The one enumeration; every harness atom links here.
 
 ## Dependencies
 
-[[agent-orchestration]], [[public-asset-distribution]], [[sdd-gate-v3]], [[ARCHITECTURE]], [[QUALITY]].
+[[agent-orchestration]], [[public-asset-distribution]], [[sdd-gate-v3]], [[workspace-doctor]], [[ARCHITECTURE]], [[QUALITY]].

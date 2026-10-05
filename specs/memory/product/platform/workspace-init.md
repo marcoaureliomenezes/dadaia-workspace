@@ -38,10 +38,10 @@ sources:
 
 ## Upgrade
 
-- Re-running `init` on an existing workspace is the upgrade; the venv's installed build — its version plus a digest of the package payload — is compared with the running distribution's by one decider.
-- An older venv, or another build of the same version, is reinstalled from the running distribution by one `pip install --force-reinstall` (a failed install keeps the old build) and reconciled, printing `upgraded A -> B`; a failed reconcile exits 1 with `fix: <cli> reconcile --expect-version B`.
+- Re-running `init` on an existing workspace is the upgrade; the venv's identity — its installed build (version plus a digest of the package payload) and its binding (the `dadaia` entrypoint names this venv's own python) — is compared with the running distribution's by one decider.
+- An older venv, another build of the same version, or a venv copied from another workspace (its entrypoint names the original's python) is reinstalled from the running distribution by one `<venv python> -m pip install --force-reinstall` (a failed install keeps the old build) and reconciled, printing `upgraded A -> B`; a failed reconcile exits 1 with `fix: <cli> reconcile --expect-version B`.
 - Every init also refreshes the pre-push hook of every ALIVE repo whose installed hook is byte-identical to one the library shipped; an operator's own hook is kept ([[context-management]]).
-- The same build prints `already at A` and writes no file under the workspace.
+- The same build, bound to its own venv, prints `already at A` and writes no file under the workspace.
 - A newer venv is refused before any write, exit 1, `fix: <cli> init <ws> --harness <h>` — the workspace's own newer CLI.
 - Versions order by PEP 440 (`packaging.version`), so a pre-release sorts above the release before it.
 - The upgrade never writes a project repo; `<cli> specs init --context <ctx>`, re-run per project, then refreshes that project's specs law ([[specs-migration]]).
@@ -55,7 +55,7 @@ sources:
 
 - `dadaia_workspace/features/workspace/onboarding.py` holds the one ordered step list; each step is an id, a kind — `command` (the fix line is a shell command) or `agent` (it names a skill section and what is pending) — a real-state predicate (files, git, the session registry; never a stamp, never the network) and one fix line.
 - In order: `context` — no ALIVE context (`Operator action: run <cli> context create with a context name and --main-repo set to the main repo's clone URL`); `bind` — the caller has a resolvable session id and that session is unbound (`<cli> context bind <name>`), never shown without a session identity; `constitution` (agent) — the `specs/constitution.md` frontmatter does not parse (repair its YAML); `specs` — the main repo's `specs/` is not at the canonical pattern version (`<cli> specs init --context <name>`, plus `--replace-foreign` only for a foreign tree); `first-pass` (agent) — `ARCHITECTURE.md` or `QUALITY.md`, fixed sections stripped, is still a shipped scaffold digest, or the catalog holds no atom (the absolute path of the installed `dd-audit-project` SKILL.md first-pass section plus the pending items, [[audits-canon]]); `publish` — the project is not published: `origin/<integration>` is absent or `specs/constitution.md` is on no `origin` ref (`<cli> context baseline <name>`, [[context-management]]).
-- The next step is the focus context's (the one just created, doctored or bound) first pending step, else the first pending across every ALIVE context in registry order, else none.
+- One context is judged: the focus (the one just created, doctored or bound), else the only ALIVE one; the next step is its first pending step, else none — another context's step is never named. With no ALIVE context the step is `context`.
 - Its text is `Next (<kind> step <id>): <reason>` plus one fix line, a command or an `Operator action:`; `<cli>` is the absolute venv CLI path built by `fix_line` ([[sdd-gate-v3]]).
 - Four callers print the same text: `init`, `context create`, [[workspace-doctor]]'s `ONBOARDING` finding (its `--json` carrying `step` and `kind`) and the SessionStart injection through one helper, unbound or bound (focused on the bound context) ([[context-management]]).
 - An agent loops on it — run `doctor`, execute the `fix:` line, repeat — from an empty directory to a published project; an end-to-end test drives that loop over local bare remotes.

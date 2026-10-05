@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-10-03T17:25:31Z",
+  "generated_at": "2026-10-05T14:24:40Z",
   "features": [
     {
       "rank": 1,
@@ -74,11 +74,12 @@
         "derivation",
         "governance"
       ],
-      "token_estimate": 1266,
+      "token_estimate": 1272,
       "depends_on": [
         "agent-orchestration",
         "sdd-gate-v3",
         "context-management",
+        "workspace-doctor",
         "QUALITY",
         "public-asset-distribution",
         "ARCHITECTURE"
@@ -105,7 +106,7 @@
         "projection",
         "privacy"
       ],
-      "token_estimate": 1026,
+      "token_estimate": 1042,
       "depends_on": [
         "harness-kimi-code",
         "agentic-entities",
@@ -149,12 +150,12 @@
         "release",
         "packaging"
       ],
-      "token_estimate": 786,
+      "token_estimate": 842,
       "depends_on": [
         "release-lifecycle",
+        "QUALITY",
         "public-asset-distribution",
         "consumer-agent-support",
-        "QUALITY",
         "cross-platform-portability"
       ],
       "sources": [
@@ -162,7 +163,8 @@
         "release-please-config.json",
         "dadaia_workspace/cli/main.py",
         "dadaia_workspace/__main__.py",
-        "pyproject.toml"
+        "pyproject.toml",
+        "scripts/**"
       ]
     },
     {
@@ -470,7 +472,7 @@
         "session",
         "privacy"
       ],
-      "token_estimate": 2754,
+      "token_estimate": 2770,
       "depends_on": [
         "specs-migration",
         "workspace-doctor",
@@ -621,7 +623,7 @@
         "compliance",
         "privacy"
       ],
-      "token_estimate": 2632,
+      "token_estimate": 2727,
       "depends_on": [
         "public-asset-distribution",
         "sdd-gate-v3",
@@ -638,6 +640,8 @@
         "dadaia_workspace/core/doctor_rules.py",
         "dadaia_workspace/core/workspace_layout.py",
         "dadaia_workspace/features/specs/**",
+        "dadaia_workspace/public/data/fixed/**",
+        "dadaia_workspace/public/schemas/memory/**",
         "dadaia_workspace/features/spec_context/doctor.py",
         "dadaia_workspace/features/spec_context/sweep.py",
         "dadaia_workspace/features/backlog/doctor.py",
@@ -661,7 +665,7 @@
         "upgrade",
         "onboarding"
       ],
-      "token_estimate": 1828,
+      "token_estimate": 1889,
       "depends_on": [
         "context-management",
         "specs-migration",
@@ -730,7 +734,7 @@
         "ledger",
         "governance"
       ],
-      "token_estimate": 756,
+      "token_estimate": 794,
       "depends_on": [
         "agent-orchestration",
         "worktrees",
@@ -751,7 +755,7 @@
       "slug": "bug-ledger",
       "title": "bug-ledger",
       "area": "sdd",
-      "tldr": "One bug record per line in BUGS.jsonl, registered after operator confirmation, closed only by a transition carrying evidence; bugs.py writes it.",
+      "tldr": "One bug record per line in BUGS.jsonl, registered after operator confirmation, closed only by a transition carrying its red loop; bugs.py writes it.",
       "summary": "The bug ledger — specs/bugs/BUGS.jsonl, one record per bug keyed by id, with no git-derived cache; the stdlib script bugs.py is its one writer and validator, and the ask-first registration plus the seven-phase resolution method run over it.",
       "path": "specs/memory/product/sdd/bug-ledger.md",
       "tags": [
@@ -760,7 +764,7 @@
         "ledger",
         "governance"
       ],
-      "token_estimate": 1349,
+      "token_estimate": 1596,
       "depends_on": [
         "sdd-gate-v3",
         "workspace-doctor",
@@ -794,7 +798,7 @@
         "memory",
         "as-is-review"
       ],
-      "token_estimate": 2580,
+      "token_estimate": 2678,
       "depends_on": [
         "sdd-gate-v3",
         "specs-migration",
@@ -862,8 +866,8 @@
       "slug": "worktrees",
       "title": "worktrees",
       "area": "sdd",
-      "tldr": "Every agent change to a repo is made in a canonical worktree of one of four kinds and lands by worktree.py merge — reviewed, rebased, fast-forwarded.",
-      "summary": "Canonical worktrees worktrees/<repo>/<M.m.p><letter>-<kind> on wt/ branches cut from the work branch; four kinds, each an allowed set; worktree.py new, merge, clean and list, stdlib and read from git alone; the merge ritual — allowed set, rebase with ledger union and TASKS-marker replay, an APPROVED verdict on the rebased sha or a patch-identical one of its reflog, fast-forward only — and the holds that keep closure and context dead waiting while one is open.",
+      "tldr": "Every agent change to a repo is made in a canonical worktree of one of four kinds and lands by worktree.py merge — reviewed, verified, fast-forwarded.",
+      "summary": "Canonical worktrees worktrees/<repo>/<M.m.p><letter>-<kind> on wt/ branches cut from the work branch; four kinds, each an allowed set; worktree.py new, merge, clean and list, stdlib and read from git alone; the merge ritual — allowed set, HEAD containing the work branch, an APPROVED verdict on HEAD or a patch-identical sha of its reflog, the repo's verify command green, fast-forward only, never a rebase — and the holds that keep closure and context dead waiting while one is open.",
       "path": "specs/memory/product/sdd/worktrees.md",
       "tags": [
         "worktrees",
@@ -872,14 +876,14 @@
         "merge",
         "review"
       ],
-      "token_estimate": 1099,
+      "token_estimate": 1187,
       "depends_on": [
         "sdd-gate-v3",
         "public-asset-distribution",
         "workspace-doctor",
-        "release-lifecycle",
         "agent-comms",
         "context-management",
+        "release-lifecycle",
         "bug-ledger",
         "agent-orchestration",
         "backlog-ledger"

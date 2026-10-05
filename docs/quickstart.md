@@ -7,8 +7,8 @@ live. Terms are defined in [concepts](concepts.md); the long walkthrough is
 
 ## 1. The three levels in one block
 
-<!-- derived-from: pypi-distribution sha256:cec6ab21a159 -->
-<!-- derived-from: workspace-init sha256:5a4a8bb1e91e -->
+<!-- derived-from: pypi-distribution sha256:969fd54bf85f -->
+<!-- derived-from: workspace-init sha256:4f0ceaccc6c8 -->
 
 Set `REPO_URL` to your repository's clone URL; everything else runs as printed (needs
 uv and network access):
@@ -57,7 +57,7 @@ Then `.dadaia/.venv/bin/dadaia specs init --context <ctx>` refreshes the project
 
 ## 2. What the init line provisioned
 
-<!-- derived-from: workspace-init sha256:5a4a8bb1e91e -->
+<!-- derived-from: workspace-init sha256:4f0ceaccc6c8 -->
 
 `--harness` names one registered harness: `claude` | `codex` | `kimi-code` | `cursor` |
 `devin` | `copilot`. The directory is required and a directory holding a foreign tree
@@ -79,7 +79,7 @@ clones every repo, installs the hook and makes the context ALIVE; `context bind`
 
 ## 3. The bind
 
-<!-- derived-from: context-management sha256:f9635e5c313c -->
+<!-- derived-from: context-management sha256:88b825d90c59 -->
 
 ```bash
 .dadaia/.venv/bin/dadaia context bind <your-repo>
@@ -95,7 +95,7 @@ id, else `DADAIA_CONTEXT`, never the cwd: sitting inside a repository is not a b
 
 ## 4. Compliance
 
-<!-- derived-from: workspace-doctor sha256:21e1298b4845 -->
+<!-- derived-from: workspace-doctor sha256:58030f05158e -->
 
 `doctor` is the one instance validator; three sections run in fixed order —
 `workspace`, `specs`, `ledgers`. Every finding prints as one `<CODE> <verdict>
@@ -107,7 +107,7 @@ entry held, an EPHEMERAL one deleted.
 
 ## 5. The first backlog entry
 
-<!-- derived-from: backlog-ledger sha256:41b18393125f -->
+<!-- derived-from: backlog-ledger sha256:c5fb2fc0ea4f -->
 
 `backlog.py new` appends one entry, born `idea`, to `specs/backlog/BACKLOG.json`'s
 `active[]` — the operator's demand queue; from the workspace root `--specs` names the
@@ -118,7 +118,7 @@ worktree.
 
 ## 6. The first release
 
-<!-- derived-from: release-lifecycle sha256:e4c5ec1f9818 -->
+<!-- derived-from: release-lifecycle sha256:29faad7020af -->
 
 `release.py new` is one birth act, all or nothing: a `SPEC.md` stub in
 `specs/releases/<id>/rc-1/` plus `_RELEASE.json` in `DEFINITION` at the release root, refusing a second live

@@ -8,7 +8,7 @@ is `dadaia_workspace/public/data/AGENTS.md`, and the walkthrough is
 ## Context
 
 <!-- derived-from: spec-context-project sha256:9690f09f679b -->
-<!-- derived-from: context-management sha256:f9635e5c313c -->
+<!-- derived-from: context-management sha256:88b825d90c59 -->
 
 A *context* — a Spec Context Project — is one canonical `specs/` tree owned by one
 main repository, the unit for memory, backlog, bugs, releases, reports and handoffs.
@@ -28,7 +28,7 @@ memory injection into the session.
 
 ## Release and candidate
 
-<!-- derived-from: release-lifecycle sha256:e4c5ec1f9818 -->
+<!-- derived-from: release-lifecycle sha256:29faad7020af -->
 
 Exactly one *release* is live, `specs/releases/<M.m.p>/`, with open scope; it grows by
 *candidates*, each a closed-scope cycle whose `SPEC.md`, `PLAN.md` and `TASKS.md` sit
@@ -41,8 +41,8 @@ moves only at an operator-approved deploy.
 
 ## The flow
 
-<!-- derived-from: release-lifecycle sha256:e4c5ec1f9818 -->
-<!-- derived-from: bug-ledger sha256:11ce7d98680f -->
+<!-- derived-from: release-lifecycle sha256:29faad7020af -->
+<!-- derived-from: bug-ledger sha256:156cfaca5544 -->
 <!-- derived-from: audits-canon sha256:94878d21d1f8 -->
 
 Every demand takes one of two arms. **Arm A**, a feature, leaves through a candidate:
@@ -52,8 +52,8 @@ SPEC with its `Replaces`, PLAN and TASKS, each task in its own `impl` worktree, 
 entries, the disposition sweep (`backlog.py exit`, `audit.py disposition`/`close`,
 `bugs.py archive`), artifact GC, the work -> integration merge (the constitution's `gitflow:`) and the operator's
 promote-or-continue choice. **Arm B**, a bug, is fixed in one `bug` worktree in
-any phase with no SPEC, PLAN or TASKS: register, lineage, RED test, root-cause fix,
-GREEN, `resolve` with evidence, one commit; a unit fixed twice before is rebuilt, not
+any phase with no SPEC, PLAN or TASKS: register, lineage, a RED new case (a fix never rewrites an old assert), root-cause fix,
+GREEN, `resolve` with its red loop, one commit; a unit fixed twice before is rebuilt, not
 patched a third time. No engine drives either arm: the documents
 carry the ordered work, and the ledger scripts move the records.
 
@@ -70,9 +70,9 @@ gate — a refusal whose fix is itself refused (a Stall) cannot ship.
 
 ## Memory
 
-<!-- derived-from: context-management sha256:f9635e5c313c -->
-<!-- derived-from: workspace-doctor sha256:21e1298b4845 -->
-<!-- derived-from: release-lifecycle sha256:e4c5ec1f9818 -->
+<!-- derived-from: context-management sha256:88b825d90c59 -->
+<!-- derived-from: workspace-doctor sha256:58030f05158e -->
+<!-- derived-from: release-lifecycle sha256:29faad7020af -->
 <!-- derived-from: audits-canon sha256:94878d21d1f8 -->
 
 *Memory* is current product truth: the atoms under `specs/memory/product/**`, plus
@@ -90,8 +90,8 @@ the warnings `MEM-DRIFT-1` (features package map vs the live tree) and `MEM-DRIF
 
 ## Bugs and backlog
 
-<!-- derived-from: bug-ledger sha256:11ce7d98680f -->
-<!-- derived-from: backlog-ledger sha256:41b18393125f -->
+<!-- derived-from: bug-ledger sha256:156cfaca5544 -->
+<!-- derived-from: backlog-ledger sha256:c5fb2fc0ea4f -->
 
 Both are records with one shape and one writer script. `specs/bugs/BUGS.jsonl` holds
 one record per bug, appended once and keyed by `id`, carrying no git-derived fact;
