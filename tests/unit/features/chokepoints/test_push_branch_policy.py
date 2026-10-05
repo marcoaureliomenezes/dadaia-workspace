@@ -194,13 +194,14 @@ def test_an_outside_ref_is_carried_onto_the_live_work_branch() -> None:
     [
         pytest.param("wt/0.5.0-rc9/job2", True),
         ("wt/0.5.0-rc9/define", False),
-        ("wt/backlog/an-idea", False),
+        ("wt/backlog/an-idea", True),
         ("wt/0.5.0-rc9/job2--T-1", False),
         ("wt/0.5.0a-impl", False),
     ],
 )
 def test_only_a_job_branch_of_wt_is_pushable(branch: str, allowed: bool) -> None:
-    """AC1.2 (ADR 0190): pre-push accepts `wt/<M.m.p>-rc<N>/<job>` and no other `wt/` branch."""
+    """AC1.2 (ADR 0190): pre-push accepts a job branch `wt/<M.m.p>-rc<N>/<job>` and a
+    `wt/backlog/<slug>` branch, no other `wt/` branch."""
     refs, _ = parse_push_stdin(_line(branch))
     decision = check_branch_policy(refs, DEFAULT, replace(gate_fixes(), work="feature/0.5.0"))
     assert (decision is None) is allowed
