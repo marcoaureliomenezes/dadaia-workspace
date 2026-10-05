@@ -174,7 +174,6 @@ def test_a_planted_failing_step_turns_its_level_red(tmp_path: Path, check: str, 
     assert done.returncode == code
 
 
-@pytest.mark.xfail(strict=True, reason="J2.S3.T1: AC2.1")
 @pytest.mark.parametrize("doc", ["tests/README.md", "tests/AGENTS.md"])
 def test_documented_coverage_line_leaves_no_coverage_file_in_the_checkout(
     tmp_path: Path, doc: str

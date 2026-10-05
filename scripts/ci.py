@@ -8,10 +8,13 @@ library only: the ``repo-hygiene`` and ``doctor`` jobs install no dev group."""
 from __future__ import annotations
 
 import os
+import shutil
 import subprocess
 import sys
 import tempfile
+from collections.abc import Generator
 from pathlib import Path
+from typing import Any
 
 ROOT = Path(__file__).resolve().parents[1]
 PY = sys.executable
@@ -46,6 +49,8 @@ JOBS: dict[str, list[Step]] = {
                 *PYTEST,
                 "-m",
                 "(unit or contract) and not quarantine",
+                "-p",
+                "scripts.ci",
                 "--cov=dadaia_workspace",
                 "--cov-report=term-missing",
                 "--cov-fail-under=80",
@@ -107,6 +112,25 @@ def plan(argv: list[str]) -> list[tuple[str, Step]]:
     return [(job, step) for job in jobs for step in JOBS[job]]
 
 
+def pytest_load_initial_conftests(early_config: Any) -> Generator[None]:
+    """As a pytest plugin (``-p scripts.ci``), the ONE decider of where coverage data lands:
+    a temp dir outside the checkout, removed when pytest exits. An xdist worker inherits the
+    controller's, which combines the workers' data before removing it."""
+    if "COVERAGE_FILE" not in os.environ:
+        tmp = tempfile.mkdtemp(prefix="dadaia-cov-")
+        early_config.add_cleanup(lambda: shutil.rmtree(tmp, ignore_errors=True))
+        os.environ["COVERAGE_FILE"] = os.path.join(tmp, ".coverage")
+    return (yield)
+
+
+# pluggy's own marker, spelled out: this file imports no pytest (standard library only). A
+# wrapper runs before pytest-cov's tryfirst hook, which starts coverage.
+pytest_load_initial_conftests.pytest_impl = dict(  # type: ignore[attr-defined]
+    wrapper=True, hookwrapper=False, optionalhook=False, tryfirst=False, trylast=False,
+    specname=None,
+)  # fmt: skip
+
+
 def main(argv: list[str]) -> int:
     # The fence (ADR 0088) mirrors the resolver's rungs: the inherited fence, every root above
     # the checkout, and the instance owning this venv (``fenced_env`` omits that last one, and
@@ -114,19 +138,17 @@ def main(argv: list[str]) -> int:
     fence = [os.environ.get("DADAIA_FENCED_ROOTS", ""), *map(str, ROOT.parents)]
     fence.append(str(Path(sys.prefix).resolve().parent.parent))
     failed = []
-    with tempfile.TemporaryDirectory(prefix="dadaia-ci-") as tmp:
-        base = {
-            **os.environ,
-            "PYTHONDONTWRITEBYTECODE": "1",
-            "DADAIA_FENCED_ROOTS": os.pathsep.join(p for p in fence if p),
-            "COVERAGE_FILE": f"{tmp}/.coverage",  # the run's own temp dir, removed at exit
-        }
-        for job, (name, cmd, env) in plan(argv):
-            print(f"--- {job}: {name}", flush=True)
-            step_env = {**base, **env}
-            code = subprocess.run(cmd, cwd=ROOT, env=step_env, check=False).returncode
-            print(f"{'FAIL' if code else 'PASS'} {name}: {' '.join(cmd)}", flush=True)
-            failed += [name] if code else []
+    base = {
+        **os.environ,
+        "PYTHONDONTWRITEBYTECODE": "1",
+        "DADAIA_FENCED_ROOTS": os.pathsep.join(p for p in fence if p),
+    }
+    for job, (name, cmd, env) in plan(argv):
+        print(f"--- {job}: {name}", flush=True)
+        step_env = {**base, **env}
+        code = subprocess.run(cmd, cwd=ROOT, env=step_env, check=False).returncode
+        print(f"{'FAIL' if code else 'PASS'} {name}: {' '.join(cmd)}", flush=True)
+        failed += [name] if code else []
     print(f"FAILED: {', '.join(failed)}" if failed else "ALL PASS", flush=True)
     return 1 if failed else 0
 
