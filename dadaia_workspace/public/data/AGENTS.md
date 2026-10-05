@@ -40,7 +40,7 @@
 - Path classes: ADDITIVE (`.dadaia/AGENTS.md`'s output and ephemeral zones) writable; PROTECTED (`workspace_layout.CORE_FLOOR`, `sdd_gate._HOOK_WIRING`, the install ledger, the `.dadaiaignore` `[protected]` globs, repo-relative) blocked; the rest MUTATING.
 - Writes under `repos/<slug>/`: `specs/audits/` directly, the rest by worktree merge; only `context create` and a repo's first `specs init` write `specs/` directly (ADR 0154).
 - Every BLOCK carries exactly one fix line, `fix: <command>` or `Operator action: <one act>` (ADR 0158); a BLOCK whose fix is itself blocked is a Stall, CRITICAL.
-- Git chokepoints (branch names: `specs/constitution.md` `gitflow:`): pre-push allows only the work branch and refuses a non-canon `specs/` path or a denylisted secret; both PRs need CI green and a `dd-code-reviewer` APPROVED verdict; no CI job calls a model API but an evals repo's, under `dd-gitflow-default` §3b.
+- Git chokepoints (branch names: `specs/constitution.md` `gitflow:`): pre-push allows only the work branch, a job branch `wt/<M.m.p>-rc<N>/<job>` and a backlog branch `wt/backlog/<slug>`, and refuses a non-canon `specs/` path or a denylisted secret; both PRs need CI green and a `dd-code-reviewer` APPROVED verdict; no CI job calls a model API but an evals repo's, under `dd-gitflow-default` §3b.
 - Races surface, never block; the binding: `.dadaia/.venv/bin/dadaia context show --json`.
 - The gate reads no SDD artifact; procedure is skill-taught and audit-measured, never gated.
 

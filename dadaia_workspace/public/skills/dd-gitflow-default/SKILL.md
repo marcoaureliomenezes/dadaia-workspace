@@ -37,6 +37,8 @@ The branch contract by role; the names are `specs/constitution.md`'s `gitflow:` 
 | Branch | Pushable | Cut from | Advances by |
 |---|---|---|---|
 | work `<work>M.m.p` | Yes — the repo's own CI checks green + valid name | integration | the PR below |
+| job `wt/<M.m.p>-rc<N>/<job>` | Yes — its push runs the CI matrix its verdict names | work | `worktree.py merge` |
+| backlog `wt/backlog/<slug>` | Yes | work | `worktree.py merge` |
 | integration | No — never a direct push | principal (bootstrap only) | PR from the row above, at definition `Approved` and at each `rc` merge |
 | principal | No — never a direct push | — | PR from the integration branch, at the final `rc` |
 
