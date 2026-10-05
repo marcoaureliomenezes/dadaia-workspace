@@ -128,7 +128,7 @@ def _parsed(key: str, value: str) -> Any:
 def archive(records: Records, ids: list[str], adr: str, accepted: set[str]) -> Records:
     """The ledger without the terminal records *ids*; each moved record gains
     ``archived_by: adr`` in place, since the store archives the very records this drops
-    (ADR 0187 (4): a record leaves only by an accepted ADR)."""
+    (a record leaves only by an accepted ADR)."""
     if adr not in accepted:
         raise Refusal(f"ADR {adr!r} is not accepted in ADRs/decisions.jsonl — a record leaves "
                       "the ledger only by an accepted ADR", f"Operator action: accept ADR {adr} first")  # fmt: skip

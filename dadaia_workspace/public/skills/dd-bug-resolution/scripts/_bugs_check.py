@@ -123,9 +123,9 @@ def accepted_adrs(root: Path) -> set[str]:
 
 
 def histo_findings(text: str, root: Path = _ledger.SPECS) -> list[dict[str, Any]]:
-    """The archive's lines: each a bug-record-v1 record moved by an accepted ADR (its
-    ``archived_by``, ADR 0187 (4)), or a pre-v6 ``event`` line that predates the record
-    shape and is history, never rewritten (ADR 0188)."""
+    """The archive's lines: each a bug-record-v1 record moved by the accepted ADR its
+    ``archived_by`` names, or a pre-v6 ``event`` line that predates the record shape and is
+    history, never rewritten."""
     schema, accepted = load_schema(), accepted_adrs(root)
     out: list[dict[str, Any]] = []
     for number, raw in enumerate(text.split("\n"), start=1):
