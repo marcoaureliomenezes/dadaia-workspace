@@ -1,4 +1,4 @@
-"""One secret matcher: the pre-push scan and the baseline / ``dead --commit`` preflight
+"""One secret matcher: the pre-push scan and the baseline publish preflight
 give the same verdict on every fixture, because both run ONE engine over ONE registry.
 
 AC5.6 / sa-pre-push-and-publish-scan-disagree-on-secret-shapes;
@@ -24,18 +24,10 @@ from dadaia_workspace.container import (
 from dadaia_workspace.core.models.doctor_report import DoctorStatus
 from dadaia_workspace.core.models.git_scan import ScannedObject
 from dadaia_workspace.features.chokepoints.denylist_scan import scan_objects
-from dadaia_workspace.features.spec_context.service import (
-    DeadSecretFoundError,
-    SpecContextService,
-)
-from dadaia_workspace.infrastructure.git_subprocess import GitSubprocessClient
 from dadaia_workspace.infrastructure.privacy_check import (
     _PUBLIC_PRIVACY_TEXT_SUFFIXES,  # allow-private-import: which suffixes the doctor reads
     check_public_privacy,
 )
-from tests.fakes import register_dead
-from tests.fixtures.real_git import seeded_remote
-from tests.fixtures.stores import context_store
 
 _DASHES = "-" * 5
 _TERM = "zz" + "fixtureterm"
@@ -135,28 +127,12 @@ def _pre_push_refuses(name: str, content: str | bytes) -> bool:
     return bool(outcome.hits)
 
 
-def _dead_commit_refuses(root: Path, name: str, content: str | bytes) -> bool:
-    """The publish side: ``dead --commit`` over the same file, untracked in its repo."""
-    (root / "repos").mkdir()
-    git = GitSubprocessClient()
-    service = SpecContextService(
-        context_store=context_store(root / ".dadaia" / "states"),
-        git_client=git,
-        workspace_root=root,
-        install_hooks=lambda _repo: None,
-        secret_scan=scan_publish_candidates,
-    )
-    register_dead(
-        service, "proj", "my-repo", seeded_remote(root, "my-repo", branch="feature/0.1.0").as_uri()
-    )
-    service.alive("proj")
-    target = root / "repos" / "my-repo" / name
+def _publish_refuses(root: Path, name: str, content: str | bytes) -> bool:
+    """The publish side: the in-process matcher ``context baseline`` runs over the same
+    file, untracked in its repo."""
+    target = root / name
     target.write_bytes(content) if isinstance(content, bytes) else target.write_text(content)
-    try:
-        service.dead("proj", commit=True)
-    except DeadSecretFoundError:
-        return True
-    return False
+    return bool(scan_publish_candidates(root, [name]))
 
 
 @pytest.mark.parametrize(
@@ -165,7 +141,7 @@ def _dead_commit_refuses(root: Path, name: str, content: str | bytes) -> bool:
 def test_pre_push_and_publish_preflight_agree(
     tmp_path: Path, case: str, name: str, content: str | bytes, refused: bool
 ) -> None:
-    verdicts = (_pre_push_refuses(name, content), _dead_commit_refuses(tmp_path, name, content))
+    verdicts = (_pre_push_refuses(name, content), _publish_refuses(tmp_path, name, content))
     assert verdicts == (refused, refused), case
     if isinstance(content, str) and Path(name).suffix in _PUBLIC_PRIVACY_TEXT_SUFFIXES:
         public = tmp_path / "lib" / "dadaia_workspace" / "public"

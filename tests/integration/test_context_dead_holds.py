@@ -13,9 +13,9 @@ sa-context-dead-removes-repos-outside-the-reaper#C3 /
 - context-dead-destroys-associated-repo-without-url: dead back-fills each repo's URL from
   origin, refuses a repo it could never clone back; alive refuses a URL-less missing repo
   with a runnable fix line.
-- context-dead-pushes-an-unborn-clone: an unborn clone (empty or holding files) is held,
-  never pushed (WP-03 undid 934377e8's refusal).
-- F-5 / AC-R7-01: a gitignored file is not untracked-for-review.
+- context-dead-pushes-an-unborn-clone: an empty unborn clone is held, never pushed.
+- ADR 0172 (rc-9 AC3.2): dead never commits; a dirty checkout refuses, one fix line per
+  file; a gitignored file is not dirty.
 The refusal fix lines on the main repo are the refusal harness's Cases
 (`test_refusal_fix_lines_clear_their_refusal.py`: untracked, secret_untracked, no_origin,
 unpushed_side_branch, commits_no_remote).
@@ -179,7 +179,7 @@ def test_dead_refuses_an_unrecoverable_repo_anywhere_in_the_set_and_touches_noth
     plant(repo.parent / offender)
 
     with pytest.raises(error, match=match):
-        service.dead("proj", commit=plant is _url_less)
+        service.dead("proj")
 
     assert (repo / ".git").is_dir() and (repo.parent / "lib" / ".git").is_dir()
     assert not (tmp_path / "ws" / ".dadaia" / "reaped").exists()
@@ -195,22 +195,21 @@ def _unborn(repo: Path, *files: str) -> None:
 
 
 _HOLDS = [
-    pytest.param(lambda r: None, "README.md", "init\n", False, id="C1-clean-set"),
-    pytest.param(lambda r: (r / "ignored.txt").write_text(f"k={aws_key_shape()}\n"), "ignored.txt", None, False, id="gitignored-is-not-untracked"),
-    pytest.param(_unborn, ".git/HEAD", None, False, id="unborn-empty-clone-no-push"),
-    pytest.param(lambda r: _unborn(r, "AGENTS.md"), "AGENTS.md", "scaffold\n", True, id="unborn-clone-holding-files"),
+    pytest.param(lambda r: None, "README.md", "init\n", id="C1-clean-set"),
+    pytest.param(lambda r: (r / "ignored.txt").write_text(f"k={aws_key_shape()}\n"), "ignored.txt", None, id="gitignored-is-not-untracked"),
+    pytest.param(_unborn, ".git/HEAD", None, id="unborn-empty-clone-no-push"),
 ]  # fmt: skip
 
 
-@pytest.mark.parametrize(("plant", "held", "content", "commit"), _HOLDS)
+@pytest.mark.parametrize(("plant", "held", "content"), _HOLDS)
 def test_dead_holds_every_repo_of_the_set_under_reaped(
-    tmp_path: Path, plant: Callable[[Path], object], held: str, content: str | None, commit: bool
+    tmp_path: Path, plant: Callable[[Path], object], held: str, content: str | None
 ) -> None:
     """#C1: each repo leaves `repos/` and is held byte-intact; the record turns DEAD."""
     service, store, repo = _alive(tmp_path)
     plant(repo.parent / "lib")
 
-    service.dead("proj", commit=commit)
+    service.dead("proj")
 
     reaped = tmp_path / "ws" / ".dadaia" / "reaped"
     assert [p.read_text() for p in reaped.glob("*/repos/main/README.md")] == ["init\n"]
@@ -253,7 +252,7 @@ def test_alive_dead_alive_keeps_every_repo_obtainable(tmp_path: Path) -> None:
     second alive (clone into a populated dir would fail) is a no-op."""
     service, store, repo = _alive(tmp_path, lib_url="")
 
-    dead = service.dead("proj", commit=True)
+    dead = service.dead("proj")
     service.alive("proj")
     again = service.alive("proj")
 
@@ -276,7 +275,6 @@ def test_alive_refuses_a_legacy_url_less_missing_repo_with_a_fix_line(tmp_path: 
     assert store.get("proj").state == ContextState.DEAD  # type: ignore[union-attr]
 
 
-@pytest.mark.xfail(strict=True, reason="RED until J3.S3.T1")
 def test_dead_refuses_a_dirty_checkout_one_fix_line_per_file(tmp_path: Path) -> None:
     """rc-9 AC3.2 (ADR 0172 measured_by): dead never commits — a dirty checkout refuses with
     one fix line per file and leaves tree and origin untouched."""

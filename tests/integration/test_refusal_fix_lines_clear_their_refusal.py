@@ -743,19 +743,8 @@ def _untracked(world: World) -> list[str]:
     return ["context", "dead", "proj"]
 
 
-def _secret_untracked(world: World) -> list[str]:
-    _on_work(world)
-    (world.repo / "notes.md").write_text(f"key {aws_key_shape()}\n", encoding="utf-8")
-    return ["context", "dead", "proj", "--commit"]
-
-
-def _drop_untracked_secret(world: World) -> None:
-    (world.repo / "notes.md").write_text("key\n", encoding="utf-8")
-
-
-def _secret_pushed(world: World) -> None:
-    _dead_done(world)
-    assert world.git(world.bare, "show", "feature/1.0.0:notes.md") == "key"
+def _discard_notes(world: World) -> None:
+    (world.repo / "notes.md").unlink()
 
 
 def _no_origin(world: World) -> list[str]:
@@ -784,7 +773,7 @@ def _commits_no_remote(world: World) -> list[str]:
 def _dirty_on_integration(world: World) -> list[str]:
     _released(world)
     world.git(world.repo, "checkout", "-q", "develop")
-    (world.repo / "README.md").write_text("edited\n", encoding="utf-8")
+    world.commit("README.md", "edited\n")  # unpushed, on the integration branch
     return ["context", "dead", "proj"]
 
 
@@ -810,6 +799,7 @@ def _associated_on_integration(world: World) -> list[str]:
     world.git(lib, "checkout", "-q", "-b", "develop", "--track", "origin/develop")
     install_git_hooks(lib)
     (lib / "README.md").write_text("edited\n", encoding="utf-8")
+    world.git(lib, "commit", "-qam", "edited")
     store = JsonContextStore(world.ws / ".dadaia" / "states")
     ctx = store.get("proj")
     assert ctx is not None
@@ -826,17 +816,7 @@ def _associated_dead(world: World) -> None:
 def _dead_denylisted(world: World) -> list[str]:
     _on_work(world)
     world.deny()
-    (world.repo / "README.md").write_text(f"a {_TERM}\n", encoding="utf-8")
-    return ["context", "dead", "proj"]
-
-
-def _dead_no_identity(world: World) -> list[str]:
-    """SA-H3-2: dead's auto-sync commit needs git's identity — refused before any write."""
-    _on_work(world)
-    (world.repo / "README.md").write_text("edited\n", encoding="utf-8")
-    (world.tmp / "gitconfig").write_text(
-        f"{GIT_QUIET_INCLUDE}[user]\n\tuseConfigOnly = true\n", encoding="utf-8"
-    )
+    world.commit("README.md", f"a {_TERM}\n")
     return ["context", "dead", "proj"]
 
 
@@ -865,9 +845,9 @@ def _stashed(world: World) -> list[str]:
 
 
 def _play_stash_act(world: World) -> None:
-    """The operator plays the first act the refusal names on the stash entry."""
-    fix = _single_fix(world.cli("context", "dead", "proj"))
-    world.git(world.repo, "stash", fix.split()[2])
+    """The operator drops the stash entry, the second act the refusal names (a pop would
+    leave a dirty checkout, which dead refuses)."""
+    world.git(world.repo, "stash", "drop", "-q")
 
 
 def _dead_twice(world: World) -> list[str]:
@@ -968,15 +948,13 @@ SITES: dict[str, tuple[Case | tuple[Case, ...] | Skip, ...]] = {
         Case(_secret_draft, _baseline_done, operator=_drop_secret),
     ),
     "service.SpecContextService._dead_preflight": (
-        Case(_untracked, _dead_done, replaces=True),
-        Case(_secret_untracked, _secret_pushed, operator=_drop_untracked_secret),
+        Case(_untracked, _dead_done, operator=_discard_notes),
         Case(_no_origin, _dead_done, operator=_origin),
         (
             Case(_unpushed_side_branch, _dead_done),
             Case(_commits_no_remote, _dead_done, operator=_origin),
             Case(_stashed, _dead_done, operator=_play_stash_act),
         ),
-        Case(_dead_no_identity, _dead_done, operator=_identity),
         (
             Case(_dirty_on_integration, _dead_via_work),
             Case(_associated_on_integration, _associated_dead),
@@ -1124,7 +1102,7 @@ def test_every_fix_line_prints_on_one_line_without_a_tty(tmp_path: Path) -> None
     world = World(tmp_path / ("d" * 90))
     _unborn_dirty(world)
     fix = _single_fix(world.cli("context", "dead", "proj"))
-    assert fix.endswith("context dead proj --commit"), fix
+    assert fix.endswith("notes.txt into a worktree, or discard it"), fix
     assert re.search(re.escape(str(world.ws)), fix)
 
 
@@ -1169,6 +1147,7 @@ def test_dead_on_a_non_fast_forward_carries_gits_own_text_and_removes_nothing(
     _on_work(world)
     _advance_origin_work(world)
     (world.repo / "README.md").write_text("edited\n", encoding="utf-8")
+    world.git(world.repo, "commit", "-qam", "edited")
     done = world.cli("context", "dead", "proj")
     output = done.stdout + done.stderr
     assert done.returncode != 0 and "rejected" in output
@@ -1193,8 +1172,7 @@ def test_dead_after_the_operator_pulls_into_a_conflict_publishes_no_markers(
     world: World,
 ) -> None:
     """Review 6 H6 (R7): the operator follows git's own `git pull` hint into a conflict;
-    dead stages no unmerged entry, so git refuses the commit — its text, nothing published,
-    the checkout kept."""
+    the unmerged file is a dirty checkout dead refuses — nothing published, the checkout kept."""
     _on_work(world)
     _advance_origin_work(world)
     other = world.tmp / "other"
@@ -1207,27 +1185,5 @@ def test_dead_after_the_operator_pulls_into_a_conflict_publishes_no_markers(
     published = world.remote_heads()["feature/1.0.0"]
     done = world.cli("context", "dead", "proj")
     output = done.stdout + done.stderr
-    assert done.returncode != 0 and "unmerged" in output, output
+    assert done.returncode != 0 and "README.md into a worktree, or discard it" in output, output
     assert world.repo.is_dir() and world.remote_heads()["feature/1.0.0"] == published
-
-
-def test_dead_commit_without_a_git_identity_refuses_and_removes_nothing(world: World) -> None:
-    """Behavior (AC4.9, security finding SA-H3-2, commit 75b92f25): with no git identity in env or config,
-    ``context dead --commit`` over a checkout holding changes refuses before any write —
-    exit non-zero, one fix line setting ``user.name`` in that repo, the checkout, its
-    change and the published branch all left as they were."""
-    _on_work(world)
-    (world.repo / "README.md").write_text("edited\n", encoding="utf-8")
-    head = world.git(world.repo, "rev-parse", "HEAD")
-    published = world.remote_heads()["feature/1.0.0"]
-    (world.tmp / "gitconfig").write_text(
-        f"{GIT_QUIET_INCLUDE}[user]\n\tuseConfigOnly = true\n", encoding="utf-8"
-    )
-    done = world.cli("context", "dead", "proj", "--commit")
-    assert done.returncode != 0
-    assert _single_fix(done) == f"Operator action: set git user.name in the config of {world.repo}"
-    assert (world.repo / "README.md").read_text(encoding="utf-8") == "edited\n"
-    assert world.git(world.repo, "rev-parse", "HEAD") == head
-    assert world.remote_heads()["feature/1.0.0"] == published
-    ctx = JsonContextStore(world.ws / ".dadaia" / "states").get("proj")
-    assert ctx is not None and ctx.state == ContextState.ALIVE

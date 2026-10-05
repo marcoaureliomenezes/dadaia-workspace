@@ -321,19 +321,11 @@ def baseline(
 @app.command()
 def dead(
     name: str = typer.Argument(..., help="Context name to make DEAD"),
-    commit: bool = typer.Option(
-        False,
-        "--commit",
-        help=(
-            "Explicit consent to commit+push untracked files. Without it, dead() "
-            "refuses if untracked files are present and pushes nothing. With it, a "
-            "secret scan runs over the files before push and blocks on any finding."
-        ),
-    ),
 ) -> None:
-    """Transition a context to DEAD; git sync + remove repo from disk."""
+    """Transition a context to DEAD: push what is committed, hold each repo in reaped/.
+    A dirty checkout refuses; dead never commits."""
     try:
-        ctx = _ctx_service().dead(name, commit=commit)
+        ctx = _ctx_service().dead(name)
         console.print(f"[green]✓[/green] Context '[bold]{ctx.name}[/bold]' is now DEAD")
     except DadaiaError as e:
         fail(e)

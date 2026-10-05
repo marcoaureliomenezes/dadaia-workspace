@@ -20,7 +20,7 @@ from dadaia_workspace.infrastructure.json_context_store import JsonContextStore
 from tests.fakes import register_dead
 from tests.fixtures.real_git import git, seeded_remote
 from tests.fixtures.stores import context_store
-from tests.helpers.privacy_fixtures import aws_key_shape, internal_host, private_ip
+from tests.helpers.privacy_fixtures import aws_key_shape
 
 
 @pytest.fixture()
@@ -87,45 +87,6 @@ def test_alive_clone_behavior_state_and_not_found(
         service.alive("ghost")
 
 
-@pytest.mark.parametrize(
-    ("filename", "write_fn", "expect_secret_absent"),
-    [
-        pytest.param("config.env", lambda repo: (repo / "config.env").write_text(f"AWS_ACCESS_KEY_ID={aws_key_shape()}\n"), aws_key_shape(), id="planted_secret"),
-        pytest.param("hosts.txt", lambda repo: (repo / "hosts.txt").write_text(f"db host: {private_ip()} ({internal_host('db-primary')})\n"), None, id="planted_private_ip"),
-        pytest.param("server.pem", lambda repo: (repo / "server.pem").write_bytes(b"\x00\x01opaque-key-bytes\xff"), None, id="pem_suffix_binary"),
-    ],
-)  # fmt: skip
-def test_dead_with_commit_blocks_on_redacted_findings(
-    service: SpecContextService,
-    remote: str,
-    workspace_root: Path,
-    filename: str,
-    write_fn: object,
-    expect_secret_absent: str | None,
-) -> None:
-    """AC-R7-01, R-2: an untracked secret, private host or .pem (by suffix alone) blocks the
-    push; nothing is committed and the secret value is never in the message."""
-    from dadaia_workspace.features.spec_context.service import DeadSecretFoundError
-
-    register_dead(service, "proj", "my-repo", remote)
-    service.alive("proj")
-    repo = workspace_root / "repos" / "my-repo"
-    head = git(repo, "rev-parse", "HEAD")
-    write_fn(repo)  # type: ignore[operator]
-
-    with pytest.raises(DeadSecretFoundError) as exc:
-        service.dead("proj", commit=True)
-
-    assert filename in str(exc.value)
-    if expect_secret_absent is not None:
-        assert expect_secret_absent not in str(exc.value)
-    # Nothing pushed/committed; repo untouched.
-    assert git(repo, "rev-parse", "HEAD") == head
-    assert git(repo, "rev-parse", "origin/feature/0.1.0") == head
-    assert repo.exists()
-    assert service.show("proj").state == ContextState.ALIVE
-
-
 def test_delete_removes_dead_context_not_found_and_alive_raises(
     service: SpecContextService, store: JsonContextStore, remote: str
 ) -> None:
@@ -159,7 +120,7 @@ def test_dead_refuses_to_drop_a_stash_the_repo_holds(
     git(repo, "stash", "push", "-u", "--", "config.env")
 
     with pytest.raises(DeadUnpushedCommitsError) as exc:
-        service.dead("proj", commit=True)
+        service.dead("proj")
 
     assert repo.exists()
     assert str(exc.value).endswith(

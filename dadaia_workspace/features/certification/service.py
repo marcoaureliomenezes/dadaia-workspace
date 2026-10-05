@@ -404,7 +404,7 @@ def certify(
     check("reports-handoff-validation", handoff_validation)
 
     def context_round_trip() -> str:
-        cli("context", "dead", "certified-consumer", "--commit")
+        cli("context", "dead", "certified-consumer")
         cli("context", "alive", "certified-consumer")
         cli("context", "dead", "certified-consumer")
         cli("context", "delete", "certified-consumer")
