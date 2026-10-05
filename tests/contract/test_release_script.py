@@ -457,9 +457,6 @@ def test_check_refuses_each_trio_row(
         assert error["fix"].startswith(("fix: ", "Operator action: ")) and "\n" not in error["fix"]
 
 
-@pytest.mark.xfail(
-    strict=True, reason="J4.S2.T2: phase IMPLEMENTATION does not read the PLAN's DAG/hot files"
-)
 @pytest.mark.parametrize(
     ("plan", "needle"),
     [
