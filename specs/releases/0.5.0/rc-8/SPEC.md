@@ -552,7 +552,7 @@ After AC9.3 and AC8.1's `Intent:` strip merge. Each RED is a behaviour assert in
   - AC13.6's verb and the age path's deletion (`--now`, `--threshold-days`, the cutoff, `archivable`, SPEC-DOC-041), `archived_by` on each moved record — T-050-210; carried to rc-9's J1 — operator ruling 2026-10-05 "Sim, fecha assim (Recommended)"; prepared work in `refs/backup/0.5.0b-impl-full`.
   - AC13.6's restore of the 65 age-archived v1 records — T-050-211; carried to rc-9's J1 — same ruling, same ref.
   - AC13.1's `found_in` backfill — T-050-212; carried to rc-9's J1 — same ruling, same ref.
-  - The closure memory pass (RC-FLOW step 5), AC10.14's memory half and the `ci-preflight` atom's deletion included — carried to rc-9's Reconciliation — same ruling.
+  - AC9.1's review step naming `git diff -U0 -- tests | grep -E '^-\s*assert'`, and the deletion of the `<bug-id>#<id>` citation clause at `dadaia_workspace/public/skills/dd-code-review/SKILL.md:76`, which accepted ADR 0163 retired — folded into T-050-198's `dd-code-review` edit; carried to rc-9 — operator ruling 2026-10-05. Until then ADR 0163's `measured_by` grep is red, and `bug-fix-adds-never-rewrites-asserts` stays active.
   - Not run at this closure: `bugs.py archive` (RC-FLOW step 7's aging). ADR 0187 (accepted): a record leaves the ledger only by an accepted ADR; T-050-210's ADR-only archive verb is carried.
   - Not carried: AC10.14's law half (T-050-189), delivered by T-050-191's commit, only its marker missing (scope I1); T-050-181's readout of what rc-8 delivered, which rc-8's closure takes (scope I3).
 
