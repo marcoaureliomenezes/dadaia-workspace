@@ -875,6 +875,12 @@
       "milestone": "defined",
       "sha": "407c28bdb",
       "text": "Candidate defined at 407c28bdb; phase IMPLEMENTATION."
+    },
+    {
+      "ts": "2026-10-05T06:33:15Z",
+      "agent": "dd-product-engineer",
+      "kind": "note",
+      "text": "Candidate 8 carries 32 tasks out (grill 2026-10-05 Q21: rc-8 closes after T-050-212; handoffs 2026-10-05T040135Z-main-thread-grill-granularity-parallelism.handoff.json, 2026-10-05T050738Z-main-thread-grill-rc9-scope.handoff.json; operator overnight authorization \"Yes, Carried only (Recommended)\"). Removed from TASKS.md by b4c6fc604: T-050-173..179, 185, 186, 188, 194..208, 213..216, 189, 180, 181; their ACs listed in the SPEC's Carried section, carried to rc-9. The rc-9 scope grill routes T-050-177 (AC10.12) to the backlog and rc-10 (Q3), the evals (185, 186, 188) and QUALITY (180) to rc-10 (Q1); T-050-213 is rc-9's SPEC section 1 and T-050-189 was delivered by T-050-191 (I1). T-050-210, 211, 212 stay open in rc-8."
     }
   ]
 }
