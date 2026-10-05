@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """What every ledger script shares, staged beside each one: the atomic write, schema read,
-validation, the `check` record, and `private_refusal` (the push gate's own matcher)."""
+validation, the `check` record, and `private_refusal` (the push gate's own question)."""
 
 from __future__ import annotations
 
@@ -8,6 +8,7 @@ import contextlib
 import json
 import os
 import re
+import subprocess
 import time
 from pathlib import Path
 from types import ModuleType, SimpleNamespace
@@ -204,12 +205,39 @@ def terms(root: Path | None) -> list[tuple[str, str]]:
     return []
 
 
-def private_refusal(record: dict[str, Any], specs: Path) -> tuple[str, str] | None:
-    """``(message, fix)`` for the first field of *record* the push refuses, else ``None``;
-    the terms are the workspace's that holds *specs*, whatever the cwd."""
-    if (hit := _privacy.first_private(record, terms(workspace_of(specs)), _baseline())) is None:
+def _published_text(path: Path) -> str | None:
+    """*path*'s text at the first publication boundary carrying it (the push's prior text,
+    ``_privacy.publication_boundaries``); ``None`` outside git or when none carries it."""
+
+    def git(args: list[str]) -> list[str]:
+        done = subprocess.run(["git", "-C", str(path.parent), *args],
+                              capture_output=True, text=True, encoding="utf-8")  # fmt: skip
+        return done.stdout.splitlines() if done.returncode == 0 else []
+
+    if not (top := git(["rev-parse", "--show-toplevel"])):
         return None
-    return (
-        f"field {hit[0]!r} carries {hit[1]!r}, which the push refuses — nothing was written",
-        "Operator action: re-run this command with that value rewritten without the private term",
-    )
+    rel = path.resolve().relative_to(Path(top[0]).resolve()).as_posix()
+    for base in _privacy.publication_boundaries(git, "HEAD"):
+        done = subprocess.run(["git", "-C", top[0], "cat-file", "blob", f"{base}:{rel}"],
+                              capture_output=True, text=True, encoding="utf-8")  # fmt: skip
+        if done.returncode == 0:
+            return done.stdout
+    return None
+
+
+def private_refusal(record: dict[str, Any], path: Path) -> tuple[str, str] | None:
+    """``(message, fix)`` for the first field of *record* the push refuses — a match the
+    published text of *path* (the ledger file) does not already carry — else ``None``;
+    the terms are the workspace's that holds *path*, whatever the cwd."""
+    found, patterns = terms(workspace_of(path)), _baseline()
+    published = _privacy.published_matches(_published_text(path), found, patterns)
+    for key, value in record.items():
+        text = json.dumps(value, ensure_ascii=False)
+        for hit, _source, _reason in _privacy.fresh_matches(text, published, found, patterns):
+            return (
+                f"field {key!r} carries {_privacy.mask(hit)!r}, which the push refuses — "
+                "nothing was written",
+                "Operator action: re-run this command with that value rewritten without the "
+                "private term",
+            )
+    return None

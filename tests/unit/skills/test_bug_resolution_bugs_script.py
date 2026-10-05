@@ -535,8 +535,7 @@ _SLUG = {**_OPEN_RECORD, "context": "acme-games"}
 
 # fmt: off
 @pytest.mark.parametrize(("published", "context", "pushed"), [
-    pytest.param((_SLUG,), "acme-games", False, id="published-context-accepted",
-                 marks=pytest.mark.xfail(strict=True, reason="J2.S3.T7: AC2.7")),
+    pytest.param((_SLUG,), "acme-games", False, id="published-context-accepted"),
     pytest.param((_OPEN_RECORD,), "acme-games", True, id="unpublished-term-refused"),
     pytest.param((_OPEN_RECORD,), "ctx", False, id="no-term-accepted"),
 ])
@@ -558,6 +557,10 @@ def test_the_seam_verdict_equals_the_push_verdict_over_the_published_ledger(
     subprocess.run(["git", "-C", str(root), "add", "-A"], check=True)
     subprocess.run(["git", "-C", str(root), "-c", "user.name=t", "-c",
                     "user.email=t@t.invalid", "commit", "-qm", "published"], check=True)  # fmt: skip
+    origin = tmp_path / "origin.git"  # published = what origin holds, as the push reads it
+    subprocess.run(["git", "init", "-q", "--bare", str(origin)], check=True)
+    subprocess.run(["git", "-C", str(root), "remote", "add", "origin", str(origin)], check=True)
+    subprocess.run(["git", "-C", str(root), "push", "-q", "origin", "HEAD"], check=True)
 
     done = _run(
         script, "append", "--specs", str(root / "specs"), "--bug-id", "new-bug", "--title",

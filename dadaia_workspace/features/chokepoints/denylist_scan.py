@@ -30,7 +30,12 @@ from dataclasses import dataclass, replace
 from typing import Protocol
 
 from dadaia_workspace.core.models.git_scan import ScannedObject
-from dadaia_workspace.core.redaction import UNSAFE_FORMAT_CHARS_RE, mask, privacy_matches
+from dadaia_workspace.core.redaction import (
+    UNSAFE_FORMAT_CHARS_RE,
+    fresh_matches,
+    mask,
+    published_matches,
+)
 
 __all__ = [
     "BaselinePatternLike",
@@ -114,16 +119,11 @@ def _first_match(
     suppressed, ADR D7), yields the same value (case-normalized) from the same source —
     keyed on the value, so a prior email never amnesties a brand-new one (grill R1/A1.3).
     Only ``masked_term`` leaves this module (A5.2)."""
-    prior = (
-        None
-        if obj.prior_text is None
-        else {(v.lower(), src) for v, src, _ in privacy_matches(obj.prior_text, terms, patterns)}
-    )
+    published = published_matches(obj.prior_text, terms, patterns)
     # AC5.6: a control character never splits a term out of reach — stripped first.
     for lineno, line_text in enumerate(UNSAFE_FORMAT_CHARS_RE.sub("", obj.text).splitlines(), 1):
-        for value, source, _reason in privacy_matches(line_text, terms, patterns):
-            if prior is None or (value.lower(), source) not in prior:
-                return Hit(obj.path, lineno, obj.sha, mask(value), source)
+        for value, source, _reason in fresh_matches(line_text, published, terms, patterns):
+            return Hit(obj.path, lineno, obj.sha, mask(value), source)
     return None
 
 

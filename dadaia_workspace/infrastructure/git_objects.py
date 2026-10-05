@@ -27,6 +27,7 @@ from dadaia_workspace.core.models.git_scan import (
     GitRunError,
     ScannedObject,
 )
+from dadaia_workspace.core.redaction import PUBLISHED, publication_boundaries
 
 _TIMEOUT_S = 30
 
@@ -128,7 +129,7 @@ def _base_exclusions(repo: Path, remote_sha: str) -> list[str]:
     here: every call gets ``--remotes=origin``, optionally extended by *remote_sha* — one
     exclusion set, asked for identically on every push.
     """
-    exclusions = ["--remotes=origin"]
+    exclusions = [PUBLISHED]
     if _is_resolvable_commit(repo, remote_sha):
         exclusions.insert(0, remote_sha)
     return exclusions
@@ -172,39 +173,19 @@ def _range_commit_shas(repo: Path, local_sha: str, exclusions: list[str]) -> lis
 
 
 def _publication_boundaries(repo: Path, local_sha: str, exclusions: list[str]) -> tuple[str, ...]:
-    """The FR2 prior-text anchor(s): every commit where *local_sha*'s own ancestry
-    first re-joins history already excluded by *exclusions* (``git rev-list
-    --boundary <local_sha> --not <exclusions> --``, keeping only the ``-``-prefixed
-    boundary lines) — bug new-branch-push-loses-prior-published-denylist-amnesty.
+    """The FR2 prior-text anchor(s) — :func:`~dadaia_workspace.core.redaction.publication_boundaries`,
+    the ONE "published" decider the ledger seam asks too, over the SAME *exclusions*
+    (:func:`_base_exclusions`) the range walk uses."""
 
-    Reuses the EXACT SAME exclusion set :func:`_rev_list_candidates` and
-    :func:`_range_commit_shas` already walk — this call only asks WHERE that
-    exclusion cuts *local_sha*'s history off, not WHICH objects it excludes. A
-    develop-style continuing push (the branch already has a resolvable
-    ``remote_sha``) and a brand-new ``feature/{M.m.p}`` push (``remote_sha`` is the
-    all-zero sentinel, contributing nothing to *exclusions* — :func:`_base_exclusions`)
-    both derive their prior-text base from this SAME call: no branch on
-    ``remote_sha``'s resolvability survives here, closing the bug's root cause — the
-    old ``remote_sha if resolvable else None`` derivation dropped ALL prior-text
-    amnesty the instant ``remote_sha`` stopped resolving, even though a perfectly
-    good publication boundary (the commit the branch was cut from) was already
-    resolvable via the exact same ``--not --remotes=origin`` the range walk uses.
+    def git(args: list[str]) -> list[str]:
+        result = _run(["git", *args], repo)
+        if result.returncode != 0:
+            raise GitObjectReadError(
+                f"git rev-list --boundary failed: {_decode(result.stderr).strip()}"
+            )
+        return _lines(result.stdout)
 
-    Ordinarily exactly one boundary exists — a ``feature/{M.m.p}`` branch is cut
-    once, linear (``dd-gitflow-default``). When more than one exists (unusual
-    ancestry), every one is returned; :func:`_resolve_prior_texts` tries each in
-    turn per path. Empty when *local_sha* shares no ancestry with anything already
-    excluded at all (bootstrapping a genuinely empty remote, or a fixture with no
-    remote and no resolvable ``remote_sha`` either) — the one honest "no baseline
-    exists" case, unchanged from the old ``base=None`` fallback for that scenario.
-    """
-    args = ["git", "rev-list", "--boundary", local_sha, "--not", *exclusions, "--"]
-    result = _run(args, repo)
-    if result.returncode != 0:
-        raise GitObjectReadError(
-            f"git rev-list --boundary failed: {_decode(result.stderr).strip()}"
-        )
-    return tuple(line[1:] for line in _lines(result.stdout) if line.startswith("-"))
+    return publication_boundaries(git, local_sha, exclusions)
 
 
 def _is_annotated_tag(repo: Path, sha: str) -> bool:

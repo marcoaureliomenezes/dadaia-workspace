@@ -112,3 +112,52 @@ def test_the_gate_runs_where_core_hookspath_points(tmp_path: Path) -> None:
 
     assert refused.returncode != 0, refused.stdout + refused.stderr
     assert _remote_branch_sha(bare) is None
+
+
+def test_a_record_whose_context_carries_a_published_term_registers_and_pushes(
+    tmp_path: Path,
+) -> None:
+    """AC2.7 (ledger-denylist-term-inside-context-slug-blocks-registration): a context value
+    origin already holds is accepted by the ledger seam AND by the installed pre-push."""
+    from tests.helpers.skill_scripts import stage_skill_scripts
+
+    stage_skill_scripts(
+        "dd-release-implementation", tmp_path / "dd-release-implementation" / "scripts"
+    )
+    bugs = stage_skill_scripts("dd-bug-resolution", tmp_path / "staged" / "scripts") / "bugs.py"
+    repo, bare = _init_repo_and_remote(tmp_path, _SLUG)
+    (repo / "cli").mkdir()
+    (repo / "cli" / "x.py").write_text("x = 1\n", encoding="utf-8")
+    (repo / "specs" / "bugs").mkdir(parents=True)
+    (repo / "specs" / "bugs" / "BUGS.jsonl").write_text("", encoding="utf-8")
+    _git(["add", "cli"], repo)
+    env = suite_env(os.environ, Path.home())
+
+    def register(bug_id: str, run_env: dict[str, str]) -> None:
+        done = subprocess.run(
+            [sys.executable, str(bugs), "append", "--specs", str(repo / "specs"),
+             "--bug-id", bug_id, "--reported-by", "t", "--title", "t", "--severity", "LOW",
+             "--surface", "cli", "--component", "c", "--context", f"{_PLANTED_TERM}-games",
+             "--symptom", "s", "--repro", "r", "--expected", "e", "--correlates", "none"],
+            cwd=repo, capture_output=True, text=True, env=run_env, timeout=_EXIT_DEADLINE,
+        )  # fmt: skip
+        assert done.returncode == 0, done.stderr
+        _git(["add", "-A"], repo)
+        _git(["commit", "-q", "-m", bug_id], repo)
+
+    register("published", env)
+    _git(["push", "-q", "origin", f"{_BRANCH}:{_BRANCH}"], repo)  # published before any gate
+    installed = subprocess.run(
+        [sys.executable, "-m", "dadaia_workspace.cli.main", "ci", "install-hook"],
+        cwd=repo, capture_output=True, text=True, timeout=_EXIT_DEADLINE,
+    )  # fmt: skip
+    assert installed.returncode == 0, installed.stdout + installed.stderr
+    _write_dadaia_stub(tmp_path, sys.executable)
+    env |= {"DADAIA_PRIVACY_DENYLIST": str(_write_denylist_file(tmp_path))}
+
+    register("second", env)
+    pushed = _push(repo, env)
+
+    assert pushed.returncode == 0, pushed.stdout + pushed.stderr
+    head = subprocess.run(["git", "rev-parse", "HEAD"], cwd=repo, capture_output=True, text=True)
+    assert _remote_branch_sha(bare) == head.stdout.strip()
