@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Canonical worktrees `worktrees/<repo>/<name>` on branch `wt/<name>` (ADR 0191), stdlib
+"""Canonical worktrees `worktrees/<repo>/<name>` on branch `wt/<name>`, stdlib
 only: `new` opens one, `merge` lands it after its gate, `clean` drops an empty one, `list` reads ours from git.
 """
 
@@ -26,7 +26,7 @@ def main(argv: list[str] | None = None) -> int:
     verbs = parser.add_subparsers(dest="verb", required=True)
     make = verbs.add_parser("new", help="open a worktree: a job, define or backlog")
     make.add_argument("repo")
-    make.add_argument("name", help="<M.m.p>-rc<N>/<job>, <M.m.p>-rc<N>/define, backlog/<slug>")
+    make.add_argument("name", help="<M.m.p>-rc<N>-<job>, <M.m.p>-rc<N>-define, backlog-<slug>")
     for verb, text in (("merge", "land a worktree on the work branch after its gate"),
                        ("clean", "remove a merged or commit-less worktree")):  # fmt: skip
         end = verbs.add_parser(verb, help=text)

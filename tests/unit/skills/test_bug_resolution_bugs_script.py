@@ -209,9 +209,9 @@ _APPEND = ["append", "--bug-id", "x", "--title", "t", "--severity", "LOW", "--su
 @pytest.mark.parametrize(
     ("argv", "trees", "fix", "note"),
     [
-        (["stats"], ("0.5.0-rc1/j5",), "{rerun} --specs {ws}/repos/demo/specs", ""),
-        (_APPEND, ("0.5.0-rc1/j1",), "{rerun} --specs {ws}/worktrees/demo/0.5.0-rc1/j1/specs", ""),
-        (_APPEND, ("0.5.0-rc1/j7", "0.5.0-rc1/j6"), "{rerun} --specs {ws}/worktrees/demo/0.5.0-rc1/j6/specs",
+        (["stats"], ("0.5.0-rc1-j5",), "{rerun} --specs {ws}/repos/demo/specs", ""),
+        (_APPEND, ("0.5.0-rc1-j1",), "{rerun} --specs {ws}/worktrees/demo/0.5.0-rc1-j1/specs", ""),
+        (_APPEND, ("0.5.0-rc1-j7", "0.5.0-rc1-j6"), "{rerun} --specs {ws}/worktrees/demo/0.5.0-rc1-j6/specs",
          "; the first by name of 2 open worktrees"),
         (_APPEND, (), "{py} {ws}/dd-gitflow-default/scripts/worktree.py list", ""),
     ],

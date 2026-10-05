@@ -73,7 +73,7 @@ class Decision(Enum):
 
 @cache
 def _locate() -> Callable[[str], tuple[str, str | None, tuple[str, ...]] | None]:
-    """The worktree grammar's one path reader (ADR 0191) through the one loader, imported on
+    """The worktree grammar's one path reader through the one loader, imported on
     the first protected glob judged so a gate with none pays nothing."""
     from dadaia_workspace.infrastructure.ledger_scripts import load_owner
 
@@ -139,7 +139,7 @@ def evaluate(
     bind's *repos* is refused with ``context bind <owner>`` — an unbound session with an id
     owns nothing (ADR 0072); an id-less one bound by env is told to relaunch; an id-less
     unbound one is the declared gap (ADR 0116). Then every write in zone ``repo`` is
-    refused with the ``worktree.py list`` fix (ADR 0105). Everything else ALLOWS.
+    refused with the ``worktree.py list`` fix. Everything else ALLOWS.
     """
     cls, hit = classify_path(rel_path, projected, protected)
     if hit:

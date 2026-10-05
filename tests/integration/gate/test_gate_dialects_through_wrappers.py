@@ -61,7 +61,7 @@ def _run(ws: Path, harness: str, case: str, **env_extra: str) -> subprocess.Comp
     fixture, repos = (_FIXTURES / harness / f"{case}.json"), case == "repos"
     fixture = fixture.with_name("scope.json") if repos else fixture  # the scope write, in repos/
     payload = fixture.read_text().replace("{ws}", str(ws))
-    payload = payload.replace("worktrees/demo/0.5.0-rc1/j1/", "repos/demo/") if repos else payload
+    payload = payload.replace("worktrees/demo/0.5.0-rc1-j1/", "repos/demo/") if repos else payload
     if harness == "claude":
         argv = [str(ws / ".dadaia/.venv/bin/python"), "-B", "-m", "dadaia_workspace.hooks.pre_gate"]
     else:

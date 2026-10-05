@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """`worktree.py merge|clean`: end one canonical worktree — land it on the work branch after
-its gate (ADR 0190), or drop an empty one — never with `--force` or `-D`, re-runnable after a
+its gate, or drop an empty one — never with `--force` or `-D`, re-runnable after a
 stop. A job lands after its review and the job gate (its tasks and stages ran their own
 `scripts/ci.py task|stage` inside its one tree); a `define` or `backlog` tree lands `specs/`
 after its review and the ledger checks alone."""
@@ -15,7 +15,7 @@ import sys
 from datetime import datetime
 from pathlib import Path
 
-from _worktree_git import (  # noqa: I001
+from _worktree_git import (
     _env,
     cli,
     cli_line,
@@ -27,10 +27,10 @@ from _worktree_git import (  # noqa: I001
     script,
     work_version,
 )
-from _worktree_names import NAME_RE, SCRIPT, Refusal, locate, non_code
+from _worktree_names import NAME_RE, SCRIPT, Refusal, branch, locate, non_code
 
 REVIEWER = "dd-code-reviewer"
-#: A CI-matrix run as a verdict names it: its GitHub Actions run URL (ADR 0190).
+#: A CI-matrix run as a verdict names it: its GitHub Actions run URL.
 _RUN_RE = re.compile(r"/actions/runs/\d+")
 #: The ledger, trio and release checks a `define` or `backlog` merge runs, in this order.
 _LEDGERS = (("dd-bug-resolution", "bugs.py"), ("dd-backlog-definition", "backlog.py"),
@@ -92,7 +92,7 @@ def _remove(into: Path, tree: Path, name: str, kept: list[str]) -> None:
             shutil.copy2(source, target)
     git(into, "worktree", "unlock", str(tree), check=False)
     git(into, "worktree", "remove", str(tree))
-    git(into, "branch", "-d", f"wt/{name}")
+    git(into, "branch", "-d", branch(name))
 
 
 def _undo(tree: Path, work: str, rel: str) -> str:
@@ -131,7 +131,7 @@ def _python(root: Path) -> Path:
 
 
 def _gate(root: Path, tree: Path, *argv: str) -> None:
-    """One gate level (ADR 0190): `scripts/ci.py <level> [files]` of the HEAD being landed, run
+    """One gate level: `scripts/ci.py <level> [files]` of the HEAD being landed, run
     as one argv list (never a shell) in *tree* by the workspace venv; its output, on stdout
     alone, is the evidence; stdin is closed: a gate reading it never blocks merge."""
     ci = tree / "scripts" / "ci.py"
@@ -187,10 +187,10 @@ def _check_approved(root: Path, tree: Path, work: str, name: str, run: bool) -> 
     `produced_at` ranks newest and refuses; handoffs tied on the newest moment all decide, and
     the fix names the first in path order that is not a valid APPROVED. An unreadable file
     names no sha and is skipped. With *run* (a job), the deciding verdict also names the job's
-    CI-matrix run (ADR 0190)."""
+    CI-matrix run."""
     head = git(tree, "rev-parse", "HEAD").strip()
     mine = _series(tree, work, head)
-    reflog = {head, *git(tree, "reflog", "--format=%H", f"wt/{name}", check=False).split()}
+    reflog = {head, *git(tree, "reflog", "--format=%H", branch(name), check=False).split()}
     shas = {x for x in reflog if x == head or _series(tree, work, x) == mine}
     named = []
     for handoff in (root / ".dadaia" / "handoff").glob("*/*.handoff.json"):
@@ -223,7 +223,7 @@ def _check_approved(root: Path, tree: Path, work: str, name: str, run: bool) -> 
         if named:
             raise Refusal(
                 f"the APPROVED verdict {path} names no CI-matrix run of HEAD {head}",
-                f"Operator action: push wt/{name}, wait for its CI run to pass, and have "
+                f"Operator action: push {branch(name)}, wait for its CI run to pass, and have "
                 f"{REVIEWER}'s verdict name that run's actions/runs URL",
             )
         path = "--all"
@@ -236,19 +236,19 @@ def _check_approved(root: Path, tree: Path, work: str, name: str, run: bool) -> 
 
 def merge(root: Path, path: str, keep: list[str], drop: bool) -> str:
     repo, tree, name, onto = _target(root, path)
-    branch = f"wt/{name}"
+    ref = branch(name)
     if not tree.exists():  # removed by an earlier run or by hand: only the branch may be left
         git(repo, "worktree", "unlock", str(tree), check=False)
         git(repo, "worktree", "prune")
-        if git(repo, "branch", "--list", branch).strip():
+        if git(repo, "branch", "--list", ref).strip():
             try:
-                git(repo, "branch", "-d", branch)
+                git(repo, "branch", "-d", ref)
             except RuntimeError as error:
                 raise Refusal(
-                    f"{branch} is unmerged: {error}",
-                    git_line(repo, "worktree", "add", str(tree), branch),
+                    f"{ref} is unmerged: {error}",
+                    git_line(repo, "worktree", "add", str(tree), ref),
                 ) from error
-        return f"{branch} merged into {onto}"
+        return f"{ref} merged into {onto}"
     _refuse_dirty(tree)
     code = not non_code(name)
     if not code:
@@ -260,23 +260,23 @@ def merge(root: Path, path: str, keep: list[str], drop: bool) -> str:
     if git(repo, "branch", "--show-current").strip() != onto:
         raise Refusal(f"repos/{repo.name} is not on {onto}", git_line(repo, "switch", onto))
     try:
-        git(repo, "merge", "-q", "--ff-only", branch)
+        git(repo, "merge", "-q", "--ff-only", ref)
     except RuntimeError as error:
         _check_ancestor(tree, onto)  # moved while merge ran; else a stray the operator owns
         fix = f"Operator action: commit or remove the paths above in {repo}"
         raise Refusal(f"fast-forward failed: {error}", fix) from error
     _remove(repo, tree, name, kept)
-    return f"{branch} merged into {onto}"
+    return f"{ref} merged into {onto}"
 
 
 def clean(root: Path, path: str, keep: list[str], drop: bool) -> str:
     repo, tree, name, onto = _target(root, path)
     if not any(Path(row["path"]).resolve() == tree for row in ours(repo)):
         raise Refusal(f"{tree} is not a dadaia:-locked worktree", f"{script(SCRIPT)} list")
-    ahead = int(git(repo, "rev-list", "--count", f"{onto}..wt/{name}"))
+    ahead = int(git(repo, "rev-list", "--count", f"{onto}..{branch(name)}"))
     if ahead:
         raise Refusal(
-            f"wt/{name} holds {ahead} unmerged commit(s)",
+            f"{branch(name)} holds {ahead} unmerged commit(s)",
             f"{script(SCRIPT)} merge {quote(str(tree))}",
         )
     _refuse_dirty(tree)

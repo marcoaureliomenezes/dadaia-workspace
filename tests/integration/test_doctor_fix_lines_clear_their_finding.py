@@ -176,7 +176,7 @@ def _plant_stray_dotfile(root: Path) -> None:
 
 def _plant_orphan_wt(root: Path) -> None:
     """An unmerged orphan: `wt/0.5.0-rc1/j1` carries a commit and has no tree."""
-    repo, tree = root / "repos/r", root / "worktrees/r/0.5.0-rc1/j1"
+    repo, tree = root / "repos/r", root / "worktrees/r/0.5.0-rc1-j1"
     worktree_ws.git(repo, "checkout", "-q", "feature/0.5.0")
     worktree_ws.git(repo, "worktree", "add", "-q", "-b", "wt/0.5.0-rc1/j1", str(tree))
     worktree_ws.commit(tree, "src/a.py")

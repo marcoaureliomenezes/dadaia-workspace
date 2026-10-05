@@ -110,7 +110,7 @@ def test_law_declared_root_files_are_canon_for_the_hook_and_the_doctor(
         pytest.param("worktrees/any/n/f.py", "", "[]", True, id="worktrees-wrong-shaped-registry"),
         pytest.param("worktrees/dead-r/x/f.py", "", REGISTRY, False, id="worktrees-stray-dead"),
         pytest.param("worktrees/dead-r/x/f.py", "worktrees/dead-r\n", REGISTRY, True, id="worktrees-globbed"),
-        pytest.param("worktrees/assoc-r/0.5.0-rc1/j2/f.py", "", REGISTRY, True, id="worktrees-associated"),
+        pytest.param("worktrees/assoc-r/0.5.0-rc1-j2/f.py", "", REGISTRY, True, id="worktrees-associated"),
         pytest.param("worktrees/AGENTS.md", "", REGISTRY, True, id="worktrees-law"),
         pytest.param(".claude/agents/unledgered.md", "", REGISTRY, True, id="harness-dir-unjudged"),
     ],

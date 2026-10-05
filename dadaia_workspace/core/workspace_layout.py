@@ -263,7 +263,7 @@ def _matches(sub: str, pattern: str) -> bool:
 
 def protected_glob(tail: Sequence[str], protected: tuple[str, ...]) -> str | None:
     """The protected glob a prefix of a repo-relative *tail* matches (the worktree grammar's
-    ``locate`` reads it, ADR 0191), else ``None``."""
+    ``locate`` reads it), else ``None``."""
     prefixes = ["/".join(tail[: n + 1]) for n in range(len(tail))]
     return next((g for g in protected for sub in prefixes if _matches(sub, g)), None)
 

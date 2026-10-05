@@ -65,13 +65,13 @@ def test_merge_fast_forwards_removes_and_reruns(root: Path) -> None:
     assert (row["state"], row["path"]) == ("orphan", str(tree))
     assert run(root, *shlex.split(row["exit"])[2:]).returncode == 0
     assert json.loads(run(root, "list", "--json").stdout) == []
-    git(repo, "worktree", "add", "-q", "-b", f"wt/{JOB}", str(tree))
+    git(repo, "worktree", "add", "-q", "-b", "wt/0.5.0-rc1/j1", str(tree))
     commit(tree, "src/b.py")
     git(repo, "worktree", "remove", str(tree))  # interrupted: tree gone, its commit unmerged
     assert _argv(run(root, "merge", TREE)) == [
-        *("git", "-C", str(repo), "worktree", "add", str(tree), f"wt/{JOB}")
+        *("git", "-C", str(repo), "worktree", "add", str(tree), "wt/0.5.0-rc1/j1")
     ]
-    assert git(repo, "branch", "--list", f"wt/{JOB}").strip()  # never -D
+    assert git(repo, "branch", "--list", "wt/0.5.0-rc1/j1").strip()  # never -D
 
 
 def test_dirty_and_outside_set_each_refuse_with_one_fix(root: Path) -> None:
@@ -97,8 +97,8 @@ def test_dirty_and_outside_set_each_refuse_with_one_fix(root: Path) -> None:
 def test_a_define_tree_lands_specs_only_through_the_ledger_checks(root: Path) -> None:
     """AC1.2 (ADR 0190): a `define` merge runs the ledger, trio and release checks alone — an
     invalid ledger refuses, a valid one lands with no test run; code refuses with its undo."""
-    repo, tree = root / "repos/r", root / "worktrees/r/0.5.0-rc1/define"
-    assert run(root, "new", "r", "0.5.0-rc1/define").returncode == 0
+    repo, tree = root / "repos/r", root / "worktrees/r/0.5.0-rc1-define"
+    assert run(root, "new", "r", "0.5.0-rc1-define").returncode == 0
     commit(tree, "specs/bugs/BUGS.jsonl", '{"id": "half"}\n')
     approve(root, git(tree, "rev-parse", "HEAD").strip(), ci_run=False)
     invalid = run(root, "merge", str(tree))
@@ -225,9 +225,9 @@ def test_clean_removes_only_an_empty_worktree_of_ours(root: Path) -> None:
     git(tree, "reset", "-q", "--hard", "feature/0.5.0")
     assert run(root, "clean", TREE).returncode == 0 and not tree.exists()
     # ours is the canonical wt/ branch, locked or not (T-050-99 N2); a tree on another is not
-    git(repo, "worktree", "add", "-q", "-b", "side", str(root / "worktrees/r/0.5.0-rc1/j2"))
-    foreign = run(root, "clean", "worktrees/r/0.5.0-rc1/j2")
-    assert foreign.returncode == 1 and (root / "worktrees/r/0.5.0-rc1/j2").exists()
+    git(repo, "worktree", "add", "-q", "-b", "side", str(root / "worktrees/r/0.5.0-rc1-j2"))
+    foreign = run(root, "clean", "worktrees/r/0.5.0-rc1-j2")
+    assert foreign.returncode == 1 and (root / "worktrees/r/0.5.0-rc1-j2").exists()
 
 
 def test_release_closure_waits_for_every_other_wt(tmp_path: Path) -> None:
@@ -237,8 +237,8 @@ def test_release_closure_waits_for_every_other_wt(tmp_path: Path) -> None:
     (root := tmp_path / "ws").mkdir()
     make_workspace(root)
     git(root / "repos/r", "checkout", "-q", "feature/0.5.0")
-    assert run(root, "new", "r", "0.5.0-rc1/reconcile").returncode == 0
-    specs = root / "worktrees/r/0.5.0-rc1/reconcile/specs"
+    assert run(root, "new", "r", "0.5.0-rc1-reconcile").returncode == 0
+    specs = root / "worktrees/r/0.5.0-rc1-reconcile/specs"
     write_release_phase(specs, "0.5.0", "IMPLEMENTATION")
     (specs / "releases/_archive").mkdir()
     (specs / "releases/_archive/releases_histo.jsonl").write_text("")
@@ -381,7 +381,7 @@ def test_a_job_merge_needs_a_verdict_naming_its_ci_matrix_run(root: Path) -> Non
     approve(root, head, ci_run=False)
     unrun = run(root, "merge", TREE)
     assert fixes(unrun) == [
-        f"fix: Operator action: push wt/{JOB}, wait for its CI run to pass, and have "
+        "fix: Operator action: push wt/0.5.0-rc1/j1, wait for its CI run to pass, and have "
         "dd-code-reviewer's verdict name that run's actions/runs URL"
     ]
     approve(root, head, at="T11:00:00Z")

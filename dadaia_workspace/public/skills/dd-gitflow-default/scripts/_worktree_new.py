@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""`worktree.py new`: open and lock one canonical worktree by its name (ADR 0191)."""
+"""`worktree.py new`: open and lock one canonical worktree by its name."""
 
 from __future__ import annotations
 
@@ -10,7 +10,7 @@ sys.path.append(str(Path(__file__).resolve().parents[2] / "dd-release-implementa
 
 from _release_schema import extract_status  # noqa: E402
 from _worktree_git import flow_for, git, quote, script, work_version  # noqa: E402
-from _worktree_names import LOCK, NAME_RE, SCRIPT, Refusal  # noqa: E402
+from _worktree_names import LOCK, NAME_RE, SCRIPT, Refusal, branch  # noqa: E402
 
 
 def _refuse_symlink(root: Path, repo_name: str) -> None:
@@ -27,9 +27,9 @@ def new(root: Path, repo_name: str, name: str) -> Path:
     work = f"{flow['work']}{version}"
     match = NAME_RE.match(name)
     if match is None or match["v"] not in (None, version):
-        shape = f"{version}-rc<N>/<job>"
+        shape = f"{version}-rc<N>-<job>"
         raise Refusal(
-            f"{name!r} is not a worktree name: {shape}, {version}-rc<N>/define or backlog/<slug>",
+            f"{name!r} is not a worktree name: {shape}, {version}-rc<N>-define or backlog-<slug>",
             f"{script(SCRIPT)} list",
         )
     if match["rc"] and match["job"] != "define":  # a job runs only under an Approved SPEC
@@ -39,11 +39,11 @@ def new(root: Path, repo_name: str, name: str) -> Path:
         if extract_status(spec) != "Approved":
             raise Refusal(
                 f"a job needs an Approved rc-{rc}/SPEC.md on {work}",
-                f"{script(SCRIPT)} new {quote(flow['main'])} {match['rc']}/define",
+                f"{script(SCRIPT)} new {quote(flow['main'])} {match['rc']}-define",
             )
     tree = root / "worktrees" / repo_name / name
-    if git(repo, "branch", "--list", f"wt/{name}").strip():
-        raise Refusal(f"wt/{name} exists", f"{script(SCRIPT)} list")
-    git(repo, "worktree", "add", "-q", "--lock", "--reason", f"{LOCK}{name}", "-b", f"wt/{name}",
+    if git(repo, "branch", "--list", branch(name)).strip():
+        raise Refusal(f"{branch(name)} exists", f"{script(SCRIPT)} list")
+    git(repo, "worktree", "add", "-q", "--lock", "--reason", f"{LOCK}{name}", "-b", branch(name),
         str(tree), work)  # fmt: skip
     return tree

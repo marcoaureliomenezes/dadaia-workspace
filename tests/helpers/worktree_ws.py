@@ -25,7 +25,7 @@ SCRIPT = (
 FLOW = {"principal": "trunk", "integration": "dev", "work": "feature/"}
 #: The repo's gate (ADR 0190): prints its argv; level L fails iff the tree holds `RED-<L>`.
 CI = 'import pathlib, sys\nprint("ci", *sys.argv[1:])\nsys.exit(pathlib.Path("RED-" + sys.argv[1]).exists())\n'
-JOB = "0.5.0-rc1/j1"
+JOB = "0.5.0-rc1-j1"
 
 
 def git(repo: Path, *args: str) -> str:
@@ -137,7 +137,7 @@ def approve(
     body = {
         "agent": "dd-code-reviewer",
         "verdict": verdict,
-        "scope": f"wt/{JOB}@{sha}",
+        "scope": f"wt/0.5.0-rc1/j1@{sha}",
         "produced_at": f"2026-10-02{at}",
         "verdict_reason": "CI matrix green: https://github.com/o/r/actions/runs/7"
         if ci_run

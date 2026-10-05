@@ -29,21 +29,21 @@ def test_new_makes_each_shape_on_its_branch_and_base(root: Path) -> None:
     repo = root / "repos/r"
     ahead = _git(repo, "commit-tree", "HEAD^{tree}", "-p", "HEAD", "-m", "ahead").strip()
     _git(repo, "branch", "-f", "feature/0.5.0", ahead)  # the start point is the work branch
-    for name in (JOB, "0.5.0-rc1/define", "0.5.0-rc1/reconcile", "backlog/an-idea"):
+    for name in (JOB, "0.5.0-rc1-define", "0.5.0-rc1-reconcile", "backlog-an-idea"):
         result = _run(root, "new", "r", name)
         assert (result.returncode, result.stdout) == (0, f"[ok] {root}/worktrees/r/{name}\n")
     assert _git(repo, "rev-parse", "wt/0.5.0-rc1/define").strip() == ahead
     porcelain = _git(repo, "worktree", "list", "--porcelain").splitlines()
     assert sorted(x for x in porcelain if x.startswith("locked")) == [
-        "locked dadaia:0.5.0-rc1/define",
-        "locked dadaia:0.5.0-rc1/j1",
-        "locked dadaia:0.5.0-rc1/reconcile",
-        "locked dadaia:backlog/an-idea",
+        "locked dadaia:0.5.0-rc1-define",
+        "locked dadaia:0.5.0-rc1-j1",
+        "locked dadaia:0.5.0-rc1-reconcile",
+        "locked dadaia:backlog-an-idea",
     ]
 
 
 @pytest.mark.parametrize(
-    "name", ["0.5.0a-impl", "0.5.0b-release", "0.4.9-rc1/j1", "0.5.0-rc1/j1--T-1", "0.5.0-rc1/J1"]
+    "name", ["0.5.0a-impl", "0.5.0b-release", "0.4.9-rc1/j1", "0.5.0-rc1-j1--T-1", "0.5.0-rc1-J1"]
 )
 def test_an_old_grammar_or_foreign_name_refuses(root: Path, name: str) -> None:
     result = _run(root, "new", "r", name)
@@ -67,7 +67,7 @@ def test_no_work_branch_refuses_with_a_fix_that_creates_it(root: Path) -> None:
 
 @pytest.mark.parametrize(
     ("spec", "code", "out"),
-    [("Approved", 0, "[ok] {root}/worktrees/a/0.5.0-rc1/j1"), ("Draft", 1, "")],
+    [("Approved", 0, "[ok] {root}/worktrees/a/0.5.0-rc1-j1"), ("Draft", 1, "")],
 )
 def test_an_associated_job_reads_the_main_repos_spec(
     root: Path, spec: str, code: int, out: str
@@ -77,9 +77,9 @@ def test_an_associated_job_reads_the_main_repos_spec(
     result = _run(root, "new", "a", JOB)
     assert (result.returncode, result.stdout.strip()) == (code, out.format(root=root))
     assert [f.split(" new ")[-1] for f in _fixes(result)] == (
-        [] if code == 0 else ["r 0.5.0-rc1/define"]
+        [] if code == 0 else ["r 0.5.0-rc1-define"]
     )
-    assert _run(root, "new", "a", "0.5.0-rc1/define").returncode == 0  # definition needs none
+    assert _run(root, "new", "a", "0.5.0-rc1-define").returncode == 0  # definition needs none
 
 
 def test_symlinked_worktrees_component_refuses(
@@ -95,7 +95,7 @@ def test_list_reports_ours_with_ahead_and_dirty_and_a_native_one_as_foreign(root
     repo = root / "repos/r"
     assert _run(root, "new", "r", JOB).returncode == 0
     _git(repo, "worktree", "add", "-q", str(root / "native"), "-b", "native")
-    (root / "worktrees/r/0.5.0-rc1/stray").mkdir()
+    (root / "worktrees/r/0.5.0-rc1-stray").mkdir()
     tree = root / "worktrees/r" / JOB
     (tree / "x.py").write_text("x = 1\n")
     _git(tree, "add", "x.py")
@@ -109,7 +109,7 @@ def test_list_reports_ours_with_ahead_and_dirty_and_a_native_one_as_foreign(root
     assert row["ahead"] == 1 and row["dirty"] is True and row["age_hours"] >= 0
     assert row["fix"] == "" and row["exit"].endswith(f"merge {tree}")
     assert by_state["foreign"]["path"] == str(root / "native") and by_state["foreign"]["exit"] == ""
-    assert by_state["unregistered"]["path"] == str(root / "worktrees/r/0.5.0-rc1/stray")
+    assert by_state["unregistered"]["path"] == str(root / "worktrees/r/0.5.0-rc1-stray")
     assert not list((root / ".dadaia/states").glob("*worktree*"))
 
 
