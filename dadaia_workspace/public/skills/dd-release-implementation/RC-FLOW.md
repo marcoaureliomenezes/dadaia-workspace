@@ -8,9 +8,9 @@ candidates.
 
 | Boundary | Who validates | What unlocks |
 |---|---|---|
-| Task | the implementer: `scripts/ci.py task <files>` | the task's commit |
-| Stage | the implementer: `scripts/ci.py stage` | the next stage |
-| Job | `dd-code-reviewer` `APPROVED` naming the job's green CI-matrix run; `scripts/ci.py job` at `WT merge` | the job's merge |
+| Task | `WT merge <task path>`: the repo's `verify-task:` line | the task's fast-forward onto its job branch |
+| Stage | `WT stage <job path>`: no task open, the `verify-stage:` line | the next stage |
+| Job | `dd-code-reviewer` `APPROVED` carrying the job's green CI-matrix run as `ci_run`; the `verify:` line at `WT merge` | the job's merge |
 | Candidate close | the Reconciliation job's merge | the candidate's work -> integration PR |
 | Promote (ship) | pre-staged security verdict naming the integration tip | the integration -> principal PR |
 
@@ -23,12 +23,12 @@ An rc is an Implement: a DAG of jobs the PLAN draws, Job 1 first, the Reconcilia
 
 **Step 1 — Open a job.**
 - `WT new <repo> <M.m.p>-rc<N>-<job>` once its PLAN edges are merged; its tasks live in `rc-<N>/tasks/<job>.md` (`dd-release-definition` §5).
-- A task is `running` while its job's tree exists and its commit does not; there is no reservation commit.
+- Each task opens `WT new <repo> <M.m.p>-rc<N>-<job>--<task-id>` from the job branch; a sub-agent works it; it is `running` while its tree exists; there is no reservation commit.
 - Done when: the tree exists.
 
 **Step 2 — Stages and tasks.**
 - Stage 1 writes every acceptance test RED, as a strict xfail; each later stage turns its rows green.
-- Each task runs its task gate and commits under its id; each stage closes on its stage gate.
+- Each task commits under its id and lands by `WT merge` after its task gate; each stage closes by `WT stage`.
 - Done when: the last stage closed green and the close task wrote the job file's `done`.
 
 **Step 3 — Job merge.**

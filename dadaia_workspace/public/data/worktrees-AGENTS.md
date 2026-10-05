@@ -11,24 +11,24 @@ a skill points here, never restates them.
 - One worktree per job, flat at `worktrees/<repo>/<M.m.p>-rc<N>-<job>`, on the branch `wt/<M.m.p>-rc<N>/<job>`, cut from the repo's work branch; a job needs its rc's Approved `SPEC.md`.
 - Two more names inside an rc: `<M.m.p>-rc<N>-define` (the candidate's definition) and `<M.m.p>-rc<N>-reconcile` (the Reconciliation job: memory, derived docs, `measured_by` repairs, the rc's measurement, closure).
 - Outside an rc only `backlog-<slug>`, on `wt/backlog/<slug>`; a bug is a job.
-- A job's tasks share its tree; a stage is a barrier inside it, never a tree. One change — code, tests, specs, memory, derived docs — lands in one job.
+- One worktree per task, `<M.m.p>-rc<N>-<job>--<task-id>` on `wt/<M.m.p>-rc<N>/<job>--<task-id>`, cut from its job branch: sub-agents work the tasks of one stage in parallel, one per task worktree; at most 5 task worktrees open per rc. A stage is a barrier on the job branch, never a tree. One change — code, tests, specs, memory, derived docs — lands in one job.
 - `WT new <repo> <name>` opens a tree; any other name is refused.
 
 ## 2. Three gates, one review
 
-1. Task: `scripts/ci.py task <files>` — ruff and mypy on the touched files, the task's owner tests; then the task's commit, its subject opening with its id.
-2. Stage: `scripts/ci.py stage` — lint, mypy, guards, unit, integration — green before the next stage opens; the closing commit carries `stage: <id> — unit+integration green`.
-3. Job: push `wt/<M.m.p>-rc<N>/<job>` (the one pushable `wt/` branch) and let its CI matrix run; `dd-code-reviewer` reviews `git diff <work branch>...HEAD` once and names that green run (`…/actions/runs/<id>`) in its verdict, a handoff whose `scope` names HEAD.
-4. `WT merge <path>` lands HEAD as it is, by fast-forward, only when the tree is clean, HEAD contains the work branch, a valid APPROVED verdict names HEAD (or a reflog sha with the same patch-id and message series) and the CI-matrix run, and `scripts/ci.py job` passes on HEAD as one argv list; it then removes the tree and `branch -d`s it.
+1. Task: its commit, the subject opening with its id; `WT merge <task path>` runs the repo's `verify-task:` line on the touched files (ruff, mypy, the owner tests) and fast-forwards the job branch — no verdict, no review; a task behind its job branch rebases first (its disjoint `W:` keeps it conflict-free) and the gate reruns.
+2. Stage: `WT stage <job path>` — refused while a task worktree of the job is open, then the repo's `verify-stage:` line (lint, mypy, guards, unit, integration) green before the next stage opens; the closing commit carries `stage: <id> — unit+integration green`.
+3. Job: push `wt/<M.m.p>-rc<N>/<job>` and let its CI matrix run; `dd-code-reviewer` reviews `git diff <work branch>...HEAD` once; its verdict is a handoff whose `scope` names HEAD and whose `ci_run` is that green run's URL.
+4. `WT merge <path>` lands HEAD as it is, by fast-forward, only when the tree is clean, HEAD contains the work branch, no task worktree of the job is open, the job branch took code only from task merges, a valid APPROVED verdict names HEAD (or a reflog sha with the same patch-id and message series) with its `ci_run`, and the repo's `verify:` line passes on HEAD, split by `shlex` and run as one argv list, never a shell; it then removes the tree and `branch -d`s it.
 5. A `define` or `backlog` tree lands `specs/` only: its merge needs its one review pass and the bugs, backlog and release checks, and runs no test.
 
 - One review per job, plus one per stage past 400 added lines (`git diff --numstat`, column 1); none per task.
 - A moved work branch refuses with `fix: git -C <tree> rebase <work>`; the rebase runs inside the worktree. A ledger conflict is redone by the ledger's own writer on the rebased tree, never hand-merged. `WT merge` re-runs cleanly after any stop.
 
-## 3. Hotfix and parallel jobs
+## 3. Hotfix and parallel work
 
 - A block-list bug's fix is a hotfix: its own job, outside the rc's DAG.
-- Jobs run in parallel only with disjoint envelopes or an edge in the PLAN's DAG.
+- Jobs run in parallel only with disjoint envelopes or an edge in the PLAN's DAG; tasks of one stage run in parallel with disjoint `W:`. The CI cost is cut in the gates, never by sharing a tree.
 
 ## 4. Environment and hygiene
 

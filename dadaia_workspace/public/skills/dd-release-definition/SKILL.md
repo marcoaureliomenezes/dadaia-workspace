@@ -64,7 +64,7 @@ Call the Skill tool with `dd-grill-me` on the picked set — never skipped; a fu
 - A stage's contract is fixed when it opens: its exit tests by level, its envelope (the `W:` union it may touch) and the ACs it serves.
 - Stage 1 writes every acceptance test RED, as a strict xfail; later stages turn them green; tasks of one stage write disjoint `W:`.
 - A task: id `J<n>.S<m>.T<k>`, its AC, its exact `W:`, its owner test file, its RED tests; one owner, one session (~1 h), ~100 new code lines.
-- A task is `running` while its job's worktree exists and its commit does not; the job's close task writes `done` once.
+- A task is `running` while its task worktree exists; the job's close task writes `done` once.
 - A task born inside an open stage cites its AC; a cancelled one keeps its line and its reason; a file two tasks write is listed as hot with one owner task — the audit measures these (`dd-audit-project` PILLAR-SPECS).
 - DELETE/REBUILD tasks precede ADD tasks; a task with no statable AC is folded, or goes back to the SPEC.
 

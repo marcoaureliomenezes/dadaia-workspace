@@ -22,7 +22,7 @@ description: >
 4. Reports land where the root `AGENTS.md` map §4 says; every report
    feeding another agent gets a handoff under `.dadaia/handoff/<context>/`.
 5. Opening, dispatching into and merging worktrees: `worktrees/AGENTS.md`.
-6. The unit of dispatch is a job or a task, never a smaller edit: an edit inside an open job is its driver's own and lands as one of its tasks; each job's `kind: merge` entry counts its `dispatches`.
+6. The unit of dispatch is a job or a task, never a smaller edit: sub-agents work one stage's tasks in parallel, one per task worktree (`worktrees/AGENTS.md` §1); an edit inside an open job is its driver's own and lands as one of its tasks; each job's `kind: merge` entry counts its `dispatches`.
 7. The review/QA sequence holds by discipline (main thread, implementer, reviewer
    each uphold their half); git chokepoints are the only mechanical backstop.
 
@@ -64,7 +64,7 @@ description: >
 | Recursive agent chains without operator approval | Breaks traceability |
 | Marking tasks DONE without validation evidence | Skips acceptance |
 | Push, PR, merge, deploy or closure before the reviewer's `APPROVED` | Bypasses the quality gate |
-| Editing production files outside a job's worktree | Breaks task traceability |
+| Editing production files outside a job's or task's worktree | Breaks task traceability |
 | Dispatching an edit smaller than a task into an open job | Micro-dispatch: the ritual wait it adds outweighs the edit |
 | Private/project-specific details in public assets | Security and portability |
 

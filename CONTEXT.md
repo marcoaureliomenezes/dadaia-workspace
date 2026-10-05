@@ -111,7 +111,7 @@ A region with one write rule. A `.dadaia/` zone is a row of `core.workspace_layo
 _Avoid_: area (for a zone), lane
 
 **Worktree**:
-A canonical git worktree, one per job: `worktrees/<repo>/<M.m.p>-rc<N>-<job>` on the branch `wt/<M.m.p>-rc<N>/<job>` (also `-define`, `-reconcile`, and `backlog-<slug>` outside an rc); a job's tasks share it; it reaches `repos/<repo>` only by `worktree.py merge`. Rules: `worktrees/AGENTS.md`.
+A canonical git worktree, one per job: `worktrees/<repo>/<M.m.p>-rc<N>-<job>` on the branch `wt/<M.m.p>-rc<N>/<job>` (also `-define`, `-reconcile`, one `-<job>--<task-id>` per task cut from its job branch, and `backlog-<slug>` outside an rc); it reaches `repos/<repo>` only by `worktree.py merge`. Rules: `worktrees/AGENTS.md`.
 _Avoid_: sandbox, harness worktree (a `.claude/worktrees/**` tree is not one), worktree kind (retired)
 
 **Stall**:

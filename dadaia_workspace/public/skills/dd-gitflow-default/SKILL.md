@@ -37,8 +37,9 @@ The branch contract by role; the names are `specs/constitution.md`'s `gitflow:` 
 | Branch | Pushable | Cut from | Advances by |
 |---|---|---|---|
 | work `<work>M.m.p` | Yes — the repo's own CI checks green + valid name | integration | the PR below |
-| job `wt/<M.m.p>-rc<N>/<job>` | Yes — its push runs the CI matrix its verdict names | work | `worktree.py merge` |
-| backlog `wt/backlog/<slug>` | Yes | work | `worktree.py merge` |
+| job `wt/<M.m.p>-rc<N>/<job>` | Yes — its push runs the CI matrix its verdict names | work | its worktree merge (`worktrees/AGENTS.md` §2) |
+| backlog `wt/backlog/<slug>` | Yes | work | its worktree merge (`worktrees/AGENTS.md` §2) |
+| task `wt/<M.m.p>-rc<N>/<job>--<task-id>` | No | its job branch | its worktree merge (`worktrees/AGENTS.md` §2) (its task gate) |
 | integration | No — never a direct push | principal (bootstrap only) | PR from the row above, at definition `Approved` and at each `rc` merge |
 | principal | No — never a direct push | — | PR from the integration branch, at the final `rc` |
 
@@ -49,7 +50,7 @@ The branch contract by role; the names are `specs/constitution.md`'s `gitflow:` 
 
 ## 3a. Commit shapes — each write in its own shape
 
-One job's tree holds code, tests, specs, memory and derived docs alike (`worktrees/AGENTS.md` §1); the shape names the write, never a tree. `<code>` is any path outside `specs/`; `<id>` a task id `J<n>.S<m>.T<k>`.
+A job and its task trees hold code, tests, specs, memory and derived docs alike (`worktrees/AGENTS.md` §1); the shape names the write, never a tree. `<code>` is any path outside `specs/`; `<id>` a task id `J<n>.S<m>.T<k>`.
 
 | # | Tree | Write | Message |
 |---|---|---|---|
@@ -60,7 +61,7 @@ One job's tree holds code, tests, specs, memory and derived docs alike (`worktre
 | 3 | a job | Bug fix: `<code>` + regression test + its `specs/bugs/BUGS.jsonl` line, red loop quoted in the body | `fix(bugs): <id> — <cause>` |
 | 4 | a job | Terminal transition without code (`resolve` by a task, `supersede`, `defer`, `reject`): `specs/bugs/BUGS.jsonl` | `chore(bugs): <verb> <id> — <reason, or by <task-id> (<sha>)>` |
 | 5 | `define` | Release definition: `specs/releases/<v>/rc-<N>/*` | `feat(specs): define candidate …` |
-| 6 | a job | Task: its `W:` | `conventional-commit(<id>): description` — the auditable trace; a stage closes with a body line `stage: <id> — unit+integration green` |
+| 6 | a task tree | Task: its `W:` | `conventional-commit(<id>): description` — the auditable trace; a stage closes with a body line `stage: <id> — unit+integration green` |
 | 7 | a job | The job file's `done`, once per job, by its close task: `specs/releases/<v>/rc-<N>/tasks/<job>.md` | `chore(tasks): done <job>` |
 | 8 | `define` | Trio amendment or approval: `specs/releases/<v>/rc-<N>/SPEC.md` | `docs(specs): …` |
 | 9 | `reconcile` | Memory pass and derived docs: `specs/memory/*`, `README.md`, `llms.txt`, `docs/*.md` | `docs(memory): …` |

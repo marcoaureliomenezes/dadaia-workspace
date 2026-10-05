@@ -27,7 +27,7 @@ description: >
 7. At `RC-FLOW.md` step 5, run `MEMORY-UPDATE.md`'s full protocol before touching any memory atom.
 8. A test enters the suite only under the root map §1 test basics.
 9. Before growing any module, run the deletion test and speak the seam vocabulary (`dd-codebase-design`) — a diff that only adds justifies itself against replace-don't-layer.
-10. Implement inside the job's one worktree, opened per `worktrees/AGENTS.md` §1; its tasks share it.
+10. Implement each task inside its own task worktree, cut from its job's worktree branch per `worktrees/AGENTS.md` §1.
 
 ## 2a. Push green
 
@@ -41,7 +41,7 @@ description: >
 ## 3. Done when
 
 - Live release resolved by reading `_RELEASE.json` directly.
-- Task committed under its id after its task gate; the stage closed on its stage gate (`RC-FLOW.md` step 2).
+- Task committed under its id and merged onto its job branch after its task gate; the stage closed by `WT stage` (`RC-FLOW.md` step 2).
 - Current step (`RC-FLOW.md`) identified before attempting its unlock action.
 - CI green before any push; trio `APPROVED` before the candidate's integration-branch PR.
 - At candidate closure: the Reconciliation job merged (`RC-FLOW.md` step 4) -> candidate PR -> the promote-or-continue gate.
