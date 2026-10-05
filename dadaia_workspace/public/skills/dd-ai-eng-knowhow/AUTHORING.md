@@ -16,12 +16,12 @@ Every library skill must satisfy all fifteen; each rule's detail lives in the se
 | 5 | Single source of truth; the environment is a source; cache only expensive lookups | §6 |
 | 6 | Every step ends on a checkable, demanding completion criterion | §4 |
 | 7 | Leading words over prose; a vocabulary skill says "use these terms exactly" with an Avoid list | §5 |
-| 8 | Positive instruction; prohibition only as a hard guardrail paired with the positive | §5 |
-| 9 | Prune no-ops, sediment, duplication — provenance and history live in git, never in the skill | §6 |
+| 8 | Positive by default; a prohibition stays only with a demonstrated failure, paired with the positive | §5 |
+| 9 | Prune no-ops, sediment, duplication; git keeps history; a prohibition carries its short reason or a bug/ADR id | §6 |
 | 10 | Right altitude: intent over mechanics that go stale (paths, snippets), with the prototype exception | §6 |
 | 11 | Steps are actions in execution order, one idea each; the branch decision comes first; templates are fenced blocks | §8 |
 | 12 | The set is curated and composed: overlap resolves by merge or by one skill calling the other | §7 |
-| 13 | Determinism goes to a script/template sibling; the skill authors stages, never re-derives the library | §3 |
+| 13 | Determinism goes to a script/template sibling; the skill authors only the stages | §3 |
 | 14 | Human gates are explicit: facts are the agent's job, decisions are the operator's | §8 |
 | 15 | The ecosystem stays equalized: behavior-map, grants, law citations and projections move with the skill | §9 |
 
@@ -34,9 +34,8 @@ Every library skill must satisfy all fifteen; each rule's detail lives in the se
 - A must-have target behind a weak pointer is a variance bug, not a content bug.
 - Fix rule: sharpen the wording first; inline only if sharpening fails.
 - House rule: front-load the trigger word — the description's first clause is where matching happens.
-- House rule: one trigger per branch — never two names for the same situation.
-- House rule: never restate identity the body already carries — a pointer names the condition, not a summary.
-- House rule: a description carries no grant lists, no rename/absorb history, no governance ids — triggers only.
+- House rule: one trigger per branch, one name per situation.
+- House rule: a pointer names the condition; the body carries the identity.
 
 ---
 
@@ -86,12 +85,11 @@ Every library skill must satisfy all fifteen; each rule's detail lives in the se
 - A leading word is a compact, already-pretrained concept the agent thinks with (this workspace's own: tight, root cause, green, seam, frontier).
 - Reach for an existing word before coining one — a made-up term recruits no priors and costs definition tokens.
 - A vocabulary skill states "use these terms exactly", pairs each term with its _Avoid_ list, and every sibling skill speaks it.
-- Negation is the failure mode beside this lever: prohibition drags the forbidden behavior into context.
-- Prompt the positive: state the target ("link to the canonical source") so the banned behavior is never spoken.
-- A prohibition earns its place only as a hard guardrail that cannot be phrased positively.
-- Even a hard guardrail (a `[SCOPE ERROR]` refusal, a security "never" rule) should pair with the positive target.
+- Negation is the failure mode beside this lever: a prohibition drags the banned behavior into context.
+- Prompt the positive: state the target ("link to the canonical source") instead of the banned behavior.
+- A prohibition stays only with a demonstrated failure: its short reason or a bug/ADR id beside it, paired with the positive target.
 - A negation of something retired ("no such flag exists") is sediment — delete it with the shape it mourns.
-- Audit test: count "never"/"don't"/"do not" instructions that could be rephrased positively — each is a rewrite.
+- Audit test: each prohibition without a reason is a rewrite to the positive.
 
 ---
 
@@ -103,8 +101,8 @@ Six checks, applied at authoring time and at review time:
 2. Cache discipline — the environment is a source of truth too (`--help`, a schema, the directory layout).
 3. Cache only what the agent cannot find by looking: the unwritten convention, the reason behind a choice, the gotcha.
 4. Relevance sweep — does each line still bear on what the document does?
-5. A line that never bears on the task, or went stale, is sediment — the default fate of an unpruned document.
-   Governance provenance (FR ids, task ids, "renamed/absorbed from") is sediment by definition: git owns history.
+5. A line off the task, or stale, is sediment — the default fate of an unpruned document.
+   Governance provenance (FR ids, task ids, "renamed/absorbed from") is sediment: git owns history.
 6. No-op hunt — does removing the sentence change what the model does? If not, delete it; the deletion test (`dd-code-review`'s `SLOP.md`) is the general form.
 
 Altitude belongs here too: state intent, not mechanics that go stale (file paths, code snippets). The one exception:
@@ -119,8 +117,8 @@ decision-rich part.
 - User/dispatch-invoked (`disable-model-invocation: true`): zero context load; the human or the calling skill is the index.
 - In this workspace persona `skills:` allowlists already scope reach — but every granted description still costs its personas every turn, so the pointer-pruning bar (§1) stays maximal.
 - Shared reference lives in exactly ONE skill; consumers call it ("call the Skill tool with X") — a two-line composing skill is a success, not a stub.
-- Overlap between two skills resolves by merge or by one calling the other, never by both restating the material.
-- A skill is one job: all steps, all reference, or a conscious mix — the form follows the content, never a fixed section template.
+- Overlap between two skills resolves by merge or by one calling the other; the material lives once.
+- A skill is one job: all steps, all reference, or a conscious mix — the form follows the content.
 - When invocable skills multiply past what the index (human or dispatcher) holds, the cure is a router map — one place naming every skill and when to reach it — not more descriptions.
 
 ---
@@ -129,7 +127,7 @@ decision-rich part.
 
 - Steps are actions in execution order, one idea per step, each ending on its criterion (§4).
 - When a skill branches, the branch decision is the FIRST step — picking the wrong branch wastes the whole run.
-- Templates and formats are given as fenced blocks where they are used, never described in prose.
+- Templates and formats are given as fenced blocks where they are used.
 - Human gates are explicit: finding facts is the agent's job (inspect before asking); decisions are the operator's — put each one to them and wait.
 - A round-based interview asks the whole frontier at once, numbered, each question carrying a recommended answer.
 
@@ -137,7 +135,7 @@ decision-rich part.
 
 ## 9. The ecosystem contract
 
-A skill never moves alone. Any authoring act (create, merge, rename, delete, restructure) carries in the same change:
+A skill moves with its ecosystem: any authoring act (create, merge, rename, delete, restructure) carries in the same change:
 
 1. `entities/behavior-map.json` — the row (exactly one per skill), `declared_overlaps`, and the re-recorded hash tuple (a deliberate, reviewed act).
 2. Persona `skills:` grants — the orphan checker requires every model-invoked skill granted somewhere; a `disable-model-invocation` skill is exempt.
