@@ -132,7 +132,7 @@ def _own(specs: Path, paths: set[str], skip: tuple[str, ...] = _NOT_PRODUCTION) 
 
 def _candidates(specs: Path, bug_id: str) -> list[str]:
     """The bugs whose fix, and the tasks whose `<type>(<task-id>)` commit, wrote a line the
-    staged diff removes: `git blame` past `(#n)`-subject squashes, `tests/` included (ADR 0186)."""
+    staged diff removes: `git blame` past `(#n)`-subject squashes, `tests/` included."""
     fixes, blamed = _fixes(specs), set[str]()
     top = Path(_git(specs, "rev-parse", "--show-toplevel").strip())
     staged = {f[1]: f[1:] for f in (ln.split("\t") for ln in _git(top, "diff", "--cached", "--name-status", "--diff-filter=MDR").splitlines())}  # fmt: skip

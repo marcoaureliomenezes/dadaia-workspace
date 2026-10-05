@@ -57,7 +57,7 @@ def findings_for(
     """Every finding the ledger *text* carries — the ONE validation path, run both by
     ``check`` over the committed file and by every write over its own candidate bytes.
     Lineage (AC3.8): a `caused_by` names a record of *text* or *archived*, or a task a
-    `TASKS.md` under *root*`/releases/` carries (ADR 0186), and never loops."""
+    `TASKS.md` under *root*`/releases/` carries, and never loops."""
     schema = load_schema()
     lines: dict[int, list[str]] = {}
     fixes: dict[int, str] = {}  # a line a governance verb clears
