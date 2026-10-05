@@ -31,7 +31,7 @@ modules =
 def _checkout(root: Path, files: dict[str, str]) -> Path:
     for d in ("scripts", "tests"):
         (root / d).mkdir(parents=True)
-    for kept in ("scripts/ci.py", "pyproject.toml"):
+    for kept in ("scripts/ci.py", "scripts/covdata.py", "pyproject.toml"):
         shutil.copyfile(_REPO / kept, root / kept)
     for rel, text in files.items():
         (root / rel).parent.mkdir(parents=True, exist_ok=True)
@@ -182,7 +182,7 @@ def test_documented_coverage_line_leaves_no_coverage_file_in_the_checkout(
     coverage file there (tracked, untracked or ignored)."""
     line = next(
         ln for ln in (_REPO / doc).read_text(encoding="utf-8").splitlines()
-        if ln.startswith("pytest") and "--cov" in ln
+        if ln.startswith("python -m pytest") and "--cov" in ln
     )  # fmt: skip
     files = {
         ".gitignore": ".coverage\n",
@@ -195,9 +195,12 @@ def test_documented_coverage_line_leaves_no_coverage_file_in_the_checkout(
     }
     checkout = _checkout(tmp_path, files)
     subprocess.run(["git", "init", "-q"], cwd=checkout, check=True)
-    argv = [sys.executable, "-m", *shlex.split(line)]
-    env = {**{k: v for k, v in os.environ.items() if k != "COVERAGE_FILE"}, "CI": "true"}
-    assert subprocess.run(argv, cwd=checkout, env=env, check=False).returncode == 0
+    tmp = tmp_path / "tmp"  # where the plugin's temp dir lives, and is gone after exit
+    tmp.mkdir()
+    env = {**{k: v for k, v in os.environ.items() if k != "COVERAGE_FILE"}, "CI": "true",
+           "TMPDIR": str(tmp), "PATH": f"{Path(sys.executable).parent}{os.pathsep}{os.environ['PATH']}"}  # fmt: skip
+    assert subprocess.run(shlex.split(line), cwd=checkout, env=env, check=False).returncode == 0
+    assert [p.name for p in tmp.iterdir() if p.name.startswith("dadaia-cov-")] == []
     status = subprocess.run(
         ["git", "status", "--porcelain", "--ignored"],
         cwd=checkout, capture_output=True, text=True, check=True,

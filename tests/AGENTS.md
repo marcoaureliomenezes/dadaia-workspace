@@ -50,5 +50,5 @@ Coverage is not the default loop. Use explicit coverage only for curated
 unit/contract runs:
 
 ```bash
-pytest -q -p scripts.ci -m "unit or contract" --cov=dadaia_workspace --cov-report=term-missing --cov-fail-under=80
+python -m pytest -q -p scripts.covdata -m "unit or contract" --cov=dadaia_workspace --cov-report=term-missing --cov-fail-under=80
 ```

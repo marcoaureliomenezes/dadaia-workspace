@@ -8,13 +8,9 @@ library only: the ``repo-hygiene`` and ``doctor`` jobs install no dev group."""
 from __future__ import annotations
 
 import os
-import shutil
 import subprocess
 import sys
-import tempfile
-from collections.abc import Generator
 from pathlib import Path
-from typing import Any
 
 ROOT = Path(__file__).resolve().parents[1]
 PY = sys.executable
@@ -50,7 +46,7 @@ JOBS: dict[str, list[Step]] = {
                 "-m",
                 "(unit or contract) and not quarantine",
                 "-p",
-                "scripts.ci",
+                "scripts.covdata",
                 "--cov=dadaia_workspace",
                 "--cov-report=term-missing",
                 "--cov-fail-under=80",
@@ -110,25 +106,6 @@ def plan(argv: list[str]) -> list[tuple[str, Step]]:
         return [("task", step) for step in _task(argv[1:])]
     jobs = STAGE if argv == ["stage"] else list(JOBS) if argv in ([], ["job"]) else argv
     return [(job, step) for job in jobs for step in JOBS[job]]
-
-
-def pytest_load_initial_conftests(early_config: Any) -> Generator[None]:
-    """As a pytest plugin (``-p scripts.ci``), the ONE decider of where coverage data lands:
-    a temp dir outside the checkout, removed when pytest exits. An xdist worker inherits the
-    controller's, which combines the workers' data before removing it."""
-    if "COVERAGE_FILE" not in os.environ:
-        tmp = tempfile.mkdtemp(prefix="dadaia-cov-")
-        early_config.add_cleanup(lambda: shutil.rmtree(tmp, ignore_errors=True))
-        os.environ["COVERAGE_FILE"] = os.path.join(tmp, ".coverage")
-    return (yield)
-
-
-# pluggy's own marker, spelled out: this file imports no pytest (standard library only). A
-# wrapper runs before pytest-cov's tryfirst hook, which starts coverage.
-pytest_load_initial_conftests.pytest_impl = dict(  # type: ignore[attr-defined]
-    wrapper=True, hookwrapper=False, optionalhook=False, tryfirst=False, trylast=False,
-    specname=None,
-)  # fmt: skip
 
 
 def main(argv: list[str]) -> int:
