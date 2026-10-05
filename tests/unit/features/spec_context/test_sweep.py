@@ -281,3 +281,28 @@ def test_a_root_level_held_symlink_keeps_its_hold_clock(tmp_path: Path) -> None:
 
     [held] = (tmp_path / ".dadaia" / "reaped").glob("*/link")
     assert held.lstat().st_mtime > 1_000_000_000
+
+
+# fmt: off
+@pytest.mark.parametrize(("gitdir", "message"), [
+    pytest.param("/repo/.git/worktrees/wt", "skipped 'tree' (holds a linked git worktree)", id="linked-worktree-skipped"),
+    pytest.param("../.git/modules/sub", "deleted 'tree'", id="row24-submodule-is-no-worktree"),
+])
+# fmt: on
+def test_only_a_gitdir_under_worktrees_marks_a_linked_worktree(tmp_path: Path, gitdir: str, message: str) -> None:
+    """rc-9 AC3.6 row 24: a submodule's ``.git`` file names a relative gitdir that moves
+    with its repo; only ``<common>/worktrees/<name>`` is a linked worktree."""
+    tree = tmp_path / "tree"
+    _file(tree / "sub" / ".git").write_text(f"gitdir: {gitdir}\n")
+
+    done = sweep.remove(tmp_path, tree, "tree")
+
+    assert str(done) == message
+
+
+def test_n_moves_to_one_destination_make_n_holds(tmp_path: Path) -> None:
+    """ADR 0074: an occupied destination yields the first free ``<name>-N`` beside it."""
+    for _ in range(3):
+        sweep.move(tmp_path, _file(tmp_path / "slop.txt"), tmp_path / "reaped" / "slop.txt", "slop")
+
+    assert sorted(p.name for p in (tmp_path / "reaped").iterdir()) == ["slop.txt", "slop.txt-1", "slop.txt-2"]

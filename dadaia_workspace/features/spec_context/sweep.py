@@ -118,7 +118,7 @@ def _inside(workspace_root: Path, target: Path) -> bool:
 
 def _is_gitfile(entry: Path) -> bool:
     """A linked worktree's ``.git`` file: its gitdir sits in ``<common>/worktrees/``."""
-    if entry.name != ".git" or not entry.is_file() or entry.is_symlink():
+    if not entry.is_file() or entry.is_symlink():
         return False
     try:
         gitdir = entry.read_text(encoding="utf-8").removeprefix("gitdir:").strip()
