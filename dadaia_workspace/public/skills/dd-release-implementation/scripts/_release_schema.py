@@ -202,7 +202,8 @@ def writes(line: str) -> list[str]:
 
 def job_errors(text: str, rel: str) -> list[str]:
     """Why job file *text* at *rel* is malformed: no `## Stage` heading, a stage with no
-    `- Contract:` line, or a first stage whose tasks write anything but tests."""
+    `- Contract:` line, or a first stage whose tasks write anything but tests — save
+    ``reconcile.md``'s, the Reconciliation job's first work stage (ADR 0192)."""
     stages = re.split(r"^## Stage ", text, flags=re.MULTILINE)[1:]
     if not stages:
         return [f"{rel} has no '## Stage <id>' heading"]
@@ -211,9 +212,17 @@ def job_errors(text: str, rel: str) -> list[str]:
         stage = body.split(maxsplit=1)[0]
         if not re.search(r"^- Contract:", body, re.MULTILINE):
             errors.append(f"{rel} stage {stage} has no '- Contract:' line")
+        lines, column = [], None  # a table row's writes sit under its header's `W:` cell
+        for line in body.splitlines() if index == 0 and Path(rel).name != "reconcile.md" else []:
+            cells = [c.strip() for c in line.split("|")] if line.lstrip().startswith("|") else []
+            if "`W:`" in cells:
+                column = cells.index("`W:`")
+                continue
+            column = column if cells else None
+            lines.append("`W:` " + cells[column] if column and column < len(cells) else line)
         errors += [
             f"{rel} stage {stage} writes {path} — stage 1 writes tests only"
-            for line in (body.splitlines() if index == 0 else [])
+            for line in lines
             for path in writes(line)
             if not (path.startswith("tests/") or Path(path).name.startswith("test_"))
         ]

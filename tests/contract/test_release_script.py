@@ -328,6 +328,11 @@ _JOB1 = (  # the rc-9 job1 file's shape: titled stages, prose contracts, AC rang
     "- J1.S2.T1 — AC1.1 · `W:` `scripts/ci.py` · owner `test_ci_script.py`\n"
 )
 
+_JOB_TABLE = (  # the rc-9 job files' task tables: the `W:` column holds each row's writes
+    "## Stage J1.S1 — RED\n\n- Contract: x\n\n| id | AC | `W:` | owner |\n|---|---|---|---|\n"
+    "| T1 | AC1 | `tests/unit/test_t.py` | same |\n"
+)
+
 
 @pytest.mark.parametrize(
     ("job", "needle"),
@@ -337,6 +342,10 @@ _JOB1 = (  # the rc-9 job1 file's shape: titled stages, prose contracts, AC rang
         pytest.param(_JOB1.replace("`tests/helpers/worktree_ws.py`", "`scripts/ci.py`"),
                      "tasks/j2.md stage J1.S1 writes scripts/ci.py — stage 1 writes tests only",
                      id="rc9-job1-shape-stage-1-source"),
+        pytest.param(_JOB_TABLE, None, id="stage-1-table-tests"),
+        pytest.param(_JOB_TABLE.replace("`tests/unit/test_t.py`", "`scripts/ci.py`"),
+                     "tasks/j2.md stage J1.S1 writes scripts/ci.py — stage 1 writes tests only",
+                     id="stage-1-table-source"),
         pytest.param(_JOB.replace("`W:` `tests/unit/test_x.py`", "`W:` `src/y.py`"),
                      "tasks/j2.md stage J2.S1 writes src/y.py — stage 1 writes tests only",
                      id="stage-1-non-test"),
@@ -355,6 +364,28 @@ def test_check_judges_each_job_file(
     assert messages == ([needle] if needle else [])
     phase = _phase(script, specs)  # the transition judges the same job file alike
     assert (phase.returncode, needle is None or needle in phase.stderr) == (int(bool(needle)), True)
+
+
+@pytest.mark.parametrize(
+    ("name", "expected"),
+    [
+        pytest.param("reconcile.md", [], id="reconciliation-stage-1-is-work"),
+        pytest.param("j2.md", ["tasks/j2.md stage JR.S1 writes specs/memory/x.md — stage 1 writes tests only"],
+                     id="other-job-stage-1-source"),
+    ],
+)  # fmt: skip
+def test_check_exempts_only_reconciliation_from_stage_1_tests(
+    script: Path, tmp_path: Path, name: str, expected: list[str]
+) -> None:
+    """ADR 0192: Reconciliation has no acceptance tests, so its stage 1 is its first work stage."""
+    specs = _specs(tmp_path, _GOOD)
+    (tasks := specs / "releases/0.5.0/rc-1/tasks").mkdir()
+    (tasks / name).write_text(
+        "## Stage JR.S1 — memory\n\n- Contract: x\n\n| task | AC | `W:` |\n|---|---|---|\n"
+        "| JR.S1.T1 | AC6.1 | `specs/memory/x.md` |\n", "utf-8")  # fmt: skip
+    done = subprocess.run([sys.executable, str(script), "check", "--json", "--specs", str(specs)],
+                          capture_output=True, text=True)  # fmt: skip
+    assert [f["message"] for f in json.loads(done.stdout) if "tasks/" in f["path"]] == expected
 
 
 @pytest.mark.parametrize(
