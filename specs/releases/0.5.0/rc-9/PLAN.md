@@ -52,38 +52,37 @@ One worktree (`worktrees/dadaia-workspace/0.5.0-rc9-job1`, operator-authorized `
 - AC1.3, operator order 2026-10-05, verbatim: "a release ja tem que começar fazendo ... vocÊ está proibio de rodar 1 worktree para cada tasks ou rodar CI para cada teste ... não podemos perder mais tempo". The `<job>--<task-id>` shape and the ≤ 5 task-worktree counter leave: a job's tasks share its tree, a stage is the barrier. The SPEC delta lands at Reconciliation (main thread).
 - Deviation, recorded: J1.S2.T3 (`ci.py` levels) and the first cut of J1.S2.T1 were written before the stage order arrived; J1.S2.T3's tests landed with its code in 0fce6c788, not as an S1 xfail.
 
+The stages and task ids are the approved SPEC's (ad9c60c6b, Job 1 `Stages:`); the rows below refine their `W:` where the code demanded it.
+
+- Commit ids, recorded: before the SPEC's ids existed, commits used an earlier numbering. `J1.S2.T1` of bb4ca7638 and 8aa97f23b is the SPEC's T2 + T3; `J1.S2.T3` of 0fce6c788 (as `J1-1`) is T1; `J1.S2.T5` of 9af5ec8e1 and `J1.S2.T6` of e0d1f0e5a are T5 (+ T10); `J1.S1` of 11b8a93d8 carries T3 and T4's rows; T1 and T2's tests landed with their code.
+
 ### Stage J1.S1 — RED (tests only)
 
-- Contract: exit tests are the acceptance tests below, each a strict xfail; envelope `tests/**`; ACs AC1.2 (branch policy), AC1.9, AC1.10.
+- Contract: exit tests are each AC's acceptance test as a strict xfail; envelope `tests/**`.
 
 | id | AC | `W:` | owner tests |
 |---|---|---|---|
-| J1.S1.T1 | AC1.2 | `tests/unit/features/chokepoints/test_branch_policy.py` | same — a job branch pushes; a `define`, `backlog` or task-shaped `wt/` branch refuses |
-| J1.S1.T2 | AC1.9 | `tests/unit/features/specs/test_canon.py` | same — a job file is canon; a stray `tasks/` file is not; a closed rc's `TASKS.md` still is |
-| J1.S1.T3 | AC1.10 | `tests/contract/test_release_script.py` | same — one valid job file passes `check`; a stage-1 non-test `W:` refuses |
+| J1.S1.T1 | AC1.1 | `tests/integration/test_ci_script.py` | same |
+| J1.S1.T2 | AC1.2–AC1.5 | `tests/integration/test_worktree_lifecycle.py`, `tests/integration/test_worktree_new.py`, `tests/helpers/worktree_ws.py` | same |
+| J1.S1.T3 | AC1.2 | `tests/unit/features/chokepoints/test_push_branch_policy.py` | same |
+| J1.S1.T4 | AC1.9, AC1.10, the phase move | `tests/unit/features/specs/test_canon.py`, `tests/contract/test_release_script.py`, `tests/helpers/release_state.py` | same |
 
-### Stage J1.S2 — code
+### Stage J1.S2 — code and law
 
-- Contract: exit tests are J1.S1's, now passing, plus each task's owner tests; envelope `dadaia_workspace/**` but `public/**/*.md`, `scripts/**`, `.github/workflows/ci.yml`, `AGENTS.md`, `tests/**`; ACs AC1.1–AC1.5, AC1.8 (the Parallel schedule check), AC1.9, AC1.10.
-
-| id | AC | `W:` | owner tests |
-|---|---|---|---|
-| J1.S2.T1 | AC1.2–AC1.5 | `GF/worktree.py`, `GF/_worktree_names.py` (was `_worktree_kinds.py`), `GF/_worktree_new.py`, `GF/_worktree_end.py`, `GF/_worktree_git.py`, `AGENTS.md`, `f/spec_context/doctor.py` | `tests/integration/test_worktree_new.py`, `tests/integration/test_worktree_lifecycle.py`, `tests/helpers/worktree_ws.py` |
-| J1.S2.T2 | AC1.3 | `core/workspace_layout.py` `protected_glob`, `f/spec_context/gate_policy.py`, `S/dd-bug-resolution/scripts/_specs.py`, `S/dd-release-implementation/scripts/_release_phase.py` | `tests/unit/features/spec_context/test_gate_policy.py`, `tests/unit/hooks/test_pre_gate.py` (a protected glob blocks in a job tree), `tests/unit/skills/test_bug_resolution_bugs_script.py` |
-| J1.S2.T3 | AC1.1 | `scripts/ci.py` | `tests/integration/test_ci_script.py` |
-| J1.S2.T4 | AC1.2 | `core/gitflow.py`, `f/chokepoints/branch_policy.py`, `.github/workflows/ci.yml`, `scripts/guards/repo.py` | `tests/unit/features/chokepoints/test_branch_policy.py`, guard plant `job-trigger` |
-| J1.S2.T5 | AC1.9 | `core/workspace_layout.py` `SPECS_CANON` | `tests/unit/features/specs/test_canon.py` |
-| J1.S2.T6 | AC1.8, AC1.10 | `S/dd-release-implementation/scripts/_release_plan.py`, `_release_tree.py` | `tests/contract/test_release_script.py`, `tests/helpers/release_state.py` |
-
-- J1.S2.T2 and J1.S2.T5 both touch `core/workspace_layout.py`, in disjoint functions; T5 runs after T2.
-
-### Stage J1.S3 — law and log
-
-- Contract: exit checks are AC1.8's two greps printing `0`, `public stage`/`install`/`doctor` clean, `release.py check` clean; envelope `dadaia_workspace/public/**/*.md`, `CONTEXT.md`, `specs/releases/0.5.0/_RELEASE.json`; ACs AC1.5, AC1.6, AC1.7, AC1.8.
+- Contract: exit tests are J1.S1's, passing, plus unit + integration; ACs AC1.1–AC1.10.
 
 | id | AC | `W:` | owner tests |
 |---|---|---|---|
-| J1.S3.T1 | AC1.5, AC1.6, AC1.8 | `pub/data/worktrees-AGENTS.md`, `pub/data/AGENTS.md`, `S/dd-gitflow-default/SKILL.md`, `S/dd-release-implementation/{SKILL,RC-FLOW,MEMORY-UPDATE}.md`, `S/dd-manager-orchestration/SKILL.md`, `CONTEXT.md` | none (law text) |
-| J1.S3.T2 | AC1.8, AC1.10 | `S/dd-release-definition/SKILL.md`, `S/dd-audit-project/PILLAR-SPECS.md` | none (law text) |
-| J1.S3.T3 | AC1.8 | the hit lines of `pub/scaffold/{releases,bugs,ADRs}/AGENTS.md`, `S/dd-bug-resolution/SKILL.md`, `S/dd-bug-registration/SKILL.md`, `S/dd-code-review/SKILL.md` | none (law text) |
-| J1.S3.T4 | AC1.7 | `specs/releases/0.5.0/_RELEASE.json` | none (log data) |
+| J1.S2.T1 | AC1.1 | `scripts/ci.py` | `test_ci_script.py` |
+| J1.S2.T2 | AC1.3 | `GF/_worktree_new.py`, `GF/_worktree_names.py` (was `_worktree_kinds.py`), `f/spec_context/gate_policy.py`, `core/workspace_layout.py` `protected_glob`, `S/dd-bug-resolution/scripts/_specs.py`, the two contract tests | `test_worktree_new.py`, `test_gate_policy.py`, `test_pre_gate.py` |
+| J1.S2.T3 | AC1.2, AC1.4, AC1.5 | `GF/worktree.py`, `GF/_worktree_end.py`, `GF/_worktree_git.py`, `f/spec_context/doctor.py`, `AGENTS.md` | `test_worktree_lifecycle.py` |
+| J1.S2.T4 | AC1.2 | `core/gitflow.py`, `f/chokepoints/branch_policy.py`, `.github/workflows/ci.yml`, `scripts/guards/repo.py` | `test_push_branch_policy.py`, guard plant `job-trigger` |
+| J1.S2.T5 | AC1.8, AC1.9, AC1.10, the phase move | `core/workspace_layout.py` `SPECS_CANON` (the canon rows live there, not in `canon.py`), `S/dd-release-implementation/scripts/{_release_schema,_release_tree,_release_phase}.py`, `_release_plan.py` (deleted) | `test_canon.py`, `test_release_script.py` |
+| J1.S2.T6 | AC1.8 | `pub/data/worktrees-AGENTS.md`, `S/dd-gitflow-default/SKILL.md` | no test |
+| J1.S2.T7 | AC1.8 | `S/dd-release-implementation/{RC-FLOW,MEMORY-UPDATE,SKILL}.md` | no test |
+| J1.S2.T8 | AC1.6, AC1.8 | `S/dd-manager-orchestration/SKILL.md`, `S/dd-release-definition/SKILL.md`, `S/dd-audit-project/PILLAR-SPECS.md` | no test |
+| J1.S2.T9 | AC1.8 (hit lines) | `pub/scaffold/{releases,bugs,ADRs}/AGENTS.md`, `S/dd-bug-resolution/SKILL.md`, `S/dd-bug-registration/SKILL.md`, `S/dd-code-review/SKILL.md` | no test |
+| J1.S2.T10 | AC1.7 | `S/dd-release-implementation/scripts/_release_check.py` | `test_release_script.py` |
+
+- The canon and law changes move the `specs_version` canon pin and the shipped template hashes; they are re-recorded with T6–T9 (stamp 9 is unshipped).
+- AC1.7's own `kind: merge` entry is appended to `_RELEASE.json` at the end, after the merge times exist.
