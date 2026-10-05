@@ -11,7 +11,6 @@ from __future__ import annotations
 import importlib.util
 import json
 import os
-import shutil
 import stat
 import subprocess
 import sys
@@ -563,13 +562,9 @@ def test_the_seam_verdict_equals_the_push_verdict_over_the_published_ledger(
     subprocess.run(["git", "init", "-q", "--bare", str(origin)], check=True)
     subprocess.run(["git", "-C", str(root), "remote", "add", "origin", str(origin)], check=True)
     subprocess.run(["git", "-C", str(root), "push", "-q", "origin", "HEAD"], check=True)
-    if rev_list_fails:  # the push's adapter raises on this failure: it amnesties nothing
-        real, shim = shutil.which("git"), tmp_path / "shim"
-        shim.mkdir()
-        (shim / "git").write_text(f'#!/bin/sh\ncase " $* " in *" rev-list "*) exit 128;; esac\n'
-                                  f'exec "{real}" "$@"\n', encoding="utf-8")  # fmt: skip
-        (shim / "git").chmod(0o755)
-        monkeypatch.setenv("PATH", f"{shim}{os.pathsep}{os.environ['PATH']}")
+    if rev_list_fails:  # a remote-tracking ref at a missing object: `rev-list` dies on every OS
+        ghost = root / ".git" / "refs" / "remotes" / "origin" / "ghost"
+        ghost.write_text("1" * 40 + "\n", encoding="utf-8")
 
     done = _run(
         script, "append", "--specs", str(root / "specs"), "--bug-id", "new-bug", "--title",
