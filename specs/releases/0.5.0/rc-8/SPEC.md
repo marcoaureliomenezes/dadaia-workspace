@@ -521,6 +521,35 @@ After AC9.3 and AC8.1's `Intent:` strip merge. Each RED is a behaviour assert in
 - rc-10: the rest of the instruction corpus to AC12.11's bar (Q12); `public-law-language-neutral`; `dd-ask-me-owned-questioning-skill`, delivering 0165 and `dd-ai-eng-knowhow/AUTHORING.md:134` ("asks the whole frontier at once"), caught by 0165's repaired `measured_by`; `adr-born-at-release-with-options`; `adr-ledger-triage-process-rules`; `architecture-adr-section-generated`; F088, F089, F139–F148.
 - rc-11: workspace replication (7 entries, ADRs 0171–0175, 0174 less AC11.0's slice); F084.
 - rc-12, the promote: docs site F109, clone detection F110, launch prep F111; the residue (`spec-context-refusals-print-prose`, `privacy-baseline-one-parser`, `ledger-refusals-guess-specs-from-command-shape`, `ledger-reader-one-numbered-tolerant-iterator`, `doctor-in-a-fresh-worktree-lacks-rendered-specs-law`, F060); memory drift F123–F127; bug metrics F001, F004, F005, F009 (re-measured over AC9.3's links); the publish gate F067; `test_docs_derived_from_memory.py` leaves pytest after check #7 rules, `meta-tests-leave-pytest` exits delivered then; the audit checks never run, F137; the removal-authority notes (F069); PyJWT, closing at the ship; the evals gate at the promote (0178): the promote PR head is evaluated and its run logged on the work branch before the merge; at `approve`, `git diff --name-only <evaluated>..<tag>` lists only `CHANGELOG.md`, `.release-please-manifest.json` and `pyproject.toml` (its version line), else `eval.yml` runs on the tag sha first and only a non-blocking verdict approves. Open, the operator's before the promote (F4): ADR 0122's zero active backlog against the four post-0.5.0 evals follow-ups, `evals-release-gate-status`, `evals-harness-lanes-and-benchmark`, `evals-windows-smoke` and `devin-subagent-projection`.
+- Carried out of rc-8 (grill 2026-10-05 Q21: rc-8 closes after T-050-212; the tasks left `TASKS.md` in b4c6fc604). Handoffs: `2026-10-05T040135Z-main-thread-grill-granularity-parallelism.handoff.json`, `2026-10-05T050738Z-main-thread-grill-rc9-scope.handoff.json` (its answers cited "scope Q1", "scope I1"). One entry per AC, or AC part:
+  - AC10.1's `-B` / `PYTHONDONTWRITEBYTECODE=1` clause; AC10.2 (F048, `ci-preflight-writes-coverage-into-the-repo`) — T-050-173; carried to rc-9 — grill 2026-10-05 Q21.
+  - AC10.6 (`registry-row-missing-a-key-escapes-reg-schema`) — T-050-174; carried to rc-9 — grill 2026-10-05 Q21.
+  - AC10.7 (F043, `pre-push-warns-no-gitflow-block-for-an-absent-specs-tree`) — T-050-175; carried to rc-9 — grill 2026-10-05 Q21.
+  - AC10.8 (F044, `upgrade-leaves-reconcile-scratch-behind`) — T-050-176; carried to rc-9 — grill 2026-10-05 Q21.
+  - AC10.3 (F051, `hook-entrypoints-invisible-to-coverage`), its coverage-JSON readout included — T-050-178, T-050-181; carried to rc-9 — grill 2026-10-05 Q21.
+  - AC10.13 (F097, `release-memory-appends-a-second-entry-on-rerun`) — T-050-179; carried to rc-9 — grill 2026-10-05 Q21.
+  - AC12.4, the 27 retro records — T-050-199; carried to rc-9 — grill 2026-10-05 Q21.
+  - AC13.4's verdict, the bug window review — T-050-213; carried to rc-9 — grill 2026-10-05 Q21; it is rc-9's SPEC §1, no task (scope I1).
+  - AC13.4's class commits — T-050-214; carried to rc-9 — grill 2026-10-05 Q21.
+  - AC13.4's re-archive by ADR — T-050-215; carried to rc-9 — grill 2026-10-05 Q21.
+  - AC10.1's re-cut, the `suite_env` REBUILD — T-050-200; carried to rc-9 — grill 2026-10-05 Q21.
+  - AC12.8 — T-050-201; carried to rc-9 — grill 2026-10-05 Q21.
+  - AC12.13 U1, U2 — T-050-202; carried to rc-9 — grill 2026-10-05 Q21.
+  - AC12.9 rows 10, 12 — T-050-203; carried to rc-9 — grill 2026-10-05 Q21.
+  - AC12.10 — T-050-204; carried to rc-9 — grill 2026-10-05 Q21.
+  - AC12.14 rows 20, 24, 25, 26 — T-050-205, T-050-206, T-050-207, T-050-208; carried to rc-9 — grill 2026-10-05 Q21.
+  - AC12.1 as AC13.7 words it; AC13.7's registration step; AC13.1's §3 class; AC13.2's block list; AC13.6's law line; AC13.3's lifecycle order; AC9.3's bugs-law semantics; AC12.9's real bump, `CANONICAL_SPECS_VERSION` 9 → 10 — T-050-194; carried to rc-9 — grill 2026-10-05 Q21.
+  - AC12.2 as AC13.2 narrows it; AC13.2 in `dd-bug-resolution` §1; AC9.3's LINEAGE step 2 — T-050-195; carried to rc-9 — grill 2026-10-05 Q21.
+  - AC12.3; AC13.6's `RC-FLOW.md` line; the root map's Arm B line; AC13.11 — T-050-196; carried to rc-9 — grill 2026-10-05 Q21.
+  - AC12.12's law row; AC13.8; AC13.4's per-class and archive shapes — T-050-197; carried to rc-9 — grill 2026-10-05 Q21.
+  - AC9.4's REBUILD read; AC12.6's and AC12.12's reviewer lines — T-050-198; carried to rc-9 — grill 2026-10-05 Q21.
+  - AC12.11's and AC13.12's bars on those law files — T-050-194 … T-050-198; carried to rc-9 — grill 2026-10-05 Q21.
+  - AC13.3 — T-050-216; carried to rc-9 — grill 2026-10-05 Q21.
+  - AC13.2's in-rc pile and cause groups — T-050-195, T-050-196, T-050-197; carried to rc-9 — grill 2026-10-05 Q21; moot there: Q19 retires the in-rc pile (scope I1).
+  - AC10.12 (F098, FR `guidance-messages-name-the-right-target`, HOOKS-DRIFT-1) — T-050-177; carried to rc-9 — grill 2026-10-05 Q21; scope Q3 routes it to the backlog (`BACKLOG.json:13`), then rc-10.
+  - AC11.2's T1 and T2 task dirs; AC11.3; AC11.4; AC11.6, its log line included — T-050-185, T-050-186, T-050-188, T-050-181; carried to rc-9 — grill 2026-10-05 Q21; scope Q1 routes the evals to rc-10, with G6's 0177 acceptance edge.
+  - AC8.10's last bullet — T-050-180; carried to rc-9 — grill 2026-10-05 Q21; scope Q1 routes QUALITY to rc-10, with the rc-9 line's AC13.5, AC13.9, AC13.10 and 0176's acceptance (scope I3).
+  - Not carried: AC10.14's law half (T-050-189), delivered by T-050-191's commit, only its marker missing (scope I1); T-050-181's readout of what rc-8 delivered, which rc-8's closure takes (scope I3).
 
 ## Open questions for the operator
 
