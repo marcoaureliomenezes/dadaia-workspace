@@ -84,6 +84,21 @@ def test_failure_restores_migrated_state_and_requires_projection_rollback(tmp_pa
     assert state_path.read_bytes() == before
 
 
+def test_failure_restores_the_primary_context_file_the_migration_deleted(tmp_path: Path) -> None:
+    workspace = _v1_workspace(tmp_path)
+    primary = workspace / ".dadaia" / "states" / "primary_context.json"
+    primary.write_bytes(b'{"name": "app"}')
+    reconcile_workspace(
+        workspace,
+        expected_version="1.2.3",
+        actual_version="1.2.3",
+        public_service=_Public(fail_install=True),
+        doctor_service=_Doctor(),
+    )
+    assert primary.read_bytes() == b'{"name": "app"}'
+    assert not (workspace / ".dadaia" / "tmp").exists()
+
+
 def test_reconcile_ignores_operator_slop_and_names_context_invariants(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
