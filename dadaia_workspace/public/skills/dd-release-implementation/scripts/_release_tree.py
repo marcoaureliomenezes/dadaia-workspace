@@ -24,12 +24,12 @@ from _ledger import records  # noqa: E402
 from _release_check import finding, histo_findings, state_findings  # noqa: E402
 from _release_phase import NEXT  # noqa: E402
 from _release_schema import (  # noqa: E402
+    CANDIDATE_DOCS,
     HISTO,
     MARK_RE,
     SEMVER_RE,
     SHA_RE,
     STATE,
-    TRIO,
     TRIO_PHASES,
     candidate_dir,
     job_errors,
@@ -202,7 +202,7 @@ def _directory_findings(release_dir: Path, specs: Path) -> list[dict[str, Any]]:
     if phase not in TRIO_PHASES:
         return (_definition_findings(state, marks, f"{dir_rel}/{STATE}", candidate, specs)
                 if candidate else []) + memory + jobs  # fmt: skip
-    missing = [n for n in TRIO if not (candidate and (candidate / n).is_file())]
+    missing = [n for n in CANDIDATE_DOCS if not (candidate and (candidate / n).is_file())]
     if candidate is None or missing:
         where = candidate.name if candidate else "rc-<N>"
         return [finding(dir_rel, 1, f"phase {phase} is missing {where}/{', '.join(missing)}",

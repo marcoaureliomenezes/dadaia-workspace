@@ -16,7 +16,7 @@ STATE = "_RELEASE.json"
 HISTO = "releases/_archive/releases_histo.jsonl"
 #: One candidate's documents, born in its own `rc-<N>/` and never rewritten after closure; its
 #: tasks live in one job file per job, `rc-<N>/tasks/<job>.md` (a closed rc keeps `TASKS.md`).
-TRIO = ("SPEC.md", "PLAN.md")
+CANDIDATE_DOCS = ("SPEC.md", "PLAN.md")
 #: A candidate folder; the live one is the highest N — `core.release_state.CANDIDATE_RE`.
 CANDIDATE_RE = re.compile(r"^rc-([1-9][0-9]*)$")
 #: The three lifecycle phases — pinned equal to the schema's enum; a shipped release

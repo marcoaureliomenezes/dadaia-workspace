@@ -14,9 +14,9 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from _release_schema import (  # noqa: E402
     APPROVED,
+    CANDIDATE_DOCS,
     SHA_RE,
     STATE,
-    TRIO,
     extract_status,
     job_errors,
     utc_now,
@@ -28,11 +28,11 @@ from _specs import choice  # noqa: E402
 PREDECESSOR = {"IMPLEMENTATION": "DEFINITION", "CLOSURE": "IMPLEMENTATION"}
 
 
-def _refuse_unapproved_trio(live: Live) -> Path:
+def _refuse_unapproved_docs(live: Live) -> Path:
     """A candidate enters IMPLEMENTATION only with SPEC and PLAN `Approved`; returns the
     candidate folder that holds them (no folder yet: `rc-1/` is where they belong)."""
     candidate = live.candidate or live.release_dir / "rc-1"
-    for name in TRIO:
+    for name in CANDIDATE_DOCS:
         document = candidate / name
         if not document.is_file():
             raise Refusal(
@@ -102,7 +102,7 @@ def set_phase(specs: Path, phase: str, sha: str) -> tuple[str, str]:
         raise choice(refusal, SUPPLY.get(current, ""))
     ts, candidate = utc_now(), live.candidate
     if phase == "IMPLEMENTATION":
-        candidate = _refuse_unapproved_trio(live)
+        candidate = _refuse_unapproved_docs(live)
         for job in sorted(candidate.glob("tasks/*.md")):
             if errors := job_errors(job.read_text(encoding="utf-8"), f"tasks/{job.name}"):
                 raise Refusal(errors[0], f"Operator action: correct {job.resolve()} "
