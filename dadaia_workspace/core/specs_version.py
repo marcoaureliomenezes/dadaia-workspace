@@ -30,9 +30,10 @@ from dadaia_workspace.core.gitflow import constitution_error, constitution_text,
 #: and catalog, all written by the repair set ``specs init`` runs; v9 = every candidate
 #: in ``releases/<M.m.p>/rc-<N>/`` (ADR 0150), the flat live trio folded by the hop;
 #: ``RELEASE.json`` back as SPEC-DOC-046's rename input (ADR 0152 (4)); the worktree law
-#: (T-050-103): specs paths land by a worktree merge, audits direct. A canon change that
+#: (T-050-103): specs paths land by a worktree merge, audits direct; v10 = the bugs law's
+#: rc-8 rewrite. A canon change that
 #: keeps the stamp leaves every older tree reading ``canonical`` while the doctor is red.
-CANONICAL_SPECS_VERSION = 9
+CANONICAL_SPECS_VERSION = 10
 
 #: The oldest stamp the one live upgrade hop starts from — and so the oldest a tree may
 #: carry and still be a dadaia tree (SPEC 0.4.8 D7, D9); anything older is foreign.
