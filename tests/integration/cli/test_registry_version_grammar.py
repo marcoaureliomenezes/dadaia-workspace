@@ -189,3 +189,22 @@ def test_ac3_9_doctor_fix_acts_on_nothing_over_an_unreadable_registry(ws: Path) 
     _runner.invoke(app, ["doctor", "--fix"])
 
     assert (ws / "junk.txt").read_text(encoding="utf-8") == "slop"
+
+
+@pytest.mark.xfail(strict=True, reason="J2.S3.T3: AC2.3")
+def test_a_registry_row_missing_a_key_is_reg_schema(ws: Path) -> None:
+    """AC2.3 (0162): a row without ``created_at`` is unreadable, never a ``KeyError``:
+    `context list` exits 1 with one ``Operator action:`` fix line, and doctor gives one
+    REG-SCHEMA finding carrying it."""
+    _registry(ws, "2", [{k: v for k, v in _ALIVE.items() if k != "created_at"}])
+
+    refused = _runner.invoke(app, ["context", "list"])
+    doctor = _runner.invoke(app, ["doctor", "--json"])
+
+    assert isinstance(refused.exception, SystemExit), refused.exception
+    fixes = [ln for ln in refused.output.splitlines() if ln.startswith("fix: ")]
+    assert refused.exit_code == 1 and len(fixes) == 1, refused.output
+    assert fixes[0].startswith("fix: Operator action: ")
+    sections = json.loads(doctor.stdout)["sections"].values()
+    (fix,) = [f["fix"] for s in sections for f in s["findings"] if f["code"] == "REG-SCHEMA"]
+    assert fix.startswith("Operator action: ")
