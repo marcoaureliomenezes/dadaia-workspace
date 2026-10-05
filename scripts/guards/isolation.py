@@ -550,7 +550,7 @@ CHECKS: dict[str, Check] = {
             "raw-assignment": _plant(
                 "tests/unit/test_h.py",
                 "import io, sys\nfrom dadaia_workspace.hooks import HOOK\n"
-                "def t():\n    sys.stdin = io.StringIO()\n",
+                "def t():\n    stream = sys.stdin = io.StringIO()\n",
             ),
         },
     ),

@@ -222,3 +222,22 @@ def test_the_expire_lane_walks_each_expired_entry_once(
     _make_doctor(ws).expire()
 
     assert walked == [entry.parent] and not entry.parent.exists()  # reaped whole: all below expired
+
+
+def test_scan_leaves_an_expired_worktree_holder_to_its_worktree_row(tmp_path: Path) -> None:
+    """rc-9 AC3.6 (doctor `_scan_ttl_zone`): an expired tmp entry holding a linked worktree
+    yields no TTL finding (its WORKTREE `foreign` row reports it); a plain expired sibling
+    is one EXPIRED finding whose detail states its age against the one-day TTL."""
+    ws = _make_workspace(tmp_path)
+    tmp = ws / ".dadaia" / "tmp"
+    holder, plain = tmp / "a" / "20200101", tmp / "b" / "20200101"
+    (holder / "wt").mkdir(parents=True)
+    (holder / "wt" / ".git").write_text("gitdir: /elsewhere/.git/worktrees/wt\n", "utf-8")
+    plain.mkdir(parents=True)
+    stamp = time.time() - 3 * 86_400 - 60
+    for path in (holder / "wt" / ".git", holder / "wt", holder, holder.parent, plain, plain.parent):
+        os.utime(path, (stamp, stamp))
+
+    found = [(f.path, f.verdict, f.detail) for f in _make_doctor(ws).scan_ttl()]
+
+    assert found == [("tmp/b", FindingVerdict.EXPIRED, "(mtime 3d > ttl 1d)")]

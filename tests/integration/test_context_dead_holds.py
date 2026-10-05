@@ -17,7 +17,7 @@ sa-context-dead-removes-repos-outside-the-reaper#C3 /
 - ADR 0172 (rc-9 AC3.2): dead never commits; a dirty checkout refuses, one fix line per
   file; a gitignored file is not dirty.
 The refusal fix lines on the main repo are the refusal harness's Cases
-(`test_refusal_fix_lines_clear_their_refusal.py`: untracked, secret_untracked, no_origin,
+(`test_refusal_fix_lines_clear_their_refusal.py`: untracked, no_origin,
 unpushed_side_branch, commits_no_remote).
 Size: MEDIUM — real git and bare origins in tmp_path (the question is a git question).
 """
@@ -160,6 +160,7 @@ _REFUSALS = [
     pytest.param("main", partial(_wt, checked_out=False), DeadUnpushedCommitsError, rf"fix: {re.escape(sys.executable)} \S+worktree\.py merge \S+/worktrees/main/0\.5\.0-rc1/j1$", id="AC1.10-unpushed-orphan-wt"),
     pytest.param("main", lambda r: (r.parents[1] / ".dadaia/.venv/bin/dadaia").unlink(), DeadUnpushedCommitsError, r"no workspace CLI[\s\S]*fix: uvx dadaia-workspace init \S+/ws$", id="AC1.10-rows-unreadable-fails-closed"),
     pytest.param("lib", lambda r: (r / "leftover.txt").write_text("x\n"), DeadReviewRequiredError, r"lib[\s\S]*leftover\.txt", id="A16.2-untracked-in-lib"),
+    pytest.param("lib", lambda r: (r / "README.md").write_text("edited\n"), DeadReviewRequiredError, r"^Context 'proj': repo 'lib' has 1 uncommitted change\(s\); dead never commits", id="AC3.2-dirty-refusal-names-context-and-repo"),
     pytest.param("lib", _no_remote, DeadUnpushedCommitsError, "lib", id="A16.2-local-commits-no-remote-in-lib"),
     pytest.param("main", _repos_outside, ContextStateError, r"skipped 'repos/main' \(outside the workspace\)\nfix: Operator action: free \S+/repos/main for the move", id="AC2.11-hold-refused"),
     pytest.param("lib", _url_less, RepoUrlMissingError, r"fix: Operator action: add the clone URL of \S+/repos/lib as its origin remote", id="url-less-never-clone-back"),
