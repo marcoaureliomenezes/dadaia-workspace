@@ -10,8 +10,12 @@ would supply that repair path is out of this task's write set.
 """
 
 import json
+from collections.abc import Callable
 from pathlib import Path
 
+import pytest
+
+from dadaia_workspace.core.exceptions import SchemaVersionError
 from dadaia_workspace.core.models.spec_context import (
     AssociatedRepo,
     ContextState,
@@ -178,3 +182,30 @@ def test_a_fresh_store_writes_v3_rows_without_legacy_fields(tmp_path: Path) -> N
     assert "alive_since" in row
     assert "dead_since" in row
     assert row["associated_repos"] == []
+
+
+@pytest.mark.parametrize(
+    "call",
+    [
+        lambda s: s.get("x"),
+        lambda s: s.update(_make_ctx("x")),
+        lambda s: s.delete("x"),
+        lambda s: s.list_all(),
+    ],
+    ids=["get", "update", "delete", "list_all"],
+)
+def test_a_row_missing_name_is_unreadable_at_every_method(
+    tmp_path: Path, call: Callable[[JsonContextStore], object]
+) -> None:
+    """J2.S6.T2 (review F3): a row without ``name`` is a SchemaVersionError at every store
+    method, never a KeyError; the registry file is left as it was."""
+    path = tmp_path / "spec_contexts.json"
+    body = json.dumps({"schema_version": 3, "contexts": [{"state": "alive"}]})
+    path.write_text(body, encoding="utf-8")
+    with pytest.raises(
+        SchemaVersionError, match="has no name, repo_slug, repo_url, created_at"
+    ) as refused:
+        call(JsonContextStore(tmp_path))
+    keys = "name, repo_slug, repo_url, created_at"
+    assert refused.value.fix == f"Operator action: add {keys} to that row of {path}"
+    assert path.read_text(encoding="utf-8") == body
