@@ -556,8 +556,7 @@ def test_new_refuses_a_slug_that_already_exited_and_writes_nothing(
 
 # fmt: off
 @pytest.mark.parametrize(("first", "refused"), [
-    pytest.param("an acme idea", False, id="published-term-accepted",
-                 marks=pytest.mark.xfail(strict=True, reason="J2.S6.T7: M1")),
+    pytest.param("an acme idea", False, id="published-term-accepted"),
     pytest.param("an idea", True, id="unpublished-term-refused"),
 ])
 # fmt: on

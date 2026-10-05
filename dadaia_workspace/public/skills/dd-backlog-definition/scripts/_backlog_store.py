@@ -66,7 +66,7 @@ def _validated(
     specs: Path, active: Items, histo: str, before: Items, record: dict[str, Any] | None
 ) -> str:
     why = private_refusal(
-        [*(i for i in active if i not in before), *([record] if record else [])], specs
+        [*(i for i in active if i not in before), *([record] if record else [])], specs / LEDGER
     )
     if why is not None:
         raise Refusal(*why)
