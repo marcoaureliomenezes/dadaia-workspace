@@ -367,28 +367,6 @@ def test_check_judges_each_job_file(
 
 
 @pytest.mark.parametrize(
-    ("name", "expected"),
-    [
-        pytest.param("reconcile.md", [], id="reconciliation-stage-1-is-work"),
-        pytest.param("j2.md", ["tasks/j2.md stage JR.S1 writes specs/memory/x.md — stage 1 writes tests only"],
-                     id="other-job-stage-1-source"),
-    ],
-)  # fmt: skip
-def test_check_exempts_only_reconciliation_from_stage_1_tests(
-    script: Path, tmp_path: Path, name: str, expected: list[str]
-) -> None:
-    """ADR 0192: Reconciliation has no acceptance tests, so its stage 1 is its first work stage."""
-    specs = _specs(tmp_path, _GOOD)
-    (tasks := specs / "releases/0.5.0/rc-1/tasks").mkdir()
-    (tasks / name).write_text(
-        "## Stage JR.S1 — memory\n\n- Contract: x\n\n| task | AC | `W:` |\n|---|---|---|\n"
-        "| JR.S1.T1 | AC6.1 | `specs/memory/x.md` |\n", "utf-8")  # fmt: skip
-    done = subprocess.run([sys.executable, str(script), "check", "--json", "--specs", str(specs)],
-                          capture_output=True, text=True)  # fmt: skip
-    assert [f["message"] for f in json.loads(done.stdout) if "tasks/" in f["path"]] == expected
-
-
-@pytest.mark.parametrize(
     ("text", "bad"),
     [
         ("job: job1; start: 2026-10-05T12:00Z; end: 2026-10-05T18:00Z; wall: 360; "

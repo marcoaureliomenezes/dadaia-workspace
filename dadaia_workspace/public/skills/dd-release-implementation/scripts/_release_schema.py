@@ -218,8 +218,7 @@ def stage_writes(body: str) -> list[list[str]]:
 def job_errors(text: str, rel: str) -> list[str]:
     """Why job file *text* at *rel* is malformed: no `## Stage` heading, a stage with no
     `- Contract:` line, two tasks of one stage writing one path, or a first stage whose
-    tasks write anything but tests — save ``reconcile.md``'s, the Reconciliation job's
-    first work stage (ADR 0192)."""
+    tasks write anything but tests."""
     stages = re.split(r"^## Stage ", text, flags=re.MULTILINE)[1:]
     if not stages:
         return [f"{rel} has no '## Stage <id>' heading"]
@@ -233,7 +232,7 @@ def job_errors(text: str, rel: str) -> list[str]:
                    for path in sorted({p for p in flat if flat.count(p) > 1 and "/" in p})]  # fmt: skip
         errors += [
             f"{rel} stage {stage} writes {path} — stage 1 writes tests only"
-            for path in (flat if index == 0 and Path(rel).name != "reconcile.md" else [])
+            for path in (flat if index == 0 else [])
             if not (path.startswith("tests/") or Path(path).name.startswith("test_"))
         ]
     return errors
