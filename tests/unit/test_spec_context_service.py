@@ -1,5 +1,5 @@
-"""SpecContextService ALIVE/DEAD transitions (lock-free) and the
-``dead --commit`` redaction gate: a finding blocks the push and never echoes the secret."""
+"""SpecContextService ALIVE/DEAD transitions (lock-free): dead never commits (ADR 0172),
+so a dirty checkout refuses before any repo is touched."""
 
 from __future__ import annotations
 

@@ -31,7 +31,8 @@ from dadaia_workspace.core.gitflow import constitution_error, constitution_text,
 #: in ``releases/<M.m.p>/rc-<N>/`` (ADR 0150), the flat live trio folded by the hop;
 #: ``RELEASE.json`` back as SPEC-DOC-046's rename input (ADR 0152 (4)); the worktree law
 #: (T-050-103): specs paths land by a worktree merge, audits direct; v10 = the bugs law's
-#: rc-8 rewrite. A canon change that
+#: rc-8 rewrite; its pin (91a8bfb1b79eac16) also covers rc-9 Job 1's scaffold-law
+#: edits. A canon change that
 #: keeps the stamp leaves every older tree reading ``canonical`` while the doctor is red.
 CANONICAL_SPECS_VERSION = 10
 
