@@ -42,7 +42,7 @@ def _target(root: Path, path: str) -> tuple[Path, Path, str, str]:
     tree = Path(path).resolve()
     rel = tree.relative_to(root).as_posix() if tree.is_relative_to(root) else ""
     repo_name, name, tail = locate(rel) or ("", None, ())
-    if name is None or tail:
+    if name is None or tail or not NAME_RE.match(name):
         raise Refusal(f"{path} is not a worktrees/<repo>/<name> path", f"{script(SCRIPT)} list")
     repo = root / "repos" / repo_name
     flow, version = flow_for(root, repo), NAME_RE.match(name)["v"]  # type: ignore[index]

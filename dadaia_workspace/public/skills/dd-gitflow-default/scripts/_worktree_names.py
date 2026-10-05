@@ -26,12 +26,13 @@ class Refusal(Exception):
 
 def locate(rel: str) -> tuple[str, str | None, tuple[str, ...]] | None:
     """`(repo, tree name, repo-relative tail)` of a workspace-relative path under `repos/<r>/`
-    (name `None`) or a canonical `worktrees/<r>/<name>/`; `None` elsewhere — the gate, the
-    doctor and reaper (through `list`) and every verb read a worktree path here alone."""
+    (name `None`) or `worktrees/<r>/<name>/` at its fixed depth, whatever the name — whether
+    the name is canonical is `NAME_RE`'s question, not this one; `None` elsewhere. The gate,
+    the doctor and reaper (through `list`) and every verb read a worktree path here alone."""
     parts = PurePosixPath(rel.replace("\\", "/")).parts
     if len(parts) >= 2 and parts[0] == "repos":
         return parts[1], None, parts[2:]
-    if len(parts) >= 3 and parts[0] == "worktrees" and NAME_RE.match(parts[2]):
+    if len(parts) >= 3 and parts[0] == "worktrees":
         return parts[1], parts[2], parts[3:]
     return None
 
