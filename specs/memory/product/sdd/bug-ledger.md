@@ -8,7 +8,7 @@ sources:
   - dadaia_workspace/public/skills/dd-bug-resolution/**
   - dadaia_workspace/public/skills/dd-bug-registration/**
   - dadaia_workspace/public/schemas/bugs/**
-  - dadaia_workspace/features/specs/doctor_governance.py
+  - dadaia_workspace/public/skills/dd-bug-resolution/scripts/_bugs_check.py
 ---
 
 ## The record
@@ -29,12 +29,13 @@ sources:
 - `append` first prints the correlation candidates — the open records on the same surface and those resolved there in the last 30 days — then opens a record at `status: open` carrying `found_in`, refusing a duplicate id (a reopen is a new record), a surface that is no tracked directory name (naming close matches), and a missing or unknown `--correlates <ids>|none`.
 - `update <id> --set field=value` writes a governance field, `caused_by` included (its repair), or a write-once one (an object field as JSON); it refuses `status` and `closed_at` (owned by the transitions), `resolved_release` (owned by `resolve`), `superseded_by` (owned by `supersede`), a change to an immutable core field and a differing second write to a write-once field.
 - A terminal status is reached only through its transition, each refusing an incomplete call with every missing field named: `resolve` needs `--cause --caused-by --solution --evidence-loop` and derives `resolved_release`, the release whose span holds the resolve instant (`unknown` outside every span); it prints the blame candidates — the bugs whose fix and the tasks whose `<type>(<task-id>)` commit wrote a line the staged diff removes — and refuses a `--caused-by` outside them, or `none` while any exist, unless `--lineage-reason` says why (stored); `supersede` needs `--by`; `defer` and `reject` need `--reason`.
-- `archive` moves records whose `closed_at` is older than 90 days (`--threshold-days`) into `specs/bugs/_archive/bugs_histo.jsonl`; a filing date never makes a record archivable.
+- `archive --adr <id> <ids…>` moves exactly the named terminal records into `specs/bugs/_archive/bugs_histo.jsonl`, each stamped `archived_by: <id>`; a record leaves the ledger only by an accepted ADR, and a non-accepted ADR or an open record is refused; no record ever leaves by age.
 - `caused_by: X` means the fix of X wrote the lines this fix corrects; X names a live or archived record, a task id a `TASKS.md` under `specs/releases/` carries, or `none`, and never forms a loop: every write and `check` refuse otherwise, `check` re-judging the whole ledger, since a merge can join two valid writes into a cycle.
 - `fix [<ids>]` prints each resolved record's fix commits (a shape-3 `fix(bugs):`/`refactor(bugs):` commit, or the task shas a shape-4 `chore(bugs): resolve` names), their numstat and the direction on production paths, or `unlinked`; the record stores none of it.
 - `window` lists every live and archived record found in or born in the live or the last shipped release, `introduced_in` read from `caused_by`'s culprit commit first, and the `release` `unknown` ones apart.
 - `check` emits one finding per invalid line with its fix: a governance verb with real values where one clears it (`update <id> --set caused_by=none` for a dangling cause), else an `Operator action:` naming the file, the line and the law — discard the uncommitted change or revert the commit that introduced it, then redo it through `bugs.py`.
-- `dadaia doctor`'s `ledgers` section runs `bugs.py check` (`LEDGER-BUGS-SCHEMA`), and `SPEC-DOC-041` warns on a terminal record closed longer ago than the archive threshold ([[workspace-doctor]]).
+- `check` also holds every archived v1 record to an `archived_by` naming an accepted ADR; pre-v6 `event` lines in the archive are history and pass unchanged.
+- `dadaia doctor`'s `ledgers` section runs `bugs.py check` (`LEDGER-BUGS-SCHEMA`) ([[workspace-doctor]]).
 
 ## Registration and resolution
 
