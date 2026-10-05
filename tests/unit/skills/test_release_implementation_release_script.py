@@ -527,7 +527,6 @@ def test_memory_derives_its_window_and_records_since_and_until(
     assert _run(script, "check", "--specs", str(specs)).returncode == 0
 
 
-@pytest.mark.xfail(strict=True, reason="J2.S3.T6: AC2.6")
 def test_a_memory_rerun_over_the_same_window_appends_nothing(script: Path, tmp_path: Path) -> None:
     specs = _reconciled_closure(tmp_path, script)
     root = specs.parent
