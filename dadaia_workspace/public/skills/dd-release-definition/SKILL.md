@@ -56,7 +56,8 @@ Call the Skill tool with `dd-grill-me` on the picked set — never skipped; a fu
 3. Commit shape 5 (`dd-gitflow-default` §3a); set the `defined` milestone in `_RELEASE.json`
    (`dd-release-implementation`'s `RELEASE-EVENTS.md`).
 4. SPEC says what; PLAN opens with §1 As-is review (§2) and draws the rc's DAG of jobs — Job 1 first, the Reconciliation job last, an edge where one job needs another's merge; SPEC carries `Replaces` — one bullet per current behaviour a DELETE/REBUILD row removes, or `none` with its reason.
-5. SPEC in domain names (`dd-domain-modeling`'s `CONTEXT.md`); only FR, AC and T- numbered; sizes per the releases law.
+5. SPEC in domain names (`dd-domain-modeling`'s `CONTEXT.md`); only FR, AC and T- numbered; each AC names its test level (unit, integration, E2E, or no test with its reason); sizes per the releases law.
+6. A trio edit after `**Status:** Approved` lands as a shape-8 amendment (`dd-gitflow-default` §3a).
 
 ## 5. The job file — stages and tasks
 
@@ -65,7 +66,7 @@ Call the Skill tool with `dd-grill-me` on the picked set — never skipped; a fu
 - Stage 1 writes every acceptance test RED, as a strict xfail; later stages turn them green; tasks of one stage write disjoint `W:`. A task is a bullet line or a table row under a `W:` column. Reconciliation has no acceptance tests (ADR 0192), so its stage 1 is its first work stage.
 - A task: id `J<n>.S<m>.T<k>`, its AC, its exact `W:`, its owner test file, its RED tests; one owner, one session (~1 h), ~100 new code lines.
 - A task is `running` while its task worktree exists; the job's close task writes `done` once.
-- A task born inside an open stage cites its AC; a cancelled one keeps its line and its reason; a file two tasks write is listed as hot with one owner task — the audit measures these (`dd-audit-project` PILLAR-SPECS).
+- A task born inside an open stage cites its AC; a cancelled one keeps its line and its reason; a hand-edited hot file sits in at most one `W:` per stage, a generated one in none — the audit measures these (`dd-audit-project` PILLAR-SPECS).
 - DELETE/REBUILD tasks precede ADD tasks; a task with no statable AC is folded, or goes back to the SPEC.
 
 ```markdown
