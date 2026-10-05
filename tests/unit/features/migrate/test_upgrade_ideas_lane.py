@@ -32,5 +32,7 @@ def test_upgrade_removes_an_ideas_dir_holding_only_its_agents_md(
         (specs / "releases").symlink_to(tmp_path / "elsewhere")
 
     assert plan_empty_ideas_dir(specs) == ([ideas] if files == ["AGENTS.md"] else [])
-    assert remove_empty_ideas_dir(specs, sweep.deleter(specs)) == ([ideas] if removed else [])
+    assert remove_empty_ideas_dir(specs, lambda p: sweep.remove(specs, p, p.name)) == (
+        [ideas] if removed else []
+    )
     assert ideas.exists() is (bool(files) and not removed)

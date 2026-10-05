@@ -110,7 +110,7 @@ def test_b1_the_tech_stack_fold_refuses_a_symlinked_architecture_md(tmp_path: Pa
     specs, arch = _v6_tree_linking(tmp_path, "memory/ARCHITECTURE.md")
 
     with pytest.raises(SymlinkRefusedError):
-        upgrade(specs, remove=sweep.deleter(specs))
+        upgrade(specs, remove=lambda p: sweep.remove(specs, p, p.name))
 
     assert arch.read_text(encoding="utf-8") == "# Architecture\n"
 
@@ -124,8 +124,8 @@ def test_a_fold_whose_delete_does_not_succeed_restores_architecture_md(tmp_path:
     def boom(path: Path) -> bool:
         raise OSError(13, "Permission denied")
 
-    assert upgrade(specs, remove=sweep.deleter(specs)).tech_stack_folded == []
-    assert upgrade(specs, remove=sweep.deleter(specs)).tech_stack_folded == []
+    assert upgrade(specs, remove=lambda p: sweep.remove(specs, p, p.name)).tech_stack_folded == []
+    assert upgrade(specs, remove=lambda p: sweep.remove(specs, p, p.name)).tech_stack_folded == []
     with pytest.raises(OSError, match="Permission denied"):
         fold_tech_stack(specs, boom)
 

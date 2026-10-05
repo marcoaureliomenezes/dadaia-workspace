@@ -85,7 +85,6 @@ def test_init_with_assets_never_writes_settings_itself(
     assert not (workspace_root / ".claude" / "settings.json").exists()
 
 
-@pytest.mark.xfail(strict=True, reason="RED until J3.S2.T3")
 def test_a_refused_hold_leaves_the_list_form_denylist_in_place(workspace_root: Path) -> None:
     """rc-9 AC3.3 row 23 (workspace-denylist-migration-reads-a-refused-hold-as-success): a
     hold the sweep refuses is falsy, so the converted file never replaces the operator's."""

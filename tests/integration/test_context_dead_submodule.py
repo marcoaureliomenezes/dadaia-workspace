@@ -17,7 +17,6 @@ from tests.integration.test_context_dead_holds import _alive, _git, _published  
 pytestmark = [pytest.mark.integration, pytest.mark.slow]
 
 
-@pytest.mark.xfail(strict=True, reason="RED until J3.S2.T3")
 def test_dead_holds_a_repo_with_a_submodule_and_its_gitdir_resolves(tmp_path: Path) -> None:
     service, store, repo = _alive(tmp_path)
     sub = _published(tmp_path, tmp_path / "subsrc")

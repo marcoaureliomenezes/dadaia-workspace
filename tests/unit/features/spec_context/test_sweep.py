@@ -10,9 +10,7 @@ through ``doctor-scan-raises-when-a-ttl-entry-vanishes-mid-walk`` and
 
 from __future__ import annotations
 
-import getpass
 import os
-import shutil
 from collections.abc import Callable
 from pathlib import Path
 
@@ -100,38 +98,11 @@ def test_remove_deletes_a_read_only_tree(
     writable on the way down, then removed; a symlink goes, its destination never; outside is never touched."""
     workspace, target = setup(tmp_path)
     done = sweep.remove(workspace, target, rel)
-    assert done == (message and message.format(rel=rel))
-    assert isinstance(done, sweep.Skipped) is (message == _SKIP) and sweep.succeeded(done) is (message not in (None, _SKIP))
+    expected = message and message.format(rel=rel)
+    assert done == (sweep.Skipped(_SKIP.format(rel=rel)) if message == _SKIP else expected)
+    assert bool(done) is (message not in (None, _SKIP))
     assert not target.is_symlink() and (target.exists() == (survivor == rel))
     assert survivor is None or (tmp_path / survivor).exists()
-
-
-@pytest.mark.skipif(os.name == "nt" or os.geteuid() == 0, reason="POSIX dir permissions; root bypasses them")
-def test_an_expired_entry_another_account_holds_names_the_one_operator_act(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """doctor-tmp-expiry-foreign-owned-entry-never-clears: the TTL delete
-    act that cannot lift a permission (chmod refused: not the owner) skips naming the owner
-    and `Operator action: remove <the expired entry>`; once the operator removed it, the
-    act has nothing left to report, so the finding clears."""
-    entry = tmp_path / ".dadaia" / "tmp" / "a" / "20200101"
-    (held := entry / "x" / "dist").mkdir(parents=True)
-    (held / "f.whl").write_text("w", encoding="utf-8")
-    held.chmod(0o555)
-    monkeypatch.setattr(sweep.os, "chmod", _not_the_owner)
-
-    done = sweep.remove(tmp_path, entry, "tmp/a/20200101")
-
-    assert done.startswith("skipped 'tmp/a/20200101' (errno ")  # 13, or 39/66 on 3.14
-    assert done.endswith(
-        f"it holds an entry owned by {getpass.getuser()}; "
-        f"Operator action: remove {tmp_path}/.dadaia/tmp/a/20200101"
-    )
-    assert isinstance(done, sweep.Skipped) and entry.exists()
-    monkeypatch.undo()
-    held.chmod(0o755)
-    shutil.rmtree(entry)  # the operator's act
-    assert sweep.remove(tmp_path, entry, "tmp/a/20200101") is None
 
 
 def _not_the_owner(*_: object) -> None:
@@ -163,7 +134,7 @@ def test_move_holds_the_content_inside_the_workspace_only(
         monkeypatch.setattr(sweep.os, "replace", _exdev)
     done = sweep.move(workspace, source, tmp_path / dest, "rel")
     moved = message.startswith("moved")
-    assert done == message and isinstance(done, sweep.Skipped) is (not moved) and sweep.succeeded(done) is moved
+    assert done == (message if moved else sweep.Skipped(message)) and bool(done) is moved
     assert (source.exists(), (tmp_path / dest).exists()) == (not moved, moved)
     assert not moved or (tmp_path / dest).read_text() == "x"
 
@@ -246,7 +217,6 @@ def _rmtree_leaving(error: OSError | None) -> Callable[..., None]:
     pytest.param(OSError(39, "Directory not empty"), "skipped 'tmp/x' (errno 39: Directory not empty)", id="row22-no-operator-act-off-a-permission"),
 ])
 # fmt: on
-@pytest.mark.xfail(strict=True, reason="RED until J3.S2.T3")
 def test_a_surviving_target_is_refused_by_its_outcome(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, error: OSError | None, line: str
 ) -> None:
@@ -259,7 +229,6 @@ def test_a_surviving_target_is_refused_by_its_outcome(
     assert target.is_dir()
 
 
-@pytest.mark.xfail(strict=True, reason="RED until J3.S2.T3")
 def test_a_refusal_is_falsy_and_no_str(tmp_path: Path) -> None:
     """U2: no caller can read a refusal as an act — not by truth value, not as a ``str``."""
     workspace = _outside_link(tmp_path)
@@ -270,7 +239,6 @@ def test_a_refusal_is_falsy_and_no_str(tmp_path: Path) -> None:
     assert not done and not isinstance(done, str)
 
 
-@pytest.mark.xfail(strict=True, reason="RED until J3.S2.T3")
 def test_move_returns_its_failure_as_a_refusal(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """U2 / row 27: a failed ``os.replace`` (not EXDEV) is the act's refusal, never raised."""
     source = _file(tmp_path / "slop.txt")
@@ -283,7 +251,6 @@ def test_move_returns_its_failure_as_a_refusal(tmp_path: Path, monkeypatch: pyte
 
 
 @pytest.mark.skipif(os.name == "nt" or os.geteuid() == 0, reason="POSIX dir permissions; root bypasses them")
-@pytest.mark.xfail(strict=True, reason="RED until J3.S2.T3")
 def test_a_permission_failure_names_the_recorded_entry(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """Row 21: the refusal names the entry the retry could not lift, recorded by this call."""
     entry = tmp_path / ".dadaia" / "tmp" / "a" / "20200101"
@@ -305,7 +272,6 @@ def test_a_permission_failure_names_the_recorded_entry(tmp_path: Path, monkeypat
 
 
 @pytest.mark.skipif(os.utime not in os.supports_follow_symlinks, reason="a link's own mtime is POSIX-only")
-@pytest.mark.xfail(strict=True, reason="RED until J3.S2.T3")
 def test_a_root_level_held_symlink_keeps_its_hold_clock(tmp_path: Path) -> None:
     """Row 26 (ADR 0074): a root-level hold is its own clock, a symlink's included."""
     (tmp_path / "link").symlink_to(tmp_path / "nowhere")

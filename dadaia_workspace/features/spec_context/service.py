@@ -98,6 +98,13 @@ def _now() -> str:
     return datetime.now(tz=UTC).isoformat()
 
 
+def _worktree_git_dir(tree: Path) -> Path:
+    """The common git dir a move of linked worktree *tree* runs from — Windows refuses to
+    rename a process's cwd, so never *tree* itself."""
+    gitdir = (tree / ".git").read_text(encoding="utf-8").removeprefix("gitdir:").strip()
+    return (tree / gitdir).parents[1]
+
+
 def _require_allowlisted(label: str, value: str) -> None:
     if not CONTEXT_NAME_RE.fullmatch(value):
         raise InvalidContextNameError(
@@ -680,7 +687,7 @@ class SpecContextService:
             lost = [refix] if failed else [r["exit"] for r in held]
             lost += self._git.unrecoverable(path)
             if tree := sweep.linked_worktree(self._workspace_root, path):
-                move = git_line(sweep.worktree_git_dir(tree), "worktree", "move", str(tree))
+                move = git_line(_worktree_git_dir(tree), "worktree", "move", str(tree))
                 lost.append(
                     f"Operator action: choose a directory to keep {tree} in and run `{move}` with it"
                 )
@@ -743,7 +750,11 @@ class SpecContextService:
         for slug, repo_path in present:
             done = sweep.hold(self._workspace_root, repo_path, f"repos/{slug}")
             if isinstance(done, sweep.Skipped):  # the refusal, not success: nothing to hold is fine
-                raise ContextStateError(f"Context '{name}' stays ALIVE: {done}")
+                again = fix_line(self._workspace_root, "context", "dead", name)
+                raise ContextStateError(
+                    f"Context '{name}' stays ALIVE: {done}\nfix: Operator action: free "
+                    f"{repo_path} for the move, then run `{again}`"
+                )
 
         dead_ctx = SpecContextProject(
             name=ctx.name,

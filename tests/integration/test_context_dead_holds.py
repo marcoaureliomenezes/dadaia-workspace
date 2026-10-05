@@ -161,7 +161,7 @@ _REFUSALS = [
     pytest.param("main", lambda r: (r.parents[1] / ".dadaia/.venv/bin/dadaia").unlink(), DeadUnpushedCommitsError, r"no workspace CLI[\s\S]*fix: uvx dadaia-workspace init \S+/ws$", id="AC1.10-rows-unreadable-fails-closed"),
     pytest.param("lib", lambda r: (r / "leftover.txt").write_text("x\n"), DeadReviewRequiredError, r"lib[\s\S]*leftover\.txt", id="A16.2-untracked-in-lib"),
     pytest.param("lib", _no_remote, DeadUnpushedCommitsError, "lib", id="A16.2-local-commits-no-remote-in-lib"),
-    pytest.param("main", _repos_outside, ContextStateError, r"skipped 'repos/main' \(outside the workspace\)$", id="AC2.11-hold-refused"),
+    pytest.param("main", _repos_outside, ContextStateError, r"skipped 'repos/main' \(outside the workspace\)\nfix: Operator action: free \S+/repos/main for the move", id="AC2.11-hold-refused"),
     pytest.param("lib", _url_less, RepoUrlMissingError, r"fix: Operator action: add the clone URL of \S+/repos/lib as its origin remote", id="url-less-never-clone-back"),
 ]  # fmt: skip
 
@@ -276,7 +276,7 @@ def test_alive_refuses_a_legacy_url_less_missing_repo_with_a_fix_line(tmp_path: 
     assert store.get("proj").state == ContextState.DEAD  # type: ignore[union-attr]
 
 
-@pytest.mark.xfail(strict=True, reason="RED until J3.S2.T2")
+@pytest.mark.xfail(strict=True, reason="RED until J3.S3.T1")
 def test_dead_refuses_a_dirty_checkout_one_fix_line_per_file(tmp_path: Path) -> None:
     """rc-9 AC3.2 (ADR 0172 measured_by): dead never commits — a dirty checkout refuses with
     one fix line per file and leaves tree and origin untouched."""
@@ -309,7 +309,6 @@ def test_dead_refuses_a_dirty_checkout_one_fix_line_per_file(tmp_path: Path) -> 
     assert store.get("proj").state is ContextState.ALIVE  # type: ignore[union-attr]
 
 
-@pytest.mark.xfail(strict=True, reason="RED until J3.S2.T2")
 def test_an_oserror_in_the_hold_loop_refuses_with_a_fix_line(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

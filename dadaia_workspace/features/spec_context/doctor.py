@@ -487,6 +487,16 @@ class DoctorService:
         return out
 
     def _scan_ttl_zone(self, zone: Zone, now: float) -> list[Finding]:
+        """:meth:`_ttl_findings` but an expired entry holding a linked worktree — its
+        WORKTREE `foreign` row reports it."""
+        return [
+            f
+            for f in self._ttl_findings(zone, now)
+            if f.verdict is not FindingVerdict.EXPIRED
+            or not sweep.linked_worktree(self._workspace_root, f.target)
+        ]
+
+    def _ttl_findings(self, zone: Zone, now: float) -> list[Finding]:
         """Expired entries, whole, and each live hold in ``reaped/``; the zone's ``AGENTS.md``
         is never a candidate (bug public-install-restores-expired-zone-agents-reblocks-preflight)."""
         assert zone.ttl_seconds is not None
@@ -506,10 +516,9 @@ class DoctorService:
                 )
                 continue
             detail = f"(mtime {timedelta(seconds=age).days}d > ttl {timedelta(seconds=ttl).days}d)"
-            if not sweep.linked_worktree(self._workspace_root, entry):  # a WORKTREE `foreign` row
-                out.append(
-                    self._finding(zone.name, self._dadaia, entry, FindingVerdict.EXPIRED, detail)
-                )
+            out.append(
+                self._finding(zone.name, self._dadaia, entry, FindingVerdict.EXPIRED, detail)
+            )
         return out
 
     # ------------------------------------------------------------------
@@ -532,7 +541,7 @@ class DoctorService:
             actions.extend(sweep.guarded("GRAVEYARD-GC", record.name, step))
         now = time.time()
         for zone in workspace_layout.zones_with_ttl():
-            for finding in self._scan_ttl_zone(zone, now):
+            for finding in self._ttl_findings(zone, now):  # the act asks the worktree question
                 if finding.verdict is FindingVerdict.EXPIRED:
                     act = _EXPIRY_ACT[zone.cls]
                     step = partial(act, self._workspace_root, finding.target, finding.path)

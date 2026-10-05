@@ -196,7 +196,6 @@ def _denied(*_: object, **__: object) -> None:
     raise PermissionError(13, "Permission denied")
 
 
-@pytest.mark.xfail(strict=True, reason="RED until J3.S2.T3")
 def test_the_expire_lane_walks_each_expired_entry_once(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
