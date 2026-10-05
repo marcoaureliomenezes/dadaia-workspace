@@ -104,8 +104,8 @@ def test_dadaiaignore_invalid_lines_and_segment_scope() -> None:
     text = "!keep\nnotes/**\n/abs\na/../b\n*.png\n[protected]\nsecrets/\n**/k\n"
     invalid = ("!keep", "notes/**", "/abs", "a/../b", "**/k")
     assert wl.parse_dadaiaignore(text) == (("*.png",), ("secrets",), invalid)
-    assert wl.protected_glob("worktrees/r/n/secrets/k", ("secrets",)) == "secrets"
-    assert wl.protected_glob("secrets/k", ("secrets",)) is None  # repo-relative only
+    assert wl.protected_glob(("secrets", "k"), ("secrets",)) == "secrets"
+    assert wl.protected_glob(("a", "secrets"), ("secrets",)) is None  # a prefix of the tail only
     assert wl.verdict("shot.png", False, ("*.png",), (), ()) == "operator"
     assert wl.verdict(".dadaia/shot.png", False, ("*.png",), (), ()) == "slop"
     assert wl.verdict(".dadaia/shot.png", False, (".dadaia/*.png",), (), ()) == "operator"

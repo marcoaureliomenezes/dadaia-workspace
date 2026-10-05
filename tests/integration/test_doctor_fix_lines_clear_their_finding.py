@@ -175,11 +175,16 @@ def _plant_stray_dotfile(root: Path) -> None:
 
 
 def _plant_orphan_wt(root: Path) -> None:
-    """An unmerged orphan: `wt/0.5.0a-impl` carries a commit and has no tree."""
-    repo, tree = root / "repos/r", root / "worktrees/r/0.5.0a-impl"
+    """An unmerged orphan: `wt/0.5.0-rc1/j1` carries a task merge and has no tree."""
+    repo, tree = root / "repos/r", root / "worktrees/r/0.5.0-rc1/j1"
+    task = root / "worktrees/r/0.5.0-rc1/j1--t1"
     worktree_ws.git(repo, "checkout", "-q", "feature/0.5.0")
-    worktree_ws.git(repo, "worktree", "add", "-q", "-b", "wt/0.5.0a-impl", str(tree))
-    worktree_ws.commit(tree, "src/a.py")
+    worktree_ws.git(repo, "worktree", "add", "-q", "-b", "wt/0.5.0-rc1/j1", str(tree))
+    worktree_ws.git(repo, "worktree", "add", "-q", "-b", "wt/0.5.0-rc1/j1--t1", str(task))
+    worktree_ws.commit(task, "src/a.py")
+    worktree_ws.git(tree, "merge", "-q", "--ff-only", "wt/0.5.0-rc1/j1--t1")
+    worktree_ws.git(repo, "worktree", "remove", str(task))
+    worktree_ws.git(repo, "branch", "-q", "-D", "wt/0.5.0-rc1/j1--t1")
     worktree_ws.git(repo, "worktree", "remove", str(tree))
 
 
@@ -396,7 +401,6 @@ OPERATOR_ACTION: dict[str, Callable[[Path], None]] = {
     "TREE-8": _plant_stray_dotfile,
     "LINT-1": lambda r: _write(r / "specs" / "memory" / "product" / "testarea" / "x.md", "# X\n"),
     "SPEC-DOC-001": lambda r: (r / "specs" / "constitution.md").unlink(),
-    "SPEC-DOC-024": lambda r: _write(r / f"specs/releases/{_RELEASE}/rc-1/TASKS.md", "# Tasks\n\n**Status:** Draft\n"),
     "SPEC-DOC-026": lambda r: _write(r / f"specs/releases/_archive/{_RELEASE}/SPEC.md", "# S\n"),
     "ADR-SUPERSEDED-CITATION": lambda r: (
         _write(r / "specs/ADRs/decisions.jsonl", '{"id": "0001", "status": "superseded"}\n'),
@@ -528,7 +532,7 @@ def test_a_worktree_finding_is_cleared_by_its_merge_fix(tmp_path: Path) -> None:
         if not (found := doctor.check_worktrees("c")):
             break
         worktree_ws.approve(
-            root, worktree_ws.git(root / "repos/r", "rev-parse", "wt/0.5.0a-impl").strip()
+            root, worktree_ws.git(root / "repos/r", "rev-parse", "wt/0.5.0-rc1/j1").strip()
         )
         command = found[0].fix
         done = subprocess.run(command, shell=True, cwd=root, capture_output=True, text=True)  # noqa: S602

@@ -1,7 +1,9 @@
-"""The ONE source of the Linux CI jobs: ``python scripts/ci.py [<job>...]`` runs the named
-``ci.yml`` jobs (all of them when none is given), prints ``PASS``/``FAIL <step>: <command>``
-per step, runs every step and exits 1 if any failed. Standard library only: the
-``repo-hygiene`` and ``doctor`` jobs install no dev group."""
+"""The ONE source of the Linux CI jobs and the three gate levels (ADR 0190):
+``python scripts/ci.py [<job>...]`` runs the named ``ci.yml`` jobs (all of them when none is
+given); ``task FILE...`` runs ruff and mypy on the touched files and the touched tests;
+``stage`` runs lint, mypy, guards, unit and integration; ``job`` runs every job. Each step
+prints ``PASS``/``FAIL <step>: <command>``; every step runs; exit 1 if any failed. Standard
+library only: the ``repo-hygiene`` and ``doctor`` jobs install no dev group."""
 
 from __future__ import annotations
 
@@ -78,6 +80,33 @@ JOBS: dict[str, list[Step]] = {
 }
 
 
+STAGE = ("lint", "typecheck", "guards", "unit-fast", "integration")
+
+
+def _task(files: list[str]) -> list[Step]:
+    """The task level over the touched *files*: format, lint, types, then the touched tests."""
+    py = [f for f in files if f.endswith(".py")]
+    tests = [f for f in py if Path(f).name.startswith("test_")]
+    src = [f for f in py if f not in tests and f.startswith(("dadaia_workspace/", "scripts/"))]
+    return [
+        *(
+            [("ruff format", [PY, "-m", "ruff", "format", "--check", "--no-cache", *py], {}),
+             ("ruff check", [PY, "-m", "ruff", "check", "--no-cache", *py], {})]
+            if py else []
+        ),
+        *([("mypy", [PY, "-m", "mypy", "--strict", *src], {})] if src else []),
+        *([("owner tests", [*PYTEST, *tests], {})] if tests else []),
+    ]  # fmt: skip
+
+
+def plan(argv: list[str]) -> list[tuple[str, Step]]:
+    """``(job, step)`` in run order for *argv*: a level, else the named CI jobs, else all."""
+    if argv[:1] == ["task"]:
+        return [("task", step) for step in _task(argv[1:])]
+    jobs = STAGE if argv == ["stage"] else list(JOBS) if argv in ([], ["job"]) else argv
+    return [(job, step) for job in jobs for step in JOBS[job]]
+
+
 def main(argv: list[str]) -> int:
     # The fence (ADR 0088) mirrors the resolver's rungs: the inherited fence, every root above
     # the checkout, and the instance owning this venv (``fenced_env`` omits that last one, and
@@ -92,13 +121,12 @@ def main(argv: list[str]) -> int:
             "DADAIA_FENCED_ROOTS": os.pathsep.join(p for p in fence if p),
             "COVERAGE_FILE": f"{tmp}/.coverage",  # the run's own temp dir, removed at exit
         }
-        for job in argv or list(JOBS):
-            for name, cmd, env in JOBS[job]:
-                print(f"--- {job}: {name}", flush=True)
-                step_env = {**base, **env}
-                code = subprocess.run(cmd, cwd=ROOT, env=step_env, check=False).returncode
-                print(f"{'FAIL' if code else 'PASS'} {name}: {' '.join(cmd)}", flush=True)
-                failed += [name] if code else []
+        for job, (name, cmd, env) in plan(argv):
+            print(f"--- {job}: {name}", flush=True)
+            step_env = {**base, **env}
+            code = subprocess.run(cmd, cwd=ROOT, env=step_env, check=False).returncode
+            print(f"{'FAIL' if code else 'PASS'} {name}: {' '.join(cmd)}", flush=True)
+            failed += [name] if code else []
     print(f"FAILED: {', '.join(failed)}" if failed else "ALL PASS", flush=True)
     return 1 if failed else 0
 

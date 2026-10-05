@@ -1,10 +1,10 @@
 name: CI
 
-# Gitflow by role (specs/constitution.md `gitflow:`): the work branch is the ONLY pushable
-# branch (its push triggers the full matrix below); the integration and principal branches
-# advance by PR only. The triggers below are literal (GitHub reads no file) and pinned to the
-# library gitflow by tests/contract/test_ci_workflow_hygiene.py; pr-source-guard reads the
-# gitflow itself. No job calls a model API — the security review is the local
+# Gitflow by role (specs/constitution.md `gitflow:`): the work branch and a job branch
+# `wt/<M.m.p>-rc<N>/<job>` are the ONLY pushable branches (a push triggers the full matrix
+# below); the integration and principal branches advance by PR only. The triggers below are
+# literal (GitHub reads no file) and pinned to the library gitflow by the ci-triggers-gitflow
+# guard; pr-source-guard reads the gitflow itself. No job calls a model API — the security review is the local
 # dd-code-reviewer lens.
 on:
   push:
@@ -12,6 +12,8 @@ on:
       - main
       - develop
       - 'feature/**'
+      # a job branch (ADR 0190): its push runs the matrix the job's verdict names
+      - 'wt/**'
   pull_request:
     branches: [main, develop]
   workflow_dispatch:

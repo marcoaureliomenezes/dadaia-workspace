@@ -17,7 +17,7 @@ compatibility: Standalone Agent Skill. Inside a dadaia-workspace (pip install da
 
 1. Inside a dadaia workspace, open `specs/bugs/AGENTS.md` (the area's scoped law) and follow it — its redaction rule
    covers the whole arc: commands, outputs, captured artifacts.
-2. A bug fix is one `bug` worktree, opened per `worktrees/AGENTS.md` §2, in any phase: no SPEC/PLAN/TASKS, no version mint.
+2. A bug fix is a job in its own worktree (`worktrees/AGENTS.md` §1).
 
 ## 2. The method — seven phases, each gated
 

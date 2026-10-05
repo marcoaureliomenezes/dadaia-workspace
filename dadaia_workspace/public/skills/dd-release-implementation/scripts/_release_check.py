@@ -12,6 +12,7 @@ to; this file validates the documents a write touches.
 from __future__ import annotations
 
 import json
+import re
 import sys
 from pathlib import Path
 from typing import Any
@@ -28,11 +29,16 @@ from _release_schema import (  # noqa: E402
 )
 
 _LAW = "specs/releases/AGENTS.md: release.py is this ledger's ONE writer"
+#: A merged job's measurement, one `kind: merge` entry per job (RELEASE-EVENTS.md §log).
+_JOB_MERGE = re.compile(
+    r"job: [a-z0-9-]+; start: \S+; end: \S+; wall: \d+; ritual_wait: \d+; dispatches: \d+; job_gate_runs: \d+"
+)
 
 
 def finding(path: str, line: int, message: str, fix: str) -> dict[str, Any]:
     """One `check --json` record of this ledger."""
-    return _ledger.finding(CODE, path, line, message, fix)
+    record: dict[str, Any] = _ledger.finding(CODE, path, line, message, fix)
+    return record
 
 
 def _unwritten(
@@ -44,9 +50,17 @@ def _unwritten(
 
 
 def _log_errors(document: dict[str, Any]) -> list[str]:
-    """``log`` is append-only and oldest first: a later entry never predates an earlier."""
-    stamps = [entry.get("ts") for entry in document.get("log", []) if isinstance(entry, dict)]
+    """``log`` is append-only and oldest first: a later entry never predates an earlier; a
+    job's `kind: merge` entry (its text opens `job:`) carries the whole measurement."""
+    entries = [entry for entry in document.get("log", []) if isinstance(entry, dict)]
+    stamps = [entry.get("ts") for entry in entries]
     return [
+        f"log[{index}] kind merge text {entry.get('text')!r} is not '{_JOB_MERGE.pattern}'"
+        for index, entry in enumerate(entries)
+        if entry.get("kind") == "merge"
+        and str(entry.get("text")).startswith("job:")
+        and not _JOB_MERGE.fullmatch(str(entry.get("text")))
+    ] + [
         f"log[{index + 1}].ts {later!r} precedes log[{index}].ts {earlier!r}"
         for index, (earlier, later) in enumerate(zip(stamps, stamps[1:], strict=False))
         if isinstance(earlier, str) and isinstance(later, str) and later < earlier

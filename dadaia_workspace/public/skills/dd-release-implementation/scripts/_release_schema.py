@@ -14,8 +14,9 @@ from pathlib import Path
 CODE = "LEDGER-RELEASE-SCHEMA"
 STATE = "_RELEASE.json"
 HISTO = "releases/_archive/releases_histo.jsonl"
-#: One candidate's trio, born in its own `rc-<N>/` and never rewritten after closure (ADR 0150).
-TRIO = ("SPEC.md", "PLAN.md", "TASKS.md")
+#: One candidate's documents, born in its own `rc-<N>/` and never rewritten after closure; its
+#: tasks live in one job file per job, `rc-<N>/tasks/<job>.md` (a closed rc keeps `TASKS.md`).
+CANDIDATE_DOCS = ("SPEC.md", "PLAN.md")
 #: A candidate folder; the live one is the highest N — `core.release_state.CANDIDATE_RE`.
 CANDIDATE_RE = re.compile(r"^rc-([1-9][0-9]*)$")
 #: The three lifecycle phases — pinned equal to the schema's enum; a shipped release
@@ -189,17 +190,6 @@ def next_candidate(release_dir: Path) -> Path:
     return release_dir / f"rc-{candidate_number(names) + 1}"
 
 
-def unfinished_tasks(candidate: Path) -> list[str]:
-    """The ``[ ]``/``[-]`` lines TASKS.md still carries — the LINES, so a refusal names
-    the task that blocks it. A missing TASKS.md carries none: its absence is the trio
-    rule's business, not this one's."""
-    tasks = candidate / "TASKS.md"
-    if not tasks.is_file():
-        return []
-    text = tasks.read_text(encoding="utf-8")
-    return [m.group(0).strip() for m in MARK_RE.finditer(text) if m[2] != MARKS[-1]]
-
-
 def writes(line: str) -> list[str]:
     """The backticked paths a task line's `W:` writes, up to the first ``·``; a path in a
     parenthesized span (nesting counted) is named, not written."""
@@ -208,3 +198,32 @@ def writes(line: str) -> list[str]:
         depth = max(0, depth + (char == "(") - (char == ")"))
         kept += char if depth == 0 and char != ")" else ""
     return re.findall(r"`([^`]+)`", kept)
+
+
+def job_errors(text: str, rel: str) -> list[str]:
+    """Why job file *text* at *rel* is malformed: no `## Stage` heading, a stage with no
+    `- Contract:` line, or a first stage whose tasks write anything but tests — save
+    ``reconcile.md``'s, the Reconciliation job's first work stage (ADR 0192)."""
+    stages = re.split(r"^## Stage ", text, flags=re.MULTILINE)[1:]
+    if not stages:
+        return [f"{rel} has no '## Stage <id>' heading"]
+    errors: list[str] = []
+    for index, body in enumerate(stages):
+        stage = body.split(maxsplit=1)[0]
+        if not re.search(r"^- Contract:", body, re.MULTILINE):
+            errors.append(f"{rel} stage {stage} has no '- Contract:' line")
+        lines, column = [], None  # a table row's writes sit under its header's `W:` cell
+        for line in body.splitlines() if index == 0 and Path(rel).name != "reconcile.md" else []:
+            cells = [c.strip() for c in line.split("|")] if line.lstrip().startswith("|") else []
+            if "`W:`" in cells:
+                column = cells.index("`W:`")
+                continue
+            column = column if cells else None
+            lines.append("`W:` " + cells[column] if column and column < len(cells) else line)
+        errors += [
+            f"{rel} stage {stage} writes {path} — stage 1 writes tests only"
+            for line in lines
+            for path in writes(line)
+            if not (path.startswith("tests/") or Path(path).name.startswith("test_"))
+        ]
+    return errors

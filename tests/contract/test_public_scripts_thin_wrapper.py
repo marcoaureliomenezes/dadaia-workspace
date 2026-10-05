@@ -57,10 +57,13 @@ def _imported_roots(path: Path) -> set[str]:
 #: the backlog exit its Origin parser (ADR 0161) and the bug reader (ADR 0137); `_specs`
 #: reads the worktree kinds. No module imports back along its own edge.
 _CROSS_SKILL_EDGES = {
-    "dd-release-implementation": {"_memory_drift", "_worktree_git", "_worktree_kinds"},
+    "dd-release-implementation": {"_memory_drift", "_worktree_git", "_worktree_names"},
     "dd-gitflow-default": {"_release_schema", "_specs"},  # `_specs`: the fix-line quote
     "dd-backlog-definition": {"_release_schema", "_bugs_store"},
-    "dd-bug-resolution": {"_worktree_kinds", "_release_schema"},  # `_specs`; `candidate_at`
+    "dd-bug-resolution": {
+        "_release_schema",
+        "_worktree_names",
+    },  # `_specs`: `candidate_at`, `NAME_RE`
 }
 
 
@@ -128,7 +131,7 @@ _OWNERS = {
     _LOADER: {"load_owner"},
     "core/context_registry.py": {"entries"},
     "features/migrate/state_v2.py": {"execute_migration"},  # the registry's upgrader
-    "public/skills/dd-gitflow-default/scripts/_worktree_kinds.py": {"KINDS"},
+    "public/skills/dd-gitflow-default/scripts/_worktree_names.py": {"NAME_RE", "locate"},
     "core/cli_line.py": {"script_line"},
 }
 

@@ -10,7 +10,6 @@ it, so the teaching and the gate cannot drift. Size: SMALL.
 
 from __future__ import annotations
 
-import importlib.util
 import json
 import re
 import shutil
@@ -22,7 +21,6 @@ import pytest
 
 from dadaia_workspace.core import gitflow
 from dadaia_workspace.core.release_state import CANDIDATE_RE
-from tests.helpers.release_state import SCHEDULE
 from tests.helpers.skill_scripts import stage_skill_scripts
 
 pytestmark = pytest.mark.contract
@@ -30,17 +28,7 @@ pytestmark = pytest.mark.contract
 _PUBLIC = Path(__file__).resolve().parents[2] / "dadaia_workspace" / "public"
 _SKILL = _PUBLIC / "skills" / "dd-release-definition" / "SKILL.md"
 _SCRIPTS = _PUBLIC / "skills" / "dd-release-implementation" / "scripts"
-_HEADER = "| unit | today | bugs | verdict | why |\n|---|---|---|---|---|\n"
-_ROW = "| `core/x.py` `run` | does x | 0 | {verdict} | reason |\n"
-_AUTH_HEADER = "| question | authority | consults | deleted |\n|---|---|---|---|\n"
-_AUTHORITIES = (
-    "\n### 1.1 Authorities\n\n" + _AUTH_HEADER + "| who writes x | `core/x.run` | cli | `y` |\n"
-)
-_SKELETONS = (r"## 1\. As-is review", r"## 5\. Parallel schedule")
-_GOOD = (
-    "## 1. As-is review\n\n" + _HEADER + _ROW.format(verdict="UPDATE") + _AUTHORITIES
-    + "\n## 2. Strategy\n"
-)  # fmt: skip
+_GOOD = "## 1. As-is review\n\n## 2. Strategy\n"
 
 
 @pytest.fixture
@@ -62,7 +50,6 @@ def _specs(tmp_path: Path, plan: str, *, plan_status: str = "Approved") -> Path:
     for name, body in (
         ("SPEC.md", "**Origin:** operator-demand\n"),
         ("PLAN.md", plan),
-        ("TASKS.md", "- [ ] T-1\n"),
     ):
         status = plan_status if name == "PLAN.md" else "Approved"
         (release / "rc-1" / name).write_text(f"# {name}\n\n**Status:** {status}\n\n{body}", "utf-8")
@@ -77,11 +64,8 @@ def _phase(script: Path, specs: Path) -> subprocess.CompletedProcess[str]:
     return subprocess.run([*argv, "--specs", str(specs)], capture_output=True, text=True)
 
 
-def _admits(
-    script: Path, tmp_path: Path, plan: str, *, authorities: bool = True, schedule: str = SCHEDULE
-) -> None:
-    """*authorities*: append a valid §1.1 table to a PLAN whose case is the As-is table."""
-    specs = _specs(tmp_path, plan + (_AUTHORITIES if authorities else "") + schedule)
+def _admits(script: Path, tmp_path: Path, plan: str) -> None:
+    specs = _specs(tmp_path, plan)
     result = _phase(script, specs)
     assert result.returncode == 0, result.stderr
     state = json.loads((specs / "releases/0.5.0/_RELEASE.json").read_text("utf-8"))
@@ -89,83 +73,16 @@ def _admits(
     assert len(state["log"]) == 1
 
 
-def _plan_fix(script: Path) -> str:
-    """`_release_plan.PLAN_FIX` as the staged script computes it (its SKILL path is staged)."""
-    spec = importlib.util.spec_from_file_location(
-        "_release_plan", script.parent / "_release_plan.py"
-    )
-    assert spec and spec.loader
-    module = importlib.util.module_from_spec(spec)
-    with pytest.MonkeyPatch.context() as mp:
-        mp.syspath_prepend(str(script.parent))
-        mp.delitem(sys.modules, "_release_schema", raising=False)
-        spec.loader.exec_module(module)
-        sys.modules.pop("_release_schema", None)
-    return str(module.PLAN_FIX)
-
-
-def _refuses(script: Path, tmp_path: Path, plan: str, *needles: str) -> str:
-    specs = _specs(tmp_path, plan)
-    before = (specs / "releases/0.5.0/_RELEASE.json").read_bytes()
-    result = _phase(script, specs)
-    assert result.returncode != 0
-    assert (specs / "releases/0.5.0/_RELEASE.json").read_bytes() == before
-    fixes = [line for line in result.stderr.splitlines() if line.lstrip().startswith("fix:")]
-    assert [f.strip() for f in fixes] == [f"fix: {_plan_fix(script)}"], result.stderr
-    for needle in needles:
-        assert needle in result.stderr
-    return result.stderr
-
-
-def test_a_plan_with_the_table_enters_implementation(script: Path, tmp_path: Path) -> None:
+def test_an_approved_spec_and_plan_enter_implementation_with_no_tasks_file(
+    script: Path, tmp_path: Path
+) -> None:
+    """AC1.9 (ADR 0194): the job files carry the tasks; no `TASKS.md`, no PLAN table judge."""
     _admits(script, tmp_path, _GOOD)
 
 
-def test_an_unnumbered_heading_and_a_lowercase_verdict_pass(script: Path, tmp_path: Path) -> None:
-    plan = "## as-is REVIEW\n\n" + _HEADER + _ROW.format(verdict="**`rebuild`**")
-    _admits(script, tmp_path, plan)
-
-
-def test_an_all_add_table_with_empty_cells_passes(script: Path, tmp_path: Path) -> None:
-    _admits(script, tmp_path, "## 1. As-is review\n\n" + _HEADER + "| new.py | — |  | ADD |  |\n")
-
-
-@pytest.mark.parametrize(
-    "plan",
-    [
-        pytest.param("## 1. Strategy\n\nno table\n", id="heading-missing"),
-        pytest.param("## 1. As-is review\n\nprose only\n\n## 2. Next\n\n" + _HEADER, id="no-table"),
-        pytest.param(
-            "## 1. As-is review\n\n| unit | verdict |\n|---|---|\n| a | KEEP |\n", id="wrong-header"
-        ),
-        pytest.param("## 1. As-is review\n\n" + _HEADER, id="zero-rows"),
-    ],
-)
-def test_a_plan_without_the_table_structure_is_refused(
-    script: Path, tmp_path: Path, plan: str
-) -> None:
-    _refuses(script, tmp_path, plan)
-
-
-def test_a_verdict_outside_the_vocabulary_names_its_row(script: Path, tmp_path: Path) -> None:
-    plan = "## 1. As-is review\n\n" + _HEADER + _ROW.format(verdict="SHRINK")
-    _refuses(script, tmp_path, plan, "core/x.py", "SHRINK")
-
-
-def test_an_unapproved_trio_refuses_before_the_table(script: Path, tmp_path: Path) -> None:
+def test_an_unapproved_plan_refuses(script: Path, tmp_path: Path) -> None:
     result = _phase(script, _specs(tmp_path, "no table\n", plan_status="Draft"))
-    assert result.returncode != 0
-    assert "'Draft'" in result.stderr and "As-is review" not in result.stderr
-
-
-def test_the_taught_skeleton_passes_the_check(script: Path, tmp_path: Path) -> None:
-    """Both skeletons `dd-release-definition` shows (§1 As-is, §5 schedule) are the PLAN
-    shape the gate admits."""
-    skill = _SKILL.read_text("utf-8")
-    fences = [re.search(rf"```markdown\n({h}\n.*?)```", skill, re.DOTALL) for h in _SKELETONS]
-    assert all(fences), "dd-release-definition lost a PLAN skeleton"
-    as_is, schedule = (f.group(1) for f in fences if f)
-    _admits(script, tmp_path, as_is, authorities=False, schedule="\n" + schedule)
+    assert result.returncode != 0 and "'Draft'" in result.stderr
 
 
 def test_new_writes_a_spec_stub_carrying_replaces(script: Path, tmp_path: Path) -> None:
@@ -179,97 +96,6 @@ def test_new_writes_a_spec_stub_carrying_replaces(script: Path, tmp_path: Path) 
     assert headings.index("Scope") + 1 == headings.index("Replaces")
     assert headings.index("Replaces") + 1 == headings.index("Out of scope")
     assert not (specs / "releases/0.9.0/rc-1/PLAN.md").exists()
-
-
-@pytest.mark.parametrize(
-    "heading",
-    ["## 1 As-is review", "## 1) As is review:", "## As-is review (PLAN §1)", "## 2. AS-IS REVIEW"],
-)
-def test_any_level_2_heading_naming_the_review_passes(
-    script: Path, tmp_path: Path, heading: str
-) -> None:
-    _admits(script, tmp_path, f"{heading}\n\n" + _HEADER + _ROW.format(verdict="KEEP"))
-
-
-def test_rows_without_outer_pipes_and_escaped_pipes_pass(script: Path, tmp_path: Path) -> None:
-    table = (
-        "unit | today | bugs | verdict | why\n---|---|---|---|---\n\ta \\| b\t| x | 0 |\tKEEP | y\n"
-    )
-    _admits(script, tmp_path, "## As-is review\n\n" + table)
-
-
-def test_the_table_ends_at_its_first_blank_line(script: Path, tmp_path: Path) -> None:
-    later = "\n| other | table | 0 | SHRINK | ignored |\n"
-    _admits(script, tmp_path, _GOOD.split("\n## 2.")[0] + later)
-
-
-def test_every_fix_names_an_existing_absolute_path(script: Path, tmp_path: Path) -> None:
-    """F1 — fix lines point at files, never at a cwd-relative or section-numbered command."""
-    plan_fix = _refuses(script, tmp_path / "plan", "").split("fix: ")[1]
-    skill = Path(re.search(r"of (\S+SKILL\.md)", plan_fix)[1]).relative_to(tmp_path)
-    assert (_PUBLIC / skill).is_file(), "the staged sibling skill the fix names ships"
-    fix = [ln for ln in _phase(script, _specs(tmp_path, "", plan_status="Draft")).stderr.splitlines()
-           if ln.lstrip().startswith("fix:")][0]  # fmt: skip
-    assert Path(fix.split(" in ", 1)[1].strip()).is_file()
-
-
-def test_a_sentence_naming_the_columns_above_the_table_passes(script: Path, tmp_path: Path) -> None:
-    prose = "## 1. As-is review\n\nColumns are `unit | today` and more.\n\n"
-    _admits(script, tmp_path, prose + _HEADER + _ROW.format(verdict="KEEP"))
-
-
-def test_a_plan_giving_each_question_one_authority_enters_implementation(
-    script: Path, tmp_path: Path
-) -> None:
-    """AC5.2 fixture pair, good twin: one authority per question, a question repeated
-    with the SAME authority is still one authority."""
-    rows = "| who writes x | `a` | b |  |\n| who reads y | `c` |  | `d` |\n| who writes x | `a` | e |  |\n"
-    plan = "## 1. As-is review\n\n" + _HEADER + _ROW.format(verdict="KEEP")
-    _admits(
-        script,
-        tmp_path,
-        plan + "\n### 1.1 Authorities\n\n" + _AUTH_HEADER + rows,
-        authorities=False,
-    )
-
-
-def test_a_question_with_two_authorities_is_refused(script: Path, tmp_path: Path) -> None:
-    """AC5.2 fixture pair, refused twin: the same question names two authorities."""
-    rows = "| who writes x | `a` | b |  |\n| Who writes x | `z` |  |  |\n"
-    plan = "## 1. As-is review\n\n" + _HEADER + _ROW.format(verdict="KEEP")
-    stderr = _refuses(
-        script, tmp_path, plan + "\n### 1.1 Authorities\n\n" + _AUTH_HEADER + rows,
-        "'who writes x'",
-    )  # fmt: skip
-    assert "`a`" in stderr and "`z`" in stderr
-
-
-@pytest.mark.parametrize(
-    ("authorities", "needle"),
-    [
-        pytest.param("", "Authorities", id="no-table"),
-        pytest.param("\n### 1.1 Authorities\n\nprose\n", "question | authority", id="no-header"),
-        pytest.param("\n### 1.1 Authorities\n\n" + _AUTH_HEADER, "question | authority", id="zero-rows"),
-        pytest.param(
-            "\n### 1.1 Authorities\n\n" + _AUTH_HEADER + "| who writes x |  | b |  |\n",
-            "empty authority", id="empty-authority",
-        ),
-    ],
-)  # fmt: skip
-def test_a_plan_without_a_well_formed_authorities_table_is_refused(
-    script: Path, tmp_path: Path, authorities: str, needle: str
-) -> None:
-    """AC5.2: missing table, header or rows, or an empty authority — one fix line each."""
-    plan = "## 1. As-is review\n\n" + _HEADER + _ROW.format(verdict="KEEP") + authorities
-    _refuses(script, tmp_path, plan, needle)
-
-
-def test_an_authorities_table_outside_section_1_does_not_count(
-    script: Path, tmp_path: Path
-) -> None:
-    """AC5.2: the table belongs to §1; one under a later section is not the table."""
-    plan = "## 1. As-is review\n\n" + _HEADER + _ROW.format(verdict="KEEP") + "\n## 2. Strategy\n"
-    _refuses(script, tmp_path, plan + _AUTHORITIES, "Authorities")
 
 
 def test_the_pinned_pair_resolves_the_same_live_candidate(tmp_path: Path) -> None:
@@ -291,52 +117,6 @@ def test_the_pinned_pair_resolves_the_same_live_candidate(tmp_path: Path) -> Non
     (release / "rc-11").write_text("", encoding="utf-8")
     assert [resolve(tmp_path) for resolve in pair] == [release / "rc-10"] * 2
     assert gitflow.next_candidate(release) == twin.next_candidate(release) == release / "rc-12"
-
-
-_TASKS = (
-    "- [ ] **T-1 — a.** `W:` `a.py`, `TASKS.md`, `specs/bugs/BUGS.jsonl`, `dir/map.json` (`x.py`)\n"
-    "- [x] **T-3 — merged.** `W:` `a.py`\n"
-    "- [ ] **T-2 — b.** `W:` `b.py`, `TASKS.md`, `specs/bugs/BUGS.jsonl`, `dir/map.json`, `x.py` · x\n"
-)
-_WIDE = SCHEDULE.replace("| T-1 | 1 |", "| T-1, T-2, T-3 | 3 |")
-
-
-@pytest.mark.parametrize(
-    ("schedule", "tasks", "needle"),
-    [
-        pytest.param(_WIDE, _TASKS, None, id="disjoint-outside-markers-ledgers-and-derived"),
-        pytest.param("", _TASKS, "no '## … Parallel schedule' table", id="no-section"),
-        pytest.param(_WIDE.replace("Critical path", "Path"), _TASKS, "critical path", id="no-path"),
-        pytest.param(_WIDE.replace("| 3 |", "| 2 |"), _TASKS, "width 2 for 3", id="width"),
-        pytest.param(_WIDE, _TASKS.replace("`b.py`", "`a.py`"), "T-1 and T-2 both write a.py", id="overlap"),
-        pytest.param(_WIDE.replace("derived `dir", "derived `ir").replace("but", "`dir/map.json` but"),
-                     _TASKS, "both write dir/map.json", id="derived-is-a-declared-path-suffix-only"),
-    ],
-)  # fmt: skip
-def test_the_transition_and_check_judge_the_parallel_schedule_alike(
-    script: Path, tmp_path: Path, schedule: str, tasks: str, needle: str | None
-) -> None:
-    """ADR 0141 `measured_by`: the PLAN carries the schedule and its critical path; each
-    step's width counts its tasks, whose unfinished `W:` sets are disjoint outside TASKS.md,
-    the JSONL ledgers and each path the schedule declares "derived `<path>`". `phase IMPLEMENTATION` refuses a row on
-    DEFINITION, and `check` refuses the same row written onto an admitted tree."""
-    specs = _specs(tmp_path, "")
-    release = specs / "releases/0.5.0/rc-1"
-
-    def write(schedule: str, tasks: str) -> None:
-        (release / "PLAN.md").write_text(f"**Status:** Approved\n\n{_GOOD}{schedule}", "utf-8")
-        (release / "TASKS.md").write_text(f"**Status:** Approved\n\n{tasks}", "utf-8")
-
-    write(schedule, tasks)
-    phase = _phase(script, specs)
-    if needle:
-        write(_WIDE, _TASKS)
-        assert _phase(script, specs).returncode == 0
-        write(schedule, tasks)
-    check = subprocess.run([sys.executable, str(script), "check", "--specs", str(specs)],
-                           capture_output=True, text=True)  # fmt: skip
-    assert (phase.returncode != 0, check.returncode != 0) == (bool(needle),) * 2, check.stdout
-    assert needle is None or needle in phase.stderr and needle in check.stdout
 
 
 # --- the Origin line (ADR 0161; SPEC-DOC-048's cases re-homed by name) ---------------
@@ -396,7 +176,7 @@ def test_spec_origin(script: Path, tmp_path: Path, origin: str, needles: list[st
     """sa-spec-doc-033-duplicates-bugs-check#B4: an Origin id resolves whatever its record's
     status or schema; a finding names only the unresolved ids. A carried id whose record
     does not point back yet is listed, not a finding, before the dispositions entry."""
-    specs = _specs(tmp_path, _GOOD + SCHEDULE)
+    specs = _specs(tmp_path, _GOOD)
     _seed_ledgers(specs)
     (specs / "releases/0.5.0/rc-1/SPEC.md").write_text(f"**Status:** Approved\n{origin}\n", "utf-8")
 
@@ -414,7 +194,7 @@ def test_a_missing_pointer_is_a_finding_once_the_candidate_logs_its_dispositions
     listed (with whether they point back) until the live candidate's `dispositions` entry
     exists; an older candidate's entry (before `defined.ts`) does not count. Once it does,
     each is an error on the real Origin line whose fix writes the pointer."""
-    specs = _specs(tmp_path, _GOOD + SCHEDULE)
+    specs = _specs(tmp_path, _GOOD)
     entry = {"ts": "2026-01-02T00:00:00Z", "agent": "a", "kind": "dispositions", "text": "t"}
     state = specs / "releases/0.5.0/_RELEASE.json"
     defined = {"sha": "abc1234", "ts": "2026-01-01T00:00:00Z"}
@@ -447,7 +227,7 @@ def test_a_missing_pointer_is_a_finding_once_the_candidate_logs_its_dispositions
 def test_a_deferred_carried_bug_is_untraced_after_the_sweep(script: Path, tmp_path: Path) -> None:
     """Operator ruling 2026-10-01: a carried bug `deferred` at the closing sweep stays
     untraced, an error whose fix is the operator's act (resolve it here, or rule on scope)."""
-    specs = _specs(tmp_path, _GOOD + SCHEDULE)
+    specs = _specs(tmp_path, _GOOD)
     state = specs / "releases/0.5.0/_RELEASE.json"
     state.write_text(json.dumps({**json.loads(state.read_text("utf-8")), "phase": "CLOSURE"}))
     _seed_ledgers(specs, log=[{"ts": "2026-01-02T00:00:00Z", "agent": "a", "kind": "dispositions",
@@ -468,7 +248,7 @@ def test_a_carried_id_is_traced_through_its_owning_ledger_after_it_moves(
     """AC3.2 (review F1, F5): `audit.py close` deletes the audit and leaves one histo record
     keyed by the audit id; `bugs.py archive` moves a record to the archive; `supersede`
     writes `superseded_by` — each carried id still traces, asked of the ledger owning it."""
-    specs = _specs(tmp_path, _GOOD + SCHEDULE)
+    specs = _specs(tmp_path, _GOOD)
     state = specs / "releases/0.5.0/_RELEASE.json"
     log = [{"ts": "2026-01-02T00:00:00Z", "agent": "a", "kind": "dispositions", "text": "t"}]
     state.write_text(json.dumps({**json.loads(state.read_text("utf-8")), "phase": "CLOSURE",
@@ -498,7 +278,7 @@ def test_a_stacked_candidate_in_definition_lists_its_carried_ids(
 ) -> None:
     """AC3.2 (review F2): `new` keeps the closed candidate's `defined` and its logged
     `dispositions`; the stacked candidate in DEFINITION has swept nothing yet."""
-    specs = _specs(tmp_path, _GOOD + SCHEDULE)
+    specs = _specs(tmp_path, _GOOD)
     state = specs / "releases/0.5.0/_RELEASE.json"
     state.write_text(json.dumps({**json.loads(state.read_text("utf-8")),
                                  "defined": {"sha": "abc1234", "ts": "2026-01-01T00:00:00Z"},
@@ -515,7 +295,7 @@ def test_a_stacked_candidate_in_definition_lists_its_carried_ids(
 
 def test_only_the_live_candidate_is_ranked(script: Path, tmp_path: Path) -> None:
     """ADR 0150 (3): the highest rc-<N>/ is ranked; a closed rc-1 is history."""
-    specs = _specs(tmp_path, _GOOD + SCHEDULE)
+    specs = _specs(tmp_path, _GOOD)
     (specs / "releases/0.5.0/rc-2").mkdir()
     (specs / "releases/0.5.0/rc-2/SPEC.md").write_text("**Status:** Draft\n", "utf-8")
 
@@ -526,3 +306,110 @@ def test_only_the_live_candidate_is_ranked(script: Path, tmp_path: Path) -> None
 
 def test_this_repos_live_spec_origin_passes(script: Path) -> None:
     assert _check(script, Path(__file__).resolve().parents[2] / "specs") == []
+
+
+_JOB = (
+    "# Job 2 — the bug window\n\n## Stage J2.S1 — RED\n\n"
+    "- Contract: exit tests `tests/unit/test_x.py` strict xfail; envelope `tests/**`; ACs AC2.1\n"
+    "- J2.S1.T1 — AC2.1 · `W:` `tests/unit/test_x.py` · owner `tests/unit/test_x.py`\n\n"
+    "## Stage J2.S2 — fix\n\n"
+    "- Contract: exit tests unit + integration; envelope `src/**`; ACs AC2.1\n"
+    "- J2.S2.T1 — AC2.1 · `W:` `src/x.py` · owner `tests/unit/test_x.py`\n"
+)
+
+_JOB1 = (  # the rc-9 job1 file's shape: titled stages, prose contracts, AC ranges
+    "# TASKS — 0.5.0 rc-9, Job 1 — the demolition\n\n## Stage J1.S1 — RED (tests only)\n\n"
+    "- Contract: exit tests are each AC's acceptance test as a strict xfail; envelope `tests/**`.\n\n"
+    "- J1.S1.T1 — AC1.1 · `W:` `tests/integration/test_ci_script.py` · owner same\n"
+    "- J1.S1.T2 — AC1.2–AC1.5 · `W:` `tests/integration/test_worktree_new.py`, "
+    "`tests/helpers/worktree_ws.py` · owner same\n\n"
+    "## Stage J1.S2 — code and law\n\n"
+    "- Contract: exit tests are J1.S1's, passing, plus unit + integration; ACs AC1.1–AC1.10.\n\n"
+    "- J1.S2.T1 — AC1.1 · `W:` `scripts/ci.py` · owner `test_ci_script.py`\n"
+)
+
+_JOB_TABLE = (  # the rc-9 job files' task tables: the `W:` column holds each row's writes
+    "## Stage J1.S1 — RED\n\n- Contract: x\n\n| id | AC | `W:` | owner |\n|---|---|---|---|\n"
+    "| T1 | AC1 | `tests/unit/test_t.py` | same |\n"
+)
+
+
+@pytest.mark.parametrize(
+    ("job", "needle"),
+    [
+        pytest.param(_JOB, None, id="valid"),
+        pytest.param(_JOB1, None, id="rc9-job1-shape"),
+        pytest.param(_JOB1.replace("`tests/helpers/worktree_ws.py`", "`scripts/ci.py`"),
+                     "tasks/j2.md stage J1.S1 writes scripts/ci.py — stage 1 writes tests only",
+                     id="rc9-job1-shape-stage-1-source"),
+        pytest.param(_JOB_TABLE, None, id="stage-1-table-tests"),
+        pytest.param(_JOB_TABLE.replace("`tests/unit/test_t.py`", "`scripts/ci.py`"),
+                     "tasks/j2.md stage J1.S1 writes scripts/ci.py — stage 1 writes tests only",
+                     id="stage-1-table-source"),
+        pytest.param(_JOB.replace("`W:` `tests/unit/test_x.py`", "`W:` `src/y.py`"),
+                     "tasks/j2.md stage J2.S1 writes src/y.py — stage 1 writes tests only",
+                     id="stage-1-non-test"),
+    ],
+)  # fmt: skip
+def test_check_judges_each_job_file(
+    script: Path, tmp_path: Path, job: str, needle: str | None
+) -> None:
+    """AC1.10 (ADR 0194, 0196): a job file parses into stages; stage 1 writes tests only."""
+    specs = _specs(tmp_path, _GOOD)
+    (tasks := specs / "releases/0.5.0/rc-1/tasks").mkdir()
+    (tasks / "j2.md").write_text(job, "utf-8")
+    done = subprocess.run([sys.executable, str(script), "check", "--json", "--specs", str(specs)],
+                          capture_output=True, text=True)  # fmt: skip
+    messages = [f["message"] for f in json.loads(done.stdout) if "tasks/" in f["path"]]
+    assert messages == ([needle] if needle else [])
+    phase = _phase(script, specs)  # the transition judges the same job file alike
+    assert (phase.returncode, needle is None or needle in phase.stderr) == (int(bool(needle)), True)
+
+
+@pytest.mark.parametrize(
+    ("name", "expected"),
+    [
+        pytest.param("reconcile.md", [], id="reconciliation-stage-1-is-work"),
+        pytest.param("j2.md", ["tasks/j2.md stage JR.S1 writes specs/memory/x.md — stage 1 writes tests only"],
+                     id="other-job-stage-1-source"),
+    ],
+)  # fmt: skip
+def test_check_exempts_only_reconciliation_from_stage_1_tests(
+    script: Path, tmp_path: Path, name: str, expected: list[str]
+) -> None:
+    """ADR 0192: Reconciliation has no acceptance tests, so its stage 1 is its first work stage."""
+    specs = _specs(tmp_path, _GOOD)
+    (tasks := specs / "releases/0.5.0/rc-1/tasks").mkdir()
+    (tasks / name).write_text(
+        "## Stage JR.S1 — memory\n\n- Contract: x\n\n| task | AC | `W:` |\n|---|---|---|\n"
+        "| JR.S1.T1 | AC6.1 | `specs/memory/x.md` |\n", "utf-8")  # fmt: skip
+    done = subprocess.run([sys.executable, str(script), "check", "--json", "--specs", str(specs)],
+                          capture_output=True, text=True)  # fmt: skip
+    assert [f["message"] for f in json.loads(done.stdout) if "tasks/" in f["path"]] == expected
+
+
+@pytest.mark.parametrize(
+    ("text", "bad"),
+    [
+        ("job: job1; start: 2026-10-05T12:00Z; end: 2026-10-05T18:00Z; wall: 360; "
+         "ritual_wait: 20; dispatches: 4; job_gate_runs: 2", False),
+        ("job: job1; start: 2026-10-05T12:00Z; end: 2026-10-05T18:00Z; wall: 360; "
+         "ritual_wait: 20; dispatches: 4", True),
+        ("job: job1; wall: 360; ritual_wait: 20; dispatches: 4", True),
+        ("Merged PR #9 into develop.", False),  # a closure merge note, not a job's
+    ],
+    ids=["job-merge", "job-merge-without-job-gate-runs", "job-merge-without-start-end",
+         "closure-merge"],
+)  # fmt: skip
+def test_check_validates_a_jobs_merge_entry(
+    script: Path, tmp_path: Path, text: str, bad: bool
+) -> None:
+    """AC1.7: a job's `kind: merge` entry carries its six measurements (start..job_gate_runs)."""
+    specs = _specs(tmp_path, _GOOD)
+    state = specs / "releases/0.5.0/_RELEASE.json"
+    entry = {"ts": "2026-10-05T18:00:00Z", "agent": "j", "kind": "merge", "text": text}
+    state.write_text(json.dumps({**json.loads(state.read_text("utf-8")), "log": [entry]}))
+    done = subprocess.run([sys.executable, str(script), "check", "--json", "--specs", str(specs)],
+                          capture_output=True, text=True)  # fmt: skip
+    hits = [f for f in json.loads(done.stdout) if "kind merge" in f["message"]]
+    assert len(hits) == int(bad)

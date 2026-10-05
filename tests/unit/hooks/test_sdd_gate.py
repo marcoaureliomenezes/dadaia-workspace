@@ -37,7 +37,7 @@ _LEDGERED = (
 )  # fmt: skip
 _BLOCK = ""  # any block, whatever its reason
 _PATCH = "*** Begin Patch\n*** Update File: README.md\n+ok\n*** Update File: {}\n+x\n*** End Patch"
-_WT_A = "worktrees/a/0.5.0a-impl/"
+_WT_A = "worktrees/a/0.5.0-rc1/j1/"
 _BOUND_A = {"s": {"context": "a"}}
 
 
@@ -56,17 +56,17 @@ def _row(id: str, target: Any, want: str | None = None, **opts: Any) -> Any:
              "SEC-01", fence=True),
         _row("worktree-agents-md-is-never-law-A1.1", _WT_A + "AGENTS.md", records=_BOUND_A),
         _row("AC1.1-bound-repos-write-names-the-worktree", "repos/a/src/x.py",
-             "worktree.py new a --kind impl", records=_BOUND_A),
+             "worktree.py list", records=_BOUND_A),
         _row("apply-patch-a-later-protected-header-blocks-T-014-02",
              _PATCH.format(".dadaia/sessions/runtime/a.ptr"), "SEC-01", tool="apply_patch"),
         _row("apply-patch-all-headers-allowed", _PATCH.format("docs/notes.md"), tool="apply_patch"),
         _row("path-first-a-write-under-b-is-b-never-first-alive-a",
-             "worktrees/b/0.5.0a-impl/src/x.py", "context bind b"),
+             "worktrees/b/0.5.0-rc1/j1/src/x.py", "context bind b"),
         _row("no-repo-no-context-fails-open", "specs/releases/x/TASKS.md"),
         _row("AC3.9-a-cwd-outside-any-workspace-judges-the-absolute-target",
              ".dadaia/sessions/runtime/a.ptr", "SEC-01", cwd="/", truncated=True),
         _row("sa-bind-has-two-stores#S1-dadaia-context-is-ignored-for-an-unbound-native-id",
-             "worktrees/b/0.5.0a-impl/src/x.py", "context bind b", env={"DADAIA_CONTEXT": "b"}),
+             "worktrees/b/0.5.0-rc1/j1/src/x.py", "context bind b", env={"DADAIA_CONTEXT": "b"}),
         _row("F3-bound-audit-write-allowed", "repos/a/specs/audits/20260101-x/index.md",
              records=_BOUND_A),
         _row("no-repo-write-resolves-via-rung3-cwd-repo", "specs/releases/r/TASKS.md",
@@ -140,7 +140,7 @@ def test_a_truncated_registry_is_no_context_at_the_gate(tmp_path: Path) -> None:
     env["DADAIA_CONTEXT"] = "proj"
     payload = {
         "tool_name": "Write",
-        "tool_input": {"file_path": str(ws / "worktrees/other/0.5.0a-impl/x.py")},
+        "tool_input": {"file_path": str(ws / "worktrees/other/0.5.0-rc1/j1/x.py")},
     }
 
     gate = run_hook_subprocess("sdd_gate", payload, env)

@@ -54,8 +54,8 @@ _A: dict[str, object] = {"context": "ctx-a", "repos": frozenset({"ctx-a", "ctx-a
 _DADAIA = "/ws/.dadaia/.venv/Scripts/dadaia.exe" if sys.platform == "win32" else "/ws/.dadaia/.venv/bin/dadaia"
 
 
-def _wt(repo: str, kind: str) -> str:
-    return "fix: " + script_line(".agents/skills/dd-gitflow-default/scripts/worktree.py", "new", repo, "--kind", kind)
+def _wt(repo: str) -> str:
+    return "fix: " + script_line(".agents/skills/dd-gitflow-default/scripts/worktree.py", "list")
 
 
 def _at(zone: str, repo: str, owner: str | None = None, **session: object) -> dict[str, object]:
@@ -65,17 +65,17 @@ def _at(zone: str, repo: str, owner: str | None = None, **session: object) -> di
 # fmt: off
 @pytest.mark.parametrize(("path", "kwargs", "fix"), [
     pytest.param("specs/releases/_archive/releases_histo.jsonl", {}, None, id="root-path-in-scope-under-any-bind"),
-    pytest.param("worktrees/ctx-a/0.5.0a-impl/src/x.py", _at("worktree", "ctx-a", **_A), None, id="AC1.1-own-worktree-allowed"),
-    pytest.param("worktrees/ctx-a-infra/0.5.0a-impl/main.tf", _at("worktree", "ctx-a-infra", "ctx-a", **_A), None, id="associated-repo-worktree-in-scope"),
+    pytest.param("worktrees/ctx-a/0.5.0-rc1/j1/src/x.py", _at("worktree", "ctx-a", **_A), None, id="AC1.1-own-worktree-allowed"),
+    pytest.param("worktrees/ctx-a-infra/0.5.0-rc1/j1/main.tf", _at("worktree", "ctx-a-infra", "ctx-a", **_A), None, id="associated-repo-worktree-in-scope"),
     pytest.param("repos/ctx-a/specs/audits/20260101-x/index.md", _at("audit", "ctx-a", **_A), None, id="AC1.1-own-audit-allowed"),
-    pytest.param("repos/ctx-a/src/x.py", _at("repo", "ctx-a", **_A), _wt("ctx-a", "impl"), id="AC1.1-own-repo-code-is-merge-only"),
-    pytest.param("repos/ctx-a/specs/bugs/BUGS.jsonl", _at("repo", "ctx-a", **_A), _wt("ctx-a", "bug"), id="ADR0124-ledger-no-longer-always-writable"),
-    pytest.param("repos/ctx-a/specs/bugs/notes.md", _at("repo", "ctx-a", **_A), "fix: Operator action: edit repos/ctx-a/specs/bugs/notes.md by hand; no worktree kind merges it", id="F5-no-kind-merges-it-names-the-operator"),
+    pytest.param("repos/ctx-a/src/x.py", _at("repo", "ctx-a", **_A), _wt("ctx-a"), id="AC1.1-own-repo-code-is-merge-only"),
+    pytest.param("repos/ctx-a/specs/bugs/BUGS.jsonl", _at("repo", "ctx-a", **_A), _wt("ctx-a"), id="ADR0124-ledger-no-longer-always-writable"),
+    pytest.param("repos/ctx-a/specs/bugs/notes.md", _at("repo", "ctx-a", **_A), _wt("ctx-a"), id="F5-a-non-canon-path-is-still-merge-only"),
     pytest.param("repos/ctx-b/src/x.py", _at("repo", "ctx-b", **_A), f"fix: {_DADAIA} context bind ctx-b", id="write-outside-the-bind-scope-names-the-bind"),
-    pytest.param("worktrees/ctx-b/0.5.0a-impl/src/x.py", _at("worktree", "ctx-b"), f"fix: {_DADAIA} context bind ctx-b", id="unbound-native-session-refused-names-the-bind"),
-    pytest.param("worktrees/ctx-b/0.5.0a-impl/src/x.py", _at("worktree", "ctx-b", has_id=False), None, id="ADR0116-id-less-unbound-worktree-is-the-declared-gap"),
-    pytest.param("repos/ctx-b/src/x.py", _at("repo", "ctx-b", has_id=False), _wt("ctx-b", "impl"), id="ADR0105-repos-refused-for-every-session"),
-    pytest.param("repos/stranger/src/x.py", {**_at("repo", "stranger", **_A), "owner": None}, _wt("stranger", "impl"), id="unregistered-slug-still-merge-only"),
+    pytest.param("worktrees/ctx-b/0.5.0-rc1/j1/src/x.py", _at("worktree", "ctx-b"), f"fix: {_DADAIA} context bind ctx-b", id="unbound-native-session-refused-names-the-bind"),
+    pytest.param("worktrees/ctx-b/0.5.0-rc1/j1/src/x.py", _at("worktree", "ctx-b", has_id=False), None, id="ADR0116-id-less-unbound-worktree-is-the-declared-gap"),
+    pytest.param("repos/ctx-b/src/x.py", _at("repo", "ctx-b", has_id=False), _wt("ctx-b"), id="ADR0105-repos-refused-for-every-session"),
+    pytest.param("repos/stranger/src/x.py", {**_at("repo", "stranger", **_A), "owner": None}, _wt("stranger"), id="unregistered-slug-still-merge-only"),
     pytest.param("repos/beta/x.py", _at("repo", "beta", context="alpha", repos=frozenset({"alpha"}), has_id=False), "fix: Operator action: relaunch this session with DADAIA_CONTEXT=beta", id="sa-bind-has-two-stores#S5-env-bound-is-told-an-operator-step"),
     pytest.param("AGENTS.md", {}, f"fix: {_DADAIA} public install", id="S6-floor-law-one-restore-command"),
     pytest.param(".dadaia/sessions/x.json", _A, f"fix: {_DADAIA} context bind ctx-a", id="AC4.4-session-floor-names-the-bound-context"),

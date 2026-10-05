@@ -72,22 +72,15 @@ class Decision(Enum):
 
 
 @cache
-def _kind_holding() -> Callable[[str], str | None]:
-    """The KINDS grammar's owner (ADR 0135) through the one loader, imported on the first
-    merge-only BLOCK so the pre-gate's ALLOW path pays nothing."""
+def _locate() -> Callable[[str], tuple[str, str | None, tuple[str, ...]] | None]:
+    """The worktree grammar's one path reader through the one loader, imported on
+    the first protected glob judged so a gate with none pays nothing."""
     from dadaia_workspace.infrastructure.ledger_scripts import load_owner
 
-    holding: Callable[[str], str | None] = load_owner(
-        "dd-gitflow-default", "_worktree_kinds"
-    ).kind_holding
-    return holding
-
-
-def _worktree_fix(repo: str, repo_rel: str) -> str:
-    kind = _kind_holding()(repo_rel)
-    if kind is None:  # no worktree merges it: only the operator's hand reaches it
-        return f"Operator action: edit repos/{repo}/{repo_rel} by hand; no worktree kind merges it"
-    return script_line(_WORKTREE_SCRIPT, "new", repo, "--kind", kind)
+    locate: Callable[[str], tuple[str, str | None, tuple[str, ...]] | None] = load_owner(
+        "dd-gitflow-default", "_worktree_names"
+    ).locate
+    return locate
 
 
 def _protection(
@@ -100,7 +93,11 @@ def _protection(
         chain(
             [(_R.LAW, p)] if p in projected else [],
             ((floor[f], f) for f in floor if p == f or p.startswith(f + "/")),
-            ((_R.GLOB, g) for g in protected if workspace_layout.protected_glob(p, (g,))),
+            (
+                (_R.GLOB, g)
+                for g in protected
+                if workspace_layout.protected_glob((_locate()(p) or ("", None, ()))[2], (g,))
+            ),  # fmt: skip
         ),
         None,
     )
@@ -142,7 +139,7 @@ def evaluate(
     bind's *repos* is refused with ``context bind <owner>`` — an unbound session with an id
     owns nothing (ADR 0072); an id-less one bound by env is told to relaunch; an id-less
     unbound one is the declared gap (ADR 0116). Then every write in zone ``repo`` is
-    refused with the ``worktree.py new`` fix (ADR 0105). Everything else ALLOWS.
+    refused with the ``worktree.py list`` fix. Everything else ALLOWS.
     """
     cls, hit = classify_path(rel_path, projected, protected)
     if hit:
@@ -167,7 +164,6 @@ def evaluate(
         )
         return Decision.BLOCK, message + f"fix: {fix}"
     if zone == "repo":
-        repo_rel = rel_path.lstrip("/").split("/", 2)[2:]
         message = _MERGE_ONLY_MESSAGE.format(rel_path=rel_path, repo=repo)
-        return Decision.BLOCK, message + f"fix: {_worktree_fix(repo, ''.join(repo_rel))}"
+        return Decision.BLOCK, message + f"fix: {script_line(_WORKTREE_SCRIPT, 'list')}"
     return Decision.ALLOW, ""

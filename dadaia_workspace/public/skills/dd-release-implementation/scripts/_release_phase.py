@@ -12,14 +12,13 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from _release_plan import PLAN_FIX, plan_errors  # noqa: E402
 from _release_schema import (  # noqa: E402
     APPROVED,
+    CANDIDATE_DOCS,
     SHA_RE,
     STATE,
-    TRIO,
     extract_status,
-    unfinished_tasks,
+    job_errors,
     utc_now,
 )
 from _release_store import SCRIPT, Live, Refusal, State, commit, live_release  # noqa: E402
@@ -29,11 +28,11 @@ from _specs import choice  # noqa: E402
 PREDECESSOR = {"IMPLEMENTATION": "DEFINITION", "CLOSURE": "IMPLEMENTATION"}
 
 
-def _refuse_unapproved_trio(live: Live) -> Path:
-    """A candidate enters IMPLEMENTATION only with all three documents `Approved`; returns
-    the candidate folder that holds them (no folder yet: `rc-1/` is where they belong)."""
+def _refuse_unapproved_docs(live: Live) -> Path:
+    """A candidate enters IMPLEMENTATION only with SPEC and PLAN `Approved`; returns the
+    candidate folder that holds them (no folder yet: `rc-1/` is where they belong)."""
     candidate = live.candidate or live.release_dir / "rc-1"
-    for name in TRIO:
+    for name in CANDIDATE_DOCS:
         document = candidate / name
         if not document.is_file():
             raise Refusal(
@@ -44,8 +43,8 @@ def _refuse_unapproved_trio(live: Live) -> Path:
         if status != APPROVED:
             raise Refusal(
                 f"{document.relative_to(live.release_dir).as_posix()} of release {live.release_id} "
-                f"carries status {status!r} — SPEC, PLAN "
-                f"and TASKS must all be '**Status:** {APPROVED}' to enter IMPLEMENTATION",
+                f"carries status {status!r} — SPEC and PLAN "
+                f"must both be '**Status:** {APPROVED}' to enter IMPLEMENTATION",
                 f"Operator action: set '**Status:** {APPROVED}' in {document.resolve()}",
             )
     return candidate
@@ -60,7 +59,7 @@ def _refuse_open_worktrees(specs: Path) -> None:
         return
     sys.path.append(str(Path(__file__).resolve().parents[2] / "dd-gitflow-default" / "scripts"))
     import _worktree_git as worktree_git  # the worktrees' owner, read-only (ADR 0135)
-    from _worktree_kinds import Refusal as WorktreeRefusal
+    from _worktree_names import Refusal as WorktreeRefusal
 
     top = worktree_git.git(specs, "rev-parse", "--path-format=absolute", "--show-toplevel",
                            "--git-common-dir", check=False).split() or ["", ""]  # fmt: skip
@@ -103,16 +102,11 @@ def set_phase(specs: Path, phase: str, sha: str) -> tuple[str, str]:
         raise choice(refusal, SUPPLY.get(current, ""))
     ts, candidate = utc_now(), live.candidate
     if phase == "IMPLEMENTATION":
-        candidate = _refuse_unapproved_trio(live)
-        plan = (candidate / "PLAN.md").read_text(encoding="utf-8")
-        if errors := plan_errors(plan, unfinished_tasks(candidate)):
-            raise Refusal(errors[0], PLAN_FIX)
-    elif candidate and (unfinished := unfinished_tasks(candidate)):
-        raise Refusal(
-            f"TASKS.md still carries {len(unfinished)} open '[ ]'/reserved '[-]' marker(s) "
-            f"— a candidate closes fully implemented: {unfinished[0]}",
-            f"Operator action: finish and mark every task '[x]' in {(candidate / 'TASKS.md').resolve()}",
-        )
+        candidate = _refuse_unapproved_docs(live)
+        for job in sorted(candidate.glob("tasks/*.md")):
+            if errors := job_errors(job.read_text(encoding="utf-8"), f"tasks/{job.name}"):
+                raise Refusal(errors[0], f"Operator action: correct {job.resolve()} "
+                              "(dd-release-definition §5)")  # fmt: skip
     else:
         _refuse_open_worktrees(specs.resolve())
 

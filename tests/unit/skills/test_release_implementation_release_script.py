@@ -250,19 +250,6 @@ def test_phase_implementation_refuses_an_unapproved_trio(script: Path, tmp_path:
     assert "PLAN.md" in result.stderr
 
 
-@pytest.mark.parametrize(
-    "marker", ["- [ ]**T-1**", "* [ ] T-1", "+ [ ] T-1", "* [-] T-1", "[ ] T-1"]
-)
-def test_phase_closure_refuses_an_open_task(script: Path, tmp_path: Path, marker: str) -> None:
-    """sa-promote-has-no-verb#B25-5, AC3.3 (task-line-grammar-accepts-a-malformed-open-marker):
-    an open marker in any bullet form, spaced or not, refuses CLOSURE."""
-    specs = _specs(tmp_path)
-    _release(specs, "0.5.0", phase="IMPLEMENTATION", tasks=f"{marker} — open\n")
-    result = _run(script, "phase", "CLOSURE", "--sha", "abc1234", "--specs", str(specs))
-    assert result.returncode == 1
-    assert "T-1" in result.stderr
-
-
 def test_phase_refuses_a_malformed_sha(script: Path, tmp_path: Path) -> None:
     specs = _specs(tmp_path)
     _release(specs, "0.5.0")
@@ -280,18 +267,6 @@ def test_check_is_clean_on_a_valid_tree(script: Path, tmp_path: Path) -> None:
     _release(specs, "0.5.0", phase="IMPLEMENTATION")
     result = _run(script, "check", "--specs", str(specs))
     assert result.returncode == 0, result.stdout
-
-
-def test_check_reads_an_unspaced_open_marker_and_its_w_set(script: Path, tmp_path: Path) -> None:
-    """AC3.3: `- [ ]**T-1**` is open to `check` — its `W:` meets T-2's in one step."""
-    specs = _specs(tmp_path)
-    tasks = "- [ ]**T-1** a `W:` `x.py` · b\n- [ ] **T-2** c `W:` `x.py`\n"
-    plan = PLAN.replace("| 1 | T-1 | 1 |", "| 1 | T-1, T-2 | 2 |")
-    (_release(specs, "0.5.0", phase="IMPLEMENTATION", tasks=tasks) / "rc-1/PLAN.md").write_text(
-        f"**Status:** Approved\n\n{plan}", encoding="utf-8"
-    )
-    result = _run(script, "check", "--specs", str(specs))
-    assert "T-1 and T-2 both write x.py" in result.stdout, result.stdout
 
 
 def test_writes_reads_rc6_t_050_117_to_its_ten_paths(script: Path) -> None:

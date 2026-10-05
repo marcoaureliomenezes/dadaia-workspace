@@ -126,7 +126,7 @@ def test_a_ghost_env_never_denies_and_is_surfaced(tmp_path: Path) -> None:
         "ctx_inject", {"session_id": "k1"}, {**kimi_hook_env(ws), "DADAIA_CONTEXT": "ghost"}
     )
     assert "! DADAIA_CONTEXT=ghost is not this session's bind" in out.stdout
-    target = ws / "worktrees" / "alpha" / "0.5.0a-impl" / "x.py"
+    target = ws / "worktrees" / "alpha" / "0.5.0-rc1/j1" / "x.py"
     payload = {"tool_name": "Write", "tool_input": {"file_path": str(target)}, "session_id": "k1"}
     gate = run_hook_subprocess(
         "sdd_gate", payload, {**kimi_hook_env(ws), "DADAIA_CONTEXT": "ghost"}
@@ -142,7 +142,7 @@ def test_running_the_printed_scope_fix_clears_the_deny(
     ws = _workspace(tmp_path, "alpha", "beta")
     _record(ws, "s1", "alpha")
     env = {**claude_hook_env(ws, session_id="s1"), "DADAIA_CONTEXT": "alpha"}
-    target = ws / "worktrees" / "beta" / "0.5.0a-impl" / "x.py"
+    target = ws / "worktrees" / "beta" / "0.5.0-rc1/j1" / "x.py"
     payload = {"tool_name": "Write", "tool_input": {"file_path": str(target)}, "session_id": "s1"}
     denied = run_hook_subprocess("sdd_gate", payload, env).block_envelope()
     assert denied is not None and "context bind beta" in denied["reason"]
@@ -172,7 +172,7 @@ def test_a_bound_context_without_specs_gets_its_next_step(tmp_path: Path) -> Non
     flow = {"main_repo": "alpha", "associated_repos": [], "gitflow": {"work": "feature/"}}
     workspace_cli(ws, flow)
     for argv in (["init", "-q"], ["commit", "-q", "--allow-empty", "-m", "x"],
-                 ["branch", "wt/0.5.0a-impl"]):  # fmt: skip
+                 ["branch", "wt/0.5.0-rc1/j1"]):  # fmt: skip
         subprocess.run(
             ["git", "-C", str(ws / "repos/alpha"), *argv], check=True, capture_output=True
         )
@@ -186,7 +186,7 @@ def test_a_bound_context_without_specs_gets_its_next_step(tmp_path: Path) -> Non
         and out.startswith("[alpha]\n")
         and f"\n{step.text()}\n" in out
     )
-    orphan = f"WORKTREE warning orphan {ws}/worktrees/alpha/0.5.0a-impl"
+    orphan = f"WORKTREE warning orphan {ws}/worktrees/alpha/0.5.0-rc1/j1"
     assert f"\n=== open worktrees ===\n{orphan}" in out and "worktree.py merge" in out
 
 

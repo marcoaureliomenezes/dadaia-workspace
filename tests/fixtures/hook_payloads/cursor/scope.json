@@ -2,7 +2,7 @@
   "hook_event_name": "preToolUse",
   "tool_name": "Write",
   "tool_input": {
-    "file_path": "{ws}/worktrees/demo/0.5.0a-impl/x.md",
+    "file_path": "{ws}/worktrees/demo/0.5.0-rc1/j1/x.md",
     "content": "x"
   }
 }

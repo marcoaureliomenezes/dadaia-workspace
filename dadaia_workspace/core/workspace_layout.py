@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import fnmatch
 import re
-from collections.abc import Callable, Collection
+from collections.abc import Callable, Collection, Sequence
 from dataclasses import dataclass
 from enum import StrEnum
 from functools import cached_property
@@ -261,11 +261,9 @@ def _matches(sub: str, pattern: str) -> bool:
     return len(parts) == len(globs) and all(map(fnmatch.fnmatch, parts, globs))
 
 
-def protected_glob(rel: str, protected: tuple[str, ...]) -> str | None:
-    """The protected glob a prefix of *rel*'s repo-relative tail matches (``repos/<r>/…``,
-    ``worktrees/<r>/<name>/…``), else ``None``."""
-    parts = rel.split("/")
-    tail = parts[2:] if parts[0] == "repos" else parts[3:] if parts[0] == "worktrees" else []
+def protected_glob(tail: Sequence[str], protected: tuple[str, ...]) -> str | None:
+    """The protected glob a prefix of a repo-relative *tail* matches (the worktree grammar's
+    ``locate`` reads it), else ``None``."""
     prefixes = ["/".join(tail[: n + 1]) for n in range(len(tail))]
     return next((g for g in protected for sub in prefixes if _matches(sub, g)), None)
 
@@ -448,7 +446,8 @@ SPECS_CANON: tuple[CanonEntry, ...] = (
     CanonEntry("releases/<M.m.p>/RELEASE.json", "releases"),
     CanonEntry("releases/<M.m.p>/rc-<N>/SPEC.md", "releases"),
     CanonEntry("releases/<M.m.p>/rc-<N>/PLAN.md", "releases"),
-    CanonEntry("releases/<M.m.p>/rc-<N>/TASKS.md", "releases"),
+    CanonEntry("releases/<M.m.p>/rc-<N>/TASKS.md", "releases"),  # a closed rc's
+    CanonEntry("releases/<M.m.p>/rc-<N>/tasks/<slug>.md", "releases"),  # one per job
     CanonEntry("backlog/AGENTS.md", "backlog", True),
     CanonEntry("backlog/BACKLOG.json", "backlog", True),
     CanonEntry("backlog/_archive/backlog_histo.jsonl", "backlog", True),
@@ -465,7 +464,9 @@ SPECS_CANON: tuple[CanonEntry, ...] = (
 
 #: One candidate's documents (ADR 0150), read off the canon rows.
 CANDIDATE_DOCUMENTS: tuple[str, ...] = tuple(
-    e.shape.rsplit("/", 1)[1] for e in SPECS_CANON if e.shape.startswith("releases/<M.m.p>/rc-<N>/")
+    e.shape.rsplit("/", 1)[1]
+    for e in SPECS_CANON
+    if e.shape.startswith("releases/<M.m.p>/rc-<N>/") and e.shape.count("/") == 3
 )
 
 #: Every entry permitted directly under ``specs/``.
