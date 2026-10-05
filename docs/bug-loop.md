@@ -5,7 +5,7 @@ in any phase, with no SPEC, PLAN or TASKS.
 
 ## 1. Register — ask first
 
-<!-- derived-from: bug-ledger sha256:156cfaca5544 -->
+<!-- derived-from: bug-ledger sha256:b5c86fd6bd99 -->
 
 A bug is a tool breaking a contract it documents. Registration is ask-first: the agent
 proposes the violated contract line, one reproducing command already run, why it is not
@@ -36,7 +36,7 @@ validation, a law ambiguity, or a missing feature.
 
 ## 2. Lineage, then a RED test
 
-<!-- derived-from: bug-ledger sha256:156cfaca5544 -->
+<!-- derived-from: bug-ledger sha256:b5c86fd6bd99 -->
 
 Resolution follows seven ordered phases — lineage, red loop, minimise, hypothesise,
 instrument, seam test, cleanup and resolve. Lineage comes first: read at most the 20
@@ -55,7 +55,7 @@ Then the red loop: a new case that fails for the real cause, before production c
 
 ## 3. Fix, and let the diff shrink
 
-<!-- derived-from: bug-ledger sha256:156cfaca5544 -->
+<!-- derived-from: bug-ledger sha256:b5c86fd6bd99 -->
 
 Fix the root cause and watch the test go green. The fix's direction is derived, never
 typed: `bugs.py fix <bug-id>` prints the fix commits, their numstat and `net-negative`,
@@ -64,7 +64,7 @@ routed to the architecture lens before it lands.
 
 ## 4. Resolve with the red loop and lineage
 
-<!-- derived-from: bug-ledger sha256:156cfaca5544 -->
+<!-- derived-from: bug-ledger sha256:b5c86fd6bd99 -->
 
 ```bash
 python3 .agents/skills/dd-bug-resolution/scripts/bugs.py resolve <bug-id> \
@@ -90,7 +90,8 @@ python3 .agents/skills/dd-bug-resolution/scripts/bugs.py resolve <bug-id> \
 One commit holds the code, the regression test and the `BUGS.jsonl` line, its red loop
 quoted in the body.
 
-`bugs.py archive` moves records whose `closed_at` is older than 90 days into
-`specs/bugs/_archive/bugs_histo.jsonl`. `.dadaia/.venv/bin/dadaia doctor`'s `ledgers` section runs
-`bugs.py check` (`LEDGER-BUGS-SCHEMA`), and `SPEC-DOC-041` warns on a terminal record
-closed longer ago than the archive threshold.
+`bugs.py archive --adr <id> <ids…>` moves exactly the named terminal records into
+`specs/bugs/_archive/bugs_histo.jsonl`, each stamped `archived_by: <id>`; a record leaves
+the ledger only by an accepted ADR, never by age, and `check` holds every archived record
+to it. `.dadaia/.venv/bin/dadaia doctor`'s `ledgers` section runs `bugs.py check`
+(`LEDGER-BUGS-SCHEMA`).
