@@ -127,10 +127,6 @@ _SECOND_LIST_ALLOWANCE: dict[str, str] = {
     "dadaia_workspace/public/skills/dd-audit-project/scripts/_audit_check.py": _PARITY,
     "dadaia_workspace/public/skills/dd-backlog-definition/scripts/_backlog_schema.py": _PARITY,
     "dadaia_workspace/public/skills/dd-bug-resolution/scripts/_bugs_check.py": _PARITY,
-    # the stdlib script cannot import the package: its TRIO is proven by the trio row
-    "dadaia_workspace/public/skills/dd-release-implementation/scripts/_release_schema.py": (
-        "parity:tests/unit/features/specs/test_release_tree.py"
-    ),
 }
 
 

@@ -22,7 +22,7 @@ def _write(tmp_path: Path, text: str) -> Path:
 
 
 #: The canon fingerprint each stamp was cut at — a published key is never re-pinned; an unshipped key follows the canon.
-_CANON_AT = {9: "8ea0d6906a41c3c2"}
+_CANON_AT = {9: "fb5d4dfe1ed6b9ff"}
 
 
 def test_a_canon_change_bumps_the_stamp() -> None:
