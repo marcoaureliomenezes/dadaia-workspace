@@ -486,7 +486,23 @@ _FIX_CTORS = {"Step": 3, "Refusal": 1}
 #: B1's other fix positions: a value bound to, or returned by, a `fix`-named name.
 _FIX_NAME = re.compile(r"(?i)(?:^|_)fix(?:es)?(?:$|_)")
 #: A builder spelling a command inside error prose with no `fix:` line (PLAN §2.8 not-sites).
-_PROSE = {"dadaia_workspace/cli/_specs_resolution.py:64", "dadaia_workspace/core/invocation.py:250"}
+#: Keyed on the stripped source line, never its number: a refactor above it moves the line.
+_PROSE = {
+    ("dadaia_workspace/cli/_specs_resolution.py",
+     "f\"'{fix_line(None, 'context', 'bind', '<name>')}' in this session or pass \""),
+    ("dadaia_workspace/core/invocation.py",
+     "f\"`{fix_line(None, 'context', 'bind', '<name>')}`.\""),
+}  # fmt: skip
+
+
+def _not_prose(site: str) -> bool:
+    rel, line = site.rsplit(":", 1)
+    if rel not in {r for r, _ in _PROSE}:
+        return True
+    text = (_REPO_ROOT / rel).read_text(encoding="utf-8").splitlines()[int(line) - 1].strip()
+    return (rel, text) not in _PROSE
+
+
 #: The builder module: the one place the CLI is spelled by hand.
 _BUILDER = "dadaia_workspace/core/cli_line.py"
 
@@ -632,7 +648,7 @@ def _code_sites(trees: dict[str, ast.Module]) -> list[str]:
                 hand = not spelled and any(_SPELLING.search(a) for a in alts)
                 if hand or any(map(_defect, alts)) or (told and rel != _BUILDER):
                     sites.add(f"{rel}:{node.lineno}")
-    return sorted(sites - _PROSE)
+    return sorted(filter(_not_prose, sites))
 
 
 #: AC4.8: a command line spelling the CLI — a code span or a fenced line naming it.
