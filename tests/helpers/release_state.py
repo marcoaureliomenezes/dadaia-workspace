@@ -17,8 +17,11 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-#: A PLAN `release.py` admits: structure is taught, never judged (ADR 0194).
-PLAN = "## 1. As-is review\n"
+#: A PLAN `release.py` admits: a `## DAG` table and a `### Hot files` list (AC4.3).
+PLAN = (
+    "## 1. As-is review\n\n## DAG\n\n| job | waits on | why |\n|---|---|---|\n"
+    "| Job 1 | — | x |\n\n### Hot files\n\n- none.\n"
+)
 
 
 def write_release_phase(specs_dir: Path, release_id: str, phase: str) -> None:
