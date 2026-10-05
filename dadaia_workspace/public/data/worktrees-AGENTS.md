@@ -16,7 +16,7 @@ a skill points here, never restates them.
 
 ## 2. Three gates, one review
 
-1. Task: its commit, the subject opening with its id; `WT merge <task path>` runs the repo's `verify-task:` line on the touched files (ruff, mypy, the owner tests) and fast-forwards the job branch — no verdict, no review; a task behind its job branch rebases first (its disjoint `W:` keeps it conflict-free) and the gate reruns.
+1. Task: its commit, the subject opening with its id; `WT merge <task path>` runs the job branch's `verify-task:` line on the touched files plus the paths its commits name in `Owner-tests:` trailers and fast-forwards the job branch — no verdict, no review; a task behind its job branch rebases first (its disjoint `W:` keeps it conflict-free) and the gate reruns.
 2. Stage: `WT stage <job path>` — refused while a task worktree of the job is open, then the repo's `verify-stage:` line (lint, mypy, guards, unit, integration) green before the next stage opens; the closing commit carries `stage: <id> — unit+integration green`.
 3. Job: push `wt/<M.m.p>-rc<N>/<job>` and let its CI matrix run; `dd-code-reviewer` reviews `git diff <work branch>...HEAD` once; its verdict is a handoff whose `scope` names HEAD and whose `ci_run` is that green run's URL.
 4. `WT merge <path>` lands HEAD as it is, by fast-forward, only when the tree is clean, HEAD contains the work branch, no task worktree of the job is open, the job branch took code only from task merges, a valid APPROVED verdict names HEAD (or a reflog sha with the same patch-id and message series) with its `ci_run`, and the repo's `verify:` line passes on HEAD, split by `shlex` and run as one argv list, never a shell; it then removes the tree and `branch -d`s it.

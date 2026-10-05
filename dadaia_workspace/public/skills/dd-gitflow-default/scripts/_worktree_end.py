@@ -119,13 +119,13 @@ def _check_ancestor(tree: Path, work: str) -> None:
         ) from error
 
 
-def _gate(tree: Path, level: str, *files: str) -> None:
-    """One gate level: the command HEAD's tracked `AGENTS.md` declares — `verify:` the job's,
+def _gate(tree: Path, level: str, *files: str, ref: str = "HEAD") -> None:
+    """One gate level: the command *ref*'s tracked `AGENTS.md` declares — `verify:` the job's,
     `verify-stage:` and `verify-task:` (the touched *files* appended) — split by `shlex` and run
     as one argv list in *tree*, never a shell, the workspace venv first on `PATH` (a bare
     `python` is the workspace's, at any tree depth); its output, on stdout alone, is the evidence;
     stdin is closed."""
-    lines = git(tree, "show", "HEAD:AGENTS.md", check=False).splitlines()
+    lines = git(tree, "show", f"{ref}:AGENTS.md", check=False).splitlines()
     key = "verify:" if level == "job" else f"verify-{level}:"
     declared = next((ln.removeprefix(key).strip() for ln in lines if ln.startswith(key)), "")
     if not declared:
@@ -277,7 +277,14 @@ def merge(root: Path, path: str, keep: list[str], drop: bool) -> str:
     _refuse_dirty(tree)
     if into != repo:  # a task: its gate, no verdict, onto its job branch
         _check_ancestor(tree, onto)
-        _gate(tree, "task", *git(tree, "diff", "--name-only", f"{onto}...HEAD").split())
+        owners = git(
+            tree, "log", "--format=%(trailers:key=Owner-tests,valueonly)", f"{onto}..HEAD"
+        ).split()
+        if missing := [p for p in owners if not (tree / p).is_file()]:
+            raise Refusal(f"Owner-tests: {' '.join(missing)} not in the tree",
+                          f"Operator action: fix the Owner-tests: trailer of the task's commits in {tree}")  # fmt: skip
+        touched = git(tree, "diff", "--name-only", "--diff-filter=d", f"{onto}...HEAD").split()
+        _gate(tree, "task", *dict.fromkeys(touched + owners), ref=onto)
         _refuse_dirty(into)
     elif non_code(name):
         _check_specs_only(tree, onto)
