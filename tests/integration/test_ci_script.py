@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import importlib.util
 import os
+import shlex
 import shutil
 import subprocess
 import sys
@@ -171,3 +172,35 @@ def test_a_planted_failing_step_turns_its_level_red(tmp_path: Path, check: str, 
         f"{'FAIL' if code else 'PASS'} owner tests",
     ]
     assert done.returncode == code
+
+
+@pytest.mark.xfail(strict=True, reason="J2.S3.T1: AC2.1")
+@pytest.mark.parametrize("doc", ["tests/README.md", "tests/AGENTS.md"])
+def test_documented_coverage_line_leaves_no_coverage_file_in_the_checkout(
+    tmp_path: Path, doc: str
+) -> None:
+    """AC2.1: on CI, the doc's own ``pytest --cov`` line, run in a git checkout, leaves no
+    coverage file there (tracked, untracked or ignored)."""
+    line = next(
+        ln for ln in (_REPO / doc).read_text(encoding="utf-8").splitlines()
+        if ln.startswith("pytest") and "--cov" in ln
+    )  # fmt: skip
+    files = {
+        ".gitignore": ".coverage\n",
+        "dadaia_workspace/__init__.py": "",
+        "dadaia_workspace/m.py": "def one() -> int:\n    return 1\n",
+        "tests/unit/test_m.py": (
+            "import pytest\n\nfrom dadaia_workspace.m import one\n\n\n"
+            "@pytest.mark.unit\ndef test_one() -> None:\n    assert one() == 1\n"
+        ),
+    }
+    checkout = _checkout(tmp_path, files)
+    subprocess.run(["git", "init", "-q"], cwd=checkout, check=True)
+    argv = [sys.executable, "-m", *shlex.split(line)]
+    env = {**{k: v for k, v in os.environ.items() if k != "COVERAGE_FILE"}, "CI": "true"}
+    assert subprocess.run(argv, cwd=checkout, env=env, check=False).returncode == 0
+    status = subprocess.run(
+        ["git", "status", "--porcelain", "--ignored"],
+        cwd=checkout, capture_output=True, text=True, check=True,
+    ).stdout  # fmt: skip
+    assert [ln for ln in status.splitlines() if "coverage" in ln] == []
