@@ -234,7 +234,7 @@ class GitSubprocessClient:
         if text is None:
             return DEFAULT, (
                 f"{repo}: no specs/constitution.md — using the default gitflow\n"
-                f"fix: {fix_line(None, 'specs', 'init', '--context', repo.name)}"
+                f"fix: {fix_line(None, 'specs', 'init', '--specs-dir', str(repo / 'specs'))}"
             )
         return read_gitflow(repo / "specs", text)
 
