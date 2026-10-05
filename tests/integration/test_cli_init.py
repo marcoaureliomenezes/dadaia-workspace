@@ -89,3 +89,75 @@ def test_a_failed_denylist_conversion_leaves_the_operator_terms_in_place(
         assert _runner.invoke(app, ["init", str(ws), "--harness", "claude"]).exit_code == 0
         assert denylist.read_text(encoding="utf-8") == original
         assert not list((ws / ".dadaia" / "reaped").rglob("privacy_denylist.json"))
+
+
+@pytest.mark.xfail(strict=True, reason="J2.S3.T5: AC2.5")
+def test_an_upgrade_leaves_no_reconcile_scratch_and_rewrites_only_a_differing_hook(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import hashlib
+    import subprocess
+
+    from dadaia_workspace.core import workspace_layout
+    from dadaia_workspace.core.cli_line import cli_path
+    from dadaia_workspace.core.platform import PLATFORM
+    from dadaia_workspace.infrastructure.python_env import (
+        VenvPythonEnvironmentManager,
+        build_digest,
+    )
+    from tests.fixtures.provider_dist import install_fake_dist
+
+    def upgrade(venv: str, running: str) -> None:
+        venv_bin = ws / ".dadaia" / ".venv" / PLATFORM.venv_scripts_dir
+        cli_path(ws).parent.mkdir(parents=True, exist_ok=True)
+        cli_path(ws).write_text(f"#!{venv_bin / ('python' + PLATFORM.venv_exe_suffix)}")
+        cli_path(ws).chmod(0o755)
+        built = f"{venv} {build_digest(None)}"
+        monkeypatch.setattr(VenvPythonEnvironmentManager, "installed_build", lambda s, w: built)
+        install_fake_dist(monkeypatch, running)
+        result = _runner.invoke(app, ["init", str(ws)])
+        assert result.exit_code == 0, result.output
+        assert f"upgraded {venv} -> {running}" in result.output
+
+    install_fake_dist(monkeypatch, "0.4.8")
+    ws = tmp_path / "ws"
+    assert _runner.invoke(app, ["init", str(ws), "--harness", "claude"]).exit_code == 0
+    monkeypatch.chdir(ws)
+    subprocess.run(["git", "init", "-q", str(ws / "repos" / "app")], check=True)
+    (ws / ".dadaia" / "states" / "spec_contexts.json").write_text(
+        json.dumps(
+            {
+                "schema_version": "2",
+                "contexts": [
+                    {
+                        "name": "app",
+                        "state": "alive",
+                        "repo_slug": "app",
+                        "repo_url": "https://example.invalid/app.git",
+                        "created_at": "2026-01-01T00:00:00Z",
+                        "alive_since": "2026-01-01T00:00:00Z",
+                        "dead_since": None,
+                        "current_branch": None,
+                    }
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+    shipped = (workspace_layout.public_scripts_dir() / "pre-push-ci-gate.sh").read_bytes()
+    hook = ws / "repos" / "app" / ".git" / "hooks" / "pre-push"
+    hook.write_bytes(shipped)
+    stamp = hook.stat().st_mtime_ns
+
+    upgrade("0.4.7", "0.4.8")
+    assert not (ws / ".dadaia" / "tmp" / "reconcile").exists()
+    assert (hook.read_bytes(), hook.stat().st_mtime_ns) == (shipped, stamp)
+
+    old = b"#!/bin/sh\n# an older shipped gate\n"
+    hook.write_bytes(old)
+    monkeypatch.setattr(
+        "dadaia_workspace.core.template_history.load_shipped_hashes",
+        lambda _d: {"scripts/pre-push-ci-gate.sh": {hashlib.sha256(old).hexdigest()}},
+    )
+    upgrade("0.4.8", "0.4.9")
+    assert hook.read_bytes() == shipped
