@@ -18,8 +18,8 @@ Bug history read at 13269b5c9 (permanent architecture review; `bugs.py stats`, t
 | unit | today | bugs | verdict | why |
 |---|---|---|---|---|
 | `GF/_worktree_kinds.py` `KINDS`, `CAPS`, `allows`, `kind_holding`, `kind_for`, `_NAME_RE` | four kinds, their allowed sets, the `<M.m.p><l>-<kind>` grammar | 1 (`memory-update-same-commit-…`) | REBUILD | 0191: one tree per job; becomes `_worktree_names.py`, the one grammar and the one tail reader |
-| `GF/_worktree_new.py` `new` | derives a letter and a kind, caps per kind, needs the trio for `impl` | 0 | REBUILD | the name is given (`<M.m.p>-rc<N>/<job>[--<task>]`, `backlog/<slug>`); a task cuts from its job branch; ≤ 5 task trees per rc |
-| `GF/_worktree_end.py` `merge`, `_check_allowed`, `_verify` | one merge for every kind: allowed set, verdict, `verify:` (`shell=True`), ff | 5 | REBUILD | 0190: a task merge runs the task gate, no verdict, onto its job branch; a job merge needs the verdict naming its CI-matrix run and runs the job gate; a `define`/`backlog` merge runs the ledger checks only; argv, `shell=False` |
+| `GF/_worktree_new.py` `new` | derives a letter and a kind, caps per kind, needs the trio for `impl` | 0 | REBUILD | the name is given (`<M.m.p>-rc<N>/<job>`, `backlog/<slug>`); a job needs its rc's Approved SPEC; no caps, no task trees (operator order, §2) |
+| `GF/_worktree_end.py` `merge`, `_check_allowed`, `_verify` | one merge for every kind: allowed set, verdict, `verify:` (`shell=True`), ff | 5 | REBUILD | 0190: a job merge needs the verdict naming its CI-matrix run and runs the job gate; a `define`/`backlog` merge lands `specs/` only and runs the ledger checks only; argv, `shell=False` |
 | `GF/_worktree_end.py` `_check_approved`, `_series` | verdict carry-over by patch and message series | 1 | KEEP | 0168's carry stands (AC1.2) |
 | `GF/_worktree_git.py` `ours`, `rows` | reads `_NAME_RE`, globs one level | 0 | UPDATE | read the tree name through the grammar module |
 | `scripts/ci.py` `JOBS`, `main` | one level: every named CI job | 0 | UPDATE | AC1.1: `task FILE…`, `stage`, `job` levels over the same steps |
@@ -46,18 +46,44 @@ Bug history read at 13269b5c9 (permanent architecture review; `bugs.py stats`, t
 
 ## 2. Job 1 — the demolition
 
-One worktree (`worktrees/dadaia-workspace/0.5.0-rc9-job1`, operator-authorized `git worktree add`), one review at its end, `scripts/ci.py` once on the result, one manual merge. No markers, no start or done commits. RED first in the owner file; REBUILD commits name the SPEC's Job 1 as the verdict for the demolished kinds and gate-1 code.
+One worktree (`worktrees/dadaia-workspace/0.5.0-rc9-job1`, operator-authorized `git worktree add`); every task runs inside it. One review at its end, `scripts/ci.py` once on the result, one manual merge. No markers, no start or done commits; a task's commit subject starts with its id; a stage closes with a commit whose body carries `stage: J1.S<m> — unit+integration green`. REBUILD commits name the SPEC's Job 1 as the verdict for the demolished kinds and gate-1 code.
 
-| id | AC | `W:` | owner tests | RED |
-|---|---|---|---|---|
-| J1-1 | AC1.1 | `scripts/ci.py` | `tests/integration/test_ci_script.py` | `test_each_level_runs_only_its_steps`, `test_a_planted_failing_step_turns_its_level_red` |
-| J1-2 | AC1.1–AC1.4 | `GF/worktree.py`, `GF/_worktree_names.py` (was `_worktree_kinds.py`), `GF/_worktree_new.py`, `GF/_worktree_end.py`, `GF/_worktree_git.py`, `AGENTS.md` | `tests/integration/test_worktree_new.py`, `tests/integration/test_worktree_lifecycle.py`, `tests/helpers/worktree_ws.py` | `new` makes each shape, refuses an old-grammar name and a 6th task tree; a red task gate lands nothing, a green one lands with no verdict; a stage with an open task cannot close; a job merge without a verdict, or with one naming no CI-matrix run, refuses; a second job's merge refuses until rebased; a stray job-branch commit refuses; a job lands a code file and an atom together; a `define` merge with an invalid ledger refuses, a valid one lands with no test run |
-| J1-3 | AC1.3 | `core/workspace_layout.py`, `f/spec_context/gate_policy.py`, `S/dd-bug-resolution/scripts/_specs.py`, `S/dd-release-implementation/scripts/_release_phase.py` | `tests/unit/features/spec_context/test_gate_policy.py` | a PROTECTED glob blocks a write in a task worktree |
-| J1-4 | AC1.2 | `core/gitflow.py`, `f/chokepoints/branch_policy.py`, `.github/workflows/ci.yml`, `scripts/guards/repo.py` | `tests/unit/features/chokepoints/test_branch_policy.py`, `scripts/guards/repo.py` plant `job-trigger` | branch-policy rows: a job branch passes, a task, `define` or `backlog` branch refuses |
-| J1-5 | AC1.9 | `core/workspace_layout.py` | `tests/unit/features/specs/test_canon.py` | a job file is canon, a stray `tasks/` file is not, a closed rc's `TASKS.md` still is |
-| J1-6 | AC1.8, AC1.10 | `S/dd-release-implementation/scripts/_release_plan.py`, `_release_tree.py`, `_release_phase.py` | `tests/contract/test_release_script.py`, `tests/helpers/release_state.py` | one valid job file passes `check`; a stage-1 non-test `W:` refuses |
-| J1-7 | AC1.5, AC1.6, AC1.8 | the law rows of §1 | none (law text) | the two AC1.8 greps print `0` |
-| J1-8 | AC1.7 | `specs/releases/0.5.0/_RELEASE.json` | none (log data) | `release.py check` clean |
+- Gates: task — `ruff` and `mypy` on the touched files plus its owner tests (`-n 2`); stage — unit + integration (`-n 2`), green before the next stage opens; job — `scripts/ci.py` once, at the end.
+- AC1.3, operator order 2026-10-05, verbatim: "a release ja tem que começar fazendo ... vocÊ está proibio de rodar 1 worktree para cada tasks ou rodar CI para cada teste ... não podemos perder mais tempo". The `<job>--<task-id>` shape and the ≤ 5 task-worktree counter leave: a job's tasks share its tree, a stage is the barrier. The SPEC delta lands at Reconciliation (main thread).
+- Deviation, recorded: J1.S2.T3 (`ci.py` levels) and the first cut of J1.S2.T1 were written before the stage order arrived; J1.S2.T3's tests landed with its code in 0fce6c788, not as an S1 xfail.
 
-- AC1.5's case is J1-2's "a job lands a code file and an atom together"; the atom-alone refusal stays the contract tier's derived-docs hash check (`tests/contract/test_docs_derived_from_memory.py`), which runs at the job level only.
-- "guards but drift" (AC1.1's stage level) reads as the guards tree run without the contract tier, where the derived-docs hash check lives.
+### Stage J1.S1 — RED (tests only)
+
+- Contract: exit tests are the acceptance tests below, each a strict xfail; envelope `tests/**`; ACs AC1.2 (branch policy), AC1.9, AC1.10.
+
+| id | AC | `W:` | owner tests |
+|---|---|---|---|
+| J1.S1.T1 | AC1.2 | `tests/unit/features/chokepoints/test_branch_policy.py` | same — a job branch pushes; a `define`, `backlog` or task-shaped `wt/` branch refuses |
+| J1.S1.T2 | AC1.9 | `tests/unit/features/specs/test_canon.py` | same — a job file is canon; a stray `tasks/` file is not; a closed rc's `TASKS.md` still is |
+| J1.S1.T3 | AC1.10 | `tests/contract/test_release_script.py` | same — one valid job file passes `check`; a stage-1 non-test `W:` refuses |
+
+### Stage J1.S2 — code
+
+- Contract: exit tests are J1.S1's, now passing, plus each task's owner tests; envelope `dadaia_workspace/**` but `public/**/*.md`, `scripts/**`, `.github/workflows/ci.yml`, `AGENTS.md`, `tests/**`; ACs AC1.1–AC1.5, AC1.8 (the Parallel schedule check), AC1.9, AC1.10.
+
+| id | AC | `W:` | owner tests |
+|---|---|---|---|
+| J1.S2.T1 | AC1.2–AC1.5 | `GF/worktree.py`, `GF/_worktree_names.py` (was `_worktree_kinds.py`), `GF/_worktree_new.py`, `GF/_worktree_end.py`, `GF/_worktree_git.py`, `AGENTS.md`, `f/spec_context/doctor.py` | `tests/integration/test_worktree_new.py`, `tests/integration/test_worktree_lifecycle.py`, `tests/helpers/worktree_ws.py` |
+| J1.S2.T2 | AC1.3 | `core/workspace_layout.py` `protected_glob`, `f/spec_context/gate_policy.py`, `S/dd-bug-resolution/scripts/_specs.py`, `S/dd-release-implementation/scripts/_release_phase.py` | `tests/unit/features/spec_context/test_gate_policy.py`, `tests/unit/hooks/test_pre_gate.py` (a protected glob blocks in a job tree), `tests/unit/skills/test_bug_resolution_bugs_script.py` |
+| J1.S2.T3 | AC1.1 | `scripts/ci.py` | `tests/integration/test_ci_script.py` |
+| J1.S2.T4 | AC1.2 | `core/gitflow.py`, `f/chokepoints/branch_policy.py`, `.github/workflows/ci.yml`, `scripts/guards/repo.py` | `tests/unit/features/chokepoints/test_branch_policy.py`, guard plant `job-trigger` |
+| J1.S2.T5 | AC1.9 | `core/workspace_layout.py` `SPECS_CANON` | `tests/unit/features/specs/test_canon.py` |
+| J1.S2.T6 | AC1.8, AC1.10 | `S/dd-release-implementation/scripts/_release_plan.py`, `_release_tree.py` | `tests/contract/test_release_script.py`, `tests/helpers/release_state.py` |
+
+- J1.S2.T2 and J1.S2.T5 both touch `core/workspace_layout.py`, in disjoint functions; T5 runs after T2.
+
+### Stage J1.S3 — law and log
+
+- Contract: exit checks are AC1.8's two greps printing `0`, `public stage`/`install`/`doctor` clean, `release.py check` clean; envelope `dadaia_workspace/public/**/*.md`, `CONTEXT.md`, `specs/releases/0.5.0/_RELEASE.json`; ACs AC1.5, AC1.6, AC1.7, AC1.8.
+
+| id | AC | `W:` | owner tests |
+|---|---|---|---|
+| J1.S3.T1 | AC1.5, AC1.6, AC1.8 | `pub/data/worktrees-AGENTS.md`, `pub/data/AGENTS.md`, `S/dd-gitflow-default/SKILL.md`, `S/dd-release-implementation/{SKILL,RC-FLOW,MEMORY-UPDATE}.md`, `S/dd-manager-orchestration/SKILL.md`, `CONTEXT.md` | none (law text) |
+| J1.S3.T2 | AC1.8, AC1.10 | `S/dd-release-definition/SKILL.md`, `S/dd-audit-project/PILLAR-SPECS.md` | none (law text) |
+| J1.S3.T3 | AC1.8 | the hit lines of `pub/scaffold/{releases,bugs,ADRs}/AGENTS.md`, `S/dd-bug-resolution/SKILL.md`, `S/dd-bug-registration/SKILL.md`, `S/dd-code-review/SKILL.md` | none (law text) |
+| J1.S3.T4 | AC1.7 | `specs/releases/0.5.0/_RELEASE.json` | none (log data) |
