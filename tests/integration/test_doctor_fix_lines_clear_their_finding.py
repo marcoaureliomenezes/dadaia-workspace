@@ -396,7 +396,6 @@ OPERATOR_ACTION: dict[str, Callable[[Path], None]] = {
     "TREE-8": _plant_stray_dotfile,
     "LINT-1": lambda r: _write(r / "specs" / "memory" / "product" / "testarea" / "x.md", "# X\n"),
     "SPEC-DOC-001": lambda r: (r / "specs" / "constitution.md").unlink(),
-    "SPEC-DOC-024": lambda r: _write(r / f"specs/releases/{_RELEASE}/rc-1/TASKS.md", "# Tasks\n\n**Status:** Draft\n"),
     "SPEC-DOC-026": lambda r: _write(r / f"specs/releases/_archive/{_RELEASE}/SPEC.md", "# S\n"),
     "ADR-SUPERSEDED-CITATION": lambda r: (
         _write(r / "specs/ADRs/decisions.jsonl", '{"id": "0001", "status": "superseded"}\n'),

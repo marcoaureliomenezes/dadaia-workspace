@@ -114,11 +114,6 @@ RULES: tuple[SpecsRule, ...] = (
         fix_help=("specs", "init", "--specs-dir", "<specs>"),
     ),
     _rule(
-        ("SPEC-DOC-024",),
-        lambda d: d._release.check_phase_markers_coherence(),
-        fix_help="Operator action: reconcile the live phase with its TASKS.md under <specs>/releases, then commit.",
-    ),
-    _rule(
         ("SPEC-DOC-026",),
         lambda d: d._release.check_unique_release_ids(),
         fix_help="Operator action: rename one of the duplicated dirs under <specs>/releases, then commit.",

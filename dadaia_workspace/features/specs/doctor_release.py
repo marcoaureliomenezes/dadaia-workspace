@@ -1,8 +1,7 @@
 """Release validator: the active release, its artifacts, SemVer + ledger invariants.
 
 Single-responsibility sibling of the SpecsDoctor coordinator. Owns the active-release
-lifecycle check (SPEC-DOC-004), the release ledger invariants (phase<->markers
-SPEC-DOC-024, unique ids SPEC-DOC-026), plus the family-local status extractor.
+lifecycle check (SPEC-DOC-004), the release ledger invariant (unique ids SPEC-DOC-026), plus the family-local status extractor.
 A release dir's name and placement are TREE-8's alone.
 Leaf-only: imports the shared leaves + core, never a sibling validator.
 
@@ -12,7 +11,6 @@ state document is valid is `release.py check`'s answer (LEDGER-RELEASE-SCHEMA).
 
 from __future__ import annotations
 
-from dataclasses import astuple
 from pathlib import Path
 
 from dadaia_workspace.core.doctor_rules import SectionFinding
@@ -103,23 +101,6 @@ class ReleaseValidator:
                     )
                 )
         return issues
-
-    def check_phase_markers_coherence(self) -> list[SectionFinding]:
-        """SPEC-DOC-024: a live release in IMPLEMENTATION carries an approved TASKS.md.
-        Whether a task is still open is `release.py phase CLOSURE`'s one refusal
-        (`_release_schema.MARK_RE`) — the doctor keeps no task-marker regex."""
-        release, phase, candidate = astuple(self.tree.active_release)
-        if not release or phase != "IMPLEMENTATION":
-            return []
-        tasks = (candidate or self.specs_dir / "releases" / release / "rc-<N>") / "TASKS.md"
-        status = _extract_status(tasks)
-        if status == APPROVED:
-            return []
-        description = (
-            f"Active release phase='IMPLEMENTATION' but TASKS.md of release '{release}' is "
-            f"not '**Status:** {APPROVED}' (found {status!r})."
-        )
-        return [specs_finding("SPEC-DOC-024", Severity.ERROR, description, str(tasks))]
 
     def check_unique_release_ids(self) -> list[SectionFinding]:
         """SPEC-DOC-026: release ids (dir basenames) must be unique across
