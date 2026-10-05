@@ -193,3 +193,18 @@ class TestAliveContextNames:
         ]
         (states / "spec_contexts.json").write_text(json.dumps({"contexts": contexts}), "utf-8")
         assert invocation.alive_context_names(tmp_path) == ["pretty", "bare"]
+
+
+def test_a_row_without_a_main_slug_has_no_specs_tree(tmp_path: Path) -> None:
+    """J2.S6.T5 (review F7): a hand-edited ALIVE row whose main slug is empty or absent maps
+    to no ``repos/<slug>/specs`` tree; the other ALIVE contexts still do."""
+    ws = _mk_ws(tmp_path)
+    path = ws / ".dadaia" / "states" / "spec_contexts.json"
+    data = json.loads(path.read_text(encoding="utf-8"))
+    data["contexts"] += [{"name": "blank", "repo_slug": "", "state": "alive"},
+                         {"name": "bare", "state": "alive"}]  # fmt: skip
+    path.write_text(json.dumps(data), encoding="utf-8")
+
+    assert invocation.alive_context_trees(ws) == {"proj": ws / "repos" / "proj" / "specs"}
+    assert invocation.repo_slug_for_context(ws, "blank") is None
+    assert invocation.alive_context_names(ws) == ["proj", "blank", "bare"]
