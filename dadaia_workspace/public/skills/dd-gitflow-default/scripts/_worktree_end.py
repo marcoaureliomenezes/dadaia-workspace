@@ -284,12 +284,13 @@ def merge(root: Path, path: str, keep: list[str], drop: bool) -> str:
             raise Refusal(f"Owner-tests: {' '.join(missing)} not in the tree",
                           f"Operator action: fix the Owner-tests: trailer of the task's commits in {tree}")  # fmt: skip
         touched = git(tree, "diff", "--name-only", "--diff-filter=d", f"{onto}...HEAD").split()
-        if not any(Path(p).name.startswith("test_") for p in owners) and any(
-            p.endswith(".py") and not p.startswith("tests/") for p in touched
+        argv = [*dict.fromkeys(touched + owners)]
+        if any(p.endswith(".py") for p in argv) and not any(
+            Path(p).name.startswith("test_") for p in argv
         ):
-            raise Refusal("a code task names no test file in Owner-tests: its gate runs no tests",
+            raise Refusal("a code task's gate names no test file: it runs no tests",
                           f"Operator action: name the task's owner tests in an Owner-tests: trailer on its commits in {tree}")  # fmt: skip
-        _gate(tree, "task", *dict.fromkeys(touched + owners), ref=onto)
+        _gate(tree, "task", *argv, ref=onto)
         _refuse_dirty(into)
     elif non_code(name):
         _check_specs_only(tree, onto)
