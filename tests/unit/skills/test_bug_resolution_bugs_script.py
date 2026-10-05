@@ -169,6 +169,25 @@ def test_check_refuses_a_caused_by_cycle_or_dangling_target(
     assert done.returncode == (1 if needle == "cycle" else 0), done.stdout
 
 
+@pytest.mark.parametrize(("caused_by", "code"), [
+    ("J1.S2.T3", 0),  # a job task row of the live rc (AC1.9)
+    ("J9.S9.T9", 1),  # in no tasks/<job>.md
+])  # fmt: skip
+def test_check_resolves_a_job_task_id_against_the_rc_tasks_folder(
+    script: Path, tmp_path: Path, caused_by: str, code: int
+) -> None:
+    specs = _ledger(tmp_path, {**_OPEN_RECORD, "caused_by": caused_by})
+    job = specs / "releases" / "0.5.0" / "rc-9" / "tasks" / "job1.md"
+    job.parent.mkdir(parents=True)
+    job.write_text("| J1.S2.T3 | AC1.1 | `ci.py` |\n", encoding="utf-8")
+    done = _run(script, "check", "--specs", str(specs), "--json")
+    assert done.returncode == code, done.stdout
+    fixes = [f["fix"] for f in json.loads(done.stdout)]
+    assert fixes == ([f"{Path(sys.executable).as_posix()} {script.as_posix()} update a-bug"
+                      f" --set caused_by=none --specs {specs.as_posix()}"]
+                     if code else []), fixes  # fmt: skip
+
+
 def _archive(specs: Path, bug_id: str) -> None:
     archived = {**_OPEN_RECORD, "id": bug_id, "status": "rejected", "cause": "c",
                 "closed_at": "2026-09-21T00:00:00Z"}  # fmt: skip
