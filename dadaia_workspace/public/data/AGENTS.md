@@ -67,7 +67,7 @@
 | handoff | `.dadaia/handoff/AGENTS.md` | emission, schema, ack |
 | tmp / states | `.dadaia/tmp/AGENTS.md`, `.dadaia/states/AGENTS.md` | TTL, state files |
 | a repo | `repos/<slug>/AGENTS.md` | clean tree, caches, tests |
-| worktrees | `worktrees/AGENTS.md` | kinds, the merge ritual, one venv |
+| worktrees | `worktrees/AGENTS.md` | one tree per job, three gates, one review, one venv |
 
 ## 6. Skills — `.agents/skills/dd-*`
 

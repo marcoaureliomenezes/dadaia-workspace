@@ -50,7 +50,7 @@ path or entity as it appears in an installed workspace.
 | `.dadaia/handoff/AGENTS.md` | the handoff lane | emission, schema, ack-on-consume |
 | `.dadaia/tmp/AGENTS.md` | the TTL scratch lane | what may be written there and for how long |
 | `.dadaia/states/AGENTS.md` | CLI-owned state files | who writes them and by which verb |
-| `worktrees/AGENTS.md` | the canonical worktrees | kinds, the merge ritual, one venv, hygiene |
+| `worktrees/AGENTS.md` | the canonical worktrees | one tree per job, three gates, one review, one venv, hygiene |
 | `repos/<slug>/AGENTS.md` | a repo working tree | clean-tree rule, cache redirection |
 
 ## 3. Skills — `.agents/skills/dd-*/SKILL.md`

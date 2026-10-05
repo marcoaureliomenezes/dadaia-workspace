@@ -25,7 +25,7 @@ The branch contract by role; the names are `specs/constitution.md`'s `gitflow:` 
 4. Surface a work branch predating the integration branch's last move to the operator first — it is stale.
 5. Branch count, cut point and name follow §2a.
 6. Definition stage: author the candidate's SPEC/PLAN/TASKS in its `rc-<N>/` on the work branch.
-7. Implementation stage: one commit per completed task group, shaped per §3a.
+7. Implementation stage: one commit per task, shaped per §3a.
 8. Candidate closure: open one work → integration PR and merge it green.
 9. After the merge, ask the operator: **promote or continue?** Continue = the next candidate's `python3 .agents/skills/dd-release-implementation/scripts/release.py new <id>`; promote = step 10.
 10. Promote: open the PR integration → principal (ship verdict pre-staged naming the integration tip, §3b); its merge is the deploy.
@@ -41,28 +41,28 @@ The branch contract by role; the names are `specs/constitution.md`'s `gitflow:` 
 | principal | No — never a direct push | — | PR from the integration branch, at the final `rc` |
 
 - No `v` prefix, no suffix, no other branch we cut; `hotfix/*` is retired (operator request only, no cadence).
-- Exactly one live work branch, named for the live release; a bug fix reaches it in any phase through a `bug` worktree (`worktrees/AGENTS.md` §2).
+- Exactly one live work branch, named for the live release; a job — a bug fix included — reaches it through its own worktree (`worktrees/AGENTS.md` §1).
 - Each candidate closure burns one work -> integration merge; after it, ask the operator: promote or continue.
 - Every flow stage runs on the work branch; the other two are PR targets only, never a working branch.
 
 ## 3a. Commit shapes — each write in its own shape
 
-A commit stages only paths its worktree kind's allowed set holds (`_worktree_kinds.KINDS`, `worktrees/AGENTS.md`); `<code>` is any path outside `specs/`.
+One job's tree holds code, tests, specs, memory and derived docs alike (`worktrees/AGENTS.md` §1); the shape names the write, never a tree. `<code>` is any path outside `specs/`; `<id>` a task id `J<n>.S<m>.T<k>`.
 
-| # | Kind | Write | Message |
+| # | Tree | Write | Message |
 |---|---|---|---|
-| 1 | `bug`, `backlog` | Bug registration: `specs/bugs/BUGS.jsonl` | `chore(bugs): report <id>` |
-| 2 | `backlog` | Backlog entry or exit: `specs/backlog/BACKLOG.json`, `specs/backlog/_archive/backlog_histo.jsonl` | `chore(backlog): …` |
-| 2 | `backlog`, `release` | ADR proposal or in-place `measured_by` repair (ADR 0138): `specs/ADRs/decisions.jsonl` | `docs(adr): propose <slug>` / `chore(adrs): repair …` |
-| 2 | `release` | ADR acceptance with its canonical-memory hunk: `specs/ADRs/decisions.jsonl`, `specs/memory/*` | `docs(adr): accept <slug>` |
-| 3 | `bug` | Bug fix: `<code>` + regression test + its `specs/bugs/BUGS.jsonl` line, red loop quoted in the body | `fix(bugs): <id> — <cause>` |
-| 4 | `bug` | Terminal transition without code (`resolve` by a task, `supersede`, `defer`, `reject`): `specs/bugs/BUGS.jsonl` | `chore(bugs): <verb> <id> — <reason, or by <task-id> (<sha>)>` |
-| 5 | `release` | Release definition: the trio, one commit, `specs/releases/<v>/rc-<N>/*` | `feat(specs): define candidate …` |
-| 6 | `impl` | Task implementation: its `W:` (`<code>`) | `conventional-commit(task-id): description` — the auditable trace |
-| 7 | `impl` | Task marker (the releases law §3): `specs/releases/<v>/rc-<N>/TASKS.md` | `chore(tasks): <verb> <id>` |
-| 8 | `release` | Trio amendment or approval: `specs/releases/<v>/rc-<N>/SPEC.md` | `docs(specs): …` |
-| 9 | `release` | Closure memory pass: `specs/memory/*` | `docs(memory): …` |
-| 10 | `release` | Release state: `specs/releases/<v>/_RELEASE.json` | `chore(release): …` |
+| 1 | a job, `backlog-<slug>` | Bug registration: `specs/bugs/BUGS.jsonl` | `chore(bugs): report <id>` |
+| 2 | `backlog-<slug>` | Backlog entry or exit: `specs/backlog/BACKLOG.json`, `specs/backlog/_archive/backlog_histo.jsonl` | `chore(backlog): …` |
+| 2 | `backlog-<slug>`, `define` | ADR proposal or in-place `measured_by` repair (ADR 0138): `specs/ADRs/decisions.jsonl` | `docs(adr): propose <slug>` / `chore(adrs): repair …` |
+| 2 | `define`, `reconcile` | ADR acceptance with its canonical-memory hunk: `specs/ADRs/decisions.jsonl`, `specs/memory/*` | `docs(adr): accept <slug>` |
+| 3 | a job | Bug fix: `<code>` + regression test + its `specs/bugs/BUGS.jsonl` line, red loop quoted in the body | `fix(bugs): <id> — <cause>` |
+| 4 | a job | Terminal transition without code (`resolve` by a task, `supersede`, `defer`, `reject`): `specs/bugs/BUGS.jsonl` | `chore(bugs): <verb> <id> — <reason, or by <task-id> (<sha>)>` |
+| 5 | `define` | Release definition: `specs/releases/<v>/rc-<N>/*` | `feat(specs): define candidate …` |
+| 6 | a job | Task: its `W:` | `conventional-commit(<id>): description` — the auditable trace; a stage closes with a body line `stage: <id> — unit+integration green` |
+| 7 | a job | The job file's `done`, once per job, by its close task: `specs/releases/<v>/rc-<N>/tasks/<job>.md` | `chore(tasks): done <job>` |
+| 8 | `define` | Trio amendment or approval: `specs/releases/<v>/rc-<N>/SPEC.md` | `docs(specs): …` |
+| 9 | `reconcile` | Memory pass and derived docs: `specs/memory/*`, `README.md`, `llms.txt`, `docs/*.md` | `docs(memory): …` |
+| 10 | a job, `reconcile` | Release state: `specs/releases/<v>/_RELEASE.json` (a job's `kind: merge` entry) | `chore(release): …` |
 
 ## 3b. The PR gate
 
