@@ -306,3 +306,34 @@ def test_n_moves_to_one_destination_make_n_holds(tmp_path: Path) -> None:
         sweep.move(tmp_path, _file(tmp_path / "slop.txt"), tmp_path / "reaped" / "slop.txt", "slop")
 
     assert sorted(p.name for p in (tmp_path / "reaped").iterdir()) == ["slop.txt", "slop.txt-1", "slop.txt-2"]
+
+
+@pytest.mark.skipif(os.name == "nt" or os.geteuid() == 0, reason="POSIX dir permissions; root bypasses them")
+def test_an_unopenable_subdirectory_is_refused_never_raised(tmp_path: Path) -> None:
+    """Rows 21/22: a 0o000 subdirectory fails ``os.open`` inside the walk; that failure is
+    recorded and judged by the outcome, never re-called without its flags."""
+    entry = tmp_path / "tmp" / "a" / "20200101"
+    (locked := entry / "x").mkdir(parents=True)
+    _file(locked / "f.txt")
+    locked.chmod(0o000)
+
+    done = sweep.remove(tmp_path, entry, "tmp/a/20200101")
+
+    assert str(done) == (
+        f"skipped 'tmp/a/20200101' (errno 13: Permission denied) — {locked} sits in a "
+        f"directory owned by {entry.owner()}; Operator action: remove {entry}"
+    )
+    assert not done and (locked / "f.txt").exists()
+
+
+def test_a_nested_hold_stamps_its_top_entry(tmp_path: Path) -> None:
+    """ADR 0074: a hold of ``a/b/c`` restarts the clock of ``reaped/<day>/a``, not of ``a/b``."""
+    _file(tmp_path / "a" / "b" / "c")
+    sweep.hold(tmp_path, tmp_path / "a" / "b" / "c", "a/b/c")
+    [top] = (tmp_path / ".dadaia" / "reaped").glob("*/a")
+    _file(tmp_path / "a" / "b" / "c")
+    os.utime(top, (0, 0))
+
+    sweep.hold(tmp_path, tmp_path / "a" / "b" / "c", "a/b/c")
+
+    assert top.stat().st_mtime > 1_000_000_000
