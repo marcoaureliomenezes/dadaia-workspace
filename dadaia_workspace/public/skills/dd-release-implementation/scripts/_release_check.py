@@ -31,13 +31,14 @@ from _release_schema import (  # noqa: E402
 _LAW = "specs/releases/AGENTS.md: release.py is this ledger's ONE writer"
 #: A merged job's measurement, one `kind: merge` entry per job (RELEASE-EVENTS.md §log).
 _JOB_MERGE = re.compile(
-    r"job: [a-z0-9-]+; start: \S+; end: \S+; wall: \d+; ritual_wait: \d+; dispatches: \d+"
+    r"job: [a-z0-9-]+; start: \S+; end: \S+; wall: \d+; ritual_wait: \d+; dispatches: \d+; job_gate_runs: \d+"
 )
 
 
 def finding(path: str, line: int, message: str, fix: str) -> dict[str, Any]:
     """One `check --json` record of this ledger."""
-    return _ledger.finding(CODE, path, line, message, fix)
+    record: dict[str, Any] = _ledger.finding(CODE, path, line, message, fix)
+    return record
 
 
 def _unwritten(
