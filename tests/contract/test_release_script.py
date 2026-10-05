@@ -424,7 +424,6 @@ def _dag(*rows: tuple[str, str]) -> str:
 
 _CHAIN = [("Job 1", "—"), *((f"Job {n}", f"Job {n - 1}") for n in range(2, 9))]
 _RECON = ("Reconciliation", "Jobs 1–8")
-_RED = pytest.mark.xfail(strict=True, reason="J4.S2.T1: release.py check lacks the row")
 
 
 @pytest.mark.parametrize(
@@ -432,14 +431,14 @@ _RED = pytest.mark.xfail(strict=True, reason="J4.S2.T1: release.py check lacks t
     [
         pytest.param(_dag(*_CHAIN, _RECON), _JOB, None, id="valid-8-jobs-plus-reconciliation"),
         pytest.param(_dag(("Job 1", "Job 2"), ("Job 2", "Job 1")), _JOB, "cyclic",
-                     id="cyclic-dag", marks=_RED),
+                     id="cyclic-dag"),
         pytest.param(_dag(("Job 2", "—"), ("Job 3", "Job 2")), _JOB, "Job 1",
-                     id="no-job-1", marks=_RED),
+                     id="no-job-1"),
         pytest.param(_dag(*_CHAIN, ("Job 9", "Job 8"), _RECON), _JOB, "8 jobs",
-                     id="nine-jobs", marks=_RED),
+                     id="nine-jobs"),
         pytest.param(_dag(*_CHAIN[:2]),
                      _JOB + "- J2.S2.T2 — AC2.1 · `W:` `src/x.py` · owner `tests/unit/test_x.py`\n",
-                     "src/x.py", id="overlapping-w-in-a-stage", marks=_RED),
+                     "src/x.py", id="overlapping-w-in-a-stage"),
     ],
 )  # fmt: skip
 def test_check_refuses_each_trio_row(

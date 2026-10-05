@@ -14,6 +14,7 @@ from __future__ import annotations
 import json
 import re
 import sys
+from graphlib import CycleError, TopologicalSorter
 from pathlib import Path
 from typing import Any
 
@@ -106,3 +107,23 @@ def histo_findings(text: str, root: Path = SPECS) -> list[dict[str, Any]]:
         if messages:
             findings.append(_unwritten(HISTO, number, "; ".join(messages), root))
     return findings
+
+
+def dag_errors(plan: str) -> list[str]:
+    """The PLAN's `## DAG` table (job | waits on | why) read once: Job 1 exists, at most 8
+    jobs (Reconciliation uncounted), no cycle."""
+    section = re.split(r"^## DAG.*$", plan, maxsplit=1, flags=re.MULTILINE)[1:]
+    rows = re.findall(r"^\|\s*Job (\d+)\s*\|([^|]*)\|", re.split(r"^#", section[0], flags=re.MULTILINE)[0],
+                      re.MULTILINE) if section else []  # fmt: skip
+    graph = {
+        int(job): {n for a, b in re.findall(r"(\d+)(?:\s*[–-]\s*(\d+))?", waits)
+                   for n in range(int(a), int(b or a) + 1)}
+        for job, waits in rows
+    }  # fmt: skip
+    errors = ["the DAG has no Job 1"] if graph and 1 not in graph else []
+    errors += [f"the DAG holds {len(graph)} jobs — at most 8 jobs"] if len(graph) > 8 else []
+    try:
+        tuple(TopologicalSorter(graph).static_order())
+    except CycleError as exc:
+        errors.append(f"the DAG is cyclic: {' -> '.join(f'Job {n}' for n in exc.args[1])}")
+    return errors

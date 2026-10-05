@@ -21,7 +21,7 @@ sys.path.insert(1, str(Path(__file__).resolve().parents[2] / "dd-spec-navigator"
 
 import _memory_drift as drift  # noqa: E402
 from _ledger import records  # noqa: E402
-from _release_check import finding, histo_findings, state_findings  # noqa: E402
+from _release_check import dag_errors, finding, histo_findings, state_findings  # noqa: E402
 from _release_phase import NEXT  # noqa: E402
 from _release_schema import (  # noqa: E402
     CANDIDATE_DOCS,
@@ -196,6 +196,11 @@ def _directory_findings(release_dir: Path, specs: Path) -> list[dict[str, Any]]:
                     f"Operator action: correct {job} (dd-release-definition §5)")
             for job in (sorted(candidate.glob("tasks/*.md")) if candidate else [])
             for error in job_errors(job.read_text("utf-8"), f"tasks/{job.name}")]  # fmt: skip
+    plan = candidate / "PLAN.md" if candidate else None
+    if plan and plan.is_file():
+        jobs += [finding(f"{dir_rel}/{plan.parent.name}/PLAN.md", 1, error,
+                         f"Operator action: redesign the DAG table in {plan}")
+                 for error in dag_errors(plan.read_text("utf-8"))]  # fmt: skip
     tasks = candidate / "TASKS.md" if candidate else None
     marks = list(MARK_RE.finditer(tasks.read_text("utf-8"))) if tasks and tasks.is_file() else []
     memory = _memory_tasks(marks, tasks, dir_rel) if tasks else []

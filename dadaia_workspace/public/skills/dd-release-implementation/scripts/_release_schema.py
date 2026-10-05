@@ -200,30 +200,40 @@ def writes(line: str) -> list[str]:
     return re.findall(r"`([^`]+)`", kept)
 
 
+def stage_writes(body: str) -> list[list[str]]:
+    """Each task line's `W:` paths in one stage *body*: a bullet's `W:` field, or a table
+    row's cell under its header's `W:` column."""
+    tasks, column = [], None
+    for line in body.splitlines():
+        cells = [c.strip() for c in line.split("|")] if line.lstrip().startswith("|") else []
+        if "`W:`" in cells:
+            column = cells.index("`W:`")
+            continue
+        column = column if cells else None
+        if paths := writes("`W:` " + cells[column] if column and column < len(cells) else line):
+            tasks.append(paths)
+    return tasks
+
+
 def job_errors(text: str, rel: str) -> list[str]:
     """Why job file *text* at *rel* is malformed: no `## Stage` heading, a stage with no
-    `- Contract:` line, or a first stage whose tasks write anything but tests — save
-    ``reconcile.md``'s, the Reconciliation job's first work stage (ADR 0192)."""
+    `- Contract:` line, two tasks of one stage writing one path, or a first stage whose
+    tasks write anything but tests — save ``reconcile.md``'s, the Reconciliation job's
+    first work stage (ADR 0192)."""
     stages = re.split(r"^## Stage ", text, flags=re.MULTILINE)[1:]
     if not stages:
         return [f"{rel} has no '## Stage <id>' heading"]
     errors: list[str] = []
     for index, body in enumerate(stages):
-        stage = body.split(maxsplit=1)[0]
+        stage, tasks = body.split(maxsplit=1)[0], stage_writes(body)
         if not re.search(r"^- Contract:", body, re.MULTILINE):
             errors.append(f"{rel} stage {stage} has no '- Contract:' line")
-        lines, column = [], None  # a table row's writes sit under its header's `W:` cell
-        for line in body.splitlines() if index == 0 and Path(rel).name != "reconcile.md" else []:
-            cells = [c.strip() for c in line.split("|")] if line.lstrip().startswith("|") else []
-            if "`W:`" in cells:
-                column = cells.index("`W:`")
-                continue
-            column = column if cells else None
-            lines.append("`W:` " + cells[column] if column and column < len(cells) else line)
+        flat = [path for paths in tasks for path in set(paths)]
+        errors += [f"{rel} stage {stage}: two tasks write {path} — `W:` sets overlap"
+                   for path in sorted({p for p in flat if flat.count(p) > 1 and "/" in p})]  # fmt: skip
         errors += [
             f"{rel} stage {stage} writes {path} — stage 1 writes tests only"
-            for line in lines
-            for path in writes(line)
+            for path in (flat if index == 0 and Path(rel).name != "reconcile.md" else [])
             if not (path.startswith("tests/") or Path(path).name.startswith("test_"))
         ]
     return errors
