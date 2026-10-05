@@ -549,6 +549,11 @@ After AC9.3 and AC8.1's `Intent:` strip merge. Each RED is a behaviour assert in
   - AC10.12 (F098, FR `guidance-messages-name-the-right-target`, HOOKS-DRIFT-1) — T-050-177; carried to rc-9 — grill 2026-10-05 Q21; scope Q3 routes it to the backlog (`BACKLOG.json:13`), then rc-10.
   - AC11.2's T1 and T2 task dirs; AC11.3; AC11.4; AC11.6, its log line included — T-050-185, T-050-186, T-050-188, T-050-181; carried to rc-9 — grill 2026-10-05 Q21; scope Q1 routes the evals to rc-10, with G6's 0177 acceptance edge.
   - AC8.10's last bullet — T-050-180; carried to rc-9 — grill 2026-10-05 Q21; scope Q1 routes QUALITY to rc-10, with the rc-9 line's AC13.5, AC13.9, AC13.10 and 0176's acceptance (scope I3).
+  - AC13.6's verb and the age path's deletion (`--now`, `--threshold-days`, the cutoff, `archivable`, SPEC-DOC-041), `archived_by` on each moved record — T-050-210; carried to rc-9's J1 — operator ruling 2026-10-05 "Sim, fecha assim (Recommended)"; prepared work in `refs/backup/0.5.0b-impl-full`.
+  - AC13.6's restore of the 65 age-archived v1 records — T-050-211; carried to rc-9's J1 — same ruling, same ref.
+  - AC13.1's `found_in` backfill — T-050-212; carried to rc-9's J1 — same ruling, same ref.
+  - The closure memory pass (RC-FLOW step 5), AC10.14's memory half and the `ci-preflight` atom's deletion included — carried to rc-9's Reconciliation — same ruling.
+  - Not run at this closure: `bugs.py archive` (RC-FLOW step 7's aging). ADR 0187 (accepted): a record leaves the ledger only by an accepted ADR; T-050-210's ADR-only archive verb is carried.
   - Not carried: AC10.14's law half (T-050-189), delivered by T-050-191's commit, only its marker missing (scope I1); T-050-181's readout of what rc-8 delivered, which rc-8's closure takes (scope I3).
 
 ## Open questions for the operator
