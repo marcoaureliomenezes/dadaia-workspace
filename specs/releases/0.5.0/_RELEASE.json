@@ -1,10 +1,10 @@
 {
   "schema": "release-state-v1",
   "release": "0.5.0",
-  "phase": "DEFINITION",
+  "phase": "IMPLEMENTATION",
   "defined": {
-    "sha": "407c28bdb",
-    "ts": "2026-10-03T16:53:34Z"
+    "sha": "29ee92d3a",
+    "ts": "2026-10-05T18:41:40Z"
   },
   "implemented": {
     "sha": "7f5fea2f0",
@@ -960,6 +960,27 @@
       "agent": "release.py new",
       "kind": "note",
       "text": "Candidate born on 0.5.0 (prior candidate closed at 7f5fea2f0)"
+    },
+    {
+      "ts": "2026-10-05T18:41:40Z",
+      "agent": "release.py",
+      "kind": "milestone",
+      "candidate": "rc-9",
+      "milestone": "defined",
+      "sha": "29ee92d3a",
+      "text": "Candidate defined at 29ee92d3a; phase IMPLEMENTATION."
+    },
+    {
+      "ts": "2026-10-05T18:41:40Z",
+      "agent": "main-thread",
+      "kind": "merge",
+      "text": "job: job1; start: 2026-10-05T16:00:19Z; end: 2026-10-05T17:57:55Z; wall: 117; ritual_wait: 13; dispatches: 13; job_gate_runs: 4"
+    },
+    {
+      "ts": "2026-10-05T18:41:40Z",
+      "agent": "main-thread",
+      "kind": "merge",
+      "text": "job: hotfix-task-id-paths; start: 2026-10-05T18:08:47Z; end: 2026-10-05T18:33:57Z; wall: 25; ritual_wait: 12; dispatches: 1; job_gate_runs: 2"
     }
   ]
 }
