@@ -1,5 +1,6 @@
-"""A tmp workspace for `worktree.py` tests: one repo `r` on `main` with an Approved 0.5.0 trio
-and `feature/0.5.0`, and a stub CLI at `.dadaia/.venv/bin/dadaia` standing for the two
+"""A tmp workspace for `worktree.py` tests: one repo `r` on `main` with an Approved 0.5.0 rc-1
+trio, a valid `_RELEASE.json`, a `scripts/ci.py` whose level L fails iff the tree holds
+`RED-<L>`, and `feature/0.5.0`; the venv's python is this interpreter, and a stub CLI at `.dadaia/.venv/bin/dadaia` standing for the two
 reads the script makes — `context list --json` (gitflow `dev` as integration, so a
 hardcoded `main`/`develop` fails) and `reports validate` (valid iff `schema_version`)."""
 
@@ -22,6 +23,9 @@ SCRIPT = (
     / "dadaia_workspace/public/skills/dd-gitflow-default/scripts/worktree.py"
 )
 FLOW = {"principal": "trunk", "integration": "dev", "work": "feature/"}
+#: The repo's gate (ADR 0190): prints its argv; level L fails iff the tree holds `RED-<L>`.
+CI = 'import pathlib, sys\nprint("ci", *sys.argv[1:])\nsys.exit(pathlib.Path("RED-" + sys.argv[1]).exists())\n'
+JOB = "0.5.0-rc1/j1"
 
 
 def git(repo: Path, *args: str) -> str:
@@ -48,25 +52,32 @@ def make_workspace(root: Path) -> Path:
     rel.mkdir(parents=True)
     git(repo, "init", "-q")
     for doc in ("SPEC", "PLAN", "TASKS"):
-        (rel / f"{doc}.md").write_text(f"# {doc}\n\n**Status:** Approved\n")
+        (rel / f"{doc}.md").write_text(
+            f"# {doc}\n\n**Status:** Approved\n\n**Origin:** operator-demand\n"
+        )
+    state = {"schema": "release-state-v1", "release": "0.5.0", "phase": "DEFINITION",
+             "defined": None, "implemented": None, "shipped": None, "log": []}  # fmt: skip
+    (rel.parent / "_RELEASE.json").write_text(json.dumps(state))
     (repo / ".gitignore").write_text("*.scratch\n__pycache__/\n")
-    (repo / "AGENTS.md").write_text("verify: true\n")  # gate 1 (ADR 0185)
+    (repo / "scripts").mkdir()
+    (repo / "scripts/ci.py").write_text(CI)
+    (root / ".dadaia/.venv/bin/python").symlink_to(sys.executable)
     git(repo, "add", "-A")
     git(repo, "commit", "-qm", "init")
     git(repo, "branch", "feature/0.5.0")
     return root
 
 
-def associate(root: Path, plan: str) -> None:
-    """Repo `a` joins `r`'s context with `feature/0.5.0` and no specs; `r`'s PLAN is *plan*."""
+def associate(root: Path, spec: str) -> None:
+    """Repo `a` joins `r`'s context with `feature/0.5.0` and no specs; `r`'s SPEC is *spec*."""
     workspace_cli(root, {"main_repo": "r", "associated_repos": [{"slug": "a"}], "gitflow": FLOW})
     (repo := root / "repos/a").mkdir()
     git(repo, "init", "-q")
     git(repo, "commit", "-q", "--allow-empty", "-m", "init")
     git(repo, "branch", "feature/0.5.0")
-    plan_md = root / "repos/r/specs/releases/0.5.0/rc-1/PLAN.md"
-    plan_md.write_text(f"**Status:** {plan}\n")
-    git(root / "repos/r", "commit", "-qam", "plan")
+    spec_md = root / "repos/r/specs/releases/0.5.0/rc-1/SPEC.md"
+    spec_md.write_text(f"**Status:** {spec}\n")
+    git(root / "repos/r", "commit", "-qam", "spec")
     git(root / "repos/r", "branch", "-f", "feature/0.5.0")
 
 
@@ -110,17 +121,27 @@ def commit(tree: Path, rel: str, text: str = "x = 1\n") -> str:
 
 
 def approve(
-    root: Path, sha: str, *, verdict: str = "APPROVED", valid: bool = True, at: str = "T10:00:00Z"
+    root: Path,
+    sha: str,
+    *,
+    verdict: str = "APPROVED",
+    valid: bool = True,
+    at: str = "T10:00:00Z",
+    ci_run: bool = True,
 ) -> Path:
-    """The reviewer's verdict as the main thread writes it: a handoff naming *sha*, emitted *at*."""
+    """The reviewer's verdict as the main thread writes it: a handoff naming *sha*, emitted *at*,
+    naming the job's CI-matrix run when *ci_run*."""
     name = f"2026-10-02{at.replace(':', '')}-dd-code-reviewer-{sha[:8]}-{verdict}.handoff.json"
     handoff = root / ".dadaia/handoff/c" / name
     handoff.parent.mkdir(parents=True, exist_ok=True)
     body = {
         "agent": "dd-code-reviewer",
         "verdict": verdict,
-        "scope": f"wt/0.5.0a-impl@{sha}",
+        "scope": f"wt/{JOB}@{sha}",
         "produced_at": f"2026-10-02{at}",
+        "verdict_reason": "CI matrix green: https://github.com/o/r/actions/runs/7"
+        if ci_run
+        else "",
     }
     handoff.write_text(json.dumps({**body, **({"schema_version": "1.2"} if valid else {})}))
     return handoff

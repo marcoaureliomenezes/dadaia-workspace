@@ -209,11 +209,11 @@ _APPEND = ["append", "--bug-id", "x", "--title", "t", "--severity", "LOW", "--su
 @pytest.mark.parametrize(
     ("argv", "trees", "fix", "note"),
     [
-        (["stats"], ("0.5.0a-bug",), "{rerun} --specs {ws}/repos/demo/specs", ""),
-        (_APPEND, ("0.5.0a-impl", "0.5.0b-bug"), "{rerun} --specs {ws}/worktrees/demo/0.5.0b-bug/specs", ""),
-        (_APPEND, ("0.5.0c-bug", "0.5.0b-bug"), "{rerun} --specs {ws}/worktrees/demo/0.5.0b-bug/specs",
-         "; the first by name of 2 open bug worktrees"),
-        (_APPEND, (), "{py} {ws}/dd-gitflow-default/scripts/worktree.py new demo --kind bug", ""),
+        (["stats"], ("0.5.0-rc1/j5",), "{rerun} --specs {ws}/repos/demo/specs", ""),
+        (_APPEND, ("0.5.0-rc1/j1",), "{rerun} --specs {ws}/worktrees/demo/0.5.0-rc1/j1/specs", ""),
+        (_APPEND, ("0.5.0-rc1/j7", "0.5.0-rc1/j6"), "{rerun} --specs {ws}/worktrees/demo/0.5.0-rc1/j6/specs",
+         "; the first by name of 2 open worktrees"),
+        (_APPEND, (), "{py} {ws}/dd-gitflow-default/scripts/worktree.py list", ""),
     ],
 )  # fmt: skip
 def test_a_missing_specs_tree_is_refused_never_created(
@@ -221,7 +221,7 @@ def test_a_missing_specs_tree_is_refused_never_created(
 ) -> None:
     """bug-law-spelling-registers-into-a-reaped-root-specs-tree; AC4.4 `_bound_tree`: a read
     verb reruns on the bound repo tree (and runs as printed); a write verb's fix names the
-    open worktree of its ledger's kind (`bug`), else the command opening one — never
+    repo's first open worktree (ADR 0191), else the command listing them — never
     `repos/<r>/specs`, which only `specs/audits/` may write."""
     (cli := tmp_path / ".dadaia/.venv/bin/dadaia").parent.mkdir(parents=True)
     cli.write_text(f'#!{sys.executable}\nprint(\'{{"main_repo": "demo"}}\')\n', "utf-8")

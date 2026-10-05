@@ -239,7 +239,7 @@ class DoctorService:
         found, failed, fix = worktree_rows(self._workspace_root)
         return [_worktree("warning", failed, fix)] if failed else [
             _worktree("warning" if r["warn"] else "info", f"{r['state']} {r['path']}"
-                      + "".join(f"  {k}={r[k]}" for k in ("kind", "age_hours", "ahead", "dirty") if k in r), r["fix"])
+                      + "".join(f"  {k}={r[k]}" for k in ("age_hours", "ahead", "dirty") if k in r), r["fix"])
             for r in found if r["repo"] in repos
         ]  # fmt: skip
 

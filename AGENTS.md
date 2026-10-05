@@ -14,7 +14,8 @@ into the source tree it projects from, so nothing here is regenerated.
 - Any failure of a workspace operation here is a product bug of this library:
   register it in `specs/bugs/`.
 
-verify: ../../../.dadaia/.venv/bin/python scripts/ci.py
+- Gates (ADR 0190): `scripts/ci.py task <files>` per task, `stage` per stage, `job` (the full run) once per job;
+  `worktree.py merge` runs the job level of a job's HEAD, as one argv list.
 
 - Versioning here: release-please owns the version, tag and CHANGELOG; the work branch
   is named for the live release (`_RELEASE.json`).

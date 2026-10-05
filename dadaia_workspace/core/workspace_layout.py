@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import fnmatch
 import re
-from collections.abc import Callable, Collection
+from collections.abc import Callable, Collection, Sequence
 from dataclasses import dataclass
 from enum import StrEnum
 from functools import cached_property
@@ -261,11 +261,9 @@ def _matches(sub: str, pattern: str) -> bool:
     return len(parts) == len(globs) and all(map(fnmatch.fnmatch, parts, globs))
 
 
-def protected_glob(rel: str, protected: tuple[str, ...]) -> str | None:
-    """The protected glob a prefix of *rel*'s repo-relative tail matches (``repos/<r>/…``,
-    ``worktrees/<r>/<name>/…``), else ``None``."""
-    parts = rel.split("/")
-    tail = parts[2:] if parts[0] == "repos" else parts[3:] if parts[0] == "worktrees" else []
+def protected_glob(tail: Sequence[str], protected: tuple[str, ...]) -> str | None:
+    """The protected glob a prefix of a repo-relative *tail* matches (the worktree grammar's
+    ``locate`` reads it, ADR 0191), else ``None``."""
     prefixes = ["/".join(tail[: n + 1]) for n in range(len(tail))]
     return next((g for g in protected for sub in prefixes if _matches(sub, g)), None)
 

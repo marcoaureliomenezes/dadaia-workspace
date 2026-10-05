@@ -175,10 +175,10 @@ def _plant_stray_dotfile(root: Path) -> None:
 
 
 def _plant_orphan_wt(root: Path) -> None:
-    """An unmerged orphan: `wt/0.5.0a-impl` carries a commit and has no tree."""
-    repo, tree = root / "repos/r", root / "worktrees/r/0.5.0a-impl"
+    """An unmerged orphan: `wt/0.5.0-rc1/j1` carries a commit and has no tree."""
+    repo, tree = root / "repos/r", root / "worktrees/r/0.5.0-rc1/j1"
     worktree_ws.git(repo, "checkout", "-q", "feature/0.5.0")
-    worktree_ws.git(repo, "worktree", "add", "-q", "-b", "wt/0.5.0a-impl", str(tree))
+    worktree_ws.git(repo, "worktree", "add", "-q", "-b", "wt/0.5.0-rc1/j1", str(tree))
     worktree_ws.commit(tree, "src/a.py")
     worktree_ws.git(repo, "worktree", "remove", str(tree))
 
@@ -528,7 +528,7 @@ def test_a_worktree_finding_is_cleared_by_its_merge_fix(tmp_path: Path) -> None:
         if not (found := doctor.check_worktrees("c")):
             break
         worktree_ws.approve(
-            root, worktree_ws.git(root / "repos/r", "rev-parse", "wt/0.5.0a-impl").strip()
+            root, worktree_ws.git(root / "repos/r", "rev-parse", "wt/0.5.0-rc1/j1").strip()
         )
         command = found[0].fix
         done = subprocess.run(command, shell=True, cwd=root, capture_output=True, text=True)  # noqa: S602

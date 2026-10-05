@@ -1,14 +1,15 @@
-"""AC1.8 (T-050-96, T-050-108), AC12.7 (ADR 0185): `worktree.py merge` fast-forwards the
-approved HEAD as it is, removes and `branch -d`s the worktree, re-runnable; every refusal (dirty,
-outside the kind's allowed set, a moved work branch, no APPROVED verdict for HEAD, ignored files,
-wrong branch, a stray blocking the fast-forward) carries one `fix:` that clears it; `clean`
-removes only an empty `dadaia:` worktree.
+"""AC1.8 (T-050-96, T-050-108); rc-9 AC1.2–AC1.5 (ADRs 0190, 0191): `worktree.py merge` lands a
+job on the work branch after its APPROVED verdict naming its CI-matrix run and the job gate,
+a `define` tree after its verdict and the ledger checks alone — HEAD as it is, by
+fast-forward, then removes and `branch -d`s the tree, re-runnable; every refusal (dirty, a
+moved work branch, no verdict, a red gate, ignored files, wrong branch, a stray blocking the
+fast-forward) carries one `fix:` that clears it; `clean` removes only an empty `dadaia:`
+worktree.
 Size: MEDIUM (real git, tmp workspace).
 """
 
 from __future__ import annotations
 
-import importlib.util
 import json
 import shlex
 import shutil
@@ -21,12 +22,12 @@ import pytest
 from tests.fixtures.harness_env import base_env
 from tests.helpers.release_state import write_release_phase
 from tests.helpers.skill_scripts import stage_skill_scripts
-from tests.helpers.worktree_ws import SCRIPT, approve, commit, fixes, git, make_workspace, run
+from tests.helpers.worktree_ws import JOB, SCRIPT, approve, commit, fixes, git, make_workspace, run
 from tests.helpers.worktree_ws import run_fix as _fix
 
 pytestmark = pytest.mark.integration
 
-TREE = "worktrees/r/0.5.0a-impl"
+TREE = f"worktrees/r/{JOB}"
 
 
 @pytest.fixture
@@ -34,7 +35,7 @@ def root(tmp_path: Path) -> Path:
     (tmp_path := tmp_path / "my ws").mkdir()  # every fix runs as printed: quoted
     make_workspace(tmp_path)
     git(tmp_path / "repos/r", "checkout", "-q", "feature/0.5.0")
-    assert run(tmp_path, "new", "r", "--kind", "impl").returncode == 0
+    assert run(tmp_path, "new", "r", JOB).returncode == 0
     return tmp_path
 
 
@@ -58,19 +59,19 @@ def test_merge_fast_forwards_removes_and_reruns(root: Path) -> None:
     assert git(repo, "rev-parse", "feature/0.5.0").strip() == sha  # HEAD as approved
     assert not tree.exists() and not git(repo, "branch", "--list", "wt/*").strip()
     assert run(root, "merge", TREE).returncode == 0  # a finished merge re-runs clean
-    assert run(root, "new", "r", "--kind", "impl").returncode == 0
+    assert run(root, "new", "r", JOB).returncode == 0
     shutil.rmtree(tree)  # the dadaia:-locked tree deleted by hand: an orphan, its exit clears it
     (row,) = json.loads(run(root, "list", "--json").stdout)
     assert (row["state"], row["path"]) == ("orphan", str(tree))
     assert run(root, *shlex.split(row["exit"])[2:]).returncode == 0
     assert json.loads(run(root, "list", "--json").stdout) == []
-    git(repo, "worktree", "add", "-q", "-b", "wt/0.5.0a-impl", str(tree))
+    git(repo, "worktree", "add", "-q", "-b", f"wt/{JOB}", str(tree))
     commit(tree, "src/b.py")
     git(repo, "worktree", "remove", str(tree))  # interrupted: tree gone, its commit unmerged
     assert _argv(run(root, "merge", TREE)) == [
-        *("git", "-C", str(repo), "worktree", "add", str(tree), "wt/0.5.0a-impl")
+        *("git", "-C", str(repo), "worktree", "add", str(tree), f"wt/{JOB}")
     ]
-    assert git(repo, "branch", "--list", "wt/0.5.0a-impl").strip()  # never -D
+    assert git(repo, "branch", "--list", f"wt/{JOB}").strip()  # never -D
 
 
 def test_dirty_and_outside_set_each_refuse_with_one_fix(root: Path) -> None:
@@ -91,15 +92,31 @@ def test_dirty_and_outside_set_each_refuse_with_one_fix(root: Path) -> None:
     assert git(tree, "status", "--porcelain") == ""  # removed, clean,
     assert not (tree / "wip").exists()
     assert git(tree, "stash", "list") == ""  # never in the stack every worktree shares
-    commit(tree, "specs/backlog/BACKLOG copy.json", "{}")  # new: the undo removes it
-    commit(tree, "specs/releases/0.5.0/rc-1/SPEC.md", "edited")  # on the work branch: restored
-    for rel, owner in (("specs/backlog/BACKLOG copy.json", "backlog"), ("SPEC.md", "release")):
-        outside = run(root, "merge", TREE)
-        assert rel in outside.stderr and f"{owner} worktree" in outside.stderr
-        restore, then = fixes(outside)[0].split("`")[1::2]  # Operator action: restore, commit
-        subprocess.run(restore, shell=True, check=True)  # noqa: S602 — runs as printed
-        assert shlex.split(then) == ["git", "-C", str(tree), "commit"]
-        git(tree, "commit", "-qm", f"revert: {rel}")
+
+
+def test_a_define_tree_lands_specs_only_through_the_ledger_checks(root: Path) -> None:
+    """AC1.2 (ADR 0190): a `define` merge runs the ledger, trio and release checks alone — an
+    invalid ledger refuses, a valid one lands with no test run; code refuses with its undo."""
+    repo, tree = root / "repos/r", root / "worktrees/r/0.5.0-rc1/define"
+    assert run(root, "new", "r", "0.5.0-rc1/define").returncode == 0
+    commit(tree, "specs/bugs/BUGS.jsonl", '{"id": "half"}\n')
+    approve(root, git(tree, "rev-parse", "HEAD").strip(), ci_run=False)
+    invalid = run(root, "merge", str(tree))
+    assert invalid.returncode == 1 and "bugs.py check failed" in invalid.stderr
+    git(tree, "reset", "-q", "--hard", "feature/0.5.0")
+    commit(tree, "RED-job", "")  # a file the job gate would fail on: never run here
+    code = run(root, "merge", str(tree))
+    assert "RED-job is code" in code.stderr
+    restore, then = fixes(code)[0].split("`")[1::2]  # Operator action: restore, commit
+    subprocess.run(restore, shell=True, check=True)  # noqa: S602 — runs as printed
+    assert shlex.split(then) == ["git", "-C", str(tree), "commit"]
+    git(tree, "commit", "-qm", "revert: RED-job")
+    approve(root, sha := commit(tree, "specs/releases/0.5.0/rc-1/PLAN.md", "**Status:** Draft\n"),
+            ci_run=False)  # fmt: skip
+    landed = run(root, "merge", str(tree))
+    assert landed.returncode == 0, landed.stderr
+    assert git(repo, "rev-parse", "feature/0.5.0").strip() == sha
+    assert "ci " not in landed.stdout and not tree.exists()
 
 
 def test_work_branch_refusals_fix_runs_verbatim(tmp_path: Path) -> None:
@@ -107,11 +124,11 @@ def test_work_branch_refusals_fix_runs_verbatim(tmp_path: Path) -> None:
     make_workspace(ws)
     repo = ws / "repos/r"
     git(repo, "branch", "feature/0.4.9", "feature/0.5.0")  # two work branches: the older goes
-    _fix(ws, two := run(ws, "new", "r", "--kind", "impl"))
+    _fix(ws, two := run(ws, "new", "r", JOB))
     assert "2 work branches" in two.stderr
     assert not git(repo, "branch", "--list", "feature/0.4.9").strip()
     git(repo, "branch", "-m", "feature/0.5.0", "dev")  # none: the fix cuts one from dev
-    _fix(ws, none := run(ws, "new", "r", "--kind", "impl"))
+    _fix(ws, none := run(ws, "new", "r", JOB))
     assert "no work branch" in none.stderr
     assert git(repo, "branch", "--list", "feature/*").strip()
 
@@ -208,48 +225,24 @@ def test_clean_removes_only_an_empty_worktree_of_ours(root: Path) -> None:
     git(tree, "reset", "-q", "--hard", "feature/0.5.0")
     assert run(root, "clean", TREE).returncode == 0 and not tree.exists()
     # ours is the canonical wt/ branch, locked or not (T-050-99 N2); a tree on another is not
-    git(repo, "worktree", "add", "-q", "-b", "side", str(root / "worktrees/r/0.5.0b-bug"))
-    foreign = run(root, "clean", "worktrees/r/0.5.0b-bug")
-    assert foreign.returncode == 1 and (root / "worktrees/r/0.5.0b-bug").exists()
-
-
-def test_each_kind_allows_its_own_set_only() -> None:
-    """ADRs 0106, 0124, 0148 (7), 0153: the allowed sets `merge` enforces, one row per kind boundary."""
-    spec = importlib.util.spec_from_file_location("kinds", SCRIPT.parent / "_worktree_kinds.py")
-    assert spec and spec.loader
-    kinds = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(kinds)
-    rows = {
-        ("impl", "src/a.py"): True,
-        ("impl", "specs/releases/0.5.0/rc-5/TASKS.md"): True,
-        ("impl", "specs/releases/0.5.0/TASKS.md"): False,
-        ("impl", "specs/backlog/BACKLOG.json"): False,
-        ("bug", "specs/bugs/BUGS.jsonl"): True,
-        ("bug", "specs/bugs/_archive/bugs_histo.jsonl"): True,
-        ("bug", "specs/releases/0.5.0/rc-5/SPEC.md"): False,
-        ("backlog", "specs/backlog/_archive/backlog_histo.jsonl"): True,
-        ("backlog", "src/a.py"): False,
-        ("release", "specs/memory/ARCHITECTURE.md"): True,
-        ("release", "specs/constitution.md"): True,
-        ("release", "specs/bugs/AGENTS.md"): True,
-        ("release", "specs/audits/x/FINDINGS.jsonl"): False,
-    }
-    assert {row: kinds.allows(*row) for row in rows} == rows
+    git(repo, "worktree", "add", "-q", "-b", "side", str(root / "worktrees/r/0.5.0-rc1/j2"))
+    foreign = run(root, "clean", "worktrees/r/0.5.0-rc1/j2")
+    assert foreign.returncode == 1 and (root / "worktrees/r/0.5.0-rc1/j2").exists()
 
 
 def test_release_closure_waits_for_every_other_wt(tmp_path: Path) -> None:
-    """AC1.10 (F4): closure runs in its release worktree, whose own wt/* is spared; any
-    other wt/* refuses it, naming repos/<r> and the owner's exit — `clean` for an empty
-    tree (N1), which clears it."""
+    """AC1.10 (F4); rc-9 AC1.5: closure runs in the Reconciliation job's tree, whose own wt/* is
+    spared; any other wt/* refuses it, naming repos/<r> and the owner's exit — `clean` for an
+    empty tree (N1), which clears it."""
     (root := tmp_path / "ws").mkdir()
     make_workspace(root)
     git(root / "repos/r", "checkout", "-q", "feature/0.5.0")
-    assert run(root, "new", "r", "--kind", "release").returncode == 0
-    specs = root / "worktrees/r/0.5.0a-release/specs"
+    assert run(root, "new", "r", "0.5.0-rc1/reconcile").returncode == 0
+    specs = root / "worktrees/r/0.5.0-rc1/reconcile/specs"
     write_release_phase(specs, "0.5.0", "IMPLEMENTATION")
     (specs / "releases/_archive").mkdir()
     (specs / "releases/_archive/releases_histo.jsonl").write_text("")
-    assert run(root, "new", "r", "--kind", "impl").returncode == 0  # empty
+    assert run(root, "new", "r", JOB).returncode == 0  # empty
     for skill in (
         "dd-spec-navigator",
         "dd-gitflow-default",
@@ -263,7 +256,7 @@ def test_release_closure_waits_for_every_other_wt(tmp_path: Path) -> None:
 
     refused = subprocess.run(closure, cwd=root, capture_output=True, text=True)
     fix = refused.stderr.rsplit("fix: ", 1)[1].strip()
-    assert "repos/r " in refused.stderr and fix.endswith(f"clean {root}/worktrees/r/0.5.0b-impl")
+    assert "repos/r " in refused.stderr and fix.endswith(f"clean {root}/{TREE}")
     subprocess.run(fix, shell=True, cwd=root, check=True)  # noqa: S602
     assert subprocess.run(closure, cwd=root, capture_output=True).returncode == 0
 
@@ -354,53 +347,55 @@ def test_a_moved_work_branch_refuses_and_its_fix_rebase_keeps_only_an_identical_
         assert _argv(result)[1:] == ["reports", "validate", "--all"] and landed == work
 
 
-@pytest.mark.parametrize(
-    ("base", "mine", "lands"),
-    [
-        (None, "verify: echo 'fix: mine' >&2; false\n", False),
-        (None, "verify: cat\n", True),
-        (None, "verify: git rev-parse HEAD\n", True),
-        (None, "verify: git -C ../../../repos/r switch -q main\n", False),  # checked after it
-        ("# a prose verify: mention declares nothing\n", None, False),
-        ("", None, False),
-        ("# a prose verify: mention declares nothing\n", "verify: true\n", True),
-    ],
-    ids=[
-        *("exits-1", "exits-0-stdin-closed", "prints-head", "switches-the-repo", "undeclared"),
-        *("no-agents-md", "declared-by-the-worktree"),
-    ],
-)
-def test_merge_lands_only_what_the_declared_verify_command_passes(
-    root: Path, base: str | None, mine: str | None, lands: bool
+@pytest.mark.parametrize("red", [True, False], ids=["red-gate", "green-gate"])
+def test_the_job_gate_runs_scripts_ci_job_as_argv_on_the_head_it_lands(
+    root: Path, red: bool
 ) -> None:
-    """AC12.5 (ADR 0185): `merge` runs HEAD's `AGENTS.md` `verify:` line in the tree before
-    the fast-forward; a failure or no declaration lands nothing."""
+    """AC1.2 (ADR 0190): a job merge runs `scripts/ci.py job` of HEAD, one argv list with
+    stdin closed, its output on stdout; a red gate lands nothing."""
     repo, tree = root / "repos/r", root / TREE
-    if base is not None:  # the work branch declares nothing, or has no AGENTS.md
-        if base:
-            commit(repo, "AGENTS.md", base)
-        else:
-            git(repo, "rm", "-q", "AGENTS.md")
-            git(repo, "commit", "-qm", "no AGENTS.md")
-        git(tree, "reset", "-q", "--hard", "feature/0.5.0")
-    head = commit(tree, "AGENTS.md", mine) if mine else commit(tree, "src/a.py")
+    head = commit(tree, "RED-job" if red else "src/a.py", "")
     approve(root, head)
     work = git(repo, "rev-parse", "feature/0.5.0").strip()
-    result = run(root, "merge", TREE, input="stdin leak\n")  # a closed stdin: `cat` reads none
-    assert "stdin leak" not in result.stdout
-    assert git(repo, "rev-parse", "feature/0.5.0").strip() == (head if lands else work)
-    if not lands:
-        assert git(tree, "rev-parse", "HEAD").strip() == head
-    assert (result.returncode, tree.exists()) == ((0, False) if lands else (1, True))
-    if mine == "verify: git rev-parse HEAD\n":
-        assert head in result.stdout.splitlines()
-    if mine and "false" in mine:  # the verify's own `fix:` line never reaches stderr
-        assert fixes(result) == [
-            f"fix: Operator action: make `echo 'fix: mine' >&2; false` exit 0 in {tree}"
-            " and commit the fix in this worktree"
+    result = run(root, "merge", TREE, input="stdin leak\n")
+    assert "ci job" in result.stdout.splitlines() and "stdin leak" not in result.stdout
+    assert git(repo, "rev-parse", "feature/0.5.0").strip() == (work if red else head)
+    assert (result.returncode, tree.exists()) == ((1, True) if red else (0, False))
+    if red:
+        act, line, where = fixes(result)[0].split("`")
+        assert act == "fix: Operator action: make "
+        assert shlex.split(line) == [
+            str(root / ".dadaia/.venv/bin/python"),
+            str(tree / "scripts/ci.py"),
+            "job",
         ]
-    if base is not None and not mine:
-        assert fixes(result) == [
-            "fix: Operator action: declare this repo's check command as a verify: line in"
-            f" {tree}/AGENTS.md and commit it in this worktree"
-        ]
+        assert where == f" exit 0 in {tree} and commit the fix in this worktree"
+
+
+def test_a_job_merge_needs_a_verdict_naming_its_ci_matrix_run(root: Path) -> None:
+    """AC1.2, AC1.4: no verdict refuses; an APPROVED naming no CI-matrix run refuses with the
+    operator's act; one naming the run lands."""
+    repo = root / "repos/r"
+    head = commit(root / TREE, "src/a.py")
+    assert _argv(run(root, "merge", TREE))[1:] == ["reports", "validate", "--all"]
+    approve(root, head, ci_run=False)
+    unrun = run(root, "merge", TREE)
+    assert fixes(unrun) == [
+        f"fix: Operator action: push wt/{JOB}, wait for its CI run to pass, and have "
+        "dd-code-reviewer's verdict name that run's actions/runs URL"
+    ]
+    approve(root, head, at="T11:00:00Z")
+    assert run(root, "merge", TREE).returncode == 0
+    assert git(repo, "rev-parse", "feature/0.5.0").strip() == head
+
+
+def test_one_job_lands_code_an_atom_and_its_derived_section_together(root: Path) -> None:
+    """AC1.3, AC1.5 (ADRs 0191, 0192): no allowed set splits one change — code, an atom and its
+    derived section land in one job merge."""
+    repo, tree = root / "repos/r", root / TREE
+    commit(tree, "src/a.py")
+    commit(tree, "specs/memory/product/x/atom.md", "# atom\n")
+    approve(root, commit(tree, "README.md", "## A\n<!-- derived-from: atom sha256:0 -->\n"))
+    assert run(root, "merge", TREE).returncode == 0
+    landed = git(repo, "diff", "--name-only", "HEAD~3", "HEAD").split()
+    assert landed == ["README.md", "specs/memory/product/x/atom.md", "src/a.py"]

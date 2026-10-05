@@ -112,22 +112,6 @@ def _script(rel: str) -> ModuleType:
     return module
 
 
-def test_commit_shapes_stage_the_kinds_allowed_set() -> None:
-    """AC3.13 (F053, F054, F057; gitflow-shape2-omits-backlog-histo): every path a §3a row
-    stages is in each named kind's allowed set (`KINDS`)."""
-    kinds = _script("dd-gitflow-default/scripts/_worktree_kinds.py")
-    text = (_PKG / "public/skills/dd-gitflow-default/SKILL.md").read_text("utf-8")
-    section = text.split("## 3a.")[1].split("\n## ")[0]
-    rows = [ln.split(" | ") for ln in section.splitlines() if re.match(r"\| \d", ln)]
-    staged = [(re.findall(r"`(\w+)`", r[1]), re.findall(r"`(<code>|specs/[^`]+)`", r[2]))
-              for r in rows]  # fmt: skip
-    assert {k for ks, _ in staged for k in ks} == set(kinds.KINDS)
-    assert all(paths for _, paths in staged)
-    outside = [(k, p) for ks, ps in staged for k in ks for p in ps
-               if not kinds.allows(k, "src/x.py" if p == kinds.CODE else p)]  # fmt: skip
-    assert outside == []
-
-
 def test_the_releases_law_transitions_equal_marks() -> None:
     """AC4.6 (ADR 0141): the releases law's marker transitions equal `_release_schema.MARKS`
     in order."""
