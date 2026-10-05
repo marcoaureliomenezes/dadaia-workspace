@@ -139,7 +139,7 @@
         "null"
       ],
       "x-mutability": "mutable-governance",
-      "description": "The fix of X, a bug or a task, wrote the lines this fix corrects; X is a bug id or a task id some `TASKS.md` under `specs/releases/` carries, or `none` (ADR 0164 (3), 0186); `bugs.py resolve` proposes the candidates by blame."
+      "description": "The fix of X, a bug or a task, wrote the lines this fix corrects; X is a bug id or a task id a closed rc's `TASKS.md` under `specs/releases/` carries, or `none` (ADR 0164 (3), 0186); `bugs.py resolve` proposes the candidates by blame."
     },
     "resolved_release": {
       "type": [
