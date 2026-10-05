@@ -662,6 +662,7 @@ def test_update_writes_a_governance_field(script: Path, tmp_path: Path) -> None:
         ("status=resolved", "resolve, supersede, defer, reject"),
         ("closed_at=2026-09-21T00:00:00Z", "resolve, supersede, defer, reject"),
         ("superseded_by=other", "supersede"),
+        ("resolved_release=0.4.7", "resolve"),  # derived, never typed (AC13.1)
         ("title=rewritten", "immutable-core"),
         ("reported_by=other", "immutable-core"),
         ("context=other", "immutable-core"),
@@ -1115,7 +1116,8 @@ def test_window_lists_the_live_and_last_shipped_release_and_unknowns_apart(
     specs = _live(tmp_path, found("found-live", "9.9.9", "rc-1"), found("old-fix", "9.9.7", "unknown"),
                   found("born-shipped", "9.9.7", "unknown", caused_by="old-fix"),
                   found("rc-unknown", "9.9.9", "unknown"), found("nowhere", "unknown", "unknown"),
-                  found("stored-born", "9.9.7", "unknown", introduced_in={"release": "9.9.8", "rc": "unknown"}))  # fmt: skip
+                  found("stored-born", "9.9.7", "unknown", introduced_in={"release": "9.9.8", "rc": "unknown"}),
+                  found("born-before", "9.9.7", "unknown", caused_by="older-fix"), found("older-fix", "9.9.7", "unknown"))  # fmt: skip
     archived = found("archived-one", "9.9.9", "rc-1", status="rejected", cause="c", closed_at="2026-09-21T00:00:00Z")  # fmt: skip
     (specs / "bugs" / "_archive").mkdir()
     pre_v6 = {"event": "archived", "data": {"id": "pre-v6"}}
@@ -1125,7 +1127,8 @@ def test_window_lists_the_live_and_last_shipped_release_and_unknowns_apart(
     _history(tmp_path,
              ("2026-01-02T00:00:00Z", "chore: shipped", {f"{_RELEASES}_archive/9.9.7/_RELEASE.json": _state("2025-01-01T00:00:00Z", "2025-05-31T00:00:00Z"),
                                                         f"{_RELEASES}_archive/9.9.8/_RELEASE.json": _state("2025-06-01T00:00:00Z", "2025-12-31T00:00:00Z")}),
-             ("2025-07-01T00:00:00Z", "fix(bugs): old-fix — x", {"cli/o.py": "o\n"}))  # fmt: skip
+             ("2025-07-01T00:00:00Z", "fix(bugs): old-fix — x", {"cli/o.py": "o\n"}),
+             ("2024-06-01T00:00:00Z", "fix(bugs): older-fix — x", {"cli/p.py": "p\n"}))  # before every span  # fmt: skip
     assert _window(script, specs) == [
         "archived-one\trejected\t9.9.9/rc-1\t-",
         "born-shipped\topen\t9.9.7/unknown\t9.9.8/unknown",
@@ -1133,8 +1136,9 @@ def test_window_lists_the_live_and_last_shipped_release_and_unknowns_apart(
         "rc-unknown\topen\t9.9.9/unknown\t-",
         "stored-born\topen\t9.9.7/unknown\t9.9.8/unknown",
         "release unknown:",
+        "born-before\topen\t9.9.7/unknown\tunknown/unknown",
         "nowhere\topen\tunknown/unknown\t-",
-        "[ok] 5 in the window (9.9.8, 9.9.9), 1 release unknown.",
+        "[ok] 5 in the window (9.9.8, 9.9.9), 2 release unknown.",
     ]
 
 
@@ -1153,3 +1157,71 @@ def test_a_shallow_clone_is_refused_by_every_verb_reading_a_candidate(
     assert done.returncode == 1
     assert done.stderr.splitlines()[-1] == f"fix: git -C {clone / 'specs'} fetch --unshallow"
     assert (clone / "specs" / "bugs" / "BUGS.jsonl").read_bytes() == before
+
+
+@pytest.mark.parametrize(("ts", "release"), [
+    ("2025-12-31T12:00:00Z", "unknown"),  # the gap between 9.9.8's ship and 9.9.9's birth
+    ("2025-12-31T00:00:00Z", "unknown"),  # 9.9.8's ship instant: the span is half-open
+    ("2026-01-01T00:00:00Z", "9.9.9"),  # 9.9.9's first log ts: inside
+])  # fmt: skip
+def test_found_in_reads_the_registration_ts_against_half_open_spans(
+    script: Path, tmp_path: Path, ts: str, release: str
+) -> None:
+    """AC13.1: `found_in` is the candidate holding the record's own `--ts`, never now."""
+    specs = _live(tmp_path)
+    shipped = _state("2025-06-01T00:00:00Z", "2025-12-31T00:00:00Z")
+    _history(tmp_path, ("2026-01-02T00:00:00Z", "chore: shipped", {f"{_RELEASES}_archive/9.9.8/_RELEASE.json": shipped}))  # fmt: skip
+    done = _run(script, *_APPEND, "--correlates", "none", "--ts", ts, "--specs", str(specs))
+    assert done.returncode == 0, done.stderr
+    assert _records(specs)[-1]["found_in"] == {"release": release, "rc": "unknown"}
+
+
+@pytest.mark.parametrize(("lives", "state", "argv", "last"), [
+    ([], "", ["window"], "fix: Operator action: run `{release} new --specs {specs}` with the release version you choose"),
+    (["9.9.8", "9.9.9"], "", ["window"], "fix: {release} check --specs {specs}"),
+    (["9.9.9"], "{", ["window"], "fix: Operator action: repair {state} until `release.py check` passes"),
+    (["9.9.9"], "", [*_APPEND, "--correlates", "none", "--ts", "yesterday"], "fix: {py} {script} check --specs {specs}"),
+    (["9.9.9"], "", ["window"], "[ok] 0 in the window (9.9.9), 0 release unknown."),  # no commit yet
+])  # fmt: skip
+def test_a_candidate_read_refuses_what_it_cannot_place(
+    script: Path, tmp_path: Path, lives: list[str], state: str, argv: list[str], last: str
+) -> None:
+    """`window` reads exactly one live release, refused as `release.py` refuses it; an
+    unreadable state names itself; a bad `--ts` gets the schema's own refusal."""
+    specs = _ledger(tmp_path)
+    for live in lives:
+        (specs / "releases" / live).mkdir(parents=True)
+        (specs / "releases" / live / "_RELEASE.json").write_text(
+            state or _state("2026-01-01T00:00:00Z")
+        )
+    done = _run(script, *argv, "--specs", str(specs))
+    release = script.parents[2] / "dd-release-implementation" / "scripts" / "release.py"
+    path = specs / "releases" / "9.9.9" / "_RELEASE.json"
+    want = last.format(
+        release=f"{sys.executable} {release}",
+        state=path,
+        py=sys.executable,
+        script=script,
+        specs=specs,
+    )
+    assert (done.stdout + done.stderr).splitlines()[-1] == want, done.stderr
+    assert done.returncode == (0 if last.startswith("[ok]") else 1)
+    assert "found_in" not in done.stderr  # a bad --ts is the schema's ts refusal alone
+
+
+def test_an_unreadable_history_is_refused_never_stamped_unknown(
+    script: Path, tmp_path: Path
+) -> None:
+    """A `git log` that fails past HEAD (a missing tree object) refuses; nothing is written."""
+    specs = _live(tmp_path)
+    tree = subprocess.run(["git", "-C", str(tmp_path), "rev-parse", "HEAD^{tree}"], capture_output=True,
+                          text=True, check=True).stdout.strip()  # fmt: skip
+    (tmp_path / ".git" / "objects" / tree[:2] / tree[2:]).unlink()
+    before = (specs / "bugs" / "BUGS.jsonl").read_bytes()
+    done = _run(script, *_APPEND, "--correlates", "none", "--specs", str(specs))
+    assert done.returncode == 1
+    assert (
+        done.stderr.splitlines()[-1]
+        == "fix: Operator action: point --specs at a specs tree inside a git repo"
+    )
+    assert (specs / "bugs" / "BUGS.jsonl").read_bytes() == before

@@ -32,8 +32,8 @@ import _bugs_transition as tr  # noqa: E402
 import _bugs_write as wr  # noqa: E402
 from _bugs_check import CODE, HISTO, LEDGER, check, tasks  # noqa: E402
 from _bugs_store import Refusal, commit, read_records  # noqa: E402
-from _release_schema import candidate_at, releases  # noqa: E402
-from _specs import find_specs, git_line, refuse  # noqa: E402
+from _release_schema import ShallowClone, Unreadable, candidate_at, live_ids, releases  # noqa: E402
+from _specs import choice, find_specs, git_line, refuse, script  # noqa: E402
 
 _OPTIONS: dict[str, tuple[str, ...]] = {
     "append": ("--bug-id", "--reported-by", "--ts", "--title", "--severity", "--surface",
@@ -169,36 +169,63 @@ def _direction(commits: dict[str, list[list[str]] | None], own: set[str]) -> str
     return "net-negative" if net < 0 else "net-positive" if net > 0 else "net-neutral"
 
 
+_RELEASE_PY = (
+    Path(__file__).resolve().parents[2] / "dd-release-implementation" / "scripts" / "release.py"
+)
+
+
 def _held_at(specs: Path, instant: str) -> dict[str, str]:
     try:
         return candidate_at(specs, instant)
-    except ValueError as exc:
+    except ShallowClone as exc:
         raise Refusal(str(exc), git_line(specs, "fetch", "--unshallow")) from None
+    except Unreadable as exc:
+        raise Refusal(*exc.args) from None
 
 
-def _introduced(specs: Path, record: dict[str, Any], fixes: dict[str, dict[str, Any]]) -> Any:
-    """Read from `caused_by`'s culprit, its oldest fix or `<type>(<task-id>)` commit, else
-    the stored value: a `caused_by` repair needs no second write."""
-    cause = record.get("caused_by")
-    grep = ("log", "--all", "-E", f"--grep=^[a-z]+\\({cause}\\)", "--format=%H")
-    shas = (
-        [] if cause in (None, "none") else list(fixes.get(cause, ())) or _git(specs, *grep).split()
-    )
-    return _held_at(specs, _git(specs, "show", "-s", "--format=%cI", shas[-1]).strip()) if shas else record.get("introduced_in")  # fmt: skip
+def _live(specs: Path) -> str:
+    """The ONE live release, refused as `release.py`'s `live_release` refuses."""
+    ids, release = live_ids(specs), script(_RELEASE_PY)
+    if not ids:
+        raise choice(Refusal("no live release under specs/releases/ — nothing to operate on",
+                     f"{release} new"), "with the release version you choose")  # fmt: skip
+    if len(ids) > 1:
+        raise Refusal(f"multiple live release directories carry _RELEASE.json: {', '.join(ids)} — "
+                      "the release-candidates model allows exactly one", f"{release} check")  # fmt: skip
+    return ids[0]
 
 
 def _window(specs: Path) -> int:
     """Every live and archived record found in or born in the live or the last shipped
-    release; a `release` `unknown` one apart (AC13.3)."""
-    live = _held_at(specs, wr.now_iso())["release"]
+    release; a `release` `unknown` one apart (AC13.3). `introduced_in` is read from
+    `caused_by`'s culprit, its oldest fix or `<type>(<task-id>)` commit, else stored."""
+    live = _live(specs)
+    _held_at(specs, wr.now_iso())  # a shallow clone is refused before any line
     shipped = sorted((end, r) for r, (_, end) in releases(specs).items() if end)
-    keys = sorted({live, *(r for _, r in shipped[-1:])} - {"unknown"})
-    fixes, rows, apart = _fixes(specs), [], []
-    for record in [
-        *read_records(specs / LEDGER),
-        *(r for r in read_records(specs / HISTO) if "id" in r),
-    ]:
-        found, born = record.get("found_in"), _introduced(specs, record, fixes)
+    keys = sorted({live, *(r for _, r in shipped[-1:])})
+    fixes, rows, apart, when, by_task = (
+        _fixes(specs),
+        [],
+        [],
+        dict[str, str](),
+        dict[str, list[str]](),
+    )
+    # one pass, --all: a repo with no commit yet lists nothing instead of failing
+    for line in _git(specs, "log", "--all", "--format=%H %cI %s").splitlines():
+        sha, instant, subject = (line.split(" ", 2) + [""])[:3]
+        when[sha] = instant
+        if task := re.match(r"[a-z]+\(([^)]+)\)", subject):
+            by_task.setdefault(task[1], []).append(sha)
+    for record in [*read_records(specs / LEDGER), *(r for r in read_records(specs / HISTO) if "id" in r)]:  # fmt: skip
+        cause = record.get("caused_by")
+        shas = (
+            [] if cause in (None, "none") else list(fixes.get(cause, ())) or by_task.get(cause, [])
+        )
+        sha = shas[-1] if shas else ""  # a shape-4 task commit is named by its short sha
+        culprit = when.get(sha) or next(
+            (v for k, v in when.items() if sha and k.startswith(sha)), None
+        )
+        found, born = record.get("found_in"), _held_at(specs, culprit) if culprit else record.get("introduced_in")  # fmt: skip
         seen = [c for c in (found, born) if c]
         cells = (f"{c['release']}/{c['rc']}" if c else "-" for c in (found, born))
         line = "\t".join((record["id"], record["status"], *cells))
@@ -271,7 +298,10 @@ def _write(args: argparse.Namespace, specs: Path) -> int:
             raise Refusal(f"cannot list the repo's tracked directories: {cause.strip()}",
                           "Operator action: point --specs at a specs tree inside a git repo") from None  # fmt: skip
         dirs = {part for path in listed.splitlines() for part in path.split("/")[:-1]}
-        values["found_in"] = _held_at(specs, values["ts"])
+        try:
+            values["found_in"] = _held_at(specs, values["ts"])
+        except ValueError:  # a bad --ts: the schema check below names it
+            values["found_in"] = None
         near = wr.candidates(read_records(ledger), values["surface"])
         print(f"correlation candidates on {values['surface']!r}: {', '.join(near) or 'none'}")
         commit(ledger, lambda records: wr.append(records, values, dirs))
