@@ -1,10 +1,10 @@
 # PLAN — Release: 0.5.0
 
-**Status:** Approved
+**Status:** In review
 **Release ID:** 0.5.0
 **Owner:** dd-software-engineer
 
-Candidate 8 — W8: the test law and the library pipeline leave; W9: bug lineage derived; W10: the open bugs (ADR 0140). SPEC AC8.1–AC8.10, AC9.1–AC9.5, AC10.1–AC10.14, Approved at 3f48e11dd and amended by operator ruling at 6ea03b0ff (AC8.9's second deletion list; AC8.10's P-07 and P-28 by their own tool; ADR 0176 edited at 6ec30315d); W11, AC11.0–AC11.6, folded by operator ruling at fde8254d3 (agent-behavior evals, a parallel lane in `dadaia-evals`; the evals gate at the promote is SPEC §Carried rc-12's, 0178); amended at e64918789 (AC8.3's visibility rows to `specs-canon-tracked`, AC10.14, AC11.5 onto `dadaia-evals` `main`) and at d5f060c17 (review of 0dfbe16f6); amended by operator ruling at 23c7c7f35 (AC10.1 runs pytest with `-B`) and at 5bc6dc63f, re-cut at 257fb7128 (AC10.1's one authority is the conftest session env, with a tripwire and its plant). Amended for W12 (AC12.1–AC12.14, AC9.3, AC9.4 and AC10.1 rewritten; SPEC Approved at 6b84527bc): §6; from here W12's Order (§6.1) governs every open task. Paths are relative to `dadaia_workspace/` (`f/` = `features/`, `pub/` = `public/`, `S/` = `pub/skills/`) unless they start with `tests/`, `scripts/`, `specs/`, `docs/`, `.github/`, `README.md`, `AGENTS.md`, `CONTEXT.md`, `pyproject.toml`, `poetry.lock` or `setup.cfg`.
+Candidate 8 — W8: the test law and the library pipeline leave; W9: bug lineage derived; W10: the open bugs (ADR 0140). SPEC AC8.1–AC8.10, AC9.1–AC9.5, AC10.1–AC10.14, Approved at 3f48e11dd and amended by operator ruling at 6ea03b0ff (AC8.9's second deletion list; AC8.10's P-07 and P-28 by their own tool; ADR 0176 edited at 6ec30315d); W11, AC11.0–AC11.6, folded by operator ruling at fde8254d3 (agent-behavior evals, a parallel lane in `dadaia-evals`; the evals gate at the promote is SPEC §Carried rc-12's, 0178); amended at e64918789 (AC8.3's visibility rows to `specs-canon-tracked`, AC10.14, AC11.5 onto `dadaia-evals` `main`) and at d5f060c17 (review of 0dfbe16f6); amended by operator ruling at 23c7c7f35 (AC10.1 runs pytest with `-B`) and at 5bc6dc63f, re-cut at 257fb7128 (AC10.1's one authority is the conftest session env, with a tripwire and its plant). Amended for W12 (AC12.1–AC12.14, AC9.3, AC9.4 and AC10.1 rewritten; SPEC Approved at 6b84527bc): §6; from here W12's Order (§6.1) governs every open task. Amended for W13 (AC13.1–AC13.4, AC13.6–AC13.8, AC13.11, AC13.12; SPEC Approved at 760015871): §7; W13's Order runs inside §6.1 step 2, after T-050-192 and before T-050-199. Paths are relative to `dadaia_workspace/` (`f/` = `features/`, `pub/` = `public/`, `S/` = `pub/skills/`) unless they start with `tests/`, `scripts/`, `specs/`, `docs/`, `.github/`, `README.md`, `AGENTS.md`, `CONTEXT.md`, `pyproject.toml`, `poetry.lock` or `setup.cfg`.
 As-is read at `wt/0.5.0b-release` 6ec30315d; the G1 `<start>` readout equals the birth readout (8f4ed785f): 25,307 production lines / 1,233 test functions / 45,464 test lines / 0 guard lines / 0 guard checks.
 
 ## 1. As-is review
@@ -225,10 +225,10 @@ As-is read at `wt/0.5.0b-release` 6b84527bc (= feature/0.5.0). Bug history: the 
 
 ### 6.1 Order (SPEC W12 Order, Q5) and the pause
 
-1. T-050-190 (AC12.6, the script), landed by today's `WT merge`; then T-050-191 (AC12.5, AC12.7, T-050-189 folded), also landed by the old code, because `worktree.py merge` runs from the instance projection. R14 re-projects the library (`public stage`, `public install`, `public doctor`) before T-050-192 opens, so T-050-192's merge is the first gated one.
+1. T-050-190 (AC12.6, the script), landed by today's `WT merge`; then T-050-191 (AC12.5, AC12.7, T-050-189 folded), also landed by the old code, because `worktree.py merge` runs from the instance projection. R14 re-projects the library (`public stage`, `public install`, `public doctor`) before any W3 worktree opens, so the merges from T-050-192 on are the first gated merges.
 2. T-050-192 (AC9.3 and AC12.12's code); one task per law file: T-050-193 `AUTHORING.md` (rule 9 first: the bar the others meet), 194 bugs law, 195 `dd-bug-resolution`, 196 `dd-release-implementation`, 197 `dd-gitflow-default`, 198 `dd-code-review` (every edit: AC9.4, AC12.6, AC12.12); then T-050-199 (AC12.4).
 3. REBUILDs T-050-200 (AC10.1), 201 (AC12.8), 202 (AC12.13); then 203 (AC12.9), 204 (AC12.10); then AC12.14's own fixes 205–208.
-4. Paused, no marker (the releases law §3 has none): T-050-172 … T-050-181, T-050-185, T-050-186, T-050-188. Each stays `[ ]` and opens only after T-050-208 merges; T-050-181 is blocked by every W12 task. Their `W:` are re-read against §6 before they open (T-050-173 now writes `scripts/ci.py`, not the pytest lines of `ci.yml`). Worktree `0.5.0a-bug` holds T-050-173's uncommitted RED from before the pause; it stays untouched until T-050-173 opens, and its `W:` re-read covers that RED.
+4. Paused, no marker (the releases law §3 has none): T-050-172 … T-050-181, T-050-185, T-050-186, T-050-188. Each stays `[ ]` and opens only after T-050-208 merges; T-050-181 is blocked by every W12 task. Their `W:` are re-read against §6 before they open (T-050-173 now writes `scripts/ci.py`, not the pytest lines of `ci.yml`). Worktree `0.5.0a-bug` holds T-050-173's uncommitted work (8 files, production included) overlapping T-050-200's `W:`: before T-050-200 opens, its diff is saved as a draft under `.dadaia/tmp/dd-software-engineer/<YYYYMMDD>/t-050-173/` and the worktree is cleaned (`worktree.py clean`); T-050-173 reopens fresh from that draft, its `W:` re-read against §6.
 
 ### 6.2 The verification command (AC12.5, AC12.6)
 
@@ -335,10 +335,9 @@ As-is read at `wt/0.5.0b-release` 6b84527bc (= feature/0.5.0). Bug history: the 
 |---|---|---|---|
 | W1 | T-050-190 | 1 | impl; today's merge |
 | W2 | T-050-191 | 1 | impl; old merge code; R14 follows |
-| W3 | T-050-192, then T-050-193; T-050-197, T-050-198 | 2 | impl each, opened as `blocked by:` merges (releases law §31); 192 merges first (the first gated merge, §6.1); 193, 197 and 198 are drafted ahead under `.dadaia/tmp/dd-software-engineer/` beside T-050-191, no worktree, and each worktree copies its draft onto the tip it opens on (no rebase); one reviewer dispatch may judge 197 and 198 together |
-| W4 | T-050-194, T-050-195 | 2 | impl each; R11 and R13 after both |
-| W5 | T-050-196 | 1 | impl; held until the operator rules the bug-handling strategy (2026-10-04 demand, under research), its text depends on it; T-050-199 waits on its merge |
-| W7 | T-050-199 | 1 | bug; ledger only |
+| W3 | T-050-192, T-050-193 | 2 | impl each, opened as `blocked by:` merges (releases law §3, `:31`), after R14; 193 merged at 43ed55724; text tasks are drafted ahead under `.dadaia/tmp/dd-software-engineer/<YYYYMMDD>/<slug>/`, no worktree, each worktree copying its draft onto the tip it opens on (no rebase) |
+| W4–W6 | W13: T-050-209 … T-050-216, then T-050-194 … T-050-198 | ≤ 2 | §7.4 |
+| W7 | T-050-199 | 1 | bug; ledger only; frozen with 200–208 until R21 re-plans them (§7.4) |
 | W8 | T-050-200 | 1 | impl; alone (its `W:` spans the suite) |
 | W9 | T-050-201 | 1 | impl; then its rows' shape-4 tail |
 | W10 | T-050-202 | 1 | impl (`service.py` after 201) |
@@ -353,8 +352,8 @@ As-is read at `wt/0.5.0b-release` 6b84527bc (= feature/0.5.0). Bug history: the 
 - Each REBUILD's AC rows resolve in one `bug` worktree after its merge (shape 4, `by T-050-NNN (<sha>)`): 200 → 14, 16, 17; 202 → 6, 21, 22, 23, 27; 203 → 10, 12; 204 → 13.
 - Release-worktree steps added to §2.7:
   - R11: `docs(specs): re-render specs/*/AGENTS.md from the scaffold — T-050-194`; the repo copy already drifts at `specs/bugs/AGENTS.md:23,49`.
-  - R12: `chore(adrs): repair measured_by of 0180`, only if T-050-191 renames `test_in_place_ledger_change_refuses_at_rebase`.
-  - R15, after T-050-191 merges: `chore(adrs): repair measured_by of 0111`; its `measured_by` names `test_parallel_siblings_replay_task_markers`, which the REBUILD deletes (the 0138 lane; T-050-191's engineer, 2026-10-04).
+  - R12: dropped; T-050-191 kept `test_in_place_ledger_change_refuses_at_rebase` (`tests/integration/test_worktree_ledger_conflict.py:21`), so 0180's `measured_by` names a live test.
+  - R15, due now (T-050-191 merged, 4a7fe2919 … 58b9f2ada), before T-050-209 opens: `chore(adrs): repair measured_by of 0111`; its `measured_by` names `test_parallel_siblings_replay_task_markers`, which the REBUILD deletes (the 0138 lane; T-050-191's engineer, 2026-10-04).
   - R13: `chore(specs): restamp the tree to v10 — T-050-194` (precedent c4471aee8).
   - R14, after T-050-191 merges and before T-050-192 opens: `.dadaia/.venv/bin/dadaia public stage`, `public install`, `public doctor` clean, re-projecting gate 1 into the instance. No commit (instance only); its doctor output is logged in the next handoff.
 - Critical path: 190 → 191 → 192 → 194 → 196 → 199 → 200 → 201 → 202 → 203 → 206 → 207 → 208 = 13 merges, each ≈ 8–10 min of verification.
@@ -365,3 +364,91 @@ As-is read at `wt/0.5.0b-release` 6b84527bc (= feature/0.5.0). Bug history: the 
 - O2, AC10.1's name sets. Answered via inspection: only the scrub sets leave (`SUITE_DADAIA_ENV`, `ENTRY_SIGNAL_ENV_VARS`, `child_keys`'s tuple). `ALLOWLISTED_DADAIA_ENV` stays because guard `harness-env-allowlist` reads it (0176, `isolation.py:23`). `HARNESS_CONTROL_DADAIA_ENV` stays because the hook helpers read it (`harness_env.py:259,332`). `_FORBIDDEN_HOOK_ENV`'s only reader, `base_env`, is deleted, so `suite_env` absorbs it as its scrub list, keeping `DADAIA_REQUIRE_UVX` and `DADAIA_FENCED_ROOTS`.
 - O3, the 0154 writers. Answered via inspection from the accepted ADR 0172. Its decision says "Each sanctioned direct writer of ADR 0154 leaves its output committed in the act that writes it", and its consequences say "specs init and the audits writer each gain the commit of their own output". T-050-201 adds both: `specs init` and the audits writer (`S/dd-audit-project/scripts/audit.py`, which exists as code) commit their own output.
 - O4, AC12.14 vs AC12.2. Answered via inspection from Q24's explicit own-fix ruling ("H4, H5 e H6 ganham correção própria no rc-8, cada uma com teste vermelho primeiro"). T-050-195 lands AC12.2 before 205–208, so Q24 is the reason, not timing. Rows 24–26 are shape-3 fixes whose body says `rebuild: none — Q24`.
+
+## 7. W13 — the bug strategy (amendment 2026-10-05)
+
+As-is read at `wt/0.5.0d-release` 760015871 (= feature/0.5.0). Paths as above; `BR/` = `S/dd-bug-resolution/scripts/`, `RI/` = `S/dd-release-implementation/scripts/`. Bug history: the grill handoff `2026-10-05T005326Z-main-thread-grill-bug-window-review` (G1–G12) and the ledger slice of surfaces `bugs` (19), `release-ledger` (3), `dd-bug-resolution` (1): 23 records, 4 with a fix-induced `caused_by`, in two chains: the shallow-checkout chain (`contract-coverage-ci-shallow-checkout-collapses-resolved-commit-derivation-to-head` → `release-workflow-shallow-checkout-…`: a git-derived value stored in the record collapsed on a shallow clone; 0.4.7 FR1 retired the stored cache) and the xdist chain (`v26-ratchet-…` → `tests-tree-walkers-…`). `git log` on `BR/bugs.py` and helpers: T-050-133's archive pair (eeeb53f39, 05213e2f8: an archive racing a write lost a record; a dropped id dangled), T-050-168's chain (579a6c70a, 363997d77, d66e50c66, aed2ac322; rows 10, 12 of AC12.4).
+
+### 7.1 As-is per surface
+
+| surface | as-is at 760015871 | verdict |
+|---|---|---|
+| age archive | `BR/bugs.py:74-76` (`--now`, `--threshold-days` 90), `:194-204` `_archive` (cutoff from `closed_at`); `BR/_bugs_write.py:107-115` `archivable`; `f/specs/doctor_governance.py` (69 lines, SPEC-DOC-041 "past the archive threshold", its only check) wired at `f/specs/rules.py:143-144`, `f/specs/doctor.py:37`; law `pub/scaffold/bugs/AGENTS.md:40` ("ages by `closed_at`"), `:42`, `S/dd-release-implementation/RC-FLOW.md:57`; tests `test_bug_resolution_bugs_script.py:866`, `:890` (age cases), `:954` (byte-intact refusal, `--threshold-days` at `:973`). The store's two-file write `BR/_bugs_store.py:70-110` (`archive=True`, T-050-133's fixes) is sound | DELETE the age path; KEEP the store; ADD `--adr` |
+| archived records | `specs/bugs/_archive/bugs_histo.jsonl`: 179 lines = 65 `bug-record-v1` records age-archived at the 0.4.7 ship (64e4885cf, `closed_at` 2026-06-04 … 06-13) + 114 pre-v6 `{"event": "archived", "data": …}` lines from the canon-v6 migration (9ebefd5fa), 34 of them sharing an id with a live record (§7.6 Q1) | restore the 65 |
+| `resolved_release` | typed: `BR/_bugs_transition.py:21-23` requires it, `BR/bugs.py:35-37` makes it `--resolved-release`; named by `RI/_release_tree.py:57`'s fix text and `S/dd-bug-resolution/SKILL.md:69` | DELETE the flag; derive |
+| `found_in`, `introduced_in` | absent: `BR/_bugs_write.py:46-70` builds the record from CORE + GOVERNANCE; `bugs.py append` stamps only `ts` (`BR/bugs.py:211`); schema `pub/schemas/bugs/bug-record-v1.schema.json:5` defines write-once as "settable exactly once from absent"; `update --set` values are strings (`BR/_bugs_write.py:118-126`) | ADD |
+| status parser (0135, 0162) | `RI/_release_schema.py:33,44-47` `extract_status`, the pinned pair with `core/spec_status`; `_RELEASE.json` read by `RI/_release_store.py:61` `read_state`, live by `:75` `live_release`; `RI/*` already import `BR/_ledger` (`RI/_release_store.py:19`); `BR/_specs.py:57` reaches `dd-gitflow-default` for a pure function (the precedent; AC12.7 deleted the merge's reach-in, which imported a parser it then re-ran) | REUSE |
+| window | Phase 0's window is the audit's: `S/dd-bug-resolution/LINEAGE.md:8-11` (newest archived audit → HEAD), rule 6 `:33`; `S/dd-release-definition/SKILL.md:16,26` read bare `status`/`stats` | UPDATE to `bugs.py window` |
+| heading | `RI/_release_new.py:20-50` `SPEC_STUB` opens with `## 1. Problem and context`; `RI/_release_tree.py:297` `tree_findings` judges no SPEC heading | ADD |
+| law | `pub/data/AGENTS.md:18` (Arm B; file 8,292 B), `pub/templates/specs-AGENTS.md:43-46` (§6), `pub/scaffold/releases/AGENTS.md:21`, `pub/data/worktrees-AGENTS.md:13` (`bug` — one fix), `:22-23`; `S/dd-bug-registration/SKILL.md:27`; `CONTEXT.md:342-343` (evidence triple, net ≤ 0), `:346` | UPDATE |
+
+### 7.2 Per AC: DELETE → REBUILD → UPDATE → KEEP → ADD
+
+- **AC13.1 + AC13.3's verb** (T-050-209).
+  - DELETE: `--resolved-release` and `resolved_release` in `REQUIRED_BY_VERB`; `resolve` writes it from the function; `RI/_release_tree.py:57` names `bugs.py resolve {i}` alone; `SKILL.md:69` drops the flag.
+  - ADD, one function `candidate_at(specs, instant) -> {"release", "rc"}` in `RI/_release_store.py`, beside `read_state` (0135: the `_RELEASE.json` and `**Status:**` owner parses them). Release: each `_RELEASE.json` under `releases/` and `releases/_archive/`, first `log` ts ≤ instant < `shipped.ts`. Rc: `git log --diff-filter=A` over `releases/**/rc-*/SPEC.md` (renames read R, not A), a commit adding exactly one whose `extract_status` at that commit is not `Approved`, until the next such add or the ship; else `unknown`. A shallow repository refuses with one fix line (`git fetch --unshallow`), never a silent `unknown`: the stamp is write-once, and the shallow-checkout chain above is this exact failure on a stored git-derived value.
+  - `BR/bugs.py` loads it by one `sys.path.append` of `RI/`, as `BR/_specs.py:57` loads the kinds; no module cycle (`RI/_release_store` imports `BR/_ledger` only).
+  - `append` stamps `found_in`; no flag. `introduced_in` is computed on read from `caused_by`'s culprit commit (a bug: its `bugs.py fix` sha; a task: its `<type>(<task-id>)` commit), else the stored value.
+  - Schema: `found_in`, `introduced_in`, objects `{release, rc}`, `additionalProperties: false`, `write-once`, optional (old records validate until the backfill); the write-once class reads "set once, at registration or later". `update --set` parses a JSON value for an object-typed field.
+  - `bugs.py window [--specs]`: every live and archived v1 record whose `found_in` or `introduced_in` release is the live one or the last shipped one; then the `release` `unknown` ones, apart. One line per record: id, status, `found_in`, `introduced_in`.
+  - Δ ≈ +55 / +90 / +4.
+- **AC13.6** (T-050-210).
+  - DELETE: `--now`, `--threshold-days`, the cutoff, `archivable`; `f/specs/doctor_governance.py` whole, its `rules.py` row and `doctor.py` import (SPEC-DOC-041 is the age path's doctor half; AC13.6's `git grep` names it); the two age tests (`:866`, `:890`).
+  - UPDATE: `:954`'s byte-intact refusal keeps its asserts; its call moves to `--adr`.
+  - ADD: `archive --adr <adr-id> <bug-id>…`: refused unless `decisions.jsonl` (read by `BR/_ledger.records`) holds the id `accepted`, or a named record is open or absent; each moved record gains `archived_by: <adr-id>` (schema, `write-once`); the store's `archive=True` write unchanged.
+  - Law lines are T-050-194's (bugs law) and T-050-196's (RC-FLOW), per SPEC.
+  - Δ ≈ −58 / −15 / −1.
+- **AC13.6 restore** (T-050-211). `bug` worktree, after ADR B is accepted (R16). A one-time writer at `.dadaia/tmp/dd-software-engineer/<YYYYMMDD>/restore-archived/restore.py` reads the 65 v1 lines, rebuilds `BUGS.jsonl` + `_archive/bugs_histo.jsonl` through `BR/_bugs_store._validated` and `_ledger.replace`; nothing lasting. One commit, `chore(bugs): restore age-archived records`. Δ 0.
+- **AC13.1 backfill** (T-050-212). `bug` worktree; `.dadaia/tmp/dd-software-engineer/<YYYYMMDD>/backfill-found-in/backfill.py` runs `bugs.py update <id> --set found_in=<json>` per record, `candidate_at(ts)`. One commit, `chore(bugs): backfill found_in`; R18 logs the `rc` `unknown` counts. Δ 0.
+- **AC13.4** (T-050-213 review, T-050-214 class commits, T-050-215 re-archive).
+  - 213: `dd-software-engineer` reads `bugs.py window` (0.5.0, 0.4.7), each cited test included; its handoff names, per cluster, the records, cause, verdict, AC; every record on a retired surface with its retiring ADR (exactly the bind/session-TTL surfaces and ENGINE/headless workflows; the reaper's live TTL out); the 205 non-product records by class with ids. No repo write.
+  - R19: `dd-product-engineer` writes rc-8 SPEC's `## Bug window review` and its cluster ACs (shape 8), operator approval; the main thread proposes each retroactive ADR.
+  - 214: one `bug` worktree, one shape-4 commit per class, `chore(bugs): <verb> class <class> — <reason>`, one id per body line; the born-in-release commit stores `introduced_in` = `found_in` on its terminal records no culprit derives; debt records `supersede --by <backlog-slug>` after their backlog entries land (operator-gated intake, a `backlog` worktree).
+  - 215: per accepted retroactive ADR, one `bug` worktree, `bugs.py archive --adr <id> <ids…>`; R20 logs before/after counts.
+- **AC13.3 heading** (T-050-216). ADD: `SPEC_STUB` opens with `## Bug window review`; `tree_findings` refuses the live candidate's SPEC lacking it, one fix line (`Operator action: add '## Bug window review' as the first section of <abs SPEC>`). UPDATE: `S/dd-release-definition/SKILL.md:16,26` (the engineer reads `bugs.py window`, each cited test, and hands its clusters to the grill). Opens after R19, else rc-8's own SPEC fails `check`. Δ ≈ +8 / +25 / +1.
+- **Law** (T-050-194 … T-050-198, amended; TASKS). The three canon files (`pub/scaffold/bugs/AGENTS.md`, `pub/scaffold/releases/AGENTS.md`, `pub/templates/specs-AGENTS.md`) land in T-050-194 alone, so one stamp bump (9 → 10, §6.7 O1) covers W12 and W13; R11 re-renders all three.
+- W13 production Δ ≈ +55 − 58 + 8 = +5, within §6.5's ≈ 158-line margin; test functions ≈ +4; test lines ≈ +100.
+
+| task | touched surface's bug history | bug-surface Δ |
+|---|---|---|
+| 209 | `bugs` 19 (shallow chain: a stored git-derived value) | + one derivation, shallow refused; `introduced_in` never stored by code, `resolved_release` never typed |
+| 210 | `bugs` (T-050-133 pair, store kept) | − the age path, a doctor check and a module; + one ADR read |
+| 211, 212, 214, 215 | ledger data only | 0 code |
+| 216 | `release-ledger` 3 (2 caused by `sa-promote-has-no-verb`) | + one heading check in the existing `tree_findings` walk |
+| 194–198 | law | 0 code |
+
+### 7.3 Release-worktree steps (§2.7, continued)
+
+- R15 (§6.6) before T-050-209 opens.
+- R16, main thread: `docs(adr): propose` and `accept` ADR B with the operator's words; before T-050-209 merges (SPEC accept point), and before T-050-211 opens (the restore is B's exception).
+- R17, main thread: ADR A, proposed and accepted before the first of T-050-194 … T-050-198 merges.
+- R18, after T-050-212: `chore(release): log the found_in backfill — rc unknown counts`.
+- R19, after T-050-213: SPEC `## Bug window review` + cluster ACs (shape 8, `dd-product-engineer`, operator approval); each retroactive ADR proposed, accepted before its T-050-215 run.
+- R20, after T-050-214 and the T-050-215 runs: `chore(release): log the window review — per-class counts before and after, re-archived and kept live`; `bugs.py stats` agrees.
+- R21, after R19: `docs(specs): candidate 8 PLAN/TASKS — W13 re-plan …`: T-050-199 … T-050-208 and the cluster ACs in one Parallel schedule, cause groups per AC13.2 (In review → operator).
+
+### 7.4 Schedule (≤ 2 test-running agents, `-n 2`; 0149)
+
+| step | tasks | width | how |
+|---|---|---|---|
+| S1 | T-050-209 | 1 | impl, after T-050-192 merges; beside it, no worktree: the 195–198 drafts redone |
+| S2 | T-050-210 | 1 | impl (same `BR/` files) |
+| S3 | T-050-211, then T-050-212 | 1 | bug, ledger only, serial (same ledger); `check` only |
+| S4 | T-050-213 ‖ T-050-194, T-050-195 | 2 | 213 reads, runs no suite; 194 and 195 impl, disjoint `W:`; R11, R13 after 194 |
+| S5 | T-050-196, T-050-197 | 2 | impl each, disjoint |
+| S6 | T-050-198 ‖ T-050-214 | 1 | 198 impl; 214 bug, ledger only, after 197 and R19 |
+| S7 | T-050-216 ‖ T-050-215 runs | 1 | 216 impl after R19; 215 bug, ledger only, per ADR |
+| S8 | R21 | — | then §6.6 W7 on |
+
+- Merges land one at a time (each runs `scripts/ci.py`). Critical path: 192 → 209 → 210 → 211 → 212 → 213 → R19 → R21 → 199.
+- Drafts: the text under `.dadaia/tmp/dd-software-engineer/20261004/text-batch/` (T-050-197, T-050-198; none for 196) predates W13 and is redone against §7.2 and the amended TASKS rows before their worktrees open; new drafts go to `.dadaia/tmp/dd-software-engineer/<YYYYMMDD>/<slug>/`.
+- One reviewer dispatch may judge two tasks only by emitting two verdicts, one per scope and sha.
+
+### 7.5 Readings for the operator (no task decides them)
+
+- Q1. AC13.6 says "the 179 age-archived records"; only 65 are age-archived and records. The other 114 are pre-v6 event lines (no `bug-record-v1` shape; 34 share a live id), which the store cannot restore and which AC13.6's check ("every `_archive/bugs_histo.jsonl` record carries an accepted ADR id") would then fail. T-050-211 restores the 65; the 114 wait on a ruling (stay as pre-v6 history, outside the check; or leave by a retroactive ADR).
+- Q2. §3a has no row for `bugs.py archive --adr`'s commit (T-050-215) nor for the restore (T-050-211, SPEC-named). T-050-197's SPEC list does not add one; until ruled, T-050-215 commits `chore(bugs): archive <ids> — ADR <id>`, the conventional ledger form.
+- Q3. "The audit window stays the audit's": `LINEAGE.md:4` says the audit's pillar 1 cites `LINEAGE.md`'s window, which T-050-195 replaces with `bugs.py window`; no W13 task owns `dd-audit-project`'s copy. T-050-195 keeps `:8-12` as the audit's window and points Phase 0 and rule 6 at `bugs.py window`, unless ruled otherwise.
+- Q4. AC13.1's "a second `--set found_in` is refused": the write-once seam refuses a differing second write; an equal one is a no-op today. T-050-209's case writes a differing value.
+- Engineering readings, for the reviewer: `candidate_at`'s home (`RI/_release_store.py`, imported by `BR/bugs.py`); the shallow-repository refusal; `archived_by` as the field carrying the ADR id; SPEC-DOC-041's deletion.
+- Done markers of T-050-191, T-050-192, T-050-193 are `chore(tasks): done <id>` in an `impl` worktree (§3a row 7; T-050-197 widens it to `release` only for cause-group markers), the first commit of the next `impl` worktree.
