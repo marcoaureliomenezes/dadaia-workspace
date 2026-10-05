@@ -1,6 +1,6 @@
-# SPEC — Release: 0.5.0, candidate 8 (W8: the test law and the library pipeline leave; W9: bug lineage derived; W10: the open bugs; W11: agent-behavior evals, a parallel lane; W12: the bug loop stops)
+# SPEC — Release: 0.5.0, candidate 8 (W8: the test law and the library pipeline leave; W9: bug lineage derived; W10: the open bugs; W11: agent-behavior evals, a parallel lane; W12: the bug loop stops; W13: the bug strategy)
 
-**Status:** Approved
+**Status:** In review
 **Release ID:** 0.5.0
 **Owner:** dd-product-engineer
 **Opened:** 2026-10-03
@@ -24,7 +24,18 @@
   - Answered via inspection, from Q1, Q2 and Q20: the REBUILD mechanics of AC12.2 and AC12.12; `bugs.py fix` and blame read the `refactor(bugs)` shape like shape 3.
   - Answered via inspection, from the bugs law §1: the operator's approval of this SPEC confirms AC12.4 row 19.
   - Answered via inspection, from Q18 and the rows 10 and 12 precedent: row 6 stays open until AC12.13, which reverts b9b28202d's OSError arm; its diagnosis was never reproduced on CI's 3.12 (audit F-QA-1).
-- Bug history read (permanent architecture review): PLAN §1, the as-is review; for W12, the audit above.
+- Amendment 2026-10-05 (W13): grill `.dadaia/handoff/dadaia-workspace/2026-10-05T005326Z-main-thread-grill-bug-window-review.handoff.json`, G1–G9, after the report https://claude.ai/artifact/AZMbDAsMvqBYPqbXd5WgZx (IBM DPP causal analysis per stage; ODC v5.2 opener/closer; ImpossibleBench; the Debugging Decay Index; Böckeler on TDD in the agent loop; Hashimoto's "engineer the mistake away"). Ledger scan 2026-10-05: 742 records; 537 product defects, 15 agent errors, 89 born in the release, 66 library dev-tooling, 35 doubtful. Operator words, verbatim (AskUserQuestion):
+  - G1 "quando o bug foi identificado. e 2. quando a implementação que gerou o bug ocorreu. acredito que seja achado e nascido."
+  - G2 "Ao encontrar um bug se ele barrar o avanço se resolve na hora. Se ele não barra o avanço se coloca ele na pilha para ser resolvido ao final da release"; "consertado se ele foi gerado durante a implementação do proprio RC ou se ele impede ou bloqueia ações"; "Lista fechada (Recommended)"; "onda final, opção 1".
+  - G3 "Bugs (historico) sempre revisado na criação da primeira spec de 1 rc. mesmo bugs resolvidos. A janela olha bugs da release atual (gerados na release atual, todos os release candidates) e bugs de todos release candidates da versão anterior. Esse audit é permanente e anda como uma janela."; "Só por rc (Recommended)"; "Seção no SPEC + congela 199–208 (Recommended)".
+  - G4 "Já no rc-8 (Recommended)"; "Reclassificar por classe (Recommended)".
+  - G5 "dado que praticamos TDD os testes gerados pelo TDD devem ser rastreaveis"; "Nosso maior problema em fixes e bugs, é o overfitting"; "No registro do bug, conferido (Recommended)".
+  - G6 "deveriamos ter gerado uma ADR, que tem um limiar muito mais alto"; "Por ADR que aposentou a superfície (Recommended)".
+  - G7 "se o agente tentou fazer algo e deu erro, ou ele criou um teste e não passou é um erro dele, não é um bug do workspace".
+  - G8 "Bugs devem ser consolidados em QUALITY.md"; "o ledger é as transações e o saldo (balance) é a soma"; "Mapa gerado + revisão escrita"; "Revisão a cada rc, consolidação por release (Recommended)".
+  - G9 "é isso mesmo" (the merge as the boundary; the `bug` kind follows the pile). Summary: "Confirmo (Recommended)".
+  - Answered via inspection: "the previous version" is the previous published one, 0.4.7 (the PyPI lineage axis); the ledger carries `ts` and `resolved_release` only.
+- Bug history read (permanent architecture review): PLAN §1, the as-is review; for W12, the audit above; for W13, the 2026-10-05 ledger scan.
 - Left out: `dependabot-pyjwt-open-on-main`, closing at the ship (rc-12); `removals-shipped-without-recorded-authority`, rejected (Q5).
 
 ## Objective
@@ -35,6 +46,7 @@
 - The open bugs are fixed; production and tests end smaller (§G1).
 - Agent behaviour is measured on the shipped wheel, from the associated repo `dadaia-evals`, beside W8–W10 (W11; 0177–0179).
 - A fix that breeds a bug is reverted and redone, never patched forward; a worktree merge lands only a verified, unrewritten HEAD (W12).
+- A bug that blocks nothing waits in the rc's pile and is fixed by cause in the rc's final wave; every rc opens with a review of the bug window, and `QUALITY.md` carries the ledger's balance (W13).
 
 ## Terms
 
@@ -45,6 +57,7 @@
 - **Owner file**: the one test file owning a module's behaviour; a RED enters it as a new case (0146 (5)).
 - **Behaviour assert**: an assert on an exit code, an effect, or a stable id (finding code, slug, flag); a sentence, roster, or count with a source of truth is not one.
 - **Evals repo**: AC11.1's `CONTEXT.md` entry. `eval.yml` is a workflow in that file's one sense.
+- **Bug window**, **Pile**, **Block list**, **Final wave**: AC13.11's `CONTEXT.md` entries. "Window" is always qualified: bug window, lineage window (`LINEAGE.md`), drift window (memory).
 - SCAFFOLD here is the test tier (V28), never the specs scaffold. Bare `preflight` is a homonym: `ctx_inject`'s generic preflight, `_dead_preflight` and `_ownership_preflight` stay.
 
 ## Decisions
@@ -61,15 +74,21 @@
   - Amendment (AskUserQuestion): "Add to rc-8 (Recommended)" (backlog `worktree-memory-states-plain-ledger-merge` joins the Origin, AC10.14); "Land eval.yml on main early (Recommended)" (AC11.5, AC11.6).
   - Amendment (AskUserQuestion, 2026-10-04): "Run pytest with -B (Recommended)" (AC10.1).
   - Amendment (AskUserQuestion, 2026-10-04): "Global test setup (Recommended)" (AC10.1; T-050-169 uses `tests/conftest.py`'s session env, not a per-test env builder).
-- Order (root map §1): AC8.9; the rest of W8; W9; W10, after AC9.3 and AC8.1's `Intent:` strip. Width: the PLAN's Parallel schedule (0149). From 2026-10-04, W12's order (Q5) governs every open task.
+- Order (root map §1): AC8.9; the rest of W8; W9; W10, after AC9.3 and AC8.1's `Intent:` strip. Width: the PLAN's Parallel schedule (0149). From 2026-10-04, W12's order (Q5) governs every open task; from 2026-10-05, W13's Order inserts its steps 1–2 before T-050-199.
 - W12 (amendment 2026-10-04): two new ADRs, proposed in the release worktree: the merge ADR (AC12.5, AC12.7; its ruling Q6, Q7, Q15, Q16 and Q19's words; 0168 cited as standing) and the bug-loop law ADR (AC9.3's Q26 line, AC12.1–AC12.3, AC12.6's reviewer line, AC12.11, AC12.12; its ruling Q1, Q2, Q9, Q12–Q14, Q18, Q20 and Q26's words; it cites 0164 (2), whose skip set Q26 amends after 0183, and 0164 (3) as amended). 0172 is ruled by Q8's words (AC12.8). The main thread writes every acceptance.
+- W13 (amendment 2026-10-05): candidate ADRs, proposed by the main thread with the operator's words; nothing is written here to `decisions.jsonl`:
+  - A, "Per-rc bug window and pile": the block list, the pile, the final wave by cause, a redesign as an ADR plus a next-rc AC (G2); the window review opening every rc's first SPEC, and rc-8's first pass (G3, G4); the merge as the error/bug boundary and the `bug` kind (G7, G9). Amends 0019 ("a confirmed bug is still fixed at once") and 0186 (2) (one fix-induced bug stops the line, now only on the block list or when born in the running rc); implements 0123; cites 0136 and 0185. `measured_by`: AC13.2's and AC13.3's checks; PILLAR-BUGS's same-surface re-bug rate (0123's).
+  - B, "The bug record's lineage and lifecycle": `found_in` and `introduced_in` (G1); `evidence_seam` required at resolve and checked (G5), amending 0164 (4) and AC9.1's clause; a record leaves the ledger only by an accepted ADR (G6), replacing the age archive. `measured_by`: AC13.1, AC13.5 and AC13.6's cases.
+  - C, "`QUALITY.md` carries the bug ledger's balance": the `## Bugs` section, its generated map under a doctor check, its written review, the decay rule, and `docs/bug-ledger-lessons.md` derived from it under P-29 (G8). `measured_by`: AC13.9's doctor case.
+  - Retroactive, per G6: one ADR per retired surface the rc-8 pass archives (ENGINE/headless workflows; the bind/TTL families), each accepted by the operator before its `archive` runs.
+  - Every W13 commit deleting a law line cites A, B or C once accepted (0151 M3).
 - W11 (amendment, operator 2026-10-03, AskUserQuestion, verbatim):
   - Fold (grill 170932Z): "fold into rc-8. make sure to define that it can surely be implemented in parallel ... because it's on other repo".
   - Q-W0: "Yes, only that slice (Recommended)". AC11.0 carries only "an associated repo's impl reads the main repo's Approved trio" of proposed 0174; the rest stays rc-11's.
   - 0179: "Accept as prepared (Recommended)".
 - Accept points of 0176, 0177, 0179 and 0180: PLAN R7–R10. 0178 (`amends: 0122`) is accepted at closure, since it governs rc-12's promote.
 
-## Gate — G1–G6, applied to W8–W10 and W12
+## Gate — G1–G6, applied to W8–W10, W12 and W13
 
 - G1 Principles, never a line-count limit (0142):
   - DELETE → REBUILD → UPDATE → KEEP → ADD; an ADD names what it could not delete. No question gets a second decider.
@@ -77,7 +96,7 @@
   - At birth (8f4ed785f): 25,307 / 1,233 / 45,464 / 0 / 0.
   - Production: rc-7 planned −160, measured +342 (PR #278 F1); rc-8 carries the 502-line miss and ends at or below 24,805, its ADDs counted; the PLAN names the DELETE rows, AC8.9 the largest.
   - Tests, guard scripts counted in (the c4 target): functions plus guard checks ≤ 1,167; test lines plus guard-script lines ≤ 43,232.
-- G2 `bugs.py status` lists no open record whose `caused_by` names a W8–W12 bug or task.
+- G2 `bugs.py status` lists no open record whose `caused_by` names a W8–W13 bug or task.
 - G3 Each open bug is re-run at `<end>`; one not reproducing is resolved, citing the commit that removed its cause.
 - G4 CI green on the three OSes; `.dadaia/.venv/bin/dadaia doctor --context dadaia-workspace` exits 0. Wall-clock vs rc-7: one runner class, the median. The guard-script job is the only job added.
 - G5 A test a DEL leaves dead leaves in the same commit. A new test follows the root-map test basics (AC8.1).
@@ -380,6 +399,98 @@ After AC9.3 and AC8.1's `Intent:` strip merge. Each RED is a behaviour assert in
   3. The REBUILDs: AC10.1, AC12.8, AC12.13; then AC12.9, AC12.10, AC12.14.
   4. Only then the paused tasks: T-050-172 … T-050-181, T-050-185, T-050-186, T-050-188.
 
+## W13 — the bug strategy (amendment, grill 2026-10-05): acceptance
+
+- Sources are edited under `dadaia_workspace/public/`, then `public stage`, `install`, `doctor`; the instance is never hand-edited.
+- Not in scope: the main thread's private rulings ("resolve on the spot", "keep a bug worktree busy"); the main thread retires them in its own memory.
+- AC13.1 Every bug record carries `found_in` and `introduced_in` (G1):
+  - Both `write-once` in `bug-record-v1`, shape `{release, rc}` or the literal `unknown`; `rc` is the candidate directory's name (0.4.7's archive holds `rc-N` and `cN`).
+  - One derivation, instant → candidate: the candidate open at that instant, read from `_RELEASE.json` and `_archive/*/_RELEASE.json`.
+  - `bugs.py append` stamps `found_in` for the append instant; no flag sets it.
+  - `bugs.py resolve` writes `introduced_in` for the instant of the culprit commit its blame already names (`caused_by`'s); `unknown` when there is no culprit or no candidate holds the instant.
+  - Backfill: one `chore(bugs): backfill found_in and introduced_in` commit, every value written by `bugs.py update --set` from a script run once under `.dadaia/tmp/`; `found_in` from `ts`, `introduced_in` from `caused_by`'s culprit; not derivable is `unknown`.
+  - Cases, `test_bug_resolution_bugs_script.py`: append under a live `rc-3` of `9.9.9` stamps `{"release": "9.9.9", "rc": "rc-3"}`; resolve with a culprit committed while `rc-2` was open writes `rc-2`'s; `caused_by none` without candidates writes `unknown`; a differing second `--set found_in` is refused.
+  - Check: `bugs.py check` clean; every record carries both fields; the `unknown` counts are logged in `_RELEASE.json`.
+- AC13.2 A bug is fixed at once only on the block list or when born in the running rc; any other joins the rc's pile (G2; implements 0123):
+  - The block list, closed, stated once in `specs/bugs/AGENTS.md` §2 (source `pub/scaffold/bugs/AGENTS.md`): (1) the work branch's CI is red; (2) a refusal whose own fix is blocked (Stall); (3) the running task cannot deliver its AC; (4) a security finding or an open dependency-vulnerability alert; (5) data loss or corruption. Every other file points there.
+  - Born in the running rc: the culprit the proposal names is a task of the running candidate or a fix merged in it; `introduced_in` confirms it at resolve.
+  - Every other confirmed bug is registered at once and waits in the pile: the open records whose `found_in` is the running rc.
+  - The final wave, after the last planned task and before `RC-FLOW.md` step 3: the engineer groups the pile by structural cause; one task and one `bug` worktree per cause, holding its N bugs (0136); its one fix commit resolves each.
+  - A cause needing more than one task becomes a proposed ADR and an AC of the next rc's SPEC; its bugs stay open and are carried by id.
+  - AC12.2 narrows: a fix-induced bug stops work in flight only on the block list or when born in the running rc; any other's REBUILD is its cause's final-wave task.
+  - Files: the root map §1 Arm B line, within 8,293 B (8,292 today); `pub/templates/specs-AGENTS.md` §6; `dd-bug-resolution` §1; `dd-release-implementation` SKILL §2a and `RC-FLOW.md`; `dd-gitflow-default` §2a.
+  - Check: `grep -rnE 'bug[^.]*in any phase' dadaia_workspace/public` prints nothing; `grep -rl 'data loss or corruption' dadaia_workspace/public` names only `scaffold/bugs/AGENTS.md`; `/corpus-audit` clean.
+- AC13.3 A review of the bug window opens every rc's first SPEC (G3):
+  - The bug window: every record whose `found_in` or `introduced_in` is a candidate of the live release or of the previous published version, whatever its status, `_archive/bugs_histo.jsonl` included; it moves with each rc.
+  - `dd-release-definition` §1's first step: `dd-software-engineer` reads the window read-only, every cited test included (AC13.5), and hands its clusters to the grill beside the as-is review.
+  - The SPEC's first section, `## Bug window review` (the operator's "Revisão de bugs"), by `dd-product-engineer`: one row per cluster — records, structural cause, verdict (REBUILD, DELETE or KEEP), the AC carrying it — and one harness rule per repeated agent error.
+  - `specs/releases/AGENTS.md` §2's lifecycle order opens with it; `release.py new`'s SPEC stub opens with the heading; `release.py check` refuses a live SPEC without it, with one fix line, beside its PLAN §1 check.
+  - Cases, `test_release_implementation_release_script.py`: `new` writes the heading as the first section; `check` on a live SPEC lacking it exits non-zero, one fix line.
+- AC13.4 rc-8's first window review (G4):
+  - One task right after T-050-192 and AC13.1's backfill; T-050-199 … T-050-208 stay frozen until its verdict.
+  - Window: 0.5.0 rc-1 … rc-8 and 0.4.7's candidates.
+  - The 205 non-product records are re-dispositioned by class through `bugs.py`, in a `bug` worktree, one shape-4 commit per class:
+    - agent error (15): `reject` with its reason, plus a harness rule when it repeats;
+    - born in the release (89): stays a bug, `introduced_in` = `found_in`; only never-merged rework is rejected;
+    - library dev-tooling (66): outside the product map (AC13.9);
+    - debt: a backlog entry through the operator-gated intake, then `supersede --by <backlog-slug>`;
+    - doubtful (35): each ruled in the review.
+  - Verdict: rc-8's SPEC gains `## Bug window review` and its cluster ACs (shape 8), and the operator approves it; PLAN §6.6 is re-planned after it.
+  - Check: one `_RELEASE.json` log entry names the counts per class before and after; `bugs.py stats` agrees.
+- AC13.5 A TDD test is traceable through its bug record (G5):
+  - `resolve` requires `evidence_seam` again: `<tracked test path>[::<node>]`, any language, no marker in test code.
+  - `resolve` refuses a path git tracks neither at HEAD nor in the index, and a node the file does not contain; records resolved before stay valid.
+  - Amends AC9.1's clause and 0164 (4); `evidence_diff` stays retired.
+  - The window review and `dd-code-review` read every cited test for overfitting: an expected value taken from the code under test, output checked against itself, a test green on the pre-fix sha.
+  - Cases, the owner file: no `--evidence-seam` exits non-zero naming it; an untracked path, or an absent node, exits non-zero; a tracked `path::node` is stored.
+- AC13.6 A record leaves the ledger only by an accepted ADR (G6):
+  - `bugs.py archive --adr <id>` moves the named terminal records into `_archive/bugs_histo.jsonl`, each carrying the ADR id; an id not `accepted` in `decisions.jsonl` is refused.
+  - Deleted: the age path (`--threshold-days`, `--now`, the `closed_at` cutoff), `RC-FLOW.md` step 7's "Age the ledger" line, the bugs law's "ages by `closed_at`".
+  - rc-8's first pass archives the ENGINE/headless-workflows and bind/TTL families, each after its retroactive ADR is accepted.
+  - Cases: `--adr` naming a proposed record exits non-zero, ledger unchanged; an accepted one moves exactly the named records; `--threshold-days` exits 2.
+- AC13.7 The worktree merge is the boundary between an agent's error and a bug (G7, G9):
+  - `specs/bugs/AGENTS.md` §1: a bug exists once a merged change breaks a documented contract; what fails inside an unmerged worktree (a wrong command, a stray quote, the agent's own failing test, review rework) is rework and gets no record. Gate 1 (0185) keeps a red from crossing the merge.
+  - AC12.1's line is written in these terms, in its one rewrite.
+  - `dd-bug-registration` §2 step 4 names the merged change and the work-branch sha that reproduce the bug.
+  - Check: `/corpus-audit` clean on both files.
+- AC13.8 The `bug` worktree kind follows the pile (G9):
+  - `worktrees/AGENTS.md` §1: `bug` — a registration; a block-list or born-in-rc fix, opened at once; or one final-wave cause holding N bugs (0136). §2 step 1's Arm B bullet says the same.
+  - `_worktree_kinds.KINDS` is unchanged.
+  - Check: `grep -n 'one fix' dadaia_workspace/public/data/worktrees-AGENTS.md` prints nothing.
+- AC13.9 `QUALITY.md`'s `## Bugs` is the ledger's balance (G8):
+  - Generated map, per surface, product surfaces apart from dev-tooling: records, recurrences, fix-induced (`caused_by` ≠ `none`), pile, archived, times reviewed, associations (`caused_by`, `correlates`), weight.
+  - Weight: a bug is live while inside the bug window or while its surface recurs; it is settled once it leaves the window with no recurrence on its surface. No other number.
+  - Times reviewed is derived from `found_in` and the candidate sequence; the ledger stores no counter, and per-bug state lives only there.
+  - One generator, the ledger's own script; doctor reports a map that differs from it, with a `fix:` line that clears it (V39).
+  - Written review: causes, verdicts, lessons; `dd-product-engineer` compiles it at every rc closure (a `MEMORY-UPDATE.md` step) and consolidates it at the release's last; 0138's lane.
+  - `specs/memory/AGENTS.md` §2, the `QUALITY.md` scaffold and the `memory-canonical-shape` guard gain `## Bugs`.
+  - Cases: a fixture record past the window with no recurrence on its surface counts settled, one whose surface recurred counts live; a stale map raises the doctor code and its fix line clears it.
+- AC13.10 `docs/bug-ledger-lessons.md` derives from `## Bugs` (G8, P-29):
+  - Its lessons carry `derived-from: QUALITY` markers and restate the written review.
+  - Deleted: the evidence-triple and diff-direction lines, and "The standing order" (the root map §1, `LINEAGE.md` and QUALITY `## Gates` own it).
+  - An `impl` worktree after the closure's `QUALITY.md` edit (`MEMORY-UPDATE.md` step 7), after AC8.10's re-derivation.
+  - Check: `test_docs_derived_from_memory.py` green; the page ends shorter.
+- AC13.11 `CONTEXT.md` gains **Bug window**, **Pile**, **Block list**, **Final wave**, `found_in` and `introduced_in`; **Wave** names the final wave's cause grouping; **Resolution contract** drops the evidence triple and "net ≤ 0" (0163, 0164) and names `evidence_loop` and `evidence_seam`.
+- AC13.12 W13's law lines meet AC12.11's bar:
+  - A W13 change to a file AC12.11 lists lands in that file's one rewriting task (T-050-194 … T-050-198).
+  - `pub/data/worktrees-AGENTS.md`, rewritten by T-050-191, takes one more rewrite (AC13.8), the only second one.
+  - Joining AC12.11's list: `pub/data/AGENTS.md`, `pub/templates/specs-AGENTS.md`, `S/dd-release-definition/SKILL.md`, `S/dd-release-implementation/RC-FLOW.md` and `MEMORY-UPDATE.md`, `S/dd-bug-registration/SKILL.md`, `pub/scaffold/releases/AGENTS.md`, `pub/scaffold/memory/AGENTS.md`, `pub/scaffold/memory/QUALITY.md`.
+  - Acceptance: AC12.11's.
+- The drafted tasks against W13 (TASKS is the engineer's; each must now meet):
+  - T-050-192: AC9.3 and AC12.12's half as drafted; its `W:` already holds AC13.1's files, so the PLAN may fold AC13.1's stamp and derivation into it.
+  - T-050-194: AC12.1 as AC13.7 words it; AC13.2's block list; AC13.6's law line.
+  - T-050-195: AC12.2 as AC13.2 narrows it; AC13.2 in `dd-bug-resolution` §1 ("in any phase" leaves); AC13.5 in Phase 6.
+  - T-050-196: AC12.3 stands (a red work branch is block-list item 1); AC13.2's final wave in SKILL §2a and `RC-FLOW.md`; AC13.6's `RC-FLOW.md` line; AC13.9's `MEMORY-UPDATE.md` step. Its `W:` widens to both files.
+  - T-050-197: AC12.12 stands; AC13.2 and AC13.8 in §2a ("in any phase" leaves); shape 3 and the `refactor(bugs)` REBUILD shape name a cause's N ids, each found by `bugs.py fix`.
+  - T-050-198: AC9.4's REBUILD read applies when the fix lands, at once or in the final wave; AC13.5's overfitting read of the cited tests; a final-wave worktree holds one cause and exactly its bugs' resolve lines (0136).
+  - T-050-199 … T-050-208: frozen until AC13.4's verdict; their order is re-planned in PLAN §6.6.
+- Order (W13):
+  1. T-050-192, then AC13.1's backfill.
+  2. AC13.4; T-050-193 … T-050-198 proceed, carrying W13's law lines; T-050-199 … T-050-208 wait for its verdict.
+  3. AC13.3, AC13.5, AC13.6 and AC13.9's code; then AC13.10.
+  4. T-050-199 … T-050-208 as re-planned; width per the PLAN's Parallel schedule (0149).
+- Net direction: law and docs shrink (the "any phase" lines, the age archive, the lessons page's duplicates); production grows by the two fields, the seam check, the map generator and its doctor code, the SPEC heading check, less the age archive. Each ADD counts against G1's 24,805 ceiling and names what it could not delete.
+
 ## Replaces
 
 - `ci preflight`, its scope error, runner and pytest bootstrap; the Python-only anchors, reaping list, tool names, extension list and `TOOL_CACHE_ENV` list (AC8.9).
@@ -396,6 +507,10 @@ After AC9.3 and AC8.1's `Intent:` strip merge. Each RED is a behaviour assert in
 - `dead --commit`, `commit_all`, dead's consent, secret and identity refusals, certification's `dead --commit` call (AC12.8); the stamp-9 re-pin and its rewritten rule; 7196e1473's loosened assert; `_StubDoctor` (AC12.9, AC12.10).
 - `sweep.py`'s except-arm delete path, `succeeded`, `deleter`, the str refusal, `move`'s raise, `worktree_git_dir` there; a submodule read as a linked worktree (AC12.13, AC12.14).
 - The map's unscoped "no CI job calls a model API", in the root map, SKILL.md §3b and `CICD-AUTOMATION.md` (0177); an `impl` worktree reading the trio from its own repo (AC11.0); memory's ledger union merge and step 7's bare conflict line (AC10.14).
+- A confirmed bug fixed at once in any phase, the `bug` kind's "one fix", and a fix-induced bug stopping the line whatever its rc (AC13.2, AC13.8; 0019, 0186 (2)).
+- The age archive (`--threshold-days`, `--now`, the `closed_at` cutoff, RC-FLOW's "Age the ledger"); an optional `evidence_seam` (AC13.5, AC13.6; 0164 (4)).
+- "Why it is not agent error" as the bug test, in place of the merge boundary; `dd-release-definition` §1's bare `status`/`stats` read (AC13.3, AC13.7).
+- `docs/bug-ledger-lessons.md`'s evidence-triple lines and its standing order; CONTEXT's evidence-triple **Resolution contract** (AC13.10, AC13.11).
 
 ## Risks
 
@@ -410,6 +525,10 @@ After AC9.3 and AC8.1's `Intent:` strip merge. Each RED is a behaviour assert in
 | AC12.6's script drifts from `ci.yml`, reopening the escape path. | `ci.yml`'s Linux jobs call the script (AC12.6). |
 | A worktree weakens its own verification command. | The reviewer sees it in the diff (AC12.5). |
 | A revert reintroduces the bug the culprit fixed. | The revert and its redo land in one commit, gate 1 green (AC12.2). |
+| The pile hides a bug that turns blocking. | The block list is re-judged at each new fact; a bug meeting it leaves the pile at once (AC13.2). |
+| The final wave grows into a rewrite. | A cause larger than one task becomes an ADR and a next-rc AC (AC13.2). |
+| The backfill guesses a candidate. | Only the instant → candidate derivation writes; the rest is `unknown` (AC13.1). |
+| A guard on cited tests turns red when a REBUILD deletes one. | The check runs at `resolve` only; the window review reads cited tests that left (AC13.5). |
 | The SPEC is past its 24 KiB recommendation (0152 (2)). | Q5 placed the amendment in rc-8; W12 lines stay one line each. |
 
 ## Carried — the 0.5.0 map (ADR 0140; one candidate at a time)
@@ -421,4 +540,16 @@ After AC9.3 and AC8.1's `Intent:` strip merge. Each RED is a behaviour assert in
 
 ## Open questions for the operator
 
+- W13, for the main thread to put to the operator (each with this SPEC's default):
+  - G5 reverses T-050-165 (done): 0164 (4) retired `evidence_seam` and deleted `_seam_exists`; AC13.5 restores both. Default: the reversal, checked at `resolve` only.
+  - G2 against 0186 (2), accepted 2026-10-04: a non-blocking fix-induced bug from an earlier rc waits in the pile. Default: AC13.2 narrows AC12.2, ADR A amends 0186 (2).
+  - G6 against the 179 records already age-archived into `bugs_histo.jsonl`: default, they stay; the window review reads them. No ADR names the 90-day age archive; ADR B replaces it.
+  - G6 "bind/TTL families": the reaper's TTL is live (AC12.13, AC12.14 rows 25, 26). Default: only surfaces a retroactive ADR retires; the review names them.
+  - G8 against LINT-1 (MEM-NARRATIVE-1 refuses a release, candidate or date id in any memory file): default, the generated map is a fenced block (exempt); the written review names no id.
+  - G4's "surface dev-tooling": `surface` is `immutable-core` and must name a tracked directory. Default: dev-tooling is derived from a surface outside the shipped package, no record rewritten; the alternative is a new mutable field.
+  - G3's "gerados na release atual": default, a record is in the window by `found_in` or `introduced_in`.
+  - G4 "right after T-050-192" while the window reads `found_in`: default, AC13.1's backfill runs between them.
+  - G2's "born in the running rc" is judged at triage, before `introduced_in` exists: default, the culprit the proposal names.
+  - Two windows read bugs: `LINEAGE.md`'s (newest archived audit → HEAD) and the bug window. Recommended: Phase 0 reads the bug window and `LINEAGE.md`'s leaves; not ruled.
+  - The section heading: default `## Bug window review` (the library's English) for "Revisão de bugs".
 - None for W8–W12: the 2026-10-03 and 2026-10-04 grill frontiers are empty. F4 is rc-12's (§Carried). Operator acts: 0176, 0177, 0178 and 0180's acceptances (§Decisions); W11's GitHub prerequisites (the `evals` environment, its secret, the required `ci.yml` job).
