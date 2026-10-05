@@ -3,9 +3,9 @@
 Every bug this workspace has is one line in `specs/bugs/BUGS.jsonl`: one record per
 bug, appended once, keyed by its id, with git history as that line's change log and no
 git-derived fact in the record. Each record names its `surface`, its `component`, the
-evidence of its red loop and its seam test, whether the fix left the feature smaller or
-larger (the direction prefix of `evidence_diff`), and its lineage: `caused_by`, the id of the bug whose fix
-made this one possible.
+candidate it was found in, the evidence of its red loop, and its lineage: `caused_by`, the
+bug or task whose fix wrote the lines this fix corrects. Whether the fix left the feature
+smaller or larger is derived from its fix commits by `bugs.py fix`, never stored.
 
 That last field is why the ledger reads as a history rather than a pile. Follow
 `caused_by` and bug families appear — chains of records on the same surface, each one
@@ -13,7 +13,7 @@ the price of the previous fix.
 
 ## Measuring the ledger
 
-<!-- derived-from: bug-ledger sha256:11ce7d98680f -->
+<!-- derived-from: bug-ledger sha256:156cfaca5544 -->
 
 The numbers are never copied into a page; the ledger's own verbs measure them.
 
@@ -24,14 +24,15 @@ python3 .agents/skills/dd-bug-resolution/scripts/bugs.py status --all
 
 `status` is `open | resolved | superseded | deferred | rejected`, and a terminal status
 is reached only through its transition, each refusing an incomplete call: `resolve`
-requires the red-loop, seam and diff evidence and the `caused_by` link; `supersede`
+requires the red-loop evidence and a `caused_by` link checked against the blame of the
+staged fix; `supersede`
 names the record that replaces it; a reopen is a new record. Nothing is closed by
 agreement.
 
 ## Lesson 1 — a per-caller fix breeds the next caller's bug
 
-<!-- derived-from: context-management sha256:f9635e5c313c -->
-<!-- derived-from: bug-ledger sha256:11ce7d98680f -->
+<!-- derived-from: context-management sha256:88b825d90c59 -->
+<!-- derived-from: bug-ledger sha256:156cfaca5544 -->
 
 When a guard lives at the caller that was just caught, the next caller without it is
 the next bug in the family, and each such fix is `net-positive`: it grows the feature.
@@ -53,7 +54,7 @@ to remember to extend.
 
 ## Lesson 3 — a derived cache breeds a bug per environment that derives it
 
-<!-- derived-from: bug-ledger sha256:11ce7d98680f -->
+<!-- derived-from: bug-ledger sha256:156cfaca5544 -->
 <!-- derived-from: QUALITY sha256:f96b10f118ed -->
 
 A record that caches a fact git already knows is wrong in every environment that
@@ -64,14 +65,15 @@ history is that line's change log. No CI job fetches history for a bug record's 
 ## The standing order the lessons produced
 
 <!-- derived-from: QUALITY sha256:f96b10f118ed -->
-<!-- derived-from: bug-ledger sha256:11ce7d98680f -->
+<!-- derived-from: bug-ledger sha256:156cfaca5544 -->
 
 The workspace is in a permanent state of architecture review, oriented by its bug
 history:
 
 - Read the ledger before proposing a fix. Resolution opens with lineage over at most
   the 20 most recent records sharing this bug's surface or component, and the link is
-  declared at resolution as `caused_by: <bug-id> | none`; a unit with two or more prior
+  declared at resolution as `caused_by: <bug-id> | <task-id> | none`, picked from the
+  blame candidates; a unit with two or more prior
   fixes is rebuilt, never patched a third time.
 - Prefer the deletion-shaped fix. A fix whose diff grows the touched feature is routed
   to the architecture lens before it lands.

@@ -44,10 +44,10 @@ memory atom under its content hash.
 
 ## A human installs and uses it
 
-<!-- derived-from: pypi-distribution sha256:cec6ab21a159 -->
-<!-- derived-from: workspace-init sha256:5a4a8bb1e91e -->
-<!-- derived-from: context-management sha256:f9635e5c313c -->
-<!-- derived-from: workspace-doctor sha256:21e1298b4845 -->
+<!-- derived-from: pypi-distribution sha256:969fd54bf85f -->
+<!-- derived-from: workspace-init sha256:4f0ceaccc6c8 -->
+<!-- derived-from: context-management sha256:88b825d90c59 -->
+<!-- derived-from: workspace-doctor sha256:58030f05158e -->
 
 ```bash
 uvx dadaia-workspace init demo --harness claude --repo <clone url>   # level 1 + 2
@@ -94,10 +94,10 @@ a TTL expiry acts by zone class, an OUTPUT entry held, an EPHEMERAL one deleted.
 
 ## An agent reads AGENTS.md and uses it
 
-<!-- derived-from: agentic-entities sha256:22f6bf181b40 -->
+<!-- derived-from: agentic-entities sha256:2e16e47d2930 -->
 <!-- derived-from: sdd-gate-v3 sha256:ed351120dcd1 -->
-<!-- derived-from: release-lifecycle sha256:e4c5ec1f9818 -->
-<!-- derived-from: bug-ledger sha256:11ce7d98680f -->
+<!-- derived-from: release-lifecycle sha256:29faad7020af -->
+<!-- derived-from: bug-ledger sha256:156cfaca5544 -->
 <!-- derived-from: harness-claude-code sha256:68e07ea44a20 -->
 <!-- derived-from: harness-codex sha256:9218e747c24f -->
 <!-- derived-from: harness-kimi-code sha256:ac3c7be4e426 -->
@@ -132,8 +132,8 @@ with a RED test. Completed work leaves as a `handoff-v1` record, validated by
 
 ## Documentation
 
-<!-- derived-from: pypi-distribution sha256:cec6ab21a159 -->
-<!-- derived-from: public-asset-distribution sha256:9be8dd881241 -->
+<!-- derived-from: pypi-distribution sha256:969fd54bf85f -->
+<!-- derived-from: public-asset-distribution sha256:d14983127b26 -->
 
 The documentation is the repository's [docs folder](https://github.com/marcoaureliomenezes/dadaia-workspace/tree/main/docs):
 
@@ -148,7 +148,7 @@ The documentation is the repository's [docs folder](https://github.com/marcoaure
 
 ## Links
 
-<!-- derived-from: pypi-distribution sha256:cec6ab21a159 -->
+<!-- derived-from: pypi-distribution sha256:969fd54bf85f -->
 
 - GitHub — <https://github.com/marcoaureliomenezes/dadaia-workspace>
 - PyPI — <https://pypi.org/project/dadaia-workspace/>
