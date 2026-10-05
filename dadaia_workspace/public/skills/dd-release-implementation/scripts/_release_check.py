@@ -116,7 +116,7 @@ def dag_errors(plan: str) -> list[str]:
     rows = re.findall(r"^\|\s*Job (\d+)\s*\|([^|]*)\|", re.split(r"^#", section[0], flags=re.MULTILINE)[0],
                       re.MULTILINE) if section else []  # fmt: skip
     graph = {int(job): {int(n) for n in re.findall(r"\d+", waits)} for job, waits in rows}
-    errors = ["the DAG has no Job 1"] if 1 not in graph else []
+    errors = ["the DAG has no Job 1"] if section and 1 not in graph else []
     errors += [f"the DAG holds {len(graph)} jobs — at most 8 jobs"] if len(graph) > 8 else []
     try:
         tuple(TopologicalSorter(graph).static_order())
