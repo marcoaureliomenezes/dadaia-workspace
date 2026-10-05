@@ -11,6 +11,7 @@ from __future__ import annotations
 import importlib.util
 import json
 import os
+import shutil
 import stat
 import subprocess
 import sys
@@ -534,15 +535,17 @@ _SLUG = {**_OPEN_RECORD, "context": "acme-games"}
 
 
 # fmt: off
-@pytest.mark.parametrize(("published", "context", "pushed"), [
-    pytest.param((_SLUG,), "acme-games", False, id="published-context-accepted"),
-    pytest.param((_OPEN_RECORD,), "acme-games", True, id="unpublished-term-refused"),
-    pytest.param((_OPEN_RECORD,), "ctx", False, id="no-term-accepted"),
+@pytest.mark.parametrize(("published", "context", "pushed", "rev_list_fails"), [
+    pytest.param((_SLUG,), "acme-games", False, False, id="published-context-accepted"),
+    pytest.param((_OPEN_RECORD,), "acme-games", True, False, id="unpublished-term-refused"),
+    pytest.param((_OPEN_RECORD,), "ctx", False, False, id="no-term-accepted"),
+    pytest.param((_SLUG,), "acme-games", True, True, id="failed-rev-list-amnesties-nothing",
+                 marks=pytest.mark.xfail(strict=True, reason="J2.S6.T1: F2")),
 ])
 # fmt: on
 def test_the_seam_verdict_equals_the_push_verdict_over_the_published_ledger(
     script: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
-    published: tuple[dict[str, object], ...], context: str, pushed: bool,
+    published: tuple[dict[str, object], ...], context: str, pushed: bool, rev_list_fails: bool,
 ) -> None:
     from dadaia_workspace.core.models.git_scan import ScannedObject
     from dadaia_workspace.features.chokepoints.denylist_scan import scan_objects
@@ -561,6 +564,13 @@ def test_the_seam_verdict_equals_the_push_verdict_over_the_published_ledger(
     subprocess.run(["git", "init", "-q", "--bare", str(origin)], check=True)
     subprocess.run(["git", "-C", str(root), "remote", "add", "origin", str(origin)], check=True)
     subprocess.run(["git", "-C", str(root), "push", "-q", "origin", "HEAD"], check=True)
+    if rev_list_fails:  # the push's adapter raises on this failure: it amnesties nothing
+        real, shim = shutil.which("git"), tmp_path / "shim"
+        shim.mkdir()
+        (shim / "git").write_text(f'#!/bin/sh\ncase " $* " in *" rev-list "*) exit 128;; esac\n'
+                                  f'exec "{real}" "$@"\n', encoding="utf-8")  # fmt: skip
+        (shim / "git").chmod(0o755)
+        monkeypatch.setenv("PATH", f"{shim}{os.pathsep}{os.environ['PATH']}")
 
     done = _run(
         script, "append", "--specs", str(root / "specs"), "--bug-id", "new-bug", "--title",
@@ -571,7 +581,7 @@ def test_the_seam_verdict_equals_the_push_verdict_over_the_published_ledger(
     blob = ScannedObject(path="specs/bugs/BUGS.jsonl", sha="", decodable=True,
                          text=ledger.read_text(encoding="utf-8") if done.returncode == 0
                          else prior + json.dumps({"context": context}) + "\n",
-                         prior_text=prior)  # fmt: skip
+                         prior_text=None if rev_list_fails else prior)  # fmt: skip
     push_refuses = bool(scan_objects([blob], [("acme", "client")], load_baseline_patterns()).hits)
     assert push_refuses is pushed
     assert (done.returncode == 1) is pushed, done.stderr
