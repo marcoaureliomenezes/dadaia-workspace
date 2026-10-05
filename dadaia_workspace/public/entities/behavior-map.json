@@ -41,7 +41,7 @@
       "scoped_agents_md": [],
       "hash_tuple": {
         "section": "sha256:44c516a20de40d92bee3d0d4bdad3ea45448881fdc2be112ba8a7eb4d3619120",
-        "skill": "sha256:1fd32e56fcd04cce288ab4dc031b8ce9cd04079211a7951b09ead3c87b9855e2",
+        "skill": "sha256:8ca14a93f04698d1a5e0f34b9e5f7bb93ec53f6d1f534de571e2cb167e2f0f3b",
         "scripts": null,
         "scoped": []
       },
@@ -84,11 +84,11 @@
         "dadaia_workspace/public/data/worktrees-AGENTS.md"
       ],
       "hash_tuple": {
-        "section": "sha256:2ae6c714ae0d0a20dc42b2274f58c7157ed93f0a8f766c48f62e3fb4c4d30da2",
-        "skill": "sha256:8683b00ea986022f875e333e7d055e2ae20bd457b6108279a95ba729dfba0d85",
-        "scripts": "sha256:196e7b4fc63d316b909165717553b91610ef662df2378482229ac2f0d128a0dd",
+        "section": "sha256:ba2bb8b1355dd3fde4207f053a6cdd721025790f616c7b4f07541175399be4db",
+        "skill": "sha256:d82a1277fd522c8713042b3dbcc89c635bcf6e0852095f0772b876a7740ddc01",
+        "scripts": "sha256:69b8f47c61e61e6f9ed75fe43c21f21af3d3cb05b8ac0a4dcf3d12c1851d79c6",
         "scoped": [
-          "sha256:ad21accd67aa65b9dea73c7ab8d25e7cb72ce3d854b49bf346283325289df5cf"
+          "sha256:0b29ecd404ef9de4356f7c2e9ec34eaa14eefda947d620077bc2e79f15a9cad5"
         ]
       },
       "recorded_by": "dd-software-engineer",
@@ -173,7 +173,7 @@
       "scoped_agents_md": [],
       "hash_tuple": {
         "section": "sha256:3e9a61792649223cbd58e9aa2c3b52df397556564caea25a42cbff2149a5ec11",
-        "skill": "sha256:b90e808455460872946633ca6da1d4060ea507642995fad1effaeb36a30dcb82",
+        "skill": "sha256:dc7de1a3b8bd66a1344a78bff7e9163ee48d4234fc077a35639554175586b92d",
         "scripts": null,
         "scoped": []
       },
@@ -189,8 +189,8 @@
       ],
       "hash_tuple": {
         "section": "sha256:3e9a61792649223cbd58e9aa2c3b52df397556564caea25a42cbff2149a5ec11",
-        "skill": "sha256:d432b27517be7dd8ad2296bbb7094e0fea8d09daeb5b2e1c129ab1c7eab56dba",
-        "scripts": "sha256:615db1870353210f9b8b99e3d46b2c5c07d98a69c74fae0b5ea6290c8825fc8c",
+        "skill": "sha256:c543a131ef2ade186e5db17324aa978deaf0b41f9beb2a421b8efd9d76de7b7c",
+        "scripts": "sha256:432c37e2e964804e9f8218436a1b237d0e0d97bfc9125e5f383ea5b88e6590bf",
         "scoped": [
           "sha256:bc4804fdb2e1598b429a7ce0c47881a51924691586e1a49da3e28e789440965e"
         ]
@@ -274,7 +274,7 @@
       "hash_tuple": {
         "section": "sha256:3e9a61792649223cbd58e9aa2c3b52df397556564caea25a42cbff2149a5ec11",
         "skill": "sha256:5a6c80704cccf7e593fea1c56b320388a1ed09572884f390f3238803914a7a05",
-        "scripts": "sha256:9da2655494812840590531088a5e4fea84ce5f95cc426a915e6ce1a7318d7abc",
+        "scripts": "sha256:1961ff5fe4f1a6c1ddbfd7e758c84f74018d4b94191d649a2de0472f9ec508d0",
         "scoped": []
       },
       "recorded_by": "dd-software-engineer",
@@ -342,7 +342,7 @@
         "skill": null,
         "scripts": null,
         "scoped": [
-          "sha256:7e234d3fa0d05b7c60e70eaadfa9782d5e4d3b7bc5ae010f0e28fad81782d1cd"
+          "sha256:496493a49a85d4a4ccbf49038e0a07e1ff0dff30313999848d0b44f20c3bf6c6"
         ]
       },
       "recorded_by": "dd-software-engineer",
@@ -360,7 +360,7 @@
         "skill": null,
         "scripts": null,
         "scoped": [
-          "sha256:468f0b9954138648c4dbdf3060c7a6e9cc71a85a261098030e5a1033f6c65fd3"
+          "sha256:54b4684f12b05642a8fbc003a7a5e22baec0f6e39c2c2ff5315a4ffe144d0bf2"
         ]
       },
       "recorded_by": "dd-software-engineer",
