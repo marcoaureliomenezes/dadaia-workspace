@@ -23,7 +23,6 @@ import _memory_drift as drift  # noqa: E402
 from _ledger import records  # noqa: E402
 from _release_check import finding, histo_findings, state_findings  # noqa: E402
 from _release_phase import NEXT  # noqa: E402
-from _release_plan import plan_errors  # noqa: E402
 from _release_schema import (  # noqa: E402
     HISTO,
     MARK_RE,
@@ -33,9 +32,9 @@ from _release_schema import (  # noqa: E402
     TRIO,
     TRIO_PHASES,
     candidate_dir,
+    job_errors,
     origin,
     origin_line,
-    unfinished_tasks,
     writes,
 )
 from _release_store import SCRIPT, Refusal, live_ids, live_release, window_start  # noqa: E402
@@ -167,7 +166,7 @@ def _definition_findings(
     log = state["log"]
     born = max((n for n, e in enumerate(log) if e["agent"] == "release.py new"), default=-1)
     found = [f"closure entry kind {e['kind']!r} logged after the candidate's birth"
-             for e in log[born + 1:] if e["kind"] not in ("note", "milestone")]  # fmt: skip
+             for e in log[born + 1:] if e["kind"] not in ("note", "milestone", "merge")]  # fmt: skip
     found += [f"task {m[0].strip()[:80]!r} is marked past '[ ]' in phase DEFINITION"
               for m in marks if m[2] != " "]  # fmt: skip
     if not found:
@@ -193,23 +192,23 @@ def _directory_findings(release_dir: Path, specs: Path) -> list[dict[str, Any]]:
         return findings
     state = json.loads(text)
     phase, candidate = state["phase"], candidate_dir(release_dir)
+    jobs = [finding(f"{dir_rel}/{job.parent.parent.name}/tasks/{job.name}", 1, error,
+                    f"Operator action: correct {job} (dd-release-definition §5)")
+            for job in (sorted(candidate.glob("tasks/*.md")) if candidate else [])
+            for error in job_errors(job.read_text("utf-8"), f"tasks/{job.name}")]  # fmt: skip
     tasks = candidate / "TASKS.md" if candidate else None
     marks = list(MARK_RE.finditer(tasks.read_text("utf-8"))) if tasks and tasks.is_file() else []
     memory = _memory_tasks(marks, tasks, dir_rel) if tasks else []
     if phase not in TRIO_PHASES:
         return (_definition_findings(state, marks, f"{dir_rel}/{STATE}", candidate, specs)
-                if candidate else []) + memory  # fmt: skip
+                if candidate else []) + memory + jobs  # fmt: skip
     missing = [n for n in TRIO if not (candidate and (candidate / n).is_file())]
     if candidate is None or missing:
         where = candidate.name if candidate else "rc-<N>"
         return [finding(dir_rel, 1, f"phase {phase} is missing {where}/{', '.join(missing)}",
                         f"Operator action: define {', '.join(missing)} in {candidate or release_dir}"
                         " (dd-release-definition)")]  # fmt: skip
-    plan = (candidate / "PLAN.md").read_text(encoding="utf-8")
-    errors = plan_errors(plan, unfinished_tasks(candidate))
-    plan_rel = f"{dir_rel}/{candidate.name}/PLAN.md"
-    fix = f"Operator action: correct {candidate / 'PLAN.md'} (dd-release-definition)"
-    return ([finding(plan_rel, 1, "; ".join(errors), fix)] if errors else []) + memory
+    return memory + jobs
 
 
 def _memory_tasks(marks: list[re.Match[str]], tasks: Path, dir_rel: str) -> list[dict[str, Any]]:
