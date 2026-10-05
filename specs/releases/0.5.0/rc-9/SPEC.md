@@ -1,6 +1,6 @@
 # SPEC — Release: 0.5.0, candidate 9 (Job 1 the demolition; the bug window; the REBUILDs; jobs, stages and tasks; the closed rc)
 
-**Status:** Draft
+**Status:** Approved
 **Release ID:** 0.5.0
 **Owner:** dd-product-engineer
 **Opened:** 2026-10-05 outside the tree (Q20); enters by `release.py new` at rc-8's CLOSURE.
