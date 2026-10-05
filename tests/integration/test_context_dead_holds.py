@@ -274,3 +274,64 @@ def test_alive_refuses_a_legacy_url_less_missing_repo_with_a_fix_line(tmp_path: 
     clone = f"Operator action: clone the 'lib' repository into {repo.parent / 'lib'}"
     assert str(refused.value).endswith(f"fix: {clone}")
     assert store.get("proj").state == ContextState.DEAD  # type: ignore[union-attr]
+
+
+@pytest.mark.xfail(strict=True, reason="RED until J3.S2.T2")
+def test_dead_refuses_a_dirty_checkout_one_fix_line_per_file(tmp_path: Path) -> None:
+    """rc-9 AC3.2 (ADR 0172 measured_by): dead never commits — a dirty checkout refuses with
+    one fix line per file and leaves tree and origin untouched."""
+    service, store, repo = _alive(tmp_path)
+    lib = repo.parent / "lib"
+    (lib / "README.md").write_text("edited\n")
+    (lib / "new.txt").write_text("new\n")
+    origin_before = subprocess.run(
+        ["git", "ls-remote", str(tmp_path / "lib.git")], capture_output=True, text=True, check=True
+    ).stdout
+
+    with pytest.raises(DeadReviewRequiredError) as refused:
+        service.dead("proj")
+
+    fixes = [line for line in str(refused.value).splitlines() if line.startswith("fix: ")]
+    assert fixes == [
+        f"fix: Operator action: move {lib / 'README.md'} into a worktree, or discard it",
+        f"fix: Operator action: move {lib / 'new.txt'} into a worktree, or discard it",
+    ]
+    assert (lib / "README.md").read_text() == "edited\n" and (lib / "new.txt").is_file()
+    assert (
+        subprocess.run(
+            ["git", "ls-remote", str(tmp_path / "lib.git")],
+            capture_output=True,
+            text=True,
+            check=True,
+        ).stdout
+        == origin_before
+    )
+    assert store.get("proj").state is ContextState.ALIVE  # type: ignore[union-attr]
+
+
+@pytest.mark.xfail(strict=True, reason="RED until J3.S2.T2")
+def test_an_oserror_in_the_hold_loop_refuses_with_a_fix_line(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """rc-9 AC3.3 row 27 (context-dead-hold-oserror-escapes-mid-loop): a hold that fails is
+    dead's refusal with a fix line, never an escaping OSError; the record stays ALIVE."""
+    from dadaia_workspace.core.cli_line import fix_line
+    from dadaia_workspace.features.spec_context import sweep
+
+    service, store, repo = _alive(tmp_path)
+
+    def _denied(src: object, dst: object) -> None:
+        raise PermissionError(13, "Permission denied")
+
+    monkeypatch.setattr(sweep.os, "replace", _denied)
+
+    with pytest.raises(ContextStateError) as refused:
+        service.dead("proj")
+
+    again = fix_line(tmp_path / "ws", "context", "dead", "proj")
+    assert str(refused.value) == (
+        "Context 'proj' stays ALIVE: skipped 'repos/main' (errno 13: Permission denied)\n"
+        f"fix: Operator action: free {repo} for the move, then run `{again}`"
+    )
+    assert (repo / ".git").is_dir()
+    assert store.get("proj").state is ContextState.ALIVE  # type: ignore[union-attr]
