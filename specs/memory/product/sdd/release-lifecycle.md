@@ -59,9 +59,13 @@ sources:
 ## The memory reconciliation gate
 
 - `python3 .agents/skills/dd-spec-navigator/scripts/memory.py drift --since <sha> [--json]` lists the atoms whose `sources` globs match a path changed over `<sha>..HEAD` and every code unit no atom covers, exiting 1 while that worklist is non-empty; `--since` is required and has no default window.
-- A code unit is derived from the audited repo alone: each directory directly holding a tracked code file, or a root-level code file on its own; `specs/`, `tests/`, `test/`, `docs/` and dot-directories hold none, and a unit is covered once any atom's `sources` match a file under it.
+- A code unit is derived from the audited repo alone: each directory directly holding a tracked file, of any language; a root-level file belongs to no unit; `specs/`, `tests/`, `test/`, `docs/` and dot-directories hold none, and a unit is covered once any atom's `sources` match a file under it.
 - Each listed atom is reconciled from its sources' diff — delete, update, then add — and `memory.py catalog generate` regenerates the catalog pair ([[workspace-doctor]]).
 - `release.py check` (`LEDGER-RELEASE-SCHEMA`) keeps a live release in `CLOSURE` red until a `kind: memory` entry stamped at or after `implemented.ts` carries `since`, `until`, `reviewed` and `changed`, its `since` equal to the state-derived window start.
+
+## Which candidate held an instant
+
+- `_release_schema.candidate_at` is the one answer: the release whose half-open span — its first `log` ts to its `shipped.ts` — holds the instant, and the `rc-<N>` whose non-Approved `SPEC.md` was added last before it in that release, else `unknown`; a shallow clone refuses, since a cut history would place an instant wrong for good; `bugs.py` stamps `found_in`, derives `resolved_release` and lists its `window` through it ([[bug-ledger]]).
 
 ## Promote
 

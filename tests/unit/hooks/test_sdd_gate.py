@@ -1,6 +1,6 @@
 """sdd_gate's ALLOW/BLOCK verdict, driven as a real PreToolUse subprocess.
 
-Intent: CONTRACT — the install ledger decides PROTECTED (sa-gate-path-classes-diverge-from-the-law);
+the install ledger decides PROTECTED (sa-gate-path-classes-diverge-from-the-law);
 scope is path-first and repos/<r>/ is merge-only (T-050-97, AC1.1); the gate never blocks on
 concurrency (NO-LOCKS doctrine, v0.1.76); a fenced root stays protected (AC1.3); a repo's own AGENTS.md is never law (v0.4.5 FR1).
 """

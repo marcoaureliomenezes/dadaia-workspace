@@ -1,4 +1,4 @@
-"""Intent: CONTRACT — AC6.2 (T-050-11): the constitution gitflow reads back; one merge-writer
+"""AC6.2 (T-050-11): the constitution gitflow reads back; one merge-writer
 keeps every other key and the body byte-identical. Bug
 upgrade-leaves-project-specs-unmigrated-and-silent: the canon a tree must meet is pinned
 to ``CANONICAL_SPECS_VERSION``."""
@@ -21,8 +21,8 @@ def _write(tmp_path: Path, text: str) -> Path:
     return tmp_path
 
 
-#: The canon fingerprint each stamp was cut at — re-pinned only together with a stamp bump.
-_CANON_AT = {9: "723d850b2e3351c4"}
+#: The canon fingerprint each stamp was cut at — a published key is never re-pinned; an unshipped key follows the canon.
+_CANON_AT = {9: "8ea0d6906a41c3c2"}
 
 
 def test_a_canon_change_bumps_the_stamp() -> None:

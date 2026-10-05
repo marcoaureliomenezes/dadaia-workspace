@@ -1,4 +1,4 @@
-"""Intent: CONTRACT — T-047-95: `memory.py drift --since <sha>` is the worklist a closure
+"""T-047-95: `memory.py drift --since <sha>` is the worklist a closure
 reconciles from. Size: SMALL.
 
 The fixture is a real, tiny git repository rather than the live tree: the verb's answer is
@@ -219,13 +219,29 @@ def test_the_closure_window_opens_at_the_last_memory_entry_until(script: Path, r
     assert _release_drift(script, repo, state)["since"] == until
 
 
-def test_a_root_level_code_file_is_its_own_unit(script: Path, repo: Path) -> None:
-    """Review N5: a repo whose code sits at its root must not yield an empty worklist."""
-    (repo / "main.py").write_text("z = 1\n", "utf-8")
-    _git(repo, "add", "main.py")
-    _git(repo, "commit", "-qm", "root code")
+@pytest.mark.parametrize(
+    ("path", "unit"),
+    [
+        ("main.py", None),
+        ("cmd/tool/main.go", "cmd/tool"),
+        ("src/lex.c", "src"),
+        (".github/workflows/ci.yml", None),
+    ],
+)
+def test_any_tracked_file_makes_its_directory_a_unit(
+    script: Path, repo: Path, path: str, unit: str | None
+) -> None:
+    """T-050-154: no language list — a `.c` dir is a unit; a unit is a directory, so a
+    root-level file or one under a dot-dir is never listed."""
+    (repo / path).parent.mkdir(parents=True, exist_ok=True)
+    (repo / path).write_text("z = 1\n", "utf-8")
+    _git(repo, "add", path)
+    _git(repo, "commit", "-qm", "code")
     base = _git(repo, "rev-parse", "HEAD")
 
     report = json.loads(_run(script, repo, "--since", base, "--json").stdout)
 
-    assert "main.py" in report["uncovered"]
+    if unit is None:
+        assert report["uncovered"] and not [u for u in report["uncovered"] if path.startswith(u)]
+    else:
+        assert unit in report["uncovered"]

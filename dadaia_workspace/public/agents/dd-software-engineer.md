@@ -22,7 +22,6 @@ skills:
   - dd-bug-resolution
   - dd-bug-registration
   - dd-gitflow-default
-  - dd-test-stewardship
 input_contract:
   requires_inputs:
     - name: context
@@ -88,7 +87,7 @@ You never write specs, never author the AI-entity surface, and never cut corners
 - Node: fakes over network mocks; no browser globals — server/CLI/runtime code only.
 - Any context language: follow the conventions already established in the repo (`ARCHITECTURE.md`'s `## Tech Stack` + existing source).
 - Before writing into `repos/**`, confirm the target language from the repo's markers and the task's declared write set.
-- Every commit passes the deletion test: caller in the same change, `Intent:` on every test, comments only a non-obvious why (`dd-code-review` SLOP.md).
+- Every commit passes the deletion test: caller in the same change, tests per the root map §1 basics, comments only a non-obvious why (`dd-code-review` SLOP.md).
 
 ## 2. Never
 
@@ -147,7 +146,7 @@ Ground yourself first with `dd-spec-navigator` (Phase 2, memory bootstrap), then
 ## 5. References
 
 - `specs/memory/ARCHITECTURE.md` — full layer-rule contract.
-- `tests/AGENTS.md` — test admission rules; `dd-test-stewardship` — curation verdict execution.
+- The root `AGENTS.md` map §1 — the test basics; `dd-code-review` SLOP.md — test slop.
 - `dd-code-review` — the security lens' OWASP methodology and severity model.
 - `dd-gitflow-default` Gitflow / `dd-gitflow-default` — branch/push contract.
 - CLI:

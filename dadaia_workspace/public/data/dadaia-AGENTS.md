@@ -11,7 +11,7 @@
 ## 2. Context, scope and races
 
 - Resolution order: the bind (a session with an id: its own record; none: a registered `DADAIA_CONTEXT`) -> the cwd repo (`.dadaia/.venv/bin/dadaia context show --json`); none -> bind, never borrow one.
-- A root in `DADAIA_FENCED_ROOTS` is never resolved: no dadaia process or child acts on it; the suite, preflight and mutating probes set it.
+- A root in `DADAIA_FENCED_ROOTS` is never resolved: no dadaia process or child acts on it; the suite and mutating probes set it.
 - `.dadaia/.venv/bin/dadaia context bind <ctx>` is one verb, no mode or release; the sole memory-injection trigger; the session id comes from the environment only, so a nested session shares its parent's bind.
 - Scope = the bound context's main and associated repos, judged under `repos/<slug>/` and `worktrees/<slug>/`; binding is optional, an ADDITIVE write needs none.
 - An out-of-scope file-tool write is BLOCKed with `fix: .dadaia/.venv/bin/dadaia context bind <owner>`; an unbound session with an id owns no repo; an unregistered slug and a root path are never scope-judged.

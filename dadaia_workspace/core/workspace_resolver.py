@@ -23,7 +23,7 @@ _SENTINEL = Path(".dadaia") / "states" / "spec_contexts.json"
 
 #: ``os.pathsep``-separated roots never resolved — by the walk, the CLI's own venv or an
 #: explicit ``--workspace`` — so no dadaia process nor child inheriting it acts on one
-#: (ADR 0088): the suite, the push preflight and every mutating probe set it.
+#: (ADR 0088): the suite and every mutating probe set it.
 FENCE_ENV = "DADAIA_FENCED_ROOTS"
 
 

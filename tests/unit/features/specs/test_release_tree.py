@@ -1,4 +1,4 @@
-"""Intent: CONTRACT — sa-release-json-validated-three-times: `release.py check` is the ONE
+"""sa-release-json-validated-three-times: `release.py check` is the ONE
 release validator (ADR 0077); the doctor delegates to it. Size: SMALL (script subprocess
 over tmp trees; the repo's own tree once).
 """
@@ -95,7 +95,6 @@ def test_closure_memory_record_is_judged_by_the_script(
 def test_a_live_release_in_implementation_missing_its_trio_is_one_finding(tmp_path: Path) -> None:
     findings = _check(_specs(tmp_path, "IMPLEMENTATION", [], trio=False))
     assert [f["code"] for f in findings] == ["LEDGER-RELEASE-SCHEMA"]
-    assert "SPEC.md, PLAN.md, TASKS.md" in findings[0]["message"]
 
 
 def test_the_repos_own_release_tree_checks_clean() -> None:

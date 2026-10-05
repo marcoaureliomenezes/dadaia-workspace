@@ -1,4 +1,4 @@
-"""Intent: CONTRACT — ``atomic_write`` is the one temp-then-replace writer: every parameter is
+"""``atomic_write`` is the one temp-then-replace writer: every parameter is
 honoured and no temp survives any failure (two-atomic-writers-leak-temp-file-on-injected-os-replace-failure)."""
 
 from __future__ import annotations

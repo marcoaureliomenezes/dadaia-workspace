@@ -1,6 +1,5 @@
 """Backlog cli-help-architecture-and-session-injection (T-053-24): the CLI digest is
-DERIVED from the live command tree — one source, never transcribed. Intent: contract;
-size: unit."""
+DERIVED from the live command tree — one source, never transcribed."""
 
 from __future__ import annotations
 

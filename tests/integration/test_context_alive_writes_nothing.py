@@ -1,7 +1,5 @@
 """``context alive`` clones and hooks; it writes no specs and commits nothing.
 
-Intent: CONTRACT — 0.4.8 AC3.7 (alive half), AC4.7, AC9.1; T-048-02.
-
 Real ``GitSubprocessClient`` against bare remotes in ``tmp_path`` with the real hook
 installer: a DEAD context going ALIVE leaves every repo of the set exactly as the remote
 holds it (HEAD unchanged, porcelain clean, no ``specs/``) with the pre-push hook present.

@@ -1,7 +1,5 @@
 """The guard matrix over the ONE traversal primitive (0.4.7 FR6a, T-047-19).
 
-Intent: CONTRACT — 0.4.7 FR6 / T-047-19. Size: SMALL (unit).
-
 Structural cause this suite pins: the five per-call-site guards in ``doctor.py``
 (``_entries``, ``_mtime``, ``_remove``, ``_guarded``, ``_remove_dead_repo``) each
 re-derived "may I touch this?" and disagreed — the bug family from
@@ -112,7 +110,7 @@ def test_remove_deletes_a_read_only_tree(
 def test_an_expired_entry_another_account_holds_names_the_one_operator_act(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Intent: CONTRACT — doctor-tmp-expiry-foreign-owned-entry-never-clears: the TTL delete
+    """doctor-tmp-expiry-foreign-owned-entry-never-clears: the TTL delete
     act that cannot lift a permission (chmod refused: not the owner) skips naming the owner
     and `Operator action: remove <the expired entry>`; once the operator removed it, the
     act has nothing left to report, so the finding clears."""
@@ -189,7 +187,7 @@ def test_move_resets_the_ttl_clock_and_never_follows_a_symlinked_source(tmp_path
 
 
 def test_a_live_bind_record_survives_a_full_doctor_fix_pass(tmp_path: Path) -> None:
-    """Intent: CONTRACT — bug doctor-ptr-gc-deletes-valid-lock-free-bind. Size: SMALL.
+    """bug doctor-ptr-gc-deletes-valid-lock-free-bind. Size: SMALL.
 
     Bind, run ``fix()``, resolve the session again: the bind is intact. The original
     CRITICAL deleted live bind state because a per-call-site rule inferred deadness from

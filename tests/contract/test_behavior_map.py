@@ -1,7 +1,5 @@
 """One enforcer for the behavior map (T-050-19).
 
-Intent: CONTRACT — A10.1-A10.6 (SPEC v0.5.0); FR27 citations, FR28 grants. Size: SMALL.
-
 - One map (`public/entities/behavior-map.json`), one schema, this one enforcer; every member (a
   skill, or a scoped `AGENTS.md` SOURCE under `public/{data,scaffold,templates}/`) maps to exactly
   one row, every root-map section has an owner, every `hash_tuple` is current (A10.1, A10.4).
@@ -32,16 +30,19 @@ import jsonschema
 import pytest
 
 from dadaia_workspace.cli.help_digest import command_paths
+from dadaia_workspace.features.spec_context.doctor import DoctorService
 from dadaia_workspace.features.specs.citations import (
     dead_body_pointers_in_tree,
     dead_path_citations_in_tree,
     dead_verb_citations_in_tree,
     posix_relpath,
 )
+from dadaia_workspace.infrastructure.git_subprocess import GitSubprocessClient
 from dadaia_workspace.infrastructure.public_assets import (
     _SKILL_SCRIPT_SCHEMAS,  # allow-private-import: the one staging table naming which shipped schema each skill script carries a copy of; a second table here is the fork this hash guards against
 )
 from dadaia_workspace.infrastructure.public_assets_common import iter_public_files
+from tests.fixtures.stores import context_store
 from tests.helpers.scan_population import assert_populated
 
 pytestmark = pytest.mark.contract
@@ -491,9 +492,9 @@ _PLANTED: dict[str, tuple[Callable[[], list[Any]], Callable[[list[Any]], bool]]]
     ),
     "8-flagged-skill-still-granted": (
         lambda: _find_flagged_but_granted(
-            _granted_to_any_model(_AGENTS_DIR, _SKILLS_DIR), {"dd-test-stewardship"}
+            _granted_to_any_model(_AGENTS_DIR, _SKILLS_DIR), {"dd-code-review"}
         ),
-        lambda v: v == ["dd-test-stewardship"],
+        lambda v: v == ["dd-code-review"],
     ),
 }
 
@@ -526,6 +527,38 @@ def test_an_oversized_skill_md_and_an_undeclared_overlap_turn_red(tmp_path: Path
     assert _find_undeclared_activation_overlaps(_real_map(), tmp_path / "glob") == [
         ("fixture-skill-one", "fixture-skill-two")
     ]
+
+
+@pytest.mark.parametrize(
+    "line",
+    [
+        pytest.param(b"l\n", id="skill-md-over-the-soft-limit-warns"),
+        pytest.param(b"\xff\xfe not utf-8\n", id="non-utf-8-skill-md-is-counted"),
+    ],
+)
+def test_skill_md_over_the_soft_limit_warns(tmp_path: Path, line: bytes) -> None:
+    """ADR 0170: a projected SKILL.md of soft + 1 lines is one workspace warning naming the
+    skill, its line count and its split; soft lines stay silent."""
+    soft = _real_map()["skill_md_line_soft"]
+    skills = tmp_path / ".agents" / "skills"
+    for name, n in (("fixture-long", soft), ("fixture-longer", soft + 1)):
+        (skills / name).mkdir(parents=True)
+        (skills / name / "SKILL.md").write_bytes(line * n)
+    service = DoctorService(
+        context_store(tmp_path / ".dadaia" / "states"), GitSubprocessClient(), tmp_path
+    )
+
+    [found] = service.check_skill_md_length()
+
+    skill_md = skills / "fixture-longer" / "SKILL.md"
+    assert (found.code, found.verdict, found.canonical, found.error, found.message, found.fix) == (
+        "SKILL-MD-LENGTH",
+        "warning",
+        False,
+        False,
+        f"fixture-longer/SKILL.md has {soft + 1} lines > soft limit {soft}",
+        f"Operator action: split {skill_md} into its references/*.md and/or scripts/",
+    )
 
 
 def test_mutation_fixture_f_edited_skill_script_turns_red(tmp_path: Path) -> None:
@@ -736,7 +769,7 @@ def _self_invoked_verb_paths() -> list[tuple[str, tuple[str, ...]]]:
 
 
 def test_every_self_invoked_dadaia_verb_exists() -> None:
-    """Intent: CONTRACT — 0.4.7 FR5 (T-047-78), bug `certify-invokes-a-retired-verb`: the
+    """0.4.7 FR5 (T-047-78), bug `certify-invokes-a-retired-verb`: the
     longest literal prefix of every argv the package runs resolves to a LEAF verb."""
     paths = set(command_paths())
     leaves = {p for p in paths if not any(q[: len(p)] == p and len(q) > len(p) for q in paths)}
@@ -756,7 +789,7 @@ _ADD_PARSER_RE = re.compile(r"add_parser\(\s*\"([a-z][a-z-]*)\"")
 
 
 def test_every_cited_skill_script_verb_exists() -> None:
-    """Intent: CONTRACT — bug `spec-navigator-cites-dead-memory-verb-and-false-binding-claim`:
+    """bug `spec-navigator-cites-dead-memory-verb-and-false-binding-claim`:
     a verb cited after `<script>.py` — inline (`memory.py drift`) or as the backticked list that
     follows (`memory.py` — `catalog generate`, …) — is one of that script's `add_parser` names."""
     verbs: dict[str, set[str]] = {}

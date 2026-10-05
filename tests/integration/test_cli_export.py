@@ -1,6 +1,4 @@
-"""Intent: CONTRACT — AC11 (FR13, T-046-31): `dadaia export` -> `dadaia import` round trip.
-
-Size: MEDIUM — two real initialized workspaces and the real `JsonContextStore`; the
+"""Size: MEDIUM — two real initialized workspaces and the real `JsonContextStore`; the
 CLI receives `--workspace` explicitly so the resolver never walks up from cwd.
 """
 
@@ -103,7 +101,7 @@ def _real_checkout(repo: Path, branch: str) -> None:
 
 
 def test_export_refreshes_an_alive_context_branch_from_its_real_checkout(tmp_path: Path) -> None:
-    """Intent: CONTRACT — AC11 (FR13): an ALIVE context's `branch` is re-read from the repo's
+    """AC11 (FR13): an ALIVE context's `branch` is re-read from the repo's
     real checked-out HEAD at export time, superseding the stale store value, in both the
     store and the exported record.
 
@@ -130,7 +128,7 @@ def test_export_refreshes_an_alive_context_branch_from_its_real_checkout(tmp_pat
 def test_explicit_workspace_pointing_at_an_uninitialized_dir_is_refused(
     tmp_path: Path, verb: str
 ) -> None:
-    """Intent: CONTRACT — bug import-export-workspace-flag-re-resolves-through-ancestor-walk:
+    """bug import-export-workspace-flag-re-resolves-through-ancestor-walk:
     an explicit --workspace is authoritative; a path without its own `.dadaia/` is refused
     instead of silently resolving to the enclosing live workspace.
 

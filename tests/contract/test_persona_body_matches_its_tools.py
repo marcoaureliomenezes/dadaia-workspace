@@ -1,6 +1,4 @@
-"""Intent: CONTRACT — sa-reviewer-persona-body-contradicts-its-tools (WP-37).
-
-The persona frontmatter rules: a read-only persona's body never instructs a write, and
+"""The persona frontmatter rules: a read-only persona's body never instructs a write, and
 ADDITIVE keeps its one meaning — the gate's path class — never a persona word.
 """
 

@@ -1,8 +1,6 @@
 """Wiring the specs/ canon scan into ``push_gate_decision`` (v0.5.0 specs-canon
 closure, operator ruling 2026-08-28).
 
-Intent: CONTRACT — v0.5.0 specs-canon closure
-
 Every range is a real git range read by the real ``GitSubprocessObjectReader`` (AC9.4).
 Covers: canon paths pass; a stray/non-canon path in the range refuses (naming the fix
 hint); a non-canon path already published never blocks; the scan reaches every

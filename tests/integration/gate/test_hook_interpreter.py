@@ -1,6 +1,4 @@
-"""Intent: CONTRACT — sa-hook-parity-claims-false-and-interpreter-rules-diverge (WP-36, AC3.3).
-
-One interpreter rule for every hook: the workspace's own self-locating wrapper (Kimi's
+"""One interpreter rule for every hook: the workspace's own self-locating wrapper (Kimi's
 user-level shim: the nearest `.dadaia/states/spec_contexts.json` sentinel), and one
 missing-venv posture — a loud stderr warning and exit 0 (DEC-10 (a)), told to the agent by
 every ctx-inject firing (missing-venv-hook-disarms-the-gate-invisibly, AC2.7).
@@ -26,6 +24,7 @@ from dadaia_workspace.infrastructure.runtime_transforms.hook_wrappers import (
     hook_wrapper_contents,
     wrapper_name,
 )
+from tests.fixtures.harness_env import child_keys
 
 pytestmark = [
     pytest.mark.integration,
@@ -63,7 +62,11 @@ def _kimi_shim(where: Path) -> Path:
 
 
 def _run(command: str, cwd: Path, **env: str) -> subprocess.CompletedProcess[str]:
-    base = {"PATH": os.environ["PATH"], "PYTHONPATH": os.environ.get("PYTHONPATH", "")}
+    base = {
+        **child_keys(),
+        "PATH": os.environ["PATH"],
+        "PYTHONPATH": os.environ.get("PYTHONPATH", ""),
+    }
     return subprocess.run(
         ["sh", "-c", command], input=_WRITE, capture_output=True, text=True, cwd=cwd,
         env={**base, **env}, timeout=60,
@@ -123,7 +126,7 @@ def test_the_claude_hook_survives_a_moved_workspace(tmp_path: Path) -> None:
         input=json.dumps({"tool_name": "Write", "tool_input": {"file_path": str(payload_dir)},
                           "cwd": str(moved)}),
         capture_output=True, text=True, cwd=moved, timeout=60,
-        env={"PATH": os.environ["PATH"], "PYTHONPATH": os.environ.get("PYTHONPATH", ""),
+        env={**child_keys(), "PATH": os.environ["PATH"], "PYTHONPATH": os.environ.get("PYTHONPATH", ""),
              "CLAUDE_PROJECT_DIR": str(moved)},
     )  # fmt: skip
     assert done.returncode == 0, done.stderr

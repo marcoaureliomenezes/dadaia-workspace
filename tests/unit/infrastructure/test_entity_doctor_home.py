@@ -3,7 +3,7 @@
 The harness-independent public-asset coherence checks live in an honestly named home
 (``infrastructure.entity_doctor``), not a codex-named one; ``public_assets`` no longer
 re-exports ~25 underscore names as a test-only interface; ``_compare_content`` (zero
-callers) is deleted. Intent: contract; size: unit.
+callers) is deleted.
 """
 
 from __future__ import annotations

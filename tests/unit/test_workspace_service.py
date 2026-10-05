@@ -26,7 +26,7 @@ def service() -> WorkspaceService:
 def test_init_creates_only_registry_init_zones_and_canon_seeds(
     service: WorkspaceService, workspace_root: Path
 ) -> None:
-    """Intent: CONTRACT — 0.4.6 AC10 (FR1/FR10).
+    """0.4.6 AC10 (FR1/FR10).
 
     ``init`` materialises exactly ``provisioned_zones()`` — the SAME view the doctor
     reports ``missing`` for (bug WS-hooks-missing), never a second list — so a retired zone (``academy``, ``reports``,

@@ -1,4 +1,4 @@
-"""Intent: CONTRACT — T-048-05 (SPEC 0.4.8 FR4 AC4.1, AC4.3–AC4.5): ``specs init --context``
+"""T-048-05 (SPEC 0.4.8 FR4 AC4.1, AC4.3–AC4.5): ``specs init --context``
 on the three tree kinds — absent scaffolds, dadaia upgrades, foreign moves to ``specs-bkp/``
 only when confirmed — never committing. Size: MEDIUM (real git repo on disk)."""
 
@@ -86,9 +86,6 @@ def test_absent_specs_scaffolds_lists_paths_and_commits_nothing(repo: Path) -> N
     assert [i.to_dict() for i in SpecsDoctor(repo / "specs").check()] == []
     assert _git(repo, "rev-parse", "HEAD") == head
     assert repo.name in (repo / "AGENTS.md").read_text(encoding="utf-8")
-    # T-048-11: the tests law governs an existing test tree; init never invents one
-    # (a manufactured tests/AGENTS.md is born with AGENTS-PLACEHOLDER-1 on a clean repo).
-    assert not (repo / "tests").exists()
     assert f"[created] {repo / 'AGENTS.md'}" in result.output
 
 
@@ -108,13 +105,11 @@ def test_the_catalog_pair_is_written_by_its_one_generator(repo: Path) -> None:
 
 def test_an_existing_scoped_law_is_never_overwritten(repo: Path) -> None:
     (repo / "AGENTS.md").write_text("# ours\n", encoding="utf-8")
-    (repo / "tests").mkdir()
 
     result = _runner.invoke(app, ["specs", "init", "--context", "c"])
 
     assert result.exit_code == 0, result.output
     assert (repo / "AGENTS.md").read_text(encoding="utf-8") == "# ours\n"
-    assert (repo / "tests" / "AGENTS.md").is_file()
 
 
 def test_a_v6_tree_ends_v7_with_a_clean_doctor(repo: Path) -> None:
@@ -222,7 +217,6 @@ _PLACEHOLDERS = (
     "<!-- zones -->",
     "<!-- canon -->",
     "<!-- root -->",
-    "<!-- repo-excluded -->",
     "<!-- specs-canon -->",
 )
 

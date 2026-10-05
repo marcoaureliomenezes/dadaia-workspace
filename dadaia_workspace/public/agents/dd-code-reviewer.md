@@ -13,7 +13,6 @@ tools:
 skills:
   - dd-codebase-design
   - dd-code-review
-  - dd-test-stewardship
   - dd-audit-project
   - dd-architecture-survey
   - dd-domain-modeling
@@ -110,6 +109,7 @@ Ground yourself first with `dd-spec-navigator` (Phase 2, memory bootstrap), then
 
 ## 5. References
 
+- The root `AGENTS.md` map §1 — the test basics the QA lens judges.
 - `dd-gitflow-default` Gitflow — where the review verdict sits in the branch contract.
 - `dd-gitflow-default` — branch/push mechanics.
 - CLI:

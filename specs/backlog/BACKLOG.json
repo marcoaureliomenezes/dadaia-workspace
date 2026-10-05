@@ -2,52 +2,12 @@
   "schema": "backlog-v1",
   "active": [
     {
-      "id": "doctor-context-ignores-other-contexts",
-      "title": "doctor --context X judges only X's repos",
-      "opened": "2026-09-28",
-      "status": "idea",
-      "description": "dadaia doctor --context invoicer exits 1 on slop in another context's repo (repos/payroll/.pytest_cache). Evidence: rubric 0.5.0 at a5e9a2ee (.dadaia/tmp/general-purpose/20260928/rubric-050/RUBRIC.md) J8 S6; 0.4.7 blockers table, still OPEN.",
-      "provenance": "operator closure ruling 2026-09-28: the rest is mapped to the backlog; source rubric 0.5.0 at a5e9a2ee (.dadaia/tmp/general-purpose/20260928/rubric-050/RUBRIC.md)"
-    },
-    {
-      "id": "release-memory-idempotent",
-      "title": "release.py memory appends the closure's one kind: memory entry once",
-      "opened": "2026-09-28",
-      "status": "idea",
-      "description": "A second release.py memory call appends a second kind: memory log entry. Evidence: rubric 0.5.0 at a5e9a2ee (.dadaia/tmp/general-purpose/20260928/rubric-050/RUBRIC.md) J6, N5; the memory verb of dd-release-implementation/scripts/release.py.",
-      "provenance": "operator closure ruling 2026-09-28: the rest is mapped to the backlog; source rubric 0.5.0 at a5e9a2ee (.dadaia/tmp/general-purpose/20260928/rubric-050/RUBRIC.md)"
-    },
-    {
       "id": "guidance-messages-name-the-right-target",
       "title": "Guidance messages name the bound context and the real target",
       "opened": "2026-09-28",
       "status": "idea",
       "description": "SessionStart shows a session bound to invoicer the next step of payroll; the root-whitelist fix line proposes mkdir .dadaia/tmp instead of where the file belongs; HOOKS-DRIFT-1 says differs for an absent hook. Evidence: rubric 0.5.0 at a5e9a2ee (.dadaia/tmp/general-purpose/20260928/rubric-050/RUBRIC.md) N6, J8 S1; hooks/root_whitelist.py, features/spec_context/doctor.py HOOKS-DRIFT-1.",
       "provenance": "operator closure ruling 2026-09-28: the rest is mapped to the backlog; source rubric 0.5.0 at a5e9a2ee (.dadaia/tmp/general-purpose/20260928/rubric-050/RUBRIC.md)"
-    },
-    {
-      "id": "init-announces-codex-trust",
-      "title": "init --harness codex announces the Codex project-trust step",
-      "opened": "2026-09-28",
-      "status": "idea",
-      "description": "init is silent on Codex project trust; only dd-ai-eng-knowhow/CODEX.md mentions it. Evidence: rubric 0.5.0 at a5e9a2ee (.dadaia/tmp/general-purpose/20260928/rubric-050/RUBRIC.md) J9; 0.4.7 blockers table, NEW-FR-12 PARTIAL.",
-      "provenance": "operator closure ruling 2026-09-28: the rest is mapped to the backlog; source rubric 0.5.0 at a5e9a2ee (.dadaia/tmp/general-purpose/20260928/rubric-050/RUBRIC.md)"
-    },
-    {
-      "id": "tests-agents-scaffold-without-placeholders",
-      "title": "specs init renders tests/AGENTS.md without placeholders",
-      "opened": "2026-09-28",
-      "status": "idea",
-      "description": "The scaffolded tests/AGENTS.md keeps <UNIT_TIMEOUT_S>, <PACKAGE>, <COVERAGE_FLOOR>; doctor warns AGENTS-PLACEHOLDER-1. Evidence: rubric 0.5.0 at a5e9a2ee (.dadaia/tmp/general-purpose/20260928/rubric-050/RUBRIC.md) J3; 0.4.7 blockers table, OPEN (surfaced); public/templates/tests-AGENTS.md.",
-      "provenance": "operator closure ruling 2026-09-28: the rest is mapped to the backlog; source rubric 0.5.0 at a5e9a2ee (.dadaia/tmp/general-purpose/20260928/rubric-050/RUBRIC.md)"
-    },
-    {
-      "id": "preflight-ci-parity-derived",
-      "title": "The preflight/CI parity test derives both sides from their sources",
-      "opened": "2026-09-28",
-      "status": "idea",
-      "description": "The parity test matches checks_for() and ci.yml against two identical hand-kept marker dicts, so a check named in neither (the doctor its docstring claims) is never compared. Evidence: tests/contract/test_ci_preflight_ci_gating_parity.py _LOCAL_MARKERS, _CI_MARKERS.",
-      "provenance": "operator closure ruling 2026-09-28: the rest is mapped to the backlog; source the 0.5.0 closure review"
     },
     {
       "id": "docs-site-zensical-pages",
@@ -72,14 +32,6 @@
       "status": "idea",
       "description": "The 0.4.7 rc-9 SPEC (specs/releases/_archive/0.4.7/rc-9/SPEC.md, D3-D6) left these to the operator, and backlog entries standalone-skills-distribution and public-presence-and-launch exited 'delivered' with the summary 'operator acts D3-D6 pending'. Checked 2026-09-29: repo dadaia-skills not found; Pages 404; homepage = PyPI; topics lack agent-skills, cursor, github-copilot, devin. Acts: D3 create the public skills repo, the SKILLS_REPO_TOKEN secret, enable Pages; D4 marketplace PR and the install line in the README; D5 gh repo edit homepage and topics; D6 video, Show HN, awesome-list PRs. Operator acts, not library code; D3's Pages and D5's homepage depend on docs-site-zensical-pages.",
       "provenance": "0.4.7 rc-9 SPEC D3-D6 (2026-09-21); histo records standalone-skills-distribution, public-presence-and-launch; inventory row A10 in reports/main-thread/20260929-050-rc1-audit/leftbehind/ (REPORT.md, inventory.json); operator order 2026-09-29"
-    },
-    {
-      "id": "test-intent-docstring-backfill",
-      "title": "Backfill the Intent: module docstring on the unit and integration test files that lack it",
-      "opened": "2026-09-29",
-      "status": "idea",
-      "description": "Deferred at 0.4.6 rc-3 closure ('new task ids') and never picked. dd-test-stewardship requires every test module to declare 'Intent: <KIND> - <AC id | bug-id | ...>' in its docstring. Counted 2026-09-29 on feature/0.5.0: tests/unit 29 of 149 files and tests/integration 7 of 55 lack it; tests/e2e and tests/contract are complete. A file deleted by the 0.5.0 test reduction leaves the count; the rest gets its intent or is itself a deletion candidate (a test that cannot state its intent).",
-      "provenance": "0.4.6 rc-3 SPEC Out of scope (specs/releases/_archive/0.4.6/rc-3/SPEC.md); inventory row A12 in reports/main-thread/20260929-050-rc1-audit/leftbehind/ (REPORT.md, inventory.json); operator order 2026-09-29"
     },
     {
       "id": "worktree-rows-injected-not-monkeypatched",
@@ -145,15 +97,6 @@
       "relates": []
     },
     {
-      "id": "bug-fix-commit-derived-by-grep",
-      "title": "A bug's fix commit is derived by grep, never stored",
-      "opened": "2026-10-02",
-      "status": "idea",
-      "description": "Measured: no field links a bug to its fix; LINEAGE.md's `git log -S<id> -- BUGS.jsonl` never finds it, because resolve rewrites the line in place. Change: `bugs.py` gains a read verb, `fix <id>`, resolving the fix sha from `^fix\\(bugs\\): .*<id>` (shape 3) or shape 4's `(<sha>)`, and printing the sha, the test files and the numstat; LINEAGE.md uses it in place of the `git log -S` recipe; no schema field is added (grill Q1). Done when: every resolved record since 2026-08-27 resolves to a sha or is listed as unlinked. Files: `dd-bug-resolution/scripts/bugs.py`, `LINEAGE.md`. ADR 0164 (proposed).",
-      "provenance": "operator demand 2026-10-02: test audit https://claude.ai/artifact/AMw3Ho2tqaAbftJUWuNhAT + grill Q1-Q9",
-      "relates": []
-    },
-    {
       "id": "caused-by-proposed-by-blame",
       "title": "resolve proposes caused_by from blame and refuses an unreasoned none",
       "opened": "2026-10-02",
@@ -187,17 +130,6 @@
       ]
     },
     {
-      "id": "delete-text-count-inventory-asserts",
-      "title": "Tests assert behavior: no prose, sentence or inventory-count asserts",
-      "opened": "2026-10-02",
-      "status": "idea",
-      "description": "Measured: ~600-900 string asserts; 53 files pin `dd-*` names; `len(depths)==13`, `len(on_disk)==13`, `_core_agents()==3`; \u22654 bugs born from stale rosters. Change: asserts on the prose of a doc, law or skill are deleted (the leak stays covered by the pre-push denylist and the review grep; the only pytest is the scanner's own fixture); a CLI output assert checks exit code + effect + stable id (finding code, slug, flag), never a sentence, and no new `--json` is added (grill Q8); an exception assert checks type/attribute, not text; `fix:` lines are executed (model: `test_refusal_fix_lines_clear_their_refusal.py`); inventory/count pins are deleted or derived from the source of truth. CONTEXT-MAP: the Measured column is deleted; size is computed live as a readout, never asserted (grill Q6, ADR 0143). Hotspots: `test_law_states_what_the_code_does.py`, `test_behavior_map.py`, `test_context_map.py`, `unit/skills/test_*_script.py`, `contract/cli/test_cli_context.py`. Done when: no test pins a sentence, a roster or a count that has a source of truth, and CONTEXT-MAP has no Measured column. ADR 0167 (proposed).",
-      "provenance": "operator demand 2026-10-02: test audit https://claude.ai/artifact/AMw3Ho2tqaAbftJUWuNhAT + grill Q1-Q9",
-      "relates": [
-        "preflight-ci-parity-derived"
-      ]
-    },
-    {
       "id": "tests-tree-mirrors-the-package",
       "title": "The tests tree mirrors the package, one owner file per module",
       "opened": "2026-10-02",
@@ -206,17 +138,6 @@
       "provenance": "operator demand 2026-10-02: test audit https://claude.ai/artifact/AMw3Ho2tqaAbftJUWuNhAT + grill Q1-Q9",
       "relates": [
         "windows-integration-coverage-gap"
-      ]
-    },
-    {
-      "id": "architecture-survey-flat-core-infrastructure",
-      "title": "Survey per-feature subpackages for the flat core/ and infrastructure/",
-      "opened": "2026-10-02",
-      "status": "idea",
-      "description": "Measured: `core/` holds 22 and `infrastructure/` 24 flat files; a feature (public assets: 6+ modules; handoff in core) has no folder, so tests cannot mirror it. Change: run `dd-architecture-survey` proposing per-feature subpackages inside each ring (the ring rule is unchanged), with this concept map as input: public assets/projection = infrastructure public_assets, public_assets_common, projection, projection_rules, install_plan, install_helpers, agent_transcodes, entity_doctor, codex_doctor, runtime_config, runtime_transforms/*, json_install_ledger_store, json_harness_profile_store, json_agent_model_policy_store, workspace_guardrail, privacy_check + core harness_registry, model_registry, template_history, models/{install_ledger,harness_profile}; handoff = core/handoff_index; specs/law/releases = core fixed_sections, frontmatter, spec_status, specs_version, release_state, gitflow; bugs/ledgers = infrastructure/ledger_scripts, core/redaction; doctor = core/doctor_rules, core/models/doctor_report; push gate/git scan = infrastructure/git_objects, core/models/git_scan; context/session/workspace = core invocation, context_registry, session_store, workspace_resolver, workspace_layout, platform, infrastructure/json_context_store, core/models/spec_context; process/git adapters = infrastructure git_subprocess, subprocess_runner, certification_process, python_env; shared = core cli_line, exceptions, atomic_write, infrastructure/provider_version, core/models/backlog. The output feeds a later candidate. Done when: the survey's proposal exists with one subpackage per feature for both rings. ADR 0167 (proposed).",
-      "provenance": "operator demand 2026-10-02: test audit https://claude.ai/artifact/AMw3Ho2tqaAbftJUWuNhAT + grill Q1-Q9",
-      "relates": [
-        "tests-tree-mirrors-the-package"
       ]
     },
     {
@@ -232,18 +153,6 @@
       ]
     },
     {
-      "id": "lib-test-guidance-dehydrated",
-      "title": "Test guidance leaves the library; the root map keeps the basics",
-      "opened": "2026-10-02",
-      "status": "idea",
-      "description": "Measured: ~330 lines of shipped test guidance in ~26 files, 9 contradictions, shipped files citing library-internal tests (SLOP S6, PILLAR-SPECS l.47, MEMORY-UPDATE l.16, CONTEXT-MAP l.5/11). Change: delete `public/skills/dd-test-stewardship/` and `public/templates/tests-AGENTS.md` and their wiring: every library file `grep -rl dd-test-stewardship dadaia_workspace` names (16 today, incl. dd-code-review/SKILL.md, dd-bug-resolution/SKILL.md, dd-release-definition/SKILL.md, dd-release-implementation/SKILL.md + RC-FLOW.md, dd-codebase-design/DEEPENING.md, scaffold/backlog/AGENTS.md), plus persona `skills:` lists, `behavior-map.json` l.8/304-306, `data/AGENTS.md:82`, CONTEXT-MAP rows, `workspace_layout.REPO_LAW`, `canon.py:278-291`, `service.py:45 _ONBOARDING`, `doctor_memory.py:96`, dependent tests); delete the `Intent:` convention (docstrings, V31, V28) (grill Q4); `slop-tests.md`, the QUALITY scaffold and the persona shrink to the root-map basics (~8 lines): RED before the fix at the lowest level; behavior, not text; mock only at the boundary; literal expected value; a fix commit never rewrites an old assert. Consumers are pointed to their harness marketplace. Done when: no shipped file names dd-test-stewardship, the tests-AGENTS template or `Intent:`, and the basics live in the root map. On delivery this entry supersedes tests-agents-scaffold-without-placeholders and test-intent-docstring-backfill; they exit at that closure, not before. ADR 0166 (proposed).",
-      "provenance": "operator demand 2026-10-02: test audit https://claude.ai/artifact/AMw3Ho2tqaAbftJUWuNhAT + grill Q1-Q9",
-      "relates": [
-        "tests-agents-scaffold-without-placeholders",
-        "test-intent-docstring-backfill"
-      ]
-    },
-    {
       "id": "meta-tests-leave-pytest",
       "title": "Tests of the suite and the repo leave pytest for one CI job",
       "opened": "2026-10-02",
@@ -252,48 +161,6 @@
       "provenance": "operator demand 2026-10-02: test audit https://claude.ai/artifact/AMw3Ho2tqaAbftJUWuNhAT + grill Q1-Q9",
       "relates": [
         "delete-text-count-inventory-asserts"
-      ]
-    },
-    {
-      "id": "grill-one-question-with-options",
-      "title": "The grill asks one question at a time with three options and an open answer",
-      "opened": "2026-10-02",
-      "status": "idea",
-      "description": "Measured: `dd-grill-me/SKILL.md:29` says \"Ask the whole frontier in one round\" and its template carries one recommendation, no options and no open answer; ADR 0146(2) and `data/handoff-AGENTS.md:8` force a questionnaire `.md`; the harness question tool is never named. Change: one question at a time; always 3 closed options, each with its trade-off and one marked recommended, plus 1 open answer; use the harness question tool (AskUserQuestion in Claude Code; numbered text elsewhere); the record is the handoff JSON + ADR lines, no `.md` (grill Q5); fix the stale step refs in `EMISSION-FORMAT.md:3,10` and `PROBLEM-TAXONOMY.md:3,17`; the skill's size is computed live as a readout, never asserted (delete-text-count-inventory-asserts, ADR 0143). Done when: the skill and `data/handoff-AGENTS.md` carry the one-question format and no questionnaire `.md`. ADR 0165 (proposed).",
-      "provenance": "operator demand 2026-10-02: test audit https://claude.ai/artifact/AMw3Ho2tqaAbftJUWuNhAT + grill Q1-Q9",
-      "relates": []
-    },
-    {
-      "id": "bug-terminal-transition-commit-shape",
-      "title": "dd-gitflow-default \u00a73a has no commit shape for a bug reject, defer or supersede",
-      "opened": "2026-10-02",
-      "status": "idea",
-      "description": "dd-gitflow-default/SKILL.md \u00a73a row 4 covers only 'Resolve of a bug a task fixed' (chore(bugs): resolve <id>[, <id>] \u2014 by <task-id> (<sha>)); a bugs.py reject, defer or supersede commit (e.g. 498da2b34, chore(bugs): reject worktree-merge-rewrites-the-branch-before-refusing) matches no row. Widen row 4, no new row: terminal transition without code (resolve, reject, defer, supersede), message chore(bugs): <verb> <id> \u2014 <reason or by task-id (sha)>. Destination: rc-8.",
-      "provenance": "operator approval 2026-10-02 via the main thread's intake; source: dd-code-reviewer review of 498da2b34 (rejection of worktree-merge-rewrites-the-branch-before-refusing), LOW",
-      "relates": []
-    },
-    {
-      "id": "skill-md-soft-hard-line-limit",
-      "title": "SKILL.md soft 333 doctor WARNING with a split fix line; hard 500 stays the contract row; the skills byte budget retires (ADR 0170)",
-      "opened": "2026-10-03",
-      "status": "idea",
-      "description": "Deliver ADR 0170 (proposed; the operator's accept sets amends 0143). (1) dadaia doctor: every projected skill's SKILL.md over behavior-map.json skill_md_line_soft (333) emits Severity.WARNING SKILL-MD-LENGTH naming the skill and its line count; its one fix line takes ADR 0158's 'Operator action: <one act>' form with the real SKILL.md path (no placeholder): split it into that skill's references/*.md and/or scripts/; never a gate failure. Existing skill-asset checks live in dadaia_workspace/infrastructure/entity_doctor.py. Test row skill-md-over-the-soft-limit-warns plants skill_md_line_soft + 1 lines, the value read from the map. (2) dadaia_workspace/public/entities/behavior-map.json gains skill_md_line_soft 333 beside skill_md_line_ceiling 500; dadaia_workspace/public/schemas/behavior-map-v1.schema.json (additionalProperties false) declares the new key; row every-skill-md-is-within-the-declared-line-ceiling in tests/contract/test_behavior_map.py keeps the hard 500 over dadaia_workspace/public/skills. (3) Delete the skills Budget column (6144 B per skill) from dadaia_workspace/public/data/CONTEXT-MAP.md \u00a73, and the _SKILL_BUDGET readout in tests/contract/test_context_map.py if it then has no reader. (4) specs/memory/product/agents/agentic-entities.md: the skill_md_line_ceiling bullet (line 48) states both limits; the CONTEXT-MAP bullet (line 42) drops the SKILL.md 6144 B budget. Scope SKILL.md only; no other size limit returns (ADR 0143). Destination: rc-8 (test/bug candidate).",
-      "provenance": "operator demand 2026-10-02 (verbatim: 'criamos um soft-limit e um hard-limit que \u00e9 50% a mais do soft-limit. E isso vir\u00e1 uma lei'); rulings 'soft 333 / hard 500 (Recommended)', 'S\u00f3 SKILL.md (Recommended)', 'ADR proposed agora + backlog \u2192 rc-8 (Recommended)'; review rulings 2026-10-03 'Retire the skills byte budget (Recommended)', 'Fix while proposed, then accept (Recommended)'; ADR 0170; supersedes reviewer F3 bug-proposal skill-md-line-ceiling-survives-adr-0143 (not registered)",
-      "relates": [
-        "tests-tree-mirrors-the-package",
-        "meta-tests-leave-pytest"
-      ]
-    },
-    {
-      "id": "adr-0143-measured-by-checks-the-concept",
-      "title": "Repair ADR 0143 measured_by to check the concept, not a symbol list (ADR 0138 lane)",
-      "opened": "2026-10-03",
-      "status": "idea",
-      "description": "Problem: ADR 0143's measured_by greps a symbol list (_V3[456]_|_OWNER_SCRIPT_MAX_LINES|max-complexity|max-nested-blocks), so a ceiling under a new name passed it: the '> 699' doctor-module row in tests/contract/test_core_file_io_purity.py (bug size-ceiling-survives-adr-0143-in-core-file-io-purity, fixed a89a557ce) and behavior-map skill_md_line_ceiling both survived. Repair in place through the ADR 0138 lane (chore(adrs): repair \u2026) so measured_by names a check of the concept: no row compares a file's line or byte count against a constant, except a declared law (ADR 0170's SKILL.md hard 500). Where and how that check lives is rc-8's as-is review, bound by ADR 0167. Destination: rc-8.",
-      "provenance": "operator ruling 2026-10-02 'Repair in rc-8 (Recommended)'; source: dd-code-reviewer finding F4 and bug size-ceiling-survives-adr-0143-in-core-file-io-purity",
-      "relates": [
-        "meta-tests-leave-pytest",
-        "skill-md-soft-hard-line-limit"
       ]
     },
     {
@@ -369,6 +236,155 @@
       "provenance": "operator demand 2026-10-02: workspace replication grill Q1-Q10",
       "relates": [
         "export-soft-and-hard"
+      ]
+    },
+    {
+      "id": "dd-ask-me-owned-questioning-skill",
+      "title": "dd-ask-me: an owned questioning skill - one question, three options, stage references, durable records",
+      "opened": "2026-10-03",
+      "status": "idea",
+      "description": "Measured (HEAD c9100eaee): `public/skills/dd-grill-me/SKILL.md:29` asks the whole frontier in one round with one recommended answer, no options, no open answer; it and `data/handoff-AGENTS.md:8` (ADR 0146) mandate a questionnaire `.md`; its step 14 (SKILL.md:43) records every decision as an ADR line; the skill has no `references/` or `scripts/`; `EMISSION-FORMAT.md:3` (Step 5, now step 16) and `:10` (Step 4, now step 10) cite stale steps (`:12` Step 1 is still true); no `.css` exists under `public/`; 28 ADR rulings cite grill answer ids (0016-0021, 0023, 0032-0039, 0042-0046, 0052, 0054-0056, 0092-0094, 0097) whose handoffs are reaped (handoff TTL 1 day, `core/workspace_layout.py:181,190`; reaped hold 7 days, :182,193). Change: rename to `dd-ask-me` (same semantic base; no \"grill\" name inside the skill). Common core: one question at a time, 3 closed options each with its trade-off, one recommended; the harness question tool (AskUserQuestion in Claude Code, numbered text elsewhere), free text via the tool's own \"Other\". Stage references: `references/backlog.md` (is it a decision at all: problem measured, feature vs bug, scope), `references/release.md`, `references/adr.md` (threshold + question bank: reversibility, decision drivers, quality-attribute scenario whose response measure becomes measured_by, bug history of the surface, ownership/coupling, reuse, failure/rollback, cost, security, what it lets us delete, accepted drawback, open issues), `references/plan.md` (PLAN contradicts an accepted ADR? a threshold-passing technical decision?). Presentation: the harness artifact first, fallback an HTML report styled by `scripts/report.css`. Every answer lands in a durable record in the same turn (backlog description at `backlog.py new`; ADR `options` + self-contained `ruling.words`); no questionnaire `.md`; handoffs stay ephemeral. Triggers: `dd-backlog-definition` (new), `dd-release-definition` \u00a73 (pre-SPEC/ADR), post-PLAN (threshold-passing technical decisions only). The skill's size is a live readout, never asserted (delete-text-count-inventory-asserts). Rename blast radius (live law only; ledgers, releases, history untouched): the skill dir; `data/AGENTS.md:76`; `data/CONTEXT-MAP.md:76`; `data/handoff-AGENTS.md:8`; `entities/behavior-map.json:5,240` (hash re-record); `scaffold/bugs/AGENTS.md:15` + `specs/bugs/AGENTS.md:15`; `dd-architecture-survey/SKILL.md:5,72,95` + `HTML-REPORT.md:92`; `dd-codebase-design/SKILL.md:58`; `dd-manager-orchestration/SKILL.md:34`; `dd-release-definition/SKILL.md:50,91`; `tests/contract/test_behavior_map.py:70` `_UNIVERSAL_NAMES`; fixture `tests/fixtures/handoffs/v1.2-deepening-audit-self-pull.handoff.json:32`. Generic \"grill\" in live law -> \"ask-me session\": `agents/dd-product-engineer.md` (x8), `entities/registry.json:7`, `schemas/ADRs/decision-record-v1.schema.json:91`, `scaffold/ADRs/AGENTS.md:18`, `scaffold/releases/AGENTS.md:20-21`, `dd-domain-modeling/SKILL.md:32`. Done when: no live-law reference to dd-grill-me; the 3 stage skills invoke dd-ask-me with their reference; no `.md` questionnaire path in law. Relates: absorbs grill-one-question-with-options; adr-born-at-release-with-options. ADR 0165 (accepted) and 0146 (questionnaire clause) are amended at the release that picks this.",
+      "provenance": "operator demand 2026-10-03: ADR/RFC/SAST grill Q1-Q7 + R2-1..R2-4 (audit 2026-10-02)",
+      "relates": [
+        "grill-one-question-with-options"
+      ]
+    },
+    {
+      "id": "adr-born-at-release-with-options",
+      "title": "An ADR is born only at release definition, past a threshold, carrying its options",
+      "opened": "2026-10-03",
+      "status": "idea",
+      "description": "Measured (HEAD c9100eaee): ADRs are proposed at any phase - `specs/ADRs/AGENTS.md:16` \"Any agent may append a record with status proposed\"; `dd-gitflow-default/SKILL.md:56` + `scripts/_worktree_kinds.py:20` (the backlog kind allows `decisions.jsonl`); mid-session offers in `dd-domain-modeling/SKILL.md:48-57`, `dd-architecture-survey/SKILL.md:77`, `dd-manager-orchestration/SKILL.md:35`, `dd-release-implementation/MEMORY-UPDATE.md:23`; `dd-grill-me/SKILL.md:43` (step 14) turns every decision into an ADR line; `dd-release-definition` has no ADR step; 0171-0175 were proposed at backlog intake (807116479). 0/175 records carry alternatives; schema `additionalProperties:false` (decision-record-v1 :7,86), no options field; `ruling.words` allows a \"grill answer id\" (`scaffold/ADRs/AGENTS.md:18`, schema :91); 147 accepted between 2026-08-31 and 2026-10-03. Change: an ADR is born only in `dd-release-definition`, after the picked backlogs are read together and before the SPEC, through dd-ask-me `references/adr.md`. Threshold, all three: one-way door (reversal costs more than this release or touches a published contract/data); >=1 architecturally-significant criterion (structural/cross-cutting, interface/contract, dependency, quality-attribute target, first of its kind, past troublemaker in the bug ledger); >=2 genuine options - else a one-line SPEC statement. Field `options: [{name, tradeoff, rejected_because}]` (min 2) required on every new record; how \"new\" is enforced is the release's call, preferring no second validation path (prior: adr-records-violate-schema-and-no-test-validates-committed-file) - e.g. optional in the schema and required by the dd-ask-me ADR session; `ruling.words` carries the question and the chosen option, never only an id. Remove `decisions.jsonl` from the backlog kind's allowed set and its gitflow \u00a73a row; every mid-session ADR offer becomes \"goes to the release's ADR session\". Done when: a backlog worktree cannot commit `decisions.jsonl`; a new record without options is refused; dd-release-definition carries the ADR step. Relates: dd-ask-me-owned-questioning-skill.",
+      "provenance": "operator demand 2026-10-03: ADR/RFC/SAST grill Q1-Q7 + R2-1..R2-4 (audit 2026-10-02)",
+      "relates": [
+        "dd-ask-me-owned-questioning-skill"
+      ]
+    },
+    {
+      "id": "architecture-adr-section-generated",
+      "title": "ARCHITECTURE.md's ADR section is generated from the ledger; the P-NN ADR label and the pairing law leave",
+      "opened": "2026-10-03",
+      "status": "idea",
+      "description": "Measured (HEAD c9100eaee): 8 of 147 accepted ADRs are cited anywhere in `specs/memory` (0015, 0021, 0023, 0025, 0119, 0138, 0143, 0167); 5 principle labels cite rejected ADRs as accepted (`ARCHITECTURE.md:13` P-01->0001, `:43` P-09->0003, `:68` P-14->0004, `:73` P-15->0004; `QUALITY.md:33` P-29->0012); 10 principles say `ADR: none`; no doctor check compares labels to ledger status (`features/specs/doctor_adr.py:49-80` flags only superseded ids); the label patch 9cfea65cd was reverted by 83b7bc52f - a symptom fix on a structure that duplicates ledger status in prose. Change: one generated block in ARCHITECTURE.md listing every accepted, non-superseded ADR (id, title, one-line decision), rendered from `decisions.jsonl` through the existing `core/fixed_sections.py` marker mechanism (a ledger-rendered variant); doctor FIXED-2 (`features/specs/doctor_memory.py:119-146`) on diff, `--fix` regenerates; the block is exempt from MEM-NARRATIVE-1 (`features/specs/memory_lint.py:72-108`). The closure memory pass regenerates it, and the regeneration refuses an accepted ADR whose measured_by does not resolve to an existing pytest node id or doctor code (a promise is allowed until then); the release names the accepted forms (test paths and node ids, doctor codes, lint contracts and CI jobs per `specs/memory/AGENTS.md:21`) and keeps the regression seam of sa-adr-measured-by-pattern-refuses-real-checks as the guard. DELETE: the `ADR:` label on `### P-NN` principles and its parser `memory_lint.py:84` `_ADR_LINE_RE`; the pairing law (`specs/ADRs/AGENTS.md:28` accept row's \"paired canonical-memory hunk\", \u00a75 :46, \u00a75.1 :48-53; `specs/memory/AGENTS.md:11` and the `ADR:` clause of :21); the pillar-3 pairing check (the pairing clause of `dd-audit-project/PILLAR-MEMORY.md:9` and :18-19 - its missing-`Measured by:` finding stays); their scaffold mirrors (`scaffold/ADRs/AGENTS.md:43-51`, the `ADR:` clause of `scaffold/memory/AGENTS.md:21`). A principle stands on its `Measured by:`. Done when: ARCHITECTURE.md's ADR block equals the projection; no `ADR:` label grammar remains; the 5 drifts are gone by construction. Relates: adr-born-at-release-with-options, adr-ledger-triage-process-rules. Bugs: adr-measured-by-existence-unchecked (being registered) delivers the existence check this reuses; prior sa-adr-measured-by-pattern-refuses-real-checks.",
+      "provenance": "operator demand 2026-10-03: ADR/RFC/SAST grill Q1-Q7 + R2-1..R2-4 (audit 2026-10-02)",
+      "relates": [
+        "adr-born-at-release-with-options"
+      ]
+    },
+    {
+      "id": "adr-ledger-triage-process-rules",
+      "title": "One-time ADR ledger triage: process rules move to their scoped AGENTS.md, one ADR supersedes them",
+      "opened": "2026-10-03",
+      "status": "idea",
+      "description": "Measured (HEAD c9100eaee; classification of the 2026-10-02 audit by the Azure criterion, read-only): 147 accepted - ~97 architectural, 36 process rules (0019, 0023, 0025, 0041, 0052, 0062-0065, 0070, 0071, 0076, 0081, 0099, 0100, 0109, 0115, 0119, 0123, 0127, 0136-0139, 0141-0143, 0147-0149, 0151, 0163, 0165-0167, 0170) and 14 spent one-shot rulings (0016, 0049, 0050, 0056, 0057, 0117, 0121, 0122, 0131, 0140, 0145, 0152, 0155, 0169), all 50 still `accepted`; measured_by: 46 promises, 9 shell-only, 1 prose (0123); 4 records amend a rejected record (0016->0002, 0032->0013, 0049->0001, 0097->0002). Change: one pass; the operator approves the classification in batch at the release ADR session: each process rule's statement is confirmed (or moved) into the scoped AGENTS.md that governs it, then one consolidated ADR supersedes all process and spent records (`supersedes` comma ids, no new status); the 5 principles resting on rejected ADRs are re-judged; every remaining accepted measured_by resolves to an executable check or is listed for the operator. Done when: the generated block lists only architectural decisions; every process rule lives in exactly one AGENTS.md. Relates: architecture-adr-section-generated; adr-0143-measured-by-checks-the-concept (0143 is a process record here - its repair folds into this pass); skill-md-soft-hard-line-limit (delivers 0170, classified here as process - whichever lands second re-checks the other).",
+      "provenance": "operator demand 2026-10-03: ADR/RFC/SAST grill Q1-Q7 + R2-1..R2-4 (audit 2026-10-02)",
+      "relates": [
+        "architecture-adr-section-generated",
+        "adr-0143-measured-by-checks-the-concept",
+        "skill-md-soft-hard-line-limit"
+      ]
+    },
+    {
+      "id": "public-law-language-neutral",
+      "title": "The shipped public surface is language-neutral: no library internals, Python-project assumptions or ADR numbers",
+      "opened": "2026-10-03",
+      "status": "idea",
+      "description": "Measured (read-only sweep of the 117 files under `dadaia_workspace/public/`, 2026-10-03; re-checked at HEAD c9100eaee): 74 findings - 5 own-pipeline, 29 Python-project assumptions, 40 self-hosting/library internals - plus this repo's ADR numbers cited in 33 shipped files (13 Markdown law files, 20 scripts/schemas), worst inside user-owned `scaffold/ADRs/AGENTS.md:19,29` and `scaffold/releases/AGENTS.md:20,24`, read as the user's own ADRs. Worst offenders: `data/CONSUMER_VALIDATION_RECIPE.md` (wheel release QA shipped to every instance); `agents/dd-software-engineer.md:54-60,80-86,97-102,125-137` (dadaia_workspace layer rules, poetry/ruff/mypy mandate); `templates/repo-AGENTS.md:56-57`; `scaffold/memory/QUALITY.md:20-21`; `dd-ai-eng-knowhow` SKILL :22,37-47, AUTHORING, CODEX (self-hosting authoring; `CODEX.md:37` contradicts `templates/repo-AGENTS.md:6`); the closure derived-docs pipeline (`dd-release-implementation/MEMORY-UPDATE.md:8,16`, `RC-FLOW.md:45-46`, `data/worktrees-AGENTS.md:12,24`); `dd-code-review/SKILL.md:29,60-61,74` + `SLOP.md:11-16,26`; `dd-audit-project` PILLAR-SPECS:44-47, PILLAR-MEMORY:29,37-41, PILLAR-BUGS:34-35; `data/AGENTS.md:2,39-40,70`; `data/dadaia-AGENTS.md:6,14,30`; `data/states-AGENTS.md:10`; `data/CONTEXT-MAP.md:3-13`; `dd-domain-modeling/SKILL.md:29-30,61`; `dd-test-stewardship/PARAMETERS.md:5-7`; `dd-release-definition/SKILL.md:37,43`; schema descriptions citing library modules/tests; `entities/registry.json:81-83`; `scripts/pre-push-ci-gate.sh:3,16-21,66-76`. Change: criterion - the shipped surface serves humans and autonomous agents building projects in any language; Python only operates the workspace. Each finding is deleted, rewritten language-neutral, or moved to this repo's own `repos/dadaia-workspace/AGENTS.md`; ADR-number citations are deleted from shipped files; nothing moves to private. lib-test-guidance-dehydrated owns, and this entry does not touch: dd-test-stewardship (incl. PARAMETERS.md), `templates/tests-AGENTS.md`, `PILLAR-SPECS.md:44-47`, `MEMORY-UPDATE.md:16`, `data/CONTEXT-MAP.md:3-13`, `scaffold/memory/QUALITY.md:20-21` and `SLOP.md` S6 - listed above as evidence only. Done when: a grep for this repo's package paths, ADR numbers and Python-only tooling in `public/` returns only the workspace's own operation (`.dadaia/.venv`, `uvx dadaia-workspace`). Relates: lib-test-guidance-dehydrated, cli-ships-no-library-pipeline.",
+      "provenance": "operator demand 2026-10-03: ADR/RFC/SAST grill Q1-Q7 + R2-1..R2-4 (audit 2026-10-02)",
+      "relates": [
+        "lib-test-guidance-dehydrated",
+        "cli-ships-no-library-pipeline"
+      ]
+    },
+    {
+      "id": "repo-ci-sast",
+      "title": "This repo's CI runs SAST: ruff S, pip-audit on poetry.lock, CodeQL",
+      "opened": "2026-10-03",
+      "status": "idea",
+      "description": "This repo's own pipeline, never library content. Measured (HEAD c9100eaee): `.github/workflows/ci.yml` lint runs ruff with `select = [E, F, I, UP, B, SIM]` (`pyproject.toml:118`), no `S`, yet 39 `noqa: S...` comments in 20 files (3 library, 17 tests) suppress a rule that never runs; CodeQL default setup `not-configured` (repo is public, free); no pip-audit job; CI installs `poetry==1.8.3` (`ci.yml:69`, `release.yml:87`), below the `pyproject.toml:78` DEFERRED floor `poetry>=2.3.4` (CVE-2026-34591, CVE-2026-41140); `secret-scan.yml` runs on push only to main (PRs to main/develop), not on work-branch pushes; 13 open Dependabot alerts, all PyJWT on main's `poetry.lock` (1 critical, 5 high, 7 medium), already absent from the feature/develop locks (de4e3179a). Change: ruff `S` on, with one triage (justified noqa or fix); a `pip-audit` job on `poetry.lock` failing on any finding; CodeQL default setup (operator act, or `gh api` on operator order); the CI poetry pin raised; `.github/required-checks.json` updated; no job reads Dependabot alerts (GITHUB_TOKEN cannot; no new secret) - that check is the operator's private post-push rule. Done when: the 3 jobs are required checks and green. Relates: none.",
+      "provenance": "operator demand 2026-10-03: ADR/RFC/SAST grill Q1-Q7 + R2-1..R2-4 (audit 2026-10-02)",
+      "relates": []
+    },
+    {
+      "id": "agent-behavior-evals",
+      "title": "Agent-behavior evals gate the 0.5.0 publish: Claude Code runs T1 and T2 under Harbor, k=3, on 0.4.7 and on the candidate wheel, in dadaia-evals",
+      "opened": "2026-10-03",
+      "status": "idea",
+      "description": "Why: 0.5.0 changes agent-facing behaviour across seven candidates (rc-1 rewrote onboarding) and 0.4.7 downloads doubled; today only deterministic layers exist (tests/e2e/test_onboarding_journey.py, tests/fixtures/hook_payloads/, the projection contract tests) - nothing measures what an agent does with the shipped law. Where: the associated repo dadaia-evals (github marcoaureliomenezes/dadaia-evals, public, registered by context repo add + context alive); its backlog, ADRs and release stay in this specs tree. Destination: an FR group of 0.5.0 candidate rc-8, explicitly implemented in parallel with rc-8's library tasks (ADR 0149) because its write set is another repo (repos/dadaia-evals); not a separate candidate (round-2 ruling, replacing the parallel-candidate ruling release.py refused). Prerequisites, before any model-calling job: (a) the operator runs claude setup-token and stores it as the dadaia-evals repo secret CLAUDE_CODE_OAUTH_TOKEN, extra usage off on the plan (Q14); (b) ADR 0177 accepted; (c) dadaia-evals carries the gitflow branches main, develop and feature/0.5.0; (d) every grader is valid on both dadaia-workspace 0.4.7 and the 0.5.0 candidate - a grader keyed on a path or name only one version has fakes a drop. Repo format (agreed): tasks/<t>/{instruction.md, task.toml, environment/Dockerfile, tests/test.sh + test_grade.py}, scripts/compare.py (the paired verdict over both versions), .github/workflows/eval.yml, AGENTS.md, README.md; jobs/ (the runner's output) never committed. Image: environment only (python, uv, git, the Claude CLI), defined in dadaia-evals; the lib under test - the wheel uv build makes from a lib ref after eval.yml stamps release-please-config.json's release-as version into pyproject.toml's version line (ADR 0178 (1)), or dadaia-workspace==0.4.7 from PyPI - is installed as the last layer per version, so a new release rebuilds no base; no registry in v1. Runner: Harbor, harbor==0.23.0 pinned (Apache-2.0), its built-in claude-code agent, auth CLAUDE_CODE_OAUTH_TOKEN with CLAUDE_FORCE_OAUTH=1, -k 3, --ak version=<cc> pins the Claude CLI, -m anthropic/<model> pins the model (Sonnet 5, main-thread assumption, operator may override), local docker compose on a GitHub-hosted ubuntu runner; it replaces the own Docker + claude -p + pytest runner (Q10/Q24); rejected: Inspect AI, claude plugin eval, Docker Sandboxes. The first run confirms the wheel layer is injected and reads the plan's rate limit at -n 1 and -n 2. Tasks: T1 cold onboarding (empty folder to a bound context with specs and a clean doctor); T2 seeded bug in Arm B (a synthetic project with a planted contract break, the operator's confirmation given in the instruction, ending resolved with its RED test); T3 Snake (Arm A) readout only, only if the budget fits. Graders: tests/test.sh runs test_grade.py (pytest) over the trial's final state (files, ledgers, exit codes), no model judge. eval.yml: workflow_dispatch only, input = lib ref; runs both versions, k=3 per task per version; the verdict in the job summary plus an uploaded artifact (per-trial grades and transcripts of synthetic projects only, token-scanned before upload, ADR 0177 (6)). Block rule (ADR 0178): a task passing >=2/3 on 0.4.7 and <=1/3 on the candidate, or T1 below 3/3 on the candidate; everything else readout; the evaluated sha is the promote PR head, logged in _RELEASE.json before the promote PR merges; release.yml does not change in 0.5.0. Model economy: the ADR 0022 economy template applied in the trial workspace before each trial (no CLI verb applies a template today - the PLAN names the seam). Model-API law (ADR 0177): the map section 3 line ships from dadaia_workspace/public/data/AGENTS.md (plus dd-gitflow-default SKILL.md and CICD-AUTOMATION.md, QUALITY.md P-33, the sdd-gate-v3 atom, and the term evals repo in CONTEXT.md) - a lib text change rc-8 carries; the lib's own workflow scan, check no-model-api-in-ci of the guard-script CI job (ADR 0176), stays as is. Reopens the 2026-09-20 rejection of plugin-packaging-and-skill-evals without the plugin (ADR 0179). Out (separate entries): evals-release-gate-status, evals-harness-lanes-and-benchmark, evals-windows-smoke, devin-subagent-projection. Done when: one eval.yml run on an rc-8 lib ref publishes a verdict over 12 trials (2 tasks x 2 versions x k=3) and ADRs 0177-0179 are ruled, at rc-8 closure; the gate read itself (ADR 0178) happens at the promote.",
+      "provenance": "operator demand 2026-10-03 ('go', evals gate 0.5.0 before PyPI); grill handoff 2026-10-03T163043Z-main-thread-grill-evals-050 (final, frontier empty) over grills Q1-Q17 of 2026-10-03 (Q9 superseded; Q11 'private' replaced by public with conditions); grill round 2, handoff 2026-10-03T170932Z-main-thread-grill-evals-format (destination rc-8 in parallel, repo format, Docker image, Harbor runner), and the dd-code-reviewer conditions on e9007d5a9",
+      "intents": [
+        {
+          "subject": {
+            "kind": "catalog",
+            "ref": "pypi-distribution"
+          },
+          "change": "change - before the 0.5.0 publish the operator reads the dadaia-evals eval.yml verdict on the promote PR head; a paired drop against 0.4.7 or T1 below 3/3 blocks it (ADR 0178); release.yml unchanged in 0.5.0"
+        },
+        {
+          "subject": {
+            "kind": "doc",
+            "ref": "memory/QUALITY.md#p-33-we-run-no-model-api-in-ci-no-workflow-uses-an-anthropics-action-or-references-a-model-api-secret-the-security-review-is-the-local-dd-code-reviewer-lens"
+          },
+          "change": "change - a context's main repo and its associated repos never call a model in CI except an evals repo (term defined in CONTEXT.md), only in workflow_dispatch/schedule jobs, no self-hosted runner, the secret only in those jobs, artifacts from synthetic projects only and token-scanned before upload (ADR 0177); the check stays the same scan"
+        }
+      ],
+      "relates": []
+    },
+    {
+      "id": "evals-release-gate-status",
+      "title": "release.yml approve requires the evals/gate commit status that dadaia-evals posts on the lib sha",
+      "opened": "2026-10-03",
+      "status": "idea",
+      "description": "Follow-up of agent-behavior-evals, after 0.5.0 (grill Q-gate: 'evals/gate status required by approve moves to 0.5.1'; Q16). eval.yml posts the commit status evals/gate on the lib sha it evaluated (a token scoped to statuses on dadaia-workspace, held by dadaia-evals - an operator act); the release.yml approve job requires that status on its sha; a weekly schedule runs a one-task smoke. Replaces ADR 0178's manual read and its evaluated-sha-to-tag diff check, and closes its 'deferred to 0.5.1' clause. Needs its own ADR at definition (a release.yml gate change). Done when: approve refuses a sha with no evals/gate success, and the smoke runs weekly.",
+      "provenance": "operator ruling in the grill handoff 2026-10-03T163043Z-main-thread-grill-evals-050 (final, frontier empty) over grills Q1-Q17 of 2026-10-03 (Q9 superseded; Q11 'private' replaced by public with conditions): the evals/gate status required by approve is deferred to 0.5.1; grill round 2, handoff 2026-10-03T170932Z-main-thread-grill-evals-format (destination rc-8 in parallel, repo format, Docker image, Harbor runner), and the dd-code-reviewer conditions on e9007d5a9",
+      "relates": [
+        "agent-behavior-evals"
+      ]
+    },
+    {
+      "id": "evals-harness-lanes-and-benchmark",
+      "title": "Evals grow past Claude Code: Devin joins the gate; Copilot and Codex join a monthly benchmark.yml",
+      "opened": "2026-10-03",
+      "status": "idea",
+      "description": "Follow-up of agent-behavior-evals, after 0.5.0 (grill: Q12-Q17 become the expansion path). Q12: gate = Claude Code + Devin; benchmark = Claude Code + Devin + Copilot + Codex; Cursor and Kimi stay deterministic-contract only. Q13: Sonnet 5 pinned on Claude Code, Devin and Copilot (isolates the harness effect); Codex on its native model; a cheap-model column in the benchmark only. Q14 billing: Devin Pro US$20/month; Copilot Pro US$10/month with a 'Copilot Requests' PAT in COPILOT_GITHUB_TOKEN; Codex an API key with a console budget; total <= US$70/month, a gate run <= US$30. Q15: Devin CLI login in CI starts with a spike - one month of Pro, credentials.toml as a secret, 5 tasks on a hosted runner, quota read with /usage; Q15's self-hosted fallback is void under ADR 0177 (public repo, no self-hosted runner), so a failed spike leaves Devin benchmark-only, run locally. Q16: eval.yml and benchmark.yml call one reusable run-task.yml (harness x task); benchmark.yml runs monthly plus dispatch, k=3, readout only, its trend recorded in the repo. Q17: gate graders stay code-only (T3 Snake by a scripted Playwright play); the benchmark adds a vision LLM judge, readout only. Runner: Harbor, as agent-behavior-evals pins it (round 2 rejected Inspect AI); a harness with no Harbor built-in agent needs a custom agent adapter, checked per lane when it is picked. Depends on devin-subagent-projection for the Devin lane. Done when: eval.yml runs both gate harnesses and benchmark.yml has one monthly trend point over the four.",
+      "provenance": "operator ruling in the grill handoff 2026-10-03T163043Z-main-thread-grill-evals-050 (final, frontier empty) over grills Q1-Q17 of 2026-10-03 (Q9 superseded; Q11 'private' replaced by public with conditions): Devin, Copilot, Codex, benchmark.yml and the vision judge move to the backlog after 0.5.0, keeping Q12-Q17 as their origin; grill round 2, handoff 2026-10-03T170932Z-main-thread-grill-evals-format (destination rc-8 in parallel, repo format, Docker image, Harbor runner), and the dd-code-reviewer conditions on e9007d5a9",
+      "relates": [
+        "agent-behavior-evals"
+      ]
+    },
+    {
+      "id": "evals-windows-smoke",
+      "title": "One Windows smoke: T1 with Claude Code on a Windows runner, at release only",
+      "opened": "2026-10-03",
+      "status": "idea",
+      "description": "Follow-up of agent-behavior-evals, after 0.5.0 (grill Q7: behaviour evals run on Linux; Windows keeps its deterministic coverage and gains one Claude Code smoke at release). The PowerShell vs bash risk is real; windows-integration-coverage-gap names the deterministic side. Conditional on ADR 0177 being accepted: the smoke is a model-calling job of dadaia-evals and runs under its conditions (2)-(6). T1 cold onboarding on windows-latest, k=1, readout, only if the first gate rounds show slack in the budget and the Actions minutes. First act: check whether Harbor's docker environment runs on windows-latest (GitHub's Windows runners run Windows containers only); if not, the definition names the smoke's runner. Done when: an eval.yml dispatch input runs T1 on Windows and its result sits in the verdict as readout.",
+      "provenance": "operator ruling in the grill handoff 2026-10-03T163043Z-main-thread-grill-evals-050 (final, frontier empty) over grills Q1-Q17 of 2026-10-03 (Q9 superseded; Q11 'private' replaced by public with conditions): the Windows smoke moves to the backlog after 0.5.0 (Q7 carried); grill round 2, handoff 2026-10-03T170932Z-main-thread-grill-evals-format (destination rc-8 in parallel, repo format, Docker image, Harbor runner), and the dd-code-reviewer conditions on e9007d5a9",
+      "relates": [
+        "agent-behavior-evals",
+        "windows-integration-coverage-gap"
+      ]
+    },
+    {
+      "id": "devin-subagent-projection",
+      "title": "Verify whether Devin reads the three personas from .agents/agents; project them if it does not",
+      "opened": "2026-10-03",
+      "status": "idea",
+      "description": "Two sources disagree: the evals study (report section 11) says the Devin CLI reads sub-agents from .devin/agents/<name>.md and the lib maps AgentTranscode.DEVIN_MD to no_rules (dadaia_workspace/infrastructure/agent_transcodes.py:240), so a Devin session would run without dd-product-engineer, dd-software-engineer and dd-code-reviewer; the memory atom harness-devin says Devin reads .agents/agents natively, so no persona copy is projected. First act: check the Devin CLI documentation and a live devin session against .agents/agents. If memory is right, this entry exits rejected with that evidence. If not, the library breaks the harness-devin contract (Arm B): the finding is proposed as a bug (dd-bug-registration); once the operator confirms, it is registered and this entry exits --disposition to-bug naming that BUGS.jsonl id, both in one backlog worktree (ADR 0137); the fix - the DEVIN_MD transcode projecting the three personas into .devin/agents with a projection contract test, harness-devin corrected - follows dd-bug-resolution. Blocks the Devin lane of evals-harness-lanes-and-benchmark.",
+      "provenance": "operator ruling in the grill handoff 2026-10-03T163043Z-main-thread-grill-evals-050 (final, frontier empty) over grills Q1-Q17 of 2026-10-03 (Q9 superseded; Q11 'private' replaced by public with conditions) (Devin lane after 0.5.0); gap measured by the evals study report section 11; grill round 2, handoff 2026-10-03T170932Z-main-thread-grill-evals-format (destination rc-8 in parallel, repo format, Docker image, Harbor runner), and the dd-code-reviewer conditions on e9007d5a9",
+      "relates": [
+        "evals-harness-lanes-and-benchmark"
+      ]
+    },
+    {
+      "id": "bug-ledger-balance-and-convergence",
+      "title": "QUALITY.md carries the bug ledger's balance and a convergence indicator: a generated map, a written review, weight decay, evidence_seam checked at resolve (rc-9)",
+      "opened": "2026-10-05",
+      "status": "idea",
+      "description": "G8, operator verbatim: 'Bugs devem ser consolidados em QUALITY.md'; 'o ledger \u00e9 as transa\u00e7\u00f5es e o saldo (balance) \u00e9 a soma'; 'Mapa gerado + revis\u00e3o escrita'; 'Revis\u00e3o a cada rc, consolida\u00e7\u00e3o por release (Recommended)'. G10, operator verbatim: 'Conferido no resolve (Recommended)' - evidence_seam (path[::node]) required at bugs.py resolve and checked there only; a later REBUILD may delete the cited test, and the window review records it; amends ADR 0164 (4) and AC9.1's clause. New operator demand, 2026-10-05, verbatim: 'na consolida\u00e7\u00e3o do QUALITY.md \u2026 Deve ter um indicador ao final que mede uma taxa de se estamos convergindo ou n\u00e3o. Convergir significar\u00e1 estarmos tornando o dadaia-workspace mais saudavel, ou seja, bugs de features amadurecidas para de ser reportados e solu\u00e7\u00e3o fica segura.' The agent-behavior evals (W11 T1/T2) are an external signal for that indicator; operator: 'Eles ser\u00e3o de grande ajuda na identifica\u00e7\u00e3o dos bugs.' Carried design: QUALITY.md gains a ## Bugs section - a generated map per surface (records, recurrences, fix-induced, pile, archived, times reviewed, associations, weight) and a written review (causes, verdicts, lessons), compiled at every rc closure and consolidated per release; per-bug state stays only in BUGS.jsonl; a bug is settled once it leaves the bug window with no recurrence on its surface. The map is a closure check generated after the disposition sweep, never an always-on doctor check; it is a fenced block, which LINT-1 exempts. Dev-tooling is a repo-declared, language-neutral class (for example a dadaia-dev-tooling attribute in .gitattributes, the ADR 0183 seam), never 'outside the shipped package'; unknown surfaces stay out of recurrence counts. evidence_seam node matching covers parametrized and class-qualified ids. docs/bug-ledger-lessons.md is derived from the ## Bugs review under P-29. The indicator's criterion is fixed at rc-9's grill from cited sources; the entry carries no formula. Candidate sources: Kanoun & Laprie, Handbook of Software Reliability Engineering ch. 10 (Laplace trend test, grouped data); IBM ODC v5.2 Age (Base, ReFixed); Kan, Metrics and Models in Software Quality Engineering ch. 4 (percent defective fixes); Capers Jones 2012, 'Software Defect Origins and Removal Methods' (bad-fix injection).",
+      "provenance": "operator scope ruling 2026-10-05 (AskUserQuestion): 'Dividir: balan\u00e7o vai p/ rc-9 (Recommended)' \u2014 an operator-ratified in-release deferral of rc-8 W13 AC13.5, AC13.9, AC13.10 and candidate ADR C, anchored at specs/releases/0.5.0/rc-8/SPEC.md \u00a7Carried, rc-9 line; grill handoff 2026-10-05T005326Z-main-thread-grill-bug-window-review (G8, G10); operator demand 2026-10-05 to the main thread (convergence indicator); the carried design from the rc-8 SPEC's W13 review (REJECTED; H7 and the map-check finding)",
+      "relates": [
+        "agent-behavior-evals",
+        "bug-fix-adds-never-rewrites-asserts"
       ]
     }
   ]

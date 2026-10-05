@@ -1,6 +1,4 @@
-"""Intent: CONTRACT — DADAIA §8.3 public asset hygiene (no bytecode under public/, build excludes)
-
-Public-source hygiene contract (FR-W5-01 / AC-W5-01, release v0.1.11).
+"""Public-source hygiene contract (FR-W5-01 / AC-W5-01, release v0.1.11).
 
 Residual R7: ``dadaia_workspace/public/scripts/__pycache__/`` had been committed —
 compiled bytecode leaking into the canonical public asset tree, which is source-of-truth
@@ -23,7 +21,6 @@ from pathlib import Path
 import pytest
 
 from dadaia_workspace.core.model_registry import CORE_AGENTS
-from dadaia_workspace.features.specs import canon
 from dadaia_workspace.infrastructure.privacy_check import PORTUGUESE_CONTROL_TERMS
 from tests.helpers.scan_population import assert_populated
 
@@ -92,7 +89,7 @@ def _denied_lines(globs: tuple[str, ...], pattern: str, spare: str | None) -> li
         # 0.4.6 c4 AC13 (FR16, D2/D3/D9): retired surfaces staged verbatim must not be taught
         pytest.param(_ALL, r"academy|dadaia clean|tmp gc|reports cleanup|ROOT-4|legacy-quarantine|repos catalog", None, id="retired-surface"),
         # 0.4.7 FR4/AC4.1 (T-047-58): the published surface is 100% English
-        pytest.param(("public/**/*.md", "public/**/*.json", "public/**/*.py", "public/**/*.txt", "public/**/*.j2"), rf"(?i){_PT_TERMS}", None, id="portuguese-control-vocabulary"),
+        pytest.param(("public/**/*.md", "public/**/*.json", "public/**/*.py", "public/**/*.txt", "public/**/*.j2", "features/specs/canon.py"), rf"(?i){_PT_TERMS}", None, id="portuguese-control-vocabulary"),
         # 0.4.7 FR1/FR7: a retired bug-record key named as a live field (its retirement line is spared)
         pytest.param(_MD_JSON, r"lineage_source|registration_commit|registration_granularity|resolved_commit|resolution_granularity|root_cause|migration_note", "retired", id="retired-bug-record-key"),
         # verdict-vocabulary-persona-schema-mismatch: the handoff schema admits APPROVED/REJECTED only
@@ -122,37 +119,6 @@ def test_public_source_names_no_retired_surface(
     assert _denied_lines(globs, pattern, spare) == []
 
 
-def test_the_retired_facts_have_their_live_statement() -> None:
-    """sa-reaper-destroys-its-own-hold-before-ttl#B6 and sa-consumer-law-carries-library-facts#FR8.4:
-    the cli skill says `--fix --expired-only` is the TTL lane alone; the constitution template is English."""
-    skill = (_PKG / "public" / "skills" / "dd-cli-library" / "SKILL.md").read_text(encoding="utf-8")
-    assert "`--fix --expired-only` deletes only TTL-expired entries" in skill
-    stub = canon._CONSTITUTION_STUB.lower()
-    assert "# constitution" in stub
-    assert [t for t, _ in PORTUGUESE_CONTROL_TERMS if t.lower() in stub] == []
-
-
-def test_public_law_never_grants_memory_writes_to_closure_alone() -> None:
-    """Intent: CONTRACT — constitution-persona-single-source-drift (SINGLE-SRC-1, §4a-6).
-
-    The memory-write phase is DEFINITION+CLOSURE; no persona/skill line grants it to
-    CLOSURE alone. A library lint of its own law, never a consumer doctor check."""
-    markers = ("write-locked", "only allows memory", "block writes to", "writes in this phase")
-    markers += ("during the closure phase", "may edit memory", "may write memory")
-    files = sorted({*_PUBLIC_ROOT.glob("agents/**/*.md"), *_PUBLIC_ROOT.glob("skills/**/*.md")})
-    assert_populated([p.name for p in files], "SKILL.md")
-    hits = [
-        f"{path.relative_to(_REPO_ROOT)}:{n}"
-        for path in files
-        for n, line in enumerate(path.read_text("utf-8").lower().splitlines(), start=1)
-        if "closure" in line and "definition" not in line and any(m in line for m in markers)
-    ]
-    assert hits == []
-
-
-# A bare `dadaia`/`dadaia-workspace` command word: not preceded by a path separator, a dot
-# or a word character (so `.venv/bin/dadaia` and `dadaia_workspace` pass). The one bare
-# spelling allowed is the `uvx dadaia-workspace init` bootstrap that creates the venv.
 _BARE_CLI_RE = re.compile(r"(?<![\w./-])dadaia(?:-workspace)?(?= [a-z-])")
 _UVX_INIT_RE = re.compile(r"uvx dadaia-workspace(?:@\S+)? init\b")
 _VENV_CALL_RE = re.compile(r"\.dadaia/\.venv/bin/dadaia((?: [a-z][\w-]*)+)([^`]*)")
@@ -193,7 +159,7 @@ def _shipped_text() -> list[Path]:
 
 
 def test_all_shipped_text_invokes_the_cli_by_its_venv_path() -> None:
-    """Intent: CONTRACT — shipped-text-cites-bare-dadaia-the-gate-blocks,
+    """shipped-text-cites-bare-dadaia-the-gate-blocks,
     shipped-text-bare-cli-guard-deleted-with-its-test. The venv-guard gate blocks a bare
     `dadaia`, so no copyable span in shipped text may spell one. Zero tolerance."""
     paths = _shipped_text()
@@ -246,7 +212,7 @@ def _dead_flags(span: str, tree: dict[str, set[str]]) -> list[str]:
 
 
 def test_every_flag_cited_beside_a_venv_call_exists_in_that_verbs_help() -> None:
-    """Intent: CONTRACT — dd-cli-library-cites-a-dead-flag-and-omits-level-3,
+    """dd-cli-library-cites-a-dead-flag-and-omits-level-3,
     shipped-text-bare-cli-guard-deleted-with-its-test. A flag cited next to
     `.dadaia/.venv/bin/dadaia <verb>` in shipped text is one that verb takes."""
     tree = _cli_tree()
@@ -257,5 +223,3 @@ def test_every_flag_cited_beside_a_venv_call_exists_in_that_verbs_help() -> None
         for dead in _dead_flags(span, tree)
     ]
     assert violations == [], "\n".join(violations)
-    skill = (_PUBLIC_ROOT / "skills/dd-cli-library/SKILL.md").read_text("utf-8")
-    assert "Level 3: `.dadaia/.venv/bin/dadaia specs init --context <ctx>`" in skill

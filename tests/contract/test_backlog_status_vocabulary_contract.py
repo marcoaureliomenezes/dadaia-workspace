@@ -1,4 +1,4 @@
-"""Intent: CONTRACT — sa-backlog-status-has-no-single-authority#B7: no law or skill names
+"""sa-backlog-status-has-no-single-authority#B7: no law or skill names
 the `picked` status or `**Consumes:**` — the pick is the SPEC's `**Origin:** backlog:`
 line. Size: SMALL.
 """

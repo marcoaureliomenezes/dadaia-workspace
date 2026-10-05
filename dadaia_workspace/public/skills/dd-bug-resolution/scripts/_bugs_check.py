@@ -9,6 +9,7 @@ commit, so a writer/validator disagreement is unrepresentable. The schema is
 from __future__ import annotations
 
 import json
+import re
 import sys
 from collections.abc import Iterator
 from pathlib import Path
@@ -49,12 +50,20 @@ def invariant_errors(record: dict[str, Any]) -> Iterator[str]:
         yield f"record {record['id']!r} closed_at={closed_at!r} precedes its filing date ts={ts!r}"
 
 
+def tasks(root: Path) -> set[str]:
+    """Every task id a `TASKS.md` under *root*`/releases/`, `_archive/` included, carries;
+    bounded: an id glued to a word or a hyphen (a doctor code, a placeholder) is no task."""
+    bounded = re.compile(r"(?<![\w-])T-\d+(?:-\d+)*(?![\w-])")
+    return {t for f in root.glob("releases/**/TASKS.md") for t in bounded.findall(f.read_text(encoding="utf-8"))}  # fmt: skip
+
+
 def findings_for(
     text: str, rel: str = LEDGER, archived: frozenset[str] = frozenset(), root: Path = _ledger.SPECS
 ) -> list[dict[str, Any]]:
     """Every finding the ledger *text* carries — the ONE validation path, run both by
     ``check`` over the committed file and by every write over its own candidate bytes.
-    Lineage (AC3.8): a `caused_by` names a record of *text* or *archived*, and never loops."""
+    Lineage (AC3.8): a `caused_by` names a record of *text* or *archived*, or a task a
+    `TASKS.md` under *root*`/releases/` carries, and never loops."""
     schema = load_schema()
     lines: dict[int, list[str]] = {}
     fixes: dict[int, str] = {}  # a line a governance verb clears
@@ -81,7 +90,7 @@ def findings_for(
         if first != number:
             add(number, f"duplicate record id {record['id']!r} (first appended at line {first})")
         links.setdefault(record["id"], record["caused_by"])
-    known = {None, "none", *links, *archived}
+    known = {None, "none", *links, *archived, *tasks(root)}
     for bug_id, target in links.items():
         chain, at = [bug_id], target
         while at in links and at not in chain:
@@ -142,7 +151,7 @@ def archived_ids(text: str) -> frozenset[str]:
 
 def check(specs: Path) -> list[dict[str, Any]]:
     """Validate the committed ledger and its archive; a young specs tree with neither is
-    not a finding. A union merge can join two valid writes into a cycle: check re-judges."""
+    not a finding. A merge can join two valid writes into a cycle: check re-judges."""
     ledger, histo = specs / LEDGER, specs / HISTO
     text = ledger.read_text(encoding="utf-8") if ledger.is_file() else ""
     archived = histo.read_text(encoding="utf-8") if histo.is_file() else ""

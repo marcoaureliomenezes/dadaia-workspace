@@ -2,8 +2,6 @@
 AC8.1): work branches ``<prefix><M.m.p>`` are pushable; the principal and integration
 branches are PR-only; every refusal and its fix line name the CONFIGURED branches.
 Every row runs under the default gitflow or a custom one (``trunk``/``next``/``work/``).
-
-Intent: CONTRACT — AC6.5, AC8.1 (T-050-12); AC4.4 fix-lines-are-not-one-runnable-command; v0.4.4 A3.1, A3.5; T-060-07 findings 1, 2, 6
 """
 
 from __future__ import annotations

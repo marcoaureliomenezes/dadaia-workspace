@@ -1,4 +1,4 @@
-"""Intent: CONTRACT — 0.4.6 AC5 (FR4/D13: the SessionStart lane is the one reaper);
+"""0.4.6 AC5 (FR4/D13: the SessionStart lane is the one reaper);
 sa-hook-files-written-by-table-and-by-hand (HOOK_DIALECTS is the one authority for every
 harness's hook wiring); projected-hooks-carry-no-timeout; size: SMALL.
 

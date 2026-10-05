@@ -1,6 +1,6 @@
 """The CLI surface: its verb tree, its rendered help and what `capabilities --json` advertises.
 
-Intent: CONTRACT — backlog cli-help-architecture (T-053-24) one-line-help ratchet; 0.4.7 FR5
+backlog cli-help-architecture (T-053-24) one-line-help ratchet; 0.4.7 FR5
 (T-047-78) verb ceiling and citation; cli-help-leaks-internal-spec-ids;
 help-texts-and-bug-schema-cite-behaviour-that-is-gone;
 capabilities-advertises-verbs-and-surfaces-that-do-not-exist; dadaia-capabilities-v3 schema.
@@ -109,8 +109,6 @@ def test_no_command_help_leaks_an_internal_id() -> None:
 @pytest.mark.parametrize(
     ("argv", "present", "absent", "at_most_once"),
     [
-        # preflight names its five checks and no hook that calls it
-        pytest.param(("ci", "preflight"), ("ruff format", "ruff check", "mypy --strict", "lint-imports", "pytest"), ("pre-push",), (), id="preflight-five-checks-no-hook"),
         # bind carries no retired-flag history
         pytest.param(("context", "bind"), (), ("--mode", "--release", "--force", "--reason", "0.4.7"), (), id="bind-no-history"),
         pytest.param(("ci", "push-gate-check"), (), (), ("dd-gitflow-default",), id="push-gate-branch-model-once"),

@@ -1,6 +1,5 @@
 """F011 (20260830-design-bug-surface-audit): memory-canon facts have ONE home —
-``features.specs.memory_canon`` — and every consumer imports it. Intent: contract;
-size: unit.
+``features.specs.memory_canon`` — and every consumer imports it.
 
 Multiplied before the fold: the required-memory-file list (canon.CANON rows,
 doctor_structural._TREE3_MEMORY_FILES, doctor_memory.TOPLEVEL_MEMORY_FILES), the

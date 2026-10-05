@@ -432,12 +432,12 @@ class VenvPythonEnvironmentManager:
             # actionable "interpreter mismatch", never pip's bare, rootless "requires a
             # different Python" failure.
             self._assert_child_interpreter_version(workspace_root)
-            pip = self.pip_executable(workspace_root)
             with tempfile.TemporaryDirectory(prefix="dadaia-wheel-") as scratch:
                 spec = self._install_spec(scratch)
                 # ONE pip transaction replaces any installed build (same label or not)
                 # with its dependencies; on failure pip rolls back to the old build.
-                install_cmd = [pip, "install", "--quiet", "--force-reinstall"]
+                python = self.python_executable(workspace_root)
+                install_cmd = [python, "-m", "pip", "install", "--quiet", "--force-reinstall"]
                 editable = Path(spec).is_dir()
                 if editable:
                     install_cmd.append("--editable")
@@ -454,7 +454,6 @@ class VenvPythonEnvironmentManager:
                         "workspace venv resolves its dependencies from PyPI (network "
                         f"required). Installer output:\n{_tail_lines(exc)}"
                     ) from exc
-            self._ensure_ci_toolchain(pip)
             # Success is only reported after the venv provider VERIFIES independently
             # (clean env, no inherited PYTHONPATH). The re-packed path IS the running
             # distribution, so its exact version is required; an operator-chosen wheel
@@ -471,9 +470,11 @@ class VenvPythonEnvironmentManager:
     def version_change(self, workspace_root: str) -> tuple[str | None, str | None, str]:
         """The ONE decider of which distribution the workspace runs: ``(before, after, action)``.
 
-        ``action`` is ``install`` (no entrypoint), ``upgrade`` (the venv's build differs
-        from the running distribution's — same label or not; D3: re-init is the upgrade)
-        or ``same``; a venv with a NEWER version is refused before any write (AC2.3).
+        The venv's identity is its build AND its binding: ``same`` only when the build
+        equals the running distribution's and the ``dadaia`` entrypoint names THIS venv's
+        python (a copied venv names the original's). ``action`` is ``install`` (no
+        entrypoint), ``upgrade`` (either differs; D3: re-init is the upgrade) or ``same``;
+        a venv with a NEWER version is refused before any write (AC2.3).
         """
         running = provider_build()
         after = running.split()[0] if running else None
@@ -485,7 +486,11 @@ class VenvPythonEnvironmentManager:
             return before, after, "same"
         if Version(before) > Version(after):
             raise WorkspaceVenvNewerError(before, after)
-        return before, after, "same" if installed == running else "upgrade"
+        # distlib writes the path after "#!", or after a double quote or a space (the
+        # /bin/sh exec form for a spaced or over-long path); a copy names the original's.
+        own = rb'(?<![^!"\s])' + re.escape(self.python_executable(workspace_root).encode("utf-8"))
+        bound = re.search(own, self._dadaia_entrypoint(workspace_root).read_bytes())
+        return before, after, "same" if installed == running and bound else "upgrade"
 
     def installed_build(self, workspace_root: str) -> str | None:
         """``"<version> <build digest>"`` the venv's own python reports, or ``None``."""
@@ -502,6 +507,7 @@ class VenvPythonEnvironmentManager:
         return subprocess.run(
             [
                 self.python_executable(workspace_root),
+                "-B",  # this probe writes no .pyc into an editable install's checkout
                 "-c",
                 f"{inspect.getsource(build_digest)}"
                 "import dadaia_workspace, importlib.metadata as m\n"
@@ -604,29 +610,6 @@ class VenvPythonEnvironmentManager:
             )
 
     @staticmethod
-    def _ensure_ci_toolchain(pip: str) -> None:
-        """Best-effort install of the CI/validation toolchain the product promises.
-
-        Bug implementation-review-approves-unexecuted-validation: the generated venv
-        could not even run ``python -m pytest`` — yet ``dadaia ci preflight`` and the
-        executed-test close gate both depend on it. pytest ships with every bootstrap;
-        failure to fetch it is a clean one-line warning, never a bootstrap failure (the
-        close gate reports loudly when tests cannot run).
-        """
-        try:
-            subprocess.run(
-                [pip, "install", "--quiet", "pytest"],
-                check=True,
-                capture_output=True,
-                text=True,
-            )
-        except subprocess.CalledProcessError:
-            print(
-                "[bootstrap] warning: could not install pytest into the workspace venv; "
-                "test validation (ci preflight, closure gate) will report it missing"
-            )
-
-    @staticmethod
     def _running_requires_python() -> str | None:
         try:
             return metadata.distribution("dadaia-workspace").metadata.get("Requires-Python")
@@ -663,11 +646,4 @@ class VenvPythonEnvironmentManager:
             self._venv_path(workspace_root)
             / PLATFORM.venv_scripts_dir
             / f"python{PLATFORM.venv_exe_suffix}"
-        )
-
-    def pip_executable(self, workspace_root: str) -> str:
-        return str(
-            self._venv_path(workspace_root)
-            / PLATFORM.venv_scripts_dir
-            / f"pip{PLATFORM.venv_exe_suffix}"
         )

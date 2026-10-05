@@ -119,7 +119,7 @@ def test_resolve_workspace_root_failure_table(tmp_path: Path) -> None:
 
 
 def test_explicit_workspace_is_authoritative_and_must_be_initialized(tmp_path: Path) -> None:
-    """Intent: CONTRACT — bug import-export-workspace-flag-re-resolves-through-ancestor-walk;
+    """bug import-export-workspace-flag-re-resolves-through-ancestor-walk;
     sa-seven-workspace-root-rules#S7.
 
     Size: SMALL — filesystem only."""

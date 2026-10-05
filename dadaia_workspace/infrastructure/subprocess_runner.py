@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import subprocess
-from collections.abc import Callable, Mapping, Sequence
+from collections.abc import Mapping, Sequence
 from pathlib import Path
 from typing import NamedTuple
 
@@ -39,19 +39,3 @@ class SubprocessProcessRunner:
         except subprocess.TimeoutExpired as exc:
             raise TimeoutError(f"command timed out after {exc.timeout}s: {exc.cmd!r}") from exc
         return ProcessResult(result.returncode, result.stdout or "", result.stderr or "")
-
-
-def subprocess_runner_for_ci(
-    cwd: Path, env: Mapping[str, str]
-) -> Callable[[Sequence[str]], tuple[int, str]]:
-    """A ``ci_preflight.Runner`` running each argv in *cwd* with *env*."""
-
-    def _run(argv: Sequence[str]) -> tuple[int, str]:
-        try:
-            result = SubprocessProcessRunner().run(argv, cwd=cwd, env=env)
-        except FileNotFoundError as exc:
-            missing = exc.filename or (argv[0] if argv else "command")
-            return 127, f"command not found: {missing} — install it or run the checks directly."
-        return result.returncode, result.stdout + result.stderr
-
-    return _run

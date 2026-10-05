@@ -1,4 +1,4 @@
-"""Intent: CONTRACT — v0.1.72 FR4 (bug context-current-branch-stale-for-alive-repo) and
+"""v0.1.72 FR4 (bug context-current-branch-stale-for-alive-repo) and
 v0.4.4 FR18 A18.1-A18.3 (bug context-list-current-branch-stale-for-alive-repo): for an
 ALIVE context whose repo is on disk, `context list` and `context show` both report the
 LIVE checked-out branch (one resolver, `repo_live_status`) and expose the stored snapshot

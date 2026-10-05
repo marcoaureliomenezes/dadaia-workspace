@@ -1,6 +1,4 @@
-"""Intent: CONTRACT — bug upgrade-never-refreshes-uncustomised-scoped-law-projection (MEDIUM).
-
-TREE-5 tells a stale SHIPPED projection (bytes equal a version we published: refresh is
+"""upgrade-never-refreshes-uncustomised-scoped-law-projection: TREE-5 tells a stale SHIPPED projection (bytes equal a version we published: refresh is
 lossless) from operator customisation (bytes we never shipped: never overwritten).
 """
 

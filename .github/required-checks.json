@@ -2,6 +2,7 @@
   "Importability smoke (Windows/macOS) (windows-latest)",
   "Importability smoke (Windows/macOS) (macos-latest)",
   "Lint (ruff)",
+  "Guards (scripts/guards)",
   "Typecheck (mypy --strict)",
   "Unit fast (pytest)",
   "Contract coverage (pytest)",

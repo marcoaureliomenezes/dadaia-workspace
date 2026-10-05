@@ -44,8 +44,9 @@ Usage
     result = run_hook_subprocess("sdd_gate", payload, env)
     assert result.returncode == 0
 
-The behavior of every hook/gate test must flow through these helpers: a contract
-test (``tests/contract/test_harness_env_contract.py``) HARD-FAILS (no baseline) any test
+The behavior of every hook/gate test must flow through these helpers: the guard checks
+``harness-env-allowlist`` and ``hook-stdin-not-in-process`` (``scripts/guards/isolation.py``,
+which reads this module's two ``frozenset({...})`` literals) fail any test
 that ``setenv``s a non-allowlisted ``DADAIA_*`` outside this module, or imports a hook
 behavior module AND patches ``sys.stdin`` in-process to drive its ``main()`` instead of
 using :func:`run_hook_subprocess`. Pure-helper unit tests (e.g. ``sdd_gate._resolve_mode``)
@@ -55,12 +56,10 @@ and fault-injection tests that monkeypatch a production internal without simulat
 
 from __future__ import annotations
 
-import functools
 import json
 import os
 import subprocess
 import sys
-import tempfile
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Final
@@ -69,17 +68,19 @@ __all__ = [
     "ALLOWLISTED_DADAIA_ENV",
     "CLAUDE_SESSION_ENV_VAR",
     "CODEX_SESSION_ENV_VAR",
-    "CONTEXT_RESOLUTION_ENV_VARS",
     "ENTRY_SIGNAL_ENV_VARS",
     "HARNESS_CONTROL_DADAIA_ENV",
     "HOOK_MODULES",
     "HookResult",
+    "base_env",
+    "child_keys",
     "claude_hook_env",
     "codex_hook_env",
     "kimi_hook_env",
+    "pin_child_env",
     "run_hook_subprocess",
-    "scrub_context_resolution_env",
-    "scrub_entry_signal_env",
+    "SUITE_DADAIA_ENV",
+    "drop_operator_env",
 ]
 
 #: The native session-id env var Claude Code provides to a hook subprocess.
@@ -90,9 +91,7 @@ CODEX_SESSION_ENV_VAR: Final[str] = "CODEX_SESSION_ID"
 
 #: The harness session-id env vars a developer's shell may legitimately carry (a codex
 #: TUI exports ``CODEX_SESSION_ID`` or ``CODEX_THREAD_ID``; Claude Code exports
-#: ``CLAUDE_CODE_SESSION_ID``). The test envelope scrubs them so session-id resolution
-#: stays hermetic; the autouse scrub (:func:`scrub_entry_signal_env`) inherits this
-#: list automatically.
+#: ``CLAUDE_CODE_SESSION_ID``); :func:`drop_operator_env` removes them for the session.
 ENTRY_SIGNAL_ENV_VARS: Final[tuple[str, ...]] = (
     CODEX_SESSION_ENV_VAR,
     "CODEX_THREAD_ID",
@@ -100,37 +99,18 @@ ENTRY_SIGNAL_ENV_VARS: Final[tuple[str, ...]] = (
 )
 
 
-def scrub_entry_signal_env(monkeypatch: Any) -> None:
-    """Delete the harness session-id vars from ``os.environ`` for the current test.
-
-    The autouse fixture in the root ``tests/conftest.py`` applies this over the whole
-    suite (hermeticity envelope); tests that exercise session-id resolution set the
-    vars explicitly AFTER the scrub via their own ``monkeypatch.setenv``.
-    """
-    for name in ENTRY_SIGNAL_ENV_VARS:
-        monkeypatch.delenv(name, raising=False)
+#: The suite's own ``DADAIA_*`` knobs, kept by :func:`drop_operator_env`: the fence
+#: (tests/conftest.py) and CI's E2E switch (read at import by test_onboarding_journey).
+SUITE_DADAIA_ENV: Final[frozenset[str]] = frozenset({"DADAIA_FENCED_ROOTS", "DADAIA_REQUIRE_UVX"})
 
 
-#: Every ambient var context resolution consults — the harness session ids plus the
-#: operator's ``DADAIA_CONTEXT``/``DADAIA_SESSION_ID``; the one place a context-resolution
-#: test isolates itself (bug ``specs-resolver-context-tests-flaky-under-xdist-full-suite``).
-CONTEXT_RESOLUTION_ENV_VARS: Final[tuple[str, ...]] = (
-    *ENTRY_SIGNAL_ENV_VARS,
-    "DADAIA_CONTEXT",
-    "DADAIA_SESSION_ID",
-)
-
-
-def scrub_context_resolution_env(monkeypatch: Any) -> None:
-    """Delete every ambient var ``resolve_context()`` consults, for the current test.
-
-    Use this (instead of, or in addition to, :func:`scrub_entry_signal_env`) in any
-    fixture that isolates a ``core.specs_resolver.resolve_context`` /
-    ``cli._specs_resolution.resolve_context_for_cli`` / ``container.resolve_context``
-    scenario.
-    """
-    for name in CONTEXT_RESOLUTION_ENV_VARS:
-        monkeypatch.delenv(name, raising=False)
+def drop_operator_env() -> None:
+    """Remove the operator's session from the session env, once, before collection (bug
+    suite-fails-under-an-operator-dadaia-context): the harness session ids and every
+    ``DADAIA_*`` but :data:`SUITE_DADAIA_ENV`. A test that needs one sets it itself."""
+    for name in [*ENTRY_SIGNAL_ENV_VARS, *(k for k in os.environ if k.startswith("DADAIA_"))]:
+        if name not in SUITE_DADAIA_ENV:
+            os.environ.pop(name, None)
 
 
 #: ``DADAIA_*`` env vars a test MAY ``setenv`` in-process without tripping the env-contract
@@ -196,7 +176,7 @@ HARNESS_CONTROL_DADAIA_ENV: Final[frozenset[str]] = frozenset(
 
 #: ``DADAIA_*`` / persona / mode vars that the harness NEVER provides to a hook and that
 #: therefore must be scrubbed from any inherited environment before a hook runs. Tests
-#: must never re-plant these (the contract test enforces it for the ``DADAIA_*`` half).
+#: must never re-plant these (``harness-env-allowlist`` enforces the ``DADAIA_*`` half).
 _FORBIDDEN_HOOK_ENV: Final[tuple[str, ...]] = (
     "DADAIA_SESSION_ID",
     "DADAIA_PERSONA",
@@ -206,12 +186,13 @@ _FORBIDDEN_HOOK_ENV: Final[tuple[str, ...]] = (
     "CODEX_AGENT_PERSONA",
     CLAUDE_SESSION_ENV_VAR,
     CODEX_SESSION_ENV_VAR,
+    "CODEX_THREAD_ID",
 )
 
 #: The dadaia hook modules invocable as ``python -m dadaia_workspace.hooks.<name>``.
 #: ``_common`` is intentionally absent — it is a shared-primitives library (pure helpers
 #: like ``sanitize_session_id``), not a hook entrypoint, so unit-testing it directly is
-#: legitimate. The behavior-import contract test uses this same list.
+#: legitimate. The ``hook-stdin-not-in-process`` guard check reads this same literal.
 
 HOOK_MODULES: Final[frozenset[str]] = frozenset(
     {"sdd_gate", "sdd_post_gate", "ctx_inject", "root_whitelist", "pre_gate"}
@@ -233,32 +214,31 @@ _POLICY_DRIVER: Final[str] = (
 )
 
 
-def _base_env() -> dict[str, str]:
-    """A copy of the operator shell env with every harness-never-set var scrubbed.
+#: The keys tests/conftest.py pins on the session env, so no child writes outside tmp
+#: (bug test-suite-writes-outside-tmp): a tmp home and cache roots (pip's included on
+#: every OS); PYTHONDONTWRITEBYTECODE is set at conftest import. An inheriting child
+#: gets them free; a from-scratch env starts from :func:`child_keys`.
+def pin_child_env(home: Path) -> None:
+    os.environ.update(
+        HOME=str(home),
+        USERPROFILE=str(home),
+        XDG_CACHE_HOME=str(home / ".cache"),
+        LOCALAPPDATA=str(home / "AppData" / "Local"),
+    )
 
-    This models the real spawn: the operator shell is inherited, but the variables the
-    harness does not actually deliver (and that a stray prior test might have leaked into
-    ``os.environ``) are removed so a hook can never accidentally observe them.
-    """
+
+def child_keys() -> dict[str, str]:
+    keys = ("HOME", "USERPROFILE", "XDG_CACHE_HOME", "LOCALAPPDATA", "PYTHONDONTWRITEBYTECODE")
+    return {k: os.environ[k] for k in keys if k in os.environ}
+
+
+def base_env() -> dict[str, str]:
+    """The session env with every harness-never-set var scrubbed — the real spawn: the
+    operator shell is inherited, the vars no harness delivers are removed."""
     env = dict(os.environ)
     for key in _FORBIDDEN_HOOK_ENV:
         env.pop(key, None)
-    env["HOME"] = str(session_home())
     return env
-
-
-@functools.lru_cache(maxsize=1)
-def session_home() -> Path:
-    """The tmp ``HOME`` every test subprocess spawned through this module inherits.
-
-    A child process cannot see the in-process telemetry seam
-    (``container.telemetry_state_dir`` routed by ``tests/conftest.py``): it resolves
-    ``Path.home()`` itself. Inheriting the operator's ``HOME`` is how governance-verb
-    subprocesses wrote synthetic events into the operator's real
-    ``~/.dadaia/state/telemetry/telemetry.sqlite``. This is the same guard at the
-    process boundary, in the ONE env builder every test subprocess goes through.
-    """
-    return Path(tempfile.mkdtemp(prefix="dadaia-test-home-"))
 
 
 def _harness_env(
@@ -268,7 +248,7 @@ def _harness_env(
     session_id: str,
     extra: dict[str, str] | None = None,
 ) -> dict[str, str]:
-    env = _base_env()
+    env = base_env()
     env["PWD"] = str(workspace)  # the harness spawns the hook in its session cwd
     env[session_env_var] = session_id
     if extra:
@@ -342,7 +322,7 @@ def kimi_hook_env(
     wiring vars (``DADAIA_RUNTIME``/``DADAIA_HOOK_EVENT``) or operator-shell vars — a
     non-allowlisted ``DADAIA_*`` raises ``ValueError``.
     """
-    env = _base_env()
+    env = base_env()
     env["PWD"] = str(workspace)
     if extra:
         for key, value in extra.items():

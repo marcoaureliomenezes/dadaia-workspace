@@ -73,7 +73,8 @@ def cli_line(root: Path, *args: str) -> str:
 
 
 def gitflows(root: Path) -> dict[str, dict[str, str]]:
-    """Each registered repo's gitflow `{principal, integration, work}`, read by the one
+    """Each registered repo's gitflow `{principal, integration, work, main}` (`main`: its
+    context's main repo), read by the one
     reader through `context list --json` (ADR 0144); a repo whose record has none is absent."""
     done = cli(root, "context", "list", "--json")
     try:
@@ -86,7 +87,7 @@ def gitflows(root: Path) -> dict[str, dict[str, str]]:
             cli_line(root, "doctor"),
         )
     return {
-        repo: row["gitflow"]
+        repo: {**row["gitflow"], "main": row["main_repo"]}
         for row in listed
         if row.get("gitflow")
         for repo in (row["main_repo"], *(a["slug"] for a in row["associated_repos"]))

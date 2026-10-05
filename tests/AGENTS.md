@@ -1,10 +1,9 @@
 # Test Rules — dadaia-workspace
 
 These rules override general workspace guidance for everything under `tests/`.
-Agents creating or editing tests must follow them. Full protocol: skill
-`dd-test-stewardship`.
+Agents creating or editing tests must follow them.
 
-- Intent, admission, deletion, tombstone: `dd-test-stewardship`; slop: `dd-code-review` SLOP.md and `specs/memory/QUALITY.md` fixed section.
+- Test basics: the root `AGENTS.md` map §1; slop: `dd-code-review` SLOP.md and `specs/memory/QUALITY.md` fixed section.
 
 ## Architecture
 
@@ -29,14 +28,11 @@ Agents creating or editing tests must follow them. Full protocol: skill
 | `e2e` (LARGE) | `tests/e2e/**` | 120 s | every file names an owner |
 
 A test that needs more time than its tier's default is **mis-tiered** — fix the
-tier, never raise the default. The LARGE-tier census cap lives in exactly one
-place — `dd-test-stewardship/PARAMETERS.md`'s "LARGE (E2E) cap" row — measured
-as a WARN by V29 (`tests/contract/test_test_suite_ratchets.py`); this file does
-not restate the number.
+tier, never raise the default.
 
 `flaky` and `quarantine` markers are registered in `pyproject.toml`; a
 `quarantine` marker without `bug="<bug-slug>"` refuses collection, and every
-gating selector (CI jobs, release jobs, the pre-push preflight) excludes the
+gating selector (CI jobs, release jobs) excludes the
 quarantine lane. Diagnosis runs use `-m quarantine` explicitly.
 
 ## Markers and cost

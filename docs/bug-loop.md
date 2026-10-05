@@ -5,7 +5,7 @@ in any phase, with no SPEC, PLAN or TASKS.
 
 ## 1. Register — ask first
 
-<!-- derived-from: bug-ledger sha256:11ce7d98680f -->
+<!-- derived-from: bug-ledger sha256:156cfaca5544 -->
 
 A bug is a tool breaking a contract it documents. Registration is ask-first: the agent
 proposes the violated contract line, one reproducing command already run, why it is not
@@ -26,7 +26,7 @@ python3 .agents/skills/dd-bug-resolution/scripts/bugs.py append \
 `specs/bugs/BUGS.jsonl` holds one record per bug, appended once and keyed by `id`, git
 history being that line's change log. `append` first prints the correlation candidates — open
 records on the same surface and those resolved there in the last 30 days — then opens
-the record at `status: open`, refusing a duplicate id, a `surface` that names no tracked
+the record at `status: open`, stamping `found_in` — the candidate holding the registration instant — and refusing a duplicate id, a `surface` that names no tracked
 directory of the repo, and a missing or unknown `--correlates <ids>|none`; `component`
 is free-text `path#symbol`. Every written field except `id`, `ts` and
 `reported_by` is redacted on write.
@@ -36,7 +36,7 @@ validation, a law ambiguity, or a missing feature.
 
 ## 2. Lineage, then a RED test
 
-<!-- derived-from: bug-ledger sha256:11ce7d98680f -->
+<!-- derived-from: bug-ledger sha256:156cfaca5544 -->
 
 Resolution follows seven ordered phases — lineage, red loop, minimise, hypothesise,
 instrument, seam test, cleanup and resolve. Lineage comes first: read at most the 20
@@ -51,36 +51,38 @@ python3 .agents/skills/dd-bug-resolution/scripts/bugs.py status
 python3 .agents/skills/dd-bug-resolution/scripts/bugs.py stats
 ```
 
-Then the red loop: a test that fails for the real cause, before production code moves.
+Then the red loop: a new case that fails for the real cause, before production code moves; a fix never rewrites an old assert.
 
 ## 3. Fix, and let the diff shrink
 
-<!-- derived-from: bug-ledger sha256:11ce7d98680f -->
+<!-- derived-from: bug-ledger sha256:156cfaca5544 -->
 
-Fix the root cause and watch the test go green. The resolution records the fix's
-direction: `--evidence-diff` opens `net-negative:`, `net-positive:` or `net-neutral:`,
-and `bugs.py stats` counts it as `direction:`. A fix whose diff grows the touched feature is
+Fix the root cause and watch the test go green. The fix's direction is derived, never
+typed: `bugs.py fix <bug-id>` prints the fix commits, their numstat and `net-negative`,
+`net-positive` or `net-neutral` on production paths, and `bugs.py stats` counts it as `direction:`. A fix whose diff grows the touched feature is
 routed to the architecture lens before it lands.
 
-## 4. Resolve with evidence and lineage
+## 4. Resolve with the red loop and lineage
 
-<!-- derived-from: bug-ledger sha256:11ce7d98680f -->
+<!-- derived-from: bug-ledger sha256:156cfaca5544 -->
 
 ```bash
 python3 .agents/skills/dd-bug-resolution/scripts/bugs.py resolve <bug-id> \
-  --cause "…" --caused-by none --resolved-release 0.1.0 --solution "…" \
-  --evidence-loop "…" --evidence-seam "…" --evidence-diff "net-negative:…"
+  --cause "…" --caused-by none --solution "…" --evidence-loop "…"
 ```
 
-- `resolve` refuses an incomplete call, naming every missing field; `--caused-by`
-  names a live or archived record or `none`, never a loop, and `--evidence-seam` names
-  a repo file (as `path::name`, a `def <name>` in it).
+- Stage the fix first: `resolve` prints the blame candidates — the bugs whose fix and the
+  tasks whose commit wrote a line the staged diff removes — and refuses a `--caused-by`
+  outside them, or `none` while any exist, unless `--lineage-reason` says why.
+- `resolve` refuses an incomplete call, naming every missing field; `caused_by: X` means
+  the fix of X wrote the lines this fix corrects — a live or archived record, a task id,
+  or `none`, never a loop; `resolved_release` is derived from the resolve instant.
 - `status` is `open | resolved | superseded | deferred | rejected`; a terminal status
   is reached only through its transition — `resolve`, `supersede --by`, `defer` or
   `reject` with `--reason` — and `closed_at` is set exactly when `status` is terminal,
   never earlier than `ts`.
 - `update <id> --set field=value` writes a governance field, `caused_by` included, and
-  refuses `status`, `closed_at`, `superseded_by`, an immutable core field and a
+  refuses `status`, `closed_at`, `resolved_release`, `superseded_by`, an immutable core field and a
   differing second write to a write-once field. A reopen is a new record.
 - Every write runs `check` over the new ledger bytes before replacing the file
   atomically, so a refused write leaves the file byte-identical.

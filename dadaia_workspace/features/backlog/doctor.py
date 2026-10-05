@@ -93,22 +93,10 @@ def _live_intents(specs_dir: Path) -> dict[str, list[Intent]]:
         return {}
 
 
-def build_context(
-    *,
-    specs_dir: Path,
-    source_root: Path,
-    catalog_path: Path,
-    alias_map_path: Path,
-    cli_anchors: frozenset[str],
-) -> DoctorContext:
-    """Bind every live entry's intents against the registry, recomputed from live truth."""
-    registry = build_registry(
-        source_root=source_root,
-        catalog_path=catalog_path,
-        alias_map_path=alias_map_path,
-        specs_dir=specs_dir,
-        cli_anchors=cli_anchors,
-    )
+def build_context(specs_dir: Path, tracked: frozenset[str]) -> DoctorContext:
+    """Bind every live entry's intents against the registry over the repo's ``tracked``
+    paths, recomputed from live truth."""
+    registry = build_registry(specs_dir=specs_dir, tracked=tracked)
     return DoctorContext(
         {slug: _bind(intents, registry) for slug, intents in _live_intents(specs_dir).items()}
     )

@@ -19,18 +19,19 @@ The audit's pillar 1 cites this section, never restates it — if the two disagr
 
 ## What to read — and what to distrust
 
-- A record carries no commit sha; find the fix by `git log -S<bug-id> -- specs/bugs/BUGS.jsonl` and read the commit it names.
+- A record carries no commit sha; `python3 .agents/skills/dd-bug-resolution/scripts/bugs.py fix <bug-id>` prints its fix commits (shape 3 or shape 4) and their numstat, or `unlinked`.
 - A release-squash or ledger-only commit isolates nothing — say the trail is coarse instead of presenting it as "the fix".
 - Presenting a coarse diff as the prior fix is fabricated evidence.
 
 ## Declare `caused_by`
 
 1. After reading the matching records, declare the link on this bug's own record — never on a prior one.
-2. `python3 .agents/skills/dd-bug-resolution/scripts/bugs.py resolve <id> --caused-by <prior-bug-id>|none` declares it, `bugs.py update <id> --set caused_by=…` repairs it; every write and `check` refuse a target naming no live or archived record, and a loop.
-3. `caused_by: none` carries the same evidentiary weight as naming a bug — the window was read, no link found.
-4. Echo the declaration in the fix commit body: `caused_by:`, `evidence:` (what the prior diff did), `prior diffs read:`.
-5. ≥ 2 prior fixes on the unit the bug lands in, within the window, make this fix a REBUILD of that unit — never a third patch.
-6. Echo `rebuild: <unit> — prior fixes <id>, <id>` (or `rebuild: none`); a rebuild's `--solution` opens with `REBUILD <unit>:`.
+2. Stage the fix first: `python3 .agents/skills/dd-bug-resolution/scripts/bugs.py resolve <id> --caused-by <prior-bug-id>|none` blames the lines the staged diff removes, past commits whose subject ends `(#n)` or starts `refactor(T-`, never in `tests/`, `specs/` or a file `.gitattributes` marks `dadaia-generated`.
+3. `resolve` refuses a `--caused-by` outside those candidates, and `none` when any exist, unless `--lineage-reason "<why>"` is given; the reason is stored.
+4. `caused_by: X` means the fix of X wrote the lines this fix corrects; `bugs.py update <id> --set caused_by=…` repairs it; every write and `check` refuse a target naming no live or archived record, and a loop.
+5. Echo the declaration in the fix commit body: `caused_by:`, `evidence:` (what the prior diff did), `prior diffs read:`.
+6. ≥ 2 prior fixes on the unit the bug lands in, within the window, make this fix a REBUILD of that unit — never a third patch.
+7. Echo `rebuild: <unit> — prior fixes <id>, <id>` (or `rebuild: none`); a rebuild's `--solution` opens with `REBUILD <unit>:`.
 
 ## Cost bound
 

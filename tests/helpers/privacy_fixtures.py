@@ -1,7 +1,5 @@
 """Pattern-shaped fixture values, composed at runtime from parts.
 
-Intent: CONTRACT — v0.4.7 FR7 (T-047-22)
-
 This repository is PUBLIC: every pushed blob is published, so the push-range denylist
 scan stays FULL on every tracked path — ``tests/**`` included. Until v0.4.7 that scope
 was made liveable by a hand-kept list of 23 tolerated ``(path, baseline pattern)``

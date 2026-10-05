@@ -1,6 +1,6 @@
 """Two console-script names, one callable.
 
-Intent: CONTRACT — T-047-85 (SPEC 0.4.7 FR3, AC3.1): `[tool.poetry.scripts]` declares
+T-047-85 (SPEC 0.4.7 FR3, AC3.1): `[tool.poetry.scripts]` declares
 both `dadaia` and `dadaia-workspace`, and both targets import to the SAME callable
 object — so `uvx dadaia-workspace init <dir> --harness <name> --repo <url>` resolves
 against the distribution name a reader already knows, without a second CLI existing.

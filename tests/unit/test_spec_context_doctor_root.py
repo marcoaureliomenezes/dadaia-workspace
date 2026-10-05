@@ -1,4 +1,4 @@
-"""Intent: CONTRACT — 0.4.6 AC2, AC4, AC6, AC7, AC9 (FR3 one scan, FR4 the reaper, FR5 TTLs,
+"""0.4.6 AC2, AC4, AC6, AC7, AC9 (FR3 one scan, FR4 the reaper, FR5 TTLs,
 FR8 the profile seed); size: SMALL.
 
 ``DoctorService.scan()`` is the ONE registry-driven walk; every entry gets one verdict and one

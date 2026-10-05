@@ -26,21 +26,22 @@ a skill points here, never restates them.
 3. Commit per the commit shapes of `dd-gitflow-default`; a dirty tree is refused at merge.
 4. Run the kind's checks inside the worktree: the ledger script's `check`, and for `impl`/`bug` the tests.
 5. `dd-code-reviewer` reviews `git diff <work branch>...HEAD`; the main thread writes its verdict as a handoff with `agent` `dd-code-reviewer` and `scope` `wt/<name>@<HEAD sha>`.
-6. `WT merge <path>` lands only a clean tree inside its allowed set, rebased, with a valid APPROVED verdict naming the rebased sha or a sha of its branch reflog with the same patch-id and message series (ADR 0168), by fast-forward; then removes the tree and `branch -d`s it.
-7. A conflict is resolved inside the worktree, never in `repos/<repo>`; `WT merge` re-runs cleanly after any stop.
+6. `WT merge <path>` lands HEAD as it is, by fast-forward, only when: the tree is clean and inside its allowed set; HEAD contains the work branch; a valid APPROVED verdict names HEAD or a reflog sha with the same patch-id and message series (ADR 0168); the repo's `verify:` line passes (ADR 0185). It never rebases or rewrites; it then removes the tree and `branch -d`s it.
+7. A moved work branch refuses with `fix: git -C <tree> rebase <work>`; the rebase runs inside the worktree, never in `repos/<repo>`. A ledger conflict is redone by the ledger's own writer on the rebased tree, never hand-merged (ADR 0180). `WT merge` re-runs cleanly after any stop.
 8. Inside a PLAN step, merges land in ready order; only a true `blocked by:` edge holds one back.
 
 - A task widening its `W:` into an open sibling's `W:` stops; the main thread records the `blocked by:` edge in a `release` worktree and the widening task waits.
 - A bug a task fixed is resolved in a `bug` worktree holding `specs/bugs/BUGS.jsonl` alone (`dd-gitflow-default` §3a).
 - Candidate closure runs in its `release` worktree.
 
+- Never `git stash` in a worktree: every worktree of a repo shares one stash stack; set work aside as a WIP commit, and read a baseline by `git archive <sha> | tar -x -C .dadaia/tmp/<agent>/<YYYYMMDD>/`.
 - Never merge by hand, never `git worktree remove --force`, never `git branch -D` a `wt/` branch.
 - An empty or merged worktree leaves by `WT clean <path>`; ignored files are kept (`--keep`) or dropped (`--drop`) by the operator's word.
 
 ## 3. Environment
 
 - A worktree never holds its own `.venv`, `.dadaia` or tool cache; caches go where the harness env points.
-- Tests run by the command the repo's `AGENTS.md` names for a worktree.
+- The repo's root `AGENTS.md` declares one `verify: <command>` line; `WT merge` runs it in the worktree on the HEAD it lands (ADR 0185).
 - A subagent works only inside the worktree path it was given, bound to the context; only the main thread opens (§2 step 1) and merges.
 
 ## 4. Hygiene

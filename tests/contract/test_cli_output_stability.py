@@ -1,6 +1,4 @@
-"""Intent: CONTRACT — v0.9.0 A8.2: ``--redact`` is strictly opt-in.
-
-Without the flag, ``context list`` still carries the true context name and never a
+"""Without the flag, ``context list`` still carries the true context name and never a
 ``[REDACTED-CONTEXT-`` placeholder, and the ``--json`` renderings of ``context list`` and
 ``context show`` keep their key set.
 """

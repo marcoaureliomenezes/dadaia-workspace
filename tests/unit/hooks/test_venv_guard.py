@@ -7,8 +7,7 @@ only — NO general shell parsing. It blocks `dadaia` and `python -m dadaia_work
 invocations NOT rooted in `.dadaia/.venv/bin/` (or the workspace-absolute equivalent),
 emitting a block message that contains the corrected command.
 ``pip``/``pip3`` are never judged (ADR 0134). pytest, ruff, and mypy are never matched — their
-caches are redirected by `pyproject.toml` configuration, so no flag is enforced here
-(tests/unit/features/ci_preflight/test_no_pollution.py proves the bare commands clean).
+caches are redirected by `pyproject.toml` configuration, so no flag is enforced here.
 The false-block law (ADR-G1) requires that quoted strings, in-repo paths like
 ``repos/x/dadaia``, and another venv's explicit bin path are never blocked — covered by
 the negative matrix below.
@@ -59,7 +58,7 @@ def test_bare_dadaia_is_corrected_to_the_cli_fix_line(args: str) -> None:
     ],
 )
 def test_blocks_bare_workspace_invocation(command: str, tool: str, args: str) -> None:
-    """Intent: sa-fix-lines-not-built-by-cli-line#S4 — the python fix is the absolute venv tool."""
+    """sa-fix-lines-not-built-by-cli-line#S4 — the python fix is the absolute venv tool."""
     reason = venv_guard.evaluate_payload(_bash(command))
     assert reason is not None, f"expected block for {command!r}"
     fix = reason.splitlines()[-1]
@@ -162,7 +161,7 @@ def test_every_shell_alias_is_judged_like_bash(
 
 
 def test_the_block_fix_runs_verbatim_from_a_repo_subdirectory(tmp_path: Path) -> None:
-    """Intent: sa-fix-lines-not-built-by-cli-line#S2 — the fix runs as printed from repos/alpha."""
+    """sa-fix-lines-not-built-by-cli-line#S2 — the fix runs as printed from repos/alpha."""
     import subprocess
 
     cwd = tmp_path / "repos" / "alpha"

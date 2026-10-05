@@ -1,4 +1,4 @@
-"""Intent: CONTRACT — v0.1.65 FR1/AC-1, FR5/AC-8 (public asset pipeline): content-level
+"""v0.1.65 FR1/AC-1, FR5/AC-8 (public asset pipeline): content-level
 invariants of the real stage -> install projection, the doctor's drift/missing verdicts,
 and the per-harness `dadaia init --harness` profiles. Stage/install rosters live in
 tests/integration/test_public_assets.py::test_stage_manifest_and_install_all.
@@ -170,7 +170,7 @@ class TestPerProfileInit:
 class TestLinkViewDoctor:
     """A broken harness view of the authored set is one ``[drift]`` line of the rule table.
 
-    Intent: CONTRACT — 0.4.7 AC3.1/AC3.2 (T-047-57); §4a-7 (the rule table's
+    0.4.7 AC3.1/AC3.2 (T-047-57); §4a-7 (the rule table's
     ``_doctor_link`` is the one judge). Size: LARGE (real projection I/O).
     """
 

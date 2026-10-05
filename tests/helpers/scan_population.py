@@ -1,78 +1,8 @@
-"""The scan-test vacuity-guard CONVENTION (v0.4.5 FR5, ``scan-test-vacuity-guard``).
+"""The scan-test vacuity guard: a test that scans a population of files asserts, at its
+own call site, that the population is non-empty and holds one known sentinel, so a
+mis-rooted walker fails loudly instead of scanning nothing and passing green.
 
-Deliberately NOT a shared harness or base class — the v0.4.4 S5-FR23 ruling evaluated
-"one scan harness, N rules" and REJECTED it as premature abstraction on evidence (zero
-registered bugs trace to walker duplication across the census below; the detectors are
-rule-specific by nature and a harness would couple N independent ratchets to one
-framework — see the v0.4.4 S5-FR23 ruling in git history (its
-``specs/_archive/releases/v0.4.4/reviews/S5-FR23-first-firing-ruling.md`` path no
-longer resolves on disk: root ``specs/_archive/`` retired, v0.5.0 specs-canon
-closure — the ruling's text survives in the commit that authored it), "One scan
-harness, N rules"). This module is a two-line CONVENTION every tree-walking
-source-scan test applies **at its own call site**: assert the enumerated population is
-non-empty, and assert one known sentinel member is present in it. A future mis-rooted
-walker (a file moved one directory deeper, a ``.parents[N]`` off by one) then fails
-LOUDLY, at the point of collection, instead of scanning zero files and passing
-vacuously green forever — the exact false-confidence class the v0.4.4 ruling verified
-live in three files (``test_frozen_clock_aging_ratchet.py``,
-``test_harness_env_contract.py``, ``test_core_file_io_purity.py``).
-
-Census (T-045-17, produced by scan over ``tests/**`` at v0.4.5 S2 HEAD; the raw scan
-transcript is captured at
-``.dadaia/tmp/dd-software-engineer/20260825/T-045-17-census.txt``). The v0.4.4 ruling
-counted 15 tree-/package-walking + single-module source-scan tests at ITS HEAD
-(the same ruling's check (b), git history).
-Landing FR5 last inside S2 — after FR2 (T-045-14), FR3 (T-045-15) and FR4 (T-045-16),
-per the TASKS.md sequencing — means the population this task guards is that same 15
-PLUS the new scan-shaped tests those three FRs themselves introduced (the atomic-write
-census, the two byte-golden-roster consumers, the three skill-inventory-oracle
-consumers) and two pre-existing scans the original ruling's grep pass did not enumerate
-(the self-scan, which discovers its tracked-file population via ``git ls-files`` rather
-than ``rglob``/``glob``; the public-source hygiene directory listing). The honest
-count at v0.4.5 S2 HEAD was 20 files / 21 call sites — a measured, not estimated,
-deviation from the SPEC text's "~15", which quotes the pre-S2 backlog finding verbatim
-(SPEC v0.4.5 §3, FR5 body). v0.5.0 T-050-19 (D14/FR10) adds one call site inside the
-same file (`_scoped_agents_md_sources()`, the new scoped-`AGENTS.md`-source scan the
-behavior map's own enforcer needs) — 20 files / 22 call sites now.
-
-Tree-/package-walking population scans (the convention applies at the call site named):
-
-* ``tests/contract/test_frozen_clock_aging_ratchet.py`` ::
-  test_no_file_combines_a_frozen_datetime_constant_with_a_real_clock_call
-* ``tests/contract/test_harness_env_contract.py`` :: ``_trees()``
-* ``tests/contract/test_core_file_io_purity.py`` ::
-  test_core_file_io_purity_ratchet_and_authorized_set_grounded
-* ``tests/contract/test_release_semver_canon.py`` :: ``_find_semver_compile_sites()``
-* ``tests/contract/test_session_store_ownership.py`` ::
-  test_pointer_and_record_namespace_residue_is_owner_or_allowlisted_only
-* ``tests/contract/test_behavior_map.py`` :: ``_skills_on_disk()``,
-  ``_scoped_agents_md_sources()``
-* ``tests/contract/test_public_scripts_thin_wrapper.py`` ::
-  test_ledger_owner_scripts_expose_check
-* ``tests/contract/test_bind_resolution_seam_dynamic_walk.py`` ::
-  test_no_resolver_driven_verb_hardcodes_the_dadaia_workspace_default
-* ``tests/unit/core/test_atomic_write_census.py`` ::
-  test_no_named_shim_or_inline_tmp_writer_survives_by_name (+ the sole-definition
-  census, belt-and-suspenders)
-* ``tests/integration/test_repo_self_scan.py`` ::
-  test_no_hit_outside_the_shrink_only_baseline (already asserted non-empty; this task
-  adds the sentinel half)
-* ``tests/contract/test_public_source_hygiene.py`` ::
-  test_pre_push_ci_gate_ships_pyproject_excludes_bytecode_and_scripts_leave_no_pycache
-* ``tests/e2e/features/test_public_pipeline.py`` :: ``TestStage`` +
-  ``TestInstallAll`` (two call sites, one per staged/installed skill-set comparison)
-* ``tests/integration/test_public_assets.py`` ::
-  test_stage_manifest_codex_adapters_and_install_all
-* ``tests/contract/test_migrate_v5_not_imported_by_permanent_consumer.py`` (v0.5.0
-  T-050-09) ::
-  test_migrate_v5_has_no_permanent_consumer_outside_the_known_switch_step
-
-Deliberately EXCLUDED:
-
-* ``tests/unit/features/chokepoints/test_denylist_scan.py`` ::
-  test_no_allowlist_or_sanctioned_terms_constant_in_matcher_source — reads
-  ``Path(module.__file__)`` after a successful ``import``; a broken path fails the
-  import, not the scan.
+A convention, not a scan harness: each detector stays with its own rule.
 """
 
 from __future__ import annotations

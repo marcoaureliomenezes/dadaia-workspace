@@ -1,7 +1,5 @@
 """The Codex body transform and model map (ADR-2): Claude model ids and the tier phrase
 are rewritten, harness skill identifiers are not, an unmapped id raises.
-
-Intent: CONTRACT — ADR-2 golden tests, T-013-12
 """
 
 from __future__ import annotations

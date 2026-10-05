@@ -71,8 +71,8 @@
       "required": ["subject", "change"],
       "if": { "properties": { "subject": { "properties": { "kind": { "const": "code" } } } } },
       "then": { "properties": { "subject": { "properties": { "ref": {
-        "pattern": "^(?!\\s*[/~]|\\s*[A-Za-z]:[\\\\/])(?!(?:[^#]*/)?\\.\\.[/#])[^#]*[^#\\s][^#]*#[^#]*[^#\\s][^#]*$",
-        "description": "kind=code: module-relative 'path#symbol' — never absolute, '~', a drive or a '..' segment (a committed backlog carries no operator-local path)."
+        "pattern": "^(?!\\s*[/~]|\\s*[A-Za-z]:[\\\\/])(?!(?:[^#]*/)?\\.\\.[/#])[^#]*[^#\\s][^#]*(?:#[^#]*[^#\\s][^#]*)?$",
+        "description": "kind=code: a repo-relative tracked path, any language, '#word' optional — never absolute, '~', a drive or a '..' segment (a committed backlog carries no operator-local path)."
       } } } } },
       "properties": {
         "subject": {
@@ -82,13 +82,13 @@
           "properties": {
             "kind": {
               "type": "string",
-              "enum": ["code", "api", "cli", "doc", "invariant", "catalog"],
+              "enum": ["code", "doc", "invariant", "catalog"],
               "description": "The registry source class this subject ref resolves against (dadaia_workspace.core.models.backlog.SubjectKind)."
             },
             "ref": {
               "type": "string",
               "pattern": "\\S",
-              "description": "The typed reference itself — 'path/to/module.py#Symbol' for kind=code (module-relative only, the 'then' rule above), a 'dadaia <command>' id for kind=cli, a catalog.json feature slug for kind=catalog, a SPEC-DOC id or memory heading anchor for kind=doc, an INV-* id for kind=invariant."
+              "description": "The typed reference itself — a repo-relative 'path[#word]' for kind=code (the 'then' rule above), a catalog.json feature slug for kind=catalog, a SPEC-DOC id or memory heading anchor for kind=doc, an INV-* id for kind=invariant."
             },
             "surface": {
               "type": "string",

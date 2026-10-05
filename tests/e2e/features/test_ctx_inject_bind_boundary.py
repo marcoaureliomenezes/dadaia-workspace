@@ -1,4 +1,4 @@
-"""Intent: CONTRACT — v0.1.14 FR-W2 (T-50-03): the ONE real-process SENTINEL of bind ->
+"""v0.1.14 FR-W2 (T-50-03): the ONE real-process SENTINEL of bind ->
 ctx_inject. `context bind` runs as its own process and the hook as another, both carrying
 the same CLAUDE_CODE_SESSION_ID: unbound -> no memory; bind X -> X injected; re-bind Y ->
 Y; a repeat prompt is silent; a same-context re-bind re-injects; the injection carries

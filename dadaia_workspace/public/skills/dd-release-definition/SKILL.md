@@ -79,7 +79,7 @@ Call the Skill tool with `dd-grill-me` on the picked set — never skipped; a fu
 - Overlap check: disjoint except `TASKS.md`, the `*.jsonl` ledgers and the derived `gen/index.json`.
 ```
 
-- A task's `RED:` names the owning test file (`dd-test-stewardship`, intent and admission).
+- A task's `RED:` names the owning test file (the root map §1 test basics).
 - A task with no statable `delivers:` is folded, or goes back to the SPEC.
 
 ## 6. Declaring consumption

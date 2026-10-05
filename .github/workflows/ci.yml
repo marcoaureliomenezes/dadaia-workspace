@@ -76,16 +76,9 @@ jobs:
           key: poetry-${{ runner.os }}-${{ hashFiles('poetry.lock') }}
       - name: Install dev deps
         run: poetry install --no-interaction --no-ansi --with dev
-      - name: ruff format --check
-        run: poetry run ruff format --check dadaia_workspace/ tests/
-      - name: ruff check
-        # Redirect ruff's cache outside the checkout (pyproject cache-dir removed in T-018-07).
-        run: RUFF_CACHE_DIR="$RUNNER_TEMP/ruff" poetry run ruff check dadaia_workspace/ tests/
-      - name: lint-imports (import-boundary contracts)
-        # Enforce the setup.cfg import-linter contracts (FR4). --no-cache keeps
-        # .import_linter_cache/ out of the checkout (repo-cleanliness law). No extra
-        # install: import-linter is provided by the `poetry install --with dev` above.
-        run: poetry run lint-imports --config setup.cfg --no-cache
+      # Every Linux job's commands live in scripts/ci.py, the one source (T-050-190).
+      - name: lint
+        run: poetry run python scripts/ci.py lint
 
   typecheck:
     name: Typecheck (mypy --strict)
@@ -109,10 +102,33 @@ jobs:
           key: poetry-${{ runner.os }}-${{ hashFiles('poetry.lock') }}
       - name: Install
         run: poetry install --no-interaction --no-ansi --with dev
-      - name: mypy --strict
-        # Redirect mypy's cache outside the checkout (pyproject cache_dir removed in T-018-07).
-        # 0.4.7 FR3: the cache is redirected by [tool.mypy] cache_dir in pyproject.toml.
-        run: poetry run mypy --strict dadaia_workspace/
+      - name: typecheck
+        run: poetry run python scripts/ci.py typecheck
+
+  guards:
+    name: Guards (scripts/guards)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97  # v7.0.0
+        with:
+          python-version: "3.12"
+      - name: Install Poetry
+        run: pipx install poetry==1.8.3
+      - name: Cache poetry deps
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # v6.1.0
+        with:
+          path: |
+            ~/.cache/pypoetry
+            ~/.cache/pip
+          key: poetry-${{ runner.os }}-${{ hashFiles('poetry.lock') }}
+      - name: Install
+        run: poetry install --no-interaction --no-ansi --with dev
+      - name: guards
+        run: poetry run python scripts/ci.py guards
 
   unit-fast:
     name: Unit fast (pytest)
@@ -136,8 +152,8 @@ jobs:
           key: poetry-${{ runner.os }}-${{ hashFiles('poetry.lock') }}
       - name: Install
         run: poetry install --no-interaction --no-ansi --with dev
-      - name: pytest unit fast
-        run: poetry run pytest -q -m "unit and not slow and not quarantine" tests/unit -n auto --durations=25
+      - name: unit-fast
+        run: poetry run python scripts/ci.py unit-fast
 
   contract-coverage:
     name: Contract coverage (pytest)
@@ -161,14 +177,8 @@ jobs:
           key: poetry-${{ runner.os }}-${{ hashFiles('poetry.lock') }}
       - name: Install
         run: poetry install --no-interaction --no-ansi --with dev
-      - name: pytest unit/contract coverage
-        # Redirect coverage's data file outside the checkout (pyproject data_file removed in T-018-07).
-        env:
-          COVERAGE_FILE: ${{ runner.temp }}/.coverage
-        # -n auto: this was the only pytest job without xdist and the CI long pole
-        # (bug test-suite-real-venv-and-ci-longpole); pytest-cov combines per-worker
-        # coverage automatically.
-        run: poetry run pytest -q -m "(unit or contract) and not quarantine" -n auto --cov=dadaia_workspace --cov-report=term-missing --cov-fail-under=80 tests/unit tests/contract --durations=25
+      - name: contract-coverage
+        run: poetry run python scripts/ci.py contract-coverage
 
   # CI matrix (T-018-21 / WS-2 → GRADUATED in 0.1.8 rc-2): unit + contract on Windows/macOS.
   # Ubuntu hard-gating jobs above remain separate companion jobs so the original required
@@ -253,8 +263,8 @@ jobs:
           key: poetry-${{ runner.os }}-${{ hashFiles('poetry.lock') }}
       - name: Install
         run: poetry install --no-interaction --no-ansi --with dev
-      - name: pytest integration
-        run: poetry run pytest -q -m "integration and not quarantine" tests/integration -n auto --durations=30
+      - name: integration
+        run: poetry run python scripts/ci.py integration
 
   e2e-python:
     name: E2E Python (pytest)
@@ -281,17 +291,11 @@ jobs:
           key: poetry-${{ runner.os }}-${{ hashFiles('poetry.lock') }}
       - name: Install
         run: poetry install --no-interaction --no-ansi --with dev
-      # The whole e2e tree, not `tests/e2e/features` alone: the journeys at the tree root
-      # (the push chokepoint, the denylist, and the one-line bootstrap through the
-      # installed console script) were outside every selector and ran nowhere in CI.
-      # The onboarding journey drives `uvx --from <wheel>` (AC8.3); DADAIA_REQUIRE_UVX turns
-      # its "uvx absent" skip into a failure so the journey can never silently skip here.
+      # The onboarding journey drives `uvx --from <wheel>` (AC8.3).
       - name: Install uv
         run: pipx install uv==0.11.16
-      - name: pytest e2e python
-        env:
-          DADAIA_REQUIRE_UVX: "1"
-        run: poetry run pytest -q -m "e2e and not quarantine" tests/e2e --durations=30
+      - name: e2e-python
+        run: poetry run python scripts/ci.py e2e-python
 
   pr-title:
     name: PR title (conventional commits)
@@ -319,8 +323,8 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
           fetch-depth: 0
-      - name: Fail if projection or runtime files are git-tracked
-        run: bash .github/scripts/check_no_repo_local_claude.sh
+      - name: repo-hygiene
+        run: python3 scripts/ci.py repo-hygiene
 
   doctor:
     name: Compliance (workspace/specs/ledgers sections)
@@ -341,8 +345,8 @@ jobs:
       # v0.1.25 R1/ADR-D). Its `ledgers` section carries BL-SCHEMA/CONFLICT/STALE and its
       # `specs` section the SPEC-DOC + RELEASE-TREE rules over committed repository truth;
       # any error-class finding fails the job. An absent document is trivially clean.
-      - name: dadaia doctor
-        run: dadaia doctor --specs-dir specs --source-root .
+      - name: doctor
+        run: python scripts/ci.py doctor
 
   pr-source-guard:
     name: PR source guard (both gitflow edges, one job)

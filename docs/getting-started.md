@@ -5,8 +5,8 @@ the terms are defined in [concepts](concepts.md) and in [`CONTEXT.md`](../CONTEX
 
 ## Install
 
-<!-- derived-from: pypi-distribution sha256:cec6ab21a159 -->
-<!-- derived-from: workspace-init sha256:5a4a8bb1e91e -->
+<!-- derived-from: pypi-distribution sha256:969fd54bf85f -->
+<!-- derived-from: workspace-init sha256:4f0ceaccc6c8 -->
 
 ```bash
 uvx dadaia-workspace init <dir> --harness claude --repo <url>
@@ -27,7 +27,7 @@ refreshes each project's specs law.
 
 ## Level 1 — the workspace
 
-<!-- derived-from: workspace-init sha256:5a4a8bb1e91e -->
+<!-- derived-from: workspace-init sha256:4f0ceaccc6c8 -->
 
 `uvx dadaia-workspace init <dir> --harness claude|codex|kimi-code|cursor|devin|copilot
 [--repo <url>] [--associated-repo <url>]… [--skip-assets]` is the only verb that works
@@ -55,7 +55,7 @@ harness later and `.dadaia/.venv/bin/dadaia harness list` reads the roster.
 ## Level 2 — the project
 
 <!-- derived-from: spec-context-project sha256:9690f09f679b -->
-<!-- derived-from: context-management sha256:f9635e5c313c -->
+<!-- derived-from: context-management sha256:88b825d90c59 -->
 
 A context — a Spec Context Project — is the unit of work: one canonical `specs/` tree
 owned by one main repository, optionally spanning associated repositories that live and
@@ -97,20 +97,20 @@ branches; a re-run is a no-op.
 
 ## Check compliance — `doctor`
 
-<!-- derived-from: workspace-doctor sha256:21e1298b4845 -->
+<!-- derived-from: workspace-doctor sha256:58030f05158e -->
 
 ```bash
 .dadaia/.venv/bin/dadaia doctor --context <ctx> [--json] [--fix] [--redact]
 ```
 
 `doctor` is the one instance validator, and three sections run in fixed order:
-`workspace` (the root, the harness dirs, the `.dadaia/` zones, every ALIVE repo tree,
-the installed git hook), `specs` (the rules over one `specs/` tree) and `ledgers` (the
+`workspace` (the root, the harness dirs, the `.dadaia/` zones, every ALIVE repo tree —
+only the scoped context's when the run is scoped — the installed git hook), `specs` (the rules over one `specs/` tree) and `ledgers` (the
 backlog document, the ADR ledger and the ledger scripts' own `check`).
 
 The `specs` and `ledgers` tree resolves from `--context`, `--specs-dir` or the bound
 context; with none, those sections are empty and `workspace` still runs. With no
-instance around — CI over a checkout — `.dadaia/.venv/bin/dadaia doctor --specs-dir specs --source-root .`
+instance around — CI over a checkout — `.dadaia/.venv/bin/dadaia doctor --specs-dir specs`
 runs the two tree sections; any other run outside a workspace exits 1 with the one
 workspace-not-found error.
 
@@ -124,9 +124,9 @@ zone class, an OUTPUT entry held, an EPHEMERAL one deleted.
 
 ## Run the first candidate
 
-<!-- derived-from: release-lifecycle sha256:e4c5ec1f9818 -->
-<!-- derived-from: backlog-ledger sha256:41b18393125f -->
-<!-- derived-from: bug-ledger sha256:11ce7d98680f -->
+<!-- derived-from: release-lifecycle sha256:29faad7020af -->
+<!-- derived-from: backlog-ledger sha256:c5fb2fc0ea4f -->
+<!-- derived-from: bug-ledger sha256:156cfaca5544 -->
 
 A candidate is one closed-scope cycle inside the live release. Nothing drives it: the
 documents are the state, the ledger scripts move the records, and the markers in
@@ -137,7 +137,7 @@ After `context baseline`, each step writes inside a worktree that then merges: a
 
 1. **Demand enters the backlog.** Only the operator creates demand;
    `python3 .agents/skills/dd-backlog-definition/scripts/backlog.py new <slug> --relates <slugs>|none`
-   appends one `active[]` entry born `idea`, and every later status binds `intents[]` that resolve to a code, doc or CLI anchor.
+   appends one `active[]` entry born `idea`, and every later status binds `intents[]` that resolve to a code, catalog, doc or invariant anchor.
 2. **Birth the release.**
    `python3 .agents/skills/dd-release-implementation/scripts/release.py new <M.m.p>`
    writes a `SPEC.md` stub in `specs/releases/<M.m.p>/rc-<N>/` and `_RELEASE.json` in
@@ -154,7 +154,7 @@ After `context baseline`, each step writes inside a worktree that then merges: a
    schedule tables, and stamps
    `defined`.
 5. **Implement each task in its own `impl` worktree.** Reserve it `[-]` in its own
-   commit, work test-first, run the local CI preflight, and land it by `worktree.py
+   commit, work test-first, run the repo's own CI checks, and land it by `worktree.py
    merge` only after the reviewer's `APPROVED`.
 6. **Close the candidate.** `release.py phase CLOSURE --sha <sha>` requires no `[ ]`
    or `[-]` marker and no other open `wt/*` worktree, and stamps `implemented`. Then,
@@ -167,5 +167,5 @@ After `context baseline`, each step writes inside a worktree that then merges: a
    principal by PR — that merge is the deploy; `release.py ship --sha <sha> --pr <n>`
    then records the merged promote PR and moves the release folder to `_archive/`.
 
-A bug needs none of this: register, lineage, RED test, root-cause fix, GREEN, `resolve`
-with evidence, one commit — in one `bug` worktree, in any phase.
+A bug needs none of this: register, lineage, a RED new case, root-cause fix, GREEN,
+`resolve` with its red loop, one commit — in one `bug` worktree, in any phase.

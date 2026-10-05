@@ -1,7 +1,4 @@
-"""``canon`` — the ONE canon predicate shared by TREE-8 and the pre-push gate.
-
-Intent: CONTRACT — v0.5.0 specs-canon closure, operator ruling 2026-08-28.
-"""
+"""``canon`` — the ONE canon predicate shared by TREE-8 and the pre-push gate."""
 
 from __future__ import annotations
 

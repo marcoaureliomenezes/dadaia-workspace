@@ -99,7 +99,7 @@ Rationale: three closures touched every product atom and left fifteen contradict
 - Runtime dependencies: Typer, Rich, PyYAML, jsonschema, packaging (PEP 440 version ordering); the package declares no optional extra.
 - Everything else is the standard library; there is no database — every state is a JSON or JSONL file.
 - Claude Code, Codex, Kimi Code, Cursor, Devin CLI and GitHub Copilot are operator-installed external CLIs, never Python dependencies; the workspace runs no agent-execution runtime.
-- Quality toolchain: pytest (`pytest-cov`, `pytest-xdist`, `pytest-randomly`, `pytest-timeout`, Hypothesis), Ruff, mypy `--strict`, import-linter; `mutmut` sits in an optional group ([[QUALITY]]).
+- Quality toolchain: pytest (`pytest-cov`, `pytest-xdist`, `pytest-randomly`, `pytest-timeout`, Hypothesis), Ruff, mypy `--strict`, import-linter.
 - Secret scanning: gitleaks, a CI action in `secret-scan.yml`, never a Python dependency.
 - Packaging: wheel and sdist ship the `dadaia_workspace` package with `public/` inside it and no bytecode.
 - Canonical commands, from the workspace root:
@@ -107,7 +107,6 @@ Rationale: three closures touched every product atom and left fifteen contradict
 ```bash
 .dadaia/.venv/bin/dadaia --version
 .dadaia/.venv/bin/python -m pytest
-.dadaia/.venv/bin/dadaia ci preflight
 .dadaia/.venv/bin/dadaia doctor
 .dadaia/.venv/bin/dadaia public doctor
 .dadaia/.venv/bin/dadaia certify --json
@@ -131,12 +130,12 @@ flowchart TB
 - Hooks import `core.invocation` directly and build the `Invocation` once per process (P-12); `sdd_post_gate` touches `last_seen_at` and writes nothing else.
 - `features/migrate` stamps `specs_pattern_version: 9` or refuses; a tree below v6 is foreign, and `specs init --replace-foreign` moves it to `specs-bkp/` before the canon is scaffolded.
 
-### `dadaia_workspace/features` — package map (13 packages)
+### `dadaia_workspace/features` — package map (12 packages)
 
 ```mermaid
 flowchart TB
     subgraph features["dadaia_workspace/features"]
-      pkgs["backlog · capabilities · certification · chokepoints · ci_preflight · export · import_ · migrate · public · reconcile · spec_context · specs · workspace"]
+      pkgs["backlog · capabilities · certification · chokepoints · export · import_ · migrate · public · reconcile · spec_context · specs · workspace"]
     end
     container["container.py"] --> features
     features --> core["core"]

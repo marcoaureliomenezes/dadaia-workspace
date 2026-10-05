@@ -1,4 +1,4 @@
-"""Intent: CONTRACT — 0.5.0 c3 re-review (C1, H1-H4, M1): every refusal of the pre-push
+"""0.5.0 c3 re-review (C1, H1-H4, M1): every refusal of the pre-push
 gate (`ci push-gate-check`), `context baseline` and `context dead` prints ONE fix line
 that, executed verbatim, clears the refusal.
 
@@ -749,6 +749,15 @@ def _secret_untracked(world: World) -> list[str]:
     return ["context", "dead", "proj", "--commit"]
 
 
+def _drop_untracked_secret(world: World) -> None:
+    (world.repo / "notes.md").write_text("key\n", encoding="utf-8")
+
+
+def _secret_pushed(world: World) -> None:
+    _dead_done(world)
+    assert world.git(world.bare, "show", "feature/1.0.0:notes.md") == "key"
+
+
 def _no_origin(world: World) -> list[str]:
     _on_work(world)
     world.git(world.repo, "remote", "remove", "origin")
@@ -844,6 +853,21 @@ def _unpushed_side_branch(world: World) -> list[str]:
     world.commit("notes.md", "m\n")
     world.git(world.repo, "checkout", "-q", "--detach", "origin/main")
     return ["context", "dead", "proj"]
+
+
+def _stashed(world: World) -> list[str]:
+    """context-dead-secret-fix-line-stashes-what-dead-then-destroys: a stash entry dies with
+    the clone."""
+    _on_work(world)
+    (world.repo / "README.md").write_text("edited\n", encoding="utf-8")
+    world.git(world.repo, "stash", "push", "-q", "-m", "wip")
+    return ["context", "dead", "proj"]
+
+
+def _play_stash_act(world: World) -> None:
+    """The operator plays the first act the refusal names on the stash entry."""
+    fix = _single_fix(world.cli("context", "dead", "proj"))
+    world.git(world.repo, "stash", fix.split()[2])
 
 
 def _dead_twice(world: World) -> list[str]:
@@ -945,11 +969,12 @@ SITES: dict[str, tuple[Case | tuple[Case, ...] | Skip, ...]] = {
     ),
     "service.SpecContextService._dead_preflight": (
         Case(_untracked, _dead_done, replaces=True),
-        Case(_secret_untracked, _dead_done),
+        Case(_secret_untracked, _secret_pushed, operator=_drop_untracked_secret),
         Case(_no_origin, _dead_done, operator=_origin),
         (
             Case(_unpushed_side_branch, _dead_done),
             Case(_commits_no_remote, _dead_done, operator=_origin),
+            Case(_stashed, _dead_done, operator=_play_stash_act),
         ),
         Case(_dead_no_identity, _dead_done, operator=_identity),
         (

@@ -1,6 +1,4 @@
-"""Intent: CONTRACT — bug ``gate-fpath-not-canonicalized-before-classifier``; size: MEDIUM.
-
-The gate resolves the target BEFORE classifying: a write through an innocuous-looking
+"""gate-fpath-not-canonicalized-before-classifier: the gate resolves the target BEFORE classifying: a write through an innocuous-looking
 symlink (a file or a directory) into `.dadaia/sessions/` classifies PROTECTED and blocks —
 classifying the link's own name would ALLOW. Real `sdd_gate` subprocess; POSIX symlinks.
 """

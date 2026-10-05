@@ -1,6 +1,6 @@
 """GitSubprocessObjectReader — the GitObjectReader adapter, driven over real git repos.
 
-Intent: CONTRACT — v0.9.0 A1.1-A1.4, A6.1, A6.2; v0.11.0 A2.1-A2.4, A4.1, A4.2, A4.6, A7.4,
+v0.9.0 A1.1-A1.4, A6.1, A6.2; v0.11.0 A2.1-A2.4, A4.1, A4.2, A4.6, A7.4,
 A8.1, A8.2; v0.4.2 A7.1, A8.4, CR-1, CR-3; v0.4.3 A11.1-A11.4, A11.6, A11.7;
 bug new-branch-push-loses-prior-published-denylist-amnesty; 0.5.0 AC5.1/AC5.2.
 """

@@ -1,6 +1,6 @@
 """``dadaia init <dir> --harness claude --repo <url>`` end to end, through the console script.
 
-Intent: CONTRACT — 0.4.7 FR1 / AC1.1 (T-047-79); 0.4.8 AC1.1/AC1.4 closing (T-048-04);
+0.4.7 FR1 / AC1.1 (T-047-79); 0.4.8 AC1.1/AC1.4 closing (T-048-04);
 0.4.8 AC3.6/AC8.2 (bug test-suite-wall-clock-doubled-past-its-frozen-budget).
 
 Size: LARGE, justified — AC1.1 is a statement about the *installed* distribution, not
@@ -43,6 +43,7 @@ from packaging.requirements import Requirement
 from dadaia_workspace.core import workspace_layout
 from dadaia_workspace.core.platform import PLATFORM
 from tests.conftest import GIT_QUIET_INCLUDE
+from tests.fixtures.harness_env import base_env
 
 pytestmark = [pytest.mark.e2e, pytest.mark.slow]
 
@@ -56,7 +57,7 @@ def _child_env(home: Path) -> dict[str, str]:
     own workspace is never this child's: M1's first rung), a tmp ``HOME``, a git identity."""
     keep = "DADAIA_FENCED_ROOTS"
     (home / "gitconfig").write_text(GIT_QUIET_INCLUDE, encoding="utf-8")
-    env = {k: v for k, v in os.environ.items() if not k.startswith("DADAIA_") or k == keep}
+    env = {k: v for k, v in base_env().items() if not k.startswith("DADAIA_") or k == keep}
     env.update(
         HOME=str(home),
         XDG_CONFIG_HOME=str(home / ".config"),
@@ -213,7 +214,7 @@ def _build_wheel(source: Path, dest: Path) -> Path:
         capture_output=True,
         text=True,
         timeout=_TIMEOUT,
-        env={**os.environ, "PIP_NO_INDEX": "1"},
+        env=base_env() | {"PIP_NO_INDEX": "1"},
     )
     built = sorted(dest.glob("dadaia_workspace-*.whl"))
     assert len(built) == 1, f"expected one wheel in {dest}, got {built}"
@@ -273,7 +274,7 @@ def _decoy_source(tmp_path: Path) -> Path:
     reason=f"the dadaia console script is not installed next to {sys.executable}",
 )
 def test_the_workspace_venv_carries_the_bootstrappers_own_bytes(tmp_path: Path, home: Path) -> None:
-    """Intent: CONTRACT — bug init-venv-installs-index-version-not-running-distribution.
+    """bug init-venv-installs-index-version-not-running-distribution.
 
     The consumer shape, end to end and hermetic: a NON-checkout install of this
     distribution (a wheel in its own venv — pipx/uvx/a git bootstrap) runs ``init``, and
@@ -313,7 +314,7 @@ def test_the_workspace_venv_carries_the_bootstrappers_own_bytes(tmp_path: Path, 
         capture_output=True,
         text=True,
         timeout=_TIMEOUT,
-        env={**os.environ, "PIP_NO_INDEX": "1", "PIP_FIND_LINKS": str(deps)},
+        env=base_env() | {"PIP_NO_INDEX": "1", "PIP_FIND_LINKS": str(deps)},
     )
 
     env = _child_env(home)

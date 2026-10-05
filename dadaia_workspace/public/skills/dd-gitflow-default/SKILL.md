@@ -36,7 +36,7 @@ The branch contract by role; the names are `specs/constitution.md`'s `gitflow:` 
 
 | Branch | Pushable | Cut from | Advances by |
 |---|---|---|---|
-| work `<work>M.m.p` | Yes — local CI preflight + valid name | integration | the PR below |
+| work `<work>M.m.p` | Yes — the repo's own CI checks green + valid name | integration | the PR below |
 | integration | No — never a direct push | principal (bootstrap only) | PR from the row above, at definition `Approved` and at each `rc` merge |
 | principal | No — never a direct push | — | PR from the integration branch, at the final `rc` |
 
@@ -56,7 +56,7 @@ A commit stages only paths its worktree kind's allowed set holds (`_worktree_kin
 | 2 | `backlog`, `release` | ADR proposal or in-place `measured_by` repair (ADR 0138): `specs/ADRs/decisions.jsonl` | `docs(adr): propose <slug>` / `chore(adrs): repair …` |
 | 2 | `release` | ADR acceptance with its canonical-memory hunk: `specs/ADRs/decisions.jsonl`, `specs/memory/*` | `docs(adr): accept <slug>` |
 | 3 | `bug` | Bug fix: `<code>` + regression test + its `specs/bugs/BUGS.jsonl` line, red loop quoted in the body | `fix(bugs): <id> — <cause>` |
-| 4 | `bug` | Resolve of a bug a task fixed: `specs/bugs/BUGS.jsonl` | `chore(bugs): resolve <id>[, <id>] — by <task-id> (<sha>)` |
+| 4 | `bug` | Terminal transition without code (`resolve` by a task, `supersede`, `defer`, `reject`): `specs/bugs/BUGS.jsonl` | `chore(bugs): <verb> <id> — <reason, or by <task-id> (<sha>)>` |
 | 5 | `release` | Release definition: the trio, one commit, `specs/releases/<v>/rc-<N>/*` | `feat(specs): define candidate …` |
 | 6 | `impl` | Task implementation: its `W:` (`<code>`) | `conventional-commit(task-id): description` — the auditable trace |
 | 7 | `impl` | Task marker (the releases law §3): `specs/releases/<v>/rc-<N>/TASKS.md` | `chore(tasks): <verb> <id>` |
@@ -67,8 +67,18 @@ A commit stages only paths its worktree kind's allowed set holds (`_worktree_kin
 ## 3b. The PR gate
 
 - Both PR edges require CI green (lint, typecheck, tests, doctor, gitleaks) and a
-  `dd-code-reviewer` APPROVED verdict, security lens included, on the PR head; no CI job
-  calls a model API. The ruleset is the operator's.
+  `dd-code-reviewer` APPROVED verdict, security lens included, on the PR head. The ruleset
+  is the operator's.
+- No CI job of a context's main repo or associated repos calls a model API, except an
+  evals repo's, under every clause below:
+  - a model-calling job runs only on `workflow_dispatch` or `schedule`, never `push`,
+    `pull_request` or `pull_request_target`;
+  - no workflow of an evals repo runs on a self-hosted runner;
+  - the model secret is read only by those jobs, at job level;
+  - artifacts and transcripts come only from synthetic projects built in the run;
+  - every artifact and the job summary pass a secret scan, the model secret's value
+    included, before any upload and before the summary is written; a hit fails the job
+    and uploads nothing.
 
 ## 4. Done when
 

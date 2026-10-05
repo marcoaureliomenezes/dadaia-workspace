@@ -1,6 +1,6 @@
 """``--redact`` output mode (SPEC v0.9.0 FR8a, T-090-07).
 
-Intent: CONTRACT — v0.9.0 A8.1, A8.3, A8.4; v0.11.0 A6.4, A6.5;
+v0.9.0 A8.1, A8.3, A8.4; v0.11.0 A6.4, A6.5;
 sa-private-match-rendering-has-three-renderers#B4, #B5, #B6.
 
 Three layers: ``core.redaction`` (the primitive the push gate's render boundary also consumes),

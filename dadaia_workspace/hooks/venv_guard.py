@@ -45,7 +45,6 @@ def evaluate_payload(payload: dict[str, object]) -> str | None:
         "[VENV GUARD] This command must run from the workspace venv "
         f"({_VENV_BIN}). Blocked:\n"
         f"  {command.strip()}\n"
-        "(pytest/ruff/mypy are never matched by this rule.)\n"
         f"fix: {corrected}"
     )
 

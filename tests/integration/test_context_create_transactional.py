@@ -1,12 +1,8 @@
-"""`dadaia context create` is one transactional step, proved against real bare remotes.
-
-Intent: CONTRACT — AC3.1, AC3.2, AC3.3, AC3.4, AC3.5, AC3.6, AC3.8.
-"""
+"""`dadaia context create` is one transactional step, proved against real bare remotes."""
 
 from __future__ import annotations
 
 import json
-import os
 import subprocess
 from pathlib import Path
 
@@ -30,12 +26,6 @@ from dadaia_workspace.infrastructure.python_env import (  # noqa: E402
 
 _runner = CliRunner()
 _SID = "sess_create01"
-_GIT_ENV = {
-    "GIT_AUTHOR_NAME": "t",
-    "GIT_AUTHOR_EMAIL": "t@e",
-    "GIT_COMMITTER_NAME": "t",
-    "GIT_COMMITTER_EMAIL": "t@e",
-}
 
 
 def _git(*args: str, cwd: Path | None = None) -> str:
@@ -45,7 +35,6 @@ def _git(*args: str, cwd: Path | None = None) -> str:
         check=True,
         capture_output=True,
         text=True,
-        env={**os.environ, **_GIT_ENV},
     ).stdout.strip()
 
 
@@ -174,8 +163,6 @@ def test_only_a_checkout_of_the_url_is_adopted(ws: Path, tmp_path: Path) -> None
 def test_refusal_fix_lines_never_repeat_the_failing_command(ws: Path, tmp_path: Path) -> None:
     """G3/G4/G6 — a bad URL fixes to an operator action naming it, an owned slug to
     `context list`."""
-    listed = _runner.invoke(app, ["context", "list"]).output
-    assert "context create with a context name and --main-repo set to" in listed
     bad = tmp_path / "nothere.git"
     code, out = _create("bad", "--main-repo", str(bad))
     assert code == 1

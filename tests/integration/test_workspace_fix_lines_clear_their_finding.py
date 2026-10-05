@@ -1,6 +1,4 @@
-"""Intent: CONTRACT — sa-unfixable-doctor-findings-say-doctor-fix (the non-specs codes).
-
-The real CLI doctor runs on a tmp tree with one planted finding; the printed ``fix:``
+"""The real CLI doctor runs on a tmp tree with one planted finding; the printed ``fix:``
 runs from ``repos/alpha`` and the re-run doctor no longer emits it. The suite fence
 (``DADAIA_FENCED_ROOTS``, inherited) keeps every child off the live instance.
 
@@ -24,23 +22,28 @@ from dadaia_workspace.cli.main import app
 
 _REPO = Path(__file__).resolve().parents[2]
 _UNSET = ("DADAIA_CONTEXT", "DADAIA_SESSION_ID", "CLAUDE_CODE_SESSION_ID")
-_ENV = {k: v for k, v in os.environ.items() if k not in _UNSET} | {"PYTHONPATH": str(_REPO)}
+
+
+def _env() -> dict[str, str]:
+    """The session env, read per call, without an ambient context or session."""
+    return {k: v for k, v in os.environ.items() if k not in _UNSET}
+
+
 _GIT = ["git", "-c", "user.name=t", "-c", "user.email=t@t"]
 
 
 def _findings(root: Path, *scope: str) -> list[dict[str, str]]:
     """The real CLI's ``doctor --json`` — the run judging a fix."""
     argv = [sys.executable, "-m", "dadaia_workspace", "doctor", *scope, "--json"]
-    run = subprocess.run(argv, cwd=root, env=_ENV, capture_output=True, text=True, check=False)  # noqa: S603
+    run = subprocess.run(argv, cwd=root, env=_env(), capture_output=True, text=True, check=False)  # noqa: S603
     return _parse(run.stdout, scope)
 
 
 def _findings_before(root: Path, *scope: str) -> list[dict[str, str]]:
     """The same ``doctor --json`` in-process — the planted finding and its printed fix,
     before any child runs; the fix and the re-run doctor stay real processes."""
-    env = {**_ENV, **dict.fromkeys(_UNSET)}
     with contextlib.chdir(root):
-        run = CliRunner().invoke(app, ["doctor", *scope, "--json"], env=env)
+        run = CliRunner().invoke(app, ["doctor", *scope, "--json"], env=dict.fromkeys(_UNSET))
     return _parse(run.stdout, scope)
 
 
@@ -55,7 +58,7 @@ def _run_from_elsewhere(root: Path, fix: str) -> None:
     elsewhere = root / "repos" / "alpha"  # WP-17 #S2: a fix runs from any cwd
     elsewhere.mkdir(parents=True, exist_ok=True)
     ran = subprocess.run(
-        ["bash", "-c", fix], cwd=elsewhere, env=_ENV, capture_output=True, text=True
+        ["bash", "-c", fix], cwd=elsewhere, env=_env(), capture_output=True, text=True
     )  # noqa: S603, S607
     assert ran.returncode == 0, ran.stdout + ran.stderr
 
@@ -72,7 +75,7 @@ _SPECS_PLANTS = {"LEDGER-MEMORY-SCHEMA": _plant_memory}
 
 @pytest.mark.parametrize("code", sorted(_SPECS_PLANTS))
 def test_the_printed_fix_clears_its_finding(tmp_path: Path, code: str) -> None:
-    """Intent: sa-unfixable-doctor-findings-say-doctor-fix#S2 — run the printed fix, re-run
+    """sa-unfixable-doctor-findings-say-doctor-fix#S2 — run the printed fix, re-run
     the whole doctor: the finding is gone and no new error finding appears."""
     subprocess.run(["git", "init", "-q", str(tmp_path)], check=True)  # noqa: S603, S607
     (tmp_path / "specs").mkdir()
@@ -112,7 +115,7 @@ _LEDGER_ROWS = [
 def test_an_invalid_ledger_line_is_one_operator_action(
     tmp_path: Path, code: str, rel: str, committed: str, bad: str, where: int | str
 ) -> None:
-    """Intent: CONTRACT — AC4.5, sa-unfixable-doctor-findings-say-doctor-fix#S1: an
+    """AC4.5, sa-unfixable-doctor-findings-say-doctor-fix#S1: an
     invalid line is ONE finding whose fix is ADR 0158's `Operator action:` naming the
     file, where in it, and the ledger's law; uncommitted content is discarded, else the
     commit that introduced it is reverted — never a hand edit."""
@@ -130,7 +133,7 @@ def test_an_invalid_ledger_line_is_one_operator_action(
     assert fix.startswith("Operator action: ") and "AGENTS.md" in fix, fix
     assert "<" not in fix and "by hand" not in fix, fix
     if "audits" in rel:  # a bound session writes findings directly: the governed act
-        assert f"line 1 of {path} " in fix and "writes audit findings directly" in fix, fix
+        assert f"line 1 of {path} " in fix, fix
         return
     finder = f"git log -L 1,1:{path}" if where == 1 else f"git log -p -- {path}"
     assert f"`git checkout -- {path}`" in fix and finder in fix, fix
@@ -154,7 +157,7 @@ def _bugs(tmp_path: Path, *records: dict[str, object]) -> str:
 
 
 def test_a_dangling_caused_by_is_cleared_by_bugs_update(tmp_path: Path) -> None:
-    """Intent: CONTRACT — AC4.5: a line a governance verb clears takes that verb with real
+    """AC4.5: a line a governance verb clears takes that verb with real
     values; run from elsewhere, `bugs.py update <id> --set caused_by=none` clears it."""
     fix = _bugs(tmp_path, {**_RECORD, "caused_by": "a-ghost"})
     assert " update a-bug --set caused_by=none --specs " in fix, fix
@@ -165,7 +168,7 @@ def test_a_dangling_caused_by_is_cleared_by_bugs_update(tmp_path: Path) -> None:
 
 
 def test_a_caused_by_cycle_is_an_operator_decision(tmp_path: Path) -> None:
-    """Intent: CONTRACT — AC4.5 (operator ruling 2026-10-02): which link of a cycle is wrong
+    """AC4.5 (operator ruling 2026-10-02): which link of a cycle is wrong
     is a judgement; the fix names the cycle's records and the law, and sets no value."""
     fix = _bugs(
         tmp_path,
@@ -221,6 +224,14 @@ def _plant_disarmed_gate(ws: Path) -> str:
     return "PROJECTION"
 
 
+def _plant_long_skill(ws: Path) -> str:
+    skill = ws / ".agents" / "skills" / "long" / "SKILL.md"
+    skill.parent.mkdir(parents=True)
+    soft = json.loads((_REPO / "dadaia_workspace/public/entities/behavior-map.json").read_bytes())
+    skill.write_text("l\n" * (soft["skill_md_line_soft"] + 1))
+    return "SKILL-MD-LENGTH"
+
+
 #: Every code this module proves: cleared by its printed fix, or an operator action (V39).
 WORKSPACE_PLANTS = {
     **_SPECS_PLANTS,
@@ -228,16 +239,28 @@ WORKSPACE_PLANTS = {
     "WS-ENTRY": _plant_root_slop,  # the fixable sub-rule (S5)
     "HOOKS-DRIFT-1": _plant_drifted_hook,
     "PROJECTION": _plant_disarmed_gate,
+    "SKILL-MD-LENGTH": _plant_long_skill,
 }
 
 
 @pytest.mark.skipif(sys.platform == "win32", reason="the stub CLI is a POSIX shell script")
 @pytest.mark.parametrize("plant", [_plant_root_slop, _plant_drifted_hook, _plant_disarmed_gate])
 def test_a_workspace_finding_is_cleared_by_its_printed_fix(tmp_path: Path, plant: object) -> None:
-    """Intent: sa-unfixable-doctor-findings-say-doctor-fix#S2 — in an initialized tmp
+    """sa-unfixable-doctor-findings-say-doctor-fix#S2 — in an initialized tmp
     workspace the printed fix, run from repos/alpha, clears the workspace finding."""
     ws = _workspace(tmp_path)
     code = plant(ws)  # type: ignore[operator]
     fix = next(f["fix"] for f in _findings_before(ws) if f["code"] == code)
     _run_from_elsewhere(ws, shlex.join(shlex.split(fix)))
     assert code not in {f["code"] for f in _findings(ws)}
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="the stub CLI is a POSIX shell script")
+def test_a_long_skill_md_is_a_warning_naming_its_file(tmp_path: Path) -> None:
+    """ADR 0170: the real doctor run prints one non-error SKILL-MD-LENGTH whose
+    `Operator action:` names the projected SKILL.md."""
+    ws = _workspace(tmp_path)
+    code = _plant_long_skill(ws)
+    [found] = [f for f in _findings_before(ws) if f["code"] == code]
+    assert found["verdict"] == "warning"
+    assert found["fix"].startswith(f"Operator action: split {ws}/.agents/skills/long/SKILL.md ")

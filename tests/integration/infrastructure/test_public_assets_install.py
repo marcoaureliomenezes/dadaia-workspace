@@ -39,7 +39,7 @@ def test_invalid_target_raises(tmp_path: Path) -> None:
 
 
 def test_install_leaves_only_ledger_owned_entries_under_claude(tmp_path: Path) -> None:
-    """Intent: SENTINEL — sa-doctor-reaps-harness-owned-entries#H4: the install ledger is
+    """sa-doctor-reaps-harness-owned-entries#H4: the install ledger is
     the one owner of what the library writes under ``.claude/`` — every entry a real
     ``install`` leaves there is a ledger target or a directory holding one; size: MEDIUM
     (drives the real ``public/`` tree, no fake agentic dir).

@@ -13,14 +13,13 @@ Disclosed reference reached at `SKILL.md` step 7 — `dd-product-engineer` runs 
 4. For each uncovered package, write one atom (`product/<area>/<slug>.md`, frontmatter with `sources`); for a feature that died, delete its atom and its wikilinks.
 5. A line naming a date, a release, a candidate, a task or an FR is history: `LINT-1` rejects it (history lines, `MEM-NARRATIVE-1:` prefix) — say what the product does, never when it started.
 6. `python3 .agents/skills/dd-spec-navigator/scripts/memory.py catalog generate`, then `memory.py check`.
-7. After the memory merge, in an `impl` worktree: `pytest tests/contract/test_docs_derived_from_memory.py`, re-derive each red section of `README.md`, `llms.txt` and `docs/*.md` from its atom and re-record its `derived-from` marker's `sha256:<12 hex>`; `docs/cli.md` regenerates from `.dadaia/.venv/bin/dadaia help tree` whenever a verb changed.
+7. After the memory merge, in an `impl` worktree: re-derive each section of `README.md`, `llms.txt` and `docs/*.md` whose atom changed from that atom and re-record its `derived-from` marker's `sha256:<12 hex>`; `docs/cli.md` regenerates from `.dadaia/.venv/bin/dadaia help tree` whenever a verb changed.
 8. Commit the atoms, then `python3 .agents/skills/dd-release-implementation/scripts/release.py memory --reviewed <slugs> --changed <slugs>` — it derives the same window, computes the worklist itself and records `since`/`until`; `reviewed` names the entries read and left as they were, `changed` those rewritten or created; it refuses a worklist entry in neither list, a name outside the worklist, a `changed` atom that did not move over the window, and any phase but `CLOSURE`.
 9. `.dadaia/.venv/bin/dadaia doctor`: `LEDGER-RELEASE-SCHEMA` (the memory record), `MEM-DRIFT-1/2`, `LINT-1` (history lines included) and `LEDGER-MEMORY-SCHEMA` clean; the candidate PR stays red until they are.
 
-## Canonical memory is out of scope here
+## Canonical memory
 
-- `ARCHITECTURE.md` and `QUALITY.md` are never touched at closure. A change to a statement is an ADR (`docs(adr): accept <slug>`, hunk and record in one commit); a rewrite of their text belongs to `dd-audit-project` pillar 3 or to the operator's explicit order.
-- A stale statement found during reconciliation is a proposed ADR or a closure note, never an edit.
+- `ARCHITECTURE.md` and `QUALITY.md` change only as the memory law says (`specs/memory/AGENTS.md` §1).
 
 ## Product memory is a folder catalog
 

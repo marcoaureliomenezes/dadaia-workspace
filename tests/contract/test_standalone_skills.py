@@ -1,4 +1,4 @@
-"""Intent: CONTRACT — FR1 (0.4.7 c9); size: SMALL (repo-pure reads, no subprocess
+"""FR1 (0.4.7 c9); size: SMALL (repo-pure reads, no subprocess
 unless `skills-ref` is installed).
 
 The skills the project distributes standalone conform to the Agent Skills spec. The

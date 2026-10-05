@@ -14,6 +14,7 @@ from pathlib import Path
 from dadaia_workspace.core.models.spec_context import ContextState, SpecContextProject
 from dadaia_workspace.features.spec_context.doctor import DoctorService
 from dadaia_workspace.infrastructure.git_subprocess import GitSubprocessClient
+from tests.fixtures.harness_env import child_keys
 from tests.fixtures.stores import context_store, workspace_cli
 
 SCRIPT = (
@@ -24,7 +25,12 @@ FLOW = {"principal": "trunk", "integration": "dev", "work": "feature/"}
 
 
 def git(repo: Path, *args: str) -> str:
-    env = {"HOME": str(repo), "PATH": os.environ["PATH"], "GIT_CONFIG_NOSYSTEM": "1"}
+    env = {
+        **child_keys(),
+        "HOME": str(repo),
+        "PATH": os.environ["PATH"],
+        "GIT_CONFIG_NOSYSTEM": "1",
+    }
     ident = ["-c", "user.name=t", "-c", "user.email=t@t", "-c", "init.defaultBranch=main"]
     out = subprocess.run(
         ["git", *ident, "-C", str(repo), *args], env=env, check=True, capture_output=True, text=True
@@ -44,14 +50,29 @@ def make_workspace(root: Path) -> Path:
     for doc in ("SPEC", "PLAN", "TASKS"):
         (rel / f"{doc}.md").write_text(f"# {doc}\n\n**Status:** Approved\n")
     (repo / ".gitignore").write_text("*.scratch\n__pycache__/\n")
+    (repo / "AGENTS.md").write_text("verify: true\n")  # gate 1 (ADR 0185)
     git(repo, "add", "-A")
     git(repo, "commit", "-qm", "init")
     git(repo, "branch", "feature/0.5.0")
     return root
 
 
-def run(root: Path, *args: str) -> subprocess.CompletedProcess[str]:
+def associate(root: Path, plan: str) -> None:
+    """Repo `a` joins `r`'s context with `feature/0.5.0` and no specs; `r`'s PLAN is *plan*."""
+    workspace_cli(root, {"main_repo": "r", "associated_repos": [{"slug": "a"}], "gitflow": FLOW})
+    (repo := root / "repos/a").mkdir()
+    git(repo, "init", "-q")
+    git(repo, "commit", "-q", "--allow-empty", "-m", "init")
+    git(repo, "branch", "feature/0.5.0")
+    plan_md = root / "repos/r/specs/releases/0.5.0/rc-1/PLAN.md"
+    plan_md.write_text(f"**Status:** {plan}\n")
+    git(root / "repos/r", "commit", "-qam", "plan")
+    git(root / "repos/r", "branch", "-f", "feature/0.5.0")
+
+
+def run(root: Path, *args: str, input: str | None = None) -> subprocess.CompletedProcess[str]:
     env = {
+        **child_keys(),
         "HOME": str(root),
         "PATH": os.environ["PATH"],
         "GIT_DIR": "/nonexistent",
@@ -59,7 +80,12 @@ def run(root: Path, *args: str) -> subprocess.CompletedProcess[str]:
         "TZ": "Asia/Tokyo",  # a naive produced_at never orders by the local zone
     }
     return subprocess.run(
-        [sys.executable, str(SCRIPT), *args], cwd=root, env=env, capture_output=True, text=True
+        [sys.executable, str(SCRIPT), *args],
+        cwd=root,
+        env=env,
+        capture_output=True,
+        text=True,
+        input=input,
     )
 
 

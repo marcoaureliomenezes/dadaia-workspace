@@ -8,7 +8,7 @@ candidates.
 
 | Boundary | Who validates | What unlocks |
 |---|---|---|
-| Per task | implementer discipline (TDD, tests, local CI preflight, handoff); `dd-code-reviewer` at the worktree merge | the merge |
+| Per task | implementer discipline (TDD, tests, the repo's own CI checks, handoff); `dd-code-reviewer` at the worktree merge | the merge |
 | Candidate close | `dd-code-reviewer` `APPROVED` (three axes, six lenses) on the same commit | the candidate's work -> integration PR |
 | Promote (ship) | pre-staged security verdict naming the integration tip | the integration -> principal PR |
 
@@ -29,7 +29,7 @@ Each step ends on a checkable criterion. Steps 5–8 are candidate-closure work.
 - Done when: the reservation commit exists.
 
 **Step 2 — TDD loop.**
-- Implement with tests; run the local CI preflight.
+- Implement with tests; run the repo's own CI checks.
 - Done when: the suite is green and an `implementation-complete` handoff is emitted.
 
 **Step 3 — Scope-complete.**
@@ -68,11 +68,6 @@ Each step ends on a checkable criterion. Steps 5–8 are candidate-closure work.
 
 The arc ends here. Gate -> promote -> record -> branch cut: `dd-gitflow-default` steps
 9-12.
-
-## Test-stewardship touchpoints (reference)
-
-- Declare test intent at birth; pass the admission filter (`dd-test-stewardship`, intent and admission) before a test enters the suite.
-- Demotion and quarantine/SCAFFOLD expiry are candidate-closure work (step 6's `kind: test-dispositions` log entry).
 
 ## Out of scope for closure
 

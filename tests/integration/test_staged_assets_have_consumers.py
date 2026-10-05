@@ -1,6 +1,6 @@
 """Every staged asset has a real consumer; what has none is not produced or checked.
 
-Intent: CONTRACT — sa-staged-assets-without-consumers#44.1, #44.2, #44.3, #44.4, #44.5.
+sa-staged-assets-without-consumers#44.1, #44.2, #44.3, #44.4, #44.5.
 Size: MEDIUM (a real stage + install into tmp_path; the public doctor through the CLI).
 """
 

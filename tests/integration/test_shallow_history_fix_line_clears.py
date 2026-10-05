@@ -1,4 +1,4 @@
-"""Intent: CONTRACT — shallow-clone-history-finding-fix-line-never-clears#history: a
+"""shallow-clone-history-finding-fix-line-never-clears#history: a
 history read that a shallow clone cannot answer names the missing history, and its fix
 line, run verbatim, clears the finding.
 

@@ -1,4 +1,4 @@
-"""Intent: CONTRACT — dd-release-implementation/scripts/release.py owns _RELEASE.json,
+"""dd-release-implementation/scripts/release.py owns _RELEASE.json,
 the candidate trio and releases_histo.jsonl (0.4.7 c7 T-047-66: the release ledger verbs
 move into a stdlib skill script). Size: SMALL.
 
@@ -150,6 +150,20 @@ def test_new_refuses_a_second_live_release_with_one_fix_line(script: Path, tmp_p
     assert len(fixes) == 1, result.stderr
     assert not (specs / "releases" / "0.6.0").exists()
     assert _tree_hash(specs) == before
+
+
+def test_a_verb_with_no_live_release_hands_new_to_the_operator(
+    script: Path, tmp_path: Path
+) -> None:
+    """ADR 0158: with no live release the one fix is the operator's `new`, version unchosen."""
+    specs = _specs(tmp_path)
+    result = _run(script, "phase", "IMPLEMENTATION", "--sha", "abc1234", "--specs", str(specs))
+    py = Path(sys.executable).as_posix()
+    assert result.returncode == 1
+    assert result.stderr.splitlines()[-1] == (
+        f"fix: Operator action: run `{py} {script.as_posix()} new --specs {specs.as_posix()}` "
+        "with the release version you choose"
+    )
 
 
 def test_new_births_the_stacked_candidate_on_a_closed_live_release(

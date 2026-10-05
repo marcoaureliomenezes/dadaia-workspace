@@ -10,6 +10,7 @@ sources:
   - dadaia_workspace/cli/main.py
   - dadaia_workspace/__main__.py
   - pyproject.toml
+  - scripts/**
 ---
 
 ## Pipeline
@@ -19,6 +20,7 @@ sources:
 - `.github/workflows/release.yml` runs on every push to `main`: the `release-please` job maintains one release PR proposing the next version from the Conventional Commits since the floor, and merging it writes the CHANGELOG section and creates the tag ([[release-lifecycle]]).
 - The publish side runs in the same workflow, every job gated on `release_created`: `ci` (the whole `ci.yml` check set, called as a reusable workflow), `build`, `approve` (blocking on the `release-gate` environment), `publish` under OIDC trusted publishing with no long-lived token, and `smoke-test` against the live index.
 - The `e2e-python` leg, in CI on every PR and before publish, installs `uv` and runs the onboarding journey (`tests/e2e/test_onboarding_journey.py`: `uvx --from <built wheel>` over `file://` bare repos — greenfield, dadaia v6 specs, foreign specs, a second project with an associated repo, a failed then corrected create, a re-init upgrade) with `DADAIA_REQUIRE_UVX=1`, so an absent `uvx` fails instead of skipping.
+- `ci.yml`'s Linux jobs call one stdlib script, `scripts/ci.py [<job>…]`, which runs the named jobs' steps (all when none is named), prints `PASS`/`FAIL <step>: <command>` per step and exits 1 on any failure; its `guards` job runs `scripts/guards/run.py`, plain and `--planted` ([[QUALITY]]).
 - `smoke-test` walks the three onboarding levels from the published wheel: `uvx dadaia-workspace==<version> init --repo <file:// bare repo>`, `specs init --context`, then `doctor --context`.
 
 ## One version axis, two positions

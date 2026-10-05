@@ -1,6 +1,4 @@
-"""Intent: CONTRACT — sa-registry-schema-version-has-three-grammars.
-
-The store, ``migrate`` and the doctor ask ONE grammar (``parse_schema_version``), so a
+"""The store, ``migrate`` and the doctor ask ONE grammar (``parse_schema_version``), so a
 registry the context verbs read is exactly one ``migrate --yes`` leaves untouched.
 Supersedes test_cli_migrate_state.py and the store's legacy-refusal table. AC3.9: an
 unreadable registry (truncated, `{}`) is REG-SCHEMA at every reader.
@@ -23,7 +21,7 @@ from typer.testing import CliRunner
 
 from dadaia_workspace.cli.main import app
 from dadaia_workspace.core import context_registry
-from tests.fixtures.harness_env import claude_hook_env, run_hook_subprocess
+from tests.fixtures.harness_env import base_env, claude_hook_env, run_hook_subprocess
 
 _runner = CliRunner()
 _ALIVE = {"name": "alpha", "state": "alive", "repo_slug": "alpha", "repo_url": "u",
@@ -109,7 +107,7 @@ def test_the_refusal_fix_line_migrates_with_no_tty(tmp_path: Path) -> None:
     (tmp_path / "ws" / ".dadaia" / "states").mkdir()
     _registry(tmp_path / "ws", "1", [_ATIVO])
     path = os.pathsep.join([str(Path(__file__).resolve().parents[3]), *site.getsitepackages()])
-    env = {**os.environ, "PYTHONPATH": path}
+    env = base_env() | {"PYTHONPATH": path}
 
     def run(argv: list[str]) -> subprocess.CompletedProcess[str]:
         return subprocess.run(argv, cwd=tmp_path, env=env, stdin=subprocess.DEVNULL,

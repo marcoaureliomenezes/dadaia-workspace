@@ -6,8 +6,6 @@ snapshot and ONE rule registry.
 - F012: check order, fix dispatch and the --fix CLI help all derive from one ordered
   RULES table — the hand-kept if/elif chain and the wrong hand-written help (TREE-3
   claimed fixable, six real fixables omitted) cannot drift again.
-
-Intent: contract; size: unit.
 """
 
 from __future__ import annotations

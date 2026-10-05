@@ -1,4 +1,4 @@
-"""Intent: CONTRACT — T-048-05 (SPEC 0.4.8 AC4.3, R6): ``specs upgrade`` on a v6 tree ends
+"""T-048-05 (SPEC 0.4.8 AC4.3, R6): ``specs upgrade`` on a v6 tree ends
 stamped canonical WITH its fixed law sections, so the specs doctor reports 0 errors — the S3 dead
 end (upgrade said "no-op", doctor said FIXED-1) is gone. 0.5.0 WP-14: the repair is the
 doctor's one writer, so the seam is the `specs upgrade` verb. Size: SMALL (CliRunner)."""

@@ -52,9 +52,8 @@ Fill these in during onboarding:
 ## 5. Tree hygiene
 
 - This tree carries source and its own artifacts only — never a nested `.dadaia/`, which corrupts context resolution for every tree-walking tool.
-- These never appear in the tree: `<!-- repo-excluded -->`.
-- Caches redirect by configuration, never by a remembered command flag: the harness env (`RUFF_CACHE_DIR`, `MYPY_CACHE_DIR` into `.dadaia/tmp/<tool>-cache`; a harness without env declares the gap), `[tool.pytest.ini_options] addopts`, hypothesis `database = None`, Playwright `outputDir` into `.dadaia/tmp/`; a bare-shell run's in-tree cache is held by `.dadaia/.venv/bin/dadaia doctor --fix`.
-- A bare `pytest` / `ruff check` / `mypy --strict` from this root leaves the tree clean; gitignore is defence in depth, not permission to create them.
+- Tool caches redirect by configuration (the harness env, each tool's own config) into `.dadaia/tmp/`, never by a remembered command flag; a harness without env declares the gap.
+- A bare test, lint or typecheck run from this root leaves the tree clean; gitignore is defence in depth, not permission to create them.
 - Published assets carry no private repo name, hostname, IP, customer or infrastructure name, operator-local path or secret.
 
 ## 6. Source hygiene

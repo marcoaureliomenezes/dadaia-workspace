@@ -1,7 +1,7 @@
 """The CLI entry point is a BOUNDARY: whatever reaches ``_safe_app`` becomes one stderr line
 and exit 1; the traceback moves behind ``DADAIA_TRACEBACK=1``; ordinary exits pass through.
 
-Intent: CONTRACT — bugs f22-cli-boundary-is-a-whitelist-not-a-boundary (a bare builtin
+bugs f22-cli-boundary-is-a-whitelist-not-a-boundary (a bare builtin
 exception outside the DadaiaError hierarchy leaked a traceback), r6a-traceback-escape-hatch-suppressed
 (the opt-in must cover DadaiaErrors too), implementation-reviews-no-task-markers-traceback.
 """

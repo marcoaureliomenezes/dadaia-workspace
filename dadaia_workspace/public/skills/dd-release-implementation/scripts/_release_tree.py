@@ -54,8 +54,8 @@ _POINTER = {
 #: The one operator act for a record no verb can point back alone (ADR 0158: no placeholder).
 _ACT = {
     "backlog": "backlog entry {i} already exited naming another release",
-    "bugs": "resolve bug {i} in release {r} (`bugs.py resolve {i} --resolved-release {r}` "
-            "with its cause, lineage and evidence triple)",
+    "bugs": "resolve bug {i} in release {r} (`bugs.py resolve {i}` "
+            "with --cause, --caused-by, --solution and --evidence-loop)",
     "findings": "finding {i}'s audit closed without naming release {r}",
 }  # fmt: skip
 

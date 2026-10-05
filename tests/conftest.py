@@ -35,6 +35,7 @@ Session-level pollution guard (_session_root_pollution_guard):
 from __future__ import annotations
 
 import os
+import shutil
 import sys
 import tempfile
 from collections.abc import Iterator, Sequence
@@ -44,7 +45,18 @@ from typing import Any
 
 import pytest
 
-from dadaia_workspace.infrastructure.subprocess_runner import ProcessResult
+# Repo-cleanliness law: the test run must never materialize bytecode caches inside
+# the working tree. Import-time compilation happens BEFORE any in-script
+# ``sys.dont_write_bytecode`` guard can run (e.g. tests importing the
+# ``public/scripts/*.py`` sources), so the suite-wide switch is the only reliable
+# enforcement point (AC-W5-01).
+sys.dont_write_bytecode = True
+# No child writes bytecode (bug test-suite-writes-outside-tmp): set here, before xdist
+# spawns its workers; the tmp home joins the session env at pytest_sessionstart.
+os.environ["PYTHONDONTWRITEBYTECODE"] = "1"
+
+from dadaia_workspace.infrastructure.subprocess_runner import ProcessResult  # noqa: E402
+from tests.fixtures.harness_env import drop_operator_env, pin_child_env  # noqa: E402
 
 # Every subprocess a test spawns (`python -m dadaia_workspace...`: CLI verbs, hooks) must
 # import THIS checkout, whatever the venv's install mode or the worktree it runs in — bugs
@@ -104,6 +116,10 @@ _GIT_GLOBAL = _publish(
     "dadaia-tests", f"{GIT_QUIET_INCLUDE}[user]\n\tname = T\n\temail = t@example.invalid\n"
 )
 os.environ["GIT_CONFIG_GLOBAL"] = str(_GIT_GLOBAL)
+# The parent's home, read once per process tree: a repeated in-process session and an
+# xdist worker both inherit it, never a home an earlier session pinned.
+os.environ.setdefault("TESTS_PARENT_HOME", str(Path.home()))
+_PARENT_CACHE = Path(os.environ["TESTS_PARENT_HOME"]) / ".cache"
 
 
 def _instance_fingerprint() -> dict[str, object]:
@@ -117,13 +133,6 @@ def _instance_fingerprint() -> dict[str, object]:
         if (root / _INSTANCE_SENTINEL).is_file()
     }
 
-
-# Repo-cleanliness law: the test run must never materialize bytecode caches inside
-# the working tree. Import-time compilation happens BEFORE any in-script
-# ``sys.dont_write_bytecode`` guard can run (e.g. tests importing the
-# ``public/scripts/*.py`` sources), so the suite-wide switch is the only reliable
-# enforcement point (AC-W5-01).
-sys.dont_write_bytecode = True
 
 # ---------------------------------------------------------------------------
 # Hypothesis: redirect storage dir and disable the on-disk database so
@@ -200,8 +209,7 @@ _PATH_MARKERS: tuple[tuple[str, str], ...] = (
     ("tests/tmp/", "tmp"),
 )
 
-# Tier -> enforced timeout seconds (dd-test-stewardship, size tiers; values in its
-# PARAMETERS.md). A test that trips its tier ceiling is MIS-TIERED — fix the tier or
+# Tier -> enforced timeout seconds (tests/AGENTS.md size tiers). A test that trips its tier ceiling is MIS-TIERED — fix the tier or
 # declare an explicit justified @pytest.mark.timeout; never raise these defaults.
 _TIER_TIMEOUTS: dict[str, int] = {"unit": 10, "contract": 30, "integration": 60, "e2e": 120}
 
@@ -231,19 +239,12 @@ def tier_timeout_seconds(
     return base * factor
 
 
-#: The closed marker set — must stay set-equal with pyproject.toml's markers block
-#: (pinned by tests/contract/test_stewardship_mechanics.py).
-_KNOWN_MARKERS: frozenset[str] = frozenset(
-    {"unit", "contract", "integration", "e2e", "slow", "tmp", "flaky", "quarantine"}
-)
-
-
 def _validate_quarantine_markers(items: list[pytest.Item]) -> None:
     """S-20/S-21: a quarantined test without a registered bug id refuses collection.
 
     Quarantine is a lane out of the gating selectors — usable ONLY with a live bug
     (`@pytest.mark.quarantine(bug="<bug-slug>")`). An unregistered quarantine would be
-    a silent green-with-exclusions, the exact failure the stewardship law forbids.
+    a silent green-with-exclusions.
     """
     for item in items:
         marker = item.get_closest_marker("quarantine")
@@ -254,7 +255,7 @@ def _validate_quarantine_markers(items: list[pytest.Item]) -> None:
             message = (
                 f"{item.nodeid}: @pytest.mark.quarantine requires a registered bug id — "
                 "use @pytest.mark.quarantine(bug='<bug-slug>') and register the bug via "
-                "`dadaia bugs append` first (dd-test-stewardship, flakes and quarantine)."
+                "`dadaia bugs append` first."
             )
             # Under xdist the UsageError kills the worker and surfaces as an opaque
             # INTERNALERROR on the controller (T-070-09 finding 2) — print the
@@ -378,19 +379,6 @@ def _hermetic_cwd(
     monkeypatch.chdir(tmp_path_factory.mktemp("cwd"))
 
 
-@pytest.fixture(autouse=True)
-def _scrub_entry_signal_env(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Hermeticity envelope: scrub the harness session-id vars.
-
-    A developer running pytest inside a codex TUI carries ``CODEX_SESSION_ID``. An
-    unscrubbed suite would leak that real session identity into tests resolving
-    session ids. This scrub keeps every test hermetic unless it sets a var explicitly.
-    """
-    from tests.fixtures.harness_env import scrub_entry_signal_env
-
-    scrub_entry_signal_env(monkeypatch)
-
-
 @pytest.fixture(autouse=True, scope="session")
 def _no_real_kimi_home_in_tests(tmp_path_factory: pytest.TempPathFactory) -> None:
     """Disk/user-config guard: never write the real ``~/.kimi-code`` during the suite.
@@ -432,16 +420,39 @@ def _repo_root_write_guard() -> object:
 # The pollution guard is a pre/post DIFF: it fails only on dirs CREATED during
 # the session, never on ones that were already present at session start.
 #
-# Why a diff and not an existence check (bug
-# ``ci-preflight-self-pollution-gate-never-passes``, T-010-25): the
-# ``dadaia ci preflight`` gate runs ruff + mypy BEFORE the pytest check.  When
-# those earlier checks created cache dirs at the repo root, the existence-based
-# guard tripped on the gate's OWN artifacts and the gate could never pass on a
-# clean tree.  Detecting whether those dirs should exist *at all* is the job of
-# ``tests/contract/test_source_repo_hygiene.py`` and CI repo-hygiene — not this
-# session guard, whose only job is to catch tests that pollute the root.
+# Why a diff and not an existence check: ruff and mypy run before pytest and may
+# leave cache dirs at the repo root; an existence check would trip on them. Whether
+# those dirs should exist at all is the CI repo-hygiene job's question.
 _PREEXISTING_POLLUTION: set[str] = set()
 _INSTANCE_AT_START: dict[str, object] = {}
+_OUTSIDE_TMP_AT_START: set[str] = set()
+_CHILD_HOME: list[Path] = []  # this process's pinned home, removed at unconfigure
+
+
+# ponytail: top-level .cache entries only; a write inside an existing ~/.cache/pip is unseen.
+def _outside_tmp() -> set[str]:
+    """What a child writing outside tmp leaves: bytecode in the checkout, a parent-HOME cache."""
+    pycache = {
+        p.as_posix()
+        for d in ("dadaia_workspace", "tests")
+        for p in (_REPO_ROOT / d).rglob("__pycache__")
+    }
+    return pycache | (
+        {f"~/.cache/{p.name}" for p in _PARENT_CACHE.iterdir()} if _PARENT_CACHE.is_dir() else set()
+    )
+
+
+def pytest_configure(config: pytest.Config) -> None:
+    """Before collection, every child and in-process ``Path.home()`` see a tmp home."""
+    _CHILD_HOME[:] = [Path(tempfile.mkdtemp(prefix="dadaia-test-home-"))]
+    pin_child_env(_CHILD_HOME[0])
+    drop_operator_env()
+
+
+def pytest_unconfigure(config: pytest.Config) -> None:
+    for home in _CHILD_HOME:
+        shutil.rmtree(home, ignore_errors=True)
+    _CHILD_HOME.clear()
 
 
 def pytest_sessionstart(session: pytest.Session) -> None:
@@ -450,6 +461,8 @@ def pytest_sessionstart(session: pytest.Session) -> None:
     _PREEXISTING_POLLUTION.update(d for d in _POLLUTION_DIRS if (_REPO_ROOT / d).exists())
     _INSTANCE_AT_START.clear()
     _INSTANCE_AT_START.update(_instance_fingerprint())
+    _OUTSIDE_TMP_AT_START.clear()
+    _OUTSIDE_TMP_AT_START.update(_outside_tmp())
 
 
 def pytest_sessionfinish(session: pytest.Session, exitstatus: int) -> None:
@@ -458,8 +471,7 @@ def pytest_sessionfinish(session: pytest.Session, exitstatus: int) -> None:
     Fails the session (exit code 1) if any tool-generated cache or state
     directory was *created during the test run* at the repo root.  Dirs that
     already existed at session start are ignored — flagging their existence at
-    all is the job of ``tests/contract/test_source_repo_hygiene.py`` and CI, not
-    this guard.  This catches misconfigured tool invocations (wrong CWD, missing
+    all is the CI repo-hygiene job's.  This catches misconfigured tool invocations (wrong CWD, missing
     --no-cache flags, etc.) that the per-test _repo_root_write_guard cannot catch
     (e.g. directories created by pytest plugins that run outside fixture scope).
 
@@ -472,6 +484,10 @@ def pytest_sessionfinish(session: pytest.Session, exitstatus: int) -> None:
             f"changed during the session: {', '.join(_INSTANCE_AT_START)}. A test process "
             "resolved the live instance (bug test-subprocesses-resolve-the-live-instance)."
         )
+        session.exitstatus = 1
+    gained = sorted(_outside_tmp() - _OUTSIDE_TMP_AT_START)
+    if gained:
+        print(f"\n\n[OUTSIDE TMP] gained: {gained}")  # noqa: T201
         session.exitstatus = 1
     offenders = [
         d for d in _POLLUTION_DIRS if (_REPO_ROOT / d).exists() and d not in _PREEXISTING_POLLUTION

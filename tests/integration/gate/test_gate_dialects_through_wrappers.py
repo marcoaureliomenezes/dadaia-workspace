@@ -1,6 +1,4 @@
-"""Intent: CONTRACT — sa-gate-blind-on-cursor-copilot-devin (0.5.0 WP-12, AC1.4, ADR 0054).
-
-sa-gate-blind-on-cursor-copilot-devin#B8: for every registry harness, a payload fixture in the harness's native shape
+"""sa-gate-blind-on-cursor-copilot-devin#B8: for every registry harness, a payload fixture in the harness's native shape
 (``tests/fixtures/hook_payloads/<harness>/``, shapes from the bug record's vendor-doc
 citations — authored, not recorded) through its rendered hook gets Claude's verdict for
 a bare `dadaia` / a new root entry / a PROTECTED file / a worktree write of an unregistered slug (scope: allowed).
@@ -33,6 +31,7 @@ from dadaia_workspace.infrastructure.runtime_transforms.hook_wrappers import (
     hook_documents,
     hook_wrapper_contents,
 )
+from tests.fixtures.harness_env import child_keys
 
 pytestmark = [pytest.mark.integration, pytest.mark.slow]
 
@@ -70,7 +69,12 @@ def _run(ws: Path, harness: str, case: str, **env_extra: str) -> subprocess.Comp
         body = hook_wrapper_contents(HARNESS_RECORDS[harness])[name]
         (ws / ".dadaia" / "hooks" / name).write_text(body)
         argv = ["sh", str(ws / ".dadaia" / "hooks" / name)]
-    env = {"PATH": os.environ["PATH"], "PYTHONPATH": os.environ.get("PYTHONPATH", ""), **env_extra}
+    env = {
+        **child_keys(),
+        "PATH": os.environ["PATH"],
+        "PYTHONPATH": os.environ.get("PYTHONPATH", ""),
+        **env_extra,
+    }
     return subprocess.run(
         argv, input=payload, capture_output=True, text=True, cwd=ws, env=env, timeout=60
     )
@@ -164,7 +168,11 @@ def test_ac1_2_every_ctx_inject_wrapper_answers_on_stdout(ws: Path, harness: str
         json.dumps({"contexts": [{"name": "alpha", "state": "alive", "repo_slug": "alpha"}]})
     )
     vendor = {"cursor": "additional_context", "copilot": "additionalContext"}.get(harness)
-    env = {"PATH": os.environ["PATH"], "PYTHONPATH": os.environ.get("PYTHONPATH", "")}
+    env = {
+        **child_keys(),
+        "PATH": os.environ["PATH"],
+        "PYTHONPATH": os.environ.get("PYTHONPATH", ""),
+    }
     env |= {"DADAIA_FENCED_ROOTS": os.environ["DADAIA_FENCED_ROOTS"], "DADAIA_CONTEXT": "alpha"}
     wrappers = hook_wrapper_contents(HARNESS_RECORDS[harness])
     docs = json.dumps(hook_documents(HARNESS_RECORDS[harness]))  # registered, not only rendered

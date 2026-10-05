@@ -139,7 +139,7 @@
       "context": "Features need I/O (git, filesystem, subprocess) but must stay unit-testable without real I/O.",
       "decision": "We will define a Protocol in core/protocols/ for every I/O boundary a feature needs, and inject a concrete infrastructure/ adapter at the composition root (container.py) — a feature module never imports infrastructure directly.",
       "consequences": "+ features are testable with fakes, no real I/O in unit tests\n- one extra indirection layer per I/O boundary",
-      "measured_by": "tests/contract/test_import_linter_ignore_cap.py (features-no-infrastructure contract)",
+      "measured_by": "lint-imports --config setup.cfg --no-cache (a features-no-infrastructure contract)",
       "supersedes": null,
       "amends": null
     }

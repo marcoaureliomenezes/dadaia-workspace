@@ -24,14 +24,12 @@ from pathlib import Path
 
 from dadaia_workspace.core.models.doctor_report import DoctorLine, DoctorStatus
 from dadaia_workspace.core.redaction import mask, privacy_matches
-from dadaia_workspace.core.workspace_layout import REPO_TREE_ARTIFACTS
 from dadaia_workspace.core.workspace_resolver import own_workspace_root
 from dadaia_workspace.infrastructure.ledger_scripts import load_owner
 
-#: Directory names never walked when scanning public assets: the repo-tree artifact
-#: set (`repos/<slug>/AGENTS.md`, one registry — 0.4.7 FR5) plus Python's own bytecode cache.
-#: Never ``.dadaia`` — the staged assets this walk reads live inside it.
-_PUBLIC_ASSET_IGNORED_DIRS = {"__pycache__", *REPO_TREE_ARTIFACTS}
+#: Directory names never walked when scanning public assets: Python's own bytecode cache
+#: (0080). Never ``.dadaia`` — the staged assets this walk reads live inside it.
+_PUBLIC_ASSET_IGNORED_DIRS = {"__pycache__"}
 _PUBLIC_ASSET_IGNORED_SUFFIXES = {".pyc", ".pyo"}
 _PUBLIC_PRIVACY_TEXT_SUFFIXES = {
     ".css",

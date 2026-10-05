@@ -1,6 +1,6 @@
 """`dadaia doctor` reports the derived onboarding step and refuses a ghost context.
 
-Intent: CONTRACT — 0.4.8 FR6 AC6.1, AC6.3, AC3.1 doctor half (T-048-07); 0.5.0 AC4.4. Size: MEDIUM
+0.4.8 FR6 AC6.1, AC6.3, AC3.1 doctor half (T-048-07); 0.5.0 AC4.4. Size: MEDIUM
 (integration: a real initialized workspace, a real git checkout as the level-2 repo).
 """
 

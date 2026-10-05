@@ -1,4 +1,4 @@
-"""Intent: CONTRACT — 0.4.6 AC1 (FR2: the three ratchets born with the zone registry); 0.5.0 AC6.1
+"""0.4.6 AC1 (FR2: the three ratchets born with the zone registry); 0.5.0 AC6.1
 (the canonical sets widened to ledger vocabularies, phases, trio names, gitflow roles; every
 ``public/**/*.md`` law file scanned); size: SMALL.
 
@@ -35,12 +35,10 @@ from dadaia_workspace.core.gitflow import Role
 from dadaia_workspace.core.workspace_layout import (
     CANON_ROOT_MEMBERS,
     DADAIA_ZONES,
-    REPO_TREE_EXCLUDED,
     ROOT_ALLOWED_DIRS,
     ROOT_ALLOWED_FILES,
     STATES_CANON,
     Creator,
-    repo_excluded_display,
     root_entries_display,
     specs_canon_table_rows,
     zone_names,
@@ -50,7 +48,6 @@ from dadaia_workspace.infrastructure.public_assets import (
     FileSystemPublicAssetManager,
     render_registry_tables,
 )
-from tests.contract.test_slop_ratchets import _allowance_violations
 from tests.helpers.scan_population import assert_populated
 
 pytestmark = pytest.mark.contract
@@ -94,7 +91,6 @@ _CANONICAL_SETS: dict[str, frozenset[str]] = {
     "zone": zone_names(),
     "root": ROOT_ALLOWED_DIRS | ROOT_ALLOWED_FILES,
     "specs-canon": CANON_ROOT_MEMBERS,
-    "repo-excluded": frozenset(REPO_TREE_EXCLUDED),
     "phase": frozenset(
         json.loads((_SCHEMAS / "releases/release-state-v1.schema.json").read_text("utf-8"))[
             "properties"
@@ -118,7 +114,7 @@ _SET_HOME: dict[str, str] = {
 }
 
 #: AC6.5 allowance for the widened sets (birth keys pinned at T-050-135): each second list,
-#: keyed ``file`` -> the open bug that deletes it.
+#: keyed ``file`` -> ``parity:<test file>``, the test proving its set.
 _SECOND_LIST_BIRTH = frozenset(  # its keys at T-050-135; the allowance only shrinks
     {
         "dadaia_workspace/public/skills/dd-audit-project/scripts/_audit_check.py",
@@ -136,6 +132,22 @@ _SECOND_LIST_ALLOWANCE: dict[str, str] = {
         "parity:tests/unit/features/specs/test_release_tree.py"
     ),
 }
+
+
+def _allowance_violations(
+    hits: set[str], allowance: dict[str, str], *, birth: frozenset[str]
+) -> list[str]:
+    """Unlisted hits, stale keys, a value naming no test file, keys absent at birth."""
+    problems = [f"unlisted: {hit}" for hit in sorted(hits - allowance.keys())]
+    problems += [f"stale key (delete it): {key}" for key in sorted(allowance.keys() - hits)]
+    problems += [
+        f"{key} -> {value!r} names no test file"
+        for key, value in sorted(allowance.items())
+        if not value.startswith("parity:")
+        or not (_REPO_ROOT / value.removeprefix("parity:")).is_file()
+    ]
+    return problems + [f"absent at birth: {key}" for key in sorted(allowance.keys() - birth)]
+
 
 #: Literals whose names coincide with a canonical set by accident, not by restatement,
 #: each with the evidence that it is not a canon list. An entry whose file no longer
@@ -343,8 +355,7 @@ def test_staged_law_canon_tables_equal_the_registry(staged_data: Path) -> None:
     assert rendered == expected
 
     assert f"- Root holds only: `{root_entries_display()}`" in text
-    assert f"- These never appear in the tree: `{repo_excluded_display()}`." in repo_law
-    for placeholder in ("<!-- root -->", "<!-- repo-excluded -->", "<!-- specs-canon -->"):
+    for placeholder in ("<!-- root -->", "<!-- specs-canon -->"):
         for rendered in (text, specs_law, repo_law):
             assert placeholder not in rendered, f"{placeholder} was left unrendered"
 

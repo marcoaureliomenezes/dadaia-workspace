@@ -57,7 +57,7 @@ def _validated(
         if why is not None:
             raise Refusal(*why)
     text = serialize(records)
-    findings = findings_for(text, rel, known)
+    findings = findings_for(text, rel, known, path.parents[1])
     if findings:
         detail = "; ".join(f"line {f['line']}: {f['message']}" for f in findings[:5])
         raise Refusal(

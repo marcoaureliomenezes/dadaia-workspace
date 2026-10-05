@@ -1,6 +1,4 @@
-"""Intent: CONTRACT — sa-rich-printer-wraps-fix-lines (0.5.0 WP-18).
-
-One printer (``cli/_fail``): every refusal prints ``Error: <message>`` with its ``fix:``
+"""One printer (``cli/_fail``): every refusal prints ``Error: <message>`` with its ``fix:``
 lines whole, exits 1 (a Click usage error keeps 2), never through Rich or ``secho``.
 Size: SMALL (AST over cli/) + MEDIUM (CliRunner over the real app, tmp roots).
 """

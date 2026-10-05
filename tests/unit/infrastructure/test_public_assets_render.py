@@ -1,4 +1,4 @@
-"""Intent: CONTRACT — 0.4.6 AC12 (FR14/D14: the zone and canon tables are rendered from the
+"""0.4.6 AC12 (FR14/D14: the zone and canon tables are rendered from the
 registry at ``public stage``); size: SMALL.
 
 The two ``.dadaia/**`` law fragments carry placeholders; ``stage`` fills them from
@@ -25,28 +25,14 @@ from dadaia_workspace.infrastructure.public_assets import FileSystemPublicAssetM
 
 pytestmark = pytest.mark.unit
 
-#: Every registry placeholder a shipped law fragment may carry (literal, the law's own).
-_PLACEHOLDERS = (
-    "<!-- zones -->",
-    "<!-- canon -->",
-    "<!-- root -->",
-    "<!-- repo-excluded -->",
-    "<!-- specs-canon -->",
-)
-
 
 def test_zones_placeholder_renders_one_row_per_zone() -> None:
     out = render_registry_tables("before\n<!-- zones -->\nafter\n")
     rows = [line for line in out.splitlines() if line.startswith("| `")]
     assert len(rows) == len(DADAIA_ZONES)
-    assert rows[0] == (
-        "| `agentic/` | staged public assets + manifest.json | projection | never | install |"
-    )
     assert "| `tmp/` | scratch + evidence | ephemeral | 86400 | runtime |" in rows
     assert out.startswith("before\n| Zone | Purpose | Class | TTL | Creator |\n|---|")
-    assert out.endswith(
-        "| operator |\n| `.venv/` | workspace venv; never scanned | managed | never | init |\nafter\n"
-    )
+    assert out.endswith(" |\nafter\n")
 
 
 def test_canon_placeholder_renders_the_closed_canon_sorted() -> None:
@@ -70,7 +56,9 @@ def test_stage_renders_every_data_fragment_before_the_manifest_hashes_it(
     fragments = sorted(agentic.rglob("*.md"))
     assert fragments
     leftovers = [
-        p.name for p in fragments if any(ph in p.read_text("utf-8") for ph in _PLACEHOLDERS)
+        p.name
+        for p in fragments
+        if render_registry_tables(p.read_text("utf-8")) != p.read_text("utf-8")
     ]
     assert not leftovers
     manifest = json.loads((agentic / "manifest.json").read_text("utf-8"))

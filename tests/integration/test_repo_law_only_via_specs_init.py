@@ -1,7 +1,7 @@
 """Repo law has one writer: ``specs init`` (canon.REPO_LAW), once; ``public install``
 never writes under ``repos/``.
 
-Intent: CONTRACT — sa-public-install-writes-the-root-map-into-product-repos (WP-07);
+sa-public-install-writes-the-root-map-into-product-repos (WP-07);
 size: MEDIUM (real public tree, real install).
 
 Statements: sa-public-install-writes-the-root-map-into-product-repos#K1, #K2, #K6. The ledger-forget test is K6's upgrade
@@ -47,19 +47,18 @@ def _workspace(tmp_path: Path) -> tuple[Path, Path]:
 
 
 def test_install_first_then_specs_init_leaves_the_repo_template(tmp_path: Path) -> None:
-    """sa-public-install-writes-the-root-map-into-product-repos#K1: install, then specs init, leaves the repo template."""
+    """sa-public-install-writes-the-root-map-into-product-repos#K1: install writes the root map
+    from staged data/AGENTS.md and nothing under repos/; specs init then leaves the template."""
     ws, repo = _workspace(tmp_path)
     FileSystemPublicAssetManager().install(ws)
     assert not (repo / "AGENTS.md").exists()
+    root_map = (ws / ".dadaia" / "agentic" / "data" / "AGENTS.md").read_bytes()
+    assert (ws / "AGENTS.md").read_bytes() == root_map  # K6: the root map's one source
 
     scaffold_repo_law(repo, project_name="zz-product")
 
     law = (repo / "AGENTS.md").read_text(encoding="utf-8")
     assert law.startswith("# zz-product")
-    # the rendered excluded list (WP-38), never the raw placeholder
-    assert "`.venv/ .pytest_cache/ .mypy_cache/ .hypothesis/ .ruff_cache/" in law
-    assert "<!-- repo-excluded -->" not in law
-    assert (repo / "tests" / "AGENTS.md").is_file()
 
 
 @pytest.mark.parametrize("banner", [False, True], ids=["plain", "bannered"])
@@ -100,20 +99,3 @@ def test_a_formerly_ledgered_repo_copy_is_forgotten_never_pruned(tmp_path: Path)
     ledger = JsonInstallLedgerStore().read(states)
     assert ledger is not None
     assert "repos/zz-product/AGENTS.md" not in ledger.by_relpath()
-
-
-def test_repo_law_has_one_writer_and_the_root_map_one_source() -> None:
-    """sa-public-install-writes-the-root-map-into-product-repos#K6: no module outside canon.scaffold_repo_law writes a repo AGENTS.md; the
-    root map's one source is data/AGENTS.md; baseline's onboarding set is REPO_LAW's."""
-    from dadaia_workspace.features.spec_context import service
-
-    pkg = _PUBLIC.parent
-    install_side = [
-        *(pkg / "infrastructure").rglob("*.py"),
-        *(pkg / "features" / "public").rglob("*.py"),
-    ]
-    assert [p.name for p in install_side if '"repos"' in p.read_text(encoding="utf-8")] == []
-    rules = (pkg / "infrastructure" / "projection_rules.py").read_text(encoding="utf-8")
-    assert 'plan.agentic_dir / "data" / "AGENTS.md"' in rules
-    assert '"templates" / "AGENTS.md"' not in rules
-    assert service._ONBOARDING == ("specs", "specs-bkp", "AGENTS.md", "tests/AGENTS.md")

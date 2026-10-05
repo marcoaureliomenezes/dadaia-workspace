@@ -3,12 +3,12 @@
   "release": "0.5.0",
   "phase": "CLOSURE",
   "defined": {
-    "sha": "79fe0eccc8fa57cad6cc5694e33ec88950ea4a9e",
-    "ts": "2026-10-01T12:44:44Z"
+    "sha": "407c28bdb",
+    "ts": "2026-10-03T16:53:34Z"
   },
   "implemented": {
-    "sha": "22054713a",
-    "ts": "2026-10-03T03:03:06Z"
+    "sha": "7f5fea2f0",
+    "ts": "2026-10-05T14:09:40Z"
   },
   "shipped": null,
   "log": [
@@ -854,6 +854,106 @@
       "agent": "dd-product-engineer",
       "kind": "artifact-gc",
       "text": "RC-FLOW step 8, dadaia doctor --context dadaia-workspace. Operator act first: .vscode entered .dadaiaignore (line 15) before any --fix, so it was held by the operator's pattern, not reaped. 2026-10-03 doctor --fix --expired-only, two passes (about 04:14Z and 04:20Z): six expired dd-code-reviewer handoffs moved to .dadaia/reaped/20261003/.dadaia/handoff/dadaia-workspace/ under the 7-day hold (T-050-146-final, T-050-146-cifix-final, T-050-143-final, rc7-release-ac45-final, T-050-148-final, T-050-147-final; verified on disk); two expired tmp/hooks ctx-inject-fired markers deleted (EPHEMERAL); tmp/general-purpose skipped with errno 13 (a root-owned 0.4.7 wheel left by the 2026-09-28 docker probe, bug doctor-tmp-expiry-foreign-owned-entry-never-clears) under its Operator action line, and the operator removed it by hand (absent on disk now). Dry doctor after: exit 0 at 2026-10-03T04:20:09Z, re-run exit 0 at 04:20:25Z with no error or warning line and no newly expired handoff - only info lines: 15 WS-reaped-reaped countdowns across 8 day directories (reaped/ holds 48M, oldest entries 1 day left), WORKTREE info for this empty release worktree, and ONBOARDING info naming the dadaia-agents context's foreign specs tree (another context's next step, not a dadaia-workspace finding). G4's doctor exit 0 clause, open in the 00:41:04Z drifts entry, is met."
+    },
+    {
+      "ts": "2026-10-03T04:58:00Z",
+      "agent": "main-thread",
+      "kind": "note",
+      "text": "Candidate 7 closure merged into develop by PR #278 (merge c80bfe63, head c9464dde, every check green, dd-code-reviewer APPROVED c9464dde; develop CI run 37097495370 green). Gate: continue — operator ruling \"Continue: rc-8 (Recommended)\": rc-8 is the test/bug candidate (ADRs 0163-0167 and 0170, the open backlog and bugs, task ids from T-050-153); 0 open bugs and 0 open backlog precede the promote."
+    },
+    {
+      "ts": "2026-10-03T12:28:01Z",
+      "agent": "release.py new",
+      "kind": "note",
+      "text": "Candidate born on 0.5.0 (prior candidate closed at 22054713a)"
+    },
+    {
+      "ts": "2026-10-03T16:53:34Z",
+      "agent": "release.py",
+      "kind": "milestone",
+      "candidate": "rc-8",
+      "milestone": "defined",
+      "sha": "407c28bdb",
+      "text": "Candidate defined at 407c28bdb; phase IMPLEMENTATION."
+    },
+    {
+      "ts": "2026-10-05T06:33:15Z",
+      "agent": "dd-product-engineer",
+      "kind": "note",
+      "text": "Candidate 8 carries 32 tasks out (grill 2026-10-05 Q21: rc-8 closes after T-050-212; handoffs 2026-10-05T040135Z-main-thread-grill-granularity-parallelism.handoff.json, 2026-10-05T050738Z-main-thread-grill-rc9-scope.handoff.json; operator overnight authorization \"Yes, Carried only (Recommended)\"). Removed from TASKS.md by b4c6fc604: T-050-173..179, 185, 186, 188, 194..208, 213..216, 189, 180, 181; their ACs listed in the SPEC's Carried section, carried to rc-9. The rc-9 scope grill routes T-050-177 (AC10.12) to the backlog and rc-10 (Q3), the evals (185, 186, 188) and QUALITY (180) to rc-10 (Q1); T-050-213 is rc-9's SPEC section 1 and T-050-189 was delivered by T-050-191 (I1). T-050-210, 211, 212 stay open in rc-8."
+    },
+    {
+      "ts": "2026-10-05T14:09:40Z",
+      "agent": "release.py",
+      "kind": "milestone",
+      "candidate": "rc-8",
+      "milestone": "implemented",
+      "sha": "7f5fea2f0",
+      "text": "Candidate implemented at 7f5fea2f0; phase CLOSURE."
+    },
+    {
+      "ts": "2026-10-05T14:11:00Z",
+      "agent": "dd-product-engineer",
+      "kind": "summary",
+      "text": "Candidate 8 \"W8: the test law and the library pipeline leave; W9: bug lineage derived; W10: the open bugs; W11: agent-behavior evals; W12: the bug loop stops; W13: the bug strategy\" (Origin backlog: 20 entries; bugs: 10; findings: 23 of 20260930-structural-convergence) closes at 7f5fea2f0: 29 tasks [x] - T-050-153..172, 182, 183, 184, 187, 190..193, 209. 35 tasks left TASKS.md: 32 by b4c6fc604 (grill 2026-10-05 Q21; T-050-189 among them, delivered by T-050-191) and T-050-210, 211, 212 by the operator ruling 2026-10-05 \"Sim, fecha assim (Recommended)\", to rc-9's J1 with their prepared work in refs/backup/0.5.0b-impl-full; the closure memory pass (RC-FLOW step 5) runs at this closure (operator ruling 2026-10-05 \"Merge manual autorizado (Recommended)\"). Delivered: the CLI ships no library pipeline, the AC8.9 grep empty at 7f5fea2f0 (153, 154, 162); test knowledge leaves the library (158, 166); meta-tests become one guard CI job of 31 checks (155, 156, 159-161); tests assert behaviour (162-164); SKILL.md soft and hard limits (162); the core/infrastructure survey (157); a bug fix adds a case, the fix commit derived, caused_by by blame, a REBUILD found (165, 167, 168, 192); a run judges only its own context, a copied workspace gets its own CLI, the surface schema rule (170, 171, 172); the test session env as one authority (169); the associated-repo impl reads the main trio, the model-API law by repo role, the dadaia-evals law and eval.yml (182, 183, 184, 187); one CI script, merge lands the verified HEAD, AUTHORING rule 9 (190, 191, 193); found_in, derived introduced_in and bugs.py window (209). The candidate review verdict (step 4) and the work -> integration PR (step 9) are the main thread's; this entry records neither."
+    },
+    {
+      "ts": "2026-10-05T14:11:00Z",
+      "agent": "dd-product-engineer",
+      "kind": "size",
+      "text": "G1 readout (PLAN 2.8), birth a7d15e9dd (release.py new) -> implemented 7f5fea2f0, 256 commits. git diff --shortstat: 369 files, +6,454/-8,174; dadaia_workspace/ 77 files +785/-1,279 (Python +568/-889); tests/ 262 files +1,717/-6,319. Production Python lines (wc -l over tracked dadaia_workspace/**/*.py) 25,307 -> 24,973 (-334; planned <= 24,805) - MISSED by 168. Test functions (def test_) 1,233 -> 1,138 (-95) plus 31 guard checks = 1,169 (planned <= 1,167) - MISSED by 2. Test lines 45,464 -> 41,004 plus 2,442 guard lines (scripts/guards/*.py) = 43,446 (planned <= 43,232) - MISSED by 214. The carried tasks 173-179 planned a net +6 production, so the carry does not explain the production miss; per-task attribution of the three misses is not done in this entry and goes with the carried memory pass to rc-9's Reconciliation."
+    },
+    {
+      "ts": "2026-10-05T14:11:00Z",
+      "agent": "dd-product-engineer",
+      "kind": "drifts",
+      "text": "The closure memory pass runs at this closure (operator ruling 2026-10-05 \"Merge manual autorizado (Recommended)\"): d7276e4cd reconciles 10 atoms over 3e5588559..7f5fea2f0 and its kind: memory entry follows the catalog regeneration. bug-ledger's archive age path and workspace-doctor's SPEC-DOC-041 stay as written: both are still true until T-050-210, carried. ARCHITECTURE.md:92 (RELEASE-TREE-MEMORY) and QUALITY's -k model_api stay until ADR 0176's accept (F128, F131 deferred). Step 7's bugs.py archive aging is not run: ADR 0187 (accepted) lets a record leave only by an accepted ADR, and T-050-210's ADR-only verb is carried. The instance runtime lags the work branch (doctor PROJECTION drift, 11 staged files): the instance bugs.py check reports LEDGER-BUGS-SCHEMA on BUGS.jsonl:743 (bug-window-tests-assume-posix-paths, caused_by T-050-209) while the worktree's own bugs.py check exits 0 (T-050-192: caused_by names a bug or a task)."
+    },
+    {
+      "ts": "2026-10-05T14:11:00Z",
+      "agent": "dd-product-engineer",
+      "kind": "test-dispositions",
+      "text": "G5 over a7d15e9dd..7f5fea2f0, from the commits' test-stack lines: 57 test-audit lines \"gate passed\", 35 \"no test touched\", 1 revert line (tests restored as reviewed at 40b038702); 36 mutation lines with a K/N, every kept survivor named with its reason (equivalent, or on lines the diff leaves untouched), 36 mutation lines skipped with their reason (no Python source, docs, TASKS.md or tests only). tests/: 28 files deleted, 2 added; test functions 1,233 -> 1,138. None apply to the closure commits (SPEC, _RELEASE.json): they touch no test and no Python."
+    },
+    {
+      "ts": "2026-10-05T14:11:00Z",
+      "agent": "dd-product-engineer",
+      "kind": "dispositions",
+      "text": "Backlog (Origin, 20 picked): not exited here - the release worktree kind holds no specs/backlog/* (_worktree_kinds.KINDS), so each exit runs in a backlog worktree. To exit delivered --release 0.5.0 (11): worktree-memory-states-plain-ledger-merge (AC10.14: law half by T-050-191, memory half by d7276e4cd), cli-ships-no-library-pipeline (AC8.9), lib-test-guidance-dehydrated (AC8.1), delete-text-count-inventory-asserts (AC8.4), adr-0143-measured-by-checks-the-concept (AC8.6), skill-md-soft-hard-line-limit (AC8.5), memory-update-states-the-truth-correction-lane (AC8.2), bug-fix-commit-derived-by-grep (AC9.2), bug-terminal-transition-commit-shape (AC9.5), architecture-survey-flat-core-infrastructure (AC8.8), doctor-context-ignores-other-contexts (AC10.4). To exit superseded --release 0.5.0 (3): preflight-ci-parity-derived (by AC8.9), tests-agents-scaffold-without-placeholders and test-intent-docstring-backfill (by AC8.1). Stay active, ACs carried (6): bug-fix-adds-never-rewrites-asserts (AC9.1's review step and the <bug-id>#<id> clause deletion, folded into T-050-198 -> rc-9; ADR 0163's measured_by grep red until then), agent-behavior-evals (AC11.2 T1/T2, AC11.3, AC11.4, AC11.6 -> rc-10), meta-tests-leave-pytest (AC8.10 leftover -> rc-12), caused-by-proposed-by-blame (AC9.3 law half, T-050-194, 195 -> rc-9), focused-review-on-caused-by (AC9.4, T-050-198 -> rc-9), guidance-messages-name-the-right-target (AC10.12 -> rc-10). Bugs, Origin 10: resolved 4 (test-suite-writes-outside-tmp, onboarding-next-step-names-another-context, init-on-a-copied-workspace-leaves-a-cli-bound-to-the-original, bug-surface-schema-documents-the-deleted-regex); open 6, carried to rc-9 with their ACs: ci-preflight-writes-coverage-into-the-repo (AC10.2), hook-entrypoints-invisible-to-coverage (AC10.3), registry-row-missing-a-key-escapes-reg-schema (AC10.6), pre-push-warns-no-gitflow-block-for-an-absent-specs-tree (AC10.7), upgrade-leaves-reconcile-scratch-behind (AC10.8), release-memory-appends-a-second-entry-on-rerun (AC10.13). Open outside the Origin: dependabot-pyjwt-open-on-main (CRITICAL, SPEC Carried rc-12, closing at the ship); ledger-denylist-term-inside-context-slug-blocks-registration (HIGH, registered 2026-10-04 during rc-8, in no Origin or Carried line; stays open for rc-9's window review, routing is the operator's). 8 open in all, none dropped. Audit findings (23 in the Origin), 20260930-structural-convergence, by 374a43d95: resolved --release 0.5.0 (11) F028 F045 F047 F049 F050 F096 F100 F101 F104 F112 F129; deferred (12) F003 F018 F043 F044 F048 F051 F097 F098 F128 F131 F135 F136, each reason naming its carried AC; open after 29, so the audit stays open (no close)."
+    },
+    {
+      "ts": "2026-10-05T14:11:12Z",
+      "agent": "dd-product-engineer",
+      "kind": "artifact-gc",
+      "text": "RC-FLOW step 8, .dadaia/.venv/bin/dadaia doctor from the workspace root, 2026-10-05. Dry: exit 1 - PROJECTION drift (11 staged files: the instance lags the work branch; fix: worktree.py merge of this release worktree, then public install); WS-states-slop states/backlog_subject_aliases.txt (the alias file AC8.9 retires); one WS-sessions-slop .tmp; 11 WS-tmp-expired; 47 WS-handoff-expired; WS-reaped-expired reaped/20260928; TREE-5 warnings on specs/backlog/AGENTS.md and specs/bugs/AGENTS.md (superseded templates); LEDGER-BUGS-SCHEMA error BUGS.jsonl:743 (the stale instance checker, see this candidate's drifts entry). doctor --fix: exit 1, 63 repairs - 11 tmp entries and reaped/20260928 deleted (TTL expired), 47 expired handoffs moved to reaped/, states/backlog_subject_aliases.txt and the sessions .tmp moved to .dadaia/reaped/20261005/ (7-day hold), and TREE-5 refreshed specs/backlog/AGENTS.md and specs/bugs/AGENTS.md in the repos/dadaia-workspace checkout of feature/0.5.0, left uncommitted there (+5/-8). Left after --fix: PROJECTION drift and LEDGER-BUGS-SCHEMA (both clear when this worktree merges and the instance is reprojected). Held for the operator: reaped/ 20260929..20261005 under the 7-day hold (1-7 days left), and the two uncommitted TREE-5 template refreshes in the main checkout."
+    },
+    {
+      "ts": "2026-10-05T14:24:47Z",
+      "agent": "release.py memory",
+      "kind": "memory",
+      "text": "Memory reconciled over 3e558855963a3ead613fbe5e5acf749e71c5084b..703efc1c5e5b: 6 reviewed, 10 changed.",
+      "since": "3e558855963a3ead613fbe5e5acf749e71c5084b",
+      "until": "703efc1c5e5bd421c844a8ac9e30b6699f468ee9",
+      "reviewed": [
+        "agent-orchestration",
+        "product-vision",
+        "spec-context-project",
+        "consumer-agent-support",
+        "audits-canon",
+        "sdd-gate-v3"
+      ],
+      "changed": [
+        "bug-ledger",
+        "workspace-doctor",
+        "workspace-init",
+        "context-management",
+        "worktrees",
+        "release-lifecycle",
+        "backlog-ledger",
+        "public-asset-distribution",
+        "agentic-entities",
+        "pypi-distribution"
+      ]
     }
   ]
 }

@@ -1,7 +1,7 @@
 """GitSubprocessClient decisions at the ``git_subprocess._run`` seam; real-git behavior
 lives in ``tests/integration/infrastructure/test_git_subprocess.py``.
 
-Intent: CONTRACT — F-05 (clone transport reject matrix); v0.4.3 A10.1, A10.3 and the
+F-05 (clone transport reject matrix); v0.4.3 A10.1, A10.3 and the
 T-043-23 ``_stage_files_safe`` hardening.
 """
 

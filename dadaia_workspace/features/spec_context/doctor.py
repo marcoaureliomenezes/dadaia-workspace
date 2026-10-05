@@ -15,6 +15,7 @@ lists and disagreed with what init/install create. Nothing here spells a zone na
 allow set, TTL and canon is a view of the registry.
 """
 
+import json
 import os
 import stat
 import time
@@ -108,6 +109,9 @@ class Finding:
         return self.verdict is not FindingVerdict.REAPED
 
 
+_BEHAVIOR_MAP = Path(__file__).resolve().parents[2] / "public" / "entities" / "behavior-map.json"
+
+
 def _worktree(verdict: str, message: str, fix: str = "") -> SectionFinding:
     """A worktree finding: printed, never an error, never acted on by ``--fix`` (AC1.10)."""
     return SectionFinding("WORKTREE", verdict, message, False, False, fix, fixable=False)
@@ -145,6 +149,22 @@ class DoctorService:
         lines, fix = self._projection(self._workspace_root) if self._projection else ([], "")
         message = "; ".join(line.render() for line in lines if line.status.blocking)
         return [SectionFinding("PROJECTION", "drift", message, False, True, fix)] if fix else []
+
+    def check_skill_md_length(self) -> list[SectionFinding]:
+        """SKILL-MD-LENGTH (ADR 0170): a projected SKILL.md over the soft limit, a warning."""
+        soft = json.loads(_BEHAVIOR_MAP.read_bytes())["skill_md_line_soft"]
+        return [
+            SectionFinding(
+                "SKILL-MD-LENGTH",
+                "warning",
+                f"{md.parent.name}/SKILL.md has {n} lines > soft limit {soft}",
+                False,
+                False,
+                f"Operator action: split {md} into its references/*.md and/or scripts/",
+            )
+            for md in sorted((self._workspace_root / ".agents" / "skills").glob("*/SKILL.md"))
+            if (n := md.read_bytes().count(b"\n")) > soft
+        ]
 
     def check_installed_hooks(self, context: str | None = None) -> list[SectionFinding]:
         """HOOKS-DRIFT-1: an ALIVE repo's hook where git runs hooks is not byte-for-byte the
@@ -301,13 +321,13 @@ class DoctorService:
     # scan() — the one walk
     # ------------------------------------------------------------------
 
-    def scan(self) -> tuple[Finding, ...]:
-        """Every entry of the instance, classified, in the fixed FR3 order."""
+    def scan(self, context: str | None = None) -> tuple[Finding, ...]:
+        """Every entry of the instance, classified, in the fixed FR3 order; *context* scopes the repo trees."""
         globs, _, invalid = workspace_layout.operator_globs(self._workspace_root)
         rules = (globs, *context_registry.registered_slugs(self._workspace_root))
         findings: list[Finding] = [*self._missing_core(), *self._scan_dadaiaignore(invalid)]
         findings.extend(self._scan_places(rules))
-        findings.extend(self._scan_repo_trees())
+        findings.extend(self._scan_repo_trees(context))
         unreadable = frozenset(session_store.unreadable_records(self._workspace_root))
         for zone in workspace_layout.zones_with_canon():
             findings.extend(self._scan_canon_zone(zone, rules, unreadable))
@@ -347,7 +367,7 @@ class DoctorService:
                     tops.append(path)
         return tops
 
-    def _scan_repo_trees(self) -> list[Finding]:
+    def _scan_repo_trees(self, context: str | None) -> list[Finding]:
         """The repo-cleanliness walk (`repos/<slug>/AGENTS.md`), one finding per excluded entry.
 
         Canonical at a repo top is EVERYTHING not on ``REPO_TREE_EXCLUDED`` (Q5): a repo
@@ -363,7 +383,7 @@ class DoctorService:
         """
         excluded = frozenset(workspace_layout.REPO_TREE_EXCLUDED)
         out: list[Finding] = []
-        for top in self._alive_repo_tops():
+        for top in self._alive_repo_tops(context):
             pending = [top]
             while pending:
                 for entry in sweep.walk(pending.pop()):
@@ -519,7 +539,7 @@ class DoctorService:
                     actions.extend(sweep.guarded(finding.code, finding.path, step))
         return actions
 
-    def fix(self) -> list[str]:
+    def fix(self, context: str | None = None) -> list[str]:
         """The full reaper: :meth:`expire` (seed first, so the scan judges after it) -> MOVE
         slop to ``reaped/`` -> reap dead contexts' repos (INV-5).
 
@@ -535,7 +555,8 @@ class DoctorService:
         except SchemaVersionError:
             return []
         actions = self.expire()
-        actions.extend(self._reap(self.scan()))  # judged after the seed: a new .dadaiaignore counts
+        # judged after the seed: a new .dadaiaignore counts
+        actions.extend(self._reap(self.scan(context)))
         for ctx in self._contexts():
             for repo in ctx.all_repos() if ctx.state is ContextState.DEAD else ():
                 if (repo_path := self._repos_dir() / repo.slug).exists():
@@ -640,7 +661,7 @@ def workspace_rules(
         return [] if expired_only else service.check_installed_hooks(context)
 
     def entries(service: DoctorService) -> list[SectionFinding]:
-        findings = service.scan_ttl() if expired_only else service.scan()
+        findings = service.scan_ttl() if expired_only else service.scan(context)
         if expired_only:
             findings = tuple(f for f in findings if f.verdict is FindingVerdict.EXPIRED)
         return [
@@ -679,6 +700,11 @@ def workspace_rules(
             ("WORKTREE",),
             SECTION,
             lambda service: [] if expired_only else service.check_worktrees(context),
+        ),
+        Rule(
+            ("SKILL-MD-LENGTH",),
+            SECTION,
+            lambda service: [] if expired_only else service.check_skill_md_length(),
         ),
         Rule(
             ("WS-ENTRY",),

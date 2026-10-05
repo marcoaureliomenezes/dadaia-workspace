@@ -1,6 +1,4 @@
-"""Intent: CONTRACT — AC3.1: each newly registered harness projects exactly its own view.
-
-The three records added here are data rows, so the only thing worth asserting is what
+"""The three records added here are data rows, so the only thing worth asserting is what
 each row makes the table emit: the directory it touches, the agent files it owns, and —
 the part a golden of the whole table states weakly — that it owns nothing else.
 

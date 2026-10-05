@@ -1,4 +1,4 @@
-"""Intent: CONTRACT — v0.9.0 A4.2, A6.1; v0.11.0 A1.6, A2.3, A10.2: the push-range denylist
+"""v0.9.0 A4.2, A6.1; v0.11.0 A1.6, A2.3, A10.2: the push-range denylist
 scan over a REAL throwaway repo, through the real ``GitSubprocessObjectReader`` wired into
 ``push_gate_decision`` (no CLI layer). Amnesty is bound to the PATH that already published
 a value at the range base (v0.11.0 FR1) — for a tag pushed over a published sha and for

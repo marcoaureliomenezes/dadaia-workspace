@@ -1,7 +1,6 @@
-"""Intent: CONTRACT — SpecsDoctor structural checks: one row per code (fires or silent).
+"""SpecsDoctor structural checks: one row per code (fires or silent).
 
-A release dir's name is TREE-8's (sa-release-dir-placement-judged-by-tree8-and-spec-doc-027).
-"""
+A release dir's name is TREE-8's (sa-release-dir-placement-judged-by-tree8-and-spec-doc-027)."""
 
 from __future__ import annotations
 
@@ -251,24 +250,6 @@ def test_tree5_drift_is_reported_never_auto_repaired(tmp_path: Path) -> None:
     root_law = str(specs_ok / "AGENTS.md")
     issues = SpecsDoctor(specs_ok, templates_dir=_TEMPLATES_DIR).check()
     assert [i for i in _by_code(issues, "TREE-5") if finding_path(i) == root_law] == []
-
-
-@pytest.mark.parametrize("created", ["2026-06-01", "2026-04-01"])
-def test_doc005_oversized_plan_warns_whatever_the_spec_creation_date(
-    tmp_path: Path, created: str
-) -> None:
-    """0.4.7 c2: a PLAN split is judgment with no command, so never error-class; ADR 0150:
-    only the live candidate is judged — once rc-2 opens, the closed rc-1 falls silent."""
-    specs = _make_clean_specs_tree(tmp_path)
-    big = "# Plan\n\n**Status:** Approved\n\n" + "\n".join(f"- line {i}" for i in range(400))
-    (specs / "releases" / "1.2.3" / "rc-1" / "PLAN.md").write_text(big, encoding="utf-8")
-    _write(
-        "releases/1.2.3/rc-1/SPEC.md", f"# Spec\n\n**Status:** Approved\n> **Created:** {created}\n"
-    )(specs)
-    doc5 = _by_code(SpecsDoctor(specs).check(), "SPEC-DOC-005")
-    assert doc5 and doc5[0].verdict == "warning"
-    (specs / "releases" / "1.2.3" / "rc-2").mkdir()
-    assert _by_code(SpecsDoctor(specs).check(), "SPEC-DOC-005") == []
 
 
 def test_one_defect_one_code_missing_active_artifact(tmp_path: Path) -> None:

@@ -21,9 +21,6 @@ from typing import Any
 from _memory_schema import CATALOG
 from _specs import git_line
 
-CODE = frozenset(
-    {".py", ".js", ".mjs", ".ts", ".tsx", ".jsx", ".go", ".rs", ".java", ".kt", ".rb", ".gd"}
-)
 NOT_CODE = frozenset({"specs", "tests", "test", "docs"})
 
 
@@ -54,16 +51,16 @@ def report(specs: Path, since: str, until: str = "HEAD") -> dict[str, Any]:
 
 
 def _units(tracked: list[str]) -> dict[str, list[str]]:
-    """Every directory directly holding a tracked code file, mapped to every file beneath it;
-    a root-level code file is its own unit.
+    """Every directory directly holding a tracked file, any language, mapped to every file
+    beneath it; a root-level file belongs to no unit.
 
     Derived from the audited repo alone: `specs/`, `tests/`, `docs/` and dot-dirs hold no
     unit, so a parent directory is covered as soon as any child is.
     """
     units = {
-        path.rpartition("/")[0] or path
+        path.rpartition("/")[0]
         for path in tracked
-        if Path(path).suffix in CODE
+        if "/" in path
         and not (top := path.split("/", 1)[0]).startswith(".")
         and top not in NOT_CODE
     }

@@ -1,4 +1,4 @@
-"""Intent: CONTRACT — AC3.2, AC3.3 (T-050-10): a memory stub is recognised as shipped by
+"""AC3.2, AC3.3 (T-050-10): a memory stub is recognised as shipped by
 its stripped digest (fixed sections removed), so a ``doctor --fix`` FIXED-2 rewrite of an
 untouched stub still reads as ours and an edited body does not."""
 

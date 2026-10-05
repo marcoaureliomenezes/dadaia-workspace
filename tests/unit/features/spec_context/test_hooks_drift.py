@@ -1,7 +1,5 @@
 """HOOKS-DRIFT-1 — the installed git hooks match the shipped ones (0.4.7 FR6c, T-047-21).
 
-Intent: CONTRACT — 0.4.7 FR6c / T-047-21. Size: SMALL (unit).
-
 A git chokepoint is the ONE mechanical backstop that runs outside every harness hook
 (`.dadaia/AGENTS.md`). An installed copy that has drifted from what the library ships is a
 chokepoint enforcing yesterday's contract, silently — the doctor is the only place that

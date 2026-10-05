@@ -1,4 +1,4 @@
-"""Intent: CONTRACT — v0.4.4 A3.1; 0.5.0 AC6.4, AC6.5 (T-050-12): `ci push-gate-check`
+"""v0.4.4 A3.1; 0.5.0 AC6.4, AC6.5 (T-050-12): `ci push-gate-check`
 driven as the pre-push hook drives it (git's ref lines on stdin, harness-free env, no
 handoff on disk). A work-branch push, a branch deletion and a tag push pass; the branch
 names come from the committed constitution's gitflow (custom, absent -> default + one
@@ -9,7 +9,6 @@ The integration-branch refusal and its fix are the refusal harness Case `birth_p
 from __future__ import annotations
 
 import json
-import os
 import shutil
 import subprocess
 import sys
@@ -19,6 +18,7 @@ import pytest
 
 from dadaia_workspace.core.cli_line import shell_line
 from dadaia_workspace.core.specs_version import CANONICAL_SPECS_VERSION
+from tests.fixtures.harness_env import base_env
 
 pytestmark = pytest.mark.e2e
 
@@ -52,14 +52,6 @@ def _init_repo(workspace: Path, slug: str) -> tuple[Path, str]:
     return repo, sha
 
 
-def _hook_env(workspace: Path) -> dict[str, str]:
-    """A harness-FREE env (mirrors the installed pre-push hook child)."""
-    env = dict(os.environ)
-    for bad in ("CLAUDE_CODE_SESSION_ID", "CODEX_SESSION_ID", "DADAIA_MODE"):
-        env.pop(bad, None)
-    return env
-
-
 def _run_push_gate(
     repo: Path, workspace: Path, stdin_text: str
 ) -> subprocess.CompletedProcess[str]:
@@ -70,7 +62,7 @@ def _run_push_gate(
         input=stdin_text,
         capture_output=True,
         text=True,
-        env=_hook_env(workspace),
+        env=base_env(),  # harness-free, as the pre-push hook's child
         timeout=_EXIT_DEADLINE,
     )
 

@@ -1,7 +1,4 @@
-"""`dadaia init <dir> --harness <name> --repo <url>` clones, creates and alives one context.
-
-Intent: CONTRACT — 0.4.7 FR1 / AC1.1. Doctor exit 0 lives in tests/e2e/test_one_line_bootstrap.py.
-"""
+"""`dadaia init <dir> --harness <name> --repo <url>` clones, creates and alives one context."""
 
 from __future__ import annotations
 
@@ -21,9 +18,7 @@ _LAW = "Sessions launch at the workspace root."
 
 
 def _git(*args: str, cwd: Path) -> None:
-    env = {**os.environ, "GIT_AUTHOR_NAME": "t", "GIT_AUTHOR_EMAIL": "t@example.invalid"}
-    env |= {"GIT_COMMITTER_NAME": "t", "GIT_COMMITTER_EMAIL": "t@example.invalid"}
-    subprocess.run(["git", *args], cwd=cwd, check=True, capture_output=True, text=True, env=env)
+    subprocess.run(["git", *args], cwd=cwd, check=True, capture_output=True, text=True)
 
 
 def _seed(bare: Path, text: str) -> Path:

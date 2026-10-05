@@ -1,6 +1,4 @@
-"""Intent: CONTRACT — 0.4.7 FR1/AC2.1 (T-047-73): `init <dir> --harness <name>`.
-
-The bootstrap seam is argv: the workspace directory is a PARAMETER, never resolved from
+"""The bootstrap seam is argv: the workspace directory is a PARAMETER, never resolved from
 cwd, and the harness is exactly ONE registered record. The three refusals asserted here
 are the whole interface contract — a missing `<dir>`, a missing `--harness`, and the
 retired meta-values (`all`, the comma subset) — each exiting 2 with exactly one

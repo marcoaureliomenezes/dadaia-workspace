@@ -1,4 +1,4 @@
-"""Intent: CONTRACT — 0.4.7 FR1 (ADR 0018 measured_by): skill owner scripts; AC3.1 (ADR 0135):
+"""0.4.7 FR1 (ADR 0018 measured_by): skill owner scripts; AC3.1 (ADR 0135):
 one loader, one owner per grammar. Size: SMALL.
 
 A ``public/skills/*/scripts/`` script OWNS its logic, so it must be self-contained:
@@ -60,7 +60,7 @@ _CROSS_SKILL_EDGES = {
     "dd-release-implementation": {"_memory_drift", "_worktree_git", "_worktree_kinds"},
     "dd-gitflow-default": {"_release_schema", "_specs"},  # `_specs`: the fix-line quote
     "dd-backlog-definition": {"_release_schema", "_bugs_store"},
-    "dd-bug-resolution": {"_worktree_kinds"},  # `_specs`: a write verb's kind (AC4.4)
+    "dd-bug-resolution": {"_worktree_kinds", "_release_schema"},  # `_specs`; `candidate_at`
 }
 
 

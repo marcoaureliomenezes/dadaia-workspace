@@ -1,7 +1,5 @@
 """public doctor shows a private match only as first…last; one mask, one redactor builder.
 
-Intent: CONTRACT — sa-private-match-rendering-has-three-renderers (WP-11): #B1, #B2, #B7.
-
 Private-shaped values are composed at run time, never tracked literals.
 """
 

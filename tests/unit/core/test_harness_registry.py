@@ -1,4 +1,4 @@
-"""Intent: CONTRACT — AC-2 (v0.1.58 T-58-11): the typed core harness registry is the single
+"""AC-2 (v0.1.58 T-58-11): the typed core harness registry is the single
 roster source; ``parse_harness_name`` accepts exactly one registered name (0.4.7 T-047-73)."""
 
 from __future__ import annotations

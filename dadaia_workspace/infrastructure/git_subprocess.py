@@ -247,7 +247,7 @@ class GitSubprocessClient:
         ``archive/<branch>/<sha7>`` (ADR 0120: a tag push is never gated on branch policy),
         the push recording it under ``refs/remotes/origin/`` so ``unpushed`` sees origin hold
         it until a ``fetch --prune`` drops it (re-running the line restores it); commits with
-        no remote."""
+        no remote; a stash entry, which lives only in this checkout."""
         if self.has_commits(path) and not self.has_remote(path):
             return [f"Operator action: add the clone URL of {path} as its origin remote"]
         run = _run(["git", "worktree", "list", "--porcelain"], cwd=path).stdout.split("\n")
@@ -261,9 +261,16 @@ class GitSubprocessClient:
             if _run([*in_head, f"refs/heads/{b}", "HEAD"], cwd=path).returncode != 0
             and self.unpushed(path, f"refs/heads/{b}")
         ]
-        return [git_line(path, "worktree", "remove", t) for t in trees] + [
-            git_line(path, *_ARCHIVE_PUSH, f"{b}:refs/tags/archive/{b}/{s[:7]}") for s, b in lost
-        ]
+        stashes = _run(["git", "stash", "list"], cwd=path).stdout.count("\n")
+        stash = f"Operator action: pop or drop the {stashes} stash entry(ies) of {path}"
+        return (
+            [git_line(path, "worktree", "remove", t) for t in trees]
+            + [
+                git_line(path, *_ARCHIVE_PUSH, f"{b}:refs/tags/archive/{b}/{s[:7]}")
+                for s, b in lost
+            ]
+            + ([stash] if stashes else [])
+        )
 
     def identity_fix(self, path: Path) -> str:
         """The ONE identity probe — git's own rule (env, config, auto-detection): ``""``
@@ -367,6 +374,13 @@ class GitSubprocessClient:
         """
         result = _run(["git", "ls-files", "--others", "--exclude-standard", "-z"], cwd=path)
         return [rel for rel in result.stdout.split("\0") if rel]
+
+    def tracked(self, path: Path) -> frozenset[str]:
+        """Tracked plus untracked-unignored paths under *path*, *path*-relative; empty outside a repo."""
+        result = _run(
+            ["git", "ls-files", "-z", "--cached", "--others", "--exclude-standard"], cwd=path
+        )
+        return frozenset(rel for rel in result.stdout.split("\0") if rel)
 
     def remote_url(self, path: Path) -> str:
         """Return the URL of the ``origin`` remote, or ``""`` if none is configured.

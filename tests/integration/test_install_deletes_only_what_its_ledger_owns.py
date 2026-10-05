@@ -1,6 +1,6 @@
 """``public install`` deletes only what its install ledger recorded.
 
-Intent: CONTRACT — sa-public-install-unlinks-operator-files-outside-its-ledger#D1,
+sa-public-install-unlinks-operator-files-outside-its-ledger#D1,
 sa-public-install-unlinks-operator-files-outside-its-ledger#D2,
 sa-public-install-unlinks-operator-files-outside-its-ledger#D6.
 """

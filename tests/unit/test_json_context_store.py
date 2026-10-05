@@ -1,6 +1,6 @@
 """Unit tests for JsonContextStore (v3 schema: ALIVE/DEAD + associated_repos).
 
-Intent: CONTRACT — A15.2, A15.3 (registry-schema half; the model half lives in
+A15.2, A15.3 (registry-schema half; the model half lives in
 tests/unit/core/models/test_spec_context.py). v2→v3 is purely additive
 (``associated_repos``), so — unlike the v1→v2 state-string rename — the store tolerates
 a v2 file on read rather than hard-refusing it: a hard version gate with no repair path

@@ -57,7 +57,8 @@ def _as_is_errors(plan: str) -> list[str]:
 
 def _schedule_errors(plan: str, unfinished: list[str]) -> list[str]:
     """Each width counts its tasks; unfinished tasks in one step write disjoint `W:` sets
-    outside the merged `TASKS.md` and `*.jsonl` (ADR 0141) and each path suffix the section
+    outside the merged `TASKS.md` and `*.jsonl` (ADR 0141: an overlapping ledger edit conflicts at
+    rebase and is resolved by re-running the ledger's writer) and each path suffix the section
     declares as "derived `<path>`" (ADR 0148); a merged task opens no worktree."""
     section = _section(plan, SCHEDULE) or ""
     if not (rows := _table(section, ["step", "tasks open together", "width", "how"])):

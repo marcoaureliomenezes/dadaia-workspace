@@ -1,7 +1,7 @@
 """One secret matcher: the pre-push scan and the baseline / ``dead --commit`` preflight
 give the same verdict on every fixture, because both run ONE engine over ONE registry.
 
-Intent: CONTRACT — AC5.6 / sa-pre-push-and-publish-scan-disagree-on-secret-shapes;
+AC5.6 / sa-pre-push-and-publish-scan-disagree-on-secret-shapes;
 sa-privacy-match-has-two-matchers: the public doctor's text scan says the same, because it
 calls the pre-push matcher (``core.redaction.privacy_matches``).
 

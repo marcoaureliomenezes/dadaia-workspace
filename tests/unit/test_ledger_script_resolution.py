@@ -1,4 +1,4 @@
-"""Intent: CONTRACT — 0.4.7 review fold (T-047-70): a ledger script is executed only
+"""0.4.7 review fold (T-047-70): a ledger script is executed only
 from the workspace this process was launched from.
 
 `script_findings` runs whatever `resolve_script` hands it. Resolution used to walk up

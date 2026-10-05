@@ -57,20 +57,8 @@ RULES: tuple[SpecsRule, ...] = (
         fix_help=("doctor", "--fix"),
     ),
     _rule(
-        ("AGENTS-PLACEHOLDER-1",),
-        lambda d: d._memory.check_tests_agents_placeholder(),
-        # No fix line: filling a project's own test rules is judgment, and `>` would
-        # overwrite the operator's file. WARNING-only, so the run never exits 1 on it.
-    ),
-    _rule(
         ("SPEC-DOC-004",),
         lambda d: d._release.check_active_release_artifacts(),
-    ),
-    _rule(
-        ("SPEC-DOC-005",),
-        lambda d: d._release.check_plan_line_limit(),
-        # No fix line: an over-long PLAN is split, and truncating it at the limit
-        # deletes the plan's tail. WARNING-only (see check_plan_line_limit).
     ),
     _rule(
         ("TREE-3",),

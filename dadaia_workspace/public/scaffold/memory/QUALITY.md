@@ -18,7 +18,7 @@ tags:
 ## Test architecture
 
 Size by directory: SMALL = `tests/unit` + `tests/contract`; MEDIUM = `tests/integration`;
-LARGE = `tests/e2e`. Full protocol: the `dd-test-stewardship` skill.
+LARGE = `tests/e2e`. Test basics: the root `AGENTS.md` map §1.
 
 ## Gates
 

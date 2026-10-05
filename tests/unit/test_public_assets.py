@@ -1,6 +1,4 @@
-"""Intent: CONTRACT — v0.4.2 A10.1-A10.4, CR-2; v0.4.3 A12.1-A12.5, T-043-23; 0.4.7 FR4/FR7.
-
-CRIT public-privacy gate (the repo went public and was reverted for an infra leak once —
+"""CRIT public-privacy gate (the repo went public and was reverted for an infra leak once —
 never weaken). Operator terms are private, so every test runs with no operator denylist.
 Hostname, home-path and trailer literals are composed at runtime, never contiguous in this
 tracked blob (push-gate-refuses-its-own-privacy-baseline-fixtures; T-043-23 HIGH CWE-532).
@@ -53,6 +51,9 @@ def _manager(public_dir: Path) -> FileSystemPublicAssetManager:
         pytest.param("windows-users-path", "at C:\\Users\\Public.", "C:\\Users\\Public.", True, id="a12.3-trailing-period-placeholder"),
         pytest.param("email-address", _NOREPLY, _NOREPLY, True, id="privacy-baseline-noreply-local-part-not-carved-out"),
         pytest.param("email-address", _OTHER_MAILBOX, _OTHER_MAILBOX, False, id="a12.2-other-local-part-fires"),
+        pytest.param("email-address", chr(92) + "n" + _OTHER_MAILBOX, _OTHER_MAILBOX, False, id="address-after-escape-n-fires"),
+        pytest.param("email-address", chr(92) + "t" + _OTHER_MAILBOX, _OTHER_MAILBOX, False, id="address-after-escape-t-fires"),
+        pytest.param("email-address", chr(92) + "r" + _OTHER_MAILBOX, _OTHER_MAILBOX, False, id="address-after-escape-r-fires"),
         pytest.param("home-abs-path", "/hom" + "e/jdoe42", "/hom" + "e/jdoe42", False, id="fr7-realistic-home-fires"),
         pytest.param("internal-hostname", f"call {_host('Path', 'home')}()", _host("Path", "home"), True, id="path-home"),
         pytest.param("internal-hostname", f"call {_host('pathlib', 'Path', 'home')}()", _host("pathlib", "Path", "home"), True, id="pathlib-path-home"),
@@ -76,6 +77,16 @@ def test_baseline_pattern_matches_and_carve_out(
     assert match is not None and match.group(0) == hit
     assert pattern.exclude is not None
     assert bool(pattern.exclude.search(hit)) is excluded
+
+
+@pytest.mark.parametrize("letter", ["n", "t", "r"])
+def test_email_pattern_never_reads_an_escape_letter_as_local_part(letter: str) -> None:
+    """privacy-email-pattern-reads-escape-as-local-part: a source escape then a decorator is no address."""
+    pattern = {p.id: p for p in _load_privacy_baseline()}["email-address"]
+    assert (
+        pattern.regex.search("'" + chr(92) + letter + "@" + _host("pytest", "mark", "unit") + "'")
+        is None
+    )
 
 
 @pytest.mark.parametrize(
@@ -138,7 +149,7 @@ def test_shipped_baseline_header_and_single_line_documented_carve_outs() -> None
             / "privacy_baseline.json"
         ).read_text(encoding="utf-8")
     )
-    assert raw["_header"]["version"] == 15
+    assert raw["_header"]["version"] == 16
     excludes = " ".join(raw["_header"]["excludes"])
     assert all(word in excludes for word in ("/root", "Users", "FR12/A12.3", "FR12/A12.4"))
     for pattern in raw["patterns"]:

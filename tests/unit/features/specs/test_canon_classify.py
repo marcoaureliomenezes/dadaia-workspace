@@ -1,4 +1,4 @@
-"""Intent: CONTRACT — sa-specs-tree-state-read-five-ways, T-048-05 (ADR 0047): the tree state
+"""sa-specs-tree-state-read-five-ways, T-048-05 (ADR 0047): the tree state
 and its fix; the scaffolded stubs speak English with the fixed memory sections. SMALL."""
 
 from __future__ import annotations

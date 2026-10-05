@@ -16,7 +16,7 @@ from _specs import choice  # noqa: E402
 
 _SLUG_RE = re.compile(r"^[a-z][a-z0-9-]+$")
 _INTENT_RE = re.compile(r"^(?P<kind>[a-z]+):(?P<ref>[^=]+)=(?P<change>.+)$", re.DOTALL)
-_KINDS = ("code", "api", "cli", "doc", "invariant", "catalog")
+KINDS = ("code", "doc", "invariant", "catalog")
 
 
 def today() -> str:
@@ -28,10 +28,10 @@ def parse_intents(raw: list[str] | None) -> list[dict[str, Any]]:
     intents: list[dict[str, Any]] = []
     for item in raw or []:
         match = _INTENT_RE.match(item)
-        if match is None or match.group("kind") not in _KINDS:
+        if match is None or match.group("kind") not in KINDS:
             raise Refusal(
-                f"intent {item!r} is not '<kind>:<ref>=<change>' with kind in {list(_KINDS)}",
-                f"{SCRIPT} subjects",
+                f"intent {item!r} is not '<kind>:<ref>=<change>' with kind in {list(KINDS)}",
+                f"{SCRIPT} new --help",
             )
         intents.append(
             {

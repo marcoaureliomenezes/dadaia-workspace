@@ -1,6 +1,4 @@
-"""Intent: CONTRACT — core.model_registry FR2 table and ruling G-1 (Fable never on dd-code-reviewer)
-
-MANDATORY tier-taxonomy contract (v0.1.60 FR6 / Ruling 17 — reworked v0.1.65 FR9).
+"""MANDATORY tier-taxonomy contract (v0.1.60 FR6 / Ruling 17 — reworked v0.1.65 FR9).
 
 The word "tier" names two distinct axes and this contract machine-enforces the split:
 

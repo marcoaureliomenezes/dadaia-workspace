@@ -52,7 +52,7 @@ regressions: measure a baseline, then bisect — logs mislead.
 *Done when one hypothesis survives by observation, not by reading code.*
 
 **Phase 5 — Seam test.** The regression test at the correct seam, BEFORE the fix, is
-an existing test rewritten when one exists (the root map §1 work order), intent and size declared at birth (`dd-test-stewardship`, intent and admission); watch it fail,
+a new case — a parametrize row in the owner file, a literal expected value — at the lowest level that detects it (the root map §1: fixes never rewrite old asserts); watch it fail,
 fix the cause, watch it pass, re-run the Phase 1 loop on the original scenario. A
 correct seam exercises the real bug pattern at its call site (`dd-codebase-design`
 owns the seam vocabulary and the deletion test the fix must pass); when none exists, that
@@ -61,15 +61,15 @@ the architecture lens before fixing.
 *Done when the test fails for the real reason and passes with the fix (or the seam
 gap is registered first).*
 
-**Phase 6 — Cleanup + resolve.** Grep the probe prefix to zero; production AND tests net
-≤ 0 — a fix growing either routes to the architecture lens first (net-positive rule):
+**Phase 6 — Cleanup + resolve.** Grep the probe prefix to zero; rewriting an old assert is its own commit, with a reason:
+
+- Stage the code and its test first: `resolve` blames the lines the staged diff removes.
 
 ```
-python3 .agents/skills/dd-bug-resolution/scripts/bugs.py resolve <bug-id> --cause … --caused-by … --resolved-release …
-  --solution … --evidence-loop … --evidence-seam … --evidence-diff 'net-negative: prod +a/-b, tests +c/-d'
+python3 .agents/skills/dd-bug-resolution/scripts/bugs.py resolve <bug-id> --cause … --caused-by …
+  --solution … --evidence-loop …
 ```
 
-- `--evidence-diff` opens `net-negative:`, `net-positive:` or `net-neutral:`; `--evidence-seam` names an existing file and `def`.
 - `caused_by` names a live or archived record, or `none`, never a loop; writes refuse else.
 - Stage code + regression test + the `BUGS.jsonl` line together, the red loop quoted in the
   body — ONE commit, shape 3 of `dd-gitflow-default` §3a.
@@ -81,9 +81,8 @@ python3 .agents/skills/dd-bug-resolution/scripts/bugs.py resolve <bug-id> --caus
   load-bearing.
 - The surviving hypothesis was confirmed by instrumentation.
 - The regression test sits at the correct seam, or the seam gap was registered first.
-- Probes are gone; production and tests net ≤ 0; the resolve record carries the
-  evidence triple, `caused_by`, `resolved_release` and `closed_at`; one isolated
-  commit; worktree clean.
+- Probes are gone; the resolve record carries `evidence_loop`, `caused_by`,
+  `resolved_release` and `closed_at`; one isolated commit; worktree clean.
 
 ## 4. References
 

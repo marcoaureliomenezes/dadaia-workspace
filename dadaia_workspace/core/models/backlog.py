@@ -1,6 +1,6 @@
 """The typed ``intents[]`` of a backlog item: ``(subject{kind,ref,surface} -> change)``.
 
-Plain constructors. The grammar (kinds, the module-relative ``path#symbol`` code-ref rule,
+Plain constructors. The grammar (kinds, the repo-relative ``path[#word]`` code-ref rule,
 no extra keys) is ``public/schemas/backlog/backlog-v1.schema.json`` alone; resolution is
 ``features/backlog/subject_registry.py``'s.
 """
@@ -23,15 +23,10 @@ INTENTS_EXEMPT_STATUS = "idea"
 
 
 class SubjectKind(StrEnum):
-    """The registry source classes a subject ref may belong to (SPEC §3.1/§3.2).
-
-    ``code``/``cli``/``catalog``/``doc``/``invariant`` are derived from live truth; ``api``
-    binds through the operator alias map only.
-    """
+    """The registry source classes a subject ref may belong to, each derived from live
+    truth (SPEC §3.1/§3.2)."""
 
     CODE = "code"
-    API = "api"
-    CLI = "cli"
     DOC = "doc"
     INVARIANT = "invariant"
     CATALOG = "catalog"

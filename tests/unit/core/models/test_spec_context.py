@@ -1,7 +1,5 @@
 """``SpecContextProject.associated_repos`` and the one repo-resolution accessor (FR15).
 
-Intent: CONTRACT — A15.3
-
 The main repo (``repo_slug``/``repo_url``) stays the sole specs/bind target (G13, I4,
 FR19); ``associated_repos`` is an *additive*, ordered collection next to it. A15.3
 requires exactly one accessor for "the context's repos" — this module proves

@@ -7,8 +7,6 @@ just the root — a directory is kept by its AGENTS.md, never a placeholder file
 (sa-placement-rules-contradict-tree8): one finding per stray path, no second rule.
 
 TREE-8 is never auto-fixed: ``doctor --fix`` deletes nothing (operator decision D8).
-
-Intent: CONTRACT — A1.2, v0.5.0 specs-canon closure; doctor-fix-tree8-deletes-operator-content.
 """
 
 from __future__ import annotations

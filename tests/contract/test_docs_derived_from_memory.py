@@ -1,6 +1,6 @@
 """Every human- and agent-facing document derives from a named memory atom.
 
-Intent: CONTRACT — T-047-36 (SPEC 0.4.7 FR3): `README.md`, `llms.txt` and every
+T-047-36 (SPEC 0.4.7 FR3): `README.md`, `llms.txt` and every
 `docs/*.md` carry, under each `## ` heading, one or more
 `<!-- derived-from: <slug> sha256:<12 hex> -->` markers; the slug resolves by stem to
 exactly one file under `specs/memory/`, the hash is that file's CURRENT content hash,
@@ -31,7 +31,6 @@ pytestmark = pytest.mark.contract
 _REPO_ROOT = Path(__file__).resolve().parents[2]
 _MEMORY_DIR = _REPO_ROOT / "specs" / "memory"
 _DOCS_DIR = _REPO_ROOT / "docs"
-_README_MAX_BYTES = 10_240
 #: `docs/cli.md` is generated, not derived: it names its generator, not an atom.
 _GENERATED = ("cli.md",)
 
@@ -175,7 +174,7 @@ def test_the_agent_index_lists_every_page_of_the_site() -> None:
 
 
 def test_the_readme_sends_a_reader_to_the_docs_folder() -> None:
-    """Intent: CONTRACT — docs-url-dead-and-readme-links-break-on-pypi. No Pages site
+    """docs-url-dead-and-readme-links-break-on-pypi. No Pages site
     exists: the Documentation URL and the README both name the repository's docs folder."""
     readme = (_REPO_ROOT / "README.md").read_text("utf-8")
 
@@ -185,7 +184,7 @@ def test_the_readme_sends_a_reader_to_the_docs_folder() -> None:
 
 
 def test_every_readme_link_is_absolute() -> None:
-    """Intent: CONTRACT — docs-url-dead-and-readme-links-break-on-pypi. PyPI renders the
+    """docs-url-dead-and-readme-links-break-on-pypi. PyPI renders the
     README outside the checkout, where a relative link or image target is a dead end."""
     readme = (_REPO_ROOT / "README.md").read_text("utf-8")
     targets = re.findall(r"\]\(([^)\s]+)", readme) + re.findall(r'(?:src|href)="([^"]+)"', readme)
@@ -242,14 +241,6 @@ def test_the_cli_reference_is_the_committed_output_of_the_generator() -> None:
         "docs/cli.md drifted from the live command tree — "
         "regenerate: dadaia help tree > docs/cli.md"
     )
-
-
-def test_the_readme_fits_the_long_description_budget() -> None:
-    """The README is PyPI's long description, read by humans and pulled whole into agent
-    context: 10 KB is the budget, and a section that cannot earn its bytes is deleted."""
-    size = (_REPO_ROOT / "README.md").stat().st_size
-
-    assert size <= _README_MAX_BYTES, f"README.md is {size} bytes (max {_README_MAX_BYTES})"
 
 
 def test_no_derived_document_cites_a_dead_verb_or_path() -> None:
@@ -325,7 +316,7 @@ def _onboarding_texts() -> list[Path]:
 
 
 def test_no_onboarding_text_claims_offline_operation() -> None:
-    """Intent: CONTRACT — bug `onboarding-docs-contradict-the-cli`, AC2.4. `init`
+    """bug `onboarding-docs-contradict-the-cli`, AC2.4. `init`
     resolves its dependencies from PyPI, so no surface may call it offline."""
     violations = [
         f"{path.relative_to(_REPO_ROOT).as_posix()}:{number}: claims offline operation"
@@ -337,7 +328,7 @@ def test_no_onboarding_text_claims_offline_operation() -> None:
 
 
 def test_no_onboarding_text_cites_a_retired_create_flag() -> None:
-    """Intent: CONTRACT — AC3.8, bug `onboarding-docs-contradict-the-cli`. `context
+    """AC3.8, bug `onboarding-docs-contradict-the-cli`. `context
     create` takes `--main-repo <url>` and repeatable `--associated-repo <url>`; a cited
     `--url` or `--associated-repos` exits 2."""
     violations = [

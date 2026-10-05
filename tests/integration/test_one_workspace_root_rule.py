@@ -1,7 +1,4 @@
-"""One workspace-root rule: the CLI's own venv workspace, else the nearest sentinel ancestor.
-
-Intent: CONTRACT — sa-seven-workspace-root-rules (AC9.5).
-"""
+"""One workspace-root rule: the CLI's own venv workspace, else the nearest sentinel ancestor."""
 
 from __future__ import annotations
 
@@ -92,9 +89,3 @@ def test_memory_lint_has_no_cwd_default() -> None:
     with pytest.raises(SystemExit) as refused:
         memory_lint([])
     assert refused.value.code == 2
-
-
-def test_the_handoff_emitter_names_the_one_sentinel() -> None:
-    """sa-seven-workspace-root-rules#S10: the skill's root rule is the resolver's sentinel."""
-    skill = _PACKAGE / "public" / "skills" / "dd-handoff-emitter" / "SKILL.md"
-    assert "`.dadaia/states/spec_contexts.json`" in skill.read_text(encoding="utf-8")

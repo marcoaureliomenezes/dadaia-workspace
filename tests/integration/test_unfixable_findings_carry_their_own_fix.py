@@ -1,6 +1,6 @@
 """A finding the doctor cannot repair carries its own fix — never `doctor --fix`.
 
-Intent: CONTRACT — sa-unfixable-doctor-findings-say-doctor-fix#S1..#S6 (listed per test).
+sa-unfixable-doctor-findings-say-doctor-fix#S1..#S6 (listed per test).
 Size: MEDIUM (real git repo, the doctor's own section assembly, the CLI in-process).
 """
 

@@ -1,6 +1,6 @@
 """``core.invocation`` — the single session/context/root/Bind resolution authority.
 
-Intent: CONTRACT — 0.5.1 K1 ("One Invocation"): the rung table asserts observable outcomes
+0.5.1 K1 ("One Invocation"): the rung table asserts observable outcomes
 through :func:`invocation.resolve`, never internal ladder state. Also covers
 ``sdd-gate-memory-phase-resolves-empty-when-cwd-is-a-linked-worktree-outside-repos``: a nested
 sentinel-bearing sandbox under cwd never shadows the workspace that owns the write target.
@@ -18,13 +18,6 @@ import pytest
 from dadaia_workspace.core import invocation
 from dadaia_workspace.core.exceptions import SchemaVersionError
 from dadaia_workspace.core.workspace_resolver import resolve_workspace_root
-from tests.fixtures.harness_env import scrub_context_resolution_env
-
-
-@pytest.fixture(autouse=True)
-def _isolate_process_env(monkeypatch: pytest.MonkeyPatch) -> None:
-    """``resolve_specs_dir`` reads ``os.environ``/``Path.cwd()``: scrub it for xdist."""
-    scrub_context_resolution_env(monkeypatch)
 
 
 def _mk_ws(tmp_path: Path, *contexts: tuple[str, str, tuple[str, ...]]) -> Path:

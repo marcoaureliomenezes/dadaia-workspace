@@ -30,7 +30,6 @@ __all__ = [
     "occupied",
     "MEMORY_TOPLEVEL_FILES",
     "REPO_LAW",
-    "REPO_TREE_ARTIFACTS",
     "INSTALLED_GIT_HOOKS",
     "REPO_TREE_EXCLUDED",
     "REQUIRED_ROOT_DIRS",
@@ -54,7 +53,6 @@ __all__ = [
     "REFUSALS",
     "FloorRefusal",
     "public_scripts_dir",
-    "repo_excluded_display",
     "root_entries_display",
     "specs_canon_table_rows",
     "walked_zones",
@@ -66,10 +64,7 @@ __all__ = [
 ]
 
 #: The main repo's scoped law, beside ``specs/``: ``templates/<name>`` -> ``<repo>/<dest>``.
-REPO_LAW: tuple[tuple[str, str], ...] = (
-    ("repo-AGENTS.md", "AGENTS.md"),
-    ("tests-AGENTS.md", "tests/AGENTS.md"),
-)
+REPO_LAW: tuple[tuple[str, str], ...] = (("repo-AGENTS.md", "AGENTS.md"),)
 
 #: Every ``specs/audits/`` directory is named ``<YYYYMMDD>-<slug>``.
 AUDIT_DIR_NAME_PATTERN: str = r"\d{8}-[a-z0-9][a-z0-9-]*"
@@ -172,7 +167,6 @@ STATES_CANON: frozenset[str] = frozenset(
         "agent_model_policy.json",
         "agent_model_policy.json.last-good.json",
         "privacy_denylist.json",
-        "backlog_subject_aliases.txt",
         "harness_profile.json",
         "AGENTS.md",
     }
@@ -385,23 +379,9 @@ ROOT_ALLOWED_DIRS: frozenset[str] = frozenset(
     {".dadaia", ".git", "repos", "worktrees"} | HARNESS_DIRS
 )
 
-#: Tool artifacts a repo working tree may carry but that are never source.
-REPO_TREE_ARTIFACTS: tuple[str, ...] = (
-    ".venv",  # rendered law line only: the repo-tree walk prunes ``.venv`` first
-    ".pytest_cache",
-    ".mypy_cache",
-    ".hypothesis",
-    ".ruff_cache",
-    "test-results",
-    "playwright-report",
-    "coverage",
-    ".coverage",
-)
-
-#: Everything a repo working tree must NOT carry: the artifacts plus a nested ``.dadaia``.
-REPO_TREE_EXCLUDED: tuple[str, ...] = (".dadaia", *REPO_TREE_ARTIFACTS)
-
-_REPO_TREE_EXCLUDED_FILES: frozenset[str] = frozenset({".coverage"})
+#: What a repo working tree must NOT carry: a nested ``.dadaia`` (tool caches are the
+#: repo's own, redirected by configuration — ``TOOL_CACHE_ENV``).
+REPO_TREE_EXCLUDED: tuple[str, ...] = (".dadaia",)
 
 MEMORY_TOPLEVEL_FILES: tuple[str, ...] = ("ARCHITECTURE.md", "QUALITY.md")
 
@@ -519,13 +499,6 @@ def root_entries_display() -> str:
     )
 
 
-def repo_excluded_display() -> str:
-    """§5.3's one line: the excluded names in registry order, directories slashed."""
-    return " ".join(
-        name if name in _REPO_TREE_EXCLUDED_FILES else f"{name}/" for name in REPO_TREE_ARTIFACTS
-    )
-
-
 def specs_canon_table_rows() -> tuple[tuple[str, str], ...]:
     """``(parent, members)`` per directory holding two or more canon members (``""`` = the
     root); a single-member directory is path-compressed into its parent's cell."""
@@ -592,7 +565,6 @@ _PLACEHOLDERS: dict[str, Callable[[], str]] = {
     "<!-- zones -->": _zone_table,
     "<!-- canon -->": _states_canon_table,
     "<!-- root -->": root_entries_display,
-    "<!-- repo-excluded -->": repo_excluded_display,
     "<!-- specs-canon -->": _specs_canon_table,
 }
 

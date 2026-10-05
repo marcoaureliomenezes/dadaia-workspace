@@ -1,4 +1,4 @@
-"""Intent: CONTRACT — AC6.4 amended, ADR 0048 (reviewer H3 repro ws13): the pre-push gate
+"""AC6.4 amended, ADR 0048 (reviewer H3 repro ws13): the pre-push gate
 reads the gitflow from committed data — HEAD's constitution, else the newest one on a
 remote-tracking ref — never the working tree. Neither -> default + one warning:
 e2e/test_push_gate_check.py::test_an_absent_gitflow_block_warns_and_falls_back_to_the_default.

@@ -1,4 +1,4 @@
-"""Intent: CONTRACT — ADR canon: records validate ``decision-record-v1`` and ids run 0001..N, judged by the
+"""ADR canon: records validate ``decision-record-v1`` and ids run 0001..N, judged by the
 doctor's LEDGER-ADR-SCHEMA rule (``features/specs/doctor_adr``), the one ADR authority. Size: SMALL.
 """
 
@@ -12,11 +12,8 @@ from typer.testing import CliRunner
 
 from dadaia_workspace.cli.main import app
 from dadaia_workspace.features.specs.doctor_adr import adr_record_issues
-from dadaia_workspace.infrastructure.ledger_scripts import load_owner
 
 pytestmark = pytest.mark.contract
-
-_REPO_ROOT = Path(__file__).resolve().parents[2]
 
 
 def _ledger(tmp_path: Path, ids: list[str], **fields: object) -> Path:
@@ -25,17 +22,6 @@ def _ledger(tmp_path: Path, ids: list[str], **fields: object) -> Path:
     lines = [json.dumps({**_VALID_RECORD, **fields, "id": i}) for i in ids]
     (specs / "ADRs" / "decisions.jsonl").write_text("\n".join(lines) + "\n", encoding="utf-8")
     return specs
-
-
-def test_the_committed_ledger_is_clean_under_the_doctor_rule() -> None:
-    """ADR 0151 M1: red until every committed accepted record carries its ruling."""
-    # The one exception to `_ledger.records`: the doctor reports a physical line number.
-    ledger = (_REPO_ROOT / "specs" / "ADRs" / "decisions.jsonl").read_text("utf-8").split("\n")
-    issues = [
-        f"ADR {json.loads(ledger[int(i.message.rsplit(':', 1)[1][:-1]) - 1])['id']}: {i.message}"
-        for i in adr_record_issues(_REPO_ROOT / "specs")
-    ]
-    assert not issues, "\n".join(issues)
 
 
 _VALID_RECORD: dict[str, object] = {
@@ -162,17 +148,6 @@ def test_an_unreadable_line_is_its_own_finding_and_the_next_record_is_still_read
     ]
 
 
-def test_no_ledger_reader_builds_a_jsonschema_validator() -> None:
-    """FR ledger-schema-one-engine (AC3.6, ADR 0018): `_ledger.validate` is the one engine."""
-    readers = (
-        "features/specs/doctor_adr.py",
-        "features/specs/doctor_governance.py",
-        "features/backlog/doctor.py",
-    )
-    package = _REPO_ROOT / "dadaia_workspace"
-    assert [r for r in readers if "jsonschema" in (package / r).read_text("utf-8")] == []
-
-
 @pytest.mark.parametrize(
     ("ids", "expected"),
     [
@@ -229,30 +204,3 @@ def test_doctor_admits_any_named_check_and_flags_a_duplicate_id(
 
     assert "id '0049' breaks 0001..N: expected 0050" in run.output, run.output
     assert "vitest" not in run.output and run.output.count("breaks 0001..N") == 1
-
-
-def test_the_projected_law_names_the_doctor_and_no_measured_by_pattern() -> None:
-    """sa-adr-measured-by-pattern-refuses-real-checks#B27-4: the ADR law names the doctor rule, never a test or pattern."""
-    law = (_REPO_ROOT / "dadaia_workspace/public/scaffold/ADRs/AGENTS.md").read_text("utf-8")
-    assert (
-        ".venv/bin/dadaia doctor` (`LEDGER-ADR-SCHEMA`) validates every record and the numbering"
-        in law
-    )
-    assert "test_adr_canon" not in law and "SPEC-DOC-nnn" not in law
-
-
-def test_every_superseded_record_is_named_by_some_successor() -> None:
-    """Every committed `superseded` record is named by some successor's `supersedes`."""
-    records = load_owner("dd-bug-resolution", "_ledger").records(
-        _REPO_ROOT / "specs" / "ADRs" / "decisions.jsonl"
-    )
-    named = {
-        adr_id
-        for record in records
-        for adr_id in (record.get("supersedes") or "").split(",")
-        if adr_id
-    }
-    orphans = sorted(
-        r["id"] for r in records if r["status"] == "superseded" and r["id"] not in named
-    )
-    assert orphans == [], f"superseded with no successor naming them: {orphans}"

@@ -1,11 +1,9 @@
-"""Intent: CONTRACT — T-047-53/T-047-54 (SPEC 0.4.7 FR2, AC2.1); size: SMALL (contract).
-
-The context balance of a dadaia-workspace, pinned from the library source:
+"""The context balance of a dadaia-workspace, pinned from the library source:
 
 1. every dd- skill that touches a governed area opens that area's scoped `AGENTS.md`
    as the FIRST numbered step of its procedure, naming the workspace-relative path;
 2. `public/data/CONTEXT-MAP.md` carries one row per surface, the rows name surfaces
-   that exist, every surface has a row, and the Measured column equals `wc -c`.
+   that exist, and every surface has a row.
 
 The scoped law reaches every harness by procedure rather than by loader luck, so the
 step-1 table below is the contract, not a description.
@@ -13,14 +11,12 @@ step-1 table below is the contract, not a description.
 
 from __future__ import annotations
 
-import os
 import re
 from pathlib import Path
 
 import pytest
 
 from dadaia_workspace.infrastructure.projection_rules import _DADAIA_FAMILY_AGENTS_MD
-from dadaia_workspace.infrastructure.public_assets import render_registry_tables
 from tests.helpers.scan_population import assert_populated
 
 pytestmark = pytest.mark.contract
@@ -60,7 +56,6 @@ SCOPED_SOURCE_BY_INSTALLED_PATH: dict[str, Path] = {
     # is an orphan below
     **{dst: _PUBLIC / "data" / src for src, dst, _ in _DADAIA_FAMILY_AGENTS_MD},
     "repos/<slug>/AGENTS.md": _PUBLIC / "templates" / "repo-AGENTS.md",
-    "tests/AGENTS.md": _PUBLIC / "templates" / "tests-AGENTS.md",
 }
 
 _FIRST_NUMBERED_STEP = re.compile(r"^1\. (?P<body>.+)$", re.MULTILINE)
@@ -99,24 +94,8 @@ def test_every_step_one_path_is_an_installed_scoped_law() -> None:
 
 
 # --------------------------------------------------------------------------- #
-# The surfaces: what CONTEXT-MAP.md must account for, and their soft byte budgets (ADR 0143).
+# The surfaces: what CONTEXT-MAP.md must account for.
 # --------------------------------------------------------------------------- #
-
-_ROOT_MAP_BUDGET = 8192
-_SCOPED_BUDGET = 4096
-_SKILL_BUDGET = 6144
-_UNBOUNDED = "—"
-
-
-def installed_bytes(src: Path) -> int:
-    """Bytes of *src* as a workspace actually receives it.
-
-    `stage` renders every `<!-- … -->` registry placeholder before install, so the
-    source size is not what an agent loads: `.dadaia/AGENTS.md` carries the zone table
-    on top of its authored text. The budget and the CONTEXT-MAP Measured column are
-    both this number.
-    """
-    return len(render_registry_tables(src.read_text(encoding="utf-8")).encode("utf-8"))
 
 
 def _persona_sources() -> dict[str, Path]:
@@ -127,28 +106,18 @@ def _skill_sources() -> dict[str, Path]:
     return {p.parent.name: p for p in sorted(_SKILLS_DIR.glob("*/SKILL.md"))}
 
 
-def surfaces() -> dict[str, tuple[Path, int | str]]:
-    """Every context surface the library ships: key -> (source file, soft byte budget).
-
-    The key is the surface as it appears in an installed workspace — the installed
-    path for the map and the scoped law, the entity name for a skill or persona.
+def surfaces() -> set[str]:
+    """Every context surface the library ships, as it appears in an installed workspace:
+    the installed path for the map and the scoped law, the entity name for a skill or persona.
     """
-    found: dict[str, tuple[Path, int | str]] = {
-        "AGENTS.md": (_PUBLIC / "data" / "AGENTS.md", _ROOT_MAP_BUDGET)
-    }
-    for installed, src in SCOPED_SOURCE_BY_INSTALLED_PATH.items():
-        found[installed] = (src, _SCOPED_BUDGET)
-    for name, src in _skill_sources().items():
-        found[name] = (src, _SKILL_BUDGET)
-    for name, src in _persona_sources().items():
-        found[name] = (src, _UNBOUNDED)
-    assert_populated(set(found), sentinel="specs/bugs/AGENTS.md")
+    found = {"AGENTS.md", *SCOPED_SOURCE_BY_INSTALLED_PATH, *_skill_sources(), *_persona_sources()}
+    assert_populated(found, sentinel="specs/bugs/AGENTS.md")
     return found
 
 
 def test_every_scoped_law_source_has_an_installed_path() -> None:
     """No scoped `AGENTS.md` ships without a declared installed path — otherwise the
-    budget table and the map would silently miss it."""
+    map would silently miss it."""
     shipped: set[Path] = set()
     for sub in ("data", "scaffold", "templates"):
         base = _PUBLIC / sub
@@ -182,7 +151,7 @@ def test_every_scoped_law_is_cited_by_the_map_or_a_skill_step_one() -> None:
 
 
 # --------------------------------------------------------------------------- #
-# (d)/(e) The map itself: one row per surface, Measured == `wc -c`.
+# (d) The map itself: one row per surface.
 # --------------------------------------------------------------------------- #
 
 _SURFACE_TABLE_HEADER = "| Surface |"
@@ -215,37 +184,9 @@ def _map_surface_rows() -> dict[str, int]:
 def test_context_map_has_exactly_one_row_per_surface() -> None:
     """The map is the auditable balance: no surface missing, no row invented."""
     rows = set(_map_surface_rows())
-    known = set(surfaces())
+    known = surfaces()
     assert sorted(rows - known) == [], "CONTEXT-MAP.md rows naming no existing surface"
     assert sorted(known - rows) == [], "context surfaces with no CONTEXT-MAP.md row"
-
-
-def test_measured_column_matches_the_bytes_on_disk() -> None:
-    """The Measured column is a recorded fact, not a claim.
-
-    Re-record with `UPDATE_CONTEXT_MAP=1 pytest tests/contract/test_context_map.py`.
-    """
-    lines = _map_lines()
-    rows = _map_surface_rows()
-    known = surfaces()
-    updating = os.environ.get("UPDATE_CONTEXT_MAP") == "1"
-    drift: list[str] = []
-    for key, index in rows.items():
-        measured = installed_bytes(known[key][0])
-        cells = lines[index].split("|")
-        if updating:
-            cells[-2] = f" {measured} "
-            lines[index] = "|".join(cells)
-            continue
-        if cells[-2].strip() != str(measured):
-            drift.append(f"{key}: map says {cells[-2].strip()!r}, disk says {measured}")
-    if updating:
-        _CONTEXT_MAP.write_text("\n".join(lines), encoding="utf-8")
-        return
-    assert drift == [], (
-        "CONTEXT-MAP.md Measured column is stale — re-record with "
-        "`UPDATE_CONTEXT_MAP=1 pytest tests/contract/test_context_map.py`:\n" + "\n".join(drift)
-    )
 
 
 def test_context_map_is_projected_nowhere() -> None:

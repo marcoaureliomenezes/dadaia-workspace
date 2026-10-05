@@ -1,6 +1,4 @@
-"""Intent: CONTRACT — 0.4.7 FR3 / T-047-76: four behaviours, N hook formats.
-
-A hook exists ONLY as the per-harness implementation of a deterministic behaviour the
+"""A hook exists ONLY as the per-harness implementation of a deterministic behaviour the
 workspace defines. This contract pins both halves of that sentence against the live
 projection table, not against a hand-listed set of harnesses. Coverage (the gate judges
 every harness's native payload) is proven by payload parity, not string search:

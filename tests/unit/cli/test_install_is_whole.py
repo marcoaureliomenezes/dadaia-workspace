@@ -1,8 +1,6 @@
 """Every public install is whole: no scope flag exists, and the staged set is the
 public walk's set.
 
-Intent: CONTRACT — sa-scoped-public-install-prunes-the-gate-wiring (WP-08)
-
 sa-scoped-public-install-prunes-the-gate-wiring#L1 and #L4.
 """
 

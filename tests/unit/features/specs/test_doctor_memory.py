@@ -1,4 +1,4 @@
-"""Intent: CONTRACT — v0.5.1 T-051-22 rework: MEM-DRIFT-1, the features package-map
+"""v0.5.1 T-051-22 rework: MEM-DRIFT-1, the features package-map
 diagram in ARCHITECTURE.md vs the live ``dadaia_workspace/features`` packages (bug
 push-gate-test-pins-memory-package-count-that-only-closure-may-change).
 

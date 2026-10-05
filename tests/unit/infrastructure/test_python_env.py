@@ -1,6 +1,6 @@
 """VenvPythonEnvironmentManager — the workspace venv bootstrap, over a faked subprocess.
 
-Intent: CONTRACT — bug init-venv-never-installs-dadaia-workspace (VENV-1 coherence);
+bug init-venv-never-installs-dadaia-workspace (VENV-1 coherence);
 bug init-venv-installs-index-version-not-running-distribution; bug
 certify-cannot-install-installed-provider; bug init-succeeds-after-provider-bootstrap-failure;
 bug init-venv-bootstrap-inherits-degraded-base-python; 0.4.8 AC1.6, AC2.1-AC2.3; v0.4.3 A9.1-A9.3.
@@ -64,10 +64,22 @@ def _venv(ws: Path) -> str:
     return str(ws / ".dadaia" / ".venv")
 
 
-def _healthy(ws: Path) -> None:
+def _python(ws: Path) -> str:
+    return str(Path(_venv(ws)) / PLATFORM.venv_scripts_dir / f"python{PLATFORM.venv_exe_suffix}")
+
+
+# The entry-script forms pip's distlib writes over the interpreter path.
+_PLAIN = "#!{}3.12\n"
+_SPACED = "#!/bin/sh\n'''exec' \"{}3.12\" \"$0\" \"$@\"\n' '''\n"  # a path with a space
+_LONG = "#!/bin/sh\n'''exec' {}3.12 \"$0\" \"$@\"\n' '''\n"  # a shebang over 127 bytes
+_LAUNCHER = 'MZ\x90\x00launcher\x00PK#!"{}"\r\n'  # Windows: launcher bytes, then the shebang
+
+
+def _healthy(ws: Path, root: Path | None = None, form: str = _PLAIN) -> None:
+    """The ``dadaia`` entrypoint in ``form``, naming ``root``'s venv python (``ws``'s by default)."""
     entry = Path(_venv(ws)) / PLATFORM.venv_scripts_dir / f"dadaia{PLATFORM.venv_exe_suffix}"
     entry.parent.mkdir(parents=True)
-    entry.write_text("#!stub")
+    entry.write_bytes(form.format(_python(root or ws)).encode("utf-8"))
 
 
 def _wheel_install(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -82,22 +94,22 @@ def _wheel_install(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
 def test_fresh_bootstrap_creates_venv_and_installs_package(
     tmp_path: Path, recorder: _Recorder
 ) -> None:
-    """Resolved interpreter creates the venv, then the editable checkout, then pytest."""
+    """Resolved interpreter creates the venv, then the editable checkout; no dev tool."""
     mgr = VenvPythonEnvironmentManager()
     assert mgr.ensure_workspace_venv(str(tmp_path)) == _venv(tmp_path)
 
-    create, install, toolchain = recorder.commands
+    create, install = recorder.commands
     assert create[:3] == ["fake-interpreter", "-m", "venv"] and create[-1] == _venv(tmp_path)
-    assert install[:2] == [mgr.pip_executable(str(tmp_path)), "install"]
+    assert install[:4] == [_python(tmp_path), "-m", "pip", "install"]
     assert "--editable" in install and (Path(install[-1]) / "pyproject.toml").is_file()
-    assert toolchain[-1] == "pytest"
+    assert not any("pytest" in argv for argv in recorder.commands)
 
 
 def test_existing_bare_venv_is_repaired_not_skipped(tmp_path: Path, recorder: _Recorder) -> None:
     """The VENV-1 state: venv dir present, entrypoint missing -> install, no re-create."""
     (Path(_venv(tmp_path)) / PLATFORM.venv_scripts_dir).mkdir(parents=True)
     VenvPythonEnvironmentManager().ensure_workspace_venv(str(tmp_path))
-    assert (recorder.venv_created, len(recorder.commands)) == ([], 2)
+    assert (recorder.venv_created, len(recorder.commands)) == ([], 1)
 
 
 def test_healthy_venv_is_a_noop(tmp_path: Path, recorder: _Recorder) -> None:
@@ -133,10 +145,50 @@ def test_reinit_reinstalls_only_an_older_venv(
     _healthy(tmp_path)
     recorder.installed = installed if " " in installed else f"{installed} {build_digest(None)}"
     VenvPythonEnvironmentManager().ensure_workspace_venv(str(tmp_path))
-    pip = VenvPythonEnvironmentManager().pip_executable(str(tmp_path))
-    assert [c[:3] for c in recorder.commands[:1]] == (
-        [[pip, "install", "--quiet"]] if installs else []
+    assert [c[:4] for c in recorder.commands[:1]] == (
+        [[_python(tmp_path), "-m", "pip", "install"]] if installs else []
     )
+
+
+@pytest.mark.parametrize(
+    ("ws_name", "origin", "form", "installs"),
+    [
+        ("ws", "", _PLAIN, False),
+        ("ws", "", _SPACED, False),
+        ("ws", "", _LONG, False),
+        ("ws", "", _LAUNCHER, False),
+        ("jo\u00e3o", "", _PLAIN, False),
+        ("ws", "orig", _PLAIN, True),
+        ("ws", "orig", _SPACED, True),
+        ("ws", "deep", _PLAIN, True),
+    ],
+    ids=["own", "own-spaced", "own-long", "own-launcher", "own-non-ascii"]
+    + ["copy", "copy-spaced", "copy-suffix-of-original"],
+)
+def test_reinit_reinstalls_a_venv_whose_entrypoint_names_another_root(
+    tmp_path: Path,
+    recorder: _Recorder,
+    monkeypatch: pytest.MonkeyPatch,
+    ws_name: str,
+    origin: str,
+    form: str,
+    installs: bool,
+) -> None:
+    """Bug init-on-a-copied-workspace-leaves-a-cli-bound-to-the-original: ``cp -a orig ws``
+    keeps the build but the entry scripts name the original's python, so the copy is
+    reinstalled by its OWN python — also when the original's path ends with the copy's."""
+    install_fake_dist(monkeypatch, "1.0.0")
+    ws = tmp_path / ws_name
+    names = {
+        "": ws,
+        "orig": tmp_path / "orig",
+        "deep": tmp_path / "deep" / ws.relative_to(tmp_path.anchor),
+    }[origin]
+    _healthy(ws, names, form)
+    recorder.installed = f"1.0.0 {build_digest(None)}"
+    VenvPythonEnvironmentManager().ensure_workspace_venv(str(ws))
+    python = _python(ws)
+    assert [c[:3] for c in recorder.commands] == ([[python, "-m", "pip"]] if installs else [])
 
 
 @pytest.mark.parametrize(("installed", "running"), [("1.0.0+e2e", "1.0.0"), ("0.5.0rc1", "0.4.7")])
@@ -209,7 +261,7 @@ def test_bootstrap_installs_the_repacked_running_distribution(
     ws = tmp_path / "ws"
     VenvPythonEnvironmentManager().ensure_workspace_venv(str(ws))
 
-    assert [c[-1] for c in recorder.commands[1:]] == [str(written[0]), "pytest"]
+    assert [c[-1] for c in recorder.commands[1:]] == [str(written[0])]
     assert not any("==" in token for call in recorder.commands for token in call)
     assert not written[0].exists() and not (ws / ".dadaia" / "tmp").exists()
 

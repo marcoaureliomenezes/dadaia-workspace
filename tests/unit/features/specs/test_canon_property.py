@@ -1,4 +1,4 @@
-"""Intent: CONTRACT — v0.5.1 K4, "one canon table: scaffold is canon rendered, doctor
+"""v0.5.1 K4, "one canon table: scaffold is canon rendered, doctor
 is canon checked."
 
 The property this task exists to hold: for every shape the scaffolder produces,

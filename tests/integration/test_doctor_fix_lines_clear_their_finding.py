@@ -1,6 +1,4 @@
-"""Intent: CONTRACT — 0.4.7 FR2 (T-047-14), doctor-messages-cite-dead-verbs.
-
-A doctor fix line CLEARS its own finding.
+"""A doctor fix line CLEARS its own finding.
 
 ``tests/contract/test_every_block_carries_a_fix.py`` proves the fix line is one
 executable command that the gate lets through. That grammar says nothing about what the
@@ -16,9 +14,8 @@ Two verdicts, one per rule class:
 
 * a rule that carries ``fix_help`` — the command runs (``bash -c``, cwd = the fixture)
   and the rule must then emit nothing;
-* a rule that carries none — its remedy is judgment (split a PLAN, migrate a deprecated
-  layout), so every finding it emits must be WARNING: a warning never exits 1, so the
-  operator is informed, never stalled.
+* a rule that carries none — its remedy is judgment, so every finding it emits must be
+  WARNING: a warning never exits 1, so the operator is informed, never stalled.
 
 The registry below is the census: a rule with no plant is skipped with the reason it
 cannot be exercised here, and the census test pins that every rule is accounted for.
@@ -57,7 +54,6 @@ from dadaia_workspace.features.specs.citations import dead_verb_citations
 from dadaia_workspace.features.specs.doctor import SpecsDoctor
 from dadaia_workspace.features.specs.rules import RULES as SPECS_RULES
 from dadaia_workspace.infrastructure.git_subprocess import GitSubprocessClient
-from tests.fixtures.harness_env import session_home
 from tests.fixtures.stores import context_store
 from tests.helpers import worktree_ws
 
@@ -134,24 +130,10 @@ def _plant_status_line_gone(root: Path) -> None:
     (release / "TASKS.md").write_text("# Tasks\n\n**Status:** approved\n" + "- t\n" * 170)
 
 
-def _plant_oversized_plan(root: Path) -> None:
-    plan = root / "specs" / "releases" / _RELEASE / "rc-1" / "PLAN.md"
-    body = "\n".join(f"- line {i}" for i in range(400))
-    plan.write_text(f"# Plan\n\n**Status:** Approved\n\n{body}\n", encoding="utf-8")
-
-
 def _plant_changelog_heading(root: Path) -> None:
     atom = root / "specs" / "memory" / "product" / "testarea" / "feature-a.md"
     atom.write_text(
         atom.read_text(encoding="utf-8") + "\n## Changelog\n\n- 1.0.0 born\n", encoding="utf-8"
-    )
-
-
-def _plant_tests_agents_placeholder(root: Path) -> None:
-    tests_dir = root / "tests"
-    tests_dir.mkdir(exist_ok=True)
-    (tests_dir / "AGENTS.md").write_text(
-        "# Test Rules\n\nThe LARGE cap is `<LARGE_CAP>`.\n", encoding="utf-8"
     )
 
 
@@ -214,9 +196,7 @@ PLANTS: dict[str, Plant] = {
     "MEM-PLACEHOLDER-1": Plant(_plant_placeholder_atom),
     "FIXED-1": Plant(_plant_fixed_block_gone),
     "FIXED-2": Plant(_plant_fixed_block_drifted),
-    "SPEC-DOC-005": Plant(_plant_oversized_plan),
     "GITFLOW-1": Plant(_plant_gitflow_gone, {"<specs>": "specs"}),
-    "AGENTS-PLACEHOLDER-1": Plant(_plant_tests_agents_placeholder),
     "SPEC-DOC-041": Plant(
         lambda r: _write(
             r / "specs/bugs/BUGS.jsonl",
@@ -323,7 +303,6 @@ def test_the_fix_line_clears_the_finding_it_was_stamped_on(
     done = subprocess.run(
         ["bash", "-c", command],
         cwd=root,
-        env={**os.environ, "HOME": str(session_home())},
         capture_output=True,
         text=True,
         check=False,
@@ -439,7 +418,7 @@ def test_an_operator_action_names_the_file_to_change(code: str, repo: Path) -> N
     `Operator action:` line naming the finding's own file — never a placeholder."""
     root = repo
     OPERATOR_ACTION[code](root)
-    ledgers = _ledgers_section(None, root / "specs", str(root), None)
+    ledgers = _ledgers_section(None, root / "specs")
     found = [f for f in (*_specs_section(_doctor(root), None).findings, *ledgers.findings) if f.code == code]  # fmt: skip
     assert found, f"{code}: the fixture did not make the rule fire"
     for finding in found:
@@ -457,7 +436,7 @@ def test_an_untraced_origin_id_is_cleared_by_its_printed_fix(repo: Path) -> None
     spec.write_text(spec.read_text("utf-8").replace("operator-demand", "backlog:carried"), "utf-8")
 
     def origin_errors() -> list[SectionFinding]:
-        found = _ledgers_section(None, specs, str(repo), None).findings
+        found = _ledgers_section(None, specs).findings
         rows = [f for f in found if "Origin" in f.message]
         assert all(f.error for f in rows), rows  # a listing row never reaches the doctor
         return rows
@@ -480,15 +459,13 @@ def test_a_judgment_only_rule_never_makes_the_run_exit_1(repo: Path) -> None:
     sa-memory-atom-has-two-grammars#B29-6: a history heading planted beside them is
     reported once, by LINT-1 — CAT-1 and SPEC-DOC-008 do not exist."""
     root = repo
-    for code in ("SPEC-DOC-005", "AGENTS-PLACEHOLDER-1"):
-        PLANTS[code].plant(root)
     _plant_changelog_heading(root)
     for plant in REPORT_ONLY.values():
         plant(root)
 
     report = _specs_section(_doctor(root), Path())
     fired = {f.code for f in report.printable}
-    assert {"SPEC-DOC-005", "AGENTS-PLACEHOLDER-1", *REPORT_ONLY} <= fired, fired
+    assert set(REPORT_ONLY) <= fired, fired
     assert not {"CAT-1", "SPEC-DOC-008", "SPEC-DOC-010"} & fired, fired
     history = [f for f in report.findings if "Changelog" in f.message]
     assert [(f.code, f.error) for f in history] == [("LINT-1", True)], history
@@ -512,7 +489,6 @@ _PLACEHOLDERS = (
     "<!-- zones -->",
     "<!-- canon -->",
     "<!-- root -->",
-    "<!-- repo-excluded -->",
     "<!-- specs-canon -->",
 )
 
@@ -587,7 +563,7 @@ def test_the_session_lane_re_creates_missing_core_and_rewrites_none(
     present: str,
     plant: Callable[[Path, Path], None],
 ) -> None:
-    """Intent: CONTRACT — AC2.4 (ADR 0096): the SessionStart lane re-creates a missing level-1
+    """AC2.4 (ADR 0096): the SessionStart lane re-creates a missing level-1
     entry (`.dadaiaignore`, `prompt.md`, every provisioned zone) and rewrites no present one —
     a dangling link is present, never written through."""
     (tmp_path / ".dadaia" / "states").mkdir(parents=True)

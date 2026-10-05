@@ -1,6 +1,6 @@
 """The shipped record schemas: closed envelopes, and what each accepts and refuses.
 
-Intent: CONTRACT — handoff-v1 (DADAIA §5.4; sa-handoff-self-pull-requirement-diverges#46.1,
+handoff-v1 (DADAIA §5.4; sa-handoff-self-pull-requirement-diverges#46.1,
 sa-handoff-self-pull-requirement-diverges#46.2, sa-handoff-self-pull-requirement-diverges#46.3:
 one ``jsonschema`` engine, one verdict per doc); bug-record-v1 (SPEC v0.5.0 A2.1); finding-record-v1
 (A13.1); decision-record-v1 (v0.5.0 specs-canon closure); release-state-v1 (no ``rc`` at any depth).

@@ -1,6 +1,6 @@
 """The onboarding journey in three levels, driven through ``uvx`` over file:// bare repos.
 
-Intent: CONTRACT — 0.4.8 FR8 / AC8.1, AC8.2 (T-048-01); 0.5.0 FR10 / AC10.1–AC10.3
+0.4.8 FR8 / AC8.1, AC8.2 (T-048-01); 0.5.0 FR10 / AC10.1–AC10.3
 (T-050-21: the autopilot loop executes only printed fix lines).
 
 Owner: dd-software-engineer (LARGE-tier e2e; tests/AGENTS.md "every file names an owner").
@@ -41,6 +41,7 @@ import pytest
 
 from dadaia_workspace.core.platform import PLATFORM
 from tests.conftest import GIT_QUIET_INCLUDE
+from tests.fixtures.harness_env import base_env
 from tests.helpers.previous_release import previous_release, published_releases
 
 _UVX = shutil.which("uvx")
@@ -80,9 +81,8 @@ class Env:
         self.home_dir.mkdir(parents=True)
         self.fixtures.mkdir()
         # No inherited session identity: a scenario that wants one sets DADAIA_SESSION_ID.
-        harness_ids = ("CLAUDE_CODE_SESSION_ID", "CODEX_SESSION_ID", "CODEX_THREAD_ID")
-        self.env = {k: v for k, v in os.environ.items()
-                    if not k.startswith("DADAIA_") and k not in harness_ids}  # fmt: skip
+        self.env = {k: v for k, v in base_env().items()
+                    if not k.startswith("DADAIA_") or k == "DADAIA_FENCED_ROOTS"}  # fmt: skip
         # The journey is a consumer: it must import the uvx-installed wheel, never this checkout.
         self.env.pop("PYTHONPATH", None)
         self.env.pop("VIRTUAL_ENV", None)
@@ -189,18 +189,6 @@ class Workspace:
         assert head == remote, f"{repo_slug}: HEAD {head} != remote {remote}"
 
 
-def _specs_scaffolded(ws: Workspace, slug: str) -> None:
-    """AC4.1/4.2: canon present, English law sections, nothing committed."""
-    specs = ws.path / "repos" / slug / "specs"
-    assert (specs / "constitution.md").is_file()
-    arch = (specs / "memory" / "ARCHITECTURE.md").read_text("utf-8")
-    quality = (specs / "memory" / "QUALITY.md").read_text("utf-8")
-    for heading in ("## Principles", "## Tech Stack", "## Structure"):
-        assert heading in arch
-    for heading in ("## Principles", "## Test architecture", "## Gates"):
-        assert heading in quality
-
-
 # ── fixtures ─────────────────────────────────────────────────────────────────────
 
 
@@ -237,7 +225,7 @@ def wheel(tmp_path_factory: pytest.TempPathFactory) -> Path:
         capture_output=True,
         text=True,
         timeout=_TIMEOUT,
-        env={**os.environ, "PIP_NO_INDEX": "1"},
+        env=base_env() | {"PIP_NO_INDEX": "1"},
     )
     (built,) = dist.glob("dadaia_workspace-*.whl")
     assert "+e2e" in built.name, built.name
@@ -308,7 +296,6 @@ def test_an_operator_journey_from_the_previous_release(env: Env) -> None:
     assert any("specs init --context second" in fix for fix in fixes), fixes  # AC6.1
     done = ws.dadaia("specs", "init", "--context", "second")
     assert done.returncode == 0, f"{done.stdout}\n{done.stderr}"
-    _specs_scaffolded(ws, "second")
     ws.assert_level_clean("second", "second", repos["second"])
 
 

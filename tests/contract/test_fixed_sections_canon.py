@@ -1,6 +1,4 @@
-"""Intent: CONTRACT — 0.4.6 AC11 (fixed law sections: one fragment home, scaffold and doctor agree).
-
-Size: SMALL. Reads the library's fragments and scaffold templates, scaffolds a fresh
+"""Size: SMALL. Reads the library's fragments and scaffold templates, scaffolds a fresh
 tree into tmp and runs the doctor over it — the expected bytes are the fragments.
 """
 

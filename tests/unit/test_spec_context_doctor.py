@@ -18,7 +18,10 @@ from dadaia_workspace.core.models.spec_context import (  # noqa: E402
     SpecContextProject,
 )
 from dadaia_workspace.core.platform import PLATFORM  # noqa: E402
-from dadaia_workspace.features.spec_context.doctor import DoctorService  # noqa: E402
+from dadaia_workspace.features.spec_context.doctor import (  # noqa: E402
+    DoctorService,
+    workspace_rules,
+)
 from dadaia_workspace.infrastructure.git_subprocess import GitSubprocessClient
 from dadaia_workspace.infrastructure.json_context_store import JsonContextStore
 from tests.fixtures.stores import context_store
@@ -88,7 +91,7 @@ def _with_lib(ctx: SpecContextProject) -> SpecContextProject:
 def test_inv4_names_a_missing_main_or_associated_repo_with_the_alive_fix(
     tmp_path: Path, missing: str
 ) -> None:
-    """Intent: CONTRACT — sa-context-dead-removes-repos-outside-the-reaper#C6: INV-4 iterates all_repos(); its fix is `context alive`."""
+    """sa-context-dead-removes-repos-outside-the-reaper#C6: INV-4 iterates all_repos(); its fix is `context alive`."""
     ctx = _with_lib(_ctx("missing", state=ContextState.ALIVE))
     present = {"missing", "lib"} - {missing}
     for slug in present:
@@ -103,6 +106,24 @@ def test_inv4_names_a_missing_main_or_associated_repo_with_the_alive_fix(
     assert inv4[0].fix.endswith("dadaia context alive missing")
 
 
+@pytest.mark.parametrize(
+    ("context", "expected"),
+    [("alpha", ["repos/alpha/.dadaia"]), (None, ["repos/alpha/.dadaia", "repos/beta/.dadaia"])],
+)
+def test_the_repo_tree_walk_judges_only_the_run_context(
+    tmp_path: Path, context: str | None, expected: list[str]
+) -> None:
+    """AC10.4: slop only in another context's repo is neither reported nor reaped."""
+    for name in ("alpha", "beta"):
+        (tmp_path / "repos" / name / ".dadaia").mkdir(parents=True)
+    svc, _ = _make_doctor(tmp_path, [_ctx(n, state=ContextState.ALIVE) for n in ("alpha", "beta")])
+    found = [f.message.split()[0] for r in workspace_rules(context=context) for f in r.run(svc)]
+    assert sorted(path for path in found if path.endswith("/.dadaia")) == expected
+    svc.fix(context)
+    left = sorted(p.parent.name for p in (tmp_path / "repos").glob("*/.dadaia"))
+    assert left == ([] if context is None else ["beta"])
+
+
 # ---------------------------------------------------------------------------
 # INV-5: DEAD context must not have repo on disk — detected, fixable, fix() removes
 # ---------------------------------------------------------------------------
@@ -110,7 +131,7 @@ def test_inv4_names_a_missing_main_or_associated_repo_with_the_alive_fix(
 
 @pytest.mark.parametrize("slug", ["stale", "lib"])
 def test_inv5_holds_a_main_or_associated_repo_of_a_dead_context(tmp_path: Path, slug: str) -> None:
-    """Intent: CONTRACT — sa-context-dead-removes-repos-outside-the-reaper#C5: INV-5 iterates all_repos(); --fix HOLDS, never deletes. sa-doctor-finding-has-four-shapes: the invariant is a SectionFinding, emitted directly."""
+    """sa-context-dead-removes-repos-outside-the-reaper#C5: INV-5 iterates all_repos(); --fix HOLDS, never deletes. sa-doctor-finding-has-four-shapes: the invariant is a SectionFinding, emitted directly."""
     ctx = _with_lib(_ctx("stale", state=ContextState.DEAD))
     repo_dir = tmp_path / "repos" / slug
     repo_dir.mkdir(parents=True)
@@ -136,7 +157,7 @@ def test_inv5_holds_a_main_or_associated_repo_of_a_dead_context(tmp_path: Path, 
 
 
 def test_inv6_main_repo_slug_collision_reported_not_fixable(tmp_path: Path) -> None:
-    """Intent: CONTRACT — T-045-22 (S3-FR9-ruling.md), main/main collision."""
+    """T-045-22 (S3-FR9-ruling.md), main/main collision."""
     a = _ctx("a", repo_slug="x")
     b = _ctx("b", repo_slug="x")
     svc, _ = _make_doctor(tmp_path, [a, b])
@@ -146,7 +167,7 @@ def test_inv6_main_repo_slug_collision_reported_not_fixable(tmp_path: Path) -> N
 
 
 def test_inv6_main_vs_associated_slug_collision_reported(tmp_path: Path) -> None:
-    """Intent: CONTRACT — T-045-22 (S3-FR9-ruling.md), main-vs-associated collision."""
+    """T-045-22 (S3-FR9-ruling.md), main-vs-associated collision."""
     a = _ctx("a", repo_slug="x")
     b = SpecContextProject(
         name="b",
@@ -163,7 +184,7 @@ def test_inv6_main_vs_associated_slug_collision_reported(tmp_path: Path) -> None
 
 
 def test_inv5_fix_refuses_a_dead_slug_that_resolves_outside_repos(tmp_path: Path) -> None:
-    """Intent: CONTRACT — bug import-registers-unvalidated-slugs-that-doctor-fix-inv5-rmtrees.
+    """bug import-registers-unvalidated-slugs-that-doctor-fix-inv5-rmtrees.
     A DEAD record whose slug resolves outside ``<workspace>/repos/`` (``..`` is the workspace
     root itself) is never rmtree'd: the step reports a skipped action and every entry of
     the workspace survives."""
@@ -184,7 +205,7 @@ def test_inv5_fix_refuses_a_dead_slug_that_resolves_outside_repos(tmp_path: Path
 
 
 def test_inv5_fix_never_follows_a_symlinked_repo_dir(tmp_path: Path) -> None:
-    """Intent: CONTRACT — same bug, the CWE-59 shape: ``repos/<slug>`` is a symlink out of
+    """same bug, the CWE-59 shape: ``repos/<slug>`` is a symlink out of
     ``repos/``; the target is neither removed nor emptied."""
     outside = tmp_path / "outside"
     outside.mkdir()

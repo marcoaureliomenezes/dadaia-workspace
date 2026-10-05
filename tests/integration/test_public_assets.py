@@ -1,4 +1,4 @@
-"""Intent: CONTRACT — v0.4.5 A4.1-4.3: the authority for public stage, install and drift
+"""v0.4.5 A4.1-4.3: the authority for public stage, install and drift
 (rosters, the source-root refusal, hash-compare overwrite/skip/force, the privacy gate,
 model-policy rendering, single-place skill rename). Size: MEDIUM — real projection I/O.
 """
@@ -80,10 +80,6 @@ def test_stage_manifest_and_install_all(tmp_path: Path, monkeypatch: pytest.Monk
     assert {p.stem for p in (workspace / ".claude" / "agents").glob("*.md")} == _AGENTS
     assert (workspace / ".codex" / "hooks.json").exists()
     assert (workspace / ".codex" / "config.toml").exists()
-    # Codex receives Starlark .rules for command policy. Markdown behavioral
-    # protocols remain guidance, not executable Codex Rules.
-    assert not (workspace / ".codex" / "rules" / "game-agents-coordination.md").exists()
-    assert not (workspace / ".codex" / "rules" / "game-developer-scope.md").exists()
     assert (workspace / ".codex" / "rules" / "dadaia-command-policy.rules").exists()
 
 
@@ -401,7 +397,7 @@ def test_model_policy_overlay_lockstep_rendering_invalid_fails_loud_and_doctor_r
 def test_a_single_skill_rename_is_green_everywhere_after_one_place(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Intent: CONTRACT — v0.4.5 A4.1, A4.2, A4.3
+    """v0.4.5 A4.1, A4.2, A4.3
 
     Executed proof (not reasoning) that ``tests.helpers.skill_inventory_oracle`` is the
     ONE shared source every former hand-kept inventory now reads. This seam produced

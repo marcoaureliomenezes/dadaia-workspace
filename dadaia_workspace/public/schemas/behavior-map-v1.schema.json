@@ -12,10 +12,15 @@
       "const": "behavior-map-v1",
       "description": "Schema version identifier. Must equal 'behavior-map-v1'."
     },
+    "skill_md_line_soft": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "ADR 0170: over it, doctor warns SKILL-MD-LENGTH and names the split into references/*.md and/or scripts/."
+    },
     "skill_md_line_ceiling": {
       "type": "integer",
       "minimum": 1,
-      "description": "Ported from rules-skills-map-v1 unchanged (FR9/G12) — the declared line-count ceiling a SKILL.md's own content must stay within."
+      "description": "ADR 0170: the hard SKILL.md line limit, held by the library's contract test."
     },
     "standalone_skills": {
       "type": "array",

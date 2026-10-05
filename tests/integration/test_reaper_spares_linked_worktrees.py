@@ -1,4 +1,4 @@
-"""Intent: CONTRACT — reaper-deletes-linked-git-worktrees: `sweep.remove`/`sweep.move`,
+"""reaper-deletes-linked-git-worktrees: `sweep.remove`/`sweep.move`,
 the one chokepoint of every reaper deletion and slop move, never touches a registered
 linked worktree — an expired one under `.dadaia/tmp/` or one at an unlisted root entry.
 AC1.10: the doctor lists the context's worktrees from git and touches none — a canonical one
@@ -21,7 +21,6 @@ import pytest
 
 from dadaia_workspace.features.spec_context.doctor import DoctorService
 from dadaia_workspace.infrastructure.git_subprocess import GitSubprocessClient
-from tests.conftest import _GIT_QUIET
 from tests.fixtures.stores import context_store
 from tests.helpers import worktree_ws
 
@@ -31,18 +30,7 @@ pytestmark = pytest.mark.slow(reason="real git init + worktree add subprocesses"
 
 
 def _git(cwd: Path, *args: str) -> str:
-    env = {
-        **os.environ,
-        "GIT_CONFIG_GLOBAL": str(_GIT_QUIET),
-        "GIT_CONFIG_SYSTEM": os.devnull,
-        "GIT_AUTHOR_NAME": "t",
-        "GIT_AUTHOR_EMAIL": "t@example.invalid",
-        "GIT_COMMITTER_NAME": "t",
-        "GIT_COMMITTER_EMAIL": "t@example.invalid",
-    }
-    done = subprocess.run(
-        ["git", *args], cwd=cwd, env=env, capture_output=True, text=True, check=True
-    )
+    done = subprocess.run(["git", *args], cwd=cwd, capture_output=True, text=True, check=True)
     return done.stdout
 
 

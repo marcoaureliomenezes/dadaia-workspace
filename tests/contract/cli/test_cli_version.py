@@ -1,4 +1,4 @@
-"""Intent: CONTRACT — bug cli-missing-version-flag (dadaia --version / -V), expected
+"""bug cli-missing-version-flag (dadaia --version / -V), expected
 value from an independent source: the fake dist-info, never the code's own reader
 (REWRITE; the -V twin is DELETE-DUP)."""
 

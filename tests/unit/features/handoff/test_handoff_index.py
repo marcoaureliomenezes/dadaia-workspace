@@ -1,6 +1,6 @@
 """Table-driven tests for ``core.handoff_index``.
 
-Intent: CONTRACT — release 0.5.1 K6 (one module owns version routing, the self_pull
+release 0.5.1 K6 (one module owns version routing, the self_pull
 rule and artifact resolution); sa-json-schema-validated-by-two-engines (jsonschema is the
 one engine).
 

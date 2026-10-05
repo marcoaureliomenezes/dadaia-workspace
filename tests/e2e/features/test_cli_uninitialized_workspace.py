@@ -7,7 +7,7 @@ full Python/Rich TRACEBACK — and two of them even exited 0 despite it. A CLI m
 surface a concise, actionable error and a NON-ZERO exit, never a traceback. server/plugin
 already did this per-command; this pins the whole class via the global entrypoint handler.
 
-Intent: CONTRACT — bug doctor-uninitialized-workspace-traceback
+bug doctor-uninitialized-workspace-traceback
 Owner: dd-software-engineer
 """
 

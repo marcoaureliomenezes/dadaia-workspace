@@ -1,6 +1,4 @@
-"""Intent: CONTRACT — v0.1.58 AC-4 and 0.4.6 AC9 (FR8, one profile writer); size: SMALL.
-
-``WorkspaceService.init`` persists the harness profile through the ONE writer,
+"""``WorkspaceService.init`` persists the harness profile through the ONE writer,
 ``JsonHarnessProfileStore.write`` — the service never spells the file (the inline
 ``_write_harness_profile`` copy is gone). Re-running ``init`` with the same set is a no-op
 (no spurious rewrite, no second hook entry). An absent profile file (a pre-v0.1.58 workspace)

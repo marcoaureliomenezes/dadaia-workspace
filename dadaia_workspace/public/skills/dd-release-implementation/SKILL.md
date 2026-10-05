@@ -25,10 +25,9 @@ description: >
 5. Read `RC-FLOW.md` for the candidate arc and gate cadence before acting past reservation.
 6. Update `_RELEASE.json` per `RELEASE-EVENTS.md`'s shape and `log` conventions.
 7. At `RC-FLOW.md` step 5, run `MEMORY-UPDATE.md`'s full protocol before touching any memory atom.
-8. Declare test intent at birth; pass the admission filter (`dd-test-stewardship`, intent and admission) before a test enters the suite.
+8. A test enters the suite only under the root map §1 test basics.
 9. Before growing any module, run the deletion test and speak the seam vocabulary (`dd-codebase-design`) — a diff that only adds justifies itself against replace-don't-layer.
 10. Implement inside the task's `impl` worktree, opened per `worktrees/AGENTS.md` §2.
-11. Handle demotion and quarantine/SCAFFOLD expiry at closure time only (`RC-FLOW.md` step 6).
 
 ## 2a. Push green
 
@@ -52,4 +51,3 @@ description: >
 - `RC-FLOW.md` — gate cadence table, the candidate arc, out-of-scope list.
 - `RELEASE-EVENTS.md` — `_RELEASE.json` shape, milestone ownership, `log` conventions.
 - `MEMORY-UPDATE.md` — closure memory protocol.
-- `dd-test-stewardship` (intent and admission) — the test admission filter.
