@@ -209,3 +209,13 @@ def test_a_row_missing_name_is_unreadable_at_every_method(
     keys = "name, repo_slug, repo_url, created_at"
     assert refused.value.fix == f"Operator action: add {keys} to that row of {path}"
     assert path.read_text(encoding="utf-8") == body
+
+
+def test_a_refused_row_is_named_by_its_name(tmp_path: Path) -> None:
+    """J2.S6.T6: the refusal names the row to repair; a row keeping its name is named."""
+    path = tmp_path / "spec_contexts.json"
+    row = {"name": "beta", "state": "alive", "repo_slug": "beta", "repo_url": "u"}
+    path.write_text(json.dumps({"schema_version": 3, "contexts": [row]}), encoding="utf-8")
+    with pytest.raises(SchemaVersionError) as refused:
+        JsonContextStore(tmp_path).list_all()
+    assert refused.value.problem == f"{path}: context row 'beta' has no created_at."
