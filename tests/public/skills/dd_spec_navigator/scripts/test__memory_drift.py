@@ -17,9 +17,9 @@ import pytest
 
 from tests.helpers.skill_scripts import stage_skill_scripts
 
-pytestmark = [pytest.mark.unit, pytest.mark.slow(reason="runs git over a tmp repository")]
+pytestmark = pytest.mark.slow(reason="runs git over a tmp repository")
 
-_REPO = Path(__file__).resolve().parents[3]
+_REPO = Path(__file__).resolve().parents[5]
 _SCRIPTS = _REPO / "dadaia_workspace" / "public" / "skills" / "dd-spec-navigator" / "scripts"
 
 _ATOM = """\

@@ -22,9 +22,7 @@ import pytest
 from dadaia_workspace.features.specs.memory_lint import lint_atom, load_frontmatter_schema
 from tests.helpers.skill_scripts import stage_skill_scripts
 
-pytestmark = pytest.mark.unit
-
-_REPO = Path(__file__).resolve().parents[3]
+_REPO = Path(__file__).resolve().parents[5]
 _PUBLIC = _REPO / "dadaia_workspace" / "public"
 _SCRIPTS = _PUBLIC / "skills" / "dd-spec-navigator" / "scripts"
 

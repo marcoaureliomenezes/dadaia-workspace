@@ -9,11 +9,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-import pytest
-
-pytestmark = pytest.mark.contract
-
-_REPO = Path(__file__).resolve().parents[2]
+_REPO = Path(__file__).resolve().parents[5]
 _SKILLS = _REPO / "dadaia_workspace" / "public" / "skills"
 _MEMORY = _SKILLS / "dd-spec-navigator" / "scripts" / "memory.py"
 
