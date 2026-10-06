@@ -18,18 +18,18 @@ Paths are relative to the repo root; aliases as in `PLAN.md` (`f/`, `pub/`, `S/`
 
 ## Stage J7.S2 — size from the fixture; the guard
 
-- Contract: exit tests J7.S1 green, unit + integration green; envelope `tests/conftest.py`, `tests/unit/conftest.py`, `pyproject.toml`, `scripts/ci.py`, `scripts/guards/suite.py`, `scripts/guards/run.py`, `.github/workflows/ci.yml`, `tests/AGENTS.md` (`:21-27`, the tier text), `tests/README.md`, `tests/integration/test_ci_script.py`, `tests/contract/test_release_script.py`; ACs AC7.3, AC7.4
+- Contract: exit: J7.S1 green, the stage gate (lint, mypy, guards, small) green; envelope `tests/conftest.py`, `tests/unit/conftest.py`, `pyproject.toml`, `scripts/ci.py`, `scripts/guards/suite.py`, `scripts/guards/run.py`, `.github/workflows/ci.yml`, `tests/AGENTS.md` (`:21-27`, the tier text), `tests/README.md`, `tests/integration/test_ci_script.py`, `tests/contract/test_release_script.py`; ACs AC7.3, AC7.4
 
 | task | AC | `W:` | owner tests / RED |
 |---|---|---|---|
 | J7.S2.T1 | AC7.3 | `tests/conftest.py` (`_PATH_MARKERS` leaves; size from the fixtures an item requests; `tests/unit/conftest.py`'s autouse moves here for `small` items, agent default 8), `tests/unit/conftest.py` (deleted), `pyproject.toml` (markers `small`, `medium`, `windows` added; `unit`, `contract`, `integration` stay registered as inert aliases until the last move), `scripts/guards/suite.py`, `scripts/guards/run.py` (the tier checks and the probe read the size marker, not the folder) | `test_conftest_size.py` |
-| J7.S2.T3 | AC7.3 | `tests/AGENTS.md` (`:21-27`: size from the fixture, never the folder), `tests/README.md` (the run commands) | no test |
+| J7.S2.T3 | AC7.3 | `tests/AGENTS.md` (`:21-27`: size from the fixture, never the folder), `tests/README.md` (the run commands), `pub/data/worktrees-AGENTS.md` (`:20`, the stage gate: lint, mypy, guards, small; closing line `stage: <id> — small green`), `pub/skills/dd-gitflow-default/SKILL.md` (`:65`, the same closing line) (Amends ADR 0190, stage level, by operator order 2026-10-06) | no test |
 | J7.S2.T4 | AC7.2 | `tests/contract/test_release_script.py` (the repo-root expression hoisted to one module constant, so the move leaves its assert line untouched) | `tests/contract/test_release_script.py` |
-| J7.S2.T2 | AC7.3, AC7.4 | `scripts/ci.py`, `.github/workflows/ci.yml` (select by marker, not folder; the Windows and macOS legs select `not e2e and not quarantine` and list the `windows-integration-coverage-gap` cases by marker), `tests/integration/test_ci_script.py` (its planted tests carry the new marker) | `tests/integration/test_ci_script.py`; check: the Windows job log lists them |
+| J7.S2.T2 | AC7.3, AC7.4 | `scripts/ci.py`, `.github/workflows/ci.yml` (the stage level drops the integration job: lint, typecheck, guards, the small tier; select by marker, not folder; the Windows and macOS legs select `not e2e and not quarantine` and list the `windows-integration-coverage-gap` cases by marker), `tests/integration/test_ci_script.py` (its planted tests carry the new marker) | `tests/integration/test_ci_script.py`; check: the Windows job log lists them |
 
 ## Stage J7.S3 — the moves, one feature per task
 
-- Contract: exit tests unit + integration + e2e green; AC7.2's assert check equal; every core, feature, cli, hooks and infrastructure test moved (the skills, scripts and suite tests move in J7.S4, after which no `tests/{unit,contract,integration}/` is left); envelope `tests/**`, `scripts/guards/*.py` (path literals), `pyproject.toml`; ACs AC7.1, AC7.2
+- Contract: exit: the stage gate (lint, mypy, guards, small) green; AC7.2's assert check equal; every core, feature, cli, hooks and infrastructure test moved (the skills, scripts and suite tests move in J7.S4, after which no `tests/{unit,contract,integration}/` is left); envelope `tests/**`, `scripts/guards/*.py` (path literals), `pyproject.toml`; ACs AC7.1, AC7.2
 - One task per top-level owner, disjoint by construction; a test naming two owners goes to the one its asserts exercise; `test_docs_derived_from_memory.py` stays (rc-13).
 
 | task | AC | `W:` | owner tests / RED |
@@ -53,7 +53,7 @@ Paths are relative to the repo root; aliases as in `PLAN.md` (`f/`, `pub/`, `S/`
 
 ## Stage J7.S5 — the mirror guard; close
 
-- Contract: exit tests unit + integration + e2e green; the guard red on its plants, green on the tree; envelope `scripts/guards/repo.py`, the six e2e journeys without an `Owner:` line, this file; ACs AC7.1
+- Contract: exit: the stage gate (lint, mypy, guards, small) green; the guard red on its plants, green on the tree; envelope `scripts/guards/repo.py`, the six e2e journeys without an `Owner:` line, this file; ACs AC7.1
 
 | task | AC | `W:` | owner tests / RED |
 |---|---|---|---|
