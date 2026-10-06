@@ -309,17 +309,6 @@
       ]
     },
     {
-      "id": "stage-gate-runs-the-contract-tier",
-      "title": "The stage gate runs the contract tier, so hash drift and the renderer allowlist turn red at the stage, not at the job or in CI",
-      "opened": "2026-10-06",
-      "status": "idea",
-      "description": "Found in rc-9: the stage level of scripts/ci.py (STAGE = lint, typecheck, guards, unit-fast, integration) runs no contract test, so a stale behavior-map hash (Job 1 job-gate red #1, fixed by J1.S3.T13) and a cross-skill edge the thin-wrapper contract did not declare (Job 1 job-gate red #3, fixed by J1.S3.T18) were first seen at the job gate or on the CI matrix, each costing a full job-gate rerun. Design: add one step to the stage level, the contract tier without coverage (pytest -m 'contract and not quarantine' tests/contract, -n 2), leaving contract-coverage to the job level; no new marker, no new script. Measure the stage gate's wall time before and after; if the contract tier costs more than the integration step, run only the generated-artifact contracts (behavior map, derived docs, thin wrapper, every-block-carries-a-fix) at the stage. Owner: scripts/ci.py STAGE, its row in tests/integration/test_ci_script.py. Done when: a stage whose task left a stale behavior-map hash fails its stage gate.",
-      "provenance": "rc-9 Reconciliation deferral (JR.S2.T5), dispatched by the main thread 2026-10-06 under the operator's rc-9 scope; target rc-10 or later",
-      "relates": [
-        "meta-tests-leave-pytest"
-      ]
-    },
-    {
       "id": "job-gate-runs-the-law-deletion-check",
       "title": "scripts/ci.py job runs the push gate's ADR 0151 M3 law-deletion check over the job range",
       "opened": "2026-10-06",
