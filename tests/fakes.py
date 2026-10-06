@@ -104,3 +104,8 @@ def gate_fixes() -> Any:
     from dadaia_workspace.features.chokepoints.branch_policy import GateFixes
 
     return GateFixes(repo="/repo")
+
+
+def no_worktree_rows(_root: Path) -> tuple[list[dict[str, Any]], str, str]:
+    """The owner's rows with no open worktree: no process is spawned to read them."""
+    return [], "", ""

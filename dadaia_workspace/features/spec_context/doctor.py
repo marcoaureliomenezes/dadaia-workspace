@@ -39,11 +39,11 @@ from dadaia_workspace.core.models.spec_context import ContextState, SpecContextP
 from dadaia_workspace.core.platform import PLATFORM
 from dadaia_workspace.core.workspace_layout import Zone, ZoneClass
 from dadaia_workspace.features.spec_context import sweep
-from dadaia_workspace.features.spec_context.service import git_hooks_dir
+from dadaia_workspace.features.spec_context.service import WorktreeRows, git_hooks_dir
 from dadaia_workspace.infrastructure.git_subprocess import GitSubprocessClient
 from dadaia_workspace.infrastructure.json_context_store import JsonContextStore
 from dadaia_workspace.infrastructure.json_harness_profile_store import JsonHarnessProfileStore
-from dadaia_workspace.infrastructure.ledger_scripts import worktree_rows
+from dadaia_workspace.infrastructure.ledger_scripts import worktree_rows as ledger_worktree_rows
 
 
 class FindingVerdict(StrEnum):
@@ -129,7 +129,9 @@ class DoctorService:
         git_client: GitSubprocessClient,
         workspace_root: Path,
         projection: Callable[[Path], tuple[list[DoctorLine], str]] | None = None,
+        worktree_rows: WorktreeRows = ledger_worktree_rows,
     ) -> None:
+        self._worktree_rows = worktree_rows
         self._projection = projection
         self._store = context_store
         self._git = git_client
@@ -242,7 +244,7 @@ class DoctorService:
         """AC1.10: the context's worktree rows, rendered — never judged or touched here."""
         if not (repos := {t.name for t in self._alive_repo_tops(context)}):
             return []
-        found, failed, fix = worktree_rows(self._workspace_root)
+        found, failed, fix = self._worktree_rows(self._workspace_root)
         return [_worktree("warning", failed, fix)] if failed else [
             _worktree("warning" if r["warn"] else "info", f"{r['state']} {r['path']}"
                       + "".join(f"  {k}={r[k]}" for k in ("age_hours", "ahead", "dirty") if k in r), r["fix"])

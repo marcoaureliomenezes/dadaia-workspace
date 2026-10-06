@@ -5,11 +5,12 @@ import logging
 import re
 import shutil
 import sys
+from collections.abc import Callable
 from dataclasses import replace
 from datetime import UTC, datetime
 from functools import partial
 from pathlib import Path
-from typing import Protocol
+from typing import Any, Protocol
 
 from dadaia_workspace.core import workspace_layout
 from dadaia_workspace.core.cli_line import fix_line, git_line, shell_line
@@ -37,7 +38,7 @@ from dadaia_workspace.core.template_history import was_shipped
 from dadaia_workspace.features.spec_context import sweep
 from dadaia_workspace.infrastructure.git_subprocess import GitSubprocessClient
 from dadaia_workspace.infrastructure.json_context_store import JsonContextStore
-from dadaia_workspace.infrastructure.ledger_scripts import worktree_rows
+from dadaia_workspace.infrastructure.ledger_scripts import worktree_rows as ledger_worktree_rows
 
 _log = logging.getLogger(__name__)
 
@@ -47,6 +48,10 @@ _ONBOARDING = ("specs", "specs-bkp", *(dest for _, dest in workspace_layout.REPO
 
 def _onboarded(rel: str) -> bool:
     return any(rel == p or rel.startswith(f"{p}/") for p in _ONBOARDING)
+
+
+WorktreeRows = Callable[[Path], tuple[list[dict[str, Any]], str, str]]
+"""The owner's open-worktree rows: ``(rows, failure, fix)`` (AC1.10)."""
 
 
 class InstallHooks(Protocol):
@@ -161,7 +166,9 @@ class SpecContextService:
         workspace_root: Path,
         install_hooks: InstallHooks,
         secret_scan: SecretScan,
+        worktree_rows: WorktreeRows = ledger_worktree_rows,
     ) -> None:
+        self._worktree_rows = worktree_rows
         self._store = context_store
         self._git = git_client
         self._workspace_root = workspace_root
@@ -644,7 +651,7 @@ class SpecContextService:
         a linked worktree, unpushed commits on a HEAD off the work branch. Every refusal
         names its repo."""
         main_repo = self._repo_path(ctx.repo_slug)
-        trees, failed, refix = worktree_rows(self._workspace_root)  # AC1.10: the owner's rows
+        trees, failed, refix = self._worktree_rows(self._workspace_root)  # AC1.10: the owner's rows
         for repo in ctx.all_repos():
             slug, path = repo.slug, self._repo_path(repo.slug)
             lead = f"Context '{name}': repo '{slug}'"
