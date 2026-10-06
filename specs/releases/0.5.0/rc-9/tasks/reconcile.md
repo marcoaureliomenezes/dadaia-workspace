@@ -50,13 +50,27 @@ Paths are relative to `dadaia_workspace/` unless they start with `scripts/`, `te
 
 ## Stage JR.S5 — bug batch inside Reconciliation (ADR 0206)
 
-- Contract: the two LOW bugs registered at 19f636f69 resolved, each by one shape-3 commit with its RED case; `bugs.py status` shows no rc-9 bug open; `ci.py job`'s doctor no longer warns TREE-5/MEM-DRIFT-2 about `specs/AGENTS.md`.
+- Contract: the two LOW bugs registered at 20e5d74d2 resolved, each by one shape-3 commit with its RED case; `bugs.py status` shows no rc-9 bug open; `ci.py job`'s doctor no longer warns TREE-5/MEM-DRIFT-2 about `specs/AGENTS.md`.
 - ACs served: ADR 0206.
-- Envelope (`specs/bugs/BUGS.jsonl` lines ride each fix commit, outside both write sets): `dadaia_workspace/public/skills/dd-bug-resolution/scripts/bugs.py`, `tests/unit/skills/test_bug_resolution_bugs_script.py`, `.gitignore`, `specs/AGENTS.md`, `tests/contract/test_copy_drift_scoped_law.py`, `scripts/guards/repo.py`, `specs/bugs/BUGS.jsonl`.
-- Exit tests: `tests/unit/skills/test_bug_resolution_bugs_script.py`, `tests/contract/test_copy_drift_scoped_law.py`; `bugs.py check`, `ci.py job` green.
+- Envelope (`specs/bugs/BUGS.jsonl` lines ride each fix commit, outside both write sets): `dadaia_workspace/public/skills/dd-bug-resolution/scripts/bugs.py`, `tests/unit/skills/test_bug_resolution_bugs_script.py`, `dadaia_workspace/public/entities/behavior-map.json` (regenerated hashes), `.gitignore`, `specs/AGENTS.md`, `tests/contract/test_copy_drift_scoped_law.py`, `scripts/guards/repo.py`, `specs/bugs/BUGS.jsonl`.
+- Exit tests: `tests/unit/skills/test_bug_resolution_bugs_script.py`, `tests/contract/test_copy_drift_scoped_law.py`, `tests/contract/test_behavior_map.py`; `bugs.py check`, `ci.py job` green.
 
 | task | AC | `W:` | owner tests / RED |
 |---|---|---|---|
-| JR.S5.T1 | bugs-fix-lists-one-commit-twice | `dadaia_workspace/public/skills/dd-bug-resolution/scripts/bugs.py`, `tests/unit/skills/test_bug_resolution_bugs_script.py` | `tests/unit/skills/test_bug_resolution_bugs_script.py` (new case) |
-| JR.S5.T2 | specs-law-file-untracked-by-gitignore — reverted at 0a6b649dc (guard `specs-canon-tracked` required the law ignored); redone by JR.S5.T3 | — | — |
-| JR.S5.T3 | specs-law-file-untracked-by-gitignore (operator ruling 2026-10-06: `specs-canon-tracked` expects every canon row tracked; drift is TREE-5's in CI's doctor) | `.gitignore`, `specs/AGENTS.md`, `scripts/guards/repo.py`, `tests/contract/test_copy_drift_scoped_law.py` | `tests/contract/test_copy_drift_scoped_law.py` (new case) |
+| JR.S5.T1 | bugs-fix-lists-one-commit-twice | `dadaia_workspace/public/skills/dd-bug-resolution/scripts/bugs.py`, `tests/unit/skills/test_bug_resolution_bugs_script.py`, `dadaia_workspace/public/entities/behavior-map.json` (the regenerated scripts hash) | `tests/unit/skills/test_bug_resolution_bugs_script.py` (new case) |
+| JR.S5.T2 | specs-law-file-untracked-by-gitignore — reverted at fbb40069a (guard `specs-canon-tracked` required the law ignored); redone by JR.S5.T3 | — | — |
+| JR.S5.T3 | specs-law-file-untracked-by-gitignore (operator ruling 2026-10-06, verbatim: "Corrige assim na rc-9 (Recommended)" — handoff `.dadaia/handoff/dadaia-workspace/2026-10-06T044417Z-main-thread-rc9-bug-rulings.handoff.json`; the design wording is the agent's, not ruled: `specs-canon-tracked` expects every canon row tracked, drift is TREE-5's in CI's doctor) | `.gitignore`, `specs/AGENTS.md`, `scripts/guards/repo.py`, `tests/contract/test_copy_drift_scoped_law.py` | `tests/contract/test_copy_drift_scoped_law.py` (new case) |
+
+## Stage JR.S6 — bug batch inside Reconciliation, second pass (ADR 0206)
+
+- Contract: the two bugs registered by `chore(bugs): report memory-window-bound-unreachable-from-head, bugs-fix-counts-a-reverted-fix` resolved, each by one shape-3 commit with its RED case: a window bound HEAD cannot reach is refused locally as a clean clone refuses it, with a `fix:` line; a fix commit a later `Revert "…"` undid drops out of `bugs.py fix`; review LOW-3: the checked-out-tree case writes no object and takes no index lock; `bugs.py status` shows no rc-9 bug open. A stage of its own: its `W:` sets meet JR.S5's (`bugs.py`, the behavior map, `test_copy_drift_scoped_law.py`).
+- ACs served: ADR 0206.
+- Envelope (`specs/bugs/BUGS.jsonl` lines ride each fix commit, outside every write set): `dadaia_workspace/public/skills/dd-spec-navigator/scripts/_memory_drift.py`, `tests/unit/skills/test_memory_drift.py`, `dadaia_workspace/public/skills/dd-bug-resolution/scripts/bugs.py`, `tests/unit/skills/test_bug_resolution_bugs_script.py`, `tests/contract/test_copy_drift_scoped_law.py`, `dadaia_workspace/public/entities/behavior-map.json` (regenerated hashes), `specs/bugs/BUGS.jsonl`.
+- Exit tests: `tests/unit/skills/test_memory_drift.py`, `tests/integration/test_shallow_history_fix_line_clears.py`, `tests/unit/features/specs/test_release_tree.py`, `tests/unit/skills/test_bug_resolution_bugs_script.py`, `tests/contract/test_copy_drift_scoped_law.py`, `tests/contract/test_behavior_map.py`; `bugs.py check`, `ci.py job` green.
+
+| task | AC | `W:` | owner tests / RED |
+|---|---|---|---|
+| JR.S6.T1 | memory-window-bound-unreachable-from-head | `dadaia_workspace/public/skills/dd-spec-navigator/scripts/_memory_drift.py`, `tests/unit/skills/test_memory_drift.py` | `tests/unit/skills/test_memory_drift.py` (new case: a bound HEAD does not reach refuses with a `fix:` line); RED before the fix |
+| JR.S6.T2 | bugs-fix-counts-a-reverted-fix | `dadaia_workspace/public/skills/dd-bug-resolution/scripts/bugs.py`, `tests/unit/skills/test_bug_resolution_bugs_script.py` | `tests/unit/skills/test_bug_resolution_bugs_script.py` (new case: a fix commit a later `Revert "…"` undid is not listed); RED before the fix |
+| JR.S6.T3 | review LOW-3 | `tests/contract/test_copy_drift_scoped_law.py` | the same file: the checked-out-tree case reads the tracked tree with no index lock and no object write; every assert line byte-identical |
+| JR.S6.T4 | — | generated only: `dadaia_workspace/public/entities/behavior-map.json` | close task, last: regenerate the behavior map, test-audit + mutation-diff over the stage diff (Q23) |
