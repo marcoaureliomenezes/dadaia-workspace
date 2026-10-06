@@ -36,8 +36,9 @@ def own_venv_workspace(root: Path) -> Path:
 
 def workspace_cli(root: Path, *listed: dict[str, object]) -> Path:
     """A POSIX `dadaia` stub in *root*'s venv (a text script: Windows runs none), standing for
-    the reads the worktree script makes: `context list` prints *listed*, `reports validate` passes iff `schema_version`; any other
-    verb drains its stdin (the pre-push pipe)."""
+    the reads the worktree script makes: `context list` prints *listed*, `reports validate` passes iff `schema_version`,
+    `doctor --specs-dir S` prints where it ran and fails iff `S/RED-doctor` exists; any other verb drains its stdin
+    (the pre-push pipe)."""
     cli = root / ".dadaia" / ".venv" / "bin" / "dadaia"
     cli.parent.mkdir(parents=True, exist_ok=True)
     cli.write_text(_CLI.format(python=sys.executable, rows=json.dumps(list(listed))))
@@ -52,6 +53,12 @@ if args[:2] == ["context", "list"]:
     print({rows!r})
 elif args[:2] == ["reports", "validate"]:
     sys.exit(0 if "schema_version" in json.load(open(args[2])) else 1)
+elif args[:1] == ["doctor"]:
+    import os
+    specs = args[args.index("--specs-dir") + 1]
+    print("doctor --specs-dir " + specs, "fenced " + os.environ.get("DADAIA_FENCED_ROOTS", ""),
+          "cwd " + os.getcwd(), sep="\\n")
+    sys.exit(os.path.exists(os.path.join(specs, "RED-doctor")))
 else:
     sys.stdin.read()
 """
