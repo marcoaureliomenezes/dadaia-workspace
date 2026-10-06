@@ -74,7 +74,7 @@ def _gen() -> Iterable[tuple[str, str]]:
     pytest.param({"leak.md": f"{_TERM}\n"}, None, _branch, _TERMS, [], id="A1.1-blob-in-branch-range"),
     pytest.param({"tag-blob.md": f"{_TERM}\n"}, None, _tag, _TERMS, [], id="A2.1-tainted-tag"),
     pytest.param({"c.md": "clean\n"}, f"mentions {_TERM}", _branch, _TERMS,
-                 ["Uncommit the unpublished range", "--no-verify"], id="A11.1-term-only-in-commit-message"),
+                 ["Uncommit the unpublished range"], id="A11.1-term-only-in-commit-message"),
     pytest.param({"leak.md": f"{_TERM}\n"}, None, _tag, "gen", ["denylisted term"], id="one-shot-generator-terms"),
     pytest.param({"t.py": f"{_TERM}\n"}, None, _branch, _TERMS, [
         "A test fixture that needs a secret shape composes it at runtime (string concatenation), never as a tracked literal."
@@ -215,7 +215,7 @@ class _Raising:
 # fmt: off
 @pytest.mark.parametrize(("exc", "in_message", "last_line"), [
     pytest.param(GitObjectReadError("stream desynchronised", path=f"{_SEG}/leak.md"),
-                 [f"{_MASKED}/leak.md", "--no-verify"], "fix: git -C {repo} fsck", id="A4.2-read-failure-path-masked"),
+                 [f"{_MASKED}/leak.md"], "fix: git -C {repo} fsck", id="A4.2-read-failure-path-masked"),
     pytest.param(GitObjectReadError("stream desynchronised"), [], "fix: git -C {repo} fsck", id="S5-corruption-names-fsck"),
     pytest.param(GitRunError("git timed out"), [], "fix: Operator action: make git runnable here, then push again",
                  id="S5-git-cannot-run-no-fsck"),
@@ -276,3 +276,19 @@ def test_a_ledger_verb_outside_the_workspace_loads_the_pre_push_terms(
     monkeypatch.chdir(tmp_path)
     ledger = load_owner("dd-bug-resolution", "_ledger")
     assert ledger.private_refusal([{"title": f"a {_TERM} leak"}], specs) is not None
+
+
+@pytest.mark.xfail(strict=True, reason="JB.S1 RED: push-refusal-advertises-no-verify")
+@pytest.mark.parametrize("scenario", ["denylisted-blob", "malformed-stdin", "unreadable-objects"])
+def test_no_refusal_advertises_a_way_around_the_gate(repo: PushRepo, scenario: str) -> None:
+    """Every refusal ends in its one fix line and names no bypass (ADR 0158)."""
+    sha = repo.commit({"x.md": f"{_TERM}\n"})
+    kw: dict[str, Any] = {"denylist_terms": _TERMS}
+    if scenario == "malformed-stdin":
+        kw["malformed_lines"] = 1
+    if scenario == "unreadable-objects":
+        kw["source"] = _Raising(GitObjectReadError("stream desynchronised"))
+    decision = _decide(repo, _branch(sha), **kw)
+    assert not decision.allowed
+    assert "--no-verify" not in decision.message
+    assert decision.message.count("\nfix: ") == 1
