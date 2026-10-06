@@ -206,6 +206,33 @@ def test_a_bound_head_does_not_reach_refuses_as_a_clean_clone_would(
     ]
 
 
+def test_a_bound_a_shallow_clone_holds_beyond_its_cut_names_the_cut_not_a_rebase(
+    script: Path, repo: Path, tmp_path: Path
+) -> None:
+    """memory-window-bound-shallow-clone-named-as-rebase: a shallow clone that fetched an
+    older bound by sha holds it, yet HEAD does not reach it through the cut history; the
+    refusal names the cut and its fix line, never a rebase."""
+    older = _git(repo, "rev-parse", "HEAD")
+    (repo / "later.txt").write_text("later\n", "utf-8")
+    _git(repo, "add", "-A")
+    _git(repo, "commit", "-qm", "later")
+    clone = tmp_path / "clone"
+    _git(tmp_path, "clone", "-q", "--depth", "1", f"file://{repo}", str(clone))
+    _git(clone, "fetch", "-q", "--depth", "1", "origin", older)
+    call = (
+        f"import sys; sys.path.insert(0, {str(script.parent)!r}); import _memory_drift as d\n"
+        f"try: d.report(__import__('pathlib').Path({str(clone / 'specs')!r}), {older!r})\n"
+        "except d.Refusal as r: print(r); print(r.fix)"
+    )
+
+    shown = subprocess.run([sys.executable, "-c", call], capture_output=True, text=True, check=True)
+
+    assert shown.stdout.splitlines() == [
+        f"{older} is out of reach: a shallow clone lacks the window's history",
+        f"git -C {clone} fetch --unshallow",
+    ]
+
+
 def _release_drift(script: Path, repo: Path, state: dict[str, object]) -> dict[str, object]:
     """`release.py drift` over a live release carrying *state*: the release skill is
     projected beside the navigator, as `public install` lays it out."""
