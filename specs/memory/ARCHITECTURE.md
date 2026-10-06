@@ -34,8 +34,8 @@ ADR: none
 Rationale: an adapter that knows a use case is no longer an adapter.
 
 ### P-07 · We keep features mutually independent: they compose through the container, never through sibling imports; a helper two features need lives in each.
-Measured by: `lint-imports --config setup.cfg --no-cache` — contract `features-no-cross-feature`, whose `modules =` list is asserted equal to the on-disk `features/*/__init__.py` package set by `pytest tests/contract/test_import_linter_ignore_cap.py`.
-ADR: none
+Measured by: `lint-imports --config setup.cfg --no-cache` — contract `features-no-cross-feature`, whose `modules = dadaia_workspace.features.*` covers every features package.
+ADR: 0176 (accepted)
 Rationale: a hand-kept `modules =` list hid three real sibling edges from the check.
 
 ### P-09 · We resolve the whole Invocation — workspace root, session, context, specs dir, the session's Bind — once per process in `core.invocation.resolve`, imported directly only by `cli._specs_resolution`, `container` and `hooks`.
@@ -44,8 +44,8 @@ ADR: 0003 (accepted)
 Rationale: every context bug came from a second resolution path answering differently.
 
 ### P-10 · We cap every suppressed layering edge and ratchet the cap only downward; an edge is added with its reason and the cap moved in the same commit.
-Measured by: `pytest tests/contract/test_import_linter_ignore_cap.py` — the test module is the cap's one numeric home.
-ADR: none
+Measured by: `poetry run python scripts/guards/run.py` prints `PASS ignore-cap` — `scripts/guards/slop.py`'s `IGNORE_EDGES` is the cap's one numeric home.
+ADR: 0176 (accepted)
 Rationale: a pinned exception list turns every new suppression into a reviewable diff.
 
 ### P-11 · We keep `core` file-I/O pure outside an authorized set of eight modules; new file I/O enters `core` only by joining that set on purpose.
@@ -78,10 +78,10 @@ Measured by: `pytest tests/contract/test_behavior_map.py` (bijection, hash tuple
 ADR: none
 Rationale: law that no asset owns is law nobody applies.
 
-### P-30 · The version, the CHANGELOG section and the tag of a release come from release-please over Conventional Commits, and promote is merging its release PR; a candidate's closed trio lives in git at its CLOSURE commit, never in a copied candidate or archive directory.
-Measured by: `pytest tests/contract/test_release_semver_canon.py tests/contract/test_ci_workflow_hygiene.py`.
-ADR: 0021 (accepted)
-Rationale: a hand-minted version and a hand-copied archive are two more writers of one fact each; the commit history already holds both.
+### P-30 · The version, the CHANGELOG section and the tag of a release come from release-please over Conventional Commits, and promote is merging its release PR.
+Measured by: `poetry run python scripts/guards/run.py` prints `PASS release-workflow-canon` (the release workflow, the release-please manifest and config, the `pyproject.toml` version equal to the CHANGELOG's top dated section).
+ADR: 0176 (accepted)
+Rationale: a hand-minted version is one more writer of one fact; the commit history already holds it.
 
 ### P-31 · We hold every repo INSIDE the workspace under `repos/<slug>/`, each its own git repository with its own `specs/`; the workspace is never a monorepo, one repo is the degenerate case of many, and bootstrap is one command (`init <dir> --harness <name> [--repo <url>]`).
 Measured by: `pytest tests/e2e/test_one_line_bootstrap.py tests/unit/core/test_workspace_resolver.py`.
@@ -89,7 +89,7 @@ ADR: 0015 (accepted)
 Rationale: the law, the harness projections, the zones and the venv live outside every repo; a per-repo or monorepo tool cannot govern ten projects with one law.
 
 ### P-32 · We change canonical memory (`ARCHITECTURE.md`, `QUALITY.md`) only in the commit that carries its accepted ADR, and we reconcile product memory from the window's code diff at every closure — delete, update, then add — recorded as one `kind: memory` entry naming every drifted atom.
-Measured by: `pytest tests/contract/test_memory_canonical_shape.py`; `dadaia doctor` — `specs`-section rules `RELEASE-TREE-MEMORY` and `LINT-1` (history lines).
+Measured by: `poetry run python scripts/guards/run.py` prints `PASS memory-canonical-shape`; `dadaia doctor` — `specs`-section rule `LINT-1` (history lines).
 ADR: 0023 (accepted)
 Rationale: three closures touched every product atom and left fifteen contradicted by the code; an append protocol stacks, a diff-driven one deletes first.
 
