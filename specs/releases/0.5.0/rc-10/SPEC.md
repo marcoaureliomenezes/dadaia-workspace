@@ -51,11 +51,11 @@ Read on `feature/0.5.0` at 27123ce99, then on `wt/0.5.0-rc9/reconcile`, with `bu
 | AC3.3 C3/C4, 8 records (REBUILD) | d8f325e3d, 93cf75152 | +133/−98; +43/−54 | stage appended inside the job | KEEP: the verdict was "reduced" |
 | AC3.4 T-050-168's tests | f6a791f3a | +3/−2; +8/−11 | nothing | KEEP |
 | AC3.5 `_StubDoctor` | 568a33c60 | 0; +2/−21 | nothing | KEEP |
-| AC3.6 stdin guard | 89746389a | guard +16/−5 | nothing | KEEP; AC8.3 removes its cause |
+| AC3.6 stdin guard | 89746389a | guard +16/−5 | nothing | DELETE in Job 8 (AC8.3): it lists patch forms; the one harness replaces it |
 
 - Pattern read (Q5):
   - No fix commit rewrites an old assert, special-cases a test value, or reaches into another feature.
-  - Second path: the stdin guard lists patch forms one by one (AC8.3).
+  - Second path: the stdin guard lists patch forms one by one → DELETE (AC8.3).
   - ≥ 2 fixes on one unit: the fix reader (T-050-167, then c9faccfdc) → REBUILD.
 - Job 1 executes the one REBUILD and builds the inputs this review lacked: direction, rework and `evidence_seam`.
 
@@ -155,7 +155,7 @@ Edge: Job 2, merged to `dadaia-evals` `main` through its PR edges.
   - **Integration**: a stale block refuses in CLOSURE and passes in IMPLEMENTATION.
 - AC4.5 The written review under `## Bugs` states the standing causes, verdicts and lessons.
   - It also carries the latest evals verdict line, outside the generated block (M7).
-  - It is rewritten, never appended. `docs/bug-ledger-lessons.md` derives from it (P-29).
+  - It is rewritten, never appended. `docs/bug-ledger-lessons.md` re-derives from it (P-29), its source moving from the `bug-ledger` atom and today's `QUALITY.md` sections.
   - `CONTEXT.md` gains this SPEC's Terms.
   - **No test** (memory).
 
@@ -187,7 +187,7 @@ Q6 items 1–5; 0209. Everything is judged by `git diff` over the repo's declare
 - AC7.1 Every test file is `tests/<mirror of dadaia_workspace>/test_<module>.py`, or one e2e journey carrying `Owner:`.
   - `contract/` and `integration/` dissolve into those owner files; no ghost or empty test directory remains.
   - `test_docs_derived_from_memory.py` stays until publish-gate check #7 rules (rc-13).
-  - **Guard**: red on a planted loose file and on an empty test directory.
+  - **No test** (guard script, 0176): a guard check, red on a planted loose file and on an empty test directory.
 - AC7.2 The move is `git mv` plus merge, one feature per commit, with no assert changed. **No test**. Check: `git grep -h '^\s*assert' <base> -- tests | sort` equals the same at HEAD.
 - AC7.3 The size marker comes from the fixture a test uses: real git or a subprocess makes it medium, never its folder. **Unit** (`pytester`): a real-git test collects as medium, a pure one as small.
 - AC7.4 The cases `windows-integration-coverage-gap` names that still exist run on the Windows CI job by marker. **No test**. Check: the Windows job log lists them.
@@ -196,9 +196,9 @@ Q6 items 1–5; 0209. Everything is judged by `git diff` over the repo's declare
 
 `unit-tier-without-processes`, `worktree-rows-injected-not-monkeypatched`, the 0163 hook harness, rc-7's slow-class G4 growth.
 
-- AC8.1 No small test spawns a process. Each offender either gets its pure core extracted and tested pure, or turns medium (AC7.3). **Guard**: red on a planted subprocess in a small test. Readout, gating nothing: ≥ 70 % of small items run under 100 ms.
+- AC8.1 No small test spawns a process. Each offender either gets its pure core extracted and tested pure, or turns medium (AC7.3). **No test** (guard script, 0176): a guard check, red on a planted subprocess in a small test. Readout, gating nothing: ≥ 70 % of small items run under 100 ms.
 - AC8.2 `SpecContextService` and `DoctorService` take worktree rows by constructor injection. The autouse monkeypatch and the inline patch in `test_cli_context.py` leave. Boundary fakes live in `tests/fakes.py`. **Unit**: each service built with a stub rows callable.
-- AC8.3 Every hook test drives its hook through the one production-faithful harness (0163): the entrypoint as a subprocess, fed a payload fixture. No test patches `sys.stdin`. **Integration**: one row per hook lane.
+- AC8.3 Every hook test drives its hook through the one production-faithful harness (0163): the entrypoint as a subprocess, fed a payload fixture. No test patches `sys.stdin`. The `hook-stdin-not-in-process` guard check leaves; the harness is the one way a hook test feeds stdin. **Integration**: one row per hook lane. Check: `grep -c hook-stdin-not-in-process scripts/guards/isolation.py` prints `0`.
 
 ## The bug batch
 
@@ -249,7 +249,8 @@ Q6 items 1–5; 0209. Everything is judged by `git diff` over the repo's declare
 - HOOKS-DRIFT-1's fixed "differs" (AC5.1).
 - Rewriting a test in an implementation task; the `test_`-name gate check (AC6).
 - Loose `contract/` and `integration/` roots; the folder-derived size tier (AC7).
-- Processes in the unit tier; the autouse rows monkeypatch; patched `sys.stdin` (AC8).
+- Processes in the unit tier; the autouse rows monkeypatch; patched `sys.stdin` and the `hook-stdin-not-in-process` guard check (AC8).
+- `docs/bug-ledger-lessons.md`'s source: the `bug-ledger` atom and today's `QUALITY.md` sections give way to `## Bugs`' written review (AC4.5).
 - Stale `Measured by` paths (AC10.1).
 
 ## Risks
@@ -276,7 +277,8 @@ Every active backlog id is placed: the Origin above, or one of the lines below.
   - `spec-context-refusals-print-prose`, `privacy-baseline-one-parser`, `ledger-refusals-guess-specs-from-command-shape`, `ledger-reader-one-numbered-tolerant-iterator`;
   - `meta-tests-leave-pytest` with check #7;
   - `repo-ci-sast`, less its poetry clause, which 858bc97ad fixed: ruff `S`, `pip-audit`, CodeQL, the work-branch secret scan;
-  - F067, F069, F123–F127, F137; the 0178 evals gate.
+  - F067, F069, F123–F127, F137; the 0178 evals gate;
+  - the operator's ruling before the promote (rc-8 F4): ADR 0122's zero active backlog against the four post-0.5.0 evals entries.
 - Delivered in rc-9; each exits at rc-10's closure:
   - `context-dead-never-commits`, by 8f878c730 (AC3.2);
   - `bug-fix-adds-never-rewrites-asserts`, by 13a4395a5 (AC5.9);
