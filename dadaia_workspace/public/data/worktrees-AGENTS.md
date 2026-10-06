@@ -10,7 +10,7 @@ a skill points here, never restates them.
 
 - One worktree per job, nested at `worktrees/<repo>/<M.m.p>-rc<N>/<job>/`, on the branch `wt/<M.m.p>-rc<N>/<job>`, cut from the repo's work branch; a job needs its rc's Approved `SPEC.md`.
 - Two more trees inside an rc folder: `define/` (the candidate's definition) and `reconcile/` (the Reconciliation job: memory, derived docs, `measured_by` repairs, the rc's measurement, closure).
-- Outside an rc only `worktrees/<repo>/backlog/<slug>/`, on `wt/backlog/<slug>`; a bug is a job.
+- Outside an rc only `worktrees/<repo>/backlog/<slug>/`, on `wt/backlog/<slug>`, and `worktrees/<repo>/hotfix/<bug-id>/`, on `wt/hotfix/<bug-id>` (§3); a bug is a job.
 - One worktree per task, `<M.m.p>-rc<N>/<job>--<task-id>/` on `wt/<M.m.p>-rc<N>/<job>--<task-id>`, cut from its job branch: sub-agents work the tasks of one stage in parallel, one per task worktree; at most 5 task worktrees open per rc. A stage is a barrier on the job branch, never a tree. One change — code, tests, specs, memory, derived docs — lands in one job.
 - `WT new <repo> <name>` opens a tree; any other name is refused.
 
@@ -31,7 +31,7 @@ a skill points here, never restates them.
 
 ## 3. Hotfix and parallel work
 
-- A hotfix (`specs/bugs/AGENTS.md` §2) is its own job, outside the rc's DAG.
+- A hotfix (`specs/bugs/AGENTS.md` §2) is its own job, outside the rc's DAG: `WT new <repo> hotfix/<bug-id>` cuts it from the work branch with no rc `SPEC.md`, once the main repo's `specs/bugs/BUGS.jsonl` on the work branch holds that bug `open`; its gates, one review and merge are §2's.
 - Jobs run in parallel only with disjoint envelopes or an edge in the PLAN's DAG; tasks of one stage run in parallel with disjoint `W:`. The CI cost is cut in the gates, never by sharing a tree.
 
 ## 4. Environment and hygiene
