@@ -22,7 +22,7 @@ a subprocess or real git; LARGE = `tests/e2e`. Test basics: the root `AGENTS.md`
 
 ## Gates
 
-Tests, lint and typecheck run green before any task-closing commit and before every push.
+The repo's `verify-task:` line runs green before any task-closing commit, its `verify:` line before every push.
 
 <!-- dadaia:fixed slop-tests -->
 <!-- /dadaia:fixed slop-tests -->

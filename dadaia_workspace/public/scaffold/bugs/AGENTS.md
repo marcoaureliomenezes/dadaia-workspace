@@ -18,8 +18,8 @@ Scope: this file governs only `specs/bugs/`.
 
 ## 2. Resolution
 
-- The block list, closed: (1) the work branch's CI is red; (2) a Stall; (3) the running task cannot deliver its AC;
-  (4) a security finding or an open dependency-vulnerability alert; (5) data loss or corruption.
+- The block list, closed: (1) the work branch's `verify:` line is red; (2) a Stall; (3) the running task cannot deliver its AC;
+  (4) a security finding; (5) data loss or corruption.
 - A block-list bug is a hotfix: registered with `caused_by`, its own job, job gate and one review, landing before any
   other job merge; its fix body names `block: <item>`; no SPEC amendment.
 - Every bug is resolved in the rc that finds it; no rc closes with an open bug.

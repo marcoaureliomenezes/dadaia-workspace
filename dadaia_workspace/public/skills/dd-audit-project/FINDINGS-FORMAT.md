@@ -27,7 +27,7 @@ Disclosed sibling of `SKILL.md`. Every claim any pillar makes becomes exactly on
 - Example: `git show <sha> --stat -- <module> -> 2 files changed, second render path added`.
 - Never a bare pointer into `.dadaia/tmp/**` — that lane expires one day after its mtime.
 - A `.dadaia/tmp/**` capture may accompany the command+result as a convenience pointer, never the sole citation.
-- Strip runner-absolute paths from a tool's raw output (`lint-imports`, `pytest`, ratchet scripts) by hand before writing the line.
+- Strip runner-absolute paths from a tool's raw output (a linter's, a test runner's, a ratchet script's) by hand before writing the line.
 
 ## Appending
 
