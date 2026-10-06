@@ -10,8 +10,6 @@ import pytest
 import dadaia_workspace
 from dadaia_workspace.core.spec_status import APPROVED, CANONICAL_STATUS, extract_status
 
-pytestmark = pytest.mark.unit
-
 _SCRIPTS = Path(dadaia_workspace.__file__).parent / "public/skills/dd-release-implementation"
 _script_extract_status = runpy.run_path(str(_SCRIPTS / "scripts/_release_schema.py"))[
     "extract_status"

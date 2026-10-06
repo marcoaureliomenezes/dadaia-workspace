@@ -6,11 +6,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-import pytest
-
 from dadaia_workspace.core.model_registry import CORE_AGENTS
-
-pytestmark = pytest.mark.contract
 
 _PUBLIC = Path(__file__).resolve().parents[2] / "dadaia_workspace" / "public"
 

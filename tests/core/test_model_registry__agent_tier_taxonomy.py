@@ -27,7 +27,6 @@ from __future__ import annotations
 
 from pathlib import Path
 
-import pytest
 import yaml
 
 import dadaia_workspace
@@ -37,8 +36,6 @@ from dadaia_workspace.core.model_registry import (
     is_fable_model,
     registry_by_claude_id,
 )
-
-pytestmark = pytest.mark.contract
 
 _PUBLIC = Path(dadaia_workspace.__file__).resolve().parent / "public"
 

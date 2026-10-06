@@ -13,7 +13,7 @@ from dadaia_workspace.core.gitflow import DEFAULT, from_mapping
 def test_the_default_names_live_only_in_default_and_work_is_cut_from_integration() -> None:
     """sa-principal-branch-defaults-to-main-and-cut-point-diverges#B42-6: only DEFAULT spells it.
     sa-principal-branch-defaults-to-main-and-cut-point-diverges#B42-5: the skill cuts work from integration."""
-    pkg = Path(__file__).resolve().parents[3] / "dadaia_workspace"
+    pkg = Path(__file__).resolve().parents[2] / "dadaia_workspace"
     literal = re.compile(r'principal: main|"--principal", "main"|else "main"')
     assert [p.name for p in pkg.rglob("*.py") if literal.search(p.read_text("utf-8"))] == []
     skill = (pkg / "public/skills/dd-gitflow-default/SKILL.md").read_text("utf-8")
@@ -24,7 +24,7 @@ def test_the_default_names_live_only_in_default_and_work_is_cut_from_integration
 def test_one_live_release_reader_and_no_verb_mints_a_version() -> None:
     """sa-live-work-branch-named-three-ways#B41-5: one reader of the live id, no tag+1.
     sa-live-work-branch-named-three-ways#B41-4: release-please owns the version; no module lists or bumps tags."""
-    pkg = Path(__file__).resolve().parents[3] / "dadaia_workspace"
+    pkg = Path(__file__).resolve().parents[2] / "dadaia_workspace"
     src = {p.name: p.read_text("utf-8") for p in pkg.rglob("*.py") if "public" not in p.parts}
     assert [n for n, t in src.items() if "def resolve_live_release_id" in t] == ["gitflow.py"]
     assert [n for n, t in src.items() if re.search(r'"tag", "--sort|\]\) \+ 1\}', t)] == []

@@ -12,7 +12,7 @@ import pytest
 
 from dadaia_workspace.infrastructure.public_assets import FileSystemPublicAssetManager
 
-_PKG = Path(__file__).resolve().parents[3] / "dadaia_workspace"
+_PKG = Path(__file__).resolve().parents[2] / "dadaia_workspace"
 
 
 def _lines(tmp_path: Path, text: str) -> list[str]:

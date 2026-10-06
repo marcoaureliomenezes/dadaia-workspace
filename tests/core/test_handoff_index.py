@@ -20,9 +20,9 @@ import pytest
 from dadaia_workspace.core.exceptions import HandoffSchemaError
 from dadaia_workspace.core.handoff_index import Handoff, HandoffIndex
 
-_REPO_ROOT = Path(__file__).resolve().parents[4]
+_REPO_ROOT = Path(__file__).resolve().parents[2]
 _SCHEMA_PATH = _REPO_ROOT / "dadaia_workspace" / "public" / "schemas" / "handoff-v1.schema.json"
-_FIXTURES = Path(__file__).resolve().parents[3] / "fixtures" / "handoffs"
+_FIXTURES = Path(__file__).resolve().parents[1] / "fixtures" / "handoffs"
 _SCHEMA = json.loads(_SCHEMA_PATH.read_text(encoding="utf-8"))
 
 

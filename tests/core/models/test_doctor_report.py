@@ -7,7 +7,12 @@ this file (a reviewed decision), never as an accidental side effect elsewhere.
 
 from __future__ import annotations
 
-from dadaia_workspace.core.models.doctor_report import DoctorLine, DoctorReport, DoctorStatus
+from dadaia_workspace.core.models.doctor_report import (
+    DoctorLine,
+    DoctorReport,
+    DoctorStatus,
+    attest,
+)
 
 #: The frozen verdict table. FOREIGN is non-blocking by Ruling 16 (hand-authored
 #: consumer guardrail pairs are legitimate); EXTRA blocks (residue on a managed
@@ -122,3 +127,15 @@ class TestControlCharacterEscaping:
         rendered = report.rendered()
         assert len(rendered) == 2
         assert all(len(line.splitlines()) == 1 for line in rendered)
+
+
+def test_attest_stamps_not_applicable_on_empty_result() -> None:
+    stamped = attest("symlink-target", [])
+    assert [line.render() for line in stamped] == [
+        "[not-applicable] check:symlink-target — no applicable objects"
+    ]
+
+
+def test_attest_passes_through_nonempty_results() -> None:
+    lines = [DoctorLine(DoctorStatus.OK, "symlink-target:.claude/agents")]
+    assert attest("symlink-target", lines) == lines

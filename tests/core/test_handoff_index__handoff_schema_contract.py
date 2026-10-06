@@ -17,8 +17,6 @@ from typing import Any
 import pytest
 from jsonschema import Draft202012Validator
 
-pytestmark = pytest.mark.contract
-
 _SCHEMAS = Path(__file__).resolve().parents[2] / "dadaia_workspace" / "public" / "schemas"
 _PATHS = {
     "handoff": _SCHEMAS / "handoff-v1.schema.json",

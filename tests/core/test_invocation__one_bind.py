@@ -163,6 +163,7 @@ def test_an_unbound_session_in_a_repo_injects_no_memory(tmp_path: Path) -> None:
     assert "[alpha]" not in out and "memory bootstrap" not in out
 
 
+@pytest.mark.windows
 def test_a_bound_context_without_specs_gets_its_next_step(tmp_path: Path) -> None:
     """sa-bind-has-two-stores#S7: header and next step, never "[no bound context]"; AC1.5:
     exactly the step text ``doctor`` reports; AC1.10: then the doctor's worktree block, fix

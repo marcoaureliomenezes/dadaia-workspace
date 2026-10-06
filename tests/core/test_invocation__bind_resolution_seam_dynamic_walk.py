@@ -8,13 +8,10 @@ import ast
 from pathlib import Path
 from typing import Any
 
-import pytest
 import typer
 
 from dadaia_workspace.cli.main import app
 from tests.helpers.scan_population import assert_populated
-
-pytestmark = pytest.mark.contract
 
 _CLI_COMMANDS = Path(__file__).resolve().parents[2] / "dadaia_workspace" / "cli" / "commands"
 _SEAM_FUNCTIONS = frozenset(

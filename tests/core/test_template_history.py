@@ -15,7 +15,7 @@ from dadaia_workspace.core.fixed_sections import (
 )
 from dadaia_workspace.core.template_history import was_shipped
 
-_PUBLIC = Path(__file__).resolve().parents[3] / "dadaia_workspace" / "public"
+_PUBLIC = Path(__file__).resolve().parents[2] / "dadaia_workspace" / "public"
 _TEMPLATES = _PUBLIC / "templates"
 _STUBS = {rel: section for rel, section in FIXED_SECTIONS if rel.startswith("memory/")}
 

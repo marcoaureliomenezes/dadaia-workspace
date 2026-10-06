@@ -7,13 +7,9 @@ from __future__ import annotations
 
 from pathlib import Path
 
-import pytest
-
 from dadaia_workspace.core import release_state
 
-pytestmark = pytest.mark.unit
-
-_PACKAGE = Path(__file__).resolve().parents[3] / "dadaia_workspace"
+_PACKAGE = Path(__file__).resolve().parents[2] / "dadaia_workspace"
 
 
 def test_core_reads_the_phase_and_judges_nothing() -> None:

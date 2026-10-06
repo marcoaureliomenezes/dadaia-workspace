@@ -11,7 +11,7 @@ from pathlib import Path
 
 from tests.helpers.scan_population import assert_populated
 
-_REPO_ROOT = Path(__file__).resolve().parents[3]
+_REPO_ROOT = Path(__file__).resolve().parents[2]
 _PACKAGE_ROOT = _REPO_ROOT / "dadaia_workspace"
 
 #: The two homes, proven by scan: the package's writer, and the stdlib ledger scripts'

@@ -12,7 +12,7 @@ from dadaia_workspace.core import release_state
 from dadaia_workspace.core.gitflow import resolve_live_release_id
 from dadaia_workspace.features.specs.doctor_common import resolve_active_release
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[3]
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]
                        / "dadaia_workspace/public/skills/dd-release-implementation/scripts"))  # fmt: skip
 import _release_store  # noqa: E402
 

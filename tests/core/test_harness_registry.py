@@ -11,8 +11,6 @@ from dadaia_workspace.core.harness_registry import (
     parse_harness_name,
 )
 
-pytestmark = pytest.mark.unit
-
 
 def test_roster_vocabulary_golden() -> None:
     roster = ("claude", "codex", "kimi-code", "cursor", "devin", "copilot")

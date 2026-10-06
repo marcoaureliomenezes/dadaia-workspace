@@ -14,10 +14,6 @@ from __future__ import annotations
 import tomllib
 from pathlib import Path
 
-import pytest
-
-pytestmark = pytest.mark.contract
-
 # The three OSes whose unit + contract CI legs are hard-gated green (T-018-30).
 _REQUIRED_OS_CLASSIFIERS = (
     "Operating System :: POSIX :: Linux",
@@ -28,7 +24,7 @@ _REQUIRED_OS_CLASSIFIERS = (
 
 def _pyproject_path() -> Path:
     """Return the absolute path to ``pyproject.toml`` in the repo root."""
-    # This file is at tests/contract/test_platform_classifier.py
+    # This file is at tests/core/test_platform__platform_classifier.py
     # Repo root is three levels up.
     return Path(__file__).resolve().parents[2] / "pyproject.toml"
 

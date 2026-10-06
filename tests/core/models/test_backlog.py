@@ -13,11 +13,9 @@ from jsonschema import Draft202012Validator
 
 from dadaia_workspace.core.models.backlog import SubjectKind
 
-pytestmark = pytest.mark.unit
-
 _SCHEMA = json.loads(
     (
-        Path(__file__).resolve().parents[2]
+        Path(__file__).resolve().parents[3]
         / "dadaia_workspace/public/schemas/backlog/backlog-v1.schema.json"
     ).read_text(encoding="utf-8")
 )

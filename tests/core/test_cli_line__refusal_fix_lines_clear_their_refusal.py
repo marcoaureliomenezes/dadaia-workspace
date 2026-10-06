@@ -56,7 +56,6 @@ from tests.conftest import GIT_QUIET_INCLUDE
 from tests.helpers.privacy_fixtures import aws_key_shape
 
 pytestmark = [
-    pytest.mark.integration,
     pytest.mark.slow(reason="real git remotes and CLI child processes per case"),
     pytest.mark.skipif(sys.platform == "win32", reason="the shipped pre-push hook is bash"),
 ]

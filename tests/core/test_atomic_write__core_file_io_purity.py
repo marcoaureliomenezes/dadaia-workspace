@@ -25,8 +25,6 @@ from dadaia_workspace.infrastructure.runtime_transforms.hook_wrappers import HOO
 from tests.fixtures.harness_env import suite_env
 from tests.helpers.scan_population import assert_populated
 
-pytestmark = pytest.mark.contract
-
 _REPO_ROOT = Path(__file__).resolve().parents[2]
 _PKG = _REPO_ROOT / "dadaia_workspace"
 _REGISTRY = _PKG / "public" / "entities" / "registry.json"

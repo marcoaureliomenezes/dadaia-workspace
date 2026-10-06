@@ -50,8 +50,6 @@ from dadaia_workspace.infrastructure.public_assets import (
 )
 from tests.helpers.scan_population import assert_populated
 
-pytestmark = pytest.mark.contract
-
 _REPO_ROOT = Path(__file__).resolve().parents[2]
 _SCHEMAS = _REPO_ROOT / "dadaia_workspace" / "public" / "schemas"
 _PACKAGE = _REPO_ROOT / "dadaia_workspace"

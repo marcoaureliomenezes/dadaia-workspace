@@ -13,8 +13,6 @@ from dadaia_workspace.features.specs.canon import scaffold
 from dadaia_workspace.features.specs.doctor import SpecsDoctor
 from dadaia_workspace.features.specs.memory_canon import FIXED_SECTIONS, read_fixed_fragment
 
-pytestmark = pytest.mark.contract
-
 _REPO_ROOT = Path(__file__).resolve().parents[2]
 _PUBLIC_DIR = _REPO_ROOT / "dadaia_workspace" / "public"
 _MAX_BULLET_CHARS = 150
