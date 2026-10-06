@@ -1,6 +1,7 @@
 # SPEC — Release: 0.5.0, candidate 10 (the fix reader; evals T1, T2 and the first run; QUALITY's bug balance; HOOKS-DRIFT-1; the test freeze; the test tree)
 
 **Status:** Approved — operator ruling 2026-10-06 (AskUserQuestion): "Aprovo SPEC + 0208–0210 (Recommended)", on 9f36ca986 (reviewer APPROVED 9f36ca986).
+Amended 2026-10-06 on review M-A at cfe73a297 (factual sha/count corrections) — reviewer verdict pending.
 **Release ID:** 0.5.0
 **Owner:** dd-product-engineer
 **Opened:** 2026-10-06 in the `0.5.0-rc10/define` tree while rc-9 reconciles (0205).
@@ -13,17 +14,17 @@
 - Scope (Q4): 8 jobs, the cap (0193); the bug batch and Reconciliation uncounted. The SPEC's packing, not a ruling: T1 and T2 share one job so the test freeze fits.
 - Facts at 27123ce99:
   - `dadaia-evals`: no `tasks/`; `eval.yml` (`main`, 877ff5b) never ran; no `verify:` line.
-  - Memory names 8 test files that no longer exist.
+  - Memory names 8 test files that no longer exist (3 at cfe73a297).
   - HOOKS-DRIFT-1 reads an absent hook as "differs".
 - Entry order (M4): at rc-9's CLOSURE `release.py new` writes the stub `rc-10/SPEC.md`; this tree then rebases and replaces it (`release-new-adopts-a-drafted-next-rc`: rc-11).
 - Bug law: 0206; no rc closes with an open bug.
 
 ## Bug window review
 
-Read at 27123ce99 and on `wt/0.5.0-rc9/reconcile` (`bugs.py window`, `fix`, `git show --numstat`).
+Read at 27123ce99 and on `wt/0.5.0-rc9/reconcile`; re-read at cfe73a297, rc-9's Reconciliation merged (`bugs.py window`, `fix`, `git show --numstat`).
 
-- Window: 251 records (`0.4.7`, `0.5.0`); 452 with release `unknown`.
-- Found in rc-9: 5, all resolved: the 4 rc-9 bug rows of the table, and `verify-line-absent-refusal-sends-to-a-tree-the-gate-never-reads`. `dependabot-pyjwt-open-on-main` (found in rc-7) is resolved in rc-9.
+- Window: 257 records (`0.4.7`, `0.5.0`); 452 with release `unknown`.
+- Found in rc-9: 7, all resolved, each a row of the table. `dependabot-pyjwt-open-on-main` (found in rc-7) is resolved in rc-9.
 - 13 records resolved retro in rc-9 (AC2.9) on older fixes: judged by rc-9's window (C9).
 - Direction: `bugs.py fix` prints `-` for task-commit fixes; the column is hand-computed (production, then tests). → AC1.1.
 - Rework count (Q5) needs AC1.1's reader; rc-11's window carries it.
@@ -32,11 +33,14 @@ Read at 27123ce99 and on `wt/0.5.0-rc9/reconcile` (`bugs.py window`, `fix`, `git
 | bug(s) | fix | direction (prod; tests) | what followed | verdict |
 |---|---|---|---|---|
 | `job-task-id-test-assumes-native-paths` (hotfix; C2) | 121ae02b2 | +5/−3; +19 | no C2 record since Job 1's matrix gate | KEEP |
-| `verify-line-absent-refusal-sends-to-a-tree-the-gate-never-reads` (hotfix, CRITICAL; caused by J1.S3.T1) | sha filled at Approval | REBUILD of `_gate` under 0207, in rc-9 | — | KEEP that REBUILD; rc-11 reads its rework |
+| `verify-line-absent-refusal-sends-to-a-tree-the-gate-never-reads` (hotfix, CRITICAL; caused by J1.S3.T1) | a1960ffc2; the merged hotfix d1d4d36c4 (HF.T3, REBUILD of `_gate` under 0207) | a1960ffc2 +20/−15; +28. d1d4d36c4 +4/−4; +36/−3 | `_gate`'s line authority moved three times (ed26c7f0d, 8818220e3, a1960ffc2), then d1d4d36c4; nothing since | KEEP that REBUILD; rc-11 reads its rework |
 | `ci-and-release-install-vulnerable-poetry` (hotfix, block 4) | 858bc97ad | workflows ±10, pyproject +3/−26; guard row `poetry-below-the-floor` | nothing | KEEP |
-| `dependabot-pyjwt-open-on-main` | 46d10b5bb (PR #277, Operational-Change Lane) | lock only, on `main` | nothing | KEEP |
-| `bugs-fix-lists-one-commit-twice` (caused by T-050-167) | c9faccfdc | +5/−1; +21 | second fix on the fix reader | **REBUILD**: AC1.1, keeping its test rows |
-| `specs-law-file-untracked-by-gitignore` | 6c73219b1 | guard +5/−15; +17 | one revert inside the job (0a6b649dc) | KEEP; its test moves with Job 7 |
+| `dependabot-pyjwt-open-on-main` | b3f03e3d8 (PR #277, Operational-Change Lane), resolved by c734b4bdc | lock only, on `main` | nothing | KEEP |
+| `bugs-fix-lists-one-commit-twice` (caused by T-050-167) | de36b0e69 | +5/−1; +21 | the third commit on `_fixes`; bd0628092 and e638d4a88 followed on it | **REBUILD**: AC1.1, keeping its test rows |
+| `bugs-fix-counts-a-reverted-fix` (caused by T-050-167) | bd0628092 | +9/−2; +22 | the fourth commit on `_fixes`; review REJECTED it at 8693810de (HIGH-A, M-1) and e638d4a88 rewrote it | **REBUILD**: AC1.1, keeping its test rows |
+| the in-job correction of bd0628092 (JR.S8.T1, a task commit `bugs.py fix` does not link) | e638d4a88 | +15/−12; +31 | the fifth commit on `_fixes`; it leaves two ceilings, AC1.1 (a) and (b) | **REBUILD**: AC1.1, keeping its test rows |
+| `memory-window-bound-unreachable-from-head` | cc544f66e | +4/−0; +29 | nothing on the unit since. `_memory_drift.py` carries 4 resolved records; d1e29503b (`shallow-clone-history-finding-fix-line-never-clears`, in `git()`, "the ONE history precondition") and cc544f66e (in `report`) answer one question, "is the window bound usable", in two places | **REBUILD** (agent default — unruled): ≥ 2 fixes on the unit and a second path; one bound precondition in `report`, keeping both fixes' tests; a born task of Job 1 (PLAN, J1.S3.T2+) |
+| `specs-law-file-untracked-by-gitignore` | ca56950b3 | guard +5/−15; +17 | the first fix ab57de945 was reverted inside the job by 70ef08270, whose subject cites ab57de945's dead pre-rebase sha b6b029319; 4a0d331e9 changed its test's setup only (review LOW-3; asserts byte-identical) | KEEP; its test moves with Job 7 |
 | AC2.1 coverage | a6fadcdde, 67d8ed1e5 | 0; +12/−10 | review fold | KEEP |
 | AC2.2 hooks coverage | 2299ce56b | +7/−4; −2 | nothing | KEEP |
 | AC2.3 registry key | 7c494c568, b19f9541c | +30/−17; −1 | review fold | KEEP |
@@ -51,10 +55,10 @@ Read at 27123ce99 and on `wt/0.5.0-rc9/reconcile` (`bugs.py window`, `fix`, `git
 | AC3.6 stdin guard | 89746389a | guard +16/−5 | nothing | DELETE in Job 8 (AC8.3): it lists patch forms; the one harness replaces it |
 
 - Pattern read (Q5):
-  - No fix commit rewrites an old assert, special-cases a test value, or reaches into another feature.
-  - Second path: the stdin guard lists patch forms one by one → DELETE (AC8.3).
-  - ≥ 2 fixes on one unit: the fix reader (T-050-167, then c9faccfdc) → REBUILD.
-- Job 1 executes the one REBUILD and builds the inputs this review lacked: direction, rework and `evidence_seam`.
+  - No fix commit rewrites an old assert, special-cases a test value, or reaches into another feature; d1d4d36c4 and 4a0d331e9 change test setup only.
+  - Second path: the stdin guard lists patch forms one by one → DELETE (AC8.3). The window bound is judged in two places (cc544f66e) → REBUILD (agent default — unruled).
+  - ≥ 2 fixes on one unit: the fix reader, 5 commits on `_fixes` (built by 48376cb96 and 19eb4c1a1; fixed by de36b0e69, bd0628092, e638d4a88) → REBUILD (AC1.1); `_memory_drift.py` (d1e29503b, cc544f66e) → REBUILD (agent default — unruled).
+- Job 1 executes the REBUILDs and builds the inputs this review lacked: direction, rework and `evidence_seam`.
 
 ## Terms
 
@@ -66,13 +70,14 @@ Read at 27123ce99 and on `wt/0.5.0-rc9/reconcile` (`bugs.py window`, `fix`, `git
 
 ## Job 1 — the fix reader and the window's instruments
 
-- AC1.1 One REBUILD of the `bugs.py fix` commit reader (verdict above; `bugs-fix-reads-the-per-class-shape`; Q5). c9faccfdc's test rows stay unchanged.
+- AC1.1 One REBUILD of the `bugs.py fix` commit reader (verdict above; `bugs-fix-reads-the-per-class-shape`; Q5). de36b0e69's test rows and the two revert tests, `test_fix_drops_a_fix_commit_a_later_revert_undid` (bd0628092) and `test_fix_pairs_each_revert_with_one_commit` (e638d4a88), stay unchanged.
+  - It fixes both known ceilings of the rc-9 reader: (a) reverting a revert-of-revert does not drop the fix again (the `ponytail:` at `bugs.py:118` at cfe73a297); (b) L-A: the greedy `_REVERT` capture mis-pairs a short-form revert whose tail holds a quote. Direction: pair on the reverted sha git's revert body names (`This reverts commit <sha>.`), or accept only git's default subject. Agent default — unruled: a rebase leaves that body citing a dead sha (bd0628092's body; 70ef08270's subject), so the pairing must survive a rebase.
   - It diffs every linked commit, a shape-4 task commit included; the never-diffed `None` path leaves.
   - It links a per-class shape-4 commit by the ids on its body lines.
   - For each fix it prints the fix surface, its rework count by class, and settled fix surface or the rcs it has left.
   - `PILLAR-BUGS.md:8` ("a shape-4 task commit is counted, never diffed") is rewritten to match.
   - Everything is derived from git; nothing is stored.
-  - **Unit** rows: a shape-4 resolve over two task commits gives summed numstat and a literal direction; a class commit links its body ids; a later overlapping `fix(bugs)` counts 1 overfitting, a REBUILD 1 planned; two rcs untouched read a settled fix surface.
+  - **Unit** rows: a shape-4 resolve over two task commits gives summed numstat and a literal direction; a class commit links its body ids; a later overlapping `fix(bugs)` counts 1 overfitting, a REBUILD 1 planned; two rcs untouched read a settled fix surface; a revert of a revert of a revert drops the fix; a short-form revert whose tail holds a quote pairs with the one commit it undid.
 - AC1.2 `evidence_seam` is required at resolve and checked only there (G10, 0208).
   - `bugs.py resolve --evidence-seam <path>[::node]` refuses a path git does not track, or a node any of whose `::` segments, parameter brackets stripped, is not in the file (`TestX::test_y` finds both). The check is textual and works for any language.
   - A fix with no test cites any tracked file.
@@ -220,7 +225,8 @@ Q6 items 1–5; 0209. Everything is judged by `git diff` over the repo's test pa
 
 ## Replaces
 
-- `bugs.py fix`'s never-diffed shape-4 link and `PILLAR-BUGS.md:8`; the fix reader's two prior fixes (AC1.1).
+- `bugs.py fix`'s never-diffed shape-4 link and `PILLAR-BUGS.md:8`; the fix reader's three rc-9 fixes, de36b0e69, bd0628092 and e638d4a88 (AC1.1).
+- `_memory_drift.py`'s second window-bound precondition (cc544f66e beside d1e29503b), by Job 1's born REBUILD task (agent default — unruled).
 - 0164 (4)'s retirement of `evidence_seam` (AC1.2).
 - A bare `rebuild: none` (AC1.4).
 - The bugs law §2's REBUILD for a fix-induced bug only; `dd-code-review/SKILL.md:55`'s "or why not" (AC1.5).

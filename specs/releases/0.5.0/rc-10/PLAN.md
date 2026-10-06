@@ -4,7 +4,7 @@
 **Release ID:** 0.5.0
 **Owner:** dd-software-engineer
 
-The SPEC says what; this PLAN holds the as-is review, the DAG, the hot files and the schedule; `tasks/<job>.md` holds each job's stages and tasks. Read at `feature/0.5.0` d1d4d36c4 and on `wt/0.5.0-rc9/reconcile` 5ba2fb995 (rc-9's JR.S5–S6 not yet on the work branch). Path aliases: `f/` = `dadaia_workspace/features/`, `pub/` = `dadaia_workspace/public/`, `S/` = `pub/skills/`, `bugres/` = `S/dd-bug-resolution/`, `relimpl/` = `S/dd-release-implementation/`, `GF/` = `S/dd-gitflow-default/scripts/`, `evals:` = a path in `repos/dadaia-evals`.
+The SPEC says what; this PLAN holds the as-is review, the DAG, the hot files and the schedule; `tasks/<job>.md` holds each job's stages and tasks. Read at `feature/0.5.0` d1d4d36c4 and on `wt/0.5.0-rc9/reconcile` 506d6835b (rc-9's JR.S5–S6 not yet on the work branch; rc-9's Reconciliation merged at cfe73a297). Path aliases: `f/` = `dadaia_workspace/features/`, `pub/` = `dadaia_workspace/public/`, `S/` = `pub/skills/`, `bugres/` = `S/dd-bug-resolution/`, `relimpl/` = `S/dd-release-implementation/`, `GF/` = `S/dd-gitflow-default/scripts/`, `evals:` = a path in `repos/dadaia-evals`.
 
 ## As-is review
 
@@ -12,7 +12,7 @@ Order per job: DELETE → REBUILD → UPDATE → KEEP → ADD. A REBUILD names i
 
 | job | unit | today | bugs on the unit | verdict | why |
 |---|---|---|---|---|---|
-| 1 | `bugres/scripts/bugs.py` `_fixes`, `_direction`, `fix` | greps subjects; a shape-4 task commit is linked with rows `None`, never diffed; a class commit (`chore(bugs): <verb> class …`, ids on body lines) is never linked | T-050-167 built it; `bugs-fix-nonrepo-test-not-portable` (rc-8, caused_by T-050-167); `bugs-fix-lists-one-commit-twice` (rc-9, c9faccfdc); `bugs-fix-counts-a-reverted-fix` (rc-9, resolved by bd0628092) | REBUILD (AC1.1) | cause: the reader is a subject regex with one branch per shape; each shape added a branch and each fix patched one key or one arm. Redo: one link step (subject id list, or class body ids) then one diff step for every linked sha, a `Revert "…"`-undone fix dropped in the link step (absorbing bd0628092's arm); the reader leaves `bugs.py` for its own module so `fix`, `stats`, `window` and `_candidates` read one function. Every prior fix's test rows stay unchanged |
+| 1 | `bugres/scripts/bugs.py` `_fixes`, `_direction`, `fix` | greps subjects; a shape-4 task commit is linked with rows `None`, never diffed; a class commit (`chore(bugs): <verb> class …`, ids on body lines) is never linked | T-050-167 built it; `bugs-fix-nonrepo-test-not-portable` (rc-8, caused_by T-050-167); `bugs-fix-lists-one-commit-twice` (rc-9, de36b0e69); `bugs-fix-counts-a-reverted-fix` (rc-9, resolved by bd0628092, rewritten in-job by e638d4a88): 5 commits on `_fixes` (48376cb96, 19eb4c1a1, de36b0e69, bd0628092, e638d4a88) | REBUILD (AC1.1) | cause: the reader is a subject regex with one branch per shape; each shape added a branch and each fix patched one key or one arm. Redo: one link step (subject id list, or class body ids) then one diff step for every linked sha, a `Revert "…"`-undone fix dropped in the link step (absorbing bd0628092's and e638d4a88's arm, and fixing their two ceilings, SPEC AC1.1 (a) and (b)); the reader leaves `bugs.py` for its own module so `fix`, `stats`, `window` and `_candidates` read one function. Every prior fix's test rows stay unchanged |
 | 1 | `bugres/scripts/_bugs_transition.py` `REQUIRED_BY_VERB["resolve"]` | `evidence_seam` retired by 0164 (4); 116/317 stored seams name a missing file | 0 on the unit | UPDATE (AC1.2) | required at resolve, checked textually there only; `check` unchanged; `window` marks a gone seam file |
 | 1 | `S/dd-audit-project/PILLAR-BUGS.md:8`; `bugres/LINEAGE.md` step 7; `pub/scaffold/bugs/AGENTS.md` §2; `S/dd-code-review/SKILL.md:55`; `S/dd-release-definition/SKILL.md` §1 | "counted, never diffed"; bare `rebuild: none`; REBUILD only for a fix-induced bug; "or why not" | — | UPDATE (AC1.3–AC1.5) | law text; the canon pin moves with the scaffold law |
 | 2, 3 | `evals:` repo | no `tasks/`, no `verify:`/`tests:` lines; `eval.yml` (main) never ran | 0 | ADD (AC2.1–AC3.1) | new tasks T1, T2; the graders are the product |
@@ -57,7 +57,7 @@ Order per job: DELETE → REBUILD → UPDATE → KEEP → ADD. A REBUILD names i
 | Reconciliation | Bug batch | AC10 |
 
 - Critical path: Job 1 → Job 4 → Job 7 → Job 8 → Job 6 → bug batch → Reconciliation.
-- Job 6 was parked on F-3 (88d9a6b8c) and is un-parked by the ruling (a); the bug batch and Reconciliation run under the freeze.
+- Job 6 was parked on F-3 (c32f07811) and is un-parked by the ruling (a); the bug batch and Reconciliation run under the freeze.
 - After every job that writes `pub/` (Jobs 1, 4, 5, 6, 8) the driver re-projects the instance (`dadaia public stage` / `install` / `doctor`); `WT merge` runs the projected `worktree.py`, so the freeze binds only once Job 6 is re-projected.
 
 ### Hot files

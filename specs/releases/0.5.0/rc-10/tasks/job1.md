@@ -12,7 +12,7 @@ Paths are relative to the repo root; aliases as in `PLAN.md` (`f/`, `pub/`, `S/`
 
 | task | AC | `W:` | owner tests / RED |
 |---|---|---|---|
-| J1.S1.T1 | AC1.1, AC1.2 | `tests/unit/skills/test_bug_resolution_bugs_script.py` | RED: shape-4 resolve over two task commits → summed numstat, literal direction; class commit links its body ids; later overlapping `fix(bugs)` → 1 overfitting, a REBUILD → 1 planned; two rcs untouched → settled; seam present / untracked / absent node / parametrized node / `TestX::test_y` / non-test tracked file / window row with a deleted seam. c9faccfdc's and JR.S6.T2's rows stay byte-identical |
+| J1.S1.T1 | AC1.1, AC1.2 | `tests/unit/skills/test_bug_resolution_bugs_script.py` | RED: shape-4 resolve over two task commits → summed numstat, literal direction; class commit links its body ids; later overlapping `fix(bugs)` → 1 overfitting, a REBUILD → 1 planned; two rcs untouched → settled; a revert of a revert of a revert drops the fix; a short-form revert whose tail holds a quote pairs with the one commit it undid; seam present / untracked / absent node / parametrized node / `TestX::test_y` / non-test tracked file / window row with a deleted seam. de36b0e69's, JR.S6.T2's (bd0628092) and JR.S8.T1's (e638d4a88) rows stay byte-identical |
 - Rows the window gains at the rebase (PLAN): a REBUILD row needing a new RED case adds its case to J1.S1.T1's rows (the rows are known before the job opens); a KEEP row needs none.
 
 ## Stage J1.S2 — REBUILD the reader; law text
