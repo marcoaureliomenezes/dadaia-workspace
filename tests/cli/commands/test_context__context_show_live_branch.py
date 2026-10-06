@@ -17,8 +17,6 @@ from typer.testing import CliRunner
 
 from dadaia_workspace.cli.main import app
 
-pytestmark = [pytest.mark.integration]
-
 _runner = CliRunner()
 _CTX = "live-branch-ctx"
 

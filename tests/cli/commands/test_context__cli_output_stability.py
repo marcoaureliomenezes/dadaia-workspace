@@ -18,8 +18,6 @@ from dadaia_workspace.features.workspace.service import WorkspaceService
 from dadaia_workspace.infrastructure.public_assets import FileSystemPublicAssetManager
 from dadaia_workspace.infrastructure.python_env import VenvPythonEnvironmentManager
 
-pytestmark = pytest.mark.contract
-
 _runner = CliRunner()
 
 

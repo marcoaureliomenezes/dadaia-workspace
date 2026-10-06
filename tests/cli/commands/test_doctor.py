@@ -1,6 +1,6 @@
 """A doctor fix line CLEARS its own finding.
 
-``tests/contract/test_every_block_carries_a_fix.py`` proves the fix line is one
+``tests/core/test_cli_line__every_block_carries_a_fix.py`` proves the fix line is one
 executable command that the gate lets through. That grammar says nothing about what the
 command DOES: ``rm -rf specs/audits/<audit>`` is one executable command, passes the
 gate, and destroys the record the finding exists to protect. This module closes the gap
@@ -54,11 +54,10 @@ from dadaia_workspace.features.specs.citations import dead_verb_citations
 from dadaia_workspace.features.specs.doctor import SpecsDoctor
 from dadaia_workspace.features.specs.rules import RULES as SPECS_RULES
 from dadaia_workspace.infrastructure.git_subprocess import GitSubprocessClient
+from tests.features.backlog.test_doctor import _SOURCE, _active_entry
+from tests.features.specs.test_doctor import _make_clean_specs_tree
 from tests.fixtures.stores import context_store
 from tests.helpers import worktree_ws
-
-from ..unit.features.specs.test_doctor import _make_clean_specs_tree
-from .test_backlog_doctor import _SOURCE, _active_entry
 
 _RELEASE = "1.2.3"
 
@@ -495,7 +494,7 @@ def test_doctor_fix_renders_a_raw_law_copy_and_clears_its_finding(repo: Path) ->
     older `specs init` copied) is flagged by `dadaia doctor` as refreshable; `dadaia
     doctor --fix` renders it and the TREE-5 finding is gone."""
     specs = repo / "specs"
-    public = Path(__file__).resolve().parents[2] / "dadaia_workspace" / "public"
+    public = Path(__file__).resolve().parents[3] / "dadaia_workspace" / "public"
     law = specs / "AGENTS.md"
     law.write_bytes((public / "templates" / "specs-AGENTS.md").read_bytes())
 

@@ -31,8 +31,6 @@ from dadaia_workspace.features.spec_context.doctor import DoctorService
 from dadaia_workspace.infrastructure.git_subprocess import GitSubprocessClient
 from tests.fixtures.stores import context_store
 
-pytestmark = pytest.mark.contract
-
 _TTL_ZONE = next(z for z in zones_with_ttl() if z.cls is ZoneClass.EPHEMERAL)
 _EXPIRED_CODE = f"WS-{_TTL_ZONE.name.lstrip('.')}-expired"
 _FINDING_LINE = re.compile(

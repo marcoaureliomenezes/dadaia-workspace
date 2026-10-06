@@ -21,10 +21,8 @@ from dadaia_workspace.cli.main import app
 from dadaia_workspace.features.specs.canon import scaffold
 from dadaia_workspace.infrastructure.ledger_scripts import script_repairs
 
-pytestmark = pytest.mark.contract
-
 _runner = CliRunner()
-_REPO_ROOT = Path(__file__).resolve().parents[2]
+_REPO_ROOT = Path(__file__).resolve().parents[3]
 _TEMPLATES_DIR = _REPO_ROOT / "dadaia_workspace" / "public" / "templates"
 
 

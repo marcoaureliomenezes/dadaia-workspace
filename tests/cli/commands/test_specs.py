@@ -18,8 +18,6 @@ from dadaia_workspace.cli.main import app
 from dadaia_workspace.core import gitflow, specs_version
 from dadaia_workspace.features.specs import SpecsDoctor, canon
 
-pytestmark = pytest.mark.integration
-
 _PUBLIC = Path(__file__).resolve().parents[3] / "dadaia_workspace" / "public"
 _runner = CliRunner()
 

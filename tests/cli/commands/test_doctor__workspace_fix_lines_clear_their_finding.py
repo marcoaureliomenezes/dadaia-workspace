@@ -20,7 +20,7 @@ from typer.testing import CliRunner
 
 from dadaia_workspace.cli.main import app
 
-_REPO = Path(__file__).resolve().parents[2]
+_REPO = Path(__file__).resolve().parents[3]
 _UNSET = ("DADAIA_CONTEXT", "DADAIA_SESSION_ID", "CLAUDE_CODE_SESSION_ID")
 
 

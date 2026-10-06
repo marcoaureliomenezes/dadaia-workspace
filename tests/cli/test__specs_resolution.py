@@ -15,8 +15,6 @@ import pytest
 
 from dadaia_workspace.cli._specs_resolution import resolve_context_for_cli
 
-pytestmark = pytest.mark.unit
-
 
 def _mk_workspace(root: Path, contexts: list[str]) -> None:
     states = root / ".dadaia" / "states"

@@ -13,8 +13,6 @@ import pytest
 from dadaia_workspace.cli import main as cli_main
 from dadaia_workspace.core.exceptions import DadaiaError
 
-pytestmark = pytest.mark.unit
-
 
 class TasksMarkerStateError(DadaiaError):
     """A stand-in operator-facing DadaiaError."""

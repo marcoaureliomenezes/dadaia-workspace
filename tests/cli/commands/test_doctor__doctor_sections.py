@@ -23,10 +23,8 @@ from typer.testing import CliRunner
 from dadaia_workspace.cli.help_digest import command_paths
 from dadaia_workspace.cli.main import app
 
-pytestmark = pytest.mark.contract
-
 _runner = CliRunner()
-_REPO_ROOT = Path(__file__).resolve().parents[2]
+_REPO_ROOT = Path(__file__).resolve().parents[3]
 _SECTIONS = ("workspace", "specs", "ledgers")
 
 

@@ -30,8 +30,6 @@ from dadaia_workspace.infrastructure.public_assets import FileSystemPublicAssetM
 from dadaia_workspace.infrastructure.python_env import VenvPythonEnvironmentManager
 from tests.fixtures.harness_env import claude_hook_env
 
-pytestmark = pytest.mark.integration
-
 _NAME = "meu-projeto"
 _SLUG = "repo-diferente"
 _RELEASE = "v0.1.0"

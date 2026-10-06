@@ -20,11 +20,7 @@ from importlib import import_module
 from pathlib import Path
 from typing import Any
 
-import pytest
-
-pytestmark = pytest.mark.unit
-
-_REPO_ROOT = Path(__file__).resolve().parents[3]
+_REPO_ROOT = Path(__file__).resolve().parents[2]
 #: The distribution name and the short verb — the only two names PyPI installs.
 _EXPECTED_NAMES = ("dadaia", "dadaia-workspace")
 _TARGET = "dadaia_workspace.cli.main:_safe_app"

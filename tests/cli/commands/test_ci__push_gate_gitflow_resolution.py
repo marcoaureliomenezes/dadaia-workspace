@@ -14,8 +14,6 @@ import pytest
 from dadaia_workspace.cli.commands import ci
 from dadaia_workspace.core.gitflow import Gitflow
 
-pytestmark = pytest.mark.integration
-
 _CUSTOM = "---\nspecs_pattern_version: 7\ngitflow: {principal: trunk, integration: next, work: work/}\n---\n"
 
 

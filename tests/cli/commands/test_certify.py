@@ -1,6 +1,6 @@
 """sa-reconcile-certify-skip-the-workspace-walk: the consumer recipe cites
 only commands, flags and certify checks the wheel has (certify's own invocations run for
-real in tests/integration/features/certification/test_certify_journey.py).
+real in tests/features/certification/test_service.py).
 
 size: SMALL (the skill scripts' ``--help`` runs as a subprocess).
 """

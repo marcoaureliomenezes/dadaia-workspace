@@ -9,14 +9,11 @@ import ast
 import json
 from pathlib import Path
 
-import pytest
 from typer.testing import CliRunner
 
 from dadaia_workspace.cli.main import app
 
-pytestmark = pytest.mark.contract
-
-_CLI = Path(__file__).resolve().parents[3] / "dadaia_workspace" / "cli"
+_CLI = Path(__file__).resolve().parents[2] / "dadaia_workspace" / "cli"
 _runner = CliRunner()
 
 

@@ -5,7 +5,7 @@ sa-private-match-rendering-has-three-renderers#B4, #B5, #B6.
 
 Three layers: ``core.redaction`` (the primitive the push gate's render boundary also consumes),
 :class:`ContextRedactor` in isolation, and the ``doctor``/``context list``/``context show`` verbs
-over a real workspace. ``tests/contract/test_cli_output_stability.py`` pins A8.2 (no flag, no change).
+over a real workspace. ``tests/cli/commands/test_context__cli_output_stability.py`` pins A8.2 (no flag, no change).
 """
 
 from __future__ import annotations
@@ -22,8 +22,6 @@ from dadaia_workspace.core.redaction import Redactor, compile_candidates
 from dadaia_workspace.features.workspace.service import WorkspaceService
 from dadaia_workspace.infrastructure.public_assets import FileSystemPublicAssetManager
 from dadaia_workspace.infrastructure.python_env import VenvPythonEnvironmentManager
-
-pytestmark = pytest.mark.unit
 
 _runner = CliRunner()
 

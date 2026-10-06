@@ -25,7 +25,7 @@ from dadaia_workspace.core.cli_line import fix_line
 from dadaia_workspace.core.harness_registry import L1_ENTRY_HARNESSES
 from dadaia_workspace.features.capabilities import build_capabilities
 
-_PUBLIC = Path(__file__).resolve().parents[2] / "dadaia_workspace" / "public"
+_PUBLIC = Path(__file__).resolve().parents[3] / "dadaia_workspace" / "public"
 _ENV = {"COLUMNS": "400", "NO_COLOR": "1"}
 
 
