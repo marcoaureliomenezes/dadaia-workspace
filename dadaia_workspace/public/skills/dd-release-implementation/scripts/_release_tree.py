@@ -332,9 +332,10 @@ def _balance_findings(specs: Path) -> list[dict[str, Any]]:
     lines = done.stderr.strip().splitlines()  # the callee's own refusal: `[error] why`, `fix: how`
     why = next((x.removeprefix("[error] ") for x in lines if x.startswith("[error] ")), "")
     fix = next((x.removeprefix("fix: ") for x in lines if x.startswith("fix: ")), "")
-    if not (why and fix):  # the verb died outside its refusal: say so, point at it
-        why = why or f"`bugs.py balance --check` exited {done.returncode}"
-        fix = fix or f"Operator action: run `{script(bugs)} balance --check` and read its output"
+    if not (why and fix):  # the verb died outside its refusal: say so, point at it, name no half
+        why = f"`bugs.py balance --check` exited {done.returncode}"
+        command = with_specs(f"{script(bugs)} balance --check", specs)
+        fix = f"Operator action: run `{command}` and read its output"
     return [finding("memory/QUALITY.md", 1, why, fix)]
 
 
