@@ -339,9 +339,43 @@ _Avoid_: baseline
 A RED at the question's seam failing at definition; GREEN; the losers gone with their tests and fakes; `bugs.py resolve` with the evidence triple; net ≤ 0 in production and tests, except the production ceilings a SPEC's ACs grant; commit shape 3.
 _Avoid_: fix (bare)
 
-**Wave**:
-A harm-ordered group of a candidate's bugs — data loss and gate holes first.
-_Avoid_: phase (a release's state), batch
+**Bug window**:
+The records an rc's first SPEC reviews in `## Bug window review`: `found_in` or `introduced_in` in the live release or the previous published one (`bugs.py window`).
+_Avoid_: wave, pile, cause group (retired)
+
+**Implement**:
+One rc's run, a DAG of jobs; not a file.
+
+**Job**:
+One measured feature: one worktree, one review and one gate at its merge; Job 1 executes the SPEC's §1.
+_Avoid_: CI job (a GitHub Actions job)
+
+**Stage**:
+A barrier on the job branch over parallel tasks; no worktree.
+
+**Task**:
+One owner (a module or law file plus its owner test file), one session, one worktree cut from its job branch; the unit of dispatch.
+
+**Envelope**:
+The `W:` union a job or stage may touch.
+
+**Closed stage contract**:
+A stage's exit tests, envelope and ACs served, fixed when the stage opens.
+
+**Live task**:
+A task born, split or cancelled inside an open stage, unreviewed.
+
+**Hot file**:
+A file two tasks would write; hand-edited or generated.
+
+**Ritual wait**:
+A merged job's wall time from its last task commit to its pushed merge: gates, review, CI waits.
+
+**Hotfix**:
+A block-list bug's fix (bugs law §2), outside the DAG.
+
+**Reconciliation**:
+An rc's last job, outside the job cap: memory and derived docs.
 
 ## Tests
 
