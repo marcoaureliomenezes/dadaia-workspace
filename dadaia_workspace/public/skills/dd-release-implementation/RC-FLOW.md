@@ -32,7 +32,7 @@ An rc is an Implement: a DAG of jobs the PLAN draws, Job 1 first, the Reconcilia
 - Done when: the last stage closed green and the close task wrote the job file's `done`.
 
 **Step 3 — Job merge.**
-- Push the job branch; the reviewer's one verdict names its HEAD; `WT merge` runs the job gate and fast-forwards.
+- The reviewer's one verdict names the job's HEAD; `WT merge` runs the job gate and fast-forwards.
 - Append the job's `kind: merge` entry to `_RELEASE.json`'s `log` (`RELEASE-EVENTS.md`).
 - Done when: the job is on the work branch and its entry passes `release.py check`.
 
