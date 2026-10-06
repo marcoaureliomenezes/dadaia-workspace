@@ -42,7 +42,7 @@ from _release_schema import (  # noqa: E402
     live_id,
     releases,
 )
-from _specs import find_specs, git_line, refuse  # noqa: E402
+from _specs import find_specs, git_line, refuse, script  # noqa: E402
 
 _OPTIONS: dict[str, tuple[str, ...]] = {
     "append": ("--bug-id", "--reported-by", "--ts", "--title", "--severity", "--surface",
@@ -63,7 +63,7 @@ _HELP = {
     "check": "validate every BUGS.jsonl record",
     "fix": "derive each resolved record's fix commits, numstat, direction, rework and settledness",
     "window": "list the records found in or born in the live or the last shipped release",
-    "balance": "print QUALITY.md's `## Bugs` block from the ledger; --write regenerates it there",
+    "balance": "print QUALITY.md's `## Bugs` block from the ledger; --write or --check it there",
 }
 
 
@@ -89,6 +89,7 @@ def _parser() -> argparse.ArgumentParser:
             command.add_argument("bug_ids", nargs="*", help="default: every resolved record")
         if verb == "balance":
             command.add_argument("--write", action="store_true", help="rewrite the block in place")
+            command.add_argument("--check", action="store_true", help="refuse a stale block")
         if verb == "check":
             command.add_argument("--json", action="store_true", help="emit findings as JSON")
     return parser
@@ -184,10 +185,20 @@ def _window(specs: Path) -> int:
 
 
 def _balance(args: argparse.Namespace, specs: Path) -> int:
-    if args.write:
-        print(f"[ok] wrote the `## Bugs` block of {_placed(lambda: qa.write(specs), specs)}")
-    else:
-        print(_placed(lambda: qa.body(specs), specs), end="")
+    """Print the block, rewrite it (`--write`) or judge it (`--check`); whatever the ledgers,
+    the release log or git cannot give is one refusal, here and nowhere deeper."""
+    me = script(Path(__file__))
+    try:
+        if args.write:
+            print(f"[ok] wrote the `## Bugs` block of {_placed(lambda: qa.write(specs), specs)}")
+        elif args.check:
+            if _placed(lambda: qa.stale(specs), specs):
+                why = "the `## Bugs` block differs from its regeneration"
+                raise Refusal(why, f"{me} balance --write")
+        else:
+            print(_placed(lambda: qa.body(specs), specs), end="")
+    except (LookupError, TypeError, ValueError, OSError, subprocess.CalledProcessError) as error:
+        raise Refusal(f"cannot render the bug balance: {error}", f"{me} check") from None
     return 0
 
 

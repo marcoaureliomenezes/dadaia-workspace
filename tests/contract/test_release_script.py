@@ -517,7 +517,6 @@ def _balance_tree(
     return [sys.executable, str(bugs), "balance", "--specs", str(specs)]
 
 
-@pytest.mark.xfail(strict=True, reason="J4.S5 RED: the verb's edge catches nothing yet")
 @pytest.mark.parametrize("git", [True, False], ids=["record-without-ts", "tree-without-git"])
 def test_balance_refuses_an_unreadable_input_with_one_fix_line(tmp_path: Path, git: bool) -> None:
     """L6: a record with no `ts`, or a tree that is no git repo, is a refusal, not a traceback."""

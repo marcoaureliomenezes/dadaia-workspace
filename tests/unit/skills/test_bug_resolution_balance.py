@@ -130,7 +130,6 @@ def test_the_block_is_set_under_bugs_and_the_section_is_appended_when_absent() -
     assert bal.replaced("# Q\n", "new\n") == "# Q\n\n## Bugs\n\n```text\nnew\n```\n"
 
 
-@pytest.mark.xfail(strict=True, reason="J4.S5 RED: replaced() appends a second `## Bugs` section")
 def test_the_block_goes_right_after_an_existing_bugs_heading_that_holds_none() -> None:
     bal = _balance()
     doc = "# Q\n\n## Bugs\n\nwritten review\n\n## Other\n"

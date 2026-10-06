@@ -313,23 +313,25 @@ def _window_findings(specs: Path) -> list[dict[str, Any]]:
 
 def _balance_findings(specs: Path) -> list[dict[str, Any]]:
     """CLOSURE: `QUALITY.md`'s `## Bugs` block, once it has one, equals its regeneration —
-    a closure check, never a doctor lane (AC4.4)."""
+    asked of `bugs.py balance --check`, the bug skill's own verb (AC4.4); never a doctor lane."""
     try:
         live = live_release(specs)
     except Refusal:
         return []  # the tree walk reports a missing or doubled live release
     if live.state.get("phase") != "CLOSURE" or not (specs / "memory" / "QUALITY.md").is_file():
         return []
-    sys.path.append(str(_SKILLS / "dd-bug-resolution" / "scripts"))  # a skill-level dependency
-    import _bugs_quality as quality
-
-    try:
-        stale, why = quality.stale(specs), "the `## Bugs` block differs from its regeneration"
-    except (OSError, ValueError, LookupError, subprocess.CalledProcessError) as error:
-        stale, why = True, f"the `## Bugs` block cannot be regenerated: {error}"
     bugs = _SKILLS / "dd-bug-resolution" / "scripts" / "bugs.py"
+    done = subprocess.run(
+        [sys.executable, str(bugs), "balance", "--check", "--specs", str(specs)],
+        stdin=subprocess.DEVNULL,
+        capture_output=True,
+        text=True,
+    )
+    if not done.returncode:
+        return []
+    why = (done.stderr.strip().splitlines() or [f"exit {done.returncode}"])[0]
     fix = f"{script(bugs)} balance --write --specs {quote(str(specs))}"
-    return [finding("memory/QUALITY.md", 1, why, fix)] if stale else []
+    return [finding("memory/QUALITY.md", 1, f"the `## Bugs` block is not current: {why}", fix)]
 
 
 def tree_findings(specs: Path) -> list[dict[str, Any]]:

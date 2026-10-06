@@ -17,7 +17,7 @@ from typing import Any, NamedTuple
 
 Records = list[dict[str, Any]]
 UNKNOWN = "unknown"
-_TREND = 4  # the trend window: the live release and the 3 published before it
+TREND = 4  # the trend window: the live release and the 3 published before it
 _BUG = 2  # the bug window: the live release and the last published
 _Z = 1.96
 _HEAD = (
@@ -25,6 +25,7 @@ _HEAD = (
     *("archived", "rcs", "correlates", "settled"),
 )
 _APART = ("release unknown", "no found_in", "outside the window")
+_HEADING = re.compile(r"^## Bugs\n", re.M)
 _BLOCK = re.compile(
     r"(?P<head>^## Bugs\n(?:(?!## ).*\n)*?```text\n)(?P<body>(?:.*\n)*?)(?P<tail>^```$)", re.M
 )
@@ -101,7 +102,7 @@ def _gaps(records: Records, window: Window) -> int:
     for r in sorted(records, key=lambda r: str(r.get("ts"))):
         if _surface(r) != UNKNOWN and (release := _found(r)[0]) in rank:
             ranks[_surface(r)].append(rank[str(release)])
-    first = len(window.order) - _TREND
+    first = len(window.order) - TREND
     return sum(
         later >= first and later - earlier >= _BUG
         for each in ranks.values()
@@ -110,7 +111,7 @@ def _gaps(records: Records, window: Window) -> int:
 
 
 def _trend(records: Records, window: Window) -> list[str]:
-    trend = set(window.order[-_TREND:])
+    trend = set(window.order[-TREND:])
     span = (window.end - window.start).total_seconds() / 86400
     kinds = [_bucket(_found(r)[0], trend) for r in records]
     days = [
@@ -119,7 +120,7 @@ def _trend(records: Records, window: Window) -> list[str]:
         if kind == "counted"
     ]
     apart = ", ".join(f"{kinds.count(k)} {k}" for k in _APART)
-    shown = window.order[-_TREND:]
+    shown = window.order[-TREND:]
     return [
         f"Laplace trend (days), window {shown[0]}..{shown[-1]}, T = {span:g} days: "
         f"{_reading(days, span)}",
@@ -172,7 +173,13 @@ def stored(document: str) -> str | None:
 
 
 def replaced(document: str, body: str) -> str:
-    """*document* with its `## Bugs` block set to *body*; the section is appended when absent."""
+    """*document* with its `## Bugs` block set to *body*: in place, else right under an existing
+    heading, else a section appended."""
+    fenced = f"```text\n{body}```\n"
     if _BLOCK.search(document):
         return _BLOCK.sub(lambda m: m["head"] + body + m["tail"], document, count=1)
-    return f"{document.rstrip()}\n\n## Bugs\n\n```text\n{body}```\n".lstrip()
+    if heading := _HEADING.search(document):
+        rest = document[heading.end() :]
+        gap = "" if rest[:1] in ("", "\n") else "\n"
+        return f"{document[: heading.end()]}\n{fenced}{gap}{rest}"
+    return f"{document.rstrip()}\n\n## Bugs\n\n{fenced}".lstrip()
