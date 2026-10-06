@@ -52,7 +52,7 @@ Paths are relative to `dadaia_workspace/` unless they start with `scripts/`, `te
 
 - Contract: the two LOW bugs registered at 19f636f69 resolved, each by one shape-3 commit with its RED case; `bugs.py status` shows no rc-9 bug open; `ci.py job`'s doctor no longer warns TREE-5/MEM-DRIFT-2 about `specs/AGENTS.md`.
 - ACs served: ADR 0206.
-- Envelope (`specs/bugs/BUGS.jsonl` lines ride each fix commit, outside both `W:`): `dadaia_workspace/public/skills/dd-bug-resolution/scripts/bugs.py`, `tests/unit/skills/test_bug_resolution_bugs_script.py`, `.gitignore`, `specs/AGENTS.md`, `tests/contract/test_copy_drift_scoped_law.py`, `specs/bugs/BUGS.jsonl`.
+- Envelope (`specs/bugs/BUGS.jsonl` lines ride each fix commit, outside both write sets): `dadaia_workspace/public/skills/dd-bug-resolution/scripts/bugs.py`, `tests/unit/skills/test_bug_resolution_bugs_script.py`, `.gitignore`, `specs/AGENTS.md`, `tests/contract/test_copy_drift_scoped_law.py`, `specs/bugs/BUGS.jsonl`.
 - Exit tests: `tests/unit/skills/test_bug_resolution_bugs_script.py`, `tests/contract/test_copy_drift_scoped_law.py`; `bugs.py check`, `ci.py job` green.
 
 | task | AC | `W:` | owner tests / RED |
