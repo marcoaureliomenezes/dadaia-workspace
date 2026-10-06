@@ -96,3 +96,4 @@ Paths are relative to `dadaia_workspace/` unless they start with `scripts/`, `te
 | task | AC | `W:` | owner tests / RED |
 |---|---|---|---|
 | JR.S8.T1 | review HIGH-A, M-1 | `dadaia_workspace/public/skills/dd-bug-resolution/scripts/bugs.py`, `tests/unit/skills/test_bug_resolution_bugs_script.py`, `dadaia_workspace/public/entities/behavior-map.json` (the regenerated scripts hash) | `tests/unit/skills/test_bug_resolution_bugs_script.py` (new cases: a quoted subject holding `"`; an older fix survives a revert of the newer; a revert of a revert reinstates); RED before the fix |
+| JR.S8.T2 | AC6.1 | `README.md`, `docs/*.md` (the `derived-from: bug-ledger` markers re-recorded after the JR.S8 memory edit) | `tests/contract/test_docs_derived_from_memory.py` |
