@@ -560,6 +560,17 @@
       "relates": [
         "skill-scripts-one-kernel"
       ]
+    },
+    {
+      "id": "task-gate-declared-owner-tests",
+      "title": "The task gate runs the task's declared owner tests and never prints ALL PASS for zero steps",
+      "opened": "2026-10-06",
+      "status": "idea",
+      "description": "Measured: scripts/ci.py task with zero steps reports ALL PASS (:87-100, :129); any test_ name counts as an owner (:293-297); Owner-tests is checked only with is_file (:288). rc-10 SPEC Carried names this ('the task gate's test_ name check becomes a declared owner mapping - design and intake at rc-10 Reconciliation'); this entry is that intake. Design: the task gate reads the owner test file the job file declares for the task and runs it; a run with no steps prints NO STEPS instead of ALL PASS. Whether NO STEPS exits non-zero is unruled. Placement and every design detail not quoted from a ruling are agent default, unruled.",
+      "provenance": "audit verification 2026-10-06 over feature/0.5.0 8e6448f13 (four read-only verifiers); main-thread registration after the operator grill of 2026-10-06",
+      "relates": [
+        "stage-gate-runs-the-contract-tier"
+      ]
     }
   ]
 }
