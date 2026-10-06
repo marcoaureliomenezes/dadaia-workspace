@@ -889,8 +889,8 @@ def test_fix_lists_a_fix_commit_once_when_its_resolve_names_it_short(
     (tmp_path / "specs/n").write_text("z\n", encoding="utf-8")
     subprocess.run([*git, "add", "-A"], check=True)
     subprocess.run([*git, "commit", "-qm", f"chore(bugs): resolve a-bug — by T-1 ({sha[:9]})"], check=True)  # fmt: skip
-    done = _run(script, "fix", "a-bug", "--specs", str(specs)).stdout.splitlines()
-    assert done == [f"a-bug\t{sha}\tnet-positive", "\t1\t0\tcli/a.py", "[ok] 1 linked, 0 unlinked."]  # fmt: skip
+    listed = _run(script, "fix", "a-bug", "--specs", str(specs)).stdout.splitlines()
+    assert listed == [f"a-bug\t{sha}\tnet-positive", "\t1\t0\tcli/a.py", "[ok] 1 linked, 0 unlinked."]  # fmt: skip
 
 
 _WHY = "the blamed fix wrote the line, not its defect"
