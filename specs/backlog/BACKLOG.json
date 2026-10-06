@@ -206,17 +206,6 @@
       ]
     },
     {
-      "id": "adr-born-at-release-with-options",
-      "title": "An ADR is born only at release definition, past a threshold, carrying its options",
-      "opened": "2026-10-03",
-      "status": "idea",
-      "description": "Measured (HEAD c9100eaee): ADRs are proposed at any phase - `specs/ADRs/AGENTS.md:16` \"Any agent may append a record with status proposed\"; `dd-gitflow-default/SKILL.md:56` + `scripts/_worktree_kinds.py:20` (the backlog kind allows `decisions.jsonl`); mid-session offers in `dd-domain-modeling/SKILL.md:48-57`, `dd-architecture-survey/SKILL.md:77`, `dd-manager-orchestration/SKILL.md:35`, `dd-release-implementation/MEMORY-UPDATE.md:23`; `dd-grill-me/SKILL.md:43` (step 14) turns every decision into an ADR line; `dd-release-definition` has no ADR step; 0171-0175 were proposed at backlog intake (807116479). 0/175 records carry alternatives; schema `additionalProperties:false` (decision-record-v1 :7,86), no options field; `ruling.words` allows a \"grill answer id\" (`scaffold/ADRs/AGENTS.md:18`, schema :91); 147 accepted between 2026-08-31 and 2026-10-03. Change: an ADR is born only in `dd-release-definition`, after the picked backlogs are read together and before the SPEC, through dd-ask-me `references/adr.md`. Threshold, all three: one-way door (reversal costs more than this release or touches a published contract/data); >=1 architecturally-significant criterion (structural/cross-cutting, interface/contract, dependency, quality-attribute target, first of its kind, past troublemaker in the bug ledger); >=2 genuine options - else a one-line SPEC statement. Field `options: [{name, tradeoff, rejected_because}]` (min 2) required on every new record; how \"new\" is enforced is the release's call, preferring no second validation path (prior: adr-records-violate-schema-and-no-test-validates-committed-file) - e.g. optional in the schema and required by the dd-ask-me ADR session; `ruling.words` carries the question and the chosen option, never only an id. Remove `decisions.jsonl` from the backlog kind's allowed set and its gitflow \u00a73a row; every mid-session ADR offer becomes \"goes to the release's ADR session\". Done when: a backlog worktree cannot commit `decisions.jsonl`; a new record without options is refused; dd-release-definition carries the ADR step. Relates: dd-ask-me-owned-questioning-skill.",
-      "provenance": "operator demand 2026-10-03: ADR/RFC/SAST grill Q1-Q7 + R2-1..R2-4 (audit 2026-10-02)",
-      "relates": [
-        "dd-ask-me-owned-questioning-skill"
-      ]
-    },
-    {
       "id": "architecture-adr-section-generated",
       "title": "ARCHITECTURE.md's ADR section is generated from the ledger; the P-NN ADR label and the pairing law leave",
       "opened": "2026-10-03",
