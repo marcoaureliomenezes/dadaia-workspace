@@ -69,8 +69,8 @@ def test_install_over_an_unreadable_hook_never_raises(
     tmp_path: Path, layout: str, force: bool
 ) -> None:
     """HOOKS-DRIFT-1 names an unreadable hook and prints `install-hook --force` as its fix: that
-    command replaces it (the link, never its target), a plain install leaves what it cannot
-    read, and an absent hook is installed executable either way."""
+    command sets it aside as `pre-push.unreadable` (the link, never its target), a plain install
+    leaves what it cannot read, and an absent hook is installed executable either way."""
     hook = _hook_as(tmp_path, layout)
     written = layout == "absent" or force
     assert install_git_hooks(tmp_path, force=force) == ([hook] if written else [])
@@ -79,3 +79,5 @@ def test_install_over_an_unreadable_hook_never_raises(
     assert (hook.is_file() and os.access(hook, os.X_OK)) is written
     assert (tmp_path / "elsewhere" / "keep").exists() is (layout == "link-to-a-directory")
     assert not written or hook.read_bytes() == _SHIPPED.read_bytes()
+    aside = hook.with_name("pre-push.unreadable")
+    assert aside.exists() is (layout != "absent" and force)
