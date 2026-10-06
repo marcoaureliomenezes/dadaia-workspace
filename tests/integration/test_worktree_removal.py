@@ -37,9 +37,6 @@ def _on_the_remote(root: Path) -> str:
     return git(root / "repos/r", "ls-remote", "--heads", "origin", BRANCH).strip()
 
 
-@pytest.mark.xfail(
-    strict=True, reason="JB.S3 RED: worktree-removal-leaves-empty-parent-and-remote-branch"
-)
 def test_a_merge_removes_the_emptied_rc_folder_and_the_pushed_branch(root: Path) -> None:
     approve(root, land(root, "src/a.py"))
     _push_to_a_remote(root)
@@ -50,9 +47,6 @@ def test_a_merge_removes_the_emptied_rc_folder_and_the_pushed_branch(root: Path)
     assert _on_the_remote(root) == ""
 
 
-@pytest.mark.xfail(
-    strict=True, reason="JB.S3 RED: worktree-removal-leaves-empty-parent-and-remote-branch"
-)
 def test_clean_removes_the_emptied_rc_folder_and_the_pushed_branch(root: Path) -> None:
     _push_to_a_remote(root)
     cleaned = run(root, "clean", f"worktrees/r/{JOB}")
@@ -69,9 +63,6 @@ def test_a_merge_with_no_remote_still_lands_and_keeps_a_sibling_tree(root: Path)
     assert (root / "worktrees/r/0.5.0-rc1/j2").is_dir()
 
 
-@pytest.mark.xfail(
-    strict=True, reason="JB.S3 RED: worktree-removal-leaves-empty-parent-and-remote-branch"
-)
 def test_list_reports_a_directory_that_holds_no_tree(root: Path) -> None:
     (root / "worktrees/r/0.5.0-rc9").mkdir()
     rows = json.loads(run(root, "list", "--json").stdout)
