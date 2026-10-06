@@ -480,6 +480,17 @@
       "description": "Found at rc-9 Reconciliation (AC6.3, JR.S2.T4): the rc-9 SPEC's proposal of 0193 says it amends 0152 (2) (at most 8 jobs; the 12 KiB recommendation read per job file), but the accepted record in specs/ADRs/decisions.jsonl carries amends: null. The ADR 0138 repair lane covers only a dead measured_by, so this cannot be repaired in place by an agent. Design: the operator rules one of (a) a new ADR record that amends 0152 (2) and cites 0193, accepted with a ruling, or (b) widening the 0138 repair lane to a missing lineage field, then the in-place repair. Owner: specs/ADRs/decisions.jsonl, specs/ADRs/AGENTS.md. Done when: the ledger's lineage shows 0152 (2) amended, and LEDGER-ADR-SCHEMA stays clean.",
       "provenance": "rc-9 Reconciliation deferral (JR.S2.T5), dispatched by the main thread 2026-10-06 under the operator's rc-9 scope; target rc-10 or later",
       "relates": []
+    },
+    {
+      "id": "architecture-principles-measured-by-re-pointed",
+      "title": "ARCHITECTURE P-12, P-14 and P-15 re-point their Measured-by lines to the checks that hold them since T-050-86",
+      "opened": "2026-10-06",
+      "status": "idea",
+      "description": "Found at rc-9 Reconciliation (review M-2 at 8693810de): ARCHITECTURE.md P-12 (:57), P-14 (:67) and P-15 (:72) name tests/contract/test_hook_import_surface.py, test_release_state_read_only.py (deleted at e68dcb0e3) and test_release_state_schema.py (deleted at be15615b0), both T-050-86 on 2026-09-28. A ### P-NN principle changes only in the commit carrying its accepted ADR (specs/memory/AGENTS.md \u00a71, ADR 0138), so an agent cannot repair the lines in place. Design: one ADR, accepted by the operator, re-pointing the three lines to the checks that hold them today: P-12 -> pytest tests/contract/test_core_file_io_purity.py::test_importing_a_hook_never_imports_the_container (the six hook modules) and ::test_gate_resolution_path_never_imports_the_container (the executed gate path); P-14 -> pytest tests/contract/test_core_file_io_purity.py::test_each_question_has_one_owner[release-state-module-never-writes]; P-15 -> pytest tests/contract/test_handoff_schema_contract.py, release rows, which cover only part of the principle: the top level and the three milestones closed, rc refused at top level and in a milestone, a log entry without kind/text refused; no row refuses an unknown log-entry key or a session_id, though the schema closes the log entry. So P-15 either gains those two refusal rows in the same release or narrows its wording to what the rows check. Owner: specs/memory/ARCHITECTURE.md, specs/ADRs/decisions.jsonl, tests/contract/test_handoff_schema_contract.py. Conflicts with rc-10 AC10.1 (every tests/\u2026py path named in QUALITY.md and ARCHITECTURE.md exists) until it lands. Done when: every Measured-by path of P-12, P-14 and P-15 exists and its check fails when the principle is violated.",
+      "provenance": "rc-9 Reconciliation deferral (review M-2 at 8693810de), dispatched by the main thread 2026-10-06; target rc-10 or later",
+      "relates": [
+        "architecture-adr-section-generated"
+      ]
     }
   ]
 }
