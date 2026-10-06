@@ -45,4 +45,41 @@ Paths are relative to the repo root; aliases as in `PLAN.md` (`f/`, `pub/`, `S/`
 | JB.S2.T14 | — | this file (T11 names the paths it extends) | no RED: `release.py check` |
 | JB.S2.T15 | AC9.1 | the service.py and test_hook_refresh.py of T7, one more commit (a forced install sets an unreadable hook aside; the path-delete guard allows no deletion there) | the rows of T7 |
 | JB.S2.T16 | — | `dadaia_workspace/features/chokepoints/branch_policy.py` (a PR-only refusal's fix is an operator action on the user's git host), `tests/unit/features/chokepoints/test_push_branch_policy.py`, `tests/integration/test_refusal_fix_lines_clear_their_refusal.py` (the operator-approved lines) | the two rows that locked the `gh` line; one site of public-law-teaches-the-private-pipeline |
-| JB.S2.T9 | — | this file | close task, last: `test-audit:`, `mutation:`; `done` |
+| JB.S2.T9 | — | `specs/releases/0.5.0/rc-10/tasks/bug-batch.md` | close task of both lanes, last: `test-audit:`, `mutation:` lines; the job's `done` line |
+
+- Lane A is JB.S3, JB.S4 and JB.S5 (the same write-set rule). The operator's rulings of 2026-10-06 that shape it: "Aceito: apagar _check_stray (Recommended)", "Job hotfix sem SPEC (Recommended)", "para os usuários do dadaia-workspace CI em repo remoto não deve ser de forma alguma obrigatorio", "Registra os 4 e corrige na rc-10 (Recommended)", "Aprovo (a)-(d) (Recommended)", and "Público, sem bloquear (Recommended)".
+
+## Stage JB.S3 — RED (lane A)
+
+- Contract: exit tests one RED case per bug, or per cause group, as strict xfail, at the lowest level that detects it; the operator-approved old lines change here and nowhere else; envelope `tests/**`; ACs AC9.1
+- Old lines changed in this stage, each on the operator's approval of 2026-10-06: `test_a_stray_job_branch_commit_refuses` is deleted ("Aprovo (a) e (b) (Recommended)", the deletion of the stray check); lines 393-397 of `test_worktree_lifecycle.py` expect a job to land with no `ci_run` ("Aprovo (a)-(d) (Recommended)"); the stale-balance row of `test_release_script.py` expects a warning, not an error ("Público, sem bloquear (Recommended)").
+- Bugs without a RED row of their own: `job-merge-accepts-any-ci-run-url` and `job-merge-requires-a-remote-ci-run` share the one deletion, so one RED row; `public-law-teaches-the-private-pipeline` belongs to the law lane.
+
+| task | AC | `W:` | owner tests / RED |
+|---|---|---|---|
+| JB.S3.T1 | AC9.1 | `specs/releases/0.5.0/rc-10/tasks/bug-batch.md` (the rows of lane A) | no RED: `release.py check` |
+| JB.S3.T2 | AC9.1 | `tests/integration/test_worktree_lifecycle.py` (check-stray-laundered-by-rebase: the stray test leaves and a directly committed code change lands once reviewed; job-merge-requires-a-remote-ci-run and job-merge-accepts-any-ci-run-url: the `ci_run` test turned around; gate-runs-the-judged-trees-own-ci-script: a task and a job editing the declared line's script refuse; test-path-convention-is-python-only: a task naming a `*_test.py` owner lands) | the new rows, strict xfail |
+| JB.S3.T3 | AC9.1 | `tests/integration/test_worktree_new.py` (a block-list hotfix opens with no rc SPEC, refuses without an open bug record, and merges) | the new rows, strict xfail |
+| JB.S3.T4 | AC9.1 | `tests/integration/test_worktree_removal.py` (worktree-removal-leaves-empty-parent-and-remote-branch: a merge removes the emptied rc folder and the pushed branch, `list` reports an empty folder) | the new rows, strict xfail |
+| JB.S3.T5 | AC9.1 | `tests/integration/test_worktree_define_gate.py`, `tests/fixtures/stores.py` (trio-status-canon-judged-outside-the-define-merge-gate: the stub CLI answers `doctor`; a define merge runs it fenced to its tree and refuses on its exit) | the new rows, strict xfail |
+| JB.S3.T6 | AC9.1 | `tests/integration/test_skill_script_workspace_root.py` (skill-script-root-walks-ignore-the-fence: each skill script walk skips a fenced root) | the new rows, strict xfail |
+| JB.S3.T7 | AC9.1 | `tests/unit/skills/test_release_implementation_release_script.py` (rc-closes-with-an-open-bug: `new` refuses while a bug found in the live rc is open or deferred; release-ship-requires-a-pr-number: `ship` with no `--pr` records `pr: null`) | the new rows, strict xfail |
+| JB.S3.T8 | AC9.1 | `tests/contract/test_release_script.py` (a stale `## Bugs` block is a warning at closure, the one old row of it changed; test-path-convention-is-python-only: a first stage naming `pkg/x_test.go` passes) | the changed row and the new row, strict xfail |
+
+## Stage JB.S4 — fixes (lane A)
+
+- Contract: exit tests JB.S3 green, unit + integration green, `bugs.py status` shows no lane A bug open except the one waiting for the operator's approval of its old rows; envelope the units the groups name, `specs/bugs/BUGS.jsonl` (by `bugs.py` only, one `resolve` line in each fix commit); ACs AC9.1
+
+| task | AC | `W:` | owner tests / RED |
+|---|---|---|---|
+| JB.S4.T1 | AC9.1 | `specs/ADRs/decisions.jsonl` (four proposals the operator accepts: the job merge no longer judges how code reached a branch, no host or remote CI is assumed, a hotfix job needs no rc SPEC, a stale balance block is a warning) | no RED: `dadaia doctor` ledger rules |
+| JB.S4.T2 | AC9.1 | `dadaia_workspace/public/skills/dd-gitflow-default/scripts/_worktree_end.py`, `dadaia_workspace/public/skills/dd-gitflow-default/scripts/_worktree_git.py`, `dadaia_workspace/public/skills/dd-gitflow-default/scripts/_worktree_names.py`, `dadaia_workspace/public/skills/dd-gitflow-default/scripts/_worktree_new.py`, `dadaia_workspace/public/skills/dd-bug-resolution/scripts/_specs.py`, `dadaia_workspace/public/skills/dd-cli-library/scripts/registry.py`, `dadaia_workspace/public/skills/dd-release-implementation/scripts/_release_phase.py`, `dadaia_workspace/public/schemas/handoff-v1.schema.json`, `dadaia_workspace/public/data/worktrees-AGENTS.md`, `dadaia_workspace/public/skills/dd-gitflow-default/SKILL.md`, `dadaia_workspace/public/skills/dd-release-implementation/RC-FLOW.md`, `dadaia_workspace/public/skills/dd-release-implementation/RELEASE-EVENTS.md`, `tests/helpers/worktree_ws.py`, `tests/integration/test_worktree_lifecycle.py`, `tests/integration/test_worktree_new.py`, `tests/integration/test_worktree_removal.py`, `tests/integration/test_worktree_define_gate.py`, `tests/integration/test_skill_script_workspace_root.py` (the worktree and workspace-root fixes, one commit each, markers leave) | its JB.S3.T2-T6 rows; check-stray, gate-runs-the-judged-trees-own-ci-script, the `ci_run` pair, trio-status-canon, worktree-removal, skill-script-root-walks, and the hotfix job |
+| JB.S4.T3 | AC9.1 | `dadaia_workspace/public/skills/dd-release-implementation/scripts/_release_new.py`, `dadaia_workspace/public/skills/dd-release-implementation/scripts/release.py`, `dadaia_workspace/public/skills/dd-release-implementation/scripts/_release_tree.py`, `dadaia_workspace/public/scaffold/memory/AGENTS.md`, `tests/unit/skills/test_release_implementation_release_script.py`, `tests/contract/test_release_script.py` (rc-closes-with-an-open-bug, release-ship-requires-a-pr-number, and the stale balance block as a warning; markers leave) | its JB.S3.T7-T8 rows |
+
+## Stage JB.S5 — close (lane A)
+
+- Contract: the behavior map re-recorded after lane A's law and script edits; exit unit + integration green; ACs AC9.1
+
+| task | AC | `W:` | owner tests / RED |
+|---|---|---|---|
+| JB.S5.T1 | — | `dadaia_workspace/public/entities/behavior-map.json` (skill and scripts hashes after lane A) | `test_behavior_map.py` |
