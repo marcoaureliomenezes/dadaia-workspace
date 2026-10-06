@@ -1,10 +1,10 @@
 {
   "schema": "release-state-v1",
   "release": "0.5.0",
-  "phase": "DEFINITION",
+  "phase": "IMPLEMENTATION",
   "defined": {
-    "sha": "29ee92d3a",
-    "ts": "2026-10-05T18:41:40Z"
+    "sha": "8e6448f13",
+    "ts": "2026-10-06T18:31:49Z"
   },
   "implemented": {
     "sha": "27123ce99",
@@ -1158,6 +1158,15 @@
       "agent": "dd-product-engineer",
       "kind": "note",
       "text": "rc-9: the kind: merge entry above (job: reconcile) is rc-9's Reconciliation, logged after rc-10's birth note. Sources of that entry, from git, gh and the session transcripts. end: createdAt of the feature/0.5.0 push CI run 37475941636 (head cfe73a297). start: the committer time of ae3d0b1cc, the first commit after d1d4d36c4 in the landed range, which is its rebase instant; its author time is 01:07:52Z, which on the author-time basis of the jobs 2-5 entries gives a wall of 777. ritual_wait: end minus the author time of the last task commit, cfe73a297 (JR.S8.T2, 13:36:31Z). dispatches: the main thread's Agent calls for the job (engineer, product engineer, reviewer), 14; the 3 SendMessage follow-ups to running agents are not counted (17 with them). job_gate_runs: full scripts/ci.py job runs on the reconcile tree in the session transcripts, plus worktree.py merge's verify run, 12. rc-9 AC1.7 readout: 12 exceeds the rule's 1 plus the recorded reds, a violation reported here. 7 of the 12 were red and 5 green (02:02, 04:20, 12:44, 13:39Z and the merge at 13:58Z), and the job file records none of the reds. Of the 7 reds, 6 were gate reds (02:26, 03:24, 04:59, 13:10, 13:18, 13:30:15Z), and 1 (13:30:09Z) was environmental: it ran under /usr/bin/python3 without lint-imports. Excluding that run gives 11 runs, 6 of them red."
+    },
+    {
+      "ts": "2026-10-06T18:31:49Z",
+      "agent": "release.py",
+      "kind": "milestone",
+      "candidate": "rc-10",
+      "milestone": "defined",
+      "sha": "8e6448f13",
+      "text": "Candidate defined at 8e6448f13; phase IMPLEMENTATION."
     }
   ]
 }
