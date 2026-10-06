@@ -397,6 +397,15 @@
       "relates": [
         "meta-tests-leave-pytest"
       ]
+    },
+    {
+      "id": "job-gate-runs-the-law-deletion-check",
+      "title": "scripts/ci.py job runs the push gate's ADR 0151 M3 law-deletion check over the job range",
+      "opened": "2026-10-06",
+      "status": "idea",
+      "description": "Found in rc-9: Job 1's commits deleting AGENTS.md/SKILL.md law lines without citing an accepted ADR were refused only by pre-push (ADR 0151 M3), after the job gate and the review had passed; the messages were then reworded to cite their ADRs (Job 1 merge 29ee92d3a). Design: the job level of scripts/ci.py runs the same policy the pre-push chokepoint runs \u2014 the law-deletion rule of features/chokepoints over <work branch>..HEAD, one function, called by both, never a copy \u2014 so a job whose commit deletes a law line without its ADR citation fails at the job gate with the same fix line (reword the first listed commit). Owner: the chokepoint's law-deletion policy (one entry point), scripts/ci.py job, tests/integration/test_ci_script.py. Done when: a job range holding an uncited law-line deletion fails scripts/ci.py job naming that commit.",
+      "provenance": "rc-9 Reconciliation deferral (JR.S2.T5), dispatched by the main thread 2026-10-06 under the operator's rc-9 scope; target rc-10 or later",
+      "relates": []
     }
   ]
 }
