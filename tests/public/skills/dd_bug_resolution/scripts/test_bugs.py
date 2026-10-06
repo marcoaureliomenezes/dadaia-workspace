@@ -1074,6 +1074,64 @@ def test_fix_counts_a_task_fix_over_a_bug_fix_as_rework(script: Path, tmp_path: 
                       "\trework\t0 planned, 1 overfitting", "[ok] 1 linked, 0 unlinked."]  # fmt: skip
 
 
+def test_fix_links_the_shas_a_legacy_resolve_cites_when_no_commit_carries_its_task_id(
+    script: Path, tmp_path: Path
+) -> None:
+    """`by J2 (<sha>)` and `retro: repaired by (<sha>)` name no task a commit carries: the cited
+    sha links, a body id with a stray space is read, an id whose task has commits links those."""
+    closed = {**_OPEN_RECORD, "status": "resolved", "closed_at": "2026-09-21T00:00:00Z"}
+    ids = ("a-bug", "b-bug", "c-bug", "d-bug")
+    specs = _ledger(tmp_path, *({**closed, "id": i} for i in ids))
+    _, one, two, three = _commits(tmp_path, ("chore: seed", {}), ("feat(x): one", {"cli/one.py": "1\n"}),
+                                  ("feat(y): two", {"cli/two.py": "2\n"}),
+                                  ("feat(T-3): three", {"cli/three.py": "3\n"}))  # fmt: skip
+    _commits(tmp_path, (f"chore(bugs): resolve a-bug — by J2 ({one[:9]})", {"specs/n": "a\n"}),
+             (f"chore(bugs): resolve b-bug — retro: repaired by ({two[:9]})", {"specs/n": "b\n"}),
+             (f"chore(bugs): resolve class C9 — by T-3 ({one[:9]})\n\nc-bug \n d-bug", {"specs/n": "c\n"}))  # fmt: skip
+    listed = _run(script, "fix", "--specs", str(specs)).stdout.splitlines()
+    assert listed == [f"a-bug\t{one}\tnet-positive", "\t1\t0\tcli/one.py",
+                      f"b-bug\t{two}\tnet-positive", "\t1\t0\tcli/two.py",
+                      f"c-bug\t{three}\tnet-positive", "\t1\t0\tcli/three.py",
+                      f"d-bug\t{three}\tnet-positive", "\t1\t0\tcli/three.py",
+                      "[ok] 4 linked, 0 unlinked."]  # fmt: skip
+
+
+def test_fix_counts_no_rework_from_a_commit_a_revert_undid(script: Path, tmp_path: Path) -> None:
+    """A `fix(bugs)` of another bug that rewrote a fix's line and was reverted is not its rework."""
+    closed = {**_OPEN_RECORD, "status": "resolved", "closed_at": "2026-09-21T00:00:00Z"}
+    specs = _ledger(tmp_path, {**closed, "id": "a-bug"}, {**closed, "id": "b-bug"})
+    _, fix_a, *_ = _commits(
+        tmp_path, ("chore: seed", {"cli/a.py": "s\n"}),
+        ("fix(bugs): a-bug — x", {"cli/a.py": "f\n"}),
+        ("fix(bugs): b-bug — y", {"cli/a.py": "g\n"}),
+        ('Revert "fix(bugs): b-bug — y"', {"cli/a.py": "f\n"}),
+    )  # fmt: skip
+    listed = _run(script, "fix", "a-bug", "--specs", str(specs)).stdout.splitlines()
+    assert listed == [f"a-bug\t{fix_a}\tnet-neutral", "\t1\t1\tcli/a.py", "[ok] 1 linked, 0 unlinked."]  # fmt: skip
+
+
+def test_window_in_a_repo_with_no_commit_yet_lists_nothing(script: Path, tmp_path: Path) -> None:
+    """The window reads history through the one task reader, which a repo before its first
+    commit answers with no task, not a failure."""
+    specs = _ledger(tmp_path, {**_OPEN_RECORD, "caused_by": "T-1"})
+    state = specs / "releases" / "9.9.9" / "_RELEASE.json"
+    state.parent.mkdir(parents=True)
+    state.write_text(_state("2026-01-01T00:00:00Z"), encoding="utf-8")
+    assert _window(script, specs)[-1] == "[ok] 0 in the window (9.9.9), 0 release unknown."
+
+
+def test_a_tasks_culprit_is_its_oldest_commit(script: Path, tmp_path: Path) -> None:
+    """`introduced_in` reads the oldest commit of the task `caused_by` names, not its later rework."""
+    specs = _live(tmp_path, {**_OPEN_RECORD, "caused_by": "T-1"})
+    _history(tmp_path,
+             ("2026-02-01T00:00:00Z", "feat(specs): rc-2", {f"{_RELEASES}9.9.9/rc-2/SPEC.md": _STUB}),
+             ("2026-02-02T00:00:00Z", "feat(T-1): first", {"cli/t.py": "t\n"}),
+             ("2026-03-01T00:00:00Z", "feat(specs): rc-3", {f"{_RELEASES}9.9.9/rc-3/SPEC.md": _STUB}),
+             ("2026-03-02T00:00:00Z", "fix(T-1): later", {"cli/t.py": "t2\n"}),
+             ("2026-03-03T00:00:00Z", "fix(T-1): latest", {"cli/t.py": "t3\n"}))  # fmt: skip
+    assert "a-bug\topen\t-\t9.9.9/rc-2" in _window(script, specs)
+
+
 def test_fix_reads_a_surface_two_rcs_left_untouched_as_settled(script: Path, tmp_path: Path) -> None:
     """AC1.1, Terms: a fix surface no fix or REBUILD touched while 2 candidates were born
     is settled; one born since is not yet, and a later fix on the surface restarts the count."""
