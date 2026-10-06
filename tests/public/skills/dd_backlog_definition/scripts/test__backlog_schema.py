@@ -8,11 +8,7 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-import pytest
-
 import dadaia_workspace
-
-pytestmark = pytest.mark.contract
 
 _PUBLIC = Path(dadaia_workspace.__file__).resolve().parent / "public"
 

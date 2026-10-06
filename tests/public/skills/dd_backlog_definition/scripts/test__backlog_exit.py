@@ -17,11 +17,7 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-import pytest
-
 import dadaia_workspace
-
-pytestmark = pytest.mark.contract
 
 _PKG = Path(dadaia_workspace.__file__).resolve().parent
 _TESTS = _PKG.parent / "tests"
