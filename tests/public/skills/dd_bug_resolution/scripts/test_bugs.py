@@ -1044,6 +1044,38 @@ def test_fix_counts_rework_per_line_not_per_file(script: Path, tmp_path: Path) -
     ]  # fmt: skip
 
 
+@pytest.mark.xfail(strict=True, reason="JB.S1 RED: rebase-orphans-bug-fix-links-cited-by-sha")
+def test_fix_links_a_shape_4_resolve_by_its_task_id_when_the_cited_sha_is_gone(
+    script: Path, tmp_path: Path
+) -> None:
+    """A rebase rewrites the cited sha; the task id in `by T-1` still names the task's commits."""
+    closed = {**_OPEN_RECORD, "status": "resolved", "closed_at": "2026-09-21T00:00:00Z"}
+    specs = _ledger(tmp_path, {**closed, "id": "b-bug"})
+    _, one, two = _commits(tmp_path, ("chore: seed", {}), ("feat(T-1): one", {"cli/t1.py": "a\n"}),
+                           ("fix(T-1): two", {"cli/t2.py": "b\n"}))  # fmt: skip
+    _commits(tmp_path, ("chore(bugs): resolve b-bug — by T-1 (0123abc, 4567def)", {"specs/n": "b\n"}))
+    listed = _run(script, "fix", "b-bug", "--specs", str(specs)).stdout.splitlines()
+    assert listed == [f"b-bug\t{one},{two}\tnet-positive", "\t1\t0\tcli/t1.py", "\t1\t0\tcli/t2.py",
+                      "[ok] 1 linked, 0 unlinked."]  # fmt: skip
+
+
+@pytest.mark.xfail(strict=True, reason="JB.S1 RED: task-fix-over-a-bug-fix-records-no-lineage")
+def test_fix_counts_a_task_fix_over_a_bug_fix_as_rework(script: Path, tmp_path: Path) -> None:
+    """A `fix(<task>)` commit removing a line a bug's fix wrote is that fix's rework, as a
+    `fix(bugs)` of another bug is; one that touches other lines is not."""
+    closed = {**_OPEN_RECORD, "status": "resolved", "closed_at": "2026-09-21T00:00:00Z"}
+    specs = _ledger(tmp_path, {**closed, "id": "a-bug"})
+    _, fix_a, *_ = _commits(
+        tmp_path, ("chore: seed", {"cli/a.py": "s1\ns2\n"}),
+        ("fix(bugs): a-bug — x", {"cli/a.py": "s1\nf2\n"}),
+        ("fix(T-9): other lines", {"cli/a.py": "t1\nf2\n"}),
+        ("fix(T-9): the fix's line", {"cli/a.py": "t1\nt2\n"}),
+    )  # fmt: skip
+    listed = _run(script, "fix", "a-bug", "--specs", str(specs)).stdout.splitlines()
+    assert listed == [f"a-bug\t{fix_a}\tnet-neutral", "\t1\t1\tcli/a.py",
+                      "\trework\t0 planned, 1 overfitting", "[ok] 1 linked, 0 unlinked."]  # fmt: skip
+
+
 def test_fix_reads_a_surface_two_rcs_left_untouched_as_settled(script: Path, tmp_path: Path) -> None:
     """AC1.1, Terms: a fix surface no fix or REBUILD touched while 2 candidates were born
     is settled; one born since is not yet, and a later fix on the surface restarts the count."""
