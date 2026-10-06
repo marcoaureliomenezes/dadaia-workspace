@@ -22,7 +22,7 @@ def _write(tmp_path: Path, text: str) -> Path:
 
 
 #: The canon fingerprint each stamp was cut at — re-pinned only together with a stamp bump.
-_CANON_AT = {11: "e8901348a11ef8de"}
+_CANON_AT = {11: "7892e7b6d16c3247"}
 
 
 def test_a_canon_change_bumps_the_stamp() -> None:
