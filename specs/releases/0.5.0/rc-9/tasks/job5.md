@@ -42,4 +42,16 @@ Paths are relative to `dadaia_workspace/` unless they start with `scripts/`, `te
 - ADRs 0193 and 0201–0205 accepted, "Aceito as seis (Recommended)" (d47d276ea).
 - AC5.7's unit: met by the AC12.12 row; J5.S1.T2 and J5.S2.T2 void.
 
-- Done: Job 5 closed by J5.S2.T8 (2026-10-05).
+## Stage J5.S3 — review rework (the Job 5 REJECTED review)
+
+- Contract: exit tests the touched owner tests green at the task gates; unit + integration green at the stage gate; envelope the J5.S2 envelope plus `public/skills/dd-release-definition/SKILL.md`, `public/skills/dd-audit-project/PILLAR-SPECS.md`, `public/data/AGENTS.md`, `public/templates/shipped-hashes.json`, `tests/unit/core/test_specs_version.py`; findings the Job 5 review HIGH 1–3, MEDIUM 1–3, LOW 1, LOW 3
+- The J5.S2.T8 close (a5aefb60b) stays in history; this stage's close supersedes it.
+
+| task | finding | `W:` (as landed) | owner tests / RED | landed |
+|---|---|---|---|---|
+| J5.S3.T1 | HIGH 1, HIGH 2, MEDIUM 1, LOW 3 (skills) | `gitflow/SKILL.md`, `public/skills/dd-release-definition/SKILL.md`, `public/skills/dd-audit-project/PILLAR-SPECS.md`, `bugres/SKILL.md`, `public/entities/behavior-map.json` | no test | 94e114580, 4cd61544c |
+| J5.S3.T2 | MEDIUM 2, MEDIUM 3, LOW 3; canon 11 re-pin; `specs upgrade` | `public/scaffold/bugs/AGENTS.md`, `public/scaffold/releases/AGENTS.md`, `CONTEXT.md`, `public/data/AGENTS.md`, `public/templates/shipped-hashes.json`, `tests/unit/core/test_specs_version.py`, `public/entities/behavior-map.json`; this repo's `specs/bugs/AGENTS.md`, `specs/releases/AGENTS.md` by `specs upgrade` | `test_specs_version.py`, `test_tree5_shipped_history.py` | 690c0e75f, c9afa653b, bd08719a7, 073c7ec63 |
+| J5.S3.T3 | HIGH 3 (the AC5.6 check scoped per phase inside `_origin_findings`, the operator's ruling on its precedent), LOW 1 | `relimpl/scripts/_release_tree.py`, `tests/unit/skills/test_release_implementation_release_script.py` (REBUILD of the AC5.6 tests), `tests/contract/test_release_script.py` (fixture line), `public/entities/behavior-map.json` | `test_release_implementation_release_script.py`, `test_release_script.py` | d391ca8bf, 39b5f47f2, e17dabb1e |
+| J5.S3.T4 | — | this file | close task: test-audit + mutation evidence | this commit, the close commit |
+
+- Done: Job 5 closed by J5.S3.T4 (2026-10-05), superseding the J5.S2.T8 close.
