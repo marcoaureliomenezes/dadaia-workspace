@@ -8,7 +8,6 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-import pytest
 from typer.testing import CliRunner
 
 from dadaia_workspace.cli.main import app
@@ -17,11 +16,9 @@ from dadaia_workspace.core.fixed_sections import FIXED_SECTIONS
 from dadaia_workspace.core.gitflow import merge_frontmatter
 from dadaia_workspace.features.specs import SpecsDoctor, canon
 
-pytestmark = pytest.mark.unit
-
-_PUBLIC = Path(__file__).resolve().parents[4] / "dadaia_workspace" / "public"
+_PUBLIC = Path(__file__).resolve().parents[3] / "dadaia_workspace" / "public"
 #: specs/bugs/AGENTS.md as published at 570af642 (its sha256 is in shipped-hashes.json).
-_SHIPPED_BUGS_LAW = Path(__file__).resolve().parents[3] / "fixtures/shipped/bugs-AGENTS.570af642.md"
+_SHIPPED_BUGS_LAW = Path(__file__).resolve().parents[2] / "fixtures/shipped/bugs-AGENTS.570af642.md"
 _FIXED_BLOCK = re.compile(
     r"\n*<!-- dadaia:fixed [\w-]+ -->\n.*?<!-- /dadaia:fixed [\w-]+ -->\n", re.S
 )

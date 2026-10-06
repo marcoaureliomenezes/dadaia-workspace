@@ -21,9 +21,7 @@ from dadaia_workspace.features.migrate.upgrade import fold_tech_stack, upgrade
 from dadaia_workspace.features.spec_context import sweep
 from dadaia_workspace.features.specs import SpecsDoctor, canon
 
-pytestmark = pytest.mark.unit
-
-_PUBLIC = Path(__file__).resolve().parents[4] / "dadaia_workspace" / "public"
+_PUBLIC = Path(__file__).resolve().parents[3] / "dadaia_workspace" / "public"
 _OUTSIDE = (  # a valid atom: the only error left is the refused symlink
     "---\nslug: QUALITY\ntitle: Quality\ntldr: Quality.\nsummary: Quality.\ntags:\n  - quality\n---\n"
     "# Quality\n\noperator text, no fixed block\n"

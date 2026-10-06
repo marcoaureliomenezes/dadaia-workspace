@@ -19,9 +19,6 @@ from dadaia_workspace.features.migrate.upgrade import (
 from dadaia_workspace.features.specs import canon
 from dadaia_workspace.features.specs.doctor import SpecsDoctor
 
-pytestmark = pytest.mark.unit
-
-
 _QUOTED = "a quoted `**Status:** Rascunho` is no declaration\n"
 
 

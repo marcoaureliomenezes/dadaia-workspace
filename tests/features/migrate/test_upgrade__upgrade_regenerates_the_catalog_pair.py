@@ -12,13 +12,10 @@ import subprocess
 import sys
 from pathlib import Path
 
-import pytest
 from typer.testing import CliRunner
 
 from dadaia_workspace.cli.main import app
 from dadaia_workspace.features.specs.canon import default_public_dir, scaffold
-
-pytestmark = pytest.mark.integration
 
 _MEMORY = default_public_dir() / "skills" / "dd-spec-navigator" / "scripts" / "memory.py"
 

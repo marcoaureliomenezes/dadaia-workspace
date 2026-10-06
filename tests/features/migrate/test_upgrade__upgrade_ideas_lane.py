@@ -10,8 +10,6 @@ import pytest
 from dadaia_workspace.features.migrate.upgrade import plan_empty_ideas_dir, remove_empty_ideas_dir
 from dadaia_workspace.features.spec_context import sweep
 
-pytestmark = pytest.mark.unit
-
 
 @pytest.mark.parametrize(
     ("files", "outside", "removed"),
