@@ -168,8 +168,8 @@ class DoctorService:
 
     def check_installed_hooks(self, context: str | None = None) -> list[SectionFinding]:
         """HOOKS-DRIFT-1: an ALIVE repo's hook where git runs hooks is not byte-for-byte the
-        shipped one (hand-edited, missing or stale) — the one backstop outside every harness
-        hook. A non-git repo is never a finding; *context* scopes the repos (0.4.8 R5)."""
+        shipped one — differs, absent or unreadable, each said as observed — the one backstop
+        outside every harness hook. A non-git repo is never a finding; *context* scopes the repos (0.4.8 R5)."""
         issues: list[SectionFinding] = []
         for top in self._alive_repo_tops(context):
             hooks_dir = git_hooks_dir(top)
@@ -178,18 +178,24 @@ class DoctorService:
             for target, source in workspace_layout.INSTALLED_GIT_HOOKS:
                 shipped = workspace_layout.public_scripts_dir() / source
                 installed = hooks_dir / target
+                shipped_bytes = shipped.read_bytes()
                 try:
-                    drifted = installed.read_bytes() != shipped.read_bytes()
-                except OSError:
-                    drifted = True
-                if drifted:
+                    state = (
+                        None
+                        if installed.read_bytes() == shipped_bytes
+                        else f"differs from the shipped {source}"
+                    )
+                except FileNotFoundError:
+                    state = "is absent"
+                except OSError as exc:
+                    state = f"is unreadable ({exc.strerror})"
+                if state:
                     rel = str(top)  # absolute: the fix runs from any cwd
                     issues.append(
                         _invariant(
                             "HOOKS-DRIFT-1",
-                            f"{Path(os.path.relpath(installed, self._workspace_root)).as_posix()} differs from the shipped "
-                            f"{source} — the chokepoint is enforcing something other "
-                            "than what this release ships.",
+                            f"{Path(os.path.relpath(installed, self._workspace_root)).as_posix()} {state} — "
+                            "the chokepoint is not enforcing what this release ships.",
                             fix_line(
                                 self._workspace_root, "ci", "install-hook", "--force", "--repo", rel
                             ),

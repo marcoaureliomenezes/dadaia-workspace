@@ -105,8 +105,7 @@ def test_no_module_computes_the_hooks_dir_itself() -> None:
 # fmt: off
 @pytest.mark.parametrize(("layout", "observed", "other"), [
     pytest.param({"drifted": True}, "differs from", "absent", id="edited-hook-differs"),
-    pytest.param({"installed": False}, "is absent", "differs", id="deleted-hook-is-absent",
-                 marks=pytest.mark.xfail(strict=True, reason="AC5.1: an absent hook reads 'differs'")),
+    pytest.param({"installed": False}, "is absent", "differs", id="deleted-hook-is-absent"),
 ])
 # fmt: on
 def test_hooks_drift_1_names_the_observed_state_with_one_code_and_one_fix(

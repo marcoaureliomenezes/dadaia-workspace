@@ -267,7 +267,6 @@ def test_a_long_skill_md_is_a_warning_naming_its_file(tmp_path: Path) -> None:
 
 
 @pytest.mark.skipif(sys.platform == "win32", reason="the stub CLI is a POSIX shell script")
-@pytest.mark.xfail(strict=True, reason="AC5.1: a deleted hook is reported as 'differs'")
 def test_a_deleted_hook_is_reported_absent_and_its_fix_restores_it(tmp_path: Path) -> None:
     """AC5.1: delete a projected hook; the finding says absent, and its printed fix, run,
     restores the hook byte for byte and clears the finding."""
