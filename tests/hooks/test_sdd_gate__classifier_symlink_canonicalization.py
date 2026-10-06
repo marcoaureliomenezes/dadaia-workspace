@@ -12,10 +12,7 @@ import pytest
 
 from tests.fixtures.harness_env import claude_hook_env, run_hook_subprocess
 
-pytestmark = [
-    pytest.mark.integration,
-    pytest.mark.skipif(os.name == "nt", reason="POSIX symlinks"),
-]
+pytestmark = pytest.mark.skipif(os.name == "nt", reason="POSIX symlinks")
 
 
 @pytest.mark.parametrize("kind", ["file", "directory"])
