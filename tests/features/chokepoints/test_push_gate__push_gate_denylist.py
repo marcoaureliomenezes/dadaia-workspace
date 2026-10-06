@@ -104,7 +104,7 @@ def test_prior_side_lookup_failure_refuses_naming_the_failure_and_no_verify(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """SPEC v0.11.0 A2.3 (integration tier — unit tier already pinned in
-    ``tests/unit/infrastructure/test_git_object_reader.py``): a forced git failure on
+    ``tests/infrastructure/test_git_objects.py``): a forced git failure on
     the prior-side lookup refuses, naming the failure AND ``--no-verify``, over the
     REAL adapter wired into ``push_gate_decision``."""
     repo = tmp_path / "repo"

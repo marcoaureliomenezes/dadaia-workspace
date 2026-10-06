@@ -97,7 +97,6 @@ def test_the_canon_scan_refuses_a_non_canon_path_in_the_pushed_range(
         assert "delete the path; canon: specs/AGENTS.md" in decision.message
 
 
-
 _LAW = "# law\n- keep\n- drop\n"
 
 
