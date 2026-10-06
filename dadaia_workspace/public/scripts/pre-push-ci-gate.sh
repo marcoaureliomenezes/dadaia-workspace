@@ -11,7 +11,6 @@
 # refuses an unresolvable runner (below).
 #
 # Installed to .git/hooks/pre-push by `dadaia ci install-hook`.
-# Emergency bypass (discouraged, leaves a trace in reflog): git push --no-verify
 #
 # Runner resolution (v0.1.10, T-010-26, bug pre-push-gate-cannot-locate-workspace-venv):
 #   1. walk UP from repo root to the workspace root, probe

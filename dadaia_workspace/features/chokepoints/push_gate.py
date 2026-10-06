@@ -35,10 +35,6 @@ __all__ = ["push_gate_decision"]
 
 _DENYLIST_LAW = "dd-release-implementation §2a — private names never enter public/pushed material"
 _MAX_LISTED_HITS = 10
-_BYPASS = (
-    "The sanctioned, traceable emergency bypass is `git push --no-verify` "
-    "(discouraged; leaves a reflog trace)."
-)
 #: R13, N3: every range is uncommitted to its oldest unpublished commit and amended.
 _REWRITE = (
     "Uncommit the unpublished range down to its oldest commit (origin's history is never "
@@ -68,11 +64,11 @@ class ObjectSource(Protocol):
 
 def _refusal(head: str, rows: Sequence[str] = (), noun: str = "", advice: str = "") -> str:
     """The one pre-push refusal shape: head, rows capped at 10 plus a remainder count,
-    then the advice and the ``--no-verify`` bypass."""
+    then the advice when there is any."""
     lines = [f"[pre-push] BLOCKED: {head}", *rows[:_MAX_LISTED_HITS]]
     if len(rows) > _MAX_LISTED_HITS:
         lines.append(f"  ... and {len(rows) - _MAX_LISTED_HITS} more offending {noun}.")
-    return "\n".join([*lines, f"  {advice}{_BYPASS}"])
+    return "\n".join([*lines, *([f"  {advice.strip()}"] if advice else [])])
 
 
 def _fail_closed(what: str) -> str:
