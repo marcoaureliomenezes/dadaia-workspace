@@ -1,6 +1,6 @@
 # SPEC — Release: 0.5.0, candidate 10 (the fix reader; evals T1, T2 and the first run; QUALITY's bug balance; HOOKS-DRIFT-1; the test freeze; the test tree)
 
-**Status:** Draft
+**Status:** Approved — operator ruling 2026-10-06 (AskUserQuestion): "Aprovo SPEC + 0208–0210 (Recommended)", on 9f36ca986 (reviewer APPROVED 9f36ca986).
 **Release ID:** 0.5.0
 **Owner:** dd-product-engineer
 **Opened:** 2026-10-06 in the `0.5.0-rc10/define` tree while rc-9 reconciles (0205).
