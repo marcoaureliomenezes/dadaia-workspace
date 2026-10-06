@@ -6,7 +6,7 @@ CLOSURE check of `release.py` asks that verb, so one reader renders and judges t
 from __future__ import annotations
 
 import sys
-from datetime import datetime
+from datetime import UTC, datetime
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -26,6 +26,12 @@ def _day(instant: datetime) -> datetime:
     return instant.replace(hour=0, minute=0, second=0, microsecond=0)
 
 
+def _utc(ts: str) -> datetime:
+    """A log instant in UTC; one with no offset is UTC already, never the host's local time."""
+    at = datetime.fromisoformat(ts)
+    return at.replace(tzinfo=UTC) if at.tzinfo is None else at.astimezone(UTC)
+
+
 def body(specs: Path) -> str:
     """The `## Bugs` block `QUALITY.md` must hold. The trend window opens on its oldest
     release's first day and ends on the live release's last log day; what the release skill
@@ -37,7 +43,7 @@ def body(specs: Path) -> str:
     spans = releases(specs)
     published = sorted((r for r in spans if r != live.release_id), key=lambda r: spans[r][0])
     order = [*published, live.release_id]
-    end = datetime.fromisoformat(live.state["log"][-1]["ts"])
+    end = _utc(live.state["log"][-1]["ts"])
     ledger = read_records(specs / LEDGER)
     old = [r for r in read_records(specs / HISTO) if "id" in r]
     top = fx.git(specs, "rev-parse", "--show-toplevel").strip()
