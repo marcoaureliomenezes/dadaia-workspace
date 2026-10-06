@@ -1,0 +1,95 @@
+"""AC4.1-AC4.3 (release 0.5.0 candidate 10, Job 4): `_bugs_balance.render` turns the ledger's
+records alone into the `## Bugs` block — the per-surface table, the Laplace trend over days
+(Kanoun & Laprie) and the defective-fix rate per rc (Kan). Pure: records in, text out."""
+
+from __future__ import annotations
+
+from datetime import UTC, datetime
+from pathlib import Path
+from types import ModuleType
+from typing import Any
+
+import pytest
+
+from dadaia_workspace.infrastructure.ledger_scripts import load_owner
+
+pytestmark = pytest.mark.unit
+
+_PUBLIC = Path(__file__).resolve().parents[3] / "dadaia_workspace" / "public"
+_SRC = _PUBLIC / "skills" / "dd-bug-resolution" / "scripts" / "_bugs_balance.py"
+_ORDER = ["0.4.5", "0.4.6", "0.4.7", "0.4.8", "0.5.0"]
+_START, _END = datetime(2026, 1, 1, tzinfo=UTC), datetime(2026, 1, 11, tzinfo=UTC)
+
+
+def _balance() -> ModuleType:
+    assert _SRC.is_file(), "_bugs_balance.py is not built yet"
+    return load_owner("dd-bug-resolution", "_bugs_balance")
+
+
+def _bug(surface: str, day: int, found: tuple[str, str] | None, **more: Any) -> dict[str, Any]:
+    record: dict[str, Any] = {"surface": surface, "ts": f"2026-01-{day:02d}T00:00:00Z", **more}
+    if found:
+        record["found_in"] = {"release": found[0], "rc": found[1]}
+    return record
+
+
+_LIVE = [
+    _bug("core", 2, ("0.5.0", "rc-1"), caused_by="none"),
+    _bug("core", 3, ("0.5.0", "rc-1"), caused_by="a-bug"),
+    _bug("core", 4, ("0.5.0", "rc-2"), caused_by=None),
+    _bug("tests", 5, ("unknown", "unknown")),
+    _bug("unknown", 5, None),
+    _bug("cli", 5, ("0.5.0", "unknown"), correlates=["x", "y"]),
+    _bug("unknown", 5, ("unknown", "unknown")),
+    _bug("cli", 1, ("0.4.5", "rc-1")),
+]
+_ARCHIVED = [_bug("cli", 5, ("unknown", "unknown"))]
+_BLOCK = """\
+Bug balance from BUGS.jsonl: 9 records (8 live, 1 archived).
+surface  records  recurrences  fix-induced  archived  rcs  correlates  settled
+cli      3        2            0            1         0    2           no
+core     3        2            1            0         2    0           no
+unknown  2        -            0            0         0    0           -
+dev-tooling:
+tests    1        0            0            0         0    0           yes
+Laplace trend (days), window 0.4.6..0.5.0, T = 10 days: u = -1.73, no trend
+  counted 4 of 9 records; apart: 3 release unknown, 1 no found_in, 1 outside the window
+  records found on an already settled surface: 1
+Defective-fix rate per rc (caused_by set over found in the rc):
+0.4.5/rc-1  0/1  0%
+0.5.0/rc-1  1/2  50%
+0.5.0/rc-2  0/1  0%
+"""
+
+
+@pytest.mark.xfail(strict=True, reason="J4.S1 RED: _bugs_balance.py is built by J4.S2.T1")
+def test_a_literal_ledger_renders_a_literal_block_and_a_rerun_is_byte_equal() -> None:
+    bal = _balance()
+    window = bal.Window(_ORDER, _START, _END)
+
+    block = bal.render(_LIVE, _ARCHIVED, window, frozenset({"tests"}))
+
+    assert block == _BLOCK
+    assert bal.render(_LIVE, _ARCHIVED, window, frozenset({"tests"})) == block
+
+
+@pytest.mark.xfail(strict=True, reason="J4.S1 RED: _bugs_balance.py is built by J4.S2.T1")
+@pytest.mark.parametrize(
+    ("days", "reading"),
+    [
+        ([1, 2, 3], "u = -1.80, no trend"),
+        ([1, 1, 1, 1], "u = -2.77, converging"),
+        ([9, 9, 9, 9], "u = 2.77, diverging"),
+        ([], "u = n/a, no data"),
+    ],
+)
+def test_the_laplace_trend_reads_days_against_the_window_length(
+    days: list[int], reading: str
+) -> None:
+    bal = _balance()
+    live = [_bug("core", 1 + d, ("0.5.0", "rc-1")) for d in days]
+
+    block = bal.render(live, [], bal.Window(_ORDER, _START, _END), frozenset())
+
+    [trend] = [ln for ln in block.splitlines() if ln.startswith("Laplace")]
+    assert trend.endswith(f"T = 10 days: {reading}")
