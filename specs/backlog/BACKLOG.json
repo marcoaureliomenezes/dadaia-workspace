@@ -433,6 +433,17 @@
       "description": "Found in rc-9: a .hypothesis/ cache appeared in repo trees during gate runs although tests/conftest.py redirects hypothesis storage with set_hypothesis_home_dir at import; a likely cause to confirm at the as-is review is that the hypothesis pytest plugin initialises its storage before the conftest runs, or a run outside the suite's conftest (a task gate over owner files from another cwd). Design: one decider, as for coverage (scripts/covdata.py): the suite env sets the hypothesis storage directory before any plugin loads (an environment value in suite_env, or a -p plugin like covdata), pointing under the harness cache zone; the conftest redirect leaves if it becomes redundant. RED first: the AC3.1 tripwire (tests/conftest.py) also exits 1 on a gained .hypothesis/ under the repo root. Done when: scripts/ci.py stage and task leave no .hypothesis/ in the tree.",
       "provenance": "rc-9 Reconciliation deferral (JR.S2.T5), dispatched by the main thread 2026-10-06 under the operator's rc-9 scope; target rc-10 or later",
       "relates": []
+    },
+    {
+      "id": "stray-pycache-never-breaks-the-job-gate",
+      "title": "A stray __pycache__ under dadaia_workspace/public/ never breaks the job gate in a local tree",
+      "opened": "2026-10-06",
+      "status": "idea",
+      "description": "Found in rc-9: an untracked __pycache__ left under dadaia_workspace/public/ (a skill script or test run by hand without -B) broke the local job gate, which CI never sees because a fresh checkout has none; Job 1's job-gate red #3 was of the same family (a reviewer pytest in the job tree wrote tests/__pycache__). Design, root cause first at the as-is review: whichever check failed must read tracked files only (git ls-files), as the behavior-map hash already does after behavior-map-hash-reads-untracked-bytecode; and every gate child runs with PYTHONDONTWRITEBYTECODE=1 (scripts/ci.py sets it for its own steps; worktree.py's _gate env does not). One fix in the reader, not a cleanup step. Done when: a planted untracked __pycache__ under public/ leaves scripts/ci.py job green.",
+      "provenance": "rc-9 Reconciliation deferral (JR.S2.T5), dispatched by the main thread 2026-10-06 under the operator's rc-9 scope; target rc-10 or later",
+      "relates": [
+        "hypothesis-cache-stays-out-of-repo-trees"
+      ]
     }
   ]
 }
