@@ -67,8 +67,37 @@ Paths are relative to the repo root; aliases as in `PLAN.md` (`f/`, `pub/`, `S/`
 | task | AC | `W:` | owner tests / RED |
 |---|---|---|---|
 | J1.S3.T16 | survivors of J1.S3.T12/T14's hand mutants | `bugres/scripts/_bugs_fix.py` (the revert key drops the word count: every subject a quote names matches the same words, so it only ever broke ties), `tests/unit/skills/test_memory_drift.py` (two new cases: an absent bound; a git read failing in a shallow clone) | RED-for-mutants: `if reach == 1` -> `if reach` and `git()`'s arm without `_cut` survived; both now die. The revert rule T14 states is now: the live commit the quote names with the fewest words beyond it, then the nearest (agent default, unruled) |
-| J1.S6.T18 | push CI 37498326402: the fix line's path on Windows | `tests/unit/skills/test_memory_drift.py` (the two fix-line expectations) | RED on windows-latest: the fix line is a shell line, `_specs.quote` spells a path with `/` on Windows while the message keeps the native form; the expectation builds the fix path `clone.as_posix()`, the code is consistent and unchanged (agent default, unruled) |
+| J1.S6.T19 | re-review a14a42511 HIGH-B (the fix link) | `specs/bugs/BUGS.jsonl` (one `lineage_reason` repair) | no RED: the resolve sat in a `refactor(J1.S3.T12): REBUILD` subject `_LINK` does not match; `bugs.py fix` prints `1 linked` after the shape-4 commit (agent default, unruled: the ledger line gets `lineage_reason` so the commit is not empty, as 458b38c51 did) |
+
+## Stage J1.S7 — re-review rework: the Windows fix line
+
+- Contract: T18 row green; AC1.1
+
+| task | AC | `W:` | owner tests / RED |
+|---|---|---|---|
+
+## Stage J1.S8 — re-review rework: the refusal helper
+
+- Contract: T20 row green; AC1.1
+
+| task | AC | `W:` | owner tests / RED |
+|---|---|---|---|
 | J1.S6.T20 | re-review a14a42511 LOW-1 | `tests/unit/skills/test_memory_drift.py` (the first shallow-clone test calls `_refusal`) | no RED: a test refactor, the two shallow-clone cases keep their literals |
+
+## Stage J1.S9 — re-review rework: the rename
+
+- Contract: T21 row green; AC1.1
+
+| task | AC | `W:` | owner tests / RED |
+|---|---|---|---|
 | J1.S6.T21 | re-review a14a42511 LOW-2 | `bugres/scripts/_bugs_fix.py`, `bugres/scripts/bugs.py` (`Fix.later` -> `Fix.rework`, its builder `rework_reader`) | no RED: a rename of what the field returns, no behaviour; the existing fix/rework rows exercise it |
+
+## Stage J1.S10 — re-review rework: the hash tuple
+
+- Contract: T22 row green, `ci.py job` ALL PASS; AC1.1
+
+| task | AC | `W:` | owner tests / RED |
+|---|---|---|---|
+| J1.S6.T22 | re-record dd-bug-resolution's scripts hash after T21 | `public/entities/behavior-map.json` (one `hash_tuple.scripts`) | no RED: `tests/contract/test_behavior_map.py::every-hash-tuple-is-current` was red after T21's rename and is green again |
 
 - done: Job 1 — every task landed on `wt/0.5.0-rc10/job1` through its task merge: J1.S1.T1 95a7ac434; J1.S2.T1 91593bf88 (REBUILD) and 2f3d22701 (exec bit); J1.S2.T2–T5 d4f81a899, b0bb26ac4, 0b95f45e7, 3b47a5294; J1.S3.T1 5382a95c4; J1.S3.T2 27dd51d53 landed KEEP, no code (its commit body: absent and unreachable are two questions, a fold re-opens cc544f66e's bug), then REBUILT by J1.S3.T12 after the review reproduced `memory-window-bound-shallow-clone-named-as-rebase` (registered 02248cee2); closed by J1.S3.T9 1b4d06e62; reviewed CHANGES_REQUESTED at b9003086f, reworked by J1.S3.T11 (bug registered 02248cee2), T12 (REBUILD, bug resolved), T13 (per-line rework), T14, T15, T16 (survivors), closed again by the T16 close commit.
