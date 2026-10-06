@@ -464,11 +464,14 @@ def test_phase_implementation_refuses_a_plan_without_dag_or_hot_files(
 # --- AC4.4: the bug balance block is a closure check ---------------------------------
 
 
+@pytest.mark.xfail(
+    strict=True, reason="JB.S3 RED: a stale balance block is a warning, never a refusal"
+)
 def test_a_stale_balance_block_refuses_at_closure_and_passes_in_implementation(
     script: Path, tmp_path: Path
 ) -> None:
-    """AC4.4: `QUALITY.md`'s `## Bugs` block that differs from its regeneration is one
-    refusal in CLOSURE, its fix the regenerating command; IMPLEMENTATION lets it be."""
+    """AC4.4: `QUALITY.md`'s `## Bugs` block that differs from its regeneration is one warning
+    in CLOSURE, never a refusal (the public bug balance blocks nothing); IMPLEMENTATION lets it be."""
     stage_skill_scripts("dd-bug-resolution", tmp_path / "skills" / "dd-bug-resolution" / "scripts")
     subprocess.run(["git", "init", "-q", str(tmp_path)], check=True)
     specs = _specs(tmp_path, _GOOD)
@@ -487,9 +490,11 @@ def test_a_stale_balance_block_refuses_at_closure_and_passes_in_implementation(
         return [f for f in json.loads(done.stdout) if f["path"] == "memory/QUALITY.md"]
 
     assert balance_rows("IMPLEMENTATION") == []
-    stale = balance_rows("CLOSURE")
-    assert [r["verdict"] for r in stale] == ["error"]
-    assert stale[0]["fix"].endswith(f" balance --write --specs {specs.as_posix()}")
+    assert balance_rows("CLOSURE") == []  # --json lists errors only: a stale block refuses nothing
+    shown = subprocess.run([sys.executable, str(script), "check", "--specs", str(specs)],
+                           capture_output=True, text=True)  # fmt: skip
+    (line,) = [x for x in shown.stdout.splitlines() if "memory/QUALITY.md" in x]
+    assert shown.returncode == 0 and " warning " in line and "differs from its regeneration" in line
 
     bugs = script.parents[2] / "dd-bug-resolution" / "scripts" / "bugs.py"
     argv = [sys.executable, str(bugs), "balance", "--write", "--specs", str(specs)]
@@ -744,3 +749,20 @@ def test_the_closure_check_never_pairs_a_callee_message_with_a_fix_it_did_not_pr
     assert [r["message"] for r in rows] == [f"`bugs.py balance --check` exited {code}"]
     assert rows[0]["fix"].startswith("Operator action: run `")
     assert "do the other half" not in rows[0]["fix"]
+
+
+@pytest.mark.xfail(strict=True, reason="JB.S3 RED: test-path-convention-is-python-only")
+def test_a_first_stage_may_write_tests_by_any_language_convention(
+    script: Path, tmp_path: Path
+) -> None:
+    """No language is assumed: the repo's own gates judge a test file, so a first stage naming
+    `pkg/x_test.go` passes `check` and `phase IMPLEMENTATION`."""
+    specs = _specs(tmp_path, _dag(*_CHAIN[:2]))
+    (tasks := specs / "releases/0.5.0/rc-1/tasks").mkdir()
+    (tasks / "j2.md").write_text(
+        _JOB_TABLE.replace("tests/unit/test_t.py", "pkg/x_test.go"), "utf-8"
+    )
+    done = subprocess.run([sys.executable, str(script), "check", "--json", "--specs", str(specs)],
+                          capture_output=True, text=True)  # fmt: skip
+    assert [f["message"] for f in json.loads(done.stdout) if "tasks/" in f["path"]] == []
+    assert _phase(script, specs).returncode == 0
