@@ -54,13 +54,17 @@ def _exe(root: Path) -> Path:
     )
 
 
-def cli(root: Path, *args: str) -> subprocess.CompletedProcess[str]:
-    """One read-only run of the workspace CLI — the owner of every package grammar."""
+def cli(root: Path, *args: str, tree: Path | None = None) -> subprocess.CompletedProcess[str]:
+    """One read-only run of the workspace CLI — the owner of every package grammar. With *tree*
+    the run acts on that tree alone: its cwd, every root above it fenced (ADR 0088)."""
     run = subprocess.run  # stdin closed: a CLI never waits on the caller's pipe
+    fence = (
+        {"DADAIA_FENCED_ROOTS": os.pathsep.join(map(str, tree.resolve().parents))} if tree else {}
+    )
     return run(
         [str(_exe(root)), *args],
-        cwd=root,
-        env=_env(),
+        cwd=tree or root,
+        env=_env() | fence,
         stdin=subprocess.DEVNULL,
         capture_output=True,
         text=True,

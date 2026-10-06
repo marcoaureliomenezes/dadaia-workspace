@@ -15,9 +15,6 @@ from tests.helpers.worktree_ws import approve, commit, git, make_workspace, run
 pytestmark = pytest.mark.integration
 
 
-@pytest.mark.xfail(
-    strict=True, reason="JB.S3 RED: trio-status-canon-judged-outside-the-define-merge-gate"
-)
 def test_a_define_merge_runs_the_doctor_fenced_to_its_tree(tmp_path: Path) -> None:
     (root := tmp_path / "ws").mkdir()
     make_workspace(root)
