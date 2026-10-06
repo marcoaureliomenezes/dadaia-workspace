@@ -68,7 +68,7 @@ def _refusal(head: str, rows: Sequence[str] = (), noun: str = "", advice: str = 
     lines = [f"[pre-push] BLOCKED: {head}", *rows[:_MAX_LISTED_HITS]]
     if len(rows) > _MAX_LISTED_HITS:
         lines.append(f"  ... and {len(rows) - _MAX_LISTED_HITS} more offending {noun}.")
-    return "\n".join([*lines, *([f"  {advice.strip()}"] if advice else [])])
+    return "\n".join([*lines, *([f"  {advice}"] if advice else [])])
 
 
 def _fail_closed(what: str) -> str:
@@ -235,7 +235,7 @@ def push_gate_decision(
             f"{len(laws)} pushed commit(s) delete a law line citing no accepted `ADR NNNN` (ADR 0151).",
             [f"  {r.local_ref}: commit {c[:12]} deletes a line of {p}" for r, c, p in laws],
             "commit(s)",
-            "Cite the ADR that rules each deletion in that commit's message. ",
+            "Cite the ADR that rules each deletion in that commit's message.",
         )
         _, sha, path = laws[0]  # one act per refusal: the re-run names the next commit
         fix = (
@@ -254,7 +254,7 @@ def push_gate_decision(
             "object(s)",
             "A test fixture that needs a secret shape composes it at runtime (string "
             "concatenation), never as a tracked literal. The range scope means "
-            "already-published history never needs a rewrite. ",
+            "already-published history never needs a rewrite.",
         )
         fix = _rewrite_fix(hits[0][0], object_source, repo, fixes)
     else:
