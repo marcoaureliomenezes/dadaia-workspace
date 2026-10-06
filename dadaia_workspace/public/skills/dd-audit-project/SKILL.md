@@ -19,7 +19,7 @@ description: >
 
 ## 2. The three pillars — run together, never fewer
 
-- **Pillar 1 — bugs** ([`PILLAR-BUGS.md`](PILLAR-BUGS.md)): compute all eight
+- **Pillar 1 — bugs** ([`PILLAR-BUGS.md`](PILLAR-BUGS.md)): compute all nine
   forensic metrics on every `BUGS.jsonl` record in the window; stamp `audited` on each
   reviewed record (`python3 .agents/skills/dd-bug-resolution/scripts/bugs.py update <id> --set audited=<slug>`, pillar 1's only write).
 - **Pillar 2 — specs** ([`PILLAR-SPECS.md`](PILLAR-SPECS.md)): commit shapes, canon compliance, `_RELEASE.json` milestones over the window.
@@ -40,7 +40,7 @@ three is not an audit. Append one `FINDINGS.jsonl` record per claim
 
 ## 4. Done when
 
-- Window recorded; eight bug metrics with baseline + target; every Part-1 check ran; `AUDIT.md` has all three pillars, each claim a `FINDINGS.jsonl` record.
+- Window recorded; nine bug metrics with baseline + target; every Part-1 check ran; `AUDIT.md` has all three pillars, each claim a `FINDINGS.jsonl` record.
 
 ## 5. References
 
