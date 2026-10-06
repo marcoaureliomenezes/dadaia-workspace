@@ -152,6 +152,23 @@ def test_new_refuses_a_second_live_release_with_one_fix_line(script: Path, tmp_p
     assert _tree_hash(specs) == before
 
 
+@pytest.mark.xfail(strict=True, reason="J5.S2.T1: AC5.6")
+def test_an_rc_spec_opens_with_the_bug_window_review(script: Path, tmp_path: Path) -> None:
+    """AC5.6: `new` writes `## Bug window review` as the first SPEC heading; `check` refuses
+    a live SPEC without it, with exactly one fix."""
+    specs = _specs(tmp_path)
+    assert _run(script, "new", "9.9.9", "--specs", str(specs)).returncode == 0
+    spec = (specs / "releases" / "9.9.9" / "rc-1" / "SPEC.md").read_text(encoding="utf-8")
+    headings = [line for line in spec.splitlines() if line.startswith("## ")]
+    assert headings[:1] == ["## Bug window review"]
+
+    bare = _specs(tmp_path / "bare")
+    _release(bare, "0.5.0", phase="IMPLEMENTATION")
+    result = _run(script, "check", "--json", "--specs", str(bare))
+    assert result.returncode != 0
+    assert [bool(f["fix"]) for f in json.loads(result.stdout)] == [True]
+
+
 def test_a_verb_with_no_live_release_hands_new_to_the_operator(
     script: Path, tmp_path: Path
 ) -> None:
