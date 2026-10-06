@@ -329,9 +329,13 @@ def _balance_findings(specs: Path) -> list[dict[str, Any]]:
     )
     if not done.returncode:
         return []
-    why = (done.stderr.strip().splitlines() or [f"exit {done.returncode}"])[0]
-    fix = f"{script(bugs)} balance --write --specs {quote(str(specs))}"
-    return [finding("memory/QUALITY.md", 1, f"the `## Bugs` block is not current: {why}", fix)]
+    lines = done.stderr.strip().splitlines()  # the callee's own refusal: `[error] why`, `fix: how`
+    why = next((x.removeprefix("[error] ") for x in lines if x.startswith("[error] ")), "")
+    fix = next((x.removeprefix("fix: ") for x in lines if x.startswith("fix: ")), "")
+    if not (why and fix):  # the verb died outside its refusal: say so, point at it
+        why = why or f"`bugs.py balance --check` exited {done.returncode}"
+        fix = fix or f"Operator action: run `{script(bugs)} balance --check` and read its output"
+    return [finding("memory/QUALITY.md", 1, why, fix)]
 
 
 def tree_findings(specs: Path) -> list[dict[str, Any]]:

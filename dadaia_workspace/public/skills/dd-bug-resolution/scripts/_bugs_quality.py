@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""The `QUALITY.md` side of the bug balance: read the ledgers and the releases' spans, hand
-them to the pure `_bugs_balance`, and write the block back. `bugs.py balance` and
-`release.py check` share it, so a block and its regeneration cannot disagree."""
+"""The `QUALITY.md` side of the bug balance: read the ledgers and the live release, hand them
+to the pure `_bugs_balance`, and write the block back. Only `bugs.py balance` runs it; the
+CLOSURE check of `release.py` asks that verb, so one reader renders and judges the block."""
 
 from __future__ import annotations
 
@@ -17,7 +17,7 @@ import _bugs_fix as fx  # noqa: E402
 from _bugs_check import HISTO, LEDGER  # noqa: E402
 from _bugs_store import Refusal, read_records  # noqa: E402
 from _ledger import replace  # noqa: E402
-from _release_schema import _utc, releases  # noqa: E402
+from _release_schema import releases  # noqa: E402
 from _release_store import Refusal as ReleaseRefusal  # noqa: E402
 from _release_store import live_release  # noqa: E402
 
@@ -37,7 +37,7 @@ def body(specs: Path) -> str:
     spans = releases(specs)
     published = sorted((r for r in spans if r != live.release_id), key=lambda r: spans[r][0])
     order = [*published, live.release_id]
-    end = _utc(live.state["log"][-1]["ts"])
+    end = datetime.fromisoformat(live.state["log"][-1]["ts"])
     ledger = read_records(specs / LEDGER)
     old = [r for r in read_records(specs / HISTO) if "id" in r]
     top = fx.git(specs, "rev-parse", "--show-toplevel").strip()

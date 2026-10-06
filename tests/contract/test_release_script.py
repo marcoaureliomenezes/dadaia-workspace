@@ -16,6 +16,7 @@ import shutil
 import subprocess
 import sys
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -523,7 +524,7 @@ def _balance_tree(
 
 @pytest.mark.parametrize("git", [True, False], ids=["record-without-ts", "tree-without-git"])
 def test_balance_refuses_an_unreadable_input_with_one_fix_line(tmp_path: Path, git: bool) -> None:
-    """L6: a record with no `ts`, or a tree that is no git repo, is a refusal, not a traceback."""
+    """A record with no `ts`, or a tree that is no git repo, is a refusal, not a traceback."""
     found = {"release": "0.5.0", "rc": "rc-1"}
     argv = _balance_tree(tmp_path, [{"id": "a", "surface": "core", "found_in": found}], git=git)
 
@@ -532,6 +533,53 @@ def test_balance_refuses_an_unreadable_input_with_one_fix_line(tmp_path: Path, g
     assert done.returncode == 1
     assert "Traceback" not in done.stderr
     assert sum(ln.startswith("fix: ") for ln in done.stderr.splitlines()) == 1
+
+
+def _garbage_ts(tmp_path: Path) -> list[str]:
+    return _balance_tree(tmp_path, [_found("not-a-date")])
+
+
+def _naive_ts(tmp_path: Path) -> list[str]:
+    return _balance_tree(tmp_path, [_found("2026-01-02T00:00:00")])
+
+
+def _quality_is_a_directory(tmp_path: Path) -> list[str]:
+    argv = _balance_tree(tmp_path, [])
+    (tmp_path / "specs" / "memory" / "QUALITY.md").mkdir(parents=True)
+    return [*argv, "--write"]
+
+
+def _found(ts: str) -> dict[str, object]:
+    found = {"release": "0.5.0", "rc": "rc-1"}
+    return {"id": "a", "surface": "core", "ts": ts, "found_in": found}
+
+
+@pytest.mark.parametrize("build", [_garbage_ts, _naive_ts, _quality_is_a_directory])
+def test_balance_refuses_each_family_of_unreadable_input_once(tmp_path: Path, build: Any) -> None:
+    done = subprocess.run(build(tmp_path), capture_output=True, text=True)
+
+    assert done.returncode == 1
+    assert "Traceback" not in done.stderr
+    assert sum(ln.startswith("fix: ") for ln in done.stderr.splitlines()) == 1
+
+
+def test_a_surface_carried_only_by_archived_records_keeps_its_dev_tooling_class(
+    tmp_path: Path,
+) -> None:
+    argv = _balance_tree(tmp_path, [])
+    (tmp_path / ".gitattributes").write_text("/tests dadaia-dev-tooling\n", "utf-8")
+    histo = tmp_path / "specs" / "bugs" / "_archive" / "bugs_histo.jsonl"
+    histo.parent.mkdir()
+    histo.write_text(json.dumps({"id": "old", "surface": "tests"}) + "\n", "utf-8")
+
+    done = subprocess.run(argv, capture_output=True, text=True)
+
+    assert done.returncode == 0, done.stderr
+    assert done.stdout.splitlines()[1:4] == [
+        "surface  records  recurrences  fix-induced  archived  rcs  correlates  settled",
+        "dev-tooling:",
+        "tests    1        0            0            1         0    0           yes",
+    ]
 
 
 def test_the_verb_prints_dev_tooling_surfaces_apart_by_the_gitattributes_class(
@@ -623,7 +671,6 @@ def test_the_closure_check_judges_only_a_block_it_can_regenerate(
     rows = _quality_rows(script, specs, "CLOSURE")
 
     assert [r["verdict"] for r in rows] == ["error"]
-    assert rows[0]["message"].startswith(
-        "the `## Bugs` block is not current: [error] BUGS.jsonl:1 is not valid JSON"
-    )
-    assert rows[0]["fix"].endswith(f" balance --write --specs {specs.as_posix()}")
+    assert rows[0]["message"].startswith("BUGS.jsonl:1 is not valid JSON")
+    assert rows[0]["fix"].startswith("sed -n '1p' ")  # the callee's own line, relayed
+    assert rows[0]["fix"].endswith("BUGS.jsonl")
