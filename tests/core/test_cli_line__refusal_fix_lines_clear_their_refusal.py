@@ -893,6 +893,7 @@ SITES: dict[str, tuple[Case | tuple[Case, ...] | Skip, ...]] = {
             Case(_outside_with_work, _work_carries_topic, then=_MERGE_TOPIC),
             Case(_outside_detached, _work_carries_topic, then="git push -q origin feature/0.1.0"),
         ),
+        Skip("an Operator action on the git host: the PR is no command to run"),
     ),
     "branch_policy.check_branch_policy": (
         Case(_mismatch, _work_pushed, then="git push -q origin feature/1.0.0"),
