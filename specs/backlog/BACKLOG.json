@@ -645,6 +645,21 @@
       "description": "Operator demand 2026-10-06 (relayed by the main thread): 'datas s\u00e3o uma delas. n\u00e3o pode alucinar aqui'. Measured: dd-handoff-emitter has no script (SKILL.md only), so the handoff's file-name stamp and produced_at are typed by the model; no library code validates produced_at (grep: only _worktree_end.py and certification/service.py read it). Design: an emit.py in dd-handoff-emitter stamps the file name and produced_at from one clock read; dadaia reports validate refuses a produced_at in the future and a file-name stamp that differs from produced_at; every other skill-written date comes from date -u, git or gh. Placement: rc-11. Placement and every design detail not quoted from a ruling are agent default, unruled.",
       "provenance": "audit verification 2026-10-06 over feature/0.5.0 8e6448f13 (four read-only verifiers); main-thread registration after the operator grill of 2026-10-06",
       "relates": []
+    },
+    {
+      "id": "adr-0122-zero-backlog-destined-to-this-release",
+      "title": "ADR 0122 amended: a promote needs zero active backlog destined to this release",
+      "opened": "2026-10-06",
+      "status": "idea",
+      "description": "Operator, 2026-10-06, verbatim: 'Emendar: zero backlog destinado a esta release'. Measured: ADR 0122 demands zero active backlog and zero open audit findings at the promote, which the four post-0.5.0 evals entries contradict (rc-10 SPEC Carried: 'the operator's ruling before the promote'). Design: amend 0122 so the promote requires zero active entries destined to the release being promoted; entries destined to a later release stay active; the two 09-30 audits close through audit-scorecard-cycle. The amendment is proposed at rc-11 definition and accepted by the operator there. How an entry declares its destination is unruled. Placement and every design detail not quoted from a ruling are agent default, unruled.",
+      "provenance": "audit verification 2026-10-06 over feature/0.5.0 8e6448f13 (four read-only verifiers); main-thread registration after the operator grill of 2026-10-06",
+      "relates": [
+        "evals-release-gate-status",
+        "evals-harness-lanes-and-benchmark",
+        "evals-windows-smoke",
+        "devin-subagent-projection",
+        "audit-scorecard-cycle"
+      ]
     }
   ]
 }
