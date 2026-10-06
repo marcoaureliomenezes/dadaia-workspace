@@ -12,9 +12,13 @@ import pytest
 pytest.importorskip("fcntl")
 
 from dadaia_workspace.core.models.spec_context import ContextState  # noqa: E402
-from tests.integration.test_context_dead_holds import _alive, _git, _published  # noqa: E402
+from tests.features.spec_context.test_service__context_dead_holds import (  # noqa: E402
+    _alive,
+    _git,
+    _published,
+)
 
-pytestmark = [pytest.mark.integration, pytest.mark.slow]
+pytestmark = pytest.mark.slow
 
 
 def test_dead_holds_a_repo_with_a_submodule_and_its_gitdir_resolves(tmp_path: Path) -> None:

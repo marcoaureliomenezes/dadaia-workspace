@@ -22,9 +22,7 @@ from dadaia_workspace.features.spec_context import gate_policy
 from dadaia_workspace.hooks import pre_gate, sdd_gate
 from dadaia_workspace.infrastructure.runtime_transforms import hook_wrappers
 
-pytestmark = pytest.mark.unit
-
-_REPO = Path(__file__).resolve().parents[2]
+_REPO = Path(__file__).resolve().parents[3]
 _PKG = _REPO / "dadaia_workspace"
 _MAP = _PKG / "public" / "data" / "AGENTS.md"
 

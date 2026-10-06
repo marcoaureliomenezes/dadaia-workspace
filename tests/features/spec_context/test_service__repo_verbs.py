@@ -10,7 +10,7 @@ second registry seam that writes into the shared `repos/<slug>` namespace).
 JsonContextStore-driven (SMALL/unit tier): a pure registry-mutation concern, no real
 git/disk behavior under test — the CLI-level surface (argument parsing,
 on-disk-left-untouched messaging for A17.2) is proven in
-``tests/integration/test_cli_context_repo_verbs.py``.
+``tests/cli/commands/test_context__cli_context_repo_verbs.py``.
 """
 
 from __future__ import annotations

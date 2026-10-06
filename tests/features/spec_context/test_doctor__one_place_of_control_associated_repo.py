@@ -15,9 +15,9 @@ Extends T-044-27's A16.4 resolution-walk coverage
 inside the associated repo) up to the three real consumers that sit on top of that
 resolver: the ``dadaia doctor`` specs/ledgers sections (via the real Typer app,
 the same convention as
-``tests/integration/test_one_bind.py``) and the
+``tests/core/test_invocation__one_bind.py``) and the
 ``sdd_gate`` PreToolUse hook (via ``run_hook_subprocess``, the same convention as
-``tests/unit/hooks/test_sdd_gate.py``). Fixture SHAPE (git-committed repos, same
+``tests/hooks/test_sdd_gate.py``). Fixture SHAPE (git-committed repos, same
 slug/name identifiers) is reused from T-044-27's suite locally, not shared as a fixture
 module — the established convention for this feature.
 """
@@ -36,12 +36,10 @@ from dadaia_workspace.cli.main import app
 from tests.fixtures.harness_env import claude_hook_env, run_hook_subprocess
 from tests.helpers.release_state import write_release_phase
 
-pytestmark = [pytest.mark.integration]
-
 _runner = CliRunner()
 
 _MEMORY_SCRIPT = (
-    Path(__file__).resolve().parents[2]
+    Path(__file__).resolve().parents[3]
     / "dadaia_workspace"
     / "public"
     / "skills"

@@ -27,8 +27,6 @@ from dadaia_workspace.features.spec_context.service import (
 from dadaia_workspace.infrastructure.git_subprocess import GitSubprocessClient  # noqa: E402
 from tests.fixtures.stores import context_store
 
-pytestmark = [pytest.mark.integration]
-
 
 def _git(cwd: Path, *args: str) -> str:
     return subprocess.run(

@@ -54,7 +54,7 @@ from dadaia_workspace.infrastructure.json_context_store import JsonContextStore
 from tests.fixtures.stores import context_store, workspace_cli
 from tests.helpers.privacy_fixtures import aws_key_shape
 
-pytestmark = [pytest.mark.integration, pytest.mark.slow]
+pytestmark = pytest.mark.slow
 
 
 def _git(*args: str, cwd: Path) -> None:
@@ -220,6 +220,7 @@ def test_dead_holds_every_repo_of_the_set_under_reaped(
     assert store.get("proj").state is ContextState.DEAD  # type: ignore[union-attr]
 
 
+@pytest.mark.windows
 def test_c2_a_nested_foreign_worktree_is_refused_and_its_fix_clears_it(tmp_path: Path) -> None:
     """A gitignored linked worktree of ANOTHER repo nested in the checkout: the hold
     would skip it, so dead refuses up front instead of recording DEAD with the repo on

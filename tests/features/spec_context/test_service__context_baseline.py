@@ -456,7 +456,7 @@ def test_a_second_foreign_backup_is_published_inside_specs_bkp(env, tmp_path: Pa
 def test_the_publish_code_never_rewrites_forces_or_deletes() -> None:
     """R13 rule 3: no forced checkout, reset, rebase, force-push, remote delete or squash
     in the publish, the gate or the sync-failure fixes."""
-    pkg = Path(__file__).resolve().parents[2] / "dadaia_workspace"
+    pkg = Path(__file__).resolve().parents[3] / "dadaia_workspace"
     for rel in (
         "features/spec_context/service.py",
         "features/chokepoints/branch_policy.py",
