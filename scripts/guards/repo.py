@@ -500,7 +500,7 @@ def _mirror_key(rel: str) -> str | None:
     if not match:
         return None
     root = "" if rel.startswith("scripts/") else "dadaia_workspace/"
-    return f"{root}{base + '/' if base else ''}{match['m']}".replace("-", "_")
+    return f"{root}{base + '/' if base else ''}{match['m']}"
 
 
 def _mirror_exempt(p: str) -> bool:
