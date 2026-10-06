@@ -133,7 +133,6 @@ def _red(bug: str) -> pytest.MarkDecorator:
     ("skill", "phrase"),
     [
         pytest.param("dd-bug-resolution/SKILL.md", "rewriting an old assert",
-                     marks=_red("bug-resolution-law-prescribes-rewriting-asserts"),
                      id="root-law-says-fixes-never-rewrite-old-asserts"),
         pytest.param("dd-audit-project/PILLAR-BUGS.md", "governance_events",
                      marks=_red("pillar-bugs-metric-reads-retired-event-stream"),
