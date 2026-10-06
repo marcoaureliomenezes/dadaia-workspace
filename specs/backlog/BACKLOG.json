@@ -109,17 +109,6 @@
       ]
     },
     {
-      "id": "meta-tests-leave-pytest",
-      "title": "Tests of the suite and the repo leave pytest for one CI job",
-      "opened": "2026-10-02",
-      "status": "idea",
-      "description": "Measured: ~20 tests test the suite or the repo; many of the 63 (2026-10-02) `surface: tests` bugs were born there. Change: delete the duplicates \u2014 `suite_cannot_reach_*` \u00d72 vs the conftest sessionfinish; `stewardship_mechanics` vs conftest; `repo_self_scan` vs gitleaks + pre-push; `source_repo_hygiene` vs the CI repo-hygiene job; mutation wiring \u00d73; V31/V28 (grill Q4, Q7). The remaining unique guards become scripts of one CI job, each proven to catch what it caught. Mutation removal (grill Q3) is owned here: delete `tests/scripts/run_mutation_baseline.sh`, its 2 wiring tests, `test_mutation_baseline_scope_stdlib_only.py`, `[tool.mutmut]` and its comment, and the optional group `mutation`; QUALITY.md:85 is rewritten to \"mutation evidence is operator tooling, outside the repo\". Done when: no pytest test inspects the suite or the repo, and each kept guard runs in the CI job. ADRs 0163, 0166, 0167 (proposed).",
-      "provenance": "operator demand 2026-10-02: test audit https://claude.ai/artifact/AMw3Ho2tqaAbftJUWuNhAT + grill Q1-Q9",
-      "relates": [
-        "delete-text-count-inventory-asserts"
-      ]
-    },
-    {
       "id": "spec-context-branch-field-deleted",
       "title": "The Spec Context Project stores no branch; context alive derives the checkout from the gitflow",
       "opened": "2026-10-03",
