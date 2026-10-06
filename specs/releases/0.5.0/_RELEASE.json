@@ -3,12 +3,12 @@
   "release": "0.5.0",
   "phase": "CLOSURE",
   "defined": {
-    "sha": "407c28bdb",
-    "ts": "2026-10-03T16:53:34Z"
+    "sha": "29ee92d3a",
+    "ts": "2026-10-05T18:41:40Z"
   },
   "implemented": {
-    "sha": "7f5fea2f0",
-    "ts": "2026-10-05T14:09:40Z"
+    "sha": "27123ce99",
+    "ts": "2026-10-06T02:01:19Z"
   },
   "shipped": null,
   "log": [
@@ -953,6 +953,192 @@
         "public-asset-distribution",
         "agentic-entities",
         "pypi-distribution"
+      ]
+    },
+    {
+      "ts": "2026-10-05T14:48:54Z",
+      "agent": "release.py new",
+      "kind": "note",
+      "text": "Candidate born on 0.5.0 (prior candidate closed at 7f5fea2f0)"
+    },
+    {
+      "ts": "2026-10-05T18:41:40Z",
+      "agent": "release.py",
+      "kind": "milestone",
+      "candidate": "rc-9",
+      "milestone": "defined",
+      "sha": "29ee92d3a",
+      "text": "Candidate defined at 29ee92d3a; phase IMPLEMENTATION."
+    },
+    {
+      "ts": "2026-10-05T18:41:40Z",
+      "agent": "main-thread",
+      "kind": "merge",
+      "text": "job: job1; start: 2026-10-05T16:00:19Z; end: 2026-10-05T17:57:55Z; wall: 117; ritual_wait: 13; dispatches: 13; job_gate_runs: 4"
+    },
+    {
+      "ts": "2026-10-05T18:41:40Z",
+      "agent": "main-thread",
+      "kind": "merge",
+      "text": "job: hotfix-task-id-paths; start: 2026-10-05T18:08:47Z; end: 2026-10-05T18:33:57Z; wall: 25; ritual_wait: 12; dispatches: 1; job_gate_runs: 2"
+    },
+    {
+      "ts": "2026-10-06T01:23:11Z",
+      "agent": "dd-product-engineer",
+      "kind": "merge",
+      "text": "job: job3; start: 2026-10-05T15:50:39Z; end: 2026-10-05T20:49:16Z; wall: 299; ritual_wait: 98; dispatches: 13; job_gate_runs: 1"
+    },
+    {
+      "ts": "2026-10-06T01:23:11Z",
+      "agent": "dd-product-engineer",
+      "kind": "merge",
+      "text": "job: job4; start: 2026-10-05T18:41:23Z; end: 2026-10-05T21:45:33Z; wall: 184; ritual_wait: 93; dispatches: 12; job_gate_runs: 1"
+    },
+    {
+      "ts": "2026-10-06T01:23:11Z",
+      "agent": "dd-product-engineer",
+      "kind": "merge",
+      "text": "job: job2; start: 2026-10-05T20:51:00Z; end: 2026-10-06T00:02:24Z; wall: 191; ritual_wait: 11; dispatches: 25; job_gate_runs: 2"
+    },
+    {
+      "ts": "2026-10-06T01:23:11Z",
+      "agent": "dd-product-engineer",
+      "kind": "merge",
+      "text": "job: job5; start: 2026-10-06T00:02:51Z; end: 2026-10-06T01:06:39Z; wall: 64; ritual_wait: 18; dispatches: 14; job_gate_runs: 2"
+    },
+    {
+      "ts": "2026-10-06T01:23:11Z",
+      "agent": "dd-product-engineer",
+      "kind": "note",
+      "text": "Sources of the four kind: merge entries above (jobs 3, 4, 2, 5, in landing order), from git and gh. end: createdAt of the feature/0.5.0 push CI run landing the job — job3 37372098671 (head 56691d852), job4 37377999887 (990d26893), job2 37391829733 (6a2a6e1a6), job5 37397484320 (27123ce99). start: the author time of the job's first own commit in the landed range — job3 990f95ece, job4 9feeae3b5, job2 2b255cffa, job5 d47d276ea — not AC1.7's committer time, which each rebase rewrote to the rebase instant (job3 2026-10-05T19:36:26Z, job4 19:36:48Z, job2 22:39:31Z; job5 was not rebased). ritual_wait: end minus the author time of the last task commit (56691d852, 990d26893, 6a2a6e1a6, 27123ce99); job2's close was re-recorded after its two review rounds, so its 11 min understates its ritual. dispatches: not measured — no record counts sub-agent dispatches; the value is the number of distinct task ids in the landed commit subjects, assuming one sub-agent per task. job_gate_runs: not measured beyond the evidence — one worktree.py merge job gate per job, plus the local scripts/ci.py job run the job2 and job5 verdicts cite; a lower bound."
+    },
+    {
+      "ts": "2026-10-06T01:23:11Z",
+      "agent": "dd-product-engineer",
+      "kind": "size",
+      "text": "G1 readout (rc-8 PLAN §2.8 method: wc -l over tracked dadaia_workspace/**/*.py; def test_ under tests/; wc -l over tests/**/*.py; scripts/guards/*.py lines and their CHECKS), rc-9 start 532479a05 (byte-equal to rc-8's close 767ba1d4f and to rc-8's end readout) -> end 27123ce99: production 24,973 -> 24,969 (-4); test functions 1,138 -> 1,170 (+32) plus guard checks 31 -> 31; test lines 41,004 -> 41,627 (+623) plus guard lines 2,442 -> 2,456 (+14). Per job, production Python net and test lines (git diff --numstat): job1 767ba1d4f..29ee92d3a +26, tests +634/-709; hotfix 29ee92d3a..b8de77ce2 0, +2/-1; job3 0c591b612..56691d852 -80, +610/-547; job4 56691d852..990d26893 +45, +117/-28; job2 990d26893..6a2a6e1a6 -16, +568/-60; job5 6a2a6e1a6..27123ce99 +21, +42/-5; the sum, -4, equals the readout. rc-9 set no size target, so none is met or missed."
+    },
+    {
+      "ts": "2026-10-06T01:23:11Z",
+      "agent": "dd-product-engineer",
+      "kind": "reviews",
+      "text": "Bug-surface delta per job, from each job's APPROVED dd-code-reviewer handoff scope and the ledger. job1: no Job 1 verdict handoff remains on disk and its merge message 29ee92d3a states no delta, so the verdict's delta is not measured; ledger evidence: one bug born in it, job-task-id-test-assumes-native-paths (MEDIUM, caused_by J1.S3.T9), fixed and resolved by the hotfix; production +26 net. hotfix-task-id-paths: product unchanged, tests reduced (verdict on b8de77ce2). job3: sweep delete path reduced, the pass-abort family included; test session env reduced; context dead reduced, -117 production lines (verdict carried by rebase to 56691d852). job4: release trio reduced; worktree gate unchanged net (verdict on 990d26893). job2: privacy seam, reconcile, ledger archive, invocation and registry store reduced; coverage decider and gitflow reader neutral; lineage restored (verdict on 6a2a6e1a6). job5: release check unchanged against its base (net -12 against the rejected tip); law surface reduced (verdict on 27123ce99). Ledger at 27123ce99: one record found in rc-9 (the one above), no other record names an rc-9 task in caused_by; bugs.py status: 1 open, dependabot-pyjwt-open-on-main (carried)."
+    },
+    {
+      "ts": "2026-10-06T01:23:11Z",
+      "agent": "dd-product-engineer",
+      "kind": "note",
+      "text": "Throughput against the rc-8 baseline of grill 2026-10-05T040135Z, over 767ba1d4f..27123ce99 (264 commits), gating nothing. (1) Process commits — a commit whose paths all lie under specs/ or docs/, or are README.md, llms.txt, behavior-map.json or shipped-hashes.json: rc-9 130/264 = 49.2 %; the same rule over rc-8 (a7d15e9dd..767ba1d4f) gives 205/271 = 75.6 %, the baseline's 75 %. (2) rc-wide parallelism, sum of wall over the six kind: merge entries / (last end - first start): 880 / 556 min = 1.58 on the author-time starts, above 1.3 — met; on AC1.7's literal committer-time starts, 491 / 546 = 0.90 — missed; the rebases make the literal reading measure the rebase, not the job. (3) Median task lead, per task id first author time to last committer time: 90 tasks, 0.89 h against 1.1 h (an upper bound: a rebase moves committer time). (4) Review rounds: 13 APPROVED dd-code-reviewer handoffs on disk from the rc-9 birth push to the job5 verdict, plus 6 REJECTED rounds the job files record (Job 1, Job 2 twice, Job 3, Job 4, Job 5): about 19 rounds in 10.3 h (14:49Z to 01:06Z), against ~81 in 26 h. (5) Gate 1 ~6 min: gate 1 left with Job 1, and no record times the job gate — not measured. (6) AC1.7: sum of ritual_wait rc-9 = 13 + 12 + 98 + 93 + 11 + 18 = 245 min on the author-time basis; rc-8 from git, the 24 feature/0.5.0 push CI runs that landed a T-050 task commit, createdAt minus the newest task commit's author time = 546 min (median 15.7) -> 1 - 245/546 = 55 % less ritual wait; on the committer-time basis rc-9 219, rc-8 254 -> 14 % less. The SPEC's 75-80 % estimate is missed on both bases; rc-8 measured 9.1 h over 24 landings, not the estimated 12-15 h over ~30. (7) job_gate_runs against AC1.7's rule (at most 1 plus the recorded red job gates): job1 4 against 1 + 2 reds, over by 1, the rerun after the review rejection (Job 1 review INFO 5); hotfix 2 against 1, over by 1, a local ci.py job before worktree.py merge, which runs the gate itself; job2 and job5 2 against 1, over by 1 each, the same duplicate; job3 and job4 1. A violation by the formula in four jobs, each one duplicate or one post-rejection rerun."
+    },
+    {
+      "ts": "2026-10-06T01:23:11Z",
+      "agent": "dd-product-engineer",
+      "kind": "note",
+      "text": "AC2.10 per-class counts, as the operator ruled (2026-10-05, AskUserQuestion, recorded in rc-9/tasks/job2.md Operator rulings): agent error 3, release-born 46, dev-tooling 27, doubtful 0, product 148 (224 records). The 23 records first classed doubtful were all resolved product bugs. No ledger write (J2.S5.T2). Source: the ruling, not a recount; bugs.py stats carries no per-class field, so the counts cannot be re-derived from the ledger."
+    },
+    {
+      "ts": "2026-10-06T02:01:19Z",
+      "agent": "release.py",
+      "kind": "milestone",
+      "candidate": "rc-9",
+      "milestone": "implemented",
+      "sha": "27123ce99",
+      "text": "Candidate implemented at 27123ce99; phase CLOSURE."
+    },
+    {
+      "ts": "2026-10-06T02:02:00Z",
+      "agent": "release.py memory",
+      "kind": "memory",
+      "text": "Memory reconciled over 703efc1c5e5bd421c844a8ac9e30b6699f468ee9..036a296f9bfb: 2 reviewed, 16 changed.",
+      "since": "703efc1c5e5bd421c844a8ac9e30b6699f468ee9",
+      "until": "036a296f9bfb316b141c29e85466d611baccc696",
+      "reviewed": [
+        "spec-context-project",
+        "workspace-init"
+      ],
+      "changed": [
+        "agent-comms",
+        "agent-orchestration",
+        "agentic-entities",
+        "public-asset-distribution",
+        "pypi-distribution",
+        "product-vision",
+        "consumer-agent-support",
+        "context-management",
+        "specs-migration",
+        "workspace-doctor",
+        "audits-canon",
+        "backlog-ledger",
+        "bug-ledger",
+        "release-lifecycle",
+        "sdd-gate-v3",
+        "worktrees"
+      ]
+    },
+    {
+      "ts": "2026-10-06T12:41:38Z",
+      "agent": "dd-product-engineer",
+      "kind": "merge",
+      "text": "job: hotfix-poetry-pin; start: 2026-10-06T02:24:42Z; end: 2026-10-06T03:06:53Z; wall: 42; ritual_wait: 16; dispatches: 3; job_gate_runs: 2"
+    },
+    {
+      "ts": "2026-10-06T12:41:38Z",
+      "agent": "dd-product-engineer",
+      "kind": "merge",
+      "text": "job: hotfix-verify-line-stall; start: 2026-10-06T03:12:12Z; end: 2026-10-06T04:13:45Z; wall: 62; ritual_wait: 28; dispatches: 4; job_gate_runs: 3"
+    },
+    {
+      "ts": "2026-10-06T12:41:38Z",
+      "agent": "dd-product-engineer",
+      "kind": "reviews",
+      "text": "Bug-surface delta of the two block-list hotfixes, from each job's APPROVED dd-code-reviewer handoff. hotfix-poetry-pin (merged 858bc97ad, CI 37407443923; verdict 2026-10-06T025911Z on 858bc97ad): reduced — net -12 lines, one HIGH closed (ci-and-release-install-vulnerable-poetry), the condition now guarded by poetry-below-the-floor. hotfix-verify-line-stall (merged d1d4d36c4, CI 37412705797; verdict 2026-10-06T040716Z on d1d4d36c4): reduced — three verify-line authorities to one, the work branch (ADR 0207), ending a four-move symptom-patch chain; one CRITICAL closed (verify-line-absent-refusal-sends-to-a-tree-the-gate-never-reads)."
+    },
+    {
+      "ts": "2026-10-06T12:41:38Z",
+      "agent": "dd-product-engineer",
+      "kind": "note",
+      "text": "rc-9 bug count, from the ledger (BUGS.jsonl ts at or after rc-9's opening) and bugs.py status ('0 open bug(s)'): 7 found in rc-9, 7 resolved, 0 open — 1 CRITICAL (verify-line-absent-refusal-sends-to-a-tree-the-gate-never-reads), 1 HIGH (ci-and-release-install-vulnerable-poetry), 2 MEDIUM (job-task-id-test-assumes-native-paths, memory-window-bound-unreachable-from-head), 3 LOW (bugs-fix-lists-one-commit-twice, specs-law-file-untracked-by-gitignore, bugs-fix-counts-a-reverted-fix); every one resolved_release 0.5.0, so rc-9 closes with no open bug (ADR 0206). AC1.7 readout on the two hotfix merge entries: job_gate_runs counts full scripts/ci.py runs from the session transcripts (the engineer's job-tree runs plus worktree.py merge's verify run), none red — hotfix-poetry-pin 2 and hotfix-verify-line-stall 3 exceed 1 plus their recorded reds (0), a violation reported here; the repeat runs are the engineer's pre-merge check and, for verify-line, the re-run after the ADR 0207 fold. dispatches count the main thread's Agent calls for each job (engineer and reviewer)."
+    },
+    {
+      "ts": "2026-10-06T12:41:52Z",
+      "agent": "release.py memory",
+      "kind": "memory",
+      "text": "Memory reconciled over 036a296f9bfb316b141c29e85466d611baccc696..4a0887130a06: 1 reviewed, 3 changed.",
+      "since": "036a296f9bfb316b141c29e85466d611baccc696",
+      "until": "4a0887130a06a6b8b5b1963955e69476af6fa587",
+      "reviewed": [
+        "agentic-entities"
+      ],
+      "changed": [
+        "pypi-distribution",
+        "bug-ledger",
+        "release-lifecycle"
+      ]
+    },
+    {
+      "ts": "2026-10-06T13:06:20Z",
+      "agent": "dd-product-engineer",
+      "kind": "note",
+      "text": "Closure note, stale memory (review M-2 at 8693810de; specs/AGENTS.md §5): the Measured-by lines of ARCHITECTURE.md P-12 (:57), P-14 (:67) and P-15 (:72) name tests deleted on 2026-09-28 by T-050-86 — tests/contract/test_hook_import_surface.py and test_release_state_read_only.py at e68dcb0e3, test_release_state_schema.py at be15615b0. The checks live on: P-12 in tests/contract/test_core_file_io_purity.py test_importing_a_hook_never_imports_the_container (the six hooks) and test_gate_resolution_path_never_imports_the_container (the executed gate path); P-14 in the same file, test_each_question_has_one_owner row release-state-module-never-writes; P-15 only in part, in tests/contract/test_handoff_schema_contract.py release rows — the top level and the three milestones closed, rc refused at top level and in a milestone, a log entry without kind/text refused — while no row refuses an unknown log-entry key or a session_id, though the schema closes the log entry (additionalProperties: false). Rewriting a ### P-NN principle needs its own accepted ADR (specs/memory/AGENTS.md §1, ADR 0138), so this is a closure note, not an rc-9 bug; the ADR need is backlog entry architecture-principles-measured-by-re-pointed. It conflicts with rc-10 AC10.1 (every tests/…py path named in QUALITY.md and ARCHITECTURE.md exists); the conflict is on the operator's list."
+    },
+    {
+      "ts": "2026-10-06T13:06:52Z",
+      "agent": "dd-product-engineer",
+      "kind": "note",
+      "text": "Review residuals accepted at 8693810de, recorded, not repaired. L-2: 8693810de sets amends on ADRs 0176 (0167) and 0178 (0122) with the off-canon shape chore(adrs): set amends; the field belonged in the accept act 036a296f9 (docs(adr): accept, dd-gitflow-default §3a row 2). L-3: the solution of specs-law-file-untracked-by-gitignore opens with \"operator ruling 2026-10-06:\" before design wording that is the agent's; the operator's verbatim words are only \"Corrige assim na rc-9 (Recommended)\" (handoff 2026-10-06T044417Z-main-thread-rc9-bug-rulings), and 86b354834's body dates the confirmation 2026-10-05 where that handoff dates it 2026-10-06. The solution field is write-once and 86b354834 is pushed history, so the handoff and rc-9/tasks/reconcile.md:62 are the record. L-4: the 11 rc-9 deferral intakes (c948e7933..8131f34c3) landed in the reconcile tree, against dd-gitflow-default §3a row 2 (backlog/<slug>); their content is ratified by the approved rc-10 SPEC; the law is inconsistent for exits, which RC-FLOW step 4's disposition sweep runs in the Reconciliation job — a grill item for rc-11. M-1/HIGH-A: the _fixes revert defect (bd0628092) was caught in review and is corrected inside this job by Stage JR.S8 of rc-9/tasks/reconcile.md, an in-job correction, not a new bug."
+    },
+    {
+      "ts": "2026-10-06T13:27:00Z",
+      "agent": "release.py memory",
+      "kind": "memory",
+      "text": "Memory reconciled over 4a0887130a06a6b8b5b1963955e69476af6fa587..f78bcebab620: 1 reviewed, 1 changed.",
+      "since": "4a0887130a06a6b8b5b1963955e69476af6fa587",
+      "until": "f78bcebab6202175cf5bbb8a84dbe33056734c1b",
+      "reviewed": [
+        "agentic-entities"
+      ],
+      "changed": [
+        "bug-ledger"
       ]
     }
   ]

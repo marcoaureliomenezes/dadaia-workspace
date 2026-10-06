@@ -21,7 +21,7 @@ from typer.testing import CliRunner
 
 from dadaia_workspace.cli.main import app
 from dadaia_workspace.core import context_registry
-from tests.fixtures.harness_env import base_env, claude_hook_env, run_hook_subprocess
+from tests.fixtures.harness_env import claude_hook_env, run_hook_subprocess, suite_env
 
 _runner = CliRunner()
 _ALIVE = {"name": "alpha", "state": "alive", "repo_slug": "alpha", "repo_url": "u",
@@ -107,7 +107,7 @@ def test_the_refusal_fix_line_migrates_with_no_tty(tmp_path: Path) -> None:
     (tmp_path / "ws" / ".dadaia" / "states").mkdir()
     _registry(tmp_path / "ws", "1", [_ATIVO])
     path = os.pathsep.join([str(Path(__file__).resolve().parents[3]), *site.getsitepackages()])
-    env = base_env() | {"PYTHONPATH": path}
+    env = suite_env(os.environ, Path.home()) | {"PYTHONPATH": path}
 
     def run(argv: list[str]) -> subprocess.CompletedProcess[str]:
         return subprocess.run(argv, cwd=tmp_path, env=env, stdin=subprocess.DEVNULL,
@@ -189,3 +189,21 @@ def test_ac3_9_doctor_fix_acts_on_nothing_over_an_unreadable_registry(ws: Path) 
     _runner.invoke(app, ["doctor", "--fix"])
 
     assert (ws / "junk.txt").read_text(encoding="utf-8") == "slop"
+
+
+def test_a_registry_row_missing_a_key_is_reg_schema(ws: Path) -> None:
+    """AC2.3 (0162): a row without ``created_at`` is unreadable, never a ``KeyError``:
+    `context list` exits 1 with one ``Operator action:`` fix line, and doctor gives one
+    REG-SCHEMA finding carrying it."""
+    _registry(ws, "2", [{k: v for k, v in _ALIVE.items() if k != "created_at"}])
+
+    refused = _runner.invoke(app, ["context", "list"])
+    doctor = _runner.invoke(app, ["doctor", "--json"])
+
+    assert isinstance(refused.exception, SystemExit), refused.exception
+    fixes = [ln for ln in refused.output.splitlines() if ln.startswith("fix: ")]
+    assert refused.exit_code == 1 and len(fixes) == 1, refused.output
+    assert fixes[0].startswith("fix: Operator action: ")
+    sections = json.loads(doctor.stdout)["sections"].values()
+    (fix,) = [f["fix"] for s in sections for f in s["findings"] if f["code"] == "REG-SCHEMA"]
+    assert fix.startswith("Operator action: ")

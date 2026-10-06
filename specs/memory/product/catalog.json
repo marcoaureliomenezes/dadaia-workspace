@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-10-05T14:24:40Z",
+  "generated_at": "2026-10-06T13:26:50Z",
   "features": [
     {
       "rank": 1,
@@ -14,7 +14,7 @@
         "handoff",
         "schema"
       ],
-      "token_estimate": 474,
+      "token_estimate": 521,
       "depends_on": [
         "worktrees",
         "workspace-doctor",
@@ -41,12 +41,12 @@
         "dispatch",
         "sdd"
       ],
-      "token_estimate": 747,
+      "token_estimate": 807,
       "depends_on": [
         "agentic-entities",
+        "release-lifecycle",
         "agent-comms",
         "ARCHITECTURE",
-        "release-lifecycle",
         "worktrees",
         "audits-canon",
         "QUALITY",
@@ -74,7 +74,7 @@
         "derivation",
         "governance"
       ],
-      "token_estimate": 1272,
+      "token_estimate": 1282,
       "depends_on": [
         "agent-orchestration",
         "sdd-gate-v3",
@@ -106,7 +106,7 @@
         "projection",
         "privacy"
       ],
-      "token_estimate": 1042,
+      "token_estimate": 1045,
       "depends_on": [
         "harness-kimi-code",
         "agentic-entities",
@@ -150,10 +150,11 @@
         "release",
         "packaging"
       ],
-      "token_estimate": 842,
+      "token_estimate": 984,
       "depends_on": [
         "release-lifecycle",
         "QUALITY",
+        "worktrees",
         "public-asset-distribution",
         "consumer-agent-support",
         "cross-platform-portability"
@@ -349,7 +350,7 @@
         "paradigm",
         "pillars"
       ],
-      "token_estimate": 809,
+      "token_estimate": 838,
       "depends_on": [
         "worktrees",
         "spec-context-project",
@@ -441,7 +442,7 @@
         "release-gate",
         "sdd"
       ],
-      "token_estimate": 367,
+      "token_estimate": 354,
       "depends_on": [
         "pypi-distribution",
         "workspace-init",
@@ -472,7 +473,7 @@
         "session",
         "privacy"
       ],
-      "token_estimate": 2770,
+      "token_estimate": 2819,
       "depends_on": [
         "specs-migration",
         "workspace-doctor",
@@ -578,8 +579,8 @@
       "slug": "specs-migration",
       "title": "specs-migration",
       "area": "platform",
-      "tldr": "specs init brings specs/ to the canon and writes the gitflow, never committing; specs upgrade re-stamps 6-8 as 9, folding flat trios; migrate lifts registry v1.",
-      "summary": "The verbs that bring persisted state up to what this installation reads — dadaia specs init (onboarding level 3a; absent scaffolds, dadaia upgrades, foreign moves to specs-bkp/, the constitution's gitflow block written or kept), dadaia specs upgrade (a tree stamped 6 or above folds TECHSTACK.md and a flat release trio, runs the doctor's repair set and is re-stamped 9; below 6 it refuses without writing) and dadaia migrate (spec_contexts.json v1 to v2, planned, confirmed, atomic).",
+      "tldr": "specs init brings specs/ to the canon and writes the gitflow, never committing; specs upgrade re-stamps 6-10 as 11; migrate lifts registry v1.",
+      "summary": "The verbs that bring persisted state up to what this installation reads — dadaia specs init (onboarding level 3a; absent scaffolds, dadaia upgrades, foreign moves to specs-bkp/, the constitution's gitflow block written or kept), dadaia specs upgrade (a tree stamped 6 or above folds TECHSTACK.md and a flat release trio, runs the doctor's repair set and is re-stamped 11; below 6 it refuses without writing) and dadaia migrate (spec_contexts.json v1 to v2, planned, confirmed, atomic).",
       "path": "specs/memory/product/platform/specs-migration.md",
       "tags": [
         "migration",
@@ -588,7 +589,7 @@
         "registry",
         "onboarding"
       ],
-      "token_estimate": 1278,
+      "token_estimate": 1277,
       "depends_on": [
         "public-asset-distribution",
         "sdd-gate-v3",
@@ -623,7 +624,7 @@
         "compliance",
         "privacy"
       ],
-      "token_estimate": 2727,
+      "token_estimate": 2796,
       "depends_on": [
         "public-asset-distribution",
         "sdd-gate-v3",
@@ -702,7 +703,7 @@
         "decisions",
         "governance"
       ],
-      "token_estimate": 1280,
+      "token_estimate": 1361,
       "depends_on": [
         "agent-orchestration",
         "sdd-gate-v3",
@@ -734,7 +735,7 @@
         "ledger",
         "governance"
       ],
-      "token_estimate": 794,
+      "token_estimate": 829,
       "depends_on": [
         "agent-orchestration",
         "worktrees",
@@ -756,7 +757,7 @@
       "title": "bug-ledger",
       "area": "sdd",
       "tldr": "One bug record per line in BUGS.jsonl, registered after operator confirmation, closed only by a transition carrying its red loop; bugs.py writes it.",
-      "summary": "The bug ledger — specs/bugs/BUGS.jsonl, one record per bug keyed by id, with no git-derived cache; the stdlib script bugs.py is its one writer and validator, and the ask-first registration plus the seven-phase resolution method run over it.",
+      "summary": "The bug ledger — specs/bugs/BUGS.jsonl, one record per bug keyed by id, storing no git-derived fact (bugs.py fix and window derive them on read); the stdlib script bugs.py is its one writer and validator, and the ask-first registration plus the seven-phase resolution method run over it.",
       "path": "specs/memory/product/sdd/bug-ledger.md",
       "tags": [
         "sdd",
@@ -764,7 +765,7 @@
         "ledger",
         "governance"
       ],
-      "token_estimate": 1596,
+      "token_estimate": 1951,
       "depends_on": [
         "sdd-gate-v3",
         "workspace-doctor",
@@ -779,7 +780,7 @@
         "dadaia_workspace/public/skills/dd-bug-resolution/**",
         "dadaia_workspace/public/skills/dd-bug-registration/**",
         "dadaia_workspace/public/schemas/bugs/**",
-        "dadaia_workspace/features/specs/doctor_governance.py"
+        "dadaia_workspace/public/skills/dd-bug-resolution/scripts/_bugs_check.py"
       ]
     },
     {
@@ -787,8 +788,8 @@
       "slug": "release-lifecycle",
       "title": "release-lifecycle",
       "area": "sdd",
-      "tldr": "Candidates, each in its own rc-<N>/, grow one live release; release.py writes _RELEASE.json; memory gates closure; promote merges a PR and archives it.",
-      "summary": "The release lifecycle — one live release directory whose _RELEASE.json state document is written by release.py (new, phase, drift, memory, ship, check), candidates that each review the as-is units their demand touches, then define, implement and close a SPEC/PLAN/TASKS trio in its own rc-<N>/ folder, the structural PLAN checks (As-is review, Authorities, Parallel schedule) at IMPLEMENTATION, release.py check as the one readiness judge in every phase and the one judge of the SPEC's Origin line and its trace back, the memory reconciliation gate at closure, and promotion by merging the release PR release-please opens, which ship records by archiving the release folder.",
+      "tldr": "Candidates in rc-<N>/ grow one live release; release.py writes _RELEASE.json; a candidate is a DAG of jobs ending in Reconciliation; promote archives it.",
+      "summary": "The release lifecycle — one live release directory whose _RELEASE.json state document is written by release.py (new, phase, drift, memory, ship, check), candidates that each review the as-is units their demand touches, then define, implement and close a SPEC, a PLAN drawing the DAG of jobs and one job file per job in its own rc-<N>/ folder, the PLAN and job-file checks at IMPLEMENTATION, release.py check as the one readiness judge in every phase and the one judge of the SPEC's Origin line and its trace back, the memory reconciliation gate at closure, and promotion by merging the release PR release-please opens, which ship records by archiving the release folder.",
       "path": "specs/memory/product/sdd/release-lifecycle.md",
       "tags": [
         "sdd",
@@ -798,7 +799,7 @@
         "memory",
         "as-is-review"
       ],
-      "token_estimate": 2678,
+      "token_estimate": 2773,
       "depends_on": [
         "sdd-gate-v3",
         "specs-migration",
@@ -835,13 +836,14 @@
         "no-locks",
         "privacy"
       ],
-      "token_estimate": 2550,
+      "token_estimate": 2646,
       "depends_on": [
         "workspace-doctor",
         "context-management",
         "worktrees",
         "agentic-entities",
         "specs-migration",
+        "bug-ledger",
         "workspace-init",
         "release-lifecycle",
         "ARCHITECTURE"
@@ -866,8 +868,8 @@
       "slug": "worktrees",
       "title": "worktrees",
       "area": "sdd",
-      "tldr": "Every agent change to a repo is made in a canonical worktree of one of four kinds and lands by worktree.py merge — reviewed, verified, fast-forwarded.",
-      "summary": "Canonical worktrees worktrees/<repo>/<M.m.p><letter>-<kind> on wt/ branches cut from the work branch; four kinds, each an allowed set; worktree.py new, merge, clean and list, stdlib and read from git alone; the merge ritual — allowed set, HEAD containing the work branch, an APPROVED verdict on HEAD or a patch-identical sha of its reflog, the repo's verify command green, fast-forward only, never a rebase — and the holds that keep closure and context dead waiting while one is open.",
+      "tldr": "Every agent change to a repo is made in a canonical worktree — a job, a task, define, reconcile or backlog — and lands by worktree.py merge after its gate.",
+      "summary": "Canonical worktrees nested in a folder per candidate, worktrees/<repo>/<M.m.p>-rc<N>/{define,reconcile,<job>,<job>--<task-id>} plus worktrees/<repo>/backlog/<slug>, each on the wt/ branch of the same name; one name grammar and one path reader; worktree.py new, stage, merge, clean and list, stdlib and read from git alone; three gate levels, each judged by a line of the work branch's AGENTS.md — a task fast-forwards onto its job branch after the verify-task line, a stage closes on the verify-stage line, a job lands on the work branch with an APPROVED verdict carrying its CI run and the verify line run as argv — and the holds that keep closure and context dead waiting while one is open.",
       "path": "specs/memory/product/sdd/worktrees.md",
       "tags": [
         "worktrees",
@@ -876,7 +878,7 @@
         "merge",
         "review"
       ],
-      "token_estimate": 1187,
+      "token_estimate": 1555,
       "depends_on": [
         "sdd-gate-v3",
         "public-asset-distribution",
@@ -884,8 +886,8 @@
         "agent-comms",
         "context-management",
         "release-lifecycle",
-        "bug-ledger",
         "agent-orchestration",
+        "bug-ledger",
         "backlog-ledger"
       ],
       "sources": [

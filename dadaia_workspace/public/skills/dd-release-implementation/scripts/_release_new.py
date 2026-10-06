@@ -15,7 +15,7 @@ sys.path.append(str(Path(__file__).resolve().parents[2] / "dd-bug-resolution" / 
 from _ledger import records, replace  # noqa: E402
 from _release_schema import SEMVER_RE, STATE, next_candidate, utc_now  # noqa: E402
 from _release_store import SCRIPT, Refusal, State, live_ids, read_state, validated  # noqa: E402
-from _release_tree import tree_findings  # noqa: E402
+from _release_tree import BUG_WINDOW, tree_findings  # noqa: E402
 
 SPEC_STUB = """\
 # SPEC — Release: {release_id}
@@ -27,6 +27,10 @@ SPEC_STUB = """\
 **Origin:** {origin}
 
 ---
+
+{bug_window}
+
+(Read `bugs.py window` and each cited test before scoping.)
 
 ## 1. Problem and context
 
@@ -128,7 +132,11 @@ def new_release(specs: Path, release_id: str, today: str, origin: str) -> Path:
     release_dir = specs / "releases" / release_id
     text = validated(candidate_state(release_id, prior), f"releases/{release_id}/{STATE}")
     stub = SPEC_STUB.format(
-        release_id=release_id, today=today, origin=origin, scope=seeded_scope(specs, origin)
+        release_id=release_id,
+        today=today,
+        origin=origin,
+        scope=seeded_scope(specs, origin),
+        bug_window=BUG_WINDOW,
     )
     candidate = next_candidate(release_dir)
     made = candidate if release_dir.exists() else release_dir

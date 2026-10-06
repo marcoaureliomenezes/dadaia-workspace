@@ -83,3 +83,22 @@ def test_init_with_assets_never_writes_settings_itself(
     installed = service.init(workspace_root, harnesses=("claude", "codex"), skip_assets=False)
     assert not any("ungated" in line for line in installed)
     assert not (workspace_root / ".claude" / "settings.json").exists()
+
+
+def test_a_refused_hold_leaves_the_list_form_denylist_in_place(workspace_root: Path) -> None:
+    """rc-9 AC3.3 row 23 (workspace-denylist-migration-reads-a-refused-hold-as-success): a
+    hold the sweep refuses is falsy, so the converted file never replaces the operator's."""
+    from dadaia_workspace.features.spec_context.sweep import Skipped
+
+    refused = WorkspaceService(
+        public_assets=FakePublicAssetManager(),
+        python_env=FakePythonEnvironmentManager(),
+        hold=lambda *_: Skipped("skipped 'privacy_denylist.json' (errno 13: Permission denied)"),
+    )
+    denylist = workspace_root / ".dadaia" / "states" / "privacy_denylist.json"
+    denylist.parent.mkdir(parents=True)
+    denylist.write_text('["zz-term-a"]', encoding="utf-8")
+
+    refused.init(workspace_root, harnesses=("claude",), skip_assets=True)
+
+    assert denylist.read_text(encoding="utf-8") == '["zz-term-a"]'

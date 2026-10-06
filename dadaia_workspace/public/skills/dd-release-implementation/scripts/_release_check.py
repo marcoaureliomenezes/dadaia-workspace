@@ -12,7 +12,9 @@ to; this file validates the documents a write touches.
 from __future__ import annotations
 
 import json
+import re
 import sys
+from graphlib import CycleError, TopologicalSorter
 from pathlib import Path
 from typing import Any
 
@@ -28,11 +30,16 @@ from _release_schema import (  # noqa: E402
 )
 
 _LAW = "specs/releases/AGENTS.md: release.py is this ledger's ONE writer"
+#: A merged job's measurement, one `kind: merge` entry per job (RELEASE-EVENTS.md §log).
+_JOB_MERGE = re.compile(
+    r"job: [a-z0-9-]+; start: \S+; end: \S+; wall: \d+; ritual_wait: \d+; dispatches: \d+; job_gate_runs: \d+"
+)
 
 
 def finding(path: str, line: int, message: str, fix: str) -> dict[str, Any]:
     """One `check --json` record of this ledger."""
-    return _ledger.finding(CODE, path, line, message, fix)
+    record: dict[str, Any] = _ledger.finding(CODE, path, line, message, fix)
+    return record
 
 
 def _unwritten(
@@ -44,9 +51,17 @@ def _unwritten(
 
 
 def _log_errors(document: dict[str, Any]) -> list[str]:
-    """``log`` is append-only and oldest first: a later entry never predates an earlier."""
-    stamps = [entry.get("ts") for entry in document.get("log", []) if isinstance(entry, dict)]
+    """``log`` is append-only and oldest first: a later entry never predates an earlier; a
+    job's `kind: merge` entry (its text opens `job:`) carries the whole measurement."""
+    entries = [entry for entry in document.get("log", []) if isinstance(entry, dict)]
+    stamps = [entry.get("ts") for entry in entries]
     return [
+        f"log[{index}] kind merge text {entry.get('text')!r} is not '{_JOB_MERGE.pattern}'"
+        for index, entry in enumerate(entries)
+        if entry.get("kind") == "merge"
+        and str(entry.get("text")).startswith("job:")
+        and not _JOB_MERGE.fullmatch(str(entry.get("text")))
+    ] + [
         f"log[{index + 1}].ts {later!r} precedes log[{index}].ts {earlier!r}"
         for index, (earlier, later) in enumerate(zip(stamps, stamps[1:], strict=False))
         if isinstance(earlier, str) and isinstance(later, str) and later < earlier
@@ -92,3 +107,19 @@ def histo_findings(text: str, root: Path = SPECS) -> list[dict[str, Any]]:
         if messages:
             findings.append(_unwritten(HISTO, number, "; ".join(messages), root))
     return findings
+
+
+def dag_errors(plan: str) -> list[str]:
+    """The PLAN's `## DAG` table (job | waits on | why) read once: Job 1 exists, at most 8
+    jobs (Reconciliation uncounted), no cycle."""
+    section = re.split(r"^## DAG.*$", plan, maxsplit=1, flags=re.MULTILINE)[1:]
+    rows = re.findall(r"^\|\s*Job (\d+)\s*\|([^|]*)\|", re.split(r"^#", section[0], flags=re.MULTILINE)[0],
+                      re.MULTILINE) if section else []  # fmt: skip
+    graph = {int(job): {int(n) for n in re.findall(r"\d+", waits)} for job, waits in rows}
+    errors = ["the DAG has no Job 1"] if section and 1 not in graph else []
+    errors += [f"the DAG holds {len(graph)} jobs — at most 8 jobs"] if len(graph) > 8 else []
+    try:
+        tuple(TopologicalSorter(graph).static_order())
+    except CycleError as exc:
+        errors.append(f"the DAG is cyclic: {' -> '.join(f'Job {n}' for n in exc.args[1])}")
+    return errors

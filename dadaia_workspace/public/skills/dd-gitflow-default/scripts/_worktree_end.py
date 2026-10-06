@@ -1,43 +1,59 @@
 #!/usr/bin/env python3
-"""`worktree.py merge|clean`: end one canonical worktree — fast-forward it into the work
-branch, or drop an empty one — never with `--force` or `-D`, re-runnable after a stop."""
+"""`worktree.py merge|stage|clean`: end one canonical worktree — land it on the branch it
+was cut from after its gate, or drop an empty one — never with `--force` or `-D`,
+re-runnable after a stop. A task lands on its job branch after the task gate, unreviewed; a
+job lands on the work branch after its review and the job gate; a `define` or `backlog` tree
+lands `specs/` after its review and the ledger checks alone. Each gate is the repo's own
+declared `verify:` (job), `verify-stage:` or `verify-task:` line, run as one argv list."""
 
 from __future__ import annotations
 
 import json
+import os
+import shlex
 import shutil
 import subprocess
+import sys
 from datetime import datetime
 from pathlib import Path
 
-from _worktree_git import _env, cli, cli_line, flow_for, git, git_line, ours, quote, script
-from _worktree_kinds import _NAME_RE, SCRIPT, Refusal, allows, kind_holding
+from _worktree_git import (
+    _env,
+    cli,
+    cli_line,
+    flow_for,
+    git,
+    git_line,
+    ours,
+    quote,
+    script,
+    work_version,
+)
+from _worktree_names import NAME_RE, SCRIPT, Refusal, base, branch, locate, non_code
 
 REVIEWER = "dd-code-reviewer"
+#: The ledger, trio and release checks a `define` or `backlog` merge runs, in this order.
+_LEDGERS = (("dd-bug-resolution", "bugs.py"), ("dd-backlog-definition", "backlog.py"),
+            ("dd-release-implementation", "release.py"))  # fmt: skip
 
 
 def _target(root: Path, path: str) -> tuple[Path, Path, str, str]:
-    """(repo, tree, name, work branch) of `worktrees/<repo>/<name>`; the tree may be gone."""
+    """(repo, tree, name, base branch) of `worktrees/<repo>/<name>`; the tree may be gone."""
     tree = Path(path).resolve()
-    parts = (
-        tree.relative_to(root / "worktrees").parts
-        if tree.is_relative_to(root / "worktrees")
-        else ()
-    )
-    match = _NAME_RE.match(parts[1]) if len(parts) == 2 else None
-    if match is None:
-        raise Refusal(
-            f"{path} is not a worktrees/<repo>/<M.m.p><l>-<kind> path", f"{script(SCRIPT)} list"
-        )
-    repo = root / "repos" / parts[0]
-    return repo, tree, parts[1], f"{flow_for(root, repo)['work']}{match['v']}"
+    rel = tree.relative_to(root).as_posix() if tree.is_relative_to(root) else ""
+    repo_name, name, tail = locate(rel) or ("", None, ())
+    if name is None or tail or not NAME_RE.match(name):
+        raise Refusal(f"{path} is not a worktrees/<repo>/<name> path", f"{script(SCRIPT)} list")
+    repo = root / "repos" / repo_name
+    flow, version = flow_for(root, repo), NAME_RE.match(name)["v"]  # type: ignore[index]
+    return repo, tree, name, base(name, flow["work"] + (version or work_version(repo, flow)))
 
 
 def _refuse_dirty(tree: Path) -> None:
     if git(tree, "status", "--porcelain").strip():
         raise Refusal(
             f"{tree} has uncommitted changes",
-            f"Operator action: commit them in the kind's commit shape (`{git_line(tree, 'add', '-A')}`"
+            f"Operator action: commit them in their commit shape (`{git_line(tree, 'add', '-A')}`"
             f" and `{git_line(tree, 'commit')}`) or remove them (`{git_line(tree, 'clean', '-fd')}`"
             f" and `{git_line(tree, 'restore', '-SW', '.')}`) — never a stash every worktree shares",
         )
@@ -65,17 +81,18 @@ def _kept(tree: Path, verb: str, keep: list[str], drop: bool) -> list[str]:
     return [p for p in precious if p in keep]
 
 
-def _remove(repo: Path, tree: Path, name: str, kept: list[str]) -> None:
+def _remove(into: Path, tree: Path, name: str, kept: list[str]) -> None:
+    """Copy *kept* into the repo *into* and drop the tree and its branch."""
     for rel in kept:
-        source, target = tree / rel, repo / rel
+        source, target = tree / rel, into / rel
         target.parent.mkdir(parents=True, exist_ok=True)
         if source.is_dir():
             shutil.copytree(source, target, dirs_exist_ok=True)
         else:
             shutil.copy2(source, target)
-    git(repo, "worktree", "unlock", str(tree), check=False)
-    git(repo, "worktree", "remove", str(tree))
-    git(repo, "branch", "-d", f"wt/{name}")
+    git(into, "worktree", "unlock", str(tree), check=False)
+    git(into, "worktree", "remove", str(tree))
+    git(into, "branch", "-d", branch(name))
 
 
 def _undo(tree: Path, work: str, rel: str) -> str:
@@ -84,16 +101,12 @@ def _undo(tree: Path, work: str, rel: str) -> str:
             f"`{git_line(tree, 'restore', '-s', work, '-SW', '--', rel)}` and `{git_line(tree, 'commit')}`")  # fmt: skip
 
 
-def _check_allowed(tree: Path, work: str, name: str) -> None:
-    kind = _NAME_RE.match(name)["k"]  # type: ignore[index]
+def _check_specs_only(tree: Path, work: str) -> None:
+    """A `define` or `backlog` tree lands `specs/` alone: its merge runs no test."""
     for rel in git(tree, "diff", "--name-only", f"{work}...HEAD").splitlines():
-        if not allows(kind, rel):
-            owner = kind_holding(rel)
-            raise Refusal(
-                f"{rel} is outside the {kind} allowed set"
-                + (f"; it belongs in a {owner} worktree" if owner else ""),
-                _undo(tree, work, rel),
-            )
+        if not rel.startswith("specs/"):
+            raise Refusal(f"{rel} is code; a define or backlog tree lands specs/ only — "
+                          "code lands through a job", _undo(tree, work, rel))  # fmt: skip
 
 
 def _check_ancestor(tree: Path, work: str) -> None:
@@ -106,34 +119,71 @@ def _check_ancestor(tree: Path, work: str) -> None:
         ) from error
 
 
-def _verify(tree: Path) -> None:
-    """Gate 1 (ADR 0185): run the `verify:` line of HEAD's `AGENTS.md` in *tree*; its
-    output, on stdout alone (one `fix:` per refusal), is the landed sha's evidence;
-    stdin is closed: a verify reading it never blocks merge."""
-    agents = git(tree, "show", "HEAD:AGENTS.md", check=False).splitlines()
-    command = next(
-        (x.removeprefix("verify:").strip() for x in agents if x.startswith("verify:")), ""
-    )
-    if not command:
-        raise Refusal(
-            "this repo declares no verify: command",
-            f"Operator action: declare this repo's check command as a verify: line in"
-            f" {tree / 'AGENTS.md'} and commit it in this worktree",
-        )
-    # S602: the command is a tracked line of the HEAD being landed, trusted as its code is
-    done = subprocess.run(  # noqa: S602
-        command,
-        shell=True,
-        cwd=tree,
-        env=_env(),
-        stdin=subprocess.DEVNULL,
-        stderr=subprocess.STDOUT,
-    )
+def _gate(tree: Path, level: str, work: str, *files: str) -> None:
+    """One gate level: the command *work*'s tracked `AGENTS.md` declares — no tree picks its judge —
+    `verify:` the job's, `verify-stage:` and `verify-task:` (the touched *files* appended) — split
+    by `shlex` and run as one argv list in *tree*, never a shell, the workspace venv first on
+    `PATH` (a bare `python` is the workspace's, at any tree depth); its output, on stdout alone,
+    is the evidence; stdin is closed. A missing or unstartable line is fixed on *work* alone."""
+    lines = git(tree, "show", f"{work}:AGENTS.md", check=False).splitlines()
+    key = "verify:" if level == "job" else f"verify-{level}:"
+    declared = next((ln.removeprefix(key).strip() for ln in lines if ln.startswith(key)), "")
+    agents = tree.parents[3] / "repos" / tree.parents[1].name / "AGENTS.md"
+    if not declared:
+        raise Refusal(f"this repo declares no {key} command",
+                      f"Operator action: add this repo's {level} gate as a {key} line to {agents} and commit it on {work}")  # fmt: skip
+    venv = [tree.parents[3] / ".dadaia/.venv" / d for d in ("bin", "Scripts")]  # the workspace's
+    env = _env() | {"PATH": os.pathsep.join([*map(str, venv), os.environ.get("PATH", "")])}
+    try:
+        command = [*shlex.split(declared), *files]
+        done = subprocess.run(command, cwd=tree, env=env, stdin=subprocess.DEVNULL,
+                              stderr=subprocess.STDOUT)  # fmt: skip
+    except (OSError, ValueError) as error:
+        raise Refusal(f"{key} {declared!r} cannot start: {error}",
+                      f"Operator action: make the {key} line of {agents} on {work} one argv list that starts:"
+                      " it runs without a shell — no VAR=value prefix, no sh -c") from error  # fmt: skip
     if done.returncode:
-        raise Refusal(
-            f"verify: {command} exited {done.returncode}",
-            f"Operator action: make `{command}` exit 0 in {tree} and commit the fix in this worktree",
-        )
+        line = " ".join(map(quote, command))
+        raise Refusal(f"{key} exited {done.returncode}",
+                      f"Operator action: make `{line}` exit 0 in {tree} and commit the fix in this worktree")  # fmt: skip
+
+
+def _check_stray(tree: Path, work: str, name: str) -> None:
+    """A job branch takes code only by task merges (its rc's specs edits may land directly):
+    a commit made on it directly that touches code refuses — read from the branch's reflog."""
+    mine = set(git(tree, "rev-list", f"{work}..HEAD").split())
+    for line in git(tree, "reflog", "--format=%H %gs", branch(name), check=False).splitlines():
+        sha, _, subject = line.partition(" ")
+        if sha not in mine or subject.startswith(("branch: ", "merge wt/", "rebase")):
+            continue
+        touched = git(tree, "diff-tree", "--no-commit-id", "--name-only", "-r", sha).split()
+        if any(not p.startswith("specs/") for p in touched):
+            undo = git_line(tree, "rebase", "--onto", f"{sha}~", sha)
+            raise Refusal(f"{sha} was committed on {branch(name)} directly; a job branch takes"
+                          " code only through a task merge",
+                          f"Operator action: drop {sha} (`{undo}`) and land its change through a task worktree")  # fmt: skip
+
+
+def _open_tasks(repo: Path, name: str) -> None:
+    """A stage closes, and a job lands, only with none of its task worktrees open."""
+    for row in ours(repo):
+        if row["name"].startswith(f"{name}--"):
+            raise Refusal(f"task worktree {row['path']} of {branch(name)} is open",
+                          f"{script(SCRIPT)} merge {quote(row['path'])}")  # fmt: skip
+
+
+def _ledgers(tree: Path) -> None:
+    """A `define` or `backlog` merge's whole gate: each ledger script's `check` on the tree."""
+    skills = Path(__file__).resolve().parents[2]
+    for skill, name in _LEDGERS:
+        command = [sys.executable, str(skills / skill / "scripts" / name),
+                   "check", "--specs", str(tree / "specs")]  # fmt: skip
+        done = subprocess.run(command, cwd=tree, env=_env(), stdin=subprocess.DEVNULL,
+                              capture_output=True, text=True)  # fmt: skip
+        if done.returncode:
+            print(done.stdout, done.stderr, sep="", end="")
+            raise Refusal(f"{name} check failed on {tree / 'specs'}",
+                          f"Operator action: fix the findings above in {tree} and commit them")  # fmt: skip
 
 
 def _series(tree: Path, work: str, tip: str) -> list[tuple[str, str]]:
@@ -151,7 +201,7 @@ def _series(tree: Path, work: str, tip: str) -> list[tuple[str, str]]:
     ]
 
 
-def _check_approved(root: Path, tree: Path, work: str, name: str) -> None:
+def _check_approved(root: Path, tree: Path, work: str, name: str, run: bool) -> None:
     """The newest dd-code-reviewer handoffs naming a candidate sha decide: each must be a valid
     APPROVED (ADR 0110). A candidate is a sha X of this branch's reflog whose (patch-id, message)
     series over *work*..X equals HEAD's, in order (ADR 0168); X == HEAD is the degenerate case;
@@ -160,10 +210,11 @@ def _check_approved(root: Path, tree: Path, work: str, name: str) -> None:
     older one on HEAD); the file name never orders. A missing, unparseable or offset-less
     `produced_at` ranks newest and refuses; handoffs tied on the newest moment all decide, and
     the fix names the first in path order that is not a valid APPROVED. An unreadable file
-    names no sha and is skipped."""
+    names no sha and is skipped. With *run* (a job), every deciding verdict also carries the
+    schema's `ci_run` field: the job's CI-matrix run."""
     head = git(tree, "rev-parse", "HEAD").strip()
     mine = _series(tree, work, head)
-    reflog = {head, *git(tree, "reflog", "--format=%H", f"wt/{name}", check=False).split()}
+    reflog = {head, *git(tree, "reflog", "--format=%H", branch(name), check=False).split()}
     shas = {x for x in reflog if x == head or _series(tree, work, x) == mine}
     named = []
     for handoff in (root / ".dadaia" / "handoff").glob("*/*.handoff.json"):
@@ -190,6 +241,12 @@ def _check_approved(root: Path, tree: Path, work: str, name: str) -> None:
             or cli(root, "reports", "validate", path).returncode
         ):
             break
+        if run and not data.get("ci_run"):  # its shape is the schema's, judged just above
+            raise Refusal(
+                f"the APPROVED verdict {path} carries no ci_run for HEAD {head}",
+                f"Operator action: push {branch(name)}, wait for its CI run to pass, and have "
+                f"{REVIEWER}'s verdict carry that run's URL as ci_run",
+            )
     else:
         if named:
             return
@@ -201,49 +258,90 @@ def _check_approved(root: Path, tree: Path, work: str, name: str) -> None:
     )
 
 
+def _into(repo: Path, onto: str) -> Path:
+    """The checkout *onto* is checked out in: its job's tree for a job branch, else the repo."""
+    name = onto.removeprefix("wt/")
+    return repo.parents[1] / "worktrees" / repo.name / name if onto.startswith("wt/") else repo
+
+
 def merge(root: Path, path: str, keep: list[str], drop: bool) -> str:
-    repo, tree, name, work = _target(root, path)
-    branch = f"wt/{name}"
+    repo, tree, name, onto = _target(root, path)
+    into, ref = _into(repo, onto), branch(name)
     if not tree.exists():  # removed by an earlier run or by hand: only the branch may be left
-        git(repo, "worktree", "unlock", str(tree), check=False)
-        git(repo, "worktree", "prune")
-        if git(repo, "branch", "--list", branch).strip():
+        git(into, "worktree", "unlock", str(tree), check=False)
+        git(into, "worktree", "prune")
+        if git(into, "branch", "--list", ref).strip():
             try:
-                git(repo, "branch", "-d", branch)
+                git(into, "branch", "-d", ref)
             except RuntimeError as error:
                 raise Refusal(
-                    f"{branch} is unmerged: {error}",
-                    git_line(repo, "worktree", "add", str(tree), branch),
+                    f"{ref} is unmerged: {error}",
+                    git_line(repo, "worktree", "add", str(tree), ref),
                 ) from error
-        return f"{branch} merged into {work}"
+        return f"{ref} merged into {onto}"
     _refuse_dirty(tree)
-    _check_allowed(tree, work, name)
-    _check_ancestor(tree, work)
-    _check_approved(root, tree, work, name)
-    _verify(tree)
+    if into != repo:  # a task: its gate, no verdict, onto its job branch
+        _check_ancestor(tree, onto)
+        owners = git(
+            tree, "log", "--format=%(trailers:key=Owner-tests,valueonly)", f"{onto}..HEAD"
+        ).split()
+        if missing := [p for p in owners if not (tree / p).is_file()]:
+            raise Refusal(f"Owner-tests: {' '.join(missing)} not in the tree",
+                          f"Operator action: fix the Owner-tests: trailer of the task's commits in {tree}")  # fmt: skip
+        touched = git(tree, "diff", "--name-only", "--diff-filter=d", f"{onto}...HEAD").split()
+        argv = [*dict.fromkeys(touched + owners)]
+        if any(p.endswith(".py") for p in argv) and not any(
+            Path(p).name.startswith("test_") for p in argv
+        ):
+            raise Refusal("a code task's gate names no test file: it runs no tests",
+                          f"Operator action: name the task's owner tests in an Owner-tests: trailer on its commits in {tree}")  # fmt: skip
+        _gate(tree, "task", _target(root, str(into))[3], *argv)
+        _refuse_dirty(into)
+    elif non_code(name):
+        _check_specs_only(tree, onto)
+        _check_ancestor(tree, onto)
+        _check_approved(root, tree, onto, name, run=False)
+        _ledgers(tree)
+    else:
+        _open_tasks(repo, name)
+        _check_ancestor(tree, onto)
+        _check_approved(root, tree, onto, name, run=True)
+        _check_stray(tree, onto, name)
+        _gate(tree, "job", onto)
     kept = _kept(tree, "merge", keep, drop)
-    if git(repo, "branch", "--show-current").strip() != work:
-        raise Refusal(f"repos/{repo.name} is not on {work}", git_line(repo, "switch", work))
+    if git(into, "branch", "--show-current").strip() != onto:
+        raise Refusal(f"{into} is not on {onto}", git_line(into, "switch", onto))
     try:
-        git(repo, "merge", "-q", "--ff-only", branch)
+        git(into, "merge", "-q", "--ff-only", ref)
     except RuntimeError as error:
-        _check_ancestor(tree, work)  # moved while merge ran; else a stray the operator owns
-        fix = f"Operator action: commit or remove the paths above in {repo}"
+        _check_ancestor(tree, onto)  # moved while merge ran; else a stray the operator owns
+        fix = f"Operator action: commit or remove the paths above in {into}"
         raise Refusal(f"fast-forward failed: {error}", fix) from error
-    _remove(repo, tree, name, kept)
-    return f"{branch} merged into {work}"
+    _remove(into, tree, name, kept)
+    return f"{ref} merged into {onto}"
+
+
+def stage(root: Path, path: str) -> str:
+    """Close a stage of a job: no task worktree of it open, the stage gate green."""
+    repo, tree, name, onto = _target(root, path)
+    match = NAME_RE.match(name)
+    if not (match and match["rc"] and not match["task"]) or non_code(name) or not tree.exists():
+        raise Refusal(f"{path} is not an open job worktree", f"{script(SCRIPT)} list")
+    _open_tasks(repo, name)
+    _gate(tree, "stage", onto)
+    return f"stage gate green on {branch(name)}@{git(tree, 'rev-parse', 'HEAD').strip()}"
 
 
 def clean(root: Path, path: str, keep: list[str], drop: bool) -> str:
-    repo, tree, name, work = _target(root, path)
+    repo, tree, name, onto = _target(root, path)
     if not any(Path(row["path"]).resolve() == tree for row in ours(repo)):
         raise Refusal(f"{tree} is not a dadaia:-locked worktree", f"{script(SCRIPT)} list")
-    ahead = int(git(repo, "rev-list", "--count", f"{work}..wt/{name}"))
+    ahead = int(git(repo, "rev-list", "--count", f"{onto}..{branch(name)}"))
     if ahead:
         raise Refusal(
-            f"wt/{name} holds {ahead} unmerged commit(s)",
+            f"{branch(name)} holds {ahead} unmerged commit(s)",
             f"{script(SCRIPT)} merge {quote(str(tree))}",
         )
     _refuse_dirty(tree)
-    _remove(repo, tree, name, _kept(tree, "clean", keep, drop))
+    _remove(_into(repo, onto), tree, name, _kept(tree, "clean", keep, drop))
     return f"cleaned {tree}"

@@ -24,7 +24,7 @@ description: >
 1. Open `specs/bugs/AGENTS.md` (the area's scoped law) and follow it.
 2. Name the contract line violated: file and line, `--help` text, or schema key.
 3. Give ONE command that reproduces it, already run, with its exit code and output.
-4. State why it is not agent error — which not-a-bug arm you ruled out and how.
+4. State why it is not agent error — which not-a-bug arm you ruled out, and the work-branch sha that reproduces it.
 5. Severity: CRITICAL a stall or data loss; HIGH a contract broken on the default
    path; MEDIUM off the default path or with a documented workaround; LOW a message
    or cosmetic defect.
@@ -39,8 +39,7 @@ description: >
    --severity LOW|MEDIUM|HIGH|CRITICAL --surface … --component … --context …
    --symptom … --repro … --expected … --correlates <ids>|none`
 2. The surface is the name of a directory tracked in the repo.
-3. In a `bug` or `backlog` worktree (`worktrees/AGENTS.md`; ADR 0137: a registration and its
-   `to-bug` exit share one), stage `BUGS.jsonl`; commit `chore(bugs): report <id>` — shape 1 of `dd-gitflow-default` §3a.
+3. In a job or `backlog-<slug>` worktree (`worktrees/AGENTS.md`), stage `BUGS.jsonl`; commit `chore(bugs): report <id>` — shape 1 of `dd-gitflow-default` §3a.
 4. A bug belongs to the context whose tooling broke: its own `specs/bugs/`, plus an
    upstream report when the broken tool is someone else's.
 5. Hand the fix to `dd-bug-resolution` once the record exists.

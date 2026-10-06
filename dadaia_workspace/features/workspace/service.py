@@ -27,7 +27,7 @@ class WorkspaceService:
         self,
         public_assets: FileSystemPublicAssetManager,
         python_env: VenvPythonEnvironmentManager,
-        hold: Callable[[Path, Path, str], str | None] = lambda *_: None,
+        hold: Callable[[Path, Path, str], object] = lambda *_: None,
     ) -> None:
         self._public_assets = public_assets
         self._python_env = python_env

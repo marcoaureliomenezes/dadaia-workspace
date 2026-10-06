@@ -8,12 +8,12 @@ description: >
 
 # dd-release-definition
 
-> `dd-product-engineer` authors the SPEC, the engineer the as-is review, PLAN and TASKS. A release has open scope; each candidate does not.
+> `dd-product-engineer` authors the SPEC, the engineer the as-is review, PLAN and the job files. A release has open scope; each candidate does not.
 
 ## 1. Pick the set
 
 1. Open `specs/releases/AGENTS.md` (the area's scoped law) and follow it.
-2. Inspect `specs/bugs/BUGS.jsonl` via `python3 .agents/skills/dd-bug-resolution/scripts/bugs.py status`/`stats`.
+2. Inspect `specs/bugs/BUGS.jsonl` via `python3 .agents/skills/dd-bug-resolution/scripts/bugs.py status`/`stats`/`window`, and read each test the window's records cite.
 3. Read `specs/backlog/BACKLOG.json`'s `active[]`, consumed untriaged.
 4. Each undispositioned `specs/audits/**` finding enters the SPEC with its disposition (`python3 .agents/skills/dd-audit-project/scripts/audit.py disposition`).
 5. Name the SPEC's `**Origin:**`: `operator-demand`, `backlog:<ids>` or `bugs:<ids>`.
@@ -27,7 +27,7 @@ description: >
 - One row per touched unit, columns `unit | today | bugs | verdict | why`; DELETE vs KEEP is `dd-codebase-design`'s deletion test; verdicts follow the root map §1 work order, ADD only for what no unit can carry (`today` `—`, `why` says why).
 - REBUILD is mandatory when the unit carries ≥ 2 bugs, the demand changes its fundamental behaviour, the change would need a flag, branch, special case or second path, or its contract contradicts the demand; the engineer and the reviewer judge these triggers, no script.
 - §1.1 Authorities: one row per touched question, one authority each; `consults` call it, `deleted` leave with the row's bug.
-- The PLAN §1 skeleton — `release.py phase IMPLEMENTATION` refuses a PLAN without either table, an empty authority or a question with two, and a Parallel schedule without its table header, with a width unequal to its task ids, without `Critical path` in the section, or with overlapping `W:` in one step (`release.py check` refuses the same on a live trio):
+- The PLAN §1 skeleton (taught, never judged by a script):
 
 ```markdown
 ## 1. As-is review
@@ -52,45 +52,45 @@ Call the Skill tool with `dd-grill-me` on the picked set — never skipped; a fu
 ## 4. Author the trio
 
 1. Author the SPEC (Draft) after the grill: the picked set, its acceptance, every `superseded_by` link.
-2. Definition runs on the work branch (`<work>M.m.p`, the constitution's `gitflow:`); the trio's place is the releases law's.
+2. Definition runs in the rc's `define` worktree (`worktrees/AGENTS.md` §1); the trio's place is the releases law's.
 3. Commit shape 5 (`dd-gitflow-default` §3a); set the `defined` milestone in `_RELEASE.json`
    (`dd-release-implementation`'s `RELEASE-EVENTS.md`).
-4. PLAN opens with §1 As-is review (§2); SPEC carries `Replaces` — one bullet per current behaviour a
-   DELETE/REBUILD row removes, or `none` with its reason.
-5. SPEC in domain names (`dd-domain-modeling`'s `CONTEXT.md`); only FR, AC and T- numbered; sizes per the releases law.
+4. SPEC says what; PLAN opens with §1 As-is review (§2) and draws the rc's DAG of jobs — Job 1 first, the Reconciliation job last, an edge where one job needs another's merge; SPEC carries `Replaces` — one bullet per current behaviour a DELETE/REBUILD row removes, or `none` with its reason.
+5. SPEC in domain names (`dd-domain-modeling`'s `CONTEXT.md`); only FR, AC and T- numbered; each AC names its test level (unit, integration, E2E, or no test with its reason); sizes per the releases law.
 
-## 5. TASKS as tracer bullets
+## 5. The job file — stages and tasks
 
-- Every task carries `blocked by:` (true edges only, or `none`) and `delivers:` ("after this task the operator can …").
-- The FIRST tasks cut a thin end-to-end path; a group verifiable only at its last task is misordered.
-- DELETE/REBUILD tasks precede ADD tasks, each expand–contract (add, switch consumers, delete the old) and independently green.
-- Each task is one `impl` worktree; `W:` is exact.
-- PLAN carries a `Parallel schedule` sizing parallel worktrees, bug fixes included (`worktrees/AGENTS.md` §2): a table walking the `blocked by:` graph and `Critical path` somewhere in the section.
-- Two tasks share a step only when their `W:` sets are disjoint, except `TASKS.md`, the `*.jsonl` ledgers, and each file the Parallel schedule section declares as the word derived followed by its backticked path (for example: derived `gen/index.json`); a declared path exempts every `W:` path that ends with it at a `/` boundary. A task's `W:` sits on its one task line; a backticked path inside parentheses is named, not written.
+- One file per job, `rc-<N>/tasks/<job>.md`; no `TASKS.md`, no markers, no start commits. `release.py check` and `phase IMPLEMENTATION` refuse a file with no `## Stage` heading, a stage with no `- Contract:` line, or a stage 1 whose tasks write anything but tests.
+- A stage's contract is fixed when it opens: its exit tests by level, its envelope (the `W:` union it may touch) and the ACs it serves.
+- Stage 1 writes every acceptance test RED, as a strict xfail; later stages turn them green; tasks of one stage write disjoint `W:`. A task is a bullet line or a table row under a `W:` column.
+- A task: id `J<n>.S<m>.T<k>`, its AC, its exact `W:`, its owner test file, its RED tests; one owner, one session (~1 h), ~100 new code lines.
+- A task is `running` while its task worktree exists; the job's close task writes `done` once.
+- A task born inside an open stage cites its AC; a cancelled one keeps its line and its reason; a hand-edited hot file sits in at most one `W:` per stage, a generated one in none — the audit measures these (`dd-audit-project` PILLAR-SPECS).
+- DELETE/REBUILD tasks precede ADD tasks; a task with no statable AC is folded, or goes back to the SPEC.
 
 ```markdown
-## 5. Parallel schedule
+# Job 2 — the bug window
 
-| step | tasks open together | width | how |
-|---|---|---|---|
-| 1 | T-1, T-2 | 2 | one impl worktree each |
+## Stage J2.S1 — RED
 
-- Critical path: T-1 → T-3 = 2 steps.
-- Overlap check: disjoint except `TASKS.md`, the `*.jsonl` ledgers and the derived `gen/index.json`.
+- Contract: exit tests `tests/unit/test_x.py` strict xfail; envelope `tests/**`; ACs AC2.1
+- J2.S1.T1 — AC2.1 · `W:` `tests/unit/test_x.py` · owner `tests/unit/test_x.py`
+
+## Stage J2.S2 — fix
+
+- Contract: exit tests unit + integration; envelope `src/**`; ACs AC2.1
+- J2.S2.T1 — AC2.1 · `W:` `src/x.py` · owner `tests/unit/test_x.py`
 ```
-
-- A task's `RED:` names the owning test file (the root map §1 test basics).
-- A task with no statable `delivers:` is folded, or goes back to the SPEC.
 
 ## 6. Declaring consumption
 
-- The pick is the SPEC's `**Origin:** backlog:<ids>` line (`release.py new --origin`); the entry exits once, at closure, by `python3 .agents/skills/dd-backlog-definition/scripts/backlog.py exit` (`dd-release-implementation` RC-FLOW step 7).
+- The pick is the SPEC's `**Origin:** backlog:<ids>` line (`release.py new --origin`); the entry exits once, at closure, by `python3 .agents/skills/dd-backlog-definition/scripts/backlog.py exit` (`dd-release-implementation` RC-FLOW step 4).
 
 ## 7. Done when
 
 - Picked set recorded; the `dd-grill-me` session completed and emitted.
 - PLAN §1 names every unit the picked set touches; SPEC authored from the refined set, `Replaces` present, `**Origin:**` declared.
-- Every approved requirement maps into PLAN strategy and >=1 TASKS entry.
+- Every approved requirement maps into the PLAN's DAG and >=1 job-file task.
 - Every unresolved gap goes to the main thread's operator-gated intake, never a direct backlog append.
 
 ## 8. References

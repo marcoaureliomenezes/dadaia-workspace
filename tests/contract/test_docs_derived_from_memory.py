@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import hashlib
 import re
+import sys
 import tomllib
 from pathlib import Path
 
@@ -339,3 +340,21 @@ def test_no_onboarding_text_cites_a_retired_create_flag() -> None:
         if re.search(r"--url\b|--associated-repos\b", match.group(0))
     ]
     assert violations == [], "\n".join(violations)
+
+
+def test_an_atom_changed_alone_is_refused_with_one_fix(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """rc-9 AC1.5: the Reconciliation job lands an atom and its derived section in one merge;
+    an atom changed without its section is refused once, naming the re-derive and re-record."""
+    monkeypatch.setattr(sys.modules[__name__], "_REPO_ROOT", tmp_path)
+    atom = tmp_path / "specs/memory/product/a/x.md"
+    atom.parent.mkdir(parents=True)
+    atom.write_text("# x\n\nbefore\n", encoding="utf-8")
+    body = f"## A section\n\n<!-- derived-from: x sha256:{_atom_hash(atom)} -->\n"
+    atom.write_text("# x\n\nafter\n", encoding="utf-8")  # the atom moved, the section did not
+
+    assert _violations("README.md", body, {"x": atom}) == [
+        "README.md#A section: derived-from x stale — re-read specs/memory/product/a/x.md, "
+        f"re-derive the section, re-record sha256:{_atom_hash(atom)}"
+    ]

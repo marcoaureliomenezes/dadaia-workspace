@@ -125,15 +125,20 @@ def _parsed(key: str, value: str) -> Any:
         ) from None
 
 
-def archivable(records: Records, cutoff: str) -> set[str]:
-    """The ids of every record CLOSED before *cutoff* — ageing is by `closed_at`, the
-    date the record actually closed, never by the filing date `ts`."""
-    return {
-        str(r["id"])
-        for r in records
-        if r.get("status") in TERMINAL and isinstance(r.get("closed_at"), str)
-        and r["closed_at"] < cutoff
-    }  # fmt: skip
+def archive(records: Records, ids: list[str], adr: str, accepted: set[str]) -> Records:
+    """The ledger without the terminal records *ids*; each moved record gains
+    ``archived_by: adr`` in place, since the store archives the very records this drops
+    (a record leaves only by an accepted ADR)."""
+    if adr not in accepted:
+        raise Refusal(f"ADR {adr!r} is not accepted in ADRs/decisions.jsonl — a record leaves "
+                      "the ledger only by an accepted ADR", f"Operator action: accept ADR {adr} first")  # fmt: skip
+    moving = [by_id(records, bug_id) for bug_id in ids]
+    if still := [str(r["id"]) for r in moving if r.get("status") not in TERMINAL]:
+        raise Refusal(f"{', '.join(still)} still open — only a terminal record is archived",
+                      f"{_SCRIPT} status")  # fmt: skip
+    for record in moving:
+        record["archived_by"] = adr
+    return [r for r in records if r not in moving]
 
 
 def parse_set_options(raw: list[str]) -> dict[str, str]:

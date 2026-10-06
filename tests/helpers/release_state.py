@@ -17,15 +17,10 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-#: A PLAN `release.py` admits for a TASKS.md holding T-1: As-is, Authorities, schedule.
-SCHEDULE = (
-    "\n## 5. Parallel schedule\n\n| step | tasks open together | width | how |\n|---|---|---|---|\n"
-    "| 1 | T-1 | 1 | x |\n\n- Critical path: 1 step.\n- Overlap check: none but the derived `dir/map.json`.\n"
-)
+#: A PLAN `release.py` admits: a `## DAG` table and a `### Hot files` list (AC4.3).
 PLAN = (
-    "## 1. As-is review\n\n| unit | today | bugs | verdict | why |\n|---|---|---|---|---|\n"
-    "| a | b | 0 | KEEP | c |\n\n### 1.1 Authorities\n\n| question | authority | consults | deleted |\n"
-    "|---|---|---|---|\n| q | `a` |  |  |\n" + SCHEDULE
+    "## 1. As-is review\n\n## DAG\n\n| job | waits on | why |\n|---|---|---|\n"
+    "| Job 1 | — | x |\n\n### Hot files\n\n- none.\n"
 )
 
 

@@ -12,7 +12,6 @@ and its validator cannot disagree about what a valid record is. `append`, `resol
 from __future__ import annotations
 
 import argparse
-import datetime as _dt
 import json
 import re
 import subprocess
@@ -31,7 +30,7 @@ sys.path.append(str(Path(__file__).resolve().parents[2] / "dd-release-implementa
 
 import _bugs_transition as tr  # noqa: E402
 import _bugs_write as wr  # noqa: E402
-from _bugs_check import CODE, HISTO, LEDGER, check, tasks  # noqa: E402
+from _bugs_check import CODE, HISTO, LEDGER, accepted_adrs, check, tasks  # noqa: E402
 from _bugs_store import Refusal, commit, read_records  # noqa: E402
 from _release_schema import ShallowClone, Unreadable, candidate_at, live_id, releases  # noqa: E402
 from _specs import find_specs, git_line, refuse  # noqa: E402
@@ -51,7 +50,7 @@ _HELP = {
     "supersede": "close a record as superseded by another slug",
     "defer": "close a record as deferred, with a reason",
     "reject": "close a record as rejected, with a reason",
-    "archive": "move long-closed terminal records into bugs_histo.jsonl",
+    "archive": "move named terminal records into bugs_histo.jsonl under an accepted ADR",
     "check": "validate every BUGS.jsonl record",
     "fix": "derive each resolved record's fix commit, numstat and direction",
     "window": "list the records found in or born in the live or the last shipped release",
@@ -60,6 +59,7 @@ _HELP = {
 _SHAPE = re.compile(
     r"@(\w+) (fix\(bugs\): |chore\(bugs\): resolve |refactor\(bugs\): )(.+?) — (.*)$"
 )
+_REVERT = re.compile(r'@\w+ Revert "(.+)"')
 _TASK_SHAS = re.compile(r"\((\w+(?:, \w+)*)\)$")
 #: Never a fix's own lines: tests (metric 6) and specs; `_own` adds the generated files.
 _NOT_PRODUCTION = ("tests/", "specs/")
@@ -81,8 +81,8 @@ def _parser() -> argparse.ArgumentParser:
             command.add_argument("--set", dest="sets", action="append", required=True,
                                  metavar="FIELD=VALUE", help="a 'field=value' pair (repeatable)")  # fmt: skip
         if verb == "archive":
-            command.add_argument("--now", help="ISO-8601 UTC instant to treat as now")
-            command.add_argument("--threshold-days", type=int, default=90)
+            command.add_argument("--adr", required=True, help="the accepted ADR moving them")
+            command.add_argument("bug_ids", nargs="+", help="the terminal records to move")
         if verb == "fix":
             command.add_argument("bug_ids", nargs="*", help="default: every resolved record")
         if verb == "check":
@@ -97,28 +97,41 @@ def _values(args: argparse.Namespace, names: tuple[str, ...]) -> dict[str, Any]:
 
 def _fixes(specs: Path) -> dict[str, dict[str, list[list[str]] | None]]:
     """Bug id -> {fix sha: numstat rows}, grepped from history, never stored; a shape-4
-    task commit is counted, never diffed (rows None)."""
+    task commit is counted, never diffed (rows None). Oldest first, a `Revert "<text>"` undoes
+    one commit, the nearest earlier live one whose subject starts `<text>`; undoing a revert
+    reinstates its own."""
     git = ["git", "-C", str(specs)]
     head = subprocess.run([*git, "rev-parse", "-q", "--verify", "HEAD"], stdout=subprocess.DEVNULL, check=False)  # fmt: skip
     if head.returncode == 1:  # a repo with no commit yet links nothing
         return {}
-    log = subprocess.run([*git, "log", "-E", r"--grep=^(fix|chore|refactor)\(bugs\): ", "--numstat", "--format=@%H %s"],
+    log = subprocess.run([*git, "log", "--reverse", "-E", r"--grep=^(fix|chore|refactor)\(bugs\): ", '--grep=^Revert "', "--numstat", "--format=@%H %s"],
                          stdout=subprocess.PIPE, text=True, check=False)  # fmt: skip
     if log.returncode:
         raise Refusal("cannot read the repo's history", "Operator action: point --specs at a specs tree inside a git repo")  # fmt: skip
-    found: dict[str, dict[str, list[list[str]] | None]] = {}
-    rows: list[list[str]] = []
+    live: list[tuple[str, list[list[str]], Any]] = []  # (header, rows, the commit it undid)
     for line in log.stdout.splitlines():
         if not line.startswith("@"):
-            rows += [line.split("\t")] if line else []
+            live[-1][1].extend([line.split("\t")] if line else [])
             continue
-        rows, shape = [], _SHAPE.match(line)
+        text = revert[1] if (revert := _REVERT.match(line)) else None
+        undone = next((e for e in reversed(live) if text and f"{e[0].partition(' ')[2]} ".startswith(f"{text} ")), None)  # fmt: skip
+        if undone:  # ponytail: a reinstated fix is not re-dropped when its revert's revert is reverted; rc-10 AC1.1
+            live.remove(undone)
+            live += [undone[2]] if undone[2] else []
+        live.append((line, [], undone))
+    found: dict[str, dict[str, list[list[str]] | None]] = {}
+    for line, rows, _ in reversed(live):  # newest first, as callers list them
+        shape = _SHAPE.match(line)
         task = _TASK_SHAS.search(shape[4]) if shape and shape[2].startswith("chore") else None
         if shape is None or (task is None and shape[2].startswith("chore")):
             continue
         for bug in shape[3].split(", "):
+            commits = found.setdefault(bug, {})
             for sha in task[1].split(", ") if task else [shape[1]]:
-                found.setdefault(bug, {})[sha] = None if task else rows
+                # newest first: a later resolve may name this fix commit by its short sha
+                for short in [k for k in commits if sha.startswith(k)]:
+                    del commits[short]
+                commits[sha] = None if task else rows
     return found
 
 
@@ -261,15 +274,9 @@ def _read(args: argparse.Namespace, specs: Path) -> int:
 
 
 def _archive(args: argparse.Namespace, specs: Path) -> int:
-    moment = _dt.datetime.fromisoformat(args.now.replace("Z", "+00:00")) if args.now else None
-    cutoff = (moment or _dt.datetime.now(tz=_dt.UTC)) - _dt.timedelta(days=args.threshold_days)
-    ledger = specs / LEDGER
-    moving = wr.archivable(read_records(ledger), cutoff.strftime("%Y-%m-%dT%H:%M:%SZ"))
-    if moving:
-        kept = commit(ledger, lambda rs: [r for r in rs if r["id"] not in moving], archive=True)  # fmt: skip
-    else:
-        kept = read_records(ledger)
-    print(f"[ok] archived {len(moving)} record(s), {len(kept)} kept.")
+    accepted = accepted_adrs(specs)
+    kept = commit(specs / LEDGER, lambda rs: wr.archive(rs, args.bug_ids, args.adr, accepted), archive=True)  # fmt: skip
+    print(f"[ok] archived {len(args.bug_ids)} record(s) by ADR {args.adr}, {len(kept)} kept.")
     return 0
 
 
@@ -320,7 +327,7 @@ def main(argv: list[str] | None = None) -> int:
     if args.verb == "check":
         findings = check(specs)
         print(json.dumps(findings, indent=2)) if args.json else [
-            print(f"{CODE} error {LEDGER}:{f['line']} {f['message']}") for f in findings
+            print(f"{CODE} error {f['path']}:{f['line']} {f['message']}") for f in findings
         ]
         return 1 if findings else 0
     try:

@@ -80,7 +80,9 @@ def _release(
     release_dir = specs / "releases" / release_id
     (release_dir / "rc-1").mkdir(parents=True, exist_ok=True)
     for name in _TRIO:
-        body = {"TASKS.md": tasks, "PLAN.md": PLAN}.get(name, "**Origin:** operator-demand\n")
+        body = {"TASKS.md": tasks, "PLAN.md": PLAN}.get(
+            name, "**Origin:** operator-demand\n\n## Bug window review\n"
+        )
         release_dir.joinpath("rc-1", name).write_text(
             f"# {name}\n\n**Status:** Approved\n\n{body}", encoding="utf-8"
         )
@@ -150,6 +152,38 @@ def test_new_refuses_a_second_live_release_with_one_fix_line(script: Path, tmp_p
     assert len(fixes) == 1, result.stderr
     assert not (specs / "releases" / "0.6.0").exists()
     assert _tree_hash(specs) == before
+
+
+def test_new_opens_the_rc_spec_with_the_bug_window_review(script: Path, tmp_path: Path) -> None:
+    """AC5.6: `new` writes `## Bug window review` as the first SPEC heading."""
+    specs = _specs(tmp_path)
+    assert _run(script, "new", "9.9.9", "--specs", str(specs)).returncode == 0
+    spec = (specs / "releases" / "9.9.9" / "rc-1" / "SPEC.md").read_text(encoding="utf-8")
+    headings = [line for line in spec.splitlines() if line.startswith("## ")]
+    assert headings[:1] == ["## Bug window review"]
+
+
+# fmt: off
+@pytest.mark.parametrize(("phase", "errors", "verdict"), [
+    pytest.param("DEFINITION", [("releases/0.5.0/rc-1/SPEC.md", 1, True)], "error",
+                 id="definition-refuses"),
+    pytest.param("IMPLEMENTATION", [], "info", id="past-definition-informs"),
+])
+# fmt: on
+def test_a_live_spec_without_the_bug_window_review(
+    script: Path, tmp_path: Path, phase: str, errors: list[tuple[str, int, bool]], verdict: str
+) -> None:
+    """AC5.6, scoped as the Origin check is: a live SPEC lacking the heading is an error with
+    one fix while its candidate is in DEFINITION (where `new` writes it); past it, info."""
+    specs = _specs(tmp_path)
+    _release(specs, "0.5.0", phase=phase, tasks="- [ ] T-1 — open\n")
+    spec_md = specs / "releases" / "0.5.0" / "rc-1" / "SPEC.md"
+    spec_md.write_text(spec_md.read_text(encoding="utf-8").replace("## Bug window review\n", ""))
+    found = _run(script, "check", "--json", "--specs", str(specs))
+    listed = _run(script, "check", "--specs", str(specs))
+    assert found.returncode == (1 if errors else 0), found.stdout
+    assert [(f["path"], f["line"], bool(f["fix"])) for f in json.loads(found.stdout)] == errors
+    assert f"{verdict} releases/0.5.0/rc-1/SPEC.md:1 " in listed.stdout
 
 
 def test_a_verb_with_no_live_release_hands_new_to_the_operator(
@@ -250,19 +284,6 @@ def test_phase_implementation_refuses_an_unapproved_trio(script: Path, tmp_path:
     assert "PLAN.md" in result.stderr
 
 
-@pytest.mark.parametrize(
-    "marker", ["- [ ]**T-1**", "* [ ] T-1", "+ [ ] T-1", "* [-] T-1", "[ ] T-1"]
-)
-def test_phase_closure_refuses_an_open_task(script: Path, tmp_path: Path, marker: str) -> None:
-    """sa-promote-has-no-verb#B25-5, AC3.3 (task-line-grammar-accepts-a-malformed-open-marker):
-    an open marker in any bullet form, spaced or not, refuses CLOSURE."""
-    specs = _specs(tmp_path)
-    _release(specs, "0.5.0", phase="IMPLEMENTATION", tasks=f"{marker} — open\n")
-    result = _run(script, "phase", "CLOSURE", "--sha", "abc1234", "--specs", str(specs))
-    assert result.returncode == 1
-    assert "T-1" in result.stderr
-
-
 def test_phase_refuses_a_malformed_sha(script: Path, tmp_path: Path) -> None:
     specs = _specs(tmp_path)
     _release(specs, "0.5.0")
@@ -280,18 +301,6 @@ def test_check_is_clean_on_a_valid_tree(script: Path, tmp_path: Path) -> None:
     _release(specs, "0.5.0", phase="IMPLEMENTATION")
     result = _run(script, "check", "--specs", str(specs))
     assert result.returncode == 0, result.stdout
-
-
-def test_check_reads_an_unspaced_open_marker_and_its_w_set(script: Path, tmp_path: Path) -> None:
-    """AC3.3: `- [ ]**T-1**` is open to `check` — its `W:` meets T-2's in one step."""
-    specs = _specs(tmp_path)
-    tasks = "- [ ]**T-1** a `W:` `x.py` · b\n- [ ] **T-2** c `W:` `x.py`\n"
-    plan = PLAN.replace("| 1 | T-1 | 1 |", "| 1 | T-1, T-2 | 2 |")
-    (_release(specs, "0.5.0", phase="IMPLEMENTATION", tasks=tasks) / "rc-1/PLAN.md").write_text(
-        f"**Status:** Approved\n\n{plan}", encoding="utf-8"
-    )
-    result = _run(script, "check", "--specs", str(specs))
-    assert "T-1 and T-2 both write x.py" in result.stdout, result.stdout
 
 
 def test_writes_reads_rc6_t_050_117_to_its_ten_paths(script: Path) -> None:
@@ -552,6 +561,35 @@ def test_memory_derives_its_window_and_records_since_and_until(
     assert _run(script, "check", "--specs", str(specs)).returncode == 0
 
 
+def test_a_memory_rerun_over_the_same_window_appends_nothing(script: Path, tmp_path: Path) -> None:
+    specs = _reconciled_closure(tmp_path, script)
+    root = specs.parent
+    before = [json.dumps(e, sort_keys=True) for e in _log(specs) if e["kind"] == "memory"]
+
+    result = _memory(script, root, specs, changed="alpha")
+
+    assert result.returncode == 0, result.stderr
+    after = [json.dumps(e, sort_keys=True) for e in _log(specs) if e["kind"] == "memory"]
+    assert after == before
+
+
+def test_the_first_memory_run_at_the_definition_sha_records_its_entry(
+    script: Path, tmp_path: Path
+) -> None:
+    """J2.S6.T5 (review F9): with HEAD at defined.sha and no memory entry yet, the run is
+    the first reconciliation, never "already reconciled": it records since == until."""
+    root, specs, _ = _memory_repo(tmp_path, script)
+    head = _git(root, "rev-parse", "HEAD")
+    _release(specs, "0.5.0", phase="CLOSURE", defined={"sha": head, "ts": _TS},
+             implemented={"sha": head, "ts": _TS})  # fmt: skip
+
+    result = _memory(script, root, specs, reviewed="", changed="")
+
+    assert result.returncode == 0, result.stderr
+    entries = [e for e in _log(specs) if e["kind"] == "memory"]
+    assert [(e["since"], e["until"]) for e in entries] == [(head, head)]
+
+
 def test_memory_takes_no_caller_chosen_window_or_worklist(script: Path, tmp_path: Path) -> None:
     """H1: `--since`/`--worklist` were the caller choosing an empty window; they are gone."""
     root, specs, base = _memory_repo(tmp_path, script)
@@ -606,6 +644,21 @@ def test_memory_opens_the_next_window_at_the_previous_until(script: Path, tmp_pa
 
     assert result.returncode == 0, result.stderr
     assert _log(specs)[-1]["since"] == until
+
+
+def test_a_rerun_after_the_second_reconciliation_appends_nothing(
+    script: Path, tmp_path: Path
+) -> None:
+    """J2.S6.T5: the no-op reads the LAST memory record's until, not the first one's."""
+    root, specs, _ = _memory_repo(tmp_path, script)
+    assert _memory(script, root, specs, reviewed="alpha", changed="").returncode == 0
+    _git(root, "commit", "-qam", "memory entry")
+    assert _memory(script, root, specs, reviewed="", changed="").returncode == 0
+
+    result = _memory(script, root, specs, reviewed="", changed="")
+
+    assert result.returncode == 0, result.stderr
+    assert len([e for e in _log(specs) if e["kind"] == "memory"]) == 2
 
 
 def test_memory_refuses_any_phase_but_closure(script: Path, tmp_path: Path) -> None:

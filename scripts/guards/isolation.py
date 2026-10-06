@@ -298,14 +298,19 @@ def _hook_imports(module: ast.Module, hooks: set[str]) -> str | None:
     return None
 
 
-def _patches_stdin(module: ast.Module) -> bool:
-    """``setattr("sys.stdin", …)`` or ``setattr(sys, "stdin", …)``."""
+def _patches_stdin(module: ast.Module) -> str | None:
+    """``setattr("sys.stdin", …)``/``setattr(sys, "stdin", …)``, or ``sys.stdin = …``."""
     for n in ast.walk(module):
         if isinstance(n, ast.Call) and _tail(n.func) == "setattr" and len(n.args) >= 2:
             a = n.args
             if _str(a[0]) == "sys.stdin" or (_tail(a[0]) == "sys" and _str(a[1]) == "stdin"):
-                return True
-    return False
+                return "setattr"
+        if isinstance(n, ast.Assign) and any(
+            isinstance(t, ast.Attribute) and t.attr == "stdin" and _tail(t.value) == "sys"
+            for t in n.targets
+        ):
+            return "raw-assignment"
+    return None
 
 
 def hook_stdin_not_in_process(tree: Tree) -> list[str]:
@@ -314,7 +319,8 @@ def hook_stdin_not_in_process(tree: Tree) -> list[str]:
     sets, out = _fixture_sets(tree)
     hooks = sets.get("HOOK_MODULES", set())
     for p, module in _suite(tree).items():
-        if (form := _hook_imports(module, hooks)) and _patches_stdin(module):
+        if (form := _hook_imports(module, hooks)) and (patch := _patches_stdin(module)):
+            form = patch if patch == "raw-assignment" else form
             out.append(f"{form}: {p} drives a hook through a patched sys.stdin")
     return out
 
@@ -540,6 +546,11 @@ CHECKS: dict[str, Check] = {
                 "tests/unit/test_h.py",
                 "import io, sys\nimport dadaia_workspace.hooks.HOOK\n"
                 "def t(m):\n    m.setattr(sys, 'stdin', io.StringIO())\n",
+            ),
+            "raw-assignment": _plant(
+                "tests/unit/test_h.py",
+                "import io, sys\nfrom dadaia_workspace.hooks import HOOK\n"
+                "def t():\n    stream = sys.stdin = io.StringIO()\n",
             ),
         },
     ),

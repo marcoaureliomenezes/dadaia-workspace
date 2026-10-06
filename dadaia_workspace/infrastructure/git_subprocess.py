@@ -1,12 +1,11 @@
 """GitSubprocessClient — git operations via stdlib subprocess."""
 
-import logging
 import os
 import subprocess
 from collections.abc import Sequence
 from pathlib import Path
 
-from dadaia_workspace.core.cli_line import git_line
+from dadaia_workspace.core.cli_line import fix_line, git_line
 from dadaia_workspace.core.exceptions import GitCloneError, GitSyncError
 from dadaia_workspace.core.gitflow import DEFAULT, Gitflow, read_gitflow
 from dadaia_workspace.core.models.git_scan import GitObjectReadError
@@ -20,8 +19,6 @@ _ARCHIVE_PUSH = (
     "origin",
 )
 
-logger = logging.getLogger(__name__)
-
 
 def _run(
     args: list[str],
@@ -33,90 +30,10 @@ def _run(
     return subprocess.run(args, cwd=cwd, capture_output=True, text=True, input=stdin, env=environ)
 
 
-def _has_embedded_git(directory: Path) -> bool:
-    """Return True if *directory* is itself a git repository (contains .git)."""
-    return (directory / ".git").exists()
-
-
-def _stage_files_safe(path: Path) -> None:
-    """Stage all changes while excluding embedded git repos.
-
-    Problem: ``git add -A`` recurses into directories that contain their own
-    ``.git`` directory (embedded repos, e.g. ``.claude/worktrees/agent-*``).
-    This produces git warnings ("adding embedded git repository") and pollutes
-    the outer repo's index.
-
-    Fix strategy:
-    1. Use ``git add -u`` to stage modifications/deletions to already-tracked files.
-    2. Find untracked directories via ``git ls-files --others --directory``.
-    3. For each untracked directory, skip it if it contains its own ``.git``.
-    4. Add the remaining untracked entries individually.
-
-    This is equivalent to ``git add -A`` but respects embedded repos.
-
-    v0.4.3 T-043-23 security-review rework (FR10 sibling hardening — this seam
-    carried NEITHER of A10.1/A10.3, the two `commit_paths`/`_commit` already
-    applies): a non-zero exit from EITHER ``git add`` call now raises
-    :class:`GitSyncError` (a stage that did not happen must never silently become
-    part of a commit, matching A10.1), and every untracked path is wrapped in the
-    ``:(literal)`` pathspec-magic escape before it reaches ``git add`` (matching
-    A10.3) — an untracked file literally named e.g. ``:(exclude)specs`` is staged
-    as the literal file it names, never reinterpreted as pathspec magic. The
-    commit itself (``_commit(path, msg)``, no *pathspec*) is UNAFFECTED by the
-    commit-vs-staged-worktree-content note documented on :func:`_commit` below —
-    that note only applies when a *pathspec* is passed (``commit_paths``); a bare
-    ``git commit -m <msg>`` (what `commit_all` issues) commits whatever the index
-    holds at commit time, exactly what the two ``git add`` calls above just staged.
-    """
-    # Never stage an unmerged entry (review 6 H6): git's own unmerged listing refuses.
-    if unmerged := _run(["git", "diff", "--name-only", "--diff-filter=U"], cwd=path).stdout:
-        raise GitSyncError(f"git commit refused in {path}: unmerged paths\n{unmerged.strip()}")
-    add_tracked = _run(["git", "add", "-u"], cwd=path)
-    if add_tracked.returncode != 0:
-        raise GitSyncError(f"git add -u failed in {path}: {add_tracked.stderr.strip()}")
-
-    # Discover untracked items (files and dirs)
-    result = _run(
-        ["git", "ls-files", "--others", "--exclude-standard", "-z"],
-        cwd=path,
-    )
-    untracked: list[str] = [item for item in result.stdout.split("\0") if item]
-
-    safe: list[str] = []
-    skipped: list[str] = []
-    for item in untracked:
-        # Paths ending with "/" are untracked directories
-        full = path / item.rstrip("/")
-        if full.is_dir() and _has_embedded_git(full):
-            skipped.append(item)
-        else:
-            safe.append(item)
-
-    if skipped:
-        logger.debug(
-            "commit_all: skipping %d embedded git repo(s) in %s: %s",
-            len(skipped),
-            path,
-            skipped,
-        )
-
-    if safe:
-        # git add accepts multiple paths; chunk to avoid ARG_MAX issues on
-        # very large trees (practical repos are fine with a single call)
-        literal_safe = [f":(literal){p}" for p in safe]
-        add_untracked = _run(["git", "add", "--", *literal_safe], cwd=path)
-        if add_untracked.returncode != 0:
-            raise GitSyncError(
-                f"git add failed in {path} for paths {safe!r}: {add_untracked.stderr.strip()}"
-            )
-
-
 def _commit(path: Path, msg: str, pathspec: Sequence[str] | None = None) -> None:
     """Run ``git commit`` against whatever is currently staged in *path*.
 
-    Shared by ``commit_all`` (blanket staging) and ``commit_paths`` (explicit-path
-    staging) — the staging strategy differs, the commit/identity-fallback/no-op
-    handling does not; git's own identity rule applies, never a fallback identity
+    ``commit_paths``'s commit; git's own identity rule applies, never a fallback identity
     (:meth:`GitSubprocessClient.identity_fix` is the one probe). When *pathspec* is given (``commit_paths``, v0.4.3
     T-043-14/FR10/A10.2), the commit itself is scoped with a trailing ``-- <pathspec>``
     — this is what makes it honest even when the index carries OTHER staged content
@@ -136,10 +53,7 @@ def _commit(path: Path, msg: str, pathspec: Sequence[str] | None = None) -> None
     intervening yield point, so this is a theoretical race, not an observed defect; a
     fix that eliminated it entirely (a temporary index via ``GIT_INDEX_FILE`` or
     ``write-tree``/``commit-tree``) is a bigger design change than this hardening pass
-    covers, and is deliberately left as a follow-up rather than half-landed here (the
-    same commit-vs-staged distinction does NOT apply to a bare, no-*pathspec* call —
-    ``commit_all``'s — which commits exactly what its own ``git add`` calls in
-    :func:`_stage_files_safe` just staged).
+    covers, and is deliberately left as a follow-up rather than half-landed here.
     """
     commit_cmd = ["git", "commit", "-m", msg]
     if pathspec:
@@ -180,26 +94,29 @@ class GitSubprocessClient:
         if result.returncode != 0:
             raise GitSyncError(f"git mv {src} {dst} failed in {repo}: {result.stderr.strip()}")
 
-    def is_dirty(self, path: Path) -> bool:
-        result = _run(["git", "status", "--porcelain"], cwd=path)
-        return bool(result.stdout.strip())
+    def dirty_paths(self, path: Path) -> list[str]:
+        """Repo-relative paths ``git status`` reports — changed, staged or untracked (not
+        ignored), each file once; a rename names its new path."""
+        out = _run(["git", "status", "--porcelain", "-z", "--untracked-files=all"], cwd=path)
+        entries, paths = iter(out.stdout.split("\0")), []
+        for entry in entries:
+            if entry:
+                paths.append(entry[3:])
+                if entry[0] in "RC":
+                    next(entries, None)  # the rename's source
+        return paths
 
     def has_commits(self, path: Path) -> bool:
         """Return whether the repository has a valid HEAD commit."""
         result = _run(["git", "rev-parse", "--verify", "HEAD"], cwd=path)
         return result.returncode == 0
 
-    def commit_all(self, path: Path, msg: str) -> None:
-        # Bug 1 fix: use safe staging that excludes embedded git repos
-        _stage_files_safe(path)
-        _commit(path, msg)
-
     def commit_paths(self, path: Path, msg: str, paths: Sequence[str]) -> None:
         """Stage and commit exactly *paths* — never a blanket ``-A``/``-u`` sweep.
 
         Bug context-alive-sweeps-unrelated-worktree-changes (MEDIUM): callers that
         must commit only the files THEY themselves just wrote (e.g. the ``context
-        alive`` scaffold commit) use this instead of ``commit_all``, so pre-existing
+        alive`` scaffold commit) use this, never a blanket stage, so pre-existing
         unrelated worktree modifications stay untouched and uncommitted. A no-op
         (nothing staged, nothing committed) when *paths* is empty.
 
@@ -314,7 +231,12 @@ class GitSubprocessClient:
         text = self.committed_text(repo, "specs/constitution.md")
         if text is None and main_repo is not None and main_repo.resolve() != repo.resolve():
             return self.gitflow(main_repo)
-        return read_gitflow(repo / "specs", text or "")
+        if text is None:
+            return DEFAULT, (
+                f"{repo}: no specs/constitution.md — using the default gitflow\n"
+                f"fix: {fix_line(None, 'specs', 'init', '--specs-dir', str(repo / 'specs'))}"
+            )
+        return read_gitflow(repo / "specs", text)
 
     def published(self, path: Path) -> bool:
         """Whether the project is published (local, offline, AC4.1): ``origin/<integration>``

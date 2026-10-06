@@ -1,8 +1,8 @@
 ---
 slug: specs-migration
 title: specs-migration
-tldr: specs init brings specs/ to the canon and writes the gitflow, never committing; specs upgrade re-stamps 6-8 as 9, folding flat trios; migrate lifts registry v1.
-summary: The verbs that bring persisted state up to what this installation reads — dadaia specs init (onboarding level 3a; absent scaffolds, dadaia upgrades, foreign moves to specs-bkp/, the constitution's gitflow block written or kept), dadaia specs upgrade (a tree stamped 6 or above folds TECHSTACK.md and a flat release trio, runs the doctor's repair set and is re-stamped 9; below 6 it refuses without writing) and dadaia migrate (spec_contexts.json v1 to v2, planned, confirmed, atomic).
+tldr: specs init brings specs/ to the canon and writes the gitflow, never committing; specs upgrade re-stamps 6-10 as 11; migrate lifts registry v1.
+summary: The verbs that bring persisted state up to what this installation reads — dadaia specs init (onboarding level 3a; absent scaffolds, dadaia upgrades, foreign moves to specs-bkp/, the constitution's gitflow block written or kept), dadaia specs upgrade (a tree stamped 6 or above folds TECHSTACK.md and a flat release trio, runs the doctor's repair set and is re-stamped 11; below 6 it refuses without writing) and dadaia migrate (spec_contexts.json v1 to v2, planned, confirmed, atomic).
 tags: [migration, upgrade, specs, registry, onboarding]
 sources:
   - dadaia_workspace/features/migrate/**
@@ -29,11 +29,11 @@ sources:
 
 ## `dadaia specs upgrade`
 
-- `dadaia specs upgrade [--specs-dir <path>] [--dry-run]` reads the tree's `specs_pattern_version` and stamps only the canonical version (9); `--specs-dir` defaults to the bound context.
+- `dadaia specs upgrade [--specs-dir <path>] [--dry-run]` reads the tree's `specs_pattern_version` and stamps only the canonical version (11); `--specs-dir` defaults to the bound context.
 - A tree below 6 is refused with no filesystem write, naming the prerequisite: upgrade with an earlier dadaia-workspace line first.
-- A tree still holding `memory/TECHSTACK.md` has its body appended under `## Tech Stack` at the end of `memory/ARCHITECTURE.md` and the file deleted through the one guarded deleter (`sweep.deleter`, [[workspace-doctor]]) — the fold lands whole or not at all: a delete that is refused, a no-op or raises restores `ARCHITECTURE.md`; a candidate document still flat at a release root moves verbatim into that release's next `rc-<N>/`, judged by shape, a closed `rc-<N>/` never touched; an upgradable tree (stamped 6, 7 or 8) is then re-stamped 9. An `ARCHITECTURE.md` still carrying the two-part Principles layout is refused whole, exit 1, nothing written, naming the rewrite it needs.
+- A tree still holding `memory/TECHSTACK.md` has its body appended under `## Tech Stack` at the end of `memory/ARCHITECTURE.md` and the file deleted through the one guarded deleter (`sweep.remove`, [[workspace-doctor]]) — the fold lands whole or not at all: a delete that is refused, a no-op or raises restores `ARCHITECTURE.md`; a candidate document still flat at a release root moves verbatim into that release's next `rc-<N>/`, judged by shape, a closed `rc-<N>/` never touched; an upgradable tree (stamped 6 to 10) is then re-stamped 11. An `ARCHITECTURE.md` still carrying the two-part Principles layout is refused whole, exit 1, nothing written, naming the rewrite it needs.
 - On every run, whatever the version: a `releases/_ideas/` holding nothing but its `AGENTS.md` is removed (reported only when the deleter succeeded), Portuguese `**Status:**` tokens in each release's live candidate (never a closed `rc-<N>/` or `_archive/`), read on the one Status line `core/spec_status` parses, are rewritten to `Approved`, `In review` or `Draft`, the doctor's own `specs` repair set runs (fixed law sections, placeholder atoms, scaffolded law files, [[workspace-doctor]]) and every ledger whose `check` fails is re-derived by its own script; an error the repair cannot clear prints `[refused]` with its `fix:` line and exits 1.
-- Each change prints one line — `[ideas-repair]`, `[status-vocabulary]`, `[tech-stack]`, `[candidate]`, `[repair]`, `[stamp] <constitution> -> 9`; `--dry-run` plans the same set prefixed `would` and writes nothing; a canonical tree with nothing to repair prints `[ok] … no-op`.
+- Each change prints one line — `[ideas-repair]`, `[status-vocabulary]`, `[tech-stack]`, `[candidate]`, `[repair]`, `[stamp] <constitution> -> 11`; `--dry-run` plans the same set prefixed `would` and writes nothing; a canonical tree with nothing to repair prints `[ok] … no-op`.
 - `dadaia_workspace/core/specs_version.py`'s `state` is the one reader of a tree's state — `absent`, `malformed`, `foreign`, `upgradable` or `canonical`, with its one fix, naming the context when the caller knows it, else the tree as `--specs-dir`; onboarding's `specs` step reports it ([[workspace-init]]).
 
 ## `dadaia migrate`

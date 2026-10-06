@@ -51,10 +51,12 @@ def invariant_errors(record: dict[str, Any]) -> Iterator[str]:
 
 
 def tasks(root: Path) -> set[str]:
-    """Every task id a `TASKS.md` under *root*`/releases/`, `_archive/` included, carries;
+    """Every task id under *root*`/releases/`, `_archive/` included: a closed rc's `TASKS.md`
+    carries `T-…`, a job rc's `tasks/<job>.md` carries `J<n>.S<m>.T<k>` (`JR.…`);
     bounded: an id glued to a word or a hyphen (a doctor code, a placeholder) is no task."""
-    bounded = re.compile(r"(?<![\w-])T-\d+(?:-\d+)*(?![\w-])")
-    return {t for f in root.glob("releases/**/TASKS.md") for t in bounded.findall(f.read_text(encoding="utf-8"))}  # fmt: skip
+    bounded = re.compile(r"(?<![\w-])(?:T-\d+(?:-\d+)*|J(?:\d+|R)\.S\d+\.T\d+)(?![\w-])")
+    files = [*root.glob("releases/**/TASKS.md"), *root.glob("releases/**/tasks/*.md")]
+    return {t for f in files for t in bounded.findall(f.read_text(encoding="utf-8"))}
 
 
 def findings_for(
@@ -113,10 +115,18 @@ def findings_for(
     ]  # fmt: skip
 
 
+def accepted_adrs(root: Path) -> set[str]:
+    """The ids of every accepted ADR in *root*'s ``ADRs/decisions.jsonl``."""
+    decisions = root / "ADRs" / "decisions.jsonl"
+    rows = _ledger.records(decisions) if decisions.is_file() else []
+    return {str(r.get("id")) for r in rows if r.get("status") == "accepted"}
+
+
 def histo_findings(text: str, root: Path = _ledger.SPECS) -> list[dict[str, Any]]:
-    """The archive's lines: each a bug-record-v1 record, or a pre-v6 ``event`` line that
-    predates the record shape and is history, never rewritten."""
-    schema = load_schema()
+    """The archive's lines: each a bug-record-v1 record moved by the accepted ADR its
+    ``archived_by`` names, or a pre-v6 ``event`` line that predates the record shape and is
+    history, never rewritten."""
+    schema, accepted = load_schema(), accepted_adrs(root)
     out: list[dict[str, Any]] = []
     for number, raw in enumerate(text.split("\n"), start=1):
         try:
@@ -130,6 +140,8 @@ def histo_findings(text: str, root: Path = _ledger.SPECS) -> list[dict[str, Any]
                 if record is None or legacy
                 else list(_ledger.validate(record, schema, schema, "record"))
             )
+            if record is not None and not legacy and record.get("archived_by") not in accepted:
+                messages.append(f"archived_by {record.get('archived_by')!r} names no accepted ADR")
         if messages:
             fix = _ledger.unwritten(root / HISTO, number, "`bugs.py archive`", _LAW)
             out.append(_ledger.finding(CODE, HISTO, number, "; ".join(messages), fix))

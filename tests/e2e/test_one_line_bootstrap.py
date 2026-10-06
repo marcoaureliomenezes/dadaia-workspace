@@ -43,7 +43,7 @@ from packaging.requirements import Requirement
 from dadaia_workspace.core import workspace_layout
 from dadaia_workspace.core.platform import PLATFORM
 from tests.conftest import GIT_QUIET_INCLUDE
-from tests.fixtures.harness_env import base_env
+from tests.fixtures.harness_env import suite_env
 
 pytestmark = [pytest.mark.e2e, pytest.mark.slow]
 
@@ -57,7 +57,11 @@ def _child_env(home: Path) -> dict[str, str]:
     own workspace is never this child's: M1's first rung), a tmp ``HOME``, a git identity."""
     keep = "DADAIA_FENCED_ROOTS"
     (home / "gitconfig").write_text(GIT_QUIET_INCLUDE, encoding="utf-8")
-    env = {k: v for k, v in base_env().items() if not k.startswith("DADAIA_") or k == keep}
+    env = {
+        k: v
+        for k, v in suite_env(os.environ, Path.home()).items()
+        if not k.startswith("DADAIA_") or k == keep
+    }
     env.update(
         HOME=str(home),
         XDG_CONFIG_HOME=str(home / ".config"),
@@ -214,7 +218,7 @@ def _build_wheel(source: Path, dest: Path) -> Path:
         capture_output=True,
         text=True,
         timeout=_TIMEOUT,
-        env=base_env() | {"PIP_NO_INDEX": "1"},
+        env=suite_env(os.environ, Path.home()) | {"PIP_NO_INDEX": "1"},
     )
     built = sorted(dest.glob("dadaia_workspace-*.whl"))
     assert len(built) == 1, f"expected one wheel in {dest}, got {built}"
@@ -314,7 +318,7 @@ def test_the_workspace_venv_carries_the_bootstrappers_own_bytes(tmp_path: Path, 
         capture_output=True,
         text=True,
         timeout=_TIMEOUT,
-        env=base_env() | {"PIP_NO_INDEX": "1", "PIP_FIND_LINKS": str(deps)},
+        env=suite_env(os.environ, Path.home()) | {"PIP_NO_INDEX": "1", "PIP_FIND_LINKS": str(deps)},
     )
 
     env = _child_env(home)

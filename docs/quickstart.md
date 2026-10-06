@@ -7,7 +7,7 @@ live. Terms are defined in [concepts](concepts.md); the long walkthrough is
 
 ## 1. The three levels in one block
 
-<!-- derived-from: pypi-distribution sha256:969fd54bf85f -->
+<!-- derived-from: pypi-distribution sha256:a97f549efcdb -->
 <!-- derived-from: workspace-init sha256:4f0ceaccc6c8 -->
 
 Set `REPO_URL` to your repository's clone URL; everything else runs as printed (needs
@@ -23,19 +23,19 @@ cd demo
 ```
 
 After the 3b first pass (below), publish and file the first entry in a `backlog`
-worktree — only `context create` (the `--repo` clone) and the first `specs init` write
+worktree (`backlog/<slug>`) — only `context create` (the `--repo` clone) and the first `specs init` write
 `specs/` directly (ADR 0154):
 
 ```bash
 .dadaia/.venv/bin/dadaia context baseline "$SLUG"
-B=$(python3 .agents/skills/dd-gitflow-default/scripts/worktree.py new "$SLUG" --kind backlog | sed 's/^\[ok\] //')
+B=$(python3 .agents/skills/dd-gitflow-default/scripts/worktree.py new "$SLUG" backlog/my-first-idea | sed 's/^\[ok\] //')
 python3 .agents/skills/dd-backlog-definition/scripts/backlog.py new my-first-idea \
   --specs "$B/specs" --title "What I want" --description "Why I want it"
 git -C "$B" commit -qam "chore(backlog): new my-first-idea"
 ```
 
 After an APPROVED `dd-code-reviewer` verdict, `worktree.py merge "$B"` lands it; the
-release is born the same way in a `release` worktree:
+release is born the same way in its `<M.m.p>-rc<N>/define` worktree:
 `release.py new 0.1.0 --specs "$R/specs" --origin backlog:my-first-idea`.
 
 - **Level 1 — workspace.** `uvx dadaia-workspace init` provisions `demo/` with its own
@@ -79,7 +79,7 @@ clones every repo, installs the hook and makes the context ALIVE; `context bind`
 
 ## 3. The bind
 
-<!-- derived-from: context-management sha256:88b825d90c59 -->
+<!-- derived-from: context-management sha256:2d908837d9f6 -->
 
 ```bash
 .dadaia/.venv/bin/dadaia context bind <your-repo>
@@ -95,7 +95,7 @@ id, else `DADAIA_CONTEXT`, never the cwd: sitting inside a repository is not a b
 
 ## 4. Compliance
 
-<!-- derived-from: workspace-doctor sha256:58030f05158e -->
+<!-- derived-from: workspace-doctor sha256:8b2f7d91f08a -->
 
 `doctor` is the one instance validator; three sections run in fixed order —
 `workspace`, `specs`, `ledgers`. Every finding prints as one `<CODE> <verdict>
@@ -107,26 +107,26 @@ entry held, an EPHEMERAL one deleted.
 
 ## 5. The first backlog entry
 
-<!-- derived-from: backlog-ledger sha256:c5fb2fc0ea4f -->
+<!-- derived-from: backlog-ledger sha256:0e13883cee01 -->
 
 `backlog.py new` appends one entry, born `idea`, to `specs/backlog/BACKLOG.json`'s
 `active[]` — the operator's demand queue; from the workspace root `--specs` names the
 context's specs tree, since no `specs/` sits at or above the cwd. The script is the
 document's one writer and validator: every write validates the bytes it is about to
-commit. Only the operator creates demand, and the document is written in a `backlog`
+commit. Only the operator creates demand, and the document is written in a `backlog/<slug>`
 worktree.
 
 ## 6. The first release
 
-<!-- derived-from: release-lifecycle sha256:29faad7020af -->
+<!-- derived-from: release-lifecycle sha256:e94a43f4bb88 -->
 
 `release.py new` is one birth act, all or nothing: a `SPEC.md` stub in
 `specs/releases/<id>/rc-1/` plus `_RELEASE.json` in `DEFINITION` at the release root, refusing a second live
-release or a non-SemVer id with a `fix:` line. From there, author `SPEC.md`, `PLAN.md`
-and `TASKS.md` in that `rc-<N>/`, `PLAN.md` opening with the As-is review table
-(`unit | today | bugs | verdict | why`) and carrying the Authorities and Parallel schedule
-tables; `release.py phase IMPLEMENTATION --sha <sha>` opens implementation once all
-three carry `**Status:** Approved` and that structure is present.
+release or a non-SemVer id with a `fix:` line; the stub opens with `## Bug window review`. From there, author
+`SPEC.md`, `PLAN.md` and one job file per job, `tasks/<job>.md`, in that `rc-<N>/`, `PLAN.md`
+opening with the As-is review table (`unit | today | bugs | verdict | why`) and carrying the
+`## DAG` of jobs and the `### Hot files`; `release.py phase IMPLEMENTATION --sha <sha>` opens
+implementation once SPEC and PLAN carry `**Status:** Approved` and every job file is well formed.
 
 Next: [positioning](positioning.md) for why this shape, [the bug loop](bug-loop.md)
 for the path a defect takes.

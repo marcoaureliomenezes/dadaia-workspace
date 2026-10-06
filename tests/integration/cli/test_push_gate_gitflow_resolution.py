@@ -67,3 +67,34 @@ def test_heads_constitution_wins_over_the_working_tree(repo: Path) -> None:
     _git(repo, "checkout", "-q", "trunk")
     (repo / "specs" / "constitution.md").write_text("# an uncommitted edit\n", encoding="utf-8")
     assert ci._gate_inputs(repo, "")[0] == Gitflow("trunk", "next", "work/")
+
+
+def test_an_absent_specs_tree_is_reported_as_absent_with_the_specs_init_fix(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    app = tmp_path / "app"
+    _git(tmp_path, "init", "-q", "-b", "trunk", str(app))
+    _git(app, "commit", "-q", "--allow-empty", "-m", "birth")
+    ci._gate_inputs(app, "")
+    err = capsys.readouterr().err
+    assert "no specs/constitution.md" in err
+    fixes = [line for line in err.splitlines() if line.startswith("fix: /")]
+    tail = f"/bin/dadaia specs init --specs-dir {app / 'specs'}"
+    assert [f.endswith(tail) for f in fixes] == [True]
+
+
+def test_a_committed_constitution_without_a_block_keeps_the_no_block_warning(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    app = tmp_path / "app"
+    _git(tmp_path, "init", "-q", "-b", "trunk", str(app))
+    (app / "specs").mkdir()
+    (app / "specs" / "constitution.md").write_text("# no frontmatter\n", encoding="utf-8")
+    _git(app, "add", "specs")
+    _git(app, "commit", "-q", "-m", "constitution")
+    ci._gate_inputs(app, "")
+    err = capsys.readouterr().err
+    assert f"{app / 'specs' / 'constitution.md'}: no gitflow block" in err
+    assert "specs init" not in err

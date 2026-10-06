@@ -22,7 +22,7 @@ import pytest
 from dadaia_workspace.core.harness_registry import HARNESS_RECORDS, L1_ENTRY_HARNESSES
 from dadaia_workspace.infrastructure.runtime_config import codex_config, merge_claude_settings
 from dadaia_workspace.infrastructure.runtime_transforms.hook_wrappers import HOOK_DIALECTS
-from tests.fixtures.harness_env import child_keys
+from tests.fixtures.harness_env import suite_env
 from tests.helpers.scan_population import assert_populated
 
 pytestmark = pytest.mark.contract
@@ -317,7 +317,7 @@ def test_importing_a_hook_never_imports_the_container(module: str) -> None:
 
 def test_gate_resolution_path_never_imports_the_container(tmp_path: Path) -> None:
     """P-12, the executed path: the gate's real entry judges a repo write (its BLOCK path:
-    the worktree fix, `kind_holding`, `script_line`) with the container still unimported;
+    the worktree fix, `_worktree_names.locate`, `script_line`) with the container still unimported;
     the child carries the conftest pin, so it judges THIS checkout."""
     ws = tmp_path / "ws"
     (ws / ".dadaia" / "states").mkdir(parents=True)
@@ -334,7 +334,9 @@ def test_gate_resolution_path_never_imports_the_container(tmp_path: Path) -> Non
         f"sdd_gate.evaluate_payload(json.loads({json.dumps(payload)!r}))\n"
         "assert 'dadaia_workspace.container' not in sys.modules\n"
     )
-    env = child_keys() | {k: os.environ[k] for k in ("PYTHONPATH", "DADAIA_FENCED_ROOTS")}
+    env = suite_env(os.environ, Path.home()) | {
+        k: os.environ[k] for k in ("PYTHONPATH", "DADAIA_FENCED_ROOTS")
+    }
     env["PATH"] = "/usr/bin:/bin"
     result = subprocess.run(
         [sys.executable, "-c", code], capture_output=True, text=True, timeout=120, cwd=ws, env=env

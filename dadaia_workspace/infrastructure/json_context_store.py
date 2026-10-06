@@ -6,6 +6,7 @@ one — v3 only adds ``associated_repos``, which ``_from_dict`` defaults to empt
 
 import json
 from pathlib import Path
+from typing import cast
 
 from dadaia_workspace.core import context_registry
 from dadaia_workspace.core.atomic_write import atomic_write
@@ -18,6 +19,9 @@ from dadaia_workspace.core.models.spec_context import (
 )
 
 _VERSION = 3
+
+# The keys every row carries: :func:`_from_dict` builds the model from them.
+ROW_KEYS = ("name", "state", "repo_slug", "repo_url", "created_at")
 
 # Legacy state values that mark a v1 row — the rows ``migrate`` rewrites.
 LEGACY_STATES: frozenset[str] = frozenset({"ativo", "inativo"})
@@ -43,11 +47,19 @@ def parse_schema_version(data: dict, path: Path) -> int:  # type: ignore[type-ar
 
 def _load(path: Path) -> dict:  # type: ignore[type-arg]
     """Load spec_contexts.json through the one parse; a v1 registry refuses with the one
-    ``migrate --yes`` fix."""
+    ``migrate --yes`` fix, a row missing a :data:`ROW_KEYS` key with an ``Operator action``."""
     data = context_registry.read(path)
     if parse_schema_version(data, path) < 2:
         problem = "spec_contexts.json holds v1 rows (ativo/inativo or schema_version < 2)."
         raise SchemaVersionError(problem, fix_line(path.parents[2], "migrate", "--yes"))
+    for row in cast(
+        "list[dict[str, object]]", data["contexts"]
+    ):  # THE row check: every method reads through here
+        if missing := [k for k in ROW_KEYS if k not in row]:
+            raise SchemaVersionError(
+                f"{path}: context row {row.get('name')!r} has no {', '.join(missing)}.",
+                f"Operator action: add {', '.join(missing)} to that row of {path}",
+            )
     return data
 
 
@@ -97,7 +109,8 @@ class JsonContextStore:
 
     def get(self, name: str) -> SpecContextProject | None:
         return next(
-            (_from_dict(c) for c in _load(self._path)["contexts"] if c["name"] == name), None
+            (_from_dict(c) for c in _load(self._path)["contexts"] if c["name"] == name),
+            None,
         )
 
     def list_all(self) -> list[SpecContextProject]:

@@ -86,6 +86,14 @@ class GateFixes:
     head: str = ""
 
 
+def _pushable(branch: str) -> bool:
+    """The worktree grammar's one answer (its owner, through the one loader), loaded only
+    for a branch the gitflow does not already name."""
+    from dadaia_workspace.infrastructure.ledger_scripts import load_owner
+
+    return bool(load_owner("dd-gitflow-default", "_worktree_names").pushable(branch))
+
+
 def _blocked(text: str, fix: str) -> Decision:
     """One refusal with one single-command fix (no ``&&``: Windows PowerShell 5.1)."""
     return Decision(allowed=False, message=f"[pre-push] BLOCKED: {text} ({_LAW}).\nfix: {fix}")
@@ -127,7 +135,7 @@ def check_branch_policy(
     fixes: GateFixes,
     births: frozenset[str] = frozenset(),
 ) -> Decision | None:
-    """The first refusal, or ``None``: each ref lands on a work branch from the
+    """The first refusal, or ``None``: each ref lands on a work or job branch from the
     same-named local head, or births the principal/integration at a sha in *births*
     (ADR 0036; R13); those two are otherwise PR-only."""
     for ref in refs:
@@ -137,7 +145,7 @@ def check_branch_policy(
         role = gitflow.role_of(branch)
         if role in ("principal", "integration") and ref.local_sha in births:
             continue
-        if role != "work":
+        if role != "work" and not _pushable(branch):
             return _refuse_branch(ref, branch, gitflow, fixes)
         if not ref.local_ref.startswith(HEADS_PREFIX):
             return _refuse_branch(ref, None, gitflow, fixes)

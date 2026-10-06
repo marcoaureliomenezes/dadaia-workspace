@@ -68,10 +68,6 @@ def _commit_paths(repo: Path) -> None:
     GitSubprocessClient().commit_paths(repo, "message", ["missing.txt"])
 
 
-def _commit_all(repo: Path) -> None:
-    GitSubprocessClient().commit_all(repo, "message")
-
-
 @pytest.mark.parametrize(
     ("act", "failing", "untracked", "match", "never"),
     [
@@ -84,23 +80,7 @@ def _commit_all(repo: Path) -> None:
             id="A10.1-commit-paths-add",
         ),
         pytest.param(
-            _commit_all,
-            ["git", "add", "-u"],
-            "",
-            "pathspec did not match",
-            "ls-files",
-            id="stage-add-dash-u",
-        ),
-        pytest.param(
-            _commit_all,
-            ["git", "add", "--"],
-            "new.txt\0",
-            "pathspec did not match",
-            "commit",
-            id="stage-untracked-add",
-        ),
-        pytest.param(
-            _commit_all,
+            _commit_paths,
             ["git", "commit"],
             "",
             "stdout detail.*stderr detail",
@@ -144,12 +124,6 @@ def test_a_failed_git_step_raises_and_nothing_after_it_runs(
             ["AGENTS.md", "tests/AGENTS.md"],
             id="A10.3-commit-paths",
         ),
-        pytest.param(
-            _commit_all,
-            "normal.txt\0:(exclude)specs\0",
-            ["normal.txt", ":(exclude)specs"],
-            id="stage-files-safe-untracked",
-        ),
     ],
 )
 def test_every_path_is_staged_and_committed_as_a_literal_pathspec(
@@ -166,7 +140,7 @@ def test_every_path_is_staged_and_committed_as_a_literal_pathspec(
     literal = [f":(literal){p}" for p in paths]
     assert ["git", "add", "--", *literal] in calls
     commit = next(c for c in calls if "commit" in c)
-    assert act is _commit_all or commit[-len(literal) - 1 :] == ["--", *literal]
+    assert commit[-len(literal) - 1 :] == ["--", *literal]
 
 
 def test_commit_paths_is_a_noop_for_an_empty_path_sequence(

@@ -13,27 +13,8 @@ from typer.testing import CliRunner
 
 from dadaia_workspace import container
 from dadaia_workspace.cli.main import app
-from dadaia_workspace.core.doctor_rules import SectionFinding
 
 _runner = CliRunner()
-
-
-_ISSUE = SectionFinding(
-    "ROOT-4", "error", ".dadaia/nonsense", False, True, "rm -r .dadaia/nonsense"
-)
-
-
-class _StubDoctor:
-    def check(self):
-        return [_ISSUE]
-
-    def check_installed_hooks(self, context=None):
-        return []
-
-    check_projection = check_worktrees = check_skill_md_length = check_installed_hooks
-
-    def scan(self, context=None):
-        return ()
 
 
 def test_doctor_exits_nonzero_when_issues_found(tmp_path: Path, monkeypatch) -> None:
@@ -41,11 +22,11 @@ def test_doctor_exits_nonzero_when_issues_found(tmp_path: Path, monkeypatch) -> 
     (tmp_path / ".dadaia" / "states" / "spec_contexts.json").write_text(
         '{"schema_version": "2", "contexts": []}'
     )
+    (tmp_path / ".dadaia" / "nonsense").mkdir()
     (tmp_path / "repos").mkdir()
     monkeypatch.chdir(tmp_path)
-    monkeypatch.setattr(container, "build_doctor_service", lambda root: _StubDoctor())
     result = _runner.invoke(app, ["doctor"])
-    assert "ROOT-4" in result.output
+    assert "WS-dadaia-slop slop nonsense" in result.output
     assert result.exit_code != 0, "doctor found issues but exited 0"
 
 

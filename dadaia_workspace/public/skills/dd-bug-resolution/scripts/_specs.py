@@ -16,7 +16,7 @@ from pathlib import Path
 def find_specs(given: Path | None, *, ledger: str | None = None) -> Path:
     """*given*, else the nearest git-rooted ``specs/`` at or above the cwd — never created:
     a missing tree refuses, its fix rerunning on the bound context's tree — for a verb
-    writing *ledger* (repo-relative), the worktree of the kind whose allowed set holds it."""
+    writing *ledger* (repo-relative), the repo's first open worktree."""
     here = Path.cwd().resolve()
     trees = (
         [given] if given else [d / "specs" for d in (here, *here.parents) if (d / ".git").exists()]
@@ -39,25 +39,30 @@ def _bound_fix(here: Path, rerun: str, ledger: str | None) -> tuple[str, str]:
                 repo = str(json.loads(shown.stdout)["main_repo"])
             except (ValueError, LookupError, TypeError):
                 return f"{head(cli)} context list", ""
-            if (kind := _kind(ledger)) is None:  # a read, or `specs/audits/` (rc-5 AC1.1)
+            if ledger is None or ledger.startswith("specs/audits/"):  # rc-5 AC1.1
                 return with_specs(rerun, root / "repos" / repo / "specs"), ""
-            if trees := sorted((root / "worktrees" / repo).glob(f"*-{kind}")):
-                many = f"; the first by name of {len(trees)} open {kind} worktrees"
+            if trees := sorted(p for p in (root / "worktrees" / repo).glob("*/*") if _job(p)):
+                many = f"; the first by name of {len(trees)} open worktrees"
                 return with_specs(rerun, trees[0] / "specs"), many if trees[1:] else ""
-            return f"{script(_GITFLOW / 'worktree.py')} new {quote(repo)} --kind {kind}", ""
+            return f"{script(_GITFLOW / 'worktree.py')} list", ""
     return "Operator action: re-run inside a repo that holds its specs/ tree", ""
 
 
 _GITFLOW = Path(__file__).resolve().parents[2] / "dd-gitflow-default" / "scripts"
 
 
-def _kind(ledger: str | None) -> str | None:
-    if ledger is None:
-        return None
-    sys.path.append(str(_GITFLOW))  # the kinds' one owner, as `_worktree_new.py` reaches it
-    from _worktree_kinds import kind_holding
+def _job(tree: Path) -> bool:
+    """*tree* is a job worktree by the one name grammar (`_worktree_names.NAME_RE`)."""
+    sys.path.append(str(_GITFLOW))
+    from _worktree_names import NAME_RE
 
-    return kind_holding(ledger)
+    match = NAME_RE.match(f"{tree.parent.name}/{tree.name}")
+    return (
+        tree.is_dir()
+        and match is not None
+        and match["job"] not in (None, "define", "reconcile")
+        and not match["task"]
+    )
 
 
 def quote(word: str) -> str:

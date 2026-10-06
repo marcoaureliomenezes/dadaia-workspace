@@ -25,7 +25,7 @@ Scope: this file governs only `specs/ADRs/`.
 | Act | Commit | Stages |
 |---|---|---|
 | Propose | `docs(adr): propose <slug>` | the appended `decisions.jsonl` line |
-| Accept | `docs(adr): accept <slug>` | the record's `status`/`measured_by` flip + the paired canonical-memory hunk, same commit, in a `release` worktree |
+| Accept | `docs(adr): accept <slug>` | the record's `status`/`measured_by` flip + the paired canonical-memory hunk, same commit, in a `define` or `reconcile` worktree |
 | Repair | `chore(adrs): repair …` | an in-place `measured_by` repair of a dead field (ADR 0138) |
 
 - Rejecting is a `status: "rejected"` edit by the operator.

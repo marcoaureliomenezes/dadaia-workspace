@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""Canonical worktrees `worktrees/<repo>/<M.m.p><letter>-<kind>` on branch `wt/<same>`,
-stdlib only: `new` derives one from the repo's work branch, `merge` fast-forwards a reviewed
-one into it, `clean` drops an empty one, `list` reads ours from git.
+"""Canonical worktrees `worktrees/<repo>/<name>` on branch `wt/<name>`, stdlib
+only: `new` opens one, `merge` lands it after its gate, `stage` runs a job's stage gate,
+`clean` drops an empty one, `list` reads ours from git.
 """
 
 from __future__ import annotations
@@ -14,21 +14,26 @@ from pathlib import Path
 sys.dont_write_bytecode = True
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from _worktree_end import clean, merge  # noqa: E402
+from _worktree_end import clean, merge, stage  # noqa: E402
 from _worktree_git import find_root, rows  # noqa: E402
-from _worktree_kinds import KINDS, Refusal, allows, kind_for  # noqa: E402
+from _worktree_names import Refusal  # noqa: E402
 from _worktree_new import new  # noqa: E402
 
-__all__ = ["KINDS", "allows", "kind_for", "main"]
+__all__ = ["main"]
 
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     verbs = parser.add_subparsers(dest="verb", required=True)
-    make = verbs.add_parser("new", help="create a worktree from the repo's work branch")
+    make = verbs.add_parser("new", help="open a worktree: a job, a task, define or backlog")
     make.add_argument("repo")
-    make.add_argument("--kind", required=True, choices=sorted(KINDS))
-    for verb, text in (("merge", "fast-forward a reviewed worktree into the work branch"),
+    make.add_argument(
+        "name", help="<M.m.p>-rc<N>/<job>[--<task-id>], <M.m.p>-rc<N>/define, backlog/<slug>"
+    )
+    verbs.add_parser(
+        "stage", help="close a job's stage: its stage gate, no task open"
+    ).add_argument("path")
+    for verb, text in (("merge", "land a worktree on its branch after its gate"),
                        ("clean", "remove a merged or commit-less worktree")):  # fmt: skip
         end = verbs.add_parser(verb, help=text)
         end.add_argument("path")
@@ -43,7 +48,10 @@ def main(argv: list[str] | None = None) -> int:
     try:
         root = find_root()
         if args.verb == "new":
-            print(f"[ok] {new(root, args.repo, args.kind)}")
+            print(f"[ok] {new(root, args.repo, args.name)}")
+            return 0
+        if args.verb == "stage":
+            print(f"[ok] {stage(root, args.path)}")
             return 0
         if args.verb in ("merge", "clean"):
             end_verb = merge if args.verb == "merge" else clean

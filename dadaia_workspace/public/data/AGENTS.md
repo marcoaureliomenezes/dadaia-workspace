@@ -17,7 +17,7 @@
 - Arm A: `demand -> backlog -> as-is review -> release candidate (SPEC/PLAN/TASKS) -> implementation + review -> memory -> closure -> promote by merging the release PR`.
 - Arm B: `propose -> operator confirms -> register -> lowest-level RED test -> root-cause fix -> GREEN -> resolved`.
 - Test: does the tool break its own contract? Yes -> Arm B. No -> Arm A.
-- A feature enters only through the backlog or an operator demand recorded in the SPEC `Origin`; a confirmed bug is fixed per `worktrees/AGENTS.md` §2.
+- A feature enters only through the backlog or an operator demand recorded in the SPEC `Origin`; a confirmed bug is fixed per `specs/bugs/AGENTS.md` §2.
 - Every change minimizes code and tests: DELETE → REBUILD → UPDATE → KEEP → ADD last; verbosity is a defect; documented behavior still works; tests assert behavior not text, mock only boundaries, expect literals; fixes never rewrite old asserts.
 - No workflow engine: the SDD documents (`specs/releases/AGENTS.md`) are the record of progress.
 
@@ -40,7 +40,7 @@
 - Path classes: ADDITIVE (`.dadaia/AGENTS.md`'s output and ephemeral zones) writable; PROTECTED (`workspace_layout.CORE_FLOOR`, `sdd_gate._HOOK_WIRING`, the install ledger, the `.dadaiaignore` `[protected]` globs, repo-relative) blocked; the rest MUTATING.
 - Writes under `repos/<slug>/`: `specs/audits/` directly, the rest by worktree merge; only `context create` and a repo's first `specs init` write `specs/` directly (ADR 0154).
 - Every BLOCK carries exactly one fix line, `fix: <command>` or `Operator action: <one act>` (ADR 0158); a BLOCK whose fix is itself blocked is a Stall, CRITICAL.
-- Git chokepoints (branch names: `specs/constitution.md` `gitflow:`): pre-push allows only the work branch and refuses a non-canon `specs/` path or a denylisted secret; both PRs need CI green and a `dd-code-reviewer` APPROVED verdict; no CI job calls a model API but an evals repo's, under `dd-gitflow-default` §3b.
+- Git chokepoints (branch names: `specs/constitution.md` `gitflow:`): pre-push allows only the work branch, a job branch `wt/<M.m.p>-rc<N>/<job>` and a backlog branch `wt/backlog/<slug>`, and refuses a non-canon `specs/` path or a denylisted secret; both PRs need CI green and a `dd-code-reviewer` APPROVED verdict; no CI job calls a model API but an evals repo's, under `dd-gitflow-default` §3b.
 - Races surface, never block; the binding: `.dadaia/.venv/bin/dadaia context show --json`.
 - The gate reads no SDD artifact; procedure is skill-taught and audit-measured, never gated.
 
@@ -67,7 +67,7 @@
 | handoff | `.dadaia/handoff/AGENTS.md` | emission, schema, ack |
 | tmp / states | `.dadaia/tmp/AGENTS.md`, `.dadaia/states/AGENTS.md` | TTL, state files |
 | a repo | `repos/<slug>/AGENTS.md` | clean tree, caches, tests |
-| worktrees | `worktrees/AGENTS.md` | kinds, the merge ritual, one venv |
+| worktrees | `worktrees/AGENTS.md` | one tree per job, three gates, one review, one venv |
 
 ## 6. Skills — `.agents/skills/dd-*`
 

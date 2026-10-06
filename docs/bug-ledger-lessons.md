@@ -13,7 +13,7 @@ the price of the previous fix.
 
 ## Measuring the ledger
 
-<!-- derived-from: bug-ledger sha256:156cfaca5544 -->
+<!-- derived-from: bug-ledger sha256:1f1d4608155e -->
 
 The numbers are never copied into a page; the ledger's own verbs measure them.
 
@@ -31,8 +31,8 @@ agreement.
 
 ## Lesson 1 — a per-caller fix breeds the next caller's bug
 
-<!-- derived-from: context-management sha256:88b825d90c59 -->
-<!-- derived-from: bug-ledger sha256:156cfaca5544 -->
+<!-- derived-from: context-management sha256:2d908837d9f6 -->
+<!-- derived-from: bug-ledger sha256:1f1d4608155e -->
 
 When a guard lives at the caller that was just caught, the next caller without it is
 the next bug in the family, and each such fix is `net-positive`: it grows the feature.
@@ -43,7 +43,7 @@ multi-owner slug already on disk.
 
 ## Lesson 2 — a per-measurement exclusion breeds the next measurement's bug
 
-<!-- derived-from: QUALITY sha256:f96b10f118ed -->
+<!-- derived-from: QUALITY sha256:418751859f73 -->
 
 When each measurement walks the tree itself and is fixed by its own special-case
 exclusion, the next measurement counts the same stray files. The structure that ends
@@ -54,8 +54,8 @@ to remember to extend.
 
 ## Lesson 3 — a derived cache breeds a bug per environment that derives it
 
-<!-- derived-from: bug-ledger sha256:156cfaca5544 -->
-<!-- derived-from: QUALITY sha256:f96b10f118ed -->
+<!-- derived-from: bug-ledger sha256:1f1d4608155e -->
+<!-- derived-from: QUALITY sha256:418751859f73 -->
 
 A record that caches a fact git already knows is wrong in every environment that
 derives it differently — a shallow checkout first among them. The structure that ends
@@ -64,8 +64,8 @@ history is that line's change log. No CI job fetches history for a bug record's 
 
 ## The standing order the lessons produced
 
-<!-- derived-from: QUALITY sha256:f96b10f118ed -->
-<!-- derived-from: bug-ledger sha256:156cfaca5544 -->
+<!-- derived-from: QUALITY sha256:418751859f73 -->
+<!-- derived-from: bug-ledger sha256:1f1d4608155e -->
 
 The workspace is in a permanent state of architecture review, oriented by its bug
 history:

@@ -21,21 +21,20 @@ sys.path.insert(1, str(Path(__file__).resolve().parents[2] / "dd-spec-navigator"
 
 import _memory_drift as drift  # noqa: E402
 from _ledger import records  # noqa: E402
-from _release_check import finding, histo_findings, state_findings  # noqa: E402
+from _release_check import dag_errors, finding, histo_findings, state_findings  # noqa: E402
 from _release_phase import NEXT  # noqa: E402
-from _release_plan import plan_errors  # noqa: E402
 from _release_schema import (  # noqa: E402
+    CANDIDATE_DOCS,
     HISTO,
     MARK_RE,
     SEMVER_RE,
     SHA_RE,
     STATE,
-    TRIO,
     TRIO_PHASES,
     candidate_dir,
+    job_errors,
     origin,
     origin_line,
-    unfinished_tasks,
     writes,
 )
 from _release_store import SCRIPT, Refusal, live_ids, live_release, window_start  # noqa: E402
@@ -110,11 +109,16 @@ def _trace(
     ]
 
 
+#: AC5.6: the first `## ` heading of every live candidate's SPEC.
+BUG_WINDOW = "## Bug window review"
+
+
 def _origin_findings(specs: Path) -> list[dict[str, Any]]:
-    """The live candidate's Origin line: grammar and existence always, and each carried id
-    listed with its standing — a missing pointer is an error only once the live candidate
-    (past DEFINITION, so a stacked candidate's inherited log is not its own) logged its
-    `dispositions` entry, or shipped."""
+    """The live candidate's SPEC head: its first `## ` heading is :data:`BUG_WINDOW` (AC5.6;
+    an error only in DEFINITION, where `new` writes it — info after), then its Origin line:
+    grammar and existence always, and each carried id listed with its standing — a missing
+    pointer is an error only once the live candidate (past DEFINITION, so a stacked
+    candidate's inherited log is not its own) logged its `dispositions` entry, or shipped."""
     try:
         live = live_release(specs)
     except Refusal:
@@ -127,12 +131,20 @@ def _origin_findings(specs: Path) -> list[dict[str, Any]]:
         spec.read_text(encoding="utf-8"),
         live.state,
     )
+    lines = text.splitlines()
+    head = next((n for n, h in enumerate(lines, 1) if h.startswith("## ")), 1)
+    out = [] if lines[head - 1 : head] == [BUG_WINDOW] else [
+        finding(rel, head, f"the live SPEC's first `## ` heading is not `{BUG_WINDOW}` (AC5.6)",
+                f"Operator action: open {spec} with `{BUG_WINDOW}` as its first `## ` heading, "
+                "reviewing `bugs.py window` and each cited test")
+        | ({} if state.get("phase") == "DEFINITION" else {"verdict": "info"})
+    ]  # fmt: skip
     line = origin_line(text)
     try:
         rows = _trace(specs, live.release_id, origin(text))
     except ValueError as error:
-        return [finding(rel, line, str(error), f"Operator action: rewrite the Origin line "
-                        f"{line} of {spec} to the Origin grammar ({error})")]  # fmt: skip
+        return out + [finding(rel, line, str(error), f"Operator action: rewrite the Origin "
+                              f"line {line} of {spec} to the Origin grammar ({error})")]  # fmt: skip
     since = str((state.get("defined") or {}).get("ts") or "")
     swept = (
         state.get("shipped")
@@ -142,7 +154,6 @@ def _origin_findings(specs: Path) -> list[dict[str, Any]]:
             for e in state.get("log") or []
         )
     )
-    out = []
     for kind, i, standing, writable in rows:
         row = finding(rel, line, f"Origin {kind}:{i} {standing}", f"Operator action: name a "
                       f"live {kind} id for {kind}:{i}, or rule it out of the Origin line of {spec}.")  # fmt: skip
@@ -167,7 +178,7 @@ def _definition_findings(
     log = state["log"]
     born = max((n for n, e in enumerate(log) if e["agent"] == "release.py new"), default=-1)
     found = [f"closure entry kind {e['kind']!r} logged after the candidate's birth"
-             for e in log[born + 1:] if e["kind"] not in ("note", "milestone")]  # fmt: skip
+             for e in log[born + 1:] if e["kind"] not in ("note", "milestone", "merge")]  # fmt: skip
     found += [f"task {m[0].strip()[:80]!r} is marked past '[ ]' in phase DEFINITION"
               for m in marks if m[2] != " "]  # fmt: skip
     if not found:
@@ -193,23 +204,28 @@ def _directory_findings(release_dir: Path, specs: Path) -> list[dict[str, Any]]:
         return findings
     state = json.loads(text)
     phase, candidate = state["phase"], candidate_dir(release_dir)
+    jobs = [finding(f"{dir_rel}/{job.parent.parent.name}/tasks/{job.name}", 1, error,
+                    f"Operator action: correct {job} (dd-release-definition §5)")
+            for job in (sorted(candidate.glob("tasks/*.md")) if candidate else [])
+            for error in job_errors(job.read_text("utf-8"), f"tasks/{job.name}")]  # fmt: skip
+    plan = candidate / "PLAN.md" if candidate else None
+    if plan and plan.is_file():
+        jobs += [finding(f"{dir_rel}/{plan.parent.name}/PLAN.md", 1, error,
+                         f"Operator action: redesign the DAG table in {plan}")
+                 for error in dag_errors(plan.read_text("utf-8"))]  # fmt: skip
     tasks = candidate / "TASKS.md" if candidate else None
     marks = list(MARK_RE.finditer(tasks.read_text("utf-8"))) if tasks and tasks.is_file() else []
     memory = _memory_tasks(marks, tasks, dir_rel) if tasks else []
     if phase not in TRIO_PHASES:
         return (_definition_findings(state, marks, f"{dir_rel}/{STATE}", candidate, specs)
-                if candidate else []) + memory  # fmt: skip
-    missing = [n for n in TRIO if not (candidate and (candidate / n).is_file())]
+                if candidate else []) + memory + jobs  # fmt: skip
+    missing = [n for n in CANDIDATE_DOCS if not (candidate and (candidate / n).is_file())]
     if candidate is None or missing:
         where = candidate.name if candidate else "rc-<N>"
         return [finding(dir_rel, 1, f"phase {phase} is missing {where}/{', '.join(missing)}",
                         f"Operator action: define {', '.join(missing)} in {candidate or release_dir}"
                         " (dd-release-definition)")]  # fmt: skip
-    plan = (candidate / "PLAN.md").read_text(encoding="utf-8")
-    errors = plan_errors(plan, unfinished_tasks(candidate))
-    plan_rel = f"{dir_rel}/{candidate.name}/PLAN.md"
-    fix = f"Operator action: correct {candidate / 'PLAN.md'} (dd-release-definition)"
-    return ([finding(plan_rel, 1, "; ".join(errors), fix)] if errors else []) + memory
+    return memory + jobs
 
 
 def _memory_tasks(marks: list[re.Match[str]], tasks: Path, dir_rel: str) -> list[dict[str, Any]]:

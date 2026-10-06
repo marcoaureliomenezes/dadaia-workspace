@@ -84,7 +84,7 @@ jobs:
         env:
           TAG: ${{ needs.release-please.outputs.tag_name }}
         run: echo "version=${TAG#v}" >> "$GITHUB_OUTPUT"
-      - run: pipx install poetry==1.8.3
+      - run: pipx install poetry==2.5.1
       - run: poetry install --no-interaction --no-ansi --with dev
       - name: Build artifacts
         run: poetry build

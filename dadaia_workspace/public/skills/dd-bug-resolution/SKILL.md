@@ -17,7 +17,7 @@ compatibility: Standalone Agent Skill. Inside a dadaia-workspace (pip install da
 
 1. Inside a dadaia workspace, open `specs/bugs/AGENTS.md` (the area's scoped law) and follow it — its redaction rule
    covers the whole arc: commands, outputs, captured artifacts.
-2. A bug fix is one `bug` worktree, opened per `worktrees/AGENTS.md` §2, in any phase: no SPEC/PLAN/TASKS, no version mint.
+2. Fix now only a block-list bug (`specs/bugs/AGENTS.md` §2), as a hotfix job in its own worktree; any other in the rc's bug batch, before its Reconciliation job.
 
 ## 2. The method — seven phases, each gated
 
@@ -71,8 +71,8 @@ python3 .agents/skills/dd-bug-resolution/scripts/bugs.py resolve <bug-id> --caus
 ```
 
 - `caused_by` names a live or archived record, or `none`, never a loop; writes refuse else.
-- Stage code + regression test + the `BUGS.jsonl` line together, the red loop quoted in the
-  body — ONE commit, shape 3 of `dd-gitflow-default` §3a.
+- Stage code + regression test + the `BUGS.jsonl` line together, the red loop in the body, a hotfix's
+  naming `block: <item>` — ONE commit, shape 3 of `dd-gitflow-default` §3a.
 
 ## 3. Done when
 

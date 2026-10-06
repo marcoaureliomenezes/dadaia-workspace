@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import shutil
-import uuid
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any
@@ -25,31 +23,18 @@ class ReconcileResult:
         return asdict(self)
 
 
-def _snapshot_state(workspace_root: Path) -> dict[Path, Path | None]:
-    backup_root = workspace_root / ".dadaia" / "tmp" / "reconcile" / f"state-{uuid.uuid4().hex}"
-    backup_root.mkdir(parents=True, exist_ok=False)
-    targets = (
-        workspace_root / ".dadaia" / "states" / "spec_contexts.json",
-        workspace_root / ".dadaia" / "states" / "primary_context.json",
-    )
-    snapshots: dict[Path, Path | None] = {}
-    for target in targets:
-        if target.is_file():
-            backup = backup_root / target.name
-            shutil.copy2(target, backup)
-            snapshots[target] = backup
-        else:
-            snapshots[target] = None
-    return snapshots
+def _snapshot_state(workspace_root: Path) -> dict[Path, bytes | None]:
+    states = workspace_root / ".dadaia" / "states"
+    targets = (states / "spec_contexts.json", states / "primary_context.json")
+    return {t: t.read_bytes() if t.is_file() else None for t in targets}
 
 
-def _restore_state(snapshots: dict[Path, Path | None]) -> None:
-    for target, backup in snapshots.items():
-        if backup is None:
+def _restore_state(snapshots: dict[Path, bytes | None]) -> None:
+    for target, content in snapshots.items():
+        if content is None:
             target.unlink(missing_ok=True)
         else:
-            target.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copy2(backup, target)
+            target.write_bytes(content)
 
 
 def reconcile_workspace(
@@ -73,7 +58,7 @@ def reconcile_workspace(
         )
 
     steps: list[str] = ["provider-version"]
-    snapshots = _snapshot_state(workspace_root)  # under .dadaia/tmp: the reaper expires it
+    snapshots = _snapshot_state(workspace_root)
     projections_started = False
     try:
         # Bug reconcile-root-owned-agentic: a mixed-ownership workspace (e.g.

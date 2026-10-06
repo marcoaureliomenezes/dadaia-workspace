@@ -1,10 +1,10 @@
 name: CI
 
-# Gitflow by role (specs/constitution.md `gitflow:`): the work branch is the ONLY pushable
-# branch (its push triggers the full matrix below); the integration and principal branches
-# advance by PR only. The triggers below are literal (GitHub reads no file) and pinned to the
-# library gitflow by tests/contract/test_ci_workflow_hygiene.py; pr-source-guard reads the
-# gitflow itself. No job calls a model API — the security review is the local
+# Gitflow by role (specs/constitution.md `gitflow:`): the work branch and a job branch
+# `wt/<M.m.p>-rc<N>/<job>` are the ONLY pushable branches (a push triggers the full matrix
+# below); the integration and principal branches advance by PR only. The triggers below are
+# literal (GitHub reads no file) and pinned to the library gitflow by the ci-triggers-gitflow
+# guard; pr-source-guard reads the gitflow itself. No job calls a model API — the security review is the local
 # dd-code-reviewer lens.
 on:
   push:
@@ -12,6 +12,8 @@ on:
       - main
       - develop
       - 'feature/**'
+      # a job branch (ADR 0190): its push runs the matrix the job's verdict names
+      - 'wt/**'
   pull_request:
     branches: [main, develop]
   workflow_dispatch:
@@ -66,7 +68,7 @@ jobs:
         with:
           python-version: "3.12"
       - name: Install Poetry
-        run: pipx install poetry==1.8.3
+        run: pipx install poetry==2.5.1
       - name: Cache poetry deps
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # v6.1.0
         with:
@@ -92,7 +94,7 @@ jobs:
         with:
           python-version: "3.12"
       - name: Install Poetry
-        run: pipx install poetry==1.8.3
+        run: pipx install poetry==2.5.1
       - name: Cache poetry deps
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # v6.1.0
         with:
@@ -117,7 +119,7 @@ jobs:
         with:
           python-version: "3.12"
       - name: Install Poetry
-        run: pipx install poetry==1.8.3
+        run: pipx install poetry==2.5.1
       - name: Cache poetry deps
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # v6.1.0
         with:
@@ -142,7 +144,7 @@ jobs:
         with:
           python-version: "3.12"
       - name: Install Poetry
-        run: pipx install poetry==1.8.3
+        run: pipx install poetry==2.5.1
       - name: Cache poetry deps
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # v6.1.0
         with:
@@ -167,7 +169,7 @@ jobs:
         with:
           python-version: "3.12"
       - name: Install Poetry
-        run: pipx install poetry==1.8.3
+        run: pipx install poetry==2.5.1
       - name: Cache poetry deps
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # v6.1.0
         with:
@@ -203,7 +205,7 @@ jobs:
         with:
           python-version: "3.12"
       - name: Install Poetry
-        run: pipx install poetry==1.8.3
+        run: pipx install poetry==2.5.1
       - name: Install
         run: poetry install --no-interaction --no-ansi --with dev
       - name: pytest unit fast
@@ -228,7 +230,7 @@ jobs:
         with:
           python-version: "3.12"
       - name: Install Poetry
-        run: pipx install poetry==1.8.3
+        run: pipx install poetry==2.5.1
       - name: Install
         run: poetry install --no-interaction --no-ansi --with dev
       # Poetry's editable builder writes no Scripts\dadaia.exe on Windows; pip's PEP 660 install does.
@@ -253,7 +255,7 @@ jobs:
         with:
           python-version: "3.12"
       - name: Install Poetry
-        run: pipx install poetry==1.8.3
+        run: pipx install poetry==2.5.1
       - name: Cache poetry deps
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # v6.1.0
         with:
@@ -281,7 +283,7 @@ jobs:
         with:
           python-version: "3.12"
       - name: Install Poetry
-        run: pipx install poetry==1.8.3
+        run: pipx install poetry==2.5.1
       - name: Cache poetry deps
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # v6.1.0
         with:

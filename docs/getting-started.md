@@ -5,7 +5,7 @@ the terms are defined in [concepts](concepts.md) and in [`CONTEXT.md`](../CONTEX
 
 ## Install
 
-<!-- derived-from: pypi-distribution sha256:969fd54bf85f -->
+<!-- derived-from: pypi-distribution sha256:a97f549efcdb -->
 <!-- derived-from: workspace-init sha256:4f0ceaccc6c8 -->
 
 ```bash
@@ -55,7 +55,7 @@ harness later and `.dadaia/.venv/bin/dadaia harness list` reads the roster.
 ## Level 2 — the project
 
 <!-- derived-from: spec-context-project sha256:9690f09f679b -->
-<!-- derived-from: context-management sha256:88b825d90c59 -->
+<!-- derived-from: context-management sha256:2d908837d9f6 -->
 
 A context — a Spec Context Project — is the unit of work: one canonical `specs/` tree
 owned by one main repository, optionally spanning associated repositories that live and
@@ -97,7 +97,7 @@ branches; a re-run is a no-op.
 
 ## Check compliance — `doctor`
 
-<!-- derived-from: workspace-doctor sha256:58030f05158e -->
+<!-- derived-from: workspace-doctor sha256:8b2f7d91f08a -->
 
 ```bash
 .dadaia/.venv/bin/dadaia doctor --context <ctx> [--json] [--fix] [--redact]
@@ -124,16 +124,17 @@ zone class, an OUTPUT entry held, an EPHEMERAL one deleted.
 
 ## Run the first candidate
 
-<!-- derived-from: release-lifecycle sha256:29faad7020af -->
-<!-- derived-from: backlog-ledger sha256:c5fb2fc0ea4f -->
-<!-- derived-from: bug-ledger sha256:156cfaca5544 -->
+<!-- derived-from: release-lifecycle sha256:e94a43f4bb88 -->
+<!-- derived-from: backlog-ledger sha256:0e13883cee01 -->
+<!-- derived-from: bug-ledger sha256:1f1d4608155e -->
 
 A candidate is one closed-scope cycle inside the live release. Nothing drives it: the
-documents are the state, the ledger scripts move the records, and the markers in
-`TASKS.md` are the trace.
+documents are the state, the ledger scripts move the records, and the job files and
+task commits are the trace.
 
 After `context baseline`, each step writes inside a worktree that then merges: a
-`backlog` one for step 1, a `release` one from step 2 (ADR 0154).
+`backlog/<slug>` one for step 1, the candidate's `define` one for steps 2 and 3, a job's
+or a task's from step 5.
 
 1. **Demand enters the backlog.** Only the operator creates demand;
    `python3 .agents/skills/dd-backlog-definition/scripts/backlog.py new <slug> --relates <slugs>|none`
@@ -146,26 +147,28 @@ After `context baseline`, each step writes inside a worktree that then merges: a
    set touches, `unit | today | bugs | verdict | why`, the As-is verdict DELETE,
    REBUILD, UPDATE or KEEP, then ADD only for what no unit can carry; the mandatory
    grill; then `SPEC.md` (its `Replaces` naming what DELETE/REBUILD rows remove),
-   `PLAN.md` (opening with that table as §1) and `TASKS.md` in that `rc-<N>/`, in one
+   `PLAN.md` (opening with that table as §1, then the DAG of jobs and the hot files) and
+   one job file per job, `tasks/<job>.md`, in that `rc-<N>/`, in one
    definition commit on the work branch (`<work>M.m.p`; the names are the
    `gitflow:` block of `specs/constitution.md`).
-4. **Open implementation.** `release.py phase IMPLEMENTATION --sha <sha>` requires all
-   three files `**Status:** Approved` and PLAN's As-is review, Authorities and Parallel
-   schedule tables, and stamps
-   `defined`.
-5. **Implement each task in its own `impl` worktree.** Reserve it `[-]` in its own
-   commit, work test-first, run the repo's own CI checks, and land it by `worktree.py
-   merge` only after the reviewer's `APPROVED`.
-6. **Close the candidate.** `release.py phase CLOSURE --sha <sha>` requires no `[ ]`
-   or `[-]` marker and no other open `wt/*` worktree, and stamps `implemented`. Then,
-   in the candidate's `release` worktree, in order: memory reconciliation, the
-   closure `log` entries, the disposition sweep (`backlog.py exit`,
-   `audit.py disposition`/`close`, `bugs.py archive`), artifact GC, and the
-   work -> integration PR merged green.
+4. **Open implementation.** `release.py phase IMPLEMENTATION --sha <sha>` requires
+   `SPEC.md` and `PLAN.md` `**Status:** Approved`, PLAN's `## DAG` and `### Hot files`
+   sections and well-formed job files, and stamps `defined`.
+5. **Run the jobs.** Each job opens its worktree by `worktree.py new`; each stage's
+   tasks run in parallel task worktrees, stage 1 writing every acceptance test RED;
+   a task lands on its job branch by `worktree.py merge` after its task gate, a stage
+   closes by `worktree.py stage`, and the job lands on the work branch after its CI
+   run and the reviewer's one `APPROVED`.
+6. **Close the candidate.** The Reconciliation job, in its `reconcile` worktree:
+   `release.py phase CLOSURE --sha <sha>` (no other open `wt/*` worktree), memory
+   reconciliation with its derived docs, the closure `log` entries, the disposition
+   sweep (`backlog.py exit`, `audit.py disposition`/`close`, `bugs.py archive`),
+   artifact GC; then the work -> integration PR merged green.
 7. **Continue or promote.** Continue: `release.py new` with the same id stacks the next
    candidate, reopening `DEFINITION`. Promote: merge the integration branch into the
    principal by PR — that merge is the deploy; `release.py ship --sha <sha> --pr <n>`
    then records the merged promote PR and moves the release folder to `_archive/`.
 
-A bug needs none of this: register, lineage, a RED new case, root-cause fix, GREEN,
-`resolve` with its red loop, one commit — in one `bug` worktree, in any phase.
+A bug is registered once the operator confirms it; a block-list bug is fixed at once as
+a hotfix job — lineage, a RED new case, root-cause fix, GREEN, `resolve` with its red
+loop, one commit — and any other in the candidate's bug batch, before its Reconciliation job.

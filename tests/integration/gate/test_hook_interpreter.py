@@ -24,7 +24,7 @@ from dadaia_workspace.infrastructure.runtime_transforms.hook_wrappers import (
     hook_wrapper_contents,
     wrapper_name,
 )
-from tests.fixtures.harness_env import child_keys
+from tests.fixtures.harness_env import suite_env
 
 pytestmark = [
     pytest.mark.integration,
@@ -63,7 +63,7 @@ def _kimi_shim(where: Path) -> Path:
 
 def _run(command: str, cwd: Path, **env: str) -> subprocess.CompletedProcess[str]:
     base = {
-        **child_keys(),
+        **suite_env(os.environ, Path.home()),
         "PATH": os.environ["PATH"],
         "PYTHONPATH": os.environ.get("PYTHONPATH", ""),
     }
@@ -126,7 +126,7 @@ def test_the_claude_hook_survives_a_moved_workspace(tmp_path: Path) -> None:
         input=json.dumps({"tool_name": "Write", "tool_input": {"file_path": str(payload_dir)},
                           "cwd": str(moved)}),
         capture_output=True, text=True, cwd=moved, timeout=60,
-        env={**child_keys(), "PATH": os.environ["PATH"], "PYTHONPATH": os.environ.get("PYTHONPATH", ""),
+        env={**suite_env(os.environ, Path.home()), "PATH": os.environ["PATH"], "PYTHONPATH": os.environ.get("PYTHONPATH", ""),
              "CLAUDE_PROJECT_DIR": str(moved)},
     )  # fmt: skip
     assert done.returncode == 0, done.stderr

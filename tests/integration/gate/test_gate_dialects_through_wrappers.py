@@ -31,7 +31,7 @@ from dadaia_workspace.infrastructure.runtime_transforms.hook_wrappers import (
     hook_documents,
     hook_wrapper_contents,
 )
-from tests.fixtures.harness_env import child_keys
+from tests.fixtures.harness_env import suite_env
 
 pytestmark = [pytest.mark.integration, pytest.mark.slow]
 
@@ -61,7 +61,7 @@ def _run(ws: Path, harness: str, case: str, **env_extra: str) -> subprocess.Comp
     fixture, repos = (_FIXTURES / harness / f"{case}.json"), case == "repos"
     fixture = fixture.with_name("scope.json") if repos else fixture  # the scope write, in repos/
     payload = fixture.read_text().replace("{ws}", str(ws))
-    payload = payload.replace("worktrees/demo/0.5.0a-impl/", "repos/demo/") if repos else payload
+    payload = payload.replace("worktrees/demo/0.5.0-rc1/j1/", "repos/demo/") if repos else payload
     if harness == "claude":
         argv = [str(ws / ".dadaia/.venv/bin/python"), "-B", "-m", "dadaia_workspace.hooks.pre_gate"]
     else:
@@ -70,7 +70,7 @@ def _run(ws: Path, harness: str, case: str, **env_extra: str) -> subprocess.Comp
         (ws / ".dadaia" / "hooks" / name).write_text(body)
         argv = ["sh", str(ws / ".dadaia" / "hooks" / name)]
     env = {
-        **child_keys(),
+        **suite_env(os.environ, Path.home()),
         "PATH": os.environ["PATH"],
         "PYTHONPATH": os.environ.get("PYTHONPATH", ""),
         **env_extra,
@@ -169,7 +169,7 @@ def test_ac1_2_every_ctx_inject_wrapper_answers_on_stdout(ws: Path, harness: str
     )
     vendor = {"cursor": "additional_context", "copilot": "additionalContext"}.get(harness)
     env = {
-        **child_keys(),
+        **suite_env(os.environ, Path.home()),
         "PATH": os.environ["PATH"],
         "PYTHONPATH": os.environ.get("PYTHONPATH", ""),
     }

@@ -83,3 +83,19 @@ def test_absence_is_still_a_finding(tmp_path: Path) -> None:
     assert len(issues) == 1, issues
     assert issues[0].startswith("TREE-5 warning"), issues[0]
     assert "specs/memory/AGENTS.md is missing" in issues[0]
+
+
+def test_a_tree_checked_out_from_git_carries_the_canonical_specs_law(tmp_path: Path) -> None:
+    """specs-law-file-untracked-by-gitignore: the specs tree git tracks (the index, what
+    every clone and worktree gets) holds a `specs/AGENTS.md` the doctor judges canonical."""
+    tracked = subprocess.run(["git", "-C", str(_REPO_ROOT), "ls-files", "-z", "--", "specs"],
+                             capture_output=True, check=True).stdout  # fmt: skip
+    subprocess.run(["git", "-C", str(_REPO_ROOT), "checkout-index", "-z", "--stdin",
+                    f"--prefix={tmp_path}/"], input=tracked, check=True)  # fmt: skip
+    subprocess.run(["git", "init", "-q", str(tmp_path)], check=True)
+    issues = SpecsDoctor(tmp_path / "specs", public_dir=_PUBLIC).check()
+    assert [
+        i.message
+        for i in issues
+        if i.code in ("TREE-5", "MEM-DRIFT-2") and "specs/AGENTS.md" in i.message
+    ] == []

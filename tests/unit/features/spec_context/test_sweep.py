@@ -10,9 +10,7 @@ through ``doctor-scan-raises-when-a-ttl-entry-vanishes-mid-walk`` and
 
 from __future__ import annotations
 
-import getpass
 import os
-import shutil
 from collections.abc import Callable
 from pathlib import Path
 
@@ -100,38 +98,11 @@ def test_remove_deletes_a_read_only_tree(
     writable on the way down, then removed; a symlink goes, its destination never; outside is never touched."""
     workspace, target = setup(tmp_path)
     done = sweep.remove(workspace, target, rel)
-    assert done == (message and message.format(rel=rel))
-    assert isinstance(done, sweep.Skipped) is (message == _SKIP) and sweep.succeeded(done) is (message not in (None, _SKIP))
+    expected = message and message.format(rel=rel)
+    assert done == (sweep.Skipped(_SKIP.format(rel=rel)) if message == _SKIP else expected)
+    assert bool(done) is (message not in (None, _SKIP))
     assert not target.is_symlink() and (target.exists() == (survivor == rel))
     assert survivor is None or (tmp_path / survivor).exists()
-
-
-@pytest.mark.skipif(os.name == "nt" or os.geteuid() == 0, reason="POSIX dir permissions; root bypasses them")
-def test_an_expired_entry_another_account_holds_names_the_one_operator_act(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """doctor-tmp-expiry-foreign-owned-entry-never-clears: the TTL delete
-    act that cannot lift a permission (chmod refused: not the owner) skips naming the owner
-    and `Operator action: remove <the expired entry>`; once the operator removed it, the
-    act has nothing left to report, so the finding clears."""
-    entry = tmp_path / ".dadaia" / "tmp" / "a" / "20200101"
-    (held := entry / "x" / "dist").mkdir(parents=True)
-    (held / "f.whl").write_text("w", encoding="utf-8")
-    held.chmod(0o555)
-    monkeypatch.setattr(sweep.os, "chmod", _not_the_owner)
-
-    done = sweep.remove(tmp_path, entry, "tmp/a/20200101")
-
-    assert done.startswith("skipped 'tmp/a/20200101' (errno ")  # 13, or 39/66 on 3.14
-    assert done.endswith(
-        f"it holds an entry owned by {getpass.getuser()}; "
-        f"Operator action: remove {tmp_path}/.dadaia/tmp/a/20200101"
-    )
-    assert isinstance(done, sweep.Skipped) and entry.exists()
-    monkeypatch.undo()
-    held.chmod(0o755)
-    shutil.rmtree(entry)  # the operator's act
-    assert sweep.remove(tmp_path, entry, "tmp/a/20200101") is None
 
 
 def _not_the_owner(*_: object) -> None:
@@ -163,7 +134,7 @@ def test_move_holds_the_content_inside_the_workspace_only(
         monkeypatch.setattr(sweep.os, "replace", _exdev)
     done = sweep.move(workspace, source, tmp_path / dest, "rel")
     moved = message.startswith("moved")
-    assert done == message and isinstance(done, sweep.Skipped) is (not moved) and sweep.succeeded(done) is moved
+    assert done == (message if moved else sweep.Skipped(message)) and bool(done) is moved
     assert (source.exists(), (tmp_path / dest).exists()) == (not moved, moved)
     assert not moved or (tmp_path / dest).read_text() == "x"
 
@@ -222,3 +193,150 @@ def test_a_live_bind_record_survives_a_full_doctor_fix_pass(tmp_path: Path) -> N
 
     assert session_store.live_session(tmp_path, "sess-1") is not None
     assert session_store.read_session(tmp_path, "sess-1") == record
+
+
+# ═════════════════════════════════════════════════════════════════════════════════
+# rc-9 AC3.3: the delete act is judged by its outcome; a refusal is falsy (rows 6, 21, 22).
+# ═════════════════════════════════════════════════════════════════════════════════
+
+
+def _rmtree_leaving(error: OSError | None) -> Callable[..., None]:
+    """``shutil.rmtree`` that deletes nothing: silent, as 3.14's swallowed retry (row 6), or
+    reporting *error* to its ``onexc`` as a failed scan (row 22): recorded as injected, never
+    replaced by a real retry's platform errno."""
+
+    def rmtree(path: str, *, onexc: Callable[..., object]) -> None:
+        if error is not None:
+            onexc(os.scandir, path, error)
+
+    return rmtree
+
+
+# fmt: off
+@pytest.mark.parametrize(("error", "line"), [
+    pytest.param(None, "skipped 'tmp/x'", id="row6-silent-failure-judged-by-occupied"),
+    pytest.param(OSError(39, "Directory not empty"), "skipped 'tmp/x' (errno 39: Directory not empty)", id="row22-no-operator-act-off-a-permission"),
+])
+# fmt: on
+def test_a_surviving_target_is_refused_by_its_outcome(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, error: OSError | None, line: str
+) -> None:
+    target = _file(tmp_path / "tmp" / "x" / "f.txt").parent
+    monkeypatch.setattr(sweep.shutil, "rmtree", _rmtree_leaving(error))
+
+    done = sweep.remove(tmp_path, target, "tmp/x")
+
+    assert done == sweep.Skipped(line) and not done
+    assert target.is_dir()
+
+
+def test_a_refusal_is_falsy_and_no_str(tmp_path: Path) -> None:
+    """U2: no caller can read a refusal as an act — not by truth value, not as a ``str``."""
+    workspace = _outside_link(tmp_path)
+
+    done = sweep.remove(workspace, tmp_path / "outside" / "treasure.txt", "treasure")
+
+    assert done == sweep.Skipped("skipped 'treasure' (outside the workspace)")
+    assert not done and not isinstance(done, str)
+
+
+def test_move_returns_its_failure_as_a_refusal(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """U2 / row 27: a failed ``os.replace`` (not EXDEV) is the act's refusal, never raised."""
+    source = _file(tmp_path / "slop.txt")
+    monkeypatch.setattr(sweep.os, "replace", _not_the_owner)
+
+    done = sweep.move(tmp_path, source, tmp_path / "reaped" / "slop.txt", "slop.txt")
+
+    assert done == sweep.Skipped("skipped 'slop.txt' (errno 1: Operation not permitted)")
+    assert source.read_text() == "x"
+
+
+@pytest.mark.skipif(os.name == "nt" or os.geteuid() == 0, reason="POSIX dir permissions; root bypasses them")
+def test_a_permission_failure_names_the_recorded_entry(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Row 21: the refusal names the entry the retry could not lift, recorded by this call."""
+    entry = tmp_path / ".dadaia" / "tmp" / "a" / "20200101"
+    (held := entry / "x" / "dist").mkdir(parents=True)
+    (held / "f.whl").write_text("w", encoding="utf-8")
+    held.chmod(0o555)
+    monkeypatch.setattr(sweep.os, "chmod", _not_the_owner)
+    try:
+        done = sweep.remove(tmp_path, entry, "tmp/a/20200101")
+    finally:
+        monkeypatch.undo()
+        held.chmod(0o755)
+
+    assert str(done) == (
+        f"skipped 'tmp/a/20200101' (errno 13: Permission denied) — {held}/f.whl sits in a "
+        f"directory owned by {held.owner()}; Operator action: remove {entry}"
+    )
+    assert not done and (held / "f.whl").exists()
+
+
+@pytest.mark.skipif(os.utime not in os.supports_follow_symlinks, reason="a link's own mtime is POSIX-only")
+def test_a_root_level_held_symlink_keeps_its_hold_clock(tmp_path: Path) -> None:
+    """Row 26 (ADR 0074): a root-level hold is its own clock, a symlink's included."""
+    (tmp_path / "link").symlink_to(tmp_path / "nowhere")
+    os.utime(tmp_path / "link", (0, 0), follow_symlinks=False)
+
+    sweep.hold(tmp_path, tmp_path / "link", "link")
+
+    [held] = (tmp_path / ".dadaia" / "reaped").glob("*/link")
+    assert held.lstat().st_mtime > 1_000_000_000
+
+
+# fmt: off
+@pytest.mark.parametrize(("gitdir", "message"), [
+    pytest.param("/repo/.git/worktrees/wt", "skipped 'tree' (holds a linked git worktree)", id="linked-worktree-skipped"),
+    pytest.param("../.git/modules/sub", "deleted 'tree'", id="row24-submodule-is-no-worktree"),
+])
+# fmt: on
+def test_only_a_gitdir_under_worktrees_marks_a_linked_worktree(tmp_path: Path, gitdir: str, message: str) -> None:
+    """rc-9 AC3.6 row 24: a submodule's ``.git`` file names a relative gitdir that moves
+    with its repo; only ``<common>/worktrees/<name>`` is a linked worktree."""
+    tree = tmp_path / "tree"
+    _file(tree / "sub" / ".git").write_text(f"gitdir: {gitdir}\n")
+
+    done = sweep.remove(tmp_path, tree, "tree")
+
+    assert str(done) == message
+
+
+def test_n_moves_to_one_destination_make_n_holds(tmp_path: Path) -> None:
+    """ADR 0074: an occupied destination yields the first free ``<name>-N`` beside it."""
+    for _ in range(3):
+        sweep.move(tmp_path, _file(tmp_path / "slop.txt"), tmp_path / "reaped" / "slop.txt", "slop")
+
+    assert sorted(p.name for p in (tmp_path / "reaped").iterdir()) == ["slop.txt", "slop.txt-1", "slop.txt-2"]
+
+
+@pytest.mark.skipif(os.name == "nt" or os.geteuid() == 0, reason="POSIX dir permissions; root bypasses them")
+def test_an_unopenable_subdirectory_is_refused_never_raised(tmp_path: Path) -> None:
+    """Rows 21/22: a 0o000 subdirectory fails ``os.open`` inside the walk; that failure is
+    recorded and judged by the outcome, never re-called without its flags."""
+    entry = tmp_path / "tmp" / "a" / "20200101"
+    (locked := entry / "x").mkdir(parents=True)
+    _file(locked / "f.txt")
+    locked.chmod(0o000)
+    try:
+        done = sweep.remove(tmp_path, entry, "tmp/a/20200101")
+    finally:
+        locked.chmod(0o700)  # the tmp tree stays removable
+
+    assert str(done) == (
+        f"skipped 'tmp/a/20200101' (errno 13: Permission denied) — {locked} sits in a "
+        f"directory owned by {entry.owner()}; Operator action: remove {entry}"
+    )
+    assert not done and (locked / "f.txt").exists()
+
+
+def test_a_nested_hold_stamps_its_top_entry(tmp_path: Path) -> None:
+    """ADR 0074: a hold of ``a/b/c`` restarts the clock of ``reaped/<day>/a``, not of ``a/b``."""
+    _file(tmp_path / "a" / "b" / "c")
+    sweep.hold(tmp_path, tmp_path / "a" / "b" / "c", "a/b/c")
+    [top] = (tmp_path / ".dadaia" / "reaped").glob("*/a")
+    _file(tmp_path / "a" / "b" / "c")
+    os.utime(top, (0, 0))
+
+    sweep.hold(tmp_path, tmp_path / "a" / "b" / "c", "a/b/c")
+
+    assert top.stat().st_mtime > 1_000_000_000

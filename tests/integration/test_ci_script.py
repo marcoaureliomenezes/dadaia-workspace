@@ -4,7 +4,9 @@ the planted files."""
 
 from __future__ import annotations
 
+import importlib.util
 import os
+import shlex
 import shutil
 import subprocess
 import sys
@@ -29,7 +31,7 @@ modules =
 def _checkout(root: Path, files: dict[str, str]) -> Path:
     for d in ("scripts", "tests"):
         (root / d).mkdir(parents=True)
-    for kept in ("scripts/ci.py", "pyproject.toml"):
+    for kept in ("scripts/ci.py", "scripts/covdata.py", "pyproject.toml"):
         shutil.copyfile(_REPO / kept, root / kept)
     for rel, text in files.items():
         (root / rel).parent.mkdir(parents=True, exist_ok=True)
@@ -124,3 +126,83 @@ def test_contract_coverage_writes_no_coverage_file_into_the_checkout(tmp_path: P
     done = _ci(checkout, "contract-coverage")
     assert done.returncode == 0
     assert list(tmp_path.rglob("*coverage*")) == []
+
+
+def _plan(*argv: str) -> list[str]:
+    """``ci.py``'s step plan for *argv*, read without running a step."""
+    spec = importlib.util.spec_from_file_location("ci", _REPO / "scripts" / "ci.py")
+    assert spec and spec.loader
+    ci = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(ci)
+    return [f"{job}: {name}" for job, (name, _, _) in ci.plan(list(argv))]
+
+
+def test_each_level_runs_only_its_steps() -> None:
+    """AC1.1 (ADR 0190): the task level runs ruff and mypy on the touched files and the owner
+    tests; the stage level runs lint, mypy, guards, unit and integration; the job level all."""
+    files = ("dadaia_workspace/m.py", "tests/unit/test_m.py", "README.md")
+    assert _plan("task", *files) == [
+        "task: ruff format", "task: ruff check", "task: mypy", "task: owner tests"
+    ]  # fmt: skip
+    assert _plan("task", "README.md") == []
+    assert _plan("stage") == [
+        "lint: ruff format", "lint: ruff check", "lint: lint-imports", "typecheck: mypy",
+        "guards: guards", "guards: guards --planted", "unit-fast: unit-fast",
+        "integration: integration",
+    ]  # fmt: skip
+    assert _plan("job") == _plan() == [
+        *_plan("stage")[:7], "contract-coverage: contract-coverage", "integration: integration",
+        "e2e-python: e2e-python", "repo-hygiene: repo-hygiene", "doctor: doctor",
+    ]  # fmt: skip
+
+
+@pytest.mark.parametrize(("check", "code"), [("1 == 2", 1), ("1 == 1", 0)])
+def test_a_planted_failing_step_turns_its_level_red(tmp_path: Path, check: str, code: int) -> None:
+    """AC1.1: the task level's owner tests decide its exit; no other step runs."""
+    test = f"def test_one() -> None:\n    assert {check}\n"
+    checkout = _checkout(tmp_path, {"tests/unit/test_one.py": test})
+    done = subprocess.run(
+        [sys.executable, str(checkout / "scripts" / "ci.py"), "task", "tests/unit/test_one.py"],
+        cwd=checkout, capture_output=True, text=True, check=False,
+    )  # fmt: skip
+    ran = [ln.split(":")[0] for ln in done.stdout.splitlines() if ln.startswith(("PASS ", "FAIL "))]
+    assert ran == [
+        "PASS ruff format",
+        "PASS ruff check",
+        f"{'FAIL' if code else 'PASS'} owner tests",
+    ]
+    assert done.returncode == code
+
+
+@pytest.mark.parametrize("doc", ["tests/README.md", "tests/AGENTS.md"])
+def test_documented_coverage_line_leaves_no_coverage_file_in_the_checkout(
+    tmp_path: Path, doc: str
+) -> None:
+    """AC2.1: on CI, the doc's own ``pytest --cov`` line, run in a git checkout, leaves no
+    coverage file there (tracked, untracked or ignored)."""
+    line = next(
+        ln for ln in (_REPO / doc).read_text(encoding="utf-8").splitlines()
+        if ln.startswith("python -m pytest") and "--cov" in ln
+    )  # fmt: skip
+    files = {
+        ".gitignore": ".coverage\n",
+        "dadaia_workspace/__init__.py": "",
+        "dadaia_workspace/m.py": "def one() -> int:\n    return 1\n",
+        "tests/unit/test_m.py": (
+            "import pytest\n\nfrom dadaia_workspace.m import one\n\n\n"
+            "@pytest.mark.unit\ndef test_one() -> None:\n    assert one() == 1\n"
+        ),
+    }
+    checkout = _checkout(tmp_path, files)
+    subprocess.run(["git", "init", "-q"], cwd=checkout, check=True)
+    tmp = tmp_path / "tmp"  # where the plugin's temp dir lives, and is gone after exit
+    tmp.mkdir()
+    env = {**{k: v for k, v in os.environ.items() if k != "COVERAGE_FILE"}, "CI": "true",
+           "TMPDIR": str(tmp), "PATH": f"{Path(sys.executable).parent}{os.pathsep}{os.environ['PATH']}"}  # fmt: skip
+    assert subprocess.run(shlex.split(line), cwd=checkout, env=env, check=False).returncode == 0
+    assert [p.name for p in tmp.iterdir() if p.name.startswith("dadaia-cov-")] == []
+    status = subprocess.run(
+        ["git", "status", "--porcelain", "--ignored"],
+        cwd=checkout, capture_output=True, text=True, check=True,
+    ).stdout  # fmt: skip
+    assert [ln for ln in status.splitlines() if "coverage" in ln] == []

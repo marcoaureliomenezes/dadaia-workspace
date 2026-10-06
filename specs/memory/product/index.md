@@ -49,7 +49,7 @@
 | `context-portability` | context-portability | dadaia export writes the workspace's context set to one file; dadaia import registers each unknown context DEAD elsewhere, ready for dadaia context alive. |
 | `cross-platform-portability` | cross-platform-portability | Linux, macOS and Windows through one platform capability seam carrying the venv layout, Python hooks and cross-OS CI legs. |
 | `server-registry` | server-registry | Dev-server port registry with TTL and PID tracking so parallel sessions never collide — one stdlib skill script over one JSON state file; no CLI verb. |
-| `specs-migration` | specs-migration | specs init brings specs/ to the canon and writes the gitflow, never committing; specs upgrade re-stamps 6-8 as 9, folding flat trios; migrate lifts registry v1. |
+| `specs-migration` | specs-migration | specs init brings specs/ to the canon and writes the gitflow, never committing; specs upgrade re-stamps 6-10 as 11; migrate lifts registry v1. |
 | `workspace-doctor` | workspace-doctor | dadaia doctor, the one compliance check — workspace, specs, ledgers; one line per finding, exit 1 with a fix line; --fix holds slop, expiry acts by zone class. |
 | `workspace-init` | workspace-init | Level 1 — uvx dadaia-workspace init [DIR] provisions venv, zones, law, one harness; re-init upgrades; --repo adds level 2; next step from one ordered step list. |
 
@@ -60,6 +60,6 @@
 | `audits-canon` | audits-canon | Audits are committed three-pillar reviews over a sha window, findings moved by audit.py; decisions.jsonl records only the operator accepts, with his ruling. |
 | `backlog-ledger` | backlog-ledger | The operator's demand queue: BACKLOG.json active[] plus one histo record per exit; backlog.py writes it, dadaia doctor judges bound subjects. |
 | `bug-ledger` | bug-ledger | One bug record per line in BUGS.jsonl, registered after operator confirmation, closed only by a transition carrying its red loop; bugs.py writes it. |
-| `release-lifecycle` | release-lifecycle | Candidates, each in its own rc-<N>/, grow one live release; release.py writes _RELEASE.json; memory gates closure; promote merges a PR and archives it. |
+| `release-lifecycle` | release-lifecycle | Candidates in rc-<N>/ grow one live release; release.py writes _RELEASE.json; a candidate is a DAG of jobs ending in Reconciliation; promote archives it. |
 | `sdd-gate-v3` | sdd-gate-v3 | No-lock enforcement — three gate blocks (root entry, non-venv command, PROTECTED or out-of-scope write; repos/<r> takes merges), one fix each, a push chokepoint |
-| `worktrees` | worktrees | Every agent change to a repo is made in a canonical worktree of one of four kinds and lands by worktree.py merge — reviewed, verified, fast-forwarded. |
+| `worktrees` | worktrees | Every agent change to a repo is made in a canonical worktree — a job, a task, define, reconcile or backlog — and lands by worktree.py merge after its gate. |

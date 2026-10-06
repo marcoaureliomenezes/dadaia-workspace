@@ -15,7 +15,7 @@
 - context baseline — Publish the project's main repo, append-only: adopt what origin holds, or give an
 - context bind — Bind this shell session to a context.
 - context create — Clone (or adopt) every repo, install the pre-push hook, make the context ALIVE —
-- context dead — Transition a context to DEAD; git sync + remove repo from disk.
+- context dead — Transition a context to DEAD: push what is committed, hold each repo in reaped/.
 - context delete — Delete a context. Context must be dead.
 - context list — List all Spec Context Projects.
 - context repo <add, remove> — Manage a context's associated repos (main repo excluded).

@@ -10,6 +10,9 @@ envelopes and new-session injection.
 from __future__ import annotations
 
 import json
+import os
+import subprocess
+import sys
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -360,3 +363,61 @@ def test_injected_catalog_is_tldr_digest_and_measurably_smaller(tmp_path: Path) 
     }
     assert len(block) < len(raw) * 0.5
     assert (tmp_path / "repos/ctx/specs/memory/product/catalog.json").read_text("utf-8") == raw
+
+
+# The hook under ``runpy``, with an audit hook counting filesystem and subprocess operations
+# (CPython's own audit events: the seam itself, never a production counter).
+_COUNTING_DRIVER = """
+import runpy, sys
+_SEAM = ("open", "os.listdir", "os.scandir", "os.mkdir", "os.remove", "os.rename",
+         "subprocess.Popen")
+ops = [0]
+sys.addaudithook(lambda event, _: ops.__setitem__(0, ops[0] + (event in _SEAM)))
+try:
+    runpy.run_module("dadaia_workspace.hooks.{hook}", run_name="__main__")
+except SystemExit:
+    pass
+finally:
+    sys.stderr.write(f"\\nOPS={{ops[0]}}\\n")
+"""
+
+
+def _ops(root: Path, hook: str, bound: bool) -> int:
+    if bound:
+        _bind(root, "s", "c0")
+    env = {**claude_hook_env(root, session_id="s"), "PYTHONPATH": os.environ.get("PYTHONPATH", "")}
+    env.pop("DADAIA_CONTEXT", None)
+    done = subprocess.run(
+        [sys.executable, "-c", _COUNTING_DRIVER.format(hook=hook)],
+        input=json.dumps({"session_id": "s"}), env=env, cwd=root,
+        capture_output=True, text=True, check=True, timeout=30,
+    )  # fmt: skip
+    return int(done.stderr.rsplit("OPS=", 1)[1])
+
+
+@pytest.mark.parametrize(
+    ("hook", "bound"),
+    [
+        pytest.param(
+            "ctx_inject",
+            False,
+            id="ctx_inject-unbound",
+        ),
+        pytest.param(
+            "ctx_inject",
+            True,
+            id="ctx_inject-bound",
+        ),
+        pytest.param("sdd_post_gate", True, id="sdd_post_gate"),
+    ],
+)
+def test_hook_lane_cost_does_not_grow_with_the_registry(
+    tmp_path: Path, hook: str, bound: bool
+) -> None:
+    """AC2.2 (0118): a hook lane's filesystem and subprocess operations are the same at 2 and
+    at 20 registered contexts."""
+    two, twenty = (
+        _ops(_ws(tmp_path / str(n), *({"name": f"c{i}"} for i in range(n))), hook, bound)
+        for n in (2, 20)
+    )
+    assert twenty == two

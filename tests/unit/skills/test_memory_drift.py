@@ -177,6 +177,35 @@ def test_drift_requires_since_and_resolves_no_window_itself(script: Path, repo: 
     assert "--since" in result.stderr
 
 
+@pytest.mark.parametrize("orphaned", ["since", "until"])
+def test_a_bound_head_does_not_reach_refuses_as_a_clean_clone_would(
+    script: Path, repo: Path, orphaned: str
+) -> None:
+    """memory-window-bound-unreachable-from-head: a rebased-away sha still in the object
+    store is refused by the one decider every verb calls, as a single-branch clone (which
+    lacks it) refuses it."""
+    base = _git(repo, "rev-parse", "HEAD")
+    (repo / "README.md").write_text("dropped\n", "utf-8")
+    _git(repo, "add", "README.md")
+    _git(repo, "commit", "-qm", "dropped by a rebase")
+    orphan = _git(repo, "rev-parse", "HEAD")
+    _git(repo, "reset", "-q", "--hard", base)
+    bounds = {"since": base, "until": base, orphaned: orphan}
+    call = (
+        f"import sys; sys.path.insert(0, {str(script.parent)!r}); import _memory_drift as d\n"
+        f"try: d.report(__import__('pathlib').Path({str(repo / 'specs')!r}), "
+        f"{bounds['since']!r}, {bounds['until']!r})\n"
+        "except d.Refusal as r: print(r); print(r.fix)"
+    )
+
+    shown = subprocess.run([sys.executable, "-c", call], capture_output=True, text=True, check=True)
+
+    assert shown.stdout.splitlines() == [
+        f"{orphan} is not an ancestor of HEAD — a clone of this branch lacks it (a rebase rewrote it)",
+        f"Operator action: replace {orphan[:12]} with the commit HEAD reaches in its place",
+    ]
+
+
 def _release_drift(script: Path, repo: Path, state: dict[str, object]) -> dict[str, object]:
     """`release.py drift` over a live release carrying *state*: the release skill is
     projected beside the navigator, as `public install` lays it out."""

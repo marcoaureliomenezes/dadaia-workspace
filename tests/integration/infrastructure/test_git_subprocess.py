@@ -1,6 +1,6 @@
 """GitSubprocessClient against real git.
 
-Bug 1 (commit_all never engulfs an embedded repo); Bug 4 (first push sets
+Bug 4 (first push sets
 upstream, a mismatched upstream pushes by explicit refspec, v0.1.50 FR3); v0.4.3 A10.2
 (commit_paths ignores pre-staged content); SA-H3-2 (the operator's own identity, never a
 fallback); review 6 N2 (a failed step carries git's stdout).
@@ -36,26 +36,21 @@ def _repo(path: Path) -> Path:
 def test_repo_lifecycle_clone_dirty_commit_remote_branch_checkout_and_error_paths(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """clone -> is_dirty -> commit_all (operator identity; nothing-to-commit is a no-op)
-    -> has_remote -> current_branch/checkout; an invalid clone and a missing branch raise."""
+    """clone -> dirty_paths (a rename once, by its new path; an untracked file) -> has_remote
+    -> current_branch/checkout; an invalid clone and a missing branch raise."""
     monkeypatch.setenv("GIT_CONFIG_GLOBAL", str(_GIT_QUIET))
     monkeypatch.setenv("GIT_CONFIG_SYSTEM", "/dev/null")
     client = GitSubprocessClient()
     src = _repo(tmp_path / "src")
     dest = tmp_path / "dest"
     client.clone(str(src), dest)
-    _git(dest, "config", "user.email", "op@example.com")
-    _git(dest, "config", "user.name", "Operator")
 
-    assert client.is_dirty(dest) is False
+    assert client.dirty_paths(dest) == []
     (dest / "new.txt").write_text("hello")
-    assert client.is_dirty(dest) is True
-    client.commit_all(dest, "add new.txt")
-    assert _git(dest, "log", "-1", "--format=%s %an <%ae>").stdout == (
-        "add new.txt Operator <op@example.com>\n"
-    )
-    client.commit_all(dest, "empty commit")
-    assert _git(dest, "log", "-1", "--format=%s").stdout == "add new.txt\n"
+    _git(dest, "mv", "README.md", "R.md")
+    assert client.dirty_paths(dest) == ["R.md", "new.txt"]
+    _git(dest, "reset", "-q", "--hard")
+    (dest / "new.txt").unlink()
 
     assert (client.has_remote(src), client.has_remote(dest)) == (False, True)
     branch = client.current_branch(dest)
@@ -83,20 +78,6 @@ def test_a_failed_git_step_carries_gits_full_output(tmp_path: Path) -> None:
     client.git(repo, "commit", "-qam", "c")
     with pytest.raises(GitSyncError, match="CONFLICT"):
         client.git(repo, "merge", "b")
-
-
-def test_commit_all_skips_embedded_git_repo(tmp_path: Path) -> None:
-    """Bug 1: a nested repo (e.g. an agent worktree) is never staged into the outer one."""
-    outer = _repo(tmp_path / "outer")
-    inner = outer / ".claude" / "worktrees" / "agent-task-1"
-    inner.mkdir(parents=True)
-    _git(inner, "init", "-q")
-    (inner / "secret.txt").write_text("inner content")
-    (outer / "legit.txt").write_text("outer content")
-
-    GitSubprocessClient().commit_all(outer, "add legit.txt")
-
-    assert _git(outer, "ls-files").stdout.split() == ["README.md", "legit.txt"]
 
 
 def test_push_first_push_sets_upstream_and_mismatched_branch_uses_explicit_refspec(

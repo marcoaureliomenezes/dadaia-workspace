@@ -90,13 +90,23 @@ def resolve_session_id(env: Mapping[str, str]) -> str:
     return sanitize_session_id(candidate)
 
 
+def _alive(entry: dict[str, object]) -> bool:
+    return str(entry.get("state")).lower() == "alive" and bool(entry.get("name"))
+
+
+def _main_slug(entry: dict[str, object]) -> str | None:
+    """A row's main repo slug; ``None`` for a hand-edited row without one."""
+    slug = context_registry.entry_slugs(entry)[0]
+    return slug if isinstance(slug, str) and slug else None
+
+
+def _specs_tree(workspace_root: Path, slug: str) -> Path:
+    return workspace_root / "repos" / slug / "specs"
+
+
 def alive_context_names(workspace_root: Path) -> list[str]:
     """The name of every ALIVE context (what ``context bind`` accepts)."""
-    return [
-        str(entry["name"])
-        for entry in context_registry.entries(workspace_root)
-        if str(entry.get("state", "")).lower() == "alive" and entry.get("name")
-    ]
+    return [str(e["name"]) for e in context_registry.entries(workspace_root) if _alive(e)]
 
 
 def _context_registered(workspace_root: Path, name: str) -> bool:
@@ -109,11 +119,8 @@ def _context_registered(workspace_root: Path, name: str) -> bool:
 
 def repo_slug_for_context(workspace_root: Path, name: str) -> str | None:
     """The ``repos/<slug>`` dir a context NAME lives in, or ``None`` when unregistered."""
-    for entry in context_registry.entries(workspace_root):
-        slug = context_registry.entry_slugs(entry)[0]
-        if entry.get("name") == name and isinstance(slug, str) and slug:
-            return slug
-    return None
+    rows = context_registry.entries(workspace_root)
+    return next((s for e in rows if e.get("name") == name and (s := _main_slug(e))), None)
 
 
 def context_name_for_repo_slug(workspace_root: Path, slug: str) -> str | None:
@@ -225,7 +232,7 @@ def resolve(
     )
     rung, name = next(((r, n) for r, n in rungs if n), ("none", None))
     slug = repo_slug_for_context(root, name) if root and name else None
-    specs_dir = (root / "repos" / slug / "specs").resolve() if root and slug else None
+    specs_dir = _specs_tree(root, slug).resolve() if root and slug else None
     return Invocation(root, session_id, name, slug, specs_dir, bind, rung)
 
 
@@ -254,12 +261,15 @@ def resolve_specs_dir(specs_dir: str | None) -> Path:
 def resolve_context_specs_dir(workspace_root: Path, context: str) -> Path | None:
     """A registered context's ``specs/`` tree, existing or not; ``None`` when unregistered."""
     slug = repo_slug_for_context(workspace_root, context)
-    return workspace_root / "repos" / slug / "specs" if slug else None
+    return _specs_tree(workspace_root, slug) if slug else None
 
 
 def alive_context_trees(workspace_root: Path) -> dict[str, Path]:
-    """Every ALIVE context name -> its ``specs/`` tree, in registry order."""
-    trees = {
-        n: resolve_context_specs_dir(workspace_root, n) for n in alive_context_names(workspace_root)
+    """Every ALIVE context name -> its ``specs/`` tree, in registry order: one registry read
+    (a hook's cost never grows with the registry, ADR 0118). Names are unique: every store
+    insert refuses a registered name (``SpecContextService._validate``)."""
+    return {
+        str(e["name"]): _specs_tree(workspace_root, slug)
+        for e in context_registry.entries(workspace_root)
+        if _alive(e) and (slug := _main_slug(e))
     }
-    return {name: tree for name, tree in trees.items() if tree is not None}

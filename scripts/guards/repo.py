@@ -27,8 +27,7 @@ from run import _CI, tracked  # noqa: E402
 
 from dadaia_workspace.core.fixed_sections import extract_fixed_section  # noqa: E402
 from dadaia_workspace.core.gitflow import read_gitflow  # noqa: E402
-from dadaia_workspace.core.workspace_layout import render_registry_tables  # noqa: E402
-from dadaia_workspace.features.specs.canon import CANON, TEMPLATES  # noqa: E402
+from dadaia_workspace.features.specs.canon import CANON  # noqa: E402
 from dadaia_workspace.infrastructure.ledger_scripts import load_owner  # noqa: E402
 
 if TYPE_CHECKING:
@@ -43,6 +42,9 @@ _SKILLS_REPO = re.compile(
     r"dadaia-skills|SKILLS_REPO_TOKEN|build-skills-repo|npx skills add|skills-repository"
 )
 # Both dated release headings: hand-written `## [x.y.z] — date`, release-please's `(date)`.
+# the one poetry floor: GHSA-2599-h6xx-hpxp (wheel path traversal), GHSA-73h3-mf4w-8647
+_POETRY_FLOOR = (2, 3, 4)
+_POETRY_PIN = re.compile(r"poetry==(\d+(?:\.\d+)*)")
 _CHANGELOG_TOP = re.compile(
     r"^## \[(\d+\.\d+\.\d+)\](?:\([^)]*\))? (?:[-—] \d{4}-\d{2}-\d{2}|\(\d{4}-\d{2}-\d{2}\))\s*$",
     re.M,
@@ -143,6 +145,12 @@ def workflow_never_rules(tree: Tree) -> list[str]:
             if "${{" in line
         ],
         "coverage-file-in-the-checkout": cov,
+        "poetry-below-the-floor": [
+            f"{p}/{j}: poetry=={v}"
+            for p, j, s in steps
+            for v in _POETRY_PIN.findall(s.get("run") or "")
+            if tuple(map(int, v.split("."))) < _POETRY_FLOOR
+        ],
         # T-050-190: every Linux job runs `scripts/ci.py <job>`, the one source of its steps
         "job-bypasses-ci-script": [
             j
@@ -332,11 +340,13 @@ def ci_triggers_gitflow(tree: Tree) -> list[str]:
     ci, release = _on(_yaml(tree, f"{_WF}/ci.yml")), _on(_yaml(tree, _RELEASE))
     scan = _yaml(tree, f"{_WF}/secret-scan.yml")
     edges = [flow.principal, flow.integration]
+    work = len(edges) + 1  # the PR edges, then the work branch, then the jobs' `wt/**`
     bot = _yaml(tree, ".github/dependabot.yml").get("updates") or []
     clauses = {
         "gitflow-unread": warning is None,
-        "ci-triggers": ci["push"]["branches"] == [*edges, f"{flow.work_prefix}**"]
+        "ci-triggers": ci["push"]["branches"][:work] == [*edges, f"{flow.work_prefix}**"]
         and ci["pull_request"]["branches"] == edges,
+        "job-trigger": ci["push"]["branches"][work:] == ["wt/**"],  # ADR 0190: the job's matrix
         "release-trigger": release["push"]["branches"] == [flow.principal],
         # A-12.1/A-12.2: the required gitleaks context reports on both PR edges
         "secret-scan-edges": _on(scan)["pull_request"]["branches"] == edges,
@@ -448,19 +458,10 @@ def onboarding_journey_uv(tree: Tree) -> list[str]:
 
 
 def specs_canon_tracked(tree: Tree) -> list[str]:
-    """AC8.3: one probe per CANON row, judged by the tree's .gitignore. A row is meant to be
-    ignored only when its template renders registry tables (a projection), plus the two
-    archived scratch shapes."""
-    expect: dict[str, str] = {}  # path -> the sub-rule its wrong visibility breaks
-    for row in CANON:
-        kind, src = TEMPLATES.get(row.shape, ("static", ""))
-        text = (
-            (ROOT / "dadaia_workspace/public" / src).read_text("utf-8") if kind == "copy" else src
-        )
-        projected = render_registry_tables(text) != text
-        expect["specs/" + re.sub(r"<[^>]+>|\*\*", "1", row.shape)] = (
-            "ignore-lost" if projected else "canon-ignored"
-        )
+    """AC8.3: one probe per CANON row, judged by the tree's .gitignore. Every row is tracked
+    (a rendered row's drift is TREE-5's, in CI's doctor); only the two archived scratch
+    shapes are ignored."""
+    expect = {"specs/" + re.sub(r"<[^>]+>|\*\*", "1", row.shape): "canon-ignored" for row in CANON}
     expect |= {
         "specs/releases/_archive/1/local-notes.md": "ignore-lost",
         "specs/releases/_archive/1/tmp/x": "scratch-tracked",
@@ -573,6 +574,7 @@ CHECKS: dict[str, Check] = {
                 "      - run: echo ${{ github.head_ref }}\n"
             ),
             "coverage-file-in-the-checkout": _workflow("      - run: pytest --cov x\n"),
+            "poetry-below-the-floor": _workflow("      - run: pipx install poetry==2.3.3\n"),
             "job-bypasses-ci-script": _edit(_G, "scripts/ci.py e2e-python", "pytest tests/e2e"),
             "release-please-outside-release-yml": _workflow(f"      - uses: {_ACTION}@v5\n"),
             "pypi-publisher-outside-release-yml": _workflow(
@@ -689,6 +691,7 @@ CHECKS: dict[str, Check] = {
         {
             "gitflow-unread": _unlink("specs/constitution.md"),
             "ci-triggers": _edit(_G, "branches: [main, develop]", "branches: [main]"),
+            "job-trigger": _edit(_G, "      - 'wt/**'\n", ""),
             "release-trigger": _edit(_RELEASE, "branches: [main]", "branches: [main, develop]"),
             "secret-scan-edges": _edit(f"{_WF}/secret-scan.yml", "[main, develop]", "[main]"),
             "secret-scan-push": _edit(

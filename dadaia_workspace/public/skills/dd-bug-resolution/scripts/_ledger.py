@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """What every ledger script shares, staged beside each one: the atomic write, schema read,
-validation, the `check` record, and `private_refusal` (the push gate's own matcher)."""
+validation, the `check` record, and `private_refusal` (the push gate's own question)."""
 
 from __future__ import annotations
 
@@ -8,7 +8,9 @@ import contextlib
 import json
 import os
 import re
+import subprocess
 import time
+from collections.abc import Iterable
 from pathlib import Path
 from types import ModuleType, SimpleNamespace
 from typing import Any
@@ -204,12 +206,41 @@ def terms(root: Path | None) -> list[tuple[str, str]]:
     return []
 
 
-def private_refusal(record: dict[str, Any], specs: Path) -> tuple[str, str] | None:
-    """``(message, fix)`` for the first field of *record* the push refuses, else ``None``;
-    the terms are the workspace's that holds *specs*, whatever the cwd."""
-    if (hit := _privacy.first_private(record, terms(workspace_of(specs)), _baseline())) is None:
-        return None
-    return (
-        f"field {hit[0]!r} carries {hit[1]!r}, which the push refuses — nothing was written",
-        "Operator action: re-run this command with that value rewritten without the private term",
-    )
+def _published_text(path: Path) -> str | None:
+    """*path*'s text at the first publication boundary carrying it (the push's prior text,
+    ``_privacy.publication_boundaries``); ``None`` outside git, when none carries it, or when
+    git fails — no amnesty, as the push's adapter raises on the same failure."""
+
+    def run(*args: str) -> str:
+        return subprocess.run(["git", "-C", str(path.parent), *args], capture_output=True,
+                              text=True, encoding="utf-8", check=True).stdout  # fmt: skip
+
+    try:
+        rel = path.resolve().relative_to(
+            Path(run("rev-parse", "--show-toplevel").strip()).resolve()
+        )
+        for base in _privacy.publication_boundaries(lambda a: run(*a).splitlines(), "HEAD"):
+            with contextlib.suppress(subprocess.CalledProcessError):
+                return run("cat-file", "blob", f"{base}:{rel.as_posix()}")
+    except (subprocess.CalledProcessError, OSError):
+        pass
+    return None
+
+
+def private_refusal(records: Iterable[dict[str, Any]], path: Path) -> tuple[str, str] | None:
+    """``(message, fix)`` for the first field of the write's *records* the push refuses — a
+    match the published text of *path* (the ledger file) does not already carry — else
+    ``None``; terms and published text are read once per write, from the workspace holding
+    *path*, whatever the cwd."""
+    found, patterns = terms(workspace_of(path)), _baseline()
+    published = _privacy.published_matches(_published_text(path), found, patterns)
+    for key, value in (item for record in records for item in record.items()):
+        text = json.dumps(value, ensure_ascii=False)
+        for hit, _source, _reason in _privacy.fresh_matches(text, published, found, patterns):
+            return (
+                f"field {key!r} carries {_privacy.mask(hit)!r}, which the push refuses — "
+                "nothing was written",
+                "Operator action: re-run this command with that value rewritten without the "
+                "private term",
+            )
+    return None

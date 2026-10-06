@@ -178,6 +178,7 @@ def test_the_doctor_rule_flags_the_first_id_breaking_0001_to_n(
         ({"status": "superseded"}, ["changes accepted ['0001'] without a ruling"]),
         ({"status": "accepted", "measured_by": "x"}, ["record is missing required field 'ruling'", "changes accepted ['0001'] without a ruling"]),
         (_RULED, []),
+        ({**_RULED, "status": "superseded"}, []),  # a ruled record, superseded later
         ({"status": "rejected"}, []),
     ],
 )  # fmt: skip

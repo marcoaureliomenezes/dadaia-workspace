@@ -14,7 +14,7 @@ Repository: <https://github.com/marcoaureliomenezes/dadaia-workspace>
 
 ## What it is
 
-<!-- derived-from: product-vision sha256:19c972934e54 -->
+<!-- derived-from: product-vision sha256:4d5160d491d5 -->
 
 dadaia-workspace is the operating environment around repositories developed with AI
 agents, and its unit is the context.
@@ -31,7 +31,7 @@ What it rests on:
 
 - Current context — agents bind explicitly and receive only the relevant project,
   memory, release and task state.
-- Documents are the lifecycle — backlog, SPEC, PLAN, TASKS, `_RELEASE.json` and
+- Documents are the lifecycle — backlog, SPEC, PLAN, the job files, `_RELEASE.json` and
   `BUGS.jsonl` carry ordered work; no runtime drives agents through steps.
 - Deterministic boundaries — path class, bind scope, root hygiene, venv-rooting and
   the push gate are mechanical, each refusal carrying one fix line; what
@@ -41,12 +41,12 @@ What it rests on:
 - No mechanism without a demand, and no slop: runtime state, reports, handoffs,
   caches, projections and temporary files have canonical homes and never leak into a
   repository.
-- Success is evidenced by reviews, task markers, commands and artifacts, never
+- Success is evidenced by reviews, task commits, commands and artifacts, never
   inferred from prose.
 
 ## Two ways in
 
-<!-- derived-from: product-vision sha256:19c972934e54 -->
+<!-- derived-from: product-vision sha256:4d5160d491d5 -->
 
 A human drives it from a shell in three levels:
 `uvx dadaia-workspace init <dir> --harness <name> --repo <url>` provisions the

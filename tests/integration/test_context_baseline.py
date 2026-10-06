@@ -396,7 +396,7 @@ def test_a_tool_commit_never_falls_back_to_a_tool_identity(tmp_path: Path, monke
         client.identity_fix(repo) == f"Operator action: set git user.name in the config of {repo}"
     )
     with pytest.raises(GitSyncError):
-        client.commit_all(repo, "c")
+        client.commit_paths(repo, "c", ["a.md"])
 
 
 def test_an_env_identity_publishes_without_git_config(env, monkeypatch) -> None:

@@ -9,22 +9,22 @@ tags: [testing, pytest, ci, quality, test-architecture, flake, quarantine, priva
 ## Principles
 
 ### P-21 · We give every test a size tier with an enforced timeout applied at collection, and an explicit `@pytest.mark.timeout` is never overridden.
-Measured by: `pytest tests/contract/test_stewardship_mechanics.py -k "test_contract_tier_carries_30s_timeout or test_explicit_timeout_marker_is_never_overridden or test_tier_timeout_table_covers_all_four_layers"` (executed path: the marker on the test's own item; F041 — the bare `-k timeout` also matched the tier marker every contract item carries, collecting all 8 with 0 deselected).
+Measured by: `poetry run python scripts/guards/run.py` prints `PASS tier-timeout`; `--planted` turns it red on a test without its tier timeout and on an overridden explicit timeout.
 ADR: 0167 (accepted)
 Rationale: a test needing more time than its tier is mis-tiered.
 
 ### P-22 · We gate quarantine on a registered bug: a `quarantine` mark without `bug=` refuses collection actionably, and every gating selector excludes the lane.
-Measured by: `pytest tests/contract/test_stewardship_mechanics.py -k quarantine`.
+Measured by: `poetry run python scripts/guards/run.py` prints `PASS quarantine-needs-bug`; `--planted` turns it red on a `quarantine` mark without `bug=` and on a gating selector in `.github/workflows` that keeps the lane.
 ADR: 0167 (accepted)
 Rationale: the registered id is what makes the lane temporary.
 
 ### P-23 · We ratchet private-symbol imports in `tests/**` downward only; a per-statement `# allow-private-import: <reason>` marker is the sole exception.
-Measured by: `pytest tests/contract/test_test_suite_ratchets.py -k v26` (AST-exact; the test module is the ceiling's numeric home).
+Measured by: `poetry run python scripts/guards/run.py` prints `PASS private-import-ratchet` (AST-exact; `scripts/guards/suite.py` is the ceiling's numeric home).
 ADR: 0167 (accepted)
 Rationale: a test reaching into a private symbol turns a safe refactor red.
 
-### P-28 · We keep the pytest marker set closed and single-sourced: `pyproject.toml`'s `markers` equals `tests/conftest.py`'s `_KNOWN_MARKERS`, and `flaky`/`quarantine` are always among them.
-Measured by: `pytest tests/contract/test_stewardship_mechanics.py -k marker_set`.
+### P-28 · We keep the pytest marker set closed and single-sourced: `pyproject.toml`'s `markers` is the one list, and `flaky`/`quarantine` are always among them.
+Measured by: `pytest --collect-only -q` exits 0 under `--strict-markers` in `pyproject.toml`'s `addopts`, which refuses any mark absent from `markers`.
 ADR: 0167 (accepted)
 Rationale: a marker known to one file and unknown to the other is a silent exclusion lane.
 

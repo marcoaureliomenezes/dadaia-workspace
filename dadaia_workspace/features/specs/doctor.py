@@ -1,7 +1,7 @@
 """SpecsDoctor — thin coordinator for SDD release-lifecycle structural validation.
 
 v0.1.55 FR1 decomposed the former 2,830-line god module into a thin ``SpecsDoctor``
-coordinator (this file) that **owns check()/fix() ORDER** and delegates all LOGIC to six
+coordinator (this file) that **owns check()/fix() ORDER** and delegates all LOGIC to five
 single-responsibility validator siblings plus two shared leaf modules:
 
   * ``doctor_types``     — ``Severity`` / ``SectionFinding``
@@ -11,11 +11,10 @@ single-responsibility validator siblings plus two shared leaf modules:
   * ``doctor_memory``       — memory files, LINT-1
   * ``doctor_release``      — active release (RELEASE.json state document), release artifacts, SemVer + ledger invariants
   * ``doctor_closure_audit``— audit naming, archive dirs; ``fix_archive_dir``
-  * ``doctor_governance``   — bug archive age, known bug ids
   * ``doctor_coherence``    — constitution and pattern-version coherence
 
 The coordinator owns ORDER: ``check()`` invokes the validators' public methods in the exact
-original interleaved sequence (families interleave — coherence→memory→release→…→governance→
+original interleaved sequence (families interleave — coherence→memory→release→…→
 closure→coherence), and ``fix()`` dispatches by issue code. It imports NO ``spec_context``
 (R-1 cap invariant): v0.1.76 T-4 retired the former ``pid_probe``/``workspace_state_dir`` seam
 along with SPEC-DOC-029 (see ``doctor_coherence.py``), so the coordinator holds no
@@ -34,7 +33,6 @@ from pathlib import Path
 from dadaia_workspace.core.doctor_rules import SectionFinding
 from dadaia_workspace.features.specs.doctor_closure_audit import ClosureAuditValidator
 from dadaia_workspace.features.specs.doctor_coherence import CoherenceValidator
-from dadaia_workspace.features.specs.doctor_governance import GovernanceValidator
 from dadaia_workspace.features.specs.doctor_memory import MemoryValidator
 from dadaia_workspace.features.specs.doctor_release import ReleaseValidator
 from dadaia_workspace.features.specs.doctor_structural import StructuralValidator
@@ -45,7 +43,7 @@ from dadaia_workspace.features.specs.specs_tree import SpecsTree
 class SpecsDoctor:
     """Diagnose specs/ structure under SDD release-lifecycle.
 
-    Thin coordinator: owns the ``check()``/``fix()`` ORDER and delegates all LOGIC to the six
+    Thin coordinator: owns the ``check()``/``fix()`` ORDER and delegates all LOGIC to the five
     validator siblings (each independently testable). The public surface — the ``__init__``
     signature, ``check()``, ``fix()``, and every issue code — is byte-identical to the
     pre-decomposition module.
@@ -99,7 +97,7 @@ class SpecsDoctor:
             else None
         )
 
-        # Build the six validators (each independently testable). The coordinator owns the
+        # Build the five validators (each independently testable). The coordinator owns the
         # config resolution; validators own their family LOGIC and family-local helpers.
         self._structural: StructuralValidator = StructuralValidator(
             self.specs_dir, self._scaffold_dir, self._templates_dir
@@ -107,7 +105,6 @@ class SpecsDoctor:
         self._memory: MemoryValidator = MemoryValidator(self.specs_dir)
         self._release: ReleaseValidator = ReleaseValidator(self.specs_dir)
         self._closure_audit: ClosureAuditValidator = ClosureAuditValidator(self.specs_dir)
-        self._governance: GovernanceValidator = GovernanceValidator(self.specs_dir, self.public_dir)
         self._coherence: CoherenceValidator = CoherenceValidator(
             self.specs_dir,
             self.public_dir,

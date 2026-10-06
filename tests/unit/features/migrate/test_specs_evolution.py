@@ -46,9 +46,9 @@ def test_upgrade_refuses_below_floor_without_any_write(tmp_path: Path) -> None:
     _write_constitution(specs, "# C\n")  # version 0, below the canonical floor
 
     with pytest.raises(_upgrade.UpgradeRefused):
-        _upgrade.upgrade(specs, remove=sweep.deleter(specs), dry_run=True)
+        _upgrade.upgrade(specs, remove=lambda p: sweep.remove(specs, p, p.name), dry_run=True)
     with pytest.raises(_upgrade.UpgradeRefused):
-        _upgrade.upgrade(specs, remove=sweep.deleter(specs), dry_run=False)
+        _upgrade.upgrade(specs, remove=lambda p: sweep.remove(specs, p, p.name), dry_run=False)
 
     assert not (tmp_path / "specs_bkp").exists()
     assert _version.state(specs)[0] == "foreign"
@@ -63,16 +63,16 @@ def test_upgrade_at_or_above_floor_is_idempotent_and_repairs_placeholders(
     stamp = _version.CANONICAL_SPECS_VERSION
     _write_constitution(specs, f"---\nspecs_pattern_version: {stamp}\n---\n# C\n")
 
-    result = _upgrade.upgrade(specs, remove=sweep.deleter(specs))
+    result = _upgrade.upgrade(specs, remove=lambda p: sweep.remove(specs, p, p.name))
     assert not result.stamped
     assert result.to_version == stamp
     assert result.ideas_removed == []
 
     # Dry-run at the floor plans nothing and writes nothing.
-    dry = _upgrade.upgrade(specs, remove=sweep.deleter(specs), dry_run=True)
+    dry = _upgrade.upgrade(specs, remove=lambda p: sweep.remove(specs, p, p.name), dry_run=True)
     assert dry.dry_run is True
     assert dry.no_op is True
 
     # Re-running is stable (idempotent).
-    second = _upgrade.upgrade(specs, remove=sweep.deleter(specs))
+    second = _upgrade.upgrade(specs, remove=lambda p: sweep.remove(specs, p, p.name))
     assert second.no_op is True

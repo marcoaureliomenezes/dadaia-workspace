@@ -5,7 +5,7 @@ projects.
 
 ## The paradigm
 
-<!-- derived-from: product-vision sha256:19c972934e54 -->
+<!-- derived-from: product-vision sha256:4d5160d491d5 -->
 
 A workspace is one folder, and the agent session launches at its root, always.
 Projects live in repos inside it — `repos/<slug>/` — which take agent work only as
@@ -47,7 +47,7 @@ write a repo inside its worktrees and land them by `worktree.py merge`, audits a
 
 ## Ten repositories, one law
 
-<!-- derived-from: product-vision sha256:19c972934e54 -->
+<!-- derived-from: product-vision sha256:4d5160d491d5 -->
 <!-- derived-from: spec-context-project sha256:9690f09f679b -->
 
 A team with ten repositories does not maintain ten copies of anything:

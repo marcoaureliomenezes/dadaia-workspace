@@ -48,7 +48,7 @@ class UpgradeResult:
 
 
 def upgrade(
-    specs_dir: Path, *, remove: Callable[[Path], bool], dry_run: bool = False
+    specs_dir: Path, *, remove: Callable[[Path], object], dry_run: bool = False
 ) -> UpgradeResult:
     """Upgrade ``specs/`` to :data:`CANONICAL_SPECS_VERSION`, the one target. Every
     delete goes through *remove* — the caller's one guarded deleter (``sweep.remove``).
@@ -135,7 +135,7 @@ def plan_tech_stack_fold(specs_dir: Path) -> list[Path]:
     return [tech] if tech.is_file() and architecture.is_file() else []
 
 
-def fold_tech_stack(specs_dir: Path, remove: Callable[[Path], bool]) -> list[Path]:
+def fold_tech_stack(specs_dir: Path, remove: Callable[[Path], object]) -> list[Path]:
     """Append ``TECHSTACK.md``'s body under ``## Tech Stack`` at the end of
     ``ARCHITECTURE.md``, then delete the file — the 6 -> 7 hop (memory canon v7).
 
@@ -146,14 +146,14 @@ def fold_tech_stack(specs_dir: Path, remove: Callable[[Path], bool]) -> list[Pat
     return [tech for tech in plan_tech_stack_fold(specs_dir) if _fold(tech, remove)]
 
 
-def _fold(tech: Path, remove: Callable[[Path], bool]) -> bool:
+def _fold(tech: Path, remove: Callable[[Path], object]) -> bool:
     architecture = tech.parent / "ARCHITECTURE.md"
     body = _tech_stack_body(tech.read_text(encoding="utf-8"))
     original = architecture.read_text(encoding="utf-8")
     atomic_write(architecture, f"{original.rstrip(chr(10))}\n\n{_TECH_STACK_HEADING}\n\n{body}\n")
     folded = False
     try:
-        folded = remove(tech)
+        folded = bool(remove(tech))
     finally:
         if not folded:  # refused, a no-op or raised: the fold lands whole or not at all
             atomic_write(architecture, original)
@@ -180,7 +180,7 @@ def plan_empty_ideas_dir(specs_dir: Path) -> list[Path]:
     return [ideas] if entries in ([], ["AGENTS.md"]) else []
 
 
-def remove_empty_ideas_dir(specs_dir: Path, remove: Callable[[Path], bool]) -> list[Path]:
+def remove_empty_ideas_dir(specs_dir: Path, remove: Callable[[Path], object]) -> list[Path]:
     return [ideas for ideas in plan_empty_ideas_dir(specs_dir) if remove(ideas)]
 
 

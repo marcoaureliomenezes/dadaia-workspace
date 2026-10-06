@@ -169,9 +169,36 @@ def test_check_refuses_a_caused_by_cycle_or_dangling_target(
     assert done.returncode == (1 if needle == "cycle" else 0), done.stdout
 
 
+@pytest.mark.parametrize(("caused_by", "code"), [
+    ("J1.S2.T3", 0),  # a job task row of the live rc (AC1.9)
+    ("J9.S9.T9", 1),  # in no tasks/<job>.md
+])  # fmt: skip
+def test_check_resolves_a_job_task_id_against_the_rc_tasks_folder(
+    script: Path, tmp_path: Path, caused_by: str, code: int
+) -> None:
+    specs = _ledger(tmp_path, {**_OPEN_RECORD, "caused_by": caused_by})
+    job = specs / "releases" / "0.5.0" / "rc-9" / "tasks" / "job1.md"
+    job.parent.mkdir(parents=True)
+    job.write_text("| J1.S2.T3 | AC1.1 | `ci.py` |\n", encoding="utf-8")
+    done = _run(script, "check", "--specs", str(specs), "--json")
+    assert done.returncode == code, done.stdout
+    fixes = [f["fix"] for f in json.loads(done.stdout)]
+    assert fixes == ([f"{Path(sys.executable).as_posix()} {script.as_posix()} update a-bug"
+                      f" --set caused_by=none --specs {specs.as_posix()}"]
+                     if code else []), fixes  # fmt: skip
+
+
+def _accept_adr(specs: Path, adr: str = "0999") -> None:
+    (specs / "ADRs").mkdir(exist_ok=True)
+    (specs / "ADRs" / "decisions.jsonl").write_text(
+        json.dumps({"id": adr, "status": "accepted"}) + "\n"
+    )
+
+
 def _archive(specs: Path, bug_id: str) -> None:
     archived = {**_OPEN_RECORD, "id": bug_id, "status": "rejected", "cause": "c",
-                "closed_at": "2026-09-21T00:00:00Z"}  # fmt: skip
+                "closed_at": "2026-09-21T00:00:00Z", "archived_by": "0999"}  # fmt: skip
+    _accept_adr(specs)
     (specs / "bugs" / "_archive").mkdir()
     (specs / "bugs" / "_archive" / "bugs_histo.jsonl").write_text(json.dumps(archived) + "\n")
 
@@ -209,11 +236,16 @@ _APPEND = ["append", "--bug-id", "x", "--title", "t", "--severity", "LOW", "--su
 @pytest.mark.parametrize(
     ("argv", "trees", "fix", "note"),
     [
-        (["stats"], ("0.5.0a-bug",), "{rerun} --specs {ws}/repos/demo/specs", ""),
-        (_APPEND, ("0.5.0a-impl", "0.5.0b-bug"), "{rerun} --specs {ws}/worktrees/demo/0.5.0b-bug/specs", ""),
-        (_APPEND, ("0.5.0c-bug", "0.5.0b-bug"), "{rerun} --specs {ws}/worktrees/demo/0.5.0b-bug/specs",
-         "; the first by name of 2 open bug worktrees"),
-        (_APPEND, (), "{py} {ws}/dd-gitflow-default/scripts/worktree.py new demo --kind bug", ""),
+        (["stats"], ("0.5.0-rc1/j5",), "{rerun} --specs {ws}/repos/demo/specs", ""),
+        (_APPEND, ("0.5.0-rc1/j1",), "{rerun} --specs {ws}/worktrees/demo/0.5.0-rc1/j1/specs", ""),
+        (_APPEND, ("0.5.0-rc1/j7", "0.5.0-rc1/j6"), "{rerun} --specs {ws}/worktrees/demo/0.5.0-rc1/j6/specs",
+         "; the first by name of 2 open worktrees"),
+        (_APPEND, ("0.5.0-rc1/define", "0.5.0-rc1/j6--J1.S1.T1", "0.5.0-rc1-define/.agents",
+                   "backlog/b", "0.5.0-rc1/j7"),
+         "{rerun} --specs {ws}/worktrees/demo/0.5.0-rc1/j7/specs", ""),
+        (_APPEND, ("0.5.0-rc1/define", "0.5.0-rc1-define/.agents"),
+         "{py} {ws}/dd-gitflow-default/scripts/worktree.py list", ""),
+        (_APPEND, (), "{py} {ws}/dd-gitflow-default/scripts/worktree.py list", ""),
     ],
 )  # fmt: skip
 def test_a_missing_specs_tree_is_refused_never_created(
@@ -221,7 +253,7 @@ def test_a_missing_specs_tree_is_refused_never_created(
 ) -> None:
     """bug-law-spelling-registers-into-a-reaped-root-specs-tree; AC4.4 `_bound_tree`: a read
     verb reruns on the bound repo tree (and runs as printed); a write verb's fix names the
-    open worktree of its ledger's kind (`bug`), else the command opening one — never
+    repo's first open job worktree (ADR 0191), else the command listing them — never
     `repos/<r>/specs`, which only `specs/audits/` may write."""
     (cli := tmp_path / ".dadaia/.venv/bin/dadaia").parent.mkdir(parents=True)
     cli.write_text(f'#!{sys.executable}\nprint(\'{{"main_repo": "demo"}}\')\n', "utf-8")
@@ -498,6 +530,57 @@ def test_the_seam_refuses_exactly_what_the_push_refuses(
         assert (specs / "bugs" / "BUGS.jsonl").read_bytes() == before
 
 
+_SLUG = {**_OPEN_RECORD, "context": "acme-games"}
+
+
+# fmt: off
+@pytest.mark.parametrize(("published", "context", "pushed", "rev_list_fails"), [
+    pytest.param((_SLUG,), "acme-games", False, False, id="published-context-accepted"),
+    pytest.param((_OPEN_RECORD,), "acme-games", True, False, id="unpublished-term-refused"),
+    pytest.param((_OPEN_RECORD,), "ctx", False, False, id="no-term-accepted"),
+    pytest.param((_SLUG,), "acme-games", True, True, id="failed-rev-list-amnesties-nothing"),
+])
+# fmt: on
+def test_the_seam_verdict_equals_the_push_verdict_over_the_published_ledger(
+    script: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+    published: tuple[dict[str, object], ...], context: str, pushed: bool, rev_list_fails: bool,
+) -> None:
+    from dadaia_workspace.core.models.git_scan import ScannedObject
+    from dadaia_workspace.features.chokepoints.denylist_scan import scan_objects
+    from dadaia_workspace.infrastructure.privacy_check import load_baseline_patterns
+
+    denylist = tmp_path / "denylist.json"
+    denylist.write_text(json.dumps({"acme": "client"}), encoding="utf-8")
+    monkeypatch.setenv("DADAIA_PRIVACY_DENYLIST", str(denylist))
+    root = tmp_path / "repo"
+    ledger = _ledger(root, *published) / "bugs" / "BUGS.jsonl"
+    prior = ledger.read_text(encoding="utf-8")
+    subprocess.run(["git", "-C", str(root), "add", "-A"], check=True)
+    subprocess.run(["git", "-C", str(root), "-c", "user.name=t", "-c",
+                    "user.email=t@t.invalid", "commit", "-qm", "published"], check=True)  # fmt: skip
+    origin = tmp_path / "origin.git"  # published = what origin holds, as the push reads it
+    subprocess.run(["git", "init", "-q", "--bare", str(origin)], check=True)
+    subprocess.run(["git", "-C", str(root), "remote", "add", "origin", str(origin)], check=True)
+    subprocess.run(["git", "-C", str(root), "push", "-q", "origin", "HEAD"], check=True)
+    if rev_list_fails:  # a remote-tracking ref at a missing object: `rev-list` dies on every OS
+        ghost = root / ".git" / "refs" / "remotes" / "origin" / "ghost"
+        ghost.write_text("1" * 40 + "\n", encoding="utf-8")
+
+    done = _run(
+        script, "append", "--specs", str(root / "specs"), "--bug-id", "new-bug", "--title",
+        "t", "--severity", "LOW", "--surface", "cli", "--component", "c", "--context",
+        context, "--symptom", "s", "--repro", "r", "--expected", "e", "--correlates", "none",
+    )  # fmt: skip
+
+    blob = ScannedObject(path="specs/bugs/BUGS.jsonl", sha="", decodable=True,
+                         text=ledger.read_text(encoding="utf-8") if done.returncode == 0
+                         else prior + json.dumps({"context": context}) + "\n",
+                         prior_text=None if rev_list_fails else prior)  # fmt: skip
+    push_refuses = bool(scan_objects([blob], [("acme", "client")], load_baseline_patterns()).hits)
+    assert push_refuses is pushed
+    assert (done.returncode == 1) is pushed, done.stderr
+
+
 def test_every_ledger_skill_stages_a_byte_identical_privacy_pair(tmp_path: Path) -> None:
     """sa-ledger-write-seam-redacts-less-than-push-refuses#B6: every ledger skill carries a
     byte-identical _privacy.py (the push matcher's module) and baseline copy."""
@@ -567,7 +650,14 @@ def test_only_an_archived_drop_keeps_its_id_known(
     other = {**_OPEN_RECORD, "id": "b-bug", "caused_by": "a-bug"}
     specs = _ledger(tmp_path, _OPEN_RECORD, other)
     ledger = specs / "bugs" / "BUGS.jsonl"
-    drop = lambda rs: [r for r in rs if r["id"] != "a-bug"]  # noqa: E731
+    _accept_adr(specs)
+
+    def drop(rs: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        for r in rs:
+            if r["id"] == "a-bug":  # as `archive --adr` stamps it
+                r["archived_by"] = "0999"
+        return [r for r in rs if r["id"] != "a-bug"]
+
     if archive:
         store.commit(ledger, drop, archive=True)
         assert _run(script, "check", "--specs", str(specs)).returncode == 0
@@ -782,6 +872,80 @@ def test_fix_derives_each_fix_commit_and_its_direction(script: Path, tmp_path: P
                      "[ok] 1 linked, 0 unlinked."]  # fmt: skip
 
 
+def test_fix_lists_a_fix_commit_once_when_its_resolve_names_it_short(
+    script: Path, tmp_path: Path
+) -> None:
+    """bugs-fix-lists-one-commit-twice: a shape-4 resolve naming the shape-3 fix commit by
+    its short sha is the same commit, listed once with its rows."""
+    resolved = {**_OPEN_RECORD, "id": "a-bug", "status": "resolved", "closed_at": "2026-09-21T00:00:00Z"}  # fmt: skip
+    specs = _ledger(tmp_path, resolved)
+    git = ["git", "-C", str(tmp_path), "-c", "user.name=t", "-c", "user.email=t@t"]
+    subprocess.run([*git, "add", "-A"], check=True)
+    subprocess.run([*git, "commit", "-qm", "chore: seed"], check=True)
+    (tmp_path / "cli/a.py").write_text("1\n", encoding="utf-8")
+    subprocess.run([*git, "add", "-A"], check=True)
+    subprocess.run([*git, "commit", "-qm", "fix(bugs): a-bug — cause"], check=True)
+    sha = subprocess.run([*git, "rev-parse", "HEAD"], capture_output=True, text=True, check=True).stdout.strip()  # fmt: skip
+    (tmp_path / "specs/n").write_text("z\n", encoding="utf-8")
+    subprocess.run([*git, "add", "-A"], check=True)
+    subprocess.run([*git, "commit", "-qm", f"chore(bugs): resolve a-bug — by T-1 ({sha[:9]})"], check=True)  # fmt: skip
+    listed = _run(script, "fix", "a-bug", "--specs", str(specs)).stdout.splitlines()
+    assert listed == [f"a-bug\t{sha}\tnet-positive", "\t1\t0\tcli/a.py", "[ok] 1 linked, 0 unlinked."]  # fmt: skip
+
+
+def test_fix_drops_a_fix_commit_a_later_revert_undid(script: Path, tmp_path: Path) -> None:
+    """bugs-fix-counts-a-reverted-fix: a fix commit a later `Revert "…"` undid (git's own
+    subject or a shortened one) is not a fix; the redo after the revert is, and so is a
+    fix of a bug whose id merely extends the reverted one."""
+    closed = {**_OPEN_RECORD, "status": "resolved", "closed_at": "2026-09-21T00:00:00Z"}
+    specs = _ledger(tmp_path, {**closed, "id": "a-bug"}, {**closed, "id": "a-bug-two"})
+    git = ["git", "-C", str(tmp_path), "-c", "user.name=t", "-c", "user.email=t@t"]
+    subprocess.run([*git, "add", "-A"], check=True)
+    subprocess.run([*git, "commit", "-qm", "chore: seed"], check=True)
+    shas = []
+    for subject, path in [("fix(bugs): a-bug-two — other", "cli/b.py"), ("fix(bugs): a-bug — first", "cli/a.py"),
+                          ('Revert "fix(bugs): a-bug" (x) — why', "cli/a.py"), ("fix(bugs): a-bug — redo", "cli/a.py")]:  # fmt: skip
+        (tmp_path / path).write_text(f"{subject}\n", encoding="utf-8")
+        subprocess.run([*git, "add", "-A"], check=True)
+        subprocess.run([*git, "commit", "-qm", subject], check=True)
+        shas.append(subprocess.run([*git, "rev-parse", "HEAD"], capture_output=True, text=True, check=True).stdout.strip())  # fmt: skip
+    listed = _run(script, "fix", "a-bug", "a-bug-two", "--specs", str(specs)).stdout.splitlines()
+    assert listed == [f"a-bug\t{shas[3]}\tnet-neutral", "\t1\t1\tcli/a.py",
+                      f"a-bug-two\t{shas[0]}\tnet-positive", "\t1\t0\tcli/b.py",
+                      "[ok] 2 linked, 0 unlinked."]  # fmt: skip
+
+
+
+@pytest.mark.parametrize(("subjects", "kept"), [
+    ([('fix(bugs): a-bug — the "x" guard', "cli/a.py"), ('Revert "fix(bugs): a-bug — the "x" guard"', "cli/a.py")], []),
+    ([("fix(bugs): a-bug — part one", "cli/a.py"), ("fix(bugs): a-bug — part two", "cli/b.py"),
+      ('Revert "fix(bugs): a-bug" — undo part two', "cli/b.py")], [0]),
+    ([("fix(bugs): a-bug — first", "cli/a.py"), ('Revert "fix(bugs): a-bug — first"', "cli/a.py"),
+      ('Revert "Revert "fix(bugs): a-bug — first""', "cli/a.py")], [0]),
+    ([("fix(bugs): a-bug — first", "cli/a.py"), ("fix(bugs): a-bug-two — other", "cli/b.py"),
+      ('Revert "fix(bugs): a-bug" — undo first', "cli/a.py")], []),
+])  # fmt: skip
+def test_fix_pairs_each_revert_with_one_commit(
+    script: Path, tmp_path: Path, subjects: list[tuple[str, str]], kept: list[int]
+) -> None:
+    """Review HIGH-A, M-1 on 8693810de: one revert undoes the nearest earlier commit its quoted
+    text starts — the whole quote, inner `"` included; an older fix stays; a revert of a
+    revert reinstates."""
+    closed = {**_OPEN_RECORD, "status": "resolved", "closed_at": "2026-09-21T00:00:00Z"}
+    specs = _ledger(tmp_path, {**closed, "id": "a-bug"})
+    git = ["git", "-C", str(tmp_path), "-c", "user.name=t", "-c", "user.email=t@t"]
+    subprocess.run([*git, "add", "-A"], check=True)
+    subprocess.run([*git, "commit", "-qm", "chore: seed"], check=True)
+    shas = []
+    for i, (subject, path) in enumerate(subjects):
+        (tmp_path / path).write_text(f"{i}\n", encoding="utf-8")
+        subprocess.run([*git, "add", "-A"], check=True)
+        subprocess.run([*git, "commit", "-qm", subject], check=True)
+        shas.append(subprocess.run([*git, "rev-parse", "HEAD"], capture_output=True, text=True, check=True).stdout.strip())  # fmt: skip
+    listed = [line.split("\t")[1] for line in _run(script, "fix", "a-bug", "--specs", str(specs)).stdout.splitlines()
+              if line.startswith("a-bug\t")]  # fmt: skip
+    assert listed == ([shas[i] for i in kept] or ["unlinked"])
+
 _WHY = "the blamed fix wrote the line, not its defect"
 _NEAR = "T-050-168, T-9, b-bug, d-bug, e-bug"  # T-5 is in no TASKS.md: never proposed
 
@@ -841,15 +1005,12 @@ def test_resolve_proposes_caused_by_by_blame(
     done = _run(script, *_resolve_argv(caused_by=caused_by), *(["--lineage-reason", reason] if reason else []),
                 "--specs", str(specs))  # fmt: skip
     assert done.stdout.splitlines()[0] == f"blame candidates: {_NEAR}"
-    errors = done.stderr.splitlines()
-    assert errors[:1] == ([refusal] if refusal else []), done.stderr
-    if refusal:  # the fix reruns this command without the refused --caused-by (ADR 0158)
-        fix, command = errors[1], errors[1].split("`")[1]
-        assert fix.startswith("fix: Operator action: run `") and fix.endswith(
-            f"` with --caused-by {_NEAR.replace(', ', ' or ')}, or --lineage-reason saying why not"
-        ), fix
-        assert "resolve a-bug" in command and f"--specs {specs.as_posix()}" in command, fix
-        assert "--caused-by" not in command and len(errors) == 2, fix
+    nt = os.name == "nt"  # the host shell's rendering: forward slashes and double quotes
+    shown = (lambda p: Path(p).as_posix()) if nt else str
+    loop = '"pytest -k x"' if nt else "'pytest -k x'"
+    rerun = f"{shown(sys.executable)} {shown(script)} resolve a-bug --cause c --solution s --evidence-loop {loop} --specs {shown(specs.resolve())}"  # fmt: skip
+    fix = f"fix: Operator action: run `{rerun}` with --caused-by {_NEAR.replace(', ', ' or ')}, or --lineage-reason saying why not"  # fmt: skip
+    assert done.stderr.splitlines() == ([refusal, fix] if refusal else []), done.stderr
     assert done.returncode == (1 if refusal else 0)
     assert _records(specs)[0].get("lineage_reason") == reason
     assert _records(specs)[0]["status"] == ("open" if refusal else "resolved")
@@ -879,40 +1040,67 @@ def test_fix_refuses_a_history_it_cannot_read(
     assert (done.stdout if code == 0 else done.stderr).splitlines()[-1] == last
 
 
-def test_archive_moves_only_records_closed_past_the_threshold(script: Path, tmp_path: Path) -> None:
-    """sa-ledger-verbs-append-histo-before-validating-the-pair#J5: "Given a valid pair, when
-    `exit`/`archive` succeed, then the record leaves the document and appears exactly once
-    in the histo, written atomically as a pair." (`archive` half)"""
-    old = {
-        **_OPEN_RECORD, "id": "old-bug", "ts": "2025-12-01T00:00:00Z",
-        "status": "resolved", "closed_at": "2026-01-01T00:00:00Z",
-    }  # fmt: skip
-    fresh = {
-        **_OPEN_RECORD, "id": "fresh-bug", "ts": "2026-09-01T00:00:00Z",
-        "status": "resolved", "closed_at": "2026-09-19T00:00:00Z",
-    }  # fmt: skip
-    specs = _ledger(tmp_path, _OPEN_RECORD, old, fresh)
-    done = _run(
-        script, "archive", "--specs", str(specs), "--now", "2026-09-20T00:00:00Z",
-        "--threshold-days", "90",
-    )  # fmt: skip
-    assert done.returncode == 0, done.stderr
-    assert done.stdout.strip() == "[ok] archived 1 record(s), 2 kept."
-    assert {r["id"] for r in _records(specs)} == {"a-bug", "fresh-bug"}
-    histo = _read(specs / "bugs" / "_archive" / "bugs_histo.jsonl")
-    assert [r["id"] for r in histo] == ["old-bug"]
+def _closed(bug_id: str) -> dict[str, object]:
+    return {**_OPEN_RECORD, "id": bug_id, "status": "rejected", "cause": "c",
+            "closed_at": "2026-09-21T00:00:00Z"}  # fmt: skip
 
 
-def test_archive_with_nothing_eligible_is_a_byte_identical_no_op(
-    script: Path, tmp_path: Path
+@pytest.mark.parametrize(("adr_status", "argv", "code"), [
+    ("proposed", ["--adr", "0999", "old-a", "old-b"], 1),
+    ("accepted", ["--adr", "0999", "old-a", "old-b"], 0),
+    ("accepted", ["--adr", "0999", "old-a", "a-bug"], 1),  # an open record never leaves
+    ("accepted", ["--threshold-days", "90"], 2),  # the age path is gone
+    ("accepted", ["--adr", "0999"], 2),  # no record named: nothing to move
+    ("accepted", ["old-a", "old-b"], 2),  # no ADR named
+])  # fmt: skip
+def test_a_record_leaves_the_ledger_only_by_an_accepted_adr(
+    script: Path, tmp_path: Path, adr_status: str, argv: list[str], code: int
 ) -> None:
+    """AC13.6, ADR 0187 (4): `archive --adr` moves exactly the named terminal records, each
+    carrying the ADR id; anything else leaves both ledger files byte-identical."""
+    specs = _ledger(tmp_path, _OPEN_RECORD, _closed("old-a"), _closed("old-b"), _closed("old-c"))
+    (specs / "ADRs").mkdir()
+    (specs / "ADRs" / "decisions.jsonl").write_text(
+        json.dumps({"id": "0999", "status": adr_status}) + "\n"
+    )
+    histo = specs / "bugs" / "_archive" / "bugs_histo.jsonl"
+    histo.parent.mkdir()
+    histo.write_text(json.dumps({"event": "archived", "data": {}}) + "\n", encoding="utf-8")
+    before = [(specs / "bugs" / "BUGS.jsonl").read_bytes(), histo.read_bytes()]
+    done = _run(script, "archive", *argv, "--specs", str(specs))
+    assert done.returncode == code, done.stderr
+    if code:
+        assert [(specs / "bugs" / "BUGS.jsonl").read_bytes(), histo.read_bytes()] == before
+        return
+    assert [r["id"] for r in _records(specs)] == ["a-bug", "old-c"]
+    assert [(r["id"], r["archived_by"]) for r in _read(histo)[1:]] == [
+        ("old-a", "0999"),
+        ("old-b", "0999"),
+    ]
+
+
+@pytest.mark.parametrize(("archived_by", "adr_status", "ok"), [
+    ({"archived_by": "0999"}, "accepted", True),
+    ({"archived_by": "0999"}, "proposed", False),
+    ({}, "accepted", False),
+])  # fmt: skip
+def test_check_holds_each_archived_record_to_an_accepted_adr(
+    script: Path, tmp_path: Path, archived_by: dict[str, str], adr_status: str, ok: bool
+) -> None:
+    """ADR 0187 (4): an archived v1 record names the accepted ADR that moved it; a pre-v6
+    event line (ADR 0188) is history and passes as it is."""
     specs = _ledger(tmp_path, _OPEN_RECORD)
-    before = (specs / "bugs" / "BUGS.jsonl").read_bytes()
-    done = _run(script, "archive", "--specs", str(specs), "--threshold-days", "90")
-    assert done.returncode == 0, done.stderr
-    assert done.stdout.strip() == "[ok] archived 0 record(s), 1 kept."
-    assert (specs / "bugs" / "BUGS.jsonl").read_bytes() == before
-    assert not (specs / "bugs" / "_archive").exists()
+    (specs / "ADRs").mkdir()
+    (specs / "ADRs" / "decisions.jsonl").write_text(
+        json.dumps({"id": "0999", "status": adr_status}) + "\n"
+    )
+    histo = specs / "bugs" / "_archive" / "bugs_histo.jsonl"
+    histo.parent.mkdir()
+    lines = [{"event": "archived", "data": {}}, {**_closed("old-a"), **archived_by}]
+    histo.write_text("".join(json.dumps(r) + "\n" for r in lines), encoding="utf-8")
+    done = _run(script, "check", "--specs", str(specs))
+    wrong = f"LEDGER-BUGS-SCHEMA error bugs/_archive/bugs_histo.jsonl:2 archived_by {archived_by.get('archived_by')!r} names no accepted ADR\n"  # fmt: skip
+    assert (done.returncode, done.stdout) == ((0, "") if ok else (1, wrong))
 
 
 def test_a_concurrent_write_is_re_read_and_re_applied_once(script: Path, tmp_path: Path) -> None:
@@ -978,16 +1166,15 @@ def test_a_refused_archive_leaves_both_ledger_files_byte_intact(
         "status": "resolved", "closed_at": "2026-01-01T00:00:00Z",
     }  # fmt: skip
     specs = _ledger(tmp_path, {**_OPEN_RECORD, "severity": "SEVERE"}, old)
+    (specs / "ADRs").mkdir()  # accepted: the refusal is the invalid ledger's alone
+    (specs / "ADRs" / "decisions.jsonl").write_text('{"id": "0999", "status": "accepted"}\n')
     histo = specs / "bugs" / "_archive" / "bugs_histo.jsonl"
     histo.parent.mkdir(parents=True)
     histo.write_text("", encoding="utf-8")
     before = [(specs / "bugs" / "BUGS.jsonl").read_bytes(), histo.read_bytes()]
 
     for _ in range(2):
-        done = _run(
-            script, "archive", "--specs", str(specs), "--now", "2026-09-20T00:00:00Z",
-            "--threshold-days", "90",
-        )  # fmt: skip
+        done = _run(script, "archive", "--adr", "0999", "old-bug", "--specs", str(specs))
         assert done.returncode == 1, done.stdout
         assert [(specs / "bugs" / "BUGS.jsonl").read_bytes(), histo.read_bytes()] == before
 

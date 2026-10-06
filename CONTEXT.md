@@ -111,12 +111,8 @@ A region with one write rule. A `.dadaia/` zone is a row of `core.workspace_layo
 _Avoid_: area (for a zone), lane
 
 **Worktree**:
-A canonical git worktree `worktrees/<repo>/<M.m.p><letter>-<kind>` on the local branch `wt/<same>`, holding one task, fix, backlog edit or candidate definition; it reaches `repos/<repo>` only by `worktree.py merge`. Rules: `worktrees/AGENTS.md`.
-_Avoid_: sandbox, harness worktree (a `.claude/worktrees/**` tree is not one)
-
-**Worktree kind**:
-`impl`, `bug`, `backlog` or `release` — the allowed set of paths a Worktree may merge (`KINDS`).
-_Avoid_: worktree type, lane
+A canonical git worktree, one per job: `worktrees/<repo>/<M.m.p>-rc<N>/<job>/` on the branch `wt/<M.m.p>-rc<N>/<job>` (also `define/`, `reconcile/`, one `<job>--<task-id>/` per task cut from its job branch, and `worktrees/<repo>/backlog/<slug>/` outside an rc); it reaches `repos/<repo>` only by `worktree.py merge`. Rules: `worktrees/AGENTS.md`.
+_Avoid_: sandbox, harness worktree (a `.claude/worktrees/**` tree is not one), worktree kind (retired)
 
 **Stall**:
 The flow cannot advance because an enforcement point (gate, chokepoint, doctor exit, CLI refusal) refuses the next action the law itself requires; every BLOCK carries one executable `fix:` line, and a BLOCK whose fix is itself blocked is a CRITICAL bug by definition (operator ruling 2026-09-12).
@@ -343,9 +339,48 @@ _Avoid_: baseline
 A RED at the question's seam failing at definition; GREEN; the losers gone with their tests and fakes; `bugs.py resolve` with the evidence triple; net ≤ 0 in production and tests, except the production ceilings a SPEC's ACs grant; commit shape 3.
 _Avoid_: fix (bare)
 
-**Wave**:
-A harm-ordered group of a candidate's bugs — data loss and gate holes first.
-_Avoid_: phase (a release's state), batch
+**Bug window**:
+The records an rc's first SPEC reviews in `## Bug window review`: `found_in` or `introduced_in` in the live release or the previous published one (`bugs.py window`); it judges the previous rc's fixes, never an open bug.
+_Avoid_: wave, pile, cause group (retired)
+
+**Implement**:
+One rc's run, a DAG of jobs; not a file.
+
+**Bug batch**:
+The one job outside an rc's DAG, after its last job merges and before the Reconciliation job, that fixes every open bug `found_in` the rc, grouped by cause.
+_Avoid_: bug window (the review of fixes)
+
+**Job**:
+One measured feature: one worktree, one review and one gate at its merge; Job 1 executes the SPEC's `## Bug window review` verdicts.
+_Avoid_: CI job (a GitHub Actions job)
+
+**Stage**:
+A barrier on the job branch over parallel tasks; no worktree.
+
+**Task**:
+One owner (a module or law file plus its owner test file), one session, one worktree cut from its job branch; the unit of dispatch.
+
+**Envelope**:
+The `W:` union a job or stage may touch.
+
+**Closed stage contract**:
+A stage's exit tests, envelope and ACs served, fixed when the stage opens.
+
+**Live task**:
+A task born, split or cancelled inside an open stage, unreviewed.
+
+**Hot file**:
+A file two tasks would write; hand-edited or generated.
+
+**Ritual wait**:
+A merged job's wall time from its last task commit to its pushed merge: gates, review, CI waits.
+
+**Hotfix**:
+A block-list bug's fix (bugs law §2), outside the DAG.
+_Avoid_: hotfix/* branch
+
+**Reconciliation**:
+An rc's last job, outside the job cap: memory and derived docs.
 
 ## Tests
 

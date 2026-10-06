@@ -131,6 +131,7 @@ pip-wheel-metadata/
 # never left without one.
 /specs/*
 !/specs/constitution.md
+!/specs/AGENTS.md
 !/specs/memory/
 !/specs/memory/**
 !/specs/audits/

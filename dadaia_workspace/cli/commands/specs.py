@@ -49,7 +49,9 @@ def upgrade(
     """
     resolved = resolve_specs_dir_for_cli(specs_dir)
     try:
-        result = upgrade_feature.upgrade(resolved, remove=sweep.deleter(resolved), dry_run=dry_run)
+        result = upgrade_feature.upgrade(
+            resolved, remove=lambda p: sweep.remove(resolved, p, p.name), dry_run=dry_run
+        )
     except SymlinkRefusedError as exc:
         _refuse_symlink(exc)
     except UpgradeRefused as exc:
@@ -166,7 +168,8 @@ def init(
     elif kind in ("upgradable", "canonical"):
         try:
             refused = _echo_upgrade(
-                target, upgrade_feature.upgrade(target, remove=sweep.deleter(target))
+                target,
+                upgrade_feature.upgrade(target, remove=lambda p: sweep.remove(target, p, p.name)),
             )
         except SymlinkRefusedError as exc:
             _refuse_symlink(exc)

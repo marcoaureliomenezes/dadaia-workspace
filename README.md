@@ -13,7 +13,7 @@ its **associated repos** are the others it owns.
 
 ## What it is and principles
 
-<!-- derived-from: product-vision sha256:19c972934e54 -->
+<!-- derived-from: product-vision sha256:4d5160d491d5 -->
 
 dadaia-workspace is the operating environment around repositories developed with AI
 agents. Its unit is the context: one main repo, where `specs/` lives, plus its
@@ -21,7 +21,7 @@ associated repos; a single-repo context is the minimal case. Eight pillars:
 
 - **Current context** — agents bind explicitly and receive only the relevant project,
   memory, release and task state.
-- **Documents are the lifecycle** — backlog, SPEC, PLAN, TASKS, `_RELEASE.json` and
+- **Documents are the lifecycle** — backlog, SPEC, PLAN, the job files, `_RELEASE.json` and
   `BUGS.jsonl` carry ordered work; no runtime drives agents through steps.
 - **Deterministic boundaries** — path class, bind scope, root hygiene, venv-rooting and
   the push gate are mechanical, each refusal carrying one fix line; what cannot
@@ -35,7 +35,7 @@ associated repos; a single-repo context is the minimal case. Eight pillars:
 - **Six entry harnesses** — Claude Code, Codex, Kimi Code, Cursor, Devin and GitHub
   Copilot, one registry record each; public assets originate once, stage once, and are
   read natively or through per-entry symlinks.
-- **Evidence, never prose** — success is evidenced by reviews, task markers, commands
+- **Evidence, never prose** — success is evidenced by reviews, task commits, commands
   and artifacts.
 
 Two usage paths follow — a human drives it from a shell, an agent reads the root
@@ -44,10 +44,10 @@ memory atom under its content hash.
 
 ## A human installs and uses it
 
-<!-- derived-from: pypi-distribution sha256:969fd54bf85f -->
+<!-- derived-from: pypi-distribution sha256:a97f549efcdb -->
 <!-- derived-from: workspace-init sha256:4f0ceaccc6c8 -->
-<!-- derived-from: context-management sha256:88b825d90c59 -->
-<!-- derived-from: workspace-doctor sha256:58030f05158e -->
+<!-- derived-from: context-management sha256:2d908837d9f6 -->
+<!-- derived-from: workspace-doctor sha256:8b2f7d91f08a -->
 
 ```bash
 uvx dadaia-workspace init demo --harness claude --repo <clone url>   # level 1 + 2
@@ -94,17 +94,17 @@ a TTL expiry acts by zone class, an OUTPUT entry held, an EPHEMERAL one deleted.
 
 ## An agent reads AGENTS.md and uses it
 
-<!-- derived-from: agentic-entities sha256:2e16e47d2930 -->
-<!-- derived-from: sdd-gate-v3 sha256:ed351120dcd1 -->
-<!-- derived-from: release-lifecycle sha256:29faad7020af -->
-<!-- derived-from: bug-ledger sha256:156cfaca5544 -->
+<!-- derived-from: agentic-entities sha256:5a467f3e3664 -->
+<!-- derived-from: sdd-gate-v3 sha256:cf697fabc31d -->
+<!-- derived-from: release-lifecycle sha256:e94a43f4bb88 -->
+<!-- derived-from: bug-ledger sha256:1f1d4608155e -->
 <!-- derived-from: harness-claude-code sha256:68e07ea44a20 -->
 <!-- derived-from: harness-codex sha256:9218e747c24f -->
 <!-- derived-from: harness-kimi-code sha256:ac3c7be4e426 -->
 <!-- derived-from: harness-cursor sha256:f66b96a0ae77 -->
 <!-- derived-from: harness-devin sha256:a35113e51a30 -->
 <!-- derived-from: harness-copilot sha256:ed72a95f6297 -->
-<!-- derived-from: agent-comms sha256:bc966ad791cd -->
+<!-- derived-from: agent-comms sha256:02e5efa78c26 -->
 
 The always-on law is the root `AGENTS.md` map; every governed area carries its own
 scoped `AGENTS.md`, and every `dd-` skill touching an area opens that file first. The
@@ -122,18 +122,19 @@ through the gate asserting ALLOW. No lease, lock or wait path exists; the gate r
 `_RELEASE.json`.
 
 Work runs as candidates inside one live release: a picked set, an as-is review of every
-unit it touches, a grill, SPEC, PLAN and TASKS, each task in its own worktree, merged only after the reviewer's `APPROVED`, then
-closure — memory reconciliation, disposition sweep, the work -> integration merge (branch names: the constitution's `gitflow:`). The
+unit it touches, a grill, SPEC, a PLAN drawing a DAG of jobs and one job file per job; each task runs in its own worktree and
+lands on its job branch after its gate, each job lands only after the reviewer's `APPROVED`, then the
+Reconciliation job closes it — memory reconciliation, disposition sweep — and the work -> integration merge follows (branch names: the constitution's `gitflow:`). The
 ledger scripts under `.agents/skills/*/scripts/` (`bugs.py`, `backlog.py`,
 `release.py`, `audit.py`) are each record's one writer. A bug is proposed to the
-operator and registered only after confirmation, then fixed in a `bug` worktree
-with a RED test. Completed work leaves as a `handoff-v1` record, validated by
+operator and registered only after confirmation; a block-list bug is fixed at once as a
+hotfix job with a RED test, any other in the candidate's bug batch. Completed work leaves as a `handoff-v1` record, validated by
 `.dadaia/.venv/bin/dadaia reports validate`.
 
 ## Documentation
 
-<!-- derived-from: pypi-distribution sha256:969fd54bf85f -->
-<!-- derived-from: public-asset-distribution sha256:d14983127b26 -->
+<!-- derived-from: pypi-distribution sha256:a97f549efcdb -->
+<!-- derived-from: public-asset-distribution sha256:6bf6a440301e -->
 
 The documentation is the repository's [docs folder](https://github.com/marcoaureliomenezes/dadaia-workspace/tree/main/docs):
 
@@ -148,7 +149,7 @@ The documentation is the repository's [docs folder](https://github.com/marcoaure
 
 ## Links
 
-<!-- derived-from: pypi-distribution sha256:969fd54bf85f -->
+<!-- derived-from: pypi-distribution sha256:a97f549efcdb -->
 
 - GitHub — <https://github.com/marcoaureliomenezes/dadaia-workspace>
 - PyPI — <https://pypi.org/project/dadaia-workspace/>

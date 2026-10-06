@@ -18,7 +18,7 @@ from _specs import git_line as git_line  # noqa: E402
 from _specs import head  # noqa: E402
 from _specs import quote as quote  # noqa: E402  (`as`: re-exported to the worktree verbs)
 from _specs import script as script  # noqa: E402
-from _worktree_kinds import _NAME_RE, SCRIPT, Refusal  # noqa: E402
+from _worktree_names import NAME_RE, SCRIPT, Refusal, base, branch, name_of  # noqa: E402
 
 _TAG_RE = re.compile(r"^v?(\d+)\.(\d+)\.(\d+)$")
 
@@ -136,10 +136,10 @@ def ours(repo: Path) -> list[dict[str, str]]:
     `wt/<name>` branch, locked or not — merge's own re-attach leaves one unlocked."""
     home = repo.parents[1] / "worktrees" / repo.name
     return [
-        {"path": t["worktree"], "kind": m["k"], "id": m["v"] + m["l"], "v": m["v"], "name": m[0]}
+        {"path": t["worktree"], "name": name}
         for t in _trees(repo)
-        if (m := _NAME_RE.match(t.get("branch", "").removeprefix("refs/heads/wt/")))
-        and Path(t["worktree"]).resolve() == (home / m[0]).resolve()
+        if (name := name_of(t.get("branch", "").removeprefix("refs/heads/")))
+        and Path(t["worktree"]).resolve() == (home / name).resolve()
     ]
 
 
@@ -159,7 +159,7 @@ def rows(root: Path) -> list[dict[str, object]]:
     ours `ready` (ahead, clean), `open` (ahead, dirty) or `empty`, an `orphan` wt/* with no tree
     (never checked out, or its directory deleted), a `foreign`
     worktree git registers (harness-native, hand-made, under a TTL zone), and an
-    `unregistered` directory under `worktrees/<repo>/`."""
+    `unregistered` directory two levels under `worktrees/<repo>/`."""
     out: list[dict[str, object]] = []
     for name, flow in sorted(gitflows(root).items()):
         repo = root / "repos" / name
@@ -171,7 +171,8 @@ def rows(root: Path) -> list[dict[str, object]]:
             if (row := mine.get(Path(path).resolve())) is None or not Path(path).is_dir():
                 out.append(_row(repo, path, "foreign" if row is None else "orphan"))
                 continue
-            span = f"{flow['work']}{row['v']}..wt/{row['name']}"
+            version = NAME_RE.match(row["name"])["v"] or work_version(repo, flow)  # type: ignore[index]
+            span = f"{base(row['name'], flow['work'] + version)}..{branch(row['name'])}"
             ahead = int(git(repo, "rev-list", "--count", span, check=False) or 0)
             dirty = bool(git(Path(path), "status", "--porcelain").strip())
             born = git(
@@ -180,25 +181,19 @@ def rows(root: Path) -> list[dict[str, object]]:
                 "show",
                 "--date=unix",
                 "--format=%gd",
-                f"wt/{row['name']}",
+                branch(row["name"]),
                 check=False,
             )
             stamps = re.findall(r"@\{(\d+)\}", born) or [str(int(time.time()))]
             age = round((time.time() - int(stamps[-1])) / 3600, 1)  # the branch's birth
             state = "empty" if not ahead else "ready" if not dirty else "open"
-            out.append(
-                _row(
-                    repo, path, state, age, kind=row["kind"], id=row["id"], ahead=ahead, dirty=dirty
-                )
-            )
+            out.append(_row(repo, path, state, age, name=row["name"], ahead=ahead, dirty=dirty))
         held = {t.get("branch", "") for t in trees}
-        for branch in git(
-            repo, "for-each-ref", "--format=%(refname:short)", "refs/heads/wt/"
-        ).split():
-            if f"refs/heads/{branch}" not in held and _NAME_RE.match(branch[3:]):
-                out.append(_row(repo, str(root / "worktrees" / name / branch[3:]), "orphan"))
+        for ref in git(repo, "for-each-ref", "--format=%(refname:short)", "refs/heads/wt/").split():
+            if f"refs/heads/{ref}" not in held and (tree_name := name_of(ref)):
+                out.append(_row(repo, str(root / "worktrees" / name / tree_name), "orphan"))
         listed = {Path(t["worktree"]).resolve() for t in trees}
-        for stray in sorted((root / "worktrees" / name).glob("*")):
-            if stray.is_dir() and stray.resolve() not in listed:
+        for stray in sorted((root / "worktrees" / name).glob("*/*")):  # a name is two levels
+            if stray.is_dir() and not {stray.resolve(), stray.parent.resolve()} & listed:
                 out.append(_row(repo, str(stray), "unregistered"))
     return out

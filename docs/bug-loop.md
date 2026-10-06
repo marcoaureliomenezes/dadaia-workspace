@@ -1,13 +1,14 @@
 # The bug loop
 
-Register → RED → fix → resolve. A confirmed bug is fixed in one `bug` worktree,
-in any phase, with no SPEC, PLAN or TASKS.
+Register → RED → fix → resolve. A confirmed block-list bug is fixed at once as a hotfix
+job; any other in the candidate's bug batch, before its Reconciliation job.
 
 ## 1. Register — ask first
 
-<!-- derived-from: bug-ledger sha256:156cfaca5544 -->
+<!-- derived-from: bug-ledger sha256:1f1d4608155e -->
 
-A bug is a tool breaking a contract it documents. Registration is ask-first: the agent
+A bug is a merged change that reproducibly breaks a documented contract; a failure inside
+an unmerged worktree is rework. Registration is ask-first: the agent
 proposes the violated contract line, one reproducing command already run, why it is not
 agent error, and a severity — CRITICAL a stall or data loss, HIGH a contract broken on
 the default path, MEDIUM off the default path or with a workaround, LOW a message or
@@ -36,7 +37,7 @@ validation, a law ambiguity, or a missing feature.
 
 ## 2. Lineage, then a RED test
 
-<!-- derived-from: bug-ledger sha256:156cfaca5544 -->
+<!-- derived-from: bug-ledger sha256:1f1d4608155e -->
 
 Resolution follows seven ordered phases — lineage, red loop, minimise, hypothesise,
 instrument, seam test, cleanup and resolve. Lineage comes first: read at most the 20
@@ -55,7 +56,7 @@ Then the red loop: a new case that fails for the real cause, before production c
 
 ## 3. Fix, and let the diff shrink
 
-<!-- derived-from: bug-ledger sha256:156cfaca5544 -->
+<!-- derived-from: bug-ledger sha256:1f1d4608155e -->
 
 Fix the root cause and watch the test go green. The fix's direction is derived, never
 typed: `bugs.py fix <bug-id>` prints the fix commits, their numstat and `net-negative`,
@@ -64,7 +65,7 @@ routed to the architecture lens before it lands.
 
 ## 4. Resolve with the red loop and lineage
 
-<!-- derived-from: bug-ledger sha256:156cfaca5544 -->
+<!-- derived-from: bug-ledger sha256:1f1d4608155e -->
 
 ```bash
 python3 .agents/skills/dd-bug-resolution/scripts/bugs.py resolve <bug-id> \
@@ -75,8 +76,8 @@ python3 .agents/skills/dd-bug-resolution/scripts/bugs.py resolve <bug-id> \
   tasks whose commit wrote a line the staged diff removes — and refuses a `--caused-by`
   outside them, or `none` while any exist, unless `--lineage-reason` says why.
 - `resolve` refuses an incomplete call, naming every missing field; `caused_by: X` means
-  the fix of X wrote the lines this fix corrects — a live or archived record, a task id,
-  or `none`, never a loop; `resolved_release` is derived from the resolve instant.
+  the fix of X wrote the lines this fix corrects — a live or archived record, a task id a
+  `TASKS.md` or a job file carries, or `none`, never a loop; `resolved_release` is derived from the resolve instant.
 - `status` is `open | resolved | superseded | deferred | rejected`; a terminal status
   is reached only through its transition — `resolve`, `supersede --by`, `defer` or
   `reject` with `--reason` — and `closed_at` is set exactly when `status` is terminal,
@@ -90,7 +91,8 @@ python3 .agents/skills/dd-bug-resolution/scripts/bugs.py resolve <bug-id> \
 One commit holds the code, the regression test and the `BUGS.jsonl` line, its red loop
 quoted in the body.
 
-`bugs.py archive` moves records whose `closed_at` is older than 90 days into
-`specs/bugs/_archive/bugs_histo.jsonl`. `.dadaia/.venv/bin/dadaia doctor`'s `ledgers` section runs
-`bugs.py check` (`LEDGER-BUGS-SCHEMA`), and `SPEC-DOC-041` warns on a terminal record
-closed longer ago than the archive threshold.
+`bugs.py archive --adr <id> <ids…>` moves exactly the named terminal records into
+`specs/bugs/_archive/bugs_histo.jsonl`, each stamped `archived_by: <id>`; a record leaves
+the ledger only by an accepted ADR, never by age, and `check` holds every archived record
+to it. `.dadaia/.venv/bin/dadaia doctor`'s `ledgers` section runs `bugs.py check`
+(`LEDGER-BUGS-SCHEMA`).

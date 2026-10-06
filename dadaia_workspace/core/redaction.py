@@ -1,23 +1,26 @@
 """Stdlib-pure privacy matching and masking primitives; zero I/O, zero internal import.
 
 ``public stage`` copies this file beside every ledger script as ``_privacy.py``, so the ledger
-seam refuses exactly what the push refuses.
+seam asks the push's own question: which matches are fresh against the published text, and
+where "published" is (:func:`publication_boundaries`, git run by the caller).
 """
 
 from __future__ import annotations
 
-import json
 import re
-from collections.abc import Iterable, Iterator, Mapping
+from collections.abc import Callable, Iterable, Iterator, Sequence
 from typing import Any
 
 __all__ = [
     "UNSAFE_FORMAT_CHARS_RE",
     "Redactor",
+    "PUBLISHED",
     "compile_candidates",
-    "first_private",
+    "fresh_matches",
     "mask",
     "privacy_matches",
+    "publication_boundaries",
+    "published_matches",
 ]
 
 
@@ -44,18 +47,42 @@ def privacy_matches(
                 yield value, f"baseline pattern '{pattern.id}'", pattern.reason
 
 
-def first_private(
-    record: Mapping[str, Any], terms: Iterable[tuple[str, str]], patterns: Iterable[Any]
-) -> tuple[str, str] | None:
-    """``(field, masked match)`` of the first field whose serialized value the push would
-    refuse, or ``None`` — a ledger line is scanned as the bytes it is written as."""
-    terms, patterns = list(terms), list(patterns)
-    for key, value in record.items():
-        for found, _source, _reason in privacy_matches(
-            json.dumps(value, ensure_ascii=False), terms, patterns
-        ):
-            return key, mask(found)
-    return None
+#: What "already published" means: reachable from a locally-known ``origin`` ref.
+PUBLISHED = "--remotes=origin"
+
+
+def publication_boundaries(
+    git: Callable[[list[str]], list[str]], tip: str, exclusions: Sequence[str] = (PUBLISHED,)
+) -> tuple[str, ...]:
+    """Where *tip*'s history re-joins published history: the commits whose text at a path is
+    that path's published text. *git* runs one git subcommand and returns its output lines,
+    and RAISES on a failed run — empty output means "nothing outside published history".
+    *tip* already published: *tip* itself. No shared history (bootstrap): none."""
+    lines = git(["rev-list", "--boundary", tip, "--not", *exclusions, "--"])
+    return tuple(line[1:] for line in lines if line.startswith("-")) if lines else (tip,)
+
+
+def published_matches(
+    prior_text: str | None, terms: Iterable[tuple[str, str]], patterns: Iterable[Any]
+) -> set[tuple[str, str]] | None:
+    """The amnesty set: ``(value.lower(), source)`` of every match in the published
+    *prior_text*; ``None`` (no published text) amnesties nothing."""
+    if prior_text is None:
+        return None
+    return {(v.lower(), src) for v, src, _ in privacy_matches(prior_text, terms, patterns)}
+
+
+def fresh_matches(
+    text: str,
+    published: set[tuple[str, str]] | None,
+    terms: Iterable[tuple[str, str]],
+    patterns: Iterable[Any],
+) -> Iterator[tuple[str, str, str]]:
+    """The matches in *text* the push refuses: every one whose value (case-normalized) and
+    source the *published* set (:func:`published_matches`) does not already carry."""
+    for value, source, reason in privacy_matches(text, terms, patterns):
+        if published is None or (value.lower(), source) not in published:
+            yield value, source, reason
 
 
 #: C0/C1/DEL minus TAB/LF/CR, plus U+2028/U+2029: line-fragmenting or terminal-forging
