@@ -39,7 +39,7 @@ from dadaia_workspace.core.models.spec_context import ContextState, SpecContextP
 from dadaia_workspace.core.platform import PLATFORM
 from dadaia_workspace.core.workspace_layout import Zone, ZoneClass
 from dadaia_workspace.features.spec_context import sweep
-from dadaia_workspace.features.spec_context.service import WorktreeRows, git_hooks_dir
+from dadaia_workspace.features.spec_context.service import HookState, WorktreeRows, git_hooks_dir, hook_state
 from dadaia_workspace.infrastructure.git_subprocess import GitSubprocessClient
 from dadaia_workspace.infrastructure.json_context_store import JsonContextStore
 from dadaia_workspace.infrastructure.json_harness_profile_store import JsonHarnessProfileStore
@@ -178,19 +178,13 @@ class DoctorService:
             if hooks_dir is None:
                 continue
             for target, source in workspace_layout.INSTALLED_GIT_HOOKS:
-                shipped = workspace_layout.public_scripts_dir() / source
                 installed = hooks_dir / target
-                shipped_bytes = shipped.read_bytes()
-                try:
-                    state = (
-                        None
-                        if installed.read_bytes() == shipped_bytes
-                        else f"differs from the shipped {source}"
-                    )
-                except FileNotFoundError:
-                    state = "is absent"
-                except OSError as exc:
-                    state = f"is unreadable ({exc.strerror})"
+                found, why = hook_state(installed, source)
+                state = {
+                    HookState.CURRENT: None,
+                    HookState.ABSENT: "is absent",
+                    HookState.UNREADABLE: f"is unreadable ({why})",
+                }.get(found, f"differs from the shipped {source}")
                 if state:
                     rel = str(top)  # absolute: the fix runs from any cwd
                     issues.append(
