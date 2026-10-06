@@ -63,6 +63,7 @@ Order per job: DELETE → REBUILD → UPDATE → KEEP → ADD. A REBUILD names i
 ### Hot files
 
 - `bugres/scripts/bugs.py`: Job 1, then Job 4. `tests/unit/skills/test_bug_resolution_bugs_script.py`: Job 1, then Job 7 (move); Job 4 writes its own `test_bug_resolution_balance.py`.
+- `S/dd-spec-navigator/scripts/_memory_drift.py`: Job 1 only (J1.S3.T2). `tests/unit/skills/test_memory_drift.py`: Job 1 (J1.S3.T2), then Job 7 (move); the DAG edge Job 7 ← Job 1 orders them.
 - `core/specs_version.py`, `pub/templates/shipped-hashes.json`, `tests/unit/core/test_specs_version.py` (canon pin): Job 1 (AC1.5), Job 4 (scaffold memory law), then Job 6 (AC6.3).
 - `S/dd-release-definition/SKILL.md`: Job 1 (§1), then Job 6 (§5).
 - `f/spec_context/doctor.py`: Job 5, then Job 8.
