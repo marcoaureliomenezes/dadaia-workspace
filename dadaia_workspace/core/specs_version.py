@@ -32,9 +32,10 @@ from dadaia_workspace.core.gitflow import constitution_error, constitution_text,
 #: ``RELEASE.json`` back as SPEC-DOC-046's rename input (ADR 0152 (4)); the worktree law
 #: (T-050-103): specs paths land by a worktree merge, audits direct; v10 = the bugs law's
 #: rc-8 rewrite; its pin (91a8bfb1b79eac16) also covers rc-9 Job 1's scaffold-law
-#: edits. A canon change that
+#: edits; v11 = rc-9 Job 5's bugs and releases laws and specs AGENTS.md template
+#: (ADRs 0193, 0201–0205). A canon change that
 #: keeps the stamp leaves every older tree reading ``canonical`` while the doctor is red.
-CANONICAL_SPECS_VERSION = 10
+CANONICAL_SPECS_VERSION = 11
 
 #: The oldest stamp the one live upgrade hop starts from — and so the oldest a tree may
 #: carry and still be a dadaia tree (SPEC 0.4.8 D7, D9); anything older is foreign.
