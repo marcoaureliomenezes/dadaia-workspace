@@ -173,7 +173,7 @@ def quarantine_needs_bug(tree: Tree) -> list[str]:
 
 
 def statement_id_cited(tree: Tree) -> list[str]:
-    ids = json.loads(tree.read("tests/contract/statement_ids.json"))
+    ids = json.loads(tree.read("tests/fixtures/statement_ids.json"))
     known = {f"{bug}#{sid}" for bug, sids in ids.items() for sid in sids}
     known |= set(_CITATION.findall(tree.read("specs/memory/QUALITY.md")))
     return [
@@ -218,7 +218,7 @@ def CONTROL(root: Path) -> Session:
     gitignored ``tests/tmp/x.py`` (bugs 465, 467: untracked stays out)."""
     _write(root, ".gitignore", "tests/tmp/*\n")
     _write(root, "tests/tmp/x.py", _IMPORT * 99 + "# sa-no-such-bug#S99\n")
-    _write(root, "tests/contract/statement_ids.json", '{"sa-known-bug": ["S1"]}')
+    _write(root, "tests/fixtures/statement_ids.json", '{"sa-known-bug": ["S1"]}')
     _write(root, "specs/memory/QUALITY.md", "cites sa-quality-bug#Q1\n")
     _write(root, "tests/unit/test_c.py", "# sa-known-bug#S1 sa-quality-bug#Q1\n" + _ALLOWED * 99)
     _write(root, ".github/workflows/ci.yml", 'run: pytest -m "unit and not quarantine"\n')

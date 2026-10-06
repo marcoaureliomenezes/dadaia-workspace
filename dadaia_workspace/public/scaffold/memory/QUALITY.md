@@ -17,8 +17,8 @@ tags:
 
 ## Test architecture
 
-Size by directory: SMALL = `tests/unit` + `tests/contract`; MEDIUM = `tests/integration`;
-LARGE = `tests/e2e`. Test basics: the root `AGENTS.md` map §1.
+Size by what a test reaches, never its folder: SMALL = no process and no real git; MEDIUM =
+a subprocess or real git; LARGE = `tests/e2e`. Test basics: the root `AGENTS.md` map §1.
 
 ## Gates
 

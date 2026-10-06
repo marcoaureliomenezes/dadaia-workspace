@@ -2,7 +2,7 @@
 
 Library document. Projected nowhere: `public stage` copies it into `.dadaia/agentic/data/`
 with the rest of `data/`, and no projection rule installs it into a runtime tree. Pinned by
-`tests/contract/test_context_map.py`.
+`tests/infrastructure/test_projection_rules.py`.
 
 One row per surface: what it is for and what belongs in it. A surface's size is a soft
 review signal (one purpose, no restated rule), never a build failure (ADR 0143); a SKILL.md's

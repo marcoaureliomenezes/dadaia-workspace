@@ -118,9 +118,6 @@ incremental = false
 testpaths = ["tests"]
 addopts = "-ra -p no:cacheprovider --strict-markers"
 markers = [
-    "unit: retired alias until the last move; the size is small",
-    "contract: retired alias until the last move; the size is small or medium",
-    "integration: retired alias until the last move; the size is medium",
     "e2e: full user journeys through the real CLI",
     "small: no process, no real git: 10 s",
     "medium: reaches a process or real git: 60 s",

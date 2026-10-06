@@ -1,6 +1,6 @@
 """Citation finders — dead `specs/` paths, dead `dadaia <verb>`s, dead skill pointers.
 
-Relocated out of ``tests/contract/test_behavior_map.py`` (0.4.7 FR2): the same three
+Relocated out of ``tests/infrastructure/test_entity_doctor.py`` (0.4.7 FR2): the same three
 finders that keep every ``public/**`` asset honest now measure ``specs/memory/**``
 through the doctor's ``MEM-DRIFT-2`` and the derived documents through FR3 — one
 implementation, three consumers, no test-local copy.

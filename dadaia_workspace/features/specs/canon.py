@@ -17,7 +17,7 @@ This module is the fold target for all four: :data:`CANON` is the ONE declarativ
 :func:`check_tree`/:func:`is_canon_path`/:func:`canon_violations` check a real tree
 against the SAME table (doctor is canon checked). The property this module exists to
 hold: ``scaffold(t); check_tree(t) == []`` — proved by
-``tests/unit/features/specs/test_canon_property.py``.
+``tests/features/specs/test_canon__canon_property.py``.
 
 Pure module for its CHECKING half (:func:`is_canon_path`, :func:`canon_violations`,
 :func:`verdict_violations`): plain data in, plain data out, never touches a filesystem.
