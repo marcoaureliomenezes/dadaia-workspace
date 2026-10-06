@@ -13,7 +13,7 @@ description: >
 ## 1. Pick the set
 
 1. Open `specs/releases/AGENTS.md` (the area's scoped law) and follow it.
-2. Inspect `specs/bugs/BUGS.jsonl` via `python3 .agents/skills/dd-bug-resolution/scripts/bugs.py status`/`stats`.
+2. Inspect `specs/bugs/BUGS.jsonl` via `python3 .agents/skills/dd-bug-resolution/scripts/bugs.py status`/`stats`/`window`, and read each test the window's records cite.
 3. Read `specs/backlog/BACKLOG.json`'s `active[]`, consumed untriaged.
 4. Each undispositioned `specs/audits/**` finding enters the SPEC with its disposition (`python3 .agents/skills/dd-audit-project/scripts/audit.py disposition`).
 5. Name the SPEC's `**Origin:**`: `operator-demand`, `backlog:<ids>` or `bugs:<ids>`.
@@ -57,7 +57,6 @@ Call the Skill tool with `dd-grill-me` on the picked set — never skipped; a fu
    (`dd-release-implementation`'s `RELEASE-EVENTS.md`).
 4. SPEC says what; PLAN opens with §1 As-is review (§2) and draws the rc's DAG of jobs — Job 1 first, the Reconciliation job last, an edge where one job needs another's merge; SPEC carries `Replaces` — one bullet per current behaviour a DELETE/REBUILD row removes, or `none` with its reason.
 5. SPEC in domain names (`dd-domain-modeling`'s `CONTEXT.md`); only FR, AC and T- numbered; each AC names its test level (unit, integration, E2E, or no test with its reason); sizes per the releases law.
-6. A trio edit after `**Status:** Approved` lands as a shape-8 amendment (`dd-gitflow-default` §3a).
 
 ## 5. The job file — stages and tasks
 

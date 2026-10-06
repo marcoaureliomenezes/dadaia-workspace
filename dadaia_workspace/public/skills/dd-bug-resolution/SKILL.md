@@ -71,8 +71,8 @@ python3 .agents/skills/dd-bug-resolution/scripts/bugs.py resolve <bug-id> --caus
 ```
 
 - `caused_by` names a live or archived record, or `none`, never a loop; writes refuse else.
-- Stage code + regression test + the `BUGS.jsonl` line together, the red loop and `block: <item>` in the
-  body — ONE commit, shape 3 of `dd-gitflow-default` §3a.
+- Stage code + regression test + the `BUGS.jsonl` line together, the red loop in the body, a hotfix's
+  naming `block: <item>` — ONE commit, shape 3 of `dd-gitflow-default` §3a.
 
 ## 3. Done when
 

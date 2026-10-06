@@ -48,7 +48,7 @@ Input: every `rc-<N>/tasks/<job>.md` the window touches and the job commits behi
 3. A cancelled task carries its reason: a task struck out of a stage keeps its line and states why; one deleted, or kept without a reason, is MEDIUM.
 4. Hot files: a hand-edited hot file sits in at most one `W:` per stage, a generated one in none; a breach is MEDIUM.
 5. Each AC names its test level (unit, integration, E2E, or no test with its reason); one that names none is LOW.
-6. Post-approval changes: a trio edit after `**Status:** Approved` lands as a shape-8 amendment (`dd-gitflow-default` §3a); any other is MEDIUM.
+6. Post-approval changes: an approved trio is never amended (`specs/releases/AGENTS.md` §2); an edit after `**Status:** Approved` is MEDIUM.
 
 ## Slop readout
 

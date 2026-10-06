@@ -43,7 +43,7 @@ The branch contract by role; the names are `specs/constitution.md`'s `gitflow:` 
 | integration | No — never a direct push | principal (bootstrap only) | PR from the row above, at definition `Approved` and at each `rc` merge |
 | principal | No — never a direct push | — | PR from the integration branch, at the final `rc` |
 
-- No `v` prefix, no suffix, no other branch we cut; `hotfix/*` is retired (operator request only, no cadence).
+- No `v` prefix, no suffix, no other branch we cut; no `hotfix/*` branch (a hotfix is a job, bugs law §2).
 - Exactly one live work branch, named for the live release; a job — a bug fix included — reaches it through its own worktree (`worktrees/AGENTS.md` §1).
 - Each candidate closure burns one work -> integration merge; after it, ask the operator: promote or continue.
 - Every flow stage runs on the work branch; the other two are PR targets only, never a working branch.
@@ -58,13 +58,13 @@ A job and its task trees hold code, tests, specs, memory and derived docs alike 
 | 2 | `backlog/<slug>` | Backlog entry or exit: `specs/backlog/BACKLOG.json`, `specs/backlog/_archive/backlog_histo.jsonl` | `chore(backlog): …` |
 | 2 | `backlog/<slug>`, `define` | ADR proposal or in-place `measured_by` repair (ADR 0138): `specs/ADRs/decisions.jsonl` | `docs(adr): propose <slug>` / `chore(adrs): repair …` |
 | 2 | `define`, `reconcile` | ADR acceptance with its canonical-memory hunk: `specs/ADRs/decisions.jsonl`, `specs/memory/*` | `docs(adr): accept <slug>` |
-| 3 | a job | Bug fix: `<code>` + regression test + its `specs/bugs/BUGS.jsonl` line, red loop and `block: <item>` in the body | `fix(bugs): <id> — <cause>`; a REBUILD `refactor(bugs): <id> — REBUILD <unit>: …`; a group names its N ids |
+| 3 | a job | Bug fix: `<code>` + regression test + its `specs/bugs/BUGS.jsonl` line, red loop in the body, a hotfix's naming `block: <item>` | `fix(bugs): <id> — <cause>`; a REBUILD `refactor(bugs): <id> — REBUILD <unit>: …`; a group names its N ids |
 | 4 | a job | Terminal transition without code (`resolve` by a task, `supersede`, `defer`, `reject`): `specs/bugs/BUGS.jsonl` | `chore(bugs): <verb> <id> — <reason, or by <task-id> (<sha>)>`; per class `chore(bugs): <verb> class <class> — <reason>`, one id per body line |
 | 4 | a job | Archive by an accepted ADR: `specs/bugs/BUGS.jsonl`, `specs/bugs/_archive/bugs_histo.jsonl` | `chore(bugs): archive <ids> — ADR <id>` |
 | 5 | `define` | Release definition: `specs/releases/<v>/rc-<N>/*` | `feat(specs): define candidate …` |
 | 6 | a task tree | Task: its `W:` | `conventional-commit(<id>): description`, a REBUILD `refactor(<id>): REBUILD <unit> — …`; a stage closes with a body line `stage: <id> — unit+integration green` |
 | 7 | a job | The job file's `done`, once per job, by its close task: `specs/releases/<v>/rc-<N>/tasks/<job>.md` | `chore(tasks): done <job>` |
-| 8 | `define` | Trio amendment or approval: `specs/releases/<v>/rc-<N>/SPEC.md` | `docs(specs): …` |
+| 8 | `define` | Trio approval: `specs/releases/<v>/rc-<N>/SPEC.md` | `docs(specs): …` |
 | 9 | `reconcile` | Memory pass and derived docs: `specs/memory/*`, `README.md`, `llms.txt`, `docs/*.md` | `docs(memory): …` |
 | 10 | a job, `reconcile` | Release state: `specs/releases/<v>/_RELEASE.json` (a job's `kind: merge` entry) | `chore(release): …` |
 
