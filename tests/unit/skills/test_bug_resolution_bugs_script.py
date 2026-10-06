@@ -1005,9 +1005,9 @@ def test_fix_links_a_class_commit_by_its_body_ids(script: Path, tmp_path: Path) 
 
 
 def test_fix_counts_the_rework_of_its_surface_by_class(script: Path, tmp_path: Path) -> None:
-    """AC1.1, Terms: a later commit overlapping a fix surface is rework — another bug's
+    """AC1.1, Terms: a later commit removing a line a fix wrote is rework — another bug's
     `fix(bugs)` is overfitting, a REBUILD is planned; the bug's own commits and a commit
-    on other files are not."""
+    on other files are not. The REBUILD removes b-bug's line, so a-bug's count stays 0 planned."""
     closed = {**_OPEN_RECORD, "status": "resolved", "closed_at": "2026-09-21T00:00:00Z"}
     specs = _ledger(tmp_path, *({**closed, "id": i} for i in ("a-bug", "b-bug", "c-bug")))
     _, fix_a, again_a, fix_b, fix_c, rebuild = _commits(
@@ -1021,9 +1021,29 @@ def test_fix_counts_the_rework_of_its_surface_by_class(script: Path, tmp_path: P
     listed = _run(script, "fix", "--specs", str(specs)).stdout.splitlines()
     assert listed == [
         f"a-bug\t{again_a},{fix_a}\tnet-positive", "\t1\t1\tcli/a.py", "\t1\t0\tcli/a.py",
-        "\trework\t1 planned, 1 overfitting",
+        "\trework\t0 planned, 1 overfitting",
         f"b-bug\t{fix_b}\tnet-neutral", "\t1\t1\tcli/a.py", "\trework\t1 planned, 0 overfitting",
         f"c-bug\t{fix_c}\tnet-positive", "\t1\t0\tcli/c.py",
+        "[ok] 3 linked, 0 unlinked.",
+    ]  # fmt: skip
+
+
+def test_fix_counts_rework_per_line_not_per_file(script: Path, tmp_path: Path) -> None:
+    """Terms: the fix surface is the production lines a fix wrote; a later fix on the same
+    file that removes none of them is not rework, one that removes one of them is."""
+    closed = {**_OPEN_RECORD, "status": "resolved", "closed_at": "2026-09-21T00:00:00Z"}
+    specs = _ledger(tmp_path, *({**closed, "id": i} for i in ("a-bug", "b-bug", "c-bug")))
+    _, fix_a, fix_b, fix_c = _commits(
+        tmp_path, ("chore: seed", {"cli/a.py": "s1\ns2\n"}),
+        ("fix(bugs): a-bug — x", {"cli/a.py": "s1\nf2\n"}),
+        ("fix(bugs): b-bug — y", {"cli/a.py": "t1\nf2\n"}),  # replaces s1, a line no fix wrote
+        ("fix(bugs): c-bug — z", {"cli/a.py": "t1\nc2\n"}),  # replaces f2, a-bug's line
+    )  # fmt: skip
+    listed = _run(script, "fix", "--specs", str(specs)).stdout.splitlines()
+    assert listed == [
+        f"a-bug\t{fix_a}\tnet-neutral", "\t1\t1\tcli/a.py", "\trework\t0 planned, 1 overfitting",
+        f"b-bug\t{fix_b}\tnet-neutral", "\t1\t1\tcli/a.py",
+        f"c-bug\t{fix_c}\tnet-neutral", "\t1\t1\tcli/a.py",
         "[ok] 3 linked, 0 unlinked.",
     ]  # fmt: skip
 

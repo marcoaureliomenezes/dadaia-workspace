@@ -16,7 +16,6 @@ import json
 import re
 import subprocess
 import sys
-import tempfile
 from collections import Counter
 from collections.abc import Callable
 from pathlib import Path
@@ -33,7 +32,6 @@ import _bugs_transition as tr  # noqa: E402
 import _bugs_write as wr  # noqa: E402
 from _bugs_check import CODE, HISTO, LEDGER, accepted_adrs, check, tasks  # noqa: E402
 from _bugs_fix import git as _git  # noqa: E402
-from _bugs_fix import own as _own  # noqa: E402
 from _bugs_store import Refusal, commit, read_records  # noqa: E402
 from _release_schema import (  # noqa: E402
     ShallowClone,
@@ -100,19 +98,10 @@ def _values(args: argparse.Namespace, names: tuple[str, ...]) -> dict[str, Any]:
 def _candidates(specs: Path, bug_id: str) -> list[str]:
     """The bugs whose fix, and the tasks whose `<type>(<task-id>)` commit, wrote a line the
     staged diff removes: `git blame` past `(#n)`-subject squashes, `tests/` included."""
-    fixes, blamed = fx.fixes(specs), set[str]()
+    fixes = fx.fixes(specs)
     top = Path(_git(specs, "rev-parse", "--show-toplevel").strip())
-    staged = {f[1]: f[1:] for f in (ln.split("\t") for ln in _git(top, "diff", "--cached", "--name-status", "--diff-filter=MDR").splitlines())}  # fmt: skip
-    subjects = {h: s for h, _, s in (ln.partition(" ") for ln in _git(top, "log", "--all", "--format=%H %s").splitlines())}  # fmt: skip
-    # --all, not HEAD: a repo with no commit yet lists nothing instead of failing
-    skip = [h for h, s in subjects.items() if re.search(r"\(#\d+\)$", s)]
-    with tempfile.TemporaryDirectory() as tmp:
-        (revs := Path(tmp) / "revs").write_text("\n".join(skip), encoding="utf-8")
-        for path in _own(top, set(staged), skip=("specs/",)):  # a rename is blamed at its old path
-            hunks = [ln.split()[1][1:].partition(",") for ln in _git(top, "diff", "--cached", "-U0", "--", *staged[path]).splitlines() if ln.startswith("@@ ")]  # fmt: skip
-            ranges = [arg for start, _, n in hunks if n != "0" for arg in ("-L", f"{start},+{n or 1}")]  # fmt: skip
-            blame = _git(top, "blame", "--porcelain", "--ignore-revs-file", str(revs), *ranges, "HEAD", "--", path) if ranges else ""  # fmt: skip
-            blamed |= {ln[:40] for ln in blame.splitlines()}
+    subjects = fx.subjects(top)
+    blamed = fx.removed(top, ("--cached",), "HEAD", subjects, ("specs/",))
     # check's one answer to "what is a task": never propose a task check refuses
     known = tasks(specs)
     named = {m[1] for b in blamed if (m := re.match(r"\w+\(([^)]+)\)", subjects.get(b, ""))) and m[1] in known}  # fmt: skip
@@ -203,12 +192,11 @@ def _read(args: argparse.Namespace, specs: Path) -> int:
             print(f"{bug}\t{','.join(fix.commits)}\t{fx.direction(fix)}")
             for row in (r for rows in fix.commits.values() for r in rows):
                 print("\t" + "\t".join(row))
-            if fix.rework:
-                print(
-                    f"\trework\t{fix.rework['planned']} planned, {fix.rework['overfitting']} overfitting"
-                )
+            rework, last = fix.later()
+            if rework:
+                print(f"\trework\t{rework['planned']} planned, {rework['overfitting']} overfitting")
             if born:  # Terms: settled once 2 candidates were born with the surface untouched
-                untouched = sum(t > fix.last for t in born)
+                untouched = sum(t > last for t in born)
                 print(
                     f"\t{'settled' if untouched >= 2 else 'unsettled'}\t{untouched} rcs untouched"
                 )

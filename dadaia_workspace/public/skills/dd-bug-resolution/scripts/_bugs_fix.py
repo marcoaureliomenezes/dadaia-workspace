@@ -9,15 +9,18 @@ Derived from git on every call, never stored, in two steps.
   the nearest), and undoing a revert flips the whole chain beneath it. A live shape-3, shape-4 or REBUILD subject then links its ids — a class
   commit the ids on its body lines — to itself or to the task commits it names.
 - Diff: every linked sha's numstat; its production paths are its fix surface. A later
-  live REBUILD (planned) or `fix(bugs)` of another bug (overfitting) writing a surface
-  path is its rework.
+  live REBUILD (planned) or `fix(bugs)` of another bug (overfitting) removing a line a
+  fix wrote (`git blame` of its removed lines names the fix sha) is its rework.
 """
 
 from __future__ import annotations
 
+import functools
 import re
 import subprocess
+import tempfile
 from collections import Counter
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import NamedTuple
@@ -42,8 +45,9 @@ NOT_PRODUCTION = ("tests/", "specs/")
 class Fix(NamedTuple):
     commits: dict[str, list[list[str]]]  # full sha -> numstat rows, newest link first
     surface: set[str]  # the production paths those commits wrote
-    rework: Counter[str]  # later commits on the surface: "planned", "overfitting"
-    last: int  # unix time of the surface's last touch, fix or rework
+    later: Callable[
+        [], tuple[Counter[str], int]
+    ]  # rework by class, unix time of the last touch: blames, so read on demand
 
 
 @dataclass
@@ -70,6 +74,35 @@ def own(specs: Path, paths: set[str], skip: tuple[str, ...] = NOT_PRODUCTION) ->
     out = git(top, "check-attr", "-z", "--stdin", "dadaia-generated", stdin="\0".join(paths)).split("\0")  # fmt: skip
     generated = {p for p, v in zip(out[0::3], out[2::3], strict=False) if v in ("set", "true")}  # fmt: skip
     return {p for p in paths if not p.startswith(skip)} - generated
+
+
+def subjects(top: Path) -> dict[str, str]:
+    """Every commit of every ref, sha -> subject; `--all`, not HEAD: a repo with no commit yet lists none."""
+    return {h: s for h, _, s in (ln.partition(" ") for ln in git(top, "log", "--all", "--format=%H %s").splitlines())}  # fmt: skip
+
+
+def removed(
+    top: Path,
+    diff: tuple[str, ...],
+    rev: str,
+    named: dict[str, str],
+    skip: tuple[str, ...],
+    only: tuple[str, ...] = (),
+) -> set[str]:
+    """The shas that wrote the lines the `git diff *diff` removes: `git blame` at *rev*, past the
+    `(#n)`-subject squashes of *named*; paths under *skip* and generated files never count, a
+    rename is blamed at its old path; *only* limits the diff to those paths. The ONE blame authority:
+    resolve's candidates and rework."""
+    changed = {f[1]: f[1:] for f in (ln.split("\t") for ln in git(top, "diff", "--name-status", "--diff-filter=MDR", *diff, "--", *only).splitlines())}  # fmt: skip
+    blamed = set[str]()
+    with tempfile.TemporaryDirectory() as tmp:
+        (revs := Path(tmp) / "revs").write_text("\n".join(h for h, s in named.items() if re.search(r"\(#\d+\)$", s)), encoding="utf-8")  # fmt: skip
+        for path in own(top, set(changed), skip=skip):
+            hunks = [ln.split()[1][1:].partition(",") for ln in git(top, "diff", "-U0", *diff, "--", *changed[path]).splitlines() if ln.startswith("@@ ")]  # fmt: skip
+            ranges = [arg for start, _, n in hunks if n != "0" for arg in ("-L", f"{start},+{n or 1}")]  # fmt: skip
+            blame = git(top, "blame", "--porcelain", "--ignore-revs-file", str(revs), *ranges, rev, "--", path) if ranges else ""  # fmt: skip
+            blamed |= {ln[:40] for ln in blame.splitlines()}
+    return blamed
 
 
 def _parse(out: str) -> list[_Commit]:
@@ -132,18 +165,35 @@ def fixes(specs: Path) -> dict[str, Fix]:
     links = {bug: list(dict.fromkeys(f for s in shas if (f := full[s]))) for bug, shas in named.items()}  # fmt: skip
     prod = own(specs, {r[2] for shas in links.values() for s in shas for r in by_sha[s].rows})
     reworkers = [c for c in log if c.live and _kind(c)]
+    top = Path(git(specs, "rev-parse", "--show-toplevel").strip())
+
+    squashes = functools.cache(lambda: subjects(top))
+
+    @functools.cache
+    def wrote(
+        sha: str,
+    ) -> set[str]:  # the shas whose lines this commit removed, on paths some fix wrote
+        hot = tuple(sorted({x[2] for x in by_sha[sha].rows} & prod))
+        return removed(top, (f"{sha}^", sha), f"{sha}^", squashes(), NOT_PRODUCTION, hot) if hot else set()  # fmt: skip
+
+    def later(
+        shas: list[str], surfaces: dict[str, set[str]]
+    ) -> Callable[[], tuple[Counter[str], int]]:
+        def read() -> tuple[Counter[str], int]:  # blames: only the verb that prints rework pays
+            rework = [r for r in reworkers if r.sha not in surfaces and any(pos[r.sha] > pos[s] and surfaces[s] & {x[2] for x in r.rows} and s in wrote(r.sha) for s in shas)]  # fmt: skip
+            return Counter(str(_kind(r)) for r in rework), max(by_sha[s].time for s in [*shas, *(r.sha for r in rework)])  # fmt: skip
+
+        return read
+
     found: dict[str, Fix] = {}
     for bug, shas in links.items():
         if not shas:
             continue
         surfaces = {s: {r[2] for r in by_sha[s].rows} & prod for s in shas}
-        rework = [r for r in reworkers if r.sha not in surfaces and any(pos[r.sha] > pos[s] and surfaces[s] & {x[2] for x in r.rows} for s in shas)]  # fmt: skip
-        # ponytail: a surface is the files a fix wrote, not its lines; blame per line if file-level overcounts
         found[bug] = Fix(
             {s: by_sha[s].rows for s in shas},
             set().union(*surfaces.values()),
-            Counter(str(_kind(r)) for r in rework),
-            max(by_sha[s].time for s in [*shas, *(r.sha for r in rework)]),
+            later(shas, surfaces),
         )
     return found
 
