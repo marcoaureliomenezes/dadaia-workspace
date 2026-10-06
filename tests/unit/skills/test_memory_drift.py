@@ -219,15 +219,11 @@ def test_a_bound_a_shallow_clone_holds_beyond_its_cut_names_the_cut_not_a_rebase
     clone = tmp_path / "clone"
     _git(tmp_path, "clone", "-q", "--depth", "1", f"file://{repo}", str(clone))
     _git(clone, "fetch", "-q", "--depth", "1", "origin", older)
-    call = (
-        f"import sys; sys.path.insert(0, {str(script.parent)!r}); import _memory_drift as d\n"
-        f"try: d.report(__import__('pathlib').Path({str(clone / 'specs')!r}), {older!r})\n"
-        "except d.Refusal as r: print(r); print(r.fix)"
+    shown = _refusal(
+        script, f"d.report(__import__('pathlib').Path({str(clone / 'specs')!r}), {older!r})"
     )
 
-    shown = subprocess.run([sys.executable, "-c", call], capture_output=True, text=True, check=True)
-
-    assert shown.stdout.splitlines() == [
+    assert shown == [
         f"{older} is out of reach: a shallow clone lacks the window's history",
         f"git -C {clone.as_posix()} fetch --unshallow",
     ]
