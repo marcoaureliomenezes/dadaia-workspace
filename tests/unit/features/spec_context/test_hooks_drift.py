@@ -100,3 +100,21 @@ def test_no_module_computes_the_hooks_dir_itself() -> None:
     hand_built = re.compile(r"""["']\.git["']\s*/\s*["']hooks["']|["']\.git/hooks""")
     offenders = [p for p in package.rglob("*.py") if hand_built.search(p.read_text("utf-8"))]
     assert offenders == []
+
+
+# fmt: off
+@pytest.mark.parametrize(("layout", "observed", "other"), [
+    pytest.param({"drifted": True}, "differs from", "absent", id="edited-hook-differs"),
+    pytest.param({"installed": False}, "is absent", "differs", id="deleted-hook-is-absent",
+                 marks=pytest.mark.xfail(strict=True, reason="AC5.1: an absent hook reads 'differs'")),
+])
+# fmt: on
+def test_hooks_drift_1_names_the_observed_state_with_one_code_and_one_fix(
+    tmp_path: Path, layout: dict[str, bool], observed: str, other: str
+) -> None:
+    """AC5.1: the message states what was observed; one code and one fix line serve both."""
+    service = DoctorService(_Store([_ctx("demo")]), None, _workspace(tmp_path, **layout))  # type: ignore[arg-type]
+    found = service.check_installed_hooks()
+    assert {f.code for f in found} == {"HOOKS-DRIFT-1"}
+    assert all(observed in f.message and other not in f.message for f in found)
+    assert all("ci install-hook --force --repo " in f.fix for f in found)
