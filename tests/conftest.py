@@ -205,15 +205,17 @@ _GUARDED_ROOT_FILES: tuple[str, ...] = (
 _TIER_TIMEOUTS: dict[str, int] = {"small": 10, "medium": 60, "e2e": 120}
 
 # What makes a test ``medium``: its module reaches a process or real-git seam.
-_SEAM_MODULES = frozenset(
+_PROCESS_MODULES = frozenset(
     {
         "subprocess",
-        "tests.fixtures.real_git",
         "tests.helpers.worktree_ws",
-        "dadaia_workspace.infrastructure.git_subprocess",
         "dadaia_workspace.infrastructure.subprocess_runner",
     }
 )
+_SEAM_MODULES = _PROCESS_MODULES | {
+    "tests.fixtures.real_git",
+    "dadaia_workspace.infrastructure.git_subprocess",
+}
 
 # Bug ``windows-xdist-workers-crash-on-unit-fast-tier``: the table above is calibrated on
 # the Linux runners. Windows CI runs the tree-copying install/doctor tests 2-3x slower
@@ -266,20 +268,25 @@ def _validate_quarantine_markers(items: list[pytest.Item]) -> None:
             raise pytest.UsageError(message)
 
 
+def _reaches(item: pytest.Item, seams: frozenset[str]) -> bool:
+    """True when a name in the test module is, or comes from, one of *seams*."""
+    values = vars(item.module).values() if hasattr(item, "module") else ()
+    return any(
+        getattr(v, attr, None) in seams for v in values for attr in ("__module__", "__name__")
+    )
+
+
 def _size(item: pytest.Item) -> str:
     """``small`` or ``medium``: an explicit marker wins; else ``medium`` when the test module
-    reaches a process or real-git seam (a name defined in a seam module, or the module
-    itself) or the test asks for ``pytester``; else ``small``. Never the folder."""
+    reaches a process or real-git seam or the test asks for ``pytester``; else ``small``.
+    Never the folder."""
     for size in ("medium", "small"):
         if item.get_closest_marker(size) is not None:
             return size
-    values = vars(item.module).values() if hasattr(item, "module") else ()
-    seam = any(
-        getattr(v, attr, None) in _SEAM_MODULES
-        for v in values
-        for attr in ("__module__", "__name__")
+    spawns = _reaches(item, frozenset(_SEAM_MODULES)) or "pytester" in getattr(
+        item, "fixturenames", ()
     )
-    return "medium" if seam or "pytester" in getattr(item, "fixturenames", ()) else "small"
+    return "medium" if spawns else "small"
 
 
 def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item]) -> None:
@@ -398,9 +405,9 @@ def _hermetic_cwd(
 
 @pytest.fixture(autouse=True)
 def _no_open_worktree(request: pytest.FixtureRequest, monkeypatch: pytest.MonkeyPatch) -> None:
-    """A ``small`` test spawns no process: ``dead()`` and the doctor read no ``worktree.py``
+    """A test that reaches no process seam: ``dead()`` and the doctor read no ``worktree.py``
     rows here (bug unit-tests-spawn-the-worktree-script-through-a-cli-stub)."""
-    if request.node.get_closest_marker("small") is None:
+    if _reaches(request.node, frozenset(_PROCESS_MODULES)):
         return
     from dadaia_workspace.features.spec_context import doctor, service
 
