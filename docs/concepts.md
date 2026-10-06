@@ -42,7 +42,7 @@ moves only at an operator-approved deploy.
 ## The flow
 
 <!-- derived-from: release-lifecycle sha256:f91b7bdd7b3c -->
-<!-- derived-from: bug-ledger sha256:03704577cc85 -->
+<!-- derived-from: bug-ledger sha256:208c07532adb -->
 <!-- derived-from: audits-canon sha256:361bf3cb94c9 -->
 
 Every demand takes one of two arms. **Arm A**, a feature, leaves through a candidate:
@@ -53,7 +53,7 @@ worktree, each job reviewed once; then the Reconciliation job — memory reconci
 entries, the disposition sweep (`backlog.py exit`, `audit.py disposition`/`close`,
 `bugs.py archive`), artifact GC — the work -> integration merge (the constitution's `gitflow:`) and the operator's
 promote-or-continue choice. **Arm B**, a bug, is registered after the operator confirms it; a block-list bug is a hotfix job,
-any other waits for the next candidate's Job 1: lineage, a RED new case (a fix never rewrites an old assert), root-cause fix,
+any other is fixed in the candidate's bug batch, before its Reconciliation job: lineage, a RED new case (a fix never rewrites an old assert), root-cause fix,
 GREEN, `resolve` with its red loop, one commit; a fix-induced bug is rebuilt, not
 patched again. No engine drives either arm: the documents
 carry the ordered work, and the ledger scripts move the records.
@@ -91,7 +91,7 @@ the warnings `MEM-DRIFT-1` (features package map vs the live tree) and `MEM-DRIF
 
 ## Bugs and backlog
 
-<!-- derived-from: bug-ledger sha256:03704577cc85 -->
+<!-- derived-from: bug-ledger sha256:208c07532adb -->
 <!-- derived-from: backlog-ledger sha256:0e13883cee01 -->
 
 Both are records with one shape and one writer script. `specs/bugs/BUGS.jsonl` holds

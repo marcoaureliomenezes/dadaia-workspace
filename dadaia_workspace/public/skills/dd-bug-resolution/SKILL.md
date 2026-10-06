@@ -17,7 +17,7 @@ compatibility: Standalone Agent Skill. Inside a dadaia-workspace (pip install da
 
 1. Inside a dadaia workspace, open `specs/bugs/AGENTS.md` (the area's scoped law) and follow it — its redaction rule
    covers the whole arc: commands, outputs, captured artifacts.
-2. Fix now only a block-list bug (`specs/bugs/AGENTS.md` §2), as a hotfix job in its own worktree; any other waits for the next Job 1.
+2. Fix now only a block-list bug (`specs/bugs/AGENTS.md` §2), as a hotfix job in its own worktree; any other in the rc's bug batch, before its Reconciliation job.
 
 ## 2. The method — seven phases, each gated
 

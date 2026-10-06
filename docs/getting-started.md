@@ -126,7 +126,7 @@ zone class, an OUTPUT entry held, an EPHEMERAL one deleted.
 
 <!-- derived-from: release-lifecycle sha256:f91b7bdd7b3c -->
 <!-- derived-from: backlog-ledger sha256:0e13883cee01 -->
-<!-- derived-from: bug-ledger sha256:03704577cc85 -->
+<!-- derived-from: bug-ledger sha256:208c07532adb -->
 
 A candidate is one closed-scope cycle inside the live release. Nothing drives it: the
 documents are the state, the ledger scripts move the records, and the job files and
@@ -171,4 +171,4 @@ or a task's from step 5.
 
 A bug is registered once the operator confirms it; a block-list bug is fixed at once as
 a hotfix job — lineage, a RED new case, root-cause fix, GREEN, `resolve` with its red
-loop, one commit — and any other by the next candidate's Job 1.
+loop, one commit — and any other in the candidate's bug batch, before its Reconciliation job.

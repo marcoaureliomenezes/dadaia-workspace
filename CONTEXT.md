@@ -340,14 +340,18 @@ A RED at the question's seam failing at definition; GREEN; the losers gone with 
 _Avoid_: fix (bare)
 
 **Bug window**:
-The records an rc's first SPEC reviews in `## Bug window review`: `found_in` or `introduced_in` in the live release or the previous published one (`bugs.py window`).
+The records an rc's first SPEC reviews in `## Bug window review`: `found_in` or `introduced_in` in the live release or the previous published one (`bugs.py window`); it judges the previous rc's fixes, never an open bug.
 _Avoid_: wave, pile, cause group (retired)
 
 **Implement**:
 One rc's run, a DAG of jobs; not a file.
 
+**Bug batch**:
+The one job outside an rc's DAG, after its last job merges and before the Reconciliation job, that fixes every open bug `found_in` the rc, grouped by cause.
+_Avoid_: bug window (the review of fixes)
+
 **Job**:
-One measured feature: one worktree, one review and one gate at its merge; Job 1 executes the SPEC's `## Bug window review`.
+One measured feature: one worktree, one review and one gate at its merge; Job 1 executes the SPEC's `## Bug window review` verdicts.
 _Avoid_: CI job (a GitHub Actions job)
 
 **Stage**:

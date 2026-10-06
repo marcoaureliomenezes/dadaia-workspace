@@ -37,6 +37,7 @@ An rc is an Implement: a DAG of jobs the PLAN draws, Job 1 first, the Reconcilia
 - Done when: the job is on the work branch and its entry passes `release.py check`.
 
 **Step 4 — The Reconciliation job.**
+- The bug batch runs first: one job outside the DAG, after its last job merges, fixing every open bug `found_in` the rc, grouped by cause (`specs/bugs/AGENTS.md` §2); a bug found in the Reconciliation job is fixed inside it.
 - The last job, one tree (`<M.m.p>-rc<N>/reconcile`): memory (`MEMORY-UPDATE.md`), the derived docs in the same merge, `measured_by` repairs, the rc's measurement, the closure narrative, the disposition sweep, the artifact GC.
 - Closure narrative: the `log` entries `RELEASE-EVENTS.md` describes — `summary`, `size`, `drifts`, `artifact-gc`, `test-dispositions`, `dispositions`.
 - Disposition sweep: a picked backlog entry exits by `python3 .agents/skills/dd-backlog-definition/scripts/backlog.py exit <slug> --disposition …`, once; an audit finding moves by `python3 .agents/skills/dd-audit-project/scripts/audit.py disposition <dir> <finding> --disposition …`, and `audit.py close <dir> --sha <window-end>` closes an audit with none `open`; a bug is never silently dropped; `python3 .agents/skills/dd-bug-resolution/scripts/bugs.py archive` ages the ledger once the sweep is terminal.

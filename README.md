@@ -97,7 +97,7 @@ a TTL expiry acts by zone class, an OUTPUT entry held, an EPHEMERAL one deleted.
 <!-- derived-from: agentic-entities sha256:5a467f3e3664 -->
 <!-- derived-from: sdd-gate-v3 sha256:cf697fabc31d -->
 <!-- derived-from: release-lifecycle sha256:f91b7bdd7b3c -->
-<!-- derived-from: bug-ledger sha256:03704577cc85 -->
+<!-- derived-from: bug-ledger sha256:208c07532adb -->
 <!-- derived-from: harness-claude-code sha256:68e07ea44a20 -->
 <!-- derived-from: harness-codex sha256:9218e747c24f -->
 <!-- derived-from: harness-kimi-code sha256:ac3c7be4e426 -->
@@ -128,7 +128,7 @@ Reconciliation job closes it — memory reconciliation, disposition sweep — an
 ledger scripts under `.agents/skills/*/scripts/` (`bugs.py`, `backlog.py`,
 `release.py`, `audit.py`) are each record's one writer. A bug is proposed to the
 operator and registered only after confirmation; a block-list bug is fixed at once as a
-hotfix job with a RED test, any other by the next candidate's Job 1. Completed work leaves as a `handoff-v1` record, validated by
+hotfix job with a RED test, any other in the candidate's bug batch. Completed work leaves as a `handoff-v1` record, validated by
 `.dadaia/.venv/bin/dadaia reports validate`.
 
 ## Documentation

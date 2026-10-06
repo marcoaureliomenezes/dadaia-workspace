@@ -1,11 +1,11 @@
 # The bug loop
 
 Register → RED → fix → resolve. A confirmed block-list bug is fixed at once as a hotfix
-job; any other waits for the next candidate's Job 1.
+job; any other in the candidate's bug batch, before its Reconciliation job.
 
 ## 1. Register — ask first
 
-<!-- derived-from: bug-ledger sha256:03704577cc85 -->
+<!-- derived-from: bug-ledger sha256:208c07532adb -->
 
 A bug is a merged change that reproducibly breaks a documented contract; a failure inside
 an unmerged worktree is rework. Registration is ask-first: the agent
@@ -37,7 +37,7 @@ validation, a law ambiguity, or a missing feature.
 
 ## 2. Lineage, then a RED test
 
-<!-- derived-from: bug-ledger sha256:03704577cc85 -->
+<!-- derived-from: bug-ledger sha256:208c07532adb -->
 
 Resolution follows seven ordered phases — lineage, red loop, minimise, hypothesise,
 instrument, seam test, cleanup and resolve. Lineage comes first: read at most the 20
@@ -56,7 +56,7 @@ Then the red loop: a new case that fails for the real cause, before production c
 
 ## 3. Fix, and let the diff shrink
 
-<!-- derived-from: bug-ledger sha256:03704577cc85 -->
+<!-- derived-from: bug-ledger sha256:208c07532adb -->
 
 Fix the root cause and watch the test go green. The fix's direction is derived, never
 typed: `bugs.py fix <bug-id>` prints the fix commits, their numstat and `net-negative`,
@@ -65,7 +65,7 @@ routed to the architecture lens before it lands.
 
 ## 4. Resolve with the red loop and lineage
 
-<!-- derived-from: bug-ledger sha256:03704577cc85 -->
+<!-- derived-from: bug-ledger sha256:208c07532adb -->
 
 ```bash
 python3 .agents/skills/dd-bug-resolution/scripts/bugs.py resolve <bug-id> \

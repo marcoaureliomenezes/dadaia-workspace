@@ -24,7 +24,7 @@ Scope: this file governs only `specs/releases/`.
 - A red outside a stage's envelope appends a new stage; a stage's third red gate stops the job for the operator,
   the driver appending one `kind: note` log entry `stop: <job> stage <n> — third red gate`.
 - rc N+1 is drafted in a `define` tree while rc N implements and enters by `RELEASE_PY new` at rc N's CLOSURE;
-  its `## Bug window review` and Job 1 close with rc N; one rc implements at a time.
+  its `## Bug window review` judges rc N's bug fixes; rc N closes with zero open bugs; one rc implements at a time.
 - Recommended size, never a gate (ADR 0152 (2)): SPEC.md within 24 KiB, each job file within 12 KiB.
 - A `v`-prefixed id is minted nowhere — the bare axis (`^\d+\.\d+\.\d+$`) is the only current one.
 
