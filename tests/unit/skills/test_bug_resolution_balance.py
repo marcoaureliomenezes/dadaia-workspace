@@ -4,6 +4,9 @@ records alone into the `## Bugs` block — the per-surface table, the Laplace tr
 
 from __future__ import annotations
 
+import json
+import subprocess
+import sys
 from datetime import UTC, datetime
 from pathlib import Path
 from types import ModuleType
@@ -12,6 +15,7 @@ from typing import Any
 import pytest
 
 from dadaia_workspace.infrastructure.ledger_scripts import load_owner
+from tests.helpers.skill_scripts import stage_skill_scripts
 
 pytestmark = pytest.mark.unit
 
@@ -62,7 +66,6 @@ Defective-fix rate per rc (caused_by set over found in the rc):
 """
 
 
-@pytest.mark.xfail(strict=True, reason="J4.S1 RED: _bugs_balance.py is built by J4.S2.T1")
 def test_a_literal_ledger_renders_a_literal_block_and_a_rerun_is_byte_equal() -> None:
     bal = _balance()
     window = bal.Window(_ORDER, _START, _END)
@@ -73,7 +76,6 @@ def test_a_literal_ledger_renders_a_literal_block_and_a_rerun_is_byte_equal() ->
     assert bal.render(_LIVE, _ARCHIVED, window, frozenset({"tests"})) == block
 
 
-@pytest.mark.xfail(strict=True, reason="J4.S1 RED: _bugs_balance.py is built by J4.S2.T1")
 @pytest.mark.parametrize(
     ("days", "reading"),
     [
@@ -93,3 +95,43 @@ def test_the_laplace_trend_reads_days_against_the_window_length(
 
     [trend] = [ln for ln in block.splitlines() if ln.startswith("Laplace")]
     assert trend.endswith(f"T = 10 days: {reading}")
+
+
+def test_the_block_is_set_under_bugs_and_the_section_is_appended_when_absent() -> None:
+    bal = _balance()
+    doc = "# Q\n\n## Bugs\n\nlead\n```text\nold\n```\ntrail\n\n## Other\n\n```text\nkeep\n```\n"
+
+    assert bal.stored(doc) == "old\n"
+    assert bal.replaced(doc, "new\n") == doc.replace("old", "new")
+    assert bal.stored("# Q\n\n## Other\n\n```text\nkeep\n```\n") is None
+    assert bal.replaced("# Q\n", "new\n") == "# Q\n\n## Bugs\n\n```text\nnew\n```\n"
+
+
+def test_the_verb_prints_dev_tooling_surfaces_apart_by_the_gitattributes_class(
+    tmp_path: Path,
+) -> None:
+    """AC4.1: the class is the repo's `.gitattributes` attribute `dadaia-dev-tooling`."""
+    for skill in ("dd-bug-resolution", "dd-release-implementation"):
+        stage_skill_scripts(skill, tmp_path / "skills" / skill / "scripts")
+    subprocess.run(["git", "init", "-q", str(tmp_path)], check=True)
+    (tmp_path / ".gitattributes").write_text("/tests dadaia-dev-tooling\n", "utf-8")
+    release = tmp_path / "specs" / "releases" / "0.5.0"
+    release.mkdir(parents=True)
+    log = [{"ts": "2026-01-01T12:00:00Z", "agent": "a", "kind": "note", "text": "t"}]
+    (release / "_RELEASE.json").write_text(json.dumps({"phase": "IMPLEMENTATION", "log": log}))
+    (tmp_path / "specs" / "bugs").mkdir()
+    records = [_bug(s, 2, ("0.5.0", "rc-1"), id=s) for s in ("tests", "core")]
+    (tmp_path / "specs/bugs/BUGS.jsonl").write_text("".join(json.dumps(r) + "\n" for r in records))
+    bugs = tmp_path / "skills" / "dd-bug-resolution" / "scripts" / "bugs.py"
+
+    argv = [sys.executable, str(bugs), "balance", "--specs", str(tmp_path / "specs")]
+    done = subprocess.run(argv, capture_output=True, text=True)
+
+    assert done.returncode == 0, done.stderr
+    assert done.stdout.splitlines()[1:5] == [
+        "surface  records  recurrences  fix-induced  archived  rcs  correlates  settled",
+        "core     1        0            0            0         1    0           no",
+        "dev-tooling:",
+        "tests    1        0            0            0         1    0           no",
+    ]
+    assert done.stdout.splitlines()[5].endswith("T = 0 days: u = n/a, no data")

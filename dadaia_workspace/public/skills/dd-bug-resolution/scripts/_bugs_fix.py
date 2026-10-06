@@ -67,14 +67,18 @@ def git(cwd: Path | str, *argv: str, stdin: str | None = None) -> str:
                           errors="replace", check=True).stdout  # fmt: skip
 
 
+def marked(top: Path | str, attribute: str, paths: set[str]) -> set[str]:
+    """The *paths* `.gitattributes` sets *attribute* on."""
+    # -z: NUL never meets Windows' text-mode \n -> \r\n stdin translation, nor path quoting
+    out = git(top, "check-attr", "-z", "--stdin", attribute, stdin="\0".join(paths)).split("\0")
+    return {p for p, v in zip(out[0::3], out[2::3], strict=False) if v in ("set", "true")}
+
+
 def own(specs: Path, paths: set[str], skip: tuple[str, ...] = NOT_PRODUCTION) -> set[str]:
     """The paths a fix writes: not under *skip* (the direction: tests, metric 6, and specs;
     the blame: specs only), not a file `.gitattributes` marks `dadaia-generated`."""
     top = git(specs, "rev-parse", "--show-toplevel").strip()
-    # -z: NUL never meets Windows' text-mode \n -> \r\n stdin translation, nor path quoting
-    out = git(top, "check-attr", "-z", "--stdin", "dadaia-generated", stdin="\0".join(paths)).split("\0")  # fmt: skip
-    generated = {p for p, v in zip(out[0::3], out[2::3], strict=False) if v in ("set", "true")}  # fmt: skip
-    return {p for p in paths if not p.startswith(skip)} - generated
+    return {p for p in paths if not p.startswith(skip)} - marked(top, "dadaia-generated", paths)
 
 
 def subjects(top: Path) -> dict[str, str]:

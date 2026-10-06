@@ -18,6 +18,7 @@ import subprocess
 import sys
 from collections import Counter
 from collections.abc import Callable
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 
@@ -27,13 +28,16 @@ sys.dont_write_bytecode = True
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 sys.path.append(str(Path(__file__).resolve().parents[2] / "dd-release-implementation" / "scripts"))
 
+import _bugs_balance as bal  # noqa: E402
 import _bugs_fix as fx  # noqa: E402
 import _bugs_transition as tr  # noqa: E402
 import _bugs_write as wr  # noqa: E402
 from _bugs_check import CODE, HISTO, LEDGER, accepted_adrs, check, tasks  # noqa: E402
 from _bugs_fix import git as _git  # noqa: E402
 from _bugs_store import Refusal, commit, read_records  # noqa: E402
+from _ledger import replace  # noqa: E402
 from _release_schema import (  # noqa: E402
+    STATE,
     ShallowClone,
     Unreadable,
     candidate_adds,
@@ -62,6 +66,7 @@ _HELP = {
     "check": "validate every BUGS.jsonl record",
     "fix": "derive each resolved record's fix commits, numstat, direction, rework and settledness",
     "window": "list the records found in or born in the live or the last shipped release",
+    "balance": "print QUALITY.md's `## Bugs` block from the ledger; --write regenerates it there",
 }
 
 
@@ -85,6 +90,8 @@ def _parser() -> argparse.ArgumentParser:
             command.add_argument("bug_ids", nargs="+", help="the terminal records to move")
         if verb == "fix":
             command.add_argument("bug_ids", nargs="*", help="default: every resolved record")
+        if verb == "balance":
+            command.add_argument("--write", action="store_true", help="rewrite the block in place")
         if verb == "check":
             command.add_argument("--json", action="store_true", help="emit findings as JSON")
     return parser
@@ -179,6 +186,42 @@ def _window(specs: Path) -> int:
     return 0
 
 
+def balance_body(specs: Path) -> str:
+    """The `## Bugs` block `QUALITY.md` must hold: the ledgers, the releases' spans and the
+    `dadaia-dev-tooling` surfaces in; the trend window opens on the oldest of its releases'
+    first day and ends on the live release's last log day."""
+    live = _placed(lambda: live_id(specs), specs)
+    spans = _placed(lambda: releases(specs), specs)
+    order = [*sorted((r for r in spans if r != live), key=lambda r: spans[r][0]), live]
+    closed = (specs / "releases" / live / STATE).read_text(encoding="utf-8")
+    start, end = (
+        spans[order[-4:][0]][0],
+        datetime.fromisoformat(json.loads(closed)["log"][-1]["ts"]),
+    )
+    ledger = read_records(specs / LEDGER)
+    old = [r for r in read_records(specs / HISTO) if "id" in r]
+    top = _git(specs, "rev-parse", "--show-toplevel").strip()
+    dev = fx.marked(
+        top, "dadaia-dev-tooling", {str(r.get("surface") or bal.UNKNOWN) for r in [*ledger, *old]}
+    )
+    return bal.render(ledger, old, bal.Window(order, _day(start), _day(end)), frozenset(dev))
+
+
+def _day(instant: datetime) -> datetime:
+    return instant.replace(hour=0, minute=0, second=0, microsecond=0)
+
+
+def _balance(args: argparse.Namespace, specs: Path) -> int:
+    body, quality = balance_body(specs), specs / "memory" / "QUALITY.md"
+    if not args.write:
+        print(body, end="")
+        return 0
+    document = quality.read_text(encoding="utf-8") if quality.is_file() else ""
+    replace(quality, bal.replaced(document, body))
+    print(f"[ok] wrote the `## Bugs` block of {quality}")
+    return 0
+
+
 def _read(args: argparse.Namespace, specs: Path) -> int:
     records = read_records(specs / LEDGER)
     fixes = fx.fixes(specs) if args.verb in ("fix", "stats") else {}
@@ -270,7 +313,7 @@ def _write(args: argparse.Namespace, specs: Path) -> int:
 
 def main(argv: list[str] | None = None) -> int:
     args = _parser().parse_args(argv)
-    reads = args.verb in ("check", "status", "stats", "fix", "window")
+    reads = args.verb in ("check", "status", "stats", "fix", "window", "balance")
     specs = find_specs(args.specs, ledger=None if reads else f"specs/{LEDGER}")
     if args.verb == "check":
         findings = check(specs)
@@ -283,6 +326,8 @@ def main(argv: list[str] | None = None) -> int:
             return _read(args, specs)
         if args.verb == "window":
             return _window(specs)
+        if args.verb == "balance":
+            return _balance(args, specs)
         return _archive(args, specs) if args.verb == "archive" else _write(args, specs)
     except Refusal as refusal:
         return refuse(refusal, specs)
