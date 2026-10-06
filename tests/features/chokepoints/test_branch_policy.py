@@ -118,8 +118,8 @@ def test_the_gate_allows(repo: PushRepo, flow: Gitflow, scenario: Scenario) -> N
 
 
 _WORK = "{prefix}0.6.0"  # the live work branch, never the <M.m.p> pattern (fix-lines-are-not-one-runnable-command)
-_PR_TO_INTEGRATION = ["gh", "pr", "create", "--base", "{integration}", "--head", _WORK]
-_PR_TO_PRINCIPAL = ["gh", "pr", "create", "--base", "{principal}", "--head", "{integration}"]
+_PR_TO_INTEGRATION = ["Operator", "action:", "open", "a", "PR/MR", "from", _WORK, "into", "{integration}", "on", "your", "git", "host"]
+_PR_TO_PRINCIPAL = ["Operator", "action:", "open", "a", "PR/MR", "from", "{integration}", "into", "{principal}", "on", "your", "git", "host"]
 
 
 def _birth_fix(tip: str, role: str) -> list[str]:
