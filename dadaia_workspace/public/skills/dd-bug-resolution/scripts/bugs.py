@@ -59,6 +59,7 @@ _HELP = {
 _SHAPE = re.compile(
     r"@(\w+) (fix\(bugs\): |chore\(bugs\): resolve |refactor\(bugs\): )(.+?) — (.*)$"
 )
+_REVERT = re.compile(r'@\w+ Revert "(.+)"')
 _TASK_SHAS = re.compile(r"\((\w+(?:, \w+)*)\)$")
 #: Never a fix's own lines: tests (metric 6) and specs; `_own` adds the generated files.
 _NOT_PRODUCTION = ("tests/", "specs/")
@@ -96,22 +97,28 @@ def _values(args: argparse.Namespace, names: tuple[str, ...]) -> dict[str, Any]:
 
 def _fixes(specs: Path) -> dict[str, dict[str, list[list[str]] | None]]:
     """Bug id -> {fix sha: numstat rows}, grepped from history, never stored; a shape-4
-    task commit is counted, never diffed (rows None)."""
+    task commit is counted, never diffed (rows None); a fix a later `Revert "<its subject>"`
+    undid is none (log is newest first, so a redo after the revert still counts)."""
     git = ["git", "-C", str(specs)]
     head = subprocess.run([*git, "rev-parse", "-q", "--verify", "HEAD"], stdout=subprocess.DEVNULL, check=False)  # fmt: skip
     if head.returncode == 1:  # a repo with no commit yet links nothing
         return {}
-    log = subprocess.run([*git, "log", "-E", r"--grep=^(fix|chore|refactor)\(bugs\): ", "--numstat", "--format=@%H %s"],
+    log = subprocess.run([*git, "log", "-E", r"--grep=^(fix|chore|refactor)\(bugs\): ", '--grep=^Revert "', "--numstat", "--format=@%H %s"],
                          stdout=subprocess.PIPE, text=True, check=False)  # fmt: skip
     if log.returncode:
         raise Refusal("cannot read the repo's history", "Operator action: point --specs at a specs tree inside a git repo")  # fmt: skip
     found: dict[str, dict[str, list[list[str]] | None]] = {}
+    reverted: list[str] = []
     rows: list[list[str]] = []
     for line in log.stdout.splitlines():
         if not line.startswith("@"):
             rows += [line.split("\t")] if line else []
             continue
         rows, shape = [], _SHAPE.match(line)
+        if revert := _REVERT.match(line):
+            reverted.append(revert[1])
+        if any(f"{line.partition(' ')[2]} ".startswith(f"{r} ") for r in reverted):
+            continue
         task = _TASK_SHAS.search(shape[4]) if shape and shape[2].startswith("chore") else None
         if shape is None or (task is None and shape[2].startswith("chore")):
             continue

@@ -893,6 +893,28 @@ def test_fix_lists_a_fix_commit_once_when_its_resolve_names_it_short(
     assert listed == [f"a-bug\t{sha}\tnet-positive", "\t1\t0\tcli/a.py", "[ok] 1 linked, 0 unlinked."]  # fmt: skip
 
 
+def test_fix_drops_a_fix_commit_a_later_revert_undid(script: Path, tmp_path: Path) -> None:
+    """bugs-fix-counts-a-reverted-fix: a fix commit a later `Revert "…"` undid (git's own
+    subject or a shortened one) is not a fix; the redo after the revert is, and so is a
+    fix of a bug whose id merely extends the reverted one."""
+    closed = {**_OPEN_RECORD, "status": "resolved", "closed_at": "2026-09-21T00:00:00Z"}
+    specs = _ledger(tmp_path, {**closed, "id": "a-bug"}, {**closed, "id": "a-bug-two"})
+    git = ["git", "-C", str(tmp_path), "-c", "user.name=t", "-c", "user.email=t@t"]
+    subprocess.run([*git, "add", "-A"], check=True)
+    subprocess.run([*git, "commit", "-qm", "chore: seed"], check=True)
+    shas = []
+    for subject, path in [("fix(bugs): a-bug-two — other", "cli/b.py"), ("fix(bugs): a-bug — first", "cli/a.py"),
+                          ('Revert "fix(bugs): a-bug" (x) — why', "cli/a.py"), ("fix(bugs): a-bug — redo", "cli/a.py")]:  # fmt: skip
+        (tmp_path / path).write_text(f"{subject}\n", encoding="utf-8")
+        subprocess.run([*git, "add", "-A"], check=True)
+        subprocess.run([*git, "commit", "-qm", subject], check=True)
+        shas.append(subprocess.run([*git, "rev-parse", "HEAD"], capture_output=True, text=True, check=True).stdout.strip())  # fmt: skip
+    listed = _run(script, "fix", "a-bug", "a-bug-two", "--specs", str(specs)).stdout.splitlines()
+    assert listed == [f"a-bug\t{shas[3]}\tnet-neutral", "\t1\t1\tcli/a.py",
+                      f"a-bug-two\t{shas[0]}\tnet-positive", "\t1\t0\tcli/b.py",
+                      "[ok] 2 linked, 0 unlinked."]  # fmt: skip
+
+
 _WHY = "the blamed fix wrote the line, not its defect"
 _NEAR = "T-050-168, T-9, b-bug, d-bug, e-bug"  # T-5 is in no TASKS.md: never proposed
 
