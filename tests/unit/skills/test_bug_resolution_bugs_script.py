@@ -803,8 +803,9 @@ def test_status_and_stats_read_the_ledger(script: Path, tmp_path: Path) -> None:
 
 
 def test_fix_derives_each_fix_commit_and_its_direction(script: Path, tmp_path: Path) -> None:
-    """AC9.2: shape 3 or 4 names the ids; shape 4's task commits are counted, never diffed;
-    the direction nets production rows only, never a stored field."""
+    """AC9.2: shape 3 or 4 names the ids; rc-10 AC1.1: shape 4's task commits are diffed
+    like any fix, and a later fix of another bug on the surface is rework; the direction nets
+    production rows only, never a stored field."""
     resolved = {**_OPEN_RECORD, "status": "resolved", "closed_at": "2026-09-21T00:00:00Z"}
     ids = ("a-bug", "b-bug", "c-bug", "d-bug", "e-bug", "f-bug", "g-bug")
     specs = _ledger(
@@ -841,14 +842,15 @@ def test_fix_derives_each_fix_commit_and_its_direction(script: Path, tmp_path: P
     fix_g = commit("fix(bugs): g-bug — cause", {"cli/x.py": "y\n"})
     e_rows = ["\t0\t1\tcli/a.py", "\t1\t0\tp/behavior-map.json", "\t1\t0\tspecs/x",
               "\t1\t0\ttests/test_a.py"]  # fmt: skip
+    t_rows = ["\t1\t1\tcli/x.py", "\t1\t0\tcli/z.py", "\trework\t0 planned, 1 overfitting"]
     done = _run(script, "fix", "--specs", str(specs))
     assert done.returncode == 0, done.stderr
     assert done.stdout.splitlines() == [
         f"a-bug\t{full(rework_a)},{full(fix_a)}\tnet-positive", "\t-\t-\tcli/b.bin",
-        "\t1\t0\tcli/a.py", "\t2\t0\ttests/test_a.py",
-        f"b-bug\t{t1},{t2}\t-",
+        "\t1\t0\tcli/a.py", "\t2\t0\ttests/test_a.py", "\trework\t0 planned, 1 overfitting",
+        f"b-bug\t{full(t1)},{full(t2)}\tnet-positive", *t_rows,
         "c-bug\tunlinked",
-        f"d-bug\t{t1},{t2}\t-",
+        f"d-bug\t{full(t1)},{full(t2)}\tnet-positive", *t_rows,
         f"e-bug\t{full(fix_e)}\tnet-negative", *e_rows,
         f"f-bug\t{full(fix_e)}\tnet-negative", *e_rows,
         f"g-bug\t{full(fix_g)}\tnet-neutral", "\t1\t1\tcli/x.py",
@@ -856,7 +858,7 @@ def test_fix_derives_each_fix_commit_and_its_direction(script: Path, tmp_path: P
     ]  # fmt: skip
     stats = _run(script, "stats", "--specs", str(specs)).stdout.splitlines()
     assert [ln for ln in stats if ln.startswith("direction:")] == [
-        "direction:net-negative\t2", "direction:net-neutral\t1", "direction:net-positive\t1",
+        "direction:net-negative\t2", "direction:net-neutral\t1", "direction:net-positive\t3",
     ]  # fmt: skip
     one = _run(script, "fix", "c-bug", "--specs", str(specs)).stdout.splitlines()
     assert one == ["c-bug\tunlinked", "[ok] 0 linked, 1 unlinked."]
@@ -864,7 +866,7 @@ def test_fix_derives_each_fix_commit_and_its_direction(script: Path, tmp_path: P
     t3 = commit("feat(T-3): task", {"cli/t3.py": "t\n"})
     commit(f"chore(bugs): resolve h-bug — by T-3 ({t3})", {"specs/n": "h\n"})
     both = _run(script, "fix", "h-bug", "--specs", str(specs)).stdout.splitlines()
-    assert both == [f"h-bug\t{t3},{full(fix_h)}\tnet-positive", "\t1\t0\tcli/h.py",
+    assert both == [f"h-bug\t{full(t3)},{full(fix_h)}\tnet-positive", "\t1\t0\tcli/t3.py", "\t1\t0\tcli/h.py",
                     "[ok] 1 linked, 0 unlinked."]  # fmt: skip
     rebuild = commit("refactor(bugs): c-bug — REBUILD u: revert and redo", {"cli/u.py": "u\n"})
     found = _run(script, "fix", "c-bug", "--specs", str(specs)).stdout.splitlines()  # AC12.12
@@ -894,7 +896,6 @@ def test_fix_lists_a_fix_commit_once_when_its_resolve_names_it_short(
 
 
 #: rc-10 Stage J1.S1 RED rows: strict, so a row turning green before its task flags itself.
-_RED_AC1_1 = pytest.mark.xfail(strict=True, reason="rc-10 AC1.1: the fix reader REBUILD (J1.S2.T1)")
 _RED_AC1_2 = pytest.mark.xfail(strict=True, reason="rc-10 AC1.2: evidence_seam at resolve (J1.S3.T1)")
 
 
@@ -946,10 +947,10 @@ def test_fix_drops_a_fix_commit_a_later_revert_undid(script: Path, tmp_path: Pat
     pytest.param([("fix(bugs): a-bug — first", "cli/a.py"), ('Revert "fix(bugs): a-bug — first"', "cli/a.py"),
                   ('Revert "Revert "fix(bugs): a-bug — first""', "cli/a.py"),
                   ('Revert "Revert "Revert "fix(bugs): a-bug — first"""', "cli/a.py")], [],
-                 marks=_RED_AC1_1, id="revert-of-revert-of-revert"),
+                 id="revert-of-revert-of-revert"),
     pytest.param([("fix(bugs): a-bug — part one", "cli/a.py"), ("fix(bugs): a-bug — part two", "cli/b.py"),
                   ('Revert "fix(bugs): a-bug" — the "x" guard of part two', "cli/b.py")], [0],
-                 marks=_RED_AC1_1, id="short-form-tail-quote"),
+                 id="short-form-tail-quote"),
 ])  # fmt: skip
 def test_fix_pairs_each_revert_with_one_commit(
     script: Path, tmp_path: Path, subjects: list[tuple[str, str]], kept: list[int]
@@ -972,7 +973,6 @@ def test_fix_pairs_each_revert_with_one_commit(
               if line.startswith("a-bug\t")]  # fmt: skip
     assert listed == ([shas[i] for i in kept] or ["unlinked"])
 
-@_RED_AC1_1
 def test_fix_diffs_a_shape_4_resolve_over_its_two_task_commits(script: Path, tmp_path: Path) -> None:
     """AC1.1: a shape-4 task commit is diffed like any fix: both commits' rows, one
     direction over their production lines (+2 −1; the test line never counts)."""
@@ -986,7 +986,6 @@ def test_fix_diffs_a_shape_4_resolve_over_its_two_task_commits(script: Path, tmp
                       "\t0\t1\tcli/x.py", "\t1\t0\ttests/test_t.py", "[ok] 1 linked, 0 unlinked."]  # fmt: skip
 
 
-@_RED_AC1_1
 def test_fix_links_a_class_commit_by_its_body_ids(script: Path, tmp_path: Path) -> None:
     """AC1.1: `chore(bugs): resolve class <class> — by <task> (<sha>)` names its ids one per
     body line; each id links the task commit."""
@@ -1000,7 +999,6 @@ def test_fix_links_a_class_commit_by_its_body_ids(script: Path, tmp_path: Path) 
                       "c-bug\tunlinked", "[ok] 2 linked, 1 unlinked."]  # fmt: skip
 
 
-@_RED_AC1_1
 def test_fix_counts_the_rework_of_its_surface_by_class(script: Path, tmp_path: Path) -> None:
     """AC1.1, Terms: a later commit overlapping a fix surface is rework — another bug's
     `fix(bugs)` is overfitting, a REBUILD is planned; the bug's own commits and a commit
@@ -1025,7 +1023,6 @@ def test_fix_counts_the_rework_of_its_surface_by_class(script: Path, tmp_path: P
     ]  # fmt: skip
 
 
-@_RED_AC1_1
 def test_fix_reads_a_surface_two_rcs_left_untouched_as_settled(script: Path, tmp_path: Path) -> None:
     """AC1.1, Terms: a fix surface no fix or REBUILD touched while 2 candidates were born
     is settled; one born since is not yet."""
