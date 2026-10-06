@@ -13,9 +13,7 @@ import pytest
 
 from dadaia_workspace.infrastructure.ledger_scripts import load_owner
 
-pytestmark = pytest.mark.unit
-
-_PUBLIC = Path(__file__).resolve().parents[3] / "dadaia_workspace" / "public"
+_PUBLIC = Path(__file__).resolve().parents[5] / "dadaia_workspace" / "public"
 _SRC = _PUBLIC / "skills" / "dd-bug-resolution" / "scripts" / "_bugs_balance.py"
 _ORDER = ["0.4.5", "0.4.6", "0.4.7", "0.4.8", "0.5.0"]
 _START, _END = datetime(2026, 1, 1, tzinfo=UTC), datetime(2026, 1, 11, tzinfo=UTC)

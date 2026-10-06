@@ -22,9 +22,7 @@ import pytest
 
 from tests.helpers.skill_scripts import stage_skill_scripts
 
-pytestmark = pytest.mark.unit
-
-_PUBLIC = Path(__file__).resolve().parents[3] / "dadaia_workspace" / "public"
+_PUBLIC = Path(__file__).resolve().parents[5] / "dadaia_workspace" / "public"
 _HISTO_SCHEMA = json.loads((_PUBLIC / "schemas/histo/histo-record-v1.schema.json").read_text())
 TERMINAL_DISPOSITIONS = tuple(_HISTO_SCHEMA["properties"]["disposition"]["enum"])
 _HISTO = (

@@ -25,9 +25,8 @@ from tests.helpers.skill_scripts import stage_skill_scripts
 
 _read = load_owner("dd-bug-resolution", "_ledger").records
 
-pytestmark = pytest.mark.unit
 
-_PUBLIC = Path(__file__).resolve().parents[3] / "dadaia_workspace" / "public"
+_PUBLIC = Path(__file__).resolve().parents[5] / "dadaia_workspace" / "public"
 _SCRIPTS = _PUBLIC / "skills" / "dd-bug-resolution" / "scripts"
 _SOURCE = _SCRIPTS / "bugs.py"
 #: Composed at run time: a tracked IPv4 literal is refused by the push-range scan.
@@ -897,8 +896,6 @@ def test_fix_lists_a_fix_commit_once_when_its_resolve_names_it_short(
     assert listed == [f"a-bug\t{sha}\tnet-positive", "\t1\t0\tcli/a.py", "[ok] 1 linked, 0 unlinked."]  # fmt: skip
 
 
-
-
 def _commits(root: Path, *commits: tuple[str, dict[str, str]]) -> list[str]:
     """Commit each ``(message, {path: text})`` in order; the full shas, oldest first."""
     shas = []
@@ -933,7 +930,6 @@ def test_fix_drops_a_fix_commit_a_later_revert_undid(script: Path, tmp_path: Pat
     assert listed == [f"a-bug\t{shas[3]}\tnet-neutral", "\t1\t1\tcli/a.py",
                       f"a-bug-two\t{shas[0]}\tnet-positive", "\t1\t0\tcli/b.py",
                       "[ok] 2 linked, 0 unlinked."]  # fmt: skip
-
 
 
 @pytest.mark.parametrize(("subjects", "kept"), [
