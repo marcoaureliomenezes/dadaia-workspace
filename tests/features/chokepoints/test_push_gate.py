@@ -278,7 +278,6 @@ def test_a_ledger_verb_outside_the_workspace_loads_the_pre_push_terms(
     assert ledger.private_refusal([{"title": f"a {_TERM} leak"}], specs) is not None
 
 
-@pytest.mark.xfail(strict=True, reason="JB.S1 RED: push-refusal-advertises-no-verify")
 @pytest.mark.parametrize("scenario", ["denylisted-blob", "malformed-stdin", "unreadable-objects"])
 def test_no_refusal_advertises_a_way_around_the_gate(repo: PushRepo, scenario: str) -> None:
     """Every refusal ends in its one fix line and names no bypass (ADR 0158)."""
