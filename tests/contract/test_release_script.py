@@ -480,8 +480,8 @@ def test_a_stale_balance_block_refuses_at_closure_and_passes_in_implementation(
 
     def balance_rows(phase: str) -> list[dict[str, str]]:
         state.write_text(json.dumps({**json.loads(state.read_text("utf-8")), "phase": phase}))
-        done = subprocess.run([sys.executable, str(script), "check", "--json", "--specs", str(specs)],
-                              capture_output=True, text=True)  # fmt: skip
+        argv = [sys.executable, str(script), "check", "--json", "--specs", str(specs)]
+        done = subprocess.run(argv, capture_output=True, text=True)
         assert done.stdout, done.stderr
         return [f for f in json.loads(done.stdout) if f["path"] == "memory/QUALITY.md"]
 
@@ -491,8 +491,8 @@ def test_a_stale_balance_block_refuses_at_closure_and_passes_in_implementation(
     assert stale[0]["fix"].endswith(f" balance --write --specs {specs.as_posix()}")
 
     bugs = script.parents[2] / "dd-bug-resolution" / "scripts" / "bugs.py"
-    written = subprocess.run([sys.executable, str(bugs), "balance", "--write", "--specs", str(specs)],
-                             capture_output=True, text=True)  # fmt: skip
+    argv = [sys.executable, str(bugs), "balance", "--write", "--specs", str(specs)]
+    written = subprocess.run(argv, capture_output=True, text=True)
     assert written.returncode == 0, written.stderr
     assert "Bug balance from BUGS.jsonl: 4 records (4 live, 0 archived)." in quality.read_text(
         "utf-8"
@@ -501,7 +501,11 @@ def test_a_stale_balance_block_refuses_at_closure_and_passes_in_implementation(
 
 
 def _balance_tree(
-    tmp_path: Path, records: list[dict[str, object]], *, git: bool = True
+    tmp_path: Path,
+    records: list[dict[str, object]],
+    *,
+    git: bool = True,
+    log: tuple[str, ...] = ("2026-01-01T12:00:00Z",),
 ) -> list[str]:
     """A one-release specs tree with *records* as its ledger and both skills staged beside it;
     returns the `bugs.py balance` argv."""
@@ -510,8 +514,8 @@ def _balance_tree(
     if git:
         subprocess.run(["git", "init", "-q", str(tmp_path)], check=True)
     specs = _specs(tmp_path, _GOOD)
-    log = [{"ts": "2026-01-01T12:00:00Z", "agent": "a", "kind": "note", "text": "t"}]
-    _seed_ledgers(specs, log=log)
+    entries = [{"ts": ts, "agent": "a", "kind": "note", "text": "t"} for ts in log]
+    _seed_ledgers(specs, log=entries)
     (specs / "bugs/BUGS.jsonl").write_text("".join(json.dumps(r) + "\n" for r in records))
     bugs = tmp_path / "skills" / "dd-bug-resolution" / "scripts" / "bugs.py"
     return [sys.executable, str(bugs), "balance", "--specs", str(specs)]
@@ -528,3 +532,96 @@ def test_balance_refuses_an_unreadable_input_with_one_fix_line(tmp_path: Path, g
     assert done.returncode == 1
     assert "Traceback" not in done.stderr
     assert sum(ln.startswith("fix: ") for ln in done.stderr.splitlines()) == 1
+
+
+def test_the_verb_prints_dev_tooling_surfaces_apart_by_the_gitattributes_class(
+    tmp_path: Path,
+) -> None:
+    """AC4.1: the class is the repo's `.gitattributes` attribute `dadaia-dev-tooling`."""
+    found = {"release": "0.5.0", "rc": "rc-1"}
+    records = [
+        {"id": n, "surface": n, "ts": "2026-01-02T00:00:00Z", "found_in": found}
+        for n in ("tests", "core")
+    ]
+    argv = _balance_tree(tmp_path, records)
+    (tmp_path / ".gitattributes").write_text("/tests dadaia-dev-tooling\n", "utf-8")
+
+    done = subprocess.run(argv, capture_output=True, text=True)
+
+    assert done.returncode == 0, done.stderr
+    assert done.stdout.splitlines()[1:5] == [
+        "surface  records  recurrences  fix-induced  archived  rcs  correlates  settled",
+        "core     1        0            0            0         1    0           no",
+        "dev-tooling:",
+        "tests    1        0            0            0         1    0           no",
+    ]
+    assert done.stdout.splitlines()[5].endswith("T = 0 days: u = n/a, no data")
+
+
+def test_the_trend_window_opens_on_the_oldest_of_four_releases_and_ends_on_the_last_log_day(
+    tmp_path: Path,
+) -> None:
+    """AC4.2: five releases, the window is the live one and the 3 before it; archived lines
+    with no `id` are not records."""
+    log = ["2026-01-09T12:00:00Z", "2026-01-12T00:00:00Z", "2026-01-15T18:00:00Z"]
+    found = {"release": "0.5.0", "rc": "rc-1"}
+    gone = {"release": "unknown", "rc": "unknown"}
+    records = [
+        {"id": "a", "surface": "core", "ts": "2026-01-06T09:00:00Z", "found_in": found},
+        {"id": "b", "surface": "core", "ts": "2026-01-07T09:00:00Z", "found_in": gone},
+    ]
+    argv = _balance_tree(tmp_path, records, log=log)
+    for release, start in (("0.4.5", "01"), ("0.4.6", "03"), ("0.4.7", "05"), ("0.4.8", "07")):
+        archive = tmp_path / "specs" / "releases" / "_archive" / release
+        archive.mkdir(parents=True)
+        entry = [{"ts": f"2026-01-{start}T06:00:00Z", "agent": "a", "kind": "note", "text": "t"}]
+        (archive / "_RELEASE.json").write_text(json.dumps({"log": entry}), "utf-8")
+    histo = tmp_path / "specs" / "bugs" / "_archive" / "bugs_histo.jsonl"
+    histo.parent.mkdir()
+    lines = [
+        {"ts": "2026-01-01T00:00:00Z", "event": "x"},
+        {"event": "y"},
+        {"id": "c", "surface": "core", "found_in": gone},
+    ]
+    histo.write_text("".join(json.dumps(line) + "\n" for line in lines), "utf-8")
+
+    done = subprocess.run(argv, capture_output=True, text=True)
+
+    assert done.returncode == 0, done.stderr
+    out = done.stdout.splitlines()
+    assert out[0] == "Bug balance from BUGS.jsonl: 3 records (2 live, 1 archived)."
+    [trend] = [ln for ln in out if ln.startswith("Laplace")]
+    assert trend == "Laplace trend (days), window 0.4.6..0.5.0, T = 12 days: u = -0.76, no trend"
+
+
+def _quality_rows(script: Path, specs: Path, phase: str) -> list[dict[str, str]]:
+    state = specs / "releases/0.5.0/_RELEASE.json"
+    state.write_text(json.dumps({**json.loads(state.read_text("utf-8")), "phase": phase}))
+    argv = [sys.executable, str(script), "check", "--json", "--specs", str(specs)]
+    done = subprocess.run(argv, capture_output=True, text=True)
+    assert done.stdout, done.stderr
+    return [f for f in json.loads(done.stdout) if f["path"] == "memory/QUALITY.md"]
+
+
+def test_the_closure_check_judges_only_a_block_it_can_regenerate(
+    script: Path, tmp_path: Path
+) -> None:
+    """AC4.4: no `## Bugs` block is not judged; a block over a ledger the verb cannot read is
+    one refusal, never a silent pass."""
+    _balance_tree(tmp_path, [])
+    specs = tmp_path / "specs"
+    quality = specs / "memory" / "QUALITY.md"
+    quality.parent.mkdir()
+    quality.write_text("# Quality\n\n## Gates\n\n```text\nnot the bug block\n```\n", "utf-8")
+    assert _quality_rows(script, specs, "CLOSURE") == []
+
+    quality.write_text("# Quality\n\n## Bugs\n\n```text\nany\n```\n", "utf-8")
+    (specs / "bugs/BUGS.jsonl").write_text("not json\n", "utf-8")
+
+    rows = _quality_rows(script, specs, "CLOSURE")
+
+    assert [r["verdict"] for r in rows] == ["error"]
+    assert rows[0]["message"].startswith(
+        "the `## Bugs` block is not current: [error] BUGS.jsonl:1 is not valid JSON"
+    )
+    assert rows[0]["fix"].endswith(f" balance --write --specs {specs.as_posix()}")
