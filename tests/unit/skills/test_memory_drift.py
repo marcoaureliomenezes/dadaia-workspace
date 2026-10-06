@@ -229,7 +229,7 @@ def test_a_bound_a_shallow_clone_holds_beyond_its_cut_names_the_cut_not_a_rebase
 
     assert shown.stdout.splitlines() == [
         f"{older} is out of reach: a shallow clone lacks the window's history",
-        f"git -C {clone} fetch --unshallow",
+        f"git -C {clone.as_posix()} fetch --unshallow",
     ]
 
 
@@ -274,7 +274,7 @@ def test_a_git_read_that_fails_in_a_shallow_clone_names_the_cut(
 
     assert shown == [
         f"git rev-parse --verify -q nope failed in {clone}: a shallow clone lacks the window's history",
-        f"git -C {clone} fetch --unshallow",
+        f"git -C {clone.as_posix()} fetch --unshallow",
     ]
 
 
