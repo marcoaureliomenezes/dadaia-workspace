@@ -5,9 +5,10 @@ Derived from git on every call, never stored, in two steps.
 
 - Link: oldest first, a `Revert "<subject>"` (git's default, or a short form quoting a
   word-prefix of it; a pairing on the subject survives a rebase, the body's sha does not)
-  undoes the earlier live commit it names in most words (a tie: the shorter subject, then
-  the nearest), and undoing a revert flips the whole chain beneath it. A live shape-3, shape-4 or REBUILD subject then links its ids — a class
-  commit the ids on its body lines — to itself or to the task commits it names.
+  undoes the earlier live commit it names with the fewest words beyond the quote (the
+  exact subject; a tie: the nearest), and undoing a revert flips the whole chain beneath
+  it. A live shape-3, shape-4 or REBUILD subject then links its ids — a class commit the
+  ids on its body lines — to itself or to the task commits it names.
 - Diff: every linked sha's numstat; its production paths are its fix surface. A later
   live REBUILD (planned) or `fix(bugs)` of another bug (overfitting) removing a line a
   fix wrote (`git blame` of its removed lines names the fix sha) is its rework.
@@ -115,12 +116,9 @@ def _parse(out: str) -> list[_Commit]:
     return commits
 
 
-def _undoes(revert: str, subject: str) -> int:
-    """How many of *subject*'s words the revert's quote starts with; 0 = it undoes nothing."""
+def _undoes(revert: str, subject: str) -> bool:
     quoted, words = revert.removeprefix('Revert "'), subject.split(" ")
-    if quoted == revert:
-        return 0
-    return max((n for n in range(1, len(words) + 1) if quoted.startswith(" ".join(words[:n]) + '"')), default=0)  # fmt: skip
+    return quoted != revert and any(quoted.startswith(" ".join(words[:n]) + '"') for n in range(1, len(words) + 1))  # fmt: skip
 
 
 def _kind(commit: _Commit) -> str | None:
@@ -143,9 +141,9 @@ def fixes(specs: Path) -> dict[str, Fix]:
     for i, commit in enumerate(log):  # link step 1: the reverts
         if not commit.subject.startswith('Revert "'):
             continue
-        # the live commit whose subject the quote matches in most words, a tie to the shorter subject, then the nearest
-        fits = [(n, -len(e.subject.split(" ")), j) for j, e in enumerate(log[:i]) if e.live and (n := _undoes(commit.subject, e.subject))]  # fmt: skip
-        target = log[max(fits)[2]] if fits else None
+        # the live commit the quote names with the fewest words beyond it (the exact subject), then the nearest
+        fits = [(-len(e.subject.split(" ")), j) for j, e in enumerate(log[:i]) if e.live and _undoes(commit.subject, e.subject)]  # fmt: skip
+        target = log[max(fits)[1]] if fits else None
         commit.undid = target
         while target:  # undoing a revert reinstates its own, and so on down the chain
             target.live, target = not target.live, target.undid

@@ -233,6 +233,51 @@ def test_a_bound_a_shallow_clone_holds_beyond_its_cut_names_the_cut_not_a_rebase
     ]
 
 
+def _refusal(script: Path, call: str) -> list[str]:
+    """The message and fix line of the `Refusal` the python *call* raises, in the staged skill."""
+    code = (
+        f"import sys; sys.path.insert(0, {str(script.parent)!r}); import _memory_drift as d\n"
+        f"try: {call}\nexcept d.Refusal as r: print(r); print(r.fix)"
+    )
+    done = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True, check=True)
+    return done.stdout.splitlines()
+
+
+def test_an_absent_bound_is_left_to_gits_own_refusal_not_named_a_rebase(
+    script: Path, repo: Path
+) -> None:
+    """The decider tells three bounds apart: an absent one is neither a cut nor a rebase."""
+    shown = _refusal(
+        script, f"d.report(__import__('pathlib').Path({str(repo / 'specs')!r}), '0' * 40)"
+    )
+
+    assert "rebase" not in shown[0] and "shallow" not in shown[0]
+    assert shown[1] == (
+        "Operator action: run this verb from a checkout whose history holds the --since commit"
+    )
+
+
+def test_a_git_read_that_fails_in_a_shallow_clone_names_the_cut(
+    script: Path, repo: Path, tmp_path: Path
+) -> None:
+    """A caller that passes no bound (release.py, _release_tree.py) gets the same cut naming."""
+    (repo / "later.txt").write_text("later\n", "utf-8")
+    _git(repo, "add", "-A")
+    _git(repo, "commit", "-qm", "later")
+    clone = tmp_path / "clone"
+    _git(tmp_path, "clone", "-q", "--depth", "1", f"file://{repo}", str(clone))
+
+    shown = _refusal(
+        script,
+        f"d.git(__import__('pathlib').Path({str(clone)!r}), 'rev-parse', '--verify', '-q', 'nope')",
+    )
+
+    assert shown == [
+        f"git rev-parse --verify -q nope failed in {clone}: a shallow clone lacks the window's history",
+        f"git -C {clone} fetch --unshallow",
+    ]
+
+
 def _release_drift(script: Path, repo: Path, state: dict[str, object]) -> dict[str, object]:
     """`release.py drift` over a live release carrying *state*: the release skill is
     projected beside the navigator, as `public install` lays it out."""
