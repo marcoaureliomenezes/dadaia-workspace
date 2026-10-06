@@ -57,5 +57,5 @@ Paths are relative to the repo root; aliases as in `PLAN.md` (`f/`, `pub/`, `S/`
 
 | task | AC | `W:` | owner tests / RED |
 |---|---|---|---|
-| J7.S5.T1 | AC7.1 | `tests/e2e/test_push_denylist_journey.py`, `tests/e2e/test_one_line_bootstrap.py`, `tests/e2e/test_push_gate_check.py`, `tests/e2e/features/test_specs_upgrade_e2e.py`, `tests/e2e/features/test_public_pipeline.py`, `tests/e2e/features/test_ctx_inject_bind_boundary.py` (an `Owner:` docstring line), `scripts/guards/repo.py` (check `tests-mirror-the-package`, after every move: red on a planted loose file and on an empty test directory) | guard plants |
+| J7.S5.T1 | AC7.1 | `tests/fixtures/test_conftest_size.py` (moved from `tests/test_conftest_size.py`, as J7.S1.T1 announced), `tests/e2e/test_push_denylist_journey.py`, `tests/e2e/test_one_line_bootstrap.py`, `tests/e2e/test_push_gate_check.py`, `tests/e2e/features/test_specs_upgrade_e2e.py`, `tests/e2e/features/test_public_pipeline.py`, `tests/e2e/features/test_ctx_inject_bind_boundary.py` (an `Owner:` docstring line), `scripts/guards/repo.py` (check `tests-mirror-the-package`, after every move: red on a planted loose file and on an empty test directory) | guard plants |
 | J7.S5.T2 | — | this file | close task, last: behavior map; `test-audit:` names `test_conftest_size.py` (moves otherwise, asserts unchanged), `mutation:`; `done` |
