@@ -6,7 +6,7 @@ Scope: this file governs only `specs/releases/`.
 
 - Exactly ONE live release directory, ever: a bare SemVer id, created only by `RELEASE_PY new <id>`,
   which writes `rc-1/SPEC.md` + `_RELEASE.json` (DEFINITION) in one transaction and refuses a second one.
-- The release has OPEN scope: it grows by closed-scope CANDIDATES, each born by `RELEASE_PY new` in its own `rc-<N>/` and never rewritten after its closure (ADR 0150).
+- The release has OPEN scope: it grows by CANDIDATES, each born by `RELEASE_PY new` in its own `rc-<N>/` (ADR 0150).
 - Canonical release state: `_RELEASE.json` — one mutable document (`phase`/milestones) plus an append-only `log`; a legacy `RELEASE.json` is renamed by `.dadaia/.venv/bin/dadaia doctor --fix` (SPEC-DOC-046, ADR 0007).
 - No `_RELEASE.jsonl` event stream, no `CLOSURE.md`, no `reviews/` directory, no `segment`/`audited` fields.
 
@@ -20,7 +20,11 @@ Scope: this file governs only `specs/releases/`.
 - One `**Origin:**` line per SPEC, the first counting (ADR 0161): `operator-demand`, or `backlog:<ids>; bugs:<ids>; findings:<ids>`, each kind at most once, a finding id in full (`<audit-id>-F<nnn>`); `RELEASE_PY check` judges it and traces each id back. Weight: `operator-demand` is the heaviest — as-is review and grill first, full memory pass; a `backlog:` pick the default, full memory pass; `bugs:` alone composes bugs, memory pass surgical or none.
 - SDD lifecycle order PER CANDIDATE: as-is review -> grill -> SPEC (Draft) -> operator approval -> PLAN -> TASKS -> implementation -> closure -> integration-branch merge -> promote-or-continue gate.
 - Full arc, gate cadence, the step-by-step ladder: `dd-release-implementation`'s `RC-FLOW.md`.
-- Recommended size, never a gate (ADR 0152 (2)): a candidate's SPEC.md within 24 KiB and TASKS.md within 12 KiB; past it, the next work opens `rc-<N+1>/`.
+- A candidate is closed: created, implemented, or cancelled into the next; never amended (shape 8 records approval only); a new AC goes to the next rc.
+- A red outside a stage's envelope appends a new stage; a stage's third red gate stops the job for the operator,
+  the driver appending one `kind: note` log entry `stop: <job> stage <n> — third red gate`.
+- rc N+1 is defined while rc N implements, its §1 and Job 1 closing with rc N; one rc implements at a time.
+- Recommended size, never a gate (ADR 0152 (2)): SPEC.md within 24 KiB, each job file within 12 KiB.
 - A `v`-prefixed id is minted nowhere — the bare axis (`^\d+\.\d+\.\d+$`) is the only current one.
 
 ## 3. Tasks — the auditable trace
