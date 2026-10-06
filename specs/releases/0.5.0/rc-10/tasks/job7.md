@@ -35,7 +35,7 @@ Paths are relative to the repo root; aliases as in `PLAN.md` (`f/`, `pub/`, `S/`
 | task | AC | `W:` | owner tests / RED |
 |---|---|---|---|
 | J7.S3.T1 | AC7.1, AC7.2 | `tests/core/**` (moved from today's tiers) | moved files |
-| J7.S3.T2 | AC7.1, AC7.2 | `tests/features/spec_context/**` (moved from today's tiers) | moved files |
+| J7.S3.T2 | AC7.1, AC7.2 | `tests/features/spec_context/**` (moved from today's tiers); `tests/conftest.py` (the worktree-rows bridge covers every test that reaches git but no process: two tests that were `unit` import `real_git`, so they are `medium`, and read the real rows without it) | moved files |
 | J7.S3.T3 | AC7.1, AC7.2 | `tests/features/specs/**` (moved from today's tiers) | moved files |
 | J7.S3.T4 | AC7.1, AC7.2 | `tests/features/<f>/**` for every other feature (moved from today's tiers); `tests/unit/features/specs/test_doctor_ledger_invariants.py` deleted (empty file) | moved files |
 | J7.S3.T5 | AC7.1, AC7.2 | `tests/cli/**`, `tests/hooks/**`, `tests/infrastructure/**`, `tests/test_container.py`, `tests/fixtures/_store_contract.py` (moved from today's tiers); `tests/integration/conftest.py` deleted (its one fixture is requested by no test) | moved files |
