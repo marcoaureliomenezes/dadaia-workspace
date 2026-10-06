@@ -4,6 +4,8 @@
 
 Paths are relative to the repo root; aliases as in `PLAN.md` (`f/`, `pub/`, `S/`, `bugres/`, `relimpl/`, `GF/`, `evals:`). Gates: task — `verify-task:` on the touched files plus `Owner-tests:`; stage — `verify-stage:`; job — CI matrix + one review + `verify:`. Every stage before Job 6 merges runs under today's law (SPEC.md Job 6): stage 1 RED as strict xfail.
 
+- Precondition: the main thread's `docs(adr): accept 0208–0210` commit, written at the rebase.
+
 ## Stage J1.S1 — RED
 
 - Contract: exit tests every AC1.1/AC1.2 unit row RED as strict xfail; envelope `tests/unit/skills/test_bug_resolution_bugs_script.py`; ACs AC1.1, AC1.2

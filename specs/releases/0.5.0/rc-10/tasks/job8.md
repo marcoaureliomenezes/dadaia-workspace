@@ -8,22 +8,23 @@ Paths are relative to the repo root; aliases as in `PLAN.md` (`f/`, `pub/`, `S/`
 
 ## Stage J8.S1 — RED
 
-- Contract: exit tests the AC8.2 and AC8.3 rows RED as strict xfail; envelope `tests/unit/features/spec_context/test_service_rows.py`, `tests/unit/hooks/**`; ACs AC8.2, AC8.3
+- Contract: exit tests the AC8.2 rows RED as strict xfail; envelope `tests/unit/features/spec_context/test_service_rows.py`; ACs AC8.2
+- AC8.3 has no RED row: its rows pass today through `run_hook_subprocess`; the rework is J8.S2.T4.
 
 | task | AC | `W:` | owner tests / RED |
 |---|---|---|---|
 | J8.S1.T1 | AC8.2 | `tests/unit/features/spec_context/test_service_rows.py` | RED: `SpecContextService` and `DoctorService` each built with a stub rows callable read its rows |
-| J8.S1.T2 | AC8.3 | `tests/unit/hooks/test_common.py`, `tests/unit/hooks/test_root_whitelist.py` | RED: one row per hook lane through `run_hook_subprocess`; no `sys.stdin` patch left |
 
 ## Stage J8.S2 — DELETE the patches; inject the rows
 
-- Contract: exit tests J8.S1 green, unit + integration green; envelope `f/spec_context/service.py`, `f/spec_context/doctor.py`, `dadaia_workspace/container.py`, `tests/conftest.py`, `tests/fakes.py`, `tests/contract/cli/test_cli_context.py`, `scripts/guards/isolation.py`, `tests/fixtures/harness_env.py`; ACs AC8.2, AC8.3
+- Contract: exit tests J8.S1 green, unit + integration green; envelope `f/spec_context/service.py`, `f/spec_context/doctor.py`, `dadaia_workspace/container.py`, `tests/conftest.py`, `tests/fakes.py`, `tests/contract/cli/test_cli_context.py`, `scripts/guards/isolation.py`, `tests/fixtures/harness_env.py`, `tests/unit/hooks/test_common.py`, `tests/unit/hooks/test_root_whitelist.py`, `dadaia_workspace/hooks/_common.py`; ACs AC8.2, AC8.3
 
 | task | AC | `W:` | owner tests / RED |
 |---|---|---|---|
 | J8.S2.T1 | AC8.2 | `f/spec_context/service.py`, `f/spec_context/doctor.py`, `dadaia_workspace/container.py` (rows callable by constructor; the module-global read leaves) | `test_service_rows.py` |
 | J8.S2.T2 | AC8.2 | `tests/conftest.py` (Job 7's bridge fixture leaves), `tests/fakes.py` (the stub rows), `tests/contract/cli/test_cli_context.py` (inline patch leaves) | `test_cli_context.py` |
 | J8.S2.T3 | AC8.3 | `scripts/guards/isolation.py` (`hook-stdin-not-in-process` and its plants leave), `tests/fixtures/harness_env.py` (its comment pointer) | check: `grep -c hook-stdin-not-in-process scripts/guards/isolation.py` prints `0` |
+| J8.S2.T4 | AC8.3 | `tests/unit/hooks/test_common.py`, `tests/unit/hooks/test_root_whitelist.py` (one row per hook lane through `run_hook_subprocess`; the `sys.stdin` patches leave), `dadaia_workspace/hooks/_common.py` (only if a row needs stdin injected at the entrypoint) | the two files |
 
 ## Stage J8.S3 — no process in a small test
 

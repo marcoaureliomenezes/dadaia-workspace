@@ -2,7 +2,7 @@
 
 **Status:** Draft
 
-Paths are relative to the repo root; aliases as in `PLAN.md` (`f/`, `pub/`, `S/`, `bugres/`, `relimpl/`, `GF/`, `evals:`). Gates: task — `verify-task:` on the touched files plus `Owner-tests:`; stage — `verify-stage:`; job — CI matrix + one review + `verify:`. Bound by the freeze; it writes no test.
+Paths are relative to the repo root; aliases as in `PLAN.md` (`f/`, `pub/`, `S/`, `bugres/`, `relimpl/`, `GF/`, `evals:`). Gates: task — `verify-task:` on the touched files plus `Owner-tests:`; stage — `verify-stage:`; job — CI matrix + one review + `verify:`. Bound by the freeze if Job 6 merged, else today's law; it writes no test.
 
 ## Stage JR.S1 — RED (none: AC10.1–AC10.5 have no test)
 
@@ -21,11 +21,11 @@ Paths are relative to the repo root; aliases as in `PLAN.md` (`f/`, `pub/`, `S/`
 
 ## Stage JR.S3 — the balance and closure
 
-- Contract: exit tests `release.py check` in CLOSURE (AC4.4's block current), `bugs.py status` `0 open`; envelope `specs/memory/QUALITY.md` (`## Bugs` regenerated), `specs/releases/0.5.0/_RELEASE.json`, `specs/releases/0.5.0/rc-11/SPEC.md`; ACs AC9.1, AC10.2, AC10.5
+- Contract: exit tests `release.py check` in CLOSURE (AC4.4's block current), `bugs.py status` `0 open`; envelope `specs/memory/**`, `docs/bug-ledger-lessons.md`, `CONTEXT.md`, `specs/releases/0.5.0/_RELEASE.json`, this rc's job files; ACs AC4.5, AC9.1, AC10.2, AC10.5
+- AC10.5's rc-11 SPEC is drafted in its own `0.5.0-rc11/define` tree, an act outside this job.
 
 | task | AC | `W:` | owner tests / RED |
 |---|---|---|---|
-| JR.S3.T1 | AC10.2 | `specs/memory/QUALITY.md` (`bugs.py balance --write` after the sweep) | `release.py check` |
+| JR.S3.T1 | AC4.5, AC10.2 | `specs/memory/QUALITY.md` (`## Bugs`: the first block by `bugs.py balance --write` after the sweep, then the written review with the latest evals verdict line), `specs/memory/product/**/bug-ledger.md` and `specs/memory/product/catalog.json` (the atom move), `docs/bug-ledger-lessons.md` (re-derived from `## Bugs`, one merge, 0192), `CONTEXT.md` (the SPEC's Terms) | `release.py check`, `test_docs_derived_from_memory.py` |
 | JR.S3.T2 | AC10.2, AC10.5 | `specs/releases/0.5.0/_RELEASE.json` (readouts, AC8.1's readout, each job's merge entry and bug-surface delta; phase) | `release.py check` |
-| JR.S3.T3 | AC10.5 | `specs/releases/0.5.0/rc-11/SPEC.md` (Draft, in the `0.5.0-rc11/define` tree) | — |
-| JR.S3.T4 | — | this file | close task, last: behavior map and derived docs; `test-audit: no test touched`, `mutation: skipped — no Python source`; `done` |
+| JR.S3.T4 | — | this file, `specs/releases/0.5.0/rc-10/tasks/job2.md`, `specs/releases/0.5.0/rc-10/tasks/job3.md` (their `done` lines: evals trees cannot write them) | close task, last: behavior map and derived docs; `test-audit: no test touched`, `mutation: skipped — no Python source`; `done` |

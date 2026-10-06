@@ -5,7 +5,7 @@
 Paths are relative to the repo root; aliases as in `PLAN.md` (`f/`, `pub/`, `S/`, `bugres/`, `relimpl/`, `GF/`, `evals:`). Gates: task — `verify-task:` on the touched files plus `Owner-tests:`; stage — `verify-stage:`; job — CI matrix + one review + `verify:`. Runs under today's law (before Job 6).
 
 - Edges: Jobs 1, 4, 5 merged (their test files move here). Mirror rule: PLAN agent default 6; markers: agent default 7.
-- AC7.2: every move is `git mv` plus merge, one feature per commit, no assert changed; check at the job gate: `git grep -h '^\s*assert' <base> -- tests | sort` equals the same at HEAD.
+- AC7.2: every move is `git mv` plus merge, one feature per commit, no assert changed; check at the job gate: `git grep -h '^\s*assert' <base> -- tests | sort`, `<base>` the commit closing J7.S2, equals the same at HEAD.
 
 ## Stage J7.S1 — RED
 
@@ -13,17 +13,17 @@ Paths are relative to the repo root; aliases as in `PLAN.md` (`f/`, `pub/`, `S/`
 
 | task | AC | `W:` | owner tests / RED |
 |---|---|---|---|
-| J7.S1.T1 | AC7.3 | `tests/test_conftest_size.py` (pytester; moves to `tests/fixtures/` in J7.S3) | RED: a test using a real-git fixture collects `medium`, a pure one `small`, wherever its folder |
+| J7.S1.T1 | AC7.3 | `tests/test_conftest_size.py` (pytester; moves to `tests/fixtures/` in J7.S4.T2) | RED: a test using a real-git fixture collects `medium`, a pure one `small`, wherever its folder |
 
 ## Stage J7.S2 — size from the fixture; the guard
 
-- Contract: exit tests J7.S1 green, unit + integration green; guard plants red; envelope `tests/conftest.py`, `tests/unit/conftest.py`, `pyproject.toml`, `scripts/ci.py`, `.github/workflows/ci.yml`, `scripts/guards/repo.py`; ACs AC7.1, AC7.3, AC7.4
+- Contract: exit tests J7.S1 green, unit + integration green; guard plants red; envelope `tests/conftest.py`, `tests/unit/conftest.py`, `pyproject.toml`, `scripts/ci.py`, `.github/workflows/ci.yml`, `tests/AGENTS.md` (`:21-27`, the tier text); ACs AC7.3, AC7.4
 
 | task | AC | `W:` | owner tests / RED |
 |---|---|---|---|
 | J7.S2.T1 | AC7.3 | `tests/conftest.py` (`_PATH_MARKERS` leaves; size from the fixtures an item requests; `tests/unit/conftest.py`'s autouse moves here for `small` items, agent default 8), `tests/unit/conftest.py` (deleted), `pyproject.toml` (markers) | `test_conftest_size.py` |
+| J7.S2.T3 | AC7.3 | `tests/AGENTS.md` (`:21-27`: size from the fixture, never the folder) | no test |
 | J7.S2.T2 | AC7.3, AC7.4 | `scripts/ci.py`, `.github/workflows/ci.yml` (select by marker, not folder; the Windows job selects the `windows-integration-coverage-gap` cases by marker) | `tests/integration/test_ci_script.py`; check: the Windows job log lists them |
-| J7.S2.T3 | AC7.1 | `scripts/guards/repo.py` (check `tests-mirror-the-package`: red on a planted loose file and on an empty test directory) | guard plants |
 
 ## Stage J7.S3 — the moves, one feature per task
 
@@ -40,11 +40,19 @@ Paths are relative to the repo root; aliases as in `PLAN.md` (`f/`, `pub/`, `S/`
 
 ## Stage J7.S4 — the skills, scripts and suite tests
 
-- Contract: as J7.S3; envelope `tests/**`, `scripts/guards/*.py`; ACs AC7.1, AC7.2
+- Contract: as J7.S3; envelope `tests/**`, `scripts/guards/*.py`, `pub/data/CONTEXT-MAP.md`; ACs AC7.1, AC7.2
 
 | task | AC | `W:` | owner tests / RED |
 |---|---|---|---|
 | J7.S4.T1 | AC7.1, AC7.2 | `tests/public/**` (moved from today's tiers) | moved files |
 | J7.S4.T2 | AC7.1, AC7.2 | `tests/scripts/**`, `tests/fixtures/test_*.py` (moved from today's tiers) | moved files |
-| J7.S4.T3 | AC7.1 | `scripts/guards/isolation.py`, `scripts/guards/suite.py`, `scripts/guards/slop.py` (path literals of moved files) | guard plants |
-| J7.S4.T4 | — | this file | close task, last: behavior map; `test-audit:` (moves only, asserts unchanged), `mutation:`; `done` |
+| J7.S4.T3 | AC7.1 | `scripts/guards/isolation.py`, `scripts/guards/suite.py`, `scripts/guards/slop.py`, `scripts/guards/run.py` (`:64`), `pub/data/CONTEXT-MAP.md` (`:5`) (path literals of moved files) | guard plants |
+
+## Stage J7.S5 — the mirror guard; close
+
+- Contract: exit tests unit + integration + e2e green; the guard red on its plants, green on the tree; envelope `scripts/guards/repo.py`, this file; ACs AC7.1
+
+| task | AC | `W:` | owner tests / RED |
+|---|---|---|---|
+| J7.S5.T1 | AC7.1 | `scripts/guards/repo.py` (check `tests-mirror-the-package`, after every move: red on a planted loose file and on an empty test directory) | guard plants |
+| J7.S5.T2 | — | this file | close task, last: behavior map; `test-audit:` names `test_conftest_size.py` (moves otherwise, asserts unchanged), `mutation:`; `done` |
