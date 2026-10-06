@@ -154,22 +154,37 @@ def test_new_refuses_a_second_live_release_with_one_fix_line(script: Path, tmp_p
     assert _tree_hash(specs) == before
 
 
-def test_an_rc_spec_opens_with_the_bug_window_review(script: Path, tmp_path: Path) -> None:
-    """AC5.6: `new` writes `## Bug window review` as the first SPEC heading; `check` refuses
-    a live SPEC without it, with exactly one fix."""
+def test_new_opens_the_rc_spec_with_the_bug_window_review(script: Path, tmp_path: Path) -> None:
+    """AC5.6: `new` writes `## Bug window review` as the first SPEC heading."""
     specs = _specs(tmp_path)
     assert _run(script, "new", "9.9.9", "--specs", str(specs)).returncode == 0
     spec = (specs / "releases" / "9.9.9" / "rc-1" / "SPEC.md").read_text(encoding="utf-8")
     headings = [line for line in spec.splitlines() if line.startswith("## ")]
     assert headings[:1] == ["## Bug window review"]
 
-    bare = _specs(tmp_path / "bare")
-    _release(bare, "0.5.0", phase="IMPLEMENTATION")
-    spec_md = bare / "releases" / "0.5.0" / "rc-1" / "SPEC.md"
+
+# fmt: off
+@pytest.mark.parametrize(("phase", "errors", "verdict"), [
+    pytest.param("DEFINITION", [("releases/0.5.0/rc-1/SPEC.md", 1, True)], "error",
+                 id="definition-refuses"),
+    pytest.param("IMPLEMENTATION", [], "info", id="past-definition-informs",
+                 marks=pytest.mark.xfail(strict=True, reason="J5.S3.T3: HIGH 3")),
+])
+# fmt: on
+def test_a_live_spec_without_the_bug_window_review(
+    script: Path, tmp_path: Path, phase: str, errors: list[tuple[str, int, bool]], verdict: str
+) -> None:
+    """AC5.6, scoped as the Origin check is: a live SPEC lacking the heading is an error with
+    one fix while its candidate is in DEFINITION (where `new` writes it); past it, info."""
+    specs = _specs(tmp_path)
+    _release(specs, "0.5.0", phase=phase, tasks="- [ ] T-1 — open\n")
+    spec_md = specs / "releases" / "0.5.0" / "rc-1" / "SPEC.md"
     spec_md.write_text(spec_md.read_text(encoding="utf-8").replace("## Bug window review\n", ""))
-    result = _run(script, "check", "--json", "--specs", str(bare))
-    assert result.returncode != 0
-    assert [bool(f["fix"]) for f in json.loads(result.stdout)] == [True]
+    found = _run(script, "check", "--json", "--specs", str(specs))
+    listed = _run(script, "check", "--specs", str(specs))
+    assert found.returncode == (1 if errors else 0), found.stdout
+    assert [(f["path"], f["line"], bool(f["fix"])) for f in json.loads(found.stdout)] == errors
+    assert f"{verdict} releases/0.5.0/rc-1/SPEC.md:1 " in listed.stdout
 
 
 def test_a_verb_with_no_live_release_hands_new_to_the_operator(
