@@ -151,3 +151,13 @@ def test_the_rates_sort_rcs_by_number_not_by_text() -> None:
         "0.5.0/rc-9  0/1  0%",
         "0.5.0/rc-10  1/1  100%",
     ]
+
+
+def test_replaced_touches_the_first_block_only_and_parts_a_review_that_abuts_the_heading() -> None:
+    bal = _balance()
+    twice = "## Bugs\n\n```text\na\n```\n\n## Bugs\n\n```text\nb\n```\n"
+
+    assert bal.replaced(twice, "new\n") == twice.replace("a\n", "new\n", 1)
+    assert bal.replaced("## Bugs\nwritten review\n", "new\n") == (
+        "## Bugs\n\n```text\nnew\n```\n\nwritten review\n"
+    )
