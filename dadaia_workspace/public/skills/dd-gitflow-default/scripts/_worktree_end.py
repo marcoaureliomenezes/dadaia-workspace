@@ -119,24 +119,29 @@ def _check_ancestor(tree: Path, work: str) -> None:
         ) from error
 
 
-def _gate(tree: Path, level: str, *files: str, ref: str = "HEAD") -> None:
-    """One gate level: the command *ref*'s tracked `AGENTS.md` declares — `verify:` the job's,
-    `verify-stage:` and `verify-task:` (the touched *files* appended) — split by `shlex` and run
-    as one argv list in *tree*, never a shell, the workspace venv first on `PATH` (a bare
-    `python` is the workspace's, at any tree depth); its output, on stdout alone, is the evidence;
-    stdin is closed."""
-    lines = git(tree, "show", f"{ref}:AGENTS.md", check=False).splitlines()
+def _gate(tree: Path, level: str, work: str, *files: str, head: bool = False) -> None:
+    """One gate level: the command *work*'s tracked `AGENTS.md` declares (HEAD's when *head*) —
+    `verify:` the job's, `verify-stage:` and `verify-task:` (the touched *files* appended) — split
+    by `shlex` and run as one argv list in *tree*, never a shell, the workspace venv first on
+    `PATH` (a bare `python` is the workspace's, at any tree depth); its output, on stdout alone,
+    is the evidence; stdin is closed. A missing or unstartable line is fixed on *work* alone."""
+    lines = git(tree, "show", f"{'HEAD' if head else work}:AGENTS.md", check=False).splitlines()
     key = "verify:" if level == "job" else f"verify-{level}:"
     declared = next((ln.removeprefix(key).strip() for ln in lines if ln.startswith(key)), "")
+    agents = tree.parents[3] / "repos" / tree.parents[1].name / "AGENTS.md"
     if not declared:
         raise Refusal(f"this repo declares no {key} command",
-                      f"Operator action: declare this repo's {level} gate as a {key} line in {tree / 'AGENTS.md'}"
-                      " and commit it in this worktree")  # fmt: skip
-    command = [*shlex.split(declared), *files]
+                      f"Operator action: add this repo's {level} gate as a {key} line to {agents} and commit it on {work}")  # fmt: skip
     venv = [tree.parents[3] / ".dadaia/.venv" / d for d in ("bin", "Scripts")]  # the workspace's
     env = _env() | {"PATH": os.pathsep.join([*map(str, venv), os.environ.get("PATH", "")])}
-    done = subprocess.run(command, cwd=tree, env=env, stdin=subprocess.DEVNULL,
-                          stderr=subprocess.STDOUT)  # fmt: skip
+    try:
+        command = [*shlex.split(declared), *files]
+        done = subprocess.run(command, cwd=tree, env=env, stdin=subprocess.DEVNULL,
+                              stderr=subprocess.STDOUT)  # fmt: skip
+    except (OSError, ValueError) as error:
+        raise Refusal(f"{key} {declared!r} cannot start: {error}",
+                      f"Operator action: make the {key} line of {agents} on {work} one argv list that starts:"
+                      " it runs without a shell — no VAR=value prefix, no sh -c") from error  # fmt: skip
     if done.returncode:
         line = " ".join(map(quote, command))
         raise Refusal(f"{key} exited {done.returncode}",
@@ -290,7 +295,7 @@ def merge(root: Path, path: str, keep: list[str], drop: bool) -> str:
         ):
             raise Refusal("a code task's gate names no test file: it runs no tests",
                           f"Operator action: name the task's owner tests in an Owner-tests: trailer on its commits in {tree}")  # fmt: skip
-        _gate(tree, "task", *argv, ref=onto)
+        _gate(tree, "task", _target(root, str(into))[3], *argv)
         _refuse_dirty(into)
     elif non_code(name):
         _check_specs_only(tree, onto)
@@ -302,7 +307,7 @@ def merge(root: Path, path: str, keep: list[str], drop: bool) -> str:
         _check_ancestor(tree, onto)
         _check_approved(root, tree, onto, name, run=True)
         _check_stray(tree, onto, name)
-        _gate(tree, "job")
+        _gate(tree, "job", onto, head=True)
     kept = _kept(tree, "merge", keep, drop)
     if git(into, "branch", "--show-current").strip() != onto:
         raise Refusal(f"{into} is not on {onto}", git_line(into, "switch", onto))
@@ -323,7 +328,7 @@ def stage(root: Path, path: str) -> str:
     if not (match and match["rc"] and not match["task"]) or non_code(name) or not tree.exists():
         raise Refusal(f"{path} is not an open job worktree", f"{script(SCRIPT)} list")
     _open_tasks(repo, name)
-    _gate(tree, "stage", ref=onto)
+    _gate(tree, "stage", onto)
     return f"stage gate green on {branch(name)}@{git(tree, 'rev-parse', 'HEAD').strip()}"
 
 

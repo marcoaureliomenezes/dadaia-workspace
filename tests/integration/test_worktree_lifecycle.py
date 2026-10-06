@@ -541,3 +541,31 @@ def test_a_stray_job_branch_commit_refuses(root: Path) -> None:
     git(tree, "reset", "-q", "--hard", "HEAD~")
     approve(root, git(tree, "rev-parse", "HEAD").strip(), at="T11:00:00Z")
     assert run(root, "merge", TREE).returncode == 0
+
+
+@pytest.mark.parametrize(
+    ("declared", "act"),
+    [("", "add this repo's task gate as a verify-task: line to"),
+     ("FOO=1 python scripts/ci.py task", "make the verify-task: line of"),
+     ("python 'scripts/ci.py task", "make the verify-task: line of")],
+    ids=["absent", "env-assignment", "unbalanced-quote"],
+)  # fmt: skip
+def test_a_task_gate_line_absent_or_unstartable_refuses_with_a_fix_that_clears_it(
+    root: Path, declared: str, act: str
+) -> None:
+    """Bug verify-line-absent-refusal-sends-to-a-tree-the-gate-never-reads: the task gate
+    reads the work branch's `verify-task:`; an absent or unstartable line refuses with one
+    operator act on that tracked line, never a traceback, and doing that act lands the task."""
+    repo, agents = root / "repos/r", root / "repos/r/AGENTS.md"
+    line = f"verify-task: {declared}\n" if declared else ""
+    commit(repo, "AGENTS.md", "verify: python scripts/ci.py job\n" + line)
+    task = _task_commit(root, "Owner-tests: tests/test_r.py")
+    refused = run(root, "merge", str(task))
+    assert refused.returncode == 1 and "Traceback" not in refused.stderr
+    tail = (" and commit it on feature/0.5.0" if not declared else
+            " on feature/0.5.0 one argv list that starts: it runs without a shell"
+            " — no VAR=value prefix, no sh -c")  # fmt: skip
+    assert fixes(refused) == [f"fix: Operator action: {act} {agents}{tail}"]
+    commit(repo, "AGENTS.md", "verify-task: python scripts/ci.py task\n")
+    landed = run(root, "merge", str(task))
+    assert landed.returncode == 0, landed.stderr
