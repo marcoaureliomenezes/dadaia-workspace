@@ -163,8 +163,8 @@ def hook_state(installed: Path, source: str) -> tuple[HookState, str]:
 def install_git_hooks(repo_root: Path, *, force: bool = False) -> list[Path]:
     """Copy every ``INSTALLED_GIT_HOOKS`` row into :func:`git_hooks_dir`; the ONE installer
     (`ci install-hook`, `context create`, `context alive`). A hook is written when absent or an
-    earlier shipped version (:func:`hook_state`), or with *force*, which also replaces what it
-    cannot read; the operator's own hook is never overwritten (HOOKS-DRIFT-1 names it); raises
+    earlier shipped version (:func:`hook_state`), or with *force*, which also sets what it
+    cannot read aside as ``<hook>.unreadable``; the operator's own hook is never overwritten (HOOKS-DRIFT-1 names it); raises
     FileNotFoundError off a git repo."""
     hooks_dir = git_hooks_dir(repo_root)
     if hooks_dir is None:
@@ -175,8 +175,8 @@ def install_git_hooks(repo_root: Path, *, force: bool = False) -> list[Path]:
         dest = hooks_dir / target
         state, _ = hook_state(dest, source)
         if force or state in (HookState.ABSENT, HookState.STALE):
-            if state is HookState.UNREADABLE:  # copyfile opens its target: clear what cannot be
-                shutil.rmtree(dest) if dest.is_dir() and not dest.is_symlink() else dest.unlink()
+            if state is HookState.UNREADABLE:  # copyfile opens its target: set aside what cannot be
+                dest.rename(dest.with_name(f"{dest.name}.unreadable"))
             shutil.copyfile(workspace_layout.public_scripts_dir() / source, dest)
             dest.chmod(0o755)
             written.append(dest)
