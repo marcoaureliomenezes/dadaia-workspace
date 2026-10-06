@@ -915,6 +915,37 @@ def test_fix_drops_a_fix_commit_a_later_revert_undid(script: Path, tmp_path: Pat
                       "[ok] 2 linked, 0 unlinked."]  # fmt: skip
 
 
+
+@pytest.mark.parametrize(("subjects", "kept"), [
+    ([('fix(bugs): a-bug — the "x" guard', "cli/a.py"), ('Revert "fix(bugs): a-bug — the "x" guard"', "cli/a.py")], []),
+    ([("fix(bugs): a-bug — part one", "cli/a.py"), ("fix(bugs): a-bug — part two", "cli/b.py"),
+      ('Revert "fix(bugs): a-bug" — undo part two', "cli/b.py")], [0]),
+    ([("fix(bugs): a-bug — first", "cli/a.py"), ('Revert "fix(bugs): a-bug — first"', "cli/a.py"),
+      ('Revert "Revert "fix(bugs): a-bug — first""', "cli/a.py")], [0]),
+    ([("fix(bugs): a-bug — first", "cli/a.py"), ("fix(bugs): a-bug-two — other", "cli/b.py"),
+      ('Revert "fix(bugs): a-bug" — undo first', "cli/a.py")], []),
+])  # fmt: skip
+def test_fix_pairs_each_revert_with_one_commit(
+    script: Path, tmp_path: Path, subjects: list[tuple[str, str]], kept: list[int]
+) -> None:
+    """Review HIGH-A, M-1 on 8693810de: one revert undoes the nearest earlier commit its quoted
+    text starts — the whole quote, inner `"` included; an older fix stays; a revert of a
+    revert reinstates."""
+    closed = {**_OPEN_RECORD, "status": "resolved", "closed_at": "2026-09-21T00:00:00Z"}
+    specs = _ledger(tmp_path, {**closed, "id": "a-bug"})
+    git = ["git", "-C", str(tmp_path), "-c", "user.name=t", "-c", "user.email=t@t"]
+    subprocess.run([*git, "add", "-A"], check=True)
+    subprocess.run([*git, "commit", "-qm", "chore: seed"], check=True)
+    shas = []
+    for i, (subject, path) in enumerate(subjects):
+        (tmp_path / path).write_text(f"{i}\n", encoding="utf-8")
+        subprocess.run([*git, "add", "-A"], check=True)
+        subprocess.run([*git, "commit", "-qm", subject], check=True)
+        shas.append(subprocess.run([*git, "rev-parse", "HEAD"], capture_output=True, text=True, check=True).stdout.strip())  # fmt: skip
+    listed = [line.split("\t")[1] for line in _run(script, "fix", "a-bug", "--specs", str(specs)).stdout.splitlines()
+              if line.startswith("a-bug\t")]  # fmt: skip
+    assert listed == ([shas[i] for i in kept] or ["unlinked"])
+
 _WHY = "the blamed fix wrote the line, not its defect"
 _NEAR = "T-050-168, T-9, b-bug, d-bug, e-bug"  # T-5 is in no TASKS.md: never proposed
 

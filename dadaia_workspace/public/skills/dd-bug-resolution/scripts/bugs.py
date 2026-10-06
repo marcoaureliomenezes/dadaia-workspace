@@ -97,28 +97,31 @@ def _values(args: argparse.Namespace, names: tuple[str, ...]) -> dict[str, Any]:
 
 def _fixes(specs: Path) -> dict[str, dict[str, list[list[str]] | None]]:
     """Bug id -> {fix sha: numstat rows}, grepped from history, never stored; a shape-4
-    task commit is counted, never diffed (rows None); a fix a later `Revert "<its subject>"`
-    undid is none (log is newest first, so a redo after the revert still counts)."""
+    task commit is counted, never diffed (rows None). Oldest first, a `Revert "<text>"` undoes
+    one commit, the nearest earlier live one whose subject starts `<text>`; undoing a revert
+    reinstates its own."""
     git = ["git", "-C", str(specs)]
     head = subprocess.run([*git, "rev-parse", "-q", "--verify", "HEAD"], stdout=subprocess.DEVNULL, check=False)  # fmt: skip
     if head.returncode == 1:  # a repo with no commit yet links nothing
         return {}
-    log = subprocess.run([*git, "log", "-E", r"--grep=^(fix|chore|refactor)\(bugs\): ", '--grep=^Revert "', "--numstat", "--format=@%H %s"],
+    log = subprocess.run([*git, "log", "--reverse", "-E", r"--grep=^(fix|chore|refactor)\(bugs\): ", '--grep=^Revert "', "--numstat", "--format=@%H %s"],
                          stdout=subprocess.PIPE, text=True, check=False)  # fmt: skip
     if log.returncode:
         raise Refusal("cannot read the repo's history", "Operator action: point --specs at a specs tree inside a git repo")  # fmt: skip
-    found: dict[str, dict[str, list[list[str]] | None]] = {}
-    reverted: list[str] = []
-    rows: list[list[str]] = []
+    live: list[tuple[str, list[list[str]], Any]] = []  # (header, rows, the commit it undid)
     for line in log.stdout.splitlines():
         if not line.startswith("@"):
-            rows += [line.split("\t")] if line else []
+            live[-1][1].extend([line.split("\t")] if line else [])
             continue
-        rows, shape = [], _SHAPE.match(line)
-        if revert := _REVERT.match(line):
-            reverted.append(revert[1])
-        if any(f"{line.partition(' ')[2]} ".startswith(f"{r} ") for r in reverted):
-            continue
+        text = revert[1] if (revert := _REVERT.match(line)) else None
+        undone = next((e for e in reversed(live) if text and f"{e[0].partition(' ')[2]} ".startswith(f"{text} ")), None)  # fmt: skip
+        if undone:  # ponytail: a reinstated fix is not re-dropped when its revert's revert is reverted; rc-10 AC1.1
+            live.remove(undone)
+            live += [undone[2]] if undone[2] else []
+        live.append((line, [], undone))
+    found: dict[str, dict[str, list[list[str]] | None]] = {}
+    for line, rows, _ in reversed(live):  # newest first, as callers list them
+        shape = _SHAPE.match(line)
         task = _TASK_SHAS.search(shape[4]) if shape and shape[2].startswith("chore") else None
         if shape is None or (task is None and shape[2].startswith("chore")):
             continue
