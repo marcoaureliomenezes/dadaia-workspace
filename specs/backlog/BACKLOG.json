@@ -523,6 +523,17 @@
       "description": "Measured: push_gate_decision takes 10 parameters and sits among the 13 D/E functions. Design: one function per decision the push gate makes, each at radon C or better, the parameters reduced to what each decision reads; behaviour unchanged, the existing push-gate tests the oracle. The --no-verify advertisement in its refusal text (push_gate.py:38-41, pre-push-ci-gate.sh:14) is the registered bug push-refusal-advertises-no-verify, not this entry. Feeds scorecard criterion 3 (push_gate refactor). Placement: rc-12 (operator, 2026-10-06: 'rc-12, antes dos evals'). Placement and every design detail not quoted from a ruling are agent default, unruled.",
       "provenance": "audit verification 2026-10-06 over feature/0.5.0 8e6448f13 (four read-only verifiers); main-thread registration after the operator grill of 2026-10-06",
       "relates": []
+    },
+    {
+      "id": "complexity-and-private-import-ratchet",
+      "title": "Ruff C901 on with a 15->10 ratchet, and a guard against private reach-ins",
+      "opened": "2026-10-06",
+      "status": "idea",
+      "description": "Measured: C901 is not selected (pyproject.toml:84); 22 functions exceed complexity 10; 13 D/E functions, 9 in skill scripts; guards/repo.py has F-61 and F-47. 28 private imports across modules (23 real; codex_assets._parse_agent_frontmatter used by 4 modules). Also measured: fmt:skip 163 (154 in skills), E501 ignored (pyproject.toml:85) with 160 long lines. Design: select C901 at max-complexity 15 now, lowered to 10 as the listed violators are fixed (a per-file ignore list that only shrinks); one check refusing an import of a _private name from another module's feature (import-linter is blind to the hyphenated skill dirs). This is the target for scorecard criteria 1 (Core) and 3 (push_gate refactor) (operator, 2026-10-06: 'Taxas viram tend\u00eancia; regex fixa; metas 1 e 3'). Whether fmt:skip and E501 join the ratchet is unruled. Placement: rc-12 (operator, 2026-10-06: 'rc-12, antes dos evals'). Placement and every design detail not quoted from a ruling are agent default, unruled.",
+      "provenance": "audit verification 2026-10-06 over feature/0.5.0 8e6448f13 (four read-only verifiers); main-thread registration after the operator grill of 2026-10-06",
+      "relates": [
+        "push-gate-decision-split"
+      ]
     }
   ]
 }
