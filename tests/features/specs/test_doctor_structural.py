@@ -17,7 +17,7 @@ from dadaia_workspace.core.template_history import (
 from dadaia_workspace.features.specs import canon
 from dadaia_workspace.features.specs.doctor import SpecsDoctor
 
-_REPO_ROOT = Path(__file__).parents[4]
+_REPO_ROOT = Path(__file__).parents[3]
 _REAL_TEMPLATES_DIR = _REPO_ROOT / "dadaia_workspace" / "public" / "templates"
 _CANONICAL_TEXT = (_REAL_TEMPLATES_DIR / "specs-AGENTS.md").read_text(encoding="utf-8")
 

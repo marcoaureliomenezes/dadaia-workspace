@@ -8,7 +8,7 @@ from dadaia_workspace.core.specs_version import CANONICAL_SPECS_VERSION
 from dadaia_workspace.features.specs import SpecsDoctor
 from dadaia_workspace.features.specs.canon import check_tree, scaffold
 
-_REPO_ROOT = Path(__file__).parent.parent.parent.parent.parent
+_REPO_ROOT = Path(__file__).parent.parent.parent.parent
 _TEMPLATES_DIR = _REPO_ROOT / "dadaia_workspace" / "public" / "templates"
 
 

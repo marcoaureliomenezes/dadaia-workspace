@@ -21,7 +21,7 @@ from dadaia_workspace.features.specs.canon import scaffold_repo_law
 from dadaia_workspace.infrastructure.json_install_ledger_store import JsonInstallLedgerStore
 from dadaia_workspace.infrastructure.public_assets import FileSystemPublicAssetManager
 
-_PUBLIC = Path(__file__).resolve().parents[2] / "dadaia_workspace" / "public"
+_PUBLIC = Path(__file__).resolve().parents[3] / "dadaia_workspace" / "public"
 
 
 def _workspace(tmp_path: Path) -> tuple[Path, Path]:

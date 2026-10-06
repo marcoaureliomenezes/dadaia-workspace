@@ -11,9 +11,6 @@ import pytest
 from dadaia_workspace.core import specs_version
 from dadaia_workspace.features.specs import canon
 
-pytestmark = pytest.mark.unit
-
-
 _MALFORMED = "---\nspecs_pattern_version: 7\ngitflow: {principal: main\n---\n# C\n"
 
 

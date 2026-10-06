@@ -19,7 +19,7 @@ from dadaia_workspace.features.specs import SpecsDoctor
 from dadaia_workspace.features.specs.canon import scaffold
 from dadaia_workspace.features.specs.doctor_types import finding_path
 
-_REPO_ROOT = Path(__file__).parent.parent.parent.parent.parent
+_REPO_ROOT = Path(__file__).parent.parent.parent.parent
 _TEMPLATES_DIR = _REPO_ROOT / "dadaia_workspace" / "public" / "templates"
 
 

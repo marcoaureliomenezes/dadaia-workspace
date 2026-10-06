@@ -19,7 +19,7 @@ from dadaia_workspace.features.specs.memory_canon import (
     render_fixed_section,
 )
 
-_REPO_ROOT = Path(__file__).parent.parent.parent.parent.parent
+_REPO_ROOT = Path(__file__).parent.parent.parent.parent
 _TEMPLATES_DIR = _REPO_ROOT / "dadaia_workspace" / "public" / "templates"
 _PUBLIC_DIR = _REPO_ROOT / "dadaia_workspace" / "public"
 

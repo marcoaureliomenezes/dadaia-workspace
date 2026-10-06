@@ -7,12 +7,8 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-import pytest
-
 from dadaia_workspace.features.specs.doctor_adr import superseded_adr_citations
 from dadaia_workspace.features.specs.doctor_types import finding_path
-
-pytestmark = pytest.mark.unit
 
 
 def _ledger(specs: Path, *records: dict[str, str]) -> None:

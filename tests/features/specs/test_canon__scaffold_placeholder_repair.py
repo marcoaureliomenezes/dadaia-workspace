@@ -20,9 +20,7 @@ from dadaia_workspace.features.specs.canon import scaffold
 from dadaia_workspace.features.specs.doctor import SpecsDoctor
 from dadaia_workspace.features.specs.doctor_memory import is_placeholder_atom
 
-pytestmark = pytest.mark.unit
-
-_TEMPLATES_DIR = Path(__file__).resolve().parents[4] / "dadaia_workspace" / "public" / "templates"
+_TEMPLATES_DIR = Path(__file__).resolve().parents[3] / "dadaia_workspace" / "public" / "templates"
 
 _PLACEHOLDER_ATOM = """---
 slug: SLUG_PLACEHOLDER

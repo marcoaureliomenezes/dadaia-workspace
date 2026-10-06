@@ -18,8 +18,8 @@ explains why: zero live callers of the v5 event shape those steps produced). Del
 with their subject, no replacement: the two functions those tests exercised no longer
 exist, so there is no write site left to pin. The doctrine itself lives on for every
 OTHER production write site via the derived, scan-based census in
-``tests/unit/core/test_atomic_write_census.py`` and the primitive's own battery in
-``tests/unit/core/test_atomic_write.py`` — this file keeps only the two tests below that
+``tests/core/test_atomic_write__atomic_write_census.py`` and the primitive's own battery in
+``tests/core/test_atomic_write.py`` — this file keeps only the two tests below that
 were never about the migration steps at all (``SpecsDoctor``'s TREE-5 repair and
 ``template_history.load_shipped_hashes``'s corrupt-input degrade path).
 """
@@ -36,7 +36,7 @@ from dadaia_workspace.core.template_history import (
 )
 from dadaia_workspace.features.specs.doctor import SpecsDoctor
 
-_REPO_ROOT = Path(__file__).parents[4]
+_REPO_ROOT = Path(__file__).parents[3]
 _TEMPLATES_DIR = _REPO_ROOT / "dadaia_workspace" / "public" / "templates"
 _CANONICAL_TEXT = (_TEMPLATES_DIR / "specs-AGENTS.md").read_text(encoding="utf-8")
 

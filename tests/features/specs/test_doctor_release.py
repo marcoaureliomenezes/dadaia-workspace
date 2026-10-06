@@ -17,9 +17,7 @@ from dadaia_workspace.features.specs.doctor import SpecsDoctor
 from dadaia_workspace.features.specs.doctor_common import resolve_active_release
 from tests.helpers.release_state import PLAN
 
-pytestmark = pytest.mark.unit
-
-_REPO = Path(__file__).resolve().parents[4]
+_REPO = Path(__file__).resolve().parents[3]
 _SCRIPT = _REPO / "dadaia_workspace/public/skills/dd-release-implementation/scripts/release.py"
 _IMPLEMENTED = "2026-09-22T10:00:00Z"
 

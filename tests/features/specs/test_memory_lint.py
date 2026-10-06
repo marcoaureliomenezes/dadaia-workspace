@@ -15,7 +15,7 @@ from dadaia_workspace.features.specs.memory_lint import (
     main,
 )
 
-_REPO_ROOT = Path(__file__).resolve().parents[4]
+_REPO_ROOT = Path(__file__).resolve().parents[3]
 
 _REQUIRED_FM = {
     "title": "Fixture atom",

@@ -12,10 +12,10 @@ that each pinned one bug where a fresh scaffold failed its own doctor (all resol
 ``default-context-scaffold-fails-specs-doctor``, ``release-new-rejects-semver-but
 -doctor-requires-it``. Deleted regression tests replaced by this file:
 
-- ``tests/unit/features/specs/test_doctor.py::
+- ``tests/features/specs/test_doctor.py::
   test_freshly_opened_release_segment_is_doctor_clean`` (named bug-042 regression) —
   covered here by the "fresh release segment" case.
-- ``tests/unit/features/specs/test_doctor.py::
+- ``tests/features/specs/test_doctor.py::
   test_fresh_scaffold_passes_all_tree_invariants`` (generic "scaffold -> 0 TREE errors")
   — covered here by the "fresh root specs" case, now asserting the FULL doctor (every
   code, not just TREE-*) is clean, a strictly stronger bar.
@@ -36,9 +36,7 @@ from dadaia_workspace.features.specs import SpecsDoctor
 from dadaia_workspace.features.specs import canon as canon_mod
 from dadaia_workspace.features.specs.canon import scaffold
 
-pytestmark = pytest.mark.unit
-
-_REPO_ROOT = Path(__file__).resolve().parents[4]
+_REPO_ROOT = Path(__file__).resolve().parents[3]
 _TEMPLATES_DIR = _REPO_ROOT / "dadaia_workspace" / "public" / "templates"
 _PUBLIC_DIR = _REPO_ROOT / "dadaia_workspace" / "public"
 

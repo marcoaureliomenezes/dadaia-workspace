@@ -10,14 +10,10 @@ import shlex
 import subprocess
 from pathlib import Path
 
-import pytest
-
 from dadaia_workspace.core.template_history import SHIPPED_HASHES_FILENAME
 from dadaia_workspace.features.specs.doctor import SpecsDoctor
 
-pytestmark = pytest.mark.contract
-
-_REPO_ROOT = Path(__file__).resolve().parents[2]
+_REPO_ROOT = Path(__file__).resolve().parents[3]
 _PUBLIC = _REPO_ROOT / "dadaia_workspace" / "public"
 _MEMORY_SCAFFOLD = (_PUBLIC / "scaffold" / "memory" / "AGENTS.md").read_text(encoding="utf-8")
 _PROSE_REWRITE = "# specs/memory/AGENTS.md — Memory Rules\n\nA prose rewrite nobody shipped.\n"

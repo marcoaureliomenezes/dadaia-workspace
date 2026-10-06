@@ -13,8 +13,6 @@ from typer.testing import CliRunner
 from dadaia_workspace.cli.main import app
 from dadaia_workspace.features.specs.doctor_adr import adr_record_issues
 
-pytestmark = pytest.mark.contract
-
 
 def _ledger(tmp_path: Path, ids: list[str], **fields: object) -> Path:
     specs = tmp_path / "specs"
