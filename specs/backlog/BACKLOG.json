@@ -462,6 +462,15 @@
       "description": "Found in rc-9: the releases law says rc N+1 is drafted in a define tree while rc N implements and enters by release.py new at rc N's CLOSURE (specs/releases/AGENTS.md \u00a72, ADR 0201), but new mints a fresh rc-<N+1>/SPEC.md stub and refuses before CLOSURE, and a hand-drafted rc-<N+1>/SPEC.md on the work branch would become the live candidate (the highest rc-<N>/) while rc N still implements. Design: release.py new at rc N's CLOSURE adopts an existing Draft rc-<N+1>/SPEC.md (its Origin and Bug window head judged as for a stub), writing only the birth note and the phase; the live-candidate reader skips a Draft rc above an IMPLEMENTATION candidate until new adopts it, one rule in _release_store.live_ids and core/gitflow's pinned twin; ADR 0199 (a Draft rc-<N+1> does not move found_in) already covers the ledger side. Done when: rc-10 drafted during rc-9's IMPLEMENTATION enters by new at rc-9's CLOSURE with its draft kept byte for byte.",
       "provenance": "rc-9 Reconciliation deferral (JR.S2.T5), dispatched by the main thread 2026-10-06 under the operator's rc-9 scope; target rc-10 or later",
       "relates": []
+    },
+    {
+      "id": "bugs-fix-reads-the-per-class-shape",
+      "title": "bugs.py fix and window read the per-class shape-4 commit, one id per body line",
+      "opened": "2026-10-06",
+      "status": "idea",
+      "description": "Found in rc-9 (Job 5 review LOW 2): dd-gitflow-default \u00a73a now carries the per-class shape 4, chore(bugs): <verb> class <class> \u2014 <reason> with one id per body line, but bugs.py fix links only a shape-3 fix(bugs)/refactor(bugs) subject or a shape-4 chore(bugs): resolve <id> subject, so a record resolved by a class commit reads 'unlinked'. Design: the one commit reader in bugs.py fix also matches a class subject and takes the ids from its body lines; no second grep. Owner: dd-bug-resolution/scripts/bugs.py fix, tests/unit/skills/test_bug_resolution_bugs_script.py. Done when: a record resolved only by a class commit prints that commit under bugs.py fix.",
+      "provenance": "rc-9 Reconciliation deferral (JR.S2.T5), dispatched by the main thread 2026-10-06 under the operator's rc-9 scope; target rc-10 or later",
+      "relates": []
     }
   ]
 }
