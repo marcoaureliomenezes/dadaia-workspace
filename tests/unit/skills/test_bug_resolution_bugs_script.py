@@ -893,6 +893,25 @@ def test_fix_lists_a_fix_commit_once_when_its_resolve_names_it_short(
     assert listed == [f"a-bug\t{sha}\tnet-positive", "\t1\t0\tcli/a.py", "[ok] 1 linked, 0 unlinked."]  # fmt: skip
 
 
+#: rc-10 Stage J1.S1 RED rows: strict, so a row turning green before its task flags itself.
+_RED_AC1_1 = pytest.mark.xfail(strict=True, reason="rc-10 AC1.1: the fix reader REBUILD (J1.S2.T1)")
+_RED_AC1_2 = pytest.mark.xfail(strict=True, reason="rc-10 AC1.2: evidence_seam at resolve (J1.S3.T1)")
+
+
+def _commits(root: Path, *commits: tuple[str, dict[str, str]]) -> list[str]:
+    """Commit each ``(message, {path: text})`` in order; the full shas, oldest first."""
+    shas = []
+    for message, files in commits:
+        for path, text in files.items():
+            (root / path).parent.mkdir(parents=True, exist_ok=True)
+            (root / path).write_text(text, encoding="utf-8")
+        git = ["git", "-C", str(root), "-c", "user.name=t", "-c", "user.email=t@t"]
+        subprocess.run([*git, "add", "-A"], check=True)
+        subprocess.run([*git, "commit", "-qm", message], check=True)
+        shas.append(subprocess.run([*git, "rev-parse", "HEAD"], capture_output=True, text=True, check=True).stdout.strip())  # fmt: skip
+    return shas
+
+
 def test_fix_drops_a_fix_commit_a_later_revert_undid(script: Path, tmp_path: Path) -> None:
     """bugs-fix-counts-a-reverted-fix: a fix commit a later `Revert "…"` undid (git's own
     subject or a shortened one) is not a fix; the redo after the revert is, and so is a
@@ -924,6 +943,13 @@ def test_fix_drops_a_fix_commit_a_later_revert_undid(script: Path, tmp_path: Pat
       ('Revert "Revert "fix(bugs): a-bug — first""', "cli/a.py")], [0]),
     ([("fix(bugs): a-bug — first", "cli/a.py"), ("fix(bugs): a-bug-two — other", "cli/b.py"),
       ('Revert "fix(bugs): a-bug" — undo first', "cli/a.py")], []),
+    pytest.param([("fix(bugs): a-bug — first", "cli/a.py"), ('Revert "fix(bugs): a-bug — first"', "cli/a.py"),
+                  ('Revert "Revert "fix(bugs): a-bug — first""', "cli/a.py"),
+                  ('Revert "Revert "Revert "fix(bugs): a-bug — first"""', "cli/a.py")], [],
+                 marks=_RED_AC1_1, id="revert-of-revert-of-revert"),
+    pytest.param([("fix(bugs): a-bug — part one", "cli/a.py"), ("fix(bugs): a-bug — part two", "cli/b.py"),
+                  ('Revert "fix(bugs): a-bug" — the "x" guard of part two', "cli/b.py")], [0],
+                 marks=_RED_AC1_1, id="short-form-tail-quote"),
 ])  # fmt: skip
 def test_fix_pairs_each_revert_with_one_commit(
     script: Path, tmp_path: Path, subjects: list[tuple[str, str]], kept: list[int]
@@ -945,6 +971,76 @@ def test_fix_pairs_each_revert_with_one_commit(
     listed = [line.split("\t")[1] for line in _run(script, "fix", "a-bug", "--specs", str(specs)).stdout.splitlines()
               if line.startswith("a-bug\t")]  # fmt: skip
     assert listed == ([shas[i] for i in kept] or ["unlinked"])
+
+@_RED_AC1_1
+def test_fix_diffs_a_shape_4_resolve_over_its_two_task_commits(script: Path, tmp_path: Path) -> None:
+    """AC1.1: a shape-4 task commit is diffed like any fix: both commits' rows, one
+    direction over their production lines (+2 −1; the test line never counts)."""
+    closed = {**_OPEN_RECORD, "status": "resolved", "closed_at": "2026-09-21T00:00:00Z"}
+    specs = _ledger(tmp_path, {**closed, "id": "b-bug"})
+    _, t1, t2 = _commits(tmp_path, ("chore: seed", {}), ("feat(T-1): one", {"cli/t1.py": "a\nb\n"}),
+                         ("feat(T-1): two", {"cli/x.py": "", "tests/test_t.py": "t\n"}))  # fmt: skip
+    _commits(tmp_path, (f"chore(bugs): resolve b-bug — by T-1 ({t1[:9]}, {t2[:9]})", {"specs/n": "b\n"}))
+    listed = _run(script, "fix", "b-bug", "--specs", str(specs)).stdout.splitlines()
+    assert listed == [f"b-bug\t{t1},{t2}\tnet-positive", "\t2\t0\tcli/t1.py",
+                      "\t0\t1\tcli/x.py", "\t1\t0\ttests/test_t.py", "[ok] 1 linked, 0 unlinked."]  # fmt: skip
+
+
+@_RED_AC1_1
+def test_fix_links_a_class_commit_by_its_body_ids(script: Path, tmp_path: Path) -> None:
+    """AC1.1: `chore(bugs): resolve class <class> — by <task> (<sha>)` names its ids one per
+    body line; each id links the task commit."""
+    closed = {**_OPEN_RECORD, "status": "resolved", "closed_at": "2026-09-21T00:00:00Z"}
+    specs = _ledger(tmp_path, *({**closed, "id": i} for i in ("a-bug", "b-bug", "c-bug")))
+    _, task = _commits(tmp_path, ("chore: seed", {}), ("feat(T-1): one", {"cli/t1.py": "a\n"}))
+    _commits(tmp_path, (f"chore(bugs): resolve class C9 — by T-1 ({task[:9]})\n\na-bug\nb-bug", {"specs/n": "b\n"}))  # fmt: skip
+    listed = _run(script, "fix", "--specs", str(specs)).stdout.splitlines()
+    assert listed == [f"a-bug\t{task}\tnet-positive", "\t1\t0\tcli/t1.py",
+                      f"b-bug\t{task}\tnet-positive", "\t1\t0\tcli/t1.py",
+                      "c-bug\tunlinked", "[ok] 2 linked, 1 unlinked."]  # fmt: skip
+
+
+@_RED_AC1_1
+def test_fix_counts_the_rework_of_its_surface_by_class(script: Path, tmp_path: Path) -> None:
+    """AC1.1, Terms: a later commit overlapping a fix surface is rework — another bug's
+    `fix(bugs)` is overfitting, a REBUILD is planned; the bug's own commits and a commit
+    on other files are not."""
+    closed = {**_OPEN_RECORD, "status": "resolved", "closed_at": "2026-09-21T00:00:00Z"}
+    specs = _ledger(tmp_path, *({**closed, "id": i} for i in ("a-bug", "b-bug", "c-bug")))
+    _, fix_a, again_a, fix_b, fix_c, rebuild = _commits(
+        tmp_path, ("chore: seed", {}),
+        ("fix(bugs): a-bug — x", {"cli/a.py": "a\n"}),
+        ("fix(bugs): a-bug — again", {"cli/a.py": "a2\n"}),
+        ("fix(bugs): b-bug — y", {"cli/a.py": "b\n"}),
+        ("fix(bugs): c-bug — z", {"cli/c.py": "c\n"}),
+        ("refactor(J9.S1.T1): REBUILD the a unit — w", {"cli/a.py": "r\n"}),
+    )  # fmt: skip
+    listed = _run(script, "fix", "--specs", str(specs)).stdout.splitlines()
+    assert listed == [
+        f"a-bug\t{again_a},{fix_a}\tnet-positive", "\t1\t1\tcli/a.py", "\t1\t0\tcli/a.py",
+        "\trework\t1 planned, 1 overfitting",
+        f"b-bug\t{fix_b}\tnet-neutral", "\t1\t1\tcli/a.py", "\trework\t1 planned, 0 overfitting",
+        f"c-bug\t{fix_c}\tnet-positive", "\t1\t0\tcli/c.py",
+        "[ok] 3 linked, 0 unlinked.",
+    ]  # fmt: skip
+
+
+@_RED_AC1_1
+def test_fix_reads_a_surface_two_rcs_left_untouched_as_settled(script: Path, tmp_path: Path) -> None:
+    """AC1.1, Terms: a fix surface no fix or REBUILD touched while 2 candidates were born
+    is settled; one born since is not yet."""
+    closed = {**_OPEN_RECORD, "status": "resolved", "closed_at": "2026-09-21T00:00:00Z"}
+    specs = _live(tmp_path, *({**closed, "id": i} for i in ("a-bug", "b-bug")))
+    _history(tmp_path,
+             ("2026-02-01T00:00:00Z", "fix(bugs): a-bug — x", {"cli/a.py": "a\n"}),
+             ("2026-02-02T00:00:00Z", "feat(specs): rc-1", {f"{_RELEASES}9.9.9/rc-1/SPEC.md": _STUB}),
+             ("2026-02-03T00:00:00Z", "fix(bugs): b-bug — y", {"cli/b.py": "b\n"}),
+             ("2026-02-04T00:00:00Z", "feat(specs): rc-2", {f"{_RELEASES}9.9.9/rc-2/SPEC.md": _STUB}))  # fmt: skip
+    listed = _run(script, "fix", "--specs", str(specs)).stdout.splitlines()
+    assert [ln for ln in listed if ln.startswith("\t") and "rcs untouched" in ln] == [
+        "\tsettled\t2 rcs untouched", "\tunsettled\t1 rcs untouched",
+    ]  # fmt: skip
+
 
 _WHY = "the blamed fix wrote the line, not its defect"
 _NEAR = "T-050-168, T-9, b-bug, d-bug, e-bug"  # T-5 is in no TASKS.md: never proposed
@@ -1416,3 +1512,57 @@ def test_an_unreadable_history_is_refused_never_stamped_unknown(
     assert done.returncode == 1
     assert done.stderr.splitlines()[-1] == f"fix: git -C {specs.as_posix()} fsck"
     assert (specs / "bugs" / "BUGS.jsonl").read_bytes() == before
+
+
+_SEAM_TEST = "class TestX:\n    def test_y(self) -> None: ...\n\n\n@mark\ndef test_p(n: int) -> None: ...\n"
+
+
+@_RED_AC1_2
+@pytest.mark.parametrize(("seam", "refusal"), [
+    ("tests/test_s.py::test_p", None),  # present
+    ("tests/test_s.py::test_p[a-1]", None),  # a parametrized node: the brackets are stripped
+    ("tests/test_s.py::TestX::test_y", None),  # every `::` segment is found
+    ("cli/x.py", None),  # a fix with no test cites any tracked file
+    ("tests/test_gone.py", "[error] evidence_seam 'tests/test_gone.py' names a path git does not track"),
+    ("tests/test_s.py::test_z", "[error] evidence_seam 'tests/test_s.py::test_z' names 'test_z', absent from tests/test_s.py"),
+    ("tests/test_s.py::TestZ::test_y", "[error] evidence_seam 'tests/test_s.py::TestZ::test_y' names 'TestZ', absent from tests/test_s.py"),
+])  # fmt: skip
+def test_resolve_checks_its_evidence_seam_textually(
+    script: Path, tmp_path: Path, seam: str, refusal: str | None
+) -> None:
+    """AC1.2: `resolve --evidence-seam <path>[::node]` refuses a path git does not track or
+    a node any of whose `::` segments, brackets stripped, the file's text lacks."""
+    specs = _ledger(tmp_path, _OPEN_RECORD)
+    _commits(tmp_path, ("chore: seed", {"tests/test_s.py": _SEAM_TEST}))
+    (tmp_path / "tests/test_gone.py").write_text("def test_z() -> None: ...\n", encoding="utf-8")  # untracked
+    done = _run(script, *_resolve_argv(), "--evidence-seam", seam, "--specs", str(specs))
+    assert done.returncode == (1 if refusal else 0), done.stderr
+    assert (done.stderr.splitlines()[:1] if refusal else []) == ([refusal] if refusal else [])
+    [record] = _records(specs)
+    assert (record["status"], record.get("evidence_seam")) == (("open", None) if refusal else ("resolved", seam))
+
+
+@_RED_AC1_2
+def test_resolve_requires_an_evidence_seam(script: Path, tmp_path: Path) -> None:
+    """AC1.2 (0208): `evidence_seam` is required at resolve, named with the other fields."""
+    specs = _ledger(tmp_path, _OPEN_RECORD)
+    done = _run(script, *_resolve_argv(), "--specs", str(specs))
+    assert done.returncode == 1
+    assert done.stderr.splitlines()[0] == "[error] transition 'resolve' refused — 'evidence_seam' required"
+    assert _records(specs)[0]["status"] == "open"
+
+
+@_RED_AC1_2
+def test_window_marks_a_record_whose_seam_file_is_gone(script: Path, tmp_path: Path) -> None:
+    """AC1.2: `window` marks a seam file the tree no longer holds; `check` never re-judges it."""
+    closed = {**_OPEN_RECORD, "status": "resolved", "cause": "c", "caused_by": "none", "solution": "s",
+              "evidence_loop": "l", "resolved_release": "9.9.9", "closed_at": "2026-09-21T00:00:00Z",
+              "found_in": {"release": "9.9.9", "rc": "rc-1"}}  # fmt: skip
+    specs = _live(tmp_path, {**closed, "id": "kept", "evidence_seam": "cli/x.py"},
+                  {**closed, "id": "gone", "evidence_seam": "tests/test_gone.py::test_z"})  # fmt: skip
+    assert _window(script, specs)[:3] == [
+        "gone\tresolved\t9.9.9/rc-1\t-\tseam gone",
+        "kept\tresolved\t9.9.9/rc-1\t-",
+        "release unknown:",
+    ]
+    assert _run(script, "check", "--specs", str(specs)).returncode == 0
