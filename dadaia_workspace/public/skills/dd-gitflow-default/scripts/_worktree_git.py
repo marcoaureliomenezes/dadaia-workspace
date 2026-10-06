@@ -163,7 +163,7 @@ def rows(root: Path) -> list[dict[str, object]]:
     ours `ready` (ahead, clean), `open` (ahead, dirty) or `empty`, an `orphan` wt/* with no tree
     (never checked out, or its directory deleted), a `foreign`
     worktree git registers (harness-native, hand-made, under a TTL zone), and an
-    `unregistered` directory two levels under `worktrees/<repo>/`."""
+    `unregistered` directory two levels under `worktrees/<repo>/` or an empty one level under it."""
     out: list[dict[str, object]] = []
     for name, flow in sorted(gitflows(root).items()):
         repo = root / "repos" / name
@@ -200,4 +200,8 @@ def rows(root: Path) -> list[dict[str, object]]:
         for stray in sorted((root / "worktrees" / name).glob("*/*")):  # a name is two levels
             if stray.is_dir() and not {stray.resolve(), stray.parent.resolve()} & listed:
                 out.append(_row(repo, str(stray), "unregistered"))
+        for folder in sorted((root / "worktrees" / name).glob("*")):  # an rc folder holding no tree
+            named = any(Path(str(r["path"])).parent == folder for r in out)  # an orphan's own
+            if folder.is_dir() and not any(folder.iterdir()) and not named:
+                out.append(_row(repo, str(folder), "unregistered"))
     return out

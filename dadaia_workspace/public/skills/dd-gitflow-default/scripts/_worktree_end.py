@@ -8,6 +8,7 @@ declared `verify:` (job), `verify-stage:` or `verify-task:` line, run as one arg
 
 from __future__ import annotations
 
+import contextlib
 import json
 import os
 import shlex
@@ -84,7 +85,8 @@ def _kept(tree: Path, verb: str, keep: list[str], drop: bool) -> list[str]:
 
 
 def _remove(into: Path, tree: Path, name: str, kept: list[str]) -> None:
-    """Copy *kept* into the repo *into* and drop the tree and its branch."""
+    """Copy *kept* into the repo *into* and drop the tree, its branch (on the remote too, when it
+    was pushed) and the rc folder it leaves empty."""
     for rel in kept:
         source, target = tree / rel, into / rel
         target.parent.mkdir(parents=True, exist_ok=True)
@@ -92,9 +94,18 @@ def _remove(into: Path, tree: Path, name: str, kept: list[str]) -> None:
             shutil.copytree(source, target, dirs_exist_ok=True)
         else:
             shutil.copy2(source, target)
+    if git(into, "branch", "-r", "--list", f"origin/{branch(name)}").strip():
+        git(into, "push", "-q", "origin", "--delete", branch(name), check=False)
     git(into, "worktree", "unlock", str(tree), check=False)
     git(into, "worktree", "remove", str(tree))
     git(into, "branch", "-d", branch(name))
+    _rmdir(tree)
+
+
+def _rmdir(tree: Path) -> None:
+    """Drop the rc folder *tree* leaves empty; a folder still holding another tree stays."""
+    with contextlib.suppress(OSError):
+        tree.parent.rmdir()
 
 
 def _undo(tree: Path, work: str, rel: str) -> str:
@@ -280,6 +291,7 @@ def merge(root: Path, path: str, keep: list[str], drop: bool) -> str:
                     f"{ref} is unmerged: {error}",
                     git_line(repo, "worktree", "add", str(tree), ref),
                 ) from error
+        _rmdir(tree)
         return f"{ref} merged into {onto}"
     _refuse_dirty(tree)
     if into != repo:  # a task: its gate, no verdict, onto its job branch
