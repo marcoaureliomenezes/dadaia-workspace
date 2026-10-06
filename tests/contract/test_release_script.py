@@ -458,3 +458,43 @@ def test_phase_implementation_refuses_a_plan_without_dag_or_hot_files(
         ln for ln in result.stderr.splitlines() if ln.startswith(("fix: ", "Operator action: "))
     ]
     assert (result.returncode, needle in result.stderr, len(fixes)) == (1, True, 1)
+
+
+# --- AC4.4: the bug balance block is a closure check ---------------------------------
+
+
+@pytest.mark.xfail(strict=True, reason="J4.S1 RED: the closure check is built by J4.S2.T2")
+def test_a_stale_balance_block_refuses_at_closure_and_passes_in_implementation(
+    script: Path, tmp_path: Path
+) -> None:
+    """AC4.4: `QUALITY.md`'s `## Bugs` block that differs from its regeneration is one
+    refusal in CLOSURE, its fix the regenerating command; IMPLEMENTATION lets it be."""
+    stage_skill_scripts("dd-bug-resolution", tmp_path / "skills" / "dd-bug-resolution" / "scripts")
+    subprocess.run(["git", "init", "-q", str(tmp_path)], check=True)
+    specs = _specs(tmp_path, _GOOD)
+    log = [{"ts": "2026-01-01T00:00:00Z", "agent": "a", "kind": "note", "text": "t"}]
+    _seed_ledgers(specs, log=log)
+    quality = specs / "memory" / "QUALITY.md"
+    quality.parent.mkdir()
+    quality.write_text("# Quality\n\n## Bugs\n\n```text\nstale\n```\n", "utf-8")
+    state = specs / "releases/0.5.0/_RELEASE.json"
+
+    def balance_rows(phase: str) -> list[dict[str, str]]:
+        state.write_text(json.dumps({**json.loads(state.read_text("utf-8")), "phase": phase}))
+        done = subprocess.run([sys.executable, str(script), "check", "--json", "--specs", str(specs)],
+                              capture_output=True, text=True)  # fmt: skip
+        return [f for f in json.loads(done.stdout) if f["path"] == "memory/QUALITY.md"]
+
+    assert balance_rows("IMPLEMENTATION") == []
+    stale = balance_rows("CLOSURE")
+    assert [r["verdict"] for r in stale] == ["error"]
+    assert stale[0]["fix"].endswith(f" balance --write --specs {specs.as_posix()}")
+
+    bugs = script.parents[2] / "dd-bug-resolution" / "scripts" / "bugs.py"
+    written = subprocess.run([sys.executable, str(bugs), "balance", "--write", "--specs", str(specs)],
+                             capture_output=True, text=True)  # fmt: skip
+    assert written.returncode == 0, written.stderr
+    assert "Bug balance from BUGS.jsonl: 4 records (4 live, 0 archived)." in quality.read_text(
+        "utf-8"
+    )
+    assert balance_rows("CLOSURE") == []
