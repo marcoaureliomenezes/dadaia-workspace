@@ -47,9 +47,9 @@ Paths are relative to the repo root; aliases as in `PLAN.md` (`f/`, `pub/`, `S/`
 
 | task | AC | `W:` | owner tests / RED |
 |---|---|---|---|
-| J1.S3.T11 | bug `memory-window-bound-shallow-clone-named-as-rebase` registered by operator delegation (review b9003086f) | `specs/bugs/BUGS.jsonl` | no test: the record; commit `chore(bugs): register …` (02248cee2) |
-| J1.S3.T12 | bug `memory-window-bound-shallow-clone-named-as-rebase` (review b9003086f, HIGH-1) | `S/dd-spec-navigator/scripts/_memory_drift.py`, `tests/unit/skills/test_memory_drift.py` (one new case) | RED: a shallow clone holding the bound by sha refuses naming `git fetch --unshallow`; commit `refactor(J1.S3.T12): REBUILD the memory-window bound check — …`. T2's KEEP verdict is withdrawn: the two arms disagreed on a shallow clone. One decider in `report` per bound (shallow first, then rebased-away, absent left to `git()`); `git()`'s arm calls the same `_cut` |
-| J1.S3.T13 | AC1.1 (review b9003086f HIGH-2: the fix surface per line, Terms) | `bugres/scripts/_bugs_fix.py` (`removed`, `subjects`: the one blame authority; `Fix.later` reads rework on demand; the `ponytail:` file-level ceiling leaves), `bugres/scripts/bugs.py` (`_candidates` calls `removed`; `fix` reads `later()`), `tests/unit/skills/test_bug_resolution_bugs_script.py` (one new case; one expected rework count of `test_fix_counts_the_rework_of_its_surface_by_class` rewritten under this REBUILD) | RED: a later fix on the same file removing none of a fix's lines is not rework; commit `refactor(J1.S3.T13): REBUILD the rework count — …` |
+| J1.S3.T11 | bug `memory-window-bound-shallow-clone-named-as-rebase` registered by operator delegation (review 3facc0a0a) | `specs/bugs/BUGS.jsonl` | no test: the record; commit `chore(bugs): register …` (633f5757d) |
+| J1.S3.T12 | bug `memory-window-bound-shallow-clone-named-as-rebase` (review 3facc0a0a, HIGH-1) | `S/dd-spec-navigator/scripts/_memory_drift.py`, `tests/unit/skills/test_memory_drift.py` (one new case) | RED: a shallow clone holding the bound by sha refuses naming `git fetch --unshallow`; commit `refactor(J1.S3.T12): REBUILD the memory-window bound check — …`. T2's KEEP verdict is withdrawn: the two arms disagreed on a shallow clone. One decider in `report` per bound (shallow first, then rebased-away, absent left to `git()`); `git()`'s arm calls the same `_cut` |
+| J1.S3.T13 | AC1.1 (review 3facc0a0a HIGH-2: the fix surface per line, Terms) | `bugres/scripts/_bugs_fix.py` (`removed`, `subjects`: the one blame authority; `Fix.later` reads rework on demand; the `ponytail:` file-level ceiling leaves), `bugres/scripts/bugs.py` (`_candidates` calls `removed`; `fix` reads `later()`), `tests/unit/skills/test_bug_resolution_bugs_script.py` (one new case; one expected rework count of `test_fix_counts_the_rework_of_its_surface_by_class` rewritten under this REBUILD) | RED: a later fix on the same file removing none of a fix's lines is not rework; commit `refactor(J1.S3.T13): REBUILD the rework count — …` |
 
 ## Stage J1.S5 — review rework: revert pairing, the public name
 
@@ -57,8 +57,8 @@ Paths are relative to the repo root; aliases as in `PLAN.md` (`f/`, `pub/`, `S/`
 
 | task | AC | `W:` | owner tests / RED |
 |---|---|---|---|
-| J1.S3.T14 | review b9003086f MEDIUM-1 (revert pairing) | `bugres/scripts/_bugs_fix.py`, `tests/unit/skills/test_bug_resolution_bugs_script.py` (one parametrize row) | RED: `Revert "fix(bugs): a-bug — cause"` pairs with the exact subject, not the nearer "… cause and more"; commit `fix(J1.S3.T14): …`; one rule: most words matched, a tie to the shorter subject, then the nearest |
-| J1.S3.T15 | review b9003086f MEDIUM-2 (private reach-in) | `relimpl/scripts/_release_schema.py` (`_candidate_adds` -> `candidate_adds`, its owner's public name), `bugres/scripts/bugs.py` (imports it by that name, the `births` alias leaves) | no RED: a rename, no behaviour; the existing `window`/`fix` rows exercise the call |
+| J1.S3.T14 | review 3facc0a0a MEDIUM-1 (revert pairing) | `bugres/scripts/_bugs_fix.py`, `tests/unit/skills/test_bug_resolution_bugs_script.py` (one parametrize row) | RED: `Revert "fix(bugs): a-bug — cause"` pairs with the exact subject, not the nearer "… cause and more"; commit `fix(J1.S3.T14): …`; one rule: most words matched, a tie to the shorter subject, then the nearest |
+| J1.S3.T15 | review 3facc0a0a MEDIUM-2 (private reach-in) | `relimpl/scripts/_release_schema.py` (`_candidate_adds` -> `candidate_adds`, its owner's public name), `bugres/scripts/bugs.py` (imports it by that name, the `births` alias leaves) | no RED: a rename, no behaviour; the existing `window`/`fix` rows exercise the call |
 
 ## Stage J1.S6 — review rework: the survivors
 
@@ -67,7 +67,7 @@ Paths are relative to the repo root; aliases as in `PLAN.md` (`f/`, `pub/`, `S/`
 | task | AC | `W:` | owner tests / RED |
 |---|---|---|---|
 | J1.S3.T16 | survivors of J1.S3.T12/T14's hand mutants | `bugres/scripts/_bugs_fix.py` (the revert key drops the word count: every subject a quote names matches the same words, so it only ever broke ties), `tests/unit/skills/test_memory_drift.py` (two new cases: an absent bound; a git read failing in a shallow clone) | RED-for-mutants: `if reach == 1` -> `if reach` and `git()`'s arm without `_cut` survived; both now die. The revert rule T14 states is now: the live commit the quote names with the fewest words beyond it, then the nearest (agent default, unruled) |
-| J1.S6.T19 | re-review a14a42511 HIGH-B (the fix link) | `specs/bugs/BUGS.jsonl` (one `lineage_reason` repair) | no RED: the resolve sat in a `refactor(J1.S3.T12): REBUILD` subject `_LINK` does not match; `bugs.py fix` prints `1 linked` after the shape-4 commit (agent default, unruled: the ledger line gets `lineage_reason` so the commit is not empty, as 458b38c51 did) |
+| J1.S6.T19 | re-review HIGH-B (the fix link) | none: an empty shape-4 commit | no RED: the resolve sat in a `refactor(J1.S3.T12): REBUILD` subject `_LINK` does not match; the commit `chore(bugs): resolve memory-window-bound-shallow-clone-named-as-rebase — by J1.S3.T12 (73983ae3c)` carries the link in its subject alone, because schema v1 retired `resolved_commit` (0.4.7 FR1); `bugs.py fix` prints `1 linked` (agent default, unruled) |
 
 ## Stage J1.S7 — re-review rework: the Windows fix line
 
@@ -75,6 +75,7 @@ Paths are relative to the repo root; aliases as in `PLAN.md` (`f/`, `pub/`, `S/`
 
 | task | AC | `W:` | owner tests / RED |
 |---|---|---|---|
+| J1.S6.T18 | push CI 37498326402: the fix line's path on Windows | `tests/unit/skills/test_memory_drift.py` (the two fix-line expectations) | RED on windows-latest: the fix line is a shell line, `_specs.quote` spells a path with `/` on Windows while the message keeps the native form; the expectation builds the fix path `clone.as_posix()`, the code is consistent and unchanged (agent default, unruled) |
 
 ## Stage J1.S8 — re-review rework: the refusal helper
 
@@ -82,7 +83,7 @@ Paths are relative to the repo root; aliases as in `PLAN.md` (`f/`, `pub/`, `S/`
 
 | task | AC | `W:` | owner tests / RED |
 |---|---|---|---|
-| J1.S6.T20 | re-review a14a42511 LOW-1 | `tests/unit/skills/test_memory_drift.py` (the first shallow-clone test calls `_refusal`) | no RED: a test refactor, the two shallow-clone cases keep their literals |
+| J1.S6.T20 | re-review 222d3a7d6 LOW-1 | `tests/unit/skills/test_memory_drift.py` (the first shallow-clone test calls `_refusal`) | no RED: a test refactor, the two shallow-clone cases keep their literals |
 
 ## Stage J1.S9 — re-review rework: the rename
 
@@ -90,7 +91,7 @@ Paths are relative to the repo root; aliases as in `PLAN.md` (`f/`, `pub/`, `S/`
 
 | task | AC | `W:` | owner tests / RED |
 |---|---|---|---|
-| J1.S6.T21 | re-review a14a42511 LOW-2 | `bugres/scripts/_bugs_fix.py`, `bugres/scripts/bugs.py` (`Fix.later` -> `Fix.rework`, its builder `rework_reader`) | no RED: a rename of what the field returns, no behaviour; the existing fix/rework rows exercise it |
+| J1.S6.T21 | re-review 222d3a7d6 LOW-2 | `bugres/scripts/_bugs_fix.py`, `bugres/scripts/bugs.py` (`Fix.later` -> `Fix.rework`, its builder `rework_reader`) | no RED: a rename of what the field returns, no behaviour; the existing fix/rework rows exercise it |
 
 ## Stage J1.S10 — re-review rework: the hash tuple
 
@@ -100,4 +101,12 @@ Paths are relative to the repo root; aliases as in `PLAN.md` (`f/`, `pub/`, `S/`
 |---|---|---|---|
 | J1.S6.T22 | re-record dd-bug-resolution's scripts hash after T21 | `public/entities/behavior-map.json` (one `hash_tuple.scripts`) | no RED: `tests/contract/test_behavior_map.py::every-hash-tuple-is-current` was red after T21's rename and is green again |
 
-- done: Job 1 — every task landed on `wt/0.5.0-rc10/job1` through its task merge: J1.S1.T1 95a7ac434; J1.S2.T1 91593bf88 (REBUILD) and 2f3d22701 (exec bit); J1.S2.T2–T5 d4f81a899, b0bb26ac4, 0b95f45e7, 3b47a5294; J1.S3.T1 5382a95c4; J1.S3.T2 27dd51d53 landed KEEP, no code (its commit body: absent and unreachable are two questions, a fold re-opens cc544f66e's bug), then REBUILT by J1.S3.T12 after the review reproduced `memory-window-bound-shallow-clone-named-as-rebase` (registered 02248cee2); closed by J1.S3.T9 1b4d06e62; reviewed CHANGES_REQUESTED at b9003086f, reworked by J1.S3.T11 (bug registered 02248cee2), T12 (REBUILD, bug resolved), T13 (per-line rework), T14, T15, T16 (survivors), closed again by the T16 close commit.
+## Stage J1.S11 — re-review rework: the rebase's citations
+
+- Contract: T23 row green, `ci.py job` ALL PASS; AC1.1
+
+| task | AC | `W:` | owner tests / RED |
+|---|---|---|---|
+| J1.S6.T23 | re-review HIGH-C and the rebase onto feature/0.5.0 | `specs/releases/0.5.0/rc-10/tasks/job1.md` (the T18 row restored under J1.S7; T19's row rewritten; every old sha cited here repaired through the rebase's sha map; the done line names T18–T23) | no RED: a data file; `release.py check` and `bugs.py fix` exit 0 (agent default, unruled: the rows keep their J1.S6 ids) |
+
+- done: Job 1 — every task landed on `wt/0.5.0-rc10/job1` through its task merge: J1.S1.T1 cd4ae4b32; J1.S2.T1 0a2696147 (REBUILD) and 1bdf7c79b (exec bit); J1.S2.T2–T5 71ade0591, a00bf3445, 667560c5b, a3ef1ac18; J1.S3.T1 7781358e5; J1.S3.T2 00b479388 landed KEEP, no code (its commit body: absent and unreachable are two questions, a fold re-opens cc544f66e's bug), then REBUILT by J1.S3.T12 after the review reproduced `memory-window-bound-shallow-clone-named-as-rebase` (registered 633f5757d); closed by J1.S3.T9 4df4d0367; reviewed CHANGES_REQUESTED at 3facc0a0a, reworked by J1.S3.T11 (bug registered 633f5757d), T12 (REBUILD, bug resolved), T13 (per-line rework), T14, T15, T16 (survivors), closed again by the T16 close commit; re-review rework T18 (Windows fix line), T19 (the empty shape-4 link commit), T20 (`_refusal`), T21 (`Fix.rework`), T22 (hash tuple), T23 (this file's citations after the rebase onto feature/0.5.0).
