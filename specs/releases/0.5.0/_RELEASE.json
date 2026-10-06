@@ -1049,9 +1049,9 @@
       "ts": "2026-10-06T02:02:00Z",
       "agent": "release.py memory",
       "kind": "memory",
-      "text": "Memory reconciled over 703efc1c5e5bd421c844a8ac9e30b6699f468ee9..cba3fd9dbd8e: 2 reviewed, 16 changed.",
+      "text": "Memory reconciled over 703efc1c5e5bd421c844a8ac9e30b6699f468ee9..036a296f9bfb: 2 reviewed, 16 changed.",
       "since": "703efc1c5e5bd421c844a8ac9e30b6699f468ee9",
-      "until": "cba3fd9dbd8ec7ef5ac49409c12bc56ca8f791c1",
+      "until": "036a296f9bfb316b141c29e85466d611baccc696",
       "reviewed": [
         "spec-context-project",
         "workspace-init"
