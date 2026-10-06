@@ -199,17 +199,21 @@ _GUARDED_ROOT_FILES: tuple[str, ...] = (
     "playwright.config.ts",
 )
 
-_PATH_MARKERS: tuple[tuple[str, str], ...] = (
-    ("tests/unit/", "unit"),
-    ("tests/contract/", "contract"),
-    ("tests/integration/", "integration"),
-    ("tests/e2e/", "e2e"),
-    ("tests/tmp/", "tmp"),
-)
+# Size -> enforced timeout seconds (tests/AGENTS.md size markers). A test that trips its
+# ceiling is MIS-SIZED — mark it ``medium`` or declare an explicit justified
+# @pytest.mark.timeout; never raise these defaults.
+_TIER_TIMEOUTS: dict[str, int] = {"small": 10, "medium": 60, "e2e": 120}
 
-# Tier -> enforced timeout seconds (tests/AGENTS.md size tiers). A test that trips its tier ceiling is MIS-TIERED — fix the tier or
-# declare an explicit justified @pytest.mark.timeout; never raise these defaults.
-_TIER_TIMEOUTS: dict[str, int] = {"unit": 10, "contract": 30, "integration": 60, "e2e": 120}
+# What makes a test ``medium``: its module reaches a process or real-git seam.
+_SEAM_MODULES = frozenset(
+    {
+        "subprocess",
+        "tests.fixtures.real_git",
+        "tests.helpers.worktree_ws",
+        "dadaia_workspace.infrastructure.git_subprocess",
+        "dadaia_workspace.infrastructure.subprocess_runner",
+    }
+)
 
 # Bug ``windows-xdist-workers-crash-on-unit-fast-tier``: the table above is calibrated on
 # the Linux runners. Windows CI runs the tree-copying install/doctor tests 2-3x slower
@@ -262,26 +266,41 @@ def _validate_quarantine_markers(items: list[pytest.Item]) -> None:
             raise pytest.UsageError(message)
 
 
-def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item]) -> None:
-    """Apply layer markers + tier timeouts from test directory layout.
+def _size(item: pytest.Item) -> str:
+    """``small`` or ``medium``: an explicit marker wins; else ``medium`` when the test module
+    reaches a process or real-git seam (a name defined in a seam module, or the module
+    itself) or the test asks for ``pytester``; else ``small``. Never the folder."""
+    for size in ("medium", "small"):
+        if item.get_closest_marker(size) is not None:
+            return size
+    values = vars(item.module).values() if hasattr(item, "module") else ()
+    seam = any(
+        getattr(v, attr, None) in _SEAM_MODULES
+        for v in values
+        for attr in ("__module__", "__name__")
+    )
+    return "medium" if seam or "pytester" in getattr(item, "fixturenames", ()) else "small"
 
-    Directory placement is the first enforcement mechanism for the existing
-    suite. Tests may still add explicit markers, but unmarked legacy tests do
-    not fall out of layer-specific commands. The tier timeout is applied only
-    when the test declares no explicit ``timeout`` marker of its own.
-    """
+
+def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item]) -> None:
+    """Apply the size marker and its timeout. A journey under ``tests/e2e/`` is ``e2e``;
+    every other test is ``small`` or ``medium`` by what it reaches (``_size``). The timeout is
+    applied only when the test declares no explicit ``timeout`` marker of its own."""
     covered = bool(getattr(config.option, "cov_source", None))
     for item in items:
         rel = Path(str(item.fspath)).resolve().relative_to(_REPO_ROOT).as_posix()
-        for prefix, marker in _PATH_MARKERS:
-            if rel.startswith(prefix):
-                item.add_marker(getattr(pytest.mark, marker))
-                if marker == "e2e":
-                    item.add_marker(pytest.mark.slow(reason="e2e process-boundary suite"))
-                tier_timeout = tier_timeout_seconds(marker, coverage=covered)
-                if tier_timeout is not None and item.get_closest_marker("timeout") is None:
-                    item.add_marker(pytest.mark.timeout(tier_timeout))
-                break
+        if rel.startswith("tests/tmp/"):
+            item.add_marker(pytest.mark.tmp)
+        if rel.startswith("tests/e2e/"):
+            size = "e2e"
+            item.add_marker(pytest.mark.e2e)
+            item.add_marker(pytest.mark.slow(reason="e2e process-boundary suite"))
+        else:
+            size = _size(item)
+            item.add_marker(getattr(pytest.mark, size))
+        tier_timeout = tier_timeout_seconds(size, coverage=covered)
+        if tier_timeout is not None and item.get_closest_marker("timeout") is None:
+            item.add_marker(pytest.mark.timeout(tier_timeout))
     _validate_quarantine_markers(items)
 
 
@@ -375,6 +394,18 @@ def _hermetic_cwd(
 ) -> None:
     """Start every test in an empty directory, so no cwd walk reaches a real workspace."""
     monkeypatch.chdir(tmp_path_factory.mktemp("cwd"))
+
+
+@pytest.fixture(autouse=True)
+def _no_open_worktree(request: pytest.FixtureRequest, monkeypatch: pytest.MonkeyPatch) -> None:
+    """A ``small`` test spawns no process: ``dead()`` and the doctor read no ``worktree.py``
+    rows here (bug unit-tests-spawn-the-worktree-script-through-a-cli-stub)."""
+    if request.node.get_closest_marker("small") is None:
+        return
+    from dadaia_workspace.features.spec_context import doctor, service
+
+    for owner in (service, doctor):
+        monkeypatch.setattr(owner, "worktree_rows", lambda _root: ([], "", ""))
 
 
 @pytest.fixture(autouse=True)

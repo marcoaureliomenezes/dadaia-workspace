@@ -27,15 +27,15 @@ PRIVATE_IMPORT_FILES = 34
 _ALLOW = "# allow-private-import:"
 
 # P-21: the tier table on Linux and macOS; the conftest calibrates once for Windows.
-TIER_SECONDS = {"unit": 10, "contract": 30, "integration": 60, "e2e": 120}
+TIER_SECONDS = {"small": 10, "medium": 60, "e2e": 120}
 CALIBRATION = {
-    "unit linux False": 10,
-    "unit win32 False": 30,
-    "contract darwin False": 30,
+    "small linux False": 10,
+    "small win32 False": 30,
+    "medium darwin False": 60,
     "e2e win32 False": 360,
     "slow win32 False": None,
-    "unit linux True": 20,
-    "unit win32 True": 60,
+    "small linux True": 20,
+    "small win32 True": 60,
 }
 
 _CITATION = re.compile(r"\b[a-z0-9]+(?:-[a-z0-9]+)+#[A-Za-z]*\d+(?:[.-]\d+)?")
@@ -268,7 +268,7 @@ CHECKS: dict[str, Check] = {
             "explicit-kept": _session(explicit=30),
             "four-tiers": _session(tiers={**TIER_SECONDS, "e2e": None}),
             "calibrated-ceiling": _session(
-                props={"calibration": {**CALIBRATION, "unit win32 False": 10}, "push_gc": []}
+                props={"calibration": {**CALIBRATION, "small win32 False": 10}, "push_gc": []}
             ),
             "probe-broke": lambda root: {},
         },
