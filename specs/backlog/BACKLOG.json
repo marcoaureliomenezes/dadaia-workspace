@@ -2,14 +2,6 @@
   "schema": "backlog-v1",
   "active": [
     {
-      "id": "guidance-messages-name-the-right-target",
-      "title": "Guidance messages name the bound context and the real target",
-      "opened": "2026-09-28",
-      "status": "idea",
-      "description": "SessionStart shows a session bound to invoicer the next step of payroll; the root-whitelist fix line proposes mkdir .dadaia/tmp instead of where the file belongs; HOOKS-DRIFT-1 says differs for an absent hook. Evidence: rubric 0.5.0 at a5e9a2ee (.dadaia/tmp/general-purpose/20260928/rubric-050/RUBRIC.md) N6, J8 S1; hooks/root_whitelist.py, features/spec_context/doctor.py HOOKS-DRIFT-1.",
-      "provenance": "operator closure ruling 2026-09-28: the rest is mapped to the backlog; source rubric 0.5.0 at a5e9a2ee (.dadaia/tmp/general-purpose/20260928/rubric-050/RUBRIC.md)"
-    },
-    {
       "id": "docs-site-zensical-pages",
       "title": "c7: the docs site per ADR 0039 - Zensical on GitHub Pages, generated reference pages with a staleness check, README about 60 lines",
       "opened": "2026-09-29",
@@ -26,24 +18,6 @@
       "provenance": "0.4.7 rc-9 SPEC D3-D6 (2026-09-21); histo records standalone-skills-distribution, public-presence-and-launch; inventory row A10 in reports/main-thread/20260929-050-rc1-audit/leftbehind/ (REPORT.md, inventory.json); operator order 2026-09-29"
     },
     {
-      "id": "worktree-rows-injected-not-monkeypatched",
-      "title": "SpecContextService and DoctorService take worktree rows by constructor injection; the unit-tier autouse monkeypatch is deleted",
-      "opened": "2026-10-01",
-      "status": "idea",
-      "description": "The rc-5 Windows fix (1f0155ee) patches service.worktree_rows and doctor.worktree_rows from tests/unit/conftest.py. Both services are container-built: accept a worktree_rows callable defaulting to the adapter (infrastructure/ledger_scripts.py), pass a stub in unit tests, delete the autouse fixture and the inline patch in test_cli_context.py (dd-codebase-design: accept dependencies, don't create them). Destination: rc-8 W6.",
-      "provenance": "dd-code-reviewer review of 4d29e905 (2026-09-30), finding 3; rc-6 PLAN \u00a74 carry",
-      "relates": []
-    },
-    {
-      "id": "windows-integration-coverage-gap",
-      "title": "dead()'s worktree hold, ctx-inject's worktree block and the closure wait are exercised on Windows at some tier",
-      "opened": "2026-10-01",
-      "status": "idea",
-      "description": "Integration runs only on ubuntu (.github/workflows/ci.yml); after 1f0155ee moved those cases to tests/integration, no Windows job exercises them. Production on Windows uses the real Scripts/dadaia.exe; the gap is coverage, not behavior. Destination: rc-8 W5 (one test child-env builder).",
-      "provenance": "dd-code-reviewer review of 4d29e905 (2026-09-30) INFO; rc-6 PLAN \u00a74 carry",
-      "relates": []
-    },
-    {
       "id": "spec-context-refusals-print-prose",
       "title": "spec_context service refusals still print prose instead of one fix line",
       "opened": "2026-10-02",
@@ -53,51 +27,6 @@
       "relates": []
     },
     {
-      "id": "caused-by-proposed-by-blame",
-      "title": "resolve proposes caused_by from blame and refuses an unreasoned none",
-      "opened": "2026-10-02",
-      "status": "idea",
-      "description": "Measured: 74% of post-migration resolves declare caused_by `none` by judgment; `bc135641c` repaired 6 links (2 cycles, a task id). Change: `resolve` blames the lines the staged diff removes (pre-fix revision), maps the blamed commits to bug ids through the bug-fix-commit-derived-by-grep resolver, and skips regenerated files, the skip set derived from what the projection already declares it writes (behavior-map, shipped-hashes, install ledger), never a literal list; it also skips squash `(#n)` commits and `refactor(T-\u2026)` commits; it refuses a `--caused-by` outside the candidates, or `none` when candidates exist, unless `--lineage-reason` is given, and stores that reason (grill Q2). One semantics, aligned in the schema, LINEAGE.md and `specs/bugs/AGENTS.md:23`: \"the fix of X wrote the lines this fix corrects\"; the schema's \"reopen\" wording is deleted. Plug-in points: `bugs.py:_write` resolve branch (l.137-139), `_bugs_transition.transition()` (l.53-65). Done when: resolve prints the blame candidates and refuses the two cases above without `--lineage-reason`. ADR 0164 (proposed).",
-      "provenance": "operator demand 2026-10-02: test audit https://claude.ai/artifact/AMw3Ho2tqaAbftJUWuNhAT + grill Q1-Q9",
-      "relates": [
-        "bug-fix-commit-derived-by-grep"
-      ]
-    },
-    {
-      "id": "focused-review-on-caused-by",
-      "title": "A declared caused_by makes the fix's review focused on the prior fix",
-      "opened": "2026-10-02",
-      "status": "idea",
-      "description": "Measured: declaring a cause triggers nothing; REBUILD fires only on \"\u22652 fixes on the surface\". Change: `caused_by != none` makes the fix's review focused: `dd-code-review` reads every code and test line the prior fix wrote, and the verdict states REBUILD of the unit or why not. Skill-taught (root map \u00a73), measured by the audit (`PILLAR-BUGS`), never gated. Done when: the `dd-code-review` skill carries the focused-review step and `PILLAR-BUGS` measures verdicts on caused_by fixes that state REBUILD or why not. Files: `dd-code-review` SKILL, `dd-audit-project` `PILLAR-BUGS`. ADR 0164 (proposed).",
-      "provenance": "operator demand 2026-10-02: test audit https://claude.ai/artifact/AMw3Ho2tqaAbftJUWuNhAT + grill Q1-Q9",
-      "relates": [
-        "caused-by-proposed-by-blame"
-      ]
-    },
-    {
-      "id": "tests-tree-mirrors-the-package",
-      "title": "The tests tree mirrors the package, one owner file per module",
-      "opened": "2026-10-02",
-      "status": "idea",
-      "description": "Measured: integration 38/56 and contract 51/60 files sit loose at their root, named as slogans; ghost dirs `unit/features/{handoff,public_assets}`, empty `unit/{gate,scripts}`, `integration/features/public`; public_assets tests spread over 4 places. Change: `tests/<mirror of dadaia_workspace>/test_<module>.py`, one owner per module; `contract/` and `integration/` dissolve into the owners; `e2e/` keeps named journeys, each with `Owner:`; size is a marker derived in conftest from the fixture used (real git/subprocess \u21d2 medium), not the folder. Migration by `git mv` + merge, one feature per commit, no assert change (Tidy First). Owner map, integration root: workspace (cli_init, init_with_repo, harness_add, onboarding_steps_property, workspace_fix_lines_clear_their_finding, cli_context_repo_url, cli_context_repo_verbs, context_create_transactional, one_workspace_root_rule); spec_context (context_alive_writes_nothing, context_baseline, context_dead_holds, gate_allow_iff_doctor_keeps, one_bind, one_place_of_control_associated_repo, reaper_spares_linked_worktrees, unfixable_findings_carry_their_own_fix); doctor/cli (cli_doctor, doctor_fix_lines_clear_their_finding, refusal_fix_lines_clear_their_refusal); ledger_scripts (doctor_ledgers_delegate_to_scripts, shallow_history_fix_line_clears); backlog (backlog_doctor); public assets (install_deletes_only_what_its_ledger_owns, install_ledger_reconciliation, public_assets, public_install_e2e, staged_assets_have_consumers); specs (repo_law_only_via_specs_init, upgrade_regenerates_the_catalog_pair); export (cli_export); chokepoints (push_gate_denylist); dd-gitflow-default worktree.py (worktree_lifecycle, worktree_new); meta (repo_self_scan, suite_cannot_reach_the_instance, tool_caches_stay_in_the_tmp_zone, version_lineage_consistency). Owner map, contract root: public assets/entities/projection (agentic_entities_derivation, agent_tier_taxonomy, behavior_map, claude_scaffold_is_loadable, codex_skill_ref_prefixes, context_map, core_persona_names, copy_drift_scoped_law, harness_registry_records, hook_behaviour_coverage, hooks_publication_boundary, install_skip_idempotent, persona_body_matches_its_tools, public_scripts_thin_wrapper, public_source_hygiene, standalone_skills); specs/law/memory/releases (adr_canon, audit_first_pass, backlog_status_vocabulary_contract, consumed_lane_deleted, docs_derived_from_memory, fixed_sections_canon, law_states_what_the_code_does, memory_canonical_shape, release_script, release_semver_canon, sdd_writers_never_mutate_task_markers, zone_registry); handoff (handoff_schema_contract); cli/doctor (bind_resolution_seam_dynamic_walk, cli_help_quality, cli_output_stability, doctor_sections, doctor_without_an_instance, every_block_carries_a_fix, onboarding_steps); ci_preflight/CI/gate (ci_preflight_ci_gating_parity, ci_preflight_includes_lint_imports, ci_workflow_hygiene, platform_classifier, push_gate_wiring); architecture (core_file_io_purity, import_linter_ignore_cap); meta (frozen_clock_aging_ratchet, harness_env_contract, mutation_baseline_scope_stdlib_only, slop_ratchets, source_repo_hygiene, stewardship_mechanics, suite_cannot_reach_a_real_workspace, test_suite_ratchets); meta files leave pytest per meta-tests-leave-pytest. Done when: every test file maps to one package module or one named e2e journey, and no ghost or empty test dir remains. ADR 0167 (proposed).",
-      "provenance": "operator demand 2026-10-02: test audit https://claude.ai/artifact/AMw3Ho2tqaAbftJUWuNhAT + grill Q1-Q9",
-      "relates": [
-        "windows-integration-coverage-gap"
-      ]
-    },
-    {
-      "id": "unit-tier-without-processes",
-      "title": "The unit tier spawns no processes",
-      "opened": "2026-10-02",
-      "status": "idea",
-      "description": "Measured: 19-44 unit files spawn processes; 534 unit items >100 ms, worst 10-18 s (`test_git_object_reader.py`, `test_ctx_inject.py`, `test_init_reinit_upgrade.py`); 188/261 items >1 s lack `slow`; conftest carries 473 lines of autouse guards. Change: per offender, extract the pure core (parse/decide) and test it pure, or admit it as medium through the derived marker (tests-tree-mirrors-the-package); one boundary fake module (`tests/fakes.py`) replaces the scattered monkeypatch; the autouse guards shrink accordingly. Done when: the readout shows \u226570% of items <100 ms. ADR 0167 (proposed).",
-      "provenance": "operator demand 2026-10-02: test audit https://claude.ai/artifact/AMw3Ho2tqaAbftJUWuNhAT + grill Q1-Q9",
-      "relates": [
-        "worktree-rows-injected-not-monkeypatched",
-        "tests-tree-mirrors-the-package"
-      ]
-    },
-    {
       "id": "spec-context-branch-field-deleted",
       "title": "The Spec Context Project stores no branch; context alive derives the checkout from the gitflow",
       "opened": "2026-10-03",
@@ -105,17 +34,6 @@
       "description": "Measured (HEAD e83e55783): the registry field `current_branch` (`stored_branch` in `context show --json`) is read only by `alive()` DEAD->ALIVE (`features/spec_context/service.py:503-510`) and written by export (`features/export/service.py:58-59`), dead (`:756`) and alive (`:525`); it is stale in 3 of 5 ALIVE contexts of this instance (dadaia-workspace stores feature/0.4.6 while feature/0.5.0 is checked out; two consumer contexts lag the same way). `.dadaia/states/spec_contexts.json` stamps `schema_version: 2` while the store is `_VERSION = 3` (`infrastructure/json_context_store.py:20`) and never re-stamps; no JSON schema. Change (DELETE first): delete the field from `SpecContextProject` (`core/models/spec_context.py:43`; `RepoLiveStatus.current_branch`, the live read, stays), `_to_dict`/`_from_dict`, `context show/list` (`stored_branch` and the stored fallback, `cli/commands/context.py:80-81,275`; the live branch of an on-disk repo stays read from git), export, import and `features/migrate/state_v2.py:123`. `alive` derives the checkout: the highest `<gitflow.work><M.m.p>` on origin, else the integration branch, through the one gitflow reader (`GitSubprocessClient.gitflow`). The store re-stamps its `schema_version` on every write; a migration removes the key from existing rows. Done when: no reader or writer of the stored field remains (grep), and reviving a context whose origin holds `feature/0.5.0` lands on it. Files: core/models/spec_context.py, infrastructure/json_context_store.py, features/spec_context/service.py, cli/commands/context.py, features/export/service.py, features/import_/service.py, features/migrate/state_v2.py. Bugs eliminated: context-current-branch-stale-for-alive-repo, context-list-current-branch-stale-for-alive-repo. Same surface, not eliminated (the change must not grow it): sa-registry-schema-version-has-three-grammars and migrate-and-reconcile-crash-on-a-schema-3-context-registry (the 2-vs-3 stamp is their residue), registry-row-missing-a-key-escapes-reg-schema (open; the migration adds no second parse beside core/context_registry.py, ADR 0162). ADR 0171 (proposed).",
       "provenance": "operator demand 2026-10-02: workspace replication grill Q1-Q10",
       "relates": []
-    },
-    {
-      "id": "context-dead-never-commits",
-      "title": "context dead never commits: a dirty checkout is refused with a fix line",
-      "opened": "2026-10-03",
-      "status": "idea",
-      "description": "Measured (HEAD e83e55783): `dead` (`features/spec_context/service.py:711-761`) commits a dirty tree (`commit_all(..., 'chore: auto-sync before dead')`, `:737-738`) and pushes; its preflight (`:644-709`) carries refusals that exist only for that commit: untracked-file consent (`--commit`, `:662-670`) with its untracked secret scan (`:671-678`), git identity (`:696-700`) and the non-work-branch refusal (`:701-709`, ADR 0056 g). The commit path is the largest lifecycle bug class, and with worktrees `repos/<r>` receives only merges (ADR 0105). Sanctioned direct writers at HEAD (ADR 0154): `specs init` writes without committing (its paths are committed later by `context baseline`'s `commit_paths`, `:575`); no `specs/audits/**` writer commits. Change (DELETE first): delete the commit, the `--commit` flag, the consent and identity refusals of the default path and `GitSubprocessClient.commit_all` (`infrastructure/git_subprocess.py:192`, dead is its only caller; `identity_fix` stays, baseline and `--snapshot` use it); a dirty checkout refuses with one `fix:` per file (move it into a worktree, or discard it) and touches nothing; the non-work-branch refusal stays only for unpushed commits on HEAD. `dead` = preflight -> fast-forward push of what is committed -> worktree snapshot (context-dead-snapshots-open-worktrees) -> hold. Verify, and guarantee, that each sanctioned direct writer (`specs/audits/**`, `context create`, the first `specs init`) leaves its output committed in the act. Done when: neither `features/spec_context/service.py` nor `infrastructure/git_subprocess.py` holds `commit_all`; a dirty checkout refuses dead with a fix line, origin and tree untouched. Files: features/spec_context/service.py (dead, _dead_preflight), infrastructure/git_subprocess.py, cli/commands/context.py (dead --commit), the specs init and audit writers. Bugs eliminated on the default (non-snapshot) path, no code path left: dead-commit-fails-without-git-identity, alive-scaffold-blocks-dead, context-dead-pushes-an-unborn-clone, and the class of context-alive-sweeps-unrelated-worktree-changes (a verb committing work it did not author): dead commits nothing of `repos/<r>`; `--snapshot` (context-dead-snapshots-open-worktrees) commits only the `wt/*` it archives, behind its own identity preflight. Same surface, kept (the push stays and must not grow): context-dead-plain-git-push-fails-mismatched-upstream, dead-holds-main-repo-before-associated-push, context-dead-ignores-the-hold-refusal. ADR 0172 (proposed; amends 0056 at acceptance).",
-      "provenance": "operator demand 2026-10-02: workspace replication grill Q1-Q10",
-      "relates": [
-        "spec-context-branch-field-deleted"
-      ]
     },
     {
       "id": "worktree-layout-per-context",
@@ -286,18 +204,6 @@
       ]
     },
     {
-      "id": "bug-ledger-balance-and-convergence",
-      "title": "QUALITY.md carries the bug ledger's balance and a convergence indicator: a generated map, a written review, weight decay, evidence_seam checked at resolve (rc-9)",
-      "opened": "2026-10-05",
-      "status": "idea",
-      "description": "G8, operator verbatim: 'Bugs devem ser consolidados em QUALITY.md'; 'o ledger \u00e9 as transa\u00e7\u00f5es e o saldo (balance) \u00e9 a soma'; 'Mapa gerado + revis\u00e3o escrita'; 'Revis\u00e3o a cada rc, consolida\u00e7\u00e3o por release (Recommended)'. G10, operator verbatim: 'Conferido no resolve (Recommended)' - evidence_seam (path[::node]) required at bugs.py resolve and checked there only; a later REBUILD may delete the cited test, and the window review records it; amends ADR 0164 (4) and AC9.1's clause. New operator demand, 2026-10-05, verbatim: 'na consolida\u00e7\u00e3o do QUALITY.md \u2026 Deve ter um indicador ao final que mede uma taxa de se estamos convergindo ou n\u00e3o. Convergir significar\u00e1 estarmos tornando o dadaia-workspace mais saudavel, ou seja, bugs de features amadurecidas para de ser reportados e solu\u00e7\u00e3o fica segura.' The agent-behavior evals (W11 T1/T2) are an external signal for that indicator; operator: 'Eles ser\u00e3o de grande ajuda na identifica\u00e7\u00e3o dos bugs.' Carried design: QUALITY.md gains a ## Bugs section - a generated map per surface (records, recurrences, fix-induced, pile, archived, times reviewed, associations, weight) and a written review (causes, verdicts, lessons), compiled at every rc closure and consolidated per release; per-bug state stays only in BUGS.jsonl; a bug is settled once it leaves the bug window with no recurrence on its surface. The map is a closure check generated after the disposition sweep, never an always-on doctor check; it is a fenced block, which LINT-1 exempts. Dev-tooling is a repo-declared, language-neutral class (for example a dadaia-dev-tooling attribute in .gitattributes, the ADR 0183 seam), never 'outside the shipped package'; unknown surfaces stay out of recurrence counts. evidence_seam node matching covers parametrized and class-qualified ids. docs/bug-ledger-lessons.md is derived from the ## Bugs review under P-29. The indicator's criterion is fixed at rc-9's grill from cited sources; the entry carries no formula. Candidate sources: Kanoun & Laprie, Handbook of Software Reliability Engineering ch. 10 (Laplace trend test, grouped data); IBM ODC v5.2 Age (Base, ReFixed); Kan, Metrics and Models in Software Quality Engineering ch. 4 (percent defective fixes); Capers Jones 2012, 'Software Defect Origins and Removal Methods' (bad-fix injection).",
-      "provenance": "operator scope ruling 2026-10-05 (AskUserQuestion): 'Dividir: balan\u00e7o vai p/ rc-9 (Recommended)' \u2014 an operator-ratified in-release deferral of rc-8 W13 AC13.5, AC13.9, AC13.10 and candidate ADR C, anchored at specs/releases/0.5.0/rc-8/SPEC.md \u00a7Carried, rc-9 line; grill handoff 2026-10-05T005326Z-main-thread-grill-bug-window-review (G8, G10); operator demand 2026-10-05 to the main thread (convergence indicator); the carried design from the rc-8 SPEC's W13 review (REJECTED; H7 and the map-check finding)",
-      "relates": [
-        "agent-behavior-evals",
-        "bug-fix-adds-never-rewrites-asserts"
-      ]
-    },
-    {
       "id": "job-gate-runs-the-law-deletion-check",
       "title": "scripts/ci.py job runs the push gate's ADR 0151 M3 law-deletion check over the job range",
       "opened": "2026-10-06",
@@ -350,15 +256,6 @@
       "opened": "2026-10-06",
       "status": "idea",
       "description": "Found in rc-9: the releases law says rc N+1 is drafted in a define tree while rc N implements and enters by release.py new at rc N's CLOSURE (specs/releases/AGENTS.md \u00a72, ADR 0201), but new mints a fresh rc-<N+1>/SPEC.md stub and refuses before CLOSURE, and a hand-drafted rc-<N+1>/SPEC.md on the work branch would become the live candidate (the highest rc-<N>/) while rc N still implements. Design: release.py new at rc N's CLOSURE adopts an existing Draft rc-<N+1>/SPEC.md (its Origin and Bug window head judged as for a stub), writing only the birth note and the phase; the live-candidate reader skips a Draft rc above an IMPLEMENTATION candidate until new adopts it, one rule in _release_store.live_ids and core/gitflow's pinned twin; ADR 0199 (a Draft rc-<N+1> does not move found_in) already covers the ledger side. Done when: rc-10 drafted during rc-9's IMPLEMENTATION enters by new at rc-9's CLOSURE with its draft kept byte for byte.",
-      "provenance": "rc-9 Reconciliation deferral (JR.S2.T5), dispatched by the main thread 2026-10-06 under the operator's rc-9 scope; target rc-10 or later",
-      "relates": []
-    },
-    {
-      "id": "bugs-fix-reads-the-per-class-shape",
-      "title": "bugs.py fix and window read the per-class shape-4 commit, one id per body line",
-      "opened": "2026-10-06",
-      "status": "idea",
-      "description": "Found in rc-9 (Job 5 review LOW 2): dd-gitflow-default \u00a73a now carries the per-class shape 4, chore(bugs): <verb> class <class> \u2014 <reason> with one id per body line, but bugs.py fix links only a shape-3 fix(bugs)/refactor(bugs) subject or a shape-4 chore(bugs): resolve <id> subject, so a record resolved by a class commit reads 'unlinked'. Design: the one commit reader in bugs.py fix also matches a class subject and takes the ids from its body lines; no second grep. Owner: dd-bug-resolution/scripts/bugs.py fix, tests/unit/skills/test_bug_resolution_bugs_script.py. Done when: a record resolved only by a class commit prints that commit under bugs.py fix.",
       "provenance": "rc-9 Reconciliation deferral (JR.S2.T5), dispatched by the main thread 2026-10-06 under the operator's rc-9 scope; target rc-10 or later",
       "relates": []
     },
