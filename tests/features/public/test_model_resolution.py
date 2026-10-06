@@ -35,7 +35,7 @@ def _has_error(reports: list[str]) -> bool:
 
 def test_current_tree_resolves_clean() -> None:
     """The live canonical public/ tree (opus-4-8 deep agents + etc) resolves ⇒ [ok]."""
-    public_dir = Path(__file__).resolve().parents[4] / "dadaia_workspace" / "public"
+    public_dir = Path(__file__).resolve().parents[3] / "dadaia_workspace" / "public"
     assert public_dir.is_dir(), public_dir
 
     reports = _rendered(check_model_resolution(public_dir))
