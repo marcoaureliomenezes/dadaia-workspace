@@ -10,27 +10,24 @@
   - `2026-10-06T015544Z-main-thread-grill-rc10-scope`: Q1–Q4, Q2b, Q5, Q6, ADR 0206.
   - `2026-10-05T040135Z-main-thread-grill-granularity-parallelism`: less Q19, which 0206 overrides.
   - `2026-10-05T005326Z-main-thread-grill-bug-window-review`: G8, G10.
-- Scope (Q4, Q6): 8 jobs, the cap (0193). Evals T1 and T2 fold into one job, so the test freeze fits. The bug batch and Reconciliation are not counted.
+- Scope (Q4, Q6): 8 jobs, the cap (0193); T1 and T2 share one job so the test freeze fits; the bug batch and Reconciliation uncounted.
 - Facts at 27123ce99:
-  - `dadaia-evals` has no `tasks/`; `eval.yml` (on its `main`, 877ff5b) has never run; its `AGENTS.md` has no `verify:` line.
+  - `dadaia-evals`: no `tasks/`; `eval.yml` (`main`, 877ff5b) never ran; no `verify:` line.
   - Memory names 8 test files that no longer exist.
   - HOOKS-DRIFT-1 reads an absent hook as "differs".
-- Entry order (M4):
-  1. At rc-9's CLOSURE, `release.py new` writes the stub `rc-10/SPEC.md` on the work branch.
-  2. This define tree rebases onto it and replaces the stub with this SPEC.
-  - `release-new-adopts-a-drafted-next-rc` is carried to rc-11.
-- Bug law: 0206. No rc closes with an open bug.
+- Entry order (M4): at rc-9's CLOSURE `release.py new` writes the stub `rc-10/SPEC.md`; this tree then rebases and replaces it (`release-new-adopts-a-drafted-next-rc`: rc-11).
+- Bug law: 0206; no rc closes with an open bug.
 
 ## Bug window review
 
-Read on `feature/0.5.0` at 27123ce99, then on `wt/0.5.0-rc9/reconcile`, with `bugs.py window`, `fix` and `git show --numstat`.
+Read at 27123ce99 and on `wt/0.5.0-rc9/reconcile` (`bugs.py window`, `fix`, `git show --numstat`).
 
 - Window: 251 records (`0.4.7`, `0.5.0`); 452 with release `unknown`.
 - Found in rc-9: 5, all resolved: the 4 rc-9 bug rows of the table, and `verify-line-absent-refusal-sends-to-a-tree-the-gate-never-reads`. `dependabot-pyjwt-open-on-main` (found in rc-7) is resolved in rc-9.
-- 13 records were resolved retro in rc-9 (AC2.9) on fixes from before rc-9. rc-9's window judged them (C9).
-- Direction: `bugs.py fix` prints `-` for every task-commit fix, so the column below is hand-computed: production `dadaia_workspace/**` lines, then tests. → AC1.1.
+- 13 records resolved retro in rc-9 (AC2.9) on older fixes: judged by rc-9's window (C9).
+- Direction: `bugs.py fix` prints `-` for task-commit fixes; the column is hand-computed (production, then tests). → AC1.1.
 - Rework count (Q5) needs AC1.1's reader; rc-11's window carries it.
-- Traceability: no rc-9 resolution carries `evidence_seam`. Of the 317 records that carry one, 116 name a file that no longer exists. → AC1.2.
+- Traceability: no rc-9 resolution carries `evidence_seam`; 116 of the 317 that do name a missing file. → AC1.2.
 
 | bug(s) | fix | direction (prod; tests) | what followed | verdict |
 |---|---|---|---|---|
@@ -62,12 +59,10 @@ Read on `feature/0.5.0` at 27123ce99, then on `wt/0.5.0-rc9/reconcile`, with `bu
 ## Terms
 
 - **Fix surface**: the production lines a fix commit wrote. It settles once it survives 2 rcs untouched by another fix or REBUILD (Q5).
-- **Rework**: a later commit whose diff overlaps a fix surface, classed by its shape.
-  - `refactor(…): REBUILD` is planned rework.
-  - `fix(bugs)` of another bug is overfitting evidence.
+- **Rework**: a later commit whose diff overlaps a fix surface: a `refactor(…): REBUILD` is planned; a `fix(bugs)` of another bug is overfitting evidence.
 - **Settled surface**: a surface whose every record left the bug window with no later record on it (G8).
-- **Convergence readout**: a number `QUALITY.md` `## Bugs` prints at each closure, blocking nothing (Q2, Q2b).
-- **RED anchor**: the sha that closes a job's RED stage. After it, the job's test files are frozen (Q6).
+- **Convergence readout**: a number `## Bugs` prints at each closure, blocking nothing (Q2, Q2b).
+- **RED anchor**: the sha closing a job's RED stage; after it the job's tests are frozen (Q6).
 
 ## Job 1 — the fix reader and the window's instruments
 
@@ -97,7 +92,8 @@ Read on `feature/0.5.0` at 27123ce99, then on `wt/0.5.0-rc9/reconcile`, with `bu
   - ≥ 2 fixes on the unit.
   - Each fix then gets KEEP or REBUILD. A REBUILD reworks the fix's code and what surrounds it, and keeps the fix's tests.
   - Taught in `dd-release-definition` §1. **No test** (law text).
-- AC1.4 One producer for the REBUILD-or-not line (M6). `dd-bug-resolution` `LINEAGE.md` step 7 writes it into the fix commit's body, either `rebuild: <unit> — prior fixes <id>, …` or `rebuild: none — <reason>`. `PILLAR-BUGS` gains a ninth metric: the share of fixes with `caused_by ≠ none` that carry a REBUILD shape or that line (`focused-review-on-caused-by`, audit half). Target 100 %; it gates nothing. **No test**. Check: `grep -c 'rebuild: none — <reason>'` prints ≥ 1 in `LINEAGE.md` and in `PILLAR-BUGS.md`.
+- AC1.5 Any `caused_by ≠ none`, a bug's fix or a feature task, makes the fix a REBUILD of the unit, keeping its tests (0210). The bugs law §2's "a fix-induced one as a REBUILD" (`public/scaffold/bugs/AGENTS.md`, `specs/bugs/AGENTS.md`) is widened to say so. **No test** (law text).
+- AC1.4 One producer for the REBUILD-or-not line (M6). `dd-bug-resolution` `LINEAGE.md` step 7 writes it into the fix commit's body, either `rebuild: <unit> — prior fixes <id>, …` or, only when `caused_by` is none, `rebuild: none — <reason>`. `PILLAR-BUGS` gains a ninth metric: the share of fixes with `caused_by ≠ none` carrying a REBUILD shape (`focused-review-on-caused-by`, audit half; 0210). Target 100 %; it gates nothing. **No test**. Check: `grep -c 'rebuild: none — <reason>'` prints ≥ 1 in `LINEAGE.md` and in `PILLAR-BUGS.md`.
 
 ## Job 2 — evals: the repo law, T1 and T2
 
@@ -143,7 +139,7 @@ Edge: Job 2, merged to `dadaia-evals` `main` through its PR edges.
   - **Unit**: a literal ledger renders a literal block; a rerun is byte-equal.
 - AC4.2 Readout 1, the Laplace trend (Kanoun & Laprie, *Handbook of Software Reliability Engineering* ch. 10), continuous time with days as the axis, over all bugs (Q2b).
   - Window: the live release plus the 3 previous published (today 0.4.5–0.5.0).
-  - Only records with a known `found_in` release count. Records sharing their `ts` with another record (a backfill or bulk import) are excluded and counted apart.
+  - Stated readings (operator, Q2b): a known `found_in` is a release other than `unknown`; a bulk import is a record sharing its `ts` with another record. Only the first count; bulk imports are excluded and counted apart.
   - u = (mean of tᵢ − T/2) / (T·√(1/(12N))), where tᵢ is a record's day offset from the window start and T is the window's length in days.
   - u ≤ −1.96 reads "converging", u ≥ +1.96 "diverging", anything else "no trend".
   - A second line counts records found on a surface that was already settled.
@@ -167,7 +163,9 @@ Edge: Job 2, merged to `dadaia-evals` `main` through its PR edges.
 
 ## Job 6 — the test freeze
 
-Q6 items 1–5; 0209. Everything is judged by `git diff` over the repo's declared test paths, so it works for any language.
+Q6 items 1–5; 0209. Everything is judged by `git diff` over the repo's test paths, so it works for any language.
+
+- AC6.0 A repo declares its test paths as one `tests:` line of globs in its tracked `AGENTS.md`, beside the `verify:` lines (e.g. `tests: tests/** **/*_test.go`). The gate reads it from the work branch, the authority 0207 uses, so no worktree changes what counts as a test. **Integration**: a worktree editing its own `tests:` line still has a test edit refused; a repo with no `tests:` line refuses with one fix line naming it.
 
 - AC6.1 Tests are born only in a RED stage, one whose tasks' `W:` holds tests only. Each new test is validated before the freeze: collected, failing by assertion (never by error), test-audit, stage review. **Integration**: a RED stage whose new test errors instead of failing cannot close.
 - AC6.2 From the RED anchor on, a task or job merge refuses any diff on a test file. This covers unit, integration and E2E tests and the tests that existed before; a pure rename is allowed.
@@ -204,19 +202,19 @@ Q6 items 1–5; 0209. Everything is judged by `git diff` over the repo's declare
 
 - AC9.1 Every bug found in rc-10 is resolved in rc-10 (0206).
   - A block-list bug is a hotfix at once.
-  - Every other bug goes to the bug batch: after the DAG's last job, before Reconciliation, grouped by cause, a fix-induced one as a REBUILD (0210 settles which ones).
+  - Every other bug goes to the bug batch: after the DAG's last job, before Reconciliation, grouped by cause, a fix with `caused_by ≠ none` as a REBUILD (0210).
   - A bug found during Reconciliation is fixed inside it.
   - **No test**. Check: `bugs.py status` prints `0 open` at Reconciliation's end.
 
 ## Reconciliation
 
-**No test**: each AC is observed by its command or by a `_RELEASE.json` line.
+**No test**: observed by the named command or a `_RELEASE.json` line.
 
-- AC10.1 Memory states the merged code; each atom lands with its derived sections in one merge (0192).
+- AC10.1 Memory states the merged code, each atom with its derived sections in one merge (0192).
   - Every `tests/…py` path named in `QUALITY.md` and `ARCHITECTURE.md` exists. `grep -c RELEASE-TREE-MEMORY specs/memory/ARCHITECTURE.md` prints `0`.
   - F098 and F128 are dispositioned `resolved`.
 - AC10.2 `## Bugs` is regenerated after the disposition sweep. `_RELEASE.json` logs the readouts, AC8.1's readout, each job's `kind: merge` entry and each job's bug-surface delta.
-- AC10.3 The `measured_by` of 0208 and 0209 names cases this rc built (AC1.2, AC4.1–AC4.4; AC6.1–AC6.2); a name that moved is repaired in the 0138 lane.
+- AC10.3 The `measured_by` of 0208 and 0209 names cases this rc built (AC1.2, AC4.1–AC4.4; AC6.0–AC6.2); a name that moved is repaired in the 0138 lane.
 - AC10.4 Each Origin backlog entry exits once, `delivered --release 0.5.0`. `agent-behavior-evals` exits after AC3.1 is logged, with 0177–0179 ruled.
 - AC10.5 Closure follows the releases law, with zero open bugs; rc-11 is defined beside it.
 
@@ -224,7 +222,7 @@ Q6 items 1–5; 0209. Everything is judged by `git diff` over the repo's declare
 
 - 0176 and 0178 are accepted (Q3); the main thread writes the rulings. 0176's memory half is AC10.1. 0178 applies at rc-13's promote.
 - 0174 is rejected (Q3); its live clauses are re-proposed at rc-11.
-- **0208** (ADR C), accepted with this SPEC's Approval, before Job 1 (G8, G10, Q2, Q2b, Q5):
+- **0208** (ADR C), accepted with this SPEC's Approval, before Job 1, with 0209 and 0210 (G8, G10, Q2, Q2b, Q5):
   - `QUALITY.md` `## Bugs` holds a generated map plus a written review, compiled at each closure; per-bug state stays only in `BUGS.jsonl`.
   - A surface settles once it leaves the window with no recurrence.
   - The map is a closure check. Context: G8 said "checked by doctor". The rc-8 W13 review (REJECTED; H7) moved it to closure, because an always-on check reddens every tree between closures. This ADR records that difference.
@@ -232,19 +230,17 @@ Q6 items 1–5; 0209. Everything is judged by `git diff` over the repo's declare
   - Fix surfaces and rework are derived from git, never stored.
   - `bugs.py resolve` requires `evidence_seam`, checked textually only then.
   - Amends 0164 (4). `measured_by`: AC1.2's and AC4.1–AC4.4's cases.
-- **0209**, proposed, accepted with this SPEC's Approval (Q6), "Tests are born in RED stages and frozen at the RED anchor":
-  - AC6.1–AC6.4's rule.
+- **0209**, accepted with this SPEC's Approval (Q6), "Tests are born in RED stages and frozen at the RED anchor":
+  - AC6.0–AC6.4's rule; test paths are the repo's `tests:` line, read from the work branch.
   - Amends the releases law §3's same-task rewrite clause.
   - `measured_by`: AC6.2's cases.
-- **0210**, proposed: one REBUILD trigger. ADR 0186 (2) says a `caused_by` other than none means a REBUILD. The bugs law §2 (0206) says a REBUILD only for a fix-induced bug. The options:
-  - (a) A REBUILD when `caused_by` names a bug. When it names a task, the smallest fix plus the focused review's REBUILD-or-not line.
-  - (b) 0186 (2) as written: every `caused_by ≠ none`.
-  - The operator decides before Job 1.
+- **0210**, accepted with this SPEC's Approval (operator, 2026-10-06: "(b) Qualquer caused_by ≠ none é REBUILD (Recommended)"): any `caused_by` other than none, a bug's fix or a feature task, makes the fix a REBUILD of the unit, keeping its tests. It keeps 0186 (2) and widens 0206's "a fix-induced one". `measured_by`: the ninth `PILLAR-BUGS` metric (AC1.4).
 
 ## Replaces
 
 - `bugs.py fix`'s never-diffed shape-4 link; the fix reader's two prior fixes (AC1.1).
 - 0164 (4)'s retirement of `evidence_seam` (AC1.2).
+- The bugs law §2's REBUILD for a fix-induced bug only (AC1.5).
 - A bare `rebuild: none` (AC1.4).
 - HOOKS-DRIFT-1's fixed "differs" (AC5.1).
 - Rewriting a test in an implementation task; the `test_`-name gate check (AC6).
@@ -258,14 +254,13 @@ Q6 items 1–5; 0209. Everything is judged by `git diff` over the repo's declare
 | Weakness | Mitigation |
 |---|---|
 | 8 jobs is the cap. | A new need goes to rc-11. |
-| Job 3 spends the operator's model quota: 12 trials. | `-n 2`, the economy template, one run. |
-| Jobs 6–8 touch the merge gate, `tests/conftest.py` and most test files. | PLAN edges; Jobs 7 and 8 change tests in test-only stages (AC6.3). |
+| Job 3 spends model quota: 12 trials. | `-n 2`, economy template, one run. |
+| Jobs 6–8 touch the merge gate and most test files. | PLAN edges; Jobs 7–8 change tests in test-only stages. |
 | Jobs 1 and 4 share the bug skill. | Disjoint files or a PLAN edge. |
-| The verify-line hotfix sha is not landed. | Filled at Approval. |
 
 ## Carried
 
-Every active backlog id is placed: the Origin above, or one of the lines below.
+Every active backlog id sits in the Origin or below.
 
 - rc-11, the corpus, the law and the ADR process:
   - `public-law-language-neutral`, `dd-ask-me-owned-questioning-skill`, `adr-born-at-release-with-options`, `adr-ledger-triage-process-rules`, `architecture-adr-section-generated`;
@@ -286,6 +281,6 @@ Every active backlog id is placed: the Origin above, or one of the lines below.
 
 ## Not in scope
 
-- An evals scenario for a bug fixed by the bug batch (Q1); `evals-release-gate-status`, `evals-harness-lanes-and-benchmark`, `evals-windows-smoke`, `devin-subagent-projection`: all after 0.5.0.
-- Q6 item 6, a read-only test layer in the harness: not taken.
-- The private test-stack and commit-gate hooks.
+- An evals scenario for a bug-batch fix (Q1); `evals-release-gate-status`, `evals-harness-lanes-and-benchmark`, `evals-windows-smoke`, `devin-subagent-projection`: all after 0.5.0.
+- Q6 item 6, a harness read-only test layer: not taken.
+- The private test-stack and commit-gate hooks: the operator's.
