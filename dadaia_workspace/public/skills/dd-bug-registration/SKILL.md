@@ -24,7 +24,7 @@ description: >
 1. Open `specs/bugs/AGENTS.md` (the area's scoped law) and follow it.
 2. Name the contract line violated: file and line, `--help` text, or schema key.
 3. Give ONE command that reproduces it, already run, with its exit code and output.
-4. State why it is not agent error — which not-a-bug arm you ruled out and how.
+4. State why it is not agent error — which not-a-bug arm you ruled out, and the work-branch sha that reproduces it.
 5. Severity: CRITICAL a stall or data loss; HIGH a contract broken on the default
    path; MEDIUM off the default path or with a documented workaround; LOW a message
    or cosmetic defect.
