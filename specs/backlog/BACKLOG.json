@@ -480,6 +480,15 @@
       "description": "Found in rc-9 (Job 5 verdict INFO): after J5.S3.T3 (39b5f47f2) _origin_findings judges the live SPEC's first ## heading (AC5.6) and its Origin line; the name is narrower than the function. Design: rename at the next touch of dd-release-implementation/scripts/_release_tree.py (e.g. _spec_head_findings), callers and the behavior-map hash re-recorded in the same task; no behaviour change, so no new test. Done when: no symbol named _origin_findings remains.",
       "provenance": "rc-9 Reconciliation deferral (JR.S2.T5), dispatched by the main thread 2026-10-06 under the operator's rc-9 scope; target rc-10 or later",
       "relates": []
+    },
+    {
+      "id": "adr-0193-records-its-amends",
+      "title": "ADR 0193 records that it amends ADR 0152 (2)",
+      "opened": "2026-10-06",
+      "status": "idea",
+      "description": "Found at rc-9 Reconciliation (AC6.3, JR.S2.T4): the rc-9 SPEC's proposal of 0193 says it amends 0152 (2) (at most 8 jobs; the 12 KiB recommendation read per job file), but the accepted record in specs/ADRs/decisions.jsonl carries amends: null. The ADR 0138 repair lane covers only a dead measured_by, so this cannot be repaired in place by an agent. Design: the operator rules one of (a) a new ADR record that amends 0152 (2) and cites 0193, accepted with a ruling, or (b) widening the 0138 repair lane to a missing lineage field, then the in-place repair. Owner: specs/ADRs/decisions.jsonl, specs/ADRs/AGENTS.md. Done when: the ledger's lineage shows 0152 (2) amended, and LEDGER-ADR-SCHEMA stays clean.",
+      "provenance": "rc-9 Reconciliation deferral (JR.S2.T5), dispatched by the main thread 2026-10-06 under the operator's rc-9 scope; target rc-10 or later",
+      "relates": []
     }
   ]
 }
