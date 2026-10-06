@@ -3,6 +3,8 @@ invariants of the real stage -> install projection, the doctor's drift/missing v
 and the per-harness `dadaia init --harness` profiles. Stage/install rosters live in
 tests/integration/test_public_assets.py::test_stage_manifest_and_install_all.
 Size: LARGE — real projection I/O (FileSystemPublicAssetManager over tmp_path).
+
+Owner: dd-software-engineer
 """
 
 from __future__ import annotations

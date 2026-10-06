@@ -11,7 +11,7 @@ from pathlib import Path
 
 import pytest
 
-_CHECKOUT = Path(__file__).resolve().parents[1]
+_CHECKOUT = Path(__file__).resolve().parents[2]
 
 _REAL_GIT = """
 from tests.fixtures.real_git import git

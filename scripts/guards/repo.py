@@ -477,6 +477,67 @@ def specs_canon_tracked(tree: Tree) -> list[str]:
     ]
 
 
+_MIRROR_FREE = ("tests/fixtures/", "tests/helpers/", "tests/tmp/", "tests/e2e/")
+_MIRROR_ALLOW = {"tests/contract/test_docs_derived_from_memory.py", "tests/contract/__init__.py"}
+_MIRROR_SUPPORT = {"tests/conftest.py", "tests/fakes.py", "tests/__init__.py"}
+_TEST_NAME = re.compile(r"^test_(?P<m>_?[a-z0-9]+(?:_[a-z0-9]+)*)(?:__(?P<topic>[a-z0-9_]+))?\.py$")
+
+
+def _source_keys(tree: Tree) -> set[str]:
+    """The mirrorable sources, hyphens read as underscores: package modules, the shell scripts
+    shipped under ``public/scripts``, and ``scripts/**``: always the library's own, whatever tree
+    is judged."""
+    found = tracked(ROOT, "dadaia_workspace", "scripts")
+    return {
+        re.sub(r"\.(py|sh)$", "", p).replace("-", "_") for p in found if p.endswith((".py", ".sh"))
+    }
+
+
+def _mirror_key(rel: str) -> str | None:
+    """The source key a ``tests/``-relative path mirrors, or None when its name is no test."""
+    base, _, name = rel.rpartition("/")
+    match = _TEST_NAME.match(name)
+    if not match:
+        return None
+    root = "" if rel.startswith("scripts/") else "dadaia_workspace/"
+    return f"{root}{base + '/' if base else ''}{match['m']}".replace("-", "_")
+
+
+def _mirror_exempt(p: str) -> bool:
+    return p in _MIRROR_ALLOW | _MIRROR_SUPPORT or p.startswith(_MIRROR_FREE[:3])
+
+
+def tests_mirror_the_package(tree: Tree) -> list[str]:
+    """AC7.1: every test file is ``tests/<p>/test_<m>.py`` (or ``test_<m>__<topic>.py``) for a
+    source ``dadaia_workspace/<p>/<m>`` (``scripts/<p>/<m>`` under ``tests/scripts``); a journey
+    under ``tests/e2e`` names its ``Owner:``; no test directory is empty; the one rc-13 file
+    is allowed where it is."""
+    sources, out = _source_keys(tree), []
+    paths = tree.tracked("tests")
+    for p in (p for p in paths if p.endswith(".py") and not _mirror_exempt(p)):
+        name = p.rsplit("/", 1)[-1]
+        if p.startswith("tests/e2e/"):
+            if name.startswith("test_") and "Owner:" not in tree.read(p):
+                out.append(
+                    f"no-owner: {p} names no `Owner:`. "
+                    "Operator action: add an `Owner: <agent>` docstring line"
+                )
+        elif name != "__init__.py" and _mirror_key(p[len("tests/") :]) not in sources:
+            out.append(
+                f"loose-test: {p} mirrors no module. "
+                "Operator action: git mv it to tests/<package path>/"
+                "test_<module>.py, or under tests/fixtures/ when it tests the suite itself"
+            )
+    live = [p for p in paths if p.rsplit("/", 1)[-1].startswith("test_")]
+    dirs = {p.rsplit("/", 1)[0] for p in paths if p.endswith("/__init__.py") and p.count("/") > 1}
+    out += [
+        f"empty-dir: {d} holds no test; fix: git rm {d}/__init__.py"
+        for d in sorted(dirs)
+        if not f"{d}/".startswith(_MIRROR_FREE) and not any(t.startswith(d + "/") for t in live)
+    ]
+    return out
+
+
 # --- plants: CONTROL is the library's own files; each plant edits one line of it ---------
 
 _COPIED = (".github", ".gitignore", "specs/constitution.md", "specs/memory", "specs/ADRs",
@@ -493,6 +554,12 @@ def CONTROL(root: Path) -> None:
     for rel in tracked(ROOT, *_COPIED):
         (root / rel).parent.mkdir(parents=True, exist_ok=True)
         shutil.copyfile(ROOT / rel, root / rel)
+    for rel in tracked(ROOT, "tests"):
+        if rel.endswith(".py") and not (root / rel).exists():
+            (root / rel).parent.mkdir(parents=True, exist_ok=True)
+            shutil.copyfile(ROOT / rel, root / rel) if rel.startswith("tests/e2e/") else (
+                root / rel
+            ).touch()
     (root / ".git/info/exclude").write_text(f"{_WF}/zz.yml\n", encoding="utf-8")
     (root / _WF / "zz.yml").write_text(
         _ROGUE + "        run: echo ${{ secrets.ANTHROPIC_KEY }}\n", "utf-8"
@@ -509,6 +576,17 @@ def _edit(rel: str, old: str, new: str) -> Plant:
         if old and old not in text:
             raise AssertionError(f"plant anchor lost in {rel}: {old!r}")
         path.write_text(text.replace(old, new, 1) if old else text + new, encoding="utf-8")
+
+    return plant
+
+
+def _file(rel: str, text: str) -> Plant:
+    """CONTROL plus a new file *rel* holding *text*."""
+
+    def plant(root: Path) -> None:
+        CONTROL(root)
+        (root / rel).parent.mkdir(parents=True, exist_ok=True)
+        (root / rel).write_text(text, encoding="utf-8")
 
     return plant
 
@@ -745,6 +823,14 @@ CHECKS: dict[str, Check] = {
             "canon-ignored": _edit(".gitignore", "", "/specs/releases/**/TASKS.md\n"),
             "ignore-lost": _edit(".gitignore", "", "!/specs/releases/_archive/**/local-notes.md\n"),
             "scratch-tracked": _edit(".gitignore", "", "!/specs/releases/_archive/**/tmp/\n"),
+        },
+    ),
+    "tests-mirror-the-package": (
+        tests_mirror_the_package,
+        {
+            "loose-test": _file("tests/test_loose.py", "def test_x():\n    pass\n"),
+            "empty-dir": _file("tests/ghost/__init__.py", ""),
+            "no-owner": _file("tests/e2e/test_journey.py", '"""A journey."""\n'),
         },
     ),
 }
