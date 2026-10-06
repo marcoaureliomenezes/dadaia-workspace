@@ -17,6 +17,7 @@ import sys
 from datetime import datetime
 from pathlib import Path
 
+from _worktree_freeze import check as check_freeze
 from _worktree_git import (
     _env,
     cli,
@@ -119,15 +120,25 @@ def _check_ancestor(tree: Path, work: str) -> None:
         ) from error
 
 
+def _declared(tree: Path, work: str, key: str) -> str:
+    """The value of the `<key>` line *work*'s tracked `AGENTS.md` declares, `""` when absent."""
+    lines = git(tree, "show", f"{work}:AGENTS.md", check=False).splitlines()
+    return next((ln.removeprefix(key).strip() for ln in lines if ln.startswith(key)), "")
+
+
+def _freeze(tree: Path, work: str) -> None:
+    """The test freeze of ADR 0209 over *tree*, judged by the lines *work* declares."""
+    check_freeze(tree, work, _declared(tree, work, "tests:"), _declared(tree, work, "tests-red:"))
+
+
 def _gate(tree: Path, level: str, work: str, *files: str) -> None:
     """One gate level: the command *work*'s tracked `AGENTS.md` declares — no tree picks its judge —
     `verify:` the job's, `verify-stage:` and `verify-task:` (the touched *files* appended) — split
     by `shlex` and run as one argv list in *tree*, never a shell, the workspace venv first on
     `PATH` (a bare `python` is the workspace's, at any tree depth); its output, on stdout alone,
     is the evidence; stdin is closed. A missing or unstartable line is fixed on *work* alone."""
-    lines = git(tree, "show", f"{work}:AGENTS.md", check=False).splitlines()
     key = "verify:" if level == "job" else f"verify-{level}:"
-    declared = next((ln.removeprefix(key).strip() for ln in lines if ln.startswith(key)), "")
+    declared = _declared(tree, work, key)
     agents = tree.parents[3] / "repos" / tree.parents[1].name / "AGENTS.md"
     if not declared:
         raise Refusal(f"this repo declares no {key} command",
@@ -295,7 +306,9 @@ def merge(root: Path, path: str, keep: list[str], drop: bool) -> str:
         ):
             raise Refusal("a code task's gate names no test file: it runs no tests",
                           f"Operator action: name the task's owner tests in an Owner-tests: trailer on its commits in {tree}")  # fmt: skip
-        _gate(tree, "task", _target(root, str(into))[3], *argv)
+        work = _target(root, str(into))[3]
+        _freeze(tree, work)
+        _gate(tree, "task", work, *argv)
         _refuse_dirty(into)
     elif non_code(name):
         _check_specs_only(tree, onto)
@@ -306,6 +319,7 @@ def merge(root: Path, path: str, keep: list[str], drop: bool) -> str:
         _open_tasks(repo, name)
         _check_ancestor(tree, onto)
         _check_approved(root, tree, onto, name, run=True)
+        _freeze(tree, onto)
         _check_stray(tree, onto, name)
         _gate(tree, "job", onto)
     kept = _kept(tree, "merge", keep, drop)
