@@ -44,3 +44,21 @@ def test_install_refreshes_only_a_hook_we_shipped(
     hook.write_bytes(installed)
     assert install_git_hooks(tmp_path) == ([hook] if refreshed else [])
     assert hook.read_bytes() == (_SHIPPED.read_bytes() if refreshed else installed)
+
+
+@pytest.mark.xfail(strict=True, reason="JB.S1 RED: hook-unreadable-fix-line-crashes-installer")
+@pytest.mark.parametrize(
+    ("force", "replaced"),
+    [pytest.param(True, True, id="force-replaces"), pytest.param(False, False, id="plain-leaves")],
+)
+def test_install_over_an_unreadable_hook_never_raises(
+    tmp_path: Path, force: bool, replaced: bool
+) -> None:
+    """HOOKS-DRIFT-1 names an unreadable hook and prints `install-hook --force` as its fix: that
+    command replaces it, and a plain install leaves what it cannot read."""
+    subprocess.run(["git", "init", "-q", str(tmp_path)], check=True)
+    hook = tmp_path / ".git" / "hooks" / "pre-push"
+    hook.mkdir()  # reading a directory raises an OSError that is no FileNotFoundError
+    assert install_git_hooks(tmp_path, force=force) == ([hook] if replaced else [])
+    assert hook.is_file() is replaced
+    assert not replaced or hook.read_bytes() == _SHIPPED.read_bytes()
