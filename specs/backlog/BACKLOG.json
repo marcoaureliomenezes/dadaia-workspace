@@ -549,6 +549,17 @@
         "clone-detection",
         "task-gate-mypy-follows-cross-skill-imports"
       ]
+    },
+    {
+      "id": "one-frontmatter-grammar-one-root-finder",
+      "title": "One frontmatter grammar and one workspace-root finder in the library",
+      "opened": "2026-10-06",
+      "status": "idea",
+      "description": "Measured: 4 frontmatter grammars; codex_assets._parse_agent_frontmatter is private yet used by 4 modules; 6 root finders and 3 CLI finders, while workspace_resolver.py (:3, :25-27) calls itself the single source of truth (ADR 0088). Design: one public frontmatter parser; every library root lookup consults workspace_resolver (the skill scripts' one fenced walk is skill-scripts-one-kernel's); the other finders are deleted. Placement: rc-12 (operator, 2026-10-06: 'rc-12, antes dos evals'). Placement and every design detail not quoted from a ruling are agent default, unruled.",
+      "provenance": "audit verification 2026-10-06 over feature/0.5.0 8e6448f13 (four read-only verifiers); main-thread registration after the operator grill of 2026-10-06",
+      "relates": [
+        "skill-scripts-one-kernel"
+      ]
     }
   ]
 }
