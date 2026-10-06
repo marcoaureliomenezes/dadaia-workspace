@@ -27,7 +27,7 @@ a skill points here, never restates them.
 
 ## 3. Hotfix and parallel work
 
-- A block-list bug's fix is a hotfix: its own job, outside the rc's DAG.
+- A hotfix (`specs/bugs/AGENTS.md` §2) is its own job, outside the rc's DAG.
 - Jobs run in parallel only with disjoint envelopes or an edge in the PLAN's DAG; tasks of one stage run in parallel with disjoint `W:`. The CI cost is cut in the gates, never by sharing a tree.
 
 ## 4. Environment and hygiene

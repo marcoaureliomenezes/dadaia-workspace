@@ -42,7 +42,7 @@ Root workspace behavior is in the workspace `AGENTS.md`; production-source behav
 
 ## 6. Bugs
 
-- A bug is fixed on the live work branch (the constitution's `gitflow:`), in any phase, with no release ceremony.
+- When a bug is fixed: `specs/bugs/AGENTS.md` §2.
 
 ## 7. Escalation
 
