@@ -538,7 +538,6 @@ def test_the_stage_gate_runs_the_work_branch_verify_stage_line(root: Path) -> No
     assert staged.stdout.splitlines()[0] == "ci stage"
 
 
-@pytest.mark.xfail(strict=True, reason="JB.S3 RED: check-stray-laundered-by-rebase")
 def test_a_code_commit_made_on_the_job_branch_lands_once_reviewed(root: Path) -> None:
     """ADR 0190 (amended): a job merge does not judge how code reached the branch; the one review
     and the job gate judge the whole diff — a commit made directly on it lands like a task's."""
