@@ -406,6 +406,15 @@
       "description": "Found in rc-9: Job 1's commits deleting AGENTS.md/SKILL.md law lines without citing an accepted ADR were refused only by pre-push (ADR 0151 M3), after the job gate and the review had passed; the messages were then reworded to cite their ADRs (Job 1 merge 29ee92d3a). Design: the job level of scripts/ci.py runs the same policy the pre-push chokepoint runs \u2014 the law-deletion rule of features/chokepoints over <work branch>..HEAD, one function, called by both, never a copy \u2014 so a job whose commit deletes a law line without its ADR citation fails at the job gate with the same fix line (reword the first listed commit). Owner: the chokepoint's law-deletion policy (one entry point), scripts/ci.py job, tests/integration/test_ci_script.py. Done when: a job range holding an uncited law-line deletion fails scripts/ci.py job naming that commit.",
       "provenance": "rc-9 Reconciliation deferral (JR.S2.T5), dispatched by the main thread 2026-10-06 under the operator's rc-9 scope; target rc-10 or later",
       "relates": []
+    },
+    {
+      "id": "merge-entry-times-survive-rebase",
+      "title": "AC1.7's kind: merge entry measures a job, not its last rebase: start, ritual_wait and dispatches anchored to facts a rebase keeps",
+      "opened": "2026-10-06",
+      "status": "idea",
+      "description": "Found at rc-9 Reconciliation (AC6.2): AC1.7 defines start as the committer time of the job branch's first commit and ritual_wait from the last task commit, but every rebase rewrites committer time to the rebase instant (job3 19:36:26Z, job4 19:36:48Z, job2 22:39:31Z, against author times 15:50:39Z, 18:41:23Z, 20:51:00Z), so the literal reading gave rc-wide parallelism 0.90 against 1.58 on author time; dispatches has no record at all (the log used distinct task ids as a proxy) and job_gate_runs only a lower bound. Design: (a) start = the author time of the job's first own commit, ritual_wait from the author time of its last task commit \u2014 author time survives rebase and cherry-pick; or (b) start = createdAt of the job branch's first push CI run (gh), which the origin remote-tracking reflog also keeps. dispatches and job_gate_runs need a writer: worktree.py merge appends one line per job-gate run and task landing to the job's own record (or the driver counts each dispatch in the job file), so Reconciliation reads facts instead of reconstructing them. Owner: RELEASE-EVENTS.md \u00a7log, SPEC template wording, worktree.py merge. Done when: the merge entry of a rebased job reports the same start before and after the rebase.",
+      "provenance": "rc-9 Reconciliation deferral (JR.S2.T5), dispatched by the main thread 2026-10-06 under the operator's rc-9 scope; target rc-10 or later",
+      "relates": []
     }
   ]
 }
