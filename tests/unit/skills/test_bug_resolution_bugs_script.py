@@ -954,6 +954,8 @@ def test_fix_drops_a_fix_commit_a_later_revert_undid(script: Path, tmp_path: Pat
     pytest.param([("fix(bugs): a-bug — first", "cli/a.py"), ("fix(bugs): a-bug — second", "cli/b.py"),
                   ('Revert "fix(bugs): a-bug — second"', "cli/b.py"), ('Revert "fix(bugs): a-bug" — undo first', "cli/a.py")],
                  [], id="a-revert-skips-an-undone-commit"),
+    pytest.param([("fix(bugs): a-bug — cause", "cli/a.py"), ("fix(bugs): a-bug — cause and more", "cli/b.py"),
+                  ('Revert "fix(bugs): a-bug — cause"', "cli/a.py")], [1], id="the-exact-subject-beats-the-nearer-longer-one"),
 ])  # fmt: skip
 def test_fix_pairs_each_revert_with_one_commit(
     script: Path, tmp_path: Path, subjects: list[tuple[str, str]], kept: list[int]
