@@ -31,7 +31,9 @@ def _fail_open_rows(
     law: dict[str, str], tmp: Path, monkeypatch: pytest.MonkeyPatch
 ) -> dict[str, bool]:
     """One row per fail-open path, keyed by the evidence the law names, each read from code."""
-    hooks = _REPO / "tests/integration/gate/test_hook_interpreter.py"
+    hooks = (
+        _REPO / "tests/infrastructure/runtime_transforms/test_hook_wrappers__hook_interpreter.py"
+    )
     (tmp / ".dadaia/states").mkdir(parents=True)
     (tmp / ".dadaia/states/spec_contexts.json").write_text("{trunc", "utf-8")
     gate = [sys.executable, "-m", "dadaia_workspace.hooks.pre_gate"]
