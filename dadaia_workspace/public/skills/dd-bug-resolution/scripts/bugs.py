@@ -35,8 +35,14 @@ from _bugs_check import CODE, HISTO, LEDGER, accepted_adrs, check, tasks  # noqa
 from _bugs_fix import git as _git  # noqa: E402
 from _bugs_fix import own as _own  # noqa: E402
 from _bugs_store import Refusal, commit, read_records  # noqa: E402
-from _release_schema import ShallowClone, Unreadable, candidate_at, live_id, releases  # noqa: E402
-from _release_schema import _candidate_adds as births  # noqa: E402  # the rc births `fix` counts
+from _release_schema import (  # noqa: E402
+    ShallowClone,
+    Unreadable,
+    candidate_adds,
+    candidate_at,
+    live_id,
+    releases,
+)
 from _specs import find_specs, git_line, refuse  # noqa: E402
 
 _OPTIONS: dict[str, tuple[str, ...]] = {
@@ -189,7 +195,7 @@ def _read(args: argparse.Namespace, specs: Path) -> int:
     fixes = fx.fixes(specs) if args.verb in ("fix", "stats") else {}
     if args.verb == "fix":
         ids = args.bug_ids or [str(r["id"]) for r in records if r["status"] == "resolved"]
-        born = [t.timestamp() for t, _, _ in _placed(lambda: births(specs), specs)]
+        born = [t.timestamp() for t, _, _ in _placed(lambda: candidate_adds(specs), specs)]
         for bug in ids:
             if (fix := fixes.get(bug)) is None:
                 print(f"{bug}\tunlinked")

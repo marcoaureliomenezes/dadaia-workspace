@@ -109,7 +109,7 @@ def releases(specs: Path) -> dict[str, tuple[_dt.datetime, _dt.datetime | None]]
 
 
 @functools.cache
-def _candidate_adds(specs: Path) -> list[tuple[_dt.datetime, str, str]]:
+def candidate_adds(specs: Path) -> list[tuple[_dt.datetime, str, str]]:
     """Each candidate's birth as (instant, release, rc): a commit adding exactly one
     rc-<N>/SPEC.md whose status reads non-Approved; a shallow history is refused."""
     git = ["git", "-C", str(specs)]
@@ -142,7 +142,7 @@ def candidate_at(specs: Path, instant: str) -> dict[str, str]:
     holds it, the rc born last before it in that release, else ``unknown``; raises
     :class:`ShallowClone`, :class:`Unreadable`, or ``ValueError`` for a bad *instant*."""
     when = _utc(instant)
-    adds = _candidate_adds(specs)
+    adds = candidate_adds(specs)
     held = (r for r, (start, end) in releases(specs).items() if start <= when and (end is None or when < end))  # fmt: skip
     release = next(held, "unknown")
     born = [(t, rc) for t, r, rc in adds if r == release and t <= when]
