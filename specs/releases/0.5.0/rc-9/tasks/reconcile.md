@@ -47,3 +47,15 @@ Paths are relative to `dadaia_workspace/` unless they start with `scripts/`, `te
 - The close task runs last, after every other task of its stage has fast-forwarded onto the job branch; its mutation-diff and test-audit run even in a stage whose gate is validators only (Q23).
 
 - Done: the Reconciliation job closed by JR.S4.T2 (2026-10-05); behavior map and derived docs current (owner tests green, nothing regenerated).
+
+## Stage JR.S5 — bug batch inside Reconciliation (ADR 0206)
+
+- Contract: the two LOW bugs registered at 19f636f69 resolved, each by one shape-3 commit with its RED case; `bugs.py status` shows no rc-9 bug open; `ci.py job`'s doctor no longer warns TREE-5/MEM-DRIFT-2 about `specs/AGENTS.md`.
+- ACs served: ADR 0206.
+- Envelope: `dadaia_workspace/public/skills/dd-bug-resolution/scripts/bugs.py`, `tests/unit/skills/test_bug_resolution_bugs_script.py`, `.gitignore`, `specs/AGENTS.md`, `tests/contract/test_copy_drift_scoped_law.py`, `specs/bugs/BUGS.jsonl`.
+- Exit tests: `tests/unit/skills/test_bug_resolution_bugs_script.py`, `tests/contract/test_copy_drift_scoped_law.py`; `bugs.py check`, `ci.py job` green.
+
+| task | AC | `W:` | owner tests / RED |
+|---|---|---|---|
+| JR.S5.T1 | bugs-fix-lists-one-commit-twice | `dadaia_workspace/public/skills/dd-bug-resolution/scripts/bugs.py`, `tests/unit/skills/test_bug_resolution_bugs_script.py`, `specs/bugs/BUGS.jsonl` (its line) | `tests/unit/skills/test_bug_resolution_bugs_script.py` (new case) |
+| JR.S5.T2 | specs-law-file-untracked-by-gitignore | `.gitignore`, `specs/AGENTS.md`, `tests/contract/test_copy_drift_scoped_law.py`, `specs/bugs/BUGS.jsonl` (its line) | `tests/contract/test_copy_drift_scoped_law.py` (new case) |
