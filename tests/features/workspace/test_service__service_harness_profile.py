@@ -6,7 +6,7 @@ reads as ``None`` — the "treated as all-four" back-compat convention every con
 
 These are unit-level assertions over the real service with fake asset/venv managers; the
 harness-gated *scaffold* behaviour (which dirs/hooks appear) is pinned end-to-end by the
-CLI suite ``tests/unit/cli/test_init_harness.py``.
+CLI suite ``tests/cli/commands/test_init__init_harness.py``.
 """
 
 from __future__ import annotations
