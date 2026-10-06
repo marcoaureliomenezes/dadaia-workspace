@@ -89,13 +89,17 @@ def _write_ledger(root: Path, *relpaths: str) -> None:
         target.write_text("projected", encoding="utf-8")
 
 
+_RED_ROOT = pytest.mark.xfail(
+    strict=True, reason="JB.S1 RED: root-allows-git-and-gitignore-though-root-is-never-a-repo"
+)
+
 _REGISTRY = json.dumps({"contexts": [
     {"name": "alpha", "state": "ALIVE", "repo_slug": "main-r", "associated_repos": [{"slug": "assoc-r"}]},
     {"name": "gone", "state": "DEAD", "repo_slug": "dead-r"},
 ]})  # fmt: skip
 _PLACES = {
     "random_junk.txt": "WS-root-slop", ".ruff_cache": "WS-root-slop", "shot.png": "WS-root-operator",
-    "AGENTS.md": "WS-root-canon", ".claude": "WS-root-canon", ".git": "WS-root-canon",
+    "AGENTS.md": "WS-root-canon", ".claude": "WS-root-canon", ".git": "WS-root-slop",
     "junk": "WS-dadaia-slop", ".DS_Store": "WS-dadaia-slop", "kept.png": "WS-dadaia-operator",
     **{n: "WS-dadaia-canon" for n in (*DADAIA_ROOT_FILES, _STATE_ZONE.name, _OPERATOR_ZONE.name)},
     "repos/alpha": "WS-repos-slop", "repos/kept": "WS-repos-operator",
@@ -108,7 +112,7 @@ _PLACES = {
 @pytest.mark.parametrize(
     ("registry", "expected"),
     [
-        pytest.param(_REGISTRY, _PLACES, id="registered"),
+        pytest.param(_REGISTRY, _PLACES, id="registered", marks=_RED_ROOT),
         *(pytest.param(text, {"repos/alpha": "WS-repos-canon", "worktrees/dead-r": "WS-worktrees-canon"}, id=f"unreadable-registry-{text}")
           for text in ("{", '{"contexts": 5}')),
     ],
