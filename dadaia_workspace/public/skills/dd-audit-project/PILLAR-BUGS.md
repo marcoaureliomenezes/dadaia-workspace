@@ -4,7 +4,7 @@ Disclosed sibling of `SKILL.md`, pillar 1. Input: every `BUGS.jsonl` record whos
 Window definition: `SKILL.md` §1.
 
 - A record carries no commit sha: attribute a fix by `python3 .agents/skills/dd-bug-resolution/scripts/bugs.py fix <bug-id>`.
-- A shape-4 task commit is counted, never diffed (`bugs.py fix` prints its direction as `-`); a release-squash or ledger-only commit is no fix and stays unlinked.
+- `bugs.py fix` diffs every linked commit, a shape-4 task commit included, and prints each fix's rework by class and its settled surface; a release-squash or ledger-only commit is no fix and stays unlinked.
 
 ## Recurrence and fix-induced bugs — operational, not adjectival
 
@@ -14,9 +14,9 @@ Window definition: `SKILL.md` §1.
 - Fix-induced bug: the later record's `caused_by` must name the earlier one; a contradicted `caused_by: none` is itself a finding.
 - Both definitions are computable from `BUGS.jsonl` + `git show` alone — no further judgement about what counts.
 
-## The eight forensic metrics — each row is a validation
+## The nine forensic metrics — each row is a validation
 
-A pillar-1 run reporting fewer than eight is incomplete, not lenient.
+A pillar-1 run reporting fewer than nine is incomplete, not lenient.
 Each metric reports the window's measured value against the previous audit's, read from `audits_histo.jsonl`.
 Metrics 7 and 8 carry `target 0` and report their measured value even when it worsened.
 
@@ -24,17 +24,18 @@ Metrics 7 and 8 carry `target 0` and report their measured value even when it wo
 |---|---|---|---|
 | 1 | Registrations per session | `governance_events` rows with `verb == "bugs append"`, grouped by `session_id` | `session_id`; a session registering many is the ask-first rule breaking |
 | 2 | Red-loop coverage | resolved records carrying `evidence_loop` | `evidence_loop`; target 100% |
-| 3 | Fix-shape ratio | `net-negative / (net-neutral + net-positive)` (`bugs.py stats`' `direction:` rows) | the shape-3 fix commits' production numstat (`bugs.py fix`) |
+| 3 | Fix-shape ratio | `net-negative / (net-neutral + net-positive)` (`bugs.py stats`' `direction:` rows) | every linked fix commit's production numstat (`bugs.py fix`) |
 | 4 | Same-surface re-bug rate at 3d/14d | grouped on the `surface` enum, never free text | `surface` |
 | 5 | Hand-kept-list touch count | resolving commits touching the fixed path set below | fixed path set, below |
 | 6 | Test-layer bug share | records whose `surface == "tests"` or `component` starts with `tests/` | `surface` |
 | 7 | Scanner-vs-prose recurrence | scanner-term symptom AND fix touches only docs/tests | target 0, reported honestly |
 | 8 | Sweep closures as `resolved` | terminal records with no code-touching commit | target 0; a sweep is `superseded`, never `resolved` |
+| 9 | REBUILD share of linked fixes | resolved records with `caused_by` ≠ `none` whose fix carries a REBUILD: a `refactor(…): … REBUILD` subject or `REBUILD` in a `fix(bugs):` subject (121ae02b2 counts); `rebuild: none — <reason>` is valid only beside `caused_by: none` | `caused_by`; target 100 %, gates nothing (0210) |
 
 - Metric 5's fixed path set: `.gitignore`, `privacy_baseline.json`, `shipped-hashes.json`.
 - Fixed path set (continued): `*_golden/*.json`, a skill roster file, a `frozenset({...})` literal.
 
-## Three cheap measures (beyond the eight)
+## Three cheap measures (beyond the nine)
 
 - Registration-to-resolution interval: diff `closed_at` against the record's `ts`; a seconds-long interval is the no-red-loop signature.
 - Core-field mutation: a hunk changing an immutable-core field (per the schema's `x-mutability`) of an existing `id` is a HIGH finding.
