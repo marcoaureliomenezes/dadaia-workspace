@@ -384,18 +384,19 @@ def test_the_job_gate_runs_scripts_ci_job_as_argv_on_the_head_it_lands(
         assert where == f" exit 0 in {tree} and commit the fix in this worktree"
 
 
+@pytest.mark.xfail(
+    strict=True,
+    reason="JB.S3 RED: job-merge-requires-a-remote-ci-run, job-merge-accepts-any-ci-run-url",
+)
 def test_a_job_merge_needs_a_verdict_naming_its_ci_matrix_run(root: Path) -> None:
-    """AC1.2, AC1.4: no verdict refuses; an APPROVED naming no CI-matrix run refuses with the
-    operator's act; one naming the run lands."""
+    """AC1.2, AC1.4: no verdict refuses; an APPROVED verdict lands the job with or without a
+    remote CI run named — the repo's `verify:` line is the job gate (no host is assumed)."""
     repo = root / "repos/r"
     head = land(root, "src/a.py")
     assert _argv(run(root, "merge", TREE))[1:] == ["reports", "validate", "--all"]
     approve(root, head, ci_run=False)
-    unrun = run(root, "merge", TREE)
-    assert fixes(unrun) == [
-        "fix: Operator action: push wt/0.5.0-rc1/j1, wait for its CI run to pass, and have "
-        "dd-code-reviewer's verdict carry that run's URL as ci_run"
-    ]
+    landed = run(root, "merge", TREE)
+    assert landed.returncode == 0, landed.stderr
     approve(root, head, at="T11:00:00Z")
     assert run(root, "merge", TREE).returncode == 0
     assert git(repo, "rev-parse", "feature/0.5.0").strip() == head
@@ -537,16 +538,14 @@ def test_the_stage_gate_runs_the_work_branch_verify_stage_line(root: Path) -> No
     assert staged.stdout.splitlines()[0] == "ci stage"
 
 
-def test_a_stray_job_branch_commit_refuses(root: Path) -> None:
-    """AC1.3: a job branch takes code only through a task merge; specs edits land directly."""
-    tree = root / TREE
-    commit(tree, "specs/releases/0.5.0/rc-1/PLAN.md", "**Status:** Approved\n")
-    approve(root, stray := commit(tree, "src/stray.py"))
-    refused = run(root, "merge", TREE)
-    assert refused.returncode == 1 and stray in refused.stderr
-    git(tree, "reset", "-q", "--hard", "HEAD~")
-    approve(root, git(tree, "rev-parse", "HEAD").strip(), at="T11:00:00Z")
-    assert run(root, "merge", TREE).returncode == 0
+@pytest.mark.xfail(strict=True, reason="JB.S3 RED: check-stray-laundered-by-rebase")
+def test_a_code_commit_made_on_the_job_branch_lands_once_reviewed(root: Path) -> None:
+    """ADR 0190 (amended): a job merge does not judge how code reached the branch; the one review
+    and the job gate judge the whole diff — a commit made directly on it lands like a task's."""
+    approve(root, commit(root / TREE, "src/stray.py"))
+    landed = run(root, "merge", TREE)
+    assert landed.returncode == 0, landed.stderr
+    assert (root / "repos/r/src/stray.py").is_file()
 
 
 @pytest.mark.parametrize(
@@ -606,3 +605,34 @@ def test_a_job_gate_reads_the_work_branch_verify_line_not_its_own(
     approve(root, git(tree, "rev-parse", "HEAD").strip(), at="T11:00:00Z")
     landed = run(root, "merge", TREE)
     assert landed.returncode == 0, landed.stderr
+
+
+@pytest.mark.xfail(strict=True, reason="JB.S3 RED: gate-runs-the-judged-trees-own-ci-script")
+@pytest.mark.parametrize("level", ["task", "job"])
+def test_no_tree_edits_the_script_its_own_gate_runs(root: Path, level: str) -> None:
+    """ADR 0207: a range touching a path the work branch's declared line names refuses, naming
+    the one act: commit that path on the work branch — a tree never picks its judge."""
+    job = root / TREE
+    task = _task_commit(root, "Owner-tests: tests/test_r.py", add="scripts/ci.py")
+    if level == "job":  # arrives by a hand merge: the task gate never saw it
+        git(job, "merge", "-q", "--ff-only", "wt/0.5.0-rc1/j1--J1.S1.T1")
+        assert run(root, "clean", str(task)).returncode == 0  # its tree is empty now
+        approve(root, git(job, "rev-parse", "HEAD").strip())
+    refused = run(root, "merge", str(job if level == "job" else task))
+    assert refused.returncode == 1 and "Traceback" not in refused.stderr
+    assert fixes(refused) == [
+        "fix: Operator action: commit scripts/ci.py on feature/0.5.0"
+        " — no tree edits its own judge (ADR 0207)"
+    ]
+    assert not (root / "repos/r/scripts/ci.py").read_text().endswith("y = 1\n")
+
+
+@pytest.mark.xfail(strict=True, reason="JB.S3 RED: test-path-convention-is-python-only")
+def test_a_code_task_names_its_owner_tests_by_any_convention(root: Path) -> None:
+    """A task's test file need not be `test_`-prefixed: the repo's `verify-task:` line judges
+    which tests ran, so a pytest `*_test.py` owner lands."""
+    land(root, "tests/b_test.py", "")
+    _task_commit(root, "Owner-tests: tests/b_test.py", add="src/b.py")
+    landed = run(root, "merge", f"worktrees/r/{TASK}")
+    assert landed.returncode == 0, landed.stderr
+    assert "ci task src/b.py tests/b_test.py" in landed.stdout.splitlines()
