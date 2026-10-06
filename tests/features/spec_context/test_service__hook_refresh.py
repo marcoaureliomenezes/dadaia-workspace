@@ -5,6 +5,7 @@ an operator's own hook (review M3: undecodable included) stays untouched."""
 from __future__ import annotations
 
 import hashlib
+import os
 import subprocess
 from pathlib import Path
 
@@ -46,19 +47,35 @@ def test_install_refreshes_only_a_hook_we_shipped(
     assert hook.read_bytes() == (_SHIPPED.read_bytes() if refreshed else installed)
 
 
-@pytest.mark.xfail(strict=True, reason="JB.S1 RED: hook-unreadable-fix-line-crashes-installer")
-@pytest.mark.parametrize(
-    ("force", "replaced"),
-    [pytest.param(True, True, id="force-replaces"), pytest.param(False, False, id="plain-leaves")],
-)
+def _hook_as(repo: Path, layout: str) -> Path:
+    """A repo whose pre-push hook is *layout*: absent, a directory, or a link to a directory."""
+    subprocess.run(["git", "init", "-q", str(repo)], check=True)
+    hook = repo / ".git" / "hooks" / "pre-push"
+    if layout == "directory":
+        hook.mkdir()  # reading a directory raises an OSError that is no FileNotFoundError
+    if layout == "link-to-a-directory":
+        (repo / "elsewhere").mkdir()
+        (repo / "elsewhere" / "keep").write_text("mine", encoding="utf-8")
+        try:
+            hook.symlink_to(repo / "elsewhere", target_is_directory=True)
+        except OSError:
+            pytest.skip("this host cannot link")
+    return hook
+
+
+@pytest.mark.parametrize("layout", ["absent", "directory", "link-to-a-directory"])
+@pytest.mark.parametrize("force", [True, False], ids=["force", "plain"])
 def test_install_over_an_unreadable_hook_never_raises(
-    tmp_path: Path, force: bool, replaced: bool
+    tmp_path: Path, layout: str, force: bool
 ) -> None:
     """HOOKS-DRIFT-1 names an unreadable hook and prints `install-hook --force` as its fix: that
-    command replaces it, and a plain install leaves what it cannot read."""
-    subprocess.run(["git", "init", "-q", str(tmp_path)], check=True)
-    hook = tmp_path / ".git" / "hooks" / "pre-push"
-    hook.mkdir()  # reading a directory raises an OSError that is no FileNotFoundError
-    assert install_git_hooks(tmp_path, force=force) == ([hook] if replaced else [])
-    assert hook.is_file() is replaced
-    assert not replaced or hook.read_bytes() == _SHIPPED.read_bytes()
+    command replaces it (the link, never its target), a plain install leaves what it cannot
+    read, and an absent hook is installed executable either way."""
+    hook = _hook_as(tmp_path, layout)
+    written = layout == "absent" or force
+    assert install_git_hooks(tmp_path, force=force) == ([hook] if written else [])
+    assert hook.is_file() is written
+    assert hook.is_symlink() is (layout == "link-to-a-directory" and not written)
+    assert (hook.is_file() and os.access(hook, os.X_OK)) is written
+    assert (tmp_path / "elsewhere" / "keep").exists() is (layout == "link-to-a-directory")
+    assert not written or hook.read_bytes() == _SHIPPED.read_bytes()
