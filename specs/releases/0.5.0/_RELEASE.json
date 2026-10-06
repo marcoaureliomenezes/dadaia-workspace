@@ -1,7 +1,7 @@
 {
   "schema": "release-state-v1",
   "release": "0.5.0",
-  "phase": "CLOSURE",
+  "phase": "DEFINITION",
   "defined": {
     "sha": "29ee92d3a",
     "ts": "2026-10-05T18:41:40Z"
@@ -1140,6 +1140,12 @@
       "changed": [
         "bug-ledger"
       ]
+    },
+    {
+      "ts": "2026-10-06T14:12:37Z",
+      "agent": "release.py new",
+      "kind": "note",
+      "text": "Candidate born on 0.5.0 (prior candidate closed at 27123ce99)"
     }
   ]
 }
