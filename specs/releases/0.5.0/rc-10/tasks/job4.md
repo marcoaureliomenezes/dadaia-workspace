@@ -34,3 +34,5 @@ Paths are relative to the repo root; aliases as in `PLAN.md` (`f/`, `pub/`, `S/`
 |---|---|---|---|
 | J4.S3.T1 | AC4.1 | `pub/scaffold/memory/AGENTS.md` (`QUALITY.md` holds `## Bugs`: the generated block and the written review), `specs/memory/AGENTS.md` (by `specs upgrade`), `core/specs_version.py`, `pub/templates/shipped-hashes.json`, `tests/unit/core/test_specs_version.py` (pin re-record) | `test_specs_version.py` |
 | J4.S3.T2 | — | this file | close task, last: behavior map; `test-audit:`, `mutation:`; `done` |
+
+- done: Job 4 — every task landed on `wt/0.5.0-rc10/job4` through its task merge: J4.S1.T1 5577759a8 and J4.S1.T2 1bf985be4 (RED, strict xfail); J4.S2.T1 232a245dc (`_bugs_balance.py`, the `balance` verb, `.gitattributes`; W widened to `_bugs_fix.py`, whose `marked` is the one check-attr reader); J4.S2.T2 450006447 (the CLOSURE check; W widened to `bugs.py` and the new `_bugs_quality.py`, the one reader of ledgers and release spans that `release.py check` cannot get by importing `bugs.py`); J4.S2.T3 15cb09d43 (added: the hand-mutation survivors' rows); J4.S3.T1 3435bf23c (law, pin re-record); closed by J4.S3.T2.
