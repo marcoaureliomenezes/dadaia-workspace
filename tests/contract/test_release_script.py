@@ -571,6 +571,7 @@ def test_the_trend_window_opens_on_the_oldest_of_four_releases_and_ends_on_the_l
         {"id": "b", "surface": "core", "ts": "2026-01-07T09:00:00Z", "found_in": gone},
     ]
     argv = _balance_tree(tmp_path, records, log=log)
+    (tmp_path / ".gitattributes").write_text("/core dadaia-dev-tooling=true\n", "utf-8")
     for release, start in (("0.4.5", "01"), ("0.4.6", "03"), ("0.4.7", "05"), ("0.4.8", "07")):
         archive = tmp_path / "specs" / "releases" / "_archive" / release
         archive.mkdir(parents=True)
@@ -590,6 +591,7 @@ def test_the_trend_window_opens_on_the_oldest_of_four_releases_and_ends_on_the_l
     assert done.returncode == 0, done.stderr
     out = done.stdout.splitlines()
     assert out[0] == "Bug balance from BUGS.jsonl: 3 records (2 live, 1 archived)."
+    assert "dev-tooling:" in out  # the attribute's `=true` spelling marks a surface too
     [trend] = [ln for ln in out if ln.startswith("Laplace")]
     assert trend == "Laplace trend (days), window 0.4.6..0.5.0, T = 12 days: u = -0.76, no trend"
 
