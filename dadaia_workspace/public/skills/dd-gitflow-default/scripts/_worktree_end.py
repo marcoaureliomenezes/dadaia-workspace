@@ -136,7 +136,8 @@ def _gate(tree: Path, level: str, work: str, *files: str) -> None:
     `verify:` the job's, `verify-stage:` and `verify-task:` (the touched *files* appended) — split
     by `shlex` and run as one argv list in *tree*, never a shell, the workspace venv first on
     `PATH` (a bare `python` is the workspace's, at any tree depth); its output, on stdout alone,
-    is the evidence; stdin is closed. A missing or unstartable line is fixed on *work* alone."""
+    is the evidence; stdin is closed. A range editing a path the line names refuses, and a missing
+    or unstartable line is fixed on *work* alone."""
     key = "verify:" if level == "job" else f"verify-{level}:"
     declared = _declared(tree, work, key)
     agents = tree.parents[3] / "repos" / tree.parents[1].name / "AGENTS.md"
@@ -146,7 +147,12 @@ def _gate(tree: Path, level: str, work: str, *files: str) -> None:
     venv = [tree.parents[3] / ".dadaia/.venv" / d for d in ("bin", "Scripts")]  # the workspace's
     env = _env() | {"PATH": os.pathsep.join([*map(str, venv), os.environ.get("PATH", "")])}
     try:
-        command = [*shlex.split(declared), *files]
+        argv = shlex.split(declared)
+        touched = git(tree, "diff", "--name-only", f"{work}...HEAD").split()
+        if own := next((a for a in argv if a in touched), None):  # no tree edits its own judge
+            raise Refusal(f"this range edits {own}, which the {key} line runs",
+                          f"Operator action: commit {own} on {work} — no tree edits its own judge (ADR 0207)")  # fmt: skip
+        command = [*argv, *files]
         done = subprocess.run(command, cwd=tree, env=env, stdin=subprocess.DEVNULL,
                               stderr=subprocess.STDOUT)  # fmt: skip
     except (OSError, ValueError) as error:
