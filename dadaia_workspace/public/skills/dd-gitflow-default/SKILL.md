@@ -93,7 +93,7 @@ A job and its task trees hold code, tests, specs, memory and derived docs alike 
 ## 5. References
 
 - `scripts/worktree.py` — opens, lists, merges and cleans worktrees; the rules: `worktrees/AGENTS.md`.
-- [`CICD-AUTOMATION.md`](CICD-AUTOMATION.md) — CI/CD checks to suggest a consumer operator.
+- [`CICD-AUTOMATION.md`](CICD-AUTOMATION.md) — optional: plug your own pipeline into the repo's `verify:` lines.
 - Mechanical enforcement (pre-push hook / CI): branch-name pattern, push refusal,
   denylist scan, `pr-source-guard`. Everything else in this skill is discipline, upheld by agents and
   reviewers, unenforced by any hook.
