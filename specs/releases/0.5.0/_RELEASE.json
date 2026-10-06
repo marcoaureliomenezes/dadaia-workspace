@@ -1074,6 +1074,30 @@
         "sdd-gate-v3",
         "worktrees"
       ]
+    },
+    {
+      "ts": "2026-10-06T12:41:38Z",
+      "agent": "dd-product-engineer",
+      "kind": "merge",
+      "text": "job: hotfix-poetry-pin; start: 2026-10-06T02:24:42Z; end: 2026-10-06T03:06:53Z; wall: 42; ritual_wait: 16; dispatches: 3; job_gate_runs: 2"
+    },
+    {
+      "ts": "2026-10-06T12:41:38Z",
+      "agent": "dd-product-engineer",
+      "kind": "merge",
+      "text": "job: hotfix-verify-line-stall; start: 2026-10-06T03:12:12Z; end: 2026-10-06T04:13:45Z; wall: 62; ritual_wait: 28; dispatches: 4; job_gate_runs: 3"
+    },
+    {
+      "ts": "2026-10-06T12:41:38Z",
+      "agent": "dd-product-engineer",
+      "kind": "reviews",
+      "text": "Bug-surface delta of the two block-list hotfixes, from each job's APPROVED dd-code-reviewer handoff. hotfix-poetry-pin (merged 858bc97ad, CI 37407443923; verdict 2026-10-06T025911Z on 858bc97ad): reduced — net -12 lines, one HIGH closed (ci-and-release-install-vulnerable-poetry), the condition now guarded by poetry-below-the-floor. hotfix-verify-line-stall (merged d1d4d36c4, CI 37412705797; verdict 2026-10-06T040716Z on d1d4d36c4): reduced — three verify-line authorities to one, the work branch (ADR 0207), ending a four-move symptom-patch chain; one CRITICAL closed (verify-line-absent-refusal-sends-to-a-tree-the-gate-never-reads)."
+    },
+    {
+      "ts": "2026-10-06T12:41:38Z",
+      "agent": "dd-product-engineer",
+      "kind": "note",
+      "text": "rc-9 bug count, from the ledger (BUGS.jsonl ts at or after rc-9's opening) and bugs.py status ('0 open bug(s)'): 7 found in rc-9, 7 resolved, 0 open — 1 CRITICAL (verify-line-absent-refusal-sends-to-a-tree-the-gate-never-reads), 1 HIGH (ci-and-release-install-vulnerable-poetry), 2 MEDIUM (job-task-id-test-assumes-native-paths, memory-window-bound-unreachable-from-head), 3 LOW (bugs-fix-lists-one-commit-twice, specs-law-file-untracked-by-gitignore, bugs-fix-counts-a-reverted-fix); every one resolved_release 0.5.0, so rc-9 closes with no open bug (ADR 0206). AC1.7 readout on the two hotfix merge entries: job_gate_runs counts full scripts/ci.py runs from the session transcripts (the engineer's job-tree runs plus worktree.py merge's verify run), none red — hotfix-poetry-pin 2 and hotfix-verify-line-stall 3 exceed 1 plus their recorded reds (0), a violation reported here; the repeat runs are the engineer's pre-merge check and, for verify-line, the re-run after the ADR 0207 fold. dispatches count the main thread's Agent calls for each job (engineer and reviewer)."
     }
   ]
 }
