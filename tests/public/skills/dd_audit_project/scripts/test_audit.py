@@ -18,9 +18,7 @@ import pytest
 from dadaia_workspace.infrastructure.ledger_scripts import load_owner
 from tests.helpers.skill_scripts import stage_skill_scripts
 
-pytestmark = pytest.mark.unit
-
-_PUBLIC = Path(__file__).resolve().parents[3] / "dadaia_workspace" / "public"
+_PUBLIC = Path(__file__).resolve().parents[5] / "dadaia_workspace" / "public"
 _SCRIPTS = _PUBLIC / "skills" / "dd-audit-project" / "scripts"
 _AUDIT = "20260101-window"
 
@@ -208,5 +206,5 @@ def test_the_doctor_neither_folds_findings_nor_recommends_close() -> None:
     from dadaia_workspace.features.specs.rules import RULES
 
     assert not [r.codes for r in RULES if "close" in str(r.fix_help)]
-    specs_src = Path(__file__).resolve().parents[3] / "dadaia_workspace" / "features" / "specs"
+    specs_src = Path(__file__).resolve().parents[5] / "dadaia_workspace" / "features" / "specs"
     assert not [p for p in specs_src.glob("*.py") if "from_dict" in p.read_text("utf-8")]
