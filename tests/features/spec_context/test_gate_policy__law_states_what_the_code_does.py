@@ -135,7 +135,6 @@ def _red(bug: str) -> pytest.MarkDecorator:
         pytest.param("dd-bug-resolution/SKILL.md", "rewriting an old assert",
                      id="root-law-says-fixes-never-rewrite-old-asserts"),
         pytest.param("dd-audit-project/PILLAR-BUGS.md", "governance_events",
-                     marks=_red("pillar-bugs-metric-reads-retired-event-stream"),
                      id="the-bug-ledger-has-no-event-stream"),
         pytest.param("dd-backlog-definition/SKILL.md", "merge a near-duplicate",
                      marks=_red("backlog-skill-asks-a-merge-the-writer-cannot-do"),
@@ -150,7 +149,6 @@ def test_a_skill_prescribes_no_act_its_own_laws_forbid_or_its_writer_cannot_do(
     assert phrase not in (_SKILLS / skill).read_text("utf-8")
 
 
-@pytest.mark.xfail(strict=True, reason="JB.S1 RED: pillar-bugs-metric-reads-retired-event-stream")
 def test_the_bugs_pillar_states_how_many_metrics_and_measures_it_lists() -> None:
     """Pillar 1 names its metrics and cheap measures by the number of rows it holds, in its own
     headings, and `dd-audit-project/SKILL.md` repeats that number."""

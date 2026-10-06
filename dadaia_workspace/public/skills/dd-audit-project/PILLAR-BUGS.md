@@ -10,7 +10,7 @@ Window definition: `SKILL.md` §1.
 
 - Recurrence: a later record whose `surface` matches an earlier, resolved record's `surface`, registered after that record's resolution date.
 - Recurrence: group by `surface` (the closed enum), never by a `component` substring guess.
-- Fix-induced bug: a later record whose `refs`/`component` names a file the earlier resolution's diff touched.
+- Fix-induced bug: a later record whose `component` names a file the earlier resolution's diff touched.
 - Fix-induced bug: the later record's `caused_by` must name the earlier one; a contradicted `caused_by: none` is itself a finding.
 - Both definitions are computable from `BUGS.jsonl` + `git show` alone — no further judgement about what counts.
 
@@ -22,7 +22,7 @@ Metrics 7 and 8 carry `target 0` and report their measured value even when it wo
 
 | # | Metric | Definition / command | Record field |
 |---|---|---|---|
-| 1 | Registrations per session | `governance_events` rows with `verb == "bugs append"`, grouped by `session_id` | `session_id`; a session registering many is the ask-first rule breaking |
+| 1 | Registrations per reporter | the window's records grouped by `reported_by` | `reported_by`; a reporter registering many is the ask-first rule breaking |
 | 2 | Red-loop coverage | resolved records carrying `evidence_loop` | `evidence_loop`; target 100% |
 | 3 | Fix-shape ratio | `net-negative / (net-neutral + net-positive)` (`bugs.py stats`' `direction:` rows) | every linked fix commit's production numstat (`bugs.py fix`) |
 | 4 | Same-surface re-bug rate at 3d/14d | grouped on the `surface` enum, never free text | `surface` |
@@ -35,12 +35,12 @@ Metrics 7 and 8 carry `target 0` and report their measured value even when it wo
 - Metric 5's fixed path set: `.gitignore`, `privacy_baseline.json`, `shipped-hashes.json`.
 - Fixed path set (continued): `*_golden/*.json`, a skill roster file, a `frozenset({...})` literal.
 
-## Three cheap measures (beyond the nine)
+## Two cheap measures (beyond the nine)
 
 - Registration-to-resolution interval: diff `closed_at` against the record's `ts`; a seconds-long interval is the no-red-loop signature.
 - Core-field mutation: a hunk changing an immutable-core field (per the schema's `x-mutability`) of an existing `id` is a HIGH finding.
 
-## Per-record checks (beyond the eight metrics)
+## Per-record checks (beyond the nine metrics)
 
 - A resolved record carrying no `cause`.
 - A `net-positive` record (`bugs.py fix`) whose resolving commit shows no architecture-lens routing evidence (`dd-code-review`).
