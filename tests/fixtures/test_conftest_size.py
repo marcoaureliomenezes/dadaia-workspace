@@ -75,7 +75,8 @@ def inner() -> Iterator[Path]:
             id="git-client-is-medium",
         ),
         pytest.param(
-            "from dadaia_workspace.infrastructure.subprocess_runner import SubprocessProcessRunner\n"
+            "from dadaia_workspace.infrastructure.subprocess_runner import (\n"
+            "    SubprocessProcessRunner,\n)\n"
             "def test_inner():\n    pass\n",
             "medium",
             "small",

@@ -88,8 +88,8 @@ def pytest_sessionfinish(session):
 
 
 def probe(root: Path, modules: list[Any]) -> Session:
-    """ONE pytest session under the repo conftest: every tracked test file (the sizes are read off its items)
-    plus a generated probe of every module's ``PROBE`` tests. Its report, plus the
+    """ONE pytest session under the repo conftest: every tracked test file (the sizes are read
+    off its items) plus a generated probe of every module's ``PROBE`` tests. Its report, plus the
     session's stderr and seconds, is what every session check reads."""
     suite = [p for p in tracked(root, "tests") if Path(p).name.startswith("test_")]
     probe_file = root / "tests" / "tmp" / f"_guard_probe_{os.getpid()}.py"

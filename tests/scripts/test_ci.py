@@ -88,13 +88,20 @@ def test_lint_exits_by_the_step_that_failed(
 
 @pytest.mark.parametrize(
     ("check", "verdict", "code"),
-    [("1 == 2", "FAIL unit-fast", 1), ("1 == 1", "PASS unit-fast", 0)],
+    [
+        ("1 == 2", "FAIL unit-fast", 1),
+        ("1 == 1", "PASS unit-fast", 0),
+        ("1 == 2", "FAIL integration", 1),
+        ("1 == 1", "PASS integration", 0),
+    ],
 )
 def test_unit_fast_exits_by_its_unit_tests(
     tmp_path: Path, check: str, verdict: str, code: int
 ) -> None:
-    test = f"import pytest\n\n\n@pytest.mark.small\ndef test_one() -> None:\n    assert {check}\n"
-    done = _ci(_checkout(tmp_path, {"tests/unit/test_one.py": test}), "unit-fast")
+    job = verdict.split()[1]
+    size = "medium" if job == "integration" else "small"
+    test = f"import pytest\n\n\n@pytest.mark.{size}\ndef test_one() -> None:\n    assert {check}\n"
+    done = _ci(_checkout(tmp_path, {"tests/unit/test_one.py": test}), job)
     assert verdict in done.stdout
     assert done.returncode == code
     assert list(tmp_path.rglob("__pycache__")) == []  # no step writes bytecode into the tree
