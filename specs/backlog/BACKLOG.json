@@ -514,6 +514,15 @@
         "fix-reader-rebuild-under-c",
         "bugs-fix-reads-the-per-class-shape"
       ]
+    },
+    {
+      "id": "push-gate-decision-split",
+      "title": "push_gate_decision splits into its decisions",
+      "opened": "2026-10-06",
+      "status": "idea",
+      "description": "Measured: push_gate_decision takes 10 parameters and sits among the 13 D/E functions. Design: one function per decision the push gate makes, each at radon C or better, the parameters reduced to what each decision reads; behaviour unchanged, the existing push-gate tests the oracle. The --no-verify advertisement in its refusal text (push_gate.py:38-41, pre-push-ci-gate.sh:14) is the registered bug push-refusal-advertises-no-verify, not this entry. Feeds scorecard criterion 3 (push_gate refactor). Placement: rc-12 (operator, 2026-10-06: 'rc-12, antes dos evals'). Placement and every design detail not quoted from a ruling are agent default, unruled.",
+      "provenance": "audit verification 2026-10-06 over feature/0.5.0 8e6448f13 (four read-only verifiers); main-thread registration after the operator grill of 2026-10-06",
+      "relates": []
     }
   ]
 }
