@@ -1,5 +1,5 @@
 ---
-specs_pattern_version: 10
+specs_pattern_version: 11
 constitution_version: 6.0.0
 gitflow: {"principal": "main", "integration": "develop", "work": "feature/"}
 ---
