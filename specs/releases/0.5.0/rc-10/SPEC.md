@@ -1,6 +1,7 @@
 # SPEC — Release: 0.5.0, candidate 10 (the fix reader; evals T1, T2 and the first run; QUALITY's bug balance; HOOKS-DRIFT-1; the test freeze; the test tree)
 
-**Status:** Approved — operator ruling 2026-10-06 (AskUserQuestion): "Aprovo SPEC + 0208–0210 (Recommended)", on 9f36ca986 (reviewer APPROVED 9f36ca986).
+**Status:** Approved
+**Approval:** operator ruling 2026-10-06 (AskUserQuestion): "Aprovo SPEC + 0208–0210 (Recommended)", on 9f36ca986 (reviewer APPROVED 9f36ca986).
 Amended 2026-10-06 on review M-A at cfe73a297 (factual sha/count corrections); approval basis: dd-code-reviewer re-review of the amended define head.
 **Release ID:** 0.5.0
 **Owner:** dd-product-engineer
