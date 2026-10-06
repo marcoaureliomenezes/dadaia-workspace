@@ -80,7 +80,9 @@ def _release(
     release_dir = specs / "releases" / release_id
     (release_dir / "rc-1").mkdir(parents=True, exist_ok=True)
     for name in _TRIO:
-        body = {"TASKS.md": tasks, "PLAN.md": PLAN}.get(name, "**Origin:** operator-demand\n")
+        body = {"TASKS.md": tasks, "PLAN.md": PLAN}.get(
+            name, "**Origin:** operator-demand\n\n## Bug window review\n"
+        )
         release_dir.joinpath("rc-1", name).write_text(
             f"# {name}\n\n**Status:** Approved\n\n{body}", encoding="utf-8"
         )
@@ -164,6 +166,8 @@ def test_an_rc_spec_opens_with_the_bug_window_review(script: Path, tmp_path: Pat
 
     bare = _specs(tmp_path / "bare")
     _release(bare, "0.5.0", phase="IMPLEMENTATION")
+    spec_md = bare / "releases" / "0.5.0" / "rc-1" / "SPEC.md"
+    spec_md.write_text(spec_md.read_text(encoding="utf-8").replace("## Bug window review\n", ""))
     result = _run(script, "check", "--json", "--specs", str(bare))
     assert result.returncode != 0
     assert [bool(f["fix"]) for f in json.loads(result.stdout)] == [True]
