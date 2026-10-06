@@ -43,6 +43,9 @@ _SKILLS_REPO = re.compile(
     r"dadaia-skills|SKILLS_REPO_TOKEN|build-skills-repo|npx skills add|skills-repository"
 )
 # Both dated release headings: hand-written `## [x.y.z] — date`, release-please's `(date)`.
+# the one poetry floor: GHSA-2599-h6xx-hpxp (wheel path traversal), GHSA-73h3-mf4w-8647
+_POETRY_FLOOR = (2, 3, 4)
+_POETRY_PIN = re.compile(r"poetry==(\d+(?:\.\d+)*)")
 _CHANGELOG_TOP = re.compile(
     r"^## \[(\d+\.\d+\.\d+)\](?:\([^)]*\))? (?:[-—] \d{4}-\d{2}-\d{2}|\(\d{4}-\d{2}-\d{2}\))\s*$",
     re.M,
@@ -143,6 +146,12 @@ def workflow_never_rules(tree: Tree) -> list[str]:
             if "${{" in line
         ],
         "coverage-file-in-the-checkout": cov,
+        "poetry-below-the-floor": [
+            f"{p}/{j}: poetry=={v}"
+            for p, j, s in steps
+            for v in _POETRY_PIN.findall(s.get("run") or "")
+            if tuple(map(int, v.split("."))) < _POETRY_FLOOR
+        ],
         # T-050-190: every Linux job runs `scripts/ci.py <job>`, the one source of its steps
         "job-bypasses-ci-script": [
             j
@@ -575,6 +584,7 @@ CHECKS: dict[str, Check] = {
                 "      - run: echo ${{ github.head_ref }}\n"
             ),
             "coverage-file-in-the-checkout": _workflow("      - run: pytest --cov x\n"),
+            "poetry-below-the-floor": _workflow("      - run: pipx install poetry==2.3.3\n"),
             "job-bypasses-ci-script": _edit(_G, "scripts/ci.py e2e-python", "pytest tests/e2e"),
             "release-please-outside-release-yml": _workflow(f"      - uses: {_ACTION}@v5\n"),
             "pypi-publisher-outside-release-yml": _workflow(
