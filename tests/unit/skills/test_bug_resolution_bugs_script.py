@@ -951,6 +951,9 @@ def test_fix_drops_a_fix_commit_a_later_revert_undid(script: Path, tmp_path: Pat
     pytest.param([("fix(bugs): a-bug — part one", "cli/a.py"), ("fix(bugs): a-bug — part two", "cli/b.py"),
                   ('Revert "fix(bugs): a-bug" — the "x" guard of part two', "cli/b.py")], [0],
                  id="short-form-tail-quote"),
+    pytest.param([("fix(bugs): a-bug — first", "cli/a.py"), ("fix(bugs): a-bug — second", "cli/b.py"),
+                  ('Revert "fix(bugs): a-bug — second"', "cli/b.py"), ('Revert "fix(bugs): a-bug" — undo first', "cli/a.py")],
+                 [], id="a-revert-skips-an-undone-commit"),
 ])  # fmt: skip
 def test_fix_pairs_each_revert_with_one_commit(
     script: Path, tmp_path: Path, subjects: list[tuple[str, str]], kept: list[int]
@@ -1025,17 +1028,18 @@ def test_fix_counts_the_rework_of_its_surface_by_class(script: Path, tmp_path: P
 
 def test_fix_reads_a_surface_two_rcs_left_untouched_as_settled(script: Path, tmp_path: Path) -> None:
     """AC1.1, Terms: a fix surface no fix or REBUILD touched while 2 candidates were born
-    is settled; one born since is not yet."""
+    is settled; one born since is not yet, and a later fix on the surface restarts the count."""
     closed = {**_OPEN_RECORD, "status": "resolved", "closed_at": "2026-09-21T00:00:00Z"}
-    specs = _live(tmp_path, *({**closed, "id": i} for i in ("a-bug", "b-bug")))
+    specs = _live(tmp_path, *({**closed, "id": i} for i in ("a-bug", "b-bug", "c-bug")))
     _history(tmp_path,
              ("2026-02-01T00:00:00Z", "fix(bugs): a-bug — x", {"cli/a.py": "a\n"}),
+             ("2026-02-01T01:00:00Z", "fix(bugs): c-bug — z", {"cli/c.py": "c\n"}),
              ("2026-02-02T00:00:00Z", "feat(specs): rc-1", {f"{_RELEASES}9.9.9/rc-1/SPEC.md": _STUB}),
-             ("2026-02-03T00:00:00Z", "fix(bugs): b-bug — y", {"cli/b.py": "b\n"}),
+             ("2026-02-03T00:00:00Z", "fix(bugs): b-bug — y", {"cli/b.py": "b\n", "cli/c.py": "b\n"}),
              ("2026-02-04T00:00:00Z", "feat(specs): rc-2", {f"{_RELEASES}9.9.9/rc-2/SPEC.md": _STUB}))  # fmt: skip
     listed = _run(script, "fix", "--specs", str(specs)).stdout.splitlines()
     assert [ln for ln in listed if ln.startswith("\t") and "rcs untouched" in ln] == [
-        "\tsettled\t2 rcs untouched", "\tunsettled\t1 rcs untouched",
+        "\tsettled\t2 rcs untouched", "\tunsettled\t1 rcs untouched", "\tunsettled\t1 rcs untouched",
     ]  # fmt: skip
 
 
@@ -1519,6 +1523,7 @@ _SEAM_TEST = "class TestX:\n    def test_y(self) -> None: ...\n\n\n@mark\ndef te
     ("tests/test_s.py::test_p[a-1]", None),  # a parametrized node: the brackets are stripped
     ("tests/test_s.py::TestX::test_y", None),  # every `::` segment is found
     ("cli/x.py", None),  # a fix with no test cites any tracked file
+    ("tests/__init__.py", None),  # tracked and empty is still tracked
     ("tests/test_gone.py", "[error] evidence_seam 'tests/test_gone.py' names a path git does not track"),
     ("tests/test_s.py::test_z", "[error] evidence_seam 'tests/test_s.py::test_z' names 'test_z', absent from tests/test_s.py"),
     ("tests/test_s.py::TestZ::test_y", "[error] evidence_seam 'tests/test_s.py::TestZ::test_y' names 'TestZ', absent from tests/test_s.py"),
@@ -1529,7 +1534,7 @@ def test_resolve_checks_its_evidence_seam_textually(
     """AC1.2: `resolve --evidence-seam <path>[::node]` refuses a path git does not track or
     a node any of whose `::` segments, brackets stripped, the file's text lacks."""
     specs = _ledger(tmp_path, _OPEN_RECORD)
-    _commits(tmp_path, ("chore: seed", {"tests/test_s.py": _SEAM_TEST}))
+    _commits(tmp_path, ("chore: seed", {"tests/test_s.py": _SEAM_TEST, "tests/__init__.py": ""}))
     (tmp_path / "tests/test_gone.py").write_text("def test_z() -> None: ...\n", encoding="utf-8")  # untracked
     done = _run(script, *_resolve_argv(), "--evidence-seam", seam, "--specs", str(specs))
     assert done.returncode == (1 if refusal else 0), done.stderr
