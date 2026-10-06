@@ -26,7 +26,8 @@ from tests.helpers.skill_scripts import stage_skill_scripts
 
 pytestmark = pytest.mark.contract
 
-_PUBLIC = Path(__file__).resolve().parents[2] / "dadaia_workspace" / "public"
+_REPO_ROOT = Path(__file__).resolve().parents[2]
+_PUBLIC = _REPO_ROOT / "dadaia_workspace" / "public"
 _SKILL = _PUBLIC / "skills" / "dd-release-definition" / "SKILL.md"
 _SCRIPTS = _PUBLIC / "skills" / "dd-release-implementation" / "scripts"
 _GOOD = "## 1. As-is review\n\n## 2. Strategy\n"
@@ -307,7 +308,7 @@ def test_only_the_live_candidate_is_ranked(script: Path, tmp_path: Path) -> None
 
 
 def test_this_repos_live_spec_origin_passes(script: Path) -> None:
-    assert _check(script, Path(__file__).resolve().parents[2] / "specs") == []
+    assert _check(script, _REPO_ROOT / "specs") == []
 
 
 _JOB = (
