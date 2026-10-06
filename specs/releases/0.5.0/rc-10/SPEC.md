@@ -58,9 +58,9 @@ Read at 27123ce99 and on `wt/0.5.0-rc9/reconcile` (`bugs.py window`, `fix`, `git
 
 ## Terms
 
-- **Fix surface**: the production lines a fix commit wrote. It settles once it survives 2 rcs untouched by another fix or REBUILD (Q5).
+- **Fix surface**: the production lines a fix commit wrote; a **settled fix surface** survived 2 rcs untouched by another fix or REBUILD (Q5).
 - **Rework**: a later commit whose diff overlaps a fix surface: a `refactor(…): REBUILD` is planned; a `fix(bugs)` of another bug is overfitting evidence.
-- **Settled surface**: a surface whose every record left the bug window with no later record on it (G8).
+- **Settled ledger surface**: a ledger `surface` (a directory) whose every record left the bug window with no later record on it (G8).
 - **Convergence readout**: a number `## Bugs` prints at each closure, blocking nothing (Q2, Q2b).
 - **RED anchor**: the sha closing a job's RED stage; after it the job's tests are frozen (Q6).
 
@@ -69,37 +69,26 @@ Read at 27123ce99 and on `wt/0.5.0-rc9/reconcile` (`bugs.py window`, `fix`, `git
 - AC1.1 One REBUILD of the `bugs.py fix` commit reader (verdict above; `bugs-fix-reads-the-per-class-shape`; Q5). c9faccfdc's test rows stay unchanged.
   - It diffs every linked commit, a shape-4 task commit included; the never-diffed `None` path leaves.
   - It links a per-class shape-4 commit by the ids on its body lines.
-  - For each fix it prints the fix surface, its rework count by class, and settled or the rcs it has left.
+  - For each fix it prints the fix surface, its rework count by class, and settled fix surface or the rcs it has left.
+  - `PILLAR-BUGS.md:8` ("a shape-4 task commit is counted, never diffed") is rewritten to match.
   - Everything is derived from git; nothing is stored.
-  - **Unit** rows:
-    - a shape-4 resolve over two task commits gives summed numstat and a literal direction;
-    - a class commit links its body ids;
-    - a later `fix(bugs)` overlapping the surface counts 1 overfitting;
-    - a REBUILD counts 1 planned;
-    - two rcs untouched read settled.
+  - **Unit** rows: a shape-4 resolve over two task commits gives summed numstat and a literal direction; a class commit links its body ids; a later overlapping `fix(bugs)` counts 1 overfitting, a REBUILD 1 planned; two rcs untouched read a settled fix surface.
 - AC1.2 `evidence_seam` is required at resolve and checked only there (G10, 0208).
-  - `bugs.py resolve --evidence-seam <path>[::node]` refuses a path git does not track, or a node whose text, with parameter brackets stripped, is not in the file. The check is textual and works for any language.
+  - `bugs.py resolve --evidence-seam <path>[::node]` refuses a path git does not track, or a node any of whose `::` segments, parameter brackets stripped, is not in the file (`TestX::test_y` finds both). The check is textual and works for any language.
   - A fix with no test cites any tracked file.
   - `bugs.py check` never re-judges a seam.
   - `bugs.py window` marks a record whose seam file is gone.
-  - **Unit** rows: present; untracked path; absent node; parametrized node; a non-test tracked file; a window row with a deleted seam.
-- AC1.3 The window review compares each fix against the overfitting patterns (Q5):
-  - an assert or test changed by the fix;
-  - a special case on a test value;
-  - a new branch, flag or second path;
-  - a reach into another feature;
-  - deleted functionality;
-  - ≥ 2 fixes on the unit.
-  - Each fix then gets KEEP or REBUILD. A REBUILD reworks the fix's code and what surrounds it, and keeps the fix's tests.
+  - **Unit** rows: present; untracked path; absent node; parametrized node; `TestX::test_y`; a non-test tracked file; a window row with a deleted seam.
+- AC1.3 The window review compares each fix against the overfitting patterns (Q5): an assert or test changed by the fix; a special case on a test value; a new branch, flag or second path; a reach into another feature; deleted functionality; ≥ 2 fixes on the unit. Each fix then gets KEEP or REBUILD. A REBUILD reworks the fix's code and what surrounds it, and keeps the fix's tests.
   - Taught in `dd-release-definition` §1. **No test** (law text).
-- AC1.5 Any `caused_by ≠ none`, a bug's fix or a feature task, makes the fix a REBUILD of the unit, keeping its tests (0210). The bugs law §2's "a fix-induced one as a REBUILD" (`public/scaffold/bugs/AGENTS.md`, `specs/bugs/AGENTS.md`) is widened to say so. **No test** (law text).
-- AC1.4 One producer for the REBUILD-or-not line (M6). `dd-bug-resolution` `LINEAGE.md` step 7 writes it into the fix commit's body, either `rebuild: <unit> — prior fixes <id>, …` or, only when `caused_by` is none, `rebuild: none — <reason>`. `PILLAR-BUGS` gains a ninth metric: the share of fixes with `caused_by ≠ none` carrying a REBUILD shape (`focused-review-on-caused-by`, audit half; 0210). Target 100 %; it gates nothing. **No test**. Check: `grep -c 'rebuild: none — <reason>'` prints ≥ 1 in `LINEAGE.md` and in `PILLAR-BUGS.md`.
+- AC1.4 One producer for the REBUILD-or-not line (M6). `dd-bug-resolution` `LINEAGE.md` step 7 writes it into the fix commit's body, either `rebuild: <unit> — prior fixes <id>, …` or, only when `caused_by` is none, `rebuild: none — <reason>`. `PILLAR-BUGS` gains a ninth metric: the share of fixes with `caused_by ≠ none` carrying a REBUILD: a `refactor(…): … REBUILD` subject or `REBUILD` in a `fix(bugs):` subject (121ae02b2 counts) (`focused-review-on-caused-by`, audit half; 0210). Target 100 %; it gates nothing. **No test**. Check: `grep -c 'rebuild: none — <reason>'` prints ≥ 1 in `LINEAGE.md` and in `PILLAR-BUGS.md`.
+- AC1.5 Any `caused_by ≠ none`, a bug's fix or a feature task, makes the fix a REBUILD of the unit, keeping its tests (0210). Rewritten to say so: the bugs law §2's "a fix-induced one as a REBUILD" (`public/scaffold/bugs/AGENTS.md`, `specs/bugs/AGENTS.md`) and `dd-code-review/SKILL.md:55`'s "state REBUILD of the unit or why not". **No test** (law text).
 
 ## Job 2 — evals: the repo law, T1 and T2
 
 Writes only to `repos/dadaia-evals` and the job file.
 
-- AC2.1 `dadaia-evals/AGENTS.md` declares `verify:`, `verify-stage:` and `verify-task:` lines, holding the secret-free checks `ci.yml` runs. **No test**. Check: `grep -c '^verify' AGENTS.md` prints `3`, and this job's gate runs the `verify:` line.
+- AC2.1 `dadaia-evals/AGENTS.md` declares `verify:`, `verify-stage:` and `verify-task:` lines, holding the secret-free checks `ci.yml` runs, and `tests: tests/** tasks/*/tests/**` (AC6.0). **No test**. Check: `grep -cE '^(verify|tests:)' AGENTS.md` prints `4`, and this job's gate runs the `verify:` line.
 - AC2.2 Skeleton (rc-8 AC11.2):
   - `tasks/t1-cold-onboarding/` and `tasks/t2-block-list-bug/` each hold `instruction.md`, `task.toml`, `environment/Dockerfile`, `tests/test.sh` and `tests/test_grade.py`.
   - The Dockerfile holds the environment only; the lib is its last layer (0179).
@@ -110,11 +99,7 @@ Writes only to `repos/dadaia-evals` and the job file.
   - **Integration** (no model): the unchanged grader passes on a hand-onboarded workspace of each version and fails on an empty one.
 - AC2.4 T2 plants a block-list bug (Q1): a small onboarded project whose suite, its work branch's CI, is red after a merged change broke a documented contract. The instruction gives the operator's confirmation.
   - Both versions' law fixes it at once.
-  - It passes when:
-    - a `BUGS.jsonl` record precedes the fix commit;
-    - the RED test fails on the pre-fix sha and passes on the fix;
-    - the suite is green at HEAD;
-    - `git diff -U0 -- tests | grep '^-\s*assert'` prints nothing.
+  - It passes when a `BUGS.jsonl` record precedes the fix commit, the RED test fails on the pre-fix sha and passes on the fix, the suite is green at HEAD, and `git diff -U0 -- tests | grep '^-\s*assert'` prints nothing.
   - The grader reads only `bug-record-v1` fields both versions carry.
   - **Integration** (no model): on both versions, a planted correct fix passes and a planted assert-rewriting fix fails.
 
@@ -123,8 +108,7 @@ Writes only to `repos/dadaia-evals` and the job file.
 Edge: Job 2, merged to `dadaia-evals` `main` through its PR edges.
 
 - AC3.1 One `gh workflow run eval.yml -f lib_ref=<tip of feature/0.5.0>`: T1 and T2, k=3, 0.4.7 against the candidate (rc-8 AC11.6).
-  - It confirms the trial ran the stamped candidate wheel (`dadaia capabilities --json`).
-  - It confirms no rate-limit error appears in `jobs/`.
+  - It confirms the stamped candidate wheel ran (`dadaia capabilities --json`) and no rate-limit error appears in `jobs/`.
   - A failing grader is fixed in the grader before closure.
   - **No test**. Check: a `_RELEASE.json` `kind: note` names the run URL, the verdict per 0178 (2), tokens and wall time.
 
@@ -133,17 +117,17 @@ Edge: Job 2, merged to `dadaia-evals` `main` through its PR edges.
 `bug-ledger-balance-and-convergence`; G8, Q2, Q2b; 0208. The generator ships with the bug skill and stays language-neutral.
 
 - AC4.1 `QUALITY.md` `## Bugs` holds one generated fenced block, rendered from `BUGS.jsonl` alone.
-  - Per surface: records, recurrences, fix-induced, archived, rcs in the window, correlates, settled.
+  - Per surface: records, recurrences, fix-induced, archived, rcs in the window, correlates, settled ledger surface.
   - Dev-tooling surfaces form a repo-declared class (a `.gitattributes` attribute, the 0183 seam) and print apart.
   - `unknown` surfaces stay out of recurrences.
   - **Unit**: a literal ledger renders a literal block; a rerun is byte-equal.
 - AC4.2 Readout 1, the Laplace trend (Kanoun & Laprie, *Handbook of Software Reliability Engineering* ch. 10), continuous time with days as the axis, over all bugs (Q2b).
-  - Window: the live release plus the 3 previous published (today 0.4.5–0.5.0).
-  - Stated readings (operator, Q2b): a known `found_in` is a release other than `unknown`; a bulk import is a record sharing its `ts` with another record. Only the first count; bulk imports are excluded and counted apart.
+  - Window: the live release plus the 3 previous published (today 0.4.5–0.5.0); it starts on the oldest one's opening day (its first `_RELEASE.json` log `ts`, archive included) and T ends on the closure day.
+  - Only records with a known `found_in` count (Q2b, "só found in conhecido"): a release other than `unknown`. Release-`unknown` records (bulk imports, backfills) are counted apart. A record with rc `unknown` but a known release counts here (the axis is days); it is excluded only from per-rc tables (AC4.3).
   - u = (mean of tᵢ − T/2) / (T·√(1/(12N))), where tᵢ is a record's day offset from the window start and T is the window's length in days.
   - u ≤ −1.96 reads "converging", u ≥ +1.96 "diverging", anything else "no trend".
-  - A second line counts records found on a surface that was already settled.
-  - **Unit**: t = `[1, 2, 3]` and T = 10 give `u = -1.80`, "no trend"; one backfill pair is counted apart.
+  - A second line counts records found on an already settled ledger surface.
+  - **Unit**: t = `[1, 2, 3]` and T = 10 give `u = -1.80`, "no trend"; a release-`unknown` record is counted apart; an rc-`unknown` record of a known release counts.
 - AC4.3 Readout 2, the defective-fix rate per rc (Kan, *Metrics and Models in Software Quality Engineering* ch. 4; Jones 2012): records found in rc i with `caused_by ≠ none`, over records found in rc i. **Unit**: literal ledger, literal rates.
 - AC4.4 The block is a closure check, never an always-on doctor check.
   - At CLOSURE, `release.py check` refuses a block that differs from its regeneration, with one fix line naming the regenerating command.
@@ -163,10 +147,9 @@ Edge: Job 2, merged to `dadaia-evals` `main` through its PR edges.
 
 ## Job 6 — the test freeze
 
-Q6 items 1–5; 0209. Everything is judged by `git diff` over the repo's test paths, so it works for any language.
+Q6 items 1–5; 0209. Everything is judged by `git diff` over the repo's test paths, so it works for any language. Edges: Jobs 1–5, 7 and 8 → Job 6, the DAG's last job; its freeze binds every job opened after it merges (rc-11 on), so earlier jobs, AC8.2's RED included, run under today's law.
 
-- AC6.0 A repo declares its test paths as one `tests:` line of globs in its tracked `AGENTS.md`, beside the `verify:` lines (e.g. `tests: tests/** **/*_test.go`). The gate reads it from the work branch, the authority 0207 uses, so no worktree changes what counts as a test. **Integration**: a worktree editing its own `tests:` line still has a test edit refused; a repo with no `tests:` line refuses with one fix line naming it.
-
+- AC6.0 A repo declares its test paths as one `tests:` line of globs in its tracked `AGENTS.md`, beside the `verify:` lines (e.g. `tests: tests/** **/*_test.go`). The gate reads it from the work branch, the authority 0207 uses, so no worktree changes what counts as a test. Job 6 commits `tests: tests/**` to dadaia-workspace's `AGENTS.md` (dadaia-evals': AC2.1). A repo with no `tests:` line refuses with one line in 0207's lane, `Operator action: commit the tests: line on <work branch>'s AGENTS.md`, and that act clears the block (rc-9's verify-line Stall shape). **Integration**: a worktree editing its own `tests:` line still has a test edit refused; a repo with no `tests:` line refuses with that line, and after the line is committed on the work branch the same merge lands.
 - AC6.1 Tests are born only in a RED stage, one whose tasks' `W:` holds tests only. Each new test is validated before the freeze: collected, failing by assertion (never by error), test-audit, stage review. **Integration**: a RED stage whose new test errors instead of failing cannot close.
 - AC6.2 From the RED anchor on, a task or job merge refuses any diff on a test file. This covers unit, integration and E2E tests and the tests that existed before; a pure rename is allowed.
   - The refusal carries one `Operator action:` line: stop and report.
@@ -175,8 +158,6 @@ Q6 items 1–5; 0209. Everything is judged by `git diff` over the repo's test pa
   - `specs/releases/AGENTS.md` §3's clause on rewriting a test in the same task leaves.
   - A REBUILD keeps the fix's tests.
   - **No test** (law text).
-- AC6.4 The task gate's `test_`-name check (`_worktree_end.py:287-292`) becomes an owner rule: a code task names its owner tests, and `scripts/guards/run.py` owns `scripts/guards/**`. **Integration**: a guard-only task with that owner passes; a code task with no owner refuses.
-- Jobs 7 and 8 change existing tests only in test-only stages. This SPEC's approval is the amendment AC6.3 names.
 
 ## Job 7 — the tests tree mirrors the package
 
@@ -201,8 +182,7 @@ Q6 items 1–5; 0209. Everything is judged by `git diff` over the repo's test pa
 ## The bug batch
 
 - AC9.1 Every bug found in rc-10 is resolved in rc-10 (0206).
-  - A block-list bug is a hotfix at once.
-  - Every other bug goes to the bug batch: after the DAG's last job, before Reconciliation, grouped by cause, a fix with `caused_by ≠ none` as a REBUILD (0210).
+  - A block-list bug is a hotfix at once; every other bug goes to the bug batch: after the DAG's last job, before Reconciliation, grouped by cause, a fix with `caused_by ≠ none` as a REBUILD (0210).
   - A bug found during Reconciliation is fixed inside it.
   - **No test**. Check: `bugs.py status` prints `0 open` at Reconciliation's end.
 
@@ -222,28 +202,29 @@ Q6 items 1–5; 0209. Everything is judged by `git diff` over the repo's test pa
 
 - 0176 and 0178 are accepted (Q3); the main thread writes the rulings. 0176's memory half is AC10.1. 0178 applies at rc-13's promote.
 - 0174 is rejected (Q3); its live clauses are re-proposed at rc-11.
-- **0208** (ADR C), accepted with this SPEC's Approval, before Job 1, with 0209 and 0210 (G8, G10, Q2, Q2b, Q5):
+- **0208** (ADR C), accepted with this SPEC's Approval, before Job 1, as are 0209 and 0210 (G8, G10, Q2, Q2b, Q5):
   - `QUALITY.md` `## Bugs` holds a generated map plus a written review, compiled at each closure; per-bug state stays only in `BUGS.jsonl`.
-  - A surface settles once it leaves the window with no recurrence.
+  - A ledger surface settles once it leaves the window with no recurrence.
   - The map is a closure check. Context: G8 said "checked by doctor". The rc-8 W13 review (REJECTED; H7) moved it to closure, because an always-on check reddens every tree between closures. This ADR records that difference.
-  - The readouts block nothing: the Laplace trend over all bugs (days axis, 4 releases, known `found_in` only), the settled-surface count, and the defective-fix rate.
+  - The readouts block nothing: the Laplace trend over all bugs (days axis, 4 releases, known `found_in` only), the settled-ledger-surface count, and the defective-fix rate.
   - Fix surfaces and rework are derived from git, never stored.
   - `bugs.py resolve` requires `evidence_seam`, checked textually only then.
   - Amends 0164 (4). `measured_by`: AC1.2's and AC4.1–AC4.4's cases.
 - **0209**, accepted with this SPEC's Approval (Q6), "Tests are born in RED stages and frozen at the RED anchor":
-  - AC6.0–AC6.4's rule; test paths are the repo's `tests:` line, read from the work branch.
+  - AC6.0–AC6.3's rule; test paths are the repo's `tests:` line, read from the work branch.
   - Amends the releases law §3's same-task rewrite clause.
-  - `measured_by`: AC6.2's cases.
-- **0210**, accepted with this SPEC's Approval (operator, 2026-10-06: "(b) Qualquer caused_by ≠ none é REBUILD (Recommended)"): any `caused_by` other than none, a bug's fix or a feature task, makes the fix a REBUILD of the unit, keeping its tests. It keeps 0186 (2) and widens 0206's "a fix-induced one". `measured_by`: the ninth `PILLAR-BUGS` metric (AC1.4).
+  - `measured_by`: AC6.0–AC6.2's cases.
+- **0210**, accepted with this SPEC's Approval (operator, 2026-10-06: "(b) Qualquer caused_by ≠ none é REBUILD (Recommended)"): any `caused_by` other than none, a bug's fix or a feature task, makes the fix a REBUILD of the unit, keeping its tests. It keeps 0186 (2) and widens 0206's "a fix-induced one" (`amends: 0206`). A REBUILD's revert under 0186 (2) keeps the culprit's test files, so it fits 0209. `measured_by`: the ninth `PILLAR-BUGS` metric (AC1.4).
+- The main thread proposes 0208–0210 in `decisions.jsonl` at Approval.
 
 ## Replaces
 
-- `bugs.py fix`'s never-diffed shape-4 link; the fix reader's two prior fixes (AC1.1).
+- `bugs.py fix`'s never-diffed shape-4 link and `PILLAR-BUGS.md:8`; the fix reader's two prior fixes (AC1.1).
 - 0164 (4)'s retirement of `evidence_seam` (AC1.2).
-- The bugs law §2's REBUILD for a fix-induced bug only (AC1.5).
 - A bare `rebuild: none` (AC1.4).
+- The bugs law §2's REBUILD for a fix-induced bug only; `dd-code-review/SKILL.md:55`'s "or why not" (AC1.5).
 - HOOKS-DRIFT-1's fixed "differs" (AC5.1).
-- Rewriting a test in an implementation task; the `test_`-name gate check (AC6).
+- Rewriting a test in an implementation task (AC6.3).
 - Loose `contract/` and `integration/` roots; the folder-derived size tier (AC7).
 - Processes in the unit tier; the autouse rows monkeypatch; patched `sys.stdin` and the `hook-stdin-not-in-process` guard check (AC8).
 - `docs/bug-ledger-lessons.md`'s source: the `bug-ledger` atom and today's `QUALITY.md` sections give way to `## Bugs`' written review (AC4.5).
@@ -255,7 +236,7 @@ Q6 items 1–5; 0209. Everything is judged by `git diff` over the repo's test pa
 |---|---|
 | 8 jobs is the cap. | A new need goes to rc-11. |
 | Job 3 spends model quota: 12 trials. | `-n 2`, economy template, one run. |
-| Jobs 6–8 touch the merge gate and most test files. | PLAN edges; Jobs 7–8 change tests in test-only stages. |
+| Jobs 7–8 change most test files. | Job 6 lands last, so its freeze does not bind them. |
 | Jobs 1 and 4 share the bug skill. | Disjoint files or a PLAN edge. |
 
 ## Carried
@@ -265,7 +246,8 @@ Every active backlog id sits in the Origin or below.
 - rc-11, the corpus, the law and the ADR process:
   - `public-law-language-neutral`, `dd-ask-me-owned-questioning-skill`, `adr-born-at-release-with-options`, `adr-ledger-triage-process-rules`, `architecture-adr-section-generated`;
   - rc-9's deferrals: `stage-gate-runs-the-contract-tier`, `job-gate-runs-the-law-deletion-check`, `merge-entry-times-survive-rebase`, `task-gate-mypy-follows-cross-skill-imports`, `hypothesis-cache-stays-out-of-repo-trees`, `stray-pycache-never-breaks-the-job-gate`, `task-gate-drops-deleted-paths-itself`, `release-new-adopts-a-drafted-next-rc`, `origin-findings-renamed-to-the-spec-head`, `adr-0193-records-its-amends`;
-  - F088, F089, F139–F148; 0174's live clauses.
+  - F088, F089, F139–F148; 0174's live clauses;
+  - the task gate's `test_` name check becomes a declared owner mapping — design and intake at rc-10 Reconciliation.
 - rc-12, workspace replication: `spec-context-branch-field-deleted`, `worktree-layout-per-context`, `context-dead-snapshots-open-worktrees`, `context-show-derives-worktrees`, `export-soft-and-hard`, `init-from-export`; 0171, 0173, 0175; F084.
 - rc-13, the promote:
   - `docs-site-zensical-pages`, `clone-detection`, `launch-operator-acts`;
