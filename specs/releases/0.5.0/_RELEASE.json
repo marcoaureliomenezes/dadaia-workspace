@@ -1098,6 +1098,22 @@
       "agent": "dd-product-engineer",
       "kind": "note",
       "text": "rc-9 bug count, from the ledger (BUGS.jsonl ts at or after rc-9's opening) and bugs.py status ('0 open bug(s)'): 7 found in rc-9, 7 resolved, 0 open — 1 CRITICAL (verify-line-absent-refusal-sends-to-a-tree-the-gate-never-reads), 1 HIGH (ci-and-release-install-vulnerable-poetry), 2 MEDIUM (job-task-id-test-assumes-native-paths, memory-window-bound-unreachable-from-head), 3 LOW (bugs-fix-lists-one-commit-twice, specs-law-file-untracked-by-gitignore, bugs-fix-counts-a-reverted-fix); every one resolved_release 0.5.0, so rc-9 closes with no open bug (ADR 0206). AC1.7 readout on the two hotfix merge entries: job_gate_runs counts full scripts/ci.py runs from the session transcripts (the engineer's job-tree runs plus worktree.py merge's verify run), none red — hotfix-poetry-pin 2 and hotfix-verify-line-stall 3 exceed 1 plus their recorded reds (0), a violation reported here; the repeat runs are the engineer's pre-merge check and, for verify-line, the re-run after the ADR 0207 fold. dispatches count the main thread's Agent calls for each job (engineer and reviewer)."
+    },
+    {
+      "ts": "2026-10-06T12:41:52Z",
+      "agent": "release.py memory",
+      "kind": "memory",
+      "text": "Memory reconciled over 036a296f9bfb316b141c29e85466d611baccc696..4a0887130a06: 1 reviewed, 3 changed.",
+      "since": "036a296f9bfb316b141c29e85466d611baccc696",
+      "until": "4a0887130a06a6b8b5b1963955e69476af6fa587",
+      "reviewed": [
+        "agentic-entities"
+      ],
+      "changed": [
+        "pypi-distribution",
+        "bug-ledger",
+        "release-lifecycle"
+      ]
     }
   ]
 }
