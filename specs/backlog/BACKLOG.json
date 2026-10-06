@@ -471,6 +471,15 @@
       "description": "Found in rc-9 (Job 5 review LOW 2): dd-gitflow-default \u00a73a now carries the per-class shape 4, chore(bugs): <verb> class <class> \u2014 <reason> with one id per body line, but bugs.py fix links only a shape-3 fix(bugs)/refactor(bugs) subject or a shape-4 chore(bugs): resolve <id> subject, so a record resolved by a class commit reads 'unlinked'. Design: the one commit reader in bugs.py fix also matches a class subject and takes the ids from its body lines; no second grep. Owner: dd-bug-resolution/scripts/bugs.py fix, tests/unit/skills/test_bug_resolution_bugs_script.py. Done when: a record resolved only by a class commit prints that commit under bugs.py fix.",
       "provenance": "rc-9 Reconciliation deferral (JR.S2.T5), dispatched by the main thread 2026-10-06 under the operator's rc-9 scope; target rc-10 or later",
       "relates": []
+    },
+    {
+      "id": "origin-findings-renamed-to-the-spec-head",
+      "title": "Rename _release_tree._origin_findings to name both judgements it makes: the SPEC's Bug window head and its Origin line",
+      "opened": "2026-10-06",
+      "status": "idea",
+      "description": "Found in rc-9 (Job 5 verdict INFO): after J5.S3.T3 (39b5f47f2) _origin_findings judges the live SPEC's first ## heading (AC5.6) and its Origin line; the name is narrower than the function. Design: rename at the next touch of dd-release-implementation/scripts/_release_tree.py (e.g. _spec_head_findings), callers and the behavior-map hash re-recorded in the same task; no behaviour change, so no new test. Done when: no symbol named _origin_findings remains.",
+      "provenance": "rc-9 Reconciliation deferral (JR.S2.T5), dispatched by the main thread 2026-10-06 under the operator's rc-9 scope; target rc-10 or later",
+      "relates": []
     }
   ]
 }
