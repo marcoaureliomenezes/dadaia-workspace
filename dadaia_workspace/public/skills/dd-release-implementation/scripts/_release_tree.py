@@ -113,30 +113,12 @@ def _trace(
 BUG_WINDOW = "## Bug window review"
 
 
-def _bug_window_findings(specs: Path) -> list[dict[str, Any]]:
-    """The live candidate's SPEC opens with :data:`BUG_WINDOW` (AC5.6)."""
-    try:
-        live = live_release(specs)
-    except Refusal:
-        return []  # the tree walk reports a missing or doubled live release
-    spec = live.candidate / "SPEC.md" if live.candidate else None
-    if spec is None or not spec.is_file():
-        return []
-    lines = spec.read_text(encoding="utf-8").splitlines()
-    first = next((n for n, line in enumerate(lines, 1) if line.startswith("## ")), 1)
-    if lines[first - 1 : first] == [BUG_WINDOW]:
-        return []
-    return [finding(spec.relative_to(specs).as_posix(), first,
-                    f"the live SPEC's first `## ` heading is not `{BUG_WINDOW}` (AC5.6)",
-                    f"Operator action: open {spec} with `{BUG_WINDOW}` as its first `## ` "
-                    "heading, reviewing `bugs.py window` and each cited test")]  # fmt: skip
-
-
 def _origin_findings(specs: Path) -> list[dict[str, Any]]:
-    """The live candidate's Origin line: grammar and existence always, and each carried id
-    listed with its standing — a missing pointer is an error only once the live candidate
-    (past DEFINITION, so a stacked candidate's inherited log is not its own) logged its
-    `dispositions` entry, or shipped."""
+    """The live candidate's SPEC head: its first `## ` heading is :data:`BUG_WINDOW` (AC5.6;
+    an error only in DEFINITION, where `new` writes it — info after), then its Origin line:
+    grammar and existence always, and each carried id listed with its standing — a missing
+    pointer is an error only once the live candidate (past DEFINITION, so a stacked
+    candidate's inherited log is not its own) logged its `dispositions` entry, or shipped."""
     try:
         live = live_release(specs)
     except Refusal:
@@ -149,12 +131,20 @@ def _origin_findings(specs: Path) -> list[dict[str, Any]]:
         spec.read_text(encoding="utf-8"),
         live.state,
     )
+    lines = text.splitlines()
+    head = next((n for n, h in enumerate(lines, 1) if h.startswith("## ")), 1)
+    out = [] if lines[head - 1 : head] == [BUG_WINDOW] else [
+        finding(rel, head, f"the live SPEC's first `## ` heading is not `{BUG_WINDOW}` (AC5.6)",
+                f"Operator action: open {spec} with `{BUG_WINDOW}` as its first `## ` heading, "
+                "reviewing `bugs.py window` and each cited test")
+        | ({} if state.get("phase") == "DEFINITION" else {"verdict": "info"})
+    ]  # fmt: skip
     line = origin_line(text)
     try:
         rows = _trace(specs, live.release_id, origin(text))
     except ValueError as error:
-        return [finding(rel, line, str(error), f"Operator action: rewrite the Origin line "
-                        f"{line} of {spec} to the Origin grammar ({error})")]  # fmt: skip
+        return out + [finding(rel, line, str(error), f"Operator action: rewrite the Origin "
+                              f"line {line} of {spec} to the Origin grammar ({error})")]  # fmt: skip
     since = str((state.get("defined") or {}).get("ts") or "")
     swept = (
         state.get("shipped")
@@ -164,7 +154,6 @@ def _origin_findings(specs: Path) -> list[dict[str, Any]]:
             for e in state.get("log") or []
         )
     )
-    out = []
     for kind, i, standing, writable in rows:
         row = finding(rel, line, f"Origin {kind}:{i} {standing}", f"Operator action: name a "
                       f"live {kind} id for {kind}:{i}, or rule it out of the Origin line of {spec}.")  # fmt: skip
@@ -362,8 +351,7 @@ def tree_findings(specs: Path) -> list[dict[str, Any]]:
 def check(specs: Path) -> list[dict[str, Any]]:
     """The ONE release validator (the doctor delegates here): the tree, the live
     candidate's Origin, then the live CLOSURE's memory record."""
-    return (tree_findings(specs) + _bug_window_findings(specs) + _origin_findings(specs)
-            + _window_findings(specs))  # fmt: skip
+    return tree_findings(specs) + _origin_findings(specs) + _window_findings(specs)
 
 
 def ship_findings(specs: Path) -> list[dict[str, Any]]:

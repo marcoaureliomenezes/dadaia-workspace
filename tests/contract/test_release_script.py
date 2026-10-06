@@ -201,7 +201,8 @@ def test_a_missing_pointer_is_a_finding_once_the_candidate_logs_its_dispositions
     state.write_text(json.dumps({**json.loads(state.read_text("utf-8")), "phase": "CLOSURE",
                                  "defined": defined}))  # fmt: skip
     (specs / "releases/0.5.0/rc-1/SPEC.md").write_text(
-        "# S\n\n**Status:** Approved\n**Origin:** backlog:a-real-entry; bugs:still-broken,already-fixed\n", "utf-8")  # fmt: skip
+        "# S\n\n**Status:** Approved\n**Origin:** backlog:a-real-entry; bugs:still-broken,already-fixed\n"
+        "\n## Bug window review\n", "utf-8")  # fmt: skip
     _seed_ledgers(specs, log=[{**entry, "ts": "2025-12-31T00:00:00Z"}])
     assert _origin_rows(script, specs) == []  # --json, the doctor's contract: errors only
     listed = subprocess.run([sys.executable, str(script), "check", "--specs", str(specs)],

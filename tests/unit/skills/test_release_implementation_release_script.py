@@ -167,8 +167,7 @@ def test_new_opens_the_rc_spec_with_the_bug_window_review(script: Path, tmp_path
 @pytest.mark.parametrize(("phase", "errors", "verdict"), [
     pytest.param("DEFINITION", [("releases/0.5.0/rc-1/SPEC.md", 1, True)], "error",
                  id="definition-refuses"),
-    pytest.param("IMPLEMENTATION", [], "info", id="past-definition-informs",
-                 marks=pytest.mark.xfail(strict=True, reason="J5.S3.T3: HIGH 3")),
+    pytest.param("IMPLEMENTATION", [], "info", id="past-definition-informs"),
 ])
 # fmt: on
 def test_a_live_spec_without_the_bug_window_review(
