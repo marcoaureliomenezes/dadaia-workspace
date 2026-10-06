@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from dadaia_workspace.core.cli_line import git_line, shell_line
+from dadaia_workspace.core.cli_line import git_line
 from dadaia_workspace.core.gitflow import Gitflow
 from dadaia_workspace.core.models.git_scan import SHA_SHAPE_RE, ZERO_SHA
 
@@ -125,7 +125,7 @@ def _refuse_branch(
     return _blocked(
         f"the {role} branch '{branch}' is never pushed directly — it advances only via a PR "
         f"from '{head}'",
-        shell_line("gh", "pr", "create", "--base", str(branch), "--head", head),
+        f"Operator action: open a PR/MR from '{head}' into '{branch}' on your git host",
     )
 
 
