@@ -52,15 +52,6 @@
       "relates": []
     },
     {
-      "id": "doctor-in-a-fresh-worktree-lacks-rendered-specs-law",
-      "title": "doctor run inside a fresh worktree reports TREE-5 because the rendered, git-ignored specs/AGENTS.md is absent",
-      "opened": "2026-10-01",
-      "status": "idea",
-      "description": "specs/AGENTS.md is rendered and ignored (.gitignore /specs/*), so a new worktree lacks it and doctor --specs-dir <wt>/specs reports TREE-5 plus a knock-on MEM-DRIFT-2. Decide whether worktree.py new renders it or doctor scopes TREE-5 to the main checkout. Destination: rc-8 W6.",
-      "provenance": "dd-code-reviewer review of bdae61bb (2026-09-30) INFO 5; rc-6 PLAN \u00a74 carry",
-      "relates": []
-    },
-    {
       "id": "spec-context-refusals-print-prose",
       "title": "spec_context service refusals still print prose instead of one fix line",
       "opened": "2026-10-02",
