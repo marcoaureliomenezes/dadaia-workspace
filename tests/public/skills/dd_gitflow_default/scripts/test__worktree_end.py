@@ -606,7 +606,6 @@ def test_a_job_gate_reads_the_work_branch_verify_line_not_its_own(
     assert landed.returncode == 0, landed.stderr
 
 
-@pytest.mark.xfail(strict=True, reason="JB.S3 RED: gate-runs-the-judged-trees-own-ci-script")
 @pytest.mark.parametrize("level", ["task", "job"])
 def test_no_tree_edits_the_script_its_own_gate_runs(root: Path, level: str) -> None:
     """ADR 0207: a range touching a path the work branch's declared line names refuses, naming
