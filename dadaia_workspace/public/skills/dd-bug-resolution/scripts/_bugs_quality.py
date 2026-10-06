@@ -44,6 +44,14 @@ def body(specs: Path) -> str:
     return bal.render(ledger, old, window, dev)
 
 
+def stale(specs: Path) -> bool:
+    """True when `QUALITY.md` holds a `## Bugs` block that differs from :func:`body`;
+    a document with no block is not judged."""
+    quality = specs / "memory" / "QUALITY.md"
+    held = bal.stored(quality.read_text(encoding="utf-8")) if quality.is_file() else None
+    return held is not None and held != body(specs)
+
+
 def write(specs: Path) -> Path:
     """Regenerate the block in `QUALITY.md`, appending its section when absent."""
     quality = specs / "memory" / "QUALITY.md"

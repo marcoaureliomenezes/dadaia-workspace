@@ -314,25 +314,21 @@ def _window_findings(specs: Path) -> list[dict[str, Any]]:
 def _balance_findings(specs: Path) -> list[dict[str, Any]]:
     """CLOSURE: `QUALITY.md`'s `## Bugs` block, once it has one, equals its regeneration —
     a closure check, never a doctor lane (AC4.4)."""
-    quality = specs / "memory" / "QUALITY.md"
     try:
         live = live_release(specs)
     except Refusal:
         return []  # the tree walk reports a missing or doubled live release
-    if live.state.get("phase") != "CLOSURE" or not quality.is_file():
+    if live.state.get("phase") != "CLOSURE" or not (specs / "memory" / "QUALITY.md").is_file():
         return []
     sys.path.append(str(_SKILLS / "dd-bug-resolution" / "scripts"))  # a skill-level dependency
-    import _bugs_balance as balance
-    import _bugs_quality as quality_block
+    import _bugs_quality as quality
 
-    held = balance.stored(quality.read_text(encoding="utf-8"))
-    bugs = _SKILLS / "dd-bug-resolution" / "scripts" / "bugs.py"
-    fix = f"{script(bugs)} balance --write --specs {quote(str(specs))}"
     try:
-        stale = held is not None and held != quality_block.body(specs)
-        why = "the `## Bugs` block differs from its regeneration"
+        stale, why = quality.stale(specs), "the `## Bugs` block differs from its regeneration"
     except (OSError, ValueError, LookupError, subprocess.CalledProcessError) as error:
         stale, why = True, f"the `## Bugs` block cannot be regenerated: {error}"
+    bugs = _SKILLS / "dd-bug-resolution" / "scripts" / "bugs.py"
+    fix = f"{script(bugs)} balance --write --specs {quote(str(specs))}"
     return [finding("memory/QUALITY.md", 1, why, fix)] if stale else []
 
 
