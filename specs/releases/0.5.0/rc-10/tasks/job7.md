@@ -47,9 +47,9 @@ Paths are relative to the repo root; aliases as in `PLAN.md` (`f/`, `pub/`, `S/`
 
 | task | AC | `W:` | owner tests / RED |
 |---|---|---|---|
-| J7.S4.T1 | AC7.1, AC7.2 | `tests/public/**` (moved from today's tiers) | moved files |
-| J7.S4.T2 | AC7.1, AC7.2 | `tests/scripts/**`, `tests/fixtures/test_*.py`, `tests/fixtures/statement_ids.json` (moved from today's tiers); `tests/contract/README.md` deleted | moved files |
-| J7.S4.T3 | AC7.1 | `scripts/guards/suite.py` (`statement_ids.json` path), `pub/data/CONTEXT-MAP.md` (`:5`), `specs/memory/**` (the `tests/...` citations), `pub/scaffold/memory/QUALITY.md` (`:20-21`, ADR 0167), the source comments naming a moved test (`f/specs/canon.py`, `f/specs/doctor.py`, `core/spec_status.py`, `core/release_state.py`, `core/doctor_rules.py`, `infrastructure/runtime_transforms/codex_assets.py`, `f/specs/citations.py`) (path literals of moved files) | guard plants |
+| J7.S4.T1 | AC7.1, AC7.2 | `tests/public/**` (moved from today's tiers); `scripts/guards/slop.py` (the three `parity:` pins naming a skill-script test), `tests/core/test_workspace_layout__zone_registry.py` (its `_PARITY` string equals the `_ledger.py` pin) | moved files |
+| J7.S4.T2 | AC7.1, AC7.2 | `tests/scripts/**`, `tests/fixtures/test_*.py`, `tests/fixtures/statement_ids.json` (moved from today's tiers); `tests/contract/README.md` deleted; the planted tests of `tests/scripts/test_ci.py` drop their transitional `unit` marker | moved files |
+| J7.S4.T3 | AC7.1 | `pyproject.toml` (the `unit`, `contract`, `integration` aliases leave with the last move), `tests/contract/test_docs_derived_from_memory.py` (its alias marker line), `scripts/guards/suite.py` (`statement_ids.json` path), `pub/data/CONTEXT-MAP.md` (`:5`), `specs/memory/**` (the `tests/...` citations), `pub/scaffold/memory/QUALITY.md` (`:20-21`, ADR 0167), the source comments naming a moved test (`f/specs/canon.py`, `f/specs/doctor.py`, `core/spec_status.py`, `core/release_state.py`, `core/doctor_rules.py`, `infrastructure/runtime_transforms/codex_assets.py`, `f/specs/citations.py`) (path literals of moved files) | guard plants |
 
 ## Stage J7.S5 — the mirror guard; close
 
