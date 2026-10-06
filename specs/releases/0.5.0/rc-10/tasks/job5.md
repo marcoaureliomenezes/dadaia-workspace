@@ -26,3 +26,5 @@ Paths are relative to the repo root; aliases as in `PLAN.md` (`f/`, `pub/`, `S/`
 | J5.S2.T4 | AC5.1 | `tests/unit/features/spec_context/test_hooks_drift.py`, this file | redo of the strengthening, path asserts compared as posix; unreadable arm; non-git repo listed before a drifted one |
 | J5.S2.T5 | — | `specs/bugs/BUGS.jsonl` | register `hook-unreadable-fix-line-crashes-installer` (reviewer-reproduced, rc bug batch) |
 | J5.S2.T6 | — | this file | close task, last: `test-audit:`, `mutation:`; then `done` |
+
+- done: Job 5 — every task landed on `wt/0.5.0-rc10/job5` through its task merge: J5.S1.T1 a6f22bbff; J5.S1.T2 0bef7dff0; J5.S2.T1 f1ed96c36; J5.S2.T3 9e807b5a2 (revert of 461adb7d6); J5.S2.T4 d8605dba0; J5.S2.T5 bug report; closed by J5.S2.T6.
