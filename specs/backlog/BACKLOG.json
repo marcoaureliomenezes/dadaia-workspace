@@ -453,6 +453,15 @@
       "description": "Found in rc-9: worktree.py merge filters deleted paths (git diff --diff-filter=d) before calling the verify-task line, but scripts/ci.py task FILE... passes every argument to ruff and mypy, so the same gate run by hand with a deleted path fails on a missing file. Two deciders of 'which touched paths a task gate judges'. Design: scripts/ci.py _task keeps only existing files, one filter; worktree.py's --diff-filter=d then leaves (the gate decides, the caller passes what the task touched). Owner: scripts/ci.py _task, dd-gitflow-default/scripts/_worktree_end.py merge, tests/integration/test_ci_script.py. Done when: scripts/ci.py task <a deleted path> <an existing test> runs the existing file's steps and exits 0.",
       "provenance": "rc-9 Reconciliation deferral (JR.S2.T5), dispatched by the main thread 2026-10-06 under the operator's rc-9 scope; target rc-10 or later",
       "relates": []
+    },
+    {
+      "id": "release-new-adopts-a-drafted-next-rc",
+      "title": "release.py new adopts the rc N+1 SPEC drafted in a define tree while rc N implements",
+      "opened": "2026-10-06",
+      "status": "idea",
+      "description": "Found in rc-9: the releases law says rc N+1 is drafted in a define tree while rc N implements and enters by release.py new at rc N's CLOSURE (specs/releases/AGENTS.md \u00a72, ADR 0201), but new mints a fresh rc-<N+1>/SPEC.md stub and refuses before CLOSURE, and a hand-drafted rc-<N+1>/SPEC.md on the work branch would become the live candidate (the highest rc-<N>/) while rc N still implements. Design: release.py new at rc N's CLOSURE adopts an existing Draft rc-<N+1>/SPEC.md (its Origin and Bug window head judged as for a stub), writing only the birth note and the phase; the live-candidate reader skips a Draft rc above an IMPLEMENTATION candidate until new adopts it, one rule in _release_store.live_ids and core/gitflow's pinned twin; ADR 0199 (a Draft rc-<N+1> does not move found_in) already covers the ledger side. Done when: rc-10 drafted during rc-9's IMPLEMENTATION enters by new at rc-9's CLOSURE with its draft kept byte for byte.",
+      "provenance": "rc-9 Reconciliation deferral (JR.S2.T5), dispatched by the main thread 2026-10-06 under the operator's rc-9 scope; target rc-10 or later",
+      "relates": []
     }
   ]
 }
