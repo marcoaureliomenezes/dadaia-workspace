@@ -660,6 +660,22 @@
         "devin-subagent-projection",
         "audit-scorecard-cycle"
       ]
+    },
+    {
+      "id": "law-one-home-per-rule",
+      "title": "Each rule lives in one home; the ADR ledger keeps only architectural decisions",
+      "opened": "2026-10-06",
+      "status": "idea",
+      "description": "Operator, 2026-10-06 (relayed by the main thread): 'Se tudo \u00e9 ADR nada \u00e9 ADR'. Measured: the assert rule says never at AGENTS.md:21, dd-bug-resolution SKILL.md:55, dd-code-review SKILL.md:76 and allow at dd-bug-resolution SKILL.md:64 and specs/releases/AGENTS.md:35, against accepted ADR 0209 (the contradiction is the registered bug bug-resolution-law-prescribes-rewriting-asserts, rc-10 batch); ADRs 0149 and 0194 are both accepted and disagree (PLAN says max 2 agents, TASK_CAP=5) - a verifier proposes supersede 0149, TASK_CAP=2, delete the PLAN restatement (unruled); RC-FLOW.md:30 says strict xfail, pyproject.toml:119 has no xfail_strict; the reviewer agent file says 'candidate close' (:3, :55); skills still cite reservations (dd-release-implementation/SKILL.md:4,17,25; CONTEXT-ENGINEERING.md:94). Design: each rule is stated in exactly one scoped file and cited elsewhere; the ADR 0151 law-deletion check stops demanding an ADR per changed law line. Absorbed (each exits rejected 'absorbed by law-one-home-per-rule'; full text stays in the histo): (a) adr-born-at-release-with-options - an ADR is born only in dd-release-definition through dd-ask-me references/adr.md, past a three-leg threshold (one-way door; an architecturally significant criterion; >=2 genuine options), with options[{name, tradeoff, rejected_because}] (min 2) and ruling.words carrying question and chosen option; decisions.jsonl leaves the backlog kind's allowed set and its gitflow row. (b) adr-ledger-triage-process-rules - one pass: 36 process rules and 14 spent rulings move to their scoped AGENTS.md and one consolidated ADR supersedes them; the 5 principles on rejected ADRs are re-judged; each remaining measured_by resolves to an executable check. (c) adr-0193-records-its-amends - 0193's accepted record carries amends: null though it amends 0152 (2); the operator rules a new amending record or a wider 0138 repair lane. Placement: rc-11 ('lei com uma casa por regra'). Placement and every design detail not quoted from a ruling are agent default, unruled.",
+      "provenance": "audit verification 2026-10-06 over feature/0.5.0 8e6448f13 (four read-only verifiers); main-thread registration after the operator grill of 2026-10-06",
+      "relates": [
+        "adr-born-at-release-with-options",
+        "adr-ledger-triage-process-rules",
+        "adr-0193-records-its-amends",
+        "job-gate-runs-the-law-deletion-check",
+        "dd-ask-me-owned-questioning-skill",
+        "architecture-adr-section-generated"
+      ]
     }
   ]
 }
