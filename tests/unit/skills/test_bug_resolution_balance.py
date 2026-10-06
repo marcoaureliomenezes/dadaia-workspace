@@ -82,6 +82,8 @@ def test_a_literal_ledger_renders_a_literal_block_and_a_rerun_is_byte_equal() ->
         ([1, 2, 3], "u = -1.80, no trend"),
         ([1, 1, 1, 1], "u = -2.77, converging"),
         ([9, 9, 9, 9], "u = 2.77, diverging"),
+        ([1, 1, 1, 3, 4, 5, 5], "u = -1.96, converging"),
+        ([9, 9, 9, 7, 6, 5, 5], "u = 1.96, diverging"),
         ([], "u = n/a, no data"),
     ],
 )
@@ -95,6 +97,27 @@ def test_the_laplace_trend_reads_days_against_the_window_length(
 
     [trend] = [ln for ln in block.splitlines() if ln.startswith("Laplace")]
     assert trend.endswith(f"T = 10 days: {reading}")
+
+
+def test_a_record_is_counted_on_a_settled_surface_once_the_previous_one_left_the_bug_window() -> (
+    None
+):
+    bal = _balance()
+    order = [f"0.4.{n}" for n in range(1, 8)]  # the trend window is the last four: 0.4.4-0.4.7
+    #: (surface, release index), oldest first: a and d and e settle (a gap of 2 or more landing
+    #: in the window), b has a gap of 1, c a gap of 2 landing before the window
+    found = [("a", 3), ("a", 5), ("b", 4), ("b", 5), ("c", 0), ("c", 2), ("d", 3), ("d", 6)]
+    found += [
+        ("e", 1),
+        ("e", 3),
+        ("unknown", 3),
+        ("unknown", 6),
+    ]  # an unknown surface never settles
+    live = [_bug(s, 1 + i, (order[n], "rc-1")) for i, (s, n) in enumerate(found)]
+
+    block = bal.render(live, [], bal.Window(order, _START, _END), frozenset())
+
+    assert "  records found on an already settled surface: 3" in block.splitlines()
 
 
 def test_the_block_is_set_under_bugs_and_the_section_is_appended_when_absent() -> None:
