@@ -237,24 +237,24 @@ pycparser = {version = "*", markers = "implementation_name != \"PyPy\""}
 
 [[package]]
 name = "claude-agent-sdk"
-version = "0.2.132"
+version = "0.2.163"
 description = "Python SDK for Claude Code"
 optional = true
 python-versions = ">=3.10"
 groups = ["main"]
 markers = "extra == \"claude-sdk\""
 files = [
-    {file = "claude_agent_sdk-0.2.132-py3-none-macosx_11_0_arm64.whl", hash = "sha256:9162fd2675f366d376529b017fdff6dc522658f88c5f3c49afdd45d77228a4ef"},
-    {file = "claude_agent_sdk-0.2.132-py3-none-macosx_11_0_x86_64.whl", hash = "sha256:1465ca52437921be79dfe1a4e5e1d35a2f850d5dbe5025256729de9befa7a62b"},
-    {file = "claude_agent_sdk-0.2.132-py3-none-manylinux_2_17_aarch64.whl", hash = "sha256:cd13af6ee4240b48fb01831a41248f57f3c83d235f218704f9a14e8c29af8a61"},
-    {file = "claude_agent_sdk-0.2.132-py3-none-manylinux_2_17_x86_64.whl", hash = "sha256:a1085b8be7fcda441cfb1c86966e008ba72d4d2f6e20da5466bebb15c4765b55"},
-    {file = "claude_agent_sdk-0.2.132-py3-none-win_amd64.whl", hash = "sha256:4860d059b89d0394acce8a7e767ea1b2da4fa73c07cf5c0ccdd86aa7ad5173ba"},
-    {file = "claude_agent_sdk-0.2.132.tar.gz", hash = "sha256:efc54a6fac96232105a40b6aed870a482dea221151a3b3356c5c514a5844cf7f"},
+    {file = "claude_agent_sdk-0.2.163-py3-none-macosx_11_0_arm64.whl", hash = "sha256:b025dcc3f9c52779bcd9e9c088b1a587d96afbffb8355b5d3053850796735ede"},
+    {file = "claude_agent_sdk-0.2.163-py3-none-macosx_11_0_x86_64.whl", hash = "sha256:e10d48657f01cc53801cdd8ec3d0a6c8c680b82da083da42493f82feb99d04e6"},
+    {file = "claude_agent_sdk-0.2.163-py3-none-manylinux_2_17_aarch64.whl", hash = "sha256:e3be00eeb9fc156a3308a2e8fb58390768fdcb2ff16683fac385b4d98e99233c"},
+    {file = "claude_agent_sdk-0.2.163-py3-none-manylinux_2_17_x86_64.whl", hash = "sha256:260cb955d237b7e1897f1dbf9ee5efbf815d8622d0c7459a05409c56432d8501"},
+    {file = "claude_agent_sdk-0.2.163.tar.gz", hash = "sha256:269821ad5acff5967522ff15f444b0598840fd9bdc45c645de569a5478061a53"},
 ]
 
 [package.dependencies]
 anyio = ">=4.0.0"
-mcp = ">=1.23.0,<2.0.0"
+jsonschema = ">=4.20.0"
+mcp = ">=1.23.0,<3.0.0"
 sniffio = ">=1.0.0"
 
 [package.extras]
@@ -1714,9 +1714,10 @@ windows-terminal = ["colorama (>=0.4.6)"]
 name = "pyjwt"
 version = "2.15.0"
 description = "JSON Web Token implementation in Python"
-optional = false
+optional = true
 python-versions = ">=3.9"
 groups = ["main"]
+markers = "extra == \"claude-sdk\""
 files = [
     {file = "pyjwt-2.15.0-py3-none-any.whl", hash = "sha256:7a3742debf6b879e912dbb9819ceec1594be812452b78c5f2e2dfc56564954f8"},
     {file = "pyjwt-2.15.0.tar.gz", hash = "sha256:b11c5f9791d7bf51c2b39a81ed669f6b2dbbd669df2942f6c60167e9e3d1abe4"},
