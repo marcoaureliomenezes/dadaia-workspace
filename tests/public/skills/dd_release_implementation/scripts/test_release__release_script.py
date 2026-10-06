@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import json
 import re
+import shlex
 import shutil
 import subprocess
 import sys
@@ -675,6 +676,7 @@ def test_the_closure_check_judges_only_a_block_it_can_regenerate(
     assert rows[0]["fix"].endswith("BUGS.jsonl")
 
 
+@pytest.mark.xfail(strict=True, reason="JB.S1 RED: release-check-fallback-fix-line-drops-specs")
 def test_the_closure_check_names_a_verb_that_died_outside_its_refusal(
     script: Path, tmp_path: Path
 ) -> None:
@@ -690,4 +692,24 @@ def test_the_closure_check_names_a_verb_that_died_outside_its_refusal(
 
     assert [r["message"] for r in rows] == ["`bugs.py balance --check` exited 1"]
     assert rows[0]["fix"].startswith("Operator action: run `")
-    assert rows[0]["fix"].endswith(" balance --check` and read its output")
+    assert rows[0]["fix"].endswith(
+        f" balance --check --specs {shlex.quote(str(specs))}` and read its output"
+    )
+
+
+@pytest.mark.xfail(strict=True, reason="JB.S1 RED: release-check-fallback-fix-line-drops-specs")
+def test_the_closure_check_never_pairs_a_callee_message_with_a_fix_it_did_not_print(
+    script: Path, tmp_path: Path
+) -> None:
+    _balance_tree(tmp_path, [])
+    specs = tmp_path / "specs"
+    quality = specs / "memory" / "QUALITY.md"
+    quality.parent.mkdir()
+    quality.write_text("# Quality\n\n## Bugs\n\n```text\nany\n```\n", "utf-8")
+    broken = tmp_path / "skills" / "dd-bug-resolution" / "scripts" / "_bugs_quality.py"
+    broken.write_text("import sys\nsys.exit('[error] half a refusal')\n", "utf-8")
+
+    rows = _quality_rows(script, specs, "CLOSURE")
+
+    assert [r["message"] for r in rows] == ["`bugs.py balance --check` exited 1"]
+    assert rows[0]["fix"].startswith("Operator action: run `")
