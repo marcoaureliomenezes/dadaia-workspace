@@ -50,7 +50,8 @@ def _origin(tmp: Path) -> Path:
     (release / "rc-1").mkdir(parents=True)
     for name in ("SPEC.md", "PLAN.md", "TASKS.md"):
         (release / "rc-1" / name).write_text(
-            f"# x\n\n{PLAN if name == 'PLAN.md' else '**Origin:** operator-demand'}",
+            f"# x\n\n{PLAN if name == 'PLAN.md' else '**Origin:** operator-demand'}"
+            + ("\n\n## Bug window review\n" if name == "SPEC.md" else ""),
             "utf-8",
         )
     ts = "2026-01-01T00:00:00Z"

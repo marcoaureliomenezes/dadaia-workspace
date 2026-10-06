@@ -54,6 +54,7 @@ def make_workspace(root: Path) -> Path:
     for doc in ("SPEC", "PLAN", "TASKS"):
         (rel / f"{doc}.md").write_text(
             f"# {doc}\n\n**Status:** Approved\n\n**Origin:** operator-demand\n"
+            + ("\n## Bug window review\n" if doc == "SPEC" else "")
         )
     state = {"schema": "release-state-v1", "release": "0.5.0", "phase": "DEFINITION",
              "defined": None, "implemented": None, "shipped": None, "log": []}  # fmt: skip

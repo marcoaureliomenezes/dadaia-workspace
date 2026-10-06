@@ -48,7 +48,7 @@ def _specs(tmp_path: Path, plan: str, *, plan_status: str = "Approved") -> Path:
     release = specs / "releases" / "0.5.0"
     (release / "rc-1").mkdir(parents=True)
     for name, body in (
-        ("SPEC.md", "**Origin:** operator-demand\n"),
+        ("SPEC.md", "**Origin:** operator-demand\n\n## Bug window review\n"),
         ("PLAN.md", plan),
     ):
         status = plan_status if name == "PLAN.md" else "Approved"
