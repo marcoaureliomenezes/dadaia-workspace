@@ -444,6 +444,15 @@
       "relates": [
         "hypothesis-cache-stays-out-of-repo-trees"
       ]
+    },
+    {
+      "id": "task-gate-drops-deleted-paths-itself",
+      "title": "scripts/ci.py task drops paths that no longer exist, so a hand-run task gate over a deletion is green",
+      "opened": "2026-10-06",
+      "status": "idea",
+      "description": "Found in rc-9: worktree.py merge filters deleted paths (git diff --diff-filter=d) before calling the verify-task line, but scripts/ci.py task FILE... passes every argument to ruff and mypy, so the same gate run by hand with a deleted path fails on a missing file. Two deciders of 'which touched paths a task gate judges'. Design: scripts/ci.py _task keeps only existing files, one filter; worktree.py's --diff-filter=d then leaves (the gate decides, the caller passes what the task touched). Owner: scripts/ci.py _task, dd-gitflow-default/scripts/_worktree_end.py merge, tests/integration/test_ci_script.py. Done when: scripts/ci.py task <a deleted path> <an existing test> runs the existing file's steps and exits 0.",
+      "provenance": "rc-9 Reconciliation deferral (JR.S2.T5), dispatched by the main thread 2026-10-06 under the operator's rc-9 scope; target rc-10 or later",
+      "relates": []
     }
   ]
 }
