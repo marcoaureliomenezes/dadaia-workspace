@@ -5,7 +5,7 @@ the terms are defined in [concepts](concepts.md) and in [`CONTEXT.md`](../CONTEX
 
 ## Install
 
-<!-- derived-from: pypi-distribution sha256:1b31683b6fb3 -->
+<!-- derived-from: pypi-distribution sha256:a97f549efcdb -->
 <!-- derived-from: workspace-init sha256:4f0ceaccc6c8 -->
 
 ```bash
@@ -124,9 +124,9 @@ zone class, an OUTPUT entry held, an EPHEMERAL one deleted.
 
 ## Run the first candidate
 
-<!-- derived-from: release-lifecycle sha256:f91b7bdd7b3c -->
+<!-- derived-from: release-lifecycle sha256:e94a43f4bb88 -->
 <!-- derived-from: backlog-ledger sha256:0e13883cee01 -->
-<!-- derived-from: bug-ledger sha256:208c07532adb -->
+<!-- derived-from: bug-ledger sha256:82e190636c15 -->
 
 A candidate is one closed-scope cycle inside the live release. Nothing drives it: the
 documents are the state, the ledger scripts move the records, and the job files and

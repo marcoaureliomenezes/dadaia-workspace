@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-10-06T01:52:43Z",
+  "generated_at": "2026-10-06T12:40:40Z",
   "features": [
     {
       "rank": 1,
@@ -150,7 +150,7 @@
         "release",
         "packaging"
       ],
-      "token_estimate": 938,
+      "token_estimate": 984,
       "depends_on": [
         "release-lifecycle",
         "QUALITY",
@@ -765,7 +765,7 @@
         "ledger",
         "governance"
       ],
-      "token_estimate": 1878,
+      "token_estimate": 1921,
       "depends_on": [
         "sdd-gate-v3",
         "workspace-doctor",
@@ -799,7 +799,7 @@
         "memory",
         "as-is-review"
       ],
-      "token_estimate": 2709,
+      "token_estimate": 2773,
       "depends_on": [
         "sdd-gate-v3",
         "specs-migration",
@@ -869,7 +869,7 @@
       "title": "worktrees",
       "area": "sdd",
       "tldr": "Every agent change to a repo is made in a canonical worktree — a job, a task, define, reconcile or backlog — and lands by worktree.py merge after its gate.",
-      "summary": "Canonical worktrees nested in a folder per candidate, worktrees/<repo>/<M.m.p>-rc<N>/{define,reconcile,<job>,<job>--<task-id>} plus worktrees/<repo>/backlog/<slug>, each on the wt/ branch of the same name; one name grammar and one path reader; worktree.py new, stage, merge, clean and list, stdlib and read from git alone; three gate levels — a task fast-forwards onto its job branch after its verify-task line, a stage closes on its verify-stage line, a job lands on the work branch with an APPROVED verdict carrying its CI run and its verify line run as argv — and the holds that keep closure and context dead waiting while one is open.",
+      "summary": "Canonical worktrees nested in a folder per candidate, worktrees/<repo>/<M.m.p>-rc<N>/{define,reconcile,<job>,<job>--<task-id>} plus worktrees/<repo>/backlog/<slug>, each on the wt/ branch of the same name; one name grammar and one path reader; worktree.py new, stage, merge, clean and list, stdlib and read from git alone; three gate levels, each judged by a line of the work branch's AGENTS.md — a task fast-forwards onto its job branch after the verify-task line, a stage closes on the verify-stage line, a job lands on the work branch with an APPROVED verdict carrying its CI run and the verify line run as argv — and the holds that keep closure and context dead waiting while one is open.",
       "path": "specs/memory/product/sdd/worktrees.md",
       "tags": [
         "worktrees",
@@ -878,7 +878,7 @@
         "merge",
         "review"
       ],
-      "token_estimate": 1496,
+      "token_estimate": 1555,
       "depends_on": [
         "sdd-gate-v3",
         "public-asset-distribution",

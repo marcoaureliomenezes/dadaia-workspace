@@ -7,7 +7,7 @@ live. Terms are defined in [concepts](concepts.md); the long walkthrough is
 
 ## 1. The three levels in one block
 
-<!-- derived-from: pypi-distribution sha256:1b31683b6fb3 -->
+<!-- derived-from: pypi-distribution sha256:a97f549efcdb -->
 <!-- derived-from: workspace-init sha256:4f0ceaccc6c8 -->
 
 Set `REPO_URL` to your repository's clone URL; everything else runs as printed (needs
@@ -118,7 +118,7 @@ worktree.
 
 ## 6. The first release
 
-<!-- derived-from: release-lifecycle sha256:f91b7bdd7b3c -->
+<!-- derived-from: release-lifecycle sha256:e94a43f4bb88 -->
 
 `release.py new` is one birth act, all or nothing: a `SPEC.md` stub in
 `specs/releases/<id>/rc-1/` plus `_RELEASE.json` in `DEFINITION` at the release root, refusing a second live

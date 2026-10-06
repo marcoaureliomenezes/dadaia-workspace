@@ -28,7 +28,7 @@ memory injection into the session.
 
 ## Release and candidate
 
-<!-- derived-from: release-lifecycle sha256:f91b7bdd7b3c -->
+<!-- derived-from: release-lifecycle sha256:e94a43f4bb88 -->
 
 Exactly one *release* is live, `specs/releases/<M.m.p>/`, with open scope; it grows by
 *candidates*, each a closed-scope cycle whose `SPEC.md`, `PLAN.md` and job files `tasks/<job>.md` sit
@@ -41,8 +41,8 @@ moves only at an operator-approved deploy.
 
 ## The flow
 
-<!-- derived-from: release-lifecycle sha256:f91b7bdd7b3c -->
-<!-- derived-from: bug-ledger sha256:208c07532adb -->
+<!-- derived-from: release-lifecycle sha256:e94a43f4bb88 -->
+<!-- derived-from: bug-ledger sha256:82e190636c15 -->
 <!-- derived-from: audits-canon sha256:361bf3cb94c9 -->
 
 Every demand takes one of two arms. **Arm A**, a feature, leaves through a candidate:
@@ -73,7 +73,7 @@ gate — a refusal whose fix is itself refused (a Stall) cannot ship.
 
 <!-- derived-from: context-management sha256:2d908837d9f6 -->
 <!-- derived-from: workspace-doctor sha256:8b2f7d91f08a -->
-<!-- derived-from: release-lifecycle sha256:f91b7bdd7b3c -->
+<!-- derived-from: release-lifecycle sha256:e94a43f4bb88 -->
 <!-- derived-from: audits-canon sha256:361bf3cb94c9 -->
 
 *Memory* is current product truth: the atoms under `specs/memory/product/**`, plus
@@ -91,7 +91,7 @@ the warnings `MEM-DRIFT-1` (features package map vs the live tree) and `MEM-DRIF
 
 ## Bugs and backlog
 
-<!-- derived-from: bug-ledger sha256:208c07532adb -->
+<!-- derived-from: bug-ledger sha256:82e190636c15 -->
 <!-- derived-from: backlog-ledger sha256:0e13883cee01 -->
 
 Both are records with one shape and one writer script. `specs/bugs/BUGS.jsonl` holds
