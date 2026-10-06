@@ -12,7 +12,7 @@ from pathlib import Path
 
 import pytest
 
-from tests.helpers.worktree_ws import JOB, TASK, associate, make_workspace
+from tests.helpers.worktree_ws import JOB, TASK, approve, associate, commit, make_workspace
 from tests.helpers.worktree_ws import fixes as _fixes
 from tests.helpers.worktree_ws import git as _git
 from tests.helpers.worktree_ws import run as _run
@@ -134,3 +134,45 @@ def test_the_one_venv_imports_the_checkout_it_runs_from() -> None:
     )  # fmt: skip
     assert Path(child.stdout.strip()).resolve().is_relative_to(checkout)
     assert not (checkout / ".venv").exists()
+
+
+def _bug_record(root: Path, status: str | None) -> None:
+    """Work branch `feature/0.5.0` carries no rc and *status*'s one bug record (`None`: none)."""
+    repo = root / "repos/r"
+    _git(repo, "checkout", "-q", "feature/0.5.0")
+    _git(repo, "rm", "-rq", "specs/releases")
+    if status:
+        commit(repo, "specs/bugs/BUGS.jsonl", f'{{"id": "a-block-bug", "status": "{status}"}}\n')
+    _git(repo, "commit", "-qm", "no rc", "--allow-empty")
+
+
+@pytest.mark.xfail(strict=True, reason="JB.S3 RED: hotfix job without an rc SPEC")
+def test_a_hotfix_job_opens_with_no_rc_and_lands_on_the_work_branch(root: Path) -> None:
+    """ADR 0206: a block-list bug is fixed as its own job — `new <repo> hotfix/<bug-id>` cuts it
+    from the work branch with no rc SPEC, and its merge runs the same review and job gate."""
+    _bug_record(root, "open")
+    repo, name = root / "repos/r", "hotfix/a-block-bug"
+    opened = _run(root, "new", "r", name)
+    assert (opened.returncode, opened.stdout) == (0, f"[ok] {root}/worktrees/r/{name}\n")
+    assert _git(repo, "rev-parse", "wt/" + name) == _git(repo, "rev-parse", "feature/0.5.0")
+    assert f"locked dadaia:{name}" in _git(repo, "worktree", "list", "--porcelain").splitlines()
+    tree = root / "worktrees/r" / name
+    approve(root, commit(tree, "src/fix.py"))
+    landed = _run(root, "merge", str(tree))
+    assert landed.returncode == 0, landed.stderr
+    assert (repo / "src/fix.py").is_file() and not tree.exists()
+
+
+@pytest.mark.xfail(strict=True, reason="JB.S3 RED: hotfix job without an rc SPEC")
+@pytest.mark.parametrize("status", [None, "resolved"], ids=["no-record", "resolved"])
+def test_a_hotfix_job_needs_its_open_bug_record_on_the_work_branch(
+    root: Path, status: str | None
+) -> None:
+    _bug_record(root, status)
+    refused = _run(root, "new", "r", "hotfix/a-block-bug")
+    assert refused.returncode == 1 and "a-block-bug" in refused.stderr
+    assert _fixes(refused) == [
+        "fix: Operator action: register bug a-block-bug on feature/0.5.0 as open"
+        " (dd-bug-registration), then open its hotfix job again"
+    ]
+    assert not (root / "worktrees/r/hotfix").exists()
