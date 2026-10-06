@@ -32,10 +32,6 @@ from dadaia_workspace.infrastructure.git_subprocess import GitSubprocessClient
 from tests.fixtures.harness_env import claude_hook_env, run_hook_subprocess
 from tests.fixtures.stores import context_store
 
-_RED_ROOT = pytest.mark.xfail(
-    strict=True, reason="JB.S1 RED: root-allows-git-and-gitignore-though-root-is-never-a-repo"
-)
-
 #: Context names differ from their repo slugs: ``repos/`` and ``worktrees/`` admit slugs only.
 REGISTRY = json.dumps({"contexts": [
     {"name": "alpha", "state": "ALIVE", "repo_slug": "main-r", "associated_repos": [{"slug": "assoc-r"}]},
@@ -57,7 +53,6 @@ def _run(tmp_path: Path, payload: dict[str, Any]) -> tuple[str, dict[str, Any] |
     return result.stdout, result.block_envelope()
 
 
-@_RED_ROOT
 def test_block_message_lists_every_whitelisted_entry(tmp_path: Path) -> None:
     """sa-gate-allows-root-entries-the-reaper-moves#E1, #E7: the block names every root
     entry the law admits, and neither its text nor its fix points the agent at the
@@ -103,10 +98,8 @@ def test_law_declared_root_files_are_canon_for_the_hook_and_the_doctor(
         pytest.param("junk.txt", "", REGISTRY, False, id="root-stray"),
         pytest.param("shot.png", "*.png\n", REGISTRY, True, id="root-globbed"),
         pytest.param(".opencode/agents/foo.md", "", REGISTRY, False, id="root-stray-nested"),
-        pytest.param(".gitignore", "", REGISTRY, False, id="root-gitignore-is-no-canon",
-                     marks=_RED_ROOT),
-        pytest.param(".git/info/exclude", "", REGISTRY, False, id="root-git-dir-is-no-canon",
-                     marks=_RED_ROOT),
+        pytest.param(".gitignore", "", REGISTRY, False, id="root-gitignore-is-no-canon"),
+        pytest.param(".git/info/exclude", "", REGISTRY, False, id="root-git-dir-is-no-canon"),
         pytest.param(".gitignore", ".gitignore\n", REGISTRY, True, id="root-gitignore-globbed"),
         pytest.param(".playwright-mcp/x.log", ".playwright-mcp/\n", REGISTRY, True, id="root-globbed-dir"),
         pytest.param(".dadaia/junk.txt", "*.txt\n", REGISTRY, False, id="dadaia-stray"),
