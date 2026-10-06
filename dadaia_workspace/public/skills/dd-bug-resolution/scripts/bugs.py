@@ -192,7 +192,7 @@ def _read(args: argparse.Namespace, specs: Path) -> int:
             print(f"{bug}\t{','.join(fix.commits)}\t{fx.direction(fix)}")
             for row in (r for rows in fix.commits.values() for r in rows):
                 print("\t" + "\t".join(row))
-            rework, last = fix.later()
+            rework, last = fix.rework()
             if rework:
                 print(f"\trework\t{rework['planned']} planned, {rework['overfitting']} overfitting")
             if born:  # Terms: settled once 2 candidates were born with the surface untouched

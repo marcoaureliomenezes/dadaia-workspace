@@ -46,7 +46,7 @@ NOT_PRODUCTION = ("tests/", "specs/")
 class Fix(NamedTuple):
     commits: dict[str, list[list[str]]]  # full sha -> numstat rows, newest link first
     surface: set[str]  # the production paths those commits wrote
-    later: Callable[
+    rework: Callable[
         [], tuple[Counter[str], int]
     ]  # rework by class, unix time of the last touch: blames, so read on demand
 
@@ -174,7 +174,7 @@ def fixes(specs: Path) -> dict[str, Fix]:
         hot = tuple(sorted({x[2] for x in by_sha[sha].rows} & prod))
         return removed(top, (f"{sha}^", sha), f"{sha}^", squashes(), NOT_PRODUCTION, hot) if hot else set()  # fmt: skip
 
-    def later(
+    def rework_reader(
         shas: list[str], surfaces: dict[str, set[str]]
     ) -> Callable[[], tuple[Counter[str], int]]:
         def read() -> tuple[Counter[str], int]:  # blames: only the verb that prints rework pays
@@ -191,7 +191,7 @@ def fixes(specs: Path) -> dict[str, Fix]:
         found[bug] = Fix(
             {s: by_sha[s].rows for s in shas},
             set().union(*surfaces.values()),
-            later(shas, surfaces),
+            rework_reader(shas, surfaces),
         )
     return found
 
