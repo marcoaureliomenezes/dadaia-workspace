@@ -257,6 +257,8 @@ def test_a_missing_specs_tree_is_refused_never_created(
     (cli := tmp_path / ".dadaia/.venv/bin/dadaia").parent.mkdir(parents=True)
     cli.write_text(f'#!{sys.executable}\nprint(\'{{"main_repo": "demo"}}\')\n', "utf-8")
     cli.chmod(0o755)
+    (tmp_path / ".dadaia/states").mkdir()  # a workspace root holds its sentinel
+    (tmp_path / ".dadaia/states/spec_contexts.json").write_text("{}")
     (tmp_path / ".git").mkdir()
     stage_skill_scripts("dd-gitflow-default", tmp_path / "dd-gitflow-default" / "scripts")
     for name in trees:

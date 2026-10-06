@@ -23,7 +23,7 @@ from _release_schema import (  # noqa: E402
     utc_now,
 )
 from _release_store import SCRIPT, Live, Refusal, State, commit, live_release  # noqa: E402
-from _specs import choice  # noqa: E402
+from _specs import choice, workspace_root  # noqa: E402
 
 #: DEFINITION is `new`'s; each later phase has one predecessor (out-of-order = re-run).
 PREDECESSOR = {"IMPLEMENTATION": "DEFINITION", "CLOSURE": "IMPLEMENTATION"}
@@ -54,8 +54,7 @@ def _refuse_unapproved_docs(live: Live) -> Path:
 def _refuse_open_worktrees(specs: Path) -> None:
     """ADR 0128 (4): a candidate closes with every `wt/*` of its repo merged or cleaned — read
     from the owner's rows (imported, ADR 0135), sparing the tree closure runs from."""
-    marker = Path(".dadaia", "states", "spec_contexts.json")
-    root = next((d for d in (specs, *specs.parents) if (d / marker).is_file()), None)
+    root = workspace_root(specs)
     if root is None:  # no workspace holds this tree: there is no worktree to wait for
         return
     sys.path.append(str(Path(__file__).resolve().parents[2] / "dd-gitflow-default" / "scripts"))

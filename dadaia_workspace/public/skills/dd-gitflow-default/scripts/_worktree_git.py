@@ -15,7 +15,7 @@ from pathlib import Path
 sys.path.append(str(Path(__file__).resolve().parents[2] / "dd-bug-resolution" / "scripts"))
 
 from _specs import git_line as git_line  # noqa: E402
-from _specs import head  # noqa: E402
+from _specs import head, workspace_root  # noqa: E402
 from _specs import quote as quote  # noqa: E402  (`as`: re-exported to the worktree verbs)
 from _specs import script as script  # noqa: E402
 from _worktree_names import NAME_RE, SCRIPT, Refusal, base, branch, name_of  # noqa: E402
@@ -38,10 +38,8 @@ def git(repo: Path, *args: str, check: bool = True, input: str | None = None) ->
 
 def find_root() -> Path:
     """The workspace above the cwd, else above this script (it is projected inside one)."""
-    for start in (Path.cwd().resolve(), Path(__file__).resolve().parent):
-        for candidate in (start, *start.parents):
-            if (candidate / ".dadaia" / "states" / "spec_contexts.json").is_file():
-                return candidate
+    if root := workspace_root(Path.cwd().resolve(), Path(__file__).resolve().parent):
+        return root
     raise Refusal("no workspace root above the cwd or this script", "uvx dadaia-workspace init")
 
 

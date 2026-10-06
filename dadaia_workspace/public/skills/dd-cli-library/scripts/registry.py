@@ -22,6 +22,7 @@ from typing import Any
 sys.dont_write_bytecode = True  # the shared _ledger imports without a __pycache__
 sys.path.append(str(Path(__file__).resolve().parents[2] / "dd-bug-resolution" / "scripts"))
 from _ledger import replace  # noqa: E402
+from _specs import workspace_root  # noqa: E402
 
 DEFAULT_MIN_PORT = 3000
 DEFAULT_MAX_PORT = 3999
@@ -36,9 +37,8 @@ def _now() -> datetime:
 
 
 def find_registry(start: Path) -> Path:
-    for candidate in (start, *start.parents):
-        if (candidate / ".dadaia" / "states" / "spec_contexts.json").is_file():
-            return candidate / ".dadaia" / "states" / "server_registry.json"
+    if root := workspace_root(start):
+        return root / ".dadaia" / "states" / "server_registry.json"
     raise SystemExit("error: no workspace sentinel above the cwd; pass --registry <path>")
 
 

@@ -29,8 +29,18 @@ def find_specs(given: Path | None, *, ledger: str | None = None) -> Path:
     raise SystemExit(1)
 
 
+def workspace_root(*starts: Path) -> Path | None:
+    """The ONE skill-script walk: the first ancestor of any of *starts* holding
+    `.dadaia/states/spec_contexts.json`, never a root `DADAIA_FENCED_ROOTS` fences (ADR 0088)."""
+    fenced = {
+        Path(p).resolve() for p in os.environ.get("DADAIA_FENCED_ROOTS", "").split(os.pathsep) if p
+    }
+    return next((d for s in starts for d in (s, *s.parents) if d.resolve() not in fenced
+                 and (d / ".dadaia" / "states" / "spec_contexts.json").is_file()), None)  # fmt: skip
+
+
 def _bound_fix(here: Path, rerun: str, ledger: str | None) -> tuple[str, str]:
-    for root, venv in ((d, d / ".dadaia" / ".venv") for d in (here, *here.parents)):
+    for root, venv in ((d, d / ".dadaia" / ".venv") for d in filter(None, [workspace_root(here)])):
         if cli := shutil.which("dadaia", path=f"{venv / 'bin'}{os.pathsep}{venv / 'Scripts'}"):
             shown = subprocess.run(
                 [cli, "context", "show", "--json"], capture_output=True, text=True
