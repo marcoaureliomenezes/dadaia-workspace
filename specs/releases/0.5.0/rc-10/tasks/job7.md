@@ -62,9 +62,9 @@ Paths are relative to the repo root; aliases as in `PLAN.md` (`f/`, `pub/`, `S/`
 
 ## Stage J7.S6 — coverage over small and medium; close
 
-- Contract: exit: the stage gate (lint, mypy, guards, small) green; `ci.py contract-coverage` green at its 80 % bar; envelope `scripts/ci.py`, `tests/scripts/test_ci.py`, this file; ACs AC7.3
+- Contract: exit: the stage gate (lint, mypy, guards, small) green; `ci.py contract-coverage` green at its 80 % bar; envelope `scripts/ci.py`, this file; ACs AC7.3
 
 | task | AC | `W:` | owner tests / RED |
 |---|---|---|---|
-| J7.S6.T1 | AC7.3 | `scripts/ci.py` (`contract-coverage` selects `not e2e and not quarantine`: the 80 % bar measured 69.99 % over the small tier alone, so the job covers small and medium as the Windows and macOS legs do), `tests/scripts/test_ci.py` (the planted inner run drops the outer coverage session's `COV_CORE_*` and `COVERAGE_*` variables, which the medium tests now run under) | `tests/scripts/test_ci.py` |
+| J7.S6.T1 | AC7.3 | `scripts/ci.py` (`contract-coverage` selects `not e2e and not quarantine`: the 80 % bar measured 69.99 % over the small tier alone, so the job covers small and medium as the Windows and macOS legs do) | `tests/scripts/test_ci.py` |
 | J7.S6.T2 | — | this file | close task, last: `test-audit:` names `tests/fixtures/test_conftest_size.py` (moves otherwise, asserts unchanged), `mutation:`; `done` |
