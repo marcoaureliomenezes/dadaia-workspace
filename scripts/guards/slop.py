@@ -50,19 +50,19 @@ v37* public/skills/dd-release-implementation/scripts/_release_schema.py:CANDIDAT
 v37* public/skills/dd-release-implementation/scripts/_release_schema.py:candidate_dir parity:tests/contract/test_release_script.py
 v37* public/skills/dd-release-implementation/scripts/_release_schema.py:candidate_number parity:tests/contract/test_release_script.py
 v37* public/skills/dd-release-implementation/scripts/_release_schema.py:next_candidate parity:tests/contract/test_release_script.py
-v38* core/atomic_write.py:atomic_write parity:tests/unit/core/test_atomic_write.py
+v38* core/atomic_write.py:atomic_write parity:tests/core/test_atomic_write.py
 v38* public/skills/dd-bug-resolution/scripts/_ledger.py:replace parity:tests/unit/skills/test_ledger_write_verbs_refuse_with_the_pair_intact.py
-v38* features/certification/service.py:certify parity:tests/integration/features/certification/test_certify_journey.py
-v38* features/migrate/state_v2.py:execute_migration parity:tests/unit/features/migrate/test_state_v2.py
-v38* features/reconcile/service.py:_restore_state parity:tests/unit/features/reconcile/test_reconcile_service.py
-v38* features/specs/doctor_memory.py:fix_placeholder_atom parity:tests/unit/features/specs/test_scaffold_placeholder_repair.py
-v38* infrastructure/projection.py:_clear parity:tests/integration/test_install_ledger_reconciliation.py
-v38* infrastructure/public_assets.py:_prune_empty_dirs parity:tests/integration/test_install_ledger_reconciliation.py
-v38* infrastructure/public_assets.py:_reconcile_install_ledger parity:tests/integration/test_install_ledger_reconciliation.py
-v38* infrastructure/public_assets.py:stage parity:tests/integration/test_staged_assets_have_consumers.py
+v38* features/certification/service.py:certify parity:tests/features/certification/test_service.py
+v38* features/migrate/state_v2.py:execute_migration parity:tests/features/migrate/test_state_v2.py
+v38* features/reconcile/service.py:_restore_state parity:tests/features/reconcile/test_service.py
+v38* features/specs/doctor_memory.py:fix_placeholder_atom parity:tests/features/specs/test_canon__scaffold_placeholder_repair.py
+v38* infrastructure/projection.py:_clear parity:tests/infrastructure/test_public_assets__install_ledger_reconciliation.py
+v38* infrastructure/public_assets.py:_prune_empty_dirs parity:tests/infrastructure/test_public_assets__install_ledger_reconciliation.py
+v38* infrastructure/public_assets.py:_reconcile_install_ledger parity:tests/infrastructure/test_public_assets__install_ledger_reconciliation.py
+v38* infrastructure/public_assets.py:stage parity:tests/infrastructure/test_public_assets__staged_assets_have_consumers.py
 v38* public/skills/dd-release-implementation/scripts/_release_new.py:new_release parity:tests/unit/skills/test_release_implementation_release_script.py
-v39* ONBOARDING parity:tests/integration/test_onboarding_steps_property.py
-v39* WS-INVARIANT parity:tests/integration/test_unfixable_findings_carry_their_own_fix.py
+v39* ONBOARDING parity:tests/features/workspace/test_onboarding__onboarding_steps_property.py
+v39* WS-INVARIANT parity:tests/features/spec_context/test_doctor__unfixable_findings_carry_their_own_fix.py
 v39* RELEASE-TREE-ARCHIVED -
 v39* RELEASE-TREE-MEMORY -
 v39* RELEASE-TREE-PARSE -
@@ -83,8 +83,8 @@ def test_guard_doctor_codes(record_property):
     from dadaia_workspace.features.specs.rules import RULES as SPECS
     from dadaia_workspace.features.workspace import onboarding
     from dadaia_workspace.infrastructure.ledger_scripts import LEDGER_SCRIPTS
-    from tests.integration.test_doctor_fix_lines_clear_their_finding import OPERATOR_ACTION, PLANTS, REPORT_ONLY
-    from tests.integration.test_workspace_fix_lines_clear_their_finding import WORKSPACE_PLANTS
+    from tests.cli.commands.test_doctor import OPERATOR_ACTION, PLANTS, REPORT_ONLY
+    from tests.cli.commands.test_doctor__workspace_fix_lines_clear_their_finding import WORKSPACE_PLANTS
 
     rules = [*SPECS, *BACKLOG, *workspace_rules(expired_only=False, context=None)]
     codes = {c for r in rules for c in r.codes} | {s.code for s in LEDGER_SCRIPTS} | {onboarding.CODE}
