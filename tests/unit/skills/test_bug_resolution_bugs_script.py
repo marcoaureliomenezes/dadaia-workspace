@@ -872,6 +872,27 @@ def test_fix_derives_each_fix_commit_and_its_direction(script: Path, tmp_path: P
                      "[ok] 1 linked, 0 unlinked."]  # fmt: skip
 
 
+def test_fix_lists_a_fix_commit_once_when_its_resolve_names_it_short(
+    script: Path, tmp_path: Path
+) -> None:
+    """bugs-fix-lists-one-commit-twice: a shape-4 resolve naming the shape-3 fix commit by
+    its short sha is the same commit, listed once with its rows."""
+    resolved = {**_OPEN_RECORD, "id": "a-bug", "status": "resolved", "closed_at": "2026-09-21T00:00:00Z"}  # fmt: skip
+    specs = _ledger(tmp_path, resolved)
+    git = ["git", "-C", str(tmp_path), "-c", "user.name=t", "-c", "user.email=t@t"]
+    subprocess.run([*git, "add", "-A"], check=True)
+    subprocess.run([*git, "commit", "-qm", "chore: seed"], check=True)
+    (tmp_path / "cli/a.py").write_text("1\n", encoding="utf-8")
+    subprocess.run([*git, "add", "-A"], check=True)
+    subprocess.run([*git, "commit", "-qm", "fix(bugs): a-bug — cause"], check=True)
+    sha = subprocess.run([*git, "rev-parse", "HEAD"], capture_output=True, text=True, check=True).stdout.strip()  # fmt: skip
+    (tmp_path / "specs/n").write_text("z\n", encoding="utf-8")
+    subprocess.run([*git, "add", "-A"], check=True)
+    subprocess.run([*git, "commit", "-qm", f"chore(bugs): resolve a-bug — by T-1 ({sha[:9]})"], check=True)  # fmt: skip
+    done = _run(script, "fix", "a-bug", "--specs", str(specs)).stdout.splitlines()
+    assert done == [f"a-bug\t{sha}\tnet-positive", "\t1\t0\tcli/a.py", "[ok] 1 linked, 0 unlinked."]  # fmt: skip
+
+
 _WHY = "the blamed fix wrote the line, not its defect"
 _NEAR = "T-050-168, T-9, b-bug, d-bug, e-bug"  # T-5 is in no TASKS.md: never proposed
 

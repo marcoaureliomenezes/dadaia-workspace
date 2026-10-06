@@ -116,8 +116,12 @@ def _fixes(specs: Path) -> dict[str, dict[str, list[list[str]] | None]]:
         if shape is None or (task is None and shape[2].startswith("chore")):
             continue
         for bug in shape[3].split(", "):
+            commits = found.setdefault(bug, {})
             for sha in task[1].split(", ") if task else [shape[1]]:
-                found.setdefault(bug, {})[sha] = None if task else rows
+                # newest first: a later resolve may name this fix commit by its short sha
+                for short in [k for k in commits if sha.startswith(k)]:
+                    del commits[short]
+                commits[sha] = None if task else rows
     return found
 
 
