@@ -1,7 +1,7 @@
 """The ONE source of the Linux CI jobs and the three gate levels (ADR 0190):
 ``python scripts/ci.py [<job>...]`` runs the named ``ci.yml`` jobs (all of them when none is
 given); ``task FILE...`` runs ruff and mypy on the touched files and the touched tests;
-``stage`` runs lint, mypy, guards, unit and integration; ``job`` runs every job. Each step
+``stage`` runs lint, mypy, guards and the small tier; ``job`` runs every job. Each step
 prints ``PASS``/``FAIL <step>: <command>``; every step runs; exit 1 if any failed. Standard
 library only: the ``repo-hygiene`` and ``doctor`` jobs install no dev group."""
 
@@ -36,7 +36,7 @@ JOBS: dict[str, list[Step]] = {
         ("guards --planted", [PY, "scripts/guards/run.py", "--planted"], {}),
     ],
     "unit-fast": [
-        ("unit-fast", [*PYTEST, "-m", "unit and not slow and not quarantine", "tests/unit"], {}),
+        ("unit-fast", [*PYTEST, "-m", "small and not slow and not quarantine", "tests"], {}),
     ],
     "contract-coverage": [
         (
@@ -44,20 +44,19 @@ JOBS: dict[str, list[Step]] = {
             [
                 *PYTEST,
                 "-m",
-                "(unit or contract) and not quarantine",
+                "small and not quarantine",
                 "-p",
                 "scripts.covdata",
                 "--cov=dadaia_workspace",
                 "--cov-report=term-missing",
                 "--cov-fail-under=80",
-                "tests/unit",
-                "tests/contract",
+                "tests",
             ],
             {},
         ),
     ],
     "integration": [
-        ("integration", [*PYTEST, "-m", "integration and not quarantine", "tests/integration"], {}),
+        ("integration", [*PYTEST, "-m", "medium and not quarantine", "tests"], {}),
     ],
     # The whole e2e tree; DADAIA_REQUIRE_UVX turns the journey's "uvx absent" skip into a failure.
     "e2e-python": [
@@ -81,7 +80,7 @@ JOBS: dict[str, list[Step]] = {
 }
 
 
-STAGE = ("lint", "typecheck", "guards", "unit-fast", "integration")
+STAGE = ("lint", "typecheck", "guards", "unit-fast")
 
 
 def _task(files: list[str]) -> list[Step]:

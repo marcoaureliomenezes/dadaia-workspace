@@ -93,7 +93,7 @@ def test_lint_exits_by_the_step_that_failed(
 def test_unit_fast_exits_by_its_unit_tests(
     tmp_path: Path, check: str, verdict: str, code: int
 ) -> None:
-    test = f"import pytest\n\n\n@pytest.mark.unit\ndef test_one() -> None:\n    assert {check}\n"
+    test = f"import pytest\n\n\n@pytest.mark.unit\n@pytest.mark.small\ndef test_one() -> None:\n    assert {check}\n"
     done = _ci(_checkout(tmp_path, {"tests/unit/test_one.py": test}), "unit-fast")
     assert verdict in done.stdout
     assert done.returncode == code
@@ -118,7 +118,7 @@ def test_contract_coverage_writes_no_coverage_file_into_the_checkout(tmp_path: P
         "dadaia_workspace/m.py": "def one() -> int:\n    return 1\n",
         "tests/unit/test_m.py": (
             "import pytest\n\nfrom dadaia_workspace.m import one\n\n\n"
-            "@pytest.mark.unit\ndef test_one() -> None:\n    assert one() == 1\n"
+            "@pytest.mark.unit\n@pytest.mark.small\ndef test_one() -> None:\n    assert one() == 1\n"
         ),
     }
     checkout = _checkout(tmp_path, files)
@@ -139,7 +139,7 @@ def _plan(*argv: str) -> list[str]:
 
 def test_each_level_runs_only_its_steps() -> None:
     """AC1.1 (ADR 0190): the task level runs ruff and mypy on the touched files and the owner
-    tests; the stage level runs lint, mypy, guards, unit and integration; the job level all."""
+    tests; the stage level runs lint, mypy, guards and the small tier; the job level all."""
     files = ("dadaia_workspace/m.py", "tests/unit/test_m.py", "README.md")
     assert _plan("task", *files) == [
         "task: ruff format", "task: ruff check", "task: mypy", "task: owner tests"
@@ -148,7 +148,6 @@ def test_each_level_runs_only_its_steps() -> None:
     assert _plan("stage") == [
         "lint: ruff format", "lint: ruff check", "lint: lint-imports", "typecheck: mypy",
         "guards: guards", "guards: guards --planted", "unit-fast: unit-fast",
-        "integration: integration",
     ]  # fmt: skip
     assert _plan("job") == _plan() == [
         *_plan("stage")[:7], "contract-coverage: contract-coverage", "integration: integration",
@@ -190,7 +189,7 @@ def test_documented_coverage_line_leaves_no_coverage_file_in_the_checkout(
         "dadaia_workspace/m.py": "def one() -> int:\n    return 1\n",
         "tests/unit/test_m.py": (
             "import pytest\n\nfrom dadaia_workspace.m import one\n\n\n"
-            "@pytest.mark.unit\ndef test_one() -> None:\n    assert one() == 1\n"
+            "@pytest.mark.unit\n@pytest.mark.small\ndef test_one() -> None:\n    assert one() == 1\n"
         ),
     }
     checkout = _checkout(tmp_path, files)
