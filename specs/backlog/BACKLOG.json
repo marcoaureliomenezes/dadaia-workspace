@@ -589,6 +589,18 @@
       "description": "Measured: rc-10 implemented while _RELEASE.json said DEFINITION (fixed on job 4 by 54832fb32), the second rc in a row. Design: RC-FLOW names the one step and its owner that run release.py phase IMPLEMENTATION, right after the trio is Approved and before the first job worktree opens. Whether a job worktree open refuses while the phase is DEFINITION is unruled. Placement and every design detail not quoted from a ruling are agent default, unruled.",
       "provenance": "audit verification 2026-10-06 over feature/0.5.0 8e6448f13 (four read-only verifiers); main-thread registration after the operator grill of 2026-10-06",
       "relates": []
+    },
+    {
+      "id": "test-suite-diet",
+      "title": "The test suite diet: a REBUILD that deletes duplicate and vacuous tests",
+      "opened": "2026-10-06",
+      "status": "idea",
+      "description": "Measured: 1,180 tests, 41,939 lines, test/code ratio 1.68; text asserts 10.8% (strict regex) to 17% (broad); test_honesty_residue.py is vacuous -> DELETE; test_atomic_write_census.py is a ratchet -> KEEP; mutation skipped 147/223 (66%). behavior-map.json took 121 fix commits; its consumers: spec_context/doctor.py:112,155 (skill_md_line_soft), test_standalone_skills, skill_inventory_oracle, .gitattributes, law and memory atoms - a DELETE candidate whose consumers move first (unruled). Absorbs meta-tests-leave-pytest (exits rejected 'absorbed by test-suite-diet'): delete the duplicates (suite_cannot_reach_* x2 vs the conftest sessionfinish; stewardship_mechanics vs conftest; repo_self_scan vs gitleaks + pre-push; source_repo_hygiene vs the CI repo-hygiene job; mutation wiring x3); the unique guards become scripts of one CI job, each proven to catch what it caught; mutation removal (run_mutation_baseline.sh, its 2 wiring tests, test_mutation_baseline_scope_stdlib_only.py, [tool.mutmut], the optional group mutation; QUALITY.md says mutation evidence is operator tooling, outside the repo); ADRs 0163, 0166, 0167. Done when no pytest test inspects the suite or the repo. The text-assert ratio is read with scorecard-one-ruler's pinned regex. Placement: rc-12, as a REBUILD (operator, 2026-10-06: 'rc-12, antes dos evals'). Placement and every design detail not quoted from a ruling are agent default, unruled.",
+      "provenance": "audit verification 2026-10-06 over feature/0.5.0 8e6448f13 (four read-only verifiers); main-thread registration after the operator grill of 2026-10-06",
+      "relates": [
+        "meta-tests-leave-pytest",
+        "stage-gate-runs-the-contract-tier"
+      ]
     }
   ]
 }
