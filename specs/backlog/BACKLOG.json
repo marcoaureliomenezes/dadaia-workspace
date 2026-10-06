@@ -580,6 +580,15 @@
       "description": "Operator, 2026-10-06, verbatim: 'develop=merge, main=squash, sem rebase'. Measured: the repo allows merge, squash and rebase; main has required_linear_history (so squash); develop takes merge commits. Design: allow_rebase_merge off (a repo setting: an operator act); dd-gitflow-default states develop=merge commit, main=squash, in one place. Placement and every design detail not quoted from a ruling are agent default, unruled.",
       "provenance": "audit verification 2026-10-06 over feature/0.5.0 8e6448f13 (four read-only verifiers); main-thread registration after the operator grill of 2026-10-06",
       "relates": []
+    },
+    {
+      "id": "phase-implementation-has-a-place",
+      "title": "The move to phase IMPLEMENTATION has a named step in the flow",
+      "opened": "2026-10-06",
+      "status": "idea",
+      "description": "Measured: rc-10 implemented while _RELEASE.json said DEFINITION (fixed on job 4 by 54832fb32), the second rc in a row. Design: RC-FLOW names the one step and its owner that run release.py phase IMPLEMENTATION, right after the trio is Approved and before the first job worktree opens. Whether a job worktree open refuses while the phase is DEFINITION is unruled. Placement and every design detail not quoted from a ruling are agent default, unruled.",
+      "provenance": "audit verification 2026-10-06 over feature/0.5.0 8e6448f13 (four read-only verifiers); main-thread registration after the operator grill of 2026-10-06",
+      "relates": []
     }
   ]
 }
