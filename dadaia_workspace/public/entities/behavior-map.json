@@ -85,10 +85,10 @@
       ],
       "hash_tuple": {
         "section": "sha256:ba2bb8b1355dd3fde4207f053a6cdd721025790f616c7b4f07541175399be4db",
-        "skill": "sha256:93ba47b56199efe520f36fb50c6c743034d443e44e9ed18e0ba803eaa7f3d5c3",
+        "skill": "sha256:f037bf79ec32799fcc399ee1ee9ddbc0622c39fa2955b1920e39814ec79ea66f",
         "scripts": "sha256:d6ebb5d3f499ddd68ebb740368ba8c6ea3e926e7a227d73bfdee39de36a65462",
         "scoped": [
-          "sha256:6d564944e9af5db4461e142cbcc8079cac06800136d55f6c361c201b0b78cc52"
+          "sha256:9d5c106cf9a5ccbfb5013d894462f31dba87351a2b93c1f58a234fbdf669256d"
         ]
       },
       "recorded_by": "dd-software-engineer",

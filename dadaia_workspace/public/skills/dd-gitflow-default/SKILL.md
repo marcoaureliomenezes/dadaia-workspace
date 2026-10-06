@@ -62,7 +62,7 @@ A job and its task trees hold code, tests, specs, memory and derived docs alike 
 | 4 | a job | Terminal transition without code (`resolve` by a task, `supersede`, `defer`, `reject`): `specs/bugs/BUGS.jsonl` | `chore(bugs): <verb> <id> — <reason, or by <task-id> (<sha>)>`; per class `chore(bugs): <verb> class <class> — <reason>`, one id per body line |
 | 4 | a job | Archive by an accepted ADR: `specs/bugs/BUGS.jsonl`, `specs/bugs/_archive/bugs_histo.jsonl` | `chore(bugs): archive <ids> — ADR <id>` |
 | 5 | `define` | Release definition: `specs/releases/<v>/rc-<N>/*` | `feat(specs): define candidate …` |
-| 6 | a task tree | Task: its `W:` | `conventional-commit(<id>): description`, a REBUILD `refactor(<id>): REBUILD <unit> — …`; a stage closes with a body line `stage: <id> — unit+integration green` |
+| 6 | a task tree | Task: its `W:` | `conventional-commit(<id>): description`, a REBUILD `refactor(<id>): REBUILD <unit> — …`; a stage closes with a body line `stage: <id> — small green` |
 | 7 | a job | The job file's `done`, once per job, by its close task: `specs/releases/<v>/rc-<N>/tasks/<job>.md` | `chore(tasks): done <job>` |
 | 8 | `define` | Trio approval: `specs/releases/<v>/rc-<N>/SPEC.md` | `docs(specs): …` |
 | 9 | `reconcile` | Memory pass and derived docs: `specs/memory/*`, `README.md`, `llms.txt`, `docs/*.md` | `docs(memory): …` |
