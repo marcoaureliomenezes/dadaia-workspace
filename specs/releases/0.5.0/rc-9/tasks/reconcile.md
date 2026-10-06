@@ -58,5 +58,5 @@ Paths are relative to `dadaia_workspace/` unless they start with `scripts/`, `te
 | task | AC | `W:` | owner tests / RED |
 |---|---|---|---|
 | JR.S5.T1 | bugs-fix-lists-one-commit-twice | `dadaia_workspace/public/skills/dd-bug-resolution/scripts/bugs.py`, `tests/unit/skills/test_bug_resolution_bugs_script.py` | `tests/unit/skills/test_bug_resolution_bugs_script.py` (new case) |
-| JR.S5.T2 | specs-law-file-untracked-by-gitignore — reverted at f59209345 (guard `specs-canon-tracked` required the law ignored); redone by JR.S5.T3 | — | — |
+| JR.S5.T2 | specs-law-file-untracked-by-gitignore — reverted at 0a6b649dc (guard `specs-canon-tracked` required the law ignored); redone by JR.S5.T3 | — | — |
 | JR.S5.T3 | specs-law-file-untracked-by-gitignore (operator ruling 2026-10-06: `specs-canon-tracked` expects every canon row tracked; drift is TREE-5's in CI's doctor) | `.gitignore`, `specs/AGENTS.md`, `scripts/guards/repo.py`, `tests/contract/test_copy_drift_scoped_law.py` | `tests/contract/test_copy_drift_scoped_law.py` (new case) |
