@@ -21,7 +21,7 @@ Order per job: DELETE → REBUILD → UPDATE → KEEP → ADD. A REBUILD names i
 | 5 | `f/spec_context/doctor.py` `check_installed_hooks` | `OSError` → `drifted = True`, one message "differs" | 0 since the 0.4.8 split | UPDATE (AC5.1) | one code, the message names absent vs differing; fix line unchanged |
 | 6 | `GF/_worktree_end.py` `merge`, `_gate` | no test-path notion; `_gate` reads `verify*` from `<work>:AGENTS.md` | 7 records (rc-7 ×3, rc-8 ×3, rc-9 CRITICAL `verify-line-absent-…`, REBUILT under 0207) | UPDATE + ADD (AC6.0–AC6.2) | the hottest unit of the repo: the freeze lives in a new `GF/_worktree_freeze.py` (one pure judge over diff rows plus one git read); `merge` gains one call; the `AGENTS.md` line reader is lifted out of `_gate` so `verify*:` and `tests:` share one reader — no second authority. REBUILD trigger judged (≥ 2 fixes on the unit): it does not fire — the seven records hit `merge`'s kind and verdict arms, all REBUILT in rc-9 (0190) and `_gate` under 0207; none touches the code Job 6 adds, and Job 6 adds no arm to them |
 | 6 | `pub/scaffold/releases/AGENTS.md` §3 same-task rewrite clause | allows rewriting a test in a code task | — | DELETE (AC6.3) | 0209 |
-| 6 | `tests/unit/core/test_specs_version.py` `_CANON_AT` | the canon pin lives in a test file, so every law change edits a test | — | UPDATE | the pin moves to `core/specs_version.py`, whatever F-3 rules (J6.S2.T4) |
+| 6 | `tests/unit/core/test_specs_version.py` `_CANON_AT` | the canon pin lives in a test file, so every law change edits a test | — | UPDATE | the pin moves to `core/specs_version.py`, (J6.S2.T4) |
 | 7 | `tests/{unit,contract,integration}/**` (307 files), `tests/conftest.py` `_PATH_MARKERS`, `_TIER_TIMEOUTS` | tier from the folder | `windows-…` tier-ceiling bugs ×2 calibrated in the table | REBUILD (AC7.1–AC7.3) | cause: folder = size let a subprocess test sit in `unit/`; the size comes from the fixture (real git or a subprocess → medium) |
 | 7 | `scripts/ci.py`, `.github/workflows/ci.yml`, `pyproject.toml` markers | select by folder and by `unit`/`contract`/`integration` | 0 | UPDATE | select by size marker |
 | 8 | `tests/unit/conftest.py` autouse `worktree_rows` patch; `tests/contract/cli/test_cli_context.py:350` | monkeypatch of a module global | `unit-tests-spawn-the-worktree-script-through-a-cli-stub` | DELETE (AC8.2) | `SpecContextService`, `DoctorService` take a rows callable by constructor |
@@ -35,7 +35,7 @@ Order per job: DELETE → REBUILD → UPDATE → KEEP → ADD. A REBUILD names i
 | question | authority | consults | deleted |
 |---|---|---|---|
 | which commits fixed a bug, their surface and rework | `bugres/scripts/_bugs_fix.py` (Job 1) | `bugs.py` `fix`, `stats`, `window`, `_candidates` | `bugs.py` `_fixes`, `_direction`, the `None` arm |
-| which paths are tests | the `tests:` line of `<work>:AGENTS.md`, read by the one line reader lifted from `_gate` (Job 6, parked) | `GF/_worktree_freeze.py` | — |
+| which paths are tests | the `tests:` line of `<work>:AGENTS.md`, read by the one line reader lifted from `_gate` (Job 6); with `tests-red:`, the one marker form whose deletion lands | `GF/_worktree_freeze.py` | — |
 | a test's size tier | the fixtures it requests, `tests/conftest.py` (Job 7) | `scripts/ci.py`, `ci.yml` selectors | `_PATH_MARKERS`, the folder rule |
 | a context's worktree rows | the rows callable `SpecContextService`/`DoctorService` take by constructor (Job 8) | `container.py`, `tests/fakes.py` | the module-global `worktree_rows` read, the autouse patch |
 | how a hook test feeds stdin | `tests/fixtures/harness_env.run_hook_subprocess` (Job 8) | every hook test | the `hook-stdin-not-in-process` guard check, `sys.stdin` patches |
@@ -57,7 +57,7 @@ Order per job: DELETE → REBUILD → UPDATE → KEEP → ADD. A REBUILD names i
 | Reconciliation | Bug batch | AC10 |
 
 - Critical path: Job 1 → Job 4 → Job 7 → Job 8 → Job 6 → bug batch → Reconciliation.
-- Job 6 is PARKED (F-3). The DAG keeps it last; while it stays parked, the bug batch and Reconciliation run under today's law.
+- Job 6 was parked on F-3 (88d9a6b8c) and is un-parked by the ruling (a); the bug batch and Reconciliation run under the freeze.
 - After every job that writes `pub/` (Jobs 1, 4, 5, 6, 8) the driver re-projects the instance (`dadaia public stage` / `install` / `doctor`); `WT merge` runs the projected `worktree.py`, so the freeze binds only once Job 6 is re-projected.
 
 ### Hot files
@@ -83,8 +83,8 @@ Tests run only in the main thread's serialized `WT merge` and stage/job gates; a
 | 2 | Job 4 | Job 5 | Job 1 merged (A); Job 2 merged (B) |
 | 3 | Job 7 | Job 3 (CI run; grader fixes take the slot) | Jobs 4, 5 merged; Job 2 on evals `main` |
 | 4 | Job 8 | — | Job 7 merged |
-| 5 | Job 6 (parked, F-3) | — | Jobs 3, 8 merged and F-3 ruled |
-| 6 | bug batch | — | Job 6 merged and re-projected, or parked |
+| 5 | Job 6 | — | Jobs 3, 8 merged |
+| 6 | bug batch | — | Job 6 merged and re-projected |
 | 7 | Reconciliation | — | bug batch merged |
 
 ## Agent defaults — unruled
@@ -95,13 +95,15 @@ Each is the literal, smallest-surface reading; the reviewer judges it; none is a
 2. AC3.1: Job 3 opens a `dadaia-evals` tree only if a grader needs a fix; its run note is the driver's `_RELEASE.json` `kind: note`, written with Job 3's `kind: merge` entry; with no tree Job 3 logs only that note. Evals trees cannot write dadaia-workspace files: Reconciliation writes Jobs 2 and 3's `done` lines.
 3. AC4.1: the generator is a `bugs.py balance` verb (`--write` regenerates the block); the dev-tooling class is the `.gitattributes` attribute `dadaia-dev-tooling`.
 4. AC6.1 "cannot close": a RED test is a strict xfail; the suite's conftest gives every strict xfail `raises=AssertionError`, so an erroring RED test reads failed and `WT stage` refuses on the existing `verify-stage:` line. `worktree.py` learns no language. Known limit: evals' `unittest.expectedFailure` counts an error as an expected failure.
-5. AC6.2 (the reviewer's literal reading; Job 6 parked): the anchor derives from subjects — the parent of the job's first commit outside `J<n>.S1`, else the job base — and the freeze fails closed when it cannot derive one; after the anchor, a modified or deleted line of a test file that existed at the anchor refuses, a pure rename lands; new tests land only in a tests-only stage; how the gate sees an amendment's approval stays parked (F-3).
+5. AC6.2 (the reviewer's literal reading): the anchor derives from subjects — the parent of the job's first commit outside `J<n>.S1`, else the job base — and the freeze fails closed when it cannot derive one; after the anchor, a modified or deleted line of a test file that existed at the anchor refuses, a pure rename lands, and so does a diff whose only change deletes a `tests-red:` marker line (F-3 (a)); new tests land only in a tests-only stage.
 6. AC7.1 mirror: `dadaia_workspace/<p>/<m>.py` → `tests/<p>/test_<m>.py` (a leading underscore kept: `_bugs_fix.py` → `test__bugs_fix.py`), a hyphen in a directory becoming `_` (importable packages); `scripts/<p>/<m>.py` → `tests/scripts/<p>/test_<m>.py`; the suite's own tests (conftest, `harness_env`) → `tests/fixtures/test_<m>.py`.
 7. AC7.3 markers: `small`, `medium`, `e2e` replace `unit`, `contract`, `integration`; the tier timeouts keep their values under the new names (small 10 s, medium 60 s).
 8. Job 7 → Job 8 bridge: Job 7 moves `tests/unit/conftest.py`'s autouse fixture into `tests/conftest.py`, applied to `small` items, so the moved tests keep it; Job 8 deletes it.
+9. F-3 (a) form: the repo declares `tests-red: <regex>` beside `tests:` in its tracked `AGENTS.md`, read by the same line reader; one regex, one line. dadaia-workspace: `^\s*@pytest\.mark\.xfail\(strict=True`; dadaia-evals: `^\s*@unittest\.expectedFailure`. A repo with no `tests-red:` line lets no marker deletion through. The evals line is a commit on `dadaia-evals` `feature/0.5.0` in cbaa6f3's lane (main thread), before any evals job opens after Job 6.
+10. Amendment visibility (AC6.3): the gate sees no approval and no gate path edits a pre-anchor test line (HIGH-2 stays closed). An amendment lands as a new tests-only RED stage that adds the corrected test; the wrong test's existing lines change only past the refusal's `Operator action:` (stop and report), by the operator's act. The approval lives in the job file and the review. No law changes; the alternative (a tests-only stage editing pre-anchor lines through the gate) would reopen HIGH-2 and is left unruled.
 
 ## Flagged — not chosen (law or ruling)
 
-- F-1 (MEDIUM-1): shape 3 (`dd-gitflow-default` §3a) is ONE commit holding code + regression test + the `BUGS.jsonl` line; under AC6.2 a fix commit touching a test after the anchor refuses. J6.S2.T4's `W:` carries `S/dd-gitflow-default/SKILL.md` and `bugres/SKILL.md` with their hash re-record; the shape-3 text waits on F-3.
+- F-1 (MEDIUM-1): shape 3 (`dd-gitflow-default` §3a) is ONE commit holding code + regression test + the `BUGS.jsonl` line; under AC6.2 a fix commit touching a test after the anchor refuses. J6.S2.T4's `W:` carries `S/dd-gitflow-default/SKILL.md` and `bugres/SKILL.md` with their hash re-record; resolved with F-3: J6.S2.T4 rewrites shape 3 as a RED commit in a RED stage, then a fix commit with the code, the `BUGS.jsonl` line and the marker-line deletion (0209 + F-3 (a)).
 - F-2: resolved — the four gate lines are on `dadaia-evals` `feature/0.5.0` by cbaa6f3 (operator act by delegation), CI run 37463825307.
-- F-3 (HIGH-1, parks Job 6): the freeze has no way to turn a RED test green — AC6.2 refuses the strict-xfail mark removal, and the canon pin `_CANON_AT` lives in a test file. Options: (a) the freeze allows a diff whose only change deletes a RED-marker line the repo declares beside `tests:`; (b) the RED expectation leaves the test files; (c) a non-strict xfail plus a tests-only flip stage. The pin's move to `core/specs_version.py` is recorded independent of the choice (J6.S2.T4). Until ruled, Job 6 does not open.
+- F-3 (HIGH-1) — RESOLVED, operator ruling 2026-10-06 (AskUserQuestion), verbatim: "(a) Só apagar a linha de marcação RED (Recommended)" (handoff `2026-10-06T044815Z-main-thread-overnight-delegation`). Job 6 un-parked; form: reading 9. Was: the freeze has no way to turn a RED test green — AC6.2 refuses the strict-xfail mark removal, and the canon pin `_CANON_AT` lives in a test file. Options: (a) the freeze allows a diff whose only change deletes a RED-marker line the repo declares beside `tests:`; (b) the RED expectation leaves the test files; (c) a non-strict xfail plus a tests-only flip stage. The pin's move to `core/specs_version.py` is recorded independent of the choice (J6.S2.T4). 
