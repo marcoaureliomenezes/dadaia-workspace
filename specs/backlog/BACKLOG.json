@@ -61,15 +61,6 @@
       "relates": []
     },
     {
-      "id": "ledger-refusals-guess-specs-from-command-shape",
-      "title": "Ledger refusals guess whether a fix takes --specs from its command shape",
-      "opened": "2026-10-02",
-      "status": "idea",
-      "description": "dd-bug-resolution/scripts/_specs.py with_specs (:77) and refuse (:99) post-process every refusal fix by its interpreter prefix to decide whether to append --specs, the design of the ledger-fix-lines-drop-specs fix (cc93a3a5a). It held only while every interpreter-headed line was a ledger script's; the worktree-script-fix-lines-hand-build-the-cli-path fix (bug worktree 0.5.0c-bug, 93cc4f9d5, f59b7b139) adds a named worktree.py exemption (_specs.py:79-80), a denylist that fails open. Wanted: the producer declares whether a fix takes --specs (built with specs at the raise site, or rendered by the ledger's own SCRIPT); else one positive predicate over the five ledger owners (bugs, backlog, release, audit, memory) from one home, since _LEDGER_OWNER_SCRIPTS lives only in tests/contract/test_public_scripts_thin_wrapper.py:31. Either way the worktree.py exemption is deleted. Destination: rc-8.",
-      "provenance": "operator approval 2026-10-02 via the main thread's intake; source: review F2 of bug worktree-script-fix-lines-hand-build-the-cli-path",
-      "relates": []
-    },
-    {
       "id": "ledger-reader-one-numbered-tolerant-iterator",
       "title": "One numbered, tolerant JSONL iterator in _ledger replaces the hand line loops",
       "opened": "2026-10-02",
