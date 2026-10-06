@@ -347,7 +347,7 @@ _Avoid_: wave, pile, cause group (retired)
 One rc's run, a DAG of jobs; not a file.
 
 **Job**:
-One measured feature: one worktree, one review and one gate at its merge; Job 1 executes the SPEC's §1.
+One measured feature: one worktree, one review and one gate at its merge; Job 1 executes the SPEC's `## Bug window review`.
 _Avoid_: CI job (a GitHub Actions job)
 
 **Stage**:
@@ -373,6 +373,7 @@ A merged job's wall time from its last task commit to its pushed merge: gates, r
 
 **Hotfix**:
 A block-list bug's fix (bugs law §2), outside the DAG.
+_Avoid_: hotfix/* branch
 
 **Reconciliation**:
 An rc's last job, outside the job cap: memory and derived docs.

@@ -17,7 +17,7 @@
 - Arm A: `demand -> backlog -> as-is review -> release candidate (SPEC/PLAN/TASKS) -> implementation + review -> memory -> closure -> promote by merging the release PR`.
 - Arm B: `propose -> operator confirms -> register -> lowest-level RED test -> root-cause fix -> GREEN -> resolved`.
 - Test: does the tool break its own contract? Yes -> Arm B. No -> Arm A.
-- A feature enters only through the backlog or an operator demand recorded in the SPEC `Origin`; a confirmed bug is fixed per `worktrees/AGENTS.md` §2.
+- A feature enters only through the backlog or an operator demand recorded in the SPEC `Origin`; a confirmed bug is fixed per `specs/bugs/AGENTS.md` §2.
 - Every change minimizes code and tests: DELETE → REBUILD → UPDATE → KEEP → ADD last; verbosity is a defect; documented behavior still works; tests assert behavior not text, mock only boundaries, expect literals; fixes never rewrite old asserts.
 - No workflow engine: the SDD documents (`specs/releases/AGENTS.md`) are the record of progress.
 

@@ -22,7 +22,7 @@ Scope: this file governs only `specs/bugs/`.
   (4) a security finding or an open dependency-vulnerability alert; (5) data loss or corruption.
 - A block-list bug is a hotfix: registered with `caused_by`, its own job, job gate and one review, landing before any
   other job merge; its fix body names `block: <item>`; no SPEC amendment.
-- Every other bug is only registered, `found_in` its rc; the next rc's §1 reads it and its Job 1 resolves it, a
+- Every other bug is only registered, `found_in` its rc; the next rc's `## Bug window review` reads it and its Job 1 resolves it, a
   fix-induced one as a REBUILD.
 - Close with the fix: `bugs.py resolve`, with the flags `dd-bug-resolution` Phase 6 names.
 - Check prior resolutions on the same component first; `caused_by: X` means the fix of X wrote the lines this fix corrects, picked from `bugs.py resolve`'s blame candidates, `none` only when there are none or with `--lineage-reason`.
