@@ -1,14 +1,14 @@
 {
   "schema": "release-state-v1",
   "release": "0.5.0",
-  "phase": "IMPLEMENTATION",
+  "phase": "CLOSURE",
   "defined": {
     "sha": "29ee92d3a",
     "ts": "2026-10-05T18:41:40Z"
   },
   "implemented": {
-    "sha": "7f5fea2f0",
-    "ts": "2026-10-05T14:09:40Z"
+    "sha": "27123ce99",
+    "ts": "2026-10-06T02:01:19Z"
   },
   "shipped": null,
   "log": [
@@ -1035,6 +1035,45 @@
       "agent": "dd-product-engineer",
       "kind": "note",
       "text": "AC2.10 per-class counts, as the operator ruled (2026-10-05, AskUserQuestion, recorded in rc-9/tasks/job2.md Operator rulings): agent error 3, release-born 46, dev-tooling 27, doubtful 0, product 148 (224 records). The 23 records first classed doubtful were all resolved product bugs. No ledger write (J2.S5.T2). Source: the ruling, not a recount; bugs.py stats carries no per-class field, so the counts cannot be re-derived from the ledger."
+    },
+    {
+      "ts": "2026-10-06T02:01:19Z",
+      "agent": "release.py",
+      "kind": "milestone",
+      "candidate": "rc-9",
+      "milestone": "implemented",
+      "sha": "27123ce99",
+      "text": "Candidate implemented at 27123ce99; phase CLOSURE."
+    },
+    {
+      "ts": "2026-10-06T02:02:00Z",
+      "agent": "release.py memory",
+      "kind": "memory",
+      "text": "Memory reconciled over 703efc1c5e5bd421c844a8ac9e30b6699f468ee9..cba3fd9dbd8e: 2 reviewed, 16 changed.",
+      "since": "703efc1c5e5bd421c844a8ac9e30b6699f468ee9",
+      "until": "cba3fd9dbd8ec7ef5ac49409c12bc56ca8f791c1",
+      "reviewed": [
+        "spec-context-project",
+        "workspace-init"
+      ],
+      "changed": [
+        "agent-comms",
+        "agent-orchestration",
+        "agentic-entities",
+        "public-asset-distribution",
+        "pypi-distribution",
+        "product-vision",
+        "consumer-agent-support",
+        "context-management",
+        "specs-migration",
+        "workspace-doctor",
+        "audits-canon",
+        "backlog-ledger",
+        "bug-ledger",
+        "release-lifecycle",
+        "sdd-gate-v3",
+        "worktrees"
+      ]
     }
   ]
 }
