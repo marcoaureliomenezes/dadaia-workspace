@@ -463,7 +463,6 @@ def test_phase_implementation_refuses_a_plan_without_dag_or_hot_files(
 # --- AC4.4: the bug balance block is a closure check ---------------------------------
 
 
-@pytest.mark.xfail(strict=True, reason="J4.S1 RED: the closure check is built by J4.S2.T2")
 def test_a_stale_balance_block_refuses_at_closure_and_passes_in_implementation(
     script: Path, tmp_path: Path
 ) -> None:
@@ -483,6 +482,7 @@ def test_a_stale_balance_block_refuses_at_closure_and_passes_in_implementation(
         state.write_text(json.dumps({**json.loads(state.read_text("utf-8")), "phase": phase}))
         done = subprocess.run([sys.executable, str(script), "check", "--json", "--specs", str(specs)],
                               capture_output=True, text=True)  # fmt: skip
+        assert done.stdout, done.stderr
         return [f for f in json.loads(done.stdout) if f["path"] == "memory/QUALITY.md"]
 
     assert balance_rows("IMPLEMENTATION") == []

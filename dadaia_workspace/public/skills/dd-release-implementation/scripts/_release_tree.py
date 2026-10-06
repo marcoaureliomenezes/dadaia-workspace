@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import json
 import re
+import subprocess
 import sys
 from pathlib import Path
 from typing import Any
@@ -310,6 +311,31 @@ def _window_findings(specs: Path) -> list[dict[str, Any]]:
     return [finding(rel, 1, "; ".join(errors), fix)] if errors else []
 
 
+def _balance_findings(specs: Path) -> list[dict[str, Any]]:
+    """CLOSURE: `QUALITY.md`'s `## Bugs` block, once it has one, equals its regeneration —
+    a closure check, never a doctor lane (AC4.4)."""
+    quality = specs / "memory" / "QUALITY.md"
+    try:
+        live = live_release(specs)
+    except Refusal:
+        return []  # the tree walk reports a missing or doubled live release
+    if live.state.get("phase") != "CLOSURE" or not quality.is_file():
+        return []
+    sys.path.append(str(_SKILLS / "dd-bug-resolution" / "scripts"))  # a skill-level dependency
+    import _bugs_balance as balance
+    import _bugs_quality as quality_block
+
+    held = balance.stored(quality.read_text(encoding="utf-8"))
+    bugs = _SKILLS / "dd-bug-resolution" / "scripts" / "bugs.py"
+    fix = f"{script(bugs)} balance --write --specs {quote(str(specs))}"
+    try:
+        stale = held is not None and held != quality_block.body(specs)
+        why = "the `## Bugs` block differs from its regeneration"
+    except (OSError, ValueError, LookupError, subprocess.CalledProcessError) as error:
+        stale, why = True, f"the `## Bugs` block cannot be regenerated: {error}"
+    return [finding("memory/QUALITY.md", 1, why, fix)] if stale else []
+
+
 def tree_findings(specs: Path) -> list[dict[str, Any]]:
     """Every live directory under ``releases/``, each archived state document, the
     one-live-release rule and the ship ledger — what `new` refuses on."""
@@ -350,8 +376,13 @@ def tree_findings(specs: Path) -> list[dict[str, Any]]:
 
 def check(specs: Path) -> list[dict[str, Any]]:
     """The ONE release validator (the doctor delegates here): the tree, the live
-    candidate's Origin, then the live CLOSURE's memory record."""
-    return tree_findings(specs) + _origin_findings(specs) + _window_findings(specs)
+    candidate's Origin, then the live CLOSURE's memory record and bug balance block."""
+    return (
+        tree_findings(specs)
+        + _origin_findings(specs)
+        + _window_findings(specs)
+        + _balance_findings(specs)
+    )
 
 
 def ship_findings(specs: Path) -> list[dict[str, Any]]:

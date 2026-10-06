@@ -18,7 +18,6 @@ import subprocess
 import sys
 from collections import Counter
 from collections.abc import Callable
-from datetime import datetime
 from pathlib import Path
 from typing import Any
 
@@ -28,16 +27,14 @@ sys.dont_write_bytecode = True
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 sys.path.append(str(Path(__file__).resolve().parents[2] / "dd-release-implementation" / "scripts"))
 
-import _bugs_balance as bal  # noqa: E402
 import _bugs_fix as fx  # noqa: E402
+import _bugs_quality as qa  # noqa: E402
 import _bugs_transition as tr  # noqa: E402
 import _bugs_write as wr  # noqa: E402
 from _bugs_check import CODE, HISTO, LEDGER, accepted_adrs, check, tasks  # noqa: E402
 from _bugs_fix import git as _git  # noqa: E402
 from _bugs_store import Refusal, commit, read_records  # noqa: E402
-from _ledger import replace  # noqa: E402
 from _release_schema import (  # noqa: E402
-    STATE,
     ShallowClone,
     Unreadable,
     candidate_adds,
@@ -186,39 +183,11 @@ def _window(specs: Path) -> int:
     return 0
 
 
-def balance_body(specs: Path) -> str:
-    """The `## Bugs` block `QUALITY.md` must hold: the ledgers, the releases' spans and the
-    `dadaia-dev-tooling` surfaces in; the trend window opens on the oldest of its releases'
-    first day and ends on the live release's last log day."""
-    live = _placed(lambda: live_id(specs), specs)
-    spans = _placed(lambda: releases(specs), specs)
-    order = [*sorted((r for r in spans if r != live), key=lambda r: spans[r][0]), live]
-    closed = (specs / "releases" / live / STATE).read_text(encoding="utf-8")
-    start, end = (
-        spans[order[-4:][0]][0],
-        datetime.fromisoformat(json.loads(closed)["log"][-1]["ts"]),
-    )
-    ledger = read_records(specs / LEDGER)
-    old = [r for r in read_records(specs / HISTO) if "id" in r]
-    top = _git(specs, "rev-parse", "--show-toplevel").strip()
-    dev = fx.marked(
-        top, "dadaia-dev-tooling", {str(r.get("surface") or bal.UNKNOWN) for r in [*ledger, *old]}
-    )
-    return bal.render(ledger, old, bal.Window(order, _day(start), _day(end)), frozenset(dev))
-
-
-def _day(instant: datetime) -> datetime:
-    return instant.replace(hour=0, minute=0, second=0, microsecond=0)
-
-
 def _balance(args: argparse.Namespace, specs: Path) -> int:
-    body, quality = balance_body(specs), specs / "memory" / "QUALITY.md"
-    if not args.write:
-        print(body, end="")
-        return 0
-    document = quality.read_text(encoding="utf-8") if quality.is_file() else ""
-    replace(quality, bal.replaced(document, body))
-    print(f"[ok] wrote the `## Bugs` block of {quality}")
+    if args.write:
+        print(f"[ok] wrote the `## Bugs` block of {_placed(lambda: qa.write(specs), specs)}")
+    else:
+        print(_placed(lambda: qa.body(specs), specs), end="")
     return 0
 
 
