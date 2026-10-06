@@ -46,13 +46,10 @@ import pytest
 
 import dadaia_workspace
 
-pytestmark = [
-    pytest.mark.contract,
-    pytest.mark.skipif(
-        sys.platform != "linux",
-        reason="pre-commit-presence-gate.sh / pre-push-ci-gate.sh are bash contracts (Linux only)",
-    ),
-]
+pytestmark = pytest.mark.skipif(
+    sys.platform != "linux",
+    reason="pre-commit-presence-gate.sh / pre-push-ci-gate.sh are bash contracts (Linux only)",
+)
 
 _SCRIPTS_DIR = Path(dadaia_workspace.__file__).parent / "public" / "scripts"
 _PRE_PUSH_SCRIPT = _SCRIPTS_DIR / "pre-push-ci-gate.sh"
@@ -148,7 +145,7 @@ def test_unresolvable_runner_still_refuses_the_push(tmp_path: Path) -> None:
     subprocess.run(["git", "config", "user.name", "Test"], cwd=repo, check=True)
 
     # A fully controlled PATH with no poetry/dadaia reachable — same isolation
-    # technique as tests/unit/public/test_pre_push_gate_venv_probe.py.
+    # technique as tests/public/scripts/test_pre_push_ci_gate__pre_push_gate_venv_probe.py.
     env = {"PATH": "/usr/bin:/bin", "HOME": str(repo)}
 
     stdin_text = f"refs/heads/feature/0.0.1 {'a' * 40} refs/heads/feature/0.0.1 {_ZERO}\n"
