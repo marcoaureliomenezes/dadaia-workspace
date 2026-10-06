@@ -698,7 +698,6 @@ def test_the_closure_check_judges_only_a_block_it_can_regenerate(
     assert rows[0]["fix"].endswith("BUGS.jsonl")
 
 
-@pytest.mark.xfail(strict=True, reason="JB.S1 RED: release-check-fallback-fix-line-drops-specs")
 def test_the_closure_check_names_a_verb_that_died_outside_its_refusal(
     script: Path, tmp_path: Path
 ) -> None:
@@ -719,9 +718,15 @@ def test_the_closure_check_names_a_verb_that_died_outside_its_refusal(
     )
 
 
-@pytest.mark.xfail(strict=True, reason="JB.S1 RED: release-check-fallback-fix-line-drops-specs")
+@pytest.mark.parametrize(
+    ("printed", "code"),
+    [
+        pytest.param("[error] half a refusal", 2, id="a-message-and-no-fix"),
+        pytest.param("fix: Operator action: do the other half", 3, id="a-fix-and-no-message"),
+    ],
+)
 def test_the_closure_check_never_pairs_a_callee_message_with_a_fix_it_did_not_print(
-    script: Path, tmp_path: Path
+    script: Path, tmp_path: Path, printed: str, code: int
 ) -> None:
     _balance_tree(tmp_path, [])
     specs = tmp_path / "specs"
@@ -729,9 +734,12 @@ def test_the_closure_check_never_pairs_a_callee_message_with_a_fix_it_did_not_pr
     quality.parent.mkdir()
     quality.write_text("# Quality\n\n## Bugs\n\n```text\nany\n```\n", "utf-8")
     broken = tmp_path / "skills" / "dd-bug-resolution" / "scripts" / "_bugs_quality.py"
-    broken.write_text("import sys\nsys.exit('[error] half a refusal')\n", "utf-8")
+    broken.write_text(
+        f"import sys\nsys.stderr.write({printed + chr(10)!r})\nsys.exit({code})\n", "utf-8"
+    )
 
     rows = _quality_rows(script, specs, "CLOSURE")
 
-    assert [r["message"] for r in rows] == ["`bugs.py balance --check` exited 1"]
+    assert [r["message"] for r in rows] == [f"`bugs.py balance --check` exited {code}"]
     assert rows[0]["fix"].startswith("Operator action: run `")
+    assert "do the other half" not in rows[0]["fix"]
