@@ -625,6 +625,17 @@
       "relates": [
         "scorecard-one-ruler"
       ]
+    },
+    {
+      "id": "stage-gate-keeps-only-the-red-check",
+      "title": "The stage gate keeps only the RED-stage check; the generic verify-stage rerun is deleted",
+      "opened": "2026-10-06",
+      "status": "idea",
+      "description": "Operator, 2026-10-06, verbatim: 'S\u00f3 a checagem RED fica'. Measured: WT stage records nothing (:324-332) and enforces no order; RC-FLOW.md:30 says stage 1 writes strict xfails, yet pyproject.toml:119 sets no xfail_strict; the green-stage rerun repeats what the job gate runs on the same sha (the suite runs 3x per job). Design: WT stage checks only that a RED stage's tests are strict xfails that fail; the generic verify-stage rerun for green stages is deleted. stage-gate-runs-the-contract-tier would ADD the contract tier to the stage level this entry deletes; it exits in this same range under the operator's 2026-10-06 ruling 'S\u00f3 a checagem RED fica'. Placement: rc-11 (gate sizing). Placement and every design detail not quoted from a ruling are agent default, unruled.",
+      "provenance": "audit verification 2026-10-06 over feature/0.5.0 8e6448f13 (four read-only verifiers); main-thread registration after the operator grill of 2026-10-06",
+      "relates": [
+        "stage-gate-runs-the-contract-tier"
+      ]
     }
   ]
 }
