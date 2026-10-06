@@ -1146,6 +1146,12 @@
       "agent": "release.py new",
       "kind": "note",
       "text": "Candidate born on 0.5.0 (prior candidate closed at 27123ce99)"
+    },
+    {
+      "ts": "2026-10-06T14:23:53Z",
+      "agent": "dd-product-engineer",
+      "kind": "merge",
+      "text": "job: reconcile; start: 2026-10-06T04:14:32Z; end: 2026-10-06T14:04:37Z; wall: 590; ritual_wait: 28; dispatches: 14; job_gate_runs: 12"
     }
   ]
 }
