@@ -14,10 +14,8 @@ from typing import Any
 
 import pytest
 
-pytestmark = pytest.mark.unit
-
 _SCRIPT = (
-    Path(__file__).resolve().parents[3]
+    Path(__file__).resolve().parents[5]
     / "dadaia_workspace"
     / "public"
     / "skills"
