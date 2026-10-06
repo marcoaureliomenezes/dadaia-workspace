@@ -119,13 +119,13 @@ def _check_ancestor(tree: Path, work: str) -> None:
         ) from error
 
 
-def _gate(tree: Path, level: str, work: str, *files: str, head: bool = False) -> None:
-    """One gate level: the command *work*'s tracked `AGENTS.md` declares (HEAD's when *head*) —
+def _gate(tree: Path, level: str, work: str, *files: str) -> None:
+    """One gate level: the command *work*'s tracked `AGENTS.md` declares — no tree picks its judge —
     `verify:` the job's, `verify-stage:` and `verify-task:` (the touched *files* appended) — split
     by `shlex` and run as one argv list in *tree*, never a shell, the workspace venv first on
     `PATH` (a bare `python` is the workspace's, at any tree depth); its output, on stdout alone,
     is the evidence; stdin is closed. A missing or unstartable line is fixed on *work* alone."""
-    lines = git(tree, "show", f"{'HEAD' if head else work}:AGENTS.md", check=False).splitlines()
+    lines = git(tree, "show", f"{work}:AGENTS.md", check=False).splitlines()
     key = "verify:" if level == "job" else f"verify-{level}:"
     declared = next((ln.removeprefix(key).strip() for ln in lines if ln.startswith(key)), "")
     agents = tree.parents[3] / "repos" / tree.parents[1].name / "AGENTS.md"
@@ -307,7 +307,7 @@ def merge(root: Path, path: str, keep: list[str], drop: bool) -> str:
         _check_ancestor(tree, onto)
         _check_approved(root, tree, onto, name, run=True)
         _check_stray(tree, onto, name)
-        _gate(tree, "job", onto, head=True)
+        _gate(tree, "job", onto)
     kept = _kept(tree, "merge", keep, drop)
     if git(into, "branch", "--show-current").strip() != onto:
         raise Refusal(f"{into} is not on {onto}", git_line(into, "switch", onto))
