@@ -14,6 +14,7 @@ import shlex
 import shutil
 import subprocess
 import sys
+from collections.abc import Iterator
 from datetime import datetime
 from pathlib import Path
 
@@ -173,14 +174,21 @@ def _open_tasks(repo: Path, name: str) -> None:
                           f"{script(SCRIPT)} merge {quote(row['path'])}")  # fmt: skip
 
 
-def _ledgers(tree: Path) -> None:
-    """A `define` or `backlog` merge's whole gate: each ledger script's `check` on the tree."""
+def _checks(root: Path, tree: Path) -> Iterator[tuple[str, subprocess.CompletedProcess[str]]]:
+    """Each ledger script's `check` on the tree, then the workspace doctor on its `specs/` — the
+    check the work branch's CI runs — fenced to the tree."""
     skills = Path(__file__).resolve().parents[2]
     for skill, name in _LEDGERS:
         command = [sys.executable, str(skills / skill / "scripts" / name),
                    "check", "--specs", str(tree / "specs")]  # fmt: skip
-        done = subprocess.run(command, cwd=tree, env=_env(), stdin=subprocess.DEVNULL,
-                              capture_output=True, text=True)  # fmt: skip
+        yield name, subprocess.run(command, cwd=tree, env=_env(), stdin=subprocess.DEVNULL,
+                                   capture_output=True, text=True)  # fmt: skip
+    yield "dadaia doctor", cli(root, "doctor", "--specs-dir", str(tree / "specs"), tree=tree)
+
+
+def _ledgers(root: Path, tree: Path) -> None:
+    """A `define` or `backlog` merge's whole gate: the ledger checks and the doctor on the tree."""
+    for name, done in _checks(root, tree):
         if done.returncode:
             print(done.stdout, done.stderr, sep="", end="")
             raise Refusal(f"{name} check failed on {tree / 'specs'}",
@@ -297,7 +305,7 @@ def merge(root: Path, path: str, keep: list[str], drop: bool) -> str:
         _check_specs_only(tree, onto)
         _check_ancestor(tree, onto)
         _check_approved(root, tree, onto, name)
-        _ledgers(tree)
+        _ledgers(root, tree)
     else:
         _open_tasks(repo, name)
         _check_ancestor(tree, onto)
