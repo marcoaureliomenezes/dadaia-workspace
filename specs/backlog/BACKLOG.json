@@ -61,15 +61,6 @@
       "relates": []
     },
     {
-      "id": "ledger-reader-one-numbered-tolerant-iterator",
-      "title": "One numbered, tolerant JSONL iterator in _ledger replaces the hand line loops",
-      "opened": "2026-10-02",
-      "status": "idea",
-      "description": "_ledger.parse (dd-bug-resolution/scripts/_ledger.py:92) raises LineError on the first bad line and returns no line numbers, so ten production loops split JSONL by hand beside it: _bugs_check.py:67,112,133; _backlog_check.py:86,126; _audit_check.py:53; _release_check.py:77; features/specs/doctor_adr.py:34,95; features/specs/doctor_governance.py:50, which splits itself and calls parse per line under suppress(LineError). All split on LF alone today. Wanted: one numbered, tolerant iterator in _ledger (line number, record or error), parse and records thin over it, the ten loops collapsed into it (deletion-shaped). Bug family, each a hand reader splitting a ledger its own way: bug-event-field-with-unicode-line-separator-silently-drops-the-event, bug-event-sanitation-strips-tab-lf-cr-from-free-text, specs-doctor-bug-lane-splits-ledger-on-unicode-line-separators, release-events-fold-splits-release-jsonl-with-splitlines, sa-git-output-split-by-unicode-line-breaks, release-new-crashes-on-a-unicode-line-separator-in-the-bug-ledger, test-ledger-readers-bypass-the-one-jsonl-reader. Destination: rc-8.",
-      "provenance": "operator approval 2026-10-02 via the main thread's intake; source: review F3 of bug test-ledger-readers-bypass-the-one-jsonl-reader",
-      "relates": []
-    },
-    {
       "id": "caused-by-proposed-by-blame",
       "title": "resolve proposes caused_by from blame and refuses an unreasoned none",
       "opened": "2026-10-02",
