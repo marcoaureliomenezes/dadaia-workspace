@@ -491,6 +491,17 @@
       "relates": [
         "architecture-adr-section-generated"
       ]
+    },
+    {
+      "id": "fix-reader-rebuild-under-c",
+      "title": "Job 1's fix reader is REBUILT to one Subject parser with every function at radon C or better",
+      "opened": "2026-10-06",
+      "status": "idea",
+      "description": "Measured: rc-10 Job 1's REBUILD grew the dd-bug-resolution scripts 1217->1383 lines (+166; its files 344->493); _bugs_fix.fixes is radon F-49, the worst function in the library; the new _bugs_transition.transition is D-24; fmt:skip 24->31; indexed regex groups remain; two task-subject regexes remain (bugs.py:107, :155); the bug-link grammar is spelled 3x. The audit's readability goal was not delivered. _fixes saw 6 commits and missed 579a6c70a. Design: REBUILD (keeps the fix's tests) to one Subject parser (one-task-id-subject-grammar), named groups, one link grammar, every function in dd-bug-resolution/scripts at radon C or better; the diff deletes more than it adds. Done when: radon cc reports nothing above C under dd-bug-resolution/scripts and Job 1's tests stay green unedited. Placement: rc-11. Placement and every design detail not quoted from a ruling are agent default, unruled.",
+      "provenance": "audit verification 2026-10-06 over feature/0.5.0 8e6448f13 (four read-only verifiers); main-thread registration after the operator grill of 2026-10-06",
+      "relates": [
+        "bugs-fix-reads-the-per-class-shape"
+      ]
     }
   ]
 }
