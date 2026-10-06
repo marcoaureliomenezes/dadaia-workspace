@@ -373,15 +373,6 @@
       "relates": []
     },
     {
-      "id": "task-gate-mypy-follows-cross-skill-imports",
-      "title": "The task gate's single-file mypy follows the skill scripts' cross-skill sys.path imports, and the two casts it forced leave",
-      "opened": "2026-10-06",
-      "status": "idea",
-      "description": "Found in rc-9 (Job 2 verdict INFO): scripts/ci.py task runs mypy --strict on the touched files only; a skill script importing a sibling skill's module through sys.path (the declared cross-skill edges of the thin-wrapper contract) types that import as Any, so two casts were added to satisfy it: int(refuse(...)) in dd-release-implementation/scripts/release.py (a9108723f) and dict(_ledger.finding(...)) in dd-backlog-definition/scripts/_backlog_check.py. Design: the task level passes mypy the skill script directories the touched files import from (MYPYPATH built from the cross-skill edges already declared in tests/contract/test_public_scripts_thin_wrapper.py, or mypy_path in pyproject for public/skills/*/scripts), one place; then delete both casts. Done when: the two casts are gone and scripts/ci.py task on those files is green.",
-      "provenance": "rc-9 Reconciliation deferral (JR.S2.T5), dispatched by the main thread 2026-10-06 under the operator's rc-9 scope; target rc-10 or later",
-      "relates": []
-    },
-    {
       "id": "hypothesis-cache-stays-out-of-repo-trees",
       "title": "No .hypothesis/ directory lands in a repo or worktree tree",
       "opened": "2026-10-06",
