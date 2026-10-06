@@ -378,10 +378,12 @@ def _records(specs: Path) -> list[dict[str, Any]]:
     return _read(specs / "bugs/BUGS.jsonl")
 
 
-def _resolve_argv(bug_id: str = "a-bug", caused_by: str = "none") -> list[str]:
+def _resolve_argv(
+    bug_id: str = "a-bug", caused_by: str = "none", seam: str | None = "cli/x.py"
+) -> list[str]:
     return [
         "resolve", bug_id, "--cause", "c", "--caused-by", caused_by,
-        "--solution", "s", "--evidence-loop", "pytest -k x",
+        "--solution", "s", "--evidence-loop", "pytest -k x", *(["--evidence-seam", seam] if seam else []),
     ]  # fmt: skip
 
 
@@ -895,8 +897,6 @@ def test_fix_lists_a_fix_commit_once_when_its_resolve_names_it_short(
     assert listed == [f"a-bug\t{sha}\tnet-positive", "\t1\t0\tcli/a.py", "[ok] 1 linked, 0 unlinked."]  # fmt: skip
 
 
-#: rc-10 Stage J1.S1 RED rows: strict, so a row turning green before its task flags itself.
-_RED_AC1_2 = pytest.mark.xfail(strict=True, reason="rc-10 AC1.2: evidence_seam at resolve (J1.S3.T1)")
 
 
 def _commits(root: Path, *commits: tuple[str, dict[str, str]]) -> list[str]:
@@ -1101,7 +1101,7 @@ def test_resolve_proposes_caused_by_by_blame(
     nt = os.name == "nt"  # the host shell's rendering: forward slashes and double quotes
     shown = (lambda p: Path(p).as_posix()) if nt else str
     loop = '"pytest -k x"' if nt else "'pytest -k x'"
-    rerun = f"{shown(sys.executable)} {shown(script)} resolve a-bug --cause c --solution s --evidence-loop {loop} --specs {shown(specs.resolve())}"  # fmt: skip
+    rerun = f"{shown(sys.executable)} {shown(script)} resolve a-bug --cause c --solution s --evidence-loop {loop} --evidence-seam cli/x.py --specs {shown(specs.resolve())}"  # fmt: skip
     fix = f"fix: Operator action: run `{rerun}` with --caused-by {_NEAR.replace(', ', ' or ')}, or --lineage-reason saying why not"  # fmt: skip
     assert done.stderr.splitlines() == ([refusal, fix] if refusal else []), done.stderr
     assert done.returncode == (1 if refusal else 0)
@@ -1514,7 +1514,6 @@ def test_an_unreadable_history_is_refused_never_stamped_unknown(
 _SEAM_TEST = "class TestX:\n    def test_y(self) -> None: ...\n\n\n@mark\ndef test_p(n: int) -> None: ...\n"
 
 
-@_RED_AC1_2
 @pytest.mark.parametrize(("seam", "refusal"), [
     ("tests/test_s.py::test_p", None),  # present
     ("tests/test_s.py::test_p[a-1]", None),  # a parametrized node: the brackets are stripped
@@ -1539,21 +1538,19 @@ def test_resolve_checks_its_evidence_seam_textually(
     assert (record["status"], record.get("evidence_seam")) == (("open", None) if refusal else ("resolved", seam))
 
 
-@_RED_AC1_2
 def test_resolve_requires_an_evidence_seam(script: Path, tmp_path: Path) -> None:
     """AC1.2 (0208): `evidence_seam` is required at resolve, named with the other fields."""
     specs = _ledger(tmp_path, _OPEN_RECORD)
-    done = _run(script, *_resolve_argv(), "--specs", str(specs))
+    done = _run(script, *_resolve_argv(seam=None), "--specs", str(specs))
     assert done.returncode == 1
     assert done.stderr.splitlines()[0] == "[error] transition 'resolve' refused — 'evidence_seam' required"
     assert _records(specs)[0]["status"] == "open"
 
 
-@_RED_AC1_2
 def test_window_marks_a_record_whose_seam_file_is_gone(script: Path, tmp_path: Path) -> None:
     """AC1.2: `window` marks a seam file the tree no longer holds; `check` never re-judges it."""
     closed = {**_OPEN_RECORD, "status": "resolved", "cause": "c", "caused_by": "none", "solution": "s",
-              "evidence_loop": "l", "resolved_release": "9.9.9", "closed_at": "2026-09-21T00:00:00Z",
+              "evidence_loop": "pytest -k x", "resolved_release": "9.9.9", "closed_at": "2026-09-21T00:00:00Z",
               "found_in": {"release": "9.9.9", "rc": "rc-1"}}  # fmt: skip
     specs = _live(tmp_path, {**closed, "id": "kept", "evidence_seam": "cli/x.py"},
                   {**closed, "id": "gone", "evidence_seam": "tests/test_gone.py::test_z"})  # fmt: skip

@@ -126,6 +126,14 @@ def _placed[T](read: Callable[[], T], specs: Path) -> T:
         raise refusal from None
 
 
+def _tracked(specs: Path, path: str) -> str | None:
+    """The text git tracks at *path* (repo-relative, from the index), None when untracked."""
+    try:
+        return _git(_git(specs, "rev-parse", "--show-toplevel").strip(), "show", f":{path}")
+    except subprocess.CalledProcessError:
+        return None
+
+
 def _held_at(specs: Path, instant: str) -> dict[str, str]:
     return _placed(lambda: candidate_at(specs, instant), specs)
 
@@ -151,6 +159,7 @@ def _window(specs: Path) -> int:
         when[sha] = instant
         if task := re.match(r"[a-z]+\(([^)]+)\)", subject):
             by_task.setdefault(task[1], []).append(sha)
+    tracked = set(_git(specs, "ls-files", "--full-name", ":/").splitlines())
     for record in [*read_records(specs / LEDGER), *(r for r in read_records(specs / HISTO) if "id" in r)]:  # fmt: skip
         cause = record.get("caused_by")
         shas = (
@@ -164,7 +173,8 @@ def _window(specs: Path) -> int:
         found, born = record.get("found_in"), _held_at(specs, culprit) if culprit else record.get("introduced_in")  # fmt: skip
         seen = [c for c in (found, born) if c]
         cells = (f"{c['release']}/{c['rc']}" if c else "-" for c in (found, born))
-        line = "\t".join((record["id"], record["status"], *cells))
+        seam = str(record.get("evidence_seam") or "").split("::")[0]
+        line = "\t".join((record["id"], record["status"], *cells, *(["seam gone"] if seam and seam not in tracked else [])))  # fmt: skip
         if any(c["release"] in keys for c in seen):
             rows.append(line)
         elif any(c["release"] == "unknown" for c in seen):
@@ -259,7 +269,7 @@ def _write(args: argparse.Namespace, specs: Path) -> int:
     near = _candidates(specs, args.bug_id) if args.verb == "resolve" else []
     if near:
         print(f"blame candidates: {', '.join(near)}")
-    commit(ledger, lambda rs: tr.transition(rs, args.bug_id, args.verb, values, near))
+    commit(ledger, lambda rs: tr.transition(rs, args.bug_id, args.verb, values, near, lambda p: _tracked(specs, p)))  # fmt: skip
     print(f"[ok] {tr.STATUS_BY_VERB[args.verb]} {args.bug_id}")
     return 0
 
