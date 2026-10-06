@@ -51,13 +51,20 @@ Paths are relative to the repo root; aliases as in `PLAN.md` (`f/`, `pub/`, `S/`
 | J7.S4.T2 | AC7.1, AC7.2 | `tests/scripts/**`, `tests/fixtures/test_*.py`, `tests/fixtures/statement_ids.json` (moved from today's tiers); `tests/contract/README.md` and the empty `tests/unit/features/specs/test_doctor_ledger_invariants.py` (J7.S3.T4 did not delete it) deleted; the planted tests of `tests/scripts/test_ci.py` drop their transitional `unit` marker | moved files |
 | J7.S4.T3 | AC7.1 | `pyproject.toml` (the `unit`, `contract`, `integration` aliases leave with the last move), `tests/contract/test_docs_derived_from_memory.py` (its alias marker line), `scripts/guards/suite.py` (`statement_ids.json` path), `pub/data/CONTEXT-MAP.md` (`:5`), `pub/scaffold/memory/QUALITY.md` (`:20-21`, ADR 0167), `pub/templates/shipped-hashes.json` (the new stub digests, append-only), the source comments naming a moved test (`f/specs/canon.py`, `f/specs/doctor.py`, `core/spec_status.py`, `core/release_state.py`, `core/doctor_rules.py`, `infrastructure/runtime_transforms/codex_assets.py`, `f/specs/citations.py`) (path literals of moved files) | guard plants |
 
-## Stage J7.S5 — the mirror guard; close
+## Stage J7.S5 — the mirror guard
 
-- Contract: exit: the stage gate (lint, mypy, guards, small) green; the guard red on its plants, green on the tree; envelope `scripts/guards/repo.py`, the six e2e journeys without an `Owner:` line, this file; ACs AC7.1
+- Contract: exit: the stage gate (lint, mypy, guards, small) green; the guard red on its plants, green on the tree; envelope `scripts/guards/repo.py`, the six e2e journeys without an `Owner:` line, `tests/fixtures/test_conftest_size.py`, `scripts/guards/run.py`, `tests/scripts/test_ci.py`; ACs AC7.1, AC7.3
 
 | task | AC | `W:` | owner tests / RED |
 |---|---|---|---|
 | J7.S5.T1 | AC7.1 | `tests/test_conftest_size.py` (moved by `git mv` into tests/fixtures, as J7.S1.T1 announced; J7.S5.T3 writes the moved file), `tests/e2e/test_push_denylist_journey.py`, `tests/e2e/test_one_line_bootstrap.py`, `tests/e2e/test_push_gate_check.py`, `tests/e2e/features/test_specs_upgrade_e2e.py`, `tests/e2e/features/test_public_pipeline.py`, `tests/e2e/features/test_ctx_inject_bind_boundary.py` (an `Owner:` docstring line), `scripts/guards/repo.py` (check `tests-mirror-the-package`, after every move: red on a planted loose file and on an empty test directory) | guard plants |
 | J7.S5.T3 | AC7.3 | `scripts/guards/run.py` (one docstring line over 100 columns), `tests/fixtures/test_conftest_size.py` (one string over 100 columns), `tests/scripts/test_ci.py` (two parametrize rows: the `integration` job selects the medium tests; its asserts unchanged) | `tests/scripts/test_ci.py` |
-| J7.S5.T4 | AC7.3 | `scripts/ci.py` (`contract-coverage` selects `not e2e and not quarantine`: the 80 % bar measured 69.99 % over the small tier alone, so the job covers small and medium as the Windows and macOS legs do) | `tests/scripts/test_ci.py` |
-| J7.S5.T2 | — | this file | close task, last: behavior map; `test-audit:` names `test_conftest_size.py` (moves otherwise, asserts unchanged), `mutation:`; `done` |
+
+## Stage J7.S6 — coverage over small and medium; close
+
+- Contract: exit: the stage gate (lint, mypy, guards, small) green; `ci.py contract-coverage` green at its 80 % bar; envelope `scripts/ci.py`, `tests/scripts/test_ci.py`, this file; ACs AC7.3
+
+| task | AC | `W:` | owner tests / RED |
+|---|---|---|---|
+| J7.S6.T1 | AC7.3 | `scripts/ci.py` (`contract-coverage` selects `not e2e and not quarantine`: the 80 % bar measured 69.99 % over the small tier alone, so the job covers small and medium as the Windows and macOS legs do), `tests/scripts/test_ci.py` (the planted inner run drops the outer coverage session's `COV_CORE_*` and `COVERAGE_*` variables, which the medium tests now run under) | `tests/scripts/test_ci.py` |
+| J7.S6.T2 | — | this file | close task, last: `test-audit:` names `tests/fixtures/test_conftest_size.py` (moves otherwise, asserts unchanged), `mutation:`; `done` |
