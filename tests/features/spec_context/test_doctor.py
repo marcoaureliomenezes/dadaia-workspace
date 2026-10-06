@@ -89,10 +89,6 @@ def _write_ledger(root: Path, *relpaths: str) -> None:
         target.write_text("projected", encoding="utf-8")
 
 
-_RED_ROOT = pytest.mark.xfail(
-    strict=True, reason="JB.S1 RED: root-allows-git-and-gitignore-though-root-is-never-a-repo"
-)
-
 _REGISTRY = json.dumps({"contexts": [
     {"name": "alpha", "state": "ALIVE", "repo_slug": "main-r", "associated_repos": [{"slug": "assoc-r"}]},
     {"name": "gone", "state": "DEAD", "repo_slug": "dead-r"},
@@ -112,7 +108,7 @@ _PLACES = {
 @pytest.mark.parametrize(
     ("registry", "expected"),
     [
-        pytest.param(_REGISTRY, _PLACES, id="registered", marks=_RED_ROOT),
+        pytest.param(_REGISTRY, _PLACES, id="registered"),
         *(pytest.param(text, {"repos/alpha": "WS-repos-canon", "worktrees/dead-r": "WS-worktrees-canon"}, id=f"unreadable-registry-{text}")
           for text in ("{", '{"contexts": 5}')),
     ],

@@ -74,11 +74,10 @@ AUDIT_DIR_NAME_RE: re.Pattern[str] = re.compile(f"^{AUDIT_DIR_NAME_PATTERN}$")
 #: The operator's file of legitimate workspace paths, at the root (ADRs 0092, 0145).
 DADAIAIGNORE: str = ".dadaiaignore"
 
-#: Files the workspace root may contain: the root map, the operator prompt, the git ignore,
-#: the operator's own globs — credentials live outside the workspace (ADR 0146).
-ROOT_ALLOWED_FILES: frozenset[str] = frozenset(
-    {"AGENTS.md", "prompt.md", ".gitignore", DADAIAIGNORE}
-)
+#: Files the workspace root may contain: the root map, the operator prompt, the operator's own
+#: globs — credentials live outside the workspace (ADR 0146); the root is never a repository,
+#: so neither a ``.gitignore`` nor a ``.git/`` is canon there (ADR 0092: ``.dadaiaignore``).
+ROOT_ALLOWED_FILES: frozenset[str] = frozenset({"AGENTS.md", "prompt.md", DADAIAIGNORE})
 
 
 class FloorRefusal(StrEnum):
@@ -373,9 +372,7 @@ HARNESS_DIRS: frozenset[str] = frozenset(
     {".agents", *(d for dirs in HARNESS_PROJECTION_DIRS.values() for d in dirs)}
 )
 
-ROOT_ALLOWED_DIRS: frozenset[str] = frozenset(
-    {".dadaia", ".git", "repos", "worktrees"} | HARNESS_DIRS
-)
+ROOT_ALLOWED_DIRS: frozenset[str] = frozenset({".dadaia", "repos", "worktrees"} | HARNESS_DIRS)
 
 #: What a repo working tree must NOT carry: a nested ``.dadaia`` (tool caches are the
 #: repo's own, redirected by configuration — ``TOOL_CACHE_ENV``).
