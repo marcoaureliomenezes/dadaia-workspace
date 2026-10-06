@@ -1,7 +1,7 @@
 # PLAN — Release: 0.5.0, candidate 10
 
-**Status:** Approved — by operator delegation 2026-10-06 ("Delego: APPROVED do revisor basta (Recommended)", handoff 2026-10-06T044815Z-main-thread-overnight-delegation); dd-code-reviewer APPROVED d1f1b01b1.
-
+**Status:** Approved
+**Approval:** by operator delegation 2026-10-06 ("Delego: APPROVED do revisor basta (Recommended)", handoff 2026-10-06T044815Z-main-thread-overnight-delegation); dd-code-reviewer APPROVED d1f1b01b1.
 **Amended:** 2026-10-06 (M-A folds, J1.S3.T2 row); approval basis: dd-code-reviewer re-review of the amended define head.
 **Release ID:** 0.5.0
 **Owner:** dd-software-engineer
