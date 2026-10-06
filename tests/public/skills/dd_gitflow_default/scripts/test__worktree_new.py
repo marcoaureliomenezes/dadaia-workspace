@@ -146,7 +146,6 @@ def _bug_record(root: Path, status: str | None) -> None:
     _git(repo, "commit", "-qm", "no rc", "--allow-empty")
 
 
-@pytest.mark.xfail(strict=True, reason="JB.S3 RED: hotfix job without an rc SPEC")
 def test_a_hotfix_job_opens_with_no_rc_and_lands_on_the_work_branch(root: Path) -> None:
     """ADR 0206: a block-list bug is fixed as its own job — `new <repo> hotfix/<bug-id>` cuts it
     from the work branch with no rc SPEC, and its merge runs the same review and job gate."""
@@ -163,7 +162,6 @@ def test_a_hotfix_job_opens_with_no_rc_and_lands_on_the_work_branch(root: Path) 
     assert (repo / "src/fix.py").is_file() and not tree.exists()
 
 
-@pytest.mark.xfail(strict=True, reason="JB.S3 RED: hotfix job without an rc SPEC")
 @pytest.mark.parametrize("status", [None, "resolved"], ids=["no-record", "resolved"])
 def test_a_hotfix_job_needs_its_open_bug_record_on_the_work_branch(
     root: Path, status: str | None

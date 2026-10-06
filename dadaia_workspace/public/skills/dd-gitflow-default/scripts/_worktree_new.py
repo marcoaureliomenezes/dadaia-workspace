@@ -6,8 +6,10 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
-sys.path.append(str(Path(__file__).resolve().parents[2] / "dd-release-implementation" / "scripts"))
+for _skill in ("dd-release-implementation", "dd-bug-resolution"):
+    sys.path.append(str(Path(__file__).resolve().parents[2] / _skill / "scripts"))
 
+from _ledger import parse  # noqa: E402
 from _release_schema import extract_status  # noqa: E402
 from _worktree_git import flow_for, git, ours, quote, rows, script, work_version  # noqa: E402
 from _worktree_names import LOCK, NAME_RE, SCRIPT, TASK_CAP, Refusal, base, branch  # noqa: E402
@@ -24,6 +26,17 @@ def _exit(root: Path, path: str) -> str:
     return next(str(row["exit"]) for row in rows(root) if row["path"] == path)
 
 
+def _refuse_unopened_bug(main: Path, work: str, bug: str) -> None:
+    """A hotfix job is the fix of one bug the main repo's ledger holds open on *work*."""
+    try:
+        found = parse(git(main, "show", f"{work}:specs/bugs/BUGS.jsonl", check=False))
+    except ValueError:
+        found = []
+    if not any(r.get("id") == bug and r.get("status") == "open" for r in found):
+        raise Refusal(f"no open bug record {bug} on {work}",
+                      f"Operator action: register bug {bug} on {work} as open (dd-bug-registration), then open its hotfix job again")  # fmt: skip
+
+
 def new(root: Path, repo_name: str, name: str) -> Path:
     repo = root / "repos" / repo_name
     _refuse_symlink(root, repo_name)
@@ -34,7 +47,7 @@ def new(root: Path, repo_name: str, name: str) -> Path:
     if match is None or match["v"] not in (None, version):
         shape = f"{version}-rc<N>/<job>[--<task-id>]"
         raise Refusal(
-            f"{name!r} is not a worktree name: {shape}, {version}-rc<N>/define or backlog/<slug>",
+            f"{name!r} is not a worktree name: {shape}, {version}-rc<N>/define, backlog/<slug> or hotfix/<bug-id>",
             f"{script(SCRIPT)} list",
         )
     if match["rc"] and match["job"] != "define":  # a job runs only under an Approved SPEC
@@ -46,6 +59,8 @@ def new(root: Path, repo_name: str, name: str) -> Path:
                 f"a job needs an Approved rc-{rc}/SPEC.md on {work}",
                 f"{script(SCRIPT)} new {quote(flow['main'])} {match['rc']}/define",
             )
+    if match["bug"]:  # a block-list hotfix: no rc SPEC, only its open bug (ADR 0206)
+        _refuse_unopened_bug(root / "repos" / flow["main"], work, match["bug"])
     start = base(name, work)
     if match["task"]:  # cut from its job branch; at most TASK_CAP open per rc
         tasks = [r for r in ours(repo) if (m := NAME_RE.match(r["name"])) and m["task"]

@@ -28,7 +28,8 @@ def main(argv: list[str] | None = None) -> int:
     make = verbs.add_parser("new", help="open a worktree: a job, a task, define or backlog")
     make.add_argument("repo")
     make.add_argument(
-        "name", help="<M.m.p>-rc<N>/<job>[--<task-id>], <M.m.p>-rc<N>/define, backlog/<slug>"
+        "name",
+        help="<M.m.p>-rc<N>/<job>[--<task-id>], <M.m.p>-rc<N>/define, backlog/<slug>, hotfix/<bug-id>",
     )
     verbs.add_parser(
         "stage", help="close a job's stage: its stage gate, no task open"
