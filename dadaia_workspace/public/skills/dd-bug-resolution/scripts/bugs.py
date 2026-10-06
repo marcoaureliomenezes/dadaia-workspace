@@ -138,37 +138,32 @@ def _held_at(specs: Path, instant: str) -> dict[str, str]:
     return _placed(lambda: candidate_at(specs, instant), specs)
 
 
+def _culprits(cause: object, fixes: dict[str, fx.Fix], tasks: dict[str, list[str]]) -> list[str]:
+    """The commits of the bug fix or task a record's `caused_by` names, newest first."""
+    if cause in (None, "none"):
+        return []
+    return list(fixes[str(cause)].commits) if cause in fixes else tasks.get(str(cause), [])[::-1]
+
+
+def _window_keys(specs: Path) -> list[str]:
+    """The live release and the last shipped one, read after a shallow clone is refused."""
+    live = _placed(lambda: live_id(specs), specs)
+    _held_at(specs, wr.now_iso())
+    shipped = sorted((end, r) for r, (_, end) in releases(specs).items() if end)
+    return sorted({live, *(r for _, r in shipped[-1:])})
+
+
 def _window(specs: Path) -> int:
     """Every live and archived record found in or born in the live or the last shipped
     release; a `release` `unknown` one apart (AC13.3). `introduced_in` is read from
     `caused_by`'s culprit, its oldest fix or `<type>(<task-id>)` commit, else stored."""
-    live = _placed(lambda: live_id(specs), specs)
-    _held_at(specs, wr.now_iso())  # a shallow clone is refused before any line
-    shipped = sorted((end, r) for r, (_, end) in releases(specs).items() if end)
-    keys = sorted({live, *(r for _, r in shipped[-1:])})
-    fixes, rows, apart, when, by_task = (
-        fx.fixes(specs),
-        [],
-        [],
-        dict[str, str](),
-        dict[str, list[str]](),
-    )
-    # one pass, --all: a repo with no commit yet lists nothing instead of failing
-    for line in _git(specs, "log", "--all", "--format=%H %cI %s").splitlines():
-        sha, instant, subject = (line.split(" ", 2) + [""])[:3]
-        when[sha] = instant
-        if task := re.match(r"[a-z]+\(([^)]+)\)", subject):
-            by_task.setdefault(task[1], []).append(sha)
+    keys = _window_keys(specs)
+    fixes, tasks, rows, apart = fx.fixes(specs), fx.tasked(specs), [], []
+    # --all: a repo with no commit yet lists nothing instead of failing
+    when = dict(ln.split(" ", 1) for ln in _git(specs, "log", "--all", "--format=%H %cI").splitlines())  # fmt: skip
     tracked = set(_git(specs, "ls-files", "--full-name", ":/").splitlines())
     for record in [*read_records(specs / LEDGER), *(r for r in read_records(specs / HISTO) if "id" in r)]:  # fmt: skip
-        cause = record.get("caused_by")
-        shas = (
-            []
-            if cause in (None, "none")
-            else list(fixes[cause].commits)
-            if cause in fixes
-            else by_task.get(cause, [])
-        )
+        shas = _culprits(record.get("caused_by"), fixes, tasks)
         culprit = when.get(shas[-1]) if shas else None
         found, born = record.get("found_in"), _held_at(specs, culprit) if culprit else record.get("introduced_in")  # fmt: skip
         seen = [c for c in (found, born) if c]
