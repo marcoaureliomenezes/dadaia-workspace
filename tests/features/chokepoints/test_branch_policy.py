@@ -143,7 +143,7 @@ def _birth_fix(tip: str, role: str) -> list[str]:
     pytest.param(_C, _feature_to_published_integration, "", None, id="finding-2-work-branch-to-the-integration-ref"),
     pytest.param(_C, lambda r, f: f"HEAD {_A} refs/heads/work/0.0.1 {_ZERO}", "",
                  ["git", "-C", "/repo", "switch", "-c", "work/0.6.0", _A], id="finding-6-detached-head-cuts-the-work-branch"),
-    pytest.param(_D, lambda r, f: "this line has three fields", "--no-verify", None, id="finding-1-malformed-stdin-fails-closed"),
+    pytest.param(_D, lambda r, f: "this line has three fields", "", None, id="finding-1-malformed-stdin-fails-closed"),
 ])
 # fmt: on
 def test_the_gate_refuses_with_the_configured_fix(

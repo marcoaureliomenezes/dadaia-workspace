@@ -4,7 +4,7 @@ scan over a REAL throwaway repo, through the real ``GitSubprocessObjectReader`` 
 a value at the range base (v0.11.0 FR1) — for a tag pushed over a published sha and for
 the first push of a new branch whose past is on origin (bug
 new-branch-push-loses-prior-published-denylist-amnesty); a git failure refuses naming
-``--no-verify`` (FR6 row 2). Synthetic terms only.
+its failure (FR6 row 2). Synthetic terms only.
 """
 
 from __future__ import annotations
@@ -105,7 +105,7 @@ def test_prior_side_lookup_failure_refuses_naming_the_failure_and_no_verify(
 ) -> None:
     """SPEC v0.11.0 A2.3 (integration tier — unit tier already pinned in
     ``tests/infrastructure/test_git_objects.py``): a forced git failure on
-    the prior-side lookup refuses, naming the failure AND ``--no-verify``, over the
+    the prior-side lookup refuses, naming the failure, over the
     REAL adapter wired into ``push_gate_decision``."""
     repo = tmp_path / "repo"
     _init_repo(repo)
@@ -134,7 +134,6 @@ def test_prior_side_lookup_failure_refuses_naming_the_failure_and_no_verify(
 
     assert not decision.allowed
     assert "prior content" in decision.message
-    assert "--no-verify" in decision.message
 
 
 def test_real_git_failure_refuses_naming_the_failure(tmp_path: Path) -> None:
@@ -145,4 +144,3 @@ def test_real_git_failure_refuses_naming_the_failure(tmp_path: Path) -> None:
     decision = _decide([_tag_push_ref("a" * 40)], not_a_repo)
 
     assert not decision.allowed
-    assert "--no-verify" in decision.message
