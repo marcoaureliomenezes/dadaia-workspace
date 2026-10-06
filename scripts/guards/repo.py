@@ -27,8 +27,7 @@ from run import _CI, tracked  # noqa: E402
 
 from dadaia_workspace.core.fixed_sections import extract_fixed_section  # noqa: E402
 from dadaia_workspace.core.gitflow import read_gitflow  # noqa: E402
-from dadaia_workspace.core.workspace_layout import render_registry_tables  # noqa: E402
-from dadaia_workspace.features.specs.canon import CANON, TEMPLATES  # noqa: E402
+from dadaia_workspace.features.specs.canon import CANON  # noqa: E402
 from dadaia_workspace.infrastructure.ledger_scripts import load_owner  # noqa: E402
 
 if TYPE_CHECKING:
@@ -459,19 +458,10 @@ def onboarding_journey_uv(tree: Tree) -> list[str]:
 
 
 def specs_canon_tracked(tree: Tree) -> list[str]:
-    """AC8.3: one probe per CANON row, judged by the tree's .gitignore. A row is meant to be
-    ignored only when its template renders registry tables (a projection), plus the two
-    archived scratch shapes."""
-    expect: dict[str, str] = {}  # path -> the sub-rule its wrong visibility breaks
-    for row in CANON:
-        kind, src = TEMPLATES.get(row.shape, ("static", ""))
-        text = (
-            (ROOT / "dadaia_workspace/public" / src).read_text("utf-8") if kind == "copy" else src
-        )
-        projected = render_registry_tables(text) != text
-        expect["specs/" + re.sub(r"<[^>]+>|\*\*", "1", row.shape)] = (
-            "ignore-lost" if projected else "canon-ignored"
-        )
+    """AC8.3: one probe per CANON row, judged by the tree's .gitignore. Every row is tracked
+    (a rendered row's drift is TREE-5's, in CI's doctor); only the two archived scratch
+    shapes are ignored."""
+    expect = {"specs/" + re.sub(r"<[^>]+>|\*\*", "1", row.shape): "canon-ignored" for row in CANON}
     expect |= {
         "specs/releases/_archive/1/local-notes.md": "ignore-lost",
         "specs/releases/_archive/1/tmp/x": "scratch-tracked",
