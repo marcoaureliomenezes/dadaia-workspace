@@ -109,6 +109,29 @@ def _trace(
     ]
 
 
+#: AC5.6: the first `## ` heading of every live candidate's SPEC.
+BUG_WINDOW = "## Bug window review"
+
+
+def _bug_window_findings(specs: Path) -> list[dict[str, Any]]:
+    """The live candidate's SPEC opens with :data:`BUG_WINDOW` (AC5.6)."""
+    try:
+        live = live_release(specs)
+    except Refusal:
+        return []  # the tree walk reports a missing or doubled live release
+    spec = live.candidate / "SPEC.md" if live.candidate else None
+    if spec is None or not spec.is_file():
+        return []
+    lines = spec.read_text(encoding="utf-8").splitlines()
+    first = next((n for n, line in enumerate(lines, 1) if line.startswith("## ")), 1)
+    if lines[first - 1 : first] == [BUG_WINDOW]:
+        return []
+    return [finding(spec.relative_to(specs).as_posix(), first,
+                    f"the live SPEC's first `## ` heading is not `{BUG_WINDOW}` (AC5.6)",
+                    f"Operator action: open {spec} with `{BUG_WINDOW}` as its first `## ` "
+                    "heading, reviewing `bugs.py window` and each cited test")]  # fmt: skip
+
+
 def _origin_findings(specs: Path) -> list[dict[str, Any]]:
     """The live candidate's Origin line: grammar and existence always, and each carried id
     listed with its standing — a missing pointer is an error only once the live candidate
@@ -339,7 +362,8 @@ def tree_findings(specs: Path) -> list[dict[str, Any]]:
 def check(specs: Path) -> list[dict[str, Any]]:
     """The ONE release validator (the doctor delegates here): the tree, the live
     candidate's Origin, then the live CLOSURE's memory record."""
-    return tree_findings(specs) + _origin_findings(specs) + _window_findings(specs)
+    return (tree_findings(specs) + _bug_window_findings(specs) + _origin_findings(specs)
+            + _window_findings(specs))  # fmt: skip
 
 
 def ship_findings(specs: Path) -> list[dict[str, Any]]:

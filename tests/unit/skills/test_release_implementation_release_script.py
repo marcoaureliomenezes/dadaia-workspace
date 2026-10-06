@@ -154,7 +154,6 @@ def test_new_refuses_a_second_live_release_with_one_fix_line(script: Path, tmp_p
     assert _tree_hash(specs) == before
 
 
-@pytest.mark.xfail(strict=True, reason="J5.S2.T1: AC5.6")
 def test_an_rc_spec_opens_with_the_bug_window_review(script: Path, tmp_path: Path) -> None:
     """AC5.6: `new` writes `## Bug window review` as the first SPEC heading; `check` refuses
     a live SPEC without it, with exactly one fix."""
