@@ -1,4 +1,9 @@
-"""codex-live-probe boundary — certify() exercises the INSTALLED Codex, not statics.
+"""`certify` over a real journey: its `dadaia` and `git` children run for real.
+
+T-050-50; 0.4.7 FR4/T-047-16 (every verb certify shells exists: its
+check PASSes). Size: MEDIUM — only `init` (a venv build) and harness binaries are faked.
+
+codex-live-probe boundary — certify() exercises the INSTALLED Codex, not statics.
 
 v0.4.3 A22.4; codex-live-probe-gate-checks-presence-not-usability (an
 installed-but-unentitled Codex is the same honest SKIP as an absent one);
@@ -6,21 +11,90 @@ certify-skip-detail-leaks-full-codex-output (CWE-532: SKIP/FAIL detail carries o
 upstream message, length-capped — never the banner's workdir/session id, never a raw blob).
 
 A FAKE ``CertificationProcess`` answers; the live probe runs only under ``dadaia certify``.
+
+Per-record live probes — one `<harness>-live-probe` for every registered record.
+
+`dadaia certify` probes the INSTALLED runtime of every harness the registry knows, by
+iteration and never by a hand-written line per harness. The probe carries NO version
+floor: the workspace derives the same four behaviours into every harness and pins no
+release of any of them. An absent binary leaves the runtime claim UNVERIFIED — an honest,
+non-failing degrade — while an installed binary that cannot answer is a genuine failure.
+
+These tests inject a FAKE process and a fake `PATH` lookup; no real binary is touched.
 """
 
 from __future__ import annotations
 
+import os
+import site
+import sys
+from collections.abc import Mapping, Sequence
 from pathlib import Path
 
 import pytest
 
+from dadaia_workspace.core.harness_registry import L1_ENTRY_HARNESSES
+from dadaia_workspace.features.certification import service
 from dadaia_workspace.features.certification.service import (
+    _HARNESS_PROBE_BINARIES,
     CertificationCheck,
     _all_checks_ok,
     _CertificationSkip,
     _codex_live_probe_detail,
+    _version_probe_detail,
+    certify,
 )
-from dadaia_workspace.infrastructure.certification_process import CertificationProcessResult
+from dadaia_workspace.infrastructure.certification_process import (
+    CertificationProcessResult,
+    SubprocessCertificationProcess,
+)
+from tests.fixtures.stores import own_venv_python, own_venv_workspace
+
+
+class _Children(SubprocessCertificationProcess):
+    """`init` lays a workspace plus slop; `dadaia` runs on *python*, `git` for real."""
+
+    def __init__(self, python: Path) -> None:
+        self._python = str(python)
+
+    def run(
+        self,
+        argv: Sequence[str],
+        *,
+        cwd: Path,
+        env: Mapping[str, str] | None = None,
+        timeout: float,
+    ) -> CertificationProcessResult:
+        if argv[0] not in ("git", sys.executable):
+            return CertificationProcessResult(1, "", "not exercised")
+        if list(argv[3:4]) == ["init"]:
+            (own_venv_workspace(Path(argv[4])) / ".dadaia" / "nonsense").mkdir()
+            (Path(argv[4]) / "notes.txt").write_text("operator notes", encoding="utf-8")
+            return CertificationProcessResult(0, "", "")
+        path = os.pathsep.join([str((env or {}).get("PYTHONPATH")), *site.getsitepackages()])
+        argv = [self._python if argv[0] == sys.executable else argv[0], *argv[1:]]
+        return super().run(argv, cwd=cwd, env={**(env or {}), "PYTHONPATH": path}, timeout=timeout)
+
+
+@pytest.mark.medium
+@pytest.mark.slow(reason="a real certify journey: about a dozen dadaia children")
+def test_certify_fails_naming_the_sandbox_slop(tmp_path: Path) -> None:
+    """sa-reconcile-certify-skip-the-workspace-walk#B1: a certify sandbox seeded with
+    `.dadaia/nonsense/` and a root `notes.txt` — the workspace section is judged and the
+    result fails naming WS-dadaia-slop and WS-root-slop. sa-certify-children-resolve-the-
+    live-workspace: run from a "live" workspace owning the children's venv, every child
+    acts on the sandbox only — the live registry is byte-identical, no session is left."""
+    live = own_venv_workspace(tmp_path / "live")
+    result = certify(live, _Children(own_venv_python(live))).to_dict()
+
+    assert (live / ".dadaia" / "states" / "spec_contexts.json").read_bytes() == b'{"contexts": []}'
+    assert sorted(p.name for p in (live / ".dadaia").iterdir()) == [".venv", "states", "tmp"]
+    checks = {c["name"]: c for c in result["checks"] if not c["name"].endswith("-probe")}
+    failed = {name for name, c in checks.items() if c["status"] != "PASS"}
+    assert result["ok"] is False
+    assert failed == {"specs-scaffold-and-doctor", "context-specs-doctor"}, checks
+    for name in failed:
+        assert {"WS-dadaia-slop", "WS-root-slop"} <= set(checks[name]["detail"].split())
 
 
 class _FakeCertificationProcess:
@@ -86,15 +160,25 @@ _REAL_ENTITLEMENT_REJECTION_STDERR = (
 
 
 _WORKDIR = "/fake/sentinel/workdir-9f3c"
+
+
 _SESSION = "sentinel-session-id-77aa"
+
+
 _BANNER = (
     f"OpenAI Codex v0.999.0\n--------\nworkdir: {_WORKDIR}\nsession id: {_SESSION}\n--------\n"
 )
+
+
 _SERVER_ERROR = (
     _BANNER
     + 'ERROR: {"type":"error","status":500,"error":{"type":"server_error","message":"upstream internal error, please retry"}}\n'
 )
+
+
 _V = CertificationProcessResult(0, "codex-cli 0.147.0\n", "")
+
+
 _SKIP = _CertificationSkip
 
 
@@ -160,3 +244,78 @@ def test_all_checks_ok_accepts_only_pass_and_skip(status: str, ok: bool) -> None
     """A22.4: an honest SKIP (no Codex CLI on this host) never fails certification; a FAIL does."""
     checks = [CertificationCheck("capability-contract", "PASS", "ok"), CertificationCheck("codex-live-probe", status, "d")]
     assert _all_checks_ok(checks) is ok
+
+
+class _FakeProcess:
+    """The ``CertificationProcess`` protocol's ``run`` only — a version probe never
+    starts a long-running process."""
+
+    def __init__(self, result: CertificationProcessResult) -> None:
+        self._result = result
+        self.calls: list[list[str]] = []
+
+    def run(
+        self,
+        argv: list[str],
+        *,
+        cwd: Path,
+        env: dict[str, str] | None = None,
+        timeout: float,
+    ) -> CertificationProcessResult:
+        self.calls.append(list(argv))
+        return self._result
+
+    def start(self, argv: list[str], *, cwd: Path, env: dict[str, str]) -> object:
+        raise AssertionError("a live probe never starts a long-running process")
+
+
+def _result(returncode: int = 0, stdout: str = "", stderr: str = "") -> CertificationProcessResult:
+    return CertificationProcessResult(returncode=returncode, stdout=stdout, stderr=stderr)
+
+
+def test_every_registered_record_has_a_probe_binary() -> None:
+    """A record with no binary would silently never be probed."""
+    assert set(_HARNESS_PROBE_BINARIES) == set(L1_ENTRY_HARNESSES)
+
+
+@pytest.mark.parametrize("harness", sorted(_HARNESS_PROBE_BINARIES))
+def test_the_probe_leaves_the_claim_unverified_when_the_binary_is_absent(
+    harness: str, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The one behaviour the task pins: no binary on PATH degrades honestly, naming the
+    claim UNVERIFIED and never running anything."""
+    monkeypatch.setattr(service.shutil, "which", lambda _name: None)
+    fake = _FakeProcess(_result())
+
+    with pytest.raises(_CertificationSkip) as excinfo:
+        _version_probe_detail(fake, tmp_path, harness, _HARNESS_PROBE_BINARIES[harness])
+
+    message = str(excinfo.value)
+    assert message.startswith("UNVERIFIED:"), message
+    assert _HARNESS_PROBE_BINARIES[harness] in message
+    assert harness in message
+    assert fake.calls == [], "an absent binary must not be executed"
+
+
+@pytest.mark.parametrize(
+    ("result", "outcome"),
+    [
+        pytest.param(_result(stdout="cursor-agent 0.0.1-alpha\n"), "cursor-agent 0.0.1-alpha", id="answers-passes-with-no-version-floor"),
+        pytest.param(_result(returncode=3, stderr="cursor: panic"), RuntimeError("cursor: panic"), id="present-but-broken-is-a-genuine-failure"),
+    ],
+)  # fmt: skip
+def test_an_installed_binary_passes_by_answering_and_fails_only_if_it_cannot(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    result: CertificationProcessResult,
+    outcome: str | Exception,
+) -> None:
+    """Only ABSENCE is an honest degrade; the version is reported as evidence, never compared to a floor."""
+    monkeypatch.setattr(service.shutil, "which", lambda name: f"/opt/bin/{name}")
+    fake = _FakeProcess(result)
+    if isinstance(outcome, Exception):
+        with pytest.raises(RuntimeError, match=str(outcome)):
+            _version_probe_detail(fake, tmp_path, "cursor", "cursor-agent")
+    else:
+        assert outcome in _version_probe_detail(fake, tmp_path, "cursor", "cursor-agent")
+    assert fake.calls == [["/opt/bin/cursor-agent", "--version"]]
