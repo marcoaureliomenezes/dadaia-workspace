@@ -981,6 +981,60 @@
       "agent": "main-thread",
       "kind": "merge",
       "text": "job: hotfix-task-id-paths; start: 2026-10-05T18:08:47Z; end: 2026-10-05T18:33:57Z; wall: 25; ritual_wait: 12; dispatches: 1; job_gate_runs: 2"
+    },
+    {
+      "ts": "2026-10-06T01:23:11Z",
+      "agent": "dd-product-engineer",
+      "kind": "merge",
+      "text": "job: job3; start: 2026-10-05T15:50:39Z; end: 2026-10-05T20:49:16Z; wall: 299; ritual_wait: 98; dispatches: 13; job_gate_runs: 1"
+    },
+    {
+      "ts": "2026-10-06T01:23:11Z",
+      "agent": "dd-product-engineer",
+      "kind": "merge",
+      "text": "job: job4; start: 2026-10-05T18:41:23Z; end: 2026-10-05T21:45:33Z; wall: 184; ritual_wait: 93; dispatches: 12; job_gate_runs: 1"
+    },
+    {
+      "ts": "2026-10-06T01:23:11Z",
+      "agent": "dd-product-engineer",
+      "kind": "merge",
+      "text": "job: job2; start: 2026-10-05T20:51:00Z; end: 2026-10-06T00:02:24Z; wall: 191; ritual_wait: 11; dispatches: 25; job_gate_runs: 2"
+    },
+    {
+      "ts": "2026-10-06T01:23:11Z",
+      "agent": "dd-product-engineer",
+      "kind": "merge",
+      "text": "job: job5; start: 2026-10-06T00:02:51Z; end: 2026-10-06T01:06:39Z; wall: 64; ritual_wait: 18; dispatches: 14; job_gate_runs: 2"
+    },
+    {
+      "ts": "2026-10-06T01:23:11Z",
+      "agent": "dd-product-engineer",
+      "kind": "note",
+      "text": "Sources of the four kind: merge entries above (jobs 3, 4, 2, 5, in landing order), from git and gh. end: createdAt of the feature/0.5.0 push CI run landing the job — job3 37372098671 (head 56691d852), job4 37377999887 (990d26893), job2 37391829733 (6a2a6e1a6), job5 37397484320 (27123ce99). start: the author time of the job's first own commit in the landed range — job3 990f95ece, job4 9feeae3b5, job2 2b255cffa, job5 d47d276ea — not AC1.7's committer time, which each rebase rewrote to the rebase instant (job3 2026-10-05T19:36:26Z, job4 19:36:48Z, job2 22:39:31Z; job5 was not rebased). ritual_wait: end minus the author time of the last task commit (56691d852, 990d26893, 6a2a6e1a6, 27123ce99); job2's close was re-recorded after its two review rounds, so its 11 min understates its ritual. dispatches: not measured — no record counts sub-agent dispatches; the value is the number of distinct task ids in the landed commit subjects, assuming one sub-agent per task. job_gate_runs: not measured beyond the evidence — one worktree.py merge job gate per job, plus the local scripts/ci.py job run the job2 and job5 verdicts cite; a lower bound."
+    },
+    {
+      "ts": "2026-10-06T01:23:11Z",
+      "agent": "dd-product-engineer",
+      "kind": "size",
+      "text": "G1 readout (rc-8 PLAN §2.8 method: wc -l over tracked dadaia_workspace/**/*.py; def test_ under tests/; wc -l over tests/**/*.py; scripts/guards/*.py lines and their CHECKS), rc-9 start 532479a05 (byte-equal to rc-8's close 767ba1d4f and to rc-8's end readout) -> end 27123ce99: production 24,973 -> 24,969 (-4); test functions 1,138 -> 1,170 (+32) plus guard checks 31 -> 31; test lines 41,004 -> 41,627 (+623) plus guard lines 2,442 -> 2,456 (+14). Per job, production Python net and test lines (git diff --numstat): job1 767ba1d4f..29ee92d3a +26, tests +634/-709; hotfix 29ee92d3a..b8de77ce2 0, +2/-1; job3 0c591b612..56691d852 -80, +610/-547; job4 56691d852..990d26893 +45, +117/-28; job2 990d26893..6a2a6e1a6 -16, +568/-60; job5 6a2a6e1a6..27123ce99 +21, +42/-5; the sum, -4, equals the readout. rc-9 set no size target, so none is met or missed."
+    },
+    {
+      "ts": "2026-10-06T01:23:11Z",
+      "agent": "dd-product-engineer",
+      "kind": "reviews",
+      "text": "Bug-surface delta per job, from each job's APPROVED dd-code-reviewer handoff scope and the ledger. job1: no Job 1 verdict handoff remains on disk and its merge message 29ee92d3a states no delta, so the verdict's delta is not measured; ledger evidence: one bug born in it, job-task-id-test-assumes-native-paths (MEDIUM, caused_by J1.S3.T9), fixed and resolved by the hotfix; production +26 net. hotfix-task-id-paths: product unchanged, tests reduced (verdict on b8de77ce2). job3: sweep delete path reduced, the pass-abort family included; test session env reduced; context dead reduced, -117 production lines (verdict carried by rebase to 56691d852). job4: release trio reduced; worktree gate unchanged net (verdict on 990d26893). job2: privacy seam, reconcile, ledger archive, invocation and registry store reduced; coverage decider and gitflow reader neutral; lineage restored (verdict on 6a2a6e1a6). job5: release check unchanged against its base (net -12 against the rejected tip); law surface reduced (verdict on 27123ce99). Ledger at 27123ce99: one record found in rc-9 (the one above), no other record names an rc-9 task in caused_by; bugs.py status: 1 open, dependabot-pyjwt-open-on-main (carried)."
+    },
+    {
+      "ts": "2026-10-06T01:23:11Z",
+      "agent": "dd-product-engineer",
+      "kind": "note",
+      "text": "Throughput against the rc-8 baseline of grill 2026-10-05T040135Z, over 767ba1d4f..27123ce99 (264 commits), gating nothing. (1) Process commits — a commit whose paths all lie under specs/ or docs/, or are README.md, llms.txt, behavior-map.json or shipped-hashes.json: rc-9 130/264 = 49.2 %; the same rule over rc-8 (a7d15e9dd..767ba1d4f) gives 205/271 = 75.6 %, the baseline's 75 %. (2) rc-wide parallelism, sum of wall over the six kind: merge entries / (last end - first start): 880 / 556 min = 1.58 on the author-time starts, above 1.3 — met; on AC1.7's literal committer-time starts, 491 / 546 = 0.90 — missed; the rebases make the literal reading measure the rebase, not the job. (3) Median task lead, per task id first author time to last committer time: 90 tasks, 0.89 h against 1.1 h (an upper bound: a rebase moves committer time). (4) Review rounds: 13 APPROVED dd-code-reviewer handoffs on disk from the rc-9 birth push to the job5 verdict, plus 6 REJECTED rounds the job files record (Job 1, Job 2 twice, Job 3, Job 4, Job 5): about 19 rounds in 10.3 h (14:49Z to 01:06Z), against ~81 in 26 h. (5) Gate 1 ~6 min: gate 1 left with Job 1, and no record times the job gate — not measured. (6) AC1.7: sum of ritual_wait rc-9 = 13 + 12 + 98 + 93 + 11 + 18 = 245 min on the author-time basis; rc-8 from git, the 24 feature/0.5.0 push CI runs that landed a T-050 task commit, createdAt minus the newest task commit's author time = 546 min (median 15.7) -> 1 - 245/546 = 55 % less ritual wait; on the committer-time basis rc-9 219, rc-8 254 -> 14 % less. The SPEC's 75-80 % estimate is missed on both bases; rc-8 measured 9.1 h over 24 landings, not the estimated 12-15 h over ~30. (7) job_gate_runs against AC1.7's rule (at most 1 plus the recorded red job gates): job1 4 against 1 + 2 reds, over by 1, the rerun after the review rejection (Job 1 review INFO 5); hotfix 2 against 1, over by 1, a local ci.py job before worktree.py merge, which runs the gate itself; job2 and job5 2 against 1, over by 1 each, the same duplicate; job3 and job4 1. A violation by the formula in four jobs, each one duplicate or one post-rejection rerun."
+    },
+    {
+      "ts": "2026-10-06T01:23:11Z",
+      "agent": "dd-product-engineer",
+      "kind": "note",
+      "text": "AC2.10 per-class counts, as the operator ruled (2026-10-05, AskUserQuestion, recorded in rc-9/tasks/job2.md Operator rulings): agent error 3, release-born 46, dev-tooling 27, doubtful 0, product 148 (224 records). The 23 records first classed doubtful were all resolved product bugs. No ledger write (J2.S5.T2). Source: the ruling, not a recount; bugs.py stats carries no per-class field, so the counts cannot be re-derived from the ledger."
     }
   ]
 }
