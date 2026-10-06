@@ -119,3 +119,53 @@ def test_the_releases_law_transitions_equal_marks() -> None:
     arrow = r"`?\[([ x-])\]`?\s*(?:-+>|→|=>)\s*`?\[([ x-])\]"
     law = (_PKG / "public/scaffold/releases/AGENTS.md").read_text("utf-8")
     assert re.findall(arrow, law) == list(zip(marks, marks[1:], strict=False))
+
+
+_SKILLS = _PKG / "public" / "skills"
+_WORDS = ["one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten"]
+
+
+def _red(bug: str) -> pytest.MarkDecorator:
+    return pytest.mark.xfail(strict=True, reason=f"JB.S1 RED: {bug}")
+
+
+@pytest.mark.parametrize(
+    ("skill", "phrase"),
+    [
+        pytest.param("dd-bug-resolution/SKILL.md", "rewriting an old assert",
+                     marks=_red("bug-resolution-law-prescribes-rewriting-asserts"),
+                     id="root-law-says-fixes-never-rewrite-old-asserts"),
+        pytest.param("dd-audit-project/PILLAR-BUGS.md", "governance_events",
+                     marks=_red("pillar-bugs-metric-reads-retired-event-stream"),
+                     id="the-bug-ledger-has-no-event-stream"),
+        pytest.param("dd-backlog-definition/SKILL.md", "merge a near-duplicate",
+                     marks=_red("backlog-skill-asks-a-merge-the-writer-cannot-do"),
+                     id="the-backlog-writer-has-no-merge"),
+    ],
+)  # fmt: skip
+def test_a_skill_prescribes_no_act_its_own_laws_forbid_or_its_writer_cannot_do(
+    skill: str, phrase: str
+) -> None:
+    """The ledger laws (`specs/bugs/AGENTS.md`: no event stream; root map: fixes never rewrite old
+    asserts; `backlog.py`: new, exit, check) bind the skills that teach those ledgers."""
+    assert phrase not in (_SKILLS / skill).read_text("utf-8")
+
+
+@pytest.mark.xfail(strict=True, reason="JB.S1 RED: pillar-bugs-metric-reads-retired-event-stream")
+def test_the_bugs_pillar_states_how_many_metrics_and_measures_it_lists() -> None:
+    """Pillar 1 names its metrics and cheap measures by the number of rows it holds, in its own
+    headings, and `dd-audit-project/SKILL.md` repeats that number."""
+    pillar = (_SKILLS / "dd-audit-project/PILLAR-BUGS.md").read_text("utf-8")
+    audit = (_SKILLS / "dd-audit-project/SKILL.md").read_text("utf-8")
+    metrics = _WORDS[len(re.findall(r"^\| \d+ \|", pillar, re.M)) - 1]
+    cheap = re.search(
+        r"^## (?P<word>\w+) cheap measures[^\n]*\n(?P<body>.*?)^## ", pillar, re.M | re.S
+    )
+    assert cheap
+    measures = _WORDS[len(re.findall(r"^- ", cheap["body"], re.M)) - 1]
+    assert f"## The {metrics} forensic metrics" in pillar
+    assert f"A pillar-1 run reporting fewer than {metrics} is incomplete" in pillar
+    assert f"(beyond the {metrics} metrics)" in pillar
+    assert cheap["word"].lower() == measures
+    assert re.search(rf"compute all {metrics}\s+forensic metrics", audit)
+    assert f"{metrics} bug metrics with baseline" in audit
