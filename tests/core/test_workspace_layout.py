@@ -79,7 +79,7 @@ def _package_sources() -> list[Path]:
 
 #: A stdlib ledger script owns its subset (it cannot import core); the parity test
 #: pins every subset to the one vocabulary.
-_PARITY = "parity:tests/unit/skills/test_ledger_write_verbs_refuse_with_the_pair_intact.py"
+_PARITY = "parity:tests/public/skills/dd_bug_resolution/scripts/test__ledger.py"
 _TEXT = "sa-text-restates-rules-the-code-contradicts"
 
 #: Every closed set of canonical names the registry owns (0.4.7 FR5 widened ratchet 2
