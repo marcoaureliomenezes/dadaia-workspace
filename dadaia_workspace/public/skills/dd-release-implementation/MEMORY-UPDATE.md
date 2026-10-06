@@ -15,7 +15,7 @@ Disclosed reference reached at `SKILL.md` step 7 — `dd-product-engineer` runs 
 6. `python3 .agents/skills/dd-spec-navigator/scripts/memory.py catalog generate`, then `memory.py check`.
 7. In the same Reconciliation tree, before its merge: re-derive each section of `README.md`, `llms.txt` and `docs/*.md` whose atom changed from that atom and re-record its `derived-from` marker's `sha256:<12 hex>`; `docs/cli.md` regenerates from `.dadaia/.venv/bin/dadaia help tree` whenever a verb changed.
 8. Commit the atoms, then `python3 .agents/skills/dd-release-implementation/scripts/release.py memory --reviewed <slugs> --changed <slugs>` — it derives the same window, computes the worklist itself and records `since`/`until`; `reviewed` names the entries read and left as they were, `changed` those rewritten or created; it refuses a worklist entry in neither list, a name outside the worklist, a `changed` atom that did not move over the window, and any phase but `CLOSURE`.
-9. `.dadaia/.venv/bin/dadaia doctor`: `LEDGER-RELEASE-SCHEMA` (the memory record), `MEM-DRIFT-1/2`, `LINT-1` (history lines included) and `LEDGER-MEMORY-SCHEMA` clean; the candidate PR stays red until they are.
+9. `.dadaia/.venv/bin/dadaia doctor`: `LEDGER-RELEASE-SCHEMA` (the memory record), `MEM-DRIFT-1/2`, `LINT-1` (history lines included) and `LEDGER-MEMORY-SCHEMA` clean; the Reconciliation merge waits until they are.
 
 ## Canonical memory
 

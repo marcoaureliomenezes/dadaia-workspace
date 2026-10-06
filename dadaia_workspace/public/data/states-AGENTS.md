@@ -7,8 +7,7 @@ They are not documentation and not an implementation workspace.
 
 ## 1. Canon
 
-The closed canon of `.dadaia/states/`, rendered from `core/workspace_layout.py`
-(`STATES_CANON`) at `.dadaia/.venv/bin/dadaia public stage`; any other entry is slop `.dadaia/.venv/bin/dadaia doctor` reports.
+The closed canon of `.dadaia/states/`, rendered at `.dadaia/.venv/bin/dadaia public stage`; any other entry is slop `.dadaia/.venv/bin/dadaia doctor` reports.
 
 <!-- canon -->
 

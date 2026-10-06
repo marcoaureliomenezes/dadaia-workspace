@@ -1,8 +1,7 @@
 # CONTEXT-MAP — the context balance of a dadaia-workspace
 
 Library document. Projected nowhere: `public stage` copies it into `.dadaia/agentic/data/`
-with the rest of `data/`, and no projection rule installs it into a runtime tree. Pinned by
-`tests/infrastructure/test_projection_rules.py`.
+with the rest of `data/`, and no projection rule installs it into a runtime tree.
 
 One row per surface: what it is for and what belongs in it. A surface's size is a soft
 review signal (one purpose, no restated rule), never a build failure (ADR 0143); a SKILL.md's
