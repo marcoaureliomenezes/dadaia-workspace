@@ -311,9 +311,14 @@ def _window_findings(specs: Path) -> list[dict[str, Any]]:
     return [finding(rel, 1, "; ".join(errors), fix)] if errors else []
 
 
+#: How `bugs.py balance --check` words a stale block, the one refusal of it that is a warning here.
+_STALE = "differs from its regeneration"
+
+
 def _balance_findings(specs: Path) -> list[dict[str, Any]]:
     """CLOSURE: `QUALITY.md`'s `## Bugs` block, once it has one, equals its regeneration —
-    asked of `bugs.py balance --check`, the bug skill's own verb (AC4.4); never a doctor lane."""
+    asked of `bugs.py balance --check`, the bug skill's own verb (AC4.4); never a doctor lane.
+    A stale block is a warning, never a refusal; a ledger the verb cannot read is an error."""
     try:
         live = live_release(specs)
     except Refusal:
@@ -336,7 +341,8 @@ def _balance_findings(specs: Path) -> list[dict[str, Any]]:
         why = f"`bugs.py balance --check` exited {done.returncode}"
         command = with_specs(f"{script(bugs)} balance --check", specs)
         fix = f"Operator action: run `{command}` and read its output"
-    return [finding("memory/QUALITY.md", 1, why, fix)]
+    row = finding("memory/QUALITY.md", 1, why, fix)
+    return [{**row, "verdict": "warning"} if why.endswith(_STALE) else row]  # stale blocks nothing
 
 
 def tree_findings(specs: Path) -> list[dict[str, Any]]:
