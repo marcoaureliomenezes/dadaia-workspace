@@ -17,6 +17,8 @@ description: >
 3. Read `specs/backlog/BACKLOG.json`'s `active[]`, consumed untriaged.
 4. Each undispositioned `specs/audits/**` finding enters the SPEC with its disposition (`python3 .agents/skills/dd-audit-project/scripts/audit.py disposition`).
 5. Name the SPEC's `**Origin:**`: `operator-demand`, `backlog:<ids>` or `bugs:<ids>`.
+6. Write the SPEC's `## Bug window review`: compare each fix in the window (`bugs.py window`, `bugs.py fix`) against the overfitting patterns — an assert or test the fix changed; a special case on a test value; a new branch, flag or second path; a reach into another feature; deleted functionality; ≥ 2 fixes on the unit.
+7. Give each fix KEEP or REBUILD; a REBUILD reworks the fix's code and what surrounds it, and keeps the fix's tests.
 
 **Done when** the picked set is recorded; it becomes the SPEC's scope.
 
