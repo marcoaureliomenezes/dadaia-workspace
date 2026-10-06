@@ -24,6 +24,7 @@ Paths are relative to the repo root; aliases as in `PLAN.md` (`f/`, `pub/`, `S/`
 |---|---|---|---|
 | J4.S2.T1 | AC4.1–AC4.3 | `bugres/scripts/_bugs_balance.py` (pure: records → block text; Laplace u; defective-fix rate), `bugres/scripts/bugs.py` (verb `balance`, `--write`), `.gitattributes` (`dadaia-dev-tooling` on the dev-tooling surfaces) | `test_bug_resolution_balance.py` |
 | J4.S2.T2 | AC4.4 | `relimpl/scripts/_release_tree.py` (CLOSURE only: the block equals its regeneration, else one refusal + fix line) | `test_release_script.py` |
+| J4.S2.T3 | AC4.2 | `tests/unit/skills/test_bug_resolution_balance.py` (added after the first hand mutation: a Laplace reading between 1.96 and 2.0, the settled-surface gap rule) | the mutants the first tests left (15cb09d43) |
 
 ## Stage J4.S3 — the law and close
 
@@ -43,4 +44,45 @@ Paths are relative to the repo root; aliases as in `PLAN.md` (`f/`, `pub/`, `S/`
 |---|---|---|---|
 | J4.S4.T1 | AC4.4 | `_bugs_quality.py` (`stale`: the one comparison, so `_release_tree.py` imports one module), `_release_tree.py`, `tests/contract/test_public_scripts_thin_wrapper.py` (the one cross-skill edge declared), the exec bit of `_bugs_balance.py` and `_bugs_quality.py`, `pub/entities/behavior-map.json` (scripts hashes), this file | no RED: the job gate's `test_public_scripts_thin_wrapper.py` was the red; `test_release_script.py` keeps AC4.4's case |
 
-- done: Job 4 — every task landed on `wt/0.5.0-rc10/job4` through its task merge: J4.S1.T1 5577759a8 and J4.S1.T2 1bf985be4 (RED, strict xfail); J4.S2.T1 232a245dc (`_bugs_balance.py`, the `balance` verb, `.gitattributes`; W widened to `_bugs_fix.py`, whose `marked` is the one check-attr reader); J4.S2.T2 450006447 (the CLOSURE check; W widened to `bugs.py` and the new `_bugs_quality.py`, the one reader of ledgers and release spans that `release.py check` cannot get by importing `bugs.py`); J4.S2.T3 15cb09d43 (added: the hand-mutation survivors' rows); J4.S3.T1 3435bf23c (law, pin re-record); J4.S3.T2 (the first close); J4.S4.T1 (the job gate's red: exec bits, one cross-skill edge, `stale`), the close commit's behavior-map re-record.
+## Stage J4.S5 — RED for the review's rework (review at b96fdd613, REJECTED)
+
+- Contract: exit tests RED as strict xfail; envelope `tests/unit/skills/test_bug_resolution_balance.py`, `tests/contract/test_release_script.py`; ACs AC4.1, AC4.4 (M3, L6)
+
+| task | AC | `W:` | owner tests / RED |
+|---|---|---|---|
+| J4.S5.T1 | AC4.1 | `tests/unit/skills/test_bug_resolution_balance.py` | RED: a `## Bugs` heading with no block gets the block right under it, not a second section (M3) |
+| J4.S5.T2 | AC4.4 | `tests/contract/test_release_script.py` | RED: a record with no `ts`, a tree with no git — one refusal, one `fix:` line, no traceback (L6) |
+
+## Stage J4.S6 — the rework
+
+- Contract: J4.S5's rows green; envelope `bugres/scripts/_bugs_balance.py`, `_bugs_quality.py`, `bugs.py`, `relimpl/scripts/_release_tree.py`, `tests/contract/test_public_scripts_thin_wrapper.py`, the two test files above (their RED markers leave); ACs AC4.1–AC4.4
+
+| task | AC | `W:` | owner tests / RED |
+|---|---|---|---|
+| J4.S6.T1 | AC4.1, AC4.4 | M1 `_bugs_quality.py` reads the live release through `_release_store.live_release` and `_release_schema._utc`; M2 (agent default, unruled) `release.py check` in CLOSURE runs `bugs.py balance --check`, the release skill no longer imports the bug skill, its edge leaves the table; M3 `replaced`; L2 `TREND` owned by `_bugs_balance`; L6 one catch at the verb edge | the S5 rows plus `test_release_script.py` |
+
+## Stage J4.S7 — the review's H1 cases
+
+- Contract: unit + integration green; envelope the two test files; ACs AC4.2, AC4.4
+
+| task | AC | `W:` | owner tests / RED |
+|---|---|---|---|
+| J4.S7.T1 | AC4.3 | `tests/unit/skills/test_bug_resolution_balance.py` (rc-10 sorts after rc-9; an absent document gets the section; M4: the process-spawning verb case leaves) | no RED: it pins the code S6 wrote |
+| J4.S7.T2 | AC4.2, AC4.4 | `tests/contract/test_release_script.py` (the literal `window 0.4.6..0.5.0, T = 12 days` line over five releases; a corrupt ledger under a block refuses; no block is not judged; the verb case moved in with its asserts unchanged; L1 wraps the `# fmt: skip` calls) | no RED: same |
+
+## Stage J4.S8 — the hand mutants' last survivors
+
+- Contract: unit + integration green; envelope the two test files; ACs AC4.1, AC4.4
+
+| task | AC | `W:` | owner tests / RED |
+|---|---|---|---|
+| J4.S8.T1 | AC4.1 | `tests/unit/skills/test_bug_resolution_balance.py` (the first block only; a review abutting the heading) | the `count=1` and `gap` mutants |
+| J4.S8.T2 | AC4.1 | `tests/contract/test_release_script.py` (the attribute's `=true` spelling) | the `marked` mutant |
+
+## Stage J4.S9 — close
+
+| task | AC | `W:` | owner tests / RED |
+|---|---|---|---|
+| J4.S9.T1 | — | this file (M5: J4.S2.T3's row, the S3.T1 citation), `pub/entities/behavior-map.json` | close task, last: `test-audit:`, `mutation:`; `done` |
+
+- done: Job 4 — every task landed on `wt/0.5.0-rc10/job4` through its task merge: J4.S1.T1 5577759a8 and J4.S1.T2 1bf985be4 (RED, strict xfail); J4.S2.T1 232a245dc (`_bugs_balance.py`, the `balance` verb, `.gitattributes`; W widened to `_bugs_fix.py`, whose `marked` is the one check-attr reader); J4.S2.T2 450006447 (the CLOSURE check; W widened to `bugs.py` and the new `_bugs_quality.py`, the one reader of ledgers and release spans that `release.py check` cannot get by importing `bugs.py`); J4.S2.T3 15cb09d43 (added: the hand-mutation survivors' rows); J4.S3.T1 da8ef77f4 (law, pin re-record; reworded from 3435bf23c to cite ADR 0208, tree identical); J4.S3.T2 (the first close); J4.S4.T1 (the job gate's red: exec bits, one cross-skill edge, `stale`), the close commit's behavior-map re-record. Review rework (REJECTED at b96fdd613): J4.S5.T1 a8a47ca49 and J4.S5.T2 8b0075fc1 (RED); J4.S6.T1 a99e5d03f (REBUILD of the CLOSURE check as `bugs.py balance --check`, the live release read through the release skill's reader, the block placed under its heading, one refusal at the verb edge); J4.S7.T1 13d0602bb and J4.S7.T2 417dc6007 (the H1 cases, the verb case moved out of the unit tier); J4.S8.T1 abc8e61bf and J4.S8.T2 87a75ecf8 (last survivors); closed by J4.S9.T1.
