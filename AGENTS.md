@@ -20,6 +20,11 @@ workspace venv first on `PATH`:
 verify: python scripts/ci.py job
 verify-stage: python scripts/ci.py stage
 verify-task: python scripts/ci.py task
+tests: tests/**
+tests-red: ^\s*@pytest\.mark\.xfail\(strict=True
+
+- The RED marker's pytest form: one decorator line `@pytest.mark.xfail(strict=True, reason="...")`, its `reason` short enough to stay on one line after ruff format at 100 columns; never `marks=` inside `pytest.param`, never a module constant — a parametrized RED row becomes its own decorated function. `tests/fixtures/red_marker.py` makes every strict xfail expect `AssertionError`, so a RED test that errors cannot close its stage.
+- The developer's pipeline — `.github/`, `scripts/ci.py`, `scripts/guards/`, `tests/`, Dependabot/SAST, mutation and test-audit — is private to this repository and never ships. What ships (`dadaia_workspace/public/**`, the projected law, the skill scripts) requires of a user's repo only its own `verify:`/`tests:` lines and local git: never a remote, CI, `gh`, a PR host or a language toolchain. `test_public_source_hygiene.py`'s `public-law-names-no-private-pipeline` row is the mechanical half.
 
 - Versioning here: release-please owns the version, tag and CHANGELOG; the work branch
   is named for the live release (`_RELEASE.json`).
