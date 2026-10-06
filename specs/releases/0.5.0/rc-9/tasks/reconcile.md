@@ -85,3 +85,14 @@ Paths are relative to `dadaia_workspace/` unless they start with `scripts/`, `te
 | task | AC | `W:` | owner tests / RED |
 |---|---|---|---|
 | JR.S7.T1 | AC6.1 | `specs/memory/**`, `specs/memory/product/catalog.json`, `README.md`, `llms.txt`, `docs/*.md`, `dadaia_workspace/public/entities/behavior-map.json` | `tests/contract/test_docs_derived_from_memory.py` |
+
+## Stage JR.S8 — `_fixes` revert pairing (review REJECTED at 8693810de: HIGH-A, M-1)
+
+- Contract: one `Revert "<text>"` undoes exactly one commit, the nearest earlier live fix or revert whose subject is `<text>` or starts with `<text> `; history is walked oldest first, so a revert of a revert reinstates its fix; an older unreverted fix of the same id stays listed; a fix subject holding `"` is matched whole. An in-job correction of JR.S6.T2, no bug record; rc-10 Job 1 (AC1.1) REBUILDs this reader.
+- ACs served: ADR 0206 (JR.S6.T2's bug stays resolved).
+- Envelope: `dadaia_workspace/public/skills/dd-bug-resolution/scripts/bugs.py`, `tests/unit/skills/test_bug_resolution_bugs_script.py`, `dadaia_workspace/public/entities/behavior-map.json` (regenerated hash).
+- Exit tests: `tests/unit/skills/test_bug_resolution_bugs_script.py`, `tests/contract/test_behavior_map.py`; `bugs.py check`, `ci.py job` green.
+
+| task | AC | `W:` | owner tests / RED |
+|---|---|---|---|
+| JR.S8.T1 | review HIGH-A, M-1 | `dadaia_workspace/public/skills/dd-bug-resolution/scripts/bugs.py`, `tests/unit/skills/test_bug_resolution_bugs_script.py`, `dadaia_workspace/public/entities/behavior-map.json` (the regenerated scripts hash) | `tests/unit/skills/test_bug_resolution_bugs_script.py` (new cases: a quoted subject holding `"`; an older fix survives a revert of the newer; a revert of a revert reinstates); RED before the fix |
