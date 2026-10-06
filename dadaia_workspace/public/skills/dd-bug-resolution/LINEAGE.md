@@ -31,7 +31,7 @@ The audit's pillar 1 cites this section, never restates it — if the two disagr
 4. `caused_by: X` means the fix of X wrote the lines this fix corrects; `bugs.py update <id> --set caused_by=…` repairs it; every write and `check` refuse a target naming no live or archived record, and a loop.
 5. Echo the declaration in the fix commit body: `caused_by:`, `evidence:` (what the prior diff did), `prior diffs read:`.
 6. ≥ 2 prior fixes on the unit the bug lands in, within the window, make this fix a REBUILD of that unit — never a third patch.
-7. Echo `rebuild: <unit> — prior fixes <id>, <id>` (or `rebuild: none`); a rebuild's `--solution` opens with `REBUILD <unit>:`.
+7. This step is the one producer of the fix commit body's REBUILD line: `rebuild: <unit> — prior fixes <id>, <id>`, or, only when `caused_by` is `none`, `rebuild: none — <reason>`; any other `caused_by` makes the fix a REBUILD of the unit, keeping its tests (0210); a rebuild's `--solution` opens with `REBUILD <unit>:`.
 
 ## Cost bound
 
