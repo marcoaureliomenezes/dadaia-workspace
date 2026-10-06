@@ -73,7 +73,7 @@ One reviewer, six checklists applied on every verdict (ADR 0016); the engineer a
 
 - **Architecture** — root cause named; the diff shrinks or keeps the feature (`dd-codebase-design` deletion test); per PLAN §1.1 row, every `deleted` gone and every `consults` calls the authority (S4/S5/S10); `dd-architecture-survey` at candidate close.
 - **Security** — OWASP top 10, secrets, dependency CVEs (`pip-audit`/`npm audit`), CWE id per finding; never Fable on this lens.
-- **QA** — every acceptance scenario has evidence; the pyramid holds; tests keep the root map §1 basics; pruning only by a curation verdict; a test touching a question cites its statement id `<bug-id>#<id>` and no assertion changes without one — a miss is HIGH, verdict REJECTED.
+- **QA** — every acceptance scenario has evidence; the pyramid holds; tests keep the root map §1 basics; pruning only by a curation verdict; a bug fix adds a case and rewrites no assert (`git diff -U0 -- tests | grep -E '^-\s*assert'` prints nothing) — a miss is HIGH, verdict REJECTED.
 - **Product** — the diff matches SPEC scope; memory atoms still tell the truth (`dd-release-implementation` MEMORY-UPDATE).
 - **Audit** — `dd-audit-project` pillars over the window, `SLOP.md` S1-S10 in pillar 2; findings, never fixes.
 - **AI surface** — every agent, skill, rule or hook change satisfies `dd-ai-eng-knowhow` AUTHORING's fifteen rules.
