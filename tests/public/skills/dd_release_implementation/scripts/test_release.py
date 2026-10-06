@@ -761,3 +761,65 @@ def test_ship_records_the_promote_and_new_births_the_next(script: Path, tmp_path
     assert json.loads(truncated.stdout)[0]["path"] == "releases/_archive/0.5.0/_RELEASE.json"
     schema = json.loads(_SCHEMAS[0].read_text("utf-8"))
     assert schema["properties"]["phase"]["enum"] == ["DEFINITION", "IMPLEMENTATION", "CLOSURE"]
+
+
+# ── closure with an open bug, ship with no PR ─────────────────────────────────
+
+
+def _closed_rc(tmp_path: Path, *bugs: dict[str, object]) -> Path:
+    """Release 0.5.0 in CLOSURE on rc-1, and a bug ledger holding *bugs*."""
+    specs = _specs(tmp_path)
+    _release(specs, "0.5.0", phase="CLOSURE", implemented={"sha": "beef123", "ts": _TS})
+    (specs / "bugs").mkdir()
+    (specs / "bugs" / "BUGS.jsonl").write_text(
+        "".join(json.dumps(b) + "\n" for b in bugs), encoding="utf-8"
+    )
+    return specs
+
+
+def _found(bug: str, status: str, rc: str = "rc-1", release: str = "0.5.0") -> dict[str, object]:
+    return {"id": bug, "status": status, "found_in": {"rc": rc, "release": release}}
+
+
+@pytest.mark.xfail(strict=True, reason="JB.S3 RED: rc-closes-with-an-open-bug")
+@pytest.mark.parametrize("status", ["open", "deferred"])
+def test_new_closes_no_rc_that_holds_an_unresolved_bug_found_in_it(
+    script: Path, tmp_path: Path, status: str
+) -> None:
+    """ADR 0206: no rc ever closes with an open bug — `new` stacks rc-2 only once every bug
+    found in rc-1 is resolved; the one fix line names the bug and its rc's batch."""
+    specs = _closed_rc(tmp_path, _found("a-bug", status))
+    before = _tree_hash(specs)
+    refused = _run(script, "new", "0.5.0", "--specs", str(specs))
+    assert refused.returncode == 1 and "a-bug" in refused.stderr
+    assert [x for x in refused.stderr.splitlines() if x.startswith("fix: ")] == [
+        "fix: Operator action: resolve a-bug in rc-1's bug batch"
+    ]
+    assert _tree_hash(specs) == before
+
+
+def test_new_stacks_when_no_bug_found_in_the_live_rc_is_unresolved(
+    script: Path, tmp_path: Path
+) -> None:
+    """A resolved bug of the live rc, an open one of another rc or release, and one with no
+    `found_in` do not hold the closure."""
+    specs = _closed_rc(
+        tmp_path,
+        _found("done", "resolved"),
+        _found("elsewhere", "open", rc="rc-9"),
+        _found("older", "open", release="0.4.9"),
+        {"id": "unplaced", "status": "open"},
+    )
+    assert _run(script, "new", "0.5.0", "--specs", str(specs)).returncode == 0
+
+
+@pytest.mark.xfail(strict=True, reason="JB.S3 RED: release-ship-requires-a-pr-number")
+def test_ship_records_a_null_pr_when_none_is_given(script: Path, tmp_path: Path) -> None:
+    """No host is assumed: `--pr` is the promote PR's number when there is one; its absence is
+    `pr: null` in the archived state, and `check` accepts it."""
+    specs = _reconciled_closure(tmp_path, script)
+    shipped = _run(script, "ship", "--sha", "beef123", "--specs", str(specs))
+    assert shipped.returncode == 0, shipped.stderr
+    archived = specs / "releases/_archive/0.5.0/_RELEASE.json"
+    assert _read(archived)["shipped"] == {"sha": "beef123", "pr": None, "ts": ANY}
+    assert _run(script, "check", "--specs", str(specs)).returncode == 0
