@@ -781,7 +781,6 @@ def _found(bug: str, status: str, rc: str = "rc-1", release: str = "0.5.0") -> d
     return {"id": bug, "status": status, "found_in": {"rc": rc, "release": release}}
 
 
-@pytest.mark.xfail(strict=True, reason="JB.S3 RED: rc-closes-with-an-open-bug")
 @pytest.mark.parametrize("status", ["open", "deferred"])
 def test_new_closes_no_rc_that_holds_an_unresolved_bug_found_in_it(
     script: Path, tmp_path: Path, status: str
