@@ -812,7 +812,6 @@ def test_new_stacks_when_no_bug_found_in_the_live_rc_is_unresolved(
     assert _run(script, "new", "0.5.0", "--specs", str(specs)).returncode == 0
 
 
-@pytest.mark.xfail(strict=True, reason="JB.S3 RED: release-ship-requires-a-pr-number")
 def test_ship_records_a_null_pr_when_none_is_given(script: Path, tmp_path: Path) -> None:
     """No host is assumed: `--pr` is the promote PR's number when there is one; its absence is
     `pr: null` in the archived state, and `check` accepts it."""

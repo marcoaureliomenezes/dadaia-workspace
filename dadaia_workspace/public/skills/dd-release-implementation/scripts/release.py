@@ -50,7 +50,7 @@ def _parser() -> argparse.ArgumentParser:
         if verb in ("phase", "ship"):
             command.add_argument("--sha", required=True, help="the commit the milestone names")
         if verb == "ship":
-            command.add_argument("--pr", required=True, help="the merged promote PR number")
+            command.add_argument("--pr", help="the merged promote PR number, when the host has one")
         if verb == "memory":
             for name in ("--reviewed", "--changed"):
                 command.add_argument(name, default="", help="comma-separated worklist entries")
@@ -108,7 +108,7 @@ def _ship(args: argparse.Namespace, specs: Path) -> int:
     """CLOSURE -> shipped {sha, pr, ts}, one `delivered` histo line, the whole directory
     moved to `_archive/<v>/`, never deleted (ADR 0152 (1)); refused on any `ship_findings`."""
     live, ts = live_release(specs), utc_now()
-    if not (SHA_RE.match(args.sha) and args.pr.isdigit() and int(args.pr) > 0):
+    if not (SHA_RE.match(args.sha) and (args.pr is None or args.pr.isdigit() and int(args.pr) > 0)):
         sha = args.sha if SHA_RE.match(args.sha) else "$(git rev-parse --short HEAD)"
         raise choice(Refusal(f"--sha {args.sha!r} / --pr {args.pr!r}: a hex sha and a PR number",
                              f"{SCRIPT} ship --sha {sha}"), SHIP_PR)  # fmt: skip
@@ -122,11 +122,14 @@ def _ship(args: argparse.Namespace, specs: Path) -> int:
         raise Refusal(f"the ship ledger would not pass check: {errors[-1]['message']}",
                       f"{SCRIPT} check")  # fmt: skip
     commit(live.release_dir / STATE, f"releases/{live.release_id}/{STATE}",
-           lambda s: {**s, "shipped": {"sha": args.sha, "pr": int(args.pr), "ts": ts}})  # fmt: skip
+           lambda s: {**s, "shipped": {"sha": args.sha, "pr": int(args.pr) if args.pr else None, "ts": ts}})  # fmt: skip
     with histo.open("a", encoding="utf-8") as ledger:
         ledger.write(line)
     live.release_dir.rename(specs / "releases" / "_archive" / live.release_id)
-    print(f"[ok] release {live.release_id} shipped at {args.sha} (PR #{args.pr})")
+    print(
+        f"[ok] release {live.release_id} shipped at {args.sha}"
+        + (f" (PR #{args.pr})" if args.pr else "")
+    )
     return 0
 
 
