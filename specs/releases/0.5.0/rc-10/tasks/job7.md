@@ -17,7 +17,7 @@ Paths are relative to the repo root; aliases as in `PLAN.md` (`f/`, `pub/`, `S/`
 
 ## Stage J7.S2 — size from the fixture; the guard
 
-- Contract: exit tests J7.S1 green, unit + integration green; guard plants red; envelope `tests/conftest.py`, `tests/unit/conftest.py`, `pyproject.toml`, `scripts/ci.py`, `.github/workflows/ci.yml`, `tests/AGENTS.md` (`:21-27`, the tier text); ACs AC7.3, AC7.4
+- Contract: exit tests J7.S1 green, unit + integration green; envelope `tests/conftest.py`, `tests/unit/conftest.py`, `pyproject.toml`, `scripts/ci.py`, `.github/workflows/ci.yml`, `tests/AGENTS.md` (`:21-27`, the tier text); ACs AC7.3, AC7.4
 
 | task | AC | `W:` | owner tests / RED |
 |---|---|---|---|

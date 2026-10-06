@@ -53,7 +53,7 @@ Order per job: DELETE → REBUILD → UPDATE → KEEP → ADD. A REBUILD names i
 | Job 7 | Jobs 1, 4, 5 | Job 7 moves every test file those jobs write; they land first in today's paths |
 | Job 8 | Job 7 | `tests/conftest.py`, `test_cli_context.py`'s moved path (SPEC edge) |
 | Job 6 | Jobs 1, 2, 3, 4, 5, 7, 8 | SPEC: the DAG's last job; the canon pin after Job 1's; `tests/conftest.py` after 7, 8 |
-| Bug batch | Job 6 | AC9.1; opened after Job 6; frozen if Job 6 merged, else under today's law |
+| Bug batch | Job 6 | AC9.1; opened after Job 6, so frozen |
 | Reconciliation | Bug batch | AC10 |
 
 - Critical path: Job 1 → Job 4 → Job 7 → Job 8 → Job 6 → bug batch → Reconciliation.
@@ -95,12 +95,18 @@ Each is the literal, smallest-surface reading; the reviewer judges it; none is a
 2. AC3.1: Job 3 opens a `dadaia-evals` tree only if a grader needs a fix; its run note is the driver's `_RELEASE.json` `kind: note`, written with Job 3's `kind: merge` entry; with no tree Job 3 logs only that note. Evals trees cannot write dadaia-workspace files: Reconciliation writes Jobs 2 and 3's `done` lines.
 3. AC4.1: the generator is a `bugs.py balance` verb (`--write` regenerates the block); the dev-tooling class is the `.gitattributes` attribute `dadaia-dev-tooling`.
 4. AC6.1 "cannot close": a RED test is a strict xfail; the suite's conftest gives every strict xfail `raises=AssertionError`, so an erroring RED test reads failed and `WT stage` refuses on the existing `verify-stage:` line. `worktree.py` learns no language. Known limit: evals' `unittest.expectedFailure` counts an error as an expected failure.
-5. AC6.2 (the reviewer's literal reading): the anchor derives from subjects — the parent of the job's first commit outside `J<n>.S1`, else the job base — and the freeze fails closed when it cannot derive one; after the anchor, a modified or deleted line of a test file that existed at the anchor refuses, a pure rename lands, and so does a diff whose only change deletes a `tests-red:` marker line (F-3 (a)); new tests land only in a tests-only stage.
+5. AC6.2 (the reviewer's literal reading): the anchor derives from subjects — the parent of the job's first commit outside `J<n>.S1`, else the job base — and the freeze fails closed when it cannot derive one; after the anchor any modified or deleted test line, in any file, refuses, except a `tests-red:` marker deletion (F-3 (a)) and a pure rename; added test lines land only in a group (a stage id; a commit with no stage id is its own group) that touches test paths alone. Residual: an added line (an inserted skip) passes the gate; the law text names it as caught by the RED review and test-audit.
 6. AC7.1 mirror: `dadaia_workspace/<p>/<m>.py` → `tests/<p>/test_<m>.py` (a leading underscore kept: `_bugs_fix.py` → `test__bugs_fix.py`), a hyphen in a directory becoming `_` (importable packages); `scripts/<p>/<m>.py` → `tests/scripts/<p>/test_<m>.py`; the suite's own tests (conftest, `harness_env`) → `tests/fixtures/test_<m>.py`.
 7. AC7.3 markers: `small`, `medium`, `e2e` replace `unit`, `contract`, `integration`; the tier timeouts keep their values under the new names (small 10 s, medium 60 s).
 8. Job 7 → Job 8 bridge: Job 7 moves `tests/unit/conftest.py`'s autouse fixture into `tests/conftest.py`, applied to `small` items, so the moved tests keep it; Job 8 deletes it.
-9. F-3 (a) form: the repo declares `tests-red: <regex>` beside `tests:` in its tracked `AGENTS.md`, read by the same line reader; one regex, one line. dadaia-workspace: `^\s*@pytest\.mark\.xfail\(strict=True`; dadaia-evals: `^\s*@unittest\.expectedFailure`. A repo with no `tests-red:` line lets no marker deletion through. The evals line is a commit on `dadaia-evals` `feature/0.5.0` in cbaa6f3's lane (main thread), before any evals job opens after Job 6.
+9. F-3 (a) form: the repo declares `tests-red: <regex>` beside `tests:` in its tracked `AGENTS.md`, read by the same line reader; one regex, one line. dadaia-workspace: `^\s*@pytest\.mark\.xfail\(strict=True`; dadaia-evals: `^\s*@unittest\.expectedFailure`. A repo with no `tests-red:` line lets no marker deletion through. The evals line: resolved by the main thread on evals `feature/0.5.0`.
 10. Amendment visibility (AC6.3): the gate sees no approval and no gate path edits a pre-anchor test line (HIGH-2 stays closed). An amendment lands as a new tests-only RED stage that adds the corrected test; the wrong test's existing lines change only past the refusal's `Operator action:` (stop and report), by the operator's act. The approval lives in the job file and the review. No law changes; the alternative (a tests-only stage editing pre-anchor lines through the gate) would reopen HIGH-2 and is left unruled.
+11. The RED marker's form (HIGH-A): one decorator line matching `tests-red:`, a one-line `reason` at 100 columns, never `marks=` in `pytest.param` nor a module constant, a parametrized RED row its own function. A marker-only deletion can leave `import pytest` unused; the option weakening no check is the authoring rule "a RED test file uses pytest beyond the marker", never a ruff F401 ignore.
+
+### For the operator — consequences of reading 10
+
+- "The operator's own act" is a direct commit on the work branch.
+- Overnight, a wrong pre-anchor test stops its job until the operator acts.
 
 ## Flagged — not chosen (law or ruling)
 
