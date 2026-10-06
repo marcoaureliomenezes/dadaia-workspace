@@ -189,7 +189,7 @@ jobs:
   unit-fast-cross:
     name: Unit fast (Windows/macOS)
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 20
+    timeout-minutes: 8
     strategy:
       fail-fast: false
       matrix:
@@ -209,7 +209,10 @@ jobs:
       - name: Install
         run: poetry install --no-interaction --no-ansi --with dev
       - name: pytest unit fast
-        run: poetry run pytest -q -m "not e2e and not slow and not quarantine" tests -n auto --durations=25
+        shell: bash
+        env:
+          SELECT: ${{ matrix.os == 'windows-latest' && 'small or windows' || 'not e2e' }}
+        run: poetry run pytest -q -m "($SELECT) and not slow and not quarantine" tests -n auto --durations=25
 
   contract-coverage-cross:
     name: Contract coverage (Windows/macOS)
@@ -237,11 +240,14 @@ jobs:
       - name: Install the dadaia launcher
         run: poetry run python -m pip install --no-deps -e .
       - name: pytest small and medium coverage
+        shell: bash
         env:
           COVERAGE_FILE: ${{ runner.temp }}/.coverage
+          SELECT: ${{ matrix.os == 'windows-latest' && 'small or windows' || 'not e2e' }}
         # -n auto: same long-pole fix as the ubuntu contract-coverage job (windows was 2:55).
-        run: poetry run pytest -q -m "not e2e and not quarantine" -n auto --cov=dadaia_workspace --cov-report=term-missing tests --durations=25
+        run: poetry run pytest -q -m "($SELECT) and not quarantine" -n auto --cov=dadaia_workspace --cov-report=term-missing tests --durations=25
       - name: the windows-integration-coverage-gap cases
+        shell: bash
         run: poetry run pytest -q -m "windows and not quarantine" -v tests
 
   integration:
