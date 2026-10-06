@@ -67,5 +67,5 @@ Paths are relative to the repo root; aliases as in `PLAN.md` (`f/`, `pub/`, `S/`
 | task | AC | `W:` | owner tests / RED |
 |---|---|---|---|
 | J7.S6.T1 | AC7.3 | `scripts/ci.py` (`contract-coverage` selects `not e2e and not quarantine`: the 80 % bar measured 69.99 % over the small tier alone, so the job covers small and medium as the Windows and macOS legs do) | `tests/scripts/test_ci.py` |
-| J7.S6.T3 | AC7.4 | `.github/workflows/ci.yml` (the two Windows and macOS legs now run small and medium: their `timeout-minutes` 8 becomes 20; the last feature run took 394 s on Windows for the contract leg) | `tests/scripts/test_ci.py` |
+| J7.S6.T3 | AC7.4 | `.github/workflows/ci.yml` (unit-fast `timeout-minutes` 2 becomes 4, contract-coverage 5 becomes 20, integration 6 becomes 10, the two Windows and macOS legs 8 become 20 (they now run small and medium; the last feature run took 394 s on Windows for the contract leg, and `not e2e` took 6 to 10 minutes here with coverage)) | `tests/scripts/test_ci.py` |
 | J7.S6.T2 | — | this file | close task, last: `test-audit:` names `tests/fixtures/test_conftest_size.py` (moves otherwise, asserts unchanged), `mutation:`; `done` |
