@@ -264,3 +264,25 @@ def test_a_long_skill_md_is_a_warning_naming_its_file(tmp_path: Path) -> None:
     [found] = [f for f in _findings_before(ws) if f["code"] == code]
     assert found["verdict"] == "warning"
     assert found["fix"].startswith(f"Operator action: split {ws}/.agents/skills/long/SKILL.md ")
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="the stub CLI is a POSIX shell script")
+@pytest.mark.xfail(strict=True, reason="AC5.1: a deleted hook is reported as 'differs'")
+def test_a_deleted_hook_is_reported_absent_and_its_fix_restores_it(tmp_path: Path) -> None:
+    """AC5.1: delete a projected hook; the finding says absent, and its printed fix, run,
+    restores the hook byte for byte and clears the finding."""
+    from dadaia_workspace.core import workspace_layout
+
+    ws = _workspace(tmp_path)
+    _plant_drifted_hook(ws)
+    hooks = ws / "repos" / "beta" / ".git" / "hooks"
+    for target, _ in workspace_layout.INSTALLED_GIT_HOOKS:
+        (hooks / target).unlink()
+    found = next(f for f in _findings_before(ws) if f["code"] == "HOOKS-DRIFT-1")
+    assert "absent" in found["message"], found["message"]
+    _run_from_elsewhere(ws, shlex.join(shlex.split(found["fix"])))
+    for target, source in workspace_layout.INSTALLED_GIT_HOOKS:
+        assert (hooks / target).read_bytes() == (
+            workspace_layout.public_scripts_dir() / source
+        ).read_bytes()
+    assert "HOOKS-DRIFT-1" not in {f["code"] for f in _findings(ws)}
