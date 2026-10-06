@@ -17,8 +17,6 @@ from tests.helpers.worktree_ws import fixes as _fixes
 from tests.helpers.worktree_ws import git as _git
 from tests.helpers.worktree_ws import run as _run
 
-pytestmark = pytest.mark.integration
-
 
 @pytest.fixture
 def root(tmp_path: Path) -> Path:
@@ -51,7 +49,7 @@ def test_an_old_grammar_or_foreign_name_refuses(root: Path, name: str) -> None:
 
 
 def _script() -> str:
-    return str(Path(__file__).resolve().parents[2] / "dadaia_workspace/public/skills"
+    return str(Path(__file__).resolve().parents[5] / "dadaia_workspace/public/skills"
                "/dd-gitflow-default/scripts/worktree.py")  # fmt: skip
 
 
@@ -129,7 +127,7 @@ def test_the_one_venv_imports_the_checkout_it_runs_from() -> None:
     """AC1.11 (ADR 0113): the shared venv's editable install points at repos/, yet a child
     spawned from the suite's hermetic cwd imports THIS checkout (the conftest PYTHONPATH
     pin), and no checkout carries its own venv."""
-    checkout = Path(__file__).resolve().parents[2]
+    checkout = Path(__file__).resolve().parents[5]
     child = subprocess.run(
         [sys.executable, "-c", "import dadaia_workspace; print(dadaia_workspace.__file__)"],
         capture_output=True, text=True, check=True,

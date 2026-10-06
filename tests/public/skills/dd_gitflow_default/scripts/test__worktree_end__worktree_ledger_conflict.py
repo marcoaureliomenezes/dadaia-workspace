@@ -11,11 +11,7 @@ import shlex
 import subprocess
 from pathlib import Path
 
-import pytest
-
 from tests.helpers.worktree_ws import commit, fixes, git, make_workspace, run
-
-pytestmark = pytest.mark.integration
 
 
 def test_in_place_ledger_change_refuses_at_rebase(tmp_path: Path) -> None:

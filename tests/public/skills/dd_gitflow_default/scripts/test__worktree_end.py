@@ -37,8 +37,6 @@ from tests.helpers.worktree_ws import (
 )
 from tests.helpers.worktree_ws import run_fix as _fix
 
-pytestmark = pytest.mark.integration
-
 TREE = f"worktrees/r/{JOB}"
 
 
@@ -242,6 +240,7 @@ def test_clean_removes_only_an_empty_worktree_of_ours(root: Path) -> None:
     assert foreign.returncode == 1 and (root / "worktrees/r/0.5.0-rc1/j2").exists()
 
 
+@pytest.mark.windows
 def test_release_closure_waits_for_every_other_wt(tmp_path: Path) -> None:
     """AC1.10 (F4); rc-9 AC1.5: closure runs in the Reconciliation job's tree, whose own wt/* is
     spared; any other wt/* refuses it, naming repos/<r> and the owner's exit — `clean` for an
