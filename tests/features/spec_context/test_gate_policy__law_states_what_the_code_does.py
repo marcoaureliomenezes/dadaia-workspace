@@ -125,10 +125,6 @@ _SKILLS = _PKG / "public" / "skills"
 _WORDS = ["one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten"]
 
 
-def _red(bug: str) -> pytest.MarkDecorator:
-    return pytest.mark.xfail(strict=True, reason=f"JB.S1 RED: {bug}")
-
-
 @pytest.mark.parametrize(
     ("skill", "phrase"),
     [
@@ -137,7 +133,6 @@ def _red(bug: str) -> pytest.MarkDecorator:
         pytest.param("dd-audit-project/PILLAR-BUGS.md", "governance_events",
                      id="the-bug-ledger-has-no-event-stream"),
         pytest.param("dd-backlog-definition/SKILL.md", "merge a near-duplicate",
-                     marks=_red("backlog-skill-asks-a-merge-the-writer-cannot-do"),
                      id="the-backlog-writer-has-no-merge"),
     ],
 )  # fmt: skip
