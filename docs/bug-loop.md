@@ -69,7 +69,8 @@ routed to the architecture lens before it lands.
 
 ```bash
 python3 .agents/skills/dd-bug-resolution/scripts/bugs.py resolve <bug-id> \
-  --cause "…" --caused-by none --solution "…" --evidence-loop "…"
+  --cause "…" --caused-by none --solution "…" --evidence-loop "…" \
+  --evidence-seam "…"
 ```
 
 - Stage the fix first: `resolve` prints the blame candidates — the bugs whose fix and the
