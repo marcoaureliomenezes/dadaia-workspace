@@ -1,228 +1,289 @@
-# SPEC — Release: 0.5.0, candidate 10 (the window's instruments; evals T1, T2 and the first run; QUALITY's bug balance and convergence readouts; HOOKS-DRIFT-1; the test tree)
+# SPEC — Release: 0.5.0, candidate 10 (the fix reader; evals T1, T2 and the first run; QUALITY's bug balance; HOOKS-DRIFT-1; the test freeze; the test tree)
 
 **Status:** Draft
 **Release ID:** 0.5.0
 **Owner:** dd-product-engineer
-**Opened:** 2026-10-06 in the `0.5.0-rc10/define` tree while rc-9 reconciles (0205); enters by `release.py new` at rc-9's CLOSURE.
-**Origin:** backlog:agent-behavior-evals,bug-ledger-balance-and-convergence,guidance-messages-name-the-right-target,tests-tree-mirrors-the-package,unit-tier-without-processes,worktree-rows-injected-not-monkeypatched,windows-integration-coverage-gap,focused-review-on-caused-by,context-dead-never-commits,bug-fix-adds-never-rewrites-asserts,caused-by-proposed-by-blame; findings:20260930-structural-convergence-F098,20260930-structural-convergence-F128
+**Opened:** 2026-10-06 in the `0.5.0-rc10/define` tree while rc-9 reconciles (0205).
+**Origin:** backlog:agent-behavior-evals,bug-ledger-balance-and-convergence,guidance-messages-name-the-right-target,tests-tree-mirrors-the-package,unit-tier-without-processes,worktree-rows-injected-not-monkeypatched,windows-integration-coverage-gap,focused-review-on-caused-by,bugs-fix-reads-the-per-class-shape,context-dead-never-commits,bug-fix-adds-never-rewrites-asserts,caused-by-proposed-by-blame; findings:20260930-structural-convergence-F098,20260930-structural-convergence-F128
 
-- Sources (operator words verbatim there), under `.dadaia/handoff/dadaia-workspace/`: `2026-10-06T015544Z-main-thread-grill-rc10-scope` (Q1–Q4, ADR 0206, PyJWT); `2026-10-05T040135Z-main-thread-grill-granularity-parallelism` (Q1–Q23, less Q19, which 0206 overrides); `2026-10-05T005326Z-main-thread-grill-bug-window-review` (G1–G12; G8, G10 for ADR C).
-- Scope (Q4): evals, `QUALITY.md`'s convergence readouts, HOOKS-DRIFT-1, the test tree: 8 jobs, the cap (0193); the bug batch and Reconciliation uncounted.
-- Facts at 27123ce99 (main thread's inspection, re-measured here): `dadaia-evals` has no `tasks/`; `eval.yml` is on its `main` (877ff5b) and has never run; its `AGENTS.md` has no `verify:` line; `QUALITY.md`/`ARCHITECTURE.md` name 8 test files that no longer exist; HOOKS-DRIFT-1 says "differs" for an absent hook (`doctor.py` `check_installed_hooks`, `except OSError: drifted = True`).
-- Bug law: ADR 0206 (accepted 2026-10-05). No rc closes with an open bug.
+- Sources, under `.dadaia/handoff/dadaia-workspace/`:
+  - `2026-10-06T015544Z-main-thread-grill-rc10-scope`: Q1–Q4, Q2b, Q5, Q6, ADR 0206.
+  - `2026-10-05T040135Z-main-thread-grill-granularity-parallelism`: less Q19, which 0206 overrides.
+  - `2026-10-05T005326Z-main-thread-grill-bug-window-review`: G8, G10.
+- Scope (Q4, Q6): 8 jobs, the cap (0193). Evals T1 and T2 fold into one job, so the test freeze fits. The bug batch and Reconciliation are not counted.
+- Facts at 27123ce99:
+  - `dadaia-evals` has no `tasks/`; `eval.yml` (on its `main`, 877ff5b) has never run; its `AGENTS.md` has no `verify:` line.
+  - Memory names 8 test files that no longer exist.
+  - HOOKS-DRIFT-1 reads an absent hook as "differs".
+- Entry order (M4):
+  1. At rc-9's CLOSURE, `release.py new` writes the stub `rc-10/SPEC.md` on the work branch.
+  2. This define tree rebases onto it and replaces the stub with this SPEC.
+  - `release-new-adopts-a-drafted-next-rc` is carried to rc-11.
+- Bug law: 0206. No rc closes with an open bug.
 
 ## Bug window review
 
-Read on `feature/0.5.0` at 27123ce99 (rc-9's Job 5 landing) by `bugs.py window`, `bugs.py fix` and `git show --numstat`. A fix that rc-9's Reconciliation or bug batch lands after that sha gets its row here before Approval.
+Read on `feature/0.5.0` at 27123ce99, then on `wt/0.5.0-rc9/reconcile`, with `bugs.py window`, `fix` and `git show --numstat`.
 
-- Window: 251 records (`0.4.7`, `0.5.0`); 452 have release `unknown`. 1 open: `dependabot-pyjwt-open-on-main` (CRITICAL, found in rc-7). rc-9 resolves it with Dependabot PR #277, an operator merge on `main`; its row is added when it resolves.
-- Found in rc-9: 1, the hotfix below. No other record's `caused_by` names an rc-9 task.
-- `bugs.py fix`: 35 links, 0 unlinked. 13 records were resolved retro in rc-9 (AC2.9) on fixes from before rc-9. rc-9's own window judged them (C9); they are not judged again here.
-- Direction: `bugs.py fix` prints `-` for every rc-9 fix but the hotfix. A shape-4 resolve links task commits it never diffs (`PILLAR-BUGS.md:8`). The column below is hand-computed: production `dadaia_workspace/**` code lines, then tests. → AC1.1.
-- Traceability: none of the 35 rc-9 resolutions carries `evidence_seam` (retired by 0164 (4)). Of the 317 records that do carry one, 116 name a file that no longer exists. → AC1.2 (G10).
+- Window: 251 records (`0.4.7`, `0.5.0`); 452 with release `unknown`.
+- Found in rc-9: 5, all resolved: the 4 rc-9 bug rows of the table, and `verify-line-absent-refusal-sends-to-a-tree-the-gate-never-reads`. `dependabot-pyjwt-open-on-main` (found in rc-7) is resolved in rc-9.
+- 13 records were resolved retro in rc-9 (AC2.9) on fixes from before rc-9. rc-9's window judged them (C9).
+- Direction: `bugs.py fix` prints `-` for every task-commit fix, so the column below is hand-computed: production `dadaia_workspace/**` lines, then tests. → AC1.1.
+- Rework count (Q5) needs AC1.1's reader; rc-11's window carries it.
+- Traceability: no rc-9 resolution carries `evidence_seam`. Of the 317 records that carry one, 116 name a file that no longer exists. → AC1.2.
 
 | bug(s) | fix | direction (prod; tests) | what followed | verdict |
 |---|---|---|---|---|
-| `job-task-id-test-assumes-native-paths` (hotfix, C2 recurrence) | 121ae02b2 | +5/−3; +19 | nothing; no C2 record since Job 1's matrix gate | KEEP |
-| `ci-preflight-writes-coverage-into-the-repo` (AC2.1) | a6fadcdde, 67d8ed1e5 | 0; +12/−10 | review fold F5, F6 inside the job | KEEP |
-| `hook-entrypoints-invisible-to-coverage` (AC2.2) | 2299ce56b | +7/−4; −2 | nothing | KEEP |
-| `registry-row-missing-a-key-escapes-reg-schema` (AC2.3) | 7c494c568, b19f9541c | +30/−17; −1 | review fold F3 inside the job | KEEP |
-| `pre-push-warns-no-gitflow-block-for-an-absent-specs-tree` (AC2.4) | 84ed78453, d55cf2399, 1c5494f10 | +9/−4; +16/−1 | review fold F4 inside the job | KEEP |
-| `upgrade-leaves-reconcile-scratch-behind` (AC2.5) | 00824a1ee | +9/−23; +15/−1 | nothing | KEEP |
-| `release-memory-appends-a-second-entry-on-rerun` (AC2.6) | 9888c647b, ac4b18094 | +5/−1; +15/−1 | review fold F9 inside the job | KEEP |
-| `ledger-denylist-term-inside-context-slug-blocks-registration` (AC2.7, REBUILD) | 5029ae91d, 6ebe02029, dc4d2f5a5, 25298e7e3 | +135/−96; +57/−7 | folds F2, F10, M1 inside the job | KEEP; net-positive, reviewer verdict "privacy seam reduced" |
-| 3 C1 records (AC3.1, REBUILD) | 68acfb610 | 0; +109/−282 | nothing | KEEP |
-| 8 C3/C4 records (AC3.3, REBUILD) | d8f325e3d, 93cf75152 | +133/−98; +43/−54 | a stage J3.S4 appended inside the job | KEEP; net-positive, verdict "sweep delete path reduced" |
-| `t168-canon-change-without-stamp-bump`, `blame-refusal-test-asserts-a-posix-fix-line` (AC3.4) | f6a791f3a | +3/−2; +8/−11 | nothing | KEEP |
-| `doctor-stub-drifts-from-doctorservice-signature` (AC3.5) | 568a33c60 | 0; +2/−21 | nothing | KEEP |
-| `hook-stdin-guard-misses-raw-assignment` (AC3.6) | 89746389a | guard script +16/−5 | nothing | KEEP. The guard lists stdin-patch forms one by one; AC8.3 removes the reason for it. |
+| `job-task-id-test-assumes-native-paths` (hotfix; C2) | 121ae02b2 | +5/−3; +19 | no C2 record since Job 1's matrix gate | KEEP |
+| `verify-line-absent-refusal-sends-to-a-tree-the-gate-never-reads` (hotfix, CRITICAL; caused by J1.S3.T1) | sha filled at Approval | REBUILD of `_gate` under 0207, in rc-9 | — | KEEP that REBUILD; rc-11 reads its rework |
+| `ci-and-release-install-vulnerable-poetry` (hotfix, block 4) | 858bc97ad | workflows ±10, pyproject +3/−26; guard row `poetry-below-the-floor` | nothing | KEEP |
+| `dependabot-pyjwt-open-on-main` | 46d10b5bb (PR #277, Operational-Change Lane) | lock only, on `main` | nothing | KEEP |
+| `bugs-fix-lists-one-commit-twice` (caused by T-050-167) | c9faccfdc | +5/−1; +21 | second fix on the fix reader | **REBUILD**: AC1.1, keeping its test rows |
+| `specs-law-file-untracked-by-gitignore` | 6c73219b1 | guard +5/−15; +17 | one revert inside the job (0a6b649dc) | KEEP; its test moves with Job 7 |
+| AC2.1 coverage | a6fadcdde, 67d8ed1e5 | 0; +12/−10 | review fold | KEEP |
+| AC2.2 hooks coverage | 2299ce56b | +7/−4; −2 | nothing | KEEP |
+| AC2.3 registry key | 7c494c568, b19f9541c | +30/−17; −1 | review fold | KEEP |
+| AC2.4 absent specs | 84ed78453, d55cf2399, 1c5494f10 | +9/−4; +16/−1 | review fold | KEEP |
+| AC2.5 upgrade scratch | 00824a1ee | +9/−23; +15/−1 | nothing | KEEP |
+| AC2.6 memory rerun | 9888c647b, ac4b18094 | +5/−1; +15/−1 | review fold | KEEP |
+| AC2.7 ledger seam (REBUILD) | 5029ae91d, 6ebe02029, dc4d2f5a5, 25298e7e3 | +135/−96; +57/−7 | review folds | KEEP: the verdict was "seam reduced" |
+| AC3.1 C1, 3 records (REBUILD) | 68acfb610 | 0; +109/−282 | nothing | KEEP |
+| AC3.3 C3/C4, 8 records (REBUILD) | d8f325e3d, 93cf75152 | +133/−98; +43/−54 | stage appended inside the job | KEEP: the verdict was "reduced" |
+| AC3.4 T-050-168's tests | f6a791f3a | +3/−2; +8/−11 | nothing | KEEP |
+| AC3.5 `_StubDoctor` | 568a33c60 | 0; +2/−21 | nothing | KEEP |
+| AC3.6 stdin guard | 89746389a | guard +16/−5 | nothing | KEEP; AC8.3 removes its cause |
 
-- Readouts:
-  - Every rc-9 fix held; nothing that followed is a bug.
-  - 5 of Job 2's 7 fixes needed a review fold before their merge (rework, not bugs: G9).
-  - No row is REBUILD. Job 1 builds the review's two missing instruments (direction, `evidence_seam`) and the audit half of the focused review, which the window needs to judge rc-10's fixes.
-
-## How rc-10 runs
-
-- rc-10 runs the model rc-9 built, as `worktrees/AGENTS.md` and `dd-release-definition` §4–§5 state it. The PLAN draws the DAG. Each job has one file, `tasks/<job>.md`. Gates run per task, stage and job. One review per job. At most 5 task worktrees and 2 test slots at once.
-- `dadaia-evals` jobs run on that repo's own work branch. Their job gate runs the repo's `verify:` lines (AC2.1).
-- Every bug found in rc-10 is fixed in rc-10 (§The bug batch).
+- Pattern read (Q5):
+  - No fix commit rewrites an old assert, special-cases a test value, or reaches into another feature.
+  - Second path: the stdin guard lists patch forms one by one (AC8.3).
+  - ≥ 2 fixes on one unit: the fix reader (T-050-167, then c9faccfdc) → REBUILD.
+- Job 1 executes the one REBUILD and builds the inputs this review lacked: direction, rework and `evidence_seam`.
 
 ## Terms
 
-- **Settled surface**: a surface whose every record has left the bug window with no later record on it (G8). Weight decays to settled; no invented number.
-- **Convergence readout**: one of the two numbers `QUALITY.md` `## Bugs` prints at each closure, blocking nothing (Q2): the Laplace trend and the defective-fix rate.
-- **Bug batch**, **Hotfix**, **Bug window**, **Evals repo**: as `CONTEXT.md` defines them.
+- **Fix surface**: the production lines a fix commit wrote. It settles once it survives 2 rcs untouched by another fix or REBUILD (Q5).
+- **Rework**: a later commit whose diff overlaps a fix surface, classed by its shape.
+  - `refactor(…): REBUILD` is planned rework.
+  - `fix(bugs)` of another bug is overfitting evidence.
+- **Settled surface**: a surface whose every record left the bug window with no later record on it (G8).
+- **Convergence readout**: a number `QUALITY.md` `## Bugs` prints at each closure, blocking nothing (Q2, Q2b).
+- **RED anchor**: the sha that closes a job's RED stage. After it, the job's test files are frozen (Q6).
 
-## Job 1 — the window's instruments
+## Job 1 — the fix reader and the window's instruments
 
-- AC1.1 `bugs.py fix` diffs every linked commit: a shape-4 task commit gets its numstat and direction like a shape-3 fix. The never-diffed `None` path leaves. One sha prints once, never in both short and full form (today `121ae02b2,121ae02b2364c…`). `PILLAR-BUGS.md:8` states the same.
-  - **Unit**: a ledger linked by a shape-4 resolve over two task commits prints their summed numstat and a literal direction.
-  - **Unit**: a short and a full sha of one commit print one sha.
-- AC1.2 `evidence_seam` is required at resolve and checked only there (G10, ADR C; amends 0164 (4)).
-  - `bugs.py resolve` takes `--evidence-seam <path>[::node]` and refuses when the path is missing or the node is not in the file. Node matching covers parametrized and class-qualified ids.
-  - `bugs.py check` never judges the seam of a resolved record: a later REBUILD may delete the test.
-  - `bugs.py window` marks a record whose seam file is gone, so the next window review reads the tests a REBUILD deleted.
-  - **Unit**: resolve rows (seam present, file missing, node missing, parametrized id); a window row with a deleted seam file.
-- AC1.3 `PILLAR-BUGS` measures the focused review (`focused-review-on-caused-by`, audit half). The skill half already stands: `dd-code-review/SKILL.md:55`.
-  - A ninth metric: of the window's fixes whose record carries `caused_by ≠ none`, the share whose commit is a REBUILD shape or whose body carries `rebuild: none — <reason>`. Target 100 %, reported honestly. It gates nothing.
-  - **No test** (audit text). Check: `grep -c 'rebuild: none' dadaia_workspace/public/skills/dd-audit-project/PILLAR-BUGS.md` prints ≥ 1.
+- AC1.1 One REBUILD of the `bugs.py fix` commit reader (verdict above; `bugs-fix-reads-the-per-class-shape`; Q5). c9faccfdc's test rows stay unchanged.
+  - It diffs every linked commit, a shape-4 task commit included; the never-diffed `None` path leaves.
+  - It links a per-class shape-4 commit by the ids on its body lines.
+  - For each fix it prints the fix surface, its rework count by class, and settled or the rcs it has left.
+  - Everything is derived from git; nothing is stored.
+  - **Unit** rows:
+    - a shape-4 resolve over two task commits gives summed numstat and a literal direction;
+    - a class commit links its body ids;
+    - a later `fix(bugs)` overlapping the surface counts 1 overfitting;
+    - a REBUILD counts 1 planned;
+    - two rcs untouched read settled.
+- AC1.2 `evidence_seam` is required at resolve and checked only there (G10, 0208).
+  - `bugs.py resolve --evidence-seam <path>[::node]` refuses a path git does not track, or a node whose text, with parameter brackets stripped, is not in the file. The check is textual and works for any language.
+  - A fix with no test cites any tracked file.
+  - `bugs.py check` never re-judges a seam.
+  - `bugs.py window` marks a record whose seam file is gone.
+  - **Unit** rows: present; untracked path; absent node; parametrized node; a non-test tracked file; a window row with a deleted seam.
+- AC1.3 The window review compares each fix against the overfitting patterns (Q5):
+  - an assert or test changed by the fix;
+  - a special case on a test value;
+  - a new branch, flag or second path;
+  - a reach into another feature;
+  - deleted functionality;
+  - ≥ 2 fixes on the unit.
+  - Each fix then gets KEEP or REBUILD. A REBUILD reworks the fix's code and what surrounds it, and keeps the fix's tests.
+  - Taught in `dd-release-definition` §1. **No test** (law text).
+- AC1.4 One producer for the REBUILD-or-not line (M6). `dd-bug-resolution` `LINEAGE.md` step 7 writes it into the fix commit's body, either `rebuild: <unit> — prior fixes <id>, …` or `rebuild: none — <reason>`. `PILLAR-BUGS` gains a ninth metric: the share of fixes with `caused_by ≠ none` that carry a REBUILD shape or that line (`focused-review-on-caused-by`, audit half). Target 100 %; it gates nothing. **No test**. Check: `grep -c 'rebuild: none — <reason>'` prints ≥ 1 in `LINEAGE.md` and in `PILLAR-BUGS.md`.
 
-## Job 2 — evals: the repo law and T1
+## Job 2 — evals: the repo law, T1 and T2
 
-The write set is `repos/dadaia-evals` only, apart from the job file.
+Writes only to `repos/dadaia-evals` and the job file.
 
-- AC2.1 `dadaia-evals/AGENTS.md` declares `verify:`, `verify-stage:` and `verify-task:` lines: the secret-free checks `ci.yml` runs (`python3 -m unittest discover -s tests`), as argv (rc-9 AC1.2). **No test** (repo law). Check: `grep -c '^verify' AGENTS.md` prints `3`; Job 2's own job gate runs the `verify:` line, and its `kind: merge` entry names that run.
-- AC2.2 The task skeleton (rc-8 AC11.2):
-  - `tasks/t1-cold-onboarding/` holds `instruction.md`, `task.toml`, `environment/Dockerfile`, `tests/test.sh` and `tests/test_grade.py`.
-  - The Dockerfile holds the environment only: python, uv, git, the Claude CLI at `eval.yml`'s pin. The lib comes from `environment/lib/` as the last layer (0179).
-  - **Integration**: the image builds with the 0.4.7 layer and with a candidate wheel; `git ls-files jobs` prints nothing.
+- AC2.1 `dadaia-evals/AGENTS.md` declares `verify:`, `verify-stage:` and `verify-task:` lines, holding the secret-free checks `ci.yml` runs. **No test**. Check: `grep -c '^verify' AGENTS.md` prints `3`, and this job's gate runs the `verify:` line.
+- AC2.2 Skeleton (rc-8 AC11.2):
+  - `tasks/t1-cold-onboarding/` and `tasks/t2-block-list-bug/` each hold `instruction.md`, `task.toml`, `environment/Dockerfile`, `tests/test.sh` and `tests/test_grade.py`.
+  - The Dockerfile holds the environment only; the lib is its last layer (0179).
+  - **Integration**: each image builds with the 0.4.7 layer and with a candidate wheel; `git ls-files jobs` prints nothing.
 - AC2.3 T1, cold onboarding (rc-8 AC11.3):
-  - The environment builds a `file://` bare repo with one commit. The instruction asks the agent to onboard it following only what `dadaia` prints.
-  - It passes when `dadaia doctor --json` reports 0 errors, the context is ALIVE and specs are initialized.
-  - `test.sh` writes `/logs/verifier/reward.txt`.
-  - **Integration** (no model): the unchanged grader passes on a hand-onboarded 0.4.7 workspace and on a hand-onboarded candidate workspace, and fails on an empty one.
-
-## Job 3 — evals: T2, a planted block-list bug
-
-- AC3.1 T2 plants a block-list bug (Q1): a small onboarded synthetic project whose test suite, its work branch's CI, is red after a merged change broke a documented contract. The instruction gives the operator's confirmation.
-  - Both 0.4.7's law and 0.5.0's (block item 1, a hotfix) fix it at once, so one grader serves both.
-  - The non-blocking path, the rc's bug batch, gets its own scenario after 0.5.0 (§Not in scope).
-- AC3.2 T2 passes when:
-  - a `BUGS.jsonl` record precedes the fix commit;
-  - the RED test fails on the pre-fix sha and passes on the fix;
-  - the project's suite is green at HEAD;
-  - `git diff -U0 -- tests | grep '^-\s*assert'` prints nothing.
-  - The grader reads only record fields both versions' `bug-record-v1` carry.
+  - The environment is a `file://` bare repo with one commit.
+  - It passes on `dadaia doctor --json` with 0 errors, the context ALIVE and specs initialized.
+  - **Integration** (no model): the unchanged grader passes on a hand-onboarded workspace of each version and fails on an empty one.
+- AC2.4 T2 plants a block-list bug (Q1): a small onboarded project whose suite, its work branch's CI, is red after a merged change broke a documented contract. The instruction gives the operator's confirmation.
+  - Both versions' law fixes it at once.
+  - It passes when:
+    - a `BUGS.jsonl` record precedes the fix commit;
+    - the RED test fails on the pre-fix sha and passes on the fix;
+    - the suite is green at HEAD;
+    - `git diff -U0 -- tests | grep '^-\s*assert'` prints nothing.
+  - The grader reads only `bug-record-v1` fields both versions carry.
   - **Integration** (no model): on both versions, a planted correct fix passes and a planted assert-rewriting fix fails.
 
-## Job 4 — evals: the first run
+## Job 3 — evals: the first run
 
-Edges: Jobs 2 and 3, merged to `dadaia-evals` `main` through its PR edges (GitHub dispatches a default-branch workflow).
+Edge: Job 2, merged to `dadaia-evals` `main` through its PR edges.
 
-- AC4.1 One run: `gh workflow run eval.yml -f lib_ref=<tip of feature/0.5.0>` on `dadaia-evals`, T1 and T2, k=3, 0.4.7 against the candidate (rc-8 AC11.6).
-  - It confirms the trial runs the candidate wheel: `dadaia capabilities --json` names the stamped version.
-  - It confirms two trials at once stay inside the plan's rate limit: no rate-limit error in `jobs/`.
-  - A failing grader, unlike a failing agent, is fixed in the grader before closure.
-  - **No test** (evidence). Check: a `_RELEASE.json` `kind: note` names the run URL, the verdict per 0178 (2), tokens and wall time.
+- AC3.1 One `gh workflow run eval.yml -f lib_ref=<tip of feature/0.5.0>`: T1 and T2, k=3, 0.4.7 against the candidate (rc-8 AC11.6).
+  - It confirms the trial ran the stamped candidate wheel (`dadaia capabilities --json`).
+  - It confirms no rate-limit error appears in `jobs/`.
+  - A failing grader is fixed in the grader before closure.
+  - **No test**. Check: a `_RELEASE.json` `kind: note` names the run URL, the verdict per 0178 (2), tokens and wall time.
 
-## Job 5 — QUALITY.md's bug balance and the convergence readouts
+## Job 4 — QUALITY.md's bug balance and the convergence readouts
 
-`bug-ledger-balance-and-convergence`; G8; Q2; ADR C. The generator ships with the bug skill, so it stays language-neutral.
+`bug-ledger-balance-and-convergence`; G8, Q2, Q2b; 0208. The generator ships with the bug skill and stays language-neutral.
 
-- AC5.1 `QUALITY.md` `## Bugs` holds one generated fenced block, rendered from `BUGS.jsonl` alone.
-  - Per surface: records, recurrences, fix-induced (`caused_by ≠ none`), archived, rcs in the window, correlates, settled.
-  - Per-bug state stays only in the ledger.
-  - Dev-tooling surfaces are a repo-declared class (a `.gitattributes` attribute, the 0183 seam) and print apart; `unknown` surfaces stay out of recurrence counts.
-  - **Unit**: a literal ledger renders a literal block; a rerun over an unchanged ledger is byte-equal.
-- AC5.2 Settled, per the Terms entry. **Unit**: rows for in the window, left clean, and left then recurred.
-- AC5.3 Readout 1, the Laplace trend (Kanoun & Laprie, *Handbook of Software Reliability Engineering* ch. 10, grouped data).
-  - n(i) is the number of records found in rc i on a surface settled when rc i opened.
-  - u = [Σ(i−1)n(i) − (k−1)/2·N] / √((k²−1)/12·N).
-  - u ≤ −1.96 is printed as converging, u ≥ +1.96 as diverging, anything else as no trend.
-  - Records whose rc is `unknown` are excluded, and their count is printed beside u.
-  - **Unit**: counts `[5, 3, 2, 1]` give `u = -1.75` and "no trend".
-- AC5.4 Readout 2, the defective-fix rate per rc (Kan, *Metrics and Models in Software Quality Engineering* ch. 4; Jones 2012, bad-fix injection): records found in rc i with `caused_by ≠ none`, over records found in rc i. **Unit**: a literal ledger gives a literal rate per rc.
-- AC5.5 The block is a closure check, never an always-on doctor check. At CLOSURE, `release.py check` refuses a `## Bugs` block that differs from its regeneration, with one fix line naming the regenerating command. The readouts block nothing. The evals verdict (AC4.1) sits beside them as one line. LINT-1 exempts the fenced block. **Integration**: a stale block refuses in CLOSURE; the same tree in IMPLEMENTATION passes.
-- AC5.6 The written review under `## Bugs` states the standing causes, verdicts and lessons. It is rewritten at each closure, never appended (memory carries no history). `docs/bug-ledger-lessons.md` derives from it under P-29. `CONTEXT.md` gains **Settled surface** and **Convergence readout**. **No test** (memory); `test_docs_derived_from_memory.py` stays green.
+- AC4.1 `QUALITY.md` `## Bugs` holds one generated fenced block, rendered from `BUGS.jsonl` alone.
+  - Per surface: records, recurrences, fix-induced, archived, rcs in the window, correlates, settled.
+  - Dev-tooling surfaces form a repo-declared class (a `.gitattributes` attribute, the 0183 seam) and print apart.
+  - `unknown` surfaces stay out of recurrences.
+  - **Unit**: a literal ledger renders a literal block; a rerun is byte-equal.
+- AC4.2 Readout 1, the Laplace trend (Kanoun & Laprie, *Handbook of Software Reliability Engineering* ch. 10), continuous time with days as the axis, over all bugs (Q2b).
+  - Window: the live release plus the 3 previous published (today 0.4.5–0.5.0).
+  - Only records with a known `found_in` release count. Records sharing their `ts` with another record (a backfill or bulk import) are excluded and counted apart.
+  - u = (mean of tᵢ − T/2) / (T·√(1/(12N))), where tᵢ is a record's day offset from the window start and T is the window's length in days.
+  - u ≤ −1.96 reads "converging", u ≥ +1.96 "diverging", anything else "no trend".
+  - A second line counts records found on a surface that was already settled.
+  - **Unit**: t = `[1, 2, 3]` and T = 10 give `u = -1.80`, "no trend"; one backfill pair is counted apart.
+- AC4.3 Readout 2, the defective-fix rate per rc (Kan, *Metrics and Models in Software Quality Engineering* ch. 4; Jones 2012): records found in rc i with `caused_by ≠ none`, over records found in rc i. **Unit**: literal ledger, literal rates.
+- AC4.4 The block is a closure check, never an always-on doctor check.
+  - At CLOSURE, `release.py check` refuses a block that differs from its regeneration, with one fix line naming the regenerating command.
+  - The readouts block nothing. LINT-1 exempts the fenced block.
+  - **Integration**: a stale block refuses in CLOSURE and passes in IMPLEMENTATION.
+- AC4.5 The written review under `## Bugs` states the standing causes, verdicts and lessons.
+  - It also carries the latest evals verdict line, outside the generated block (M7).
+  - It is rewritten, never appended. `docs/bug-ledger-lessons.md` derives from it (P-29).
+  - `CONTEXT.md` gains this SPEC's Terms.
+  - **No test** (memory).
 
-## Job 6 — HOOKS-DRIFT-1 states what it observed
+## Job 5 — HOOKS-DRIFT-1 states what it observed
 
-- AC6.1 (rc-8 AC10.12; F098; `guidance-messages-name-the-right-target`, its last open part) One code. The message names the observed state, absent or differing. One fix line (`ci install-hook --force --repo <abs>`) serves both.
-  - **Unit**: an absent hook is reported as absent, a hand-edited one as differing.
-  - **Integration**: delete a projected hook; the finding says absent, and its fix line, run, restores the hook and clears the finding.
+- AC5.1 One code (rc-8 AC10.12; F098; `guidance-messages-name-the-right-target`'s last part). The message names the observed state, absent or differing. One fix line, `ci install-hook --force --repo <abs>`, serves both.
+  - **Unit**: an absent hook is reported as absent, an edited one as differing.
+  - **Integration**: delete a projected hook; its fix line, run, restores the hook and clears the finding.
+
+## Job 6 — the test freeze
+
+Q6 items 1–5; 0209. Everything is judged by `git diff` over the repo's declared test paths, so it works for any language.
+
+- AC6.1 Tests are born only in a RED stage, one whose tasks' `W:` holds tests only. Each new test is validated before the freeze: collected, failing by assertion (never by error), test-audit, stage review. **Integration**: a RED stage whose new test errors instead of failing cannot close.
+- AC6.2 From the RED anchor on, a task or job merge refuses any diff on a test file. This covers unit, integration and E2E tests and the tests that existed before; a pure rename is allowed.
+  - The refusal carries one `Operator action:` line: stop and report.
+  - **Integration**: an edited test refuses; a pure rename lands; a new RED stage lands.
+- AC6.3 A wrong test is never edited in an implementation task. The implementer stops and reports; the amendment is a new RED stage, with its review and the operator's approval.
+  - `specs/releases/AGENTS.md` §3's clause on rewriting a test in the same task leaves.
+  - A REBUILD keeps the fix's tests.
+  - **No test** (law text).
+- AC6.4 The task gate's `test_`-name check (`_worktree_end.py:287-292`) becomes an owner rule: a code task names its owner tests, and `scripts/guards/run.py` owns `scripts/guards/**`. **Integration**: a guard-only task with that owner passes; a code task with no owner refuses.
+- Jobs 7 and 8 change existing tests only in test-only stages. This SPEC's approval is the amendment AC6.3 names.
 
 ## Job 7 — the tests tree mirrors the package
 
-`tests-tree-mirrors-the-package`, `windows-integration-coverage-gap`; 0167. Edge: Job 7 before Job 8; both touch `tests/conftest.py`.
+`tests-tree-mirrors-the-package`, `windows-integration-coverage-gap`; 0167. Edge: Job 7 → Job 8 (`tests/conftest.py`).
 
-- AC7.1 Every test file is `tests/<mirror of dadaia_workspace>/test_<module>.py` for one module, or one named e2e journey carrying `Owner:`.
-  - `contract/` and `integration/` dissolve into the owners; no ghost or empty test directory remains.
-  - `tests/contract/test_docs_derived_from_memory.py` stays where it is until publish-gate check #7 rules (rc-13).
-  - **Guard**: a check of the one guard-script CI job, red on a planted loose file and on an empty test directory.
-- AC7.2 The move is `git mv` plus merge, one feature per commit, and changes no assert (Tidy First). **No test**. Check: `git grep -h '^\s*assert' <job base> -- tests | sort` equals the same at the job HEAD, less the file AC7.1 excludes.
-- AC7.3 The size marker is derived in conftest from the fixture a test uses (real git or a subprocess makes it medium), never from its folder. **Unit** (`pytester`): a test using the real-git fixture collects as medium, a pure one as small.
-- AC7.4 The cases `windows-integration-coverage-gap` names, those that still exist, run on the Windows CI job by marker. **No test**. Check: the Windows CI job's log of the job push lists them.
+- AC7.1 Every test file is `tests/<mirror of dadaia_workspace>/test_<module>.py`, or one e2e journey carrying `Owner:`.
+  - `contract/` and `integration/` dissolve into those owner files; no ghost or empty test directory remains.
+  - `test_docs_derived_from_memory.py` stays until publish-gate check #7 rules (rc-13).
+  - **Guard**: red on a planted loose file and on an empty test directory.
+- AC7.2 The move is `git mv` plus merge, one feature per commit, with no assert changed. **No test**. Check: `git grep -h '^\s*assert' <base> -- tests | sort` equals the same at HEAD.
+- AC7.3 The size marker comes from the fixture a test uses: real git or a subprocess makes it medium, never its folder. **Unit** (`pytester`): a real-git test collects as medium, a pure one as small.
+- AC7.4 The cases `windows-integration-coverage-gap` names that still exist run on the Windows CI job by marker. **No test**. Check: the Windows job log lists them.
 
 ## Job 8 — the unit tier spawns no processes
 
-`unit-tier-without-processes`, `worktree-rows-injected-not-monkeypatched`, 0163's production-faithful hook harness, and rc-7's slow-class G4 growth.
+`unit-tier-without-processes`, `worktree-rows-injected-not-monkeypatched`, the 0163 hook harness, rc-7's slow-class G4 growth.
 
-- AC8.1 No small-marked test spawns a process. Each offender either gets its pure core extracted and tested pure, or turns medium through AC7.3's marker. **Guard**: red on a planted subprocess call in a small test. Readout, gating nothing: ≥ 70 % of small items under 100 ms, logged at Reconciliation.
-- AC8.2 `SpecContextService` and `DoctorService` take worktree rows by constructor injection, defaulting to the adapter. The unit-tier autouse monkeypatch and the inline patch in `test_cli_context.py` leave. Scattered boundary monkeypatches move into `tests/fakes.py`. **Unit**: each service built with a stub rows callable.
-- AC8.3 Every hook test drives its hook through the one production-faithful harness (0163): the entrypoint as a subprocess fed a payload fixture, medium-marked. No test patches `sys.stdin`; the `hook-stdin-not-in-process` guard stays green with nothing left to catch. **Integration**: one row per hook lane through the harness.
+- AC8.1 No small test spawns a process. Each offender either gets its pure core extracted and tested pure, or turns medium (AC7.3). **Guard**: red on a planted subprocess in a small test. Readout, gating nothing: ≥ 70 % of small items run under 100 ms.
+- AC8.2 `SpecContextService` and `DoctorService` take worktree rows by constructor injection. The autouse monkeypatch and the inline patch in `test_cli_context.py` leave. Boundary fakes live in `tests/fakes.py`. **Unit**: each service built with a stub rows callable.
+- AC8.3 Every hook test drives its hook through the one production-faithful harness (0163): the entrypoint as a subprocess, fed a payload fixture. No test patches `sys.stdin`. **Integration**: one row per hook lane.
 
 ## The bug batch
 
 - AC9.1 Every bug found in rc-10 is resolved in rc-10 (0206).
-  - A block-list bug (bugs law §2) is a hotfix at once.
-  - Every other bug is fixed by the bug batch: one job outside the DAG, after Job 8 or the DAG's last job merges and before Reconciliation, grouped by cause, a fix-induced one as a REBUILD.
+  - A block-list bug is a hotfix at once.
+  - Every other bug goes to the bug batch: after the DAG's last job, before Reconciliation, grouped by cause, a fix-induced one as a REBUILD (0210 settles which ones).
   - A bug found during Reconciliation is fixed inside it.
-  - **No test** (ledger). Check: at Reconciliation's end, `bugs.py status` prints `0 open`; rc-11's `## Bug window review` judges these fixes.
+  - **No test**. Check: `bugs.py status` prints `0 open` at Reconciliation's end.
 
 ## Reconciliation
 
-**No test**: each AC is observed by the command it names or by a `_RELEASE.json` log line.
+**No test**: each AC is observed by its command or by a `_RELEASE.json` line.
 
 - AC10.1 Memory states the merged code; each atom lands with its derived sections in one merge (0192).
-  - Every `tests/…py` path that `QUALITY.md` and `ARCHITECTURE.md` name exists (8 missing at 27123ce99), unless 0176's accept commit already corrected it. F128's `RELEASE-TREE-MEMORY` line leaves (`grep -c RELEASE-TREE-MEMORY specs/memory/ARCHITECTURE.md` prints `0`).
-  - F098 and F128 are dispositioned `resolved` by `audit.py disposition`.
-- AC10.2 `## Bugs` is regenerated after the disposition sweep (AC5.5). `_RELEASE.json` logs both readouts, the evals verdict, AC8.1's readout, each job's `kind: merge` entry, and each job's bug-surface delta with ledger evidence.
-- AC10.3 The operator accepts or rejects ADR C; its `measured_by` names AC1.2's and AC5.1–AC5.5's cases.
-- AC10.4 Each Origin entry exits once, `delivered --release 0.5.0`. `agent-behavior-evals` exits after AC4.1 is logged with 0177–0179 ruled. The three rc-9 deliveries cite rc-9's commits (§Carried).
-- AC10.5 Closure follows the releases law: zero open bugs; rc-11 defined beside it (0205).
+  - Every `tests/…py` path named in `QUALITY.md` and `ARCHITECTURE.md` exists. `grep -c RELEASE-TREE-MEMORY specs/memory/ARCHITECTURE.md` prints `0`.
+  - F098 and F128 are dispositioned `resolved`.
+- AC10.2 `## Bugs` is regenerated after the disposition sweep. `_RELEASE.json` logs the readouts, AC8.1's readout, each job's `kind: merge` entry and each job's bug-surface delta.
+- AC10.3 The `measured_by` of 0208 and 0209 names cases this rc built (AC1.2, AC4.1–AC4.4; AC6.1–AC6.2); a name that moved is repaired in the 0138 lane.
+- AC10.4 Each Origin backlog entry exits once, `delivered --release 0.5.0`. `agent-behavior-evals` exits after AC3.1 is logged, with 0177–0179 ruled.
+- AC10.5 Closure follows the releases law, with zero open bugs; rc-11 is defined beside it.
 
 ## ADRs
 
-- 0176, 0178: accepted with the operator's words (Q3). The main thread writes the rulings. 0176's memory half is AC10.1; 0178 (1)–(5) apply at rc-13's promote.
-- 0174: rejected (Q3). Its live clauses are re-proposed at rc-11 (§Carried).
-- ADR C (proposed here; tentative id 0207), "The bug ledger's balance lives in QUALITY.md; evidence_seam is checked at resolve" (G8, G10, Q2):
-  - We will keep a `## Bugs` section in `QUALITY.md`: a generated map per surface plus a written review, compiled at each rc closure and consolidated per release, with per-bug state only in `BUGS.jsonl`.
-  - A bug is settled once it leaves the bug window with no recurrence on its surface.
-  - The map is a closure check, never an always-on doctor check.
-  - Two convergence readouts, the Laplace trend over settled surfaces and the defective-fix rate, are printed at each closure and block nothing; the evals verdict sits beside them.
-  - `bugs.py resolve` requires `evidence_seam` and checks it only then; a later REBUILD may delete the cited test, and the window review records it.
-  - Amends 0164 (4); its `amends` is written at acceptance (0151 M2). `measured_by`: AC1.2's and AC5.1–AC5.5's cases.
+- 0176 and 0178 are accepted (Q3); the main thread writes the rulings. 0176's memory half is AC10.1. 0178 applies at rc-13's promote.
+- 0174 is rejected (Q3); its live clauses are re-proposed at rc-11.
+- **0208** (ADR C), accepted with this SPEC's Approval, before Job 1 (G8, G10, Q2, Q2b, Q5):
+  - `QUALITY.md` `## Bugs` holds a generated map plus a written review, compiled at each closure; per-bug state stays only in `BUGS.jsonl`.
+  - A surface settles once it leaves the window with no recurrence.
+  - The map is a closure check. Context: G8 said "checked by doctor". The rc-8 W13 review (REJECTED; H7) moved it to closure, because an always-on check reddens every tree between closures. This ADR records that difference.
+  - The readouts block nothing: the Laplace trend over all bugs (days axis, 4 releases, known `found_in` only), the settled-surface count, and the defective-fix rate.
+  - Fix surfaces and rework are derived from git, never stored.
+  - `bugs.py resolve` requires `evidence_seam`, checked textually only then.
+  - Amends 0164 (4). `measured_by`: AC1.2's and AC4.1–AC4.4's cases.
+- **0209**, proposed, accepted with this SPEC's Approval (Q6), "Tests are born in RED stages and frozen at the RED anchor":
+  - AC6.1–AC6.4's rule.
+  - Amends the releases law §3's same-task rewrite clause.
+  - `measured_by`: AC6.2's cases.
+- **0210**, proposed: one REBUILD trigger. ADR 0186 (2) says a `caused_by` other than none means a REBUILD. The bugs law §2 (0206) says a REBUILD only for a fix-induced bug. The options:
+  - (a) A REBUILD when `caused_by` names a bug. When it names a task, the smallest fix plus the focused review's REBUILD-or-not line.
+  - (b) 0186 (2) as written: every `caused_by ≠ none`.
+  - The operator decides before Job 1.
 
 ## Replaces
 
-- `bugs.py fix`'s never-diffed shape-4 link and its `-` direction; a sha printed twice (AC1.1).
-- 0164 (4)'s retirement of `evidence_seam` for new records (AC1.2).
-- HOOKS-DRIFT-1's fixed "differs", and its `except OSError` that reads an absent hook as drift (AC6.1).
-- Loose `contract/` and `integration/` roots, ghost and empty test directories, the folder-derived size tier (AC7).
-- Processes in the unit tier; the autouse worktree-rows monkeypatch; tests patching `sys.stdin` (AC8).
-- Stale `Measured by` test paths and `RELEASE-TREE-MEMORY` in memory (AC10.1).
+- `bugs.py fix`'s never-diffed shape-4 link; the fix reader's two prior fixes (AC1.1).
+- 0164 (4)'s retirement of `evidence_seam` (AC1.2).
+- A bare `rebuild: none` (AC1.4).
+- HOOKS-DRIFT-1's fixed "differs" (AC5.1).
+- Rewriting a test in an implementation task; the `test_`-name gate check (AC6).
+- Loose `contract/` and `integration/` roots; the folder-derived size tier (AC7).
+- Processes in the unit tier; the autouse rows monkeypatch; patched `sys.stdin` (AC8).
+- Stale `Measured by` paths (AC10.1).
 
 ## Risks
 
 | Weakness | Mitigation |
 |---|---|
-| 8 jobs is the cap (0193); no room for a ninth. | A new need goes to rc-11. |
-| Job 4 calls a model with the operator's token: 12 trials. | `-n 2`, k=3, the economy template; one run; a grader fix needs no rerun of passing trials. |
-| Jobs 7 and 8 touch `tests/conftest.py` and most test files. | The PLAN edge Job 7 → Job 8. |
-| Jobs 1 and 5 both touch the bug skill's scripts. | The PLAN gives them disjoint files or an edge. |
-| This window was read before rc-9 closed. | Rows for later fixes are added before Approval (§Bug window review). |
+| 8 jobs is the cap. | A new need goes to rc-11. |
+| Job 3 spends the operator's model quota: 12 trials. | `-n 2`, the economy template, one run. |
+| Jobs 6–8 touch the merge gate, `tests/conftest.py` and most test files. | PLAN edges; Jobs 7 and 8 change tests in test-only stages (AC6.3). |
+| Jobs 1 and 4 share the bug skill. | Disjoint files or a PLAN edge. |
+| The verify-line hotfix sha is not landed. | Filled at Approval. |
 
 ## Carried
 
+Every active backlog id is placed: the Origin above, or one of the lines below.
+
 - rc-11, the corpus, the law and the ADR process:
-  - the instruction corpus to AC12.11's bar;
-  - `public-law-language-neutral` and `dd-ask-me-owned-questioning-skill` (0165);
-  - `adr-born-at-release-with-options`, `adr-ledger-triage-process-rules` and `architecture-adr-section-generated`;
-  - F088, F089, F139–F148;
-  - 0174's live clauses, re-proposed.
-- rc-12, workspace replication: `spec-context-branch-field-deleted`, `worktree-layout-per-context`, `context-dead-snapshots-open-worktrees`, `context-show-derives-worktrees`, `export-soft-and-hard`, `init-from-export`; ADRs 0171, 0173, 0175; F084.
+  - `public-law-language-neutral`, `dd-ask-me-owned-questioning-skill`, `adr-born-at-release-with-options`, `adr-ledger-triage-process-rules`, `architecture-adr-section-generated`;
+  - rc-9's deferrals: `stage-gate-runs-the-contract-tier`, `job-gate-runs-the-law-deletion-check`, `merge-entry-times-survive-rebase`, `task-gate-mypy-follows-cross-skill-imports`, `hypothesis-cache-stays-out-of-repo-trees`, `stray-pycache-never-breaks-the-job-gate`, `task-gate-drops-deleted-paths-itself`, `release-new-adopts-a-drafted-next-rc`, `origin-findings-renamed-to-the-spec-head`, `adr-0193-records-its-amends`;
+  - F088, F089, F139–F148; 0174's live clauses.
+- rc-12, workspace replication: `spec-context-branch-field-deleted`, `worktree-layout-per-context`, `context-dead-snapshots-open-worktrees`, `context-show-derives-worktrees`, `export-soft-and-hard`, `init-from-export`; 0171, 0173, 0175; F084.
 - rc-13, the promote:
-  - docs site F109, clone detection F110, launch prep F111;
-  - rc-8 §Carried's residue: memory drift F123–F127, bug metrics, F067, F069, F137;
-  - check #7 and `meta-tests-leave-pytest`;
-  - the 0178 evals gate on the promote PR head.
-- `context-dead-never-commits`: delivered in rc-9 by 8f878c730 (AC3.2); exits at rc-10's closure.
-- `bug-fix-adds-never-rewrites-asserts`: delivered in rc-9 by 13a4395a5 (AC5.9); exits at rc-10's closure.
-- `caused-by-proposed-by-blame`: delivered by 579a6c70a (T-050-168), its tests REBUILT in rc-9 by f6a791f3a (AC3.4); exits at rc-10's closure.
+  - `docs-site-zensical-pages`, `clone-detection`, `launch-operator-acts`;
+  - `spec-context-refusals-print-prose`, `privacy-baseline-one-parser`, `ledger-refusals-guess-specs-from-command-shape`, `ledger-reader-one-numbered-tolerant-iterator`;
+  - `meta-tests-leave-pytest` with check #7;
+  - `repo-ci-sast`, less its poetry clause, which 858bc97ad fixed: ruff `S`, `pip-audit`, CodeQL, the work-branch secret scan;
+  - F067, F069, F123–F127, F137; the 0178 evals gate.
+- Delivered in rc-9; each exits at rc-10's closure:
+  - `context-dead-never-commits`, by 8f878c730 (AC3.2);
+  - `bug-fix-adds-never-rewrites-asserts`, by 13a4395a5 (AC5.9);
+  - `caused-by-proposed-by-blame`, by 579a6c70a with its tests REBUILT by f6a791f3a (AC3.4).
 
 ## Not in scope
 
-- An evals scenario for the non-blocking path, a bug fixed by the rc's bug batch (Q1): after 0.5.0.
-- `evals-release-gate-status`, `evals-harness-lanes-and-benchmark`, `evals-windows-smoke`, `devin-subagent-projection`: after 0.5.0 (0178).
-- The private test-stack and commit-gate hooks: the operator's, outside the library.
+- An evals scenario for a bug fixed by the bug batch (Q1); `evals-release-gate-status`, `evals-harness-lanes-and-benchmark`, `evals-windows-smoke`, `devin-subagent-projection`: all after 0.5.0.
+- Q6 item 6, a read-only test layer in the harness: not taken.
+- The private test-stack and commit-gate hooks.
