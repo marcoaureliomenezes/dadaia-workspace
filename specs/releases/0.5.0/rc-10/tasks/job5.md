@@ -22,5 +22,4 @@ Paths are relative to the repo root; aliases as in `PLAN.md` (`f/`, `pub/`, `S/`
 |---|---|---|---|
 | J5.S2.T1 | AC5.1 | `f/spec_context/doctor.py` (`check_installed_hooks`: the observed state, absent or differing; the `OSError` arm stops reading as "differs") | `test_hooks_drift.py`, `test_workspace_fix_lines_clear_their_finding.py` |
 | J5.S2.T2 | — | this file | close task, last: behavior map; `test-audit:`, `mutation:`; `done` |
-
-- done: Job 5 — every task landed on `wt/0.5.0-rc10/job5` through its task merge: J5.S1.T1 a6f22bbff; J5.S1.T2 0bef7dff0; J5.S2.T1 f1ed96c36; closed by J5.S2.T2 (mutation survivors strengthened the unit test; no new `W:`).
+| J5.S2.T3 | AC5.1 | `tests/unit/features/spec_context/test_hooks_drift.py`, this file | revert of 461adb7d6: its fix-line assert compared `str(path)` (backslashes on Windows) with `fix_line`'s forward slashes; reviewer HIGH-1 |
