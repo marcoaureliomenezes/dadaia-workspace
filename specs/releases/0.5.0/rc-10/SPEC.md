@@ -10,7 +10,7 @@
   - `2026-10-06T015544Z-main-thread-grill-rc10-scope`: Q1–Q4, Q2b, Q5, Q6, ADR 0206.
   - `2026-10-05T040135Z-main-thread-grill-granularity-parallelism`: less Q19, which 0206 overrides.
   - `2026-10-05T005326Z-main-thread-grill-bug-window-review`: G8, G10.
-- Scope (Q4, Q6): 8 jobs, the cap (0193); T1 and T2 share one job so the test freeze fits; the bug batch and Reconciliation uncounted.
+- Scope (Q4): 8 jobs, the cap (0193); the bug batch and Reconciliation uncounted. The SPEC's packing, not a ruling: T1 and T2 share one job so the test freeze fits.
 - Facts at 27123ce99:
   - `dadaia-evals`: no `tasks/`; `eval.yml` (`main`, 877ff5b) never ran; no `verify:` line.
   - Memory names 8 test files that no longer exist.
@@ -123,11 +123,12 @@ Edge: Job 2, merged to `dadaia-evals` `main` through its PR edges.
   - **Unit**: a literal ledger renders a literal block; a rerun is byte-equal.
 - AC4.2 Readout 1, the Laplace trend (Kanoun & Laprie, *Handbook of Software Reliability Engineering* ch. 10), continuous time with days as the axis, over all bugs (Q2b).
   - Window: the live release plus the 3 previous published (today 0.4.5–0.5.0); it starts on the oldest one's opening day (its first `_RELEASE.json` log `ts`, archive included) and T ends on the closure day.
-  - Only records with a known `found_in` count (Q2b, "só found in conhecido"): a release other than `unknown`. Release-`unknown` records (bulk imports, backfills) are counted apart. A record with rc `unknown` but a known release counts here (the axis is days); it is excluded only from per-rc tables (AC4.3).
+  - Only records with a known `found_in` count (Q2b; operator: "4 releases, eixos em dias, so found in conhecido").
+  - The SPEC's reading, not a ruling: a known `found_in` is a release other than `unknown`. Release-`unknown` records (bulk imports, backfills) are counted apart. The 33 records with no `found_in` key at all are counted apart the same way. A record with rc `unknown` but a known release counts here (the axis is days); it is excluded only from per-rc tables (AC4.3).
   - u = (mean of tᵢ − T/2) / (T·√(1/(12N))), where tᵢ is a record's day offset from the window start and T is the window's length in days.
   - u ≤ −1.96 reads "converging", u ≥ +1.96 "diverging", anything else "no trend".
   - A second line counts records found on an already settled ledger surface.
-  - **Unit**: t = `[1, 2, 3]` and T = 10 give `u = -1.80`, "no trend"; a release-`unknown` record is counted apart; an rc-`unknown` record of a known release counts.
+  - **Unit**: t = `[1, 2, 3]` and T = 10 give `u = -1.80`, "no trend"; a release-`unknown` record is counted apart; a record with no `found_in` key is counted apart; an rc-`unknown` record of a known release counts.
 - AC4.3 Readout 2, the defective-fix rate per rc (Kan, *Metrics and Models in Software Quality Engineering* ch. 4; Jones 2012): records found in rc i with `caused_by ≠ none`, over records found in rc i. **Unit**: literal ledger, literal rates.
 - AC4.4 The block is a closure check, never an always-on doctor check.
   - At CLOSURE, `release.py check` refuses a block that differs from its regeneration, with one fix line naming the regenerating command.
@@ -147,7 +148,7 @@ Edge: Job 2, merged to `dadaia-evals` `main` through its PR edges.
 
 ## Job 6 — the test freeze
 
-Q6 items 1–5; 0209. Everything is judged by `git diff` over the repo's test paths, so it works for any language. Edges: Jobs 1–5, 7 and 8 → Job 6, the DAG's last job; its freeze binds every job opened after it merges (rc-11 on), so earlier jobs, AC8.2's RED included, run under today's law.
+Q6 items 1–5; 0209. Everything is judged by `git diff` over the repo's test paths, so it works for any language. Edges: Jobs 1–5, 7 and 8 → Job 6, the DAG's last job; its freeze binds every job opened after Job 6 merges, rc-10's bug batch (AC9.1), any later hotfix and Reconciliation included; the gate keeps no rc-number special case. Arm B's RED-then-fix stages already fit the freeze. Jobs 1–5, 7 and 8, AC8.2's RED included, run under today's law.
 
 - AC6.0 A repo declares its test paths as one `tests:` line of globs in its tracked `AGENTS.md`, beside the `verify:` lines (e.g. `tests: tests/** **/*_test.go`). The gate reads it from the work branch, the authority 0207 uses, so no worktree changes what counts as a test. Job 6 commits `tests: tests/**` to dadaia-workspace's `AGENTS.md` (dadaia-evals': AC2.1). A repo with no `tests:` line refuses with one line in 0207's lane, `Operator action: commit the tests: line on <work branch>'s AGENTS.md`, and that act clears the block (rc-9's verify-line Stall shape). **Integration**: a worktree editing its own `tests:` line still has a test edit refused; a repo with no `tests:` line refuses with that line, and after the line is committed on the work branch the same merge lands.
 - AC6.1 Tests are born only in a RED stage, one whose tasks' `W:` holds tests only. Each new test is validated before the freeze: collected, failing by assertion (never by error), test-audit, stage review. **Integration**: a RED stage whose new test errors instead of failing cannot close.
@@ -214,7 +215,7 @@ Q6 items 1–5; 0209. Everything is judged by `git diff` over the repo's test pa
   - AC6.0–AC6.3's rule; test paths are the repo's `tests:` line, read from the work branch.
   - Amends the releases law §3's same-task rewrite clause.
   - `measured_by`: AC6.0–AC6.2's cases.
-- **0210**, accepted with this SPEC's Approval (operator, 2026-10-06: "(b) Qualquer caused_by ≠ none é REBUILD (Recommended)"): any `caused_by` other than none, a bug's fix or a feature task, makes the fix a REBUILD of the unit, keeping its tests. It keeps 0186 (2) and widens 0206's "a fix-induced one" (`amends: 0206`). A REBUILD's revert under 0186 (2) keeps the culprit's test files, so it fits 0209. `measured_by`: the ninth `PILLAR-BUGS` metric (AC1.4).
+- **0210**, accepted with this SPEC's Approval (operator, 2026-10-06: "(b) Qualquer caused_by ≠ none é REBUILD (Recommended)"): any `caused_by` other than none, a bug's fix or a feature task, makes the fix a REBUILD of the unit, keeping its tests. It keeps 0186 (2) and widens 0206's "a fix-induced one" (`amends: 0206`). SPEC text, not part of the ruling, which the operator accepts at Approval: a REBUILD's revert under 0186 (2) keeps the culprit's test files, so it fits 0209. `measured_by`: the ninth `PILLAR-BUGS` metric (AC1.4).
 - The main thread proposes 0208–0210 in `decisions.jsonl` at Approval.
 
 ## Replaces
