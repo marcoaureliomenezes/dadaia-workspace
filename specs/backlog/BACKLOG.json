@@ -502,6 +502,18 @@
       "relates": [
         "bugs-fix-reads-the-per-class-shape"
       ]
+    },
+    {
+      "id": "one-task-id-subject-grammar",
+      "title": "One task-id subject grammar, one parser, for every reader of commit subjects",
+      "opened": "2026-10-06",
+      "status": "idea",
+      "description": "Measured: the task id J<n>.S<m>.T<k> and the shape-3/4/6 subjects are parsed by three hands - the fix reader (two regexes, bugs.py:107 and :155; link grammar 3x), the worktree merge's stray check (_worktree_end.py:155-157) and rc-10 Job 6's anchor. The Job 1 reader dropped 5 links whose resolve commits cite pre-rebase shas (bug-proposal-handoff-reaped-without-a-hold: fb42217d6 cites bcd75b5e). Design: one Subject parser in one home, consulted by every reader; a shape-4 resolve links by task id, which survives a rebase. The bugs rebase-orphans-bug-fix-links-cited-by-sha and check-stray-laundered-by-rebase (registered; fixed in rc-10's bug batch under the operator's 2026-10-06 ruling 'Registrar j\u00e1, corrigir no lote da rc-10') own their symptoms; this entry owns the one grammar. If check-stray's fix DELETEs _check_stray (its simplest fix), that consumer leaves the list. Done when: one module defines the subject grammar and grep finds no second task-id regex. Placement: rc-11. Placement and every design detail not quoted from a ruling are agent default, unruled.",
+      "provenance": "audit verification 2026-10-06 over feature/0.5.0 8e6448f13 (four read-only verifiers); main-thread registration after the operator grill of 2026-10-06",
+      "relates": [
+        "fix-reader-rebuild-under-c",
+        "bugs-fix-reads-the-per-class-shape"
+      ]
     }
   ]
 }
