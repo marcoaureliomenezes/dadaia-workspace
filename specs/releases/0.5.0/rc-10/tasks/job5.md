@@ -23,3 +23,4 @@ Paths are relative to the repo root; aliases as in `PLAN.md` (`f/`, `pub/`, `S/`
 | J5.S2.T1 | AC5.1 | `f/spec_context/doctor.py` (`check_installed_hooks`: the observed state, absent or differing; the `OSError` arm stops reading as "differs") | `test_hooks_drift.py`, `test_workspace_fix_lines_clear_their_finding.py` |
 | J5.S2.T2 | — | this file | close task, last: behavior map; `test-audit:`, `mutation:`; `done` |
 | J5.S2.T3 | AC5.1 | `tests/unit/features/spec_context/test_hooks_drift.py`, this file | revert of 461adb7d6: its fix-line assert compared `str(path)` (backslashes on Windows) with `fix_line`'s forward slashes; reviewer HIGH-1 |
+| J5.S2.T4 | AC5.1 | `tests/unit/features/spec_context/test_hooks_drift.py`, this file | redo of the strengthening, path asserts compared as posix; unreadable arm; non-git repo listed before a drifted one |
