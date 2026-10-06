@@ -1114,6 +1114,12 @@
         "bug-ledger",
         "release-lifecycle"
       ]
+    },
+    {
+      "ts": "2026-10-06T13:06:20Z",
+      "agent": "dd-product-engineer",
+      "kind": "note",
+      "text": "Closure note, stale memory (review M-2 at 8693810de; specs/AGENTS.md §5): the Measured-by lines of ARCHITECTURE.md P-12 (:57), P-14 (:67) and P-15 (:72) name tests deleted on 2026-09-28 by T-050-86 — tests/contract/test_hook_import_surface.py and test_release_state_read_only.py at e68dcb0e3, test_release_state_schema.py at be15615b0. The checks live on: P-12 in tests/contract/test_core_file_io_purity.py test_importing_a_hook_never_imports_the_container (the six hooks) and test_gate_resolution_path_never_imports_the_container (the executed gate path); P-14 in the same file, test_each_question_has_one_owner row release-state-module-never-writes; P-15 only in part, in tests/contract/test_handoff_schema_contract.py release rows — the top level and the three milestones closed, rc refused at top level and in a milestone, a log entry without kind/text refused — while no row refuses an unknown log-entry key or a session_id, though the schema closes the log entry (additionalProperties: false). Rewriting a ### P-NN principle needs its own accepted ADR (specs/memory/AGENTS.md §1, ADR 0138), so this is a closure note, not an rc-9 bug; the ADR need is backlog entry architecture-principles-measured-by-re-pointed. It conflicts with rc-10 AC10.1 (every tests/…py path named in QUALITY.md and ARCHITECTURE.md exists); the conflict is on the operator's list."
     }
   ]
 }
