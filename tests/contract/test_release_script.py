@@ -498,3 +498,34 @@ def test_a_stale_balance_block_refuses_at_closure_and_passes_in_implementation(
         "utf-8"
     )
     assert balance_rows("CLOSURE") == []
+
+
+def _balance_tree(
+    tmp_path: Path, records: list[dict[str, object]], *, git: bool = True
+) -> list[str]:
+    """A one-release specs tree with *records* as its ledger and both skills staged beside it;
+    returns the `bugs.py balance` argv."""
+    for skill in ("dd-bug-resolution", "dd-release-implementation"):
+        stage_skill_scripts(skill, tmp_path / "skills" / skill / "scripts")
+    if git:
+        subprocess.run(["git", "init", "-q", str(tmp_path)], check=True)
+    specs = _specs(tmp_path, _GOOD)
+    log = [{"ts": "2026-01-01T12:00:00Z", "agent": "a", "kind": "note", "text": "t"}]
+    _seed_ledgers(specs, log=log)
+    (specs / "bugs/BUGS.jsonl").write_text("".join(json.dumps(r) + "\n" for r in records))
+    bugs = tmp_path / "skills" / "dd-bug-resolution" / "scripts" / "bugs.py"
+    return [sys.executable, str(bugs), "balance", "--specs", str(specs)]
+
+
+@pytest.mark.xfail(strict=True, reason="J4.S5 RED: the verb's edge catches nothing yet")
+@pytest.mark.parametrize("git", [True, False], ids=["record-without-ts", "tree-without-git"])
+def test_balance_refuses_an_unreadable_input_with_one_fix_line(tmp_path: Path, git: bool) -> None:
+    """L6: a record with no `ts`, or a tree that is no git repo, is a refusal, not a traceback."""
+    found = {"release": "0.5.0", "rc": "rc-1"}
+    argv = _balance_tree(tmp_path, [{"id": "a", "surface": "core", "found_in": found}], git=git)
+
+    done = subprocess.run(argv, capture_output=True, text=True)
+
+    assert done.returncode == 1
+    assert "Traceback" not in done.stderr
+    assert sum(ln.startswith("fix: ") for ln in done.stderr.splitlines()) == 1
