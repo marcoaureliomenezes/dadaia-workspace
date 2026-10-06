@@ -161,3 +161,13 @@ def test_replaced_touches_the_first_block_only_and_parts_a_review_that_abuts_the
     assert bal.replaced("## Bugs\nwritten review\n", "new\n") == (
         "## Bugs\n\n```text\nnew\n```\n\nwritten review\n"
     )
+
+
+def test_stored_never_reads_the_block_of_another_section() -> None:
+    bal = _balance()
+    doc = "# Q\n\n## Bugs\n\nreview\n\n## Notes\n\n```text\nkeep\n```\n"
+
+    assert bal.stored(doc) is None
+    assert bal.replaced(doc, "new\n") == doc.replace(
+        "## Bugs\n", "## Bugs\n\n```text\nnew\n```\n", 1
+    )
