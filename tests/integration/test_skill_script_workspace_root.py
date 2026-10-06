@@ -46,21 +46,18 @@ def _fenced(ws: Path, script: str, *argv: str) -> subprocess.CompletedProcess[st
     )  # fmt: skip
 
 
-@pytest.mark.xfail(strict=True, reason="JB.S3 RED: skill-script-root-walks-ignore-the-fence")
 def test_the_worktree_script_finds_no_root_in_a_fenced_workspace(ws: Path) -> None:
     refused = _fenced(ws, "worktree.py", "list")
     assert refused.returncode == 1
     assert "no workspace root above the cwd or this script" in refused.stderr
 
 
-@pytest.mark.xfail(strict=True, reason="JB.S3 RED: skill-script-root-walks-ignore-the-fence")
 def test_the_dev_server_registry_finds_no_sentinel_in_a_fenced_workspace(ws: Path) -> None:
     refused = _fenced(ws, "registry.py", "list")
     assert refused.returncode == 1
     assert "no workspace sentinel above the cwd" in refused.stderr
 
 
-@pytest.mark.xfail(strict=True, reason="JB.S3 RED: skill-script-root-walks-ignore-the-fence")
 def test_a_missing_specs_tree_names_no_fenced_workspace_cli(ws: Path) -> None:
     refused = _fenced(ws, "bugs.py", "status")
     assert refused.returncode == 1
@@ -69,7 +66,6 @@ def test_a_missing_specs_tree_names_no_fenced_workspace_cli(ws: Path) -> None:
     ]
 
 
-@pytest.mark.xfail(strict=True, reason="JB.S3 RED: skill-script-root-walks-ignore-the-fence")
 def test_the_closure_waits_for_no_worktree_of_a_fenced_workspace(
     ws: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
