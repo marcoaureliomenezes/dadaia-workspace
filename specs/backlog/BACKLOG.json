@@ -614,6 +614,17 @@
         "complexity-and-private-import-ratchet",
         "test-suite-diet"
       ]
+    },
+    {
+      "id": "audit-scorecard-cycle",
+      "title": "dd-audit-project is REBUILT as the scorecard cycle and closes the two 2026-09-30 audits",
+      "opened": "2026-10-06",
+      "status": "idea",
+      "description": "Audit verdict: 'REBUILD as the scorecard cycle'; the scorecard cycle closes the two 2026-09-30 audits (20260930-050-publish-gate-baseline, 20260930-structural-convergence with 29 open findings). Measured: PILLAR-SPECS.md:31 prescribes a 'final-rc QA close'; specs/audits/AGENTS.md:25 prescribes a 'remediation release', against ADR 0206 (no rc closes with an open bug); the skill says eight metrics where PILLAR-BUGS lists nine, 'three cheap measures' lists two, and PILLAR-BUGS relies on a refs field the schema lacks; 20260930-structural-convergence-F008's resolved disposition is false (22/70 closures <10 min after it) and reopens. PILLAR-BUGS.md:25 reading the retired governance_events is the registered bug pillar-bugs-metric-reads-retired-event-stream (rc-10 batch). Design: dd-audit-project becomes the scorecard cycle - run scorecard-one-ruler's ruler, record the scores, disposition the findings - and the two 09-30 audits close through it; PILLAR-SPECS and audits/AGENTS.md lose the final-rc QA close and the remediation release. Placement: rc-11. Placement and every design detail not quoted from a ruling are agent default, unruled.",
+      "provenance": "audit verification 2026-10-06 over feature/0.5.0 8e6448f13 (four read-only verifiers); main-thread registration after the operator grill of 2026-10-06",
+      "relates": [
+        "scorecard-one-ruler"
+      ]
     }
   ]
 }
