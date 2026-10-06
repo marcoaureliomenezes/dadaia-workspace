@@ -534,6 +534,21 @@
       "relates": [
         "push-gate-decision-split"
       ]
+    },
+    {
+      "id": "skill-scripts-one-kernel",
+      "title": "The skill scripts share one kernel: _ledger/_specs updated in place, gitflow included",
+      "opened": "2026-10-06",
+      "status": "idea",
+      "description": "Measured: Refusal defined 7x (_release_store:31, _worktree_names:23, _audit_store:31, _memory_catalog:33, _bugs_store:27, _backlog_store:31, _memory_drift:27); the store commit loop copied 3x (_bugs_store.commit 69-109, _backlog_store.commit 85-114, _release_store.commit 102-121); 9 git wrappers with >=5 error contracts and 2 shallow-clone probes; 6 root finders; a 4-skill import cycle (gitflow, bug-resolution, spec-navigator, release-implementation) with 3 two-way pairs; 35 sys.path lines, 102 noqa E402. _SKILL_SCRIPT_SHARED already copies 4 sources (_privacy, privacy_baseline.json, _ledger, _specs) into 6 skills but excludes gitflow, and the tests resolve via sys.path while the projection resolves the copies. Design: UPDATE the already-copied _ledger.py/_specs.py, never ADD a _kernel; add gitflow to _SKILL_SCRIPT_SHARED; one Refusal, one commit loop, one git(), one fenced root walk (honouring DADAIA_FENCED_ROOTS; the symptom is the bug skill-script-root-walks-ignore-the-fence, fixed in rc-10's bug batch); drop the cross-skill sys.path edges. Tidy First: one skill per job. Absorbed (each exits rejected 'absorbed by skill-scripts-one-kernel'; their full text stays in the histo): (a) privacy-baseline-one-parser - infrastructure/privacy_check.py _load_privacy_baseline and _ledger._baseline both parse privacy_baseline.json and disagree on a malformed entry and exclude_rationale; one owner parses, the other consults (ADR 0135, 0157). (b) ledger-refusals-guess-specs-from-command-shape - _specs.with_specs/refuse guess --specs from the interpreter prefix with a worktree.py denylist exemption; the producer declares it, the exemption is deleted. (c) ledger-reader-one-numbered-tolerant-iterator - one numbered tolerant iterator in _ledger, the ten hand JSONL loops collapse into it (seven-bug family of hand readers). Supersedes: clone-detection (the sanctioned copies become one kernel, removing the divergent-copy class it was meant to find) and task-gate-mypy-follows-cross-skill-imports (with the sys.path edges gone mypy follows real imports; delete the casts in release.py (a9108723f) and _backlog_check.py). Placement: rc-12 (operator, 2026-10-06: 'rc-12, antes dos evals'). Placement and every design detail not quoted from a ruling are agent default, unruled.",
+      "provenance": "audit verification 2026-10-06 over feature/0.5.0 8e6448f13 (four read-only verifiers); main-thread registration after the operator grill of 2026-10-06",
+      "relates": [
+        "privacy-baseline-one-parser",
+        "ledger-refusals-guess-specs-from-command-shape",
+        "ledger-reader-one-numbered-tolerant-iterator",
+        "clone-detection",
+        "task-gate-mypy-follows-cross-skill-imports"
+      ]
     }
   ]
 }
