@@ -61,15 +61,6 @@
       "relates": []
     },
     {
-      "id": "privacy-baseline-one-parser",
-      "title": "privacy_baseline.json has two parsers",
-      "opened": "2026-10-02",
-      "status": "idea",
-      "description": "dadaia_workspace/infrastructure/privacy_check.py _load_privacy_baseline (:98) and dadaia_workspace/public/skills/dd-bug-resolution/scripts/_ledger.py _baseline (:160) each parse infrastructure/data/privacy_baseline.json: a second reader of one fact, and they disagree on a malformed entry (privacy_check skips it, _ledger raises) and on exclude_rationale. _ledger._baseline arrived with 1bcfdba8f (sa-ledger-write-seam-redacts-less-than-push-refuses); the family sa-privacy-match-has-two-matchers, sa-redact-text-keeps-a-second-privacy-grammar and sa-pre-push-and-publish-scan-disagree-on-secret-shapes was each a second privacy reader. One owner parses it (ADR 0135, 0157 loader); the other consults it. Destination: rc-8.",
-      "provenance": "operator approval 2026-10-02 via the main thread's intake at the 0.5.0 rc-7 T-050-150 closure; source: the T-050-150 review",
-      "relates": []
-    },
-    {
       "id": "ledger-refusals-guess-specs-from-command-shape",
       "title": "Ledger refusals guess whether a fix takes --specs from its command shape",
       "opened": "2026-10-02",
