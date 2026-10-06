@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 from pathlib import Path
 
 import pytest
@@ -262,3 +263,19 @@ def test_a_retired_version_without_self_pull_is_invalid(
 
     assert result.exit_code == 1, result.output
     assert "schema_version" in result.output
+
+
+@pytest.mark.xfail(
+    strict=True, reason="JB.S1 RED: reports-validate-documents-exit-codes-it-never-returns"
+)
+def test_help_promises_only_the_exit_codes_validate_returns(tmp_path: Path, monkeypatch) -> None:
+    """A missing path and a bare invocation both exit 1, so `--help` lists no other refusal code."""
+    _init_workspace(tmp_path)
+    monkeypatch.chdir(tmp_path)
+
+    missing = _runner.invoke(app, ["reports", "validate", str(tmp_path / "nope.handoff.json")])
+    bare = _runner.invoke(app, ["reports", "validate"])
+    listed = _runner.invoke(app, ["reports", "validate", "--help"]).output
+
+    assert (missing.exit_code, bare.exit_code) == (1, 1)
+    assert {int(code) for code in re.findall(r"^\s+(\d)\s{2}", listed, re.M)} == {0, 1}
