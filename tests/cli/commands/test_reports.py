@@ -265,9 +265,6 @@ def test_a_retired_version_without_self_pull_is_invalid(
     assert "schema_version" in result.output
 
 
-@pytest.mark.xfail(
-    strict=True, reason="JB.S1 RED: reports-validate-documents-exit-codes-it-never-returns"
-)
 def test_help_promises_only_the_exit_codes_validate_returns(tmp_path: Path, monkeypatch) -> None:
     """A missing path and a bare invocation both exit 1, so `--help` lists no other refusal code."""
     _init_workspace(tmp_path)
