@@ -24,9 +24,7 @@ from dadaia_workspace.core import gitflow
 from dadaia_workspace.core.release_state import CANDIDATE_RE
 from tests.helpers.skill_scripts import stage_skill_scripts
 
-pytestmark = pytest.mark.contract
-
-_REPO_ROOT = Path(__file__).resolve().parents[2]
+_REPO_ROOT = Path(__file__).resolve().parents[5]
 _PUBLIC = _REPO_ROOT / "dadaia_workspace" / "public"
 _SKILL = _PUBLIC / "skills" / "dd-release-definition" / "SKILL.md"
 _SCRIPTS = _PUBLIC / "skills" / "dd-release-implementation" / "scripts"

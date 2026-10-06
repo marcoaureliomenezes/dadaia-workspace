@@ -22,9 +22,7 @@ from dadaia_workspace.infrastructure.ledger_scripts import load_owner
 from tests.helpers.release_state import PLAN
 from tests.helpers.skill_scripts import stage_skill_scripts
 
-pytestmark = pytest.mark.unit
-
-_PUBLIC = Path(__file__).resolve().parents[3] / "dadaia_workspace" / "public"
+_PUBLIC = Path(__file__).resolve().parents[5] / "dadaia_workspace" / "public"
 _SCRIPTS = _PUBLIC / "skills" / "dd-release-implementation" / "scripts"
 _SCHEMAS = (
     _PUBLIC / "schemas" / "releases" / "release-state-v1.schema.json",

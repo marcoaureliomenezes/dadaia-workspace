@@ -14,9 +14,7 @@ import pytest
 from dadaia_workspace.core.release_state import RELEASE_ID_RE
 from dadaia_workspace.features.specs.canon import is_canon_path
 
-pytestmark = pytest.mark.contract
-
-_REPO_ROOT = Path(__file__).resolve().parents[2]
+_REPO_ROOT = Path(__file__).resolve().parents[5]
 _SCRIPTS = _REPO_ROOT / "dadaia_workspace/public/skills/dd-release-implementation/scripts"
 sys.path.insert(0, str(_SCRIPTS))
 import _release_schema  # noqa: E402
