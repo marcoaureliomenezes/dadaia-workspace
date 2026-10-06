@@ -636,6 +636,15 @@
       "relates": [
         "stage-gate-runs-the-contract-tier"
       ]
+    },
+    {
+      "id": "programmatic-dates-in-skills",
+      "title": "Every date a skill writes comes from the clock or git, never from the model",
+      "opened": "2026-10-06",
+      "status": "idea",
+      "description": "Operator demand 2026-10-06 (relayed by the main thread): 'datas s\u00e3o uma delas. n\u00e3o pode alucinar aqui'. Measured: dd-handoff-emitter has no script (SKILL.md only), so the handoff's file-name stamp and produced_at are typed by the model; no library code validates produced_at (grep: only _worktree_end.py and certification/service.py read it). Design: an emit.py in dd-handoff-emitter stamps the file name and produced_at from one clock read; dadaia reports validate refuses a produced_at in the future and a file-name stamp that differs from produced_at; every other skill-written date comes from date -u, git or gh. Placement: rc-11. Placement and every design detail not quoted from a ruling are agent default, unruled.",
+      "provenance": "audit verification 2026-10-06 over feature/0.5.0 8e6448f13 (four read-only verifiers); main-thread registration after the operator grill of 2026-10-06",
+      "relates": []
     }
   ]
 }
