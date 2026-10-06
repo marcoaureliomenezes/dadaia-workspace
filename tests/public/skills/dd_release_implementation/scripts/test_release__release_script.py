@@ -606,6 +606,28 @@ def test_the_verb_prints_dev_tooling_surfaces_apart_by_the_gitattributes_class(
     assert done.stdout.splitlines()[5].endswith("T = 0 days: u = n/a, no data")
 
 
+@pytest.mark.xfail(strict=True, reason="JB.S1 RED: bug-balance-cuts-a-non-utc-closure-day-to-local")
+@pytest.mark.parametrize(
+    ("last", "span"),
+    [
+        pytest.param("2026-01-12T23:30:00-03:00", "11", id="an-offset-ts-ends-on-its-utc-day"),
+        pytest.param("2026-01-12T12:00:00", "10", id="a-ts-with-no-offset-is-read-as-utc"),
+    ],
+)
+def test_the_trend_window_ends_on_the_utc_day_of_the_last_log_entry(
+    tmp_path: Path, last: str, span: str
+) -> None:
+    """The window opens on 2026-01-02 (UTC) and closes on the UTC day of the live release's last
+    log instant: 02:30Z on the 13th for the first row, noon on the 12th for the second."""
+    argv = _balance_tree(tmp_path, [], log=("2026-01-02T00:00:00Z", last))
+
+    done = subprocess.run(argv, capture_output=True, text=True)
+
+    assert done.returncode == 0, done.stderr
+    [trend] = [ln for ln in done.stdout.splitlines() if ln.startswith("Laplace")]
+    assert f"T = {span} days:" in trend
+
+
 def test_the_trend_window_opens_on_the_oldest_of_four_releases_and_ends_on_the_last_log_day(
     tmp_path: Path,
 ) -> None:
