@@ -110,7 +110,7 @@ def test_a_define_tree_lands_specs_only_through_the_ledger_checks(root: Path) ->
     repo, tree = root / "repos/r", root / "worktrees/r/0.5.0-rc1/define"
     assert run(root, "new", "r", "0.5.0-rc1/define").returncode == 0
     commit(tree, "specs/bugs/BUGS.jsonl", '{"id": "half"}\n')
-    approve(root, git(tree, "rev-parse", "HEAD").strip(), ci_run=False)
+    approve(root, git(tree, "rev-parse", "HEAD").strip())
     invalid = run(root, "merge", str(tree))
     assert invalid.returncode == 1 and "bugs.py check failed" in invalid.stderr
     git(tree, "reset", "-q", "--hard", "feature/0.5.0")
@@ -121,8 +121,7 @@ def test_a_define_tree_lands_specs_only_through_the_ledger_checks(root: Path) ->
     subprocess.run(restore, shell=True, check=True)  # noqa: S602 — runs as printed
     assert shlex.split(then) == ["git", "-C", str(tree), "commit"]
     git(tree, "commit", "-qm", "revert: RED-job")
-    approve(root, sha := commit(tree, "specs/releases/0.5.0/rc-1/PLAN.md", "**Status:** Draft\n"),
-            ci_run=False)  # fmt: skip
+    approve(root, sha := commit(tree, "specs/releases/0.5.0/rc-1/PLAN.md", "**Status:** Draft\n"))
     landed = run(root, "merge", str(tree))
     assert landed.returncode == 0, landed.stderr
     assert git(repo, "rev-parse", "feature/0.5.0").strip() == sha
@@ -384,17 +383,13 @@ def test_the_job_gate_runs_scripts_ci_job_as_argv_on_the_head_it_lands(
         assert where == f" exit 0 in {tree} and commit the fix in this worktree"
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="JB.S3 RED: job-merge-requires-a-remote-ci-run, job-merge-accepts-any-ci-run-url",
-)
 def test_a_job_merge_needs_a_verdict_naming_its_ci_matrix_run(root: Path) -> None:
     """AC1.2, AC1.4: no verdict refuses; an APPROVED verdict lands the job with or without a
     remote CI run named — the repo's `verify:` line is the job gate (no host is assumed)."""
     repo = root / "repos/r"
     head = land(root, "src/a.py")
     assert _argv(run(root, "merge", TREE))[1:] == ["reports", "validate", "--all"]
-    approve(root, head, ci_run=False)
+    approve(root, head)
     landed = run(root, "merge", TREE)
     assert landed.returncode == 0, landed.stderr
     approve(root, head, at="T11:00:00Z")

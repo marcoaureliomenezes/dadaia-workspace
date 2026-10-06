@@ -202,7 +202,7 @@ def _series(tree: Path, work: str, tip: str) -> list[tuple[str, str]]:
     ]
 
 
-def _check_approved(root: Path, tree: Path, work: str, name: str, run: bool) -> None:
+def _check_approved(root: Path, tree: Path, work: str, name: str) -> None:
     """The newest dd-code-reviewer handoffs naming a candidate sha decide: each must be a valid
     APPROVED (ADR 0110). A candidate is a sha X of this branch's reflog whose (patch-id, message)
     series over *work*..X equals HEAD's, in order (ADR 0168); X == HEAD is the degenerate case;
@@ -211,8 +211,7 @@ def _check_approved(root: Path, tree: Path, work: str, name: str, run: bool) -> 
     older one on HEAD); the file name never orders. A missing, unparseable or offset-less
     `produced_at` ranks newest and refuses; handoffs tied on the newest moment all decide, and
     the fix names the first in path order that is not a valid APPROVED. An unreadable file
-    names no sha and is skipped. With *run* (a job), every deciding verdict also carries the
-    schema's `ci_run` field: the job's CI-matrix run."""
+    names no sha and is skipped."""
     head = git(tree, "rev-parse", "HEAD").strip()
     mine = _series(tree, work, head)
     reflog = {head, *git(tree, "reflog", "--format=%H", branch(name), check=False).split()}
@@ -242,12 +241,6 @@ def _check_approved(root: Path, tree: Path, work: str, name: str, run: bool) -> 
             or cli(root, "reports", "validate", path).returncode
         ):
             break
-        if run and not data.get("ci_run"):  # its shape is the schema's, judged just above
-            raise Refusal(
-                f"the APPROVED verdict {path} carries no ci_run for HEAD {head}",
-                f"Operator action: push {branch(name)}, wait for its CI run to pass, and have "
-                f"{REVIEWER}'s verdict carry that run's URL as ci_run",
-            )
     else:
         if named:
             return
@@ -303,12 +296,12 @@ def merge(root: Path, path: str, keep: list[str], drop: bool) -> str:
     elif non_code(name):
         _check_specs_only(tree, onto)
         _check_ancestor(tree, onto)
-        _check_approved(root, tree, onto, name, run=False)
+        _check_approved(root, tree, onto, name)
         _ledgers(tree)
     else:
         _open_tasks(repo, name)
         _check_ancestor(tree, onto)
-        _check_approved(root, tree, onto, name, run=True)
+        _check_approved(root, tree, onto, name)
         _freeze(tree, onto)
         _gate(tree, "job", onto)
     kept = _kept(tree, "merge", keep, drop)

@@ -61,7 +61,7 @@ def non_code(name: str) -> bool:
 
 
 def pushable(ref: str) -> bool:
-    """A `wt/` branch pre-push accepts: a job's (its push runs the CI matrix) or a backlog
-    tree's; never a task's, `define`'s or any other `wt/` branch."""
+    """A `wt/` branch pre-push accepts: a job's or a backlog tree's; never a task's, `define`'s
+    or any other `wt/` branch."""
     match = NAME_RE.match(name_of(ref) or "")
     return match is not None and match["job"] != "define" and not match["task"]

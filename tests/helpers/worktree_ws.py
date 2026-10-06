@@ -135,10 +135,8 @@ def approve(
     verdict: str = "APPROVED",
     valid: bool = True,
     at: str = "T10:00:00Z",
-    ci_run: bool = True,
 ) -> Path:
-    """The reviewer's verdict as the main thread writes it: a handoff naming *sha*, emitted *at*,
-    naming the job's CI-matrix run when *ci_run*."""
+    """The reviewer's verdict as the main thread writes it: a handoff naming *sha*, emitted *at*."""
     name = f"2026-10-02{at.replace(':', '')}-dd-code-reviewer-{sha[:8]}-{verdict}.handoff.json"
     handoff = root / ".dadaia/handoff/c" / name
     handoff.parent.mkdir(parents=True, exist_ok=True)
@@ -147,7 +145,6 @@ def approve(
         "verdict": verdict,
         "scope": f"wt/0.5.0-rc1/j1@{sha}",
         "produced_at": f"2026-10-02{at}",
-        **({"ci_run": "https://github.com/o/r/actions/runs/7"} if ci_run else {}),
     }
     handoff.write_text(json.dumps({**body, **({"schema_version": "1.2"} if valid else {})}))
     return handoff
