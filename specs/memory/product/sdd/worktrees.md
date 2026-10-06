@@ -1,8 +1,8 @@
 ---
 slug: worktrees
 title: worktrees
-tldr: Every agent change to a repo is made in a canonical worktree of one of four kinds and lands by worktree.py merge — reviewed, verified, fast-forwarded.
-summary: Canonical worktrees worktrees/<repo>/<M.m.p><letter>-<kind> on wt/ branches cut from the work branch; four kinds, each an allowed set; worktree.py new, merge, clean and list, stdlib and read from git alone; the merge ritual — allowed set, HEAD containing the work branch, an APPROVED verdict on HEAD or a patch-identical sha of its reflog, the repo's verify command green, fast-forward only, never a rebase — and the holds that keep closure and context dead waiting while one is open.
+tldr: Every agent change to a repo is made in a canonical worktree — a job, a task, define, reconcile or backlog — and lands by worktree.py merge after its gate.
+summary: Canonical worktrees nested in a folder per candidate, worktrees/<repo>/<M.m.p>-rc<N>/{define,reconcile,<job>,<job>--<task-id>} plus worktrees/<repo>/backlog/<slug>, each on the wt/ branch of the same name; one name grammar and one path reader; worktree.py new, stage, merge, clean and list, stdlib and read from git alone; three gate levels — a task fast-forwards onto its job branch after its verify-task line, a stage closes on its verify-stage line, a job lands on the work branch with an APPROVED verdict carrying its CI run and its verify line run as argv — and the holds that keep closure and context dead waiting while one is open.
 tags: [worktrees, gitflow, isolation, merge, review]
 sources:
   - dadaia_workspace/public/skills/dd-gitflow-default/scripts/worktree.py
@@ -10,45 +10,43 @@ sources:
   - dadaia_workspace/public/data/worktrees-AGENTS.md
 ---
 
-## The worktree
+## The tree
 
-- A worktree is `worktrees/<repo>/<M.m.p><letter>-<kind>` on the local branch `wt/<same>`, cut from the HEAD of the repo's work branch; it is never pushed and never lives under `.dadaia/tmp` or a harness directory.
+- A worktree is `worktrees/<repo>/<name>` on the branch `wt/<name>`; the names are `<M.m.p>-rc<N>/<job>` (one per job, `define` and `reconcile` among them), `<M.m.p>-rc<N>/<job>--<task-id>` (one per parallel task) and `backlog/<slug>`; it never lives under `.dadaia/tmp` or a harness directory.
+- `_worktree_names.py` holds the one grammar (`NAME_RE`) and the one path reader, `locate`, which turns a workspace-relative path under `repos/<r>/` or `worktrees/<r>/<a>/<b>/` into its repo, tree name and repo-relative tail; the gate's protected globs, the doctor, the reaper and every verb read a worktree path through it ([[sdd-gate-v3]]).
+- A job tree and the `define`, `reconcile` and backlog trees are cut from the repo's work branch; a task tree is cut from its job branch and lands back on it.
 - `repos/<repo>` receives agent work only as a merge from a worktree; `specs/audits/` is the one repo path written directly ([[sdd-gate-v3]]).
+- One change — code, tests, specs, memory and derived docs — lands in one job; a job branch takes code only through task merges, its rc's `specs/` edits aside; a `define` or backlog tree lands `specs/` only.
 - `worktrees/` is a root entry of the layout law; it holds only `<repo>/<name>` worktrees and its projected `AGENTS.md`, the one home of the worktree rules ([[public-asset-distribution]]); the doctor never moves anything under it ([[workspace-doctor]]).
-- A worktree holds no `.venv`, `.dadaia` or tool cache: its tests run on the workspace venv and import the worktree's own package; the repo's root `AGENTS.md` declares one `verify: <command>` line, the check `merge` runs.
+- A worktree holds no `.venv`, `.dadaia` or tool cache: its gates run on the workspace venv, put first on `PATH`, and import the worktree's own package.
 - `git stash` is never used in a worktree — every worktree of a repo shares one stash stack; work is set aside as a WIP commit.
 - A harness-native worktree is not ours: never opened for SDD work, never merged.
-
-## Kinds
-
-| Kind | Allowed set (repo-relative, `fnmatch`) | Cap |
-|---|---|---|
-| `impl` | any path outside `specs/`, plus `specs/releases/*/rc-*/TASKS.md` | 5 per repo and release |
-| `bug` | any path outside `specs/`, `specs/bugs/BUGS.jsonl`, `specs/bugs/_archive/*` | — |
-| `backlog` | `specs/backlog/*`, `specs/ADRs/decisions.jsonl`, `specs/bugs/BUGS.jsonl` | — |
-| `release` | `specs/releases/*`, `specs/ADRs/decisions.jsonl`, `specs/memory/*`, `specs/*/AGENTS.md`, `specs/constitution.md` | 1 per repo and version |
-
-- `KINDS` in `_worktree_kinds.py` is the one table, and a commit stages only paths its kind's allowed set holds (`dd-gitflow-default` §3a); the gate loads its `kind_holding` to name the kind a refused repo write belongs in, and a path no kind holds gets an `Operator action:` fix.
 
 ## `worktree.py`
 
 - `python3 .agents/skills/dd-gitflow-default/scripts/worktree.py <verb>` is stdlib only; every refusal prints one `fix:` line, it runs no other script's verb and imports only owner parsers.
-- `new <repo> --kind <kind>` derives the version from the repo's work branch; `impl` needs the live candidate's trio `Approved` on that branch of the context's main repo — an associated repo reads its main repo's trio, and the refusal names `new <main> --kind release` — judged by `release.py`'s own status parser; a cap refusal, and letters past `z`, name an existing worktree's `merge` or `clean`; it creates the tree already locked `dadaia:<kind>:<id>` in one `git worktree add --lock` and refuses a symlinked `worktrees/` component.
-- `merge <path> [--keep <files>… | --drop]` lands HEAD as it is, in order: refuse a dirty tree, its fix an `Operator action:` to commit the changes in the kind's shape or remove them, never a stash; refuse a file outside the kind's allowed set, naming the kind that holds it, the fix an `Operator action:` to revert that file to the work branch in one commit; refuse when the work branch is no ancestor of HEAD, `fix: git -C <tree> rebase <work>` (the rebase runs inside the worktree; a ledger conflict is redone by the ledger's own writer, never hand-merged); require the newest `dd-code-reviewer` handoffs, by `produced_at`, naming in their `scope` HEAD or a sha of the branch's reflog whose (`git patch-id --stable`, full message) series over the work branch equals HEAD's, in order, to be valid `APPROVED` — a newer verdict overrules an older one, and a missing or unparseable `produced_at` ranks newest and refuses ([[agent-comms]]); run the `verify:` line of HEAD's `AGENTS.md` in the tree, stdin closed, a non-zero exit or no `verify:` line refusing with an `Operator action:`; keep or drop ignored files (tool caches and `*.pyc` are disposable); fast-forward only. It never rebases or rewrites.
-- A failed fast-forward names its fix by ancestry: the work branch moved while `merge` ran refuses with the rebase; otherwise a stray change in the checkout, an `Operator action:`.
+- `new <repo> <name>` derives the version from the repo's work branch and refuses a name outside the grammar or for another version; a job needs its rc's `SPEC.md` `Approved` on the work branch of the context's main repo — a job in an associated repo reads its main repo's — judged by `release.py`'s own status parser, the refusal naming the rc's `define` tree; a task needs its job branch and refuses a sixth open task tree in the rc, naming an open one's exit; it creates the tree already locked `dadaia:<name>` in one `git worktree add --lock` and refuses a symlinked `worktrees/` component.
+- Each gate level is a line the repo's tracked root `AGENTS.md` declares — `verify:` (job), `verify-stage:`, `verify-task:` — split by `shlex` and run in the tree as one argv list, never through a shell, stdin closed, the workspace venv first on `PATH`; a missing line or a non-zero exit refuses with an `Operator action:`.
+- `merge <task path>` lands a task on its job branch with no verdict: it refuses a dirty tree, a job branch that is no ancestor of HEAD (`fix: git -C <tree> rebase <job branch>`), an `Owner-tests:` trailer naming a file not in the tree, and a task whose touched `.py` names no `test_` file; then it runs the job branch's `verify-task:` line on the touched files (deleted paths dropped) plus the `Owner-tests:` paths, and fast-forwards.
+- `stage <job path>` closes a stage: refused while a task tree of the job is open, then the work branch's `verify-stage:` line green.
+- `merge <job path>` lands a job on the work branch, in order: no task tree of the job open; the work branch an ancestor of HEAD; the newest `dd-code-reviewer` handoffs, by `produced_at`, naming in their `scope` HEAD or a sha of the branch's reflog whose (`git patch-id --stable`, full message) series over the work branch equals HEAD's, in order, valid `APPROVED` and carrying the job's CI run as `ci_run` — a newer verdict overrules an older one, and a missing or unparseable `produced_at` ranks newest and refuses ([[agent-comms]]); no commit made on the job branch directly that touches code, read from its reflog; then the `verify:` line on HEAD.
+- `merge <define or backlog path>` needs every changed path under `specs/`, the work branch an ancestor of HEAD, a valid `APPROVED` verdict and the `bugs.py`, `backlog.py` and `release.py` `check`s green on the tree; it runs no test.
+- Every merge lands HEAD as it is: ignored files are kept or dropped (tool caches and `*.pyc` are disposable), the target branch must be checked out where it lands, and only a fast-forward follows; a failed fast-forward names its fix by ancestry — a moved base refuses with the rebase, otherwise a stray change in the checkout is an `Operator action:`. It never rebases or rewrites; a ledger conflict after a rebase is redone by the ledger's own writer, never hand-merged.
 - After the fast-forward it removes the tree and `branch -d`s it, never `--force` or `-D`; a re-run after any stop finishes the job.
-- `clean <path>` removes only a `dadaia:`-locked, clean worktree with no commit ahead.
-- `list [--json]` reads every worktree fact from git alone, writing nothing under `.dadaia/states/`: ours `ready` (ahead, clean), `open` (ahead, dirty) or `empty`; an `orphan` `wt/*` branch with no tree; a `foreign` tree git registers; an `unregistered` directory under `worktrees/<repo>/` — each with kind, age, commits ahead, dirty, a warning past a day or off-canon, and its one exit, `clean` when empty, else `merge`.
+- `clean <path>` removes only a `dadaia:`-locked, clean worktree with no commit ahead of the branch it was cut from.
+- `list [--json]` reads every worktree fact from git alone, writing nothing under `.dadaia/states/`: ours `ready` (ahead, clean), `open` (ahead, dirty) or `empty`; an `orphan` `wt/*` branch with no tree; a `foreign` tree git registers; an `unregistered` directory two levels under `worktrees/<repo>/` — each with age, commits ahead, dirty, a warning past a day or off-canon, and its one exit, `clean` when empty, else `merge`.
+- A `wt/` branch is pushable when it is a job's or a backlog tree's — never a task's or `define`'s; `_worktree_names.pushable` is the answer the pre-push gate reads ([[sdd-gate-v3]]).
 
 ## Holds
 
 - The doctor's `WORKTREE` lines and the session-start injection render these rows ([[workspace-doctor]], [[context-management]]).
 - `release.py phase CLOSURE` refuses while the repo holds an open `wt/*` other than the worktree it runs in, and `context dead` refuses while any is open, each naming the row's exit ([[release-lifecycle]], [[context-management]]).
 
-## The ritual
+## The work
 
-- Only the main thread opens and merges worktrees; `impl` and `bug` worktrees run side by side only where the PLAN's Parallel schedule puts their tasks in one step with disjoint `W:`, and an Arm B fix no PLAN names is the only open `bug` worktree ([[release-lifecycle]], [[bug-ledger]]).
-- The reviewer reviews `git diff <work branch>...HEAD`; a patch-identical rebase keeps the verdict, while a changed patch, a reworded message, or an added or dropped commit needs a new review ([[agent-orchestration]]).
+- Only the main thread opens and merges worktrees; a sub-agent works only inside the path it was given, one per task tree, the tasks of one stage in parallel with disjoint `W:` sets ([[release-lifecycle]], [[agent-orchestration]]).
+- The reviewer reviews a job's `git diff <work branch>...HEAD` once, plus once per stage past 400 added lines, never a task; a patch-identical rebase keeps the verdict, while a changed patch, a reworded message, or an added or dropped commit needs a new review ([[agent-orchestration]]).
+- A hotfix is its own job, outside the candidate's DAG ([[bug-ledger]]).
 
 ## Runtime state
 
@@ -56,4 +54,4 @@ sources:
 
 ## Dependencies
 
-[[sdd-gate-v3]], [[release-lifecycle]], [[bug-ledger]], [[backlog-ledger]], [[workspace-doctor]], [[context-management]], [[agent-orchestration]], [[public-asset-distribution]].
+[[sdd-gate-v3]], [[release-lifecycle]], [[bug-ledger]], [[backlog-ledger]], [[workspace-doctor]], [[context-management]], [[agent-orchestration]], [[agent-comms]], [[public-asset-distribution]].
