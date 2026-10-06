@@ -674,3 +674,21 @@ def test_the_closure_check_judges_only_a_block_it_can_regenerate(
     assert rows[0]["message"].startswith("BUGS.jsonl:1 is not valid JSON")
     assert rows[0]["fix"].startswith("sed -n '1p' ")  # the callee's own line, relayed
     assert rows[0]["fix"].endswith("BUGS.jsonl")
+
+
+def test_the_closure_check_names_a_verb_that_died_outside_its_refusal(
+    script: Path, tmp_path: Path
+) -> None:
+    _balance_tree(tmp_path, [])
+    specs = tmp_path / "specs"
+    quality = specs / "memory" / "QUALITY.md"
+    quality.parent.mkdir()
+    quality.write_text("# Quality\n\n## Bugs\n\n```text\nany\n```\n", "utf-8")
+    broken = tmp_path / "skills" / "dd-bug-resolution" / "scripts" / "_bugs_quality.py"
+    broken.write_text("raise RuntimeError('boom')\n", "utf-8")
+
+    rows = _quality_rows(script, specs, "CLOSURE")
+
+    assert [r["message"] for r in rows] == ["`bugs.py balance --check` exited 1"]
+    assert rows[0]["fix"].startswith("Operator action: run `")
+    assert rows[0]["fix"].endswith(" balance --check` and read its output")
