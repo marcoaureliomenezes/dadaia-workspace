@@ -601,6 +601,19 @@
         "meta-tests-leave-pytest",
         "stage-gate-runs-the-contract-tier"
       ]
+    },
+    {
+      "id": "scorecard-one-ruler",
+      "title": "QUALITY.md carries one scorecard ruler: rates as trend, one pinned text-assert regex, targets for criteria 1 and 3",
+      "opened": "2026-10-06",
+      "status": "idea",
+      "description": "Operator, 2026-10-06, verbatim: 'Taxas viram tend\u00eancia; regex fixa; metas 1 e 3'; and 'Sim, na Reconcilia\u00e7\u00e3o da rc-10' - the baseline scorecard runs at rc-10 Reconciliation, so rc-11 is measured against it. Measured: rates (parallelism, test/code ratio) were read as gates; the text-assert share is 10.8% or 17% depending on the regex; criteria 1 (Core) and 3 (push_gate refactor) had no target. Design: one ruler in QUALITY.md - rates are reported as a trend, never a gate; one pinned regex counts text asserts; criteria 1 and 3 get targets from complexity-and-private-import-ratchet and push-gate-decision-split; dd-code-review gains a scorecard lens reading that ruler. rc-11 note carried from bug-ledger-balance-and-convergence (picked by rc-10, whose SPEC is Approved and frozen): add a fix-induced Laplace line (u=+2.9..+4.6, accelerating; the all-bugs Laplace was NOT reproduced - its sign flips with the end date, +0.95/-0.89/-1.57) and a count of closures under 10 minutes (116/789 resolved <10 min, 52 <1 min; 22/70 <10 min since 20260930-structural-convergence-F008 was marked resolved), both as readouts, never gates; the Laplace counts audit batches unless found_by is derived from the registration commit (a typed found_by is rejected as a puxadinho). Placement: rc-11. Placement and every design detail not quoted from a ruling are agent default, unruled.",
+      "provenance": "audit verification 2026-10-06 over feature/0.5.0 8e6448f13 (four read-only verifiers); main-thread registration after the operator grill of 2026-10-06",
+      "relates": [
+        "bug-ledger-balance-and-convergence",
+        "complexity-and-private-import-ratchet",
+        "test-suite-diet"
+      ]
     }
   ]
 }
