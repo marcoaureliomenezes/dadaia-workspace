@@ -23,9 +23,6 @@ from dadaia_workspace.features.backlog.subject_registry import (
 )
 from dadaia_workspace.infrastructure.git_subprocess import GitSubprocessClient
 
-pytestmark = pytest.mark.unit
-
-
 MINIMAL_GO = """package widget
 
 const WidgetConst = 1

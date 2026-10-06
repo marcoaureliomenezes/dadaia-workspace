@@ -16,8 +16,6 @@ import pytest
 
 from dadaia_workspace.cli.commands.doctor import _ledgers_section
 
-pytestmark = pytest.mark.integration
-
 _SOURCE = "class Widget:\n    pass\n"
 _LEDGER = "LEDGER-BACKLOG-SCHEMA"
 
