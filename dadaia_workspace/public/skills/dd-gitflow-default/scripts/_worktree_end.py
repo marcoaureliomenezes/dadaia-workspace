@@ -159,22 +159,6 @@ def _gate(tree: Path, level: str, work: str, *files: str) -> None:
                       f"Operator action: make `{line}` exit 0 in {tree} and commit the fix in this worktree")  # fmt: skip
 
 
-def _check_stray(tree: Path, work: str, name: str) -> None:
-    """A job branch takes code only by task merges (its rc's specs edits may land directly):
-    a commit made on it directly that touches code refuses — read from the branch's reflog."""
-    mine = set(git(tree, "rev-list", f"{work}..HEAD").split())
-    for line in git(tree, "reflog", "--format=%H %gs", branch(name), check=False).splitlines():
-        sha, _, subject = line.partition(" ")
-        if sha not in mine or subject.startswith(("branch: ", "merge wt/", "rebase")):
-            continue
-        touched = git(tree, "diff-tree", "--no-commit-id", "--name-only", "-r", sha).split()
-        if any(not p.startswith("specs/") for p in touched):
-            undo = git_line(tree, "rebase", "--onto", f"{sha}~", sha)
-            raise Refusal(f"{sha} was committed on {branch(name)} directly; a job branch takes"
-                          " code only through a task merge",
-                          f"Operator action: drop {sha} (`{undo}`) and land its change through a task worktree")  # fmt: skip
-
-
 def _open_tasks(repo: Path, name: str) -> None:
     """A stage closes, and a job lands, only with none of its task worktrees open."""
     for row in ours(repo):
@@ -320,7 +304,6 @@ def merge(root: Path, path: str, keep: list[str], drop: bool) -> str:
         _check_ancestor(tree, onto)
         _check_approved(root, tree, onto, name, run=True)
         _freeze(tree, onto)
-        _check_stray(tree, onto, name)
         _gate(tree, "job", onto)
     kept = _kept(tree, "merge", keep, drop)
     if git(into, "branch", "--show-current").strip() != onto:
