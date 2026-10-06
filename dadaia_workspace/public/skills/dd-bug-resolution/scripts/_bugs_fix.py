@@ -8,10 +8,11 @@ Derived from git on every call, never stored, in two steps.
   undoes the earlier live commit it names with the fewest words beyond the quote (the
   exact subject; a tie: the nearest), and undoing a revert flips the whole chain beneath
   it. A live shape-3, shape-4 or REBUILD subject then links its ids — a class commit the
-  ids on its body lines — to itself or to the task commits it names.
+  ids on its body lines — to itself or, for shape 4's `by <task-id>`, to the commits whose
+  subjects carry that task id (a rebase rewrites a sha, never the id).
 - Diff: every linked sha's numstat; its production paths are its fix surface. A later
-  live REBUILD (planned) or `fix(bugs)` of another bug (overfitting) removing a line a
-  fix wrote (`git blame` of its removed lines names the fix sha) is its rework.
+  live REBUILD (planned) or `fix(...)` commit, a bug's or a task's (overfitting), removing
+  a line a fix wrote (`git blame` of its removed lines names the fix sha) is its rework.
 """
 
 from __future__ import annotations
@@ -28,13 +29,17 @@ from typing import NamedTuple
 
 from _bugs_store import Refusal
 
-#: Shapes 3, 4 and a REBUILD share one id list; shape 4 names its task commit(s) as `(<sha>[, <sha>])`.
+#: Shapes 3, 4 and a REBUILD share one id list; shape 4 names its task as `by <task-id>` and may
+#: cite its commits as `(<sha>[, <sha>])`.
 _LINK = re.compile(r"(fix\(bugs\): |chore\(bugs\): resolve |refactor\(bugs\): )(.+?) — (.*)$")
-_TASK_SHAS = re.compile(r"\((\w+(?:, \w+)*)\)$")
+_BY = re.compile(r"by (?P<task>[\w.-]+)")
+_CITED = re.compile(r"\((\w+(?:, \w+)*)\)$")
+_TASK = re.compile(r"[a-z]+\((?P<task>[^)]+)\)")
 _REBUILD = re.compile(r"(fix|refactor)\([^)]+\): .*\bREBUILD\b")
 _BODY_ID = re.compile(r"[a-z0-9][a-z0-9.-]*")
 _GREP = (
     r"--grep=^(fix|chore|refactor)\(bugs\): ",
+    r"--grep=^fix\(",
     r"--grep=^refactor\(.*REBUILD",
     '--grep=^Revert "',
 )
@@ -128,47 +133,116 @@ def _undoes(revert: str, subject: str) -> bool:
 def _kind(commit: _Commit) -> str | None:
     if _REBUILD.match(commit.subject):
         return "planned"
-    return "overfitting" if commit.subject.startswith("fix(bugs): ") else None
+    return "overfitting" if commit.subject.startswith("fix(") else None
 
 
-def fixes(specs: Path) -> dict[str, Fix]:
-    """Bug id -> its :class:`Fix`, for every bug a live commit links."""
-    head = subprocess.run(["git", "-C", str(specs), "rev-parse", "-q", "--verify", "HEAD"], capture_output=True, check=False)  # fmt: skip
-    if head.returncode == 1:  # a repo with no commit yet links nothing
-        return {}
+def _history(specs: Path) -> list[tuple[str, str]]:
+    """Every commit on HEAD, oldest first, as ``(sha, subject)``; none in a repo with no commit."""
+    head = subprocess.run(
+        ["git", "-C", str(specs), "rev-parse", "-q", "--verify", "HEAD"],
+        capture_output=True,
+        check=False,
+    )
+    if head.returncode == 1:
+        return []
     try:
-        order = git(specs, "rev-list", "--reverse", "HEAD").split()
+        out = git(specs, "log", "--reverse", "--format=%H %s", "HEAD")
     except subprocess.CalledProcessError:
-        raise Refusal("cannot read the repo's history", "Operator action: point --specs at a specs tree inside a git repo") from None  # fmt: skip
-    pos = {sha: i for i, sha in enumerate(order)}
-    log = _parse(git(specs, "log", "--reverse", "-E", *_GREP, "--numstat", _FORMAT))
-    for i, commit in enumerate(log):  # link step 1: the reverts
+        raise Refusal(
+            "cannot read the repo's history",
+            "Operator action: point --specs at a specs tree inside a git repo",
+        ) from None
+    return [
+        (sha, subject) for sha, _, subject in (line.partition(" ") for line in out.splitlines())
+    ]
+
+
+def _tasks(history: list[tuple[str, str]]) -> dict[str, list[str]]:
+    found: dict[str, list[str]] = {}
+    for sha, subject in history:
+        if task := _TASK.match(subject):
+            found.setdefault(task["task"], []).append(sha)
+    return found
+
+
+def tasked(specs: Path) -> dict[str, list[str]]:
+    """Task id -> the shas of its `<type>(<task-id>)` commits on HEAD, oldest first: the ONE reader
+    of a task's commits, by the id their subjects carry, which a rebase keeps and a sha does not."""
+    return _tasks(_history(specs))
+
+
+def _revert(log: list[_Commit]) -> None:
+    """Link step 1: a `Revert "..."` kills the live commit it quotes; reverting a revert revives."""
+    for i, commit in enumerate(log):
         if not commit.subject.startswith('Revert "'):
             continue
-        # the live commit the quote names with the fewest words beyond it (the exact subject), then the nearest
-        fits = [(-len(e.subject.split(" ")), j) for j, e in enumerate(log[:i]) if e.live and _undoes(commit.subject, e.subject)]  # fmt: skip
+        # the live commit the quote names with the fewest words beyond it, then the nearest
+        fits = [
+            (-len(e.subject.split(" ")), j)
+            for j, e in enumerate(log[:i])
+            if e.live and _undoes(commit.subject, e.subject)
+        ]
         target = log[max(fits)[1]] if fits else None
         commit.undid = target
         while target:  # undoing a revert reinstates its own, and so on down the chain
             target.live, target = not target.live, target.undid
-    named: dict[str, list[str]] = {}
-    for commit in reversed([c for c in log if c.live]):  # link step 2, newest first
-        link = _LINK.match(commit.subject)
-        task = _TASK_SHAS.search(link[3]) if link and link[1].startswith("chore") else None
-        if link is None or (task is None and link[1].startswith("chore")):
-            continue
-        ids = [ln.strip() for ln in commit.body.splitlines() if _BODY_ID.fullmatch(ln.strip())] if link[2].startswith("class ") else link[2].split(", ")  # fmt: skip
-        for bug in ids:
-            named.setdefault(bug, []).extend(task[1].split(", ") if task else [commit.sha])
-    full = {s: next((f for f in order if f.startswith(s)), None) for s in {s for v in named.values() for s in v}}  # fmt: skip
-    by_sha = {c.sha: c for c in log}
-    shown = sorted({f for f in full.values() if f and f not in by_sha})
-    by_sha |= {c.sha: c for c in _parse(git(specs, "show", "--numstat", _FORMAT, *shown))} if shown else {}  # fmt: skip
-    links = {bug: list(dict.fromkeys(f for s in shas if (f := full[s]))) for bug, shas in named.items()}  # fmt: skip
-    prod = own(specs, {r[2] for shas in links.values() for s in shas for r in by_sha[s].rows})
-    reworkers = [c for c in log if c.live and _kind(c)]
-    top = Path(git(specs, "rev-parse", "--show-toplevel").strip())
 
+
+def _named(
+    log: list[_Commit], tasks: dict[str, list[str]], order: list[str]
+) -> dict[str, list[str]]:
+    """Link step 2, newest first: bug id -> the shas its live subject names; a shape-4 resolve
+    names its task's commits by id (which a rebase keeps), else the shas it cites."""
+    named: dict[str, list[str]] = {}
+    for commit in reversed([c for c in log if c.live]):
+        link = _LINK.match(commit.subject)
+        if link is None:
+            continue
+        shas = [commit.sha]
+        if link[1].startswith("chore"):
+            by, cited = _BY.match(link[3]), _CITED.search(link[3])
+            shas = (by and tasks.get(by["task"])) or [
+                full for s in (cited[1].split(", ") if cited else []) if (full := _full(s, order))
+            ]
+        ids = (
+            [ln.strip() for ln in commit.body.splitlines() if _BODY_ID.fullmatch(ln.strip())]
+            if link[2].startswith("class ")
+            else link[2].split(", ")
+        )
+        for bug in ids:
+            named.setdefault(bug, []).extend(shas)
+    return named
+
+
+def _full(short: str, order: list[str]) -> str | None:
+    """The oldest sha of *order* that *short* starts, None when a rebase dropped it."""
+    return next((sha for sha in order if sha.startswith(short)), None)
+
+
+def _shown(specs: Path, log: list[_Commit], shas: set[str]) -> dict[str, _Commit]:
+    """The commits of *shas* with their numstat: the log's own, the rest read by `git show`."""
+    by_sha = {c.sha: c for c in log}
+    rest = sorted(shas - by_sha.keys())
+    return (
+        by_sha | {c.sha: c for c in _parse(git(specs, "show", "--numstat", _FORMAT, *rest))}
+        if rest
+        else by_sha
+    )
+
+
+def fixes(specs: Path) -> dict[str, Fix]:
+    """Bug id -> its :class:`Fix`, for every bug a live commit links."""
+    history = _history(specs)
+    if not history:
+        return {}
+    log = _parse(git(specs, "log", "--reverse", "-E", *_GREP, "--numstat", _FORMAT))
+    _revert(log)
+    order = [sha for sha, _ in history]
+    named = _named(log, _tasks(history), order)
+    by_sha = _shown(specs, log, {s for shas in named.values() for s in shas})
+    links = {bug: list(dict.fromkeys(shas)) for bug, shas in named.items() if shas}
+    prod = own(specs, {r[2] for shas in links.values() for s in shas for r in by_sha[s].rows})
+    top = Path(git(specs, "rev-parse", "--show-toplevel").strip())
     squashes = functools.cache(lambda: subjects(top))
 
     @functools.cache
@@ -176,28 +250,43 @@ def fixes(specs: Path) -> dict[str, Fix]:
         sha: str,
     ) -> set[str]:  # the shas whose lines this commit removed, on paths some fix wrote
         hot = tuple(sorted({x[2] for x in by_sha[sha].rows} & prod))
-        return removed(top, (f"{sha}^", sha), f"{sha}^", squashes(), NOT_PRODUCTION, hot) if hot else set()  # fmt: skip
-
-    def rework_reader(
-        shas: list[str], surfaces: dict[str, set[str]]
-    ) -> Callable[[], tuple[Counter[str], int]]:
-        def read() -> tuple[Counter[str], int]:  # blames: only the verb that prints rework pays
-            rework = [r for r in reworkers if r.sha not in surfaces and any(pos[r.sha] > pos[s] and surfaces[s] & {x[2] for x in r.rows} and s in wrote(r.sha) for s in shas)]  # fmt: skip
-            return Counter(str(_kind(r)) for r in rework), max(by_sha[s].time for s in [*shas, *(r.sha for r in rework)])  # fmt: skip
-
-        return read
-
-    found: dict[str, Fix] = {}
-    for bug, shas in links.items():
-        if not shas:
-            continue
-        surfaces = {s: {r[2] for r in by_sha[s].rows} & prod for s in shas}
-        found[bug] = Fix(
-            {s: by_sha[s].rows for s in shas},
-            set().union(*surfaces.values()),
-            rework_reader(shas, surfaces),
+        return (
+            removed(top, (f"{sha}^", sha), f"{sha}^", squashes(), NOT_PRODUCTION, hot)
+            if hot
+            else set()
         )
-    return found
+
+    reworkers = [c for c in log if c.live and _kind(c)]
+    pos = {sha: i for i, sha in enumerate(order)}
+    return {bug: _fix(shas, by_sha, prod, reworkers, pos, wrote) for bug, shas in links.items()}
+
+
+def _fix(
+    shas: list[str],
+    by_sha: dict[str, _Commit],
+    prod: set[str],
+    reworkers: list[_Commit],
+    pos: dict[str, int],
+    wrote: Callable[[str], set[str]],
+) -> Fix:
+    """One bug's :class:`Fix`; its rework blames, so only the verb that prints it pays."""
+    surfaces = {s: {r[2] for r in by_sha[s].rows} & prod for s in shas}
+
+    def read() -> tuple[Counter[str], int]:
+        rework = [
+            r
+            for r in reworkers
+            if r.sha not in surfaces
+            and any(
+                pos[r.sha] > pos[s] and surfaces[s] & {x[2] for x in r.rows} and s in wrote(r.sha)
+                for s in shas
+            )
+        ]
+        return Counter(str(_kind(r)) for r in rework), max(
+            by_sha[s].time for s in [*shas, *(r.sha for r in rework)]
+        )
+
+    return Fix({s: by_sha[s].rows for s in shas}, set().union(*surfaces.values()), read)
 
 
 def direction(fix: Fix) -> str:

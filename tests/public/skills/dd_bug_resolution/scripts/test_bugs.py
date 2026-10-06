@@ -1044,7 +1044,6 @@ def test_fix_counts_rework_per_line_not_per_file(script: Path, tmp_path: Path) -
     ]  # fmt: skip
 
 
-@pytest.mark.xfail(strict=True, reason="JB.S1 RED: rebase-orphans-bug-fix-links-cited-by-sha")
 def test_fix_links_a_shape_4_resolve_by_its_task_id_when_the_cited_sha_is_gone(
     script: Path, tmp_path: Path
 ) -> None:
@@ -1059,7 +1058,6 @@ def test_fix_links_a_shape_4_resolve_by_its_task_id_when_the_cited_sha_is_gone(
                       "[ok] 1 linked, 0 unlinked."]  # fmt: skip
 
 
-@pytest.mark.xfail(strict=True, reason="JB.S1 RED: task-fix-over-a-bug-fix-records-no-lineage")
 def test_fix_counts_a_task_fix_over_a_bug_fix_as_rework(script: Path, tmp_path: Path) -> None:
     """A `fix(<task>)` commit removing a line a bug's fix wrote is that fix's rework, as a
     `fix(bugs)` of another bug is; one that touches other lines is not."""
