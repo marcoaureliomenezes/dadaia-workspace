@@ -43,7 +43,12 @@ def _ci(checkout: Path, job: str, python: str = sys.executable) -> subprocess.Co
     return subprocess.run(
         [python, str(checkout / "scripts" / "ci.py"), job],
         cwd=checkout,
-        env={k: v for k, v in os.environ.items() if k != "PYTHONDONTWRITEBYTECODE"},
+        # an outer coverage session (the medium tests run under it) must not steer this inner one
+        env={
+            k: v
+            for k, v in os.environ.items()
+            if k != "PYTHONDONTWRITEBYTECODE" and not k.startswith(("COV_CORE_", "COVERAGE"))
+        },
         capture_output=True,
         text=True,
         check=False,

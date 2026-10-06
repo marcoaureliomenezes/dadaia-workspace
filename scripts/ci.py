@@ -44,7 +44,7 @@ JOBS: dict[str, list[Step]] = {
             [
                 *PYTEST,
                 "-m",
-                "small and not quarantine",
+                "not e2e and not quarantine",
                 "-p",
                 "scripts.covdata",
                 "--cov=dadaia_workspace",
