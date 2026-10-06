@@ -18,14 +18,6 @@
       "provenance": "ADR 0039 (grill 2026-09-24), ADR 0053 (2026-09-27), ADR 0101 (operator 2026-09-29); inventory row A09 in reports/main-thread/20260929-050-rc1-audit/leftbehind/ (REPORT.md, inventory.json)"
     },
     {
-      "id": "clone-detection",
-      "title": "Clone detection (duplicate-code scanning) as a systemic-ambiguity check",
-      "opened": "2026-09-29",
-      "status": "idea",
-      "description": "Listed out of scope in specs/releases/0.5.0/SPEC.md ('Clone detection.') with no entry to hold it. The c4 as-is scan (f) measured it: 11 exact normalized-AST clone groups, mostly script-to-script copies the self-contained-script law sanctions; it misses the divergent copies that caused the ambiguity bugs (WP-26 status parser, WP-29 frontmatter grammar) and was not adopted in favour of a parity test per sanctioned pair (reports/main-thread/20260927-050-c4-evidence/c4/ASIS-B.md scan (f)). The operator decides: pick it with a design that finds divergent copies, or reject it.",
-      "provenance": "0.5.0 SPEC 'Out of scope and deferred' (candidate 4 definition, 2026-09-27); c4 as-is scan (f); inventory row A11 in reports/main-thread/20260929-050-rc1-audit/leftbehind/ (REPORT.md, inventory.json)"
-    },
-    {
       "id": "launch-operator-acts",
       "title": "0.4.7 operator acts D3-D6 that never happened: skills repo + token, Pages, marketplace PR, homepage/topics, launch posts",
       "opened": "2026-09-29",
