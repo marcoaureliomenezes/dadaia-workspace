@@ -45,6 +45,10 @@ def git(repo: Path, *argv: str) -> list[str]:
 def report(specs: Path, since: str, until: str = "HEAD") -> dict[str, Any]:
     """The worklist for the window *since*..*until* — the ONE decider every verb calls."""
     repo = specs.parent
+    for bound in (since, until):  # exit 1 = present but unreachable; 128 = absent, git() names it
+        if subprocess.run(["git", "merge-base", "--is-ancestor", bound, "HEAD"], cwd=repo, capture_output=True, check=False).returncode == 1:  # fmt: skip
+            raise Refusal(f"{bound} is not an ancestor of HEAD — a clone of this branch lacks it (a rebase rewrote it)",
+                          f"Operator action: replace {bound[:12]} with the commit HEAD reaches in its place")  # fmt: skip
     catalog = json.loads((specs / CATALOG).read_text(encoding="utf-8"))
     changed = git(repo, "diff", "--name-only", f"{since}..{until}")
     return {"since": since, **worklist(catalog, changed, git(repo, "ls-files"))}
