@@ -11,6 +11,7 @@ from pathlib import Path
 from dadaia_workspace.core import workspace_layout
 from dadaia_workspace.core.fixed_sections import FIXED_SECTIONS
 from dadaia_workspace.core.gitflow import DEFAULT, Gitflow, merge_frontmatter, read_gitflow
+from dadaia_workspace.core.specs_version import CANON_AT as _CANON_AT
 from dadaia_workspace.core.specs_version import CANONICAL_SPECS_VERSION, state
 
 _CUSTOM = Gitflow(principal="trunk", integration="next", work_prefix="work/")
@@ -19,10 +20,6 @@ _CUSTOM = Gitflow(principal="trunk", integration="next", work_prefix="work/")
 def _write(tmp_path: Path, text: str) -> Path:
     (tmp_path / "constitution.md").write_text(text, encoding="utf-8")
     return tmp_path
-
-
-#: The canon fingerprint each stamp was cut at — re-pinned only together with a stamp bump.
-_CANON_AT = {11: "7ffb4bbec2e63807"}
 
 
 def test_a_canon_change_bumps_the_stamp() -> None:
