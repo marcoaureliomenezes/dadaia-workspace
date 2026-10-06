@@ -75,17 +75,6 @@
       ]
     },
     {
-      "id": "bug-fix-adds-never-rewrites-asserts",
-      "title": "A bug fix adds a parametrize row and never rewrites an old assert",
-      "opened": "2026-10-02",
-      "status": "idea",
-      "description": "Measured: 113/183 (62%) `fix(bugs):` commits removed asserts, 111 without the text reappearing (e.g. `0ae560b68` copied new output into 5 asserts). The cause is in the law: Phase 5 \"existing test rewritten\" and Phase 6 \"production AND tests net \u2264 0\" (contradicts ADR 0142). Change: delete both clauses; the RED enters the owner file as a parametrize row with a literal expected value, named by behavior, never by the bug slug; rewriting a pre-existing assert is its own commit with a reason; review detects it with `git diff -U0 -- tests | grep -E '^-\\s*assert'`. Retire `evidence_seam` and `evidence_diff` for new records (optional in the schema, history intact) and keep `evidence_loop`; 40% of recorded seams are already stale (grill Q9). Done when: Phase 5/6 carry neither clause, `REQUIRED_BY_VERB` no longer requires the two retired fields, and the review step names the grep. Files: `dd-bug-resolution/SKILL.md` Ph5/6, schema `bug-record-v1`, `_bugs_transition.REQUIRED_BY_VERB`, `dd-gitflow-default` \u00a73a. ADRs 0163, 0164 (proposed).",
-      "provenance": "operator demand 2026-10-02: test audit https://claude.ai/artifact/AMw3Ho2tqaAbftJUWuNhAT + grill Q1-Q9",
-      "relates": [
-        "bug-fix-commit-derived-by-grep"
-      ]
-    },
-    {
       "id": "tests-tree-mirrors-the-package",
       "title": "The tests tree mirrors the package, one owner file per module",
       "opened": "2026-10-02",
