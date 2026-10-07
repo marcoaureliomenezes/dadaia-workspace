@@ -11,7 +11,6 @@ from __future__ import annotations
 
 import os
 import re
-import shlex
 import subprocess
 import sys
 import time
@@ -19,6 +18,7 @@ from pathlib import Path
 
 import pytest
 
+from dadaia_workspace.core.cli_line import shell_line
 from dadaia_workspace.features.spec_context.doctor import DoctorService
 from dadaia_workspace.infrastructure.git_subprocess import GitSubprocessClient
 from tests.fixtures.stores import context_store
@@ -110,12 +110,7 @@ def test_doctor_lists_the_contexts_worktrees_from_git_and_touches_none(tmp_path:
     found = {f.message.split(" ", 1)[1].split("  ")[0]: f for f in doctor.check_worktrees("c")}
 
     assert found[str(ready)].verdict == "warning"
-    assert shlex.split(found[str(ready)].fix) == [
-        sys.executable,
-        str(worktree_ws.SCRIPT),
-        "merge",
-        str(ready),
-    ]
+    assert found[str(ready)].fix == shell_line(sys.executable, str(worktree_ws.SCRIPT), "merge", str(ready))
     assert found[str(empty)].message.startswith("empty") and found[str(empty)].fix == ""
     assert found[str(foreign)].message.startswith("foreign")  # the expired TTL entry surfaces here
     assert not [f for f in doctor.scan_ttl() if "20200101" in f.path]
