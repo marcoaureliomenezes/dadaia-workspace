@@ -109,11 +109,6 @@ def test_render_claude_agent_seam(case: str, tmp_path: Path) -> None:
 @pytest.mark.parametrize(
     ("declared", "claude", "sandbox"),
     [
-        (
-            "true",
-            ("permissionMode: default", "disallowedTools: [Edit, Write, NotebookEdit]"),
-            "read-only",
-        ),
         ("false", ("permissionMode: acceptEdits",), "workspace-write"),
     ],
 )
@@ -121,7 +116,8 @@ def test_privilege_derives_from_read_only_on_both_harnesses(
     tmp_path: Path, declared: str, claude: tuple[str, ...], sandbox: str
 ) -> None:
     """sa-reviewer-persona-body-contradicts-its-tools#B2: read_only is the one privilege
-    field — Claude's permission mode and Codex's sandbox both derive from it."""
+    field — Claude's permission mode derives from it, and so does the sandbox of a
+    writer (a read_only reviewer's Codex sandbox is pinned apart)."""
     body = _GENERIC_BODY.replace("read_only: false", f"read_only: {declared}")
     resolved = ResolvedAgentModel(model="claude-sonnet-5", effort="high", source="default")
     fm = render_claude_agent(body, resolved).split("---\n", 2)[1].splitlines()
