@@ -46,6 +46,7 @@ Paths are relative to the repo root; aliases as in `PLAN.md` (`f/`, `pub/`, `S/`
 | J6.S3.T5 | — | this file | close task, last: regenerates `pub/entities/behavior-map.json` (the skills' hashes T4 moved); `test-audit:`, `mutation:`; `done` |
 
 - done: Job 6 — every task landed on `wt/0.5.0-rc10/job6` through its task merge: J6.S1.T1 f327dda3b and J6.S1.T2 9f1c9f80a (RED, strict xfail); J6.S2.T1 6e99f6a52 and 26f7e5635 (the freeze judge and the shared `AGENTS.md` line reader; the RED markers lift), T2 35dd0450d, T3 a8c2fbf60, T4 6e857ff2f and fc6640798 (the freeze in the law) and 5e71ce92a (shipped history), T5 e01ddf995 (the repo law template's empty `tests:` line); J6.S3.T1 565fc4b50, T2 320ef632d, T3 4f6cc6b98, T4 f0d5436c9 (the consumer recipe moves to `scripts/`), T6 be615e848 and 81752a87f (`CICD-AUTOMATION.md`), T7 24dddd3e2 (the pre-push runner drops the poetry fallback), T8 ea6cfd0af (the exec bit), T9 0d15072fe (REBUILD of the runner-resolution table); the job file's stage rows 1192e55d2, d77e386de, 8a8b26fff; closed by J6.S3.T5.
+- done: Job 6 review repair — S3 repairs 3f3cf7020 (T10 `dd-cli-library`), 591af0ce2 (T11 platform atoms), ee2449ff9 (T5 derived docs); S4 618677797 (T2 RED) and 6fe0486e5 (T1, whole hunks and adjacent hunks); S5 d9546e432 (the freeze judges the job's own range, first-parent diffs); S6 55d6c1e9a (T1, killing rows for the four fail-open mutants) and 05c056521 (T2, the law line); closed by J6.S6.T3.
 
 ## Stage J6.S4 — RED for the review's findings (CHANGES_REQUESTED on 8f8da611d)
 
