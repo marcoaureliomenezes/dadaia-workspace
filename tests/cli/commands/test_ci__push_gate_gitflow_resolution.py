@@ -6,6 +6,7 @@ Size: MEDIUM (real git repos on disk)."""
 
 from __future__ import annotations
 
+import os
 import subprocess
 from pathlib import Path
 
@@ -13,6 +14,7 @@ import pytest
 
 from dadaia_workspace.cli.commands import ci
 from dadaia_workspace.core.gitflow import Gitflow
+from dadaia_workspace.core.platform import PLATFORM
 
 _CUSTOM = "---\nspecs_pattern_version: 7\ngitflow: {principal: trunk, integration: next, work: work/}\n---\n"
 
@@ -77,8 +79,8 @@ def test_an_absent_specs_tree_is_reported_as_absent_with_the_specs_init_fix(
     ci._gate_inputs(app, "")
     err = capsys.readouterr().err
     assert "no specs/constitution.md" in err
-    fixes = [line for line in err.splitlines() if line.startswith("fix: /")]
-    tail = f"/bin/dadaia specs init --specs-dir {app / 'specs'}"
+    fixes = [line for line in err.splitlines() if line.startswith("fix: ")]
+    tail = f"{os.sep}{PLATFORM.venv_scripts_dir}{os.sep}dadaia{PLATFORM.venv_exe_suffix} specs init --specs-dir {app / 'specs'}"
     assert [f.endswith(tail) for f in fixes] == [True]
 
 
