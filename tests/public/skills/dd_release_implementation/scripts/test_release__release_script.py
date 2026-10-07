@@ -468,6 +468,27 @@ def test_a_stale_balance_block_refuses_at_closure_and_passes_in_implementation(
     quality.parent.mkdir()
     quality.write_text("# Quality\n\n## Bugs\n\n```text\nstale\n```\n", "utf-8")
     state = specs / "releases/0.5.0/_RELEASE.json"
+    (specs / "memory" / "product").mkdir()
+    navigator = script.parents[2] / "dd-spec-navigator" / "scripts" / "memory.py"
+    cataloged = subprocess.run([sys.executable, str(navigator), "catalog", "generate", "--specs",
+                                str(specs)], capture_output=True, text=True)  # fmt: skip
+    assert cataloged.returncode == 0, cataloged.stderr
+    for key, value in (("user.email", "fixture@example.invalid"), ("user.name", "fixture")):
+        subprocess.run(["git", "-C", str(tmp_path), "config", key, value], check=True)
+    (tmp_path / ".gitignore").write_text(
+        "skills/\n", "utf-8"
+    )  # the staged scripts are no code under review
+    subprocess.run(["git", "-C", str(tmp_path), "add", "-A"], check=True)
+    subprocess.run(["git", "-C", str(tmp_path), "commit", "-qm", "base"], check=True)
+    base = subprocess.run(["git", "-C", str(tmp_path), "rev-parse", "HEAD"], check=True,
+                          capture_output=True, text=True).stdout.strip()  # fmt: skip
+    seeded = {**json.loads(state.read_text("utf-8")), "phase": "CLOSURE",
+              "defined": {"sha": base, "ts": "2026-01-01T00:00:00Z"},
+              "implemented": {"sha": base, "ts": "2026-01-01T00:00:00Z"}}  # fmt: skip
+    state.write_text(json.dumps(seeded, indent=2) + "\n", "utf-8")
+    recorded = subprocess.run([sys.executable, str(script), "memory", "--specs", str(specs)],
+                              capture_output=True, text=True, cwd=tmp_path)  # fmt: skip
+    assert recorded.returncode == 0, recorded.stderr
 
     def balance_rows(phase: str) -> list[dict[str, str]]:
         state.write_text(json.dumps({**json.loads(state.read_text("utf-8")), "phase": phase}))
@@ -481,7 +502,7 @@ def test_a_stale_balance_block_refuses_at_closure_and_passes_in_implementation(
     shown = subprocess.run([sys.executable, str(script), "check", "--specs", str(specs)],
                            capture_output=True, text=True)  # fmt: skip
     (line,) = [x for x in shown.stdout.splitlines() if "memory/QUALITY.md" in x]
-    assert " warning " in line and "differs from its regeneration" in line
+    assert shown.returncode == 0 and " warning " in line and "differs from its regeneration" in line
 
     bugs = script.parents[2] / "dd-bug-resolution" / "scripts" / "bugs.py"
     argv = [sys.executable, str(bugs), "balance", "--write", "--specs", str(specs)]
