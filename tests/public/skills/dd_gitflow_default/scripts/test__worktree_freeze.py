@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import re
 import sys
+from pathlib import Path
 
 import pytest
 
@@ -64,3 +65,35 @@ def test_added_test_lines_land_only_in_a_tests_only_stage(code: bool) -> None:
     rows = [S1, row("c2", "test(J1.S3.T1): more", edits=((T, (), 1),))]
     rows.append(row("c3", "feat(J1.S3.T2): code", code=True)) if code else None
     assert (freeze.judge(rows, "base", None) is None) is (not code)
+
+
+def patched(sha: str, subject: str, patch: str) -> object:
+    head = f"diff --git a/{T} b/{T}\nindex 1..2 100644\n"
+    return row(sha, subject, code=True, edits=freeze._edits(head + patch))
+
+
+GREEN = "fix(J1.S2.T1): green"
+
+
+def test_a_hunk_of_several_lines_is_read_whole() -> None:
+    patch = f"--- a/{T}\n+++ b/{T}\n@@ -3,2 +3 @@\n-@red\n-assert x == 1\n+assert x == 2\n"
+    assert freeze.judge([S1, patched("c2", GREEN, patch)], "base", RED) == (T, "c1")
+
+
+def test_the_second_of_two_adjacent_hunks_is_read() -> None:
+    patch = f"--- a/{T}\n+++ b/{T}\n@@ -3 +2,0 @@\n-@red\n@@ -5 +4 @@\n-assert x == 1\n+assert x\n"
+    assert freeze.judge([S1, patched("c2", GREEN, patch)], "base", RED) == (T, "c1")
+
+
+def test_a_binary_test_file_edit_refuses() -> None:
+    patch = f"Binary files a/{T} and b/{T} differ\n"
+    assert freeze.judge([S1, patched("c2", GREEN, patch)], "base", RED) == (T, "c1")
+
+
+def test_an_invalid_tests_red_pattern_refuses_with_one_fix_line(tmp_path: Path) -> None:
+    with pytest.raises(freeze.Refusal) as refused:
+        freeze.check(tmp_path, "w", "tests/**", "(")
+    assert (
+        refused.value.fix
+        == "Operator action: fix the tests-red: line on w's AGENTS.md and commit it"
+    )
