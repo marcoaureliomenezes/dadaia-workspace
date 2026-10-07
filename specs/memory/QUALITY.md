@@ -53,7 +53,7 @@ Rationale: a model call on a PR path fails closed without the paid key and expos
 
 ## Gates
 
-- CI runs ruff and `lint-imports`, mypy `--strict`, the guards (`scripts/guards/run.py`, plain and `--planted`), unit and contract tiers with Windows/macOS subsets and an importability smoke, integration, Python E2E, repo hygiene, `dadaia doctor` over the checked-out tree, PR governance and gitleaks — every PR job a required status check listed in `.github/required-checks.json` (`required-checks-listed`), gitleaks included; no job calls a model API (P-33).
+- CI runs ruff and `lint-imports`, mypy `--strict`, the guards (`scripts/guards/run.py`, plain and `--planted`), unit and contract tiers with Windows/macOS subsets and an importability smoke, integration, Python E2E, repo hygiene, `dadaia doctor` over the checked-out tree, PR governance and gitleaks — every PR job a required status check listed in `.github/required-checks.json` (`required-checks-listed`), gitleaks included; no job calls a model API (P-33) except `.github/workflows/eval.yml`, the one exception (ADR 0217).
 - Push triggers are `main`, `develop` and `feature/**`; PRs to `develop` or `main` run the same matrix.
 - `pr-source-guard` is fail-closed; the security review of both PR edges is the `dd-code-reviewer` security lens on the PR head, run by the main thread before the PR.
 - Every review verdict states the bug-surface delta from `bugs.py stats`, and no deploy is approved without the consumer-side matrix.

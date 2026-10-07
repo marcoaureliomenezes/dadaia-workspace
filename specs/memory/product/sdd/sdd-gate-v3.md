@@ -2,7 +2,7 @@
 slug: sdd-gate-v3
 title: sdd-gate-v3
 tldr: No-lock enforcement — three gate blocks (root entry, non-venv command, PROTECTED or out-of-scope write; repos/<r> takes merges), one fix each, a push chokepoint
-summary: The merged PreToolUse gate blocks exactly three things and reads no SDD artifact; every refusal anywhere carries one fix line, a command or an operator action; the pre-push chokepoint enforces the branch contract read from the project gitflow, the specs canon, ADR-cited law deletions and one secret registry over every pushed object, with one rewrite formula as its fix, and no CI job calls a model API — the security review is the reviewer's lens before each pull request.
+summary: The merged PreToolUse gate blocks exactly three things and reads no SDD artifact; every refusal anywhere carries one fix line, a command or an operator action; the pre-push chokepoint enforces the branch contract read from the project gitflow, the specs canon, ADR-cited law deletions and one secret registry over every pushed object, with one rewrite formula as its fix, and no CI job calls a model API except `eval.yml` (ADR 0217) — the security review is the reviewer's lens before each pull request.
 tags: [sdd, gate, hooks, enforcement, no-locks, privacy]
 sources:
   - .github/dependabot.yml
@@ -55,7 +55,7 @@ sources:
 - A law-deletion refusal's fix is `Operator action:` to reword its first listed commit to cite the accepted ADR ruling the deletion; a re-run names the next.
 - A specs-canon or denylist refusal carries one rewrite formula for every unpublished range, a root-reaching one included: `git -C <repo> reset --soft <oldest unpublished commit of the refused ref>`, remove what is listed, `git commit --amend`, push (a branch HEAD is not on is switched to first); a tag or a detached HEAD gets operator-action text; origin's history is never rewritten.
 - "Already published" is one rule, `unpublished` (the commits of a ref no `origin` ref holds), shared by births, the rewrite fix and every "unpushed" check.
-- The security review is the `dd-code-reviewer` security lens on the PR head, run by the main thread before each pull request; no workflow calls a model API. `secret-scan.yml` runs gitleaks on every PR to `develop` and `main`.
+- The security review is the `dd-code-reviewer` security lens on the PR head, run by the main thread before each pull request; no workflow calls a model API except `eval.yml`, the one exception (ADR 0217). `secret-scan.yml` runs gitleaks on every PR to `develop` and `main`.
 - `ci.yml` runs its matrix on pushes to `main`, `develop`, `feature/**` and `wt/**` — a job branch's push is the run its verdict names ([[worktrees]]); CI's `pr-source-guard` reads the gitflow of the base branch's committed constitution through the same reader and admits into the principal only the integration branch and `release-please--branches--<principal>`, into the integration branch only work branches and Dependabot update branches; the workflow's push triggers stay literal and the `ci-triggers-gitflow` guard pins them to the library's own gitflow plus `wt/**`. `.github/dependabot.yml` targets the integration branch, so dependency updates reach the principal with the next promote.
 - No pre-commit hook enforces the gitflow and no CI workflow is written into a consumer repo.
 
