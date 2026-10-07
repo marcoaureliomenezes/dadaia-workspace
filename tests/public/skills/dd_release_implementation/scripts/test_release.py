@@ -816,7 +816,6 @@ def test_new_stacks_when_no_bug_found_in_the_live_rc_is_unresolved(
     assert _run(script, "new", "0.5.0", "--specs", str(specs)).returncode == 0
 
 
-@pytest.mark.xfail(strict=True, raises=AssertionError, reason="rc-closes-with-an-open-bug")  # fmt: skip
 @pytest.mark.parametrize("status", ["open", "deferred"])
 def test_ship_refuses_while_a_bug_found_in_the_shipping_rc_is_unresolved(
     script: Path, tmp_path: Path, status: str

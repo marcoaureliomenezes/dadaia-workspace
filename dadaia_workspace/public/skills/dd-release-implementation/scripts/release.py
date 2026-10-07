@@ -22,7 +22,7 @@ from _release_new import new_release  # noqa: E402
 from _release_phase import SHIP_PR, set_phase  # noqa: E402
 from _release_schema import CODE, HISTO, SHA_RE, STATE, utc_now  # noqa: E402
 from _release_store import SCRIPT, Refusal, commit, live_release, window_start  # noqa: E402
-from _release_tree import check, drift, memory_errors, ship_findings  # noqa: E402
+from _release_tree import check, drift, memory_errors, refuse_open_bugs, ship_findings  # noqa: E402
 from _specs import choice, find_specs, refuse  # noqa: E402
 
 _HELP = {
@@ -114,6 +114,7 @@ def _ship(args: argparse.Namespace, specs: Path) -> int:
                              f"{SCRIPT} ship --sha {sha}"), SHIP_PR)  # fmt: skip
     if found := ship_findings(specs):
         raise Refusal(found[0]["message"], found[0]["fix"])
+    refuse_open_bugs(specs, live.release_id, live.release_dir)
     line = json.dumps({"id": live.release_id, "ts": ts, "disposition": "delivered",
                        "release": live.release_id, "reason": None, "entry": None,
                        "summary": None}) + "\n"  # fmt: skip

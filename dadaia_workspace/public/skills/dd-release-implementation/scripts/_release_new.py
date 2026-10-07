@@ -13,9 +13,9 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 sys.path.append(str(Path(__file__).resolve().parents[2] / "dd-bug-resolution" / "scripts"))
 
 from _ledger import records, replace  # noqa: E402
-from _release_schema import SEMVER_RE, STATE, candidate_dir, next_candidate, utc_now  # noqa: E402
+from _release_schema import SEMVER_RE, STATE, next_candidate, utc_now  # noqa: E402
 from _release_store import SCRIPT, Refusal, State, live_ids, read_state, validated  # noqa: E402
-from _release_tree import BUG_WINDOW, tree_findings  # noqa: E402
+from _release_tree import BUG_WINDOW, refuse_open_bugs, tree_findings  # noqa: E402
 
 SPEC_STUB = """\
 # SPEC — Release: {release_id}
@@ -89,7 +89,7 @@ def candidate_state(release_id: str, prior: State | None) -> State:
 def refuse_unfree(specs: Path, release_id: str) -> State | None:
     """`new`'s two legal states: no live release (birth — returns ``None``), and the live
     release IS *release_id* in phase CLOSURE, the stacked candidate the law requires
-    (returns the closed state to reopen), once no bug found in the closing rc is open or deferred.
+    (returns the closed state to reopen), once `bugs.py` finds no bug open in the closing rc.
     Anything else, a red tree, or a symlink, refuses."""
     if not SEMVER_RE.match(release_id):
         raise Refusal(
@@ -123,14 +123,7 @@ def refuse_unfree(specs: Path, release_id: str) -> State | None:
             "candidate is stacked only on a closed one",
             f"{SCRIPT} phase CLOSURE --sha $(git rev-parse --short HEAD)",
         )
-    rc = (candidate_dir(release_dir) or release_dir).name
-    for bug in records(specs / "bugs" / "BUGS.jsonl"):  # no rc closes with an open bug
-        placed = bug.get("found_in")
-        if bug.get("status") in ("open", "deferred") and isinstance(placed, dict) and (
-            placed.get("rc"), placed.get("release")
-        ) == (rc, release_id):  # fmt: skip
-            raise Refusal(f"{rc} of release {release_id} holds {bug.get('status')} bug {bug['id']}",
-                          f"Operator action: resolve {bug['id']} in {rc}'s bug batch")  # fmt: skip
+    refuse_open_bugs(specs, release_id, release_dir)
     return prior
 
 
