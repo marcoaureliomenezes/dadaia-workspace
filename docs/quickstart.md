@@ -79,7 +79,7 @@ clones every repo, installs the hook and makes the context ALIVE; `context bind`
 
 ## 3. The bind
 
-<!-- derived-from: context-management sha256:2d908837d9f6 -->
+<!-- derived-from: context-management sha256:e084ff04890d -->
 
 ```bash
 .dadaia/.venv/bin/dadaia context bind <your-repo>

@@ -46,7 +46,7 @@ memory atom under its content hash.
 
 <!-- derived-from: pypi-distribution sha256:41df64f3512e -->
 <!-- derived-from: workspace-init sha256:4f0ceaccc6c8 -->
-<!-- derived-from: context-management sha256:2d908837d9f6 -->
+<!-- derived-from: context-management sha256:e084ff04890d -->
 <!-- derived-from: workspace-doctor sha256:268ca27600e5 -->
 
 ```bash
