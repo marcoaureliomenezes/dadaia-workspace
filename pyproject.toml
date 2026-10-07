@@ -121,7 +121,6 @@ markers = [
     "e2e: full user journeys through the real CLI",
     "small: no process, no real git: 10 s",
     "medium: reaches a process or real git: 60 s",
-    "windows: runs on the Windows and macOS CI legs by name (windows-integration-coverage-gap)",
     "slow: tests over 1s or tests that start a server/subprocess",
     "tmp: temporary debugging tests excluded from default runs",
     "flaky: observed pass+fail on identical code; being diagnosed",
