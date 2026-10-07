@@ -12,6 +12,7 @@ from pathlib import Path
 
 import pytest
 
+from dadaia_workspace.core.cli_line import git_line, shell_line
 from tests.helpers.worktree_ws import JOB, TASK, approve, associate, commit, make_workspace
 from tests.helpers.worktree_ws import fixes as _fixes
 from tests.helpers.worktree_ws import git as _git
@@ -29,7 +30,7 @@ def test_new_makes_each_shape_on_its_branch_and_base(root: Path) -> None:
     _git(repo, "branch", "-f", "feature/0.5.0", ahead)  # the start point is the work branch
     for name in (JOB, "0.5.0-rc1/define", "0.5.0-rc1/reconcile", "backlog/an-idea", TASK):
         result = _run(root, "new", "r", name)
-        assert (result.returncode, result.stdout) == (0, f"[ok] {root}/worktrees/r/{name}\n")
+        assert (result.returncode, result.stdout) == (0, f"[ok] {root / 'worktrees/r' / name}\n")
     assert _git(repo, "rev-parse", "wt/0.5.0-rc1/define").strip() == ahead
     porcelain = _git(repo, "worktree", "list", "--porcelain").splitlines()
     assert sorted(x for x in porcelain if x.startswith("locked")) == [
@@ -45,12 +46,18 @@ def test_new_makes_each_shape_on_its_branch_and_base(root: Path) -> None:
 def test_an_old_grammar_or_foreign_name_refuses(root: Path, name: str) -> None:
     result = _run(root, "new", "r", name)
     assert result.returncode == 1 and not (root / "worktrees/r").exists()
-    assert [f.split(" ", 2)[2] for f in _fixes(result)] == [f"{_script()} list"]
+    assert [f.removeprefix("fix: ") for f in _fixes(result)] == [f"{_script()} list"]
 
 
 def _script() -> str:
-    return str(Path(__file__).resolve().parents[5] / "dadaia_workspace/public/skills"
-               "/dd-gitflow-default/scripts/worktree.py")  # fmt: skip
+    """The script prefix of a fix line, as the product's `script()` prints it."""
+    return shell_line(sys.executable, str(Path(__file__).resolve().parents[5] / "dadaia_workspace/public/skills"
+               "/dd-gitflow-default/scripts/worktree.py"))  # fmt: skip
+
+
+def _word(path: Path) -> str:
+    """*path* as one word of a fix line, as `cli_line.shell_line` spells it."""
+    return shell_line("x", str(path)).split(" ", 1)[1]
 
 
 def test_a_task_needs_its_job_branch_and_a_sixth_task_refuses(root: Path) -> None:
@@ -62,7 +69,9 @@ def test_a_task_needs_its_job_branch_and_a_sixth_task_refuses(root: Path) -> Non
         assert _run(root, "new", "r", f"{JOB}--T-{task}").returncode == 0
     sixth = _run(root, "new", "r", f"{JOB}--T-6")
     assert sixth.returncode == 1  # a commit-less task's exit is clean
-    assert _fixes(sixth)[0].endswith(f"worktree.py clean {root}/worktrees/r/{JOB}--T-1")
+    assert _fixes(sixth)[0].endswith(
+        f"worktree.py clean {_word(root / 'worktrees/r' / f'{JOB}--T-1')}"
+    )
     assert _run(root, "new", "r", "0.5.0-rc1/j2").returncode == 0  # the cap counts tasks only
 
 
@@ -72,12 +81,14 @@ def test_no_work_branch_refuses_with_a_fix_that_creates_it(root: Path) -> None:
     result = _run(root, "new", "r", JOB)
     assert result.returncode == 1
     (fix,) = _fixes(result)
-    assert fix == f"fix: git -C {repo} branch feature/0.1.0 dev"  # the flow's integration
+    assert (
+        fix == f"fix: {git_line(repo, 'branch', 'feature/0.1.0', 'dev')}"
+    )  # the flow's integration
 
 
 @pytest.mark.parametrize(
     ("spec", "code", "out"),
-    [("Approved", 0, "[ok] {root}/worktrees/a/0.5.0-rc1/j1"), ("Draft", 1, "")],
+    [("Approved", 0, "worktrees/a/0.5.0-rc1/j1"), ("Draft", 1, "")],
 )
 def test_an_associated_job_reads_the_main_repos_spec(
     root: Path, spec: str, code: int, out: str
@@ -85,7 +96,7 @@ def test_an_associated_job_reads_the_main_repos_spec(
     """AC11.0: `a` carries no specs; its job is gated by `r`'s SPEC on `r`'s work branch."""
     associate(root, spec)
     result = _run(root, "new", "a", JOB)
-    assert (result.returncode, result.stdout.strip()) == (code, out.format(root=root))
+    assert (result.returncode, result.stdout.strip()) == (code, f"[ok] {root / out}" if out else "")
     assert [f.split(" new ")[-1] for f in _fixes(result)] == (
         [] if code == 0 else ["r 0.5.0-rc1/define"]
     )
@@ -117,7 +128,7 @@ def test_list_reports_ours_with_ahead_and_dirty_and_a_native_one_as_foreign(root
     row = by_state["open"]  # dirty: never `ready`, no fix shown, its exit still the merge
     assert row["repo"] == "r" and row["name"] == JOB
     assert row["ahead"] == 1 and row["dirty"] is True and row["age_hours"] >= 0
-    assert row["fix"] == "" and row["exit"].endswith(f"merge {tree}")
+    assert row["fix"] == "" and row["exit"].endswith(f"merge {_word(tree)}")
     assert by_state["foreign"]["path"] == str(root / "native") and by_state["foreign"]["exit"] == ""
     assert by_state["unregistered"]["path"] == str(root / "worktrees/r/0.5.0-rc1/stray")
     assert not list((root / ".dadaia/states").glob("*worktree*"))
@@ -152,7 +163,7 @@ def test_a_hotfix_job_opens_with_no_rc_and_lands_on_the_work_branch(root: Path) 
     _bug_record(root, "open")
     repo, name = root / "repos/r", "hotfix/a-block-bug"
     opened = _run(root, "new", "r", name)
-    assert (opened.returncode, opened.stdout) == (0, f"[ok] {root}/worktrees/r/{name}\n")
+    assert (opened.returncode, opened.stdout) == (0, f"[ok] {root / 'worktrees/r' / name}\n")
     assert _git(repo, "rev-parse", "wt/" + name) == _git(repo, "rev-parse", "feature/0.5.0")
     assert f"locked dadaia:{name}" in _git(repo, "worktree", "list", "--porcelain").splitlines()
     tree = root / "worktrees/r" / name
