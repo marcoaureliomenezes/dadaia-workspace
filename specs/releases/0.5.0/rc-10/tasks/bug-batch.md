@@ -232,3 +232,12 @@ Paths are relative to the repo root; aliases as in `PLAN.md` (`f/`, `pub/`, `S/`
 |---|---|---|---|
 | JB.S15.T1 | AC4.4 | `tests/public/skills/dd_release_implementation/scripts/test_release__release_script.py` (`test_a_stale_balance_block_refuses_at_closure_and_passes_in_implementation`: the seeded log gains one `kind: memory` entry dated after the stamp `check` reads, and the assert reads again `shown.returncode == 0 and " warning " in line and "differs from its regeneration" in line`, as 99a7bebdf wrote it) | the test passes at HEAD with the clause restored; dropping the memory entry turns it red on `returncode` |
 | JB.S15.T2 | AC9.1 | `dadaia_workspace/public/skills/dd-gitflow-default/scripts/_worktree_freeze.py` (`_ID` reads every task id the job files use — `J<n>`, `JB`, `JR` — not only `J<n>`: review REJECTED 2b7ebd088 MEDIUM, reproduced by the reviewer on this job's range), its owner test file under `tests/public/skills/dd_gitflow_default/scripts/` (one RED row: a `JB.S1.T1` RED commit anchors the freeze) | bug `freeze-reads-only-numbered-job-ids`, registered by operator delegation ("Registra e corrige se o revisor reproduzir (Recommended)"); RED first. Sweep: `git grep -nE 'J\\d\+\\.S' -- '*.py'` prints nothing |
+
+## Stage JB.S16 — the v38 amendment (review REJECTED 2b7ebd088, HIGH 1)
+
+- Contract: the operator accepted the v38 amendment on 2026-10-07T14:46:00Z: "Vamos, eu aceito, autorizo, segue em frente ze buceta." (ADR 0222). A stdlib skill script cannot import `features/spec_context/sweep.py` (ADR 0150), so v38 admits a deleter in `public/skills/*/scripts/` keyed to the test pinning its delete, the way v37 admits the candidate-folder twins. The `_rmdir` row of 869d3cd82 loses its false birth star and stands under the amendment. Exit: the guard and its plants green; an adversary plant shows that a new package deleter and a skill-script row with no test file are still refused. ACs: AC9.1.
+
+| task | AC | `W:` | owner tests / RED |
+|---|---|---|---|
+| JB.S16.T1 | AC9.1 | `specs/ADRs/decisions.jsonl` (ADR 0222, the operator's words verbatim) | `tests/features/specs/test_doctor_adr.py` |
+| JB.S16.T2 | AC9.1 | `scripts/guards/slop.py` (v38's born rule admits a `public/skills/*/scripts/` key whose value is `parity:<an existing test file>`; the `_rmdir` row loses its `*`; the plants prove a package deleter row and a skill-script row without a test still refuse) | the guard run with its plants (`scripts/guards/run.py`) |
