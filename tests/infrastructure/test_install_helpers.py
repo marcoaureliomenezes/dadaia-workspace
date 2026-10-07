@@ -132,7 +132,6 @@ def test_privilege_derives_from_read_only_on_both_harnesses(
     assert f'sandbox_mode = "{sandbox}"' in toml
 
 
-@pytest.mark.xfail(strict=True, raises=AssertionError, reason=_BUG)
 def test_a_read_only_persona_gets_the_workspace_write_codex_sandbox(tmp_path: Path) -> None:
     """merge-gate-accepts-verdict-written-by-the-merger: the reviewer (read_only: true) runs
     ``verdict.py`` on Codex, so its sandbox is workspace-write (operator ruling 2026-10-07);

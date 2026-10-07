@@ -162,7 +162,6 @@ def _render_codex_agent_toml(
     *,
     reasoning_effort: str,
     description: str | None = None,
-    read_only: bool = False,
 ) -> str:
     """Serialize an agent as a TOML file for the Codex runtime.
 
@@ -170,9 +169,7 @@ def _render_codex_agent_toml(
     - ``name`` — basic string
     - ``description`` — basic string when available
     - ``model`` — basic string
-    - ``sandbox_mode`` — ``read-only`` when *read_only* (the persona's
-      ``read_only: true``, the same source the Claude render uses), else
-      ``workspace-write``
+    - ``sandbox_mode`` — always ``workspace-write``
     - ``model_reasoning_effort`` — *reasoning_effort*, as named by
       ``install_helpers.resolve_codex_agent_model`` (the one effort authority)
     - ``developer_instructions`` — triple-quoted multiline basic string
@@ -202,11 +199,10 @@ def _render_codex_agent_toml(
     ]
     if description:
         lines.append(f"description = {_toml_escape(description)}\n")
-    sandbox_mode = "read-only" if read_only else "workspace-write"
     lines.extend(
         [
             f"model = {_toml_escape(model)}\n",
-            f"sandbox_mode = {_toml_escape(sandbox_mode)}\n",
+            'sandbox_mode = "workspace-write"\n',
             f"model_reasoning_effort = {_toml_escape(reasoning_effort)}\n",
             f'developer_instructions = """\n{escaped}\n"""\n',
         ]
