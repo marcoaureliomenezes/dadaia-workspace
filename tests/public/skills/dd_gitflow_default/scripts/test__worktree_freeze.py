@@ -120,7 +120,10 @@ def test_a_first_row_test_edit_is_judged_though_the_last_row_is_clean() -> None:
     assert freeze.judge(rows, "base", None) == (T, "base")
 
 
-@pytest.mark.xfail(strict=True, raises=AssertionError, reason="freeze-reads-only-numbered-job-ids")
-def test_a_bug_batch_red_commit_anchors_the_freeze() -> None:
-    rows = [row("c1", "test(JB.S1.T1): red", edits=((T, (), 2),)), row("c2", "feat(JB.S2.T1): rm", edits=((T, ("x",), 0),))]
+@pytest.mark.parametrize("job", ["JB", "JR", "J12"])
+def test_a_bug_batch_red_commit_anchors_the_freeze(job: str) -> None:
+    rows = [
+        row("c1", f"test({job}.S1.T1): red", edits=((T, (), 2),)),
+        row("c2", f"feat({job}.S2.T1): rm", edits=((T, ("x",), 0),)),
+    ]
     assert freeze.judge(rows, "base", None) == (T, "c1")

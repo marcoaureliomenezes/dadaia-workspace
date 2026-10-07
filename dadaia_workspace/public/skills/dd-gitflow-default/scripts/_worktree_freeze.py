@@ -5,7 +5,7 @@ branch's `AGENTS.md` declares — no tree picks its own judge. Everything is rea
 `git log` over `<merge-base>..HEAD`, each commit diffed against its first parent, so it holds
 for any language.
 
-A range whose subject ids (`J<n>.S<m>.T<k>`) name stages but not stage 1 — the RED stage —
+A range whose subject ids (`J<n|B|R>.S<m>.T<k>`) name stages but not stage 1 — the RED stage —
 refuses. The anchor is the parent of the first commit not in it, else the range base. Past it a commit may only delete lines
 matching the repo's `tests-red:` pattern (the RED marker), and may only add test lines in a
 stage group that touches test paths alone (a new RED stage); a commit with no stage id is
@@ -20,7 +20,7 @@ from typing import NamedTuple
 from _worktree_git import git
 from _worktree_names import Refusal
 
-_ID = re.compile(r"\b(?P<stage>J\d+\.S(?P<n>\d+))\.T\d+\b")
+_ID = re.compile(r"\b(?P<stage>J[\dA-Z]+\.S(?P<n>\d+))\.T\d+\b")
 _HUNK = re.compile(r"^@@ -\d+(?:,(?P<old>\d+))? \+\d+(?:,(?P<new>\d+))? @@")
 _BINARY = re.compile(r"^Binary files (?P<a>.+) and (?P<b>.+) differ$")
 #: What a binary test file's change counts as: one removed line no `tests-red:` pattern matches.
