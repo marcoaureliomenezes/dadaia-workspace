@@ -39,7 +39,12 @@ from dadaia_workspace.core.models.spec_context import ContextState, SpecContextP
 from dadaia_workspace.core.platform import PLATFORM
 from dadaia_workspace.core.workspace_layout import Zone, ZoneClass
 from dadaia_workspace.features.spec_context import sweep
-from dadaia_workspace.features.spec_context.service import HookState, WorktreeRows, git_hooks_dir, hook_state
+from dadaia_workspace.features.spec_context.service import (
+    HookState,
+    WorktreeRows,
+    git_hooks_dir,
+    hook_state,
+)
 from dadaia_workspace.infrastructure.git_subprocess import GitSubprocessClient
 from dadaia_workspace.infrastructure.json_context_store import JsonContextStore
 from dadaia_workspace.infrastructure.json_harness_profile_store import JsonHarnessProfileStore
