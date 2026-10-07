@@ -94,7 +94,7 @@ a TTL expiry acts by zone class, an OUTPUT entry held, an EPHEMERAL one deleted.
 
 ## An agent reads AGENTS.md and uses it
 
-<!-- derived-from: agentic-entities sha256:f4c4b4b1eecc -->
+<!-- derived-from: agentic-entities sha256:f962e613358e -->
 <!-- derived-from: sdd-gate-v3 sha256:11e94d99c0d1 -->
 <!-- derived-from: release-lifecycle sha256:552f1da8e8b7 -->
 <!-- derived-from: bug-ledger sha256:c4e8fd6ee96c -->

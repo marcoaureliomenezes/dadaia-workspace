@@ -25,7 +25,7 @@ The one enumeration; every harness atom links here.
 | Behaviour | What it does | Lane |
 |---|---|---|
 | `root-whitelist` | blocks a file-tool write that would mint an entry the layout law judges slop — at the root, `.dadaia/`, a closed-canon zone, or the first level of `repos/` and `worktrees/` | pre-tool gate |
-| `venv-guard` | blocks the dadaia CLI (`dadaia`, `python -m dadaia_workspace`) run outside the workspace venv, naming the corrected command | pre-tool gate |
+| `venv-guard` | blocks the dadaia CLI (`dadaia`, `python -m dadaia_workspace`) run outside the workspace venv, judging every command of a Bash line (after `&&`, `;`, `|`, an env assignment or a shell keyword), naming the corrected command | pre-tool gate |
 | `sdd-gate` | classifies each write ADDITIVE / PROTECTED / MUTATING (PROTECTED holding a code floor with or without the install ledger), scope-judges MUTATING writes into a repo against the session's bind and sends every other write under `repos/<slug>/`, audits aside, to a worktree | pre-tool gate (+ post-tool session heartbeat where the harness has one) |
 | `context-memory-injection` | runs the session-start reaper (`dadaia doctor --fix --expired-only --quiet`) and injects the bound context's bootstrap through whichever session-start and prompt hooks the harness has | session start (+ prompt) |
 | `git-chokepoints` | pre-push allows only a work branch of the project gitflow, a job branch `wt/<M.m.p>-rc<N>/<job>`, a backlog branch `wt/backlog/<slug>`, or the bootstrap birth of its principal and integration branches, and refuses a non-canon `specs/` path or a denylisted secret in the pushed range | git hooks, identical for every harness |
