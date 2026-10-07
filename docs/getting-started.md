@@ -126,7 +126,7 @@ zone class, an OUTPUT entry held, an EPHEMERAL one deleted.
 
 <!-- derived-from: release-lifecycle sha256:e94a43f4bb88 -->
 <!-- derived-from: backlog-ledger sha256:44b145a6a3aa -->
-<!-- derived-from: bug-ledger sha256:1f1d4608155e -->
+<!-- derived-from: bug-ledger sha256:c4e8fd6ee96c -->
 
 A candidate is one closed-scope cycle inside the live release. Nothing drives it: the
 documents are the state, the ledger scripts move the records, and the job files and

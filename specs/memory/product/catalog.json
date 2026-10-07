@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-10-07T16:36:32Z",
+  "generated_at": "2026-10-07T16:36:53Z",
   "features": [
     {
       "rank": 1,
@@ -765,7 +765,7 @@
         "ledger",
         "governance"
       ],
-      "token_estimate": 1951,
+      "token_estimate": 2121,
       "depends_on": [
         "sdd-gate-v3",
         "workspace-doctor",

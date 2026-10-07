@@ -97,7 +97,7 @@ a TTL expiry acts by zone class, an OUTPUT entry held, an EPHEMERAL one deleted.
 <!-- derived-from: agentic-entities sha256:f4c4b4b1eecc -->
 <!-- derived-from: sdd-gate-v3 sha256:11e94d99c0d1 -->
 <!-- derived-from: release-lifecycle sha256:e94a43f4bb88 -->
-<!-- derived-from: bug-ledger sha256:1f1d4608155e -->
+<!-- derived-from: bug-ledger sha256:c4e8fd6ee96c -->
 <!-- derived-from: harness-claude-code sha256:bac4bed1d5e9 -->
 <!-- derived-from: harness-codex sha256:a0d4ae5884d5 -->
 <!-- derived-from: harness-kimi-code sha256:ac3c7be4e426 -->
