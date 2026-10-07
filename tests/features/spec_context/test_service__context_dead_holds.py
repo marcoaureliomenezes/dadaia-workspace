@@ -25,7 +25,6 @@ Size: MEDIUM — real git and bare origins in tmp_path (the question is a git qu
 from __future__ import annotations
 
 import re
-import shutil
 import subprocess
 import sys
 from collections.abc import Callable
@@ -50,6 +49,7 @@ from dadaia_workspace.features.spec_context.service import (
 )
 from dadaia_workspace.infrastructure.git_subprocess import GitSubprocessClient
 from dadaia_workspace.infrastructure.json_context_store import JsonContextStore
+from tests.fixtures.harness_env import retire_tree
 from tests.fixtures.stores import context_store, fake_venv
 from tests.helpers.privacy_fixtures import aws_key_shape
 
@@ -140,7 +140,7 @@ def _no_remote(repo: Path) -> None:
 
 
 def _url_less(repo: Path) -> None:
-    shutil.rmtree(repo)
+    retire_tree(repo, repo.parents[2])
     _git("init", str(repo), cwd=repo.parent)
 
 
@@ -187,7 +187,7 @@ def test_dead_refuses_an_unrecoverable_repo_anywhere_in_the_set_and_touches_noth
 
 
 def _unborn(repo: Path, *files: str) -> None:
-    shutil.rmtree(repo)
+    retire_tree(repo, repo.parents[2])
     _git("init", str(repo), cwd=repo.parent)
     _git("remote", "add", "origin", str(repo.parents[2] / "vanished.git"), cwd=repo)
     for name in files:
