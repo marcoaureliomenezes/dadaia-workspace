@@ -6,7 +6,7 @@ gitflow: {"principal": "main", "integration": "develop", "work": "feature/"}
 
 # Constitution — dadaia-workspace
 
-Permanent product law, stated **once**. Every rule already stated in `DADAIA.md` lives there
+Permanent product law, stated **once**. Every rule that has a home elsewhere lives there
 alone; this file carries only what no other file states.
 
 ## 1. Identity
