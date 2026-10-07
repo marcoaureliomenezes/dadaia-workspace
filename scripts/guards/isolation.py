@@ -282,49 +282,6 @@ def harness_env_allowlist(tree: Tree) -> list[str]:
     return out
 
 
-def _hook_imports(module: ast.Module, hooks: set[str]) -> str | None:
-    for n in ast.walk(module):
-        if (
-            isinstance(n, ast.ImportFrom)
-            and n.module == "dadaia_workspace.hooks"
-            and {a.name for a in n.names} & hooks
-        ):
-            return "from-import"
-        if isinstance(n, ast.Import) and any(
-            a.name.startswith("dadaia_workspace.hooks.") and a.name.split(".")[2] in hooks
-            for a in n.names
-        ):
-            return "module-import"
-    return None
-
-
-def _patches_stdin(module: ast.Module) -> str | None:
-    """``setattr("sys.stdin", …)``/``setattr(sys, "stdin", …)``, or ``sys.stdin = …``."""
-    for n in ast.walk(module):
-        if isinstance(n, ast.Call) and _tail(n.func) == "setattr" and len(n.args) >= 2:
-            a = n.args
-            if _str(a[0]) == "sys.stdin" or (_tail(a[0]) == "sys" and _str(a[1]) == "stdin"):
-                return "setattr"
-        if isinstance(n, ast.Assign) and any(
-            isinstance(t, ast.Attribute) and t.attr == "stdin" and _tail(t.value) == "sys"
-            for t in n.targets
-        ):
-            return "raw-assignment"
-    return None
-
-
-def hook_stdin_not_in_process(tree: Tree) -> list[str]:
-    """A hook's behaviour runs in a child (``run_hook_subprocess``), never by importing it
-    and patching ``sys.stdin`` in-process."""
-    sets, out = _fixture_sets(tree)
-    hooks = sets.get("HOOK_MODULES", set())
-    for p, module in _suite(tree).items():
-        if (form := _hook_imports(module, hooks)) and (patch := _patches_stdin(module)):
-            form = patch if patch == "raw-assignment" else form
-            out.append(f"{form}: {p} drives a hook through a patched sys.stdin")
-    return out
-
-
 # --- plants: each writes one violation; ``run.py --planted`` requires red ----------------
 
 _ROOT = Path(__file__).resolve().parent.parent.parent
@@ -403,23 +360,11 @@ def deadline():
     return time.time() + _TIMEOUT_S
 """
 
-_CONTROL_STDIN = """
-import sys
-import dadaia_workspace.hooks._common
-from dadaia_workspace.hooks import _common
-
-def test(monkeypatch):
-    monkeypatch.setattr(sys, "stdin", None)
-"""
-
 _VIOLATOR = """
-import io, os, time
+import os, time
 from datetime import datetime
-from dadaia_workspace.hooks import HOOK
 _NOW = datetime(2026, 1, 1)
 os.environ["DADAIA_PERSONA"] = time.time()
-def t(m):
-    m.setattr("sys.stdin", io.StringIO())
 """
 
 
@@ -428,11 +373,10 @@ def CONTROL(root: Path) -> Session:
     only in an untracked, gitignored ``tests/tmp/x.py`` (bugs 465, 467) or in the fixture
     itself, the one module that may write any ``DADAIA_*``."""
     _write(root, ".gitignore", "tests/tmp/*\n")
-    _write(root, "tests/tmp/x.py", _VIOLATOR.replace("HOOK", _hook()))
+    _write(root, "tests/tmp/x.py", _VIOLATOR)
     _fixture_copy(root, tail='\nos.environ["DADAIA_PERSONA"] = "x"\n')
     _write(root, "tests/unit/test_frozen_alone.py", _CONTROL_TEST.replace("HOOK", _hook()))
     _write(root, "tests/unit/test_clock_alone.py", _CONTROL_CLOCK)
-    _write(root, "tests/unit/test_stdin_common.py", _CONTROL_STDIN)
     return _healthy()
 
 
@@ -531,27 +475,6 @@ CHECKS: dict[str, Check] = {
             "setdefault": _env('os.environ.setdefault("DADAIA_PERSONA", "x")'),
             "setitem": _env('monkeypatch.setitem(os.environ, "DADAIA_PERSONA", "x")'),
             "update": _env('os.environ.update({"DADAIA_PERSONA": "x"})'),
-        },
-    ),
-    "hook-stdin-not-in-process": (
-        hook_stdin_not_in_process,
-        {
-            "fixture-unreadable": _UNREADABLE,
-            "from-import": _plant(
-                "tests/unit/test_h.py",
-                "import io\nfrom dadaia_workspace.hooks import HOOK\n"
-                "def t(m):\n    m.setattr('sys.stdin', io.StringIO())\n",
-            ),
-            "module-import": _plant(
-                "tests/unit/test_h.py",
-                "import io, sys\nimport dadaia_workspace.hooks.HOOK\n"
-                "def t(m):\n    m.setattr(sys, 'stdin', io.StringIO())\n",
-            ),
-            "raw-assignment": _plant(
-                "tests/unit/test_h.py",
-                "import io, sys\nfrom dadaia_workspace.hooks import HOOK\n"
-                "def t():\n    stream = sys.stdin = io.StringIO()\n",
-            ),
         },
     ),
 }

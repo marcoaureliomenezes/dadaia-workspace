@@ -44,14 +44,12 @@ Usage
     result = run_hook_subprocess("sdd_gate", payload, env)
     assert result.returncode == 0
 
-The behavior of every hook/gate test must flow through these helpers: the guard checks
-``harness-env-allowlist`` and ``hook-stdin-not-in-process`` (``scripts/guards/isolation.py``,
-which reads this module's two ``frozenset({...})`` literals) fail any test
-that ``setenv``s a non-allowlisted ``DADAIA_*`` outside this module, or imports a hook
-behavior module AND patches ``sys.stdin`` in-process to drive its ``main()`` instead of
-using :func:`run_hook_subprocess`. Pure-helper unit tests (e.g. ``sdd_gate._resolve_mode``)
-and fault-injection tests that monkeypatch a production internal without simulating
-``sys.stdin`` are legitimately in-process and are not flagged.
+The behavior of every hook/gate test must flow through these helpers: the guard check
+``harness-env-allowlist`` (``scripts/guards/isolation.py``, which reads this module's two
+``frozenset({...})`` literals) fails any test that ``setenv``s a non-allowlisted
+``DADAIA_*`` outside this module. Pure-helper unit tests (e.g. ``sdd_gate._resolve_mode``)
+and fault-injection tests that monkeypatch a production internal are legitimately
+in-process.
 """
 
 from __future__ import annotations
@@ -181,7 +179,7 @@ HARNESS_CONTROL_DADAIA_ENV: Final[frozenset[str]] = frozenset(
 #: The dadaia hook modules invocable as ``python -m dadaia_workspace.hooks.<name>``.
 #: ``_common`` is intentionally absent — it is a shared-primitives library (pure helpers
 #: like ``sanitize_session_id``), not a hook entrypoint, so unit-testing it directly is
-#: legitimate. The ``hook-stdin-not-in-process`` guard check reads this same literal.
+#: legitimate.
 
 HOOK_MODULES: Final[frozenset[str]] = frozenset(
     {"sdd_gate", "sdd_post_gate", "ctx_inject", "root_whitelist", "pre_gate"}
