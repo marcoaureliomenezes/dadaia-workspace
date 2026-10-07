@@ -1251,6 +1251,12 @@
       "agent": "dd-software-engineer",
       "kind": "note",
       "text": "rc-10 bug count, from the ledger (BUGS.jsonl records whose found_in is rc-10 of 0.5.0) and bugs.py status ('0 open bug(s)'): 51 found in rc-10, 51 resolved, 0 open: 7 CRITICAL, 19 HIGH, 19 MEDIUM, 6 LOW; every one resolved_release 0.5.0, so rc-10 closes with no open bug (ADR 0206)."
+    },
+    {
+      "ts": "2026-10-07T16:45:18Z",
+      "agent": "dd-software-engineer",
+      "kind": "note",
+      "text": "J9.S4.T2 first eval run — https://github.com/marcoaureliomenezes/dadaia-workspace/actions/runs/37629005413 ref feature/0.5.0 @ 25498eea7, workflow_dispatch, baseline 0.4.7, Claude Code 2.1.284 wall 2026-10-07T13:30:18Z → 13:53:46Z (23.5 min); 6 trials per side tokens: base in 5,922,829 / out 41,523; candidate in 9,739,065 / out 97,011 verdict: BLOCK. t1-cold-onboarding 3/3 vs 3/3 (readout); t2-block-list-bug 3/3 vs 0/3 (BLOCK: drop) cause (trajectory): candidate gate refuses direct writes under repos/demo/ (ADR 0105) and `worktree.py new` had no tree kind outside an rc → Stall. The fix is JB.S4.T1 (152f6cd2c, `hotfix/<bug-id>`, ADR 0206/0215), on the bug batch, not yet on feature at 25498eea7. next: rerun eval on feature/0.5.0 after the bug batch merges; a red there is a bug."
     }
   ]
 }
