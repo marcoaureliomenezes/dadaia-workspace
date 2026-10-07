@@ -278,3 +278,21 @@ def test_specs_init_writes_every_law_rendered(repo: Path) -> None:
         if marker in path.read_text(encoding="utf-8")
     ]
     assert raw == []
+
+
+@pytest.mark.xfail(strict=True, raises=AssertionError, reason="onboarding-writes-no-tests-line")
+def test_specs_init_declares_a_tests_line_in_a_law_that_lacks_one(repo: Path) -> None:
+    """onboarding-writes-no-tests-line: ADR 0216 — a pre-onboarding AGENTS.md is not left
+    with no `tests:` line, which refuses every worktree merge."""
+    (repo / "AGENTS.md").write_text("# ours\nverify: make test\n", encoding="utf-8")
+
+    result = _runner.invoke(app, ["specs", "init", "--context", "c"])
+
+    assert result.exit_code == 0, result.output
+    text = (repo / "AGENTS.md").read_text(encoding="utf-8")
+    assert text.startswith("# ours\nverify: make test\n")
+    values = [
+        ln.removeprefix("tests:").strip() for ln in text.splitlines() if ln.startswith("tests:")
+    ]
+    assert len(values) == 1
+    assert values[0] != ""

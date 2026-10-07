@@ -108,3 +108,88 @@ def test_repo_law_heading_carries_the_project_name(tmp_path: Path, public: Path)
     canon.scaffold_repo_law(repo, project_name="acme", public_dir=public)
 
     assert (repo / "AGENTS.md").read_text(encoding="utf-8") == "# acme — Repo Rules\n"
+
+
+_TESTS_LINE = "tests: tests/** src/**/test_*.py"
+
+
+def _declare(repo: Path, public: Path) -> list[Path]:
+    declare = getattr(canon, "declare_tests_line", None)
+    assert callable(declare), "canon.declare_tests_line is the one declaring function"
+    return declare(repo, public_dir=public)
+
+
+@pytest.fixture
+def declaring_public(public: Path) -> Path:
+    (public / "templates" / "repo-AGENTS.md").write_text(
+        f"# repo law\n\n{_TESTS_LINE}\n", encoding="utf-8"
+    )
+    return public
+
+
+@pytest.mark.xfail(strict=True, raises=AssertionError, reason="onboarding-writes-no-tests-line")
+def test_a_law_without_a_tests_line_gains_the_templates_line_appended(
+    tmp_path: Path, declaring_public: Path
+) -> None:
+    """onboarding-writes-no-tests-line: ADR 0216 — onboarding declares the freeze."""
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    (repo / "AGENTS.md").write_text("# mine\nverify: make test\n", encoding="utf-8")
+
+    assert _declare(repo, declaring_public) == [repo / "AGENTS.md"]
+
+    text = (repo / "AGENTS.md").read_text(encoding="utf-8")
+    assert text.startswith("# mine\nverify: make test\n")
+    assert text.splitlines()[-1] == _TESTS_LINE
+
+
+@pytest.mark.xfail(strict=True, raises=AssertionError, reason="onboarding-writes-no-tests-line")
+@pytest.mark.parametrize("line", ["tests:", "tests: custom/**"])
+def test_a_present_tests_line_is_left_alone(
+    tmp_path: Path, declaring_public: Path, line: str
+) -> None:
+    """onboarding-writes-no-tests-line: an operator's line, empty or not, is never rewritten."""
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    (repo / "AGENTS.md").write_text(f"# mine\n\n{line}\n", encoding="utf-8")
+
+    assert _declare(repo, declaring_public) == []
+    assert (repo / "AGENTS.md").read_text(encoding="utf-8") == f"# mine\n\n{line}\n"
+
+
+@pytest.mark.xfail(strict=True, raises=AssertionError, reason="onboarding-writes-no-tests-line")
+def test_the_shipped_template_declares_a_non_empty_tests_line() -> None:
+    """onboarding-writes-no-tests-line: the one default lives in the shipped template."""
+    template = canon.default_public_dir() / "templates" / "repo-AGENTS.md"
+    values = [
+        ln.removeprefix("tests:").strip()
+        for ln in template.read_text(encoding="utf-8").splitlines()
+        if ln.startswith("tests:")
+    ]
+    assert len(values) == 1
+    assert values[0] != ""
+
+
+@pytest.mark.xfail(strict=True, raises=AssertionError, reason="onboarding-writes-no-tests-line")
+def test_an_absent_law_gets_nothing_from_the_declaration(
+    tmp_path: Path, declaring_public: Path
+) -> None:
+    """onboarding-writes-no-tests-line: scaffold_repo_law installs the template; declaring adds no file."""
+    repo = tmp_path / "repo"
+    repo.mkdir()
+
+    assert _declare(repo, declaring_public) == []
+    assert list(repo.iterdir()) == []
+
+
+@pytest.mark.xfail(strict=True, raises=AssertionError, reason="onboarding-writes-no-tests-line")
+def test_a_symlinked_law_is_never_declared_through(tmp_path: Path, declaring_public: Path) -> None:
+    """onboarding-writes-no-tests-line: CWE-59 — the append never follows a symlink."""
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    target = tmp_path / "elsewhere.md"
+    target.write_text("real\n", encoding="utf-8")
+    (repo / "AGENTS.md").symlink_to(target)
+
+    assert _declare(repo, declaring_public) == []
+    assert target.read_text(encoding="utf-8") == "real\n"
