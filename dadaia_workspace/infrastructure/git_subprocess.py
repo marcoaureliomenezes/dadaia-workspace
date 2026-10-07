@@ -80,7 +80,7 @@ class GitSubprocessClient:
         # local-path / file:// clones are still allowed.
         if url.startswith("ext::") or url.startswith("-"):
             raise GitCloneError(f"refusing to clone from unsafe URL: {url!r}", url)
-        result = _run(["git", "clone", url, str(dest)])
+        result = _run(["git", "clone", "-c", "core.longpaths=true", url, str(dest)])
         if result.returncode != 0:
             raise GitCloneError(f"git clone failed for {url!r}: {result.stderr.strip()}", url)
 

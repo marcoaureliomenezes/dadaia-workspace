@@ -117,7 +117,6 @@ def test_commit_paths_ignores_operator_pre_staged_unrelated_content(tmp_path: Pa
     assert "A  operator-staged.txt" in _git(repo, "status", "--porcelain").stdout
 
 
-@pytest.mark.xfail(strict=True, raises=AssertionError, reason="context-clone-fails-past-windows-max-path")  # fmt: skip
 def test_clone_writes_longpaths_into_the_clone_config(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
