@@ -43,7 +43,7 @@ moves only at an operator-approved deploy.
 
 <!-- derived-from: release-lifecycle sha256:e94a43f4bb88 -->
 <!-- derived-from: bug-ledger sha256:1f1d4608155e -->
-<!-- derived-from: audits-canon sha256:361bf3cb94c9 -->
+<!-- derived-from: audits-canon sha256:611e3746cfd5 -->
 
 Every demand takes one of two arms. **Arm A**, a feature, leaves through a candidate:
 the picked backlog and bug set, the as-is review (one As-is verdict — DELETE, REBUILD,
@@ -74,7 +74,7 @@ gate — a refusal whose fix is itself refused (a Stall) cannot ship.
 <!-- derived-from: context-management sha256:e084ff04890d -->
 <!-- derived-from: workspace-doctor sha256:84a9bec9fec9 -->
 <!-- derived-from: release-lifecycle sha256:e94a43f4bb88 -->
-<!-- derived-from: audits-canon sha256:361bf3cb94c9 -->
+<!-- derived-from: audits-canon sha256:611e3746cfd5 -->
 
 *Memory* is current product truth: the atoms under `specs/memory/product/**`, plus
 `ARCHITECTURE.md` (its `## Tech Stack` section included) and `QUALITY.md`, whose
@@ -107,7 +107,7 @@ every histo: `delivered resolved superseded deferred rejected to-bug`.
 
 ## Audits
 
-<!-- derived-from: audits-canon sha256:361bf3cb94c9 -->
+<!-- derived-from: audits-canon sha256:611e3746cfd5 -->
 
 An *audit* is the only full-tree inspection lane, every other quality boundary being
 diff-scoped: a committed folder `specs/audits/<YYYYMMDD>-<slug>/` holding `AUDIT.md` —

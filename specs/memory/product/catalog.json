@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-10-07T16:36:11Z",
+  "generated_at": "2026-10-07T16:36:26Z",
   "features": [
     {
       "rank": 1,
@@ -703,7 +703,7 @@
         "decisions",
         "governance"
       ],
-      "token_estimate": 1361,
+      "token_estimate": 1380,
       "depends_on": [
         "agent-orchestration",
         "sdd-gate-v3",
