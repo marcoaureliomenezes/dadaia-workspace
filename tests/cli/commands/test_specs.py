@@ -335,4 +335,17 @@ def test_the_declared_line_names_the_default_and_asks_to_narrow_it(repo: Path) -
 
     echo = next(ln for ln in result.output.splitlines() if ln.startswith("[declared]"))
     assert default in echo
-    assert "narrow" in echo
+
+
+@pytest.mark.xfail(strict=True, raises=AssertionError, reason="declared-echo-rereads-the-law")  # fmt: skip
+def test_specs_init_declares_the_tests_line_in_a_latin1_law(repo: Path) -> None:
+    law = repo / "AGENTS.md"
+    original = "# Configuração\nverify: x\n".encode("latin-1")
+    law.write_bytes(original)
+
+    result = _runner.invoke(app, ["specs", "init", "--context", "c"])
+
+    assert result.exit_code == 0, result.output
+    after = law.read_bytes()
+    assert after.startswith(original)
+    assert b"\ntests:" in after

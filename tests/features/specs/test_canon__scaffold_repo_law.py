@@ -308,3 +308,25 @@ def test_the_shipped_default_freezes_no_source_that_merely_ends_in_test(tmp_path
     run("add", ".")
 
     assert run("ls-files", "--", *(f":(glob){g}" for g in globs)).split() == []
+
+
+@pytest.mark.xfail(strict=True, raises=AssertionError, reason="default-tests-globs-under-match-dotnet-android")  # fmt: skip
+def test_the_shipped_default_freezes_dotnet_and_android_test_trees(tmp_path: Path) -> None:
+    template = canon.default_public_dir() / "templates" / "repo-AGENTS.md"
+    globs = next(
+        ln.removeprefix("tests:").split()
+        for ln in template.read_text(encoding="utf-8").splitlines()
+        if ln.startswith("tests:")
+    )
+    paths = ["Foo.Tests/FooTest.cs", "app/src/androidTest/a/FooTest.kt"]
+    for rel in paths:
+        (tmp_path / rel).parent.mkdir(parents=True, exist_ok=True)
+        (tmp_path / rel).write_text("x\n", encoding="utf-8")
+    run = lambda *a: subprocess.run(  # noqa: E731
+        ["git", "-c", "user.name=t", "-c", "user.email=t@t.invalid", *a],
+        cwd=tmp_path, check=True, capture_output=True, text=True,
+    ).stdout  # fmt: skip
+    run("init", "-q")
+    run("add", ".")
+
+    assert sorted(run("ls-files", "--", *(f":(glob){g}" for g in globs)).split()) == sorted(paths)

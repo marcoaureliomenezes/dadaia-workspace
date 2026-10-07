@@ -673,15 +673,28 @@ def _law_end(tmp_path: Path, law: bytes) -> Any:
     return end
 
 
-def test_a_tests_line_after_a_bom_is_declared_when_git_output_decodes_as_cp1252(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+@pytest.mark.xfail(strict=True, raises=AssertionError, reason="skill-git-output-decodes-with-the-locale")  # fmt: skip
+@pytest.mark.parametrize("codepage", ["cp1251", "cp932"])
+def test_a_tests_line_after_a_bom_is_declared_whatever_codepage_text_decoding_defaults_to(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, codepage: str
 ) -> None:
-    """Seam assumed: `_declared` reads `git show` through the module's `git`, which decodes with
-    the locale; a cp1252 decode turns the 3 BOM bytes into 3 characters."""
+    """Real git; only the process boundary is wrapped: a `text=True` call naming no encoding
+    decodes with the forced codepage, as on a machine whose locale is that codepage."""
     end = _law_end(tmp_path, b"\xef\xbb\xbftests: x/**\n")
-    monkeypatch.setattr(end, "git", lambda *a, **k: b"\xef\xbb\xbftests: x/**\n".decode("cp1252"))
+    real_run = subprocess.run
 
-    assert end._declared(tmp_path, "work", "tests:") == "x/**"
+    def run_in_locale(*args: Any, **kwargs: Any) -> Any:
+        if kwargs.get("text") and not kwargs.get("encoding"):
+            kwargs = {**kwargs, "encoding": codepage}
+        return real_run(*args, **kwargs)
+
+    monkeypatch.setattr(subprocess, "run", run_in_locale)
+    try:
+        declared: object = end._declared(tmp_path, "work", "tests:")
+    except UnicodeDecodeError as exc:
+        declared = type(exc).__name__
+
+    assert declared == "x/**"
 
 
 @pytest.mark.parametrize(
