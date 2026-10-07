@@ -18,7 +18,6 @@ import json
 import os
 import shutil
 import subprocess
-import sys
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -31,7 +30,8 @@ from dadaia_workspace.infrastructure.runtime_transforms.hook_wrappers import (
     hook_documents,
     hook_wrapper_contents,
 )
-from tests.fixtures.harness_env import suite_env
+from tests.fixtures.harness_env import git_bash, suite_env
+from tests.fixtures.stores import fake_venv, own_venv_python
 
 pytestmark = pytest.mark.slow
 
@@ -42,8 +42,7 @@ _CLAUDE = {"venv": "deny", "new-root": "deny", "protected": "deny", "scope": "al
 
 @pytest.fixture
 def ws(tmp_path: Path) -> Path:
-    (tmp_path / ".dadaia" / ".venv" / "bin").mkdir(parents=True)
-    (tmp_path / ".dadaia" / ".venv" / "bin" / "python").symlink_to(sys.executable)
+    fake_venv(tmp_path)
     (tmp_path / ".dadaia" / "states").mkdir()
     (tmp_path / ".dadaia" / "states" / "spec_contexts.json").write_text(
         '{"schema_version": "2", "contexts": [{"name": "demo", "state": "alive", "repo_slug": "demo"}]}'
@@ -63,12 +62,12 @@ def _run(ws: Path, harness: str, case: str, **env_extra: str) -> subprocess.Comp
     payload = fixture.read_text().replace("{ws}", str(ws))
     payload = payload.replace("worktrees/demo/0.5.0-rc1/j1/", "repos/demo/") if repos else payload
     if harness == "claude":
-        argv = [str(ws / ".dadaia/.venv/bin/python"), "-B", "-m", "dadaia_workspace.hooks.pre_gate"]
+        argv = [str(own_venv_python(ws)), "-B", "-m", "dadaia_workspace.hooks.pre_gate"]
     else:
         name = "dadaia-kimi-pre-gate.sh" if harness == "kimi-code" else f"{harness}-pre-gate"
         body = hook_wrapper_contents(HARNESS_RECORDS[harness])[name]
         (ws / ".dadaia" / "hooks" / name).write_text(body)
-        argv = ["sh", str(ws / ".dadaia" / "hooks" / name)]
+        argv = [git_bash(), str(ws / ".dadaia" / "hooks" / name)]
     env = {
         **suite_env(os.environ, Path.home()),
         "PATH": os.environ["PATH"],
@@ -183,7 +182,7 @@ def test_ac1_2_every_ctx_inject_wrapper_answers_on_stdout(ws: Path, harness: str
         shutil.rmtree(ws / MARKER_DIR, ignore_errors=True)  # each wrapper starts fresh
         for _ in range(2 if vendor else 1):
             out = subprocess.run(
-                ["sh", str(ws / ".dadaia" / "hooks" / name)],
+                [git_bash(), str(ws / ".dadaia" / "hooks" / name)],
                 input="{}", capture_output=True, text=True, cwd=ws, env=env, timeout=60,
             ).stdout  # fmt: skip
             assert "[alpha]" in (json.loads(out)[vendor] if vendor else out), (name, out)
