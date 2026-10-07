@@ -40,7 +40,8 @@ V32_COMMENTS, V32_DOCSTRINGS, V33_ORPHANS, IGNORE_EDGES = 109, 215, 31, 2
 
 # v37: the candidate-folder pair (ADR 0150): the stdlib scripts cannot import the package, so
 # each side keeps its twin and one test pins them equal. v38: each deleter outside sweep,
-# keyed to the test pinning its delete. v39: a doctor code with no fix-clears plant.
+# keyed to the test pinning its delete (a stdlib skill script cannot import the sweep, so its
+# row is unstarred when its value is parity:<test>). v39: a doctor code with no fix-clears plant.
 ALLOWANCES = """
 v37* core/gitflow.py:candidate_dir parity:tests/public/skills/dd_release_implementation/scripts/test_release__release_script.py
 v37* core/gitflow.py:candidate_number parity:tests/public/skills/dd_release_implementation/scripts/test_release__release_script.py
@@ -60,7 +61,7 @@ v38* infrastructure/projection.py:_clear parity:tests/infrastructure/test_public
 v38* infrastructure/public_assets.py:_prune_empty_dirs parity:tests/infrastructure/test_public_assets__install_ledger_reconciliation.py
 v38* infrastructure/public_assets.py:_reconcile_install_ledger parity:tests/infrastructure/test_public_assets__install_ledger_reconciliation.py
 v38* infrastructure/public_assets.py:stage parity:tests/infrastructure/test_public_assets__staged_assets_have_consumers.py
-v38* public/skills/dd-gitflow-default/scripts/_worktree_end.py:_rmdir parity:tests/public/skills/dd_gitflow_default/scripts/test__worktree_end__removal.py
+v38 public/skills/dd-gitflow-default/scripts/_worktree_end.py:_rmdir parity:tests/public/skills/dd_gitflow_default/scripts/test__worktree_end__removal.py
 v38* public/skills/dd-release-implementation/scripts/_release_new.py:new_release parity:tests/public/skills/dd_release_implementation/scripts/test_release.py
 v39* ONBOARDING parity:tests/features/workspace/test_onboarding__onboarding_steps_property.py
 v39* WS-INVARIANT parity:tests/features/spec_context/test_doctor__unfixable_findings_carry_their_own_fix.py
@@ -112,6 +113,10 @@ def _table(text: str) -> list[list[str]]:
     return [row.split() for row in body.splitlines() if row]
 
 
+def _skill_script(key: str) -> bool:
+    return key.startswith("public/skills/") and "/scripts/" in key
+
+
 def _allowance(tree: Tree, hits: dict[str, str], check: str, also: str = "") -> list[str]:
     """*hits* (key -> its sub-rule) against the tree's allowance rows of *check*."""
     rows = [r for r in _table(tree.read(SELF)) if r[0].rstrip("*") == check]
@@ -126,6 +131,11 @@ def _allowance(tree: Tree, hits: dict[str, str], check: str, also: str = "") -> 
         elif value.startswith("parity:") and not (tree.root / value[7:]).is_file():
             out.append(f"no-test-file: {key} -> {value}")
     born = {key for check_, key, _ in rows if check_.endswith("*")}
+    skill = {k: v for k, v in allow.items() if check == "v38" and _skill_script(k)}
+    out += [
+        f"skill-row-no-test: {k} -> {v!r}" for k, v in sorted(skill.items()) if v[:7] != "parity:"
+    ]
+    born |= skill.keys()
     return out + [f"absent-at-birth: {k} (only shrinks)" for k in sorted(allow.keys() - born)]
 
 
@@ -470,11 +480,11 @@ def CONTROL(root: Path) -> Session:
                 f"{PKG}/{rel}",
                 f"{sym} = compile('x')\n" if sym.isupper() else f"def {sym}(p):\n    return p\n",
             )
-        if check == "v38*":
+        if check.rstrip("*") == "v38":
             _write(root, f"{PKG}/{rel}", f"def {sym}(p, q):\n    {_DELETERS[i % 6]}\n")
         if value.startswith("parity:"):
             _write(root, value[7:], "")
-    _edit_row(root, "v38", lambda r: f"{r[0]} {r[1]} zz-open-bug", -1)
+    _edit_row(root, "v38", lambda r: f"{r[0]} {r[1]} zz-open-bug", -2)
     _edit_row(root, "v39", lambda r: f"{r[0]} {r[1]} report-only", -1)
     _write(
         root,
@@ -547,6 +557,11 @@ def _rows(check: str, bad: str) -> dict[str, Plant]:
     return {rule: bind(f) for rule, f in rules.items()}
 
 
+def _born_package_row(root: Path) -> None:
+    _write(root, f"{PKG}/zz/tidy.py", "def tidy(p):\n    p.unlink()\n")
+    _edit_row(root, "v38", lambda r: f"{' '.join(r)}\nv38 zz/tidy.py:tidy {r[2]}")
+
+
 def _first(constant: bool) -> str:
     """The first v37 key's symbol of the real table that is (or is not) a constant."""
     syms = [r[1].split(":")[1] for r in _table((ROOT / SELF).read_text("utf-8")) if r[0] == "v37*"]
@@ -610,7 +625,20 @@ _PLANTS: dict[str, dict[str, Plant]] = {
         "constant-twin": _add(_TWIN, lambda: f"{_first(True)}: object = compile('x')\n"),
         **_rows("v37", "report-only"),
     },
-    "v38": _rows("v38", "zz-shut"),
+    "v38": {
+        **_rows("v38", "zz-shut"),
+        "absent-at-birth": _plant(_born_package_row),
+        "skill-row-no-test": _edit(
+            SELF,
+            "_worktree_end.py:_rmdir parity:tests/public/skills/dd_gitflow_default/scripts/test__worktree_end__removal.py",
+            "_worktree_end.py:_rmdir zz-open-bug",
+        ),
+        "no-test-file": _edit(
+            SELF,
+            "_worktree_end.py:_rmdir parity:tests/public",
+            "_worktree_end.py:_rmdir parity:tests/zz/public",
+        ),
+    },
     "v39": {
         "uncovered": _doctor(["ZZ-NEW"], []),
         "undeclared-code": _doctor([], ["ZZ-GHOST"]),
