@@ -13,10 +13,13 @@ the price of the previous fix.
 
 ## Measuring the ledger
 
-<!-- derived-from: QUALITY sha256:f5dd4434275d -->
+<!-- derived-from: QUALITY sha256:607b41a3fe67 -->
 
 
-The numbers are never copied into a page; the ledger's own verbs measure them.
+The numbers are never copied into a page; the ledger's own verbs measure them. A
+candidate closes only with no open bug, and the balance (`bugs.py balance`) reads a
+defective-fix rate per candidate and a Laplace trend: `diverging` means the ledger grows
+faster than it settles.
 
 ```bash
 python3 .agents/skills/dd-bug-resolution/scripts/bugs.py stats
@@ -45,7 +48,7 @@ owned it.
 
 ## Lesson 2 — a per-measurement exclusion breeds the next measurement's bug
 
-<!-- derived-from: QUALITY sha256:f5dd4434275d -->
+<!-- derived-from: QUALITY sha256:607b41a3fe67 -->
 
 When each measurement walks the tree itself and is fixed by its own special-case
 exclusion, the next measurement counts the same stray files. The structure that ends
@@ -56,7 +59,7 @@ to remember to extend.
 
 ## Lesson 3 — a derived cache breeds a bug per environment that derives it
 
-<!-- derived-from: QUALITY sha256:f5dd4434275d -->
+<!-- derived-from: QUALITY sha256:607b41a3fe67 -->
 
 A record that caches a fact git already knows is wrong in every environment that
 derives it differently — a shallow checkout first among them. The structure that ends
@@ -65,7 +68,7 @@ history is that line's change log. No CI job fetches history for a bug record's 
 
 ## The standing order the lessons produced
 
-<!-- derived-from: QUALITY sha256:f5dd4434275d -->
+<!-- derived-from: QUALITY sha256:607b41a3fe67 -->
 <!-- derived-from: bug-ledger sha256:c4e8fd6ee96c -->
 
 The workspace is in a permanent state of architecture review, oriented by its bug
@@ -83,6 +86,8 @@ history:
 - Let ratchets refuse growth. Private-symbol imports in tests (P-23) and the slop
   counts are pinned at their measured values and move downward only.
 - Keep one home per definition (V37).
+- Never waive an eval verdict. A BLOCK is a bug to register and fix at its cause, then the
+  eval reruns; a missing tree or an unbuilt half of an ADR is such a cause.
 
 Next: [the bug loop](bug-loop.md) — register, RED, fix, resolve, in commands. Or start
 at the [quickstart](quickstart.md).
