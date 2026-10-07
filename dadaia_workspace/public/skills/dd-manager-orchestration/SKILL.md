@@ -22,7 +22,7 @@ description: >
 4. Reports land where the root `AGENTS.md` map §4 says; every report
    feeding another agent gets a handoff under `.dadaia/handoff/<context>/`.
 5. Opening, dispatching into and merging worktrees: `worktrees/AGENTS.md`.
-6. The unit of dispatch is a job or a task, never a smaller edit: sub-agents work one stage's tasks in parallel, one per task worktree (`worktrees/AGENTS.md` §1); an edit inside an open job is its driver's own and lands as one of its tasks; each job's `kind: merge` entry counts its `dispatches`.
+6. The task is the unit of dispatch (ADR 0190), never a job: sub-agents work one stage's tasks in parallel, one per task worktree (`worktrees/AGENTS.md` §1); an edit inside an open job is its driver's own and lands as one of its tasks; each job's `kind: merge` entry counts its `dispatches`.
 7. The review/QA sequence holds by discipline (main thread, implementer, reviewer
    each uphold their half); git chokepoints are the only mechanical backstop.
 
