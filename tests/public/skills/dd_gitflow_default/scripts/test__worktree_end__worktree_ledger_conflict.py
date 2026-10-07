@@ -11,6 +11,7 @@ import shlex
 import subprocess
 from pathlib import Path
 
+from dadaia_workspace.core.cli_line import git_line
 from tests.helpers.worktree_ws import commit, fixes, git, make_workspace, run
 
 
@@ -24,9 +25,7 @@ def test_in_place_ledger_change_refuses_at_rebase(tmp_path: Path) -> None:
     commit(tree, ledger, one + two.replace("proposed", "accepted"))
     commit(repo, ledger, one + two + '{"id": "3", "status": "proposed"}\n')
     (fix,) = fixes(run(root, "merge", str(tree.relative_to(root))))
-    assert shlex.split(fix.removeprefix("fix: ")) == [
-        *("git", "-C", str(tree), "rebase", "feature/0.5.0")
-    ]
+    assert fix == f"fix: {git_line(tree, 'rebase', 'feature/0.5.0')}"
     env = {"HOME": str(root), "PATH": "/usr/bin:/bin", "GIT_CONFIG_NOSYSTEM": "1"}
     rebase = subprocess.run(shlex.split(fix.removeprefix("fix: ")), env=env, capture_output=True)
     assert rebase.returncode == 1
