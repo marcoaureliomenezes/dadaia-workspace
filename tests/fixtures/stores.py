@@ -68,3 +68,15 @@ def own_venv_python(root: Path) -> Path:
     return (
         root / ".dadaia" / ".venv" / PLATFORM.venv_scripts_dir / f"python{PLATFORM.venv_exe_suffix}"
     )
+
+
+def fake_venv(root: Path) -> Path:
+    """`root/.dadaia/.venv` with a `python` that runs: the interpreter copied (no symlink: Windows
+    needs a privilege for one) under its real name, `python` plus `PLATFORM`'s exe suffix, in
+    `PLATFORM`'s scripts dir, and a `pyvenv.cfg` naming its home. Returns that `python`."""
+    python = own_venv_python(root)
+    python.parent.mkdir(parents=True, exist_ok=True)
+    real = Path(sys.executable).resolve()
+    shutil.copy2(real, python)
+    (root / ".dadaia" / ".venv" / "pyvenv.cfg").write_text(f"home = {real.parent}\n")
+    return python
