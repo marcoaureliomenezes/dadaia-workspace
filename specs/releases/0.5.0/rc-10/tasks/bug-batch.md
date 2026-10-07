@@ -257,3 +257,11 @@ Paths are relative to the repo root; aliases as in `PLAN.md` (`f/`, `pub/`, `S/`
 | task | AC | `W:` | owner tests / RED |
 |---|---|---|---|
 | JB.S18.T1 | AC9.1 | `specs/ADRs/decisions.jsonl` (0220 and 0221 inserted before 0222, each line byte-equal to `wt/0.5.0-rc10/reconcile` and `wt/0.5.0-rc10/job10`) | `tests/features/specs/test_doctor_adr.py`, `release.py check`, doctor LEDGER-ADR-SCHEMA |
+
+## Stage JB.S19 — one task-id grammar (review REJECTED 217bc3a70, HIGH)
+
+- Contract: `_bugs_check.py` reads `caused_by` task ids as `J(?:\d+|R)\.S\d+\.T\d+`, so a record naming a bug-batch task (`JB.S4.T2`) fails `bugs.py check` with "caused_by names no record". The freeze's `_ID` (JB.S15.T2) reads `J[\dA-Z]+`. The two stdlib skills cannot import each other (ADR 0150), so each keeps its twin and one parity test pins them equal, as v37 does. The bug `bugs-check-reads-no-jb-task-ids` is registered by operator delegation (the reviewer reproduced it); RED first. Prior chain on this pattern: 0730b713c, 7f503046c (revert), 121ae02b2. ACs: AC9.1.
+
+| task | AC | `W:` | owner tests / RED |
+|---|---|---|---|
+| JB.S19.T1 | AC9.1 | `dadaia_workspace/public/skills/dd-bug-resolution/scripts/_bugs_check.py` (the task-id pattern reads `J[\dA-Z]+`), the owner test file of `_bugs_check` (a RED row: a `caused_by: JB.S4.T2` record checks clean) and one parity row pinning `_bugs_check`'s pattern equal to `_worktree_freeze._ID`'s id part | the `_bugs_check` owner test; sweep `git grep -nE 'J\(\?:\\\\d\+\|R\)' -- '*.py'` prints nothing |
