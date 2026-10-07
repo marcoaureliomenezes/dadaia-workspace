@@ -10,7 +10,7 @@ candidates.
 |---|---|---|
 | Task | `WT merge <task path>`: the repo's `verify-task:` line | the task's fast-forward onto its job branch |
 | Stage | `WT stage <job path>`: no task open, the `verify-stage:` line | the next stage |
-| Job | `dd-code-reviewer` `APPROVED` carrying the job's green CI-matrix run as `ci_run`; the `verify:` line at `WT merge` | the job's merge |
+| Job | `dd-code-reviewer` `APPROVED` naming the job's HEAD; the `verify:` line at `WT merge` | the job's merge |
 | Candidate close | the Reconciliation job's merge | the candidate's work -> integration PR |
 | Promote (ship) | pre-staged security verdict naming the integration tip | the integration -> principal PR |
 
@@ -32,7 +32,7 @@ An rc is an Implement: a DAG of jobs the PLAN draws, Job 1 first, the Reconcilia
 - Done when: the last stage closed green and the close task wrote the job file's `done`.
 
 **Step 3 — Job merge.**
-- Push the job branch; the reviewer's one verdict names its green CI-matrix run; `WT merge` runs the job gate and fast-forwards.
+- Push the job branch; the reviewer's one verdict names its HEAD; `WT merge` runs the job gate and fast-forwards.
 - Append the job's `kind: merge` entry to `_RELEASE.json`'s `log` (`RELEASE-EVENTS.md`).
 - Done when: the job is on the work branch and its entry passes `release.py check`.
 
@@ -45,8 +45,8 @@ An rc is an Implement: a DAG of jobs the PLAN draws, Job 1 first, the Reconcilia
 - Done when: the Reconciliation job merged; `.dadaia/.venv/bin/dadaia doctor` is clean.
 
 **Step 5 — Candidate PR.**
-- Open the work -> integration PR (branch names: the constitution's `gitflow:`) (security verdict covering the head, `dd-gitflow-default` §2a); watch CI to green; merge.
-- Done when: it merges green.
+- Open the work -> integration PR (branch names: the constitution's `gitflow:`) (security verdict covering the head, `dd-gitflow-default` §2a); the `verify:` line green; merge.
+- Done when: it merges.
 
 The arc ends here. Gate -> promote -> record -> branch cut: `dd-gitflow-default` steps
 9-12.

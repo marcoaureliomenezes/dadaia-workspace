@@ -23,7 +23,9 @@ from dadaia_workspace.features.certification import service
 
 _SOURCE = Path(service.__file__)
 _PUBLIC = _SOURCE.parents[2] / "public"
-_RECIPE = (_PUBLIC / "data" / "CONSUMER_VALIDATION_RECIPE.md").read_text(encoding="utf-8")
+_RECIPE = (_SOURCE.parents[3] / "scripts" / "CONSUMER_VALIDATION_RECIPE.md").read_text(
+    encoding="utf-8"
+)
 _SPANS = [
     re.sub(r"<[^>]*>", "X", part).split()
     for span in re.findall(r"`([^`]+)`", _RECIPE)

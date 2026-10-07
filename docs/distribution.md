@@ -40,7 +40,7 @@ Every field PyPI renders has exactly one home:
 
 The wheel ships `dadaia_workspace/` with the full `public/` tree (`.dadaia/.venv/bin/dadaia init` still
 resolves the workspace venv's dependencies from PyPI), and
-`dadaia_workspace/public/data/CONSUMER_VALIDATION_RECIPE.md`, the matrix run against
+`scripts/CONSUMER_VALIDATION_RECIPE.md`, the matrix run against
 every candidate wheel before a deploy. It installs one CLI under two console-script
 names, `dadaia` and `dadaia-workspace`. Consumer-validation candidate wheels are
 throwaway and never mint a published version; a venv bootstrap installs the running

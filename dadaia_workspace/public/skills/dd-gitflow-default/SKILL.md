@@ -36,8 +36,8 @@ The branch contract by role; the names are `specs/constitution.md`'s `gitflow:` 
 
 | Branch | Pushable | Cut from | Advances by |
 |---|---|---|---|
-| work `<work>M.m.p` | Yes — the repo's own CI checks green + valid name | integration | the PR below |
-| job `wt/<M.m.p>-rc<N>/<job>` | Yes — its push runs the CI matrix its verdict names | work | its worktree merge (`worktrees/AGENTS.md` §2) |
+| work `<work>M.m.p` | Yes — its `verify:` line green + valid name | integration | the PR below |
+| job `wt/<M.m.p>-rc<N>/<job>` | Yes — valid name | work | its worktree merge (`worktrees/AGENTS.md` §2) |
 | backlog `wt/backlog/<slug>` | Yes | work | its worktree merge (`worktrees/AGENTS.md` §2) |
 | task `wt/<M.m.p>-rc<N>/<job>--<task-id>` | No | its job branch | its worktree merge (`worktrees/AGENTS.md` §2) (its task gate) |
 | integration | No — never a direct push | principal (bootstrap only) | PR from the row above, at definition `Approved` and at each `rc` merge |
@@ -62,7 +62,7 @@ A job and its task trees hold code, tests, specs, memory and derived docs alike 
 | 4 | a job | Terminal transition without code (`resolve` by a task, `supersede`, `defer`, `reject`): `specs/bugs/BUGS.jsonl` | `chore(bugs): <verb> <id> — <reason, or by <task-id> (<sha>)>`; per class `chore(bugs): <verb> class <class> — <reason>`, one id per body line |
 | 4 | a job | Archive by an accepted ADR: `specs/bugs/BUGS.jsonl`, `specs/bugs/_archive/bugs_histo.jsonl` | `chore(bugs): archive <ids> — ADR <id>` |
 | 5 | `define` | Release definition: `specs/releases/<v>/rc-<N>/*` | `feat(specs): define candidate …` |
-| 6 | a task tree | Task: its `W:` | `conventional-commit(<id>): description`, a REBUILD `refactor(<id>): REBUILD <unit> — …`; a stage closes with a body line `stage: <id> — small green` |
+| 6 | a task tree | Task: its `W:` | `conventional-commit(<id>): description`, a REBUILD `refactor(<id>): REBUILD <unit> — …`; a stage closes with a body line `stage: <id> — verify-stage green` |
 | 7 | a job | The job file's `done`, once per job, by its close task: `specs/releases/<v>/rc-<N>/tasks/<job>.md` | `chore(tasks): done <job>` |
 | 8 | `define` | Trio approval: `specs/releases/<v>/rc-<N>/SPEC.md` | `docs(specs): …` |
 | 9 | `reconcile` | Memory pass and derived docs: `specs/memory/*`, `README.md`, `llms.txt`, `docs/*.md` | `docs(memory): …` |
@@ -70,19 +70,7 @@ A job and its task trees hold code, tests, specs, memory and derived docs alike 
 
 ## 3b. The PR gate
 
-- Both PR edges require CI green (lint, typecheck, tests, doctor, gitleaks) and a
-  `dd-code-reviewer` APPROVED verdict, security lens included, on the PR head. The ruleset
-  is the operator's.
-- No CI job of a context's main repo or associated repos calls a model API, except an
-  evals repo's, under every clause below:
-  - a model-calling job runs only on `workflow_dispatch` or `schedule`, never `push`,
-    `pull_request` or `pull_request_target`;
-  - no workflow of an evals repo runs on a self-hosted runner;
-  - the model secret is read only by those jobs, at job level;
-  - artifacts and transcripts come only from synthetic projects built in the run;
-  - every artifact and the job summary pass a secret scan, the model secret's value
-    included, before any upload and before the summary is written; a hit fails the job
-    and uploads nothing.
+- Both PR edges require the repo's `verify:` line green and a `dd-code-reviewer` APPROVED verdict, security lens included, on the PR head.
 
 ## 4. Done when
 
