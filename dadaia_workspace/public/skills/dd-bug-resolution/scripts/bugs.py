@@ -233,7 +233,7 @@ def _read(args: argparse.Namespace, specs: Path) -> int:
             for value, count in sorted(Counter(values).items()):
                 print(f"{label}:{value}\t{count}")
         return 0
-    if args.found_in:  # ADR 0206: the one reader of found_in x status
+    if args.found_in:  # the one reader of found_in x status
         release, _, rc = args.found_in.partition("/")
         for bug in records:
             if bug.get("status") in ("open", "deferred") and bug.get("found_in") == {"release": release, "rc": rc}:  # fmt: skip

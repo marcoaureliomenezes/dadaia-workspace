@@ -352,7 +352,7 @@ def _bugs(*argv: str, specs: Path) -> None:
 
 
 def refuse_open_bugs(specs: Path, release_id: str, release_dir: Path) -> None:
-    """ADR 0206: relay `bugs.py status --found-in` for the release's live candidate."""
+    """Relay `bugs.py status --found-in` for the release's live candidate."""
     _bugs("status", "--found-in", f"{release_id}/{(candidate_dir(release_dir) or release_dir).name}", specs=specs)  # fmt: skip
 
 
