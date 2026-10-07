@@ -5,6 +5,7 @@
 Amended 2026-10-06 on review M-A at cfe73a297 (factual sha/count corrections); approval basis: dd-code-reviewer re-review of the amended define head.
 Amended 2026-10-07 by operator ruling: Jobs 2 and 3 annulled, Job 9 added ("Novo job no rc-10 (Recommended)").
 Amended 2026-10-07 by operator ruling: Job 10 added ("Job estrutural no rc-10 (Recommended)"; "Revisor emite o próprio (Recommended)").
+Amended 2026-10-07 (scope unchanged): AC12.2's lead and the removed-list line narrow to what ADR 0218's design binds, the diff and not the author (authorship stays discipline plus audit, backlog `verdict-author-unbound`); approval basis: dd-code-reviewer delta review of the Job 10 plan, plus ADR 0218 accepted by the operator ("Revisor emite o próprio (Recommended)").
 **Release ID:** 0.5.0
 **Owner:** dd-product-engineer
 **Opened:** 2026-10-06 in the `0.5.0-rc10/define` tree while rc-9 reconciles (0205).
@@ -276,7 +277,7 @@ Edge: Job 10 merges after Job 9 and the bug batch, and rebases on both, because 
 - Stale `Measured by` paths (AC10.1).
 - dadaia-evals as the context's evals repo, its `check_workflows.py` and the cross-repo `lib_ref` (AC11.1–AC11.3).
 - The shipped law's model-API-in-CI line and its §3b clauses; the `CONTEXT.md` term "Evals repo" (AC11.4).
-- A verdict written by the merging main thread; a verdict without `reviewed_sha` and `diff_sha256`; a verdict reaped before its merge (AC12.2, AC12.3).
+- A verdict without `reviewed_sha` and `diff_sha256`; a verdict whose diff changed after review; a verdict reaped before its merge (AC12.2, AC12.3).
 - Agent-writable agentic projections and harness settings (AC12.1); the venv guard's first-token-only reading (AC12.4).
 - Every second statement of a rule that has its one home; root §3's false blocks; the base-less review assert line; the grill's `.md` questionnaire; the subagent bind step; retired terms and dead citations (AC12.5–AC12.11).
 
