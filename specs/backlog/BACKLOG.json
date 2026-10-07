@@ -489,6 +489,15 @@
         "public-law-language-neutral",
         "complexity-and-private-import-ratchet"
       ]
+    },
+    {
+      "id": "verdict-author-unbound",
+      "title": "The merge gate knows who wrote a verdict, and a PR-edge verdict binds a hash",
+      "opened": "2026-10-07",
+      "status": "idea",
+      "description": "rc-10 Reconciliation review, deferred: 'the merge gate cannot tell who ran verdict.py; a PR-edge verdict reads no hash'. What Job 10 covers (SPEC AC12.2, ADR 0218): the verdict carries reviewed_sha and diff_sha256 and worktree.py merge refuses a missing field or a mismatch - a verdict binds the diff. What it leaves (SPEC 2026-10-07 amendment: 'authorship stays discipline plus audit, backlog verdict-author-unbound'): (1) authorship - any session, the merging main thread included, can run verdict.py over the right range and produce a hash-valid verdict, so the 'main thread never writes a verdict' rule of ADR 0218 is unenforced; (2) the PR edge - the work->integration and integration->principal verdicts are the reviewer's text pasted by the main thread into the PR, bound to no sha and no hash. Design: (1) the PreToolUse gate refuses a Bash run of verdict.py whose hook payload does not come from a dd-code-reviewer subagent (the payload's agent type is the one decider), with an adversary test where the main thread runs verdict.py itself; where a harness carries no agent type, the gate fails open and the audit counts verdicts with no reviewer session; (2) verdict.py gains a PR mode that hashes the PR's base..head diff, and the PR quote carries reviewed_sha and diff_sha256 so the promote reads the same binding the merge gate reads - one verdict shape, one decider. Placement and every design detail not quoted from a ruling are agent default, unruled.",
+      "provenance": "rc-10 Reconciliation review (2026-10-07), named by the rc-10 SPEC AC12.2 amendment as this backlog entry; ADR 0218 ruling 'Revisor emite o pr\u00f3prio (Recommended)'",
+      "relates": []
     }
   ]
 }
