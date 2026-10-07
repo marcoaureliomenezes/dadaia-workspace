@@ -4,7 +4,7 @@
 
 ## What it is
 
-<!-- derived-from: product-vision sha256:4d5160d491d5 -->
+<!-- derived-from: product-vision sha256:50aa2de46233 -->
 
 - [README](README.md): one workspace folder, projects in repos inside it, governance outside every repo; the unit is the context (main repo + associated repos); documents are the lifecycle; boundaries are mechanical.
 
@@ -37,7 +37,7 @@
 ## The docs
 
 <!-- derived-from: pypi-distribution sha256:bd9f29d03eb3 -->
-<!-- derived-from: product-vision sha256:4d5160d491d5 -->
+<!-- derived-from: product-vision sha256:50aa2de46233 -->
 
 - [Documentation](https://github.com/marcoaureliomenezes/dadaia-workspace/tree/main/docs): the repository's `docs/` folder on `main`, every page derived under its markers.
 - [Landing](docs/index.md): the tagline, the paradigm and the two ways in.

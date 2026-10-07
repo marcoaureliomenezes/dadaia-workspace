@@ -13,7 +13,7 @@ its **associated repos** are the others it owns.
 
 ## What it is and principles
 
-<!-- derived-from: product-vision sha256:4d5160d491d5 -->
+<!-- derived-from: product-vision sha256:50aa2de46233 -->
 
 dadaia-workspace is the operating environment around repositories developed with AI
 agents. Its unit is the context: one main repo, where `specs/` lives, plus its
