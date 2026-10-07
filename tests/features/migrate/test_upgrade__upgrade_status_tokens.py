@@ -50,6 +50,7 @@ def test_upgrade_rewrites_retired_status_tokens_only_in_the_live_trio(tmp_path: 
         assert text.splitlines()[2:] == [f"**Status:** {expected.get(rel, status)}", _QUOTED.strip()]
 
 
+@pytest.mark.medium
 def test_one_upgrade_run_folds_a_legacy_flat_tree_clean(tmp_path: Path) -> None:
     """ADR 0150, 0151 M5, 0152 (4): a stamp-6 tree whose release carries the legacy
     `RELEASE.json`, a closed `rc-1/` and a flat trio is clean after ONE `specs upgrade`:

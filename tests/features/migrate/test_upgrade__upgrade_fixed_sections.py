@@ -8,6 +8,7 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
+import pytest
 from typer.testing import CliRunner
 
 from dadaia_workspace.cli.main import app
@@ -35,6 +36,7 @@ def _v6_tree(tmp_path: Path) -> Path:
     return specs
 
 
+@pytest.mark.medium
 def test_a_v6_tree_ends_canonical_with_fixed_sections_and_a_clean_doctor(tmp_path: Path) -> None:
     """sa-specs-upgrade-writes-through-symlinks#B3, sa-specs-upgrade-writes-through-symlinks#B4: the hop, then the doctor's repair set — a superseded shipped scoped
     law (a real published specs/bugs/AGENTS.md) is refreshed too: no TREE-5, no FIXED."""

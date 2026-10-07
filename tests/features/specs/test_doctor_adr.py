@@ -191,6 +191,7 @@ def test_only_a_ruled_record_changes_an_accepted_one(
     assert [i.message.rsplit(" (", 1)[0] for i in adr_record_issues(specs)] == expected
 
 
+@pytest.mark.medium
 def test_doctor_admits_any_named_check_and_flags_a_duplicate_id(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

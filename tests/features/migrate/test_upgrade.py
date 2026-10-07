@@ -66,6 +66,7 @@ def test_b4_the_one_writer_refuses_a_symlinked_destination(tmp_path: Path) -> No
     assert [p.name for p in tmp_path.iterdir() if p.name.endswith(".tmp")] == []
 
 
+@pytest.mark.medium
 def test_b1_specs_upgrade_refuses_a_symlinked_quality_md_with_its_fix(tmp_path: Path) -> None:
     """#B1: `specs upgrade` repairs through the doctor's writer, which refuses the link:
     the verb exits non-zero naming the path with its fix line; the outside md5 is
