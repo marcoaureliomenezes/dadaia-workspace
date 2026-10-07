@@ -36,12 +36,14 @@ from __future__ import annotations
 
 import os
 import shutil
+import subprocess
 import sys
 import tempfile
 from collections.abc import Iterator, Sequence
 from hashlib import sha256
 from pathlib import Path
 from typing import Any
+from unittest import mock
 
 import pytest
 
@@ -309,6 +311,26 @@ def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item
         if tier_timeout is not None and item.get_closest_marker("timeout") is None:
             item.add_marker(pytest.mark.timeout(tier_timeout))
     _validate_quarantine_markers(items)
+
+
+@pytest.hookimpl(wrapper=True)
+def pytest_runtest_call(item: pytest.Item) -> Iterator[None]:
+    """The one decider of what ``small`` means: a test sized small (``_size``) that starts a
+    process (``subprocess.*``, ``os.system``) fails here, whatever helper it goes through."""
+    if item.get_closest_marker("small") is None:
+        return (yield)
+
+    def refuse(*_args: object, **_kwargs: object) -> None:
+        pytest.fail(
+            f"{item.nodeid} is small and starts a process: mark it `medium` or extract its pure core",
+            pytrace=False,
+        )
+
+    with (
+        mock.patch.object(subprocess.Popen, "__init__", refuse),
+        mock.patch.object(os, "system", refuse),
+    ):
+        return (yield)
 
 
 def _collect_entries(

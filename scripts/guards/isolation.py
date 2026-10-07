@@ -15,7 +15,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
-    from collections.abc import Callable, Iterator
+    from collections.abc import Callable
 
     from run import Check, Session, Tree
 
@@ -24,6 +24,9 @@ _SETS = ("ALLOWLISTED_DADAIA_ENV", "HOOK_MODULES")
 _NO_WORKSPACE = "WorkspaceNotInitializedError"
 
 PROBE = """
+import pytest
+
+
 def test_guard_no_real_workspace(record_property):
     from pathlib import Path
     from typer.testing import CliRunner
@@ -42,6 +45,19 @@ def test_guard_no_real_workspace(record_property):
     })
 
 
+@pytest.mark.small
+def test_guard_small_spawns_no_process(record_property):
+    import subprocess, sys
+
+    try:
+        subprocess.run([sys.executable, "-c", "pass"], check=True)
+        outcome = "ran"
+    except pytest.fail.Exception:
+        outcome = "refused"
+    record_property("small_spawn", outcome)
+
+
+@pytest.mark.medium
 def test_guard_no_instance_reach(tmp_path, record_property):
     import os, subprocess, sys
     from pathlib import Path
@@ -284,67 +300,14 @@ def harness_env_allowlist(tree: Tree) -> list[str]:
 
 # --- small tests start no process ---------------------------------------------------------
 
-_SEAMS = frozenset(
-    {
-        "subprocess",
-        "tests.helpers.worktree_ws",
-        "dadaia_workspace.infrastructure.subprocess_runner",
-        "tests.fixtures.real_git",
-        "dadaia_workspace.infrastructure.git_subprocess",
-    }
-)
-_SPAWN = re.compile(
-    r"(^|\.)(subprocess\.(run|Popen|call|check_call|check_output|getoutput|getstatusoutput)"
-    r"|os\.(system|popen|exec\w*|spawn\w*|posix_spawn\w*)"
-    r"|asyncio\.create_subprocess_\w+|run_hook_subprocess)$|^(Popen|check_output|check_call)$"
-)
-
-
-def _marks(nodes: list[ast.AST]) -> set[str]:
-    """Names of every ``<x>.mark.<name>`` under *nodes*."""
-    return {
-        n.attr
-        for top in nodes
-        for n in ast.walk(top)
-        if isinstance(n, ast.Attribute) and _tail(n.value) == "mark"
-    }
-
-
-def _tests(module: ast.Module) -> Iterator[tuple[ast.FunctionDef, set[str]]]:
-    """Each ``test_*`` function with the marker names it inherits (module, class, own)."""
-    base = _marks([n for n in module.body if isinstance(n, ast.Assign)])
-    for top in module.body:
-        owner = top.decorator_list if isinstance(top, ast.ClassDef) else []
-        for fn in top.body if isinstance(top, ast.ClassDef) else [top]:
-            if isinstance(fn, ast.FunctionDef) and fn.name.startswith("test_"):
-                yield fn, base | _marks([*owner, *fn.decorator_list])
-
-
-def _reaches_seam(module: ast.Module) -> bool:
-    return any(
-        (isinstance(n, ast.ImportFrom) and n.module in _SEAMS)
-        or (isinstance(n, ast.Import) and any(a.name in _SEAMS for a in n.names))
-        for n in ast.walk(module)
-    )
-
 
 def small_spawns_no_process(tree: Tree) -> list[str]:
-    """A test sized ``small`` (as ``tests/conftest.py`` sizes it: an explicit marker, else
-    ``medium`` when its module imports a process seam) calls no spawn in its own body."""
-    out = []
-    for p, module in _suite(tree).items():
-        seam = _reaches_seam(module)
-        for fn, marks in _tests(module):
-            if "medium" in marks or ("small" not in marks and seam):
-                continue
-            kind = "spawn" if "small" in marks else "unmarked"
-            out += [
-                f"{'hook' if 'hook' in ast.unparse(c.func) else kind}: {p}::{fn.name} "
-                f"starts a process ({ast.unparse(c.func)}) at line {c.lineno}"
-                for c in ast.walk(fn)
-                if isinstance(c, ast.Call) and _SPAWN.search(ast.unparse(c.func))
-            ]
-    return out
+    """``tests/conftest.py`` fails a small test that starts a process: the probe's small
+    test spawns one, and the guard is red when the suite's conftest lets it run."""
+    p = tree.session.get("props", {}).get("small_spawn")
+    if p is None:
+        return ["probe-broke: the small-spawn probe recorded nothing"]
+    return [] if p == "refused" else [f"spawn: a small test started a process ({p})"]
 
 
 # --- plants: each writes one violation; ``run.py --planted`` requires red ----------------
@@ -361,6 +324,7 @@ def _healthy() -> Session:
     ws = "/elsewhere/instance"
     return {
         "props": {
+            "small_spawn": "refused",
             "workspace": {"walk": _NO_WORKSPACE, "cwd": "/elsewhere", "doctor": [1, True]},
             "instance": {
                 "ws": ws,
@@ -433,34 +397,6 @@ os.environ["DADAIA_PERSONA"] = time.time()
 """
 
 
-_CONTROL_SPAWN = """
-import os, pytest, subprocess
-
-@pytest.mark.medium
-def test_decorated():
-    subprocess.run(['true'])
-
-class TestOwned:
-    pytestmark = pytest.mark.medium
-    def test_inherits(self):
-        os.system('true')
-
-@pytest.mark.medium
-class TestDecoratedClass:
-    def test_inherits(self):
-        os.system('true')
-
-def test_seam_import_sizes_it_medium():
-    subprocess.run(['true'])
-
-def helper():
-    subprocess.run(['true'])
-
-def test_calls_no_spawn():
-    helper()
-"""
-
-
 def CONTROL(root: Path) -> Session:
     """Every check green: a healthy session, near-miss shapes tracked, and every violation
     only in an untracked, gitignored ``tests/tmp/x.py`` (bugs 465, 467) or in the fixture
@@ -470,7 +406,6 @@ def CONTROL(root: Path) -> Session:
     _fixture_copy(root, tail='\nos.environ["DADAIA_PERSONA"] = "x"\n')
     _write(root, "tests/unit/test_frozen_alone.py", _CONTROL_TEST.replace("HOOK", _hook()))
     _write(root, "tests/unit/test_clock_alone.py", _CONTROL_CLOCK)
-    _write(root, "tests/unit/test_spawn_exempt.py", _CONTROL_SPAWN)
     return _healthy()
 
 
@@ -574,19 +509,11 @@ CHECKS: dict[str, Check] = {
     "small-spawns-no-process": (
         small_spawns_no_process,
         {
-            "spawn": _plant(
-                "tests/unit/test_spawn.py",
-                "import pytest, subprocess\n@pytest.mark.small\n"
-                "def test_x():\n    subprocess.run(['true'])\n",
-            ),
-            "unmarked": _plant(
-                "tests/unit/test_spawn.py", "import os\ndef test_x():\n    os.system('true')\n"
-            ),
-            "hook": _plant(
-                "tests/unit/test_spawn.py",
-                "from tests.fixtures.harness_env import run_hook_subprocess\n"
-                "def test_x():\n    run_hook_subprocess('pre_gate', {}, {})\n",
-            ),
+            "spawn": lambda root: {
+                **CONTROL(root),
+                "props": {**_healthy()["props"], "small_spawn": "ran"},
+            },
+            "probe-broke": lambda root: {},
         },
     ),
 }

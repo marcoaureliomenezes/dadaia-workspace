@@ -68,6 +68,7 @@ def test_guard_calibration(record_property):
     })
 
 
+@pytest.mark.medium
 def test_guard_push_starts_no_gc(tmp_path, record_property):
     import os, re, subprocess
 
