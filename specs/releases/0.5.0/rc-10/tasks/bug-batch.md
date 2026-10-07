@@ -223,3 +223,11 @@ Paths are relative to the repo root; aliases as in `PLAN.md` (`f/`, `pub/`, `S/`
 | JB.S14.T2 | AC9.1 | `dadaia_workspace/features/certification/service.py` (`empty_remote`'s bare remote, made by `git init --bare`, gets `core.longpaths true` in its own config, as the context clone did in JB.S13.T2: CI run 37626857778 Windows Contract, `context baseline` → `git push` → `remote: error: unable to write file …: Filename too long`) | the Windows certify id; RED: a unit row asserting the sandbox's bare remote config carries `core.longpaths=true` (find how the certify tests fake or run the child). Decider: the bare init. Sweep: `git grep -n '"--bare"' -- dadaia_workspace` with its count. Net ≤ 2 |
 
 - done: the bug batch — every task of JB.S1 to JB.S14 landed on `wt/0.5.0-rc10/bug-batch`; the map, the shipped hashes and the derived docs were checked last and had not drifted; closed by JB.S14.T1. `bugs.py status` shows 0 open: `guards-check-not-required-by-live-protection` was resolved by the operator's act on live protection (7e2916241).
+
+## Stage JB.S15 — RED amendment (review REJECTED 2b7ebd088, HIGH 2)
+
+- Contract: a RED-stage amendment (ADR 0209), approved on the reviewer's APPROVED by operator delegation ("Delego: APPROVED do revisor basta (Recommended)", 2026-10-06: TASKS and test amendments). 394006d32 (`feat(JB.S4.T2)`) dropped `shown.returncode == 0` from 99a7bebdf's RED row because the row's fixture logs no `kind: memory` entry, so `check` refuses CLOSURE for that reason, not for the stale block. The fixture gains the closure's memory entry and the RED assert returns whole; exit the S14 contract; ACs AC4.4
+
+| task | AC | `W:` | owner tests / RED |
+|---|---|---|---|
+| JB.S15.T1 | AC4.4 | `tests/public/skills/dd_release_implementation/scripts/test_release__release_script.py` (`test_a_stale_balance_block_refuses_at_closure_and_passes_in_implementation`: the seeded log gains one `kind: memory` entry dated after the stamp `check` reads, and the assert reads again `shown.returncode == 0 and " warning " in line and "differs from its regeneration" in line`, as 99a7bebdf wrote it) | the test passes at HEAD with the clause restored; dropping the memory entry turns it red on `returncode` |
