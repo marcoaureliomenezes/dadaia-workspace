@@ -8,8 +8,6 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
-import pytest
-
 from tests.helpers.worktree_ws import approve, commit, fixes, git, make_workspace, run
 
 
@@ -36,7 +34,6 @@ DOCTOR_FIX = "fix: dadaia doctor --fix --specs-dir specs"
 RED_DOCTOR = 'sys.exit(os.path.exists(os.path.join(specs, "RED-doctor")))'
 
 
-@pytest.mark.xfail(strict=True, raises=AssertionError, reason="trio-status-canon-judged-outside-the-define-merge-gate")  # fmt: skip
 def test_a_red_doctor_refuses_once_with_its_own_fix_line(tmp_path: Path) -> None:
     (root := tmp_path / "ws").mkdir()
     make_workspace(root)

@@ -618,7 +618,6 @@ def test_no_tree_edits_the_script_its_own_gate_runs(root: Path, level: str) -> N
     assert not (root / "repos/r/scripts/ci.py").read_text().endswith("y = 1\n")
 
 
-@pytest.mark.xfail(strict=True, raises=AssertionError, reason="gate-runs-the-judged-trees-own-ci-script")  # fmt: skip
 def test_no_tree_edits_a_module_the_script_its_own_gate_runs_imports(root: Path) -> None:
     """ADR 0207, the redo of 4936ab4f6: the declared script imports `scripts/ci_steps.py`; a range
     editing that module, not the literal script path, weakens its own judge and refuses."""
@@ -636,7 +635,6 @@ def test_no_tree_edits_a_module_the_script_its_own_gate_runs_imports(root: Path)
     ]
 
 
-@pytest.mark.xfail(strict=True, reason="JB.S3 RED: test-path-convention-is-python-only")
 def test_a_code_task_names_its_owner_tests_by_any_convention(root: Path) -> None:
     """A task's test file need not be `test_`-prefixed: the repo's `verify-task:` line judges
     which tests ran, so a pytest `*_test.py` owner lands."""
