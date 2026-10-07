@@ -20,6 +20,7 @@ from dadaia_workspace.core.release_state import CANDIDATE_RE, RELEASE_ID_RE
 
 __all__ = [
     "render_registry_tables",
+    "source_form",
     "AUDIT_DIR_NAME_PATTERN",
     "AUDIT_DIR_NAME_RE",
     "CANON_ROOT_MEMBERS",
@@ -577,7 +578,19 @@ def render_registry_tables(text: str) -> str:
     render the source CLI form ``.dadaia/.venv/bin/dadaia`` into the platform's venv form."""
     for placeholder, render in _PLACEHOLDERS.items():
         text = text.replace(placeholder, render())
+    return text.replace(_SOURCE_CLI, _platform_cli())
+
+
+_SOURCE_CLI = ".venv/bin/dadaia"
+
+
+def _platform_cli() -> str:
     caps = platform.PLATFORM
-    return text.replace(
-        ".venv/bin/dadaia", f".venv/{caps.venv_scripts_dir}/dadaia{caps.venv_exe_suffix}"
-    )
+    return f".venv/{caps.venv_scripts_dir}/dadaia{caps.venv_exe_suffix}"
+
+
+def source_form(text: str) -> str:
+    """The inverse of the CLI render in ``render_registry_tables``: the platform's venv CLI
+    spelling back to ``.dadaia/.venv/bin/dadaia`` — the one form shipped history and the
+    canonical source are compared in. The identity where the platform form is the source."""
+    return text.replace(_platform_cli(), _SOURCE_CLI)
