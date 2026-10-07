@@ -16,6 +16,7 @@ pytestmark = pytest.mark.skipif(os.name == "nt", reason="POSIX symlinks")
 
 
 @pytest.mark.parametrize("kind", ["file", "directory"])
+@pytest.mark.medium
 def test_a_symlink_into_protected_sessions_classifies_protected(tmp_path: Path, kind: str) -> None:
     (tmp_path / "repos" / "app" / "specs").mkdir(parents=True)
     (tmp_path / ".dadaia" / "states").mkdir(parents=True)
