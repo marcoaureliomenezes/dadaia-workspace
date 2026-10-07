@@ -155,3 +155,71 @@ def test_a_repo_with_no_tests_line_refuses_until_the_work_branch_declares_it(roo
     commit(repo, "AGENTS.md", "verify-task: python scripts/ci.py task\ntests: tests/**\n")
     landed = run(root, "merge", "worktrees/r/0.5.0-rc1/j1--J1.S1.T1")
     assert landed.returncode == 0, (sha, landed.stderr)
+
+
+@pytest.mark.xfail(strict=True, reason="a merge commit's own diff is never read")
+def test_a_merge_commit_that_edits_a_test_line_refuses(root: Path) -> None:
+    anchor = _born(root)
+    task = "0.5.0-rc1/j1--J1.S2.T2"
+    assert run(root, "new", "r", task).returncode == 0
+    tree = root / "worktrees/r" / task
+    git(tree, "switch", "-qc", "side")
+    commit(tree, "src/b.py")
+    git(tree, "switch", "-q", "-")
+    git(tree, "merge", "-q", "--no-ff", "--no-commit", "side")
+    (tree / "tests/test_a.py").write_text(GREEN)
+    git(tree, "add", "tests/test_a.py")
+    git(
+        tree,
+        "commit",
+        "-qm",
+        "test(J1.S2.T2): merge side",
+        "--trailer",
+        "Owner-tests: tests/test_r.py",
+    )
+    merged = run(root, "merge", f"worktrees/r/{task}")
+    assert (merged.returncode, fixes(merged)) == (1, _frozen("tests/test_a.py", anchor))
+
+
+@pytest.mark.xfail(strict=True, reason="the range is work...HEAD, not <merge-base>..HEAD")
+def test_a_work_branch_commit_the_job_lacks_is_not_judged_as_the_jobs(root: Path) -> None:
+    _born(root)
+    repo = root / "repos/r"
+    commit(repo, "tests/test_o.py", RED)
+    commit(repo, "tests/test_o.py", GREEN)
+    _, merged = attempt(root, {"src/b.py": "y = 1\n"}, "J1.S2.T2")
+    assert merged.returncode == 0, merged.stderr
+
+
+@pytest.mark.xfail(strict=True, reason="no RED stage falls back to the range base")
+def test_a_job_with_no_commit_naming_its_red_stage_refuses(root: Path) -> None:
+    _, merged = attempt(root, {"src/a.py": "x = 1\n"}, "J1.S2.T1")
+    assert (merged.returncode, fixes(merged)) == (
+        1,
+        [
+            "fix: Operator action: stop and report — no commit since feature/0.5.0 names its RED stage, so the RED anchor cannot be derived (ADR 0209)"
+        ],
+    )
+
+
+def test_a_hotfix_commit_with_no_task_id_holding_code_and_a_marker_deletion_lands(
+    root: Path,
+) -> None:
+    land(root, "tests/test_a.py", "@red\n" + RED, "J1.S1.T1")
+    task = "0.5.0-rc1/j1--J1.S2.T1"
+    assert run(root, "new", "r", task).returncode == 0
+    tree = root / "worktrees/r" / task
+    (tree / "src").mkdir()
+    (tree / "src/a.py").write_text("x = 1\n")
+    (tree / "tests/test_a.py").write_text(RED)
+    git(tree, "add", "src/a.py", "tests/test_a.py")
+    git(
+        tree,
+        "commit",
+        "-qm",
+        "fix(bugs): b1 — the cause",
+        "--trailer",
+        "Owner-tests: tests/test_r.py",
+    )
+    merged = run(root, "merge", f"worktrees/r/{task}")
+    assert merged.returncode == 0, merged.stderr
