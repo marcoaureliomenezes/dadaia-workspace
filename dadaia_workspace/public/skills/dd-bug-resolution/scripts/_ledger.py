@@ -172,12 +172,14 @@ def _baseline() -> list[SimpleNamespace]:
     ]  # fmt: skip
 
 
-def workspace_of(path: Path) -> Path | None:
-    """The nearest ancestor of *path* holding ``.dadaia/states/spec_contexts.json``."""
-    path = path.resolve()
-    return next(
-        (d for d in (path, *path.parents) if (d / _STATES / "spec_contexts.json").is_file()), None
-    )
+def workspace_of(*starts: Path) -> Path | None:
+    """The ONE skill-script walk: the first ancestor of any of *starts* holding
+    `.dadaia/states/spec_contexts.json`, never a root `DADAIA_FENCED_ROOTS` fences (ADR 0088)."""
+    fenced = {
+        Path(p).resolve() for p in os.environ.get("DADAIA_FENCED_ROOTS", "").split(os.pathsep) if p
+    }
+    return next((d for s in starts for d in (s.resolve(), *s.resolve().parents)
+                 if d not in fenced and (d / _STATES / "spec_contexts.json").is_file()), None)  # fmt: skip
 
 
 def terms(root: Path | None) -> list[tuple[str, str]]:
