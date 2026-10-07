@@ -84,7 +84,7 @@ Related: [[ARCHITECTURE]]
 ## Bugs
 
 ```text
-Bug balance from BUGS.jsonl: 907 records (875 live, 32 archived).
+Bug balance from BUGS.jsonl: 908 records (876 live, 32 archived).
 surface                                            records  recurrences  fix-induced  archived  rcs  correlates  settled
 .github/dependabot.yml                             1        0            0            0         0    0           yes
 .github/workflows/release.yml                      1        0            0            0         0    0           yes
@@ -121,7 +121,7 @@ sdd                                                1        0            0      
 shipped text (CONTEXT.md, docs/, public/)          1        0            1            0         0    0           no
 skills                                             3        2            2            0         1    0           no
 spec_context                                       74       73           18           7         1    2           no
-specs                                              61       60           8            0         2    0           no
+specs                                              62       61           8            0         2    0           no
 specs-doctor                                       1        0            0            0         0    0           no
 telemetry                                          1        0            0            0         0    0           yes
 unknown                                            268      -            32           16        0    0           -
@@ -130,23 +130,23 @@ dev-tooling:
 .github                                            3        2            0            0         3    2           no
 scripts                                            7        6            2            0         4    5           no
 tests                                              92       91           33           0         4    15          no
-Laplace trend (days), window 0.4.5..0.5.0, T = 41 days: u = 14.34, diverging
-  counted 390 of 907 records; apart: 452 release unknown, 65 no found_in, 0 outside the window
+Laplace trend (days), window 0.4.5..0.5.0, T = 41 days: u = 14.41, diverging
+  counted 391 of 908 records; apart: 452 release unknown, 65 no found_in, 0 outside the window
   records found on an already settled surface: 6
 Defective-fix rate per rc (caused_by set over found in the rc):
 0.5.0/rc-6  2/8  25%
 0.5.0/rc-7  6/23  26%
 0.5.0/rc-8  20/26  76%
 0.5.0/rc-9  4/7  57%
-0.5.0/rc-10  41/65  63%
+0.5.0/rc-10  41/66  62%
 ```
 
 
 The review below is rewritten at every closure, never appended; the block above is `bugs.py balance --write` and nothing else.
 
-- **The balance.** The block's last candidate row counts 51 bugs found and all 51 resolved (`bugs.py status`: 0 open; a candidate closes only with no open bug). 32 of them carry a `caused_by` (the row's 62% defective-fix rate; the rows above it read 76%, 57%, 26% and 25%), 19 carry `none`. The Laplace trend reads `diverging` (u = 14.48): the ledger grows faster than it settles, and 6 records landed on an already settled surface.
+- **The balance.** The numbers (found, resolved, defective-fix rate, trend, settled-surface records) are the block above's and are not restated here. In words: the window's open count is zero (a candidate closes only with no open bug), and the deferred records (`freeze-has-no-lane-for-an-approved-amendment`, `git-errors-replace-has-no-row`, `memory-written-before-closure-phase`, `panel-telemetry-sqlite-corrupts-under-concurrent-access`, `subprocess-text-encoding-has-no-guard`) stay in the ledger, each with its reason. The trend says the ledger grows faster than it settles, so every cause below is read as a structure to rebuild, not a bug to patch.
 - **Standing cause 1 — one platform seam skipped.** `J7.S2.T2` is the culprit of 8 records of the last candidate, all Windows-only test or fixture bugs (a POSIX `bin/` path, a bare `python`, a `bash` spawn, a read-only `.git` rmtree). Verdict: the fixes are KEEP; the structure is `core/platform.py` as the one home of platform facts, and a test reaching past it is the defect.
 - **Standing cause 2 — the merge gate and the worktree verbs.** `J1.S3.T1` is the culprit of 4 records (worktree removal leaving its parent and remote branch, a job merge accepting any CI run URL, a job merge requiring a remote CI run, a rebase laundering the stray check) and `J1.S2.T1` of 2 more (task fix lineage, rebase orphaning fix links cited by sha). The records show the chain: each gate fix left a second reader of the same fact. Verdict: REBUILD on any further hit; the judged party must never be able to supply its own evidence.
 - **Standing cause 3 — a closed id grammar.** `freeze-reads-only-numbered-job-ids` and `bugs-check-reads-no-jb-task-ids` are one family: a task id reader written for `J<n>` and later widened one prefix at a time. Verdict: one id grammar, read in one place.
-- **Lessons.** A bug fixed at the caller it was caught in breeds the next caller's bug; a measurement with its own exclusion breeds the next measurement's bug; a cached derived fact breeds a bug per environment that derives it differently. Each family ended only by a deletion-shaped fix. Read the ledger before every fix and rebuild a unit with two prior fixes; every review verdict states the bug-surface delta from `bugs.py stats` (`direction:` counts 118 net-positive, 62 net-neutral, 132 net-negative over the resolved records).
-- **Evals.** An eval run judges the candidate against the previous release on two scenarios, three trials per side. The first run ended BLOCK: `t1-cold-onboarding` 3/3 against 3/3, `t2-block-list-bug` 3/3 baseline against 0/3 candidate. Its causes were a missing `hotfix/<bug-id>` tree and an onboarding that wrote no tests line (ADR 0216's onboarding half unbuilt, bug `onboarding-writes-no-tests-line`); the review found three more on the way: `freeze-cannot-see-a-red-amendment-stage`, `skill-git-output-decodes-with-the-locale`, `declared-echo-rereads-the-law`. The rerun after those fixes ended non-blocking (run 37673898303, `workflow_dispatch`, success): `t1-cold-onboarding` 3/3 against 3/3 (3 found each side), `t2-block-list-bug` 3/3 against 3/3, both readout. Lesson: a BLOCK that names a missing tree or an unbuilt half of an ADR is a bug to register and fix at its cause, then rerun; the verdict is never waived.
+- **Lessons.** A bug fixed at the caller it was caught in breeds the next caller's bug; a measurement with its own exclusion breeds the next measurement's bug; a cached derived fact breeds a bug per environment that derives it differently. Each family ended only by a deletion-shaped fix. Read the ledger before every fix and rebuild a unit with two prior fixes; every review verdict states the bug-surface delta, read from `bugs.py stats`.
+- **Evals.** An eval run judges the candidate against the previous release on two scenarios, three trials per side. Three runs happened. The first (run 37629005413) ended BLOCK: `t1-cold-onboarding` 3/3 against 3/3, `t2-block-list-bug` 3/3 baseline against 0/3 candidate, because the candidate gate refused direct writes under `repos/demo/` and `worktree.py new` had no `hotfix/<bug-id>` tree outside an rc. The second (run 37652269562) ended BLOCK again on `t2-block-list-bug` (0/3 against 3/3); its cause was an onboarding that wrote no tests line (ADR 0216's onboarding half unbuilt, bug `onboarding-writes-no-tests-line`); the review found three more on the way: `freeze-cannot-see-a-red-amendment-stage`, `skill-git-output-decodes-with-the-locale`, `declared-echo-rereads-the-law`. The third (run 37673898303, `workflow_dispatch`, success) ended non-blocking: `t1-cold-onboarding` 3/3 against 3/3 (3 found each side), `t2-block-list-bug` 3/3 against 3/3, both readout. Lesson: a BLOCK that names a missing tree or an unbuilt half of an ADR is a bug to register and fix at its cause, then rerun; the verdict is never waived.
