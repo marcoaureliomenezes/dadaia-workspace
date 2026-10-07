@@ -56,12 +56,15 @@ from __future__ import annotations
 
 import json
 import os
+import shutil
 import subprocess
 import sys
 from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path, PurePath
 from typing import Any, Final
+
+from dadaia_workspace.core import platform
 
 __all__ = [
     "ALLOWLISTED_DADAIA_ENV",
@@ -71,9 +74,13 @@ __all__ = [
     "HOOK_MODULES",
     "HookResult",
     "claude_hook_env",
+    "git_bash",
     "codex_hook_env",
     "kimi_hook_env",
+    "retire_tree",
+    "run_bash",
     "run_hook_subprocess",
+    "run_python",
     "suite_env",
 ]
 
@@ -424,3 +431,34 @@ def run_hook_subprocess(
         cwd=str(effective_cwd) if effective_cwd else None,
     )
     return HookResult(returncode=proc.returncode, stdout=proc.stdout, stderr=proc.stderr)
+
+
+def git_bash() -> str:
+    """The bash a test child runs: ``bash`` off Windows; on Windows Git for Windows' own
+    ``bin/bash.exe`` found beside ``git`` (never System32's WSL launcher), else under
+    ``%PROGRAMFILES%\\Git``."""
+    if not platform.PLATFORM.windows:
+        return "bash"
+    git = shutil.which("git")
+    roots = list(Path(git).resolve().parents[:3]) if git else []
+    roots.append(Path(os.environ.get("PROGRAMFILES", r"C:\Program Files"), "Git"))
+    for root in roots:
+        if (found := root / "bin" / "bash.exe").is_file():
+            return str(found)
+    raise FileNotFoundError("Git Bash not found beside git or under %PROGRAMFILES%\\Git")
+
+
+def run_python(*args: str, **kwargs: Any) -> subprocess.CompletedProcess[str]:
+    """Run the interpreter of this suite (``sys.executable``, never a bare ``python``)."""
+    return subprocess.run([sys.executable, *args], capture_output=True, text=True, **kwargs)  # noqa: S603
+
+
+def run_bash(command: str, **kwargs: Any) -> subprocess.CompletedProcess[str]:
+    """Run *command* under :func:`git_bash` ``-c``."""
+    return subprocess.run([git_bash(), "-c", command], capture_output=True, text=True, **kwargs)  # noqa: S603
+
+
+def retire_tree(tree: Path, into: Path) -> Path:
+    """Move *tree* under *into* and return its new place: a tree holding ``.git`` keeps
+    read-only objects that ``rmtree`` cannot unlink on Windows, a rename always works."""
+    return tree.rename(into / tree.name)
