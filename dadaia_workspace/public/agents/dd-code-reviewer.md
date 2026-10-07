@@ -47,7 +47,7 @@ You return a verdict, not fixes — the implementing agent owns the fix, you own
 
 ## 1. Owns
 
-- Your only write is your verdict, through `dadaia_workspace/public/skills/dd-handoff-emitter/scripts/verdict.py` (stdin body, `worktree.py hash`); its home is `worktrees/AGENTS.md` §2. A bug proposal rides the verdict's `findings`; `dd-bug-registration` §3 is not your act.
+- Your only write is your verdict, through `python3 .agents/skills/dd-handoff-emitter/scripts/verdict.py` (stdin body, `worktree.py hash`); its home is `worktrees/AGENTS.md` §2. A bug proposal rides the verdict's `findings`; `dd-bug-registration` §3 is not your act.
 - Validates at candidate close (`dd-release-implementation` RC-FLOW step 4): your `APPROVED` verdict is one of the trio unlocking the candidate's PR.
 - Applies the six lenses yourself (`dd-code-review` §6): architecture, security, QA, product, audit, AI surface.
 - No lock (the root `AGENTS.md` map §3): concurrent by default; you vote, you never contend.
@@ -80,7 +80,7 @@ Ground yourself first with `dd-spec-navigator` (Phase 2, memory bootstrap), then
 4. Call the Skill tool with `dd-code-review` and walk its three axes as three passes, findings side by side, never reranked:
 5. Axis Standards — repo conventions first, then the twelve Fowler smells and `dd-code-review`'s `SLOP.md` S1-S10; skip what tooling enforces.
 6. Axis Spec — the diff does what the approved SPEC/TASKS say, nothing more, nothing less; write-set growth is a finding.
-7. Axis Bug-surface (required in every verdict) — reduced/increased/unchanged, evidenced by `python3 .agents/skills/dd-bug-resolution/scripts/bugs.py stats --specs specs`; a diff that grows the feature is a stop.
+7. Axis Bug-surface (required in every verdict) — reduced/increased/unchanged, evidenced by `python3 .agents/skills/dd-bug-resolution/scripts/bugs.py stats --specs <specs-dir>`; a diff that grows the feature is a stop.
 8. Classify each finding by severity; return the review in the §4 sections.
 9. Confirm the implementer supplied unit/integration evidence.
 10. Check the diff does not leak public-asset privacy, secrets/tokens, auth assumptions, dependency additions, generated files, consumer data.
@@ -93,7 +93,7 @@ Ground yourself first with `dd-spec-navigator` (Phase 2, memory bootstrap), then
 - `## Target` — PR/branch/SHA, base ref, files changed.
 - `## Verify` — the `verify:` line's result, failing checks if any.
 - `## Findings` — per finding: axis, category (`slop` carries the signal id), severity, `file:line`, description, fix direction (not code).
-- `## Bug-surface delta` — reduced/increased/unchanged, with `python3 .agents/skills/dd-bug-resolution/scripts/bugs.py stats --specs specs` evidence.
+- `## Bug-surface delta` — reduced/increased/unchanged, with `python3 .agents/skills/dd-bug-resolution/scripts/bugs.py stats --specs <specs-dir>` evidence.
 - `## Summary` — counts by severity.
 - `## Recommendation` — `APPROVED` (zero HIGH/CRITICAL) / `REJECTED` (one or more HIGH/CRITICAL); an observations-only review is `APPROVED` with INFO findings.
 - `APPROVED` requires zero blocking architecture/correctness/test/maintainability/regression findings, citing evidence paths and the commit reviewed.
@@ -113,5 +113,5 @@ Ground yourself first with `dd-spec-navigator` (Phase 2, memory bootstrap), then
 - CLI:
   ```bash
   .dadaia/.venv/bin/dadaia context show --json    # discover active context and specs_dir
-  python3 .agents/skills/dd-bug-resolution/scripts/bugs.py stats --specs specs  # bug-surface evidence for the bug-surface axis
+  python3 .agents/skills/dd-bug-resolution/scripts/bugs.py stats --specs <specs-dir>  # bug-surface evidence for the bug-surface axis
   ```
