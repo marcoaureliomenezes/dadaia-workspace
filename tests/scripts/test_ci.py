@@ -15,6 +15,8 @@ from pathlib import Path
 
 import pytest
 
+from tests.fixtures.stores import fake_venv
+
 pytestmark = pytest.mark.slow(reason="each case spawns scripts/ci.py and its tools")
 _REPO = Path(__file__).resolve().parents[2]
 _CONTRACT = """[importlinter]
@@ -62,16 +64,13 @@ def _instance(root: Path) -> Path:
 
 
 def _venv_owned_by(instance: Path) -> str:
-    """A python whose ``sys.prefix`` is ``<instance>/.dadaia/.venv``: a symlink to this
-    interpreter, this venv's ``pyvenv.cfg``, and a ``.pth`` onto its packages — no install."""
+    """A python whose ``sys.prefix`` is ``<instance>/.dadaia/.venv``: ``fake_venv``'s copy of
+    this interpreter, and a ``.pth`` onto its packages — no install."""
     venv = instance / ".dadaia" / ".venv"
     site = venv / Path(sysconfig.get_path("purelib")).relative_to(sys.prefix)
     site.mkdir(parents=True)
     (site / "deps.pth").write_text(sysconfig.get_path("purelib") + "\n")
-    shutil.copyfile(Path(sys.prefix) / "pyvenv.cfg", venv / "pyvenv.cfg")
-    (venv / "bin").mkdir()
-    (venv / "bin" / "python").symlink_to(sys.executable)
-    return str(venv / "bin" / "python")
+    return str(fake_venv(instance))
 
 
 @pytest.mark.parametrize(
@@ -217,8 +216,9 @@ def test_documented_coverage_line_leaves_no_coverage_file_in_the_checkout(
     tmp = tmp_path / "tmp"  # where the plugin's temp dir lives, and is gone after exit
     tmp.mkdir()
     env = {**{k: v for k, v in os.environ.items() if k != "COVERAGE_FILE"}, "CI": "true",
-           "TMPDIR": str(tmp), "PATH": f"{Path(sys.executable).parent}{os.pathsep}{os.environ['PATH']}"}  # fmt: skip
-    assert subprocess.run(shlex.split(line), cwd=checkout, env=env, check=False).returncode == 0
+           "TMPDIR": str(tmp)}  # fmt: skip
+    argv = [sys.executable, *shlex.split(line)[1:]]
+    assert subprocess.run(argv, cwd=checkout, env=env, check=False).returncode == 0
     assert [p.name for p in tmp.iterdir() if p.name.startswith("dadaia-cov-")] == []
     status = subprocess.run(
         ["git", "status", "--porcelain", "--ignored"],
