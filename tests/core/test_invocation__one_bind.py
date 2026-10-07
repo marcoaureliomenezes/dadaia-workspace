@@ -8,7 +8,9 @@ boundaries over a tmp workspace).
 from __future__ import annotations
 
 import json
+import shutil
 import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -19,13 +21,14 @@ from dadaia_workspace.cli._specs_resolution import resolve_specs_dir_for_cli
 from dadaia_workspace.cli.main import app
 from dadaia_workspace.core import session_store
 from dadaia_workspace.core.invocation import alive_context_trees, resolve
+from dadaia_workspace.core.platform import PLATFORM
 from dadaia_workspace.features.workspace.onboarding import next_step
 from tests.fixtures.harness_env import (
     claude_hook_env,
     kimi_hook_env,
     run_hook_subprocess,
 )
-from tests.fixtures.stores import workspace_cli
+from tests.fixtures.stores import fake_venv
 
 _NOW = "2999-01-01T00:00:00+00:00"
 _CLAUDE = "CLAUDE_CODE_SESSION_ID"
@@ -163,16 +166,14 @@ def test_an_unbound_session_in_a_repo_injects_no_memory(tmp_path: Path) -> None:
     assert "[alpha]" not in out and "memory bootstrap" not in out
 
 
-@pytest.mark.windows
-@pytest.mark.quarantine(bug="orphan-worktree-line-absent-from-the-bind-block-on-windows")
 def test_a_bound_context_without_specs_gets_its_next_step(tmp_path: Path) -> None:
     """sa-bind-has-two-stores#S7: header and next step, never "[no bound context]"; AC1.5:
     exactly the step text ``doctor`` reports; AC1.10: then the doctor's worktree block, fix
     included, in the doctor's rendering (read through `worktree.py`, hence this tier)."""
     ws = _workspace(tmp_path, "alpha")
     _record(ws, "s1", "alpha")
-    flow = {"main_repo": "alpha", "associated_repos": [], "gitflow": {"work": "feature/"}}
-    workspace_cli(ws, flow)
+    cli = f"dadaia{PLATFORM.venv_exe_suffix}"
+    shutil.copy2(Path(sys.executable).parent / cli, fake_venv(ws).parent / cli)
     for argv in (["init", "-q"], ["commit", "-q", "--allow-empty", "-m", "x"],
                  ["branch", "wt/0.5.0-rc1/j1"]):  # fmt: skip
         subprocess.run(
@@ -188,7 +189,7 @@ def test_a_bound_context_without_specs_gets_its_next_step(tmp_path: Path) -> Non
         and out.startswith("[alpha]\n")
         and f"\n{step.text()}\n" in out
     )
-    orphan = f"WORKTREE warning orphan {ws}/worktrees/alpha/0.5.0-rc1/j1"
+    orphan = f"WORKTREE warning orphan {ws / 'worktrees' / 'alpha' / '0.5.0-rc1' / 'j1'}"
     assert f"\n=== open worktrees ===\n{orphan}" in out and "worktree.py merge" in out
 
 
