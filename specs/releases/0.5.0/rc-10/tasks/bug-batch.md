@@ -91,7 +91,7 @@ Paths are relative to the repo root; aliases as in `PLAN.md` (`f/`, `pub/`, `S/`
 |---|---|---|---|
 | JB.S6.T1 | AC9.1 | `dadaia_workspace/public/skills/dd-gitflow-default/scripts/_worktree_new.py`, `dadaia_workspace/public/skills/dd-gitflow-default/scripts/_worktree_git.py`, `dadaia_workspace/public/skills/dd-release-implementation/scripts/_release_new.py`, `dadaia_workspace/public/scaffold/memory/AGENTS.md` (the line is back to its published bytes), `scripts/guards/slop.py` (one allowance row) | `test_worktree_removal.py` |
 | JB.S6.T2 | — | `dadaia_workspace/public/entities/behavior-map.json` (skill and scripts hashes after the repairs) | `test_behavior_map.py` |
-| JB.S6.T3 | — | `dadaia_workspace/features/spec_context/doctor.py` (the import block ruff I001 refuses after the rebase; order only, no line changes meaning) | `ruff check`, `tests/features/spec_context/test_doctor.py` |
+| JB.S6.T3 | — | `dadaia_workspace/features/spec_context/doctor.py` (the import block ruff's import-sort rule refuses after the rebase; order only, no line changes meaning) | `ruff check`, `tests/features/spec_context/test_doctor.py` |
 | JB.S6.T4 | AC9.1 | `tests/infrastructure/test_privacy_check.py` (public-law-teaches-the-private-pipeline: the strict-xfail marker line leaves, because Job 6 already cleaned the law; it XPASSes strict at 7b95b4b30) | the guard, green |
 | JB.S6.T5 | — | `specs/releases/0.5.0/rc-10/tasks/bug-batch.md` (v33: the orphan id family I the bug batch added, ruff's import-sort code in the JB.S6.T3 row; the id leaves, the ratchet stays 31) | `python scripts/guards/run.py` v33 |
 
