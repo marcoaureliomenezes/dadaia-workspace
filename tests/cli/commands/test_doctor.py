@@ -56,6 +56,7 @@ from dadaia_workspace.features.specs.rules import RULES as SPECS_RULES
 from dadaia_workspace.infrastructure.git_subprocess import GitSubprocessClient
 from tests.features.backlog.test_doctor import _SOURCE, _active_entry
 from tests.features.specs.test_doctor import _make_clean_specs_tree
+from tests.fixtures.harness_env import run_bash
 from tests.fixtures.stores import context_store
 from tests.helpers import worktree_ws
 
@@ -297,13 +298,7 @@ def test_the_fix_line_clears_the_finding_it_was_stamped_on(
     # sa-unfixable-doctor-findings-say-doctor-fix#S1: no `<…>` survives into a printed fix.
     assert not re.search(r"<[^<>]+>", printed.fix), f"{code}: placeholder in {printed.fix}"
     command = _resolve(printed.fix, plant)
-    done = subprocess.run(
-        ["bash", "-c", command],
-        cwd=root,
-        capture_output=True,
-        text=True,
-        check=False,
-    )
+    done = run_bash(command, cwd=root, check=False)
     # `doctor --fix` exits 1 while the fixture's unrelated findings remain; the judge is
     # sa-unfixable-doctor-findings-say-doctor-fix#S2: re-run the WHOLE doctor — this
     # finding (its message) is gone and the fix created no new error elsewhere.
@@ -444,7 +439,7 @@ def test_an_untraced_origin_id_is_cleared_by_its_printed_fix(repo: Path) -> None
 
     [before] = origin_errors()
     assert before.message.startswith(f"releases/{_RELEASE}/rc-1/SPEC.md:5 "), before.message
-    subprocess.run(["bash", "-c", before.fix], cwd=repo, check=True, capture_output=True)
+    run_bash(before.fix, cwd=repo, check=True)
     assert origin_errors() == []
 
 
