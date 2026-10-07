@@ -167,6 +167,15 @@ def test_each_level_runs_only_its_steps() -> None:
     ]  # fmt: skip
 
 
+@pytest.mark.xfail(strict=True, raises=AssertionError, reason="AC11.1 owner tests: tests/ only")
+def test_a_grader_under_evals_is_no_owner_test() -> None:
+    """AC11.1: the task level's owner tests are ``test_*.py`` under ``tests/``; an eval grader
+    holds no test function, so it is linted but gets no ``owner tests`` step."""
+    grader = "evals/tasks/t1-cold-onboarding/tests/test_grade.py"
+    assert _plan("task", grader) == ["task: ruff format", "task: ruff check"]
+    assert _plan("task", "tests/unit/test_x.py")[-1] == "task: owner tests"
+
+
 @pytest.mark.parametrize(("check", "code"), [("1 == 2", 1), ("1 == 1", 0)])
 def test_a_planted_failing_step_turns_its_level_red(tmp_path: Path, check: str, code: int) -> None:
     """AC1.1: the task level's owner tests decide its exit; no other step runs."""
