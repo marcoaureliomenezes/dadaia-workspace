@@ -42,12 +42,11 @@ def evaluate_payload(payload: dict[str, object]) -> str | None:
             continue
         tool = _unrooted_tool(words, venv_bin)
         if tool:
-            tail = "".join(f" {w if set(w) <= _BOUNDARY else shlex.quote(w)}" for w in words[1:])
             return (
                 "[VENV GUARD] This command must run from the workspace venv "
                 f"({venv_bin}). Blocked:\n"
                 f"  {command.strip()}\n"
-                f"fix: {venv_line(None, tool)}{tail}"
+                f"fix: {venv_line(None, tool, *words[1:])}"
             )
         words = []
     return None
@@ -74,5 +73,12 @@ def _unrooted_tool(words: list[str], venv_bin: str) -> str | None:
         tool = "python"
     else:
         return None
-    rooted = word.endswith(venv_bin + name) and name.endswith(suffix)
+    if word == shlex.split(venv_line(None, tool))[0]:  # the venv the guard itself names
+        return None
+    home = ".dadaia/.venv/"
+    rooted = (
+        home in word
+        if tool == "python"
+        else word.endswith(venv_bin + name) and name.endswith(suffix)
+    )
     return None if rooted else tool
