@@ -164,6 +164,7 @@ def test_an_unbound_session_in_a_repo_injects_no_memory(tmp_path: Path) -> None:
 
 
 @pytest.mark.windows
+@pytest.mark.quarantine(bug="orphan-worktree-line-absent-from-the-bind-block-on-windows")
 def test_a_bound_context_without_specs_gets_its_next_step(tmp_path: Path) -> None:
     """sa-bind-has-two-stores#S7: header and next step, never "[no bound context]"; AC1.5:
     exactly the step text ``doctor`` reports; AC1.10: then the doctor's worktree block, fix

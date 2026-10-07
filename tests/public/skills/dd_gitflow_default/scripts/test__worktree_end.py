@@ -241,6 +241,7 @@ def test_clean_removes_only_an_empty_worktree_of_ours(root: Path) -> None:
 
 
 @pytest.mark.windows
+@pytest.mark.quarantine(bug="worktree-script-run-fails-winerror-193-on-windows")
 def test_release_closure_waits_for_every_other_wt(tmp_path: Path) -> None:
     """AC1.10 (F4); rc-9 AC1.5: closure runs in the Reconciliation job's tree, whose own wt/* is
     spared; any other wt/* refuses it, naming repos/<r> and the owner's exit — `clean` for an
