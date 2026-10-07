@@ -102,10 +102,6 @@ _Avoid_: lane, MEMORY, LAW, UNGATED, FROZEN (retired classes)
 The repo set one Bind owns — its context's main repo plus its associated repos. A file-tool write under `repos/<slug>/` or `worktrees/<slug>/` outside it is blocked, and an unbound session with an id owns no repo; inside it, `repos/<slug>/` takes only `specs/audits/` directly, the rest lands by a Worktree merge. An unregistered slug and a workspace-root path are never scope-judged.
 _Avoid_: ownership, lease, territory, allowlist (for the repo set)
 
-**Evals repo**:
-An associated repo whose one role is to measure agent behaviour against the distribution its context ships; the only repo whose CI may call a model API, under `dd-gitflow-default` §3b.
-_Avoid_: eval harness, benchmark repo
-
 **Zone**:
 A region with one write rule. A `.dadaia/` zone is a row of `core.workspace_layout.DADAIA_ZONES` (class, TTL, creator); a path's scope zone is `core.invocation.scope`'s `root`, `repo`, `audit` or `worktree`.
 _Avoid_: area (for a zone), lane

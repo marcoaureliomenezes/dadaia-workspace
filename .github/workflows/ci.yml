@@ -4,7 +4,7 @@ name: CI
 # `wt/<M.m.p>-rc<N>/<job>` are the ONLY pushable branches (a push triggers the full matrix
 # below); the integration and principal branches advance by PR only. The triggers below are
 # literal (GitHub reads no file) and pinned to the library gitflow by the ci-triggers-gitflow
-# guard; pr-source-guard reads the gitflow itself. No job calls a model API — the security review is the local
+# guard; pr-source-guard reads the gitflow itself. The security review is the local
 # dd-code-reviewer lens.
 on:
   push:
