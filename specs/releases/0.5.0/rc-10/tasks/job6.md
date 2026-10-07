@@ -64,3 +64,13 @@ Paths are relative to the repo root; aliases as in `PLAN.md` (`f/`, `pub/`, `S/`
 | task | AC | `W:` | owner tests / RED |
 |---|---|---|---|
 | J6.S5.T1 | AC6.0, AC6.2 | `GF/_worktree_freeze.py` (range `<merge-base>..HEAD`; a range commit with two parents refuses, or each commit diffs against its first parent; the hunk loop reads whole hunks) and the J6.S4 marker lines | `tests/public/skills/dd_gitflow_default/scripts/test__worktree_freeze.py`, `tests/public/skills/dd_gitflow_default/scripts/test__worktree_end__worktree_freeze.py` |
+
+## Stage J6.S6 — the freeze's fail-open survivors and its law line
+
+- Contract: exit tests unit + integration green, mutation-diff on `GF/_worktree_freeze.py` keeps no fail-open survivor; envelope `tests/public/skills/dd_gitflow_default/scripts/test__worktree_freeze.py`, `pub/data/worktrees-AGENTS.md`, the close's generated files; ACs AC6.0, AC6.2.
+
+| task | AC | `W:` | owner tests / RED |
+|---|---|---|---|
+| J6.S6.T1 | AC6.0 | `tests/public/skills/dd_gitflow_default/scripts/test__worktree_freeze.py` (rows that kill the four fail-open mutants J6.S5.T1 named: a marker-first several-line hunk in a tests-only group refuses; a binary edit in a tests-only group refuses; a new binary test file beside code refuses; a range whose first row edits a test and whose last row is clean refuses) | the file; mutation-diff shows the four killed |
+| J6.S6.T2 | AC6.0 | `pub/data/worktrees-AGENTS.md` (the freeze judges `<merge-base>..HEAD` first-parent diffs, not `<work>...HEAD`) | `tests/contract/test_law_states_what_the_code_does.py` and the guard rows |
+| J6.S6.T3 | — | this file | close, last: behavior map, shipped hashes, derived docs regenerated for S3–S6; `test-audit:`, `mutation:`; `done` |
