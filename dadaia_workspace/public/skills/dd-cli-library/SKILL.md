@@ -18,7 +18,7 @@ line here and `--help` disagree, `--help` wins.
 2. Invoke the CLI by its venv path, never a bare `dadaia`: `.dadaia/.venv/bin/dadaia --help` lists the groups, `<group> --help` the subcommands; add `--json` to read commands for machine-readable output.
 3. `.dadaia/.venv/bin/dadaia harness list` names this workspace's projected runtimes; `.dadaia/.venv/bin/dadaia harness add <name>` registers one more.
 4. Run `.dadaia/.venv/bin/dadaia capabilities --json` first in any new or upgraded session.
-5. Bind the session: `.dadaia/.venv/bin/dadaia context bind <ctx>` — the session id and nested sessions: `.dadaia/AGENTS.md` §2; the bind sets the write scope to the context's main repo plus its associated repos (`.dadaia/AGENTS.md`).
+5. Bind the session: `.dadaia/.venv/bin/dadaia context bind <ctx>` — the main thread's act; a subagent inherits it and never binds (`.dadaia/AGENTS.md` §2).
 6. Workspace compliance: `.dadaia/.venv/bin/dadaia doctor --context <ctx> [--json]` — clean before any implementation write; `--fix` MOVES slop to `.dadaia/reaped/` (7-day hold) and nothing is deleted before its own TTL; `--fix --expired-only` deletes only TTL-expired entries and stale session records — the SessionStart lane (`.dadaia/AGENTS.md`).
 7. Pass an explicit `--context` on every command that takes it.
 8. Converge a runtime: resolve `provider.distribution_version` from `.dadaia/.venv/bin/dadaia capabilities --json`, then `.dadaia/.venv/bin/dadaia reconcile --expect-version "$v" --json`, then `.dadaia/.venv/bin/dadaia certify --json` — a failed certify check is a release blocker.
