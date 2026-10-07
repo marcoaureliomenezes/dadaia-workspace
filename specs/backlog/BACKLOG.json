@@ -463,6 +463,19 @@
         "dd-ask-me-owned-questioning-skill",
         "architecture-adr-section-generated"
       ]
+    },
+    {
+      "id": "impacted-test-selection",
+      "title": "The local stage and merge gates run only the tests a change can reach; CI keeps the full suite",
+      "opened": "2026-10-07",
+      "status": "idea",
+      "description": "Operator, 2026-10-06, verbatim (ADR 0211's ruling): 'N\u00e3o \u00e9 possivel mapear e rodar somente os necess\u00e1rios??'. ADR 0211 answered with a tier cut (the stage level runs lint, typecheck, guards and the whole small tier); the rc-10 Reconciliation review (M3) found that cut is an agent reading of the demand, not the mapping the operator asked for, and deferred it here. Design: the local stage gate and worktree.py merge derive the selection from the change itself - the static import graph of the changed modules (a test is selected when it imports, transitively, a changed module) united with the owner tests the job file declares per task (task-gate-declared-owner-tests is that mapping's one decider; no second owner list); a change the graph cannot resolve (law, data, schema, a non-Python file) selects the whole small tier; CI on push keeps the full suite of every tier unchanged, so a selection miss surfaces there, never as a skip. One decider for the selection, in scripts/ci.py; no new marker. Placement and every design detail not quoted from a ruling are agent default, unruled.",
+      "provenance": "rc-10 Reconciliation review finding M3 (2026-10-07), deferred by the main thread; operator demand in ADR 0211's ruling, 2026-10-06",
+      "relates": [
+        "task-gate-declared-owner-tests",
+        "stage-gate-keeps-only-the-red-check",
+        "test-suite-diet"
+      ]
     }
   ]
 }
