@@ -45,7 +45,6 @@ def test_one_release_id_grammar_everywhere(tmp_path: Path, release_id: str, lega
     assert (new.returncode == 0) is legal, new.stderr
 
 
-@pytest.mark.xfail(strict=True, raises=AssertionError, reason="bug-balance-cuts-a-non-utc-closure-day-to-local")  # fmt: skip
 def test_the_release_instant_reader_reads_an_instant_with_no_offset_as_utc() -> None:
     """bug-balance-cuts-a-non-utc-closure-day-to-local (redo of 3fdfebebc): `_utc` reads every
     instant in UTC — an offset converts, `Z` and `+00:00` are UTC, no offset is UTC and never
@@ -53,7 +52,7 @@ def test_the_release_instant_reader_reads_an_instant_with_no_offset_as_utc() -> 
     probe = (
         "import sys; sys.path.insert(0, sys.argv[1]); import _release_schema as r\n"
         "for ts in sys.argv[2:]:\n"
-        "    try: print(r._utc(ts).isoformat())\n"
+        "    try: print(r.utc(ts).isoformat())\n"
         "    except ValueError: print('ValueError')\n"
     )  # fmt: skip
     instants = ["2026-10-06T23:30:00", "2026-10-06T23:30:00Z", "2026-10-06T23:30:00+00:00",
