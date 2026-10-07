@@ -24,7 +24,7 @@ from pathlib import Path
 import pytest
 
 from dadaia_workspace.core.cli_line import fix_line, venv_line
-from dadaia_workspace.core.platform import Capabilities
+from dadaia_workspace.core.platform import PLATFORM, Capabilities
 from dadaia_workspace.hooks import _common, venv_guard
 
 
@@ -76,10 +76,10 @@ def test_blocks_bare_workspace_invocation(command: str, tool: str, args: str) ->
     "command",
     [
         # Venv-rooted (relative) — the canonical correct form.
-        ".dadaia/.venv/bin/dadaia doctor",
+        f".dadaia/.venv/{PLATFORM.venv_scripts_dir}/dadaia{PLATFORM.venv_exe_suffix} doctor",
         ".dadaia/.venv/bin/python -m dadaia_workspace",
         # Workspace-absolute venv equivalent.
-        "/home/user/ws/.dadaia/.venv/bin/dadaia doctor",
+        f"/home/user/ws/.dadaia/.venv/{PLATFORM.venv_scripts_dir}/dadaia{PLATFORM.venv_exe_suffix} doctor",
         # ADR-G4 explicit exclusions from the VENV-ROOTING rule — never matched by it.
         # (Compliant with the FR28 cache-guard too, see the dedicated matrices below.)
         "pytest -p no:cacheprovider",

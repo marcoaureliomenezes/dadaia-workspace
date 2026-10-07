@@ -14,6 +14,7 @@ from typing import Any
 
 import pytest
 
+from dadaia_workspace.core.platform import PLATFORM
 from dadaia_workspace.hooks import pre_gate
 from tests.fixtures.harness_env import claude_hook_env, run_hook_subprocess
 
@@ -154,4 +155,4 @@ def test_envelope_contract(tmp_path: Path, payload: dict[str, Any], blocked: boo
     }
     assert '"decision": "block"' in raw
     assert raw.index('"hookSpecificOutput"') < raw.index('"reason": "')
-    assert "VENV GUARD" in reason.upper() and ".dadaia/.venv/bin" in reason
+    assert "VENV GUARD" in reason.upper() and f".dadaia/.venv/{PLATFORM.venv_scripts_dir}" in reason
