@@ -161,3 +161,11 @@ def test_the_bugs_pillar_states_how_many_metrics_and_measures_it_lists() -> None
     assert cheap["word"].lower() == measures
     assert re.search(rf"compute all {metrics}\s+forensic metrics", audit)
     assert f"{metrics} bug metrics with baseline" in audit
+
+
+@pytest.mark.xfail(strict=True, raises=AssertionError, reason="manager-orchestration-skill-allows-job-dispatch")  # fmt: skip
+def test_the_orchestration_skill_dispatches_a_task_never_a_job() -> None:
+    """ADR 0190: the task is the dispatch unit, so step 6 of `dd-manager-orchestration` names no
+    job as a unit of dispatch."""
+    skill = (_SKILLS / "dd-manager-orchestration/SKILL.md").read_text("utf-8")
+    assert "unit of dispatch is a job" not in skill
