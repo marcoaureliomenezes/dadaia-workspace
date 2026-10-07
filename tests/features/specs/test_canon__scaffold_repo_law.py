@@ -286,3 +286,26 @@ def test_the_shipped_default_freezes_the_common_test_layouts(tmp_path: Path) -> 
     listed = run("ls-files", "--", *(f":(glob){g}" for g in globs)).split()
 
     assert sorted(listed) == sorted(paths)
+
+
+@pytest.mark.xfail(strict=True, raises=AssertionError, reason="default-tests-globs-over-match-source")  # fmt: skip
+def test_the_shipped_default_freezes_no_source_that_merely_ends_in_test(tmp_path: Path) -> None:
+    """default-tests-globs-over-match-source: `ABTest.tsx` and `LoadTest.md` are source and docs."""
+    template = canon.default_public_dir() / "templates" / "repo-AGENTS.md"
+    globs = next(
+        ln.removeprefix("tests:").split()
+        for ln in template.read_text(encoding="utf-8").splitlines()
+        if ln.startswith("tests:")
+    )
+    paths = ["src/ui/ABTest.tsx", "docs/LoadTest.md"]
+    for rel in paths:
+        (tmp_path / rel).parent.mkdir(parents=True, exist_ok=True)
+        (tmp_path / rel).write_text("x\n", encoding="utf-8")
+    run = lambda *a: subprocess.run(  # noqa: E731
+        ["git", "-c", "user.name=t", "-c", "user.email=t@t.invalid", *a],
+        cwd=tmp_path, check=True, capture_output=True, text=True,
+    ).stdout  # fmt: skip
+    run("init", "-q")
+    run("add", ".")
+
+    assert run("ls-files", "--", *(f":(glob){g}" for g in globs)).split() == []

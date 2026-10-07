@@ -319,3 +319,21 @@ def test_specs_init_with_an_unreadable_law_finishes_onboarding_and_a_rerun_decla
     assert (repo / "specs" / "constitution.md").is_file()
     assert _runner.invoke(app, ["specs", "init", "--context", "c"]).exit_code == 0
     assert any(ln.startswith("tests:") for ln in law.read_text(encoding="utf-8").splitlines())
+
+
+@pytest.mark.xfail(strict=True, raises=AssertionError, reason="default-tests-globs-over-match-source")  # fmt: skip
+def test_the_declared_line_names_the_default_and_asks_to_narrow_it(repo: Path) -> None:
+    """default-tests-globs-over-match-source: the operator learns a language-neutral default was written."""
+    (repo / "AGENTS.md").write_text("# ours\n", encoding="utf-8")
+    template = canon.default_public_dir() / "templates" / "repo-AGENTS.md"
+    default = next(
+        ln.removeprefix("tests:").strip()
+        for ln in template.read_text(encoding="utf-8").splitlines()
+        if ln.startswith("tests:")
+    )
+
+    result = _runner.invoke(app, ["specs", "init", "--context", "c"])
+
+    echo = next(ln for ln in result.output.splitlines() if ln.startswith("[declared]"))
+    assert default in echo
+    assert "narrow" in echo

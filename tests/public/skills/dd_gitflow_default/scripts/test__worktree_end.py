@@ -17,6 +17,7 @@ import shutil
 import subprocess
 import sys
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -660,3 +661,54 @@ def test_a_tests_line_after_a_utf8_bom_is_declared(tmp_path: Path) -> None:
     git(tmp_path, "commit", "-q", "-m", "law")
 
     assert end._declared(tmp_path, "work", "tests:") == "x/**"
+
+
+def _law_end(tmp_path: Path, law: bytes) -> Any:
+    sys.path.insert(0, str(_PACKAGE_SKILLS / "dd-gitflow-default" / "scripts"))
+    end = load_owner("dd-gitflow-default", "_worktree_end")
+    git(tmp_path, "init", "-q", "-b", "work")
+    (tmp_path / "AGENTS.md").write_bytes(law)
+    git(tmp_path, "add", "AGENTS.md")
+    git(tmp_path, "commit", "-q", "-m", "law")
+    return end
+
+
+@pytest.mark.xfail(strict=True, raises=AssertionError, reason="declared-bom-strip-depends-on-locale-decoding")  # fmt: skip
+def test_a_tests_line_after_a_bom_is_declared_when_git_output_decodes_as_cp1252(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Seam assumed: `_declared` reads `git show` through the module's `git`, which decodes with
+    the locale; a cp1252 decode turns the 3 BOM bytes into 3 characters."""
+    end = _law_end(tmp_path, b"\xef\xbb\xbftests: x/**\n")
+    monkeypatch.setattr(end, "git", lambda *a, **k: b"\xef\xbb\xbftests: x/**\n".decode("cp1252"))
+
+    assert end._declared(tmp_path, "work", "tests:") == "x/**"
+
+
+@pytest.mark.parametrize(
+    ("law", "declared"),
+    [
+        (b"# law\ntests: x/**\n", True),
+        (b"# law\nverify: make test\n", False),
+        (b"\xef\xbb\xbftests: x/**\n", True),
+        (b"# law\r\ntests: x/**\r\n", True),
+    ],
+    ids=["present", "absent", "bom", "crlf"],
+)
+def test_the_merge_and_onboarding_readers_judge_a_tests_line_alike(
+    tmp_path: Path, law: bytes, declared: bool
+) -> None:
+    """tests-line-predicate-lives-in-two-readers: `_worktree_end._declared` (the merge freeze) and
+    `canon.declare_tests_line` (onboarding appends only when undeclared) agree on shared fixtures."""
+    from dadaia_workspace.features.specs import canon
+
+    (tmp_path / "a").mkdir()
+    end = _law_end(tmp_path / "a", law)
+    other = tmp_path / "b"
+    other.mkdir()
+    (other / "AGENTS.md").write_bytes(law)
+
+    merge_sees = end._declared(tmp_path / "a", "work", "tests:") != ""
+    onboarding_leaves_alone = canon.declare_tests_line(other) == []
+
+    assert merge_sees == onboarding_leaves_alone == declared
