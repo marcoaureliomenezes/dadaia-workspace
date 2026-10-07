@@ -8,30 +8,8 @@ of that seam, shared by gate/heartbeat/ctx-inject).
 
 from __future__ import annotations
 
-import io
-import json
-from typing import Any
-
-import pytest
-
 from dadaia_workspace.core import invocation
 from dadaia_workspace.hooks import _common
-
-
-@pytest.mark.parametrize(
-    ("stdin_text", "expected"),
-    [
-        (json.dumps({"tool_name": "Write"}), {"tool_name": "Write"}),
-        ("   ", {}),
-        ("{not json", {}),
-        ("[1, 2, 3]", {}),
-    ],
-)
-def test_read_stdin_json(
-    monkeypatch: pytest.MonkeyPatch, stdin_text: str, expected: dict[str, Any]
-) -> None:
-    monkeypatch.setattr("sys.stdin", io.StringIO(stdin_text))
-    assert _common.read_stdin_json() == expected
 
 
 def test_target_path_forms() -> None:

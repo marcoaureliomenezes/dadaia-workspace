@@ -78,6 +78,16 @@ def test_non_write_and_protected_matrix(
         assert block is not None and want in block["reason"], block
 
 
+@pytest.mark.parametrize("envelope", [{}, [1, 2, 3], "text", None], ids=["empty", "list", "string", "null"])
+def test_non_object_envelope_fails_open(tmp_path: Path, envelope: Any) -> None:
+    """The hook lane reads stdin through ``read_stdin_json``: an envelope that is not a JSON
+    object is read as ``{}`` and allowed, never a crash."""
+    env = claude_hook_env(tmp_path, session_id="s")
+    result = run_hook_subprocess("pre_gate", envelope, env)
+    assert result.returncode == 0, result.stderr
+    assert result.block_envelope() is None
+
+
 def test_evaluate_payload_first_block_wins_and_faulty_policy_fails_open(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
