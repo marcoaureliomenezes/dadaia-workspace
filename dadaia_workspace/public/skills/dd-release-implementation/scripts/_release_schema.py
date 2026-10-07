@@ -86,8 +86,10 @@ def live_id(specs: Path) -> str:
     return ids[0]
 
 
-def _utc(ts: str) -> _dt.datetime:
-    return _dt.datetime.fromisoformat(ts.replace("Z", "+00:00")).astimezone(_dt.UTC)
+def utc(ts: str) -> _dt.datetime:
+    """An instant in UTC: an offset converts, `Z` is UTC, and none is UTC, never the host's zone."""
+    at = _dt.datetime.fromisoformat(ts.replace("Z", "+00:00"))
+    return at.replace(tzinfo=_dt.UTC) if at.tzinfo is None else at.astimezone(_dt.UTC)
 
 
 @functools.cache
@@ -99,8 +101,8 @@ def releases(specs: Path) -> dict[str, tuple[_dt.datetime, _dt.datetime | None]]
             state = json.loads(path.read_text(encoding="utf-8"))
             shipped = (state.get("shipped") or {}).get("ts")
             spans[path.parent.name] = (
-                _utc(state["log"][0]["ts"]),
-                _utc(shipped) if shipped else None,
+                utc(state["log"][0]["ts"]),
+                utc(shipped) if shipped else None,
             )
         except (OSError, ValueError, LookupError, TypeError, AttributeError) as exc:
             raise Unreadable(f"{path} has no readable first log ts and shipped ts ({exc})",
@@ -133,7 +135,7 @@ def candidate_adds(specs: Path) -> list[tuple[_dt.datetime, str, str]]:
         show = subprocess.run([*git, "show", f"{sha}:{paths[1]}"], capture_output=True, text=True, check=False)  # fmt: skip
         if extract_status(show.stdout) != APPROVED:
             parts = paths[1].split("/")
-            adds.append((_utc(paths[0]), parts[-3], parts[-2]))
+            adds.append((utc(paths[0]), parts[-3], parts[-2]))
     return adds
 
 
@@ -141,7 +143,7 @@ def candidate_at(specs: Path, instant: str) -> dict[str, str]:
     """The ONE answer to "which candidate held *instant*": the release whose half-open span
     holds it, the rc born last before it in that release, else ``unknown``; raises
     :class:`ShallowClone`, :class:`Unreadable`, or ``ValueError`` for a bad *instant*."""
-    when = _utc(instant)
+    when = utc(instant)
     adds = candidate_adds(specs)
     held = (r for r, (start, end) in releases(specs).items() if start <= when and (end is None or when < end))  # fmt: skip
     release = next(held, "unknown")
