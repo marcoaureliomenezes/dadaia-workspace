@@ -148,8 +148,8 @@ def _gate(tree: Path, level: str, work: str, *files: str) -> None:
     `verify:` the job's, `verify-stage:` and `verify-task:` (the touched *files* appended) — split
     by `shlex` and run as one argv list in *tree*, never a shell, the workspace venv first on
     `PATH` (a bare `python` is the workspace's, at any tree depth); its output, on stdout alone,
-    is the evidence; stdin is closed. A range editing a path the line names refuses, and a missing
-    or unstartable line is fixed on *work* alone."""
+    is the evidence; stdin is closed. A range editing a path in the directory of a file *work*
+    tracks that the line names refuses, and a missing or unstartable line is fixed on *work* alone."""
     key = "verify:" if level == "job" else f"verify-{level}:"
     declared = _declared(tree, work, key)
     agents = tree.parents[3] / "repos" / tree.parents[1].name / "AGENTS.md"
@@ -161,7 +161,8 @@ def _gate(tree: Path, level: str, work: str, *files: str) -> None:
     try:
         argv = shlex.split(declared)
         touched = git(tree, "diff", "--name-only", f"{work}...HEAD").split()
-        if own := next((a for a in argv if a in touched), None):  # no tree edits its own judge
+        named = set(argv) & set(git(tree, "ls-tree", "-r", "--name-only", work, "--", *argv).splitlines())  # fmt: skip
+        if own := next((p for p in touched for a in named if p == a or p.startswith(a.rpartition("/")[0] + "/")), None):  # fmt: skip
             raise Refusal(f"this range edits {own}, which the {key} line runs",
                           f"Operator action: commit {own} on {work} — no tree edits its own judge (ADR 0207)")  # fmt: skip
         command = [*argv, *files]
@@ -198,12 +199,11 @@ def _checks(root: Path, tree: Path) -> Iterator[tuple[str, subprocess.CompletedP
 
 
 def _ledgers(root: Path, tree: Path) -> None:
-    """A `define` or `backlog` merge's whole gate: the ledger checks and the doctor on the tree."""
+    """A `define` or `backlog` merge's whole gate: the ledger checks and the doctor on the tree, a red one relaying its own first `fix:` line."""
     for name, done in _checks(root, tree):
         if done.returncode:
-            print(done.stdout, done.stderr, sep="", end="")
-            raise Refusal(f"{name} check failed on {tree / 'specs'}",
-                          f"Operator action: fix the findings above in {tree} and commit them")  # fmt: skip
+            print(out := done.stdout + done.stderr, end="")
+            raise Refusal(f"{name} check failed on {tree / 'specs'}", next((ln[5:] for ln in out.splitlines() if ln.startswith("fix: ")), f"Operator action: fix the findings above in {tree} and commit them"))  # fmt: skip
 
 
 def _series(tree: Path, work: str, tip: str) -> list[tuple[str, str]]:
@@ -304,13 +304,12 @@ def merge(root: Path, path: str, keep: list[str], drop: bool) -> str:
                           f"Operator action: fix the Owner-tests: trailer of the task's commits in {tree}")  # fmt: skip
         touched = git(tree, "diff", "--name-only", "--diff-filter=d", f"{onto}...HEAD").split()
         argv = [*dict.fromkeys(touched + owners)]
-        if any(p.endswith(".py") for p in argv) and not any(
-            Path(p).name.startswith("test_") for p in argv
-        ):
+        work = _target(root, str(into))[3]
+        _freeze(tree, work)  # refuses an absent `tests:` line first
+        tests = git(tree, "ls-files", "--", *(f":(glob){g}" for g in _declared(tree, work, "tests:").split())).splitlines()  # fmt: skip
+        if any(p.endswith(".py") for p in argv) and not set(argv) & set(tests):
             raise Refusal("a code task's gate names no test file: it runs no tests",
                           f"Operator action: name the task's owner tests in an Owner-tests: trailer on its commits in {tree}")  # fmt: skip
-        work = _target(root, str(into))[3]
-        _freeze(tree, work)
         _gate(tree, "task", work, *argv)
         _refuse_dirty(into)
     elif non_code(name):
