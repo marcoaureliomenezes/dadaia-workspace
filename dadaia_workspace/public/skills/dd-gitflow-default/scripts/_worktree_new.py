@@ -9,8 +9,8 @@ from pathlib import Path
 for _skill in ("dd-release-implementation", "dd-bug-resolution"):
     sys.path.append(str(Path(__file__).resolve().parents[2] / _skill / "scripts"))
 
-from _ledger import parse  # noqa: E402
 from _release_schema import extract_status  # noqa: E402
+from _specs import parse  # noqa: E402
 from _worktree_git import flow_for, git, ours, quote, rows, script, work_version  # noqa: E402
 from _worktree_names import LOCK, NAME_RE, SCRIPT, TASK_CAP, Refusal, base, branch  # noqa: E402
 
