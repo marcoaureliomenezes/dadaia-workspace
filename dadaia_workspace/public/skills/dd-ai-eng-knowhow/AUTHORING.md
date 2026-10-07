@@ -64,7 +64,7 @@ Every library skill must satisfy all fifteen; each rule's detail lives in the se
 - A sibling is one ALL-CAPS.md per topic, pointed at with its reaching condition ("deepening a cluster → `DEEPENING.md`").
 - A deterministic procedure ships as a script/template sibling; the skill's job reduces to authoring its variable parts.
 - Co-location: keep a concept's definition, rule, and caveat under one heading, not scattered.
-- Sprawl is the failure disclosure cures; the reference corpus keeps every SKILL.md between 7 and ~140 lines.
+- Sprawl is the failure disclosure cures; each SKILL.md's size is recorded in `behavior-map.json`.
 
 ---
 
@@ -129,7 +129,7 @@ decision-rich part.
 - When a skill branches, the branch decision is the FIRST step — picking the wrong branch wastes the whole run.
 - Templates and formats are given as fenced blocks where they are used.
 - Human gates are explicit: finding facts is the agent's job (inspect before asking); decisions are the operator's — put each one to them and wait.
-- A round-based interview asks the whole frontier at once, numbered, each question carrying a recommended answer.
+- An interview puts one question per `AskUserQuestion` call, carrying a recommended answer (ADR 0165).
 
 ---
 
