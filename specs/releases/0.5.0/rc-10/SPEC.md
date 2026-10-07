@@ -3,6 +3,7 @@
 **Status:** Approved
 **Approval:** operator ruling 2026-10-06 (AskUserQuestion): "Aprovo SPEC + 0208–0210 (Recommended)", on 9f36ca986 (reviewer APPROVED 9f36ca986).
 Amended 2026-10-06 on review M-A at cfe73a297 (factual sha/count corrections); approval basis: dd-code-reviewer re-review of the amended define head.
+Amended 2026-10-07 by operator ruling: Jobs 2 and 3 annulled, Job 9 added ("Novo job no rc-10 (Recommended)").
 **Release ID:** 0.5.0
 **Owner:** dd-product-engineer
 **Opened:** 2026-10-06 in the `0.5.0-rc10/define` tree while rc-9 reconciles (0205).
@@ -14,7 +15,7 @@ Amended 2026-10-06 on review M-A at cfe73a297 (factual sha/count corrections); a
   - `2026-10-05T005326Z-main-thread-grill-bug-window-review`: G8, G10.
 - Scope (Q4): 8 jobs, the cap (0193); the bug batch and Reconciliation uncounted. The SPEC's packing, not a ruling: T1 and T2 share one job so the test freeze fits.
 - Facts at 27123ce99:
-  - `dadaia-evals`: no `tasks/`; `eval.yml` (`main`, 877ff5b) never ran; no `verify:` line.
+  - `dadaia-evals`: annulled 2026-10-07 by operator ruling; it leaves the context, and the evals move to the library repo (Job 9).
   - Memory names 8 test files that no longer exist (3 at cfe73a297).
   - HOOKS-DRIFT-1 reads an absent hook as "differs".
 - Entry order (M4): at rc-9's CLOSURE `release.py new` writes the stub `rc-10/SPEC.md`; this tree then rebases and replaces it (`release-new-adopts-a-drafted-next-rc`: rc-11).
@@ -92,31 +93,11 @@ Read at 27123ce99 and on `wt/0.5.0-rc9/reconcile`; re-read at cfe73a297, rc-9's 
 
 ## Job 2 — evals: the repo law, T1 and T2
 
-Writes only to `repos/dadaia-evals` and the job file.
-
-- AC2.1 `dadaia-evals/AGENTS.md` declares `verify:`, `verify-stage:` and `verify-task:` lines, holding the secret-free checks `ci.yml` runs, and `tests: tests/** tasks/*/tests/**` (AC6.0). **No test**. Check: `grep -cE '^(verify|tests:)' AGENTS.md` prints `4`, and this job's gate runs the `verify:` line.
-- AC2.2 Skeleton (rc-8 AC11.2):
-  - `tasks/t1-cold-onboarding/` and `tasks/t2-block-list-bug/` each hold `instruction.md`, `task.toml`, `environment/Dockerfile`, `tests/test.sh` and `tests/test_grade.py`.
-  - The Dockerfile holds the environment only; the lib is its last layer (0179).
-  - **Integration**: each image builds with the 0.4.7 layer and with a candidate wheel; `git ls-files jobs` prints nothing.
-- AC2.3 T1, cold onboarding (rc-8 AC11.3):
-  - The environment is a `file://` bare repo with one commit.
-  - It passes on `dadaia doctor --json` with 0 errors, the context ALIVE and specs initialized.
-  - **Integration** (no model): the unchanged grader passes on a hand-onboarded workspace of each version and fails on an empty one.
-- AC2.4 T2 plants a block-list bug (Q1): a small onboarded project whose suite, its work branch's CI, is red after a merged change broke a documented contract. The instruction gives the operator's confirmation.
-  - Both versions' law fixes it at once.
-  - It passes when a `BUGS.jsonl` record precedes the fix commit, the RED test fails on the pre-fix sha and passes on the fix, the suite is green at HEAD, and `git diff -U0 -- tests | grep '^-\s*assert'` prints nothing.
-  - The grader reads only `bug-record-v1` fields both versions carry.
-  - **Integration** (no model): on both versions, a planted correct fix passes and a planted assert-rewriting fix fails.
+Annulled 2026-10-07 by operator ruling; replaced by Job 9.
 
 ## Job 3 — evals: the first run
 
-Edge: Job 2, merged to `dadaia-evals` `main` through its PR edges.
-
-- AC3.1 One `gh workflow run eval.yml -f lib_ref=<tip of feature/0.5.0>`: T1 and T2, k=3, 0.4.7 against the candidate (rc-8 AC11.6).
-  - It confirms the stamped candidate wheel ran (`dadaia capabilities --json`) and no rate-limit error appears in `jobs/`.
-  - A failing grader is fixed in the grader before closure.
-  - **No test**. Check: a `_RELEASE.json` `kind: note` names the run URL, the verdict per 0178 (2), tokens and wall time.
+Annulled 2026-10-07 by operator ruling; replaced by Job 9.
 
 ## Job 4 — QUALITY.md's bug balance and the convergence readouts
 
@@ -156,7 +137,7 @@ Edge: Job 2, merged to `dadaia-evals` `main` through its PR edges.
 
 Q6 items 1–5; 0209. Everything is judged by `git diff` over the repo's test paths, so it works for any language. Edges: Jobs 1–5, 7 and 8 → Job 6, the DAG's last job; its freeze binds every job opened after Job 6 merges, rc-10's bug batch (AC9.1), any later hotfix and Reconciliation included; the gate keeps no rc-number special case. Arm B's RED-then-fix stages already fit the freeze. Jobs 1–5, 7 and 8, AC8.2's RED included, run under today's law.
 
-- AC6.0 A repo declares its test paths as one `tests:` line of globs in its tracked `AGENTS.md`, beside the `verify:` lines (e.g. `tests: tests/** **/*_test.go`). The gate reads it from the work branch, the authority 0207 uses, so no worktree changes what counts as a test. Job 6 commits `tests: tests/**` to dadaia-workspace's `AGENTS.md` (dadaia-evals': AC2.1). A repo with no `tests:` line refuses with one line in 0207's lane, `Operator action: commit the tests: line on <work branch>'s AGENTS.md`, and that act clears the block (rc-9's verify-line Stall shape). **Integration**: a worktree editing its own `tests:` line still has a test edit refused; a repo with no `tests:` line refuses with that line, and after the line is committed on the work branch the same merge lands.
+- AC6.0 A repo declares its test paths as one `tests:` line of globs in its tracked `AGENTS.md`, beside the `verify:` lines (e.g. `tests: tests/** **/*_test.go`). The gate reads it from the work branch, the authority 0207 uses, so no worktree changes what counts as a test. Job 6 commits `tests: tests/**` to dadaia-workspace's `AGENTS.md`. A repo with no `tests:` line refuses with one line in 0207's lane, `Operator action: commit the tests: line on <work branch>'s AGENTS.md`, and that act clears the block (rc-9's verify-line Stall shape). **Integration**: a worktree editing its own `tests:` line still has a test edit refused; a repo with no `tests:` line refuses with that line, and after the line is committed on the work branch the same merge lands.
 - AC6.1 Tests are born only in a RED stage, one whose tasks' `W:` holds tests only. Each new test is validated before the freeze: collected, failing by assertion (never by error), test-audit, stage review. **Integration**: a RED stage whose new test errors instead of failing cannot close.
 - AC6.2 From the RED anchor on, a task or job merge refuses any diff on a test file. This covers unit, integration and E2E tests and the tests that existed before; a pure rename is allowed.
   - The refusal carries one `Operator action:` line: stop and report.
@@ -186,6 +167,29 @@ Q6 items 1–5; 0209. Everything is judged by `git diff` over the repo's test pa
 - AC8.2 `SpecContextService` and `DoctorService` take worktree rows by constructor injection. The autouse monkeypatch and the inline patch in `test_cli_context.py` leave. Boundary fakes live in `tests/fakes.py`. **Unit**: each service built with a stub rows callable.
 - AC8.3 Every hook test drives its hook through the one production-faithful harness (0163): the entrypoint as a subprocess, fed a payload fixture. No test patches `sys.stdin`. The `hook-stdin-not-in-process` guard check leaves; the harness is the one way a hook test feeds stdin. **Integration**: one row per hook lane. Check: `grep -c hook-stdin-not-in-process scripts/guards/isolation.py` prints `0`.
 
+## Job 9 — evals in the library's own CI
+
+Operator rulings 2026-10-07: the evals live in the dadaia-workspace repo and its CI; the context carries no second repo. ACs are AC11.x: AC9 is the bug batch's, AC10 Reconciliation's.
+
+- AC11.1 `evals/` at the repo root holds `tasks/t1-cold-onboarding/`, `tasks/t2-block-list-bug/` and `scripts/compare.py`, `scripts/scan.py`, ported from dadaia-evals c075ed6.
+  - Each task holds `instruction.md`, `task.toml`, `environment/Dockerfile` (environment only, the lib its last layer), `tests/test.sh` and `tests/test_grade.py`.
+  - The wheel ships none of it (`packages` = `dadaia_workspace` only).
+  - **Integration** (no model), in the library's test tree: each image builds with the 0.4.7 layer and with the candidate wheel; the T1 grader passes on a hand-onboarded workspace and fails on an empty one; on T2 a planted correct fix passes and a planted assert-rewriting fix fails. Check: the built wheel's file list holds no `evals/` path.
+- AC11.2 One decider for the eval workflow rules: dadaia-evals' `scripts/check_workflows.py` is not ported; its clauses become the guard `no-model-api-in-ci` (`scripts/guards/repo.py`).
+  - A model call only in `.github/workflows/eval.yml`; its triggers only `workflow_dispatch` and `schedule`; no self-hosted runner; the model secret read at job level only; a secret scan before any upload and before the job summary.
+  - **Unit** + adversary rows, each refused: a model call in a push-triggered workflow; `eval.yml` with `pull_request`; a self-hosted runner; a workflow-level secret.
+- AC11.3 `.github/workflows/eval.yml`: `workflow_dispatch` plus a weekly `schedule`; environment `evals`; builds the candidate wheel from its own checkout sha (no cross-repo `lib_ref`); a baseline input, default 0.4.7; T1 and T2, k=3; the scan before upload. **No test**. Check: the guard passes on it.
+- AC11.4 The shipped law states no model-API-in-CI rule.
+  - The line and its clauses leave `public/data/AGENTS.md` (map §3), `dd-gitflow-default` SKILL.md §3b, `CICD-AUTOMATION.md` and `CONTEXT.md` (the term "Evals repo").
+  - Memory atoms (`specs/memory/**`) and `QUALITY.md` that name dadaia-evals as a context repo name the library's own evals.
+  - **No test**. Check: `git grep -n -i 'evals repo\|dadaia-evals' -- dadaia_workspace CONTEXT.md specs/memory` prints nothing; the sweep count goes in the commit body.
+- AC11.5 `eval.yml` reaches `main` through the constitution's Operational-Change Lane (operator order 2026-10-07): reviewer APPROVED, CI green. GitHub dispatches a workflow only when its file is on the default branch. **No test**. Check: `gh api repos/marcoaureliomenezes/dadaia-workspace/contents/.github/workflows/eval.yml?ref=main` succeeds.
+- AC11.6 The first run (replaces AC3.1): `gh workflow run eval.yml --ref feature/0.5.0`, T1 and T2, k=3, 0.4.7 against the candidate.
+  - It confirms the stamped candidate ran (`dadaia capabilities --json`) and no rate-limit error.
+  - A failing grader is fixed in the grader before closure.
+  - The secret `CLAUDE_CODE_OAUTH_TOKEN` lives in the repo's Environment `evals` (branches `main`, `feature/*`); the operator sets it.
+  - **No test**. Check: a `_RELEASE.json` `kind: note` names the run URL, the verdict per 0178 (2), tokens and wall time.
+
 ## The bug batch
 
 - AC9.1 Every bug found in rc-10 is resolved in rc-10 (0206).
@@ -202,7 +206,7 @@ Q6 items 1–5; 0209. Everything is judged by `git diff` over the repo's test pa
   - F098 and F128 are dispositioned `resolved`.
 - AC10.2 `## Bugs` is regenerated after the disposition sweep. `_RELEASE.json` logs the readouts, AC8.1's readout, each job's `kind: merge` entry and each job's bug-surface delta.
 - AC10.3 The `measured_by` of 0208 and 0209 names cases this rc built (AC1.2, AC4.1–AC4.4; AC6.0–AC6.2); a name that moved is repaired in the 0138 lane.
-- AC10.4 Each Origin backlog entry exits once, `delivered --release 0.5.0`. `agent-behavior-evals` exits after AC3.1 is logged, with 0177–0179 ruled.
+- AC10.4 Each Origin backlog entry exits once, `delivered --release 0.5.0`. `agent-behavior-evals` exits after AC11.6 is logged, with 0211 ruled.
 - AC10.5 Closure follows the releases law, with zero open bugs; rc-11 is defined beside it.
 
 ## ADRs
@@ -223,6 +227,7 @@ Q6 items 1–5; 0209. Everything is judged by `git diff` over the repo's test pa
   - `measured_by`: AC6.0–AC6.2's cases.
 - **0210**, accepted with this SPEC's Approval (operator, 2026-10-06: "(b) Qualquer caused_by ≠ none é REBUILD (Recommended)"): any `caused_by` other than none, a bug's fix or a feature task, makes the fix a REBUILD of the unit, keeping its tests. It keeps 0186 (2) and widens 0206's "a fix-induced one" (`amends: 0206`). SPEC text, not part of the ruling, which the operator accepts at Approval: a REBUILD's revert under 0186 (2) keeps the culprit's test files, so it fits 0209. `measured_by`: the ninth `PILLAR-BUGS` metric (AC1.4).
 - The main thread proposes 0208–0210 in `decisions.jsonl` at Approval.
+- **0211**, proposed 2026-10-07 (supersedes 0177, 0179): evals live in the library repo's own CI; no context carries an evals repo; the shipped law states no model-API-in-CI rule (Job 9). `measured_by`: the guard `no-model-api-in-ci` and AC11.4's grep.
 
 ## Replaces
 
@@ -237,13 +242,15 @@ Q6 items 1–5; 0209. Everything is judged by `git diff` over the repo's test pa
 - Processes in the unit tier; the autouse rows monkeypatch; patched `sys.stdin` and the `hook-stdin-not-in-process` guard check (AC8).
 - `docs/bug-ledger-lessons.md`'s source: the `bug-ledger` atom and today's `QUALITY.md` sections give way to `## Bugs`' written review (AC4.5).
 - Stale `Measured by` paths (AC10.1).
+- dadaia-evals as the context's evals repo, its `check_workflows.py` and the cross-repo `lib_ref` (AC11.1–AC11.3).
+- The shipped law's model-API-in-CI line and its §3b clauses; the `CONTEXT.md` term "Evals repo" (AC11.4).
 
 ## Risks
 
 | Weakness | Mitigation |
 |---|---|
 | 8 jobs is the cap. | A new need goes to rc-11. |
-| Job 3 spends model quota: 12 trials. | `-n 2`, economy template, one run. |
+| Job 9 spends model quota: 12 trials. | `-n 2`, economy template, one run. |
 | Jobs 7–8 change most test files. | Job 6 lands last, so its freeze does not bind them. |
 | Jobs 1 and 4 share the bug skill. | Disjoint files or a PLAN edge. |
 
