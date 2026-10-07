@@ -4,10 +4,11 @@
 **Approval:** operator ruling 2026-10-06 (AskUserQuestion): "Aprovo SPEC + 0208–0210 (Recommended)", on 9f36ca986 (reviewer APPROVED 9f36ca986).
 Amended 2026-10-06 on review M-A at cfe73a297 (factual sha/count corrections); approval basis: dd-code-reviewer re-review of the amended define head.
 Amended 2026-10-07 by operator ruling: Jobs 2 and 3 annulled, Job 9 added ("Novo job no rc-10 (Recommended)").
+Amended 2026-10-07 by operator ruling: Job 10 added ("Job estrutural no rc-10 (Recommended)"; "Revisor emite o próprio (Recommended)").
 **Release ID:** 0.5.0
 **Owner:** dd-product-engineer
 **Opened:** 2026-10-06 in the `0.5.0-rc10/define` tree while rc-9 reconciles (0205).
-**Origin:** backlog:agent-behavior-evals,bug-ledger-balance-and-convergence,guidance-messages-name-the-right-target,tests-tree-mirrors-the-package,unit-tier-without-processes,worktree-rows-injected-not-monkeypatched,windows-integration-coverage-gap,focused-review-on-caused-by,bugs-fix-reads-the-per-class-shape,context-dead-never-commits,bug-fix-adds-never-rewrites-asserts,caused-by-proposed-by-blame; findings:20260930-structural-convergence-F098,20260930-structural-convergence-F128
+**Origin:** backlog:agent-behavior-evals,bug-ledger-balance-and-convergence,guidance-messages-name-the-right-target,tests-tree-mirrors-the-package,unit-tier-without-processes,worktree-rows-injected-not-monkeypatched,windows-integration-coverage-gap,focused-review-on-caused-by,bugs-fix-reads-the-per-class-shape,context-dead-never-commits,bug-fix-adds-never-rewrites-asserts,caused-by-proposed-by-blame,law-one-home-per-rule; bugs:agentic-projections-agent-writable,merge-gate-accepts-verdict-written-by-the-merger,verdict-ttl-shorter-than-merge-window,venv-guard-misses-prefixed-and-absolute-dadaia,root-enforcement-section-states-false-blocks,approval-precondition-four-versions,spec-navigator-subagent-rebinds-parent,push-before-review-forbidden-and-required,read-only-reviewer-named-audit-writer,software-engineer-persona-self-contradicts,grill-skill-contradicts-adr-0165,review-assert-guard-has-no-base-range,skills-ask-grantees-for-writes-they-cannot-do,law-cites-commands-that-fail-from-root,law-cites-dead-sections-and-retired-terms; findings:20260930-structural-convergence-F098,20260930-structural-convergence-F128
 
 - Sources, under `.dadaia/handoff/dadaia-workspace/`:
   - `2026-10-06T015544Z-main-thread-grill-rc10-scope`: Q1–Q4, Q2b, Q5, Q6, ADR 0206.
@@ -189,6 +190,36 @@ Operator rulings 2026-10-07: the evals live in the dadaia-workspace repo and its
   - A failing grader is fixed in the grader before closure.
   - The secret `CLAUDE_CODE_OAUTH_TOKEN` lives in the repo's Environment `evals` (branches `main`, `feature/*`); the operator sets it.
   - **No test**. Check: a `_RELEASE.json` `kind: note` names the run URL, the verdict per 0178 (2), tokens and wall time.
+## Job 10 — one home per rule
+
+The agentic set audit's 15 bugs (registered at 7b0f8a1ca) and `law-one-home-per-rule`, resolved together. Operator, 2026-10-07: "Job estrutural no rc-10 (Recommended)"; "Revisor emite o próprio (Recommended)". Work order: deletion first; a code gate gets its fix with a RED test first; a law rule gets one home and every other file points there.
+
+Edge: Job 10 merges after Job 9 and the bug batch, and rebases on both, because they edit the same law files (the root map §3, `dd-gitflow-default` §3b, the 29 law files of the posix venv path render).
+
+- AC12.1 `.dadaia/agentic/**` and `.claude/settings.local.json` are PROTECTED, so no agent rewrites the schema or the wiring that judges it. They join the protected set the gate already reads; the engineer names its one decider (`workspace_layout.CORE_FLOOR` or the install ledger), and no second list is added. **Unit**, RED first: an agent `Write` and `Edit` to `.dadaia/agentic/schemas/handoff-v1.schema.json` and to `.claude/settings.local.json` are each blocked. (`agentic-projections-agent-writable`)
+- AC12.2 The reviewer writes its own verdict, so the merger cannot certify its own merge (ADR 0212):
+  - A `dd-handoff-emitter` script, run by the reviewer through Bash, writes the review handoff; it is the reviewer's only write.
+  - The verdict carries `reviewed_sha` and `diff_sha256`, the hash of the job range diff the merge will land.
+  - `worktree.py merge` recomputes the hash over its own range and refuses a verdict with a missing field or a mismatch.
+  - The reviewer persona and the law name the reviewer as the only verdict writer, in one home; the main thread never writes a verdict.
+  - **Unit**, RED first, adversary rows (checklist 12): a verdict for another sha, a verdict whose range moved after the review, and a hand-written verdict without the hash are each refused; the matching verdict merges. (`merge-gate-accepts-verdict-written-by-the-merger`)
+- AC12.3 A verdict stays findable until its merge, so a slow merge never loses its review. The engineer picks one decider: the merge gate finds the verdict for its head sha wherever the reaper moved it, or verdicts leave the TTL. **Unit**, RED first: a verdict older than the TTL, reaped, is still found by the merge of its sha. (`verdict-ttl-shorter-than-merge-window`)
+- AC12.4 The venv guard judges every command of a Bash line, so no prefix carries a bare `dadaia` past it: after `&&`, `;` and `|`, behind an env assignment, and as an absolute or relative path to a `dadaia` outside `.dadaia/.venv/bin/`. The law states exactly that. **Unit**, RED first: one row per bypass, each blocked; the venv path in the same positions passes. (`venv-guard-misses-prefixed-and-absolute-dadaia`)
+- AC12.5 Root §3 states what the code enforces. The existing law-states-what-the-code-does test extends to its block list and its fail-open list. The PR-needs-APPROVED claim names what enforces it (the merge gate) or leaves. **Unit**, RED first: the extended test fails on today's §3 and passes on the rewritten one. (`root-enforcement-section-states-false-blocks`)
+- AC12.6 One home per rule, deletion first; net law lines < 0, measured by `git diff --numstat` over the law files and stated in the close commit body:
+  - The approval precondition lives only in `specs/AGENTS.md`, true to `_release_phase.py`; every other file points there. (`approval-precondition-four-versions`)
+  - Push-then-review lives once in `worktrees/AGENTS.md`, as the merge gate needs it: the job branch is pushed for CI before the review, and the verdict cites `ci_run`. Orchestration and the reviewer persona point there. (`push-before-review-forbidden-and-required`)
+  - Commit shapes live only in `dd-gitflow-default` §3a; worktree rules only in `worktrees/AGENTS.md`; the bug flow only in `specs/bugs/AGENTS.md`.
+  - **No test** (law text). Check: the sweep greps, each with its hit count, in the commit body.
+- AC12.7 Each writer matches its tools, so no skill asks for a write its grantee cannot make:
+  - The reviewer is named a writer only of its verdict; the main thread writes an audit from the reviewer's report, stated in one home. (`read-only-reviewer-named-audit-writer`)
+  - Every skill a persona receives asks only for writes that persona can make. (`skills-ask-grantees-for-writes-they-cannot-do`)
+  - The `dd-software-engineer` persona loses its four self-contradictions (E2E, AI-entity authoring, reservation, HTML) and receives `dd-release-definition`. (`software-engineer-persona-self-contradicts`)
+  - **No test**. Check: the entity doctor tests stay green; one grep per contradiction prints one side only.
+- AC12.8 A subagent inherits its parent's binding and never binds, so it cannot rewrite the parent's write scope. `dd-spec-navigator` drops the env-before-bind and bind steps for a subagent; `.dadaia/AGENTS.md` states the inheritance once. **No test**. Check: `grep -n 'bind' dadaia_workspace/public/skills/dd-spec-navigator/SKILL.md` names no subagent bind step. (`spec-navigator-subagent-rebinds-parent`)
+- AC12.9 `dd-grill-me` teaches ADR 0165: one question per `AskUserQuestion` call, no `.md` questionnaire. `AUTHORING.md` and `.dadaia/handoff/AGENTS.md` lose the `.md` form. **No test**. Check: a grep for the questionnaire `.md` form over the three files prints nothing. (`grill-skill-contradicts-adr-0165`)
+- AC12.10 The review's assert guard has one decider: the ADR 0209 test freeze already judges test edits over the job range. `dd-code-review`'s base-less `git diff -U0 -- tests` line is deleted and points to the freeze; if the freeze does not cover the review case, the line gets the merge-base range instead. **No test**. Check: `grep -rn 'git diff -U0 -- tests' dadaia_workspace/public/skills/dd-code-review` prints nothing, or only the merge-base form. (`review-assert-guard-has-no-base-range`)
+- AC12.11 Every command the law cites runs from the workspace root as written: `bugs.py status` gets its working form, and a bare `dadaia` becomes the venv path the gate allows. Dead references and retired terms are deleted or repointed: `TASKS.md` for a live rc, reservation, locks, QA and security handoffs, `DADAIA.md`, ADR #14, the misquoted 0027, the §7 lenses, D11, FR8, and the rest the audit's §6 lists. **No test**. Check: the sweep greps print nothing; their count is in the commit body. (`law-cites-commands-that-fail-from-root`, `law-cites-dead-sections-and-retired-terms`)
 
 ## The bug batch
 
@@ -228,6 +259,7 @@ Operator rulings 2026-10-07: the evals live in the dadaia-workspace repo and its
 - **0210**, accepted with this SPEC's Approval (operator, 2026-10-06: "(b) Qualquer caused_by ≠ none é REBUILD (Recommended)"): any `caused_by` other than none, a bug's fix or a feature task, makes the fix a REBUILD of the unit, keeping its tests. It keeps 0186 (2) and widens 0206's "a fix-induced one" (`amends: 0206`). SPEC text, not part of the ruling, which the operator accepts at Approval: a REBUILD's revert under 0186 (2) keeps the culprit's test files, so it fits 0209. `measured_by`: the ninth `PILLAR-BUGS` metric (AC1.4).
 - The main thread proposes 0208–0210 in `decisions.jsonl` at Approval.
 - **0217**, accepted 2026-10-07 (supersedes 0177, 0179): evals live in the library repo's own CI; no context carries an evals repo; the shipped law states no model-API-in-CI rule (Job 9). `measured_by`: the guard `no-model-api-in-ci` and AC11.4's grep.
+- **0212**, proposed with Job 10 (operator, 2026-10-07: "Revisor emite o próprio (Recommended)"): the reviewer writes its own verdict; the merge gate binds it to the reviewed sha and the diff hash (AC12.2). `measured_by`: AC12.2's adversary rows.
 
 ## Replaces
 
@@ -244,6 +276,9 @@ Operator rulings 2026-10-07: the evals live in the dadaia-workspace repo and its
 - Stale `Measured by` paths (AC10.1).
 - dadaia-evals as the context's evals repo, its `check_workflows.py` and the cross-repo `lib_ref` (AC11.1–AC11.3).
 - The shipped law's model-API-in-CI line and its §3b clauses; the `CONTEXT.md` term "Evals repo" (AC11.4).
+- A verdict written by the merging main thread; a verdict without `reviewed_sha` and `diff_sha256`; a verdict reaped before its merge (AC12.2, AC12.3).
+- Agent-writable agentic projections and harness settings (AC12.1); the venv guard's first-token-only reading (AC12.4).
+- Every second statement of a rule that has its one home; root §3's false blocks; the base-less review assert line; the grill's `.md` questionnaire; the subagent bind step; retired terms and dead citations (AC12.5–AC12.11).
 
 ## Risks
 
