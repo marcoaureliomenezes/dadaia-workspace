@@ -82,7 +82,7 @@ Paths are relative to the repo root; aliases as in `PLAN.md` (`f/`, `pub/`, `S/`
 
 ## Stage J7.S8 — the AC7.4 listing step lists, it does not run
 
-- Contract: exit: the stage gate (lint, mypy, guards, small) green; the Windows legs' listing step exits 0 with the quarantined cases; envelope `.github/workflows/ci.yml`; ACs AC7.4
+- Contract: exit: the stage gate (lint, mypy, guards, small) green; the Windows legs listing step exits 0 when its selection is empty; envelope `.github/workflows/ci.yml`; ACs AC7.4
 
 | task | AC | `W:` | owner tests / RED |
 |---|---|---|---|
