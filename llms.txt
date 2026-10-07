@@ -11,7 +11,7 @@
 ## Install
 
 <!-- derived-from: pypi-distribution sha256:41df64f3512e -->
-<!-- derived-from: workspace-init sha256:4f0ceaccc6c8 -->
+<!-- derived-from: workspace-init sha256:a8f08f87ae76 -->
 
 - [PyPI project](https://pypi.org/project/dadaia-workspace/): three levels — `uvx dadaia-workspace init <dir> --harness <name> --repo <url>` (workspace + project: cloned and ALIVE; only `.dadaia/.venv/bin/dadaia context bind <slug>` binds a session), then `.dadaia/.venv/bin/dadaia specs init --context <slug>` (specs on the canon) and `.dadaia/.venv/bin/dadaia doctor`; every later command runs through `.dadaia/.venv/bin/dadaia`; re-running the `uvx` init line upgrades the workspace, then `.dadaia/.venv/bin/dadaia specs init --context <ctx>` refreshes each project's specs law.
 - [Changelog](CHANGELOG.md): written by release-please, one section per released version.
