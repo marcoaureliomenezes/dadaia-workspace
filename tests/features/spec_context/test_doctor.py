@@ -373,3 +373,18 @@ def test_fix_migrates_the_legacy_exceptions_and_never_touches_operator_files(
     assert not env.fixable and "outside the workspace" in env.detail
     _make_doctor(tmp_path).fix()
     assert (tmp_path / DADAIAIGNORE).is_file() and (tmp_path / ".env").is_file()
+
+
+@pytest.mark.xfail(strict=True, raises=AssertionError, reason="root-allows-git-and-gitignore-though-root-is-never-a-repo")  # fmt: skip
+def test_fix_on_a_root_holding_a_git_dir_moves_nothing(tmp_path: Path) -> None:
+    """A root ``.git/`` is a finding the reaper never moves: it is a repository's history, so
+    the finding is unfixable and names the operator's act."""
+    _init_workspace(tmp_path)
+    (tmp_path / ".git").mkdir()
+    head = tmp_path / ".git" / "HEAD"
+    head.write_text("ref: refs/heads/main\n", encoding="utf-8")
+    (git,) = [f for f in _make_doctor(tmp_path).scan() if f.path == ".git"]
+    assert git.verdict is FindingVerdict.SLOP and not git.fixable
+    assert git.fix.startswith("Operator action:")
+    _make_doctor(tmp_path).fix()
+    assert head.read_text(encoding="utf-8") == "ref: refs/heads/main\n"
