@@ -54,7 +54,7 @@
       "skill": "dd-codebase-design",
       "scoped_agents_md": [],
       "hash_tuple": {
-        "section": "sha256:32febec70a2dcab7e065ac03249e1edbbbad2f605b1931df7ba7299911055593",
+        "section": "sha256:dd4350607c0212912393a29bfcc8611630b53e42962c6d37bb9b35544e7b4118",
         "skill": "sha256:86ee4680e5d66595563797defe9614ef307fafd716551b3dce1e48045ac65f76",
         "scripts": null,
         "scoped": []
@@ -84,7 +84,7 @@
         "dadaia_workspace/public/data/worktrees-AGENTS.md"
       ],
       "hash_tuple": {
-        "section": "sha256:732c541925727cdf04d796735aa544caf99181053aa7d6ad6b3cb9f6b8a3c9d6",
+        "section": "sha256:c656cd493e1574102eb48ed63c59059acec3d91e0726a24c621df6bb1b339435",
         "skill": "sha256:06c9b6e4a31aa36465416f2b498ff402ab6df8c63ca7fae89543e3ee962ffb37",
         "scripts": "sha256:d692d5e5c839d6f1cd0de06a1f612d1cd93217aa935fce0df52f6f8bf95273f1",
         "scoped": [
@@ -206,7 +206,7 @@
         "dadaia_workspace/public/scaffold/audits/AGENTS.md"
       ],
       "hash_tuple": {
-        "section": "sha256:32febec70a2dcab7e065ac03249e1edbbbad2f605b1931df7ba7299911055593",
+        "section": "sha256:dd4350607c0212912393a29bfcc8611630b53e42962c6d37bb9b35544e7b4118",
         "skill": "sha256:113c0fd6945e9eed1d2496854689c886887393d4701184ad1c92a4a10a966a33",
         "scripts": "sha256:081ca34ad201b652f666abda16e4b15389926d86937f043a2c8bb1e141c99b17",
         "scoped": [
@@ -372,7 +372,7 @@
       "skill": "dd-architecture-survey",
       "scoped_agents_md": [],
       "hash_tuple": {
-        "section": "sha256:32febec70a2dcab7e065ac03249e1edbbbad2f605b1931df7ba7299911055593",
+        "section": "sha256:dd4350607c0212912393a29bfcc8611630b53e42962c6d37bb9b35544e7b4118",
         "skill": "sha256:6ae3958f5d0bc8b8eeedea455a66bc282962f49077f44a63b3b56cc37131038e",
         "scripts": null,
         "scoped": []
@@ -400,7 +400,7 @@
       "skill": "dd-domain-modeling",
       "scoped_agents_md": [],
       "hash_tuple": {
-        "section": "sha256:32febec70a2dcab7e065ac03249e1edbbbad2f605b1931df7ba7299911055593",
+        "section": "sha256:dd4350607c0212912393a29bfcc8611630b53e42962c6d37bb9b35544e7b4118",
         "skill": "sha256:0f6c0323eadf99a721c2d80bb5f541b2579ea0800ffffada335a40b1502f7b6b",
         "scripts": null,
         "scoped": []
