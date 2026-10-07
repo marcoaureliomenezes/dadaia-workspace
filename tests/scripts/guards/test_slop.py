@@ -35,10 +35,10 @@ class _Tree:
             _TASK_READER,
             "",
             id="dotted-id-read-whole",
-            marks=pytest.mark.xfail(strict=True, raises=AssertionError, reason="v33-witness-cuts-dotted-task-ids"),
         ),
         pytest.param("J10.S1.T1 done", "X = 1\n", "J", id="dotted-id-unread-stays-orphan"),
-        pytest.param("end of J10. Next", _TASK_READER, "J", id="trailing-dot-not-joined"),
+        pytest.param("end of J10. Next", 'R = r"J\\d+$"\n', "", id="trailing-dot-not-joined"),
+        pytest.param("J1.S10.T1 done", _TASK_READER, "", id="dotted-id-joined-leftwards"),
     ],
 )
 def test_v33_dotted_task_id_is_one_witness(

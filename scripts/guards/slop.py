@@ -163,6 +163,13 @@ _FAMILY, _UPPER = re.compile(r"\b[A-Z]{1,4}-?[0-9]{2,3}\b"), re.compile(r"[A-Z]+
 _WORD = frozenset("ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-")
 
 
+def _joined(text: str, i: int) -> bool:
+    """``text[i]`` is a witness char: a `_WORD` char, or a `.` between two (a dotted id)."""
+    return text[i] in _WORD or (
+        text[i] == "." and 0 < i < len(text) - 1 and {text[i - 1], text[i + 1]} <= _WORD
+    )
+
+
 def _constants(source: str) -> list[str]:
     """Every non-empty string constant of *source* that is not a bare docstring statement."""
     nodes = list(ast.walk(ast.parse(source)))
@@ -191,9 +198,9 @@ def v33(tree: Tree) -> list[str]:
     for text in _files(tree, "specs", PKG, "tests").values():
         for m in _FAMILY.finditer(text):
             left, right = m.start(), m.end()
-            while left > 0 and text[left - 1] in _WORD:
+            while left > 0 and _joined(text, left - 1):
                 left -= 1
-            while right < len(text) and text[right] in _WORD:
+            while right < len(text) and _joined(text, right):
                 right += 1
             prefix = _UPPER.match(m.group(0)).group(0)  # type: ignore[union-attr]
             families[prefix].add((text[left:right], m.start() - left))
