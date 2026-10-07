@@ -673,7 +673,6 @@ def _law_end(tmp_path: Path, law: bytes) -> Any:
     return end
 
 
-@pytest.mark.xfail(strict=True, raises=AssertionError, reason="declared-bom-strip-depends-on-locale-decoding")  # fmt: skip
 def test_a_tests_line_after_a_bom_is_declared_when_git_output_decodes_as_cp1252(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

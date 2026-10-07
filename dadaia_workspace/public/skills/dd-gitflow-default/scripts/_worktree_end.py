@@ -144,9 +144,9 @@ def _check_ancestor(tree: Path, work: str) -> None:
 
 def _declared(tree: Path, work: str, key: str) -> str:
     """The value of the `<key>` line *work*'s tracked `AGENTS.md` declares (a leading UTF-8 BOM is
-    ignored), `""` when absent."""
+    ignored, as U+FEFF or as the three characters a cp1252 decode makes of it), `""` when absent."""
     shown = git(tree, "show", f"{work}:AGENTS.md", check=False)
-    lines = shown.removeprefix("\ufeff").splitlines()
+    lines = shown.removeprefix("\ufeff").removeprefix("\u00ef\u00bb\u00bf").splitlines()
     return next((ln.removeprefix(key).strip() for ln in lines if ln.startswith(key)), "")
 
 

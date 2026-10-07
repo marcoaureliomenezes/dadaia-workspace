@@ -186,7 +186,8 @@ def init(
         f"work {flow.work_pattern}"
     )
     for path in canon.declare_tests_line(target.parent):
-        typer.echo(f"[declared] {path}: tests: line")
+        globs = path.read_text(encoding="utf-8").splitlines()[-1].removeprefix("tests:").strip()
+        typer.echo(f"[declared] {path}: tests: {globs} — narrow it to this repo's own test paths")
     if refused:
         raise typer.Exit(1)
     if kind in ("absent", "foreign"):

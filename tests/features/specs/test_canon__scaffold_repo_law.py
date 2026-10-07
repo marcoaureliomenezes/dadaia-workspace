@@ -288,7 +288,6 @@ def test_the_shipped_default_freezes_the_common_test_layouts(tmp_path: Path) -> 
     assert sorted(listed) == sorted(paths)
 
 
-@pytest.mark.xfail(strict=True, raises=AssertionError, reason="default-tests-globs-over-match-source")  # fmt: skip
 def test_the_shipped_default_freezes_no_source_that_merely_ends_in_test(tmp_path: Path) -> None:
     """default-tests-globs-over-match-source: `ABTest.tsx` and `LoadTest.md` are source and docs."""
     template = canon.default_public_dir() / "templates" / "repo-AGENTS.md"

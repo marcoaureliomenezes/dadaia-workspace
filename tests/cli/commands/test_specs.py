@@ -321,7 +321,6 @@ def test_specs_init_with_an_unreadable_law_finishes_onboarding_and_a_rerun_decla
     assert any(ln.startswith("tests:") for ln in law.read_text(encoding="utf-8").splitlines())
 
 
-@pytest.mark.xfail(strict=True, raises=AssertionError, reason="default-tests-globs-over-match-source")  # fmt: skip
 def test_the_declared_line_names_the_default_and_asks_to_narrow_it(repo: Path) -> None:
     """default-tests-globs-over-match-source: the operator learns a language-neutral default was written."""
     (repo / "AGENTS.md").write_text("# ours\n", encoding="utf-8")
