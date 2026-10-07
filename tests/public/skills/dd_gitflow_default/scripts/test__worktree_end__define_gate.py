@@ -8,11 +8,7 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
-import pytest
-
 from tests.helpers.worktree_ws import approve, commit, git, make_workspace, run
-
-pytestmark = pytest.mark.integration
 
 
 def test_a_define_merge_runs_the_doctor_fenced_to_its_tree(tmp_path: Path) -> None:

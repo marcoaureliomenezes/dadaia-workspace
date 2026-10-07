@@ -12,8 +12,6 @@ import pytest
 
 from tests.helpers.worktree_ws import JOB, approve, git, land, make_workspace, run
 
-pytestmark = pytest.mark.integration
-
 BRANCH = "wt/0.5.0-rc1/j1"
 
 
