@@ -45,6 +45,7 @@ def _row(id: str, target: Any, want: str | None = None, **opts: Any) -> Any:
     return pytest.param(target, want, opts, id=id)
 
 
+@pytest.mark.medium
 @pytest.mark.parametrize(
     ("target", "want", "opts"),
     [
@@ -128,6 +129,7 @@ def test_gate_verdict(tmp_path: Path, target: Any, want: str | None, opts: dict[
         assert block is not None and want in block["reason"], block
 
 
+@pytest.mark.medium
 def test_a_truncated_registry_is_no_context_at_the_gate(tmp_path: Path) -> None:
     """sa-context-repo-mapping-falls-back-to-the-name#B4 (the gate leg; `context show`
     prints REG-SCHEMA since AC3.9, test_registry_version_grammar): with a truncated
