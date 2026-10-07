@@ -78,6 +78,7 @@ def test_non_write_and_protected_matrix(
         assert block is not None and want in block["reason"], block
 
 
+@pytest.mark.medium
 @pytest.mark.parametrize("envelope", [{}, [1, 2, 3], "text", None], ids=["empty", "list", "string", "null"])
 def test_non_object_envelope_fails_open(tmp_path: Path, envelope: Any) -> None:
     """The hook lane reads stdin through ``read_stdin_json``: an envelope that is not a JSON
@@ -88,6 +89,7 @@ def test_non_object_envelope_fails_open(tmp_path: Path, envelope: Any) -> None:
     assert result.block_envelope() is None
 
 
+@pytest.mark.medium
 @pytest.mark.parametrize("raw", ["", "   ", "{not json"], ids=["empty", "blank", "malformed"])
 def test_unreadable_stdin_fails_open(tmp_path: Path, raw: str) -> None:
     """Blank or malformed stdin text is read as ``{}`` and allowed, never a crash."""
