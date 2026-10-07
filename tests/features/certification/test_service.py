@@ -348,7 +348,6 @@ class _BareConfigSeen(_Children):
 
 @pytest.mark.medium
 @pytest.mark.slow(reason="a real certify journey: about a dozen dadaia children")
-@pytest.mark.xfail(strict=True, raises=AssertionError, reason="context-clone-fails-past-windows-max-path")
 def test_certify_bare_remote_writes_long_paths(tmp_path: Path) -> None:
     """context-clone-fails-past-windows-max-path: the sandbox's bare remote receives the
     baseline push, so its own config carries `core.longpaths = true`."""
