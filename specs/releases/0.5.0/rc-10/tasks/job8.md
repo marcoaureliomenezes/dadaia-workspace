@@ -30,10 +30,14 @@ Paths are relative to the repo root; aliases as in `PLAN.md` (`f/`, `pub/`, `S/`
 ## Stage J8.S3 — no process in a small test
 
 - Contract: exit tests unit + integration green; guard plant red; envelope `scripts/guards/isolation.py`, the offenders' test files and sources named at stage open; ACs AC8.1
-- Offender list: produced at the stage's open by the new guard's dry run; each offender is one task row (pure core extracted, or the test turns `medium`), disjoint `W:`.
+- Offender list: produced at the stage's open by the new guard's dry run (J8.S3.T1, 9 tests in 5 files, all hook-entrypoint tests through `run_hook_subprocess`); each offender file is one task row, disjoint `W:`.
 
 | task | AC | `W:` | owner tests / RED |
 |---|---|---|---|
 | J8.S3.T1 | AC8.1 | `scripts/guards/isolation.py` (check `small-spawns-no-process`: red on a planted subprocess in a small test) | guard plant |
-| J8.S3.T2+ | AC8.1 | per offender | born from the list |
+| J8.S3.T2 | AC8.1 | `tests/core/test_workspace_resolver__one_workspace_root_rule.py` (`test_workspace_root_in_the_hook_env_never_opens_a_protected_write` drive the hook entrypoint through `run_hook_subprocess`: they turn `medium`, AC8.3) | the file; guard `small-spawns-no-process` |
+| J8.S3.T3 | AC8.1 | `tests/hooks/test_pre_gate.py` (`test_non_object_envelope_fails_open`, `test_unreadable_stdin_fails_open` drive the hook entrypoint through `run_hook_subprocess`: they turn `medium`, AC8.3) | the file; guard `small-spawns-no-process` |
+| J8.S3.T4 | AC8.1 | `tests/hooks/test_sdd_gate.py` (`test_gate_verdict`, `test_a_truncated_registry_is_no_context_at_the_gate` drive the hook entrypoint through `run_hook_subprocess`: they turn `medium`, AC8.3) | the file; guard `small-spawns-no-process` |
+| J8.S3.T5 | AC8.1 | `tests/hooks/test_sdd_gate__classifier_symlink_canonicalization.py` (`test_a_symlink_into_protected_sessions_classifies_protected` drive the hook entrypoint through `run_hook_subprocess`: they turn `medium`, AC8.3) | the file; guard `small-spawns-no-process` |
+| J8.S3.T6 | AC8.1 | `tests/hooks/test_sdd_post_gate.py` (the three `*_never_mutates_tasks_md*` tests drive the hook entrypoint through `run_hook_subprocess`: they turn `medium`, AC8.3) | the file; guard `small-spawns-no-process` |
 | J8.S3.T9 | — | this file | close task, last: readout (share of small items under 100 ms) for `_RELEASE.json`; behavior map; `test-audit:`, `mutation:`; `done` |
