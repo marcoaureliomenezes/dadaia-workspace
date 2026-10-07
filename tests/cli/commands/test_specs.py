@@ -282,7 +282,6 @@ def test_specs_init_writes_every_law_rendered(repo: Path) -> None:
     assert raw == []
 
 
-@pytest.mark.xfail(strict=True, raises=AssertionError, reason="onboarding-writes-no-tests-line")
 def test_specs_init_declares_a_tests_line_in_a_law_that_lacks_one(repo: Path) -> None:
     """onboarding-writes-no-tests-line: ADR 0216 — a pre-onboarding AGENTS.md is not left
     with no `tests:` line, which refuses every worktree merge."""
@@ -300,7 +299,6 @@ def test_specs_init_declares_a_tests_line_in_a_law_that_lacks_one(repo: Path) ->
     assert values[0] != ""
 
 
-@pytest.mark.xfail(strict=True, raises=AssertionError, reason="onboarding-writes-no-tests-line")
 def test_specs_init_with_an_unreadable_law_finishes_onboarding_and_a_rerun_declares(
     repo: Path,
 ) -> None:

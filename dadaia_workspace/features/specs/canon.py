@@ -98,6 +98,7 @@ __all__ = [
     "Violation",
     "canon_violations",
     "check_tree",
+    "declare_tests_line",
     "is_canon_path",
     "scaffold",
     "scaffold_entry",
@@ -290,6 +291,31 @@ def scaffold_repo_law(
             for template, dest in REPO_LAW
         ],
     )
+
+
+def declare_tests_line(repo: Path, *, public_dir: Path | None = None) -> list[Path]:
+    """Append the template's ``tests:`` line to a present, unsymlinked ``AGENTS.md`` that
+    has none (ADR 0216). Works in bytes: the law keeps its encoding and newline style, a
+    leading UTF-8 BOM never hides a line, and an unreadable law is skipped."""
+    law = repo / "AGENTS.md"
+    template = (public_dir if public_dir is not None else default_public_dir()) / "templates"
+    default = next(
+        ln
+        for ln in (template / "repo-AGENTS.md").read_text(encoding="utf-8").splitlines()
+        if ln.startswith("tests:")
+    )
+    if law.is_symlink() or not law.is_file():
+        return []
+    try:
+        data = law.read_bytes()
+    except OSError:
+        return []
+    if any(ln.removeprefix(b"\xef\xbb\xbf").startswith(b"tests:") for ln in data.splitlines()):
+        return []
+    nl = b"\r\n" if b"\r\n" in data else b"\n"
+    lead = b"" if not data or data.endswith(b"\n") else nl
+    atomic_write(law, data + lead + default.encode("utf-8") + nl)
+    return [law]
 
 
 def _fill_repo_name(template: Path, project_name: str) -> str:

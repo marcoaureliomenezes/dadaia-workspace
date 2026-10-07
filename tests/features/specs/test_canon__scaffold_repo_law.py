@@ -128,7 +128,6 @@ def declaring_public(public: Path) -> Path:
     return public
 
 
-@pytest.mark.xfail(strict=True, raises=AssertionError, reason="onboarding-writes-no-tests-line")
 def test_a_law_without_a_tests_line_gains_the_templates_line_appended(
     tmp_path: Path, declaring_public: Path
 ) -> None:
@@ -144,7 +143,6 @@ def test_a_law_without_a_tests_line_gains_the_templates_line_appended(
     assert text.splitlines()[-1] == _TESTS_LINE
 
 
-@pytest.mark.xfail(strict=True, raises=AssertionError, reason="onboarding-writes-no-tests-line")
 @pytest.mark.parametrize("line", ["tests:", "tests: custom/**"])
 def test_a_present_tests_line_is_left_alone(
     tmp_path: Path, declaring_public: Path, line: str
@@ -158,7 +156,6 @@ def test_a_present_tests_line_is_left_alone(
     assert (repo / "AGENTS.md").read_text(encoding="utf-8") == f"# mine\n\n{line}\n"
 
 
-@pytest.mark.xfail(strict=True, raises=AssertionError, reason="onboarding-writes-no-tests-line")
 def test_the_shipped_template_declares_a_non_empty_tests_line() -> None:
     """onboarding-writes-no-tests-line: the one default lives in the shipped template."""
     template = canon.default_public_dir() / "templates" / "repo-AGENTS.md"
@@ -171,7 +168,6 @@ def test_the_shipped_template_declares_a_non_empty_tests_line() -> None:
     assert values[0] != ""
 
 
-@pytest.mark.xfail(strict=True, raises=AssertionError, reason="onboarding-writes-no-tests-line")
 def test_an_absent_law_gets_nothing_from_the_declaration(
     tmp_path: Path, declaring_public: Path
 ) -> None:
@@ -183,7 +179,6 @@ def test_an_absent_law_gets_nothing_from_the_declaration(
     assert list(repo.iterdir()) == []
 
 
-@pytest.mark.xfail(strict=True, raises=AssertionError, reason="onboarding-writes-no-tests-line")
 def test_a_symlinked_law_is_never_declared_through(tmp_path: Path, declaring_public: Path) -> None:
     """onboarding-writes-no-tests-line: CWE-59 — the append never follows a symlink."""
     repo = tmp_path / "repo"
@@ -196,7 +191,6 @@ def test_a_symlinked_law_is_never_declared_through(tmp_path: Path, declaring_pub
     assert target.read_text(encoding="utf-8") == "real\n"
 
 
-@pytest.mark.xfail(strict=True, raises=AssertionError, reason="onboarding-writes-no-tests-line")
 @pytest.mark.parametrize(
     ("before", "after"),
     [
@@ -218,7 +212,6 @@ def test_the_declared_line_keeps_the_laws_own_newline_style(
     assert (repo / "AGENTS.md").read_bytes() == after.encode()
 
 
-@pytest.mark.xfail(strict=True, raises=AssertionError, reason="onboarding-writes-no-tests-line")
 def test_a_law_that_is_not_utf8_gains_the_line_with_its_bytes_kept(
     tmp_path: Path, declaring_public: Path
 ) -> None:
@@ -232,7 +225,6 @@ def test_a_law_that_is_not_utf8_gains_the_line_with_its_bytes_kept(
     assert (repo / "AGENTS.md").read_bytes() == before + f"{_TESTS_LINE}\n".encode()
 
 
-@pytest.mark.xfail(strict=True, raises=AssertionError, reason="onboarding-writes-no-tests-line")
 def test_a_tests_line_after_a_utf8_bom_is_left_alone(
     tmp_path: Path, declaring_public: Path
 ) -> None:
@@ -246,7 +238,6 @@ def test_a_tests_line_after_a_utf8_bom_is_left_alone(
     assert (repo / "AGENTS.md").read_bytes() == law
 
 
-@pytest.mark.xfail(strict=True, raises=AssertionError, reason="onboarding-writes-no-tests-line")
 def test_an_unreadable_law_is_skipped_not_raised(tmp_path: Path, declaring_public: Path) -> None:
     """onboarding-writes-no-tests-line: a law the user cannot read is left as found."""
     if os.geteuid() == 0:
@@ -263,7 +254,6 @@ def test_an_unreadable_law_is_skipped_not_raised(tmp_path: Path, declaring_publi
     assert law.read_text(encoding="utf-8") == "# mine\n"
 
 
-@pytest.mark.xfail(strict=True, raises=AssertionError, reason="onboarding-writes-no-tests-line")
 def test_the_shipped_default_freezes_the_common_test_layouts(tmp_path: Path) -> None:
     """onboarding-writes-no-tests-line: judged as the freeze judges, by git's `:(glob)` pathspec."""
     template = canon.default_public_dir() / "templates" / "repo-AGENTS.md"
