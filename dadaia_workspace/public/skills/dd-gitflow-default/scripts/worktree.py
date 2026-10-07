@@ -34,14 +34,16 @@ def main(argv: list[str] | None = None) -> int:
     verbs.add_parser(
         "stage", help="close a job's stage: its stage gate, no task open"
     ).add_argument("path")
-    for verb, text in (("merge", "land a worktree on its branch after its gate"),
-                       ("clean", "remove a merged or commit-less worktree")):  # fmt: skip
-        end = verbs.add_parser(verb, help=text)
+
+    def end_args(end: argparse.ArgumentParser) -> None:
         end.add_argument("path")
         end.add_argument(
             "--keep", nargs="+", default=[], help="ignored files to copy into the repo"
         )
         end.add_argument("--drop", action="store_true", help="discard the other ignored files")
+
+    end_args(verbs.add_parser("merge", help="land a worktree on its branch after its gate"))
+    end_args(verbs.add_parser("clean", help="remove a merged or commit-less worktree"))
     seal = verbs.add_parser("hash", help="the diff_sha256 binding a verdict carries for a sha")
     seal.add_argument("path")
     seal.add_argument("--sha", required=True)
