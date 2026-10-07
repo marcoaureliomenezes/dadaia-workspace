@@ -6,6 +6,7 @@ hardcoded `main`/`develop` fails) and `reports validate` (valid iff `schema_vers
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import subprocess
@@ -165,6 +166,15 @@ def commit(tree: Path, rel: str, text: str = "x = 1\n") -> str:
     return git(tree, "rev-parse", "HEAD").strip()
 
 
+def diff_hash(root: Path, sha: str) -> str:
+    """The oracle: sha256 (UTF-8) of `git diff-tree -r -z --full-index <merge-base> <sha>` in `r`,
+    the merge-base taken against `feature/0.5.0`."""
+    repo = root / "repos/r"
+    base = git(repo, "merge-base", "feature/0.5.0", sha).strip()
+    diff = git(repo, "diff-tree", "-r", "-z", "--full-index", base, sha)
+    return hashlib.sha256(diff.encode("utf-8")).hexdigest()
+
+
 def approve(
     root: Path,
     sha: str,
@@ -173,7 +183,7 @@ def approve(
     valid: bool = True,
     at: str = "T10:00:00Z",
 ) -> Path:
-    """The reviewer's verdict as the main thread writes it: a handoff naming *sha*, emitted *at*."""
+    """The reviewer's verdict as `verdict.py` writes it: a handoff naming *sha*, emitted *at*."""
     name = f"2026-10-02{at.replace(':', '')}-dd-code-reviewer-{sha[:8]}-{verdict}.handoff.json"
     handoff = root / ".dadaia/handoff/c" / name
     handoff.parent.mkdir(parents=True, exist_ok=True)
@@ -181,6 +191,8 @@ def approve(
         "agent": "dd-code-reviewer",
         "verdict": verdict,
         "scope": f"wt/0.5.0-rc1/j1@{sha}",
+        "reviewed_sha": sha,
+        "diff_sha256": diff_hash(root, sha),
         "produced_at": f"2026-10-02{at}",
     }
     handoff.write_text(json.dumps({**body, **({"schema_version": "1.2"} if valid else {})}))
