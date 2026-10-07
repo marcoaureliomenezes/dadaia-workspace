@@ -36,7 +36,11 @@ _TS = "2026-09-22T00:00:00Z"
 def script(tmp_path: Path) -> Path:
     """The staged shape: release.py with both schema copies beside it, and the spec
     navigator's scripts projected as its sibling skill (the drift decider it imports)."""
-    for skill in ("dd-spec-navigator", "dd-gitflow-default"):  # the siblings it imports
+    for skill in (
+        "dd-spec-navigator",
+        "dd-gitflow-default",
+        "dd-bug-resolution",
+    ):  # the siblings it imports
         stage_skill_scripts(skill, tmp_path / "skills" / skill / "scripts")
     return (
         stage_skill_scripts(
@@ -828,7 +832,7 @@ def test_ship_refuses_while_a_bug_found_in_the_shipping_rc_is_unresolved(
     refused = _run(script, "ship", "--sha", "beef123", "--pr", "261", "--specs", str(specs))
     assert refused.returncode == 1 and "a-bug" in refused.stderr
     fixes = [x for x in refused.stderr.splitlines() if x.startswith("fix: ")]
-    assert len(fixes) == 1 and "bugs.py" in fixes[0]
+    assert fixes == ["fix: Operator action: resolve a-bug in rc-1's bug batch"]
     assert _tree_hash(specs) == before
     elsewhere = [_found("elsewhere", "open", rc="rc-9"), {"id": "unplaced", "status": "open"}]
     ledger.write_text("".join(json.dumps(b) + "\n" for b in elsewhere), encoding="utf-8")
