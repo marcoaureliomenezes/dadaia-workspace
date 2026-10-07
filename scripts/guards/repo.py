@@ -31,6 +31,8 @@ from dadaia_workspace.features.specs.canon import CANON  # noqa: E402
 from dadaia_workspace.infrastructure.ledger_scripts import load_owner  # noqa: E402
 
 if TYPE_CHECKING:
+    from collections.abc import Iterator
+
     from run import Check, Plant, Tree
 
 _WF = ".github/workflows"
@@ -38,6 +40,18 @@ _RELEASE = f"{_WF}/release.yml"
 _ACTION = "googleapis/release-please-action"
 _GATE = "needs.release-please.outputs.release_created == 'true'"
 _MODEL_SECRET = re.compile(r"CLAUDE_API_KEY|ANTHROPIC_(?:API_)?KEY|api\.anthropic\.com", re.I)
+_OAUTH = re.compile(r"CLAUDE_CODE_OAUTH_TOKEN")
+_EVAL = f"{_WF}/eval.yml"
+_EVAL_TRIGGERS = {"workflow_dispatch", "schedule"}
+_HOSTED = {"ubuntu-latest", "ubuntu-24.04", "ubuntu-22.04", "windows-latest", "windows-2025",
+           "windows-2022", "macos-latest", "macos-15", "macos-14"}  # fmt: skip
+_SCAN = "python3 evals/scripts/scan.py evals/jobs evals/summary.md"
+_SUMMARY = 'cat evals/summary.md >> "$GITHUB_STEP_SUMMARY"'
+_UPLOADED = {"evals/jobs/", "evals/summary.md"}  # what the scan covers
+_ACTIONS = ("actions/checkout@", "actions/upload-artifact@")
+_EXPR = re.compile(r"\$\{\{(.*?)\}\}", re.S)
+_SECRETS = re.compile(r"\bsecrets\b(?!\.GITHUB_TOKEN\b)", re.I)
+_WORD = re.compile(r"\bsecrets\b", re.I)
 _SKILLS_REPO = re.compile(
     r"dadaia-skills|SKILLS_REPO_TOKEN|build-skills-repo|npx skills add|skills-repository"
 )
@@ -91,17 +105,194 @@ def _anthropic(uses: str) -> bool:
     return uses.lower().startswith("anthropics/")
 
 
+def _strings(node: Any) -> Iterator[str]:
+    if isinstance(node, dict):
+        for v in node.values():
+            yield from _strings(v)
+    elif isinstance(node, list):
+        for v in node:
+            yield from _strings(v)
+    elif isinstance(node, str):
+        yield node
+
+
+def _secret_use(node: Any) -> bool:
+    """The word ``secrets`` as a key, or inside a ``${{ }}`` expression (``GITHUB_TOKEN`` aside)."""
+    if isinstance(node, dict):
+        return any(str(k).lower() == "secrets" or _secret_use(v) for k, v in node.items())
+    if isinstance(node, list):
+        return any(_secret_use(v) for v in node)
+    return isinstance(node, str) and any(_SECRETS.search(e) for e in _EXPR.findall(node))
+
+
+def _triggers(doc: dict[Any, Any]) -> set[str]:
+    on = _on(doc)
+    return {on} if isinstance(on, str) else set(on)
+
+
+def _hits(rules: dict[str, bool], where: str) -> list[str]:
+    return [f"{rule}: {where}" for rule, hit in rules.items() if hit]
+
+
+def _model_markers(tree: Tree, p: str, doc: dict[Any, Any]) -> list[str]:
+    """P-33: outside ``eval.yml``, no ``anthropics/*`` action, model secret or endpoint."""
+    jobs = _jobs(doc).values()
+    steps = [str(s.get("uses", "")) for j in jobs for s in j.get("steps") or []]
+    calls = [str(j.get("uses", "")) for j in jobs]
+    out = [f"anthropic-workflow: {p} uses {u}" for u in calls if _anthropic(u)]
+    out += [f"anthropic-action: {p} uses {u}" for u in steps if _anthropic(u)]
+    lines = list(enumerate(tree.read(p).splitlines(), 1))
+    out += [f"model-secret: {p}:{n}" for n, line in lines if _MODEL_SECRET.search(line)]
+    return out + [f"oauth-token: {p}:{n}" for n, line in lines if _OAUTH.search(line)]
+
+
+def _outside_eval(p: str, doc: dict[Any, Any]) -> list[str]:
+    """Clauses (a) and (b) for a workflow that is not ``eval.yml``: a job in environment
+    ``evals`` runs on dispatch or schedule only, and no secret is read at all."""
+    on = _triggers(doc)
+    jobs, push = _jobs(doc), not (on and on <= _EVAL_TRIGGERS)
+    env = {j: job.get("environment") for j, job in jobs.items()}
+    exprs = [e for s in _strings(doc) for e in _EXPR.findall(s)]
+    shapes = {
+        "evals-environment-push": push and "evals" in env.values(),
+        "env-dict-prt": push
+        and any(isinstance(e, dict) and e.get("name") == "evals" for e in env.values()),
+        "bracket-secret-push": any(re.search(r"secrets\s*\[", e, re.I) for e in exprs),
+        "tojson-secrets-push": any(re.search(r"tojson\(\s*secrets\b", e, re.I) for e in exprs),
+        "lowercase-secret-push": any(w != "secrets" for e in exprs for w in _WORD.findall(e)),
+        "renamed-secret-push": any(_SECRETS.search(e) for e in exprs),
+        "reusable-call-has-no-runs-on": any("uses" in j and "secrets" in j for j in jobs.values()),
+    }
+    return _hits(shapes, p)
+
+
+def _eval_header(doc: dict[Any, Any]) -> list[str]:
+    """``eval.yml``: dispatch or schedule only, no workflow-level secret or ``defaults``."""
+    on = _triggers(doc)
+    shapes = {
+        "no-on": not on,
+        "pull-request": "pull_request" in on,
+        "pull-request-target-no-secret": "pull_request_target" in on,
+        "quoted-on-push": "push" in on,
+        "trigger-other": bool(
+            on - _EVAL_TRIGGERS - {"pull_request", "pull_request_target", "push"}
+        ),
+        "secret-workflow-level": _secret_use({k: v for k, v in doc.items() if k != "jobs"}),
+        "defaults-workflow-level": "defaults" in doc,
+    }
+    return _hits(shapes, _EVAL)
+
+
+def _eval_job(job: dict[str, Any]) -> list[str]:
+    """One ``eval.yml`` job: an exact hosted label, no ``defaults``, a secret only in its ``env``,
+    actions from the allowlist alone."""
+    ro, steps = job.get("runs-on"), job.get("steps") or []
+    uses = [str(s["uses"]) for s in steps if "uses" in s]
+    shapes = {
+        "runs-on-self-hosted": "self-hosted" in str(ro),
+        "runs-on-list-hosted": isinstance(ro, list),
+        "runs-on-prefix-label": not isinstance(ro, list) and str(ro) not in _HOSTED,
+        "defaults-job-level": "defaults" in job,
+        "step-env-secret": any(_secret_use(s) for s in steps),
+        "job-container-secret": _secret_use(
+            {k: v for k, v in job.items() if k not in ("env", "steps")}
+        ),
+        "action-not-allowlisted": any(
+            not u.startswith(("actions/", "./", "docker:")) for u in uses
+        ),
+        "uses-summary": any(u.startswith(("./", "docker:")) for u in uses),
+        "action-prefix-lookalike": any(
+            u.startswith("actions/") and not u.startswith(_ACTIONS) for u in uses
+        ),
+    }
+    return _hits(shapes, _EVAL)
+
+
+def _publishes(step: dict[str, Any]) -> bool:
+    return "GITHUB_STEP_SUMMARY" in str(step.get("run")) or str(step.get("uses")).startswith(
+        _ACTIONS[1]
+    )
+
+
+def _publish_if(step: dict[str, Any]) -> str:
+    cond = str(step["if"])
+    named = {
+        "failure()": "upload-on-failure",
+        "cancelled()": "upload-not-cancelled",
+        "always()": "upload-always",
+    }
+    return next((r for w, r in named.items() if w in cond), "publish-conditional")
+
+
+def _publish_step(step: dict[str, Any]) -> str | None:
+    """The rule a publishing step breaks after the scan: conditional, its own summary source
+    or extra keys, an upload path the scan did not cover."""
+    if "if" in step:
+        return _publish_if(step)
+    if "run" in step and step != {"run": _SUMMARY}:
+        return "summary-step-extra-key" if step["run"] == _SUMMARY else "summary-other-source"
+    paths = str((step.get("with") or {}).get("path", "")).split()
+    return None if "run" in step or set(paths) <= _UPLOADED else "upload-other-path"
+
+
+def _write_rule(before_first_publish: bool) -> str:
+    return "write-after-scan" if before_first_publish else "write-between-publishes"
+
+
+def _scan_rules(steps: list[dict[str, Any]]) -> dict[str, bool]:
+    """The ways a step can look like the canonical scan and still not be it."""
+    runs = [(s, str(s.get("run"))) for s in steps]
+    return {
+        "scan-conditional": any(r == _SCAN and "if" in s for s, r in runs),
+        "scan-continue-on-error": any(r == _SCAN and "continue-on-error" in s for s, r in runs),
+        "scan-or-true": any(r.startswith(_SCAN) and r != _SCAN for _, r in runs),
+        "scan-wrong-path": any("scan.py" in r and not r.startswith(_SCAN) for _, r in runs),
+    }
+
+
+def _eval_publish(job: dict[str, Any]) -> list[str]:
+    """Clause (c): after the canonical scan, only publishing steps up to the last one, each
+    unconditional and uploading only what the scan covers."""
+    steps = job.get("steps") or []
+    pub = [i for i, s in enumerate(steps) if _publishes(s)]
+    scans = [i for i, s in enumerate(steps) if s.get("run") == _SCAN and len(s) == 1]
+    scan = scans[0] if scans else len(steps)
+    after = steps[scan + 1 : pub[-1] + 1] if pub else []
+    rules = [
+        _publish_step(s) if _publishes(s) else _write_rule(i < pub[0])
+        for i, s in enumerate(after, scan + 1)
+    ]
+    shapes = {
+        "summary-unscanned": not scans,
+        "upload-before-scan": bool(pub and scans) and pub[0] < scan,
+        **_scan_rules(steps),
+    }
+    return _hits(shapes, _EVAL) + [f"{r}: {_EVAL}" for r in rules if r]
+
+
+def _cli_pin(tree: Tree, doc: dict[Any, Any]) -> list[str]:
+    """``eval-cli-pin``: every task Dockerfile's ``ARG CLAUDE_CODE_VERSION`` equals ``eval.yml``'s."""
+    pin = re.escape(str((doc.get("env") or {}).get("CLAUDE_CODE_VERSION")))
+    arg = re.compile(rf"^ARG CLAUDE_CODE_VERSION={pin}\s*$", re.M)
+    return [
+        f"eval-cli-pin: {d}"
+        for d in tree.tracked("evals/tasks/*/environment/Dockerfile")
+        if not arg.search(tree.read(d))
+    ]
+
+
 def no_model_calls_in_ci(tree: Tree) -> list[str]:
-    """P-33 (ADR 0025): no ``anthropics/*`` action, model secret or endpoint in a workflow."""
-    out = []
+    """P-33 (ADR 0217): a model is called only from ``eval.yml``, which is dispatch or schedule
+    only, on an exact hosted runner, reads its secret at job level alone, and publishes
+    only what the canonical scan covered. ``check_workflows.py``'s clauses live here."""
+    out: list[str] = []
     for p, doc in _workflows(tree).items():
+        if p != _EVAL:
+            out += _model_markers(tree, p, doc) + _outside_eval(p, doc)
+            continue
         jobs = _jobs(doc).values()
-        reusable = [str(j.get("uses", "")) for j in jobs]
-        uses = [str(s.get("uses", "")) for j in jobs for s in j.get("steps") or []]
-        out += [f"anthropic-workflow: {p} uses {u}" for u in reusable if _anthropic(u)]
-        out += [f"anthropic-action: {p} uses {u}" for u in uses if _anthropic(u)]
-        lines = enumerate(tree.read(p).splitlines(), 1)
-        out += [f"model-secret: {p}:{n}" for n, line in lines if _MODEL_SECRET.search(line)]
+        out += _eval_header(doc) + _cli_pin(tree, doc)
+        out += [v for job in jobs for v in _eval_job(job) + _eval_publish(job)]
     return out
 
 
@@ -542,7 +733,7 @@ def tests_mirror_the_package(tree: Tree) -> list[str]:
 
 _COPIED = (".github", ".gitignore", "specs/constitution.md", "specs/memory", "specs/ADRs",
            "pyproject.toml", "CHANGELOG.md", ".release-please-manifest.json",
-           "release-please-config.json", "README.md", "llms.txt", "docs", "scripts/ci.py")  # fmt: skip
+           "release-please-config.json", "README.md", "llms.txt", "docs", "evals", "scripts/ci.py")  # fmt: skip
 _ROGUE = (
     "on: push\njobs:\n  x:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: anthropics/a@v1\n"
 )
@@ -560,6 +751,9 @@ def CONTROL(root: Path) -> None:
             shutil.copyfile(ROOT / rel, root / rel) if rel.startswith("tests/e2e/") else (
                 root / rel
             ).touch()
+    pin = yaml.safe_load((root / _EVAL).read_text("utf-8"))["env"]["CLAUDE_CODE_VERSION"]
+    (root / "evals/tasks/ok/environment").mkdir(parents=True)
+    (root / "evals/tasks/ok/environment/Dockerfile").write_text(f"ARG CLAUDE_CODE_VERSION={pin}\n")
     (root / ".git/info/exclude").write_text(f"{_WF}/zz.yml\n", encoding="utf-8")
     (root / _WF / "zz.yml").write_text(
         _ROGUE + "        run: echo ${{ secrets.ANTHROPIC_KEY }}\n", "utf-8"
@@ -628,6 +822,14 @@ def _unlink(rel: str) -> Plant:
 
 
 _A, _Q, _G = "specs/memory/ARCHITECTURE.md", "specs/memory/QUALITY.md", f"{_WF}/ci.yml"
+# a clean job first, so a plant is judged among clean expressions and jobs
+_CLEAN = (
+    "on: push\njobs:\n  a:\n    runs-on: ubuntu-latest\n    steps:\n"
+    "      - run: echo\n        env: {L: '${{ github.sha }}'}\n  x:\n"
+)
+_NON_EVAL = _CLEAN + "    runs-on: ubuntu-latest\n"
+_ON = r"(?ms)^on:.*?(?=^permissions:)"
+_STEPS = "    steps:\n      - run: echo\n"
 _GATED_JOB = f"  rogue:\n    needs: [release-please, ghost]\n    if: {_GATE}\n    runs-on: x\n"
 _SUPERSEDED = json.dumps({"id": "9999", "status": "superseded", "supersedes": None}) + "\n"
 
@@ -641,6 +843,160 @@ CHECKS: dict[str, Check] = {
             "anthropic-action": _workflow("      - uses: anthropics/claude-code-action@v1\n"),
             "model-secret": _workflow(
                 "      - env: {K: x}\n        run: echo $anthropic_api_key\n"
+            ),
+            "oauth-token": _workflow(
+                "      - env: {K: x}\n        run: echo $CLAUDE_CODE_OAUTH_TOKEN\n"
+            ),
+            "evals-environment-push": _edit(
+                f"{_WF}/planted.yml", "", _NON_EVAL + "    environment: evals\n" + _STEPS
+            ),
+            "env-dict-prt": _edit(
+                f"{_WF}/planted.yml",
+                "",
+                _NON_EVAL.replace("push", "pull_request_target")
+                + "    environment: {name: evals}\n"
+                + _STEPS,
+            ),
+            "tojson-secrets-push": _edit(
+                f"{_WF}/planted.yml",
+                "",
+                _NON_EVAL + _STEPS + "        env: {K: '${{ toJSON(secrets) }}'}\n",
+            ),
+            "bracket-secret-push": _edit(
+                f"{_WF}/planted.yml",
+                "",
+                _NON_EVAL + _STEPS + "        env: {K: \"${{ SECRETS['X'] }}\"}\n",
+            ),
+            "lowercase-secret-push": _edit(
+                f"{_WF}/planted.yml",
+                "",
+                _NON_EVAL + _STEPS + "        env: {K: '${{ SECRETS.X }}'}\n",
+            ),
+            "renamed-secret-push": _edit(
+                f"{_WF}/planted.yml",
+                "",
+                _NON_EVAL + _STEPS + "        env: {K: '${{ secrets.OTHER }}'}\n",
+            ),
+            "reusable-call-has-no-runs-on": _edit(
+                f"{_WF}/planted.yml",
+                "",
+                _CLEAN + "    uses: ./.github/workflows/eval.yml\n    secrets: inherit\n",
+            ),
+            "no-on": _re(_EVAL, _ON, ""),
+            "pull-request": _re(_EVAL, _ON, "on: pull_request\n"),
+            "pull-request-target-no-secret": _re(_EVAL, _ON, "on: pull_request_target\n"),
+            "quoted-on-push": _re(_EVAL, _ON, '"on": push\n'),
+            "trigger-other": _re(_EVAL, _ON, "on: workflow_run\n"),
+            "secret-workflow-level": _edit(
+                _EVAL, "permissions:\n", "x: [y, '${{ secrets.K }}']\npermissions:\n"
+            ),
+            "defaults-workflow-level": _edit(
+                _EVAL, "permissions:\n", "defaults: {run: {shell: bash}}\npermissions:\n"
+            ),
+            "defaults-job-level": _edit(
+                _EVAL,
+                "    environment: evals\n",
+                "    environment: evals\n    defaults: {run: {shell: bash}}\n",
+            ),
+            "runs-on-self-hosted": _edit(_EVAL, "runs-on: ubuntu-24.04", "runs-on: self-hosted"),
+            "runs-on-list-hosted": _edit(_EVAL, "runs-on: ubuntu-24.04", "runs-on: [ubuntu-24.04]"),
+            "runs-on-prefix-label": _edit(
+                _EVAL, "runs-on: ubuntu-24.04", "runs-on: ubuntu-24.04-arm"
+            ),
+            "step-env-secret": _edit(
+                _EVAL,
+                "      - run: pipx install poetry",
+                "      - env: {K: '${{ secrets.K }}'}\n        run: pipx install poetry",
+            ),
+            "job-container-secret": _edit(
+                _EVAL,
+                "    environment: evals\n",
+                "    environment: evals\n    container: {image: x, credentials: {password: '${{ secrets.K }}'}}\n",
+            ),
+            "action-not-allowlisted": _edit(
+                _EVAL,
+                "      - run: pipx install poetry",
+                "      - uses: softprops/x@v1\n      - run: pipx install poetry",
+            ),
+            "uses-summary": _edit(
+                _EVAL,
+                "      - run: pipx install poetry",
+                "      - uses: ./.github/actions/summary\n      - run: pipx install poetry",
+            ),
+            "action-prefix-lookalike": _edit(
+                _EVAL, "actions/upload-artifact@043", "actions/upload-artifact-lookalike@043"
+            ),
+            "summary-unscanned": _edit(
+                _EVAL,
+                "      - run: python3 evals/scripts/scan.py evals/jobs evals/summary.md\n",
+                "",
+            ),
+            "upload-before-scan": _edit(
+                _EVAL,
+                "      - run: python3 evals/scripts/scan.py evals/jobs",
+                "      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a\n        with: {path: evals/jobs/}\n      - run: python3 evals/scripts/scan.py evals/jobs",
+            ),
+            "scan-or-true": _edit(
+                _EVAL, "evals/jobs evals/summary.md\n", "evals/jobs evals/summary.md || true\n"
+            ),
+            "scan-conditional": _edit(
+                _EVAL,
+                "      - run: python3 evals/scripts/scan.py",
+                "      - if: always()\n        run: python3 evals/scripts/scan.py",
+            ),
+            "scan-continue-on-error": _edit(
+                _EVAL,
+                "      - run: python3 evals/scripts/scan.py evals/jobs evals/summary.md\n",
+                "      - run: python3 evals/scripts/scan.py evals/jobs evals/summary.md\n        continue-on-error: true\n",
+            ),
+            "scan-wrong-path": _edit(
+                _EVAL, "scan.py evals/jobs evals/summary.md", "scan.py evals/jobs"
+            ),
+            "write-after-scan": _edit(
+                _EVAL,
+                "      - run: cat evals/summary.md",
+                "      - run: env >> evals/summary.md\n      - run: cat evals/summary.md",
+            ),
+            "write-between-publishes": _edit(
+                _EVAL,
+                "      - uses: actions/upload-artifact",
+                "      - run: env >> evals/summary.md\n      - uses: actions/upload-artifact",
+            ),
+            "summary-other-source": _edit(
+                _EVAL, "cat evals/summary.md >>", "cat evals/other.md >>"
+            ),
+            "summary-step-extra-key": _edit(
+                _EVAL,
+                '      - run: cat evals/summary.md >> "$GITHUB_STEP_SUMMARY"\n',
+                '      - run: cat evals/summary.md >> "$GITHUB_STEP_SUMMARY"\n        shell: bash\n',
+            ),
+            "upload-on-failure": _edit(
+                _EVAL,
+                "      - uses: actions/upload-artifact",
+                "      - if: failure()\n        uses: actions/upload-artifact",
+            ),
+            "upload-not-cancelled": _edit(
+                _EVAL,
+                "      - uses: actions/upload-artifact",
+                "      - if: ${{ !cancelled() }}\n        uses: actions/upload-artifact",
+            ),
+            "upload-always": _edit(
+                _EVAL,
+                "      - uses: actions/upload-artifact",
+                "      - if: always()\n        uses: actions/upload-artifact",
+            ),
+            "publish-conditional": _edit(
+                _EVAL,
+                "      - uses: actions/upload-artifact",
+                "      - if: github.ref == 'refs/heads/main'\n        uses: actions/upload-artifact",
+            ),
+            "upload-other-path": _edit(
+                _EVAL,
+                "            evals/summary.md\n",
+                "            evals/summary.md\n            ../.claude/\n",
+            ),
+            "eval-cli-pin": _file(
+                "evals/tasks/x/environment/Dockerfile", "ARG CLAUDE_CODE_VERSION=0.0.1\n"
             ),
         },
     ),

@@ -1,0 +1,64 @@
+name: eval
+# The one workflow that calls a model (ADR 0217): dispatch or weekly schedule, GitHub-hosted,
+# the secret at job level in the one job that needs it, the scan before anything is published.
+# The guard no-model-api-in-ci (scripts/guards/repo.py) judges every line of it.
+on:
+  workflow_dispatch:
+    inputs:
+      baseline:
+        description: dadaia-workspace release the baseline run installs from PyPI (default 0.4.7)
+        required: false
+        type: string
+  schedule:
+    - cron: '0 6 * * 1'
+permissions:
+  contents: read
+env:
+  # The one owner of the Claude CLI pin; each task Dockerfile's ARG equals it (guard eval-cli-pin).
+  CLAUDE_CODE_VERSION: 2.1.284
+jobs:
+  eval:
+    runs-on: ubuntu-24.04
+    environment: evals
+    env:
+      BASELINE: ${{ inputs.baseline || '0.4.7' }}
+      CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+      CLAUDE_FORCE_OAUTH: "1"
+      SCAN_SECRET: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
+      - run: pipx install poetry==2.5.1
+      - run: pipx install harbor==0.23.0
+      # The candidate is this checkout: the dispatched ref, or main on the schedule.
+      - name: Build the candidate wheel
+        run: |
+          v=$(python3 -c 'import json; print(json.load(open("release-please-config.json"))["packages"]["."].get("release-as", ""))')
+          if [ -n "$v" ]; then poetry version "$v"; fi
+          poetry build -f wheel
+      # environment/lib/ is each image's last layer: requirements.txt names a pinned PyPI
+      # release, or the wheel beside it. Written per run, never committed.
+      - name: Run on the baseline release
+        run: |
+          for t in evals/tasks/*/; do mkdir -p "$t/environment/lib"; echo "dadaia-workspace==$BASELINE" > "$t/environment/lib/requirements.txt"; done
+          harbor run -p evals/tasks -a claude-code -m anthropic/claude-sonnet-5 --ak version=$CLAUDE_CODE_VERSION -k 3 -n 2 -o evals/jobs/base
+      - name: Run on the candidate wheel
+        run: |
+          w=$(ls dist/*.whl)
+          for t in evals/tasks/*/; do rm -rf "$t/environment/lib"; mkdir -p "$t/environment/lib"; cp "$w" "$t/environment/lib/"; echo "/lib/$(basename "$w")" > "$t/environment/lib/requirements.txt"; done
+          harbor run -p evals/tasks -a claude-code -m anthropic/claude-sonnet-5 --ak version=$CLAUDE_CODE_VERSION -k 3 -n 2 -o evals/jobs/cand
+      - name: Compare
+        id: compare
+        run: python3 evals/scripts/compare.py evals/jobs/base evals/jobs/cand > evals/summary.md
+        continue-on-error: true
+      - run: python3 evals/scripts/scan.py evals/jobs evals/summary.md
+      - run: cat evals/summary.md >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
+        with:
+          name: jobs
+          path: |
+            evals/jobs/
+            evals/summary.md
+      - if: steps.compare.outcome == 'failure'
+        run: echo "compare.py blocks" && exit 1
