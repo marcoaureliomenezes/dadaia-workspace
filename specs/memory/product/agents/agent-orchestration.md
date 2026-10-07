@@ -41,7 +41,7 @@ The main thread — the operator's own session — coordinates: intake, the gril
 
 - Persona sources carry no model; `public install` resolves `(model, effort)` per persona from one of three templates — `balanced` (default), `max-quality`, `economy` — with a per-agent overlay taking precedence, all through the one resolver in `dadaia_workspace/core/model_registry.py`.
 - The resolver in `dadaia_workspace/core/model_registry.py` refuses a model unknown to its registry and a Fable-family model for `dd-code-reviewer`.
-- Least privilege derives from each persona's `activity_class` at install: Claude `permissionMode`/`disallowedTools`, Codex `sandbox_mode` ([[harness-claude-code]], [[harness-codex]]).
+- Least privilege derives from each persona's `activity_class` at install: Claude `permissionMode`/`disallowedTools`; Codex always renders `sandbox_mode = "workspace-write"` ([[harness-claude-code]], [[harness-codex]]).
 
 ## Dependencies
 
