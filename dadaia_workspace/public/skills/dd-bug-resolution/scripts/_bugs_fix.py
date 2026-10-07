@@ -32,8 +32,7 @@ from _bugs_store import Refusal
 #: Shapes 3, 4 and a REBUILD share one id list; shape 4 names its task as `by <task-id>` and may
 #: cite its commits as `(<sha>[, <sha>])`.
 _LINK = re.compile(r"(fix\(bugs\): |chore\(bugs\): resolve |refactor\(bugs\): )(.+?) — (.*)$")
-_BY = re.compile(r"by (?P<task>[\w.-]+)")
-_CITED = re.compile(r"\((\w+(?:, \w+)*)\)$")
+_REF = re.compile(r"\bby ([\w.-]+)|\(([\w, ]+)\)$")
 _TASK = re.compile(r"[a-z]+\((?P<task>[^)]+)\)")
 _REBUILD = re.compile(r"(fix|refactor)\([^)]+\): .*\bREBUILD\b")
 _BODY_ID = re.compile(r"[a-z0-9][a-z0-9.-]*")
@@ -138,23 +137,14 @@ def _kind(commit: _Commit) -> str | None:
 
 def _history(specs: Path) -> list[tuple[str, str]]:
     """Every commit on HEAD, oldest first, as ``(sha, subject)``; none in a repo with no commit."""
-    head = subprocess.run(
-        ["git", "-C", str(specs), "rev-parse", "-q", "--verify", "HEAD"],
-        capture_output=True,
-        check=False,
-    )
+    head = subprocess.run(["git", "-C", str(specs), "rev-parse", "-q", "--verify", "HEAD"], capture_output=True, check=False)  # fmt: skip
     if head.returncode == 1:
         return []
     try:
         out = git(specs, "log", "--reverse", "--format=%H %s", "HEAD")
     except subprocess.CalledProcessError:
-        raise Refusal(
-            "cannot read the repo's history",
-            "Operator action: point --specs at a specs tree inside a git repo",
-        ) from None
-    return [
-        (sha, subject) for sha, _, subject in (line.partition(" ") for line in out.splitlines())
-    ]
+        raise Refusal("cannot read the repo's history", "Operator action: point --specs at a specs tree inside a git repo") from None  # fmt: skip
+    return [(sha, subject) for sha, _, subject in (line.partition(" ") for line in out.splitlines())]  # fmt: skip
 
 
 def _tasks(history: list[tuple[str, str]]) -> dict[str, list[str]]:
@@ -188,46 +178,32 @@ def _revert(log: list[_Commit]) -> None:
             target.live, target = not target.live, target.undid
 
 
-def _named(
-    log: list[_Commit], tasks: dict[str, list[str]], order: list[str]
-) -> dict[str, list[str]]:
-    """Link step 2, newest first: bug id -> the shas its live subject names; a shape-4 resolve
-    names its task's commits by id (which a rebase keeps), else the shas it cites."""
+def _named(log: list[_Commit], tasks: dict[str, list[str]], order: list[str]) -> dict[str, list[str]]:  # fmt: skip
+    """Link step 2, newest first: bug id -> the shas its live subject names. A shape-4 resolve
+    names refs, its `by <task-id>` first, then the shas it cites; the first ref that names commits
+    wins (a task id a rebase keeps, a sha it drops)."""
     named: dict[str, list[str]] = {}
     for commit in reversed([c for c in log if c.live]):
         link = _LINK.match(commit.subject)
         if link is None:
             continue
-        shas = [commit.sha]
-        if link[1].startswith("chore"):
-            by, cited = _BY.match(link[3]), _CITED.search(link[3])
-            shas = (by and tasks.get(by["task"])) or [
-                full for s in (cited[1].split(", ") if cited else []) if (full := _full(s, order))
-            ]
-        ids = (
-            [ln.strip() for ln in commit.body.splitlines() if _BODY_ID.fullmatch(ln.strip())]
-            if link[2].startswith("class ")
-            else link[2].split(", ")
-        )
+        refs = (tasks.get(m[1]) or [] if m[1] else [f for r in m[2].split(", ") for f in _full(r, order)] for m in _REF.finditer(link[3]))  # fmt: skip
+        shas = next(filter(None, refs), []) if link[1].startswith("chore") else [commit.sha]
+        ids = [ln.strip() for ln in commit.body.splitlines() if _BODY_ID.fullmatch(ln.strip())] if link[2].startswith("class ") else link[2].split(", ")  # fmt: skip
         for bug in ids:
             named.setdefault(bug, []).extend(shas)
     return named
 
 
-def _full(short: str, order: list[str]) -> str | None:
-    """The oldest sha of *order* that *short* starts, None when a rebase dropped it."""
-    return next((sha for sha in order if sha.startswith(short)), None)
+def _full(short: str, order: list[str]) -> list[str]:
+    """The oldest sha of *order* that *short* starts; none when it is no sha or a rebase dropped it."""
+    return [sha for sha in order if sha.startswith(short)][:1]
 
 
 def _shown(specs: Path, log: list[_Commit], shas: set[str]) -> dict[str, _Commit]:
-    """The commits of *shas* with their numstat: the log's own, the rest read by `git show`."""
-    by_sha = {c.sha: c for c in log}
-    rest = sorted(shas - by_sha.keys())
-    return (
-        by_sha | {c.sha: c for c in _parse(git(specs, "show", "--numstat", _FORMAT, *rest))}
-        if rest
-        else by_sha
-    )
+    """The log's commits (their paths) with the numstat of *shas*, which `git show` reads."""
+    shown = _parse(git(specs, "show", "--numstat", _FORMAT, *sorted(shas))) if shas else []
+    return {c.sha: c for c in log} | {c.sha: c for c in shown}
 
 
 def fixes(specs: Path) -> dict[str, Fix]:
@@ -235,26 +211,21 @@ def fixes(specs: Path) -> dict[str, Fix]:
     history = _history(specs)
     if not history:
         return {}
-    log = _parse(git(specs, "log", "--reverse", "-E", *_GREP, "--numstat", _FORMAT))
+    log = _parse(git(specs, "log", "--reverse", "-E", *_GREP, "--name-only", _FORMAT))
     _revert(log)
     order = [sha for sha, _ in history]
     named = _named(log, _tasks(history), order)
     by_sha = _shown(specs, log, {s for shas in named.values() for s in shas})
     links = {bug: list(dict.fromkeys(shas)) for bug, shas in named.items() if shas}
-    prod = own(specs, {r[2] for shas in links.values() for s in shas for r in by_sha[s].rows})
+    prod = own(specs, {r[-1] for shas in links.values() for s in shas for r in by_sha[s].rows})
     top = Path(git(specs, "rev-parse", "--show-toplevel").strip())
     squashes = functools.cache(lambda: subjects(top))
 
     @functools.cache
-    def wrote(
-        sha: str,
-    ) -> set[str]:  # the shas whose lines this commit removed, on paths some fix wrote
-        hot = tuple(sorted({x[2] for x in by_sha[sha].rows} & prod))
-        return (
-            removed(top, (f"{sha}^", sha), f"{sha}^", squashes(), NOT_PRODUCTION, hot)
-            if hot
-            else set()
-        )
+    def wrote(sha: str) -> set[str]:
+        # the shas whose lines this commit removed, on paths some fix wrote
+        hot = tuple(sorted({x[-1] for x in by_sha[sha].rows} & prod))
+        return removed(top, (f"{sha}^", sha), f"{sha}^", squashes(), NOT_PRODUCTION, hot) if hot else set()  # fmt: skip
 
     reworkers = [c for c in log if c.live and _kind(c)]
     pos = {sha: i for i, sha in enumerate(order)}
@@ -270,7 +241,7 @@ def _fix(
     wrote: Callable[[str], set[str]],
 ) -> Fix:
     """One bug's :class:`Fix`; its rework blames, so only the verb that prints it pays."""
-    surfaces = {s: {r[2] for r in by_sha[s].rows} & prod for s in shas}
+    surfaces = {s: {r[-1] for r in by_sha[s].rows} & prod for s in shas}
 
     def read() -> tuple[Counter[str], int]:
         rework = [
@@ -278,7 +249,7 @@ def _fix(
             for r in reworkers
             if r.sha not in surfaces
             and any(
-                pos[r.sha] > pos[s] and surfaces[s] & {x[2] for x in r.rows} and s in wrote(r.sha)
+                pos[r.sha] > pos[s] and surfaces[s] & {x[-1] for x in r.rows} and s in wrote(r.sha)
                 for s in shas
             )
         ]
