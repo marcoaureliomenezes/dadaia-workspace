@@ -19,7 +19,7 @@ The audit's pillar 1 cites this section, never restates it — if the two disagr
 
 ## What to read — and what to distrust
 
-- A record carries no commit sha; `python3 .agents/skills/dd-bug-resolution/scripts/bugs.py fix <bug-id> --specs specs` prints its fix commits (shape 3 or shape 4) and their numstat, or `unlinked`.
+- A record carries no commit sha; `python3 .agents/skills/dd-bug-resolution/scripts/bugs.py fix <bug-id> --specs <specs-dir>` prints its fix commits (shape 3 or shape 4) and their numstat, or `unlinked`.
 - A release-squash or ledger-only commit isolates nothing — say the trail is coarse instead of presenting it as "the fix".
 - Presenting a coarse diff as the prior fix is fabricated evidence.
 

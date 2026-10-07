@@ -13,11 +13,11 @@ description: >
 ## 1. Pick the set
 
 1. Open `specs/releases/AGENTS.md` (the area's scoped law) and follow it.
-2. Inspect `specs/bugs/BUGS.jsonl` via `python3 .agents/skills/dd-bug-resolution/scripts/bugs.py status`/`stats`/`window`, each with `--specs specs`, and read each test the window's records cite.
+2. Inspect `specs/bugs/BUGS.jsonl` via `python3 .agents/skills/dd-bug-resolution/scripts/bugs.py status`/`stats`/`window`, each with `--specs <specs-dir>`, and read each test the window's records cite.
 3. Read `specs/backlog/BACKLOG.json`'s `active[]`, consumed untriaged.
 4. Each undispositioned `specs/audits/**` finding enters the SPEC with its disposition (`python3 .agents/skills/dd-audit-project/scripts/audit.py disposition`).
 5. Name the SPEC's `**Origin:**`: `operator-demand`, `backlog:<ids>` or `bugs:<ids>`.
-6. Write the SPEC's `## Bug window review`: compare each fix in the window (`bugs.py window --specs specs`, `bugs.py fix --specs specs`) against the overfitting patterns — an assert or test the fix changed; a special case on a test value; a new branch, flag or second path; a reach into another feature; deleted functionality; ≥ 2 fixes on the unit.
+6. Write the SPEC's `## Bug window review`: compare each fix in the window (`bugs.py window --specs <specs-dir>`, `bugs.py fix --specs <specs-dir>`) against the overfitting patterns — an assert or test the fix changed; a special case on a test value; a new branch, flag or second path; a reach into another feature; deleted functionality; ≥ 2 fixes on the unit.
 7. Give each fix KEEP or REBUILD; a REBUILD reworks the fix's code and what surrounds it, and keeps the fix's tests.
 
 **Done when** the picked set is recorded; it becomes the SPEC's scope.
@@ -25,7 +25,7 @@ description: >
 ## 2. As-is review
 
 - `dd-software-engineer` runs it read-only, dispatched after the pick and before the grill.
-- Read every unit the picked set touches and its ledger slice (`python3 .agents/skills/dd-bug-resolution/scripts/bugs.py status`/`stats` with `--specs specs`, `git log` on the unit); the table rides the handoff into the grill and lands as PLAN §1.
+- Read every unit the picked set touches and its ledger slice (`python3 .agents/skills/dd-bug-resolution/scripts/bugs.py status`/`stats` with `--specs <specs-dir>`, `git log` on the unit); the table rides the handoff into the grill and lands as PLAN §1.
 - One row per touched unit, columns `unit | today | bugs | verdict | why`; DELETE vs KEEP is `dd-codebase-design`'s deletion test; verdicts follow the root map §1 work order, ADD only for what no unit can carry (`today` `—`, `why` says why).
 - REBUILD is mandatory when the unit carries ≥ 2 bugs, the demand changes its fundamental behaviour, the change would need a flag, branch, special case or second path, or its contract contradicts the demand; the engineer and the reviewer judge these triggers, no script.
 - §1.1 Authorities: one row per touched question, one authority each; `consults` call it, `deleted` leave with the row's bug.

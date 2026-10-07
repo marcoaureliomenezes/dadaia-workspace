@@ -27,7 +27,7 @@ change actually happens:
 2. Otherwise, measure — never impressionistic:
    - The bug history aggregated per surface/component — re-bug rate, fix-induced
      `caused_by` edges, resolved-without-evidence count; inside a dadaia workspace,
-     `python3 .agents/skills/dd-bug-resolution/scripts/bugs.py stats --specs specs` and `… status --all --specs specs`.
+     `python3 .agents/skills/dd-bug-resolution/scripts/bugs.py stats --specs <specs-dir>` and `… status --all --specs <specs-dir>`.
    - `git log --oneline --since=<window> -- <path>` churn per touched path; join the
      two — the loop lives where re-bugs and churn coincide.
    - The prior survey/audit's dispositions (inside a dadaia workspace,

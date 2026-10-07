@@ -47,12 +47,12 @@ axes are reported side by side — an axis never outranks another.
 
 ## 4. Axis 3 — Bug-surface
 
-- Pull the touched feature's ledger slice: `python3 .agents/skills/dd-bug-resolution/scripts/bugs.py stats --specs specs`, `python3 .agents/skills/dd-bug-resolution/scripts/bugs.py status --all --specs specs` filtered to its surface/component.
+- Pull the touched feature's ledger slice: `python3 .agents/skills/dd-bug-resolution/scripts/bugs.py stats --specs <specs-dir>`, `python3 .agents/skills/dd-bug-resolution/scripts/bugs.py status --all --specs <specs-dir>` filtered to its surface/component.
 - Answer WITH EVIDENCE: did this diff reduce, keep, or increase the feature's bug surface?
 - The operator's rule applied as a review axis: a diff that GROWS the feature is a stop —
   a branch, flag, special case, second code path or cross-feature reach-in added by a fix
   is a puxadinho; name it and recommend the replace-don't-layer shape instead.
-- A fix whose `caused_by` is not `none`: read every line the prior fix wrote (`bugs.py fix <caused_by> --specs specs`); the fix is a REBUILD of the unit, keeping its tests, and a patch in its place is a finding; `PILLAR-BUGS` measures it, nothing gates it.
+- A fix whose `caused_by` is not `none`: read every line the prior fix wrote (`bugs.py fix <caused_by> --specs <specs-dir>`); the fix is a REBUILD of the unit, keeping its tests, and a patch in its place is a finding; `PILLAR-BUGS` measures it, nothing gates it.
 - An S4, S5, S8 or S10 finding (`SLOP.md`), or an added ratchet allowance key, answers this axis "increased" until it is gone.
 
 ## 4a. The root-cause and approval bars

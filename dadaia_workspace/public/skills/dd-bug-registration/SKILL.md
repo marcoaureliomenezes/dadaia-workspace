@@ -29,7 +29,7 @@ description: >
 
 ## 3. Register — after the operator confirms
 
-1. `python3 .agents/skills/dd-bug-resolution/scripts/bugs.py append --specs specs --bug-id <slug> --reported-by <agent> --title "…"
+1. `python3 .agents/skills/dd-bug-resolution/scripts/bugs.py append --specs <specs-dir> --bug-id <slug> --reported-by <agent> --title "…"
    --severity LOW|MEDIUM|HIGH|CRITICAL --surface … --component … --context …
    --symptom … --repro … --expected … --correlates <ids>|none`
 2. The surface is the name of a directory tracked in the repo.
