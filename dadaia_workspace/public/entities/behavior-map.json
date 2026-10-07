@@ -210,7 +210,7 @@
         "skill": "sha256:113c0fd6945e9eed1d2496854689c886887393d4701184ad1c92a4a10a966a33",
         "scripts": "sha256:081ca34ad201b652f666abda16e4b15389926d86937f043a2c8bb1e141c99b17",
         "scoped": [
-          "sha256:b49c2c7d74916bf1af3ba2c06ae1c8bb8b6ed72ee5b7a1d3caa9b98480ec6348"
+          "sha256:e030d06a975a5469cb6040515e721096abd1e1d657f6e1a4934f669f5ed71872"
         ]
       },
       "recorded_by": "dd-software-engineer",
