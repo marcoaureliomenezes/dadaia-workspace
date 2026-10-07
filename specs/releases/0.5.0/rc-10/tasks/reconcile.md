@@ -68,11 +68,28 @@ Paths are relative to the repo root; aliases as in `PLAN.md` (`f/`, `pub/`, `S/`
 | JR.S7.T3 | AC4.5 | `specs/memory/QUALITY.md` (`## Bugs`'s written review states its causes, verdicts and lessons with no release or candidate id), `docs/bug-ledger-lessons.md` (its sections derived from QUALITY re-derived, their `derived-from` hashes re-recorded) | `dadaia doctor` clean of MEM-NARRATIVE-1, `tests/contract/test_docs_derived_from_memory.py` green; resolves `quality-bugs-review-names-release-ids` |
 | JR.S7.T4 | — | `dadaia_workspace/public/entities/behavior-map.json` (re-recorded after T1 and T2 land) | `tests/infrastructure/test_entity_doctor.py` |
 
-## Stage JR.S8 — the eval and closure
+## Stage JR.S8 — RED amendment (review APPROVED 142cf04c7, the non-blocking findings)
+
+- Contract: a RED-stage amendment (ADR 0209) approved by operator delegation ("Delego: APPROVED do revisor basta (Recommended)", 2026-10-06); bugs registered from the reviewer's findings by delegation ("Registra e corrige se o revisor reproduzir (Recommended)"). Tests only; new RED rows `xfail(strict=True, raises=AssertionError)`; the one assert amendment is the adversary row's literal. Exit: the rows xfail at HEAD; ACs AC6.0, AC6.2
+
+| task | AC | `W:` | owner tests / RED |
+|---|---|---|---|
+| JR.S8.T1 | AC6.0 | `tests/public/skills/dd_gitflow_default/scripts/test__worktree_end.py` (a `tests:` line after a UTF-8 BOM is declared when git's output decodes under a non-UTF-8 locale; an agreement row: `_worktree_end._declared` and `canon.declare_tests_line` judge the same law fixtures alike — present, absent, empty, BOM, CRLF), `tests/features/specs/test_canon__scaffold_repo_law.py` (the shipped default freezes no `src/ui/ABTest.tsx`, `docs/LoadTest.md`), `tests/cli/commands/test_specs.py` (the `[declared]` line names the default and asks to narrow it) | bugs `declared-bom-strip-depends-on-locale-decoding`, `tests-line-predicate-lives-in-two-readers`, `default-tests-globs-over-match-source` |
+| JR.S8.T2 | AC6.2 | `tests/public/skills/dd_gitflow_default/scripts/test__worktree_freeze.py` (`test_a_source_stage_after_a_test_only_stage_refuses_an_added_or_changed_test_line` asserts the literal `(path, anchor)`) | bug `freeze-adversary-row-asserts-not-none`; resolved by this task (an assert amendment, the delegation) |
+
+## Stage JR.S9 — fixes (the non-blocking findings)
+
+- Contract: exit the JR.S8 rows green, CI green; envelope as the rows; ACs AC6.0
+
+| task | AC | `W:` | owner tests / RED |
+|---|---|---|---|
+| JR.S9.T1 | AC6.0 | `dadaia_workspace/public/skills/dd-gitflow-default/scripts/_worktree_end.py` (`_declared` reads the law as UTF-8 whatever the locale), `dadaia_workspace/public/templates/repo-AGENTS.md` (the default drops `**/*Test.*`; `**/test/**` keeps Maven's `src/test/`), `dadaia_workspace/cli/commands/specs.py` (the `[declared]` line names the default and asks to narrow it), `dadaia_workspace/public/entities/behavior-map.json` (re-recorded in this task) | JR.S8.T1's rows; resolves the three bugs |
+
+## Stage JR.S10 — the eval and closure
 
 - Contract: exit tests `release.py check` in CLOSURE, `bugs.py status` `0 open`, eval.yml green on `feature/0.5.0` (AC11.6); envelope `specs/memory/QUALITY.md`, `specs/releases/0.5.0/_RELEASE.json`, `specs/backlog/**`, this rc's job files; ACs AC10.2, AC10.4, AC11.6
 
 | task | AC | `W:` | owner tests / RED |
 |---|---|---|---|
-| JR.S8.T1 | AC11.6, AC10.4 | `specs/memory/QUALITY.md` (the eval verdict line of the rerun), `specs/releases/0.5.0/_RELEASE.json` (the rerun's note), `specs/backlog/**` (`agent-behavior-evals` exits `delivered --release 0.5.0`; ADR 0220 cited where the multi-platform entry says its ADR has no id) | `release.py check`, `backlog.py check` |
-| JR.S8.T2 | — | this file | close task, last: behavior map and derived docs; `test-audit: no test touched`, `mutation: skipped — no Python source`; `done` |
+| JR.S10.T1 | AC11.6, AC10.4 | `specs/memory/QUALITY.md` (the eval verdict line of the rerun), `specs/releases/0.5.0/_RELEASE.json` (the rerun's note), `specs/backlog/**` (`agent-behavior-evals` exits `delivered --release 0.5.0`; ADR 0220 cited where the multi-platform entry says its ADR has no id) | `release.py check`, `backlog.py check` |
+| JR.S10.T2 | — | this file | close task, last: behavior map and derived docs; `test-audit: no test touched`, `mutation: skipped — no Python source`; `done` |
