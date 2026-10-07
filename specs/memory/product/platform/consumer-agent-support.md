@@ -21,7 +21,7 @@ sources:
 
 ## `dadaia certify`
 
-- `dadaia certify [--json]` runs the deterministic public-feature journey in a disposable workspace under `.dadaia/tmp/certification/<id>/`, with its own `HOME` and the session and context variables cleared, and reports one check per step; its empty-remote step walks the onboarding levels — `context create --main-repo <bare remote>`, `specs init --context`, `context baseline`.
+- `dadaia certify [--json]` runs the deterministic public-feature journey in a disposable workspace under `.dadaia/tmp/certification/<id>/`, with its own `HOME` and the session and context variables cleared, and reports one check per step; its empty-remote step walks the onboarding levels — `context create --main-repo <bare remote>`, `specs init --context`, `context baseline`; the bare remote is created with `core.longpaths=true`, so the journey also passes past Windows' path limit.
 - A failed certify check is a release blocker, yet a green certify never approves a release by itself ([[pypi-distribution]]).
 
 ## Dependencies

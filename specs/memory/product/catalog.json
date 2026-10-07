@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-10-07T16:35:05Z",
+  "generated_at": "2026-10-07T16:35:14Z",
   "features": [
     {
       "rank": 1,
@@ -350,7 +350,7 @@
         "paradigm",
         "pillars"
       ],
-      "token_estimate": 838,
+      "token_estimate": 927,
       "depends_on": [
         "worktrees",
         "spec-context-project",
@@ -442,7 +442,7 @@
         "release-gate",
         "sdd"
       ],
-      "token_estimate": 366,
+      "token_estimate": 387,
       "depends_on": [
         "pypi-distribution",
         "workspace-init",
