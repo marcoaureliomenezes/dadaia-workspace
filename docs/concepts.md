@@ -60,7 +60,7 @@ carry the ordered work, and the ledger scripts move the records.
 
 ## The gate
 
-<!-- derived-from: sdd-gate-v3 sha256:61115164982a -->
+<!-- derived-from: sdd-gate-v3 sha256:68785958dab2 -->
 
 The *gate* is one PreToolUse pre-gate evaluating root whitelist, venv guard and SDD
 gate in that order — first block wins. What it blocks, its path classes and every
