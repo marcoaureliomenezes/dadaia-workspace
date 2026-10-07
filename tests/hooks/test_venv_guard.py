@@ -24,6 +24,7 @@ from pathlib import Path
 import pytest
 
 from dadaia_workspace.core.cli_line import fix_line, venv_line
+from dadaia_workspace.core.platform import Capabilities
 from dadaia_workspace.hooks import _common, venv_guard
 
 
@@ -172,3 +173,23 @@ def test_the_block_fix_runs_verbatim_from_a_repo_subdirectory(tmp_path: Path) ->
     fix = reason.splitlines()[-1].removeprefix("fix: ")
     done = subprocess.run(shlex.split(fix), cwd=cwd, capture_output=True, text=True, check=False)
     assert done.returncode == 0, done.stderr
+
+
+@pytest.mark.parametrize("command", ["dadaia doctor", "python -m dadaia_workspace"])
+@pytest.mark.xfail(strict=True, raises=AssertionError, reason="shipped-law-hardcodes-the-posix-venv-path")  # fmt: skip
+def test_block_message_names_the_windows_venv_scripts_dir(
+    command: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr("dadaia_workspace.core.platform.PLATFORM", Capabilities.detect("win32"))
+    reason = venv_guard.evaluate_payload(_bash(command))
+    assert reason is not None
+    assert ".dadaia/.venv/Scripts/" in reason.splitlines()[0]
+    assert "/bin/" not in reason.splitlines()[0]
+
+
+@pytest.mark.xfail(strict=True, raises=AssertionError, reason="shipped-law-hardcodes-the-posix-venv-path")  # fmt: skip
+def test_win32_blocks_a_posix_bin_cli_that_does_not_exist_there(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr("dadaia_workspace.core.platform.PLATFORM", Capabilities.detect("win32"))
+    assert venv_guard.evaluate_payload(_bash(".dadaia/.venv/bin/dadaia doctor")) is not None
