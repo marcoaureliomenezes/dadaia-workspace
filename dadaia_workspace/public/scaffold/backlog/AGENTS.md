@@ -6,7 +6,7 @@ Scope: this file governs only `specs/backlog/`.
 - An entry materializes only through the main thread's operator-facing intake report; an operator-ratified in-release deferral already counts as intake.
 - Retention covers bugs and backlog only — a test is pruned by a `dd-code-reviewer` verdict.
 - The backlog is a single JSON document: `specs/backlog/BACKLOG.json`, `{schema: "backlog-v1", active: [...]}`.
-- No per-entry file per backlog item — every live candidate/idea is one `active[]` object (ADR #14).
+- No per-entry file per backlog item — every live candidate/idea is one `active[]` object.
 - Full schema: `dd-backlog-definition` (The document), `schemas/backlog/backlog-v1.schema.json`.
 - A closed item's history lives beside the document, in `specs/backlog/_archive/backlog_histo.jsonl`.
 
