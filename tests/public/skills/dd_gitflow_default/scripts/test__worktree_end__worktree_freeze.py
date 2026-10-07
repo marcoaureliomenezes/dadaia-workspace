@@ -157,7 +157,6 @@ def test_a_repo_with_no_tests_line_refuses_until_the_work_branch_declares_it(roo
     assert landed.returncode == 0, (sha, landed.stderr)
 
 
-@pytest.mark.xfail(strict=True, reason="a merge commit's own diff is never read")
 def test_a_merge_commit_that_edits_a_test_line_refuses(root: Path) -> None:
     anchor = _born(root)
     task = "0.5.0-rc1/j1--J1.S2.T2"
@@ -181,7 +180,6 @@ def test_a_merge_commit_that_edits_a_test_line_refuses(root: Path) -> None:
     assert (merged.returncode, fixes(merged)) == (1, _frozen("tests/test_a.py", anchor))
 
 
-@pytest.mark.xfail(strict=True, reason="the range is work...HEAD, not <merge-base>..HEAD")
 def test_a_work_branch_commit_the_job_lacks_is_not_judged_as_the_jobs(root: Path) -> None:
     _born(root)
     repo = root / "repos/r"
@@ -191,7 +189,6 @@ def test_a_work_branch_commit_the_job_lacks_is_not_judged_as_the_jobs(root: Path
     assert merged.returncode == 0, merged.stderr
 
 
-@pytest.mark.xfail(strict=True, reason="no RED stage falls back to the range base")
 def test_a_job_with_no_commit_naming_its_red_stage_refuses(root: Path) -> None:
     _, merged = attempt(root, {"src/a.py": "x = 1\n"}, "J1.S2.T1")
     assert (merged.returncode, fixes(merged)) == (

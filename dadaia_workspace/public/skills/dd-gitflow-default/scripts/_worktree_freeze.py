@@ -2,10 +2,11 @@
 """The test freeze (ADR 0209): a task or job merge refuses any diff that modifies or deletes a
 test line from the RED anchor on. Test paths are the globs of the `tests:` line the work
 branch's `AGENTS.md` declares — no tree picks its own judge. Everything is read from
-`git log` over `<work>...HEAD`, so it holds for any language.
+`git log` over `<merge-base>..HEAD`, each commit diffed against its first parent, so it holds
+for any language.
 
-The anchor is the parent of the first commit whose subject id (`J<n>.S<m>.T<k>`) is not in
-stage 1 — the RED stage — else the range base. Past it a commit may only delete lines
+A range whose subject ids (`J<n>.S<m>.T<k>`) name stages but not stage 1 — the RED stage —
+refuses. The anchor is the parent of the first commit not in it, else the range base. Past it a commit may only delete lines
 matching the repo's `tests-red:` pattern (the RED marker), and may only add test lines in a
 stage group that touches test paths alone (a new RED stage); a commit with no stage id is
 its own group. A pure rename has no hunks and lands."""
@@ -68,6 +69,7 @@ def _blocks(tree: Path, rng: str, specs: list[str], *flags: str) -> list[tuple[s
         "--no-color",
         "--no-ext-diff",
         "--no-show-signature",
+        "--diff-merges=first-parent",
         "--format=%x00%H %s",
         *flags,
         rng,
@@ -139,14 +141,19 @@ def check(tree: Path, work: str, tests: str, red: str) -> None:
         ) from error
     try:
         base = git(tree, "merge-base", work, "HEAD").strip()
-        rows = _rows(tree, f"{work}...HEAD", tests.split())
+        rows = _rows(tree, f"{base}..HEAD", tests.split())
     except RuntimeError as error:  # fail closed: no anchor, no merge
         raise Refusal(
             f"the RED anchor cannot be derived: {error}",
-            f"Operator action: stop and report — the RED anchor of {work}...HEAD cannot be derived (ADR 0209)",
+            f"Operator action: stop and report — the RED anchor since {work} cannot be derived (ADR 0209)",
         ) from error
+    if (stages := {f["n"] for r in rows if (f := _ID.search(r.subject))}) and "1" not in stages:
+        raise Refusal(
+            f"no commit since {work} names its RED stage",
+            f"Operator action: stop and report — no commit since {work} names its RED stage, so the RED anchor cannot be derived (ADR 0209)",
+        )
     if hit := judge(rows, base, pattern):
         raise Refusal(
-            f"{hit[0]} is a test, frozen past the RED anchor {hit[1]}",
+            "a test is frozen past the RED anchor",
             f"Operator action: stop and report — {hit[0]} is frozen past the RED anchor {hit[1]} (ADR 0209)",
         )
