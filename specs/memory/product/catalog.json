@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-10-07T16:35:26Z",
+  "generated_at": "2026-10-07T16:35:58Z",
   "features": [
     {
       "rank": 1,
@@ -14,7 +14,7 @@
         "handoff",
         "schema"
       ],
-      "token_estimate": 522,
+      "token_estimate": 535,
       "depends_on": [
         "worktrees",
         "workspace-doctor",
@@ -878,7 +878,7 @@
         "merge",
         "review"
       ],
-      "token_estimate": 1555,
+      "token_estimate": 1785,
       "depends_on": [
         "sdd-gate-v3",
         "public-asset-distribution",
