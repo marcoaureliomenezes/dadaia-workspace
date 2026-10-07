@@ -34,6 +34,7 @@ from tests.helpers.worktree_ws import (
     git,
     land,
     make_workspace,
+    patch_cli,
     run,
 )
 from tests.helpers.worktree_ws import run_fix as _fix
@@ -53,7 +54,9 @@ def root(tmp_path: Path) -> Path:
 def _argv(result: subprocess.CompletedProcess[str]) -> list[str]:
     """The one fix line, split as the shell will: the expected argv is the oracle."""
     (fix,) = fixes(result)
-    return shlex.split(fix.removeprefix("fix: "))
+    return [
+        str(Path(w)) if Path(w).is_absolute() else w for w in shlex.split(fix.removeprefix("fix: "))
+    ]
 
 
 def test_merge_fast_forwards_removes_and_reruns(root: Path) -> None:
@@ -204,10 +207,10 @@ def test_failed_fast_forward_tells_a_stray_from_a_moved_work_branch(root: Path) 
         f"fix: Operator action: commit or remove the paths above in {repo}"
     ]
     (repo / "src/a.py").unlink()
-    cli = cli_path(root)  # a sibling lands while the verdict is read
+    # a sibling lands while the verdict is read
     move = f"subprocess.run(['git', '-C', {str(repo)!r}, 'commit', '-qm', 'm', '--allow-empty'])"
     verdict = 'elif args[:2] == ["reports", "validate"]:\n'
-    cli.write_text(cli.read_text().replace(verdict, f"{verdict}    import subprocess; {move}\n"))
+    patch_cli(root, verdict, f"{verdict}    import subprocess; {move}\n")
     moved = run(root, "merge", TREE)
     assert _argv(moved) == ["git", "-C", str(tree), "rebase", "feature/0.5.0"] and tree.exists()
 

@@ -50,9 +50,20 @@ def cli_path(root: Path) -> Path:
     return root / ".dadaia/.venv" / PLATFORM.venv_scripts_dir / f"dadaia{PLATFORM.venv_exe_suffix}"
 
 
+_STUBS: dict[Path, str] = {}  # each workspace's stub source: on Windows the stub is an .exe
+
+
 def _stub_cli(root: Path, *listed: dict[str, object]) -> None:
     """The `dadaia` stub over *listed*, placed at `cli_path` by `fake_venv` (startable per platform)."""
-    fake_venv(root, cli=_CLI.format(rows=json.dumps(list(listed))))
+    _STUBS[root] = _CLI.format(rows=json.dumps(list(listed)))
+    fake_venv(root, cli=_STUBS[root])
+
+
+def patch_cli(root: Path, old: str, new: str) -> None:
+    """Re-stub *root*'s CLI with *old* replaced by *new* in its source (the `.exe` is no text)."""
+    assert old in _STUBS[root]
+    _STUBS[root] = _STUBS[root].replace(old, new)
+    fake_venv(root, cli=_STUBS[root])
 
 
 def git(repo: Path, *args: str) -> str:
