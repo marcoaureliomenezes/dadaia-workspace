@@ -32,6 +32,7 @@ from pathlib import Path
 import pytest
 
 from dadaia_workspace.core.gitflow import Role
+from dadaia_workspace.core.platform import Capabilities
 from dadaia_workspace.core.workspace_layout import (
     CANON_ROOT_MEMBERS,
     DADAIA_ZONES,
@@ -364,3 +365,16 @@ def test_every_zone_creator_exists() -> None:
         if module is not None:
             assert creator in used, f"{creator} names a module but creates no zone"
             importlib.import_module(module)
+
+
+@pytest.mark.xfail(strict=True, raises=AssertionError, reason="shipped-law-hardcodes-the-posix-venv-path")  # fmt: skip
+def test_law_staged_under_win32_names_the_scripts_cli(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The staged root law names the workspace CLI in the host's venv form: under win32
+    it is ``.dadaia/.venv/Scripts/dadaia.exe`` and the POSIX path appears nowhere."""
+    monkeypatch.setattr("dadaia_workspace.core.platform.PLATFORM", Capabilities.detect("win32"))
+    FileSystemPublicAssetManager().stage(tmp_path)
+    text = (tmp_path / ".dadaia" / "agentic" / "data" / "AGENTS.md").read_text("utf-8")
+    assert ".dadaia/.venv/Scripts/dadaia.exe" in text
+    assert ".venv/bin/dadaia" not in text
