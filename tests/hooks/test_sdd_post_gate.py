@@ -36,6 +36,8 @@ import json
 import re
 from pathlib import Path
 
+import pytest
+
 from dadaia_workspace.core.spec_status import STATUS_LINE
 from tests.fixtures.harness_env import claude_hook_env, run_hook_subprocess
 
@@ -118,6 +120,7 @@ def _mk_hook_workspace(tmp_path: Path, ctx: str = "dummy-ctx") -> Path:
     return tmp_path
 
 
+@pytest.mark.medium
 def test_pre_gate_hook_never_mutates_tasks_md_between_read_and_edit(tmp_path: Path) -> None:
     ws = _mk_hook_workspace(tmp_path)
     specs_dir = ws / "worktrees" / "dummy-ctx" / "0.5.0-rc1/j1" / "specs"
@@ -145,6 +148,7 @@ def test_pre_gate_hook_never_mutates_tasks_md_between_read_and_edit(tmp_path: Pa
     _assert_sdd_invariants_preserved(before, after)
 
 
+@pytest.mark.medium
 def test_sdd_post_gate_hook_never_mutates_tasks_md_content(tmp_path: Path) -> None:
     ws = _mk_hook_workspace(tmp_path)
     specs_dir = ws / "repos" / "dummy-ctx" / "specs"
@@ -167,6 +171,7 @@ def test_sdd_post_gate_hook_never_mutates_tasks_md_content(tmp_path: Path) -> No
     _assert_sdd_invariants_preserved(before, after)
 
 
+@pytest.mark.medium
 def test_ctx_inject_hook_never_mutates_tasks_md_content(tmp_path: Path) -> None:
     ws = _mk_hook_workspace(tmp_path)
     specs_dir = ws / "repos" / "dummy-ctx" / "specs"
