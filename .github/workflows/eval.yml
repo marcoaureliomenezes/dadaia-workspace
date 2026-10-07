@@ -1,0 +1,21 @@
+name: eval
+
+# Registration skeleton: GitHub dispatches a workflow only when its file exists on the
+# default branch. `gh workflow run eval.yml --ref feature/<M.m.p>` runs that ref's own
+# eval.yml; this copy calls no model and has no schedule. The promote replaces it.
+on:
+  workflow_dispatch:
+    inputs:
+      baseline:
+        description: dadaia-workspace version on PyPI to compare against
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  skeleton:
+    runs-on: ubuntu-24.04
+    steps:
+      - run: echo "Dispatch with --ref feature/<M.m.p>; main carries no eval run until the promote."
