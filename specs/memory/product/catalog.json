@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-10-07T16:32:36Z",
+  "generated_at": "2026-10-07T16:33:13Z",
   "features": [
     {
       "rank": 1,
@@ -14,7 +14,7 @@
         "handoff",
         "schema"
       ],
-      "token_estimate": 521,
+      "token_estimate": 522,
       "depends_on": [
         "worktrees",
         "workspace-doctor",
@@ -41,7 +41,7 @@
         "dispatch",
         "sdd"
       ],
-      "token_estimate": 807,
+      "token_estimate": 813,
       "depends_on": [
         "agentic-entities",
         "release-lifecycle",
@@ -182,7 +182,7 @@
         "projection",
         "hooks"
       ],
-      "token_estimate": 429,
+      "token_estimate": 444,
       "depends_on": [
         "agent-orchestration",
         "agentic-entities",
@@ -211,7 +211,7 @@
         "projection",
         "hooks"
       ],
-      "token_estimate": 339,
+      "token_estimate": 369,
       "depends_on": [
         "agentic-entities",
         "sdd-gate-v3",
