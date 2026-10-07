@@ -164,4 +164,4 @@ def test_a_source_stage_after_a_test_only_stage_refuses_an_added_or_changed_test
         row("c1", "test(JR.S4.T1): red", edits=((T, (), 2),)),
         row("c2", "fix(JR.S5.T1): green", code=True, edits=((T, removed, 1),)),
     ]
-    assert freeze.judge(rows, "base", None) is not None
+    assert freeze.judge(rows, "base", None) == (T, "base")
