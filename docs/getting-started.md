@@ -5,7 +5,7 @@ the terms are defined in [concepts](concepts.md) and in [`CONTEXT.md`](../CONTEX
 
 ## Install
 
-<!-- derived-from: pypi-distribution sha256:41df64f3512e -->
+<!-- derived-from: pypi-distribution sha256:bd9f29d03eb3 -->
 <!-- derived-from: workspace-init sha256:a8f08f87ae76 -->
 
 ```bash
