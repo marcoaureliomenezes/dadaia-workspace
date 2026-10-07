@@ -1167,6 +1167,66 @@
       "milestone": "defined",
       "sha": "8e6448f13",
       "text": "Candidate defined at 8e6448f13; phase IMPLEMENTATION."
+    },
+    {
+      "ts": "2026-10-07T16:44:15Z",
+      "agent": "dd-software-engineer",
+      "kind": "merge",
+      "text": "job: job5; start: 2026-10-06T15:57:17Z; end: 2026-10-06T16:55:02Z; wall: 58; ritual_wait: 6; dispatches: 4; job_gate_runs: 4"
+    },
+    {
+      "ts": "2026-10-07T16:44:15Z",
+      "agent": "dd-software-engineer",
+      "kind": "merge",
+      "text": "job: job1; start: 2026-10-06T14:52:32Z; end: 2026-10-06T18:09:30Z; wall: 197; ritual_wait: 10; dispatches: 13; job_gate_runs: 6"
+    },
+    {
+      "ts": "2026-10-07T16:44:15Z",
+      "agent": "dd-software-engineer",
+      "kind": "merge",
+      "text": "job: job4; start: 2026-10-06T18:35:54Z; end: 2026-10-06T20:45:56Z; wall: 130; ritual_wait: 1; dispatches: 7; job_gate_runs: 1"
+    },
+    {
+      "ts": "2026-10-07T16:44:15Z",
+      "agent": "dd-software-engineer",
+      "kind": "merge",
+      "text": "job: job7; start: 2026-10-06T21:05:45Z; end: 2026-10-07T00:31:26Z; wall: 206; ritual_wait: 0; dispatches: 3; job_gate_runs: 3"
+    },
+    {
+      "ts": "2026-10-07T16:44:15Z",
+      "agent": "dd-software-engineer",
+      "kind": "merge",
+      "text": "job: job8; start: 2026-10-06T22:36:33Z; end: 2026-10-07T01:34:11Z; wall: 178; ritual_wait: 0; dispatches: 20; job_gate_runs: 1"
+    },
+    {
+      "ts": "2026-10-07T16:44:15Z",
+      "agent": "dd-software-engineer",
+      "kind": "merge",
+      "text": "job: job6; start: 2026-10-06T22:37:51Z; end: 2026-10-07T03:05:07Z; wall: 267; ritual_wait: 2; dispatches: 25; job_gate_runs: 3"
+    },
+    {
+      "ts": "2026-10-07T16:44:15Z",
+      "agent": "dd-software-engineer",
+      "kind": "merge",
+      "text": "job: job9; start: 2026-10-07T03:29:13Z; end: 2026-10-07T05:43:31Z; wall: 134; ritual_wait: 2; dispatches: 20; job_gate_runs: 1"
+    },
+    {
+      "ts": "2026-10-07T16:44:15Z",
+      "agent": "dd-software-engineer",
+      "kind": "merge",
+      "text": "job: bug-batch; start: 2026-10-06T21:22:44Z; end: 2026-10-07T15:42:58Z; wall: 1100; ritual_wait: 2; dispatches: 77; job_gate_runs: 2"
+    },
+    {
+      "ts": "2026-10-07T16:44:15Z",
+      "agent": "dd-software-engineer",
+      "kind": "merge",
+      "text": "job: job10; start: 2026-10-07T12:51:30Z; end: 2026-10-07T15:49:42Z; wall: 178; ritual_wait: 2; dispatches: 66; job_gate_runs: 1"
+    },
+    {
+      "ts": "2026-10-07T16:44:15Z",
+      "agent": "dd-software-engineer",
+      "kind": "note",
+      "text": "rc-10: the kind: merge entries above (jobs 5, 1, 4, 7, 8, 6, 9, bug-batch, 10, in the order their reviewed heads' push CI ran) are logged at Reconciliation; release.py has no log verb (RELEASE-EVENTS.md: Read-then-Edit), so each is an appended entry that release.py check validates. Sources, from git and gh. end: createdAt of the push CI run on the head each APPROVED reviewer handoff names (job5 37499451940 on d13b0eb0c; job1 37509126941 on 8e6448f13; job4 37528915391 on fe539b1fd; job7 37552414517 on 4521a1f9c; job8 37557756294 on cc5b3b01f; job6 37565084462 on 955595313; job9 37577736015 on ebab9e479; bug-batch 37646189889 on 0bfb9e46e; job10 37647117575 on 0618ddf35). All nine runs concluded success. start: the author time of the job's first task commit (a subject carrying J<n>.S or JB.S; job9's and job10's `docs(J<n>)` definition commits are not task commits); the committer time is not used, because the rebases onto feature/0.5.0 rewrote it to one instant (as in rc-9's JR.S2.T3). ritual_wait: end minus the author time of the job's last task commit (d13b0eb0c, 8e6448f13, fe539b1fd, 4521a1f9c, cc5b3b01f, 955595313, job9 tip 25498eea7, bug-batch tip 4ec4bcea6, job10 tip 0f46c1abc on the current feature/0.5.0; the reviewed shas of jobs 9, bug-batch and 10 were rewritten by the later rebases). dispatches: the count of the main thread's Agent calls whose prompt or description names the job (its worktree, its task ids), read from the session transcripts; an agent reading, unruled. job_gate_runs: the full `scripts/ci.py job` commands run by hand in the transcripts that name the job's tree, plus one for the verify run worktree.py merge makes; a lower bound, since a run launched through a wrapper script is not seen. Jobs 2 and 3 (the evals repo) were annulled by the operator's ruling 2026-10-06/07 and replaced by Job 9: they have no merge entry. The reconcile job's own merge entry is logged when it merges."
     }
   ]
 }
