@@ -19,7 +19,7 @@ import pytest
 
 from dadaia_workspace.core import context_registry
 from dadaia_workspace.features.spec_context import gate_policy
-from dadaia_workspace.hooks import pre_gate, sdd_gate
+from dadaia_workspace.hooks import pre_gate, root_whitelist, sdd_gate, venv_guard
 from dadaia_workspace.infrastructure.runtime_transforms import hook_wrappers
 
 _REPO = Path(__file__).resolve().parents[3]
@@ -71,6 +71,59 @@ def test_the_map_lists_every_fail_open_path_the_code_has(
     rows = _fail_open_rows(named, tmp_path, monkeypatch)
     assert len(named) == len(items) and sorted(named) == sorted(rows)
     assert [k for k, held in rows.items() if not held] == []
+
+
+_BUG = "root-enforcement-section-states-false-blocks"
+
+
+def _block_rows(tmp: Path, monkeypatch: pytest.MonkeyPatch) -> dict[str, bool]:
+    """One row per block the code has, keyed by the evidence the law names, each read in-process."""
+    for name, registry in (("ok", '{"contexts": []}'), ("bad", "{trunc")):
+        (tmp / name / ".dadaia/states").mkdir(parents=True)
+        (tmp / name / ".dadaia/states/spec_contexts.json").write_text(registry, "utf-8")
+
+    def write(name: str, rel: str, policy: ModuleType) -> str | None:
+        monkeypatch.chdir(tmp / name)
+        target = {"file_path": str(tmp / name / rel)}
+        payload = {"tool_name": "Write", "tool_input": target, "session_id": "s"}
+        return policy.evaluate_payload(payload)  # type: ignore[attr-defined,no-any-return]
+
+    venv = {"tool_name": "Bash", "tool_input": {"command": "cd x && dadaia doctor"}}
+    away = {
+        "zone": "worktree",
+        "repo": "b",
+        "owner": "b",
+        "context": "a",
+        "repos": frozenset({"a"}),
+    }
+    return {
+        "root_whitelist": write("ok", "stray.txt", root_whitelist) is not None,
+        "venv_guard": venv_guard.evaluate_payload(venv) is not None,
+        "PROTECTED": write("ok", "AGENTS.md", sdd_gate) is not None,
+        "out-of-scope": gate_policy.evaluate("worktrees/b/w/x.py", root=PurePath("/ws"), **away)[0]
+        == gate_policy.Decision.BLOCK,
+        "ADR 0105": write("bad", "repos/r/src/x.py", sdd_gate) is not None,
+    }
+
+
+@pytest.mark.xfail(strict=True, raises=AssertionError, reason=_BUG)
+def test_the_map_lists_every_block_the_code_has(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """AC12.5 (root-enforcement-section-states-false-blocks): §3's `blocks:` list is set-equal
+    to the code's blocks, each naming its evidence, merge-only included; the fail-open item
+    `(ADR 0132)` names the merge-only block; no §3 line claims a PR check, the line naming
+    APPROVED names `worktree.py merge`."""
+    section = _MAP.read_text("utf-8").split("## 3.")[1].split("\n## ")[0].splitlines()
+    line = next((ln for ln in section if "blocks:" in ln), "")
+    items = line.partition("blocks:")[2].rstrip(".").split(";")
+    named = {m[1]: i for i in items if (m := re.search(r"\(([^()]+)\)\s*$", i))}
+    rows = _block_rows(tmp_path, monkeypatch)
+    assert line and len(named) == len(items) and sorted(named) == sorted(rows)
+    assert [k for k, held in rows.items() if not held] == []
+    assert any("merge-only" in ln for ln in section if "(ADR 0132)" in ln)
+    assert all("worktree.py merge" in ln for ln in section if "APPROVED" in ln)
+    assert not any("green" in ln for ln in section)
 
 
 def test_the_bind_resolution_contract_covers_every_verb_module() -> None:
