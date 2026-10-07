@@ -46,7 +46,7 @@ description: >
 - The pick is the SPEC's `**Origin:** backlog:<ids>` line; the entry keeps its status.
 - It exits exactly once, at closure, by `python3 .agents/skills/dd-backlog-definition/scripts/backlog.py exit <slug> --disposition
   <disposition> [--release <id>] [--reason <text>]` — one histo
-  record, refused on a second exit (`dd-release-implementation` RC-FLOW step 7).
+  record, refused on a second exit (`dd-release-implementation` RC-FLOW step 4).
 - `dd-release-definition` consumes the picked set with no further triage — the
   backlog it reads is already sanitized.
 
