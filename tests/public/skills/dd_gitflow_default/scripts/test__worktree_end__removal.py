@@ -28,7 +28,7 @@ def _push_to_a_remote(root: Path) -> None:
     remote = root.parent / "remote.git"
     git(root.parent, "init", "-q", "--bare", str(remote))
     git(root / "repos/r", "remote", "add", "origin", str(remote))
-    git(root / "repos/r", "push", "-q", "origin", BRANCH)
+    git(root / "repos/r", "push", "-q", "-u", "origin", BRANCH)
 
 
 def _on_the_remote(root: Path) -> str:
@@ -77,7 +77,6 @@ def _push_upstream(root: Path, remote_name: str) -> Path:
     return remote
 
 
-@pytest.mark.xfail(strict=True, raises=AssertionError, reason="worktree-removal-leaves-empty-parent-and-remote-branch")  # fmt: skip
 def test_a_merge_deletes_the_pushed_branch_on_a_non_origin_upstream(root: Path) -> None:
     approve(root, land(root, "src/a.py"))
     remote = _push_upstream(root, "mirror")
@@ -86,7 +85,6 @@ def test_a_merge_deletes_the_pushed_branch_on_a_non_origin_upstream(root: Path) 
     assert git(root.parent, "-C", str(remote), "branch", "--list", BRANCH).strip() == ""
 
 
-@pytest.mark.xfail(strict=True, raises=AssertionError, reason="worktree-removal-leaves-empty-parent-and-remote-branch")  # fmt: skip
 def test_a_refused_remote_delete_is_reported_with_its_fix_line(root: Path) -> None:
     remote = _push_upstream(root, "origin")
     git(root.parent, "-C", str(remote), "config", "receive.denyDeletes", "true")

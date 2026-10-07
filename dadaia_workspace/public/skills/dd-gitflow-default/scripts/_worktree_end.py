@@ -8,7 +8,6 @@ declared `verify:` (job), `verify-stage:` or `verify-task:` line, run as one arg
 
 from __future__ import annotations
 
-import contextlib
 import json
 import os
 import shlex
@@ -94,8 +93,18 @@ def _remove(into: Path, tree: Path, name: str, kept: list[str]) -> None:
             shutil.copytree(source, target, dirs_exist_ok=True)
         else:
             shutil.copy2(source, target)
-    if git(into, "branch", "-r", "--list", f"origin/{branch(name)}").strip():
-        git(into, "push", "-q", "origin", "--delete", branch(name), check=False)
+    held = f"refs/heads/{branch(name)}"  # its upstream remote, when it has one that still holds it
+    fields = git(
+        into, "for-each-ref", "--format=%(upstream:remotename) %(upstream:track)", held
+    ).split()
+    if fields and "[gone]" not in fields:
+        try:
+            git(into, "push", "-q", fields[0], "--delete", branch(name))
+        except RuntimeError as error:
+            raise Refusal(
+                f"{branch(name)} is still on {fields[0]}: {error}",
+                git_line(into, "push", fields[0], "--delete", branch(name)),
+            ) from error
     git(into, "worktree", "unlock", str(tree), check=False)
     git(into, "worktree", "remove", str(tree))
     git(into, "branch", "-d", branch(name))
@@ -104,7 +113,7 @@ def _remove(into: Path, tree: Path, name: str, kept: list[str]) -> None:
 
 def _rmdir(tree: Path) -> None:
     """Drop the rc folder *tree* leaves empty; a folder still holding another tree stays."""
-    with contextlib.suppress(OSError):
+    if tree.parent.is_dir() and not any(tree.parent.iterdir()):
         tree.parent.rmdir()
 
 
