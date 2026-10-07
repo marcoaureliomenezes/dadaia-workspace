@@ -88,6 +88,14 @@ def test_non_object_envelope_fails_open(tmp_path: Path, envelope: Any) -> None:
     assert result.block_envelope() is None
 
 
+@pytest.mark.parametrize("raw", ["", "   ", "{not json"], ids=["empty", "blank", "malformed"])
+def test_unreadable_stdin_fails_open(tmp_path: Path, raw: str) -> None:
+    """Blank or malformed stdin text is read as ``{}`` and allowed, never a crash."""
+    result = run_hook_subprocess("pre_gate", {}, claude_hook_env(tmp_path, session_id="s"), raw=raw)
+    assert result.returncode == 0, result.stderr
+    assert result.block_envelope() is None
+
+
 def test_evaluate_payload_first_block_wins_and_faulty_policy_fails_open(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

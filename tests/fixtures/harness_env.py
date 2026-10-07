@@ -372,6 +372,7 @@ def run_hook_subprocess(
     *,
     timeout: float = 30.0,
     cwd: Path | str | None = None,
+    raw: str | None = None,
 ) -> HookResult:
     """Invoke a dadaia hook as a real subprocess, the way the harness does.
 
@@ -390,6 +391,8 @@ def run_hook_subprocess(
     Defaults to ``env["PWD"]`` — the harness's session cwd, the workspace root itself —
     so the hook resolves its root exactly as in production; pass an explicit ``cwd`` to simulate a session working from a specific
     ``repos/<slug>/`` subdirectory (rung 3).
+
+    ``raw`` replaces the serialized payload with literal stdin text (blank or malformed envelopes).
 
     This is the single sanctioned channel for hook *behavior* tests in
     ``tests/**/hooks|gate/**``; importing a hook module and calling ``main()`` in-process
@@ -415,7 +418,7 @@ def run_hook_subprocess(
     env = {**env, "PYTHONPATH": os.environ.get("PYTHONPATH", "")}
     proc = subprocess.run(
         cmd,
-        input=json.dumps(payload),
+        input=json.dumps(payload) if raw is None else raw,
         capture_output=True,
         text=True,
         env=env,
