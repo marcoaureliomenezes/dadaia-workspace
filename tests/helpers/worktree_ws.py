@@ -1,7 +1,7 @@
 """A tmp workspace for `worktree.py` tests: one repo `r` on `main` with an Approved 0.5.0 rc-1
 trio, a valid `_RELEASE.json`, a `scripts/ci.py` whose level L fails iff the tree holds
-`RED-<L>`, and `feature/0.5.0`; its `verify:` lines declare it, and a stub CLI at `.dadaia/.venv/bin/dadaia` standing for the two
-reads the script makes — `context list --json` (gitflow `dev` as integration, so a
+`RED-<L>`, and `feature/0.5.0`; its `verify:` lines declare it, and a stub CLI in the fake venv's
+scripts dir (`cli_path`) standing for the two reads the script makes — `context list --json` (gitflow `dev` as integration, so a
 hardcoded `main`/`develop` fails) and `reports validate` (valid iff `schema_version`)."""
 
 from __future__ import annotations
@@ -13,10 +13,11 @@ import sys
 from pathlib import Path
 
 from dadaia_workspace.core.models.spec_context import ContextState, SpecContextProject
+from dadaia_workspace.core.platform import PLATFORM
 from dadaia_workspace.features.spec_context.doctor import DoctorService
 from dadaia_workspace.infrastructure.git_subprocess import GitSubprocessClient
-from tests.fixtures.harness_env import suite_env
-from tests.fixtures.stores import context_store, workspace_cli
+from tests.fixtures.harness_env import run_bash, suite_env
+from tests.fixtures.stores import context_store, fake_venv
 
 SCRIPT = (
     Path(__file__).resolve().parents[2]
@@ -26,6 +27,34 @@ FLOW = {"principal": "trunk", "integration": "dev", "work": "feature/"}
 #: The repo's gate (ADR 0190): prints its argv; level L fails iff the tree holds `RED-<L>`.
 CI = 'import pathlib, sys\nprint("ci", *sys.argv[1:])\nsys.exit(pathlib.Path("RED-" + sys.argv[1]).exists())\n'
 JOB, TASK = "0.5.0-rc1/j1", "0.5.0-rc1/j1--J1.S1.T1"
+_CLI = """#!{python}
+import json, sys
+args = sys.argv[1:]
+if args[:2] == ["context", "list"]:
+    print({rows!r})
+elif args[:2] == ["reports", "validate"]:
+    sys.exit(0 if "schema_version" in json.load(open(args[2])) else 1)
+elif args[:1] == ["doctor"]:
+    import os
+    specs = args[args.index("--specs-dir") + 1]
+    print("doctor --specs-dir " + specs, "fenced " + os.environ.get("DADAIA_FENCED_ROOTS", ""),
+          "cwd " + os.getcwd(), sep="\\n")
+    sys.exit(os.path.exists(os.path.join(specs, "RED-doctor")))
+else:
+    sys.stdin.read()
+"""
+
+
+def cli_path(root: Path) -> Path:
+    """Where the stub CLI lives: the fake venv's scripts dir, `dadaia` plus `PLATFORM`'s suffix."""
+    return root / ".dadaia/.venv" / PLATFORM.venv_scripts_dir / f"dadaia{PLATFORM.venv_exe_suffix}"
+
+
+def _stub_cli(root: Path, *listed: dict[str, object]) -> None:
+    """The `dadaia` stub over *listed*, written at `cli_path` (a Python script with a shebang)."""
+    cli = cli_path(root)
+    cli.write_text(_CLI.format(python=sys.executable, rows=json.dumps(list(listed))))
+    cli.chmod(0o755)
 
 
 def git(repo: Path, *args: str) -> str:
@@ -46,7 +75,8 @@ def make_workspace(root: Path) -> Path:
     (root / ".gitconfig").write_text("[user]\n\tname = t\n\temail = t@t\n")  # HOME for rebase
     (root / ".dadaia/states").mkdir(parents=True)
     (root / ".dadaia/states/spec_contexts.json").write_text("{}")
-    workspace_cli(root, {"main_repo": "r", "associated_repos": [], "gitflow": FLOW})
+    fake_venv(root)
+    _stub_cli(root, {"main_repo": "r", "associated_repos": [], "gitflow": FLOW})
     repo = root / "repos/r"
     rel = repo / "specs/releases/0.5.0/rc-1"
     rel.mkdir(parents=True)
@@ -69,7 +99,6 @@ def make_workspace(root: Path) -> Path:
         "tests: tests/**\ntests-red: ^@red\n"
         + "".join(f"verify-{lv}: python scripts/ci.py {lv}\n" for lv in ("task", "stage"))
     )
-    (root / ".dadaia/.venv/bin/python").symlink_to(sys.executable)  # the gate's bare `python`
     git(repo, "add", "-A")
     git(repo, "commit", "-qm", "init")
     git(repo, "branch", "feature/0.5.0")
@@ -78,7 +107,7 @@ def make_workspace(root: Path) -> Path:
 
 def associate(root: Path, spec: str) -> None:
     """Repo `a` joins `r`'s context with `feature/0.5.0` and no specs; `r`'s SPEC is *spec*."""
-    workspace_cli(root, {"main_repo": "r", "associated_repos": [{"slug": "a"}], "gitflow": FLOW})
+    _stub_cli(root, {"main_repo": "r", "associated_repos": [{"slug": "a"}], "gitflow": FLOW})
     (repo := root / "repos/a").mkdir()
     git(repo, "init", "-q")
     git(repo, "commit", "-q", "--allow-empty", "-m", "init")
@@ -154,8 +183,8 @@ def run_fix(root: Path, result: subprocess.CompletedProcess[str]) -> None:
     """Run the refusal's one `fix:` line as an agent would, from the workspace root."""
     (fix,) = fixes(result)
     command = fix.removeprefix("fix: ")
-    env = {"HOME": str(root), "PATH": "/usr/bin:/bin", "GIT_CONFIG_NOSYSTEM": "1"}
-    subprocess.run(command, shell=True, cwd=root, env=env, check=True, capture_output=True)
+    env = {**os.environ, "HOME": str(root), "GIT_CONFIG_NOSYSTEM": "1"}
+    run_bash(command, cwd=root, env=env, check=True)
 
 
 def attempt(
