@@ -416,7 +416,11 @@ def test_one_job_lands_code_an_atom_and_its_derived_section_together(root: Path)
 def test_a_declared_verify_line_runs_as_argv_never_through_a_shell(root: Path) -> None:
     """AC1.2: the `verify:` line is split by shlex and run as argv: `;` and `$(...)` are words."""
     line = "verify: python scripts/ci.py job ; touch PWNED $(touch PWNED2)\n"
-    commit(root / "repos/r", "AGENTS.md", line + "verify-task: python scripts/ci.py task\n")
+    commit(
+        root / "repos/r",
+        "AGENTS.md",
+        line + "verify-task: python scripts/ci.py task\ntests: tests/**\n",
+    )
     git(root / TREE, "merge", "-q", "--ff-only", "feature/0.5.0")
     head = land(root, "src/a.py")
     approve(root, head)
@@ -560,7 +564,7 @@ def test_a_task_gate_line_absent_or_unstartable_refuses_with_a_fix_that_clears_i
     operator act on that tracked line, never a traceback, and doing that act lands the task."""
     repo, agents = root / "repos/r", root / "repos/r/AGENTS.md"
     line = f"verify-task: {declared}\n" if declared else ""
-    commit(repo, "AGENTS.md", "verify: python scripts/ci.py job\n" + line)
+    commit(repo, "AGENTS.md", "verify: python scripts/ci.py job\ntests: tests/**\n" + line)
     task = _task_commit(root, "Owner-tests: tests/test_r.py")
     refused = run(root, "merge", str(task))
     assert refused.returncode == 1 and "Traceback" not in refused.stderr
@@ -568,7 +572,7 @@ def test_a_task_gate_line_absent_or_unstartable_refuses_with_a_fix_that_clears_i
             " on feature/0.5.0 one argv list that starts: it runs without a shell"
             " — no VAR=value prefix, no sh -c")  # fmt: skip
     assert fixes(refused) == [f"fix: Operator action: {act} {agents}{tail}"]
-    commit(repo, "AGENTS.md", "verify-task: python scripts/ci.py task\n")
+    commit(repo, "AGENTS.md", "verify-task: python scripts/ci.py task\ntests: tests/**\n")
     landed = run(root, "merge", str(task))
     assert landed.returncode == 0, landed.stderr
 

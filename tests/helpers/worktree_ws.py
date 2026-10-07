@@ -66,6 +66,7 @@ def make_workspace(root: Path) -> Path:
     (repo / "tests/test_r.py").write_text("")  # the owner test `land` names
     (repo / "AGENTS.md").write_text(
         "verify: python scripts/ci.py job\n"
+        "tests: tests/**\ntests-red: ^@red\n"
         + "".join(f"verify-{lv}: python scripts/ci.py {lv}\n" for lv in ("task", "stage"))
     )
     (root / ".dadaia/.venv/bin/python").symlink_to(sys.executable)  # the gate's bare `python`
@@ -160,12 +161,28 @@ def run_fix(root: Path, result: subprocess.CompletedProcess[str]) -> None:
     subprocess.run(command, shell=True, cwd=root, env=env, check=True, capture_output=True)
 
 
-def land(root: Path, rel: str, text: str = "x = 1\n") -> str:
+def attempt(
+    root: Path, files: dict[str, str], task_id: str = "", mv: tuple[str, str] = ("", "")
+) -> tuple[str, subprocess.CompletedProcess[str]]:
+    """Commit *files* (a `git mv` of *mv* first) in a task of `JOB` and try to merge it:
+    (the commit, the merge's result). With *task_id* (`J1.S2.T1`) the task tree is named for
+    it and the subject opens with it."""
+    task = f"0.5.0-rc1/j1--{task_id}" if task_id else TASK
+    assert run(root, "new", "r", task).returncode == 0
+    tree = root / "worktrees/r" / task
+    if mv[0]:
+        git(tree, "mv", *mv)
+    for rel, text in files.items():
+        (tree / rel).parent.mkdir(parents=True, exist_ok=True)
+        (tree / rel).write_text(text)
+        git(tree, "add", rel)
+    name = f"test({task_id}): {next(iter(files), mv[1])}" if task_id else next(iter(files), mv[1])
+    git(tree, "commit", "-qm", name, "--trailer", "Owner-tests: tests/test_r.py")
+    return git(tree, "rev-parse", "HEAD").strip(), run(root, "merge", f"worktrees/r/{task}")
+
+
+def land(root: Path, rel: str, text: str = "x = 1\n", task_id: str = "") -> str:
     """Commit *rel* in task `TASK` of `JOB` and merge it: a job branch takes code only so."""
-    assert run(root, "new", "r", TASK).returncode == 0
-    commit(tree := root / "worktrees/r" / TASK, rel, text)
-    git(tree, "commit", "-q", "--amend", "--no-edit", "--trailer", "Owner-tests: tests/test_r.py")
-    sha = git(tree, "rev-parse", "HEAD").strip()
-    merged = run(root, "merge", f"worktrees/r/{TASK}")
+    sha, merged = attempt(root, {rel: text}, task_id)
     assert merged.returncode == 0, merged.stderr
     return sha
