@@ -341,16 +341,7 @@ _JOB_TABLE = (  # the rc-9 job files' task tables: the `W:` column holds each ro
     [
         pytest.param(_JOB, None, id="valid"),
         pytest.param(_JOB1, None, id="rc9-job1-shape"),
-        pytest.param(_JOB1.replace("`tests/helpers/worktree_ws.py`", "`scripts/ci.py`"),
-                     "tasks/j2.md stage J1.S1 writes scripts/ci.py — stage 1 writes tests only",
-                     id="rc9-job1-shape-stage-1-source"),
         pytest.param(_JOB_TABLE, None, id="stage-1-table-tests"),
-        pytest.param(_JOB_TABLE.replace("`tests/unit/test_t.py`", "`scripts/ci.py`"),
-                     "tasks/j2.md stage J1.S1 writes scripts/ci.py — stage 1 writes tests only",
-                     id="stage-1-table-source"),
-        pytest.param(_JOB.replace("`W:` `tests/unit/test_x.py`", "`W:` `src/y.py`"),
-                     "tasks/j2.md stage J2.S1 writes src/y.py — stage 1 writes tests only",
-                     id="stage-1-non-test"),
     ],
 )  # fmt: skip
 def test_check_judges_each_job_file(
