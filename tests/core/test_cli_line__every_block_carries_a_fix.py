@@ -448,6 +448,7 @@ _ENTRY_SCRIPTS: dict[str, str] = {
     "dd-backlog-definition": "backlog.py",
     "dd-bug-resolution": "bugs.py",
     "dd-cli-library": "registry.py",
+    "dd-handoff-emitter": "verdict.py",
     "dd-gitflow-default": "worktree.py",
     "dd-release-implementation": "release.py",
     "dd-spec-navigator": "memory.py",
