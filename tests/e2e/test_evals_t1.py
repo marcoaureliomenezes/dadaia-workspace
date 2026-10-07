@@ -14,19 +14,16 @@ from tests.helpers.evals import HAND, T1, VERSIONS, image, reward
 pytestmark = [pytest.mark.e2e, pytest.mark.slow, pytest.mark.timeout(600)]
 
 
-@pytest.mark.xfail(strict=True, raises=AssertionError, reason="AC11.1 evals/tasks/t1 (J9.S3)")
 @pytest.mark.parametrize("version", VERSIONS)
 def test_the_image_builds_on_each_version(version: str) -> None:
     assert image(T1, version) == f"dadaia-evals-{T1}:{version}"
 
 
-@pytest.mark.xfail(strict=True, raises=AssertionError, reason="AC11.1 evals/tasks/t1 (J9.S3)")
 @pytest.mark.parametrize("version", VERSIONS)
 def test_the_grader_passes_a_hand_onboarded_workspace(version: str) -> None:
     assert reward(T1, version, HAND[version]) == "1"
 
 
-@pytest.mark.xfail(strict=True, raises=AssertionError, reason="AC11.1 evals/tasks/t1 (J9.S3)")
 @pytest.mark.parametrize("version", VERSIONS)
 def test_the_grader_fails_an_empty_workspace(version: str) -> None:
     assert reward(T1, version, "true") == "0"
