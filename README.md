@@ -47,7 +47,7 @@ memory atom under its content hash.
 <!-- derived-from: pypi-distribution sha256:41df64f3512e -->
 <!-- derived-from: workspace-init sha256:a8f08f87ae76 -->
 <!-- derived-from: context-management sha256:e084ff04890d -->
-<!-- derived-from: workspace-doctor sha256:268ca27600e5 -->
+<!-- derived-from: workspace-doctor sha256:84a9bec9fec9 -->
 
 ```bash
 uvx dadaia-workspace init demo --harness claude --repo <clone url>   # level 1 + 2
