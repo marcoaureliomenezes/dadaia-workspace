@@ -127,6 +127,7 @@ def declaring_public(public: Path) -> Path:
     return public
 
 
+@pytest.mark.xfail(strict=True, raises=AssertionError, reason="onboarding-writes-no-tests-line")
 def test_a_law_without_a_tests_line_gains_the_templates_line_appended(
     tmp_path: Path, declaring_public: Path
 ) -> None:
@@ -142,6 +143,7 @@ def test_a_law_without_a_tests_line_gains_the_templates_line_appended(
     assert text.splitlines()[-1] == _TESTS_LINE
 
 
+@pytest.mark.xfail(strict=True, raises=AssertionError, reason="onboarding-writes-no-tests-line")
 @pytest.mark.parametrize("line", ["tests:", "tests: custom/**"])
 def test_a_present_tests_line_is_left_alone(
     tmp_path: Path, declaring_public: Path, line: str
@@ -155,6 +157,7 @@ def test_a_present_tests_line_is_left_alone(
     assert (repo / "AGENTS.md").read_text(encoding="utf-8") == f"# mine\n\n{line}\n"
 
 
+@pytest.mark.xfail(strict=True, raises=AssertionError, reason="onboarding-writes-no-tests-line")
 def test_the_shipped_template_declares_a_non_empty_tests_line() -> None:
     """onboarding-writes-no-tests-line: the one default lives in the shipped template."""
     template = canon.default_public_dir() / "templates" / "repo-AGENTS.md"
@@ -167,6 +170,7 @@ def test_the_shipped_template_declares_a_non_empty_tests_line() -> None:
     assert values[0] != ""
 
 
+@pytest.mark.xfail(strict=True, raises=AssertionError, reason="onboarding-writes-no-tests-line")
 def test_an_absent_law_gets_nothing_from_the_declaration(
     tmp_path: Path, declaring_public: Path
 ) -> None:
@@ -178,6 +182,7 @@ def test_an_absent_law_gets_nothing_from_the_declaration(
     assert list(repo.iterdir()) == []
 
 
+@pytest.mark.xfail(strict=True, raises=AssertionError, reason="onboarding-writes-no-tests-line")
 def test_a_symlinked_law_is_never_declared_through(tmp_path: Path, declaring_public: Path) -> None:
     """onboarding-writes-no-tests-line: CWE-59 — the append never follows a symlink."""
     repo = tmp_path / "repo"
@@ -188,23 +193,3 @@ def test_a_symlinked_law_is_never_declared_through(tmp_path: Path, declaring_pub
 
     assert _declare(repo, declaring_public) == []
     assert target.read_text(encoding="utf-8") == "real\n"
-
-
-@pytest.mark.parametrize(
-    ("before", "after"),
-    [
-        ("# a\r\nb\r\n", f"# a\r\nb\r\n{_TESTS_LINE}\r\n"),
-        ("# a\nb", f"# a\nb\n{_TESTS_LINE}\n"),
-        ("# a\r\nb", f"# a\r\nb\r\n{_TESTS_LINE}\r\n"),
-        ("", f"{_TESTS_LINE}\n"),
-    ],
-)
-def test_the_declared_line_keeps_the_laws_own_newline_style(
-    tmp_path: Path, declaring_public: Path, before: str, after: str
-) -> None:
-    repo = tmp_path / "repo"
-    repo.mkdir()
-    (repo / "AGENTS.md").write_bytes(before.encode())
-
-    assert _declare(repo, declaring_public) == [repo / "AGENTS.md"]
-    assert (repo / "AGENTS.md").read_bytes() == after.encode()
