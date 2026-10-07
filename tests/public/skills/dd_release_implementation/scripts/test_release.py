@@ -812,6 +812,30 @@ def test_new_stacks_when_no_bug_found_in_the_live_rc_is_unresolved(
     assert _run(script, "new", "0.5.0", "--specs", str(specs)).returncode == 0
 
 
+@pytest.mark.xfail(strict=True, raises=AssertionError, reason="rc-closes-with-an-open-bug")  # fmt: skip
+@pytest.mark.parametrize("status", ["open", "deferred"])
+def test_ship_refuses_while_a_bug_found_in_the_shipping_rc_is_unresolved(
+    script: Path, tmp_path: Path, status: str
+) -> None:
+    """ADR 0206, redo of df9b28641: `ship` judges the bug ledger too, relaying `bugs.py`'s own
+    refusal and its one fix line, nothing written; a bug of another rc and a record with no
+    `found_in` do not hold the ship."""
+    specs = _reconciled_closure(tmp_path, script)
+    ledger = specs / "bugs" / "BUGS.jsonl"
+    ledger.parent.mkdir(exist_ok=True)
+    ledger.write_text(json.dumps(_found("a-bug", status)) + "\n", encoding="utf-8")
+    before = _tree_hash(specs)
+    refused = _run(script, "ship", "--sha", "beef123", "--pr", "261", "--specs", str(specs))
+    assert refused.returncode == 1 and "a-bug" in refused.stderr
+    fixes = [x for x in refused.stderr.splitlines() if x.startswith("fix: ")]
+    assert len(fixes) == 1 and "bugs.py" in fixes[0]
+    assert _tree_hash(specs) == before
+    elsewhere = [_found("elsewhere", "open", rc="rc-9"), {"id": "unplaced", "status": "open"}]
+    ledger.write_text("".join(json.dumps(b) + "\n" for b in elsewhere), encoding="utf-8")
+    shipped = _run(script, "ship", "--sha", "beef123", "--pr", "261", "--specs", str(specs))
+    assert shipped.returncode == 0, shipped.stderr
+
+
 def test_ship_records_a_null_pr_when_none_is_given(script: Path, tmp_path: Path) -> None:
     """No host is assumed: `--pr` is the promote PR's number when there is one; its absence is
     `pr: null` in the archived state, and `check` accepts it."""
