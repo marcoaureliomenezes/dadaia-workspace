@@ -322,3 +322,38 @@ def test_an_installed_binary_passes_by_answering_and_fails_only_if_it_cannot(
     else:
         assert outcome in _version_probe_detail(fake, tmp_path, "cursor", "cursor-agent")
     assert fake.calls == [["/opt/bin/cursor-agent", "--version"]]
+
+
+class _BareConfigSeen(_Children):
+    """Reads the certify bare remote's own config when `context create` is handed it."""
+
+    def __init__(self, python: Path) -> None:
+        super().__init__(python)
+        self.bare_config = ""
+
+    def run(
+        self,
+        argv: Sequence[str],
+        *,
+        cwd: Path,
+        env: Mapping[str, str] | None = None,
+        timeout: float,
+    ) -> CertificationProcessResult:
+        if "--main-repo" in argv:
+            self.bare_config = (Path(argv[argv.index("--main-repo") + 1]) / "config").read_text(
+                encoding="utf-8"
+            )
+        return super().run(argv, cwd=cwd, env=env, timeout=timeout)
+
+
+@pytest.mark.medium
+@pytest.mark.slow(reason="a real certify journey: about a dozen dadaia children")
+@pytest.mark.xfail(strict=True, raises=AssertionError, reason="context-clone-fails-past-windows-max-path")
+def test_certify_bare_remote_writes_long_paths(tmp_path: Path) -> None:
+    """context-clone-fails-past-windows-max-path: the sandbox's bare remote receives the
+    baseline push, so its own config carries `core.longpaths = true`."""
+    live = own_venv_workspace(tmp_path / "live")
+    seen = _BareConfigSeen(own_venv_python(live))
+    certify(live, seen)
+
+    assert "longpaths = true" in seen.bare_config
