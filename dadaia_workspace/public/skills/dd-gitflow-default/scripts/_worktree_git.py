@@ -14,11 +14,11 @@ from pathlib import Path
 
 sys.path.append(str(Path(__file__).resolve().parents[2] / "dd-bug-resolution" / "scripts"))
 
-from _ledger import workspace_of  # noqa: E402
 from _specs import git_line as git_line  # noqa: E402
 from _specs import head  # noqa: E402
 from _specs import quote as quote  # noqa: E402  (`as`: re-exported to the worktree verbs)
 from _specs import script as script  # noqa: E402
+from _specs import workspace_of as workspace_of  # noqa: E402
 from _worktree_names import NAME_RE, SCRIPT, Refusal, base, branch, name_of  # noqa: E402
 
 _TAG_RE = re.compile(r"^v?(\d+)\.(\d+)\.(\d+)$")
@@ -132,7 +132,7 @@ def _trees(repo: Path) -> list[dict[str, str]]:
     """Every linked worktree of *repo* (the main checkout excluded), from git's porcelain."""
     blocks = git(repo, "worktree", "list", "--porcelain").split("\n\n")
     parsed = [dict(ln.partition(" ")[::2] for ln in b.splitlines() if ln) for b in blocks]
-    return [fields for fields in parsed if "worktree" in fields][1:]
+    return [{**f, "worktree": str(Path(f["worktree"]))} for f in parsed if "worktree" in f][1:]
 
 
 def ours(repo: Path) -> list[dict[str, str]]:
