@@ -44,3 +44,22 @@ Paths are relative to the repo root; aliases as in `PLAN.md` (`f/`, `pub/`, `S/`
 | J6.S3.T5 | — | this file | close task, last: regenerates `pub/entities/behavior-map.json` (the skills' hashes T4 moved); `test-audit:`, `mutation:`; `done` |
 
 - done: Job 6 — every task landed on `wt/0.5.0-rc10/job6` through its task merge: J6.S1.T1 f327dda3b and J6.S1.T2 9f1c9f80a (RED, strict xfail); J6.S2.T1 6e99f6a52 and 26f7e5635 (the freeze judge and the shared `AGENTS.md` line reader; the RED markers lift), T2 35dd0450d, T3 a8c2fbf60, T4 6e857ff2f and fc6640798 (the freeze in the law) and 5e71ce92a (shipped history), T5 e01ddf995 (the repo law template's empty `tests:` line); J6.S3.T1 565fc4b50, T2 320ef632d, T3 4f6cc6b98, T4 f0d5436c9 (the consumer recipe moves to `scripts/`), T6 be615e848 and 81752a87f (`CICD-AUTOMATION.md`), T7 24dddd3e2 (the pre-push runner drops the poetry fallback), T8 ea6cfd0af (the exec bit), T9 0d15072fe (REBUILD of the runner-resolution table); the job file's stage rows 1192e55d2, d77e386de, 8a8b26fff; closed by J6.S3.T5.
+
+## Stage J6.S4 — RED for the review's findings (CHANGES_REQUESTED on 8f8da611d)
+
+- Contract: exit tests the rows below RED as strict xfail for an AssertionError, the recipe verbs cited again; envelope `tests/public/skills/dd_gitflow_default/scripts/test__worktree_freeze.py`, `tests/public/skills/dd_gitflow_default/scripts/test__worktree_end__worktree_freeze.py`, `pub/skills/dd-cli-library/SKILL.md`, `specs/memory/product/platform/consumer-agent-support.md`, `specs/memory/product/platform/pypi-distribution.md`; ACs AC6.0–AC6.2, AC9.1.
+- AC9.1's guard row (`test_public_law_names_no_private_pipeline`) cannot end green in this job: its remaining hits are the merge gate's `ci_run` (bug job-merge-accepts-any-ci-run-url) and lie outside every J6 `W:`; the exit moves to the bug batch.
+
+| task | AC | `W:` | owner tests / RED |
+|---|---|---|---|
+| J6.S4.T1 | AC6.0, AC6.2 | `tests/public/skills/dd_gitflow_default/scripts/test__worktree_freeze.py` | RED (pure judge): a hunk of several lines and two adjacent hunks are each read whole; a binary test file edit refuses; the anchor's first commit is inside the frozen range (off-by-one); an invalid `tests-red:` pattern refuses with its fix line |
+| J6.S4.T2 | AC6.0, AC6.2 | `tests/public/skills/dd_gitflow_default/scripts/test__worktree_end__worktree_freeze.py` | RED (merge): a merge commit carrying a test edit refuses; an operator commit on the work branch the job lacks is not judged as the job's; an underivable anchor refuses; a hotfix RED commit then a no-id fix commit with a marker-only deletion lands |
+| J6.S4.T3 | AC9.1 | `pub/skills/dd-cli-library/SKILL.md` (cites `init`, `specs upgrade`, `migrate`), `specs/memory/product/platform/consumer-agent-support.md` and `pypi-distribution.md` (`sources` follow the recipe to `scripts/`) | `tests/cli/commands/test_help.py`; doctor LINT-1 and MEM-DRIFT-2 clean |
+
+## Stage J6.S5 — the freeze judges the job's own range
+
+- Contract: exit tests J6.S4's rows green, unit + integration green, no kept fail-open survivor; envelope `GF/_worktree_freeze.py`; ACs AC6.0–AC6.2.
+
+| task | AC | `W:` | owner tests / RED |
+|---|---|---|---|
+| J6.S5.T1 | AC6.0, AC6.2 | `GF/_worktree_freeze.py` (range `<merge-base>..HEAD`; a range commit with two parents refuses, or each commit diffs against its first parent; the hunk loop reads whole hunks) and the J6.S4 marker lines | `tests/public/skills/dd_gitflow_default/scripts/test__worktree_freeze.py`, `tests/public/skills/dd_gitflow_default/scripts/test__worktree_end__worktree_freeze.py` |
