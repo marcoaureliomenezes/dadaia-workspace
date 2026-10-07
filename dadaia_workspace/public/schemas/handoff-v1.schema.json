@@ -71,7 +71,7 @@
         "content_hash": {
           "type": "string",
           "pattern": "^[a-f0-9]{64}$",
-          "description": "SHA-256 hex digest of the artifact file content. Required whenever path is present — `.dadaia/.venv/bin/dadaia reports validate` recomputes the file hash and fails on mismatch or absence."
+          "description": "SHA-256 hex digest of the artifact file content. Required whenever path is present — `dadaia reports validate` recomputes the file hash and fails on mismatch or absence."
         }
       }
     },

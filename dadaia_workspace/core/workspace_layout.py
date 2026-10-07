@@ -14,6 +14,7 @@ from functools import cached_property
 from pathlib import Path
 from typing import Literal
 
+from dadaia_workspace.core import platform
 from dadaia_workspace.core.harness_registry import HARNESS_PROJECTION_DIRS
 from dadaia_workspace.core.release_state import CANDIDATE_RE, RELEASE_ID_RE
 
@@ -572,7 +573,11 @@ _PLACEHOLDERS: dict[str, Callable[[], str]] = {
 
 
 def render_registry_tables(text: str) -> str:
-    """Fill every registry placeholder in a law fragment from ``core.workspace_layout``."""
+    """Fill every registry placeholder in a law fragment from ``core.workspace_layout``, and
+    render the source CLI form ``.dadaia/.venv/bin/dadaia`` into the platform's venv form."""
     for placeholder, render in _PLACEHOLDERS.items():
         text = text.replace(placeholder, render())
-    return text
+    caps = platform.PLATFORM
+    return text.replace(
+        ".venv/bin/dadaia", f".venv/{caps.venv_scripts_dir}/dadaia{caps.venv_exe_suffix}"
+    )

@@ -47,12 +47,14 @@ resolve_runner() {
     # 1. Walk up from repo root looking for the workspace-level venv.
     local dir="$ROOT"
     while :; do
-        local candidate="$dir/.dadaia/.venv/bin/dadaia"
-        if [ -x "$candidate" ]; then
-            RUNNER_BIN=("$candidate")
-            RUNNER_LABEL="workspace-venv $candidate"
-            return 0
-        fi
+        local candidate
+        for candidate in "$dir/.dadaia/.venv/bin/dadaia" "$dir/.dadaia/.venv/Scripts/dadaia.exe"; do
+            if [ -x "$candidate" ]; then
+                RUNNER_BIN=("$candidate")
+                RUNNER_LABEL="workspace-venv $candidate"
+                return 0
+            fi
+        done
         local parent
         parent="$(dirname "$dir")"
         if [ "$parent" = "$dir" ]; then

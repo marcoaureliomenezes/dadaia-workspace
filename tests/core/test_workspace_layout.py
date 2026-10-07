@@ -367,7 +367,6 @@ def test_every_zone_creator_exists() -> None:
             importlib.import_module(module)
 
 
-@pytest.mark.xfail(strict=True, raises=AssertionError, reason="shipped-law-hardcodes-the-posix-venv-path")  # fmt: skip
 def test_law_staged_under_win32_names_the_scripts_cli(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
