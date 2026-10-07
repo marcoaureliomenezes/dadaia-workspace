@@ -54,7 +54,7 @@ ADR: none
 Rationale: joining the set is legal; arriving there unnoticed is not.
 
 ### P-12 · We never import the composition root from a hook; hooks reach the resolution authority directly because they are one-shot processes on the write hot path.
-Measured by: `pytest tests/contract/test_hook_import_surface.py` (six hook modules plus the executed gate path, with `container` absent from `sys.modules`).
+Measured by: `pytest tests/core/test_atomic_write__core_file_io_purity.py` (six hook modules plus the executed gate path, with `container` absent from `sys.modules`).
 ADR: none
 Rationale: the composition graph costs seconds of import time per gated tool call.
 
@@ -69,7 +69,7 @@ ADR: 0004 (accepted)
 Rationale: a reader that can write is a reader that can rewrite history.
 
 ### P-15 · We close the release-state envelope: `release-state-v1` carries `additionalProperties: false` at every level, a closed log-entry shape, and no harness `session_id`.
-Measured by: `pytest tests/contract/test_release_state_schema.py`.
+Measured by: `pytest tests/core/test_handoff_index__handoff_schema_contract.py`.
 ADR: 0004 (accepted)
 Rationale: an open envelope accumulates fields until no consumer can fold it.
 
