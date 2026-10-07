@@ -92,7 +92,9 @@ def test_certify_fails_naming_the_sandbox_slop(tmp_path: Path) -> None:
     checks = {c["name"]: c for c in result["checks"] if not c["name"].endswith("-probe")}
     failed = {name for name, c in checks.items() if c["status"] != "PASS"}
     assert result["ok"] is False
-    assert failed == {"specs-scaffold-and-doctor", "context-specs-doctor"}, checks
+    assert failed == {"specs-scaffold-and-doctor", "context-specs-doctor"}, {
+        n: checks[n]["detail"] for n in failed
+    }
     for name in failed:
         assert {"WS-dadaia-slop", "WS-root-slop"} <= set(checks[name]["detail"].split())
 
