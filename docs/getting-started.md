@@ -125,7 +125,7 @@ zone class, an OUTPUT entry held, an EPHEMERAL one deleted.
 ## Run the first candidate
 
 <!-- derived-from: release-lifecycle sha256:e94a43f4bb88 -->
-<!-- derived-from: backlog-ledger sha256:0e13883cee01 -->
+<!-- derived-from: backlog-ledger sha256:44b145a6a3aa -->
 <!-- derived-from: bug-ledger sha256:1f1d4608155e -->
 
 A candidate is one closed-scope cycle inside the live release. Nothing drives it: the

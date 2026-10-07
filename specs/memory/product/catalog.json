@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-10-07T16:36:26Z",
+  "generated_at": "2026-10-07T16:36:32Z",
   "features": [
     {
       "rank": 1,
@@ -735,7 +735,7 @@
         "ledger",
         "governance"
       ],
-      "token_estimate": 829,
+      "token_estimate": 857,
       "depends_on": [
         "agent-orchestration",
         "worktrees",

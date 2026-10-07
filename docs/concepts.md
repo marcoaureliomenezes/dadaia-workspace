@@ -92,7 +92,7 @@ the warnings `MEM-DRIFT-1` (features package map vs the live tree) and `MEM-DRIF
 ## Bugs and backlog
 
 <!-- derived-from: bug-ledger sha256:1f1d4608155e -->
-<!-- derived-from: backlog-ledger sha256:0e13883cee01 -->
+<!-- derived-from: backlog-ledger sha256:44b145a6a3aa -->
 
 Both are records with one shape and one writer script. `specs/bugs/BUGS.jsonl` holds
 one record per bug, appended once and keyed by `id`, carrying no git-derived fact;

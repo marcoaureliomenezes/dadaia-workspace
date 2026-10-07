@@ -107,7 +107,7 @@ entry held, an EPHEMERAL one deleted.
 
 ## 5. The first backlog entry
 
-<!-- derived-from: backlog-ledger sha256:0e13883cee01 -->
+<!-- derived-from: backlog-ledger sha256:44b145a6a3aa -->
 
 `backlog.py new` appends one entry, born `idea`, to `specs/backlog/BACKLOG.json`'s
 `active[]` — the operator's demand queue; from the workspace root `--specs` names the
