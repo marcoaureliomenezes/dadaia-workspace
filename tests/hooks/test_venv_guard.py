@@ -160,6 +160,7 @@ def test_every_shell_alias_is_judged_like_bash(
         assert reason is None
 
 
+@pytest.mark.medium
 def test_the_block_fix_runs_verbatim_from_a_repo_subdirectory(tmp_path: Path) -> None:
     """sa-fix-lines-not-built-by-cli-line#S2 — the fix runs as printed from repos/alpha."""
     import subprocess

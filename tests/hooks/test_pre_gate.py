@@ -29,6 +29,7 @@ def _spawn(ws: Path, payload: dict[str, Any]) -> Any:
 
 
 # fmt: off
+@pytest.mark.medium
 @pytest.mark.parametrize(
     ("tool", "tool_input", "want"),
     [
@@ -122,6 +123,7 @@ def test_evaluate_payload_first_block_wins_and_faulty_policy_fails_open(
     assert pre_gate.evaluate_payload({"tool_name": "Write"}) is None
 
 
+@pytest.mark.medium
 @pytest.mark.parametrize(
     ("payload", "blocked"),
     [
