@@ -20,13 +20,11 @@ def _planted(version: str, *plants: str) -> str:
     return reward(T2, version, script)
 
 
-@pytest.mark.xfail(strict=True, raises=AssertionError, reason="AC11.1 evals/tasks/t2 (J9.S3)")
 @pytest.mark.parametrize("version", VERSIONS)
 def test_the_planted_correct_fix_passes(version: str) -> None:
     assert _planted(version, "correct-fix") == "1"
 
 
-@pytest.mark.xfail(strict=True, raises=AssertionError, reason="AC11.1 evals/tasks/t2 (J9.S3)")
 @pytest.mark.parametrize("version", VERSIONS)
 def test_the_planted_assert_rewriting_fix_fails(version: str) -> None:
     assert _planted(version, "correct-fix", "assert-rewrite") == "0"
