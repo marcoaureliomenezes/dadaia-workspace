@@ -620,6 +620,24 @@ def test_no_tree_edits_the_script_its_own_gate_runs(root: Path, level: str) -> N
     assert not (root / "repos/r/scripts/ci.py").read_text().endswith("y = 1\n")
 
 
+@pytest.mark.xfail(strict=True, raises=AssertionError, reason="gate-runs-the-judged-trees-own-ci-script")  # fmt: skip
+def test_no_tree_edits_a_module_the_script_its_own_gate_runs_imports(root: Path) -> None:
+    """ADR 0207, the redo of 4936ab4f6: the declared script imports `scripts/ci_steps.py`; a range
+    editing that module, not the literal script path, weakens its own judge and refuses."""
+    repo = root / "repos/r"
+    commit(repo, "scripts/ci_steps.py", "def run(level):\n    return 0\n")
+    ci = "import sys\nfrom ci_steps import run\nprint('ci', *sys.argv[1:])\nsys.exit(run(sys.argv[1]))\n"
+    commit(repo, "scripts/ci.py", ci)
+    git(root / TREE, "merge", "-q", "--ff-only", "feature/0.5.0")
+    task = _task_commit(root, "Owner-tests: tests/test_r.py", add="scripts/ci_steps.py")
+    refused = run(root, "merge", str(task))
+    assert refused.returncode == 1 and "Traceback" not in refused.stderr
+    assert fixes(refused) == [
+        "fix: Operator action: commit scripts/ci_steps.py on feature/0.5.0"
+        " — no tree edits its own judge (ADR 0207)"
+    ]
+
+
 @pytest.mark.xfail(strict=True, reason="JB.S3 RED: test-path-convention-is-python-only")
 def test_a_code_task_names_its_owner_tests_by_any_convention(root: Path) -> None:
     """A task's test file need not be `test_`-prefixed: the repo's `verify-task:` line judges
