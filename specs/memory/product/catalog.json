@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-10-07T16:37:33Z",
+  "generated_at": "2026-10-07T16:38:36Z",
   "features": [
     {
       "rank": 1,
@@ -93,6 +93,31 @@
     },
     {
       "rank": 4,
+      "slug": "agent-evals",
+      "title": "agent-evals",
+      "area": "distribution",
+      "tldr": "The library's own agent evals — two graded tasks run on the candidate wheel and a PyPI baseline by one dispatch-or-schedule workflow.",
+      "summary": "evals/ holds a cold-onboarding task and a block-list-bug task, each graded by a script on the state the agent leaves; .github/workflows/eval.yml runs each three times on a baseline release and on the candidate wheel built from its own checkout, scans every upload for the model secret, and blocks when the candidate drops where the baseline passed.",
+      "path": "specs/memory/product/distribution/agent-evals.md",
+      "tags": [
+        "evals",
+        "ci",
+        "release-gate",
+        "distribution"
+      ],
+      "token_estimate": 440,
+      "depends_on": [
+        "pypi-distribution",
+        "QUALITY",
+        "consumer-agent-support"
+      ],
+      "sources": [
+        "evals/**",
+        ".github/workflows/eval.yml"
+      ]
+    },
+    {
+      "rank": 5,
       "slug": "public-asset-distribution",
       "title": "public-asset-distribution",
       "area": "distribution",
@@ -137,7 +162,7 @@
       ]
     },
     {
-      "rank": 5,
+      "rank": 6,
       "slug": "pypi-distribution",
       "title": "pypi-distribution",
       "area": "distribution",
@@ -150,11 +175,12 @@
         "release",
         "packaging"
       ],
-      "token_estimate": 1064,
+      "token_estimate": 1065,
       "depends_on": [
         "release-lifecycle",
         "QUALITY",
         "worktrees",
+        "agent-evals",
         "public-asset-distribution",
         "consumer-agent-support",
         "cross-platform-portability"
@@ -169,7 +195,7 @@
       ]
     },
     {
-      "rank": 6,
+      "rank": 7,
       "slug": "harness-claude-code",
       "title": "harness-claude-code",
       "area": "harness",
@@ -198,7 +224,7 @@
       ]
     },
     {
-      "rank": 7,
+      "rank": 8,
       "slug": "harness-codex",
       "title": "harness-codex",
       "area": "harness",
@@ -227,7 +253,7 @@
       ]
     },
     {
-      "rank": 8,
+      "rank": 9,
       "slug": "harness-copilot",
       "title": "harness-copilot",
       "area": "harness",
@@ -255,7 +281,7 @@
       ]
     },
     {
-      "rank": 9,
+      "rank": 10,
       "slug": "harness-cursor",
       "title": "harness-cursor",
       "area": "harness",
@@ -283,7 +309,7 @@
       ]
     },
     {
-      "rank": 10,
+      "rank": 11,
       "slug": "harness-devin",
       "title": "harness-devin",
       "area": "harness",
@@ -310,7 +336,7 @@
       ]
     },
     {
-      "rank": 11,
+      "rank": 12,
       "slug": "harness-kimi-code",
       "title": "harness-kimi-code",
       "area": "harness",
@@ -338,7 +364,7 @@
       ]
     },
     {
-      "rank": 12,
+      "rank": 13,
       "slug": "product-vision",
       "title": "product-vision",
       "area": "philosophy",
@@ -375,7 +401,7 @@
       ]
     },
     {
-      "rank": 13,
+      "rank": 14,
       "slug": "spec-context-project",
       "title": "spec-context-project",
       "area": "philosophy",
@@ -403,7 +429,7 @@
       ]
     },
     {
-      "rank": 14,
+      "rank": 15,
       "slug": "capabilities",
       "title": "capabilities",
       "area": "platform",
@@ -430,7 +456,7 @@
       ]
     },
     {
-      "rank": 15,
+      "rank": 16,
       "slug": "consumer-agent-support",
       "title": "Consumer validation gate",
       "area": "platform",
@@ -460,7 +486,7 @@
       ]
     },
     {
-      "rank": 16,
+      "rank": 17,
       "slug": "context-management",
       "title": "context-management",
       "area": "platform",
@@ -498,7 +524,7 @@
       ]
     },
     {
-      "rank": 17,
+      "rank": 18,
       "slug": "context-portability",
       "title": "context-portability",
       "area": "platform",
@@ -524,7 +550,7 @@
       ]
     },
     {
-      "rank": 18,
+      "rank": 19,
       "slug": "cross-platform-portability",
       "title": "cross-platform-portability",
       "area": "platform",
@@ -552,7 +578,7 @@
       ]
     },
     {
-      "rank": 19,
+      "rank": 20,
       "slug": "server-registry",
       "title": "server-registry",
       "area": "platform",
@@ -575,7 +601,7 @@
       ]
     },
     {
-      "rank": 20,
+      "rank": 21,
       "slug": "specs-migration",
       "title": "specs-migration",
       "area": "platform",
@@ -606,7 +632,7 @@
       ]
     },
     {
-      "rank": 21,
+      "rank": 22,
       "slug": "workspace-doctor",
       "title": "workspace-doctor",
       "area": "platform",
@@ -652,7 +678,7 @@
       ]
     },
     {
-      "rank": 22,
+      "rank": 23,
       "slug": "workspace-init",
       "title": "workspace-init",
       "area": "platform",
@@ -688,7 +714,7 @@
       ]
     },
     {
-      "rank": 23,
+      "rank": 24,
       "slug": "audits-canon",
       "title": "audits-canon",
       "area": "sdd",
@@ -722,7 +748,7 @@
       ]
     },
     {
-      "rank": 24,
+      "rank": 25,
       "slug": "backlog-ledger",
       "title": "backlog-ledger",
       "area": "sdd",
@@ -752,7 +778,7 @@
       ]
     },
     {
-      "rank": 25,
+      "rank": 26,
       "slug": "bug-ledger",
       "title": "bug-ledger",
       "area": "sdd",
@@ -784,7 +810,7 @@
       ]
     },
     {
-      "rank": 26,
+      "rank": 27,
       "slug": "release-lifecycle",
       "title": "release-lifecycle",
       "area": "sdd",
@@ -821,7 +847,7 @@
       ]
     },
     {
-      "rank": 27,
+      "rank": 28,
       "slug": "sdd-gate-v3",
       "title": "sdd-gate-v3",
       "area": "sdd",
@@ -864,7 +890,7 @@
       ]
     },
     {
-      "rank": 28,
+      "rank": 29,
       "slug": "worktrees",
       "title": "worktrees",
       "area": "sdd",
