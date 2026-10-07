@@ -4,6 +4,7 @@
 **Approval:** by operator delegation 2026-10-06 ("Delego: APPROVED do revisor basta (Recommended)", handoff 2026-10-06T044815Z-main-thread-overnight-delegation); dd-code-reviewer APPROVED d1f1b01b1.
 **Amended:** 2026-10-06 (M-A folds, J1.S3.T2 row); approval basis: dd-code-reviewer re-review of the amended define head.
 **Amended:** 2026-10-07 by operator ruling: Jobs 2 and 3 annulled, replaced by Job 9 (SPEC e261c7e8b, ADR 0217 accepted on the reconcile branch); approval basis: dd-code-reviewer review of this amendment.
+**Amended:** 2026-10-07: Job 10 (SPEC `## Job 10` b81f60493; ADR 0218, accepted on the reconcile branch at cdecfbbdb); approval basis: dd-code-reviewer review of this amendment and `tasks/job10.md`.
 **Release ID:** 0.5.0
 **Owner:** dd-software-engineer
 
@@ -31,6 +32,11 @@ Order per job: DELETE → REBUILD → UPDATE → KEEP → ADD. A REBUILD names i
 | 8 | `tests/unit/conftest.py` autouse `worktree_rows` patch; `tests/contract/cli/test_cli_context.py:350` | monkeypatch of a module global | `unit-tests-spawn-the-worktree-script-through-a-cli-stub` | DELETE (AC8.2) | `SpecContextService`, `DoctorService` take a rows callable by constructor |
 | 8 | `scripts/guards/isolation.py` `hook-stdin-not-in-process` | lists patch forms one by one | `hook-stdin-guard-misses-raw-assignment` (caused_by T-050-160), `heartbeat-test-drives-hook-in-process` | DELETE (AC8.3) | cause: a guard enumerating patch shapes; the harness `tests/fixtures/harness_env.run_hook_subprocess` is the one way |
 | 8 | small tests spawning a process | present, unmeasured | rc-7 slow-class G4 | REBUILD (AC8.1) | pure core extracted, or the test turns medium |
+| 10 | `GF/_worktree_end.py` `_check_approved`, `_series` | a verdict is any reviewer handoff whose `scope` holds a candidate sha (HEAD, or a reflog sha with the same patch-id and message series, ADR 0168); no diff bound; read only in `.dadaia/handoff/*/` | `merge-gate-accepts-verdict-written-by-the-merger`, `verdict-ttl-shorter-than-merge-window` (rc-10, open); the bug batch REBUILT the unit at a2c78a3c8 (`ci_run` arm gone, caused_by J1.S3.T1) | REBUILD (AC12.2, AC12.3) | cause: the verdict names a sha by substring and no diff, so the merger can write it and a moved range keeps it. Redo under 0218: `reviewed_sha` == HEAD and `diff_sha256` over `<onto>`..HEAD, one hash function in `GF/_worktree_git.py`; `_series` and the reflog read are deleted; the reaper's hold is searched too. Old rows ruled by the operator (job10.md (b)) |
+| 10 | `S/dd-handoff-emitter/` | no script; the reviewer is read-only and the main thread files its verdict | the same CRITICAL | ADD (AC12.2) | `scripts/verdict.py`, the reviewer's one write; it relays `worktree.py hash`, never imports it |
+| 10 | `dadaia_workspace/hooks/venv_guard.py` `evaluate_payload` | judges `args[0]` only (ADR-G4); T-050-91 rebuilt it, T-050-113 deleted the pip arm | `venv-guard-misses-prefixed-and-absolute-dadaia` (open) | UPDATE (AC12.4) | one per-command judge over `shlex` operator tokens; two old allow rows leave on the operator's approval (job10.md (a)) |
+| 10 | `core/workspace_layout.py` `CORE_FLOOR`; `hooks/sdd_gate.py` `_HOOK_WIRING` | `.dadaia/agentic/**` and `.claude/settings.local.json` are MUTATING | `agentic-projections-agent-writable` (open) | UPDATE (AC12.1) | one floor entry and one dialect field; `gate_policy._protection` stays the one predicate |
+| 10 | the law: root map §3, the worktrees, `.dadaia`, handoff and states laws, the specs scaffold law, 2 personas, 13 skills | each rule in 2–6 homes; §3 states false blocks; dead citations | 11 law-text bugs of 7b0f8a1ca | DELETE (AC12.5–AC12.11) | one home per rule, the rest pointers; net law lines < 0 |
 
 - Job 1, rows the window gains at the rebase (two more bugs confirmed after the SPEC: `bugs-fix-counts-a-reverted-fix`, resolved by bd0628092 on the fix reader, and `memory-window-bound-unreachable-from-head`, `S/dd-spec-navigator/scripts/_memory_drift.py`): each REBUILD row becomes one born task (`tasks/job1.md` J1.S3.T2+); a KEEP row needs none. The first is absorbed by AC1.1's single link step (its test row stays).
 
@@ -44,7 +50,8 @@ Order per job: DELETE → REBUILD → UPDATE → KEEP → ADD. A REBUILD names i
 | a context's worktree rows | the rows callable `SpecContextService`/`DoctorService` take by constructor (Job 8) | `container.py`, `tests/fakes.py` | the module-global `worktree_rows` read, the autouse patch |
 | which workflow may call a model, and how | the guard `no-model-api-in-ci`, `scripts/guards/repo.py` (Job 9) | `.github/workflows/eval.yml` | `ev:scripts/check_workflows.py`, `dd-gitflow-default` §3b's clauses |
 | how a hook test feeds stdin | `tests/fixtures/harness_env.run_hook_subprocess` (Job 8) | every hook test | the `hook-stdin-not-in-process` guard check, `sys.stdin` patches |
-- Bug-surface delta expected: Job 1 reduces (one reader, the `None` arm gone); Job 5 neutral; Job 6 adds a module but no branch to `merge`'s kinds; Jobs 7–8 reduce (a guard check, an autouse patch and a folder rule gone); Job 9 grows the guard by the merged clauses and deletes a second repo, its CI and its workflow checker.
+| which verdict lands a job merge | `GF/_worktree_end.py` `_check_approved`, hashing with `GF/_worktree_git.py` `diff_sha256` (Job 10, ADR 0218) | `S/dd-handoff-emitter/scripts/verdict.py` through `worktree.py hash` | `_series`, the reflog candidate set, the `scope` substring match |
+- Bug-surface delta expected: Job 1 reduces (one reader, the `None` arm gone); Job 5 neutral; Job 6 adds a module but no branch to `merge`'s kinds; Jobs 7–8 reduce (a guard check, an autouse patch and a folder rule gone); Job 9 grows the guard by the merged clauses and deletes a second repo, its CI and its workflow checker; Job 10 reduces (`_series` and the reflog read gone, net law lines < 0) and grows the venv guard by one splitter and the emitter by one script.
 
 ## DAG
 
@@ -58,12 +65,14 @@ Order per job: DELETE → REBUILD → UPDATE → KEEP → ADD. A REBUILD names i
 | Job 6 | Jobs 1, 4, 5, 7, 8 | SPEC: the DAG's last job; the canon pin after Job 1's; `tests/conftest.py` after 7, 8 |
 | Job 9 | Jobs 7, 8 | the mirror rule and the size decider land first; runs beside Job 6, its S3 after Job 6 merges (shared `S/dd-gitflow-default/SKILL.md`, behavior map) and it merges after Job 6, so the freeze binds it |
 | Bug batch | Jobs 6, 9 | AC9.1; opened after Jobs 6 and 9, so frozen |
-| Reconciliation | Bug batch | AC10 |
+| Job 10 | Jobs 6, 9, bug batch | it REBUILDs `_check_approved`, which the bug batch rebuilt, edits `tests/helpers/worktree_ws.py` `approve()` after it, and rewrites the law files Jobs 6 and 9 and the bug batch rewrite; it opens on the rebased tree, so only its definition commits rebase |
+| Reconciliation | Bug batch, Job 10 | AC10 |
 
-- Critical path: Job 1 → Job 4 → Job 7 → Job 8 → Job 6 → bug batch → Reconciliation; Job 9 rides lane B beside Job 6, and its J9.S4 driver rows (AC11.5, AC11.6) run before Reconciliation.
+- Critical path: Job 1 → Job 4 → Job 7 → Job 8 → Job 6 → bug batch → Job 10 → Reconciliation; Job 9 rides lane B beside Job 6, and its J9.S4 driver rows (AC11.5, AC11.6) run before Reconciliation.
 - Jobs 2 and 3: annulled 2026-10-07 by operator ruling; replaced by Job 9.
+- Counted jobs (0193 cap, 8): Jobs 1, 4, 5, 6, 7, 8, 9, 10 — 8, at the cap; the bug batch and Reconciliation are uncounted.
 - Job 6 was parked on F-3 (c32f07811) and is un-parked by the ruling (a); the bug batch and Reconciliation run under the freeze.
-- After every job that writes `pub/` (Jobs 1, 4, 5, 6, 8, 9) the driver re-projects the instance (`dadaia public stage` / `install` / `doctor`); `WT merge` runs the projected `worktree.py`, so the freeze binds only once Job 6 is re-projected.
+- After every job that writes `pub/` (Jobs 1, 4, 5, 6, 8, 9, 10) the driver re-projects the instance (`dadaia public stage` / `install` / `doctor`); `WT merge` runs the projected `worktree.py`, so the freeze binds only once Job 6 is re-projected.
 
 ### Hot files
 
@@ -76,6 +85,7 @@ Order per job: DELETE → REBUILD → UPDATE → KEEP → ADD. A REBUILD names i
 - `specs/memory/QUALITY.md`: Job 9 (the Gates line only, J9.S3.T4; the P-33 rewrite lands on the reconcile branch with 0217), then Reconciliation (AC4.5, AC10.1, AC10.2). `CONTEXT.md`: Job 9 (the term "Evals repo" leaves), then Reconciliation.
 - `S/dd-gitflow-default/SKILL.md`: Job 6 (§3a), then Job 9 (§3b). `scripts/guards/repo.py`, `scripts/ci.py`, `.github/workflows/ci.yml`, `tests/scripts/test_ci.py`: Job 7, then Job 9.
 - `specs/bugs/BUGS.jsonl`: written only by `bugs.py`; a rebase conflict is redone by its writer (0180).
+- Job 10, after the bug batch: `GF/_worktree_end.py` (`_check_approved` only; `_gate`, `_ledgers`, `_remove` stay the bug batch's), `GF/_worktree_git.py`, `GF/worktree.py`, `tests/helpers/worktree_ws.py`, `tests/public/skills/dd_gitflow_default/scripts/test__worktree_end.py`, `dadaia_workspace/hooks/venv_guard.py`, `tests/hooks/test_venv_guard.py`, `core/workspace_layout.py`, `pub/schemas/handoff-v1.schema.json`, `tests/features/spec_context/test_gate_policy__law_states_what_the_code_does.py`, the canon pin, `pub/data/AGENTS.md` (after Job 9's §3 edit), `S/dd-gitflow-default/SKILL.md`, `S/dd-manager-orchestration/SKILL.md`, the personas and every law file `tasks/job10.md` J10.S4 names; Job 10 writes `pub/entities/behavior-map.json` in one closing row per stage.
 - `specs/releases/0.5.0/_RELEASE.json`: the driver's `kind: merge`/`note` entries, one job at a time.
 - Generated, in no `W:`: `pub/entities/behavior-map.json` and the derived docs; each job's close task regenerates them.
 - Job 6 and Job 8 file `W:` sets name today's test paths; at each job's open the driver rewrites them to Job 7's mirror paths (an edit to that job's own file).
@@ -92,7 +102,8 @@ Tests run only in the main thread's serialized `WT merge` and stage/job gates; a
 | 4 | Job 8 | — | Job 7 merged |
 | 5 | Job 6 | Job 9 (J9.S3 after Job 6 merges) | Job 8 merged |
 | 6 | bug batch | — | Jobs 6, 9 merged and re-projected; lane B: J9.S4 (AC11.5, AC11.6) |
-| 7 | Reconciliation | — | bug batch merged |
+| 7 | Job 10 | — | bug batch merged and re-projected; Job 10 rebased |
+| 8 | Reconciliation | — | Job 10 merged and re-projected |
 
 ## Agent defaults — unruled
 
