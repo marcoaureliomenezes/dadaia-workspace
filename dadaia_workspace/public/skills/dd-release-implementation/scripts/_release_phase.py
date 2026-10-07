@@ -13,7 +13,6 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from _ledger import workspace_of  # noqa: E402
 from _release_schema import (  # noqa: E402
     APPROVED,
     CANDIDATE_DOCS,
@@ -55,6 +54,8 @@ def _refuse_unapproved_docs(live: Live) -> Path:
 def _refuse_open_worktrees(specs: Path) -> None:
     """ADR 0128 (4): a candidate closes with every `wt/*` of its repo merged or cleaned — read
     from the owner's rows (imported, ADR 0135), sparing the tree closure runs from."""
+    from _ledger import workspace_of
+
     root = workspace_of(specs)
     if root is None:  # no workspace holds this tree: there is no worktree to wait for
         return
