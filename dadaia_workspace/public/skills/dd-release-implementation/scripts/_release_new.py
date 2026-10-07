@@ -124,7 +124,7 @@ def refuse_unfree(specs: Path, release_id: str) -> State | None:
             f"{SCRIPT} phase CLOSURE --sha $(git rev-parse --short HEAD)",
         )
     rc = (candidate_dir(release_dir) or release_dir).name
-    for bug in records(specs / "bugs" / "BUGS.jsonl"):  # no rc closes with an open bug (ADR 0206)
+    for bug in records(specs / "bugs" / "BUGS.jsonl"):  # no rc closes with an open bug
         placed = bug.get("found_in")
         if bug.get("status") in ("open", "deferred") and isinstance(placed, dict) and (
             placed.get("rc"), placed.get("release")

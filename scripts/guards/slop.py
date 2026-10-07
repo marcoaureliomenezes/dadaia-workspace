@@ -60,6 +60,7 @@ v38* infrastructure/projection.py:_clear parity:tests/infrastructure/test_public
 v38* infrastructure/public_assets.py:_prune_empty_dirs parity:tests/infrastructure/test_public_assets__install_ledger_reconciliation.py
 v38* infrastructure/public_assets.py:_reconcile_install_ledger parity:tests/infrastructure/test_public_assets__install_ledger_reconciliation.py
 v38* infrastructure/public_assets.py:stage parity:tests/infrastructure/test_public_assets__staged_assets_have_consumers.py
+v38* public/skills/dd-gitflow-default/scripts/_worktree_end.py:_rmdir parity:tests/public/skills/dd_gitflow_default/scripts/test__worktree_end__removal.py
 v38* public/skills/dd-release-implementation/scripts/_release_new.py:new_release parity:tests/public/skills/dd_release_implementation/scripts/test_release.py
 v39* ONBOARDING parity:tests/features/workspace/test_onboarding__onboarding_steps_property.py
 v39* WS-INVARIANT parity:tests/features/spec_context/test_doctor__unfixable_findings_carry_their_own_fix.py
