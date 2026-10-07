@@ -106,7 +106,6 @@ def _block_rows(tmp: Path, monkeypatch: pytest.MonkeyPatch) -> dict[str, bool]:
     }
 
 
-@pytest.mark.xfail(strict=True, raises=AssertionError, reason=_BUG)
 def test_the_map_lists_every_block_the_code_has(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

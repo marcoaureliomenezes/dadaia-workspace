@@ -35,12 +35,13 @@
 
 ## 3. What is enforced
 
-- One PreToolUse gate blocks exactly three things: a file-tool write (`Write`, `Edit`, `MultiEdit`, `apply_patch`) creating a new entry at the root, `.dadaia/`, a closed-canon zone or the first level of `repos/`, `worktrees/` (§4); a Bash command whose first token is `dadaia` or `python -m dadaia_workspace` outside `.dadaia/.venv/bin/`; a file-tool write (those or `NotebookEdit`) that is PROTECTED or out-of-scope.
-- No tool, Bash included, writes out of scope or PROTECTED; the gate fails open on: a missing `.dadaia/.venv` (ADR 0067); a pre-gate past 10 s (ADR 0118); a Bash write (ADRs 0096, 0103, 0133); an id-less unbound session under `worktrees/<r>/` (ADR 0116); a policy that raises (`pre_gate`); an unreadable payload (`read_stdin_json`); an unreadable registry, judging nothing below `repos/`, `worktrees/` (ADR 0132).
+- One PreToolUse gate blocks: a file-tool write (`Write`, `Edit`, `MultiEdit`, `apply_patch`) creating a new entry at the root, `.dadaia/`, a closed-canon zone or the first level of `repos/`, `worktrees/` per §4 (root_whitelist); a Bash command of any position in the line whose first word is the `dadaia` CLI or `python -m dadaia_workspace` outside `.dadaia/.venv/bin/` (venv_guard); a file-tool write (those or `NotebookEdit`) to a PROTECTED path (PROTECTED); a file-tool write (those or `NotebookEdit`) out of the bound scope (out-of-scope); a file-tool write under `repos/<slug>/` outside `specs/audits/`, since `repos/` is merge-only (ADR 0105).
+- The venv guard judges every command of a Bash line: after `&&`, a semicolon, `|` or `(`, behind an env assignment or a shell keyword, and as an absolute or relative path to a `dadaia` outside the venv. Not judged: PowerShell syntax, `$(…)`, backticks, `bash -c`, the `env`, `xargs`, `sudo` and `exec` wrappers, heredoc bodies and `time` options. It reads bash syntax, so on Windows an unquoted backslash path loses its backslashes as in Git Bash; unbalanced quotes fail open; a quoted argument made only of operator characters reads as a boundary, a false block.
+- The gate fails open on: a missing `.dadaia/.venv` (ADR 0067); a pre-gate past 10 s (ADR 0118); a Bash write (ADRs 0096, 0103, 0133); an id-less unbound session under `worktrees/<r>/` (ADR 0116); a policy that raises (`pre_gate`); an unreadable payload (`read_stdin_json`); an unreadable registry, judging nothing below `repos/`, `worktrees/`, so only the merge-only block holds there (ADR 0132).
 - Path classes: ADDITIVE (`.dadaia/AGENTS.md`'s output and ephemeral zones) writable; PROTECTED (`workspace_layout.CORE_FLOOR`, `sdd_gate._HOOK_WIRING`, the install ledger, the `.dadaiaignore` `[protected]` globs, repo-relative) blocked; the rest MUTATING.
 - Writes under `repos/<slug>/`: `specs/audits/` directly, the rest by worktree merge; only `context create` and a repo's first `specs init` write `specs/` directly (ADR 0154).
 - Every BLOCK carries exactly one fix line, `fix: <command>` or `Operator action: <one act>` (ADR 0158); a BLOCK whose fix is itself blocked is a Stall, CRITICAL.
-- Git chokepoints (branch names: `specs/constitution.md` `gitflow:`): pre-push allows only the work branch, a job branch `wt/<M.m.p>-rc<N>/<job>` and a backlog branch `wt/backlog/<slug>`, and refuses a non-canon `specs/` path or a denylisted secret; both PRs need the repo's `verify:` line green and a `dd-code-reviewer` APPROVED verdict.
+- Git chokepoints (branch names: `specs/constitution.md` `gitflow:`): pre-push allows only the work branch, a job branch `wt/<M.m.p>-rc<N>/<job>` and a backlog branch `wt/backlog/<slug>`, and refuses a non-canon `specs/` path or a denylisted secret; both PRs need the repo's `verify:` line passing and a `dd-code-reviewer` APPROVED verdict, which `worktree.py merge` enforces on a job merge.
 - Races surface, never block; the binding: `.dadaia/.venv/bin/dadaia context show --json`.
 - The gate reads no SDD artifact; procedure is skill-taught and audit-measured, never gated.
 
@@ -82,14 +83,14 @@
 | `dd-gitflow-default` | branches, PRs, commit shapes |
 | `dd-handoff-emitter` | machine-readable completion records |
 | `dd-audit-project` | the periodic three-pillar audit |
-| `dd-spec-navigator` | finding truth in `specs/`; the glossary |
+| `dd-spec-navigator` | finding truth in `specs/` |
 | `dd-cli-library` | the `dadaia` verbs, skill scripts, dev servers |
 | `dd-ai-eng-knowhow` | harness literacy and AI-entity authoring |
 | `dd-architecture-survey`, `dd-codebase-design`, `dd-domain-modeling` | design vocabulary for PLAN and SPEC |
 | `dd-manager-orchestration` | dispatching the three roles |
 
 - Language: operator preference, default English. Tone: direct, concise, operational.
-- Instance state: `.dadaia/.venv/bin/dadaia doctor`, `.dadaia/.venv/bin/dadaia public doctor`, `python3 .agents/skills/dd-bug-resolution/scripts/bugs.py status`.
+- Instance state: `.dadaia/.venv/bin/dadaia doctor`, `.dadaia/.venv/bin/dadaia public doctor`, `python3 .agents/skills/dd-bug-resolution/scripts/bugs.py status --specs <specs-dir>`.
 
 ## 7. Onboarding — three levels
 
