@@ -118,3 +118,9 @@ def test_a_new_binary_test_file_beside_code_refuses() -> None:
 def test_a_first_row_test_edit_is_judged_though_the_last_row_is_clean() -> None:
     rows = [row("c1", "tweak", edits=((T, ("x",), 1),)), row("c2", "chore: tidy")]
     assert freeze.judge(rows, "base", None) == (T, "base")
+
+
+@pytest.mark.xfail(strict=True, raises=AssertionError, reason="freeze-reads-only-numbered-job-ids")
+def test_a_bug_batch_red_commit_anchors_the_freeze() -> None:
+    rows = [row("c1", "test(JB.S1.T1): red", edits=((T, (), 2),)), row("c2", "feat(JB.S2.T1): rm", edits=((T, ("x",), 0),))]
+    assert freeze.judge(rows, "base", None) == (T, "c1")
