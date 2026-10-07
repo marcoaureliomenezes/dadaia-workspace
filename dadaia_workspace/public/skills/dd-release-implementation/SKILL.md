@@ -1,7 +1,7 @@
 ---
 name: dd-release-implementation
 description: >
-  Implement a release candidate from the first task reservation through the
+  Implement a release candidate from the first task through the
   promote-or-continue gate. Use when working a task inside an Approved candidate, at
   candidate closure, and at the gate (the next candidate, or promote + branch cut).
 ---
@@ -14,7 +14,7 @@ description: >
 
 - `dd-software-engineer` working a task inside an `Approved` candidate.
 - `dd-product-engineer` at each candidate's closure (memory, `_RELEASE.json`).
-- From the first reservation through the promote-or-continue gate (and, on promote, the ship + branch cut).
+- From the first task through the promote-or-continue gate (and, on promote, the ship + branch cut).
 
 ## 2. Steps
 
@@ -22,9 +22,9 @@ description: >
 2. Resolve the live release by reading `_RELEASE.json`'s `phase` field directly.
 3. The live candidate's job files sit at `releases/<v>/rc-<N>/tasks/<job>.md`, the highest `rc-<N>/`; a lower one is closed history (a closed rc keeps its `TASKS.md`).
 4. Full navigation protocol: `dd-spec-navigator`.
-5. Read `RC-FLOW.md` for the candidate arc and gate cadence before acting past reservation.
+5. Read `RC-FLOW.md` for the candidate arc and gate cadence before acting past opening a task.
 6. Update `_RELEASE.json` per `RELEASE-EVENTS.md`; a stage's third red gate adds the `stop:` note (`specs/releases/AGENTS.md` §2).
-7. At `RC-FLOW.md` step 5, run `MEMORY-UPDATE.md`'s full protocol before touching any memory atom.
+7. At `RC-FLOW.md` step 4, run `MEMORY-UPDATE.md`'s full protocol before touching any memory atom.
 8. A test enters the suite only under the root map §1 test basics.
 9. Before growing any module, run the deletion test and speak the seam vocabulary (`dd-codebase-design`) — a diff that only adds justifies itself against replace-don't-layer.
 10. Implement each task inside its own task worktree, cut from its job's worktree branch per `worktrees/AGENTS.md` §1.

@@ -1,4 +1,4 @@
-# MEMORY-UPDATE — dd-release-implementation (RC-FLOW step 5 detail)
+# MEMORY-UPDATE — dd-release-implementation (RC-FLOW step 4 detail)
 
 Disclosed reference reached at `SKILL.md` step 7 — `dd-product-engineer` runs it inside the Reconciliation job (`RC-FLOW.md` step 4), after every other job merged. Memory is reconciled from the code diff, never appended to.
 

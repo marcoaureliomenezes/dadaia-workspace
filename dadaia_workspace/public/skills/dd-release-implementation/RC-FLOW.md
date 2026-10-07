@@ -23,7 +23,7 @@ An rc is an Implement: a DAG of jobs the PLAN draws, Job 1 first, the Reconcilia
 
 **Step 1 — Open a job.**
 - `WT new <repo> <M.m.p>-rc<N>/<job>` once its PLAN edges are merged; its tasks live in `rc-<N>/tasks/<job>.md` (`dd-release-definition` §5).
-- Each task opens `WT new <repo> <M.m.p>-rc<N>/<job>--<task-id>` from the job branch; a sub-agent works it; it is `running` while its tree exists; there is no reservation commit.
+- Each task opens `WT new <repo> <M.m.p>-rc<N>/<job>--<task-id>` from the job branch; a sub-agent works it; it is `running` while its tree exists.
 - Done when: the tree exists.
 
 **Step 2 — Stages and tasks.**
@@ -45,7 +45,7 @@ An rc is an Implement: a DAG of jobs the PLAN draws, Job 1 first, the Reconcilia
 - Done when: the Reconciliation job merged; `.dadaia/.venv/bin/dadaia doctor` is clean.
 
 **Step 5 — Candidate PR.**
-- Open the work -> integration PR (branch names: the constitution's `gitflow:`) (security verdict covering the head, `dd-gitflow-default` §2a); the `verify:` line green; merge.
+- Open the work -> integration PR and merge it: `dd-gitflow-default` §3b.
 - Done when: it merges.
 
 The arc ends here. Gate -> promote -> record -> branch cut: `dd-gitflow-default` steps
@@ -55,5 +55,5 @@ The arc ends here. Gate -> promote -> record -> branch cut: `dd-gitflow-default`
 
 - Writing source code, tests, or pipelines (other agents) — the closer records test dispositions, never authors a test.
 - Modifying `specs/constitution.md` (requires explicit operator approval).
-- Memory updates outside CLOSURE phase (or DEFINITION under its own authorization) — gate-blocked for any other agent/phase.
+- Memory updates outside CLOSURE phase (or DEFINITION under its own authorization) (`specs/memory/AGENTS.md`).
 - Minting a version, writing a CHANGELOG section or moving a closed trio on disk — the project's release pipeline owns the first two, git owns the third.
