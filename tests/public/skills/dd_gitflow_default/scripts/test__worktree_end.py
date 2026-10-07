@@ -20,6 +20,7 @@ from pathlib import Path
 
 import pytest
 
+from dadaia_workspace.core.cli_line import git_line, shell_line
 from tests.fixtures.harness_env import run_bash, run_python, suite_env
 from tests.helpers.release_state import write_release_phase
 from tests.helpers.skill_scripts import stage_skill_scripts
@@ -97,9 +98,9 @@ def test_a_dirty_tree_refuses_with_one_fix_that_commits_or_removes(root: Path) -
     dirty = run(root, "merge", TREE)
     assert "uncommitted" in dirty.stderr
     add, then, *remove = fixes(dirty)[0].split("`")[1::2]  # Operator action: commit or remove
-    assert [shlex.split(add), shlex.split(then)] == [  # the commit takes its own message
-        ["git", "-C", str(tree), "add", "-A"],
-        ["git", "-C", str(tree), "commit"],
+    assert [add, then] == [  # the commit takes its own message
+        git_line(tree, "add", "-A"),
+        git_line(tree, "commit"),
     ]
     for step in remove:
         subprocess.run(step, shell=True, check=True, capture_output=True)  # noqa: S602
@@ -123,7 +124,7 @@ def test_a_define_tree_lands_specs_only_through_the_ledger_checks(root: Path) ->
     assert "RED-job is code" in code.stderr
     restore, then = fixes(code)[0].split("`")[1::2]  # Operator action: restore, commit
     subprocess.run(restore, shell=True, check=True)  # noqa: S602 — runs as printed
-    assert shlex.split(then) == ["git", "-C", str(tree), "commit"]
+    assert then == git_line(tree, "commit")
     git(tree, "commit", "-qm", "revert: RED-job")
     approve(root, sha := commit(tree, "specs/releases/0.5.0/rc-1/PLAN.md", "**Status:** Draft\n"))
     landed = run(root, "merge", str(tree))
@@ -268,7 +269,7 @@ def test_release_closure_waits_for_every_other_wt(tmp_path: Path) -> None:
 
     refused = run_python(*closure, cwd=root)
     fix = refused.stderr.rsplit("fix: ", 1)[1].strip()
-    assert "repos/r " in refused.stderr and fix.endswith(f"clean {root}/{TREE}")
+    assert "repos/r " in refused.stderr and fix.endswith(shell_line("clean", str(root / TREE)))
     run_bash(fix, cwd=root, check=True)
     assert run_python(*closure, cwd=root).returncode == 0
 
