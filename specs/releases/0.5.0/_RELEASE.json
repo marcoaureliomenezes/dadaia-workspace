@@ -1310,6 +1310,12 @@
         "workspace-init",
         "worktrees"
       ]
+    },
+    {
+      "ts": "2026-10-07T20:17:57Z",
+      "agent": "dd-product-engineer",
+      "kind": "note",
+      "text": "Correction to the J9.S4.T2 eval rerun note: run 37652269562 was the second run, not the first. The first run is 37629005413 (BLOCK, t2 candidate 0/3 vs 3/3, cause: no `hotfix/<bug-id>` tree outside an rc); the second, 37652269562 (BLOCK, t2 candidate 0/3 vs 3/3), was caused by bug onboarding-writes-no-tests-line; the green rerun is 37673898303."
     }
   ]
 }
