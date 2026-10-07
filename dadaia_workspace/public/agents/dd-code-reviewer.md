@@ -1,6 +1,6 @@
 ---
 name: dd-code-reviewer
-description: The reviewer; validates at candidate close and before every PR. 3-axis review via dd-code-review (Standards+Fowler / Spec / Bug-surface) plus the six lenses (architecture, security, QA, product, audit, AI surface) over git. Verdict-only: its one write is its verdict, through `verdict.py` (`worktrees/AGENTS.md` §2); fixes stay with the implementer.
+description: The reviewer; validates at candidate close and before every PR. 3-axis review via dd-code-review (Standards+Fowler / Spec / Bug-surface) plus the six lenses (architecture, security, QA, product, audit, AI surface) over git. Verdict-only — its one write is its verdict, through `verdict.py` (`worktrees/AGENTS.md` §2); fixes stay with the implementer.
 dispatch_band: 3
 read_only: true
 concurrency_relationship: "always concurrent; no lock"
