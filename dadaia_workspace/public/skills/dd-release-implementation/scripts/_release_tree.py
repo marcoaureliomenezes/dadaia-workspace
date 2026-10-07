@@ -339,7 +339,7 @@ def _bugs(*argv: str, specs: Path) -> None:
     """Run `bugs.py <argv>`; its refusal (`[error] why`, `fix: how`) is raised as ours, a death outside one named."""
     bugs, command = _SKILLS / "dd-bug-resolution" / "scripts" / "bugs.py", " ".join(argv)
     done = subprocess.run([sys.executable, str(bugs), *argv, "--specs", str(specs)],
-                          stdin=subprocess.DEVNULL, capture_output=True, text=True)  # fmt: skip
+                          stdin=subprocess.DEVNULL, capture_output=True, text=True, encoding="utf-8", errors="replace")  # fmt: skip
     if done.returncode:
         lines = done.stderr.strip().splitlines()
         why, fix = (

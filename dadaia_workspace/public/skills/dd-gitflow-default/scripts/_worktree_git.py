@@ -31,8 +31,8 @@ def _env() -> dict[str, str]:
 
 def git(repo: Path, *args: str, check: bool = True, input: str | None = None) -> str:
     done = subprocess.run(
-        ["git", "-C", str(repo), *args], env=_env(), capture_output=True, text=True, input=input
-    )
+        ["git", "-C", str(repo), *args], env=_env(), capture_output=True, text=True, encoding="utf-8", errors="replace", input=input
+    )  # fmt: skip
     if check and done.returncode:
         raise RuntimeError(f"git {' '.join(args)}: {done.stderr.strip()}")
     return done.stdout
@@ -74,8 +74,8 @@ def cli(root: Path, *args: str, tree: Path | None = None) -> subprocess.Complete
         env=_env() | fence,
         stdin=subprocess.DEVNULL,
         capture_output=True,
-        text=True,
-    )
+        text=True, encoding="utf-8", errors="replace",
+    )  # fmt: skip
 
 
 def cli_line(root: Path, *args: str) -> str:

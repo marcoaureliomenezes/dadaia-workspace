@@ -55,8 +55,8 @@ def main(argv: list[str] | None = None) -> int:
     done = subprocess.run(
         [sys.executable, str(_WORKTREE), "hash", args.path, "--sha", args.sha],
         capture_output=True,
-        text=True,
-    )
+        text=True, encoding="utf-8", errors="replace",
+    )  # fmt: skip
     if done.returncode:
         sys.stderr.write(done.stderr)
         return done.returncode

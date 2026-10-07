@@ -208,8 +208,8 @@ def _ss_output() -> str | None:
         return None
     try:
         result = subprocess.run(
-            ["ss", "-tlnp"], capture_output=True, text=True, timeout=5, check=False
-        )
+            ["ss", "-tlnp"], capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=5, check=False
+        )  # fmt: skip
     except (FileNotFoundError, subprocess.TimeoutExpired):
         return None
     return result.stdout if result.returncode == 0 else None

@@ -144,9 +144,9 @@ def _check_ancestor(tree: Path, work: str) -> None:
 
 def _declared(tree: Path, work: str, key: str) -> str:
     """The value of the `<key>` line *work*'s tracked `AGENTS.md` declares (a leading UTF-8 BOM is
-    ignored, as U+FEFF or as the three characters a cp1252 decode makes of it), `""` when absent."""
+    ignored), `""` when absent."""
     shown = git(tree, "show", f"{work}:AGENTS.md", check=False)
-    lines = shown.removeprefix("\ufeff").removeprefix("\u00ef\u00bb\u00bf").splitlines()
+    lines = shown.removeprefix("\ufeff").splitlines()
     return next((ln.removeprefix(key).strip() for ln in lines if ln.startswith(key)), "")
 
 
@@ -206,7 +206,7 @@ def _checks(root: Path, tree: Path) -> Iterator[tuple[str, subprocess.CompletedP
         command = [sys.executable, str(skills / skill / "scripts" / name),
                    "check", "--specs", str(tree / "specs")]  # fmt: skip
         yield name, subprocess.run(command, cwd=tree, env=_env(), stdin=subprocess.DEVNULL,
-                                   capture_output=True, text=True)  # fmt: skip
+                                   capture_output=True, text=True, encoding="utf-8", errors="replace")  # fmt: skip
     yield "dadaia doctor", cli(root, "doctor", "--specs-dir", str(tree / "specs"), tree=tree)
 
 

@@ -115,13 +115,13 @@ def candidate_adds(specs: Path) -> list[tuple[_dt.datetime, str, str]]:
     """Each candidate's birth as (instant, release, rc): a commit adding exactly one
     rc-<N>/SPEC.md whose status reads non-Approved; a shallow history is refused."""
     git = ["git", "-C", str(specs)]
-    shallow = subprocess.run([*git, "rev-parse", "--is-shallow-repository"], capture_output=True, text=True, check=False)  # fmt: skip
+    shallow = subprocess.run([*git, "rev-parse", "--is-shallow-repository"], capture_output=True, text=True, encoding="utf-8", errors="replace", check=False)  # fmt: skip
     if shallow.stdout.strip() == "true":
         raise ShallowClone(f"{specs} is in a shallow clone: a release candidate read from a cut history "
                            "would be stamped wrong for good (ADR 0187)")  # fmt: skip
     head = subprocess.run([*git, "rev-parse", "-q", "--verify", "HEAD"], capture_output=True, check=False)  # fmt: skip
     log = subprocess.run([*git, "log", "--diff-filter=A", "--name-only", "--format=%x00%H %cI", "--",
-                          ":(glob)releases/**/rc-*/SPEC.md"], capture_output=True, text=True, check=False)  # fmt: skip
+                          ":(glob)releases/**/rc-*/SPEC.md"], capture_output=True, text=True, encoding="utf-8", errors="replace", check=False)  # fmt: skip
     if head.returncode == 0 and log.returncode:  # a repo with no commit yet holds no birth
         from _specs import git_line  # on every caller's sys.path; a runpy load never acts
 
@@ -132,7 +132,7 @@ def candidate_adds(specs: Path) -> list[tuple[_dt.datetime, str, str]]:
         sha, *paths = commit.split()
         if len(paths) != 2:  # the instant, then exactly one added SPEC.md
             continue
-        show = subprocess.run([*git, "show", f"{sha}:{paths[1]}"], capture_output=True, text=True, check=False)  # fmt: skip
+        show = subprocess.run([*git, "show", f"{sha}:{paths[1]}"], capture_output=True, text=True, encoding="utf-8", errors="replace", check=False)  # fmt: skip
         if extract_status(show.stdout) != APPROVED:
             parts = paths[1].split("/")
             adds.append((utc(paths[0]), parts[-3], parts[-2]))

@@ -262,7 +262,7 @@ def _write(args: argparse.Namespace, specs: Path) -> int:
         values["reported_by"] = values["reported_by"] or "dd-software-engineer"
         try:
             listed = subprocess.run(["git", "-C", str(specs), "ls-files", "--full-name", ":/"],
-                                    capture_output=True, text=True, check=True).stdout  # fmt: skip
+                                    capture_output=True, text=True, encoding="utf-8", errors="replace", check=True).stdout  # fmt: skip
         except (OSError, subprocess.CalledProcessError) as exc:
             cause = getattr(exc, "stderr", "") or str(exc)
             raise Refusal(f"cannot list the repo's tracked directories: {cause.strip()}",

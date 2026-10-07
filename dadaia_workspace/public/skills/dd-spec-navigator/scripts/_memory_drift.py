@@ -34,7 +34,7 @@ class Refusal(Exception):
 
 def _cut(repo: Path, what: str) -> Refusal | None:
     """The one refusal naming a history cut: *repo* is a shallow clone, else None."""
-    shallow = subprocess.run(["git", "rev-parse", "--is-shallow-repository"], cwd=repo, capture_output=True, text=True, check=False)  # fmt: skip
+    shallow = subprocess.run(["git", "rev-parse", "--is-shallow-repository"], cwd=repo, capture_output=True, text=True, encoding="utf-8", errors="replace", check=False)  # fmt: skip
     if shallow.stdout != "true\n":
         return None
     return Refusal(
@@ -45,7 +45,7 @@ def _cut(repo: Path, what: str) -> Refusal | None:
 
 def git(repo: Path, *argv: str) -> list[str]:
     """`git *argv` from *repo*, as non-empty lines; a git that refuses is a Refusal."""
-    done = subprocess.run(["git", *argv], cwd=repo, capture_output=True, text=True, check=False)
+    done = subprocess.run(["git", *argv], cwd=repo, capture_output=True, text=True, encoding="utf-8", errors="replace", check=False)  # fmt: skip
     if done.returncode != 0:  # a bound-less caller's history precondition: a cut is named first
         what = f"git {' '.join(argv)} failed in {repo}"
         raise _cut(repo, what) or Refusal(f"{what}: {done.stderr.strip()}",

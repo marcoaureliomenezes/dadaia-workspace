@@ -38,8 +38,8 @@ def _bound_fix(here: Path, rerun: str, ledger: str | None) -> tuple[str, str]:
     for root, venv in ((d, d / ".dadaia" / ".venv") for d in filter(None, [workspace_of(here)])):
         if cli := shutil.which("dadaia", path=f"{venv / 'bin'}{os.pathsep}{venv / 'Scripts'}"):
             shown = subprocess.run(
-                [cli, "context", "show", "--json"], capture_output=True, text=True
-            )
+                [cli, "context", "show", "--json"], capture_output=True, text=True, encoding="utf-8", errors="replace"
+            )  # fmt: skip
             try:
                 repo = str(json.loads(shown.stdout)["main_repo"])
             except (ValueError, LookupError, TypeError):

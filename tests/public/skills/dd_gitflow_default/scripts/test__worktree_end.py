@@ -673,7 +673,6 @@ def _law_end(tmp_path: Path, law: bytes) -> Any:
     return end
 
 
-@pytest.mark.xfail(strict=True, raises=AssertionError, reason="skill-git-output-decodes-with-the-locale")  # fmt: skip
 @pytest.mark.parametrize("codepage", ["cp1251", "cp932"])
 def test_a_tests_line_after_a_bom_is_declared_whatever_codepage_text_decoding_defaults_to(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, codepage: str
