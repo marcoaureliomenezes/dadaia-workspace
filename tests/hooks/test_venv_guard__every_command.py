@@ -26,108 +26,87 @@ def _win32(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr("dadaia_workspace.core.platform.PLATFORM", Capabilities.detect("win32"))
 
 
-@pytest.mark.xfail(strict=True, reason="venv-guard-misses-prefixed-and-absolute-dadaia")
 def test_blocks_cd_and() -> None:
     _assert_blocked("cd x && dadaia doctor")
 
 
-@pytest.mark.xfail(strict=True, reason="venv-guard-misses-prefixed-and-absolute-dadaia")
 def test_blocks_semicolon() -> None:
     _assert_blocked("true; dadaia doctor")
 
 
-@pytest.mark.xfail(strict=True, reason="venv-guard-misses-prefixed-and-absolute-dadaia")
 def test_blocks_semicolon_subshell() -> None:
     _assert_blocked("true;(dadaia doctor)")
 
 
-@pytest.mark.xfail(strict=True, reason="venv-guard-misses-prefixed-and-absolute-dadaia")
 def test_blocks_subshell_semicolon() -> None:
     _assert_blocked("(true);dadaia doctor")
 
 
-@pytest.mark.xfail(strict=True, reason="venv-guard-misses-prefixed-and-absolute-dadaia")
 def test_blocks_pipe() -> None:
     _assert_blocked("echo y | dadaia doctor")
 
 
-@pytest.mark.xfail(strict=True, reason="venv-guard-misses-prefixed-and-absolute-dadaia")
 def test_blocks_if_then() -> None:
     _assert_blocked("if true; then dadaia doctor; fi")
 
 
-@pytest.mark.xfail(strict=True, reason="venv-guard-misses-prefixed-and-absolute-dadaia")
 def test_blocks_brace_group() -> None:
     _assert_blocked("{ dadaia doctor; }")
 
 
-@pytest.mark.xfail(strict=True, reason="venv-guard-misses-prefixed-and-absolute-dadaia")
 def test_blocks_negation() -> None:
     _assert_blocked("! dadaia doctor")
 
 
-@pytest.mark.xfail(strict=True, reason="venv-guard-misses-prefixed-and-absolute-dadaia")
 def test_blocks_time() -> None:
     _assert_blocked("time dadaia doctor")
 
 
-@pytest.mark.xfail(strict=True, reason="venv-guard-misses-prefixed-and-absolute-dadaia")
 def test_blocks_or() -> None:
     _assert_blocked("false || dadaia doctor")
 
 
-@pytest.mark.xfail(strict=True, reason="venv-guard-misses-prefixed-and-absolute-dadaia")
 def test_blocks_background() -> None:
     _assert_blocked("sleep 1 & dadaia doctor")
 
 
-@pytest.mark.xfail(strict=True, reason="venv-guard-misses-prefixed-and-absolute-dadaia")
 def test_blocks_subshell() -> None:
     _assert_blocked("(dadaia doctor)")
 
 
-@pytest.mark.xfail(strict=True, reason="venv-guard-misses-prefixed-and-absolute-dadaia")
 def test_blocks_newline() -> None:
     _assert_blocked("true\ndadaia doctor")
 
 
-@pytest.mark.xfail(strict=True, reason="venv-guard-misses-prefixed-and-absolute-dadaia")
 def test_blocks_env_assignment() -> None:
     _assert_blocked("DADAIA_CONTEXT=x dadaia doctor")
 
 
-@pytest.mark.xfail(strict=True, reason="venv-guard-misses-prefixed-and-absolute-dadaia")
 def test_blocks_absolute_path() -> None:
     _assert_blocked("/usr/local/bin/dadaia doctor")
 
 
-@pytest.mark.xfail(strict=True, reason="venv-guard-misses-prefixed-and-absolute-dadaia")
 def test_blocks_dot_slash() -> None:
     _assert_blocked("./dadaia doctor")
 
 
-@pytest.mark.xfail(strict=True, reason="venv-guard-misses-prefixed-and-absolute-dadaia")
 def test_blocks_foreign_venv() -> None:
     _assert_blocked("repos/other/.venv/bin/dadaia doctor")
 
 
-@pytest.mark.xfail(strict=True, reason="venv-guard-misses-prefixed-and-absolute-dadaia")
 def test_blocks_cd_and_python() -> None:
     _assert_blocked("cd x && python3 -m dadaia_workspace doctor")
 
 
-@pytest.mark.xfail(strict=True, reason="venv-guard-misses-prefixed-and-absolute-dadaia")
 def test_blocks_system_python() -> None:
     _assert_blocked("/usr/bin/python3 -m dadaia_workspace doctor")
 
 
-@pytest.mark.xfail(strict=True, reason="venv-guard-misses-prefixed-and-absolute-dadaia")
 def test_blocks_win32_exe(monkeypatch: pytest.MonkeyPatch) -> None:
     _win32(monkeypatch)
     _assert_blocked("dadaia.exe doctor")
 
 
-@pytest.mark.xfail(strict=True, reason="venv-guard-misses-prefixed-and-absolute-dadaia")
 def test_blocks_win32_absolute_exe(monkeypatch: pytest.MonkeyPatch) -> None:
     _win32(monkeypatch)
     _assert_blocked("C:/tools/dadaia.exe doctor")
@@ -174,3 +153,11 @@ def test_blocks_win32_bare_dadaia(monkeypatch: pytest.MonkeyPatch) -> None:
     """Born green: today's first-token rule already blocks it; it stays blocked."""
     _win32(monkeypatch)
     _assert_blocked("dadaia doctor")
+
+
+@pytest.mark.parametrize(
+    "command",
+    ["python -m dadaia_workspacex doctor", "python -m", "python script.py dadaia_workspace"],
+)
+def test_allows_a_python_that_does_not_run_the_workspace_module(command: str) -> None:
+    assert venv_guard.evaluate_payload(_bash(command)) is None

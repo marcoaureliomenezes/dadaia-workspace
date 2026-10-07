@@ -1,16 +1,23 @@
-"""Venv-determinism PreToolUse policy: a Bash command whose FIRST token is a bare ``dadaia``
-or ``python[3] -m dadaia_workspace`` is BLOCKED with one ``fix:`` — the absolute venv
-command. A venv-rooted token, any other shape (``pip`` included, ADR 0134)
-or an unparseable payload is ALLOWED (fail-open)."""
+"""Venv-determinism PreToolUse policy: every command of a Bash line is judged. One whose first
+word (past ``NAME=value`` and reserved words) is a ``dadaia`` or ``python[3] -m dadaia_workspace``
+not ending in the workspace venv path is BLOCKED with one ``fix:``; any other shape (``pip``
+included, ADR 0134) or an unparseable payload is ALLOWED. Caveats: bash syntax only (Git Bash on
+Windows loses an unquoted ``C:\\x`` path's backslashes as bash does); not judged: PowerShell,
+``$(...)``, backticks, ``bash -c``, ``env``/``xargs``/``sudo``/``exec``, heredocs, ``time -p``;
+a quoted operator-only argument reads as a boundary (a false block)."""
 
 from __future__ import annotations
 
+import re
 import shlex
 
 from dadaia_workspace.core import platform
-from dadaia_workspace.core.cli_line import fix_line, venv_line
+from dadaia_workspace.core.cli_line import venv_line
 
-_PYTHON_NAMES: frozenset[str] = frozenset({"python", "python3"})
+_OPERATORS = ";()<>|&\n"
+_BOUNDARY = frozenset(";&|()\n")
+_SKIP = frozenset({"{", "!", "if", "then", "do", "else", "elif", "while", "until", "time"})
+_ASSIGN = re.compile(r"[A-Za-z_]\w*=")
 
 
 def evaluate_payload(payload: dict[str, object]) -> str | None:
@@ -21,34 +28,51 @@ def evaluate_payload(payload: dict[str, object]) -> str | None:
     command = (inp if isinstance(inp, dict) else payload).get("command")
     if not isinstance(command, str):
         return None
+    lex = shlex.shlex(command, posix=True, punctuation_chars=_OPERATORS)
+    lex.whitespace, lex.whitespace_split, lex.commenters = " \t\r", True, ""
     try:
-        args = shlex.split(command, comments=False, posix=True)
+        tokens = list(lex)
     except ValueError:
         return None
     venv_bin = f".dadaia/.venv/{platform.PLATFORM.venv_scripts_dir}/"
-    if not args or venv_bin in args[0]:
+    words: list[str] = []
+    for token in [*tokens, ";"]:
+        if not set(token) <= _BOUNDARY:
+            words.append(token)
+            continue
+        tool = _unrooted_tool(words, venv_bin)
+        if tool:
+            tail = "".join(f" {w if set(w) <= _BOUNDARY else shlex.quote(w)}" for w in words[1:])
+            return (
+                "[VENV GUARD] This command must run from the workspace venv "
+                f"({venv_bin}). Blocked:\n"
+                f"  {command.strip()}\n"
+                f"fix: {venv_line(None, tool)}{tail}"
+            )
+        words = []
+    return None
+
+
+def _unrooted_tool(words: list[str], venv_bin: str) -> str | None:
+    """``dadaia`` or ``python`` when the command's first word is that tool outside the venv."""
+    while words and (words[0] in _SKIP or _ASSIGN.match(words[0])):
+        del words[0]
+    if not words:
         return None
-    token = args[0]
-    rest = command.strip()[len(token) :].lstrip()
-    tail = f" {rest}" if rest else ""
-    if token == "dadaia" or token.endswith(".dadaia/.venv/bin/dadaia"):
-        corrected = fix_line(None) + tail
+    word = words[0].replace("\\", "/")
+    name = word.rsplit("/", 1)[-1]
+    suffix = platform.PLATFORM.venv_exe_suffix
+    stem = name.removesuffix(suffix)
+    if stem == "dadaia":
+        tool = "dadaia"
     elif (
-        token in _PYTHON_NAMES
-        and args[1:2] == ["-m"]
-        and len(args) >= 3
-        and _is_dadaia_module(args[2])
+        stem in {"python", "python3"}
+        and words[1:2] == ["-m"]
+        and words[2:3]
+        and words[2].split(".")[0] == "dadaia_workspace"
     ):
-        corrected = venv_line(None, "python", *args[1:])
+        tool = "python"
     else:
         return None
-    return (
-        "[VENV GUARD] This command must run from the workspace venv "
-        f"({venv_bin}). Blocked:\n"
-        f"  {command.strip()}\n"
-        f"fix: {corrected}"
-    )
-
-
-def _is_dadaia_module(module: str) -> bool:
-    return module == "dadaia_workspace" or module.startswith("dadaia_workspace.")
+    rooted = word.endswith(venv_bin + name) and name.endswith(suffix)
+    return None if rooted else tool
