@@ -8,7 +8,9 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
-from tests.helpers.worktree_ws import approve, commit, git, make_workspace, run
+import pytest
+
+from tests.helpers.worktree_ws import approve, commit, fixes, git, make_workspace, run
 
 
 def test_a_define_merge_runs_the_doctor_fenced_to_its_tree(tmp_path: Path) -> None:
@@ -28,3 +30,25 @@ def test_a_define_merge_runs_the_doctor_fenced_to_its_tree(tmp_path: Path) -> No
     approve(root, git(tree, "rev-parse", "HEAD").strip(), at="T11:00:00Z")
     landed = run(root, "merge", str(tree))
     assert landed.returncode == 0, landed.stderr
+
+
+DOCTOR_FIX = "fix: dadaia doctor --fix --specs-dir specs"
+RED_DOCTOR = 'sys.exit(os.path.exists(os.path.join(specs, "RED-doctor")))'
+
+
+@pytest.mark.xfail(strict=True, raises=AssertionError, reason="trio-status-canon-judged-outside-the-define-merge-gate")  # fmt: skip
+def test_a_red_doctor_refuses_once_with_its_own_fix_line(tmp_path: Path) -> None:
+    (root := tmp_path / "ws").mkdir()
+    make_workspace(root)
+    cli = root / ".dadaia/.venv/bin/dadaia"
+    red = f'print("[error] SPEC-DOC-004 bad Status", "{DOCTOR_FIX}", sep="\\n"); sys.exit(1)'
+    assert RED_DOCTOR in cli.read_text()
+    cli.write_text(cli.read_text().replace(RED_DOCTOR, red))
+    git(root / "repos/r", "checkout", "-q", "feature/0.5.0")
+    assert run(root, "new", "r", "0.5.0-rc1/define").returncode == 0
+    tree = root / "worktrees/r/0.5.0-rc1/define"
+    approve(root, commit(tree, "specs/notes", ""))
+    refused = run(root, "merge", str(tree))
+    assert refused.returncode == 1
+    assert fixes(refused) == [DOCTOR_FIX]
+    assert refused.stderr.count("[error]") == 1
