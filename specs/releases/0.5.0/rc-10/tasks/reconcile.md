@@ -85,11 +85,29 @@ Paths are relative to the repo root; aliases as in `PLAN.md` (`f/`, `pub/`, `S/`
 |---|---|---|---|
 | JR.S9.T1 | AC6.0 | `dadaia_workspace/public/skills/dd-gitflow-default/scripts/_worktree_end.py` (`_declared` reads the law as UTF-8 whatever the locale), `dadaia_workspace/public/templates/repo-AGENTS.md` (the default drops `**/*Test.*`; `**/test/**` keeps Maven's `src/test/`), `dadaia_workspace/cli/commands/specs.py` (the `[declared]` line names the default and asks to narrow it), `dadaia_workspace/public/entities/behavior-map.json` (re-recorded in this task) | JR.S8.T1's rows; resolves the three bugs |
 
-## Stage JR.S10 — the eval and closure
+## Stage JR.S10 — RED amendment (review REJECTED 90ca2c78c)
+
+- Contract: a RED-stage amendment (ADR 0209) approved by operator delegation ("Delego: APPROVED do revisor basta (Recommended)", 2026-10-06); bugs registered from the reviewer's reproduced findings by delegation. Tests only; new RED rows `xfail(strict=True, raises=AssertionError)`; the amendments are named. Exit: the rows xfail at HEAD; ACs AC6.0
+
+| task | AC | `W:` | owner tests / RED |
+|---|---|---|---|
+| JR.S10.T1 | AC6.0 | `tests/public/skills/dd_gitflow_default/scripts/test__worktree_end.py` (`test_a_tests_line_after_a_bom_is_declared_when_git_output_decodes_as_cp1252` is replaced by a row at the subprocess boundary: real git, the text decoding of a call that names no encoding forced to cp1251 and to cp932, `_declared` returns the literal `x/**`), `tests/features/specs/test_canon__scaffold_repo_law.py` (the shipped default freezes `Foo.Tests/FooTest.cs` and `app/src/androidTest/a/FooTest.kt`), `tests/cli/commands/test_specs.py` (a latin-1 law: `specs init` exits 0 and the law gains the line; the `'narrow' in echo` text assert leaves, the `default in echo` assert stays) | bugs `skill-git-output-decodes-with-the-locale`, `declared-echo-rereads-the-law`, `default-tests-globs-under-match-dotnet-android`; the replaced row and the dropped text assert are amendments by the delegation |
+
+## Stage JR.S11 — fixes (review REJECTED 90ca2c78c)
+
+- Contract: exit the JR.S10 rows green, CI green; envelope as the rows; ACs AC6.0
+
+| task | AC | `W:` | owner tests / RED |
+|---|---|---|---|
+| JR.S11.T1 | AC6.0 | `dadaia_workspace/public/skills/dd-gitflow-default/scripts/_worktree_git.py` (`git()` decodes UTF-8, the one seam), `dadaia_workspace/public/skills/dd-gitflow-default/scripts/_worktree_end.py` (`_declared` drops the cp1252 strip), every other `text=True` subprocess call without an encoding under `dadaia_workspace/public/skills/*/scripts/` (the class sweep) | JR.S10.T1's boundary row; resolves `skill-git-output-decodes-with-the-locale` and reopens nothing; sweep `grep -rn 'text=True' dadaia_workspace/public/skills/*/scripts/*.py \| grep -v encoding` prints nothing |
+| JR.S11.T2 | AC6.0 | `dadaia_workspace/features/specs/canon.py` (one reader of the template's default `tests:` line, used by `declare_tests_line` and named for the CLI), `dadaia_workspace/cli/commands/specs.py` (the echo prints that default and never reads the law), `dadaia_workspace/public/templates/repo-AGENTS.md` (the default adds `**/*.Tests/** **/androidTest/**`) | JR.S10.T1's canon and specs rows; resolves `declared-echo-rereads-the-law`, `default-tests-globs-under-match-dotnet-android` |
+| JR.S11.T3 | — | `dadaia_workspace/public/entities/behavior-map.json` (re-recorded after T1 and T2 land, in its own task tree) | `tests/infrastructure/test_entity_doctor.py` |
+
+## Stage JR.S12 — the eval and closure
 
 - Contract: exit tests `release.py check` in CLOSURE, `bugs.py status` `0 open`, eval.yml green on `feature/0.5.0` (AC11.6); envelope `specs/memory/QUALITY.md`, `specs/releases/0.5.0/_RELEASE.json`, `specs/backlog/**`, this rc's job files; ACs AC10.2, AC10.4, AC11.6
 
 | task | AC | `W:` | owner tests / RED |
 |---|---|---|---|
-| JR.S10.T1 | AC11.6, AC10.4 | `specs/memory/QUALITY.md` (the eval verdict line of the rerun), `specs/releases/0.5.0/_RELEASE.json` (the rerun's note), `specs/backlog/**` (`agent-behavior-evals` exits `delivered --release 0.5.0`; ADR 0220 cited where the multi-platform entry says its ADR has no id) | `release.py check`, `backlog.py check` |
-| JR.S10.T2 | — | this file | close task, last: behavior map and derived docs; `test-audit: no test touched`, `mutation: skipped — no Python source`; `done` |
+| JR.S12.T1 | AC11.6, AC10.4 | `specs/memory/QUALITY.md` (the eval verdict line of the rerun; the `## Bugs` review bullets restated as standing facts — causes and verdicts, no relative time, no pending line), `specs/releases/0.5.0/_RELEASE.json` (the rerun's note), `specs/backlog/**` (`agent-behavior-evals` exits `delivered --release 0.5.0`; ADR 0220 cited where the multi-platform entry says its ADR has no id) | `release.py check`, `backlog.py check` |
+| JR.S12.T2 | — | this file | close task, last: behavior map and derived docs; `test-audit: no test touched`, `mutation: skipped — no Python source`; `done` |
