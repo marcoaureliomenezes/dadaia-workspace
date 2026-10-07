@@ -218,7 +218,6 @@ def test_a_shared_disposition_requires_the_same_evidence_in_both_ledgers(
     assert shared == {"superseded": ("release",) * 2, "rejected": ("reason",) * 2}
 
 
-@pytest.mark.xfail(strict=True, raises=AssertionError, reason="skill-script-root-walks-ignore-the-fence")  # fmt: skip
 def test_the_ledger_walk_skips_a_fenced_root(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:  # fmt: skip
     """ADR 0088: no dadaia process acts on a fenced root, the privacy lookup included."""
     import importlib.util
