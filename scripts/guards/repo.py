@@ -461,7 +461,7 @@ def release_workflow_canon(tree: Tree) -> list[str]:
 
 _SECTIONS = {
     "ARCHITECTURE.md": (["Principles", "Tech Stack", "Structure"], "slop-code"),
-    "QUALITY.md": (["Principles", "Test architecture", "Gates"], "slop-tests"),
+    "QUALITY.md": (["Principles", "Test architecture", "Gates", "Bugs"], "slop-tests"),
 }
 _TOP = re.compile(r"^## (.+?)\s*$", re.M)
 _HISTORY = re.compile(r"^#{1,6}\s*(Changelog|History|Hist[oó]rico|Versions)\b", re.M | re.I)
