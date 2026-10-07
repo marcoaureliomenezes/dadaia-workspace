@@ -40,7 +40,8 @@ Rationale: a model call on a PR path fails closed without the paid key and expos
 
 ## Test architecture
 
-- Size tiers: unit and contract SMALL, integration MEDIUM, E2E LARGE (Python journeys), live Codex-binary validation opt-in outside CI.
+- Size tiers `small` (10 s: no process, no real git), `medium` (60 s: reaches a process or real git) and `e2e` (120 s: a journey in `tests/e2e/**` naming its `Owner:`), read from what a test reaches by `tests/conftest.py`, never from its folder; a small test that starts a process fails (`small-spawns-no-process`); live Codex-binary validation is opt-in outside CI.
+- `tests/<p>/test_<m>.py` mirrors `dadaia_workspace/<p>/<m>.py`, a second file for a module is `test_<m>__<topic>.py` (`tests-mirror-the-package`).
 - The suite is hermetic; `tests/conftest.py` blocks a real Codex call without its live flag and fakes `ensure_workspace_venv`.
 - `tests/conftest.py` prepends this checkout to `PYTHONPATH` once for the whole session, so every spawned CLI/hook subprocess imports the worktree under test, never the venv's installed package.
 - Every guard check enumerates one set — `scripts/guards/run.py`'s `tracked()` over `git ls-files` — so a scratch file another process writes is outside the measurement by construction.
@@ -53,8 +54,8 @@ Rationale: a model call on a PR path fails closed without the paid key and expos
 
 ## Gates
 
-- CI runs ruff and `lint-imports`, mypy `--strict`, the guards (`scripts/guards/run.py`, plain and `--planted`), unit and contract tiers with Windows/macOS subsets and an importability smoke, integration, Python E2E, repo hygiene, `dadaia doctor` over the checked-out tree, PR governance and gitleaks — every PR job a required status check listed in `.github/required-checks.json` (`required-checks-listed`), gitleaks included; no job calls a model API (P-33) except `.github/workflows/eval.yml`, the one exception (ADR 0217).
-- Push triggers are `main`, `develop` and `feature/**`; PRs to `develop` or `main` run the same matrix.
+- CI runs ruff and `lint-imports`, mypy `--strict`, the guards (`scripts/guards/run.py`, plain and `--planted`), the small tier on Linux, the `not e2e` coverage run on Linux, Windows and macOS, the small tier again on Windows and macOS with an importability smoke, the medium tier, Python E2E, repo hygiene, `dadaia doctor` over the checked-out tree, PR governance and gitleaks — every PR job a required status check listed in `.github/required-checks.json` (`required-checks-listed`), gitleaks included; no job calls a model API (P-33) except `.github/workflows/eval.yml`, the one exception (ADR 0217).
+- Push triggers are `main`, `develop`, `feature/**` and `wt/**`; PRs to `develop` or `main` run the same matrix.
 - `pr-source-guard` is fail-closed; the security review of both PR edges is the `dd-code-reviewer` security lens on the PR head, run by the main thread before the PR.
 - Every review verdict states the bug-surface delta from `bugs.py stats`, and no deploy is approved without the consumer-side matrix.
 - Caches redirect by configuration, never by a remembered flag: `[tool.pytest.ini_options] addopts` (`-p no:cacheprovider`), hypothesis `database = None`, and ruff and mypy write to the absolute `.dadaia/tmp/<tool>-cache` that every harness env exports (`workspace_layout.TOOL_CACHE_ENV`); a bare `pytest`, `ruff check`, `ruff format --check`, `mypy --strict` from any cwd leaves the tree clean (`tests/infrastructure/test_runtime_config__tool_caches_stay_in_the_tmp_zone.py`).
@@ -62,7 +63,7 @@ Rationale: a model call on a PR path fails closed without the paid key and expos
 - Memory-vs-code drift is a `dadaia doctor` `specs`-section WARNING (`MEM-DRIFT-1` for the features package map, `MEM-DRIFT-2` for a dead `dadaia <verb>` or path an atom cites), never a push-gated test: a package added or a verb deleted mid-implementation is memory drift to fix at the next closure, not a red build.
 - A citation of a superseded decision is an ERROR (`ADR-SUPERSEDED-CITATION`): a rule pointing at a dead ADR fails the build.
 - A doctor fix is proven on the executed path: `tests/cli/commands/test_doctor.py` executes every specs rule's fix line against a planted finding and re-runs the rule, which must then emit nothing, never the fixer's return value; the `ledgers` section delegates to each ledger's skill script (`tests/infrastructure/test_ledger_scripts__doctor_ledgers_delegate_to_scripts.py`); a schema drop ships with its repair and its test in the same change.
-- The closed pytest marker set is eight — unit, contract, integration, e2e, slow, tmp, flaky, quarantine (P-28).
+- The closed pytest marker set is seven — e2e, small, medium, slow, tmp, flaky, quarantine (P-28).
 - Every `ci.yml` checkout fetches full history (`ci-checkout-history`); `release.yml`'s build and `secret-scan.yml` fetch full history; no job fetches history for a bug record's sake.
 
 - Repo-pure ratchets move only downward and run as `scripts/guards/run.py` checks: `suite.py` holds `private-import-ratchet` (V26, P-23); `slop.py` holds V32 (governance ids in production comments and docstrings), V33 (`PREFIX-NN` families without a mechanical reader) and `ignore-cap` (suppressed layering edges, P-10) as pinned counts, V37 (one home per definition), V38 (deletes only in `features/spec_context/sweep.py`) and V39 (every doctor code has a fix-clears case) as keyed allowances whose keys stay within their birth keys, and V40 (every JSONL ledger read through the one reader) at zero; no check pins a file's line or byte count (`no-size-pin`, ADR 0143).
