@@ -44,7 +44,7 @@ memory atom under its content hash.
 
 ## A human installs and uses it
 
-<!-- derived-from: pypi-distribution sha256:a97f549efcdb -->
+<!-- derived-from: pypi-distribution sha256:a360b84790ff -->
 <!-- derived-from: workspace-init sha256:4f0ceaccc6c8 -->
 <!-- derived-from: context-management sha256:2d908837d9f6 -->
 <!-- derived-from: workspace-doctor sha256:8b2f7d91f08a -->
@@ -133,7 +133,7 @@ hotfix job with a RED test, any other in the candidate's bug batch. Completed wo
 
 ## Documentation
 
-<!-- derived-from: pypi-distribution sha256:a97f549efcdb -->
+<!-- derived-from: pypi-distribution sha256:a360b84790ff -->
 <!-- derived-from: public-asset-distribution sha256:6bf6a440301e -->
 
 The documentation is the repository's [docs folder](https://github.com/marcoaureliomenezes/dadaia-workspace/tree/main/docs):
@@ -149,7 +149,7 @@ The documentation is the repository's [docs folder](https://github.com/marcoaure
 
 ## Links
 
-<!-- derived-from: pypi-distribution sha256:a97f549efcdb -->
+<!-- derived-from: pypi-distribution sha256:a360b84790ff -->
 
 - GitHub — <https://github.com/marcoaureliomenezes/dadaia-workspace>
 - PyPI — <https://pypi.org/project/dadaia-workspace/>

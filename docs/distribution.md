@@ -4,7 +4,7 @@ Where dadaia-workspace is published and what each channel carries.
 
 ## Channels
 
-<!-- derived-from: pypi-distribution sha256:a97f549efcdb -->
+<!-- derived-from: pypi-distribution sha256:a360b84790ff -->
 
 | channel | artifact | how it is published |
 |---|---|---|
@@ -15,7 +15,7 @@ Where dadaia-workspace is published and what each channel carries.
 
 ## The PyPI metadata contract
 
-<!-- derived-from: pypi-distribution sha256:a97f549efcdb -->
+<!-- derived-from: pypi-distribution sha256:a360b84790ff -->
 
 Every field PyPI renders has exactly one home:
 
@@ -36,12 +36,12 @@ Every field PyPI renders has exactly one home:
 
 ## What the wheel carries
 
-<!-- derived-from: pypi-distribution sha256:a97f549efcdb -->
+<!-- derived-from: pypi-distribution sha256:a360b84790ff -->
 
 The wheel ships `dadaia_workspace/` with the full `public/` tree (`.dadaia/.venv/bin/dadaia init` still
-resolves the workspace venv's dependencies from PyPI), and
-`scripts/CONSUMER_VALIDATION_RECIPE.md`, the matrix run against
-every candidate wheel before a deploy. It installs one CLI under two console-script
+resolves the workspace venv's dependencies from PyPI). It does not ship the
+consumer-validation recipe: that lives in `scripts/CONSUMER_VALIDATION_RECIPE.md`, the
+developer's matrix run against every candidate wheel before a deploy. It installs one CLI under two console-script
 names, `dadaia` and `dadaia-workspace`. Consumer-validation candidate wheels are
 throwaway and never mint a published version; a venv bootstrap installs the running
 distribution itself, and `DADAIA_BOOTSTRAP_PACKAGE=<wheel>` makes it install a named
