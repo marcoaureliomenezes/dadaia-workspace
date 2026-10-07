@@ -93,6 +93,7 @@ _KEYS = {
 }
 
 
+@pytest.mark.medium
 def test_context_json_key_sets_are_unchanged(workspace: Path) -> None:
     _register_alive_ctx(workspace)
     listed = _runner.invoke(app, ["context", "list", "--json"])

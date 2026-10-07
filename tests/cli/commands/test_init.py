@@ -91,6 +91,7 @@ def test_a_failed_denylist_conversion_leaves_the_operator_terms_in_place(
         assert not list((ws / ".dadaia" / "reaped").rglob("privacy_denylist.json"))
 
 
+@pytest.mark.medium
 def test_an_upgrade_leaves_no_reconcile_scratch_and_rewrites_only_a_differing_hook(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

@@ -33,6 +33,7 @@ def no_instance(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     return tmp_path
 
 
+@pytest.mark.medium
 def test_explicit_specs_dir_is_read_with_no_instance_around(no_instance: Path) -> None:
     specs = no_instance / "specs"
     scaffold(specs, project_name="bare", force=False, public_dir=_TEMPLATES_DIR.parent)

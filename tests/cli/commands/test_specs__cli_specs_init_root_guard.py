@@ -33,6 +33,7 @@ def test_specs_init_refuses_workspace_root_default(workspace_root: Path) -> None
     assert "Root Law" in out or "specs-dir" in out or "bind" in out.lower()
 
 
+@pytest.mark.medium
 def test_specs_init_explicit_specs_dir_still_works(workspace_root: Path) -> None:
     target = workspace_root / "repos" / "proj" / "specs"
     result = _runner.invoke(app, ["specs", "init", "--specs-dir", str(target)])

@@ -13,6 +13,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import pytest
 from typer.testing import CliRunner
 
 from dadaia_workspace.cli.main import app
@@ -54,6 +55,7 @@ def _make_minimal_specs(root: Path) -> Path:
     return specs
 
 
+@pytest.mark.medium
 def test_doctor_clean_tree_then_remove_backlog_then_fix_recreates_then_no_fix_never_mutates(
     tmp_path: Path,
 ) -> None:
@@ -91,6 +93,7 @@ def test_doctor_clean_tree_then_remove_backlog_then_fix_recreates_then_no_fix_ne
     assert not arch.exists(), "Without --fix, missing files must NOT be created"
 
 
+@pytest.mark.medium
 def test_tree8_stray_root_folder_errors_and_fix_keeps_it(tmp_path: Path) -> None:
     """TREE-8 is ERROR and never auto-fixed (bug doctor-fix-tree8-deletes-operator-
     content, decision D8): a non-canon top-level folder flips the exit code non-zero,
