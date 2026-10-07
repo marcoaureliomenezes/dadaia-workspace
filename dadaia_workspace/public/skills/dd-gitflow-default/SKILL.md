@@ -3,8 +3,7 @@ name: dd-gitflow-default
 description: >
   The three-branch contract whenever git is touched: when to start work, which
   branch to cut, how a release rides it, the isolated commit shapes, and what gates
-  a push. Use when branching, committing, opening a PR, starting a task, or minting
-  a version.
+  a push. Use when branching, committing, opening a PR, or starting a task.
 ---
 
 # dd-gitflow-default — The Branch Contract
@@ -14,7 +13,7 @@ The branch contract by role; the names are `specs/constitution.md`'s `gitflow:` 
 ## 1. When
 
 - Start of any session touching git.
-- Branching, committing, opening a PR, starting a task, or minting a version.
+- Branching, committing, opening a PR, or starting a task.
 - Any bug fix (`dd-bug-resolution`).
 
 ## 2. Steps
@@ -24,7 +23,7 @@ The branch contract by role; the names are `specs/constitution.md`'s `gitflow:` 
 3. Identify the one live work branch `<work>M.m.p`.
 4. Surface a work branch predating the integration branch's last move to the operator first — it is stale.
 5. Branch count, cut point and name follow §2a.
-6. Definition stage: author the candidate's SPEC/PLAN/TASKS in its `rc-<N>/` on the work branch.
+6. Definition stage: where a candidate is defined is `specs/releases/AGENTS.md`'s.
 7. Implementation stage: one commit per task, shaped per §3a.
 8. Candidate closure: open one work → integration PR and merge it green.
 9. After the merge, ask the operator: **promote or continue?** Continue = the next candidate's `python3 .agents/skills/dd-release-implementation/scripts/release.py new <id>`; promote = step 10.
@@ -40,12 +39,11 @@ The branch contract by role; the names are `specs/constitution.md`'s `gitflow:` 
 | job `wt/<M.m.p>-rc<N>/<job>` | Yes — valid name | work | its worktree merge (`worktrees/AGENTS.md` §2) |
 | backlog `wt/backlog/<slug>` | Yes | work | its worktree merge (`worktrees/AGENTS.md` §2) |
 | task `wt/<M.m.p>-rc<N>/<job>--<task-id>` | No | its job branch | its worktree merge (`worktrees/AGENTS.md` §2) (its task gate) |
-| integration | No — never a direct push | principal (bootstrap only) | PR from the row above, at definition `Approved` and at each `rc` merge |
+| integration | No — never a direct push | principal (bootstrap only) | PR from the row above, one per candidate |
 | principal | No — never a direct push | — | PR from the integration branch, at the final `rc` |
 
 - No `v` prefix, no suffix, no other branch we cut; no `hotfix/*` branch (a hotfix is a job, bugs law §2).
 - Exactly one live work branch, named for the live release; a job — a bug fix included — reaches it through its own worktree (`worktrees/AGENTS.md` §1).
-- Each candidate closure burns one work -> integration merge; after it, ask the operator: promote or continue.
 - Every flow stage runs on the work branch; the other two are PR targets only, never a working branch.
 
 ## 3a. Commit shapes — each write in its own shape
@@ -71,6 +69,7 @@ A job and its task trees hold code, tests, specs, memory and derived docs alike 
 ## 3b. The PR gate
 
 - Both PR edges require the repo's `verify:` line green and a `dd-code-reviewer` APPROVED verdict, security lens included, on the PR head.
+- The reviewer's verdict is pasted verbatim into the PR as a quote by the main thread; no script gates it and no handoff is written for it.
 
 ## 4. Done when
 
