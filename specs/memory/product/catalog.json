@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-10-07T05:40:11Z",
+  "generated_at": "2026-10-07T16:32:36Z",
   "features": [
     {
       "rank": 1,
@@ -836,7 +836,7 @@
         "no-locks",
         "privacy"
       ],
-      "token_estimate": 2655,
+      "token_estimate": 2735,
       "depends_on": [
         "workspace-doctor",
         "context-management",
