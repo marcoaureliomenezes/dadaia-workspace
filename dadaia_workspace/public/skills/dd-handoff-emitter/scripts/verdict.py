@@ -1,4 +1,4 @@
-"""Write the reviewer's verdict handoff, bound to the sha and diff it judged (ADR 0218)."""
+"""Write the reviewer's verdict handoff, bound to the sha and diff it judged."""
 
 from __future__ import annotations
 

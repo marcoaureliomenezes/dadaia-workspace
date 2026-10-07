@@ -1,7 +1,7 @@
 """Venv-determinism PreToolUse policy: every command of a Bash line is judged. One whose first
 word (past ``NAME=value`` and reserved words) is a ``dadaia`` or ``python[3] -m dadaia_workspace``
 not ending in the workspace venv path is BLOCKED with one ``fix:``; any other shape (``pip``
-included, ADR 0134) or an unparseable payload is ALLOWED. Caveats: bash syntax only (Git Bash on
+included) or an unparseable payload is ALLOWED. Caveats: bash syntax only (Git Bash on
 Windows loses an unquoted ``C:\\x`` path's backslashes as bash does); not judged: PowerShell,
 ``$(...)``, backticks, ``bash -c``, ``env``/``xargs``/``sudo``/``exec``, heredocs, ``time -p``;
 a quoted operator-only argument reads as a boundary (a false block)."""

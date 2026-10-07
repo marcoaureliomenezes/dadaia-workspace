@@ -233,7 +233,7 @@ def _series(tree: Path, work: str, tip: str) -> list[tuple[str, str]]:
 
 def _check_approved(root: Path, tree: Path, work: str, name: str) -> None:
     """The newest dd-code-reviewer handoffs whose `reviewed_sha` is a candidate sha decide: each must
-    be a valid APPROVED (ADR 0110) whose `diff_sha256` is HEAD's (ADR 0218), read from the handoff
+    be a valid APPROVED whose `diff_sha256` is HEAD's, read from the handoff
     zone and from the reaper's hold of it. A candidate is a sha X of this branch's reflog whose (patch-id, message)
     series over *work*..X equals HEAD's, in order (ADR 0168); X == HEAD is the degenerate case;
     the reflog's base (series []) matches only an empty branch. Newest is the schema-required
