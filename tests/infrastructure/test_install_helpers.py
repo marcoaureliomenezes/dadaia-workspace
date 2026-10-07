@@ -24,6 +24,8 @@ from dadaia_workspace.infrastructure.runtime_transforms.codex_assets import (
     _parse_agent_frontmatter,
 )
 
+_BUG = "merge-gate-accepts-verdict-written-by-the-merger"
+
 _GENERIC_BODY = (
     "---\n"
     "name: dd-software-engineer\n"
@@ -128,6 +130,22 @@ def test_privilege_derives_from_read_only_on_both_harnesses(
     md.write_text(body, encoding="utf-8")
     toml = codex_agent_toml_bytes(md, "dd-software-engineer", resolved).decode("utf-8")
     assert f'sandbox_mode = "{sandbox}"' in toml
+
+
+@pytest.mark.xfail(strict=True, raises=AssertionError, reason=_BUG)
+def test_a_read_only_persona_gets_the_workspace_write_codex_sandbox(tmp_path: Path) -> None:
+    """merge-gate-accepts-verdict-written-by-the-merger: the reviewer (read_only: true) runs
+    ``verdict.py`` on Codex, so its sandbox is workspace-write (operator ruling 2026-10-07);
+    Claude still denies its edit tools."""
+    body = _GENERIC_BODY.replace("read_only: false", "read_only: true")
+    resolved = ResolvedAgentModel(model="claude-sonnet-5", effort="high", source="default")
+    fm = render_claude_agent(body, resolved).split("---\n", 2)[1].splitlines()
+    assert "permissionMode: default" in fm
+    assert "disallowedTools: [Edit, Write, NotebookEdit]" in fm
+    md = tmp_path / "dd-software-engineer.md"
+    md.write_text(body, encoding="utf-8")
+    toml = codex_agent_toml_bytes(md, "dd-software-engineer", resolved).decode("utf-8")
+    assert 'sandbox_mode = "workspace-write"' in toml
 
 
 @pytest.mark.parametrize(
