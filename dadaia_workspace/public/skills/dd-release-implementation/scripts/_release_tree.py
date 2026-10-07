@@ -233,7 +233,7 @@ def _memory_tasks(marks: list[re.Match[str]], tasks: Path, dir_rel: str) -> list
     """A task whose `W:` writes `specs/memory`: memory is closure procedure, never a task."""
     fix = f"Operator action: drop the specs/memory path from that task's `W:` in {tasks}"
     return [finding(f"{dir_rel}/{tasks.parent.name}/TASKS.md", 1, f"task {line[:80]!r} writes "
-                    "specs/memory — memory is closure procedure (RC-FLOW step 5)", fix)
+                    "specs/memory — memory is closure procedure (RC-FLOW step 4)", fix)
             for line in (m[0].strip() for m in marks)
             if any(p.split("/")[:2] == ["specs", "memory"] for p in writes(line))]  # fmt: skip
 

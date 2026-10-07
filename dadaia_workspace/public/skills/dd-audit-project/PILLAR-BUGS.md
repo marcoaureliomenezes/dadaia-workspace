@@ -3,7 +3,7 @@
 Disclosed sibling of `SKILL.md`, pillar 1. Input: every `BUGS.jsonl` record whose `ts` or `closed_at` falls inside the window.
 Window definition: `SKILL.md` §1.
 
-- A record carries no commit sha: attribute a fix by `python3 .agents/skills/dd-bug-resolution/scripts/bugs.py fix <bug-id>`.
+- A record carries no commit sha: attribute a fix by `python3 .agents/skills/dd-bug-resolution/scripts/bugs.py fix <bug-id> --specs specs`.
 - `bugs.py fix` diffs every linked commit, a shape-4 task commit included, and prints each fix's rework by class and its settled surface; a release-squash or ledger-only commit is no fix and stays unlinked.
 
 ## Recurrence and fix-induced bugs — operational, not adjectival
