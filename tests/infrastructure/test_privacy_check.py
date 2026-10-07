@@ -117,6 +117,22 @@ def test_public_source_names_no_retired_surface(
     assert _denied_lines(globs, pattern, spare) == []
 
 
+_PRIVATE_PIPELINE = (
+    r"(?i)\bci[_ -]?(green|matrix|run|status)\b|green ci|watch ci|github\.com|\bgh (pr|run|api)\b"
+    r'|"gh"|dependabot|codeql|pip-audit|\bpoetry\b|\bmypy\b|\bruff\b|xfail|workflow_dispatch'
+    r"|self-hosted"
+)
+
+
+@pytest.mark.xfail(strict=True, reason="public law still names the private pipeline")
+def test_public_law_names_no_private_pipeline() -> None:
+    """public-law-teaches-the-private-pipeline: shipped text names no remote CI or one-stack tool."""
+    globs = tuple(f"public/**/*.{s}" for s in ("md", "json", "py", "sh")) + (
+        "features/chokepoints/*.py",
+    )
+    assert _denied_lines(globs, _PRIVATE_PIPELINE, None) == []
+
+
 _BARE_CLI_RE = re.compile(r"(?<![\w./-])dadaia(?:-workspace)?(?= [a-z-])")
 _UVX_INIT_RE = re.compile(r"uvx dadaia-workspace(?:@\S+)? init\b")
 _VENV_CALL_RE = re.compile(r"\.dadaia/\.venv/bin/dadaia((?: [a-z][\w-]*)+)([^`]*)")
