@@ -15,6 +15,7 @@ from typer.testing import CliRunner
 
 from dadaia_workspace.cli.main import app
 from dadaia_workspace.core import workspace_layout
+from dadaia_workspace.core.cli_line import fix_line
 from dadaia_workspace.core.harness_registry import L1_ENTRY_HARNESSES
 from dadaia_workspace.core.platform import PLATFORM
 from dadaia_workspace.features.workspace.service import WorkspaceService
@@ -89,5 +90,4 @@ def test_doctor_names_the_onboarding_step_of_the_context_it_judges(
     assert code is None or result.exit_code == code, result.output
     assert "SPEC-DOC" not in result.output
     assert code != 1 or result.output.count("fix: ") == 1, result.output  # a refusal: one fix line
-    cli = workspace / ".dadaia" / ".venv" / PLATFORM.venv_scripts_dir / "dadaia"
-    assert f"{cli}{PLATFORM.venv_exe_suffix} " in result.output
+    assert f"{fix_line(workspace)} " in result.output
