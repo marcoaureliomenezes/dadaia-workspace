@@ -35,6 +35,7 @@ from pathlib import Path
 import pytest
 
 from dadaia_workspace.container import scan_publish_candidates
+from dadaia_workspace.core.cli_line import shell_line
 from dadaia_workspace.core.exceptions import ContextStateError, RepoUrlMissingError
 from dadaia_workspace.core.models.spec_context import (
     AssociatedRepo,
@@ -155,13 +156,13 @@ _REFUSALS = [
     pytest.param("main", _side_branch, DeadUnpushedCommitsError, r"fix: git -C \S+ -c \S+ push origin topic:refs/tags/archive/topic/[0-9a-f]{7}$", id="C3-side-branch-main"),
     pytest.param("lib", _side_branch, DeadUnpushedCommitsError, r"fix: git -C \S+ -c \S+ push origin topic:refs/tags/archive/topic/[0-9a-f]{7}$", id="C4-side-branch-lib"),
     pytest.param("main", _worktree, DeadUnpushedCommitsError, r"fix: git -C \S+ worktree remove ", id="C2-registered-worktree"),
-    pytest.param("lib", partial(_wt, checked_out=True), DeadUnpushedCommitsError, rf"fix: {re.escape(sys.executable)} \S+worktree\.py merge \S+/worktrees/lib/0\.5\.0-rc1/j1$", id="AC1.10-open-wt-worktree"),
-    pytest.param("main", partial(_wt, checked_out=False), DeadUnpushedCommitsError, rf"fix: {re.escape(sys.executable)} \S+worktree\.py merge \S+/worktrees/main/0\.5\.0-rc1/j1$", id="AC1.10-unpushed-orphan-wt"),
+    pytest.param("lib", partial(_wt, checked_out=True), DeadUnpushedCommitsError, rf"fix: {re.escape(shell_line(sys.executable))} \S+worktree\.py merge \S+/worktrees/lib/0\.5\.0-rc1/j1$", id="AC1.10-open-wt-worktree"),
+    pytest.param("main", partial(_wt, checked_out=False), DeadUnpushedCommitsError, rf"fix: {re.escape(shell_line(sys.executable))} \S+worktree\.py merge \S+/worktrees/main/0\.5\.0-rc1/j1$", id="AC1.10-unpushed-orphan-wt"),
     pytest.param("main", lambda r: (r.parents[1] / ".dadaia/.venv" / PLATFORM.venv_scripts_dir / f"dadaia{PLATFORM.venv_exe_suffix}").unlink(), DeadUnpushedCommitsError, r"no workspace CLI[\s\S]*fix: uvx dadaia-workspace init \S+/ws$", id="AC1.10-rows-unreadable-fails-closed"),
     pytest.param("lib", lambda r: (r / "leftover.txt").write_text("x\n"), DeadReviewRequiredError, r"lib[\s\S]*leftover\.txt", id="A16.2-untracked-in-lib"),
     pytest.param("lib", lambda r: (r / "README.md").write_text("edited\n"), DeadReviewRequiredError, r"^Context 'proj': repo 'lib' has 1 uncommitted change\(s\); dead never commits", id="AC3.2-dirty-refusal-names-context-and-repo"),
     pytest.param("lib", _no_remote, DeadUnpushedCommitsError, "lib", id="A16.2-local-commits-no-remote-in-lib"),
-    pytest.param("main", _repos_outside, ContextStateError, r"skipped 'repos/main' \(outside the workspace\)\nfix: Operator action: free \S+/repos/main for the move", id="AC2.11-hold-refused"),
+    pytest.param("main", _repos_outside, ContextStateError, rf"skipped 'repos/main' \(outside the workspace\)\nfix: Operator action: free \S+{re.escape(str(Path('/', 'repos', 'main')))} for the move", id="AC2.11-hold-refused"),
     pytest.param("lib", _url_less, RepoUrlMissingError, r"fix: Operator action: add the clone URL of \S+/repos/lib as its origin remote", id="url-less-never-clone-back"),
 ]  # fmt: skip
 
