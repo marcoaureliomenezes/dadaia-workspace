@@ -67,3 +67,29 @@ def test_list_reports_a_directory_that_holds_no_tree(root: Path) -> None:
     assert [(r["state"], r["path"]) for r in rows if r["state"] != "empty"] == [
         ("unregistered", str(root / "worktrees/r/0.5.0-rc9"))
     ]
+
+
+def _push_upstream(root: Path, remote_name: str) -> Path:
+    remote = root.parent / f"{remote_name}.git"
+    git(root.parent, "init", "-q", "--bare", str(remote))
+    git(root / "repos/r", "remote", "add", remote_name, str(remote))
+    git(root / "repos/r", "push", "-q", "-u", remote_name, BRANCH)
+    return remote
+
+
+@pytest.mark.xfail(strict=True, raises=AssertionError, reason="worktree-removal-leaves-empty-parent-and-remote-branch")  # fmt: skip
+def test_a_merge_deletes_the_pushed_branch_on_a_non_origin_upstream(root: Path) -> None:
+    approve(root, land(root, "src/a.py"))
+    remote = _push_upstream(root, "mirror")
+    merged = run(root, "merge", f"worktrees/r/{JOB}")
+    assert merged.returncode == 0, merged.stderr
+    assert git(root.parent, "-C", str(remote), "branch", "--list", BRANCH).strip() == ""
+
+
+@pytest.mark.xfail(strict=True, raises=AssertionError, reason="worktree-removal-leaves-empty-parent-and-remote-branch")  # fmt: skip
+def test_a_refused_remote_delete_is_reported_with_its_fix_line(root: Path) -> None:
+    remote = _push_upstream(root, "origin")
+    git(root.parent, "-C", str(remote), "config", "receive.denyDeletes", "true")
+    cleaned = run(root, "clean", f"worktrees/r/{JOB}")
+    assert BRANCH in cleaned.stderr + cleaned.stdout
+    assert "fix: " in cleaned.stderr + cleaned.stdout
