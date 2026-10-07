@@ -59,7 +59,7 @@ def ws(tmp_path: Path) -> Path:
 def _run(ws: Path, harness: str, case: str, **env_extra: str) -> subprocess.CompletedProcess[str]:
     fixture, repos = (_FIXTURES / harness / f"{case}.json"), case == "repos"
     fixture = fixture.with_name("scope.json") if repos else fixture  # the scope write, in repos/
-    payload = fixture.read_text().replace("{ws}", str(ws))
+    payload = fixture.read_text().replace("{ws}", ws.as_posix())
     payload = payload.replace("worktrees/demo/0.5.0-rc1/j1/", "repos/demo/") if repos else payload
     if harness == "claude":
         argv = [str(own_venv_python(ws)), "-B", "-m", "dadaia_workspace.hooks.pre_gate"]
