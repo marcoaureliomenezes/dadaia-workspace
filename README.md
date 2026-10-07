@@ -104,7 +104,7 @@ a TTL expiry acts by zone class, an OUTPUT entry held, an EPHEMERAL one deleted.
 <!-- derived-from: harness-cursor sha256:f66b96a0ae77 -->
 <!-- derived-from: harness-devin sha256:a35113e51a30 -->
 <!-- derived-from: harness-copilot sha256:ed72a95f6297 -->
-<!-- derived-from: agent-comms sha256:02e5efa78c26 -->
+<!-- derived-from: agent-comms sha256:1e9c941e7d79 -->
 
 The always-on law is the root `AGENTS.md` map; every governed area carries its own
 scoped `AGENTS.md`, and every `dd-` skill touching an area opens that file first. The
