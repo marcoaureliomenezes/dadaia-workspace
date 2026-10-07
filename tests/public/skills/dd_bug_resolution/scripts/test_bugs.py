@@ -11,6 +11,7 @@ from __future__ import annotations
 import importlib.util
 import json
 import os
+import re
 import stat
 import subprocess
 import sys
@@ -1673,3 +1674,23 @@ def test_window_marks_a_record_whose_seam_file_is_gone(script: Path, tmp_path: P
         "release unknown:",
     ]
     assert _run(script, "check", "--specs", str(specs)).returncode == 0
+
+
+def test_check_reads_every_task_id_grammar_the_job_files_use(script: Path, tmp_path: Path) -> None:
+    """bugs-check-reads-no-jb-task-ids: a bug-batch (JB) and a reconcile (JR) task are causes too."""
+    records = [{**_OPEN_RECORD, "id": i, "caused_by": c}
+               for i, c in (("a-bug", "JB.S4.T2"), ("b-bug", "JR.S1.T1"))]  # fmt: skip
+    specs = _ledger(tmp_path, *records)
+    job = specs / "releases" / "0.5.0" / "rc-9" / "tasks" / "bug-batch.md"
+    job.parent.mkdir(parents=True)
+    job.write_text("| JB.S4.T2 | AC1.1 | `a.py` |\n| JR.S1.T1 | AC1.2 | `b.py` |\n", encoding="utf-8")
+    done = _run(script, "check", "--specs", str(specs), "--json")
+    assert (done.returncode, json.loads(done.stdout)) == (0, []), done.stdout
+
+
+def test_the_bugs_check_and_freeze_task_ids_are_one_grammar() -> None:
+    """ADR 0150: two stdlib skills keep a twin each; the freeze's id part is the bugs check's."""
+    sys.path.insert(0, str(_PUBLIC / "skills" / "dd-gitflow-default" / "scripts"))
+    freeze = load_owner("dd-gitflow-default", "_worktree_freeze")
+    check = load_owner("dd-bug-resolution", "_bugs_check")
+    assert re.sub(r"\(\?P<\w+>|\)|\\b", "", freeze._ID.pattern) == check.TASK_ID
