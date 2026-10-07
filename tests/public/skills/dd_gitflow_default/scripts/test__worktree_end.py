@@ -20,7 +20,7 @@ from pathlib import Path
 
 import pytest
 
-from tests.fixtures.harness_env import suite_env
+from tests.fixtures.harness_env import run_bash, run_python, suite_env
 from tests.helpers.release_state import write_release_phase
 from tests.helpers.skill_scripts import stage_skill_scripts
 from tests.helpers.worktree_ws import (
@@ -28,6 +28,7 @@ from tests.helpers.worktree_ws import (
     SCRIPT,
     TASK,
     approve,
+    cli_path,
     commit,
     fixes,
     git,
@@ -185,7 +186,7 @@ def test_merge_needs_a_valid_approval_of_the_exact_head(
     result = run(root, "merge", TREE)
     head = git(root / TREE, "rev-parse", "HEAD").strip()
     assert result.returncode == 1 and head in result.stderr
-    cli = str(root / ".dadaia/.venv/bin/dadaia")
+    cli = str(cli_path(root))
     assert _argv(result) == [cli, "reports", "validate", str(target)]
     assert git(root / "repos/r", "rev-parse", "feature/0.5.0").strip() != head
 
@@ -203,7 +204,7 @@ def test_failed_fast_forward_tells_a_stray_from_a_moved_work_branch(root: Path) 
         f"fix: Operator action: commit or remove the paths above in {repo}"
     ]
     (repo / "src/a.py").unlink()
-    cli = root / ".dadaia/.venv/bin/dadaia"  # a sibling lands while the verdict is read
+    cli = cli_path(root)  # a sibling lands while the verdict is read
     move = f"subprocess.run(['git', '-C', {str(repo)!r}, 'commit', '-qm', 'm', '--allow-empty'])"
     verdict = 'elif args[:2] == ["reports", "validate"]:\n'
     cli.write_text(cli.read_text().replace(verdict, f"{verdict}    import subprocess; {move}\n"))
@@ -239,8 +240,6 @@ def test_clean_removes_only_an_empty_worktree_of_ours(root: Path) -> None:
     assert foreign.returncode == 1 and (root / "worktrees/r/0.5.0-rc1/j2").exists()
 
 
-@pytest.mark.windows
-@pytest.mark.quarantine(bug="worktree-script-run-fails-winerror-193-on-windows")
 def test_release_closure_waits_for_every_other_wt(tmp_path: Path) -> None:
     """AC1.10 (F4); rc-9 AC1.5: closure runs in the Reconciliation job's tree, whose own wt/* is
     spared; any other wt/* refuses it, naming repos/<r> and the owner's exit — `clean` for an
@@ -262,14 +261,13 @@ def test_release_closure_waits_for_every_other_wt(tmp_path: Path) -> None:
     ):
         stage_skill_scripts(skill, tmp_path / "skills" / skill / "scripts")
     script = tmp_path / "skills/dd-release-implementation/scripts/release.py"
-    closure = [sys.executable, str(script), "phase", "CLOSURE", "--sha", "beef123"]
-    closure += ["--specs", str(specs)]
+    closure = [str(script), "phase", "CLOSURE", "--sha", "beef123", "--specs", str(specs)]
 
-    refused = subprocess.run(closure, cwd=root, capture_output=True, text=True)
+    refused = run_python(*closure, cwd=root)
     fix = refused.stderr.rsplit("fix: ", 1)[1].strip()
     assert "repos/r " in refused.stderr and fix.endswith(f"clean {root}/{TREE}")
-    subprocess.run(fix, shell=True, cwd=root, check=True)  # noqa: S602
-    assert subprocess.run(closure, cwd=root, capture_output=True).returncode == 0
+    run_bash(fix, cwd=root, check=True)
+    assert run_python(*closure, cwd=root).returncode == 0
 
 
 def test_a_verdict_carries_over_only_an_identical_patch_and_message_series(root: Path) -> None:
@@ -282,7 +280,7 @@ def test_a_verdict_carries_over_only_an_identical_patch_and_message_series(root:
     approve(root, approved := git(tree, "rev-parse", "HEAD").strip())
     commit(repo, "src/z.py")
     git(repo, "config", "color.ui", "always")
-    refusal = [str(root / ".dadaia/.venv/bin/dadaia"), "reports", "validate", "--all"]
+    refusal = [str(cli_path(root)), "reports", "validate", "--all"]
     work = git(repo, "rev-parse", "feature/0.5.0")
     for change in (
         [("rm", "-q", "src/a.py"), ("commit", "-q", "--amend", "-C", "HEAD")],  # same message
