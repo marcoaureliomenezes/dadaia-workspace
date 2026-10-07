@@ -2,15 +2,14 @@
 
 ONE rule lives in this policy (0.4.7 FR3 deleted the second):
 
-**Venv-rooting** (ADR-G4): a fixed leading-token check on the FIRST command token
-only — NO general shell parsing. It blocks `dadaia` and `python -m dadaia_workspace`
-invocations NOT rooted in `.dadaia/.venv/bin/` (or the workspace-absolute equivalent),
-emitting a block message that contains the corrected command.
+**Venv-rooting** (ADR-G4, AC12.4): every command of a Bash line is judged. It blocks
+`dadaia` and `python -m dadaia_workspace` invocations NOT rooted in `.dadaia/.venv/bin/`
+(or the workspace-absolute equivalent), after `&&`, `;`, `|`, behind an env assignment or
+as a path to another `dadaia`, emitting a block message that contains the corrected command.
 ``pip``/``pip3`` are never judged (ADR 0134). pytest, ruff, and mypy are never matched — their
 caches are redirected by `pyproject.toml` configuration, so no flag is enforced here.
-The false-block law (ADR-G1) requires that quoted strings, in-repo paths like
-``repos/x/dadaia``, and another venv's explicit bin path are never blocked — covered by
-the negative matrix below.
+The false-block law (ADR-G1) requires that quoted strings and in-repo paths like
+``repos/x/dadaia`` are never blocked — covered by the negative matrix below.
 
 CRIT: the corrected-command message content is preserved as a parametrized column (was 3
 separate fns) — never dropped. False-block law rows are untouched — never weakened.
@@ -118,12 +117,8 @@ def test_allows_venv_rooted_or_unmatched(command: str) -> None:
         # In-repo paths ending in the tool name are not the leading token.
         "cat repos/x/dadaia",
         "vim repos/dadaia-workspace/dadaia_workspace/cli/main.py",
-        # Another venv's explicit bin path (rooted, just not ours) — out of scope.
-        "repos/other/.venv/bin/dadaia doctor",
         # A path that merely has 'dadaia' as a substring.
         "./dadaia-wrapper.sh doctor",
-        # sa-text-restates-rules-the-code-contradicts#49.1: only the FIRST token counts.
-        "cd x && dadaia doctor",
     ],
 )
 def test_no_false_block(command: str) -> None:
