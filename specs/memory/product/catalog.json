@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-10-07T16:33:45Z",
+  "generated_at": "2026-10-07T16:33:58Z",
   "features": [
     {
       "rank": 1,
@@ -589,7 +589,7 @@
         "registry",
         "onboarding"
       ],
-      "token_estimate": 1277,
+      "token_estimate": 1314,
       "depends_on": [
         "public-asset-distribution",
         "sdd-gate-v3",
@@ -624,7 +624,7 @@
         "compliance",
         "privacy"
       ],
-      "token_estimate": 2855,
+      "token_estimate": 2874,
       "depends_on": [
         "public-asset-distribution",
         "sdd-gate-v3",
@@ -666,7 +666,7 @@
         "upgrade",
         "onboarding"
       ],
-      "token_estimate": 1889,
+      "token_estimate": 1895,
       "depends_on": [
         "context-management",
         "specs-migration",
