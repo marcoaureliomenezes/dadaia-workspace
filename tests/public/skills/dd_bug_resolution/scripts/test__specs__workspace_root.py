@@ -16,8 +16,6 @@ from dadaia_workspace.infrastructure.ledger_scripts import load_owner
 from tests.helpers.skill_scripts import stage_skill_scripts
 from tests.helpers.worktree_ws import JOB, git, make_workspace, run
 
-pytestmark = pytest.mark.integration
-
 
 @pytest.fixture
 def ws(tmp_path: Path) -> Path:
