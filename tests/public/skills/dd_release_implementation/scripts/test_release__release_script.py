@@ -739,7 +739,6 @@ def test_the_closure_check_never_pairs_a_callee_message_with_a_fix_it_did_not_pr
     assert "do the other half" not in rows[0]["fix"]
 
 
-@pytest.mark.xfail(strict=True, reason="JB.S3 RED: test-path-convention-is-python-only")
 def test_a_first_stage_may_write_tests_by_any_language_convention(
     script: Path, tmp_path: Path
 ) -> None:

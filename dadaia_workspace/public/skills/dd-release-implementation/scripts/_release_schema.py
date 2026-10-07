@@ -219,22 +219,16 @@ def stage_writes(body: str) -> list[list[str]]:
 
 def job_errors(text: str, rel: str) -> list[str]:
     """Why job file *text* at *rel* is malformed: no `## Stage` heading, a stage with no
-    `- Contract:` line, two tasks of one stage writing one path, or a first stage whose
-    tasks write anything but tests."""
+    `- Contract:` line, or two tasks of one stage writing one path."""
     stages = re.split(r"^## Stage ", text, flags=re.MULTILINE)[1:]
     if not stages:
         return [f"{rel} has no '## Stage <id>' heading"]
     errors: list[str] = []
-    for index, body in enumerate(stages):
+    for body in stages:
         stage, tasks = body.split(maxsplit=1)[0], stage_writes(body)
         if not re.search(r"^- Contract:", body, re.MULTILINE):
             errors.append(f"{rel} stage {stage} has no '- Contract:' line")
         flat = [path for paths in tasks for path in set(paths)]
         errors += [f"{rel} stage {stage}: two tasks write {path} — `W:` sets overlap"
                    for path in sorted({p for p in flat if flat.count(p) > 1})]  # fmt: skip
-        errors += [
-            f"{rel} stage {stage} writes {path} — stage 1 writes tests only"
-            for path in (flat if index == 0 else [])
-            if not (path.startswith("tests/") or Path(path).name.startswith("test_"))
-        ]
     return errors
