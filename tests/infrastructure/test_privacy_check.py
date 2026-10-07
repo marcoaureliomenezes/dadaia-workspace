@@ -124,7 +124,6 @@ _PRIVATE_PIPELINE = (
 )
 
 
-@pytest.mark.xfail(strict=True, reason="public law still names the private pipeline")
 def test_public_law_names_no_private_pipeline() -> None:
     """public-law-teaches-the-private-pipeline: shipped text names no remote CI or one-stack tool."""
     globs = tuple(f"public/**/*.{s}" for s in ("md", "json", "py", "sh")) + (
