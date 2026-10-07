@@ -197,7 +197,7 @@ The agentic set audit's 15 bugs (registered at 7b0f8a1ca) and `law-one-home-per-
 Edge: Job 10 merges after Job 9 and the bug batch, and rebases on both, because they edit the same law files (the root map §3, `dd-gitflow-default` §3b, the 29 law files of the posix venv path render).
 
 - AC12.1 `.dadaia/agentic/**` and `.claude/settings.local.json` are PROTECTED, so no agent rewrites the schema or the wiring that judges it. They join the protected set the gate already reads; the engineer names its one decider (`workspace_layout.CORE_FLOOR` or the install ledger), and no second list is added. **Unit**, RED first: an agent `Write` and `Edit` to `.dadaia/agentic/schemas/handoff-v1.schema.json` and to `.claude/settings.local.json` are each blocked. (`agentic-projections-agent-writable`)
-- AC12.2 The reviewer writes its own verdict, so the merger cannot certify its own merge (ADR 0218):
+- AC12.2 A verdict binds the diff it judged: the merge gate lands only a diff whose hash a `dd-code-reviewer` verdict carries; who ran `verdict.py` is discipline plus audit (backlog `verdict-author-unbound`) (ADR 0218):
   - A `dd-handoff-emitter` script, run by the reviewer through Bash, writes the review handoff; it is the reviewer's only write.
   - The verdict carries `reviewed_sha` and `diff_sha256`, the hash of the job range diff the merge will land.
   - `worktree.py merge` recomputes the hash over its own range and refuses a verdict with a missing field or a mismatch.
