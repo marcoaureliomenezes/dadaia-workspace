@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-10-06T13:26:50Z",
+  "generated_at": "2026-10-07T02:14:24Z",
   "features": [
     {
       "rank": 1,
@@ -150,7 +150,7 @@
         "release",
         "packaging"
       ],
-      "token_estimate": 984,
+      "token_estimate": 998,
       "depends_on": [
         "release-lifecycle",
         "QUALITY",
@@ -434,15 +434,15 @@
       "slug": "consumer-agent-support",
       "title": "Consumer validation gate",
       "area": "platform",
-      "tldr": "A consumer-side validation agent running the shipped recipe on a real workspace is the release gate; no wheel publishes until every statement reports PASS.",
-      "summary": "The release gate is a consumer-side validation agent running the shipped recipe on a real workspace; dadaia certify runs the deterministic journey in a disposable workspace and is necessary, never sufficient.",
+      "tldr": "A consumer-side agent running the developer's recipe on a real workspace is the release gate; no wheel publishes until every statement reports PASS.",
+      "summary": "The release gate is a consumer-side validation agent running the developer's validation recipe on a real workspace; dadaia certify runs the deterministic journey in a disposable workspace and is necessary, never sufficient.",
       "path": "specs/memory/product/platform/consumer-agent-support.md",
       "tags": [
         "consumer-validation",
         "release-gate",
         "sdd"
       ],
-      "token_estimate": 354,
+      "token_estimate": 366,
       "depends_on": [
         "pypi-distribution",
         "workspace-init",
@@ -453,7 +453,7 @@
         "capabilities"
       ],
       "sources": [
-        "dadaia_workspace/public/data/CONSUMER_VALIDATION_RECIPE.md",
+        "scripts/CONSUMER_VALIDATION_RECIPE.md",
         "dadaia_workspace/features/certification/**",
         "dadaia_workspace/infrastructure/certification_process.py",
         "dadaia_workspace/cli/commands/certify.py"
