@@ -123,6 +123,7 @@ CORE_FLOOR: dict[str, FloorRefusal] = {
     DADAIAIGNORE: FloorRefusal.OPERATOR,
     ".dadaia/states": FloorRefusal.LAW,
     ".dadaia/hooks": FloorRefusal.LAW,
+    ".dadaia/agentic": FloorRefusal.LAW,
     ".dadaia/sessions": FloorRefusal.SESSION,
 }
 

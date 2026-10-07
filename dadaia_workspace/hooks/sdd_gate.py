@@ -13,14 +13,14 @@ from dadaia_workspace.core.harness_registry import HARNESS_RECORDS
 from dadaia_workspace.features.spec_context import gate_policy
 from dadaia_workspace.hooks import _common
 from dadaia_workspace.infrastructure.json_install_ledger_store import JsonInstallLedgerStore
-from dadaia_workspace.infrastructure.runtime_transforms.hook_wrappers import hook_documents
+from dadaia_workspace.infrastructure.runtime_transforms import hook_wrappers
 
 #: Each harness's hook wiring is floor too: the gate holds without the ledger (ADR 0133).
 _HOOK_WIRING = frozenset(
     f"{r.directory}/{doc}"
     for r in HARNESS_RECORDS.values()
     if r.directory
-    for doc in hook_documents(r)
+    for doc in (*hook_wrappers.hook_documents(r), *hook_wrappers.HOOK_DIALECTS[r.hooks].overrides)
 )
 
 

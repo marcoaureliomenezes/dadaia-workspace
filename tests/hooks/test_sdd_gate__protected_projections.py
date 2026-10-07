@@ -34,7 +34,6 @@ def _verdict(root: Path, tool: str, rel: str) -> str | None:
 @pytest.mark.small
 @pytest.mark.parametrize("tool", ["Write", "Edit"])
 @pytest.mark.parametrize("rel", _PROTECTED)
-@pytest.mark.xfail(strict=True, raises=AssertionError, reason=_BUG)
 def test_an_agent_write_to_a_judging_projection_is_blocked_with_one_fix_line(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, tool: str, rel: str
 ) -> None:

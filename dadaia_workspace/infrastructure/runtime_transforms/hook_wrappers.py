@@ -80,7 +80,8 @@ class HookDialect:
 
     ``files`` are rendered by :func:`hook_documents`; ``nested`` groups each entry as
     ``{matcher, hooks: [entry]}``; ``bare`` drops the top-level ``hooks`` key; ``prefix``
-    precedes every command; ``ungated`` states the actions with no pre-action event.
+    precedes every command; ``ungated`` states the actions with no pre-action event;
+    ``overrides`` name the harness's own files that outrank the registration (PROTECTED too).
     """
 
     lanes: tuple[HookLane, ...] = ()
@@ -95,6 +96,7 @@ class HookDialect:
     wrapper: str = "{harness}-{lane}"
     root: str = _SELF_ROOT
     ungated: tuple[str, ...] = ()
+    overrides: tuple[str, ...] = ()
 
     def timeout(self, lane: str) -> int:
         return next(each.timeout for each in self.lanes if each.name == lane)
@@ -132,6 +134,7 @@ HOOK_DIALECTS: dict[HookFormat, HookDialect] = {
         ),
         nested=True,
         prefix='"$CLAUDE_PROJECT_DIR"/',
+        overrides=("settings.local.json",),
     ),
     HookFormat.KIMI_HOOKS: HookDialect(
         lanes=(
