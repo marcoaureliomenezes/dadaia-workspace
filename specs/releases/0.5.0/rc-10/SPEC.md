@@ -206,7 +206,7 @@ Operator rulings 2026-10-07: the evals live in the dadaia-workspace repo and its
   - F098 and F128 are dispositioned `resolved`.
 - AC10.2 `## Bugs` is regenerated after the disposition sweep. `_RELEASE.json` logs the readouts, AC8.1's readout, each job's `kind: merge` entry and each job's bug-surface delta.
 - AC10.3 The `measured_by` of 0208 and 0209 names cases this rc built (AC1.2, AC4.1–AC4.4; AC6.0–AC6.2); a name that moved is repaired in the 0138 lane.
-- AC10.4 Each Origin backlog entry exits once, `delivered --release 0.5.0`. `agent-behavior-evals` exits after AC11.6 is logged, with 0211 ruled.
+- AC10.4 Each Origin backlog entry exits once, `delivered --release 0.5.0`. `agent-behavior-evals` exits after AC11.6 is logged, with 0217 ruled.
 - AC10.5 Closure follows the releases law, with zero open bugs; rc-11 is defined beside it.
 
 ## ADRs
@@ -227,7 +227,7 @@ Operator rulings 2026-10-07: the evals live in the dadaia-workspace repo and its
   - `measured_by`: AC6.0–AC6.2's cases.
 - **0210**, accepted with this SPEC's Approval (operator, 2026-10-06: "(b) Qualquer caused_by ≠ none é REBUILD (Recommended)"): any `caused_by` other than none, a bug's fix or a feature task, makes the fix a REBUILD of the unit, keeping its tests. It keeps 0186 (2) and widens 0206's "a fix-induced one" (`amends: 0206`). SPEC text, not part of the ruling, which the operator accepts at Approval: a REBUILD's revert under 0186 (2) keeps the culprit's test files, so it fits 0209. `measured_by`: the ninth `PILLAR-BUGS` metric (AC1.4).
 - The main thread proposes 0208–0210 in `decisions.jsonl` at Approval.
-- **0211**, proposed 2026-10-07 (supersedes 0177, 0179): evals live in the library repo's own CI; no context carries an evals repo; the shipped law states no model-API-in-CI rule (Job 9). `measured_by`: the guard `no-model-api-in-ci` and AC11.4's grep.
+- **0217**, accepted 2026-10-07 (supersedes 0177, 0179): evals live in the library repo's own CI; no context carries an evals repo; the shipped law states no model-API-in-CI rule (Job 9). `measured_by`: the guard `no-model-api-in-ci` and AC11.4's grep.
 
 ## Replaces
 

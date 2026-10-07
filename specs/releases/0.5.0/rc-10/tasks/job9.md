@@ -1,7 +1,7 @@
 # TASKS — 0.5.0 rc-10, Job 9 — evals in the library's own CI
 
 **Status:** Draft
-**Approval:** pending — dd-code-reviewer review of this file and the PLAN amendment; SPEC amended at e261c7e8b, ADR 0211 proposed at 398b04157.
+**Approval:** pending — dd-code-reviewer review of this file and the PLAN amendment; SPEC amended at e261c7e8b, ADR 0217 accepted on the reconcile branch at 398b04157.
 
 Paths are relative to the repo root; aliases as in `PLAN.md` (`f/`, `pub/`, `S/`, `GF/`); `ev:` = the dadaia-evals tree at c075ed6, the port's read-only source. Gates: task — `verify-task:` on the touched files plus `Owner-tests:`; stage — `verify-stage:`; job — CI matrix + one review + `verify:`. Every implementation brief carries the pre-review checklist, items 1–13. Platform facts go only through `dadaia_workspace/core/platform.py`. Host-side test code uses `Path` and `sys.executable`. Bash runs only inside a task container. `eval.yml` is ubuntu-only because the tasks need Docker.
 
@@ -44,7 +44,7 @@ Paths are relative to the repo root; aliases as in `PLAN.md` (`f/`, `pub/`, `S/`
 | task | AC | `W:` | owner tests / RED |
 |---|---|---|---|
 | J9.S2.T1 | AC11.1 | `scripts/ci.py` (`_task`: owner tests are `test_*.py` under `tests/` only), `tests/scripts/test_ci.py` (its marker line) | `tests/scripts/test_ci.py` |
-| J9.S2.T2 | AC11.1 | `evals/scripts/compare.py`, `evals/scripts/scan.py` (ported; docstrings cite 0211, never 0177/0179), `tests/e2e/test_evals_scripts.py` (its marker lines) | `tests/e2e/test_evals_scripts.py` |
+| J9.S2.T2 | AC11.1 | `evals/scripts/compare.py`, `evals/scripts/scan.py` (ported; docstrings cite 0217, never 0177/0179), `tests/e2e/test_evals_scripts.py` (its marker lines) | `tests/e2e/test_evals_scripts.py` |
 | J9.S2.T3 | AC11.2, AC11.3 | `scripts/guards/repo.py`, `.github/workflows/eval.yml` | guard plants: `run.py --planted` reds each plant; `run.py` passes on the tree with `eval.yml` |
 
 - J9.S2.T3 changes in `scripts/guards/repo.py`:
@@ -75,10 +75,10 @@ Paths are relative to the repo root; aliases as in `PLAN.md` (`f/`, `pub/`, `S/`
 
 | task | AC | `W:` | owner tests / RED |
 |---|---|---|---|
-| J9.S3.T1 | AC11.1 | `evals/tasks/t1-cold-onboarding/instruction.md`, `evals/tasks/t1-cold-onboarding/task.toml`, `evals/tasks/t1-cold-onboarding/environment/Dockerfile`, `evals/tasks/t1-cold-onboarding/tests/test.sh`, `evals/tasks/t1-cold-onboarding/tests/test_grade.py` (ported; the Dockerfile's last layer is the lib, its comment cites 0211), `tests/e2e/test_evals_t1.py` (its marker lines) | `tests/e2e/test_evals_t1.py` |
+| J9.S3.T1 | AC11.1 | `evals/tasks/t1-cold-onboarding/instruction.md`, `evals/tasks/t1-cold-onboarding/task.toml`, `evals/tasks/t1-cold-onboarding/environment/Dockerfile`, `evals/tasks/t1-cold-onboarding/tests/test.sh`, `evals/tasks/t1-cold-onboarding/tests/test_grade.py` (ported; the Dockerfile's last layer is the lib, its comment cites 0217), `tests/e2e/test_evals_t1.py` (its marker lines) | `tests/e2e/test_evals_t1.py` |
 | J9.S3.T2 | AC11.1 | `evals/tasks/t2-block-list-bug/instruction.md`, `evals/tasks/t2-block-list-bug/task.toml`, `evals/tasks/t2-block-list-bug/environment/Dockerfile`, `evals/tasks/t2-block-list-bug/environment/project.sh`, `evals/tasks/t2-block-list-bug/tests/test.sh`, `evals/tasks/t2-block-list-bug/tests/test_grade.py` (ported, same rules), `tests/e2e/test_evals_t2.py` (its marker lines) | `tests/e2e/test_evals_t2.py` |
 | J9.S3.T3 | AC11.4 | `pub/data/AGENTS.md` (map §3: the model-API clause leaves the git-chokepoints line), `S/dd-gitflow-default/SKILL.md` (§3b: the model-API bullet and its five clauses leave), `S/dd-gitflow-default/CICD-AUTOMATION.md` (its model-API wiring note leaves), `CONTEXT.md` (the term "Evals repo" leaves), `.github/workflows/ci.yml` (line 7's "No job calls a model API" clause leaves; the security-review half stays) | check: the AC11.4 sweep over these paths prints nothing |
-| J9.S3.T4 | AC11.4 | `specs/memory/QUALITY.md` (P-33 names the library's own `eval.yml` under 0211, not an evals repo), `specs/memory/product/sdd/sdd-gate-v3.md` (the "no workflow calls a model API" line and summary name `eval.yml` as the one exception), `specs/memory/product/catalog.json` (by `memory.py catalog generate`) | author `dd-product-engineer` (memory law); check: `memory.py check` green and the AC11.4 sweep over `specs/memory` prints nothing |
+| J9.S3.T4 | AC11.4 | `specs/memory/QUALITY.md` (P-33 names the library's own `eval.yml` under 0217, not an evals repo), `specs/memory/product/sdd/sdd-gate-v3.md` (the "no workflow calls a model API" line and summary name `eval.yml` as the one exception), `specs/memory/product/catalog.json` (by `memory.py catalog generate`) | author `dd-product-engineer` (memory law); check: `memory.py check` green and the AC11.4 sweep over `specs/memory` prints nothing |
 | J9.S3.T9 | — | this file | close task, last. It regenerates `pub/entities/behavior-map.json` (T3 moved skill hashes) and runs the AC11.1 wheel check: `pip wheel --no-deps --no-build-isolation .` then `python -c "import zipfile,glob,sys; sys.exit(any(n.startswith('evals/') for n in zipfile.ZipFile(glob.glob('*.whl')[0]).namelist()))"` exits 0. It reruns the sweep and writes `test-audit:`, `mutation:` (compare, scan, `ci.py _task`, the guard clauses by hand mutants) and `done` |
 
 ## Stage J9.S4 — after the job merges to `feature/0.5.0` (driver)
