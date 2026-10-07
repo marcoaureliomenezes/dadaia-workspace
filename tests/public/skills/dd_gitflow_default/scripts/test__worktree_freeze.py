@@ -97,3 +97,24 @@ def test_an_invalid_tests_red_pattern_refuses_with_one_fix_line(tmp_path: Path) 
         refused.value.fix
         == "Operator action: fix the tests-red: line on w's AGENTS.md and commit it"
     )
+
+
+def test_a_marker_first_hunk_with_a_real_line_in_a_tests_only_group_refuses() -> None:
+    patch = f"--- a/{T}\n+++ b/{T}\n@@ -3,2 +3,0 @@\n-@red\n-assert x == 1\n"
+    edits = freeze._edits(f"diff --git a/{T} b/{T}\n" + patch)
+    assert freeze.judge([S1, row("c2", GREEN, edits=edits)], "base", RED) == (T, "c1")
+
+
+def test_a_binary_test_edit_in_a_tests_only_group_refuses() -> None:
+    edits = freeze._edits(f"Binary files a/{T} and b/{T} differ\n")
+    assert freeze.judge([S1, row("c2", GREEN, edits=edits)], "base", RED) == (T, "c1")
+
+
+def test_a_new_binary_test_file_beside_code_refuses() -> None:
+    patch = f"Binary files /dev/null and b/{T} differ\n"
+    assert freeze.judge([S1, patched("c2", GREEN, patch)], "base", RED) == (T, "c1")
+
+
+def test_a_first_row_test_edit_is_judged_though_the_last_row_is_clean() -> None:
+    rows = [row("c1", "tweak", edits=((T, ("x",), 1),)), row("c2", "chore: tidy")]
+    assert freeze.judge(rows, "base", None) == (T, "base")
