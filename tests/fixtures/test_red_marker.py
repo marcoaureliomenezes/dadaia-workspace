@@ -22,7 +22,6 @@ def test_errors():
 """
 
 
-@pytest.mark.xfail(strict=True, raises=AssertionError, reason="no plugin")
 def test_a_red_test_that_errors_fails_while_one_that_asserts_xfails(
     pytester: pytest.Pytester,
 ) -> None:
