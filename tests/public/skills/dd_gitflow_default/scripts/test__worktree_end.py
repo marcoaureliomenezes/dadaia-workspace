@@ -650,7 +650,6 @@ def test_a_code_task_names_its_owner_tests_by_any_convention(root: Path) -> None
     assert "ci task src/b.py tests/b_test.py" in landed.stdout.splitlines()
 
 
-@pytest.mark.xfail(strict=True, raises=AssertionError, reason="onboarding-writes-no-tests-line")
 def test_a_tests_line_after_a_utf8_bom_is_declared(tmp_path: Path) -> None:
     """onboarding-writes-no-tests-line: a BOM before the first line does not hide `tests:`."""
     sys.path.insert(0, str(_PACKAGE_SKILLS / "dd-gitflow-default" / "scripts"))

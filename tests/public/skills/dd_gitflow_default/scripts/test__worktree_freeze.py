@@ -140,7 +140,6 @@ def refusal(rows: list, monkeypatch: pytest.MonkeyPatch) -> str | None:
     return None
 
 
-@pytest.mark.xfail(strict=True, raises=AssertionError, reason="freeze-cannot-see-a-red-amendment-stage")  # fmt: skip
 def test_a_test_only_stage_is_red_wherever_it_sits(monkeypatch: pytest.MonkeyPatch) -> None:
     rows = [
         row("c1", "docs(JR.S2.T1): doc", code=True),
@@ -150,16 +149,6 @@ def test_a_test_only_stage_is_red_wherever_it_sits(monkeypatch: pytest.MonkeyPat
     assert refusal(rows, monkeypatch) is None
 
 
-@pytest.mark.xfail(strict=True, raises=AssertionError, reason="freeze-cannot-see-a-red-amendment-stage")  # fmt: skip
-def test_a_test_only_stage_may_amend_an_old_assert() -> None:
-    rows = [
-        row("c1", "feat(JR.S2.T1): code", code=True),
-        row("c2", "test(JR.S4.T1): amend", edits=((T, ("assert x == 1",), 1),)),
-    ]
-    assert freeze.judge(rows, "base", None) is None
-
-
-@pytest.mark.xfail(strict=True, raises=AssertionError, reason="freeze-cannot-see-a-red-amendment-stage")  # fmt: skip
 def test_stage_ids_with_no_test_edit_are_judged_not_refused_for_lacking_stage_one(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

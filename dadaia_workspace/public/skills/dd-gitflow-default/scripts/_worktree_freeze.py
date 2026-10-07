@@ -5,8 +5,8 @@ branch's `AGENTS.md` declares — no tree picks its own judge. Everything is rea
 `git log` over `<merge-base>..HEAD`, each commit diffed against its first parent, so it holds
 for any language.
 
-A range whose subject ids (`J<n|B|R>.S<m>.T<k>`) name stages but not stage 1 — the RED stage —
-refuses. The anchor is the parent of the first commit not in it, else the range base. Past it a commit may only delete lines
+The RED stage is stage 1 (subject ids `J<n|B|R>.S<m>.T<k>`). The anchor is the parent of the first
+commit not in it, else the range base (a range with no stage 1 is judged from its base). Past it a commit may only delete lines
 matching the repo's `tests-red:` pattern (the RED marker), and may only add test lines in a
 stage group that touches test paths alone (a new RED stage); a commit with no stage id is
 its own group. A pure rename has no hunks and lands."""
@@ -147,11 +147,6 @@ def check(tree: Path, work: str, tests: str, red: str) -> None:
             f"the RED anchor cannot be derived: {error}",
             f"Operator action: stop and report — the RED anchor since {work} cannot be derived (ADR 0209)",
         ) from error
-    if (stages := {f["n"] for r in rows if (f := _ID.search(r.subject))}) and "1" not in stages:
-        raise Refusal(
-            f"no commit since {work} names its RED stage",
-            f"Operator action: stop and report — no commit since {work} names its RED stage, so the RED anchor cannot be derived (ADR 0209)",
-        )
     if hit := judge(rows, base, pattern):
         raise Refusal(
             "a test is frozen past the RED anchor",

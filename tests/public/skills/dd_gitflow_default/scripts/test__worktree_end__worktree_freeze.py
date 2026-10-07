@@ -189,14 +189,9 @@ def test_a_work_branch_commit_the_job_lacks_is_not_judged_as_the_jobs(root: Path
     assert merged.returncode == 0, merged.stderr
 
 
-def test_a_job_with_no_commit_naming_its_red_stage_refuses(root: Path) -> None:
+def test_a_job_with_no_red_commit_is_judged_from_its_base_and_lands(root: Path) -> None:
     _, merged = attempt(root, {"src/a.py": "x = 1\n"}, "J1.S2.T1")
-    assert (merged.returncode, fixes(merged)) == (
-        1,
-        [
-            "fix: Operator action: stop and report — no commit since feature/0.5.0 names its RED stage, so the RED anchor cannot be derived (ADR 0209)"
-        ],
-    )
+    assert merged.returncode == 0, merged.stderr
 
 
 def test_a_hotfix_commit_with_no_task_id_holding_code_and_a_marker_deletion_lands(
