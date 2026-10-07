@@ -38,6 +38,7 @@ Paths are relative to the repo root; aliases as in `PLAN.md` (`f/`, `pub/`, `S/`
 | task | AC | `W:` | owner tests / RED |
 |---|---|---|---|
 | JR.S4.T1 | AC6.0 | `tests/features/specs/test_canon__scaffold_repo_law.py` (new rows only: a present `AGENTS.md` with no `tests:` line gains the template's `tests:` line, appended, its own text kept byte for byte; a present `tests:` line, empty or not, is left alone; the shipped template's `tests:` line is non-empty), `tests/cli/` specs-init owner file if `specs init` needs its own row (a repo whose `AGENTS.md` lacks `tests:` leaves `specs init` declaring a non-empty `tests:` line; and the amendment ADR 0216 forces: `test_an_existing_scoped_law_is_never_overwritten`'s own law declares a `tests:` line, so it still proves a present law is kept byte for byte — its assert's literal gains that same line, nothing else) | RED: each new row fails by assertion at HEAD; the one amended row stays green at HEAD and after the fix |
+| JR.S4.T2 | AC4.1 | `scripts/guards/repo.py` (`_SECTIONS`: QUALITY.md's order is Principles, Test architecture, Gates, Bugs — the section AC4.1 requires; any other order still refuses) | bug `canonical-shape-guard-refuses-the-bugs-section` (the JR.S4 stage gate red: JR.S3.T1 wrote `## Bugs`), registered by delegation; RED: the guard's own `control` planted case, NOISY at HEAD; a stage-gate repair, so it lands in this stage |
 
 ## Stage JR.S5 — onboarding declares the tests: line
 
