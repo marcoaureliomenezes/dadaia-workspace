@@ -7,10 +7,10 @@ from __future__ import annotations
 
 import shlex
 
+from dadaia_workspace.core import platform
 from dadaia_workspace.core.cli_line import fix_line, venv_line
 
 _PYTHON_NAMES: frozenset[str] = frozenset({"python", "python3"})
-_VENV_BIN = ".dadaia/.venv/bin/"
 
 
 def evaluate_payload(payload: dict[str, object]) -> str | None:
@@ -25,12 +25,13 @@ def evaluate_payload(payload: dict[str, object]) -> str | None:
         args = shlex.split(command, comments=False, posix=True)
     except ValueError:
         return None
-    if not args or _VENV_BIN in args[0]:
+    venv_bin = f".dadaia/.venv/{platform.PLATFORM.venv_scripts_dir}/"
+    if not args or venv_bin in args[0]:
         return None
     token = args[0]
     rest = command.strip()[len(token) :].lstrip()
     tail = f" {rest}" if rest else ""
-    if token == "dadaia":
+    if token == "dadaia" or token.endswith(".dadaia/.venv/bin/dadaia"):
         corrected = fix_line(None) + tail
     elif (
         token in _PYTHON_NAMES
@@ -43,7 +44,7 @@ def evaluate_payload(payload: dict[str, object]) -> str | None:
         return None
     return (
         "[VENV GUARD] This command must run from the workspace venv "
-        f"({_VENV_BIN}). Blocked:\n"
+        f"({venv_bin}). Blocked:\n"
         f"  {command.strip()}\n"
         f"fix: {corrected}"
     )

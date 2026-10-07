@@ -176,7 +176,6 @@ def test_the_block_fix_runs_verbatim_from_a_repo_subdirectory(tmp_path: Path) ->
 
 
 @pytest.mark.parametrize("command", ["dadaia doctor", "python -m dadaia_workspace"])
-@pytest.mark.xfail(strict=True, raises=AssertionError, reason="shipped-law-hardcodes-the-posix-venv-path")  # fmt: skip
 def test_block_message_names_the_windows_venv_scripts_dir(
     command: str, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -187,7 +186,6 @@ def test_block_message_names_the_windows_venv_scripts_dir(
     assert "/bin/" not in reason.splitlines()[0]
 
 
-@pytest.mark.xfail(strict=True, raises=AssertionError, reason="shipped-law-hardcodes-the-posix-venv-path")  # fmt: skip
 def test_win32_blocks_a_posix_bin_cli_that_does_not_exist_there(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
