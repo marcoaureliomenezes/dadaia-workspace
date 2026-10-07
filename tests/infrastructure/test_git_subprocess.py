@@ -115,3 +115,16 @@ def test_commit_paths_ignores_operator_pre_staged_unrelated_content(tmp_path: Pa
 
     assert _git(repo, "show", "--name-only", "--format=", "HEAD").stdout == "tool-written.txt\n"
     assert "A  operator-staged.txt" in _git(repo, "status", "--porcelain").stdout
+
+
+@pytest.mark.xfail(strict=True, raises=AssertionError, reason="context-clone-fails-past-windows-max-path")  # fmt: skip
+def test_clone_writes_longpaths_into_the_clone_config(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Windows' 260-character limit: the clone's own config carries core.longpaths=true."""
+    monkeypatch.setenv("GIT_CONFIG_GLOBAL", str(_GIT_QUIET))
+    monkeypatch.setenv("GIT_CONFIG_SYSTEM", "/dev/null")
+    dest = tmp_path / "dest"
+    GitSubprocessClient().clone(str(_repo(tmp_path / "src")), dest)
+
+    assert _git(dest, "config", "--get", "core.longpaths").stdout.strip() == "true"
