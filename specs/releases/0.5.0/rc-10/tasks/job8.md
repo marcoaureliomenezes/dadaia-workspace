@@ -43,3 +43,15 @@ Paths are relative to the repo root; aliases as in `PLAN.md` (`f/`, `pub/`, `S/`
 | J8.S3.T9 | — | this file, `scripts/guards/isolation.py` (control spawn shapes and the `unmarked` and `hook` plants: hand mutants of the check survived the one plant) | close task, last: readout (share of small items under 100 ms) for `_RELEASE.json`; behavior map; `test-audit:`, `mutation:`; `done` |
 
 - done: Job 8 — every task landed on `wt/0.5.0-rc10/job8`: J8.S1.T1 dd2a1d293; J8.S2.T1 9dd24140e, T2 0f9c7a128, T3 8e6c7209e, T4 812df47ed and 2aec51a27; J8.S3.T1 0b6cd9ecf, T2 87f5807a7, T3 ff45eb7a6, T4 84d4155bf, T5 82e5295bf, T6 bb7248291; closed by J8.S3.T9. AC8.1 readout, gating nothing: 1,185 of 1,265 small items (93.3 %) run under 100 ms (setup + call + teardown, `-m "small and not slow and not quarantine"`, 85 items at or over).
+
+## Stage J8.S4 — the review's two HIGH findings (CHANGES_REQUESTED on 1d1dfe3e1)
+
+- Contract: exit tests unit + integration green, guard plant red; ACs AC8.1. One decider: `tests/conftest.py` sizes a test and, for a small test, refuses a process start at run time; the guard check plants a small test that spawns and expects the suite to fail it, so the AST spawn list and the restated seam list leave `scripts/guards/isolation.py`.
+- Offenders: the reviewer's run-time spy at 1d1dfe3e1 (13 tests in 12 files); each turns `medium` (AC8.1).
+
+| task | AC | `W:` | owner tests / RED |
+|---|---|---|---|
+| J8.S4.T1 | AC8.1 | `tests/conftest.py` (a small test that starts a process fails), `scripts/guards/isolation.py` (`small-spawns-no-process` runs a planted small test through the suite; the AST list and `_PROCESS_MODULES` restatement leave) | guard plant |
+| J8.S4.T2 | AC8.1 | `tests/cli/commands/test_context__cli_output_stability.py`, `test_doctor__cli_specs_doctor_fix.py`, `test_doctor__doctor_without_an_instance.py`, `test_init.py`, `test_specs__cli_specs_init_root_guard.py` | the files |
+| J8.S4.T3 | AC8.1 | `tests/features/migrate/test_upgrade.py`, `test_upgrade__upgrade_fixed_sections.py`, `test_upgrade__upgrade_status_tokens.py`, `tests/features/specs/test_doctor_adr.py` | the files |
+| J8.S4.T4 | AC8.1 | `tests/hooks/test_pre_gate.py` (`test_envelope_contract`, `test_non_write_and_protected_matrix`), `tests/hooks/test_venv_guard.py` | the files |
