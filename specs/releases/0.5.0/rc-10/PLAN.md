@@ -73,7 +73,7 @@ Order per job: DELETE → REBUILD → UPDATE → KEEP → ADD. A REBUILD names i
 - `S/dd-release-definition/SKILL.md`: Job 1 (§1), then Job 6 (§5).
 - `f/spec_context/doctor.py`: Job 5, then Job 8.
 - `tests/conftest.py`: Job 7, Job 8, Job 6, in that order. `scripts/guards/isolation.py`: Job 7, then Job 8.
-- `specs/memory/QUALITY.md`: Job 9 (P-33 only, J9.S3.T4), then Reconciliation (AC4.5, AC10.1, AC10.2). `CONTEXT.md`: Job 9 (the term "Evals repo" leaves), then Reconciliation.
+- `specs/memory/QUALITY.md`: Job 9 (the Gates line only, J9.S3.T4; the P-33 rewrite lands on the reconcile branch with 0217), then Reconciliation (AC4.5, AC10.1, AC10.2). `CONTEXT.md`: Job 9 (the term "Evals repo" leaves), then Reconciliation.
 - `S/dd-gitflow-default/SKILL.md`: Job 6 (§3a), then Job 9 (§3b). `scripts/guards/repo.py`, `scripts/ci.py`, `.github/workflows/ci.yml`, `tests/scripts/test_ci.py`: Job 7, then Job 9.
 - `specs/bugs/BUGS.jsonl`: written only by `bugs.py`; a rebase conflict is redone by its writer (0180).
 - `specs/releases/0.5.0/_RELEASE.json`: the driver's `kind: merge`/`note` entries, one job at a time.
