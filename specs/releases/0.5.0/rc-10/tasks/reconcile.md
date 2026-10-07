@@ -17,9 +17,8 @@ Paths are relative to the repo root; aliases as in `PLAN.md` (`f/`, `pub/`, `S/`
 |---|---|---|---|
 | JR.S2.T1 | AC10.1 | `specs/memory/**` (each atom with its derived sections), `docs/*.md`; every `tests/…py` path in `QUALITY.md`/`ARCHITECTURE.md` exists (Job 7 moved them); `RELEASE-TREE-MEMORY` gone | checks: the SPEC's greps |
 | JR.S2.T2 | AC10.1 | `specs/audits/20260930-structural-convergence/FINDINGS.jsonl` (F098, F128 `resolved`, by `audit.py disposition`) | `audit.py` |
-| JR.S2.T3 | AC10.3 | `specs/ADRs/decisions.jsonl` (`measured_by` repairs of 0208, 0209, 0210, the 0138 lane) | `dadaia doctor` |
+| JR.S2.T3 | AC10.3 | `specs/ADRs/decisions.jsonl` (`measured_by` repairs of 0208, 0209, 0210, the 0138 lane; and ADR 0220, multi-platform by construction, accepted by the operator 2026-10-07T02:37:54Z, "Aceito, com essa divisão (Recommended)", landed as `docs(JR.S2.T5)` bd18b7d3b: one writer of this file per stage, LEDGER-RELEASE-SCHEMA) | `dadaia doctor`, `tests/features/specs/test_doctor_adr.py` |
 | JR.S2.T4 | AC10.4 | `specs/backlog/**` (each Origin entry and the three rc-9 deliveries exit once, `delivered --release 0.5.0`; `agent-behavior-evals` after AC11.6 is logged) | `backlog.py check` |
-| JR.S2.T5 | AC10.3 | `specs/ADRs/decisions.jsonl` (the multi-platform-by-construction ADR the operator accepted 2026-10-07T02:37:54Z, answer verbatim "Aceito, com essa divisão (Recommended)", recorded through its lane with the next free id: P1–P10 and the rc-10/rc-11 split as `decision`, `measured_by` naming the backlog entry `multi-platform-by-construction-migration` and the Windows CI legs; text source: the operator-accepted draft handed in the brief) | `dadaia doctor`, `tests/features/specs/test_doctor_adr.py` |
 | JR.S2.T6 | AC10.1 | `specs/releases/0.5.0/rc-10/tasks/job9.md` (Status line and the `done` shas: each task's sha as it landed on `feature/0.5.0`, by subject, since the rebase rewrote them) | `tests/features/specs/test_doctor_release.py` |
 
 ## Stage JR.S3 — the balance and closure
