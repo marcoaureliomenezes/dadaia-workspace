@@ -1,0 +1,66 @@
+"""ADR 0209: the pure `judge` of the test freeze over diff rows, no git. Size: SMALL."""
+
+from __future__ import annotations
+
+import re
+import sys
+
+import pytest
+
+from dadaia_workspace.infrastructure.ledger_scripts import _PACKAGE_SKILLS, load_owner
+
+sys.path.insert(0, str(_PACKAGE_SKILLS / "dd-gitflow-default" / "scripts"))
+freeze = load_owner("dd-gitflow-default", "_worktree_freeze")
+RED = re.compile(r"^@red$")
+T = "tests/test_a.py"
+
+
+def row(sha: str, subject: str, *, code: bool = False, edits: tuple = ()) -> object:
+    tests = frozenset({T}) if edits else frozenset()
+    paths = tests | ({"src/a.py"} if code else set())
+    return freeze.Commit(sha, subject, paths, tests, edits)
+
+
+S1 = row("c1", "test(J1.S1.T1): red", edits=((T, (), 2),))
+
+
+def test_no_rows_judge_nothing() -> None:
+    assert freeze.judge([], "base", None) is None
+
+
+def test_a_rename_has_no_hunks_and_lands() -> None:
+    rows = [S1, row("c2", "feat(J1.S2.T1): code", code=True), row("c3", "chore(J1.S2.T2): mv")]
+    assert freeze.judge(rows, "base", None) is None
+
+
+def test_a_deleted_file_past_the_anchor_refuses_with_the_anchor() -> None:
+    rows = [S1, row("c2", "feat(J1.S2.T1): rm", edits=((T, ("def test_a():", "pass"), 0),))]
+    assert freeze.judge(rows, "base", None) == (T, "c1")
+
+
+def test_a_file_born_in_stage_two_then_edited_refuses() -> None:
+    rows = [
+        S1,
+        row("c2", "feat(J1.S2.T1): code", code=True, edits=((T, (), 3),)),
+        row("c3", "feat(J1.S2.T2): edit", edits=((T, ("x",), 1),)),
+    ]
+    assert freeze.judge(rows, "base", None) == (T, "c1")
+
+
+def test_an_edit_with_no_stage_id_is_judged_from_the_base() -> None:
+    rows = [row("c1", "tweak", edits=((T, ("x",), 1),))]
+    assert freeze.judge(rows, "base", None) == (T, "base")
+
+
+def test_a_marker_only_deletion_lands_and_a_mixed_one_refuses() -> None:
+    marker = row("c2", "fix(J1.S2.T1): green", code=True, edits=((T, ("@red",), 0),))
+    mixed = row("c2", "fix(J1.S2.T1): green", code=True, edits=((T, ("@red", "y"), 0),))
+    assert freeze.judge([S1, marker], "base", RED) is None
+    assert freeze.judge([S1, mixed], "base", RED) == (T, "c1")
+
+
+@pytest.mark.parametrize("code", [False, True])
+def test_added_test_lines_land_only_in_a_tests_only_stage(code: bool) -> None:
+    rows = [S1, row("c2", "test(J1.S3.T1): more", edits=((T, (), 1),))]
+    rows.append(row("c3", "feat(J1.S3.T2): code", code=True)) if code else None
+    assert (freeze.judge(rows, "base", None) is None) is (not code)

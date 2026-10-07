@@ -50,14 +50,12 @@ def _born(root: Path, text: str = RED) -> str:
     return sha
 
 
-@pytest.mark.xfail(strict=True, raises=AssertionError, reason="no freeze")
 def test_a_modified_test_line_past_the_anchor_refuses(root: Path) -> None:
     anchor = _born(root)
     _, merged = attempt(root, {"tests/test_a.py": GREEN}, "J1.S2.T2")
     assert (merged.returncode, fixes(merged)) == (1, _frozen("tests/test_a.py", anchor))
 
 
-@pytest.mark.xfail(strict=True, raises=AssertionError, reason="no freeze")
 def test_a_deleted_test_file_past_the_anchor_refuses(root: Path) -> None:
     anchor = _born(root)
     assert run(root, "new", "r", TASK).returncode == 0
@@ -68,7 +66,6 @@ def test_a_deleted_test_file_past_the_anchor_refuses(root: Path) -> None:
     assert (merged.returncode, fixes(merged)) == (1, _frozen("tests/test_a.py", anchor))
 
 
-@pytest.mark.xfail(strict=True, raises=AssertionError, reason="no freeze")
 def test_a_test_edit_inside_stage_one_alone_is_frozen_from_the_range_base(root: Path) -> None:
     land(root, "tests/test_a.py", RED, "J1.S1.T1")
     base = git(root / "repos/r", "rev-parse", "feature/0.5.0").strip()
@@ -76,7 +73,6 @@ def test_a_test_edit_inside_stage_one_alone_is_frozen_from_the_range_base(root: 
     assert (merged.returncode, fixes(merged)) == (1, _frozen("tests/test_a.py", base))
 
 
-@pytest.mark.xfail(strict=True, raises=AssertionError, reason="no freeze")
 def test_a_file_born_after_the_anchor_and_then_edited_refuses(root: Path) -> None:
     anchor = _born(root)
     land(root, "tests/test_n.py", RED, "J1.S3.T1")
@@ -84,7 +80,6 @@ def test_a_file_born_after_the_anchor_and_then_edited_refuses(root: Path) -> Non
     assert (merged.returncode, fixes(merged)) == (1, _frozen("tests/test_n.py", anchor))
 
 
-@pytest.mark.xfail(strict=True, raises=AssertionError, reason="no freeze")
 def test_test_lines_added_in_a_stage_that_also_touches_code_refuse(root: Path) -> None:
     anchor = _born(root)
     _, merged = attempt(root, {"tests/test_b.py": RED}, "J1.S2.T3")
@@ -115,21 +110,18 @@ def test_a_marker_only_deletion_lands_beside_the_fix(root: Path) -> None:
     assert merged.returncode == 0, merged.stderr
 
 
-@pytest.mark.xfail(strict=True, raises=AssertionError, reason="no freeze")
 def test_a_marker_deleted_together_with_another_line_refuses(root: Path) -> None:
     anchor = _born(root, "@red\n" + RED)
     _, merged = attempt(root, {"tests/test_a.py": GREEN}, "J1.S2.T2")
     assert (merged.returncode, fixes(merged)) == (1, _frozen("tests/test_a.py", anchor))
 
 
-@pytest.mark.xfail(strict=True, raises=AssertionError, reason="no freeze")
 def test_a_deleted_line_the_repo_does_not_declare_as_a_marker_refuses(root: Path) -> None:
     anchor = _born(root, "@blue\n" + RED)
     _, merged = attempt(root, {"tests/test_a.py": RED}, "J1.S2.T2")
     assert (merged.returncode, fixes(merged)) == (1, _frozen("tests/test_a.py", anchor))
 
 
-@pytest.mark.xfail(strict=True, raises=AssertionError, reason="no freeze")
 def test_a_worktree_editing_its_own_tests_line_is_still_judged_by_the_work_branch(
     root: Path,
 ) -> None:
@@ -141,7 +133,6 @@ def test_a_worktree_editing_its_own_tests_line_is_still_judged_by_the_work_branc
     assert (merged.returncode, fixes(merged)) == (1, _frozen("tests/test_a.py", anchor))
 
 
-@pytest.mark.xfail(strict=True, raises=AssertionError, reason="no freeze")
 def test_a_job_merge_refuses_a_test_edit_that_reached_the_branch_directly(root: Path) -> None:
     anchor = _born(root)
     approve(root, commit(root / TREE, "tests/test_a.py", GREEN))
@@ -149,7 +140,6 @@ def test_a_job_merge_refuses_a_test_edit_that_reached_the_branch_directly(root: 
     assert (merged.returncode, fixes(merged)) == (1, _frozen("tests/test_a.py", anchor))
 
 
-@pytest.mark.xfail(strict=True, raises=AssertionError, reason="no freeze")
 def test_a_repo_with_no_tests_line_refuses_until_the_work_branch_declares_it(root: Path) -> None:
     repo = root / "repos/r"
     commit(
