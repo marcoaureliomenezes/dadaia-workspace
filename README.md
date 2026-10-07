@@ -44,7 +44,7 @@ memory atom under its content hash.
 
 ## A human installs and uses it
 
-<!-- derived-from: pypi-distribution sha256:a360b84790ff -->
+<!-- derived-from: pypi-distribution sha256:41df64f3512e -->
 <!-- derived-from: workspace-init sha256:4f0ceaccc6c8 -->
 <!-- derived-from: context-management sha256:2d908837d9f6 -->
 <!-- derived-from: workspace-doctor sha256:8b2f7d91f08a -->
@@ -94,8 +94,8 @@ a TTL expiry acts by zone class, an OUTPUT entry held, an EPHEMERAL one deleted.
 
 ## An agent reads AGENTS.md and uses it
 
-<!-- derived-from: agentic-entities sha256:5a467f3e3664 -->
-<!-- derived-from: sdd-gate-v3 sha256:cf697fabc31d -->
+<!-- derived-from: agentic-entities sha256:f4c4b4b1eecc -->
+<!-- derived-from: sdd-gate-v3 sha256:61115164982a -->
 <!-- derived-from: release-lifecycle sha256:e94a43f4bb88 -->
 <!-- derived-from: bug-ledger sha256:1f1d4608155e -->
 <!-- derived-from: harness-claude-code sha256:68e07ea44a20 -->
@@ -133,7 +133,7 @@ hotfix job with a RED test, any other in the candidate's bug batch. Completed wo
 
 ## Documentation
 
-<!-- derived-from: pypi-distribution sha256:a360b84790ff -->
+<!-- derived-from: pypi-distribution sha256:41df64f3512e -->
 <!-- derived-from: public-asset-distribution sha256:6bf6a440301e -->
 
 The documentation is the repository's [docs folder](https://github.com/marcoaureliomenezes/dadaia-workspace/tree/main/docs):
@@ -149,7 +149,7 @@ The documentation is the repository's [docs folder](https://github.com/marcoaure
 
 ## Links
 
-<!-- derived-from: pypi-distribution sha256:a360b84790ff -->
+<!-- derived-from: pypi-distribution sha256:41df64f3512e -->
 
 - GitHub — <https://github.com/marcoaureliomenezes/dadaia-workspace>
 - PyPI — <https://pypi.org/project/dadaia-workspace/>

@@ -39,7 +39,7 @@ ADR: 0176 (accepted)
 Rationale: a hand-kept `modules =` list hid three real sibling edges from the check.
 
 ### P-09 · We resolve the whole Invocation — workspace root, session, context, specs dir, the session's Bind — once per process in `core.invocation.resolve`, imported directly only by `cli._specs_resolution`, `container` and `hooks`.
-Measured by: `lint-imports --config setup.cfg --no-cache` — contract `bind-resolution-seam-is-a-single-home` (zero ignored imports, none ever accepted); `pytest tests/unit/core/test_invocation.py`.
+Measured by: `lint-imports --config setup.cfg --no-cache` — contract `bind-resolution-seam-is-a-single-home` (zero ignored imports, none ever accepted); `pytest tests/core/test_invocation.py`.
 ADR: 0003 (accepted)
 Rationale: every context bug came from a second resolution path answering differently.
 
@@ -49,7 +49,7 @@ ADR: 0176 (accepted)
 Rationale: a pinned exception list turns every new suppression into a reviewable diff.
 
 ### P-11 · We keep `core` file-I/O pure outside an authorized set of eight modules; new file I/O enters `core` only by joining that set on purpose.
-Measured by: `pytest tests/contract/test_core_file_io_purity.py` (AST walk; every authorized stem must exist).
+Measured by: `pytest tests/core/test_atomic_write__core_file_io_purity.py` (AST walk; every authorized stem must exist).
 ADR: none
 Rationale: joining the set is legal; arriving there unnoticed is not.
 
@@ -64,7 +64,7 @@ ADR: none
 Rationale: a diagram nobody checks is the first artifact to lie.
 
 ### P-14 · We keep the release-state reader pure: `core/release_state.py` parses and serializes already-read text and performs no file I/O.
-Measured by: `pytest tests/contract/test_release_state_read_only.py`.
+Measured by: `pytest tests/core/test_atomic_write__core_file_io_purity.py`.
 ADR: 0004 (accepted)
 Rationale: a reader that can write is a reader that can rewrite history.
 
@@ -74,7 +74,7 @@ ADR: 0004 (accepted)
 Rationale: an open envelope accumulates fields until no consumer can fold it.
 
 ### P-17 · We map every core skill and every scoped `AGENTS.md` source to exactly one `DADAIA.md` section, every section to at least one owner, with content hashes re-recorded only by review.
-Measured by: `pytest tests/contract/test_behavior_map.py` (bijection, hash tuples, citation check, invocation grants).
+Measured by: `pytest tests/infrastructure/test_entity_doctor.py` (bijection, hash tuples, citation check, invocation grants).
 ADR: none
 Rationale: law that no asset owns is law nobody applies.
 
@@ -84,7 +84,7 @@ ADR: 0176 (accepted)
 Rationale: a hand-minted version is one more writer of one fact; the commit history already holds it.
 
 ### P-31 · We hold every repo INSIDE the workspace under `repos/<slug>/`, each its own git repository with its own `specs/`; the workspace is never a monorepo, one repo is the degenerate case of many, and bootstrap is one command (`init <dir> --harness <name> [--repo <url>]`).
-Measured by: `pytest tests/e2e/test_one_line_bootstrap.py tests/unit/core/test_workspace_resolver.py`.
+Measured by: `pytest tests/e2e/test_one_line_bootstrap.py tests/core/test_workspace_resolver.py`.
 ADR: 0015 (accepted)
 Rationale: the law, the harness projections, the zones and the venv live outside every repo; a per-repo or monorepo tool cannot govern ten projects with one law.
 

@@ -4,7 +4,7 @@ Where dadaia-workspace is published and what each channel carries.
 
 ## Channels
 
-<!-- derived-from: pypi-distribution sha256:a360b84790ff -->
+<!-- derived-from: pypi-distribution sha256:41df64f3512e -->
 
 | channel | artifact | how it is published |
 |---|---|---|
@@ -15,7 +15,7 @@ Where dadaia-workspace is published and what each channel carries.
 
 ## The PyPI metadata contract
 
-<!-- derived-from: pypi-distribution sha256:a360b84790ff -->
+<!-- derived-from: pypi-distribution sha256:41df64f3512e -->
 
 Every field PyPI renders has exactly one home:
 
@@ -36,7 +36,7 @@ Every field PyPI renders has exactly one home:
 
 ## What the wheel carries
 
-<!-- derived-from: pypi-distribution sha256:a360b84790ff -->
+<!-- derived-from: pypi-distribution sha256:41df64f3512e -->
 
 The wheel ships `dadaia_workspace/` with the full `public/` tree (`.dadaia/.venv/bin/dadaia init` still
 resolves the workspace venv's dependencies from PyPI). It does not ship the
