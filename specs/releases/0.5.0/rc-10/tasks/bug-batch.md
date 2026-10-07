@@ -82,3 +82,12 @@ Paths are relative to the repo root; aliases as in `PLAN.md` (`f/`, `pub/`, `S/`
 | task | AC | `W:` | owner tests / RED |
 |---|---|---|---|
 | JB.S5.T1 | — | `dadaia_workspace/public/entities/behavior-map.json` (skill and scripts hashes after lane A) | `test_behavior_map.py` |
+
+## Stage JB.S6 — stage-gate repairs and the map (lane A)
+
+- Contract: the stage gate of JB.S4 green again (guards v32 and v38, unit, integration) and the behavior map re-recorded last; ACs AC9.1
+
+| task | AC | `W:` | owner tests / RED |
+|---|---|---|---|
+| JB.S6.T1 | AC9.1 | `dadaia_workspace/public/skills/dd-gitflow-default/scripts/_worktree_new.py`, `dadaia_workspace/public/skills/dd-gitflow-default/scripts/_worktree_git.py`, `dadaia_workspace/public/skills/dd-release-implementation/scripts/_release_new.py`, `dadaia_workspace/public/scaffold/memory/AGENTS.md` (the line is back to its published bytes), `scripts/guards/slop.py` (one allowance row) | `test_worktree_removal.py` |
+| JB.S6.T2 | — | `dadaia_workspace/public/entities/behavior-map.json` (skill and scripts hashes after the repairs) | `test_behavior_map.py` |
