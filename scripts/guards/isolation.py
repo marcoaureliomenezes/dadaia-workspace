@@ -337,8 +337,10 @@ def small_spawns_no_process(tree: Tree) -> list[str]:
         for fn, marks in _tests(module):
             if "medium" in marks or ("small" not in marks and seam):
                 continue
+            kind = "spawn" if "small" in marks else "unmarked"
             out += [
-                f"spawn: {p}::{fn.name} starts a process ({ast.unparse(c.func)}) at line {c.lineno}"
+                f"{'hook' if 'hook' in ast.unparse(c.func) else kind}: {p}::{fn.name} "
+                f"starts a process ({ast.unparse(c.func)}) at line {c.lineno}"
                 for c in ast.walk(fn)
                 if isinstance(c, ast.Call) and _SPAWN.search(ast.unparse(c.func))
             ]
@@ -431,6 +433,34 @@ os.environ["DADAIA_PERSONA"] = time.time()
 """
 
 
+_CONTROL_SPAWN = """
+import os, pytest, subprocess
+
+@pytest.mark.medium
+def test_decorated():
+    subprocess.run(['true'])
+
+class TestOwned:
+    pytestmark = pytest.mark.medium
+    def test_inherits(self):
+        os.system('true')
+
+@pytest.mark.medium
+class TestDecoratedClass:
+    def test_inherits(self):
+        os.system('true')
+
+def test_seam_import_sizes_it_medium():
+    subprocess.run(['true'])
+
+def helper():
+    subprocess.run(['true'])
+
+def test_calls_no_spawn():
+    helper()
+"""
+
+
 def CONTROL(root: Path) -> Session:
     """Every check green: a healthy session, near-miss shapes tracked, and every violation
     only in an untracked, gitignored ``tests/tmp/x.py`` (bugs 465, 467) or in the fixture
@@ -440,6 +470,7 @@ def CONTROL(root: Path) -> Session:
     _fixture_copy(root, tail='\nos.environ["DADAIA_PERSONA"] = "x"\n')
     _write(root, "tests/unit/test_frozen_alone.py", _CONTROL_TEST.replace("HOOK", _hook()))
     _write(root, "tests/unit/test_clock_alone.py", _CONTROL_CLOCK)
+    _write(root, "tests/unit/test_spawn_exempt.py", _CONTROL_SPAWN)
     return _healthy()
 
 
@@ -547,7 +578,15 @@ CHECKS: dict[str, Check] = {
                 "tests/unit/test_spawn.py",
                 "import pytest, subprocess\n@pytest.mark.small\n"
                 "def test_x():\n    subprocess.run(['true'])\n",
-            )
+            ),
+            "unmarked": _plant(
+                "tests/unit/test_spawn.py", "import os\ndef test_x():\n    os.system('true')\n"
+            ),
+            "hook": _plant(
+                "tests/unit/test_spawn.py",
+                "from tests.fixtures.harness_env import run_hook_subprocess\n"
+                "def test_x():\n    run_hook_subprocess('pre_gate', {}, {})\n",
+            ),
         },
     ),
 }
