@@ -1,6 +1,6 @@
 # TASKS — 0.5.0 rc-10, Job 9 — evals in the library's own CI
 
-**Status:** Draft
+**Status:** Approved
 **Approval:** pending — dd-code-reviewer review of this file and the PLAN amendment; SPEC amended at e261c7e8b, ADR 0217 accepted at cdecfbbdb. The P-33 rewrite in `specs/memory/QUALITY.md` is not this job's: a principle changes only in the commit carrying its accepted ADR (`specs/memory/AGENTS.md`), so it landed on the reconcile branch at daf177d2b, so that precondition is met. J9.S3.T4 keeps the atom, the catalog and the Gates line.
 
 Paths are relative to the repo root; aliases as in `PLAN.md` (`f/`, `pub/`, `S/`, `GF/`); `ev:` = the dadaia-evals tree at c075ed6, the port's read-only source. Gates: task — `verify-task:` on the touched files plus `Owner-tests:`; stage — `verify-stage:`; job — CI matrix + one review + `verify:`. Every implementation brief carries the pre-review checklist, items 1–13. Platform facts go only through `dadaia_workspace/core/platform.py`. Host-side test code uses `Path` and `sys.executable`. Bash runs only inside a task container. `eval.yml` is ubuntu-only because the tasks need Docker.
@@ -92,4 +92,4 @@ Paths are relative to the repo root; aliases as in `PLAN.md` (`f/`, `pub/`, `S/`
 | J9.S4.T1 | AC11.5 | — (driver, operator order "Eu gravo via gh api": main gets only the dispatch-only skeleton, blob `924b17769edacf82562b12029f5425e8d17f502c`, dd-code-reviewer APPROVED, delivered once the operator lifts `enforce_admins`. At the promote, the add/add conflict on `eval.yml` takes the feature version: the stub lacks `env.CLAUDE_CODE_VERSION`, so the `eval-cli-pin` check catches a wrong pick) | check: `gh api repos/marcoaureliomenezes/dadaia-workspace/contents/.github/workflows/eval.yml?ref=main` succeeds |
 | J9.S4.T2 | AC11.6 | — (driver: `gh workflow run eval.yml --ref feature/0.5.0`, after the operator sets `CLAUDE_CODE_OAUTH_TOKEN` in Environment `evals`, branches `main` and `feature/*`; confirms `dadaia capabilities --json` names the stamped candidate and that `evals/jobs/` holds no rate-limit error) | check: the `kind: note` names the run URL, the verdict per 0178 (2), tokens and wall time |
 
-- done: Job 9 — every task landed on `wt/0.5.0-rc10/job9`: J9.S1.T1 b7d3e3310, T2 310803a6e, T3 93f92a132; J9.S2.T1 3244c920a, T2 ba505f9de, T3 ded8d4244; J9.S3.T1 edf22cb5a, T2 e73bb5e1b, T3 92d2aab63 and b716efcbb, T4 485e505bd; closed by J9.S3.T9. J9.S4 is the driver, after the merge.
+- done: Job 9 — every task landed on `wt/0.5.0-rc10/job9`: J9.S1.T1 8ec72c78e, T2 045e5227a, T3 d90143964; J9.S2.T1 8cb15d6c0, T2 46acad8ef, T3 656ed4e8d; J9.S3.T1 1aea48077, T2 ee18dd596, T3 66e1306da, T4 59910d096; closed by J9.S3.T9 89e852fad. J9.S4 is the driver, after the merge.
