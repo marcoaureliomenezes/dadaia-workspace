@@ -197,7 +197,7 @@ The agentic set audit's 15 bugs (registered at 7b0f8a1ca) and `law-one-home-per-
 Edge: Job 10 merges after Job 9 and the bug batch, and rebases on both, because they edit the same law files (the root map §3, `dd-gitflow-default` §3b, the 29 law files of the posix venv path render).
 
 - AC12.1 `.dadaia/agentic/**` and `.claude/settings.local.json` are PROTECTED, so no agent rewrites the schema or the wiring that judges it. They join the protected set the gate already reads; the engineer names its one decider (`workspace_layout.CORE_FLOOR` or the install ledger), and no second list is added. **Unit**, RED first: an agent `Write` and `Edit` to `.dadaia/agentic/schemas/handoff-v1.schema.json` and to `.claude/settings.local.json` are each blocked. (`agentic-projections-agent-writable`)
-- AC12.2 The reviewer writes its own verdict, so the merger cannot certify its own merge (ADR 0212):
+- AC12.2 The reviewer writes its own verdict, so the merger cannot certify its own merge (ADR 0218):
   - A `dd-handoff-emitter` script, run by the reviewer through Bash, writes the review handoff; it is the reviewer's only write.
   - The verdict carries `reviewed_sha` and `diff_sha256`, the hash of the job range diff the merge will land.
   - `worktree.py merge` recomputes the hash over its own range and refuses a verdict with a missing field or a mismatch.
@@ -208,7 +208,7 @@ Edge: Job 10 merges after Job 9 and the bug batch, and rebases on both, because 
 - AC12.5 Root §3 states what the code enforces. The existing law-states-what-the-code-does test extends to its block list and its fail-open list. The PR-needs-APPROVED claim names what enforces it (the merge gate) or leaves. **Unit**, RED first: the extended test fails on today's §3 and passes on the rewritten one. (`root-enforcement-section-states-false-blocks`)
 - AC12.6 One home per rule, deletion first; net law lines < 0, measured by `git diff --numstat` over the law files and stated in the close commit body:
   - The approval precondition lives only in `specs/AGENTS.md`, true to `_release_phase.py`; every other file points there. (`approval-precondition-four-versions`)
-  - Push-then-review lives once in `worktrees/AGENTS.md`, as the merge gate needs it: the job branch is pushed for CI before the review, and the verdict cites `ci_run`. Orchestration and the reviewer persona point there. (`push-before-review-forbidden-and-required`)
+  - Push-then-review lives once in `worktrees/AGENTS.md`, as the merge gate needs it: a job branch may be pushed before its review, and the merge needs the verdict; the verdict cites no CI run (ADR 0214: no remote CI is required). Orchestration and the reviewer persona point there. (`push-before-review-forbidden-and-required`)
   - Commit shapes live only in `dd-gitflow-default` §3a; worktree rules only in `worktrees/AGENTS.md`; the bug flow only in `specs/bugs/AGENTS.md`.
   - **No test** (law text). Check: the sweep greps, each with its hit count, in the commit body.
 - AC12.7 Each writer matches its tools, so no skill asks for a write its grantee cannot make:
@@ -259,7 +259,7 @@ Edge: Job 10 merges after Job 9 and the bug batch, and rebases on both, because 
 - **0210**, accepted with this SPEC's Approval (operator, 2026-10-06: "(b) Qualquer caused_by ≠ none é REBUILD (Recommended)"): any `caused_by` other than none, a bug's fix or a feature task, makes the fix a REBUILD of the unit, keeping its tests. It keeps 0186 (2) and widens 0206's "a fix-induced one" (`amends: 0206`). SPEC text, not part of the ruling, which the operator accepts at Approval: a REBUILD's revert under 0186 (2) keeps the culprit's test files, so it fits 0209. `measured_by`: the ninth `PILLAR-BUGS` metric (AC1.4).
 - The main thread proposes 0208–0210 in `decisions.jsonl` at Approval.
 - **0217**, accepted 2026-10-07 (supersedes 0177, 0179): evals live in the library repo's own CI; no context carries an evals repo; the shipped law states no model-API-in-CI rule (Job 9). `measured_by`: the guard `no-model-api-in-ci` and AC11.4's grep.
-- **0212**, proposed with Job 10 (operator, 2026-10-07: "Revisor emite o próprio (Recommended)"): the reviewer writes its own verdict; the merge gate binds it to the reviewed sha and the diff hash (AC12.2). `measured_by`: AC12.2's adversary rows.
+- **0218**, accepted on the reconcile branch (`chore(adr): accept 0217 and 0218 — the operator's rulings of 2026-10-07`; operator, 2026-10-07: "Revisor emite o próprio (Recommended)"): the reviewer writes its own verdict; the merge gate binds it to the reviewed sha and the diff hash (AC12.2). `measured_by`: AC12.2's adversary rows.
 
 ## Replaces
 
