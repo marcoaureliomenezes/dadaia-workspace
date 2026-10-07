@@ -77,10 +77,10 @@ def _refusal(root: Path, result: subprocess.CompletedProcess[str], kind: str, he
 @pytest.mark.parametrize(
     ("kind", "fields"),
     [
-        pytest.param(VALIDATE_ALL, "hand", marks=pytest.mark.xfail(strict=True, raises=AssertionError, reason="merge-gate-accepts-verdict-written-by-the-merger"), id="hand-form"),
-        pytest.param(DISPATCH, "no-hash", marks=pytest.mark.xfail(strict=True, raises=AssertionError, reason="merge-gate-accepts-verdict-written-by-the-merger"), id="no-diff-sha256"),
-        pytest.param(DISPATCH, "other-range", marks=pytest.mark.xfail(strict=True, raises=AssertionError, reason="merge-gate-accepts-verdict-written-by-the-merger"), id="other-range-hash"),
-        pytest.param(VALIDATE_ALL, "outside", marks=pytest.mark.xfail(strict=True, raises=AssertionError, reason="merge-gate-accepts-verdict-written-by-the-merger"), id="reviewed-sha-outside"),
+        pytest.param(VALIDATE_ALL, "hand", id="hand-form"),
+        pytest.param(DISPATCH, "no-hash", id="no-diff-sha256"),
+        pytest.param(DISPATCH, "other-range", id="other-range-hash"),
+        pytest.param(VALIDATE_ALL, "outside", id="reviewed-sha-outside"),
     ],
 )  # fmt: skip
 def test_a_verdict_that_does_not_bind_the_diff_it_lands_refuses(
@@ -101,9 +101,6 @@ def test_a_verdict_that_does_not_bind_the_diff_it_lands_refuses(
     _refusal(root, run(root, "merge", TREE), kind, head)
 
 
-@pytest.mark.xfail(
-    strict=True, raises=AssertionError, reason="merge-gate-accepts-verdict-written-by-the-merger"
-)
 def test_hash_prints_the_binding_a_verdict_carries(root: Path) -> None:
     head = land(root, "src/a.py")
     printed = run(root, "hash", TREE, "--sha", head)
@@ -116,9 +113,6 @@ def test_hash_prints_the_binding_a_verdict_carries(root: Path) -> None:
     }
 
 
-@pytest.mark.xfail(
-    strict=True, raises=AssertionError, reason="merge-gate-accepts-verdict-written-by-the-merger"
-)
 def test_hash_refuses_an_unknown_sha_and_a_path_that_is_not_our_worktree(root: Path) -> None:
     head = land(root, "src/a.py")
     unknown = run(root, "hash", TREE, "--sha", "0" * 40)
@@ -134,9 +128,6 @@ def test_a_stale_sha_named_by_a_verdict_refuses_for_review(root: Path) -> None:
     _refusal(root, run(root, "merge", TREE), VALIDATE_ALL, head)
 
 
-@pytest.mark.xfail(
-    strict=True, raises=AssertionError, reason="merge-gate-accepts-verdict-written-by-the-merger"
-)
 def test_a_same_patch_rebase_over_other_blobs_refuses_with_the_dispatch_line(root: Path) -> None:
     repo, tree = root / "repos/r", root / TREE
     text = "".join(f"l{i}\n" for i in range(30))
@@ -155,6 +146,14 @@ def test_a_commit_that_changes_the_diff_after_the_review_refuses(root: Path) -> 
     approve(root, land(root, "src/a.py"))
     head = commit(root / TREE, "src/b.py")
     _refusal(root, run(root, "merge", TREE), VALIDATE_ALL, head)
+
+
+def test_a_matching_verdict_tied_with_a_forged_one_refuses(root: Path) -> None:
+    first = land(root, "src/a.py")
+    head = land(root, "src/b.py")
+    approve(root, head)
+    _hand(root, head, reviewed_sha=head, diff_sha256=diff_hash(root, first))  # same moment
+    _refusal(root, run(root, "merge", TREE), DISPATCH, head)
 
 
 def test_a_bound_approval_of_head_lands(root: Path) -> None:

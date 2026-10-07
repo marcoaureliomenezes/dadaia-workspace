@@ -4,6 +4,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import re
@@ -35,6 +36,12 @@ def git(repo: Path, *args: str, check: bool = True, input: str | None = None) ->
     if check and done.returncode:
         raise RuntimeError(f"git {' '.join(args)}: {done.stderr.strip()}")
     return done.stdout
+
+
+def diff_sha256(tree: Path, work: str, tip: str) -> str:
+    """The sha256 of *tip*'s plumbing diff over its merge-base with *work*: it names blob ids, so it binds the exact bytes a fast-forward lands."""
+    base = git(tree, "merge-base", work, tip).strip()
+    return hashlib.sha256(git(tree, "diff-tree", "-r", "-z", "--full-index", base, tip).encode()).hexdigest()  # fmt: skip
 
 
 def find_root() -> Path:

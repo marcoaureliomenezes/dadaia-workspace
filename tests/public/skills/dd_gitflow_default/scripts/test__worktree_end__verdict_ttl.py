@@ -32,9 +32,6 @@ def root(tmp_path: Path) -> Path:
     return tmp_path
 
 
-@pytest.mark.xfail(
-    strict=True, raises=AssertionError, reason="verdict-ttl-shorter-than-merge-window"
-)
 def test_a_verdict_reaped_past_the_handoff_ttl_still_lands_its_merge(root: Path) -> None:
     head = land(root, "src/a.py")
     handoff = approve(root, head)

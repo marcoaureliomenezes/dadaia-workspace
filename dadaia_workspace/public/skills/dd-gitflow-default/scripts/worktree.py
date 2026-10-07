@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Canonical worktrees `worktrees/<repo>/<name>` on branch `wt/<name>`, stdlib
 only: `new` opens one, `merge` lands it after its gate, `stage` runs a job's stage gate,
-`clean` drops an empty one, `list` reads ours from git.
+`clean` drops an empty one, `hash` prints a verdict's binding, `list` reads ours from git.
 """
 
 from __future__ import annotations
@@ -14,7 +14,7 @@ from pathlib import Path
 sys.dont_write_bytecode = True
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from _worktree_end import clean, merge, stage  # noqa: E402
+from _worktree_end import clean, digest, merge, stage  # noqa: E402
 from _worktree_git import find_root, rows  # noqa: E402
 from _worktree_names import Refusal  # noqa: E402
 from _worktree_new import new  # noqa: E402
@@ -42,6 +42,9 @@ def main(argv: list[str] | None = None) -> int:
             "--keep", nargs="+", default=[], help="ignored files to copy into the repo"
         )
         end.add_argument("--drop", action="store_true", help="discard the other ignored files")
+    seal = verbs.add_parser("hash", help="the diff_sha256 binding a verdict carries for a sha")
+    seal.add_argument("path")
+    seal.add_argument("--sha", required=True)
     verbs.add_parser("list", help="our dadaia:-locked worktrees").add_argument(
         "--json", action="store_true"
     )
@@ -53,6 +56,9 @@ def main(argv: list[str] | None = None) -> int:
             return 0
         if args.verb == "stage":
             print(f"[ok] {stage(root, args.path)}")
+            return 0
+        if args.verb == "hash":
+            print(digest(root, args.path, args.sha))
             return 0
         if args.verb in ("merge", "clean"):
             end_verb = merge if args.verb == "merge" else clean

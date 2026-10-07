@@ -23,6 +23,7 @@ from _worktree_git import (
     _env,
     cli,
     cli_line,
+    diff_sha256,
     flow_for,
     git,
     git_line,
@@ -231,8 +232,9 @@ def _series(tree: Path, work: str, tip: str) -> list[tuple[str, str]]:
 
 
 def _check_approved(root: Path, tree: Path, work: str, name: str) -> None:
-    """The newest dd-code-reviewer handoffs naming a candidate sha decide: each must be a valid
-    APPROVED (ADR 0110). A candidate is a sha X of this branch's reflog whose (patch-id, message)
+    """The newest dd-code-reviewer handoffs whose `reviewed_sha` is a candidate sha decide: each must
+    be a valid APPROVED (ADR 0110) whose `diff_sha256` is HEAD's (ADR 0218), read from the handoff
+    zone and from the reaper's hold of it. A candidate is a sha X of this branch's reflog whose (patch-id, message)
     series over *work*..X equals HEAD's, in order (ADR 0168); X == HEAD is the degenerate case;
     the reflog's base (series []) matches only an empty branch. Newest is the schema-required
     `produced_at`, across every candidate (a newer verdict on a carried-over sha overrules an
@@ -245,7 +247,7 @@ def _check_approved(root: Path, tree: Path, work: str, name: str) -> None:
     reflog = {head, *git(tree, "reflog", "--format=%H", branch(name), check=False).split()}
     shas = {x for x in reflog if x == head or _series(tree, work, x) == mine}
     named = []
-    for handoff in (root / ".dadaia" / "handoff").glob("*/*.handoff.json"):
+    for handoff in [*root.glob(".dadaia/handoff/*/*.handoff.json"), *root.glob(".dadaia/reaped/*/.dadaia/handoff/*/*.handoff.json")]:  # fmt: skip
         try:
             data = json.loads(handoff.read_text(encoding="utf-8"))
         except (OSError, ValueError):
@@ -253,7 +255,7 @@ def _check_approved(root: Path, tree: Path, work: str, name: str) -> None:
         if (
             isinstance(data, dict)
             and data.get("agent") == REVIEWER
-            and any(sha in str(data.get("scope")) for sha in shas)
+            and str(data.get("reviewed_sha")) in shas
         ):
             try:
                 at = datetime.fromisoformat(str(data.get("produced_at")))
@@ -262,7 +264,8 @@ def _check_approved(root: Path, tree: Path, work: str, name: str) -> None:
                 moment = None
             named.append((moment is None, moment or 0.0, str(handoff), data))
     top = max((row[:2] for row in named), default=None)
-    for unparsed, _, path, data in sorted(row for row in named if row[:2] == top):
+    decided = sorted(row for row in named if row[:2] == top)
+    for unparsed, _, path, data in decided:
         if (
             unparsed
             or data.get("verdict") != "APPROVED"
@@ -270,14 +273,27 @@ def _check_approved(root: Path, tree: Path, work: str, name: str) -> None:
         ):
             break
     else:
-        if named:
-            return
         path = "--all"
+        if named:
+            want = diff_sha256(tree, work, head)
+            if all(row[3].get("diff_sha256") == want for row in decided):
+                return
+            raise Refusal(f"no {REVIEWER} verdict binds the diff {head} lands",
+                          f"Operator action: dispatch {REVIEWER} on {tree} at HEAD {head}; its verdict.py run writes the verdict")  # fmt: skip
     raise Refusal(
         f"the newest {REVIEWER} handoff naming HEAD {head} or a sha of its patch and message"
         " series is not a valid APPROVED (the file comes from the reviewer's verdict)",
         cli_line(root, "reports", "validate", path),
     )
+
+
+def digest(root: Path, path: str, sha: str) -> str:
+    """The binding a verdict carries for *sha* of a worktree, as one JSON object."""
+    _, tree, name, onto = _target(root, path)
+    if git(tree, "rev-parse", "--verify", "--quiet", f"{sha}^{{commit}}", check=False).strip() != sha:  # fmt: skip
+        raise Refusal(f"{sha} is not a commit sha of {tree}", f"Operator action: pass a 40-hex commit of {tree}")  # fmt: skip
+    scope = f"{branch(name)}@{git(tree, 'rev-parse', 'HEAD').strip()}"
+    return json.dumps({"root": str(root), "scope": scope, "reviewed_sha": sha, "diff_sha256": diff_sha256(tree, onto, sha)})  # fmt: skip
 
 
 def _into(repo: Path, onto: str) -> Path:
