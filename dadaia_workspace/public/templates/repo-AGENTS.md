@@ -49,9 +49,9 @@ Fill these in during onboarding:
 
 - Agents should prefer these commands over guessing toolchains.
 
-Declare this repo's test paths, one line of space-separated globs — the worktree merge freezes them from the RED stage on and refuses every merge while the line is empty (`worktrees/AGENTS.md` §2):
+Declare this repo's test paths, one line of space-separated globs (a language-neutral default; narrow it to this repo's own) — the worktree merge freezes them from the RED stage on and refuses every merge while the line is empty (`worktrees/AGENTS.md` §2):
 
-tests:
+tests: tests/** test/** **/test_*.* **/*_test.* **/*.test.* **/*.spec.*
 
 ## 5. Tree hygiene
 
