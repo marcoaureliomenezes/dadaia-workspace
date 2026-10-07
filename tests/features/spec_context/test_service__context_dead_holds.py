@@ -163,7 +163,7 @@ _REFUSALS = [
     pytest.param("lib", lambda r: (r / "README.md").write_text("edited\n"), DeadReviewRequiredError, r"^Context 'proj': repo 'lib' has 1 uncommitted change\(s\); dead never commits", id="AC3.2-dirty-refusal-names-context-and-repo"),
     pytest.param("lib", _no_remote, DeadUnpushedCommitsError, "lib", id="A16.2-local-commits-no-remote-in-lib"),
     pytest.param("main", _repos_outside, ContextStateError, rf"skipped 'repos/main' \(outside the workspace\)\nfix: Operator action: free \S+{re.escape(str(Path('/', 'repos', 'main')))} for the move", id="AC2.11-hold-refused"),
-    pytest.param("lib", _url_less, RepoUrlMissingError, r"fix: Operator action: add the clone URL of \S+/repos/lib as its origin remote", id="url-less-never-clone-back"),
+    pytest.param("lib", _url_less, RepoUrlMissingError, r"fix: Operator action: add the clone URL of \S+[\\/]repos[\\/]lib as its origin remote", id="url-less-never-clone-back"),
 ]  # fmt: skip
 
 
