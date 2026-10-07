@@ -12,8 +12,6 @@ import subprocess
 import sys
 from pathlib import Path
 
-from _ledger import workspace_of
-
 
 def find_specs(given: Path | None, *, ledger: str | None = None) -> Path:
     """*given*, else the nearest git-rooted ``specs/`` at or above the cwd — never created:
@@ -32,6 +30,8 @@ def find_specs(given: Path | None, *, ledger: str | None = None) -> Path:
 
 
 def _bound_fix(here: Path, rerun: str, ledger: str | None) -> tuple[str, str]:
+    from _ledger import workspace_of
+
     for root, venv in ((d, d / ".dadaia" / ".venv") for d in filter(None, [workspace_of(here)])):
         if cli := shutil.which("dadaia", path=f"{venv / 'bin'}{os.pathsep}{venv / 'Scripts'}"):
             shown = subprocess.run(
