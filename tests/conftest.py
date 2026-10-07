@@ -426,6 +426,12 @@ def _hermetic_cwd(
 
 
 @pytest.fixture(autouse=True)
+def _plain_help(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Typer reads GITHUB_ACTIONS/FORCE_COLOR at import and then colours CliRunner help."""
+    monkeypatch.setattr("typer.rich_utils.FORCE_TERMINAL", False)
+
+
+@pytest.fixture(autouse=True)
 def _repo_root_write_guard() -> object:
     """Assert no new files appear in protected lib-repo paths during a test.
 
