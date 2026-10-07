@@ -30,4 +30,28 @@ Paths are relative to the repo root; aliases as in `PLAN.md` (`f/`, `pub/`, `S/`
 |---|---|---|---|
 | JR.S3.T1 | AC4.5, AC10.2 | `specs/memory/QUALITY.md` (`## Bugs`: the first block by `bugs.py balance --write` after the sweep, then the written review with the latest evals verdict line), `specs/memory/product/**/bug-ledger.md` and `specs/memory/product/catalog.json` (the atom move), `docs/bug-ledger-lessons.md` (re-derived from `## Bugs`, one merge, 0192), `CONTEXT.md` (the SPEC's Terms) | `release.py check`, `test_docs_derived_from_memory.py` |
 | JR.S3.T2 | AC10.2, AC10.5 | `specs/releases/0.5.0/_RELEASE.json` (readouts, AC8.1's readout, each job's merge entry and bug-surface delta; phase) | `release.py check` |
-| JR.S3.T4 | — | this file | close task, last: behavior map and derived docs; `test-audit: no test touched`, `mutation: skipped — no Python source`; `done` |
+
+## Stage JR.S4 — RED amendment (eval run 37652269562, bug `onboarding-writes-no-tests-line`)
+
+- Contract: a RED-stage amendment (ADR 0209), approved on the reviewer's APPROVED by operator delegation ("Delego: APPROVED do revisor basta (Recommended)", 2026-10-06: TASKS and test amendments); the bug is registered by delegation ("Registra e corrige se o revisor reproduzir (Recommended)"): the eval grader reproduced it 3/3. ADR 0216 says onboarding writes the `tests:` line; no code does, so a repo whose `AGENTS.md` predates onboarding refuses every merge (`this repo declares no tests: line`) and `t2-block-list-bug` scored 0/3 against 3/3. Exit: the new rows fail by assertion at HEAD; ACs AC6.0, AC11.6
+
+| task | AC | `W:` | owner tests / RED |
+|---|---|---|---|
+| JR.S4.T1 | AC6.0 | `tests/features/specs/test_canon__scaffold_repo_law.py` (new rows only: a present `AGENTS.md` with no `tests:` line gains the template's `tests:` line, appended, its own text kept byte for byte; a present `tests:` line, empty or not, is left alone; the shipped template's `tests:` line is non-empty), `tests/cli/` specs-init owner file if `specs init` needs its own row (a repo whose `AGENTS.md` lacks `tests:` leaves `specs init` declaring a non-empty `tests:` line) | RED: each new row fails by assertion at HEAD; no existing assert changes |
+
+## Stage JR.S5 — onboarding declares the tests: line
+
+- Contract: exit the JR.S4 rows green and `test_present_law_is_never_overwritten` unchanged and green; envelope `dadaia_workspace/features/specs/canon.py`, `dadaia_workspace/cli/commands/specs.py`, `dadaia_workspace/public/templates/repo-AGENTS.md`, `dadaia_workspace/public/entities/behavior-map.json`; ACs AC6.0, AC11.6
+
+| task | AC | `W:` | owner tests / RED |
+|---|---|---|---|
+| JR.S5.T1 | AC6.0 | `dadaia_workspace/public/templates/repo-AGENTS.md` (its `tests:` line carries the one default, language-neutral glob set — the only place the default lives), `dadaia_workspace/features/specs/canon.py` (one function, called by `specs init` beside `scaffold_repo_law`, appends the template's `tests:` line to a present `AGENTS.md` that has none; `scaffold_repo_law` keeps "never overwritten"), `dadaia_workspace/cli/commands/specs.py` (the call and its `[created]`/`[declared]` line), `dadaia_workspace/public/entities/behavior-map.json` (re-recorded) | JR.S4.T1's rows; bug `onboarding-writes-no-tests-line` resolved by this task; sweep `git grep -n '^tests:' -- dadaia_workspace` names one default |
+
+## Stage JR.S6 — the eval and closure
+
+- Contract: exit tests `release.py check` in CLOSURE, `bugs.py status` `0 open`, eval.yml green on `feature/0.5.0` (AC11.6); envelope `specs/memory/QUALITY.md`, `specs/releases/0.5.0/_RELEASE.json`, `specs/backlog/**`, this rc's job files; ACs AC10.2, AC10.4, AC11.6
+
+| task | AC | `W:` | owner tests / RED |
+|---|---|---|---|
+| JR.S6.T1 | AC11.6, AC10.4 | `specs/memory/QUALITY.md` (the eval verdict line of the rerun), `specs/releases/0.5.0/_RELEASE.json` (the rerun's note), `specs/backlog/**` (`agent-behavior-evals` exits `delivered --release 0.5.0`; ADR 0220 cited where the multi-platform entry says its ADR has no id) | `release.py check`, `backlog.py check` |
+| JR.S6.T2 | — | this file | close task, last: behavior map and derived docs; `test-audit: no test touched`, `mutation: skipped — no Python source`; `done` |
