@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-10-07T16:35:14Z",
+  "generated_at": "2026-10-07T16:35:26Z",
   "features": [
     {
       "rank": 1,
@@ -106,7 +106,7 @@
         "projection",
         "privacy"
       ],
-      "token_estimate": 1045,
+      "token_estimate": 1148,
       "depends_on": [
         "harness-kimi-code",
         "agentic-entities",

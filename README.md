@@ -134,7 +134,7 @@ hotfix job with a RED test, any other in the candidate's bug batch. Completed wo
 ## Documentation
 
 <!-- derived-from: pypi-distribution sha256:bd9f29d03eb3 -->
-<!-- derived-from: public-asset-distribution sha256:6bf6a440301e -->
+<!-- derived-from: public-asset-distribution sha256:e126ab716189 -->
 
 The documentation is the repository's [docs folder](https://github.com/marcoaureliomenezes/dadaia-workspace/tree/main/docs):
 
