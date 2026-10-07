@@ -426,14 +426,16 @@ class DoctorService:
         detail: str,
         *,
         fixable: bool | None = None,
+        fix: str = "",
     ) -> Finding:
         return Finding(
             code=f"WS-{zone.lstrip('.')}-{verdict.value}",
             path=target.relative_to(base).as_posix(),
             verdict=verdict,
-            fixable=(verdict not in _CANONICAL) if fixable is None else fixable,
+            fixable=(verdict not in _CANONICAL and not fix) if fixable is None else fixable,
             detail=detail,
             target=target,
+            fix=fix,
         )
 
     def _missing_core(self) -> list[Finding]:
@@ -475,11 +477,11 @@ class DoctorService:
         for zone, base, directory in places:
             for entry in sweep.walk(directory):
                 verdict, detail = self._judged(entry, rules)
-                credential = verdict is FindingVerdict.SLOP and entry.name == ".env"
-                if credential:  # ADR 0146: the library never touches a credential file
-                    detail = "(credentials live outside the workspace: the operator moves it out or names it in .dadaiaignore)"
-                fixable = False if credential else None
-                out.append(self._finding(zone, base, entry, verdict, detail, fixable=fixable))
+                fix = ""
+                if verdict is FindingVerdict.SLOP and entry.name in workspace_layout.NEVER_MOVED:
+                    detail = "(credentials and repositories live outside the workspace: the library never moves them)"
+                    fix = f"Operator action: move {entry.name} out of the workspace, or name it in .dadaiaignore"
+                out.append(self._finding(zone, base, entry, verdict, detail, fix=fix))
         return out
 
     def _scan_canon_zone(

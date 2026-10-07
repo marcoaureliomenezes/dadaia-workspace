@@ -79,6 +79,10 @@ DADAIAIGNORE: str = ".dadaiaignore"
 #: so neither a ``.gitignore`` nor a ``.git/`` is canon there (ADR 0092: ``.dadaiaignore``).
 ROOT_ALLOWED_FILES: frozenset[str] = frozenset({"AGENTS.md", "prompt.md", DADAIAIGNORE})
 
+#: Entries the doctor reports and never moves: a credential file (ADR 0146) and a repository's
+#: history — the operator moves them out or names them in ``.dadaiaignore``.
+NEVER_MOVED: frozenset[str] = frozenset({".env", ".git"})
+
 
 class FloorRefusal(StrEnum):
     """Why a PROTECTED write is refused; its message is ``REFUSALS[refusal]``."""
