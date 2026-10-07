@@ -23,8 +23,6 @@ description: >
    feeding another agent gets a handoff under `.dadaia/handoff/<context>/`.
 5. Opening, dispatching into and merging worktrees: `worktrees/AGENTS.md`.
 6. The task is the unit of dispatch (ADR 0190), never a job: sub-agents work one stage's tasks in parallel, one per task worktree (`worktrees/AGENTS.md` §1); an edit inside an open job is its driver's own and lands as one of its tasks; each job's `kind: merge` entry counts its `dispatches`.
-7. The review/QA sequence holds by discipline (main thread, implementer, reviewer
-   each uphold their half); git chokepoints are the only mechanical backstop.
 
 ## 2. Conflict resolution
 
@@ -63,7 +61,7 @@ description: >
 |---|---|
 | Recursive agent chains without operator approval | Breaks traceability |
 | Marking tasks DONE without validation evidence | Skips acceptance |
-| Push, PR, merge, deploy or closure before the reviewer's `APPROVED` | Bypasses the quality gate |
+| Writing a verdict, or merging, deploying or closing before the reviewer's `APPROVED` | `worktrees/AGENTS.md` §2 |
 | Editing production files outside a job's or task's worktree | Breaks task traceability |
 | Dispatching an edit smaller than a task into an open job | Micro-dispatch: the ritual wait it adds outweighs the edit |
 | Private/project-specific details in public assets | Security and portability |
