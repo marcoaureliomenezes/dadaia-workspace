@@ -5,8 +5,7 @@ T-010-26 / bug pre-push-gate-cannot-locate-workspace-venv. The gate
 priority order:
 
   1. walk UP from the repo root to ``<ws>/.dadaia/.venv/bin/dadaia``
-  2. ``poetry`` on PATH
-  3. repo-local ``.venv/bin/dadaia``
+  2. repo-local ``.venv/bin/dadaia``
   None found → fail CLOSED with a clear error.
 
 These tests build fake directory trees + stub executables and drive the real
@@ -105,13 +104,7 @@ def _run_probe(repo_dir: Path, *, path_dirs: list[Path]) -> subprocess.Completed
             "workspace-venv",
         ),
         (
-            # No workspace venv → poetry on PATH is used.
-            "poetry_on_path",
-            None,  # handled specially below (needs a poetry stub on the bin_dir)
-            "poetry",
-        ),
-        (
-            # No workspace venv, no poetry → repo-local .venv/bin/dadaia.
+            # No workspace venv → repo-local .venv/bin/dadaia.
             "repo_local_venv",
             None,  # handled specially below
             "repo-venv",
@@ -134,16 +127,6 @@ def test_runner_resolution_branch_table(
         assert expect_label in res.stdout
         assert str(ws_dadaia) in res.stdout
         assert "poetry" not in res.stdout
-        return
-
-    if name == "poetry_on_path":
-        repo = tmp_path / "lonely-repo"
-        repo.mkdir(parents=True)
-        bin_dir = _make_repo_with_fake_git(tmp_path, repo)
-        _write_executable(bin_dir / "poetry")
-        res = _run_probe(repo, path_dirs=[bin_dir])
-        assert res.returncode == 0, res.stderr
-        assert expect_label in res.stdout
         return
 
     # repo_local_venv
