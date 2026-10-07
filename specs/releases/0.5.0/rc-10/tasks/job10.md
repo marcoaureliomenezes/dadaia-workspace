@@ -1,7 +1,7 @@
 # TASKS — 0.5.0 rc-10, Job 10 — one home per rule
 
 **Status:** Draft
-**Approval:** pending — dd-code-reviewer re-review of this file and the PLAN amendment (the delta since the first Job 10 definition commits); SPEC `## Job 10` (`docs(spec): rc-10 Job 10 — one home per rule …`); ADR 0218, accepted on `wt/0.5.0-rc10/reconcile` (`chore(adr): accept 0217 and 0218 — the operator's rulings of 2026-10-07`).
+**Approval:** dd-code-reviewer APPROVED 2026-10-07T04:38Z on the define head `docs(specs): amend rc-10 AC12.2 lead to what ADR 0218 binds` ("Every finding from the last round is closed"), the delta re-review of this file and the PLAN amendment; ADR 0218 accepted.
 
 Paths are relative to the repo root; aliases as in `PLAN.md` (`f/`, `pub/`, `S/`, `bugres/`, `relimpl/`, `GF/`). Gates: task — `verify-task:` on the touched files plus `Owner-tests:`; stage — `verify-stage:`; job — `verify:` + one review. Every implementation brief carries the pre-review checklist, items 1–13 (`~/.claude/rules/private-pre-review-checklist.md`). Platform facts go only through `dadaia_workspace/core/platform.py`; every row holds on Windows by construction (a path is a `Path`, a child process is `sys.executable`, the venv CLI is the form `PLATFORM` names: `.dadaia/.venv/Scripts/dadaia.exe` on win32). Commits and branches are cited by subject; a sha moves at every rebase.
 
