@@ -110,7 +110,9 @@ def test_doctor_lists_the_contexts_worktrees_from_git_and_touches_none(tmp_path:
     found = {f.message.split(" ", 1)[1].split("  ")[0]: f for f in doctor.check_worktrees("c")}
 
     assert found[str(ready)].verdict == "warning"
-    assert found[str(ready)].fix == shell_line(sys.executable, str(worktree_ws.SCRIPT), "merge", str(ready))
+    assert found[str(ready)].fix == shell_line(
+        sys.executable, str(worktree_ws.SCRIPT), "merge", str(ready)
+    )
     assert found[str(empty)].message.startswith("empty") and found[str(empty)].fix == ""
     assert found[str(foreign)].message.startswith("foreign")  # the expired TTL entry surfaces here
     assert not [f for f in doctor.scan_ttl() if "20200101" in f.path]
