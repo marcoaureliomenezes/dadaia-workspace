@@ -167,7 +167,6 @@ def test_each_level_runs_only_its_steps() -> None:
     ]  # fmt: skip
 
 
-@pytest.mark.xfail(strict=True, raises=AssertionError, reason="AC11.1 owner tests: tests/ only")
 def test_a_grader_under_evals_is_no_owner_test() -> None:
     """AC11.1: the task level's owner tests are ``test_*.py`` under ``tests/``; an eval grader
     holds no test function, so it is linted but gets no ``owner tests`` step."""

@@ -14,7 +14,8 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 PY = sys.executable
-SRC = ["dadaia_workspace/", "tests/", "scripts/"]
+# ruff errors on an absent path, so only the trees this checkout has.
+SRC = [d for d in ("dadaia_workspace/", "tests/", "scripts/", "evals/") if (ROOT / d).is_dir()]
 # -n 2 caps the workers (machine limit); pytest-randomly, in the dev group, shuffles the order.
 PYTEST = [PY, "-m", "pytest", "-q", "-n", "2", "--durations=25"]
 
@@ -86,7 +87,7 @@ STAGE = ("lint", "typecheck", "guards", "unit-fast")
 def _task(files: list[str]) -> list[Step]:
     """The task level over the touched *files*: format, lint, types, then the touched tests."""
     py = [f for f in files if f.endswith(".py")]
-    tests = [f for f in py if Path(f).name.startswith("test_")]
+    tests = [f for f in py if f.startswith("tests/") and Path(f).name.startswith("test_")]
     src = [f for f in py if f not in tests and f.startswith(("dadaia_workspace/", "scripts/"))]
     return [
         *(
