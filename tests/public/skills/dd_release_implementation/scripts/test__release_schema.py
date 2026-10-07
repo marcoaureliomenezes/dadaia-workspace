@@ -5,6 +5,7 @@ exempt by location. Size: SMALL.
 
 from __future__ import annotations
 
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -42,3 +43,22 @@ def test_one_release_id_grammar_everywhere(tmp_path: Path, release_id: str, lega
     new = subprocess.run([sys.executable, str(_SCRIPTS / "release.py"), "new", release_id,
                           "--specs", str(tmp_path / "specs")], capture_output=True, text=True)  # fmt: skip
     assert (new.returncode == 0) is legal, new.stderr
+
+
+@pytest.mark.xfail(strict=True, raises=AssertionError, reason="bug-balance-cuts-a-non-utc-closure-day-to-local")  # fmt: skip
+def test_the_release_instant_reader_reads_an_instant_with_no_offset_as_utc() -> None:
+    """bug-balance-cuts-a-non-utc-closure-day-to-local (redo of 3fdfebebc): `_utc` reads every
+    instant in UTC — an offset converts, `Z` and `+00:00` are UTC, no offset is UTC and never
+    the host's zone (run on a host three hours behind UTC), a malformed one raises ValueError."""
+    probe = (
+        "import sys; sys.path.insert(0, sys.argv[1]); import _release_schema as r\n"
+        "for ts in sys.argv[2:]:\n"
+        "    try: print(r._utc(ts).isoformat())\n"
+        "    except ValueError: print('ValueError')\n"
+    )  # fmt: skip
+    instants = ["2026-10-06T23:30:00", "2026-10-06T23:30:00Z", "2026-10-06T23:30:00+00:00",
+                "2026-10-06T23:30:00-03:00", "not-a-timestamp", ""]  # fmt: skip
+    env = {**os.environ, "TZ": "UTC+3"}
+    out = subprocess.run([sys.executable, "-c", probe, str(_SCRIPTS), *instants],
+                         capture_output=True, text=True, env=env, check=True)  # fmt: skip
+    assert out.stdout.split() == ["2026-10-06T23:30:00+00:00"] * 3 + ["2026-10-07T02:30:00+00:00"] + ["ValueError"] * 2  # fmt: skip
