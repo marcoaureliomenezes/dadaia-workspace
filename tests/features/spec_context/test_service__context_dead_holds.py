@@ -35,23 +35,22 @@ from pathlib import Path
 
 import pytest
 
-pytest.importorskip("fcntl")
-
-from dadaia_workspace.container import scan_publish_candidates  # noqa: E402
-from dadaia_workspace.core.exceptions import ContextStateError, RepoUrlMissingError  # noqa: E402
-from dadaia_workspace.core.models.spec_context import (  # noqa: E402
+from dadaia_workspace.container import scan_publish_candidates
+from dadaia_workspace.core.exceptions import ContextStateError, RepoUrlMissingError
+from dadaia_workspace.core.models.spec_context import (
     AssociatedRepo,
     ContextState,
     SpecContextProject,
 )
-from dadaia_workspace.features.spec_context.service import (  # noqa: E402
+from dadaia_workspace.core.platform import PLATFORM
+from dadaia_workspace.features.spec_context.service import (
     DeadReviewRequiredError,
     DeadUnpushedCommitsError,
     SpecContextService,
 )
-from dadaia_workspace.infrastructure.git_subprocess import GitSubprocessClient  # noqa: E402
+from dadaia_workspace.infrastructure.git_subprocess import GitSubprocessClient
 from dadaia_workspace.infrastructure.json_context_store import JsonContextStore
-from tests.fixtures.stores import context_store, workspace_cli
+from tests.fixtures.stores import context_store, fake_venv
 from tests.helpers.privacy_fixtures import aws_key_shape
 
 pytestmark = pytest.mark.slow
@@ -85,8 +84,9 @@ def _alive(
     bare = _published(tmp_path, repo)
     lib = _published(tmp_path, ws / "repos" / "lib")
     store = context_store(ws / ".dadaia" / "states")
-    flow = {"work": "feature/"}  # the stub CLI names the set's gitflow to worktree.py list
-    workspace_cli(ws, {"main_repo": "main", "associated_repos": [{"slug": "lib"}], "gitflow": flow})
+    # the real CLI worktree.py lists through
+    cli = fake_venv(ws).with_name(f"dadaia{PLATFORM.venv_exe_suffix}")
+    shutil.copy2(Path(sys.executable).with_name(cli.name), cli)
     store.save(
         SpecContextProject(
             "proj", ContextState.ALIVE, "main", str(bare), "2026-09-27T00:00:00+00:00",
@@ -158,7 +158,7 @@ _REFUSALS = [
     pytest.param("main", _worktree, DeadUnpushedCommitsError, r"fix: git -C \S+ worktree remove ", id="C2-registered-worktree"),
     pytest.param("lib", partial(_wt, checked_out=True), DeadUnpushedCommitsError, rf"fix: {re.escape(sys.executable)} \S+worktree\.py merge \S+/worktrees/lib/0\.5\.0-rc1/j1$", id="AC1.10-open-wt-worktree"),
     pytest.param("main", partial(_wt, checked_out=False), DeadUnpushedCommitsError, rf"fix: {re.escape(sys.executable)} \S+worktree\.py merge \S+/worktrees/main/0\.5\.0-rc1/j1$", id="AC1.10-unpushed-orphan-wt"),
-    pytest.param("main", lambda r: (r.parents[1] / ".dadaia/.venv/bin/dadaia").unlink(), DeadUnpushedCommitsError, r"no workspace CLI[\s\S]*fix: uvx dadaia-workspace init \S+/ws$", id="AC1.10-rows-unreadable-fails-closed"),
+    pytest.param("main", lambda r: (r.parents[1] / ".dadaia/.venv" / PLATFORM.venv_scripts_dir / f"dadaia{PLATFORM.venv_exe_suffix}").unlink(), DeadUnpushedCommitsError, r"no workspace CLI[\s\S]*fix: uvx dadaia-workspace init \S+/ws$", id="AC1.10-rows-unreadable-fails-closed"),
     pytest.param("lib", lambda r: (r / "leftover.txt").write_text("x\n"), DeadReviewRequiredError, r"lib[\s\S]*leftover\.txt", id="A16.2-untracked-in-lib"),
     pytest.param("lib", lambda r: (r / "README.md").write_text("edited\n"), DeadReviewRequiredError, r"^Context 'proj': repo 'lib' has 1 uncommitted change\(s\); dead never commits", id="AC3.2-dirty-refusal-names-context-and-repo"),
     pytest.param("lib", _no_remote, DeadUnpushedCommitsError, "lib", id="A16.2-local-commits-no-remote-in-lib"),
@@ -220,7 +220,6 @@ def test_dead_holds_every_repo_of_the_set_under_reaped(
     assert store.get("proj").state is ContextState.DEAD  # type: ignore[union-attr]
 
 
-@pytest.mark.windows
 def test_c2_a_nested_foreign_worktree_is_refused_and_its_fix_clears_it(tmp_path: Path) -> None:
     """A gitignored linked worktree of ANOTHER repo nested in the checkout: the hold
     would skip it, so dead refuses up front instead of recording DEAD with the repo on
