@@ -7,6 +7,7 @@ import json
 import os
 import subprocess
 import sys
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import jsonschema
@@ -157,3 +158,52 @@ def test_a_slug_that_climbs_out_is_refused_and_writes_nothing(tmp_path: Path) ->
     refused = _verdict(root, tree, sha=head, slug="../x")
     assert refused.returncode != 0 and refused.stderr
     assert _written(root) == [] and not (root / ".dadaia/handoff/x").exists()
+
+
+def _tree_files(top: Path) -> set[Path]:
+    return {p for p in top.rglob("*") if p.is_file() and ".git" not in p.parts}
+
+
+@pytest.mark.parametrize("name", ["--context", "--slug"])
+@pytest.mark.parametrize("bad", ["../../evil", "a/b", "a\\b", "_x", "A", ""])
+def test_a_bad_context_or_slug_is_refused_by_name_and_writes_nothing_anywhere(
+    tmp_path: Path, name: str, bad: str
+) -> None:
+    root, tree, head = _workspace(tmp_path)
+    before = _tree_files(tmp_path)
+    refused = _verdict(root, tree, sha=head, **{name: bad})
+    assert refused.returncode == 1
+    assert refused.stderr.startswith(f"[error] {name} must match ")
+    assert "Traceback" not in refused.stderr
+    assert _tree_files(tmp_path) == before
+
+
+@pytest.mark.parametrize("stdin", ["[1]", "3", "null", '"s"'])
+def test_a_non_object_json_is_refused_with_text_and_no_traceback(
+    tmp_path: Path, stdin: str
+) -> None:
+    root, tree, head = _workspace(tmp_path)
+    refused = _verdict(root, tree, sha=head, stdin=stdin)
+    assert refused.returncode == 1
+    assert refused.stderr == "[error] stdin is not a JSON object\n"
+    assert _written(root) == []
+
+
+def test_a_verdict_in_a_second_already_taken_never_overwrites_the_first(tmp_path: Path) -> None:
+    root, tree, head = _workspace(tmp_path)
+    out = root / ".dadaia/handoff/c"
+    out.mkdir(parents=True)
+    now = datetime.now(UTC)
+    taken = [
+        out / f"{now + timedelta(seconds=i):%Y-%m-%dT%H%M%SZ}-dd-code-reviewer-s.handoff.json"
+        for i in range(-2, 8)  # every second the run can stamp
+    ]
+    for path in taken:
+        path.write_text("first")
+    refused = _verdict(root, tree, sha=head)
+    assert refused.returncode == 1
+    assert refused.stderr.startswith("[error] ") and refused.stderr.endswith(
+        "exists; rerun in a second\n"
+    )
+    assert [p.read_text() for p in taken] == ["first"] * len(taken)
+    assert set(_written(root)) == set(taken)
