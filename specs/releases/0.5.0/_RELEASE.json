@@ -1233,6 +1233,24 @@
       "agent": "dd-software-engineer",
       "kind": "reviews",
       "text": "Bug-surface delta of each rc-10 job, from its APPROVED dd-code-reviewer handoff (.dadaia/handoff, verdict instant in the file name). Job 5 (verdict 2026-10-06T170459Z on d13b0eb0c, CI 37499451940): unchanged; one decider's boolean became a stated reason, the installer/doctor double decider predates the job and is registered. Job 1 (2026-10-06T182344Z on 8e6448f13, CI 37509126941): rebase unchanged; reduced in deciders (one fix reader, one decider per memory-window bound), net-positive in lines. Job 4 (2026-10-06T205614Z on fe539b1fd, CI 37528915391): reduced on the release check (one fix-line home, no cross-skill private import); the bug balance itself is the approved AC4 feature. Job 7 (2026-10-07T004103Z on 4521a1f9c, CI 37552414517): tier machinery shrinks; the Windows surface grows until the bug batch re-widens the selector. Job 8 (2026-10-07T013508Z on cc5b3b01f, CI 37557756294): reduced; the spec_context autouse patch and the hook-stdin guard deleted, isolation guard -50 lines, one decider. Job 6 (2026-10-07T031336Z on 955595313, CI 37565084462): reduced; fail-open paths closed, no freeze bug in the ledger, source net +7 lines (one refusal branch, justified in d9546e432). Job 9 (2026-10-07T055425Z on ebab9e479, CI 37577736015): the guard grows locally (about +190 code lines, 14 functions, 41 plants), context-wide deciders 3 to 1, a second repo and the shipped model-API law gone; ledger 836 total, 25 open, untouched. Bug batch (2026-10-07T155927Z on 0bfb9e46e, CI 37646189889; the delta judged 217bc3a70..0bfb9e46e): reduced; the freeze and bugs check read one task-id grammar, pinned equal by a parity row, source net +2, no new branch, flag or path; ledger 845 total and 0 open at 217bc3a70, 846 total and 0 open at the head. Job 10 (2026-10-07T160546Z on 0618ddf35, CI 37647117575): the three HIGHs of ab009c72d closed, verdict.py's traversal guard, exclusive create and object check pinned with no source growth; the job-level answer of the prior review stands: increased on the venv guard and the merge gate, by operator ruling, with the MEDIUMs logged for the next batch. Jobs 2 and 3 (APPROVED in the evals repo at dc7ba632d, unchanged for existing features, and c075ed6f7, reduced) were annulled by the operator's ruling and replaced by Job 9; they carry no merge entry."
+    },
+    {
+      "ts": "2026-10-07T16:44:44Z",
+      "agent": "dd-software-engineer",
+      "kind": "note",
+      "text": "rc-10 convergence readouts (AC4.2, AC4.3, AC10.2; Q2, Q2b), gating nothing, from `bugs.py balance --specs specs` at 4ec4bcea6 (feature/0.5.0 head, 893 records: 861 live, 32 archived): Laplace trend, continuous time, days axis, window 0.4.5..0.5.0, T = 40 days: u = 14.48, diverging (counted 376 of 893 records; set apart: 452 with release unknown, 65 with no found_in, 0 outside the window). Records found on an already settled surface: 6. Defective-fix rate per rc (caused_by set over found in the rc): rc-6 2/8 25%, rc-7 6/23 26%, rc-8 20/26 76%, rc-9 4/7 57%, rc-10 32/51 62%. The `## Bugs` block that `bugs.py balance --write` prints after the disposition sweep (JR.S3.T1) is the record of the closure; these figures are the pre-sweep reading."
+    },
+    {
+      "ts": "2026-10-07T16:44:44Z",
+      "agent": "dd-software-engineer",
+      "kind": "note",
+      "text": "AC8.1 readout (Job 8, gating nothing), from the close commit 1d1dfe3e1 and job8.md's done line: 1,185 of 1,265 small items (93.3 %) run under 100 ms (setup + call + teardown, `-m \"small and not slow and not quarantine\"`); 85 at or over. The 70 % bar the SPEC names is met."
+    },
+    {
+      "ts": "2026-10-07T16:44:44Z",
+      "agent": "dd-software-engineer",
+      "kind": "note",
+      "text": "rc-10 bug count, from the ledger (BUGS.jsonl records whose found_in is rc-10 of 0.5.0) and bugs.py status ('0 open bug(s)'): 51 found in rc-10, 51 resolved, 0 open: 7 CRITICAL, 19 HIGH, 19 MEDIUM, 6 LOW; every one resolved_release 0.5.0, so rc-10 closes with no open bug (ADR 0206)."
     }
   ]
 }
