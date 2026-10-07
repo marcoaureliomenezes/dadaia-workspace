@@ -10,7 +10,11 @@ import shlex
 import subprocess
 from pathlib import Path
 
+import pytest
+
+from dadaia_workspace.core.platform import Capabilities
 from dadaia_workspace.core.template_history import SHIPPED_HASHES_FILENAME
+from dadaia_workspace.core.workspace_layout import render_registry_tables
 from dadaia_workspace.features.specs.doctor import SpecsDoctor
 
 _REPO_ROOT = Path(__file__).resolve().parents[3]
@@ -95,3 +99,15 @@ def test_a_tree_checked_out_from_git_carries_the_canonical_specs_law(tmp_path: P
         for i in issues
         if i.code in ("TREE-5", "MEM-DRIFT-2") and "specs/AGENTS.md" in i.message
     ] == []
+
+
+def test_a_law_in_either_cli_form_is_silent_under_win32(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """shipped-law-hardcodes-the-posix-venv-path: the tracked source form and the rendered
+    `Scripts\\dadaia.exe` form of a canonical law are the same law, never drift."""
+    monkeypatch.setattr("dadaia_workspace.core.platform.PLATFORM", Capabilities.detect("win32"))
+    rendered = render_registry_tables(_MEMORY_SCAFFOLD)
+    assert ".venv/Scripts/dadaia.exe" in rendered
+    assert _memory_issues(tmp_path / "a", _MEMORY_SCAFFOLD) == []
+    assert _memory_issues(tmp_path / "b", rendered) == []

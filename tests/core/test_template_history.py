@@ -13,7 +13,9 @@ from dadaia_workspace.core.fixed_sections import (
     render_fixed_section,
     strip_fixed_sections,
 )
+from dadaia_workspace.core.platform import Capabilities
 from dadaia_workspace.core.template_history import was_shipped
+from dadaia_workspace.core.workspace_layout import render_registry_tables
 
 _PUBLIC = Path(__file__).resolve().parents[2] / "dadaia_workspace" / "public"
 _TEMPLATES = _PUBLIC / "templates"
@@ -35,3 +37,14 @@ def test_fixed2_rewritten_stub_reads_shipped(rel: str) -> None:
 def test_a_stub_from_before_fixed_sections_strips_to_the_same_text() -> None:
     marked = "# T\n\nbody\n\n<!-- dadaia:fixed x -->\nlaw\n<!-- /dadaia:fixed x -->\n"
     assert strip_fixed_sections(marked) == strip_fixed_sections("# T\n\nbody\n") == "# T\n\nbody\n"
+
+
+def test_a_law_rendered_for_win32_reads_shipped(monkeypatch: pytest.MonkeyPatch) -> None:
+    """shipped-law-hardcodes-the-posix-venv-path: history holds source-form digests; the
+    rendered `Scripts/dadaia.exe` form of a shipped law is still ours."""
+    monkeypatch.setattr("dadaia_workspace.core.platform.PLATFORM", Capabilities.detect("win32"))
+    source = (_PUBLIC / "scaffold" / "memory" / "AGENTS.md").read_text(encoding="utf-8")
+    rendered = render_registry_tables(source)
+    assert rendered != source
+    assert was_shipped(rendered, "scaffold/memory/AGENTS.md", _TEMPLATES)
+    assert not was_shipped(rendered + "x", "scaffold/memory/AGENTS.md", _TEMPLATES)
