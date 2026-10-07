@@ -37,7 +37,6 @@ def _scan(tmp_path: Path, content: str | bytes, name: str, env: dict[str, str] |
     return _run("scan.py", tmp_path / "jobs", env=env)
 
 
-@pytest.mark.xfail(strict=True, raises=AssertionError, reason="AC11.1 scan.py lands in J9.S2.T2")
 @pytest.mark.parametrize(
     ("content", "name", "env", "expected"),
     [
@@ -55,7 +54,6 @@ def test_scan_exit_code(
     assert _scan(tmp_path, content, name, env) == expected
 
 
-@pytest.mark.xfail(strict=True, raises=AssertionError, reason="AC11.1 scan.py lands in J9.S2.T2")
 def test_scan_missing_path_is_red(tmp_path: Path) -> None:
     assert _run("scan.py", tmp_path / "no-such-dir") == 1
 
@@ -70,7 +68,6 @@ def _job(root: Path, task: str, rewards: list[float]) -> None:
         (d / "result.json").write_text(json.dumps(body))
 
 
-@pytest.mark.xfail(strict=True, raises=AssertionError, reason="AC11.1 compare.py lands in J9.S2.T2")
 @pytest.mark.parametrize(
     ("base", "cand", "expected"),
     [
