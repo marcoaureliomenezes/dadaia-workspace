@@ -27,15 +27,15 @@ PRIVATE_IMPORT_FILES = 34
 _ALLOW = "# allow-private-import:"
 
 # P-21: the tier table on Linux and macOS; the conftest calibrates once for Windows.
-TIER_SECONDS = {"unit": 10, "contract": 30, "integration": 60, "e2e": 120}
+TIER_SECONDS = {"small": 10, "medium": 60, "e2e": 120}
 CALIBRATION = {
-    "unit linux False": 10,
-    "unit win32 False": 30,
-    "contract darwin False": 30,
+    "small linux False": 10,
+    "small win32 False": 30,
+    "medium darwin False": 60,
     "e2e win32 False": 360,
     "slow win32 False": None,
-    "unit linux True": 20,
-    "unit win32 True": 60,
+    "small linux True": 20,
+    "small win32 True": 60,
 }
 
 _CITATION = re.compile(r"\b[a-z0-9]+(?:-[a-z0-9]+)+#[A-Za-z]*\d+(?:[.-]\d+)?")
@@ -68,6 +68,7 @@ def test_guard_calibration(record_property):
     })
 
 
+@pytest.mark.medium
 def test_guard_push_starts_no_gc(tmp_path, record_property):
     import os, re, subprocess
 
@@ -173,7 +174,7 @@ def quarantine_needs_bug(tree: Tree) -> list[str]:
 
 
 def statement_id_cited(tree: Tree) -> list[str]:
-    ids = json.loads(tree.read("tests/contract/statement_ids.json"))
+    ids = json.loads(tree.read("tests/fixtures/statement_ids.json"))
     known = {f"{bug}#{sid}" for bug, sids in ids.items() for sid in sids}
     known |= set(_CITATION.findall(tree.read("specs/memory/QUALITY.md")))
     return [
@@ -218,7 +219,7 @@ def CONTROL(root: Path) -> Session:
     gitignored ``tests/tmp/x.py`` (bugs 465, 467: untracked stays out)."""
     _write(root, ".gitignore", "tests/tmp/*\n")
     _write(root, "tests/tmp/x.py", _IMPORT * 99 + "# sa-no-such-bug#S99\n")
-    _write(root, "tests/contract/statement_ids.json", '{"sa-known-bug": ["S1"]}')
+    _write(root, "tests/fixtures/statement_ids.json", '{"sa-known-bug": ["S1"]}')
     _write(root, "specs/memory/QUALITY.md", "cites sa-quality-bug#Q1\n")
     _write(root, "tests/unit/test_c.py", "# sa-known-bug#S1 sa-quality-bug#Q1\n" + _ALLOWED * 99)
     _write(root, ".github/workflows/ci.yml", 'run: pytest -m "unit and not quarantine"\n')
@@ -268,7 +269,7 @@ CHECKS: dict[str, Check] = {
             "explicit-kept": _session(explicit=30),
             "four-tiers": _session(tiers={**TIER_SECONDS, "e2e": None}),
             "calibrated-ceiling": _session(
-                props={"calibration": {**CALIBRATION, "unit win32 False": 10}, "push_gc": []}
+                props={"calibration": {**CALIBRATION, "small win32 False": 10}, "push_gc": []}
             ),
             "probe-broke": lambda root: {},
         },

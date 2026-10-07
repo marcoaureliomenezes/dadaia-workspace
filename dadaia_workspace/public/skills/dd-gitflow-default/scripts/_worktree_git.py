@@ -4,6 +4,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import re
@@ -18,6 +19,7 @@ from _specs import git_line as git_line  # noqa: E402
 from _specs import head  # noqa: E402
 from _specs import quote as quote  # noqa: E402  (`as`: re-exported to the worktree verbs)
 from _specs import script as script  # noqa: E402
+from _specs import workspace_of as workspace_of  # noqa: E402
 from _worktree_names import NAME_RE, SCRIPT, Refusal, base, branch, name_of  # noqa: E402
 
 _TAG_RE = re.compile(r"^v?(\d+)\.(\d+)\.(\d+)$")
@@ -29,19 +31,24 @@ def _env() -> dict[str, str]:
 
 def git(repo: Path, *args: str, check: bool = True, input: str | None = None) -> str:
     done = subprocess.run(
-        ["git", "-C", str(repo), *args], env=_env(), capture_output=True, text=True, input=input
-    )
+        ["git", "-C", str(repo), *args], env=_env(), capture_output=True, text=True, encoding="utf-8", errors="replace", input=input
+    )  # fmt: skip
     if check and done.returncode:
         raise RuntimeError(f"git {' '.join(args)}: {done.stderr.strip()}")
     return done.stdout
 
 
+def diff_sha256(tree: Path, work: str, tip: str) -> str:
+    """The sha256 of *tip*'s plumbing diff over its merge-base with *work*: it names blob ids, so it binds the exact bytes a fast-forward lands."""
+    base = git(tree, "merge-base", work, tip).strip()
+    return hashlib.sha256(git(tree, "diff-tree", "-r", "-z", "--full-index", base, tip).encode()).hexdigest()  # fmt: skip
+
+
 def find_root() -> Path:
     """The workspace above the cwd, else above this script (it is projected inside one)."""
-    for start in (Path.cwd().resolve(), Path(__file__).resolve().parent):
-        for candidate in (start, *start.parents):
-            if (candidate / ".dadaia" / "states" / "spec_contexts.json").is_file():
-                return candidate
+    root: Path | None = workspace_of(Path.cwd().resolve(), Path(__file__).resolve().parent)
+    if root:
+        return root
     raise Refusal("no workspace root above the cwd or this script", "uvx dadaia-workspace init")
 
 
@@ -54,17 +61,21 @@ def _exe(root: Path) -> Path:
     )
 
 
-def cli(root: Path, *args: str) -> subprocess.CompletedProcess[str]:
-    """One read-only run of the workspace CLI — the owner of every package grammar."""
+def cli(root: Path, *args: str, tree: Path | None = None) -> subprocess.CompletedProcess[str]:
+    """One read-only run of the workspace CLI — the owner of every package grammar. With *tree*
+    the run acts on that tree alone: its cwd, every root above it fenced (ADR 0088)."""
     run = subprocess.run  # stdin closed: a CLI never waits on the caller's pipe
+    fence = (
+        {"DADAIA_FENCED_ROOTS": os.pathsep.join(map(str, tree.resolve().parents))} if tree else {}
+    )
     return run(
         [str(_exe(root)), *args],
-        cwd=root,
-        env=_env(),
+        cwd=tree or root,
+        env=_env() | fence,
         stdin=subprocess.DEVNULL,
         capture_output=True,
-        text=True,
-    )
+        text=True, encoding="utf-8", errors="replace",
+    )  # fmt: skip
 
 
 def cli_line(root: Path, *args: str) -> str:
@@ -128,7 +139,7 @@ def _trees(repo: Path) -> list[dict[str, str]]:
     """Every linked worktree of *repo* (the main checkout excluded), from git's porcelain."""
     blocks = git(repo, "worktree", "list", "--porcelain").split("\n\n")
     parsed = [dict(ln.partition(" ")[::2] for ln in b.splitlines() if ln) for b in blocks]
-    return [fields for fields in parsed if "worktree" in fields][1:]
+    return [{**f, "worktree": str(Path(f["worktree"]))} for f in parsed if "worktree" in f][1:]
 
 
 def ours(repo: Path) -> list[dict[str, str]]:
@@ -159,7 +170,7 @@ def rows(root: Path) -> list[dict[str, object]]:
     ours `ready` (ahead, clean), `open` (ahead, dirty) or `empty`, an `orphan` wt/* with no tree
     (never checked out, or its directory deleted), a `foreign`
     worktree git registers (harness-native, hand-made, under a TTL zone), and an
-    `unregistered` directory two levels under `worktrees/<repo>/`."""
+    `unregistered` directory two levels under `worktrees/<repo>/` or an empty one level under it."""
     out: list[dict[str, object]] = []
     for name, flow in sorted(gitflows(root).items()):
         repo = root / "repos" / name
@@ -196,4 +207,8 @@ def rows(root: Path) -> list[dict[str, object]]:
         for stray in sorted((root / "worktrees" / name).glob("*/*")):  # a name is two levels
             if stray.is_dir() and not {stray.resolve(), stray.parent.resolve()} & listed:
                 out.append(_row(repo, str(stray), "unregistered"))
+        for folder in sorted((root / "worktrees" / name).glob("*")):  # an rc folder holding no tree
+            named = any(Path(str(r["path"])).parent == folder for r in out)  # an orphan's own
+            if folder.is_dir() and not any(folder.iterdir()) and not named:
+                out.append(_row(repo, str(folder), "unregistered"))
     return out

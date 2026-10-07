@@ -28,6 +28,7 @@ sources:
 - No slop — runtime state, reports, handoffs, caches, projections and temporary files have canonical homes and never leak into repositories.
 - Claude Code, Codex, Kimi Code, Cursor, Devin and GitHub Copilot are the entry harnesses, one registry record each; public assets originate once, stage once, and are read natively or through per-entry symlinks ([[public-asset-distribution]]).
 - Success is evidenced by reviews, task commits, commands and artifacts, never inferred from prose.
+- The trust contract (`specs/constitution.md` §5): no gate accepts a red that vanished; evidence — verdict, mutation, test-audit — exists only as the output of the tool that computed it, tied to the sha it judged; shipped scripts read as clean architecture; a ceremony that produces no gate-checked evidence is deleted; the version scorecard measures each, every criterion at 8 or above before evals or publication.
 
 ## Two usage paths
 

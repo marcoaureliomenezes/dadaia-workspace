@@ -4,7 +4,7 @@ name: CI
 # `wt/<M.m.p>-rc<N>/<job>` are the ONLY pushable branches (a push triggers the full matrix
 # below); the integration and principal branches advance by PR only. The triggers below are
 # literal (GitHub reads no file) and pinned to the library gitflow by the ci-triggers-gitflow
-# guard; pr-source-guard reads the gitflow itself. No job calls a model API — the security review is the local
+# guard; pr-source-guard reads the gitflow itself. The security review is the local
 # dd-code-reviewer lens.
 on:
   push:
@@ -135,7 +135,7 @@ jobs:
   unit-fast:
     name: Unit fast (pytest)
     runs-on: ubuntu-latest
-    timeout-minutes: 2
+    timeout-minutes: 4
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
@@ -160,7 +160,7 @@ jobs:
   contract-coverage:
     name: Contract coverage (pytest)
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
@@ -208,13 +208,16 @@ jobs:
         run: pipx install poetry==2.5.1
       - name: Install
         run: poetry install --no-interaction --no-ansi --with dev
+      # Poetry's editable builder writes no Scripts\dadaia.exe on Windows; pip's PEP 660 install does.
+      - name: Install the dadaia launcher
+        run: poetry run python -m pip install --no-deps -e .
       - name: pytest unit fast
-        run: poetry run pytest -q -m "unit and not slow and not quarantine" tests/unit -n auto --durations=25
+        run: poetry run pytest -q -m "small and not slow and not quarantine" tests -n auto --durations=25
 
   contract-coverage-cross:
     name: Contract coverage (Windows/macOS)
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 8
+    timeout-minutes: 20
     strategy:
       fail-fast: false
       matrix:
@@ -236,17 +239,18 @@ jobs:
       # Poetry's editable builder writes no Scripts\dadaia.exe on Windows; pip's PEP 660 install does.
       - name: Install the dadaia launcher
         run: poetry run python -m pip install --no-deps -e .
-      - name: pytest unit/contract coverage
+      - name: pytest small and medium coverage
+        shell: bash
         env:
           COVERAGE_FILE: ${{ runner.temp }}/.coverage
         # -n auto: same long-pole fix as the ubuntu contract-coverage job (windows was 2:55).
-        run: poetry run pytest -q -m "(unit or contract) and not quarantine" -n auto --cov=dadaia_workspace --cov-report=term-missing tests/unit tests/contract --durations=25
+        run: poetry run pytest -q -m "not e2e and not quarantine" -n auto --cov=dadaia_workspace --cov-report=term-missing tests --durations=25
 
   integration:
     name: Integration (pytest)
     runs-on: ubuntu-latest
     # v0.7.0 P6 ratchet: ~1.5x measured job wall; raising this needs a CLOSURE justification.
-    timeout-minutes: 6
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:

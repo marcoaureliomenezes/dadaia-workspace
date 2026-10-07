@@ -39,11 +39,16 @@ from dadaia_workspace.core.models.spec_context import ContextState, SpecContextP
 from dadaia_workspace.core.platform import PLATFORM
 from dadaia_workspace.core.workspace_layout import Zone, ZoneClass
 from dadaia_workspace.features.spec_context import sweep
-from dadaia_workspace.features.spec_context.service import git_hooks_dir
+from dadaia_workspace.features.spec_context.service import (
+    HookState,
+    WorktreeRows,
+    git_hooks_dir,
+    hook_state,
+)
 from dadaia_workspace.infrastructure.git_subprocess import GitSubprocessClient
 from dadaia_workspace.infrastructure.json_context_store import JsonContextStore
 from dadaia_workspace.infrastructure.json_harness_profile_store import JsonHarnessProfileStore
-from dadaia_workspace.infrastructure.ledger_scripts import worktree_rows
+from dadaia_workspace.infrastructure.ledger_scripts import worktree_rows as ledger_worktree_rows
 
 
 class FindingVerdict(StrEnum):
@@ -129,7 +134,9 @@ class DoctorService:
         git_client: GitSubprocessClient,
         workspace_root: Path,
         projection: Callable[[Path], tuple[list[DoctorLine], str]] | None = None,
+        worktree_rows: WorktreeRows = ledger_worktree_rows,
     ) -> None:
+        self._worktree_rows = worktree_rows
         self._projection = projection
         self._store = context_store
         self._git = git_client
@@ -168,28 +175,28 @@ class DoctorService:
 
     def check_installed_hooks(self, context: str | None = None) -> list[SectionFinding]:
         """HOOKS-DRIFT-1: an ALIVE repo's hook where git runs hooks is not byte-for-byte the
-        shipped one (hand-edited, missing or stale) — the one backstop outside every harness
-        hook. A non-git repo is never a finding; *context* scopes the repos (0.4.8 R5)."""
+        shipped one — differs, absent or unreadable, each said as observed — the one backstop
+        outside every harness hook. A non-git repo is never a finding; *context* scopes the repos (0.4.8 R5)."""
         issues: list[SectionFinding] = []
         for top in self._alive_repo_tops(context):
             hooks_dir = git_hooks_dir(top)
             if hooks_dir is None:
                 continue
             for target, source in workspace_layout.INSTALLED_GIT_HOOKS:
-                shipped = workspace_layout.public_scripts_dir() / source
                 installed = hooks_dir / target
-                try:
-                    drifted = installed.read_bytes() != shipped.read_bytes()
-                except OSError:
-                    drifted = True
-                if drifted:
+                found, why = hook_state(installed, source)
+                state = {
+                    HookState.CURRENT: None,
+                    HookState.ABSENT: "is absent",
+                    HookState.UNREADABLE: f"is unreadable ({why})",
+                }.get(found, f"differs from the shipped {source}")
+                if state:
                     rel = str(top)  # absolute: the fix runs from any cwd
                     issues.append(
                         _invariant(
                             "HOOKS-DRIFT-1",
-                            f"{Path(os.path.relpath(installed, self._workspace_root)).as_posix()} differs from the shipped "
-                            f"{source} — the chokepoint is enforcing something other "
-                            "than what this release ships.",
+                            f"{Path(os.path.relpath(installed, self._workspace_root)).as_posix()} {state} — "
+                            "the chokepoint is not enforcing what this release ships.",
                             fix_line(
                                 self._workspace_root, "ci", "install-hook", "--force", "--repo", rel
                             ),
@@ -236,7 +243,7 @@ class DoctorService:
         """AC1.10: the context's worktree rows, rendered — never judged or touched here."""
         if not (repos := {t.name for t in self._alive_repo_tops(context)}):
             return []
-        found, failed, fix = worktree_rows(self._workspace_root)
+        found, failed, fix = self._worktree_rows(self._workspace_root)
         return [_worktree("warning", failed, fix)] if failed else [
             _worktree("warning" if r["warn"] else "info", f"{r['state']} {r['path']}"
                       + "".join(f"  {k}={r[k]}" for k in ("age_hours", "ahead", "dirty") if k in r), r["fix"])
@@ -419,14 +426,16 @@ class DoctorService:
         detail: str,
         *,
         fixable: bool | None = None,
+        fix: str = "",
     ) -> Finding:
         return Finding(
             code=f"WS-{zone.lstrip('.')}-{verdict.value}",
             path=target.relative_to(base).as_posix(),
             verdict=verdict,
-            fixable=(verdict not in _CANONICAL) if fixable is None else fixable,
+            fixable=(verdict not in _CANONICAL and not fix) if fixable is None else fixable,
             detail=detail,
             target=target,
+            fix=fix,
         )
 
     def _missing_core(self) -> list[Finding]:
@@ -468,11 +477,11 @@ class DoctorService:
         for zone, base, directory in places:
             for entry in sweep.walk(directory):
                 verdict, detail = self._judged(entry, rules)
-                credential = verdict is FindingVerdict.SLOP and entry.name == ".env"
-                if credential:  # ADR 0146: the library never touches a credential file
-                    detail = "(credentials live outside the workspace: the operator moves it out or names it in .dadaiaignore)"
-                fixable = False if credential else None
-                out.append(self._finding(zone, base, entry, verdict, detail, fixable=fixable))
+                fix = ""
+                if verdict is FindingVerdict.SLOP and entry.name in workspace_layout.NEVER_MOVED:
+                    detail = "(credentials and repositories live outside the workspace: the library never moves them)"
+                    fix = f"Operator action: move {entry.name} out of the workspace, or name it in .dadaiaignore"
+                out.append(self._finding(zone, base, entry, verdict, detail, fix=fix))
         return out
 
     def _scan_canon_zone(

@@ -14,7 +14,7 @@ Repository: <https://github.com/marcoaureliomenezes/dadaia-workspace>
 
 ## What it is
 
-<!-- derived-from: product-vision sha256:4d5160d491d5 -->
+<!-- derived-from: product-vision sha256:50aa2de46233 -->
 
 dadaia-workspace is the operating environment around repositories developed with AI
 agents, and its unit is the context.
@@ -46,7 +46,7 @@ What it rests on:
 
 ## Two ways in
 
-<!-- derived-from: product-vision sha256:4d5160d491d5 -->
+<!-- derived-from: product-vision sha256:50aa2de46233 -->
 
 A human drives it from a shell in three levels:
 `uvx dadaia-workspace init <dir> --harness <name> --repo <url>` provisions the

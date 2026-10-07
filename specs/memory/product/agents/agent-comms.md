@@ -16,13 +16,12 @@ sources:
 - `handoff-v1` is the JSON record every agent emits, written to `.dadaia/handoff/<context>/<UTC>-<agent>-<slug>.handoff.json`.
 - An optional HTML report at `.dadaia/reports/<context>/<UTC>-<agent>-<slug>.html` — an output zone never reaped or committed — is referenced by `artifact.path` plus `artifact.content_hash`.
 - `schema_version` accepts `handoff-v1`, `handoff-v1.1` and `handoff-v1.2`; `handoff-v1.2` carries `self_pull.refs` — the `specs/`-prefixed atoms the session read — and `handoff-v1.1` is the emission for a session that read none.
-- An optional `verdict` (`APPROVED`/`REJECTED`) records `dd-code-reviewer`'s recommendation; `worktree.py merge` lands a job, `define` or backlog worktree only when the newest verdict naming its rebased HEAD, or a reflog sha of the same patch and message series, in `scope` is a valid `APPROVED`, a task needing none ([[worktrees]]).
-- An optional `ci_run`, a GitHub Actions run URL, names the green CI-matrix run of the job branch HEAD the verdict approves; a job's merge requires it.
+- An optional `verdict` (`APPROVED`/`REJECTED`) records `dd-code-reviewer`'s verdict, written only by the emitter's `verdict.py` (the reviewer's one write), which binds it to `reviewed_sha`, the commit judged, and `diff_sha256`, the hash of its diff from `worktree.py hash`; `worktree.py merge` lands a job, `define` or backlog worktree only when the newest verdict naming its rebased HEAD, or a reflog sha of the same patch and message series, as `reviewed_sha` is a valid `APPROVED` whose `diff_sha256` matches the diff the merge lands, a task needing none ([[worktrees]]).
 - `dadaia_workspace/public/schemas/handoff-v1.schema.json` is the single source of field semantics, staged to `.dadaia/agentic/schemas/` and never projected into a harness root; only the CLI reads it.
 
 ## Validation
 
-- `dadaia reports validate` is the `reports` group's only verb: exit 0 all valid, 1 any invalid, 2 a path not found, 3 bad invocation or no workspace; `--all` scans `.dadaia/handoff/`, `--release` filters by `release_id`, `--json` emits machine output.
+- `dadaia reports validate` is the `reports` group's only verb: exit 0 all valid, 1 any refusal (an invalid file, a path not found, a bare call, no workspace); `--all` scans `.dadaia/handoff/`, `--release` filters by `release_id`, `--json` emits machine output.
 - `--workspace` pins the workspace root; `--reviewed-root` resolves `self_pull.refs` against another tree (a worktree at the reviewed commit) before `repos/<context>/<ref>` and `<workspace>/<ref>`.
 - `dadaia_workspace/core/handoff_index.py` is the one handoff reader: `HandoffIndex.validate_file()` validates, and `Handoff.validate()` checks schema shape (through `jsonschema`), version, the `self_pull` rule and the artifact hash; every other consumer calls it.
 - The `self_pull` rule lives in the reader, not the schema: a `handoff-v1.2` record needs non-empty `refs`, each an existing file inside its boundary root.

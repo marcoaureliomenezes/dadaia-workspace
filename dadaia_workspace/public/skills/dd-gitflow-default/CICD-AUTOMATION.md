@@ -1,21 +1,9 @@
-# CI/CD automation for the branch contract
+# Optional: plug your own CI into the repo's verify: lines
 
-Disclosed depth behind `dd-gitflow-default`'s "CI/CD automation" pointer.
-Addressed to a consumer operator wiring this contract into their own CI/CD, not to the agent running the skill.
+Optional depth behind `dd-gitflow-default`. Nothing here is required: the branch contract runs on local git and the repo's own `verify:`, `verify-stage:` and `verify-task:` lines alone.
+Addressed to an operator who also runs a pipeline of their own.
 
-Four checks turn the branch contract from a convention into a machine boundary. Each maps to one row of the skill's mechanical table; branch names are the `gitflow:` keys of `specs/constitution.md`.
-
-| Suggested check | Where it runs | What it refuses |
-|---|---|---|
-| Branch-name guard | pre-push hook | any ref outside the `gitflow:` names (`<work>M.m.p`: numeric, no `v`, no suffix) |
-| Direct-push refusal | pre-push hook | any push to the integration or principal branch; message names the PR path instead |
-| `pr-source-guard` (1 job, 2 rules) | required CI check | a PR whose source breaks the skill's §2a table |
-| Post-merge branch deletion | CI job on the integration merge following a deploy | a stale work branch left behind |
-
-## Wiring notes
-
-- No CI job calls a model API but an evals repo's, under the skill's §3b; the security review is the `dd-code-reviewer` lens run before the PR.
-- A job newly added on a feature branch does not run on the PR that introduces it — mark it required only from the following PR onward.
-- `gh api PATCH .../required_status_checks` clobbers the existing list — always re-supply the full set, never a delta.
-- The denylist scan and the CI trigger on `<work>**` pushes belong to the same pipeline stage as the branch-name guard.
-- Keep all three in one job so a single failure names the actual rule that fired.
+- Point the pipeline at the same lines the worktree gates run, so one command is the one judge, locally and in the pipeline.
+- Two checks turn the branch contract into a machine boundary, each a pre-push hook: a branch-name guard (any ref outside the `gitflow:` names of `specs/constitution.md`: numeric version, no `v`, no suffix) and a direct-push refusal (any push to a branch the skill's §2a table marks not pushable, the message naming the review path instead).
+- A check that rejects a change from a source branch outside the skill's §2a table, and the deletion of a stale work branch after a deploy, are the same table read by your own host.
+- Keep the branch-name guard and the denylist scan in one job, so a single failure names the rule that fired.

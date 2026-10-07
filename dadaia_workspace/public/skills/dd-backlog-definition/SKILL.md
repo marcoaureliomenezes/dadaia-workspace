@@ -24,7 +24,7 @@ description: >
   review is a discipline failure.
 - Dedup: compare a new entry's title+description against every ACTIVE item for the
   same subject — by domain concept (`dd-domain-modeling`), not by the request's
-  wording; merge a near-duplicate into the existing entry.
+  wording; exit a near-duplicate as `rejected`, its `--reason` `absorbed by <existing slug>`.
 - Staleness: an ACTIVE item with no reads/updates past a reasonable window is a
   sanitize candidate; a confirmed-invalid item exits as `rejected` with a one-line
   `reason`; a merely-postponed one stays `active[]`.
@@ -46,7 +46,7 @@ description: >
 - The pick is the SPEC's `**Origin:** backlog:<ids>` line; the entry keeps its status.
 - It exits exactly once, at closure, by `python3 .agents/skills/dd-backlog-definition/scripts/backlog.py exit <slug> --disposition
   <disposition> [--release <id>] [--reason <text>]` — one histo
-  record, refused on a second exit (`dd-release-implementation` RC-FLOW step 7).
+  record, refused on a second exit (`dd-release-implementation` RC-FLOW step 4).
 - `dd-release-definition` consumes the picked set with no further triage — the
   backlog it reads is already sanitized.
 

@@ -24,12 +24,12 @@ RELEASE_STATE_FILENAME = "_RELEASE.json"
 LEGACY_RELEASE_STATE_FILENAME = "RELEASE.json"
 
 #: The ONE release-id grammar: bare ``M.m.p`` — `_release_schema.SEMVER_RE`'s pattern,
-#: pinned equal by ``tests/contract/test_release_semver_canon.py``. No ``v``, no suffix;
+#: pinned equal by ``tests/public/skills/dd_release_implementation/scripts/test__release_schema.py``. No ``v``, no suffix;
 #: an archived directory is exempt by its location (``_archive/``), never by its name.
 RELEASE_ID_RE = re.compile(r"^\d+\.\d+\.\d+$")
 
 #: The ONE candidate-folder grammar (ADR 0150): ``rc-<N>``, N from 1, no leading zero —
-#: `_release_schema.CANDIDATE_RE`'s pattern, pinned equal by tests/contract/test_release_script.py.
+#: `_release_schema.CANDIDATE_RE`'s pattern, pinned equal by tests/public/skills/dd_release_implementation/scripts/test_release__release_script.py.
 CANDIDATE_RE = re.compile(r"^rc-([1-9][0-9]*)$")
 
 

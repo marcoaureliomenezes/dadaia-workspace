@@ -5,7 +5,7 @@ job; any other in the candidate's bug batch, before its Reconciliation job.
 
 ## 1. Register — ask first
 
-<!-- derived-from: bug-ledger sha256:1f1d4608155e -->
+<!-- derived-from: bug-ledger sha256:c4e8fd6ee96c -->
 
 A bug is a merged change that reproducibly breaks a documented contract; a failure inside
 an unmerged worktree is rework. Registration is ask-first: the agent
@@ -37,7 +37,7 @@ validation, a law ambiguity, or a missing feature.
 
 ## 2. Lineage, then a RED test
 
-<!-- derived-from: bug-ledger sha256:1f1d4608155e -->
+<!-- derived-from: bug-ledger sha256:c4e8fd6ee96c -->
 
 Resolution follows seven ordered phases — lineage, red loop, minimise, hypothesise,
 instrument, seam test, cleanup and resolve. Lineage comes first: read at most the 20
@@ -56,7 +56,7 @@ Then the red loop: a new case that fails for the real cause, before production c
 
 ## 3. Fix, and let the diff shrink
 
-<!-- derived-from: bug-ledger sha256:1f1d4608155e -->
+<!-- derived-from: bug-ledger sha256:c4e8fd6ee96c -->
 
 Fix the root cause and watch the test go green. The fix's direction is derived, never
 typed: `bugs.py fix <bug-id>` prints the fix commits, their numstat and `net-negative`,
@@ -65,11 +65,12 @@ routed to the architecture lens before it lands.
 
 ## 4. Resolve with the red loop and lineage
 
-<!-- derived-from: bug-ledger sha256:1f1d4608155e -->
+<!-- derived-from: bug-ledger sha256:c4e8fd6ee96c -->
 
 ```bash
 python3 .agents/skills/dd-bug-resolution/scripts/bugs.py resolve <bug-id> \
-  --cause "…" --caused-by none --solution "…" --evidence-loop "…"
+  --cause "…" --caused-by none --solution "…" --evidence-loop "…" \
+  --evidence-seam "…"
 ```
 
 - Stage the fix first: `resolve` prints the blame candidates — the bugs whose fix and the

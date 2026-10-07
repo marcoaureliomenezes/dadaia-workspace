@@ -18,20 +18,21 @@ Scope: this file governs only `specs/bugs/`.
 
 ## 2. Resolution
 
-- The block list, closed: (1) the work branch's CI is red; (2) a Stall; (3) the running task cannot deliver its AC;
-  (4) a security finding or an open dependency-vulnerability alert; (5) data loss or corruption.
+- The block list, closed: (1) the work branch's `verify:` line is red; (2) a Stall; (3) the running task cannot deliver its AC;
+  (4) a security finding; (5) data loss or corruption.
 - A block-list bug is a hotfix: registered with `caused_by`, its own job, job gate and one review, landing before any
   other job merge; its fix body names `block: <item>`; no SPEC amendment.
 - Every bug is resolved in the rc that finds it; no rc closes with an open bug.
 - Every other bug is registered, `found_in` its rc, and fixed by the rc's bug batch: one job outside the DAG, after its
-  last job merges and before the Reconciliation job, grouped by cause, a fix-induced one as a REBUILD; a bug found in
-  the Reconciliation job is fixed inside it.
+  last job merges and before the Reconciliation job, grouped by cause; a bug found in the Reconciliation job is fixed
+  inside it.
+- Any fix whose `caused_by` is not `none`, a bug's fix or a feature task, is a REBUILD of the unit, keeping its tests.
 - The next rc's `## Bug window review` judges those fixes (KEEP or REBUILD); its Job 1 executes the verdicts.
 - Close with the fix: `bugs.py resolve`, with the flags `dd-bug-resolution` Phase 6 names.
 - Check prior resolutions on the same component first; `caused_by: X` means the fix of X wrote the lines this fix corrects, picked from `bugs.py resolve`'s blame candidates, `none` only when there are none or with `--lineage-reason`.
 - Commit exactly what the fix touched, never a blanket `-A`; a net-positive diff passes the architecture lens first.
 
-## 3. Field classes (D11)
+## 3. Field classes
 
 - Each field's class is its `x-mutability` in `bug-record-v1`; this law lists no fields.
 - `immutable-core`: never rewritten once appended.
@@ -59,4 +60,3 @@ Scope: this file governs only `specs/bugs/`.
 - No session-lock gate on filing a bug (NO-LOCKS DOCTRINE) — `bugs.py append` never blocks on session state.
 - `reported_by` records the agent/runtime that registered the record.
 - Concurrent sessions racing to file or resolve the same bug are surfaced, never prevented.
-- `bugs.py status`/`stats` read the ledger as it stands.

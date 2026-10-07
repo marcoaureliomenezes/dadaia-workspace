@@ -16,7 +16,6 @@ import json
 import re
 import subprocess
 import sys
-import tempfile
 from collections import Counter
 from collections.abc import Callable
 from pathlib import Path
@@ -28,12 +27,22 @@ sys.dont_write_bytecode = True
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 sys.path.append(str(Path(__file__).resolve().parents[2] / "dd-release-implementation" / "scripts"))
 
+import _bugs_fix as fx  # noqa: E402
+import _bugs_quality as qa  # noqa: E402
 import _bugs_transition as tr  # noqa: E402
 import _bugs_write as wr  # noqa: E402
 from _bugs_check import CODE, HISTO, LEDGER, accepted_adrs, check, tasks  # noqa: E402
+from _bugs_fix import git as _git  # noqa: E402
 from _bugs_store import Refusal, commit, read_records  # noqa: E402
-from _release_schema import ShallowClone, Unreadable, candidate_at, live_id, releases  # noqa: E402
-from _specs import find_specs, git_line, refuse  # noqa: E402
+from _release_schema import (  # noqa: E402
+    ShallowClone,
+    Unreadable,
+    candidate_adds,
+    candidate_at,
+    live_id,
+    releases,
+)
+from _specs import find_specs, git_line, refuse, script  # noqa: E402
 
 _OPTIONS: dict[str, tuple[str, ...]] = {
     "append": ("--bug-id", "--reported-by", "--ts", "--title", "--severity", "--surface",
@@ -52,17 +61,10 @@ _HELP = {
     "reject": "close a record as rejected, with a reason",
     "archive": "move named terminal records into bugs_histo.jsonl under an accepted ADR",
     "check": "validate every BUGS.jsonl record",
-    "fix": "derive each resolved record's fix commit, numstat and direction",
+    "fix": "derive each resolved record's fix commits, numstat, direction, rework and settledness",
     "window": "list the records found in or born in the live or the last shipped release",
+    "balance": "print QUALITY.md's `## Bugs` block from the ledger; --write or --check it there",
 }
-#: Shapes 3, 4 and a REBUILD share one id list; shape 4 names its task commit(s) as `(<sha>[, <sha>])`.
-_SHAPE = re.compile(
-    r"@(\w+) (fix\(bugs\): |chore\(bugs\): resolve |refactor\(bugs\): )(.+?) — (.*)$"
-)
-_REVERT = re.compile(r'@\w+ Revert "(.+)"')
-_TASK_SHAS = re.compile(r"\((\w+(?:, \w+)*)\)$")
-#: Never a fix's own lines: tests (metric 6) and specs; `_own` adds the generated files.
-_NOT_PRODUCTION = ("tests/", "specs/")
 
 
 def _parser() -> argparse.ArgumentParser:
@@ -77,6 +79,7 @@ def _parser() -> argparse.ArgumentParser:
             command.add_argument(option)
         if verb == "status":
             command.add_argument("--all", dest="include_closed", action="store_true")
+            command.add_argument("--found-in", metavar="RELEASE/RC", help="refuse while a record found there is open or deferred")  # fmt: skip
         if verb == "update":
             command.add_argument("--set", dest="sets", action="append", required=True,
                                  metavar="FIELD=VALUE", help="a 'field=value' pair (repeatable)")  # fmt: skip
@@ -85,6 +88,9 @@ def _parser() -> argparse.ArgumentParser:
             command.add_argument("bug_ids", nargs="+", help="the terminal records to move")
         if verb == "fix":
             command.add_argument("bug_ids", nargs="*", help="default: every resolved record")
+        if verb == "balance":
+            command.add_argument("--write", action="store_true", help="rewrite the block in place")
+            command.add_argument("--check", action="store_true", help="refuse a stale block")
         if verb == "check":
             command.add_argument("--json", action="store_true", help="emit findings as JSON")
     return parser
@@ -95,92 +101,19 @@ def _values(args: argparse.Namespace, names: tuple[str, ...]) -> dict[str, Any]:
     return {key: getattr(args, key) for key in keys}
 
 
-def _fixes(specs: Path) -> dict[str, dict[str, list[list[str]] | None]]:
-    """Bug id -> {fix sha: numstat rows}, grepped from history, never stored; a shape-4
-    task commit is counted, never diffed (rows None). Oldest first, a `Revert "<text>"` undoes
-    one commit, the nearest earlier live one whose subject starts `<text>`; undoing a revert
-    reinstates its own."""
-    git = ["git", "-C", str(specs)]
-    head = subprocess.run([*git, "rev-parse", "-q", "--verify", "HEAD"], stdout=subprocess.DEVNULL, check=False)  # fmt: skip
-    if head.returncode == 1:  # a repo with no commit yet links nothing
-        return {}
-    log = subprocess.run([*git, "log", "--reverse", "-E", r"--grep=^(fix|chore|refactor)\(bugs\): ", '--grep=^Revert "', "--numstat", "--format=@%H %s"],
-                         stdout=subprocess.PIPE, text=True, check=False)  # fmt: skip
-    if log.returncode:
-        raise Refusal("cannot read the repo's history", "Operator action: point --specs at a specs tree inside a git repo")  # fmt: skip
-    live: list[tuple[str, list[list[str]], Any]] = []  # (header, rows, the commit it undid)
-    for line in log.stdout.splitlines():
-        if not line.startswith("@"):
-            live[-1][1].extend([line.split("\t")] if line else [])
-            continue
-        text = revert[1] if (revert := _REVERT.match(line)) else None
-        undone = next((e for e in reversed(live) if text and f"{e[0].partition(' ')[2]} ".startswith(f"{text} ")), None)  # fmt: skip
-        if undone:  # ponytail: a reinstated fix is not re-dropped when its revert's revert is reverted; rc-10 AC1.1
-            live.remove(undone)
-            live += [undone[2]] if undone[2] else []
-        live.append((line, [], undone))
-    found: dict[str, dict[str, list[list[str]] | None]] = {}
-    for line, rows, _ in reversed(live):  # newest first, as callers list them
-        shape = _SHAPE.match(line)
-        task = _TASK_SHAS.search(shape[4]) if shape and shape[2].startswith("chore") else None
-        if shape is None or (task is None and shape[2].startswith("chore")):
-            continue
-        for bug in shape[3].split(", "):
-            commits = found.setdefault(bug, {})
-            for sha in task[1].split(", ") if task else [shape[1]]:
-                # newest first: a later resolve may name this fix commit by its short sha
-                for short in [k for k in commits if sha.startswith(k)]:
-                    del commits[short]
-                commits[sha] = None if task else rows
-    return found
-
-
-def _git(cwd: Path | str, *argv: str, stdin: str | None = None) -> str:
-    return subprocess.run(["git", "-c", "core.quotePath=false", "-C", str(cwd), *argv], input=stdin, capture_output=True, encoding="utf-8",
-                          errors="replace", check=True).stdout  # fmt: skip
-
-
-def _own(specs: Path, paths: set[str], skip: tuple[str, ...] = _NOT_PRODUCTION) -> set[str]:
-    """The paths a fix writes: not under *skip* (the direction: tests, metric 6, and specs;
-    the blame: specs only), not a file `.gitattributes` marks `dadaia-generated`."""
-    top = _git(specs, "rev-parse", "--show-toplevel").strip()
-    # -z: NUL never meets Windows' text-mode \n -> \r\n stdin translation, nor path quoting
-    out = _git(top, "check-attr", "-z", "--stdin", "dadaia-generated", stdin="\0".join(paths)).split("\0")  # fmt: skip
-    generated = {p for p, v in zip(out[0::3], out[2::3], strict=False) if v in ("set", "true")}  # fmt: skip
-    return {p for p in paths if not p.startswith(skip)} - generated
-
-
 def _candidates(specs: Path, bug_id: str) -> list[str]:
     """The bugs whose fix, and the tasks whose `<type>(<task-id>)` commit, wrote a line the
     staged diff removes: `git blame` past `(#n)`-subject squashes, `tests/` included."""
-    fixes, blamed = _fixes(specs), set[str]()
+    fixes = fx.fixes(specs)
     top = Path(_git(specs, "rev-parse", "--show-toplevel").strip())
-    staged = {f[1]: f[1:] for f in (ln.split("\t") for ln in _git(top, "diff", "--cached", "--name-status", "--diff-filter=MDR").splitlines())}  # fmt: skip
-    subjects = {h: s for h, _, s in (ln.partition(" ") for ln in _git(top, "log", "--all", "--format=%H %s").splitlines())}  # fmt: skip
-    # --all, not HEAD: a repo with no commit yet lists nothing instead of failing
-    skip = [h for h, s in subjects.items() if re.search(r"\(#\d+\)$", s)]
-    with tempfile.TemporaryDirectory() as tmp:
-        (revs := Path(tmp) / "revs").write_text("\n".join(skip), encoding="utf-8")
-        for path in _own(top, set(staged), skip=("specs/",)):  # a rename is blamed at its old path
-            hunks = [ln.split()[1][1:].partition(",") for ln in _git(top, "diff", "--cached", "-U0", "--", *staged[path]).splitlines() if ln.startswith("@@ ")]  # fmt: skip
-            ranges = [arg for start, _, n in hunks if n != "0" for arg in ("-L", f"{start},+{n or 1}")]  # fmt: skip
-            blame = _git(top, "blame", "--porcelain", "--ignore-revs-file", str(revs), *ranges, "HEAD", "--", path) if ranges else ""  # fmt: skip
-            blamed |= {ln[:40] for ln in blame.splitlines()}
+    subjects = fx.subjects(top)
+    blamed = fx.removed(top, ("--cached",), "HEAD", subjects, ("specs/",))
     # check's one answer to "what is a task": never propose a task check refuses
     known = tasks(specs)
     named = {m[1] for b in blamed if (m := re.match(r"\w+\(([^)]+)\)", subjects.get(b, ""))) and m[1] in known}  # fmt: skip
-    return sorted(({bug for bug, shas in fixes.items() for sha in shas for b in blamed if b.startswith(sha)} | named) - {bug_id})  # fmt: skip
-
-
-def _direction(commits: dict[str, list[list[str]] | None], own: set[str]) -> str:
-    if all(rs is None for rs in commits.values()):
-        return "-"
-    rows = [r for rs in commits.values() for r in rs or []]
-    net = sum(
-        int(a) - int(d) for a, d, path in rows
-        if a != "-" and path in own
-    )  # fmt: skip
-    return "net-negative" if net < 0 else "net-positive" if net > 0 else "net-neutral"
+    return sorted(
+        ({bug for bug, fix in fixes.items() if blamed & set(fix.commits)} | named) - {bug_id}
+    )
 
 
 def _placed[T](read: Callable[[], T], specs: Path) -> T:
@@ -194,44 +127,50 @@ def _placed[T](read: Callable[[], T], specs: Path) -> T:
         raise refusal from None
 
 
+def _tracked(specs: Path, path: str) -> str | None:
+    """The text git tracks at *path* (repo-relative, from the index), None when untracked."""
+    try:
+        return _git(_git(specs, "rev-parse", "--show-toplevel").strip(), "show", f":{path}")
+    except subprocess.CalledProcessError:
+        return None
+
+
 def _held_at(specs: Path, instant: str) -> dict[str, str]:
     return _placed(lambda: candidate_at(specs, instant), specs)
+
+
+def _culprits(cause: object, fixes: dict[str, fx.Fix], tasks: dict[str, list[str]]) -> list[str]:
+    """The commits of the bug fix or task a record's `caused_by` names, newest first."""
+    if cause in (None, "none"):
+        return []
+    return list(fixes[str(cause)].commits) if cause in fixes else tasks.get(str(cause), [])[::-1]
+
+
+def _window_keys(specs: Path) -> list[str]:
+    """The live release and the last shipped one, read after a shallow clone is refused."""
+    live = _placed(lambda: live_id(specs), specs)
+    _held_at(specs, wr.now_iso())
+    shipped = sorted((end, r) for r, (_, end) in releases(specs).items() if end)
+    return sorted({live, *(r for _, r in shipped[-1:])})
 
 
 def _window(specs: Path) -> int:
     """Every live and archived record found in or born in the live or the last shipped
     release; a `release` `unknown` one apart (AC13.3). `introduced_in` is read from
     `caused_by`'s culprit, its oldest fix or `<type>(<task-id>)` commit, else stored."""
-    live = _placed(lambda: live_id(specs), specs)
-    _held_at(specs, wr.now_iso())  # a shallow clone is refused before any line
-    shipped = sorted((end, r) for r, (_, end) in releases(specs).items() if end)
-    keys = sorted({live, *(r for _, r in shipped[-1:])})
-    fixes, rows, apart, when, by_task = (
-        _fixes(specs),
-        [],
-        [],
-        dict[str, str](),
-        dict[str, list[str]](),
-    )
-    # one pass, --all: a repo with no commit yet lists nothing instead of failing
-    for line in _git(specs, "log", "--all", "--format=%H %cI %s").splitlines():
-        sha, instant, subject = (line.split(" ", 2) + [""])[:3]
-        when[sha] = instant
-        if task := re.match(r"[a-z]+\(([^)]+)\)", subject):
-            by_task.setdefault(task[1], []).append(sha)
+    keys = _window_keys(specs)
+    fixes, tasks, rows, apart = fx.fixes(specs), fx.tasked(specs), [], []
+    # --all: a repo with no commit yet lists nothing instead of failing
+    when = dict(ln.split(" ", 1) for ln in _git(specs, "log", "--all", "--format=%H %cI").splitlines())  # fmt: skip
+    tracked = set(_git(specs, "ls-files", "--full-name", ":/").splitlines())
     for record in [*read_records(specs / LEDGER), *(r for r in read_records(specs / HISTO) if "id" in r)]:  # fmt: skip
-        cause = record.get("caused_by")
-        shas = (
-            [] if cause in (None, "none") else list(fixes.get(cause, ())) or by_task.get(cause, [])
-        )
-        sha = shas[-1] if shas else ""  # a shape-4 task commit is named by its short sha
-        culprit = when.get(sha) or next(
-            (v for k, v in when.items() if sha and k.startswith(sha)), None
-        )
+        shas = _culprits(record.get("caused_by"), fixes, tasks)
+        culprit = when.get(shas[-1]) if shas else None
         found, born = record.get("found_in"), _held_at(specs, culprit) if culprit else record.get("introduced_in")  # fmt: skip
         seen = [c for c in (found, born) if c]
         cells = (f"{c['release']}/{c['rc']}" if c else "-" for c in (found, born))
-        line = "\t".join((record["id"], record["status"], *cells))
+        seam = str(record.get("evidence_seam") or "").split("::")[0]
+        line = "\t".join((record["id"], record["status"], *cells, *(["seam gone"] if seam and seam not in tracked else [])))  # fmt: skip
         if any(c["release"] in keys for c in seen):
             rows.append(line)
         elif any(c["release"] == "unknown" for c in seen):
@@ -241,30 +180,64 @@ def _window(specs: Path) -> int:
     return 0
 
 
+def _balance(args: argparse.Namespace, specs: Path) -> int:
+    """Print the block, rewrite it (`--write`) or judge it (`--check`); whatever the ledgers,
+    the release log or git cannot give is one refusal, here and nowhere deeper."""
+    me = script(Path(__file__))
+    try:
+        if args.write:
+            print(f"[ok] wrote the `## Bugs` block of {_placed(lambda: qa.write(specs), specs)}")
+        elif args.check:
+            if _placed(lambda: qa.stale(specs), specs):
+                why = "the `## Bugs` block differs from its regeneration"
+                raise Refusal(why, f"{me} balance --write")
+        else:
+            print(_placed(lambda: qa.body(specs), specs), end="")
+    except (LookupError, TypeError, ValueError, OSError, subprocess.CalledProcessError) as error:
+        raise Refusal(f"cannot render the bug balance: {error}", f"{me} check") from None
+    return 0
+
+
 def _read(args: argparse.Namespace, specs: Path) -> int:
     records = read_records(specs / LEDGER)
-    fixes = _fixes(specs) if args.verb in ("fix", "stats") else {}
-    own = _own(specs, {r[2] for c in fixes.values() for rs in c.values() for r in rs or []}) if fixes else set()  # fmt: skip
+    fixes = fx.fixes(specs) if args.verb in ("fix", "stats") else {}
     if args.verb == "fix":
         ids = args.bug_ids or [str(r["id"]) for r in records if r["status"] == "resolved"]
+        born = [t.timestamp() for t, _, _ in _placed(lambda: candidate_adds(specs), specs)]
         for bug in ids:
-            commits = fixes.get(bug, {})
-            print(f"{bug}\t{','.join(commits)}\t{_direction(commits, own)}" if commits else f"{bug}\tunlinked")  # fmt: skip
-            for row in (r for rows in commits.values() for r in rows or []):
+            if (fix := fixes.get(bug)) is None:
+                print(f"{bug}\tunlinked")
+                continue
+            print(f"{bug}\t{','.join(fix.commits)}\t{fx.direction(fix)}")
+            for row in (r for rows in fix.commits.values() for r in rows):
                 print("\t" + "\t".join(row))
+            rework, last = fix.rework()
+            if rework:
+                print(f"\trework\t{rework['planned']} planned, {rework['overfitting']} overfitting")
+            if born:  # Terms: settled once 2 candidates were born with the surface untouched
+                untouched = sum(t > last for t in born)
+                print(
+                    f"\t{'settled' if untouched >= 2 else 'unsettled'}\t{untouched} rcs untouched"
+                )
         linked = sum(b in fixes for b in ids)
         print(f"[ok] {linked} linked, {len(ids) - linked} unlinked.")
         return 0
     if args.verb == "stats":
         print(f"total\t{len(records)}")
-        directions = [_direction(fixes[r["id"]], own) for r in records if r["id"] in fixes]
+        directions = [fx.direction(fixes[r["id"]]) for r in records if r["id"] in fixes]
         for label, values in (
             ("status", [r["status"] for r in records]),
             ("severity", [r["severity"] for r in records if r.get("severity")]),
-            ("direction", [d for d in directions if d != "-"]),
+            ("direction", directions),
         ):
             for value, count in sorted(Counter(values).items()):
                 print(f"{label}:{value}\t{count}")
+        return 0
+    if args.found_in:  # the one reader of found_in x status
+        release, _, rc = args.found_in.partition("/")
+        for bug in records:
+            if bug.get("status") in ("open", "deferred") and bug.get("found_in") == {"release": release, "rc": rc}:  # fmt: skip
+                raise Refusal(f"{rc} of release {release} holds {bug['status']} bug {bug['id']}", f"Operator action: resolve {bug['id']} in {rc}'s bug batch")  # fmt: skip
         return 0
     selected = [r for r in records if args.include_closed or r.get("status") == "open"]
     for record in sorted(selected, key=lambda r: str(r["id"])):
@@ -289,7 +262,7 @@ def _write(args: argparse.Namespace, specs: Path) -> int:
         values["reported_by"] = values["reported_by"] or "dd-software-engineer"
         try:
             listed = subprocess.run(["git", "-C", str(specs), "ls-files", "--full-name", ":/"],
-                                    capture_output=True, text=True, check=True).stdout  # fmt: skip
+                                    capture_output=True, text=True, encoding="utf-8", errors="replace", check=True).stdout  # fmt: skip
         except (OSError, subprocess.CalledProcessError) as exc:
             cause = getattr(exc, "stderr", "") or str(exc)
             raise Refusal(f"cannot list the repo's tracked directories: {cause.strip()}",
@@ -315,14 +288,14 @@ def _write(args: argparse.Namespace, specs: Path) -> int:
     near = _candidates(specs, args.bug_id) if args.verb == "resolve" else []
     if near:
         print(f"blame candidates: {', '.join(near)}")
-    commit(ledger, lambda rs: tr.transition(rs, args.bug_id, args.verb, values, near))
+    commit(ledger, lambda rs: tr.transition(rs, args.bug_id, args.verb, values, near, lambda p: _tracked(specs, p)))  # fmt: skip
     print(f"[ok] {tr.STATUS_BY_VERB[args.verb]} {args.bug_id}")
     return 0
 
 
 def main(argv: list[str] | None = None) -> int:
     args = _parser().parse_args(argv)
-    reads = args.verb in ("check", "status", "stats", "fix", "window")
+    reads = args.verb in ("check", "status", "stats", "fix", "window", "balance")
     specs = find_specs(args.specs, ledger=None if reads else f"specs/{LEDGER}")
     if args.verb == "check":
         findings = check(specs)
@@ -335,6 +308,8 @@ def main(argv: list[str] | None = None) -> int:
             return _read(args, specs)
         if args.verb == "window":
             return _window(specs)
+        if args.verb == "balance":
+            return _balance(args, specs)
         return _archive(args, specs) if args.verb == "archive" else _write(args, specs)
     except Refusal as refusal:
         return refuse(refusal, specs)

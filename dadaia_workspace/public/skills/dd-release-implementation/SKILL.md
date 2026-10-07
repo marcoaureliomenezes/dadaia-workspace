@@ -1,7 +1,7 @@
 ---
 name: dd-release-implementation
 description: >
-  Implement a release candidate from the first task reservation through the
+  Implement a release candidate from the first task through the
   promote-or-continue gate. Use when working a task inside an Approved candidate, at
   candidate closure, and at the gate (the next candidate, or promote + branch cut).
 ---
@@ -14,7 +14,7 @@ description: >
 
 - `dd-software-engineer` working a task inside an `Approved` candidate.
 - `dd-product-engineer` at each candidate's closure (memory, `_RELEASE.json`).
-- From the first reservation through the promote-or-continue gate (and, on promote, the ship + branch cut).
+- From the first task through the promote-or-continue gate (and, on promote, the ship + branch cut).
 
 ## 2. Steps
 
@@ -22,28 +22,28 @@ description: >
 2. Resolve the live release by reading `_RELEASE.json`'s `phase` field directly.
 3. The live candidate's job files sit at `releases/<v>/rc-<N>/tasks/<job>.md`, the highest `rc-<N>/`; a lower one is closed history (a closed rc keeps its `TASKS.md`).
 4. Full navigation protocol: `dd-spec-navigator`.
-5. Read `RC-FLOW.md` for the candidate arc and gate cadence before acting past reservation.
+5. Read `RC-FLOW.md` for the candidate arc and gate cadence before acting past opening a task.
 6. Update `_RELEASE.json` per `RELEASE-EVENTS.md`; a stage's third red gate adds the `stop:` note (`specs/releases/AGENTS.md` §2).
-7. At `RC-FLOW.md` step 5, run `MEMORY-UPDATE.md`'s full protocol before touching any memory atom.
+7. At `RC-FLOW.md` step 4, run `MEMORY-UPDATE.md`'s full protocol before touching any memory atom.
 8. A test enters the suite only under the root map §1 test basics.
 9. Before growing any module, run the deletion test and speak the seam vocabulary (`dd-codebase-design`) — a diff that only adds justifies itself against replace-don't-layer.
 10. Implement each task inside its own task worktree, cut from its job's worktree branch per `worktrees/AGENTS.md` §1.
 
 ## 2a. Push green
 
-- Every work-branch push (`<work>M.m.p`, the constitution's `gitflow:`) runs the repo's own CI checks first (its lint, typecheck and tests), green.
+- Every work-branch push (`<work>M.m.p`, the constitution's `gitflow:`) runs the repo's `verify:` line first, green.
 - The push IS the publication boundary: pre-push scans every object the pushed range introduces or rewrites against the structural baseline and the operator denylist (`$DADAIA_PRIVACY_DENYLIST` or `.dadaia/states/privacy_denylist.json`) — a private repo or context name is protected only when listed there; no path is exempt.
 - Published history is the baseline and is never rescanned; a fixture needing a secret shape composes it at runtime, never as a tracked literal.
 - Only pushes are review-blocked; commits flow freely, and a full scan lives only in the audit lane.
-- Watch every push and PR to green — a red job is fixed at its cause, never waited out.
-- A `quarantine`-marked test sits outside the gating selectors, bug-gated; unregistered pass-on-retry is a failure.
+- A red `verify:` line is fixed at its cause, never waited out.
+- A flaky test is quarantined by the repo's own mechanism, bug-gated; an unregistered pass-on-retry is a failure.
 
 ## 3. Done when
 
 - Live release resolved by reading `_RELEASE.json` directly.
 - Task committed under its id and merged onto its job branch after its task gate; the stage closed by `WT stage` (`RC-FLOW.md` step 2).
 - Current step (`RC-FLOW.md`) identified before attempting its unlock action.
-- CI green before any push; trio `APPROVED` before the candidate's integration-branch PR.
+- `verify:` line green before any push; trio `APPROVED` before the candidate's integration-branch PR.
 - At candidate closure: the Reconciliation job merged (`RC-FLOW.md` step 4) -> candidate PR -> the promote-or-continue gate.
 
 ## 4. References

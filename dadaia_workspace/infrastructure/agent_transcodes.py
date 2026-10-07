@@ -167,6 +167,7 @@ def codex_agent_toml_bytes(
     claude_model, reasoning_effort = resolve_codex_agent_model(
         agent_name, fm.get("model") if fm else None, resolved
     )
+    persona_read_only(fm)  # fail closed on a bad read_only
     description = fm.get("description") if fm else None
     toml_content = _render_codex_agent_toml(
         agent_name,
@@ -174,7 +175,6 @@ def codex_agent_toml_bytes(
         body,
         description=transform_for_codex(str(description)) if description else None,
         reasoning_effort=reasoning_effort,
-        read_only=persona_read_only(fm),
     )
     return toml_content.encode("utf-8")
 

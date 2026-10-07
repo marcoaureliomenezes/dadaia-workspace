@@ -84,15 +84,14 @@ Audit protocol — detecting order drift:
 
 ## 3. Persona-Consistency Invariants
 
-Five invariants MUST hold across all personas. Inconsistencies are bugs — file them in a refactor report.
+Four invariants MUST hold across all personas. Inconsistencies are bugs — file them in a refactor report.
 
 | # | Invariant | What must match |
 |---|---|---|
 | I1 | Frontmatter schema | Same keys, same order (see below); no `tier`/`model` frontmatter key |
 | I2 | Body section order | The canonical 10-section spine of §2 |
 | I3 | `[SCOPE ERROR]` block format | Opener, one-line identity, explicit redirect per foreign domain |
-| I4 | TDD / task-manager reservation flow | The marker lifecycle, cited from `specs/releases/AGENTS.md` §3 (not restated) |
-| I5 | Handoff JSON contract | All agents emit via `dd-handoff-emitter` against the same schema version |
+| I4 | Handoff JSON contract | All agents emit via `dd-handoff-emitter` against the same schema version |
 
 - I1 reference key list (on-disk today): `name`, `description`, `dispatch_band`, `read_only`, `concurrency_relationship`.
 - I1 reference key list (continued): `gate_role`, `tools`, `skills`, `input_contract`, `paths.write_allowlist`.
@@ -104,8 +103,7 @@ Detection method:
 1. I1: `grep -n '^[a-z_]*:' <persona>.md`, diff the key list against the on-disk reference (re-derive if the schema changes).
 2. I2: run the §2 audit protocol.
 3. I3: `grep -A12 '\[SCOPE ERROR\]' <persona>.md`; verify opener, one-line identity, and a correct redirect per domain.
-4. I4: confirm the persona references the task-manager flow rather than restating it.
-5. I5: confirm `dd-handoff-emitter` is in the skills list and the report section cites the current schema.
+4. I4: confirm `dd-handoff-emitter` is in the skills list and the report section cites the current schema.
 
 Fix protocol:
 

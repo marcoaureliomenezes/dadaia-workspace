@@ -4,6 +4,8 @@ handoff on disk). A work-branch push, a branch deletion and a tag push pass; the
 names come from the committed constitution's gitflow (custom, absent -> default + one
 warning, inherited by an associated repo; its main repo absent -> default + one warning).
 The integration-branch refusal and its fix are the refusal harness Case `birth_published`.
+
+Owner: dd-software-engineer
 """
 
 from __future__ import annotations

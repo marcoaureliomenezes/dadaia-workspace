@@ -17,7 +17,7 @@ Disclosed reference reached from `SKILL.md`/`RC-FLOW.md` wherever the arc says "
 - `log` is the one append-only array inside the document — oldest first, never rewritten once appended; each entry is `{ts, agent, kind, text}`.
 - `kind` is one of `note summary size drifts dispositions test-dispositions artifact-gc reviews merge memory milestone`.
 - `release.py check` judges every phase: under DEFINITION, a closure entry after the candidate's birth note is a finding (a job's `kind: merge` entry is not one); every job file is judged (`dd-release-definition` §5).
-- A merged job appends one `kind: merge` entry, Read-then-Edit (no verb writes it), text `job: <name>; start: <UTC>; end: <UTC>; wall: <min>; ritual_wait: <min>; dispatches: <n>; job_gate_runs: <n>` — `start` the committer time of the job branch's first commit, `end` the `createdAt` of the push CI run that lands it; `release.py check` validates the shape.
+- A merged job appends one `kind: merge` entry, Read-then-Edit (no verb writes it), text `job: <name>; start: <UTC>; end: <UTC>; wall: <min>; ritual_wait: <min>; dispatches: <n>; job_gate_runs: <n>` — `start` the committer time of the job branch's first commit, `end` the committer time of the merge that lands it; `release.py check` validates the shape.
 
 ## Who sets which milestone
 
@@ -26,7 +26,7 @@ Disclosed reference reached from `SKILL.md`/`RC-FLOW.md` wherever the arc says "
 | `phase` + `defined` | `python3 .agents/skills/dd-release-implementation/scripts/release.py phase IMPLEMENTATION --sha <sha>` | phase string, `{sha, ts}` |
 | `phase` + `implemented` | `python3 .agents/skills/dd-release-implementation/scripts/release.py phase CLOSURE --sha <sha>` | phase string, `{sha, ts}` |
 | `phase: DEFINITION` | `python3 .agents/skills/dd-release-implementation/scripts/release.py new <id>` | phase string |
-| `shipped`, then the directory moves to `_archive/<v>/` | `python3 .agents/skills/dd-release-implementation/scripts/release.py ship --sha <sha> --pr <n>`, refused on any `check` error | `{sha, pr, ts}` (`check` verifies it from 0.5.0 on) + one `delivered` histo line, `summary` null |
+| `shipped`, then the directory moves to `_archive/<v>/` | `python3 .agents/skills/dd-release-implementation/scripts/release.py ship --sha <sha>`, refused on any `check` error | `{sha, pr, ts}` (`check` verifies it from 0.5.0 on) + one `delivered` histo line, `summary` null |
 
 
 ## `log` — the closure narrative's home

@@ -8,8 +8,7 @@ description: >
 
 # dd-audit-project — Three Pillars Over a SHA Window
 
-> `dd-code-reviewer` drives this directly, dispatched by the operator or a dispatching
-> agent. Suggested every 5 releases, never mandatory.
+> `dd-code-reviewer` is the lens (read-only, it returns its report); the main thread writes the audit from it — `specs/audits/AGENTS.md` §2. Suggested every 5 releases, never mandatory.
 
 ## 1. The window — computed once per audit
 
@@ -19,15 +18,15 @@ description: >
 
 ## 2. The three pillars — run together, never fewer
 
-- **Pillar 1 — bugs** ([`PILLAR-BUGS.md`](PILLAR-BUGS.md)): compute all eight
-  forensic metrics on every `BUGS.jsonl` record in the window; stamp `audited` on each
+- **Pillar 1 — bugs** ([`PILLAR-BUGS.md`](PILLAR-BUGS.md)): compute all nine
+  forensic metrics it lists on each `BUGS.jsonl` record in the window; the main thread stamps `audited` on each
   reviewed record (`python3 .agents/skills/dd-bug-resolution/scripts/bugs.py update <id> --set audited=<slug>`, pillar 1's only write).
 - **Pillar 2 — specs** ([`PILLAR-SPECS.md`](PILLAR-SPECS.md)): commit shapes, canon compliance, `_RELEASE.json` milestones over the window.
 - **Pillar 3 — memory** ([`PILLAR-MEMORY.md`](PILLAR-MEMORY.md)): execute every
   Part-1 principle's named `Measured by:` check; match every Part-1 hunk in the
   window to an `accepted` ADR in the same commit, or flag HIGH.
 
-Refuse to write `AUDIT.md` until all three pillar sections are present — fewer than
+The main thread refuses to write `AUDIT.md` until all three pillar sections are present — fewer than
 three is not an audit. Append one `FINDINGS.jsonl` record per claim
 ([`FINDINGS-FORMAT.md`](FINDINGS-FORMAT.md)).
 
@@ -40,7 +39,7 @@ three is not an audit. Append one `FINDINGS.jsonl` record per claim
 
 ## 4. Done when
 
-- Window recorded; eight bug metrics with baseline + target; every Part-1 check ran; `AUDIT.md` has all three pillars, each claim a `FINDINGS.jsonl` record.
+- Window recorded; nine bug metrics with baseline + target; every Part-1 check ran; `AUDIT.md` has all three pillars, each claim a `FINDINGS.jsonl` record.
 
 ## 5. References
 

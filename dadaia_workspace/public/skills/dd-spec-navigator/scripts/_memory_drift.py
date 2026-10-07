@@ -32,21 +32,35 @@ class Refusal(Exception):
         self.fix = fix
 
 
+def _cut(repo: Path, what: str) -> Refusal | None:
+    """The one refusal naming a history cut: *repo* is a shallow clone, else None."""
+    shallow = subprocess.run(["git", "rev-parse", "--is-shallow-repository"], cwd=repo, capture_output=True, text=True, encoding="utf-8", errors="replace", check=False)  # fmt: skip
+    if shallow.stdout != "true\n":
+        return None
+    return Refusal(
+        f"{what}: a shallow clone lacks the window's history",
+        git_line(repo, "fetch", "--unshallow"),
+    )
+
+
 def git(repo: Path, *argv: str) -> list[str]:
     """`git *argv` from *repo*, as non-empty lines; a git that refuses is a Refusal."""
-    done = subprocess.run(["git", *argv], cwd=repo, capture_output=True, text=True, check=False)
-    if done.returncode != 0:  # the ONE history precondition: a shallow clone is named
-        shallow = subprocess.run(["git", "rev-parse", "--is-shallow-repository"], cwd=repo, capture_output=True, text=True).stdout == "true\n"  # fmt: skip
-        raise Refusal(f"git {' '.join(argv)} failed in {repo}: " + ("a shallow clone lacks the window's history" if shallow else done.stderr.strip()),
-                      git_line(repo, "fetch", "--unshallow") if shallow else "Operator action: run this verb from a checkout whose history holds the --since commit")  # fmt: skip
+    done = subprocess.run(["git", *argv], cwd=repo, capture_output=True, text=True, encoding="utf-8", errors="replace", check=False)  # fmt: skip
+    if done.returncode != 0:  # a bound-less caller's history precondition: a cut is named first
+        what = f"git {' '.join(argv)} failed in {repo}"
+        raise _cut(repo, what) or Refusal(f"{what}: {done.stderr.strip()}",
+                                          "Operator action: run this verb from a checkout whose history holds the --since commit")  # fmt: skip
     return [line for line in done.stdout.split("\n") if line]
 
 
 def report(specs: Path, since: str, until: str = "HEAD") -> dict[str, Any]:
     """The worklist for the window *since*..*until* — the ONE decider every verb calls."""
     repo = specs.parent
-    for bound in (since, until):  # exit 1 = present but unreachable; 128 = absent, git() names it
-        if subprocess.run(["git", "merge-base", "--is-ancestor", bound, "HEAD"], cwd=repo, capture_output=True, check=False).returncode == 1:  # fmt: skip
+    for bound in (since, until):  # usable = an ancestor of HEAD; absent (128) is left to git()
+        reach = subprocess.run(["git", "merge-base", "--is-ancestor", bound, "HEAD"], cwd=repo, capture_output=True, check=False).returncode  # fmt: skip
+        if reach and (cut := _cut(repo, f"{bound} is out of reach")):  # a cut is checked first
+            raise cut
+        if reach == 1:  # present, reached by no path from HEAD
             raise Refusal(f"{bound} is not an ancestor of HEAD — a clone of this branch lacks it (a rebase rewrote it)",
                           f"Operator action: replace {bound[:12]} with the commit HEAD reaches in its place")  # fmt: skip
     catalog = json.loads((specs / CATALOG).read_text(encoding="utf-8"))

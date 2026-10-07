@@ -8,26 +8,30 @@ a skill points here, never restates them.
 
 ## 1. The tree
 
-- One worktree per job, nested at `worktrees/<repo>/<M.m.p>-rc<N>/<job>/`, on the branch `wt/<M.m.p>-rc<N>/<job>`, cut from the repo's work branch; a job needs its rc's Approved `SPEC.md`.
+- One worktree per job, nested at `worktrees/<repo>/<M.m.p>-rc<N>/<job>/`, on the branch `wt/<M.m.p>-rc<N>/<job>`, cut from the repo's work branch; a job needs its rc's approved SPEC (`specs/AGENTS.md`).
 - Two more trees inside an rc folder: `define/` (the candidate's definition) and `reconcile/` (the Reconciliation job: memory, derived docs, `measured_by` repairs, the rc's measurement, closure).
-- Outside an rc only `worktrees/<repo>/backlog/<slug>/`, on `wt/backlog/<slug>`; a bug is a job.
+- Outside an rc only `worktrees/<repo>/backlog/<slug>/`, on `wt/backlog/<slug>`, and `worktrees/<repo>/hotfix/<bug-id>/`, on `wt/hotfix/<bug-id>` (§3); a bug is a job.
 - One worktree per task, `<M.m.p>-rc<N>/<job>--<task-id>/` on `wt/<M.m.p>-rc<N>/<job>--<task-id>`, cut from its job branch: sub-agents work the tasks of one stage in parallel, one per task worktree; at most 5 task worktrees open per rc. A stage is a barrier on the job branch, never a tree. One change — code, tests, specs, memory, derived docs — lands in one job.
 - `WT new <repo> <name>` opens a tree; any other name is refused.
 
 ## 2. Three gates, one review
 
-1. Task: its commit, the subject opening with its id; `WT merge <task path>` runs the work branch's `verify-task:` line on the touched files plus the paths its commits name in `Owner-tests:` trailers (one a `test_` file once it touches non-test `.py`) and fast-forwards the job branch — no verdict, no review; a task behind its job branch rebases first (its disjoint `W:` keeps it conflict-free) and the gate reruns.
-2. Stage: `WT stage <job path>` — refused while a task worktree of the job is open, then the work branch's `verify-stage:` line (lint, mypy, guards, unit, integration) green before the next stage opens; the closing commit carries `stage: <id> — unit+integration green`.
-3. Job: push `wt/<M.m.p>-rc<N>/<job>` and let its CI matrix run; `dd-code-reviewer` reviews `git diff <work branch>...HEAD` once; its verdict is a handoff whose `scope` names HEAD and whose `ci_run` is that green run's URL.
-4. `WT merge <path>` lands HEAD as it is, by fast-forward, only when the tree is clean, HEAD contains the work branch, no task worktree of the job is open, the job branch took code only from task merges, a valid APPROVED verdict names HEAD (or a reflog sha with the same patch-id and message series) with its `ci_run`, and the work branch's `verify:` line passes on HEAD, split by `shlex` and run as one argv list, never a shell; it then removes the tree and `branch -d`s it.
+1. Task: its commit, the subject opening with its id; `WT merge <task path>` holds the test freeze (below), then runs the work branch's `verify-task:` line on the touched files plus the paths its commits name in `Owner-tests:` trailers (one a `test_` file once it touches non-test `.py`) and fast-forwards the job branch — no verdict, no review; a task behind its job branch rebases first (its disjoint `W:` keeps it conflict-free) and the gate reruns.
+2. Stage: `WT stage <job path>` — refused while a task worktree of the job is open, then the work branch's `verify-stage:` line green before the next stage opens; the closing commit carries `stage: <id> — verify-stage green`.
+3. Job: `dd-code-reviewer` reviews `git diff <work branch>...HEAD` once and writes its own verdict with `verdict.py` (`dd-handoff-emitter`), its only write; the main thread never writes one. The hash binds the verdict to a diff; authorship is discipline plus audit. A job branch may be pushed before its review (a push is never a merge).
+4. `WT merge <path>` lands HEAD as it is, by fast-forward, only when the tree is clean, HEAD contains the work branch, no task worktree of the job is open, the test freeze holds, a valid APPROVED verdict names HEAD, or a reflog sha of HEAD's patch-id and message series (ADR 0168), by `reviewed_sha`, and its `diff_sha256` matches the range the merge lands, and the work branch's `verify:` line passes on HEAD, split by `shlex` and run as one argv list, never a shell; it then removes the tree and `branch -d`s it.
 5. A `define` or `backlog` tree lands `specs/` only: its merge needs its one review pass and the bugs, backlog and release checks, and runs no test.
 
+- The test freeze (ADR 0209): a task or job `WT merge` judges the job's own range `<merge-base>..HEAD`, each commit diffed against its first parent, over the paths the work branch's `tests:` line declares — one line of globs in its tracked `AGENTS.md`, e.g. `tests: tests/** **/*_test.go` — so no tree changes what counts as a test.
+  - From the RED anchor, the parent of the first commit whose task id is not in stage 1, any modified or deleted test line refuses.
+  - Added test lines pass only in a stage whose commits touch test paths alone; a pure rename passes; so does a commit whose only change deletes lines matching the work branch's `tests-red:` pattern, the RED marker.
+  - A repo with no `tests:` line refuses with `Operator action: commit the tests: line on <work branch>'s AGENTS.md`; any other refusal carries `Operator action: stop and report`, and an anchor that cannot be derived refuses too.
 - One review per job, plus one per stage past 400 added lines (`git diff --numstat`, column 1); none per task.
 - A moved work branch refuses with `fix: git -C <tree> rebase <work>`; the rebase runs inside the worktree. A ledger conflict is redone by the ledger's own writer on the rebased tree, never hand-merged. `WT merge` re-runs cleanly after any stop.
 
 ## 3. Hotfix and parallel work
 
-- A hotfix (`specs/bugs/AGENTS.md` §2) is its own job, outside the rc's DAG.
+- A hotfix (`specs/bugs/AGENTS.md` §2) is its own job, outside the rc's DAG: `WT new <repo> hotfix/<bug-id>` cuts it from the work branch with no rc `SPEC.md`, once the main repo's `specs/bugs/BUGS.jsonl` on the work branch holds that bug `open`; its gates, one review and merge are §2's.
 - Jobs run in parallel only with disjoint envelopes or an edge in the PLAN's DAG; tasks of one stage run in parallel with disjoint `W:`. The CI cost is cut in the gates, never by sharing a tree.
 
 ## 4. Environment and hygiene
@@ -37,6 +41,5 @@ a skill points here, never restates them.
 - Never `git stash` in a worktree: every worktree of a repo shares one stash stack; set work aside as a WIP commit.
 - Never merge by hand, never `git worktree remove --force`, never `git branch -D` a `wt/` branch.
 - An empty or merged worktree leaves by `WT clean <path>`; ignored files are kept (`--keep`) or dropped (`--drop`) by the operator's word.
-- `WT list` shows every open worktree: name, age, commits ahead, dirty or clean.
 - Never close a candidate or `context dead` a context while one of its `wt/*` branches exists, the closing tree's own aside: merge or clean it first.
 - Nothing lives under `worktrees/` but `<repo>/<name>` worktrees and this file.

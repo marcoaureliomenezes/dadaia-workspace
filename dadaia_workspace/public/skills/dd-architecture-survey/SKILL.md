@@ -27,7 +27,7 @@ change actually happens:
 2. Otherwise, measure — never impressionistic:
    - The bug history aggregated per surface/component — re-bug rate, fix-induced
      `caused_by` edges, resolved-without-evidence count; inside a dadaia workspace,
-     `python3 .agents/skills/dd-bug-resolution/scripts/bugs.py stats` and `… status --all`.
+     `python3 .agents/skills/dd-bug-resolution/scripts/bugs.py stats --specs <specs-dir>` and `… status --all --specs <specs-dir>`.
    - `git log --oneline --since=<window> -- <path>` churn per touched path; join the
      two — the loop lives where re-bugs and churn coincide.
    - The prior survey/audit's dispositions (inside a dadaia workspace,
@@ -81,7 +81,7 @@ survey never decides. During that session, keep the domain model current via
 
 ## 6. Boundaries (ADDITIVE)
 
-- Writes a report and/or a handoff only (the root `AGENTS.md` map §4).
+- Writes nothing: it returns its report to the caller, who files it (`specs/audits/AGENTS.md` §2).
 - A candidate reaches the backlog only through the operator-gated intake.
 
 ## 7. Done when

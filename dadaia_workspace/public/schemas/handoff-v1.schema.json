@@ -48,6 +48,16 @@
       "type": "string",
       "description": "Scope descriptor for the handoff (e.g. file path, module, component)."
     },
+    "reviewed_sha": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{40}$",
+      "description": "The commit a verdict judged; written only by the emitter's verdict.py."
+    },
+    "diff_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$",
+      "description": "The hash of the diff a verdict judged, from worktree.py hash; written only by verdict.py."
+    },
     "metrics": {
       "type": "object",
       "description": "Key quantitative metrics for this handoff (e.g. token counts, file counts).",
@@ -71,7 +81,7 @@
         "content_hash": {
           "type": "string",
           "pattern": "^[a-f0-9]{64}$",
-          "description": "SHA-256 hex digest of the artifact file content. Required whenever path is present — `.dadaia/.venv/bin/dadaia reports validate` recomputes the file hash and fails on mismatch or absence."
+          "description": "SHA-256 hex digest of the artifact file content. Required whenever path is present — the CLI's `reports validate` verb recomputes the file hash and fails on mismatch or absence."
         }
       }
     },
@@ -143,11 +153,6 @@
     "verdict_reason": {
       "type": "string",
       "description": "Optional human-readable summary explaining the verdict."
-    },
-    "ci_run": {
-      "type": "string",
-      "pattern": "^https://github\\.com/[^/]+/[^/]+/actions/runs/[0-9]+$",
-      "description": "The green CI-matrix run of the job branch HEAD a reviewer verdict approves; worktree.py merge requires it on a job's verdict."
     }
   }
 }

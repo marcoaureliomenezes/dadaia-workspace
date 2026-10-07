@@ -40,29 +40,31 @@ V32_COMMENTS, V32_DOCSTRINGS, V33_ORPHANS, IGNORE_EDGES = 109, 215, 31, 2
 
 # v37: the candidate-folder pair (ADR 0150): the stdlib scripts cannot import the package, so
 # each side keeps its twin and one test pins them equal. v38: each deleter outside sweep,
-# keyed to the test pinning its delete. v39: a doctor code with no fix-clears plant.
+# keyed to the test pinning its delete (a stdlib skill script cannot import the sweep, so its
+# row is unstarred when its value is parity:<test>). v39: a doctor code with no fix-clears plant.
 ALLOWANCES = """
-v37* core/gitflow.py:candidate_dir parity:tests/contract/test_release_script.py
-v37* core/gitflow.py:candidate_number parity:tests/contract/test_release_script.py
-v37* core/gitflow.py:next_candidate parity:tests/contract/test_release_script.py
-v37* core/release_state.py:CANDIDATE_RE parity:tests/contract/test_release_script.py
-v37* public/skills/dd-release-implementation/scripts/_release_schema.py:CANDIDATE_RE parity:tests/contract/test_release_script.py
-v37* public/skills/dd-release-implementation/scripts/_release_schema.py:candidate_dir parity:tests/contract/test_release_script.py
-v37* public/skills/dd-release-implementation/scripts/_release_schema.py:candidate_number parity:tests/contract/test_release_script.py
-v37* public/skills/dd-release-implementation/scripts/_release_schema.py:next_candidate parity:tests/contract/test_release_script.py
-v38* core/atomic_write.py:atomic_write parity:tests/unit/core/test_atomic_write.py
-v38* public/skills/dd-bug-resolution/scripts/_ledger.py:replace parity:tests/unit/skills/test_ledger_write_verbs_refuse_with_the_pair_intact.py
-v38* features/certification/service.py:certify parity:tests/integration/features/certification/test_certify_journey.py
-v38* features/migrate/state_v2.py:execute_migration parity:tests/unit/features/migrate/test_state_v2.py
-v38* features/reconcile/service.py:_restore_state parity:tests/unit/features/reconcile/test_reconcile_service.py
-v38* features/specs/doctor_memory.py:fix_placeholder_atom parity:tests/unit/features/specs/test_scaffold_placeholder_repair.py
-v38* infrastructure/projection.py:_clear parity:tests/integration/test_install_ledger_reconciliation.py
-v38* infrastructure/public_assets.py:_prune_empty_dirs parity:tests/integration/test_install_ledger_reconciliation.py
-v38* infrastructure/public_assets.py:_reconcile_install_ledger parity:tests/integration/test_install_ledger_reconciliation.py
-v38* infrastructure/public_assets.py:stage parity:tests/integration/test_staged_assets_have_consumers.py
-v38* public/skills/dd-release-implementation/scripts/_release_new.py:new_release parity:tests/unit/skills/test_release_implementation_release_script.py
-v39* ONBOARDING parity:tests/integration/test_onboarding_steps_property.py
-v39* WS-INVARIANT parity:tests/integration/test_unfixable_findings_carry_their_own_fix.py
+v37* core/gitflow.py:candidate_dir parity:tests/public/skills/dd_release_implementation/scripts/test_release__release_script.py
+v37* core/gitflow.py:candidate_number parity:tests/public/skills/dd_release_implementation/scripts/test_release__release_script.py
+v37* core/gitflow.py:next_candidate parity:tests/public/skills/dd_release_implementation/scripts/test_release__release_script.py
+v37* core/release_state.py:CANDIDATE_RE parity:tests/public/skills/dd_release_implementation/scripts/test_release__release_script.py
+v37* public/skills/dd-release-implementation/scripts/_release_schema.py:CANDIDATE_RE parity:tests/public/skills/dd_release_implementation/scripts/test_release__release_script.py
+v37* public/skills/dd-release-implementation/scripts/_release_schema.py:candidate_dir parity:tests/public/skills/dd_release_implementation/scripts/test_release__release_script.py
+v37* public/skills/dd-release-implementation/scripts/_release_schema.py:candidate_number parity:tests/public/skills/dd_release_implementation/scripts/test_release__release_script.py
+v37* public/skills/dd-release-implementation/scripts/_release_schema.py:next_candidate parity:tests/public/skills/dd_release_implementation/scripts/test_release__release_script.py
+v38* core/atomic_write.py:atomic_write parity:tests/core/test_atomic_write.py
+v38* public/skills/dd-bug-resolution/scripts/_ledger.py:replace parity:tests/public/skills/dd_bug_resolution/scripts/test__ledger.py
+v38* features/certification/service.py:certify parity:tests/features/certification/test_service.py
+v38* features/migrate/state_v2.py:execute_migration parity:tests/features/migrate/test_state_v2.py
+v38* features/reconcile/service.py:_restore_state parity:tests/features/reconcile/test_service.py
+v38* features/specs/doctor_memory.py:fix_placeholder_atom parity:tests/features/specs/test_canon__scaffold_placeholder_repair.py
+v38* infrastructure/projection.py:_clear parity:tests/infrastructure/test_public_assets__install_ledger_reconciliation.py
+v38* infrastructure/public_assets.py:_prune_empty_dirs parity:tests/infrastructure/test_public_assets__install_ledger_reconciliation.py
+v38* infrastructure/public_assets.py:_reconcile_install_ledger parity:tests/infrastructure/test_public_assets__install_ledger_reconciliation.py
+v38* infrastructure/public_assets.py:stage parity:tests/infrastructure/test_public_assets__staged_assets_have_consumers.py
+v38 public/skills/dd-gitflow-default/scripts/_worktree_end.py:_rmdir parity:tests/public/skills/dd_gitflow_default/scripts/test__worktree_end__removal.py
+v38* public/skills/dd-release-implementation/scripts/_release_new.py:new_release parity:tests/public/skills/dd_release_implementation/scripts/test_release.py
+v39* ONBOARDING parity:tests/features/workspace/test_onboarding__onboarding_steps_property.py
+v39* WS-INVARIANT parity:tests/features/spec_context/test_doctor__unfixable_findings_carry_their_own_fix.py
 v39* RELEASE-TREE-ARCHIVED -
 v39* RELEASE-TREE-MEMORY -
 v39* RELEASE-TREE-PARSE -
@@ -83,8 +85,8 @@ def test_guard_doctor_codes(record_property):
     from dadaia_workspace.features.specs.rules import RULES as SPECS
     from dadaia_workspace.features.workspace import onboarding
     from dadaia_workspace.infrastructure.ledger_scripts import LEDGER_SCRIPTS
-    from tests.integration.test_doctor_fix_lines_clear_their_finding import OPERATOR_ACTION, PLANTS, REPORT_ONLY
-    from tests.integration.test_workspace_fix_lines_clear_their_finding import WORKSPACE_PLANTS
+    from tests.cli.commands.test_doctor import OPERATOR_ACTION, PLANTS, REPORT_ONLY
+    from tests.cli.commands.test_doctor__workspace_fix_lines_clear_their_finding import WORKSPACE_PLANTS
 
     rules = [*SPECS, *BACKLOG, *workspace_rules(expired_only=False, context=None)]
     codes = {c for r in rules for c in r.codes} | {s.code for s in LEDGER_SCRIPTS} | {onboarding.CODE}
@@ -111,6 +113,10 @@ def _table(text: str) -> list[list[str]]:
     return [row.split() for row in body.splitlines() if row]
 
 
+def _skill_script(key: str) -> bool:
+    return key.startswith("public/skills/") and "/scripts/" in key
+
+
 def _allowance(tree: Tree, hits: dict[str, str], check: str, also: str = "") -> list[str]:
     """*hits* (key -> its sub-rule) against the tree's allowance rows of *check*."""
     rows = [r for r in _table(tree.read(SELF)) if r[0].rstrip("*") == check]
@@ -125,6 +131,11 @@ def _allowance(tree: Tree, hits: dict[str, str], check: str, also: str = "") -> 
         elif value.startswith("parity:") and not (tree.root / value[7:]).is_file():
             out.append(f"no-test-file: {key} -> {value}")
     born = {key for check_, key, _ in rows if check_.endswith("*")}
+    skill = {k: v for k, v in allow.items() if check == "v38" and _skill_script(k)}
+    out += [
+        f"skill-row-no-test: {k} -> {v!r}" for k, v in sorted(skill.items()) if v[:7] != "parity:"
+    ]
+    born |= skill.keys()
     return out + [f"absent-at-birth: {k} (only shrinks)" for k in sorted(allow.keys() - born)]
 
 
@@ -150,6 +161,13 @@ def v32(tree: Tree) -> list[str]:
 
 _FAMILY, _UPPER = re.compile(r"\b[A-Z]{1,4}-?[0-9]{2,3}\b"), re.compile(r"[A-Z]+")
 _WORD = frozenset("ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-")
+
+
+def _joined(text: str, i: int) -> bool:
+    """``text[i]`` is a witness char: a `_WORD` char, or a `.` between two (a dotted id)."""
+    return text[i] in _WORD or (
+        text[i] == "." and 0 < i < len(text) - 1 and {text[i - 1], text[i + 1]} <= _WORD
+    )
 
 
 def _constants(source: str) -> list[str]:
@@ -180,9 +198,9 @@ def v33(tree: Tree) -> list[str]:
     for text in _files(tree, "specs", PKG, "tests").values():
         for m in _FAMILY.finditer(text):
             left, right = m.start(), m.end()
-            while left > 0 and text[left - 1] in _WORD:
+            while left > 0 and _joined(text, left - 1):
                 left -= 1
-            while right < len(text) and text[right] in _WORD:
+            while right < len(text) and _joined(text, right):
                 right += 1
             prefix = _UPPER.match(m.group(0)).group(0)  # type: ignore[union-attr]
             families[prefix].add((text[left:right], m.start() - left))
@@ -469,11 +487,11 @@ def CONTROL(root: Path) -> Session:
                 f"{PKG}/{rel}",
                 f"{sym} = compile('x')\n" if sym.isupper() else f"def {sym}(p):\n    return p\n",
             )
-        if check == "v38*":
+        if check.rstrip("*") == "v38":
             _write(root, f"{PKG}/{rel}", f"def {sym}(p, q):\n    {_DELETERS[i % 6]}\n")
         if value.startswith("parity:"):
             _write(root, value[7:], "")
-    _edit_row(root, "v38", lambda r: f"{r[0]} {r[1]} zz-open-bug", -1)
+    _edit_row(root, "v38", lambda r: f"{r[0]} {r[1]} zz-open-bug", -2)
     _edit_row(root, "v39", lambda r: f"{r[0]} {r[1]} report-only", -1)
     _write(
         root,
@@ -546,6 +564,11 @@ def _rows(check: str, bad: str) -> dict[str, Plant]:
     return {rule: bind(f) for rule, f in rules.items()}
 
 
+def _born_package_row(root: Path) -> None:
+    _write(root, f"{PKG}/zz/tidy.py", "def tidy(p):\n    p.unlink()\n")
+    _edit_row(root, "v38", lambda r: f"{' '.join(r)}\nv38 zz/tidy.py:tidy {r[2]}")
+
+
 def _first(constant: bool) -> str:
     """The first v37 key's symbol of the real table that is (or is not) a constant."""
     syms = [r[1].split(":")[1] for r in _table((ROOT / SELF).read_text("utf-8")) if r[0] == "v37*"]
@@ -609,7 +632,20 @@ _PLANTS: dict[str, dict[str, Plant]] = {
         "constant-twin": _add(_TWIN, lambda: f"{_first(True)}: object = compile('x')\n"),
         **_rows("v37", "report-only"),
     },
-    "v38": _rows("v38", "zz-shut"),
+    "v38": {
+        **_rows("v38", "zz-shut"),
+        "absent-at-birth": _plant(_born_package_row),
+        "skill-row-no-test": _edit(
+            SELF,
+            "_worktree_end.py:_rmdir parity:tests/public/skills/dd_gitflow_default/scripts/test__worktree_end__removal.py",
+            "_worktree_end.py:_rmdir zz-open-bug",
+        ),
+        "no-test-file": _edit(
+            SELF,
+            "_worktree_end.py:_rmdir parity:tests/public",
+            "_worktree_end.py:_rmdir parity:tests/zz/public",
+        ),
+    },
     "v39": {
         "uncovered": _doctor(["ZZ-NEW"], []),
         "undeclared-code": _doctor([], ["ZZ-GHOST"]),

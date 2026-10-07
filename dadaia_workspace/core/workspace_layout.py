@@ -14,11 +14,13 @@ from functools import cached_property
 from pathlib import Path
 from typing import Literal
 
+from dadaia_workspace.core import platform
 from dadaia_workspace.core.harness_registry import HARNESS_PROJECTION_DIRS
 from dadaia_workspace.core.release_state import CANDIDATE_RE, RELEASE_ID_RE
 
 __all__ = [
     "render_registry_tables",
+    "source_form",
     "AUDIT_DIR_NAME_PATTERN",
     "AUDIT_DIR_NAME_RE",
     "CANON_ROOT_MEMBERS",
@@ -74,11 +76,14 @@ AUDIT_DIR_NAME_RE: re.Pattern[str] = re.compile(f"^{AUDIT_DIR_NAME_PATTERN}$")
 #: The operator's file of legitimate workspace paths, at the root (ADRs 0092, 0145).
 DADAIAIGNORE: str = ".dadaiaignore"
 
-#: Files the workspace root may contain: the root map, the operator prompt, the git ignore,
-#: the operator's own globs — credentials live outside the workspace (ADR 0146).
-ROOT_ALLOWED_FILES: frozenset[str] = frozenset(
-    {"AGENTS.md", "prompt.md", ".gitignore", DADAIAIGNORE}
-)
+#: Files the workspace root may contain: the root map, the operator prompt, the operator's own
+#: globs — credentials live outside the workspace (ADR 0146); the root is never a repository,
+#: so neither a ``.gitignore`` nor a ``.git/`` is canon there (ADR 0092: ``.dadaiaignore``).
+ROOT_ALLOWED_FILES: frozenset[str] = frozenset({"AGENTS.md", "prompt.md", DADAIAIGNORE})
+
+#: Entries the doctor reports and never moves: a credential file (ADR 0146) and a repository's
+#: history — the operator moves them out or names them in ``.dadaiaignore``.
+NEVER_MOVED: frozenset[str] = frozenset({".env", ".git"})
 
 
 class FloorRefusal(StrEnum):
@@ -118,6 +123,7 @@ CORE_FLOOR: dict[str, FloorRefusal] = {
     DADAIAIGNORE: FloorRefusal.OPERATOR,
     ".dadaia/states": FloorRefusal.LAW,
     ".dadaia/hooks": FloorRefusal.LAW,
+    ".dadaia/agentic": FloorRefusal.LAW,
     ".dadaia/sessions": FloorRefusal.SESSION,
 }
 
@@ -373,9 +379,7 @@ HARNESS_DIRS: frozenset[str] = frozenset(
     {".agents", *(d for dirs in HARNESS_PROJECTION_DIRS.values() for d in dirs)}
 )
 
-ROOT_ALLOWED_DIRS: frozenset[str] = frozenset(
-    {".dadaia", ".git", "repos", "worktrees"} | HARNESS_DIRS
-)
+ROOT_ALLOWED_DIRS: frozenset[str] = frozenset({".dadaia", "repos", "worktrees"} | HARNESS_DIRS)
 
 #: What a repo working tree must NOT carry: a nested ``.dadaia`` (tool caches are the
 #: repo's own, redirected by configuration — ``TOOL_CACHE_ENV``).
@@ -571,7 +575,23 @@ _PLACEHOLDERS: dict[str, Callable[[], str]] = {
 
 
 def render_registry_tables(text: str) -> str:
-    """Fill every registry placeholder in a law fragment from ``core.workspace_layout``."""
+    """Fill every registry placeholder in a law fragment from ``core.workspace_layout``, and
+    render the source CLI form ``.dadaia/.venv/bin/dadaia`` into the platform's venv form."""
     for placeholder, render in _PLACEHOLDERS.items():
         text = text.replace(placeholder, render())
-    return text
+    return text.replace(_SOURCE_CLI, _platform_cli())
+
+
+_SOURCE_CLI = ".venv/bin/dadaia"
+
+
+def _platform_cli() -> str:
+    caps = platform.PLATFORM
+    return f".venv/{caps.venv_scripts_dir}/dadaia{caps.venv_exe_suffix}"
+
+
+def source_form(text: str) -> str:
+    """The inverse of the CLI render in ``render_registry_tables``: the platform's venv CLI
+    spelling back to ``.dadaia/.venv/bin/dadaia`` — the one form shipped history and the
+    canonical source are compared in. The identity where the platform form is the source."""
+    return text.replace(_platform_cli(), _SOURCE_CLI)

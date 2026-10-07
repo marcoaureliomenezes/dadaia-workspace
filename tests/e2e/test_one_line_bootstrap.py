@@ -22,6 +22,8 @@ Hermetic by construction — no network, no container:
   ``ensure_workspace_venv``'s documented idempotent-repair contract (a venv directory
   that already carries an executable ``dadaia`` entrypoint is left alone), which is also
   exactly what doctor's VENV-1 check asserts. No ``venv.create``, no ``pip install``.
+
+Owner: dd-software-engineer
 """
 
 from __future__ import annotations

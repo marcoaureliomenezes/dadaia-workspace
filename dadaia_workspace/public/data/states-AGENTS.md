@@ -7,8 +7,7 @@ They are not documentation and not an implementation workspace.
 
 ## 1. Canon
 
-The closed canon of `.dadaia/states/`, rendered from `core/workspace_layout.py`
-(`STATES_CANON`) at `.dadaia/.venv/bin/dadaia public stage`; any other entry is slop `.dadaia/.venv/bin/dadaia doctor` reports.
+The closed canon of `.dadaia/states/`, rendered at `.dadaia/.venv/bin/dadaia public stage`; any other entry is slop `.dadaia/.venv/bin/dadaia doctor` reports.
 
 <!-- canon -->
 
@@ -17,7 +16,7 @@ The closed canon of `.dadaia/states/`, rendered from `core/workspace_layout.py`
 - Prefer dadaia CLI commands over manual edits.
 - Preserve valid JSON, stable keys, and atomic-write semantics.
 - Do not store secrets, tokens, private keys, or credentials.
-- Do not hand-edit state to bypass SDD gates, task locks, or context locks.
+- Do not hand-edit state to bypass SDD gates.
 - If a state schema changes, update migration/doctor logic and tests.
 
 ## 3. When manual repair is acceptable

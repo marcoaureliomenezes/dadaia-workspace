@@ -35,10 +35,6 @@ __all__ = ["push_gate_decision"]
 
 _DENYLIST_LAW = "dd-release-implementation §2a — private names never enter public/pushed material"
 _MAX_LISTED_HITS = 10
-_BYPASS = (
-    "The sanctioned, traceable emergency bypass is `git push --no-verify` "
-    "(discouraged; leaves a reflog trace)."
-)
 #: R13, N3: every range is uncommitted to its oldest unpublished commit and amended.
 _REWRITE = (
     "Uncommit the unpublished range down to its oldest commit (origin's history is never "
@@ -68,11 +64,11 @@ class ObjectSource(Protocol):
 
 def _refusal(head: str, rows: Sequence[str] = (), noun: str = "", advice: str = "") -> str:
     """The one pre-push refusal shape: head, rows capped at 10 plus a remainder count,
-    then the advice and the ``--no-verify`` bypass."""
+    then the advice when there is any."""
     lines = [f"[pre-push] BLOCKED: {head}", *rows[:_MAX_LISTED_HITS]]
     if len(rows) > _MAX_LISTED_HITS:
         lines.append(f"  ... and {len(rows) - _MAX_LISTED_HITS} more offending {noun}.")
-    return "\n".join([*lines, f"  {advice}{_BYPASS}"])
+    return "\n".join([*lines, *([f"  {advice}"] if advice else [])])
 
 
 def _fail_closed(what: str) -> str:
@@ -239,7 +235,7 @@ def push_gate_decision(
             f"{len(laws)} pushed commit(s) delete a law line citing no accepted `ADR NNNN` (ADR 0151).",
             [f"  {r.local_ref}: commit {c[:12]} deletes a line of {p}" for r, c, p in laws],
             "commit(s)",
-            "Cite the ADR that rules each deletion in that commit's message. ",
+            "Cite the ADR that rules each deletion in that commit's message.",
         )
         _, sha, path = laws[0]  # one act per refusal: the re-run names the next commit
         fix = (
@@ -258,7 +254,7 @@ def push_gate_decision(
             "object(s)",
             "A test fixture that needs a secret shape composes it at runtime (string "
             "concatenation), never as a tracked literal. The range scope means "
-            "already-published history never needs a rewrite. ",
+            "already-published history never needs a rewrite.",
         )
         fix = _rewrite_fix(hits[0][0], object_source, repo, fixes)
     else:

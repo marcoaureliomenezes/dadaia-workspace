@@ -86,8 +86,10 @@ def live_id(specs: Path) -> str:
     return ids[0]
 
 
-def _utc(ts: str) -> _dt.datetime:
-    return _dt.datetime.fromisoformat(ts.replace("Z", "+00:00")).astimezone(_dt.UTC)
+def utc(ts: str) -> _dt.datetime:
+    """An instant in UTC: an offset converts, `Z` is UTC, and none is UTC, never the host's zone."""
+    at = _dt.datetime.fromisoformat(ts.replace("Z", "+00:00"))
+    return at.replace(tzinfo=_dt.UTC) if at.tzinfo is None else at.astimezone(_dt.UTC)
 
 
 @functools.cache
@@ -99,8 +101,8 @@ def releases(specs: Path) -> dict[str, tuple[_dt.datetime, _dt.datetime | None]]
             state = json.loads(path.read_text(encoding="utf-8"))
             shipped = (state.get("shipped") or {}).get("ts")
             spans[path.parent.name] = (
-                _utc(state["log"][0]["ts"]),
-                _utc(shipped) if shipped else None,
+                utc(state["log"][0]["ts"]),
+                utc(shipped) if shipped else None,
             )
         except (OSError, ValueError, LookupError, TypeError, AttributeError) as exc:
             raise Unreadable(f"{path} has no readable first log ts and shipped ts ({exc})",
@@ -109,17 +111,17 @@ def releases(specs: Path) -> dict[str, tuple[_dt.datetime, _dt.datetime | None]]
 
 
 @functools.cache
-def _candidate_adds(specs: Path) -> list[tuple[_dt.datetime, str, str]]:
+def candidate_adds(specs: Path) -> list[tuple[_dt.datetime, str, str]]:
     """Each candidate's birth as (instant, release, rc): a commit adding exactly one
     rc-<N>/SPEC.md whose status reads non-Approved; a shallow history is refused."""
     git = ["git", "-C", str(specs)]
-    shallow = subprocess.run([*git, "rev-parse", "--is-shallow-repository"], capture_output=True, text=True, check=False)  # fmt: skip
+    shallow = subprocess.run([*git, "rev-parse", "--is-shallow-repository"], capture_output=True, text=True, encoding="utf-8", errors="replace", check=False)  # fmt: skip
     if shallow.stdout.strip() == "true":
         raise ShallowClone(f"{specs} is in a shallow clone: a release candidate read from a cut history "
                            "would be stamped wrong for good (ADR 0187)")  # fmt: skip
     head = subprocess.run([*git, "rev-parse", "-q", "--verify", "HEAD"], capture_output=True, check=False)  # fmt: skip
     log = subprocess.run([*git, "log", "--diff-filter=A", "--name-only", "--format=%x00%H %cI", "--",
-                          ":(glob)releases/**/rc-*/SPEC.md"], capture_output=True, text=True, check=False)  # fmt: skip
+                          ":(glob)releases/**/rc-*/SPEC.md"], capture_output=True, text=True, encoding="utf-8", errors="replace", check=False)  # fmt: skip
     if head.returncode == 0 and log.returncode:  # a repo with no commit yet holds no birth
         from _specs import git_line  # on every caller's sys.path; a runpy load never acts
 
@@ -130,10 +132,10 @@ def _candidate_adds(specs: Path) -> list[tuple[_dt.datetime, str, str]]:
         sha, *paths = commit.split()
         if len(paths) != 2:  # the instant, then exactly one added SPEC.md
             continue
-        show = subprocess.run([*git, "show", f"{sha}:{paths[1]}"], capture_output=True, text=True, check=False)  # fmt: skip
+        show = subprocess.run([*git, "show", f"{sha}:{paths[1]}"], capture_output=True, text=True, encoding="utf-8", errors="replace", check=False)  # fmt: skip
         if extract_status(show.stdout) != APPROVED:
             parts = paths[1].split("/")
-            adds.append((_utc(paths[0]), parts[-3], parts[-2]))
+            adds.append((utc(paths[0]), parts[-3], parts[-2]))
     return adds
 
 
@@ -141,8 +143,8 @@ def candidate_at(specs: Path, instant: str) -> dict[str, str]:
     """The ONE answer to "which candidate held *instant*": the release whose half-open span
     holds it, the rc born last before it in that release, else ``unknown``; raises
     :class:`ShallowClone`, :class:`Unreadable`, or ``ValueError`` for a bad *instant*."""
-    when = _utc(instant)
-    adds = _candidate_adds(specs)
+    when = utc(instant)
+    adds = candidate_adds(specs)
     held = (r for r, (start, end) in releases(specs).items() if start <= when and (end is None or when < end))  # fmt: skip
     release = next(held, "unknown")
     born = [(t, rc) for t, r, rc in adds if r == release and t <= when]
@@ -217,22 +219,16 @@ def stage_writes(body: str) -> list[list[str]]:
 
 def job_errors(text: str, rel: str) -> list[str]:
     """Why job file *text* at *rel* is malformed: no `## Stage` heading, a stage with no
-    `- Contract:` line, two tasks of one stage writing one path, or a first stage whose
-    tasks write anything but tests."""
+    `- Contract:` line, or two tasks of one stage writing one path."""
     stages = re.split(r"^## Stage ", text, flags=re.MULTILINE)[1:]
     if not stages:
         return [f"{rel} has no '## Stage <id>' heading"]
     errors: list[str] = []
-    for index, body in enumerate(stages):
+    for body in stages:
         stage, tasks = body.split(maxsplit=1)[0], stage_writes(body)
         if not re.search(r"^- Contract:", body, re.MULTILINE):
             errors.append(f"{rel} stage {stage} has no '- Contract:' line")
         flat = [path for paths in tasks for path in set(paths)]
         errors += [f"{rel} stage {stage}: two tasks write {path} — `W:` sets overlap"
                    for path in sorted({p for p in flat if flat.count(p) > 1})]  # fmt: skip
-        errors += [
-            f"{rel} stage {stage} writes {path} — stage 1 writes tests only"
-            for path in (flat if index == 0 else [])
-            if not (path.startswith("tests/") or Path(path).name.startswith("test_"))
-        ]
     return errors

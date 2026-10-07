@@ -36,16 +36,18 @@ from __future__ import annotations
 
 import os
 import shutil
+import subprocess
 import sys
 import tempfile
 from collections.abc import Iterator, Sequence
 from hashlib import sha256
 from pathlib import Path
 from typing import Any
+from unittest import mock
 
 import pytest
 
-pytest_plugins = ("pytester",)
+pytest_plugins = ("pytester", "tests.fixtures.red_marker")
 
 # Repo-cleanliness law: the test run must never materialize bytecode caches inside
 # the working tree. Import-time compilation happens BEFORE any in-script
@@ -199,17 +201,23 @@ _GUARDED_ROOT_FILES: tuple[str, ...] = (
     "playwright.config.ts",
 )
 
-_PATH_MARKERS: tuple[tuple[str, str], ...] = (
-    ("tests/unit/", "unit"),
-    ("tests/contract/", "contract"),
-    ("tests/integration/", "integration"),
-    ("tests/e2e/", "e2e"),
-    ("tests/tmp/", "tmp"),
-)
+# Size -> enforced timeout seconds (tests/AGENTS.md size markers). A test that trips its
+# ceiling is MIS-SIZED — mark it ``medium`` or declare an explicit justified
+# @pytest.mark.timeout; never raise these defaults.
+_TIER_TIMEOUTS: dict[str, int] = {"small": 10, "medium": 60, "e2e": 120}
 
-# Tier -> enforced timeout seconds (tests/AGENTS.md size tiers). A test that trips its tier ceiling is MIS-TIERED — fix the tier or
-# declare an explicit justified @pytest.mark.timeout; never raise these defaults.
-_TIER_TIMEOUTS: dict[str, int] = {"unit": 10, "contract": 30, "integration": 60, "e2e": 120}
+# What makes a test ``medium``: its module reaches a process or real-git seam.
+_PROCESS_MODULES = frozenset(
+    {
+        "subprocess",
+        "tests.helpers.worktree_ws",
+        "dadaia_workspace.infrastructure.subprocess_runner",
+    }
+)
+_SEAM_MODULES = _PROCESS_MODULES | {
+    "tests.fixtures.real_git",
+    "dadaia_workspace.infrastructure.git_subprocess",
+}
 
 # Bug ``windows-xdist-workers-crash-on-unit-fast-tier``: the table above is calibrated on
 # the Linux runners. Windows CI runs the tree-copying install/doctor tests 2-3x slower
@@ -262,27 +270,67 @@ def _validate_quarantine_markers(items: list[pytest.Item]) -> None:
             raise pytest.UsageError(message)
 
 
-def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item]) -> None:
-    """Apply layer markers + tier timeouts from test directory layout.
+def _reaches(item: pytest.Item, seams: frozenset[str]) -> bool:
+    """True when a name in the test module is, or comes from, one of *seams*."""
+    values = vars(item.module).values() if hasattr(item, "module") else ()
+    return any(
+        getattr(v, attr, None) in seams for v in values for attr in ("__module__", "__name__")
+    )
 
-    Directory placement is the first enforcement mechanism for the existing
-    suite. Tests may still add explicit markers, but unmarked legacy tests do
-    not fall out of layer-specific commands. The tier timeout is applied only
-    when the test declares no explicit ``timeout`` marker of its own.
-    """
+
+def _size(item: pytest.Item) -> str:
+    """``small`` or ``medium``: an explicit marker wins; else ``medium`` when the test module
+    reaches a process or real-git seam or the test asks for ``pytester``; else ``small``.
+    Never the folder."""
+    for size in ("medium", "small"):
+        if item.get_closest_marker(size) is not None:
+            return size
+    spawns = _reaches(item, frozenset(_SEAM_MODULES)) or "pytester" in getattr(
+        item, "fixturenames", ()
+    )
+    return "medium" if spawns else "small"
+
+
+def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item]) -> None:
+    """Apply the size marker and its timeout. A journey under ``tests/e2e/`` is ``e2e``;
+    every other test is ``small`` or ``medium`` by what it reaches (``_size``). The timeout is
+    applied only when the test declares no explicit ``timeout`` marker of its own."""
     covered = bool(getattr(config.option, "cov_source", None))
     for item in items:
         rel = Path(str(item.fspath)).resolve().relative_to(_REPO_ROOT).as_posix()
-        for prefix, marker in _PATH_MARKERS:
-            if rel.startswith(prefix):
-                item.add_marker(getattr(pytest.mark, marker))
-                if marker == "e2e":
-                    item.add_marker(pytest.mark.slow(reason="e2e process-boundary suite"))
-                tier_timeout = tier_timeout_seconds(marker, coverage=covered)
-                if tier_timeout is not None and item.get_closest_marker("timeout") is None:
-                    item.add_marker(pytest.mark.timeout(tier_timeout))
-                break
+        if rel.startswith("tests/tmp/"):
+            item.add_marker(pytest.mark.tmp)
+        if rel.startswith("tests/e2e/"):
+            size = "e2e"
+            item.add_marker(pytest.mark.e2e)
+            item.add_marker(pytest.mark.slow(reason="e2e process-boundary suite"))
+        else:
+            size = _size(item)
+            item.add_marker(getattr(pytest.mark, size))
+        tier_timeout = tier_timeout_seconds(size, coverage=covered)
+        if tier_timeout is not None and item.get_closest_marker("timeout") is None:
+            item.add_marker(pytest.mark.timeout(tier_timeout))
     _validate_quarantine_markers(items)
+
+
+@pytest.hookimpl(wrapper=True)
+def pytest_runtest_call(item: pytest.Item) -> Iterator[None]:
+    """The one decider of what ``small`` means: a test sized small (``_size``) that starts a
+    process (``subprocess.*``, ``os.system``) fails here, whatever helper it goes through."""
+    if item.get_closest_marker("small") is None:
+        return (yield)
+
+    def refuse(*_args: object, **_kwargs: object) -> None:
+        pytest.fail(
+            f"{item.nodeid} is small and starts a process: mark it `medium` or extract its pure core",
+            pytrace=False,
+        )
+
+    with (
+        mock.patch.object(subprocess.Popen, "__init__", refuse),
+        mock.patch.object(os, "system", refuse),
+    ):
+        return (yield)
 
 
 def _collect_entries(
@@ -375,6 +423,12 @@ def _hermetic_cwd(
 ) -> None:
     """Start every test in an empty directory, so no cwd walk reaches a real workspace."""
     monkeypatch.chdir(tmp_path_factory.mktemp("cwd"))
+
+
+@pytest.fixture(autouse=True)
+def _plain_help(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Typer reads GITHUB_ACTIONS/FORCE_COLOR at import and then colours CliRunner help."""
+    monkeypatch.setattr("typer.rich_utils.FORCE_TERMINAL", False)
 
 
 @pytest.fixture(autouse=True)

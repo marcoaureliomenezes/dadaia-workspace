@@ -25,6 +25,8 @@ import hashlib
 import json
 from pathlib import Path
 
+from dadaia_workspace.core.workspace_layout import source_form
+
 __all__ = ["SHIPPED_HASHES_FILENAME", "load_shipped_hashes", "was_shipped"]
 
 #: Name of the history file, resolved inside the templates directory.
@@ -55,6 +57,6 @@ def load_shipped_hashes(templates_dir: Path) -> dict[str, set[str]]:
 
 
 def was_shipped(text: str, asset_name: str, templates_dir: Path) -> bool:
-    """True when *text* is byte-identical to some published version of *asset_name*."""
-    digest = hashlib.sha256(text.encode("utf-8")).hexdigest()
+    """True when *text*, in source form, is byte-identical to a published version of *asset_name*."""
+    digest = hashlib.sha256(source_form(text).encode("utf-8")).hexdigest()
     return digest in load_shipped_hashes(templates_dir).get(asset_name, set())

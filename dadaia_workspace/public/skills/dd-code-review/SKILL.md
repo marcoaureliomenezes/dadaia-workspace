@@ -26,7 +26,7 @@ axes are reported side by side — an axis never outranks another.
 ## 2. Axis 1 — Standards
 
 - The repo's own documented conventions come FIRST and always override the baseline.
-- Skip anything tooling already enforces (ruff/mypy/import-linter findings are not review findings).
+- Skip anything tooling already enforces (lint, typecheck and import-rule findings are not review findings).
 - Baseline: the twelve Fowler smells, each reported as a labelled judgement call, never a rule:
   Mysterious Name · Duplicated Code · Feature Envy · Data Clumps · Primitive Obsession ·
   Repeated Switches · Shotgun Surgery · Divergent Change · Speculative Generality ·
@@ -47,18 +47,18 @@ axes are reported side by side — an axis never outranks another.
 
 ## 4. Axis 3 — Bug-surface
 
-- Pull the touched feature's ledger slice: `python3 .agents/skills/dd-bug-resolution/scripts/bugs.py stats`, `python3 .agents/skills/dd-bug-resolution/scripts/bugs.py status --all` filtered to its surface/component.
+- Pull the touched feature's ledger slice: `python3 .agents/skills/dd-bug-resolution/scripts/bugs.py stats --specs <specs-dir>`, `python3 .agents/skills/dd-bug-resolution/scripts/bugs.py status --all --specs <specs-dir>` filtered to its surface/component.
 - Answer WITH EVIDENCE: did this diff reduce, keep, or increase the feature's bug surface?
 - The operator's rule applied as a review axis: a diff that GROWS the feature is a stop —
   a branch, flag, special case, second code path or cross-feature reach-in added by a fix
   is a puxadinho; name it and recommend the replace-don't-layer shape instead.
-- A fix whose `caused_by` is not `none`: read every line the prior fix wrote (`bugs.py fix <caused_by>`) and state REBUILD of the unit or why not; `PILLAR-BUGS` measures it, nothing gates it.
+- A fix whose `caused_by` is not `none`: read every line the prior fix wrote (`bugs.py fix <caused_by> --specs <specs-dir>`); the fix is a REBUILD of the unit, keeping its tests, and a patch in its place is a finding; `PILLAR-BUGS` measures it, nothing gates it.
 - An S4, S5, S8 or S10 finding (`SLOP.md`), or an added ratchet allowance key, answers this axis "increased" until it is gone.
 
 ## 4a. The root-cause and approval bars
 
 - A fix qualifies only when it reproduces the failure on the executed path, tests for the real reason, fixes the cause and proves it green — a workaround or symptom patch is a finding.
-- Approved means the operator and the consumer-side validation agent agree after validating a real workspace.
+- The verdict is the enum `APPROVED`/`REJECTED`, written by `verdict.py` (`worktrees/AGENTS.md`).
 - A green internal gate that diverges from real consumer behavior is itself a bug.
 
 ## 5. Reporting
@@ -72,8 +72,8 @@ axes are reported side by side — an axis never outranks another.
 One reviewer, six checklists applied on every verdict (ADR 0016); the engineer anticipates them.
 
 - **Architecture** — root cause named; the diff shrinks or keeps the feature (`dd-codebase-design` deletion test); per PLAN §1.1 row, every `deleted` gone and every `consults` calls the authority (S4/S5/S10); `dd-architecture-survey` at candidate close.
-- **Security** — OWASP top 10, secrets, dependency CVEs (`pip-audit`/`npm audit`), CWE id per finding; never Fable on this lens.
-- **QA** — every acceptance scenario has evidence; the pyramid holds; tests keep the root map §1 basics; pruning only by a curation verdict; a bug fix adds a case and rewrites no assert (`git diff -U0 -- tests | grep -E '^-\s*assert'` prints nothing) — a miss is HIGH, verdict REJECTED.
+- **Security** — OWASP top 10, secrets, dependency CVEs (the ecosystem's dependency audit), CWE id per finding; never Fable on this lens.
+- **QA** — every acceptance scenario has evidence; the pyramid holds; tests keep the root map §1 basics; pruning only by a curation verdict; a bug fix adds a case and rewrites no assert (`git diff -U0 <work>...HEAD -- <the repo's tests: globs> | grep -E '^-\s*assert'` prints nothing, each hit citing an operator ruling) — a miss is HIGH, verdict REJECTED.
 - **Product** — the diff matches SPEC scope; memory atoms still tell the truth (`dd-release-implementation` MEMORY-UPDATE).
 - **Audit** — `dd-audit-project` pillars over the window, `SLOP.md` S1-S10 in pillar 2; findings, never fixes.
 - **AI surface** — every agent, skill, rule or hook change satisfies `dd-ai-eng-knowhow` AUTHORING's fifteen rules.

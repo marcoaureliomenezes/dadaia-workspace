@@ -12,12 +12,12 @@
 
 - Resolution order: the bind (a session with an id: its own record; none: a registered `DADAIA_CONTEXT`) -> the cwd repo (`.dadaia/.venv/bin/dadaia context show --json`); none -> bind, never borrow one.
 - A root in `DADAIA_FENCED_ROOTS` is never resolved: no dadaia process or child acts on it; the suite and mutating probes set it.
-- `.dadaia/.venv/bin/dadaia context bind <ctx>` is one verb, no mode or release; the sole memory-injection trigger; the session id comes from the environment only, so a nested session shares its parent's bind.
+- `.dadaia/.venv/bin/dadaia context bind <ctx>` is one verb, no mode or release; the sole memory-injection trigger; the session id comes from the environment only; a subagent inherits its parent's session id and binding and never binds.
 - Scope = the bound context's main and associated repos, judged under `repos/<slug>/` and `worktrees/<slug>/`; binding is optional, an ADDITIVE write needs none.
 - An out-of-scope file-tool write is BLOCKed with `fix: .dadaia/.venv/bin/dadaia context bind <owner>`; an unbound session with an id owns no repo; an unregistered slug and a root path are never scope-judged.
 - Races surface, never block (no locks); zero ALIVE -> alert the operator.
 - One harness session per checked-out tree; parallel work: `worktrees/AGENTS.md`.
-- Frozen context surface (ADR 0027): `context create` clones, hooks, ALIVEs, never binds; no new state file or session field.
+- Frozen context surface (ADR 0038): `context create` clones, hooks, ALIVEs, never binds; no new state file or session field.
 
 ## 3. Git chokepoints
 
@@ -27,8 +27,7 @@
 
 ## 4. Projections and law files
 
-- Files in `agentic/manifest.json` are projections; change them at their `dadaia_workspace/public/` source, never in place.
-- Every projected file (in the install ledger) is PROTECTED; only a human hand-edits one.
+- Files in `agentic/manifest.json` are projections; change them at their `dadaia_workspace/public/` source, never in place; protection: root `AGENTS.md` §3 (PROTECTED).
 - Re-project: `.dadaia/.venv/bin/dadaia public stage`, then `public install`, then `public doctor` shows `[ok] public-privacy`.
 
 ## 5. Doctor — the one scan and reaper

@@ -23,16 +23,17 @@ Scope: this file governs only `specs/releases/`.
 - A candidate is closed: created, implemented, or cancelled into the next; never amended (shape 8 records approval only); a new AC goes to the next rc.
 - A red outside a stage's envelope appends a new stage; a stage's third red gate stops the job for the operator,
   the driver appending one `kind: note` log entry `stop: <job> stage <n> — third red gate`.
-- rc N+1 is drafted in a `define` tree while rc N implements and enters by `RELEASE_PY new` at rc N's CLOSURE;
+- A candidate is defined in its own `rc-<N>/`, authored in a `define` tree: rc N+1 is drafted there while rc N implements and enters by `RELEASE_PY new` at rc N's CLOSURE;
   its `## Bug window review` judges rc N's bug fixes; rc N closes with zero open bugs; one rc implements at a time.
 - Recommended size, never a gate (ADR 0152 (2)): SPEC.md within 24 KiB, each job file within 12 KiB.
 - A `v`-prefixed id is minted nowhere — the bare axis (`^\d+\.\d+\.\d+$`) is the only current one.
 
 ## 3. Tasks — the auditable trace
 
-- Read SPEC, PLAN and TASKS before implementing; all three must carry `**Status:** Approved`.
-- A closed rc's `TASKS.md` keeps its markers as history (`[ ] -> [-]`, `[-] -> [x]`); from rc-9 on, a job file carries the tasks (`dd-release-definition` §5).
-- The `W:` is exact: every file the task touches. A test pinning behaviour the task removes is rewritten or deleted in the same task, its `W:` widened, with the derived files it re-records, in the feat commit, the body naming each file and why.
+- Read SPEC, PLAN and TASKS before implementing; the approval precondition's home is `specs/AGENTS.md`. A closed rc's `TASKS.md` keeps its markers as history (`[ ] -> [-]`, `[-] -> [x]`); from rc-9 on, a job file carries the tasks (`dd-release-definition` §5).
+- The `W:` is exact: every file the task touches, with the derived files it re-records; the commit body names each file and why.
+- Tests are born only in a RED stage, one whose tasks' `W:` hold tests only: each fails by assertion, never by error, carries the repo's RED marker — one line matching its `tests-red:` pattern — and passes the test-audit and the stage review. A REBUILD keeps the fix's tests.
+- From the RED anchor on, `WT merge` refuses a task or job diff that modifies or deletes a line of a path the repo's `tests:` line declares (`worktrees/AGENTS.md` §2); a wrong test is never edited in an implementation task — the implementer stops and reports, and the amendment is a new RED stage, with its review and the operator's approval (ADR 0209).
 - The task's commit is `conventional-commit(task-id): description`.
 - `phase` and the `defined`/`implemented` milestones move only by `RELEASE_PY phase`; `shipped` only by `RELEASE_PY ship`.
 
@@ -43,5 +44,5 @@ Scope: this file governs only `specs/releases/`.
 
 ## 5. Promote
 
-- Promote is merging the PR into the principal branch (the constitution's `gitflow:`); `RELEASE_PY ship --sha <sha> --pr <n>` records it: `shipped`, one `delivered` histo line, the whole release directory moved to `_archive/<id>/`, never deleted (ADR 0152 (1)).
+- Promote is merging the PR into the principal branch (the constitution's `gitflow:`); `RELEASE_PY ship --sha <sha>` records it: `shipped`, one `delivered` histo line, the whole release directory moved to `_archive/<id>/`, never deleted (ADR 0152 (1)).
 - Version, CHANGELOG and tag belong to the project's own release pipeline; no verb and no agent mints a version.

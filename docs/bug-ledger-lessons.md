@@ -13,9 +13,13 @@ the price of the previous fix.
 
 ## Measuring the ledger
 
-<!-- derived-from: bug-ledger sha256:1f1d4608155e -->
+<!-- derived-from: QUALITY sha256:2efca431bdbf -->
 
-The numbers are never copied into a page; the ledger's own verbs measure them.
+
+The numbers are never copied into a page; the ledger's own verbs measure them. A
+candidate closes only with no open bug, and the balance (`bugs.py balance`) reads a
+defective-fix rate per candidate and a Laplace trend: `diverging` means the ledger grows
+faster than it settles.
 
 ```bash
 python3 .agents/skills/dd-bug-resolution/scripts/bugs.py stats
@@ -31,19 +35,20 @@ agreement.
 
 ## Lesson 1 — a per-caller fix breeds the next caller's bug
 
-<!-- derived-from: context-management sha256:2d908837d9f6 -->
-<!-- derived-from: bug-ledger sha256:1f1d4608155e -->
+<!-- derived-from: context-management sha256:e084ff04890d -->
 
 When a guard lives at the caller that was just caught, the next caller without it is
 the next bug in the family, and each such fix is `net-positive`: it grows the feature.
 The structure that ends the family is one guarded seam every writer delegates to. The
 context registry is the example: a repo slug belongs to one context, and `create`,
 `repo add` and `.dadaia/.venv/bin/dadaia import` pass one ownership check; `INV-6` reports any
-multi-owner slug already on disk.
+multi-owner slug already on disk. The rc-10 window repeats the shape on the merge gate and
+the worktree verbs: each gate fix left a second reader of the same fact, until one reader
+owned it.
 
 ## Lesson 2 — a per-measurement exclusion breeds the next measurement's bug
 
-<!-- derived-from: QUALITY sha256:418751859f73 -->
+<!-- derived-from: QUALITY sha256:2efca431bdbf -->
 
 When each measurement walks the tree itself and is fixed by its own special-case
 exclusion, the next measurement counts the same stray files. The structure that ends
@@ -54,8 +59,7 @@ to remember to extend.
 
 ## Lesson 3 — a derived cache breeds a bug per environment that derives it
 
-<!-- derived-from: bug-ledger sha256:1f1d4608155e -->
-<!-- derived-from: QUALITY sha256:418751859f73 -->
+<!-- derived-from: QUALITY sha256:2efca431bdbf -->
 
 A record that caches a fact git already knows is wrong in every environment that
 derives it differently — a shallow checkout first among them. The structure that ends
@@ -64,8 +68,8 @@ history is that line's change log. No CI job fetches history for a bug record's 
 
 ## The standing order the lessons produced
 
-<!-- derived-from: QUALITY sha256:418751859f73 -->
-<!-- derived-from: bug-ledger sha256:1f1d4608155e -->
+<!-- derived-from: QUALITY sha256:2efca431bdbf -->
+<!-- derived-from: bug-ledger sha256:c4e8fd6ee96c -->
 
 The workspace is in a permanent state of architecture review, oriented by its bug
 history:
@@ -82,6 +86,8 @@ history:
 - Let ratchets refuse growth. Private-symbol imports in tests (P-23) and the slop
   counts are pinned at their measured values and move downward only.
 - Keep one home per definition (V37).
+- Never waive an eval verdict. A BLOCK is a bug to register and fix at its cause, then the
+  eval reruns; a missing tree or an unbuilt half of an ADR is such a cause.
 
 Next: [the bug loop](bug-loop.md) — register, RED, fix, resolve, in commands. Or start
 at the [quickstart](quickstart.md).

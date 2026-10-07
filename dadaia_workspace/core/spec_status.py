@@ -1,7 +1,7 @@
 """The SDD artifact status vocabulary and the one ``**Status:**`` line rule.
 
 The stdlib ``_release_schema.py`` cannot import this module; it copies ``STATUS_LINE``
-literally and ``tests/unit/core/test_spec_status.py`` holds both to parity.
+literally and ``tests/core/test_spec_status.py`` holds both to parity.
 """
 
 from __future__ import annotations

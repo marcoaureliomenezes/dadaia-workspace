@@ -1,3 +1,6 @@
 dadaia_workspace/public/** text eol=lf
 dadaia_workspace/public/entities/behavior-map.json dadaia-generated
 dadaia_workspace/public/templates/shipped-hashes.json dadaia-generated
+/tests dadaia-dev-tooling
+/scripts dadaia-dev-tooling
+/.github dadaia-dev-tooling

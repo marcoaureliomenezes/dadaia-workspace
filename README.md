@@ -13,7 +13,7 @@ its **associated repos** are the others it owns.
 
 ## What it is and principles
 
-<!-- derived-from: product-vision sha256:4d5160d491d5 -->
+<!-- derived-from: product-vision sha256:50aa2de46233 -->
 
 dadaia-workspace is the operating environment around repositories developed with AI
 agents. Its unit is the context: one main repo, where `specs/` lives, plus its
@@ -44,10 +44,10 @@ memory atom under its content hash.
 
 ## A human installs and uses it
 
-<!-- derived-from: pypi-distribution sha256:a97f549efcdb -->
-<!-- derived-from: workspace-init sha256:4f0ceaccc6c8 -->
-<!-- derived-from: context-management sha256:2d908837d9f6 -->
-<!-- derived-from: workspace-doctor sha256:8b2f7d91f08a -->
+<!-- derived-from: pypi-distribution sha256:7c22e9e9609a -->
+<!-- derived-from: workspace-init sha256:a8f08f87ae76 -->
+<!-- derived-from: context-management sha256:e084ff04890d -->
+<!-- derived-from: workspace-doctor sha256:84a9bec9fec9 -->
 
 ```bash
 uvx dadaia-workspace init demo --harness claude --repo <clone url>   # level 1 + 2
@@ -94,17 +94,17 @@ a TTL expiry acts by zone class, an OUTPUT entry held, an EPHEMERAL one deleted.
 
 ## An agent reads AGENTS.md and uses it
 
-<!-- derived-from: agentic-entities sha256:5a467f3e3664 -->
-<!-- derived-from: sdd-gate-v3 sha256:cf697fabc31d -->
-<!-- derived-from: release-lifecycle sha256:e94a43f4bb88 -->
-<!-- derived-from: bug-ledger sha256:1f1d4608155e -->
-<!-- derived-from: harness-claude-code sha256:68e07ea44a20 -->
-<!-- derived-from: harness-codex sha256:9218e747c24f -->
+<!-- derived-from: agentic-entities sha256:f962e613358e -->
+<!-- derived-from: sdd-gate-v3 sha256:11e94d99c0d1 -->
+<!-- derived-from: release-lifecycle sha256:552f1da8e8b7 -->
+<!-- derived-from: bug-ledger sha256:c4e8fd6ee96c -->
+<!-- derived-from: harness-claude-code sha256:bac4bed1d5e9 -->
+<!-- derived-from: harness-codex sha256:a0d4ae5884d5 -->
 <!-- derived-from: harness-kimi-code sha256:ac3c7be4e426 -->
 <!-- derived-from: harness-cursor sha256:f66b96a0ae77 -->
 <!-- derived-from: harness-devin sha256:a35113e51a30 -->
 <!-- derived-from: harness-copilot sha256:ed72a95f6297 -->
-<!-- derived-from: agent-comms sha256:02e5efa78c26 -->
+<!-- derived-from: agent-comms sha256:aec2b079135d -->
 
 The always-on law is the root `AGENTS.md` map; every governed area carries its own
 scoped `AGENTS.md`, and every `dd-` skill touching an area opens that file first. The
@@ -133,8 +133,8 @@ hotfix job with a RED test, any other in the candidate's bug batch. Completed wo
 
 ## Documentation
 
-<!-- derived-from: pypi-distribution sha256:a97f549efcdb -->
-<!-- derived-from: public-asset-distribution sha256:6bf6a440301e -->
+<!-- derived-from: pypi-distribution sha256:7c22e9e9609a -->
+<!-- derived-from: public-asset-distribution sha256:e126ab716189 -->
 
 The documentation is the repository's [docs folder](https://github.com/marcoaureliomenezes/dadaia-workspace/tree/main/docs):
 
@@ -149,7 +149,7 @@ The documentation is the repository's [docs folder](https://github.com/marcoaure
 
 ## Links
 
-<!-- derived-from: pypi-distribution sha256:a97f549efcdb -->
+<!-- derived-from: pypi-distribution sha256:7c22e9e9609a -->
 
 - GitHub — <https://github.com/marcoaureliomenezes/dadaia-workspace>
 - PyPI — <https://pypi.org/project/dadaia-workspace/>

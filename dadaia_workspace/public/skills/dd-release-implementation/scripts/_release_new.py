@@ -15,7 +15,7 @@ sys.path.append(str(Path(__file__).resolve().parents[2] / "dd-bug-resolution" / 
 from _ledger import records, replace  # noqa: E402
 from _release_schema import SEMVER_RE, STATE, next_candidate, utc_now  # noqa: E402
 from _release_store import SCRIPT, Refusal, State, live_ids, read_state, validated  # noqa: E402
-from _release_tree import BUG_WINDOW, tree_findings  # noqa: E402
+from _release_tree import BUG_WINDOW, refuse_open_bugs, tree_findings  # noqa: E402
 
 SPEC_STUB = """\
 # SPEC — Release: {release_id}
@@ -89,7 +89,8 @@ def candidate_state(release_id: str, prior: State | None) -> State:
 def refuse_unfree(specs: Path, release_id: str) -> State | None:
     """`new`'s two legal states: no live release (birth — returns ``None``), and the live
     release IS *release_id* in phase CLOSURE, the stacked candidate the law requires
-    (returns the closed state to reopen). Anything else, a red tree, or a symlink, refuses."""
+    (returns the closed state to reopen), once `bugs.py` finds no bug open in the closing rc.
+    Anything else, a red tree, or a symlink, refuses."""
     if not SEMVER_RE.match(release_id):
         raise Refusal(
             f"{release_id!r} is not a bare SemVer release id (M.m.p)",
@@ -122,6 +123,7 @@ def refuse_unfree(specs: Path, release_id: str) -> State | None:
             "candidate is stacked only on a closed one",
             f"{SCRIPT} phase CLOSURE --sha $(git rev-parse --short HEAD)",
         )
+    refuse_open_bugs(specs, release_id, release_dir)
     return prior
 
 

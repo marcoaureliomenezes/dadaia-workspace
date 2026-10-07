@@ -13,12 +13,17 @@ from dadaia_workspace.features.export.service import ExportService
 from dadaia_workspace.features.import_.service import ImportService
 from dadaia_workspace.features.public.service import PublicAssetService
 from dadaia_workspace.features.spec_context.doctor import DoctorService
-from dadaia_workspace.features.spec_context.service import SpecContextService, install_git_hooks
+from dadaia_workspace.features.spec_context.service import (
+    SpecContextService,
+    WorktreeRows,
+    install_git_hooks,
+)
 from dadaia_workspace.features.spec_context.sweep import hold
 from dadaia_workspace.features.workspace.service import WorkspaceService
 from dadaia_workspace.infrastructure.git_objects import GitSubprocessObjectReader
 from dadaia_workspace.infrastructure.git_subprocess import GitSubprocessClient
 from dadaia_workspace.infrastructure.json_context_store import JsonContextStore
+from dadaia_workspace.infrastructure.ledger_scripts import worktree_rows
 from dadaia_workspace.infrastructure.public_assets import FileSystemPublicAssetManager
 from dadaia_workspace.infrastructure.python_env import VenvPythonEnvironmentManager
 
@@ -43,7 +48,9 @@ def build_workspace_service(workspace_root: Path) -> WorkspaceService:
     )
 
 
-def build_spec_context_service(workspace_root: Path) -> SpecContextService:
+def build_spec_context_service(
+    workspace_root: Path, *, rows: WorktreeRows = worktree_rows
+) -> SpecContextService:
     _guard_initialized(workspace_root)
     states = states_dir(workspace_root)
 
@@ -53,6 +60,7 @@ def build_spec_context_service(workspace_root: Path) -> SpecContextService:
         workspace_root=workspace_root,
         install_hooks=install_git_hooks,
         secret_scan=scan_publish_candidates,
+        worktree_rows=rows,
     )
 
 
@@ -123,7 +131,9 @@ def scan_publish_candidates(repo: Path, rels: list[str]) -> dict[str, str]:
     return {h.path: f"{h.source_layer} '{h.masked_term}' (line {h.line})" for h in outcome.hits}
 
 
-def build_doctor_service(workspace_root: Path) -> DoctorService:
+def build_doctor_service(
+    workspace_root: Path, *, rows: WorktreeRows = worktree_rows
+) -> DoctorService:
     _guard_initialized(workspace_root)
     states = states_dir(workspace_root)
     return DoctorService(
@@ -131,6 +141,7 @@ def build_doctor_service(workspace_root: Path) -> DoctorService:
         git_client=GitSubprocessClient(),
         workspace_root=workspace_root,
         projection=build_public_service().verdict,
+        worktree_rows=rows,
     )
 
 

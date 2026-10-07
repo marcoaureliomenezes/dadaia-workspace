@@ -23,6 +23,8 @@ from _specs import quote, script, with_specs  # noqa: E402
 CODE = "LEDGER-BUGS-SCHEMA"
 LEDGER = "bugs/BUGS.jsonl"
 HISTO = "bugs/_archive/bugs_histo.jsonl"
+#: The job files' task id; `_worktree_freeze._ID` keeps its twin, pinned equal by a parity test.
+TASK_ID = r"J[\dA-Z]+\.S\d+\.T\d+"
 TERMINAL = ("resolved", "superseded", "deferred", "rejected")
 _VERBS, _LAW = (
     "`bugs.py append` or `bugs.py update`",
@@ -54,7 +56,7 @@ def tasks(root: Path) -> set[str]:
     """Every task id under *root*`/releases/`, `_archive/` included: a closed rc's `TASKS.md`
     carries `T-…`, a job rc's `tasks/<job>.md` carries `J<n>.S<m>.T<k>` (`JR.…`);
     bounded: an id glued to a word or a hyphen (a doctor code, a placeholder) is no task."""
-    bounded = re.compile(r"(?<![\w-])(?:T-\d+(?:-\d+)*|J(?:\d+|R)\.S\d+\.T\d+)(?![\w-])")
+    bounded = re.compile(rf"(?<![\w-])(?:T-\d+(?:-\d+)*|{TASK_ID})(?![\w-])")
     files = [*root.glob("releases/**/TASKS.md"), *root.glob("releases/**/tasks/*.md")]
     return {t for f in files for t in bounded.findall(f.read_text(encoding="utf-8"))}
 

@@ -1,0 +1,112 @@
+# TASKS — 0.5.0 rc-10, Job 1 — the fix reader and the window's instruments
+
+**Status:** Approved
+**Approval:** by operator delegation 2026-10-06 ("Delego: APPROVED do revisor basta (Recommended)", handoff 2026-10-06T044815Z-main-thread-overnight-delegation); dd-code-reviewer APPROVED d1f1b01b1.
+**Amended:** 2026-10-06 (M-A folds, J1.S3.T2 row); approval basis: dd-code-reviewer re-review of the amended define head.
+
+Paths are relative to the repo root; aliases as in `PLAN.md` (`f/`, `pub/`, `S/`, `bugres/`, `relimpl/`, `GF/`, `evals:`). Gates: task — `verify-task:` on the touched files plus `Owner-tests:`; stage — `verify-stage:`; job — CI matrix + one review + `verify:`. Every stage before Job 6 merges runs under today's law (SPEC.md Job 6): stage 1 RED as strict xfail.
+
+- Precondition: the main thread's `docs(adr): accept 0208–0210` commit, written at the rebase.
+
+## Stage J1.S1 — RED
+
+- Contract: exit tests every AC1.1/AC1.2 unit row RED as strict xfail; envelope `tests/unit/skills/test_bug_resolution_bugs_script.py`; ACs AC1.1, AC1.2
+
+| task | AC | `W:` | owner tests / RED |
+|---|---|---|---|
+| J1.S1.T1 | AC1.1, AC1.2 | `tests/unit/skills/test_bug_resolution_bugs_script.py` | RED: shape-4 resolve over two task commits → summed numstat, literal direction; class commit links its body ids; later overlapping `fix(bugs)` → 1 overfitting, a REBUILD → 1 planned; two rcs untouched → settled; a revert of a revert of a revert drops the fix; a short-form revert whose tail holds a quote pairs with the one commit it undid; seam present / untracked / absent node / parametrized node / `TestX::test_y` / non-test tracked file / window row with a deleted seam. de36b0e69's, JR.S6.T2's (bd0628092) and JR.S8.T1's (e638d4a88) rows stay byte-identical |
+- Rows the window gains at the rebase (PLAN): a REBUILD row needing a new RED case adds its case to J1.S1.T1's rows (the rows are known before the job opens); a KEEP row needs none.
+
+## Stage J1.S2 — REBUILD the reader; law text
+
+- Contract: exit tests J1.S1's AC1.1 rows green, unit + integration green; envelope `bugres/scripts/bugs.py`, `bugres/scripts/_bugs_fix.py`, `S/dd-audit-project/PILLAR-BUGS.md`, `S/dd-release-definition/SKILL.md`, `bugres/LINEAGE.md`, `pub/scaffold/bugs/AGENTS.md`, `specs/bugs/AGENTS.md`, `S/dd-code-review/SKILL.md`, the canon pin; ACs AC1.1, AC1.3–AC1.5
+
+| task | AC | `W:` | owner tests / RED |
+|---|---|---|---|
+| J1.S2.T1 | AC1.1 | `bugres/scripts/_bugs_fix.py` (new: link, diff, fix surface, rework, settled), `bugres/scripts/bugs.py` (`_fixes`, `_direction` and the `None` arm leave; `fix`, `stats`, `window`, `_candidates` call the one reader) | `test_bug_resolution_bugs_script.py`; commit `refactor(J1.S2.T1): REBUILD the fix reader — …` |
+| J1.S2.T2 | AC1.1, AC1.4 | `S/dd-audit-project/PILLAR-BUGS.md` (:8 rewritten; ninth metric, target 100 %) | no test; check: `grep -c 'rebuild: none — <reason>'` ≥ 1 |
+| J1.S2.T3 | AC1.3 | `S/dd-release-definition/SKILL.md` (§1: the overfitting patterns, KEEP or REBUILD) | no test |
+| J1.S2.T4 | AC1.4 | `bugres/LINEAGE.md` (step 7: one producer of the `rebuild:` line) | no test; same grep check |
+| J1.S2.T5 | AC1.5 | `pub/scaffold/bugs/AGENTS.md`, `specs/bugs/AGENTS.md` (by `specs upgrade`), `S/dd-code-review/SKILL.md`, `core/specs_version.py`, `pub/templates/shipped-hashes.json`, `tests/unit/core/test_specs_version.py` (the pin re-record) | `test_specs_version.py`, `test_tree5_shipped_history.py` |
+
+## Stage J1.S3 — evidence_seam; absorbed window rows; close
+
+- Contract: exit tests J1.S1's AC1.2 rows green, no xfail left for AC1.1/AC1.2, unit + integration green; envelope `bugres/scripts/_bugs_transition.py`, `bugres/scripts/bugs.py`, the born rows' `W:`, this file; ACs AC1.2, the added window rows
+
+| task | AC | `W:` | owner tests / RED |
+|---|---|---|---|
+| J1.S3.T1 | AC1.2 | `bugres/scripts/_bugs_transition.py` (`evidence_seam` required; textual check of path and `::` segments, brackets stripped), `bugres/scripts/bugs.py` (resolve passes the tracked-file read; `window` marks a gone seam file) | `test_bug_resolution_bugs_script.py` |
+| J1.S3.T2+ | the window rows added at the rebase | per row, disjoint from T1 and from each other; a row meeting another's `W:` moves to a Stage J1.S4, and the close task with it | born at the rebase: one REBUILD per row, keeping the fix's tests; `bugs-fix-counts-a-reverted-fix` is AC1.1's unit and needs no row |
+| J1.S3.T2 | Bug window `memory-window-bound-unreachable-from-head` (cc544f66e, REBUILD) | `S/dd-spec-navigator/scripts/_memory_drift.py` only (one home for "is the window bound usable": the history precondition stays in `git()`'s failure arm, and `report`'s separate `merge-base --is-ancestor` probe (cc544f66e) folds into that arm, which names an unreachable bound or a shallow clone with its one fix line; no output change for `release.py memory`/`drift`) | no RED: the REBUILD preserves behaviour; guarded by the existing rows of `tests/unit/skills/test_memory_drift.py` and `tests/integration/test_shallow_history_fix_line_clears.py`, no assert line changed. `git()`'s callers that never pass a window bound (`relimpl/scripts/release.py:87`, `relimpl/scripts/_release_tree.py:188`, `:249`) keep the shallow-clone refusal in `git()`'s failure arm, unchanged; commit `refactor(J1.S3.T2): REBUILD the memory-window bound precondition — …`. Job 7 moves `test_memory_drift.py` and already waits on Job 1 (PLAN DAG) |
+| J1.S3.T10 | AC1.2 | `bugres/SKILL.md`, `relimpl/scripts/_release_tree.py`, `docs/bug-loop.md` (the taught `resolve` names `--evidence-seam`), `pub/entities/behavior-map.json` (the two hash tuples re-recorded) | no test: text-only |
+| J1.S3.T9 | — | this file | close task, last: behavior map regenerated; `test-audit:` and `mutation:` lines in its body (Q23); `done` |
+
+## Stage J1.S4 — review rework: the bug, the bound check, the per-line rework
+
+- Contract: exit tests the T12 shallow-clone case and the T13 per-line case green, unit + integration green; envelope `S/dd-spec-navigator/scripts/_memory_drift.py`, `bugres/scripts/_bugs_fix.py`, `bugres/scripts/bugs.py`, `specs/bugs/BUGS.jsonl`; ACs AC1.1, AC1.4
+
+| task | AC | `W:` | owner tests / RED |
+|---|---|---|---|
+| J1.S3.T11 | bug `memory-window-bound-shallow-clone-named-as-rebase` registered by operator delegation (review 3facc0a0a) | `specs/bugs/BUGS.jsonl` | no test: the record; commit `chore(bugs): register …` (633f5757d) |
+| J1.S3.T12 | bug `memory-window-bound-shallow-clone-named-as-rebase` (review 3facc0a0a, HIGH-1) | `S/dd-spec-navigator/scripts/_memory_drift.py`, `tests/unit/skills/test_memory_drift.py` (one new case) | RED: a shallow clone holding the bound by sha refuses naming `git fetch --unshallow`; commit `refactor(J1.S3.T12): REBUILD the memory-window bound check — …`. T2's KEEP verdict is withdrawn: the two arms disagreed on a shallow clone. One decider in `report` per bound (shallow first, then rebased-away, absent left to `git()`); `git()`'s arm calls the same `_cut` |
+| J1.S3.T13 | AC1.1 (review 3facc0a0a HIGH-2: the fix surface per line, Terms) | `bugres/scripts/_bugs_fix.py` (`removed`, `subjects`: the one blame authority; `Fix.later` reads rework on demand; the `ponytail:` file-level ceiling leaves), `bugres/scripts/bugs.py` (`_candidates` calls `removed`; `fix` reads `later()`), `tests/unit/skills/test_bug_resolution_bugs_script.py` (one new case; one expected rework count of `test_fix_counts_the_rework_of_its_surface_by_class` rewritten under this REBUILD) | RED: a later fix on the same file removing none of a fix's lines is not rework; commit `refactor(J1.S3.T13): REBUILD the rework count — …` |
+
+## Stage J1.S5 — review rework: revert pairing, the public name
+
+- Contract: exit tests the T14 row green; envelope `bugres/scripts/_bugs_fix.py`, `relimpl/scripts/_release_schema.py`, `bugres/scripts/bugs.py`; AC1.1
+
+| task | AC | `W:` | owner tests / RED |
+|---|---|---|---|
+| J1.S3.T14 | review 3facc0a0a MEDIUM-1 (revert pairing) | `bugres/scripts/_bugs_fix.py`, `tests/unit/skills/test_bug_resolution_bugs_script.py` (one parametrize row) | RED: `Revert "fix(bugs): a-bug — cause"` pairs with the exact subject, not the nearer "… cause and more"; commit `fix(J1.S3.T14): …`; one rule: most words matched, a tie to the shorter subject, then the nearest |
+| J1.S3.T15 | review 3facc0a0a MEDIUM-2 (private reach-in) | `relimpl/scripts/_release_schema.py` (`_candidate_adds` -> `candidate_adds`, its owner's public name), `bugres/scripts/bugs.py` (imports it by that name, the `births` alias leaves) | no RED: a rename, no behaviour; the existing `window`/`fix` rows exercise the call |
+
+## Stage J1.S6 — review rework: the survivors
+
+- Contract: exit tests the T16 rows green, `ci.py job` ALL PASS; envelope `bugres/scripts/_bugs_fix.py`, `tests/unit/skills/test_memory_drift.py`; AC1.1
+
+| task | AC | `W:` | owner tests / RED |
+|---|---|---|---|
+| J1.S3.T16 | survivors of J1.S3.T12/T14's hand mutants | `bugres/scripts/_bugs_fix.py` (the revert key drops the word count: every subject a quote names matches the same words, so it only ever broke ties), `tests/unit/skills/test_memory_drift.py` (two new cases: an absent bound; a git read failing in a shallow clone) | RED-for-mutants: `if reach == 1` -> `if reach` and `git()`'s arm without `_cut` survived; both now die. The revert rule T14 states is now: the live commit the quote names with the fewest words beyond it, then the nearest (agent default, unruled) |
+| J1.S6.T19 | re-review HIGH-B (the fix link) | none: an empty shape-4 commit | no RED: the resolve sat in a `refactor(J1.S3.T12): REBUILD` subject `_LINK` does not match; the commit `chore(bugs): resolve memory-window-bound-shallow-clone-named-as-rebase — by J1.S3.T12 (73983ae3c)` carries the link in its subject alone, because schema v1 retired `resolved_commit` (0.4.7 FR1); `bugs.py fix` prints `1 linked` (agent default, unruled) |
+
+## Stage J1.S7 — re-review rework: the Windows fix line
+
+- Contract: T18 row green; AC1.1
+
+| task | AC | `W:` | owner tests / RED |
+|---|---|---|---|
+| J1.S6.T18 | push CI 37498326402: the fix line's path on Windows | `tests/unit/skills/test_memory_drift.py` (the two fix-line expectations) | RED on windows-latest: the fix line is a shell line, `_specs.quote` spells a path with `/` on Windows while the message keeps the native form; the expectation builds the fix path `clone.as_posix()`, the code is consistent and unchanged (agent default, unruled) |
+
+## Stage J1.S8 — re-review rework: the refusal helper
+
+- Contract: T20 row green; AC1.1
+
+| task | AC | `W:` | owner tests / RED |
+|---|---|---|---|
+| J1.S6.T20 | re-review 222d3a7d6 LOW-1 | `tests/unit/skills/test_memory_drift.py` (the first shallow-clone test calls `_refusal`) | no RED: a test refactor, the two shallow-clone cases keep their literals |
+
+## Stage J1.S9 — re-review rework: the rename
+
+- Contract: T21 row green; AC1.1
+
+| task | AC | `W:` | owner tests / RED |
+|---|---|---|---|
+| J1.S6.T21 | re-review 222d3a7d6 LOW-2 | `bugres/scripts/_bugs_fix.py`, `bugres/scripts/bugs.py` (`Fix.later` -> `Fix.rework`, its builder `rework_reader`) | no RED: a rename of what the field returns, no behaviour; the existing fix/rework rows exercise it |
+
+## Stage J1.S10 — re-review rework: the hash tuple
+
+- Contract: T22 row green, `ci.py job` ALL PASS; AC1.1
+
+| task | AC | `W:` | owner tests / RED |
+|---|---|---|---|
+| J1.S6.T22 | re-record dd-bug-resolution's scripts hash after T21 | `public/entities/behavior-map.json` (one `hash_tuple.scripts`) | no RED: `tests/contract/test_behavior_map.py::every-hash-tuple-is-current` was red after T21's rename and is green again |
+
+## Stage J1.S11 — re-review rework: the rebase's citations
+
+- Contract: T23 row green, `ci.py job` ALL PASS; AC1.1
+
+| task | AC | `W:` | owner tests / RED |
+|---|---|---|---|
+| J1.S6.T23 | re-review HIGH-C and the rebase onto feature/0.5.0 | `specs/releases/0.5.0/rc-10/tasks/job1.md` (the T18 row restored under J1.S7; T19's row rewritten; every old sha cited here repaired through the rebase's sha map; the done line names T18–T23) | no RED: a data file; `release.py check` and `bugs.py fix` exit 0 (agent default, unruled: the rows keep their J1.S6 ids) |
+
+- done: Job 1 — every task landed on `wt/0.5.0-rc10/job1` through its task merge: J1.S1.T1 cd4ae4b32; J1.S2.T1 0a2696147 (REBUILD) and 1bdf7c79b (exec bit); J1.S2.T2–T5 71ade0591, a00bf3445, 667560c5b, a3ef1ac18; J1.S3.T1 7781358e5; J1.S3.T2 00b479388 landed KEEP, no code (its commit body: absent and unreachable are two questions, a fold re-opens cc544f66e's bug), then REBUILT by J1.S3.T12 after the review reproduced `memory-window-bound-shallow-clone-named-as-rebase` (registered 633f5757d); closed by J1.S3.T9 4df4d0367; reviewed CHANGES_REQUESTED at 3facc0a0a, reworked by J1.S3.T11 (bug registered 633f5757d), T12 (REBUILD, bug resolved), T13 (per-line rework), T14, T15, T16 (survivors), closed again by the T16 close commit; re-review rework T18 (Windows fix line), T19 (the empty shape-4 link commit), T20 (`_refusal`), T21 (`Fix.rework`), T22 (hash tuple), T23 (this file's citations after the rebase onto feature/0.5.0).

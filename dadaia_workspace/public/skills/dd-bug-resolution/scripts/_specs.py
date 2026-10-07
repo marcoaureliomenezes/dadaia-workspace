@@ -12,6 +12,11 @@ import subprocess
 import sys
 from pathlib import Path
 
+sys.path.append(str(Path(__file__).resolve().parent))  # loadable alone, not only by name
+
+from _ledger import parse as parse  # noqa: E402  (the one door to the sibling skill)
+from _ledger import workspace_of as workspace_of  # noqa: E402
+
 
 def find_specs(given: Path | None, *, ledger: str | None = None) -> Path:
     """*given*, else the nearest git-rooted ``specs/`` at or above the cwd — never created:
@@ -30,11 +35,11 @@ def find_specs(given: Path | None, *, ledger: str | None = None) -> Path:
 
 
 def _bound_fix(here: Path, rerun: str, ledger: str | None) -> tuple[str, str]:
-    for root, venv in ((d, d / ".dadaia" / ".venv") for d in (here, *here.parents)):
+    for root, venv in ((d, d / ".dadaia" / ".venv") for d in filter(None, [workspace_of(here)])):
         if cli := shutil.which("dadaia", path=f"{venv / 'bin'}{os.pathsep}{venv / 'Scripts'}"):
             shown = subprocess.run(
-                [cli, "context", "show", "--json"], capture_output=True, text=True
-            )
+                [cli, "context", "show", "--json"], capture_output=True, text=True, encoding="utf-8", errors="replace"
+            )  # fmt: skip
             try:
                 repo = str(json.loads(shown.stdout)["main_repo"])
             except (ValueError, LookupError, TypeError):

@@ -44,26 +44,27 @@ Usage
     result = run_hook_subprocess("sdd_gate", payload, env)
     assert result.returncode == 0
 
-The behavior of every hook/gate test must flow through these helpers: the guard checks
-``harness-env-allowlist`` and ``hook-stdin-not-in-process`` (``scripts/guards/isolation.py``,
-which reads this module's two ``frozenset({...})`` literals) fail any test
-that ``setenv``s a non-allowlisted ``DADAIA_*`` outside this module, or imports a hook
-behavior module AND patches ``sys.stdin`` in-process to drive its ``main()`` instead of
-using :func:`run_hook_subprocess`. Pure-helper unit tests (e.g. ``sdd_gate._resolve_mode``)
-and fault-injection tests that monkeypatch a production internal without simulating
-``sys.stdin`` are legitimately in-process and are not flagged.
+The behavior of every hook/gate test must flow through these helpers: the guard check
+``harness-env-allowlist`` (``scripts/guards/isolation.py``, which reads this module's two
+``frozenset({...})`` literals) fails any test that ``setenv``s a non-allowlisted
+``DADAIA_*`` outside this module. Pure-helper unit tests (e.g. ``sdd_gate._resolve_mode``)
+and fault-injection tests that monkeypatch a production internal are legitimately
+in-process.
 """
 
 from __future__ import annotations
 
 import json
 import os
+import shutil
 import subprocess
 import sys
 from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path, PurePath
 from typing import Any, Final
+
+from dadaia_workspace.core import platform
 
 __all__ = [
     "ALLOWLISTED_DADAIA_ENV",
@@ -73,9 +74,13 @@ __all__ = [
     "HOOK_MODULES",
     "HookResult",
     "claude_hook_env",
+    "git_bash",
     "codex_hook_env",
     "kimi_hook_env",
+    "retire_tree",
+    "run_bash",
     "run_hook_subprocess",
+    "run_python",
     "suite_env",
 ]
 
@@ -181,7 +186,7 @@ HARNESS_CONTROL_DADAIA_ENV: Final[frozenset[str]] = frozenset(
 #: The dadaia hook modules invocable as ``python -m dadaia_workspace.hooks.<name>``.
 #: ``_common`` is intentionally absent — it is a shared-primitives library (pure helpers
 #: like ``sanitize_session_id``), not a hook entrypoint, so unit-testing it directly is
-#: legitimate. The ``hook-stdin-not-in-process`` guard check reads this same literal.
+#: legitimate.
 
 HOOK_MODULES: Final[frozenset[str]] = frozenset(
     {"sdd_gate", "sdd_post_gate", "ctx_inject", "root_whitelist", "pre_gate"}
@@ -372,6 +377,7 @@ def run_hook_subprocess(
     *,
     timeout: float = 30.0,
     cwd: Path | str | None = None,
+    raw: str | None = None,
 ) -> HookResult:
     """Invoke a dadaia hook as a real subprocess, the way the harness does.
 
@@ -390,6 +396,8 @@ def run_hook_subprocess(
     Defaults to ``env["PWD"]`` — the harness's session cwd, the workspace root itself —
     so the hook resolves its root exactly as in production; pass an explicit ``cwd`` to simulate a session working from a specific
     ``repos/<slug>/`` subdirectory (rung 3).
+
+    ``raw`` replaces the serialized payload with literal stdin text (blank or malformed envelopes).
 
     This is the single sanctioned channel for hook *behavior* tests in
     ``tests/**/hooks|gate/**``; importing a hook module and calling ``main()`` in-process
@@ -415,7 +423,7 @@ def run_hook_subprocess(
     env = {**env, "PYTHONPATH": os.environ.get("PYTHONPATH", "")}
     proc = subprocess.run(
         cmd,
-        input=json.dumps(payload),
+        input=json.dumps(payload) if raw is None else raw,
         capture_output=True,
         text=True,
         env=env,
@@ -423,3 +431,34 @@ def run_hook_subprocess(
         cwd=str(effective_cwd) if effective_cwd else None,
     )
     return HookResult(returncode=proc.returncode, stdout=proc.stdout, stderr=proc.stderr)
+
+
+def git_bash() -> str:
+    """The bash a test child runs: ``bash`` off Windows; on Windows Git for Windows' own
+    ``bin/bash.exe`` found beside ``git`` (never System32's WSL launcher), else under
+    ``%PROGRAMFILES%\\Git``."""
+    if not platform.PLATFORM.windows:
+        return "bash"
+    git = shutil.which("git")
+    roots = list(Path(git).resolve().parents[:3]) if git else []
+    roots.append(Path(os.environ.get("PROGRAMFILES", r"C:\Program Files"), "Git"))
+    for root in roots:
+        if (found := root / "bin" / "bash.exe").is_file():
+            return str(found)
+    raise FileNotFoundError("Git Bash not found beside git or under %PROGRAMFILES%\\Git")
+
+
+def run_python(*args: str, **kwargs: Any) -> subprocess.CompletedProcess[str]:
+    """Run the interpreter of this suite (``sys.executable``, never a bare ``python``)."""
+    return subprocess.run([sys.executable, *args], capture_output=True, text=True, **kwargs)  # noqa: S603
+
+
+def run_bash(command: str, **kwargs: Any) -> subprocess.CompletedProcess[str]:
+    """Run *command* under :func:`git_bash` ``-c``."""
+    return subprocess.run([git_bash(), "-c", command], capture_output=True, text=True, **kwargs)  # noqa: S603
+
+
+def retire_tree(tree: Path, into: Path) -> Path:
+    """Move *tree* under *into* and return its new place: a tree holding ``.git`` keeps
+    read-only objects that ``rmtree`` cannot unlink on Windows, a rename always works."""
+    return tree.rename(into / tree.name)

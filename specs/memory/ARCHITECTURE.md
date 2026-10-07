@@ -39,7 +39,7 @@ ADR: 0176 (accepted)
 Rationale: a hand-kept `modules =` list hid three real sibling edges from the check.
 
 ### P-09 · We resolve the whole Invocation — workspace root, session, context, specs dir, the session's Bind — once per process in `core.invocation.resolve`, imported directly only by `cli._specs_resolution`, `container` and `hooks`.
-Measured by: `lint-imports --config setup.cfg --no-cache` — contract `bind-resolution-seam-is-a-single-home` (zero ignored imports, none ever accepted); `pytest tests/unit/core/test_invocation.py`.
+Measured by: `lint-imports --config setup.cfg --no-cache` — contract `bind-resolution-seam-is-a-single-home` (zero ignored imports, none ever accepted); `pytest tests/core/test_invocation.py`.
 ADR: 0003 (accepted)
 Rationale: every context bug came from a second resolution path answering differently.
 
@@ -49,12 +49,12 @@ ADR: 0176 (accepted)
 Rationale: a pinned exception list turns every new suppression into a reviewable diff.
 
 ### P-11 · We keep `core` file-I/O pure outside an authorized set of eight modules; new file I/O enters `core` only by joining that set on purpose.
-Measured by: `pytest tests/contract/test_core_file_io_purity.py` (AST walk; every authorized stem must exist).
+Measured by: `pytest tests/core/test_atomic_write__core_file_io_purity.py` (AST walk; every authorized stem must exist).
 ADR: none
 Rationale: joining the set is legal; arriving there unnoticed is not.
 
 ### P-12 · We never import the composition root from a hook; hooks reach the resolution authority directly because they are one-shot processes on the write hot path.
-Measured by: `pytest tests/contract/test_hook_import_surface.py` (six hook modules plus the executed gate path, with `container` absent from `sys.modules`).
+Measured by: `pytest tests/core/test_atomic_write__core_file_io_purity.py` (six hook modules plus the executed gate path, with `container` absent from `sys.modules`).
 ADR: none
 Rationale: the composition graph costs seconds of import time per gated tool call.
 
@@ -64,17 +64,17 @@ ADR: none
 Rationale: a diagram nobody checks is the first artifact to lie.
 
 ### P-14 · We keep the release-state reader pure: `core/release_state.py` parses and serializes already-read text and performs no file I/O.
-Measured by: `pytest tests/contract/test_release_state_read_only.py`.
+Measured by: `pytest tests/core/test_atomic_write__core_file_io_purity.py`.
 ADR: 0004 (accepted)
 Rationale: a reader that can write is a reader that can rewrite history.
 
 ### P-15 · We close the release-state envelope: `release-state-v1` carries `additionalProperties: false` at every level, a closed log-entry shape, and no harness `session_id`.
-Measured by: `pytest tests/contract/test_release_state_schema.py`.
+Measured by: `pytest tests/core/test_handoff_index__handoff_schema_contract.py`.
 ADR: 0004 (accepted)
 Rationale: an open envelope accumulates fields until no consumer can fold it.
 
 ### P-17 · We map every core skill and every scoped `AGENTS.md` source to exactly one `DADAIA.md` section, every section to at least one owner, with content hashes re-recorded only by review.
-Measured by: `pytest tests/contract/test_behavior_map.py` (bijection, hash tuples, citation check, invocation grants).
+Measured by: `pytest tests/infrastructure/test_entity_doctor.py` (bijection, hash tuples, citation check, invocation grants).
 ADR: none
 Rationale: law that no asset owns is law nobody applies.
 
@@ -84,7 +84,7 @@ ADR: 0176 (accepted)
 Rationale: a hand-minted version is one more writer of one fact; the commit history already holds it.
 
 ### P-31 · We hold every repo INSIDE the workspace under `repos/<slug>/`, each its own git repository with its own `specs/`; the workspace is never a monorepo, one repo is the degenerate case of many, and bootstrap is one command (`init <dir> --harness <name> [--repo <url>]`).
-Measured by: `pytest tests/e2e/test_one_line_bootstrap.py tests/unit/core/test_workspace_resolver.py`.
+Measured by: `pytest tests/e2e/test_one_line_bootstrap.py tests/core/test_workspace_resolver.py`.
 ADR: 0015 (accepted)
 Rationale: the law, the harness projections, the zones and the venv live outside every repo; a per-repo or monorepo tool cannot govern ten projects with one law.
 
@@ -128,7 +128,7 @@ flowchart TB
 - No `core/protocols/` package exists: no seam carries two production adapters, so every adapter is imported by its one consumer; a `typing.Protocol` lives only as a structural type inside the module that consumes it.
 - `setup.cfg` carries seven import-linter contracts; `features-no-subprocess` has no suppressed edge, and the two suppressed edges (`reconcile.service` -> `capabilities`, `reconcile.service` -> `migrate.state_v2`) sit under `features-no-cross-feature` (P-10).
 - Hooks import `core.invocation` directly and build the `Invocation` once per process (P-12); `sdd_post_gate` touches `last_seen_at` and writes nothing else.
-- `features/migrate` stamps `specs_pattern_version: 9` or refuses; a tree below v6 is foreign, and `specs init --replace-foreign` moves it to `specs-bkp/` before the canon is scaffolded.
+- `features/migrate` stamps `specs_pattern_version: 11` (`core/specs_version.CANONICAL_SPECS_VERSION`) or refuses; a tree below v6 is foreign, and `specs init --replace-foreign` moves it to `specs-bkp/` before the canon is scaffolded.
 
 ### `dadaia_workspace/features` — package map (12 packages)
 

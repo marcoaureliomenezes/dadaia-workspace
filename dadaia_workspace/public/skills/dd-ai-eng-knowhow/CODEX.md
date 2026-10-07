@@ -234,7 +234,7 @@ prefix_rule(
 |---|---|---|
 | One-off task, temporary context, operator decision | Prompt | (ephemeral) |
 | Durable behavior, scoped | `AGENTS.md` (narrowest scope) | Markdown |
-| Current product truth | Memory | `specs/memory/*.md` (write in DEFINITION + CLOSURE) |
+| Current product truth | Memory | `specs/memory/*.md` (`specs/memory/AGENTS.md`) |
 | Repeatable procedure | Skill | `SKILL.md` |
 | External system / context source | MCP | MCP server config |
 | Mechanical invariant on a session event | Hook | hook script + `.codex/hooks.json` |

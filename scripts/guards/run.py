@@ -25,7 +25,6 @@ from typing import Any
 
 HERE = Path(__file__).resolve().parent
 ROOT = HERE.parent.parent
-TIERS = ("unit", "contract", "integration", "e2e")
 
 Session = dict[str, Any]
 Plant = Callable[[Path], Session | None]
@@ -61,7 +60,7 @@ def _timeout(item):
 
 @pytest.hookimpl(wrapper=True)
 def pytest_collection_modifyitems(config, items):
-    planted = next(i for i in items if "/tests/contract/" in i.path.as_posix())
+    planted = next(i for i in items if "/tests/e2e/" not in i.path.as_posix())
     own = {id(i) for i in items if i.get_closest_marker("timeout")}
     planted.add_marker(pytest.mark.timeout(45))
     try:
@@ -71,7 +70,8 @@ def pytest_collection_modifyitems(config, items):
     REPORT["explicit"] = _timeout(planted)
     for item in items:
         if item is not planted and id(item) not in own:
-            REPORT["tiers"].setdefault(item.path.relative_to(ROOT).parts[1], _timeout(item))
+            size = next((m for m in ("small", "medium", "e2e") if item.get_closest_marker(m)), None)
+            REPORT["tiers"].setdefault(size, _timeout(item))
     config.hook.pytest_deselected(items=[i for i in items if str(i.path) != PROBE])
     items[:] = [i for i in items if str(i.path) == PROBE]
 
@@ -88,13 +88,10 @@ def pytest_sessionfinish(session):
 
 
 def probe(root: Path, modules: list[Any]) -> Session:
-    """ONE pytest session under the repo conftest: the first tracked test file of each tier
-    plus a generated probe of every module's ``PROBE`` tests. Its report, plus the
+    """ONE pytest session under the repo conftest: every tracked test file (the sizes are read
+    off its items) plus a generated probe of every module's ``PROBE`` tests. Its report, plus the
     session's stderr and seconds, is what every session check reads."""
-    firsts: dict[str, str] = {}
-    for path in tracked(root, *(f"tests/{t}" for t in TIERS)):
-        if Path(path).name.startswith("test_"):
-            firsts.setdefault(Path(path).parts[1], path)
+    suite = [p for p in tracked(root, "tests") if Path(p).name.startswith("test_")]
     probe_file = root / "tests" / "tmp" / f"_guard_probe_{os.getpid()}.py"
     probe_file.write_text("\n\n".join(m.PROBE for m in modules if hasattr(m, "PROBE")), "utf-8")
     with tempfile.TemporaryDirectory(prefix="guard-probe-") as tmp:
@@ -111,7 +108,7 @@ def probe(root: Path, modules: list[Any]) -> Session:
         start = time.monotonic()
         try:
             result = subprocess.run(
-                [*argv, *firsts.values(), str(probe_file)],
+                [*argv, *suite, str(probe_file)],
                 cwd=root,
                 env=env,
                 capture_output=True,

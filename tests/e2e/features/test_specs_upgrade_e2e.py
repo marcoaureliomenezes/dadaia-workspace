@@ -6,6 +6,8 @@ version, folding a consumer's ``memory/TECHSTACK.md`` body into ``ARCHITECTURE.m
 REFUSED (exit non-zero, its one fix printed) and nothing is written; a tree already at the canonical version
 is a no-op (exit 0, byte-identical tree). The two scenarios are driven end-to-end through
 the real CLI subprocess against a real on-disk tree.
+
+Owner: dd-software-engineer
 """
 
 from __future__ import annotations

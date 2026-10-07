@@ -5,6 +5,8 @@ amend -> push journey is the refusal harness Case `denylisted`
 masking) is tests/unit/features/chokepoints/test_push_denylist_scan.py.
 The hook's runner is a `<ws>/.dadaia/.venv/bin/dadaia` stub forwarding to this interpreter's CLI.
 Size: LARGE — real git hooks.
+
+Owner: dd-software-engineer
 """
 
 from __future__ import annotations

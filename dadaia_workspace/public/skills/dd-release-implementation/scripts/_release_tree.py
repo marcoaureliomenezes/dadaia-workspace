@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import json
 import re
+import subprocess
 import sys
 from pathlib import Path
 from typing import Any
@@ -40,7 +41,7 @@ from _release_schema import (  # noqa: E402
 from _release_store import SCRIPT, Refusal, live_ids, live_release, window_start  # noqa: E402
 from _specs import quote, script, with_specs  # noqa: E402
 
-__all__ = ["check", "drift", "memory_errors", "ship_findings", "tree_findings"]
+__all__ = ["check", "drift", "memory_errors", "refuse_open_bugs", "ship_findings", "tree_findings"]
 
 _SKILLS = Path(__file__).resolve().parents[2]
 #: The verb writing a LIVE record's pointer back to the release (`{i}` the id, `{r}` it).
@@ -54,7 +55,7 @@ _POINTER = {
 _ACT = {
     "backlog": "backlog entry {i} already exited naming another release",
     "bugs": "resolve bug {i} in release {r} (`bugs.py resolve {i}` "
-            "with --cause, --caused-by, --solution and --evidence-loop)",
+            "with --cause, --caused-by, --solution, --evidence-loop and --evidence-seam)",
     "findings": "finding {i}'s audit closed without naming release {r}",
 }  # fmt: skip
 
@@ -232,7 +233,7 @@ def _memory_tasks(marks: list[re.Match[str]], tasks: Path, dir_rel: str) -> list
     """A task whose `W:` writes `specs/memory`: memory is closure procedure, never a task."""
     fix = f"Operator action: drop the specs/memory path from that task's `W:` in {tasks}"
     return [finding(f"{dir_rel}/{tasks.parent.name}/TASKS.md", 1, f"task {line[:80]!r} writes "
-                    "specs/memory — memory is closure procedure (RC-FLOW step 5)", fix)
+                    "specs/memory — memory is closure procedure (RC-FLOW step 4)", fix)
             for line in (m[0].strip() for m in marks)
             if any(p.split("/")[:2] == ["specs", "memory"] for p in writes(line))]  # fmt: skip
 
@@ -310,6 +311,51 @@ def _window_findings(specs: Path) -> list[dict[str, Any]]:
     return [finding(rel, 1, "; ".join(errors), fix)] if errors else []
 
 
+#: How `bugs.py balance --check` words a stale block, the one refusal of it that is a warning here.
+_STALE = "differs from its regeneration"
+
+
+def _balance_findings(specs: Path) -> list[dict[str, Any]]:
+    """CLOSURE: `QUALITY.md`'s `## Bugs` block, once it has one, equals its regeneration —
+    asked of `bugs.py balance --check`, the bug skill's own verb (AC4.4); never a doctor lane.
+    A stale block is a warning, never a refusal; a ledger the verb cannot read is an error."""
+    try:
+        live = live_release(specs)
+    except Refusal:
+        return []  # the tree walk reports a missing or doubled live release
+    if live.state.get("phase") != "CLOSURE" or not (specs / "memory" / "QUALITY.md").is_file():
+        return []
+    try:
+        _bugs("balance", "--check", specs=specs)
+    except Refusal as refusal:
+        row = finding("memory/QUALITY.md", 1, str(refusal), refusal.fix)
+        return [
+            {**row, "verdict": "warning"} if str(refusal).endswith(_STALE) else row
+        ]  # stale blocks nothing
+    return []
+
+
+def _bugs(*argv: str, specs: Path) -> None:
+    """Run `bugs.py <argv>`; its refusal (`[error] why`, `fix: how`) is raised as ours, a death outside one named."""
+    bugs, command = _SKILLS / "dd-bug-resolution" / "scripts" / "bugs.py", " ".join(argv)
+    done = subprocess.run([sys.executable, str(bugs), *argv, "--specs", str(specs)],
+                          stdin=subprocess.DEVNULL, capture_output=True, text=True, encoding="utf-8", errors="replace")  # fmt: skip
+    if done.returncode:
+        lines = done.stderr.strip().splitlines()
+        why, fix = (
+            next((x[len(p) :] for x in lines if x.startswith(p)), "") for p in ("[error] ", "fix: ")
+        )
+        if not (why and fix):
+            why = f"`bugs.py {command}` exited {done.returncode}"
+            fix = f"Operator action: run `{with_specs(f'{script(bugs)} {command}', specs)}` and read its output"
+        raise Refusal(why, fix)
+
+
+def refuse_open_bugs(specs: Path, release_id: str, release_dir: Path) -> None:
+    """Relay `bugs.py status --found-in` for the release's live candidate."""
+    _bugs("status", "--found-in", f"{release_id}/{(candidate_dir(release_dir) or release_dir).name}", specs=specs)  # fmt: skip
+
+
 def tree_findings(specs: Path) -> list[dict[str, Any]]:
     """Every live directory under ``releases/``, each archived state document, the
     one-live-release rule and the ship ledger — what `new` refuses on."""
@@ -341,17 +387,22 @@ def tree_findings(specs: Path) -> list[dict[str, Any]]:
             continue
         shipped = state.get("shipped") if isinstance(state, dict) else None
         if not (isinstance(shipped, dict) and SHA_RE.match(str(shipped.get("sha")))
-                and isinstance(shipped.get("pr"), int)):  # fmt: skip
+                and "pr" in shipped and isinstance(shipped["pr"], int | None)):  # fmt: skip
             findings.append(finding(rel, 1, "archived release carries no shipped {sha, pr}",
                                     f"Operator action: {act}object whose shipped names the "
-                                    "merged promote PR's sha and number"))  # fmt: skip
+                                    "merged promote PR's sha"))  # fmt: skip
     return findings
 
 
 def check(specs: Path) -> list[dict[str, Any]]:
     """The ONE release validator (the doctor delegates here): the tree, the live
-    candidate's Origin, then the live CLOSURE's memory record."""
-    return tree_findings(specs) + _origin_findings(specs) + _window_findings(specs)
+    candidate's Origin, then the live CLOSURE's memory record and bug balance block."""
+    return (
+        tree_findings(specs)
+        + _origin_findings(specs)
+        + _window_findings(specs)
+        + _balance_findings(specs)
+    )
 
 
 def ship_findings(specs: Path) -> list[dict[str, Any]]:

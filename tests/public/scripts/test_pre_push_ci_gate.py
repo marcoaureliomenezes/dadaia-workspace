@@ -1,0 +1,163 @@
+"""FR9 — hooks de-slopped to the publication boundary (v0.5.0 D9).
+
+Two EXECUTED-PATH fixtures, at CONTRACT tier, that replace the two files this FR
+deletes: ``tests/integration/test_precommit_backlog_scoping.py`` (imported
+``_run_backlog_doctor_gate`` directly — the symbol this FR deletes, so the import
+would fail) and its LARGE-tier e2e companion
+``tests/e2e/features/test_backlog_precommit.py`` (its entire premise — pre-commit
+*blocking* a bad stage — is deleted by this FR; rewriting either would be a
+change-detector test of the new advisory behaviour, the class
+the root map test basics prohibit). Verdict: `qa-engineer`, SPEC FR9 "Tests:"
+line / A9.3 — both files DELETE, replaced here.
+
+Each test below drives the REAL shipped shell script through ``bash`` (never asserts
+on the script's *text* — SPEC A9.1/A9.2 both say "the executed path, not the script's
+text"):
+
+* :func:`test_pre_commit_exits_0_on_a_staged_set_backlog_doctor_would_reject` — A9.1:
+  ``pre-commit-presence-gate.sh`` exits 0 on a staged set the (now-deleted) backlog
+  doctor block would have rejected.
+* :func:`test_unresolvable_runner_still_refuses_the_push` — A9.2: with no resolvable
+  dadaia runner anywhere, ``pre-push-ci-gate.sh`` REFUSES the push (exit 1), never
+  silently skips it — the fail-closed publication boundary the pre-commit hook does
+  NOT share (pre-commit is advisory-only, D9).
+
+The other two refusals A9.2 names — an invalid branch name and a denylist hit — are
+already proven at the real CLI boundary by
+``tests/e2e/test_push_gate_check.py::test_develop_push_is_blocked_naming_the_pr_path``
+and ``tests/e2e/test_push_denylist_journey.py::
+test_planted_term_refused_then_clean_push_after_amend`` respectively; this module adds
+no duplicate coverage of those two.
+
+v0.5.0 A9.1, A9.2, A9.3
+Owner: dd-software-engineer
+"""
+
+from __future__ import annotations
+
+import json
+import shutil
+import stat
+import subprocess
+import sys
+from pathlib import Path
+
+import pytest
+
+import dadaia_workspace
+
+pytestmark = pytest.mark.skipif(
+    sys.platform != "linux",
+    reason="pre-commit-presence-gate.sh / pre-push-ci-gate.sh are bash contracts (Linux only)",
+)
+
+_SCRIPTS_DIR = Path(dadaia_workspace.__file__).parent / "public" / "scripts"
+_PRE_PUSH_SCRIPT = _SCRIPTS_DIR / "pre-push-ci-gate.sh"
+
+_BASH = shutil.which("bash") or "/usr/bin/bash"
+_DEADLINE = 30.0
+_ZERO = "0" * 40
+
+#: bug self-scan-baseline-drift-t05018-hooks-publication-boundary-fixture: the
+#: prior email-shaped placeholder used a real ccTLD, never one of
+#: privacy_baseline.json's RFC-2606-reserved-domain exclusions
+#: (.invalid/.test/.example/.localhost) -- one placeholder, reused at both synthetic
+#: git-identity call sites in this module, rather than two independently-typed
+#: literals drifting apart again.
+_SYNTHETIC_GIT_EMAIL = "test@example.invalid"
+
+
+def _write_executable(path: Path, body: str) -> None:
+    path.write_text(body, encoding="utf-8")
+    path.chmod(path.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
+
+
+def _write_dadaia_forwarder(path: Path) -> None:
+    """A `dadaia` stub that forwards every verb into the REAL CLI through THIS
+    interpreter — same technique as tests/e2e/test_push_denylist_journey.py."""
+    _write_executable(
+        path,
+        "#!/usr/bin/env bash\nset -euo pipefail\n"
+        f'exec "{sys.executable}" -m dadaia_workspace.cli.main "$@"\n',
+    )
+
+
+def _init_context_repo(workspace: Path, slug: str) -> Path:
+    """A real git repo at <workspace>/repos/<slug>, laid out as a Spec Context repo
+    (the shape `dadaia ci pre-commit-check` resolves the workspace + specs/ against)."""
+    (workspace / ".dadaia" / "states").mkdir(parents=True, exist_ok=True)
+    (workspace / ".dadaia" / "states" / "spec_contexts.json").write_text("{}", encoding="utf-8")
+    repo = workspace / "repos" / slug
+    (repo / "specs" / "backlog").mkdir(parents=True)
+    (repo / "specs" / "memory" / "product").mkdir(parents=True)
+    (repo / "specs" / "memory" / "product" / "catalog.json").write_text(
+        '{"features": []}', encoding="utf-8"
+    )
+    (repo / "dadaia_workspace").mkdir()
+    (repo / "dadaia_workspace" / "m.py").write_text("class Widget:\n    pass\n", encoding="utf-8")
+    subprocess.run(["git", "init", "-q"], cwd=repo, check=True)
+    subprocess.run(["git", "config", "user.email", _SYNTHETIC_GIT_EMAIL], cwd=repo, check=True)
+    subprocess.run(["git", "config", "user.name", "Test"], cwd=repo, check=True)
+    return repo
+
+
+def _plant_backlog_doctor_violation(repo: Path) -> None:
+    """A BL-SCHEMA violation (an unresolved subject symbol) — the exact shape the
+    deleted integration test used to prove the (now-removed) blocking gate against.
+    ``BACKLOG.json`` (operator ruling 2026-08-28) replaces the retired ``BACKLOG.md``
+    Markdown grammar — the content shape changes, the violation itself does not."""
+    (repo / "specs" / "backlog" / "BACKLOG.json").write_text(
+        json.dumps(
+            {
+                "schema": "backlog-v1",
+                "active": [
+                    {
+                        "id": "bad-item",
+                        "title": "Bad",
+                        "opened": "2026-08-15",
+                        "status": "candidate",
+                        "description": "references a phantom symbol.",
+                        "provenance": "operator request",
+                        "intents": [
+                            {
+                                "subject": {"kind": "code", "ref": "dadaia_workspace/m.py#Ghost"},
+                                "change": "x",
+                            }
+                        ],
+                    }
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+
+def test_unresolvable_runner_still_refuses_the_push(tmp_path: Path) -> None:
+    """A9.2: with no workspace venv, no poetry, and no repo-local
+    venv, ``pre-push-ci-gate.sh`` REFUSES the push (exit 1) — never silently skipped.
+    Pre-push keeps its fail-closed runner resolution; only pre-commit became
+    unconditionally exit 0 (D9)."""
+    workspace = tmp_path
+    repo = workspace / "isolated-repo"
+    repo.mkdir(parents=True)
+    subprocess.run(["git", "init", "-q"], cwd=repo, check=True)
+    subprocess.run(["git", "config", "user.email", _SYNTHETIC_GIT_EMAIL], cwd=repo, check=True)
+    subprocess.run(["git", "config", "user.name", "Test"], cwd=repo, check=True)
+
+    # A fully controlled PATH with no poetry/dadaia reachable — same isolation
+    # technique as tests/public/scripts/test_pre_push_ci_gate__pre_push_gate_venv_probe.py.
+    env = {"PATH": "/usr/bin:/bin", "HOME": str(repo)}
+
+    stdin_text = f"refs/heads/feature/0.0.1 {'a' * 40} refs/heads/feature/0.0.1 {_ZERO}\n"
+    result = subprocess.run(
+        [_BASH, str(_PRE_PUSH_SCRIPT)],
+        cwd=repo,
+        input=stdin_text,
+        capture_output=True,
+        text=True,
+        env=env,
+        timeout=_DEADLINE,
+    )
+    out = result.stdout + result.stderr
+    assert result.returncode == 1, out
+    assert "could not locate the dadaia runner" in out, out

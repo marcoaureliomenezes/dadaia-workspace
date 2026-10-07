@@ -21,7 +21,7 @@ sources:
 
 ## Hooks and binding
 
-- `dadaia harness add claude` writes `.claude/settings.json` and the symlink set; its `env` carries the absolute tool caches under `.dadaia/tmp/<tool>-cache` and `PLAYWRIGHT_MCP_OUTPUT_DIR=<ws>/.dadaia/mcps/playwright`; every other key the operator set there is kept.
+- `dadaia harness add claude` writes `.claude/settings.json` and the symlink set; its `env` carries the absolute tool caches under `.dadaia/tmp/<tool>-cache` and `PLAYWRIGHT_MCP_OUTPUT_DIR=<ws>/.dadaia/mcps/playwright`; every other key the operator set there is kept; `.claude/settings.local.json`, which outranks that registration, is PROTECTED beside it (`HookDialect.overrides`, [[sdd-gate-v3]]).
 - The four hook behaviours ([[agentic-entities]]) are registered there: `PreToolUse` `dadaia_workspace.hooks.pre_gate` (matcher `Edit|Write|MultiEdit|NotebookEdit|Bash`), a match-all `PostToolUse` `dadaia_workspace.hooks.sdd_post_gate` (the session heartbeat), `UserPromptSubmit` and `SessionStart` `dadaia_workspace.hooks.ctx_inject`, and the session-start reaper; the git chokepoints run beside them ([[sdd-gate-v3]]).
 - `SessionStart` matchers `startup`, `resume`, `compact` and `clear` re-emit the bootstrap after a compact or `/clear` as well as at a new session.
 - A block answers `hookSpecificOutput.permissionDecision: deny` with its reason, the top-level `decision: block`/`reason` pair riding along for other consumers; an allow carries no permission verdict, so the user's permission prompts are never bypassed.

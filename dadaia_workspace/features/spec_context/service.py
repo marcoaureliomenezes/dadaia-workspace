@@ -5,11 +5,13 @@ import logging
 import re
 import shutil
 import sys
+from collections.abc import Callable
 from dataclasses import replace
 from datetime import UTC, datetime
+from enum import StrEnum
 from functools import partial
 from pathlib import Path
-from typing import Protocol
+from typing import Any, Protocol
 
 from dadaia_workspace.core import workspace_layout
 from dadaia_workspace.core.cli_line import fix_line, git_line, shell_line
@@ -37,7 +39,7 @@ from dadaia_workspace.core.template_history import was_shipped
 from dadaia_workspace.features.spec_context import sweep
 from dadaia_workspace.infrastructure.git_subprocess import GitSubprocessClient
 from dadaia_workspace.infrastructure.json_context_store import JsonContextStore
-from dadaia_workspace.infrastructure.ledger_scripts import worktree_rows
+from dadaia_workspace.infrastructure.ledger_scripts import worktree_rows as ledger_worktree_rows
 
 _log = logging.getLogger(__name__)
 
@@ -47,6 +49,10 @@ _ONBOARDING = ("specs", "specs-bkp", *(dest for _, dest in workspace_layout.REPO
 
 def _onboarded(rel: str) -> bool:
     return any(rel == p or rel.startswith(f"{p}/") for p in _ONBOARDING)
+
+
+WorktreeRows = Callable[[Path], tuple[list[dict[str, Any]], str, str]]
+"""The owner's open-worktree rows: ``(rows, failure, fix)`` (AC1.10)."""
 
 
 class InstallHooks(Protocol):
@@ -125,29 +131,53 @@ def git_hooks_dir(repo_root: Path) -> Path | None:
     return repo_root / git.git(repo_root, "rev-parse", "--git-path", "hooks")
 
 
+class HookState(StrEnum):
+    """What :func:`hook_state` found at a hook path."""
+
+    CURRENT = "current"  # byte-identical to the shipped hook
+    ABSENT = "absent"
+    STALE = "stale"  # an earlier shipped version, which refreshing loses nothing of
+    DIFFERS = "differs"  # not ours: the operator's own hook
+    UNREADABLE = "unreadable"  # a directory, or a file this process cannot open
+
+
+def hook_state(installed: Path, source: str) -> tuple[HookState, str]:
+    """The ONE decision about an installed hook, shared by the installer and HOOKS-DRIFT-1:
+    its :class:`HookState` against the shipped ``public/scripts/<source>``, with the OS's reason
+    when it is unreadable (``shipped-hashes.json`` tells an earlier shipped version, a CRLF
+    checkout of it included, from the operator's own)."""
+    scripts = workspace_layout.public_scripts_dir()
+    try:
+        raw = installed.read_bytes()
+    except FileNotFoundError:
+        return HookState.ABSENT, ""
+    except OSError as exc:
+        return HookState.UNREADABLE, exc.strerror or ""
+    if raw == (scripts / source).read_bytes():
+        return HookState.CURRENT, ""
+    text = raw.decode("utf-8", errors="replace").replace("\r\n", "\n")
+    ours = was_shipped(text, f"scripts/{source}", scripts.parent / "templates")
+    return (HookState.STALE if ours else HookState.DIFFERS), ""
+
+
 def install_git_hooks(repo_root: Path, *, force: bool = False) -> list[Path]:
     """Copy every ``INSTALLED_GIT_HOOKS`` row into :func:`git_hooks_dir`; the ONE installer
-    (`ci install-hook`, `context create`, `context alive`). A hook is overwritten only when
-    *force* or byte-identical to a shipped version (``shipped-hashes.json``), never the
-    operator's own (HOOKS-DRIFT-1 names it); raises FileNotFoundError off a git repo."""
+    (`ci install-hook`, `context create`, `context alive`). A hook is written when absent or an
+    earlier shipped version (:func:`hook_state`), or with *force*, which also sets what it
+    cannot read aside as ``<hook>.unreadable``; the operator's own hook is never overwritten (HOOKS-DRIFT-1 names it); raises
+    FileNotFoundError off a git repo."""
     hooks_dir = git_hooks_dir(repo_root)
     if hooks_dir is None:
         raise FileNotFoundError(f"{repo_root} is not a git repository")
     hooks_dir.mkdir(parents=True, exist_ok=True)
-    scripts = workspace_layout.public_scripts_dir()
     written = []
     for target, source in workspace_layout.INSTALLED_GIT_HOOKS:
-        dest, shipped = hooks_dir / target, scripts / source
-        old = dest.read_text(encoding="utf-8", errors="replace") if dest.exists() else None
-        if (
-            force
-            or old is None
-            or (
-                old != shipped.read_text(encoding="utf-8")
-                and was_shipped(old, f"scripts/{source}", scripts.parent / "templates")
-            )
-        ):
-            shutil.copyfile(shipped, dest)
+        dest = hooks_dir / target
+        state, _ = hook_state(dest, source)
+        if force or state in (HookState.ABSENT, HookState.STALE):
+            if state is HookState.UNREADABLE:  # copyfile opens its target: set aside what cannot be
+                dest.rename(dest.with_name(f"{dest.name}.unreadable"))
+            shutil.copyfile(workspace_layout.public_scripts_dir() / source, dest)
             dest.chmod(0o755)
             written.append(dest)
     return written
@@ -161,7 +191,9 @@ class SpecContextService:
         workspace_root: Path,
         install_hooks: InstallHooks,
         secret_scan: SecretScan,
+        worktree_rows: WorktreeRows = ledger_worktree_rows,
     ) -> None:
+        self._worktree_rows = worktree_rows
         self._store = context_store
         self._git = git_client
         self._workspace_root = workspace_root
@@ -644,7 +676,7 @@ class SpecContextService:
         a linked worktree, unpushed commits on a HEAD off the work branch. Every refusal
         names its repo."""
         main_repo = self._repo_path(ctx.repo_slug)
-        trees, failed, refix = worktree_rows(self._workspace_root)  # AC1.10: the owner's rows
+        trees, failed, refix = self._worktree_rows(self._workspace_root)  # AC1.10: the owner's rows
         for repo in ctx.all_repos():
             slug, path = repo.slug, self._repo_path(repo.slug)
             lead = f"Context '{name}': repo '{slug}'"

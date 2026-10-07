@@ -10,7 +10,7 @@ candidates.
 |---|---|---|
 | Task | `WT merge <task path>`: the repo's `verify-task:` line | the task's fast-forward onto its job branch |
 | Stage | `WT stage <job path>`: no task open, the `verify-stage:` line | the next stage |
-| Job | `dd-code-reviewer` `APPROVED` carrying the job's green CI-matrix run as `ci_run`; the `verify:` line at `WT merge` | the job's merge |
+| Job | `dd-code-reviewer` `APPROVED` naming the job's HEAD; the `verify:` line at `WT merge` | the job's merge |
 | Candidate close | the Reconciliation job's merge | the candidate's work -> integration PR |
 | Promote (ship) | pre-staged security verdict naming the integration tip | the integration -> principal PR |
 
@@ -23,16 +23,16 @@ An rc is an Implement: a DAG of jobs the PLAN draws, Job 1 first, the Reconcilia
 
 **Step 1 — Open a job.**
 - `WT new <repo> <M.m.p>-rc<N>/<job>` once its PLAN edges are merged; its tasks live in `rc-<N>/tasks/<job>.md` (`dd-release-definition` §5).
-- Each task opens `WT new <repo> <M.m.p>-rc<N>/<job>--<task-id>` from the job branch; a sub-agent works it; it is `running` while its tree exists; there is no reservation commit.
+- Each task opens `WT new <repo> <M.m.p>-rc<N>/<job>--<task-id>` from the job branch; a sub-agent works it; it is `running` while its tree exists.
 - Done when: the tree exists.
 
 **Step 2 — Stages and tasks.**
-- Stage 1 writes every acceptance test RED, as a strict xfail; each later stage turns its rows green.
+- Stage 1 writes every acceptance test RED, each failing by assertion and carrying the repo's RED marker; each later stage turns its rows green by deleting that marker line alone — past the RED stage's close a test is never edited (`worktrees/AGENTS.md` §2).
 - Each task commits under its id and lands by `WT merge` after its task gate; each stage closes by `WT stage`.
 - Done when: the last stage closed green and the close task wrote the job file's `done`.
 
 **Step 3 — Job merge.**
-- Push the job branch; the reviewer's one verdict names its green CI-matrix run; `WT merge` runs the job gate and fast-forwards.
+- The reviewer's one verdict names the job's HEAD; `WT merge` runs the job gate and fast-forwards.
 - Append the job's `kind: merge` entry to `_RELEASE.json`'s `log` (`RELEASE-EVENTS.md`).
 - Done when: the job is on the work branch and its entry passes `release.py check`.
 
@@ -45,8 +45,8 @@ An rc is an Implement: a DAG of jobs the PLAN draws, Job 1 first, the Reconcilia
 - Done when: the Reconciliation job merged; `.dadaia/.venv/bin/dadaia doctor` is clean.
 
 **Step 5 — Candidate PR.**
-- Open the work -> integration PR (branch names: the constitution's `gitflow:`) (security verdict covering the head, `dd-gitflow-default` §2a); watch CI to green; merge.
-- Done when: it merges green.
+- Open the work -> integration PR and merge it: `dd-gitflow-default` §3b.
+- Done when: it merges.
 
 The arc ends here. Gate -> promote -> record -> branch cut: `dd-gitflow-default` steps
 9-12.
@@ -55,5 +55,5 @@ The arc ends here. Gate -> promote -> record -> branch cut: `dd-gitflow-default`
 
 - Writing source code, tests, or pipelines (other agents) — the closer records test dispositions, never authors a test.
 - Modifying `specs/constitution.md` (requires explicit operator approval).
-- Memory updates outside CLOSURE phase (or DEFINITION under its own authorization) — gate-blocked for any other agent/phase.
+- Memory updates outside CLOSURE phase (or DEFINITION under its own authorization) (`specs/memory/AGENTS.md`).
 - Minting a version, writing a CHANGELOG section or moving a closed trio on disk — the project's release pipeline owns the first two, git owns the third.

@@ -83,9 +83,7 @@ def validate(
     \b
     Exit codes:
       0  All files valid
-      1  One or more INVALID files
-      2  One or more file paths not found
-      3  Bad invocation (no paths and not --all) or workspace not initialized
+      1  Any refusal: an INVALID file, a path not found, a bare call, no workspace
     """
     # Invocation guard: must have paths or --all
     if not paths and not all_:

@@ -27,8 +27,6 @@ import pytest
 from dadaia_workspace.cli.help_digest import command_paths, render_digest
 from dadaia_workspace.features.specs.citations import dead_citations
 
-pytestmark = pytest.mark.contract
-
 _REPO_ROOT = Path(__file__).resolve().parents[2]
 _MEMORY_DIR = _REPO_ROOT / "specs" / "memory"
 _DOCS_DIR = _REPO_ROOT / "docs"

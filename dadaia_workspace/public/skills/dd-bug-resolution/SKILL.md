@@ -52,7 +52,7 @@ regressions: measure a baseline, then bisect — logs mislead.
 *Done when one hypothesis survives by observation, not by reading code.*
 
 **Phase 5 — Seam test.** The regression test at the correct seam, BEFORE the fix, is
-a new case — a parametrize row in the owner file, a literal expected value — at the lowest level that detects it (the root map §1: fixes never rewrite old asserts); watch it fail,
+a new case in the owner file with a literal expected value, at the lowest level that detects it (the root map §1: fixes never rewrite old asserts), committed in a RED stage with the repo's RED marker (ADR 0209); watch it fail,
 fix the cause, watch it pass, re-run the Phase 1 loop on the original scenario. A
 correct seam exercises the real bug pattern at its call site (`dd-codebase-design`
 owns the seam vocabulary and the deletion test the fix must pass); when none exists, that
@@ -61,17 +61,17 @@ the architecture lens before fixing.
 *Done when the test fails for the real reason and passes with the fix (or the seam
 gap is registered first).*
 
-**Phase 6 — Cleanup + resolve.** Grep the probe prefix to zero; rewriting an old assert is its own commit, with a reason:
+**Phase 6 — Cleanup + resolve.** Grep the probe prefix to zero:
 
-- Stage the code and its test first: `resolve` blames the lines the staged diff removes.
+- Stage the code first, with the deletion of the regression test's RED marker line: `resolve` blames the lines the staged diff removes.
 
 ```
 python3 .agents/skills/dd-bug-resolution/scripts/bugs.py resolve <bug-id> --cause … --caused-by …
-  --solution … --evidence-loop …
+  --solution … --evidence-loop … --evidence-seam …
 ```
 
 - `caused_by` names a live or archived record, or `none`, never a loop; writes refuse else.
-- Stage code + regression test + the `BUGS.jsonl` line together, the red loop in the body, a hotfix's
+- Stage code + the marker-line deletion + the `BUGS.jsonl` line together, the red loop in the body, a hotfix's
   naming `block: <item>` — ONE commit, shape 3 of `dd-gitflow-default` §3a.
 
 ## 3. Done when

@@ -143,7 +143,7 @@ def _with_fix[C](
 
     0.4.7 FR2 — every BLOCK carries one executable fix. That every error-class rule
     carries a ``fix_help`` is proven statically, before the operator ever runs the
-    doctor, by ``tests/contract/test_every_block_carries_a_fix.py``; raising here would
+    doctor, by ``tests/core/test_cli_line__every_block_carries_a_fix.py``; raising here would
     turn a rule-authoring defect into a traceback, which is a refusal with no message
     at all.
     """

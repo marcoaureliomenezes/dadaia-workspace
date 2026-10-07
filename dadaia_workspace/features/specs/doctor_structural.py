@@ -11,7 +11,11 @@ from dadaia_workspace.core.atomic_write import atomic_write
 from dadaia_workspace.core.cli_line import mkdir_line, shell_line
 from dadaia_workspace.core.doctor_rules import SectionFinding
 from dadaia_workspace.core.template_history import was_shipped
-from dadaia_workspace.core.workspace_layout import SCOPED_LAW_AREAS, render_registry_tables
+from dadaia_workspace.core.workspace_layout import (
+    SCOPED_LAW_AREAS,
+    render_registry_tables,
+    source_form,
+)
 from dadaia_workspace.features.specs import memory_canon
 from dadaia_workspace.features.specs.canon import (
     CANON_ROOT_MEMBERS,
@@ -141,7 +145,8 @@ class StructuralValidator:
         label = f"specs/{dst.relative_to(self.specs_dir).as_posix()}"
         canonical_text = render_registry_tables(canonical_path.read_text(encoding="utf-8"))
         current_text = dst.read_text(encoding="utf-8")
-        canonical_hash, current_hash = _sha(canonical_text), _sha(current_text)
+        canonical_hash = _sha(source_form(canonical_text))
+        current_hash = _sha(source_form(current_text))
         if canonical_hash == current_hash:
             return []
         # A symlinked projection is never repaired (the write would leave the tree): never fixable.

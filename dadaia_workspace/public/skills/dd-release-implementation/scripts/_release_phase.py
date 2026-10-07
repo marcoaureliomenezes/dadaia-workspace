@@ -54,8 +54,9 @@ def _refuse_unapproved_docs(live: Live) -> Path:
 def _refuse_open_worktrees(specs: Path) -> None:
     """ADR 0128 (4): a candidate closes with every `wt/*` of its repo merged or cleaned — read
     from the owner's rows (imported, ADR 0135), sparing the tree closure runs from."""
-    marker = Path(".dadaia", "states", "spec_contexts.json")
-    root = next((d for d in (specs, *specs.parents) if (d / marker).is_file()), None)
+    from _ledger import workspace_of
+
+    root = workspace_of(specs)
     if root is None:  # no workspace holds this tree: there is no worktree to wait for
         return
     sys.path.append(str(Path(__file__).resolve().parents[2] / "dd-gitflow-default" / "scripts"))
@@ -79,8 +80,8 @@ def _refuse_open_worktrees(specs: Path) -> None:
 #: The one verb that moves each phase forward — every refusal's fix names it, so a fix
 #: never names a verb that refuses in the same state.
 NEXT = {"DEFINITION": "phase IMPLEMENTATION", "IMPLEMENTATION": "phase CLOSURE", "CLOSURE": "ship"}
-#: `ship`'s one value no code knows: the promote PR's number exists once that PR is open.
-SHIP_PR = "with --pr set to the promote PR's number, once that PR is open"
+#: `ship`'s one optional value no code knows: the promote PR's number, when the host has one.
+SHIP_PR = "with --pr set to the promote PR's number, when the host has one"
 #: What the operator supplies to each NEXT verb that the code cannot fill (ADR 0158).
 SUPPLY = {"CLOSURE": SHIP_PR}
 

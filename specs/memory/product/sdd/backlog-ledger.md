@@ -18,6 +18,7 @@ sources:
 - `specs/backlog/` holds `BACKLOG.json` (`backlog-v1`, `{schema, active: [...]}`), `AGENTS.md` and `_archive/backlog_histo.jsonl`; no per-entry file exists.
 - An `active[]` entry carries `title`, `opened`, `status`, `description`, `provenance`, optional `intents` and `relates` — the live entries it was judged to update, obsolete or relate to at birth, empty for none, absent when the backlog was empty; its slug matches `^[a-z][a-z0-9-]+$`.
 - `status` is a lowercase live token, never a backlog terminal word; an `idea` needs no intents, every later status binds `intents[]` whose subjects resolve to one of four anchor kinds, each derived from live truth: `code` (a repo-relative tracked path, any language, an optional `#word` that must occur in the file), `catalog` (a catalog slug), `doc` (a `SPEC-DOC` id or memory heading anchor) or `invariant` (an `INV-*` id).
+- A near-duplicate of a live entry exits `rejected`, its `--reason` `absorbed by <existing slug>`; no entry is merged into another.
 - The document is written in a `backlog/<slug>` worktree, which lands `specs/` only, `BUGS.jsonl` included, so a bug registration and the `to-bug` exit it receives share one ([[worktrees]], [[bug-ledger]]).
 - A release picks an entry by naming its slug in the `backlog:` clause of a candidate SPEC's first `**Origin:**` line, read by `release.py`'s one Origin parser; the entry stays in `active[]` and exits once, at the closure disposition sweep ([[release-lifecycle]]); a deferred entry stays in `active[]`.
 

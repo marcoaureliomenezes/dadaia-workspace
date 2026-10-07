@@ -340,7 +340,7 @@ class VenvPythonEnvironmentManager:
 
         ``DADAIA_BOOTSTRAP_PACKAGE`` still names an explicit local wheel: it is the
         operator's override for validating a candidate build (see
-        ``CONSUMER_VALIDATION_RECIPE.md``), not a bootstrap path of its own.
+        ``scripts/CONSUMER_VALIDATION_RECIPE.md``), not a bootstrap path of its own.
         """
         candidate = os.environ.get("DADAIA_BOOTSTRAP_PACKAGE", "").strip()
         if candidate:

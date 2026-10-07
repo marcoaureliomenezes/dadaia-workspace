@@ -102,10 +102,6 @@ _Avoid_: lane, MEMORY, LAW, UNGATED, FROZEN (retired classes)
 The repo set one Bind owns — its context's main repo plus its associated repos. A file-tool write under `repos/<slug>/` or `worktrees/<slug>/` outside it is blocked, and an unbound session with an id owns no repo; inside it, `repos/<slug>/` takes only `specs/audits/` directly, the rest lands by a Worktree merge. An unregistered slug and a workspace-root path are never scope-judged.
 _Avoid_: ownership, lease, territory, allowlist (for the repo set)
 
-**Evals repo**:
-An associated repo whose one role is to measure agent behaviour against the distribution its context ships; the only repo whose CI may call a model API, under `dd-gitflow-default` §3b.
-_Avoid_: eval harness, benchmark repo
-
 **Zone**:
 A region with one write rule. A `.dadaia/` zone is a row of `core.workspace_layout.DADAIA_ZONES` (class, TTL, creator); a path's scope zone is `core.invocation.scope`'s `root`, `repo`, `audit` or `worktree`.
 _Avoid_: area (for a zone), lane
@@ -342,6 +338,26 @@ _Avoid_: fix (bare)
 **Bug window**:
 The records an rc's first SPEC reviews in `## Bug window review`: `found_in` or `introduced_in` in the live release or the previous published one (`bugs.py window`); it judges the previous rc's fixes, never an open bug.
 _Avoid_: wave, pile, cause group (retired)
+
+**Fix surface**:
+The production lines a fix commit wrote. A settled fix surface survived 2 rcs untouched by another fix or REBUILD.
+_Avoid_: fix footprint
+
+**Rework**:
+A later commit whose diff overlaps a fix surface: a `refactor(…): REBUILD` is planned; a `fix(bugs)` of another bug is overfitting evidence.
+_Avoid_: regression (bare)
+
+**Settled ledger surface**:
+A ledger `surface` (a directory) whose every record left the bug window with no later record on it.
+_Avoid_: closed surface
+
+**Convergence readout**:
+A number `## Bugs` prints at each closure, blocking nothing.
+_Avoid_: gate, threshold
+
+**RED anchor**:
+The sha closing a job's RED stage; after it the job's tests are frozen.
+_Avoid_: red tag
 
 **Implement**:
 One rc's run, a DAG of jobs; not a file.

@@ -26,20 +26,14 @@ Reach shared understanding by mapping every open branch of the demand as a desig
 3. Classify each gap against `PROBLEM-TAXONOMY.md` before deciding inspection vs promotion to the tree.
 4. Map every remaining open question as a node; a dependent question hangs beneath its prerequisite as a child.
 5. Identify the frontier: every question whose prerequisites are already settled.
-6. Ask the whole frontier in one round, numbered, each carrying a recommended answer; a written questionnaire lives at `.dadaia/handoff/<ctx>/<UTC>-main-thread-grill-<slug>.md`, never at the root:
-
-   ```
-   ❓ **Q1** - **<question title>**: <question body — cite the exact spec/section/file>
-
-   ➡️ <your recommended answer>
-   ```
-7. Wait for the operator's answers before the next round.
-8. Recompute the frontier from the answers; settled nodes unblock their children.
-9. Skip aesthetic preference, an already-working implementation choice, and anything answerable "whatever is reasonable."
-10. Repeat rounds until the frontier is empty — every branch visited, nothing silently assumed.
+6. Ask one question per `AskUserQuestion` call (ADR 0165): 3 closed options, each with its trade-off, one marked recommended, no option previews; the open answer is the tool's own. Without that tool, ask in numbered text, still one at a time. No `.md` file is written.
+7. Wait for the operator's answer, recompute the frontier from it (settled nodes unblock their children), and ask the next question.
+8. Skip aesthetic preference, an already-working implementation choice, and anything answerable "whatever is reasonable."
+9. Stop when the frontier is empty — every branch visited, nothing silently assumed.
+10. The grill happens before a candidate launches, never during one. Operator, 2026-10-07: "É priobido, 100% proibido fazer peguntas idiotas e desnecessárias durante release candidate em andamento. tudo é feito antes. ao disparar, uma rc não para jamais".
 11. Sharpen terminology as decisions land (`dd-domain-modeling`): resolve a fuzzy or colliding term into its canonical `CONTEXT.md` sense before it enters the record.
 12. State the resulting shared understanding back to the operator in one summary.
-13. Record every inspection-resolved item as "answered via inspection: <value>".
+13. Record every inspection-resolved item as `answered via inspection: <value>`.
 14. Record every operator decision as an ADR line (`<decision> — reason: <justification>`).
 15. Emit the session as a handoff via `dd-handoff-emitter` — handoff-only by default.
 16. Write the HTML report (`EMISSION-FORMAT.md`) only when the operator asked for one or the next hop is human.

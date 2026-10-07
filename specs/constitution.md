@@ -1,12 +1,12 @@
 ---
 specs_pattern_version: 11
-constitution_version: 6.0.0
+constitution_version: 6.1.0
 gitflow: {"principal": "main", "integration": "develop", "work": "feature/"}
 ---
 
 # Constitution — dadaia-workspace
 
-Permanent product law, stated **once**. Every rule already stated in `DADAIA.md` lives there
+Permanent product law, stated **once**. Every rule that has a home elsewhere lives there
 alone; this file carries only what no other file states.
 
 ## 1. Identity
@@ -57,6 +57,17 @@ the bound context's `specs/`, never in a persona.
 article or substantive clarification, PATCH for wording. An amendment lands with the accepted
 decision that decided it, in the same commit; amendment history lives in git and in the
 amending release's `_RELEASE.json` `log`, never inline.
+
+## 5. O contrato de confiança
+
+Cada passo do processo existe pelo que garante; cada garantia é verdade por mecanismo e número, nunca por declaração; versão cuja medida falha não publica.
+
+1. **Teste não se burla.** Nenhum gate aceita uma vermelha que sumiu: assert antigo editado, skip/xfail/marker/seletor mudado, ou o julgado editando o próprio juiz. Medida: cada burla conhecida no ledger é um teste adversário plantado que os gates recusam; re-bug na mesma superfície ≤ 30%.
+2. **Evidência é produzida, nunca declarada.** Veredito, CI run, mutação, test-audit e data existem só como saída da ferramenta que os calculou, presos ao sha julgado; o julgado nunca escreve a própria evidência. Medida: zero campo de evidência digitado à mão; o merge recusa veredito com sha ou hash de diff divergente.
+3. **Código é escrito para humanos.** Script e módulo entregues leem como arquitetura limpa: um kernel por preocupação, zero cópia, zero ciclo de import, toda função com complexidade grau C ou melhor. Medida: critério "scripts" do scorecard ≥ 8.
+4. **Peso compra confiança ou sai.** Passo de cerimônia que não produz evidência checada por um gate é apagado.
+
+Medido pelo scorecard da versão; todo critério ≥ 8 antes de evals ou publicação.
 
 <!-- dadaia:fixed slop-law -->
 ## Slop — workspace law (fixed)

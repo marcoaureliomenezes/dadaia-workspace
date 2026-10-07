@@ -1,8 +1,7 @@
 # CONTEXT-MAP — the context balance of a dadaia-workspace
 
 Library document. Projected nowhere: `public stage` copies it into `.dadaia/agentic/data/`
-with the rest of `data/`, and no projection rule installs it into a runtime tree. Pinned by
-`tests/contract/test_context_map.py`.
+with the rest of `data/`, and no projection rule installs it into a runtime tree.
 
 One row per surface: what it is for and what belongs in it. A surface's size is a soft
 review signal (one purpose, no restated rule), never a build failure (ADR 0143); a SKILL.md's
@@ -74,7 +73,7 @@ One procedure each; a skill that touches a governed area opens its scoped law as
 | `dd-handoff-emitter` | handoff-first emission and ack-on-consume | `.dadaia/handoff/AGENTS.md` |
 | `dd-manager-orchestration` | intake, dispatch and the closure pass | — |
 | `dd-release-definition` | picking the set and authoring the trio | `specs/releases/AGENTS.md` |
-| `dd-release-implementation` | the candidate arc from reservation to the gate | `specs/releases/AGENTS.md` |
+| `dd-release-implementation` | the candidate arc from the first task to the gate | `specs/releases/AGENTS.md` |
 | `dd-spec-navigator` | the three-phase session grounding protocol | `specs/AGENTS.md` |
 
 ## 4. Personas — `.agents/agents/*.md`

@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-10-06T13:26:50Z",
+  "generated_at": "2026-10-07T16:38:36Z",
   "features": [
     {
       "rank": 1,
@@ -14,7 +14,7 @@
         "handoff",
         "schema"
       ],
-      "token_estimate": 521,
+      "token_estimate": 535,
       "depends_on": [
         "worktrees",
         "workspace-doctor",
@@ -41,7 +41,7 @@
         "dispatch",
         "sdd"
       ],
-      "token_estimate": 807,
+      "token_estimate": 855,
       "depends_on": [
         "agentic-entities",
         "release-lifecycle",
@@ -74,7 +74,7 @@
         "derivation",
         "governance"
       ],
-      "token_estimate": 1282,
+      "token_estimate": 1307,
       "depends_on": [
         "agent-orchestration",
         "sdd-gate-v3",
@@ -93,6 +93,31 @@
     },
     {
       "rank": 4,
+      "slug": "agent-evals",
+      "title": "agent-evals",
+      "area": "distribution",
+      "tldr": "The library's own agent evals — two graded tasks run on the candidate wheel and a PyPI baseline by one dispatch-or-schedule workflow.",
+      "summary": "evals/ holds a cold-onboarding task and a block-list-bug task, each graded by a script on the state the agent leaves; .github/workflows/eval.yml runs each three times on a baseline release and on the candidate wheel built from its own checkout, scans every upload for the model secret, and blocks when the candidate drops where the baseline passed.",
+      "path": "specs/memory/product/distribution/agent-evals.md",
+      "tags": [
+        "evals",
+        "ci",
+        "release-gate",
+        "distribution"
+      ],
+      "token_estimate": 440,
+      "depends_on": [
+        "pypi-distribution",
+        "QUALITY",
+        "consumer-agent-support"
+      ],
+      "sources": [
+        "evals/**",
+        ".github/workflows/eval.yml"
+      ]
+    },
+    {
+      "rank": 5,
       "slug": "public-asset-distribution",
       "title": "public-asset-distribution",
       "area": "distribution",
@@ -106,7 +131,7 @@
         "projection",
         "privacy"
       ],
-      "token_estimate": 1045,
+      "token_estimate": 1148,
       "depends_on": [
         "harness-kimi-code",
         "agentic-entities",
@@ -137,7 +162,7 @@
       ]
     },
     {
-      "rank": 5,
+      "rank": 6,
       "slug": "pypi-distribution",
       "title": "pypi-distribution",
       "area": "distribution",
@@ -150,11 +175,12 @@
         "release",
         "packaging"
       ],
-      "token_estimate": 984,
+      "token_estimate": 1065,
       "depends_on": [
         "release-lifecycle",
         "QUALITY",
         "worktrees",
+        "agent-evals",
         "public-asset-distribution",
         "consumer-agent-support",
         "cross-platform-portability"
@@ -169,7 +195,7 @@
       ]
     },
     {
-      "rank": 6,
+      "rank": 7,
       "slug": "harness-claude-code",
       "title": "harness-claude-code",
       "area": "harness",
@@ -182,7 +208,7 @@
         "projection",
         "hooks"
       ],
-      "token_estimate": 429,
+      "token_estimate": 444,
       "depends_on": [
         "agent-orchestration",
         "agentic-entities",
@@ -198,7 +224,7 @@
       ]
     },
     {
-      "rank": 7,
+      "rank": 8,
       "slug": "harness-codex",
       "title": "harness-codex",
       "area": "harness",
@@ -211,7 +237,7 @@
         "projection",
         "hooks"
       ],
-      "token_estimate": 339,
+      "token_estimate": 369,
       "depends_on": [
         "agentic-entities",
         "sdd-gate-v3",
@@ -227,7 +253,7 @@
       ]
     },
     {
-      "rank": 8,
+      "rank": 9,
       "slug": "harness-copilot",
       "title": "harness-copilot",
       "area": "harness",
@@ -255,7 +281,7 @@
       ]
     },
     {
-      "rank": 9,
+      "rank": 10,
       "slug": "harness-cursor",
       "title": "harness-cursor",
       "area": "harness",
@@ -283,7 +309,7 @@
       ]
     },
     {
-      "rank": 10,
+      "rank": 11,
       "slug": "harness-devin",
       "title": "harness-devin",
       "area": "harness",
@@ -310,7 +336,7 @@
       ]
     },
     {
-      "rank": 11,
+      "rank": 12,
       "slug": "harness-kimi-code",
       "title": "harness-kimi-code",
       "area": "harness",
@@ -338,7 +364,7 @@
       ]
     },
     {
-      "rank": 12,
+      "rank": 13,
       "slug": "product-vision",
       "title": "product-vision",
       "area": "philosophy",
@@ -350,7 +376,7 @@
         "paradigm",
         "pillars"
       ],
-      "token_estimate": 838,
+      "token_estimate": 927,
       "depends_on": [
         "worktrees",
         "spec-context-project",
@@ -375,7 +401,7 @@
       ]
     },
     {
-      "rank": 13,
+      "rank": 14,
       "slug": "spec-context-project",
       "title": "spec-context-project",
       "area": "philosophy",
@@ -403,7 +429,7 @@
       ]
     },
     {
-      "rank": 14,
+      "rank": 15,
       "slug": "capabilities",
       "title": "capabilities",
       "area": "platform",
@@ -430,19 +456,19 @@
       ]
     },
     {
-      "rank": 15,
+      "rank": 16,
       "slug": "consumer-agent-support",
       "title": "Consumer validation gate",
       "area": "platform",
-      "tldr": "A consumer-side validation agent running the shipped recipe on a real workspace is the release gate; no wheel publishes until every statement reports PASS.",
-      "summary": "The release gate is a consumer-side validation agent running the shipped recipe on a real workspace; dadaia certify runs the deterministic journey in a disposable workspace and is necessary, never sufficient.",
+      "tldr": "A consumer-side agent running the developer's recipe on a real workspace is the release gate; no wheel publishes until every statement reports PASS.",
+      "summary": "The release gate is a consumer-side validation agent running the developer's validation recipe on a real workspace; dadaia certify runs the deterministic journey in a disposable workspace and is necessary, never sufficient.",
       "path": "specs/memory/product/platform/consumer-agent-support.md",
       "tags": [
         "consumer-validation",
         "release-gate",
         "sdd"
       ],
-      "token_estimate": 354,
+      "token_estimate": 387,
       "depends_on": [
         "pypi-distribution",
         "workspace-init",
@@ -453,14 +479,14 @@
         "capabilities"
       ],
       "sources": [
-        "dadaia_workspace/public/data/CONSUMER_VALIDATION_RECIPE.md",
+        "scripts/CONSUMER_VALIDATION_RECIPE.md",
         "dadaia_workspace/features/certification/**",
         "dadaia_workspace/infrastructure/certification_process.py",
         "dadaia_workspace/cli/commands/certify.py"
       ]
     },
     {
-      "rank": 16,
+      "rank": 17,
       "slug": "context-management",
       "title": "context-management",
       "area": "platform",
@@ -473,7 +499,7 @@
         "session",
         "privacy"
       ],
-      "token_estimate": 2819,
+      "token_estimate": 2862,
       "depends_on": [
         "specs-migration",
         "workspace-doctor",
@@ -498,7 +524,7 @@
       ]
     },
     {
-      "rank": 17,
+      "rank": 18,
       "slug": "context-portability",
       "title": "context-portability",
       "area": "platform",
@@ -524,7 +550,7 @@
       ]
     },
     {
-      "rank": 18,
+      "rank": 19,
       "slug": "cross-platform-portability",
       "title": "cross-platform-portability",
       "area": "platform",
@@ -552,7 +578,7 @@
       ]
     },
     {
-      "rank": 19,
+      "rank": 20,
       "slug": "server-registry",
       "title": "server-registry",
       "area": "platform",
@@ -565,7 +591,7 @@
         "ports",
         "ttl"
       ],
-      "token_estimate": 331,
+      "token_estimate": 340,
       "depends_on": [
         "workspace-init",
         "agentic-entities"
@@ -575,7 +601,7 @@
       ]
     },
     {
-      "rank": 20,
+      "rank": 21,
       "slug": "specs-migration",
       "title": "specs-migration",
       "area": "platform",
@@ -589,7 +615,7 @@
         "registry",
         "onboarding"
       ],
-      "token_estimate": 1277,
+      "token_estimate": 1314,
       "depends_on": [
         "public-asset-distribution",
         "sdd-gate-v3",
@@ -606,7 +632,7 @@
       ]
     },
     {
-      "rank": 21,
+      "rank": 22,
       "slug": "workspace-doctor",
       "title": "workspace-doctor",
       "area": "platform",
@@ -624,7 +650,7 @@
         "compliance",
         "privacy"
       ],
-      "token_estimate": 2796,
+      "token_estimate": 2874,
       "depends_on": [
         "public-asset-distribution",
         "sdd-gate-v3",
@@ -652,7 +678,7 @@
       ]
     },
     {
-      "rank": 22,
+      "rank": 23,
       "slug": "workspace-init",
       "title": "workspace-init",
       "area": "platform",
@@ -666,7 +692,7 @@
         "upgrade",
         "onboarding"
       ],
-      "token_estimate": 1889,
+      "token_estimate": 1895,
       "depends_on": [
         "context-management",
         "specs-migration",
@@ -688,7 +714,7 @@
       ]
     },
     {
-      "rank": 23,
+      "rank": 24,
       "slug": "audits-canon",
       "title": "audits-canon",
       "area": "sdd",
@@ -703,7 +729,7 @@
         "decisions",
         "governance"
       ],
-      "token_estimate": 1361,
+      "token_estimate": 1380,
       "depends_on": [
         "agent-orchestration",
         "sdd-gate-v3",
@@ -722,7 +748,7 @@
       ]
     },
     {
-      "rank": 24,
+      "rank": 25,
       "slug": "backlog-ledger",
       "title": "backlog-ledger",
       "area": "sdd",
@@ -735,7 +761,7 @@
         "ledger",
         "governance"
       ],
-      "token_estimate": 829,
+      "token_estimate": 857,
       "depends_on": [
         "agent-orchestration",
         "worktrees",
@@ -752,7 +778,7 @@
       ]
     },
     {
-      "rank": 25,
+      "rank": 26,
       "slug": "bug-ledger",
       "title": "bug-ledger",
       "area": "sdd",
@@ -765,7 +791,7 @@
         "ledger",
         "governance"
       ],
-      "token_estimate": 1951,
+      "token_estimate": 2121,
       "depends_on": [
         "sdd-gate-v3",
         "workspace-doctor",
@@ -784,7 +810,7 @@
       ]
     },
     {
-      "rank": 26,
+      "rank": 27,
       "slug": "release-lifecycle",
       "title": "release-lifecycle",
       "area": "sdd",
@@ -799,7 +825,7 @@
         "memory",
         "as-is-review"
       ],
-      "token_estimate": 2773,
+      "token_estimate": 2893,
       "depends_on": [
         "sdd-gate-v3",
         "specs-migration",
@@ -821,12 +847,12 @@
       ]
     },
     {
-      "rank": 27,
+      "rank": 28,
       "slug": "sdd-gate-v3",
       "title": "sdd-gate-v3",
       "area": "sdd",
       "tldr": "No-lock enforcement — three gate blocks (root entry, non-venv command, PROTECTED or out-of-scope write; repos/<r> takes merges), one fix each, a push chokepoint",
-      "summary": "The merged PreToolUse gate blocks exactly three things and reads no SDD artifact; every refusal anywhere carries one fix line, a command or an operator action; the pre-push chokepoint enforces the branch contract read from the project gitflow, the specs canon, ADR-cited law deletions and one secret registry over every pushed object, with one rewrite formula as its fix, and no CI job calls a model API — the security review is the reviewer's lens before each pull request.",
+      "summary": "The merged PreToolUse gate blocks exactly three things and reads no SDD artifact; every refusal anywhere carries one fix line, a command or an operator action; the pre-push chokepoint enforces the branch contract read from the project gitflow, the specs canon, ADR-cited law deletions and one secret registry over every pushed object, with one rewrite formula as its fix, and no CI job calls a model API except `eval.yml` (ADR 0217) — the security review is the reviewer's lens before each pull request.",
       "path": "specs/memory/product/sdd/sdd-gate-v3.md",
       "tags": [
         "sdd",
@@ -836,7 +862,7 @@
         "no-locks",
         "privacy"
       ],
-      "token_estimate": 2646,
+      "token_estimate": 2735,
       "depends_on": [
         "workspace-doctor",
         "context-management",
@@ -864,7 +890,7 @@
       ]
     },
     {
-      "rank": 28,
+      "rank": 29,
       "slug": "worktrees",
       "title": "worktrees",
       "area": "sdd",
@@ -878,7 +904,7 @@
         "merge",
         "review"
       ],
-      "token_estimate": 1555,
+      "token_estimate": 1785,
       "depends_on": [
         "sdd-gate-v3",
         "public-asset-distribution",

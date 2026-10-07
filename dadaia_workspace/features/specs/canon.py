@@ -17,7 +17,7 @@ This module is the fold target for all four: :data:`CANON` is the ONE declarativ
 :func:`check_tree`/:func:`is_canon_path`/:func:`canon_violations` check a real tree
 against the SAME table (doctor is canon checked). The property this module exists to
 hold: ``scaffold(t); check_tree(t) == []`` — proved by
-``tests/unit/features/specs/test_canon_property.py``.
+``tests/features/specs/test_canon__canon_property.py``.
 
 Pure module for its CHECKING half (:func:`is_canon_path`, :func:`canon_violations`,
 :func:`verdict_violations`): plain data in, plain data out, never touches a filesystem.
@@ -98,6 +98,7 @@ __all__ = [
     "Violation",
     "canon_violations",
     "check_tree",
+    "declare_tests_line",
     "is_canon_path",
     "scaffold",
     "scaffold_entry",
@@ -290,6 +291,36 @@ def scaffold_repo_law(
             for template, dest in REPO_LAW
         ],
     )
+
+
+def default_tests_line(public_dir: Path | None = None) -> str:
+    """The template's own ``tests:`` line: the one default the law declares and the CLI echoes."""
+    template = (public_dir if public_dir is not None else default_public_dir()) / "templates"
+    return next(
+        ln
+        for ln in (template / "repo-AGENTS.md").read_text(encoding="utf-8").splitlines()
+        if ln.startswith("tests:")
+    )
+
+
+def declare_tests_line(repo: Path, *, public_dir: Path | None = None) -> list[Path]:
+    """Append the template's ``tests:`` line to a present, unsymlinked ``AGENTS.md`` that
+    has none (ADR 0216). Works in bytes: the law keeps its encoding and newline style, a
+    leading UTF-8 BOM never hides a line, and an unreadable law is skipped."""
+    law = repo / "AGENTS.md"
+    default = default_tests_line(public_dir)
+    if law.is_symlink() or not law.is_file():
+        return []
+    try:
+        data = law.read_bytes()
+    except OSError:
+        return []
+    if any(ln.removeprefix(b"\xef\xbb\xbf").startswith(b"tests:") for ln in data.splitlines()):
+        return []
+    nl = b"\r\n" if b"\r\n" in data else b"\n"
+    lead = b"" if not data or data.endswith(b"\n") else nl
+    atomic_write(law, data + lead + default.encode("utf-8") + nl)
+    return [law]
 
 
 def _fill_repo_name(template: Path, project_name: str) -> str:
