@@ -249,3 +249,11 @@ Paths are relative to the repo root; aliases as in `PLAN.md` (`f/`, `pub/`, `S/`
 | task | AC | `W:` | owner tests / RED |
 |---|---|---|---|
 | JB.S17.T1 | AC9.1 | `dadaia_workspace/public/entities/behavior-map.json` (the `dd-gitflow-default` scripts hash re-recorded) | `tests/infrastructure/test_entity_doctor.py` |
+
+## Stage JB.S18 — the ADR ledger in order
+
+- Contract: doctor LEDGER-ADR-SCHEMA refuses a gap in 0001..N. ADR 0220 is recorded on the Reconciliation branch (bd18b7d3b), 0221 on Job 10's (J10.S5.T1), and 0222 here (JB.S16.T1); each branch alone breaks the sequence (CI 37640024832: "id '0221' breaks 0001..N: expected 0220"). The bug batch merges first, so it carries the three records in order, byte-equal to their first recording; the other two branches drop their copy at rebase. ACs: AC9.1.
+
+| task | AC | `W:` | owner tests / RED |
+|---|---|---|---|
+| JB.S18.T1 | AC9.1 | `specs/ADRs/decisions.jsonl` (0220 and 0221 inserted before 0222, each line byte-equal to `wt/0.5.0-rc10/reconcile` and `wt/0.5.0-rc10/job10`) | `tests/features/specs/test_doctor_adr.py`, `release.py check`, doctor LEDGER-ADR-SCHEMA |
