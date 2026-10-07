@@ -143,7 +143,7 @@ Paths are relative to the repo root; aliases as in `PLAN.md` (`f/`, `pub/`, `S/`
 | JB.S8.T8 | AC9.1 | `tests/scripts/test_ci.py` (coverage-line-spawns-bare-python: `sys.executable`) | the file |
 | JB.S8.T9 | AC9.1 | `tests/cli/commands/test_init__init_with_repo.py`, `tests/cli/commands/test_specs.py`, `tests/cli/commands/test_ci__push_gate_gitflow_resolution.py` (fix-line-posix-bin: expectations through `PLATFORM`) | the files |
 | JB.S8.T10 | AC9.1 | `tests/infrastructure/test_ledger_scripts.py`, `tests/features/certification/test_service.py` (fix-line-posix-bin) | the files |
-| JB.S8.T11 | AC9.1 | `tests/fixtures/stores.py` (`workspace_cli` is deleted once T1–T10 hold no caller) | `git grep -n workspace_cli -- tests` reports 0 hits |
+| JB.S8.T11 | AC9.1 | `tests/fixtures/stores.py` (`workspace_cli` is deleted once T1–T10 hold no caller; `own_venv_workspace` builds through `fake_venv` instead of its own `symlink_to(sys.executable)` — one builder, no symlink privilege on Windows; T5 and T10 needed no change of their own: their Windows exposure is `make_workspace` (T3) and `own_venv_workspace` (this row)) | `git grep -n workspace_cli -- tests` reports 0 hits |
 
 ## Stage JB.S9 — fixes
 
