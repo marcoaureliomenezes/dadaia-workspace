@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-10-07T16:35:58Z",
+  "generated_at": "2026-10-07T16:36:11Z",
   "features": [
     {
       "rank": 1,
@@ -41,7 +41,7 @@
         "dispatch",
         "sdd"
       ],
-      "token_estimate": 813,
+      "token_estimate": 855,
       "depends_on": [
         "agentic-entities",
         "release-lifecycle",

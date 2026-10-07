@@ -18,11 +18,11 @@ The main thread — the operator's own session — coordinates: intake, the gril
 |---|---|
 | `dd-product-engineer` | backlog curation, the SPEC of a candidate (from the main thread's grill handoff, its `Replaces` naming every behaviour the as-is review marks DELETE or REBUILD), product-memory reconciliation at closure |
 | `dd-software-engineer` | the as-is review (read-only, its table returned in the handoff), PLAN and the job files, production code and its tests, inside the task's declared write set |
-| `dd-code-reviewer` | the three-axis review plus six lenses — architecture, security, QA, product, audit, AI surface — read-only and verdict-only |
+| `dd-code-reviewer` | the three-axis review plus six lenses — architecture, security, QA, product, audit, AI surface — verdict-only: its one write is its own verdict, through `dd-handoff-emitter`'s `verdict.py`, never a file the main thread files for it |
 
 - A request outside a persona's scope is answered with a `[SCOPE ERROR]` block naming the owner; the main thread re-dispatches.
 - A definition demand (the as-is review, PLAN, job files) reaches `dd-software-engineer` without a task id; an implementation demand carries its task id from its job file.
-- The unit of dispatch is a job or a task, never a smaller edit: sub-agents work one stage's tasks in parallel, one per task worktree; an edit inside an open job is its driver's own and lands as one of its tasks; each job's `kind: merge` entry counts its `dispatches` ([[release-lifecycle]]).
+- The task is the unit of dispatch, never a job and never a smaller edit: sub-agents work one stage's tasks in parallel, one per task worktree; an edit inside an open job is its driver's own and lands as one of its tasks; each job's `kind: merge` entry counts its `dispatches` ([[release-lifecycle]]).
 - `dd-manager-orchestration` is the main thread's reference: the Input Contract block that opens every dispatch prompt, the decision-authority table, the escalation triggers and the forbidden actions.
 
 ## Behaviour
@@ -33,7 +33,7 @@ The main thread — the operator's own session — coordinates: intake, the gril
 - Work happens inside a job's or a task's worktree; only the main thread opens and merges worktrees, and a sub-agent works only inside the path it was given ([[worktrees]]).
 - Only the operator accepts a decision: no role agent writes `accepted` or `ruling` in an ADR record ([[audits-canon]]).
 - Concurrent sessions are allowed and never locked: no agent acquires, holds or releases a lock; races surface through git.
-- The reviewer's `APPROVED` is required at each job merge — once per job, never per task — and before a candidate's PR; a `REJECTED` blocks the merge, push, PR, deploy, closure and memory updates, and every verdict states the bug-surface delta from the bug ledger ([[QUALITY]]).
+- The reviewer writes its own verdict (`verdict.py`) and the main thread never writes one; its `APPROVED` is required at each job merge — once per job, never per task — and before a candidate's PR; a `REJECTED` blocks the merge, push, PR, deploy, closure and memory updates, and every verdict states the bug-surface delta from the bug ledger ([[QUALITY]]).
 - The reviewer's spec axis confronts PLAN §1's As-is verdicts with the diff: a DELETE or REBUILD unit left unchanged is HIGH, a KEEP unit that grew is a finding ([[release-lifecycle]]).
 - A merge further requires CI green and a `dd-code-reviewer` APPROVED verdict, security lens included, on the PR head ([[sdd-gate-v3]]).
 
