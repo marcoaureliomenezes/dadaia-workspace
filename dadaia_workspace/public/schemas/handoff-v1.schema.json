@@ -48,6 +48,16 @@
       "type": "string",
       "description": "Scope descriptor for the handoff (e.g. file path, module, component)."
     },
+    "reviewed_sha": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{40}$",
+      "description": "The commit a verdict judged; written only by the emitter's verdict.py."
+    },
+    "diff_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$",
+      "description": "The hash of the diff a verdict judged, from worktree.py hash; written only by verdict.py."
+    },
     "metrics": {
       "type": "object",
       "description": "Key quantitative metrics for this handoff (e.g. token counts, file counts).",

@@ -41,7 +41,7 @@ def _workspace(tmp_path: Path) -> tuple[Path, Path, str]:
     assert (PKG / "public/skills" / SKILL / "scripts/verdict.py").is_file(), "verdict.py is absent"
     (root := tmp_path / "ws").mkdir()
     make_workspace(root)
-    for skill in (SKILL, "dd-gitflow-default"):
+    for skill in (SKILL, "dd-gitflow-default", "dd-bug-resolution", "dd-release-implementation"):
         stage_skill_scripts(skill, root / ".agents/skills" / skill / "scripts")
     git(root / "repos/r", "checkout", "-q", "feature/0.5.0")
     assert run(root, "new", "r", "0.5.0-rc1/define").returncode == 0
@@ -83,7 +83,6 @@ def _written(root: Path) -> list[Path]:
     return sorted((root / ".dadaia/handoff").glob("**/*.handoff.json"))
 
 
-@pytest.mark.xfail(strict=True, raises=AssertionError, reason=RED)
 def test_a_verdict_binds_the_head_it_judged_and_the_merge_lands_on_it(tmp_path: Path) -> None:
     root, tree, head = _workspace(tmp_path)
     done = _verdict(root, tree, sha=head)
@@ -105,7 +104,6 @@ def test_a_verdict_binds_the_head_it_judged_and_the_merge_lands_on_it(tmp_path: 
     assert landed.returncode == 0, landed.stderr
 
 
-@pytest.mark.xfail(strict=True, raises=AssertionError, reason=RED)
 def test_a_verdict_for_a_sha_a_later_commit_left_behind_is_refused_by_the_merge(
     tmp_path: Path,
 ) -> None:
@@ -121,7 +119,6 @@ _CASES = [(f'{{"{k}": "x"}}', k) for k in RESERVED] + [
 ]  # fmt: skip
 
 
-@pytest.mark.xfail(strict=True, raises=AssertionError, reason=RED)
 @pytest.mark.parametrize(("stdin", "why"), _CASES, ids=[w for _, w in _CASES])
 def test_a_bad_stdin_is_refused_and_writes_nothing(tmp_path: Path, stdin: str, why: str) -> None:
     root, tree, head = _workspace(tmp_path)
@@ -130,20 +127,22 @@ def test_a_bad_stdin_is_refused_and_writes_nothing(tmp_path: Path, stdin: str, w
     assert _written(root) == []
 
 
-@pytest.mark.xfail(strict=True, raises=AssertionError, reason=RED)
 def test_a_path_that_is_no_worktree_is_refused_with_the_hash_verbs_own_words(
     tmp_path: Path,
 ) -> None:
     root, tree, head = _workspace(tmp_path)
     (plain := tmp_path / "plain").mkdir()
-    own = run(root, "hash", str(plain), "--sha", head)
+    staged = (
+        root / ".agents/skills/dd-gitflow-default/scripts/worktree.py"
+    )  # its fix line names itself
+    hash_cmd = [sys.executable, str(staged), "hash", str(plain), "--sha", head]
+    own = subprocess.run(hash_cmd, cwd=root, capture_output=True, text=True, env={"PATH": os.environ["PATH"], "HOME": str(root)})  # fmt: skip
     assert own.returncode != 0 and own.stderr
     refused = _verdict(root, plain, sha=head)
     assert refused.returncode == own.returncode and refused.stderr == own.stderr
     assert _written(root) == []
 
 
-@pytest.mark.xfail(strict=True, raises=AssertionError, reason=RED)
 def test_an_unknown_sha_is_refused_with_the_hash_verbs_own_words(tmp_path: Path) -> None:
     root, tree, head = _workspace(tmp_path)
     own = run(root, "hash", str(tree), "--sha", "0" * 40)
@@ -153,7 +152,6 @@ def test_an_unknown_sha_is_refused_with_the_hash_verbs_own_words(tmp_path: Path)
     assert _written(root) == []
 
 
-@pytest.mark.xfail(strict=True, raises=AssertionError, reason=RED)
 def test_a_slug_that_climbs_out_is_refused_and_writes_nothing(tmp_path: Path) -> None:
     root, tree, head = _workspace(tmp_path)
     refused = _verdict(root, tree, sha=head, slug="../x")

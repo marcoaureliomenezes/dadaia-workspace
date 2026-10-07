@@ -28,6 +28,10 @@ completed agent task; the HTML report is the exception, not the rule.
 6. Write `.dadaia/handoff/<context>/<YYYY-MM-DDTHHMMSSZ>-<agent>-<slug>.handoff.json`
    (2-space indent) and run `.dadaia/.venv/bin/dadaia reports validate <path>` — fix any non-zero exit
    before moving on.
+7. A reviewer verdict is written only by `scripts/verdict.py <worktree> --sha <sha> --context <ctx>
+   --slug <slug> --verdict APPROVED|REJECTED --reason "<line>"`, the rest of the body as one JSON
+   object on stdin; it binds the verdict to the diff it judged. Then run `reports validate` on the
+   path it prints.
 
 **Done when** the handoff file exists at that exact path shape, `dadaia reports
 validate` exits 0, and (report mode) `artifact.content_hash` matches the file on disk.
@@ -38,8 +42,8 @@ After reading and acting on a coordination handoff addressed to you:
 
 1. Resolve its real target path; act only on a path inside `.dadaia/`, and never
    follow a symlinked directory.
-2. Delete only that one consumed handoff file; every other handoff expires one day
-   after its mtime and `.dadaia/.venv/bin/dadaia doctor` reaps it, `artifact.path` or not.
+2. Delete only that one consumed handoff file; every other handoff is reaped on the
+   schedule in `.dadaia/AGENTS.md`'s zone table.
 
 **Done when** the consumed coordination handoff is gone and every other handoff still
 validates.
