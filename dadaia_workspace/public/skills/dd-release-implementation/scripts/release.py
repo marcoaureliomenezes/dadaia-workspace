@@ -110,7 +110,7 @@ def _ship(args: argparse.Namespace, specs: Path) -> int:
     live, ts = live_release(specs), utc_now()
     if not (SHA_RE.match(args.sha) and (args.pr is None or args.pr.isdigit() and int(args.pr) > 0)):
         sha = args.sha if SHA_RE.match(args.sha) else "$(git rev-parse --short HEAD)"
-        raise choice(Refusal(f"--sha {args.sha!r} / --pr {args.pr!r}: a hex sha and a PR number",
+        raise choice(Refusal(f"--sha {args.sha!r} / --pr {args.pr!r}: a hex sha and, if given, a PR number",
                              f"{SCRIPT} ship --sha {sha}"), SHIP_PR)  # fmt: skip
     if found := ship_findings(specs):
         raise Refusal(found[0]["message"], found[0]["fix"])

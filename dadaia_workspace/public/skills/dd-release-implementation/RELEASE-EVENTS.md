@@ -26,7 +26,7 @@ Disclosed reference reached from `SKILL.md`/`RC-FLOW.md` wherever the arc says "
 | `phase` + `defined` | `python3 .agents/skills/dd-release-implementation/scripts/release.py phase IMPLEMENTATION --sha <sha>` | phase string, `{sha, ts}` |
 | `phase` + `implemented` | `python3 .agents/skills/dd-release-implementation/scripts/release.py phase CLOSURE --sha <sha>` | phase string, `{sha, ts}` |
 | `phase: DEFINITION` | `python3 .agents/skills/dd-release-implementation/scripts/release.py new <id>` | phase string |
-| `shipped`, then the directory moves to `_archive/<v>/` | `python3 .agents/skills/dd-release-implementation/scripts/release.py ship --sha <sha> --pr <n>`, refused on any `check` error | `{sha, pr, ts}` (`check` verifies it from 0.5.0 on) + one `delivered` histo line, `summary` null |
+| `shipped`, then the directory moves to `_archive/<v>/` | `python3 .agents/skills/dd-release-implementation/scripts/release.py ship --sha <sha>`, refused on any `check` error | `{sha, pr, ts}` (`check` verifies it from 0.5.0 on) + one `delivered` histo line, `summary` null |
 
 
 ## `log` — the closure narrative's home

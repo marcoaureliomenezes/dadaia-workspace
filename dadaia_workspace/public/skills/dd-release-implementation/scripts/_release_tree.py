@@ -379,7 +379,7 @@ def tree_findings(specs: Path) -> list[dict[str, Any]]:
                 and "pr" in shipped and isinstance(shipped["pr"], int | None)):  # fmt: skip
             findings.append(finding(rel, 1, "archived release carries no shipped {sha, pr}",
                                     f"Operator action: {act}object whose shipped names the "
-                                    "merged promote PR's sha and number"))  # fmt: skip
+                                    "merged promote PR's sha"))  # fmt: skip
     return findings
 
 
