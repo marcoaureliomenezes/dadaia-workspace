@@ -17,7 +17,7 @@ Memory is current product truth: what the product is now, never how it got there
 ## 2. Canonical memory
 
 - `ARCHITECTURE.md`: `## Principles`, `## Tech Stack`, `## Structure`. `QUALITY.md`: `## Principles`, `## Test architecture`, `## Gates`, `## Bugs`. Fixed `<!-- dadaia:fixed … -->` blocks keep their place.
-- `QUALITY.md`'s `## Bugs` holds one generated fenced `text` block, then the written review: `python3 .agents/skills/dd-bug-resolution/scripts/bugs.py balance --write` regenerates the block from `BUGS.jsonl` alone, surfaces `.gitattributes` marks `dadaia-dev-tooling` print apart, and `release.py check` warns of a stale block in CLOSURE only, never refusing.
+- `QUALITY.md`'s `## Bugs` holds one generated fenced `text` block, then the written review: `python3 .agents/skills/dd-bug-resolution/scripts/bugs.py balance --write` regenerates the block from `BUGS.jsonl` alone, surfaces `.gitattributes` marks `dadaia-dev-tooling` print apart, and `release.py check` refuses a stale block in CLOSURE only.
 - `## Tech Stack` is one line per technology, 8 to 15 lines — a soft ceiling a large stack may exceed, never with prose.
 - A principle needs an existing mechanical check that fails when violated: `### P-NN · We …` / `Measured by:` (a doctor code, contract test, lint contract or CI job) / `ADR: NNNN (proposed|accepted) | none` / `Rationale:` one line. An unmeasurable rule is a proposed ADR, not a principle.
 - Moving or deleting a statement is recorded row by row in the reviewer's coverage table: old section -> new home, or `deleted: <reason>`.

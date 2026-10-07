@@ -59,7 +59,7 @@ def new(root: Path, repo_name: str, name: str) -> Path:
                 f"a job needs an Approved rc-{rc}/SPEC.md on {work}",
                 f"{script(SCRIPT)} new {quote(flow['main'])} {match['rc']}/define",
             )
-    if match["bug"]:  # a block-list hotfix: no rc SPEC, only its open bug (ADR 0206)
+    if match["bug"]:  # a block-list hotfix: no rc SPEC, only its open bug
         _refuse_unopened_bug(root / "repos" / flow["main"], work, match["bug"])
     start = base(name, work)
     if match["task"]:  # cut from its job branch; at most TASK_CAP open per rc

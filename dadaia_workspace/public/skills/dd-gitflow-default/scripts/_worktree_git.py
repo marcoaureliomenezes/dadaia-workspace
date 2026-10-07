@@ -38,7 +38,8 @@ def git(repo: Path, *args: str, check: bool = True, input: str | None = None) ->
 
 def find_root() -> Path:
     """The workspace above the cwd, else above this script (it is projected inside one)."""
-    if root := workspace_root(Path.cwd().resolve(), Path(__file__).resolve().parent):
+    root: Path | None = workspace_root(Path.cwd().resolve(), Path(__file__).resolve().parent)
+    if root:
         return root
     raise Refusal("no workspace root above the cwd or this script", "uvx dadaia-workspace init")
 
