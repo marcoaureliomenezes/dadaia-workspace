@@ -80,3 +80,73 @@ Related: [[ARCHITECTURE]]
 - Pruning is a `dd-code-reviewer` verdict executed by `dd-software-engineer`; a deletion cites its criterion and its replacement `file:line`.
 - Detection: `dd-code-review` SLOP.md S3.
 <!-- /dadaia:fixed slop-tests -->
+
+## Bugs
+
+```text
+Bug balance from BUGS.jsonl: 893 records (861 live, 32 archived).
+surface                                            records  recurrences  fix-induced  archived  rcs  correlates  settled
+.github/dependabot.yml                             1        0            0            0         0    0           yes
+.github/workflows/release.yml                      1        0            0            0         0    0           yes
+backlog                                            22       21           3            1         0    0           no
+bugs                                               21       20           6            0         2    1           no
+certification                                      7        6            2            0         0    0           no
+chokepoints                                        27       26           11           1         1    2           no
+ci                                                 1        0            0            0         0    0           no
+ci_preflight                                       14       13           0            2         0    0           no
+cli                                                27       26           8            0         0    0           no
+core                                               28       27           4            0         0    0           no
+dadaia context dead                                1        0            1            0         0    0           no
+dadaia doctor --fix                                1        0            0            0         0    0           yes
+dadaia specs init / doctor TREE-1,TREE-2 messages  1        0            0            0         0    0           yes
+dadaia_workspace                                   72       71           36           0         5    26          no
+dd-bug-resolution                                  1        0            1            0         1    4           no
+docs                                               1        0            0            0         0    0           yes
+doctor                                             3        2            2            0         0    0           no
+features                                           6        5            2            0         0    0           no
+hooks                                              27       26           4            2         0    0           no
+import_                                            1        0            1            0         0    0           yes
+infrastructure                                     33       32           9            0         1    2           no
+migrate                                            4        3            0            0         0    0           no
+onboarding                                         1        0            1            0         0    0           no
+panel                                              6        5            1            3         0    0           yes
+public                                             27       26           10           0         2    3           no
+public-assets                                      28       27           2            0         0    0           no
+reconcile                                          3        2            0            0         0    0           no
+release-ledger                                     3        2            2            0         0    0           no
+reports                                            3        2            1            0         0    0           yes
+repos                                              1        0            0            0         0    0           yes
+schemas                                            1        0            0            0         1    1           no
+sdd                                                1        0            0            0         0    0           no
+shipped text (CONTEXT.md, docs/, public/)          1        0            1            0         0    0           no
+skills                                             3        2            2            0         1    0           no
+spec_context                                       74       73           18           7         1    2           no
+specs                                              60       59           7            0         1    0           no
+specs-doctor                                       1        0            0            0         0    0           no
+telemetry                                          1        0            0            0         0    0           yes
+unknown                                            268      -            32           16        0    0           -
+workspace                                          13       12           1            0         0    0           no
+dev-tooling:
+.github                                            3        2            0            0         3    2           no
+scripts                                            5        4            1            0         3    4           no
+tests                                              90       89           33           0         4    14          no
+Laplace trend (days), window 0.4.5..0.5.0, T = 40 days: u = 14.48, diverging
+  counted 376 of 893 records; apart: 452 release unknown, 65 no found_in, 0 outside the window
+  records found on an already settled surface: 6
+Defective-fix rate per rc (caused_by set over found in the rc):
+0.5.0/rc-6  2/8  25%
+0.5.0/rc-7  6/23  26%
+0.5.0/rc-8  20/26  76%
+0.5.0/rc-9  4/7  57%
+0.5.0/rc-10  32/51  62%
+```
+
+
+The review below is rewritten at every closure, never appended; the block above is `bugs.py balance --write` and nothing else.
+
+- **The rc-10 window.** 51 bugs were found in 0.5.0/rc-10 and all 51 are resolved (`bugs.py status`: 0 open). 32 of them carry a `caused_by` (the block's 62% defective-fix rate; rc-8 was 76%, rc-9 57%, rc-7 26%, rc-6 25%), 19 carry `none`. The Laplace trend over the 0.4.5..0.5.0 window reads `diverging` (u = 14.48): the ledger still grows faster than it settles, and 6 records landed on an already settled surface.
+- **Standing cause 1 — one platform seam skipped.** `J7.S2.T2` is the culprit of 8 rc-10 records, all Windows-only test or fixture bugs (a POSIX `bin/` path, a bare `python`, a `bash` spawn, a read-only `.git` rmtree). Verdict: the fixes are KEEP; the structure is `core/platform.py` as the one home of platform facts, and a test reaching past it is the defect.
+- **Standing cause 2 — the merge gate and the worktree verbs.** `J1.S3.T1` is the culprit of 4 records (worktree removal leaving its parent and remote branch, a job merge accepting any CI run URL, a job merge requiring a remote CI run, a rebase laundering the stray check) and `J1.S2.T1` of 2 more (task fix lineage, rebase orphaning fix links cited by sha). The records show the chain: each gate fix left a second reader of the same fact. Verdict: REBUILD on any further hit; the judged party must never be able to supply its own evidence.
+- **Standing cause 3 — a closed id grammar.** `freeze-reads-only-numbered-job-ids` and `bugs-check-reads-no-jb-task-ids` are one family: a task id reader written for `J<n>` and later widened one prefix at a time. Verdict: one id grammar, read in one place.
+- **Lessons.** A bug fixed at the caller it was caught in breeds the next caller's bug; a measurement with its own exclusion breeds the next measurement's bug; a cached derived fact breeds a bug per environment that derives it differently. Each family ended only by a deletion-shaped fix. Read the ledger before every fix and rebuild a unit with two prior fixes; every review verdict states the bug-surface delta from `bugs.py stats` (`direction:` counts 118 net-positive, 62 net-neutral, 132 net-negative over the resolved records).
+- **Evals.** The first eval run (https://github.com/marcoaureliomenezes/dadaia-workspace/actions/runs/37629005413) ended BLOCK: `t1-cold-onboarding` 3/3 against 3/3, `t2-block-list-bug` 3/3 baseline against 0/3 candidate, because the feature branch lacked the bug batch's `hotfix/<bug-id>` tree (JB.S4.T1). A rerun on `feature/0.5.0` with the bug batch merged is pending as run 37652269562; its verdict is appended when it ends.

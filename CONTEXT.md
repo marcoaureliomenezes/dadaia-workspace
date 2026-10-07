@@ -339,6 +339,26 @@ _Avoid_: fix (bare)
 The records an rc's first SPEC reviews in `## Bug window review`: `found_in` or `introduced_in` in the live release or the previous published one (`bugs.py window`); it judges the previous rc's fixes, never an open bug.
 _Avoid_: wave, pile, cause group (retired)
 
+**Fix surface**:
+The production lines a fix commit wrote. A settled fix surface survived 2 rcs untouched by another fix or REBUILD.
+_Avoid_: fix footprint
+
+**Rework**:
+A later commit whose diff overlaps a fix surface: a `refactor(…): REBUILD` is planned; a `fix(bugs)` of another bug is overfitting evidence.
+_Avoid_: regression (bare)
+
+**Settled ledger surface**:
+A ledger `surface` (a directory) whose every record left the bug window with no later record on it.
+_Avoid_: closed surface
+
+**Convergence readout**:
+A number `## Bugs` prints at each closure, blocking nothing.
+_Avoid_: gate, threshold
+
+**RED anchor**:
+The sha closing a job's RED stage; after it the job's tests are frozen.
+_Avoid_: red tag
+
 **Implement**:
 One rc's run, a DAG of jobs; not a file.
 

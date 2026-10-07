@@ -13,7 +13,8 @@ the price of the previous fix.
 
 ## Measuring the ledger
 
-<!-- derived-from: bug-ledger sha256:c4e8fd6ee96c -->
+<!-- derived-from: QUALITY sha256:305fe38f52fa -->
+
 
 The numbers are never copied into a page; the ledger's own verbs measure them.
 
@@ -32,18 +33,19 @@ agreement.
 ## Lesson 1 — a per-caller fix breeds the next caller's bug
 
 <!-- derived-from: context-management sha256:e084ff04890d -->
-<!-- derived-from: bug-ledger sha256:c4e8fd6ee96c -->
 
 When a guard lives at the caller that was just caught, the next caller without it is
 the next bug in the family, and each such fix is `net-positive`: it grows the feature.
 The structure that ends the family is one guarded seam every writer delegates to. The
 context registry is the example: a repo slug belongs to one context, and `create`,
 `repo add` and `.dadaia/.venv/bin/dadaia import` pass one ownership check; `INV-6` reports any
-multi-owner slug already on disk.
+multi-owner slug already on disk. The rc-10 window repeats the shape on the merge gate and
+the worktree verbs: each gate fix left a second reader of the same fact, until one reader
+owned it.
 
 ## Lesson 2 — a per-measurement exclusion breeds the next measurement's bug
 
-<!-- derived-from: QUALITY sha256:4432646f5a7a -->
+<!-- derived-from: QUALITY sha256:305fe38f52fa -->
 
 When each measurement walks the tree itself and is fixed by its own special-case
 exclusion, the next measurement counts the same stray files. The structure that ends
@@ -54,8 +56,7 @@ to remember to extend.
 
 ## Lesson 3 — a derived cache breeds a bug per environment that derives it
 
-<!-- derived-from: bug-ledger sha256:c4e8fd6ee96c -->
-<!-- derived-from: QUALITY sha256:4432646f5a7a -->
+<!-- derived-from: QUALITY sha256:305fe38f52fa -->
 
 A record that caches a fact git already knows is wrong in every environment that
 derives it differently — a shallow checkout first among them. The structure that ends
@@ -64,7 +65,7 @@ history is that line's change log. No CI job fetches history for a bug record's 
 
 ## The standing order the lessons produced
 
-<!-- derived-from: QUALITY sha256:4432646f5a7a -->
+<!-- derived-from: QUALITY sha256:305fe38f52fa -->
 <!-- derived-from: bug-ledger sha256:c4e8fd6ee96c -->
 
 The workspace is in a permanent state of architecture review, oriented by its bug
