@@ -248,7 +248,8 @@ jobs:
         run: poetry run pytest -q -m "($SELECT) and not quarantine" -n auto --cov=dadaia_workspace --cov-report=term-missing tests --durations=25
       - name: the windows-integration-coverage-gap cases
         shell: bash
-        run: poetry run pytest -q -m "windows and not quarantine" -v tests
+        # exit 5 is "no case selected": a quarantined case leaves the selection
+        run: poetry run pytest -q -m "windows and not quarantine" -v tests || [ $? -eq 5 ]
 
   integration:
     name: Integration (pytest)
