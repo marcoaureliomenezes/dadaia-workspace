@@ -19,6 +19,7 @@ import pytest
 from typer.testing import CliRunner
 
 from dadaia_workspace.cli.main import app
+from tests.fixtures.harness_env import run_bash
 
 _REPO = Path(__file__).resolve().parents[3]
 _UNSET = ("DADAIA_CONTEXT", "DADAIA_SESSION_ID", "CLAUDE_CODE_SESSION_ID")
@@ -57,9 +58,7 @@ def _parse(stdout: str, scope: tuple[str, ...]) -> list[dict[str, str]]:
 def _run_from_elsewhere(root: Path, fix: str) -> None:
     elsewhere = root / "repos" / "alpha"  # WP-17 #S2: a fix runs from any cwd
     elsewhere.mkdir(parents=True, exist_ok=True)
-    ran = subprocess.run(
-        ["bash", "-c", fix], cwd=elsewhere, env=_env(), capture_output=True, text=True
-    )  # noqa: S603, S607
+    ran = run_bash(fix, cwd=elsewhere, env=_env())
     assert ran.returncode == 0, ran.stdout + ran.stderr
 
 
