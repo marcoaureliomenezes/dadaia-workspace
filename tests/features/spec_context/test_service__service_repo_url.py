@@ -27,7 +27,7 @@ from dadaia_workspace.core.models.spec_context import (  # noqa: E402
 from dadaia_workspace.features.spec_context.service import SpecContextService  # noqa: E402
 from dadaia_workspace.infrastructure.git_subprocess import GitSubprocessClient  # noqa: E402
 from dadaia_workspace.infrastructure.json_context_store import JsonContextStore
-from tests.fakes import register_dead  # noqa: E402
+from tests.fakes import no_worktree_rows, register_dead  # noqa: E402
 from tests.fixtures.real_git import clone, git, seeded_remote
 from tests.fixtures.stores import context_store
 
@@ -53,6 +53,7 @@ def fake_service(store: JsonContextStore, workspace_root: Path) -> SpecContextSe
         workspace_root=workspace_root,
         install_hooks=lambda _repo: None,
         secret_scan=scan_publish_candidates,
+        worktree_rows=no_worktree_rows,
     )
 
 

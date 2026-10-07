@@ -17,7 +17,7 @@ from dadaia_workspace.core.models.spec_context import ContextState
 from dadaia_workspace.features.spec_context.service import SpecContextService
 from dadaia_workspace.infrastructure.git_subprocess import GitSubprocessClient
 from dadaia_workspace.infrastructure.json_context_store import JsonContextStore
-from tests.fakes import register_dead
+from tests.fakes import no_worktree_rows, register_dead
 from tests.fixtures.real_git import git, seeded_remote
 from tests.fixtures.stores import context_store
 from tests.helpers.privacy_fixtures import aws_key_shape
@@ -52,6 +52,7 @@ def service(
         workspace_root=workspace_root,
         install_hooks=lambda _repo: None,
         secret_scan=scan_publish_candidates,
+        worktree_rows=no_worktree_rows,
     )
 
 

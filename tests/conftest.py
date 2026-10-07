@@ -404,18 +404,6 @@ def _hermetic_cwd(
 
 
 @pytest.fixture(autouse=True)
-def _no_open_worktree(request: pytest.FixtureRequest, monkeypatch: pytest.MonkeyPatch) -> None:
-    """A test that reaches no process seam: ``dead()`` and the doctor read no ``worktree.py``
-    rows here (bug unit-tests-spawn-the-worktree-script-through-a-cli-stub)."""
-    if _reaches(request.node, frozenset(_PROCESS_MODULES)):
-        return
-    from dadaia_workspace.features.spec_context import doctor, service
-
-    for owner in (service, doctor):
-        monkeypatch.setattr(owner, "worktree_rows", lambda _root: ([], "", ""))
-
-
-@pytest.fixture(autouse=True)
 def _repo_root_write_guard() -> object:
     """Assert no new files appear in protected lib-repo paths during a test.
 

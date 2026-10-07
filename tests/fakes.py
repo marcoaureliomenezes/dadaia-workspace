@@ -3,6 +3,7 @@
 from pathlib import Path
 from typing import Any
 
+from dadaia_workspace import container
 from dadaia_workspace.core.models.doctor_report import DoctorLine, DoctorStatus
 
 
@@ -109,3 +110,13 @@ def gate_fixes() -> Any:
 def no_worktree_rows(_root: Path) -> tuple[list[dict[str, Any]], str, str]:
     """The owner's rows with no open worktree: no process is spawned to read them."""
     return [], "", ""
+
+
+class NoWorktreeContainer:
+    """``dadaia_workspace.container`` whose spec-context service reads no worktree rows."""
+
+    def build_spec_context_service(self, workspace_root: Path) -> Any:
+        return container.build_spec_context_service(workspace_root, rows=no_worktree_rows)
+
+    def build_git_client(self) -> Any:
+        return container.build_git_client()

@@ -5,14 +5,14 @@ from pathlib import Path
 import pytest
 from typer.testing import CliRunner
 
+from dadaia_workspace.cli.commands import context as context_cmd
 from dadaia_workspace.cli.main import app
 from dadaia_workspace.core.harness_registry import L1_ENTRY_HARNESSES
-from dadaia_workspace.features.spec_context import service
 from dadaia_workspace.features.workspace.service import WorkspaceService
 from dadaia_workspace.infrastructure.git_subprocess import GitSubprocessClient
 from dadaia_workspace.infrastructure.public_assets import FileSystemPublicAssetManager
 from dadaia_workspace.infrastructure.python_env import VenvPythonEnvironmentManager
-from tests.fakes import seed_dead_context
+from tests.fakes import NoWorktreeContainer, seed_dead_context
 from tests.fixtures.stores import workspace_cli
 
 _runner = CliRunner()
@@ -347,7 +347,7 @@ def test_context_dead_surfaces_the_refused_push_with_its_fix_line(
     hook.write_text("#!/bin/sh\necho 'fix: git checkout -b feature/0.1.0' >&2\nexit 1\n")
     hook.chmod(0o755)
     _register_alive_ctx(workspace, "refused")
-    monkeypatch.setattr(service, "worktree_rows", lambda _root: ([], "", ""))  # no process
+    monkeypatch.setattr(context_cmd, "container", NoWorktreeContainer())
 
     result = _runner.invoke(app, ["context", "dead", "refused"])
 
