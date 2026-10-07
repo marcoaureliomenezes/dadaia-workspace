@@ -21,6 +21,7 @@ from pathlib import Path
 import pytest
 
 from dadaia_workspace.core.cli_line import git_line, shell_line
+from dadaia_workspace.infrastructure.ledger_scripts import _PACKAGE_SKILLS, load_owner
 from tests.fixtures.harness_env import run_bash, run_python, suite_env
 from tests.helpers.release_state import write_release_phase
 from tests.helpers.skill_scripts import stage_skill_scripts
@@ -647,3 +648,16 @@ def test_a_code_task_names_its_owner_tests_by_any_convention(root: Path) -> None
     landed = run(root, "merge", f"worktrees/r/{TASK}")
     assert landed.returncode == 0, landed.stderr
     assert "ci task src/b.py tests/b_test.py" in landed.stdout.splitlines()
+
+
+@pytest.mark.xfail(strict=True, raises=AssertionError, reason="onboarding-writes-no-tests-line")
+def test_a_tests_line_after_a_utf8_bom_is_declared(tmp_path: Path) -> None:
+    """onboarding-writes-no-tests-line: a BOM before the first line does not hide `tests:`."""
+    sys.path.insert(0, str(_PACKAGE_SKILLS / "dd-gitflow-default" / "scripts"))
+    end = load_owner("dd-gitflow-default", "_worktree_end")
+    git(tmp_path, "init", "-q", "-b", "work")
+    (tmp_path / "AGENTS.md").write_bytes(b"\xef\xbb\xbftests: x/**\n")
+    git(tmp_path, "add", "AGENTS.md")
+    git(tmp_path, "commit", "-q", "-m", "law")
+
+    assert end._declared(tmp_path, "work", "tests:") == "x/**"

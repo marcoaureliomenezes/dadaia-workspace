@@ -5,6 +5,7 @@ only when confirmed — never committing. Size: MEDIUM (real git repo on disk)."
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 import sys
 from collections.abc import Callable
@@ -16,6 +17,7 @@ from typer.testing import CliRunner
 from dadaia_workspace.cli._specs_resolution import HARNESS_SESSION_ID_ENV_VARS
 from dadaia_workspace.cli.main import app
 from dadaia_workspace.core import gitflow, specs_version
+from dadaia_workspace.core.platform import PLATFORM
 from dadaia_workspace.features.specs import SpecsDoctor, canon
 
 _PUBLIC = Path(__file__).resolve().parents[3] / "dadaia_workspace" / "public"
@@ -296,3 +298,26 @@ def test_specs_init_declares_a_tests_line_in_a_law_that_lacks_one(repo: Path) ->
     ]
     assert len(values) == 1
     assert values[0] != ""
+
+
+@pytest.mark.xfail(strict=True, raises=AssertionError, reason="onboarding-writes-no-tests-line")
+def test_specs_init_with_an_unreadable_law_finishes_onboarding_and_a_rerun_declares(
+    repo: Path,
+) -> None:
+    """onboarding-writes-no-tests-line: an unreadable AGENTS.md never stops `specs init`; once
+    readable, the next run declares the `tests:` line."""
+    if PLATFORM.windows or os.geteuid() == 0:
+        pytest.skip("needs POSIX file modes and a non-root user")
+    law = repo / "AGENTS.md"
+    law.write_text("# ours\n", encoding="utf-8")
+    law.chmod(0)
+    try:
+        first = _runner.invoke(app, ["specs", "init", "--context", "c"])
+    finally:
+        law.chmod(0o644)
+
+    assert first.exit_code == 0, first.output
+    assert gitflow.read_gitflow(repo / "specs")[1] is None
+    assert (repo / "specs" / "constitution.md").is_file()
+    assert _runner.invoke(app, ["specs", "init", "--context", "c"]).exit_code == 0
+    assert any(ln.startswith("tests:") for ln in law.read_text(encoding="utf-8").splitlines())
