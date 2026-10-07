@@ -79,10 +79,8 @@ def test_git_bash_on_windows_without_git_refuses(
 
 @pytest.mark.medium
 def test_run_bash_runs_the_command(monkeypatch: pytest.MonkeyPatch) -> None:
-    from dadaia_workspace.core.platform import Capabilities
     from tests.fixtures.harness_env import run_bash
 
-    monkeypatch.setattr("dadaia_workspace.core.platform.PLATFORM", Capabilities.detect("linux"))
     assert run_bash("echo hi").stdout.strip() == "hi"
 
 
