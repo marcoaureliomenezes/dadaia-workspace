@@ -1257,6 +1257,12 @@
       "agent": "dd-software-engineer",
       "kind": "note",
       "text": "J9.S4.T2 first eval run — https://github.com/marcoaureliomenezes/dadaia-workspace/actions/runs/37629005413 ref feature/0.5.0 @ 25498eea7, workflow_dispatch, baseline 0.4.7, Claude Code 2.1.284 wall 2026-10-07T13:30:18Z → 13:53:46Z (23.5 min); 6 trials per side tokens: base in 5,922,829 / out 41,523; candidate in 9,739,065 / out 97,011 verdict: BLOCK. t1-cold-onboarding 3/3 vs 3/3 (readout); t2-block-list-bug 3/3 vs 0/3 (BLOCK: drop) cause (trajectory): candidate gate refuses direct writes under repos/demo/ (ADR 0105) and `worktree.py new` had no tree kind outside an rc → Stall. The fix is JB.S4.T1 (152f6cd2c, `hotfix/<bug-id>`, ADR 0206/0215), on the bug batch, not yet on feature at 25498eea7. next: rerun eval on feature/0.5.0 after the bug batch merges; a red there is a bug."
+    },
+    {
+      "ts": "2026-10-07T19:55:11Z",
+      "agent": "dd-product-engineer",
+      "kind": "note",
+      "text": "J9.S4.T2 eval rerun — https://github.com/marcoaureliomenezes/dadaia-workspace/actions/runs/37673898303 ref feature/0.5.0 @ 7326a198e, workflow_dispatch, baseline 0.4.7, wall 2026-10-07T19:21:43Z → 19:52:07Z (30.4 min), conclusion success. Summary: t1-cold-onboarding 0.4.7 3/3 (3 found), candidate 3/3 (3 found), readout; t2-block-list-bug 0.4.7 3/3, candidate 3/3, readout. Verdict: non-blocking (AC11.6). The first run (37652269562 @ 4ec4bcea6, t2 candidate 0/3 vs 3/3, BLOCK) was caused by bug onboarding-writes-no-tests-line (ADR 0216's onboarding half unbuilt), resolved by JR.S7.T1 (881058a63)."
     }
   ]
 }
