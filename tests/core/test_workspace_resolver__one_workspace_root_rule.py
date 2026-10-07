@@ -35,6 +35,7 @@ def test_no_package_module_reads_workspace_root_from_the_environment() -> None:
     assert reads == []
 
 
+@pytest.mark.medium
 def test_workspace_root_in_the_hook_env_never_opens_a_protected_write(tmp_path: Path) -> None:
     """sa-seven-workspace-root-rules#S2 and #S3 — WORKSPACE_ROOT elsewhere: the gate still BLOCKs."""
     ws = _workspace(tmp_path / "ws")
