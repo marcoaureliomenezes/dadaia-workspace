@@ -91,6 +91,8 @@ Paths are relative to the repo root; aliases as in `PLAN.md` (`f/`, `pub/`, `S/`
 |---|---|---|---|
 | JB.S6.T1 | AC9.1 | `dadaia_workspace/public/skills/dd-gitflow-default/scripts/_worktree_new.py`, `dadaia_workspace/public/skills/dd-gitflow-default/scripts/_worktree_git.py`, `dadaia_workspace/public/skills/dd-release-implementation/scripts/_release_new.py`, `dadaia_workspace/public/scaffold/memory/AGENTS.md` (the line is back to its published bytes), `scripts/guards/slop.py` (one allowance row) | `test_worktree_removal.py` |
 | JB.S6.T2 | — | `dadaia_workspace/public/entities/behavior-map.json` (skill and scripts hashes after the repairs) | `test_behavior_map.py` |
+| JB.S6.T3 | — | `dadaia_workspace/features/spec_context/doctor.py` (the import block ruff I001 refuses after the rebase; order only, no line changes meaning) | `ruff check`, `tests/features/spec_context/test_doctor.py` |
+| JB.S6.T4 | AC9.1 | `tests/infrastructure/test_privacy_check.py` (public-law-teaches-the-private-pipeline: the strict-xfail marker line leaves, because Job 6 already cleaned the law; it XPASSes strict at 7b95b4b30) | the guard, green |
 
 ## The redo and the open bugs — stages JB.S7 to JB.S11
 
@@ -101,11 +103,11 @@ Paths are relative to the repo root; aliases as in `PLAN.md` (`f/`, `pub/`, `S/`
 - The Windows legs run the same selection as Linux. Every test that is red on Windows today (runs 37543869150, 37546529916) passes there for real: no skip, no quarantine, no marker, no exit-5 escape.
 - Barriers: JB.S8 calls the helpers that JB.S7 adds. JB.S10 writes files that JB.S9 rows also write (`_worktree_end.py`, `_release_schema.py`, `release.py`, `workspace_layout.py`).
 - Not in rc-10: a Windows eval job in `dadaia-evals` CI. Reconciliation registers it as a backlog entry.
-- Known red at open: `tests/infrastructure/test_privacy_check.py::test_public_law_names_no_private_pipeline` XPASSes strict at 7b95b4b30, because Job 6 already cleaned the law. JB.S7.T15 removes its marker.
+- Known red at open: `tests/infrastructure/test_privacy_check.py::test_public_law_names_no_private_pipeline` XPASSes strict at 7b95b4b30, because Job 6 already cleaned the law. JB.S6.T4 removes its marker, so the JB.S6 gate is green before JB.S7 opens.
 
 ## Stage JB.S7 — RED, and the Windows helpers
 
-- Contract: exit is every new row RED by assertion, the helpers importable and the rest of the suite green; envelope `tests/**`, test paths alone. Lines are only added, except the three rows ruled 2026-10-07T00:26:11Z ("Approve deleting the 3 (Recommended)") and the T15 marker deletion (F-3 (a)); ACs AC9.1
+- Contract: exit is every new row RED by assertion, the helpers importable and the rest of the suite green; envelope `tests/**`, test paths alone. Lines are only added, except the three rows ruled 2026-10-07T00:26:11Z ("Approve deleting the 3 (Recommended)"); ACs AC9.1
 
 | task | AC | `W:` | owner tests / RED |
 |---|---|---|---|
@@ -123,7 +125,6 @@ Paths are relative to the repo root; aliases as in `PLAN.md` (`f/`, `pub/`, `S/`
 | JB.S7.T12 | AC9.1 | `tests/hooks/test_venv_guard.py` (the same bug: under win32 the guard allows the `Scripts` CLI and its block message names it) | the new rows, strict xfail |
 | JB.S7.T13 | AC9.1 | `tests/fixtures/stores.py` (the Windows seam: adds the one fake-venv builder; `_exe` comes from `PLATFORM`, and the launcher is copied by its real name) | its own small rows on every OS leg |
 | JB.S7.T14 | AC9.1 | `tests/fixtures/harness_env.py` (the Windows seam: adds the one child-process helper, which runs `sys.executable`, never a bare `python`, runs Git Bash, never System32 `bash`, and renames a tree holding `.git` instead of using `rmtree`) | its own small rows on every OS leg |
-| JB.S7.T15 | AC9.1 | `tests/infrastructure/test_privacy_check.py` (public-law-teaches-the-private-pipeline: the strict-xfail marker line leaves, because the law is already clean) | the guard, green |
 
 ## Stage JB.S8 — the Windows call sites
 
