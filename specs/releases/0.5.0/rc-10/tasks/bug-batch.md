@@ -241,3 +241,11 @@ Paths are relative to the repo root; aliases as in `PLAN.md` (`f/`, `pub/`, `S/`
 |---|---|---|---|
 | JB.S16.T1 | AC9.1 | `specs/ADRs/decisions.jsonl` (ADR 0222, the operator's words verbatim) | `tests/features/specs/test_doctor_adr.py` |
 | JB.S16.T2 | AC9.1 | `scripts/guards/slop.py` (v38's born rule admits a `public/skills/*/scripts/` key whose value is `parity:<an existing test file>`; the `_rmdir` row loses its `*`; the plants prove a package deleter row and a skill-script row without a test still refuse) | the guard run with its plants (`scripts/guards/run.py`) |
+
+## Stage JB.S17 — the map after S15
+
+- Contract: CI run 37638891337 (0421aa7d9) red on `test_entity_doctor.py` (`dd-gitflow-default` scripts hash stale): JB.S15.T2 changed `_worktree_freeze.py` and did not re-record the behavior map; the task gate does not run the entity doctor. Exit: the CI matrix green. ACs: AC9.1.
+
+| task | AC | `W:` | owner tests / RED |
+|---|---|---|---|
+| JB.S17.T1 | AC9.1 | `dadaia_workspace/public/entities/behavior-map.json` (the `dd-gitflow-default` scripts hash re-recorded) | `tests/infrastructure/test_entity_doctor.py` |
