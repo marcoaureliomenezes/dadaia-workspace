@@ -79,8 +79,8 @@ def _refuse_open_worktrees(specs: Path) -> None:
 #: The one verb that moves each phase forward — every refusal's fix names it, so a fix
 #: never names a verb that refuses in the same state.
 NEXT = {"DEFINITION": "phase IMPLEMENTATION", "IMPLEMENTATION": "phase CLOSURE", "CLOSURE": "ship"}
-#: `ship`'s one value no code knows: the promote PR's number exists once that PR is open.
-SHIP_PR = "with --pr set to the promote PR's number, once that PR is open"
+#: `ship`'s one optional value no code knows: the promote PR's number, when the host has one.
+SHIP_PR = "with --pr set to the promote PR's number, when the host has one"
 #: What the operator supplies to each NEXT verb that the code cannot fill (ADR 0158).
 SUPPLY = {"CLOSURE": SHIP_PR}
 

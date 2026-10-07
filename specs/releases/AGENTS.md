@@ -45,5 +45,5 @@ Scope: this file governs only `specs/releases/`.
 
 ## 5. Promote
 
-- Promote is merging the PR into the principal branch (the constitution's `gitflow:`); `RELEASE_PY ship --sha <sha> --pr <n>` records it: `shipped`, one `delivered` histo line, the whole release directory moved to `_archive/<id>/`, never deleted (ADR 0152 (1)).
+- Promote is merging the PR into the principal branch (the constitution's `gitflow:`); `RELEASE_PY ship --sha <sha>` records it: `shipped`, one `delivered` histo line, the whole release directory moved to `_archive/<id>/`, never deleted (ADR 0152 (1)).
 - Version, CHANGELOG and tag belong to the project's own release pipeline; no verb and no agent mints a version.
