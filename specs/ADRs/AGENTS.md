@@ -20,13 +20,9 @@ Scope: this file governs only `specs/ADRs/`.
 - `accepted` is then immutable: `context`/`decision`/`consequences` never rewritten again.
 - A reversal is always a new record (`supersedes`/`amends` naming the earlier `id`), never an edit; a proposed record never changes a ruled one.
 
-## 3. Commit shapes (FR8 shape 2, extended)
+## 3. Commit shapes
 
-| Act | Commit | Stages |
-|---|---|---|
-| Propose | `docs(adr): propose <slug>` | the appended `decisions.jsonl` line |
-| Accept | `docs(adr): accept <slug>` | the record's `status`/`measured_by` flip + the paired canonical-memory hunk, same commit, in a `define` or `reconcile` worktree |
-| Repair | `chore(adrs): repair …` | an in-place `measured_by` repair of a dead field (ADR 0138) |
+- The ADR commit shapes (propose, accept, repair): `dd-gitflow-default` §3a.
 
 - Rejecting is a `status: "rejected"` edit by the operator.
 - Superseding is a new record proposal; once accepted, the superseded record stays in `decisions.jsonl` with `status: superseded` and the successor's `supersedes` naming it (one id, or comma-separated ids ascending).

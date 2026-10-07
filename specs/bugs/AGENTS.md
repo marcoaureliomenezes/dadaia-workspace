@@ -32,7 +32,7 @@ Scope: this file governs only `specs/bugs/`.
 - Check prior resolutions on the same component first; `caused_by: X` means the fix of X wrote the lines this fix corrects, picked from `bugs.py resolve`'s blame candidates, `none` only when there are none or with `--lineage-reason`.
 - Commit exactly what the fix touched, never a blanket `-A`; a net-positive diff passes the architecture lens first.
 
-## 3. Field classes (D11)
+## 3. Field classes
 
 - Each field's class is its `x-mutability` in `bug-record-v1`; this law lists no fields.
 - `immutable-core`: never rewritten once appended.
@@ -60,4 +60,3 @@ Scope: this file governs only `specs/bugs/`.
 - No session-lock gate on filing a bug (NO-LOCKS DOCTRINE) — `bugs.py append` never blocks on session state.
 - `reported_by` records the agent/runtime that registered the record.
 - Concurrent sessions racing to file or resolve the same bug are surfaced, never prevented.
-- `bugs.py status`/`stats` read the ledger as it stands.
