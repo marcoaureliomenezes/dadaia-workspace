@@ -117,6 +117,8 @@ incremental = false
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-ra -p no:cacheprovider --strict-markers"
+truncation_limit_lines = "0"
+truncation_limit_chars = "0"
 markers = [
     "e2e: full user journeys through the real CLI",
     "small: no process, no real git: 10 s",
