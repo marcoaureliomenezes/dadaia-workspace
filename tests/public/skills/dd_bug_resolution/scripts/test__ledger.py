@@ -216,3 +216,21 @@ def test_a_shared_disposition_requires_the_same_evidence_in_both_ledgers(
     audit = script_table("dd-audit-project/scripts/_audit_check.py")
     shared = {w: (backlog[w], audit[w]) for w in backlog.keys() & audit.keys()}
     assert shared == {"superseded": ("release",) * 2, "rejected": ("reason",) * 2}
+
+
+@pytest.mark.xfail(strict=True, raises=AssertionError, reason="skill-script-root-walks-ignore-the-fence")  # fmt: skip
+def test_the_ledger_walk_skips_a_fenced_root(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:  # fmt: skip
+    """ADR 0088: no dadaia process acts on a fenced root, the privacy lookup included."""
+    import importlib.util
+
+    source = _PUBLIC / "skills" / "dd-bug-resolution" / "scripts" / "_ledger.py"
+    spec = importlib.util.spec_from_file_location("_ledger_fenced", source)
+    assert spec is not None and spec.loader is not None
+    ledger = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(ledger)
+    (tmp_path / ".dadaia/states").mkdir(parents=True)
+    (tmp_path / ".dadaia/states/spec_contexts.json").write_text("{}", encoding="utf-8")
+    (tmp_path / "specs").mkdir()
+    assert ledger.workspace_of(tmp_path / "specs") == tmp_path.resolve()
+    monkeypatch.setenv("DADAIA_FENCED_ROOTS", str(tmp_path))
+    assert ledger.workspace_of(tmp_path / "specs") is None
