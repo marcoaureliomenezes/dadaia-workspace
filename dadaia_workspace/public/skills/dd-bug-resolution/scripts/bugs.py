@@ -79,6 +79,7 @@ def _parser() -> argparse.ArgumentParser:
             command.add_argument(option)
         if verb == "status":
             command.add_argument("--all", dest="include_closed", action="store_true")
+            command.add_argument("--found-in", metavar="RELEASE/RC", help="refuse while a record found there is open or deferred")  # fmt: skip
         if verb == "update":
             command.add_argument("--set", dest="sets", action="append", required=True,
                                  metavar="FIELD=VALUE", help="a 'field=value' pair (repeatable)")  # fmt: skip
@@ -231,6 +232,12 @@ def _read(args: argparse.Namespace, specs: Path) -> int:
         ):
             for value, count in sorted(Counter(values).items()):
                 print(f"{label}:{value}\t{count}")
+        return 0
+    if args.found_in:  # ADR 0206: the one reader of found_in x status
+        release, _, rc = args.found_in.partition("/")
+        for bug in records:
+            if bug.get("status") in ("open", "deferred") and bug.get("found_in") == {"release": release, "rc": rc}:  # fmt: skip
+                raise Refusal(f"{rc} of release {release} holds {bug['status']} bug {bug['id']}", f"Operator action: resolve {bug['id']} in {rc}'s bug batch")  # fmt: skip
         return 0
     selected = [r for r in records if args.include_closed or r.get("status") == "open"]
     for record in sorted(selected, key=lambda r: str(r["id"])):

@@ -41,7 +41,7 @@ from _release_schema import (  # noqa: E402
 from _release_store import SCRIPT, Refusal, live_ids, live_release, window_start  # noqa: E402
 from _specs import quote, script, with_specs  # noqa: E402
 
-__all__ = ["check", "drift", "memory_errors", "ship_findings", "tree_findings"]
+__all__ = ["check", "drift", "memory_errors", "refuse_open_bugs", "ship_findings", "tree_findings"]
 
 _SKILLS = Path(__file__).resolve().parents[2]
 #: The verb writing a LIVE record's pointer back to the release (`{i}` the id, `{r}` it).
@@ -325,24 +325,35 @@ def _balance_findings(specs: Path) -> list[dict[str, Any]]:
         return []  # the tree walk reports a missing or doubled live release
     if live.state.get("phase") != "CLOSURE" or not (specs / "memory" / "QUALITY.md").is_file():
         return []
-    bugs = _SKILLS / "dd-bug-resolution" / "scripts" / "bugs.py"
-    done = subprocess.run(
-        [sys.executable, str(bugs), "balance", "--check", "--specs", str(specs)],
-        stdin=subprocess.DEVNULL,
-        capture_output=True,
-        text=True,
-    )
-    if not done.returncode:
-        return []
-    lines = done.stderr.strip().splitlines()  # the callee's own refusal: `[error] why`, `fix: how`
-    why = next((x.removeprefix("[error] ") for x in lines if x.startswith("[error] ")), "")
-    fix = next((x.removeprefix("fix: ") for x in lines if x.startswith("fix: ")), "")
-    if not (why and fix):  # the verb died outside its refusal: say so, point at it, name no half
-        why = f"`bugs.py balance --check` exited {done.returncode}"
-        command = with_specs(f"{script(bugs)} balance --check", specs)
-        fix = f"Operator action: run `{command}` and read its output"
-    row = finding("memory/QUALITY.md", 1, why, fix)
-    return [{**row, "verdict": "warning"} if why.endswith(_STALE) else row]  # stale blocks nothing
+    try:
+        _bugs("balance", "--check", specs=specs)
+    except Refusal as refusal:
+        row = finding("memory/QUALITY.md", 1, str(refusal), refusal.fix)
+        return [
+            {**row, "verdict": "warning"} if str(refusal).endswith(_STALE) else row
+        ]  # stale blocks nothing
+    return []
+
+
+def _bugs(*argv: str, specs: Path) -> None:
+    """Run `bugs.py <argv>`; its refusal (`[error] why`, `fix: how`) is raised as ours, a death outside one named."""
+    bugs, command = _SKILLS / "dd-bug-resolution" / "scripts" / "bugs.py", " ".join(argv)
+    done = subprocess.run([sys.executable, str(bugs), *argv, "--specs", str(specs)],
+                          stdin=subprocess.DEVNULL, capture_output=True, text=True)  # fmt: skip
+    if done.returncode:
+        lines = done.stderr.strip().splitlines()
+        why, fix = (
+            next((x[len(p) :] for x in lines if x.startswith(p)), "") for p in ("[error] ", "fix: ")
+        )
+        if not (why and fix):
+            why = f"`bugs.py {command}` exited {done.returncode}"
+            fix = f"Operator action: run `{with_specs(f'{script(bugs)} {command}', specs)}` and read its output"
+        raise Refusal(why, fix)
+
+
+def refuse_open_bugs(specs: Path, release_id: str, release_dir: Path) -> None:
+    """ADR 0206: relay `bugs.py status --found-in` for the release's live candidate."""
+    _bugs("status", "--found-in", f"{release_id}/{(candidate_dir(release_dir) or release_dir).name}", specs=specs)  # fmt: skip
 
 
 def tree_findings(specs: Path) -> list[dict[str, Any]]:
