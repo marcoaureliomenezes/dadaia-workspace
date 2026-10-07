@@ -127,3 +127,52 @@ def test_a_bug_batch_red_commit_anchors_the_freeze(job: str) -> None:
         row("c2", f"feat({job}.S2.T1): rm", edits=((T, ("x",), 0),)),
     ]
     assert freeze.judge(rows, "base", None) == (T, "c1")
+
+
+def refusal(rows: list, monkeypatch: pytest.MonkeyPatch) -> str | None:
+    """The refusal `check` raises over *rows*, else `None`; git is the only thing stood in."""
+    monkeypatch.setattr(freeze, "git", lambda *args: "base\n")
+    monkeypatch.setattr(freeze, "_rows", lambda *args: rows)
+    try:
+        freeze.check(Path("."), "w", "tests/**", "")
+    except freeze.Refusal as refused:
+        return str(refused)
+    return None
+
+
+@pytest.mark.xfail(strict=True, raises=AssertionError, reason="freeze-cannot-see-a-red-amendment-stage")  # fmt: skip
+def test_a_test_only_stage_is_red_wherever_it_sits(monkeypatch: pytest.MonkeyPatch) -> None:
+    rows = [
+        row("c1", "docs(JR.S2.T1): doc", code=True),
+        row("c2", "test(JR.S4.T1): red", edits=((T, (), 2),)),
+        row("c3", "fix(JR.S5.T1): green", code=True),
+    ]
+    assert refusal(rows, monkeypatch) is None
+
+
+@pytest.mark.xfail(strict=True, raises=AssertionError, reason="freeze-cannot-see-a-red-amendment-stage")  # fmt: skip
+def test_a_test_only_stage_may_amend_an_old_assert() -> None:
+    rows = [
+        row("c1", "feat(JR.S2.T1): code", code=True),
+        row("c2", "test(JR.S4.T1): amend", edits=((T, ("assert x == 1",), 1),)),
+    ]
+    assert freeze.judge(rows, "base", None) is None
+
+
+@pytest.mark.xfail(strict=True, raises=AssertionError, reason="freeze-cannot-see-a-red-amendment-stage")  # fmt: skip
+def test_stage_ids_with_no_test_edit_are_judged_not_refused_for_lacking_stage_one(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    rows = [row("c1", "feat(JR.S2.T1): a", code=True), row("c2", "fix(JR.S3.T1): b", code=True)]
+    assert refusal(rows, monkeypatch) is None
+
+
+@pytest.mark.parametrize("removed", [(), ("assert x == 1",)])
+def test_a_source_stage_after_a_test_only_stage_refuses_an_added_or_changed_test_line(
+    removed: tuple,
+) -> None:
+    rows = [
+        row("c1", "test(JR.S4.T1): red", edits=((T, (), 2),)),
+        row("c2", "fix(JR.S5.T1): green", code=True, edits=((T, removed, 1),)),
+    ]
+    assert freeze.judge(rows, "base", None) is not None
