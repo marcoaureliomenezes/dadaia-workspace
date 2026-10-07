@@ -15,6 +15,7 @@ from pathlib import Path
 
 import pytest
 
+from dadaia_workspace.core import cli_line
 from dadaia_workspace.infrastructure.ledger_scripts import script_findings
 from tests.helpers.release_state import PLAN
 
@@ -84,6 +85,8 @@ def test_a_shallow_clone_finding_names_the_history_and_its_fix_clears_it(
 
     assert len(findings) == 1, findings
     assert "shallow" in findings[0].message
-    assert shlex.split(findings[0].fix) == ["git", "-C", str(clone), "fetch", "--unshallow"]
+    assert shlex.split(findings[0].fix) == shlex.split(
+        cli_line.git_line(clone, "fetch", "--unshallow")
+    )
     subprocess.run(shlex.split(findings[0].fix), check=True, capture_output=True)
     assert _release_findings(clone / "specs") == []

@@ -12,7 +12,6 @@ from __future__ import annotations
 
 import json
 import re
-import shlex
 import shutil
 import subprocess
 import sys
@@ -21,7 +20,7 @@ from typing import Any
 
 import pytest
 
-from dadaia_workspace.core import gitflow
+from dadaia_workspace.core import cli_line, gitflow
 from dadaia_workspace.core.release_state import CANDIDATE_RE
 from tests.helpers.skill_scripts import stage_skill_scripts
 
@@ -708,7 +707,7 @@ def test_the_closure_check_names_a_verb_that_died_outside_its_refusal(
     assert [r["message"] for r in rows] == ["`bugs.py balance --check` exited 1"]
     assert rows[0]["fix"].startswith("Operator action: run `")
     assert rows[0]["fix"].endswith(
-        f" balance --check --specs {shlex.quote(str(specs))}` and read its output"
+        f" {cli_line.shell_line('balance', '--check', '--specs', str(specs))}` and read its output"
     )
 
 
