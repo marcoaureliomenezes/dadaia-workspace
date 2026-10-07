@@ -337,7 +337,6 @@ def test_the_declared_line_names_the_default_and_asks_to_narrow_it(repo: Path) -
     assert default in echo
 
 
-@pytest.mark.xfail(strict=True, raises=AssertionError, reason="declared-echo-rereads-the-law")  # fmt: skip
 def test_specs_init_declares_the_tests_line_in_a_latin1_law(repo: Path) -> None:
     law = repo / "AGENTS.md"
     original = "# Configuração\nverify: x\n".encode("latin-1")

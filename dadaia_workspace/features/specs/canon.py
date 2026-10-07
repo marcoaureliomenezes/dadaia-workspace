@@ -293,17 +293,22 @@ def scaffold_repo_law(
     )
 
 
+def default_tests_line(public_dir: Path | None = None) -> str:
+    """The template's own ``tests:`` line: the one default the law declares and the CLI echoes."""
+    template = (public_dir if public_dir is not None else default_public_dir()) / "templates"
+    return next(
+        ln
+        for ln in (template / "repo-AGENTS.md").read_text(encoding="utf-8").splitlines()
+        if ln.startswith("tests:")
+    )
+
+
 def declare_tests_line(repo: Path, *, public_dir: Path | None = None) -> list[Path]:
     """Append the template's ``tests:`` line to a present, unsymlinked ``AGENTS.md`` that
     has none (ADR 0216). Works in bytes: the law keeps its encoding and newline style, a
     leading UTF-8 BOM never hides a line, and an unreadable law is skipped."""
     law = repo / "AGENTS.md"
-    template = (public_dir if public_dir is not None else default_public_dir()) / "templates"
-    default = next(
-        ln
-        for ln in (template / "repo-AGENTS.md").read_text(encoding="utf-8").splitlines()
-        if ln.startswith("tests:")
-    )
+    default = default_tests_line(public_dir)
     if law.is_symlink() or not law.is_file():
         return []
     try:

@@ -310,7 +310,6 @@ def test_the_shipped_default_freezes_no_source_that_merely_ends_in_test(tmp_path
     assert run("ls-files", "--", *(f":(glob){g}" for g in globs)).split() == []
 
 
-@pytest.mark.xfail(strict=True, raises=AssertionError, reason="default-tests-globs-under-match-dotnet-android")  # fmt: skip
 def test_the_shipped_default_freezes_dotnet_and_android_test_trees(tmp_path: Path) -> None:
     template = canon.default_public_dir() / "templates" / "repo-AGENTS.md"
     globs = next(
