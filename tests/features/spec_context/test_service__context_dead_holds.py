@@ -85,8 +85,7 @@ def _alive(
     lib = _published(tmp_path, ws / "repos" / "lib")
     store = context_store(ws / ".dadaia" / "states")
     # the real CLI worktree.py lists through
-    cli = fake_venv(ws).with_name(f"dadaia{PLATFORM.venv_exe_suffix}")
-    shutil.copy2(Path(sys.executable).with_name(cli.name), cli)
+    fake_venv(ws, cli=True)
     store.save(
         SpecContextProject(
             "proj", ContextState.ALIVE, "main", str(bare), "2026-09-27T00:00:00+00:00",

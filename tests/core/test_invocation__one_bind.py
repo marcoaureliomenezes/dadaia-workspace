@@ -8,9 +8,7 @@ boundaries over a tmp workspace).
 from __future__ import annotations
 
 import json
-import shutil
 import subprocess
-import sys
 from pathlib import Path
 
 import pytest
@@ -21,7 +19,6 @@ from dadaia_workspace.cli._specs_resolution import resolve_specs_dir_for_cli
 from dadaia_workspace.cli.main import app
 from dadaia_workspace.core import session_store
 from dadaia_workspace.core.invocation import alive_context_trees, resolve
-from dadaia_workspace.core.platform import PLATFORM
 from dadaia_workspace.features.workspace.onboarding import next_step
 from tests.fixtures.harness_env import (
     claude_hook_env,
@@ -172,8 +169,7 @@ def test_a_bound_context_without_specs_gets_its_next_step(tmp_path: Path) -> Non
     included, in the doctor's rendering (read through `worktree.py`, hence this tier)."""
     ws = _workspace(tmp_path, "alpha")
     _record(ws, "s1", "alpha")
-    cli = f"dadaia{PLATFORM.venv_exe_suffix}"
-    shutil.copy2(Path(sys.executable).parent / cli, fake_venv(ws).parent / cli)
+    fake_venv(ws, cli=True)
     for argv in (["init", "-q"], ["commit", "-q", "--allow-empty", "-m", "x"],
                  ["branch", "wt/0.5.0-rc1/j1"]):  # fmt: skip
         subprocess.run(

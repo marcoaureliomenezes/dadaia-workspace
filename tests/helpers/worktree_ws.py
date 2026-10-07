@@ -27,7 +27,7 @@ FLOW = {"principal": "trunk", "integration": "dev", "work": "feature/"}
 #: The repo's gate (ADR 0190): prints its argv; level L fails iff the tree holds `RED-<L>`.
 CI = 'import pathlib, sys\nprint("ci", *sys.argv[1:])\nsys.exit(pathlib.Path("RED-" + sys.argv[1]).exists())\n'
 JOB, TASK = "0.5.0-rc1/j1", "0.5.0-rc1/j1--J1.S1.T1"
-_CLI = """#!{python}
+_CLI = """#!python
 import json, sys
 args = sys.argv[1:]
 if args[:2] == ["context", "list"]:
@@ -51,10 +51,8 @@ def cli_path(root: Path) -> Path:
 
 
 def _stub_cli(root: Path, *listed: dict[str, object]) -> None:
-    """The `dadaia` stub over *listed*, written at `cli_path` (a Python script with a shebang)."""
-    cli = cli_path(root)
-    cli.write_text(_CLI.format(python=sys.executable, rows=json.dumps(list(listed))))
-    cli.chmod(0o755)
+    """The `dadaia` stub over *listed*, placed at `cli_path` by `fake_venv` (startable per platform)."""
+    fake_venv(root, cli=_CLI.format(rows=json.dumps(list(listed))))
 
 
 def git(repo: Path, *args: str) -> str:
@@ -75,7 +73,6 @@ def make_workspace(root: Path) -> Path:
     (root / ".gitconfig").write_text("[user]\n\tname = t\n\temail = t@t\n")  # HOME for rebase
     (root / ".dadaia/states").mkdir(parents=True)
     (root / ".dadaia/states/spec_contexts.json").write_text("{}")
-    fake_venv(root)
     _stub_cli(root, {"main_repo": "r", "associated_repos": [], "gitflow": FLOW})
     repo = root / "repos/r"
     rel = repo / "specs/releases/0.5.0/rc-1"
