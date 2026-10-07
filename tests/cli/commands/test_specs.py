@@ -105,12 +105,12 @@ def test_the_catalog_pair_is_written_by_its_one_generator(repo: Path) -> None:
 
 
 def test_an_existing_scoped_law_is_never_overwritten(repo: Path) -> None:
-    (repo / "AGENTS.md").write_text("# ours\n", encoding="utf-8")
+    (repo / "AGENTS.md").write_text("# ours\ntests: src/**\n", encoding="utf-8")
 
     result = _runner.invoke(app, ["specs", "init", "--context", "c"])
 
     assert result.exit_code == 0, result.output
-    assert (repo / "AGENTS.md").read_text(encoding="utf-8") == "# ours\n"
+    assert (repo / "AGENTS.md").read_text(encoding="utf-8") == "# ours\ntests: src/**\n"
 
 
 def test_a_v6_tree_ends_v7_with_a_clean_doctor(repo: Path) -> None:
