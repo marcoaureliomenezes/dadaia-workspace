@@ -15,7 +15,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
-    from collections.abc import Callable
+    from collections.abc import Callable, Iterator
 
     from run import Check, Session, Tree
 
@@ -282,6 +282,69 @@ def harness_env_allowlist(tree: Tree) -> list[str]:
     return out
 
 
+# --- small tests start no process ---------------------------------------------------------
+
+_SEAMS = frozenset(
+    {
+        "subprocess",
+        "tests.helpers.worktree_ws",
+        "dadaia_workspace.infrastructure.subprocess_runner",
+        "tests.fixtures.real_git",
+        "dadaia_workspace.infrastructure.git_subprocess",
+    }
+)
+_SPAWN = re.compile(
+    r"(^|\.)(subprocess\.(run|Popen|call|check_call|check_output|getoutput|getstatusoutput)"
+    r"|os\.(system|popen|exec\w*|spawn\w*|posix_spawn\w*)"
+    r"|asyncio\.create_subprocess_\w+|run_hook_subprocess)$|^(Popen|check_output|check_call)$"
+)
+
+
+def _marks(nodes: list[ast.AST]) -> set[str]:
+    """Names of every ``<x>.mark.<name>`` under *nodes*."""
+    return {
+        n.attr
+        for top in nodes
+        for n in ast.walk(top)
+        if isinstance(n, ast.Attribute) and _tail(n.value) == "mark"
+    }
+
+
+def _tests(module: ast.Module) -> Iterator[tuple[ast.FunctionDef, set[str]]]:
+    """Each ``test_*`` function with the marker names it inherits (module, class, own)."""
+    base = _marks([n for n in module.body if isinstance(n, ast.Assign)])
+    for top in module.body:
+        owner = top.decorator_list if isinstance(top, ast.ClassDef) else []
+        for fn in top.body if isinstance(top, ast.ClassDef) else [top]:
+            if isinstance(fn, ast.FunctionDef) and fn.name.startswith("test_"):
+                yield fn, base | _marks([*owner, *fn.decorator_list])
+
+
+def _reaches_seam(module: ast.Module) -> bool:
+    return any(
+        (isinstance(n, ast.ImportFrom) and n.module in _SEAMS)
+        or (isinstance(n, ast.Import) and any(a.name in _SEAMS for a in n.names))
+        for n in ast.walk(module)
+    )
+
+
+def small_spawns_no_process(tree: Tree) -> list[str]:
+    """A test sized ``small`` (as ``tests/conftest.py`` sizes it: an explicit marker, else
+    ``medium`` when its module imports a process seam) calls no spawn in its own body."""
+    out = []
+    for p, module in _suite(tree).items():
+        seam = _reaches_seam(module)
+        for fn, marks in _tests(module):
+            if "medium" in marks or ("small" not in marks and seam):
+                continue
+            out += [
+                f"spawn: {p}::{fn.name} starts a process ({ast.unparse(c.func)}) at line {c.lineno}"
+                for c in ast.walk(fn)
+                if isinstance(c, ast.Call) and _SPAWN.search(ast.unparse(c.func))
+            ]
+    return out
+
+
 # --- plants: each writes one violation; ``run.py --planted`` requires red ----------------
 
 _ROOT = Path(__file__).resolve().parent.parent.parent
@@ -475,6 +538,16 @@ CHECKS: dict[str, Check] = {
             "setdefault": _env('os.environ.setdefault("DADAIA_PERSONA", "x")'),
             "setitem": _env('monkeypatch.setitem(os.environ, "DADAIA_PERSONA", "x")'),
             "update": _env('os.environ.update({"DADAIA_PERSONA": "x"})'),
+        },
+    ),
+    "small-spawns-no-process": (
+        small_spawns_no_process,
+        {
+            "spawn": _plant(
+                "tests/unit/test_spawn.py",
+                "import pytest, subprocess\n@pytest.mark.small\n"
+                "def test_x():\n    subprocess.run(['true'])\n",
+            )
         },
     ),
 }
