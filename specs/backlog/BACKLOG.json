@@ -476,6 +476,19 @@
         "stage-gate-keeps-only-the-red-check",
         "test-suite-diet"
       ]
+    },
+    {
+      "id": "multi-platform-by-construction-migration",
+      "title": "Existing code migrates to the multi-platform-by-construction ADR, rules P1-P10, one sweep per rule",
+      "opened": "2026-10-07",
+      "status": "idea",
+      "description": "Operator, 2026-10-07, verbatim: 'toda arquitetura e a forma como metodos s\u00e3o programados deve pensar em ser multi-plataforma'; 'tanto na lib, na CLI, nos scripts dentro de skills'; ADR accepted the same day: 'Aceito, com essa divis\u00e3o (Recommended)'. The ADR has no id yet: decisions.jsonl on feature/0.5.0 and every rc-10 tree carries no multi-platform record (the rc-10 Reconciliation writes it through its lane). Decision: one codebase; OS facts live in one seam, dadaia_workspace/core/platform.py, and tooling refuses OS literals elsewhere. Rules: P1 platform.py is the only reader of sys.platform/os.name, venv dir and .exe via sysconfig; P2 never bare python/bash - sys.executable, executables via shutil.which; P3 list argv, shell=False, no shlex; P4 pathlib in code, as_posix only for display/compare, no '/' joins; P5 encoding='utf-8' on all text I/O incl. hook stdout, CI never masks with PYTHONUTF8; P6 rmtree onexc read-only handler, os.replace atomic writes, no exec bit/symlink reliance; P7 one renderer for printed commands (core/cli_line), never &&, $VAR, sudo, chmod +x; P8 git and harness hooks are a one-line #!/bin/sh shim exec'ing the absolute interpreter, logic in Python; P9 shipped law names commands once, neutral, rendered per platform at install; P10 ruff PTH, S602, S605, PLW1514, a guard refusing OS literals outside the seam, Windows+macOS CI = Linux selection, .gitattributes eol. Split (ruled): rc-10 bug batch takes the 8 Windows bugs, shipped-law-hardcodes-the-posix-venv-path (P9) and CI selection parity (P10 CI part); this entry is the rc-11 rest - hook shims (P8), pre-push in Python, lint + guard (P10), path joins (P4), one command renderer (P7). Design: one sweep per P-rule over dadaia_workspace/ (lib, CLI, skill scripts), each sweep lands with its repo guard (the P10 OS-literal guard or the named ruff rule) turned on in the same job so the rule cannot regress; each sweep's commit carries its git grep line and hit count. Open (to the PLAN): how skill scripts get command lines without a second decider - relay the CLI's rendered output. Placement rc-11 is the operator's split; every other design detail not quoted from a ruling is agent default, unruled.",
+      "provenance": "operator ruling 2026-10-07 (multi-platform ADR, accepted with its rc-10/rc-11 split), deferred to the backlog by the rc-10 Reconciliation",
+      "relates": [
+        "evals-windows-smoke",
+        "public-law-language-neutral",
+        "complexity-and-private-import-ratchet"
+      ]
     }
   ]
 }
