@@ -8,7 +8,7 @@ import json
 import subprocess
 import sys
 from collections.abc import Callable
-from pathlib import Path
+from pathlib import Path, PurePath
 
 import pytest
 from typer.testing import CliRunner
@@ -79,7 +79,10 @@ def test_absent_specs_scaffolds_lists_paths_and_commits_nothing(repo: Path) -> N
     result = _runner.invoke(app, ["specs", "init", "--context", "c"])
 
     assert result.exit_code == 0, result.output
-    assert "constitution.md" in result.output and "memory/ARCHITECTURE.md" in result.output
+    created = {
+        PurePath(ln.removeprefix("[created] ")).parts[-2:] for ln in result.output.splitlines()
+    }
+    assert {("specs", "constitution.md"), ("memory", "ARCHITECTURE.md")} <= created
     # sa-placement-rules-contradict-tree8#B5: a fresh scaffold is doctor-clean — no issue at all.
     assert [i.to_dict() for i in SpecsDoctor(repo / "specs").check()] == []
     assert _git(repo, "rev-parse", "HEAD") == head

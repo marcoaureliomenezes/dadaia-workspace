@@ -11,7 +11,7 @@ import pytest
 from typer.testing import CliRunner
 
 from dadaia_workspace.cli.main import app
-from dadaia_workspace.core.platform import PLATFORM
+from dadaia_workspace.core.cli_line import fix_line
 
 _runner = CliRunner()
 
@@ -86,16 +86,9 @@ def test_the_printed_fix_line_succeeds_once_the_url_is_reachable(
 
     assert failed.exit_code == 1
     fixes = [ln for ln in failed.output.splitlines() if ln.startswith("fix: ")]
-    venv_cli = (
-        workspace
-        / ".dadaia"
-        / ".venv"
-        / PLATFORM.venv_scripts_dir
-        / f"dadaia{PLATFORM.venv_exe_suffix}"
-    )
+    create = fix_line(workspace, "context", "create", "--main-repo", str(bare))
     assert fixes == [
-        f"fix: Operator action: run `{venv_cli} context create --main-repo {bare}` with a "
-        f"reachable clone URL in place of {bare}"
+        f"fix: Operator action: run `{create}` with a reachable clone URL in place of {bare}"
     ]
     assert not (workspace / "repos" / "app").exists()
 
@@ -118,9 +111,7 @@ def test_init_without_repo_closes_with_the_law_and_the_next_step(tmp_path: Path)
     closing = lines[-3:]
     assert closing[0] == _LAW
     assert closing[1].startswith("Next (")  # AC6.2
-    assert closing[2].startswith(
-        f"fix: Operator action: run {ws / '.dadaia' / '.venv' / PLATFORM.venv_scripts_dir / f'dadaia{PLATFORM.venv_exe_suffix}'} context create"
-    )
+    assert closing[2].startswith(f"fix: Operator action: run {fix_line(ws, 'context', 'create')}")
     assert _LAW not in "\n".join(lines[:-3])
 
 
