@@ -141,9 +141,9 @@ The governing product philosophy is Features × Futures: a feature or fix spends
 - The push-gate law-deletion citation becomes reviewer-governed law change.
 - The release-shaped worktree name parser becomes a kernel that also accepts plain change worktrees.
 
-### Governance proposals requiring the approval turn
+### Governance scope and sequencing
 
-This Draft enumerates proposals only; grill shorthand and SPEC approval are not accepted ADRs. After the operator concretely rules on this exact set, the main thread transcribes each status and `ruling` it owns. Before implementation, its accepted Features × Futures record and the dd-product-engineer's authorized constitution amendment land together in one define-tree governance commit. Only a later, separate approval-status commit may change SPEC and PLAN to `Approved`. Q21 instead follows the reconciliation sequence below.
+The numbered set below is the exact governance scope approved with this SPEC; it is not an ADR-status authority. The canonical **Status:** field is the sole authority for SPEC approval, and ADR acceptance and rulings live only in `decisions.jsonl`. The G0 sequence is the main thread's Features × Futures ADR record and the dd-product-engineer's authorized constitution amendment in one define-tree governance commit, followed by a separate approval-status commit for SPEC and PLAN. Q21 instead follows the reconciliation sequence below.
 
 1. Supersede ADR 0134 by deleting the venv guard behaviour, while retaining the workspace venv as the CLI runtime.
 2. Amend ADR 0151 by deleting M3 only; retain operator-only acceptance, ruling evidence, ruled lineage and the release canon.
@@ -180,4 +180,4 @@ At Reconciliation, after the operator's concrete Q21 ruling, the main thread tra
 
 ## 6. Open questions
 
-No product-behaviour question remains after Q1–Q23. The PLAN is the sole authority for task, gate/review, dependency, reconciliation, critical-path and aggregate-effort arithmetic. This SPEC remains Draft for the operator's governance rulings and independent definition review; any new edge or write outside the listed sets requires the PLAN to be recalculated, and an upper path beyond the 7.8-hour cap requires an explicit operator choice of the requirement cluster that moves to rc-12.
+None. The PLAN is the sole authority for task, gate/review, dependency, reconciliation, critical-path and aggregate-effort arithmetic. Any new edge or write outside the listed sets requires the PLAN to be recalculated, and an upper path beyond the 7.8-hour cap requires an explicit operator choice of the requirement cluster that moves to rc-12.
