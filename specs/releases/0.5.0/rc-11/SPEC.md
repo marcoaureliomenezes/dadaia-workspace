@@ -1,6 +1,6 @@
 # SPEC — Release: 0.5.0, candidate 11 — light by default
 
-**Status:** Draft
+**Status:** Approved
 **Release ID:** 0.5.0
 **Owner:** dd-product-engineer
 **Opened:** 2026-10-08

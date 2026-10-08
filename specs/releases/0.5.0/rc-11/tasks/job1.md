@@ -1,6 +1,6 @@
 # TASKS — 0.5.0 rc-11, Job 1 — light-path kernel and law
 
-**Status:** Draft
+**Status:** Approved
 
 The `## Stage` heading and `- Contract:` line are a temporary compatibility wrapper required by the pre-rc-11 checker. Current task ids are used. After J1.T2–J1.T4 merge, the main thread opens J1.T5 from the updated Job 1 branch; T5 removes these wrappers from Jobs 2–4 and this file remains historical input only.
 

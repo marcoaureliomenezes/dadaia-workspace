@@ -1,6 +1,6 @@
 # TASKS — 0.5.0 rc-11, Job 3 — lean release state
 
-**Status:** Draft
+**Status:** Approved
 
 The following wrapper exists only so the pre-Job-1 checker can validate the definition. J1.T5 removes the heading and Contract line after J1.T2–J1.T4 merge and before this job opens; its task table is unchanged.
 
