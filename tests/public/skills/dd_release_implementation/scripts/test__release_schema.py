@@ -73,3 +73,37 @@ def test_a_job_accepts_both_supported_task_id_shapes(task_id: str) -> None:
     )
 
     assert _release_schema.job_errors(job, "tasks/job2.md") == []
+
+
+@pytest.mark.parametrize(
+    "header",
+    [
+        "task | AC | notes | outcome",
+        "id | AC | `W:` | outcome",
+        "task | acceptance | `W:` | outcome",
+    ],
+)
+def test_a_current_job_requires_its_canonical_task_columns(header: str) -> None:
+    job = (
+        "# Job 2\n\n"
+        f"| {header} |\n"
+        "|---|---|---|---|\n"
+        "| J2.T3 | AC2.1 | `src/x.py` | parser owner |\n"
+    )
+
+    assert _release_schema.job_errors(job, "tasks/job2.md")
+
+
+@pytest.mark.parametrize(
+    "rows",
+    [
+        "| J2.T3 | AC2.1 | `src/x.py` | owner | extra |\n",
+        "| J2.T3 | AC2.1 | `src/x.py` | owner |\n| J2.T3 | AC2.2 | `tests/test_x.py` | owner |\n",
+        "| J2.T3 | AC2.1 | `src/x.py` | owner |\n|  |  |  |  |\n",
+    ],
+    ids=["malformed", "duplicate", "empty"],
+)
+def test_a_current_job_refuses_malformed_duplicate_and_empty_rows(rows: str) -> None:
+    job = f"# Job 2\n\n| task | AC | `W:` | outcome |\n|---|---|---|---|\n{rows}"
+
+    assert _release_schema.job_errors(job, "tasks/job2.md")

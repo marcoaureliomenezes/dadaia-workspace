@@ -593,6 +593,7 @@ def test_a_plain_merge_returns_to_its_recorded_base(tmp_path: Path, declared_ver
     assert opened.returncode == 0, opened.stderr
     tree = root / "worktrees/r/maintenance"
     head = commit(tree, "src/a.py")
+    approve(root, head)
 
     landed = run(root, "merge", str(tree))
 

@@ -3,7 +3,7 @@ the one envelope every harness parses.
 
 T-014-03 (parity with sdd_gate + root_whitelist through one spawn),
 pre-gate-allow-envelope-fails-claude-schema, claude-pre-gate-envelope-contract (the
-kimi shim's two raw anchors), the Bash arm wired to venv_guard.
+kimi shim's two raw anchors).
 """
 
 from __future__ import annotations

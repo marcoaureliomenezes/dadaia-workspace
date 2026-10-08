@@ -194,6 +194,7 @@ def test_an_outside_ref_is_carried_onto_the_live_work_branch() -> None:
         pytest.param("wt/0.5.0-rc9/job2", True),
         ("wt/0.5.0-rc9/define", False),
         ("wt/backlog/an-idea", True),
+        ("wt/maintenance", False),
         ("wt/0.5.0-rc9/job2--T-1", False),
         ("wt/0.5.0a-impl", False),
     ],

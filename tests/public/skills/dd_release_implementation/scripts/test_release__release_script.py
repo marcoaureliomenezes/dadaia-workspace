@@ -493,6 +493,117 @@ def test_phase_implementation_accepts_the_jobs_and_tasks_dialect(
     assert result.returncode == 0, result.stderr
 
 
+def _current_plan(*rows: str) -> str:
+    return f"{_GOOD}\n## DAG\n\n| job | waits on | wave | `W:` |\n|---|---|---|---|\n" + "".join(
+        rows
+    )
+
+
+def _current_job(job: int, *writes: str) -> str:
+    rows = "".join(
+        f"| J{job}.T{number} | AC3.4 | `{path}` | owner |\n"
+        for number, path in enumerate(writes, 1)
+    )
+    return f"# Job {job}\n\n| task | AC | `W:` | outcome |\n|---|---|---|---|\n{rows}"
+
+
+def _phase_with_current_jobs(
+    script: Path, tmp_path: Path, plan: str, jobs: dict[str, str]
+) -> subprocess.CompletedProcess[str]:
+    specs = _specs(tmp_path, plan)
+    tasks = specs / "releases/0.5.0/rc-1/tasks"
+    tasks.mkdir()
+    for name, body in jobs.items():
+        tasks.joinpath(name).write_text(body, encoding="utf-8")
+    return _phase(script, specs)
+
+
+@pytest.mark.parametrize(
+    ("plan", "jobs"),
+    [
+        pytest.param(_current_plan(), {}, id="empty-dag"),
+        pytest.param(
+            _current_plan(
+                "| Job 1 | — | 1 | `src/a.py` |\n",
+                "| Job 2 | Job 1 | 2 | `src/b.py` |\n",
+            ),
+            {"job1.md": _current_job(1, "src/a.py")},
+            id="missing-job-file",
+        ),
+        pytest.param(
+            _current_plan("| Job 1 | — | 1 | `src/a.py` |\n"),
+            {
+                "job1.md": _current_job(1, "src/a.py"),
+                "job2.md": _current_job(2, "src/b.py"),
+            },
+            id="extra-job-file",
+        ),
+        pytest.param(
+            _current_plan(
+                "| Job 1 | — | 1 | `src/a.py` |\n",
+                "| Job 1 | — | 2 | `src/a.py` |\n",
+            ),
+            {"job1.md": _current_job(1, "src/a.py")},
+            id="duplicate-job",
+        ),
+        pytest.param(
+            _current_plan("| Job 1 | — | first | `src/a.py` |\n"),
+            {"job1.md": _current_job(1, "src/a.py")},
+            id="non-numeric-wave",
+        ),
+        pytest.param(
+            _current_plan("| Job 1 | — | 1 | `src/a.py` |\n"),
+            {"job1.md": _current_job(1, "src/a.py", "tests/test_a.py")},
+            id="incomplete-write-set",
+        ),
+    ],
+)
+def test_phase_implementation_refuses_an_incomplete_current_job_union(
+    script: Path, tmp_path: Path, plan: str, jobs: dict[str, str]
+) -> None:
+    result = _phase_with_current_jobs(script, tmp_path, plan, jobs)
+
+    assert result.returncode == 1
+
+
+def test_phase_implementation_accepts_each_current_jobs_exact_task_union(
+    script: Path, tmp_path: Path
+) -> None:
+    result = _phase_with_current_jobs(
+        script,
+        tmp_path,
+        _current_plan(
+            "| Job 1 | — | 1 | `src/a.py`, `tests/test_a.py` |\n",
+            "| Job 2 | Job 1 | 2 | `src/b.py` |\n",
+        ),
+        {
+            "job1.md": _current_job(1, "src/a.py", "tests/test_a.py"),
+            "job2.md": _current_job(2, "src/b.py"),
+        },
+    )
+
+    assert result.returncode == 0, result.stderr
+
+
+def test_phase_implementation_checks_same_wave_overlap_after_exact_task_unions(
+    script: Path, tmp_path: Path
+) -> None:
+    result = _phase_with_current_jobs(
+        script,
+        tmp_path,
+        _current_plan(
+            "| Job 1 | — | 1 | `src/shared.py` |\n",
+            "| Job 2 | — | 1 | `src/shared.py` |\n",
+        ),
+        {
+            "job1.md": _current_job(1, "src/shared.py"),
+            "job2.md": _current_job(2, "src/shared.py"),
+        },
+    )
+
+    assert result.returncode == 1
+
+
 # --- AC4.4: the bug balance block is a closure check ---------------------------------
 
 
