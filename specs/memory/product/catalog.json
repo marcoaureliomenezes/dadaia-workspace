@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-10-08T01:23:19Z",
+  "generated_at": "2026-10-08T02:43:19Z",
   "features": [
     {
       "rank": 1,
@@ -904,7 +904,7 @@
         "merge",
         "review"
       ],
-      "token_estimate": 1827,
+      "token_estimate": 1837,
       "depends_on": [
         "sdd-gate-v3",
         "public-asset-distribution",
