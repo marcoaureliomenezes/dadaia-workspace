@@ -1407,6 +1407,25 @@
       "agent": "main-thread",
       "kind": "artifact-gc",
       "text": "RC-FLOW step 4, .dadaia/.venv/bin/dadaia doctor from the workspace root, 2026-10-08. Dry: exit 1 - 13 WS-handoff-expired, 7 WS-tmp-expired, 2 WS-root-slop (.hypothesis, .pytest_cache at the workspace root), 1 WS-repos-slop (repos/dadaia-evals, the repo ADR 0217 retired: a clean clone in sync with its origin, no unpushed commit), 6 WS-reaped-reaped held by their TTL, 1 WORKTREE (job encoding open), 1 LEDGER-RELEASE-SCHEMA on feature/0.5.0 (the operator-act guard commit d731bc911 sits after the memory entry; this job's memory entry clears it at merge). --fix: exit 1 on those two non-GC lines only; deleted the 13 handoffs, the 7 tmp entries and 1 graveyard record; moved .hypothesis, .pytest_cache and repos/dadaia-evals to .dadaia/reaped/20261008/. After: WORKTREE and LEDGER-RELEASE-SCHEMA as above, 10 WS-reaped-reaped held by their TTL. The operator holds nothing new."
+    },
+    {
+      "ts": "2026-10-08T12:52:34Z",
+      "agent": "release.py memory",
+      "kind": "memory",
+      "text": "Memory reconciled over 5518c69c094f950733f7522cc77d876d524ec3b3..94430dcc9db2: 4 reviewed, 3 changed.",
+      "since": "5518c69c094f950733f7522cc77d876d524ec3b3",
+      "until": "94430dcc9db2e36d4482c5e8890a52b69336b3cd",
+      "reviewed": [
+        "agentic-entities",
+        "consumer-agent-support",
+        "workspace-init",
+        "sdd-gate-v3"
+      ],
+      "changed": [
+        "pypi-distribution",
+        "release-lifecycle",
+        "workspace-doctor"
+      ]
     }
   ]
 }
