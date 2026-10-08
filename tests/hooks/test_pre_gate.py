@@ -139,7 +139,6 @@ def test_evaluate_payload_first_block_wins_and_faulty_policy_fails_open(
             {"tool_name": "Bash", "tool_input": {"command": "dadaia doctor"}},
             False,
             id="allow-workspace-cli",
-            marks=pytest.mark.xfail(strict=True, reason="the venv policy is deleted by J1.T3"),
         ),
     ],
 )

@@ -538,7 +538,6 @@ def test_a_repo_declaring_only_verify_lines_lands_a_task_and_its_job(root: Path)
     assert git(root / "repos/r", "rev-parse", "feature/0.5.0").strip() == sha
 
 
-@pytest.mark.xfail(strict=True, reason="task test separation is implemented by J1.T2")
 @pytest.mark.parametrize(
     ("law", "test_path"),
     [
@@ -570,7 +569,6 @@ def test_an_implementation_commit_cannot_carry_a_test(root: Path, law: str, test
     assert git(job, "rev-parse", "HEAD").strip() != git(task, "rev-parse", "HEAD").strip()
 
 
-@pytest.mark.xfail(strict=True, reason="the task gate becomes hygiene-only in J1.T2")
 def test_a_repo_without_a_tests_declaration_lands_a_source_only_task(root: Path) -> None:
     repo, job = root / "repos/r", root / TREE
     commit(repo, "AGENTS.md", "verify: python scripts/ci.py job\n")
@@ -584,7 +582,6 @@ def test_a_repo_without_a_tests_declaration_lands_a_source_only_task(root: Path)
     assert landed.returncode == 0, landed.stderr
 
 
-@pytest.mark.xfail(strict=True, reason="plain merge and recorded bases are implemented by J1.T2")
 @pytest.mark.parametrize("declared_verify", [True, False], ids=["verify-once", "no-verify"])
 def test_a_plain_merge_returns_to_its_recorded_base(tmp_path: Path, declared_verify: bool) -> None:
     root = make_workspace(tmp_path)

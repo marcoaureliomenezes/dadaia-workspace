@@ -42,7 +42,6 @@ def test_new_makes_each_shape_on_its_branch_and_base(root: Path) -> None:
     ]
 
 
-@pytest.mark.xfail(strict=True, reason="plain worktrees are implemented by J1.T2")
 @pytest.mark.parametrize("live_release", [True, False], ids=["live-release", "no-release"])
 def test_a_plain_worktree_uses_the_release_work_branch_or_checked_out_branch(
     root: Path, live_release: bool

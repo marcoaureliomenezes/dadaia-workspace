@@ -466,7 +466,6 @@ def test_phase_implementation_refuses_a_plan_without_a_dag(
     assert (result.returncode, needle in result.stderr, len(fixes)) == (1, True, 1)
 
 
-@pytest.mark.xfail(strict=True, reason="the lean phase bridge is implemented by J1.T2")
 def test_phase_implementation_accepts_the_jobs_and_tasks_dialect(
     script: Path, tmp_path: Path
 ) -> None:

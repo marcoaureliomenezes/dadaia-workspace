@@ -149,7 +149,6 @@ def _plan(*argv: str) -> list[str]:
     return [f"{job}: {name}" for job, (name, _, _) in ci.plan(list(argv))]
 
 
-@pytest.mark.xfail(strict=True, reason="the fast verify plan is implemented by J1.T3")
 def test_job_verify_is_the_fast_check() -> None:
     assert _plan("job") == _plan() == [
         "lint: ruff format", "lint: ruff check", "lint: lint-imports", "typecheck: mypy",
@@ -157,7 +156,6 @@ def test_job_verify_is_the_fast_check() -> None:
     ]  # fmt: skip
 
 
-@pytest.mark.xfail(strict=True, reason="push and pull-request CI selection is implemented by J1.T3")
 def test_pushes_use_linux_and_pull_requests_use_the_full_matrix() -> None:
     workflow = yaml.load(
         (_REPO / ".github/workflows/ci.yml").read_text("utf-8"), Loader=yaml.BaseLoader
