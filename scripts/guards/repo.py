@@ -408,7 +408,7 @@ def release_workflow_canon(tree: Tree) -> list[str]:
     top = _CHANGELOG_TOP.search(tree.read("CHANGELOG.md"))
     tags = subprocess.run(
         ["git", "tag", "-l", "v*", "--sort=version:refname"],
-        cwd=tree.root, capture_output=True, text=True, check=False,
+        cwd=tree.root, capture_output=True, text=True, encoding="utf-8", errors="replace", check=False,
     ).stdout.split()  # fmt: skip
     clauses = {
         "push-main": (on.get("push") or {}).get("branches") == ["main"],
@@ -659,7 +659,7 @@ def specs_canon_tracked(tree: Tree) -> list[str]:
     }
     ignored = set(subprocess.run(
         ["git", "check-ignore", "--no-index", "--stdin"], cwd=tree.root,
-        input="\n".join(expect), capture_output=True, text=True, check=False,
+        input="\n".join(expect), capture_output=True, text=True, encoding="utf-8", errors="replace", check=False,
     ).stdout.split())  # fmt: skip
     return [
         f"{rule}: {p} is {'ignored' if p in ignored else 'tracked'}"

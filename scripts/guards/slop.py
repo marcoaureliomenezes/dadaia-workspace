@@ -1,4 +1,4 @@
-"""Slop checks: the package's slop ratchets (V32, V33, V37-V40), the doctor section subset,
+"""Slop checks: the package's slop ratchets (V32, V33, V37-V41), the doctor section subset,
 the suppressed layering-edge cap (ARCHITECTURE P-10) and no file-size pin (ADR 0143).
 
 ``ALLOWANCES`` (V37-V39) is data each check reads from the tree's own copy of this file, so
@@ -318,6 +318,25 @@ def v40(tree: Tree) -> list[str]:
     return out
 
 
+def v41(tree: Tree) -> list[str]:
+    """A call with ``text=True`` or ``universal_newlines=True`` and no ``encoding``: the
+    locale decodes its output; CI's ``PYTHONUTF8=1`` hides it. A ``**`` spread is not judged."""
+    out = []
+    for rel, text in _files(tree, PKG, "scripts", py=True).items():
+        for node in ast.walk(ast.parse(text)):
+            if not isinstance(node, ast.Call):
+                continue
+            kw = {k.arg: k.value for k in node.keywords}
+            for name in ("text", "universal_newlines"):
+                if (
+                    isinstance(kw.get(name), ast.Constant)
+                    and kw[name].value is True  # type: ignore[attr-defined]
+                    and not {"encoding", None} & kw.keys()
+                ):
+                    out.append(f"{name}: {rel}:{node.lineno}")
+    return out
+
+
 def doctor_section_subset(tree: Tree) -> list[str]:
     """No code selects a subset of doctor sections, named by each module's ``SECTION``."""
     modules = {rel: ast.parse(text) for rel, text in _files(tree, PKG, py=True).items()}
@@ -461,6 +480,8 @@ def near(p, q, t, r, cfg, limit):
     y = map(str, t.splitlines()); z = sorted(json.loads, t.splitlines())
     ok = len(p.read_text().splitlines()) > cfg["skill_md_line_soft"]; ok = len(t.splitlines()) <= 12
     ok = p.read_text().count("x") > 3; ok = len(p.read_bytes()) > limit; bad = "("
+    run(p, text=True, encoding="utf-8"); run(p, text=True, **cfg); run(p, text=False); run(p, text=t)
+    run(p, universal_newlines=True, encoding="utf-8"); run(p, universal_newlines=True, **cfg)
 '''
 _DELETERS = [
     "p.rmtree()",
@@ -610,6 +631,8 @@ v40 argument tests/unit/test_j.py r = json.loads(t.splitlines()[0])\n
 v40 map tests/unit/test_j.py rows = list(map(json.loads, t.splitlines()))\n
 v40 hop tests/unit/test_j.py lines = t.splitlines()\nrows = [json.loads(x) for x in lines]\n
 v40 annotated-hop tests/unit/test_j.py lines: list = t.splitlines()\nrows = [json.loads(x) for x in lines]\n
+v41 text scripts/zz/enc.py import subprocess\nsubprocess.run(["git"], text=True)\n
+v41 universal_newlines dadaia_workspace/zz/enc.py import subprocess\nsubprocess.run(["git"], universal_newlines=True)\n
 doctor-section-subset sections-read dadaia_workspace/zz/s.py x = report['sections']\n
 doctor-section-subset section-literal dadaia_workspace/zz/s.py x = ['workspace', 'ledgers']\n
 no-size-pin st_size tests/unit/test_pin.py assert p.stat().st_size <= 10240\n
@@ -653,6 +676,7 @@ _PLANTS: dict[str, dict[str, Plant]] = {
         **_rows("v39", "zz-unknown"),
     },
     "v40": {},
+    "v41": {},
     "doctor-section-subset": {
         "no-sections": _edit(f"{PKG}/zz/near2.py", '"ledgers"', "Section.LEDGERS")
     },
