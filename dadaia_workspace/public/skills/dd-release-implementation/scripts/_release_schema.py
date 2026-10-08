@@ -39,6 +39,7 @@ _STATUS_RE = re.compile(r"^\*\*Status:\*\*\s*(.+?)\s*$", re.MULTILINE)
 ORIGIN_KINDS = ("backlog", "bugs", "findings")
 _ORIGIN_RE = re.compile(r"^\*\*Origin:\*\*[ \t]*(.*?)[ \t]*$", re.MULTILINE)
 _ORIGIN_GRAMMAR = "operator-demand | backlog:<ids>; bugs:<ids>; findings:<ids>, each kind once"
+TASK_ID_RE = re.compile(r"^J[1-9][0-9]*(?:\.S[1-9][0-9]*)?\.T[1-9][0-9]*$")
 
 
 def utc_now() -> str:
@@ -218,12 +219,31 @@ def stage_writes(body: str) -> list[list[str]]:
 
 
 def job_errors(text: str, rel: str) -> list[str]:
-    """Why job file *text* at *rel* is malformed: no `## Stage` heading, a stage with no
-    `- Contract:` line, or two tasks of one stage writing one path."""
+    """Why a current task table or historical stage-shaped job file is malformed."""
     stages = re.split(r"^## Stage ", text, flags=re.MULTILINE)[1:]
+    task_rows: list[tuple[str, str, list[str]]] = []
+    for line in text.splitlines():
+        cells = [cell.strip() for cell in line.strip().strip("|").split("|")]
+        if len(cells) >= 3 and TASK_ID_RE.fullmatch(cells[0]):
+            task_rows.append((cells[0], cells[1], writes(f"`W:` {cells[2]}")))
+            continue
+        match = re.match(r"^[-*+]\s+(J\d+(?:\.S\d+)?\.T\d+)\s+", line)
+        if match:
+            task_rows.append((match.group(1), line.partition("—")[2], writes(line)))
+    if not task_rows and not stages:
+        return [f"{rel} has no task carrying id, AC and exact `W:` set"]
+    errors = [
+        f"{rel} task {task_id} has no AC"
+        for task_id, ac, _ in task_rows
+        if not re.search(r"\bAC\d", ac)
+    ]
+    errors += [
+        f"{rel} task {task_id} has no exact `W:` set"
+        for task_id, _, paths in task_rows
+        if not paths
+    ]
     if not stages:
-        return [f"{rel} has no '## Stage <id>' heading"]
-    errors: list[str] = []
+        return errors
     for body in stages:
         stage, tasks = body.split(maxsplit=1)[0], stage_writes(body)
         if not re.search(r"^- Contract:", body, re.MULTILINE):
@@ -231,4 +251,51 @@ def job_errors(text: str, rel: str) -> list[str]:
         flat = [path for paths in tasks for path in set(paths)]
         errors += [f"{rel} stage {stage}: two tasks write {path} — `W:` sets overlap"
                    for path in sorted({p for p in flat if flat.count(p) > 1})]  # fmt: skip
+    return errors
+
+
+def plan_errors(text: str) -> list[str]:
+    """Why a current PLAN's as-is review and DAG table cannot enter implementation."""
+    if not re.search(r"^## (?:\d+\. )?As-is review\s*$", text, re.MULTILINE):
+        return ["PLAN.md has no 'As-is review' section"]
+    section = re.split(r"^## DAG.*$", text, maxsplit=1, flags=re.MULTILINE)[1:]
+    if not section:
+        return ["PLAN.md has no '## DAG' section"]
+    lines = re.split(r"^#", section[0], maxsplit=1, flags=re.MULTILINE)[0].splitlines()
+    header_at = next((n for n, line in enumerate(lines) if line.lstrip().startswith("|")), None)
+    if header_at is None:
+        return ["PLAN.md DAG has no table"]
+    headers = [
+        cell.strip().strip("`").lower() for cell in lines[header_at].strip().strip("|").split("|")
+    ]
+    required = ("job", "waits on")
+    if any(name not in headers for name in required):
+        return ["PLAN.md DAG table must carry job and waits on columns"]
+    current = "wave" in headers or "w:" in headers
+    if current and not {"wave", "w:"}.issubset(headers):
+        return ["PLAN.md DAG table must carry wave and exact `W:` columns together"]
+    if not current:  # historical plans carry their overlap metadata in `### Hot files`.
+        return (
+            []
+            if re.search(r"^### Hot files\s*$", text, re.MULTILINE)
+            else ["PLAN.md DAG table has no wave and exact `W:` columns"]
+        )
+    wave_at, writes_at = headers.index("wave"), headers.index("w:")
+    by_wave: dict[str, list[str]] = {}
+    for line in lines[header_at + 2 :]:
+        if not line.lstrip().startswith("|"):
+            continue
+        cells = [cell.strip() for cell in line.strip().strip("|").split("|")]
+        if len(cells) != len(headers) or not cells[0]:
+            continue
+        paths = re.findall(r"`([^`]+)`", cells[writes_at])
+        if not cells[wave_at].isdigit() or not paths:
+            return [f"PLAN.md DAG job {cells[0]} has no numeric wave and exact `W:` set"]
+        by_wave.setdefault(cells[wave_at], []).extend(paths)
+    errors: list[str] = []
+    for wave, paths in by_wave.items():
+        errors += [
+            f"PLAN.md DAG wave {wave}: two jobs write {path} — `W:` sets overlap"
+            for path in sorted({path for path in paths if paths.count(path) > 1})
+        ]
     return errors

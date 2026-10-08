@@ -1,8 +1,6 @@
 #!/usr/bin/env python3
-"""The worktree name grammar and its one path reader — module data the gate imports: a folder
-per rc holding sibling trees, `worktrees/<repo>/<M.m.p>-rc<N>/{define,reconcile,<job>,
-<job>--<task-id>}`, and `worktrees/<repo>/backlog/<slug>` or `hotfix/<bug-id>` outside one; tree name `<a>/<b>` is
-on the branch `wt/<a>/<b>`. A task tree is cut from its job branch and lands back on it."""
+"""The worktree name grammar and its one path reader: one-segment plain changes plus release,
+backlog and hotfix trees. A task tree is cut from its job branch and lands back on it."""
 
 from __future__ import annotations
 
@@ -17,7 +15,7 @@ _WORD = r"[a-z0-9]+(?:-[a-z0-9]+)*"  # single hyphens: `--` separates a job from
 _TASK = r"(?:--(?P<task>[A-Za-z0-9]+(?:[.-][A-Za-z0-9]+)*))?"
 NAME_RE = re.compile(
     rf"^(?:(?P<rc>(?P<v>\d+\.\d+\.\d+)-rc\d+)/(?P<job>{_WORD}){_TASK}|backlog/(?P<slug>{_WORD})"
-    rf"|hotfix/(?P<bug>{_WORD}))$"
+    rf"|hotfix/(?P<bug>{_WORD})|(?P<plain>(?!(?:backlog|hotfix)$){_WORD}))$"
 )
 
 
@@ -37,6 +35,8 @@ def locate(rel: str) -> tuple[str, str | None, tuple[str, ...]] | None:
         return parts[1], None, parts[2:]
     if len(parts) >= 4 and parts[0] == "worktrees":
         return parts[1], f"{parts[2]}/{parts[3]}", parts[4:]
+    if len(parts) >= 3 and parts[0] == "worktrees":
+        return parts[1], parts[2], parts[3:]
     return None
 
 
@@ -53,6 +53,12 @@ def base(name: str, work: str) -> str:
     """The branch tree *name* is cut from and lands on: its job branch for a task, else *work*."""
     match = NAME_RE.match(name)
     return branch(f"{match['rc']}/{match['job']}") if match and match["task"] else work
+
+
+def plain(name: str) -> bool:
+    """Whether *name* is the one-segment light-worktree shape."""
+    match = NAME_RE.match(name)
+    return bool(match and match["plain"])
 
 
 def non_code(name: str) -> bool:

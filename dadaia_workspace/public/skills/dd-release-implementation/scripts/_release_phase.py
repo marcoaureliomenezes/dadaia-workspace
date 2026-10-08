@@ -7,7 +7,6 @@ and its milestone move in one act, so they cannot disagree.
 
 from __future__ import annotations
 
-import re
 import sys
 from pathlib import Path
 
@@ -20,6 +19,7 @@ from _release_schema import (  # noqa: E402
     STATE,
     extract_status,
     job_errors,
+    plan_errors,
     utc_now,
 )
 from _release_store import SCRIPT, Live, Refusal, State, commit, live_release  # noqa: E402
@@ -107,11 +107,8 @@ def set_phase(specs: Path, phase: str, sha: str) -> tuple[str, str]:
         candidate = _refuse_unapproved_docs(live)
         plan = (candidate / "PLAN.md").resolve()
         text = plan.read_text(encoding="utf-8")
-        missing = [h for h in ("## DAG", "### Hot files") if not re.search(f"^{h}", text, re.M)]
-        if errors := [f"PLAN.md has no '{h}' section" for h in missing]:
-            raise Refusal(
-                errors[0], f"Operator action: write the DAG table and hot files in {plan}"
-            )
+        if errors := plan_errors(text):
+            raise Refusal(errors[0], f"Operator action: correct the as-is review and DAG in {plan}")
         for job in sorted(candidate.glob("tasks/*.md")):
             if errors := job_errors(job.read_text(encoding="utf-8"), f"tasks/{job.name}"):
                 raise Refusal(errors[0], f"Operator action: correct {job.resolve()} "
