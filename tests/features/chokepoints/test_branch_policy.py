@@ -20,7 +20,6 @@ from dadaia_workspace.features.chokepoints.branch_policy import (
     parse_push_stdin,
 )
 from dadaia_workspace.features.specs.canon import canon_violations
-from dadaia_workspace.features.specs.doctor_adr import cites_an_accepted_adr
 from dadaia_workspace.infrastructure.git_objects import GitSubprocessObjectReader
 from tests.fakes import gate_fixes
 from tests.fixtures.real_git import PushRepo
@@ -41,7 +40,7 @@ def _decide(stdin: str, repo: PushRepo, flow: Gitflow) -> Decision:
     refs, malformed = parse_push_stdin(stdin)
     return push_gate_decision(
         refs, gitflow=flow, fixes=replace(gate_fixes(), work=f"{flow.work_prefix}0.6.0"), object_source=GitSubprocessObjectReader(),
-        repo=repo.path, canon_violations_fn=canon_violations, cites_accepted_adr=cites_an_accepted_adr(None), malformed_lines=malformed,
+        repo=repo.path, canon_violations_fn=canon_violations, malformed_lines=malformed,
     )  # fmt: skip
 
 
