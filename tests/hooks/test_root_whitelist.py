@@ -187,7 +187,6 @@ def test_the_fix_creates_the_agents_own_temp_dir(
     assert any((tmp / day).as_posix() in fix for day in days)
 
 
-@pytest.mark.xfail(strict=True, reason="bug root-gate-blocks-editing-an-existing-entry")
 @pytest.mark.parametrize(
     ("tool_name", "entry", "target"),
     [
