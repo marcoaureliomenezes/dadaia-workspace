@@ -284,10 +284,22 @@ def _memory_record_error(state: dict[str, Any]) -> str:
     return ""
 
 
+def _on_principal(specs: Path) -> bool:
+    """HEAD is the branch the constitution's `gitflow:` line names `principal`; a detached HEAD,
+    an absent line or an unreadable one is not, so the window stays judged."""
+    try:
+        line = next(x for x in (specs / "constitution.md").read_text("utf-8").splitlines() if x.startswith("gitflow:"))  # fmt: skip
+        principal = json.loads(line[len("gitflow:") :])["principal"]
+    except (OSError, StopIteration, ValueError, KeyError, TypeError):
+        return False
+    head = subprocess.run(["git", "symbolic-ref", "--short", "HEAD"], cwd=specs.parent, capture_output=True, text=True, check=False)  # fmt: skip
+    return head.returncode == 0 and head.stdout.strip() == principal
+
+
 def _window_findings(specs: Path) -> list[dict[str, Any]]:
     """CLOSURE: the latest memory entry names its window, is re-judged over its
     [since, until], and no atom's sources moved over [until, HEAD] — code after the
-    entry is unreconciled. Judged only while `until` is history of HEAD."""
+    entry is unreconciled. Closed once HEAD is on the principal."""
     try:
         live = live_release(specs)
     except Refusal:
@@ -303,8 +315,8 @@ def _window_findings(specs: Path) -> list[dict[str, Any]]:
         return [finding(rel, 1, message, fix)]
     entry = [e for e in live.state["log"] if isinstance(e, dict) and e.get("kind") == "memory"][-1]
     until = str(entry["until"])
-    if subprocess.run(["git", "merge-base", "--is-ancestor", until, "HEAD"], cwd=specs.parent, capture_output=True, check=False).returncode == 1:  # fmt: skip
-        return []  # squash-merged off the principal: the window is not this tree's history
+    if _on_principal(specs):
+        return []  # promoted onto the principal: the window is closed
     try:
         errors = memory_errors(specs, "CLOSURE", entry)
         errors += [f"atom {a['slug']!r} moved after the memory entry's until {until[:12]}: "

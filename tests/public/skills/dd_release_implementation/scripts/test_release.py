@@ -737,6 +737,7 @@ def test_check_is_clean_when_until_was_squash_merged_off_the_principal(
     script: Path, tmp_path: Path
 ) -> None:
     root, specs, base = _memory_repo(tmp_path, script)
+    _declare_principal(specs, _git(root, "rev-parse", "--abbrev-ref", "HEAD"))
     _side_branch_until(root, specs, base, "--squash")
 
     result = _run(script, "check", "--specs", str(specs), cwd=root)
@@ -748,6 +749,7 @@ def test_check_names_the_moved_source_when_until_is_history_of_head(
     script: Path, tmp_path: Path
 ) -> None:
     root, specs, base = _memory_repo(tmp_path, script)
+    _declare_principal(specs, "trunk")
     until = _side_branch_until(root, specs, base, "--no-ff", "-m", "merge side")
 
     result = _run(script, "check", "--specs", str(specs), cwd=root)
@@ -764,7 +766,6 @@ def _declare_principal(specs: Path, branch: str) -> None:
     )
 
 
-@pytest.mark.xfail(strict=True, reason="release-check-skips-a-rebased-away-until")
 def test_check_refuses_an_amend_orphaned_until_off_the_principal(
     script: Path, tmp_path: Path
 ) -> None:
@@ -783,7 +784,6 @@ def test_check_refuses_an_amend_orphaned_until_off_the_principal(
     assert f"{until} is not an ancestor of HEAD" in result.stdout
 
 
-@pytest.mark.xfail(strict=True, reason="release-check-skips-a-rebased-away-until")
 def test_check_is_clean_after_a_no_ff_promote_on_the_principal(script: Path, tmp_path: Path) -> None:
     root, specs, base = _memory_repo(tmp_path, script)
     _declare_principal(specs, _git(root, "rev-parse", "--abbrev-ref", "HEAD"))
@@ -792,6 +792,18 @@ def test_check_is_clean_after_a_no_ff_promote_on_the_principal(script: Path, tmp
     result = _run(script, "check", "--specs", str(specs), cwd=root)
 
     assert result.returncode == 0, result.stdout
+
+
+def test_check_judges_a_detached_head_on_the_principal_commit(script: Path, tmp_path: Path) -> None:
+    root, specs, base = _memory_repo(tmp_path, script)
+    _declare_principal(specs, _git(root, "rev-parse", "--abbrev-ref", "HEAD"))
+    until = _side_branch_until(root, specs, base, "--no-ff", "-m", "merge side")
+    _git(root, "switch", "-q", "--detach")
+
+    result = _run(script, "check", "--specs", str(specs), cwd=root)
+
+    assert result.returncode == 1
+    assert "'alpha'" in result.stdout and until[:12] in result.stdout
 
 
 def test_check_is_clean_after_a_squash_promote_on_the_principal(script: Path, tmp_path: Path) -> None:
