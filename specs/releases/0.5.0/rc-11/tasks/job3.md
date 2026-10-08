@@ -2,7 +2,7 @@
 
 **Status:** Draft
 
-The following wrapper exists only so the pre-Job-1 checker can validate the definition. J1.T4 removes the heading and Contract line before this job opens; its task table is unchanged.
+The following wrapper exists only so the pre-Job-1 checker can validate the definition. J1.T5 removes the heading and Contract line after J1.T2–J1.T4 merge and before this job opens; its task table is unchanged.
 
 ## Stage J3.S1 — compatibility wrapper
 

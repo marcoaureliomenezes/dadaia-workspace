@@ -21,7 +21,7 @@
 
 ## 1. Problem
 
-The default development path grew into release, candidate, job, stage and task rituals whose repeated gates, parsers, ledgers and generated narratives cost more than the product changes they protect. rc-10 made the cost visible: about 47 hours and 335 tasks. The product needs a small safe core in which ceremony is opt-in, tests are written before implementation, one review judges one job, and persisted records contain product facts rather than duplicated code facts.
+The default development path grew into release, candidate, job, stage and task rituals whose repeated gates, parsers, ledgers and generated narratives cost more than the product changes they protect. rc-10 made that cost visible. The product needs a small safe core in which ceremony is opt-in, tests are written before implementation, one review judges one job, and persisted records contain product facts rather than duplicated code facts.
 
 The governing product philosophy is Features × Futures: a feature or fix spends future options when it adds coupling, so delivery alternates with work that restores options. The bug window review is the concrete recovery mechanism.
 
@@ -86,7 +86,7 @@ The governing product philosophy is Features × Futures: a feature or fix spends
 
 - AC6.1 (integration): A push to `wt/**` or `feature/**` must run Linux jobs only, with coverage measured once inside unit plus integration.
 - AC6.2 (integration): A pull request must run the complete Linux, Windows and macOS matrix.
-- AC6.3 (integration): This repository's `verify:` must be the fast check — lint, mypy, guards and unit tests — with an approximately one-minute target; no release law may promise a fixed wall time.
+- AC6.3 (integration): This repository's `verify:` must be the fast check — lint, mypy, guards and unit tests. Its numeric target and measured baseline belong only to the PLAN; no release law may promise a fixed wall time.
 
 ### FR7 — AI-entity source and derivation cleanup
 
@@ -143,7 +143,7 @@ The governing product philosophy is Features × Futures: a feature or fix spends
 
 ### Governance proposals requiring the approval turn
 
-Approval of this SPEC authorizes the main thread to record these exact rulings; their current `proposed` state or shorthand in the grill is not acceptance:
+This Draft enumerates proposals only; grill shorthand and SPEC approval are not accepted ADRs. After the operator concretely rules on this exact set, the main thread transcribes each status and `ruling` it owns. Before implementation, its accepted Features × Futures record and the dd-product-engineer's authorized constitution amendment land together in one define-tree governance commit. Only a later, separate approval-status commit may change SPEC and PLAN to `Approved`. Q21 instead follows the reconciliation sequence below.
 
 1. Supersede ADR 0134 by deleting the venv guard behaviour, while retaining the workspace venv as the CLI runtime.
 2. Amend ADR 0151 by deleting M3 only; retain operator-only acceptance, ruling evidence, ruled lineage and the release canon.
@@ -156,6 +156,8 @@ Approval of this SPEC authorizes the main thread to record these exact rulings; 
 9. Reject proposed ADRs 0224 and 0226: the freeze and own-judge refusal they extend are retired.
 10. Accept a new ADR for the Features × Futures constitution principle.
 11. Accept one new Q21 ADR authorizing both canonical-memory changes: delete QUALITY P-29 and replace ARCHITECTURE P-17 with structural registry, grant, ownership and source/projection checks that carry no content hash or `hash_tuple`. The new record has no `supersedes` or `amends` target: ADR 0012 is rejected and must not be superseded, while P-17 names no prior ADR. The accepted Q21 ADR is the sole decision cited by both changed principles in their shared commit.
+
+At Reconciliation, after the operator's concrete Q21 ruling, the main thread transcribes the accepted Q21 ADR and the dd-product-engineer authors the authorized QUALITY P-29 deletion and ARCHITECTURE P-17 replacement. The record and both memory changes land together in one reconciliation commit. No implementation task owns the constitution, `decisions.jsonl`, ARCHITECTURE or QUALITY changes.
 
 ### Delivery constraints
 
@@ -178,4 +180,4 @@ Approval of this SPEC authorizes the main thread to record these exact rulings; 
 
 ## 6. Open questions
 
-No product-behaviour question remains after Q1–Q23. The revised PLAN derives a 4.5–6.9-hour critical path and 8.2–12.6 aggregate agent-hours from every task, gate/review, dependency and reconciliation act; its upper path preserves 0.9 hour inside the operator's 7.8-hour cap. This SPEC remains Draft for the operator's governance rulings and independent definition review; any new edge or write outside the listed sets returns it to Draft arithmetic and, if the upper path exceeds the cap, requires an explicit operator choice of the requirement cluster that moves to rc-12.
+No product-behaviour question remains after Q1–Q23. The PLAN is the sole authority for task, gate/review, dependency, reconciliation, critical-path and aggregate-effort arithmetic. This SPEC remains Draft for the operator's governance rulings and independent definition review; any new edge or write outside the listed sets requires the PLAN to be recalculated, and an upper path beyond the 7.8-hour cap requires an explicit operator choice of the requirement cluster that moves to rc-12.

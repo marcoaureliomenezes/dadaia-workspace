@@ -32,11 +32,23 @@ Order per row is DELETE → REBUILD → UPDATE → KEEP → ADD. The detailed ev
 - Every implementation task has two main-thread dispatches: the first owns all test-path changes and commits the failing acceptance tests; a fresh second dispatch owns production/source changes and may not touch a declared or fallback test path. Review rework follows the same split when it adds or changes behavior.
 - Job review retains `reviewed_sha` plus `diff_sha256`; merge recomputes the digest. The work branch's tracked `verify:` is the only verify authority.
 
+## Governance acts
+
+These are ordered governance acts, not implementation jobs and not authority for a write now.
+
+### G0 — approval/define governance sequence
+
+G0 starts only after the operator approves the exact Draft SPEC and its proposals. First, the main thread transcribes the accepted ADR records and operator rulings while the dd-product-engineer, authorized by that approval, authors the Features × Futures constitution amendment. The main thread commits those completed writes together in one joint governance commit. Its exact `W:` is `specs/ADRs/decisions.jsonl`, `specs/constitution.md`; the software engineer owns neither path. Second, the product engineer changes only the SPEC status and the software engineer changes only the PLAN/job statuses to `Approved`, and the main thread records those changes in a separate approval-status-only commit. That commit's exact `W:` is `specs/releases/0.5.0/rc-11/SPEC.md`, `specs/releases/0.5.0/rc-11/PLAN.md`, `specs/releases/0.5.0/rc-11/tasks/job1.md`, `specs/releases/0.5.0/rc-11/tasks/job2.md`, `specs/releases/0.5.0/rc-11/tasks/job3.md`, `specs/releases/0.5.0/rc-11/tasks/job4.md`. Third, an independent dd-code-reviewer reviews the exact two-commit definition delta at its resulting HEAD, the main thread runs the canon checks, and the main thread completes the define merge. Job 1 may be dispatched only after that review, those checks and the define merge succeed. Q21's accepted record is deliberately excluded from G0 and reserved for R-Q21 below so its decision and canonical-memory changes share their required commit.
+
+### R-Q21 — reconciliation governance commit
+
+After implementation enters reconciliation, the main thread transcribes the operator-approved Q21 ADR and ruling while the dd-product-engineer authors the Q21 changes to the two canonical-memory principles. The main thread commits those writes together before the remaining memory/catalog pass. Exact `W:` is `specs/ADRs/decisions.jsonl`, `specs/memory/ARCHITECTURE.md`, `specs/memory/QUALITY.md`. Only the main thread writes accepted/ruling fields; only the product engineer writes canonical memory.
+
 ## DAG
 
 | job | waits on | why |
 |---|---|---|
-| Job 1 | — | dependency kernel, transition parser, all AGENTS/SKILL law, worktrees, CI, hooks and push gate land first |
+| Job 1 | — | first implementation job; dispatch is blocked until G0's two commits, exact-head independent review, canon checks and define merge complete; dependency kernel, transition parser, all AGENTS/SKILL law, worktrees, CI, hooks and push gate land first |
 | Job 2 | Job 1 | imports the one task-id parser; deletes bug/audit derived state together with `_release_tree.py` and the existing release tests that consume it |
 | Job 3 | Job 1 | consumes the new task/job parser and document dialect; its dedicated lean-state test file does not share Job 2's consumer tests |
 | Job 4 | Job 1 | Job 1 temporarily re-records `behavior-map.json` so its verify remains green; Job 4 then deletes the hash fields and validators |
@@ -69,10 +81,10 @@ This subsection is compatibility metadata for the current `release.py phase IMPL
 
 The complete per-task paths live in `tasks/job1.md` through `tasks/job4.md`. No glob is a write grant. Generated runtime projections (`.agents/`, `.claude/`, `.codex/`, `.kimi-code/`) are never in W; public sources are staged and installed after their owning job merges.
 
-- Job 1 owns the dependency parser and phase bridge, worktree scripts, CI configuration, hook/push deletion, `public/entities/registry.json`, every AGENTS.md/SKILL.md source authorized by SPEC AC7.3, their installed repository counterparts, supporting release/worktree prose, shipped-template history and its temporary behavior-map re-record.
-- Job 2 owns bug/audit code and schemas, ledger migration, the bug-schema contract test, `LINEAGE.md`, `FINDINGS-FORMAT.md`, `_release_tree.py` and its existing balance/deferred consumer tests. It does not edit AGENTS.md or SKILL.md.
+- Job 1 owns the dependency parser and phase bridge, worktree scripts, CI configuration, the active T2 eval project writer and its runtime E2E owner, hook/push deletion, `CONTEXT.md`, `docs/getting-started.md`, `public/entities/registry.json`, every AGENTS.md/SKILL.md source authorized by SPEC AC7.3, their installed repository counterparts, supporting release/worktree prose, shipped-template history and its temporary behavior-map re-record. Documentation semantics are verified by source review, not new prose assertions. It does not own the constitution.
+- Job 2 owns bug/audit code and schemas, ledger migration, the bug-schema contract test, `LINEAGE.md`, `FINDINGS-FORMAT.md`, `_release_tree.py`, its existing balance/deferred consumer tests, and the semantic plus hash-marker cleanup of `docs/bug-ledger-lessons.md`, `docs/bug-loop.md` and `docs/concepts.md`. It does not edit AGENTS.md or SKILL.md.
 - Job 3 owns the remaining release writers/schema, `RELEASE-EVENTS.md`, the release doctor if its rigid duplicate is present, and a dedicated lean-state acceptance test. It does not edit bug/audit files, `_release_tree.py`, AGENTS.md or SKILL.md.
-- Job 4 owns only derived-hash code/data/docs and its tests. Product memory (`specs/memory/ARCHITECTURE.md`, `QUALITY.md`, `product/agents/agentic-entities.md`, catalog) is reserved for the dd-product-engineer reconciliation pass.
+- Job 4 owns only derived-hash code/data, the remaining hash-only docs and its tests. It does not own worktree or bug semantic prose. Product memory is reserved for dd-product-engineer reconciliation; R-Q21 owns the exact canonical pair and its ADR, while the remaining drift worklist and catalog are the later reconciliation pass.
 
 ## Schedule and estimate
 
@@ -80,24 +92,30 @@ The clean unchanged-main rerun supplied by the main thread is the baseline proof
 
 | act | waits on | elapsed | uncertainty / contingency |
 |---|---|---:|---|
-| J1.T1 transition RED | — | 0.6–0.9 h | existing cross-contract tests make deletion triage the main variance |
+| G0.1 main ADR/ruling transcription | operator approval | 0.1–0.2 h | exact accepted set from the approved SPEC; excludes Q21 |
+| G0.2 product constitution amendment | operator approval | 0.1–0.2 h | runs beside G0.1; Features × Futures only |
+| G0.3 two commits + exact-head review/checks + define merge | G0.1, G0.2 | 0.1–0.3 h | joint ADR+constitution commit, separate approval-status-only commit, independent exact-two-commit-delta review, canon checks and define merge; the allowance assumes this already-refined docs-only delta needs no rework, and any review or merge overrun invokes the zero-contingency decision below; human decision latency before G0 is unbounded and excluded |
+| J1.T1 transition RED | G0.3 | 0.6–0.9 h | existing cross-contract behavior tests, the eval runtime row and structural doc-hash deletion make deletion triage the main variance; no prose/vocabulary assertion is added |
 | J1.T2 parser/worktree/phase implementation | J1.T1 | 0.7–1.1 h | parser compatibility and recorded-base merge are the risk |
-| J1.T3 hook/push/CI implementation | J1.T1 | 0.5–0.8 h | CI selector and deletion sweep may expose one extra contract row |
-| J1.T4 law/ecosystem implementation | J1.T1 | 0.8–1.2 h | 15-rule ecosystem/cross-citation sweep is the upper-bound driver |
+| J1.T3 hook/push/CI/eval implementation | J1.T1 | 0.5–0.8 h | CI selector, active eval writer and deletion sweep are inside the range |
+| J1.T4 law/glossary/ecosystem implementation | J1.T1 | 0.8–1.2 h | 15-rule ecosystem, canonical terminology and getting-started sweep are the upper-bound driver |
 | J1.T5 final compatibility metadata | J1.T2–J1.T4 | 0.2–0.4 h | includes opening from the updated job branch, four document edits, commit and task-merge `verify-task:`; it is not opened early and needs no rebase contingency |
 | Job 1 gate + review | J1.T5 | 0.4–0.6 h | includes public stage/install/doctor and one rework allowance over the post-transition head |
-| J2.T1 bug/audit/consumer RED | Job 1 | 0.6–0.9 h | balance/deferred tombstone triage spans existing release tests |
-| J2.T2 bug/audit/consumer implementation | J2.T1 | 1.2–1.8 h | one-time finding migration and `_release_tree.py` are the risk |
+| J2.T1 bug/audit/consumer RED | Job 1 | 0.6–0.9 h | balance/deferred tombstone triage spans existing runtime and schema tests; semantic documentation changes are review-only |
+| J2.T2 bug/audit/consumer/docs implementation | J2.T1 | 1.2–1.8 h | one-time finding migration, `_release_tree.py` and three semantic docs are inside the range |
 | Job 2 gate + review | J2.T2 | 0.4–0.6 h | one rework allowance |
 | J3.T1 lean-release RED | Job 1 | 0.5–0.8 h | dedicated owner file avoids Job 2 test overlap |
 | J3.T2 lean-release implementation | J3.T1 | 1.0–1.5 h | history-compatible log/schema reads are the risk |
 | Job 3 gate + review | J3.T2 | 0.4–0.6 h | one rework allowance |
-| J4.T1 structural-derivation RED | Job 1 | 0.4–0.7 h | deletion-test inventory is the variance |
-| J4.T2 structural-derivation implementation | J4.T1 | 1.0–1.5 h | docs marker removal and structural validator retention are the risk |
+| J4.T1 structural-derivation RED | Job 1 | 0.4–0.7 h | entity/hash deletion-test inventory is the variance; doc-validator deletion already landed in J1.T1 |
+| J4.T2 structural-derivation implementation | J4.T1 | 1.0–1.5 h | remaining hash-only docs and structural validator retention are the risk |
 | Job 4 gate + review | J4.T2 | 0.4–0.6 h | includes public doctor and one rework allowance |
-| Reconciliation + final review | Jobs 2–4 | 0.5–0.9 h | memory worklist or projection drift consumes the contingency |
+| R-Q21.1 main accepted-ADR transcription | Jobs 2–4 | 0.1–0.2 h | exact W is decisions.jsonl; no canonical-memory write by main |
+| R-Q21.2 product canonical-memory change | Jobs 2–4 | 0.2–0.3 h | runs beside R-Q21.1; exact W is ARCHITECTURE.md and QUALITY.md |
+| R-Q21.3 main same-commit check + commit | R-Q21.1, R-Q21.2 | 0.1–0.2 h | ADR and both canonical-memory changes land together |
+| Remaining reconciliation + final review | R-Q21.3 | 0.2–0.4 h | remaining drift worklist, catalog, projection and final checks |
 
-J1.T2–J1.T4 run in parallel after J1.T1; J1.T5 then runs alone before the gate. Job 1 elapsed is therefore `J1.T1 + max(T2,T3,T4) + T5 + gate/review` = 2.0–3.1 hours, while its aggregate effort is `T1 + T2 + T3 + T4 + T5 + gate/review` = 3.2–5.0 agent-hours. Jobs 2–4 then run in parallel; their elapsed and aggregate ranges are respectively 2.2–3.3, 1.9–2.9 and 1.8–2.8 hours because each job's two tasks and gate are sequential. The critical path is `Job 1 elapsed + max(Jobs 2–4 elapsed) + reconciliation` = 4.7–7.3 wall-clock hours. Aggregate effort is `Job 1 aggregate + Job 2 + Job 3 + Job 4 + reconciliation` = 9.6–14.9 agent-hours. The 7.8-hour cap retains 0.5 hour of upper-bound contingency; a new semantic edge, a Job 1 estimate above 3.5 hours or work outside the listed W sets returns this Draft to the main thread for an explicit scope decision. Q19's private `~/.claude` work is excluded from both estimates.
+G0.1 and G0.2 run in parallel, then G0.3 performs the joint governance commit, the separate approval-status-only commit, exact-head review and checks, and define merge in sequence: G0 elapsed is 0.2–0.5 hours and aggregate effort 0.3–0.7. The existing 0.1–0.3-hour G0.3 allowance covers that short docs-only sequence only when no rework is required; it does not hide reviewer or merge work. J1.T2–J1.T4 run in parallel after J1.T1; J1.T5 then runs alone before the gate. Job 1 elapsed remains `J1.T1 + max(T2,T3,T4) + T5 + gate/review` = 2.0–3.1 hours, while aggregate effort remains 3.2–5.0. Jobs 2–4 then run in parallel; their elapsed and aggregate ranges remain 2.2–3.3, 1.9–2.9 and 1.8–2.8 hours. R-Q21.1 and R-Q21.2 run in parallel, followed by R-Q21.3 and remaining reconciliation: reconciliation elapsed is 0.5–0.9 hours and aggregate effort 0.6–1.1. The complete post-approval critical path is `G0 elapsed + Job 1 elapsed + max(Jobs 2–4 elapsed) + reconciliation elapsed` = 4.9–7.8 wall-clock hours. Aggregate effort is `G0 aggregate + Job 1 aggregate + Job 2 + Job 3 + Job 4 + reconciliation aggregate` = 10.0–15.8 agent-hours. The upper bound consumes the entire 7.8-hour cap: there is zero contingency. Any new path, semantic edge, review rework beyond the stated allowances or estimate growth returns this Draft to the operator for a choice between moving a requirement cluster to rc-12 or relaxing the cap; scope is never silently dropped. Q19's private `~/.claude` work and the operator's decision latency are excluded from agent-work estimates.
 
 ## Verification and closure
 
