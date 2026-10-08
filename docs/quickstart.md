@@ -118,7 +118,7 @@ worktree.
 
 ## 6. The first release
 
-<!-- derived-from: release-lifecycle sha256:10740254e84a -->
+<!-- derived-from: release-lifecycle sha256:99a806b1d9d6 -->
 
 `release.py new` is one birth act, all or nothing: a `SPEC.md` stub in
 `specs/releases/<id>/rc-1/` plus `_RELEASE.json` in `DEFINITION` at the release root, refusing a second live
