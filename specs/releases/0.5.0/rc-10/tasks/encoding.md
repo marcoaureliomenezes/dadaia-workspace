@@ -63,3 +63,13 @@ Paths are relative to the repo root; aliases as in `PLAN.md` (`f/`, `pub/`, `S/`
 | task | AC | `W:` | owner tests / RED |
 |---|---|---|---|
 | JE.S6.T1 | AC9.1 | `dadaia_workspace/public/skills/dd-release-implementation/scripts/_release_tree.py` (`_on_principal` deleted; `_window_findings` and `check` take the principal), `dadaia_workspace/public/skills/dd-release-implementation/scripts/release.py` (`check --principal`), `dadaia_workspace/infrastructure/ledger_scripts.py` (a `LedgerScript` row field naming the flag; the value from `core.gitflow.read_gitflow`), `tests/public/skills/dd_release_implementation/scripts/test_release.py` (the JE.S1 rows and the two frozen JT.S1.T4 rows pass `--principal`; `_declare_principal` leaves), `tests/infrastructure/test_ledger_scripts__release_window_principal.py` (marker leaves) | its JE.S5.T1 rows. One `refactor(bugs): release-check-parses-the-gitflow-in-the-skill — REBUILD _window_findings: …` commit. Lineage: cc544f66e, d1e29503b, b50f0c971, 73983ae3c, dd5399f08, 2c7369c9a, 7e05b3148. Decider: `core.gitflow.read_gitflow` (ADR 0144), the skill reads no constitution. Gate change: hand mutants, adversary rows. Net ≤ 0 over `_release_tree.py` |
+
+## Stage JE.S7 — the closure pass after the principal REBUILD (a barrier after JE.S6)
+
+- Contract: no tests; exit `release.py check` exit 0, `bugs.py balance --check` exit 0, `bugs.py status` 0 open and 0 deferred; envelope `specs/memory/**`, the derived docs whose atom changed, `specs/releases/0.5.0/_RELEASE.json`, this file; ACs AC10.1, AC10.2
+- The authorized rebase onto the work branch's registration of `release-check-parses-the-gitflow-in-the-skill` orphaned the first memory entry's `until`; that entry left history, so one memory entry covers the whole window from the tail's.
+
+| task | AC | `W:` | owner tests / RED |
+|---|---|---|---|
+| JE.S7.T1 | AC10.1 | `specs/memory/QUALITY.md` (`## Bugs` by `bugs.py balance --write`), `specs/memory/product/platform/workspace-doctor.md` (the release script's check takes the principal), `specs/memory/product/catalog.json`, `specs/memory/product/index.md`, the derived docs of a changed atom, `specs/releases/0.5.0/_RELEASE.json` (the memory entry by `release.py memory`) | `release.py check` exit 0, `tests/contract/test_docs_derived_from_memory.py` |
+| JE.S7.T2 | — | this file | close task, last: `test-audit:`, `mutation:` lines; the job's `done` line |
