@@ -490,6 +490,15 @@ def test_a_task_cannot_rewrite_its_own_gate(root: Path) -> None:
     assert "ci task AGENTS.md" in landed.stdout.splitlines()
 
 
+def test_a_verify_line_whose_shell_body_climbs_out_of_the_repo_runs(root: Path) -> None:
+    """Bug own-judge-check-hands-the-verify-argv-to-git-as-paths: the gate runs the declared argv;
+    no token of it is read as a path, so a shell body naming `../../../x` lands the task."""
+    body = "verify-task: sh -c 'echo \"$(pwd)/../../../x\"; exit 0' --\n"
+    commit(root / "repos/r", "AGENTS.md", "verify: python scripts/ci.py job\n" + body)
+    landed = run(root, "merge", str(_task_commit(root)))
+    assert (landed.returncode, "Traceback" in landed.stderr) == (0, False), landed.stderr
+
+
 def test_the_stage_gate_runs_the_work_branch_verify_stage_line(root: Path) -> None:
     """LOW 3: a task that rewrote `verify-stage:` on the job branch does not choose its gate."""
     line = "verify: python scripts/ci.py job\nverify-stage: python scripts/ci.py task\n"
