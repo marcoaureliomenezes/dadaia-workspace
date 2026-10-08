@@ -62,3 +62,24 @@ def test_install_leaves_only_ledger_owned_entries_under_claude(tmp_path: Path) -
     assert entries, "install must project into .claude/"
     assert [e for e in entries if e not in targets and e not in owned_dirs] == []
     assert ".claude/commands" not in entries
+
+
+@pytest.mark.xfail(strict=True, reason="public-install-never-restages-after-an-upgrade RED")
+def test_install_restages_a_staging_older_than_the_package(tmp_path: Path) -> None:
+    """Bug public-install-never-restages-after-an-upgrade: a staging left by an older
+    package reads as `stage:` drift, and `install` is the remedy doctor names."""
+    workspace_root = tmp_path / "workspace"
+    (workspace_root / ".dadaia" / "states").mkdir(parents=True)
+    manager = FileSystemPublicAssetManager()
+    manager.install(workspace_root, harness="claude")
+    staged = workspace_root / ".dadaia" / "agentic" / "skills" / "dd-grill-me" / "SKILL.md"
+    staged.write_text("older package\n", encoding="utf-8")
+
+    manager.install(workspace_root, harness="claude")
+
+    drift = [
+        line.text
+        for line in manager.doctor(workspace_root)
+        if line.text.startswith("stage:") and line.status.blocking
+    ]
+    assert drift == []
