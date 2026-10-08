@@ -61,3 +61,16 @@ def test_the_release_instant_reader_reads_an_instant_with_no_offset_as_utc() -> 
     out = subprocess.run([sys.executable, "-c", probe, str(_SCRIPTS), *instants],
                          capture_output=True, text=True, env=env, check=True)  # fmt: skip
     assert out.stdout.split() == ["2026-10-06T23:30:00+00:00"] * 3 + ["2026-10-07T02:30:00+00:00"] + ["ValueError"] * 2  # fmt: skip
+
+
+@pytest.mark.xfail(strict=True, reason="the lean job parser is implemented by J1.T2")
+@pytest.mark.parametrize("task_id", ["J2.T3", "J2.S1.T3"], ids=["current", "historical"])
+def test_a_job_accepts_both_supported_task_id_shapes(task_id: str) -> None:
+    job = (
+        "# Job 2\n\n"
+        "| task | AC | `W:` | outcome |\n"
+        "|---|---|---|---|\n"
+        f"| {task_id} | AC2.1 | `src/x.py` | parser owner |\n"
+    )
+
+    assert _release_schema.job_errors(job, "tasks/job2.md") == []

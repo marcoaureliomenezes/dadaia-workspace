@@ -373,7 +373,8 @@ def test_the_job_gate_runs_scripts_ci_job_as_argv_on_the_head_it_lands(
     approve(root, head)
     work = git(repo, "rev-parse", "feature/0.5.0").strip()
     result = run(root, "merge", TREE, input="stdin leak\n")
-    assert "ci job" in result.stdout.splitlines() and "stdin leak" not in result.stdout
+    assert result.stdout.splitlines().count("ci job") == 1
+    assert "stdin leak" not in result.stdout
     assert git(repo, "rev-parse", "feature/0.5.0").strip() == (work if red else head)
     assert (result.returncode, tree.exists()) == ((1, True) if red else (0, False))
     if red:
@@ -430,84 +431,6 @@ def test_a_declared_verify_line_runs_as_argv_never_through_a_shell(root: Path) -
     assert not list(root.rglob("PWNED*"))
 
 
-def test_a_task_lands_on_its_job_branch_after_the_task_gate_with_no_verdict(root: Path) -> None:
-    """AC1.1, AC1.4: a red task gate lands nothing; a green one fast-forwards the job branch
-    in the job's tree, unreviewed; a stage with an open task cannot close, nor a job land."""
-    job, task = root / TREE, root / "worktrees/r" / TASK
-    assert run(root, "new", "r", TASK).returncode == 0
-    held = run(root, "stage", TREE)
-    assert held.returncode == 1 and _argv(held)[-2:] == ["merge", str(task)]
-    assert _argv(run(root, "merge", TREE))[-2:] == ["merge", str(task)]
-    red = commit(task, "RED-task", "")
-    refused = run(root, "merge", str(task))
-    assert refused.returncode == 1 and "ci task RED-task" in refused.stdout.splitlines()
-    assert git(job, "rev-parse", "HEAD").strip() != red
-    git(task, "rm", "-q", "RED-task")
-    git(task, "commit", "-qm", "green")
-    commit(task, "src/a.py")
-    sha = git(task, "rev-parse", "HEAD").strip()
-    landed = run(root, "merge", str(task))
-    assert landed.returncode == 0, landed.stderr
-    assert git(job, "rev-parse", "HEAD").strip() == sha and not task.exists()
-    assert not git(root / "repos/r", "branch", "--list", "wt/0.5.0-rc1/j1--J1.S1.T1").strip()
-    staged = run(root, "stage", TREE)
-    assert (staged.returncode, staged.stdout.splitlines()) == (
-        0, ["ci stage", f"[ok] stage gate green on wt/0.5.0-rc1/j1@{sha}"]
-    )  # fmt: skip
-
-
-def _task_commit(root: Path, rm: str = "", add: str = "src/b.py") -> Path:
-    """Open `TASK`, delete *rm*, write *add*, commit; return the task tree."""
-    task = root / "worktrees/r" / TASK
-    assert run(root, "new", "r", TASK).returncode == 0
-    if rm:
-        git(task, "rm", "-q", rm)
-    (task / add).parent.mkdir(parents=True, exist_ok=True)
-    (task / add).write_text("y = 1\n")
-    git(task, "add", add)
-    git(task, "commit", "-qm", "J1.S1.T1 work")
-    return task
-
-
-def test_the_task_gate_skips_deleted_files(root: Path) -> None:
-    """J1.S3.T14: a deleted path never reaches `verify-task:`."""
-    land(root, "src/a.py")
-    _task_commit(root, rm="src/a.py")
-    landed = run(root, "merge", f"worktrees/r/{TASK}")
-    assert landed.returncode == 0, landed.stderr
-    assert "ci task src/b.py" in landed.stdout.splitlines()
-
-
-def test_a_task_cannot_rewrite_its_own_gate(root: Path) -> None:
-    """J1.S3.T14 (ADR 0207): the task gate runs the work branch's `verify-task:`, not the task's."""
-    line = "verify: python scripts/ci.py job\nverify-task: python scripts/ci.py stage\n"
-    _task_commit(root, add="AGENTS.md")
-    task = root / "worktrees/r" / TASK
-    (task / "AGENTS.md").write_text(line)
-    git(task, "commit", "-qam", "J1.S1.T1 gate")
-    landed = run(root, "merge", f"worktrees/r/{TASK}")
-    assert landed.returncode == 0, landed.stderr
-    assert "ci task AGENTS.md" in landed.stdout.splitlines()
-
-
-def test_a_verify_line_whose_shell_body_climbs_out_of_the_repo_runs(root: Path) -> None:
-    """Bug own-judge-check-hands-the-verify-argv-to-git-as-paths: the gate runs the declared argv;
-    no token of it is read as a path, so a shell body naming `../../../x` lands the task."""
-    body = "verify-task: sh -c 'echo \"$(pwd)/../../../x\"; exit 0' --\n"
-    commit(root / "repos/r", "AGENTS.md", "verify: python scripts/ci.py job\n" + body)
-    landed = run(root, "merge", str(_task_commit(root)))
-    assert (landed.returncode, "Traceback" in landed.stderr) == (0, False), landed.stderr
-
-
-def test_the_stage_gate_runs_the_work_branch_verify_stage_line(root: Path) -> None:
-    """LOW 3: a task that rewrote `verify-stage:` on the job branch does not choose its gate."""
-    line = "verify: python scripts/ci.py job\nverify-stage: python scripts/ci.py task\n"
-    land(root, "AGENTS.md", line)
-    staged = run(root, "stage", TREE)
-    assert staged.returncode == 0, staged.stderr
-    assert staged.stdout.splitlines()[0] == "ci stage"
-
-
 def test_a_code_commit_made_on_the_job_branch_lands_once_reviewed(root: Path) -> None:
     """ADR 0190 (amended): a job merge does not judge how code reached the branch; the one review
     and the job gate judge the whole diff — a commit made directly on it lands like a task's."""
@@ -515,34 +438,6 @@ def test_a_code_commit_made_on_the_job_branch_lands_once_reviewed(root: Path) ->
     landed = run(root, "merge", TREE)
     assert landed.returncode == 0, landed.stderr
     assert (root / "repos/r/src/stray.py").is_file()
-
-
-@pytest.mark.parametrize(
-    ("declared", "act"),
-    [("", "add this repo's task gate as a verify-task: line to"),
-     ("FOO=1 python scripts/ci.py task", "make the verify-task: line of"),
-     ("python 'scripts/ci.py task", "make the verify-task: line of")],
-    ids=["absent", "env-assignment", "unbalanced-quote"],
-)  # fmt: skip
-def test_a_task_gate_line_absent_or_unstartable_refuses_with_a_fix_that_clears_it(
-    root: Path, declared: str, act: str
-) -> None:
-    """Bug verify-line-absent-refusal-sends-to-a-tree-the-gate-never-reads: the task gate
-    reads the work branch's `verify-task:`; an absent or unstartable line refuses with one
-    operator act on that tracked line, never a traceback, and doing that act lands the task."""
-    repo, agents = root / "repos/r", root / "repos/r/AGENTS.md"
-    line = f"verify-task: {declared}\n" if declared else ""
-    commit(repo, "AGENTS.md", "verify: python scripts/ci.py job\n" + line)
-    task = _task_commit(root)
-    refused = run(root, "merge", str(task))
-    assert refused.returncode == 1 and "Traceback" not in refused.stderr
-    tail = (" and commit it on feature/0.5.0" if not declared else
-            " on feature/0.5.0 one argv list that starts: it runs without a shell"
-            " — no VAR=value prefix, no sh -c")  # fmt: skip
-    assert fixes(refused) == [f"fix: Operator action: {act} {agents}{tail}"]
-    commit(repo, "AGENTS.md", "verify-task: python scripts/ci.py task\n")
-    landed = run(root, "merge", str(task))
-    assert landed.returncode == 0, landed.stderr
 
 
 @pytest.mark.parametrize(
@@ -641,3 +536,69 @@ def test_a_repo_declaring_only_verify_lines_lands_a_task_and_its_job(root: Path)
     landed = run(root, "merge", TREE)
     assert landed.returncode == 0, landed.stderr
     assert git(root / "repos/r", "rev-parse", "feature/0.5.0").strip() == sha
+
+
+@pytest.mark.xfail(strict=True, reason="task test separation is implemented by J1.T2")
+@pytest.mark.parametrize(
+    ("law", "test_path"),
+    [
+        ("tests: checks/**\n", "checks/check_feature.py"),
+        ("", "pkg/feature_test.go"),
+    ],
+    ids=["declared-test-path", "fallback-test-path"],
+)
+def test_an_implementation_commit_cannot_carry_a_test(root: Path, law: str, test_path: str) -> None:
+    repo, job = root / "repos/r", root / TREE
+    commit(
+        repo,
+        "AGENTS.md",
+        "verify: python scripts/ci.py job\nverify-task: python scripts/ci.py task\n" + law,
+    )
+    git(job, "merge", "-q", "--ff-only", "feature/0.5.0")
+    assert run(root, "new", "r", TASK).returncode == 0
+    task = root / "worktrees/r" / TASK
+    for rel in ("src/feature.py", test_path):
+        (task / rel).parent.mkdir(parents=True, exist_ok=True)
+        (task / rel).write_text("value = 1\n", encoding="utf-8")
+        git(task, "add", rel)
+    git(task, "commit", "-qm", "feat(J1.T2): implementation")
+
+    refused = run(root, "merge", str(task))
+
+    assert refused.returncode == 1
+    assert test_path in refused.stderr
+    assert git(job, "rev-parse", "HEAD").strip() != git(task, "rev-parse", "HEAD").strip()
+
+
+@pytest.mark.xfail(strict=True, reason="the task gate becomes hygiene-only in J1.T2")
+def test_a_repo_without_a_tests_declaration_lands_a_source_only_task(root: Path) -> None:
+    repo, job = root / "repos/r", root / TREE
+    commit(repo, "AGENTS.md", "verify: python scripts/ci.py job\n")
+    git(job, "merge", "-q", "--ff-only", "feature/0.5.0")
+    assert run(root, "new", "r", TASK).returncode == 0
+    task = root / "worktrees/r" / TASK
+    commit(task, "src/feature.py")
+
+    landed = run(root, "merge", str(task))
+
+    assert landed.returncode == 0, landed.stderr
+
+
+@pytest.mark.xfail(strict=True, reason="plain merge and recorded bases are implemented by J1.T2")
+@pytest.mark.parametrize("declared_verify", [True, False], ids=["verify-once", "no-verify"])
+def test_a_plain_merge_returns_to_its_recorded_base(tmp_path: Path, declared_verify: bool) -> None:
+    root = make_workspace(tmp_path)
+    repo = root / "repos/r"
+    git(repo, "checkout", "-q", "feature/0.5.0")
+    law = "verify: python scripts/ci.py job\n" if declared_verify else "# local law\n"
+    commit(repo, "AGENTS.md", law)
+    opened = run(root, "new", "r", "maintenance")
+    assert opened.returncode == 0, opened.stderr
+    tree = root / "worktrees/r/maintenance"
+    head = commit(tree, "src/a.py")
+
+    landed = run(root, "merge", str(tree))
+
+    assert landed.returncode == 0, landed.stderr
+    assert git(repo, "rev-parse", "feature/0.5.0").strip() == head
+    assert landed.stdout.splitlines().count("ci job") == int(declared_verify)

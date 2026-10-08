@@ -302,7 +302,7 @@ def test_each_question_has_one_owner(rule: str) -> None:
 
 @pytest.mark.parametrize(
     "module",
-    ["pre_gate", "sdd_gate", "sdd_post_gate", "ctx_inject", "root_whitelist", "venv_guard"],
+    ["pre_gate", "sdd_gate", "sdd_post_gate", "ctx_inject", "root_whitelist"],
 )
 def test_importing_a_hook_never_imports_the_container(module: str) -> None:
     """P-12: a hook is a one-shot process per write; the container costs ~2s to import."""

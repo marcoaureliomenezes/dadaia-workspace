@@ -27,7 +27,7 @@ SCRIPT = (
 FLOW = {"principal": "trunk", "integration": "dev", "work": "feature/"}
 #: The repo's gate (ADR 0190): prints its argv; level L fails iff the tree holds `RED-<L>`.
 CI = 'import pathlib, sys\nprint("ci", *sys.argv[1:])\nsys.exit(pathlib.Path("RED-" + sys.argv[1]).exists())\n'
-JOB, TASK = "0.5.0-rc1/j1", "0.5.0-rc1/j1--J1.S1.T1"
+JOB, TASK = "0.5.0-rc1/j1", "0.5.0-rc1/j1--J1.T1"
 _CLI = """#!python
 import json, sys
 args = sys.argv[1:]

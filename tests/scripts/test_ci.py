@@ -14,6 +14,7 @@ import sysconfig
 from pathlib import Path
 
 import pytest
+import yaml
 
 from tests.fixtures.stores import fake_venv
 
@@ -148,48 +149,32 @@ def _plan(*argv: str) -> list[str]:
     return [f"{job}: {name}" for job, (name, _, _) in ci.plan(list(argv))]
 
 
-def test_each_level_runs_only_its_steps() -> None:
-    """AC1.1 (ADR 0190): the task level runs ruff and mypy on the touched files and the owner
-    tests; the stage level runs lint, mypy, guards and the small tier; the job level all."""
-    files = ("dadaia_workspace/m.py", "tests/unit/test_m.py", "README.md")
-    assert _plan("task", *files) == [
-        "task: ruff format", "task: ruff check", "task: mypy", "task: owner tests"
-    ]  # fmt: skip
-    assert _plan("task", "README.md") == []
-    assert _plan("stage") == [
+@pytest.mark.xfail(strict=True, reason="the fast verify plan is implemented by J1.T3")
+def test_job_verify_is_the_fast_check() -> None:
+    assert _plan("job") == _plan() == [
         "lint: ruff format", "lint: ruff check", "lint: lint-imports", "typecheck: mypy",
         "guards: guards", "guards: guards --planted", "unit-fast: unit-fast",
     ]  # fmt: skip
-    assert _plan("job") == _plan() == [
-        *_plan("stage")[:7], "contract-coverage: contract-coverage", "integration: integration",
-        "e2e-python: e2e-python", "repo-hygiene: repo-hygiene", "doctor: doctor",
-    ]  # fmt: skip
 
 
-def test_a_grader_under_evals_is_no_owner_test() -> None:
-    """AC11.1: the task level's owner tests are ``test_*.py`` under ``tests/``; an eval grader
-    holds no test function, so it is linted but gets no ``owner tests`` step."""
-    grader = "evals/tasks/t1-cold-onboarding/tests/test_grade.py"
-    assert _plan("task", grader) == ["task: ruff format", "task: ruff check"]
-    assert _plan("task", "tests/unit/test_x.py")[-1] == "task: owner tests"
-
-
-@pytest.mark.parametrize(("check", "code"), [("1 == 2", 1), ("1 == 1", 0)])
-def test_a_planted_failing_step_turns_its_level_red(tmp_path: Path, check: str, code: int) -> None:
-    """AC1.1: the task level's owner tests decide its exit; no other step runs."""
-    test = f"def test_one() -> None:\n    assert {check}\n"
-    checkout = _checkout(tmp_path, {"tests/unit/test_one.py": test})
-    done = subprocess.run(
-        [sys.executable, str(checkout / "scripts" / "ci.py"), "task", "tests/unit/test_one.py"],
-        cwd=checkout, capture_output=True, text=True, check=False,
-    )  # fmt: skip
-    ran = [ln.split(":")[0] for ln in done.stdout.splitlines() if ln.startswith(("PASS ", "FAIL "))]
-    assert ran == [
-        "PASS ruff format",
-        "PASS ruff check",
-        f"{'FAIL' if code else 'PASS'} owner tests",
+@pytest.mark.xfail(strict=True, reason="push and pull-request CI selection is implemented by J1.T3")
+def test_pushes_use_linux_and_pull_requests_use_the_full_matrix() -> None:
+    workflow = yaml.load(
+        (_REPO / ".github/workflows/ci.yml").read_text("utf-8"), Loader=yaml.BaseLoader
+    )
+    triggers = workflow["on"]
+    assert set(triggers["push"]["branches"]) >= {"feature/**", "wt/**"}
+    assert set(triggers["pull_request"]["branches"]) == {"main", "develop"}
+    cross_platform = [
+        job
+        for job in workflow["jobs"].values()
+        if set(job.get("strategy", {}).get("matrix", {}).get("os", []))
+        & {"windows-latest", "macos-latest"}
     ]
-    assert done.returncode == code
+    assert cross_platform
+    assert {job.get("if") for job in cross_platform} == {
+        "${{ github.event_name == 'pull_request' }}"
+    }
 
 
 @pytest.mark.parametrize("doc", ["tests/README.md", "tests/AGENTS.md"])

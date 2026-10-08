@@ -453,19 +453,45 @@ def test_check_refuses_each_trio_row(
     ("plan", "needle"),
     [
         pytest.param(_dag(*_CHAIN[:2]).replace("## DAG", "## Jobs"), "DAG", id="no-dag"),
-        pytest.param(_dag(*_CHAIN[:2]).replace("### Hot files", "### Notes"), "Hot files",
-                     id="no-hot-files"),
     ],
 )  # fmt: skip
-def test_phase_implementation_refuses_a_plan_without_dag_or_hot_files(
+def test_phase_implementation_refuses_a_plan_without_a_dag(
     script: Path, tmp_path: Path, plan: str, needle: str
 ) -> None:
-    """AC4.3: the PLAN carries `## DAG` and `### Hot files`; one fix line each."""
+    """The PLAN carries one dependency DAG; its refusal has one fix line."""
     result = _phase(script, _specs(tmp_path, plan))
     fixes = [
         ln for ln in result.stderr.splitlines() if ln.startswith(("fix: ", "Operator action: "))
     ]
     assert (result.returncode, needle in result.stderr, len(fixes)) == (1, True, 1)
+
+
+@pytest.mark.xfail(strict=True, reason="the lean phase bridge is implemented by J1.T2")
+def test_phase_implementation_accepts_the_jobs_and_tasks_dialect(
+    script: Path, tmp_path: Path
+) -> None:
+    plan = (
+        f"{_GOOD}\n## DAG\n\n"
+        "| job | waits on | wave | `W:` |\n"
+        "|---|---|---|---|\n"
+        "| Job 1 | — | 1 | `src/a.py`, `tests/test_a.py` |\n"
+        "| Reconciliation | Job 1 | 2 | `specs/memory/product/a.md` |\n"
+    )
+    specs = _specs(tmp_path, plan)
+    tasks = specs / "releases/0.5.0/rc-1/tasks"
+    tasks.mkdir()
+    tasks.joinpath("job1.md").write_text(
+        "# Job 1\n\n"
+        "| task | AC | `W:` | outcome |\n"
+        "|---|---|---|---|\n"
+        "| J1.T1 | AC2.1 | `tests/test_a.py` | RED |\n"
+        "| J1.T2 | AC2.1 | `src/a.py` | GREEN |\n",
+        encoding="utf-8",
+    )
+
+    result = _phase(script, specs)
+
+    assert result.returncode == 0, result.stderr
 
 
 # --- AC4.4: the bug balance block is a closure check ---------------------------------
