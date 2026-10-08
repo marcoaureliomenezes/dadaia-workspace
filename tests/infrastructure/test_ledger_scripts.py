@@ -1,27 +1,27 @@
 """shallow-clone-history-finding-fix-line-never-clears#history: a
 history read that a shallow clone cannot answer names the missing history, and its fix
-line, run verbatim, clears the finding.
+line, run verbatim, clears the refusal.
 
-size: MEDIUM — real git clones over file:// and the real release script via the doctor.
+size: MEDIUM — real git clones over file:// and the real release script's `drift` verb.
 """
 
 from __future__ import annotations
 
 import json
 import shlex
-import shutil
 import subprocess
+import sys
 from pathlib import Path
 
 import pytest
 
 from dadaia_workspace.core import cli_line
-from dadaia_workspace.infrastructure.ledger_scripts import script_findings
 from tests.helpers.release_state import PLAN
+from tests.public.skills.dd_release_implementation.scripts.test_release import (
+    script,  # noqa: F401  (the staged-skill fixture)
+)
 
 pytestmark = pytest.mark.slow(reason="real git clones")
-
-_SKILLS = Path(__file__).resolve().parents[2] / "dadaia_workspace" / "public" / "skills"
 
 
 def _git(cwd: Path, *argv: str) -> str:
@@ -68,25 +68,28 @@ def _origin(tmp: Path) -> Path:
     return origin
 
 
-def _release_findings(specs: Path) -> list[object]:
-    return [f for f in script_findings(specs) if f.code == "LEDGER-RELEASE-SCHEMA"]
+def _drift(release: Path, specs: Path) -> subprocess.CompletedProcess[str]:
+    argv = [sys.executable, str(release), "drift", "--specs", str(specs)]
+    return subprocess.run(argv, capture_output=True, text=True, check=False)
 
 
 def test_a_shallow_clone_finding_names_the_history_and_its_fix_clears_it(
+    script: Path,  # noqa: F811
     tmp_path: Path,
 ) -> None:
-    ws = tmp_path / "my ws"  # the fix quotes its spaced path
-    clone = ws / "repos" / "checkout"
+    clone = tmp_path / "my ws" / "repos" / "checkout"  # the fix quotes its spaced path
     _git(tmp_path, "clone", "-q", "--depth", "1", f"file://{_origin(tmp_path)}", str(clone))
-    shutil.copytree(_SKILLS, ws / ".agents" / "skills")
-    (ws / ".dadaia").mkdir()
 
-    findings = _release_findings(clone / "specs")
+    refused = _drift(script, clone / "specs")
 
-    assert len(findings) == 1, findings
-    assert "shallow" in findings[0].message
-    assert shlex.split(findings[0].fix) == shlex.split(
-        cli_line.git_line(clone, "fetch", "--unshallow")
-    )
-    subprocess.run(shlex.split(findings[0].fix), check=True, capture_output=True)
-    assert _release_findings(clone / "specs") == []
+    assert refused.returncode == 1
+    assert "shallow" in refused.stderr
+    [fix] = [
+        line.removeprefix("fix: ")
+        for line in refused.stderr.splitlines()
+        if line.startswith("fix: ")
+    ]
+    assert shlex.split(fix) == shlex.split(cli_line.git_line(clone, "fetch", "--unshallow"))
+    subprocess.run(shlex.split(fix), check=True, capture_output=True)
+    cleared = _drift(script, clone / "specs")
+    assert (cleared.returncode, cleared.stderr) == (0, "")
