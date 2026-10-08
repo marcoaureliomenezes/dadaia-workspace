@@ -1401,6 +1401,12 @@
       "agent": "dd-product-engineer",
       "kind": "dispositions",
       "text": "Backlog (Origin, 13 picked): every exit is recorded in backlog_histo.jsonl - delivered --release 0.5.0 (12): agent-behavior-evals, bug-ledger-balance-and-convergence, guidance-messages-name-the-right-target, tests-tree-mirrors-the-package, unit-tier-without-processes, worktree-rows-injected-not-monkeypatched, windows-integration-coverage-gap, focused-review-on-caused-by, bugs-fix-reads-the-per-class-shape, context-dead-never-commits, caused-by-proposed-by-blame, law-one-home-per-rule (half delivered, its residual re-intaken as law-one-home-residual); rejected (1): bug-fix-adds-never-rewrites-asserts, which contradicts ADR 0209 (its law defect is the bug bug-resolution-law-prescribes-rewriting-asserts, resolved). None stays active. active[] holds 52 entries, 15 of them opened 2026-10-08. Bugs, Origin 15: all resolved. Ledger-wide at the encoding head: 0 open, 0 deferred, 13 superseded, 7 rejected, 862 resolved (bugs.py stats --specs specs). Audit findings, 20260930-structural-convergence (150 lines): F098 and F128 (the Origin pair) resolved; F001 resolved by 0668ba612 (metric 1 reads reported_by); F008 could not reopen (no reopening verb, carried as above). The audit counts 111 resolved, 25 open, 13 deferred and 1 rejected; deferred counts as open by operator ruling, so the audit stays open (no close). artifact-gc is written after this entry by the main thread."
+    },
+    {
+      "ts": "2026-10-08T04:05:09Z",
+      "agent": "main-thread",
+      "kind": "artifact-gc",
+      "text": "RC-FLOW step 4, .dadaia/.venv/bin/dadaia doctor from the workspace root, 2026-10-08. Dry: exit 1 - 13 WS-handoff-expired, 7 WS-tmp-expired, 2 WS-root-slop (.hypothesis, .pytest_cache at the workspace root), 1 WS-repos-slop (repos/dadaia-evals, the repo ADR 0217 retired: a clean clone in sync with its origin, no unpushed commit), 6 WS-reaped-reaped held by their TTL, 1 WORKTREE (job encoding open), 1 LEDGER-RELEASE-SCHEMA on feature/0.5.0 (the operator-act guard commit d731bc911 sits after the memory entry; this job's memory entry clears it at merge). --fix: exit 1 on those two non-GC lines only; deleted the 13 handoffs, the 7 tmp entries and 1 graveyard record; moved .hypothesis, .pytest_cache and repos/dadaia-evals to .dadaia/reaped/20261008/. After: WORKTREE and LEDGER-RELEASE-SCHEMA as above, 10 WS-reaped-reaped held by their TTL. The operator holds nothing new."
     }
   ]
 }
