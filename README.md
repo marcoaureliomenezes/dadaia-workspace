@@ -44,10 +44,10 @@ memory atom under its content hash.
 
 ## A human installs and uses it
 
-<!-- derived-from: pypi-distribution sha256:7c22e9e9609a -->
+<!-- derived-from: pypi-distribution sha256:9dadd611ee50 -->
 <!-- derived-from: workspace-init sha256:a8f08f87ae76 -->
 <!-- derived-from: context-management sha256:e084ff04890d -->
-<!-- derived-from: workspace-doctor sha256:84a9bec9fec9 -->
+<!-- derived-from: workspace-doctor sha256:6b147c7a0b91 -->
 
 ```bash
 uvx dadaia-workspace init demo --harness claude --repo <clone url>   # level 1 + 2
@@ -96,8 +96,8 @@ a TTL expiry acts by zone class, an OUTPUT entry held, an EPHEMERAL one deleted.
 
 <!-- derived-from: agentic-entities sha256:f962e613358e -->
 <!-- derived-from: sdd-gate-v3 sha256:11e94d99c0d1 -->
-<!-- derived-from: release-lifecycle sha256:552f1da8e8b7 -->
-<!-- derived-from: bug-ledger sha256:c4e8fd6ee96c -->
+<!-- derived-from: release-lifecycle sha256:99a806b1d9d6 -->
+<!-- derived-from: bug-ledger sha256:a3df43b6e94e -->
 <!-- derived-from: harness-claude-code sha256:bac4bed1d5e9 -->
 <!-- derived-from: harness-codex sha256:a0d4ae5884d5 -->
 <!-- derived-from: harness-kimi-code sha256:ac3c7be4e426 -->
@@ -133,7 +133,7 @@ hotfix job with a RED test, any other in the candidate's bug batch. Completed wo
 
 ## Documentation
 
-<!-- derived-from: pypi-distribution sha256:7c22e9e9609a -->
+<!-- derived-from: pypi-distribution sha256:9dadd611ee50 -->
 <!-- derived-from: public-asset-distribution sha256:e126ab716189 -->
 
 The documentation is the repository's [docs folder](https://github.com/marcoaureliomenezes/dadaia-workspace/tree/main/docs):
@@ -149,7 +149,7 @@ The documentation is the repository's [docs folder](https://github.com/marcoaure
 
 ## Links
 
-<!-- derived-from: pypi-distribution sha256:7c22e9e9609a -->
+<!-- derived-from: pypi-distribution sha256:9dadd611ee50 -->
 
 - GitHub — <https://github.com/marcoaureliomenezes/dadaia-workspace>
 - PyPI — <https://pypi.org/project/dadaia-workspace/>

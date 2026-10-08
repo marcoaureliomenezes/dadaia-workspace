@@ -5,7 +5,7 @@ the terms are defined in [concepts](concepts.md) and in [`CONTEXT.md`](../CONTEX
 
 ## Install
 
-<!-- derived-from: pypi-distribution sha256:7c22e9e9609a -->
+<!-- derived-from: pypi-distribution sha256:9dadd611ee50 -->
 <!-- derived-from: workspace-init sha256:a8f08f87ae76 -->
 
 ```bash
@@ -97,7 +97,7 @@ branches; a re-run is a no-op.
 
 ## Check compliance — `doctor`
 
-<!-- derived-from: workspace-doctor sha256:84a9bec9fec9 -->
+<!-- derived-from: workspace-doctor sha256:6b147c7a0b91 -->
 
 ```bash
 .dadaia/.venv/bin/dadaia doctor --context <ctx> [--json] [--fix] [--redact]
@@ -124,9 +124,9 @@ zone class, an OUTPUT entry held, an EPHEMERAL one deleted.
 
 ## Run the first candidate
 
-<!-- derived-from: release-lifecycle sha256:552f1da8e8b7 -->
+<!-- derived-from: release-lifecycle sha256:99a806b1d9d6 -->
 <!-- derived-from: backlog-ledger sha256:44b145a6a3aa -->
-<!-- derived-from: bug-ledger sha256:c4e8fd6ee96c -->
+<!-- derived-from: bug-ledger sha256:a3df43b6e94e -->
 
 A candidate is one closed-scope cycle inside the live release. Nothing drives it: the
 documents are the state, the ledger scripts move the records, and the job files and

@@ -27,7 +27,16 @@ def _run(
     env: dict[str, str] | None = None,
 ) -> subprocess.CompletedProcess[str]:
     environ = {**os.environ, **env} if env else None
-    return subprocess.run(args, cwd=cwd, capture_output=True, text=True, input=stdin, env=environ)
+    return subprocess.run(
+        args,
+        cwd=cwd,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        input=stdin,
+        env=environ,
+    )
 
 
 def _commit(path: Path, msg: str, pathspec: Sequence[str] | None = None) -> None:

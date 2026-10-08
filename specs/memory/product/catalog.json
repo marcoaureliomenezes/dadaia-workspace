@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-10-07T16:38:36Z",
+  "generated_at": "2026-10-08T12:52:18Z",
   "features": [
     {
       "rank": 1,
@@ -175,7 +175,7 @@
         "release",
         "packaging"
       ],
-      "token_estimate": 1065,
+      "token_estimate": 1116,
       "depends_on": [
         "release-lifecycle",
         "QUALITY",
@@ -537,7 +537,7 @@
         "import",
         "portability"
       ],
-      "token_estimate": 328,
+      "token_estimate": 350,
       "depends_on": [
         "workspace-doctor",
         "context-management"
@@ -650,7 +650,7 @@
         "compliance",
         "privacy"
       ],
-      "token_estimate": 2874,
+      "token_estimate": 2907,
       "depends_on": [
         "public-asset-distribution",
         "sdd-gate-v3",
@@ -791,7 +791,7 @@
         "ledger",
         "governance"
       ],
-      "token_estimate": 2121,
+      "token_estimate": 2144,
       "depends_on": [
         "sdd-gate-v3",
         "workspace-doctor",
@@ -825,7 +825,7 @@
         "memory",
         "as-is-review"
       ],
-      "token_estimate": 2893,
+      "token_estimate": 2993,
       "depends_on": [
         "sdd-gate-v3",
         "specs-migration",
@@ -904,7 +904,7 @@
         "merge",
         "review"
       ],
-      "token_estimate": 1785,
+      "token_estimate": 1837,
       "depends_on": [
         "sdd-gate-v3",
         "public-asset-distribution",

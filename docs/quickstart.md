@@ -7,7 +7,7 @@ live. Terms are defined in [concepts](concepts.md); the long walkthrough is
 
 ## 1. The three levels in one block
 
-<!-- derived-from: pypi-distribution sha256:7c22e9e9609a -->
+<!-- derived-from: pypi-distribution sha256:9dadd611ee50 -->
 <!-- derived-from: workspace-init sha256:a8f08f87ae76 -->
 
 Set `REPO_URL` to your repository's clone URL; everything else runs as printed (needs
@@ -95,7 +95,7 @@ id, else `DADAIA_CONTEXT`, never the cwd: sitting inside a repository is not a b
 
 ## 4. Compliance
 
-<!-- derived-from: workspace-doctor sha256:84a9bec9fec9 -->
+<!-- derived-from: workspace-doctor sha256:6b147c7a0b91 -->
 
 `doctor` is the one instance validator; three sections run in fixed order —
 `workspace`, `specs`, `ledgers`. Every finding prints as one `<CODE> <verdict>
@@ -118,7 +118,7 @@ worktree.
 
 ## 6. The first release
 
-<!-- derived-from: release-lifecycle sha256:552f1da8e8b7 -->
+<!-- derived-from: release-lifecycle sha256:99a806b1d9d6 -->
 
 `release.py new` is one birth act, all or nothing: a `SPEC.md` stub in
 `specs/releases/<id>/rc-1/` plus `_RELEASE.json` in `DEFINITION` at the release root, refusing a second live

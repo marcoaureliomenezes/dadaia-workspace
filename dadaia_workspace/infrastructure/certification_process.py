@@ -50,6 +50,8 @@ class SubprocessCertificationProcess:
                 env=dict(env) if env is not None else None,
                 capture_output=True,
                 text=True,
+                encoding="utf-8",
+                errors="replace",
                 timeout=timeout,
                 check=False,
             )
@@ -74,5 +76,7 @@ class SubprocessCertificationProcess:
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
                 text=True,
+                encoding="utf-8",
+                errors="replace",
             )
         )

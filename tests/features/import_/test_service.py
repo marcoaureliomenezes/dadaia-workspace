@@ -12,6 +12,7 @@ from pathlib import Path
 import pytest
 
 from dadaia_workspace.container import scan_publish_candidates
+from dadaia_workspace.core.exceptions import DadaiaError
 from dadaia_workspace.core.models.spec_context import (
     AssociatedRepo,
     ContextState,
@@ -192,4 +193,18 @@ def test_import_rejects_files_outside_the_contract(
     with pytest.raises(ValueError, match=reason):
         _importer(tmp_path, store).run(file)
 
+    assert store.list_all() == []
+
+
+def test_import_refuses_a_record_missing_a_field_naming_it(tmp_path: Path) -> None:
+    record = _record("x", "x")
+    del record["name"]
+    store = context_store(tmp_path / "states")
+
+    with pytest.raises(Exception) as caught:  # noqa: PT011 - the type is the assertion
+        _importer(tmp_path, store).run(_export_file(tmp_path, record))
+
+    assert isinstance(caught.value, DadaiaError)
+    assert "name" in str(caught.value)
+    assert str(caught.value).count("fix:") == 1
     assert store.list_all() == []

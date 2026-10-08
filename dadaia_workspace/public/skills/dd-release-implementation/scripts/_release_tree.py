@@ -98,7 +98,8 @@ def _trace(
         if (by := record.get("superseded_by")) and by not in seen:
             return standing(kind, by, seen | {i})
         back = record.get("resolved_release" if kind == "bugs" else "release")
-        return "traced" if back == release or record.get("status") == "rejected" else "untraced"
+        declined = "rejected" in (record.get("status"), record.get("disposition"))
+        return "traced" if back == release or declined else "untraced"
 
     live = {
         "backlog": {e.get("id") for e in active.get("active") or []},
@@ -283,10 +284,11 @@ def _memory_record_error(state: dict[str, Any]) -> str:
     return ""
 
 
-def _window_findings(specs: Path) -> list[dict[str, Any]]:
+def _window_findings(specs: Path, principal: str = "") -> list[dict[str, Any]]:
     """CLOSURE: the latest memory entry names its window, is re-judged over its
     [since, until], and no atom's sources moved over [until, HEAD] — code after the
-    entry is unreconciled."""
+    entry is unreconciled. Closed once HEAD is on *principal*, the branch the caller passes
+    (core's gitflow reader); none given, or a detached HEAD, stays judged."""
     try:
         live = live_release(specs)
     except Refusal:
@@ -302,6 +304,9 @@ def _window_findings(specs: Path) -> list[dict[str, Any]]:
         return [finding(rel, 1, message, fix)]
     entry = [e for e in live.state["log"] if isinstance(e, dict) and e.get("kind") == "memory"][-1]
     until = str(entry["until"])
+    head = subprocess.run(["git", "symbolic-ref", "HEAD"], cwd=specs.parent, capture_output=True, text=True, encoding="utf-8", errors="replace", check=False)  # fmt: skip
+    if head.stdout.strip() == f"refs/heads/{principal}":
+        return []  # promoted onto the principal (none given or detached never matches)
     try:
         errors = memory_errors(specs, "CLOSURE", entry)
         errors += [f"atom {a['slug']!r} moved after the memory entry's until {until[:12]}: "
@@ -394,13 +399,13 @@ def tree_findings(specs: Path) -> list[dict[str, Any]]:
     return findings
 
 
-def check(specs: Path) -> list[dict[str, Any]]:
+def check(specs: Path, principal: str = "") -> list[dict[str, Any]]:
     """The ONE release validator (the doctor delegates here): the tree, the live
     candidate's Origin, then the live CLOSURE's memory record and bug balance block."""
     return (
         tree_findings(specs)
         + _origin_findings(specs)
-        + _window_findings(specs)
+        + _window_findings(specs, principal)
         + _balance_findings(specs)
     )
 

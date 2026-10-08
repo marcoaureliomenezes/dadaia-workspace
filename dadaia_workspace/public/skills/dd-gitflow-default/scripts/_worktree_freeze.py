@@ -13,6 +13,8 @@ its own group. A pure rename has no hunks and lands."""
 
 from __future__ import annotations
 
+import contextlib
+import json
 import re
 from pathlib import Path
 from typing import NamedTuple
@@ -22,6 +24,7 @@ from _worktree_names import Refusal
 
 _ID = re.compile(r"\b(?P<stage>J[\dA-Z]+\.S(?P<n>\d+))\.T\d+\b")
 _HUNK = re.compile(r"^@@ -\d+(?:,(?P<old>\d+))? \+\d+(?:,(?P<new>\d+))? @@")
+_REBUILD = re.compile(r"^refactor\(bugs\): (?P<id>\S+) — REBUILD\b")
 _BINARY = re.compile(r"^Binary files (?P<a>.+) and (?P<b>.+) differ$")
 #: What a binary test file's change counts as: one removed line no `tests-red:` pattern matches.
 _BINARY_LINE = "\0binary"
@@ -105,13 +108,18 @@ def _group(row: Commit) -> str:
     return found["stage"] if (found := _ID.search(row.subject)) else row.sha
 
 
-def judge(rows: list[Commit], base: str, red: re.Pattern[str] | None) -> tuple[str, str] | None:
+def judge(
+    rows: list[Commit], base: str, red: re.Pattern[str] | None, bugs: frozenset[str] = frozenset()
+) -> tuple[str, str] | None:
     """(path, anchor) of the first test edit the freeze refuses in *rows* (oldest first, cut
-    from *base*), else `None`."""
+    from *base*), else `None`. A `refactor(bugs): <id> — REBUILD …` commit naming an open or
+    deferred ledger id of *bugs* amends frozen lines: the operator confirmed that bug."""
     cut = next((i for i, r in enumerate(rows) if not _red_stage(r)), 0)
     anchor, past = (rows[cut - 1].sha if cut else base), rows[cut:]
     dirty = {_group(r) for r in past if r.paths - r.tests}  # stage groups holding non-test paths
     for row in past:
+        if (named := _REBUILD.match(row.subject)) and named["id"] in bugs:
+            continue
         for path, removed, added in row.edits:
             kept = all(red and red.search(x) for x in removed)
             if not kept or (added and _group(row) in dirty):
@@ -122,6 +130,24 @@ def judge(rows: list[Commit], base: str, red: re.Pattern[str] | None) -> tuple[s
 def _red_stage(row: Commit) -> bool:
     found = _ID.search(row.subject)
     return found is not None and found["n"] == "1"
+
+
+def _ledger_ids(tree: Path, work: str) -> frozenset[str]:
+    """The ids of the records of *work*'s `specs/bugs/BUGS.jsonl` (one JSON object per line,
+    written by `bugs.py`) whose status is open or deferred, the only ones an amendment may name;
+    none when the file is absent. A line that is no JSON object with a string `id` names nothing."""
+    ids = set()
+    try:
+        ledger = git(tree, "show", f"{work}:specs/bugs/BUGS.jsonl")
+    except RuntimeError:
+        return frozenset()
+    for line in ledger.split("\n"):
+        with contextlib.suppress(ValueError):
+            rec = json.loads(line)
+            live = isinstance(rec, dict) and rec.get("status") in ("open", "deferred")
+            if live and isinstance(rec.get("id"), str):
+                ids.add(rec["id"])
+    return frozenset(ids)
 
 
 def check(tree: Path, work: str, tests: str, red: str) -> None:
@@ -147,8 +173,15 @@ def check(tree: Path, work: str, tests: str, red: str) -> None:
             f"the RED anchor cannot be derived: {error}",
             f"Operator action: stop and report — the RED anchor since {work} cannot be derived (ADR 0209)",
         ) from error
-    if hit := judge(rows, base, pattern):
+    ids = _ledger_ids(tree, work)
+    if hit := judge(rows, base, pattern, ids):
+        act = (
+            "propose the bug to the operator, then python3 "
+            ".agents/skills/dd-bug-resolution/scripts/bugs.py append …"
+            if ids
+            else "stop and report"
+        )
         raise Refusal(
             "a test is frozen past the RED anchor",
-            f"Operator action: stop and report — {hit[0]} is frozen past the RED anchor {hit[1]} (ADR 0209)",
+            f"Operator action: {act} — {hit[0]} is frozen past the RED anchor {hit[1]} (ADR 0209)",
         )

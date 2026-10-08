@@ -125,49 +125,6 @@
       ]
     },
     {
-      "id": "repo-ci-sast",
-      "title": "This repo's CI runs SAST: ruff S, pip-audit on poetry.lock, CodeQL",
-      "opened": "2026-10-03",
-      "status": "idea",
-      "description": "This repo's own pipeline, never library content. Measured (HEAD c9100eaee): `.github/workflows/ci.yml` lint runs ruff with `select = [E, F, I, UP, B, SIM]` (`pyproject.toml:118`), no `S`, yet 39 `noqa: S...` comments in 20 files (3 library, 17 tests) suppress a rule that never runs; CodeQL default setup `not-configured` (repo is public, free); no pip-audit job; CI installs `poetry==1.8.3` (`ci.yml:69`, `release.yml:87`), below the `pyproject.toml:78` DEFERRED floor `poetry>=2.3.4` (CVE-2026-34591, CVE-2026-41140); `secret-scan.yml` runs on push only to main (PRs to main/develop), not on work-branch pushes; 13 open Dependabot alerts, all PyJWT on main's `poetry.lock` (1 critical, 5 high, 7 medium), already absent from the feature/develop locks (de4e3179a). Change: ruff `S` on, with one triage (justified noqa or fix); a `pip-audit` job on `poetry.lock` failing on any finding; CodeQL default setup (operator act, or `gh api` on operator order); the CI poetry pin raised; `.github/required-checks.json` updated; no job reads Dependabot alerts (GITHUB_TOKEN cannot; no new secret) - that check is the operator's private post-push rule. Done when: the 3 jobs are required checks and green. Relates: none.",
-      "provenance": "operator demand 2026-10-03: ADR/RFC/SAST grill Q1-Q7 + R2-1..R2-4 (audit 2026-10-02)",
-      "relates": []
-    },
-    {
-      "id": "evals-release-gate-status",
-      "title": "release.yml approve requires the evals/gate commit status that dadaia-evals posts on the lib sha",
-      "opened": "2026-10-03",
-      "status": "idea",
-      "description": "Follow-up of agent-behavior-evals, after 0.5.0 (grill Q-gate: 'evals/gate status required by approve moves to 0.5.1'; Q16). eval.yml posts the commit status evals/gate on the lib sha it evaluated (a token scoped to statuses on dadaia-workspace, held by dadaia-evals - an operator act); the release.yml approve job requires that status on its sha; a weekly schedule runs a one-task smoke. Replaces ADR 0178's manual read and its evaluated-sha-to-tag diff check, and closes its 'deferred to 0.5.1' clause. Needs its own ADR at definition (a release.yml gate change). Done when: approve refuses a sha with no evals/gate success, and the smoke runs weekly.",
-      "provenance": "operator ruling in the grill handoff 2026-10-03T163043Z-main-thread-grill-evals-050 (final, frontier empty) over grills Q1-Q17 of 2026-10-03 (Q9 superseded; Q11 'private' replaced by public with conditions): the evals/gate status required by approve is deferred to 0.5.1; grill round 2, handoff 2026-10-03T170932Z-main-thread-grill-evals-format (destination rc-8 in parallel, repo format, Docker image, Harbor runner), and the dd-code-reviewer conditions on e9007d5a9",
-      "relates": [
-        "agent-behavior-evals"
-      ]
-    },
-    {
-      "id": "evals-harness-lanes-and-benchmark",
-      "title": "Evals grow past Claude Code: Devin joins the gate; Copilot and Codex join a monthly benchmark.yml",
-      "opened": "2026-10-03",
-      "status": "idea",
-      "description": "Follow-up of agent-behavior-evals, after 0.5.0 (grill: Q12-Q17 become the expansion path). Q12: gate = Claude Code + Devin; benchmark = Claude Code + Devin + Copilot + Codex; Cursor and Kimi stay deterministic-contract only. Q13: Sonnet 5 pinned on Claude Code, Devin and Copilot (isolates the harness effect); Codex on its native model; a cheap-model column in the benchmark only. Q14 billing: Devin Pro US$20/month; Copilot Pro US$10/month with a 'Copilot Requests' PAT in COPILOT_GITHUB_TOKEN; Codex an API key with a console budget; total <= US$70/month, a gate run <= US$30. Q15: Devin CLI login in CI starts with a spike - one month of Pro, credentials.toml as a secret, 5 tasks on a hosted runner, quota read with /usage; Q15's self-hosted fallback is void under ADR 0177 (public repo, no self-hosted runner), so a failed spike leaves Devin benchmark-only, run locally. Q16: eval.yml and benchmark.yml call one reusable run-task.yml (harness x task); benchmark.yml runs monthly plus dispatch, k=3, readout only, its trend recorded in the repo. Q17: gate graders stay code-only (T3 Snake by a scripted Playwright play); the benchmark adds a vision LLM judge, readout only. Runner: Harbor, as agent-behavior-evals pins it (round 2 rejected Inspect AI); a harness with no Harbor built-in agent needs a custom agent adapter, checked per lane when it is picked. Depends on devin-subagent-projection for the Devin lane. Done when: eval.yml runs both gate harnesses and benchmark.yml has one monthly trend point over the four.",
-      "provenance": "operator ruling in the grill handoff 2026-10-03T163043Z-main-thread-grill-evals-050 (final, frontier empty) over grills Q1-Q17 of 2026-10-03 (Q9 superseded; Q11 'private' replaced by public with conditions): Devin, Copilot, Codex, benchmark.yml and the vision judge move to the backlog after 0.5.0, keeping Q12-Q17 as their origin; grill round 2, handoff 2026-10-03T170932Z-main-thread-grill-evals-format (destination rc-8 in parallel, repo format, Docker image, Harbor runner), and the dd-code-reviewer conditions on e9007d5a9",
-      "relates": [
-        "agent-behavior-evals"
-      ]
-    },
-    {
-      "id": "evals-windows-smoke",
-      "title": "One Windows smoke: T1 with Claude Code on a Windows runner, at release only",
-      "opened": "2026-10-03",
-      "status": "idea",
-      "description": "Follow-up of agent-behavior-evals, after 0.5.0 (grill Q7: behaviour evals run on Linux; Windows keeps its deterministic coverage and gains one Claude Code smoke at release). The PowerShell vs bash risk is real; windows-integration-coverage-gap names the deterministic side. Conditional on ADR 0177 being accepted: the smoke is a model-calling job of dadaia-evals and runs under its conditions (2)-(6). T1 cold onboarding on windows-latest, k=1, readout, only if the first gate rounds show slack in the budget and the Actions minutes. First act: check whether Harbor's docker environment runs on windows-latest (GitHub's Windows runners run Windows containers only); if not, the definition names the smoke's runner. Done when: an eval.yml dispatch input runs T1 on Windows and its result sits in the verdict as readout.",
-      "provenance": "operator ruling in the grill handoff 2026-10-03T163043Z-main-thread-grill-evals-050 (final, frontier empty) over grills Q1-Q17 of 2026-10-03 (Q9 superseded; Q11 'private' replaced by public with conditions): the Windows smoke moves to the backlog after 0.5.0 (Q7 carried); grill round 2, handoff 2026-10-03T170932Z-main-thread-grill-evals-format (destination rc-8 in parallel, repo format, Docker image, Harbor runner), and the dd-code-reviewer conditions on e9007d5a9",
-      "relates": [
-        "agent-behavior-evals",
-        "windows-integration-coverage-gap"
-      ]
-    },
-    {
       "id": "devin-subagent-projection",
       "title": "Verify whether Devin reads the three personas from .agents/agents; project them if it does not",
       "opened": "2026-10-03",
@@ -365,30 +322,6 @@
       ]
     },
     {
-      "id": "scorecard-one-ruler",
-      "title": "QUALITY.md carries one scorecard ruler: rates as trend, one pinned text-assert regex, targets for criteria 1 and 3",
-      "opened": "2026-10-06",
-      "status": "idea",
-      "description": "Operator, 2026-10-06, verbatim: 'Taxas viram tend\u00eancia; regex fixa; metas 1 e 3'; and 'Sim, na Reconcilia\u00e7\u00e3o da rc-10' - the baseline scorecard runs at rc-10 Reconciliation, so rc-11 is measured against it. Measured: rates (parallelism, test/code ratio) were read as gates; the text-assert share is 10.8% or 17% depending on the regex; criteria 1 (Core) and 3 (push_gate refactor) had no target. Design: one ruler in QUALITY.md - rates are reported as a trend, never a gate; one pinned regex counts text asserts; criteria 1 and 3 get targets from complexity-and-private-import-ratchet and push-gate-decision-split; dd-code-review gains a scorecard lens reading that ruler. rc-11 note carried from bug-ledger-balance-and-convergence (picked by rc-10, whose SPEC is Approved and frozen): add a fix-induced Laplace line (u=+2.9..+4.6, accelerating; the all-bugs Laplace was NOT reproduced - its sign flips with the end date, +0.95/-0.89/-1.57) and a count of closures under 10 minutes (116/789 resolved <10 min, 52 <1 min; 22/70 <10 min since 20260930-structural-convergence-F008 was marked resolved), both as readouts, never gates; the Laplace counts audit batches unless found_by is derived from the registration commit (a typed found_by is rejected as a puxadinho). Placement: rc-11. Placement and every design detail not quoted from a ruling are agent default, unruled.",
-      "provenance": "audit verification 2026-10-06 over feature/0.5.0 8e6448f13 (four read-only verifiers); main-thread registration after the operator grill of 2026-10-06",
-      "relates": [
-        "bug-ledger-balance-and-convergence",
-        "complexity-and-private-import-ratchet",
-        "test-suite-diet"
-      ]
-    },
-    {
-      "id": "audit-scorecard-cycle",
-      "title": "dd-audit-project is REBUILT as the scorecard cycle and closes the two 2026-09-30 audits",
-      "opened": "2026-10-06",
-      "status": "idea",
-      "description": "Audit verdict: 'REBUILD as the scorecard cycle'; the scorecard cycle closes the two 2026-09-30 audits (20260930-050-publish-gate-baseline, 20260930-structural-convergence with 29 open findings). Measured: PILLAR-SPECS.md:31 prescribes a 'final-rc QA close'; specs/audits/AGENTS.md:25 prescribes a 'remediation release', against ADR 0206 (no rc closes with an open bug); the skill says eight metrics where PILLAR-BUGS lists nine, 'three cheap measures' lists two, and PILLAR-BUGS relies on a refs field the schema lacks; 20260930-structural-convergence-F008's resolved disposition is false (22/70 closures <10 min after it) and reopens. PILLAR-BUGS.md:25 reading the retired governance_events is the registered bug pillar-bugs-metric-reads-retired-event-stream (rc-10 batch). Design: dd-audit-project becomes the scorecard cycle - run scorecard-one-ruler's ruler, record the scores, disposition the findings - and the two 09-30 audits close through it; PILLAR-SPECS and audits/AGENTS.md lose the final-rc QA close and the remediation release. Placement: rc-11. Placement and every design detail not quoted from a ruling are agent default, unruled.",
-      "provenance": "audit verification 2026-10-06 over feature/0.5.0 8e6448f13 (four read-only verifiers); main-thread registration after the operator grill of 2026-10-06",
-      "relates": [
-        "scorecard-one-ruler"
-      ]
-    },
-    {
       "id": "stage-gate-keeps-only-the-red-check",
       "title": "The stage gate keeps only the RED-stage check; the generic verify-stage rerun is deleted",
       "opened": "2026-10-06",
@@ -424,22 +357,6 @@
       ]
     },
     {
-      "id": "law-one-home-per-rule",
-      "title": "Each rule lives in one home; the ADR ledger keeps only architectural decisions",
-      "opened": "2026-10-06",
-      "status": "idea",
-      "description": "Operator, 2026-10-06 (relayed by the main thread): 'Se tudo \u00e9 ADR nada \u00e9 ADR'. Measured: the assert rule says never at AGENTS.md:21, dd-bug-resolution SKILL.md:55, dd-code-review SKILL.md:76 and allow at dd-bug-resolution SKILL.md:64 and specs/releases/AGENTS.md:35, against accepted ADR 0209 (the contradiction is the registered bug bug-resolution-law-prescribes-rewriting-asserts, rc-10 batch); ADRs 0149 and 0194 are both accepted and disagree (PLAN says max 2 agents, TASK_CAP=5) - a verifier proposes supersede 0149, TASK_CAP=2, delete the PLAN restatement (unruled); RC-FLOW.md:30 says strict xfail, pyproject.toml:119 has no xfail_strict; the reviewer agent file says 'candidate close' (:3, :55); skills still cite reservations (dd-release-implementation/SKILL.md:4,17,25; CONTEXT-ENGINEERING.md:94). Design: each rule is stated in exactly one scoped file and cited elsewhere; the ADR 0151 law-deletion check stops demanding an ADR per changed law line. Absorbed (each exits rejected 'absorbed by law-one-home-per-rule'; full text stays in the histo): (a) adr-born-at-release-with-options - an ADR is born only in dd-release-definition through dd-ask-me references/adr.md, past a three-leg threshold (one-way door; an architecturally significant criterion; >=2 genuine options), with options[{name, tradeoff, rejected_because}] (min 2) and ruling.words carrying question and chosen option; decisions.jsonl leaves the backlog kind's allowed set and its gitflow row. (b) adr-ledger-triage-process-rules - one pass: 36 process rules and 14 spent rulings move to their scoped AGENTS.md and one consolidated ADR supersedes them; the 5 principles on rejected ADRs are re-judged; each remaining measured_by resolves to an executable check. (c) adr-0193-records-its-amends - 0193's accepted record carries amends: null though it amends 0152 (2); the operator rules a new amending record or a wider 0138 repair lane. Placement: rc-11 ('lei com uma casa por regra'). Placement and every design detail not quoted from a ruling are agent default, unruled.",
-      "provenance": "audit verification 2026-10-06 over feature/0.5.0 8e6448f13 (four read-only verifiers); main-thread registration after the operator grill of 2026-10-06",
-      "relates": [
-        "adr-born-at-release-with-options",
-        "adr-ledger-triage-process-rules",
-        "adr-0193-records-its-amends",
-        "job-gate-runs-the-law-deletion-check",
-        "dd-ask-me-owned-questioning-skill",
-        "architecture-adr-section-generated"
-      ]
-    },
-    {
       "id": "impacted-test-selection",
       "title": "The local stage and merge gates run only the tests a change can reach; CI keeps the full suite",
       "opened": "2026-10-07",
@@ -472,6 +389,166 @@
       "status": "idea",
       "description": "rc-10 Reconciliation review, deferred: 'the merge gate cannot tell who ran verdict.py; a PR-edge verdict reads no hash'. What Job 10 covers (SPEC AC12.2, ADR 0218): the verdict carries reviewed_sha and diff_sha256 and worktree.py merge refuses a missing field or a mismatch - a verdict binds the diff. What it leaves (SPEC 2026-10-07 amendment: 'authorship stays discipline plus audit, backlog verdict-author-unbound'): (1) authorship - any session, the merging main thread included, can run verdict.py over the right range and produce a hash-valid verdict, so the 'main thread never writes a verdict' rule of ADR 0218 is unenforced; (2) the PR edge - the work->integration and integration->principal verdicts are the reviewer's text pasted by the main thread into the PR, bound to no sha and no hash. Design: (1) the PreToolUse gate refuses a Bash run of verdict.py whose hook payload does not come from a dd-code-reviewer subagent (the payload's agent type is the one decider), with an adversary test where the main thread runs verdict.py itself; where a harness carries no agent type, the gate fails open and the audit counts verdicts with no reviewer session; (2) verdict.py gains a PR mode that hashes the PR's base..head diff, and the PR quote carries reviewed_sha and diff_sha256 so the promote reads the same binding the merge gate reads - one verdict shape, one decider. Placement and every design detail not quoted from a ruling are agent default, unruled.",
       "provenance": "rc-10 Reconciliation review (2026-10-07), named by the rc-10 SPEC AC12.2 amendment as this backlog entry; ADR 0218 ruling 'Revisor emite o pr\u00f3prio (Recommended)'",
+      "relates": []
+    },
+    {
+      "id": "judge-config-outside-the-script-dir",
+      "title": "The judged range may not change what the verify line's judgement reads",
+      "opened": "2026-10-08",
+      "status": "idea",
+      "description": "Evidence: _worktree_end.py:172-177 refuses a range only for edits in the directory of the file the verify line names (scripts/). scripts/ci.py imports only the stdlib, but its judgement also reads pyproject.toml ([tool.ruff] select :84, [tool.pytest] addopts/markers :119-122), tests/conftest.py and the doctor it runs (ci.py:74-77): a job can weaken lint or pytest config and still pass its own gate. Design: the refusal covers every file the judgement reads; trade-off is legitimate config or dependency edits; adversary test required (judged party edits its own judge). Scope of ADR 0207 (proposed, ADR 0226, awaiting operator). Distinct from verdict-author-unbound. Placement: rc-11 wave A (closes bypasses); no ruling, agent default. Placement and every design detail not quoted from a ruling are agent default, unruled.",
+      "provenance": "operator confirmation 2026-10-07 of intake report review-of-reports-20261007 (.dadaia/reports/dadaia-workspace/review-of-reports-20261007/intake-report-review-of-reports.md), grill rulings 2026-10-07",
+      "relates": [
+        "verdict-author-unbound"
+      ]
+    },
+    {
+      "id": "gate-reuses-a-green-result-for-the-same-tree",
+      "title": "A job merge reuses the green gate result recorded for the same tree",
+      "opened": "2026-10-08",
+      "status": "idea",
+      "description": "Evidence: `worktree.py merge` reruns `verify:` on HEAD after the job gate already ran on that HEAD (worktrees law 2.4); stage-gate-keeps-only-the-red-check records the suite runs 3x per job. Design: a local green record keyed by tree hash + verify line. Reusing a remote CI result needs a remote, so it is developer-only (private-public boundary). Risk: a new state file is new bug surface; the deletion test applies at the as-is review. Neighbours: impacted-test-selection (what runs), stage-gate-keeps-only-the-red-check (which level). Placement: rc-12, after stage-gate-keeps-only-the-red-check measures what is left. Placement and every design detail not quoted from a ruling are agent default, unruled.",
+      "provenance": "operator confirmation 2026-10-07 of intake report review-of-reports-20261007 (.dadaia/reports/dadaia-workspace/review-of-reports-20261007/intake-report-review-of-reports.md), grill rulings 2026-10-07",
+      "relates": [
+        "stage-gate-keeps-only-the-red-check",
+        "impacted-test-selection"
+      ]
+    },
+    {
+      "id": "process-proportional-to-change-size",
+      "title": "Gate and review cost scale with change size",
+      "opened": "2026-10-08",
+      "status": "idea",
+      "description": "Evidence: 47 of 451 commits are feat/fix and 234 are chore/docs; the per-task fixed cost (brief, tree, gate, merge, map rebase) dominates small changes; today's only size rule is one review per stage past 400 added lines (worktrees law 2). Design: size classes for the gate and the review; the exact classes are for the as-is review. Neighbour of stage-gate-keeps-only-the-red-check. Placement: rc-11 (gate sizing). Placement and every design detail not quoted from a ruling are agent default, unruled.",
+      "provenance": "operator confirmation 2026-10-07 of intake report review-of-reports-20261007 (.dadaia/reports/dadaia-workspace/review-of-reports-20261007/intake-report-review-of-reports.md), grill rulings 2026-10-07",
+      "relates": [
+        "stage-gate-keeps-only-the-red-check"
+      ]
+    },
+    {
+      "id": "bug-status-deferred-banned",
+      "title": "`deferred` is no terminal status for bugs nor audit findings: it is open",
+      "opened": "2026-10-08",
+      "status": "idea",
+      "description": "Ruling 2026-10-07: 'Deferred = open (Recommended)'; scope: 'Yes, one rule (Recommended)' - the ban covers BUGS and audit FINDINGS dispositions. Evidence: `deferred` lives in bug-record-v1.schema.json:122, _bugs_check.py:28 TERMINAL, bugs.py:60 `defer` verb, specs/bugs/AGENTS.md:46, dd-gitflow-default 3a row 4 (19 lib hits); audit FINDINGS carry 13 deferred dispositions; `bugs.py status --found-in` and `release.py new|ship` already count deferred as open (bugs.py:236-241), so the status buys nothing. Design: delete the verb, the enum value and the law rows (net-negative); one-shot migration of existing deferred records (the 4 rc-10 ones are fixed in the rc-10 batch; `panel-telemetry-sqlite-corrupts-under-concurrent-access` closes resolved citing 545ce34ef, ADR 0123); audit findings take open|resolved|rejected only. Needs ADR amending 0206 (proposed, ADR 0223). Placement: rc-11 Job 1. Placement and every design detail not quoted from a ruling are agent default, unruled.",
+      "provenance": "operator confirmation 2026-10-07 of intake report review-of-reports-20261007 (.dadaia/reports/dadaia-workspace/review-of-reports-20261007/intake-report-review-of-reports.md), grill rulings 2026-10-07",
+      "relates": []
+    },
+    {
+      "id": "law-one-home-residual",
+      "title": "Residual of law-one-home-per-rule: ADR ledger keeps only architectural decisions (a)-(c)",
+      "opened": "2026-10-08",
+      "status": "idea",
+      "description": "Operator, 2026-10-06: 'Se tudo \u00e9 ADR nada \u00e9 ADR'. Ruling 2026-10-07: 'Exit delivered + re-intake rest (Recommended)'. law-one-home-per-rule exited delivered at 0.5.0 for its AC12.6 half (one home per rule across the laws). This entry carries the residual, unchanged in design: (a) adr-born-at-release-with-options - an ADR is born only in dd-release-definition through dd-ask-me references/adr.md, past a three-leg threshold (one-way door; architecturally significant criterion; >=2 genuine options), options[{name, tradeoff, rejected_because}] (min 2), ruling.words carrying question and chosen option; decisions.jsonl leaves the backlog kind's allowed set and its gitflow row. (b) adr-ledger-triage-process-rules - one pass: 36 process rules and 14 spent rulings move to their scoped AGENTS.md and one consolidated ADR supersedes them; the 5 principles on rejected ADRs are re-judged; each remaining measured_by resolves to an executable check. (c) adr-0193-records-its-amends - 0193 carries amends: null though it amends 0152 (2); the operator rules a new amending record or a wider 0138 repair lane. Also: the ADR 0151 law-deletion check stops demanding an ADR per changed law line (if it lands first, job-gate-runs-the-law-deletion-check shrinks). Input to triage: rerun corpus-audit and prompt-audit on the rc-10 tip (the 20261004/20261007 runs scanned 76d7af604, before Job 10's law rework). Placement: rc-11. Placement and design details not quoted from a ruling are agent default, unruled.",
+      "provenance": "operator ruling 2026-10-07 K1: 'Exit delivered + re-intake rest (Recommended)'; intake report review-of-reports-20261007",
+      "relates": [
+        "job-gate-runs-the-law-deletion-check"
+      ]
+    },
+    {
+      "id": "quality-scorecard-ruler",
+      "title": "QUALITY.md carries one scorecard ruler: rates as trend, one pinned text-assert regex, targets for criteria 1 and 3",
+      "opened": "2026-10-08",
+      "status": "idea",
+      "description": "Operator, 2026-10-06, verbatim: 'Taxas viram tend\u00eancia; regex fixa; metas 1 e 3'; and 'Sim, na Reconcilia\u00e7\u00e3o da rc-10' - the baseline scorecard was missed at the Reconciliation and now runs as an rc-10 tail act (2026-10-08), so rc-11 (>=8 on every criterion, ruling Quality-uplift 2026-10-07) is measured against it. Measured: rates (parallelism, test/code ratio) were read as gates; the text-assert share is 10.8% or 17% depending on the regex; criteria 1 (Core) and 3 (push_gate refactor) had no target. Design: one ruler in QUALITY.md - rates are reported as a trend, never a gate; one pinned regex counts text asserts; criteria 1 and 3 get targets from complexity-and-private-import-ratchet and push-gate-decision-split; dd-code-review gains a scorecard lens reading that ruler. rc-11 note carried from bug-ledger-balance-and-convergence (picked by rc-10, whose SPEC is Approved and frozen): add a fix-induced Laplace line (u=+2.9..+4.6, accelerating; the all-bugs Laplace was NOT reproduced - its sign flips with the end date, +0.95/-0.89/-1.57) and a count of closures under 10 minutes (116/789 resolved <10 min, 52 <1 min; 22/70 <10 min since 20260930-structural-convergence-F008 was marked resolved), both as readouts, never gates; the Laplace counts audit batches unless found_by is derived from the registration commit (a typed found_by is rejected as a puxadinho). Placement: rc-11. Placement and every design detail not quoted from a ruling are agent default, unruled. Corrected 2026-10-07 on operator confirmation of intake report review-of-reports-20261007 (successor of scorecard-one-ruler; its baseline moved from the Reconciliation to an rc-10 tail act, K5).\nReplaces scorecard-one-ruler; still linked by test-suite-diet, re-pointed when picked.",
+      "provenance": "audit verification 2026-10-06 over feature/0.5.0 8e6448f13 (four read-only verifiers); main-thread registration after the operator grill of 2026-10-06; corrected on operator confirmation 2026-10-07 (intake report review-of-reports-20261007)",
+      "relates": [
+        "complexity-and-private-import-ratchet",
+        "test-suite-diet"
+      ]
+    },
+    {
+      "id": "bug-batch-cause-trigger-and-attempt-cap",
+      "title": "The bug batch is triggered by cause, and a fix gets two attempts before a fresh session",
+      "opened": "2026-10-08",
+      "status": "idea",
+      "description": "Ruling 2026-10-07: 'Adopt b+c, derive a (Recommended)'. Evidence: dd-architecture-survey SKILL.md triggers only 'at the close of each candidate'; ADR 0123's group-by-cause has no skill trigger; dd-bug-resolution has no attempt cap (grep attempt -> 0). Design: trigger = the rc bug window or 20 registrations, whichever comes first; a 2-attempt cap on one bug, then a fresh session with a written diagnosis. Distinct from quality-scorecard-ruler (readouts only). Placement: rc-11. Placement and every design detail not quoted from a ruling are agent default, unruled.",
+      "provenance": "operator confirmation 2026-10-07 of intake report review-of-reports-20261007 (.dadaia/reports/dadaia-workspace/review-of-reports-20261007/intake-report-review-of-reports.md), grill rulings 2026-10-07",
+      "relates": [
+        "quality-scorecard-ruler"
+      ]
+    },
+    {
+      "id": "bug-stats-hotspots-and-age",
+      "title": "`bugs.py stats` prints per-surface hotspots and ODC Age derived from `caused_by`",
+      "opened": "2026-10-08",
+      "status": "idea",
+      "description": "Ruling 2026-10-07: 'Adopt b+c, derive a (Recommended)': ODC Age derived from caused_by, no new field. Evidence: dd-architecture-survey SKILL.md:28-30 says to aggregate per surface/component with `bugs.py stats`, which prints only status, severity and direction (bugs.py:226-234). Design: derived hotspot rows per surface/component, plus Age (Base/New/Rewritten/ReFixed) derived from caused_by and `bugs.py fix`; no new typed field. Absorbs the evals-report bug-metrics-per-release together with audit-scorecard-cycle. Placement: rc-11. Placement and every design detail not quoted from a ruling are agent default, unruled.",
+      "provenance": "operator confirmation 2026-10-07 of intake report review-of-reports-20261007 (.dadaia/reports/dadaia-workspace/review-of-reports-20261007/intake-report-review-of-reports.md), grill rulings 2026-10-07",
+      "relates": [
+        "quality-scorecard-ruler"
+      ]
+    },
+    {
+      "id": "audit-project-scorecard-cycle",
+      "title": "dd-audit-project is REBUILT as the scorecard cycle and closes the two 2026-09-30 audits",
+      "opened": "2026-10-08",
+      "status": "idea",
+      "description": "Audit verdict: 'REBUILD as the scorecard cycle'; the scorecard cycle closes the two 2026-09-30 audits (20260930-050-publish-gate-baseline, 20260930-structural-convergence with 29 open findings). Measured: PILLAR-SPECS.md:31 prescribes a 'final-rc QA close'; specs/audits/AGENTS.md:25 prescribes a 'remediation release', against ADR 0206 (no rc closes with an open bug); the skill says eight metrics where PILLAR-BUGS lists nine, 'three cheap measures' lists two, and PILLAR-BUGS relies on a refs field the schema lacks; 20260930-structural-convergence-F008's resolved disposition is false (22/70 closures <10 min after it) and reopens. PILLAR-BUGS.md:25 reading the retired governance_events is the registered bug pillar-bugs-metric-reads-retired-event-stream (rc-10 batch). Design: dd-audit-project becomes the scorecard cycle - run quality-scorecard-ruler's ruler, record the scores, disposition the findings - and the two 09-30 audits close through it; PILLAR-SPECS and audits/AGENTS.md lose the final-rc QA close and the remediation release. F001 (resolved: cause removed, PILLAR-BUGS metric 1 is now registrations per reporter) and F008 (reopened: 12 of 62 resolved rc-10 records closed <10 min after ts) are dispositioned by the rc-10 tail job (JT.S4.T3, K9), pending; at HEAD F001 is open and F008 resolved. The deferred ban (bug-status-deferred-banned, one rule) covers audit finding dispositions too (ADR 0227, proposed, amends 0081). Placement: rc-11. Placement and every design detail not quoted from a ruling are agent default, unruled. Corrected 2026-10-07 on operator confirmation of intake report review-of-reports-20261007 (successor of audit-scorecard-cycle; the F001/F008 dispositions belong to the rc-10 tail job, K9).\nReplaces audit-scorecard-cycle; still linked by adr-0122-zero-backlog-destined-to-this-release, re-pointed when picked.",
+      "provenance": "audit verification 2026-10-06 over feature/0.5.0 8e6448f13 (four read-only verifiers); main-thread registration after the operator grill of 2026-10-06; corrected on operator confirmation 2026-10-07 (intake report review-of-reports-20261007)",
+      "relates": [
+        "quality-scorecard-ruler",
+        "bug-status-deferred-banned"
+      ]
+    },
+    {
+      "id": "repo-ci-sast-gates",
+      "title": "This repo's CI runs SAST (poetry floor delivered): ruff S, pip-audit on poetry.lock, CodeQL",
+      "opened": "2026-10-08",
+      "status": "idea",
+      "description": "This repo's own pipeline, never library content. Measured (HEAD c9100eaee): `.github/workflows/ci.yml` lint runs ruff with `select = [E, F, I, UP, B, SIM]` (`pyproject.toml:118`), no `S`, yet 39 `noqa: S...` comments in 20 files (3 library, 17 tests) suppress a rule that never runs; CodeQL default setup `not-configured` (repo is public, free); no pip-audit job; `secret-scan.yml` runs on push only to main (PRs to main/develop), not on work-branch pushes; 13 open Dependabot alerts, all PyJWT on main's `poetry.lock` (1 critical, 5 high, 7 medium), already absent from the feature/develop locks (de4e3179a). Change: ruff `S` on, with one triage (justified noqa or fix); a `pip-audit` job on `poetry.lock` failing on any finding; CodeQL default setup (operator act, or `gh api` on operator order); `.github/required-checks.json` updated; no job reads Dependabot alerts (GITHUB_TOKEN cannot; no new secret) - that check is the operator's private post-push rule. Delivered already: the poetry floor (`ci.yml:71` `poetry==2.5.1`). Still absent (grep codeql|pip-audit .github/workflows -> 0; pyproject.toml:84 select has no S). Done when: the 3 jobs are required checks and green. Relates: none. Corrected 2026-10-07 on operator confirmation of intake report review-of-reports-20261007 (successor of repo-ci-sast; the poetry floor is delivered at ci.yml:71 and the measurements are rerun at HEAD).\nReplaces repo-ci-sast; no live entry still links it.",
+      "provenance": "operator demand 2026-10-03: ADR/RFC/SAST grill Q1-Q7 + R2-1..R2-4 (audit 2026-10-02); corrected on operator confirmation 2026-10-07 (intake report review-of-reports-20261007)",
+      "relates": []
+    },
+    {
+      "id": "task-lines-carry-seam-and-adr-clause",
+      "title": "Job-file task lines carry the seam and the ADR clause they serve",
+      "opened": "2026-10-08",
+      "status": "idea",
+      "description": "Evidence: postmortem gaps that no law line states: C9 stages ordered by real dependency, the operator's priority first; C13 one task row per ADR clause, each with its measured_by case; C15 a gate-contract task cites the governing ADR clause; C16 a fix task's `W:` names the causing seam. grep seam in dd-release-definition and dd-bug-resolution finds only Phase 5's seam test. Design: law lines in dd-release-definition 4-5 (one home per rule). Placement: rc-11, may ride the law-one-home-residual entry. Placement and every design detail not quoted from a ruling are agent default, unruled.\nReplaces task-lines-carry-seam-and-adr-clause (renamed, never landed); still linked by law-one-home-residual, re-pointed when picked.",
+      "provenance": "operator confirmation 2026-10-07 of intake report review-of-reports-20261007 (.dadaia/reports/dadaia-workspace/review-of-reports-20261007/intake-report-review-of-reports.md), grill rulings 2026-10-07",
+      "relates": [
+        "law-one-home-residual"
+      ]
+    },
+    {
+      "id": "eval-codex-lane-in-library-ci",
+      "title": "The library CI runs an eval with Codex; a Codex red blocks the promote",
+      "opened": "2026-10-08",
+      "status": "idea",
+      "description": "Rulings 2026-10-07: 'ja temos CHAT GPT (Codex) para usar em evals tamb\u00e9m.'; 'No CI do dadaia-workspace deve executar um eval com Codex' (the dadaia-evals repo is retired, ADR 0217); placement 'rc-11, blocks promote (Recommended)'. Evidence: eval.yml:45,50 runs only `-a claude-code`. Carried from the 2026-10-03 evals grill: Q13 'Codex on its native model'; Q14 billing 'Codex an API key with a console budget'. Design: same paired base/candidate semantics, T1+T2, k=3 as the Claude lane (agent default, unruled); auth is a job-level secret under the ADR 0217 guard; Q14's API key and the 2026-10-07 remark (a subscription already held) differ, so the operator rules which (unruled); first act: confirm Harbor ships a `codex` agent. A Codex red blocks the promote: ADR amending 0178 (proposed, ADR 0225, which also grows ADR 0217 (3)'s lane set). Placement: rc-11.",
+      "provenance": "operator confirmation 2026-10-07 of intake report review-of-reports-20261007 (.dadaia/reports/dadaia-workspace/review-of-reports-20261007/intake-report-review-of-reports.md), grill rulings 2026-10-07",
+      "relates": []
+    },
+    {
+      "id": "evals-benchmark-lanes",
+      "title": "Evals grow past Claude Code: Devin joins the gate; Copilot joins a monthly benchmark.yml",
+      "opened": "2026-10-08",
+      "status": "idea",
+      "description": "Follow-up of agent-behavior-evals, after 0.5.0 (grill: Q12-Q17 become the expansion path). Q12: gate = Claude Code + Devin; benchmark = Claude Code + Devin + Copilot (Codex moved to eval-codex-lane-in-library-ci, a CI lane that blocks the promote); Cursor and Kimi stay deterministic-contract only. Q13: Sonnet 5 pinned on Claude Code, Devin and Copilot (isolates the harness effect); a cheap-model column in the benchmark only. Q14 billing: Devin Pro US$20/month; Copilot Pro US$10/month with a 'Copilot Requests' PAT in COPILOT_GITHUB_TOKEN; a gate run <= US$30. The Q14 total of US$70/month included Codex's API key; no ruling restates it without Codex (unruled); Codex billing moved to eval-codex-lane-in-library-ci. Q15: Devin CLI login in CI starts with a spike - one month of Pro, credentials.toml as a secret, 5 tasks on a hosted runner, quota read with /usage; Q15's self-hosted fallback is void (public repo, no self-hosted runner, ADR 0217), so a failed spike leaves Devin benchmark-only, run locally. Q16: eval.yml and benchmark.yml call one reusable run-task.yml (harness x task); benchmark.yml runs monthly plus dispatch, k=3, readout only, its trend recorded in the repo. Q17: gate graders stay code-only (T3 Snake by a scripted Playwright play); the benchmark adds a vision LLM judge, readout only. Runner: Harbor, as agent-behavior-evals pins it (round 2 rejected Inspect AI); a harness with no Harbor built-in agent needs a custom agent adapter, checked per lane when it is picked. Depends on devin-subagent-projection for the Devin lane. Done when: eval.yml runs both gate harnesses and benchmark.yml has one monthly trend point over the three. Corrected 2026-10-07 on operator confirmation of intake report review-of-reports-20261007 (successor of evals-harness-lanes-and-benchmark; ADR 0217 retired dadaia-evals, ADR 0177 is superseded).\nReplaces evals-harness-lanes-and-benchmark; still linked by adr-0122-zero-backlog-destined-to-this-release and devin-subagent-projection, re-pointed when picked.",
+      "provenance": "operator ruling in the grill handoff 2026-10-03T163043Z-main-thread-grill-evals-050 (final, frontier empty) over grills Q1-Q17 of 2026-10-03 (Q9 superseded; Q11 'private' replaced by public with conditions): Devin, Copilot, Codex, benchmark.yml and the vision judge move to the backlog after 0.5.0, keeping Q12-Q17 as their origin; grill round 2, handoff 2026-10-03T170932Z-main-thread-grill-evals-format (destination rc-8 in parallel, repo format, Docker image, Harbor runner), and the dd-code-reviewer conditions on e9007d5a9; corrected on operator confirmation 2026-10-07 (intake report review-of-reports-20261007)",
+      "relates": [
+        "eval-codex-lane-in-library-ci"
+      ]
+    },
+    {
+      "id": "release-approve-requires-evals-gate",
+      "title": "release.yml approve requires the evals/gate commit status that the lib eval.yml posts on the lib sha",
+      "opened": "2026-10-08",
+      "status": "idea",
+      "description": "Follow-up of agent-behavior-evals, after 0.5.0 (grill Q-gate: 'evals/gate status required by approve moves to 0.5.1'; Q16). eval.yml posts the commit status evals/gate on the lib sha it evaluated (the workflow's own GITHUB_TOKEN with statuses: write, same repo; no cross-repo token, ADR 0217); the release.yml approve job requires that status on its sha; a weekly schedule runs a one-task smoke. Replaces ADR 0178's manual read and its evaluated-sha-to-tag diff check, and closes its 'deferred to 0.5.1' clause. Needs its own ADR at definition (a release.yml gate change). Done when: approve refuses a sha with no evals/gate success, and the smoke runs weekly. Corrected 2026-10-07 on operator confirmation of intake report review-of-reports-20261007 (successor of evals-release-gate-status; ADR 0217 retired dadaia-evals, ADR 0177 is superseded).\nReplaces evals-release-gate-status; still linked by adr-0122-zero-backlog-destined-to-this-release, re-pointed when picked.",
+      "provenance": "operator ruling in the grill handoff 2026-10-03T163043Z-main-thread-grill-evals-050 (final, frontier empty) over grills Q1-Q17 of 2026-10-03 (Q9 superseded; Q11 'private' replaced by public with conditions): the evals/gate status required by approve is deferred to 0.5.1; grill round 2, handoff 2026-10-03T170932Z-main-thread-grill-evals-format (destination rc-8 in parallel, repo format, Docker image, Harbor runner), and the dd-code-reviewer conditions on e9007d5a9; corrected on operator confirmation 2026-10-07 (intake report review-of-reports-20261007)",
+      "relates": [
+        "eval-codex-lane-in-library-ci"
+      ]
+    },
+    {
+      "id": "windows-smoke-t1-at-release",
+      "title": "One Windows smoke: T1 with Claude Code on a Windows runner, at release only",
+      "opened": "2026-10-08",
+      "status": "idea",
+      "description": "Follow-up of agent-behavior-evals, after 0.5.0 (grill Q7: behaviour evals run on Linux; Windows keeps its deterministic coverage and gains one Claude Code smoke at release). The PowerShell vs bash risk is real; windows-integration-coverage-gap names the deterministic side. The smoke is a model-calling job of the lib's own eval.yml and runs under the ADR 0217 guard. T1 cold onboarding on windows-latest, k=1, readout, only if the first gate rounds show slack in the budget and the Actions minutes. First act: check whether Harbor's docker environment runs on windows-latest (GitHub's Windows runners run Windows containers only); if not, the definition names the smoke's runner. Done when: an eval.yml dispatch input runs T1 on Windows and its result sits in the verdict as readout. Corrected 2026-10-07 on operator confirmation of intake report review-of-reports-20261007 (successor of evals-windows-smoke; ADR 0217 retired dadaia-evals, ADR 0177 is superseded).\nReplaces evals-windows-smoke; still linked by adr-0122-zero-backlog-destined-to-this-release and multi-platform-by-construction-migration, re-pointed when picked.",
+      "provenance": "operator ruling in the grill handoff 2026-10-03T163043Z-main-thread-grill-evals-050 (final, frontier empty) over grills Q1-Q17 of 2026-10-03 (Q9 superseded; Q11 'private' replaced by public with conditions): the Windows smoke moves to the backlog after 0.5.0 (Q7 carried); grill round 2, handoff 2026-10-03T170932Z-main-thread-grill-evals-format (destination rc-8 in parallel, repo format, Docker image, Harbor runner), and the dd-code-reviewer conditions on e9007d5a9; corrected on operator confirmation 2026-10-07 (intake report review-of-reports-20261007)",
       "relates": []
     }
   ]

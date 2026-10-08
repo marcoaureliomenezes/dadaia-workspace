@@ -723,3 +723,12 @@ def test_the_merge_and_onboarding_readers_judge_a_tests_line_alike(
     onboarding_leaves_alone = canon.declare_tests_line(other) == []
 
     assert merge_sees == onboarding_leaves_alone == declared
+
+
+def test_git_output_decoded_with_replacement_keeps_a_latin1_laws_tests_line_declared(
+    tmp_path: Path,
+) -> None:
+    """git-errors-replace-has-no-row: a latin-1 byte on another line does not hide `tests:`."""
+    end = _law_end(tmp_path, b"# caf\xe9\ntests: tests/**\n")
+
+    assert end._declared(tmp_path, "work", "tests:") == "tests/**"

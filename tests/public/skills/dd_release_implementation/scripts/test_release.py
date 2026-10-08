@@ -714,6 +714,112 @@ def test_check_refuses_code_that_moved_after_the_entry(script: Path, tmp_path: P
     assert "'alpha'" in result.stdout and until[:12] in result.stdout
 
 
+def _side_branch_until(root: Path, specs: Path, base: str, *merge: str) -> str:
+    """`until` = the tip of a side branch, landed on the principal by `git merge <merge>`,
+    then a later commit that touches an atom source. Returns `until`."""
+    principal = _git(root, "rev-parse", "--abbrev-ref", "HEAD")
+    _git(root, "switch", "-qc", "side")
+    (root / "note.txt").write_text("side\n", encoding="utf-8")
+    _git(root, "add", "-A")
+    _git(root, "commit", "-qm", "side work")
+    until = _git(root, "rev-parse", "HEAD")
+    _git(root, "switch", "-q", principal)
+    _git(root, "merge", "-q", *merge, "side")
+    if "--squash" in merge:
+        _git(root, "commit", "-qm", "squash side")
+    _hand_append(specs, since=base, until=until, reviewed=["alpha"], changed=[])
+    (root / "dadaia_workspace" / "features" / "alpha" / "core.py").write_text("x = 3\n", "utf-8")
+    _git(root, "commit", "-qam", "code moved after the entry")
+    return until
+
+
+def test_check_is_clean_when_until_was_squash_merged_off_the_principal(
+    script: Path, tmp_path: Path
+) -> None:
+    root, specs, base = _memory_repo(tmp_path, script)
+    principal = _git(root, "rev-parse", "--abbrev-ref", "HEAD")
+    _side_branch_until(root, specs, base, "--squash")
+
+    result = _run(script, "check", "--specs", str(specs), "--principal", principal, cwd=root)
+
+    assert result.returncode == 0, result.stdout
+
+
+def test_check_names_the_moved_source_when_until_is_history_of_head(
+    script: Path, tmp_path: Path
+) -> None:
+    root, specs, base = _memory_repo(tmp_path, script)
+    principal = "trunk"
+    until = _side_branch_until(root, specs, base, "--no-ff", "-m", "merge side")
+
+    result = _run(script, "check", "--specs", str(specs), "--principal", principal, cwd=root)
+
+    assert result.returncode == 1
+    assert "'alpha'" in result.stdout and until[:12] in result.stdout
+
+
+def test_check_refuses_an_amend_orphaned_until_off_the_principal(
+    script: Path, tmp_path: Path
+) -> None:
+    root, specs, base = _memory_repo(tmp_path, script)
+    principal = "trunk"
+    _git(root, "switch", "-qc", "feature-x")
+    until = _git(root, "rev-parse", "HEAD")
+    _hand_append(specs, since=base, until=until, reviewed=["alpha"], changed=[])
+    _git(root, "commit", "-q", "--amend", "-m", "code moved, amended")
+    (root / "dadaia_workspace" / "features" / "alpha" / "core.py").write_text("x = 3\n", "utf-8")
+    _git(root, "commit", "-qam", "code moved after the entry")
+
+    result = _run(script, "check", "--specs", str(specs), "--principal", principal, cwd=root)
+
+    assert result.returncode == 1
+    assert f"{until} is not an ancestor of HEAD" in result.stdout
+
+
+def test_check_is_clean_after_a_no_ff_promote_on_the_principal(script: Path, tmp_path: Path) -> None:
+    root, specs, base = _memory_repo(tmp_path, script)
+    principal = _git(root, "rev-parse", "--abbrev-ref", "HEAD")
+    _side_branch_until(root, specs, base, "--no-ff", "-m", "merge side")
+
+    result = _run(script, "check", "--specs", str(specs), "--principal", principal, cwd=root)
+
+    assert result.returncode == 0, result.stdout
+
+
+def test_check_judges_a_detached_head_on_the_principal_commit(script: Path, tmp_path: Path) -> None:
+    root, specs, base = _memory_repo(tmp_path, script)
+    principal = _git(root, "rev-parse", "--abbrev-ref", "HEAD")
+    until = _side_branch_until(root, specs, base, "--no-ff", "-m", "merge side")
+    _git(root, "switch", "-q", "--detach")
+
+    result = _run(script, "check", "--specs", str(specs), "--principal", principal, cwd=root)
+
+    assert result.returncode == 1
+    assert "'alpha'" in result.stdout and until[:12] in result.stdout
+
+
+def test_check_is_clean_after_a_squash_promote_on_the_principal(script: Path, tmp_path: Path) -> None:
+    root, specs, base = _memory_repo(tmp_path, script)
+    principal = _git(root, "rev-parse", "--abbrev-ref", "HEAD")
+    _side_branch_until(root, specs, base, "--squash")
+
+    result = _run(script, "check", "--specs", str(specs), "--principal", principal, cwd=root)
+
+    assert result.returncode == 0, result.stdout
+
+
+def test_check_judges_the_window_on_the_principal_without_a_principal(
+    script: Path, tmp_path: Path
+) -> None:
+    root, specs, base = _memory_repo(tmp_path, script)
+    until = _side_branch_until(root, specs, base, "--squash")
+
+    result = _run(script, "check", "--specs", str(specs), cwd=root)
+
+    assert result.returncode == 1
+    assert f"{until} is not an ancestor of HEAD" in result.stdout
+
+
 # ── ship ──────────────────────────────────────────────────────────────────────
 
 

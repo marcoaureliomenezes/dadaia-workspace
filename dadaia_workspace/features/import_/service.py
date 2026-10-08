@@ -12,6 +12,7 @@ from dadaia_workspace.core.exceptions import (
     ContextAlreadyExistsError,
     InvalidContextNameError,
     RepoUrlMissingError,
+    SchemaVersionError,
 )
 from dadaia_workspace.core.models.spec_context import (
     EXPORT_SCHEMA_VERSION,
@@ -36,6 +37,15 @@ class ContextRegistry(Protocol):
     def register(self, ctx: SpecContextProject) -> SpecContextProject: ...
 
 
+def _require(file: Path, record: object, *keys: str) -> None:
+    absent = [k for k in keys if not isinstance(record, dict) or k not in record]
+    if absent:
+        raise SchemaVersionError(
+            f"'{file.name}' has a record missing {', '.join(absent)}.",
+            fix_line(None, "export"),
+        )
+
+
 def _read(file: Path) -> list[dict[str, object]]:
     if not file.is_file():
         raise ValueError(
@@ -53,6 +63,10 @@ def _read(file: Path) -> list[dict[str, object]]:
     contexts = payload.get("contexts")
     if not isinstance(contexts, list) or not all(isinstance(c, dict) for c in contexts):
         raise ValueError(f"'{file.name}' has no 'contexts' list.")
+    for c in contexts:
+        _require(file, c, "name", "slug", "repo_url")
+        for r in c.get("associated_repos") or []:
+            _require(file, r, "slug", "url")
     return contexts
 
 

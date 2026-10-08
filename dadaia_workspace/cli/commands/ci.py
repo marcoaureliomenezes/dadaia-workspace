@@ -27,6 +27,8 @@ def _repo_root() -> Path:
             ["git", "rev-parse", "--show-toplevel"],
             capture_output=True,
             text=True,
+            encoding="utf-8",
+            errors="replace",
             check=True,
         )
     except (subprocess.CalledProcessError, FileNotFoundError) as exc:

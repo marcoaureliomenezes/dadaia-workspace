@@ -1694,3 +1694,31 @@ def test_the_bugs_check_and_freeze_task_ids_are_one_grammar() -> None:
     freeze = load_owner("dd-gitflow-default", "_worktree_freeze")
     check = load_owner("dd-bug-resolution", "_bugs_check")
     assert re.sub(r"\(\?P<\w+>|\)|\\b", "", freeze._ID.pattern) == check.TASK_ID
+
+
+def test_fix_links_a_resolve_by_task_to_the_commits_of_the_records_rc_only(
+    script: Path, tmp_path: Path
+) -> None:
+    """bug-fix-links-a-task-id-across-rcs: the id names the task of the record's rc; a commit
+    of the same bare id inside another rc's window (the release state's milestone shas) is
+    not its fix."""
+    record = {**_OPEN_RECORD, "id": "a-bug", "status": "resolved", "closed_at": "2026-09-21T00:00:00Z",
+              "found_in": {"release": "9.9.9", "rc": "rc-10"}}  # fmt: skip
+    specs = _ledger(tmp_path, record)
+    seed, old, boundary, new = _commits(
+        tmp_path,
+        ("chore: seed", {}),
+        ("fix(JR.S8.T1): rc-9 task", {"cli/old.py": "a\n"}),
+        ("docs(specs): define rc-10", {"specs/n": "n\n"}),
+        ("fix(JR.S8.T1): rc-10 task", {"cli/new.py": "b\n"}),
+    )
+    milestones = [("rc-9", "defined", seed), ("rc-9", "implemented", old),
+                  ("rc-10", "defined", boundary)]  # fmt: skip
+    state = specs / "releases" / "9.9.9" / "_RELEASE.json"
+    state.parent.mkdir(parents=True)
+    state.write_text(json.dumps({"schema": "release-state-v1", "release": "9.9.9", "log": [
+        {"kind": "milestone", "candidate": rc, "milestone": m, "sha": sha} for rc, m, sha in milestones
+    ]}), encoding="utf-8")  # fmt: skip
+    _commits(tmp_path, ("chore(bugs): resolve a-bug — by JR.S8.T1", {"specs/n": "r\n"}))
+    listed = _run(script, "fix", "a-bug", "--specs", str(specs)).stdout.splitlines()
+    assert listed[0] == f"a-bug\t{new}\tnet-positive", listed
