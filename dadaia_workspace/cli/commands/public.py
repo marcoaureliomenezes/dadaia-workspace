@@ -46,7 +46,7 @@ def stage() -> None:
 def install(
     force: bool = typer.Option(False, "--force", help="Overwrite existing files"),
 ) -> None:
-    """Install staged public assets into runtime projections.
+    """Stage the packaged public assets, then install them into runtime projections.
 
     Projects the shared authored set plus every harness registered in
     `.dadaia/states/harness_profile.json` — the roster of record. A harness enters

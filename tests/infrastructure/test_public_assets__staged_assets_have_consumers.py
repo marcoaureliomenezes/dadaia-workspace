@@ -7,6 +7,7 @@ Size: MEDIUM (a real stage + install into tmp_path; the public doctor through th
 from __future__ import annotations
 
 import re
+import shutil
 from pathlib import Path
 from unittest.mock import patch
 
@@ -88,9 +89,8 @@ def test_a_persona_without_a_model_is_refused_on_claude(tmp_path: Path) -> None:
     ws = tmp_path / "ws"
     register_all(ws)
     manager = FileSystemPublicAssetManager()
-    manager.stage(ws)
-    staged = ws / ".dadaia" / "agentic" / "agents" / "dd-extra.md"
-    staged.write_bytes(_persona_without_model(tmp_path).read_bytes())
+    manager._public_dir = shutil.copytree(manager._public_dir, tmp_path / "public")  # noqa: SLF001
+    shutil.copy2(_persona_without_model(tmp_path), manager._public_dir / "agents")  # noqa: SLF001
 
     with pytest.raises(PublicAssetError):
         manager.install(ws)

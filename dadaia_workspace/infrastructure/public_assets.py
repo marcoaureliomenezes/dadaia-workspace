@@ -242,9 +242,7 @@ class FileSystemPublicAssetManager:
         self._guard_source_root_install(workspace_root)
 
         agentic_dir = workspace_root / ".dadaia" / "agentic"
-        installed: list[str] = []
-        if not (agentic_dir / "manifest.json").exists():
-            installed.extend(self.stage(workspace_root))
+        installed = self.stage(workspace_root)
 
         plan = self._resolve_install_plan(workspace_root, agentic_dir, harness, force)
         rules = projection_rules(plan)

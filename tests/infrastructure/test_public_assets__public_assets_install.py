@@ -64,7 +64,6 @@ def test_install_leaves_only_ledger_owned_entries_under_claude(tmp_path: Path) -
     assert ".claude/commands" not in entries
 
 
-@pytest.mark.xfail(strict=True, reason="public-install-never-restages-after-an-upgrade RED")
 def test_install_restages_a_staging_older_than_the_package(tmp_path: Path) -> None:
     """Bug public-install-never-restages-after-an-upgrade: a staging left by an older
     package reads as `stage:` drift, and `install` is the remedy doctor names."""
