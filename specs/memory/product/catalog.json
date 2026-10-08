@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-10-08T03:58:17Z",
+  "generated_at": "2026-10-08T12:06:42Z",
   "features": [
     {
       "rank": 1,
@@ -825,7 +825,7 @@
         "memory",
         "as-is-review"
       ],
-      "token_estimate": 2977,
+      "token_estimate": 2993,
       "depends_on": [
         "sdd-gate-v3",
         "specs-migration",
