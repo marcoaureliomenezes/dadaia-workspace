@@ -4,7 +4,7 @@ Disclosed reference reached at `SKILL.md` step 7 — `dd-product-engineer` runs 
 
 ## Protocol — delete, update, add
 
-1. `python3 .agents/skills/dd-release-implementation/scripts/release.py phase CLOSURE --sha <sha>` — it refuses while another `wt/*` of the repo is open; no memory write before it.
+1. `phase CLOSURE` already ran, per the order in `RC-FLOW.md` step 4; no memory write before it.
 2. `python3 .agents/skills/dd-release-implementation/scripts/release.py drift` — the window opens at the live release's last `kind: memory` entry's `until`, else its `defined.sha`; exit 1 means there is work. The worklist is every atom at least one of whose `sources` globs matched a changed path, and every `features/<pkg>/` package or `hooks/*.py` module no atom's sources cover.
 3. For each listed atom, read `git diff <since>..HEAD -- <matched paths>` in full, then edit the atom in this order and no other:
    - DELETE every claim the code no longer supports — a verb, a file, a behavior, a number.
