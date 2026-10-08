@@ -9,6 +9,7 @@ from pathlib import Path
 import pytest
 
 from dadaia_workspace.infrastructure.ledger_scripts import _PACKAGE_SKILLS, load_owner
+from tests.helpers.worktree_ws import git
 
 sys.path.insert(0, str(_PACKAGE_SKILLS / "dd-gitflow-default" / "scripts"))
 freeze = load_owner("dd-gitflow-default", "_worktree_freeze")
@@ -165,3 +166,57 @@ def test_a_source_stage_after_a_test_only_stage_refuses_an_added_or_changed_test
         row("c2", "fix(JR.S5.T1): green", code=True, edits=((T, removed, 1),)),
     ]
     assert freeze.judge(rows, "base", None) == (T, "base")
+
+
+BUG = '{"id": "b1", "status": "open"}\n'
+
+
+def amended(tmp_path: Path, subject: str, *, ledger: str = BUG) -> freeze.Refusal | None:
+    """The refusal `check` raises over a real repo whose work branch holds *ledger* and whose
+    only commit past the RED anchor, titled *subject*, changes a frozen test line."""
+    git(tmp_path, "init", "-q", "-b", "main")
+    for rel, text, msg in (
+        ("specs/bugs/BUGS.jsonl", ledger, "init"),
+        ("tests/test_a.py", "assert 0\n", "test(J1.S1.T1): red"),
+        ("src/a.py", "x = 1\n", "feat(J1.S2.T1): code"),
+    ):
+        (tmp_path / rel).parent.mkdir(parents=True, exist_ok=True)
+        (tmp_path / rel).write_text(text)
+        git(tmp_path, "add", rel)
+        git(tmp_path, "commit", "-qm", msg)
+        if msg == "init":
+            git(tmp_path, "branch", "work")  # the work branch holds the ledger only
+    (tmp_path / "tests/test_a.py").write_text("assert 1\n")
+    git(tmp_path, "commit", "-qam", subject)
+    try:
+        freeze.check(tmp_path, "work", "tests/**", "^@red")
+    except freeze.Refusal as refused:
+        return refused
+    return None
+
+
+REBUILD = "refactor(bugs): b1 — REBUILD the unit: a wrong assert"
+
+
+@pytest.mark.medium
+@pytest.mark.xfail(strict=True, reason="no lane admits an approved REBUILD of a frozen test")
+def test_a_rebuild_naming_a_ledger_bug_amends_a_frozen_test_line(tmp_path: Path) -> None:
+    assert amended(tmp_path, REBUILD) is None
+
+
+@pytest.mark.medium
+@pytest.mark.xfail(strict=True, reason="the refusal fix line says stop and report")
+def test_the_freeze_refusal_names_the_bug_proposal_act(tmp_path: Path) -> None:
+    refused = amended(tmp_path, "fix(bugs): b1 — the cause")
+    assert refused is not None
+    assert "bugs.py append" in refused.fix
+
+
+@pytest.mark.medium
+def test_a_rebuild_naming_no_ledger_record_still_refuses(tmp_path: Path) -> None:
+    assert amended(tmp_path, REBUILD, ledger='{"id": "other", "status": "open"}\n') is not None
+
+
+@pytest.mark.medium
+def test_a_non_rebuild_subject_naming_a_ledger_bug_still_refuses(tmp_path: Path) -> None:
+    assert amended(tmp_path, "fix(bugs): b1 — the cause") is not None

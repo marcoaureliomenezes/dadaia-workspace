@@ -215,3 +215,24 @@ def test_a_hotfix_commit_with_no_task_id_holding_code_and_a_marker_deletion_land
     )
     merged = run(root, "merge", f"worktrees/r/{task}")
     assert merged.returncode == 0, merged.stderr
+
+
+@pytest.mark.xfail(strict=True, reason="no lane admits an approved REBUILD of a frozen test")
+def test_a_rebuild_naming_a_ledger_bug_amends_a_frozen_test_line_through_merge(
+    tmp_path: Path,
+) -> None:
+    make_workspace(tmp_path)
+    repo = tmp_path / "repos/r"
+    git(repo, "checkout", "-q", "feature/0.5.0")
+    commit(repo, "specs/bugs/BUGS.jsonl", '{"id": "b1", "status": "open"}\n')
+    assert run(tmp_path, "new", "r", JOB).returncode == 0
+    _born(tmp_path)
+    task = "0.5.0-rc1/j1--J1.S2.T2"
+    assert run(tmp_path, "new", "r", task).returncode == 0
+    tree = tmp_path / "worktrees/r" / task
+    (tree / "tests/test_a.py").write_text(GREEN)
+    git(tree, "add", "tests/test_a.py")
+    subject = "refactor(bugs): b1 — REBUILD test_a: a wrong assert"
+    git(tree, "commit", "-qm", subject, "--trailer", "Owner-tests: tests/test_r.py")
+    merged = run(tmp_path, "merge", f"worktrees/r/{task}")
+    assert merged.returncode == 0, merged.stderr
