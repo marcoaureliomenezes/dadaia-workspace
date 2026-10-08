@@ -63,7 +63,7 @@ sources:
 ## The `ledgers` section
 
 - `BL-SCHEMA`, `BL-CONFLICT` over `BACKLOG.json` (`dadaia_workspace/features/backlog/doctor.py`); `LEDGER-ADR-SCHEMA` over `decisions.jsonl`, its fix an `Operator action:` to discard or revert the change that wrote the line, then redo it as an ADR commit.
-- Each ledger script (`bugs.py`, `backlog.py`, `release.py`, `audit.py`, `memory.py`) runs its own `check --specs <dir> --json` — `release.py` also gets `--principal` with the principal `core.gitflow` reads, so its memory window closes on that branch and no skill parses the gitflow; each record re-emits as `LEDGER-<NAME>-SCHEMA` with the fix the script wrote, a record without one meaning an older install (`<cli> public install`); a script that cannot run is a finding whose fix is `<cli> public install`.
+- Each ledger script (`bugs.py`, `backlog.py`, `release.py`, `audit.py`, `memory.py`) runs its own `check --specs <dir> --json`; each record re-emits as `LEDGER-<NAME>-SCHEMA` with the fix the script wrote, a record without one meaning an older install (`<cli> public install`); a script that cannot run is a finding whose fix is `<cli> public install`.
 - The doctor builds no validator for a ledger schema: where it reads a ledger itself (the backlog anchors, the ADR ledger) it goes through the scripts' own reader and schema engine, `_ledger.py`, loaded from the package's copy by `infrastructure/ledger_scripts.load_owner`; it repairs no ledger.
 
 ## The reaper

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """The release TREE walk `release.py check` runs: every state document under
-``releases/``, the ship ledger, and the live CLOSURE's memory entry re-judged over git.
+``releases/``, the ship ledger, and the live CLOSURE's memory entry.
 
 Split from `_release_check`, which judges DOCUMENT bytes every write validates against;
 this one judges a tree on disk and the history beside it.
@@ -38,7 +38,7 @@ from _release_schema import (  # noqa: E402
     origin_line,
     writes,
 )
-from _release_store import SCRIPT, Refusal, live_ids, live_release, window_start  # noqa: E402
+from _release_store import SCRIPT, Refusal, live_ids, live_release  # noqa: E402
 from _specs import quote, script, with_specs  # noqa: E402
 
 __all__ = ["check", "drift", "memory_errors", "refuse_open_bugs", "ship_findings", "tree_findings"]
@@ -240,8 +240,8 @@ def _memory_tasks(marks: list[re.Match[str]], tasks: Path, dir_rel: str) -> list
 
 
 def memory_errors(specs: Path, phase: str, entry: dict[str, Any]) -> list[str]:
-    """Why *entry* reconciles nothing over its own [since, until]: the ONE judgement the
-    `memory` verb refuses on and `check` re-applies to the entry the log records."""
+    """Why *entry* reconciles nothing over its own [since, until]: what the `memory`
+    verb refuses on."""
     since, until = str(entry.get("since")), str(entry.get("until"))
     worklist = drift.report(specs, since, until)
     lists = [[str(s) for s in entry.get(name) or []] for name in ("reviewed", "changed")]
@@ -260,60 +260,24 @@ def memory_errors(specs: Path, phase: str, entry: dict[str, Any]) -> list[str]:
     return errors or unmoved
 
 
-def _memory_record_error(state: dict[str, Any]) -> str:
-    """Why this CLOSURE state names no conformant reconciliation record, or "": the latest
-    `kind: memory` entry stamped at or after `implemented.ts` carries its four fields and
-    opens at the ledger-derived start."""
-    stamp = str((state.get("implemented") or {}).get("ts") or "")
-    log = [e for e in state.get("log") or [] if isinstance(e, dict)]
-    entries = [e for e in log if e.get("kind") == "memory" and str(e.get("ts")) >= stamp]
-    if not entries:
-        return (f"release is in CLOSURE with no `kind: memory` log entry stamped at or after "
-                f"implemented.ts {stamp!r} — the closure reconciled no memory")  # fmt: skip
-    missing = [f for f in ("since", "until", "reviewed", "changed") if f not in entries[-1]]
-    if missing:
-        return (f"the latest `kind: memory` log entry lacks {', '.join(missing)} — a prose "
-                "note names no window and dispositions no atom")  # fmt: skip
-    try:
-        start = window_start({**state, "log": log[: log.index(entries[-1])]})
-    except Refusal:
-        start = ""
-    if str(entries[-1]["since"]) != start:
-        return (f"the latest `kind: memory` log entry opens at {entries[-1]['since']!r}, not "
-                f"at the ledger-derived start {start!r} — the window was chosen, not derived")  # fmt: skip
-    return ""
-
-
-def _window_findings(specs: Path, principal: str = "") -> list[dict[str, Any]]:
-    """CLOSURE: the latest memory entry names its window, is re-judged over its
-    [since, until], and no atom's sources moved over [until, HEAD] — code after the
-    entry is unreconciled. Closed once HEAD is on *principal*, the branch the caller passes
-    (core's gitflow reader); none given, or a detached HEAD, stays judged."""
+def _memory_findings(specs: Path) -> list[dict[str, Any]]:
+    """CLOSURE: a `kind: memory` log entry stamped at or after `implemented.ts` exists —
+    memory references the code, never repeats it, so no git re-judges the entry."""
     try:
         live = live_release(specs)
     except Refusal:
         return []  # the tree walk reports a missing or doubled live release
     if live.state.get("phase") != "CLOSURE":
         return []
-    rel = f"releases/{live.release_id}/{STATE}"
-    fix = (
-        f"Operator action: run `{SCRIPT} memory --specs {quote(str(specs))}` with the "
-        "atom slugs the memory pass reviewed as --reviewed and changed as --changed"
-    )
-    if message := _memory_record_error(live.state):
-        return [finding(rel, 1, message, fix)]
-    entry = [e for e in live.state["log"] if isinstance(e, dict) and e.get("kind") == "memory"][-1]
-    until = str(entry["until"])
-    head = subprocess.run(["git", "symbolic-ref", "HEAD"], cwd=specs.parent, capture_output=True, text=True, encoding="utf-8", errors="replace", check=False)  # fmt: skip
-    if head.stdout.strip() == f"refs/heads/{principal}":
-        return []  # promoted onto the principal (none given or detached never matches)
-    try:
-        errors = memory_errors(specs, "CLOSURE", entry)
-        errors += [f"atom {a['slug']!r} moved after the memory entry's until {until[:12]}: "
-                   f"{', '.join(a['matched'])}" for a in drift.report(specs, until)["atoms"]]  # fmt: skip
-    except (drift.Refusal, OSError) as refusal:  # a Refusal carries the fix that clears it
-        return [finding(rel, 1, str(refusal), getattr(refusal, "fix", "") or fix)]
-    return [finding(rel, 1, "; ".join(errors), fix)] if errors else []
+    stamp = str((live.state.get("implemented") or {}).get("ts") or "")
+    if any(isinstance(e, dict) and e.get("kind") == "memory" and str(e.get("ts")) >= stamp
+           for e in live.state.get("log") or []):  # fmt: skip
+        return []
+    message = (f"release is in CLOSURE with no `kind: memory` log entry stamped at or after "
+               f"implemented.ts {stamp!r} — the closure reconciled no memory")  # fmt: skip
+    fix = (f"Operator action: run `{SCRIPT} memory --specs {quote(str(specs))}` with the "
+           "atom slugs the memory pass reviewed as --reviewed and changed as --changed")  # fmt: skip
+    return [finding(f"releases/{live.release_id}/{STATE}", 1, message, fix)]
 
 
 #: How `bugs.py balance --check` words a stale block, the one refusal of it that is a warning here.
@@ -399,13 +363,13 @@ def tree_findings(specs: Path) -> list[dict[str, Any]]:
     return findings
 
 
-def check(specs: Path, principal: str = "") -> list[dict[str, Any]]:
+def check(specs: Path) -> list[dict[str, Any]]:
     """The ONE release validator (the doctor delegates here): the tree, the live
     candidate's Origin, then the live CLOSURE's memory record and bug balance block."""
     return (
         tree_findings(specs)
         + _origin_findings(specs)
-        + _window_findings(specs, principal)
+        + _memory_findings(specs)
         + _balance_findings(specs)
     )
 

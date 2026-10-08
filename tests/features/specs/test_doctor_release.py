@@ -55,7 +55,6 @@ def _specs(
     return specs
 
 
-_PROSE = {"ts": "2026-09-22T11:00:00Z", "agent": "pm", "kind": "memory", "text": "done"}
 _FIRST = _entry("2026-09-22T12:00:00Z")
 
 
@@ -63,11 +62,7 @@ _FIRST = _entry("2026-09-22T12:00:00Z")
     ("phase", "log", "expected"),
     [
         ("CLOSURE", [], "reconciled no memory"),
-        ("CLOSURE", [_PROSE], "lacks since"),
         ("CLOSURE", [_entry("2026-09-21T10:00:00Z")], "reconciled no memory"),
-        ("CLOSURE", [_FIRST, {**_PROSE, "ts": "2026-09-22T13:00:00Z"}], "lacks since"),
-        ("CLOSURE", [_entry("2026-09-22T12:00:00Z", since="0000002")], "'0000001'"),
-        ("CLOSURE", [_FIRST, _entry("2026-09-22T13:00:00Z", until="0000004")], "'0000003'"),
         ("CLOSURE", [_FIRST, _entry("2026-09-22T13:00:00Z", since="0000003")], None),
         ("CLOSURE", [_entry(_IMPLEMENTED)], None),
         ("DEFINITION", [], None),
@@ -77,9 +72,8 @@ _FIRST = _entry("2026-09-22T12:00:00Z")
 def test_closure_memory_record_is_judged_by_the_script(
     tmp_path: Path, phase: str, log: list[Any], expected: str | None
 ) -> None:
-    """The latest memory entry stamped at or after implemented.ts names its window and
-    opens at the ledger-derived start; its fix names the real script and --specs, and no
-    placeholder (ADR 0158)."""
+    """A memory entry stamped at or after implemented.ts exists; its fix names the real
+    script and --specs, and no placeholder (ADR 0158)."""
     specs = _specs(tmp_path, phase, log)
     record = [f for f in _check(specs) if "`kind: memory`" in f["message"]]
     fix = f"Operator action: run `{sys.executable} {_SCRIPT} memory --specs {specs.resolve()}` "

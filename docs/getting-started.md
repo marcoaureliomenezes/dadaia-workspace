@@ -97,7 +97,7 @@ branches; a re-run is a no-op.
 
 ## Check compliance — `doctor`
 
-<!-- derived-from: workspace-doctor sha256:6b147c7a0b91 -->
+<!-- derived-from: workspace-doctor sha256:84a9bec9fec9 -->
 
 ```bash
 .dadaia/.venv/bin/dadaia doctor --context <ctx> [--json] [--fix] [--redact]
@@ -124,7 +124,7 @@ zone class, an OUTPUT entry held, an EPHEMERAL one deleted.
 
 ## Run the first candidate
 
-<!-- derived-from: release-lifecycle sha256:99a806b1d9d6 -->
+<!-- derived-from: release-lifecycle sha256:7b50f03ee3e9 -->
 <!-- derived-from: backlog-ledger sha256:44b145a6a3aa -->
 <!-- derived-from: bug-ledger sha256:a3df43b6e94e -->
 
