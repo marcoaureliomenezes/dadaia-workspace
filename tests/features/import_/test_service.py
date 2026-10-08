@@ -196,7 +196,6 @@ def test_import_rejects_files_outside_the_contract(
     assert store.list_all() == []
 
 
-@pytest.mark.xfail(strict=True, reason="import-raises-keyerror-on-a-record-missing-a-field")
 def test_import_refuses_a_record_missing_a_field_naming_it(tmp_path: Path) -> None:
     record = _record("x", "x")
     del record["name"]
