@@ -218,3 +218,67 @@ def test_a_rebuild_naming_no_ledger_record_still_refuses(tmp_path: Path) -> None
 @pytest.mark.medium
 def test_a_non_rebuild_subject_naming_a_ledger_bug_still_refuses(tmp_path: Path) -> None:
     assert amended(tmp_path, "fix(bugs): b1 — the cause") is not None
+
+
+@pytest.mark.medium
+@pytest.mark.xfail(strict=True, reason="the lane admits a terminal record")
+@pytest.mark.parametrize("status", ["resolved", "rejected"])
+def test_a_rebuild_naming_a_terminal_record_still_refuses(tmp_path: Path, status: str) -> None:
+    refused = amended(tmp_path, REBUILD, ledger=f'{{"id": "b1", "status": "{status}"}}\n')
+    assert refused is not None
+    assert "tests/test_a.py is frozen past the RED anchor" in refused.fix
+
+
+@pytest.mark.medium
+def test_a_rebuild_naming_a_deferred_record_amends(tmp_path: Path) -> None:
+    assert amended(tmp_path, REBUILD, ledger='{"id": "b1", "status": "deferred"}\n') is None
+
+
+@pytest.mark.medium
+def test_a_rebuild_naming_an_id_only_the_job_trees_ledger_holds_still_refuses(
+    tmp_path: Path,
+) -> None:
+    git(tmp_path, "init", "-q", "-b", "main")
+    (tmp_path / "specs/bugs").mkdir(parents=True)
+    (tmp_path / "tests").mkdir()
+    for rel, text, msg in (
+        ("specs/bugs/BUGS.jsonl", '{"id": "other", "status": "open"}\n', "init"),
+        ("tests/test_a.py", "assert 0\n", "test(J1.S1.T1): red"),
+    ):
+        (tmp_path / rel).write_text(text)
+        git(tmp_path, "add", rel)
+        git(tmp_path, "commit", "-qm", msg)
+        if msg == "init":
+            git(tmp_path, "branch", "work")
+    (tmp_path / "src").mkdir()
+    (tmp_path / "src/a.py").write_text("x = 1\n")
+    git(tmp_path, "add", "src/a.py")
+    git(tmp_path, "commit", "-qm", "feat(J1.S2.T1): code")
+    (tmp_path / "specs/bugs/BUGS.jsonl").write_text('{"id": "b1", "status": "open"}\n')
+    (tmp_path / "tests/test_a.py").write_text("assert 1\n")
+    git(tmp_path, "commit", "-qam", REBUILD)
+    with pytest.raises(freeze.Refusal) as refused:
+        freeze.check(tmp_path, "work", "tests/**", "^@red")
+    assert "tests/test_a.py is frozen past the RED anchor" in refused.value.fix
+
+
+def outcome(tmp_path: Path, ledger: str) -> str:
+    """What the freeze did with a REBUILD over a frozen line given *ledger*: refused, admitted,
+    or the name of the exception that escaped."""
+    try:
+        return "admitted" if amended(tmp_path, REBUILD, ledger=ledger) is None else "refused"
+    except Exception as crash:  # noqa: BLE001 - the row names whatever escaped
+        return type(crash).__name__
+
+
+@pytest.mark.medium
+@pytest.mark.xfail(strict=True, reason="a ledger line with no id or no object crashes the read")
+@pytest.mark.parametrize("line", ['{"status": "open"}', "[1]", '"b1"'])
+def test_a_ledger_line_naming_nothing_does_not_crash_or_admit(tmp_path: Path, line: str) -> None:
+    assert outcome(tmp_path, f"{line}\n") == "refused"
+
+
+@pytest.mark.medium
+@pytest.mark.xfail(strict=True, reason="a ledger line with no object crashes the read")
+def test_a_non_object_ledger_line_leaves_the_records_after_it_readable(tmp_path: Path) -> None:
+    assert outcome(tmp_path, f"[1]\n{BUG}") == "admitted"
