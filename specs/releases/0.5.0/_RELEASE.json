@@ -1,7 +1,7 @@
 {
   "schema": "release-state-v1",
   "release": "0.5.0",
-  "phase": "CLOSURE",
+  "phase": "DEFINITION",
   "defined": {
     "sha": "8e6448f13",
     "ts": "2026-10-06T18:31:49Z"
@@ -1438,6 +1438,12 @@
       "agent": "main-thread",
       "kind": "merge",
       "text": "job: encoding; start: 2026-10-08T03:27:36Z; end: 2026-10-08T13:22:27Z; wall: 595; ritual_wait: 21; dispatches: 12; job_gate_runs: 1"
+    },
+    {
+      "ts": "2026-10-08T18:34:07Z",
+      "agent": "release.py new",
+      "kind": "note",
+      "text": "Candidate born on 0.5.0 (prior candidate closed at 7326a198e)"
     }
   ]
 }
