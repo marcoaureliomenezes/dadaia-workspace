@@ -185,3 +185,26 @@ def test_the_fix_creates_the_agents_own_temp_dir(
     fix = block["reason"].rsplit("fix: ", 1)[1]
     tmp = tmp_path.resolve() / ".dadaia" / "tmp" / segment  # the hook prints it resolved, POSIX
     assert any((tmp / day).as_posix() in fix for day in days)
+
+
+@pytest.mark.parametrize(
+    ("tool_name", "entry", "target"),
+    [
+        pytest.param("Edit", "z_feedback.md", "z_feedback.md", id="edit-existing-root-file"),
+        pytest.param("Write", "z_feedback.md", "z_feedback.md", id="overwrite-existing-root-file"),
+        pytest.param("Write", ".dadaia/junk.txt", ".dadaia/junk.txt", id="existing-dadaia-stray"),
+    ],
+)  # fmt: skip
+def test_the_gate_judges_creation_only(
+    tmp_path: Path, tool_name: str, entry: str, target: str
+) -> None:
+    """Bug root-gate-blocks-editing-an-existing-entry: the law blocks a write "creating a new
+    entry"; an Edit or overwrite of a path that already exists creates nothing and is allowed — the
+    doctor still reports it. A new path under an existing slop directory stays blocked (#E1)."""
+    ws = _ws(tmp_path)
+    payload = {"tool_name": tool_name, "tool_input": {"file_path": str(ws / target)}}
+    _out, block = _run(tmp_path, payload)
+    assert block is not None and target in block["reason"]
+
+    (ws / entry).mkdir() if entry.endswith("/") else (ws / entry).write_text("", encoding="utf-8")
+    assert _run(tmp_path, payload) == ("", None)

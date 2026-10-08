@@ -18,7 +18,6 @@ from collections.abc import Iterator
 from datetime import datetime
 from pathlib import Path
 
-from _worktree_freeze import check as check_freeze
 from _worktree_git import (
     _env,
     cli,
@@ -148,11 +147,6 @@ def _declared(tree: Path, work: str, key: str) -> str:
     shown = git(tree, "show", f"{work}:AGENTS.md", check=False)
     lines = shown.removeprefix("\ufeff").splitlines()
     return next((ln.removeprefix(key).strip() for ln in lines if ln.startswith(key)), "")
-
-
-def _freeze(tree: Path, work: str) -> None:
-    """The test freeze of ADR 0209 over *tree*, judged by the lines *work* declares."""
-    check_freeze(tree, work, _declared(tree, work, "tests:"), _declared(tree, work, "tests-red:"))
 
 
 def _gate(tree: Path, level: str, work: str, *files: str) -> None:
@@ -323,21 +317,8 @@ def merge(root: Path, path: str, keep: list[str], drop: bool) -> str:
     _refuse_dirty(tree)
     if into != repo:  # a task: its gate, no verdict, onto its job branch
         _check_ancestor(tree, onto)
-        owners = git(
-            tree, "log", "--format=%(trailers:key=Owner-tests,valueonly)", f"{onto}..HEAD"
-        ).split()
-        if missing := [p for p in owners if not (tree / p).is_file()]:
-            raise Refusal(f"Owner-tests: {' '.join(missing)} not in the tree",
-                          f"Operator action: fix the Owner-tests: trailer of the task's commits in {tree}")  # fmt: skip
         touched = git(tree, "diff", "--name-only", "--diff-filter=d", f"{onto}...HEAD").split()
-        argv = [*dict.fromkeys(touched + owners)]
-        work = _target(root, str(into))[3]
-        _freeze(tree, work)  # refuses an absent `tests:` line first
-        tests = git(tree, "ls-files", "--", *(f":(glob){g}" for g in _declared(tree, work, "tests:").split())).splitlines()  # fmt: skip
-        if any(p.endswith(".py") for p in argv) and not set(argv) & set(tests):
-            raise Refusal("a code task's gate names no test file: it runs no tests",
-                          f"Operator action: name the task's owner tests in an Owner-tests: trailer on its commits in {tree}")  # fmt: skip
-        _gate(tree, "task", work, *argv)
+        _gate(tree, "task", _target(root, str(into))[3], *touched)
         _refuse_dirty(into)
     elif non_code(name):
         _check_specs_only(tree, onto)
@@ -348,7 +329,6 @@ def merge(root: Path, path: str, keep: list[str], drop: bool) -> str:
         _open_tasks(repo, name)
         _check_ancestor(tree, onto)
         _check_approved(root, tree, onto, name)
-        _freeze(tree, onto)
         _gate(tree, "job", onto)
     kept = _kept(tree, "merge", keep, drop)
     if git(into, "branch", "--show-current").strip() != onto:

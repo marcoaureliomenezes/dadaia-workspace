@@ -101,11 +101,8 @@ def make_workspace(root: Path) -> Path:
     (repo / ".gitignore").write_text("*.scratch\n__pycache__/\n")
     (repo / "scripts").mkdir()
     (repo / "scripts/ci.py").write_text(CI)
-    (repo / "tests").mkdir()
-    (repo / "tests/test_r.py").write_text("")  # the owner test `land` names
     (repo / "AGENTS.md").write_text(
         "verify: python scripts/ci.py job\n"
-        "tests: tests/**\ntests-red: ^@red\n"
         + "".join(f"verify-{lv}: python scripts/ci.py {lv}\n" for lv in ("task", "stage"))
     )
     git(repo, "add", "-A")
@@ -223,7 +220,7 @@ def attempt(
         (tree / rel).write_text(text)
         git(tree, "add", rel)
     name = f"test({task_id}): {next(iter(files), mv[1])}" if task_id else next(iter(files), mv[1])
-    git(tree, "commit", "-qm", name, "--trailer", "Owner-tests: tests/test_r.py")
+    git(tree, "commit", "-qm", name)
     return git(tree, "rev-parse", "HEAD").strip(), run(root, "merge", f"worktrees/r/{task}")
 
 

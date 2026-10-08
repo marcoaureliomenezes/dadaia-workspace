@@ -36,7 +36,6 @@ def add(name: str = typer.Argument(..., help=f"One of: {', '.join(L1_ENTRY_HARNE
 
     workspace_root = resolve_workspace_root()
     svc = container.build_public_service()
-    svc.stage(workspace_root)
     installed = svc.install(workspace_root, harness=name)
 
     states_dir = container.states_dir(workspace_root)

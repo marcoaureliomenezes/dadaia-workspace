@@ -54,9 +54,6 @@ def _parser() -> argparse.ArgumentParser:
         if verb == "memory":
             for name in ("--reviewed", "--changed"):
                 command.add_argument(name, default="", help="comma-separated worklist entries")
-        if verb == "check":
-            command.add_argument("--principal", default="",
-                                 help="the principal branch: HEAD on it closes the CLOSURE window")  # fmt: skip
         if verb in ("check", "drift"):
             command.add_argument("--json", action="store_true", help="emit findings as JSON")
     return parser
@@ -145,7 +142,7 @@ def main(argv: list[str] | None = None) -> int:
     reads = args.verb in ("check", "drift")
     specs = find_specs(args.specs, ledger=None if reads else f"specs/releases/{STATE}")
     if args.verb == "check":
-        findings = check(specs, args.principal)
+        findings = check(specs)
         errors = [f for f in findings if f["verdict"] == "error"]
         # --json is the doctor's contract: errors only; the text view also lists (AC3.2).
         print(json.dumps(errors, indent=2)) if args.json else [

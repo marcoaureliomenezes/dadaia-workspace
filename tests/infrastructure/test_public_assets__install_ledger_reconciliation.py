@@ -25,8 +25,11 @@ def test_retired_family_is_pruned_on_next_install(tmp_path: Path) -> None:
     """
     ws = tmp_path / "ws"
     ws.mkdir()
-    mgr = _install_all(ws)
-    skills_src = ws / ".dadaia" / "agentic" / "skills"
+    mgr = FileSystemPublicAssetManager()
+    mgr._public_dir = shutil.copytree(mgr._public_dir, tmp_path / "public")  # noqa: SLF001
+    register_all(ws)
+    mgr.install(ws)
+    skills_src = mgr._public_dir / "skills"  # noqa: SLF001
     pristine, edited = sorted(p.name for p in skills_src.iterdir() if p.is_dir())[:2]
     gone = ws / ".agents" / "skills" / pristine / "SKILL.md"
     kept = ws / ".agents" / "skills" / edited / "SKILL.md"

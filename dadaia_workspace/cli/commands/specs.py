@@ -185,11 +185,6 @@ def init(
         f"[gitflow] principal {flow.principal}, integration {flow.integration}, "
         f"work {flow.work_pattern}"
     )
-    for path in canon.declare_tests_line(target.parent):
-        typer.echo(
-            f"[declared] {path}: {canon.default_tests_line()} "
-            "— narrow or widen it to this repo's own test paths"
-        )
     if refused:
         raise typer.Exit(1)
     if kind in ("absent", "foreign"):

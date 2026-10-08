@@ -90,7 +90,6 @@ class WorkspaceService:
         # workspace ungated, and that state must be loud, never silent.
         installed: list[str] = []
         if not skip_assets:
-            installed.extend(self._public_assets.stage(workspace_root))
             # The roster install resolves the chosen-harness SUBSET on its own: it reads
             # the profile persisted above to scope its harness targets (v0.1.58 FR3).
             installed.extend(self._public_assets.install(workspace_root))

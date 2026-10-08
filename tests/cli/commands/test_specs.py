@@ -5,7 +5,6 @@ only when confirmed — never committing. Size: MEDIUM (real git repo on disk)."
 from __future__ import annotations
 
 import json
-import os
 import subprocess
 import sys
 from collections.abc import Callable
@@ -17,7 +16,6 @@ from typer.testing import CliRunner
 from dadaia_workspace.cli._specs_resolution import HARNESS_SESSION_ID_ENV_VARS
 from dadaia_workspace.cli.main import app
 from dadaia_workspace.core import gitflow, specs_version
-from dadaia_workspace.core.platform import PLATFORM
 from dadaia_workspace.features.specs import SpecsDoctor, canon
 
 _PUBLIC = Path(__file__).resolve().parents[3] / "dadaia_workspace" / "public"
@@ -280,71 +278,3 @@ def test_specs_init_writes_every_law_rendered(repo: Path) -> None:
         if marker in path.read_text(encoding="utf-8")
     ]
     assert raw == []
-
-
-def test_specs_init_declares_a_tests_line_in_a_law_that_lacks_one(repo: Path) -> None:
-    """onboarding-writes-no-tests-line: ADR 0216 — a pre-onboarding AGENTS.md is not left
-    with no `tests:` line, which refuses every worktree merge."""
-    (repo / "AGENTS.md").write_text("# ours\nverify: make test\n", encoding="utf-8")
-
-    result = _runner.invoke(app, ["specs", "init", "--context", "c"])
-
-    assert result.exit_code == 0, result.output
-    text = (repo / "AGENTS.md").read_text(encoding="utf-8")
-    assert text.startswith("# ours\nverify: make test\n")
-    values = [
-        ln.removeprefix("tests:").strip() for ln in text.splitlines() if ln.startswith("tests:")
-    ]
-    assert len(values) == 1
-    assert values[0] != ""
-
-
-def test_specs_init_with_an_unreadable_law_finishes_onboarding_and_a_rerun_declares(
-    repo: Path,
-) -> None:
-    """onboarding-writes-no-tests-line: an unreadable AGENTS.md never stops `specs init`; once
-    readable, the next run declares the `tests:` line."""
-    if PLATFORM.windows or os.geteuid() == 0:
-        pytest.skip("needs POSIX file modes and a non-root user")
-    law = repo / "AGENTS.md"
-    law.write_text("# ours\n", encoding="utf-8")
-    law.chmod(0)
-    try:
-        first = _runner.invoke(app, ["specs", "init", "--context", "c"])
-    finally:
-        law.chmod(0o644)
-
-    assert first.exit_code == 0, first.output
-    assert gitflow.read_gitflow(repo / "specs")[1] is None
-    assert (repo / "specs" / "constitution.md").is_file()
-    assert _runner.invoke(app, ["specs", "init", "--context", "c"]).exit_code == 0
-    assert any(ln.startswith("tests:") for ln in law.read_text(encoding="utf-8").splitlines())
-
-
-def test_the_declared_line_names_the_default_and_asks_to_narrow_it(repo: Path) -> None:
-    """default-tests-globs-over-match-source: the operator learns a language-neutral default was written."""
-    (repo / "AGENTS.md").write_text("# ours\n", encoding="utf-8")
-    template = canon.default_public_dir() / "templates" / "repo-AGENTS.md"
-    default = next(
-        ln.removeprefix("tests:").strip()
-        for ln in template.read_text(encoding="utf-8").splitlines()
-        if ln.startswith("tests:")
-    )
-
-    result = _runner.invoke(app, ["specs", "init", "--context", "c"])
-
-    echo = next(ln for ln in result.output.splitlines() if ln.startswith("[declared]"))
-    assert default in echo
-
-
-def test_specs_init_declares_the_tests_line_in_a_latin1_law(repo: Path) -> None:
-    law = repo / "AGENTS.md"
-    original = "# Configuração\nverify: x\n".encode("latin-1")
-    law.write_bytes(original)
-
-    result = _runner.invoke(app, ["specs", "init", "--context", "c"])
-
-    assert result.exit_code == 0, result.output
-    after = law.read_bytes()
-    assert after.startswith(original)
-    assert b"\ntests:" in after

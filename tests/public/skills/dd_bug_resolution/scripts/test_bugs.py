@@ -11,7 +11,6 @@ from __future__ import annotations
 import importlib.util
 import json
 import os
-import re
 import stat
 import subprocess
 import sys
@@ -1686,14 +1685,6 @@ def test_check_reads_every_task_id_grammar_the_job_files_use(script: Path, tmp_p
     job.write_text("| JB.S4.T2 | AC1.1 | `a.py` |\n| JR.S1.T1 | AC1.2 | `b.py` |\n", encoding="utf-8")
     done = _run(script, "check", "--specs", str(specs), "--json")
     assert (done.returncode, json.loads(done.stdout)) == (0, []), done.stdout
-
-
-def test_the_bugs_check_and_freeze_task_ids_are_one_grammar() -> None:
-    """ADR 0150: two stdlib skills keep a twin each; the freeze's id part is the bugs check's."""
-    sys.path.insert(0, str(_PUBLIC / "skills" / "dd-gitflow-default" / "scripts"))
-    freeze = load_owner("dd-gitflow-default", "_worktree_freeze")
-    check = load_owner("dd-bug-resolution", "_bugs_check")
-    assert re.sub(r"\(\?P<\w+>|\)|\\b", "", freeze._ID.pattern) == check.TASK_ID
 
 
 def test_fix_links_a_resolve_by_task_to_the_commits_of_the_records_rc_only(
