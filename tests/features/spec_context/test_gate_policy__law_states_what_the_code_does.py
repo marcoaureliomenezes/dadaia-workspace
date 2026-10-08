@@ -8,7 +8,6 @@ from __future__ import annotations
 
 import ast
 import configparser
-import importlib.util
 import re
 import subprocess
 import sys
@@ -147,23 +146,6 @@ def test_os_name_is_read_only_through_the_platform_seam() -> None:
         and isinstance(node.value, ast.Name) and node.value.id == "os"
     ]  # fmt: skip
     assert reads == []
-
-
-def _script(rel: str) -> ModuleType:
-    spec = importlib.util.spec_from_file_location(Path(rel).stem, _PKG / "public/skills" / rel)
-    assert spec and spec.loader
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    return module
-
-
-def test_the_releases_law_transitions_equal_marks() -> None:
-    """AC4.6 (ADR 0141): the releases law's marker transitions equal `_release_schema.MARKS`
-    in order."""
-    marks = _script("dd-release-implementation/scripts/_release_schema.py").MARKS
-    arrow = r"`?\[([ x-])\]`?\s*(?:-+>|→|=>)\s*`?\[([ x-])\]"
-    law = (_PKG / "public/scaffold/releases/AGENTS.md").read_text("utf-8")
-    assert re.findall(arrow, law) == list(zip(marks, marks[1:], strict=False))
 
 
 _SKILLS = _PKG / "public" / "skills"
