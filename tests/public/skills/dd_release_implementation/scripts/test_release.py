@@ -756,6 +756,54 @@ def test_check_names_the_moved_source_when_until_is_history_of_head(
     assert "'alpha'" in result.stdout and until[:12] in result.stdout
 
 
+def _declare_principal(specs: Path, branch: str) -> None:
+    """The fixture constitution's `gitflow:` line: *branch* is the principal."""
+    (specs / "constitution.md").write_text(
+        f'gitflow: {{"principal": "{branch}", "integration": "develop", "work": "feature/"}}\n',
+        encoding="utf-8",
+    )
+
+
+@pytest.mark.xfail(strict=True, reason="release-check-skips-a-rebased-away-until")
+def test_check_refuses_an_amend_orphaned_until_off_the_principal(
+    script: Path, tmp_path: Path
+) -> None:
+    root, specs, base = _memory_repo(tmp_path, script)
+    _declare_principal(specs, "trunk")
+    _git(root, "switch", "-qc", "feature-x")
+    until = _git(root, "rev-parse", "HEAD")
+    _hand_append(specs, since=base, until=until, reviewed=["alpha"], changed=[])
+    _git(root, "commit", "-q", "--amend", "-m", "code moved, amended")
+    (root / "dadaia_workspace" / "features" / "alpha" / "core.py").write_text("x = 3\n", "utf-8")
+    _git(root, "commit", "-qam", "code moved after the entry")
+
+    result = _run(script, "check", "--specs", str(specs), cwd=root)
+
+    assert result.returncode == 1
+    assert f"{until} is not an ancestor of HEAD" in result.stdout
+
+
+@pytest.mark.xfail(strict=True, reason="release-check-skips-a-rebased-away-until")
+def test_check_is_clean_after_a_no_ff_promote_on_the_principal(script: Path, tmp_path: Path) -> None:
+    root, specs, base = _memory_repo(tmp_path, script)
+    _declare_principal(specs, _git(root, "rev-parse", "--abbrev-ref", "HEAD"))
+    _side_branch_until(root, specs, base, "--no-ff", "-m", "merge side")
+
+    result = _run(script, "check", "--specs", str(specs), cwd=root)
+
+    assert result.returncode == 0, result.stdout
+
+
+def test_check_is_clean_after_a_squash_promote_on_the_principal(script: Path, tmp_path: Path) -> None:
+    root, specs, base = _memory_repo(tmp_path, script)
+    _declare_principal(specs, _git(root, "rev-parse", "--abbrev-ref", "HEAD"))
+    _side_branch_until(root, specs, base, "--squash")
+
+    result = _run(script, "check", "--specs", str(specs), cwd=root)
+
+    assert result.returncode == 0, result.stdout
+
+
 # ── ship ──────────────────────────────────────────────────────────────────────
 
 
