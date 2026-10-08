@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-10-08T03:33:06Z",
+  "generated_at": "2026-10-08T03:58:17Z",
   "features": [
     {
       "rank": 1,
@@ -175,7 +175,7 @@
         "release",
         "packaging"
       ],
-      "token_estimate": 1065,
+      "token_estimate": 1116,
       "depends_on": [
         "release-lifecycle",
         "QUALITY",

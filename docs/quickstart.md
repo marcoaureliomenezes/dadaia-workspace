@@ -7,7 +7,7 @@ live. Terms are defined in [concepts](concepts.md); the long walkthrough is
 
 ## 1. The three levels in one block
 
-<!-- derived-from: pypi-distribution sha256:7c22e9e9609a -->
+<!-- derived-from: pypi-distribution sha256:9dadd611ee50 -->
 <!-- derived-from: workspace-init sha256:a8f08f87ae76 -->
 
 Set `REPO_URL` to your repository's clone URL; everything else runs as printed (needs
