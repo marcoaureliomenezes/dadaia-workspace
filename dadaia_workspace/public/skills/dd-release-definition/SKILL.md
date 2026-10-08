@@ -60,28 +60,22 @@ Call the Skill tool with `dd-grill-me` on the picked set — never skipped; a fu
 4. SPEC says what; PLAN opens with §1 As-is review (§2) and draws the rc's DAG of jobs — Job 1 first, the Reconciliation job last, an edge where one job needs another's merge; SPEC carries `Replaces` — one bullet per current behaviour a DELETE/REBUILD row removes, or `none` with its reason.
 5. SPEC in domain names (`dd-domain-modeling`'s `CONTEXT.md`); only FR, AC and T- numbered; each AC names its test level (unit, integration, E2E, or no test with its reason); sizes per the releases law.
 
-## 5. The job file — stages and tasks
+## 5. The job file — tasks
 
-- One file per job, `rc-<N>/tasks/<job>.md`; no `TASKS.md`, no markers, no start commits. `release.py check` and `phase IMPLEMENTATION` refuse a file with no `## Stage` heading, a stage with no `- Contract:` line, or two tasks of one stage writing one path.
-- A stage's contract is fixed when it opens: its exit tests by level, its envelope (the `W:` union it may touch) and the ACs it serves.
-- Tasks of one stage write disjoint `W:`. A task is a bullet line or a table row under a `W:` column.
-- A task: id `J<n>.S<m>.T<k>`, its AC, its exact `W:`, its owner test file, its RED tests; one owner, one session (~1 h), ~100 new code lines.
-- A task is `running` while its task worktree exists; the job's close task writes `done` once.
-- A task born inside an open stage cites its AC; a cancelled one keeps its line and its reason; a hand-edited hot file sits in at most one `W:` per stage, a generated one in none — the audit measures these (`dd-audit-project` PILLAR-SPECS).
+- One file per job, `rc-<N>/tasks/<job>.md`; no `TASKS.md`, markers, stage headings, contracts or start commits.
+- Every job file carries a task table. Each task has id `J<n>.T<k>`, its AC, exact `W:`, owner test file and RED tests; one owner, one session (~1 h), ~100 new code lines.
+- The PLAN DAG names each job's wave and complete `W:` set. Jobs in one wave and tasks in one job have disjoint `W:` sets; validation refuses an overlap.
+- Each behavior task is two dispatches: the first writes and commits the failing acceptance tests; a fresh second dispatch implements without touching a declared or fallback test path.
+- A task is `running` while its task worktree exists. A cancelled task keeps its row and reason.
 - DELETE/REBUILD tasks precede ADD tasks; a task with no statable AC is folded, or goes back to the SPEC.
 
 ```markdown
-# Job 2 — the bug window
+# Job 2 — feature x
 
-## Stage J2.S1 — RED
-
-- Contract: exit tests `tests/unit/test_x.py` RED; envelope `tests/**`; ACs AC2.1
-- J2.S1.T1 — AC2.1 · `W:` `tests/unit/test_x.py` · owner `tests/unit/test_x.py`
-
-## Stage J2.S2 — fix
-
-- Contract: exit tests unit + integration; envelope `src/**`; ACs AC2.1
-- J2.S2.T1 — AC2.1 · `W:` `src/x.py` · owner `tests/unit/test_x.py`
+| task | AC | `W:` | outcome |
+|---|---|---|---|
+| J2.T1 | AC2.1 | `tests/unit/test_x.py` | RED acceptance test |
+| J2.T2 | AC2.1 | `src/x.py` | implementation; owner `tests/unit/test_x.py` |
 ```
 
 ## 6. Declaring consumption

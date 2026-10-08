@@ -33,9 +33,10 @@ from dadaia_workspace.core.gitflow import constitution_error, constitution_text,
 #: (T-050-103): specs paths land by a worktree merge, audits direct; v10 = the bugs law's
 #: rc-8 rewrite; its pin (91a8bfb1b79eac16) also covers rc-9 Job 1's scaffold-law
 #: edits; v11 = rc-9 Job 5's bugs and releases laws and specs AGENTS.md template
-#: (ADRs 0193, 0201–0205). A canon change that
+#: (ADRs 0193, 0201–0205); v12 = the jobs-and-tasks law, single verify authority and
+#: removal of the bug-balance projection. A canon change that
 #: keeps the stamp leaves every older tree reading ``canonical`` while the doctor is red.
-CANONICAL_SPECS_VERSION = 11
+CANONICAL_SPECS_VERSION = 12
 
 #: The oldest stamp the one live upgrade hop starts from — and so the oldest a tree may
 #: carry and still be a dadaia tree (SPEC 0.4.8 D7, D9); anything older is foreign.
@@ -43,7 +44,7 @@ OLDEST_UPGRADABLE_VERSION = 6
 
 #: The canon fingerprint each stamp was cut at — re-pinned only together with a stamp bump,
 #: or while the stamp is unpublished (``test_a_canon_change_bumps_the_stamp`` computes it).
-CANON_AT = {11: "4aa2ddbfc5da03f3"}
+CANON_AT = {12: "fe5ca7deb83ba941"}
 State = Literal["absent", "malformed", "foreign", "upgradable", "canonical"]
 
 

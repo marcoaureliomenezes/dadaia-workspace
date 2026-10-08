@@ -22,7 +22,7 @@ a subprocess or real git; LARGE = `tests/e2e`. Test basics: the root `AGENTS.md`
 
 ## Gates
 
-The repo's `verify-task:` line runs green before any task-closing commit, its `verify:` line before every push.
+The repo's tracked `verify:` line runs before every push and once at a job or plain-change merge.
 
 <!-- dadaia:fixed slop-tests -->
 <!-- /dadaia:fixed slop-tests -->

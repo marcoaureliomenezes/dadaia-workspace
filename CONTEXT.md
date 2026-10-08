@@ -79,7 +79,7 @@ _Avoid_: bootstrap audit, initial import, migration
 ## Enforcement
 
 **Gate**:
-The one PreToolUse chain (root whitelist, venv guard, SDD classifier) that decides whether a harness write proceeds. It blocks exactly three things — a new workspace-root entry, a non-venv `dadaia`/`pip`/`python -m dadaia_workspace`, and a PROTECTED or out-of-Scope write — each with one `fix:` line.
+The one PreToolUse chain (root whitelist, SDD classifier) that decides whether a harness write proceeds. It blocks a new workspace-root entry and a PROTECTED or out-of-Scope write, each with one `fix:` line.
 _Avoid_: hook (for the chain), guard (for the chain)
 
 **Hook**:
@@ -107,7 +107,7 @@ A region with one write rule. A `.dadaia/` zone is a row of `core.workspace_layo
 _Avoid_: area (for a zone), lane
 
 **Worktree**:
-A canonical git worktree, one per job: `worktrees/<repo>/<M.m.p>-rc<N>/<job>/` on the branch `wt/<M.m.p>-rc<N>/<job>` (also `define/`, `reconcile/`, one `<job>--<task-id>/` per task cut from its job branch, and `worktrees/<repo>/backlog/<slug>/` outside an rc); it reaches `repos/<repo>` only by `worktree.py merge`. Rules: `worktrees/AGENTS.md`.
+A canonical git worktree that reaches `repos/<repo>` only by `worktree.py merge`: a plain change is `worktrees/<repo>/<name>/` on `wt/<name>`; a release job is `worktrees/<repo>/<M.m.p>-rc<N>/<job>/` with one `<job>--<task-id>/` per task; `define/`, `reconcile/`, `backlog/` and `hotfix/` are the reserved workflow shapes. Rules: `worktrees/AGENTS.md`.
 _Avoid_: sandbox, harness worktree (a `.claude/worktrees/**` tree is not one), worktree kind (retired)
 
 **Stall**:
@@ -147,11 +147,11 @@ An append-only archive JSONL under an area's `_archive/`, one record per exit.
 _Avoid_: archive file, ledger, log
 
 **Histo record**:
-The one shape every histo line carries — `histo-record-v1`: `{id, ts, disposition, release, reason, summary, entry}`, where `entry` is the removed live object. Each area's `disposition` is a subset of the one lowercase vocabulary `delivered resolved superseded deferred rejected`.
+The one shape every histo line carries — `histo-record-v1`: `{id, ts, disposition, release, reason, summary, entry}`, where `entry` is the removed live object. Each area's `disposition` is a subset of the one lowercase vocabulary `delivered resolved superseded rejected`.
 _Avoid_: exit record, summary record, archive event, CONSUMED (retired)
 
 **Terminal**:
-A record's final status — `delivered`, `resolved`, `superseded`, `deferred`, `rejected` — reached only through a transition that carries its evidence and stamps `closed_at`.
+A record's final status — `delivered`, `resolved`, `superseded`, `rejected` — reached only through a transition that carries its evidence and stamps `closed_at`.
 _Avoid_: closed, dispositioned, done
 
 **Transition**:
@@ -174,7 +174,7 @@ _Avoid_: twin, copy, mirror
 The open-scope publication unit, named last-published-PyPI + 1 patch — exactly one live, growing by stacked Candidates; its state is `_RELEASE.json`, its narrative is that file's `log`. The version increments only at operator-approved deploy (ADR 0021). _Avoid_: "release" for one closed scope — that is a Candidate.
 
 **Candidate**:
-One closed-scope SDD cycle inside the live Release (as-is review → grill → SPEC/PLAN/TASKS `Aprovado` → implementation → memory → closure → integration-branch merge → promote-or-continue gate). Every Candidate lives in `specs/releases/<v>/rc-<N>/`, never rewritten after its closure; the live one is the highest `rc-<N>/`, and the whole release is archived at promote.
+One closed-scope SDD cycle inside the live Release (as-is review → grill → approved SPEC/PLAN/job files → implementation → memory → closure → integration-branch merge → promote-or-continue gate). Every Candidate lives in `specs/releases/<v>/rc-<N>/`, never rewritten after its closure; the live one is the highest `rc-<N>/`, and the whole release is archived at promote.
 _Avoid_: version (for the unit), sprint, "rc" as a branch name or a fixes-only round
 
 **As-is review**:
@@ -220,7 +220,7 @@ _Avoid_: memory pass, apply the deltas, sync
 ## Governance verbs and hand edits
 
 **Governance verb**:
-The one CLI command authorized to change a governance record — `bugs.py append|update|resolve|supersede|defer|reject|archive`, `backlog new|exit`, `release new|phase|check`, `audit disposition|close`.
+The one CLI command authorized to change a governance record — `bugs.py append|update|resolve|supersede|reject|archive`, `backlog new|exit`, `release new|phase|check`, `audit disposition|close`.
 _Avoid_: CLI command (generic), mutation, setter
 
 **Hand edit**:
@@ -351,38 +351,21 @@ _Avoid_: regression (bare)
 A ledger `surface` (a directory) whose every record left the bug window with no later record on it.
 _Avoid_: closed surface
 
-**Convergence readout**:
-A number `## Bugs` prints at each closure, blocking nothing.
-_Avoid_: gate, threshold
-
 **Implement**:
 One rc's run, a DAG of jobs; not a file.
-
-**Bug batch**:
-The one job outside an rc's DAG, after its last job merges and before the Reconciliation job, that fixes every open bug `found_in` the rc, grouped by cause.
-_Avoid_: bug window (the review of fixes)
 
 **Job**:
 One measured feature: one worktree, one review and one gate at its merge; Job 1 executes the SPEC's `## Bug window review` verdicts.
 _Avoid_: CI job (a GitHub Actions job)
 
-**Stage**:
-A barrier on the job branch over parallel tasks; no worktree.
-
 **Task**:
-One owner (a module or law file plus its owner test file), one session, one worktree cut from its job branch; the unit of dispatch.
+One exact `W:` set and AC, one session and one worktree cut from its job branch; the unit of dispatch. New behavior uses a RED-test task followed by a fresh implementation task.
 
 **Envelope**:
-The `W:` union a job or stage may touch.
-
-**Closed stage contract**:
-A stage's exit tests, envelope and ACs served, fixed when the stage opens.
-
-**Live task**:
-A task born, split or cancelled inside an open stage, unreviewed.
+The complete `W:` set a PLAN declares for a job; every changed path is also in exactly one task's `W:`.
 
 **Hot file**:
-A file two tasks would write; hand-edited or generated.
+A file two same-wave jobs or two tasks would write; the PLAN adds an edge or repartitions ownership until their `W:` sets are disjoint.
 
 **Ritual wait**:
 A merged job's wall time from its last task commit to its pushed merge: gates, review, CI waits.

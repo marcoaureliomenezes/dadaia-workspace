@@ -48,7 +48,7 @@ The branch contract by role; the names are `specs/constitution.md`'s `gitflow:` 
 
 ## 3a. Commit shapes — each write in its own shape
 
-A job and its task trees hold code, tests, specs, memory and derived docs alike (`worktrees/AGENTS.md` §1); the shape names the write, never a tree. `<code>` is any path outside `specs/`; `<id>` a task id `J<n>.S<m>.T<k>`.
+A job and its task trees hold code, tests, specs, memory and derived docs alike (`worktrees/AGENTS.md` §1); the shape names the write, never a tree. `<code>` is any path outside `specs/`; `<id>` is the current task id `J<n>.T<k>`.
 
 | # | Tree | Write | Message |
 |---|---|---|---|
@@ -56,12 +56,11 @@ A job and its task trees hold code, tests, specs, memory and derived docs alike 
 | 2 | `backlog/<slug>` | Backlog entry or exit: `specs/backlog/BACKLOG.json`, `specs/backlog/_archive/backlog_histo.jsonl` | `chore(backlog): …` |
 | 2 | `backlog/<slug>`, `define` | ADR proposal or in-place `measured_by` repair (ADR 0138): `specs/ADRs/decisions.jsonl` | `docs(adr): propose <slug>` / `chore(adrs): repair …` |
 | 2 | `define`, `reconcile` | ADR acceptance with its canonical-memory hunk: `specs/ADRs/decisions.jsonl`, `specs/memory/*` | `docs(adr): accept <slug>` |
-| 3 | a job | Bug fix: `<code>` + its `specs/bugs/BUGS.jsonl` line, red loop in the body, a hotfix's naming `block: <item>`; the regression test lands before it, in a RED stage (shape 6) | `fix(bugs): <id> — <cause>`; a REBUILD `refactor(bugs): <id> — REBUILD <unit>: …`; a group names its N ids |
-| 4 | a job | Terminal transition without code (`resolve` by a task, `supersede`, `defer`, `reject`): `specs/bugs/BUGS.jsonl` | `chore(bugs): <verb> <id> — <reason, or by <task-id> (<sha>)>`; per class `chore(bugs): <verb> class <class> — <reason>`, one id per body line |
-| 4 | a job | Archive by an accepted ADR: `specs/bugs/BUGS.jsonl`, `specs/bugs/_archive/bugs_histo.jsonl` | `chore(bugs): archive <ids> — ADR <id>` |
+| 3 | a job | Bug fix: `<code>` + its `specs/bugs/BUGS.jsonl` line, red loop in the body, a hotfix's naming `block: <item>`; the regression test lands first in its RED-test task (shape 6) | `fix(bugs): <id> — <cause>`; a REBUILD `refactor(bugs): <id> — REBUILD <unit>: …`; a group names its N ids |
+| 4 | a job | Terminal transition without code (`resolve` by a task, `supersede`, `reject`): `specs/bugs/BUGS.jsonl` | `chore(bugs): <verb> <id> — <reason, or by <task-id> (<sha>)>`; per class `chore(bugs): <verb> class <class> — <reason>`, one id per body line |
+| 4 | a job | Archive terminal bugs: `specs/bugs/BUGS.jsonl`, `specs/bugs/_archive/bugs_histo.jsonl` | `chore(bugs): archive <ids>` |
 | 5 | `define` | Release definition: `specs/releases/<v>/rc-<N>/*` | `feat(specs): define candidate …` |
-| 6 | a task tree | Task: its `W:` | `conventional-commit(<id>): description`, a REBUILD `refactor(<id>): REBUILD <unit> — …`; a stage closes with a body line `stage: <id> — verify-stage green` |
-| 7 | a job | The job file's `done`, once per job, by its close task: `specs/releases/<v>/rc-<N>/tasks/<job>.md` | `chore(tasks): done <job>` |
+| 6 | a task tree | Task: its `W:` | `conventional-commit(<id>): description`, a REBUILD `refactor(<id>): REBUILD <unit> — …` |
 | 8 | `define` | Trio approval: `specs/releases/<v>/rc-<N>/SPEC.md` | `docs(specs): …` |
 | 9 | `reconcile` | Memory pass and derived docs: `specs/memory/*`, `README.md`, `llms.txt`, `docs/*.md` | `docs(memory): …` |
 | 10 | a job, `reconcile` | Release state: `specs/releases/<v>/_RELEASE.json` (a job's `kind: merge` entry) | `chore(release): …` |

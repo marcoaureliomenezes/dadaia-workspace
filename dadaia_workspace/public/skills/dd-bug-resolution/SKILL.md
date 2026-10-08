@@ -17,7 +17,7 @@ compatibility: Standalone Agent Skill. Inside a dadaia-workspace (pip install da
 
 1. Inside a dadaia workspace, open `specs/bugs/AGENTS.md` (the area's scoped law) and follow it — its redaction rule
    covers the whole arc: commands, outputs, captured artifacts.
-2. Fix now only a block-list bug (`specs/bugs/AGENTS.md` §2), as a hotfix job in its own worktree; any other in the rc's bug batch, before its Reconciliation job.
+2. Fix a block-list bug now as a hotfix job (`specs/bugs/AGENTS.md` §2); every other bug becomes explicit candidate scope and may be carried only by the operator-authorized ship exception.
 
 ## 2. The method — seven phases, each gated
 
@@ -52,7 +52,7 @@ regressions: measure a baseline, then bisect — logs mislead.
 *Done when one hypothesis survives by observation, not by reading code.*
 
 **Phase 5 — Seam test.** The regression test at the correct seam, BEFORE the fix, is
-a new case in the owner file with a literal expected value, at the lowest level that detects it (the root map §1: fixes never rewrite old asserts), committed in a RED stage; watch it fail,
+a new case in the owner file with a literal expected value, at the lowest level that detects it (the root map §1: fixes never rewrite old asserts), committed by the RED-test dispatch; watch it fail,
 fix the cause, watch it pass, re-run the Phase 1 loop on the original scenario. A
 correct seam exercises the real bug pattern at its call site (`dd-codebase-design`
 owns the seam vocabulary and the deletion test the fix must pass); when none exists, that

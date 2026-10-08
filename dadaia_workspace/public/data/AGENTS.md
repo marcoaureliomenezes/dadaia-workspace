@@ -19,6 +19,10 @@
 - Test: does the tool break its own contract? Yes -> Arm B. No -> Arm A.
 - A feature enters only through the backlog or an operator demand recorded in the SPEC `Origin`; a confirmed bug is fixed per `specs/bugs/AGENTS.md` §2.
 - Every change minimizes code and tests: DELETE → REBUILD → UPDATE → KEEP → ADD last; verbosity is a defect; documented behavior still works; tests assert behavior not text, mock only boundaries, expect literals; fixes never rewrite old asserts.
+- Features and fixes spend future options when they add coupling.
+  Coupling is cost, so delivery alternates with option-restoring work that deletes,
+  simplifies or decouples. The next candidate's bug-window review tests whether the
+  previous changes preserved those futures.
 - No workflow engine: the SDD documents (`specs/releases/AGENTS.md`) are the record of progress.
 
 ## 2. Who does what
@@ -35,9 +39,8 @@
 
 ## 3. What is enforced
 
-- One PreToolUse gate blocks: a file-tool write (`Write`, `Edit`, `MultiEdit`, `apply_patch`) creating a new entry at the root, `.dadaia/`, a closed-canon zone or the first level of `repos/`, `worktrees/` per §4 (root_whitelist); a Bash command of any position in the line whose first word is the `dadaia` CLI or `python -m dadaia_workspace` outside `.dadaia/.venv/bin/` (venv_guard); a file-tool write (those or `NotebookEdit`) to a PROTECTED path (PROTECTED); a file-tool write (those or `NotebookEdit`) out of the bound scope (out-of-scope); a file-tool write under `repos/<slug>/` outside `specs/audits/`, since `repos/` is merge-only (ADR 0105).
-- The venv guard judges every command of a Bash line: after `&&`, a semicolon, `|` or `(`, behind an env assignment or a shell keyword, and as an absolute or relative path to a `dadaia` outside the venv. Not judged: PowerShell syntax, `$(…)`, backticks, `bash -c`, the `env`, `xargs`, `sudo` and `exec` wrappers, heredoc bodies and `time` options. It reads bash syntax, so on Windows an unquoted backslash path loses its backslashes as in Git Bash; unbalanced quotes fail open; a quoted argument made only of operator characters reads as a boundary, a false block.
-- The gate fails open on: a missing `.dadaia/.venv` (ADR 0067); a pre-gate past 10 s (ADR 0118); a Bash write (ADRs 0096, 0103, 0133); an id-less unbound session under `worktrees/<r>/` (ADR 0116); a policy that raises (`pre_gate`); an unreadable payload (`read_stdin_json`); an unreadable registry, judging nothing below `repos/`, `worktrees/`, so only the merge-only block holds there (ADR 0132).
+- One PreToolUse gate blocks: a file-tool write (`Write`, `Edit`, `MultiEdit`, `apply_patch`) creating a new entry at the root, `.dadaia/`, a closed-canon zone or the first level of `repos/`, `worktrees/` per §4 (root_whitelist); a file-tool write (those or `NotebookEdit`) to a PROTECTED path (PROTECTED); a file-tool write (those or `NotebookEdit`) out of the bound scope (out-of-scope); a file-tool write under `repos/<slug>/` outside `specs/audits/`, since `repos/` is merge-only (ADR 0105).
+- The gate fails open on: a pre-gate past 10 s (ADR 0118); a Bash write (ADRs 0096, 0103, 0133); an id-less unbound session under `worktrees/<r>/` (ADR 0116); a policy that raises (`pre_gate`); an unreadable payload (`read_stdin_json`); an unreadable registry, judging nothing below `repos/`, `worktrees/`, so only the merge-only block holds there (ADR 0132).
 - Path classes: ADDITIVE (`.dadaia/AGENTS.md`'s output and ephemeral zones) writable; PROTECTED (`workspace_layout.CORE_FLOOR`, `sdd_gate._HOOK_WIRING`, the install ledger, the `.dadaiaignore` `[protected]` globs, repo-relative) blocked; the rest MUTATING.
 - Writes under `repos/<slug>/`: `specs/audits/` directly, the rest by worktree merge; only `context create` and a repo's first `specs init` write `specs/` directly (ADR 0154).
 - Every BLOCK carries exactly one fix line, `fix: <command>` or `Operator action: <one act>` (ADR 0158); a BLOCK whose fix is itself blocked is a Stall, CRITICAL.
@@ -68,7 +71,7 @@
 | handoff | `.dadaia/handoff/AGENTS.md` | emission, schema, ack |
 | tmp / states | `.dadaia/tmp/AGENTS.md`, `.dadaia/states/AGENTS.md` | TTL, state files |
 | a repo | `repos/<slug>/AGENTS.md` | clean tree, caches, tests |
-| worktrees | `worktrees/AGENTS.md` | one tree per job, three gates, one review, one venv |
+| worktrees | `worktrees/AGENTS.md` | plain changes plus release jobs/tasks, two gates, one review, one venv |
 
 ## 6. Skills — `.agents/skills/dd-*`
 

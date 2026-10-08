@@ -8,13 +8,13 @@ description: >
 
 # dd-manager-orchestration
 
-> No engine runs the SDD flow — each stage is agent-dispatched.
+> No engine runs the SDD flow — each task is agent-dispatched.
 > This skill is reference for the main thread, never a substitute for the SDD
 > documents. It stays generic: no operator-private names, hosts, or repo slugs.
 
 ## 1. Dispatch protocol
 
-1. The main thread dispatches the three roles; resolve the target agent and its stage from the root `AGENTS.md` map §2.
+1. The main thread dispatches the three roles; resolve the target agent and task from the root `AGENTS.md` map §2.
 2. Only the main thread calls other agents — a leaf specialist cannot chain
    further dispatch; route a leaf's returned handoff to its `next_handoff.agent`.
 3. Open every dispatch prompt with the Input Contract block: context, specs_dir,
@@ -22,7 +22,7 @@ description: >
 4. Reports land where the root `AGENTS.md` map §4 says; every report
    feeding another agent gets a handoff under `.dadaia/handoff/<context>/`.
 5. Opening, dispatching into and merging worktrees: `worktrees/AGENTS.md`.
-6. The task is the unit of dispatch (ADR 0190), never a job: sub-agents work one stage's tasks in parallel, one per task worktree (`worktrees/AGENTS.md` §1); an edit inside an open job is its driver's own and lands as one of its tasks; each job's `kind: merge` entry counts its `dispatches`.
+6. The task is the unit of dispatch (ADR 0190), never a job: sub-agents work disjoint tasks in parallel, one per task worktree (`worktrees/AGENTS.md` §1); each behavior uses one RED-test dispatch then a fresh implementation dispatch; an edit inside an open job lands as one of its tasks.
 
 ## 2. Conflict resolution
 

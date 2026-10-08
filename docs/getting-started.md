@@ -5,9 +5,6 @@ the terms are defined in [concepts](concepts.md) and in [`CONTEXT.md`](../CONTEX
 
 ## Install
 
-<!-- derived-from: pypi-distribution sha256:9dadd611ee50 -->
-<!-- derived-from: workspace-init sha256:a8f08f87ae76 -->
-
 ```bash
 uvx dadaia-workspace init <dir> --harness claude --repo <url>
 ```
@@ -26,8 +23,6 @@ never writes a project repo: `.dadaia/.venv/bin/dadaia specs init --context <ctx
 refreshes each project's specs law.
 
 ## Level 1 — the workspace
-
-<!-- derived-from: workspace-init sha256:a8f08f87ae76 -->
 
 `uvx dadaia-workspace init <dir> --harness claude|codex|kimi-code|cursor|devin|copilot
 [--repo <url>] [--associated-repo <url>]… [--skip-assets]` is the only verb that works
@@ -54,9 +49,6 @@ harness later and `.dadaia/.venv/bin/dadaia harness list` reads the roster.
 
 ## Level 2 — the project
 
-<!-- derived-from: spec-context-project sha256:9690f09f679b -->
-<!-- derived-from: context-management sha256:e084ff04890d -->
-
 A context — a Spec Context Project — is the unit of work: one canonical `specs/` tree
 owned by one main repository, optionally spanning associated repositories that live and
 die with it. Specs, bind, memory, releases and backlog resolve only from the main repo.
@@ -81,8 +73,6 @@ and the open worktrees once.
 
 ## Level 3 — the specs
 
-<!-- derived-from: spec-context-project sha256:9690f09f679b -->
-
 ```bash
 .dadaia/.venv/bin/dadaia specs init --context <ctx> [--replace-foreign]
 ```
@@ -96,8 +86,6 @@ stamp. `context baseline <ctx>` (3c) publishes the principal, integration and wo
 branches; a re-run is a no-op.
 
 ## Check compliance — `doctor`
-
-<!-- derived-from: workspace-doctor sha256:84a9bec9fec9 -->
 
 ```bash
 .dadaia/.venv/bin/dadaia doctor --context <ctx> [--json] [--fix] [--redact]
@@ -124,10 +112,6 @@ zone class, an OUTPUT entry held, an EPHEMERAL one deleted.
 
 ## Run the first candidate
 
-<!-- derived-from: release-lifecycle sha256:7b50f03ee3e9 -->
-<!-- derived-from: backlog-ledger sha256:44b145a6a3aa -->
-<!-- derived-from: bug-ledger sha256:e077e8f27f88 -->
-
 A candidate is one closed-scope cycle inside the live release. Nothing drives it: the
 documents are the state, the ledger scripts move the records, and the job files and
 task commits are the trace.
@@ -147,18 +131,18 @@ or a task's from step 5.
    set touches, `unit | today | bugs | verdict | why`, the As-is verdict DELETE,
    REBUILD, UPDATE or KEEP, then ADD only for what no unit can carry; the mandatory
    grill; then `SPEC.md` (its `Replaces` naming what DELETE/REBUILD rows remove),
-   `PLAN.md` (opening with that table as §1, then the DAG of jobs and the hot files) and
+   `PLAN.md` (opening with that table as §1, then the job DAG with waves and exact `W:` sets) and
    one job file per job, `tasks/<job>.md`, in that `rc-<N>/`, in one
    definition commit on the work branch (`<work>M.m.p`; the names are the
    `gitflow:` block of `specs/constitution.md`).
 4. **Open implementation.** `release.py phase IMPLEMENTATION --sha <sha>` requires
-   `SPEC.md` and `PLAN.md` `**Status:** Approved`, PLAN's `## DAG` and `### Hot files`
-   sections and well-formed job files, and stamps `defined`.
-5. **Run the jobs.** Each job opens its worktree by `worktree.py new`; each stage's
-   tasks run in parallel task worktrees, stage 1 writing every acceptance test RED;
-   a task lands on its job branch by `worktree.py merge` after its task gate, a stage
-   closes by `worktree.py stage`, and the job lands on the work branch after its CI
-   run and the reviewer's one `APPROVED`.
+   `SPEC.md` and `PLAN.md` `**Status:** Approved`, PLAN's `## DAG` with wave and exact
+   `W:` sets, and lean job files containing task id, AC and exact `W:`, then stamps `defined`.
+5. **Run the jobs.** Each job opens its worktree by `worktree.py new`. Each behavior
+   gets two task worktrees: the first commits its acceptance test RED; a fresh second
+   task implements without touching a test path. Task merge checks hygiene and that
+   separation. Job merge runs the tracked `verify:` once and requires the reviewer's
+   one `APPROVED`, bound to the exact diff.
 6. **Close the candidate.** The Reconciliation job, in its `reconcile` worktree:
    `release.py phase CLOSURE --sha <sha>` (no other open `wt/*` worktree), memory
    reconciliation with its derived docs, the closure `log` entries, the disposition
@@ -166,9 +150,10 @@ or a task's from step 5.
    artifact GC; then the work -> integration PR merged green.
 7. **Continue or promote.** Continue: `release.py new` with the same id stacks the next
    candidate, reopening `DEFINITION`. Promote: merge the integration branch into the
-   principal by PR — that merge is the deploy; `release.py ship --sha <sha> --pr <n>`
-   then records the merged promote PR and moves the release folder to `_archive/`.
+   principal by PR — that merge is the deploy; `release.py ship --sha <sha>` then
+   records it and moves the release folder to `_archive/`.
 
 A bug is registered once the operator confirms it; a block-list bug is fixed at once as
 a hotfix job — lineage, a RED new case, root-cause fix, GREEN, `resolve` with its red
-loop, one commit — and any other in the candidate's bug batch, before its Reconciliation job.
+loop, one commit. Any other bug becomes explicit candidate scope; ship refuses it while
+open unless the operator authorizes that exact id and the authorization is recorded.
