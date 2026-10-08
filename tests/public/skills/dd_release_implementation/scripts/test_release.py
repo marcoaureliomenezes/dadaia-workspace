@@ -676,6 +676,23 @@ def test_memory_refuses_any_phase_but_closure(script: Path, tmp_path: Path) -> N
     assert "CLOSURE" in result.stderr
 
 
+@pytest.mark.xfail(strict=True, reason="check re-judges the memory entry over git")
+def test_check_is_clean_when_a_source_moves_after_the_memory_entry(
+    script: Path, tmp_path: Path
+) -> None:
+    """release-check-reds-every-change-after-the-closure-memory-entry: memory references
+    the code, never repeats it — a commit after the entry leaves check clean."""
+    specs = _reconciled_closure(tmp_path, script)
+    root = specs.parent
+    _git(root, "commit", "-qam", "memory entry")
+    (root / "dadaia_workspace" / "features" / "alpha" / "core.py").write_text("x = 3\n", "utf-8")
+    _git(root, "commit", "-qam", "code moved after the entry")
+
+    result = _run(script, "check", "--specs", str(specs), cwd=root)
+
+    assert result.returncode == 0, result.stdout
+
+
 def _hand_append(specs: Path, **entry: object) -> None:
     """A `kind: memory` entry written by hand, bypassing the verb's refusals."""
     state = specs / "releases" / "0.5.0" / "_RELEASE.json"
