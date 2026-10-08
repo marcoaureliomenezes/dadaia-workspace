@@ -10,7 +10,7 @@ Paths are relative to the repo root; aliases as in `PLAN.md` (`f/`, `pub/`, `S/`
 ## Stage JT.S1 — RED
 
 - Contract: exit tests one strict-xfail RED case per bug (or cause group), at the lowest seam; the row for `git-errors-replace-has-no-row` and the window adversary row pass on arrival, so they carry no marker; the two law-text bugs (`release-definition-law-claims-a-deleted-stage-one-check`, `memory-written-before-closure-phase`) take no text-assert row; envelope `tests/**`; ACs AC9.1
-- JT.S1.T1 opened the job: it registered the 5 bugs the review reproduced (specs/bugs/BUGS.jsonl, commits 40bcd2066 and aaff3c016) and wrote this file.
+- The job opened with the registration of the 5 bugs the review reproduced (specs/bugs/BUGS.jsonl, commits 27bb0c653 and f9db29603) and this file; those commits carry no stage-1 task id, so stage JT.S1 holds test paths alone (freeze, `worktrees/AGENTS.md` §2).
 
 | task | AC | `W:` | owner tests / RED |
 |---|---|---|---|
