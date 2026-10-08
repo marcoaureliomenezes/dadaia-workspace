@@ -155,7 +155,6 @@ def push_gate_decision(
     object_source: ObjectSource,
     repo: Path,
     canon_violations_fn: Callable[[Sequence[str]], Sequence[str]],
-    cites_accepted_adr: Callable[[str], bool],
     gitflow: Gitflow,
     fixes: GateFixes,
     malformed_lines: int = 0,
