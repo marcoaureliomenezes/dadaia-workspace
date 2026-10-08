@@ -733,7 +733,6 @@ def _side_branch_until(root: Path, specs: Path, base: str, *merge: str) -> str:
     return until
 
 
-@pytest.mark.xfail(strict=True, reason="until off HEAD history is judged, not skipped")
 def test_check_is_clean_when_until_was_squash_merged_off_the_principal(
     script: Path, tmp_path: Path
 ) -> None:
