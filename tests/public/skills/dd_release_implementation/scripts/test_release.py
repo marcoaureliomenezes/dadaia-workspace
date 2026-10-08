@@ -816,6 +816,18 @@ def test_check_is_clean_after_a_squash_promote_on_the_principal(script: Path, tm
     assert result.returncode == 0, result.stdout
 
 
+def test_check_judges_the_window_on_the_principal_without_a_principal(
+    script: Path, tmp_path: Path
+) -> None:
+    root, specs, base = _memory_repo(tmp_path, script)
+    until = _side_branch_until(root, specs, base, "--squash")
+
+    result = _run(script, "check", "--specs", str(specs), cwd=root)
+
+    assert result.returncode == 1
+    assert f"{until} is not an ancestor of HEAD" in result.stdout
+
+
 # ── ship ──────────────────────────────────────────────────────────────────────
 
 
