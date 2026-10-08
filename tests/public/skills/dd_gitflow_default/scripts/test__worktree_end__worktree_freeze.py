@@ -217,7 +217,6 @@ def test_a_hotfix_commit_with_no_task_id_holding_code_and_a_marker_deletion_land
     assert merged.returncode == 0, merged.stderr
 
 
-@pytest.mark.xfail(strict=True, reason="no lane admits an approved REBUILD of a frozen test")
 def test_a_rebuild_naming_a_ledger_bug_amends_a_frozen_test_line_through_merge(
     tmp_path: Path,
 ) -> None:

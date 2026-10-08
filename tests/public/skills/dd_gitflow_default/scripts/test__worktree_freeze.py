@@ -199,13 +199,11 @@ REBUILD = "refactor(bugs): b1 — REBUILD the unit: a wrong assert"
 
 
 @pytest.mark.medium
-@pytest.mark.xfail(strict=True, reason="no lane admits an approved REBUILD of a frozen test")
 def test_a_rebuild_naming_a_ledger_bug_amends_a_frozen_test_line(tmp_path: Path) -> None:
     assert amended(tmp_path, REBUILD) is None
 
 
 @pytest.mark.medium
-@pytest.mark.xfail(strict=True, reason="the refusal fix line says stop and report")
 def test_the_freeze_refusal_names_the_bug_proposal_act(tmp_path: Path) -> None:
     refused = amended(tmp_path, "fix(bugs): b1 — the cause")
     assert refused is not None
