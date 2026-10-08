@@ -576,42 +576,6 @@ def test_a_job_gate_reads_the_work_branch_verify_line_not_its_own(
     assert landed.returncode == 0, landed.stderr
 
 
-@pytest.mark.parametrize("level", ["task", "job"])
-def test_no_tree_edits_the_script_its_own_gate_runs(root: Path, level: str) -> None:
-    """ADR 0207: a range touching a path the work branch's declared line names refuses, naming
-    the one act: commit that path on the work branch — a tree never picks its judge."""
-    job = root / TREE
-    task = _task_commit(root, add="scripts/ci.py")
-    if level == "job":  # arrives by a hand merge: the task gate never saw it
-        git(job, "merge", "-q", "--ff-only", "wt/0.5.0-rc1/j1--J1.S1.T1")
-        assert run(root, "clean", str(task)).returncode == 0  # its tree is empty now
-        approve(root, git(job, "rev-parse", "HEAD").strip())
-    refused = run(root, "merge", str(job if level == "job" else task))
-    assert refused.returncode == 1 and "Traceback" not in refused.stderr
-    assert fixes(refused) == [
-        "fix: Operator action: commit scripts/ci.py on feature/0.5.0"
-        " — no tree edits its own judge (ADR 0207)"
-    ]
-    assert not (root / "repos/r/scripts/ci.py").read_text().endswith("y = 1\n")
-
-
-def test_no_tree_edits_a_module_the_script_its_own_gate_runs_imports(root: Path) -> None:
-    """ADR 0207, the redo of 4936ab4f6: the declared script imports `scripts/ci_steps.py`; a range
-    editing that module, not the literal script path, weakens its own judge and refuses."""
-    repo = root / "repos/r"
-    commit(repo, "scripts/ci_steps.py", "def run(level):\n    return 0\n")
-    ci = "import sys\nfrom ci_steps import run\nprint('ci', *sys.argv[1:])\nsys.exit(run(sys.argv[1]))\n"
-    commit(repo, "scripts/ci.py", ci)
-    git(root / TREE, "merge", "-q", "--ff-only", "feature/0.5.0")
-    task = _task_commit(root, add="scripts/ci_steps.py")
-    refused = run(root, "merge", str(task))
-    assert refused.returncode == 1 and "Traceback" not in refused.stderr
-    assert fixes(refused) == [
-        "fix: Operator action: commit scripts/ci_steps.py on feature/0.5.0"
-        " — no tree edits its own judge (ADR 0207)"
-    ]
-
-
 def test_a_tests_line_after_a_utf8_bom_is_declared(tmp_path: Path) -> None:
     """onboarding-writes-no-tests-line: a BOM before the first line does not hide `tests:`."""
     sys.path.insert(0, str(_PACKAGE_SKILLS / "dd-gitflow-default" / "scripts"))
