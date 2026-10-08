@@ -2,11 +2,9 @@
 
 **Status:** Approved
 
-The following wrapper exists only so the pre-Job-1 checker can validate the definition. J1.T5 removes the heading and Contract line after J1.T2–J1.T4 merge and before this job opens; its task table is unchanged.
+J1.T5 removes the pre-Job-1 compatibility heading and Contract label after J1.T2–J1.T4 merge and before this job opens; its task table is unchanged.
 
-## Stage J3.S1 — compatibility wrapper
-
-- Contract: J3.T1 is a RED-only dispatch; J3.T2 is a fresh implementation dispatch and touches no tests; historical releases remain readable and no new stage-shaped or legacy-log data is written.
+J3.T1 is a RED-only dispatch; J3.T2 is a fresh implementation dispatch and touches no tests; historical releases remain readable and no new stage-shaped or legacy-log data is written.
 
 | task | AC | `W:` | outcome |
 |---|---|---|---|
