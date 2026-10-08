@@ -225,6 +225,24 @@ def test_a_missing_pointer_is_a_finding_once_the_candidate_logs_its_dispositions
     assert "<" not in errors[1]["fix"]  # ADR 0158: a bug's resolve needs evidence no row holds
 
 
+@pytest.mark.xfail(strict=True, reason="standing() reads status, backlog exits write disposition")
+def test_a_backlog_exit_rejected_by_disposition_traces(script: Path, tmp_path: Path) -> None:
+    """release-check-reads-status-of-backlog-exits: `backlog.py exit --disposition rejected`
+    writes `disposition` and no `status`; the carried id traces."""
+    specs = _specs(tmp_path, _GOOD)
+    _seed_ledgers(specs)
+    with (specs / "backlog/_archive/backlog_histo.jsonl").open("a") as histo:
+        histo.write(json.dumps({"id": "declined", "disposition": "rejected"}) + "\n")
+    (specs / "releases/0.5.0/rc-1/SPEC.md").write_text("**Origin:** backlog:declined\n", "utf-8")
+
+    listed = subprocess.run([sys.executable, str(script), "check", "--specs", str(specs)],
+                            capture_output=True, text=True)  # fmt: skip
+
+    assert [ln.split(" ", 3)[3] for ln in listed.stdout.splitlines() if " info " in ln] == [
+        "Origin backlog:declined traced"
+    ]
+
+
 def test_a_deferred_carried_bug_is_untraced_after_the_sweep(script: Path, tmp_path: Path) -> None:
     """Operator ruling 2026-10-01: a carried bug `deferred` at the closing sweep stays
     untraced, an error whose fix is the operator's act (resolve it here, or rule on scope)."""
