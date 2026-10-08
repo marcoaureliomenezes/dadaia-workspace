@@ -288,11 +288,11 @@ def _on_principal(specs: Path) -> bool:
     """HEAD is the branch the constitution's `gitflow:` line names `principal`; a detached HEAD,
     an absent line or an unreadable one is not, so the window stays judged."""
     try:
-        line = next(x for x in (specs / "constitution.md").read_text("utf-8").splitlines() if x.startswith("gitflow:"))  # fmt: skip
+        line = next(x for x in (specs / "constitution.md").read_text("utf-8").split("\n") if x.startswith("gitflow:"))  # fmt: skip
         principal = json.loads(line[len("gitflow:") :])["principal"]
     except (OSError, StopIteration, ValueError, KeyError, TypeError):
         return False
-    head = subprocess.run(["git", "symbolic-ref", "--short", "HEAD"], cwd=specs.parent, capture_output=True, text=True, check=False)  # fmt: skip
+    head = subprocess.run(["git", "symbolic-ref", "--short", "HEAD"], cwd=specs.parent, capture_output=True, text=True, encoding="utf-8", errors="replace", check=False)  # fmt: skip
     return head.returncode == 0 and head.stdout.strip() == principal
 
 
