@@ -124,7 +124,7 @@ zone class, an OUTPUT entry held, an EPHEMERAL one deleted.
 
 ## Run the first candidate
 
-<!-- derived-from: release-lifecycle sha256:b3c18e0eed64 -->
+<!-- derived-from: release-lifecycle sha256:10740254e84a -->
 <!-- derived-from: backlog-ledger sha256:44b145a6a3aa -->
 <!-- derived-from: bug-ledger sha256:a3df43b6e94e -->
 

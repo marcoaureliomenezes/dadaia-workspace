@@ -28,7 +28,7 @@ memory injection into the session.
 
 ## Release and candidate
 
-<!-- derived-from: release-lifecycle sha256:b3c18e0eed64 -->
+<!-- derived-from: release-lifecycle sha256:10740254e84a -->
 
 Exactly one *release* is live, `specs/releases/<M.m.p>/`, with open scope; it grows by
 *candidates*, each a closed-scope cycle whose `SPEC.md`, `PLAN.md` and job files `tasks/<job>.md` sit
@@ -41,7 +41,7 @@ moves only at an operator-approved deploy.
 
 ## The flow
 
-<!-- derived-from: release-lifecycle sha256:b3c18e0eed64 -->
+<!-- derived-from: release-lifecycle sha256:10740254e84a -->
 <!-- derived-from: bug-ledger sha256:a3df43b6e94e -->
 <!-- derived-from: audits-canon sha256:611e3746cfd5 -->
 
@@ -73,7 +73,7 @@ gate — a refusal whose fix is itself refused (a Stall) cannot ship.
 
 <!-- derived-from: context-management sha256:e084ff04890d -->
 <!-- derived-from: workspace-doctor sha256:84a9bec9fec9 -->
-<!-- derived-from: release-lifecycle sha256:b3c18e0eed64 -->
+<!-- derived-from: release-lifecycle sha256:10740254e84a -->
 <!-- derived-from: audits-canon sha256:611e3746cfd5 -->
 
 *Memory* is current product truth: the atoms under `specs/memory/product/**`, plus
