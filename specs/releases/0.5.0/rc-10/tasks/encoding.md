@@ -44,4 +44,7 @@ Paths are relative to the repo root; aliases as in `PLAN.md` (`f/`, `pub/`, `S/`
 |---|---|---|---|
 | JE.S4.T1 | AC10.2 | `specs/memory/**` (the atoms `release.py check` names as moved, by `release.py memory`, MEMORY-UPDATE.md) | `release.py check` exit 0 |
 | JE.S4.T2 | AC10.2 | `specs/releases/0.5.0/_RELEASE.json` (K2, the closure narrative `log` entries: `summary`, `size`, `drifts`, `artifact-gc` (doctor dry, then `--fix`), `test-dispositions`, `dispositions`; the tail's `kind: merge` entry) | `release.py check` exit 0 |
+| JE.S4.T4 | AC10.2 | `specs/releases/0.5.0/_RELEASE.json` (the `artifact-gc` entry: doctor dry, then `--fix`, from the workspace root) | `release.py check` exit 0 |
 | JE.S4.T3 | — | this file | close task, last: `test-audit:`, `mutation:` lines; the job's `done` line |
+
+- done: rc-10 job encoding — every task of JE.S1 to JE.S4 landed on `wt/0.5.0-rc10/encoding`; `release-check-skips-a-rebased-away-until` (REBUILD of `_window_findings`) and `subprocess-text-encoding-has-no-guard` (guard v41, its scripts/ half committed on the work branch as d731bc911 by authorized operator act) are resolved, so rc-10 holds 0 open and 0 deferred bugs; the memory pass, the closure narrative and the artifact GC are logged; closed by JE.S4.T3.
