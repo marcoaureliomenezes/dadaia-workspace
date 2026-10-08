@@ -69,7 +69,7 @@ history is that line's change log. No CI job fetches history for a bug record's 
 ## The standing order the lessons produced
 
 <!-- derived-from: QUALITY sha256:87ee88521d9a -->
-<!-- derived-from: bug-ledger sha256:c4e8fd6ee96c -->
+<!-- derived-from: bug-ledger sha256:a3df43b6e94e -->
 
 The workspace is in a permanent state of architecture review, oriented by its bug
 history:

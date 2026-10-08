@@ -23,7 +23,7 @@ sources:
 
 ## Import
 
-- `dadaia import <file> [--workspace <root>]` accepts only a file carrying `spec-contexts-export-v1`; a missing file, invalid JSON or another schema exits 1 naming the cause.
+- `dadaia import <file> [--workspace <root>]` accepts only a file carrying `spec-contexts-export-v1`; a missing file, invalid JSON, another schema or a context or associated-repo record missing a required field exits 1 naming the cause, the field and the `export` fix line.
 - Each record is registered DEAD with its branch and associated repos through the same guarded insert as `dadaia context create`: a known name prints `skipped (exists)`, an invalid name, a slug another context owns, or a repo with neither URL nor `repos/<slug>` checkout prints `skipped (<reason>)`.
 - The run lists each `registered (dead)` name and the venv CLI's `context alive <name>` line that clones it, spelled by `fix_line` ([[context-management]]).
 - Import clones nothing and never overwrites a known context.
