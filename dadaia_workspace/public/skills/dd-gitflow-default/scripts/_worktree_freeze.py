@@ -112,8 +112,8 @@ def judge(
     rows: list[Commit], base: str, red: re.Pattern[str] | None, bugs: frozenset[str] = frozenset()
 ) -> tuple[str, str] | None:
     """(path, anchor) of the first test edit the freeze refuses in *rows* (oldest first, cut
-    from *base*), else `None`. A `refactor(bugs): <id> — REBUILD …` commit naming a ledger id of
-    *bugs* amends frozen lines: the operator confirmed that bug."""
+    from *base*), else `None`. A `refactor(bugs): <id> — REBUILD …` commit naming an open or
+    deferred ledger id of *bugs* amends frozen lines: the operator confirmed that bug."""
     cut = next((i for i, r in enumerate(rows) if not _red_stage(r)), 0)
     anchor, past = (rows[cut - 1].sha if cut else base), rows[cut:]
     dirty = {_group(r) for r in past if r.paths - r.tests}  # stage groups holding non-test paths
@@ -133,8 +133,9 @@ def _red_stage(row: Commit) -> bool:
 
 
 def _ledger_ids(tree: Path, work: str) -> frozenset[str]:
-    """The record ids of *work*'s `specs/bugs/BUGS.jsonl` (one record per newline-ended line,
-    written by `bugs.py`), none when absent; a line that is no JSON is skipped."""
+    """The ids of the records of *work*'s `specs/bugs/BUGS.jsonl` (one JSON object per line,
+    written by `bugs.py`) whose status is open or deferred, the only ones an amendment may name;
+    none when the file is absent. A line that is no JSON object with a string `id` names nothing."""
     ids = set()
     try:
         ledger = git(tree, "show", f"{work}:specs/bugs/BUGS.jsonl")
@@ -142,7 +143,10 @@ def _ledger_ids(tree: Path, work: str) -> frozenset[str]:
         return frozenset()
     for line in ledger.split("\n"):
         with contextlib.suppress(ValueError):
-            ids.add(json.loads(line)["id"])
+            rec = json.loads(line)
+            live = isinstance(rec, dict) and rec.get("status") in ("open", "deferred")
+            if live and isinstance(rec.get("id"), str):
+                ids.add(rec["id"])
     return frozenset(ids)
 
 

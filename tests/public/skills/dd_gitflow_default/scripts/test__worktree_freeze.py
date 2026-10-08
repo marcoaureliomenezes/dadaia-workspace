@@ -221,7 +221,6 @@ def test_a_non_rebuild_subject_naming_a_ledger_bug_still_refuses(tmp_path: Path)
 
 
 @pytest.mark.medium
-@pytest.mark.xfail(strict=True, reason="the lane admits a terminal record")
 @pytest.mark.parametrize("status", ["resolved", "rejected"])
 def test_a_rebuild_naming_a_terminal_record_still_refuses(tmp_path: Path, status: str) -> None:
     refused = amended(tmp_path, REBUILD, ledger=f'{{"id": "b1", "status": "{status}"}}\n')
@@ -272,13 +271,11 @@ def outcome(tmp_path: Path, ledger: str) -> str:
 
 
 @pytest.mark.medium
-@pytest.mark.xfail(strict=True, reason="a ledger line with no id or no object crashes the read")
 @pytest.mark.parametrize("line", ['{"status": "open"}', "[1]", '"b1"'])
 def test_a_ledger_line_naming_nothing_does_not_crash_or_admit(tmp_path: Path, line: str) -> None:
     assert outcome(tmp_path, f"{line}\n") == "refused"
 
 
 @pytest.mark.medium
-@pytest.mark.xfail(strict=True, reason="a ledger line with no object crashes the read")
 def test_a_non_object_ledger_line_leaves_the_records_after_it_readable(tmp_path: Path) -> None:
     assert outcome(tmp_path, f"[1]\n{BUG}") == "admitted"
