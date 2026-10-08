@@ -1,4 +1,4 @@
-"""PreToolUse layout gate: a write that creates an entry ``workspace_layout.verdict`` judges
+"""PreToolUse layout gate: a write that creates a path ``workspace_layout.verdict`` judges
 ``slop`` — at the root, ``.dadaia/``, a closed-canon zone, ``repos/`` or ``worktrees/`` —
 is blocked; the doctor asks the same function and reports existing slop. Fails open.
 """
@@ -35,20 +35,18 @@ _AGENT_RE = re.compile(r"[A-Za-z0-9._-]+")
 
 
 def _root_violation(anchor: Path | None, raw_path: str, agent: str) -> str | None:
-    """A block reason when *raw_path* creates the entry ``workspace_layout.verdict`` judges
-    slop in the root owning it, fenced or not; ``None`` outside any or when it exists."""
+    """A block reason when *raw_path* does not exist and ``workspace_layout.verdict`` judges it
+    slop in the root owning it, fenced or not; ``None`` outside any."""
     fpath = Path(raw_path)
     if not fpath.is_absolute():
         fpath = (anchor or Path.cwd()) / fpath
     ws = workspace_resolver.owning_root(fpath)  # an ancestor of the resolved fpath
-    if ws is None:
+    if ws is None or fpath.exists():  # an edit creates no entry
         return None
     rel = fpath.resolve().relative_to(ws)
     globs = workspace_layout.operator_globs(ws)[0]
     slugs = context_registry.registered_slugs(ws)
-    heads = [Path(*rel.parts[:k]) for k in range(1, len(rel.parts) + 1)]
-    verdicts = [workspace_layout.verdict(h.as_posix(), h != rel, globs, *slugs) for h in heads]
-    if "slop" not in verdicts or (ws / heads[verdicts.index("slop")]).exists():
+    if not rel.parts or workspace_layout.verdict(rel.as_posix(), False, globs, *slugs) != "slop":
         return None
     return (
         f"[ROOT WHITELIST GATE] Writing '{rel.as_posix()}' creates an entry the layout law "

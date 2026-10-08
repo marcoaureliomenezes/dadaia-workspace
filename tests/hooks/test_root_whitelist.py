@@ -192,7 +192,6 @@ def test_the_fix_creates_the_agents_own_temp_dir(
     [
         pytest.param("Edit", "z_feedback.md", "z_feedback.md", id="edit-existing-root-file"),
         pytest.param("Write", "z_feedback.md", "z_feedback.md", id="overwrite-existing-root-file"),
-        pytest.param("Write", ".opencode/", ".opencode/agents/foo.md", id="new-file-in-existing-root-dir"),
         pytest.param("Write", ".dadaia/junk.txt", ".dadaia/junk.txt", id="existing-dadaia-stray"),
     ],
 )  # fmt: skip
@@ -200,8 +199,8 @@ def test_the_gate_judges_creation_only(
     tmp_path: Path, tool_name: str, entry: str, target: str
 ) -> None:
     """Bug root-gate-blocks-editing-an-existing-entry: the law blocks a write "creating a new
-    entry"; the entry is the name the layout judges (a root-level name here), so a write
-    under one that already exists creates nothing and is allowed — the doctor still reports it."""
+    entry"; an Edit or overwrite of a path that already exists creates nothing and is allowed — the
+    doctor still reports it. A new path under an existing slop directory stays blocked (#E1)."""
     ws = _ws(tmp_path)
     payload = {"tool_name": tool_name, "tool_input": {"file_path": str(ws / target)}}
     _out, block = _run(tmp_path, payload)
