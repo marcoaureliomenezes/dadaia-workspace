@@ -1,7 +1,7 @@
 # TASKS — 0.5.0 rc-10, the closure tail
 
 **Status:** Approved
-**Approval:** by operator order 2026-10-07 ("confirmos. faça 1, então 2, 3, 4 e so pare quando finalizar o passo 5") and the review-of-reports grill rulings 2026-10-07; dd-code-reviewer APPROVED at the job review.
+**Approval:** by operator order 2026-10-07 ("confirmos. faça 1, então 2, 3, 4 e so pare quando finalizar o passo 5") and the review-of-reports grill rulings 2026-10-07; the dd-code-reviewer job review is pending (a first verdict, REJECTED at af9462693, opened stages JT.S6 and JT.S7).
 
 Paths are relative to the repo root; aliases as in `PLAN.md` (`f/`, `pub/`, `S/`, `bugres/`, `relimpl/`, `GF/`, `evals:`). Gates: task — `verify-task:` on the touched files plus `Owner-tests:`; stage — `verify-stage:`; job — CI matrix + one review + `verify:`. Opened after rc-10 merged into develop: bugs remain found_in rc-10 and ADR 0206 closes no rc over an open bug. Bound by the freeze (ADR 0209). Every fix row names its single decider, puts its `git grep` sweep line and hit count in the commit body, and states net lines over its source files (≤ 0, or why not); a fix with `caused_by ≠ none` is a REBUILD of its unit keeping its tests (0210); the `BUGS.jsonl` line is written by `bugs.py resolve` only. `deferred` counts as open (operator ruling), so the deferred bugs below are fixed here.
 
@@ -65,5 +65,22 @@ Paths are relative to the repo root; aliases as in `PLAN.md` (`f/`, `pub/`, `S/`
 |---|---|---|---|
 | JT.S5.T1 | AC10.1 | `specs/memory/**` (the atoms whose sources this job moved after rc-10's memory entry `until` 55ce0a25d: `agentic-entities`, `release-lifecycle`, and any other `release.py check` names), their derived docs, `specs/releases/0.5.0/_RELEASE.json` (the new `kind: memory` entry by `release.py memory`, MEMORY-UPDATE.md) | `release.py check` exit 0 |
 | JT.S5.T2 | — | this file | close task, last: `test-audit:`, `mutation:` lines; the job's `done` line |
+
+## Stage JT.S6 — RED (review fix: the freeze lane admits a terminal record)
+
+- Contract: exit tests one strict-xfail RED row per case that fails today; the HEAD-ledger and deferred rows pass on arrival and carry no marker; envelope `tests/public/skills/dd_gitflow_default/scripts/test__worktree_freeze.py`; ACs AC9.1
+- Born of the job review (HIGH: `_worktree_freeze.py` admitted any ledger id, resolved ones included, and no row pinned the work branch as the authority; MEDIUM: a ledger line with no `id` or no object crashed the read).
+
+| task | AC | `W:` | owner tests / RED |
+|---|---|---|---|
+| JT.S6.T1 | AC9.1 | `tests/public/skills/dd_gitflow_default/scripts/test__worktree_freeze.py` (a REBUILD naming a resolved or rejected record refuses; one naming an id only the job tree's ledger holds refuses; a deferred record admits; a ledger line with no `id` or no object neither crashes nor admits) | the new rows; strict xfail on the terminal-record and ledger-line rows |
+
+## Stage JT.S7 — the fix
+
+- Contract: exit tests JT.S6 green; envelope `dadaia_workspace/public/skills/dd-gitflow-default/scripts/_worktree_freeze.py`, `tests/public/skills/dd_gitflow_default/scripts/test__worktree_freeze.py` (markers leave); ACs AC9.1
+
+| task | AC | `W:` | owner tests / RED |
+|---|---|---|---|
+| JT.S7.T1 | AC9.1 | `dadaia_workspace/public/skills/dd-gitflow-default/scripts/_worktree_freeze.py` (`_ledger_ids` names only a record whose `status` is open or deferred, a line that is no object with a string `id` names nothing), `tests/public/skills/dd_gitflow_default/scripts/test__worktree_freeze.py` (markers leave) | its JT.S6.T1 rows. Decider: `judge`'s admission. Gate change: mutation never `skipped` (the `HEAD:`-for-`<work>:` mutant, a status-set mutant) |
 
 - done: the rc-10 tail — every task of JT.S1 to JT.S5 landed on `wt/0.5.0-rc10/tail`; 9 of the 10 rc-10 bugs it carried are resolved (6 as REBUILDs with `caused_by` set), `subprocess-text-encoding-has-no-guard` moves to job `encoding` with K2; closed by JT.S5.T2.
