@@ -204,6 +204,8 @@ def _interpreter_version(executable: str) -> tuple[int, int, int] | None:
             [executable, "-c", "import sys; print(*sys.version_info[:3])"],
             capture_output=True,
             text=True,
+            encoding="utf-8",
+            errors="replace",
             check=False,
             timeout=_INTERPRETER_PROBE_TIMEOUT_SECONDS,
             stdin=subprocess.DEVNULL,
@@ -388,6 +390,8 @@ class VenvPythonEnvironmentManager:
                     check=True,
                     capture_output=True,
                     text=True,
+                    encoding="utf-8",
+                    errors="replace",
                 )
             except OSError as exc:
                 # Bug r3b-portability-import-venv-permission (F-16/F-22 class): on a
@@ -447,7 +451,14 @@ class VenvPythonEnvironmentManager:
                 # version..." into init's output, where it reads as a masked broken
                 # bootstrap.
                 try:
-                    subprocess.run(install_cmd, check=True, capture_output=True, text=True)
+                    subprocess.run(
+                        install_cmd,
+                        check=True,
+                        capture_output=True,
+                        text=True,
+                        encoding="utf-8",
+                        errors="replace",
+                    )
                 except subprocess.CalledProcessError as exc:
                     raise WorkspaceVenvBootstrapError(
                         f"workspace venv bootstrap failed installing '{spec}'. The "
@@ -516,6 +527,8 @@ class VenvPythonEnvironmentManager:
             ],
             capture_output=True,
             text=True,
+            encoding="utf-8",
+            errors="replace",
             env={"PATH": os.environ.get("PATH", "")},
             check=False,
         )

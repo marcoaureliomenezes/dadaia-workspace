@@ -34,6 +34,8 @@ class SubprocessProcessRunner:
                 env=None if env is None else dict(env),
                 capture_output=True,
                 text=True,
+                encoding="utf-8",
+                errors="replace",
                 timeout=timeout,
             )
         except subprocess.TimeoutExpired as exc:
