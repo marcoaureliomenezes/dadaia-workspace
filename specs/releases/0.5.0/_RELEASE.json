@@ -1359,6 +1359,18 @@
       "changed": [
         "worktrees"
       ]
+    },
+    {
+      "ts": "2026-10-08T03:26:14Z",
+      "agent": "main-thread",
+      "kind": "merge",
+      "text": "job: tail; start: 2026-10-08T00:13:40Z; end: 2026-10-08T03:24:28Z; wall: 191; ritual_wait: 102; dispatches: 22; job_gate_runs: 2"
+    },
+    {
+      "ts": "2026-10-08T03:26:14Z",
+      "agent": "main-thread",
+      "kind": "note",
+      "text": "rc-10 tail merge entry sources. start: the author time of d34f53212, the job's first own commit (its committer time 2026-10-08T01:23:57Z is a message-rewrite instant). end: the feature/0.5.0 reflog fast-forward to d1e0113f7. ritual_wait: the union of push-CI walls of the job branch (gh runs 37712831482, 37713898544, 37718665434, 37719298911), the three job-review dispatches and the two job-gate runs of worktree.py merge (the first, all gates green, refused on an ignored .hypothesis cache in the tree). dispatches: the subagent dispatches and resumes the main session's transcript records for this job between start and end (task, review and measurement), excluding the backlog intake tree and the scorecard review."
     }
   ]
 }
