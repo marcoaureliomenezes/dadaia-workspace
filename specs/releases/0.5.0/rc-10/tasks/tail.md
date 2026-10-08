@@ -65,3 +65,5 @@ Paths are relative to the repo root; aliases as in `PLAN.md` (`f/`, `pub/`, `S/`
 |---|---|---|---|
 | JT.S5.T1 | AC10.1 | `specs/memory/**` (the atoms whose sources this job moved after rc-10's memory entry `until` 55ce0a25d: `agentic-entities`, `release-lifecycle`, and any other `release.py check` names), their derived docs, `specs/releases/0.5.0/_RELEASE.json` (the new `kind: memory` entry by `release.py memory`, MEMORY-UPDATE.md) | `release.py check` exit 0 |
 | JT.S5.T2 | — | this file | close task, last: `test-audit:`, `mutation:` lines; the job's `done` line |
+
+- done: the rc-10 tail — every task of JT.S1 to JT.S5 landed on `wt/0.5.0-rc10/tail`; 9 of the 10 rc-10 bugs it carried are resolved (6 as REBUILDs with `caused_by` set), `subprocess-text-encoding-has-no-guard` moves to job `encoding` with K2; closed by JT.S5.T2.
