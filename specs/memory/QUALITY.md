@@ -84,7 +84,7 @@ Related: [[ARCHITECTURE]]
 ## Bugs
 
 ```text
-Bug balance from BUGS.jsonl: 914 records (882 live, 32 archived).
+Bug balance from BUGS.jsonl: 915 records (883 live, 32 archived).
 surface                                            records  recurrences  fix-induced  archived  rcs  correlates  settled
 .github/dependabot.yml                             1        0            0            0         0    0           yes
 .github/workflows/release.yml                      1        0            0            0         0    0           yes
@@ -119,7 +119,7 @@ repos                                              1        0            0      
 schemas                                            1        0            0            0         1    1           no
 sdd                                                1        0            0            0         0    0           no
 shipped text (CONTEXT.md, docs/, public/)          1        0            1            0         0    0           no
-skills                                             3        2            2            0         1    0           no
+skills                                             4        3            3            0         1    2           no
 spec_context                                       74       73           18           7         1    2           no
 specs                                              62       61           9            0         2    0           no
 specs-doctor                                       1        0            0            0         0    0           no
@@ -130,15 +130,15 @@ dev-tooling:
 .github                                            3        2            0            0         3    2           no
 scripts                                            8        7            3            0         4    6           no
 tests                                              92       91           34           0         4    15          no
-Laplace trend (days), window 0.4.5..0.5.0, T = 42 days: u = 13.67, diverging
-  counted 397 of 914 records; apart: 452 release unknown, 65 no found_in, 0 outside the window
+Laplace trend (days), window 0.4.5..0.5.0, T = 42 days: u = 13.74, diverging
+  counted 398 of 915 records; apart: 452 release unknown, 65 no found_in, 0 outside the window
   records found on an already settled surface: 6
 Defective-fix rate per rc (caused_by set over found in the rc):
 0.5.0/rc-6  2/8  25%
 0.5.0/rc-7  6/23  26%
 0.5.0/rc-8  20/26  76%
 0.5.0/rc-9  4/7  57%
-0.5.0/rc-10  51/72  70%
+0.5.0/rc-10  52/73  71%
 ```
 
 

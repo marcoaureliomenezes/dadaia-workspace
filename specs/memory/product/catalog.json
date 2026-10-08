@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-10-08T12:06:42Z",
+  "generated_at": "2026-10-08T12:52:18Z",
   "features": [
     {
       "rank": 1,
@@ -650,7 +650,7 @@
         "compliance",
         "privacy"
       ],
-      "token_estimate": 2874,
+      "token_estimate": 2907,
       "depends_on": [
         "public-asset-distribution",
         "sdd-gate-v3",
