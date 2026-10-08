@@ -1,0 +1,14 @@
+# TASKS — 0.5.0 rc-11, Job 2 — lean bug and audit ledgers
+
+**Status:** Draft
+
+The following wrapper exists only so the pre-Job-1 checker can validate the definition. J1.T4 removes the heading and Contract line before this job opens; its task table is unchanged.
+
+## Stage J2.S1 — compatibility wrapper
+
+- Contract: J2.T1 is a RED-only dispatch; J2.T2 is a fresh implementation dispatch and touches no tests; bug and audit checks pass before and after the byte-preserving status migration.
+
+| task | AC | `W:` | outcome |
+|---|---|---|---|
+| J2.T1 | AC4.1, AC4.3–AC4.6 | `tests/public/skills/dd_bug_resolution/scripts/test_bugs.py`, `tests/public/skills/dd_bug_resolution/scripts/test__bugs_balance.py`, `tests/public/skills/dd_bug_resolution/scripts/test__ledger.py`, `tests/public/skills/dd_audit_project/scripts/test_audit.py` | RED rows prove stored resolve sha, absent derived fields/verbs/archive gate, no deferred disposition and open-audit closure refusal |
+| J2.T2 | AC4.1, AC4.3–AC4.6 | `dadaia_workspace/public/skills/dd-bug-resolution/scripts/bugs.py`, `dadaia_workspace/public/skills/dd-bug-resolution/scripts/_bugs_check.py`, `dadaia_workspace/public/skills/dd-bug-resolution/scripts/_bugs_transition.py`, `dadaia_workspace/public/skills/dd-bug-resolution/scripts/_bugs_write.py`, `dadaia_workspace/public/skills/dd-bug-resolution/scripts/_bugs_store.py`, `dadaia_workspace/public/skills/dd-bug-resolution/scripts/_bugs_fix.py`, `dadaia_workspace/public/skills/dd-bug-resolution/scripts/_bugs_balance.py`, `dadaia_workspace/public/skills/dd-bug-resolution/scripts/_bugs_quality.py`, `dadaia_workspace/public/skills/dd-audit-project/scripts/audit.py`, `dadaia_workspace/public/skills/dd-audit-project/scripts/_audit_check.py`, `dadaia_workspace/public/skills/dd-audit-project/scripts/_audit_verbs.py`, `dadaia_workspace/public/skills/dd-audit-project/scripts/_audit_store.py`, `dadaia_workspace/public/schemas/bugs/bug-record-v1.schema.json`, `dadaia_workspace/public/schemas/audits/finding-record-v1.schema.json`, `specs/audits/20260930-structural-convergence/FINDINGS.jsonl` | delete balance/quality/fix reconstruction, use Job 1's identity parser, persist resolve facts, remove deferred and reopen the 13 existing deferred findings unless independently terminal |
