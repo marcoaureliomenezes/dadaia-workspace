@@ -84,7 +84,7 @@ Related: [[ARCHITECTURE]]
 ## Bugs
 
 ```text
-Bug balance from BUGS.jsonl: 913 records (881 live, 32 archived).
+Bug balance from BUGS.jsonl: 914 records (882 live, 32 archived).
 surface                                            records  recurrences  fix-induced  archived  rcs  correlates  settled
 .github/dependabot.yml                             1        0            0            0         0    0           yes
 .github/workflows/release.yml                      1        0            0            0         0    0           yes
@@ -128,23 +128,23 @@ unknown                                            268      -            32     
 workspace                                          13       12           1            0         0    0           no
 dev-tooling:
 .github                                            3        2            0            0         3    2           no
-scripts                                            7        6            2            0         4    5           no
+scripts                                            8        7            2            0         4    6           no
 tests                                              92       91           34           0         4    15          no
-Laplace trend (days), window 0.4.5..0.5.0, T = 41 days: u = 14.77, diverging
-  counted 396 of 913 records; apart: 452 release unknown, 65 no found_in, 0 outside the window
+Laplace trend (days), window 0.4.5..0.5.0, T = 42 days: u = 13.67, diverging
+  counted 397 of 914 records; apart: 452 release unknown, 65 no found_in, 0 outside the window
   records found on an already settled surface: 6
 Defective-fix rate per rc (caused_by set over found in the rc):
 0.5.0/rc-6  2/8  25%
 0.5.0/rc-7  6/23  26%
 0.5.0/rc-8  20/26  76%
 0.5.0/rc-9  4/7  57%
-0.5.0/rc-10  50/71  70%
+0.5.0/rc-10  50/72  69%
 ```
 
 
 The review below is rewritten at every closure, never appended; the block above is `bugs.py balance --write` and nothing else.
 
-- **The balance.** The numbers (found, resolved, defective-fix rate, trend, settled-surface records) are the block above's and are not restated here. In words: the window's open count is zero (a candidate closes only with no open bug), and the deferred records (`freeze-has-no-lane-for-an-approved-amendment`, `git-errors-replace-has-no-row`, `memory-written-before-closure-phase`, `panel-telemetry-sqlite-corrupts-under-concurrent-access`, `subprocess-text-encoding-has-no-guard`) stay in the ledger, each with its reason. The trend says the ledger grows faster than it settles, so every cause below is read as a structure to rebuild, not a bug to patch.
+- **The balance.** The numbers (found, resolved, defective-fix rate, trend, settled-surface records) are the block above's and are not restated here. In words: a candidate closes only with no open bug, and `deferred` counts as open (operator ruling 2026-10-07), so every rc-10 record still open or deferred is fixed inside rc-10. The trend says the ledger grows faster than it settles, so every cause below is read as a structure to rebuild, not a bug to patch.
 - **Standing cause 1 — one platform seam skipped.** `J7.S2.T2` is the culprit of 8 records of the last candidate, all Windows-only test or fixture bugs (a POSIX `bin/` path, a bare `python`, a `bash` spawn, a read-only `.git` rmtree). Verdict: the fixes are KEEP; the structure is `core/platform.py` as the one home of platform facts, and a test reaching past it is the defect.
 - **Standing cause 2 — the merge gate and the worktree verbs.** `J1.S3.T1` is the culprit of 4 records (worktree removal leaving its parent and remote branch, a job merge accepting any CI run URL, a job merge requiring a remote CI run, a rebase laundering the stray check) and `J1.S2.T1` of 2 more (task fix lineage, rebase orphaning fix links cited by sha). The records show the chain: each gate fix left a second reader of the same fact. Verdict: REBUILD on any further hit; the judged party must never be able to supply its own evidence.
 - **Standing cause 3 — a closed id grammar.** `freeze-reads-only-numbered-job-ids` and `bugs-check-reads-no-jb-task-ids` are one family: a task id reader written for `J<n>` and later widened one prefix at a time. Verdict: one id grammar, read in one place.
