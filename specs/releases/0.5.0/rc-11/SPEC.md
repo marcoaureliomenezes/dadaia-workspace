@@ -27,7 +27,7 @@ The governing product philosophy is Features × Futures: a feature or fix spends
 
 ## 2. Measurable Goals
 
-- G1. The PLAN estimates the complete candidate at no more than 7.8 wall-clock hours on its critical path from explicit task durations and dependencies, cites measured baseline timings, states uncertainty and contingency, and discloses aggregate agent-hours; any larger cluster is removed before approval rather than assigned a fictional estimate.
+- G1. The PLAN estimates the complete candidate at no more than 8.7 wall-clock hours on its critical path from explicit task durations and dependencies, cites measured baseline timings, states uncertainty and contingency, and discloses aggregate agent-hours; any larger cluster is removed before approval rather than assigned a fictional estimate.
 - G2. A normal change can use one plain worktree, one repository `verify:` run and one review, without creating a release, candidate, job or task record.
 - G3. After the Job 1 bootstrap, a release candidate uses jobs and tasks only: no stage command, stage contract, stage gate, task gate or mandatory bug-batch job remains.
 - G4. The release, bug, audit and memory ledgers retain only facts that are not derived from git or source; each retained fact has one parser and one writer.
@@ -46,7 +46,9 @@ The governing product philosophy is Features × Futures: a feature or fix spends
 
 ### FR1 — Features × Futures and bounded candidates
 
-- AC1.1 (no test — operator approval gate): When a candidate is proposed, the PLAN must estimate a critical path of at most 7.8 wall-clock hours from each task's duration and the DAG dependencies, disclose aggregate agent-hours, cite the measured gate/runtime baselines used, and state uncertainty plus contingency before the SPEC may become Approved.
+- AC1.1 (no test — operator approval gate): When a candidate is proposed, the PLAN must estimate a critical path of at most 8.7 wall-clock hours from each task's duration and the DAG dependencies, disclose aggregate agent-hours, cite the measured gate/runtime baselines used, and state uncertainty plus contingency before the SPEC may become Approved. An agent independent of main and the implementers must measure and validate forecast and compliance; main must not self-measure or self-validate.
+
+Operator amendment (2026-10-08): 8.7 hours is the ceiling, not a compliance finding; five formal-review gaps leave actuals and reforecast pending independent validation.
 - AC1.2 (no test — reviewer source sweep): The constitution must state Features × Futures as an accepted product principle, and the public root map must explain in 3–5 lines that features and fixes spend options, coupling is cost, delivery alternates with option-restoring work, and the bug window review restores futures.
 - AC1.3 (no test — reviewer source sweep): When the public corpus is reviewed, the retired private architecture-review rule must have no projected or source reference.
 
@@ -161,7 +163,7 @@ At Reconciliation, after the operator's concrete Q21 ruling, the main thread tra
 
 ### Delivery constraints
 
-- The PLAN's estimated critical path is bounded at 7.8 hours and must also disclose aggregate agent-hours, measured baseline inputs, uncertainty and contingency. If the estimate does not fit, the SPEC stays Draft and the operator chooses the subset; estimates must not be compressed to manufacture compliance.
+- The PLAN's estimated critical path is bounded at 8.7 hours and must also disclose aggregate agent-hours, measured baseline inputs, uncertainty and contingency. If the estimate does not fit, the SPEC stays Draft and the operator chooses the subset; estimates must not be compressed to manufacture compliance.
 - The candidate has exactly four implementation jobs. Job 1 contains the dependency kernel, removes merge-time weight and lands every authorized AGENTS.md/SKILL.md source plus CI, worktree, hook and push-gate changes; it lands before another job. The PLAN owns every later semantic dependency and may claim parallel execution only for jobs whose complete consumers, tests and write sets are independent. No fifth implementation job or changed edge is added silently.
 - Job 1 is the sole bootstrap artifact allowed to use the current stageful grammar because the current validator cannot accept its own replacement. After Job 1 merges, every subsequently opened job/task file uses the stage-free grammar; this transition does not preserve a stage writer.
 - Every production behaviour follows test-first separation; each job receives one reviewer verdict.
@@ -180,4 +182,4 @@ At Reconciliation, after the operator's concrete Q21 ruling, the main thread tra
 
 ## 6. Open questions
 
-None. The PLAN is the sole authority for task, gate/review, dependency, reconciliation, critical-path and aggregate-effort arithmetic. Any new edge or write outside the listed sets requires the PLAN to be recalculated, and an upper path beyond the 7.8-hour cap requires an explicit operator choice of the requirement cluster that moves to rc-12.
+None. The PLAN is the sole authority for task, gate/review, dependency, reconciliation, critical-path and aggregate-effort arithmetic. Any new edge or write outside the listed sets requires the PLAN to be recalculated, and an upper path beyond the 8.7-hour cap requires an explicit operator choice of the requirement cluster that moves to rc-12.
