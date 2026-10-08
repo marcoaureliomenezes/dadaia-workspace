@@ -732,3 +732,17 @@ def test_git_output_decoded_with_replacement_keeps_a_latin1_laws_tests_line_decl
     end = _law_end(tmp_path, b"# caf\xe9\ntests: tests/**\n")
 
     assert end._declared(tmp_path, "work", "tests:") == "tests/**"
+
+
+@pytest.mark.xfail(strict=True, reason="freeze-deadlocks-a-repo-without-a-tests-line")
+def test_a_repo_declaring_only_verify_lines_lands_a_task_and_its_job(root: Path) -> None:
+    """freeze-deadlocks-a-repo-without-a-tests-line: the three verify lines are the whole law a
+    task and a job merge read; a repo declaring nothing else lands both."""
+    law = "".join(f"verify{k}: python scripts/ci.py {lv}\n"
+                  for k, lv in (("", "job"), ("-stage", "stage"), ("-task", "task")))  # fmt: skip
+    commit(root / "repos/r", "AGENTS.md", law)
+    git(root / TREE, "merge", "-q", "--ff-only", "feature/0.5.0")
+    approve(root, sha := land(root, "src/a.py"))
+    landed = run(root, "merge", TREE)
+    assert landed.returncode == 0, landed.stderr
+    assert git(root / "repos/r", "rev-parse", "feature/0.5.0").strip() == sha
