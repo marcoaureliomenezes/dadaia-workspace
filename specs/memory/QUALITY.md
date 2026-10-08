@@ -128,7 +128,7 @@ unknown                                            268      -            32     
 workspace                                          13       12           1            0         0    0           no
 dev-tooling:
 .github                                            3        2            0            0         3    2           no
-scripts                                            8        7            2            0         4    6           no
+scripts                                            8        7            3            0         4    6           no
 tests                                              92       91           34           0         4    15          no
 Laplace trend (days), window 0.4.5..0.5.0, T = 42 days: u = 13.67, diverging
   counted 397 of 914 records; apart: 452 release unknown, 65 no found_in, 0 outside the window
@@ -138,7 +138,7 @@ Defective-fix rate per rc (caused_by set over found in the rc):
 0.5.0/rc-7  6/23  26%
 0.5.0/rc-8  20/26  76%
 0.5.0/rc-9  4/7  57%
-0.5.0/rc-10  50/72  69%
+0.5.0/rc-10  51/72  70%
 ```
 
 
