@@ -39,10 +39,12 @@ The branch contract by role; the names are `specs/constitution.md`'s `gitflow:` 
 | job `wt/<M.m.p>-rc<N>/<job>` | Yes — valid name | work | its worktree merge (`worktrees/AGENTS.md` §2) |
 | backlog `wt/backlog/<slug>` | Yes | work | its worktree merge (`worktrees/AGENTS.md` §2) |
 | task `wt/<M.m.p>-rc<N>/<job>--<task-id>` | No | its job branch | its worktree merge (`worktrees/AGENTS.md` §2) (its task gate) |
+| plain `wt/<name>` | No — local only | current branch, recorded as its base | its reviewed worktree merge, with optional `verify:` |
 | integration | No — never a direct push | principal (bootstrap only) | PR from the row above, one per candidate |
 | principal | No — never a direct push | — | PR from the integration branch, at the final `rc` |
 
-- No `v` prefix, no suffix, no other branch we cut; no `hotfix/*` branch (a hotfix is a job, bugs law §2).
+- No `v` prefix or suffix; aside from the local-only plain row, no other branch is cut; no
+  `hotfix/*` branch (a hotfix is a job, bugs law §2).
 - Exactly one live work branch, named for the live release; a job — a bug fix included — reaches it through its own worktree (`worktrees/AGENTS.md` §1).
 - Every flow stage runs on the work branch; the other two are PR targets only, never a working branch.
 

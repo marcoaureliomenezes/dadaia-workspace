@@ -359,6 +359,7 @@ def merge(root: Path, path: str, keep: list[str], drop: bool) -> str:
         _ledgers(root, tree)
     elif plain(name):
         _check_ancestor(tree, onto)
+        _check_approved(root, tree, onto, name)
         _gate(tree, onto, required=False)
     else:
         _open_tasks(repo, name)

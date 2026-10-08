@@ -71,4 +71,8 @@ def pushable(ref: str) -> bool:
     """A `wt/` branch pre-push accepts: a job's or a backlog tree's; never a task's, `define`'s
     or any other `wt/` branch."""
     match = NAME_RE.match(name_of(ref) or "")
-    return match is not None and match["job"] != "define" and not match["task"]
+    return bool(
+        match
+        and not match["task"]
+        and (match["slug"] is not None or match["job"] not in (None, "define"))
+    )
