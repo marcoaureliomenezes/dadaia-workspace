@@ -225,7 +225,6 @@ def test_a_missing_pointer_is_a_finding_once_the_candidate_logs_its_dispositions
     assert "<" not in errors[1]["fix"]  # ADR 0158: a bug's resolve needs evidence no row holds
 
 
-@pytest.mark.xfail(strict=True, reason="standing() reads status, backlog exits write disposition")
 def test_a_backlog_exit_rejected_by_disposition_traces(script: Path, tmp_path: Path) -> None:
     """release-check-reads-status-of-backlog-exits: `backlog.py exit --disposition rejected`
     writes `disposition` and no `status`; the carried id traces."""

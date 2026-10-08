@@ -98,7 +98,8 @@ def _trace(
         if (by := record.get("superseded_by")) and by not in seen:
             return standing(kind, by, seen | {i})
         back = record.get("resolved_release" if kind == "bugs" else "release")
-        return "traced" if back == release or record.get("status") == "rejected" else "untraced"
+        declined = "rejected" in (record.get("status"), record.get("disposition"))
+        return "traced" if back == release or declined else "untraced"
 
     live = {
         "backlog": {e.get("id") for e in active.get("active") or []},
