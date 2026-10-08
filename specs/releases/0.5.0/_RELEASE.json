@@ -1316,6 +1316,18 @@
       "agent": "dd-product-engineer",
       "kind": "note",
       "text": "Correction to the J9.S4.T2 eval rerun note: run 37652269562 was the second run, not the first. The first run is 37629005413 (BLOCK, t2 candidate 0/3 vs 3/3, cause: no `hotfix/<bug-id>` tree outside an rc); the second, 37652269562 (BLOCK, t2 candidate 0/3 vs 3/3), was caused by bug onboarding-writes-no-tests-line; the green rerun is 37673898303."
+    },
+    {
+      "ts": "2026-10-08T01:19:30Z",
+      "agent": "main-thread",
+      "kind": "merge",
+      "text": "job: reconcile; start: 2026-10-06T23:05:51Z; end: 2026-10-07T20:47:49Z; wall: 1302; ritual_wait: 29; dispatches: 34; job_gate_runs: 2"
+    },
+    {
+      "ts": "2026-10-08T01:19:30Z",
+      "agent": "main-thread",
+      "kind": "note",
+      "text": "rc-10: the kind: merge entry above (job: reconcile) is rc-10's Reconciliation, logged by the rc-10 tail (JT.S4.T5, K4) after the candidate PR #285 review found it missing. Sources, from git, gh and the main session's transcripts (bfd58b2d and its subagents/). end: createdAt of the feature/0.5.0 push CI run 37684744207 (head 492cb18d9, success); the job landed in two merges, phase 1 (head d1c278764, push CI 37577177846 at 2026-10-07T05:36:47Z) and phase 2 (JR.S2..S13, last commit 492cb18d9). start: the author time of d39799381 (2026-10-06T23:05:51Z), the first own commit in the landed range; its committer time (2026-10-07T04:43:10Z) is a rebase instant (wall 964 on that basis; 433 counting phase 2 alone from cb667cbaa, 13:35:03Z). ritual_wait: end minus the author time of the last task commit 492cb18d9 (JR.S13.T1, 20:18:38Z), 29 min. dispatches: the main thread's Agent calls for the job, 34 (4 in phase 1, 30 in phase 2: 24 engineer or product-engineer calls and 6 reviewer calls); the 9 SendMessage follow-ups are not counted (43 with them); the backlog-intake calls and the PR #285 review (after end) are excluded. job_gate_runs: 2, both green, the worktree.py merge verify runs (phase 1 about 05:23Z, the landing run 20:35Z); the transcripts hold no scripts/ci.py job run on this tree, and the at least 11 worktree.py stage runs are a different gate, not counted; a lower bound. A merge at 18:11Z was refused by _check_stray before any verify run."
     }
   ]
 }
