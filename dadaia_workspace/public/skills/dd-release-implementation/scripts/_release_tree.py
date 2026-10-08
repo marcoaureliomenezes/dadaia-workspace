@@ -284,22 +284,11 @@ def _memory_record_error(state: dict[str, Any]) -> str:
     return ""
 
 
-def _on_principal(specs: Path) -> bool:
-    """HEAD is the branch the constitution's `gitflow:` line names `principal`; a detached HEAD,
-    an absent line or an unreadable one is not, so the window stays judged."""
-    try:
-        line = next(x for x in (specs / "constitution.md").read_text("utf-8").split("\n") if x.startswith("gitflow:"))  # fmt: skip
-        principal = json.loads(line[len("gitflow:") :])["principal"]
-    except (OSError, StopIteration, ValueError, KeyError, TypeError):
-        return False
-    head = subprocess.run(["git", "symbolic-ref", "--short", "HEAD"], cwd=specs.parent, capture_output=True, text=True, encoding="utf-8", errors="replace", check=False)  # fmt: skip
-    return head.returncode == 0 and head.stdout.strip() == principal
-
-
-def _window_findings(specs: Path) -> list[dict[str, Any]]:
+def _window_findings(specs: Path, principal: str = "") -> list[dict[str, Any]]:
     """CLOSURE: the latest memory entry names its window, is re-judged over its
     [since, until], and no atom's sources moved over [until, HEAD] — code after the
-    entry is unreconciled. Closed once HEAD is on the principal."""
+    entry is unreconciled. Closed once HEAD is on *principal*, the branch the caller passes
+    (core's gitflow reader); none given, or a detached HEAD, stays judged."""
     try:
         live = live_release(specs)
     except Refusal:
@@ -315,8 +304,9 @@ def _window_findings(specs: Path) -> list[dict[str, Any]]:
         return [finding(rel, 1, message, fix)]
     entry = [e for e in live.state["log"] if isinstance(e, dict) and e.get("kind") == "memory"][-1]
     until = str(entry["until"])
-    if _on_principal(specs):
-        return []  # promoted onto the principal: the window is closed
+    head = subprocess.run(["git", "symbolic-ref", "HEAD"], cwd=specs.parent, capture_output=True, text=True, encoding="utf-8", errors="replace", check=False)  # fmt: skip
+    if head.stdout.strip() == f"refs/heads/{principal}":
+        return []  # promoted onto the principal (none given or detached never matches)
     try:
         errors = memory_errors(specs, "CLOSURE", entry)
         errors += [f"atom {a['slug']!r} moved after the memory entry's until {until[:12]}: "
@@ -409,13 +399,13 @@ def tree_findings(specs: Path) -> list[dict[str, Any]]:
     return findings
 
 
-def check(specs: Path) -> list[dict[str, Any]]:
+def check(specs: Path, principal: str = "") -> list[dict[str, Any]]:
     """The ONE release validator (the doctor delegates here): the tree, the live
     candidate's Origin, then the live CLOSURE's memory record and bug balance block."""
     return (
         tree_findings(specs)
         + _origin_findings(specs)
-        + _window_findings(specs)
+        + _window_findings(specs, principal)
         + _balance_findings(specs)
     )
 

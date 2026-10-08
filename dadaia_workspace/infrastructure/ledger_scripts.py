@@ -27,6 +27,7 @@ from typing import Any, Protocol
 
 from dadaia_workspace.core.cli_line import fix_line, script_line
 from dadaia_workspace.core.doctor_rules import SectionFinding
+from dadaia_workspace.core.gitflow import read_gitflow
 from dadaia_workspace.core.workspace_resolver import own_workspace_root
 from dadaia_workspace.infrastructure.subprocess_runner import SubprocessProcessRunner
 
@@ -66,6 +67,9 @@ class LedgerScript:
     #: The script's own verb that re-derives a DERIVED ledger from its source — empty
     #: for a ledger of record, which no repair may rewrite.
     regenerate: tuple[str, ...] = ()
+    #: The `check` flag taking the principal branch `core.gitflow` reads — empty for a
+    #: script whose check has no branch to judge.
+    principal_flag: str = ""
 
     @property
     def code(self) -> str:
@@ -80,7 +84,9 @@ class LedgerScript:
 #: One row per ledger script (0.4.7 FR2's table). A new ledger is a row, never a branch.
 BUGS_SCRIPT = LedgerScript("BUGS", "dd-bug-resolution", "bugs.py")
 BACKLOG_SCRIPT = LedgerScript("BACKLOG", "dd-backlog-definition", "backlog.py")
-RELEASE_SCRIPT = LedgerScript("RELEASE", "dd-release-implementation", "release.py")
+RELEASE_SCRIPT = LedgerScript(
+    "RELEASE", "dd-release-implementation", "release.py", principal_flag="--principal"
+)
 AUDIT_SCRIPT = LedgerScript("FINDINGS", "dd-audit-project", "audit.py")
 MEMORY_SCRIPT = LedgerScript("MEMORY", "dd-spec-navigator", "memory.py", ("catalog", "generate"))
 #: Not a ledger: the worktrees' owner, read by `worktree_rows` alone (ADR 0135).
@@ -167,6 +173,8 @@ def script_findings(specs_dir: Path, runner: _Runner | None = None) -> list[Sect
             findings.append(_unrunnable(script, "is not installed"))
             continue
         argv = [sys.executable, str(path), "check", "--specs", str(specs_dir), "--json"]
+        if script.principal_flag:
+            argv += [script.principal_flag, read_gitflow(specs_dir)[0].principal]
         try:
             result = process.run(argv, cwd=specs_dir.parent, timeout=_TIMEOUT_SECONDS)
         except (OSError, TimeoutError) as exc:

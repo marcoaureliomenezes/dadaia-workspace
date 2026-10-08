@@ -24,7 +24,6 @@ _YAML = "---\ngitflow:\n  principal: trunk\n  integration: develop\n  work: feat
 _NONE = "---\nconstitution_version: 1.0.0\n---\n"
 
 
-@pytest.mark.xfail(strict=True, reason="the skill parses the gitflow line itself")
 @pytest.mark.parametrize(("constitution", "principal"), [(_YAML, "trunk"), (_NONE, "main")])
 def test_the_window_is_closed_on_the_principal_core_reads(
     script: Path,  # noqa: F811
