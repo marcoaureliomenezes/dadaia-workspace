@@ -46,7 +46,6 @@ Paths are relative to the repo root; aliases as in `PLAN.md` (`f/`, `pub/`, `S/`
 | JE.S4.T2 | AC10.2 | `specs/releases/0.5.0/_RELEASE.json` (K2, the closure narrative `log` entries: `summary`, `size`, `drifts`, `artifact-gc` (doctor dry, then `--fix`), `test-dispositions`, `dispositions`; the tail's `kind: merge` entry) | `release.py check` exit 0 |
 | JE.S4.T3 | — | this file | close task, last: `test-audit:`, `mutation:` lines; the job's `done` line |
 
-- done: rc-10 job encoding — every task of JE.S1 to JE.S4 landed on `wt/0.5.0-rc10/encoding`; `release-check-skips-a-rebased-away-until` (REBUILD of `_window_findings`) and `subprocess-text-encoding-has-no-guard` (guard v41, its scripts/ half committed on the work branch as d731bc911 by authorized operator act) are resolved, so rc-10 holds 0 open and 0 deferred bugs; the memory pass, the closure narrative and the artifact GC are logged; closed by JE.S4.T3.
 
 ## Stage JE.S5 — RED (bug `release-check-parses-the-gitflow-in-the-skill`)
 
@@ -73,3 +72,5 @@ Paths are relative to the repo root; aliases as in `PLAN.md` (`f/`, `pub/`, `S/`
 |---|---|---|---|
 | JE.S7.T1 | AC10.1 | `specs/memory/QUALITY.md` (`## Bugs` by `bugs.py balance --write`), `specs/memory/product/platform/workspace-doctor.md` (the release script's check takes the principal), `specs/memory/product/catalog.json`, `specs/memory/product/index.md`, the derived docs of a changed atom, `specs/releases/0.5.0/_RELEASE.json` (the memory entry by `release.py memory`) | `release.py check` exit 0, `tests/contract/test_docs_derived_from_memory.py` |
 | JE.S7.T2 | — | this file | close task, last: `test-audit:`, `mutation:` lines; the job's `done` line |
+
+- done: rc-10 job encoding — every task of JE.S1 to JE.S7 landed on `wt/0.5.0-rc10/encoding`; `release-check-skips-a-rebased-away-until`, `subprocess-text-encoding-has-no-guard` (guard v41, its scripts/ half committed on the work branch as d731bc911 by authorized operator act) and `release-check-parses-the-gitflow-in-the-skill` (registered on the work branch as a1343aaec, the job rebased onto it by operator ruling) are resolved, so rc-10 holds 0 open and 0 deferred bugs; one memory entry covers the job; the closure narrative, its note and the artifact GC are logged; closed by JE.S7.T2.
