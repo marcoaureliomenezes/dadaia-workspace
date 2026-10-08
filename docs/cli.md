@@ -40,7 +40,7 @@
 
 ## dadaia public — Manage distributed public agent assets.
 - public doctor — Diagnose drift between package source, staging, and runtime projections.
-- public install — Install staged public assets into runtime projections.
+- public install — Stage the packaged public assets, then install them into runtime projections.
 - public stage — Stage packaged public assets into .dadaia/agentic/.
 
 ## dadaia reconcile — Reconcile state and projections after installing an exact candidate wheel.
