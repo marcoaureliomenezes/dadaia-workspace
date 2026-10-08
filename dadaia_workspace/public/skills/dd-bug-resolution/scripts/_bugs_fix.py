@@ -9,7 +9,8 @@ Derived from git on every call, never stored, in two steps.
   exact subject; a tie: the nearest), and undoing a revert flips the whole chain beneath
   it. A live shape-3, shape-4 or REBUILD subject then links its ids — a class commit the
   ids on its body lines — to itself or, for shape 4's `by <task-id>`, to the commits whose
-  subjects carry that task id (a rebase rewrites a sha, never the id).
+  subjects carry that task id (a rebase rewrites a sha, never the id) inside the record's
+  `found_in` rc window: its `defined` milestone to the next rc's, in the release state.
 - Diff: every linked sha's numstat; its production paths are its fix surface. A later
   live REBUILD (planned) or `fix(...)` commit, a bug's or a task's (overfitting), removing
   a line a fix wrote (`git blame` of its removed lines names the fix sha) is its rework.
@@ -18,6 +19,7 @@ Derived from git on every call, never stored, in two steps.
 from __future__ import annotations
 
 import functools
+import json
 import re
 import subprocess
 import tempfile
@@ -27,7 +29,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import NamedTuple
 
-from _bugs_store import Refusal
+from _bugs_check import HISTO, LEDGER
+from _bugs_store import Refusal, read_records
 
 #: Shapes 3, 4 and a REBUILD share one id list; shape 4 names its task as `by <task-id>` and may
 #: cite its commits as `(<sha>[, <sha>])`.
@@ -147,18 +150,32 @@ def _history(specs: Path) -> list[tuple[str, str]]:
     return [(sha, subject) for sha, _, subject in (line.partition(" ") for line in out.splitlines())]  # fmt: skip
 
 
-def _tasks(history: list[tuple[str, str]]) -> dict[str, list[str]]:
+def tasked(specs: Path) -> dict[str, list[str]]:
+    """Task id -> the shas of its `<type>(<task-id>)` commits on HEAD, oldest first: the ONE reader
+    of a task's commits, by the id their subjects carry, which a rebase keeps and a sha does not."""
     found: dict[str, list[str]] = {}
-    for sha, subject in history:
+    for sha, subject in _history(specs):
         if task := _TASK.match(subject):
             found.setdefault(task["task"], []).append(sha)
     return found
 
 
-def tasked(specs: Path) -> dict[str, list[str]]:
-    """Task id -> the shas of its `<type>(<task-id>)` commits on HEAD, oldest first: the ONE reader
-    of a task's commits, by the id their subjects carry, which a rebase keeps and a sha does not."""
-    return _tasks(_history(specs))
+def _window(specs: Path, order: list[str]) -> Callable[[str, str], list[str]]:
+    """(bug id, task id) -> the task's commits inside the bug's `found_in` rc window: its `defined`
+    milestone (the release state's log) to the next one; all of HEAD without a milestone."""
+    found = {r["id"]: r["found_in"] for p in (LEDGER, HISTO) for r in read_records(specs / p) if r.get("found_in")}  # fmt: skip
+    tasks = tasked(specs)
+
+    def commits(bug: str, task: str) -> list[str]:
+        rel = found.get(bug) or {}
+        log = [e for p in specs.glob(f"releases/**/{rel.get('release')}/_RELEASE.json") for e in json.loads(p.read_text(encoding="utf-8"))["log"]]  # fmt: skip
+        starts = {e["candidate"]: order.index(f) for e in log if e.get("milestone") == "defined" for f in _full(e["sha"], order)}  # fmt: skip
+        if rel.get("rc") not in starts:
+            return tasks.get(task, [])
+        end = min((i for i in starts.values() if i > starts[rel["rc"]]), default=len(order))
+        return [s for s in tasks.get(task, []) if starts[rel["rc"]] <= order.index(s) < end]
+
+    return commits
 
 
 def _revert(log: list[_Commit]) -> None:
@@ -178,7 +195,7 @@ def _revert(log: list[_Commit]) -> None:
             target.live, target = not target.live, target.undid
 
 
-def _named(log: list[_Commit], tasks: dict[str, list[str]], order: list[str]) -> dict[str, list[str]]:  # fmt: skip
+def _named(log: list[_Commit], tasks: Callable[[str, str], list[str]], order: list[str]) -> dict[str, list[str]]:  # fmt: skip
     """Link step 2, newest first: bug id -> the shas its live subject names. A shape-4 resolve
     names refs, its `by <task-id>` first, then the shas it cites; the first ref that names commits
     wins (a task id a rebase keeps, a sha it drops)."""
@@ -187,10 +204,10 @@ def _named(log: list[_Commit], tasks: dict[str, list[str]], order: list[str]) ->
         link = _LINK.match(commit.subject)
         if link is None:
             continue
-        refs = (tasks.get(m[1]) or [] if m[1] else [f for r in m[2].split(", ") for f in _full(r, order)] for m in _REF.finditer(link[3]))  # fmt: skip
-        shas = next(filter(None, refs), []) if link[1].startswith("chore") else [commit.sha]
         ids = [ln.strip() for ln in commit.body.splitlines() if _BODY_ID.fullmatch(ln.strip())] if link[2].startswith("class ") else link[2].split(", ")  # fmt: skip
         for bug in ids:
+            refs = (tasks(bug, m[1]) if m[1] else [f for r in m[2].split(", ") for f in _full(r, order)] for m in _REF.finditer(link[3]))  # fmt: skip
+            shas = next(filter(None, refs), []) if link[1].startswith("chore") else [commit.sha]
             named.setdefault(bug, []).extend(shas)
     return named
 
@@ -214,7 +231,7 @@ def fixes(specs: Path) -> dict[str, Fix]:
     log = _parse(git(specs, "log", "--reverse", "-E", *_GREP, "--name-only", _FORMAT))
     _revert(log)
     order = [sha for sha, _ in history]
-    named = _named(log, _tasks(history), order)
+    named = _named(log, _window(specs, order), order)
     by_sha = _shown(specs, log, {s for shas in named.values() for s in shas})
     links = {bug: list(dict.fromkeys(shas)) for bug, shas in named.items() if shas}
     prod = own(specs, {r[-1] for shas in links.values() for s in shas for r in by_sha[s].rows})

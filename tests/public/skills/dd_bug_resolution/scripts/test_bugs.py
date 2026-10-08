@@ -1696,7 +1696,6 @@ def test_the_bugs_check_and_freeze_task_ids_are_one_grammar() -> None:
     assert re.sub(r"\(\?P<\w+>|\)|\\b", "", freeze._ID.pattern) == check.TASK_ID
 
 
-@pytest.mark.xfail(strict=True, reason="bug-fix-links-a-task-id-across-rcs")
 def test_fix_links_a_resolve_by_task_to_the_commits_of_the_records_rc_only(
     script: Path, tmp_path: Path
 ) -> None:
