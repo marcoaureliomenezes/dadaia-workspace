@@ -117,6 +117,7 @@ The governing product philosophy is Features × Futures: a feature or fix spends
   - `dadaia_workspace/public/skills/dd-release-implementation/SKILL.md`
   - `dadaia_workspace/public/skills/dd-spec-navigator/SKILL.md`
 - AC7.4 (unit): When the public context map describes worktrees after rc-11, `dadaia_workspace/public/data/CONTEXT-MAP.md` must describe the plain path and the surviving job/task gates without the retired three-level model.
+- AC7.5 (unit and reviewer source sweep): The complete additional AI-entity ecosystem source write set is `dadaia_workspace/public/entities/registry.json` and these disclosed siblings: `dadaia_workspace/public/skills/dd-audit-project/FINDINGS-FORMAT.md`, `dadaia_workspace/public/skills/dd-audit-project/PILLAR-BUGS.md`, `dadaia_workspace/public/skills/dd-audit-project/PILLAR-SPECS.md`, `dadaia_workspace/public/skills/dd-bug-resolution/LINEAGE.md`, `dadaia_workspace/public/skills/dd-gitflow-default/CICD-AUTOMATION.md`, `dadaia_workspace/public/skills/dd-release-implementation/MEMORY-UPDATE.md`, `dadaia_workspace/public/skills/dd-release-implementation/RC-FLOW.md`, and `dadaia_workspace/public/skills/dd-release-implementation/RELEASE-EVENTS.md`. Their owning jobs must update the corresponding behavioral contract tests, including `tests/core/test_atomic_write__core_file_io_purity.py`, `tests/core/test_handoff_index__handoff_schema_contract.py`, and `tests/infrastructure/test_public_assets__public_scripts_thin_wrapper.py`; adding another AI-entity source or disclosed sibling requires returning this Draft to the operator. Generated runtime projections remain outside every task write set and are changed only by stage/install from these sources.
 
 ### FR8 — hook and push-gate deletion
 
@@ -149,17 +150,17 @@ Approval of this SPEC authorizes the main thread to record these exact rulings; 
 3. Amend ADRs 0190 and 0211 by deleting task and stage gate levels; retain one review per job and the task as dispatch unit.
 4. Amend ADR 0206 with AC4.2 and delete the mandatory bug batch.
 5. Amend ADR 0207 only for the retired `verify-task:`/`verify-stage:` levels; preserve the work branch's `verify:` authority.
-6. Withdraw ADR 0208 and delete the bug-balance surface.
-7. Supersede ADR 0209's freeze with the two-dispatch TDD separation; amend ADR 0216 to delete its freeze and balance halves while preserving the mandatory reviewer verdict.
+6. Accept a new successor ADR that supersedes accepted ADR 0208 and deletes the bug-balance surface; ADR 0208 remains immutable history and is never withdrawn or rewritten.
+7. Accept a new successor ADR that supersedes accepted ADR 0209's freeze with the two-dispatch TDD separation; amend ADR 0216 to delete its freeze and balance halves while preserving the mandatory reviewer verdict.
 8. Accept proposed ADRs 0223 and 0227 together with AC4.6 and their one-time migrations.
 9. Reject proposed ADRs 0224 and 0226: the freeze and own-judge refusal they extend are retired.
 10. Accept a new ADR for the Features × Futures constitution principle.
-11. Record Q21 as replacing rejected ADR 0012's hash implementation, retire QUALITY P-29, and amend ARCHITECTURE P-17 to keep structural ownership without `hash_tuple`.
+11. Accept one new Q21 ADR authorizing both canonical-memory changes: delete QUALITY P-29 and replace ARCHITECTURE P-17 with structural registry, grant, ownership and source/projection checks that carry no content hash or `hash_tuple`. The new record has no `supersedes` or `amends` target: ADR 0012 is rejected and must not be superseded, while P-17 names no prior ADR. The accepted Q21 ADR is the sole decision cited by both changed principles in their shared commit.
 
 ### Delivery constraints
 
 - The PLAN's estimated critical path is bounded at 7.8 hours and must also disclose aggregate agent-hours, measured baseline inputs, uncertainty and contingency. If the estimate does not fit, the SPEC stays Draft and the operator chooses the subset; estimates must not be compressed to manufacture compliance.
-- Job 1 contains the dependency kernel, removes merge-time weight and lands every authorized AGENTS.md/SKILL.md source plus CI, worktree, hook and push-gate changes. Jobs 2 (bugs/audits) and 3 (release model) wait for Job 1; Job 4 (hashes/memory) may run beside it. If Job 1 exceeds 3.5 estimated hours, scope is cut before adding work; no fifth implementation job is added silently.
+- The candidate has exactly four implementation jobs. Job 1 contains the dependency kernel, removes merge-time weight and lands every authorized AGENTS.md/SKILL.md source plus CI, worktree, hook and push-gate changes; it lands before another job. The PLAN owns every later semantic dependency and may claim parallel execution only for jobs whose complete consumers, tests and write sets are independent. No fifth implementation job or changed edge is added silently.
 - Job 1 is the sole bootstrap artifact allowed to use the current stageful grammar because the current validator cannot accept its own replacement. After Job 1 merges, every subsequently opened job/task file uses the stage-free grammar; this transition does not preserve a stage writer.
 - Every production behaviour follows test-first separation; each job receives one reviewer verdict.
 - `J<n>.S<m>.T<k>` remains readable only for historical records. No writer emits it after rc-11.
@@ -177,4 +178,4 @@ Approval of this SPEC authorizes the main thread to record these exact rulings; 
 
 ## 6. Open questions
 
-None. The Draft PLAN estimates a 5–7.5 hour critical path and 8.5–13 aggregate agent-hours from its task ranges and DAG, cites the measured 76-second fast-check baseline, and makes the uncertainty explicit. Its upper critical-path estimate fits the operator's 7.8 estimated wall-clock-hour cap with about 18 minutes of contingency; any expansion returns the candidate to Draft for scope reduction.
+No product-behaviour question remains after Q1–Q23. The revised PLAN derives a 4.5–6.9-hour critical path and 8.2–12.6 aggregate agent-hours from every task, gate/review, dependency and reconciliation act; its upper path preserves 0.9 hour inside the operator's 7.8-hour cap. This SPEC remains Draft for the operator's governance rulings and independent definition review; any new edge or write outside the listed sets returns it to Draft arithmetic and, if the upper path exceeds the cap, requires an explicit operator choice of the requirement cluster that moves to rc-12.
