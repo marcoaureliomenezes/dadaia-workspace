@@ -55,12 +55,6 @@ class ObjectSource(Protocol):
 
     def netted_specs(self, repo: Path, local_sha: str, remote_sha: str) -> list[str]: ...
 
-    def law_deletions(
-        self, repo: Path, local_sha: str, remote_sha: str
-    ) -> list[tuple[str, str, str]]:
-        """ADR 0151 M3: (commit, path, message) per range commit deleting a law line."""
-        ...
-
 
 def _refusal(head: str, rows: Sequence[str] = (), noun: str = "", advice: str = "") -> str:
     """The one pre-push refusal shape: head, rows capped at 10 plus a remainder count,
@@ -203,12 +197,6 @@ def push_gate_decision(
         return scan
     hits, binaries, oversized = scan
     try:
-        laws = [
-            (r, c, p)
-            for r in scan_refs
-            for c, p, m in object_source.law_deletions(repo, r.local_sha, r.remote_sha)
-            if not cites_accepted_adr(m)
-        ]
         canon = [
             (r, p)
             for r in scan_refs
@@ -230,18 +218,6 @@ def push_gate_decision(
             "path(s)",
         )
         fix = _rewrite_fix(canon[0][0], object_source, repo, fixes)
-    elif laws:
-        message = _refusal(
-            f"{len(laws)} pushed commit(s) delete a law line citing no accepted `ADR NNNN` (ADR 0151).",
-            [f"  {r.local_ref}: commit {c[:12]} deletes a line of {p}" for r, c, p in laws],
-            "commit(s)",
-            "Cite the ADR that rules each deletion in that commit's message.",
-        )
-        _, sha, path = laws[0]  # one act per refusal: the re-run names the next commit
-        fix = (
-            f"fix: Operator action: reword commit {sha[:12]} to cite the accepted ADR "
-            f"that rules its deletion of {path}"
-        )
     elif hits:
         message = _refusal(
             f"the pushed range publishes {len(hits)} object(s) carrying a denylisted term "

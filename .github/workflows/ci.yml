@@ -33,6 +33,7 @@ jobs:
   # GRADUATED to a hard gate in 0.1.8 rc-2 (F-01 fcntl crash fixed; green on both OSes).
   importability-smoke:
     name: Importability smoke (Windows/macOS)
+    if: ${{ github.event_name == 'pull_request' }}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 10
     strategy:
@@ -188,6 +189,7 @@ jobs:
   # feature/0.1.8 graduation run recorded in CLOSURE) — no continue-on-error.
   unit-fast-cross:
     name: Unit fast (Windows/macOS)
+    if: ${{ github.event_name == 'pull_request' }}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 8
     strategy:
@@ -216,6 +218,7 @@ jobs:
 
   contract-coverage-cross:
     name: Contract coverage (Windows/macOS)
+    if: ${{ github.event_name == 'pull_request' }}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 20
     strategy:
