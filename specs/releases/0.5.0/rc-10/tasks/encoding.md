@@ -47,3 +47,19 @@ Paths are relative to the repo root; aliases as in `PLAN.md` (`f/`, `pub/`, `S/`
 | JE.S4.T3 | — | this file | close task, last: `test-audit:`, `mutation:` lines; the job's `done` line |
 
 - done: rc-10 job encoding — every task of JE.S1 to JE.S4 landed on `wt/0.5.0-rc10/encoding`; `release-check-skips-a-rebased-away-until` (REBUILD of `_window_findings`) and `subprocess-text-encoding-has-no-guard` (guard v41, its scripts/ half committed on the work branch as d731bc911 by authorized operator act) are resolved, so rc-10 holds 0 open and 0 deferred bugs; the memory pass, the closure narrative and the artifact GC are logged; closed by JE.S4.T3.
+
+## Stage JE.S5 — RED (bug `release-check-parses-the-gitflow-in-the-skill`)
+
+- Contract: exit tests the rows below; `release.py check` on the principal without `--principal` refuses (passes on arrival, no marker); the doctor path (`script_findings`) over a YAML `gitflow:` block and over a constitution with none (the default principal) shows no `LEDGER-RELEASE-SCHEMA` window finding after a squash promote and an atom move (strict xfail); envelope `tests/**`; ACs AC9.1
+
+| task | AC | `W:` | owner tests / RED |
+|---|---|---|---|
+| JE.S5.T1 | AC9.1 | `tests/public/skills/dd_release_implementation/scripts/test_release.py` (one new row, no marker), `tests/infrastructure/test_ledger_scripts__release_window_principal.py` (new file, two parametrized rows) | the doctor rows strict xfail; the no-`--principal` row passes on arrival |
+
+## Stage JE.S6 — the REBUILD (a barrier after JE.S5)
+
+- Contract: exit tests JE.S5 green, the JE.S1 rows green through `--principal`, unit + integration green, `python scripts/guards/run.py`; envelope the units the row names; ACs AC9.1
+
+| task | AC | `W:` | owner tests / RED |
+|---|---|---|---|
+| JE.S6.T1 | AC9.1 | `dadaia_workspace/public/skills/dd-release-implementation/scripts/_release_tree.py` (`_on_principal` deleted; `_window_findings` and `check` take the principal), `dadaia_workspace/public/skills/dd-release-implementation/scripts/release.py` (`check --principal`), `dadaia_workspace/infrastructure/ledger_scripts.py` (a `LedgerScript` row field naming the flag; the value from `core.gitflow.read_gitflow`), `tests/public/skills/dd_release_implementation/scripts/test_release.py` (the JE.S1 rows and the two frozen JT.S1.T4 rows pass `--principal`; `_declare_principal` leaves), `tests/infrastructure/test_ledger_scripts__release_window_principal.py` (marker leaves) | its JE.S5.T1 rows. One `refactor(bugs): release-check-parses-the-gitflow-in-the-skill — REBUILD _window_findings: …` commit. Lineage: cc544f66e, d1e29503b, b50f0c971, 73983ae3c, dd5399f08, 2c7369c9a, 7e05b3148. Decider: `core.gitflow.read_gitflow` (ADR 0144), the skill reads no constitution. Gate change: hand mutants, adversary rows. Net ≤ 0 over `_release_tree.py` |
