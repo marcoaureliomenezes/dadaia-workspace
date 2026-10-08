@@ -23,7 +23,7 @@ from _specs import quote, script, with_specs  # noqa: E402
 CODE = "LEDGER-BUGS-SCHEMA"
 LEDGER = "bugs/BUGS.jsonl"
 HISTO = "bugs/_archive/bugs_histo.jsonl"
-#: The job files' task id; `_worktree_freeze._ID` keeps its twin, pinned equal by a parity test.
+#: The job files' task id.
 TASK_ID = r"J[\dA-Z]+\.S\d+\.T\d+"
 TERMINAL = ("resolved", "superseded", "deferred", "rejected")
 _VERBS, _LAW = (

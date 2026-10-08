@@ -355,10 +355,6 @@ _Avoid_: closed surface
 A number `## Bugs` prints at each closure, blocking nothing.
 _Avoid_: gate, threshold
 
-**RED anchor**:
-The sha closing a job's RED stage; after it the job's tests are frozen.
-_Avoid_: red tag
-
 **Implement**:
 One rc's run, a DAG of jobs; not a file.
 

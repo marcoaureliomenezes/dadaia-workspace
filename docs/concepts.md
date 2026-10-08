@@ -42,7 +42,7 @@ moves only at an operator-approved deploy.
 ## The flow
 
 <!-- derived-from: release-lifecycle sha256:7b50f03ee3e9 -->
-<!-- derived-from: bug-ledger sha256:a3df43b6e94e -->
+<!-- derived-from: bug-ledger sha256:e077e8f27f88 -->
 <!-- derived-from: audits-canon sha256:611e3746cfd5 -->
 
 Every demand takes one of two arms. **Arm A**, a feature, leaves through a candidate:
@@ -91,7 +91,7 @@ the warnings `MEM-DRIFT-1` (features package map vs the live tree) and `MEM-DRIF
 
 ## Bugs and backlog
 
-<!-- derived-from: bug-ledger sha256:a3df43b6e94e -->
+<!-- derived-from: bug-ledger sha256:e077e8f27f88 -->
 <!-- derived-from: backlog-ledger sha256:44b145a6a3aa -->
 
 Both are records with one shape and one writer script. `specs/bugs/BUGS.jsonl` holds

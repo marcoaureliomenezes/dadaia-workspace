@@ -419,7 +419,7 @@ def test_a_declared_verify_line_runs_as_argv_never_through_a_shell(root: Path) -
     commit(
         root / "repos/r",
         "AGENTS.md",
-        line + "verify-task: python scripts/ci.py task\ntests: tests/**\n",
+        line + "verify-task: python scripts/ci.py task\n",
     )
     git(root / TREE, "merge", "-q", "--ff-only", "feature/0.5.0")
     head = land(root, "src/a.py")
@@ -445,7 +445,6 @@ def test_a_task_lands_on_its_job_branch_after_the_task_gate_with_no_verdict(root
     git(task, "rm", "-q", "RED-task")
     git(task, "commit", "-qm", "green")
     commit(task, "src/a.py")
-    git(task, "commit", "-q", "--amend", "--no-edit", "--trailer", "Owner-tests: tests/test_r.py")
     sha = git(task, "rev-parse", "HEAD").strip()
     landed = run(root, "merge", str(task))
     assert landed.returncode == 0, landed.stderr
@@ -457,8 +456,8 @@ def test_a_task_lands_on_its_job_branch_after_the_task_gate_with_no_verdict(root
     )  # fmt: skip
 
 
-def _task_commit(root: Path, *trailers: str, rm: str = "", add: str = "src/b.py") -> Path:
-    """Open `TASK`, delete *rm*, write *add*, commit with *trailers*; return the task tree."""
+def _task_commit(root: Path, rm: str = "", add: str = "src/b.py") -> Path:
+    """Open `TASK`, delete *rm*, write *add*, commit; return the task tree."""
     task = root / "worktrees/r" / TASK
     assert run(root, "new", "r", TASK).returncode == 0
     if rm:
@@ -466,27 +465,17 @@ def _task_commit(root: Path, *trailers: str, rm: str = "", add: str = "src/b.py"
     (task / add).parent.mkdir(parents=True, exist_ok=True)
     (task / add).write_text("y = 1\n")
     git(task, "add", add)
-    git(task, "commit", "-qm", "J1.S1.T1 work", *(a for t in trailers for a in ("--trailer", t)))
+    git(task, "commit", "-qm", "J1.S1.T1 work")
     return task
 
 
-def test_the_task_gate_skips_deleted_files_and_appends_owner_tests(root: Path) -> None:
-    """J1.S3.T14: a deleted path never reaches `verify-task:`; `Owner-tests:` trailer paths do."""
+def test_the_task_gate_skips_deleted_files(root: Path) -> None:
+    """J1.S3.T14: a deleted path never reaches `verify-task:`."""
     land(root, "src/a.py")
-    land(root, "tests/test_a.py", "")
-    _task_commit(root, "Owner-tests: tests/test_a.py src/b.py", rm="src/a.py")
+    _task_commit(root, rm="src/a.py")
     landed = run(root, "merge", f"worktrees/r/{TASK}")
     assert landed.returncode == 0, landed.stderr
-    assert "ci task src/b.py tests/test_a.py" in landed.stdout.splitlines()
-
-
-def test_a_missing_owner_test_refuses_with_one_fix_line(root: Path) -> None:
-    """J1.S3.T14: an `Owner-tests:` path absent from the tree refuses, one fix line."""
-    _task_commit(root, "Owner-tests: tests/test_gone.py")
-    refused = run(root, "merge", f"worktrees/r/{TASK}")
-    assert refused.returncode == 1 and "tests/test_gone.py" in refused.stderr
-    lines = refused.stderr.splitlines()
-    assert len([ln for ln in lines if ln.startswith(("fix: ", "Operator action: "))]) == 1
+    assert "ci task src/b.py" in landed.stdout.splitlines()
 
 
 def test_a_task_cannot_rewrite_its_own_gate(root: Path) -> None:
@@ -499,33 +488,6 @@ def test_a_task_cannot_rewrite_its_own_gate(root: Path) -> None:
     landed = run(root, "merge", f"worktrees/r/{TASK}")
     assert landed.returncode == 0, landed.stderr
     assert "ci task AGENTS.md" in landed.stdout.splitlines()
-
-
-@pytest.mark.parametrize(
-    ("add", "trailers", "code"),
-    [("src/b.py", (), 1), ("tests/test_b.py", (), 0), ("docs/b.md", (), 0),
-     ("src/b.py", ("Owner-tests: src/b.py",), 1),
-     ("src/b.py", ("Owner-tests: tests/test_r.py",), 0)],
-)  # fmt: skip
-def test_a_code_task_without_owner_tests_refuses_with_one_fix_line(
-    root: Path, add: str, trailers: tuple[str, ...], code: int
-) -> None:
-    """LOW 2: a task touching non-test `.py` with no `Owner-tests:` trailer runs no tests."""
-    task = _task_commit(root, *trailers, add=add)
-    result = run(root, "merge", f"worktrees/r/{TASK}")
-    assert result.returncode == code, result.stderr
-    if code:
-        assert fixes(result) == [
-            f"fix: Operator action: name the task's owner tests in an Owner-tests: trailer on its commits in {task}"
-        ]
-
-
-def test_a_code_task_whose_touched_test_feeds_its_gate_lands(root: Path) -> None:
-    """LOW 4: a touched `test_` file is in the gate's argv, so no trailer is needed."""
-    commit(_task_commit(root, add="tests/test_b.py"), "src/b.py")
-    landed = run(root, "merge", f"worktrees/r/{TASK}")
-    assert landed.returncode == 0, landed.stderr
-    assert "ci task src/b.py tests/test_b.py" in landed.stdout.splitlines()
 
 
 def test_the_stage_gate_runs_the_work_branch_verify_stage_line(root: Path) -> None:
@@ -561,15 +523,15 @@ def test_a_task_gate_line_absent_or_unstartable_refuses_with_a_fix_that_clears_i
     operator act on that tracked line, never a traceback, and doing that act lands the task."""
     repo, agents = root / "repos/r", root / "repos/r/AGENTS.md"
     line = f"verify-task: {declared}\n" if declared else ""
-    commit(repo, "AGENTS.md", "verify: python scripts/ci.py job\ntests: tests/**\n" + line)
-    task = _task_commit(root, "Owner-tests: tests/test_r.py")
+    commit(repo, "AGENTS.md", "verify: python scripts/ci.py job\n" + line)
+    task = _task_commit(root)
     refused = run(root, "merge", str(task))
     assert refused.returncode == 1 and "Traceback" not in refused.stderr
     tail = (" and commit it on feature/0.5.0" if not declared else
             " on feature/0.5.0 one argv list that starts: it runs without a shell"
             " — no VAR=value prefix, no sh -c")  # fmt: skip
     assert fixes(refused) == [f"fix: Operator action: {act} {agents}{tail}"]
-    commit(repo, "AGENTS.md", "verify-task: python scripts/ci.py task\ntests: tests/**\n")
+    commit(repo, "AGENTS.md", "verify-task: python scripts/ci.py task\n")
     landed = run(root, "merge", str(task))
     assert landed.returncode == 0, landed.stderr
 
@@ -610,7 +572,7 @@ def test_no_tree_edits_the_script_its_own_gate_runs(root: Path, level: str) -> N
     """ADR 0207: a range touching a path the work branch's declared line names refuses, naming
     the one act: commit that path on the work branch — a tree never picks its judge."""
     job = root / TREE
-    task = _task_commit(root, "Owner-tests: tests/test_r.py", add="scripts/ci.py")
+    task = _task_commit(root, add="scripts/ci.py")
     if level == "job":  # arrives by a hand merge: the task gate never saw it
         git(job, "merge", "-q", "--ff-only", "wt/0.5.0-rc1/j1--J1.S1.T1")
         assert run(root, "clean", str(task)).returncode == 0  # its tree is empty now
@@ -632,23 +594,13 @@ def test_no_tree_edits_a_module_the_script_its_own_gate_runs_imports(root: Path)
     ci = "import sys\nfrom ci_steps import run\nprint('ci', *sys.argv[1:])\nsys.exit(run(sys.argv[1]))\n"
     commit(repo, "scripts/ci.py", ci)
     git(root / TREE, "merge", "-q", "--ff-only", "feature/0.5.0")
-    task = _task_commit(root, "Owner-tests: tests/test_r.py", add="scripts/ci_steps.py")
+    task = _task_commit(root, add="scripts/ci_steps.py")
     refused = run(root, "merge", str(task))
     assert refused.returncode == 1 and "Traceback" not in refused.stderr
     assert fixes(refused) == [
         "fix: Operator action: commit scripts/ci_steps.py on feature/0.5.0"
         " — no tree edits its own judge (ADR 0207)"
     ]
-
-
-def test_a_code_task_names_its_owner_tests_by_any_convention(root: Path) -> None:
-    """A task's test file need not be `test_`-prefixed: the repo's `verify-task:` line judges
-    which tests ran, so a pytest `*_test.py` owner lands."""
-    land(root, "tests/b_test.py", "")
-    _task_commit(root, "Owner-tests: tests/b_test.py", add="src/b.py")
-    landed = run(root, "merge", f"worktrees/r/{TASK}")
-    assert landed.returncode == 0, landed.stderr
-    assert "ci task src/b.py tests/b_test.py" in landed.stdout.splitlines()
 
 
 def test_a_tests_line_after_a_utf8_bom_is_declared(tmp_path: Path) -> None:
@@ -696,35 +648,6 @@ def test_a_tests_line_after_a_bom_is_declared_whatever_codepage_text_decoding_de
     assert declared == "x/**"
 
 
-@pytest.mark.parametrize(
-    ("law", "declared"),
-    [
-        (b"# law\ntests: x/**\n", True),
-        (b"# law\nverify: make test\n", False),
-        (b"\xef\xbb\xbftests: x/**\n", True),
-        (b"# law\r\ntests: x/**\r\n", True),
-    ],
-    ids=["present", "absent", "bom", "crlf"],
-)
-def test_the_merge_and_onboarding_readers_judge_a_tests_line_alike(
-    tmp_path: Path, law: bytes, declared: bool
-) -> None:
-    """tests-line-predicate-lives-in-two-readers: `_worktree_end._declared` (the merge freeze) and
-    `canon.declare_tests_line` (onboarding appends only when undeclared) agree on shared fixtures."""
-    from dadaia_workspace.features.specs import canon
-
-    (tmp_path / "a").mkdir()
-    end = _law_end(tmp_path / "a", law)
-    other = tmp_path / "b"
-    other.mkdir()
-    (other / "AGENTS.md").write_bytes(law)
-
-    merge_sees = end._declared(tmp_path / "a", "work", "tests:") != ""
-    onboarding_leaves_alone = canon.declare_tests_line(other) == []
-
-    assert merge_sees == onboarding_leaves_alone == declared
-
-
 def test_git_output_decoded_with_replacement_keeps_a_latin1_laws_tests_line_declared(
     tmp_path: Path,
 ) -> None:
@@ -734,7 +657,6 @@ def test_git_output_decoded_with_replacement_keeps_a_latin1_laws_tests_line_decl
     assert end._declared(tmp_path, "work", "tests:") == "tests/**"
 
 
-@pytest.mark.xfail(strict=True, reason="freeze-deadlocks-a-repo-without-a-tests-line")
 def test_a_repo_declaring_only_verify_lines_lands_a_task_and_its_job(root: Path) -> None:
     """freeze-deadlocks-a-repo-without-a-tests-line: the three verify lines are the whole law a
     task and a job merge read; a repo declaring nothing else lands both."""

@@ -27,7 +27,6 @@ An rc is an Implement: a DAG of jobs the PLAN draws, Job 1 first, the Reconcilia
 - Done when: the tree exists.
 
 **Step 2 — Stages and tasks.**
-- Stage 1 writes every acceptance test RED, each failing by assertion and carrying the repo's RED marker; each later stage turns its rows green by deleting that marker line alone — past the RED stage's close a test is never edited (`worktrees/AGENTS.md` §2).
 - Each task commits under its id and lands by `WT merge` after its task gate; each stage closes by `WT stage`.
 - Done when: the last stage closed green and the close task wrote the job file's `done`.
 

@@ -49,10 +49,6 @@ Fill these in during onboarding:
 
 - Agents should prefer these commands over guessing toolchains.
 
-Declare this repo's test paths, one line of space-separated globs (a language-neutral default; narrow it to this repo's own) — the worktree merge freezes them from the RED stage on and refuses every merge while the line is empty (`worktrees/AGENTS.md` §2):
-
-tests: **/tests/** **/test/** **/spec/** **/__tests__/** **/*.Tests/** **/androidTest/** **/test_*.* **/*_test.* **/*_spec.* **/*.test.* **/*.spec.*
-
 ## 5. Tree hygiene
 
 - This tree carries source and its own artifacts only — never a nested `.dadaia/`, which corrupts context resolution for every tree-walking tool.

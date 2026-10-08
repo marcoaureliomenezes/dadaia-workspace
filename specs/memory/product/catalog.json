@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-10-08T15:42:42Z",
+  "generated_at": "2026-10-08T16:21:47Z",
   "features": [
     {
       "rank": 1,
@@ -131,7 +131,7 @@
         "projection",
         "privacy"
       ],
-      "token_estimate": 1148,
+      "token_estimate": 1120,
       "depends_on": [
         "harness-kimi-code",
         "agentic-entities",
@@ -791,7 +791,7 @@
         "ledger",
         "governance"
       ],
-      "token_estimate": 2144,
+      "token_estimate": 2133,
       "depends_on": [
         "sdd-gate-v3",
         "workspace-doctor",
@@ -904,7 +904,7 @@
         "merge",
         "review"
       ],
-      "token_estimate": 1837,
+      "token_estimate": 1620,
       "depends_on": [
         "sdd-gate-v3",
         "public-asset-distribution",
