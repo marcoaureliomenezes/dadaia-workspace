@@ -1426,6 +1426,12 @@
         "release-lifecycle",
         "workspace-doctor"
       ]
+    },
+    {
+      "ts": "2026-10-08T12:54:08Z",
+      "agent": "main-thread",
+      "kind": "note",
+      "text": "After the closure narrative above, the encoding job review found one more rc-10 bug: release-check-parses-the-gitflow-in-the-skill (HIGH; the window fix had added a gitflow parser in the skill, against ADR 0144). Operator rulings 2026-10-08 registered it on the work branch and authorized the rebase of this job onto that registration with a force-push. It is resolved as a REBUILD of _window_findings: the doctor's ledger runner passes --principal from core.gitflow.read_gitflow, and the skill reads no constitution. The narrative's ledger facts move by that one record: 883 records, 73 found in rc-10, all 73 resolved, 12 closed after the PR #285 merge instant (BUGS.jsonl; bugs.py stats --specs specs: 863 resolved, 13 superseded, 7 rejected). The rebase orphaned the job's first memory entry; that entry left history, and one memory entry now covers the job."
     }
   ]
 }
