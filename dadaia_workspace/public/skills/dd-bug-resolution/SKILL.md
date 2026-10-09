@@ -22,7 +22,7 @@ compatibility: Standalone Agent Skill. Inside a dadaia-workspace (pip install da
 
 **Phase 0 — Lineage.** Read the bug ledger for prior fixes to the same
 `surface`/`component` in the bounded window ([`LINEAGE.md`](LINEAGE.md)); inspect every named
-`fix_sha` with `git show`; a `caused_by` other than `none`, or ≥ 2 prior fixes, makes this fix a REBUILD (`specs/bugs/AGENTS.md` §2);
+`fix_sha` with `git show`; a `caused_by` other than `none` makes this fix a REBUILD (`specs/bugs/AGENTS.md` §2);
 carry the link to Phase 6 (`resolve --caused-by`; `update` repairs);
 echo the `caused_by:`/`evidence:`/`prior diffs read:`/`rebuild:` block in the fix commit body.
 *Done when prior diffs were actually read and the link and the rebuild decision (`rebuild` or `none`) are decided.*
@@ -52,7 +52,7 @@ regressions: measure a baseline, then bisect — logs mislead.
 *Done when one hypothesis survives by observation, not by reading code.*
 
 **Phase 5 — Seam test.** The regression test at the correct seam, BEFORE the fix, is
-a new case in the owner file with a literal expected value, at the lowest level that detects it (the root map §1: fixes never rewrite old asserts), committed by the RED-test dispatch; watch it fail,
+a new case in the owner file with a literal expected value, at the lowest level that detects it (the root map §1: fixes never rewrite old asserts), committed first under a `test(` subject; watch it fail,
 fix the cause, watch it pass, re-run the Phase 1 loop on the original scenario. A
 correct seam exercises the real bug pattern at its call site; when none exists, that
 is itself the finding — return the seam gap to the main thread as a finding

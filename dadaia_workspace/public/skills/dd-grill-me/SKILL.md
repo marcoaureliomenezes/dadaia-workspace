@@ -25,7 +25,7 @@ Reach shared understanding by mapping every open branch of the demand as a desig
 3. Read `PROBLEM-TAXONOMY.md` and classify each gap against it before deciding inspection vs promotion to the tree.
 4. Map every remaining open question as a node; a dependent question hangs beneath its prerequisite as a child.
 5. Identify the frontier: every question whose prerequisites are already settled.
-6. Ask one question per `AskUserQuestion` call (ADR 0165): 3 closed options, each with its trade-off, one marked recommended, plain-text options; the open answer is the tool's own. Without that tool, ask in numbered text, still one at a time. The handoff (step 15) is the session's one record.
+6. Ask one question per `AskUserQuestion` call: 3 closed options, each with its trade-off, one marked recommended, plain-text options; the open answer is the tool's own. Without that tool, ask in numbered text, still one at a time. The handoff (step 15) is the session's one record.
 7. Wait for the operator's answer, recompute the frontier from it (settled nodes unblock their children), and ask the next question.
 8. Skip aesthetic preference, an already-working implementation choice, and anything answerable "whatever is reasonable."
 9. Stop when the frontier is empty — every branch visited, nothing silently assumed.
