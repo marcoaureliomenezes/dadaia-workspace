@@ -7,8 +7,10 @@ release state.
 
 - `specs/releases/<release-id>/_RELEASE.json` is one mutable object with the seven
   required fields `{schema, release, phase, defined, implemented, shipped, log}`.
-- `phase` is `DEFINITION`, `IMPLEMENTATION` or `CLOSURE`; it is overwritten on a
-  transition. `defined`, `implemented` and `shipped` are the sha-bearing facts.
+- `phase` takes its lifecycle value from the
+  [release-state schema](../../schemas/releases/release-state-v1.schema.json) and is
+  overwritten on a transition. `defined`, `implemented` and `shipped` are the
+  sha-bearing facts.
 - `log` is append-only, oldest first. Every entry carries `{ts, agent, kind, text}`.
   The schema retains legacy kinds so archived and earlier-candidate history stays
   readable. From the live candidate's birth onward, `release.py check` accepts only
