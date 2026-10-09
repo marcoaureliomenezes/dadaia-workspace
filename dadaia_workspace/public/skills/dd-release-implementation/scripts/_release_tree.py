@@ -139,7 +139,8 @@ def _origin_findings(specs: Path) -> list[dict[str, Any]]:
     out = [] if lines[head - 1 : head] == [BUG_WINDOW] else [
         finding(rel, head, f"the live SPEC's first `## ` heading is not `{BUG_WINDOW}` (AC5.6)",
                 f"Operator action: open {spec} with `{BUG_WINDOW}` as its first `## ` heading, "
-                "reviewing `bugs.py window` and each cited test")
+                "reviewing the prior candidate's table and each resolved record's persisted "
+                "`fix_sha` with `git show` as `dd-bug-resolution/LINEAGE.md` defines")
         | ({} if state.get("phase") == "DEFINITION" else {"verdict": "info"})
     ]  # fmt: skip
     line = origin_line(text)

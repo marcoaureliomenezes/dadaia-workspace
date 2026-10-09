@@ -68,8 +68,6 @@ def append(records: Records, values: dict[str, Any], dirs: set[str]) -> Records:
                      "with --correlates set to the comma-separated ids, or none",
                      "--correlates")  # fmt: skip
     record = {key: values.get(key) for key in CORE} | {"correlates": ids}
-    if values.get("found_in"):  # absent only beside a bad `ts`, which the schema check names
-        record["found_in"] = values["found_in"]
     record.update({key: None for key in GOVERNANCE})
     record["status"] = "open"
     return [*records, record]
