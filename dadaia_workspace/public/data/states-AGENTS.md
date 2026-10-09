@@ -2,8 +2,7 @@
 
 Scope: this file governs `.dadaia/states/**`.
 
-State files are machine-owned JSON records used by dadaia services and hooks.
-They are not documentation and not an implementation workspace.
+Each state file is written only by its owning `dadaia` verb.
 
 ## 1. Canon
 
@@ -11,22 +10,9 @@ The closed canon of `.dadaia/states/`, rendered at `.dadaia/.venv/bin/dadaia pub
 
 <!-- canon -->
 
-## 2. Rules
-
-- Prefer dadaia CLI commands over manual edits.
-- Preserve valid JSON, stable keys, and atomic-write semantics.
-- Do not store secrets, tokens, private keys, or credentials.
-- Do not hand-edit state to bypass SDD gates.
-- If a state schema changes, update migration/doctor logic and tests.
-
-## 3. When manual repair is acceptable
-
-- Only for corrupted local state, after diagnosing the owner and recording what changed in a report.
-- Keep the edit minimal; run the owning doctor/command immediately after.
-
-## 4. Validation
+## 2. Validation
 
 ```bash
 .dadaia/.venv/bin/dadaia context show --json
-.dadaia/.venv/bin/dadaia public doctor
+.dadaia/.venv/bin/dadaia doctor
 ```

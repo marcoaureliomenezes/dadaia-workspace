@@ -2,24 +2,13 @@
 
 Scope: this file governs `.dadaia/tmp/**`.
 
-This directory is for disposable agent scratch files, screenshots, command captures, generated probes, and intermediate data.
-Nothing here is product source or an approval artifact.
-
 ## 1. Rules
 
-- Use task/agent-scoped subdirectories: `.dadaia/tmp/<agent>/<YYYYMMDD>/<slug>/`.
+- Path: the root `AGENTS.md` map §4, one `<slug>/` per task beneath it.
 - A dated dir expires one day after its own mtime, whatever it holds; work that outlives the day continues in today's dir.
-- Prefer small text, JSON, screenshots, or logs that support a report.
-- Do not store secrets, credentials, tokens, private keys, or production dumps.
-- Do not import files from here as application/runtime dependencies.
-- Do not use this directory for a release trio, source code, committed tests, or persistent state.
+- If a temporary artifact is required for traceability, move the evidence reference into the reports home (the root `AGENTS.md` map §4).
+- Release documents, source, tests and state live in their repo or zone; this zone holds evidence only.
 
 ## 2. Cleanup
 
-- Files here may be deleted after their evidence is summarized in a report.
-- If a temporary artifact is required for traceability, move the evidence reference into the reports home (the root `AGENTS.md` map §4).
-- Mention the moved reference in the handoff JSON.
-
-## 3. Validation
-
-- Reports that cite temporary files must include enough detail to reproduce the evidence if the temp file is later removed.
+- Set the handoff's `artifact.path` (with its `content_hash`) to the moved file.

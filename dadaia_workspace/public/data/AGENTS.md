@@ -14,16 +14,13 @@
 ## 1. The flow
 
 - Classify every demand: Arm A (feature) or Arm B (bug); state the arm before acting.
-- Arm A: `demand -> backlog -> as-is review -> release candidate (SPEC/PLAN/TASKS) -> implementation + review -> memory -> closure -> promote by merging the release PR`.
+- Arm A: `demand -> backlog -> as-is review -> release candidate (SPEC/PLAN/job files) -> implementation + review -> memory -> closure -> promote by merging the release PR`.
 - Arm B: `propose -> operator confirms -> register -> lowest-level RED test -> root-cause fix -> GREEN -> resolved`.
+- Writes under `repos/<slug>/`: `specs/audits/` directly, the rest by worktree merge; only `context create` and a repo's first `specs init` write `specs/` directly.
 - Test: does the tool break its own contract? Yes -> Arm B. No -> Arm A.
 - A feature enters only through the backlog or an operator demand recorded in the SPEC `Origin`; a confirmed bug is fixed per `specs/bugs/AGENTS.md` §2.
 - Every change minimizes code and tests: DELETE → REBUILD → UPDATE → KEEP → ADD last; verbosity is a defect; documented behavior still works; tests assert behavior not text, mock only boundaries, expect literals; fixes never rewrite old asserts.
-- Features and fixes spend future options when they add coupling.
-  Coupling is cost, so delivery alternates with option-restoring work that deletes,
-  simplifies or decouples. The next candidate's bug-window review tests whether the
-  previous changes preserved those futures.
-- No workflow engine: the SDD documents (`specs/releases/AGENTS.md`) are the record of progress.
+- The SDD documents (`specs/releases/AGENTS.md`) are the record of progress.
 
 ## 2. Who does what
 
@@ -31,21 +28,20 @@
 |---|---|
 | Intake, grill, dispatch, the review checkpoint, gates | the main thread (the operator's session) |
 | Backlog, SPEC, the product-memory pass at closure | `dd-product-engineer` |
-| The as-is review, PLAN, TASKS, production code and tests in any language | `dd-software-engineer` |
+| The as-is review, PLAN, job files, production code and tests in any language | `dd-software-engineer` |
 | Three-axis review + six lenses (architecture, security, QA, product, audit, AI surface) | `dd-code-reviewer` |
 
-- Three roles, no fourth; every retired role is a lens the reviewer applies and the engineer anticipates; only the operator accepts an ADR (`specs/ADRs/AGENTS.md` §2).
+- Three roles, no fourth; only the operator accepts an ADR (`specs/ADRs/AGENTS.md` §2).
 - Every agent invokes `dd-ai-eng-knowhow` for harness literacy; an AI-entity change follows its AUTHORING contract.
 
 ## 3. What is enforced
 
-- One PreToolUse gate blocks: a file-tool write (`Write`, `Edit`, `MultiEdit`, `apply_patch`) creating a new entry at the root, `.dadaia/`, a closed-canon zone or the first level of `repos/`, `worktrees/` per §4 (root_whitelist); a file-tool write (those or `NotebookEdit`) to a PROTECTED path (PROTECTED); a file-tool write (those or `NotebookEdit`) out of the bound scope (out-of-scope); a file-tool write under `repos/<slug>/` outside `specs/audits/`, since `repos/` is merge-only (ADR 0105).
-- The gate fails open on: a pre-gate past 10 s (ADR 0118); a Bash write (ADRs 0096, 0103, 0133); an id-less unbound session under `worktrees/<r>/` (ADR 0116); a policy that raises (`pre_gate`); an unreadable payload (`read_stdin_json`); an unreadable registry, judging nothing below `repos/`, `worktrees/`, so only the merge-only block holds there (ADR 0132).
-- Path classes: ADDITIVE (`.dadaia/AGENTS.md`'s output and ephemeral zones) writable; PROTECTED (`workspace_layout.CORE_FLOOR`, `sdd_gate._HOOK_WIRING`, the install ledger, the `.dadaiaignore` `[protected]` globs, repo-relative) blocked; the rest MUTATING.
-- Writes under `repos/<slug>/`: `specs/audits/` directly, the rest by worktree merge; only `context create` and a repo's first `specs init` write `specs/` directly (ADR 0154).
-- Every BLOCK carries exactly one fix line, `fix: <command>` or `Operator action: <one act>` (ADR 0158); a BLOCK whose fix is itself blocked is a Stall, CRITICAL.
-- Git chokepoints (branch names: `specs/constitution.md` `gitflow:`): pre-push allows only the work branch, a job branch `wt/<M.m.p>-rc<N>/<job>` and a backlog branch `wt/backlog/<slug>`, and refuses a non-canon `specs/` path or a denylisted secret; both PRs need the repo's `verify:` line passing and a `dd-code-reviewer` APPROVED verdict, which `worktree.py merge` enforces on a job merge.
-- Races surface, never block; the binding: `.dadaia/.venv/bin/dadaia context show --json`.
+- One PreToolUse gate blocks: a file-tool write (`Write`, `Edit`, `MultiEdit`, `apply_patch`) creating a new entry at the root, `.dadaia/`, a closed-canon zone or the first level of `repos/`, `worktrees/` per §4 (root_whitelist); a file-tool write (those or `NotebookEdit`) to a PROTECTED path (PROTECTED); a file-tool write (those or `NotebookEdit`) out of the bound scope (out-of-scope); a file-tool write under `repos/<slug>/` outside `specs/audits/`, since `repos/` is merge-only.
+- The gate fails open on: a pre-gate past 10 s or a missing `.dadaia/.venv`; a Bash write; an id-less unbound session under `worktrees/<r>/`; a policy that raises; an unreadable payload; an unreadable registry, judging nothing below `repos/`, `worktrees/`, so only the merge-only block holds there.
+- Path classes: ADDITIVE (`.dadaia/AGENTS.md`'s output and ephemeral zones) writable; PROTECTED (projected law files and hook wiring, `.dadaia/states`, `hooks`, `agentic`, `sessions`, `.dadaiaignore` and its `[protected]` globs) blocked; the rest MUTATING.
+- Every BLOCK carries exactly one fix line, `fix: <command>` or `Operator action: <one act>`; a BLOCK whose fix is itself blocked is a Stall, CRITICAL.
+- Git chokepoints (branch names: `specs/constitution.md` `gitflow:`): pre-push allows only the work branch, a job branch `wt/<M.m.p>-rc<N>/<job>` and a backlog branch `wt/backlog/<slug>`, and refuses a non-canon `specs/` path or a denylisted secret; `worktree.py merge` refuses a tree without a valid APPROVED verdict bound to its diff, and a job without a green `verify:`; the PR gate is discipline (`dd-gitflow-default` §3b).
+- The binding: `.dadaia/.venv/bin/dadaia context show --json`.
 - The gate reads no SDD artifact; procedure is skill-taught and audit-measured, never gated.
 
 ## 4. Where things are written
@@ -61,7 +57,7 @@
 | Area | File | Governs |
 |---|---|---|
 | specs tree | `specs/AGENTS.md` | canon, status tokens, doctor codes |
-| releases | `specs/releases/AGENTS.md` | candidates, phases, task markers, promote, commit shapes |
+| releases | `specs/releases/AGENTS.md` | candidates, phases, tasks, promote |
 | backlog | `specs/backlog/AGENTS.md` | demand queue, `exit`, dispositions |
 | bugs | `specs/bugs/AGENTS.md` | what a bug is, propose/confirm, records, resolution |
 | memory | `specs/memory/AGENTS.md` | product truth, atoms, ownership |
@@ -79,7 +75,7 @@
 |---|---|
 | `dd-grill-me` | the mandatory questioning session before any SPEC |
 | `dd-backlog-definition` | curating the backlog from operator demand |
-| `dd-release-definition` | SPEC -> PLAN -> TASKS for a candidate |
+| `dd-release-definition` | SPEC -> PLAN -> job files for a candidate |
 | `dd-release-implementation` | tasks, push green, closure order |
 | `dd-code-review` | three axes, six lenses, slop detection |
 | `dd-bug-registration`, `dd-bug-resolution` | Arm B end to end |
@@ -89,15 +85,13 @@
 | `dd-spec-navigator` | finding truth in `specs/` |
 | `dd-cli-library` | the `dadaia` verbs, skill scripts, dev servers |
 | `dd-ai-eng-knowhow` | harness literacy and AI-entity authoring |
-| `dd-architecture-survey`, `dd-codebase-design`, `dd-domain-modeling` | design vocabulary for PLAN and SPEC |
 | `dd-manager-orchestration` | dispatching the three roles |
 
 - Language: operator preference, default English. Tone: direct, concise, operational.
-- Instance state: `.dadaia/.venv/bin/dadaia doctor`, `.dadaia/.venv/bin/dadaia public doctor`, `python3 .agents/skills/dd-bug-resolution/scripts/bugs.py status --specs <specs-dir>`.
 
 ## 7. Onboarding — three levels
 
 - Level 1 workspace: `uvx dadaia-workspace init [DIR]`; re-running it on an existing workspace is the upgrade.
 - Level 2 context: `.dadaia/.venv/bin/dadaia context create <name> --main-repo <url> [--associated-repo <url>]...` clones, hooks and marks ALIVE; only `.dadaia/.venv/bin/dadaia context bind <ctx>` binds a session.
 - Level 3 specs: 3a `.dadaia/.venv/bin/dadaia specs init --context <ctx>`; 3b the `dd-audit-project` first pass, done when memory holds real content (never a stamp); 3c `.dadaia/.venv/bin/dadaia context baseline <ctx>` publishes.
-- The next step is never guessed: `.dadaia/.venv/bin/dadaia doctor` (`ONBOARDING`) and SessionStart print it with its `fix:` line.
+- Read the next step from `.dadaia/.venv/bin/dadaia doctor` (`ONBOARDING`) and SessionStart print it with its `fix:` line.
