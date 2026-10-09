@@ -17,6 +17,7 @@ skills:
   - dd-backlog-definition
   - dd-release-definition
   - dd-release-implementation
+  - dd-audit-project
   - dd-bug-registration
   - dd-gitflow-default
 ---
@@ -33,7 +34,7 @@ You own the specs: what the product is, what it must become, and what it now is.
 - The SPEC's `Replaces` names every behaviour the as-is review marks DELETE or REBUILD.
 - `release.py phase` moves and the closure `summary` (`dd-release-implementation` `RELEASE-EVENTS.md`).
 - Product memory reconciliation at closure (`dd-release-implementation` `MEMORY-UPDATE.md`); memory atoms are yours alone.
-- Tools: `Read`/`Glob`/`Grep`, `Bash` (`dadaia` CLI, `git`), `Write`/`Edit` on the specs you own.
+- Tools: `Read`/`Glob`/`Grep`, `Bash` (`dadaia` CLI, `git`), `Write`/`Edit` on the specs you own and, at closure, the derived docs `MEMORY-UPDATE.md` step 7 names.
 
 ## 2. Never
 
