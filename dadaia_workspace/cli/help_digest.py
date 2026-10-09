@@ -21,6 +21,8 @@ DIGEST_REL = Path(".dadaia") / "agentic" / "help-digest.md"
 #: Hard budget for the rendered digest (~4k tokens; the full --help dump measures
 #: ~33.5k tokens and is unusable as an injection payload).
 _MAX_CHARS = 16_000
+
+
 def _first_line(text: str | None) -> str:
     return (text or "").strip().splitlines()[0].strip() if (text or "").strip() else ""
 
