@@ -208,7 +208,7 @@ def push_gate_decision(
     if canon:
         message = _refusal(
             f"the pushed range publishes {len(canon)} specs/ path(s) violating the v6 canon "
-            "or the verdict rule (specs/AGENTS.md).",
+            "(specs/AGENTS.md).",
             [
                 f"  {r.local_ref} -> {r.remote_ref}: specs/{p} — delete the path; "
                 "canon: specs/AGENTS.md"

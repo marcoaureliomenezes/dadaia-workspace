@@ -227,7 +227,7 @@ def _open_tasks(repo: Path, name: str) -> None:
 
 def _checks(root: Path, tree: Path) -> Iterator[tuple[str, subprocess.CompletedProcess[str]]]:
     """Each ledger script's `check` on the tree, then the workspace doctor on its `specs/` — the
-    check the work branch's CI runs — fenced to the tree."""
+    check the work branch's gates run — fenced to the tree."""
     skills = Path(__file__).resolve().parents[2]
     for skill, name in _LEDGERS:
         command = [sys.executable, str(skills / skill / "scripts" / name),
