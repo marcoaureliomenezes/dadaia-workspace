@@ -13,7 +13,6 @@ from typing import Any
 
 sys.dont_write_bytecode = True
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-sys.path.append(str(Path(__file__).resolve().parents[2] / "dd-release-implementation" / "scripts"))
 
 import _bugs_transition as tr  # noqa: E402
 import _bugs_write as wr  # noqa: E402

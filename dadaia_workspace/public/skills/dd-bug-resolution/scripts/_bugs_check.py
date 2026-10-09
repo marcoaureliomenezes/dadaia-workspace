@@ -15,6 +15,7 @@ from pathlib import Path
 from typing import Any
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+sys.path.append(str(Path(__file__).resolve().parents[2] / "dd-release-implementation" / "scripts"))
 
 import _ledger  # noqa: E402
 from _release_schema import TASK_ID_RE  # noqa: E402
