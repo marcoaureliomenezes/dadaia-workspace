@@ -6,9 +6,6 @@
     "dd-grill-me",
     "dd-bug-resolution",
     "dd-code-review",
-    "dd-codebase-design",
-    "dd-domain-modeling",
-    "dd-architecture-survey",
     "dd-ai-eng-knowhow"
   ],
   "declared_overlaps": [
@@ -38,12 +35,6 @@
       "section": "§2 Who does what",
       "anchor": null,
       "skill": "dd-manager-orchestration",
-      "scoped_agents_md": []
-    },
-    {
-      "section": "§6 Skills — `.agents/skills/dd-*`",
-      "anchor": null,
-      "skill": "dd-codebase-design",
       "scoped_agents_md": []
     },
     {
@@ -181,21 +172,9 @@
       ]
     },
     {
-      "section": "§6 Skills — `.agents/skills/dd-*`",
-      "anchor": null,
-      "skill": "dd-architecture-survey",
-      "scoped_agents_md": []
-    },
-    {
       "section": "§2 Who does what",
       "anchor": null,
       "skill": "dd-code-review",
-      "scoped_agents_md": []
-    },
-    {
-      "section": "§6 Skills — `.agents/skills/dd-*`",
-      "anchor": null,
-      "skill": "dd-domain-modeling",
       "scoped_agents_md": []
     }
   ]

@@ -9,37 +9,28 @@ Scope: this file governs only `specs/ADRs/`.
 - Fields (continued): `context`, `decision`, `consequences`, `measured_by`, `supersedes`, `amends`.
 - `status` values: `proposed` | `accepted` | `rejected` | `superseded`.
 - `accepted` requires a non-empty `measured_by` naming the check; `.dadaia/.venv/bin/dadaia doctor` (`LEDGER-ADR-SCHEMA`) validates every record and the numbering.
-- Schema: `public/schemas/ADRs/decision-record-v1.schema.json`.
+- Schema: `.dadaia/agentic/schemas/ADRs/decision-record-v1.schema.json`.
 
 ## 2. Acceptance law (operator-only)
 
 - Any agent may append a record with `status: "proposed"`.
 - One decision per change set, naming every canonical memory statement it creates or changes — never one per statement that merely exists.
-- Only the operator accepts: the main thread writes `accepted` with `ruling: {date, words}` (his verbatim words or grill answer id, in the turn he rules) and `measured_by` a real check; never delegated, and no role agent writes `accepted` or `ruling`.
-- A canonical-memory commit that only states what the code is, outside a `### P-NN` principle, needs no ADR and names its code evidence (ADR 0138).
+- Only the operator accepts: the main thread writes `accepted` with `ruling: {date, words}` (his verbatim words or grill answer id, in the turn he rules) and `measured_by` naming a check of a kind `specs/memory/AGENTS.md` §2 lists; never delegated, and no role agent writes `accepted` or `ruling`.
+- A canonical-memory commit that only states what the code is, outside a `### P-NN` principle, needs no ADR and names its code evidence.
 - `accepted` is then immutable: `context`/`decision`/`consequences` never rewritten again.
-- A reversal is always a new record (`supersedes`/`amends` naming the earlier `id`), never an edit; a proposed record never changes a ruled one.
+- A reversal is a new record naming the earlier `id` in `supersedes`/`amends`.
+- Rejecting is a `status: "rejected"` edit by the operator.
+- Superseding is a new record proposal; once accepted, the superseded record stays in `decisions.jsonl` with `status: superseded` and the successor's `supersedes` naming it (one id, or comma-separated ids ascending).
+- A superseded record keeps its `id` and its line.
 
 ## 3. Commit shapes
 
 - The ADR commit shapes (propose, accept, repair): `dd-gitflow-default` §3a.
 
-- Rejecting is a `status: "rejected"` edit by the operator.
-- Superseding is a new record proposal; once accepted, the superseded record stays in `decisions.jsonl` with `status: superseded` and the successor's `supersedes` naming it (one id, or comma-separated ids ascending).
-- A superseded record's `id` is never reused, never re-numbered, and its line never moves.
-
-## 4. Discovery
-
-- `decisions.jsonl` is the complete, authored inventory — proposed, accepted, rejected and superseded alike.
-- No hand-kept index table; the records are the index.
-- The file may be legitimately empty.
-
 ## 5. Relationship to memory and audits
 
-- A canonical memory statement — one `### P-NN ·` block under `## Principles` in `ARCHITECTURE.md` or `QUALITY.md` — carries `ADR: NNNN (proposed|accepted)` naming the decision record that admitted it.
-- The commit touching a canonical memory statement carries its accepted decision; a pre-canon statement carries `ADR: none` until it is next touched.
-- The memory statement points at the ADR, never the reverse.
-- `dd-audit-project`'s pillar 3 (`PILLAR-MEMORY.md`) is the sole mechanical check that a canonical hunk and an accept commit pair.
+- Canonical memory's `ADR:` line: `specs/memory/AGENTS.md` §2.
+- `dd-audit-project`'s pillar 3 (`PILLAR-MEMORY.md`) is the audit check that a canonical hunk and an accept commit pair.
 
 ### 5.1 The first-inventory case (bootstrap)
 

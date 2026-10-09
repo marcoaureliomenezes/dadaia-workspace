@@ -179,14 +179,14 @@ _Avoid_: version (for the unit), sprint, "rc" as a branch name or a fixes-only r
 
 **As-is review**:
 Definition step 2: the read-only reading of every unit a picked set touches, its bug history included, ending in one As-is verdict per unit — PLAN §1.
-_Avoid_: audit (the three-pillar review), inventory, survey (`dd-architecture-survey`)
+_Avoid_: audit (the three-pillar review), inventory, survey
 
 **As-is verdict**:
 One of `DELETE REBUILD UPDATE KEEP ADD` on one row of PLAN §1; always written qualified.
 _Avoid_: verdict (bare — the PR approval record), finding verdict (the doctor's)
 
 **As-is unit**:
-The row subject of an As-is review: a module (`dd-codebase-design`) or a law/skill/doc section with a today-behaviour.
+The row subject of an As-is review: a module or a law/skill/doc section with a today-behaviour.
 _Avoid_: code unit (`memory.py drift`'s directory holding code files)
 
 **Replaces**:
