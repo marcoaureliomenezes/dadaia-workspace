@@ -470,11 +470,18 @@ def test_the_three_design_skills_are_gone_from_stage_install_and_the_shipped_tre
     and the shipped tree (dadaia_workspace, tests, CONTEXT.md) cites none of them."""
     ws = tmp_path / "ws"
     stale = ws / ".agents" / "skills"
+    # An earlier public tree still carrying the three skills: a real install ledgers them.
+    earlier = tmp_path / "earlier" / "dadaia_workspace" / "public"
+    shutil.copytree(public_asset_roster.default_public_dir(), earlier)
     for name in _DESIGN_SKILLS:
-        (stale / name).mkdir(parents=True)
-        (stale / name / "SKILL.md").write_text("stale\n", encoding="utf-8")
-    manager = FileSystemPublicAssetManager()
+        (earlier / "skills" / name).mkdir()
+        (earlier / "skills" / name / "SKILL.md").write_text(f"---\nname: {name}\n---\n", encoding="utf-8")
     register_all(ws)
+    old_manager = FileSystemPublicAssetManager()
+    old_manager._public_dir = earlier  # noqa: SLF001 — exercise the earlier tree only
+    old_manager.install(ws)
+    assert {n for n in _DESIGN_SKILLS if (stale / n / "SKILL.md").exists()} == set(_DESIGN_SKILLS)
+    manager = FileSystemPublicAssetManager()
     manager.stage(ws)
     manager.install(ws)
 
