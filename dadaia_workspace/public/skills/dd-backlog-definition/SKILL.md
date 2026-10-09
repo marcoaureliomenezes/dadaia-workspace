@@ -43,6 +43,10 @@ description: >
 
 - `python3 .agents/skills/dd-backlog-definition/scripts/backlog.py check --specs <specs-dir>` exits 0 and `.dadaia/.venv/bin/dadaia doctor` prints no `BL-` finding.
 - Every entry added this session names its intake item or operator words in `provenance`.
+- Human review has compared every pair of active entries by domain subject: no semantic
+  duplicate remains active, and each absorbed duplicate has a `rejected` history record naming the retained slug.
+- Human review has classified every staleness candidate: a postponed item remains active;
+  an invalid item has a `rejected` history record with its one-line reason.
 
 ## References
 
