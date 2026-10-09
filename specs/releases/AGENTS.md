@@ -12,7 +12,10 @@ Scope: this file governs only `specs/releases/`.
 
 ## 1. Structure
 
-- `<release-id>/` — the live release: only `_RELEASE.json` at its root, one `rc-<N>/` per candidate; a defined candidate carries `SPEC.md`, `PLAN.md` and `tasks/job<n>.md`, while legacy candidates may retain `TASKS.md`. The live candidate is the highest `rc-<N>/`, every lower one is history. A flat candidate set at the root is off-canon (TREE-8).
+- `<release-id>/` — the live release: only `_RELEASE.json` at its root, one `rc-<N>/` per
+  candidate; `specs/AGENTS.md` §1 is the canonical candidate-artifact set. The live candidate
+  is the highest `rc-<N>/`; every lower one is history and retains the shape it closed with.
+  A flat candidate set at the root is off-canon (TREE-8).
 - `_archive/**` is history: read-only history.
 
 ## 2. Authoring rules
