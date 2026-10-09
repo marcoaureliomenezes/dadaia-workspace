@@ -43,6 +43,7 @@ An append authors the immutable core. Every later change uses the disposition ve
    ```
 
 4. `resolved` and `superseded` require the remediation release; `rejected` requires a
-   reason. A second transition is refused.
+   reason. A later disposition replaces only the finding's governance triple; its
+   immutable fields remain unchanged.
 5. `audit.py close <audit> --sha <window-end>` refuses while any finding is `open`, then
    appends one audit-history record and deletes the live directory atomically.

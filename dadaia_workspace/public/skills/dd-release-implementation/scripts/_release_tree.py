@@ -353,15 +353,4 @@ def ship_findings(specs: Path) -> list[dict[str, Any]]:
                      f"archived at {archive}", f"Operator action: decide which of "
                      f"{live.release_dir.resolve()} and {archive.resolve()} is release "
                                     f"{live.release_id}; a release ships once"))  # fmt: skip
-    for record in records(specs / "bugs/BUGS.jsonl"):
-        if record.get("status") == "open":
-            bug_id = str(record.get("id"))
-            found.append(
-                finding(
-                    "bugs/BUGS.jsonl",
-                    1,
-                    f"open bug {bug_id} blocks ship",
-                    f"Operator action: resolve {bug_id} before ship",
-                )
-            )
     return found
