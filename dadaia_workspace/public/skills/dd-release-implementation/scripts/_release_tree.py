@@ -40,7 +40,7 @@ from _release_schema import (  # noqa: E402
 from _release_store import SCRIPT, Refusal, live_ids, live_release  # noqa: E402
 from _specs import quote, script, with_specs  # noqa: E402
 
-__all__ = ["check", "drift", "memory_errors", "refuse_open_bugs", "ship_findings", "tree_findings"]
+__all__ = ["check", "drift", "memory_errors", "ship_findings", "tree_findings"]
 
 _SKILLS = Path(__file__).resolve().parents[2]
 #: The verb writing a LIVE record's pointer back to the release (`{i}` the id, `{r}` it).
@@ -287,11 +287,6 @@ def _memory_findings(specs: Path) -> list[dict[str, Any]]:
     fix = (f"Operator action: run `{SCRIPT} memory --specs {quote(str(specs))}` with the "
            "atom slugs the memory pass reviewed as --reviewed and changed as --changed")  # fmt: skip
     return [finding(f"releases/{live.release_id}/{STATE}", 1, message, fix)]
-
-
-def refuse_open_bugs(specs: Path, release_id: str, release_dir: Path) -> None:
-    """Candidate stacking has no bug gate; ship judges all persisted open records."""
-    del specs, release_id, release_dir
 
 
 def tree_findings(specs: Path) -> list[dict[str, Any]]:
