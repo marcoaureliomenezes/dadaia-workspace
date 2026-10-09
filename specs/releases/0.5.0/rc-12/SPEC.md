@@ -1,6 +1,6 @@
 # SPEC — Release: 0.5.0, candidate 12 — futures restored
 
-**Status:** Draft
+**Status:** Approved
 **Release ID:** 0.5.0
 **Owner:** dd-product-engineer
 **Opened:** 2026-10-09
