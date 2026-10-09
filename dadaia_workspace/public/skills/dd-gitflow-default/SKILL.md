@@ -65,7 +65,7 @@ A job and its task trees hold code, tests, specs, memory and derived docs alike 
 | 6 | a task tree | Task: its `W:` | `conventional-commit(<id>): description`, a REBUILD `refactor(<id>): REBUILD <unit> — …` |
 | 8 | `define` | Trio approval: `specs/releases/<v>/rc-<N>/SPEC.md` | `docs(specs): …` |
 | 9 | `reconcile` | Memory pass and derived docs: `specs/memory/*`, `README.md`, `llms.txt`, `docs/*.md` | `docs(memory): …` |
-| 10 | a job, `reconcile` | Release state: `specs/releases/<v>/_RELEASE.json` (a job's `kind: merge` entry) | `chore(release): …` |
+| 10 | `define`, `reconcile` | Release state: `specs/releases/<v>/_RELEASE.json`, only when [`RELEASE-EVENTS.md`](../dd-release-implementation/RELEASE-EVENTS.md) requires a current entry | `chore(release): …` |
 
 ## 3b. The PR gate
 
