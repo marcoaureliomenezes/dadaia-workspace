@@ -137,14 +137,14 @@ def test_disposition_then_close_appends_the_histo_and_removes_the_directory(
     }
 
 
-def test_disposition_refuses_a_verdict_without_its_evidence(script: Path, specs: Path) -> None:
+def test_disposition_refuses_the_retired_deferred_verdict(script: Path, specs: Path) -> None:
     result = _run(
         script, "disposition", _AUDIT, f"{_AUDIT}-F001",
         "--disposition", "deferred", "--specs", str(specs),
     )  # fmt: skip
 
-    assert result.returncode == 1
-    assert "--reason" in result.stderr
+    assert result.returncode == 2
+    assert "invalid choice: 'deferred'" in result.stderr
     findings = load_owner("dd-bug-resolution", "_ledger").records(
         specs / "audits" / _AUDIT / "FINDINGS.jsonl"
     )
@@ -172,16 +172,14 @@ def test_check_passes_on_a_valid_tree_and_fails_on_a_broken_record(
     ("verdicts", "expected"),
     [
         ((), "rejected"),
-        (("deferred", "deferred"), "deferred"),
         (("rejected", "rejected"), "rejected"),
-        (("deferred", "rejected"), "deferred"),
     ],
 )
 def test_close_without_a_resolved_finding_never_records_resolved(
     script: Path, specs: Path, verdicts: tuple[str, ...], expected: str
 ) -> None:
-    """sa-audit-close-archives-without-validating#B43-3: all deferred/rejected gives the
-    histo disposition deferred/rejected, never resolved; a clean audit
+    """sa-audit-close-archives-without-validating#B43-3: all rejected gives the
+    histo disposition rejected, never resolved; a clean audit
     (audit-close-refuses-a-clean-audit) still closes."""
     records = [_finding(i + 1, disposition=v, reason="r") for i, v in enumerate(verdicts)]
     (specs / "audits" / _AUDIT / "FINDINGS.jsonl").write_text(

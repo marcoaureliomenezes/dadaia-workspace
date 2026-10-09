@@ -64,8 +64,6 @@ _BASE: dict[str, dict[str, Any]] = {
         "status": "open",
         "cause": None,
         "caused_by": None,
-        "resolved_release": None,
-        "audited": None,
         "closed_at": None,
     },
     # the SPEC FR13 example, as appended
@@ -109,11 +107,9 @@ _REWRITE: dict[str, dict[str, Any]] = {
         "status": "resolved",
         "closed_at": "2026-09-01T00:00:00Z",
         "cause": "root cause narrative",
-        "resolved_release": "0.5.0",
         "solution": "the fix narrative",
-        "evidence_loop": "pytest -q tests/unit",
-        "evidence_seam": "tests/contract/test_x.py::test_y",
-        "evidence_diff": "net-neutral: relocated",
+        "caused_by": "none",
+        "fix_sha": "a" * 40,
     },
     "finding": {"disposition": "resolved", "release": "0.5.1", "reason": "one render path"},
 }
@@ -123,7 +119,11 @@ _REWRITE: dict[str, dict[str, Any]] = {
     ("kind", "properties"),
     [
         pytest.param("handoff", None, id="handoff"),
-        pytest.param("bug", None, id="bug"),
+        pytest.param("bug", {
+            "id", "ts", "reported_by", "title", "severity", "surface", "correlates",
+            "component", "context", "symptom", "repro", "expected", "status", "cause",
+            "caused_by", "closed_at", "solution", "fix_sha", "superseded_by",
+        }, id="bug"),
         pytest.param("finding", {"id", "pillar", "severity", "refs", "claim", "evidence", "disposition", "release", "reason"}, id="finding"),
         pytest.param("adr", {"id", "ts", "title", "status", "context", "decision", "consequences", "measured_by", "supersedes", "amends", "ruling"}, id="adr"),
         pytest.param("release", {"schema", "release", "phase", "defined", "implemented", "shipped", "log"}, id="release"),
@@ -133,14 +133,15 @@ def test_schema_is_draft_2020_12_and_closes_the_envelope(
     kind: str, properties: set[str] | None
 ) -> None:
     """Every record schema is valid Draft 2020-12 and refuses an unknown top-level key; the
-    finding, ADR and release schemas require exactly their declared property set."""
+    bug, finding, ADR and release schemas require exactly their declared property set."""
     schema = _schema(kind)
     Draft202012Validator.check_schema(schema)
     assert schema["additionalProperties"] is False
     if properties is not None:
-        # ADR 0151 M1: `ruling` is required on `accepted` only, by the schema's allOf.
-        assert set(schema["properties"]) == set(schema["required"]) | {"ruling"} & properties
         assert set(schema["properties"]) == properties
+        if kind != "bug":
+            # ADR 0151 M1: `ruling` is required on `accepted` only, by the schema's allOf.
+            assert set(schema["properties"]) == set(schema["required"]) | {"ruling"} & properties
 
 
 def _milestone(**extra: object) -> dict[str, object]:
@@ -189,8 +190,10 @@ _DROP = object()
         pytest.param("bug", {"unexpected": "nope"}, None, id="bug-unknown-property"),
         # no `picked` status: the pick is the bundled definition commit (v0.5.0 FR2)
         pytest.param("bug", {"status": "picked"}, "status", id="bug-picked-status"),
+        pytest.param("bug", {"status": "deferred"}, "status", id="bug-deferred-status"),
         pytest.param("finding", {"unexpected": "nope"}, None, id="finding-unknown-property"),
         pytest.param("finding", {"disposition": "picked"}, "disposition", id="finding-bad-disposition"),
+        pytest.param("finding", {"disposition": "deferred"}, "disposition", id="finding-deferred-disposition"),
         pytest.param("adr", {"unexpected": "nope"}, None, id="adr-unknown-property"),
         pytest.param("adr", {"status": "in-review"}, "status", id="adr-bad-status"),
         pytest.param("adr", {"id": "1"}, "id", id="adr-non-4-digit-id"),

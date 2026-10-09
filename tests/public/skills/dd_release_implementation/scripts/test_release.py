@@ -759,60 +759,33 @@ def _closed_rc(tmp_path: Path, *bugs: dict[str, object]) -> Path:
     return specs
 
 
-def _found(bug: str, status: str, rc: str = "rc-1", release: str = "0.5.0") -> dict[str, object]:
-    return {"id": bug, "status": status, "found_in": {"rc": rc, "release": release}}
+def _found(bug: str, status: str) -> dict[str, object]:
+    return {"id": bug, "status": status}
 
 
-@pytest.mark.parametrize("status", ["open", "deferred"])
-def test_new_closes_no_rc_that_holds_an_unresolved_bug_found_in_it(
-    script: Path, tmp_path: Path, status: str
-) -> None:
-    """ADR 0206: no rc ever closes with an open bug — `new` stacks rc-2 only once every bug
-    found in rc-1 is resolved; the one fix line names the bug and its rc's batch."""
-    specs = _closed_rc(tmp_path, _found("a-bug", status))
-    before = _tree_hash(specs)
-    refused = _run(script, "new", "0.5.0", "--specs", str(specs))
-    assert refused.returncode == 1 and "a-bug" in refused.stderr
-    assert [x for x in refused.stderr.splitlines() if x.startswith("fix: ")] == [
-        "fix: Operator action: resolve a-bug in rc-1's bug batch"
-    ]
-    assert _tree_hash(specs) == before
-
-
-def test_new_stacks_when_no_bug_found_in_the_live_rc_is_unresolved(
+def test_new_stacks_while_an_open_bug_waits_for_the_ship_gate(
     script: Path, tmp_path: Path
 ) -> None:
-    """A resolved bug of the live rc, an open one of another rc or release, and one with no
-    `found_in` do not hold the closure."""
-    specs = _closed_rc(
-        tmp_path,
-        _found("done", "resolved"),
-        _found("elsewhere", "open", rc="rc-9"),
-        _found("older", "open", release="0.4.9"),
-        {"id": "unplaced", "status": "open"},
-    )
+    """AC4.3: candidate closure has no mandatory bug-batch gate; ship owns open bugs."""
+    specs = _closed_rc(tmp_path, _found("still-open", "open"))
     assert _run(script, "new", "0.5.0", "--specs", str(specs)).returncode == 0
 
 
-@pytest.mark.parametrize("status", ["open", "deferred"])
-def test_ship_refuses_while_a_bug_found_in_the_shipping_rc_is_unresolved(
-    script: Path, tmp_path: Path, status: str
+def test_ship_refuses_every_open_bug_without_derived_candidate_fields(
+    script: Path, tmp_path: Path
 ) -> None:
-    """ADR 0206, redo of df9b28641: `ship` judges the bug ledger too, relaying `bugs.py`'s own
-    refusal and its one fix line, nothing written; a bug of another rc and a record with no
-    `found_in` do not hold the ship."""
+    """AC4.2: ship judges the persisted open status, not a derived candidate placement."""
     specs = _reconciled_closure(tmp_path, script)
     ledger = specs / "bugs" / "BUGS.jsonl"
     ledger.parent.mkdir(exist_ok=True)
-    ledger.write_text(json.dumps(_found("a-bug", status)) + "\n", encoding="utf-8")
+    ledger.write_text(json.dumps(_found("a-bug", "open")) + "\n", encoding="utf-8")
     before = _tree_hash(specs)
     refused = _run(script, "ship", "--sha", "beef123", "--pr", "261", "--specs", str(specs))
     assert refused.returncode == 1 and "a-bug" in refused.stderr
     fixes = [x for x in refused.stderr.splitlines() if x.startswith("fix: ")]
-    assert fixes == ["fix: Operator action: resolve a-bug in rc-1's bug batch"]
+    assert len(fixes) == 1 and "resolve a-bug" in fixes[0]
     assert _tree_hash(specs) == before
-    elsewhere = [_found("elsewhere", "open", rc="rc-9"), {"id": "unplaced", "status": "open"}]
-    ledger.write_text("".join(json.dumps(b) + "\n" for b in elsewhere), encoding="utf-8")
+    ledger.write_text(json.dumps(_found("done", "resolved")) + "\n", encoding="utf-8")
     shipped = _run(script, "ship", "--sha", "beef123", "--pr", "261", "--specs", str(specs))
     assert shipped.returncode == 0, shipped.stderr
 

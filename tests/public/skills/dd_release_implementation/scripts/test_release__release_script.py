@@ -12,15 +12,13 @@ from __future__ import annotations
 
 import json
 import re
-import shutil
 import subprocess
 import sys
 from pathlib import Path
-from typing import Any
 
 import pytest
 
-from dadaia_workspace.core import cli_line, gitflow
+from dadaia_workspace.core import gitflow
 from dadaia_workspace.core.release_state import CANDIDATE_RE
 from tests.helpers.skill_scripts import stage_skill_scripts
 
@@ -143,7 +141,7 @@ def _seed_ledgers(specs: Path, *, log: list[dict[str, object]] | None = None) ->
           {"id": "a-shipped-entry", "disposition": "delivered", "release": "0.5.0"},
           {"id": "sent-to-a-bug", "disposition": "to-bug", "reason": "turned-down"})  # fmt: skip
     jsonl("bugs/BUGS.jsonl", {"id": "still-broken", "status": "open"},
-          {"id": "already-fixed", "status": "resolved", "resolved_release": "0.5.0"},
+          {"id": "already-fixed", "status": "resolved"},
           {"id": "half-written", "severity": "BLOCKER"}, {"id": "turned-down", "status": "rejected"})  # fmt: skip
     jsonl("audits/20260930-x/FINDINGS.jsonl", {"id": "20260930-x-F001", "release": "0.5.0"})
     if log is not None:
@@ -174,8 +172,7 @@ def _seed_ledgers(specs: Path, *, log: list[dict[str, object]] | None = None) ->
 )  # fmt: skip
 def test_spec_origin(script: Path, tmp_path: Path, origin: str, needles: list[str]) -> None:
     """sa-spec-doc-033-duplicates-bugs-check#B4: an Origin id resolves whatever its record's
-    status or schema; a finding names only the unresolved ids. A carried id whose record
-    does not point back yet is listed, not a finding, before the dispositions entry."""
+    status or schema; a finding names only the unresolved ids."""
     specs = _specs(tmp_path, _GOOD)
     _seed_ledgers(specs)
     (specs / "releases/0.5.0/rc-1/SPEC.md").write_text(f"**Status:** Approved\n{origin}\n", "utf-8")
@@ -187,42 +184,31 @@ def test_spec_origin(script: Path, tmp_path: Path, origin: str, needles: list[st
     assert "a-real-entry" not in "".join(messages) and "still-broken" not in "".join(messages)
 
 
-def test_a_missing_pointer_is_a_finding_once_the_candidate_logs_its_dispositions(
+def test_origin_trace_reads_the_closure_summary_instead_of_derived_ledger_fields(
     script: Path, tmp_path: Path
 ) -> None:
-    """AC3.2: a carried bug without `resolved_release` and a live entry with no exit are
-    listed (with whether they point back) until the live candidate's `dispositions` entry
-    exists; an older candidate's entry (before `defined.ts`) does not count. Once it does,
-    each is an error on the real Origin line whose fix writes the pointer."""
+    """AC5.1: the summary is the closure fact for delivered, carried and backlog exits;
+    Origin tracing does not reconstruct those facts from bug/backlog record fields."""
     specs = _specs(tmp_path, _GOOD)
-    entry = {"ts": "2026-01-02T00:00:00Z", "agent": "a", "kind": "dispositions", "text": "t"}
     state = specs / "releases/0.5.0/_RELEASE.json"
-    defined = {"sha": "abc1234", "ts": "2026-01-01T00:00:00Z"}
-    state.write_text(json.dumps({**json.loads(state.read_text("utf-8")), "phase": "CLOSURE",
-                                 "defined": defined}))  # fmt: skip
     (specs / "releases/0.5.0/rc-1/SPEC.md").write_text(
         "# S\n\n**Status:** Approved\n**Origin:** backlog:a-real-entry; bugs:still-broken,already-fixed\n"
         "\n## Bug window review\n", "utf-8")  # fmt: skip
-    _seed_ledgers(specs, log=[{**entry, "ts": "2025-12-31T00:00:00Z"}])
-    assert _origin_rows(script, specs) == []  # --json, the doctor's contract: errors only
-    listed = subprocess.run([sys.executable, str(script), "check", "--specs", str(specs)],
-                            capture_output=True, text=True)  # fmt: skip
-    assert [
-        ln.split(" ", 3)[3] for ln in listed.stdout.splitlines() if " info " in ln
-    ] == [  # fmt: skip
-        "Origin backlog:a-real-entry untraced",
-        "Origin bugs:still-broken untraced",
-        "Origin bugs:already-fixed traced",
+    summary = {
+        "ts": "2026-01-02T00:00:00Z",
+        "agent": "closer",
+        "kind": "summary",
+        "text": "delivered: bugs:already-fixed; carried: bugs:still-broken; backlog exits: a-real-entry",
+    }
+    _seed_ledgers(specs, log=[summary])
+    state.write_text(json.dumps({**json.loads(state.read_text("utf-8")), "phase": "CLOSURE"}))
+
+    rows = _origin_rows(script, specs)
+    assert [(row["message"], row["verdict"]) for row in rows] == [
+        ("Origin backlog:a-real-entry traced", "info"),
+        ("Origin bugs:still-broken traced", "info"),
+        ("Origin bugs:already-fixed traced", "info"),
     ]
-
-    _seed_ledgers(specs, log=[entry])
-
-    errors = [f for f in _origin_rows(script, specs) if f["verdict"] == "error"]
-    assert [(f["line"], f["message"]) for f in errors] == [
-        (4, "Origin backlog:a-real-entry untraced"), (4, "Origin bugs:still-broken untraced")]  # fmt: skip
-    assert " exit a-real-entry --disposition delivered --release 0.5.0 --specs " in errors[0]["fix"]
-    assert errors[1]["fix"].startswith("Operator action: resolve bug still-broken in release 0.5.0")
-    assert "<" not in errors[1]["fix"]  # ADR 0158: a bug's resolve needs evidence no row holds
 
 
 def test_a_backlog_exit_rejected_by_disposition_traces(script: Path, tmp_path: Path) -> None:
@@ -242,67 +228,18 @@ def test_a_backlog_exit_rejected_by_disposition_traces(script: Path, tmp_path: P
     ]
 
 
-def test_a_deferred_carried_bug_is_untraced_after_the_sweep(script: Path, tmp_path: Path) -> None:
-    """Operator ruling 2026-10-01: a carried bug `deferred` at the closing sweep stays
-    untraced, an error whose fix is the operator's act (resolve it here, or rule on scope)."""
-    specs = _specs(tmp_path, _GOOD)
-    state = specs / "releases/0.5.0/_RELEASE.json"
-    state.write_text(json.dumps({**json.loads(state.read_text("utf-8")), "phase": "CLOSURE"}))
-    _seed_ledgers(specs, log=[{"ts": "2026-01-02T00:00:00Z", "agent": "a", "kind": "dispositions",
-                               "text": "t"}])  # fmt: skip
-    with (specs / "bugs/BUGS.jsonl").open("a") as ledger:
-        ledger.write(json.dumps({"id": "parked", "status": "deferred", "reason": "later"}) + "\n")
-    (specs / "releases/0.5.0/rc-1/SPEC.md").write_text("**Origin:** bugs:parked\n", "utf-8")
-
-    [row] = _origin_rows(script, specs)
-
-    assert row["message"] == "Origin bugs:parked untraced"
-    assert row["fix"].startswith("Operator action: resolve bug parked in release 0.5.0")
-
-
-def test_a_carried_id_is_traced_through_its_owning_ledger_after_it_moves(
-    script: Path, tmp_path: Path
-) -> None:
-    """AC3.2 (review F1, F5): `audit.py close` deletes the audit and leaves one histo record
-    keyed by the audit id; `bugs.py archive` moves a record to the archive; `supersede`
-    writes `superseded_by` — each carried id still traces, asked of the ledger owning it."""
-    specs = _specs(tmp_path, _GOOD)
-    state = specs / "releases/0.5.0/_RELEASE.json"
-    log = [{"ts": "2026-01-02T00:00:00Z", "agent": "a", "kind": "dispositions", "text": "t"}]
-    state.write_text(json.dumps({**json.loads(state.read_text("utf-8")), "phase": "CLOSURE",
-                                 "defined": {"sha": "abc1234", "ts": "2026-01-01T00:00:00Z"}}))  # fmt: skip
-    _seed_ledgers(specs, log=log)
-    shutil.rmtree(specs / "audits/20260930-x")
-    (specs / "audits/_archive").mkdir(parents=True)
-    (specs / "audits/_archive/audits_histo.jsonl").write_text(
-        json.dumps({"id": "20260930-x", "disposition": "resolved", "release": "0.5.0"}) + "\n"
-    )
-    (specs / "bugs/_archive").mkdir()
-    (specs / "bugs/_archive/bugs_histo.jsonl").write_text(
-        json.dumps({"id": "gone-fixed", "status": "resolved", "resolved_release": "0.5.0"}) + "\n"
-    )
-    with (specs / "bugs/BUGS.jsonl").open("a") as ledger:
-        ledger.write(json.dumps({"id": "folded", "status": "superseded",
-                                 "superseded_by": "already-fixed"}) + "\n")  # fmt: skip
-    (specs / "releases/0.5.0/rc-1/SPEC.md").write_text(
-        "**Status:** Approved\n**Origin:** bugs:gone-fixed,folded; findings:20260930-x-F001\n"
-    )
-
-    assert _check(script, specs) == []
-
-
 def test_a_stacked_candidate_in_definition_lists_its_carried_ids(
     script: Path, tmp_path: Path
 ) -> None:
-    """AC3.2 (review F2): `new` keeps the closed candidate's `defined` and its logged
-    `dispositions`; the stacked candidate in DEFINITION has swept nothing yet."""
+    """AC5.1: `new` keeps the closed candidate's summary; a stacked candidate in
+    DEFINITION has no closure summary of its own yet."""
     specs = _specs(tmp_path, _GOOD)
     state = specs / "releases/0.5.0/_RELEASE.json"
     state.write_text(json.dumps({**json.loads(state.read_text("utf-8")),
                                  "defined": {"sha": "abc1234", "ts": "2026-01-01T00:00:00Z"},
                                  "implemented": {"sha": "abc1235", "ts": "2026-01-02T00:00:00Z"}}))  # fmt: skip
-    _seed_ledgers(specs, log=[{"ts": "2026-01-03T00:00:00Z", "agent": "a", "kind": "dispositions",
-                               "text": "rc-1 sweep"}])  # fmt: skip
+    _seed_ledgers(specs, log=[{"ts": "2026-01-03T00:00:00Z", "agent": "a", "kind": "summary",
+                               "text": "delivered: none; carried: none; backlog exits: a-real-entry"}])  # fmt: skip
     (specs / "releases/0.5.0/rc-2").mkdir()
     (specs / "releases/0.5.0/rc-2/SPEC.md").write_text(
         "**Status:** Draft\n**Origin:** backlog:a-real-entry\n", "utf-8"
@@ -632,314 +569,6 @@ def test_phase_implementation_checks_same_wave_overlap_after_exact_task_unions(
     )
 
     assert result.returncode == 1
-
-
-# --- AC4.4: the bug balance block is a closure check ---------------------------------
-
-
-def test_a_stale_balance_block_refuses_at_closure_and_passes_in_implementation(
-    script: Path, tmp_path: Path
-) -> None:
-    """AC4.4: `QUALITY.md`'s `## Bugs` block that differs from its regeneration is one warning
-    in CLOSURE, never a refusal (the public bug balance blocks nothing); IMPLEMENTATION lets it be."""
-    stage_skill_scripts("dd-bug-resolution", tmp_path / "skills" / "dd-bug-resolution" / "scripts")
-    subprocess.run(["git", "init", "-q", str(tmp_path)], check=True)
-    specs = _specs(tmp_path, _GOOD)
-    log = [{"ts": "2026-01-01T00:00:00Z", "agent": "a", "kind": "note", "text": "t"}]
-    _seed_ledgers(specs, log=log)
-    quality = specs / "memory" / "QUALITY.md"
-    quality.parent.mkdir()
-    quality.write_text("# Quality\n\n## Bugs\n\n```text\nstale\n```\n", "utf-8")
-    state = specs / "releases/0.5.0/_RELEASE.json"
-    (specs / "memory" / "product").mkdir()
-    navigator = script.parents[2] / "dd-spec-navigator" / "scripts" / "memory.py"
-    cataloged = subprocess.run([sys.executable, str(navigator), "catalog", "generate", "--specs",
-                                str(specs)], capture_output=True, text=True)  # fmt: skip
-    assert cataloged.returncode == 0, cataloged.stderr
-    for key, value in (("user.email", "fixture@example.invalid"), ("user.name", "fixture")):
-        subprocess.run(["git", "-C", str(tmp_path), "config", key, value], check=True)
-    (tmp_path / ".gitignore").write_text(
-        "skills/\n", "utf-8"
-    )  # the staged scripts are no code under review
-    subprocess.run(["git", "-C", str(tmp_path), "add", "-A"], check=True)
-    subprocess.run(["git", "-C", str(tmp_path), "commit", "-qm", "base"], check=True)
-    base = subprocess.run(["git", "-C", str(tmp_path), "rev-parse", "HEAD"], check=True,
-                          capture_output=True, text=True).stdout.strip()  # fmt: skip
-    seeded = {**json.loads(state.read_text("utf-8")), "phase": "CLOSURE",
-              "defined": {"sha": base, "ts": "2026-01-01T00:00:00Z"},
-              "implemented": {"sha": base, "ts": "2026-01-01T00:00:00Z"}}  # fmt: skip
-    state.write_text(json.dumps(seeded, indent=2) + "\n", "utf-8")
-    recorded = subprocess.run([sys.executable, str(script), "memory", "--specs", str(specs)],
-                              capture_output=True, text=True, cwd=tmp_path)  # fmt: skip
-    assert recorded.returncode == 0, recorded.stderr
-
-    def balance_rows(phase: str) -> list[dict[str, str]]:
-        state.write_text(json.dumps({**json.loads(state.read_text("utf-8")), "phase": phase}))
-        argv = [sys.executable, str(script), "check", "--json", "--specs", str(specs)]
-        done = subprocess.run(argv, capture_output=True, text=True)
-        assert done.stdout, done.stderr
-        return [f for f in json.loads(done.stdout) if f["path"] == "memory/QUALITY.md"]
-
-    assert balance_rows("IMPLEMENTATION") == []
-    assert balance_rows("CLOSURE") == []  # --json lists errors only: a stale block refuses nothing
-    shown = subprocess.run([sys.executable, str(script), "check", "--specs", str(specs)],
-                           capture_output=True, text=True)  # fmt: skip
-    (line,) = [x for x in shown.stdout.splitlines() if "memory/QUALITY.md" in x]
-    assert shown.returncode == 0 and " warning " in line and "differs from its regeneration" in line
-
-    bugs = script.parents[2] / "dd-bug-resolution" / "scripts" / "bugs.py"
-    argv = [sys.executable, str(bugs), "balance", "--write", "--specs", str(specs)]
-    written = subprocess.run(argv, capture_output=True, text=True)
-    assert written.returncode == 0, written.stderr
-    assert "Bug balance from BUGS.jsonl: 4 records (4 live, 0 archived)." in quality.read_text(
-        "utf-8"
-    )
-    assert balance_rows("CLOSURE") == []
-
-
-def _balance_tree(
-    tmp_path: Path,
-    records: list[dict[str, object]],
-    *,
-    git: bool = True,
-    log: tuple[str, ...] = ("2026-01-01T12:00:00Z",),
-) -> list[str]:
-    """A one-release specs tree with *records* as its ledger and both skills staged beside it;
-    returns the `bugs.py balance` argv."""
-    for skill in ("dd-bug-resolution", "dd-release-implementation"):
-        stage_skill_scripts(skill, tmp_path / "skills" / skill / "scripts")
-    if git:
-        subprocess.run(["git", "init", "-q", str(tmp_path)], check=True)
-    specs = _specs(tmp_path, _GOOD)
-    entries = [{"ts": ts, "agent": "a", "kind": "note", "text": "t"} for ts in log]
-    _seed_ledgers(specs, log=entries)
-    (specs / "bugs/BUGS.jsonl").write_text("".join(json.dumps(r) + "\n" for r in records))
-    bugs = tmp_path / "skills" / "dd-bug-resolution" / "scripts" / "bugs.py"
-    return [sys.executable, str(bugs), "balance", "--specs", str(specs)]
-
-
-@pytest.mark.parametrize("git", [True, False], ids=["record-without-ts", "tree-without-git"])
-def test_balance_refuses_an_unreadable_input_with_one_fix_line(tmp_path: Path, git: bool) -> None:
-    """A record with no `ts`, or a tree that is no git repo, is a refusal, not a traceback."""
-    found = {"release": "0.5.0", "rc": "rc-1"}
-    argv = _balance_tree(tmp_path, [{"id": "a", "surface": "core", "found_in": found}], git=git)
-
-    done = subprocess.run(argv, capture_output=True, text=True)
-
-    assert done.returncode == 1
-    assert "Traceback" not in done.stderr
-    assert sum(ln.startswith("fix: ") for ln in done.stderr.splitlines()) == 1
-
-
-def _garbage_ts(tmp_path: Path) -> list[str]:
-    return _balance_tree(tmp_path, [_found("not-a-date")])
-
-
-def _naive_ts(tmp_path: Path) -> list[str]:
-    return _balance_tree(tmp_path, [_found("2026-01-02T00:00:00")])
-
-
-def _quality_is_a_directory(tmp_path: Path) -> list[str]:
-    argv = _balance_tree(tmp_path, [])
-    (tmp_path / "specs" / "memory" / "QUALITY.md").mkdir(parents=True)
-    return [*argv, "--write"]
-
-
-def _found(ts: str) -> dict[str, object]:
-    found = {"release": "0.5.0", "rc": "rc-1"}
-    return {"id": "a", "surface": "core", "ts": ts, "found_in": found}
-
-
-@pytest.mark.parametrize("build", [_garbage_ts, _naive_ts, _quality_is_a_directory])
-def test_balance_refuses_each_family_of_unreadable_input_once(tmp_path: Path, build: Any) -> None:
-    done = subprocess.run(build(tmp_path), capture_output=True, text=True)
-
-    assert done.returncode == 1
-    assert "Traceback" not in done.stderr
-    assert sum(ln.startswith("fix: ") for ln in done.stderr.splitlines()) == 1
-
-
-def test_a_surface_carried_only_by_archived_records_keeps_its_dev_tooling_class(
-    tmp_path: Path,
-) -> None:
-    argv = _balance_tree(tmp_path, [])
-    (tmp_path / ".gitattributes").write_text("/tests dadaia-dev-tooling\n", "utf-8")
-    histo = tmp_path / "specs" / "bugs" / "_archive" / "bugs_histo.jsonl"
-    histo.parent.mkdir()
-    histo.write_text(json.dumps({"id": "old", "surface": "tests"}) + "\n", "utf-8")
-
-    done = subprocess.run(argv, capture_output=True, text=True)
-
-    assert done.returncode == 0, done.stderr
-    assert done.stdout.splitlines()[1:4] == [
-        "surface  records  recurrences  fix-induced  archived  rcs  correlates  settled",
-        "dev-tooling:",
-        "tests    1        0            0            1         0    0           yes",
-    ]
-
-
-def test_the_verb_prints_dev_tooling_surfaces_apart_by_the_gitattributes_class(
-    tmp_path: Path,
-) -> None:
-    """AC4.1: the class is the repo's `.gitattributes` attribute `dadaia-dev-tooling`."""
-    found = {"release": "0.5.0", "rc": "rc-1"}
-    records = [
-        {"id": n, "surface": n, "ts": "2026-01-02T00:00:00Z", "found_in": found}
-        for n in ("tests", "core")
-    ]
-    argv = _balance_tree(tmp_path, records)
-    (tmp_path / ".gitattributes").write_text("/tests dadaia-dev-tooling\n", "utf-8")
-
-    done = subprocess.run(argv, capture_output=True, text=True)
-
-    assert done.returncode == 0, done.stderr
-    assert done.stdout.splitlines()[1:5] == [
-        "surface  records  recurrences  fix-induced  archived  rcs  correlates  settled",
-        "core     1        0            0            0         1    0           no",
-        "dev-tooling:",
-        "tests    1        0            0            0         1    0           no",
-    ]
-    assert done.stdout.splitlines()[5].endswith("T = 0 days: u = n/a, no data")
-
-
-@pytest.mark.parametrize(
-    ("last", "span"),
-    [
-        pytest.param("2026-01-12T23:30:00-03:00", "11", id="an-offset-ts-ends-on-its-utc-day"),
-        pytest.param("2026-01-12T23:30:00", "10", id="a-ts-with-no-offset-is-read-as-utc"),
-    ],
-)
-def test_the_trend_window_ends_on_the_utc_day_of_the_last_log_entry(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, last: str, span: str
-) -> None:
-    """The window opens on 2026-01-02 (UTC) and closes on the UTC day of the live release's last
-    log instant: 02:30Z on the 13th for the first row, 23:30Z on the 12th for the second, on a
-    host whose clock is three hours behind UTC."""
-    monkeypatch.setenv("TZ", "UTC+3")
-    argv = _balance_tree(tmp_path, [], log=("2026-01-02T00:00:00Z", last))
-
-    done = subprocess.run(argv, capture_output=True, text=True)
-
-    assert done.returncode == 0, done.stderr
-    [trend] = [ln for ln in done.stdout.splitlines() if ln.startswith("Laplace")]
-    assert f"T = {span} days:" in trend
-
-
-def test_the_trend_window_opens_on_the_oldest_of_four_releases_and_ends_on_the_last_log_day(
-    tmp_path: Path,
-) -> None:
-    """AC4.2: five releases, the window is the live one and the 3 before it; archived lines
-    with no `id` are not records."""
-    log = ["2026-01-09T12:00:00Z", "2026-01-12T00:00:00Z", "2026-01-15T18:00:00Z"]
-    found = {"release": "0.5.0", "rc": "rc-1"}
-    gone = {"release": "unknown", "rc": "unknown"}
-    records = [
-        {"id": "a", "surface": "core", "ts": "2026-01-06T09:00:00Z", "found_in": found},
-        {"id": "b", "surface": "core", "ts": "2026-01-07T09:00:00Z", "found_in": gone},
-    ]
-    argv = _balance_tree(tmp_path, records, log=log)
-    (tmp_path / ".gitattributes").write_text("/core dadaia-dev-tooling=true\n", "utf-8")
-    for release, start in (("0.4.5", "01"), ("0.4.6", "03"), ("0.4.7", "05"), ("0.4.8", "07")):
-        archive = tmp_path / "specs" / "releases" / "_archive" / release
-        archive.mkdir(parents=True)
-        entry = [{"ts": f"2026-01-{start}T06:00:00Z", "agent": "a", "kind": "note", "text": "t"}]
-        (archive / "_RELEASE.json").write_text(json.dumps({"log": entry}), "utf-8")
-    histo = tmp_path / "specs" / "bugs" / "_archive" / "bugs_histo.jsonl"
-    histo.parent.mkdir()
-    lines = [
-        {"ts": "2026-01-01T00:00:00Z", "event": "x"},
-        {"event": "y"},
-        {"id": "c", "surface": "core", "found_in": gone},
-    ]
-    histo.write_text("".join(json.dumps(line) + "\n" for line in lines), "utf-8")
-
-    done = subprocess.run(argv, capture_output=True, text=True)
-
-    assert done.returncode == 0, done.stderr
-    out = done.stdout.splitlines()
-    assert out[0] == "Bug balance from BUGS.jsonl: 3 records (2 live, 1 archived)."
-    assert "dev-tooling:" in out  # the attribute's `=true` spelling marks a surface too
-    [trend] = [ln for ln in out if ln.startswith("Laplace")]
-    assert trend == "Laplace trend (days), window 0.4.6..0.5.0, T = 12 days: u = -0.76, no trend"
-
-
-def _quality_rows(script: Path, specs: Path, phase: str) -> list[dict[str, str]]:
-    state = specs / "releases/0.5.0/_RELEASE.json"
-    state.write_text(json.dumps({**json.loads(state.read_text("utf-8")), "phase": phase}))
-    argv = [sys.executable, str(script), "check", "--json", "--specs", str(specs)]
-    done = subprocess.run(argv, capture_output=True, text=True)
-    assert done.stdout, done.stderr
-    return [f for f in json.loads(done.stdout) if f["path"] == "memory/QUALITY.md"]
-
-
-def test_the_closure_check_judges_only_a_block_it_can_regenerate(
-    script: Path, tmp_path: Path
-) -> None:
-    """AC4.4: no `## Bugs` block is not judged; a block over a ledger the verb cannot read is
-    one refusal, never a silent pass."""
-    _balance_tree(tmp_path, [])
-    specs = tmp_path / "specs"
-    quality = specs / "memory" / "QUALITY.md"
-    quality.parent.mkdir()
-    quality.write_text("# Quality\n\n## Gates\n\n```text\nnot the bug block\n```\n", "utf-8")
-    assert _quality_rows(script, specs, "CLOSURE") == []
-
-    quality.write_text("# Quality\n\n## Bugs\n\n```text\nany\n```\n", "utf-8")
-    (specs / "bugs/BUGS.jsonl").write_text("not json\n", "utf-8")
-
-    rows = _quality_rows(script, specs, "CLOSURE")
-
-    assert [r["verdict"] for r in rows] == ["error"]
-    assert rows[0]["message"].startswith("BUGS.jsonl:1 is not valid JSON")
-    assert rows[0]["fix"].startswith("sed -n '1p' ")  # the callee's own line, relayed
-    assert rows[0]["fix"].endswith("BUGS.jsonl")
-
-
-def test_the_closure_check_names_a_verb_that_died_outside_its_refusal(
-    script: Path, tmp_path: Path
-) -> None:
-    _balance_tree(tmp_path, [])
-    specs = tmp_path / "specs"
-    quality = specs / "memory" / "QUALITY.md"
-    quality.parent.mkdir()
-    quality.write_text("# Quality\n\n## Bugs\n\n```text\nany\n```\n", "utf-8")
-    broken = tmp_path / "skills" / "dd-bug-resolution" / "scripts" / "_bugs_quality.py"
-    broken.write_text("raise RuntimeError('boom')\n", "utf-8")
-
-    rows = _quality_rows(script, specs, "CLOSURE")
-
-    assert [r["message"] for r in rows] == ["`bugs.py balance --check` exited 1"]
-    assert rows[0]["fix"].startswith("Operator action: run `")
-    assert rows[0]["fix"].endswith(
-        f" {cli_line.shell_line('balance', '--check', '--specs', str(specs))}` and read its output"
-    )
-
-
-@pytest.mark.parametrize(
-    ("printed", "code"),
-    [
-        pytest.param("[error] half a refusal", 2, id="a-message-and-no-fix"),
-        pytest.param("fix: Operator action: do the other half", 3, id="a-fix-and-no-message"),
-    ],
-)
-def test_the_closure_check_never_pairs_a_callee_message_with_a_fix_it_did_not_print(
-    script: Path, tmp_path: Path, printed: str, code: int
-) -> None:
-    _balance_tree(tmp_path, [])
-    specs = tmp_path / "specs"
-    quality = specs / "memory" / "QUALITY.md"
-    quality.parent.mkdir()
-    quality.write_text("# Quality\n\n## Bugs\n\n```text\nany\n```\n", "utf-8")
-    broken = tmp_path / "skills" / "dd-bug-resolution" / "scripts" / "_bugs_quality.py"
-    broken.write_text(
-        f"import sys\nsys.stderr.write({printed + chr(10)!r})\nsys.exit({code})\n", "utf-8"
-    )
-
-    rows = _quality_rows(script, specs, "CLOSURE")
-
-    assert [r["message"] for r in rows] == [f"`bugs.py balance --check` exited {code}"]
-    assert rows[0]["fix"].startswith("Operator action: run `")
-    assert "do the other half" not in rows[0]["fix"]
 
 
 def test_a_first_stage_may_write_tests_by_any_language_convention(

@@ -58,11 +58,7 @@ _CROSS_SKILL_EDGES = {
     "dd-release-implementation": {"_memory_drift", "_worktree_git", "_worktree_names"},
     "dd-gitflow-default": {"_release_schema", "_specs"},  # `_specs`: the fix-line quote
     "dd-backlog-definition": {"_release_schema", "_bugs_store"},
-    "dd-bug-resolution": {
-        "_release_schema",
-        "_release_store",  # the live release's one reader (`_bugs_quality`)
-        "_worktree_names",
-    },  # `_specs`: `candidate_at`, `NAME_RE`
+    "dd-bug-resolution": {"_release_schema", "_worktree_names"},
 }
 
 
