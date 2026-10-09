@@ -29,7 +29,9 @@ Reach shared understanding by mapping every open branch of the demand as a desig
 7. Wait for the operator's answer, recompute the frontier from it (settled nodes unblock their children), and ask the next question.
 8. Skip aesthetic preference, an already-working implementation choice, and anything answerable "whatever is reasonable."
 9. Stop when the frontier is empty — every branch visited, nothing silently assumed.
-10. The grill happens before a candidate launches; a launched candidate runs to closure without operator questions.
+10. The grill settles new-scope and design questions before launch; a launched candidate carries
+    those decisions to closure. Workflow-required operator confirmations and escalations follow
+    `specs/bugs/AGENTS.md` §1 and `dd-manager-orchestration` §3.
 11. Sharpen terminology as decisions land: resolve a fuzzy or colliding term to the one name the repo's specs already use before it enters the record.
 12. State the resulting shared understanding back to the operator in one summary.
 13. In the handoff's `findings`, record each inspection-resolved item as `answered via inspection: <value>`.
