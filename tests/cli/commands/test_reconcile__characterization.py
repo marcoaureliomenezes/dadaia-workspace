@@ -57,4 +57,9 @@ def test_reconcile_reports_every_step_and_persists_the_v2_registry(
             "capability-canary",
         ],
     }
-    assert registry.read_bytes() == b'{\n  "schema_version": "2",\n  "contexts": []\n}'
+    expected_registry = (
+        b'{\r\n  "schema_version": "2",\r\n  "contexts": []\r\n}'
+        if PLATFORM.windows
+        else b'{\n  "schema_version": "2",\n  "contexts": []\n}'
+    )
+    assert registry.read_bytes() == expected_registry

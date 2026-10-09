@@ -2,7 +2,7 @@
 
 **Status:** Approved
 
-Pins today's behaviour at the public seams before any CP job merges. Every test is green on Job 3's base (the post-Job-1 head) and stays green, unedited, on every CP job head (AC4.3). Each new file is a `test_<m>__characterization.py` beside its owner (`tests/AGENTS.md`), so AC4.3 is checkable by path: `git diff --name-only <cp-base>..<cp-head> -- '*__characterization.py'` prints nothing.
+Pins today's behaviour at the public seams before any CP job merges. Every test is green on Job 3's base (the post-Job-1 head), stays green on every CP job head and remains unedited by those CP jobs (AC4.3). Each new file is a `test_<m>__characterization.py` beside its owner (`tests/AGENTS.md`), so AC4.3 is checkable by path: `git diff --name-only <cp-base>..<cp-head> -- '*__characterization.py'` prints nothing.
 
 - Each test drives the seam as a user does (the CLI verb or `python3 <script>.py` from a workspace fixture) and asserts, in one test, the exit code, the exact `fix:`/`Operator action:` line and the artifact written (file bytes, ledger record or JSON), with literal expected values.
 - AC4.2: J3.T3 and J3.T4 pin `BUGS.jsonl` and `_RELEASE.json` byte-for-byte after each writer verb on a fixed fixture.
@@ -17,3 +17,4 @@ Pins today's behaviour at the public seams before any CP job merges. Every test 
 | J3.T3 | AC4.1, AC4.2 | `tests/public/skills/dd_bug_resolution/scripts/test_bugs__characterization.py` | CP3 `bugs.py` seams (6) and the `BUGS.jsonl` byte pin |
 | J3.T4 | AC4.1, AC4.2 | `tests/public/skills/dd_release_implementation/scripts/test_release__characterization.py` | CP3 `release.py` seams (3) and the `_RELEASE.json` byte pin |
 | J3.T5 | AC4.1 | `tests/hooks/test_root_whitelist__characterization.py`, `tests/hooks/test_ctx_inject__characterization.py`, `tests/cli/commands/test_ci__characterization.py`, `tests/cli/commands/test_public__characterization.py`, `tests/cli/commands/test_init__characterization.py` | touched seams: `root_whitelist`, `ctx_inject`, `ci push-gate-check`, `public stage`, `public install`, `public doctor`, `init` |
+| J3.T6 | AC4.1, AC4.3 | `tests/cli/commands/test_reconcile__characterization.py`, `tests/cli/commands/test_context__characterization.py`, `specs/releases/0.5.0/rc-12/tasks/job3.md` | closure test-authoring correction: exact Windows and POSIX literals for native registry newlines and Rich line wrapping; no production behavior change |

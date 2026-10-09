@@ -12,6 +12,7 @@ from typer.testing import CliRunner
 
 from dadaia_workspace.cli.main import app
 from dadaia_workspace.core.harness_registry import L1_ENTRY_HARNESSES
+from dadaia_workspace.core.platform import PLATFORM
 from dadaia_workspace.features.workspace.service import WorkspaceService
 from dadaia_workspace.infrastructure.public_assets import FileSystemPublicAssetManager
 from tests.fakes import FakePythonEnvironmentManager
@@ -159,13 +160,24 @@ def test_context_repo_remove_keeps_the_checkout_and_rewrites_only_registry(
     )
 
     assert result.exit_code == 0
-    assert result.output == (
-        "✓ Associated repo 'catalog-events' removed from context 'catalog' registry "
-        "(0 \nassociated repo(s) remain).\n"
-        "! The on-disk checkout at 'repos/catalog-events' was left untouched — this only "
-        "\nremoves the registry entry, it never deletes files. Remove it yourself if it is "
-        "\nno longer needed.\n"
+    expected_output = (
+        (
+            "✓ Associated repo 'catalog-events' removed from context 'catalog' registry "
+            "(0 \nassociated repo(s) remain).\n"
+            "! The on-disk checkout at 'repos/catalog-events' was left untouched — this only\n"
+            "removes the registry entry, it never deletes files. Remove it yourself if it is\n"
+            "no longer needed.\n"
+        )
+        if PLATFORM.windows
+        else (
+            "✓ Associated repo 'catalog-events' removed from context 'catalog' registry "
+            "(0 \nassociated repo(s) remain).\n"
+            "! The on-disk checkout at 'repos/catalog-events' was left untouched — this only "
+            "\nremoves the registry entry, it never deletes files. Remove it yourself if it is "
+            "\nno longer needed.\n"
+        )
     )
+    assert result.output == expected_output
     assert marker.read_bytes() == b"event-1\n"
     assert json.loads(registry.read_text("utf-8")) == {
         "schema_version": "3",
