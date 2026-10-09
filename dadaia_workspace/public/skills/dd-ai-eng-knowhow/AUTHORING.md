@@ -48,7 +48,7 @@ Every library skill must satisfy all fifteen; each rule's detail lives in the se
 | Context load | The agent, every turn | Speed/reliability of reaching material without a human in the loop |
 | Cognitive load | The operator/reviewer | Zero context tax, but the human must remember the document exists |
 
-- `dd-ai-eng-knowhow` has the shared shape in miniature: its description pays the discovery cost; its body loads only when invoked. Harness-specific loading and privilege live in [`CLAUDE-CODE.md`](CLAUDE-CODE.md) and [`CODEX.md`](CODEX.md).
+- `dd-ai-eng-knowhow` has the shared shape in miniature: its description pays the discovery cost. Harness-specific body loading and privilege live in [`CLAUDE-CODE.md`](CLAUDE-CODE.md) and [`CODEX.md`](CODEX.md).
 - Siblings are reached only by pointer — free until an author needs them.
 
 ---
