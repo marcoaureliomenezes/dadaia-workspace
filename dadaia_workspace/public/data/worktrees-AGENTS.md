@@ -9,7 +9,7 @@ Scope: this file governs only `worktrees/**`.
 ## 1. The tree
 
 - A plain change uses `worktrees/<repo>/<name>/` on `wt/<name>`, where `<name>` is one lowercase kebab segment outside the reserved release, `backlog` and `hotfix` namespaces. It records the live release's work branch as its base, or the currently checked-out branch when no release is live.
-- One worktree per release job lives at `worktrees/<repo>/<M.m.p>-rc<N>/<job>/`, on `wt/<M.m.p>-rc<N>/<job>`, cut from the repo's work branch; a job needs its rc's approved SPEC (`specs/AGENTS.md`).
+- One worktree per release job lives at `worktrees/<repo>/<M.m.p>-rc<N>/<job>/`, on `wt/<M.m.p>-rc<N>/<job>`, cut from the repo's work branch; its admission precondition is `specs/AGENTS.md` §3.
 - Two more trees inside an rc folder: `define/` (the candidate's definition) and `reconcile/` (the Reconciliation job: memory, derived docs, `measured_by` repairs, the rc's measurement, closure).
 - Outside an rc only `worktrees/<repo>/backlog/<slug>/`, on `wt/backlog/<slug>`, and `worktrees/<repo>/hotfix/<bug-id>/`, on `wt/hotfix/<bug-id>` (§3); a bug is a job.
 - One worktree per task, `<M.m.p>-rc<N>/<job>--<task-id>/` on `wt/<M.m.p>-rc<N>/<job>--<task-id>`, cut from its job branch; at most 5 task worktrees are open per rc. One change — code, tests, specs, memory or derived docs — lands in one job.

@@ -3,13 +3,14 @@
 
 from __future__ import annotations
 
+import json
 import sys
 from pathlib import Path
 
 for _skill in ("dd-release-implementation", "dd-bug-resolution"):
     sys.path.append(str(Path(__file__).resolve().parents[2] / _skill / "scripts"))
 
-from _release_schema import extract_status, live_ids  # noqa: E402
+from _release_schema import STATE, live_ids  # noqa: E402
 from _specs import parse  # noqa: E402
 from _worktree_git import (  # noqa: E402
     flow_for,
@@ -84,13 +85,12 @@ def new(root: Path, repo_name: str, name: str) -> Path:
         work = start
     else:
         work = f"{flow['work']}{version}"
-    if match["rc"] and match["job"] != "define":  # a job runs only under an Approved SPEC
+    if match["rc"] and match["job"] not in ("define", "reconcile"):
         main = root / "repos" / flow["main"]  # the context's trio lives in its main repo
-        rc = match["rc"].rpartition("-rc")[2]
-        spec = git(main, "show", f"{work}:specs/releases/{version}/rc-{rc}/SPEC.md", check=False)
-        if extract_status(spec) != "Approved":
+        state = git(main, "show", f"{work}:specs/releases/{version}/{STATE}", check=False)
+        if json.loads(state).get("phase") != "IMPLEMENTATION":
             raise Refusal(
-                f"a job needs an Approved rc-{rc}/SPEC.md on {work}",
+                f"a job needs release {version} in phase IMPLEMENTATION on {work}",
                 f"{script(SCRIPT)} new {quote(flow['main'])} {match['rc']}/define",
             )
     if match["bug"]:  # a block-list hotfix: no rc SPEC, only its open bug
