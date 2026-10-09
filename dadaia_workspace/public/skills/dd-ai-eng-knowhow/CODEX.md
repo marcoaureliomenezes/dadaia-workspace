@@ -17,7 +17,7 @@ Current-doc corrections to keep active:
 - Project `.codex/config.toml`, project hooks, and project rules load only when the project layer is trusted.
 - Provider/auth/telemetry settings remain user/admin concerns; never emit them from dadaia public assets.
 - Hook matchers are event-specific; `UserPromptSubmit` and `Stop` ignore matchers.
-- Command hooks are the only handler type that runs today.
+- `command` and `mcp_tool` handlers run today; `prompt` and `agent` handlers are parsed but skipped.
 
 ---
 
