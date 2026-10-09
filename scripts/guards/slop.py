@@ -55,7 +55,6 @@ v38* core/atomic_write.py:atomic_write parity:tests/core/test_atomic_write.py
 v38* public/skills/dd-bug-resolution/scripts/_ledger.py:replace parity:tests/public/skills/dd_bug_resolution/scripts/test__ledger.py
 v38* features/certification/service.py:certify parity:tests/features/certification/test_service.py
 v38* features/migrate/state_v2.py:execute_migration parity:tests/features/migrate/test_state_v2.py
-v38* features/reconcile/service.py:_restore_state parity:tests/features/reconcile/test_service.py
 v38* features/specs/doctor_memory.py:fix_placeholder_atom parity:tests/features/specs/test_canon__scaffold_placeholder_repair.py
 v38* infrastructure/projection.py:_clear parity:tests/infrastructure/test_public_assets__install_ledger_reconciliation.py
 v38* infrastructure/public_assets.py:_prune_empty_dirs parity:tests/infrastructure/test_public_assets__install_ledger_reconciliation.py
@@ -611,7 +610,13 @@ def _cfg(edit: Callable[[str, str], str]) -> Plant:
 
     def rewrite(root: Path) -> None:
         text = (root / "setup.cfg").read_text("utf-8")
-        (root / "setup.cfg").write_text(edit(text, _edges(text)[0][1]), "utf-8")
+        edges = _edges(text)
+        if not edges:
+            section = text.index(f"[{_CROSS}]")
+            assignment = text.index("\n", text.index("ignore_imports =", section))
+            text = text[: assignment + 1] + f"    {_EDGE}\n" + text[assignment + 1 :]
+            edges = _edges(text)
+        (root / "setup.cfg").write_text(edit(text, edges[0][1]), "utf-8")
 
     return _plant(rewrite)
 
