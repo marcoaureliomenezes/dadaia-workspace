@@ -11,7 +11,6 @@ the drift the community asks CI to fail on; the successor lives in ``decisions.j
 from __future__ import annotations
 
 import re
-from collections.abc import Callable
 from contextlib import suppress
 from pathlib import Path
 from types import ModuleType
@@ -35,15 +34,6 @@ def _ids(text: str, status: str) -> set[str]:
         with suppress(owner.LineError):
             ids |= {str(r.get("id")) for r in owner.parse(raw) if r.get("status") == status}
     return ids
-
-
-def cites_an_accepted_adr(ledger: str | None) -> Callable[[str], bool]:
-    """ADR 0151 M3: a message cites an ADR *ledger* accepts; no ledger (an unowned repo)
-    resolves no id, so any cited id stands."""
-    accepted = None if ledger is None else _ids(ledger, "accepted")
-    return lambda m: bool(
-        (cited := set(_ADR_CITATION_RE.findall(m))) and (accepted is None or cited & accepted)
-    )
 
 
 def superseded_adr_citations(specs_dir: Path, public_dir: Path | None) -> list[SectionFinding]:

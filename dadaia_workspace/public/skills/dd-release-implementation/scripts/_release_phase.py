@@ -7,7 +7,6 @@ and its milestone move in one act, so they cannot disagree.
 
 from __future__ import annotations
 
-import re
 import sys
 from pathlib import Path
 
@@ -18,8 +17,11 @@ from _release_schema import (  # noqa: E402
     CANDIDATE_DOCS,
     SHA_RE,
     STATE,
+    current_job_writes,
+    current_plan_jobs,
     extract_status,
     job_errors,
+    plan_errors,
     utc_now,
 )
 from _release_store import SCRIPT, Live, Refusal, State, commit, live_release  # noqa: E402
@@ -107,15 +109,44 @@ def set_phase(specs: Path, phase: str, sha: str) -> tuple[str, str]:
         candidate = _refuse_unapproved_docs(live)
         plan = (candidate / "PLAN.md").resolve()
         text = plan.read_text(encoding="utf-8")
-        missing = [h for h in ("## DAG", "### Hot files") if not re.search(f"^{h}", text, re.M)]
-        if errors := [f"PLAN.md has no '{h}' section" for h in missing]:
-            raise Refusal(
-                errors[0], f"Operator action: write the DAG table and hot files in {plan}"
-            )
+        planned, errors = current_plan_jobs(text)
+        if errors:
+            raise Refusal(errors[0], f"Operator action: correct the as-is review and DAG in {plan}")
+        if planned is None and (errors := plan_errors(text)):
+            raise Refusal(errors[0], f"Operator action: correct the as-is review and DAG in {plan}")
+        authorities: dict[str, set[str]] = {}
         for job in sorted(candidate.glob("tasks/*.md")):
-            if errors := job_errors(job.read_text(encoding="utf-8"), f"tasks/{job.name}"):
+            job_text = job.read_text(encoding="utf-8")
+            if errors := job_errors(job_text, f"tasks/{job.name}"):
                 raise Refusal(errors[0], f"Operator action: correct {job.resolve()} "
                               "(dd-release-definition §5)")  # fmt: skip
+            writes, _ = current_job_writes(job_text, f"tasks/{job.name}")
+            if writes is not None:
+                number = job.stem.removeprefix("job")
+                if not number.isdigit() or number.startswith("0"):
+                    raise Refusal(
+                        f"current task authority {job.name} has no positive-numbered job filename",
+                        f"Operator action: rename {job.resolve()} to its canonical "
+                        "positive-numbered job filename",
+                    )
+                authorities[f"Job {int(number)}"] = writes
+        if planned is not None:
+            implementation = {job: row for job, row in planned.items() if job != "Reconciliation"}
+            if set(implementation) != set(authorities):
+                raise Refusal(
+                    "PLAN.md DAG jobs do not equal the current tasks/job<n>.md authorities",
+                    f"Operator action: make every current job appear exactly once in {plan}",
+                )
+            for plan_job, (_, planned_writes) in implementation.items():
+                if planned_writes != authorities[plan_job]:
+                    raise Refusal(
+                        f"PLAN.md DAG {plan_job} `W:` is not its exact task-file union",
+                        f"Operator action: set {plan_job}'s exact `W:` in {plan} from tasks/job{plan_job.split()[-1]}.md",
+                    )
+            if errors := plan_errors(text):
+                raise Refusal(
+                    errors[0], f"Operator action: correct the as-is review and DAG in {plan}"
+                )
     else:
         _refuse_open_worktrees(specs.resolve())
 

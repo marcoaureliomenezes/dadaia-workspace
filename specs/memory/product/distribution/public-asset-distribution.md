@@ -1,8 +1,8 @@
 ---
 slug: public-asset-distribution
 title: public-asset-distribution
-tldr: Public assets staged once, projected into the root map, scoped AGENTS.md, .agents/ and each harness's files, with scaffold and scripts; doctor reports drift.
-summary: The stage, install and doctor chain that distributes the agentic surface into a workspace — hash-compared overwrite, rendered personas, whole-folder skills, per-harness hook and agent files derived from one registry, the specs scaffold, and a privacy gate.
+tldr: Public install stages packaged assets and projects shared law, agents, skills and every registered harness; public doctor reports projection drift.
+summary: The stage, install and doctor chain that distributes the agentic surface — deterministic staging, rendered personas, whole-folder skills, registry-derived harness files, specs scaffold, projection pruning and privacy checks.
 tags: [public, assets, distribution, projection, privacy]
 sources:
   - dadaia_workspace/features/public/**
@@ -25,7 +25,7 @@ sources:
 ## The chain
 
 - `dadaia public stage` copies `dadaia_workspace/public/` into `.dadaia/agentic/<type>/` with a SHA256 manifest that carries no timestamp, so an unchanged stage writes identical bytes, rendering the registry tables (zones, root canon, repo exclusions, specs canon) into the law fragments so every canon table in the projected law is the registry itself, and the source spelling of the venv CLI (`.dadaia/.venv/bin/dadaia`) rendered into the platform's own scripts directory (`workspace_layout.render_registry_tables`; `source_form` is its inverse, the one form shipped history is compared in).
-- `dadaia public install` projects the staged assets into the authored set — the root `AGENTS.md` map, the scoped `AGENTS.md` family (`.dadaia/**` and `worktrees/AGENTS.md`), `.agents/skills/`, `.agents/agents/` — plus, per registered harness, its own agent and hook files: `.claude/settings.json` and per-entry symlinks under `.claude/`, `.codex/{config.toml,hooks.json,rules,agents/*.toml}`, `.cursor/{hooks.json,agents/*.md}`, `.devin/hooks.v1.json`, `.github/{hooks/*.json,agents/*.agent.md}` and the hook wrappers under `.dadaia/hooks/`; Kimi Code gets no file in the workspace tree, only user-level hooks ([[harness-kimi-code]]).
+- `dadaia public install` first refreshes staging, then projects the authored set — the root `AGENTS.md` map, scoped `AGENTS.md` files, `.agents/skills/` and `.agents/agents/` — plus each registered harness's agents, hooks and rule files. A separate `public stage` remains available for inspection.
 - One harness registry drives every per-harness file: each harness is one record naming its directory, its persona transcode and its hook format, so adding a harness is one data row ([[agentic-entities]]).
 - Hooks are the Python package `dadaia_workspace/hooks/`, rendered into each harness's own hook format; a harness action with no pre-event would be declared `ungated` in its dialect row (one `public doctor` WARN); every harness gates its pre-tool event, so none is declared.
 - Install compares content, not existence: a differing staged hash overwrites without `--force`, which is reserved for a hand-edited projection; an operator's own keys in a shared settings file are left alone.
@@ -43,10 +43,10 @@ sources:
 
 ## Scaffold and consumer fan-out
 
-- The scaffolded `specs/` tree is the canon — `AGENTS.md`, an English `constitution.md`, `memory/` (`ARCHITECTURE.md` with `## Principles`, `## Tech Stack`, `## Structure`; `QUALITY.md` with `## Principles`, `## Test architecture`, `## Gates`, `## Bugs`; `product/`), `releases/`, `backlog/`, `bugs/`, `audits/`, `ADRs/` — stamped at the canonical `specs_pattern_version` (11), every candidate trio of `releases/` in its own `rc-<N>/`; `dadaia specs init` writes it ([[specs-migration]]).
+- The scaffolded `specs/` tree is the canon — `AGENTS.md`, constitution, canonical and product memory, releases, backlog, bugs, audits and ADRs — stamped at `specs_pattern_version: 12`; QUALITY carries principles, test architecture and gates, with no generated bug-balance section ([[specs-migration]]).
 - The scaffold writes only absent files, each through one `O_CREAT|O_NOFOLLOW` open: an existing file or a symlinked destination is skipped, and a path escaping the tree through a symlinked parent is never written.
 - Every scoped scaffold `AGENTS.md` is the system of record of its area; no test or script pins a file's byte or line count, the one exception `behavior-map.json`'s `SKILL.md` line limits (`skill_md_line_soft`, a doctor warning, and `skill_md_line_ceiling`); `TREE-5` heals each by shipped hash, and operator-owned files are never overwritten ([[workspace-doctor]]).
-- The one repo template lands with `dadaia specs init`: `repo-AGENTS.md` as the main repo's `AGENTS.md`, `<repo-name>` rendered as the project name; once written it is the operator's and never overwritten; the library ships no test law to a consumer repo.
+- The repo template lands with `dadaia specs init`: `repo-AGENTS.md` becomes the main repo's `AGENTS.md`, names its tracked `verify:` as the sole repository verification authority, and carries no test-path, stage or task-gate declaration. Once written it is operator-owned and never overwritten.
 - A memory atom still carrying the scaffold's placeholders is `MEM-PLACEHOLDER-1` in `dadaia doctor`'s `specs` section, removed by `--fix`.
 - Consumer-repo `AGENTS.md` fan-out is gated by the canonical banner: absent creates, a stale banner is restored as `[updated]`, a bannerless file is `[foreign]` and never overwritten; a symlinked destination file is `[foreign]`.
 

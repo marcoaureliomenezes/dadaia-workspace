@@ -27,6 +27,7 @@ from run import _CI, tracked  # noqa: E402
 
 from dadaia_workspace.core.fixed_sections import extract_fixed_section  # noqa: E402
 from dadaia_workspace.core.gitflow import read_gitflow  # noqa: E402
+from dadaia_workspace.core.specs_version import state as specs_state  # noqa: E402
 from dadaia_workspace.features.specs.canon import CANON  # noqa: E402
 from dadaia_workspace.infrastructure.ledger_scripts import load_owner  # noqa: E402
 
@@ -461,7 +462,7 @@ def release_workflow_canon(tree: Tree) -> list[str]:
 
 _SECTIONS = {
     "ARCHITECTURE.md": (["Principles", "Tech Stack", "Structure"], "slop-code"),
-    "QUALITY.md": (["Principles", "Test architecture", "Gates", "Bugs"], "slop-tests"),
+    "QUALITY.md": (["Principles", "Test architecture", "Gates"], "slop-tests"),
 }
 _TOP = re.compile(r"^## (.+?)\s*$", re.M)
 _HISTORY = re.compile(r"^#{1,6}\s*(Changelog|History|Hist[oó]rico|Versions)\b", re.M | re.I)
@@ -473,18 +474,21 @@ _ADR_LINE = re.compile(r"^ADR: (?:none|(\d{4}) \((?:proposed|accepted)\b.*\))\s*
 
 def memory_canonical_shape(tree: Tree) -> list[str]:
     """P-32 (0.4.7 FR1, ADR 0023): its nine rules over the canonical pair."""
+    sections = dict(_SECTIONS)
+    if specs_state(tree.root / "specs", tree.read("specs/constitution.md"))[0] != "canonical":
+        sections["QUALITY.md"] = ([*_SECTIONS["QUALITY.md"][0], "Bugs"], "slop-tests")
     top = sorted(
         Path(p).name
         for p in tree.tracked("specs/memory")
         if p.count("/") == 2 and p.endswith(".md")
     )
     out = []
-    if top != ["AGENTS.md", *_SECTIONS]:
+    if top != ["AGENTS.md", *sections]:
         out.append(f"canonical-pair: specs/memory holds {top}")
     known, seen = {r["id"] for r in _records(tree)}, set()
-    for name, (sections, fixed) in _SECTIONS.items():
+    for name, (headings, fixed) in sections.items():
         text = tree.read(f"specs/memory/{name}")
-        if (heads := _TOP.findall(text)) != sections:
+        if (heads := _TOP.findall(text)) != headings:
             out.append(f"section-order: {name} has {heads}")
         if not extract_fixed_section(text, fixed):
             out.append(f"fixed-block: {name} lost `{fixed}`")

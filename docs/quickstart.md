@@ -7,9 +7,6 @@ live. Terms are defined in [concepts](concepts.md); the long walkthrough is
 
 ## 1. The three levels in one block
 
-<!-- derived-from: pypi-distribution sha256:9dadd611ee50 -->
-<!-- derived-from: workspace-init sha256:a8f08f87ae76 -->
-
 Set `REPO_URL` to your repository's clone URL; everything else runs as printed (needs
 uv and network access):
 
@@ -57,8 +54,6 @@ Then `.dadaia/.venv/bin/dadaia specs init --context <ctx>` refreshes the project
 
 ## 2. What the init line provisioned
 
-<!-- derived-from: workspace-init sha256:a8f08f87ae76 -->
-
 `--harness` names one registered harness: `claude` | `codex` | `kimi-code` | `cursor` |
 `devin` | `copilot`. The directory is required and a directory holding a foreign tree
 is refused with one `fix:` line.
@@ -79,8 +74,6 @@ clones every repo, installs the hook and makes the context ALIVE; `context bind`
 
 ## 3. The bind
 
-<!-- derived-from: context-management sha256:e084ff04890d -->
-
 ```bash
 .dadaia/.venv/bin/dadaia context bind <your-repo>
 .dadaia/.venv/bin/dadaia context show <your-repo> --json
@@ -95,8 +88,6 @@ id, else `DADAIA_CONTEXT`, never the cwd: sitting inside a repository is not a b
 
 ## 4. Compliance
 
-<!-- derived-from: workspace-doctor sha256:84a9bec9fec9 -->
-
 `doctor` is the one instance validator; three sections run in fixed order —
 `workspace`, `specs`, `ledgers`. Every finding prints as one `<CODE> <verdict>
 <message>` line, every error-class finding carries one fix line (a command, or
@@ -107,8 +98,6 @@ entry held, an EPHEMERAL one deleted.
 
 ## 5. The first backlog entry
 
-<!-- derived-from: backlog-ledger sha256:44b145a6a3aa -->
-
 `backlog.py new` appends one entry, born `idea`, to `specs/backlog/BACKLOG.json`'s
 `active[]` — the operator's demand queue; from the workspace root `--specs` names the
 context's specs tree, since no `specs/` sits at or above the cwd. The script is the
@@ -118,14 +107,12 @@ worktree.
 
 ## 6. The first release
 
-<!-- derived-from: release-lifecycle sha256:7b50f03ee3e9 -->
-
 `release.py new` is one birth act, all or nothing: a `SPEC.md` stub in
 `specs/releases/<id>/rc-1/` plus `_RELEASE.json` in `DEFINITION` at the release root, refusing a second live
 release or a non-SemVer id with a `fix:` line; the stub opens with `## Bug window review`. From there, author
 `SPEC.md`, `PLAN.md` and one job file per job, `tasks/<job>.md`, in that `rc-<N>/`, `PLAN.md`
 opening with the As-is review table (`unit | today | bugs | verdict | why`) and carrying the
-`## DAG` of jobs and the `### Hot files`; `release.py phase IMPLEMENTATION --sha <sha>` opens
+`## DAG` of jobs with waves and exact write sets; `release.py phase IMPLEMENTATION --sha <sha>` opens
 implementation once SPEC and PLAN carry `**Status:** Approved` and every job file is well formed.
 
 Next: [positioning](positioning.md) for why this shape, [the bug loop](bug-loop.md)

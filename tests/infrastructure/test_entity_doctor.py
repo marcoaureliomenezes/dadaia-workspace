@@ -2,7 +2,7 @@
 
 - One map (`public/entities/behavior-map.json`), one schema, this one enforcer; every member (a
   skill, or a scoped `AGENTS.md` SOURCE under `public/{data,scaffold,templates}/`) maps to exactly
-  one row, every root-map section has an owner, every `hash_tuple` is current (A10.1, A10.4).
+  one row and every root-map section has an owner (A10.1).
 - `scoped_agents_md` names SOURCE paths, never the projected instance path — bug
   `citation-enforcer-resolves-projected-instance-paths-against-the-checkout`.
 - Every violation is built from POSIX-relative paths and every planted fixture is in-memory or
@@ -15,10 +15,8 @@ from __future__ import annotations
 import ast
 import copy
 import functools
-import hashlib
 import json
 import re
-import shutil
 import tempfile
 from collections import Counter
 from collections.abc import Callable
@@ -38,10 +36,6 @@ from dadaia_workspace.features.specs.citations import (
     posix_relpath,
 )
 from dadaia_workspace.infrastructure.git_subprocess import GitSubprocessClient
-from dadaia_workspace.infrastructure.public_assets import (
-    _SKILL_SCRIPT_SCHEMAS,  # allow-private-import: the one staging table naming which shipped schema each skill script carries a copy of; a second table here is the fork this hash guards against
-)
-from dadaia_workspace.infrastructure.public_assets_common import iter_public_files
 from tests.fixtures.stores import context_store
 from tests.helpers.scan_population import assert_populated
 
@@ -84,16 +78,6 @@ def _real_map() -> dict[str, Any]:
 
 def _law_section_titles(law_path: Path = _LAW_PATH) -> set[str]:
     return {m.group(1).strip() for m in _HEADING_RE.finditer(law_path.read_text(encoding="utf-8"))}
-
-
-def _law_section_bodies(law_path: Path = _LAW_PATH) -> dict[str, str]:
-    """Title -> the span `hash_tuple.section` hashes: its heading up to the next one (A10.4)."""
-    text = law_path.read_text(encoding="utf-8")
-    heads = list(_HEADING_RE.finditer(text))
-    return {
-        m.group(1).strip(): text[m.start() : heads[i + 1].start() if i + 1 < len(heads) else None]
-        for i, m in enumerate(heads)
-    }
 
 
 def _section_title(section_field: str) -> str:
@@ -167,85 +151,6 @@ def _find_members_mapped_to_two_sections(map_data: dict[str, Any]) -> list[str]:
 
 def _find_sections_without_an_owner(map_data: dict[str, Any], law_titles: set[str]) -> list[str]:
     return sorted(law_titles - {_section_title(row["section"]) for row in map_data["rows"]})
-
-
-def _sha256_text(text: str) -> str:
-    return "sha256:" + hashlib.sha256(text.encode("utf-8")).hexdigest()
-
-
-def _sha256_file(path: Path) -> str:
-    return _sha256_text(path.read_text(encoding="utf-8"))
-
-
-def _script_members(skill: str, skills_dir: Path, public_dir: Path) -> list[tuple[str, Path]]:
-    """Every file `stage` copies from the skill's `scripts/` (its one walk) plus, as `schemas/<name>`, the shipped
-    original of each schema `stage` copies beside them — so a schema fork is red on both sides."""
-    scripts_dir = skills_dir / skill / "scripts"
-    members = [
-        (path.relative_to(scripts_dir).as_posix(), path)
-        for path in iter_public_files(scripts_dir)
-        if "schemas" not in path.relative_to(scripts_dir).parts
-    ]
-    return members + sorted(
-        {
-            (f"schemas/{Path(schema_rel).name}", public_dir / schema_rel)
-            for schema_rel, scripts_rel in _SKILL_SCRIPT_SCHEMAS
-            if scripts_rel.split("/")[1] == skill
-        }
-    )
-
-
-def _scripts_hash(skill: str, skills_dir: Path, public_dir: Path) -> str | None:
-    members = _script_members(skill, skills_dir, public_dir)
-    if not members:
-        return None
-    return _sha256_text("".join(f"{name}:{_sha256_file(path)}\n" for name, path in members))
-
-
-def _find_stale_hash_tuples(
-    map_data: dict[str, Any],
-    law_sections: dict[str, str],
-    skills_dir: Path = _SKILLS_DIR,
-    repo_root: Path = _REPO_ROOT,
-    public_dir: Path = _PUBLIC,
-) -> list[str]:
-    """Every message names what to re-read (A10.4)."""
-    violations: list[str] = []
-    for row in map_data["rows"]:
-        who, recorded = f"row(skill={row['skill']!r})", row["hash_tuple"]
-        body = law_sections.get(_section_title(row["section"]))
-        if body is not None and _sha256_text(body) != recorded["section"]:
-            violations.append(
-                f"{who}: section hash stale for {row['section']!r} — re-read "
-                f"`dadaia_workspace/public/data/AGENTS.md` {row['section']} and re-record hash_tuple.section"
-            )
-        if row["skill"] is not None:
-            skill_path = skills_dir / row["skill"] / "SKILL.md"
-            if skill_path.exists() and _sha256_file(skill_path) != recorded["skill"]:
-                rel = skill_path.relative_to(repo_root).as_posix()
-                violations.append(
-                    f"{who}: skill hash stale — re-read `{rel}` and re-record hash_tuple.skill"
-                )
-            if (skills_dir / row["skill"] / "scripts").is_dir() and _scripts_hash(
-                row["skill"], skills_dir, public_dir
-            ) != recorded["scripts"]:
-                violations.append(
-                    f"{who}: scripts hash stale — re-read every file under `{row['skill']}/scripts/` "
-                    "and the shipped schemas it carries, and re-record hash_tuple.scripts"
-                )
-        scoped_paths = row["scoped_agents_md"]
-        if len(recorded["scoped"]) != len(scoped_paths):
-            violations.append(
-                f"{who}: hash_tuple.scoped has {len(recorded['scoped'])} entries but "
-                f"scoped_agents_md has {len(scoped_paths)} — re-read the row and re-record hash_tuple.scoped"
-            )
-            continue
-        violations += [
-            f"{who}: scoped_agents_md hash stale for `{rel}` — re-read `{rel}` and re-record hash_tuple.scoped"
-            for rel, recorded_hash in zip(scoped_paths, recorded["scoped"], strict=True)
-            if (repo_root / rel).exists() and _sha256_file(repo_root / rel) != recorded_hash
-        ]
-    return violations
 
 
 def _find_ceiling_violations(map_data: dict[str, Any], skills_dir: Path) -> list[str]:
@@ -359,9 +264,6 @@ _REAL_CHECKS: dict[str, Callable[[], list[Any]]] = {
     "every-law-section-has-an-owner": lambda: _find_sections_without_an_owner(
         _real_map(), _law_section_titles()
     ),
-    "every-hash-tuple-is-current": lambda: _find_stale_hash_tuples(
-        _real_map(), _law_section_bodies()
-    ),
     "every-skill-md-is-within-the-declared-line-ceiling": lambda: _find_ceiling_violations(
         _real_map(), _SKILLS_DIR
     ),
@@ -404,13 +306,7 @@ def _duplicate_row1_skill(m: dict[str, Any]) -> None:
     m["rows"].append({**copy.deepcopy(m["rows"][0]), "skill": m["rows"][1]["skill"]})
 
 
-_ZERO = "sha256:" + "0" * 64
 _ORPHAN_TITLE = "A Section Title That Definitely Does Not Own Anything Fixture"
-
-
-def _stale_skill_and_section(m: dict[str, Any]) -> None:
-    m["rows"][0]["hash_tuple"]["skill"] = _ZERO
-    m["rows"][1]["hash_tuple"]["section"] = _ZERO
 
 
 _PLANTED: dict[str, tuple[Callable[[], list[Any]], Callable[[list[Any]], bool]]] = {
@@ -467,12 +363,6 @@ _PLANTED: dict[str, tuple[Callable[[], list[Any]], Callable[[list[Any]], bool]]]
             _real_map(), _law_section_titles() | {_ORPHAN_TITLE}
         ),
         lambda v: v == [_ORPHAN_TITLE],
-    ),
-    "e-stale-skill-and-section-hash": (
-        lambda: _find_stale_hash_tuples(_with(_stale_skill_and_section), _law_section_bodies()),
-        lambda v: (
-            any("skill hash stale" in x for x in v) and any("section hash stale" in x for x in v)
-        ),
     ),
     "self-test-a-universal-glob-never-fires": (
         lambda: _find_overlap_pairs([("some-stage", "specs/foo/**")], []),
@@ -557,33 +447,6 @@ def test_skill_md_over_the_soft_limit_warns(tmp_path: Path, line: bytes) -> None
         f"fixture-longer/SKILL.md has {soft + 1} lines > soft limit {soft}",
         f"Operator action: split {skill_md} into its references/*.md and/or scripts/",
     )
-
-
-def test_mutation_fixture_f_edited_skill_script_turns_red(tmp_path: Path) -> None:
-    """A10.4 scripts side: one byte appended to a copied skill script is a stale scripts hash;
-    planted bytecode is not (bug behavior-map-hash-reads-untracked-bytecode)."""
-    skill = next(
-        r["skill"]
-        for r in _real_map()["rows"]
-        if r["skill"] is not None and (_SKILLS_DIR / r["skill"] / "scripts").is_dir()
-    )
-    shutil.copytree(_SKILLS_DIR / skill, tmp_path / "skills" / skill)
-    pyc = tmp_path / "skills" / skill / "scripts" / "__pycache__" / "x.cpython-312.pyc"
-    pyc.parent.mkdir(exist_ok=True)
-    pyc.write_bytes(b"\xa7\r\r")
-    stale = f"row(skill={skill!r}): scripts hash stale"
-    planted = _find_stale_hash_tuples(
-        _real_map(), _law_section_bodies(), skills_dir=tmp_path / "skills"
-    )
-    assert not any(stale in v for v in planted), planted
-    edited = sorted((tmp_path / "skills" / skill / "scripts").glob("*.py"))[0]
-    edited.write_text(edited.read_text(encoding="utf-8") + "\n", encoding="utf-8")
-
-    violations = _find_stale_hash_tuples(
-        _real_map(), _law_section_bodies(), skills_dir=tmp_path / "skills"
-    )
-
-    assert any(stale in v for v in violations), violations
 
 
 @functools.cache

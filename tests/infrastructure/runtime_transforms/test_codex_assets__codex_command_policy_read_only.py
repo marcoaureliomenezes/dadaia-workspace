@@ -68,6 +68,41 @@ def test_b1_codex_execpolicy_allows_only_read_only_commands(
     assert (json.loads(out).get("decision") == "allow") is allowed
 
 
+@pytest.mark.skipif(shutil.which("codex") is None, reason="codex CLI not on PATH")
+@pytest.mark.parametrize("executable", [".dadaia/.venv/bin/dadaia", "dadaia"])
+def test_public_install_inherits_host_policy_while_force_prompts(
+    tmp_path: Path, executable: str
+) -> None:
+    rules = tmp_path / "dadaia-command-policy.rules"
+    rules.write_text(_render_codex_command_policy_rules(), encoding="utf-8")
+
+    def decision(*options: str) -> str | None:
+        out = subprocess.run(
+            [
+                "codex",
+                "execpolicy",
+                "check",
+                "--rules",
+                str(rules),
+                "--",
+                executable,
+                "public",
+                "install",
+                *options,
+            ],
+            capture_output=True,
+            text=True,
+            check=True,
+            timeout=60,
+        ).stdout
+        value = json.loads(out).get("decision")
+        assert value is None or isinstance(value, str)
+        return value
+
+    assert decision() is None
+    assert decision("--force") == "prompt"
+
+
 def test_b4_the_registry_mandate_describes_the_rendered_file() -> None:
     rules = json.loads(_REGISTRY.read_text(encoding="utf-8"))["rules"]
     mandate = next(r["mandate"] for r in rules if r["id"] == "codex-command-policy")

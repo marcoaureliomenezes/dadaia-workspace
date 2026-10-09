@@ -1,40 +1,62 @@
 # LINEAGE.md — Phase 0 in Full
 
-Sibling of `SKILL.md` (`dd-bug-resolution`, Phase 0). The one canonical statement of the lineage window, the filter, and the diff-trust rule.
-The audit's pillar 1 cites this section, never restates it — if the two disagree, this file is stale, fix it here.
+Sibling of `SKILL.md` (`dd-bug-resolution`, Phase 0). The canonical statement of the
+lineage window, filter and diff-trust rule. The audit's bug pillar cites this file instead
+of repeating it.
 
-## The window (stated once)
+## The window
 
 - The window runs from the newest archived audit to `HEAD`.
-- Read `specs/audits/_archive/audits_histo.jsonl` — an audit is not a release milestone.
-- A shipped release survives whole under `releases/_archive/<v>/` (ADR 0152 (1)); its `_RELEASE.json` `shipped` holds the sha and PR.
-- The window is `[newest archived audit's sha, HEAD]`; the whole file when that histo is empty.
-- An audit record missing its sha: recover it with `git log -S <audit-id> -- specs/audits`.
+- Read `specs/audits/_archive/audits_histo.jsonl`; an audit is not a release milestone.
+- A shipped release survives under `releases/_archive/<v>/`; its `_RELEASE.json`
+  `shipped` field holds the sha and PR.
+- The window is `[newest archived audit sha, HEAD]`, or the whole history when the audit
+  history is empty.
+- Recover a historical audit record missing its sha with
+  `git log -S <audit-id> -- specs/audits`.
 
 ## The filter
 
-- A prior record matches when `surface` is an exact match — a closed enum, never a substring guess.
-- A prior record matches when `component` is a match — free text, judgement, not a string-equality check.
-- Cap: read at most the 20 most recent matching records in the window, ordered by `closed_at` (newest first).
+- Match `surface` exactly. It is the stable grouping key.
+- Match `component` by engineering judgement; it is precise free text, not an enum.
+- Read at most the 20 most recent matching records in the window, ordered by
+  `closed_at`, newest first.
 
-## What to read — and what to distrust
+## Read persisted facts, inspect the named fix
 
-- A record carries no commit sha; `python3 .agents/skills/dd-bug-resolution/scripts/bugs.py fix <bug-id> --specs <specs-dir>` prints its fix commits (shape 3 or shape 4) and their numstat, or `unlinked`.
-- A release-squash or ledger-only commit isolates nothing — say the trail is coarse instead of presenting it as "the fix".
-- Presenting a coarse diff as the prior fix is fabricated evidence.
+- A resolved record persists `cause`, `solution`, `caused_by` and `fix_sha`.
+- Inspect the named fix with `git show <fix_sha> --stat --patch`. A release squash or a
+  ledger-only commit isolates no implementation; report that coarse trail honestly.
+- Follow `caused_by` through live and archived records. It names the bug or task whose
+  implementation wrote the lines this fix corrects; `none` means blame offered no
+  candidate.
+- Bug-window maturity belongs to the next candidate's `SPEC.md` `## Bug window review`:
+  one KEEP leaves the first-level window; a REBUILD leaves after its tested replacement
+  and a following candidate with no child bug.
 
 ## Declare `caused_by`
 
-1. After reading the matching records, declare the link on this bug's own record — never on a prior one.
-2. Stage the fix first: `python3 .agents/skills/dd-bug-resolution/scripts/bugs.py resolve <id> --caused-by <prior-bug-id>|none` blames the lines the staged diff removes, past commits whose subject ends `(#n)` or starts `refactor(T-`, never in `tests/`, `specs/` or a file `.gitattributes` marks `dadaia-generated`.
-3. `resolve` refuses a `--caused-by` outside those candidates, and `none` when any exist, unless `--lineage-reason "<why>"` is given; the reason is stored.
-4. `caused_by: X` means the fix of X wrote the lines this fix corrects; `bugs.py update <id> --set caused_by=…` repairs it; every write and `check` refuse a target naming no live or archived record, and a loop.
-5. Echo the declaration in the fix commit body: `caused_by:`, `evidence:` (what the prior diff did), `prior diffs read:`.
-6. ≥ 2 prior fixes on the unit the bug lands in, within the window, make this fix a REBUILD of that unit — never a third patch.
-7. This step is the one producer of the fix commit body's REBUILD line: `rebuild: <unit> — prior fixes <id>, <id>`, or, only when `caused_by` is `none`, `rebuild: none — <reason>`; any other `caused_by` makes the fix a REBUILD of the unit, keeping its tests (0210); a rebuild's `--solution` opens with `REBUILD <unit>:`.
+1. Inspect blame for the production lines the fix replaces and the matching records.
+2. Choose the prior bug or task that wrote those lines. Use `none` only when blame offers
+   no candidate.
+3. Resolve once the fix commit exists:
+
+   ```bash
+   python3 .agents/skills/dd-bug-resolution/scripts/bugs.py resolve <id> \
+     --cause "…" --caused-by <prior-bug-id>|<task-id>|none \
+     --solution "…" --fix-sha <40-hex-sha>
+   ```
+
+4. `check` refuses a target naming no live or archived bug or known release task, and
+   refuses a lineage loop.
+5. Two or more prior fixes on the touched module make the next fix a REBUILD that keeps
+   its regression tests; its commit subject and solution name the rebuilt module.
+6. Publish through the installed pre-push hook; it feeds Git ref lines to
+   `.dadaia/.venv/bin/dadaia ci push-gate-check`, which checks the introduced object
+   range.
 
 ## Cost bound
 
-- At most 20 records read, at most 20 `git show` calls, per fix; a wider read is the audit's (`dd-audit-project`).
-- This is a reading discipline, not a mechanized scan — no CLI verb enforces the cap, no hook blocks a wider read.
-- The audit (pillar 1) measures how well the discipline is followed, over time, across the fleet.
+- Read at most 20 records and inspect at most 20 named fix commits per fix. A wider read
+  belongs to `dd-audit-project`.
+- This is a reading discipline. The audit measures its outcomes across the fleet.

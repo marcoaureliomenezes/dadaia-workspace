@@ -1,6 +1,6 @@
 ---
-specs_pattern_version: 11
-constitution_version: 6.1.0
+specs_pattern_version: 12
+constitution_version: 6.2.0
 gitflow: {"principal": "main", "integration": "develop", "work": "feature/"}
 ---
 
@@ -68,6 +68,12 @@ Cada passo do processo existe pelo que garante; cada garantia é verdade por mec
 4. **Peso compra confiança ou sai.** Passo de cerimônia que não produz evidência checada por um gate é apagado.
 
 Medido pelo scorecard da versão; todo critério ≥ 8 antes de evals ou publicação.
+
+## 6. Features × Futures
+
+A feature or fix delivers present behaviour and spends future options when it increases
+coupling. Because coupling is software cost, development alternates feature investment with
+option-restoring work that deletes, simplifies or decouples. Decision: ADR 0228.
 
 <!-- dadaia:fixed slop-law -->
 ## Slop — workspace law (fixed)

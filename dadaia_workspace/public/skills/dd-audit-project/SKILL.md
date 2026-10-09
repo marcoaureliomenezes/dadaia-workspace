@@ -19,8 +19,7 @@ description: >
 ## 2. The three pillars — run together, never fewer
 
 - **Pillar 1 — bugs** ([`PILLAR-BUGS.md`](PILLAR-BUGS.md)): compute all nine
-  forensic metrics it lists on each `BUGS.jsonl` record in the window; the main thread stamps `audited` on each
-  reviewed record (`python3 .agents/skills/dd-bug-resolution/scripts/bugs.py update <id> --set audited=<slug>`, pillar 1's only write).
+  forensic metrics it lists on each `BUGS.jsonl` record in the window; the audit record and git history establish coverage.
 - **Pillar 2 — specs** ([`PILLAR-SPECS.md`](PILLAR-SPECS.md)): commit shapes, canon compliance, `_RELEASE.json` milestones over the window.
 - **Pillar 3 — memory** ([`PILLAR-MEMORY.md`](PILLAR-MEMORY.md)): execute every
   Part-1 principle's named `Measured by:` check; match every Part-1 hunk in the

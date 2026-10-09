@@ -1,28 +1,10 @@
-"""Every human- and agent-facing document derives from a named memory atom.
-
-T-047-36 (SPEC 0.4.7 FR3): `README.md`, `llms.txt` and every
-`docs/*.md` carry, under each `## ` heading, one or more
-`<!-- derived-from: <slug> sha256:<12 hex> -->` markers; the slug resolves by stem to
-exactly one file under `specs/memory/`, the hash is that file's CURRENT content hash,
-and `docs/cli.md` is the committed output of `dadaia help tree`.
-Size: SMALL — reads this repo's own tree plus in-memory mutation fixtures; no
-subprocess, no network, no tmp workspace.
-
-One changed atom byte reddens every section derived from it, and the failure names the
-atom to re-read and the line to re-record — the `behavior-map.json` pattern, applied to
-prose. There is no generator verb: a derived section is re-derived by a reader, and
-this test is what makes forgetting impossible.
-"""
+"""Behavioral contracts for documentation navigation and generated CLI reference."""
 
 from __future__ import annotations
 
-import hashlib
 import re
-import sys
 import tomllib
 from pathlib import Path
-
-import pytest
 
 from dadaia_workspace.cli.help_digest import command_paths, render_digest
 from dadaia_workspace.features.specs.citations import dead_citations
@@ -33,97 +15,12 @@ _DOCS_DIR = _REPO_ROOT / "docs"
 #: `docs/cli.md` is generated, not derived: it names its generator, not an atom.
 _GENERATED = ("cli.md",)
 
-_H2_RE = re.compile(r"^## (.+)$")
-_MARKER_RE = re.compile(r"^<!-- derived-from: ([A-Za-z0-9._-]+) sha256:([0-9a-f]{12}) -->$")
-_HASH_CHARS = 12
-
-
-def _atom_hash(path: Path) -> str:
-    """The atom's content hash — over LF bytes, so a CRLF checkout (Windows autocrlf)
-    pins the same twelve characters as the LF checkout that recorded them."""
-    return hashlib.sha256(path.read_bytes().replace(b"\r\n", b"\n")).hexdigest()[:_HASH_CHARS]
-
-
-def _atoms() -> dict[str, Path]:
-    """Every memory file addressable by stem — the 22 product atoms plus the trio."""
-    by_slug: dict[str, Path] = {}
-    for path in sorted(_MEMORY_DIR.rglob("*.md")):
-        if path.name == "AGENTS.md":
-            continue
-        by_slug.setdefault(path.stem, path)
-    return by_slug
-
 
 def _derived_docs() -> list[Path]:
     """The derived set is a glob, never a list: a new `docs/*.md` is governed at birth."""
     docs = [_REPO_ROOT / "README.md", _REPO_ROOT / "llms.txt"]
     docs.extend(p for p in sorted(_DOCS_DIR.glob("*.md")) if p.name not in _GENERATED)
     return [p for p in docs if p.is_file()]
-
-
-def _sections(text: str) -> list[tuple[str, list[tuple[str, str]]]]:
-    """Each `## ` heading with the markers that immediately follow it (blank lines
-    tolerated, so a section may be introduced by one marker per atom it derives from)."""
-    lines = text.splitlines()
-    out: list[tuple[str, list[tuple[str, str]]]] = []
-    for index, line in enumerate(lines):
-        heading = _H2_RE.match(line)
-        if heading is None:
-            continue
-        markers: list[tuple[str, str]] = []
-        for follower in lines[index + 1 :]:
-            stripped = follower.strip()
-            if not stripped:
-                continue
-            marker = _MARKER_RE.match(stripped)
-            if marker is None:
-                break
-            markers.append((marker.group(1), marker.group(2)))
-        out.append((heading.group(1).strip(), markers))
-    return out
-
-
-def _violations(rel: str, text: str, atoms: dict[str, Path]) -> list[str]:
-    """The one checker the repo tree and the mutation fixtures share."""
-    found: list[str] = []
-    for heading, markers in _sections(text):
-        where = f"{rel}#{heading}"
-        if not markers:
-            found.append(
-                f"{where}: no derived-from marker — name the atom this section derives from"
-            )
-            continue
-        for slug, recorded in markers:
-            if slug == "none":
-                found.append(
-                    f"{where}: derived-from none — a section that can name no atom is slop"
-                )
-                continue
-            atom = atoms.get(slug)
-            if atom is None:
-                found.append(f"{where}: derived-from {slug} unknown — no specs/memory/**/{slug}.md")
-                continue
-            current = _atom_hash(atom)
-            if current != recorded:
-                found.append(
-                    f"{where}: derived-from {slug} stale — re-read "
-                    f"{atom.relative_to(_REPO_ROOT).as_posix()}, re-derive the section, "
-                    f"re-record sha256:{current}"
-                )
-    return found
-
-
-def test_every_derived_section_names_a_current_atom() -> None:
-    """The repo's own derived set: every `## ` heading names an atom that exists and
-    whose bytes are the ones the section was written from."""
-    atoms = _atoms()
-    violations = [
-        v
-        for doc in _derived_docs()
-        for v in _violations(doc.relative_to(_REPO_ROOT).as_posix(), doc.read_text("utf-8"), atoms)
-    ]
-
-    assert violations == [], "\n".join(violations)
 
 
 def test_the_derived_set_covers_the_readme_the_agent_index_and_every_authored_doc() -> None:
@@ -147,16 +44,6 @@ def test_the_derived_set_covers_the_readme_the_agent_index_and_every_authored_do
 
 
 _DOCS_URL = "https://github.com/marcoaureliomenezes/dadaia-workspace/tree/main/docs"
-
-
-def test_the_ledger_article_derives_from_the_quality_and_governance_atoms() -> None:
-    """The article states counts a reader can re-measure and lessons the atoms carry:
-    both `[[QUALITY]]` and `[[bug-ledger]]` are named under its sections,
-    and (by the marker test above) under their current hashes."""
-    article = _REPO_ROOT / "docs" / "bug-ledger-lessons.md"
-    slugs = {slug for _, markers in _sections(article.read_text("utf-8")) for slug, _ in markers}
-
-    assert {"QUALITY", "bug-ledger"} <= slugs
 
 
 def test_the_agent_index_lists_every_page_of_the_site() -> None:
@@ -189,46 +76,6 @@ def test_every_readme_link_is_absolute() -> None:
     targets = re.findall(r"\]\(([^)\s]+)", readme) + re.findall(r'(?:src|href)="([^"]+)"', readme)
     relative = [t for t in targets if not re.match(r"(?:https?:|mailto:|#)", t)]
     assert relative == []
-
-
-@pytest.mark.parametrize(
-    ("mutation", "expected"),
-    [
-        ("missing", "no derived-from marker"),
-        ("unknown", "unknown"),
-        ("stale", "stale"),
-        ("none", "derived-from none"),
-    ],
-)
-def test_each_red_direction_is_proven_on_a_fixture(mutation: str, expected: str) -> None:
-    """Four mutants, four reds: a section with no marker, a slug memory does not carry,
-    a hash one byte behind the atom, and the explicit `none` escape hatch."""
-    atoms = _atoms()
-    slug, atom = next(iter(sorted(atoms.items())))
-    body = {
-        "missing": "## A section\n\nprose\n",
-        "unknown": "## A section\n\n<!-- derived-from: not-an-atom sha256:000000000000 -->\n",
-        "stale": f"## A section\n\n<!-- derived-from: {slug} sha256:000000000000 -->\n",
-        "none": "## A section\n\n<!-- derived-from: none sha256:000000000000 -->\n",
-    }[mutation]
-
-    violations = _violations("FIXTURE.md", body, atoms)
-
-    assert len(violations) == 1, violations
-    assert expected in violations[0]
-    if mutation == "stale":
-        assert atom.relative_to(_REPO_ROOT).as_posix() in violations[0]
-        assert f"sha256:{_atom_hash(atom)}" in violations[0]
-
-
-def test_a_current_marker_is_green_on_a_fixture() -> None:
-    """The other direction: the checker passes exactly when the recorded hash is the
-    atom's own — otherwise every red above would be vacuous."""
-    atoms = _atoms()
-    slug, atom = next(iter(sorted(atoms.items())))
-    body = f"## A section\n\n<!-- derived-from: {slug} sha256:{_atom_hash(atom)} -->\n\nprose\n"
-
-    assert _violations("FIXTURE.md", body, atoms) == []
 
 
 def test_the_cli_reference_is_the_committed_output_of_the_generator() -> None:
@@ -338,21 +185,3 @@ def test_no_onboarding_text_cites_a_retired_create_flag() -> None:
         if re.search(r"--url\b|--associated-repos\b", match.group(0))
     ]
     assert violations == [], "\n".join(violations)
-
-
-def test_an_atom_changed_alone_is_refused_with_one_fix(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """rc-9 AC1.5: the Reconciliation job lands an atom and its derived section in one merge;
-    an atom changed without its section is refused once, naming the re-derive and re-record."""
-    monkeypatch.setattr(sys.modules[__name__], "_REPO_ROOT", tmp_path)
-    atom = tmp_path / "specs/memory/product/a/x.md"
-    atom.parent.mkdir(parents=True)
-    atom.write_text("# x\n\nbefore\n", encoding="utf-8")
-    body = f"## A section\n\n<!-- derived-from: x sha256:{_atom_hash(atom)} -->\n"
-    atom.write_text("# x\n\nafter\n", encoding="utf-8")  # the atom moved, the section did not
-
-    assert _violations("README.md", body, {"x": atom}) == [
-        "README.md#A section: derived-from x stale — re-read specs/memory/product/a/x.md, "
-        f"re-derive the section, re-record sha256:{_atom_hash(atom)}"
-    ]

@@ -1,41 +1,47 @@
-# RELEASE-EVENTS — the `_RELEASE.json` state+log contract
+# RELEASE-EVENTS — the `_RELEASE.json` state contract
 
-Disclosed reference reached from `SKILL.md`/`RC-FLOW.md` wherever the arc says "update the release state" or "append a log entry".
-
-- `specs/releases/<release-id>/_RELEASE.json` is ONE mutable JSON object — the release's current state, never an append-only event stream.
-- Schema: `dadaia_workspace/public/schemas/releases/release-state-v1.schema.json`.
+Disclosed reference reached from `SKILL.md`/`RC-FLOW.md` whenever the arc updates
+release state.
 
 ## Shape
 
-- Fields, all seven required: `{schema, release, phase, defined, implemented, shipped, log[]}`.
-- An audit is not a release milestone; the audit window is read from `audits/_archive/audits_histo.jsonl`.
-- `phase` holds one value of the schema's `phase` enum (`release.py check` validates it).
-- `phase` is rewritten in place on every transition — no history of prior values survives in the field.
-- A transition worth remembering becomes a `log` entry.
-- `defined`/`implemented`/`shipped` are the three sha-bearing milestone facts.
-- `defined`/`implemented` hold the live candidate's stamp; each `phase` also appends a `kind: milestone` entry `{candidate, milestone, sha}`, the per-candidate history. Stamps older than these entries are the `Candidate defined at …`/`Candidate implemented at …` notes.
-- `log` is the one append-only array inside the document — oldest first, never rewritten once appended; each entry is `{ts, agent, kind, text}`.
-- `kind` is one of `note summary size drifts dispositions test-dispositions artifact-gc reviews merge memory milestone`.
-- `release.py check` judges every phase: under DEFINITION, a closure entry after the candidate's birth note is a finding (a job's `kind: merge` entry is not one); every job file is judged (`dd-release-definition` §5).
-- A merged job appends one `kind: merge` entry, Read-then-Edit (no verb writes it), text `job: <name>; start: <UTC>; end: <UTC>; wall: <min>; ritual_wait: <min>; dispatches: <n>; job_gate_runs: <n>` — `start` the committer time of the job branch's first commit, `end` the committer time of the merge that lands it; `release.py check` validates the shape.
+- `specs/releases/<release-id>/_RELEASE.json` is one mutable object with the seven
+  required fields `{schema, release, phase, defined, implemented, shipped, log}`.
+- `phase` takes its lifecycle value from the
+  [release-state schema](../../schemas/releases/release-state-v1.schema.json) and is
+  overwritten on a transition. `defined`, `implemented` and `shipped` are the
+  sha-bearing facts.
+- `log` is append-only, oldest first. Every entry carries `{ts, agent, kind, text}`.
+  The schema retains legacy kinds so archived and earlier-candidate history stays
+  readable. From the live candidate's birth onward, `release.py check` accepts only
+  `note`, `milestone`, `summary` and `memory`.
 
-## Who sets which milestone
+## Current entries
 
-| Milestone | Set by | Shape |
+| Kind | Writer | Completion criterion |
 |---|---|---|
-| `phase` + `defined` | `python3 .agents/skills/dd-release-implementation/scripts/release.py phase IMPLEMENTATION --sha <sha>` | phase string, `{sha, ts}` |
-| `phase` + `implemented` | `python3 .agents/skills/dd-release-implementation/scripts/release.py phase CLOSURE --sha <sha>` | phase string, `{sha, ts}` |
-| `phase: DEFINITION` | `python3 .agents/skills/dd-release-implementation/scripts/release.py new <id>` | phase string |
-| `shipped`, then the directory moves to `_archive/<v>/` | `python3 .agents/skills/dd-release-implementation/scripts/release.py ship --sha <sha>`, refused on any `check` error | `{sha, pr, ts}` (`check` verifies it from 0.5.0 on) + one `delivered` histo line, `summary` null |
+| `note` | `release.py new`, or the agent recording an operator authorization verbatim | The entry holds one fact that belongs to no typed entry. |
+| `milestone` | `release.py phase` | `{candidate, milestone, sha}` matches the transition. |
+| `summary` | the closer, Read-then-Edit | Its text contains `delivered: …; carried: …; backlog exits: …`. |
+| `memory` | `release.py memory` | It is the one closure entry and carries `{since, until, reviewed, changed}`. |
 
+`memory` is closure-only. A rerun at the same HEAD appends nothing. `release.py check`
+requires one memory entry at or after `implemented.ts` and reads no git to validate that
+fact; `release.py drift` remains the worklist command used before the entry is written.
 
-## `log` — the closure narrative's home
+An open bug blocks `ship` by default. A carried bug needs all three facts: one
+`--allow-open <id>` flag per open id, a `kind: note` containing the operator's
+authorization verbatim and that id, and the id in the summary's `carried` field. The bug
+stays open.
 
-- Every closure-narrative class lands as one `log` entry whose `kind` names it — `summary`, `size`, `drifts`, `artifact-gc`, `test-dispositions`, `dispositions`, `memory`, `reviews`, `merge`.
-- The `memory` entry is written only by `release.py memory`; it adds `since`, `until`, `reviewed`, `changed` to `{ts, agent, kind, text}` — the ledger-derived window (previous entry's `until`, else `defined.sha`) and the HEAD it closed at, the atoms read and left byte-identical, the atoms rewritten or created; `dispositions` records the sweep.
-- Already-native facts need no entry: tasks completed (their commits, under their ids) and the `APPROVED` handoffs.
+## Milestones
 
-## Write seam
+| Milestone | Command | Written shape |
+|---|---|---|
+| candidate birth | `release.py new <id>` | `phase: DEFINITION` plus a `note` |
+| definition | `release.py phase IMPLEMENTATION --sha <sha>` | `defined: {sha, ts}` plus a `milestone` |
+| implementation | `release.py phase CLOSURE --sha <sha>` | `implemented: {sha, ts}` plus a `milestone` |
+| ship | `release.py ship --sha <sha> [--pr <n>]` | `shipped: {sha, pr, ts}`, then archive |
 
-- `phase` and the three milestones move by verb only.
-- `log` entries are Read-then-Edit by the agent that owns the narrative.
+The state document is validated before every scripted replacement. Historical log
+entries are read, never rewritten to the lean vocabulary.

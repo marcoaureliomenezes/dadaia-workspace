@@ -162,3 +162,29 @@ def test_a_bound_approval_of_head_lands(root: Path) -> None:
     landed = run(root, "merge", TREE)
     assert landed.returncode == 0, landed.stderr
     assert git(root / "repos/r", "rev-parse", "feature/0.5.0").strip() == head
+
+
+@pytest.mark.parametrize(
+    "verdict",
+    ["missing", "rejected", "other-sha", "other-diff"],
+)
+def test_a_plain_merge_refuses_without_a_bound_approval(tmp_path: Path, verdict: str) -> None:
+    root = make_workspace(tmp_path)
+    repo = root / "repos/r"
+    git(repo, "checkout", "-q", "feature/0.5.0")
+    base = git(repo, "rev-parse", "HEAD").strip()
+    assert run(root, "new", "r", "maintenance").returncode == 0
+    tree = root / "worktrees/r/maintenance"
+    head = commit(tree, "src/a.py")
+    if verdict == "rejected":
+        approve(root, head, verdict="REJECTED")
+    elif verdict == "other-sha":
+        _hand(root, head, reviewed_sha=base, diff_sha256=diff_hash(root, head))
+    elif verdict == "other-diff":
+        _hand(root, head, reviewed_sha=head, diff_sha256=diff_hash(root, base))
+
+    refused = run(root, "merge", str(tree))
+
+    assert refused.returncode == 1
+    assert tree.exists()
+    assert git(repo, "rev-parse", "feature/0.5.0").strip() == base

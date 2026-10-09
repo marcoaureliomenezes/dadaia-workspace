@@ -20,7 +20,7 @@ from _specs import head  # noqa: E402
 from _specs import quote as quote  # noqa: E402  (`as`: re-exported to the worktree verbs)
 from _specs import script as script  # noqa: E402
 from _specs import workspace_of as workspace_of  # noqa: E402
-from _worktree_names import NAME_RE, SCRIPT, Refusal, base, branch, name_of  # noqa: E402
+from _worktree_names import NAME_RE, SCRIPT, Refusal, base, branch, name_of, plain  # noqa: E402
 
 _TAG_RE = re.compile(r"^v?(\d+)\.(\d+)\.(\d+)$")
 
@@ -135,6 +135,26 @@ def work_version(repo: Path, flow: dict[str, str]) -> str:
     )
 
 
+def record_base(repo: Path, name: str, ref: str) -> None:
+    """Persist the one base ref a plain worktree must return to."""
+    git(repo, "config", "--local", f"branch.{branch(name)}.dadaia-base", ref)
+
+
+def recorded_base(repo: Path, name: str, work: str = "") -> str:
+    """The persisted base of a plain tree, or the grammar-derived base of a release tree."""
+    if not plain(name):
+        return base(name, work)
+    ref = git(
+        repo, "config", "--local", "--get", f"branch.{branch(name)}.dadaia-base", check=False
+    ).strip()
+    if not ref:
+        raise Refusal(
+            f"{branch(name)} has no recorded base ref",
+            f"Operator action: recover the branch {branch(name)} from git history, then reopen the plain worktree",
+        )
+    return ref
+
+
 def _trees(repo: Path) -> list[dict[str, str]]:
     """Every linked worktree of *repo* (the main checkout excluded), from git's porcelain."""
     blocks = git(repo, "worktree", "list", "--porcelain").split("\n\n")
@@ -182,8 +202,14 @@ def rows(root: Path) -> list[dict[str, object]]:
             if (row := mine.get(Path(path).resolve())) is None or not Path(path).is_dir():
                 out.append(_row(repo, path, "foreign" if row is None else "orphan"))
                 continue
-            version = NAME_RE.match(row["name"])["v"] or work_version(repo, flow)  # type: ignore[index]
-            span = f"{base(row['name'], flow['work'] + version)}..{branch(row['name'])}"
+            match = NAME_RE.match(row["name"])
+            assert match is not None  # `ours` admits names through this grammar.
+            work = (
+                flow["work"] + (match["v"] or work_version(repo, flow))
+                if not plain(row["name"])
+                else ""
+            )
+            span = f"{recorded_base(repo, row['name'], work)}..{branch(row['name'])}"
             ahead = int(git(repo, "rev-list", "--count", span, check=False) or 0)
             dirty = bool(git(Path(path), "status", "--porcelain").strip())
             born = git(

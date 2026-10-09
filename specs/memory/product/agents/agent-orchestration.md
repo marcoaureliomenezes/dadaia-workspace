@@ -1,8 +1,8 @@
 ---
 slug: agent-orchestration
 title: agent-orchestration
-tldr: Three dd- personas dispatched by the main thread alone; ordered work carried by the SDD documents and handoffs, never a runtime; concurrent sessions, no locks.
-summary: Who owns which artifact, who may dispatch, how a stage's sequencing is evidenced by the documents themselves, and how each persona receives its model, effort and least-privilege tool set at install.
+tldr: Three dd- personas are leaf workers dispatched by the main thread; SDD documents, worktrees and handoffs carry the work, never an orchestration runtime.
+summary: The role boundary, task-level dispatch contract, evidence flow and install-time model and privilege resolution for the product, software and review personas.
 tags: [orchestration, agents, dispatch, sdd]
 sources:
   - dadaia_workspace/public/agents/**
@@ -10,39 +10,34 @@ sources:
   - dadaia_workspace/public/skills/dd-manager-orchestration/**
 ---
 
-## Roster
+## Roster and authority
 
-The main thread — the operator's own session — coordinates: intake, the grill, dispatch, gates. It is the only dispatcher; the three personas in `dadaia_workspace/public/agents/*.md` are leaf workers that return a handoff and never spawn agents ([[agentic-entities]]).
+The main thread is the operator's session and the only dispatcher. It owns intake, the grill, routing, gates and operator decisions. The three projected personas are leaf workers:
 
 | Persona | Owns |
 |---|---|
-| `dd-product-engineer` | backlog curation, the SPEC of a candidate (from the main thread's grill handoff, its `Replaces` naming every behaviour the as-is review marks DELETE or REBUILD), product-memory reconciliation at closure |
-| `dd-software-engineer` | the as-is review (read-only, its table returned in the handoff), PLAN and the job files, production code and its tests, inside the task's declared write set |
-| `dd-code-reviewer` | the three-axis review plus six lenses — architecture, security, QA, product, audit, AI surface — verdict-only: its one write is its own verdict, through `dd-handoff-emitter`'s `verdict.py`, never a file the main thread files for it |
+| `dd-product-engineer` | backlog, candidate SPEC and closure product memory |
+| `dd-software-engineer` | as-is review, PLAN, job files, production code and tests |
+| `dd-code-reviewer` | independent three-axis review and the architecture, security, QA, product, audit and AI-surface lenses |
 
-- A request outside a persona's scope is answered with a `[SCOPE ERROR]` block naming the owner; the main thread re-dispatches.
-- A definition demand (the as-is review, PLAN, job files) reaches `dd-software-engineer` without a task id; an implementation demand carries its task id from its job file.
-- The task is the unit of dispatch, never a job and never a smaller edit: sub-agents work one stage's tasks in parallel, one per task worktree; an edit inside an open job is its driver's own and lands as one of its tasks; each job's `kind: merge` entry counts its `dispatches` ([[release-lifecycle]]).
-- `dd-manager-orchestration` is the main thread's reference: the Input Contract block that opens every dispatch prompt, the decision-authority table, the escalation triggers and the forbidden actions.
+- A persona reports out-of-scope work with `[SCOPE ERROR]`; the main thread re-routes it.
+- Only the operator accepts an ADR. Role agents never write `accepted` or `ruling`.
+- The reviewer is verdict-only and writes its own sha-bound handoff through `verdict.py`.
 
-## Behaviour
+## Dispatch and evidence
 
-- No runtime drives agents through steps; the main thread classifies the demand (feature or bug) and dispatches the owning persona per artifact.
-- Sequencing evidence is the artifacts themselves: `_RELEASE.json`'s `phase` and `log`, `**Status:** Approved` markers, the job files, the open task worktrees and handoffs ([[agent-comms]]).
-- An agent grounds itself with `dd-spec-navigator` (context, constitution, [[ARCHITECTURE]], the catalog, the relevant atoms, the live release), commits its task under its id and emits a handoff; a record change goes through its governance script, never a hand edit ([[release-lifecycle]]).
-- Work happens inside a job's or a task's worktree; only the main thread opens and merges worktrees, and a sub-agent works only inside the path it was given ([[worktrees]]).
-- Only the operator accepts a decision: no role agent writes `accepted` or `ruling` in an ADR record ([[audits-canon]]).
-- Concurrent sessions are allowed and never locked: no agent acquires, holds or releases a lock; races surface through git.
-- The reviewer writes its own verdict (`verdict.py`) and the main thread never writes one; its `APPROVED` is required at each job merge — once per job, never per task — and before a candidate's PR; a `REJECTED` blocks the merge, push, PR, deploy, closure and memory updates, and every verdict states the bug-surface delta from the bug ledger ([[QUALITY]]).
-- The reviewer's spec axis confronts PLAN §1's As-is verdicts with the diff: a DELETE or REBUILD unit left unchanged is HIGH, a KEEP unit that grew is a finding ([[release-lifecycle]]).
-- A merge further requires CI green and a `dd-code-reviewer` APPROVED verdict, security lens included, on the PR head ([[sdd-gate-v3]]).
+- The task is the implementation dispatch unit. A behavior begins with a RED-test dispatch and continues in a fresh implementation dispatch that cannot touch test paths ([[worktrees]]).
+- Jobs and tasks may run concurrently only where the approved PLAN and exact write sets permit it. Git exposes races; no agent acquires a lock.
+- No runtime advances the lifecycle. `_RELEASE.json`, approved definition documents, job files, worktrees, commits and handoffs are the evidence ([[release-lifecycle]]).
+- Only the main thread opens and merges canonical worktrees. A leaf works inside the path it receives and returns a validated handoff.
+- A job or plain change lands only after the reviewer's `APPROVED` verdict binds to its exact diff; task merges are unreviewed and enforce git hygiene plus RED/implementation separation.
 
 ## Models and privilege
 
-- Persona sources carry no model; `public install` resolves `(model, effort)` per persona from one of three templates — `balanced` (default), `max-quality`, `economy` — with a per-agent overlay taking precedence, all through the one resolver in `dadaia_workspace/core/model_registry.py`.
-- The resolver in `dadaia_workspace/core/model_registry.py` refuses a model unknown to its registry and a Fable-family model for `dd-code-reviewer`.
-- Least privilege derives from each persona's `activity_class` at install: Claude `permissionMode`/`disallowedTools`; Codex always renders `sandbox_mode = "workspace-write"` ([[harness-claude-code]], [[harness-codex]]).
+- Persona sources contain no model id. `public install` resolves model and effort from the selected policy template and per-agent overlay through `dadaia_workspace/core/model_registry.py`.
+- Unknown models are refused, and the reviewer cannot use a model family disallowed for review.
+- Install derives harness permissions from each persona's activity class. Harness serialization changes, but the role boundary does not ([[agentic-entities]], [[public-asset-distribution]]).
 
 ## Dependencies
 
-[[agentic-entities]], [[agent-comms]], [[sdd-gate-v3]], [[release-lifecycle]], [[harness-claude-code]], [[harness-codex]], [[worktrees]], [[audits-canon]].
+[[agentic-entities]], [[agent-comms]], [[release-lifecycle]], [[worktrees]], [[audits-canon]], [[public-asset-distribution]].

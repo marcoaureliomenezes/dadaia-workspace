@@ -13,11 +13,8 @@ def test_digest_derives_from_the_live_tree_within_budget() -> None:
     assert len(text) <= _MAX_CHARS, "digest must stay within the ~4k-token budget"
     # Derived and grounded in real groups; no version, which is not a fact of the tree —
     # a version bump must never drift the committed docs/cli.md.
-    assert text.startswith("<!-- derived-from: dadaia help tree")
-    assert text.splitlines()[2].startswith(
-        "# dadaia CLI digest (derived from the live command tree"
-    )
-    assert "(v" not in text.splitlines()[2]
+    assert text.startswith("# dadaia CLI digest (derived from the live command tree")
+    assert "(v" not in text.splitlines()[0]
     for group in ("context", "specs", "doctor", "public", "help"):
         assert f"## dadaia {group}" in text or f"- {group} " in text, group
     # The one retired phantom the old hand-written skill documented.

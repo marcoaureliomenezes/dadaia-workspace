@@ -1,13 +1,14 @@
 #!/usr/bin/env python3
-"""`worktree.py merge|stage|clean`: end one canonical worktree — land it on the branch it
+"""`worktree.py merge|clean`: end one canonical worktree — land it on the branch it
 was cut from after its gate, or drop an empty one — never with `--force` or `-D`,
-re-runnable after a stop. A task lands on its job branch after the task gate, unreviewed; a
+re-runnable after a stop. A task lands on its job branch after test separation, unreviewed; a
 job lands on the work branch after its review and the job gate; a `define` or `backlog` tree
-lands `specs/` after its review and the ledger checks alone. Each gate is the repo's own
-declared `verify:` (job), `verify-stage:` or `verify-task:` line, run as one argv list."""
+lands `specs/` after its review and the ledger checks alone. The job gate is the repo's own
+declared `verify:` line, run as one argv list."""
 
 from __future__ import annotations
 
+import fnmatch
 import json
 import os
 import shlex
@@ -28,10 +29,12 @@ from _worktree_git import (
     git_line,
     ours,
     quote,
+    recorded_base,
     script,
     work_version,
+    workspace_of,
 )
-from _worktree_names import NAME_RE, SCRIPT, Refusal, base, branch, locate, non_code
+from _worktree_names import NAME_RE, SCRIPT, Refusal, branch, locate, non_code, plain
 
 REVIEWER = "dd-code-reviewer"
 #: The ledger, trio and release checks a `define` or `backlog` merge runs, in this order.
@@ -48,7 +51,8 @@ def _target(root: Path, path: str) -> tuple[Path, Path, str, str]:
         raise Refusal(f"{path} is not a worktrees/<repo>/<name> path", f"{script(SCRIPT)} list")
     repo = root / "repos" / repo_name
     flow, version = flow_for(root, repo), NAME_RE.match(name)["v"]  # type: ignore[index]
-    return repo, tree, name, base(name, flow["work"] + (version or work_version(repo, flow)))
+    work = flow["work"] + (version or work_version(repo, flow)) if not plain(name) else ""
+    return repo, tree, name, recorded_base(repo, name, work)
 
 
 def _refuse_dirty(tree: Path) -> None:
@@ -149,22 +153,26 @@ def _declared(tree: Path, work: str, key: str) -> str:
     return next((ln.removeprefix(key).strip() for ln in lines if ln.startswith(key)), "")
 
 
-def _gate(tree: Path, level: str, work: str, *files: str) -> None:
-    """One gate level: the command *work*'s tracked `AGENTS.md` declares — no tree picks its judge —
-    `verify:` the job's, `verify-stage:` and `verify-task:` (the touched *files* appended) — split
-    by `shlex` and run as one argv list in *tree*, never a shell, the workspace venv first on
-    `PATH` (a bare `python` is the workspace's, at any tree depth); its output, on stdout alone,
-    is the evidence; stdin is closed. A missing or unstartable line is fixed on *work* alone."""
-    key = "verify:" if level == "job" else f"verify-{level}:"
+def _gate(tree: Path, work: str, *, required: bool = True) -> None:
+    """Run *work*'s tracked `verify:` once; a plain tree may omit the declaration."""
+    key = "verify:"
     declared = _declared(tree, work, key)
-    agents = tree.parents[3] / "repos" / tree.parents[1].name / "AGENTS.md"
+    root = workspace_of(tree)
+    if root is None:
+        raise Refusal(
+            f"no workspace owns {tree}", "Operator action: run this merge inside its workspace"
+        )
+    repo_name = tree.relative_to(root / "worktrees").parts[0]
+    agents = root / "repos" / repo_name / "AGENTS.md"
     if not declared:
+        if not required:
+            return
         raise Refusal(f"this repo declares no {key} command",
-                      f"Operator action: add this repo's {level} gate as a {key} line to {agents} and commit it on {work}")  # fmt: skip
-    venv = [tree.parents[3] / ".dadaia/.venv" / d for d in ("bin", "Scripts")]  # the workspace's
+                      f"Operator action: add this repo's job gate as a {key} line to {agents} and commit it on {work}")  # fmt: skip
+    venv = [root / ".dadaia/.venv" / d for d in ("bin", "Scripts")]  # the workspace's
     env = _env() | {"PATH": os.pathsep.join([*map(str, venv), os.environ.get("PATH", "")])}
     try:
-        command = [*shlex.split(declared), *files]
+        command = shlex.split(declared)
         done = subprocess.run(command, cwd=tree, env=env, stdin=subprocess.DEVNULL,
                               stderr=subprocess.STDOUT)  # fmt: skip
     except (OSError, ValueError) as error:
@@ -175,6 +183,38 @@ def _gate(tree: Path, level: str, work: str, *files: str) -> None:
         line = " ".join(map(quote, command))
         raise Refusal(f"{key} exited {done.returncode}",
                       f"Operator action: make `{line}` exit 0 in {tree} and commit the fix in this worktree")  # fmt: skip
+
+
+def _is_test_path(path: str, declared: str) -> bool:
+    """Whether *path* is a declared test glob, or a built-in fallback when none is declared."""
+    if declared:
+        try:
+            return any(fnmatch.fnmatchcase(path, glob) for glob in shlex.split(declared))
+        except ValueError:
+            return False
+    name = Path(path).name
+    return (
+        path.startswith("tests/")
+        or name.startswith("test_")
+        or fnmatch.fnmatchcase(name, "*_test.*")
+        or fnmatch.fnmatchcase(name, "*.spec.*")
+    )
+
+
+def _refuse_implementation_tests(tree: Path, onto: str, law: str) -> None:
+    """Keep RED test commits separate from every non-test implementation commit."""
+    declared = _declared(tree, law, "tests:")
+    commits = git(tree, "rev-list", "--reverse", f"{onto}..HEAD").split()
+    for commit in commits:
+        subject = git(tree, "show", "-s", "--format=%s", commit).strip()
+        if subject.startswith("test("):
+            continue
+        paths = git(tree, "diff-tree", "--no-commit-id", "--name-only", "-r", commit).split()
+        if test := next((path for path in paths if _is_test_path(path, declared)), None):
+            raise Refusal(
+                f"implementation commit {commit[:12]} touches test path {test}",
+                f"Operator action: move {test} to the separate RED test dispatch and keep this implementation commit source-only",
+            )
 
 
 def _open_tasks(repo: Path, name: str) -> None:
@@ -308,21 +348,24 @@ def merge(root: Path, path: str, keep: list[str], drop: bool) -> str:
         _rmdir(tree)
         return f"{ref} merged into {onto}"
     _refuse_dirty(tree)
-    if into != repo:  # a task: its gate, no verdict, onto its job branch
+    if into != repo:  # a task: hygiene and implementation/test separation, no gate or verdict
         _check_ancestor(tree, onto)
-        touched = git(tree, "diff", "--name-only", "--diff-filter=d", f"{onto}...HEAD").split()
-        _gate(tree, "task", _target(root, str(into))[3], *touched)
+        _refuse_implementation_tests(tree, onto, _target(root, str(into))[3])
         _refuse_dirty(into)
     elif non_code(name):
         _check_specs_only(tree, onto)
         _check_ancestor(tree, onto)
         _check_approved(root, tree, onto, name)
         _ledgers(root, tree)
+    elif plain(name):
+        _check_ancestor(tree, onto)
+        _check_approved(root, tree, onto, name)
+        _gate(tree, onto, required=False)
     else:
         _open_tasks(repo, name)
         _check_ancestor(tree, onto)
         _check_approved(root, tree, onto, name)
-        _gate(tree, "job", onto)
+        _gate(tree, onto)
     kept = _kept(tree, "merge", keep, drop)
     if git(into, "branch", "--show-current").strip() != onto:
         raise Refusal(f"{into} is not on {onto}", git_line(into, "switch", onto))
@@ -334,17 +377,6 @@ def merge(root: Path, path: str, keep: list[str], drop: bool) -> str:
         raise Refusal(f"fast-forward failed: {error}", fix) from error
     _remove(into, tree, name, kept)
     return f"{ref} merged into {onto}"
-
-
-def stage(root: Path, path: str) -> str:
-    """Close a stage of a job: no task worktree of it open, the stage gate green."""
-    repo, tree, name, onto = _target(root, path)
-    match = NAME_RE.match(name)
-    if not (match and match["rc"] and not match["task"]) or non_code(name) or not tree.exists():
-        raise Refusal(f"{path} is not an open job worktree", f"{script(SCRIPT)} list")
-    _open_tasks(repo, name)
-    _gate(tree, "stage", onto)
-    return f"stage gate green on {branch(name)}@{git(tree, 'rev-parse', 'HEAD').strip()}"
 
 
 def clean(root: Path, path: str, keep: list[str], drop: bool) -> str:

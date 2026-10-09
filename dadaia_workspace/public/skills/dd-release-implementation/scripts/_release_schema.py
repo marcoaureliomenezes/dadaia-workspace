@@ -39,6 +39,7 @@ _STATUS_RE = re.compile(r"^\*\*Status:\*\*\s*(.+?)\s*$", re.MULTILINE)
 ORIGIN_KINDS = ("backlog", "bugs", "findings")
 _ORIGIN_RE = re.compile(r"^\*\*Origin:\*\*[ \t]*(.*?)[ \t]*$", re.MULTILINE)
 _ORIGIN_GRAMMAR = "operator-demand | backlog:<ids>; bugs:<ids>; findings:<ids>, each kind once"
+TASK_ID_RE = re.compile(r"^J[1-9][0-9]*(?:\.S[1-9][0-9]*)?\.T[1-9][0-9]*$")
 
 
 def utc_now() -> str:
@@ -217,13 +218,94 @@ def stage_writes(body: str) -> list[list[str]]:
     return tasks
 
 
+def _cells(line: str) -> list[str]:
+    """The cells of one Markdown table line, without its optional edge pipes."""
+    return [cell.strip() for cell in line.strip().strip("|").split("|")]
+
+
+def _table_rows(
+    lines: list[str], header_at: int, headers: list[str], missing_separator: str
+) -> tuple[list[str], list[str]]:
+    """A Markdown table's data rows, after its canonical separator."""
+    separator_at = header_at + 1
+    if separator_at >= len(lines):
+        return [], [missing_separator]
+    separator = _cells(lines[separator_at])
+    if len(separator) != len(headers) or any(
+        re.fullmatch(r":?-{3,}:?", cell) is None for cell in separator
+    ):
+        return [], [missing_separator]
+    return [line for line in lines[separator_at + 1 :] if line.lstrip().startswith("|")], []
+
+
+def current_job_writes(text: str, rel: str) -> tuple[set[str] | None, list[str]]:
+    """A current job table's authoritative write union and errors; ``None`` marks history."""
+    if re.search(r"^## Stage ", text, re.MULTILINE):
+        return None, []
+    lines = text.splitlines()
+    header_at = next((n for n, line in enumerate(lines) if line.lstrip().startswith("|")), None)
+    if header_at is None:
+        return set(), [f"{rel} has no canonical task table"]
+    headers = _cells(lines[header_at])
+    required = ("task", "AC", "`W:`")
+    if any(headers.count(name) != 1 for name in required):
+        return set(), [f"{rel} task table must carry canonical task, AC and `W:` columns"]
+    rows, errors = _table_rows(
+        lines, header_at, headers, f"{rel} task table has no canonical separator row"
+    )
+    if errors:
+        return set(), errors
+    task_at, ac_at, writes_at = (headers.index(name) for name in required)
+    found: set[str] = set()
+    authority: set[str] = set()
+    if not rows:
+        return set(), [f"{rel} has no task carrying id, AC and exact `W:` set"]
+    for line in rows:
+        cells = _cells(line)
+        if len(cells) != len(headers):
+            errors.append(f"{rel} has a malformed task row")
+            continue
+        task_id = cells[task_at]
+        if not TASK_ID_RE.fullmatch(task_id):
+            errors.append(f"{rel} has an empty or malformed task id")
+            continue
+        if task_id in found:
+            errors.append(f"{rel} repeats task {task_id}")
+            continue
+        found.add(task_id)
+        if not re.search(r"\bAC\d", cells[ac_at]):
+            errors.append(f"{rel} task {task_id} has no AC")
+        paths = writes(f"`W:` {cells[writes_at]}")
+        if not paths:
+            errors.append(f"{rel} task {task_id} has no exact `W:` set")
+        authority.update(paths)
+    return authority, errors
+
+
 def job_errors(text: str, rel: str) -> list[str]:
-    """Why job file *text* at *rel* is malformed: no `## Stage` heading, a stage with no
-    `- Contract:` line, or two tasks of one stage writing one path."""
+    """Why a current task table or historical stage-shaped job file is malformed."""
     stages = re.split(r"^## Stage ", text, flags=re.MULTILINE)[1:]
     if not stages:
-        return [f"{rel} has no '## Stage <id>' heading"]
-    errors: list[str] = []
+        return current_job_writes(text, rel)[1]
+    task_rows: list[tuple[str, str, list[str]]] = []
+    for line in text.splitlines():
+        cells = [cell.strip() for cell in line.strip().strip("|").split("|")]
+        if len(cells) >= 3 and TASK_ID_RE.fullmatch(cells[0]):
+            task_rows.append((cells[0], cells[1], writes(f"`W:` {cells[2]}")))
+            continue
+        match = re.match(r"^[-*+]\s+(J\d+(?:\.S\d+)?\.T\d+)\s+", line)
+        if match:
+            task_rows.append((match.group(1), line.partition("—")[2], writes(line)))
+    errors = [
+        f"{rel} task {task_id} has no AC"
+        for task_id, ac, _ in task_rows
+        if not re.search(r"\bAC\d", ac)
+    ]
+    errors += [
+        f"{rel} task {task_id} has no exact `W:` set"
+        for task_id, _, paths in task_rows
+        if not paths
+    ]
     for body in stages:
         stage, tasks = body.split(maxsplit=1)[0], stage_writes(body)
         if not re.search(r"^- Contract:", body, re.MULTILINE):
@@ -231,4 +313,71 @@ def job_errors(text: str, rel: str) -> list[str]:
         flat = [path for paths in tasks for path in set(paths)]
         errors += [f"{rel} stage {stage}: two tasks write {path} — `W:` sets overlap"
                    for path in sorted({p for p in flat if flat.count(p) > 1})]  # fmt: skip
+    return errors
+
+
+def current_plan_jobs(text: str) -> tuple[dict[str, tuple[int, set[str]]] | None, list[str]]:
+    """The current DAG's job -> (wave, exact writes) authority; ``None`` marks history."""
+    if not re.search(r"^## (?:\d+\. )?As-is review\s*$", text, re.MULTILINE):
+        return {}, ["PLAN.md has no 'As-is review' section"]
+    section = re.split(r"^## DAG.*$", text, maxsplit=1, flags=re.MULTILINE)[1:]
+    if not section:
+        return {}, ["PLAN.md has no '## DAG' section"]
+    lines = re.split(r"^#", section[0], maxsplit=1, flags=re.MULTILINE)[0].splitlines()
+    header_at = next((n for n, line in enumerate(lines) if line.lstrip().startswith("|")), None)
+    if header_at is None:
+        return {}, ["PLAN.md DAG has no table"]
+    headers = [cell.strip().strip("`").lower() for cell in _cells(lines[header_at])]
+    required = ("job", "waits on")
+    if any(name not in headers for name in required):
+        return {}, ["PLAN.md DAG table must carry job and waits on columns"]
+    current = "wave" in headers or "w:" in headers
+    if current and not {"wave", "w:"}.issubset(headers):
+        return {}, ["PLAN.md DAG table must carry wave and exact `W:` columns together"]
+    if not current:  # historical plans carry their overlap metadata in `### Hot files`.
+        history_errors = (
+            []
+            if re.search(r"^### Hot files\s*$", text, re.MULTILINE)
+            else ["PLAN.md DAG table has no wave and exact `W:` columns"]
+        )
+        return None, history_errors
+    rows, errors = _table_rows(
+        lines, header_at, headers, "PLAN.md DAG table has no canonical separator row"
+    )
+    if errors:
+        return {}, errors
+    job_at, wave_at, writes_at = (headers.index(name) for name in ("job", "wave", "w:"))
+    jobs: dict[str, tuple[int, set[str]]] = {}
+    for line in rows:
+        cells = _cells(line)
+        if len(cells) != len(headers) or not cells[job_at]:
+            errors.append("PLAN.md DAG has an empty or malformed job row")
+            continue
+        job = cells[job_at]
+        row_paths = re.findall(r"`([^`]+)`", cells[writes_at])
+        if not cells[wave_at].isdigit() or not row_paths:
+            errors.append(f"PLAN.md DAG job {job} has no numeric wave and exact `W:` set")
+            continue
+        if job in jobs:
+            errors.append(f"PLAN.md DAG repeats {job}")
+            continue
+        jobs[job] = (int(cells[wave_at]), set(row_paths))
+    if not jobs:
+        errors.append("PLAN.md DAG has no jobs")
+    return jobs, errors
+
+
+def plan_errors(text: str) -> list[str]:
+    """Why a current PLAN's as-is review and DAG table cannot enter implementation."""
+    jobs, errors = current_plan_jobs(text)
+    if jobs is None or errors:
+        return errors
+    by_wave: dict[int, list[str]] = {}
+    for wave, paths in jobs.values():
+        by_wave.setdefault(wave, []).extend(paths)
+    for wave, wave_paths in by_wave.items():
+        errors += [
+            f"PLAN.md DAG wave {wave}: two jobs write {path} — `W:` sets overlap"
+            for path in sorted({path for path in wave_paths if wave_paths.count(path) > 1})
+        ]
     return errors

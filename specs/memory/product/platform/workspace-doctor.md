@@ -63,7 +63,8 @@ sources:
 ## The `ledgers` section
 
 - `BL-SCHEMA`, `BL-CONFLICT` over `BACKLOG.json` (`dadaia_workspace/features/backlog/doctor.py`); `LEDGER-ADR-SCHEMA` over `decisions.jsonl`, its fix an `Operator action:` to discard or revert the change that wrote the line, then redo it as an ADR commit.
-- Each ledger script (`bugs.py`, `backlog.py`, `release.py`, `audit.py`, `memory.py`) runs its own `check --specs <dir> --json`; each record re-emits as `LEDGER-<NAME>-SCHEMA` with the fix the script wrote, a record without one meaning an older install (`<cli> public install`); a script that cannot run is a finding whose fix is `<cli> public install`.
+- Each record ledger script (`bugs.py`, `backlog.py`, `release.py`, `audit.py`) runs its own `check --specs <dir> --json`; error and warning records re-emit as `LEDGER-<NAME>-SCHEMA`, while informational trace rows remain on the owner script's direct JSON surface. A record without a fix means an older install (`<cli> public install`); a script that cannot run is a finding whose fix is `<cli> public install`.
+- Product-memory atoms are linted in the `specs` section through the shared `memory.py` grammar. The generated catalog pair is checked and rewritten by `memory.py` during the closure pass and `specs init` or `specs upgrade`; it is not a record ledger in the doctor's `ledgers` section.
 - The doctor builds no validator for a ledger schema: where it reads a ledger itself (the backlog anchors, the ADR ledger) it goes through the scripts' own reader and schema engine, `_ledger.py`, loaded from the package's copy by `infrastructure/ledger_scripts.load_owner`; it repairs no ledger.
 
 ## The reaper

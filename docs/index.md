@@ -14,8 +14,6 @@ Repository: <https://github.com/marcoaureliomenezes/dadaia-workspace>
 
 ## What it is
 
-<!-- derived-from: product-vision sha256:50aa2de46233 -->
-
 dadaia-workspace is the operating environment around repositories developed with AI
 agents, and its unit is the context.
 
@@ -33,20 +31,19 @@ What it rests on:
   memory, release and task state.
 - Documents are the lifecycle — backlog, SPEC, PLAN, the job files, `_RELEASE.json` and
   `BUGS.jsonl` carry ordered work; no runtime drives agents through steps.
-- Deterministic boundaries — path class, bind scope, root hygiene, venv-rooting and
+- Deterministic boundaries — path class, bind scope, root hygiene and
   the push gate are mechanical, each refusal carrying one fix line; what
   cannot be mechanical is written as law.
 - Visible concurrency — sessions may race, git exposes the overlap, and nothing waits
   on a lock.
-- No mechanism without a demand, and no slop: runtime state, reports, handoffs,
-  caches, projections and temporary files have canonical homes and never leak into a
-  repository.
+- Features and fixes spend future options when they add coupling, so delivery alternates
+  with deletion, simplification or decoupling. Mechanisms without a current demand are
+  removed, and runtime state, reports, handoffs, caches, projections and temporary files
+  have canonical homes.
 - Success is evidenced by reviews, task commits, commands and artifacts, never
   inferred from prose.
 
 ## Two ways in
-
-<!-- derived-from: product-vision sha256:50aa2de46233 -->
 
 A human drives it from a shell in three levels:
 `uvx dadaia-workspace init <dir> --harness <name> --repo <url>` provisions the
@@ -65,4 +62,4 @@ area, and works inside the gate, the ledger scripts and the handoff contract;
 Claude Code, Codex, Kimi Code, Cursor, Devin and GitHub Copilot are the entry
 harnesses, one registry record each. The same canonical rules reach every harness
 through one authored set, read natively or through per-entry symlinks. Both paths read
-one truth: every page here derives from a named memory atom under its content hash.
+one truth: every page here is reconciled from named product memory.

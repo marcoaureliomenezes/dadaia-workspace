@@ -15,7 +15,7 @@ sys.path.append(str(Path(__file__).resolve().parents[2] / "dd-bug-resolution" / 
 from _ledger import records, replace  # noqa: E402
 from _release_schema import SEMVER_RE, STATE, next_candidate, utc_now  # noqa: E402
 from _release_store import SCRIPT, Refusal, State, live_ids, read_state, validated  # noqa: E402
-from _release_tree import BUG_WINDOW, refuse_open_bugs, tree_findings  # noqa: E402
+from _release_tree import BUG_WINDOW, tree_findings  # noqa: E402
 
 SPEC_STUB = """\
 # SPEC — Release: {release_id}
@@ -30,31 +30,32 @@ SPEC_STUB = """\
 
 {bug_window}
 
-(Read `bugs.py window` and each cited test before scoping.)
+(Read the prior candidate's `## Bug window review`, then inspect each resolved record's
+persisted `fix_sha` with `git show` as `dd-bug-resolution/LINEAGE.md` defines.)
 
-## 1. Problem and context
+## 1. Problem
 
 (Describe the problem this release solves.)
 
-## 2. Objective
+## 2. Measurable Goals
 
-(State the release objective in one sentence.)
+(List observable outcomes.)
 
-## 3. Scope
-
-{scope}
-
-## 4. Replaces
-
-(One bullet per current behaviour an As-is DELETE/REBUILD row removes, or `none` and why.)
-
-## 5. Out of scope
+## 3. Non-goals
 
 (Explicitly list what this release does NOT cover.)
 
-## 6. Dependencies and risks
+## 4. Requirements
+
+{scope}
+
+## 5. Constraints and risks
 
 (Upstream blockers, sequencing constraints, risk table.)
+
+## 6. Open questions
+
+(Questions the operator must decide before approval, or `none`.)
 """
 
 
@@ -89,7 +90,7 @@ def candidate_state(release_id: str, prior: State | None) -> State:
 def refuse_unfree(specs: Path, release_id: str) -> State | None:
     """`new`'s two legal states: no live release (birth — returns ``None``), and the live
     release IS *release_id* in phase CLOSURE, the stacked candidate the law requires
-    (returns the closed state to reopen), once `bugs.py` finds no bug open in the closing rc.
+    (returns the closed state to reopen), once the tree's global open-bug readiness permits it.
     Anything else, a red tree, or a symlink, refuses."""
     if not SEMVER_RE.match(release_id):
         raise Refusal(
@@ -123,7 +124,6 @@ def refuse_unfree(specs: Path, release_id: str) -> State | None:
             "candidate is stacked only on a closed one",
             f"{SCRIPT} phase CLOSURE --sha $(git rev-parse --short HEAD)",
         )
-    refuse_open_bugs(specs, release_id, release_dir)
     return prior
 
 

@@ -9,27 +9,41 @@ commit, so a writer/validator disagreement is unrepresentable. The schema is
 from __future__ import annotations
 
 import json
-import re
 import sys
 from collections.abc import Iterator
 from pathlib import Path
 from typing import Any
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+sys.path.append(str(Path(__file__).resolve().parents[2] / "dd-release-implementation" / "scripts"))
 
 import _ledger  # noqa: E402
+from _release_schema import TASK_ID_RE  # noqa: E402
 from _specs import quote, script, with_specs  # noqa: E402
 
 CODE = "LEDGER-BUGS-SCHEMA"
 LEDGER = "bugs/BUGS.jsonl"
 HISTO = "bugs/_archive/bugs_histo.jsonl"
-#: The job files' task id.
-TASK_ID = r"J[\dA-Z]+\.S\d+\.T\d+"
-TERMINAL = ("resolved", "superseded", "deferred", "rejected")
+TERMINAL = ("resolved", "superseded", "rejected")
 _VERBS, _LAW = (
     "`bugs.py append` or `bugs.py update`",
     "specs/bugs/AGENTS.md: never hand-edit BUGS.jsonl",
 )
+_LEGACY_MARKERS = frozenset({"audited", "resolved_release"})
+
+
+def _schema_record(record: Any, schema: dict[str, Any]) -> Any:
+    """Project historical records onto the lean shape without admitting retired fields
+    on records written by the current CLI.
+
+    Every pre-lean record carries both legacy governance markers. Current writers expose
+    neither marker, so their candidate bytes still receive strict additional-property
+    validation.
+    """
+    if isinstance(record, dict) and record.keys() >= _LEGACY_MARKERS:
+        allowed = schema["properties"]
+        return {key: value for key, value in record.items() if key in allowed}
+    return record
 
 
 def load_schema() -> dict[str, Any]:
@@ -54,11 +68,16 @@ def invariant_errors(record: dict[str, Any]) -> Iterator[str]:
 
 def tasks(root: Path) -> set[str]:
     """Every task id under *root*`/releases/`, `_archive/` included: a closed rc's `TASKS.md`
-    carries `T-…`, a job rc's `tasks/<job>.md` carries `J<n>.S<m>.T<k>` (`JR.…`);
-    bounded: an id glued to a word or a hyphen (a doctor code, a placeholder) is no task."""
-    bounded = re.compile(rf"(?<![\w-])(?:T-\d+(?:-\d+)*|{TASK_ID})(?![\w-])")
+    carries historical rows, and a job rc's `tasks/<job>.md` carries current or historical
+    ids. The release schema's parser is the one identity grammar."""
     files = [*root.glob("releases/**/TASKS.md"), *root.glob("releases/**/tasks/*.md")]
-    return {t for f in files for t in bounded.findall(f.read_text(encoding="utf-8"))}
+    return {
+        cell
+        for file in files
+        for line in file.read_text(encoding="utf-8").splitlines()
+        for cell in (part.strip() for part in line.split("|"))
+        if TASK_ID_RE.fullmatch(cell)
+    }
 
 
 def findings_for(
@@ -73,6 +92,7 @@ def findings_for(
     fixes: dict[int, str] = {}  # a line a governance verb clears
     seen: dict[str, int] = {}
     links: dict[str, object] = {}
+    legacy_ids: set[str] = set()
 
     def add(line: int, message: str) -> None:
         lines.setdefault(line, []).append(message)
@@ -85,7 +105,7 @@ def findings_for(
         except json.JSONDecodeError as exc:
             add(number, f"line is not valid JSON: {exc.msg}")
             continue
-        messages = list(_ledger.validate(record, schema, schema, "record"))
+        messages = list(_ledger.validate(_schema_record(record, schema), schema, schema, "record"))
         for message in messages or invariant_errors(record):
             add(number, message)
         if messages:
@@ -94,8 +114,12 @@ def findings_for(
         if first != number:
             add(number, f"duplicate record id {record['id']!r} (first appended at line {first})")
         links.setdefault(record["id"], record["caused_by"])
+        if record.keys() >= _LEGACY_MARKERS:
+            legacy_ids.add(record["id"])
     known = {None, "none", *links, *archived, *tasks(root)}
     for bug_id, target in links.items():
+        if bug_id in legacy_ids:
+            continue
         chain, at = [bug_id], target
         while at in links and at not in chain:
             chain.append(str(at))
@@ -117,18 +141,9 @@ def findings_for(
     ]  # fmt: skip
 
 
-def accepted_adrs(root: Path) -> set[str]:
-    """The ids of every accepted ADR in *root*'s ``ADRs/decisions.jsonl``."""
-    decisions = root / "ADRs" / "decisions.jsonl"
-    rows = _ledger.records(decisions) if decisions.is_file() else []
-    return {str(r.get("id")) for r in rows if r.get("status") == "accepted"}
-
-
 def histo_findings(text: str, root: Path = _ledger.SPECS) -> list[dict[str, Any]]:
-    """The archive's lines: each a bug-record-v1 record moved by the accepted ADR its
-    ``archived_by`` names, or a pre-v6 ``event`` line that predates the record shape and is
-    history, never rewritten."""
-    schema, accepted = load_schema(), accepted_adrs(root)
+    """The archive's bug records plus pre-v6 event lines, which remain readable history."""
+    schema = load_schema()
     out: list[dict[str, Any]] = []
     for number, raw in enumerate(text.split("\n"), start=1):
         try:
@@ -140,10 +155,10 @@ def histo_findings(text: str, root: Path = _ledger.SPECS) -> list[dict[str, Any]
             messages = (
                 []
                 if record is None or legacy
-                else list(_ledger.validate(record, schema, schema, "record"))
+                else list(
+                    _ledger.validate(_schema_record(record, schema), schema, schema, "record")
+                )
             )
-            if record is not None and not legacy and record.get("archived_by") not in accepted:
-                messages.append(f"archived_by {record.get('archived_by')!r} names no accepted ADR")
         if messages:
             fix = _ledger.unwritten(root / HISTO, number, "`bugs.py archive`", _LAW)
             out.append(_ledger.finding(CODE, HISTO, number, "; ".join(messages), fix))

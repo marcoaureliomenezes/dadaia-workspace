@@ -1,4 +1,4 @@
-"""Merged PreToolUse gate: root-whitelist -> venv-guard -> SDD gate, first block wins; a
+"""Merged PreToolUse gate: root-whitelist -> SDD gate, first block wins; a
 policy that raises is treated as ALLOW (fail-open)."""
 
 from __future__ import annotations
@@ -6,11 +6,10 @@ from __future__ import annotations
 import sys
 from collections.abc import Callable
 
-from dadaia_workspace.hooks import _common, root_whitelist, sdd_gate, venv_guard
+from dadaia_workspace.hooks import _common, root_whitelist, sdd_gate
 
 _POLICIES: tuple[Callable[[dict[str, object]], str | None], ...] = (
     root_whitelist.evaluate_payload,
-    venv_guard.evaluate_payload,
     sdd_gate.evaluate_payload,
 )
 

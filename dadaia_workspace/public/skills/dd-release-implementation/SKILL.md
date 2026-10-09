@@ -23,7 +23,7 @@ description: >
 3. The live candidate's job files sit at `releases/<v>/rc-<N>/tasks/<job>.md`, the highest `rc-<N>/`; a lower one is closed history (a closed rc keeps its `TASKS.md`).
 4. Full navigation protocol: `dd-spec-navigator`.
 5. Read `RC-FLOW.md` for the candidate arc and gate cadence before acting past opening a task.
-6. Update `_RELEASE.json` per `RELEASE-EVENTS.md`; a stage's third red gate adds the `stop:` note (`specs/releases/AGENTS.md` §2).
+6. Update `_RELEASE.json` per `RELEASE-EVENTS.md`.
 7. At `RC-FLOW.md` step 4, run `MEMORY-UPDATE.md`'s full protocol before touching any memory atom.
 8. A test enters the suite only under the root map §1 test basics.
 9. Before growing any module, run the deletion test and speak the seam vocabulary (`dd-codebase-design`) — a diff that only adds justifies itself against replace-don't-layer.
@@ -41,7 +41,7 @@ description: >
 ## 3. Done when
 
 - Live release resolved by reading `_RELEASE.json` directly.
-- Task committed under its id and merged onto its job branch after its task gate; the stage closed by `WT stage` (`RC-FLOW.md` step 2).
+- Task committed under its id and merged onto its job branch after its task gate.
 - Current step (`RC-FLOW.md`) identified before attempting its unlock action.
 - `verify:` line green before any push; trio `APPROVED` before the candidate's integration-branch PR.
 - At candidate closure: the Reconciliation job merged (`RC-FLOW.md` step 4) -> candidate PR -> the promote-or-continue gate.

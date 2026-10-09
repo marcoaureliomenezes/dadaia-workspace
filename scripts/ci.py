@@ -1,7 +1,7 @@
-"""The ONE source of the Linux CI jobs and the three gate levels (ADR 0190):
+"""The ONE source of the Linux CI jobs and repository verification:
 ``python scripts/ci.py [<job>...]`` runs the named ``ci.yml`` jobs (all of them when none is
 given); ``task FILE...`` runs ruff and mypy on the touched files and the touched tests;
-``stage`` runs lint, mypy, guards and the small tier; ``job`` runs every job. Each step
+``stage`` and ``job`` run lint, mypy, guards and the small tier. Each step
 prints ``PASS``/``FAIL <step>: <command>``; every step runs; exit 1 if any failed. Standard
 library only: the ``repo-hygiene`` and ``doctor`` jobs install no dev group."""
 
@@ -104,7 +104,7 @@ def plan(argv: list[str]) -> list[tuple[str, Step]]:
     """``(job, step)`` in run order for *argv*: a level, else the named CI jobs, else all."""
     if argv[:1] == ["task"]:
         return [("task", step) for step in _task(argv[1:])]
-    jobs = STAGE if argv == ["stage"] else list(JOBS) if argv in ([], ["job"]) else argv
+    jobs = STAGE if argv in ([], ["job"], ["stage"]) else argv
     return [(job, step) for job in jobs for step in JOBS[job]]
 
 

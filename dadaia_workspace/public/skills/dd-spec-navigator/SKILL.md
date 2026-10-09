@@ -31,7 +31,7 @@ read or any output written.
 
 1. Read `<specs-dir>/releases/<release-id>/_RELEASE.json` — its `phase` field is the resolver; the live candidate's trio is the highest `rc-<N>/` beside it.
 2. No state-document-carrying release directory: stop before implementation and inform the operator.
-3. Read the SPEC; add the PLAN when planning or implementing, the TASKS when implementing; read `_RELEASE.json`'s `log` when `phase` is `CLOSURE`.
+3. Read the SPEC; add the PLAN when planning or implementing and every job file when implementing; read `_RELEASE.json`'s `log` when `phase` is `CLOSURE`.
 4. Before any implementation, the precondition is `specs/AGENTS.md` §3; stop and name the missing item otherwise.
 
 ## Done when

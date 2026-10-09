@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-10-08T16:21:47Z",
+  "generated_at": "2026-10-09T11:15:35Z",
   "features": [
     {
       "rank": 1,
@@ -32,8 +32,8 @@
       "slug": "agent-orchestration",
       "title": "agent-orchestration",
       "area": "agents",
-      "tldr": "Three dd- personas dispatched by the main thread alone; ordered work carried by the SDD documents and handoffs, never a runtime; concurrent sessions, no locks.",
-      "summary": "Who owns which artifact, who may dispatch, how a stage's sequencing is evidenced by the documents themselves, and how each persona receives its model, effort and least-privilege tool set at install.",
+      "tldr": "Three dd- personas are leaf workers dispatched by the main thread; SDD documents, worktrees and handoffs carry the work, never an orchestration runtime.",
+      "summary": "The role boundary, task-level dispatch contract, evidence flow and install-time model and privilege resolution for the product, software and review personas.",
       "path": "specs/memory/product/agents/agent-orchestration.md",
       "tags": [
         "orchestration",
@@ -41,18 +41,14 @@
         "dispatch",
         "sdd"
       ],
-      "token_estimate": 855,
+      "token_estimate": 435,
       "depends_on": [
-        "agentic-entities",
-        "release-lifecycle",
-        "agent-comms",
-        "ARCHITECTURE",
         "worktrees",
-        "audits-canon",
-        "QUALITY",
-        "sdd-gate-v3",
-        "harness-claude-code",
-        "harness-codex"
+        "release-lifecycle",
+        "agentic-entities",
+        "public-asset-distribution",
+        "agent-comms",
+        "audits-canon"
       ],
       "sources": [
         "dadaia_workspace/public/agents/**",
@@ -65,8 +61,8 @@
       "slug": "agentic-entities",
       "title": "agentic-entities",
       "area": "agents",
-      "tldr": "The entity registry — three personas, the deterministic behaviours every harness implements, the rules — and the behavior map binding each skill to law.",
-      "summary": "The registry defines the workspace method harness-agnostically and every scaffolded persona, hook and rule derives from it; this atom holds the one enumeration of the hook behaviours the harness atoms link to; the behavior map binds each skill and scoped rule file to one law section.",
+      "tldr": "One registry names three personas, five deterministic behaviors and two abstract rules; a behavior map assigns each shipped skill and scoped law to an owner.",
+      "summary": "The harness-neutral entity registry, its projected implementations, the universal authored surface and the structural ownership and citation checks that keep agentic law complete.",
       "path": "specs/memory/product/agents/agentic-entities.md",
       "tags": [
         "agents",
@@ -74,18 +70,18 @@
         "derivation",
         "governance"
       ],
-      "token_estimate": 1307,
+      "token_estimate": 417,
       "depends_on": [
-        "agent-orchestration",
         "sdd-gate-v3",
-        "context-management",
-        "workspace-doctor",
-        "QUALITY",
         "public-asset-distribution",
-        "ARCHITECTURE"
+        "agent-orchestration",
+        "workspace-doctor",
+        "ARCHITECTURE",
+        "QUALITY"
       ],
       "sources": [
         "dadaia_workspace/public/entities/**",
+        "dadaia_workspace/public/schemas/behavior-map-v1.schema.json",
         "dadaia_workspace/public/data/CONTEXT-MAP.md",
         "dadaia_workspace/public/skills/**",
         "dadaia_workspace/infrastructure/entity_doctor.py"
@@ -121,8 +117,8 @@
       "slug": "public-asset-distribution",
       "title": "public-asset-distribution",
       "area": "distribution",
-      "tldr": "Public assets staged once, projected into the root map, scoped AGENTS.md, .agents/ and each harness's files, with scaffold and scripts; doctor reports drift.",
-      "summary": "The stage, install and doctor chain that distributes the agentic surface into a workspace — hash-compared overwrite, rendered personas, whole-folder skills, per-harness hook and agent files derived from one registry, the specs scaffold, and a privacy gate.",
+      "tldr": "Public install stages packaged assets and projects shared law, agents, skills and every registered harness; public doctor reports projection drift.",
+      "summary": "The stage, install and doctor chain that distributes the agentic surface — deterministic staging, rendered personas, whole-folder skills, registry-derived harness files, specs scaffold, projection pruning and privacy checks.",
       "path": "specs/memory/product/distribution/public-asset-distribution.md",
       "tags": [
         "public",
@@ -131,9 +127,8 @@
         "projection",
         "privacy"
       ],
-      "token_estimate": 1120,
+      "token_estimate": 1056,
       "depends_on": [
-        "harness-kimi-code",
         "agentic-entities",
         "workspace-init",
         "workspace-doctor",
@@ -141,7 +136,8 @@
         "context-management",
         "sdd-gate-v3",
         "pypi-distribution",
-        "consumer-agent-support"
+        "consumer-agent-support",
+        "harness-kimi-code"
       ],
       "sources": [
         "dadaia_workspace/features/public/**",
@@ -175,7 +171,7 @@
         "release",
         "packaging"
       ],
-      "token_estimate": 1116,
+      "token_estimate": 1075,
       "depends_on": [
         "release-lifecycle",
         "QUALITY",
@@ -237,7 +233,7 @@
         "projection",
         "hooks"
       ],
-      "token_estimate": 369,
+      "token_estimate": 396,
       "depends_on": [
         "agentic-entities",
         "sdd-gate-v3",
@@ -368,31 +364,25 @@
       "slug": "product-vision",
       "title": "product-vision",
       "area": "philosophy",
-      "tldr": "One workspace folder, an agent at its root, projects in repos inside, governance outside every repo; multi-project x multi-repo, never a monorepo; no slop.",
-      "summary": "The founding paradigm and the pillars of dadaia-workspace, plus the two usage paths — a human from a shell, an agent from the root AGENTS.md map — reading one truth.",
+      "tldr": "One workspace keeps project repositories inside it and governance outside; each context spans one main repository and any associated repositories.",
+      "summary": "The product paradigm, evidence and coupling principles, and the human and agent paths through one current product truth.",
       "path": "specs/memory/product/philosophy/product-vision.md",
       "tags": [
         "vision",
         "paradigm",
         "pillars"
       ],
-      "token_estimate": 927,
+      "token_estimate": 487,
       "depends_on": [
-        "worktrees",
-        "spec-context-project",
         "context-management",
+        "worktrees",
         "agentic-entities",
-        "release-lifecycle",
-        "bug-ledger",
-        "backlog-ledger",
         "sdd-gate-v3",
-        "public-asset-distribution",
-        "pypi-distribution",
         "workspace-init",
         "workspace-doctor",
-        "agent-comms",
-        "QUALITY",
-        "ARCHITECTURE"
+        "spec-context-project",
+        "release-lifecycle",
+        "public-asset-distribution"
       ],
       "sources": [
         "AGENTS.md",
@@ -605,8 +595,8 @@
       "slug": "specs-migration",
       "title": "specs-migration",
       "area": "platform",
-      "tldr": "specs init brings specs/ to the canon and writes the gitflow, never committing; specs upgrade re-stamps 6-10 as 11; migrate lifts registry v1.",
-      "summary": "The verbs that bring persisted state up to what this installation reads — dadaia specs init (onboarding level 3a; absent scaffolds, dadaia upgrades, foreign moves to specs-bkp/, the constitution's gitflow block written or kept), dadaia specs upgrade (a tree stamped 6 or above folds TECHSTACK.md and a flat release trio, runs the doctor's repair set and is re-stamped 11; below 6 it refuses without writing) and dadaia migrate (spec_contexts.json v1 to v2, planned, confirmed, atomic).",
+      "tldr": "specs init establishes canon and gitflow; specs upgrade reaches pattern 12; migrate updates the context registry.",
+      "summary": "The persisted-state upgrade verbs: specs init scaffolds or upgrades a dadaia tree and preserves a foreign tree in specs-bkp; specs upgrade runs the supported migration and repair set before stamping pattern 12; migrate updates the context registry atomically.",
       "path": "specs/memory/product/platform/specs-migration.md",
       "tags": [
         "migration",
@@ -615,7 +605,7 @@
         "registry",
         "onboarding"
       ],
-      "token_estimate": 1314,
+      "token_estimate": 1102,
       "depends_on": [
         "public-asset-distribution",
         "sdd-gate-v3",
@@ -650,7 +640,7 @@
         "compliance",
         "privacy"
       ],
-      "token_estimate": 2874,
+      "token_estimate": 2947,
       "depends_on": [
         "public-asset-distribution",
         "sdd-gate-v3",
@@ -683,7 +673,7 @@
       "title": "workspace-init",
       "area": "platform",
       "tldr": "Level 1 — uvx dadaia-workspace init [DIR] provisions venv, zones, law, one harness; re-init upgrades; --repo adds level 2; next step from one ordered step list.",
-      "summary": "dadaia init fills one plan from flags or TTY prompts, provisions the venv, the registry's init/install zones, the shared skills root and one harness's projection, seeds the states and the level-1 root files and stages and installs public assets in at most twelve lines of output naming the absolute venv CLI; on an existing workspace it upgrades an older venv, reports an equal one and refuses a newer one; with --repo it delegates to context create; one ordered onboarding step list, each step a real-state predicate plus one built fix line, gives the next step every onboarding caller prints.",
+      "summary": "dadaia init fills one plan from flags or prompts, provisions the venv and workspace tree, seeds state, and invokes the install path that stages current public assets before projection; re-init upgrades, and one ordered real-state step list drives onboarding guidance.",
       "path": "specs/memory/product/platform/workspace-init.md",
       "tags": [
         "workspace",
@@ -692,7 +682,7 @@
         "upgrade",
         "onboarding"
       ],
-      "token_estimate": 1895,
+      "token_estimate": 1893,
       "depends_on": [
         "context-management",
         "specs-migration",
@@ -718,32 +708,28 @@
       "slug": "audits-canon",
       "title": "audits-canon",
       "area": "sdd",
-      "tldr": "Audits are committed three-pillar reviews over a sha window, findings moved by audit.py; decisions.jsonl records only the operator accepts, with his ruling.",
-      "summary": "The two governance records that police canonical truth — an audit folder (AUDIT.md plus FINDINGS.jsonl) whose findings move by audit.py disposition and which audit.py close archives, and the decision ledger specs/ADRs/decisions.jsonl whose accepted records admit every canonical memory statement.",
+      "tldr": "An audit runs bug-history, spec-compliance and memory-drift pillars over one measured window and stores schema-valid findings until terminal disposition.",
+      "summary": "The three-pillar audit, reproducible finding evidence, terminal disposition vocabulary, single remediation release and atomic archive close.",
       "path": "specs/memory/product/sdd/audits-canon.md",
       "tags": [
-        "sdd",
-        "audits",
+        "audit",
         "findings",
-        "adrs",
-        "decisions",
-        "governance"
+        "bugs",
+        "specs",
+        "memory"
       ],
-      "token_estimate": 1380,
+      "token_estimate": 350,
       "depends_on": [
-        "agent-orchestration",
-        "sdd-gate-v3",
-        "workspace-init",
         "bug-ledger",
-        "workspace-doctor",
         "release-lifecycle",
-        "worktrees"
+        "workspace-doctor",
+        "ARCHITECTURE",
+        "QUALITY"
       ],
       "sources": [
-        "dadaia_workspace/public/skills/dd-audit-project/**",
-        "dadaia_workspace/public/schemas/audits/**",
+        "dadaia_workspace/public/schemas/audits/finding-record-v1.schema.json",
         "dadaia_workspace/public/schemas/ADRs/**",
-        "dadaia_workspace/features/specs/doctor_closure_audit.py",
+        "dadaia_workspace/public/skills/dd-audit-project/**",
         "dadaia_workspace/features/specs/doctor_adr.py"
       ]
     },
@@ -782,31 +768,27 @@
       "slug": "bug-ledger",
       "title": "bug-ledger",
       "area": "sdd",
-      "tldr": "One bug record per line in BUGS.jsonl, registered after operator confirmation, closed only by a transition carrying its red loop; bugs.py writes it.",
-      "summary": "The bug ledger — specs/bugs/BUGS.jsonl, one record per bug keyed by id, storing no git-derived fact (bugs.py fix and window derive them on read); the stdlib script bugs.py is its one writer and validator, and the ask-first registration plus the seven-phase resolution method run over it.",
+      "tldr": "BUGS.jsonl stores one lean current record per confirmed defect; its writer persists registration and resolution facts while git owns derived history.",
+      "summary": "The bug record grammar, confirmation and privacy boundary, terminal transitions, persisted fix lineage, archival and candidate integration.",
       "path": "specs/memory/product/sdd/bug-ledger.md",
       "tags": [
-        "sdd",
         "bugs",
         "ledger",
-        "governance"
+        "lineage",
+        "resolution"
       ],
-      "token_estimate": 2133,
+      "token_estimate": 447,
       "depends_on": [
-        "sdd-gate-v3",
-        "workspace-doctor",
-        "agent-comms",
-        "backlog-ledger",
-        "worktrees",
         "release-lifecycle",
-        "agent-orchestration",
-        "audits-canon"
+        "worktrees",
+        "audits-canon",
+        "sdd-gate-v3",
+        "QUALITY"
       ],
       "sources": [
-        "dadaia_workspace/public/skills/dd-bug-resolution/**",
-        "dadaia_workspace/public/skills/dd-bug-registration/**",
-        "dadaia_workspace/public/schemas/bugs/**",
-        "dadaia_workspace/public/skills/dd-bug-resolution/scripts/_bugs_check.py"
+        "dadaia_workspace/public/schemas/bugs/bug-record-v1.schema.json",
+        "dadaia_workspace/public/scaffold/bugs/AGENTS.md",
+        "dadaia_workspace/public/skills/dd-bug-resolution/**"
       ]
     },
     {
@@ -814,35 +796,29 @@
       "slug": "release-lifecycle",
       "title": "release-lifecycle",
       "area": "sdd",
-      "tldr": "Candidates in rc-<N>/ grow one live release; release.py writes _RELEASE.json; a candidate is a DAG of jobs ending in Reconciliation; promote archives it.",
-      "summary": "The release lifecycle — one live release directory whose _RELEASE.json state document is written by release.py (new, phase, drift, memory, ship, check), candidates that each review the as-is units their demand touches, then define, implement and close a SPEC, a PLAN drawing the DAG of jobs and one job file per job in its own rc-<N>/ folder, the PLAN and job-file checks at IMPLEMENTATION, release.py check as the one readiness judge in every phase and the one judge of the SPEC's Origin line and its trace back, the memory reconciliation gate at closure, and promotion by merging the release PR release-please opens, which ship records by archiving the release folder.",
+      "tldr": "One live release grows through closed-scope candidates; _RELEASE.json holds current phase, milestones and a lean append-only narrative.",
+      "summary": "Candidate birth, approval, task and job structure, phase transitions, authoritative memory drift, closure records, open-bug ship authorization and archival.",
       "path": "specs/memory/product/sdd/release-lifecycle.md",
       "tags": [
-        "sdd",
         "release",
         "candidate",
-        "lifecycle",
-        "memory",
-        "as-is-review"
+        "sdd",
+        "state",
+        "closure"
       ],
-      "token_estimate": 2889,
+      "token_estimate": 487,
       "depends_on": [
-        "sdd-gate-v3",
-        "specs-migration",
-        "backlog-ledger",
+        "worktrees",
         "bug-ledger",
+        "backlog-ledger",
         "audits-canon",
         "workspace-doctor",
-        "worktrees",
-        "agent-orchestration",
-        "pypi-distribution"
+        "agent-orchestration"
       ],
       "sources": [
-        "dadaia_workspace/public/skills/dd-release-implementation/**",
+        "dadaia_workspace/public/schemas/releases/release-state-v1.schema.json",
         "dadaia_workspace/public/skills/dd-release-definition/**",
-        "dadaia_workspace/public/skills/dd-spec-navigator/scripts/**",
-        "dadaia_workspace/public/schemas/releases/**",
-        "dadaia_workspace/core/release_state.py",
+        "dadaia_workspace/public/skills/dd-release-implementation/**",
         "dadaia_workspace/features/specs/doctor_release.py"
       ]
     },
@@ -851,42 +827,33 @@
       "slug": "sdd-gate-v3",
       "title": "sdd-gate-v3",
       "area": "sdd",
-      "tldr": "No-lock enforcement — three gate blocks (root entry, non-venv command, PROTECTED or out-of-scope write; repos/<r> takes merges), one fix each, a push chokepoint",
-      "summary": "The merged PreToolUse gate blocks exactly three things and reads no SDD artifact; every refusal anywhere carries one fix line, a command or an operator action; the pre-push chokepoint enforces the branch contract read from the project gitflow, the specs canon, ADR-cited law deletions and one secret registry over every pushed object, with one rewrite formula as its fix, and no CI job calls a model API except `eval.yml` (ADR 0217) — the security review is the reviewer's lens before each pull request.",
+      "tldr": "No-lock enforcement combines root-entry hygiene and SDD write policy before tools, then applies branch, specs-canon and privacy checks at push.",
+      "summary": "The two-policy pre-tool gate, path classes and bind scope, fail-open boundaries, one-fix refusal shape and range-scoped git publication chokepoint.",
       "path": "specs/memory/product/sdd/sdd-gate-v3.md",
       "tags": [
-        "sdd",
         "gate",
         "hooks",
-        "enforcement",
-        "no-locks",
-        "privacy"
+        "scope",
+        "privacy",
+        "git"
       ],
-      "token_estimate": 2735,
+      "token_estimate": 526,
       "depends_on": [
-        "workspace-doctor",
         "context-management",
+        "workspace-doctor",
         "worktrees",
         "agentic-entities",
-        "specs-migration",
-        "bug-ledger",
-        "workspace-init",
-        "release-lifecycle",
+        "public-asset-distribution",
         "ARCHITECTURE"
       ],
       "sources": [
-        ".github/dependabot.yml",
-        ".github/workflows/ci.yml",
-        "dadaia_workspace/hooks/__init__.py",
         "dadaia_workspace/hooks/pre_gate.py",
-        "dadaia_workspace/hooks/sdd_gate.py",
-        "dadaia_workspace/hooks/sdd_post_gate.py",
         "dadaia_workspace/hooks/root_whitelist.py",
-        "dadaia_workspace/hooks/venv_guard.py",
-        "dadaia_workspace/features/spec_context/gate_policy.py",
+        "dadaia_workspace/hooks/sdd_gate.py",
+        "dadaia_workspace/cli/commands/ci.py",
         "dadaia_workspace/features/chokepoints/**",
         "dadaia_workspace/infrastructure/data/privacy_baseline.json",
-        "dadaia_workspace/cli/commands/ci.py"
+        "dadaia_workspace/infrastructure/git_objects.py"
       ]
     },
     {
@@ -894,8 +861,8 @@
       "slug": "worktrees",
       "title": "worktrees",
       "area": "sdd",
-      "tldr": "Every agent change to a repo is made in a canonical worktree — a job, a task, define, reconcile or backlog — and lands by worktree.py merge after its gate.",
-      "summary": "Canonical worktrees nested in a folder per candidate, worktrees/<repo>/<M.m.p>-rc<N>/{define,reconcile,<job>,<job>--<task-id>} plus worktrees/<repo>/backlog/<slug>, each on the wt/ branch of the same name; one name grammar and one path reader; worktree.py new, stage, merge, clean and list, stdlib and read from git alone; three gate levels, each judged by a line of the work branch's AGENTS.md — a task fast-forwards onto its job branch after the verify-task line, a stage closes on the verify-stage line, a job lands on the work branch with an APPROVED verdict carrying its CI run and the verify line run as argv — and the holds that keep closure and context dead waiting while one is open.",
+      "tldr": "Repository changes are isolated in canonical plain, release, task, backlog or hotfix worktrees and land by worktree.py merge after the gate for that tree shape.",
+      "summary": "The worktree grammar, recorded bases, RED/implementation separation, one reviewed job or plain-change gate, merge cleanup and closure holds.",
       "path": "specs/memory/product/sdd/worktrees.md",
       "tags": [
         "worktrees",
@@ -904,21 +871,21 @@
         "merge",
         "review"
       ],
-      "token_estimate": 1620,
+      "token_estimate": 501,
       "depends_on": [
         "sdd-gate-v3",
-        "public-asset-distribution",
-        "workspace-doctor",
-        "agent-comms",
-        "context-management",
         "release-lifecycle",
-        "agent-orchestration",
         "bug-ledger",
-        "backlog-ledger"
+        "workspace-doctor",
+        "context-management",
+        "agent-orchestration"
       ],
       "sources": [
         "dadaia_workspace/public/skills/dd-gitflow-default/scripts/worktree.py",
-        "dadaia_workspace/public/skills/dd-gitflow-default/scripts/_worktree_*.py",
+        "dadaia_workspace/public/skills/dd-gitflow-default/scripts/_worktree_end.py",
+        "dadaia_workspace/public/skills/dd-gitflow-default/scripts/_worktree_git.py",
+        "dadaia_workspace/public/skills/dd-gitflow-default/scripts/_worktree_names.py",
+        "dadaia_workspace/public/skills/dd-gitflow-default/scripts/_worktree_new.py",
         "dadaia_workspace/public/data/worktrees-AGENTS.md"
       ]
     }

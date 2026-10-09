@@ -8,7 +8,6 @@ from __future__ import annotations
 
 import ast
 import configparser
-import importlib.util
 import re
 import subprocess
 import sys
@@ -19,7 +18,7 @@ import pytest
 
 from dadaia_workspace.core import context_registry
 from dadaia_workspace.features.spec_context import gate_policy
-from dadaia_workspace.hooks import pre_gate, root_whitelist, sdd_gate, venv_guard
+from dadaia_workspace.hooks import pre_gate, root_whitelist, sdd_gate
 from dadaia_workspace.infrastructure.runtime_transforms import hook_wrappers
 
 _REPO = Path(__file__).resolve().parents[3]
@@ -31,9 +30,6 @@ def _fail_open_rows(
     law: dict[str, str], tmp: Path, monkeypatch: pytest.MonkeyPatch
 ) -> dict[str, bool]:
     """One row per fail-open path, keyed by the evidence the law names, each read from code."""
-    hooks = (
-        _REPO / "tests/infrastructure/runtime_transforms/test_hook_wrappers__hook_interpreter.py"
-    )
     (tmp / ".dadaia/states").mkdir(parents=True)
     (tmp / ".dadaia/states/spec_contexts.json").write_text("{trunc", "utf-8")
     gate = [sys.executable, "-m", "dadaia_workspace.hooks.pre_gate"]
@@ -47,8 +43,6 @@ def _fail_open_rows(
     bash = {"tool_name": "Bash", "tool_input": {"command": "echo x > AGENTS.md"}}
     worktree = {"root": PurePath("/ws"), "zone": "worktree", "repo": "r", "owner": "r"}
     return {
-        "ADR 0067": "def test_missing_venv_is_loud_and_fails_open_on_every_harness"
-        in hooks.read_text("utf-8"),
         "ADR 0118": f"past {hook_wrappers.TOOL_TIMEOUT_S} s" in law["ADR 0118"],
         "ADRs 0096, 0103, 0133": sdd_gate.evaluate_payload(bash) is None,
         "ADR 0116": gate_policy.evaluate("worktrees/r/w/x.py", has_id=False, **worktree)[0]
@@ -88,7 +82,6 @@ def _block_rows(tmp: Path, monkeypatch: pytest.MonkeyPatch) -> dict[str, bool]:
         payload = {"tool_name": "Write", "tool_input": target, "session_id": "s"}
         return policy.evaluate_payload(payload)  # type: ignore[attr-defined,no-any-return]
 
-    venv = {"tool_name": "Bash", "tool_input": {"command": "cd x && dadaia doctor"}}
     away = {
         "zone": "worktree",
         "repo": "b",
@@ -98,7 +91,6 @@ def _block_rows(tmp: Path, monkeypatch: pytest.MonkeyPatch) -> dict[str, bool]:
     }
     return {
         "root_whitelist": write("ok", "stray.txt", root_whitelist) is not None,
-        "venv_guard": venv_guard.evaluate_payload(venv) is not None,
         "PROTECTED": write("ok", "AGENTS.md", sdd_gate) is not None,
         "out-of-scope": gate_policy.evaluate("worktrees/b/w/x.py", root=PurePath("/ws"), **away)[0]
         == gate_policy.Decision.BLOCK,
@@ -156,25 +148,7 @@ def test_os_name_is_read_only_through_the_platform_seam() -> None:
     assert reads == []
 
 
-def _script(rel: str) -> ModuleType:
-    spec = importlib.util.spec_from_file_location(Path(rel).stem, _PKG / "public/skills" / rel)
-    assert spec and spec.loader
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    return module
-
-
-def test_the_releases_law_transitions_equal_marks() -> None:
-    """AC4.6 (ADR 0141): the releases law's marker transitions equal `_release_schema.MARKS`
-    in order."""
-    marks = _script("dd-release-implementation/scripts/_release_schema.py").MARKS
-    arrow = r"`?\[([ x-])\]`?\s*(?:-+>|→|=>)\s*`?\[([ x-])\]"
-    law = (_PKG / "public/scaffold/releases/AGENTS.md").read_text("utf-8")
-    assert re.findall(arrow, law) == list(zip(marks, marks[1:], strict=False))
-
-
 _SKILLS = _PKG / "public" / "skills"
-_WORDS = ["one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten"]
 
 
 @pytest.mark.parametrize(
@@ -194,25 +168,6 @@ def test_a_skill_prescribes_no_act_its_own_laws_forbid_or_its_writer_cannot_do(
     """The ledger laws (`specs/bugs/AGENTS.md`: no event stream; root map: fixes never rewrite old
     asserts; `backlog.py`: new, exit, check) bind the skills that teach those ledgers."""
     assert phrase not in (_SKILLS / skill).read_text("utf-8")
-
-
-def test_the_bugs_pillar_states_how_many_metrics_and_measures_it_lists() -> None:
-    """Pillar 1 names its metrics and cheap measures by the number of rows it holds, in its own
-    headings, and `dd-audit-project/SKILL.md` repeats that number."""
-    pillar = (_SKILLS / "dd-audit-project/PILLAR-BUGS.md").read_text("utf-8")
-    audit = (_SKILLS / "dd-audit-project/SKILL.md").read_text("utf-8")
-    metrics = _WORDS[len(re.findall(r"^\| \d+ \|", pillar, re.M)) - 1]
-    cheap = re.search(
-        r"^## (?P<word>\w+) cheap measures[^\n]*\n(?P<body>.*?)^## ", pillar, re.M | re.S
-    )
-    assert cheap
-    measures = _WORDS[len(re.findall(r"^- ", cheap["body"], re.M)) - 1]
-    assert f"## The {metrics} forensic metrics" in pillar
-    assert f"A pillar-1 run reporting fewer than {metrics} is incomplete" in pillar
-    assert f"(beyond the {metrics} metrics)" in pillar
-    assert cheap["word"].lower() == measures
-    assert re.search(rf"compute all {metrics}\s+forensic metrics", audit)
-    assert f"{metrics} bug metrics with baseline" in audit
 
 
 def test_the_orchestration_skill_dispatches_a_task_never_a_job() -> None:

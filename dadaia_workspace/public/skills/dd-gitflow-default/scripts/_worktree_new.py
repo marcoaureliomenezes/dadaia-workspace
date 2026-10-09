@@ -9,10 +9,28 @@ from pathlib import Path
 for _skill in ("dd-release-implementation", "dd-bug-resolution"):
     sys.path.append(str(Path(__file__).resolve().parents[2] / _skill / "scripts"))
 
-from _release_schema import extract_status  # noqa: E402
+from _release_schema import extract_status, live_ids  # noqa: E402
 from _specs import parse  # noqa: E402
-from _worktree_git import flow_for, git, ours, quote, rows, script, work_version  # noqa: E402
-from _worktree_names import LOCK, NAME_RE, SCRIPT, TASK_CAP, Refusal, base, branch  # noqa: E402
+from _worktree_git import (  # noqa: E402
+    flow_for,
+    git,
+    ours,
+    quote,
+    record_base,
+    rows,
+    script,
+    work_version,
+)
+from _worktree_names import (  # noqa: E402
+    LOCK,
+    NAME_RE,
+    SCRIPT,
+    TASK_CAP,
+    Refusal,
+    base,
+    branch,
+    plain,
+)
 
 
 def _refuse_symlink(root: Path, repo_name: str) -> None:
@@ -41,15 +59,31 @@ def new(root: Path, repo_name: str, name: str) -> Path:
     repo = root / "repos" / repo_name
     _refuse_symlink(root, repo_name)
     flow = flow_for(root, repo)
-    version = work_version(repo, flow)
-    work = f"{flow['work']}{version}"
     match = NAME_RE.match(name)
-    if match is None or match["v"] not in (None, version):
+    version = work_version(repo, flow) if not (match and plain(name)) else ""
+    if match is None or (match["v"] is not None and match["v"] != version):
+        version = version or work_version(repo, flow)
         shape = f"{version}-rc<N>/<job>[--<task-id>]"
         raise Refusal(
             f"{name!r} is not a worktree name: {shape}, {version}-rc<N>/define, backlog/<slug> or hotfix/<bug-id>",
             f"{script(SCRIPT)} list",
         )
+    if plain(name):
+        releases = live_ids(root / "repos" / flow["main"] / "specs")
+        if len(releases) > 1:
+            raise Refusal("multiple live releases make the plain worktree base ambiguous",
+                          f"Operator action: make exactly one release live in repos/{flow['main']}/specs")  # fmt: skip
+        start = (
+            f"{flow['work']}{releases[0]}"
+            if releases
+            else git(repo, "branch", "--show-current").strip()
+        )
+        if not start:
+            raise Refusal("a plain worktree needs a checked-out base branch when no release is live",
+                          f"Operator action: switch {repo} to the branch this change should return to")  # fmt: skip
+        work = start
+    else:
+        work = f"{flow['work']}{version}"
     if match["rc"] and match["job"] != "define":  # a job runs only under an Approved SPEC
         main = root / "repos" / flow["main"]  # the context's trio lives in its main repo
         rc = match["rc"].rpartition("-rc")[2]
@@ -78,4 +112,6 @@ def new(root: Path, repo_name: str, name: str) -> Path:
         raise Refusal(f"{branch(name)} exists", f"{script(SCRIPT)} list")
     git(repo, "worktree", "add", "-q", "--lock", "--reason", f"{LOCK}{name}", "-b", branch(name),
         str(tree), start)  # fmt: skip
+    if plain(name):
+        record_base(repo, name, start)
     return tree

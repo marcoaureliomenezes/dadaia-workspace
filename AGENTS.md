@@ -14,12 +14,10 @@ Hand-authored, repo-scoped. Not a projection: nothing here is regenerated.
 - Any failure of a workspace operation here is a product bug of this library:
   register it in `specs/bugs/`.
 
-Gates, declared once and run by `worktree.py` as argv (never a shell) from the worktree root, the
-workspace venv first on `PATH`:
+The job gate runs this tracked command once as argv (never a shell) from the worktree root,
+with the workspace venv first on `PATH`:
 
 verify: python scripts/ci.py job
-verify-stage: python scripts/ci.py stage
-verify-task: python scripts/ci.py task
 
 - The developer's pipeline — `.github/`, `scripts/ci.py`, `scripts/guards/`, `tests/`, Dependabot/SAST, mutation and test-audit — is private to this repository and never ships. What ships (`dadaia_workspace/public/**`, the projected law, the skill scripts) requires of a user's repo only its own `verify:` lines and local git: never a remote, CI, `gh`, a PR host or a language toolchain. `test_public_source_hygiene.py`'s `public-law-names-no-private-pipeline` row is the mechanical half.
 

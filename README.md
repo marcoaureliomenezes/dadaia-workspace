@@ -13,8 +13,6 @@ its **associated repos** are the others it owns.
 
 ## What it is and principles
 
-<!-- derived-from: product-vision sha256:50aa2de46233 -->
-
 dadaia-workspace is the operating environment around repositories developed with AI
 agents. Its unit is the context: one main repo, where `specs/` lives, plus its
 associated repos; a single-repo context is the minimal case. Eight pillars:
@@ -23,31 +21,27 @@ associated repos; a single-repo context is the minimal case. Eight pillars:
   memory, release and task state.
 - **Documents are the lifecycle** — backlog, SPEC, PLAN, the job files, `_RELEASE.json` and
   `BUGS.jsonl` carry ordered work; no runtime drives agents through steps.
-- **Deterministic boundaries** — path class, bind scope, root hygiene, venv-rooting and
+- **Deterministic boundaries** — path class, bind scope, root hygiene and
   the push gate are mechanical, each refusal carrying one fix line; what cannot
   be mechanical is written as law.
 - **Visible concurrency** — sessions may race, git exposes the overlap, and nothing
   waits on a lock.
-- **No mechanism without a demand** — a capability exists only while it earns its
-  maintenance cost, and deleted surface beats accreted surface.
+- **Features preserve futures** — features and fixes spend options when coupling grows;
+  delivery alternates with deletion, simplification or decoupling, and a capability
+  exists only while it earns its maintenance cost.
 - **No slop** — runtime state, reports, handoffs, caches, projections and temporary
   files have canonical homes and never leak into repositories.
 - **Six entry harnesses** — Claude Code, Codex, Kimi Code, Cursor, Devin and GitHub
-  Copilot, one registry record each; public assets originate once, stage once, and are
-  read natively or through per-entry symlinks.
+  Copilot, one registry record each; public assets originate once, and installation
+  refreshes staging before native or projected consumption.
 - **Evidence, never prose** — success is evidenced by reviews, task commits, commands
   and artifacts.
 
 Two usage paths follow — a human drives it from a shell, an agent reads the root
-`AGENTS.md` map — and both read one truth: every section below derives from a named
-memory atom under its content hash.
+`AGENTS.md` map — and both read one truth: every section below is reconciled from
+named product memory.
 
 ## A human installs and uses it
-
-<!-- derived-from: pypi-distribution sha256:9dadd611ee50 -->
-<!-- derived-from: workspace-init sha256:a8f08f87ae76 -->
-<!-- derived-from: context-management sha256:e084ff04890d -->
-<!-- derived-from: workspace-doctor sha256:84a9bec9fec9 -->
 
 ```bash
 uvx dadaia-workspace init demo --harness claude --repo <clone url>   # level 1 + 2
@@ -94,18 +88,6 @@ a TTL expiry acts by zone class, an OUTPUT entry held, an EPHEMERAL one deleted.
 
 ## An agent reads AGENTS.md and uses it
 
-<!-- derived-from: agentic-entities sha256:f962e613358e -->
-<!-- derived-from: sdd-gate-v3 sha256:11e94d99c0d1 -->
-<!-- derived-from: release-lifecycle sha256:7b50f03ee3e9 -->
-<!-- derived-from: bug-ledger sha256:e077e8f27f88 -->
-<!-- derived-from: harness-claude-code sha256:bac4bed1d5e9 -->
-<!-- derived-from: harness-codex sha256:a0d4ae5884d5 -->
-<!-- derived-from: harness-kimi-code sha256:ac3c7be4e426 -->
-<!-- derived-from: harness-cursor sha256:f66b96a0ae77 -->
-<!-- derived-from: harness-devin sha256:a35113e51a30 -->
-<!-- derived-from: harness-copilot sha256:ed72a95f6297 -->
-<!-- derived-from: agent-comms sha256:aec2b079135d -->
-
 The always-on law is the root `AGENTS.md` map; every governed area carries its own
 scoped `AGENTS.md`, and every `dd-` skill touching an area opens that file first. The
 map, the scoped files, `.agents/skills/dd-*` and `.agents/agents/dd-*.md` are authored
@@ -114,8 +96,8 @@ natively; Claude Code reaches skills and personas through per-entry symlinks. A 
 differs only in serialization — event names, hook file, answer shape — and adds no
 behaviour.
 
-The gate is one PreToolUse pre-gate: root whitelist, venv guard, SDD gate, in that
-order, first block wins; what it blocks, its path classes and every fail-open path are
+The gate is one PreToolUse pre-gate: root whitelist then SDD gate, first block wins;
+what it blocks, its path classes and every fail-open path are
 stated once, in the root `AGENTS.md` §3.
 Every BLOCK carries exactly one `fix:` line, and a contract test feeds each fix back
 through the gate asserting ALLOW. No lease, lock or wait path exists; the gate reads no
@@ -128,13 +110,11 @@ Reconciliation job closes it — memory reconciliation, disposition sweep — an
 ledger scripts under `.agents/skills/*/scripts/` (`bugs.py`, `backlog.py`,
 `release.py`, `audit.py`) are each record's one writer. A bug is proposed to the
 operator and registered only after confirmation; a block-list bug is fixed at once as a
-hotfix job with a RED test, any other in the candidate's bug batch. Completed work leaves as a `handoff-v1` record, validated by
+hotfix job with a RED test, while any other bug becomes explicit candidate scope. Ship
+may carry an open bug only with the operator's exact recorded authorization. Completed work leaves as a `handoff-v1` record, validated by
 `.dadaia/.venv/bin/dadaia reports validate`.
 
 ## Documentation
-
-<!-- derived-from: pypi-distribution sha256:9dadd611ee50 -->
-<!-- derived-from: public-asset-distribution sha256:431575dbc8c0 -->
 
 The documentation is the repository's [docs folder](https://github.com/marcoaureliomenezes/dadaia-workspace/tree/main/docs):
 
@@ -148,8 +128,6 @@ The documentation is the repository's [docs folder](https://github.com/marcoaure
   [getting started](https://github.com/marcoaureliomenezes/dadaia-workspace/blob/main/docs/getting-started.md) · [distribution](https://github.com/marcoaureliomenezes/dadaia-workspace/blob/main/docs/distribution.md)
 
 ## Links
-
-<!-- derived-from: pypi-distribution sha256:9dadd611ee50 -->
 
 - GitHub — <https://github.com/marcoaureliomenezes/dadaia-workspace>
 - PyPI — <https://pypi.org/project/dadaia-workspace/>

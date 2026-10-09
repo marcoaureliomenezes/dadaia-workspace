@@ -75,6 +75,10 @@ Every implementation report must include:
 
 Reports never live in this tree: the root `AGENTS.md` map §4.
 
+The tracked `verify:` line is the sole repository verification authority. A task merge checks
+git hygiene and keeps the RED-test and implementation dispatches separate; a job or plain-change
+merge runs `verify:` once when this file declares it.
+
 ## 8. Stop conditions
 
 Stop before editing when:

@@ -21,17 +21,15 @@ Scope: this file governs only `specs/releases/`.
 - SDD lifecycle order PER CANDIDATE: as-is review -> grill -> SPEC (Draft) -> operator approval -> PLAN -> TASKS -> implementation -> closure -> integration-branch merge -> promote-or-continue gate.
 - Full arc, gate cadence, the step-by-step ladder: `dd-release-implementation`'s `RC-FLOW.md`.
 - A candidate is closed: created, implemented, or cancelled into the next; never amended (shape 8 records approval only); a new AC goes to the next rc.
-- A red outside a stage's envelope appends a new stage; a stage's third red gate stops the job for the operator,
-  the driver appending one `kind: note` log entry `stop: <job> stage <n> — third red gate`.
 - A candidate is defined in its own `rc-<N>/`, authored in a `define` tree: rc N+1 is drafted there while rc N implements and enters by `RELEASE_PY new` at rc N's CLOSURE;
-  its `## Bug window review` judges rc N's bug fixes; rc N closes with zero open bugs; one rc implements at a time.
+  its `## Bug window review` judges rc N's bug fixes; one rc implements at a time.
 - Recommended size, never a gate (ADR 0152 (2)): SPEC.md within 24 KiB, each job file within 12 KiB.
 - A `v`-prefixed id is minted nowhere — the bare axis (`^\d+\.\d+\.\d+$`) is the only current one.
 
 ## 3. Tasks — the auditable trace
 
-- Read SPEC, PLAN and TASKS before implementing; the approval precondition's home is `specs/AGENTS.md`. A closed rc's `TASKS.md` keeps its markers as history (`[ ] -> [-]`, `[-] -> [x]`); from rc-9 on, a job file carries the tasks (`dd-release-definition` §5).
-- The `W:` is exact: every file the task touches, with the derived files it re-records; the commit body names each file and why.
+- Read SPEC, PLAN and every job file before implementing; the approval precondition's home is `specs/AGENTS.md`. Historical `TASKS.md` files remain readable, but current candidates carry tasks only in `tasks/<job>.md` (`dd-release-definition` §5).
+- The `W:` is exact: every file the task touches, with derived files it re-records; the commit body names each file and why. Current task ids are `J<n>.T<k>`; readers retain historical `J<n>.S<m>.T<k>` ids.
 - A REBUILD keeps the fix's tests.
 - The task's commit is `conventional-commit(task-id): description`.
 - `phase` and the `defined`/`implemented` milestones move only by `RELEASE_PY phase`; `shipped` only by `RELEASE_PY ship`.

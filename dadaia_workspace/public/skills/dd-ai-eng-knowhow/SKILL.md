@@ -28,7 +28,7 @@ compatibility: Standalone Agent Skill. Inside a dadaia-workspace (pip install da
   deltas (persona serialization, constitution shape, hook firing, skill discovery,
   subagent spawn, config-layer trust) are compiled in
   [`CLAUDE-CODE.md`](CLAUDE-CODE.md) and [`CODEX.md`](CODEX.md).
-- Gate order: root-whitelist → venv-guard → SDD gate, first-block-wins; what it
+- Gate order: root-whitelist → SDD gate, first-block-wins; what it
   blocks is the root map §3; git chokepoints run independently of any
   harness hook.
 

@@ -36,7 +36,7 @@ _CASES: dict[str, tuple[str, dict[str, str], list[str]]] = {
         "dd-bug-resolution/scripts/bugs.py",
         {"bugs/BUGS.jsonl": '{"id": "a-bug", "status": "open"}\n',
          "bugs/_archive/bugs_histo.jsonl": ""},
-        ["update", "a-bug", "--set", "audited=x"],
+        ["update", "a-bug", "--set", "caused_by=none"],
     ),
     "backlog.py new": (
         "dd-backlog-definition/scripts/backlog.py",
@@ -201,6 +201,11 @@ def test_every_script_subset_is_drawn_from_the_one_vocabulary(
 ) -> None:
     subset = script_table(rel, name)
     assert set(subset) <= set(TERMINAL_DISPOSITIONS)
+    if rel in {
+        "dd-bug-resolution/scripts/_bugs_check.py",
+        "dd-audit-project/scripts/_audit_check.py",
+    }:
+        assert "deferred" not in subset
 
 
 def test_a_shared_disposition_requires_the_same_evidence_in_both_ledgers(

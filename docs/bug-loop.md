@@ -1,20 +1,14 @@
 # The bug loop
 
-Register → RED → fix → resolve. A confirmed block-list bug is fixed at once as a hotfix
-job; any other in the candidate's bug batch, before its Reconciliation job.
+Register → RED → fix → resolve. A confirmed block-list bug uses a hotfix job; other bugs
+enter the approved release scope through its ordinary job structure.
 
 ## 1. Register — ask first
 
-<!-- derived-from: bug-ledger sha256:e077e8f27f88 -->
-
 A bug is a merged change that reproducibly breaks a documented contract; a failure inside
-an unmerged worktree is rework. Registration is ask-first: the agent
-proposes the violated contract line, one reproducing command already run, why it is not
-agent error, and a severity — CRITICAL a stall or data loss, HIGH a contract broken on
-the default path, MEDIUM off the default path or with a workaround, LOW a message or
-cosmetic defect. `append` runs only after the operator confirms; with no operator
-present the proposal leaves the session as one handoff finding whose `message` starts
-`bug-proposal:`.
+an unmerged worktree is rework. Registration starts with a proposal naming the violated
+contract, one reproducing command already run, why the failure is not agent error and its
+severity. `append` runs only after the operator confirms.
 
 ```bash
 python3 .agents/skills/dd-bug-resolution/scripts/bugs.py append \
@@ -24,76 +18,48 @@ python3 .agents/skills/dd-bug-resolution/scripts/bugs.py append \
   --context demo --symptom "…" --repro "…" --expected "…" --correlates none
 ```
 
-`specs/bugs/BUGS.jsonl` holds one record per bug, appended once and keyed by `id`, git
-history being that line's change log. `append` first prints the correlation candidates — open
-records on the same surface and those resolved there in the last 30 days — then opens
-the record at `status: open`, stamping `found_in` — the candidate holding the registration instant — and refusing a duplicate id, a `surface` that names no tracked
-directory of the repo, and a missing or unknown `--correlates <ids>|none`; `component`
-is free-text `path#symbol`. Every written field except `id`, `ts` and
-`reported_by` is redacted on write.
+The ledger holds one record per bug, keyed by id. `append` prints correlation candidates,
+opens the record, refuses a duplicate id or unknown tracked-directory `surface`, and
+requires `--correlates <ids>|none`. `component` remains precise free text. Every supplied
+value passes the same privacy check used by the push gate.
 
-Not a bug: an agent's own mistake, wrong usage, an environment limit, a designed
-validation, a law ambiguity, or a missing feature.
+Not a bug: an agent mistake, wrong usage, an environment limit, designed validation, law
+ambiguity or a missing feature.
 
-## 2. Lineage, then a RED test
+## 2. Lineage, then RED
 
-<!-- derived-from: bug-ledger sha256:e077e8f27f88 -->
+Read at most the 20 most recent records sharing the bug's surface or component since the
+newest archived audit. Inspect the persisted `fix_sha` commits and blame the production
+lines the new fix replaces. End with `caused_by: <bug-id> | <task-id> | none`; use `none`
+only when blame offers no candidate.
 
-Resolution follows seven ordered phases — lineage, red loop, minimise, hypothesise,
-instrument, seam test, cleanup and resolve. Lineage comes first: read at most the 20
-most recent records sharing this bug's `surface` or `component` in the window since the
-newest archived audit, and end with `caused_by: <id> | none`. Two or more prior fixes on
-the unit the bug lands in make this fix a rebuild of that unit, never a third patch: the
-commit body says `rebuild: <unit> — prior fixes <id>, <id>` (or `rebuild: none`), and
-the `--solution` opens with `REBUILD <unit>:`.
+Two or more prior fixes on the touched module require a REBUILD that keeps the regression
+tests. Then add the lowest-level case that fails for the real cause before production code
+moves. Existing assertions remain contract evidence.
 
-```bash
-python3 .agents/skills/dd-bug-resolution/scripts/bugs.py status
-python3 .agents/skills/dd-bug-resolution/scripts/bugs.py stats
-```
+## 3. Fix at the owning seam
 
-Then the red loop: a new case that fails for the real cause, before production code moves; a fix never rewrites an old assert.
+Replace the faulty path and let the RED case turn GREEN. Prefer deletion and locality over
+a wrapper around the old behavior. The implementation commit's sha becomes the persisted
+`fix_sha`; its production numstat is the source for any later diff-direction analysis.
 
-## 3. Fix, and let the diff shrink
-
-<!-- derived-from: bug-ledger sha256:e077e8f27f88 -->
-
-Fix the root cause and watch the test go green. The fix's direction is derived, never
-typed: `bugs.py fix <bug-id>` prints the fix commits, their numstat and `net-negative`,
-`net-positive` or `net-neutral` on production paths, and `bugs.py stats` counts it as `direction:`. A fix whose diff grows the touched feature is
-routed to the architecture lens before it lands.
-
-## 4. Resolve with the red loop and lineage
-
-<!-- derived-from: bug-ledger sha256:e077e8f27f88 -->
+## 4. Resolve with persisted facts
 
 ```bash
 python3 .agents/skills/dd-bug-resolution/scripts/bugs.py resolve <bug-id> \
-  --cause "…" --caused-by none --solution "…" --evidence-loop "…" \
-  --evidence-seam "…"
+  --cause "…" --caused-by none --solution "…" --fix-sha <40-hex-sha>
 ```
 
-- Stage the fix first: `resolve` prints the blame candidates — the bugs whose fix and the
-  tasks whose commit wrote a line the staged diff removes — and refuses a `--caused-by`
-  outside them, or `none` while any exist, unless `--lineage-reason` says why.
-- `resolve` refuses an incomplete call, naming every missing field; `caused_by: X` means
-  the fix of X wrote the lines this fix corrects — a live or archived record, a task id a
-  `TASKS.md` or a job file carries, or `none`, never a loop; `resolved_release` is derived from the resolve instant.
-- `status` is `open | resolved | superseded | deferred | rejected`; a terminal status
-  is reached only through its transition — `resolve`, `supersede --by`, `defer` or
-  `reject` with `--reason` — and `closed_at` is set exactly when `status` is terminal,
-  never earlier than `ts`.
-- `update <id> --set field=value` writes a governance field, `caused_by` included, and
-  refuses `status`, `closed_at`, `resolved_release`, `superseded_by`, an immutable core field and a
-  differing second write to a write-once field. A reopen is a new record.
-- Every write runs `check` over the new ledger bytes before replacing the file
-  atomically, so a refused write leaves the file byte-identical.
+- `resolve` requires `cause`, `caused_by`, `solution` and `fix_sha`, then stamps
+  `status: resolved` and `closed_at`.
+- `caused_by` names a live or archived bug, a known release task, or `none`; `check`
+  refuses a dangling link or loop.
+- `supersede --by` and `reject --reason` are the other terminal transitions.
+- `update <id> --set field=value` uses the schema's mutability classes and cannot replace
+  transition-owned state.
+- Every write validates the candidate bytes before atomic replacement, so refusal leaves
+  both ledger files unchanged.
 
-One commit holds the code, the regression test and the `BUGS.jsonl` line, its red loop
-quoted in the body.
-
-`bugs.py archive --adr <id> <ids…>` moves exactly the named terminal records into
-`specs/bugs/_archive/bugs_histo.jsonl`, each stamped `archived_by: <id>`; a record leaves
-the ledger only by an accepted ADR, never by age, and `check` holds every archived record
-to it. `.dadaia/.venv/bin/dadaia doctor`'s `ledgers` section runs `bugs.py check`
-(`LEDGER-BUGS-SCHEMA`).
+`bugs.py archive <ids…>` moves exactly the named terminal records into
+`specs/bugs/_archive/bugs_histo.jsonl`. The archive retains historical record shapes as
+readable history; new writes use the lean schema.

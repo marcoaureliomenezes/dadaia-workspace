@@ -18,7 +18,6 @@ from dadaia_workspace.core.gitflow import DEFAULT
 from dadaia_workspace.features.chokepoints import push_gate_decision
 from dadaia_workspace.features.chokepoints.branch_policy import Decision, PushRef
 from dadaia_workspace.features.specs.canon import canon_violations
-from dadaia_workspace.features.specs.doctor_adr import cites_an_accepted_adr
 from dadaia_workspace.infrastructure.git_objects import GitSubprocessObjectReader
 from tests.fakes import gate_fixes
 
@@ -51,7 +50,7 @@ def _tag_push_ref(local_sha: str, *, remote_sha: str = _ZERO) -> PushRef:
 def _decide(refs: list[PushRef], repo: Path, terms: tuple[tuple[str, str], ...] = ()) -> Decision:
     return push_gate_decision(
         refs, gitflow=DEFAULT, fixes=gate_fixes(), object_source=GitSubprocessObjectReader(),
-        repo=repo, canon_violations_fn=canon_violations, cites_accepted_adr=cites_an_accepted_adr(None), denylist_terms=terms,
+        repo=repo, canon_violations_fn=canon_violations, denylist_terms=terms,
     )  # fmt: skip
 
 

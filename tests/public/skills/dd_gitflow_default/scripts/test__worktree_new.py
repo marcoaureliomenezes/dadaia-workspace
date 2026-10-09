@@ -36,10 +36,31 @@ def test_new_makes_each_shape_on_its_branch_and_base(root: Path) -> None:
     assert sorted(x for x in porcelain if x.startswith("locked")) == [
         "locked dadaia:0.5.0-rc1/define",
         "locked dadaia:0.5.0-rc1/j1",
-        "locked dadaia:0.5.0-rc1/j1--J1.S1.T1",
+        "locked dadaia:0.5.0-rc1/j1--J1.T1",
         "locked dadaia:0.5.0-rc1/reconcile",
         "locked dadaia:backlog/an-idea",
     ]
+
+
+@pytest.mark.parametrize("live_release", [True, False], ids=["live-release", "no-release"])
+def test_a_plain_worktree_uses_the_release_work_branch_or_checked_out_branch(
+    root: Path, live_release: bool
+) -> None:
+    repo = root / "repos/r"
+    if live_release:
+        ahead = _git(repo, "commit-tree", "HEAD^{tree}", "-p", "HEAD", "-m", "work").strip()
+        _git(repo, "branch", "-f", "feature/0.5.0", ahead)
+        expected = ahead
+    else:
+        _git(repo, "rm", "-rq", "specs/releases")
+        _git(repo, "commit", "-qm", "no release")
+        expected = _git(repo, "rev-parse", "HEAD").strip()
+
+    opened = _run(root, "new", "r", "maintenance")
+
+    assert opened.returncode == 0, opened.stderr
+    assert _git(repo, "rev-parse", "wt/maintenance").strip() == expected
+    assert (root / "worktrees/r/maintenance").is_dir()
 
 
 @pytest.mark.parametrize("name", ["0.5.0a-impl", "0.5.0b-release", "0.4.9-rc1/j1", "0.5.0-rc1/J1"])

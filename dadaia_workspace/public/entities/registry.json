@@ -29,18 +29,6 @@
       }
     },
     {
-      "id": "venv-guard",
-      "mandate": "One rule: the dadaia CLI (dadaia, python -m dadaia_workspace) runs only from the workspace venv; the block carries one fix: line with the corrected command. Caches redirect by configuration, never by a guard.",
-      "implementations": {
-        "claude": "PreToolUse hook (Bash payloads) via dadaia_workspace.hooks.pre_gate",
-        "codex": ".codex/hooks.json wrapper → the same Python gate",
-        "kimi-code": "managed hook block → the same Python gate",
-        "cursor": ".cursor/hooks.json preToolUse (Shell payloads) → dadaia_workspace.hooks.pre_gate",
-        "devin": ".devin/hooks.v1.json PreToolUse (Bash payloads) → dadaia_workspace.hooks.pre_gate",
-        "copilot": ".github/hooks/pre-tool-use.json preToolUse (Bash payloads) → dadaia_workspace.hooks.pre_gate"
-      }
-    },
-    {
       "id": "sdd-gate",
       "mandate": "Three path classes on every write: ADDITIVE always writable, PROTECTED blocked, MUTATING writable but scope-judged under repos/<slug>/ when the session is bound; no phase, no mode; every block carries one fix: line; races surfaced, never prevented.",
       "implementations": {
@@ -104,7 +92,7 @@
     },
     {
       "id": "codex-command-policy",
-      "mandate": "Codex-native executable command policy (Starlark, the only rule dialect Codex executes): allows only the argv-closed readers ls and cat; every other command prompts or falls to the Codex default.",
+      "mandate": "Codex-native executable command policy (Starlark, the only rule dialect Codex executes): allows only the argv-closed readers ls and cat; ordinary public install inherits host policy, while --force, publishing, context deletion and destructive commands prompt; every other command falls to the Codex default.",
       "implementations": {
         "codex": ".codex/rules/dadaia-command-policy.rules"
       }

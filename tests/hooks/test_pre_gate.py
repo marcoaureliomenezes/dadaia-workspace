@@ -3,7 +3,7 @@ the one envelope every harness parses.
 
 T-014-03 (parity with sdd_gate + root_whitelist through one spawn),
 pre-gate-allow-envelope-fails-claude-schema, claude-pre-gate-envelope-contract (the
-kimi shim's two raw anchors), the Bash arm wired to venv_guard.
+kimi shim's two raw anchors).
 """
 
 from __future__ import annotations
@@ -14,7 +14,6 @@ from typing import Any
 
 import pytest
 
-from dadaia_workspace.core.platform import PLATFORM
 from dadaia_workspace.hooks import pre_gate
 from tests.fixtures.harness_env import claude_hook_env, run_hook_subprocess
 
@@ -128,18 +127,27 @@ def test_evaluate_payload_first_block_wins_and_faulty_policy_fails_open(
 @pytest.mark.parametrize(
     ("payload", "blocked"),
     [
-        ({"tool_name": "Read", "tool_input": {"file_path": "x"}}, False),
-        ({"tool_name": "Bash", "tool_input": {"command": "pip install requests"}}, False),
-        ({"tool_name": "Bash", "tool_input": {"command": "dadaia doctor"}}, True),
+        pytest.param(
+            {"tool_name": "Read", "tool_input": {"file_path": "x"}}, False, id="allow"
+        ),
+        pytest.param(
+            {"tool_name": "Bash", "tool_input": {"command": "pip install requests"}},
+            False,
+            id="allow-bash-pip",
+        ),
+        pytest.param(
+            {"tool_name": "Bash", "tool_input": {"command": "dadaia doctor"}},
+            False,
+            id="allow-workspace-cli",
+        ),
     ],
-    ids=["allow", "allow-bash-pip", "block-bash-venv-guard"],
 )
 def test_envelope_contract(tmp_path: Path, payload: dict[str, Any], blocked: bool) -> None:
     """Whole stdout is ONE JSON object. Allow carries no verdict at all (Claude's schema
     rejects ``decision: allow`` and interactive sessions ignore ``defer``). Block carries the
     legacy ``"decision": "block"`` (codex + the kimi shim's grep) AND
     ``permissionDecision: deny`` with the same reason, top-level ``reason`` LAST (the shim's
-    sed capture); the Bash block is venv_guard's, with the corrected command."""
+    sed capture)."""
     raw = _spawn(tmp_path, payload).stdout.strip()
     envelope = json.loads(raw)
     if not blocked:
@@ -155,4 +163,3 @@ def test_envelope_contract(tmp_path: Path, payload: dict[str, Any], blocked: boo
     }
     assert '"decision": "block"' in raw
     assert raw.index('"hookSpecificOutput"') < raw.index('"reason": "')
-    assert "VENV GUARD" in reason.upper() and f".dadaia/.venv/{PLATFORM.venv_scripts_dir}" in reason

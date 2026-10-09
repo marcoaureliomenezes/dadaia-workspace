@@ -85,7 +85,7 @@ AUDIT_SCRIPT = LedgerScript("FINDINGS", "dd-audit-project", "audit.py")
 MEMORY_SCRIPT = LedgerScript("MEMORY", "dd-spec-navigator", "memory.py", ("catalog", "generate"))
 #: Not a ledger: the worktrees' owner, read by `worktree_rows` alone (ADR 0135).
 WORKTREE_SCRIPT = LedgerScript("WORKTREES", "dd-gitflow-default", "worktree.py")
-LEDGER_SCRIPTS = (BUGS_SCRIPT, BACKLOG_SCRIPT, RELEASE_SCRIPT, AUDIT_SCRIPT, MEMORY_SCRIPT)
+LEDGER_SCRIPTS = (BUGS_SCRIPT, BACKLOG_SCRIPT, RELEASE_SCRIPT, AUDIT_SCRIPT)
 
 
 @cache
@@ -176,7 +176,9 @@ def script_findings(specs_dir: Path, runner: _Runner | None = None) -> list[Sect
         if records is None:
             findings.append(_unrunnable(script, f"check exited {result.returncode} with no JSON"))
             continue
-        findings.extend(_finding(script, record) for record in records)
+        findings.extend(
+            _finding(script, record) for record in records if record.get("verdict") != "info"
+        )
     return findings
 
 
@@ -185,7 +187,7 @@ def script_repairs(specs_dir: Path, runner: _Runner | None = None) -> list[str]:
     the repair never writes a ledger itself."""
     process = runner if runner is not None else SubprocessProcessRunner()
     repaired: list[str] = []
-    for script in LEDGER_SCRIPTS:
+    for script in (MEMORY_SCRIPT,):
         path = resolve_script(script, specs_dir) if script.regenerate else None
         if path is None:
             continue

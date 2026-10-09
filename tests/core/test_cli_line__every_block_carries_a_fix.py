@@ -36,7 +36,6 @@ from dadaia_workspace.features.chokepoints import push_gate_decision
 from dadaia_workspace.features.chokepoints.branch_policy import parse_push_stdin
 from dadaia_workspace.features.spec_context.service import install_git_hooks
 from dadaia_workspace.features.specs.canon import canon_violations
-from dadaia_workspace.features.specs.doctor_adr import cites_an_accepted_adr
 from dadaia_workspace.hooks import pre_gate
 from dadaia_workspace.infrastructure.git_objects import GitSubprocessObjectReader
 from dadaia_workspace.infrastructure.runtime_transforms.hook_wrappers import VENV_MISSING
@@ -166,7 +165,6 @@ def _workspace(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     (tmp_path / ".dadaiaignore").write_text("[protected]\nsecrets\n", encoding="utf-8")
     _plant_cli(cli_path(tmp_path))
     monkeypatch.chdir(tmp_path)
-    monkeypatch.setattr(sys, "prefix", sys.prefix)  # restored after _bare_cli moves it
     return tmp_path
 
 
@@ -180,16 +178,6 @@ def _scope_block(ws: Path, *, has_id: bool) -> str:
 
     return evaluate("repos/b/x.py", root=ws, zone="repo", repo="b", owner="b",
                     context="a", repos=frozenset({"a"}), has_id=has_id)[1]  # fmt: skip
-
-
-def _bare_cli(ws: Path) -> str | None:
-    """The fix names the RUNNING CLI (ADR 0045): a host venv outside any workspace (CI's
-    poetry venv) proves no expectation pins the instance's own spelling."""
-    sys.prefix = str(ws.parent / "host-venv")
-    _plant_cli(Path(shlex.split(fix_line(None))[0]))
-    return pre_gate.evaluate_payload(
-        {"tool_name": "Bash", "tool_input": {"command": "dadaia doctor --context x"}}
-    )
 
 
 def _push(ws: Path, line: str = "", files: dict[str, str] | None = None, **kwargs: Any) -> str:
@@ -209,7 +197,6 @@ def _push(ws: Path, line: str = "", files: dict[str, str] | None = None, **kwarg
         object_source=GitSubprocessObjectReader(),
         repo=repo.path,
         canon_violations_fn=canon_violations,
-        cites_accepted_adr=cites_an_accepted_adr(None),
         **{"malformed_lines": 0, "denylist_terms": (), **kwargs},
     )
     assert not decision.allowed, "expected a refusal"
@@ -224,7 +211,6 @@ _BLOCKS: dict[str, Callable[[Path], str | None]] = {
     "gate-protected-glob-dec-11": lambda ws: _gate(ws, "repos/a/secrets/k"),
     "gate-scope-names-the-bind": lambda ws: _scope_block(ws, has_id=True),
     "gate-id-less-session-relaunch": lambda ws: _scope_block(ws, has_id=False),
-    "venv-guard-bare-cli": _bare_cli,
     "hook-missing-venv": lambda ws: VENV_MISSING.replace("$ROOT", ws.as_posix()),
     "push-malformed-stdin": lambda ws: _push(ws, malformed_lines=1),
     "push-main": lambda ws: _push(ws, "refs/heads/main {sha} refs/heads/main {other}"),
