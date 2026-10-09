@@ -38,12 +38,12 @@ An append authors the immutable core. Every later change uses the disposition ve
 
    ```bash
    python3 .agents/skills/dd-audit-project/scripts/audit.py disposition \
-     <audit> <finding-id> --disposition resolved|superseded|rejected \
+     <audit> <finding-id> --disposition <terminal-disposition> \
      [--release <id>] [--reason <reason>]
    ```
 
-4. `resolved` and `superseded` require the remediation release; `rejected` requires a
-   reason. A later disposition replaces only the finding's governance triple; its
-   immutable fields remain unchanged.
+4. The finding schema defines dispositions and their required evidence. A later
+   disposition replaces only the finding's governance triple; its immutable fields
+   remain unchanged.
 5. `audit.py close <audit> --sha <window-end>` refuses while any finding is `open`, then
    appends one audit-history record and deletes the live directory atomically.

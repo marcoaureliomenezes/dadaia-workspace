@@ -51,6 +51,9 @@ of repeating it.
    refuses a lineage loop.
 5. Two or more prior fixes on the touched module make the next fix a REBUILD that keeps
    its regression tests; its commit subject and solution name the rebuilt module.
+6. Publish through the installed pre-push hook; it feeds Git ref lines to
+   `.dadaia/.venv/bin/dadaia ci push-gate-check`, which checks the introduced object
+   range.
 
 ## Cost bound
 

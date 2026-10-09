@@ -1,12 +1,12 @@
 # PILLAR-BUGS — bug-history forensics
 
-Disclosed sibling of `SKILL.md`, pillar 1. The lineage window and filter live in
-`dd-bug-resolution/LINEAGE.md`. Input is every bug record whose `ts` or `closed_at`
-falls inside that window.
+Disclosed sibling of `SKILL.md`, pillar 1. The lineage window, filter and resolution
+facts live in `dd-bug-resolution/LINEAGE.md`; record validity lives in
+`dadaia_workspace/public/schemas/bugs/bug-record-v1.schema.json`. Input is every bug
+record whose `ts` or `closed_at` falls inside that window.
 
 ## Resolution evidence
 
-- A resolved record persists `cause`, `solution`, `caused_by` and `fix_sha`.
 - Inspect a fix with `git show <fix_sha> --stat --patch`. Report a missing commit or a
   release-squash trail as coarse evidence instead of inventing attribution.
 - Derive diff direction from the named commit's production numstat. Direction is an
@@ -31,7 +31,7 @@ value against the previous audit from `audits_histo.jsonl`. Metrics 7 and 8 have
 | # | Metric | Definition / evidence |
 |---|---|---|
 | 1 | Registrations per reporter | group records by `reported_by` |
-| 2 | Complete resolutions | resolved records carrying `cause`, `solution`, `caused_by` and `fix_sha` |
+| 2 | Complete resolutions | resolved records satisfying the canonical resolution facts |
 | 3 | Fix-shape ratio | `net-negative / (net-neutral + net-positive)` from `git show --numstat <fix_sha>` on production paths |
 | 4 | Same-surface re-bug rate at 3d/14d | group on exact `surface` |
 | 5 | Hand-kept-list touch count | named fix commits touching the fixed path set below |
@@ -49,7 +49,7 @@ Metric 5's fixed path set is `.gitignore`, `privacy_baseline.json`,
 - Compare `closed_at` with `ts`; an unusually short interval is a prompt to inspect the
   actual RED/GREEN history.
 - Treat a hunk changing an immutable-core field on an existing id as HIGH.
-- Report any resolved record missing `cause`, `solution` or a valid `fix_sha`.
+- Report any resolved record that fails the canonical resolution-fact check.
 - Check bug registration and fix commit shapes against `dd-gitflow-default` §3a.
 
 ## Pillar 1 output
