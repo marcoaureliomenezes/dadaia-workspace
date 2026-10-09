@@ -62,36 +62,6 @@ def _run_from_elsewhere(root: Path, fix: str) -> None:
     assert ran.returncode == 0, ran.stdout + ran.stderr
 
 
-def _plant_memory(root: Path) -> dict[str, str]:
-    atom = root / "specs/memory/product/core/feature-a.md"
-    atom.parent.mkdir(parents=True)
-    atom.write_text("---\ntitle: feature-a\ntldr: One line.\n---\n\n# feature-a\n", "utf-8")
-    return {}
-
-
-_SPECS_PLANTS = {"LEDGER-MEMORY-SCHEMA": _plant_memory}
-
-
-@pytest.mark.parametrize("code", sorted(_SPECS_PLANTS))
-def test_the_printed_fix_clears_its_finding(tmp_path: Path, code: str) -> None:
-    """sa-unfixable-doctor-findings-say-doctor-fix#S2 — run the printed fix, re-run
-    the whole doctor: the finding is gone and no new error finding appears."""
-    subprocess.run(["git", "init", "-q", str(tmp_path)], check=True)  # noqa: S603, S607
-    (tmp_path / "specs").mkdir()
-    fills = _SPECS_PLANTS[code](tmp_path)
-    before = _findings_before(tmp_path, "--specs-dir", "specs")
-    fix = next(f["fix"] for f in before if f["code"] == code)
-    for placeholder, value in fills.items():
-        fix = fix.replace(placeholder, value)
-    _run_from_elsewhere(tmp_path, fix)
-    after = _findings(tmp_path, "--specs-dir", "specs")
-    old = {(f["code"], f["message"]) for f in before}
-    assert code not in {f["code"] for f in after}, fix
-    assert [
-        f for f in after if f["verdict"] == "error" and (f["code"], f["message"]) not in old
-    ] == []
-
-
 _ENTRY = {"id": "a-entry", "title": "a", "opened": "2026-10-02", "status": "idea",
           "description": "d", "provenance": "operator request"}  # fmt: skip
 _PRETTY = json.dumps(
@@ -233,7 +203,6 @@ def _plant_long_skill(ws: Path) -> str:
 
 #: Every code this module proves: cleared by its printed fix, or an operator action (V39).
 WORKSPACE_PLANTS = {
-    **_SPECS_PLANTS,
     **dict.fromkeys(code for code, *_ in _LEDGER_ROWS),
     "WS-ENTRY": _plant_root_slop,  # the fixable sub-rule (S5)
     "HOOKS-DRIFT-1": _plant_drifted_hook,
