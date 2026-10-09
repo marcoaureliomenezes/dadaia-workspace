@@ -2,12 +2,14 @@
 
 from __future__ import annotations
 
+import shlex
 from pathlib import Path
 
 import pytest
 from typer.testing import CliRunner
 
 from dadaia_workspace.cli.main import app
+from dadaia_workspace.core.platform import PLATFORM
 
 
 @pytest.mark.medium
@@ -18,14 +20,15 @@ def test_init_creates_the_literal_level_one_state(tmp_path: Path) -> None:
     result = CliRunner().invoke(app, ["init", str(ws), "--harness", "claude"])
 
     assert result.exit_code == 0
-    cli = ws / ".dadaia" / ".venv" / "bin" / "dadaia"
+    cli = ws / ".dadaia" / ".venv" / PLATFORM.venv_scripts_dir / f"dadaia{PLATFORM.venv_exe_suffix}"
+    cli_word = str(cli).replace("\\", "/") if PLATFORM.windows else shlex.quote(str(cli))
     assert result.output == (
         f"✓ Workspace {ws} (claude)\n"
         "✓ 164 asset(s) installed\n"
         f"CLI: {cli}\n"
         "Sessions launch at the workspace root.\n"
         "Next (command step context): no ALIVE Spec Context — create one\n"
-        f"fix: Operator action: run {cli} context create with a context name and --main-repo "
+        f"fix: Operator action: run {cli_word} context create with a context name and --main-repo "
         "set to the main repo's clone URL\n"
     )
     assert (ws / ".dadaia/states/spec_contexts.json").read_bytes() == (
