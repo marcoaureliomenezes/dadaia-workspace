@@ -30,7 +30,8 @@ SPEC_STUB = """\
 
 {bug_window}
 
-(Read `bugs.py window` and each cited test before scoping.)
+(Read the prior candidate's `## Bug window review`, then inspect each resolved record's
+persisted `fix_sha` with `git show` as `dd-bug-resolution/LINEAGE.md` defines.)
 
 ## 1. Problem
 
@@ -89,7 +90,7 @@ def candidate_state(release_id: str, prior: State | None) -> State:
 def refuse_unfree(specs: Path, release_id: str) -> State | None:
     """`new`'s two legal states: no live release (birth — returns ``None``), and the live
     release IS *release_id* in phase CLOSURE, the stacked candidate the law requires
-    (returns the closed state to reopen), once `bugs.py` finds no bug open in the closing rc.
+    (returns the closed state to reopen), once the tree's global open-bug readiness permits it.
     Anything else, a red tree, or a symlink, refuses."""
     if not SEMVER_RE.match(release_id):
         raise Refusal(
