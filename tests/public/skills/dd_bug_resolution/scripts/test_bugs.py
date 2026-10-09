@@ -73,10 +73,10 @@ def _ledger(root: Path, *records: dict[str, object]) -> Path:
     schema = json.loads(
         (_PUBLIC / "schemas" / "bugs" / "bug-record-v1.schema.json").read_text(encoding="utf-8")
     )
-    properties, required = set(schema["properties"]), set(schema["required"])
+    required = set(schema["required"])
     shaped = [
         {**{key: None for key in required - record.keys()},
-         **{key: value for key, value in record.items() if key in properties}}
+         **record}
         for record in records
     ]
     (specs / "bugs" / "BUGS.jsonl").write_text(

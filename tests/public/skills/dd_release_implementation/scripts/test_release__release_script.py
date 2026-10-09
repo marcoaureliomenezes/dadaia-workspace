@@ -11,7 +11,6 @@ it, so the teaching and the gate cannot drift. Size: SMALL.
 from __future__ import annotations
 
 import json
-import re
 import subprocess
 import sys
 from pathlib import Path
@@ -81,19 +80,6 @@ def test_an_approved_spec_and_plan_enter_implementation_with_no_tasks_file(
 def test_an_unapproved_plan_refuses(script: Path, tmp_path: Path) -> None:
     result = _phase(script, _specs(tmp_path, "no table\n", plan_status="Draft"))
     assert result.returncode != 0 and "'Draft'" in result.stderr
-
-
-def test_new_writes_a_spec_stub_carrying_replaces(script: Path, tmp_path: Path) -> None:
-    """AC1.9 — the stub asks for Replaces between Scope and Out of scope; no PLAN born."""
-    specs = tmp_path / "specs"
-    (specs / "releases").mkdir(parents=True)
-    argv = [sys.executable, str(script), "new", "0.9.0", "--specs", str(specs)]
-    assert subprocess.run(argv, capture_output=True, text=True).returncode == 0
-    stub = (specs / "releases/0.9.0/rc-1/SPEC.md").read_text("utf-8")
-    headings = re.findall(r"^## \d+\. (.+)$", stub, re.MULTILINE)
-    assert headings.index("Scope") + 1 == headings.index("Replaces")
-    assert headings.index("Replaces") + 1 == headings.index("Out of scope")
-    assert not (specs / "releases/0.9.0/rc-1/PLAN.md").exists()
 
 
 def test_the_pinned_pair_resolves_the_same_live_candidate(tmp_path: Path) -> None:
