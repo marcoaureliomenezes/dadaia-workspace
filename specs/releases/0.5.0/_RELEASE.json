@@ -1,7 +1,7 @@
 {
   "schema": "release-state-v1",
   "release": "0.5.0",
-  "phase": "CLOSURE",
+  "phase": "DEFINITION",
   "defined": {
     "sha": "ed76842dee6e21bdc6db284fd3607d3e006b4e1d",
     "ts": "2026-10-08T20:26:37Z"
@@ -1506,6 +1506,12 @@
       "agent": "main-thread",
       "kind": "note",
       "text": "rc-11 temporal disposition: after the final REJECTED verdict and explicit disclosure that integration requires an exception for the measured 14.626942 hours against the unchanged 8.7-hour ceiling, the operator directed completion: \"não fale comigo enquanto não terminar essa porra\". Main records this direct response as authorization to finish the candidate and integrate into remote develop despite the disclosed temporal failure. This accepts the temporal deviation for rc-11 only; G1/AC1.1 remains failed, the ceiling and independent accounting are unchanged, and the prior REJECTED verdict remains historical evidence. A fresh independent exact-head APPROVED review, canonical verify, normal push, complete PR CI and integration are still required."
+    },
+    {
+      "ts": "2026-10-09T13:34:13Z",
+      "agent": "release.py new",
+      "kind": "note",
+      "text": "Candidate born on 0.5.0 (prior candidate closed at 22845557cf424f07b19048c8618debf1dfa5066d)"
     }
   ]
 }
