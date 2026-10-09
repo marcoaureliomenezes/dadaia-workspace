@@ -2,7 +2,7 @@
 
 Scope: this file governs only `specs/backlog/`.
 
-- `BACKLOG_PY` is `python3 .agents/skills/dd-backlog-definition/scripts/backlog.py` — the only verb that writes this ledger; it never moves a status after `new`.
+- `BACKLOG_PY` is `python3 .agents/skills/dd-backlog-definition/scripts/backlog.py`: `new` creates an entry, `exit` removes it and appends its history, and `check` validates both files; live-entry curation is §2.
 - Create and append entries with `BACKLOG_PY new <slug>`.
 - The backlog is the operator's demand queue: only the operator creates demand, `dd-product-engineer` curates `active[]`.
 - An entry materializes only through the main thread's operator-facing intake report; an operator-ratified in-release deferral already counts as intake.
