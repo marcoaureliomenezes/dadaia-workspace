@@ -1,0 +1,14 @@
+# Job 4 — REBUILD the test-side carry units and one child-process env builder (FR3, AC8.4)
+
+**Status:** Draft
+
+Six of FR3's twelve units live in the suite: each was closed by a CI-selection change (`JB.S9.T11`), not by reworking the test. They are rebuilt here together with AC8.4, because every one of them is an ad-hoc child-process environment. Test-only REBUILD: one dispatch per task, the units' regression tests are kept (rebuilt, never weakened), and each commit takes shape 3 `refactor(bugs): <id> — REBUILD <unit>: …` with net lines ≤ 0 or the reason in its body (AC3.2).
+
+- Unit assignment: `context-show-live-branch-test-rmtree-readonly-git-on-windows`, `coverage-line-test-spawns-bare-python-on-windows`, `fix-line-run-tests-spawn-wsl-bash-on-windows`, `hook-wrapper-tests-run-an-unrunnable-fixture-python-on-windows`, `worktree-script-run-fails-winerror-193-on-windows` → J4.T1; `fix-line-tests-expect-posix-bin-paths-on-windows` → J4.T2.
+- AC8.4 proof (the PLAN's grep): `git grep -nE "os\.environ\.copy\(\)|dict\(os\.environ|\{\*\*os\.environ|env=\{" -- tests ':!tests/fixtures/harness_env.py'` — 13 hits in 12 files at `eb4ce8c93`; after J4.T2 exactly 2, both non-spawn: `tests/core/test_invocation.py:136` (a pure function argument) and `tests/hooks/test_sdd_gate.py:70` (an overlay handed to the builder). Live probes stay out of the default suite.
+- AC3.1's Windows/macOS evidence is the candidate PR matrix (push runs are Linux-only); the job's own gate runs the Linux push CI.
+
+| task | AC | `W:` | outcome |
+|---|---|---|---|
+| J4.T1 | AC3.1, AC3.2, AC8.4 | `tests/fixtures/harness_env.py`, `tests/fixtures/test_harness_env.py`, `tests/fixtures/stores.py`, `tests/scripts/test_ci.py`, `tests/cli/commands/test_doctor.py`, `tests/cli/commands/test_doctor__workspace_fix_lines_clear_their_finding.py`, `tests/infrastructure/runtime_transforms/test_hook_wrappers.py`, `tests/infrastructure/runtime_transforms/test_hook_wrappers__hook_interpreter.py`, `tests/cli/commands/test_context__context_show_live_branch.py` | one env builder in `harness_env.py`; REBUILD of five spawn units through it |
+| J4.T2 | AC3.1, AC3.2, AC8.4 | `tests/cli/commands/test_init__init_with_repo.py`, `tests/infrastructure/test_ledger_scripts.py`, `tests/cli/commands/test_specs.py`, `tests/cli/commands/test_ci__push_gate_gitflow_resolution.py`, `tests/features/certification/test_service.py`, `tests/core/test_invocation__one_bind.py`, `tests/e2e/test_one_line_bootstrap.py`, `tests/helpers/worktree_ws.py`, `tests/public/skills/dd_bug_resolution/scripts/test__specs__workspace_root.py`, `tests/public/skills/dd_handoff_emitter/scripts/test_verdict.py`, `tests/public/skills/dd_release_implementation/scripts/test__release_schema.py`, `tests/public/skills/dd_release_implementation/scripts/test_release__lean_state.py` | after J4.T1; REBUILD of the posix-bin-path unit (six files) and the remaining AC8.4 sites, through the builder |
