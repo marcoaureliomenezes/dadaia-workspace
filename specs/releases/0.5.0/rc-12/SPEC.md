@@ -31,14 +31,14 @@ The agentic law that every later agent reads scored 7.2/7.3 at `b1e402511`, with
 - G1. The PLAN's critical path is at most 8.7 wall-clock hours, from explicit task durations and DAG edges, with aggregate agent-hours, measured baselines, uncertainty and contingency disclosed. When the estimate exceeds the ceiling, CP3 (FR7, with its two backlog items) moves to rc-13 first.
 - G2. Every cell of the agentic-set scorecard scores ≥ 9 under two new independent judges, and the three design skills ship nowhere.
 - G3. The CP jobs are pure refactoring: exit codes, `fix:`/`Operator action:` lines, ledgers and files written, JSON output, and BLOCK/ALLOW decisions are identical before and after. The characterization net (FR4) proves it.
-- G4. The coupling metrics move, re-measured with the audit scripts:
+- G4. The coupling metrics move, re-measured with the audit scripts at `.dadaia/reports/dadaia-workspace/futures-audit/` (`coupling/analyze.py`; `coupling/summarize.py` on `uvx radon` 6.0.1 output):
 
 | metric | before (`b1e402511`) | after | owner |
 |---|---|---|---|
 | `sys.path` mutations (`analyze.py` `syspath_manipulations`) | 44 | 0 | FR6 |
 | unit import cycles (`analyze.py` `unit_sccs_all_coarse` cycles) | 7 | 0 | FR6 |
 | `BUGS.jsonl` reader modules (`summarize.py` `ledger_parsers_estimated`) | 8 | 1 | FR7 |
-| `spec_contexts.json` writer modules | 3 | 1 | FR5 |
+| `spec_contexts.json` writer modules (`git grep -nE "spec_contexts\.json" -- dadaia_workspace`, filtered to write sites — `write_bytes`, `write_text`, `atomic_write`, `unlink` — counted per module) | 3 (`json_context_store`, `migrate/state_v2`, `reconcile/service`) | 1 | FR5 |
 | `setup.cfg` `ignore_imports` edges (`analyze.py` `ignored_imports`) | 2 | 0 | FR5 |
 
 - G5. Each CP's test actions (delete, lint, rewrite, narrow) land in that CP's job, and each CP job's net line count, tests included, is ≤ 0.
@@ -59,7 +59,7 @@ The agentic law that every later agent reads scored 7.2/7.3 at `b1e402511`, with
 
 - AC1.1 (no test — reviewer source sweep): The job applies every row of the law-9 edit plan (`.dadaia/reports/dadaia-workspace/agentic-scorecard/20261009T1335Z/PLAN-law9.md`, 288 official cells below 9, `plan.json`). Where the two judges propose different edits for one cell, the edit that deletes more and satisfies both applies. The plan's four conflict resolutions apply as written: the release-state schema path is `.dadaia/agentic/schemas/release-state-v1.schema.json`; `SLOP.md` keeps the verdict rule and `dd-code-review/SKILL.md:59` is deleted; `SLOP.md:17` names "the domain names the repo's specs already use"; and the G rows replace J1/J2 for gitflow S4, manager S4, grill S5 and rel-impl S3.
 - AC1.2 (integration): The library deletes `dd-domain-modeling`, `dd-codebase-design` and `dd-architecture-survey` and every reference to them in the AC1.6 sources, `behavior-map.json`, `CONTEXT-MAP.md`, the repo's `CONTEXT.md` and `tests/infrastructure/test_public_assets.py`. A rule that lived only in those skills moves to its owning skill as a pointer. `public stage`, `public install` and `public doctor` finish clean, and install prunes the instance copies. `git grep -nE 'dd-(domain-modeling|codebase-design|architecture-survey)' -- dadaia_workspace tests CONTEXT.md` returns no hit. Ledgers, ADRs, `CHANGELOG.md` and archived history are not rewritten.
-- AC1.3 (no test — operator ruling): Constitution §5 reads ≥ 9 in place of both "≥ 8" (item 3's "scripts" criterion and the closing measure line), with every cell counted and a scorecard at least every 2 days and before evals, promote or publication. The amendment lands in one define-tree commit with the main thread's acceptance of proposed ADR 0239. On acceptance, ADR 0239 sets `amends: "0219"` and the operator's ruling. `constitution_version` moves per §4.
+- AC1.3 (no test — operator ruling): Constitution §5 reads ≥ 9 in place of both "≥ 8" (item 3's "scripts" criterion and the closing measure line), with every cell counted and a scorecard at least every 2 days and before evals, promote or publication. The amendment lands in one define-tree commit with the main thread's acceptance of proposed ADR 0239. On acceptance, ADR 0239 sets `amends: "0219"` and the operator's ruling. `constitution_version` goes from 6.2.0 to 7.0.0, because §4 makes a changed article MAJOR.
 - AC1.4 (no test — independent judgement): Acceptance requires two new independent read-only `dd-code-reviewer` judges, neither of them an author of the plan or the edits. Each scores every cell (R1–R8, P1–P3, S1–S12, C1–C6) with `path:line` for any score below 9. The loop is score, fix, re-score until both judges put every cell at ≥ 9. The main thread never scores. The record lands under `.dadaia/reports/dadaia-workspace/agentic-scorecard/<UTC>/`.
 - AC1.5 (unit): The five code-text fixes of the plan land as string and docstring edits with no behaviour change:
   - `features/chokepoints/push_gate.py:210-211` drops "or the verdict rule".
@@ -94,7 +94,7 @@ Bug `worktree-new-opens-a-job-outside-implementation` (MEDIUM, merged 4f8024cab)
 
 ### FR4 — characterization net (before any CP refactor)
 
-- AC4.1 (integration): Before any CP job merges, each of the 42 public seams named by the audit's seam inventory (`tests_audit/seams.py`, enumerated in the PLAN) has a test at its public seam. The test asserts the exit code, the exact `fix:`/`Operator action:` line, and the artifact written (file, ledger record or JSON).
+- AC4.1 (integration): The audit inventory `.dadaia/reports/dadaia-workspace/futures-audit/seams-42.txt` lists 42 public seams without a contract-complete test, each with its owning CP. Before any CP job merges, each of the 19 seams owned by CP1 (5), CP3 (9) and CP4 (5), and every other listed seam an rc-12 job touches, has a test at its public seam. The test asserts the exit code, the exact `fix:`/`Operator action:` line, and the artifact written (file, ledger record or JSON). The 10 unowned seams (`registry.py` ×6, `capabilities`, `certify`, `help tree`, `reports validate`) and the seams owned by CP2, CP5, CP6 and CP7 get their net in rc-13 and rc-14, before those refactors.
 - AC4.2 (integration): Byte-exact tests pin `BUGS.jsonl` and `_RELEASE.json`. Each writer verb run on a fixed fixture yields the same bytes before and after every CP job.
 - AC4.3 (no test — reviewer check): Each characterization test is green on the pre-refactor head and on every CP job's head, and no CP job edits one of them.
 
@@ -118,7 +118,7 @@ Bug `worktree-new-opens-a-job-outside-implementation` (MEDIUM, merged 4f8024cab)
 ### FR8 — audit findings
 
 - AC8.1 (no test — closure measurement): F004 is an acceptance metric. The same-surface re-bug rate, measured at closure with the finding's metric-4 command over rc-12's window, is ≤ 30% at 3 days. The 14-day figure (target ≤ 50%) is re-measured before the 0.5.0 promote.
-- AC8.2 (no test — closure measurement): F009 is an acceptance metric. No bug found in rc-12's window carries a `caused_by` that names an rc-12 CP or REBUILD task or fix. The fix-induced share of rc-12-window resolutions is reported against the 37/189 baseline.
+- AC8.2 (no test — closure measurement): F009 is an acceptance metric, and this statement is its target: zero bugs found in rc-12's window carry a `caused_by` that names an rc-12 CP or REBUILD task or fix. The fix-induced share of rc-12-window resolutions is reported against the 37/189 baseline with no numeric target; F009 states none, and the zero-caused rule is stricter than any share.
 - AC8.3 (no test — reviewer diff check): F003 and F005 resolve through G5 and AC3.2. Each rc-12 fix or REBUILD is net ≤ 0 or justified in its body, and no rc-12 commit adds an entry to a hand-kept list except `shipped-hashes.json` re-recorded by its tool.
 - AC8.4 (integration): F018 is resolved when every test that spawns a child process builds its environment through one builder in `tests/fixtures/harness_env.py`. The PLAN names the grep that proves no other construction remains. Live probes stay out of the default suite.
 - AC8.5 (no test — evidence): F048 and F051 are dispositioned `resolved`. Their bugs (`ci-preflight-writes-coverage-into-the-repo`, `hook-entrypoints-invisible-to-coverage`) were resolved on 2026-10-05, and the disposition cites those records.
@@ -155,11 +155,9 @@ Bug `worktree-new-opens-a-job-outside-implementation` (MEDIUM, merged 4f8024cab)
 |---|---|
 | A refactor silently changes an exit code or fix line. | FR4 is green before and after every CP job (AC4.3). |
 | Law edits regress a cell that already scored 9 or more. | AC1.4 re-scores every cell, not only those below 9. |
-| The audit scripts live under `.dadaia/tmp/` with a TTL. | The PLAN pins how they are preserved before the after-measurement (§6). |
+| The before→after measurement drifts from its method. | The audit scripts and their outputs live at `.dadaia/reports/dadaia-workspace/futures-audit/` (the `reports/` zone, never reaped); the after-measurement re-runs them unchanged. |
 | Parallel jobs collide on `_worktree_*` and `release.py`. | PLAN `W:` sets are disjoint per wave, and the overlap check refuses a collision. |
 
 ## 6. Open questions
 
-1. F009 has no numeric target in its finding. AC8.2 sets "zero bugs caused by an rc-12 refactor" and reports the share. Is a numeric share target required?
-2. The metric scripts (`analyze.py`, `summarize.py`) live in `.dadaia/tmp/main-thread/20261009/futures-audit/` under TTL. `summarize.py` also needs radon output, and radon is not installed here. Where do they live for the after-measurement?
-3. The 42-seam inventory is not on disk; `seams.py` must be re-run for the PLAN to enumerate it. Confirm 42 is the number to hold if the re-run yields a different count.
+None.
