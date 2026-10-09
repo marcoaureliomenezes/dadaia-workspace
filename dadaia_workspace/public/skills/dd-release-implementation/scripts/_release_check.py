@@ -27,6 +27,7 @@ from _release_schema import (  # noqa: E402
     CODE,
     DELIVERED,
     HISTO,
+    current_plan_jobs,
 )
 
 _LAW = "specs/releases/AGENTS.md: release.py is this ledger's ONE writer"
@@ -34,6 +35,9 @@ _LAW = "specs/releases/AGENTS.md: release.py is this ledger's ONE writer"
 _JOB_MERGE = re.compile(
     r"job: [a-z0-9-]+; start: \S+; end: \S+; wall: \d+; ritual_wait: \d+; dispatches: \d+; job_gate_runs: \d+"
 )
+_CURRENT_LOG_KINDS = frozenset({"milestone", "note", "summary", "memory"})
+_SUMMARY = re.compile(r"delivered: .+; carried: .+; backlog exits: .+")
+_BIRTH = re.compile(r"^(?:Candidate|Release \d+\.\d+\.\d+) born\b")
 
 
 def finding(path: str, line: int, message: str, fix: str) -> dict[str, Any]:
@@ -51,21 +55,44 @@ def _unwritten(
 
 
 def _log_errors(document: dict[str, Any]) -> list[str]:
-    """``log`` is append-only and oldest first: a later entry never predates an earlier; a
-    job's `kind: merge` entry (its text opens `job:`) carries the whole measurement."""
+    """Validate ordering and the lean current-candidate log while retaining history."""
     entries = [entry for entry in document.get("log", []) if isinstance(entry, dict)]
     stamps = [entry.get("ts") for entry in entries]
-    return [
-        f"log[{index}] kind merge text {entry.get('text')!r} is not '{_JOB_MERGE.pattern}'"
-        for index, entry in enumerate(entries)
-        if entry.get("kind") == "merge"
-        and str(entry.get("text")).startswith("job:")
-        and not _JOB_MERGE.fullmatch(str(entry.get("text")))
-    ] + [
-        f"log[{index + 1}].ts {later!r} precedes log[{index}].ts {earlier!r}"
-        for index, (earlier, later) in enumerate(zip(stamps, stamps[1:], strict=False))
-        if isinstance(earlier, str) and isinstance(later, str) and later < earlier
-    ]
+    born = max(
+        (index for index, entry in enumerate(entries) if _BIRTH.match(str(entry.get("text", "")))),
+        default=len(entries),
+    )
+    current = entries[born:]
+    return (
+        [
+            f"log[{born + index}] kind {entry.get('kind')!r} is legacy; current candidates "
+            f"write only {', '.join(sorted(_CURRENT_LOG_KINDS))}"
+            for index, entry in enumerate(current)
+            if entry.get("kind") not in _CURRENT_LOG_KINDS
+        ]
+        + [
+            f"log[{born + index}] kind memory is closure-only"
+            for index, entry in enumerate(current)
+            if entry.get("kind") == "memory" and document.get("phase") != "CLOSURE"
+        ]
+        + [
+            f"log[{born + index}] kind summary must contain delivered, carried and backlog exits"
+            for index, entry in enumerate(current)
+            if entry.get("kind") == "summary" and not _SUMMARY.fullmatch(str(entry.get("text", "")))
+        ]
+        + [
+            f"log[{index}] kind merge text {entry.get('text')!r} is not '{_JOB_MERGE.pattern}'"
+            for index, entry in enumerate(entries)
+            if entry.get("kind") == "merge"
+            and str(entry.get("text")).startswith("job:")
+            and not _JOB_MERGE.fullmatch(str(entry.get("text")))
+        ]
+        + [
+            f"log[{index + 1}].ts {later!r} precedes log[{index}].ts {earlier!r}"
+            for index, (earlier, later) in enumerate(zip(stamps, stamps[1:], strict=False))
+            if isinstance(earlier, str) and isinstance(later, str) and later < earlier
+        ]
+    )
 
 
 def state_findings(text: str, rel: str, root: Path = SPECS) -> list[dict[str, Any]]:
@@ -112,11 +139,36 @@ def histo_findings(text: str, root: Path = SPECS) -> list[dict[str, Any]]:
 def dag_errors(plan: str) -> list[str]:
     """The PLAN's `## DAG` table (job | waits on | why) read once: Job 1 exists, at most 8
     jobs (Reconciliation uncounted), no cycle."""
+    lines = plan.splitlines()
+    dag_at = next((n for n, line in enumerate(lines) if re.match(r"^## DAG", line)), None)
+    end = len(lines)
+    current_table = False
+    if dag_at is not None:
+        saw_table = False
+        for index, line in enumerate(lines[dag_at + 1 :], start=dag_at + 1):
+            if line.lstrip().startswith("|"):
+                if not saw_table:
+                    lowered = line.lower()
+                    current_table = "wave" in lowered and "w:" in lowered
+                saw_table = True
+            elif saw_table and line.strip():
+                end = index
+                break
+    current, current_errors = current_plan_jobs("\n".join(lines[:end]) if current_table else plan)
+    if current is not None:
+        by_wave: dict[int, list[str]] = {}
+        for wave, paths in current.values():
+            by_wave.setdefault(wave, []).extend(paths)
+        return current_errors + [
+            f"PLAN.md DAG wave {wave}: two jobs write {path} — `W:` sets overlap"
+            for wave, paths in by_wave.items()
+            for path in sorted({path for path in paths if paths.count(path) > 1})
+        ]
     section = re.split(r"^## DAG.*$", plan, maxsplit=1, flags=re.MULTILINE)[1:]
     rows = re.findall(r"^\|\s*Job (\d+)\s*\|([^|]*)\|", re.split(r"^#", section[0], flags=re.MULTILINE)[0],
                       re.MULTILINE) if section else []  # fmt: skip
     graph = {int(job): {int(n) for n in re.findall(r"\d+", waits)} for job, waits in rows}
-    errors = ["the DAG has no Job 1"] if section and 1 not in graph else []
+    errors = current_errors + (["the DAG has no Job 1"] if section and 1 not in graph else [])
     errors += [f"the DAG holds {len(graph)} jobs — at most 8 jobs"] if len(graph) > 8 else []
     try:
         tuple(TopologicalSorter(graph).static_order())

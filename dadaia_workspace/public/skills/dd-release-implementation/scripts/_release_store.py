@@ -18,7 +18,7 @@ from typing import Any
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 sys.path.append(str(Path(__file__).resolve().parents[2] / "dd-bug-resolution" / "scripts"))
 
-from _ledger import replace, stamp  # noqa: E402
+from _ledger import records, replace, stamp  # noqa: E402
 from _release_check import state_findings  # noqa: E402
 from _release_schema import STATE, Unreadable, candidate_dir, live_id  # noqa: E402
 from _release_schema import live_ids as live_ids  # noqa: E402 — re-exported for the verbs
@@ -80,6 +80,18 @@ def window_start(state: State) -> str:
                      f"{SCRIPT} phase IMPLEMENTATION --sha"),
                      "with the sha of the commit that approved the definition")  # fmt: skip
     return str(start)
+
+
+def open_bug_ids(specs: Path, release_id: str, release_dir: Path) -> list[str]:
+    """Open bugs found in the live candidate, sorted for deterministic refusals."""
+    candidate = (candidate_dir(release_dir) or release_dir).name
+    return sorted(
+        str(record["id"])
+        for record in records(specs / "bugs" / "BUGS.jsonl")
+        if record.get("status") == "open"
+        and record.get("found_in") == {"release": release_id, "rc": candidate}
+        and record.get("id")
+    )
 
 
 def serialize(state: State) -> str:

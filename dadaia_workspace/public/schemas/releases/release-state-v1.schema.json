@@ -119,7 +119,7 @@
     },
     "log": {
       "type": "array",
-      "description": "Append-only governance narrative living inside this mutable document, oldest first. An entry is appended, never edited or removed once written.",
+      "description": "Append-only governance narrative living inside this mutable document, oldest first. Legacy kinds remain schema-readable; release.py check restricts entries after the live candidate's birth to note, milestone, summary and closure-only memory.",
       "items": {
         "type": "object",
         "additionalProperties": false,
@@ -143,7 +143,7 @@
           "kind": {
             "type": "string",
             "minLength": 1,
-            "description": "The closure-narrative category of this log entry, from the closed enum below: 'note' (anything with no dedicated kind), the nine narrative kinds a candidate closure writes — summary, size, drifts, dispositions, test-dispositions, artifact-gc, reviews, merge, memory — and 'milestone', which `release.py phase` appends at each candidate's defined/implemented stamp.",
+            "description": "The entry category. The enum retains historical kinds; current candidates write only note, milestone, summary and closure-only memory.",
             "enum": [
               "note",
               "summary",

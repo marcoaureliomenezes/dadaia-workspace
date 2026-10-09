@@ -21,7 +21,7 @@ from dadaia_workspace.core.release_state import (
 )
 from dadaia_workspace.core.spec_status import APPROVED, extract_status
 from dadaia_workspace.core.spec_status import CANONICAL_STATUS as _CANONICAL_STATUS
-from dadaia_workspace.features.specs.doctor_common import RELEASE_ARTIFACTS, iter_all_release_dirs
+from dadaia_workspace.features.specs.doctor_common import iter_all_release_dirs
 from dadaia_workspace.features.specs.doctor_types import Severity, finding_path, specs_finding
 from dadaia_workspace.features.specs.specs_tree import SpecsTree
 
@@ -51,7 +51,7 @@ class ReleaseValidator:
         active = self.tree.active_release
         if not active.candidate:
             return issues
-        for fname in RELEASE_ARTIFACTS:
+        for fname in ("SPEC.md", "PLAN.md"):
             fpath = active.candidate / fname
             if not fpath.exists():
                 # Presence is `release.py check`'s rule, in ONE home. This rule judges the `**Status:**`

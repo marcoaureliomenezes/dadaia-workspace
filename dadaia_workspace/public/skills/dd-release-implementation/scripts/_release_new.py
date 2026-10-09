@@ -32,29 +32,29 @@ SPEC_STUB = """\
 
 (Read `bugs.py window` and each cited test before scoping.)
 
-## 1. Problem and context
+## 1. Problem
 
 (Describe the problem this release solves.)
 
-## 2. Objective
+## 2. Measurable Goals
 
-(State the release objective in one sentence.)
+(List observable outcomes.)
 
-## 3. Scope
-
-{scope}
-
-## 4. Replaces
-
-(One bullet per current behaviour an As-is DELETE/REBUILD row removes, or `none` and why.)
-
-## 5. Out of scope
+## 3. Non-goals
 
 (Explicitly list what this release does NOT cover.)
 
-## 6. Dependencies and risks
+## 4. Requirements
+
+{scope}
+
+## 5. Constraints and risks
 
 (Upstream blockers, sequencing constraints, risk table.)
+
+## 6. Open questions
+
+(Questions the operator must decide before approval, or `none`.)
 """
 
 

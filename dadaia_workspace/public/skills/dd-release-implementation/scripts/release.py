@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import sys
 from pathlib import Path
 
@@ -21,7 +22,14 @@ from _release_check import histo_findings  # noqa: E402
 from _release_new import new_release  # noqa: E402
 from _release_phase import SHIP_PR, set_phase  # noqa: E402
 from _release_schema import CODE, HISTO, SHA_RE, STATE, utc_now  # noqa: E402
-from _release_store import SCRIPT, Refusal, commit, live_release, window_start  # noqa: E402
+from _release_store import (  # noqa: E402
+    SCRIPT,
+    Refusal,
+    commit,
+    live_release,
+    open_bug_ids,
+    window_start,
+)
 from _release_tree import check, drift, memory_errors, refuse_open_bugs, ship_findings  # noqa: E402
 from _specs import choice, find_specs, refuse  # noqa: E402
 
@@ -33,6 +41,11 @@ _HELP = {
     "ship": "record the merged promote PR: shipped, a delivered histo line, the dir archived",
     "check": "validate every _RELEASE.json under releases/ and the ship ledger",
 }
+
+
+def _mentions(text: str, bug_id: str) -> bool:
+    """Whether *text* names one whole slug-like bug id, not a longer id."""
+    return re.search(rf"(?<![a-z0-9-]){re.escape(bug_id)}(?![a-z0-9-])", text) is not None
 
 
 def _parser() -> argparse.ArgumentParser:
@@ -51,6 +64,13 @@ def _parser() -> argparse.ArgumentParser:
             command.add_argument("--sha", required=True, help="the commit the milestone names")
         if verb == "ship":
             command.add_argument("--pr", help="the merged promote PR number, when the host has one")
+            command.add_argument(
+                "--allow-open",
+                action="append",
+                default=[],
+                metavar="ID",
+                help="carry one operator-authorized open bug (repeat once per id)",
+            )
         if verb == "memory":
             for name in ("--reviewed", "--changed"):
                 command.add_argument(name, default="", help="comma-separated worklist entries")
@@ -114,7 +134,46 @@ def _ship(args: argparse.Namespace, specs: Path) -> int:
                              f"{SCRIPT} ship --sha {sha}"), SHIP_PR)  # fmt: skip
     if found := ship_findings(specs):
         raise Refusal(found[0]["message"], found[0]["fix"])
-    refuse_open_bugs(specs, live.release_id, live.release_dir)
+    open_ids = open_bug_ids(specs, live.release_id, live.release_dir)
+    allowed = sorted(set(args.allow_open))
+    if len(allowed) != len(args.allow_open):
+        raise Refusal(
+            "--allow-open repeats an id — supply exactly one flag per open bug",
+            "Operator action: remove the duplicate --allow-open flag",
+        )
+    if not allowed:
+        refuse_open_bugs(specs, live.release_id, live.release_dir)
+    if missing := sorted(set(open_ids) - set(allowed)):
+        raise Refusal(
+            f"open bug(s) require one --allow-open flag each: {', '.join(missing)}",
+            "Operator action: authorize each open bug carry, record the authorization "
+            "verbatim in a kind: note entry, then repeat --allow-open for each id",
+        )
+    if extra := sorted(set(allowed) - set(open_ids)):
+        raise Refusal(
+            f"--allow-open names bug(s) not open in the live candidate: {', '.join(extra)}",
+            f"Operator action: remove --allow-open for {', '.join(extra)}",
+        )
+    log = [entry for entry in live.state.get("log") or [] if isinstance(entry, dict)]
+    summaries = [str(entry.get("text", "")) for entry in log if entry.get("kind") == "summary"]
+    for bug_id in allowed:
+        authorized = any(
+            entry.get("kind") == "note"
+            and "Operator authorization verbatim:" in str(entry.get("text", ""))
+            and _mentions(str(entry.get("text", "")), bug_id)
+            for entry in log
+        )
+        carried = any(
+            _mentions(text.partition("carried:")[2].partition("; backlog exits:")[0], bug_id)
+            for text in summaries
+        )
+        if not authorized or not carried:
+            need = "authorization note" if not authorized else "closure summary carry"
+            raise Refusal(
+                f"--allow-open {bug_id} has no {need}",
+                f"Operator action: add {bug_id} to the kind: note verbatim authorization "
+                "and the kind: summary carried field",
+            )
     line = json.dumps({"id": live.release_id, "ts": ts, "disposition": "delivered",
                        "release": live.release_id, "reason": None, "entry": None,
                        "summary": None}) + "\n"  # fmt: skip
