@@ -176,7 +176,9 @@ def script_findings(specs_dir: Path, runner: _Runner | None = None) -> list[Sect
         if records is None:
             findings.append(_unrunnable(script, f"check exited {result.returncode} with no JSON"))
             continue
-        findings.extend(_finding(script, record) for record in records)
+        findings.extend(
+            _finding(script, record) for record in records if record.get("verdict") != "info"
+        )
     return findings
 
 
