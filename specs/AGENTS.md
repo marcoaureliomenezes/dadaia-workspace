@@ -26,7 +26,7 @@ Scope: this file governs only the `specs/` tree of one Spec Context Project.
 
 ## 2. Load order
 
-- Ground the session with `dd-spec-navigator` — context, memory bootstrap, live release and its trio, in that order.
+- Ground the session with `dd-spec-navigator` — context, memory bootstrap, live release state, then the current candidate's SPEC, PLAN and job files.
 - `_archive/` and `backlog/` are history and intake; neither is an approval.
 
 ## 3. Before implementing
