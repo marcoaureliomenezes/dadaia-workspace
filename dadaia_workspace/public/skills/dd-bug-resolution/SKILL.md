@@ -64,7 +64,8 @@ gap is registered first).*
 
 **Phase 6 — Cleanup + resolve.** Grep the probe prefix to zero:
 
-- Commit the GREEN fix, then use its 40-hex sha in the canonical resolve command from
+- Commit the GREEN source fix with shape 3 of `dd-gitflow-default` §3a, then use its
+  40-hex sha in the canonical resolve command from
   [`LINEAGE.md`](LINEAGE.md) §Declare `caused_by`.
 
 ```
@@ -74,8 +75,8 @@ python3 .agents/skills/dd-bug-resolution/scripts/bugs.py resolve <bug-id> --caus
 
 - `caused_by` names a live or archived bug, a known release task, or `none`, never a loop;
   writes refuse anything else.
-- Commit the resulting `BUGS.jsonl` transition with the red loop in the body and a hotfix's
-  `block: <item>`, using shape 3 of `dd-gitflow-default` §3a.
+- Commit the resulting ledger-only `BUGS.jsonl` transition with shape 4 of
+  `dd-gitflow-default` §3a.
 
 ## 3. Done when
 

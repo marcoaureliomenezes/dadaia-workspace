@@ -52,7 +52,10 @@ axes are reported side by side — an axis never outranks another.
 - The operator's rule applied as a review axis: a diff that GROWS the feature is a stop —
   a branch, flag, special case, second code path or cross-feature reach-in added by a fix
   is a puxadinho; name it and recommend the replace-don't-layer shape instead.
-- A fix whose `caused_by` is not `none`: resolve the named bug or task, read its persisted `fix_sha` and inspect every line with `git show <fix_sha>`; the fix is a REBUILD of the unit, keeping its tests, and a patch in its place is a finding; `PILLAR-BUGS` measures it, nothing gates it.
+- A fix whose `caused_by` is not `none`: when it names a bug, read that record's persisted
+  `fix_sha`; when it names a task, locate that task's source commit in git history. Inspect
+  every line of the named commit with `git show`; the fix is a REBUILD of the unit, keeping
+  its tests, and a patch in its place is a finding; `PILLAR-BUGS` measures it, nothing gates it.
 - An S4, S5, S8 or S10 finding (`SLOP.md`), or an added ratchet allowance key, answers this axis "increased" until it is gone.
 
 ## 4a. The root-cause and approval bars
