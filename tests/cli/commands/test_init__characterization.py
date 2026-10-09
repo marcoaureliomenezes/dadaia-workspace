@@ -15,13 +15,14 @@ from dadaia_workspace.core.platform import PLATFORM
 @pytest.mark.medium
 @pytest.mark.slow(reason="runs the public workspace bootstrap")
 def test_init_creates_the_literal_level_one_state(tmp_path: Path) -> None:
-    ws = tmp_path / "ws"
+    ws = tmp_path / "a b"
 
     result = CliRunner().invoke(app, ["init", str(ws), "--harness", "claude"])
 
     assert result.exit_code == 0
     cli = ws / ".dadaia" / ".venv" / PLATFORM.venv_scripts_dir / f"dadaia{PLATFORM.venv_exe_suffix}"
-    cli_word = str(cli).replace("\\", "/") if PLATFORM.windows else shlex.quote(str(cli))
+    cli_text = str(cli).replace("\\", "/")
+    cli_word = f'{cli_text[0]}"{cli_text[1:]}"' if PLATFORM.windows else shlex.quote(cli_text)
     assert result.output == (
         f"✓ Workspace {ws} (claude)\n"
         "✓ 164 asset(s) installed\n"
