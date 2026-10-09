@@ -143,7 +143,7 @@ prefix_rule(
 
 - Current Codex custom-agent schema requires `name`, `description`, `developer_instructions`.
 - Optional `model`, `model_reasoning_effort`, `sandbox_mode`, `mcp_servers`, skill config inherit when omitted.
-- Use `sandbox_mode` as a real role-boundary signal — evidence-only reviewers should not be general workspace writers.
+- `sandbox_mode = "workspace-write"` is the minimum Codex sandbox for the verdict-only reviewer: it permits test fixtures and the `verdict.py` artifact. `read_only: true` describes its source/direct-edit posture; its persona limits persisted output to that verdict.
 
 | Guard | Rule |
 |---|---|

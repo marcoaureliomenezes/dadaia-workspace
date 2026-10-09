@@ -3,7 +3,7 @@
 Sections: 1. Token Economy; 2. Instruction Hierarchy and Attention Ordering; 3. Persona-Consistency Invariants; 4. Model-Tier Selection Decision Protocol; 5. Recursive Scope-Drift Detection; Applying this file.
 Sibling of [`SKILL.md`](SKILL.md) (`dd-ai-eng-knowhow`, authoring depth).
 Persona files, skills, and rules are themselves prompts — every shipped line is paid for in tokens by every downstream invocation.
-The craft: maximize behavior-change-per-token under a hard context budget, keeping every persona structurally identical.
+The craft: maximize behavior-change-per-token under a hard context budget, keeping every persona's shared structure consistent.
 
 - Five disciplines, ordered by how often you reach for them: token economy, instruction hierarchy.
 - Disciplines (continued): consistency invariants, tier selection, scope-drift detection.
@@ -72,7 +72,7 @@ Audit protocol — detecting order drift:
 2. Map each heading to a canonical slot (1..5); omission is allowed, reordering is not.
 3. Verify mapped slot numbers are strictly non-decreasing top-to-bottom.
 4. Any inversion (a later slot above an earlier one) is an ORDER-DRIFT finding.
-5. Classify: inversion of 1/2/3 = HIGH; inversion among 4..10 = MEDIUM; extra non-canonical section = LOW.
+5. Classify: inversion of 1/2/3 = HIGH; inversion among 4..5 = MEDIUM; extra non-canonical section = LOW.
 6. Fix by moving sections to restore canonical order — never rewrite content while reordering.
 
 ---
@@ -83,12 +83,12 @@ Four invariants MUST hold across all personas. Inconsistencies are bugs — file
 
 | # | Invariant | What must match |
 |---|---|---|
-| I1 | Frontmatter schema | Same keys, same order (see below); no `tier`/`model` frontmatter key |
-| I2 | Body section order | The canonical 10-section spine of §2 |
+| I1 | Frontmatter schema | Shared core keys and order match; role-specific extensions follow the core; no `tier`/`model` frontmatter key |
+| I2 | Body section order | The canonical five-section spine of §2 |
 | I3 | `[SCOPE ERROR]` block format | Opener, one-line identity, explicit redirect per foreign domain |
 | I4 | Handoff JSON contract | All agents emit via `dd-handoff-emitter` against the same schema version |
 
-- I1 reference: the frontmatter keys `public/agents/*.md` carry today.
+- I1 reference: the shared core is `name`, `description`, `dispatch_band`, `read_only`, `tools`, `skills`, in that order; a role-specific extension such as `input_contract` follows it.
 - No persona sets `maxTurns`: a capped subagent stops mid-work and returns no report; the main thread stops a runaway one.
 - Model resolution is a separate policy-overlay mechanism, never asserted in persona frontmatter.
 
