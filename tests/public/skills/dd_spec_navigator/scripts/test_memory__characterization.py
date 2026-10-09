@@ -30,6 +30,7 @@ sources:
 
 Tracks [[beta]].
 """
+_NOW = "2026-01-01T00:00:00Z"
 _CATALOG = b"""{
   "generated_at": "2026-01-01T00:00:00Z",
   "features": [
@@ -72,9 +73,24 @@ _INDEX = b"""# Memory Catalog
 """
 
 
-def _run(script: Path, repo: Path, *args: str) -> subprocess.CompletedProcess[str]:
+def _run(
+    script: Path, repo: Path, *args: str, fixed_clock: bool = False
+) -> subprocess.CompletedProcess[str]:
+    command = [sys.executable, str(script), *args]
+    if fixed_clock:
+        bootstrap = (
+            "import sys\nfrom datetime import datetime\nfrom pathlib import Path\n"
+            "sys.path.insert(0, str(Path(sys.argv.pop(1))))\n"
+            "import memory\n"
+            "class Clock:\n"
+            " @staticmethod\n"
+            f" def now(tz): return datetime.fromisoformat({_NOW!r}.replace('Z', '+00:00'))\n"
+            "memory.cat.datetime = Clock\n"
+            "raise SystemExit(memory.main(sys.argv[1:]))"
+        )
+        command = [sys.executable, "-c", bootstrap, str(script.parent), *args]
     return subprocess.run(
-        [sys.executable, str(script), *args],
+        command,
         cwd=repo,
         env=suite_env(os.environ, repo),
         capture_output=True,
@@ -112,13 +128,26 @@ def test_catalog_generate_and_drift_pin_exit_output_and_artifacts(tmp_path: Path
     atom = product / "platform/alpha.md"
     atom.parent.mkdir(parents=True)
     atom.write_text(_ATOM, encoding="utf-8")
-    (product / "catalog.json").write_bytes(_CATALOG)
+    stale_catalog = b'{"generated_at":"2000-01-01T00:00:00Z","features":[]}\n'
+    stale_index = b"# stale catalog fixture\n"
+    (product / "catalog.json").write_bytes(stale_catalog)
+    (product / "index.md").write_bytes(stale_index)
+    assert stale_catalog != _CATALOG
+    assert stale_index != _INDEX
     source = repo / "src/alpha/core.py"
     source.parent.mkdir(parents=True)
     source.write_text("value = 1\n", encoding="utf-8")
     _git(repo.parent, "init", "-q", str(repo))
 
-    generated = _run(script, repo, "catalog", "generate", "--specs", str(repo / "specs"))
+    generated = _run(
+        script,
+        repo,
+        "catalog",
+        "generate",
+        "--specs",
+        str(repo / "specs"),
+        fixed_clock=True,
+    )
 
     assert (generated.returncode, generated.stdout, generated.stderr) == (
         0,

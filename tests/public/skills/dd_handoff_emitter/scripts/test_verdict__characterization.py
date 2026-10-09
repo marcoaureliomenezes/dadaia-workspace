@@ -21,6 +21,7 @@ _BODY = {
     "artifact": {"type": "other"},
     "metrics": {"finding_count": 0},
 }
+_NOW = "2026-10-09T12:34:56Z"
 
 
 def test_verdict_writes_the_exact_bound_handoff(tmp_path: Path) -> None:
@@ -41,10 +42,22 @@ def test_verdict_writes_the_exact_bound_handoff(tmp_path: Path) -> None:
     head = commit(tree, "specs/note.md", "reviewed\n")
     script = root / ".agents/skills/dd-handoff-emitter/scripts/verdict.py"
 
+    bootstrap = (
+        "import sys\nfrom datetime import datetime\nfrom pathlib import Path\n"
+        "sys.path.insert(0, str(Path(sys.argv.pop(1))))\n"
+        "import verdict\n"
+        "class Clock:\n"
+        " @staticmethod\n"
+        f" def now(tz): return datetime.fromisoformat({_NOW!r}.replace('Z', '+00:00'))\n"
+        "verdict.datetime = Clock\n"
+        "raise SystemExit(verdict.main(sys.argv[1:]))"
+    )
     result = subprocess.run(
         [
             sys.executable,
-            str(script),
+            "-c",
+            bootstrap,
+            str(script.parent),
             str(tree),
             "--sha",
             head,
@@ -66,15 +79,19 @@ def test_verdict_writes_the_exact_bound_handoff(tmp_path: Path) -> None:
     )
 
     assert (result.returncode, result.stderr) == (0, "")
-    target = Path(result.stdout.strip())
+    target = (
+        root
+        / ".dadaia/handoff/catalog/2026-10-09T123456Z-dd-code-reviewer-characterization.handoff.json"
+    )
+    assert result.stdout == f"{target}\n"
     assert target.parent == root / ".dadaia/handoff/catalog"
-    assert target.name.endswith("-dd-code-reviewer-characterization.handoff.json")
+    assert target.name == "2026-10-09T123456Z-dd-code-reviewer-characterization.handoff.json"
     document = json.loads(target.read_text(encoding="utf-8"))
     assert document == {
         "schema_version": "handoff-v1.2",
         "agent": "dd-code-reviewer",
         "context": "catalog",
-        "produced_at": document["produced_at"],
+        "produced_at": "2026-10-09T12:34:56Z",
         "verdict": "APPROVED",
         "verdict_reason": "characterized",
         "scope": f"wt/{name}@{head}",
