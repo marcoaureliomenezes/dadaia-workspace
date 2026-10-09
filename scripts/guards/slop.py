@@ -36,7 +36,7 @@ _LEDGER = load_owner("dd-bug-resolution", "_ledger")
 
 # Ceilings measured on this tree; ratchet DOWN ONLY, target 0: lower one in the commit that
 # removes a hit, never raise one.
-V32_COMMENTS, V32_DOCSTRINGS, V33_ORPHANS, IGNORE_EDGES = 109, 215, 31, 2
+V32_COMMENTS, V32_DOCSTRINGS, V33_ORPHANS, IGNORE_EDGES = 109, 215, 31, 0
 
 # v37: the candidate-folder pair (ADR 0150): the stdlib scripts cannot import the package, so
 # each side keeps its twin and one test pins them equal. v38: each deleter outside sweep,
