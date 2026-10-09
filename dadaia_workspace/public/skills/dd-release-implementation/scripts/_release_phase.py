@@ -125,8 +125,9 @@ def set_phase(specs: Path, phase: str, sha: str) -> tuple[str, str]:
                 number = job.stem.removeprefix("job")
                 if not number.isdigit() or number.startswith("0"):
                     raise Refusal(
-                        f"current task authority {job.name} is not named job<n>.md",
-                        f"Operator action: rename {job.resolve()} to its canonical job<n>.md name",
+                        f"current task authority {job.name} has no positive-numbered job filename",
+                        f"Operator action: rename {job.resolve()} to its canonical "
+                        "positive-numbered job filename",
                     )
                 authorities[f"Job {int(number)}"] = writes
         if planned is not None:
