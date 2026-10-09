@@ -26,10 +26,7 @@ description: >
 
 ## The intake gate — the only path to a new entry
 
-- Only the operator creates demand. An entry materializes via the main thread's
-  operator-facing intake report (handoff with `next_handoff.agent: "human"` plus its
-  HTML report), or via an operator-ratified in-release deferral (already counts as
-  intake).
+- Intake: `specs/backlog/AGENTS.md`.
 - The main thread compiles every actionable defect (review findings, closure returns, audit
   observations) into that report at each release close and review round; the operator's ruling on that report is what creates an entry.
 - A record-only observation (INFO-grade, awareness-only) terminates in the

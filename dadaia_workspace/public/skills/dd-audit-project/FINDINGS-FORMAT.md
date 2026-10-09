@@ -2,7 +2,7 @@
 
 Disclosed sibling of `SKILL.md`. Every claim becomes one line in
 `specs/audits/<YYYYMMDD>-<slug>/FINDINGS.jsonl`, validated by
-`dadaia_workspace/public/schemas/audits/finding-record-v1.schema.json`. The schema owns
+`.dadaia/agentic/schemas/audits/finding-record-v1.schema.json`. The schema owns
 field semantics.
 
 ## Fields
@@ -32,9 +32,7 @@ An append authors the immutable core. Every later change uses the disposition ve
 ## Append, disposition and close
 
 1. Append one schema-valid JSON object as one line.
-2. Before publishing the audit, run the push-time privacy detector over its range and
-   record the zero-hit result.
-3. Move a finding with:
+2. Move a finding with:
 
    ```bash
    python3 .agents/skills/dd-audit-project/scripts/audit.py disposition \
@@ -42,8 +40,8 @@ An append authors the immutable core. Every later change uses the disposition ve
      [--release <id>] [--reason <reason>]
    ```
 
-4. The finding schema defines dispositions and their required evidence. A later
+3. The finding schema defines dispositions and their required evidence. A later
    disposition replaces only the finding's governance triple; its immutable fields
    remain unchanged.
-5. `audit.py close <audit> --sha <window-end>` refuses while any finding is `open`, then
+4. `audit.py close <audit> --sha <window-end>` refuses while any finding is `open`, then
    appends one audit-history record and deletes the live directory atomically.

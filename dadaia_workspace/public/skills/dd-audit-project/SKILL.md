@@ -8,7 +8,7 @@ description: >
 
 # dd-audit-project — Three Pillars Over a SHA Window
 
-> `dd-code-reviewer` is the lens (read-only, it returns its report); the main thread writes the audit from it — `specs/audits/AGENTS.md` §2. Suggested every 5 releases, never mandatory.
+> `dd-code-reviewer` is the lens (read-only, it returns its report); the main thread writes the audit from it — `specs/audits/AGENTS.md`.
 
 ## 1. The window — computed once per audit
 
@@ -35,7 +35,7 @@ The main thread refuses to write `AUDIT.md` until all three pillar sections are 
 
 ## 4. Done when
 
-- Window recorded; nine bug metrics with baseline + target; every Part-1 check ran; `AUDIT.md` has all three pillars, each claim a `FINDINGS.jsonl` record; `python3 .agents/skills/dd-audit-project/scripts/audit.py check --specs <specs-dir>` exits 0.
+- Window recorded; nine bug metrics with baseline + target; every PILLAR-MEMORY §1 check ran; `AUDIT.md` has all three pillars, each claim a `FINDINGS.jsonl` record; `python3 .agents/skills/dd-audit-project/scripts/audit.py check --specs <specs-dir>` exits 0.
 
 ## 5. References
 

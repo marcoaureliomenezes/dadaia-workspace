@@ -10,10 +10,9 @@ Also input: `.dadaia/.venv/bin/dadaia doctor` against every release the window t
 3. The shapes are defined once, at `dd-gitflow-default` §3a — this pillar reads that table, never restates it.
 4. Flag a commit matching none of the shapes, or matching a message pattern while staging paths outside its set.
 5. Severity: registration/backlog/ADR isolation violations are MEDIUM.
-6. Severity: a bug fix that is not self-contained (code + regression test + `BUGS.jsonl` line alone) is HIGH.
-7. Report conformance per shape, never as one aggregate pass/fail — a finding must say which shape failed.
+6. Report conformance per shape, never as one aggregate pass/fail — a finding must say which shape failed.
 
-## Canon-v6 pattern compliance
+## Canon compliance
 
 ```bash
 .dadaia/.venv/bin/dadaia doctor --context <ctx> --json
@@ -23,12 +22,12 @@ Also input: `.dadaia/.venv/bin/dadaia doctor` against every release the window t
 2. Each finding reads `<CODE> <verdict> <message>`; the message carries its own remediation.
 3. Every non-zero-severity issue inside the window becomes a `FINDINGS-FORMAT.md` record with `pillar: "specs"`.
 4. Record a WARN that `--fix` can repair mechanically as a finding too — this pillar measures, it never fixes.
-6. Treat an archived release carrying no directory (only its `releases_histo.jsonl` summary) as the canon shape, not drift.
+5. Treat an archived release carrying no directory (only its `releases_histo.jsonl` summary) as the canon shape, not drift.
 
 ## `_RELEASE.json` milestone completeness
 
 1. For every release whose `_RELEASE.json` the window's commits touch, confirm the three canonical milestones.
-2. Milestones: `defined` (SPEC `Approved`), `implemented` (final-rc QA close), `shipped` (merge to the principal branch of the constitution's `gitflow:`).
+2. Milestones: `defined` (SPEC `Approved`), `implemented` (`release.py phase CLOSURE`), `shipped` (merge to the principal branch of the constitution's `gitflow:`).
 3. Confirm each carries a `sha` (and, where applicable, a `pr`).
 4. Flag a release with a `shipped` milestone but no `defined`/`implemented` milestone — the chain has a gap.
 5. For an archived release, check the same via its `releases_histo.jsonl` summary.
@@ -48,7 +47,7 @@ Input: every `rc-<N>/tasks/<job>.md` the window touches and the job commits behi
 3. A cancelled task keeps its row and states why; one deleted, or kept without a reason, is MEDIUM.
 4. Every path changed by a job is in its PLAN `W:` set and in exactly one task `W:` set; a breach is MEDIUM.
 5. Each AC names its test level (unit, integration, E2E, or no test with its reason); one that names none is LOW.
-6. Post-approval changes: an approved trio is never amended (`specs/releases/AGENTS.md` §2); an edit after `**Status:** Approved` is MEDIUM.
+6. Post-approval changes: an approved SPEC or PLAN is never amended (`specs/releases/AGENTS.md` §2); an edit after `**Status:** Approved` is MEDIUM.
 
 ## Slop readout
 

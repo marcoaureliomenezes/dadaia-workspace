@@ -15,10 +15,9 @@ Disclosed sibling of `SKILL.md`, pillar 3. Input: canonical memory (`ARCHITECTUR
 git log -p <from-sha>..HEAD -- specs/memory/ARCHITECTURE.md specs/memory/QUALITY.md
 ```
 
-1. Every hunk that adds, removes or rewrites a statement pairs with a `docs(adr): accept NNNN-<slug>` commit — the same commit — whose record names the statement.
-2. A hunk that changes wording only (statement-equal) pairs with an audit commit or an operator-ordered rewrite, both carrying a statement-by-statement coverage table in the commit body.
-3. Any other hunk is HIGH — canonical memory is ADR-gated by law, and this is the only mechanical check for it.
-4. Exception: the first-inventory case — read `specs/ADRs/AGENTS.md` §5.1 before scoring a CREATING commit.
+1. Every `### P-NN` hunk pairs with a `docs(adr): accept NNNN-<slug>` commit — the same commit — whose record names the statement; other sections follow `specs/memory/AGENTS.md` §1.
+2. A `### P-NN` hunk without that pairing is HIGH.
+3. Exception: the first-inventory case — read `specs/ADRs/AGENTS.md` §5.1 before scoring a CREATING commit.
 
 ## 3 — Product memory vs code (scored)
 
@@ -27,7 +26,6 @@ git log -p <from-sha>..HEAD -- specs/memory/ARCHITECTURE.md specs/memory/QUALITY
 3. Run `memory.py check` and the doctor's `LINT-1` (history lines, `MEM-NARRATIVE-1:` prefix), `MEM-DRIFT-1/2` over the tree; any finding is MEDIUM (the closure should have left them clean).
 4. `git log --format=%h <from-sha>..HEAD -- specs/memory/product`: an atom commit whose diff only adds lines to an existing atom is evidence of stacking — LOW, named per commit.
 5. Tech stack: for each line of `ARCHITECTURE.md`'s `## Tech Stack`, confirm the technology and its pin in the repo's manifest and lockfile; an undeclared dependency or a line with no manifest counterpart is MEDIUM.
-6. This pillar is the one place a canonical file's text is rewritten outside an ADR: a rewrite lands as its own commit with the coverage table, statement-equal, never adding or removing a statement.
 
 ## 4 — Dead-code detection
 
