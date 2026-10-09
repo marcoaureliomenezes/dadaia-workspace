@@ -30,7 +30,7 @@ from _release_store import (  # noqa: E402
     open_bug_ids,
     window_start,
 )
-from _release_tree import check, drift, memory_errors, refuse_open_bugs, ship_findings  # noqa: E402
+from _release_tree import check, drift, memory_errors, ship_findings  # noqa: E402
 from _specs import choice, find_specs, refuse  # noqa: E402
 
 _HELP = {
@@ -141,17 +141,20 @@ def _ship(args: argparse.Namespace, specs: Path) -> int:
             "--allow-open repeats an id — supply exactly one flag per open bug",
             "Operator action: remove the duplicate --allow-open flag",
         )
-    if not allowed:
-        refuse_open_bugs(specs, live.release_id, live.release_dir)
     if missing := sorted(set(open_ids) - set(allowed)):
+        fix = (
+            f"Operator action: resolve {', '.join(missing)} before shipping"
+            if not allowed
+            else "Operator action: authorize each open bug carry, record the authorization "
+            "verbatim in a kind: note entry, then repeat --allow-open for each id"
+        )
         raise Refusal(
             f"open bug(s) require one --allow-open flag each: {', '.join(missing)}",
-            "Operator action: authorize each open bug carry, record the authorization "
-            "verbatim in a kind: note entry, then repeat --allow-open for each id",
+            fix,
         )
     if extra := sorted(set(allowed) - set(open_ids)):
         raise Refusal(
-            f"--allow-open names bug(s) not open in the live candidate: {', '.join(extra)}",
+            f"--allow-open names bug(s) not open: {', '.join(extra)}",
             f"Operator action: remove --allow-open for {', '.join(extra)}",
         )
     log = [entry for entry in live.state.get("log") or [] if isinstance(entry, dict)]
