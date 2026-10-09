@@ -137,7 +137,7 @@ decision-rich part.
 
 A skill moves with its ecosystem: any authoring act (create, merge, rename, delete, restructure) carries in the same change:
 
-1. `entities/behavior-map.json` — the row (exactly one per skill), `declared_overlaps`, and the re-recorded hash tuple (a deliberate, reviewed act).
+1. `entities/behavior-map.json` — the row (exactly one per skill) and `declared_overlaps`.
 2. Persona `skills:` grants — the orphan checker requires every model-invoked skill granted somewhere; a `disable-model-invocation` skill is exempt.
 3. Law citations — the root map and every scoped `AGENTS.md` SOURCE under `public/` that names the skill.
 4. Cross-citations in sibling skills (the citation contract test checks every path-shaped token in `public/**`).
