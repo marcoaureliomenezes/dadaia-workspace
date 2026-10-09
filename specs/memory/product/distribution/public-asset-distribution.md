@@ -1,7 +1,7 @@
 ---
 slug: public-asset-distribution
 title: public-asset-distribution
-tldr: Public install stages current packaged assets and projects the root map, scoped law, shared agents and skills, and each registered harness; public doctor reports drift.
+tldr: Public install stages packaged assets and projects shared law, agents, skills and every registered harness; public doctor reports projection drift.
 summary: The stage, install and doctor chain that distributes the agentic surface — deterministic staging, rendered personas, whole-folder skills, registry-derived harness files, specs scaffold, projection pruning and privacy checks.
 tags: [public, assets, distribution, projection, privacy]
 sources:

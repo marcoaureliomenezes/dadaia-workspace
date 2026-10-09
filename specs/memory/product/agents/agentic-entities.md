@@ -1,7 +1,7 @@
 ---
 slug: agentic-entities
 title: agentic-entities
-tldr: One registry names the three personas, five deterministic behaviors and two abstract rules; a structural behavior map assigns every shipped skill and scoped law to an owner.
+tldr: One registry names three personas, five deterministic behaviors and two abstract rules; a behavior map assigns each shipped skill and scoped law to an owner.
 summary: The harness-neutral entity registry, its projected implementations, the universal authored surface and the structural ownership and citation checks that keep agentic law complete.
 tags: [agents, entities, derivation, governance]
 sources:

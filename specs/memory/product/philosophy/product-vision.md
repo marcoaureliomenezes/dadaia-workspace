@@ -1,7 +1,7 @@
 ---
 slug: product-vision
 title: product-vision
-tldr: One workspace, projects in repositories inside it, governance outside every repository; contexts span one main repository and any associated repositories, never a monorepo.
+tldr: One workspace keeps project repositories inside it and governance outside; each context spans one main repository and any associated repositories.
 summary: The product paradigm, evidence and coupling principles, and the human and agent paths through one current product truth.
 tags: [vision, paradigm, pillars]
 sources:

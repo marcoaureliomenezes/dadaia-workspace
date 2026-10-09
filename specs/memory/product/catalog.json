@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-10-09T11:10:37Z",
+  "generated_at": "2026-10-09T11:15:35Z",
   "features": [
     {
       "rank": 1,
@@ -61,7 +61,7 @@
       "slug": "agentic-entities",
       "title": "agentic-entities",
       "area": "agents",
-      "tldr": "One registry names the three personas, five deterministic behaviors and two abstract rules; a structural behavior map assigns every shipped skill and scoped law to an owner.",
+      "tldr": "One registry names three personas, five deterministic behaviors and two abstract rules; a behavior map assigns each shipped skill and scoped law to an owner.",
       "summary": "The harness-neutral entity registry, its projected implementations, the universal authored surface and the structural ownership and citation checks that keep agentic law complete.",
       "path": "specs/memory/product/agents/agentic-entities.md",
       "tags": [
@@ -117,7 +117,7 @@
       "slug": "public-asset-distribution",
       "title": "public-asset-distribution",
       "area": "distribution",
-      "tldr": "Public install stages current packaged assets and projects the root map, scoped law, shared agents and skills, and each registered harness; public doctor reports drift.",
+      "tldr": "Public install stages packaged assets and projects shared law, agents, skills and every registered harness; public doctor reports projection drift.",
       "summary": "The stage, install and doctor chain that distributes the agentic surface — deterministic staging, rendered personas, whole-folder skills, registry-derived harness files, specs scaffold, projection pruning and privacy checks.",
       "path": "specs/memory/product/distribution/public-asset-distribution.md",
       "tags": [
@@ -364,7 +364,7 @@
       "slug": "product-vision",
       "title": "product-vision",
       "area": "philosophy",
-      "tldr": "One workspace, projects in repositories inside it, governance outside every repository; contexts span one main repository and any associated repositories, never a monorepo.",
+      "tldr": "One workspace keeps project repositories inside it and governance outside; each context spans one main repository and any associated repositories.",
       "summary": "The product paradigm, evidence and coupling principles, and the human and agent paths through one current product truth.",
       "path": "specs/memory/product/philosophy/product-vision.md",
       "tags": [
@@ -595,7 +595,7 @@
       "slug": "specs-migration",
       "title": "specs-migration",
       "area": "platform",
-      "tldr": "specs init brings specs/ to the canon and writes gitflow without committing; specs upgrade brings supported trees to pattern 12; migrate lifts the context registry.",
+      "tldr": "specs init establishes canon and gitflow; specs upgrade reaches pattern 12; migrate updates the context registry.",
       "summary": "The persisted-state upgrade verbs: specs init scaffolds or upgrades a dadaia tree and preserves a foreign tree in specs-bkp; specs upgrade runs the supported migration and repair set before stamping pattern 12; migrate updates the context registry atomically.",
       "path": "specs/memory/product/platform/specs-migration.md",
       "tags": [

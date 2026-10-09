@@ -12,14 +12,14 @@
 |------|-------|------|
 | `agent-comms` | agent-comms | The handoff-v1 JSON contract agents emit, its validator behind `dadaia reports validate`, and ack-on-consume deletion with a one-day TTL. |
 | `agent-orchestration` | agent-orchestration | Three dd- personas are leaf workers dispatched by the main thread; SDD documents, worktrees and handoffs carry the work, never an orchestration runtime. |
-| `agentic-entities` | agentic-entities | One registry names the three personas, five deterministic behaviors and two abstract rules; a structural behavior map assigns every shipped skill and scoped law to an owner. |
+| `agentic-entities` | agentic-entities | One registry names three personas, five deterministic behaviors and two abstract rules; a behavior map assigns each shipped skill and scoped law to an owner. |
 
 ### distribution
 
 | slug | title | tldr |
 |------|-------|------|
 | `agent-evals` | agent-evals | The library's own agent evals — two graded tasks run on the candidate wheel and a PyPI baseline by one dispatch-or-schedule workflow. |
-| `public-asset-distribution` | public-asset-distribution | Public install stages current packaged assets and projects the root map, scoped law, shared agents and skills, and each registered harness; public doctor reports drift. |
+| `public-asset-distribution` | public-asset-distribution | Public install stages packaged assets and projects shared law, agents, skills and every registered harness; public doctor reports projection drift. |
 | `pypi-distribution` | pypi-distribution | The PyPI package on one version axis, two console-script names, the OIDC pipeline, the wheel contract and the derived docs. |
 
 ### harness
@@ -37,7 +37,7 @@
 
 | slug | title | tldr |
 |------|-------|------|
-| `product-vision` | product-vision | One workspace, projects in repositories inside it, governance outside every repository; contexts span one main repository and any associated repositories, never a monorepo. |
+| `product-vision` | product-vision | One workspace keeps project repositories inside it and governance outside; each context spans one main repository and any associated repositories. |
 | `spec-context-project` | spec-context-project | One canonical specs tree owned by one main repository, optionally spanning associated repos, bound per session and safe for visible concurrent work. |
 
 ### platform
@@ -50,7 +50,7 @@
 | `context-portability` | context-portability | dadaia export writes the workspace's context set to one file; dadaia import registers each unknown context DEAD elsewhere, ready for dadaia context alive. |
 | `cross-platform-portability` | cross-platform-portability | Linux, macOS and Windows through one platform capability seam carrying the venv layout, Python hooks and cross-OS CI legs. |
 | `server-registry` | server-registry | Dev-server port registry with TTL and PID tracking so parallel sessions never collide — one stdlib skill script over one JSON state file; no CLI verb. |
-| `specs-migration` | specs-migration | specs init brings specs/ to the canon and writes gitflow without committing; specs upgrade brings supported trees to pattern 12; migrate lifts the context registry. |
+| `specs-migration` | specs-migration | specs init establishes canon and gitflow; specs upgrade reaches pattern 12; migrate updates the context registry. |
 | `workspace-doctor` | workspace-doctor | dadaia doctor, the one compliance check — workspace, specs, ledgers; one line per finding, exit 1 with a fix line; --fix holds slop, expiry acts by zone class. |
 | `workspace-init` | workspace-init | Level 1 — uvx dadaia-workspace init [DIR] provisions venv, zones, law, one harness; re-init upgrades; --repo adds level 2; next step from one ordered step list. |
 

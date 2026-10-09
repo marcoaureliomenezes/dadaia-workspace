@@ -1,7 +1,7 @@
 ---
 slug: specs-migration
 title: specs-migration
-tldr: specs init brings specs/ to the canon and writes gitflow without committing; specs upgrade brings supported trees to pattern 12; migrate lifts the context registry.
+tldr: specs init establishes canon and gitflow; specs upgrade reaches pattern 12; migrate updates the context registry.
 summary: "The persisted-state upgrade verbs: specs init scaffolds or upgrades a dadaia tree and preserves a foreign tree in specs-bkp; specs upgrade runs the supported migration and repair set before stamping pattern 12; migrate updates the context registry atomically."
 tags: [migration, upgrade, specs, registry, onboarding]
 sources:
