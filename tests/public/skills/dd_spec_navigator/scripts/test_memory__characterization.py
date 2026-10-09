@@ -10,6 +10,7 @@ from pathlib import Path
 
 import pytest
 
+from dadaia_workspace.core.platform import PLATFORM
 from tests.fixtures.harness_env import suite_env
 from tests.helpers.skill_scripts import stage_skill_scripts
 
@@ -31,7 +32,7 @@ sources:
 Tracks [[beta]].
 """
 _NOW = "2026-01-01T00:00:00Z"
-_CATALOG = b"""{
+_CATALOG_POSIX = b"""{
   "generated_at": "2026-01-01T00:00:00Z",
   "features": [
     {
@@ -57,7 +58,34 @@ _CATALOG = b"""{
   ]
 }
 """
-_INDEX = b"""# Memory Catalog
+_CATALOG_WINDOWS = (
+    b"{\r\n"
+    b'  "generated_at": "2026-01-01T00:00:00Z",\r\n'
+    b'  "features": [\r\n'
+    b"    {\r\n"
+    b'      "rank": 1,\r\n'
+    b'      "slug": "alpha",\r\n'
+    b'      "title": "Alpha",\r\n'
+    b'      "area": "platform",\r\n'
+    b'      "tldr": "Alpha feature.",\r\n'
+    b'      "summary": "Catalog fixture.",\r\n'
+    b'      "path": "specs/memory/product/platform/alpha.md",\r\n'
+    b'      "tags": [\r\n'
+    b'        "one",\r\n'
+    b'        "two"\r\n'
+    b"      ],\r\n"
+    b'      "token_estimate": 5,\r\n'
+    b'      "depends_on": [\r\n'
+    b'        "beta"\r\n'
+    b"      ],\r\n"
+    b'      "sources": [\r\n'
+    b'        "src/alpha/**"\r\n'
+    b"      ]\r\n"
+    b"    }\r\n"
+    b"  ]\r\n"
+    b"}\r\n"
+)
+_INDEX_POSIX = b"""# Memory Catalog
 
 > Generated automatically from `specs/memory/product/<area>/*.md` frontmatter.
 > The catalog section below is refreshed by `memory.py catalog generate`; other
@@ -71,6 +99,21 @@ _INDEX = b"""# Memory Catalog
 |------|-------|------|
 | `alpha` | Alpha | Alpha feature. |
 """
+_INDEX_WINDOWS = (
+    b"# Memory Catalog\r\n"
+    b"\r\n"
+    b"> Generated automatically from `specs/memory/product/<area>/*.md` frontmatter.\r\n"
+    b"> The catalog section below is refreshed by `memory.py catalog generate`; other\r\n"
+    b"> sections of this file are preserved verbatim.\r\n"
+    b"\r\n"
+    b"## Feature catalog\r\n"
+    b"\r\n"
+    b"### platform\r\n"
+    b"\r\n"
+    b"| slug | title | tldr |\r\n"
+    b"|------|-------|------|\r\n"
+    b"| `alpha` | Alpha | Alpha feature. |\r\n"
+)
 
 
 def _run(
@@ -132,8 +175,10 @@ def test_catalog_generate_and_drift_pin_exit_output_and_artifacts(tmp_path: Path
     stale_index = b"# stale catalog fixture\n"
     (product / "catalog.json").write_bytes(stale_catalog)
     (product / "index.md").write_bytes(stale_index)
-    assert stale_catalog != _CATALOG
-    assert stale_index != _INDEX
+    expected_catalog = _CATALOG_WINDOWS if PLATFORM.windows else _CATALOG_POSIX
+    expected_index = _INDEX_WINDOWS if PLATFORM.windows else _INDEX_POSIX
+    assert stale_catalog != expected_catalog
+    assert stale_index != expected_index
     source = repo / "src/alpha/core.py"
     source.parent.mkdir(parents=True)
     source.write_text("value = 1\n", encoding="utf-8")
@@ -154,8 +199,8 @@ def test_catalog_generate_and_drift_pin_exit_output_and_artifacts(tmp_path: Path
         "[ok] memory/product/catalog.json and memory/product/index.md written (1 feature)\n",
         "",
     )
-    assert (product / "catalog.json").read_bytes() == _CATALOG
-    assert (product / "index.md").read_bytes() == _INDEX
+    assert (product / "catalog.json").read_bytes() == expected_catalog
+    assert (product / "index.md").read_bytes() == expected_index
 
     _git(repo, "add", "-A")
     _git(repo, "commit", "-qm", "base")

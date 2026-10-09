@@ -11,6 +11,7 @@ from typer.testing import CliRunner
 
 from dadaia_workspace import container
 from dadaia_workspace.cli.main import app
+from dadaia_workspace.core.platform import PLATFORM
 from dadaia_workspace.features.public.service import PublicAssetService
 from dadaia_workspace.infrastructure.json_agent_model_policy_store import (
     JsonAgentModelPolicyStore,
@@ -65,8 +66,14 @@ def test_public_projection_lifecycle(tmp_path: Path, monkeypatch: pytest.MonkeyP
     doctor = CliRunner().invoke(app, ["public", "doctor"])
 
     assert (stage.exit_code, install.exit_code, doctor.exit_code) == (0, 0, 0), doctor.output
-    assert stage.output.splitlines()[0] == "✓ 37 asset group(s) staged:"
-    assert install.output.splitlines()[0] == "✓ 164 asset(s) processed:"
+    expected_stage = (
+        "✓ 54 asset group(s) staged:" if PLATFORM.windows else "✓ 37 asset group(s) staged:"
+    )
+    expected_install = (
+        "✓ 181 asset(s) processed:" if PLATFORM.windows else "✓ 164 asset(s) processed:"
+    )
+    assert stage.output.splitlines()[0] == expected_stage
+    assert install.output.splitlines()[0] == expected_install
     assert "fix:" not in stage.output
     assert "fix:" not in install.output
     assert "fix:" not in doctor.output

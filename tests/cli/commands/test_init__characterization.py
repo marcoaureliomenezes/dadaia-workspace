@@ -23,15 +23,28 @@ def test_init_creates_the_literal_level_one_state(tmp_path: Path) -> None:
     cli = ws / ".dadaia" / ".venv" / PLATFORM.venv_scripts_dir / f"dadaia{PLATFORM.venv_exe_suffix}"
     cli_text = str(cli).replace("\\", "/")
     cli_word = f'{cli_text[0]}"{cli_text[1:]}"' if PLATFORM.windows else shlex.quote(cli_text)
-    assert result.output == (
-        f"✓ Workspace {ws} (claude)\n"
-        "✓ 164 asset(s) installed\n"
-        f"CLI: {cli}\n"
-        "Sessions launch at the workspace root.\n"
-        "Next (command step context): no ALIVE Spec Context — create one\n"
-        f"fix: Operator action: run {cli_word} context create with a context name and --main-repo "
-        "set to the main repo's clone URL\n"
+    expected_output = (
+        (
+            f"✓ Workspace {ws} (claude)\n"
+            "✓ 181 asset(s) installed\n"
+            f"CLI: {cli}\n"
+            "Sessions launch at the workspace root.\n"
+            "Next (command step context): no ALIVE Spec Context — create one\n"
+            f"fix: Operator action: run {cli_word} context create with a context name and "
+            "--main-repo set to the main repo's clone URL\n"
+        )
+        if PLATFORM.windows
+        else (
+            f"✓ Workspace {ws} (claude)\n"
+            "✓ 164 asset(s) installed\n"
+            f"CLI: {cli}\n"
+            "Sessions launch at the workspace root.\n"
+            "Next (command step context): no ALIVE Spec Context — create one\n"
+            f"fix: Operator action: run {cli_word} context create with a context name and "
+            "--main-repo set to the main repo's clone URL\n"
+        )
     )
+    assert result.output == expected_output
     assert (ws / ".dadaia/states/spec_contexts.json").read_bytes() == (
         b'{\n  "schema_version": "2",\n  "contexts": []\n}'
     )

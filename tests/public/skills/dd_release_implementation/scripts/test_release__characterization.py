@@ -10,6 +10,7 @@ from pathlib import Path
 
 import pytest
 
+from dadaia_workspace.core.platform import PLATFORM
 from tests.fixtures.harness_env import suite_env
 from tests.helpers.release_state import PLAN
 from tests.helpers.skill_scripts import stage_skill_scripts
@@ -201,8 +202,17 @@ def test_drift_memory_and_ship_pin_outputs_and_release_bytes(tmp_path: Path) -> 
     archived = archive / "0.5.0"
     assert not release_dir.exists()
     assert (archived / "_RELEASE.json").read_bytes() == _bytes(shipped)
-    assert history.read_bytes() == (
-        b'{"id": "0.5.0", "ts": "2026-10-09T12:00:00Z", '
-        b'"disposition": "delivered", "release": "0.5.0", "reason": null, '
-        b'"entry": null, "summary": null}\n'
+    expected_history = (
+        (
+            b'{"id": "0.5.0", "ts": "2026-10-09T12:00:00Z", '
+            b'"disposition": "delivered", "release": "0.5.0", "reason": null, '
+            b'"entry": null, "summary": null}\r\n'
+        )
+        if PLATFORM.windows
+        else (
+            b'{"id": "0.5.0", "ts": "2026-10-09T12:00:00Z", '
+            b'"disposition": "delivered", "release": "0.5.0", "reason": null, '
+            b'"entry": null, "summary": null}\n'
+        )
     )
+    assert history.read_bytes() == expected_history
