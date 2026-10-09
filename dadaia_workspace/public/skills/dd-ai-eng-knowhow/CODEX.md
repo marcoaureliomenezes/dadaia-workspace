@@ -1,5 +1,6 @@
 # CODEX.md — Compiled Decision Protocols for the Codex Harness
 
+Sections: 1. AGENTS.md as scoped constitution — discovery + stacking; 2. Naming-collision disambiguation (EXPLICIT — read code/logs correctly); 3. Codex Rules (Starlark `.rules`) — what they enforce, when to use; 4. Skills in Codex — discovery, frontmatter deltas, cross-harness authoring; 5. Subagents and fan-out — concurrency, deltas, guard conditions; 6. Config layers and trust model (EXPLICIT — what must NOT be project-local); 7. Hooks in Codex — types and lifecycle deltas; Customization decision table — goal -> layer + file type; 8. Official reference index (links only — no content copied).
 Sibling of [`SKILL.md`](SKILL.md) (`dd-ai-eng-knowhow`, authoring depth).
 A protocol reference, not a doc mirror — read official docs (§8) on demand for primitive-level detail.
 
@@ -27,15 +28,15 @@ Current-doc corrections to keep active:
 | Changes every task | the prompt or the SPEC, not AGENTS.md | stale constitution; agents trust dead rules |
 | Must always hold, whole workspace | workspace-root `AGENTS.md` | heavy/private context taxes every agent |
 | Governs only the library source repo | the source repo's `AGENTS.md` | editing generated projections |
-| Governs SPEC/PLAN/TASKS/memory/closure | `specs/AGENTS.md` | implementation without approval |
+| Governs SPEC/PLAN/job files/memory/closure | `specs/AGENTS.md` | implementation without approval |
 | Governs the agent-to-agent contract | `.dadaia/handoff/AGENTS.md` | reviewers get prose, not a machine contract |
 
 - Discovery order is root -> subdir; a subdir `AGENTS.md` adds to and overrides the inherited chain.
 - Put a rule at the narrowest scope where it is true everywhere beneath that point.
 - Keep the root file a global contract, not an encyclopedia — push specifics to the owning directory.
 - When the same mistake recurs twice, update the correctly-scoped AGENTS.md, not a one-off prompt.
-- `AGENTS.md` at the workspace root and every consumer repo is lib-originated (manifest-tracked); never hand-edit.
-- Author the source in `public/` and propagate via `.dadaia/.venv/bin/dadaia public stage && .dadaia/.venv/bin/dadaia public install`.
+- Root `AGENTS.md` and `worktrees/AGENTS.md` are projections; `repos/<slug>/AGENTS.md` and `specs/AGENTS.md` are the project's own.
+- Author the source in `public/`; reproject per `.dadaia/AGENTS.md` §4.
 - Never put long repeatable workflow into AGENTS.md — that is a skill's job.
 
 ---
@@ -48,12 +49,9 @@ Current-doc corrections to keep active:
 | dadaia's rule-law corpus | One root `AGENTS.md` map plus scoped `AGENTS.md` files | No | Advisory text read via native discovery |
 
 - File extension is the ground truth: `.rules` = official Codex command policy, `.md` = dadaia's advisory law.
-- Current dadaia projection must not install Markdown law content into `.codex/rules/`.
 - A `.codex/rules/foo.md` file is projection drift — report it, fix the source installer/doctor.
 - In logs: an `allow`/`prompt`/`forbidden` decision on a command = a real Starlark Rule fired.
 - Plain instruction-following with no approval gate = the Markdown law was merely in context.
-- There is no `public/rules/` directory in this workspace — law lives in the root map and the scoped `AGENTS.md` files.
-- Never document or project a `public/rules/*.md` taxonomy against a directory that does not exist.
 
 ---
 
@@ -87,7 +85,7 @@ prefix_rule(
 | Use when | durable guidance the model follows | must block or prompt on a command |
 
 - Reach for a Codex Rule only for command policy, never to make the model "think" differently.
-- Candidate dadaia rules: `prompt` on `git push` (publishing follows QA/review).
+- Candidate dadaia rules: `prompt` on `git push` (publishing follows review).
 - Candidate dadaia rules: `prompt` on `.dadaia/.venv/bin/dadaia context dead` and `.dadaia/.venv/bin/dadaia public install --force`; ordinary install inherits host policy.
 - Candidate dadaia rules: `forbidden` on destructive sweeps over `repos/` (user projects).
 - Projection invariant: `dadaia-command-policy.rules` must contain `prefix_rule(` and never `command_allowed(`.
@@ -155,7 +153,7 @@ prefix_rule(
 | Recursion depth | A subagent should not spawn another subagent except in exceptional cases |
 | Output contract | Each subagent returns findings with severity, evidence, and a verdict |
 
-- dadaia mapping: the main thread = primary orchestrator; `dd-code-reviewer` = the read-only custom agent.
+- dadaia mapping: the main thread = primary orchestrator; `dd-code-reviewer` = the verdict-only custom agent (its one write: `verdict.py`).
 
 ---
 
@@ -189,9 +187,6 @@ prefix_rule(
 
 ## 7. Hooks in Codex — types and lifecycle deltas
 
-- Codex hooks fire on: `SessionStart`, `UserPromptSubmit`, `PreToolUse`, `PostToolUse`, `PreCompact`.
-- Codex hooks also fire on: `PostCompact`, `SubagentStart`, `SubagentStop`, `Stop`.
-- Only command hook handlers run today; `prompt` and `agent` handlers are parsed but skipped.
 - `UserPromptSubmit` and `Stop` do not honor matchers — never depend on a matcher there.
 
 | Fact | Evidence level |
@@ -207,7 +202,7 @@ prefix_rule(
 - Whether hooks fire in interactive `codex` TUI vs headless `codex exec` is a version-qualified fact.
 - Consult the live probe (`.dadaia/.venv/bin/dadaia certify --json`'s `codex-live-probe` check) instead of assuming.
 - Rerun the live contract after any Codex CLI upgrade.
-- The git chokepoints remain independent regardless of hook enforcement (pre-commit, pre-push).
+- The git chokepoints remain independent regardless of hook enforcement (pre-push).
 - Inject full context once per session on `SessionStart` (matcher `startup|resume`), keyed on `session_id`.
 - The bootstrap must stay a silent no-op after the first injection (session-keyed sentinel).
 - Re-injecting the whole bootstrap per prompt is token waste and drift.

@@ -1,10 +1,7 @@
 ---
 name: dd-ai-eng-knowhow
 description: >
-  Harness literacy for every agent (persona, subagent, skill, rule, hook, AGENTS.md,
-  MCP — and the Claude-Code/Codex deltas), plus the disclosed
-  authoring depth. Use when reasoning about your own harness configuration, before
-  touching any AI-entity file.
+  Use before reading or changing any persona, skill, rule, hook, AGENTS.md or MCP config: harness literacy, Claude Code/Codex deltas, the AUTHORING contract.
 compatibility: Standalone Agent Skill. Inside a dadaia-workspace (pip install dadaia-workspace) it also drives the SDD lifecycle — specs, backlog, bugs, releases.
 ---
 
@@ -15,8 +12,8 @@ compatibility: Standalone Agent Skill. Inside a dadaia-workspace (pip install da
 - Every agent: reasoning about your own harness configuration (persona, skill, rule,
   hook, AGENTS.md, MCP).
 - Authoring or auditing any AI-entity file (the reviewer's AI-surface lens).
-- Any other agent needing to CHANGE (not read) a persona/skill/rule/hook: dispatch
-  the AUTHORING contract instead.
+- Any other agent needing to CHANGE (not read) a persona/skill/rule/hook: follow
+  `AUTHORING.md`, or return the change to the main thread.
 
 ## 2. The working model
 
@@ -28,25 +25,20 @@ compatibility: Standalone Agent Skill. Inside a dadaia-workspace (pip install da
   deltas (persona serialization, constitution shape, hook firing, skill discovery,
   subagent spawn, config-layer trust) are compiled in
   [`CLAUDE-CODE.md`](CLAUDE-CODE.md) and [`CODEX.md`](CODEX.md).
-- Gate order: root-whitelist → SDD gate, first-block-wins; what it
-  blocks is the root map §3; git chokepoints run independently of any
-  harness hook.
 
 ## 3. Editing an AI-entity file
 
-1. Trace the harness file to its `dadaia_workspace/public/<type>/<file>` source —
+1. Trace the harness file to its source: the matching `assets[].path` in `.dadaia/agentic/manifest.json` is `dadaia_workspace/public/<path>` —
    every authoring target is the source, never a `.claude/`, `.agents/`, `.codex/`
    projection.
-2. Re-project the source: inside a dadaia workspace, run `.dadaia/.venv/bin/dadaia public stage`,
-   `.dadaia/.venv/bin/dadaia public install`, `.dadaia/.venv/bin/dadaia public doctor`.
+2. Reproject per `.dadaia/AGENTS.md` §4.
 3. Author against [`AUTHORING.md`](AUTHORING.md) — the 15-rule
    writing-for-agents contract — and opens the relevant disclosed sibling instead of
-   re-deriving harness behavior; public assets carry no consumer names, hostnames,
-   IPs or secrets.
+   re-deriving harness behavior; then `.dadaia/.venv/bin/dadaia public doctor` must print `[ok] public-privacy` (its scan covers hostnames, IPs, home paths, emails and secrets).
 
 ## 4. Done when
 
-- You can name the primitive and its harness-specific serialization before acting.
+- Your output names the primitive and its harness serialization.
 - Any AI-entity edit landed in `public/` source and was re-projected and
   doctor-verified.
 

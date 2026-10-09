@@ -1,5 +1,6 @@
 # CONTEXT-ENGINEERING.md — Authoring and Auditing the AI-Entity Surface
 
+Sections: 1. Token Economy; 2. Instruction Hierarchy and Attention Ordering; 3. Persona-Consistency Invariants; 4. Model-Tier Selection Decision Protocol; 5. Recursive Scope-Drift Detection; Applying this file.
 Sibling of [`SKILL.md`](SKILL.md) (`dd-ai-eng-knowhow`, authoring depth).
 Persona files, skills, and rules are themselves prompts — every shipped line is paid for in tokens by every downstream invocation.
 The craft: maximize behavior-change-per-token under a hard context budget, keeping every persona structurally identical.
@@ -62,7 +63,7 @@ cost(file) = tokens(file) x invocations(file) x unit_price(tier)
 | 5 | Workflow protocol | TDD / task-manager / release resolution | Steps |
 | 6 | Security rules | What must it never do? | OWASP-style table where applicable |
 | 7 | Collaboration patterns | Who does it hand off to? | Named-agent table |
-| 8 | Write permissions | Where may it write? | Table mirroring `paths.write_allowlist` |
+| 8 | Write permissions | Where may it write? | Table |
 | 9 | Report contract | What does it emit at the end? | Steps / template ref |
 | 10 | CLI reference | What tools does it drive? | Command list |
 
@@ -93,8 +94,7 @@ Four invariants MUST hold across all personas. Inconsistencies are bugs — file
 | I3 | `[SCOPE ERROR]` block format | Opener, one-line identity, explicit redirect per foreign domain |
 | I4 | Handoff JSON contract | All agents emit via `dd-handoff-emitter` against the same schema version |
 
-- I1 reference key list (on-disk today): `name`, `description`, `dispatch_band`, `read_only`, `concurrency_relationship`.
-- I1 reference key list (continued): `gate_role`, `tools`, `skills`, `input_contract`, `paths.write_allowlist`.
+- I1 reference: the frontmatter keys `public/agents/*.md` carry today.
 - No persona sets `maxTurns`: a capped subagent stops mid-work and returns no report; the main thread stops a runaway one.
 - Model resolution is a separate policy-overlay mechanism, never asserted in persona frontmatter.
 

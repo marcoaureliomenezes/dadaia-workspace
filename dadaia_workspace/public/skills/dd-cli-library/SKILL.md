@@ -1,8 +1,7 @@
 ---
 name: dd-cli-library
 description: >
-  Operate the dadaia-workspace CLI: bind a context, check state, author
-  backlog/release artifacts, register a bug, manage dev servers, discover any
+  Operate the dadaia-workspace CLI: bind a context, check state, manage dev servers, discover any
   command. Use whenever a task needs the CLI; the non-obvious idioms live here, the
   authoritative surface is --help.
 ---
@@ -18,30 +17,22 @@ line here and `--help` disagree, `--help` wins.
 2. Invoke the CLI by its venv path, never a bare `dadaia`: `.dadaia/.venv/bin/dadaia --help` lists the groups, `<group> --help` the subcommands; add `--json` to read commands for machine-readable output.
 3. `.dadaia/.venv/bin/dadaia harness list` names this workspace's projected runtimes; `.dadaia/.venv/bin/dadaia harness add <name>` registers one more.
 4. Run `.dadaia/.venv/bin/dadaia capabilities --json` first in any new or upgraded session.
-5. Bind the session: `.dadaia/.venv/bin/dadaia context bind <ctx>` — the main thread's act; a subagent inherits it and never binds (`.dadaia/AGENTS.md` §2).
-6. Workspace compliance: `.dadaia/.venv/bin/dadaia doctor --context <ctx> [--json]` — clean before any implementation write; `--fix` MOVES slop to `.dadaia/reaped/` (7-day hold) and nothing is deleted before its own TTL; `--fix --expired-only` deletes only TTL-expired entries and stale session records — the SessionStart lane (`.dadaia/AGENTS.md`).
+5. Bind: `.dadaia/AGENTS.md` §2.
+6. Workspace compliance: `.dadaia/.venv/bin/dadaia doctor --context <ctx> [--json]` — clean before any implementation write; `--fix` semantics: `.dadaia/AGENTS.md` §5.
 7. Pass an explicit `--context` on every command that takes it.
-8. Converge a runtime: resolve `provider.distribution_version` from `.dadaia/.venv/bin/dadaia capabilities --json`, then `.dadaia/.venv/bin/dadaia reconcile --expect-version "$v" --json`, then `.dadaia/.venv/bin/dadaia certify --json` — a failed certify check is a release blocker.
-9. On a failing command: preserve the evidence trail (command, exit code, output); classify and register a genuine bug (`dd-bug-registration`) before any workaround.
+8. Converge a runtime: `v=$(.dadaia/.venv/bin/dadaia capabilities --json | python3 -c 'import json,sys;print(json.load(sys.stdin)["provider"]["distribution_version"])')`, then `.dadaia/.venv/bin/dadaia reconcile --expect-version "$v" --json`, then `.dadaia/.venv/bin/dadaia certify --json` — a failed certify check is a release blocker.
+9. On a failing command: preserve the evidence trail (command, exit code, output); propose a genuine bug (`dd-bug-registration` §2) before any workaround.
 
 ## Workspace state is CLI-owned
 
-- Never edit `.dadaia/states/*.json`, never `git clone` into `repos/`, never
-  `rm -rf repos/<slug>/`, never hand-write `.dadaia/dist/` — `.dadaia/.venv/bin/dadaia context
-  create|alive|dead` and `.dadaia/.venv/bin/dadaia import|export` own those.
-- Level 1: `uvx dadaia-workspace init [DIR] [--harness …] [--repo <url>]`; re-run = upgrade. Level 2: `.dadaia/.venv/bin/dadaia context create [<name>] --main-repo <url> [--associated-repo <url>]…`
-  clones, hooks and ALIVEs, transactionally — it never binds; `.dadaia/.venv/bin/dadaia context bind <ctx>` does. Level 3: `.dadaia/.venv/bin/dadaia specs init --context <ctx>`, the `dd-audit-project` first pass (done at `.dadaia/.venv/bin/dadaia doctor --context <ctx>` exit 0), then `.dadaia/.venv/bin/dadaia context baseline <ctx>`. Retire: `.dadaia/.venv/bin/dadaia context dead` (removes the repo; never mid-switch) → `.dadaia/.venv/bin/dadaia context delete`.
-- Bootstrap: `.dadaia/.venv/bin/dadaia init [DIR] --harness <name>` scaffolds a workspace for one harness (the `uvx` form above runs it).
-- Specs tree upgrade: `.dadaia/.venv/bin/dadaia specs upgrade [--dry-run]` re-stamps `specs/` to the canonical version and applies the doctor's repair set.
-- Migration: `.dadaia/.venv/bin/dadaia migrate [--dry-run] [--yes]` runs the migration helpers for workspace and spec trees.
-- A project is published once by `.dadaia/.venv/bin/dadaia context baseline <ctx>` (every `gitflow:` branch; a re-run is a no-op); every later write is an ordinary commit.
-- The associated set is written by `.dadaia/.venv/bin/dadaia context repo add <ctx> <slug> [--url <url>]` / `.dadaia/.venv/bin/dadaia context repo remove <ctx> <slug>` and READ only by `.dadaia/.venv/bin/dadaia context show <ctx> --json`, whose `associated_repos` carries slug, url, on-disk and branch.
-- Portability: `.dadaia/.venv/bin/dadaia export` writes `.dadaia/dist/spec-contexts.json` (overwritten each run); on the destination `.dadaia/.venv/bin/dadaia import <file>` registers each unknown context DEAD, then `.dadaia/.venv/bin/dadaia context alive <slug>` clones it; verify with `.dadaia/.venv/bin/dadaia context list`.
+- `.dadaia/states/`, `repos/` clones and `.dadaia/dist/` change only through `context create`, `alive`, `dead` and `import`/`export`.
+- Onboarding levels: the root `AGENTS.md` map §7; retire with `context dead` → `context delete`.
+- Every other verb (`context baseline`, `context repo add|remove`, `export`/`import`): its `--help`.
 
-## Dev-server law
+## Dev servers
 
 - The registry (`.dadaia/states/server_registry.json`) is the one record of who holds
-  which local port; every verb is `python3 <skill-dir>/scripts/registry.py <verb>` (the
+  which local port; every verb is `python3 .agents/skills/dd-cli-library/scripts/registry.py <verb>` (the
   script walks up from cwd to the nearest `.dadaia/states/spec_contexts.json`; `--registry <path>` overrides).
 - Open a port in this order: `list` → `next --project <name> --json` → start the server on
   loopback → `register --port N --project <name> [--pid <pid>] [--ttl <hours>]` — idempotent
@@ -52,7 +43,7 @@ line here and `--help` disagree, `--help` wins.
 
 ## Done when
 
-- The command run matches live `--help`, not a remembered table.
+- Each command run was checked against its live `--help` this session.
 - `.dadaia/.venv/bin/dadaia doctor` clean before any implementation write; `certify --json` green before promoting a runtime; every dev server started is registered.
 
 ## References
