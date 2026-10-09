@@ -521,6 +521,36 @@ def _phase_with_current_jobs(
 @pytest.mark.parametrize(
     ("plan", "jobs"),
     [
+        pytest.param(
+            _current_plan("| Job 1 | — | 1 | `src/second.py` |\n"),
+            {
+                "job1.md": _current_job(1, "src/first.py", "src/second.py").replace(
+                    "|---|---|---|---|\n", "", 1
+                )
+            },
+            id="job-table",
+        ),
+        pytest.param(
+            _current_plan(
+                "| Job 1 | — | 1 | `src/first.py` |\n",
+                "| Job 2 | Job 1 | 2 | `src/second.py` |\n",
+            ).replace("|---|---|---|---|\n", "", 1),
+            {"job2.md": _current_job(2, "src/second.py")},
+            id="plan-table",
+        ),
+    ],
+)
+def test_phase_implementation_refuses_a_current_authority_without_a_separator(
+    script: Path, tmp_path: Path, plan: str, jobs: dict[str, str]
+) -> None:
+    result = _phase_with_current_jobs(script, tmp_path, plan, jobs)
+
+    assert result.returncode == 1
+
+
+@pytest.mark.parametrize(
+    ("plan", "jobs"),
+    [
         pytest.param(_current_plan(), {}, id="empty-dag"),
         pytest.param(
             _current_plan(

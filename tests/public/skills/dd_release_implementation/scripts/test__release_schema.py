@@ -107,3 +107,84 @@ def test_a_current_job_refuses_malformed_duplicate_and_empty_rows(rows: str) -> 
     job = f"# Job 2\n\n| task | AC | `W:` | outcome |\n|---|---|---|---|\n{rows}"
 
     assert _release_schema.job_errors(job, "tasks/job2.md")
+
+
+def test_a_current_job_keeps_every_task_after_its_canonical_separator() -> None:
+    job = (
+        "# Job 2\n\n"
+        "| task | AC | `W:` | outcome |\n"
+        "|---|---|---|---|\n"
+        "| J2.T1 | AC3.3 | `src/first.py` | owner |\n"
+        "| J2.T2 | AC3.3 | `src/second.py` | owner |\n"
+    )
+
+    assert _release_schema.current_job_writes(job, "tasks/job2.md") == (
+        {"src/first.py", "src/second.py"},
+        [],
+    )
+    assert _release_schema.job_errors(job, "tasks/job2.md") == []
+
+
+@pytest.mark.parametrize(
+    "separator",
+    [
+        pytest.param("", id="missing"),
+        pytest.param("|---|---|---|\n", id="wrong-column-count"),
+        pytest.param("|---|---|owner|---|\n", id="non-separator-cell"),
+    ],
+)
+def test_a_current_job_refuses_noncanonical_table_framing(separator: str) -> None:
+    job = (
+        "# Job 2\n\n"
+        "| task | AC | `W:` | outcome |\n"
+        f"{separator}"
+        "| J2.T1 | AC3.3 | `src/first.py` | owner |\n"
+        "| J2.T2 | AC3.3 | `src/second.py` | owner |\n"
+    )
+
+    _, errors = _release_schema.current_job_writes(job, "tasks/job2.md")
+    assert errors
+    assert _release_schema.job_errors(job, "tasks/job2.md") == errors
+
+
+def test_a_current_plan_keeps_every_job_after_its_canonical_separator() -> None:
+    plan = (
+        "## As-is review\n\n"
+        "## DAG\n\n"
+        "| job | waits on | wave | `W:` |\n"
+        "|---|---|---|---|\n"
+        "| Job 1 | — | 1 | `src/first.py` |\n"
+        "| Job 2 | Job 1 | 2 | `src/second.py` |\n"
+    )
+
+    assert _release_schema.current_plan_jobs(plan) == (
+        {
+            "Job 1": (1, {"src/first.py"}),
+            "Job 2": (2, {"src/second.py"}),
+        },
+        [],
+    )
+    assert _release_schema.plan_errors(plan) == []
+
+
+@pytest.mark.parametrize(
+    "separator",
+    [
+        pytest.param("", id="missing"),
+        pytest.param("|---|---|---|\n", id="wrong-column-count"),
+        pytest.param("|---|---|owner|---|\n", id="non-separator-cell"),
+    ],
+)
+def test_a_current_plan_refuses_noncanonical_table_framing(separator: str) -> None:
+    plan = (
+        "## As-is review\n\n"
+        "## DAG\n\n"
+        "| job | waits on | wave | `W:` |\n"
+        f"{separator}"
+        "| Job 1 | — | 1 | `src/first.py` |\n"
+        "| Job 2 | Job 1 | 2 | `src/second.py` |\n"
+    )
+
+    _, errors = _release_schema.current_plan_jobs(plan)
+    assert errors
+    assert _release_schema.plan_errors(plan) == errors
