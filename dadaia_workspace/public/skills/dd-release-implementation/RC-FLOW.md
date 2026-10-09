@@ -21,7 +21,7 @@ candidates. `WT` is `python3 .agents/skills/dd-gitflow-default/scripts/worktree.
 An rc is a DAG of jobs the PLAN draws, Job 1 first, the Reconciliation job last.
 
 **Step 1 — Open a job.**
-- `WT new <repo> <M.m.p>-rc<N>/<job>` once its PLAN edges are merged; its tasks live in `rc-<N>/tasks/<job>.md` (`dd-release-definition` §5).
+- `WT new <repo> <M.m.p>-rc<N>/<job>` once its PLAN edges are merged; its tasks live in `rc-<N>/tasks/job<n>.md` (`dd-release-definition` §5).
 - Each task opens `WT new <repo> <M.m.p>-rc<N>/<job>--<task-id>` from the job branch; a sub-agent works it; it is `running` while its tree exists.
 - Done when: the tree exists.
 

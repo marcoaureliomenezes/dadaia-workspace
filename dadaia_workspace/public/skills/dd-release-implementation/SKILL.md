@@ -21,7 +21,7 @@ description: >
 
 1. Open `specs/releases/AGENTS.md` (the area's scoped law) and follow it.
 2. Resolve the live release: `dd-spec-navigator` Phase 3.
-3. The live candidate's job files sit at `releases/<v>/rc-<N>/tasks/<job>.md`, the highest `rc-<N>/`; a lower one is closed history.
+3. The live candidate's job files sit at `releases/<v>/rc-<N>/tasks/job<n>.md`, the highest `rc-<N>/`; a lower one is closed history.
 4. Full navigation protocol: `dd-spec-navigator`.
 5. Read `RC-FLOW.md` for the candidate arc and gate cadence before acting past opening a task.
 6. Change `_RELEASE.json` through `release.py` verbs (`phase`, `memory`, `ship`); only `summary` and the authorization `note` are hand-written (`RELEASE-EVENTS.md`).

@@ -2,7 +2,7 @@
 name: dd-release-definition
 description: >
   Define the live release's next closed-scope candidate from bugs, backlog items and audit findings:
-  pick the set, the As-is review (PLAN §1), the SPEC, the PLAN's job DAG and the rc-<N>/tasks/<job>.md
+  pick the set, the As-is review (PLAN §1), the SPEC, the PLAN's job DAG and the rc-<N>/tasks/job<n>.md
   job files. Use when drafting a candidate in its define tree or writing its SPEC, PLAN or a job file.
   The grill is the main thread's dd-grill-me; implementing tasks is dd-release-implementation's.
 ---
