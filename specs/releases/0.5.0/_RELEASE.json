@@ -1494,6 +1494,12 @@
         "sdd-gate-v3",
         "worktrees"
       ]
+    },
+    {
+      "ts": "2026-10-09T11:52:13Z",
+      "agent": "main-thread",
+      "kind": "summary",
+      "text": "delivered: plain and task worktrees with test/source separation, job-level review and tracked verify; current job tables and one-way release phases; lean bug, audit and release records with causal lineage and open-bug ship refusal; structural agent registry, grants, ownership and source/projection checks; Linux-only branch CI and full PR matrix; normal public-install stall repair; accepted ADR0238 with ARCHITECTURE P-17 replacement and QUALITY P-29 deletion in the same commit; full product-memory and derived-document reconciliation; carried: the 12 REBUILD units explicitly assigned by the SPEC bug-window review to rc-12 Job 1, and 38 unpicked open structural-audit findings; the independently measured 8.7-hour ceiling is EXCEEDED, not waived or declared compliant; backlog exits: none (operator-demand candidate)."
     }
   ]
 }
