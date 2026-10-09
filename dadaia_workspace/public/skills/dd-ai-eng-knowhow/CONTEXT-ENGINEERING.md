@@ -163,24 +163,16 @@ Justify a tier DOWNGRADE (up -> down):
 
 - The AI-entity surface is recursive: an agent can edit another agent's file.
 - Failure signature: agent A "fixes" agent B's persona -> B's behavior shifts -> agent C (dispatches B) breaks, far from the edit.
-- Defense: three detection rules applied before the edit lands, plus a topology guard for the self-edit case.
+- Defense: two detection rules applied before the edit lands, plus a topology guard for the self-edit case.
 
-Detection rule 1 — write_allowlist agreement (frontmatter vs body):
-
-1. Extract the frontmatter `paths.write_allowlist` globs and the body Write-permissions table rows.
-2. Diff them; a body-granted/frontmatter-omitted path is a FALSE-PROMISE drift.
-3. A frontmatter-granted/body-omitted path is a SILENT-PRIVILEGE drift.
-4. The frontmatter is authoritative by convention — fix both so they match the SPEC's authorized scope, never wider.
-5. Widening an allowlist requires an operator-approved release task (privilege-escalation control).
-
-Detection rule 2 — forbidden-actions table propagates via release, not spot-edit:
+Detection rule 1 — forbidden-actions table propagates via release, not spot-edit:
 
 1. Compare each persona's `[SCOPE ERROR]` redirect set against the reference.
 2. A single persona whose redirect set differs from all others is spot-edit drift.
 3. If the reference changed: open a fleet-wide release task and update all personas together.
 4. If one persona drifted: restore it to the reference — never "improve" one persona's refusal block in isolation.
 
-Detection rule 3 — self-edit risk + topology-guard protocol:
+Detection rule 2 — self-edit risk + topology-guard protocol:
 
 1. Any dispatch-graph/allowlist/tool-grant change is the highest-risk operation.
 2. Confirm an operator-approved release task authorizes the specific change — no self-granted privileges.
@@ -190,7 +182,7 @@ Detection rule 3 — self-edit risk + topology-guard protocol:
 6. The security lens reviews any change adding a powerful tool or widening an allowlist.
 7. Re-validate frontmatter via the workspace reader test so the parse still succeeds.
 
-Re-verify topology invariants whenever: `write_allowlist` changes, `tools` changes (esp. adding `Agent`), or a persona is added/removed.
+Re-verify topology invariants whenever: `tools` changes (esp. adding `Agent`), or a persona is added/removed.
 Re-verify topology invariants also when a `[SCOPE ERROR]` redirect set changes.
 
 - Skill-extraction trigger: when two or more personas restate the same protocol, extract it into `public/skills/<name>/SKILL.md`.
