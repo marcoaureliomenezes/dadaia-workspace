@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import json
 import shutil
+import subprocess
 from pathlib import Path
 
 import pytest
@@ -33,6 +34,8 @@ def _rendered(result: object) -> list[str]:
 
 
 pytestmark = pytest.mark.slow
+
+_DESIGN_SKILLS = tuple(f"dd-{n}" for n in ("domain-modeling", "codebase-design", "architecture-survey"))
 
 _runner = CliRunner()
 _AGENTS = {"dd-code-reviewer", "dd-product-engineer", "dd-software-engineer"}
@@ -417,7 +420,7 @@ def test_a_single_skill_rename_is_green_everywhere_after_one_place(
     with ZERO further edits to either former list.
     """
     real_public_dir = public_asset_roster.default_public_dir()
-    old_name, new_name = "dd-codebase-design", "dd-codebase-design-renamed-t045-16"
+    old_name, new_name = "dd-handoff-emitter", "dd-handoff-emitter-renamed-t045-16"
     real_roster = skill_names()
     assert old_name in real_roster
     assert new_name not in real_roster
@@ -458,3 +461,34 @@ def test_a_single_skill_rename_is_green_everywhere_after_one_place(
     for skill in mutated_roster:
         assert (ws / ".agents" / "skills" / skill / "SKILL.md").exists()
     assert not (ws / ".agents" / "skills" / old_name).exists()
+
+
+def test_the_three_design_skills_are_gone_from_stage_install_and_the_shipped_tree(
+    tmp_path: Path,
+) -> None:
+    """AC1.2: stage ships none, install prunes stale instance copies, doctor stays clean,
+    and the shipped tree (dadaia_workspace, tests, CONTEXT.md) cites none of them."""
+    ws = tmp_path / "ws"
+    stale = ws / ".agents" / "skills"
+    for name in _DESIGN_SKILLS:
+        (stale / name).mkdir(parents=True)
+        (stale / name / "SKILL.md").write_text("stale\n", encoding="utf-8")
+    manager = FileSystemPublicAssetManager()
+    register_all(ws)
+    manager.stage(ws)
+    manager.install(ws)
+
+    staged = {p.name for p in (ws / ".dadaia" / "agentic" / "skills").iterdir()}
+    installed = {p.name for p in stale.iterdir()}
+    assert staged & set(_DESIGN_SKILLS) == set()
+    assert installed & set(_DESIGN_SKILLS) == set()
+    report = _rendered(manager.doctor(ws))
+    assert not [line for line in report if line.startswith(("[drift]", "[missing]", "[error]"))]
+
+    repo = Path(__file__).resolve().parents[2]
+    hits = subprocess.run(
+        ["git", "grep", "-nE", "|".join(_DESIGN_SKILLS), "--", "dadaia_workspace", "tests", "CONTEXT.md"],
+        cwd=repo, capture_output=True, text=True, check=False,
+    ).stdout.splitlines()  # fmt: skip
+    # this file spells the names only through f"dd-{n}", so it cannot self-match
+    assert hits == []

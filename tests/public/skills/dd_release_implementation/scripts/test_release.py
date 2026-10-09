@@ -799,3 +799,10 @@ def test_ship_records_a_null_pr_when_none_is_given(script: Path, tmp_path: Path)
     archived = specs / "releases/_archive/0.5.0/_RELEASE.json"
     assert _read(archived)["shipped"] == {"sha": "beef123", "pr": None, "ts": ANY}
     assert _run(script, "check", "--specs", str(specs)).returncode == 0
+
+
+def test_new_help_states_the_origin_grammar_the_parser_enforces(script: Path) -> None:
+    grammar = load_owner("dd-release-implementation", "_release_schema")._ORIGIN_GRAMMAR
+    result = _run(script, "new", "--help")
+    assert result.returncode == 0
+    assert grammar in " ".join(result.stdout.split())
