@@ -1,14 +1,14 @@
 {
   "schema": "release-state-v1",
   "release": "0.5.0",
-  "phase": "IMPLEMENTATION",
+  "phase": "CLOSURE",
   "defined": {
     "sha": "ed76842dee6e21bdc6db284fd3607d3e006b4e1d",
     "ts": "2026-10-08T20:26:37Z"
   },
   "implemented": {
-    "sha": "7326a198e",
-    "ts": "2026-10-07T19:56:36Z"
+    "sha": "22845557cf424f07b19048c8618debf1dfa5066d",
+    "ts": "2026-10-09T04:47:54Z"
   },
   "shipped": null,
   "log": [
@@ -1459,6 +1459,15 @@
       "agent": "main-thread",
       "kind": "note",
       "text": "rc-11 approved: operator words \"aprovada as specs\". Constitution6.2.0 Features × Futures and accepted ADR0228 paired in2c1544853; statuses3d010e3b0; definition ed76842de independently APPROVED and merged before implementation. Q21 acceptance remains paired with reconciliation memory."
+    },
+    {
+      "ts": "2026-10-09T04:47:54Z",
+      "agent": "release.py",
+      "kind": "milestone",
+      "candidate": "rc-11",
+      "milestone": "implemented",
+      "sha": "22845557cf424f07b19048c8618debf1dfa5066d",
+      "text": "Candidate implemented at 22845557cf424f07b19048c8618debf1dfa5066d; phase CLOSURE."
     }
   ]
 }
