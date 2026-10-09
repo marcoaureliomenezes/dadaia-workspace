@@ -68,12 +68,7 @@ def _run(ws: Path, harness: str, case: str, **env_extra: str) -> subprocess.Comp
         body = hook_wrapper_contents(HARNESS_RECORDS[harness])[name]
         (ws / ".dadaia" / "hooks" / name).write_text(body)
         argv = [git_bash(), str(ws / ".dadaia" / "hooks" / name)]
-    env = {
-        **suite_env(os.environ, Path.home()),
-        "PATH": os.environ["PATH"],
-        "PYTHONPATH": os.environ.get("PYTHONPATH", ""),
-        **env_extra,
-    }
+    env = suite_env(os.environ, Path.home(), overrides=env_extra)
     return subprocess.run(
         argv, input=payload, capture_output=True, text=True, cwd=ws, env=env, timeout=60
     )
@@ -156,12 +151,7 @@ def test_ac1_2_every_ctx_inject_wrapper_answers_on_stdout(ws: Path, harness: str
         json.dumps({"contexts": [{"name": "alpha", "state": "alive", "repo_slug": "alpha"}]})
     )
     vendor = {"cursor": "additional_context", "copilot": "additionalContext"}.get(harness)
-    env = {
-        **suite_env(os.environ, Path.home()),
-        "PATH": os.environ["PATH"],
-        "PYTHONPATH": os.environ.get("PYTHONPATH", ""),
-    }
-    env |= {"DADAIA_FENCED_ROOTS": os.environ["DADAIA_FENCED_ROOTS"], "DADAIA_CONTEXT": "alpha"}
+    env = suite_env(os.environ, Path.home(), overrides={"DADAIA_CONTEXT": "alpha"})
     wrappers = hook_wrapper_contents(HARNESS_RECORDS[harness])
     docs = json.dumps(hook_documents(HARNESS_RECORDS[harness]))  # registered, not only rendered
     names = sorted(n for n, body in wrappers.items() if "hooks.ctx_inject" in body and n in docs)

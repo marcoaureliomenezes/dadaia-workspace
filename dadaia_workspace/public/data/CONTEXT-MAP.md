@@ -59,15 +59,12 @@ One procedure each; a skill that touches a governed area opens its scoped law as
 | Surface | Purpose | Step-1 law |
 |---|---|---|
 | `dd-ai-eng-knowhow` | harness literacy and the AI-entity authoring contract | — |
-| `dd-architecture-survey` | portfolio-level architecture candidates from bug history | — |
 | `dd-audit-project` | the three-pillar audit and its window | `specs/audits/AGENTS.md` |
 | `dd-backlog-definition` | backlog curation, the intake gate, dispositions | `specs/backlog/AGENTS.md` |
 | `dd-bug-registration` | classify-first bug proposal and its record | `specs/bugs/AGENTS.md` |
 | `dd-bug-resolution` | the seven-phase diagnosing method and the resolve record | `specs/bugs/AGENTS.md` |
 | `dd-cli-library` | CLI idioms, CLI-owned state, the dev-server registry | `.dadaia/AGENTS.md` |
 | `dd-code-review` | the three review axes and the six lenses | `specs/memory/AGENTS.md` |
-| `dd-codebase-design` | the deep-module vocabulary and the deletion test | — |
-| `dd-domain-modeling` | the repo's domain terms and their one home | — |
 | `dd-gitflow-default` | the branch contract, commit shapes, the PR gate | — |
 | `dd-grill-me` | the operator grill that precedes a candidate | — |
 | `dd-handoff-emitter` | handoff-first emission and ack-on-consume | `.dadaia/handoff/AGENTS.md` |

@@ -8,10 +8,14 @@ if TYPE_CHECKING:
     from dadaia_workspace.features.certification import CertificationResult
 
 from dadaia_workspace.core.workspace_resolver import not_initialized
+from dadaia_workspace.features.capabilities import distribution_version
 from dadaia_workspace.features.chokepoints.denylist_scan import BaselinePatternLike
 from dadaia_workspace.features.export.service import ExportService
 from dadaia_workspace.features.import_.service import ImportService
+from dadaia_workspace.features.migrate.state_v2 import execute_migration, plan_migration
 from dadaia_workspace.features.public.service import PublicAssetService
+from dadaia_workspace.features.reconcile import ReconcileResult
+from dadaia_workspace.features.reconcile import reconcile_workspace as _reconcile_workspace
 from dadaia_workspace.features.spec_context.doctor import DoctorService
 from dadaia_workspace.features.spec_context.service import (
     SpecContextService,
@@ -34,6 +38,10 @@ def states_dir(workspace_root: Path) -> Path:
     return workspace_root / ".dadaia" / "states"
 
 
+def build_context_store(workspace_root: Path) -> JsonContextStore:
+    return JsonContextStore(states_dir(workspace_root))
+
+
 def _guard_initialized(workspace_root: Path) -> None:
     marker = states_dir(workspace_root) / "spec_contexts.json"
     if not marker.exists():
@@ -52,10 +60,8 @@ def build_spec_context_service(
     workspace_root: Path, *, rows: WorktreeRows = worktree_rows
 ) -> SpecContextService:
     _guard_initialized(workspace_root)
-    states = states_dir(workspace_root)
-
     return SpecContextService(
-        context_store=JsonContextStore(states),
+        context_store=build_context_store(workspace_root),
         git_client=GitSubprocessClient(),
         workspace_root=workspace_root,
         install_hooks=install_git_hooks,
@@ -135,9 +141,8 @@ def build_doctor_service(
     workspace_root: Path, *, rows: WorktreeRows = worktree_rows
 ) -> DoctorService:
     _guard_initialized(workspace_root)
-    states = states_dir(workspace_root)
     return DoctorService(
-        context_store=JsonContextStore(states),
+        context_store=build_context_store(workspace_root),
         git_client=GitSubprocessClient(),
         workspace_root=workspace_root,
         projection=build_public_service().verdict,
@@ -147,9 +152,8 @@ def build_doctor_service(
 
 def build_export_service(workspace_root: Path) -> ExportService:
     _guard_initialized(workspace_root)
-    states = states_dir(workspace_root)
     return ExportService(
-        context_store=JsonContextStore(states),
+        context_store=build_context_store(workspace_root),
         git_client=GitSubprocessClient(),
         workspace_root=workspace_root,
     )
@@ -157,6 +161,22 @@ def build_export_service(workspace_root: Path) -> ExportService:
 
 def build_import_service(workspace_root: Path) -> ImportService:
     return ImportService(build_spec_context_service(workspace_root))
+
+
+def reconcile_workspace(
+    workspace_root: Path, *, expected_version: str, actual_version: str | None = None
+) -> ReconcileResult:
+    return _reconcile_workspace(
+        workspace_root,
+        context_store=build_context_store(workspace_root),
+        version=distribution_version,
+        migration_plan=plan_migration,
+        migrate=execute_migration,
+        expected_version=expected_version,
+        public_service=build_public_service(),
+        doctor_service=build_doctor_service(workspace_root),
+        actual_version=actual_version,
+    )
 
 
 def run_certification(workspace_root: Path, *, keep: bool = False) -> "CertificationResult":

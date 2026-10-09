@@ -2,32 +2,26 @@
 
 Scope: this file governs only `specs/backlog/`.
 
+- `BACKLOG_PY` is `python3 .agents/skills/dd-backlog-definition/scripts/backlog.py`: `new` creates an entry, `exit` removes it and appends its history, and `check` validates both files; live-entry curation is §2.
+- Create and append entries with `BACKLOG_PY new <slug>`.
 - The backlog is the operator's demand queue: only the operator creates demand, `dd-product-engineer` curates `active[]`.
 - An entry materializes only through the main thread's operator-facing intake report; an operator-ratified in-release deferral already counts as intake.
-- Retention covers bugs and backlog only — a test is pruned by a `dd-code-reviewer` verdict.
 - The backlog is a single JSON document: `specs/backlog/BACKLOG.json`, `{schema: "backlog-v1", active: [...]}`.
-- No per-entry file per backlog item — every live candidate/idea is one `active[]` object.
-- Full schema: `dd-backlog-definition` (The document), `schemas/backlog/backlog-v1.schema.json`.
+- Full schema: `dd-backlog-definition` (The document), `.dadaia/agentic/schemas/backlog/backlog-v1.schema.json`.
 - A closed item's history lives beside the document, in `specs/backlog/_archive/backlog_histo.jsonl`.
 
 ## 1. The document, plus its histo
 
-- `active[]` (in `BACKLOG.json`) — one object per live candidate or idea, the document's only array.
-- `backlog_histo.jsonl` (in `_archive/`) — one append-only record per closed item.
 - Fields: `{id, ts, disposition, release, reason, summary, entry}`.
 - One record per slug, ever — a duplicate exit is structurally impossible.
 
 ## 2. Authoring rules
 
-- `BACKLOG_PY` below is `python3 .agents/skills/dd-backlog-definition/scripts/backlog.py` — this ledger's ONE writer.
-
-- Create and append entries with `BACKLOG_PY new <slug>` — never hand-edit `BACKLOG.json`.
 - `<slug>` matches `^[a-z][a-z0-9-]+$`.
 - Every `active[]` entry carries five required fields: `title`, `opened` (`YYYY-MM-DD`), `status`, `description`, `provenance`.
-- `status` is `idea`, `candidate`, or another lowercase live (non-terminal) token.
-- Plus one optional field: `intents` (see §4).
-- An entry enters SDD when a release picks it: `python3 .agents/skills/dd-release-implementation/scripts/release.py new <id> --origin backlog:<slug>`.
-- Never delete an entry — `BACKLOG_PY exit <slug> --disposition …` removes the `active[]` object and appends its one histo record.
+- `BACKLOG_PY new` writes `status: idea`; a later lowercase live token (`candidate`, …) is a hand edit, which `BACKLOG_PY check` validates: no terminal status on a live entry, and a status past `idea` binds `intents[]`.
+- Optional: `intents` (§4) and `relates` (`BACKLOG_PY new --help`).
+- An entry leaves only by `BACKLOG_PY exit <slug> --disposition …`, which removes the `active[]` object and appends its one histo record.
 
 ## 3. Terminal disposition tokens
 
@@ -52,7 +46,7 @@ Scope: this file governs only `specs/backlog/`.
 | `code` | `path/to/file[#word]`, any language | the repo's git paths; `#word` must occur in the file |
 | `catalog` | a `catalog.json` feature slug | `specs/memory/product/catalog.json` |
 | `doc` | a SPEC-DOC id or memory heading | `specs/memory/**/*.md` |
-| `invariant` | an `INV-*` identifier | invariant declarations |
+| `invariant` | an `INV-*` identifier | `INV-*` ids in `specs/memory/**/*.md` |
 
 - Every ref is judged only by the doctor's `BL-SCHEMA`, which names the ref it cannot resolve.
 

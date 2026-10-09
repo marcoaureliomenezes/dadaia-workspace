@@ -48,7 +48,7 @@ Every library skill must satisfy all fifteen; each rule's detail lives in the se
 | Context load | The agent, every turn | Speed/reliability of reaching material without a human in the loop |
 | Cognitive load | The operator/reviewer | Zero context tax, but the human must remember the document exists |
 
-- This is `dd-ai-eng-knowhow`'s own shape in miniature: its `SKILL.md` is context-loaded for every agent, every session.
+- `dd-ai-eng-knowhow` has the shared shape in miniature: its description pays the discovery cost. Harness-specific body loading and privilege live in [`CLAUDE-CODE.md`](CLAUDE-CODE.md) and [`CODEX.md`](CODEX.md).
 - Siblings are reached only by pointer — free until an author needs them.
 
 ---
@@ -64,7 +64,7 @@ Every library skill must satisfy all fifteen; each rule's detail lives in the se
 - A sibling is one ALL-CAPS.md per topic, pointed at with its reaching condition ("deepening a cluster → `DEEPENING.md`").
 - A deterministic procedure ships as a script/template sibling; the skill's job reduces to authoring its variable parts.
 - Co-location: keep a concept's definition, rule, and caveat under one heading, not scattered.
-- Sprawl is the failure disclosure cures; each SKILL.md's size is recorded in `behavior-map.json`.
+- Sprawl is the failure disclosure cures; the SKILL.md size thresholds live in `behavior-map.json`.
 
 ---
 
@@ -113,10 +113,9 @@ decision-rich part.
 
 ## 7. Skill mechanics: invocation, composition, the curated set
 
-- Model-invoked: the description stays loaded every turn — pay that only when the agent, or another skill, must reach it autonomously.
+- Model-invoked: the description occupies the discovery surface — pay that only when the agent, or another skill, must reach it autonomously.
 - User/dispatch-invoked (`disable-model-invocation: true`): zero context load; the human or the calling skill is the index.
-- In this workspace persona `skills:` allowlists already scope reach — but every granted description still costs its personas every turn, so the pointer-pruning bar (§1) stays maximal.
-- Shared reference lives in exactly ONE skill; consumers call it ("call the Skill tool with X") — a two-line composing skill is a success, not a stub.
+- Shared reference lives in exactly ONE skill; consumers name it — a two-line composing skill is a success, not a stub.
 - Overlap between two skills resolves by merge or by one calling the other; the material lives once.
 - A skill is one job: all steps, all reference, or a conscious mix — the form follows the content.
 - When invocable skills multiply past what the index (human or dispatcher) holds, the cure is a router map — one place naming every skill and when to reach it — not more descriptions.
@@ -129,7 +128,6 @@ decision-rich part.
 - When a skill branches, the branch decision is the FIRST step — picking the wrong branch wastes the whole run.
 - Templates and formats are given as fenced blocks where they are used.
 - Human gates are explicit: finding facts is the agent's job (inspect before asking); decisions are the operator's — put each one to them and wait.
-- An interview puts one question per `AskUserQuestion` call, carrying a recommended answer (ADR 0165).
 
 ---
 
@@ -138,10 +136,10 @@ decision-rich part.
 A skill moves with its ecosystem: any authoring act (create, merge, rename, delete, restructure) carries in the same change:
 
 1. `entities/behavior-map.json` — the row (exactly one per skill) and `declared_overlaps`.
-2. Persona `skills:` grants — the orphan checker requires every model-invoked skill granted somewhere; a `disable-model-invocation` skill is exempt.
+2. Persona `skills:` grants.
 3. Law citations — the root map and every scoped `AGENTS.md` SOURCE under `public/` that names the skill.
 4. Cross-citations in sibling skills (the citation contract test checks every path-shaped token in `public/**`).
-5. Reprojection — `.dadaia/.venv/bin/dadaia public stage` → `install` → `public doctor` `[ok]`; stale projected directories removed from every harness target.
+5. Reprojection — per `.dadaia/AGENTS.md` §4, `public doctor` `[ok]`; stale projected directories removed from every harness target.
 
 ---
 

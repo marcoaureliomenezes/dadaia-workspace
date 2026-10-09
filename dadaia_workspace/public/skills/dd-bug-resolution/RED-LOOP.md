@@ -1,8 +1,6 @@
 # RED-LOOP.md — building the feedback loop (Phase 1)
 
-Disclosed reference of [`SKILL.md`](SKILL.md) Phase 1. Spend disproportionate
-effort here: with a tight loop the cause falls out; without one no amount of staring
-at code will save you.
+Disclosed reference of [`SKILL.md`](SKILL.md) Phase 1.
 
 ## Ways to construct one, in roughly this order
 
@@ -31,11 +29,8 @@ at code will save you.
 Treat the loop as a product. Once you have *a* loop:
 
 - Faster — cache setup, skip unrelated init, narrow the scope.
-- Sharper — assert the specific symptom, never "didn't crash".
+- Sharper — assert the specific symptom.
 - Deterministic — pin time, seed RNG, isolate filesystem, freeze network.
-
-A 30-second flaky loop is barely better than none; a 2-second deterministic one is
-tight — a debugging superpower.
 
 ## Non-deterministic bugs
 
@@ -45,7 +40,7 @@ is debuggable; 1% is not — raise the rate until it is.
 
 ## When you genuinely cannot build a loop
 
-Stop and say so explicitly, listing what you tried. Ask the operator for: (a) access
+Stop and say so explicitly, listing what you tried. Return to the main thread a request for: (a) access
 to the reproducing environment, (b) a redacted captured artifact (HAR, log dump, core
 dump, recording with timestamps), or (c) permission for temporary instrumentation.
 Hypothesising without a loop is Phase 1's named failure — the gate holds.

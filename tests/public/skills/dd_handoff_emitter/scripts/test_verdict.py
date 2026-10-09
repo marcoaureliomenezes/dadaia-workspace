@@ -13,6 +13,7 @@ from pathlib import Path
 import jsonschema
 import pytest
 
+from tests.fixtures.harness_env import suite_env
 from tests.helpers.skill_scripts import stage_skill_scripts
 from tests.helpers.worktree_ws import commit, git, make_workspace, run
 
@@ -69,7 +70,11 @@ def _verdict(
         sha,
         *(a for kv in args.items() for a in kv),
     ]
-    env = {"PATH": os.environ["PATH"], "HOME": str(root), "GIT_CONFIG_NOSYSTEM": "1"}
+    env = suite_env(
+        os.environ,
+        Path.home(),
+        overrides={"PATH": os.environ["PATH"], "HOME": str(root), "GIT_CONFIG_NOSYSTEM": "1"},
+    )
     return subprocess.run(
         cmd,
         cwd=root,
@@ -137,7 +142,15 @@ def test_a_path_that_is_no_worktree_is_refused_with_the_hash_verbs_own_words(
         root / ".agents/skills/dd-gitflow-default/scripts/worktree.py"
     )  # its fix line names itself
     hash_cmd = [sys.executable, str(staged), "hash", str(plain), "--sha", head]
-    own = subprocess.run(hash_cmd, cwd=root, capture_output=True, text=True, env={"PATH": os.environ["PATH"], "HOME": str(root)})  # fmt: skip
+    own = subprocess.run(
+        hash_cmd,
+        cwd=root,
+        capture_output=True,
+        text=True,
+        env=suite_env(
+            os.environ, Path.home(), overrides={"PATH": os.environ["PATH"], "HOME": str(root)}
+        ),
+    )
     assert own.returncode != 0 and own.stderr
     refused = _verdict(root, plain, sha=head)
     assert refused.returncode == own.returncode and refused.stderr == own.stderr

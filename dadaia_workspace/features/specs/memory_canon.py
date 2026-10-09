@@ -34,7 +34,7 @@ MEMORY_TOPLEVEL_FILES = _MEMORY_TOPLEVEL_FILES
 MEMORY_REQUIRED_FILES: tuple[str, ...] = (*MEMORY_TOPLEVEL_FILES, "product/index.md")
 
 #: Forbidden memory H2 headings: changelog/history sections violate the atomicity
-#: contract (specs/memory/AGENTS.md §3) regardless of prose policy. Prefix match,
+#: contract (specs/memory/AGENTS.md §4) regardless of prose policy. Prefix match,
 #: case-insensitive, accented and unaccented forms — the ONE matcher (the retired
 #: memory_lint frozenset silently passed singular 'Version' and 'Historico').
 FORBIDDEN_MEMORY_HEADING_RE = re.compile(

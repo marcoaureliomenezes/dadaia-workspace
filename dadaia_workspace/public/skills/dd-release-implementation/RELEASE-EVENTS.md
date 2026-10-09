@@ -8,7 +8,7 @@ release state.
 - `specs/releases/<release-id>/_RELEASE.json` is one mutable object with the seven
   required fields `{schema, release, phase, defined, implemented, shipped, log}`.
 - `phase` takes its lifecycle value from the
-  [release-state schema](../../schemas/releases/release-state-v1.schema.json) and is
+  release-state schema (`.dadaia/agentic/schemas/releases/release-state-v1.schema.json`) and is
   overwritten on a transition. `defined`, `implemented` and `shipped` are the
   sha-bearing facts.
 - `log` is append-only, oldest first. Every entry carries `{ts, agent, kind, text}`.
@@ -30,8 +30,7 @@ requires one memory entry at or after `implemented.ts` and reads no git to valid
 fact; `release.py drift` remains the worklist command used before the entry is written.
 
 An open bug blocks `ship` by default. A carried bug needs all three facts: one
-`--allow-open <id>` flag per open id, a `kind: note` containing the operator's
-authorization verbatim and that id, and the id in the summary's `carried` field. The bug
+`--allow-open <id>` flag per open id, a `kind: note` starting `Operator authorization verbatim:` and naming that id, and the id in the summary's `carried` field. The bug
 stays open.
 
 ## Milestones
@@ -43,5 +42,5 @@ stays open.
 | implementation | `release.py phase CLOSURE --sha <sha>` | `implemented: {sha, ts}` plus a `milestone` |
 | ship | `release.py ship --sha <sha> [--pr <n>]` | `shipped: {sha, pr, ts}`, then archive |
 
-The state document is validated before every scripted replacement. Historical log
+Historical log
 entries are read, never rewritten to the lean vocabulary.

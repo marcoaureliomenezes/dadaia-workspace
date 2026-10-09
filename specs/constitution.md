@@ -1,6 +1,6 @@
 ---
 specs_pattern_version: 12
-constitution_version: 6.2.0
+constitution_version: 7.0.0
 gitflow: {"principal": "main", "integration": "develop", "work": "feature/"}
 ---
 
@@ -64,10 +64,10 @@ Cada passo do processo existe pelo que garante; cada garantia é verdade por mec
 
 1. **Teste não se burla.** Nenhum gate aceita uma vermelha que sumiu: assert antigo editado, skip/xfail/marker/seletor mudado, ou o julgado editando o próprio juiz. Medida: cada burla conhecida no ledger é um teste adversário plantado que os gates recusam; re-bug na mesma superfície ≤ 30%.
 2. **Evidência é produzida, nunca declarada.** Veredito, CI run, mutação, test-audit e data existem só como saída da ferramenta que os calculou, presos ao sha julgado; o julgado nunca escreve a própria evidência. Medida: zero campo de evidência digitado à mão; o merge recusa veredito com sha ou hash de diff divergente.
-3. **Código é escrito para humanos.** Script e módulo entregues leem como arquitetura limpa: um kernel por preocupação, zero cópia, zero ciclo de import, toda função com complexidade grau C ou melhor. Medida: critério "scripts" do scorecard ≥ 8.
+3. **Código é escrito para humanos.** Script e módulo entregues leem como arquitetura limpa: um kernel por preocupação, zero cópia, zero ciclo de import, toda função com complexidade grau C ou melhor. Medida: critério "scripts" do scorecard ≥ 9.
 4. **Peso compra confiança ou sai.** Passo de cerimônia que não produz evidência checada por um gate é apagado.
 
-Medido pelo scorecard da versão; todo critério ≥ 8 antes de evals ou publicação.
+Medido pelo scorecard da versão: toda célula ≥ 9, pontuada por dois juízes independentes ao menos a cada 2 dias e sempre antes de evals, promote ou publicação.
 
 ## 6. Features × Futures
 

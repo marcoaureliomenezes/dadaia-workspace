@@ -14,6 +14,7 @@ import pytest
 
 from dadaia_workspace.core.release_state import RELEASE_ID_RE
 from dadaia_workspace.features.specs.canon import is_canon_path
+from tests.fixtures.harness_env import suite_env
 
 _REPO_ROOT = Path(__file__).resolve().parents[5]
 _SCRIPTS = _REPO_ROOT / "dadaia_workspace/public/skills/dd-release-implementation/scripts"
@@ -57,7 +58,7 @@ def test_the_release_instant_reader_reads_an_instant_with_no_offset_as_utc() -> 
     )  # fmt: skip
     instants = ["2026-10-06T23:30:00", "2026-10-06T23:30:00Z", "2026-10-06T23:30:00+00:00",
                 "2026-10-06T23:30:00-03:00", "not-a-timestamp", ""]  # fmt: skip
-    env = {**os.environ, "TZ": "UTC+3"}
+    env = suite_env(os.environ, Path.home(), overrides={"TZ": "UTC+3"})
     out = subprocess.run([sys.executable, "-c", probe, str(_SCRIPTS), *instants],
                          capture_output=True, text=True, env=env, check=True)  # fmt: skip
     assert out.stdout.split() == ["2026-10-06T23:30:00+00:00"] * 3 + ["2026-10-07T02:30:00+00:00"] + ["ValueError"] * 2  # fmt: skip

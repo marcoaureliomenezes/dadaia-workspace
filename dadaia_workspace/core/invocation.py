@@ -1,6 +1,6 @@
 """One Invocation — the single session/context/root/mode resolution authority.
 
-Rungs (the root map §3): 0 ``explicit`` or the context owning an explicit write target under
+Rungs (`.dadaia/AGENTS.md` §2): 0 ``explicit`` or the context owning an explicit write target under
 ``repos/<slug>/``; 1 the session's bind; 2 the repo containing the cwd. The workspace root is
 walked from the target first, so a cwd inside a nested sandbox never shadows the real root.
 """

@@ -227,7 +227,7 @@ def _open_tasks(repo: Path, name: str) -> None:
 
 def _checks(root: Path, tree: Path) -> Iterator[tuple[str, subprocess.CompletedProcess[str]]]:
     """Each ledger script's `check` on the tree, then the workspace doctor on its `specs/` — the
-    check the work branch's CI runs — fenced to the tree."""
+    check the work branch's gates run — fenced to the tree."""
     skills = Path(__file__).resolve().parents[2]
     for skill, name in _LEDGERS:
         command = [sys.executable, str(skills / skill / "scripts" / name),
@@ -294,26 +294,26 @@ def _check_approved(root: Path, tree: Path, work: str, name: str) -> None:
             named.append((moment is None, moment or 0.0, str(handoff), data))
     top = max((row[:2] for row in named), default=None)
     decided = sorted(row for row in named if row[:2] == top)
-    for unparsed, _, path, data in decided:
-        if (
-            unparsed
+    invalid = next(
+        (
+            path
+            for unparsed, _, path, data in decided
+            if unparsed
             or data.get("verdict") != "APPROVED"
             or cli(root, "reports", "validate", path).returncode
-        ):
-            break
-    else:
-        path = "--all"
-        if named:
-            want = diff_sha256(tree, work, head)
-            if all(row[3].get("diff_sha256") == want for row in decided):
-                return
-            raise Refusal(f"no {REVIEWER} verdict binds the diff {head} lands",
-                          f"Operator action: dispatch {REVIEWER} on {tree} at HEAD {head}; its verdict.py run writes the verdict")  # fmt: skip
-    raise Refusal(
-        f"the newest {REVIEWER} handoff naming HEAD {head} or a sha of its patch and message"
-        " series is not a valid APPROVED (the file comes from the reviewer's verdict)",
-        cli_line(root, "reports", "validate", path),
+        ),
+        None,
     )
+    if invalid or not decided:
+        raise Refusal(
+            f"the newest {REVIEWER} handoff naming HEAD {head} or a sha of its patch and message"
+            " series is not a valid APPROVED (the file comes from the reviewer's verdict)",
+            cli_line(root, "reports", "validate", invalid or "--all"),
+        )
+    want = diff_sha256(tree, work, head)
+    if any(row[3].get("diff_sha256") != want for row in decided):
+        raise Refusal(f"no {REVIEWER} verdict binds the diff {head} lands",
+                      f"Operator action: dispatch {REVIEWER} on {tree} at HEAD {head}; its verdict.py run writes the verdict")  # fmt: skip
 
 
 def digest(root: Path, path: str, sha: str) -> str:

@@ -16,6 +16,7 @@ from pathlib import Path
 import pytest
 import yaml
 
+from tests.fixtures.harness_env import suite_env
 from tests.fixtures.stores import fake_venv
 
 pytestmark = pytest.mark.slow(reason="each case spawns scripts/ci.py and its tools")
@@ -47,11 +48,15 @@ def _ci(checkout: Path, job: str, python: str = sys.executable) -> subprocess.Co
         [python, str(checkout / "scripts" / "ci.py"), job],
         cwd=checkout,
         # an outer coverage session (the medium tests run under it) must not steer this inner one
-        env={
-            k: v
-            for k, v in os.environ.items()
-            if k != "PYTHONDONTWRITEBYTECODE" and not k.startswith(("COV_CORE_", "COVERAGE"))
-        },
+        env=suite_env(
+            os.environ,
+            Path.home(),
+            unset=tuple(
+                k
+                for k in os.environ
+                if k == "PYTHONDONTWRITEBYTECODE" or k.startswith(("COV_CORE_", "COVERAGE"))
+            ),
+        ),
         capture_output=True,
         text=True,
         check=False,
@@ -198,8 +203,12 @@ def test_documented_coverage_line_leaves_no_coverage_file_in_the_checkout(
     subprocess.run(["git", "init", "-q"], cwd=checkout, check=True)
     tmp = tmp_path / "tmp"  # where the plugin's temp dir lives, and is gone after exit
     tmp.mkdir()
-    env = {**{k: v for k, v in os.environ.items() if k != "COVERAGE_FILE"}, "CI": "true",
-           "TMPDIR": str(tmp)}  # fmt: skip
+    env = suite_env(
+        os.environ,
+        Path.home(),
+        unset=("COVERAGE_FILE",),
+        overrides={"CI": "true", "TMPDIR": str(tmp)},
+    )
     argv = [sys.executable, *shlex.split(line)[1:]]
     assert subprocess.run(argv, cwd=checkout, env=env, check=False).returncode == 0
     assert [p.name for p in tmp.iterdir() if p.name.startswith("dadaia-cov-")] == []

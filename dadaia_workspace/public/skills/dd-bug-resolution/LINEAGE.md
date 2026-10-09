@@ -39,21 +39,10 @@ of repeating it.
 1. Inspect blame for the production lines the fix replaces and the matching records.
 2. Choose the prior bug or task that wrote those lines. Use `none` only when blame offers
    no candidate.
-3. Resolve once the fix commit exists:
-
-   ```bash
-   python3 .agents/skills/dd-bug-resolution/scripts/bugs.py resolve <id> \
-     --cause "…" --caused-by <prior-bug-id>|<task-id>|none \
-     --solution "…" --fix-sha <40-hex-sha>
-   ```
+3. Resolve once the fix commit exists (`SKILL.md` Phase 6).
 
 4. `check` refuses a target naming no live or archived bug or known release task, and
    refuses a lineage loop.
-5. Two or more prior fixes on the touched module make the next fix a REBUILD that keeps
-   its regression tests; its commit subject and solution name the rebuilt module.
-6. Publish through the installed pre-push hook; it feeds Git ref lines to
-   `.dadaia/.venv/bin/dadaia ci push-gate-check`, which checks the introduced object
-   range.
 
 ## Cost bound
 

@@ -1,5 +1,6 @@
 # CLAUDE-CODE.md — Claude Code Harness Mastery
 
+Sections: 1. Agentic loop model and the compaction boundary; 2. Context hierarchy decision protocol (ADR-style); 3. Rules enforcement model — always-on vs path-scoped; 4. Skills mechanics — and the listing-budget tax; 5. Hooks lifecycle — the determinism primitive; 6. Subagents and dispatch authority; 7. Tools and permission model; 8. MCP and tool-search; Composition decision tree; 9. Official reference index (on-demand links — no content copied).
 Sibling of [`SKILL.md`](SKILL.md) (`dd-ai-eng-knowhow`, authoring depth).
 A decision surface, not a doc mirror — official docs are an on-demand index at §9; consult, never transcribe.
 
@@ -24,7 +25,6 @@ A decision surface, not a doc mirror — official docs are an on-demand index at
 | Most-recent skill invocation (partially re-attached, capped) | Earlier skill invocations beyond the re-attach budget |
 
 - A behavior that must hold across a long session belongs in CLAUDE.md/a rule (survives) or a hook (deterministic).
-- Never a one-time chat instruction or a resident skill body for a must-hold behavior.
 - A skill whose guidance is lost at compaction is placed at the wrong layer — promote it to a rule, or re-invoke it.
 - Subagents isolate a big exploration in its own context window and return only a summary.
 
@@ -46,7 +46,6 @@ A decision surface, not a doc mirror — official docs are an on-demand index at
 - A long CLAUDE.md lowers adherence.
 - A "see X" prose pointer loads nothing in Claude Code — only an `@import` or a symlink pulls a file in.
 - Personal machine-local content goes to `~/.claude/` and `CLAUDE.local.md` (gitignored).
-- Never put machine-local content in team-shared `public/` source, which ships open-source.
 
 ---
 
@@ -85,10 +84,8 @@ A decision surface, not a doc mirror — official docs are an on-demand index at
 - Gotcha: listing-budget tax = N skills x description tokens, capped near 1% of context window.
 - Overflow drops least-used descriptions first, causing mis-triggering.
 - Split-vs-merge: split a skill only on genuinely distinct triggers; otherwise merge to one description.
-- This folder is the worked example — four skills merged to one description.
 - Prefer `user-invocable: false` for agent-internal protocols nobody types as a command.
 - Gotcha: `applyTo` is silently ignored by Claude Code — the native path-scoping field is `paths:`.
-- dadaia's `applyTo:` is a listing convention for the projection toolchain, not a Claude Code activation lever.
 
 ---
 
@@ -146,7 +143,6 @@ A decision surface, not a doc mirror — official docs are an on-demand index at
 | Tier 2 | Synthesis / review with delegated sub-work | Allowed only when the brief justifies it |
 | Tier 3 | Implementers / workers | Never — would let a worker spawn workers |
 
-- Never add the `Agent` tool to a Tier-3 persona.
 - Dispatch authority is reserved to dispatchers and justified by an operator-approved brief.
 
 ---
@@ -165,9 +161,8 @@ A decision surface, not a doc mirror — official docs are an on-demand index at
 - Prune dead/stale permission entries.
 - Gotcha: nothing enforces the per-persona write-allowlist.
 - Native frontmatter (`name`, `description`, `model`, `tools`, `skills`, `maxTurns`) is honored.
-- dadaia extras (`dispatch_band`, `input_contract`, `paths.write_allowlist`) are ignored by the runtime.
+- dadaia extras (`dispatch_band`, `input_contract`) are ignored by the runtime.
 - dadaia's PreToolUse gate is persona-blind: path-class x scope only.
-- `write_allowlist` is a convention checked by tooling/tests/reviewers — no runtime or hook polices it.
 
 ---
 
@@ -208,8 +203,6 @@ Must it hold EVERY time, regardless of what the model decides?
 ```
 
 - Prune stale/dead permission entries and machine-specific paths from settings before they mislead.
-- Never project a `.claude/workflows/` reference directory — no workflow engine exists.
-- The ordered SDD flow is agent-dispatched, never a declarative workflow file Claude Code executes.
 
 ---
 

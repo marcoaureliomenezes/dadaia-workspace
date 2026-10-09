@@ -68,12 +68,11 @@ def patch_cli(root: Path, old: str, new: str) -> None:
 
 
 def git(repo: Path, *args: str) -> str:
-    env = {
-        **suite_env(os.environ, Path.home()),
-        "HOME": str(repo),
-        "PATH": os.environ["PATH"],
-        "GIT_CONFIG_NOSYSTEM": "1",
-    }
+    env = suite_env(
+        os.environ,
+        Path.home(),
+        overrides={"HOME": str(repo), "PATH": os.environ["PATH"], "GIT_CONFIG_NOSYSTEM": "1"},
+    )
     ident = ["-c", "user.name=t", "-c", "user.email=t@t", "-c", "init.defaultBranch=main"]
     out = subprocess.run(
         ["git", *ident, "-C", str(repo), *args], env=env, check=True, capture_output=True, text=True
@@ -109,8 +108,9 @@ def make_workspace(root: Path) -> Path:
     (tasks / "job1.md").write_text(
         "# Job 1\n\n| task | AC | `W:` |\n|---|---|---|\n| J1.T1 | AC2.1 | `src/a.py` |\n"
     )
-    state = {"schema": "release-state-v1", "release": "0.5.0", "phase": "DEFINITION",
-             "defined": None, "implemented": None, "shipped": None, "log": []}  # fmt: skip
+    state = {"schema": "release-state-v1", "release": "0.5.0", "phase": "IMPLEMENTATION",
+             "defined": {"sha": "initial", "ts": "2026-10-09T09:00:00Z"},
+             "implemented": None, "shipped": None, "log": []}  # fmt: skip
     (rel.parent / "_RELEASE.json").write_text(json.dumps(state))
     (repo / ".gitignore").write_text("*.scratch\n__pycache__/\n")
     (repo / "scripts").mkdir()
@@ -139,14 +139,17 @@ def associate(root: Path, spec: str) -> None:
 
 
 def run(root: Path, *args: str, input: str | None = None) -> subprocess.CompletedProcess[str]:
-    env = {
-        **suite_env(os.environ, Path.home()),
-        "HOME": str(root),
-        "PATH": os.environ["PATH"],
-        "GIT_DIR": "/nonexistent",
-        "GIT_CONFIG_NOSYSTEM": "1",
-        "TZ": "Asia/Tokyo",  # a naive produced_at never orders by the local zone
-    }
+    env = suite_env(
+        os.environ,
+        Path.home(),
+        overrides={
+            "HOME": str(root),
+            "PATH": os.environ["PATH"],
+            "GIT_DIR": "/nonexistent",
+            "GIT_CONFIG_NOSYSTEM": "1",
+            "TZ": "Asia/Tokyo",  # a naive produced_at never orders by the local zone
+        },
+    )
     return subprocess.run(
         [sys.executable, str(SCRIPT), *args],
         cwd=root,
@@ -214,7 +217,11 @@ def run_fix(root: Path, result: subprocess.CompletedProcess[str]) -> None:
     """Run the refusal's one `fix:` line as an agent would, from the workspace root."""
     (fix,) = fixes(result)
     command = fix.removeprefix("fix: ")
-    env = {**os.environ, "HOME": str(root), "GIT_CONFIG_NOSYSTEM": "1"}
+    env = suite_env(
+        os.environ,
+        Path.home(),
+        overrides={"HOME": str(root), "GIT_CONFIG_NOSYSTEM": "1"},
+    )
     run_bash(command, cwd=root, env=env, check=True)
 
 

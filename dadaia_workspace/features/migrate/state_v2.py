@@ -1,21 +1,16 @@
-"""State-file migration: spec_contexts.json v1 → v2.
-
-This module implements the v1-to-v2 context-record migration.
-It is called by ``dadaia migrate [--dry-run] [--yes]``.
-
-Which registry needs it is ``json_context_store.parse_schema_version``'s answer (below 2);
-only the v1 (``ativo``/``inativo``) rows are rewritten, every other row is kept verbatim.
-"""
+"""State-file migration: spec_contexts.json v1 → v2."""
 
 from __future__ import annotations
 
-import json
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from dadaia_workspace.core.atomic_write import atomic_write
 from dadaia_workspace.core.workspace_resolver import not_initialized
-from dadaia_workspace.infrastructure.json_context_store import LEGACY_STATES, parse_schema_version
+from dadaia_workspace.infrastructure.json_context_store import (
+    LEGACY_STATES,
+    JsonContextStore,
+    parse_schema_version,
+)
 
 
 @dataclass
@@ -29,16 +24,16 @@ class MigrationPlan:
     already_v2: bool = False
 
 
-def plan_migration(states_dir: Path) -> MigrationPlan:
+def plan_migration(store: JsonContextStore) -> MigrationPlan:
     """Read spec_contexts.json and compute the migration plan without writing."""
-    ctx_file = states_dir / "spec_contexts.json"
+    states_dir = store.states_dir
     primary_file = states_dir / "primary_context.json"
 
-    if not ctx_file.exists():
+    if not store.exists():
         raise ValueError(str(not_initialized(states_dir.parent.parent)))
 
-    raw = json.loads(ctx_file.read_text(encoding="utf-8"))
-    if parse_schema_version(raw, ctx_file) >= 2:
+    raw = store.read_raw()
+    if parse_schema_version(raw, states_dir / "spec_contexts.json") >= 2:
         return MigrationPlan(
             schema_version_before="2",
             contexts_to_migrate=[],
@@ -46,105 +41,54 @@ def plan_migration(states_dir: Path) -> MigrationPlan:
             already_v2=True,
         )
 
-    # Build list of context changes
-    contexts_to_migrate = []
-    for ctx in raw.get("contexts", []):
-        old_state = ctx.get("state", "")
-        if old_state not in LEGACY_STATES:
-            continue
-        new_state = "alive" if old_state == "ativo" else "dead"
-        entry = {
+    contexts_to_migrate = [
+        {
             "name": ctx.get("name"),
-            "old_state": old_state,
-            "new_state": new_state,
+            "old_state": state,
+            "new_state": "alive" if state == "ativo" else "dead",
             "had_is_primary": "is_primary" in ctx,
             "had_activated_at": "activated_at" in ctx,
         }
-        contexts_to_migrate.append(entry)
-
-    dirs_to_create = []
-    for rel in (".dadaia/sessions",):
-        dirs_to_create.append(rel)
+        for ctx in raw.get("contexts", [])
+        if (state := ctx.get("state", "")) in LEGACY_STATES
+    ]
 
     return MigrationPlan(
         schema_version_before="1",
         contexts_to_migrate=contexts_to_migrate,
         primary_context_exists=primary_file.exists(),
-        dirs_to_create=dirs_to_create,
+        dirs_to_create=[".dadaia/sessions"],
         already_v2=False,
     )
 
 
-def execute_migration(states_dir: Path, workspace_root: Path) -> None:
-    """Execute the migration atomically.
-
-    Actions (in spec order):
-    1.  Detect schema_version.
-    2a. Map states: ativo→alive, inativo→dead.
-    2b. Rename activated_at → alive_since.
-    2c. Remove is_primary.
-    2d. Add dead_since: null.
-    2e. Set schema_version = "2".
-    2f. Write atomically (tmp → os.replace()).
-    2g. Delete primary_context.json if exists.
-    2h. Create .dadaia/sessions/ directory.
-    """
-    ctx_file = states_dir / "spec_contexts.json"
+def execute_migration(store: JsonContextStore, workspace_root: Path) -> None:
+    """Migrate the registry and its retired primary marker to schema v2."""
+    states_dir = store.states_dir
     primary_file = states_dir / "primary_context.json"
-
-    if not ctx_file.exists():
-        _create_dirs(workspace_root)
-        return
-
-    raw = json.loads(ctx_file.read_text(encoding="utf-8"))
-    if parse_schema_version(raw, ctx_file) >= 2:
-        _create_dirs(workspace_root)
-        return
-
-    new_contexts = []
-    for ctx in raw.get("contexts", []):
-        if ctx.get("state") not in LEGACY_STATES:
-            new_contexts.append(ctx)
-            continue
-        old_state = ctx.get("state", "")
-        new_state = "alive" if old_state == "ativo" else "dead"
-
-        # alive_since: use activated_at value if present, else None
-        alive_since = ctx.get("activated_at")
-
-        new_ctx: dict[str, object] = {
-            "name": ctx["name"],
-            "state": new_state,
-            "repo_slug": ctx.get("repo_slug", ""),
-            "repo_url": ctx.get("repo_url", ""),
-            "created_at": ctx.get("created_at", ""),
-            "alive_since": alive_since,
-            "dead_since": None,
-            "current_branch": ctx.get("current_branch"),
-        }
-        new_contexts.append(new_ctx)
-
-    migrated: dict[str, object] = {
-        "schema_version": "2",
-        "contexts": new_contexts,
-    }
-
-    # Write atomically (T-045-13: core.atomic_write.atomic_write, AR-1). This writer
-    # never passed newline="" — platform-default newline translation, matched here by
-    # newline=None — and never cleaned up its temp sibling on an injected os.replace
-    # failure (uncharacterized gap, per the T-045-12 behaviour matrix); the primitive's
-    # cleanup is unconditional on every failure path, closing that gap by construction.
-    atomic_write(ctx_file, json.dumps(migrated, indent=2), newline=None)
-
-    # Delete primary_context.json
-    if primary_file.exists():
-        primary_file.unlink()
-
-    # Create required directories
-    _create_dirs(workspace_root)
-
-
-def _create_dirs(workspace_root: Path) -> None:
-    """Create the new directories required by v2."""
-    for rel in (".dadaia/sessions",):
-        (workspace_root / rel).mkdir(parents=True, exist_ok=True)
+    raw = store.read_raw() if store.exists() else None
+    if raw is not None and parse_schema_version(raw, states_dir / "spec_contexts.json") < 2:
+        store.replace_raw(
+            {
+                "schema_version": "2",
+                "contexts": [
+                    ctx
+                    if ctx.get("state") not in LEGACY_STATES
+                    else {
+                        "name": ctx["name"],
+                        "state": "alive" if ctx.get("state") == "ativo" else "dead",
+                        "repo_slug": ctx.get("repo_slug", ""),
+                        "repo_url": ctx.get("repo_url", ""),
+                        "created_at": ctx.get("created_at", ""),
+                        "alive_since": ctx.get("activated_at"),
+                        "dead_since": None,
+                        "current_branch": ctx.get("current_branch"),
+                    }
+                    for ctx in raw.get("contexts", [])
+                ],
+            },
+            newline=None,
+        )
+        if primary_file.exists():
+            primary_file.unlink()
+    (workspace_root / ".dadaia/sessions").mkdir(parents=True, exist_ok=True)

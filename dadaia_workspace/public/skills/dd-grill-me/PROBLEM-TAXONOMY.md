@@ -1,6 +1,6 @@
 # PROBLEM-TAXONOMY — dd-grill-me
 
-Disclosed reference reached during Step 1 (inspect before asking): the problem shapes that destroy specs.
+Disclosed reference reached at step 3 (inspect before asking): the problem shapes that destroy specs.
 Named so a gap can be classified before it resolves by inspection or promotes to the design tree.
 
 | Problem type | Example |

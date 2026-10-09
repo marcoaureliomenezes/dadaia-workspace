@@ -15,6 +15,7 @@ import sys
 
 import typer
 
+from dadaia_workspace import container
 from dadaia_workspace.cli._fail import fail
 from dadaia_workspace.core.exceptions import SchemaVersionError, WorkspaceNotInitializedError
 from dadaia_workspace.core.workspace_resolver import resolve_workspace_root
@@ -77,8 +78,8 @@ def migrate_state(
 
     try:
         workspace_root = resolve_workspace_root()
-        states_dir = workspace_root / ".dadaia" / "states"
-        plan = plan_migration(states_dir)
+        store = container.build_context_store(workspace_root)
+        plan = plan_migration(store)
     except (ValueError, SchemaVersionError, WorkspaceNotInitializedError) as exc:
         fail(exc)
 
@@ -101,6 +102,6 @@ def migrate_state(
             sys.exit(0)
 
     # Execute
-    execute_migration(states_dir, workspace_root)
+    execute_migration(store, workspace_root)
 
     typer.echo("[ok] Migration complete. spec_contexts.json is now at schema_version 2.")

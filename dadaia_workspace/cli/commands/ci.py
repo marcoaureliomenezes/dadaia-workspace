@@ -71,7 +71,7 @@ def push_gate_check() -> None:
     <remote-sha>``). Every non-deletion ref (tags included) is scanned for new objects
     carrying a denylisted term — a work-branch push is the first publication to ``origin``.
     Branch deletions are never scanned; tag pushes are scanned but never gated on branch
-    policy. No security verdict is checked here — that runs as a PR gate.
+    policy.
 
     The object source, denylist terms and baseline patterns are all built here and
     injected; a call site that fails to wire the object reader is a defect, never a

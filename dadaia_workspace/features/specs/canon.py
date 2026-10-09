@@ -19,8 +19,7 @@ against the SAME table (doctor is canon checked). The property this module exist
 hold: ``scaffold(t); check_tree(t) == []`` — proved by
 ``tests/features/specs/test_canon__canon_property.py``.
 
-Pure module for its CHECKING half (:func:`is_canon_path`, :func:`canon_violations`,
-:func:`verdict_violations`): plain data in, plain data out, never touches a filesystem.
+Pure module for its CHECKING half (:func:`is_canon_path`, :func:`canon_violations`): plain data in, plain data out, never touches a filesystem.
 Its RENDERING half (:func:`scaffold`, :func:`scaffold_entry`) does
 real file I/O by design (that is the whole point of a scaffolder) but touches nothing
 outside the *specs_dir*/*public_dir* it is given.
@@ -164,8 +163,7 @@ TEMPLATES: dict[str, tuple[Kind, str]] = {
 
 def is_canon_path(rel_posix: str) -> bool:
     """True iff *rel_posix* (POSIX-relative to ``specs/``) is a v6-canon-conformant
-    file path — structural shape only, never sha-specific (see :func:`verdict_violations`
-    for the verdict business rule layered on top of the same path shape)."""
+    file path — structural shape only, never sha-specific."""
     return any(entry.pattern.match(rel_posix) for entry in CANON)
 
 

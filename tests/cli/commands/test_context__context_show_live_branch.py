@@ -15,7 +15,6 @@ import pytest
 from typer.testing import CliRunner
 
 from dadaia_workspace.cli.main import app
-from tests.fixtures.harness_env import retire_tree
 
 _runner = CliRunner()
 _CTX = "live-branch-ctx"
@@ -64,7 +63,7 @@ def test_list_and_show_report_the_live_branch_else_the_stored_one(
 ) -> None:
     ws = _make_workspace_with_repo(tmp_path)
     if not on_disk:
-        retire_tree(ws / "repos" / _CTX, tmp_path)
+        (ws / "repos" / _CTX).rename(tmp_path / _CTX)
     monkeypatch.chdir(ws)
 
     shown = json.loads(_runner.invoke(app, ["context", "show", _CTX, "--json"]).stdout)

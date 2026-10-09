@@ -21,7 +21,7 @@ sys.path.append(str(Path(__file__).resolve().parents[2] / "dd-bug-resolution" / 
 from _release_check import histo_findings  # noqa: E402
 from _release_new import new_release  # noqa: E402
 from _release_phase import SHIP_PR, set_phase  # noqa: E402
-from _release_schema import CODE, HISTO, SHA_RE, STATE, utc_now  # noqa: E402
+from _release_schema import _ORIGIN_GRAMMAR, CODE, HISTO, SHA_RE, STATE, utc_now  # noqa: E402
 from _release_store import (  # noqa: E402
     SCRIPT,
     Refusal,
@@ -56,8 +56,7 @@ def _parser() -> argparse.ArgumentParser:
         command.add_argument("--specs", type=Path, default=None, help="path to the specs/ tree")
         if verb == "new":
             command.add_argument("release_id", help="the new release's bare SemVer id")
-            command.add_argument("--origin", default="operator-demand",
-                                 help="operator-demand | backlog:<id>[,..] | bugs:<id>[,..]")  # fmt: skip
+            command.add_argument("--origin", default="operator-demand", help=_ORIGIN_GRAMMAR)
         if verb == "phase":
             command.add_argument("phase", help="IMPLEMENTATION or CLOSURE")
         if verb in ("phase", "ship"):

@@ -59,14 +59,9 @@ def _kimi_shim(where: Path) -> Path:
 
 
 def _run(command: str, cwd: Path, **env: str) -> subprocess.CompletedProcess[str]:
-    base = {
-        **suite_env(os.environ, Path.home()),
-        "PATH": os.environ["PATH"],
-        "PYTHONPATH": os.environ.get("PYTHONPATH", ""),
-    }
     return subprocess.run(
         ["sh", "-c", command], input=_WRITE, capture_output=True, text=True, cwd=cwd,
-        env={**base, **env}, timeout=60,
+        env=suite_env(os.environ, Path.home(), overrides=env), timeout=60,
     )  # fmt: skip
 
 
@@ -123,8 +118,9 @@ def test_the_claude_hook_survives_a_moved_workspace(tmp_path: Path) -> None:
         input=json.dumps({"tool_name": "Write", "tool_input": {"file_path": str(payload_dir)},
                           "cwd": str(moved)}),
         capture_output=True, text=True, cwd=moved, timeout=60,
-        env={**suite_env(os.environ, Path.home()), "PATH": os.environ["PATH"], "PYTHONPATH": os.environ.get("PYTHONPATH", ""),
-             "CLAUDE_PROJECT_DIR": str(moved)},
+        env=suite_env(
+            os.environ, Path.home(), overrides={"CLAUDE_PROJECT_DIR": str(moved)}
+        ),
     )  # fmt: skip
     assert done.returncode == 0, done.stderr
     assert json.loads(done.stdout)["hookSpecificOutput"]["permissionDecision"] == "deny"

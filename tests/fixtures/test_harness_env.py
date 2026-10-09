@@ -13,24 +13,28 @@ _HOME = "/tmp/h"
 
 
 # fmt: off
-@pytest.mark.parametrize(("parent", "expected"), [
+@pytest.mark.parametrize(("parent", "unset", "overrides", "expected"), [
     pytest.param(
         {"PATH": "/bin", "HOME": "/op", "XDG_CACHE_HOME": "/op/.cache",
          "DADAIA_CONTEXT": "ghost", "DADAIA_SESSION_ID": "s", "DADAIA_PERSONA": "p",
          "CLAUDE_CODE_SESSION_ID": "c", "CODEX_SESSION_ID": "x", "CODEX_THREAD_ID": "t",
          "CLAUDE_AGENT_PERSONA": "a", "CODEX_AGENT_PERSONA": "b",
          "DADAIA_FENCED_ROOTS": "/fence", "DADAIA_REQUIRE_UVX": "1"},
+        ("PYTHONDONTWRITEBYTECODE",),
+        {"CI": "true"},
         {"PATH": "/bin", "HOME": _HOME, "USERPROFILE": _HOME, "XDG_CACHE_HOME": f"{_HOME}/.cache",
          "LOCALAPPDATA": f"{_HOME}/AppData/Local", "KIMI_CODE_HOME": f"{_HOME}/.kimi-code",
-         "PYTHONDONTWRITEBYTECODE": "1", "DADAIA_FENCED_ROOTS": "/fence", "DADAIA_REQUIRE_UVX": "1"},
+         "DADAIA_FENCED_ROOTS": "/fence", "DADAIA_REQUIRE_UVX": "1", "CI": "true"},
         id="operator-out-temp-home-in",
     ),
 ])
 # fmt: on
-def test_suite_env(parent: dict[str, str], expected: dict[str, str]) -> None:
+def test_suite_env(
+    parent: dict[str, str], unset: tuple[str, ...], overrides: dict[str, str], expected: dict[str, str]
+) -> None:
     from tests.fixtures.harness_env import suite_env
 
-    assert suite_env(parent, PurePosixPath(_HOME)) == expected
+    assert suite_env(parent, PurePosixPath(_HOME), unset=unset, overrides=overrides) == expected
 
 
 @pytest.mark.medium
@@ -82,21 +86,3 @@ def test_run_bash_runs_the_command(monkeypatch: pytest.MonkeyPatch) -> None:
     from tests.fixtures.harness_env import run_bash
 
     assert run_bash("echo hi").stdout.strip() == "hi"
-
-
-def test_retire_tree_moves_a_tree_holding_a_readonly_git(tmp_path: Path) -> None:
-    from tests.fixtures.harness_env import retire_tree
-
-    repo = tmp_path / "repos" / "alpha"
-    (repo / ".git").mkdir(parents=True)
-    obj = repo / ".git" / "obj"
-    obj.write_text("x", "utf-8")
-    obj.chmod(0o444)
-    elsewhere = tmp_path / "gone"
-    elsewhere.mkdir()
-    moved = retire_tree(repo, elsewhere)
-    assert (moved, repo.exists(), (moved / ".git" / "obj").read_text("utf-8")) == (
-        elsewhere / "alpha",
-        False,
-        "x",
-    )

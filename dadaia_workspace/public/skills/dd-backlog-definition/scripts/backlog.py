@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
-"""The backlog's ONE writer and validator — `specs/backlog/BACKLOG.json` and its
-append-only exit ledger, stdlib only.
+"""The backlog ledger CLI and validator — `specs/backlog/BACKLOG.json` and its
+append-only exit ledger, stdlib only. Live-entry authoring authority is
+`specs/backlog/AGENTS.md` §2.
 
 ``backlog.py <verb> --specs <path>``. Every write builds the new document bytes, runs
-`check` over them, and only then replaces the file atomically — so this script's writer
+`check` over them, and only then replaces the file atomically — so its write paths
 and its validator cannot disagree about what a valid backlog is; resolving a subject is the
 doctor's alone.
 """

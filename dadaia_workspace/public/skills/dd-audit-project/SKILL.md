@@ -1,14 +1,14 @@
 ---
 name: dd-audit-project
 description: >
-  The three-pillar drift audit (the reviewer's audit lens) — bug history, spec compliance, memory
+  The periodic three-pillar drift audit of a whole context (one diff's review is dd-code-review's) — bug history, spec compliance, memory
   drift — over the sha window read from audits_histo.jsonl. Use when dispatched to
-  audit a context.
+  audit a context or to run an onboarding first pass.
 ---
 
 # dd-audit-project — Three Pillars Over a SHA Window
 
-> `dd-code-reviewer` is the lens (read-only, it returns its report); the main thread writes the audit from it — `specs/audits/AGENTS.md` §2. Suggested every 5 releases, never mandatory.
+> `dd-code-reviewer` is the lens (read-only, it returns its report); the main thread writes the audit from it — `specs/audits/AGENTS.md`.
 
 ## 1. The window — computed once per audit
 
@@ -16,17 +16,14 @@ description: >
 2. Window mechanics: `dd-bug-resolution`'s `LINEAGE.md` §The window, cited never restated.
 3. Record the resulting `[from-sha, HEAD]` in `AUDIT.md`'s scope.
 
-## 2. The three pillars — run together, never fewer
+## 2. The three pillars — all three in one run
 
 - **Pillar 1 — bugs** ([`PILLAR-BUGS.md`](PILLAR-BUGS.md)): compute all nine
   forensic metrics it lists on each `BUGS.jsonl` record in the window; the audit record and git history establish coverage.
 - **Pillar 2 — specs** ([`PILLAR-SPECS.md`](PILLAR-SPECS.md)): commit shapes, canon compliance, `_RELEASE.json` milestones over the window.
-- **Pillar 3 — memory** ([`PILLAR-MEMORY.md`](PILLAR-MEMORY.md)): execute every
-  Part-1 principle's named `Measured by:` check; match every Part-1 hunk in the
-  window to an `accepted` ADR in the same commit, or flag HIGH.
+- **Pillar 3 — memory** ([`PILLAR-MEMORY.md`](PILLAR-MEMORY.md)): principles through their `Measured by:` checks, canonical hunks against ADRs, product atoms against code.
 
-The main thread refuses to write `AUDIT.md` until all three pillar sections are present — fewer than
-three is not an audit. Append one `FINDINGS.jsonl` record per claim
+The main thread refuses to write `AUDIT.md` until all three pillar sections are present. Append one `FINDINGS.jsonl` record per claim
 ([`FINDINGS-FORMAT.md`](FINDINGS-FORMAT.md)).
 
 ## 3. First pass — a freshly onboarded context
@@ -38,7 +35,7 @@ three is not an audit. Append one `FINDINGS.jsonl` record per claim
 
 ## 4. Done when
 
-- Window recorded; nine bug metrics with baseline + target; every Part-1 check ran; `AUDIT.md` has all three pillars, each claim a `FINDINGS.jsonl` record.
+- Window recorded; nine bug metrics with baseline + target; every PILLAR-MEMORY §1 check ran; `AUDIT.md` has all three pillars, each claim a `FINDINGS.jsonl` record; `python3 .agents/skills/dd-audit-project/scripts/audit.py check --specs <specs-dir>` exits 0.
 
 ## 5. References
 

@@ -220,19 +220,17 @@ def _parse(result: Any) -> list[dict[str, Any]] | None:
 def worktree_rows(
     root: Path, runner: _Runner | None = None
 ) -> tuple[list[dict[str, Any]], str, str]:
-    """``worktree.py list --json``'s rows for the workspace at *root*: ``(rows, "", "")``,
-    or ``([], reason, fix)`` — bounded, since SessionStart waits on it."""
+    """Read the owner's bounded ``worktree.py list --json`` result once."""
     path = resolve_script(WORKTREE_SCRIPT, root)
     if path is None:
         return [], "list failed: worktree.py is not installed", fix_line(root, "public", "install")
     process = runner if runner is not None else SubprocessProcessRunner()
-    rerun = f"{WORKTREE_SCRIPT.invocation} list"
     try:
         done = process.run([sys.executable, str(path), "list", "--json"], cwd=root, timeout=10.0)
         found = json.loads(done.stdout) if done.returncode == 0 else None
     except (OSError, TimeoutError, ValueError) as exc:
-        return [], f"list failed: {type(exc).__name__}", rerun
+        return [], f"list failed: {type(exc).__name__}", f"{WORKTREE_SCRIPT.invocation} list"
     if not isinstance(found, list):  # the script's refusal: reason, then its one fix line
         reason, _, fix = done.stderr.strip().partition("\nfix: ")
-        return [], f"list failed: {reason}", fix or rerun
+        return [], f"list failed: {reason}", fix or f"{WORKTREE_SCRIPT.invocation} list"
     return found, "", ""

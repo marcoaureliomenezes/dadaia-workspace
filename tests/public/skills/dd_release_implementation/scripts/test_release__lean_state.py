@@ -10,6 +10,7 @@ from pathlib import Path
 
 import pytest
 
+from tests.fixtures.harness_env import suite_env
 from tests.helpers.skill_scripts import stage_skill_scripts
 
 _TS = "2026-10-08T12:00:00Z"
@@ -269,7 +270,7 @@ def test_closure_check_needs_the_memory_entry_but_not_git(script: Path, tmp_path
         capture_output=True,
         text=True,
         check=False,
-        env={**os.environ, "PATH": ""},
+        env=suite_env(os.environ, Path.home(), overrides={"PATH": ""}),
     )
     assert (checked.returncode, json.loads(checked.stdout)) == (0, [])
 
