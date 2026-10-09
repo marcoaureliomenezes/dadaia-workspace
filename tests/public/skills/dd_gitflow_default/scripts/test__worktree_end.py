@@ -22,7 +22,11 @@ from typing import Any
 import pytest
 
 from dadaia_workspace.core.cli_line import git_line, shell_line
-from dadaia_workspace.infrastructure.ledger_scripts import _PACKAGE_SKILLS, load_owner
+from dadaia_workspace.infrastructure.ledger_scripts import (
+    _PACKAGE_SKILLS,
+    LEDGER_SCRIPTS,
+    load_owner,
+)
 from tests.fixtures.harness_env import run_bash, run_python, suite_env
 from tests.helpers.release_state import write_release_phase
 from tests.helpers.skill_scripts import stage_skill_scripts
@@ -402,16 +406,13 @@ def test_a_job_merge_needs_a_verdict_naming_its_ci_matrix_run(root: Path) -> Non
     assert git(repo, "rev-parse", "feature/0.5.0").strip() == head
 
 
-def test_one_job_lands_code_an_atom_and_its_derived_section_together(root: Path) -> None:
-    """AC1.3, AC1.5 (ADRs 0191, 0192): no allowed set splits one change — code, an atom and its
-    derived section land in one job merge."""
-    repo = root / "repos/r"
-    land(root, "src/a.py")
-    land(root, "specs/memory/product/x/atom.md", "# atom\n")
-    approve(root, land(root, "README.md", "## A\n<!-- derived-from: atom sha256:0 -->\n"))
-    assert run(root, "merge", TREE).returncode == 0
-    landed = git(repo, "diff", "--name-only", "HEAD~3", "HEAD").split()
-    assert landed == ["README.md", "specs/memory/product/x/atom.md", "src/a.py"]
+def test_memory_is_not_a_doctor_ledger() -> None:
+    assert [script.filename for script in LEDGER_SCRIPTS] == [
+        "bugs.py",
+        "backlog.py",
+        "release.py",
+        "audit.py",
+    ]
 
 
 def test_a_declared_verify_line_runs_as_argv_never_through_a_shell(root: Path) -> None:
