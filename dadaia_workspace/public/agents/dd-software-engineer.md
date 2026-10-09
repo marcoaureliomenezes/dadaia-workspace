@@ -11,6 +11,7 @@ tools:
   - Glob
   - Grep
 skills:
+  - dd-code-review
   - dd-cli-library
   - dd-handoff-emitter
   - dd-spec-navigator
