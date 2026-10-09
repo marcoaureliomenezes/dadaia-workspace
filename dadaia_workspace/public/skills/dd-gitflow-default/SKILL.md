@@ -26,8 +26,8 @@ The branch contract by role; the names are `specs/constitution.md`'s `gitflow:` 
 8. Candidate closure: open one work → integration PR and merge it green.
 9. After the merge, the main thread asks the operator: **promote or continue?** Continue = the next candidate's `python3 .agents/skills/dd-release-implementation/scripts/release.py new <id>`; promote = step 10.
 10. Promote: open the PR integration → principal (the reviewer's `APPROVED` on the integration tip, §3b); its merge is the deploy.
-11. The moment the promote PR merges, record it — `python3 .agents/skills/dd-release-implementation/scripts/release.py ship --sha <sha>` — then delete the work branch and cut the next one per §2a.
-12. `git tag archive/<name> <name>` then `git branch -d <name>` the moment its work lands elsewhere.
+11. The moment the promote PR merges, record it — `python3 .agents/skills/dd-release-implementation/scripts/release.py ship --sha <sha>` — then tag the work tip as `archive/<work-name>` before deleting that work branch, and cut the next one per §2a when another release opens.
+12. A WT-managed worktree and its branch complete under `worktrees/AGENTS.md` §2, which owns their merge and cleanup lifecycle.
 
 ## 2a. The branch contract
 
@@ -70,7 +70,9 @@ The branch contract by role; the names are `specs/constitution.md`'s `gitflow:` 
 
 ## 4. Done when
 
-- `git branch -a` lists only §2a branches, and every commit since the work branch's cut matches one §3a row.
+- Current branches match §2a, and every commit since the work branch's cut matches one §3a row.
+- After a work → integration PR: the repo's `verify:` line passed, the reviewer's `APPROVED` verdict names the PR head, and the PR merged.
+- After promotion: the release's archived state records the principal merge as `shipped`, the `archive/<work-name>` tag resolves to the former work tip, the work branch is gone, and a next work branch exists when another release has opened.
 
 ## 5. References
 
