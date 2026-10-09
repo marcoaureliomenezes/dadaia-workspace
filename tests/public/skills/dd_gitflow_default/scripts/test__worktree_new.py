@@ -166,8 +166,10 @@ def test_no_work_branch_refuses_with_a_fix_that_creates_it(root: Path) -> None:
 def test_an_associated_job_reads_the_main_repos_spec(
     root: Path, spec: str, code: int, out: str
 ) -> None:
-    """AC11.0: `a` carries no specs; its job is gated by `r`'s SPEC on `r`'s work branch."""
+    """AC11.0: `a` carries no specs; its job reads `r`'s release on `r`'s work branch."""
     associate(root, spec)
+    if spec == "Draft":
+        _set_release(root, "DEFINITION")
     result = _run(root, "new", "a", JOB)
     assert (result.returncode, result.stdout.strip()) == (code, f"[ok] {root / out}" if out else "")
     assert [f.split(" new ")[-1] for f in _fixes(result)] == (
