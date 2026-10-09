@@ -82,15 +82,12 @@ def window_start(state: State) -> str:
     return str(start)
 
 
-def open_bug_ids(specs: Path, release_id: str, release_dir: Path) -> list[str]:
-    """Open bugs found in the live candidate, sorted for deterministic refusals."""
-    candidate = (candidate_dir(release_dir) or release_dir).name
+def open_bug_ids(specs: Path) -> list[str]:
+    """Every persisted open bug id, sorted for deterministic refusals."""
     return sorted(
         str(record["id"])
         for record in records(specs / "bugs" / "BUGS.jsonl")
-        if record.get("status") == "open"
-        and record.get("found_in") == {"release": release_id, "rc": candidate}
-        and record.get("id")
+        if record.get("status") == "open" and record.get("id")
     )
 
 

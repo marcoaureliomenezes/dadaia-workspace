@@ -134,7 +134,7 @@ def _ship(args: argparse.Namespace, specs: Path) -> int:
                              f"{SCRIPT} ship --sha {sha}"), SHIP_PR)  # fmt: skip
     if found := ship_findings(specs):
         raise Refusal(found[0]["message"], found[0]["fix"])
-    open_ids = open_bug_ids(specs, live.release_id, live.release_dir)
+    open_ids = open_bug_ids(specs)
     allowed = sorted(set(args.allow_open))
     if len(allowed) != len(args.allow_open):
         raise Refusal(
