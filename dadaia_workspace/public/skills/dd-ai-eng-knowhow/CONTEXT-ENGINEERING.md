@@ -17,12 +17,12 @@ The craft: maximize behavior-change-per-token under a hard context budget, keepi
 cost(file) = tokens(file) x invocations(file) x unit_price(tier)
 ```
 
-- A persona body is re-read on every invocation; a skill body only when loaded; an `always_on` rule on every turn of every in-scope agent.
+- A persona body is re-read on every invocation; a skill body only when loaded; the root `AGENTS.md` map on every turn of every agent.
 - The first question for any line: does it change behavior often enough to justify its lifetime token cost in this layer?
 
 | Layer | Read frequency | Rule of thumb |
 |---|---|---|
-| `always_on` rule | Every turn, every in-scope agent | Reserve for invariants that must never be forgotten; keep terse |
+| Root `AGENTS.md` map | Every turn, every agent | Reserve for invariants that must never be forgotten; keep terse |
 | Agent persona body | Every invocation of that one agent | Lean on frontmatter for hard rules |
 | Skill body | Only when the skill is loaded | Right home for deep protocols and tables |
 | Frontmatter (any) | Parsed by tooling, not re-reasoned | Put machine-enforced hard rules here |
@@ -40,7 +40,7 @@ cost(file) = tokens(file) x invocations(file) x unit_price(tier)
 - "First... then... however... unless..." prose is almost always a table in disguise — convert it.
 - Inline content only if: short (<=~3 lines), needed on essentially every invocation, and changes behavior at the point of reading.
 - Otherwise link to the canonical source and carry only a one-line orientation pointer.
-- Shared protocol (workspace-protocol, tmp-file guardrail, SDD gate flow, task-manager flow) is authored once, referenced everywhere.
+- Shared protocol is authored once, referenced everywhere.
 - Restating shared protocol in N personas multiplies lifetime cost by N and drifts N ways.
 - Smell: the same paragraph appears verbatim in two or more files — a missing link or a missing skill (see §5).
 - Token estimation for audits: `tokens ~= words x 1.33` (English), `tokens ~= words x 1.20` (Portuguese).
@@ -54,28 +54,22 @@ cost(file) = tokens(file) x invocations(file) x unit_price(tier)
 - Refusal templates must be encountered before the agent reasons itself into accepting an out-of-scope task.
 - Reordering sections moves the agent's attention and changes which constraints dominate on conflict.
 
-| # | Section | Answers the question | Form |
-|---|---|---|---|
-| 1 | Identity | What IS this agent? | One paragraph |
-| 2 | Scope | What does it write / NOT write? | Table preferred |
-| 3 | Forbidden actions + `[SCOPE ERROR]` | How does it refuse? | Verbatim refusal block |
-| 4 | Stack expertise | What technical depth does it have? | Sub-headed by stack |
-| 5 | Workflow protocol | TDD / task-manager / release resolution | Steps |
-| 6 | Security rules | What must it never do? | OWASP-style table where applicable |
-| 7 | Collaboration patterns | Who does it hand off to? | Named-agent table |
-| 8 | Write permissions | Where may it write? | Table |
-| 9 | Report contract | What does it emit at the end? | Steps / template ref |
-| 10 | CLI reference | What tools does it drive? | Command list |
+| # | Section | Answers the question |
+|---|---|---|
+| 1 | Owns | What does it write, and what is its gate role? |
+| 2 | Never | What must it refuse, and how (the `[SCOPE ERROR]` block)? |
+| 3 | Procedure | How does it work? |
+| 4 | Outputs | What does it emit, and where may it write? |
+| 5 | References | What does it consult? |
 
-- Ordering logic: who -> what -> how-it-refuses -> what-it-knows -> how-it-works -> what-it-must-not.
-- Ordering logic (continued): who-it-talks-to -> where-it-writes -> what-it-emits -> how-it-operates.
-- Refusal (3) precedes capability (4) deliberately — an agent that knows its limits before its powers is harder to talk out of scope.
+- Ordering logic: what-it-owns -> what-it-refuses -> how-it-works -> what-it-emits -> what-it-consults.
+- Refusal (2) precedes procedure (3) deliberately — an agent that knows its limits before its powers is harder to talk out of scope.
 - Do not reorder without a documented reason; reordering changes behavior.
 
 Audit protocol — detecting order drift:
 
 1. Extract the section spine: `grep -n '^## ' <persona>.md`.
-2. Map each heading to a canonical slot (1..10); omission is allowed, reordering is not.
+2. Map each heading to a canonical slot (1..5); omission is allowed, reordering is not.
 3. Verify mapped slot numbers are strictly non-decreasing top-to-bottom.
 4. Any inversion (a later slot above an earlier one) is an ORDER-DRIFT finding.
 5. Classify: inversion of 1/2/3 = HIGH; inversion among 4..10 = MEDIUM; extra non-canonical section = LOW.

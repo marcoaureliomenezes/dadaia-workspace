@@ -25,7 +25,6 @@ A decision surface, not a doc mirror — official docs are an on-demand index at
 | Most-recent skill invocation (partially re-attached, capped) | Earlier skill invocations beyond the re-attach budget |
 
 - A behavior that must hold across a long session belongs in CLAUDE.md/a rule (survives) or a hook (deterministic).
-- Put a must-hold behavior in CLAUDE.md, a rule or a hook.
 - A skill whose guidance is lost at compaction is placed at the wrong layer — promote it to a rule, or re-invoke it.
 - Subagents isolate a big exploration in its own context window and return only a summary.
 
@@ -47,7 +46,6 @@ A decision surface, not a doc mirror — official docs are an on-demand index at
 - A long CLAUDE.md lowers adherence.
 - A "see X" prose pointer loads nothing in Claude Code — only an `@import` or a symlink pulls a file in.
 - Personal machine-local content goes to `~/.claude/` and `CLAUDE.local.md` (gitignored).
-- Keep machine-local content in `~/.claude/`.
 
 ---
 
@@ -205,8 +203,6 @@ Must it hold EVERY time, regardless of what the model decides?
 ```
 
 - Prune stale/dead permission entries and machine-specific paths from settings before they mislead.
-- Never project a `.claude/workflows/` reference directory — no workflow engine exists.
-- The ordered SDD flow is agent-dispatched, never a declarative workflow file Claude Code executes.
 
 ---
 

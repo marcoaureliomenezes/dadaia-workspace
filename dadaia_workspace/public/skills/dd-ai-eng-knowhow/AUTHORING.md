@@ -129,7 +129,6 @@ decision-rich part.
 - When a skill branches, the branch decision is the FIRST step — picking the wrong branch wastes the whole run.
 - Templates and formats are given as fenced blocks where they are used.
 - Human gates are explicit: finding facts is the agent's job (inspect before asking); decisions are the operator's — put each one to them and wait.
-- An interview puts one question per `AskUserQuestion` call, carrying a recommended answer (ADR 0165).
 
 ---
 
@@ -138,7 +137,7 @@ decision-rich part.
 A skill moves with its ecosystem: any authoring act (create, merge, rename, delete, restructure) carries in the same change:
 
 1. `entities/behavior-map.json` — the row (exactly one per skill) and `declared_overlaps`.
-2. Persona `skills:` grants — the orphan checker requires every model-invoked skill granted somewhere; a `disable-model-invocation` skill is exempt.
+2. Persona `skills:` grants.
 3. Law citations — the root map and every scoped `AGENTS.md` SOURCE under `public/` that names the skill.
 4. Cross-citations in sibling skills (the citation contract test checks every path-shaped token in `public/**`).
 5. Reprojection — per `.dadaia/AGENTS.md` §4, `public doctor` `[ok]`; stale projected directories removed from every harness target.

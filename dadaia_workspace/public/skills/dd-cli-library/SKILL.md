@@ -25,7 +25,7 @@ line here and `--help` disagree, `--help` wins.
 
 ## Workspace state is CLI-owned
 
-- `.dadaia/states/`, `repos/` clones and `.dadaia/dist/` change only through `context create`, `alive`, `dead` and `import`/`export`.
+- Each `.dadaia/states/` file changes through its owning verb (`.dadaia/states/AGENTS.md`); `repos/` clones and `.dadaia/dist/` only through `context create`, `alive`, `dead` and `import`/`export`.
 - Onboarding levels: the root `AGENTS.md` map §7; retire with `context dead` → `context delete`.
 - Verb index (flags: `--help`): `.dadaia/.venv/bin/dadaia init`, `.dadaia/.venv/bin/dadaia export`, `.dadaia/.venv/bin/dadaia import`, `.dadaia/.venv/bin/dadaia context list`, `.dadaia/.venv/bin/dadaia context alive`, `.dadaia/.venv/bin/dadaia context delete`, `.dadaia/.venv/bin/dadaia context repo add`, `.dadaia/.venv/bin/dadaia context repo remove`, `.dadaia/.venv/bin/dadaia ci push-gate-check`, `.dadaia/.venv/bin/dadaia specs upgrade`, `.dadaia/.venv/bin/dadaia migrate`, `.dadaia/.venv/bin/dadaia help tree`.
 

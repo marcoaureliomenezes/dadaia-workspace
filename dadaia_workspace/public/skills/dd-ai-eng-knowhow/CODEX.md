@@ -111,7 +111,7 @@ prefix_rule(
 |---|---|---|---|
 | `name` | required | required | keep identical across both |
 | `description` | required (trigger) | required (trigger) | one description that triggers in both |
-| `applyTo` | path glob, honored | not a Codex primitive | safe to include; Codex ignores it gracefully |
+| `applyTo` | ignored (`paths:` is native) | not a Codex primitive | safe to include; Codex ignores it gracefully |
 | richer CC-only keys | may exist | unknown keys ignored | never depend on a CC-only key for correctness |
 
 - dadaia projects one canonical `public/skills/<name>/SKILL.md` into both `.claude/` and `.codex`/`.agents`.
