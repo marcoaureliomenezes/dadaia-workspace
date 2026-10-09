@@ -3,7 +3,7 @@
 Scope: this file governs only `specs/releases/`.
 
 - `RELEASE_PY` below is `python3 .agents/skills/dd-release-implementation/scripts/release.py` — this ledger's ONE writer.
-- `phase` and the `defined`/`implemented` milestones move only by `RELEASE_PY phase`; `shipped` only by `RELEASE_PY ship`.
+- `phase` moves only by `RELEASE_PY new` (DEFINITION) and `RELEASE_PY phase`, the `defined`/`implemented` milestones only by `RELEASE_PY phase`; `shipped` only by `RELEASE_PY ship`.
 
 - Exactly ONE live release directory, ever: a bare SemVer id, created only by `RELEASE_PY new <id>`,
   which writes the next `rc-<N>/SPEC.md` + `_RELEASE.json` (DEFINITION) in one transaction and refuses a second one.
@@ -28,7 +28,7 @@ Scope: this file governs only `specs/releases/`.
 
 ## 3. Tasks — the auditable trace
 
-- Read SPEC, PLAN and every job file before implementing; the approval precondition's home is `specs/AGENTS.md`. Historical `TASKS.md` files remain readable, but current candidates carry tasks only in `tasks/<job>.md` (`dd-release-definition` §5).
+- Read SPEC, PLAN and every job file before implementing; the approval precondition's home is `specs/AGENTS.md`. Tasks live in `tasks/job<n>.md` (`dd-release-definition` §5); a closed rc keeps its `TASKS.md`.
 - The `W:` is exact: every file the task touches, with derived files it re-records; the commit body names each file and why. Current task ids are `J<n>.T<k>`.
 
 ## 4. _RELEASE.json

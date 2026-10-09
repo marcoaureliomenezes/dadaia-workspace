@@ -40,7 +40,7 @@ Scope: this file governs only `specs/bugs/`.
 
 - Register a new bug with `bugs.py append --bug-id <slug> --title ... --severity ...` and the remaining required flags.
 - Every record change is one governance verb: `bugs.py append|update|resolve|supersede|reject|archive`.
-- `status` and `closed_at` change only through the four terminal transitions, never through `--set`.
+- `status` and `closed_at` change only through the three terminal transitions (`resolve`, `supersede`, `reject`), never through `--set`.
 
 ## 5. Duties this ledger carries, and where each lives
 

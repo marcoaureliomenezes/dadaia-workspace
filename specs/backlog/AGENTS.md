@@ -2,7 +2,7 @@
 
 Scope: this file governs only `specs/backlog/`.
 
-- `BACKLOG_PY` is `python3 .agents/skills/dd-backlog-definition/scripts/backlog.py` — this ledger's ONE writer.
+- `BACKLOG_PY` is `python3 .agents/skills/dd-backlog-definition/scripts/backlog.py` — the only verb that writes this ledger; it never moves a status after `new`.
 - Create and append entries with `BACKLOG_PY new <slug>`.
 - The backlog is the operator's demand queue: only the operator creates demand, `dd-product-engineer` curates `active[]`.
 - An entry materializes only through the main thread's operator-facing intake report; an operator-ratified in-release deferral already counts as intake.
@@ -19,7 +19,7 @@ Scope: this file governs only `specs/backlog/`.
 
 - `<slug>` matches `^[a-z][a-z0-9-]+$`.
 - Every `active[]` entry carries five required fields: `title`, `opened` (`YYYY-MM-DD`), `status`, `description`, `provenance`.
-- `status` is `idea`, `candidate`, or another lowercase live (non-terminal) token.
+- `BACKLOG_PY new` writes `status: idea`; a later lowercase live token (`candidate`, …) is a hand edit, which `BACKLOG_PY check` validates: no terminal status on a live entry, and a status past `idea` binds `intents[]`.
 - Optional: `intents` (§4) and `relates` (`BACKLOG_PY new --help`).
 - An entry leaves only by `BACKLOG_PY exit <slug> --disposition …`, which removes the `active[]` object and appends its one histo record.
 
