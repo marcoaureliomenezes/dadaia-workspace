@@ -49,6 +49,7 @@ from dadaia_workspace.infrastructure.certification_process import (
     CertificationProcessResult,
     SubprocessCertificationProcess,
 )
+from tests.fixtures.harness_env import suite_env
 from tests.fixtures.stores import own_venv_python, own_venv_workspace
 
 
@@ -74,7 +75,10 @@ class _Children(SubprocessCertificationProcess):
             return CertificationProcessResult(0, "", "")
         path = os.pathsep.join([str((env or {}).get("PYTHONPATH")), *site.getsitepackages()])
         argv = [self._python if argv[0] == sys.executable else argv[0], *argv[1:]]
-        return super().run(argv, cwd=cwd, env={**(env or {}), "PYTHONPATH": path}, timeout=timeout)
+        child_env = suite_env(
+            os.environ, Path.home(), overrides={**(env or {}), "PYTHONPATH": path}
+        )
+        return super().run(argv, cwd=cwd, env=child_env, timeout=timeout)
 
 
 @pytest.mark.medium

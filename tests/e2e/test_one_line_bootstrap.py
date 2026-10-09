@@ -352,7 +352,7 @@ def test_the_workspace_venv_carries_the_bootstrappers_own_bytes(tmp_path: Path, 
         capture_output=True,
         text=True,
         timeout=_TIMEOUT,
-        env={k: v for k, v in _child_env(home).items() if k != "PYTHONPATH"},
+        env=suite_env(_child_env(home), home, unset=("PYTHONPATH",)),
     )
     assert help_text.returncode == 0, help_text.stderr
     assert "DIR" in help_text.stdout, (

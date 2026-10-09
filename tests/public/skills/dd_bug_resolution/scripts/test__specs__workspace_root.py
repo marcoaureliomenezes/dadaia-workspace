@@ -13,6 +13,7 @@ from pathlib import Path
 import pytest
 
 from dadaia_workspace.infrastructure.ledger_scripts import load_owner
+from tests.fixtures.harness_env import suite_env
 from tests.helpers.skill_scripts import stage_skill_scripts
 from tests.helpers.worktree_ws import JOB, git, make_workspace, run
 
@@ -37,7 +38,7 @@ def ws(tmp_path: Path) -> Path:
 def _fenced(ws: Path, script: str, *argv: str) -> subprocess.CompletedProcess[str]:
     """*script* of the staged skills, run from `ws/folder` with the workspace fenced."""
     path = next((ws / ".agents/skills").glob(f"*/scripts/{script}"))
-    env = {**os.environ, "DADAIA_FENCED_ROOTS": str(ws)}
+    env = suite_env(os.environ, Path.home(), overrides={"DADAIA_FENCED_ROOTS": str(ws)})
     return subprocess.run(
         [sys.executable, str(path), *argv],
         cwd=ws / "folder", env=env, capture_output=True, text=True,
