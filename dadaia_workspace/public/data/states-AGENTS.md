@@ -2,7 +2,7 @@
 
 Scope: this file governs `.dadaia/states/**`.
 
-Each state file is written only by its owning `dadaia` verb.
+Each state file is written only by its owning verb or skill script.
 
 ## 1. Canon
 
