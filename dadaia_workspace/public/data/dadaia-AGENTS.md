@@ -16,6 +16,7 @@
 - A root in `DADAIA_FENCED_ROOTS` is never resolved: no dadaia process or child acts on it.
 - `.dadaia/.venv/bin/dadaia context bind <ctx>` is one verb, no mode or release; the sole memory-injection trigger; the session id comes from the environment only; a subagent inherits its parent's session id and binding and never binds.
 - Scope = the bound context's main and associated repos, judged under `repos/<slug>/` and `worktrees/<slug>/`; binding is optional, an ADDITIVE write needs none.
+- An id-bearing session with no bind owns no repo; an unregistered slug and a root path are not scope-judged.
 - Races are surfaced, not prevented; zero ALIVE -> alert the operator.
 - One harness session per checked-out tree; parallel work: `worktrees/AGENTS.md`.
 - Frozen context surface: `context create` clones, hooks and ALIVEs; binding is `context bind`'s.
