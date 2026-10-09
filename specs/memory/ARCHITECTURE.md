@@ -73,10 +73,10 @@ Measured by: `pytest tests/core/test_handoff_index__handoff_schema_contract.py`.
 ADR: 0004 (accepted)
 Rationale: an open envelope accumulates fields until no consumer can fold it.
 
-### P-17 · We map every core skill and every scoped `AGENTS.md` source to exactly one `DADAIA.md` section, every section to at least one owner, with content hashes re-recorded only by review.
-Measured by: `pytest tests/infrastructure/test_entity_doctor.py` (bijection, hash tuples, citation check, invocation grants).
-ADR: none
-Rationale: law that no asset owns is law nobody applies.
+### P-17 · We keep the agentic-law registry structurally complete: every shipped skill and scoped `AGENTS.md` source maps to one law section, every section has an owner, persona grants exclude non-invokable skills, source and projection references resolve, and law citations name live paths, commands and body targets.
+Measured by: `pytest tests/infrastructure/test_entity_doctor.py`.
+ADR: 0238 (accepted)
+Rationale: structural ownership and resolvable relationships keep agentic law reachable and enforceable without duplicating its content.
 
 ### P-30 · The version, the CHANGELOG section and the tag of a release come from release-please over Conventional Commits, and promote is merging its release PR.
 Measured by: `poetry run python scripts/guards/run.py` prints `PASS release-workflow-canon` (the release workflow, the release-please manifest and config, the `pyproject.toml` version equal to the CHANGELOG's top dated section).

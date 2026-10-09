@@ -28,11 +28,6 @@ Measured by: `pytest --collect-only -q` exits 0 under `--strict-markers` in `pyp
 ADR: 0167 (accepted)
 Rationale: a marker known to one file and unknown to the other is a silent exclusion lane.
 
-### P-29 · We derive every human- and agent-facing document from a named memory atom under a content hash: each `## ` section of `README.md`, `llms.txt` and every `docs/*.md` names its atom and the atom's current sha256, and `docs/cli.md` is the committed output of `dadaia help tree`.
-Measured by: `pytest tests/contract/test_docs_derived_from_memory.py`.
-ADR: 0012 (accepted)
-Rationale: a document written beside memory rots; one that names its source is red the moment the source moves.
-
 ### P-33 · Only the library's own `.github/workflows/eval.yml` calls a model API, and only in `workflow_dispatch` or `schedule` jobs, reading the model secret at job level from the `evals` environment and scanning every upload first (ADR 0217); no other library workflow uses an `anthropics/*` action or references a model secret; the shipped law states no rule about a user's CI.
 Measured by: `poetry run python scripts/guards/run.py` prints `PASS no-model-api-in-ci`.
 ADR: 0217 (accepted, superseding 0177 and 0179)
