@@ -203,8 +203,17 @@ def main(argv: list[str] | None = None) -> int:
     if args.verb == "check":
         findings = check(specs)
         errors = [f for f in findings if f["verdict"] == "error"]
-        # JSON preserves informational trace rows; only errors control the exit status.
-        print(json.dumps(findings, indent=2)) if args.json else [
+        origin_rows = [f for f in findings if f["message"].startswith("Origin ")]
+        publish_origin = bool(origin_rows) and all(
+            f["verdict"] == "info" and f["message"].endswith(" traced") for f in origin_rows
+        )
+        json_findings = [
+            f
+            for f in findings
+            if f["verdict"] == "error" or (publish_origin and f["message"].startswith("Origin "))
+        ]
+        # JSON adds Origin trace information; only errors control the exit status.
+        print(json.dumps(json_findings, indent=2)) if args.json else [
             print(f"{CODE} {f['verdict']} {f['path']}:{f['line']} {f['message']}") for f in findings
         ]
         return 1 if errors else 0
