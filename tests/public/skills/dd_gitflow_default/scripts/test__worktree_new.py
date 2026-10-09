@@ -20,8 +20,60 @@ from tests.helpers.worktree_ws import run as _run
 
 
 @pytest.fixture
-def root(tmp_path: Path) -> Path:
+def definition_root(tmp_path: Path) -> Path:
     return make_workspace(tmp_path)
+
+
+def _set_release(root: Path, phase: str, *, plan: str = "Approved") -> None:
+    """Put the fake work branch in one coherent release phase."""
+    repo = root / "repos/r"
+    release = repo / "specs/releases/0.5.0"
+    plan_md = release / "rc-1/PLAN.md"
+    plan_md.write_text(plan_md.read_text().replace("**Status:** Approved", f"**Status:** {plan}"))
+    state_path = release / "_RELEASE.json"
+    state = json.loads(state_path.read_text())
+    state["phase"] = phase
+    state["defined"] = (
+        {"sha": "def1234", "ts": "2026-10-09T10:00:00Z"} if phase != "DEFINITION" else None
+    )
+    state["implemented"] = (
+        {"sha": "abc1234", "ts": "2026-10-09T11:00:00Z"} if phase == "CLOSURE" else None
+    )
+    state_path.write_text(json.dumps(state))
+    _git(repo, "add", "specs/releases")
+    _git(repo, "commit", "-qm", f"release {phase}")
+    _git(repo, "branch", "-f", "feature/0.5.0", "HEAD")
+
+
+@pytest.fixture
+def root(definition_root: Path) -> Path:
+    _set_release(definition_root, "IMPLEMENTATION")
+    return definition_root
+
+
+def test_a_release_job_needs_the_implementation_phase(definition_root: Path) -> None:
+    """AC2.1: an Approved SPEC does not start implementation while PLAN is still Draft."""
+    _set_release(definition_root, "DEFINITION", plan="Draft")
+    repo = definition_root / "repos/r"
+
+    refused = _run(definition_root, "new", "r", JOB)
+
+    assert refused.returncode != 0
+    assert _fixes(refused) == [f"fix: {_script()} new r 0.5.0-rc1/define"]
+    assert not (definition_root / "worktrees/r" / JOB).exists()
+    assert _git(repo, "branch", "--list", f"wt/{JOB}").strip() == ""
+
+
+def test_reconcile_also_opens_in_closure(definition_root: Path) -> None:
+    """AC2.2: reconciliation spans the IMPLEMENTATION-to-CLOSURE boundary."""
+    _set_release(definition_root, "CLOSURE")
+
+    opened = _run(definition_root, "new", "r", "0.5.0-rc1/reconcile")
+
+    assert (opened.returncode, opened.stdout) == (
+        0,
+        f"[ok] {definition_root / 'worktrees/r/0.5.0-rc1/reconcile'}\n",
+    )
 
 
 def test_new_makes_each_shape_on_its_branch_and_base(root: Path) -> None:
