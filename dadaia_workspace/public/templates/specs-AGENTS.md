@@ -19,7 +19,7 @@ Scope: this file governs only the `specs/` tree of one Spec Context Project.
 ## 3. Before implementing
 
 - The live release's `_RELEASE.json` `phase` reads `IMPLEMENTATION`: `release.py phase` enters it only when the candidate's SPEC and PLAN both carry `**Status:** Approved`.
-- The task is a row of its job file (`rc-<N>/tasks/<job>.md`), and its declared write set names every file touched.
+- The task is a row of its job file (`rc-<N>/tasks/job<n>.md`), and its declared write set names every file touched.
 - Any item missing: stop and emit the §7 `[SDD BLOCKED]` block naming it. A hotfix job needs only its open bug (`specs/bugs/AGENTS.md` §2).
 
 ## 4. Artifact authority
@@ -28,7 +28,7 @@ Scope: this file governs only the `specs/` tree of one Spec Context Project.
 |---|---|
 | `constitution.md` | operator, or `dd-product-engineer` under approved governance work |
 | `releases/<id>/_RELEASE.json` | `python3 .agents/skills/dd-release-implementation/scripts/release.py new\|phase\|memory\|ship`; `log` entries per `dd-release-implementation`'s `RELEASE-EVENTS.md` table |
-| `releases/<id>/rc-<N>/{SPEC,PLAN}.md`, `rc-<N>/tasks/<job>.md` (read-only after its closure; archived whole at promote) | `dd-product-engineer` (SPEC), `dd-software-engineer` (PLAN, job files) |
+| `releases/<id>/rc-<N>/{SPEC,PLAN}.md`, `rc-<N>/tasks/job<n>.md` (read-only after its closure; archived whole at promote) | `dd-product-engineer` (SPEC), `dd-software-engineer` (PLAN, job files) |
 | `memory/**` | `dd-product-engineer`; phases and tiers: `memory/AGENTS.md` §1 |
 | `backlog/**` | `dd-product-engineer`; entries exit by `python3 .agents/skills/dd-backlog-definition/scripts/backlog.py exit` |
 | `bugs/**` | any agent, by verbs only; propose and confirm: `bugs/AGENTS.md` |
