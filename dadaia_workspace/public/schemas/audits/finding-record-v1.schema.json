@@ -46,9 +46,9 @@
     },
     "disposition": {
       "type": "string",
-      "enum": ["open", "resolved", "superseded", "deferred", "rejected"],
+      "enum": ["open", "resolved", "superseded", "rejected"],
       "x-mutability": "mutable-governance",
-      "description": "Governance state, appended as `open` and rewritten in place by `dd-audit-project/scripts/audit.py disposition` (0.4.7 FR4). The terminal words are exactly `audit.py`'s DISPOSITIONS — one finding vocabulary; the historical `fixed` was renamed to `resolved` with zero committed FINDINGS.jsonl to migrate."
+      "description": "Governance state, appended as `open` and rewritten in place by `audit.py disposition`."
     },
     "release": {
       "type": ["string", "null"],

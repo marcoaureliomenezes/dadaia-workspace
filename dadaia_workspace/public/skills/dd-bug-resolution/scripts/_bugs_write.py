@@ -28,9 +28,9 @@ CORE = tuple(k for k, v in _MUTABILITY.items() if v == "immutable-core")
 GOVERNANCE = tuple(k for k, v in _MUTABILITY.items() if v == "mutable-governance")
 WRITE_ONCE = tuple(k for k, v in _MUTABILITY.items() if v == "write-once")
 #: The fields a verb owns, so `update` refuses them and names the verb.
-_TRANSITIONS = ("resolve", "supersede", "defer", "reject")
+_TRANSITIONS = ("resolve", "supersede", "reject")
 _VERB_OWNED = {"status": _TRANSITIONS, "closed_at": _TRANSITIONS, "superseded_by": ("supersede",),
-               "resolved_release": ("resolve",)}  # fmt: skip
+               }  # fmt: skip
 _SCRIPT = script(Path(__file__).parent / "bugs.py")
 
 
@@ -125,19 +125,12 @@ def _parsed(key: str, value: str) -> Any:
         ) from None
 
 
-def archive(records: Records, ids: list[str], adr: str, accepted: set[str]) -> Records:
-    """The ledger without the terminal records *ids*; each moved record gains
-    ``archived_by: adr`` in place, since the store archives the very records this drops
-    (a record leaves only by an accepted ADR)."""
-    if adr not in accepted:
-        raise Refusal(f"ADR {adr!r} is not accepted in ADRs/decisions.jsonl — a record leaves "
-                      "the ledger only by an accepted ADR", f"Operator action: accept ADR {adr} first")  # fmt: skip
+def archive(records: Records, ids: list[str]) -> Records:
+    """The ledger without exactly the named terminal records."""
     moving = [by_id(records, bug_id) for bug_id in ids]
     if still := [str(r["id"]) for r in moving if r.get("status") not in TERMINAL]:
         raise Refusal(f"{', '.join(still)} still open — only a terminal record is archived",
                       f"{_SCRIPT} status")  # fmt: skip
-    for record in moving:
-        record["archived_by"] = adr
     return [r for r in records if r not in moving]
 
 

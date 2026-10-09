@@ -95,7 +95,7 @@ def close(specs: Path, audit: str, sha: str) -> str:
         )
     pillars = Counter(str(record.get("pillar")) for record in records)
     verdicts = Counter(str(record.get("disposition")) for record in records)
-    verdict = "resolved" if releases else "deferred" if verdicts["deferred"] else "rejected"
+    verdict = "resolved" if releases else "rejected"
     append_histo(specs, {
         "id": audit,
         "ts": datetime.now(tz=UTC).strftime("%Y-%m-%d"),

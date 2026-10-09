@@ -10,7 +10,6 @@ from __future__ import annotations
 
 import json
 import re
-import subprocess
 import sys
 from pathlib import Path
 from typing import Any
@@ -54,14 +53,14 @@ _POINTER = {
 #: The one operator act for a record no verb can point back alone (ADR 0158: no placeholder).
 _ACT = {
     "backlog": "backlog entry {i} already exited naming another release",
-    "bugs": "resolve bug {i} in release {r} (`bugs.py resolve {i}` "
-            "with --cause, --caused-by, --solution, --evidence-loop and --evidence-seam)",
+    "bugs": "resolve bug {i} (`bugs.py resolve {i}` "
+            "with --cause, --caused-by, --solution and --fix-sha)",
     "findings": "finding {i}'s audit closed without naming release {r}",
 }  # fmt: skip
 
 
 def _trace(
-    specs: Path, release: str, carried: dict[str, list[str]]
+    specs: Path, release: str, carried: dict[str, list[str]], summary: str = ""
 ) -> list[tuple[str, str, str, bool]]:
     """Each carried id as ``(kind, id, standing, live)`` (ADR 0127), asked of its OWNING ledger,
     live or archived: ``traced`` when its record points back to *release* (a delivered or
@@ -86,6 +85,8 @@ def _trace(
     }  # fmt: skip
 
     def standing(kind: str, i: str, seen: frozenset[str] = frozenset()) -> str:
+        if summary and re.search(rf"(?<![\w-]){re.escape(i)}(?![\w-])", summary):
+            return "traced"
         record = ledgers[kind].get(
             i, closed.get(i.rpartition("-F")[0]) if kind == "findings" else None
         )
@@ -143,7 +144,15 @@ def _origin_findings(specs: Path) -> list[dict[str, Any]]:
     ]  # fmt: skip
     line = origin_line(text)
     try:
-        rows = _trace(specs, live.release_id, origin(text))
+        summary = next(
+            (
+                str(entry.get("text") or "")
+                for entry in reversed(state.get("log") or [])
+                if entry.get("kind") == "summary"
+            ),
+            "",
+        )
+        rows = _trace(specs, live.release_id, origin(text), summary)
     except ValueError as error:
         return out + [finding(rel, line, str(error), f"Operator action: rewrite the Origin "
                               f"line {line} of {spec} to the Origin grammar ({error})")]  # fmt: skip
@@ -280,49 +289,9 @@ def _memory_findings(specs: Path) -> list[dict[str, Any]]:
     return [finding(f"releases/{live.release_id}/{STATE}", 1, message, fix)]
 
 
-#: How `bugs.py balance --check` words a stale block, the one refusal of it that is a warning here.
-_STALE = "differs from its regeneration"
-
-
-def _balance_findings(specs: Path) -> list[dict[str, Any]]:
-    """CLOSURE: `QUALITY.md`'s `## Bugs` block, once it has one, equals its regeneration —
-    asked of `bugs.py balance --check`, the bug skill's own verb (AC4.4); never a doctor lane.
-    A stale block is a warning, never a refusal; a ledger the verb cannot read is an error."""
-    try:
-        live = live_release(specs)
-    except Refusal:
-        return []  # the tree walk reports a missing or doubled live release
-    if live.state.get("phase") != "CLOSURE" or not (specs / "memory" / "QUALITY.md").is_file():
-        return []
-    try:
-        _bugs("balance", "--check", specs=specs)
-    except Refusal as refusal:
-        row = finding("memory/QUALITY.md", 1, str(refusal), refusal.fix)
-        return [
-            {**row, "verdict": "warning"} if str(refusal).endswith(_STALE) else row
-        ]  # stale blocks nothing
-    return []
-
-
-def _bugs(*argv: str, specs: Path) -> None:
-    """Run `bugs.py <argv>`; its refusal (`[error] why`, `fix: how`) is raised as ours, a death outside one named."""
-    bugs, command = _SKILLS / "dd-bug-resolution" / "scripts" / "bugs.py", " ".join(argv)
-    done = subprocess.run([sys.executable, str(bugs), *argv, "--specs", str(specs)],
-                          stdin=subprocess.DEVNULL, capture_output=True, text=True, encoding="utf-8", errors="replace")  # fmt: skip
-    if done.returncode:
-        lines = done.stderr.strip().splitlines()
-        why, fix = (
-            next((x[len(p) :] for x in lines if x.startswith(p)), "") for p in ("[error] ", "fix: ")
-        )
-        if not (why and fix):
-            why = f"`bugs.py {command}` exited {done.returncode}"
-            fix = f"Operator action: run `{with_specs(f'{script(bugs)} {command}', specs)}` and read its output"
-        raise Refusal(why, fix)
-
-
 def refuse_open_bugs(specs: Path, release_id: str, release_dir: Path) -> None:
-    """Relay `bugs.py status --found-in` for the release's live candidate."""
-    _bugs("status", "--found-in", f"{release_id}/{(candidate_dir(release_dir) or release_dir).name}", specs=specs)  # fmt: skip
+    """Candidate stacking has no bug gate; ship judges all persisted open records."""
+    del specs, release_id, release_dir
 
 
 def tree_findings(specs: Path) -> list[dict[str, Any]]:
@@ -365,12 +334,11 @@ def tree_findings(specs: Path) -> list[dict[str, Any]]:
 
 def check(specs: Path) -> list[dict[str, Any]]:
     """The ONE release validator (the doctor delegates here): the tree, the live
-    candidate's Origin, then the live CLOSURE's memory record and bug balance block."""
+    candidate's Origin, then the live CLOSURE's memory record."""
     return (
         tree_findings(specs)
         + _origin_findings(specs)
         + _memory_findings(specs)
-        + _balance_findings(specs)
     )
 
 
@@ -388,5 +356,16 @@ def ship_findings(specs: Path) -> list[dict[str, Any]]:
         found.append(finding(rel, 1, f"release {live.release_id} is live and already "
                      f"archived at {archive}", f"Operator action: decide which of "
                      f"{live.release_dir.resolve()} and {archive.resolve()} is release "
-                     f"{live.release_id}; a release ships once"))  # fmt: skip
+                                    f"{live.release_id}; a release ships once"))  # fmt: skip
+    for record in records(specs / "bugs/BUGS.jsonl"):
+        if record.get("status") == "open":
+            bug_id = str(record.get("id"))
+            found.append(
+                finding(
+                    "bugs/BUGS.jsonl",
+                    1,
+                    f"open bug {bug_id} blocks ship",
+                    f"Operator action: resolve {bug_id} before ship",
+                )
+            )
     return found

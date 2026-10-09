@@ -45,7 +45,7 @@ def _parser() -> argparse.ArgumentParser:
             command.add_argument("audit", help="the audit directory name under specs/audits/")
         if verb == "disposition":
             command.add_argument("finding", help="the finding id, e.g. 20260101-slug-F003")
-            command.add_argument("--disposition", required=True,
+            command.add_argument("--disposition", required=True, choices=DISPOSITIONS,
                                  help=f"one of {'|'.join(DISPOSITIONS)}")  # fmt: skip
             command.add_argument("--release", help="the remediation release that closed it")
             command.add_argument("--reason", help="why the finding was not fixed")
