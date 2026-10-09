@@ -7,6 +7,7 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any
 
+from dadaia_workspace.core.atomic_write import atomic_write
 from dadaia_workspace.infrastructure.json_context_store import JsonContextStore
 from dadaia_workspace.infrastructure.provider_version import provider_version
 
@@ -22,13 +23,6 @@ class ReconcileResult:
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
-
-
-def _restore_file(target: Path, content: bytes | None) -> None:
-    if content is None:
-        target.unlink(missing_ok=True)
-    else:
-        target.write_bytes(content)
 
 
 def reconcile_workspace(
@@ -111,7 +105,7 @@ def reconcile_workspace(
         steps.append("capability-canary")
     except Exception as exc:  # noqa: BLE001 - transaction boundary returns structured failure.
         context_store.restore(registry_snapshot)
-        _restore_file(primary, primary_snapshot)
+        atomic_write(primary, primary_snapshot)
         return ReconcileResult(
             ok=False,
             expected_version=expected_version,

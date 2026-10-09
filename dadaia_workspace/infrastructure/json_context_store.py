@@ -111,10 +111,7 @@ class JsonContextStore:
         return self._path.read_bytes() if self._path.is_file() else None
 
     def restore(self, content: bytes | None) -> None:
-        if content is None:
-            self._path.unlink(missing_ok=True)
-        else:
-            atomic_write(self._path, content)
+        atomic_write(self._path, content)
 
     def save(self, ctx: SpecContextProject) -> None:
         data = _load(self._path)

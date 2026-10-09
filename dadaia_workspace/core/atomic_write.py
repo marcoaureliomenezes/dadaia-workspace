@@ -26,20 +26,21 @@ from pathlib import Path
 
 def atomic_write(
     path: Path,
-    content: str | bytes,
+    content: str | bytes | None,
     *,
     preserve_mode: bool = False,
     newline: str | None = "",
     ensure_parent: bool = False,
 ) -> None:
-    """Write ``content`` to ``path`` atomically via a uuid-suffixed temp sibling + ``os.replace``.
+    """Restore ``path`` to ``content``; write bytes atomically or unlink for ``None``.
 
     ``os.replace`` is atomic-over-existing on both POSIX and Windows, unlike
     ``os.rename``. The destination either ends up holding the full new content or is left
     completely unchanged — a reader never observes a partial write.
 
-    ``content``: ``str`` writes in text mode (``encoding="utf-8"``); ``bytes`` writes in
-    binary mode (no newline translation applies). ``newline`` matches the stdlib
+    ``content``: ``None`` restores absence without creating a missing parent; ``str`` writes
+    in text mode (``encoding="utf-8"``); ``bytes`` writes in binary mode (no newline
+    translation applies). ``newline`` matches the stdlib
     ``open()``/``Path.write_text`` parameter and is ignored for ``bytes`` content:
     ``""`` (the default) disables universal-newline translation, so the bytes on disk are
     exactly ``content.encode("utf-8")`` (LF-preserving on every platform); ``None``
@@ -55,6 +56,9 @@ def atomic_write(
     """
     if path.is_symlink():
         raise SymlinkRefusedError(path)
+    if content is None:
+        path.unlink(missing_ok=True)
+        return
     if ensure_parent:
         path.parent.mkdir(parents=True, exist_ok=True)
     tmp = path.parent / f".{path.name}.{uuid.uuid4().hex}.tmp"
