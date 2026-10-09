@@ -9,7 +9,7 @@ from pathlib import Path
 
 import pytest
 
-from dadaia_workspace.core.atomic_write import atomic_write
+from dadaia_workspace.core.atomic_write import SymlinkRefusedError, atomic_write
 
 _REAL = {"write_text": Path.write_text, "write_bytes": Path.write_bytes}
 
@@ -61,6 +61,36 @@ def test_hardlink_target_is_rebound_not_written_through(tmp_path: Path) -> None:
     atomic_write(target, "REBOUND\n")
     assert outside.read_text(encoding="utf-8") == "original\n"
     assert target.stat().st_ino != before_ino
+
+
+def test_none_restores_an_existing_file_to_absence(tmp_path: Path) -> None:
+    target = tmp_path / "state.json"
+    target.write_bytes(b"previous state")
+
+    atomic_write(target, None)  # type: ignore[arg-type]
+
+    assert not target.exists()
+
+
+def test_none_for_an_absent_file_does_not_create_its_missing_parent(tmp_path: Path) -> None:
+    target = tmp_path / "missing" / "state.json"
+
+    atomic_write(target, None)  # type: ignore[arg-type]
+
+    assert not target.parent.exists()
+
+
+def test_none_refuses_a_symlink_before_restoring_absence(tmp_path: Path) -> None:
+    outside = tmp_path / "outside.json"
+    outside.write_bytes(b"operator state")
+    target = tmp_path / "state.json"
+    target.symlink_to(outside)
+
+    with pytest.raises(SymlinkRefusedError):
+        atomic_write(target, None)  # type: ignore[arg-type]
+
+    assert target.is_symlink()
+    assert outside.read_bytes() == b"operator state"
 
 
 @pytest.mark.parametrize("existing", [True, False], ids=["existing-target", "new-target"])
