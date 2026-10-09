@@ -1473,9 +1473,9 @@
       "ts": "2026-10-09T11:50:32Z",
       "agent": "release.py memory",
       "kind": "memory",
-      "text": "Memory reconciled over 94430dcc9db2e36d4482c5e8890a52b69336b3cd..286eb97c9862: 1 reviewed, 13 changed.",
+      "text": "Memory reconciled over 94430dcc9db2e36d4482c5e8890a52b69336b3cd..7bae3d11723a: 1 reviewed, 13 changed.",
       "since": "94430dcc9db2e36d4482c5e8890a52b69336b3cd",
-      "until": "286eb97c98629f7aa2006fbc1db6331bff60ece6",
+      "until": "7bae3d11723af0e6dfb0fb7054ecc78602cb0dd4",
       "reviewed": [
         "agent-evals"
       ],
