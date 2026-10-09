@@ -17,8 +17,10 @@ from dadaia_workspace.core.models.spec_context import (
     ContextState,
     SpecContextProject,
 )
+from dadaia_workspace.core.workspace_layout import occupied
 
 _VERSION = 3
+_EMPTY_CONTEXTS = {"schema_version": "2", "contexts": []}
 
 # The keys every row carries: :func:`_from_dict` builds the model from them.
 ROW_KEYS = ("name", "state", "repo_slug", "repo_url", "created_at")
@@ -106,6 +108,10 @@ class JsonContextStore:
 
     def replace_raw(self, data: dict, *, newline: str | None = "") -> None:  # type: ignore[type-arg]
         atomic_write(self._path, json.dumps(data, indent=2), newline=newline)
+
+    def seed_if_absent(self) -> None:
+        if not occupied(self._path):
+            self.replace_raw(_EMPTY_CONTEXTS, newline=None)
 
     def snapshot(self) -> bytes | None:
         return self._path.read_bytes() if self._path.is_file() else None

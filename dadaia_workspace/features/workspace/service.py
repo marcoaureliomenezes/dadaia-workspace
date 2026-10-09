@@ -10,11 +10,11 @@ from dadaia_workspace.core.cli_line import fix_line
 from dadaia_workspace.core.harness_registry import L1_ENTRY_HARNESSES
 from dadaia_workspace.core.models.harness_profile import HarnessProfile
 from dadaia_workspace.core.workspace_layout import LEVEL1_SEEDS, occupied, provisioned_zones
+from dadaia_workspace.infrastructure.json_context_store import JsonContextStore
 from dadaia_workspace.infrastructure.json_harness_profile_store import JsonHarnessProfileStore
 from dadaia_workspace.infrastructure.public_assets import FileSystemPublicAssetManager
 from dadaia_workspace.infrastructure.python_env import VenvPythonEnvironmentManager
 
-_EMPTY_CONTEXTS = {"schema_version": "2", "contexts": []}
 _EMPTY_SERVER_REGISTRY = {
     "version": "1",
     "range": {"min_port": 3000, "max_port": 3999},
@@ -39,39 +39,28 @@ class WorkspaceService:
         harnesses: tuple[str, ...],
         skip_assets: bool = False,
     ) -> list[str]:
-        """Bootstrap .dadaia/ template. Idempotent. Returns the installed assets.
+        """Bootstrap ``.dadaia/`` and return installed assets.
 
-        *harnesses* names the Layer-1 entry harnesses to scaffold (their projection
-        directories plus per-harness hook registration) and is REQUIRED — there is no
-        implied full set (0.4.7 FR1: `init` takes exactly one `--harness`). Only the
-        chosen harnesses' directories, hooks, and asset projections are created; the
-        selected set is persisted through the profile store (the source of truth for
-        profile-aware install/doctor scoping, v0.1.58 FR3).
-
-        Bug init-harness-profile-silent-narrowing: init deletes no projection, so it must
-        never un-manage one — a re-init with a harness subset MERGES into the persisted
-        profile (canonical L1 order, unknown names appended sorted).
-        """
+        Re-init merges required *harnesses* because init deletes no projection."""
         states_dir = workspace_root / ".dadaia" / "states"
-        chosen = tuple(harnesses)
-        chosen_set = set(chosen)
+        chosen_set = set(harnesses)
 
-        # The venv manager owns `.dadaia/.venv` and runs before the zone pass: an empty
-        # pre-made `.venv` would read to it as an already-built venv.
+        # Run the venv manager before zone creation so an empty directory cannot look provisioned.
         self._python_env.ensure_workspace_venv(str(workspace_root))
         for zone in provisioned_zones():
             (workspace_root / ".dadaia" / zone.name).mkdir(parents=True, exist_ok=True)
         for name, seed in LEVEL1_SEEDS.items():  # the operator's from then on (ADR 0095)
             if not occupied(target := workspace_root / name):
                 target.write_text(seed(workspace_root), encoding="utf-8")
-        # The shared skills root is harness-independent — always created.
+        # Harness directories come from projections; only the shared skills root is eager.
         (workspace_root / ".agents" / "skills").mkdir(parents=True, exist_ok=True)
-        # Every harness directory is created by its own projection (the record's
-        # `directory`), never by a branch here.
 
-        # Initialize JSON state files (idempotent — never overwrite existing data)
-        self._init_json_file(states_dir / "spec_contexts.json", _EMPTY_CONTEXTS)
-        self._init_json_file(states_dir / "server_registry.json", _EMPTY_SERVER_REGISTRY)
+        JsonContextStore(states_dir).seed_if_absent()
+        server_registry = states_dir / "server_registry.json"
+        if not occupied(server_registry):
+            server_registry.write_text(
+                json.dumps(_EMPTY_SERVER_REGISTRY, indent=2), encoding="utf-8"
+            )
         self._migrate_denylist(workspace_root, states_dir / "privacy_denylist.json")
 
         store = JsonHarnessProfileStore()
@@ -82,24 +71,13 @@ class WorkspaceService:
         )
         store.write(states_dir, HarnessProfile.of(ordered))
 
-        # Install public assets — only the chosen harness projections. Every hook wiring
-        # (.claude/settings.json, .codex/hooks.json, kimi user hooks) is install's output:
-        # `public install` is the ONE settings writer (bug
-        # init-skip-assets-writes-gateless-claude-settings — init's own gateless
-        # UserPromptSubmit-only writer was deleted). Skipping assets therefore leaves the
-        # workspace ungated, and that state must be loud, never silent.
-        installed: list[str] = []
+        # Public install owns every hook setting; skipping it must report an ungated workspace.
         if not skip_assets:
-            # The roster install resolves the chosen-harness SUBSET on its own: it reads
-            # the profile persisted above to scope its harness targets (v0.1.58 FR3).
-            installed.extend(self._public_assets.install(workspace_root))
-        else:
-            installed.append(
-                "[warn] assets skipped — no hooks configured; the workspace is ungated "
-                f"until '{fix_line(workspace_root, 'public', 'install')}' runs"
-            )
-
-        return installed
+            return self._public_assets.install(workspace_root)
+        return [
+            "[warn] assets skipped — no hooks configured; the workspace is ungated "
+            f"until '{fix_line(workspace_root, 'public', 'install')}' runs"
+        ]
 
     def venv_change(self, workspace_root: Path) -> tuple[str | None, str | None, str]:
         """``(before, after, action)`` of the venv against the running distribution."""
@@ -110,15 +88,10 @@ class WorkspaceService:
         states_dir = workspace_root / ".dadaia" / "states"
         return JsonHarnessProfileStore().resolve(states_dir, workspace_root).harnesses
 
-    def _init_json_file(self, path: Path, empty: dict) -> None:  # type: ignore[type-arg]
-        if not occupied(path):
-            path.write_text(json.dumps(empty, indent=2), encoding="utf-8")
-
     def _migrate_denylist(self, workspace_root: Path, path: Path) -> None:
-        """A 0.4.7 list form (``["term"]`` or ``[["term", "reason"]]``, strings only) rewritten
-        once as the one object form (ADR 0157): the converted file lands beside it first, then
-        the original is held and the conversion moved into place, so no failed step leaves the
-        terms unreadable. Any other content is left for the loader to refuse."""
+        """Rewrite the legacy string-pair list as the object form.
+
+        Stage before holding the original so failure never leaves the terms unreadable."""
         staged = path.with_name(f"{path.name}.migrating")
         try:
             raw = json.loads(path.read_text(encoding="utf-8"))
