@@ -112,7 +112,7 @@ def test_an_invalid_ledger_line_is_one_operator_action(
 _RECORD = {"id": "a-bug", "ts": "2026-09-20T10:00:00Z", "reported_by": "e", "title": "t",
            "severity": "LOW", "surface": "cli", "component": "c", "context": "x", "symptom": "s",
            "repro": "r", "expected": "e", "status": "open", "cause": None, "caused_by": None,
-           "resolved_release": None, "audited": None, "closed_at": None}  # fmt: skip
+           "closed_at": None}  # fmt: skip
 
 
 def _bugs(tmp_path: Path, *records: dict[str, object]) -> str:
