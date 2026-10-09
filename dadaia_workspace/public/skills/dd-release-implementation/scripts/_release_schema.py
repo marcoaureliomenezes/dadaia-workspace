@@ -223,6 +223,21 @@ def _cells(line: str) -> list[str]:
     return [cell.strip() for cell in line.strip().strip("|").split("|")]
 
 
+def _table_rows(
+    lines: list[str], header_at: int, headers: list[str], missing_separator: str
+) -> tuple[list[str], list[str]]:
+    """A Markdown table's data rows, after its canonical separator."""
+    separator_at = header_at + 1
+    if separator_at >= len(lines):
+        return [], [missing_separator]
+    separator = _cells(lines[separator_at])
+    if len(separator) != len(headers) or any(
+        re.fullmatch(r":?-{3,}:?", cell) is None for cell in separator
+    ):
+        return [], [missing_separator]
+    return [line for line in lines[separator_at + 1 :] if line.lstrip().startswith("|")], []
+
+
 def current_job_writes(text: str, rel: str) -> tuple[set[str] | None, list[str]]:
     """A current job table's authoritative write union and errors; ``None`` marks history."""
     if re.search(r"^## Stage ", text, re.MULTILINE):
@@ -235,13 +250,14 @@ def current_job_writes(text: str, rel: str) -> tuple[set[str] | None, list[str]]
     required = ("task", "AC", "`W:`")
     if any(headers.count(name) != 1 for name in required):
         return set(), [f"{rel} task table must carry canonical task, AC and `W:` columns"]
-    if header_at + 1 >= len(lines) or len(_cells(lines[header_at + 1])) != len(headers):
-        return set(), [f"{rel} task table has no canonical separator row"]
+    rows, errors = _table_rows(
+        lines, header_at, headers, f"{rel} task table has no canonical separator row"
+    )
+    if errors:
+        return set(), errors
     task_at, ac_at, writes_at = (headers.index(name) for name in required)
     found: set[str] = set()
     authority: set[str] = set()
-    errors: list[str] = []
-    rows = [line for line in lines[header_at + 2 :] if line.lstrip().startswith("|")]
     if not rows:
         return set(), [f"{rel} has no task carrying id, AC and exact `W:` set"]
     for line in rows:
@@ -325,12 +341,14 @@ def current_plan_jobs(text: str) -> tuple[dict[str, tuple[int, set[str]]] | None
             else ["PLAN.md DAG table has no wave and exact `W:` columns"]
         )
         return None, history_errors
+    rows, errors = _table_rows(
+        lines, header_at, headers, "PLAN.md DAG table has no canonical separator row"
+    )
+    if errors:
+        return {}, errors
     job_at, wave_at, writes_at = (headers.index(name) for name in ("job", "wave", "w:"))
     jobs: dict[str, tuple[int, set[str]]] = {}
-    errors: list[str] = []
-    for line in lines[header_at + 2 :]:
-        if not line.lstrip().startswith("|"):
-            continue
+    for line in rows:
         cells = _cells(line)
         if len(cells) != len(headers) or not cells[job_at]:
             errors.append("PLAN.md DAG has an empty or malformed job row")
