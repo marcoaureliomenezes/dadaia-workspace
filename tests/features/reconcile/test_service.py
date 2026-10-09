@@ -5,17 +5,17 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-import pytest
-
 from dadaia_workspace.core.models.doctor_report import (
     DoctorLine,
     DoctorReport,
     DoctorStatus,
 )
 from dadaia_workspace.core.platform import PLATFORM
-from dadaia_workspace.features.reconcile import reconcile_workspace
+from dadaia_workspace.features.migrate.state_v2 import execute_migration, plan_migration
+from dadaia_workspace.features.reconcile import ReconcileResult, reconcile_workspace
 from dadaia_workspace.features.spec_context.doctor import DoctorService
 from dadaia_workspace.infrastructure.git_subprocess import GitSubprocessClient
+from dadaia_workspace.infrastructure.json_context_store import JsonContextStore
 from tests.fixtures.stores import context_store
 
 
@@ -52,10 +52,31 @@ def _v1_workspace(root: Path) -> Path:
     return root
 
 
+def _reconcile(
+    workspace: Path,
+    *,
+    expected_version: str,
+    public_service: object,
+    doctor_service: object,
+    actual_version: str | None = None,
+) -> ReconcileResult:
+    return reconcile_workspace(
+        workspace,
+        context_store=JsonContextStore(workspace / ".dadaia" / "states"),
+        version=lambda: "1.2.3",
+        migration_plan=plan_migration,
+        migrate=execute_migration,
+        expected_version=expected_version,
+        public_service=public_service,
+        doctor_service=doctor_service,
+        actual_version=actual_version,
+    )
+
+
 def test_version_mismatch_is_read_only(tmp_path: Path) -> None:
     workspace = _v1_workspace(tmp_path)
     before = (workspace / ".dadaia" / "states" / "spec_contexts.json").read_bytes()
-    result = reconcile_workspace(
+    result = _reconcile(
         workspace,
         expected_version="9.9.9",
         actual_version="1.0.0",
@@ -71,7 +92,7 @@ def test_failure_restores_migrated_state_and_requires_projection_rollback(tmp_pa
     workspace = _v1_workspace(tmp_path)
     state_path = workspace / ".dadaia" / "states" / "spec_contexts.json"
     before = state_path.read_bytes()
-    result = reconcile_workspace(
+    result = _reconcile(
         workspace,
         expected_version="1.2.3",
         actual_version="1.2.3",
@@ -88,7 +109,7 @@ def test_failure_restores_the_primary_context_file_the_migration_deleted(tmp_pat
     workspace = _v1_workspace(tmp_path)
     primary = workspace / ".dadaia" / "states" / "primary_context.json"
     primary.write_bytes(b'{"name": "app"}')
-    reconcile_workspace(
+    _reconcile(
         workspace,
         expected_version="1.2.3",
         actual_version="1.2.3",
@@ -99,9 +120,7 @@ def test_failure_restores_the_primary_context_file_the_migration_deleted(tmp_pat
     assert not (workspace / ".dadaia" / "tmp").exists()
 
 
-def test_reconcile_ignores_operator_slop_and_names_context_invariants(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_reconcile_ignores_operator_slop_and_names_context_invariants(tmp_path: Path) -> None:
     """sa-reconcile-certify-skip-the-workspace-walk#B2: with `.dadaia/nonsense/` and a root
     `notes.txt` seeded, reconcile succeeds (operator slop never blocks an upgrade) and its
     doctor step is reported as 'context-invariants' — run against the real doctor service."""
@@ -112,15 +131,11 @@ def test_reconcile_ignores_operator_slop_and_names_context_invariants(
     (venv_bin / f"dadaia{PLATFORM.venv_exe_suffix}").chmod(0o755)
     (workspace / ".dadaia" / "nonsense").mkdir()
     (workspace / "notes.txt").write_text("operator notes", encoding="utf-8")
-    monkeypatch.setattr(
-        "dadaia_workspace.features.reconcile.service.distribution_version",
-        lambda: "1.2.3",
-    )
     doctor = DoctorService(
         context_store(workspace / ".dadaia" / "states"), GitSubprocessClient(), workspace
     )
 
-    result = reconcile_workspace(
+    result = _reconcile(
         workspace,
         expected_version="1.2.3",
         actual_version="1.2.3",
