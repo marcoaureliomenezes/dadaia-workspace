@@ -16,7 +16,7 @@ The main thread is the operator's session and the only dispatcher. It owns intak
 
 | Persona | Owns |
 |---|---|
-| `dd-product-engineer` | backlog, candidate SPEC and closure product memory |
+| `dd-product-engineer` | backlog, candidate SPEC, closure product memory and release summary |
 | `dd-software-engineer` | as-is review, PLAN, job files, production code and tests |
 | `dd-code-reviewer` | independent three-axis review and the architecture, security, QA, product, audit and AI-surface lenses |
 
@@ -30,7 +30,7 @@ The main thread is the operator's session and the only dispatcher. It owns intak
 - Jobs and tasks may run concurrently only where the approved PLAN and exact write sets permit it. Git exposes races; no agent acquires a lock.
 - No runtime advances the lifecycle. `_RELEASE.json`, approved definition documents, job files, worktrees, commits and handoffs are the evidence ([[release-lifecycle]]).
 - Only the main thread opens and merges canonical worktrees. A leaf works inside the path it receives and returns a validated handoff.
-- A job or plain change lands only after the reviewer's `APPROVED` verdict binds to its exact diff; task merges are unreviewed and enforce git hygiene plus RED/implementation separation.
+- A job, plain change, `define` or backlog tree lands only after the reviewer's `APPROVED` verdict binds to its exact diff; task merges are unreviewed and enforce git hygiene plus RED/implementation separation.
 
 ## Models and privilege
 
