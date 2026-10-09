@@ -19,6 +19,7 @@ from dadaia_workspace.core.harness_registry import HARNESS_PROJECTION_DIRS
 from dadaia_workspace.core.release_state import CANDIDATE_RE, RELEASE_ID_RE
 
 __all__ = [
+    "render_workspace_cli",
     "render_registry_tables",
     "AUDIT_DIR_NAME_PATTERN",
     "AUDIT_DIR_NAME_RE",
@@ -573,16 +574,19 @@ _PLACEHOLDERS: dict[str, Callable[[], str]] = {
 }
 
 
+_SOURCE_CLI = ".venv/bin/dadaia"
+
+
+def render_workspace_cli(text: str) -> str:
+    """Render the workspace CLI source for this host."""
+    caps = platform.PLATFORM
+    return text.replace(
+        _SOURCE_CLI, f".venv/{caps.venv_scripts_dir}/dadaia{caps.venv_exe_suffix}"
+    )
+
+
 def render_registry_tables(text: str) -> str:
     """Fill registry placeholders and render the workspace CLI source for this host."""
     for placeholder, render in _PLACEHOLDERS.items():
         text = text.replace(placeholder, render())
-    return text.replace(_SOURCE_CLI, _platform_cli())
-
-
-_SOURCE_CLI = ".venv/bin/dadaia"
-
-
-def _platform_cli() -> str:
-    caps = platform.PLATFORM
-    return f".venv/{caps.venv_scripts_dir}/dadaia{caps.venv_exe_suffix}"
+    return render_workspace_cli(text)
