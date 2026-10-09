@@ -10,6 +10,7 @@ sources:
   - dadaia_workspace/hooks/sdd_gate.py
   - dadaia_workspace/cli/commands/ci.py
   - dadaia_workspace/features/chokepoints/**
+  - dadaia_workspace/infrastructure/data/privacy_baseline.json
   - dadaia_workspace/infrastructure/git_objects.py
 ---
 

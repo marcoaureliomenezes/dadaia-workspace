@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-10-09T10:40:13Z",
+  "generated_at": "2026-10-09T11:10:37Z",
   "features": [
     {
       "rank": 1,
@@ -640,7 +640,7 @@
         "compliance",
         "privacy"
       ],
-      "token_estimate": 2935,
+      "token_estimate": 2947,
       "depends_on": [
         "public-asset-distribution",
         "sdd-gate-v3",
@@ -728,6 +728,7 @@
       ],
       "sources": [
         "dadaia_workspace/public/schemas/audits/finding-record-v1.schema.json",
+        "dadaia_workspace/public/schemas/ADRs/**",
         "dadaia_workspace/public/skills/dd-audit-project/**",
         "dadaia_workspace/features/specs/doctor_adr.py"
       ]
@@ -851,6 +852,7 @@
         "dadaia_workspace/hooks/sdd_gate.py",
         "dadaia_workspace/cli/commands/ci.py",
         "dadaia_workspace/features/chokepoints/**",
+        "dadaia_workspace/infrastructure/data/privacy_baseline.json",
         "dadaia_workspace/infrastructure/git_objects.py"
       ]
     },

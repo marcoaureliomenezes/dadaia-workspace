@@ -6,6 +6,7 @@ summary: The three-pillar audit, reproducible finding evidence, terminal disposi
 tags: [audit, findings, bugs, specs, memory]
 sources:
   - dadaia_workspace/public/schemas/audits/finding-record-v1.schema.json
+  - dadaia_workspace/public/schemas/ADRs/**
   - dadaia_workspace/public/skills/dd-audit-project/**
   - dadaia_workspace/features/specs/doctor_adr.py
 ---
