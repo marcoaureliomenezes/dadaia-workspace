@@ -11,5 +11,5 @@ Pure refactor: exit codes, fix lines, ledgers, files and JSON output are unchang
 | task | AC | `W:` | outcome |
 |---|---|---|---|
 | J6.T1 | AC5.1 | `tests/features/migrate/test_state_v2.py`, `tests/features/reconcile/test_service.py` | RED dispatch and test actions: both writers driven through an injected store |
-| J6.T2 | AC5.1, AC5.2 | `dadaia_workspace/infrastructure/json_context_store.py`, `dadaia_workspace/features/migrate/state_v2.py`, `dadaia_workspace/features/reconcile/service.py`, `setup.cfg` | after J6.T1; source-only: one writer, both `ignore_imports` edges deleted |
+| J6.T2 | AC5.1, AC5.2 | `dadaia_workspace/infrastructure/json_context_store.py`, `dadaia_workspace/features/migrate/state_v2.py`, `dadaia_workspace/features/reconcile/service.py`, `dadaia_workspace/container.py`, `dadaia_workspace/cli/commands/reconcile.py`, `dadaia_workspace/cli/commands/init.py`, `dadaia_workspace/cli/commands/migrate.py`, `setup.cfg` | after J6.T1; source-only: one writer, both `ignore_imports` edges deleted; the container composes the injected dependencies and the three production callers supply them |
 | J6.T3 | AC5.2 | `scripts/guards/slop.py` | after J6.T2; the ignore cap in the ignore-cap check drops by 2, the only edit |
