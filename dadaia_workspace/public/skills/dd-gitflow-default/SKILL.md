@@ -34,12 +34,12 @@ The branch contract by role; the names are `specs/constitution.md`'s `gitflow:` 
 | Branch | Pushable | Cut from | Advances by |
 |---|---|---|---|
 | work `<work>M.m.p` | Yes — valid name (run `verify:` first) | integration | its jobs' worktree merges |
+| integration | No — advances only by PR | principal (bootstrap only) | PR from the row above, one per candidate |
+| principal | No — advances only by PR | — | PR from the integration branch, at the final `rc` |
 | job `wt/<M.m.p>-rc<N>/<job>` | Yes — valid name (not `define`) | work | its worktree merge (`worktrees/AGENTS.md` §2) |
 | backlog `wt/backlog/<slug>` | Yes | work | its worktree merge (`worktrees/AGENTS.md` §2) |
 | task `wt/<M.m.p>-rc<N>/<job>--<task-id>` | No | its job branch | its worktree merge (`worktrees/AGENTS.md` §2) (its task gate) |
 | plain `wt/<name>` | No — local only | the live work branch, else the checked-out branch, recorded | its reviewed worktree merge, with optional `verify:` |
-| integration | No — advances only by PR | principal (bootstrap only) | PR from the row above, one per candidate |
-| principal | No — advances only by PR | — | PR from the integration branch, at the final `rc` |
 
 - No `v` prefix or suffix; a hotfix job is `wt/hotfix/<bug-id>`, local only, landing by its worktree merge (`worktrees/AGENTS.md` §2).
 - Exactly one live work branch, named for the live release; a job — a bug fix included — reaches it through its own worktree (`worktrees/AGENTS.md` §1).
@@ -52,14 +52,14 @@ The branch contract by role; the names are `specs/constitution.md`'s `gitflow:` 
 |---|---|---|---|
 | 1 | a job, `backlog/<slug>` | Bug registration: `specs/bugs/BUGS.jsonl` | `chore(bugs): report <id>` |
 | 2 | `backlog/<slug>` | Backlog entry or exit: `specs/backlog/BACKLOG.json`, `specs/backlog/_archive/backlog_histo.jsonl` | `chore(backlog): …` |
-| 2 | `backlog/<slug>`, `define` | ADR proposal or in-place `measured_by` repair (ADR 0138): `specs/ADRs/decisions.jsonl` | `docs(adr): propose <slug>` / `chore(adrs): repair …` |
+| 2 | `backlog/<slug>`, `define` | ADR proposal or in-place `measured_by` repair: `specs/ADRs/decisions.jsonl` | `docs(adr): propose <slug>` / `chore(adrs): repair …` |
 | 2 | `define`, `reconcile` | ADR acceptance with its canonical-memory hunk: `specs/ADRs/decisions.jsonl`, `specs/memory/*` | `docs(adr): accept <slug>` |
-| 3 | a job | Bug fix or REBUILD: `<code>`, red loop in the body, a hotfix's naming `block: <item>`; the regression test lands first in its RED-test task (shape 6) | `fix(bugs): <id> — <cause>`; a REBUILD `refactor(bugs): <id> — REBUILD <unit>: …`; a group names its N ids |
+| 3 | a job | Bug fix or REBUILD: `<code>`, red loop in the body, a hotfix's naming `block: <item>`; the regression test lands first as a `test(` commit (a task's shape 6, or the hotfix tree's) | `fix(bugs): <id> — <cause>`; a REBUILD `refactor(bugs): <id> — REBUILD <unit>: …`; a group names its N ids |
 | 4 | a job | Terminal transition without code (`resolve` after its named shape-3 fix commit, `supersede`, `reject`): `specs/bugs/BUGS.jsonl` | `chore(bugs): <verb> <id> — <reason, by task-id, or fix sha>`; per class `chore(bugs): <verb> class <class> — <reason>`, one id per body line |
 | 4 | a job | Archive terminal bugs: `specs/bugs/BUGS.jsonl`, `specs/bugs/_archive/bugs_histo.jsonl` | `chore(bugs): archive <ids>` |
 | 5 | `define` | Release definition: `specs/releases/<v>/rc-<N>/*` | `feat(specs): define candidate …` |
 | 6 | a task tree | Task: its `W:` | `conventional-commit(<id>): description`, a REBUILD `refactor(<id>): REBUILD <unit> — …` |
-| 8 | `define` | Trio approval: `specs/releases/<v>/rc-<N>/{SPEC,PLAN}.md` | `docs(specs): …` |
+| 8 | `define` | SPEC and PLAN approval: `specs/releases/<v>/rc-<N>/{SPEC,PLAN}.md` | `docs(specs): …` |
 | 9 | `reconcile` | Memory pass and derived docs: `specs/memory/*`, `README.md`, `llms.txt`, `docs/*.md` | `docs(memory): …` |
 | 10 | `define`, `reconcile` | Release state: `specs/releases/<v>/_RELEASE.json`, only when [`RELEASE-EVENTS.md`](../dd-release-implementation/RELEASE-EVENTS.md) requires a current entry | `chore(release): …` |
 

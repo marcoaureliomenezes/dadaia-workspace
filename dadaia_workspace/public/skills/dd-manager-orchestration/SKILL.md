@@ -23,7 +23,7 @@ description: >
 4. Reports land where the root `AGENTS.md` map §4 says; every report
    feeding another agent gets a handoff under `.dadaia/handoff/<context>/`.
 5. Open, merge and clean worktrees with `python3 .agents/skills/dd-gitflow-default/scripts/worktree.py new|merge|clean` (`worktrees/AGENTS.md`).
-6. The task is the unit of dispatch (ADR 0190), never a job: sub-agents work disjoint tasks in parallel, one per task worktree (`worktrees/AGENTS.md` §1).
+6. The task is the unit of dispatch, never a job: sub-agents work disjoint tasks in parallel, one per task worktree (`worktrees/AGENTS.md` §1).
 
 ## 2. Conflict resolution
 
@@ -56,17 +56,16 @@ description: >
 
 ### Main-thread discipline
 
-| Do | Why |
+| Do | Because |
 |---|---|
-| Chain agents only through the main thread, with operator approval | Breaks traceability |
-| Merge a task only with its validation evidence | Skips acceptance |
-| Write a verdict, merge, deploy or close only after the reviewer's `APPROVED` | `worktrees/AGENTS.md` §2 |
-| Edit production files only inside a job's or task's worktree | Breaks task traceability |
+| Chain agents only through the main thread | Every hand-off stays traceable |
+| Merge a task only with its validation evidence | Acceptance is checked |
+| Merge, deploy or close only after the reviewer's `APPROVED` | `worktrees/AGENTS.md` §2 |
+| Edit production files only inside a job's or task's worktree | Each edit traces to its task |
 | Land an edit inside an open job as one of its tasks | Micro-dispatch: the ritual wait it adds outweighs the edit |
 | Keep private/project-specific details out of public assets | Security and portability |
 
 ## 4. Done when
 
-- Every merge of the session names an APPROVED verdict file; every dispatch prompt carries that block.
+- Every job, plain, define or backlog merge names an APPROVED verdict file; every dispatch prompt carries that block.
 - Every conflict either resolved via evidence-based authority or escalated.
-- The §3 discipline held.
