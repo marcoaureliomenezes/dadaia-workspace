@@ -27,7 +27,7 @@ line here and `--help` disagree, `--help` wins.
 
 - `.dadaia/states/`, `repos/` clones and `.dadaia/dist/` change only through `context create`, `alive`, `dead` and `import`/`export`.
 - Onboarding levels: the root `AGENTS.md` map §7; retire with `context dead` → `context delete`.
-- Every other verb (`context baseline`, `context repo add|remove`, `export`/`import`): its `--help`.
+- Verb index (flags: `--help`): `.dadaia/.venv/bin/dadaia init`, `.dadaia/.venv/bin/dadaia export`, `.dadaia/.venv/bin/dadaia import`, `.dadaia/.venv/bin/dadaia context list`, `.dadaia/.venv/bin/dadaia context alive`, `.dadaia/.venv/bin/dadaia context delete`, `.dadaia/.venv/bin/dadaia context repo add`, `.dadaia/.venv/bin/dadaia context repo remove`, `.dadaia/.venv/bin/dadaia ci push-gate-check`, `.dadaia/.venv/bin/dadaia specs upgrade`, `.dadaia/.venv/bin/dadaia migrate`, `.dadaia/.venv/bin/dadaia help tree`.
 
 ## Dev servers
 
