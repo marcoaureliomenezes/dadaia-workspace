@@ -171,7 +171,7 @@ Each seam was ruled on 2026-10-09 by the main thread as a conservative default, 
 
 - Each RED task proves its failure for the intended reason. Each source task turns the same focused tests green without touching a test path. Each job gate runs the tracked `verify: python scripts/ci.py job` once and takes one bound reviewer verdict.
 - G3/AC4.3: Job 3's net is green on Job 3's base and on Job 6's head. `git diff --name-only` over Job 6's range prints no `*__characterization.py` file.
-- G4 rows kept in rc-12: `ignored_imports` 2 → 0; the published literal-path writer measure remains 3 → 1, while Job 6 records the corrected semantic sink trace as 4 → 1 (the rejected implementation is 2 → 1). The `sys.path`, cycle and `BUGS.jsonl` reader rows are re-measured in rc-13.
+- G4 rows kept in rc-12: `ignored_imports` 2 → 0; the SPEC's published literal-path 3 → 1 forecast is historical and withdrawn as an actual measurement because its exact filter now returns zero. Job 6 uses the corrected semantic sink trace as the acceptance proof: 4 → 1, with 2 writers at the rejected checkpoint. The `sys.path`, cycle and `BUGS.jsonl` reader rows are re-measured in rc-13.
 - Reconciliation (dd-product-engineer) covers:
   - the F123 `ARCHITECTURE.md` line on import-linter contracts after FR5;
   - the dispositions of F003, F004, F005, F009, F018, F048, F051, F123 and F135;
