@@ -74,11 +74,7 @@ def _ledger(root: Path, *records: dict[str, object]) -> Path:
         (_PUBLIC / "schemas" / "bugs" / "bug-record-v1.schema.json").read_text(encoding="utf-8")
     )
     required = set(schema["required"])
-    shaped = [
-        {**{key: None for key in required - record.keys()},
-         **record}
-        for record in records
-    ]
+    shaped = [{**{key: None for key in required - record.keys()}, **record} for record in records]
     (specs / "bugs" / "BUGS.jsonl").write_text(
         "".join(json.dumps(record) + "\n" for record in shaped), encoding="utf-8"
     )
@@ -185,7 +181,9 @@ def test_check_resolves_a_job_task_id_against_the_rc_tasks_folder(
     specs = _ledger(tmp_path, {**_OPEN_RECORD, "caused_by": caused_by})
     job = specs / "releases" / "0.5.0" / "rc-9" / "tasks" / "job1.md"
     job.parent.mkdir(parents=True)
-    job.write_text("| J1.T3 | AC1.1 | `ci.py` |\n| J1.S2.T3 | AC1.1 | `old.py` |\n", encoding="utf-8")
+    job.write_text(
+        "| J1.T3 | AC1.1 | `ci.py` |\n| J1.S2.T3 | AC1.1 | `old.py` |\n", encoding="utf-8"
+    )
     done = _run(script, "check", "--specs", str(specs), "--json")
     assert done.returncode == code, done.stdout
     fixes = [f["fix"] for f in json.loads(done.stdout)]
@@ -385,9 +383,7 @@ def _records(specs: Path) -> list[dict[str, Any]]:
     return _read(specs / "bugs/BUGS.jsonl")
 
 
-def _resolve_argv(
-    bug_id: str = "a-bug", caused_by: str = "none"
-) -> list[str]:
+def _resolve_argv(bug_id: str = "a-bug", caused_by: str = "none") -> list[str]:
     return [
         "resolve", bug_id, "--cause", "c", "--caused-by", caused_by,
         "--solution", "s", "--fix-sha", "a" * 40,
