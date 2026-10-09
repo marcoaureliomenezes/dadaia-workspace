@@ -18,7 +18,7 @@ candidates. `WT` is `python3 .agents/skills/dd-gitflow-default/scripts/worktree.
 
 ## The candidate arc, step by step
 
-An rc is an Implement: a DAG of jobs the PLAN draws, Job 1 first, the Reconciliation job last.
+An rc is a DAG of jobs the PLAN draws, Job 1 first, the Reconciliation job last.
 
 **Step 1 — Open a job.**
 - `WT new <repo> <M.m.p>-rc<N>/<job>` once its PLAN edges are merged; its tasks live in `rc-<N>/tasks/<job>.md` (`dd-release-definition` §5).

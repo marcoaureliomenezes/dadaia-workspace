@@ -21,10 +21,10 @@ description: >
 
 1. Open `specs/releases/AGENTS.md` (the area's scoped law) and follow it.
 2. Resolve the live release: `dd-spec-navigator` Phase 3.
-3. The live candidate's job files sit at `releases/<v>/rc-<N>/tasks/<job>.md`, the highest `rc-<N>/`; a lower one is closed history (a closed rc keeps its `TASKS.md`).
+3. The live candidate's job files sit at `releases/<v>/rc-<N>/tasks/<job>.md`, the highest `rc-<N>/`; a lower one is closed history.
 4. Full navigation protocol: `dd-spec-navigator`.
 5. Read `RC-FLOW.md` for the candidate arc and gate cadence before acting past opening a task.
-6. Change `_RELEASE.json` through `release.py` verbs (`phase`, `memory`, `ship`); only the closer's `summary` entry is hand-written (`RELEASE-EVENTS.md`).
+6. Change `_RELEASE.json` through `release.py` verbs (`phase`, `memory`, `ship`); only `summary` and the authorization `note` are hand-written (`RELEASE-EVENTS.md`).
 7. At `RC-FLOW.md` step 4, run `MEMORY-UPDATE.md`'s full protocol before touching any memory atom.
 8. A test enters the suite only under the root map §1 test basics.
 9. Before growing any module, run the deletion test (delete it: does complexity vanish or reappear across callers?) — a diff that only adds justifies itself against replace-don't-layer.
@@ -41,7 +41,7 @@ description: >
 ## 3. Done when
 
 - Live release resolved (`dd-spec-navigator` Phase 3).
-- Task committed under its id in its task worktree; the main thread runs its `WT merge` (`worktrees/AGENTS.md` §4).
+- Task committed under its id in its task worktree; the main thread runs its `WT merge` (`worktrees/AGENTS.md` §2).
 - Current step (`RC-FLOW.md`) identified before attempting its unlock action.
 - `verify:` line green before any push; the reviewer's `APPROVED` on the work-branch head before its PR (`dd-gitflow-default` §3b).
 - At candidate closure: the Reconciliation job merged (`RC-FLOW.md` step 4) -> candidate PR -> the promote-or-continue gate.

@@ -64,7 +64,7 @@ The main thread runs `dd-grill-me` on the picked set before the SPEC — never s
 
 ## 5. The job file — tasks
 
-- One file per job, `rc-<N>/tasks/<job>.md`.
+- One file per job, `rc-<N>/tasks/job<n>.md`, its PLAN DAG row `Job <n>`.
 - Every job file carries a task table. Each task has id `J<n>.T<k>`, its AC, exact `W:`, owner test file and RED tests; one owner, one session (~1 h), ~100 new code lines.
 - The PLAN DAG names each job's wave and complete `W:` set.
 - Each behavior task runs as two dispatches (`worktrees/AGENTS.md` §2).

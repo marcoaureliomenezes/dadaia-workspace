@@ -30,8 +30,7 @@ requires one memory entry at or after `implemented.ts` and reads no git to valid
 fact; `release.py drift` remains the worklist command used before the entry is written.
 
 An open bug blocks `ship` by default. A carried bug needs all three facts: one
-`--allow-open <id>` flag per open id, a `kind: note` containing the operator's
-authorization verbatim and that id, and the id in the summary's `carried` field. The bug
+`--allow-open <id>` flag per open id, a `kind: note` starting `Operator authorization verbatim:` and naming that id, and the id in the summary's `carried` field. The bug
 stays open.
 
 ## Milestones
