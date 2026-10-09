@@ -12,7 +12,7 @@ Scope: this file governs only `specs/releases/`.
 
 ## 1. Structure
 
-- `<release-id>/` — the live release: only `_RELEASE.json` at its root, one `rc-<N>/` trio per candidate; the live candidate is the highest `rc-<N>/`, every lower one is history. A flat trio at the root is off-canon (TREE-8).
+- `<release-id>/` — the live release: only `_RELEASE.json` at its root, one `rc-<N>/` per candidate; a defined candidate carries `SPEC.md`, `PLAN.md` and `tasks/job<n>.md`, while legacy candidates may retain `TASKS.md`. The live candidate is the highest `rc-<N>/`, every lower one is history. A flat candidate set at the root is off-canon (TREE-8).
 - `_archive/**` is history: read-only history.
 
 ## 2. Authoring rules
@@ -28,7 +28,7 @@ Scope: this file governs only `specs/releases/`.
 
 ## 3. Tasks — the auditable trace
 
-- Read SPEC, PLAN and every job file before implementing; the approval precondition's home is `specs/AGENTS.md`. Tasks live in `tasks/job<n>.md` (`dd-release-definition` §5); a closed rc keeps its `TASKS.md`.
+- Read SPEC, PLAN and every job file before implementing; the approval precondition's home is `specs/AGENTS.md`. Tasks live in `tasks/job<n>.md` (`dd-release-definition` §5).
 - The `W:` is exact: every file the task touches, with derived files it re-records; the commit body names each file and why. Current task ids are `J<n>.T<k>`.
 
 ## 4. _RELEASE.json
