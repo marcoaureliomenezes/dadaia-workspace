@@ -1,14 +1,14 @@
 {
   "schema": "release-state-v1",
   "release": "0.5.0",
-  "phase": "IMPLEMENTATION",
+  "phase": "CLOSURE",
   "defined": {
     "sha": "8726693711b27a4ca931aef278f2e6a3c567e72a",
     "ts": "2026-10-09T15:12:02Z"
   },
   "implemented": {
-    "sha": "22845557cf424f07b19048c8618debf1dfa5066d",
-    "ts": "2026-10-09T04:47:54Z"
+    "sha": "ed7f76224bc1810e7b7f93d8014dec8307aead10",
+    "ts": "2026-10-09T22:29:24Z"
   },
   "shipped": null,
   "log": [
@@ -1539,6 +1539,21 @@
       "agent": "main-thread",
       "kind": "note",
       "text": "G1 overshoot accepted: the amended PLAN measures a 6.9-13.7 h critical path (low bound 1.8 h under, high bound 5.0 h over the unchanged 8.7 h ceiling), disclosed before approval and approved by the operator; the ceiling and its accounting stay unchanged and rc-12's actual is measured at closure."
+    },
+    {
+      "ts": "2026-10-09T22:29:24Z",
+      "agent": "release.py",
+      "kind": "milestone",
+      "candidate": "rc-12",
+      "milestone": "implemented",
+      "sha": "ed7f76224bc1810e7b7f93d8014dec8307aead10",
+      "text": "Candidate implemented at ed7f76224bc1810e7b7f93d8014dec8307aead10; phase CLOSURE."
+    },
+    {
+      "ts": "2026-10-09T22:29:39.805781Z",
+      "agent": "main-thread",
+      "kind": "note",
+      "text": "Operator authorization verbatim: \"avance até terminar\". Interpretation in direct response to the two presented rc-12 exceptions: exclusively-test J4.T1/J4.T2 REBUILD commits use test(J4.T1/T2) subjects instead of AC3.2 refactor(bugs); AC8.1/F004 with an empty eligible registration cohort is N/A (0 eligible, 0 recurrences), satisfied by absence, never 0%. Nonempty 3-day cohorts and the 14-day pre-promote measurement remain mandatory. The Approved SPEC is not rewritten; no other exception is granted."
     }
   ]
 }
