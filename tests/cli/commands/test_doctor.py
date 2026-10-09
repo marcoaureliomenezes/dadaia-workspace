@@ -56,7 +56,7 @@ from dadaia_workspace.features.specs.rules import RULES as SPECS_RULES
 from dadaia_workspace.infrastructure.git_subprocess import GitSubprocessClient
 from tests.features.backlog.test_doctor import _SOURCE, _active_entry
 from tests.features.specs.test_doctor import _make_clean_specs_tree
-from tests.fixtures.harness_env import run_bash
+from tests.fixtures.harness_env import run_bash, suite_env
 from tests.fixtures.stores import context_store
 from tests.helpers import worktree_ws
 
@@ -213,7 +213,9 @@ def _git(root: Path, *args: str) -> None:
         cwd=root,
         check=True,
         capture_output=True,
-        env={"HOME": str(root), "PATH": "/usr/bin:/bin", "GIT_CONFIG_GLOBAL": "/dev/null"},
+        env=suite_env(
+            {}, root, overrides={"PATH": "/usr/bin:/bin", "GIT_CONFIG_GLOBAL": "/dev/null"}
+        ),
     )
 
 

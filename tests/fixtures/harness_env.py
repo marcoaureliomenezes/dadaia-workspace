@@ -77,7 +77,6 @@ __all__ = [
     "git_bash",
     "codex_hook_env",
     "kimi_hook_env",
-    "retire_tree",
     "run_bash",
     "run_hook_subprocess",
     "run_python",
@@ -102,17 +101,24 @@ _OPERATOR_ENV: Final[frozenset[str]] = frozenset(
 )  # fmt: skip
 
 
-def suite_env(parent: Mapping[str, str], home: PurePath) -> dict[str, str]:
+def suite_env(
+    parent: Mapping[str, str],
+    home: PurePath,
+    *,
+    unset: tuple[str, ...] = (),
+    overrides: Mapping[str, str] | None = None,
+) -> dict[str, str]:
     """The suite's whole env, from *parent*: the operator's session out (:data:`_OPERATOR_ENV`
     and every ``DADAIA_*`` but the suite's), *home* and its cache roots in (pip's on every OS),
-    no bytecode. tests/conftest.py applies it once per process; every child env is
-    ``suite_env(os.environ, Path.home()) | overrides`` (bug test-suite-writes-outside-tmp)."""
+    no bytecode. *unset* removes inherited/default keys and *overrides* supplies the child's
+    explicit values. tests/conftest.py applies it once per process; every child env is built
+    here (bug test-suite-writes-outside-tmp)."""
     kept = {
         k: v
         for k, v in parent.items()
         if k not in _OPERATOR_ENV and (not k.startswith("DADAIA_") or k in _SUITE_DADAIA_ENV)
     }
-    return kept | {
+    env = kept | {
         "HOME": str(home),
         "USERPROFILE": str(home),
         "XDG_CACHE_HOME": str(home / ".cache"),
@@ -120,6 +126,9 @@ def suite_env(parent: Mapping[str, str], home: PurePath) -> dict[str, str]:
         "KIMI_CODE_HOME": str(home / ".kimi-code"),
         "PYTHONDONTWRITEBYTECODE": "1",
     }
+    for key in unset:
+        env.pop(key, None)
+    return env | dict(overrides or {})
 
 
 #: ``DADAIA_*`` env vars a test MAY ``setenv`` in-process without tripping the env-contract
@@ -456,9 +465,3 @@ def run_python(*args: str, **kwargs: Any) -> subprocess.CompletedProcess[str]:
 def run_bash(command: str, **kwargs: Any) -> subprocess.CompletedProcess[str]:
     """Run *command* under :func:`git_bash` ``-c``."""
     return subprocess.run([git_bash(), "-c", command], capture_output=True, text=True, **kwargs)  # noqa: S603
-
-
-def retire_tree(tree: Path, into: Path) -> Path:
-    """Move *tree* under *into* and return its new place: a tree holding ``.git`` keeps
-    read-only objects that ``rmtree`` cannot unlink on Windows, a rename always works."""
-    return tree.rename(into / tree.name)

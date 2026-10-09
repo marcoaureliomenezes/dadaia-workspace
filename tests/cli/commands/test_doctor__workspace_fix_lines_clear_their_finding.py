@@ -19,7 +19,7 @@ import pytest
 from typer.testing import CliRunner
 
 from dadaia_workspace.cli.main import app
-from tests.fixtures.harness_env import run_bash
+from tests.fixtures.harness_env import run_bash, suite_env
 
 _REPO = Path(__file__).resolve().parents[3]
 _UNSET = ("DADAIA_CONTEXT", "DADAIA_SESSION_ID", "CLAUDE_CODE_SESSION_ID")
@@ -27,7 +27,7 @@ _UNSET = ("DADAIA_CONTEXT", "DADAIA_SESSION_ID", "CLAUDE_CODE_SESSION_ID")
 
 def _env() -> dict[str, str]:
     """The session env, read per call, without an ambient context or session."""
-    return {k: v for k, v in os.environ.items() if k not in _UNSET}
+    return suite_env(os.environ, Path.home(), unset=_UNSET)
 
 
 _GIT = ["git", "-c", "user.name=t", "-c", "user.email=t@t"]
