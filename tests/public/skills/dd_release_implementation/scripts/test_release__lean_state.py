@@ -272,3 +272,74 @@ def test_closure_check_needs_the_memory_entry_but_not_git(script: Path, tmp_path
         env={**os.environ, "PATH": ""},
     )
     assert (checked.returncode, json.loads(checked.stdout)) == (0, [])
+
+
+@pytest.mark.parametrize(
+    ("found_in", "live_candidate"),
+    [
+        pytest.param({"release": "0.5.0", "rc": "rc-1"}, "rc-2", id="older-candidate"),
+        pytest.param({"release": "0.4.9", "rc": "rc-3"}, "rc-1", id="other-release"),
+    ],
+)
+def test_ship_refuses_every_open_bug_then_carries_each_authorized_id(
+    script: Path,
+    tmp_path: Path,
+    found_in: dict[str, str],
+    live_candidate: str,
+) -> None:
+    authorization = 'Operator authorization verbatim: "carry a-bug open"'
+    specs = _specs(tmp_path)
+    release = _write_release(
+        specs,
+        phase="CLOSURE",
+        log=[
+            _entry("note", "Candidate born on 0.5.0"),
+            _entry("note", authorization),
+            _entry("summary", "delivered: lean state; carried: a-bug; backlog exits: none"),
+            _entry(
+                "memory",
+                "memory reconciled",
+                since="1111111",
+                until="2222222",
+                reviewed=[],
+                changed=[],
+            ),
+        ],
+    )
+    if live_candidate == "rc-2":
+        release.joinpath("rc-1").rename(release / live_candidate)
+    bugs = specs / "bugs" / "BUGS.jsonl"
+    bugs.parent.mkdir()
+    bugs.write_text(
+        json.dumps({"id": "a-bug", "status": "open", "found_in": found_in}) + "\n",
+        encoding="utf-8",
+    )
+    state = release / "_RELEASE.json"
+    histo = specs / "releases/_archive/releases_histo.jsonl"
+    before = (state.read_bytes(), histo.read_bytes())
+
+    refused = _run(script, "ship", "--sha", "3333333", "--specs", str(specs))
+
+    assert refused.returncode == 1
+    assert "a-bug" in refused.stderr
+    assert release.is_dir()
+    assert not specs.joinpath("releases/_archive/0.5.0").exists()
+    assert (state.read_bytes(), histo.read_bytes()) == before
+
+    shipped = _run(
+        script,
+        "ship",
+        "--sha",
+        "3333333",
+        "--allow-open",
+        "a-bug",
+        "--specs",
+        str(specs),
+    )
+
+    assert shipped.returncode == 0, shipped.stderr
+    assert json.loads(bugs.read_text("utf-8"))["status"] == "open"
+    archived = json.loads(
+        specs.joinpath("releases/_archive/0.5.0/_RELEASE.json").read_text("utf-8")
+    )
+    assert authorization in [entry["text"] for entry in archived["log"]]
