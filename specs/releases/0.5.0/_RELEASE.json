@@ -1521,6 +1521,24 @@
       "milestone": "defined",
       "sha": "8726693711b27a4ca931aef278f2e6a3c567e72a",
       "text": "Candidate defined at 8726693711b27a4ca931aef278f2e6a3c567e72a; phase IMPLEMENTATION."
+    },
+    {
+      "ts": "2026-10-09T15:24:00Z",
+      "agent": "main-thread",
+      "kind": "note",
+      "text": "Constitution amended 6.2.0 -> 7.0.0 by ADR 0239 (accepted, amends 0219) in c9ac82696: article 5 bar rises from >= 8 per criterion to >= 9 on every scorecard cell, scored by two independent judges at least every 2 days and always before evals, promote or publication. Operator words: 'não admitiremos menos que nota 9 em todos os quesitos a partir de agora', 'auditaremos de 2 em 2 dias', 'nota 9 é o mínimo'; acceptance 'Aprovo os dois (Recomendado)'."
+    },
+    {
+      "ts": "2026-10-09T15:24:00Z",
+      "agent": "main-thread",
+      "kind": "note",
+      "text": "rc-12 subset rulings: FR7 (CP3) moved to rc-13 by SPEC G1 when the PLAN measured 11.4-22.8 h; FR6 (CP1) moved to rc-13 by the operator, 'Tirar o CP1 (Recomendado)', when the PLAN measured 9.5-18.9 h with FR7 already out. AC6.1-AC6.3, AC7.1-AC7.3 and the G4 sys.path and import-cycle rows are dispositioned moved-to-rc-13; the Origin backlog ids skill-scripts-one-kernel, one-task-id-subject-grammar and origin-findings-renamed-to-the-spec-head do not exit in rc-12 and are re-picked by rc-13."
+    },
+    {
+      "ts": "2026-10-09T15:24:00Z",
+      "agent": "main-thread",
+      "kind": "note",
+      "text": "G1 overshoot accepted: the amended PLAN measures a 6.9-13.7 h critical path (low bound 1.8 h under, high bound 5.0 h over the unchanged 8.7 h ceiling), disclosed before approval and approved by the operator; the ceiling and its accounting stay unchanged and rc-12's actual is measured at closure."
     }
   ]
 }
