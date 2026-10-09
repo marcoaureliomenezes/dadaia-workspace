@@ -23,5 +23,6 @@ verify: python scripts/ci.py job
 
 - Versioning here: release-please owns the version, tag and CHANGELOG; the work branch
   is named for the live release (`_RELEASE.json`).
+- Tests never build a real venv (exhausts disk) and never use `time.sleep`/`threading.Barrier` in unit tests.
 - Dev tools (pytest, ruff, mypy, lint-imports) come from the `dev` group, installed into
   the workspace venv from this repo's root: `VIRTUAL_ENV=../../.dadaia/.venv poetry install --no-root --with dev`.
