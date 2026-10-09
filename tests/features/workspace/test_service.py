@@ -1,6 +1,7 @@
 """Unit tests for WorkspaceService."""
 
 import json
+import os
 from pathlib import Path
 
 import pytest
@@ -24,7 +25,7 @@ def service() -> WorkspaceService:
 
 
 def test_init_creates_only_registry_init_zones_and_canon_seeds(
-    service: WorkspaceService, workspace_root: Path
+    service: WorkspaceService, workspace_root: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """0.4.6 AC10 (FR1/FR10).
 
@@ -47,16 +48,37 @@ def test_init_creates_only_registry_init_zones_and_canon_seeds(
 
     spec_contexts_path = dadaia / "states" / "spec_contexts.json"
     assert json.loads(spec_contexts_path.read_text()) == {"schema_version": "2", "contexts": []}
+    expected = (
+        b'{\r\n  "schema_version": "2",\r\n  "contexts": []\r\n}'
+        if os.linesep == "\r\n"
+        else b'{\n  "schema_version": "2",\n  "contexts": []\n}'
+    )
+    assert spec_contexts_path.read_bytes() == expected
 
     registry_data = json.loads((dadaia / "states" / "server_registry.json").read_text())
     assert registry_data["version"] == "1"
     assert registry_data["entries"] == []
 
     # Idempotent: modify the state file; second init must not overwrite it.
-    spec_contexts_path.write_text(json.dumps({"version": "1", "contexts": [{"name": "x"}]}))
+    occupied_registry = b'{\r\n  "version": "1",\r\n  "contexts": [{"name": "x"}]\r\n}\r\n'
+    spec_contexts_path.write_bytes(occupied_registry)
     service.init(workspace_root, harnesses=("claude", "codex"), skip_assets=True)
     data = json.loads(spec_contexts_path.read_text())
     assert data["contexts"] == [{"name": "x"}]
+    assert spec_contexts_path.read_bytes() == occupied_registry
+
+    from dadaia_workspace.infrastructure.json_context_store import JsonContextStore
+
+    seeded: list[Path] = []
+    monkeypatch.setattr(
+        JsonContextStore,
+        "seed_if_absent",
+        lambda store: seeded.append(store.states_dir),
+        raising=False,
+    )
+    spec_contexts_path.unlink()
+    service.init(workspace_root, harnesses=("claude",), skip_assets=True)
+    assert (seeded, spec_contexts_path.exists()) == ([spec_contexts_path.parent], False)
 
 
 def test_init_skip_assets_writes_no_settings_and_says_ungated(
