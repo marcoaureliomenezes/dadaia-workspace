@@ -2,12 +2,13 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any
 
-from dadaia_workspace.features.capabilities import distribution_version
-from dadaia_workspace.features.migrate.state_v2 import execute_migration, plan_migration
+from dadaia_workspace.infrastructure.json_context_store import JsonContextStore
+from dadaia_workspace.infrastructure.provider_version import provider_version
 
 
 @dataclass(frozen=True)
@@ -23,30 +24,27 @@ class ReconcileResult:
         return asdict(self)
 
 
-def _snapshot_state(workspace_root: Path) -> dict[Path, bytes | None]:
-    states = workspace_root / ".dadaia" / "states"
-    targets = (states / "spec_contexts.json", states / "primary_context.json")
-    return {t: t.read_bytes() if t.is_file() else None for t in targets}
-
-
-def _restore_state(snapshots: dict[Path, bytes | None]) -> None:
-    for target, content in snapshots.items():
-        if content is None:
-            target.unlink(missing_ok=True)
-        else:
-            target.write_bytes(content)
+def _restore_file(target: Path, content: bytes | None) -> None:
+    if content is None:
+        target.unlink(missing_ok=True)
+    else:
+        target.write_bytes(content)
 
 
 def reconcile_workspace(
     workspace_root: Path,
     *,
+    context_store: JsonContextStore | None = None,
+    version: Callable[[], str] = lambda: provider_version() or "0+source",
+    migration_plan: Callable[[JsonContextStore], Any] | None = None,
+    migrate: Callable[[JsonContextStore, Path], None] | None = None,
     expected_version: str,
     public_service: Any,
     doctor_service: Any,
     actual_version: str | None = None,
 ) -> ReconcileResult:
     """Converge a workspace after an exact candidate wheel has been installed."""
-    actual = actual_version or distribution_version()
+    actual = actual_version or version()
     if actual != expected_version:
         return ReconcileResult(
             ok=False,
@@ -56,9 +54,13 @@ def reconcile_workspace(
             error=f"provider version mismatch: expected {expected_version}, found {actual}",
             rollback_required=False,
         )
+    if context_store is None or migration_plan is None or migrate is None:
+        return ReconcileResult(False, expected_version, actual, (), "dependencies not composed")
 
     steps: list[str] = ["provider-version"]
-    snapshots = _snapshot_state(workspace_root)
+    registry_snapshot = context_store.snapshot()
+    primary = context_store.states_dir / "primary_context.json"
+    primary_snapshot = primary.read_bytes() if primary.is_file() else None
     projections_started = False
     try:
         # Bug reconcile-root-owned-agentic: a mixed-ownership workspace (e.g.
@@ -76,10 +78,9 @@ def reconcile_workspace(
                 error=ownership_error,
             )
 
-        states_dir = workspace_root / ".dadaia" / "states"
-        plan = plan_migration(states_dir)
+        plan = migration_plan(context_store)
         if not plan.already_v2:
-            execute_migration(states_dir, workspace_root)
+            migrate(context_store, workspace_root)
         steps.append("state-schema-v2")
 
         public_service.stage(workspace_root)
@@ -105,11 +106,12 @@ def reconcile_workspace(
             raise RuntimeError("context invariants failed: " + summary)
         steps.append("context-invariants")
 
-        if distribution_version() != expected_version:
+        if version() != expected_version:
             raise RuntimeError("capability canary does not identify the expected provider")
         steps.append("capability-canary")
     except Exception as exc:  # noqa: BLE001 - transaction boundary returns structured failure.
-        _restore_state(snapshots)
+        context_store.restore(registry_snapshot)
+        _restore_file(primary, primary_snapshot)
         return ReconcileResult(
             ok=False,
             expected_version=expected_version,

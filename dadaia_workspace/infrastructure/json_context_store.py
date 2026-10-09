@@ -6,7 +6,7 @@ one — v3 only adds ``associated_repos``, which ``_from_dict`` defaults to empt
 
 import json
 from pathlib import Path
-from typing import cast
+from typing import Any, cast
 
 from dadaia_workspace.core import context_registry
 from dadaia_workspace.core.atomic_write import atomic_write
@@ -95,17 +95,36 @@ def _from_dict(d: dict) -> SpecContextProject:  # type: ignore[type-arg]
 
 class JsonContextStore:
     def __init__(self, states_dir: Path) -> None:
+        self.states_dir = states_dir
         self._path = states_dir / "spec_contexts.json"
+
+    def exists(self) -> bool:
+        return self._path.exists()
+
+    def read_raw(self) -> dict[str, Any]:
+        return cast("dict[str, Any]", json.loads(self._path.read_text(encoding="utf-8")))
+
+    def replace_raw(self, data: dict, *, newline: str | None = "") -> None:  # type: ignore[type-arg]
+        atomic_write(self._path, json.dumps(data, indent=2), newline=newline)
+
+    def snapshot(self) -> bytes | None:
+        return self._path.read_bytes() if self._path.is_file() else None
+
+    def restore(self, content: bytes | None) -> None:
+        if content is None:
+            self._path.unlink(missing_ok=True)
+        else:
+            atomic_write(self._path, content)
 
     def save(self, ctx: SpecContextProject) -> None:
         data = _load(self._path)
         data["contexts"].append(_to_dict(ctx))
-        atomic_write(self._path, json.dumps(data, indent=2))
+        self.replace_raw(data)
 
     def update(self, ctx: SpecContextProject) -> None:
         data = _load(self._path)
         data["contexts"] = [_to_dict(ctx) if c["name"] == ctx.name else c for c in data["contexts"]]
-        atomic_write(self._path, json.dumps(data, indent=2))
+        self.replace_raw(data)
 
     def get(self, name: str) -> SpecContextProject | None:
         return next(
@@ -119,4 +138,4 @@ class JsonContextStore:
     def delete(self, name: str) -> None:
         data = _load(self._path)
         data["contexts"] = [c for c in data["contexts"] if c["name"] != name]
-        atomic_write(self._path, json.dumps(data, indent=2))
+        self.replace_raw(data)

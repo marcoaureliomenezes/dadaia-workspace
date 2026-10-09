@@ -18,7 +18,6 @@ from dadaia_workspace.core.exceptions import (
     WorkspaceVenvBootstrapError,
     WorkspaceVenvNewerError,
 )
-from dadaia_workspace.features.reconcile import reconcile_workspace
 from dadaia_workspace.features.spec_context.service import slug_from_url
 
 console = Console()
@@ -29,6 +28,7 @@ _LAW_NOTE = "Sessions launch at the workspace root."
 #: How ``init`` is invoked before any workspace (and so any ``.dadaia/.venv``) exists —
 #: every ``fix:`` line init prints starts here, so each one runs as printed.
 _INIT = "uvx dadaia-workspace init"
+reconcile_workspace = container.reconcile_workspace
 
 
 @dataclass(frozen=True)
@@ -182,8 +182,6 @@ def _reconcile_upgrade(root: Path, before: str | None, after: str | None) -> Non
     result = reconcile_workspace(
         root,
         expected_version=after or "",
-        public_service=container.build_public_service(),
-        doctor_service=container.build_doctor_service(root),
     )
     if not result.ok:
         fix = fix_line(root, "reconcile", "--expect-version", after or "")

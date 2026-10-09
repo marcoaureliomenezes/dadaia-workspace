@@ -9,7 +9,6 @@ import typer
 from dadaia_workspace import container
 from dadaia_workspace.core.cli_line import fix_line
 from dadaia_workspace.core.workspace_resolver import resolve_workspace_root
-from dadaia_workspace.features.reconcile import reconcile_workspace
 
 
 def reconcile(
@@ -20,12 +19,7 @@ def reconcile(
 ) -> None:
     """Reconcile state and projections after installing an exact candidate wheel."""
     workspace_root = resolve_workspace_root()
-    result = reconcile_workspace(
-        workspace_root,
-        expected_version=expect_version,
-        public_service=container.build_public_service(),
-        doctor_service=container.build_doctor_service(workspace_root),
-    )
+    result = container.reconcile_workspace(workspace_root, expected_version=expect_version)
     payload = result.to_dict()
     if json_output:
         typer.echo(json.dumps(payload, sort_keys=True))
