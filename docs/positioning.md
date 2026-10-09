@@ -49,12 +49,12 @@ A team with ten repositories does not maintain ten copies of anything:
   and every project in the workspace is governed by that one set.
 - **One authored set, every harness.** Claude Code, Codex, Kimi Code, Cursor, Devin and
   GitHub Copilot are entry harnesses over the same canonical rules: public assets
-  originate once, stage once, and each harness reads them natively or through
-  per-entry symlinks.
+  originate once, installation refreshes their staging, and each harness reads them
+  natively or through its projection.
 - **One project, however many repos.** Ten repositories can be one context or ten
   contexts. The specs tree follows the product, and the repositories it spans are
   declared as its associated repos.
-- **Boundaries are mechanical.** Path class, bind scope, root hygiene, venv-rooting and
+- **Boundaries are mechanical.** Path class, bind scope, root hygiene and
   the push gate refuse mechanically, each refusal carrying one fix line. No
   phase and no mode is enforced.
 - **Concurrency stays visible.** Concurrent sessions never block each other; overlap

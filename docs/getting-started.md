@@ -154,6 +154,6 @@ or a task's from step 5.
    records it and moves the release folder to `_archive/`.
 
 A bug is registered once the operator confirms it; a block-list bug is fixed at once as
-a hotfix job — lineage, a RED new case, root-cause fix, GREEN, `resolve` with its red
-loop, one commit. Any other bug becomes explicit candidate scope; ship refuses it while
+a hotfix job — lineage, a RED new case, root-cause fix, GREEN, then `resolve` with the
+implementation sha. Any other bug becomes explicit candidate scope; ship refuses it while
 open unless the operator authorizes that exact id and the authorization is recorded.

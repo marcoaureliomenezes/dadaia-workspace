@@ -31,14 +31,15 @@ What it rests on:
   memory, release and task state.
 - Documents are the lifecycle — backlog, SPEC, PLAN, the job files, `_RELEASE.json` and
   `BUGS.jsonl` carry ordered work; no runtime drives agents through steps.
-- Deterministic boundaries — path class, bind scope, root hygiene, venv-rooting and
+- Deterministic boundaries — path class, bind scope, root hygiene and
   the push gate are mechanical, each refusal carrying one fix line; what
   cannot be mechanical is written as law.
 - Visible concurrency — sessions may race, git exposes the overlap, and nothing waits
   on a lock.
-- No mechanism without a demand, and no slop: runtime state, reports, handoffs,
-  caches, projections and temporary files have canonical homes and never leak into a
-  repository.
+- Features and fixes spend future options when they add coupling, so delivery alternates
+  with deletion, simplification or decoupling. Mechanisms without a current demand are
+  removed, and runtime state, reports, handoffs, caches, projections and temporary files
+  have canonical homes.
 - Success is evidenced by reviews, task commits, commands and artifacts, never
   inferred from prose.
 

@@ -11,15 +11,15 @@
 | slug | title | tldr |
 |------|-------|------|
 | `agent-comms` | agent-comms | The handoff-v1 JSON contract agents emit, its validator behind `dadaia reports validate`, and ack-on-consume deletion with a one-day TTL. |
-| `agent-orchestration` | agent-orchestration | Three dd- personas dispatched by the main thread alone; ordered work carried by the SDD documents and handoffs, never a runtime; concurrent sessions, no locks. |
-| `agentic-entities` | agentic-entities | The entity registry — three personas, the deterministic behaviours every harness implements, the rules — and the behavior map binding each skill to law. |
+| `agent-orchestration` | agent-orchestration | Three dd- personas are leaf workers dispatched by the main thread; SDD documents, worktrees and handoffs carry the work, never an orchestration runtime. |
+| `agentic-entities` | agentic-entities | One registry names the three personas, five deterministic behaviors and two abstract rules; a structural behavior map assigns every shipped skill and scoped law to an owner. |
 
 ### distribution
 
 | slug | title | tldr |
 |------|-------|------|
 | `agent-evals` | agent-evals | The library's own agent evals — two graded tasks run on the candidate wheel and a PyPI baseline by one dispatch-or-schedule workflow. |
-| `public-asset-distribution` | public-asset-distribution | Public assets staged once, projected into the root map, scoped AGENTS.md, .agents/ and each harness's files, with scaffold and scripts; doctor reports drift. |
+| `public-asset-distribution` | public-asset-distribution | Public install stages current packaged assets and projects the root map, scoped law, shared agents and skills, and each registered harness; public doctor reports drift. |
 | `pypi-distribution` | pypi-distribution | The PyPI package on one version axis, two console-script names, the OIDC pipeline, the wheel contract and the derived docs. |
 
 ### harness
@@ -37,7 +37,7 @@
 
 | slug | title | tldr |
 |------|-------|------|
-| `product-vision` | product-vision | One workspace folder, an agent at its root, projects in repos inside, governance outside every repo; multi-project x multi-repo, never a monorepo; no slop. |
+| `product-vision` | product-vision | One workspace, projects in repositories inside it, governance outside every repository; contexts span one main repository and any associated repositories, never a monorepo. |
 | `spec-context-project` | spec-context-project | One canonical specs tree owned by one main repository, optionally spanning associated repos, bound per session and safe for visible concurrent work. |
 
 ### platform
@@ -50,7 +50,7 @@
 | `context-portability` | context-portability | dadaia export writes the workspace's context set to one file; dadaia import registers each unknown context DEAD elsewhere, ready for dadaia context alive. |
 | `cross-platform-portability` | cross-platform-portability | Linux, macOS and Windows through one platform capability seam carrying the venv layout, Python hooks and cross-OS CI legs. |
 | `server-registry` | server-registry | Dev-server port registry with TTL and PID tracking so parallel sessions never collide — one stdlib skill script over one JSON state file; no CLI verb. |
-| `specs-migration` | specs-migration | specs init brings specs/ to the canon and writes the gitflow, never committing; specs upgrade re-stamps 6-10 as 11; migrate lifts registry v1. |
+| `specs-migration` | specs-migration | specs init brings specs/ to the canon and writes gitflow without committing; specs upgrade brings supported trees to pattern 12; migrate lifts the context registry. |
 | `workspace-doctor` | workspace-doctor | dadaia doctor, the one compliance check — workspace, specs, ledgers; one line per finding, exit 1 with a fix line; --fix holds slop, expiry acts by zone class. |
 | `workspace-init` | workspace-init | Level 1 — uvx dadaia-workspace init [DIR] provisions venv, zones, law, one harness; re-init upgrades; --repo adds level 2; next step from one ordered step list. |
 
@@ -58,9 +58,9 @@
 
 | slug | title | tldr |
 |------|-------|------|
-| `audits-canon` | audits-canon | Audits are committed three-pillar reviews over a sha window, findings moved by audit.py; decisions.jsonl records only the operator accepts, with his ruling. |
+| `audits-canon` | audits-canon | An audit runs bug-history, spec-compliance and memory-drift pillars over one measured window and stores schema-valid findings until terminal disposition. |
 | `backlog-ledger` | backlog-ledger | The operator's demand queue: BACKLOG.json active[] plus one histo record per exit; backlog.py writes it, dadaia doctor judges bound subjects. |
-| `bug-ledger` | bug-ledger | One bug record per line in BUGS.jsonl, registered after operator confirmation, closed only by a transition carrying its red loop; bugs.py writes it. |
-| `release-lifecycle` | release-lifecycle | Candidates in rc-<N>/ grow one live release; release.py writes _RELEASE.json; a candidate is a DAG of jobs ending in Reconciliation; promote archives it. |
-| `sdd-gate-v3` | sdd-gate-v3 | No-lock enforcement — three gate blocks (root entry, non-venv command, PROTECTED or out-of-scope write; repos/<r> takes merges), one fix each, a push chokepoint |
-| `worktrees` | worktrees | Every agent change to a repo is made in a canonical worktree — a job, a task, define, reconcile or backlog — and lands by worktree.py merge after its gate. |
+| `bug-ledger` | bug-ledger | BUGS.jsonl stores one lean current record per confirmed defect; its writer persists registration and resolution facts while git owns derived history. |
+| `release-lifecycle` | release-lifecycle | One live release grows through closed-scope candidates; _RELEASE.json holds current phase, milestones and a lean append-only narrative. |
+| `sdd-gate-v3` | sdd-gate-v3 | No-lock enforcement combines root-entry hygiene and SDD write policy before tools, then applies branch, specs-canon and privacy checks at push. |
+| `worktrees` | worktrees | Repository changes are isolated in canonical plain, release, task, backlog or hotfix worktrees and land by worktree.py merge after the gate for that tree shape. |

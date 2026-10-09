@@ -1,8 +1,8 @@
 ---
 slug: product-vision
 title: product-vision
-tldr: One workspace folder, an agent at its root, projects in repos inside, governance outside every repo; multi-project x multi-repo, never a monorepo; no slop.
-summary: The founding paradigm and the pillars of dadaia-workspace, plus the two usage paths — a human from a shell, an agent from the root AGENTS.md map — reading one truth.
+tldr: One workspace, projects in repositories inside it, governance outside every repository; contexts span one main repository and any associated repositories, never a monorepo.
+summary: The product paradigm, evidence and coupling principles, and the human and agent paths through one current product truth.
 tags: [vision, paradigm, pillars]
 sources:
   - AGENTS.md
@@ -10,34 +10,30 @@ sources:
   - specs/constitution.md
 ---
 
-## The paradigm
+## Paradigm
 
-- One workspace folder; the agent session launches at its root, always.
-- Projects live in repos inside it (`repos/<slug>/`), which receive agent work only as merges from their worktrees under `worktrees/<repo>/` ([[worktrees]]); governance — the root `AGENTS.md` map, the scoped `AGENTS.md` files, `.agents/skills`, `.agents/agents`, `.dadaia/` — lives outside every repo.
-- A project is a context: one main repo, where `specs/` lives, plus its associated repos; a workspace holds many contexts and a context many repos — never a monorepo; a single-repo context is the minimal case ([[spec-context-project]], [[context-management]]).
-- The same canonical rules reach every harness through the one authored set ([[agentic-entities]]).
+- An agent session starts at the workspace root. Product repositories live under `repos/<slug>/`; governance, projections, skills and runtime state live outside them.
+- A context is one main repository, where `specs/` lives, plus associated repositories. A workspace holds many contexts and a context may span many repositories; this is not a monorepo ([[context-management]]).
+- Repository changes land from canonical worktrees. Audits are the sole direct specs exception ([[worktrees]]).
+- The same authored law reaches every registered harness through native files or projections ([[agentic-entities]]).
 
-## Identity and pillars
+## Product principles
 
-- dadaia-workspace is the operating environment around repositories developed with AI agents; its unit is the context.
-- Current context — agents bind explicitly and receive only the relevant project, memory, release and task state.
-- Documents are the lifecycle — backlog, SPEC, PLAN, the job files, `_RELEASE.json` and `BUGS.jsonl` carry ordered work; no runtime drives agents through steps ([[release-lifecycle]], [[bug-ledger]], [[backlog-ledger]]).
-- Deterministic boundaries — path class, bind scope, root hygiene, venv-rooting and the push gate are mechanical, each refusal carrying one fix line — a command, or an `Operator action:` when only the operator can choose; what cannot be mechanical is written as law ([[sdd-gate-v3]]).
-- Visible concurrency — sessions may race, git exposes overlap, and nothing waits on a lock.
-- No mechanism without a demand — a capability exists only while it earns its maintenance cost, and deleted surface beats accreted surface.
-- No slop — runtime state, reports, handoffs, caches, projections and temporary files have canonical homes and never leak into repositories.
-- Claude Code, Codex, Kimi Code, Cursor, Devin and GitHub Copilot are the entry harnesses, one registry record each; public assets originate once, stage once, and are read natively or through per-entry symlinks ([[public-asset-distribution]]).
-- Success is evidenced by reviews, task commits, commands and artifacts, never inferred from prose.
-- The trust contract (`specs/constitution.md` §5): no gate accepts a red that vanished; evidence — verdict, mutation, test-audit — exists only as the output of the tool that computed it, tied to the sha it judged; shipped scripts read as clean architecture; a ceremony that produces no gate-checked evidence is deleted; the version scorecard measures each, every criterion at 8 or above before evals or publication.
+- Context is explicit: a bind scopes the session to one context's repository set and injects its constitution and memory.
+- Documents are the lifecycle: backlog, approved definition, job files, release state and record stores carry progress; no workflow engine advances them.
+- Mechanical boundaries cover path class, bind scope, root hygiene and push publication. Each refusal carries one executable fix or one operator action ([[sdd-gate-v3]]).
+- Concurrency remains visible through git; no lock hides overlap.
+- Evidence is produced by the mechanism that judged the artifact and binds to the judged sha.
+- Features and fixes spend future options when they add coupling. Delivery alternates with deletion, simplification or decoupling that restores options.
+- Mechanisms without a current demand are removed, and runtime state, reports, handoffs, caches and projections stay in their canonical homes.
 
-## Two usage paths
+## Two entry paths
 
-- A human drives it from a shell in three onboarding levels: `uvx dadaia-workspace init [DIR] --harness <name> --repo <url>` provisions the workspace with its first project cloned, hooked and ALIVE, and `.dadaia/.venv/bin/dadaia context bind <ctx>` binds the session; `.dadaia/.venv/bin/dadaia specs init --context <ctx>` gives the main repo its canonical `specs/` and the project gitflow in its constitution, the first pass fills memory, and `.dadaia/.venv/bin/dadaia context baseline <ctx>` publishes the project on its principal, integration and work branches; `.dadaia/.venv/bin/dadaia context create --main-repo <url>` adds the next project; `.dadaia/.venv/bin/dadaia doctor` lists findings with one fix line under each — a command, or an `Operator action:` when only the operator can choose — and names the next step, so an agent loops on it — run doctor, execute the `fix:` line — from an empty directory to a published project; re-running the `uvx` init line upgrades the workspace; `README.md` is that path ([[pypi-distribution]], [[workspace-init]], [[context-management]], [[workspace-doctor]]).
-- A repo's root `AGENTS.md` declares its three gate commands, `verify:`, `verify-stage:` and `verify-task:`, which `worktree.py` runs as argv ([[worktrees]]).
-- The root `AGENTS.md` map carries the three levels in its onboarding section, and every command it and the scoped law cite runs through `.dadaia/.venv/bin/dadaia`.
-- An agent reads the root `AGENTS.md` map — flow, roles, gate invariants, where things live, the index of every scoped law and skill — opens the scoped `AGENTS.md` of its area, and works inside the gate, the ledger scripts and the handoff contract; `llms.txt` at the repository root is its index ([[sdd-gate-v3]], [[agent-comms]]).
-- Both paths read one truth: every human- and agent-facing document derives from a named memory atom under its content hash ([[QUALITY]] P-29).
+- A human initializes the workspace, creates or adopts a context, initializes its specs, completes the first memory pass and publishes the project. `doctor` reports the next real-state step and one fix line ([[workspace-init]], [[workspace-doctor]]).
+- An agent reads the root map, the scoped law for the area, the relevant memory and the approved release artifacts, then works through the owning ledger scripts and worktree gates.
+- A repository declares one tracked `verify:` command. Job and plain-change merges run it when present; task merges enforce RED/implementation separation without a second repository command ([[worktrees]]).
+- Human documents and agent-facing indices are reconciled from current product memory. The CLI reference is generated from the live command tree; text identity is not a product-truth mechanism.
 
 ## Dependencies
 
-[[spec-context-project]], [[context-management]], [[sdd-gate-v3]], [[release-lifecycle]], [[bug-ledger]], [[backlog-ledger]], [[ARCHITECTURE]], [[public-asset-distribution]], [[pypi-distribution]], [[QUALITY]], [[agentic-entities]], [[worktrees]].
+[[spec-context-project]], [[context-management]], [[sdd-gate-v3]], [[release-lifecycle]], [[worktrees]], [[public-asset-distribution]], [[workspace-init]], [[workspace-doctor]], [[agentic-entities]].

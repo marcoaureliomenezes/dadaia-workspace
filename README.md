@@ -21,18 +21,19 @@ associated repos; a single-repo context is the minimal case. Eight pillars:
   memory, release and task state.
 - **Documents are the lifecycle** — backlog, SPEC, PLAN, the job files, `_RELEASE.json` and
   `BUGS.jsonl` carry ordered work; no runtime drives agents through steps.
-- **Deterministic boundaries** — path class, bind scope, root hygiene, venv-rooting and
+- **Deterministic boundaries** — path class, bind scope, root hygiene and
   the push gate are mechanical, each refusal carrying one fix line; what cannot
   be mechanical is written as law.
 - **Visible concurrency** — sessions may race, git exposes the overlap, and nothing
   waits on a lock.
-- **No mechanism without a demand** — a capability exists only while it earns its
-  maintenance cost, and deleted surface beats accreted surface.
+- **Features preserve futures** — features and fixes spend options when coupling grows;
+  delivery alternates with deletion, simplification or decoupling, and a capability
+  exists only while it earns its maintenance cost.
 - **No slop** — runtime state, reports, handoffs, caches, projections and temporary
   files have canonical homes and never leak into repositories.
 - **Six entry harnesses** — Claude Code, Codex, Kimi Code, Cursor, Devin and GitHub
-  Copilot, one registry record each; public assets originate once, stage once, and are
-  read natively or through per-entry symlinks.
+  Copilot, one registry record each; public assets originate once, and installation
+  refreshes staging before native or projected consumption.
 - **Evidence, never prose** — success is evidenced by reviews, task commits, commands
   and artifacts.
 
@@ -95,8 +96,8 @@ natively; Claude Code reaches skills and personas through per-entry symlinks. A 
 differs only in serialization — event names, hook file, answer shape — and adds no
 behaviour.
 
-The gate is one PreToolUse pre-gate: root whitelist, venv guard, SDD gate, in that
-order, first block wins; what it blocks, its path classes and every fail-open path are
+The gate is one PreToolUse pre-gate: root whitelist then SDD gate, first block wins;
+what it blocks, its path classes and every fail-open path are
 stated once, in the root `AGENTS.md` §3.
 Every BLOCK carries exactly one `fix:` line, and a contract test feeds each fix back
 through the gate asserting ALLOW. No lease, lock or wait path exists; the gate reads no
@@ -109,7 +110,8 @@ Reconciliation job closes it — memory reconciliation, disposition sweep — an
 ledger scripts under `.agents/skills/*/scripts/` (`bugs.py`, `backlog.py`,
 `release.py`, `audit.py`) are each record's one writer. A bug is proposed to the
 operator and registered only after confirmation; a block-list bug is fixed at once as a
-hotfix job with a RED test, any other in the candidate's bug batch. Completed work leaves as a `handoff-v1` record, validated by
+hotfix job with a RED test, while any other bug becomes explicit candidate scope. Ship
+may carry an open bug only with the operator's exact recorded authorization. Completed work leaves as a `handoff-v1` record, validated by
 `.dadaia/.venv/bin/dadaia reports validate`.
 
 ## Documentation

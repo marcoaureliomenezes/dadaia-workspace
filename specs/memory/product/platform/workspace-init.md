@@ -2,7 +2,7 @@
 slug: workspace-init
 title: workspace-init
 tldr: Level 1 — uvx dadaia-workspace init [DIR] provisions venv, zones, law, one harness; re-init upgrades; --repo adds level 2; next step from one ordered step list.
-summary: dadaia init fills one plan from flags or TTY prompts, provisions the venv, the registry's init/install zones, the shared skills root and one harness's projection, seeds the states and the level-1 root files and stages and installs public assets in at most twelve lines of output naming the absolute venv CLI; on an existing workspace it upgrades an older venv, reports an equal one and refuses a newer one; with --repo it delegates to context create; one ordered onboarding step list, each step a real-state predicate plus one built fix line, gives the next step every onboarding caller prints.
+summary: dadaia init fills one plan from flags or prompts, provisions the venv and workspace tree, seeds state, and invokes the install path that stages current public assets before projection; re-init upgrades, and one ordered real-state step list drives onboarding guidance.
 tags: [workspace, init, setup, upgrade, onboarding]
 sources:
   - dadaia_workspace/cli/commands/init.py
@@ -31,10 +31,10 @@ sources:
 - The tree it lays down is a view of `dadaia_workspace/core/workspace_layout.py` — the root law, `DADAIA_ZONES`, `STATES_CANON` — the same rows `dadaia public stage` renders into the law files ([[public-asset-distribution]]).
 - It seeds `states/spec_contexts.json` and `states/server_registry.json` as empty documents without overwriting existing data ([[server-registry]]), and the absent level-1 root files from `workspace_layout.LEVEL1_SEEDS`: `.dadaiaignore` from the legacy `states/instance_exceptions.txt`, verbatim, else a comment-only template, and an empty `prompt.md`; an entry already present — a dangling link included — is never rewritten (one exception: a list-form `states/privacy_denylist.json` is converted once to the one object form, the original held in `.dadaia/reaped/`; any other content is left for the loader to refuse, [[sdd-gate-v3]]), each file is the operator's from then on, and the doctor's SessionStart lane re-creates one that goes missing ([[workspace-doctor]]); the root `AGENTS.md` comes from `public install`.
 - `states/harness_profile.json` is the roster, written through the profile store's one writer (shared with `dadaia doctor --fix`); a re-init with another harness merges into the persisted roster, never narrowing it.
-- Unless `--skip-assets`, init runs public stage and install, the one writer of every hook wiring; with `--skip-assets` the output carries the warning that the workspace is ungated until `dadaia public install` runs.
+- Unless `--skip-assets`, init invokes public install, which refreshes staging before projecting every hook wiring; with `--skip-assets` the output warns that the workspace is ungated until `dadaia public install` runs.
 - Output is at most twelve lines: the workspace line, one asset-count line (never a per-path listing), `CLI: <absolute path of .dadaia/.venv/bin/dadaia>`, the root-launch note, then the next step; no harness-specific or user-settings advice is printed; no line names a bare `dadaia` verb.
 - The only write outside the workspace is the documented Kimi Code user config ([[harness-kimi-code]]); init deletes no projection.
-- `dadaia harness add <name>` stages if needed, installs that harness's set and appends it to the roster; `dadaia harness list` reads it.
+- `dadaia harness add <name>` invokes the staging install path for that harness and appends it to the roster; `dadaia harness list` reads it.
 
 ## Upgrade
 

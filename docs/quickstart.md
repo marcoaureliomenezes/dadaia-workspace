@@ -112,7 +112,7 @@ worktree.
 release or a non-SemVer id with a `fix:` line; the stub opens with `## Bug window review`. From there, author
 `SPEC.md`, `PLAN.md` and one job file per job, `tasks/<job>.md`, in that `rc-<N>/`, `PLAN.md`
 opening with the As-is review table (`unit | today | bugs | verdict | why`) and carrying the
-`## DAG` of jobs and the `### Hot files`; `release.py phase IMPLEMENTATION --sha <sha>` opens
+`## DAG` of jobs with waves and exact write sets; `release.py phase IMPLEMENTATION --sha <sha>` opens
 implementation once SPEC and PLAN carry `**Status:** Approved` and every job file is well formed.
 
 Next: [positioning](positioning.md) for why this shape, [the bug loop](bug-loop.md)
