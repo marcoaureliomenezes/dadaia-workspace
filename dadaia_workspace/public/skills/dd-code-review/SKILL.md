@@ -35,7 +35,7 @@ axes are reported side by side with equal weight, so no axis hides another's fin
 
 ## 3. Axis 2 — Spec
 
-- Read `<specs-dir>/releases/<v>/rc-<N>/SPEC.md` (`**Status:** Approved`) and the job's `rc-<N>/tasks/<job>.md`.
+- Read `<specs-dir>/releases/<v>/rc-<N>/SPEC.md` (`**Status:** Approved`) and the job's `rc-<N>/tasks/job<n>.md`.
 - Does the diff do what they say — nothing more, nothing less?
 - Scope growth beyond the task's declared write set is a finding, even when the code is good.
 - Acceptance criteria without corresponding evidence (test/assertion) is a finding.
