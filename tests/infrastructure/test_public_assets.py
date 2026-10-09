@@ -35,7 +35,9 @@ def _rendered(result: object) -> list[str]:
 
 pytestmark = pytest.mark.slow
 
-_DESIGN_SKILLS = tuple(f"dd-{n}" for n in ("domain-modeling", "codebase-design", "architecture-survey"))
+_DESIGN_SKILLS = tuple(
+    f"dd-{n}" for n in ("domain-modeling", "codebase-design", "architecture-survey")
+)
 
 _runner = CliRunner()
 _AGENTS = {"dd-code-reviewer", "dd-product-engineer", "dd-software-engineer"}
@@ -475,7 +477,9 @@ def test_the_three_design_skills_are_gone_from_stage_install_and_the_shipped_tre
     shutil.copytree(public_asset_roster.default_public_dir(), earlier)
     for name in _DESIGN_SKILLS:
         (earlier / "skills" / name).mkdir()
-        (earlier / "skills" / name / "SKILL.md").write_text(f"---\nname: {name}\n---\n", encoding="utf-8")
+        (earlier / "skills" / name / "SKILL.md").write_text(
+            f"---\nname: {name}\n---\n", encoding="utf-8"
+        )
     register_all(ws)
     old_manager = FileSystemPublicAssetManager()
     old_manager._public_dir = earlier  # noqa: SLF001 — exercise the earlier tree only
