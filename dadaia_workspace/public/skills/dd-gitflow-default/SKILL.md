@@ -38,7 +38,7 @@ The branch contract by role; the names are `specs/constitution.md`'s `gitflow:` 
 | backlog `wt/backlog/<slug>` | Yes | work | its worktree merge (`worktrees/AGENTS.md` §2) |
 | task `wt/<M.m.p>-rc<N>/<job>--<task-id>` | No | its job branch | its worktree merge (`worktrees/AGENTS.md` §2) (its task gate) |
 | plain `wt/<name>` | No — local only | the live work branch, else the checked-out branch, recorded | its reviewed worktree merge, with optional `verify:` |
-| integration | No — advances only by PR | principal (bootstrap only) | PR from the work branch, one per candidate |
+| integration | No — advances only by PR | principal (bootstrap only) | PR from the row above, one per candidate |
 | principal | No — advances only by PR | — | PR from the integration branch, at the final `rc` |
 
 - No `v` prefix or suffix; a hotfix job is `wt/hotfix/<bug-id>`, local only, landing by its worktree merge (`worktrees/AGENTS.md` §2).
