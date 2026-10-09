@@ -40,7 +40,7 @@ Also input: `.dadaia/.venv/bin/dadaia doctor` against every release the window t
 
 ## Job files — the checks the code leaves to the audit
 
-Input: every `rc-<N>/tasks/<job>.md` the window touches and the job commits behind it (`dd-release-definition` §5 teaches the rules).
+Input: every `rc-<N>/tasks/job<n>.md` the window touches and the job commits behind it (`dd-release-definition` §5 teaches the rules).
 
 1. Disjoint sets: jobs in one PLAN wave have disjoint complete `W:` sets; tasks in one job have disjoint exact `W:` sets. An overlap is MEDIUM.
 2. Every task cites the AC it serves; one that names none is MEDIUM.
