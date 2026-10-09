@@ -45,9 +45,12 @@ def test_init_creates_the_literal_level_one_state(tmp_path: Path) -> None:
         )
     )
     assert result.output == expected_output
-    assert (ws / ".dadaia/states/spec_contexts.json").read_bytes() == (
-        b'{\n  "schema_version": "2",\n  "contexts": []\n}'
+    expected_registry = (
+        b'{\r\n  "schema_version": "2",\r\n  "contexts": []\r\n}'
+        if PLATFORM.windows
+        else b'{\n  "schema_version": "2",\n  "contexts": []\n}'
     )
+    assert (ws / ".dadaia/states/spec_contexts.json").read_bytes() == expected_registry
     assert (ws / ".dadaia/states/harness_profile.json").read_bytes() == (
         b'{\n  "schema_version": "1",\n  "harnesses": [\n    "claude"\n  ]\n}'
     )
