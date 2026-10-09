@@ -5,7 +5,7 @@ Disclosed reference reached at `SKILL.md` step 7 — `dd-product-engineer` runs 
 ## Protocol — delete, update, add
 
 1. `phase CLOSURE` already ran, per the order in `RC-FLOW.md` step 4; no memory write before it.
-2. `python3 .agents/skills/dd-release-implementation/scripts/release.py drift` — the window opens at the live release's last `kind: memory` entry's `until`, else its `defined.sha`; exit 1 means there is work. The worklist is every atom at least one of whose `sources` globs matched a changed path, and every `features/<pkg>/` package or `hooks/*.py` module no atom's sources cover.
+2. `python3 .agents/skills/dd-release-implementation/scripts/release.py drift` — the window opens at the live release's last `kind: memory` entry's `until`, else its `defined.sha`; exit 1 means there is work, and its output is the authoritative worklist.
 3. For each listed atom, read `git diff <since>..HEAD -- <matched paths>` in full, then edit the atom in this order and no other:
    - DELETE every claim the code no longer supports — a verb, a file, a behavior, a number.
    - UPDATE every claim whose behavior changed; the tldr and summary are claims too.
@@ -26,4 +26,4 @@ Disclosed reference reached at `SKILL.md` step 7 — `dd-product-engineer` runs 
 - `product/index.md` and `product/catalog.json` are generated together — never edited by hand.
 - `product/<area>/<slug>.md`: one atom per feature — what it does for its user, its boundaries, its current behavior, its runtime state, its dependencies as `[[slug]]` links; no implementation tour, no principle.
 
-*Done when:* the `kind: memory` entry covers every worklist entry, `.dadaia/.venv/bin/dadaia doctor` is clean and the derived-docs test is green on the Reconciliation job's HEAD — an atom and its derived sections land in one merge.
+*Done when:* the closure's single `kind: memory` entry covers every authoritative worklist entry, `.dadaia/.venv/bin/dadaia doctor` is clean, and each changed atom lands with its reconciled `README.md`, `llms.txt` and `docs/*.md` sections in the same Reconciliation merge.
