@@ -144,8 +144,8 @@ class StructuralValidator:
         label = f"specs/{dst.relative_to(self.specs_dir).as_posix()}"
         canonical_text = render_registry_tables(canonical_path.read_text(encoding="utf-8"))
         current_text = dst.read_text(encoding="utf-8")
-        canonical_hash = _sha(render_registry_tables(canonical_text))
-        current_hash = _sha(render_registry_tables(current_text))
+        canonical_hash = _sha(canonical_text)
+        current_hash = _sha(current_text)
         if canonical_hash == current_hash:
             return []
         # A symlinked projection is never repaired (the write would leave the tree): never fixable.
