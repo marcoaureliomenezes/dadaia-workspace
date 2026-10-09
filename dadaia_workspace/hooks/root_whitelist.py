@@ -35,18 +35,18 @@ _AGENT_RE = re.compile(r"[A-Za-z0-9._-]+")
 
 
 def _root_violation(anchor: Path | None, raw_path: str, agent: str) -> str | None:
-    """A block reason when *raw_path* does not exist and ``workspace_layout.verdict`` judges it
-    slop in the root owning it, fenced or not; ``None`` outside any."""
+    """Block a new path judged slop in its owning root; allow existing paths and outsiders."""
     fpath = Path(raw_path)
-    if not fpath.is_absolute():
-        fpath = (anchor or Path.cwd()) / fpath
-    ws = workspace_resolver.owning_root(fpath)  # an ancestor of the resolved fpath
-    if ws is None or fpath.exists():  # an edit creates no entry
+    fpath = fpath if fpath.is_absolute() else (anchor or Path.cwd()) / fpath
+    if fpath.exists():
+        return None
+    ws = workspace_resolver.owning_root(fpath)
+    if ws is None:
         return None
     rel = fpath.resolve().relative_to(ws)
     globs = workspace_layout.operator_globs(ws)[0]
     slugs = context_registry.registered_slugs(ws)
-    if not rel.parts or workspace_layout.verdict(rel.as_posix(), False, globs, *slugs) != "slop":
+    if workspace_layout.verdict(rel.as_posix(), False, globs, *slugs) != "slop":
         return None
     return (
         f"[ROOT WHITELIST GATE] Writing '{rel.as_posix()}' creates an entry the layout law "
