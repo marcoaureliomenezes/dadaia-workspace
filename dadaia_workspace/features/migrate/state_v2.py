@@ -41,20 +41,17 @@ def plan_migration(store: JsonContextStore) -> MigrationPlan:
             already_v2=True,
         )
 
-    contexts_to_migrate = []
-    for ctx in raw.get("contexts", []):
-        old_state = ctx.get("state", "")
-        if old_state not in LEGACY_STATES:
-            continue
-        new_state = "alive" if old_state == "ativo" else "dead"
-        entry = {
+    contexts_to_migrate = [
+        {
             "name": ctx.get("name"),
-            "old_state": old_state,
-            "new_state": new_state,
+            "old_state": state,
+            "new_state": "alive" if state == "ativo" else "dead",
             "had_is_primary": "is_primary" in ctx,
             "had_activated_at": "activated_at" in ctx,
         }
-        contexts_to_migrate.append(entry)
+        for ctx in raw.get("contexts", [])
+        if (state := ctx.get("state", "")) in LEGACY_STATES
+    ]
 
     return MigrationPlan(
         schema_version_before="1",
@@ -69,47 +66,29 @@ def execute_migration(store: JsonContextStore, workspace_root: Path) -> None:
     """Migrate the registry and its retired primary marker to schema v2."""
     states_dir = store.states_dir
     primary_file = states_dir / "primary_context.json"
-
-    if not store.exists():
-        _create_dirs(workspace_root)
-        return
-
-    raw = store.read_raw()
-    if parse_schema_version(raw, states_dir / "spec_contexts.json") >= 2:
-        _create_dirs(workspace_root)
-        return
-
-    new_contexts = []
-    for ctx in raw.get("contexts", []):
-        if ctx.get("state") not in LEGACY_STATES:
-            new_contexts.append(ctx)
-            continue
-        new_ctx: dict[str, object] = {
-            "name": ctx["name"],
-            "state": "alive" if ctx.get("state") == "ativo" else "dead",
-            "repo_slug": ctx.get("repo_slug", ""),
-            "repo_url": ctx.get("repo_url", ""),
-            "created_at": ctx.get("created_at", ""),
-            "alive_since": ctx.get("activated_at"),
-            "dead_since": None,
-            "current_branch": ctx.get("current_branch"),
-        }
-        new_contexts.append(new_ctx)
-
-    migrated: dict[str, object] = {
-        "schema_version": "2",
-        "contexts": new_contexts,
-    }
-
-    store.replace_raw(migrated, newline=None)
-
-    if primary_file.exists():
-        primary_file.unlink()
-
-    _create_dirs(workspace_root)
-
-
-def _create_dirs(workspace_root: Path) -> None:
-    """Create the new directories required by v2."""
-    for rel in (".dadaia/sessions",):
-        (workspace_root / rel).mkdir(parents=True, exist_ok=True)
+    raw = store.read_raw() if store.exists() else None
+    if raw is not None and parse_schema_version(raw, states_dir / "spec_contexts.json") < 2:
+        store.replace_raw(
+            {
+                "schema_version": "2",
+                "contexts": [
+                    ctx
+                    if ctx.get("state") not in LEGACY_STATES
+                    else {
+                        "name": ctx["name"],
+                        "state": "alive" if ctx.get("state") == "ativo" else "dead",
+                        "repo_slug": ctx.get("repo_slug", ""),
+                        "repo_url": ctx.get("repo_url", ""),
+                        "created_at": ctx.get("created_at", ""),
+                        "alive_since": ctx.get("activated_at"),
+                        "dead_since": None,
+                        "current_branch": ctx.get("current_branch"),
+                    }
+                    for ctx in raw.get("contexts", [])
+                ],
+            },
+            newline=None,
+        )
+        if primary_file.exists():
+            primary_file.unlink()
+    (workspace_root / ".dadaia/sessions").mkdir(parents=True, exist_ok=True)

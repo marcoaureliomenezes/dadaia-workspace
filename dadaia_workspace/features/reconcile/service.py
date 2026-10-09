@@ -39,17 +39,18 @@ def reconcile_workspace(
 ) -> ReconcileResult:
     """Converge a workspace after an exact candidate wheel has been installed."""
     actual = actual_version or version()
-    if actual != expected_version:
+
+    def failed(
+        error: str, steps: tuple[str, ...] = (), rollback_required: bool = False
+    ) -> ReconcileResult:
         return ReconcileResult(
-            ok=False,
-            expected_version=expected_version,
-            actual_version=actual,
-            steps=(),
-            error=f"provider version mismatch: expected {expected_version}, found {actual}",
-            rollback_required=False,
+            False, expected_version, actual, tuple(steps), error, rollback_required
         )
+
+    if actual != expected_version:
+        return failed(f"provider version mismatch: expected {expected_version}, found {actual}")
     if context_store is None or migration_plan is None or migrate is None:
-        return ReconcileResult(False, expected_version, actual, (), "dependencies not composed")
+        return failed("dependencies not composed")
 
     steps: list[str] = ["provider-version"]
     registry_snapshot = context_store.snapshot()
@@ -64,13 +65,7 @@ def reconcile_workspace(
         # command instead of a rollback-flavored ok:false.
         ownership_error = _ownership_preflight(workspace_root)
         if ownership_error is not None:
-            return ReconcileResult(
-                ok=False,
-                expected_version=expected_version,
-                actual_version=actual,
-                steps=(),
-                error=ownership_error,
-            )
+            return failed(ownership_error)
 
         plan = migration_plan(context_store)
         if not plan.already_v2:
@@ -106,21 +101,9 @@ def reconcile_workspace(
     except Exception as exc:  # noqa: BLE001 - transaction boundary returns structured failure.
         context_store.restore(registry_snapshot)
         atomic_write(primary, primary_snapshot)
-        return ReconcileResult(
-            ok=False,
-            expected_version=expected_version,
-            actual_version=actual,
-            steps=tuple(steps),
-            error=str(exc),
-            rollback_required=projections_started,
-        )
+        return failed(str(exc), tuple(steps), projections_started)
 
-    return ReconcileResult(
-        ok=True,
-        expected_version=expected_version,
-        actual_version=actual,
-        steps=tuple(steps),
-    )
+    return ReconcileResult(True, expected_version, actual, tuple(steps))
 
 
 def _ownership_preflight(workspace_root: Path) -> str | None:
