@@ -168,6 +168,7 @@ Each seam was ruled on 2026-10-09 by the main thread as a conservative default, 
 - A13. **AC5.1 closure measurement repair.** The closing writer measurement found `WorkspaceService._init_json_file` reaching `spec_contexts.json`; J6.T4 and J6.T5 run as separate RED and source task trees cut from the already-open Reconciliation job. They extend that job's exact `W:` for the approved AC5.1 only; the release stays in CLOSURE and no milestone, feature or AC is added.
 - A14. **J3.T6 closure test-authoring correction.** Windows CI exposed platform-specific newline and Rich wrapping literals in two new Job 3 characterization tests. J3.T6 corrects only those exact test oracles as a child of the open Reconciliation job; no pre-rc-12 assertion, production behavior, milestone, feature or AC changes, and no CP job edits a characterization file.
 - A15. **J3.T7 closure test-authoring correction.** The same Windows run exposed four more new Job 3 oracles: native catalog/index and history newlines, plus the existing Windows public-render counts. J3.T7 adds exact platform literals only; every behavioral assertion remains, production is untouched, and no CP job edits a characterization file.
+- A16. **J3.T8 closure test-authoring correction.** Windows CI reached the remaining init artifact checks and exposed the context registry's existing native newline behavior. J3.T8 adds its exact CRLF/LF literal only; the harness profile remains LF-exact, production is untouched, and no CP job edits a characterization file.
 
 ## Verification and closure
 
