@@ -28,7 +28,7 @@ Scope: this file governs only `specs/releases/`.
 
 ## 3. Tasks — the auditable trace
 
-- Read SPEC, PLAN and every job file before implementing; the approval precondition's home is `specs/AGENTS.md`. Tasks live in `tasks/<job>.md` (`dd-release-definition` §5); a closed rc keeps its `TASKS.md`.
+- Read SPEC, PLAN and every job file before implementing; the approval precondition's home is `specs/AGENTS.md`. Tasks live in `tasks/job<n>.md` (`dd-release-definition` §5); a closed rc keeps its `TASKS.md`.
 - The `W:` is exact: every file the task touches, with derived files it re-records; the commit body names each file and why. Current task ids are `J<n>.T<k>`.
 
 ## 4. _RELEASE.json
