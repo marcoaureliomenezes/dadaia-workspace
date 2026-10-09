@@ -15,6 +15,7 @@ import pytest
 
 from dadaia_workspace.features.specs.doctor import SpecsDoctor
 from dadaia_workspace.features.specs.doctor_common import resolve_active_release
+from dadaia_workspace.features.specs.doctor_release import ReleaseValidator
 from tests.helpers.release_state import PLAN
 
 _REPO = Path(__file__).resolve().parents[3]
@@ -87,6 +88,25 @@ def test_closure_memory_record_is_judged_by_the_script(
 def test_a_live_release_in_implementation_missing_its_trio_is_one_finding(tmp_path: Path) -> None:
     findings = _check(_specs(tmp_path, "IMPLEMENTATION", [], trio=False))
     assert [f["code"] for f in findings] == ["LEDGER-RELEASE-SCHEMA"]
+
+
+def test_release_doctor_judges_status_only_on_the_two_candidate_documents(
+    tmp_path: Path,
+) -> None:
+    specs = _specs(tmp_path, "IMPLEMENTATION", [])
+    candidate = specs / "releases/0.5.0/rc-1"
+    candidate.joinpath("SPEC.md").write_text(
+        "# S\n\n**Status:** Approved\n**Origin:** customer-conversation\n\n"
+        "## Bug window review\n\n## User-added section\n",
+        encoding="utf-8",
+    )
+    candidate.joinpath("TASKS.md").write_text(
+        "# historical task index\n\n**Status:** Not a candidate status\n", encoding="utf-8"
+    )
+
+    validator = ReleaseValidator(specs)
+
+    assert validator.check_active_release_artifacts() == []
 
 
 def test_the_repos_own_release_tree_checks_clean() -> None:
