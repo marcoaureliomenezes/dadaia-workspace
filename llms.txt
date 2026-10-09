@@ -4,28 +4,18 @@
 
 ## What it is
 
-<!-- derived-from: product-vision sha256:50aa2de46233 -->
-
 - [README](README.md): one workspace folder, projects in repos inside it, governance outside every repo; the unit is the context (main repo + associated repos); documents are the lifecycle; boundaries are mechanical.
 
 ## Install
-
-<!-- derived-from: pypi-distribution sha256:9dadd611ee50 -->
-<!-- derived-from: workspace-init sha256:a8f08f87ae76 -->
 
 - [PyPI project](https://pypi.org/project/dadaia-workspace/): three levels — `uvx dadaia-workspace init <dir> --harness <name> --repo <url>` (workspace + project: cloned and ALIVE; only `.dadaia/.venv/bin/dadaia context bind <slug>` binds a session), then `.dadaia/.venv/bin/dadaia specs init --context <slug>` (specs on the canon) and `.dadaia/.venv/bin/dadaia doctor`; every later command runs through `.dadaia/.venv/bin/dadaia`; re-running the `uvx` init line upgrades the workspace, then `.dadaia/.venv/bin/dadaia specs init --context <ctx>` refreshes each project's specs law.
 - [Changelog](CHANGELOG.md): written by release-please, one section per released version.
 
 ## The law
 
-<!-- derived-from: agentic-entities sha256:f962e613358e -->
-<!-- derived-from: sdd-gate-v3 sha256:11e94d99c0d1 -->
-
 - [AGENTS.md](dadaia_workspace/public/data/AGENTS.md): the always-on root map — flow, roles, gate invariants, where things live, the index of every scoped `AGENTS.md` and skill; projected once to the workspace root.
 
 ## Reference
-
-<!-- derived-from: pypi-distribution sha256:9dadd611ee50 -->
 
 - [CLI reference](docs/cli.md): the committed output of `.dadaia/.venv/bin/dadaia help tree`.
 - [Concepts](docs/concepts.md): the vocabulary — context, release, candidate, gate, memory, ledgers, audits.
@@ -36,10 +26,7 @@
 
 ## The docs
 
-<!-- derived-from: pypi-distribution sha256:9dadd611ee50 -->
-<!-- derived-from: product-vision sha256:50aa2de46233 -->
-
-- [Documentation](https://github.com/marcoaureliomenezes/dadaia-workspace/tree/main/docs): the repository's `docs/` folder on `main`, every page derived under its markers.
+- [Documentation](https://github.com/marcoaureliomenezes/dadaia-workspace/tree/main/docs): the repository's `docs/` folder on `main`, reconciled from product memory.
 - [Landing](docs/index.md): the tagline, the paradigm and the two ways in.
 - [Quickstart](docs/quickstart.md): the three levels (workspace, project, specs) in one shell block, doctor, first backlog entry, first release, upgrade.
 - [Positioning](docs/positioning.md): product repos never carry agent config; one law governs many projects.

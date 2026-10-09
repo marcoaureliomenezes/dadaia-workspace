@@ -38,43 +38,19 @@
       "section": "§2 Who does what",
       "anchor": null,
       "skill": "dd-manager-orchestration",
-      "scoped_agents_md": [],
-      "hash_tuple": {
-        "section": "sha256:44c516a20de40d92bee3d0d4bdad3ea45448881fdc2be112ba8a7eb4d3619120",
-        "skill": "sha256:6d3465c5131c3341d0c8980503b319b9157f3042ecc970b68146a54a94d9e7f4",
-        "scripts": null,
-        "scoped": []
-      },
-      "recorded_by": "dd-software-engineer",
-      "recorded_at": "2026-10-08"
+      "scoped_agents_md": []
     },
     {
       "section": "§6 Skills — `.agents/skills/dd-*`",
       "anchor": null,
       "skill": "dd-codebase-design",
-      "scoped_agents_md": [],
-      "hash_tuple": {
-        "section": "sha256:dd4350607c0212912393a29bfcc8611630b53e42962c6d37bb9b35544e7b4118",
-        "skill": "sha256:f8037fc1bd75fc383566abf0341be2c52ac63403708151c020f30310c62caf87",
-        "scripts": null,
-        "scoped": []
-      },
-      "recorded_by": "dd-software-engineer",
-      "recorded_at": "2026-10-08"
+      "scoped_agents_md": []
     },
     {
       "section": "§2 Who does what",
       "anchor": null,
       "skill": "dd-ai-eng-knowhow",
-      "scoped_agents_md": [],
-      "hash_tuple": {
-        "section": "sha256:44c516a20de40d92bee3d0d4bdad3ea45448881fdc2be112ba8a7eb4d3619120",
-        "skill": "sha256:fa65c32921bd99d3429d97e89b2fcb0fc5a329854e000a744a1dfea7e9807270",
-        "scripts": null,
-        "scoped": []
-      },
-      "recorded_by": "dd-software-engineer",
-      "recorded_at": "2026-10-08"
+      "scoped_agents_md": []
     },
     {
       "section": "§3 What is enforced",
@@ -82,17 +58,7 @@
       "skill": "dd-gitflow-default",
       "scoped_agents_md": [
         "dadaia_workspace/public/data/worktrees-AGENTS.md"
-      ],
-      "hash_tuple": {
-        "section": "sha256:196f66690a3800e19b1ed73c8758c0824ee905693313a19610fa1bd8984449b1",
-        "skill": "sha256:70d2167d8b15c4d5728b1e19bfcfedd35a177f2a0f963b7fa788034ff419e771",
-        "scripts": "sha256:f23ed0a917eb85d536cc62ad9b1713f4e7c3ac7b277490d3e44182d31e78eaeb",
-        "scoped": [
-          "sha256:d2afad6adfa2a1ef041131757aa320d7ac159542a69eda77246de6a2d03fe07e"
-        ]
-      },
-      "recorded_by": "dd-software-engineer",
-      "recorded_at": "2026-10-08"
+      ]
     },
     {
       "section": "§4 Where things are written",
@@ -100,17 +66,7 @@
       "skill": "dd-handoff-emitter",
       "scoped_agents_md": [
         "dadaia_workspace/public/data/handoff-AGENTS.md"
-      ],
-      "hash_tuple": {
-        "section": "sha256:ca7dd2e033652ee7c0ce8fa480df7bf5afdc23d8d66c38802af6cafe3c4fc6a2",
-        "skill": "sha256:91e8c838cb966e6512e9aced85bffb1df3ebc6cae349ea9b2f237212d562b581",
-        "scripts": "sha256:d9bbabf5e98374dc33b11a44a2b4f115c06bd819d90c4062f60080f3758ab85b",
-        "scoped": [
-          "sha256:9cf21e395660b0275874a7975b0143997bf14b08fbad62040cd2f3e016d37f39"
-        ]
-      },
-      "recorded_by": "dd-software-engineer",
-      "recorded_at": "2026-10-08"
+      ]
     },
     {
       "section": "§5 Scoped law — open before acting there",
@@ -118,17 +74,7 @@
       "skill": null,
       "scoped_agents_md": [
         "dadaia_workspace/public/data/dadaia-AGENTS.md"
-      ],
-      "hash_tuple": {
-        "section": "sha256:baba0572ca1bf03df5257b1f2ec379dc6a33aa22afe217ef6131c7b49e569b9e",
-        "skill": null,
-        "scripts": null,
-        "scoped": [
-          "sha256:3212bcffb1ba6de97806328b6482fdfe4b975880ebc9d1f717059f9a1d70c56f"
-        ]
-      },
-      "recorded_by": "dd-software-engineer",
-      "recorded_at": "2026-10-08"
+      ]
     },
     {
       "section": "§4 Where things are written",
@@ -136,17 +82,7 @@
       "skill": null,
       "scoped_agents_md": [
         "dadaia_workspace/public/data/tmp-AGENTS.md"
-      ],
-      "hash_tuple": {
-        "section": "sha256:ca7dd2e033652ee7c0ce8fa480df7bf5afdc23d8d66c38802af6cafe3c4fc6a2",
-        "skill": null,
-        "scripts": null,
-        "scoped": [
-          "sha256:1710a501d630f0b0b05134f9f6ce437e14eb005857b7f657b32116690034b439"
-        ]
-      },
-      "recorded_by": "dd-software-engineer",
-      "recorded_at": "2026-10-08"
+      ]
     },
     {
       "section": "§1 The flow",
@@ -154,31 +90,13 @@
       "skill": "dd-backlog-definition",
       "scoped_agents_md": [
         "dadaia_workspace/public/scaffold/backlog/AGENTS.md"
-      ],
-      "hash_tuple": {
-        "section": "sha256:c6d4a25313ed38d8d1b6dcd6196348516db693841fb885132ec63a9d05f2503d",
-        "skill": "sha256:c3f89abffb8aaa779a8464bbfdc200c6d2efac22ddeb10515cd6ab2514bcedd1",
-        "scripts": "sha256:50c4bec7438ee1bdf5bbe9f752e5a1efd759e860e9a7e95c12da002600def5bb",
-        "scoped": [
-          "sha256:271ffb737ef752e109e79037eaaf89253a0ed15df39bf5c61949326ae5c258a5"
-        ]
-      },
-      "recorded_by": "dd-software-engineer",
-      "recorded_at": "2026-10-08"
+      ]
     },
     {
       "section": "§1 The flow",
       "anchor": "releases",
       "skill": "dd-release-definition",
-      "scoped_agents_md": [],
-      "hash_tuple": {
-        "section": "sha256:c6d4a25313ed38d8d1b6dcd6196348516db693841fb885132ec63a9d05f2503d",
-        "skill": "sha256:893896a4b127c7d8371f45468ebf6dd8f4fd9db3824962e94bdfe0ecdd4c3471",
-        "scripts": null,
-        "scoped": []
-      },
-      "recorded_by": "dd-software-engineer",
-      "recorded_at": "2026-10-08"
+      "scoped_agents_md": []
     },
     {
       "section": "§1 The flow",
@@ -186,17 +104,7 @@
       "skill": "dd-release-implementation",
       "scoped_agents_md": [
         "dadaia_workspace/public/scaffold/releases/AGENTS.md"
-      ],
-      "hash_tuple": {
-        "section": "sha256:c6d4a25313ed38d8d1b6dcd6196348516db693841fb885132ec63a9d05f2503d",
-        "skill": "sha256:c746c249fe679d18a4a52dc05e63f5c7ef4ea124bfd182f5cbaf653bb68b7672",
-        "scripts": "sha256:1325896a6eafae6409d9587fd82b3e6857b31baa75d5e88631e1fecf28c8a781",
-        "scoped": [
-          "sha256:8368d8f16db46184544306ae653ace185b9b44c0ec95bb5724041ea0c7ce0db9"
-        ]
-      },
-      "recorded_by": "dd-software-engineer",
-      "recorded_at": "2026-10-08"
+      ]
     },
     {
       "section": "§6 Skills — `.agents/skills/dd-*`",
@@ -204,17 +112,7 @@
       "skill": "dd-audit-project",
       "scoped_agents_md": [
         "dadaia_workspace/public/scaffold/audits/AGENTS.md"
-      ],
-      "hash_tuple": {
-        "section": "sha256:dd4350607c0212912393a29bfcc8611630b53e42962c6d37bb9b35544e7b4118",
-        "skill": "sha256:60ce443687e1051e121ae4500ec2f2fdcc46efc5d83afcd96fd2d8512152686f",
-        "scripts": "sha256:081ca34ad201b652f666abda16e4b15389926d86937f043a2c8bb1e141c99b17",
-        "scoped": [
-          "sha256:e030d06a975a5469cb6040515e721096abd1e1d657f6e1a4934f669f5ed71872"
-        ]
-      },
-      "recorded_by": "dd-software-engineer",
-      "recorded_at": "2026-10-08"
+      ]
     },
     {
       "section": "§5 Scoped law — open before acting there",
@@ -222,31 +120,13 @@
       "skill": null,
       "scoped_agents_md": [
         "dadaia_workspace/public/scaffold/ADRs/AGENTS.md"
-      ],
-      "hash_tuple": {
-        "section": "sha256:baba0572ca1bf03df5257b1f2ec379dc6a33aa22afe217ef6131c7b49e569b9e",
-        "skill": null,
-        "scripts": null,
-        "scoped": [
-          "sha256:29add968ea8e596b92ecd5014dd25bb7ce86e42bd6ab92edbd800b8162f62c3c"
-        ]
-      },
-      "recorded_by": "dd-software-engineer",
-      "recorded_at": "2026-10-08"
+      ]
     },
     {
       "section": "§1 The flow",
       "anchor": "releases",
       "skill": "dd-grill-me",
-      "scoped_agents_md": [],
-      "hash_tuple": {
-        "section": "sha256:c6d4a25313ed38d8d1b6dcd6196348516db693841fb885132ec63a9d05f2503d",
-        "skill": "sha256:8d330832c78997eba0a644bc74629a44c2431f743c05ddfcbf585c45e7ba0591",
-        "scripts": null,
-        "scoped": []
-      },
-      "recorded_by": "dd-software-engineer",
-      "recorded_at": "2026-10-08"
+      "scoped_agents_md": []
     },
     {
       "section": "§5 Scoped law — open before acting there",
@@ -254,31 +134,13 @@
       "skill": "dd-spec-navigator",
       "scoped_agents_md": [
         "dadaia_workspace/public/scaffold/memory/AGENTS.md"
-      ],
-      "hash_tuple": {
-        "section": "sha256:baba0572ca1bf03df5257b1f2ec379dc6a33aa22afe217ef6131c7b49e569b9e",
-        "skill": "sha256:3a763aef92dcb2619bcfc0562e8d0c0a26172fa4055ce31de927085a3d4ee173",
-        "scripts": "sha256:de4b824b6a41b10f45c75c11b03c7a07b949522c92008e095fc991aa6506a131",
-        "scoped": [
-          "sha256:40b3eeea297ba1842eb53317b85db27caffcb578eb99fc8920f58b18438b06c7"
-        ]
-      },
-      "recorded_by": "dd-software-engineer",
-      "recorded_at": "2026-10-08"
+      ]
     },
     {
       "section": "§1 The flow",
       "anchor": "bugs",
       "skill": "dd-bug-resolution",
-      "scoped_agents_md": [],
-      "hash_tuple": {
-        "section": "sha256:c6d4a25313ed38d8d1b6dcd6196348516db693841fb885132ec63a9d05f2503d",
-        "skill": "sha256:fd02c65a05de7878550c6a31a45e345a6090519935d91492af266d089a22512b",
-        "scripts": "sha256:3318357f5f823838af4d61184d27f08a5bfc81eee22923b55aca48f7d85192e9",
-        "scoped": []
-      },
-      "recorded_by": "dd-software-engineer",
-      "recorded_at": "2026-10-08"
+      "scoped_agents_md": []
     },
     {
       "section": "§1 The flow",
@@ -286,17 +148,7 @@
       "skill": "dd-bug-registration",
       "scoped_agents_md": [
         "dadaia_workspace/public/scaffold/bugs/AGENTS.md"
-      ],
-      "hash_tuple": {
-        "section": "sha256:c6d4a25313ed38d8d1b6dcd6196348516db693841fb885132ec63a9d05f2503d",
-        "skill": "sha256:5a8b08a709d9734b8cbe96f69c14ff0effbe1734aeeb21163b27f79eb5661011",
-        "scripts": null,
-        "scoped": [
-          "sha256:4f9adfaacbd954c8815b8fe51b7aad20b5c78a12a97304a512615623290cda66"
-        ]
-      },
-      "recorded_by": "dd-software-engineer",
-      "recorded_at": "2026-10-08"
+      ]
     },
     {
       "section": "§5 Scoped law — open before acting there",
@@ -304,31 +156,13 @@
       "skill": null,
       "scoped_agents_md": [
         "dadaia_workspace/public/data/states-AGENTS.md"
-      ],
-      "hash_tuple": {
-        "section": "sha256:baba0572ca1bf03df5257b1f2ec379dc6a33aa22afe217ef6131c7b49e569b9e",
-        "skill": null,
-        "scripts": null,
-        "scoped": [
-          "sha256:473f2011afa787f2c7163dbc67af54e2a52c59d3b5a2526abf8fdde15a664be5"
-        ]
-      },
-      "recorded_by": "dd-software-engineer",
-      "recorded_at": "2026-10-08"
+      ]
     },
     {
       "section": "§7 Onboarding — three levels",
       "anchor": null,
       "skill": "dd-cli-library",
-      "scoped_agents_md": [],
-      "hash_tuple": {
-        "section": "sha256:a5f78cfa7b782eac015b441fcb71f729d28f3f4ebeb04450bcc6ecb3d66f80f6",
-        "skill": "sha256:5b6f5d4e77c6ae88624d2f6a76781a67b5def1333415a3a064fc9eabf4030ae6",
-        "scripts": "sha256:1d52751a8936c49be5163a771b07c8c2dd7513baf138bff3b1f1136ec81a3da5",
-        "scoped": []
-      },
-      "recorded_by": "dd-software-engineer",
-      "recorded_at": "2026-10-08"
+      "scoped_agents_md": []
     },
     {
       "section": "§4 Where things are written",
@@ -336,17 +170,7 @@
       "skill": null,
       "scoped_agents_md": [
         "dadaia_workspace/public/templates/repo-AGENTS.md"
-      ],
-      "hash_tuple": {
-        "section": "sha256:ca7dd2e033652ee7c0ce8fa480df7bf5afdc23d8d66c38802af6cafe3c4fc6a2",
-        "skill": null,
-        "scripts": null,
-        "scoped": [
-          "sha256:8193f2d945da45c8947a8cf149a6c343513471bb192488df41e1e6d153d280b1"
-        ]
-      },
-      "recorded_by": "dd-software-engineer",
-      "recorded_at": "2026-10-08"
+      ]
     },
     {
       "section": "§5 Scoped law — open before acting there",
@@ -354,59 +178,25 @@
       "skill": null,
       "scoped_agents_md": [
         "dadaia_workspace/public/templates/specs-AGENTS.md"
-      ],
-      "hash_tuple": {
-        "section": "sha256:baba0572ca1bf03df5257b1f2ec379dc6a33aa22afe217ef6131c7b49e569b9e",
-        "skill": null,
-        "scripts": null,
-        "scoped": [
-          "sha256:e1cc08bc0dbfc2e9296e90b01fc727b4f488ae729475b46ea2f8872669ed6234"
-        ]
-      },
-      "recorded_by": "dd-software-engineer",
-      "recorded_at": "2026-10-08"
+      ]
     },
     {
       "section": "§6 Skills — `.agents/skills/dd-*`",
       "anchor": null,
       "skill": "dd-architecture-survey",
-      "scoped_agents_md": [],
-      "hash_tuple": {
-        "section": "sha256:dd4350607c0212912393a29bfcc8611630b53e42962c6d37bb9b35544e7b4118",
-        "skill": "sha256:bbcc49df5973d2ffbe0feb5fbbb40a3b2a6fce12eb6c442d8fbe87369ac61454",
-        "scripts": null,
-        "scoped": []
-      },
-      "recorded_by": "dd-software-engineer",
-      "recorded_at": "2026-10-08"
+      "scoped_agents_md": []
     },
     {
       "section": "§2 Who does what",
       "anchor": null,
       "skill": "dd-code-review",
-      "scoped_agents_md": [],
-      "hash_tuple": {
-        "section": "sha256:44c516a20de40d92bee3d0d4bdad3ea45448881fdc2be112ba8a7eb4d3619120",
-        "skill": "sha256:1cfeaf70172dc02a2b436f308d4c78912ac973276a6bb1bc0bb83512d8793814",
-        "scripts": null,
-        "scoped": []
-      },
-      "recorded_by": "dd-software-engineer",
-      "recorded_at": "2026-10-08"
+      "scoped_agents_md": []
     },
     {
       "section": "§6 Skills — `.agents/skills/dd-*`",
       "anchor": null,
       "skill": "dd-domain-modeling",
-      "scoped_agents_md": [],
-      "hash_tuple": {
-        "section": "sha256:dd4350607c0212912393a29bfcc8611630b53e42962c6d37bb9b35544e7b4118",
-        "skill": "sha256:0f6c0323eadf99a721c2d80bb5f541b2579ea0800ffffada335a40b1502f7b6b",
-        "scripts": null,
-        "scoped": []
-      },
-      "recorded_by": "dd-software-engineer",
-      "recorded_at": "2026-10-08"
+      "scoped_agents_md": []
     }
   ]
 }

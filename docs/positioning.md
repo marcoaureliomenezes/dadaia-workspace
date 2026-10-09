@@ -5,8 +5,6 @@ projects.
 
 ## The paradigm
 
-<!-- derived-from: product-vision sha256:50aa2de46233 -->
-
 A workspace is one folder, and the agent session launches at its root, always.
 Projects live in repos inside it — `repos/<slug>/` — which take agent work only as
 merges from their worktrees under `worktrees/<repo>/`. Governance lives outside every
@@ -21,8 +19,6 @@ A workspace holds many contexts and a context many repos. It is never a monorepo
 single-repo context is the minimal case of the multi-repo one.
 
 ## The unit is the context
-
-<!-- derived-from: spec-context-project sha256:9690f09f679b -->
 
 A context — a Spec Context Project — is one canonical `specs/` tree owned by one main
 repository: the unit for memory, backlog, bugs, releases, reports and handoffs. A
@@ -46,9 +42,6 @@ an unbound session with an id owns no repo. A repo checkout receives only merges
 write a repo inside its worktrees and land them by `worktree.py merge`, audits aside.
 
 ## Ten repositories, one law
-
-<!-- derived-from: product-vision sha256:50aa2de46233 -->
-<!-- derived-from: spec-context-project sha256:9690f09f679b -->
 
 A team with ten repositories does not maintain ten copies of anything:
 
