@@ -68,7 +68,7 @@ def invariant_errors(record: dict[str, Any]) -> Iterator[str]:
 
 def tasks(root: Path) -> set[str]:
     """Every task id under *root*`/releases/`, `_archive/` included: a closed rc's `TASKS.md`
-    carries historical rows, and a job rc's `tasks/<job>.md` carries current or historical
+    carries historical rows, and a job rc's `tasks/job<n>.md` carries current or historical
     ids. The release schema's parser is the one identity grammar."""
     files = [*root.glob("releases/**/TASKS.md"), *root.glob("releases/**/tasks/*.md")]
     return {
