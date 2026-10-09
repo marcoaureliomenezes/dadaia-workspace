@@ -5,6 +5,8 @@ Workspace SDD rules live in the root `AGENTS.md`; spec artifact rules live in `s
 
 Edit this file directly for repo-specific behavior. It is not overwritten by `.dadaia/.venv/bin/dadaia public install`.
 
+`verify: <one argv command>` (required by every job merge) and `tests: <globs>` (test paths an implementation commit may not touch), each as a line starting at column 0 here; `WT merge` reads them from the work branch.
+
 ## 1. Repo purpose
 
 <!-- 2-3 sentences: what this repo ships, who uses it, and its main runtime. -->
@@ -19,19 +21,11 @@ Edit this file directly for repo-specific behavior. It is not overwritten by `.d
 | `tests/` | automated tests |
 | `docs/` | docs |
 
-- Do not edit generated files, vendored dependencies, build outputs, secrets, or environment-specific local config.
-- Exception: only when this file explicitly allows it.
+- Edit only the paths §2 owns; generated, vendored and build files change through their own tool.
 
 ## 3. SDD entry check
 
-Before editing production source:
-
-1. Resolve context with `.dadaia/.venv/bin/dadaia context show --json`.
-2. Read the active release under `specs/releases/<release-id>/`.
-3. Confirm the release's SPEC and PLAN are approved.
-4. Confirm your task is a row of its job file.
-5. Confirm every edited file is in the task write set.
-6. If any item fails, stop and report the exact missing artifact or task row.
+Before editing production source: `specs/AGENTS.md` §3.
 
 ## 4. Repo commands
 
@@ -58,33 +52,8 @@ Fill these in during onboarding:
 
 ## 6. Source hygiene
 
-- A comment explains a non-obvious why only; the what and the history live in git and the ledgers.
-- A docstring states the contract in at most 3 lines.
-- Code is born with a real caller in the same change.
-- A fix replaces the old path, never wraps it.
-- Full statements: `specs/memory/ARCHITECTURE.md`, fixed section Slop — code.
+- Rules: `specs/memory/ARCHITECTURE.md`, the `slop-code` fixed section.
 
 ## 7. Validation evidence
 
-Every implementation report must include:
-
-- commands run
-- pass/fail output
-- changed production paths
-- known risk or `none`
-
 Reports never live in this tree: the root `AGENTS.md` map §4.
-
-The tracked `verify:` line is the sole repository verification authority. A task merge checks
-git hygiene and keeps the RED-test and implementation dispatches separate; a job or plain-change
-merge runs `verify:` once when this file declares it.
-
-## 8. Stop conditions
-
-Stop before editing when:
-
-- the active SDD gate is missing or not approved
-- the requested change is outside this repo's source boundaries
-- the change needs a new public API/behavior not described by SPEC
-- tests cannot be run and no alternative validation is available
-- a secret, credential, private hostname, or private IP would be committed
