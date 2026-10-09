@@ -1,8 +1,9 @@
 # FINDINGS-FORMAT — one record per finding
 
-Disclosed sibling of `SKILL.md`. Every claim any pillar makes becomes exactly one line appended to
-`specs/audits/<YYYYMMDD>-<slug>/FINDINGS.jsonl`, validating
-`dadaia_workspace/public/schemas/audits/finding-record-v1.schema.json` — the schema is the source of field semantics.
+Disclosed sibling of `SKILL.md`. Every claim becomes one line in
+`specs/audits/<YYYYMMDD>-<slug>/FINDINGS.jsonl`, validated by
+`dadaia_workspace/public/schemas/audits/finding-record-v1.schema.json`. The schema owns
+field semantics.
 
 ## Fields
 
@@ -11,32 +12,37 @@ Disclosed sibling of `SKILL.md`. Every claim any pillar makes becomes exactly on
 | `id` | immutable-core | `<audit-slug>-F<nnn>`, appended once |
 | `pillar` | immutable-core | `bugs` \| `specs` \| `memory` |
 | `severity` | immutable-core | `LOW` \| `MEDIUM` \| `HIGH` \| `CRITICAL` |
-| `refs` | immutable-core | file:line, bug ids, commit shas, and/or release ids the claim is anchored to |
-| `claim` | immutable-core | one sentence stating what the record asserts |
-| `evidence` | immutable-core | the reproducible command plus a redacted one-line result — never a path alone |
-| `disposition` | mutable-governance | `open` at append; rewritten by `python3 .agents/skills/dd-audit-project/scripts/audit.py disposition` |
-| `release` | mutable-governance | `null` until dispositioned |
-| `reason` | mutable-governance | `null` until dispositioned |
+| `refs` | immutable-core | file:line, bug ids, commit shas and/or release ids |
+| `claim` | immutable-core | one sentence stating the finding |
+| `evidence` | immutable-core | reproducible command plus a redacted one-line result |
+| `disposition` | mutable-governance | `open` at append; later moved by `audit.py disposition` |
+| `release` | mutable-governance | remediation release for `resolved` or `superseded` |
+| `reason` | mutable-governance | rationale for `rejected` |
 
-- An append is file-tool authoring (the immutable core, like an ADR); every later change is a verb.
-- No write-time seam guards the append, so the evidence rule below is a hand discipline.
+An append authors the immutable core. Every later change uses the disposition verb.
 
-## The evidence rule — reproducible command, never a path
+## Evidence
 
-- `evidence` is always the reproducible command plus a redacted one-line result.
-- Example: `git show <sha> --stat -- <module> -> 2 files changed, second render path added`.
-- Never a bare pointer into `.dadaia/tmp/**` — that lane expires one day after its mtime.
-- A `.dadaia/tmp/**` capture may accompany the command+result as a convenience pointer, never the sole citation.
-- Strip runner-absolute paths from a tool's raw output (a linter's, a test runner's, a ratchet script's) by hand before writing the line.
+- Record the reproducible command and its redacted one-line result.
+- Example: `git show <sha> --stat -- <module> -> 2 files changed, old path deleted`.
+- A `.dadaia/tmp/**` capture may accompany that evidence, but it expires and is never the
+  sole citation.
+- Remove runner-absolute paths and private data before writing the line.
 
-## Appending
+## Append, disposition and close
 
-1. Append with ordinary file tools: read the existing file, add one line, write.
-2. Before the S3-equivalent close of any audit, run the folder through the push-time detector (`.dadaia/.venv/bin/dadaia ci push-gate-check` over the range).
-3. Record a zero-hit result from that detector run.
+1. Append one schema-valid JSON object as one line.
+2. Before publishing the audit, run the push-time privacy detector over its range and
+   record the zero-hit result.
+3. Move a finding with:
 
-## Disposition and close — by verb
+   ```bash
+   python3 .agents/skills/dd-audit-project/scripts/audit.py disposition \
+     <audit> <finding-id> --disposition resolved|superseded|rejected \
+     [--release <id>] [--reason <reason>]
+   ```
 
-- `python3 .agents/skills/dd-audit-project/scripts/audit.py disposition <dir> <finding-id> --disposition <disposition> --release <id> [--reason]` (the vocabulary its `--help` lists) rewrites the three governance fields in place; every immutable field stays byte-identical.
-- `--reason` is required for `deferred` and `rejected`; a second disposition of the same finding is refused.
-- `python3 .agents/skills/dd-audit-project/scripts/audit.py close <dir> --sha <window-end>` refuses while any finding is `open`, appends the one `audits_histo.jsonl` record and deletes the directory — all-or-nothing.
+4. `resolved` and `superseded` require the remediation release; `rejected` requires a
+   reason. A second transition is refused.
+5. `audit.py close <audit> --sha <window-end>` refuses while any finding is `open`, then
+   appends one audit-history record and deletes the live directory atomically.

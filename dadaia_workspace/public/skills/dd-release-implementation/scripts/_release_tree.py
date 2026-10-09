@@ -335,11 +335,7 @@ def tree_findings(specs: Path) -> list[dict[str, Any]]:
 def check(specs: Path) -> list[dict[str, Any]]:
     """The ONE release validator (the doctor delegates here): the tree, the live
     candidate's Origin, then the live CLOSURE's memory record."""
-    return (
-        tree_findings(specs)
-        + _origin_findings(specs)
-        + _memory_findings(specs)
-    )
+    return tree_findings(specs) + _origin_findings(specs) + _memory_findings(specs)
 
 
 def ship_findings(specs: Path) -> list[dict[str, Any]]:

@@ -23,8 +23,18 @@ from _specs import find_specs, refuse  # noqa: E402
 
 _OPTIONS: dict[str, tuple[str, ...]] = {
     "append": (
-        "--bug-id", "--reported-by", "--ts", "--title", "--severity", "--surface",
-        "--component", "--context", "--symptom", "--repro", "--expected", "--correlates",
+        "--bug-id",
+        "--reported-by",
+        "--ts",
+        "--title",
+        "--severity",
+        "--surface",
+        "--component",
+        "--context",
+        "--symptom",
+        "--repro",
+        "--expected",
+        "--correlates",
     ),
     "resolve": ("--cause", "--caused-by", "--solution", "--fix-sha"),
     "supersede": ("--by",),
@@ -148,9 +158,7 @@ def main(argv: list[str] | None = None) -> int:
             print(json.dumps(findings, indent=2))
         else:
             for finding in findings:
-                print(
-                    f"{CODE} error {finding['path']}:{finding['line']} {finding['message']}"
-                )
+                print(f"{CODE} error {finding['path']}:{finding['line']} {finding['message']}")
         return 1 if findings else 0
     try:
         if args.verb in ("status", "stats"):
