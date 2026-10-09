@@ -77,6 +77,7 @@ __all__ = [
     "git_bash",
     "codex_hook_env",
     "kimi_hook_env",
+    "retire_tree",
     "run_bash",
     "run_hook_subprocess",
     "run_python",
@@ -465,3 +466,9 @@ def run_python(*args: str, **kwargs: Any) -> subprocess.CompletedProcess[str]:
 def run_bash(command: str, **kwargs: Any) -> subprocess.CompletedProcess[str]:
     """Run *command* under :func:`git_bash` ``-c``."""
     return subprocess.run([git_bash(), "-c", command], capture_output=True, text=True, **kwargs)  # noqa: S603
+
+
+def retire_tree(tree: Path, into: Path) -> Path:
+    """Move *tree* under *into* and return its new place: a tree holding ``.git`` keeps
+    read-only objects that ``rmtree`` cannot unlink on Windows, a rename always works."""
+    return tree.rename(into / tree.name)
