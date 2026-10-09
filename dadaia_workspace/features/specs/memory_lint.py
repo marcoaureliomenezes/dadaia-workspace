@@ -165,7 +165,7 @@ def lint_atom(md_path: Path, memory_dir: Path, schema: dict[str, Any]) -> AtomRe
         if memory_canon.is_forbidden_memory_heading(heading):
             result.error(
                 f"Forbidden heading '## {heading}' — changelog/history sections "
-                "violate the atomicity contract (specs/memory/AGENTS.md §3)."
+                "violate the atomicity contract (specs/memory/AGENTS.md §4)."
             )
             continue
         if heading in seen:

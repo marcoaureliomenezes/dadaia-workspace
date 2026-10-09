@@ -33,7 +33,7 @@ from dadaia_workspace.features.chokepoints.denylist_scan import (
 
 __all__ = ["push_gate_decision"]
 
-_DENYLIST_LAW = "dd-release-implementation §2a — private names never enter public/pushed material"
+_DENYLIST_LAW = "dd-release-implementation §2a — the push scan refuses a denylisted private name"
 _MAX_LISTED_HITS = 10
 #: R13, N3: every range is uncommitted to its oldest unpublished commit and amended.
 _REWRITE = (
