@@ -41,7 +41,6 @@ from dadaia_workspace.core.workspace_layout import (
     STATES_CANON,
     Creator,
     root_entries_display,
-    source_form,
     specs_canon_table_rows,
     zone_names,
 )
@@ -380,9 +379,9 @@ def test_law_staged_under_win32_names_the_scripts_cli(
     assert ".venv/bin/dadaia" not in text
 
 
-@pytest.mark.parametrize("host", ["linux", "win32"])
-def test_source_form_inverts_the_cli_render(host: str, monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr("dadaia_workspace.core.platform.PLATFORM", Capabilities.detect(host))
-    source = "run `.dadaia/.venv/bin/dadaia doctor`"
-    assert source_form(render_registry_tables(source)) == source
-    assert source_form(source) == source
+def test_workspace_cli_token_renders_to_one_windows_spelling(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr("dadaia_workspace.core.platform.PLATFORM", Capabilities.detect("win32"))
+    source = "run `<!-- workspace-cli --> doctor`"
+    assert render_registry_tables(source) == "run `.dadaia/.venv/Scripts/dadaia.exe doctor`"
