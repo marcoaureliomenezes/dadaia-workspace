@@ -141,17 +141,26 @@ def _generic_preflight(workspace: Path, session: str | None, lost: str) -> str:
 
 
 def _worktrees(workspace: Path, context: str) -> list[str]:
-    """The doctor's worktree findings for *context* (AC1.10), in the doctor's own rendering."""
-    from dadaia_workspace.features.spec_context.doctor import DoctorService  # P-12: no container
-    from dadaia_workspace.infrastructure.git_subprocess import GitSubprocessClient
-    from dadaia_workspace.infrastructure.json_context_store import JsonContextStore
+    from dadaia_workspace.infrastructure.ledger_scripts import worktree_rows
 
     try:
-        store = JsonContextStore(workspace / ".dadaia" / "states")
-        found = DoctorService(store, GitSubprocessClient(), workspace).check_worktrees(context)
+        repos = (
+            invocation.all_repos(workspace, context)
+            if context in invocation.alive_context_names(workspace)
+            else ()
+        )
+        found, failed, fix = worktree_rows(workspace)
     except Exception:  # noqa: BLE001 — fail-open: a hook never crashes the session
         return []
-    return [render_finding(f) for f in found]
+    if failed:
+        return [f"WORKTREE warning {failed}\nfix: {fix}"]
+    return [
+        f"WORKTREE {'warning' if row['warn'] else 'info'} {row['state']} {row['path']}"
+        + "".join(f"  {key}={row[key]}" for key in ("age_hours", "ahead", "dirty") if key in row)
+        + (f"\nfix: {row['fix']}" if row["fix"] else "")
+        for row in found
+        if row["repo"] in repos
+    ]
 
 
 def _emit_bootstrap(workspace: Path, context: str) -> None:
