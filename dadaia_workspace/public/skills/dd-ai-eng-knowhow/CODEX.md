@@ -88,7 +88,7 @@ prefix_rule(
 
 - Reach for a Codex Rule only for command policy, never to make the model "think" differently.
 - Candidate dadaia rules: `prompt` on `git push` (publishing follows QA/review).
-- Candidate dadaia rules: `prompt` on `.dadaia/.venv/bin/dadaia context dead` and `.dadaia/.venv/bin/dadaia public install` (they mutate canonical state).
+- Candidate dadaia rules: `prompt` on `.dadaia/.venv/bin/dadaia context dead` and `.dadaia/.venv/bin/dadaia public install --force`; ordinary install inherits host policy.
 - Candidate dadaia rules: `forbidden` on destructive sweeps over `repos/` (user projects).
 - Projection invariant: `dadaia-command-policy.rules` must contain `prefix_rule(` and never `command_allowed(`.
 - Keep a focused test for that shape — it separates current Codex command policy from older compatibility assumptions.

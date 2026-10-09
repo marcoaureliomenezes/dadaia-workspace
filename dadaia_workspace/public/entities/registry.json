@@ -92,7 +92,7 @@
     },
     {
       "id": "codex-command-policy",
-      "mandate": "Codex-native executable command policy (Starlark, the only rule dialect Codex executes): allows only the argv-closed readers ls and cat; every other command prompts or falls to the Codex default.",
+      "mandate": "Codex-native executable command policy (Starlark, the only rule dialect Codex executes): allows only the argv-closed readers ls and cat; ordinary public install inherits host policy, while --force, publishing, context deletion and destructive commands prompt; every other command falls to the Codex default.",
       "implementations": {
         "codex": ".codex/rules/dadaia-command-policy.rules"
       }

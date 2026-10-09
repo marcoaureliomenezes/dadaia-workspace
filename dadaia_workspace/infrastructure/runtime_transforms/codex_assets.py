@@ -238,22 +238,23 @@ prefix_rule(
 # normalization). The workspace mandates the venv-absolute invocation
 # `.dadaia/.venv/bin/dadaia ...` (bare `dadaia` is intentionally off-PATH), so a
 # pattern whose first token is `dadaia` would never fire in a compliant session.
-# We therefore gate BOTH the venv-relative argv0 form actually used in this
-# workspace's docs AND the bare name (for any non-compliant PATH invocation), and
-# prove the real form in `match=`.
+# The ordinary install inherits the host's execution and approval policy. Only
+# `--force` needs a dadaia prompt, in BOTH the documented venv-relative argv0
+# form and the bare-name fallback.
 prefix_rule(
-    pattern = [".dadaia/.venv/bin/dadaia", "public", "install"],
+    pattern = [".dadaia/.venv/bin/dadaia", "public", "install", "--force"],
     decision = "prompt",
-    justification = "Public install rewrites generated runtime projections.",
-    match = [".dadaia/.venv/bin/dadaia public install", ".dadaia/.venv/bin/dadaia public install --force"],
-    not_match = [".dadaia/.venv/bin/dadaia public doctor"],
+    justification = "Forcing public install overwrites generated runtime projections.",
+    match = [".dadaia/.venv/bin/dadaia public install --force"],
+    not_match = [".dadaia/.venv/bin/dadaia public install"],
 )
 
 prefix_rule(
-    pattern = ["dadaia", "public", "install"],
+    pattern = ["dadaia", "public", "install", "--force"],
     decision = "prompt",
-    justification = "Public install rewrites generated runtime projections (bare-name fallback).",
-    match = ["dadaia public install", "dadaia public install --force"],
+    justification = "Forcing public install overwrites generated runtime projections (bare-name fallback).",
+    match = ["dadaia public install --force"],
+    not_match = ["dadaia public install"],
 )
 
 prefix_rule(
