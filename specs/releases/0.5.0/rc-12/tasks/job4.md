@@ -1,6 +1,6 @@
 # Job 4 — REBUILD the test-side carry units and one child-process env builder (FR3, AC8.4)
 
-**Status:** Draft
+**Status:** Approved
 
 Six of FR3's twelve units live in the suite: each was closed by a CI-selection change (`JB.S9.T11`), not by reworking the test. They are rebuilt here together with AC8.4, because every one of them is an ad-hoc child-process environment. Test-only REBUILD: one dispatch per task, the units' regression tests are kept (rebuilt, never weakened), and each commit takes shape 3 `refactor(bugs): <id> — REBUILD <unit>: …` with net lines ≤ 0 or the reason in its body (AC3.2).
 

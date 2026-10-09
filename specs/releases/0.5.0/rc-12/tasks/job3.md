@@ -1,6 +1,6 @@
 # Job 3 — characterization net (FR4)
 
-**Status:** Draft
+**Status:** Approved
 
 Pins today's behaviour at the public seams before any CP job merges. Every test is green on Job 3's base (the post-Job-1 head) and stays green, unedited, on every CP job head (AC4.3). Each new file is a `test_<m>__characterization.py` beside its owner (`tests/AGENTS.md`), so AC4.3 is checkable by path: `git diff --name-only <cp-base>..<cp-head> -- '*__characterization.py'` prints nothing.
 

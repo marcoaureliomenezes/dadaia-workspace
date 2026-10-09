@@ -1,6 +1,6 @@
 # Job 2 — a release job opens only in IMPLEMENTATION (FR2, Arm B)
 
-**Status:** Draft
+**Status:** Approved
 
 The candidate's one intended behaviour change, in its own job. Bug `worktree-new-opens-a-job-outside-implementation` (MEDIUM). Two dispatches: J2.T1 commits the failing tests, a fresh J2.T2 implements without touching a test path.
 

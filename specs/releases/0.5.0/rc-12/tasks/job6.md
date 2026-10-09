@@ -1,6 +1,6 @@
 # Job 6 — CP4: `spec_contexts.json` has one writer (FR5)
 
-**Status:** Draft
+**Status:** Approved
 
 Pure refactor: exit codes, fix lines, ledgers, files and JSON output are unchanged, and the Job 3 net stays green and unedited (AC4.3).
 

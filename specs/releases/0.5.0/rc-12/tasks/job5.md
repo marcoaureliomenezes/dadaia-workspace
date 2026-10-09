@@ -1,6 +1,6 @@
 # Job 5 — REBUILD the production carry units (FR3)
 
-**Status:** Draft
+**Status:** Approved
 
 Six of FR3's twelve units live in production code. Each REBUILD keeps the unit's regression tests and the FR4 net green and unedited; it adds no branch, flag, special case or second path, and its net lines are ≤ 0 or its commit body says why (AC3.2). Commit shape 3 `refactor(bugs): <id> — REBUILD <unit>: …`.
 

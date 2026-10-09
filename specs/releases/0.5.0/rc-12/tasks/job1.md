@@ -1,6 +1,6 @@
 # Job 1 — law ≥ 9 (FR1)
 
-**Status:** Draft
+**Status:** Approved
 
 Job 1 runs first and alone: every later job is dispatched under the law it lands. Tasks J1.T1–J1.T9 partition the PLAN-law9 rows by the file each row's `onde` names (`.dadaia/reports/dadaia-workspace/agentic-scorecard/20261009T1335Z/PLAN-law9.md`, `plan.json`); a row whose cell belongs to one area but whose `onde` names another area's file is applied by the task owning that file (bug-registration → `scaffold/bugs/AGENTS.md`, spec-navigator → `dd-release-implementation/SKILL.md`). Each by-file task also removes every mention of the three deleted design skills from its own files, so AC1.2's grep reaches zero only when J1.T1–J1.T9 have merged.
 
