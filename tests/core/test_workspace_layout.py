@@ -23,6 +23,7 @@ down only — an entry whose file no longer violates is stale and fails the test
 from __future__ import annotations
 
 import ast
+import hashlib
 import importlib
 import json
 import re
@@ -33,6 +34,7 @@ import pytest
 
 from dadaia_workspace.core.gitflow import Role
 from dadaia_workspace.core.platform import Capabilities
+from dadaia_workspace.core.template_history import was_shipped
 from dadaia_workspace.core.workspace_layout import (
     CANON_ROOT_MEMBERS,
     DADAIA_ZONES,
@@ -379,9 +381,16 @@ def test_law_staged_under_win32_names_the_scripts_cli(
     assert ".venv/bin/dadaia" not in text
 
 
-def test_workspace_cli_token_renders_to_one_windows_spelling(
-    monkeypatch: pytest.MonkeyPatch,
+def test_shipped_history_reads_the_forward_rendered_windows_law(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     monkeypatch.setattr("dadaia_workspace.core.platform.PLATFORM", Capabilities.detect("win32"))
-    source = "run `<!-- workspace-cli --> doctor`"
-    assert render_registry_tables(source) == "run `.dadaia/.venv/Scripts/dadaia.exe doctor`"
+    source = "run `.dadaia/.venv/bin/dadaia doctor`"
+    rendered = "run `.dadaia/.venv/Scripts/dadaia.exe doctor`"
+    (tmp_path / "shipped-hashes.json").write_text(
+        json.dumps({"law.md": [hashlib.sha256(rendered.encode()).hexdigest()]}), encoding="utf-8"
+    )
+
+    assert render_registry_tables(source) == render_registry_tables(rendered) == rendered
+    assert was_shipped(rendered, "law.md", tmp_path)
+    assert not was_shipped(rendered + " --edited", "law.md", tmp_path)
