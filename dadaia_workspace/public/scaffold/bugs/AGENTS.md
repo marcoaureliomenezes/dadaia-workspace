@@ -20,14 +20,14 @@ Scope: this file governs only `specs/bugs/`.
 
 - The block list, closed: (1) the work branch's `verify:` line is red; (2) a Stall; (3) the running task cannot deliver its AC;
   (4) a security finding; (5) data loss or corruption.
-- A block-list bug is a hotfix: registered with `caused_by`, its own job, job gate and one review, landing before any
+- A block-list bug is a hotfix: its own job, job gate and one review, landing before any
   other job merge; its fix body names `block: <item>`; no SPEC amendment.
-- Every other bug is registered with `found_in` and becomes explicit candidate scope. Ship refuses an open bug unless
+- Every other confirmed bug becomes explicit candidate scope. Ship refuses an open bug unless
   the operator authorizes that exact id; the authorization is recorded verbatim and the bug remains open for the next candidate.
 - Any fix whose `caused_by` is not `none`, a bug's fix or a feature task, is a REBUILD of the unit, keeping its tests.
 - The next rc's `## Bug window review` judges those fixes (KEEP or REBUILD); its Job 1 executes the verdicts.
 - Close with the fix: `bugs.py resolve`, with the flags `dd-bug-resolution` Phase 6 names.
-- Check prior resolutions on the same component first; `caused_by: X` means the fix of X wrote the lines this fix corrects, picked from `bugs.py resolve`'s blame candidates, `none` only when there are none or with `--lineage-reason`.
+- Check prior resolutions on the same component first using `dd-bug-resolution/LINEAGE.md`; inspect each persisted `fix_sha` with `git show`. `caused_by: X` means bug or task X wrote the lines this fix corrects; use `none` only when blame offers no candidate.
 - Commit exactly what the fix touched, never a blanket `-A`; a net-positive diff passes the architecture lens first.
 
 ## 3. Field classes

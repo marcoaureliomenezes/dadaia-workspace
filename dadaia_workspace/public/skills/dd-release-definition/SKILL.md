@@ -13,11 +13,11 @@ description: >
 ## 1. Pick the set
 
 1. Open `specs/releases/AGENTS.md` (the area's scoped law) and follow it.
-2. Inspect `specs/bugs/BUGS.jsonl` via `python3 .agents/skills/dd-bug-resolution/scripts/bugs.py status`/`stats`/`window`, each with `--specs <specs-dir>`, and read each test the window's records cite.
+2. Inspect `specs/bugs/BUGS.jsonl` via `python3 .agents/skills/dd-bug-resolution/scripts/bugs.py status`/`stats`, each with `--specs <specs-dir>`; read the prior candidate's `## Bug window review` and the bounded ledger slice defined by `dd-bug-resolution/LINEAGE.md`.
 3. Read `specs/backlog/BACKLOG.json`'s `active[]`, consumed untriaged.
 4. Each undispositioned `specs/audits/**` finding enters the SPEC with its disposition (`python3 .agents/skills/dd-audit-project/scripts/audit.py disposition`).
 5. Name the SPEC's `**Origin:**`: `operator-demand`, `backlog:<ids>` or `bugs:<ids>`.
-6. Write the SPEC's `## Bug window review`: compare each fix in the window (`bugs.py window --specs <specs-dir>`, `bugs.py fix --specs <specs-dir>`) against the overfitting patterns — an assert or test the fix changed; a special case on a test value; a new branch, flag or second path; a reach into another feature; deleted functionality; ≥ 2 fixes on the unit.
+6. Write the SPEC's `## Bug window review`: inspect each resolved record's persisted `fix_sha` with `git show` and compare that fix against the overfitting patterns — an assert or test the fix changed; a special case on a test value; a new branch, flag or second path; a reach into another feature; deleted functionality; ≥ 2 fixes on the unit.
 7. Give each fix KEEP or REBUILD; a REBUILD reworks the fix's code and what surrounds it, and keeps the fix's tests.
 
 **Done when** the picked set is recorded; it becomes the SPEC's scope.

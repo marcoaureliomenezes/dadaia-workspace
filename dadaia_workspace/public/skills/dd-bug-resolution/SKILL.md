@@ -22,8 +22,9 @@ compatibility: Standalone Agent Skill. Inside a dadaia-workspace (pip install da
 ## 2. The method — seven phases, each gated
 
 **Phase 0 — Lineage.** Read the bug ledger for prior fixes to the same
-`surface`/`component` in the bounded window ([`LINEAGE.md`](LINEAGE.md)); ≥ 2 prior fixes on the unit
-make this fix a REBUILD of it (LINEAGE.md); carry the link to Phase 6 (`resolve --caused-by`; `update` repairs);
+`surface`/`component` in the bounded window ([`LINEAGE.md`](LINEAGE.md)); inspect every named
+`fix_sha` with `git show`; ≥ 2 prior fixes on the unit make this fix a REBUILD of it (LINEAGE.md);
+carry the link to Phase 6 (`resolve --caused-by`; `update` repairs);
 echo the `caused_by:`/`evidence:`/`prior diffs read:`/`rebuild:` block in the fix commit body.
 *Done when prior diffs were actually read and the link and the rebuild decision (`rebuild` or `none`) are decided.*
 
@@ -63,16 +64,18 @@ gap is registered first).*
 
 **Phase 6 — Cleanup + resolve.** Grep the probe prefix to zero:
 
-- Stage the code first: `resolve` blames the lines the staged diff removes.
+- Commit the GREEN fix, then use its 40-hex sha in the canonical resolve command from
+  [`LINEAGE.md`](LINEAGE.md) §Declare `caused_by`.
 
 ```
 python3 .agents/skills/dd-bug-resolution/scripts/bugs.py resolve <bug-id> --cause … --caused-by …
-  --solution … --evidence-loop … --evidence-seam …
+  --solution … --fix-sha <40-hex-sha>
 ```
 
-- `caused_by` names a live or archived record, or `none`, never a loop; writes refuse else.
-- Stage code + the `BUGS.jsonl` line together, the red loop in the body, a hotfix's
-  naming `block: <item>` — ONE commit, shape 3 of `dd-gitflow-default` §3a.
+- `caused_by` names a live or archived bug, a known release task, or `none`, never a loop;
+  writes refuse anything else.
+- Commit the resulting `BUGS.jsonl` transition with the red loop in the body and a hotfix's
+  `block: <item>`, using shape 3 of `dd-gitflow-default` §3a.
 
 ## 3. Done when
 
@@ -81,8 +84,8 @@ python3 .agents/skills/dd-bug-resolution/scripts/bugs.py resolve <bug-id> --caus
   load-bearing.
 - The surviving hypothesis was confirmed by instrumentation.
 - The regression test sits at the correct seam, or the seam gap was registered first.
-- Probes are gone; the resolve record carries `evidence_loop`, `caused_by`,
-  `resolved_release` and `closed_at`; one isolated commit; worktree clean.
+- Probes are gone; the resolve record carries `cause`, `solution`, `caused_by`, `fix_sha`
+  and `closed_at`; the fix and ledger transition are isolated; worktree clean.
 
 ## 4. References
 

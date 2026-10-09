@@ -332,11 +332,11 @@ A violation a ratchet tolerates: `file:symbol` → the open bug id deleting it, 
 _Avoid_: baseline
 
 **Resolution contract**:
-A RED at the question's seam failing at definition; GREEN; the losers gone with their tests and fakes; `bugs.py resolve` with the evidence triple; net ≤ 0 in production and tests, except the production ceilings a SPEC's ACs grant; commit shape 3.
+A RED at the question's seam failing at definition; GREEN; the losers gone with their tests and fakes; a named fix commit followed by `bugs.py resolve` persisting `cause`, `solution`, `caused_by` and `fix_sha`; net ≤ 0 in production and tests, except the production ceilings a SPEC's ACs grant; commit shape 3.
 _Avoid_: fix (bare)
 
 **Bug window**:
-The records an rc's first SPEC reviews in `## Bug window review`: `found_in` or `introduced_in` in the live release or the previous published one (`bugs.py window`); it judges the previous rc's fixes, never an open bug.
+The resolved fixes an rc's first SPEC reviews in `## Bug window review`: begin with the prior candidate's table, then read the bounded ledger slice defined by `dd-bug-resolution/LINEAGE.md` and inspect each persisted `fix_sha` with `git show`; it judges fixes, never an open bug.
 _Avoid_: wave, pile, cause group (retired)
 
 **Fix surface**:
