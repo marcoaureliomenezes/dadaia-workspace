@@ -580,9 +580,7 @@ _SOURCE_CLI = ".venv/bin/dadaia"
 def render_workspace_cli(text: str) -> str:
     """Render the workspace CLI source for this host."""
     caps = platform.PLATFORM
-    return text.replace(
-        _SOURCE_CLI, f".venv/{caps.venv_scripts_dir}/dadaia{caps.venv_exe_suffix}"
-    )
+    return text.replace(_SOURCE_CLI, f".venv/{caps.venv_scripts_dir}/dadaia{caps.venv_exe_suffix}")
 
 
 def render_registry_tables(text: str) -> str:
