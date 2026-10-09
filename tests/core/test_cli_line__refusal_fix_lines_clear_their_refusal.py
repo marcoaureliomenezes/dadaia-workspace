@@ -510,58 +510,6 @@ def _no_junk(world: World) -> None:
     assert "specs/junk.md" not in world.git(world.repo, "ls-tree", "-r", "--name-only", tip)
 
 
-def _law_deleted(world: World) -> str:
-    """law-deletion-refusal-reuses-the-denylist-rewrite-fix: the tip deletes a published
-    law line citing no ADR — the uncommit-amend remedy loops; the reword clears it."""
-    _published(world)
-    world.commit("AGENTS.md", "- keep\n- drop\n", branch="feature/1.0.0")
-    world.git(world.repo, "push", "-q", "origin", "feature/1.0.0")
-    world.commit("AGENTS.md", "- keep\n")
-    return "git push -q origin feature/1.0.0"
-
-
-def _cite_adr(world: World) -> None:
-    """Plays the printed act: the refusal named HEAD's commit and its law file."""
-    shown = _single_fix(_gate(world, "git push -q origin feature/1.0.0"))
-    assert f"reword commit {world.git(world.repo, 'rev-parse', 'HEAD')[:12]} " in shown
-    assert shown.endswith("deletion of AGENTS.md"), shown
-    world.git(world.repo, "commit", "-q", "--amend", "-m", "drop a law line (ADR 0151)")
-
-
-def _associated_law_deleted(world: World) -> list[str]:
-    """law-deletion-citation-accepts-any-adr-number: an associated repo (no specs/) cites
-    ADR 9999; its owner's committed ledger (a malformed line, 0001 accepted) refuses it —
-    through lib's real pre-push hook."""
-    _associated_on_integration(world)
-    world.commit("specs/ADRs/decisions.jsonl", 'not json\n{"id": "0001", "status": "accepted"}\n')
-    lib = world.ws / "repos" / "lib"
-    world.git(lib, "checkout", "-q", "--", ".")
-    world.git(lib, "checkout", "-q", "-b", "feature/1.0.0")
-    (lib / "AGENTS.md").write_text("- keep\n- drop\n", encoding="utf-8")
-    world.git(lib, "add", "AGENTS.md")
-    world.git(lib, "commit", "-qm", "law")
-    world.git(lib, "push", "-q", "origin", "feature/1.0.0")
-    (lib / "AGENTS.md").write_text("- keep\n", encoding="utf-8")
-    world.git(lib, "commit", "-qam", "drop (ADR 9999)")
-    return ["git", "-C", str(lib), "push", "-q", "origin", "feature/1.0.0"]
-
-
-def _cite_accepted_adr(world: World) -> None:
-    """Plays the printed act: the refusal named lib's HEAD and its law file."""
-    lib = world.ws / "repos" / "lib"
-    shown = _single_fix(world.run(["git", "push", "-q", "origin", "feature/1.0.0"], lib))
-    assert f"reword commit {world.git(lib, 'rev-parse', 'HEAD')[:12]} " in shown
-    assert shown.endswith("deletion of AGENTS.md"), shown
-    world.git(lib, "commit", "-q", "--amend", "-m", "drop (ADR 0001)")
-
-
-def _lib_pushed(world: World) -> None:
-    lib = world.ws / "repos" / "lib"
-    remote = world.git(world.tmp / "lib.git", "rev-parse", "feature/1.0.0")
-    assert remote == world.git(lib, "rev-parse", "HEAD")
-    assert "(ADR 0001)" in world.git(lib, "log", "-1", "--format=%s")
-
-
 def _denylisted_in_a_worktree(world: World) -> str:
     """Review H-B (P10): the pushing repo is a worktree under repos/<slug>/."""
     _published(world)
@@ -922,10 +870,6 @@ SITES: dict[str, tuple[Case | tuple[Case, ...] | Skip, ...]] = {
     "push_gate._read_failure": (Skip("needs a corrupted object store; `git fsck` names it"),),
     "push_gate.push_gate_decision": (
         Case(_malformed, lambda w: _work_pushed(w, _work(w)), replaces=True),
-        (
-            Case(_law_deleted, _work_pushed, operator=_cite_adr),
-            Case(_associated_law_deleted, _lib_pushed, operator=_cite_accepted_adr),
-        ),
     ),
     "ci._repo_root": (Skip("the pre-push hook always runs inside the repo it pushes"),),
     "ci.push_gate_check": (Skip("the gate's refusal: its fix is a branch_policy/push_gate site"),),

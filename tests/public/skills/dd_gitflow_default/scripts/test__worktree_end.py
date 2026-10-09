@@ -132,7 +132,9 @@ def test_a_define_tree_lands_specs_only_through_the_ledger_checks(root: Path) ->
     subprocess.run(restore, shell=True, check=True)  # noqa: S602 — runs as printed
     assert then == git_line(tree, "commit")
     git(tree, "commit", "-qm", "revert: RED-job")
-    approve(root, sha := commit(tree, "specs/releases/0.5.0/rc-1/PLAN.md", "**Status:** Draft\n"))
+    plan = tree / "specs/releases/0.5.0/rc-1/PLAN.md"
+    draft = plan.read_text().replace("**Status:** Approved", "**Status:** Draft", 1)
+    approve(root, sha := commit(tree, "specs/releases/0.5.0/rc-1/PLAN.md", draft))
     landed = run(root, "merge", str(tree))
     assert landed.returncode == 0, landed.stderr
     assert git(repo, "rev-parse", "feature/0.5.0").strip() == sha

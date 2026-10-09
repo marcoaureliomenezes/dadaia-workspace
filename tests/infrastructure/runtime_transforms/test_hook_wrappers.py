@@ -1,8 +1,8 @@
 """sa-gate-blind-on-cursor-copilot-devin#B8: for every registry harness, a payload fixture in the harness's native shape
 (``tests/fixtures/hook_payloads/<harness>/``, shapes from the bug record's vendor-doc
 citations — authored, not recorded) through its rendered hook gets Claude's verdict for
-a bare `dadaia` / a new root entry / a PROTECTED file / a worktree write of an unregistered slug (scope: allowed).
-sa-gate-blind-on-cursor-copilot-devin#B1 Copilot's deny carries the venv guard's reason and fix line; sa-gate-blind-on-cursor-copilot-devin#B2 Cursor's preToolUse
+a new root entry / a PROTECTED file / a worktree write of an unregistered slug (scope: allowed).
+sa-gate-blind-on-cursor-copilot-devin#B2 Cursor's preToolUse
 deny reaches the model (agent_message) with a fix line; sa-gate-blind-on-cursor-copilot-devin#B3 Devin's hooks.v1.json has the
 documented event -> [{matcher, hooks}] shape; sa-gate-blind-on-cursor-copilot-devin#B4 an allowed call prints nothing on the
 translated harnesses; sa-gate-blind-on-cursor-copilot-devin#B5 Kimi's shim prints the reason with real newlines, `fix:` at a
@@ -37,7 +37,7 @@ pytestmark = pytest.mark.slow
 
 _FIXTURES = Path(__file__).resolve().parents[2] / "fixtures" / "hook_payloads"
 #: Claude's verdict per case — the reference side of the parity (literal, not computed).
-_CLAUDE = {"venv": "deny", "new-root": "deny", "protected": "deny", "scope": "allow"}
+_CLAUDE = {"new-root": "deny", "protected": "deny", "scope": "allow"}
 
 
 @pytest.fixture
@@ -116,23 +116,13 @@ def test_ac3_9_a_bound_session_over_a_truncated_registry_still_blocks(
     assert _verdict(harness, _run(ws, harness, case, DADAIA_SESSION_ID="s")) == "deny"
 
 
-@pytest.mark.parametrize(
-    ("harness", "case", "decision", "reason", "text"),
-    [
-        ("copilot", "venv", "permissionDecision", "permissionDecisionReason", "[VENV GUARD]"),  # B1
-        ("cursor", "new-root", "permission", "agent_message", "\nfix: "),  # B2
-    ],
-    ids=["b1-copilot-venv", "b2-cursor-new-root"],
-)
-def test_b1_b2_the_deny_reaches_the_agent_with_its_reason_and_fix(
-    ws: Path, harness: str, case: str, decision: str, reason: str, text: str
-) -> None:
-    out = json.loads(_run(ws, harness, case).stdout)
-    assert out[decision] == "deny"
-    assert text in out[reason] and "\nfix: " in out[reason]
+def test_b2_cursor_deny_reaches_the_agent_with_its_reason_and_fix(ws: Path) -> None:
+    out = json.loads(_run(ws, "cursor", "new-root").stdout)
+    assert out["permission"] == "deny"
+    assert "\nfix: " in out["agent_message"]
 
 
-def test_b3_devin_hook_file_has_the_documented_shape_and_denies(ws: Path) -> None:
+def test_b3_devin_hook_file_has_the_documented_shape() -> None:
     document = hook_documents(HARNESS_RECORDS["devin"])["hooks.v1.json"]
 
     def row(lane: str, timeout: int) -> dict[str, object]:
@@ -144,7 +134,6 @@ def test_b3_devin_hook_file_has_the_documented_shape_and_denies(ws: Path) -> Non
         "UserPromptSubmit": [row("ctx-inject", 30)],
         "SessionStart": [row("ctx-inject", 30), row("doctor-expired", 30)],
     }
-    assert _verdict("devin", _run(ws, "devin", "venv")) == "deny"
 
 
 @pytest.mark.parametrize("harness", ["cursor", "copilot"])

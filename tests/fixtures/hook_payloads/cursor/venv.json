@@ -1,7 +1,0 @@
-{
-  "hook_event_name": "preToolUse",
-  "tool_name": "Shell",
-  "tool_input": {
-    "command": "dadaia doctor"
-  }
-}

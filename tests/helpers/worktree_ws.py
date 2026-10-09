@@ -90,11 +90,25 @@ def make_workspace(root: Path) -> Path:
     rel = repo / "specs/releases/0.5.0/rc-1"
     rel.mkdir(parents=True)
     git(repo, "init", "-q")
-    for doc in ("SPEC", "PLAN", "TASKS"):
-        (rel / f"{doc}.md").write_text(
-            f"# {doc}\n\n**Status:** Approved\n\n**Origin:** operator-demand\n"
-            + ("\n## Bug window review\n" if doc == "SPEC" else "")
-        )
+    (rel / "SPEC.md").write_text(
+        "# SPEC\n\n**Status:** Approved\n\n**Origin:** operator-demand\n\n## Bug window review\n"
+    )
+    (rel / "PLAN.md").write_text(
+        "# PLAN\n\n**Status:** Approved\n\n"
+        "## As-is review\n\n"
+        "| unit | today | bugs | verdict | why |\n"
+        "|---|---|---|---|---|\n"
+        "| worktree | current | 0 | KEEP | fixture |\n\n"
+        "## DAG\n\n"
+        "| job | wave | waits on | `W:` |\n"
+        "|---|---|---|---|\n"
+        "| Job 1 | 1 | — | `src/a.py` |\n"
+    )
+    tasks = rel / "tasks"
+    tasks.mkdir()
+    (tasks / "job1.md").write_text(
+        "# Job 1\n\n| task | AC | `W:` |\n|---|---|---|\n| J1.T1 | AC2.1 | `src/a.py` |\n"
+    )
     state = {"schema": "release-state-v1", "release": "0.5.0", "phase": "DEFINITION",
              "defined": None, "implemented": None, "shipped": None, "log": []}  # fmt: skip
     (rel.parent / "_RELEASE.json").write_text(json.dumps(state))

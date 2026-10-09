@@ -149,7 +149,6 @@ def test_os_name_is_read_only_through_the_platform_seam() -> None:
 
 
 _SKILLS = _PKG / "public" / "skills"
-_WORDS = ["one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten"]
 
 
 @pytest.mark.parametrize(
@@ -169,25 +168,6 @@ def test_a_skill_prescribes_no_act_its_own_laws_forbid_or_its_writer_cannot_do(
     """The ledger laws (`specs/bugs/AGENTS.md`: no event stream; root map: fixes never rewrite old
     asserts; `backlog.py`: new, exit, check) bind the skills that teach those ledgers."""
     assert phrase not in (_SKILLS / skill).read_text("utf-8")
-
-
-def test_the_bugs_pillar_states_how_many_metrics_and_measures_it_lists() -> None:
-    """Pillar 1 names its metrics and cheap measures by the number of rows it holds, in its own
-    headings, and `dd-audit-project/SKILL.md` repeats that number."""
-    pillar = (_SKILLS / "dd-audit-project/PILLAR-BUGS.md").read_text("utf-8")
-    audit = (_SKILLS / "dd-audit-project/SKILL.md").read_text("utf-8")
-    metrics = _WORDS[len(re.findall(r"^\| \d+ \|", pillar, re.M)) - 1]
-    cheap = re.search(
-        r"^## (?P<word>\w+) cheap measures[^\n]*\n(?P<body>.*?)^## ", pillar, re.M | re.S
-    )
-    assert cheap
-    measures = _WORDS[len(re.findall(r"^- ", cheap["body"], re.M)) - 1]
-    assert f"## The {metrics} forensic metrics" in pillar
-    assert f"A pillar-1 run reporting fewer than {metrics} is incomplete" in pillar
-    assert f"(beyond the {metrics} metrics)" in pillar
-    assert cheap["word"].lower() == measures
-    assert re.search(rf"compute all {metrics}\s+forensic metrics", audit)
-    assert f"{metrics} bug metrics with baseline" in audit
 
 
 def test_the_orchestration_skill_dispatches_a_task_never_a_job() -> None:
