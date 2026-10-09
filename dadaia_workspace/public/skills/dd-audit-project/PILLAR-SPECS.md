@@ -65,4 +65,4 @@ Input: the ratchet modules and the window `from-sha..HEAD`. Output: the "Slop re
 
 ## Findings
 
-- Every check above emits `pillar: "specs"` records via `FINDINGS-FORMAT.md`'s shape — never a bespoke report format.
+- Every check above emits `pillar: "specs"` records via `FINDINGS-FORMAT.md`'s shape.
