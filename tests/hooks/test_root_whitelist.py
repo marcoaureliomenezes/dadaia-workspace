@@ -167,7 +167,7 @@ def test_fail_open_table(tmp_path: Path, tool_name: str, tool_input: dict[str, A
     ("extra", "segment"),
     [
         ({}, "main-thread"),
-        ({"agent_id": "a1", "agent_type": "dd-software-engineer"}, "dd-software-engineer"),
+        ({"agent_id": "a1", "agent_type": "dd-sw-engineer-sr"}, "dd-sw-engineer-sr"),
         *(({"agent_type": bad}, "main-thread") for bad in ("../x", "a/b", "", "..", 3, None)),
     ],
 )

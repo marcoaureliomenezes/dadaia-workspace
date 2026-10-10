@@ -43,7 +43,7 @@ def _make_valid_handoff(
     doc: dict = {
         "schema_version": "handoff-v1.2",
         "self_pull": {"refs": ["AGENTS.md"]},  # the root map every initialized workspace has
-        "agent": "dd-software-engineer",
+        "agent": "dd-sw-engineer-sr",
         "context": "dadaia-workspace",
         "produced_at": "2026-05-17T00:00:00Z",
         "scope": "dadaia-workspace/test",

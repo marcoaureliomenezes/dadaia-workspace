@@ -54,7 +54,7 @@ def _base_doc(**overrides: object) -> dict[str, object]:
     doc: dict[str, object] = {
         "schema_version": "handoff-v1.2",
         "self_pull": {"refs": [_REF]},
-        "agent": "dd-software-engineer",
+        "agent": "dd-sw-engineer-sr",
         "context": "dadaia-workspace",
         "produced_at": "2026-08-28T12:00:00Z",
         "scope": "table-driven fixture",

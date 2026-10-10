@@ -38,7 +38,7 @@ def _refused_workspace(tmp_path: Path) -> None:
             {
                 "schema_version": "agent-model-policy-v1",
                 "applied_template": "max-quality",
-                "overrides": {"dd-software-engineer": {"effort": "medium"}},
+                "overrides": {"dd-sw-engineer-sr": {"effort": "medium"}},
             }
         ),
         encoding="utf-8",

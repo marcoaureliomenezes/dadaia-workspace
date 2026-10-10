@@ -52,7 +52,7 @@ _BASE: dict[str, dict[str, Any]] = {
     "bug": {
         "id": "sample-bug",
         "ts": _TS,
-        "reported_by": "dd-software-engineer",
+        "reported_by": "dd-sw-engineer-sr",
         "title": "sample bug",
         "severity": "MEDIUM",
         "surface": "tests",
