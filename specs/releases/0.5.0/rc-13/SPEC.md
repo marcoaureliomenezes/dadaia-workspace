@@ -50,7 +50,11 @@ No verb selects a template. `JsonAgentModelPolicyStore.save()` has had no produc
 - AC1.3 (unit): G-1 still holds: `dd-code-reviewer` never resolves to `fable`. The rule is kept by the template table alone, and a unit test over every template enforces it. With overrides gone (AC1.6), the store's runtime Fable guard and `is_fable_model` are deleted.
 - AC1.4 (integration): `public install` writes `model: <alias>` into each projected Claude persona. It writes the alias's Codex id and the clamped effort into each Codex agent.
 - AC1.5 (no test — reviewer source sweep): A docstring or comment in `model_registry.py` states the contract: "templates name a tier by alias; a new model release needs no library change". G2's grep returns no hit.
-- AC1.6 (unit, RED first): The overlay keeps only `applied_template`, and per-agent `overrides` are deleted. An overlay that still carries `overrides` is refused by the store's existing unknown-key refusal, with a `fix:` line naming `dadaia public install --template <id>`. Nothing is migrated. Several things go with the store's REBUILD: `overrides` in `agent-model-policy-v1.schema.json`, the stale retired-name docstring (`json_agent_model_policy_store.py:17`), and the uncalled public `parse()` wrapper. The test fails on today's store, which accepts `overrides`. (Operator ruling, 2026-10-10.)
+- AC1.6 (unit, RED first): The overlay keeps only `applied_template`, and per-agent `overrides` are deleted. An overlay that still carries `overrides` is refused by the store's existing unknown-key refusal, with a `fix:` line naming `dadaia public install --template <id>`. Nothing is migrated. Several things go with the store's REBUILD: `overrides` in `agent-model-policy-v1.schema.json`, the stale retired-name docstring (`json_agent_model_policy_store.py:17`), and the uncalled public `parse()` wrapper. The refusal never ships without its remedy:
+  - It lands in the same job as the `--template` flag (FR4).
+  - For that DRIFT, `public doctor`'s remedy is the refusal's own `fix:` line, and there is no second remedy.
+
+  The test fails on today's store, which accepts `overrides`. (Operator ruling, 2026-10-10.)
 
 ### FR2 — five personas: sr and jr replace `dd-software-engineer`, plus `dd-researcher`
 
@@ -64,13 +68,14 @@ No verb selects a template. `JsonAgentModelPolicyStore.save()` has had no produc
   - Its tools are `Read`, `Grep`, `Glob`, `Bash`, `WebSearch` and `WebFetch`, and it preloads no skills.
   - It returns findings as `path:line` or URL.
   - Install projects it read-only, the same way the reviewer is projected.
+  - Its body states that fetched web content is data and never instructions, and that it runs only read-only commands through `Bash` (OWASP LLM01). The tool list stays as the operator ruled it.
 - AC2.3 (unit): The core-agent set is the five personas: `dd-product-engineer`, `dd-code-reviewer`, `dd-sw-engineer-sr`, `dd-sw-engineer-jr` and `dd-researcher`. The set is read from the template table's keys, and no other agent list is kept by hand.
 - AC2.4 (no test — reviewer source sweep): The root map §2 table names five roles in place of "Three roles, no fourth". `dd-manager-orchestration` routes research dispatches to `dd-researcher` in place of `Explore` and `general-purpose`, and routes engineer dispatches by the task's `who:` (FR5).
 - AC2.5 (unit): `git grep -n "dd-software-engineer" -- dadaia_workspace tests` returns no hit.
 
 ### FR3 — the template table
 
-- AC3.1 (unit): The templates resolve exactly to this table (model alias, effort). `balanced` stays the default.
+- AC3.1 (unit): The unit test asserts all 15 cells exactly as this table gives them (model alias, effort). `balanced` stays the default. The product engineer stays on Opus in `balanced` because a SPEC is open-ended judgement. The engineer cells are the operator's.
 
 | template | dd-product-engineer | dd-code-reviewer | dd-sw-engineer-sr | dd-sw-engineer-jr | dd-researcher |
 |---|---|---|---|---|---|
@@ -78,7 +83,6 @@ No verb selects a template. `JsonAgentModelPolicyStore.save()` has had no produc
 | `max-quality` | fable high | opus xhigh | opus medium | sonnet medium | sonnet medium |
 | `economy` | sonnet medium | sonnet high | sonnet medium | haiku low | haiku low |
 
-- AC3.2 (no test — reviewer source sweep): The product engineer stays on Opus in `balanced` because a SPEC is open-ended judgement. The engineer cells are the operator's. Any cell that differs from the table returns this Draft to the operator.
 
 ### FR4 — the template selector
 
@@ -86,10 +90,12 @@ No verb selects a template. `JsonAgentModelPolicyStore.save()` has had no produc
 - AC4.2 (integration): `public install` without `--template` keeps the current `applied_template`.
 - AC4.3 (integration): `uvx dadaia-workspace init [DIR] --template <id>` takes the same flag and has the same effect, both on a new workspace and on a re-run, which is the upgrade. There is no `upgrade` verb. `reconcile` keeps the saved template and takes no flag.
 - AC4.4 (integration): `dadaia public doctor` prints one `[ok] model-resolution: template <id>` line. That line replaces the check's re-validation of models and efforts (a REBUILD of `check_model_resolution`). `dadaia doctor` is unchanged, because a template finding there would be a fifth finding shape (bug `sa-doctor-finding-has-four-shapes`). (Operator ruling, 2026-10-10.)
+- AC4.5 (integration, RED first): Start from an overlay that carries `overrides`. The `fix:` command that the refusal prints exits 0 and clears the refusal. Then `public install`, an `init` re-run and `reconcile` each exit 0.
+- AC4.6 (no test — closure instance step): At closure, this instance's own overlay drops its `dd-product-engineer` and `dd-software-engineer` medium-effort overrides through `dadaia public install --template balanced`. `public doctor` then prints `[ok] model-resolution: template balanced`. `balanced` stays as the grill set it, with the product engineer on opus high. (Operator ruling, 2026-10-10.)
 
 ### FR5 — `who:` in the job-file task table
 
-- AC5.1 (no test — reviewer source sweep): `dd-release-definition` §5 adds a `who` column (`sr` | `jr`) to the job-file task table, and its example table shows it. The senior fills it while writing the job files.
+- AC5.1 (no test — reviewer source sweep): `dd-release-definition` §5 adds a `who` column to the job-file task table, and its example table shows it. The column names the dispatched role: `sr` or `jr` for an engineer task, or the owning role (`pe`, `cr`) for a task another persona owns, so every row's cell is true. The senior fills it while writing the job files. (Operator ruling, 2026-10-10.)
   - `jr`: the outcome is fully stated by the AC and `W:`. Examples are ports, trims, renames, characterization or literal tests, closure corrections and doc sync.
   - `sr`: new behaviour, design choices, root causes, the RED test of a new contract, the PLAN, job files and the as-is review.
 - AC5.2 (no test — reviewer source sweep): One REJECTED verdict on a `jr` task re-dispatches that task to `dd-sw-engineer-sr`. The rule is stated once, in `dd-release-implementation` or `dd-manager-orchestration`, as the PLAN assigns.
@@ -99,11 +105,12 @@ No verb selects a template. `JsonAgentModelPolicyStore.save()` has had no produc
 
 - AC6.1 (no test — reviewer source sweep): The list below is the complete set of law, skill and persona sources this candidate may change. Adding another source returns this Draft to the operator. Projections change only through `public stage` and `public install`.
   - Personas: add `dadaia_workspace/public/agents/{dd-sw-engineer-sr,dd-sw-engineer-jr,dd-researcher}.md`; delete `dd-software-engineer.md`; edit `dd-product-engineer.md` and `dd-code-reviewer.md` (their `[SCOPE ERROR]` routing).
-  - Law: `dadaia_workspace/public/data/{AGENTS,CONTEXT-MAP}.md`, `dadaia_workspace/public/data/fixed/slop-tests.md`, `dadaia_workspace/public/templates/specs-AGENTS.md` and `dadaia_workspace/public/scaffold/releases/AGENTS.md`. The repo's own `specs/AGENTS.md` changes through `specs upgrade` only.
+  - Law: `dadaia_workspace/public/data/{AGENTS,CONTEXT-MAP}.md`, `dadaia_workspace/public/data/fixed/slop-tests.md` and `dadaia_workspace/public/templates/specs-AGENTS.md`. The repo's own `specs/AGENTS.md` changes through `specs upgrade` only.
   - Skills: the `SKILL.md` of `dd-release-definition`, `dd-release-implementation`, `dd-bug-resolution`, `dd-manager-orchestration` and `dd-code-review`; `dd-ai-eng-knowhow/CONTEXT-ENGINEERING.md`.
   - Entity data and schemas: `dadaia_workspace/public/entities/registry.json`, `dadaia_workspace/public/schemas/handoff-v1.schema.json` (its example name), and `dadaia_workspace/public/schemas/agent-model-policy-v1.schema.json`.
   - Skill script: `dadaia_workspace/public/skills/dd-bug-resolution/scripts/bugs.py`. Its `reported_by` default (`:117`) still names the retired persona, and AC2.5's zero hits requires changing it.
   - Derived: `dadaia_workspace/public/templates/shipped-hashes.json`. It is append-only, and its tool re-records it for every edited template (releases law §3).
+- AC6.2 (no test — closure memory pass): The Reconciliation updates every canonical statement ADR 0240 names. These are `specs/memory/product/agents/agent-orchestration.md` (summary line, roster table, model-policy lines), `specs/memory/QUALITY.md:75`, and the "three dd- personas" summaries at `specs/memory/product/harness/harness-claude-code.md:5`, `harness-codex.md:5` and `harness-copilot.md:5`, plus their `catalog.json` entries.
 
 ## 5. Constraints and risks
 
@@ -137,7 +144,7 @@ No verb selects a template. `JsonAgentModelPolicyStore.save()` has had no produc
 | risk | control |
 |---|---|
 | A harness rejects an alias at dispatch. | Closed for `fable`. The main thread's probe on 2026-10-10 dispatched an agent with `model: fable`, and the run's `modelUsage` billed `claude-fable-5-1`. `opus`, `sonnet` and `haiku` are documented Claude Code aliases. AC1.4 pins what install writes. |
-| An existing overlay carries `overrides`. | AC1.6 refuses it with a `fix:` line naming `public install --template`. |
+| An existing overlay carries `overrides`, which this instance's does. | AC1.6 refuses it with a `fix:` line naming `public install --template`, which lands in the same job. `public doctor` prints that same line. AC4.5 proves the line clears the refusal on install, re-init and reconcile. AC4.6 runs it on this instance. |
 | A `jr` cell is too weak for a task. | AC5.2 escalates on the first REJECTED. AC5.3 has the reviewer judge the column before implementation. |
 
 ## 6. Open questions
