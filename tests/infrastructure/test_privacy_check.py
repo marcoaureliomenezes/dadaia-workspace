@@ -248,7 +248,7 @@ def test_the_retired_persona_name_stays_out_of_library_and_tests() -> None:
         for p in (_REPO_ROOT / root).rglob("*")
         if p.is_file() and "__pycache__" not in p.parts
     )
-    assert_populated(paths, sentinel=_REPO_ROOT / "tests" / "infrastructure" / "test_privacy_check.py")
+    assert_populated(paths, sentinel=Path(__file__))
     hits = []
     for path in paths:
         try:
