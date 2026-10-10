@@ -69,14 +69,22 @@ def test_codex_effort_clamp_map(claude_effort: str, codex_effort: str) -> None:
 def test_applied_template_resolves_its_cell(template: str, agent: str) -> None:
     cell = TEMPLATES[template][agent]
     resolved = resolve_agent_model(agent, AgentModelPolicyOverlay(applied_template=template))
-    assert (resolved.model, resolved.effort, resolved.source) == (cell.model, cell.effort, "template")
+    assert (resolved.model, resolved.effort, resolved.source) == (
+        cell.model,
+        cell.effort,
+        "template",
+    )
 
 
 @pytest.mark.parametrize("agent", CORE_AGENTS)
 def test_no_overlay_resolves_the_balanced_default(agent: str) -> None:
     cell = TEMPLATES["balanced"][agent]
     resolved = resolve_agent_model(agent, None)
-    assert (resolved.model, resolved.effort, resolved.source) == (cell.model, cell.effort, "default")
+    assert (resolved.model, resolved.effort, resolved.source) == (
+        cell.model,
+        cell.effort,
+        "default",
+    )
 
 
 @pytest.mark.parametrize(
