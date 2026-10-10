@@ -102,6 +102,8 @@ No verb selects a template. `JsonAgentModelPolicyStore.save()` has had no produc
   - Law: `dadaia_workspace/public/data/{AGENTS,CONTEXT-MAP}.md`, `dadaia_workspace/public/data/fixed/slop-tests.md`, `dadaia_workspace/public/templates/specs-AGENTS.md` and `dadaia_workspace/public/scaffold/releases/AGENTS.md`. The repo's own `specs/AGENTS.md` changes through `specs upgrade` only.
   - Skills: the `SKILL.md` of `dd-release-definition`, `dd-release-implementation`, `dd-bug-resolution`, `dd-manager-orchestration` and `dd-code-review`; `dd-ai-eng-knowhow/CONTEXT-ENGINEERING.md`.
   - Entity data and schemas: `dadaia_workspace/public/entities/registry.json`, `dadaia_workspace/public/schemas/handoff-v1.schema.json` (its example name), and `dadaia_workspace/public/schemas/agent-model-policy-v1.schema.json`.
+  - Skill script: `dadaia_workspace/public/skills/dd-bug-resolution/scripts/bugs.py`. Its `reported_by` default (`:117`) still names the retired persona, and AC2.5's zero hits requires changing it.
+  - Derived: `dadaia_workspace/public/templates/shipped-hashes.json`. It is append-only, and its tool re-records it for every edited template (releases law §3).
 
 ## 5. Constraints and risks
 
