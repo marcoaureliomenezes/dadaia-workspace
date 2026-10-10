@@ -582,9 +582,13 @@ def test_install_prunes_the_instance_copy_of_the_deleted_engineer(tmp_path: Path
     earlier = tmp_path / "earlier" / "dadaia_workspace" / "public"
     shutil.copytree(public_asset_roster.default_public_dir(), earlier)
     reviewer = (earlier / "agents" / "dd-code-reviewer.md").read_text(encoding="utf-8")
-    (earlier / "agents" / "dd-software-engineer.md").write_text(
-        reviewer.replace("dd-code-reviewer", "dd-software-engineer"), encoding="utf-8"
+    # The earlier library's engineer was a core persona with a model cell; outside today's
+    # CORE_AGENTS it renders only through an authored alias (fail-closed otherwise, #44.4).
+    retired = reviewer.replace("dd-code-reviewer", "dd-software-engineer")
+    retired = retired.replace(
+        "name: dd-software-engineer\n", "name: dd-software-engineer\nmodel: sonnet\n", 1
     )
+    (earlier / "agents" / "dd-software-engineer.md").write_text(retired, encoding="utf-8")
     ws = tmp_path / "ws"
     register_all(ws)
     old = FileSystemPublicAssetManager()
