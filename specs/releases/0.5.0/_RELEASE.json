@@ -1,7 +1,7 @@
 {
   "schema": "release-state-v1",
   "release": "0.5.0",
-  "phase": "CLOSURE",
+  "phase": "DEFINITION",
   "defined": {
     "sha": "8726693711b27a4ca931aef278f2e6a3c567e72a",
     "ts": "2026-10-09T15:12:02Z"
@@ -1589,6 +1589,12 @@
       "agent": "dd-product-engineer",
       "kind": "summary",
       "text": "delivered: a law bar of at least 9 with two independent 319/319 scorecards; release-job admission by IMPLEMENTATION phase; twelve carried REBUILD units and one shared child-process environment builder; JsonContextStore as the sole spec_contexts.json writer, including bootstrap seeding, with the semantic writer baseline reduced from 4 to 1; seven import contracts and zero suppressed edges; a repaired critical-path aggregate of -3 reported from the original Job 6 -7 plus the late repair's -21 meaningful source and +25 RED/metadata, awaiting independent reviewer validation; 17-atom full-window memory reconciliation; findings F003, F004, F005, F009, F018, F048, F051, F123 and F135 resolved. The earlier literal 3 to 1 registry-writer proof is withdrawn because blind review exposed the second bootstrap writer; the replacement claim uses semantic ownership. F004 is N/A (0 eligible, 0 recurrences), never 0%; F009 has 0 registered-window bugs and N/A (0/0) fix-induced share; the only allowed hand-kept-list touch is the generated shipped-hashes.json update; F018's three raw grep hits are classified as nonspawn; F048 and F051 were already resolved in the October 5 bug records; F135's seven cache-only feature directories were held by the existing reaper primitive and remeasured at zero residual directories; carried: CP1 and CP3 plus backlog items skill-scripts-one-kernel, one-task-id-subject-grammar and origin-findings-renamed-to-the-spec-head to rc-13; F004's mandatory 14-day remeasurement and G1's final charged time await the exact-head green candidate PR endpoint. Two candidate-CI rework families and the shared fixture restoration remain disclosed outside the bug cohort. The late repair has local source-ownership, focused-test, Ruff, mypy and seven-contract import evidence, but this summary makes no claim that independent review, candidate CI or the PR is complete; backlog exits: none."
+    },
+    {
+      "ts": "2026-10-10T18:19:39Z",
+      "agent": "release.py new",
+      "kind": "note",
+      "text": "Candidate born on 0.5.0 (prior candidate closed at ed7f76224bc1810e7b7f93d8014dec8307aead10)"
     }
   ]
 }
