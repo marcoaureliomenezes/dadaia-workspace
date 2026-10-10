@@ -13,7 +13,7 @@ description: >
 
 ## 1. When
 
-- `dd-software-engineer` working a task inside an `Approved` candidate.
+- `dd-sw-engineer-sr` working a task inside an `Approved` candidate.
 - `dd-product-engineer` at each candidate's closure (memory, `_RELEASE.json`).
 - From the first task through the candidate PR; the gate after it: `dd-gitflow-default` §2 steps 9-12.
 

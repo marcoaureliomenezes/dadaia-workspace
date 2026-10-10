@@ -10,7 +10,7 @@ compatibility: Standalone Agent Skill. Inside a dadaia-workspace (pip install da
 
 # dd-bug-resolution — Arm B
 
-> `dd-software-engineer` runs this directly once a bug carries a record.
+> `dd-sw-engineer-sr` runs this directly once a bug carries a record.
 
 ## 1. Lifecycle frame
 

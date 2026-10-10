@@ -9,7 +9,7 @@ description: >
 
 # dd-release-definition
 
-> `dd-product-engineer` authors the SPEC, `dd-software-engineer` the as-is review, PLAN and the job files. A release has open scope; each candidate does not.
+> `dd-product-engineer` authors the SPEC, `dd-sw-engineer-sr` the as-is review, PLAN and the job files. A release has open scope; each candidate does not.
 
 ## 1. Pick the set
 
@@ -23,7 +23,7 @@ description: >
 
 ## 2. As-is review
 
-- `dd-software-engineer` runs it read-only, dispatched after the pick and before the grill.
+- `dd-sw-engineer-sr` runs it read-only, dispatched after the pick and before the grill.
 - Read every unit the picked set touches and its ledger slice (its `surface` records in `BUGS.jsonl` and `_archive/bugs_histo.jsonl`, `git log` on the unit); the table rides the handoff into the grill and lands as PLAN §1.
 - One row per touched unit, columns `unit | today | bugs | verdict | why`; DELETE vs KEEP is the deletion test (delete the unit: does complexity vanish or reappear across callers?); verdicts follow the root map §1 work order, ADD only for what no unit can carry (`today` `—`, `why` says why).
 - REBUILD is mandatory when the unit carries ≥ 2 bugs, the demand changes its fundamental behaviour, the change would need a flag, branch, special case or second path, or its contract contradicts the demand; the engineer and the reviewer judge these triggers.

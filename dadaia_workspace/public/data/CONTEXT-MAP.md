@@ -80,7 +80,9 @@ Three roles, no fourth; every retired role is a lens the reviewer applies.
 | Surface | Purpose | Belongs |
 |---|---|---|
 | `dd-product-engineer` | backlog, SPEC, the product-memory pass at closure | role, read_only, model policy |
-| `dd-software-engineer` | PLAN/TASKS, production code and its tests | role, read_only, model policy |
+| `dd-sw-engineer-sr` | as-is review, PLAN, job files, new behaviour and its tests | role, read_only, model policy |
+| `dd-sw-engineer-jr` | tasks whose AC and `W:` fully state the outcome | role, read_only, model policy |
+| `dd-researcher` | read-only research, findings as `path:line` or URL | role, read_only, model policy |
 | `dd-code-reviewer` | the three-axis review and its six lenses | role, read_only, model policy |
 
 - A statement belongs to exactly one surface: the map indexes, the scoped file rules, the

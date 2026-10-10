@@ -20,7 +20,7 @@
     },
     {
       "id": "dd-researcher",
-      "mandate": "Read-only researcher: gathers and cites evidence for a stated question and returns findings; writes no source."
+      "mandate": "Read-only research on codebase and web questions: cites evidence as path:line or a URL; writes no source."
     }
   ],
   "behaviors": [
