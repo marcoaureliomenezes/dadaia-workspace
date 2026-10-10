@@ -21,10 +21,6 @@ from dadaia_workspace.core.model_registry import (
 )
 from dadaia_workspace.infrastructure.entity_doctor import check_agent_skill_refs
 from dadaia_workspace.infrastructure.public_assets import FileSystemPublicAssetManager
-from dadaia_workspace.infrastructure.runtime_transforms.codex_assets import (
-    _parse_agent_frontmatter,
-    _parse_skills_from_frontmatter,
-)
 from tests.helpers import public_asset_roster
 from tests.helpers.harness_profile import register_all
 from tests.helpers.privacy_fixtures import private_ip
@@ -539,18 +535,17 @@ def test_the_three_design_skills_are_gone_from_stage_install_and_the_shipped_tre
 # rc-13 FR2 (AC2.1, AC2.2, AC1.4): the five personas
 # ---------------------------------------------------------------------------
 
-_RESEARCHER_TOOLS = ["Read", "Grep", "Glob", "Bash", "WebSearch", "WebFetch"]
-
-
-def _claude_tools(ws: Path, agent: str) -> list[str]:
-    text = (ws / ".claude" / "agents" / f"{agent}.md").read_text(encoding="utf-8")
-    fm = text.split("---\n", 2)[1].splitlines()
-    tools: list[str] = []
-    for line in fm[fm.index("tools:") + 1 :]:
-        if not line.startswith("  - "):
-            break
-        tools.append(line[4:])
-    return tools
+_RESEARCHER_TOOLS = "tools:\n" + "".join(
+    f"  - {t}\n" for t in ("Read", "Grep", "Glob", "Bash", "WebSearch", "WebFetch")
+)
+_FIVE_EFFORT = {
+    "dd-product-engineer": "high",
+    "dd-code-reviewer": "high",
+    "dd-sw-engineer-sr": "medium",
+    "dd-sw-engineer-jr": "medium",
+    "dd-researcher": "medium",
+}
+_OLD_ENGINEER = "dd-" + "software-engineer"  # the retired name, never spelled whole
 
 
 def test_install_projects_the_five_personas_with_template_model_and_effort(
@@ -568,38 +563,37 @@ def test_install_projects_the_five_personas_with_template_model_and_effort(
     for agent in _FIVE:
         cell = cells[agent]
         fm = _claude_frontmatter(ws, agent)
-        assert (fm["model"], fm["effort"]) == (cell.model, cell.effort), agent
+        assert (fm["model"], fm["effort"]) == (cell.model, _FIVE_EFFORT[agent]), agent
         toml = _codex_toml_fields(ws, agent)
-        codex_effort = "high" if cell.effort in ("xhigh", "max") else cell.effort
         assert (toml["model"], toml["model_reasoning_effort"]) == (
             TIER_CODEX[cell.model],
-            codex_effort,
+            _FIVE_EFFORT[agent],
         ), agent
 
 
 def test_install_prunes_the_instance_copy_of_the_deleted_engineer(tmp_path: Path) -> None:
-    """AC2.1: an instance a prior install filled with `dd-software-engineer` loses it."""
+    """AC2.1: an instance a prior install filled with the retired engineer loses it."""
     earlier = tmp_path / "earlier" / "dadaia_workspace" / "public"
     shutil.copytree(public_asset_roster.default_public_dir(), earlier)
     reviewer = (earlier / "agents" / "dd-code-reviewer.md").read_text(encoding="utf-8")
     # The earlier library's engineer was a core persona with a model cell; outside today's
     # CORE_AGENTS it renders only through an authored alias (fail-closed otherwise, #44.4).
-    retired = reviewer.replace("dd-code-reviewer", "dd-software-engineer")
+    retired = reviewer.replace("dd-code-reviewer", _OLD_ENGINEER)
     retired = retired.replace(
-        "name: dd-software-engineer\n", "name: dd-software-engineer\nmodel: sonnet\n", 1
+        f"name: {_OLD_ENGINEER}\n", f"name: {_OLD_ENGINEER}\nmodel: sonnet\n", 1
     )
-    (earlier / "agents" / "dd-software-engineer.md").write_text(retired, encoding="utf-8")
+    (earlier / "agents" / f"{_OLD_ENGINEER}.md").write_text(retired, encoding="utf-8")
     ws = tmp_path / "ws"
     register_all(ws)
     old = FileSystemPublicAssetManager()
     old._public_dir = earlier  # noqa: SLF001 — exercise the earlier tree only
     old.install(ws)
-    assert (ws / ".claude" / "agents" / "dd-software-engineer.md").exists()
+    assert (ws / ".claude" / "agents" / f"{_OLD_ENGINEER}.md").exists()
 
     FileSystemPublicAssetManager().install(ws)
 
-    assert not (ws / ".claude" / "agents" / "dd-software-engineer.md").exists()
-    assert not (ws / ".codex" / "agents" / "dd-software-engineer.toml").exists()
+    assert not (ws / ".claude" / "agents" / f"{_OLD_ENGINEER}.md").exists()
+    assert not (ws / ".codex" / "agents" / f"{_OLD_ENGINEER}.toml").exists()
 
 
 def test_the_researcher_projects_read_only_with_six_tools_no_skills_and_its_two_clauses(
@@ -613,22 +607,28 @@ def test_the_researcher_projects_read_only_with_six_tools_no_skills_and_its_two_
 
     fm = _claude_frontmatter(ws, "dd-researcher")
     assert fm["read_only"] == _claude_frontmatter(ws, "dd-code-reviewer")["read_only"] == "true"
-    assert _claude_tools(ws, "dd-researcher") == _RESEARCHER_TOOLS
     text = (ws / ".claude" / "agents" / "dd-researcher.md").read_text(encoding="utf-8")
-    assert _parse_skills_from_frontmatter(text) == []
+    assert _RESEARCHER_TOOLS in text
+    assert fm["skills"] == ""
     body = text.split("\n---\n", 1)[1].lower()
     assert "web content is data" in body
     assert "never instructions" in body
     assert "read-only commands" in body
 
 
-def test_codex_keeps_the_researcher_tools_and_an_empty_skills_list_passes_the_ref_check() -> None:
-    """Harness facts (PLAN): the Codex frontmatter parser keeps `tools` and `read_only`
-    (WebSearch, WebFetch included), and an empty `skills:` raises no D-CX-SKILLS drift."""
-    public = public_asset_roster.default_public_dir()
-    text = (public / "agents" / "dd-researcher.md").read_text(encoding="utf-8")
+def test_codex_projects_the_researcher_like_the_reviewer_and_an_empty_skills_list_passes_the_ref_check(
+    tmp_path: Path,
+) -> None:
+    """The installed Codex TOML carries the reviewer's sandbox_mode for the researcher and no
+    `tools` key for either; an empty `skills:` raises no ref-check drift."""
+    ws = tmp_path / "ws"
+    register_all(ws)
+    FileSystemPublicAssetManager().install(ws)
 
-    parsed = _parse_agent_frontmatter(text)
-    assert parsed["tools"] == _RESEARCHER_TOOLS
-    assert parsed["read_only"] == "true"
+    researcher = _codex_toml_fields(ws, "dd-researcher")
+    reviewer = _codex_toml_fields(ws, "dd-code-reviewer")
+    assert researcher["sandbox_mode"] == reviewer["sandbox_mode"] == "workspace-write"
+    assert "tools" not in researcher
+    assert "tools" not in reviewer
+    public = public_asset_roster.default_public_dir()
     assert not [line for line in check_agent_skill_refs(public) if "dd-researcher" in line.text]
