@@ -26,6 +26,7 @@ from dadaia_workspace.core.model_registry import (
     AgentModelPolicyStoreError,
     ResolvedAgentModel,
     resolve_agent_model,
+    template_by_id,
 )
 from dadaia_workspace.core.models.doctor_report import DoctorLine, DoctorStatus, attest
 from dadaia_workspace.core.models.install_ledger import InstallLedger, LedgerEntry
@@ -237,9 +238,18 @@ class FileSystemPublicAssetManager:
         workspace_root: Path,
         harness: str | None = None,
         force: bool = False,
+        template: str | None = None,
     ) -> list[str]:
         self._validate_install_harness(harness)
         self._guard_source_root_install(workspace_root)
+        if template is not None:
+            try:
+                template_by_id(template)
+            except ValueError as exc:
+                raise PublicAssetError(str(exc)) from exc
+            JsonAgentModelPolicyStore(workspace_root).save(
+                AgentModelPolicyOverlay(applied_template=template)
+            )
 
         agentic_dir = workspace_root / ".dadaia" / "agentic"
         installed = self.stage(workspace_root)
@@ -473,7 +483,8 @@ class FileSystemPublicAssetManager:
         try:
             overlay = self._load_agent_policy(workspace_root)
         except AgentModelPolicyStoreError as exc:
-            reports.append(DoctorLine(DoctorStatus.DRIFT, f"agent-model-policy ERROR: {exc}"))
+            fix = f" fix: {exc.fix}" if exc.fix else ""
+            reports.append(DoctorLine(DoctorStatus.DRIFT, f"agent-model-policy ERROR: {exc}{fix}"))
         resolved_models = self._resolved_core_models(overlay)
 
         # The doctor plan is a whole install over the roster, scoped to the PERSISTED
