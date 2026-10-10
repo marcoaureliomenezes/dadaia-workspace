@@ -35,8 +35,6 @@ from dadaia_workspace.infrastructure.runtime_transforms.codex_assets import (
     _render_codex_agent_toml,
     _render_codex_command_policy_rules,
     _split_frontmatter,
-    codex_model,
-    transform_for_codex,
 )
 
 
@@ -157,23 +155,23 @@ def copilot_agent_md_rules(record: HarnessRecord, plan: InstallPlan) -> tuple[Pr
 def codex_agent_toml_bytes(
     md_path: Path, agent_name: str, resolved: ResolvedAgentModel | None
 ) -> bytes:
-    """The ONE codex-agent renderer: frontmatter parse, strip, Codex transform, resolve
+    """The ONE codex-agent renderer: frontmatter parse, strip, resolve
     ``(model, effort)``, render TOML. Shared by install (write) and doctor (compare)
     through the :class:`ProjectionRule` seam.
     """
     text = md_path.read_text(encoding="utf-8")
-    body = transform_for_codex(_split_frontmatter(text)[1])
+    body = _split_frontmatter(text)[1]
     fm = _parse_agent_frontmatter(text)
-    claude_model, reasoning_effort = resolve_codex_agent_model(
+    model, reasoning_effort = resolve_codex_agent_model(
         agent_name, fm.get("model") if fm else None, resolved
     )
     persona_read_only(fm)  # fail closed on a bad read_only
     description = fm.get("description") if fm else None
     toml_content = _render_codex_agent_toml(
         agent_name,
-        codex_model(claude_model),
+        model,
         body,
-        description=transform_for_codex(str(description)) if description else None,
+        description=str(description) if description else None,
         reasoning_effort=reasoning_effort,
     )
     return toml_content.encode("utf-8")

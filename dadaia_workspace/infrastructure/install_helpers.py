@@ -9,7 +9,6 @@ from dadaia_workspace.core.exceptions import PublicAssetError
 from dadaia_workspace.core.model_registry import (
     ResolvedAgentModel,
     codex_effort_for_claude_effort,
-    registry_by_claude_id,
 )
 from dadaia_workspace.infrastructure.public_assets_common import (
     _SCHEMA_VERSION,
@@ -19,6 +18,7 @@ from dadaia_workspace.infrastructure.public_assets_common import (
 from dadaia_workspace.infrastructure.runtime_transforms.codex_assets import (
     _parse_agent_frontmatter,
     _split_frontmatter,
+    codex_model,
 )
 
 
@@ -76,17 +76,17 @@ def resolve_codex_agent_model(
     staged_model: object,
     resolved: ResolvedAgentModel | None,
 ) -> tuple[str, str]:
-    """``(model, reasoning_effort)``: resolved policy, else the authored ``model:``, else refuse.
+    """``(Codex id, reasoning_effort)`` from the resolved policy, else the authored ``model:``.
 
     The effort is the clamped policy effort, else ``medium``.
     """
     effort = resolved.effort if resolved is not None else None
     codex_effort = codex_effort_for_claude_effort(effort) if effort is not None else "medium"
-    if resolved is not None:
-        return resolved.model, codex_effort
-    if str(staged_model) in registry_by_claude_id():
-        return str(staged_model), codex_effort
-    raise PublicAssetError(
-        f"cannot render agent '{agent_name}': its authored 'model:' ({staged_model}) is not "
-        "in core.model_registry.REGISTRY and no agent-model policy resolves one (fail-closed)"
-    )
+    alias = resolved.model if resolved is not None else str(staged_model)
+    try:
+        return codex_model(alias), codex_effort
+    except ValueError as exc:
+        raise PublicAssetError(
+            f"cannot render agent '{agent_name}': its authored 'model:' ({staged_model}) is not "
+            "in core.model_registry.TIER_CODEX and no agent-model policy resolves one (fail-closed)"
+        ) from exc
