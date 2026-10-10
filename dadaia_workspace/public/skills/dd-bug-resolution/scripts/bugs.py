@@ -114,7 +114,7 @@ def _write(args: argparse.Namespace, specs: Path) -> int:
         values = _values(args, _OPTIONS["append"])
         values["id"] = values.pop("bug_id")
         values["ts"] = values["ts"] or wr.now_iso()
-        values["reported_by"] = values["reported_by"] or "dd-software-engineer"
+        values["reported_by"] = values["reported_by"] or "dd-sw-engineer-sr"
         try:
             listed = subprocess.run(
                 ["git", "-C", str(specs), "ls-files", "--full-name", ":/"],

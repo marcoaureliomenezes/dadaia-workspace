@@ -32,7 +32,7 @@
     },
     "agent": {
       "type": "string",
-      "description": "Name of the agent that produced this handoff (e.g. 'dd-software-engineer')."
+      "description": "Name of the agent that produced this handoff (e.g. 'dd-sw-engineer-sr')."
     },
     "context": {
       "type": "string",
