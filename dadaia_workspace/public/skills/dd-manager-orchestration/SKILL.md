@@ -8,9 +8,8 @@ description: >
 
 ## 1. Dispatch protocol
 
-1. The main thread dispatches the three roles; resolve the target agent and task from the root `AGENTS.md` map §2.
-2. Only the main thread calls other agents — a leaf specialist cannot chain
-   further dispatch; route a leaf's returned handoff to its `next_handoff.agent`.
+1. The main thread dispatches the five roles; resolve the target agent from the root `AGENTS.md` map §2. Research and extraction go to `dd-researcher`, never `Explore` or `general-purpose`.
+2. Only the main thread calls other agents; route a leaf's returned handoff to its `next_handoff.agent`.
 3. Open every dispatch prompt with this block:
 
    ```
@@ -20,10 +19,11 @@ description: >
    task_id: <J<n>.T<k> or the review target>
    worktree: <path>
    ```
-4. Reports land where the root `AGENTS.md` map §4 says; every report
-   feeding another agent gets a handoff under `.dadaia/handoff/<context>/`.
+4. Reports land where the root `AGENTS.md` map §4 says; a report feeding another agent gets a handoff under `.dadaia/handoff/<context>/`.
 5. Open, merge and clean worktrees with `python3 .agents/skills/dd-gitflow-default/scripts/worktree.py new|merge|clean` (`worktrees/AGENTS.md`).
 6. The task is the unit of dispatch, never a job: sub-agents work disjoint tasks in parallel, one per task worktree (`worktrees/AGENTS.md` §1).
+7. Dispatch by the job file's `who:` (shape rule: `dd-release-definition` §5): `sr` → dd-sw-engineer-sr, `jr` → dd-sw-engineer-jr, `pe`/`cr` → the owning persona. Pass no model; the installed template decides.
+8. One REJECTED verdict on a `jr` task re-dispatches that task to dd-sw-engineer-sr.
 
 ## 2. Conflict resolution
 
@@ -42,8 +42,8 @@ description: >
 | Domain | Primary authority | May object with evidence | Tie-breaker |
 |---|---|---|---|
 | Scope, SPEC, memory, backlog | dd-product-engineer | any agent | operator |
-| PLAN, job files, implementation, tests | dd-software-engineer | dd-code-reviewer | operator |
-| Every review lens (architecture, security, QA, product, audit, AI surface) | dd-code-reviewer | dd-software-engineer | operator |
+| PLAN, job files, implementation, tests | dd-sw-engineer-sr | dd-code-reviewer | operator |
+| Every review lens (architecture, security, QA, product, audit, AI surface) | dd-code-reviewer | dd-sw-engineer-sr | operator |
 
 ### Escalation triggers — stop and surface to the operator
 
