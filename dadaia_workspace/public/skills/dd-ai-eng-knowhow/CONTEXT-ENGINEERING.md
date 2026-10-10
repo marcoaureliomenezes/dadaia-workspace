@@ -121,7 +121,7 @@ Fix protocol:
 | Volume | Occasional -> high-frequency / bulk |
 
 - The dominant task drives the tier — not the easiest or the rarest.
-- Tier aliases are the keys of `TEMPLATES` in `core/model_registry.py` — never hand-maintain a copy that can drift.
+- Tier aliases are the keys of `TIER_CODEX` in `core/model_registry.py` — never hand-maintain a copy that can drift.
 
 | Tier alias | Workload character |
 |---|---|
