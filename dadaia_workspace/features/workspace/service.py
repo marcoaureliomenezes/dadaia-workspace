@@ -38,6 +38,7 @@ class WorkspaceService:
         workspace_root: Path,
         harnesses: tuple[str, ...],
         skip_assets: bool = False,
+        template: str | None = None,
     ) -> list[str]:
         """Bootstrap ``.dadaia/`` and return installed assets.
 
@@ -73,7 +74,7 @@ class WorkspaceService:
 
         # Public install owns every hook setting; skipping it must report an ungated workspace.
         if not skip_assets:
-            return self._public_assets.install(workspace_root)
+            return self._public_assets.install(workspace_root, template=template)
         return [
             "[warn] assets skipped — no hooks configured; the workspace is ungated "
             f"until '{fix_line(workspace_root, 'public', 'install')}' runs"

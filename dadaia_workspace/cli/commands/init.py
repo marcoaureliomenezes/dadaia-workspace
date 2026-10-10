@@ -18,6 +18,7 @@ from dadaia_workspace.core.exceptions import (
     WorkspaceVenvBootstrapError,
     WorkspaceVenvNewerError,
 )
+from dadaia_workspace.core.model_registry import TEMPLATES
 from dadaia_workspace.features.spec_context.service import slug_from_url
 
 console = Console()
@@ -123,6 +124,11 @@ def init(
         "--associated-repo",
         help="Clone URL of an associated repo of the --repo project (repeatable).",
     ),
+    template: str | None = typer.Option(
+        None,
+        "--template",
+        help=f"Agent model template to save and project: {', '.join(TEMPLATES)}.",
+    ),
     skip_assets: bool = typer.Option(
         False, "--skip-assets", help="Skip installing public agent assets"
     ),
@@ -151,7 +157,7 @@ def init(
     svc = container.build_workspace_service(root)
     try:
         before, after, action = svc.venv_change(root)
-        installed = svc.init(root, skip_assets=skip_assets, harnesses=(chosen,))
+        installed = svc.init(root, skip_assets=skip_assets, harnesses=(chosen,), template=template)
     except WorkspaceVenvNewerError as exc:
         fail(f"{exc}\nfix: {fix_line(root, 'init', str(root), '--harness', chosen)}")
     except WorkspaceVenvBootstrapError as exc:
