@@ -35,29 +35,26 @@ class PublicAssetService:
         workspace_root: Path,
         harness: str | None = None,
         force: bool = False,
+        template: str | None = None,
     ) -> list[str]:
-        return self._public_assets.install(workspace_root, harness=harness, force=force)
+        return self._public_assets.install(
+            workspace_root, harness=harness, force=force, template=template
+        )
 
     def list_all(self) -> dict[str, list[str]]:
         return self._public_assets.list_all()
 
+    def _load_overlay(self, workspace_root: Path) -> AgentModelPolicyOverlay | None:
+        return self._agent_policy_loader(workspace_root) if self._agent_policy_loader else None
+
     def doctor(self, workspace_root: Path) -> DoctorReport:
         reports = self._public_assets.doctor(workspace_root)
-        # R8b (T-010-24): model-resolution guard against
-        # model-catalog-modelmap-pricing-drift-no-registry. Runs against the
-        # canonical packaged public/ source (same dir the asset manager stages from),
-        # not the workspace projection, so it validates the source of truth.
-        public_dir = Path(__file__).resolve().parent.parent.parent / "public"
-        # v0.1.65 FR7: validate the RESOLVED roster (templates + overlay) too. An
-        # invalid overlay is already reported as a doctor ERROR line by the asset
-        # manager's doctor pass, so it degrades to defaults here (no duplicate line).
-        overlay: AgentModelPolicyOverlay | None = None
-        if self._agent_policy_loader is not None:
-            try:
-                overlay = self._agent_policy_loader(workspace_root)
-            except AgentModelPolicyStoreError:
-                overlay = None
-        reports.extend(check_model_resolution(public_dir, overlay=overlay))
+        # An invalid overlay is already a doctor ERROR line from the asset manager's pass.
+        try:
+            overlay = self._load_overlay(workspace_root)
+        except AgentModelPolicyStoreError:
+            overlay = None
+        reports.extend(check_model_resolution(overlay))
         return DoctorReport(lines=tuple(reports))
 
     def verdict(self, workspace_root: Path) -> tuple[list[DoctorLine], str]:
@@ -66,5 +63,11 @@ class PublicAssetService:
         `dadaia doctor` carries it, so the two never disagree. The verdict is the typed
         report's, fail-closed: every blocking status fails (public-doctor-exits-zero-despite-error)."""
         lines = list(self.doctor(workspace_root).lines)
-        blocking = any(line.status.blocking for line in lines)
-        return lines, fix_line(workspace_root, "public", "install") if blocking else ""
+        if not any(line.status.blocking for line in lines):
+            return lines, ""
+        try:
+            self._load_overlay(workspace_root)
+        except AgentModelPolicyStoreError as exc:
+            if exc.fix:
+                return lines, exc.fix
+        return lines, fix_line(workspace_root, "public", "install")
