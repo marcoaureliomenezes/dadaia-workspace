@@ -23,7 +23,7 @@ description: >
 5. Open, merge and clean worktrees with `python3 .agents/skills/dd-gitflow-default/scripts/worktree.py new|merge|clean` (`worktrees/AGENTS.md`).
 6. The task is the unit of dispatch, never a job: sub-agents work disjoint tasks in parallel, one per task worktree (`worktrees/AGENTS.md` §1).
 7. Dispatch by the job file's `who:` (shape rule: `dd-release-definition` §5): `sr` → dd-sw-engineer-sr, `jr` → dd-sw-engineer-jr, `pe`/`cr` → the owning persona. Pass no model; the installed template decides.
-8. One REJECTED verdict on a `jr` task re-dispatches that task to dd-sw-engineer-sr.
+8. A REJECTED verdict whose finding names a `jr` task re-dispatches that task to dd-sw-engineer-sr.
 
 ## 2. Conflict resolution
 
