@@ -42,6 +42,7 @@ axes are reported side by side with equal weight, so no axis hides another's fin
 - Read `rc-<N>/PLAN.md` §1 (As-is review) beside the SPEC and job files: a DELETE or REBUILD unit the range leaves unchanged is HIGH.
 - A KEEP unit the range grew is a finding.
 - A worktree's (`worktrees/AGENTS.md`) commits follow the `dd-gitflow-default` §3a rows of what they write.
+- The reviewer of a `define` tree judges each job-file `who` column against the shape rule in `dd-release-definition` §5.
 
 ## 4. Axis 3 — Bug-surface
 
