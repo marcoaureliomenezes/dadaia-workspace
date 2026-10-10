@@ -11,8 +11,14 @@ from dadaia_workspace.core.model_registry import CORE_AGENTS
 _PUBLIC = Path(__file__).resolve().parents[2] / "dadaia_workspace" / "public"
 
 
-def test_core_agents_roster_is_the_dd_named_trio() -> None:
-    assert CORE_AGENTS == ("dd-product-engineer", "dd-software-engineer", "dd-code-reviewer")
+def test_core_agents_roster_is_the_five_dd_named_personas() -> None:
+    assert CORE_AGENTS == (
+        "dd-product-engineer",
+        "dd-code-reviewer",
+        "dd-sw-engineer-sr",
+        "dd-sw-engineer-jr",
+        "dd-researcher",
+    )
 
 
 def test_every_persona_file_is_dd_named_and_declares_that_name() -> None:

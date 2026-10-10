@@ -36,11 +36,11 @@ def _core_agents() -> list[Path]:
 
 
 def test_core_agent_frontmatter_tiers() -> None:
-    """(f): roster count is exactly the 9 core agents. (e): staged core bodies carry
+    """(f): roster count is exactly the 5 core agents. (e): staged core bodies carry
     ``dispatch_band`` but NO ``model:``/``effort:`` (v0.1.65 FR1: the model/effort
     pinning moved from per-file frontmatter to the template registry, asserted above;
     the projected files carry them, the staged sources must not)."""
-    assert len(_core_agents()) == 3, [p.name for p in _core_agents()]
+    assert len(_core_agents()) == 5, [p.name for p in _core_agents()]
     assert {p.stem for p in _core_agents()} == set(CORE_AGENTS)
 
     seen: set[str] = set()
@@ -58,5 +58,7 @@ def test_core_agent_frontmatter_tiers() -> None:
             f"{md.name}: staged core body must not pin 'effort' (FR1/AC-1); "
             f"found effort: {fm.get('effort')!r}"
         )
+        if md.stem == "dd-researcher":
+            assert not fm.get("skills"), f"{md.name}: the researcher declares no skills"
         seen.add(md.stem)
     assert seen == set(CORE_AGENTS), f"roster/template mismatch: missing {set(CORE_AGENTS) - seen}"
