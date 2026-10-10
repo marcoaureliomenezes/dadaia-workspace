@@ -100,18 +100,24 @@ DEFAULT_TEMPLATE_ID = "balanced"
 TEMPLATES: dict[str, dict[str, AgentModelAssignment]] = {
     "balanced": {
         "dd-product-engineer": AgentModelAssignment("opus", "high"),
-        "dd-software-engineer": AgentModelAssignment("sonnet", "medium"),
         "dd-code-reviewer": AgentModelAssignment("opus", "high"),
+        "dd-sw-engineer-sr": AgentModelAssignment("sonnet", "medium"),
+        "dd-sw-engineer-jr": AgentModelAssignment("haiku", "medium"),
+        "dd-researcher": AgentModelAssignment("haiku", "medium"),
     },
     "max-quality": {
         "dd-product-engineer": AgentModelAssignment("fable", "high"),
-        "dd-software-engineer": AgentModelAssignment("opus", "medium"),
         "dd-code-reviewer": AgentModelAssignment("opus", "xhigh"),
+        "dd-sw-engineer-sr": AgentModelAssignment("opus", "medium"),
+        "dd-sw-engineer-jr": AgentModelAssignment("sonnet", "medium"),
+        "dd-researcher": AgentModelAssignment("sonnet", "medium"),
     },
     "economy": {
         "dd-product-engineer": AgentModelAssignment("sonnet", "medium"),
-        "dd-software-engineer": AgentModelAssignment("sonnet", "medium"),
         "dd-code-reviewer": AgentModelAssignment("sonnet", "high"),
+        "dd-sw-engineer-sr": AgentModelAssignment("sonnet", "medium"),
+        "dd-sw-engineer-jr": AgentModelAssignment("haiku", "low"),
+        "dd-researcher": AgentModelAssignment("haiku", "low"),
     },
 }
 
