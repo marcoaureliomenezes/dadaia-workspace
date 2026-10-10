@@ -101,6 +101,8 @@ def reconcile_workspace(
     except Exception as exc:  # noqa: BLE001 - transaction boundary returns structured failure.
         context_store.restore(registry_snapshot)
         atomic_write(primary, primary_snapshot)
+        if getattr(exc, "fix", ""):
+            raise  # a refusal carries its own remedy: the CLI boundary prints it, the only one
         return failed(str(exc), tuple(steps), projections_started)
 
     return ReconcileResult(True, expected_version, actual, tuple(steps))

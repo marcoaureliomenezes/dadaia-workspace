@@ -44,14 +44,12 @@ class PublicAssetService:
     def list_all(self) -> dict[str, list[str]]:
         return self._public_assets.list_all()
 
-    def _load_overlay(self, workspace_root: Path) -> AgentModelPolicyOverlay | None:
-        return self._agent_policy_loader(workspace_root) if self._agent_policy_loader else None
-
     def doctor(self, workspace_root: Path) -> DoctorReport:
         reports = self._public_assets.doctor(workspace_root)
         # An invalid overlay is already a doctor ERROR line from the asset manager's pass.
         try:
-            overlay = self._load_overlay(workspace_root)
+            loader = self._agent_policy_loader
+            overlay = loader(workspace_root) if loader else None
         except AgentModelPolicyStoreError:
             overlay = None
         reports.extend(check_model_resolution(overlay))
@@ -66,4 +64,5 @@ class PublicAssetService:
         blocking = [line for line in lines if line.status.blocking]
         if not blocking:
             return lines, ""
-        return lines, blocking[0].fix or fix_line(workspace_root, "public", "install")
+        remedy = next((line.fix for line in blocking if line.fix), "")
+        return lines, remedy or fix_line(workspace_root, "public", "install")

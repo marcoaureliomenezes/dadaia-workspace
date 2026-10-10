@@ -12,6 +12,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal, get_args
 
+from dadaia_workspace.core.exceptions import DadaiaError
+
 #: Tier alias -> Codex model id (``codex_assets.codex_model`` reads it).
 TIER_CODEX: dict[str, str] = {
     "opus": "gpt-5.6-sol",
@@ -79,16 +81,17 @@ class ResolvedAgentModel:
     source: ResolvedSource
 
 
-@dataclass(frozen=True)
-class AgentModelPolicyStoreError(Exception):
-    """Actionable agent-model-policy overlay failure (missing != invalid; FR3)."""
+class AgentModelPolicyStoreError(DadaiaError):
+    """Actionable agent-model-policy overlay failure (missing != invalid; FR3).
 
-    message: str
-    path: Path | None = None
-    fix: str | None = None
+    *problem* is the finding; *fix* its one remedy (``""`` when none), joined into the
+    message the CLI boundary prints, like ``SchemaVersionError``.
+    """
 
-    def __str__(self) -> str:
-        return self.message if self.path is None else f"{self.message}: {self.path}"
+    def __init__(self, message: str, path: Path | None = None, fix: str = "") -> None:
+        self.problem = message if path is None else f"{message}: {path}"
+        self.fix = fix
+        super().__init__(f"{self.problem}\nfix: {fix}" if fix else self.problem)
 
 
 DEFAULT_TEMPLATE_ID = "balanced"

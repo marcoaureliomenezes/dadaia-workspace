@@ -122,7 +122,7 @@ _CODEX_COMPACT_PATTERNS: tuple[re.Pattern[str], ...] = (
 def _compact_codex_developer_instructions(body: str) -> str:
     """Strip shared-law / cross-role boilerplate from a Codex persona body (A22.1).
 
-    *body* is the persona body (    frontmatter already stripped). Every pattern in :data:`_CODEX_COMPACT_PATTERNS`
+    *body* is the persona body, frontmatter already stripped. Every pattern in :data:`_CODEX_COMPACT_PATTERNS`
     targets content that restates law or protocol Codex already delivers
     elsewhere in the effective context — never role identity, role-specific
     decisions, authority, or write/refusal boundaries, which ship untouched.
