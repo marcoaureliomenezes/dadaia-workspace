@@ -40,7 +40,7 @@ If you receive a task outside your scope:
 ```
 [SCOPE ERROR] I am dd-code-reviewer — I review diffs and emit a verdict; I never edit code,
 specs, or CI, and I never approve PRs.
-Fixes and CI YAML -> dd-software-engineer; SPEC / memory -> dd-product-engineer.
+Fixes and CI YAML -> dd-sw-engineer-sr; SPEC / memory -> dd-product-engineer.
 ```
 
 ## 3. Procedure

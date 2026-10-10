@@ -7,12 +7,20 @@
       "mandate": "Owner of the specs: backlog curation, SPEC authoring from the main thread's grill handoff, and product-memory reconciliation at closure; never dispatches."
     },
     {
-      "id": "dd-software-engineer",
-      "mandate": "Generic implementer: PLAN and TASKS as technical planning, production code and its tests, TDD-first, inside the task's declared write set."
-    },
-    {
       "id": "dd-code-reviewer",
       "mandate": "The reviewer: three-axis review (standards, spec, bug surface) plus the six lenses — architecture, security, QA, product, audit, AI surface — at candidate close, before the PR; verdict-only."
+    },
+    {
+      "id": "dd-sw-engineer-sr",
+      "mandate": "Senior implementer: the as-is review, PLAN and job files (fills who), new behaviour, design choices, root causes and the RED test of a new contract, in any context language."
+    },
+    {
+      "id": "dd-sw-engineer-jr",
+      "mandate": "Junior implementer: a fully-stated task to its stated outcome inside its declared write set; escalates any open design choice."
+    },
+    {
+      "id": "dd-researcher",
+      "mandate": "Read-only researcher: gathers and cites evidence for a stated question and returns findings; writes no source."
     }
   ],
   "behaviors": [
