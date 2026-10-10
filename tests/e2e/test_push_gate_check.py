@@ -5,7 +5,7 @@ names come from the committed constitution's gitflow (custom, absent -> default 
 warning, inherited by an associated repo; its main repo absent -> default + one warning).
 The integration-branch refusal and its fix are the refusal harness Case `birth_published`.
 
-Owner: dd-software-engineer
+Owner: dd-sw-engineer-sr
 """
 
 from __future__ import annotations

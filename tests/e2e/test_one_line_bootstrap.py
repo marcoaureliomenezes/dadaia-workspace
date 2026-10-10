@@ -23,7 +23,7 @@ Hermetic by construction — no network, no container:
   that already carries an executable ``dadaia`` entrypoint is left alone), which is also
   exactly what doctor's VENV-1 check asserts. No ``venv.create``, no ``pip install``.
 
-Owner: dd-software-engineer
+Owner: dd-sw-engineer-sr
 """
 
 from __future__ import annotations

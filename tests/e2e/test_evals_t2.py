@@ -3,7 +3,7 @@ fails the planted assert-rewriting one (``tests/fixtures/evals/t2/``).
 
 Docker is required: a missing tool fails the row, never skips it. 600 s as in ``test_evals_t1``.
 
-Owner: dd-software-engineer
+Owner: dd-sw-engineer-sr
 """
 
 import pytest

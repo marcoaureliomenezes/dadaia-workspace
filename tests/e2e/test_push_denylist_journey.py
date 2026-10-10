@@ -6,7 +6,7 @@ masking) is tests/unit/features/chokepoints/test_push_denylist_scan.py.
 The hook's runner is a `<ws>/.dadaia/.venv/bin/dadaia` stub forwarding to this interpreter's CLI.
 Size: LARGE — real git hooks.
 
-Owner: dd-software-engineer
+Owner: dd-sw-engineer-sr
 """
 
 from __future__ import annotations
