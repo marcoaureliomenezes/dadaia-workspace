@@ -50,6 +50,7 @@ No verb selects a template. `JsonAgentModelPolicyStore.save()` has had no produc
 - AC1.3 (unit): An overlay override whose `model` is not one of the four aliases is refused with the valid aliases named. `dd-code-reviewer` never resolves to `fable`, in any template or by any override (G-1, unchanged).
 - AC1.4 (integration): `public install` writes `model: <alias>` into each projected Claude persona. It writes the alias's Codex id and the clamped effort into each Codex agent.
 - AC1.5 (no test — reviewer source sweep): A docstring or comment in `model_registry.py` states the contract: "templates name a tier by alias; a new model release needs no library change". G2's grep returns no hit.
+- AC1.6 (unit, RED first): The overlay store migrates on read. An override keyed `dd-software-engineer` loads as `dd-sw-engineer-sr`. An override `model` naming an exact Claude id loads as its family alias, for example `claude-sonnet-5` → `sonnet`, and likewise for `opus`, `haiku` and `fable`. Both mappings extend the store's existing retired-persona-name migration (`json_agent_model_policy_store.py:17`): one map, with no second path. The test fails on today's store. (Operator ruling, 2026-10-10: migrate on read.)
 
 ### FR2 — five personas: sr and jr replace `dd-software-engineer`, plus `dd-researcher`
 
@@ -65,7 +66,7 @@ No verb selects a template. `JsonAgentModelPolicyStore.save()` has had no produc
   - Install projects it read-only, the same way the reviewer is projected.
 - AC2.3 (unit): The core-agent set is the five personas: `dd-product-engineer`, `dd-code-reviewer`, `dd-sw-engineer-sr`, `dd-sw-engineer-jr` and `dd-researcher`. The overlay store refuses any other agent name.
 - AC2.4 (no test — reviewer source sweep): The root map §2 table names five roles in place of "Three roles, no fourth". `dd-manager-orchestration` routes research dispatches to `dd-researcher` in place of `Explore` and `general-purpose`, and routes engineer dispatches by the task's `who:` (FR5).
-- AC2.5 (unit): `git grep -n "dd-software-engineer" -- dadaia_workspace tests` returns no hit outside a retired-name migration that the PLAN names.
+- AC2.5 (unit): `git grep -n "dd-software-engineer" -- dadaia_workspace tests` returns no hit outside the AC1.6 migration map.
 
 ### FR3 — the template table
 
@@ -114,6 +115,7 @@ No verb selects a template. `JsonAgentModelPolicyStore.save()` has had no produc
 - The model as a per-dispatch parameter is replaced by the dispatched persona name (G1).
 - The job-file task table without an owner tier gains `who` (FR5).
 - "Three roles, no fourth" (root map §2) becomes five roles (AC2.4).
+- The overlay store currently refuses a model that is not a registered exact id. It now migrates an exact id to its family alias on read, and migrates `dd-software-engineer` to `dd-sw-engineer-sr` (AC1.6).
 
 ### Governance sequencing
 
@@ -131,9 +133,9 @@ No verb selects a template. `JsonAgentModelPolicyStore.save()` has had no produc
 | risk | control |
 |---|---|
 | A harness rejects an alias at dispatch. | AC1.4 pins what install writes. A live dispatch per alias is the closure smoke the PLAN names. |
-| An existing overlay names `dd-software-engineer` or an exact id. | §6 Q1, decided before approval. |
+| An existing overlay names `dd-software-engineer` or an exact id. | AC1.6 migrates it on read. |
 | A `jr` cell is too weak for a task. | AC5.2 escalates on the first REJECTED. AC5.3 has the reviewer judge the column before implementation. |
 
 ## 6. Open questions
 
-- Q1 (main thread → operator): The grill did not decide what happens to an existing overlay that overrides `dd-software-engineer` or names an exact model id. Option (a): refuse it on load with a `fix:` line. Option (b): migrate it on read, mapping `dd-software-engineer` to `dd-sw-engineer-sr` and an id to its family alias. The store already migrates a retired persona name on read (`json_agent_model_policy_store.py:17`).
+None. Q1 (overlay migration) was ruled by the operator on 2026-10-10 as migrate on read (AC1.6). The bug-window routing to rc-14 is confirmed. Two readings go to the operator at approval: AC4.4 (`dadaia doctor` shows the template) and AC5.2 (one REJECTED verdict on a `jr` task → sr).
