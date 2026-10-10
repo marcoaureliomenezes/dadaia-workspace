@@ -131,7 +131,7 @@ Fix protocol:
 | `haiku` | High-volume mechanical reformatting, bulk renames, deterministic transforms |
 
 - Current model ids come from `core/model_registry.py`, never hand-copied: Codex ids from `TIER_CODEX`; Claude resolves the alias itself. Reasoning effort is the template cell's effort.
-- On Codex the tiering axis is (model id x model_reasoning_effort); on Claude it is the model id.
+- The tiering axis is (model x effort): on Claude the alias and `effort:`; on Codex the `TIER_CODEX` id and `model_reasoning_effort`.
 - Quote the template cell (alias + effort), and on Codex its `TIER_CODEX` id, when recommending a move; take the price from the provider's published table, never from memory.
 - Move up a tier only when depth/breadth/error-cost are all high; move down only when the task is mechanical and high-volume.
 
