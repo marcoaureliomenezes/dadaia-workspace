@@ -70,7 +70,7 @@ def test_public_projection_lifecycle(tmp_path: Path, monkeypatch: pytest.MonkeyP
         "✓ 54 asset group(s) staged:" if PLATFORM.windows else "✓ 37 asset group(s) staged:"
     )
     expected_install = (
-        "✓ 181 asset(s) processed:" if PLATFORM.windows else "✓ 164 asset(s) processed:"
+        "✓ 185 asset(s) processed:" if PLATFORM.windows else "✓ 168 asset(s) processed:"
     )
     assert stage.output.splitlines()[0] == expected_stage
     assert install.output.splitlines()[0] == expected_install
