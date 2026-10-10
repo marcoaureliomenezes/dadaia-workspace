@@ -91,7 +91,7 @@ def test_overrides_refused_with_runnable_fix(
     doc = {
         **_valid_doc(),
         "applied_template": applied_template,
-        "overrides": {"dd-software-engineer": {"effort": "medium"}},
+        "overrides": {"dd-sw-engineer-sr": {"effort": "medium"}},
     }
     store.path.write_text(json.dumps(doc), encoding="utf-8")
     with pytest.raises(AgentModelPolicyStoreError, match="overrides") as raised:

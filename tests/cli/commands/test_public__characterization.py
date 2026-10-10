@@ -82,7 +82,7 @@ def test_public_projection_lifecycle(tmp_path: Path, monkeypatch: pytest.MonkeyP
     assert "[ok] root:AGENTS.md" in doctor_lines
     assert doctor_lines[-3:] == [
         "[ok] public-privacy (baseline structural scan, no operator denylist)",
-        "[ok] entities-derivation: 3 Personas ↔ 3 core sub-agents; 5 Deterministic Behaviors "
+        "[ok] entities-derivation: 5 Personas ↔ 5 core sub-agents; 5 Deterministic Behaviors "
         "derived for every harness with a hook derivation (ENT-DERIVE-1)",
         "[ok] model-resolution: template balanced",
     ]

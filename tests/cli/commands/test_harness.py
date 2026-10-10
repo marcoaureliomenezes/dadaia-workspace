@@ -83,9 +83,9 @@ def test_harness_add_projects_the_set_registers_it_and_is_idempotent(
 @pytest.mark.parametrize(
     ("harness", "projected"),
     [
-        ("cursor", ".cursor/agents/dd-software-engineer.md"),
+        ("cursor", ".cursor/agents/dd-sw-engineer-sr.md"),
         ("devin", None),
-        ("copilot", ".github/agents/dd-software-engineer.agent.md"),
+        ("copilot", ".github/agents/dd-sw-engineer-sr.agent.md"),
     ],
 )
 def test_harness_add_registers_each_newly_recorded_harness(
@@ -104,7 +104,7 @@ def test_harness_add_registers_each_newly_recorded_harness(
     assert _profile(ws) == ["claude", harness]
 
     if projected is None:
-        assert (ws / ".agents" / "agents" / "dd-software-engineer.md").exists()
+        assert (ws / ".agents" / "agents" / "dd-sw-engineer-sr.md").exists()
         assert [p.name for p in (ws / ".devin").iterdir()] == ["hooks.v1.json"], (
             "devin reads the authored persona tree natively; its directory carries the "
             "hook registration and nothing else"

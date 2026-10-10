@@ -16,7 +16,7 @@ _BUG = "merge-gate-accepts-verdict-written-by-the-merger"
 
 _GENERIC_BODY = (
     "---\n"
-    "name: dd-software-engineer\n"
+    "name: dd-sw-engineer-sr\n"
     "description: generic implementer\n"
     "read_only: false\n"
     "dispatch_band: 3\n"
@@ -123,9 +123,9 @@ def test_privilege_derives_from_read_only_on_both_harnesses(
     for line in claude:
         assert line in fm
     assert ("disallowedTools" in "\n".join(fm)) == (declared == "true")
-    md = tmp_path / "dd-software-engineer.md"
+    md = tmp_path / "dd-sw-engineer-sr.md"
     md.write_text(body, encoding="utf-8")
-    toml = codex_agent_toml_bytes(md, "dd-software-engineer", resolved).decode("utf-8")
+    toml = codex_agent_toml_bytes(md, "dd-sw-engineer-sr", resolved).decode("utf-8")
     assert f'sandbox_mode = "{sandbox}"' in toml
 
 
@@ -141,9 +141,9 @@ def test_a_read_only_persona_gets_the_workspace_write_codex_sandbox(tmp_path: Pa
     fm = render_claude_agent(body, resolved).split("---\n", 2)[1].splitlines()
     assert "permissionMode: default" in fm
     assert "disallowedTools: [Edit, Write, NotebookEdit]" in fm
-    md = tmp_path / "dd-software-engineer.md"
+    md = tmp_path / "dd-sw-engineer-sr.md"
     md.write_text(body, encoding="utf-8")
-    toml = codex_agent_toml_bytes(md, "dd-software-engineer", resolved).decode("utf-8")
+    toml = codex_agent_toml_bytes(md, "dd-sw-engineer-sr", resolved).decode("utf-8")
     assert 'sandbox_mode = "workspace-write"' in toml
 
 
@@ -163,16 +163,16 @@ def test_a_persona_without_read_only_never_renders(tmp_path: Path, body: str) ->
     resolved = ResolvedAgentModel(model="sonnet", effort="high", source="default")
     with pytest.raises(PublicAssetError, match="read_only"):
         render_claude_agent(body, resolved)
-    md = tmp_path / "dd-software-engineer.md"
+    md = tmp_path / "dd-sw-engineer-sr.md"
     md.write_text(body, encoding="utf-8")
     with pytest.raises(PublicAssetError, match="read_only"):
-        codex_agent_toml_bytes(md, "dd-software-engineer", resolved)
+        codex_agent_toml_bytes(md, "dd-sw-engineer-sr", resolved)
 
 
 @pytest.mark.parametrize(
     ("agent", "persona"),
     [
-        ("dd-software-engineer", "---\nname: dd-software-engineer\n---\nmodel: sonnet\n"),
+        ("dd-sw-engineer-sr", "---\nname: dd-sw-engineer-sr\n---\nmodel: sonnet\n"),
         ("frontend-engineer", "---\nname: frontend-engineer\nmodel: ghost\n---\n"),
     ],
 )
@@ -228,7 +228,7 @@ def test_resolve_codex_agent_model_with_a_resolved_policy(
     from dadaia_workspace.infrastructure.install_helpers import resolve_codex_agent_model
 
     resolved = ResolvedAgentModel(model=model, effort=effort, source="template")
-    got = resolve_codex_agent_model("dd-software-engineer", staged, resolved)
+    got = resolve_codex_agent_model("dd-sw-engineer-sr", staged, resolved)
     assert got == (codex_model, codex_effort)
 
 
@@ -265,14 +265,14 @@ def test_force_rerenders_diverged_claude_projection_to_render_output(
     from dadaia_workspace.infrastructure.projection import ProjectionRule, install_rules
 
     resolved = ResolvedAgentModel(model="sonnet", effort="xhigh", source="default")
-    dst = tmp_path / ".claude" / "agents" / "dd-software-engineer.md"
+    dst = tmp_path / ".claude" / "agents" / "dd-sw-engineer-sr.md"
     expected = render_claude_agent(_GENERIC_BODY, resolved)
 
     def _render(_current: bytes | None) -> bytes:
         return expected.encode("utf-8")
 
     rule = ProjectionRule(
-        label="claude:agents/dd-software-engineer.md", harness="claude", dst=dst, render=_render
+        label="claude:agents/dd-sw-engineer-sr.md", harness="claude", dst=dst, render=_render
     )
     install_rules((rule,), force=False)
     assert dst.read_text(encoding="utf-8") == expected

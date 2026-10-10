@@ -93,7 +93,7 @@ def test_the_copilot_transcode_keeps_only_the_frontmatter_copilot_reads(tmp_path
     plan_rules = [
         rule
         for rule in _agent_rules(tmp_path, "copilot")
-        if rule.label.endswith("dd-software-engineer.agent.md")
+        if rule.label.endswith("dd-sw-engineer-sr.agent.md")
     ]
     assert len(plan_rules) == 1
     rule = plan_rules[0]

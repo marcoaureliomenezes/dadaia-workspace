@@ -4,7 +4,7 @@ and the per-harness `dadaia init --harness` profiles. Stage/install rosters live
 tests/integration/test_public_assets.py::test_stage_manifest_and_install_all.
 Size: LARGE — real projection I/O (FileSystemPublicAssetManager over tmp_path).
 
-Owner: dd-software-engineer
+Owner: dd-sw-engineer-sr
 """
 
 from __future__ import annotations
@@ -97,7 +97,7 @@ class TestDoctor:
         assert [line for line in report if line.startswith(("[drift]", "[missing]"))] == []
 
     @pytest.mark.parametrize(
-        ("mutation", "agent"), [("drift", "dd-software-engineer"), ("missing", "dd-code-reviewer")]
+        ("mutation", "agent"), [("drift", "dd-sw-engineer-sr"), ("missing", "dd-code-reviewer")]
     )
     def test_doctor_detects_drift_and_missing_after_runtime_mutation(
         self, tmp_path: Path, mutation: str, agent: str
