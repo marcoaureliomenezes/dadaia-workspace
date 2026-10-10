@@ -6,7 +6,7 @@ constitution.md (AC1.2, ADR 0103). A bind under a distinct
 session id never bridges (T-50-04): test_one_bind.py row native-id-no-record-unbound.
 Hand-built workspace, never a real venv.
 
-Owner: dd-software-engineer
+Owner: dd-sw-engineer-sr
 """
 
 from __future__ import annotations

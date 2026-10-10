@@ -4,7 +4,7 @@ the grader passes a hand-onboarded workspace of each version and fails an empty 
 Docker is required: a missing tool fails the row, never skips it. 600 s: evals' whole suite, with
 four image builds, took 95 s on ubuntu-24.04 (run 37554712931).
 
-Owner: dd-software-engineer
+Owner: dd-sw-engineer-sr
 """
 
 import pytest

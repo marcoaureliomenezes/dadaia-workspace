@@ -2,7 +2,7 @@
 a subprocess. scan exits 1 on a token, a missing path or `$SCAN_SECRET`'s value and 0 on a
 clean tree; compare blocks on a T1 or T2 drop, with the seven gate cases.
 
-Owner: dd-software-engineer
+Owner: dd-sw-engineer-sr
 """
 
 from __future__ import annotations

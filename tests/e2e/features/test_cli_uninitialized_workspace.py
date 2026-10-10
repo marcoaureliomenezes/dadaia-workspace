@@ -8,7 +8,7 @@ surface a concise, actionable error and a NON-ZERO exit, never a traceback. serv
 already did this per-command; this pins the whole class via the global entrypoint handler.
 
 bug doctor-uninitialized-workspace-traceback
-Owner: dd-software-engineer
+Owner: dd-sw-engineer-sr
 """
 
 from __future__ import annotations
