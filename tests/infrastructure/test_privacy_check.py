@@ -20,7 +20,6 @@ from pathlib import Path
 
 import pytest
 
-from dadaia_workspace.core.model_registry import CORE_AGENTS
 from dadaia_workspace.infrastructure.privacy_check import PORTUGUESE_CONTROL_TERMS
 from tests.helpers.scan_population import assert_populated
 
@@ -57,7 +56,7 @@ def test_pre_push_ci_gate_ships_pyproject_excludes_bytecode_and_scripts_leave_no
 _PKG = _REPO_ROOT / "dadaia_workspace"
 _ALL, _MD_JSON = ("public/**/*",), ("public/**/*.md", "public/**/*.json")
 _PT_TERMS = "|".join(re.escape(term) for term, _ in PORTUGUESE_CONTROL_TERMS)
-_OLD_PERSONAS = "|".join(name.removeprefix("dd-") for name in CORE_AGENTS)
+_OLD_PERSONAS = "|".join(("product-engineer", "software-engineer", "code-reviewer"))
 
 
 def _denied_lines(globs: tuple[str, ...], pattern: str, spare: str | None) -> list[str]:
@@ -236,3 +235,26 @@ def test_every_flag_cited_beside_a_venv_call_exists_in_that_verbs_help() -> None
         for dead in _dead_flags(span, tree)
     ]
     assert violations == [], "\n".join(violations)
+
+
+_RETIRED_PERSONA = "dd-" + "software-engineer"
+
+
+def test_the_retired_persona_name_stays_out_of_library_and_tests() -> None:
+    """AC2.5: no text file under dadaia_workspace/ or tests/ names the retired persona."""
+    paths = sorted(
+        p
+        for root in ("dadaia_workspace", "tests")
+        for p in (_REPO_ROOT / root).rglob("*")
+        if p.is_file() and "__pycache__" not in p.parts
+    )
+    assert_populated(paths, sentinel=_REPO_ROOT / "tests" / "infrastructure" / "test_privacy_check.py")
+    hits = []
+    for path in paths:
+        try:
+            lines = path.read_text(encoding="utf-8").splitlines()
+        except UnicodeDecodeError:
+            continue
+        rel = path.relative_to(_REPO_ROOT).as_posix()
+        hits += [f"{rel}:{n}" for n, line in enumerate(lines, 1) if _RETIRED_PERSONA in line]
+    assert hits == [], "\n".join(hits)
