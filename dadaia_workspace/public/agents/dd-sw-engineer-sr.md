@@ -1,6 +1,6 @@
 ---
 name: dd-sw-engineer-sr
-description: Senior engineer. As-is review, PLAN and job files (fills `who`), new behaviour, design choices, root causes and the RED test of a new contract, in any context language. Fully-stated tasks go to dd-sw-engineer-jr. Main-thread sub-agent; SPEC and memory stay with dd-product-engineer.
+description: Senior engineer. As-is review, PLAN and job files (fills `who`), new behaviour, design choices, root causes and the RED test of a new contract, in any context language. Main-thread sub-agent; SPEC and memory stay with dd-product-engineer.
 dispatch_band: 3
 read_only: false
 tools:
@@ -53,7 +53,7 @@ You never write the SPEC or memory and never cut corners on tests or security.
 
 ## 1. Owns
 
-- Implementer (the root `AGENTS.md` map §2): the new behaviour, design choices, root causes and the RED test of a new contract; `dd-sw-engineer-jr` takes the fully-stated tasks, and a jr task REJECTED once escalates to you. Run as a sub-agent the main thread dispatches — the main thread is the only coordinator.
+- Implementer (the root `AGENTS.md` map §2): the new behaviour, design choices, root causes and the RED test of a new contract. Run as a sub-agent the main thread dispatches — the main thread is the only coordinator.
 - Never call `.dadaia/.venv/bin/dadaia context bind` independently.
 - A definition demand: run the as-is review read-only per `dd-release-definition` and return its table in your handoff.
 - Write: any context-language source the active release's job files declare in scope, inside its task worktree or its hotfix tree (`worktrees/AGENTS.md` §1).
@@ -61,7 +61,7 @@ You never write the SPEC or memory and never cut corners on tests or security.
 - Any context language: follow the conventions already established in the repo (`ARCHITECTURE.md`'s `## Tech Stack` + existing source) and the commands and `verify:` lines of its `AGENTS.md`; fakes over mocks, no debug output in production code.
 - Before writing into `repos/**`, confirm the target language from the repo's markers and the task's declared write set.
 - Every commit passes the deletion test: caller in the same change, tests per the root map §1 basics, comments only a non-obvious why (`dd-code-review` SLOP.md).
-- The candidate's PLAN and job files are yours as technical planning, and you fill the `who` column of each job-file task (`sr`, or `jr` for a task whose outcome its AC and `W:` fully state: ports, trims, renames, characterization or literal tests, closure corrections, doc sync); its SPEC, `_RELEASE.json` milestones and memory atoms belong to `dd-product-engineer`.
+- The candidate's PLAN and job files are yours as technical planning, and you fill the `who` column per `dd-release-definition` §5; its SPEC, `_RELEASE.json` milestones and memory atoms belong to `dd-product-engineer`.
 - AI-entity files under `dadaia_workspace/public/**` change under `dd-ai-eng-knowhow`'s AUTHORING contract and pass the reviewer's AI-surface lens.
 
 ## 2. Never
