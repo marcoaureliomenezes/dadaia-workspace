@@ -24,6 +24,7 @@ class FakePublicAssetManager:
         harness: str | None = None,
         force: bool = False,
         scope: str = "all",
+        template: str | None = None,
     ) -> list[str]:
         self.installed.append((workspace_root, harness, force))
         return [str(workspace_root / ".agents" / "skills" / "fake-skill" / "SKILL.md")]
