@@ -7,6 +7,8 @@ from rich.console import Console
 
 from dadaia_workspace import container
 from dadaia_workspace.core.cli_line import fix_line
+from dadaia_workspace.core.exceptions import PublicAssetError
+from dadaia_workspace.core.model_registry import TEMPLATES
 from dadaia_workspace.core.models.doctor_report import DoctorStatus
 from dadaia_workspace.core.workspace_resolver import resolve_workspace_root
 
@@ -45,6 +47,11 @@ def stage() -> None:
 )
 def install(
     force: bool = typer.Option(False, "--force", help="Overwrite existing files"),
+    template: str | None = typer.Option(
+        None,
+        "--template",
+        help="Agent-model template to save and apply: " + ", ".join(TEMPLATES) + ".",
+    ),
 ) -> None:
     """Stage the packaged public assets, then install them into runtime projections.
 
@@ -54,7 +61,11 @@ def install(
     """
     workspace_root = resolve_workspace_root()
     svc = container.build_public_service()
-    installed = svc.install(workspace_root, force=force)
+    try:
+        installed = svc.install(workspace_root, force=force, template=template)
+    except PublicAssetError as exc:
+        console.print(f"✗ {exc}", style="red", markup=False)
+        raise typer.Exit(1) from exc
 
     if installed:
         console.print(f"[green]✓[/green] {len(installed)} asset(s) processed:")
