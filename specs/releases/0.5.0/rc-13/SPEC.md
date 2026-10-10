@@ -46,11 +46,11 @@ No verb selects a template. `JsonAgentModelPolicyStore.save()` has had no produc
 ### FR1 — the alias contract (Arm B: `agent-model-templates-pin-superseded-sonnet-and-haiku`, REBUILD of `model_registry.py`)
 
 - AC1.1 (unit, RED first): Every cell of every template names a model by one of the four aliases `opus`, `sonnet`, `haiku` or `fable`. No cell names an exact Claude model id. The test fails on today's templates.
-- AC1.2 (unit): The registry is one map from tier alias to Codex model id, with exactly four entries: `opus` → `gpt-5.6-sol`, `fable` → `gpt-5.6-sol`, `sonnet` → `gpt-5.6-terra`, `haiku` → `gpt-5.3-codex-spark`. These are today's Codex ids for those families. The per-id rows, `ModelEntry.claude_id` and the `deep|dispatch|standard|fast` tier taxonomy are deleted.
-- AC1.3 (unit): An overlay override whose `model` is not one of the four aliases is refused with the valid aliases named. `dd-code-reviewer` never resolves to `fable`, in any template or by any override (G-1, unchanged).
+- AC1.2 (unit): The registry is one map from tier alias to Codex model id, with exactly four entries: `opus` → `gpt-5.6-sol`, `fable` → `gpt-5.6-sol`, `sonnet` → `gpt-5.6-terra`, `haiku` → `gpt-5.3-codex-spark`. These are today's Codex ids for those families. `codex_model` reads this map. The following are deleted: the per-id rows, `ModelEntry`, the `deep|dispatch|standard|fast` tier taxonomy, `registry_by_claude_id`, and Codex's persona-body id rewrite (`_CODEX_MODELS`, `_CLAUDE_MODEL_RE`, and the `Opus / Sonnet / Haiku` replace in `codex_assets.py`). Today that rewrite has no live input.
+- AC1.3 (unit): G-1 still holds: `dd-code-reviewer` never resolves to `fable`. The rule is kept by the template table alone, and a unit test over every template enforces it. With overrides gone (AC1.6), the store's runtime Fable guard and `is_fable_model` are deleted.
 - AC1.4 (integration): `public install` writes `model: <alias>` into each projected Claude persona. It writes the alias's Codex id and the clamped effort into each Codex agent.
 - AC1.5 (no test — reviewer source sweep): A docstring or comment in `model_registry.py` states the contract: "templates name a tier by alias; a new model release needs no library change". G2's grep returns no hit.
-- AC1.6 (unit, RED first): The overlay store migrates on read. An override keyed `dd-software-engineer` loads as `dd-sw-engineer-sr`. An override `model` naming an exact Claude id loads as its family alias, for example `claude-sonnet-5` → `sonnet`, and likewise for `opus`, `haiku` and `fable`. Both mappings extend the store's existing retired-persona-name migration (`json_agent_model_policy_store.py:17`): one map, with no second path. The test fails on today's store. (Operator ruling, 2026-10-10: migrate on read.)
+- AC1.6 (unit, RED first): The overlay keeps only `applied_template`, and per-agent `overrides` are deleted. An overlay that still carries `overrides` is refused by the store's existing unknown-key refusal, with a `fix:` line naming `dadaia public install --template <id>`. Nothing is migrated. Several things go with the store's REBUILD: `overrides` in `agent-model-policy-v1.schema.json`, the stale retired-name docstring (`json_agent_model_policy_store.py:17`), and the uncalled public `parse()` wrapper. The test fails on today's store, which accepts `overrides`. (Operator ruling, 2026-10-10.)
 
 ### FR2 — five personas: sr and jr replace `dd-software-engineer`, plus `dd-researcher`
 
@@ -64,9 +64,9 @@ No verb selects a template. `JsonAgentModelPolicyStore.save()` has had no produc
   - Its tools are `Read`, `Grep`, `Glob`, `Bash`, `WebSearch` and `WebFetch`, and it preloads no skills.
   - It returns findings as `path:line` or URL.
   - Install projects it read-only, the same way the reviewer is projected.
-- AC2.3 (unit): The core-agent set is the five personas: `dd-product-engineer`, `dd-code-reviewer`, `dd-sw-engineer-sr`, `dd-sw-engineer-jr` and `dd-researcher`. The overlay store refuses any other agent name.
+- AC2.3 (unit): The core-agent set is the five personas: `dd-product-engineer`, `dd-code-reviewer`, `dd-sw-engineer-sr`, `dd-sw-engineer-jr` and `dd-researcher`. The set is read from the template table's keys, and no other agent list is kept by hand.
 - AC2.4 (no test — reviewer source sweep): The root map §2 table names five roles in place of "Three roles, no fourth". `dd-manager-orchestration` routes research dispatches to `dd-researcher` in place of `Explore` and `general-purpose`, and routes engineer dispatches by the task's `who:` (FR5).
-- AC2.5 (unit): `git grep -n "dd-software-engineer" -- dadaia_workspace tests` returns no hit outside the AC1.6 migration map.
+- AC2.5 (unit): `git grep -n "dd-software-engineer" -- dadaia_workspace tests` returns no hit.
 
 ### FR3 — the template table
 
@@ -82,10 +82,10 @@ No verb selects a template. `JsonAgentModelPolicyStore.save()` has had no produc
 
 ### FR4 — the template selector
 
-- AC4.1 (integration): `dadaia public install --template <id>` writes `applied_template` to the agent-model overlay. It is the overlay's only writer of that field, and it re-projects every persona in the same pass. An unknown id exits non-zero with the valid ids named, and leaves the overlay and the projections unchanged.
+- AC4.1 (integration): `dadaia public install --template <id>` writes `applied_template` to the agent-model overlay. It is the overlay's only writer of that field, and it re-projects every persona in the same pass. The flag feeds the one whole install, and there is no template-only re-projection. An unknown id exits non-zero with the valid ids named, and leaves the overlay and the projections unchanged.
 - AC4.2 (integration): `public install` without `--template` keeps the current `applied_template`.
-- AC4.3 (integration): `uvx dadaia-workspace init [DIR] --template <id>` takes the same flag, both for a new workspace and for a re-init upgrade, and has the same effect.
-- AC4.4 (integration): `dadaia doctor` prints the active template id.
+- AC4.3 (integration): `uvx dadaia-workspace init [DIR] --template <id>` takes the same flag and has the same effect, both on a new workspace and on a re-run, which is the upgrade. There is no `upgrade` verb. `reconcile` keeps the saved template and takes no flag.
+- AC4.4 (integration): `dadaia public doctor` prints one `[ok] model-resolution: template <id>` line. That line replaces the check's re-validation of models and efforts (a REBUILD of `check_model_resolution`). `dadaia doctor` is unchanged, because a template finding there would be a fifth finding shape (bug `sa-doctor-finding-has-four-shapes`). (Operator ruling, 2026-10-10.)
 
 ### FR5 — `who:` in the job-file task table
 
@@ -99,7 +99,7 @@ No verb selects a template. `JsonAgentModelPolicyStore.save()` has had no produc
 
 - AC6.1 (no test — reviewer source sweep): The list below is the complete set of law, skill and persona sources this candidate may change. Adding another source returns this Draft to the operator. Projections change only through `public stage` and `public install`.
   - Personas: add `dadaia_workspace/public/agents/{dd-sw-engineer-sr,dd-sw-engineer-jr,dd-researcher}.md`; delete `dd-software-engineer.md`; edit `dd-product-engineer.md` and `dd-code-reviewer.md` (their `[SCOPE ERROR]` routing).
-  - Law: `dadaia_workspace/public/data/{AGENTS,CONTEXT-MAP}.md`, `dadaia_workspace/public/data/fixed/slop-tests.md`, and `dadaia_workspace/public/templates/specs-AGENTS.md`. The repo's own `specs/AGENTS.md` changes through `specs upgrade` only.
+  - Law: `dadaia_workspace/public/data/{AGENTS,CONTEXT-MAP}.md`, `dadaia_workspace/public/data/fixed/slop-tests.md`, `dadaia_workspace/public/templates/specs-AGENTS.md` and `dadaia_workspace/public/scaffold/releases/AGENTS.md`. The repo's own `specs/AGENTS.md` changes through `specs upgrade` only.
   - Skills: the `SKILL.md` of `dd-release-definition`, `dd-release-implementation`, `dd-bug-resolution`, `dd-manager-orchestration` and `dd-code-review`; `dd-ai-eng-knowhow/CONTEXT-ENGINEERING.md`.
   - Entity data and schemas: `dadaia_workspace/public/entities/registry.json`, `dadaia_workspace/public/schemas/handoff-v1.schema.json` (its example name), and `dadaia_workspace/public/schemas/agent-model-policy-v1.schema.json`.
 
@@ -109,13 +109,15 @@ No verb selects a template. `JsonAgentModelPolicyStore.save()` has had no produc
 
 - `dd-software-engineer`, one persona whose model came from the template or a per-dispatch parameter, becomes `dd-sw-engineer-sr` and `dd-sw-engineer-jr`, each fixed by the template (FR2).
 - Research dispatches to the harness's `Explore` and `general-purpose`, which inherit the main model, go to `dd-researcher` (FR2).
-- The nine-entry registry of exact Claude ids and its four-tier taxonomy becomes a four-entry map from alias to Codex id (FR1).
+- The nine-entry registry of exact Claude ids and its four-tier taxonomy becomes a four-entry map from alias to Codex id. Codex's persona-body id rewrite is deleted (FR1).
 - ADR 0022's three-agent, exact-id template table becomes the 15-cell alias table (FR3).
 - The unreachable `applied_template` (no production writer) becomes the `--template` flag on `public install` and `init` (FR4).
 - The model as a per-dispatch parameter is replaced by the dispatched persona name (G1).
 - The job-file task table without an owner tier gains `who` (FR5).
 - "Three roles, no fourth" (root map §2) becomes five roles (AC2.4).
-- The overlay store currently refuses a model that is not a registered exact id. It now migrates an exact id to its family alias on read, and migrates `dd-software-engineer` to `dd-sw-engineer-sr` (AC1.6).
+- Per-agent overrides in the overlay are removed. Templates become the one selector, and the store's runtime Fable guard goes with them (AC1.3, AC1.6).
+- The uncalled public `parse()` wrapper of the overlay store is deleted (AC1.6).
+- `public doctor`'s re-validation of resolved models and efforts becomes one line naming the active template (AC4.4).
 
 ### Governance sequencing
 
@@ -132,10 +134,15 @@ No verb selects a template. `JsonAgentModelPolicyStore.save()` has had no produc
 
 | risk | control |
 |---|---|
-| A harness rejects an alias at dispatch. | AC1.4 pins what install writes. A live dispatch per alias is the closure smoke the PLAN names. |
-| An existing overlay names `dd-software-engineer` or an exact id. | AC1.6 migrates it on read. |
+| A harness rejects an alias at dispatch. | Closed for `fable`. The main thread's probe on 2026-10-10 dispatched an agent with `model: fable`, and the run's `modelUsage` billed `claude-fable-5-1`. `opus`, `sonnet` and `haiku` are documented Claude Code aliases. AC1.4 pins what install writes. |
+| An existing overlay carries `overrides`. | AC1.6 refuses it with a `fix:` line naming `public install --template`. |
 | A `jr` cell is too weak for a task. | AC5.2 escalates on the first REJECTED. AC5.3 has the reviewer judge the column before implementation. |
 
 ## 6. Open questions
 
-None. Q1 (overlay migration) was ruled by the operator on 2026-10-10 as migrate on read (AC1.6). The bug-window routing to rc-14 is confirmed. Two readings go to the operator at approval: AC4.4 (`dadaia doctor` shows the template) and AC5.2 (one REJECTED verdict on a `jr` task → sr).
+None. The operator ruled on 2026-10-10:
+- Per-agent `overrides` are deleted, and no migration is made (AC1.6).
+- `public doctor` shows the template (AC4.4).
+- The bug window is routed to rc-14 under CP3.
+
+One reading remains for approval: AC5.2, where one REJECTED verdict on a `jr` task sends it to sr.
