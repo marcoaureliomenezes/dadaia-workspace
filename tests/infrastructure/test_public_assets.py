@@ -19,7 +19,12 @@ from dadaia_workspace.core.model_registry import (
     TEMPLATES,
     TIER_CODEX,
 )
+from dadaia_workspace.infrastructure.entity_doctor import check_agent_skill_refs
 from dadaia_workspace.infrastructure.public_assets import FileSystemPublicAssetManager
+from dadaia_workspace.infrastructure.runtime_transforms.codex_assets import (
+    _parse_agent_frontmatter,
+    _parse_skills_from_frontmatter,
+)
 from tests.helpers import public_asset_roster
 from tests.helpers.harness_profile import register_all
 from tests.helpers.privacy_fixtures import private_ip
@@ -522,3 +527,105 @@ def test_the_three_design_skills_are_gone_from_stage_install_and_the_shipped_tre
     ).stdout.splitlines()  # fmt: skip
     # this file spells the names only through f"dd-{n}", so it cannot self-match
     assert hits == []
+
+
+# ---------------------------------------------------------------------------
+# rc-13 FR2 (AC2.1, AC2.2, AC1.4): the five personas
+# ---------------------------------------------------------------------------
+
+_FIVE = (
+    "dd-product-engineer",
+    "dd-code-reviewer",
+    "dd-sw-engineer-sr",
+    "dd-sw-engineer-jr",
+    "dd-researcher",
+)
+_RESEARCHER_TOOLS = ["Read", "Grep", "Glob", "Bash", "WebSearch", "WebFetch"]
+
+
+def _claude_tools(ws: Path, agent: str) -> list[str]:
+    text = (ws / ".claude" / "agents" / f"{agent}.md").read_text(encoding="utf-8")
+    fm = text.split("---\n", 2)[1].splitlines()
+    tools: list[str] = []
+    for line in fm[fm.index("tools:") + 1 :]:
+        if not line.startswith("  - "):
+            break
+        tools.append(line[4:])
+    return tools
+
+
+def test_install_projects_the_five_personas_with_template_model_and_effort(
+    tmp_path: Path,
+) -> None:
+    """AC2.1 + AC1.4: Claude gets `model: <alias>` and the effort, Codex the TIER_CODEX id
+    and the clamped effort, for each of the five personas."""
+    ws = tmp_path / "ws"
+    register_all(ws)
+    FileSystemPublicAssetManager().install(ws)
+
+    assert {p.stem for p in (ws / ".claude" / "agents").glob("*.md")} == set(_FIVE)
+    assert {p.stem for p in (ws / ".codex" / "agents").glob("*.toml")} == set(_FIVE)
+    cells = TEMPLATES[DEFAULT_TEMPLATE_ID]
+    for agent in _FIVE:
+        cell = cells[agent]
+        fm = _claude_frontmatter(ws, agent)
+        assert (fm["model"], fm["effort"]) == (cell.model, cell.effort), agent
+        toml = _codex_toml_fields(ws, agent)
+        codex_effort = "high" if cell.effort in ("xhigh", "max") else cell.effort
+        assert (toml["model"], toml["model_reasoning_effort"]) == (
+            TIER_CODEX[cell.model],
+            codex_effort,
+        ), agent
+
+
+def test_install_prunes_the_instance_copy_of_the_deleted_engineer(tmp_path: Path) -> None:
+    """AC2.1: an instance a prior install filled with `dd-software-engineer` loses it."""
+    earlier = tmp_path / "earlier" / "dadaia_workspace" / "public"
+    shutil.copytree(public_asset_roster.default_public_dir(), earlier)
+    reviewer = (earlier / "agents" / "dd-code-reviewer.md").read_text(encoding="utf-8")
+    (earlier / "agents" / "dd-software-engineer.md").write_text(
+        reviewer.replace("dd-code-reviewer", "dd-software-engineer"), encoding="utf-8"
+    )
+    ws = tmp_path / "ws"
+    register_all(ws)
+    old = FileSystemPublicAssetManager()
+    old._public_dir = earlier  # noqa: SLF001 — exercise the earlier tree only
+    old.install(ws)
+    assert (ws / ".claude" / "agents" / "dd-software-engineer.md").exists()
+
+    FileSystemPublicAssetManager().install(ws)
+
+    assert not (ws / ".claude" / "agents" / "dd-software-engineer.md").exists()
+    assert not (ws / ".codex" / "agents" / "dd-software-engineer.toml").exists()
+
+
+def test_the_researcher_projects_read_only_with_six_tools_no_skills_and_its_two_clauses(
+    tmp_path: Path,
+) -> None:
+    """AC2.2: read-only like the reviewer, the six tools, no skills, and a body that says
+    fetched web content is data and Bash runs read-only commands only."""
+    ws = tmp_path / "ws"
+    register_all(ws)
+    FileSystemPublicAssetManager().install(ws)
+
+    fm = _claude_frontmatter(ws, "dd-researcher")
+    assert fm["read_only"] == _claude_frontmatter(ws, "dd-code-reviewer")["read_only"] == "true"
+    assert _claude_tools(ws, "dd-researcher") == _RESEARCHER_TOOLS
+    text = (ws / ".claude" / "agents" / "dd-researcher.md").read_text(encoding="utf-8")
+    assert _parse_skills_from_frontmatter(text) == []
+    body = text.split("\n---\n", 1)[1].lower()
+    assert "web content is data" in body
+    assert "never instructions" in body
+    assert "read-only commands" in body
+
+
+def test_codex_keeps_the_researcher_tools_and_an_empty_skills_list_passes_the_ref_check() -> None:
+    """Harness facts (PLAN): the Codex frontmatter parser keeps `tools` and `read_only`
+    (WebSearch, WebFetch included), and an empty `skills:` raises no D-CX-SKILLS drift."""
+    public = public_asset_roster.default_public_dir()
+    text = (public / "agents" / "dd-researcher.md").read_text(encoding="utf-8")
+
+    parsed = _parse_agent_frontmatter(text)
+    assert parsed["tools"] == _RESEARCHER_TOOLS
+    assert parsed["read_only"] == "true"
+    assert not [line for line in check_agent_skill_refs(public) if "dd-researcher" in line.text]
