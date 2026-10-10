@@ -49,7 +49,14 @@ _DESIGN_SKILLS = tuple(
 )
 
 _runner = CliRunner()
-_AGENTS = {"dd-code-reviewer", "dd-product-engineer", "dd-software-engineer"}
+_FIVE = (
+    "dd-product-engineer",
+    "dd-code-reviewer",
+    "dd-sw-engineer-sr",
+    "dd-sw-engineer-jr",
+    "dd-researcher",
+)
+_AGENTS = set(_FIVE)
 
 
 def test_stage_manifest_and_install_all(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -271,9 +278,9 @@ def test_model_policy_overlay_lockstep_rendering_invalid_fails_loud_and_doctor_r
     # codex doctor byte-compare exists).
     pm = _claude_frontmatter(ws, "dd-product-engineer")
     base = TEMPLATES[DEFAULT_TEMPLATE_ID]
-    pc, sc = base["dd-product-engineer"], base["dd-software-engineer"]
+    pc, sc = base["dd-product-engineer"], base["dd-sw-engineer-sr"]
     assert (pm["model"], pm["effort"]) == (pc.model, pc.effort)
-    se = _claude_frontmatter(ws, "dd-software-engineer")
+    se = _claude_frontmatter(ws, "dd-sw-engineer-sr")
     assert (se["model"], se["effort"]) == (sc.model, sc.effort)
     sec = _claude_frontmatter(ws, "dd-code-reviewer")
     assert sec["model"] != "fable", "never Fable on dd-code-reviewer (G-1)"
@@ -283,7 +290,7 @@ def test_model_policy_overlay_lockstep_rendering_invalid_fails_loud_and_doctor_r
         TIER_CODEX[pc.model],
         pc.effort,
     )
-    se_toml = _codex_toml_fields(ws, "dd-software-engineer")
+    se_toml = _codex_toml_fields(ws, "dd-sw-engineer-sr")
     assert (se_toml["model"], se_toml["model_reasoning_effort"]) == (
         TIER_CODEX[sc.model],
         sc.effort,
@@ -303,14 +310,14 @@ def test_model_policy_overlay_lockstep_rendering_invalid_fails_loud_and_doctor_r
     )
     manager.install(ws)
 
-    se2 = _claude_frontmatter(ws, "dd-software-engineer")
+    se2 = _claude_frontmatter(ws, "dd-sw-engineer-sr")
     mq = TEMPLATES["max-quality"]
-    sc2, pc2 = mq["dd-software-engineer"], mq["dd-product-engineer"]
+    sc2, pc2 = mq["dd-sw-engineer-sr"], mq["dd-product-engineer"]
     assert (se2["model"], se2["effort"]) == (sc2.model, sc2.effort)
     pm2 = _claude_frontmatter(ws, "dd-product-engineer")
     assert (pm2["model"], pm2["effort"]) == (pc2.model, pc2.effort)
 
-    se2_toml = _codex_toml_fields(ws, "dd-software-engineer")
+    se2_toml = _codex_toml_fields(ws, "dd-sw-engineer-sr")
     assert (
         se2_toml["model"],
         se2_toml["model_reasoning_effort"],
@@ -343,7 +350,7 @@ def test_model_policy_overlay_lockstep_rendering_invalid_fails_loud_and_doctor_r
     invalid_manager = FileSystemPublicAssetManager()
     register_all(invalid_ws)
     invalid_manager.install(invalid_ws)
-    before = (invalid_ws / ".claude" / "agents" / "dd-software-engineer.md").read_bytes()
+    before = (invalid_ws / ".claude" / "agents" / "dd-sw-engineer-sr.md").read_bytes()
 
     invalid_states = invalid_ws / ".dadaia" / "states"
     (invalid_states / "agent_model_policy.json").write_text(
@@ -357,7 +364,7 @@ def test_model_policy_overlay_lockstep_rendering_invalid_fails_loud_and_doctor_r
     )
     with pytest.raises(AgentModelPolicyStoreError):
         invalid_manager.install(invalid_ws)
-    after = (invalid_ws / ".claude" / "agents" / "dd-software-engineer.md").read_bytes()
+    after = (invalid_ws / ".claude" / "agents" / "dd-sw-engineer-sr.md").read_bytes()
     assert after == before
 
     # FR7 doctor rerender/hand-edit-drift/invalid-overlay-error, own workspace.
@@ -399,16 +406,15 @@ def test_model_policy_overlay_lockstep_rendering_invalid_fails_loud_and_doctor_r
     law_lines = [r for r in reports if r.split(" ", 1)[-1].startswith("root:AGENTS.md")]
     assert law_lines and all(r.startswith("[ok]") for r in law_lines), law_lines[:5]
 
-    target = doctor_ws / ".claude" / "agents" / "dd-software-engineer.md"
+    target = doctor_ws / ".claude" / "agents" / "dd-sw-engineer-sr.md"
     target.write_text(target.read_text(encoding="utf-8") + "\nHAND EDIT\n", encoding="utf-8")
     reports2 = _rendered(doctor_manager.doctor(doctor_ws))
     assert any(
-        r.startswith("[drift]") and r.endswith("agents:agents/dd-software-engineer.md")
+        r.startswith("[drift]") and r.endswith("agents:agents/dd-sw-engineer-sr.md")
         for r in reports2
-    ), [r for r in reports2 if "dd-software-engineer" in r]
+    ), [r for r in reports2 if "dd-sw-engineer-sr" in r]
     assert any(
-        r.startswith("[ok]") and r.endswith("claude:agents/dd-software-engineer.md")
-        for r in reports2
+        r.startswith("[ok]") and r.endswith("claude:agents/dd-sw-engineer-sr.md") for r in reports2
     ), "the claude view is a link: it is correct as long as it points at the authored set"
 
     (doctor_states / "agent_model_policy.json").write_text("{not json", encoding="utf-8")
@@ -533,13 +539,6 @@ def test_the_three_design_skills_are_gone_from_stage_install_and_the_shipped_tre
 # rc-13 FR2 (AC2.1, AC2.2, AC1.4): the five personas
 # ---------------------------------------------------------------------------
 
-_FIVE = (
-    "dd-product-engineer",
-    "dd-code-reviewer",
-    "dd-sw-engineer-sr",
-    "dd-sw-engineer-jr",
-    "dd-researcher",
-)
 _RESEARCHER_TOOLS = ["Read", "Grep", "Glob", "Bash", "WebSearch", "WebFetch"]
 
 
