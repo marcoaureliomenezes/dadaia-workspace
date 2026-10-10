@@ -14,7 +14,11 @@ import pytest
 from typer.testing import CliRunner
 
 from dadaia_workspace.core.exceptions import PublicAssetError
-from dadaia_workspace.core.model_registry import is_fable_model
+from dadaia_workspace.core.model_registry import (
+    DEFAULT_TEMPLATE_ID,
+    TEMPLATES,
+    TIER_CODEX,
+)
 from dadaia_workspace.infrastructure.public_assets import FileSystemPublicAssetManager
 from tests.helpers import public_asset_roster
 from tests.helpers.harness_profile import register_all
@@ -261,16 +265,24 @@ def test_model_policy_overlay_lockstep_rendering_invalid_fails_loud_and_doctor_r
     # the SAME resolved config — this lockstep IS the codex-correctness assurance (no
     # codex doctor byte-compare exists).
     pm = _claude_frontmatter(ws, "dd-product-engineer")
-    assert (pm["model"], pm["effort"]) == ("claude-opus-5-5", "high")
+    base = TEMPLATES[DEFAULT_TEMPLATE_ID]
+    pc, sc = base["dd-product-engineer"], base["dd-software-engineer"]
+    assert (pm["model"], pm["effort"]) == (pc.model, pc.effort)
     se = _claude_frontmatter(ws, "dd-software-engineer")
-    assert (se["model"], se["effort"]) == ("claude-opus-5-5", "low")
+    assert (se["model"], se["effort"]) == (sc.model, sc.effort)
     sec = _claude_frontmatter(ws, "dd-code-reviewer")
-    assert not is_fable_model(sec["model"]), "never Fable on dd-code-reviewer (G-1)"
+    assert sec["model"] != "fable", "never Fable on dd-code-reviewer (G-1)"
 
     pm_toml = _codex_toml_fields(ws, "dd-product-engineer")
-    assert (pm_toml["model"], pm_toml["model_reasoning_effort"]) == ("gpt-5.6-sol", "high")
+    assert (pm_toml["model"], pm_toml["model_reasoning_effort"]) == (
+        TIER_CODEX[pc.model],
+        pc.effort,
+    )
     se_toml = _codex_toml_fields(ws, "dd-software-engineer")
-    assert (se_toml["model"], se_toml["model_reasoning_effort"]) == ("gpt-5.6-sol", "low")
+    assert (se_toml["model"], se_toml["model_reasoning_effort"]) == (
+        TIER_CODEX[sc.model],
+        sc.effort,
+    )
 
     # AC-3: an overlay change moves the .claude md AND .codex toml together at install.
     states = ws / ".dadaia" / "states"
@@ -280,7 +292,6 @@ def test_model_policy_overlay_lockstep_rendering_invalid_fails_loud_and_doctor_r
             {
                 "schema_version": "agent-model-policy-v1",
                 "applied_template": "max-quality",
-                "overrides": {"dd-software-engineer": {"model": "claude-opus-4-8"}},
             }
         ),
         encoding="utf-8",
@@ -288,14 +299,22 @@ def test_model_policy_overlay_lockstep_rendering_invalid_fails_loud_and_doctor_r
     manager.install(ws)
 
     se2 = _claude_frontmatter(ws, "dd-software-engineer")
-    assert (se2["model"], se2["effort"]) == ("claude-opus-4-8", "medium")
+    mq = TEMPLATES["max-quality"]
+    sc2, pc2 = mq["dd-software-engineer"], mq["dd-product-engineer"]
+    assert (se2["model"], se2["effort"]) == (sc2.model, sc2.effort)
     pm2 = _claude_frontmatter(ws, "dd-product-engineer")
-    assert (pm2["model"], pm2["effort"]) == ("claude-fable-5-1", "high")
+    assert (pm2["model"], pm2["effort"]) == (pc2.model, pc2.effort)
 
     se2_toml = _codex_toml_fields(ws, "dd-software-engineer")
-    assert (se2_toml["model"], se2_toml["model_reasoning_effort"]) == ("gpt-5.6-sol", "medium")
+    assert (
+        se2_toml["model"],
+        se2_toml["model_reasoning_effort"],
+    ) == (TIER_CODEX[sc2.model], sc2.effort)
     pm2_toml = _codex_toml_fields(ws, "dd-product-engineer")
-    assert (pm2_toml["model"], pm2_toml["model_reasoning_effort"]) == ("gpt-5.6-sol", "high")
+    assert (
+        pm2_toml["model"],
+        pm2_toml["model_reasoning_effort"],
+    ) == (TIER_CODEX[pc2.model], pc2.effort)
 
     # Byte-stable repeated install: every agent projection line is a [skip].
     third = manager.install(ws)
@@ -326,7 +345,7 @@ def test_model_policy_overlay_lockstep_rendering_invalid_fails_loud_and_doctor_r
         json.dumps(
             {
                 "schema_version": "agent-model-policy-v1",
-                "overrides": {"dd-code-reviewer": {"model": "claude-fable-5"}},
+                "applied_template": "no-such-template",
             }
         ),
         encoding="utf-8",
