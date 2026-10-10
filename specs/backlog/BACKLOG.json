@@ -559,6 +559,27 @@
       "description": "Split dd-software-engineer into dd-sw-engineer-sr and dd-sw-engineer-jr (both implement tasks; model fixed per template, so the dispatched name is the model choice). Add dd-researcher: lean read-only persona (Read, Grep, Glob, Bash, WebSearch, WebFetch), no preloaded skills, path:line or URL findings. Templates name tiers by alias (opus/sonnet/haiku/fable), the registry shrinks to tier -> Codex id. Table: balanced = PE opus high, CR opus high, sr sonnet medium, jr haiku medium, researcher haiku medium; max-quality = PE fable high, CR opus xhigh, sr opus medium, jr sonnet medium, researcher sonnet medium; economy = PE sonnet medium, CR sonnet high, sr sonnet medium, jr haiku low, researcher haiku low. dadaia public install --template <id> is the one writer of applied_template (init and upgrade take the same flag; doctor shows the active template). Job file task tables gain who: sr|jr (jr = outcome fully stated by AC and W:; one REJECTED moves a jr task to sr). Resolves bug agent-model-templates-pin-superseded-sonnet-and-haiku. An ADR amending 0022 (three roles to five) awaits operator acceptance. Priority MAXIMUM: runs before the defined skill-kernel candidate (rc-13), which gets a delta check of its as-is and PLAN. Grill handoff: .dadaia/handoff/dadaia-workspace/2026-10-10T180417Z-main-thread-model-tiers-grill.handoff.json",
       "provenance": "Operator demand 2026-10-10: 'o trabalho sobre os modelos de sub-agentes deve ser prioridade maxima. n\u00e3o podemos admitir custos desnecess\u00e1rios usando modelos improprios para as tarefas.'",
       "relates": []
+    },
+    {
+      "id": "define-backlog-merge-runs-verify",
+      "title": "A define or backlog tree merge runs the recorded base's verify: line when the repo declares one",
+      "opened": "2026-10-10",
+      "status": "idea",
+      "description": "Measured: worktrees/AGENTS.md \u00a72 item 4 lands a define or backlog tree after one review plus bugs.py check, backlog.py check, release.py check and doctor, and runs no test, so specs text that turns a repo guard red is caught only by CI after the push. Evidence: bug rc13-define-cites-an-unread-prefix-family (specs/bugs/_archive/bugs_histo.jsonl): the OWASP prompt-injection id in the rc-13 SPEC and PLAN made guard v33 (scripts/guards/slop.py:194) count 32 orphan families against a limit of 31; CI run 38079070924 failed, the fix took a revert hotfix plus a redo, and every commit was blocked meanwhile. Design: the define/backlog merge runs the recorded base's tracked verify: line once, as a job merge does (\u00a72 item 3), when the repo declares one; with none declared it keeps today's checks. Public shape asks nothing of users: it runs only the repo's own declared line (private-public boundary). Cost: that line's runtime on every define and backlog merge.",
+      "provenance": "Operator, 2026-10-10: 'define/backlog merge runs verify:' - selected for the backlog as an Arm A demand.",
+      "relates": [
+        "gate-reuses-a-green-result-for-the-same-tree",
+        "impacted-test-selection"
+      ]
+    },
+    {
+      "id": "hotfix-specs-revert-commit-shape",
+      "title": "dd-gitflow-default \u00a73a has a commit-shape row for a hotfix that reverts specs text",
+      "opened": "2026-10-10",
+      "status": "idea",
+      "description": "Measured: dd-gitflow-default \u00a73a row 3 covers a bug fix on <code> only (paths outside specs/), and row 5 is define-only, so the rc13-define-cites-an-unread-prefix-family hotfix - two git revert commits of rc-13 specs with a 'block: (1)' body - matched no row. The reviewer flagged it MEDIUM (verdict .dadaia/handoff/dadaia-workspace/2026-10-10T201433Z-dd-code-reviewer-rc13-define-cites-an-unread-prefix-family-hotfix.handoff.json, finding 1). Design: one \u00a73a row (or a widened row 3) naming the hotfix tree, the reverted specs/ paths and the message shape of a revert that carries its block: item.",
+      "provenance": "Operator, 2026-10-10: '\u00a73a row for a hotfix revert' - selected for the backlog as an Arm A demand.",
+      "relates": []
     }
   ]
 }
