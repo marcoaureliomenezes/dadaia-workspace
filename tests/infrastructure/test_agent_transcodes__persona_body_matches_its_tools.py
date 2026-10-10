@@ -21,7 +21,7 @@ _NEEDS_WRITE = re.compile(
     r"|`Write` to|write to `repos/|writes reports",
     re.IGNORECASE,
 )
-_RESOLVED = ResolvedAgentModel(model="claude-sonnet-5", effort="high", source="default")
+_RESOLVED = ResolvedAgentModel(model="sonnet", effort="high", source="default")
 
 
 @pytest.mark.parametrize("persona", _PERSONAS, ids=lambda p: p.stem)
