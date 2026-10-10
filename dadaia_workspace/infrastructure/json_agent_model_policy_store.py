@@ -1,24 +1,12 @@
-"""JSON-backed Layer-1 agent-model-policy overlay store (v0.1.65 FR3/D-7).
+"""JSON-backed agent-model-policy overlay store (schema ``agent-model-policy-v1``).
 
-Reads/writes the operator-editable overlay at
-``.dadaia/states/agent_model_policy.json`` (schema ``agent-model-policy-v1`` —
-``public/schemas/agent-model-policy-v1.schema.json``):
-atomic temp+rename write (``core.atomic_write.atomic_write``) and a
-``.last-good.json`` backup of the prior valid file.
+Reads/writes the operator-editable overlay at ``.dadaia/states/agent_model_policy.json``
+(``public/schemas/agent-model-policy-v1.schema.json``): atomic temp+rename write and a
+``.last-good.json`` backup of the prior valid file. The overlay carries ``applied_template`` only.
 
-Two load paths, deliberately distinct (NFR-4, "missing != invalid"):
-
-- **Missing file** ⇒ :meth:`load` returns ``None`` ⇒ the resolver falls back to the
-  library default template (``balanced``).
-- **Present but invalid** ⇒ :meth:`load` raises the typed
-  :class:`AgentModelPolicyStoreError` with a distinct, actionable message per FR3
-  rejection: corrupt JSON, non-object root, unknown top-level/override key, wrong
-  schema version, unknown ``applied_template`` id, unknown agent name (valid names =
-  the ``CORE_AGENTS``; a retired persona name migrates on read), a model not in the registry, an
-  effort outside the D-3 vocabulary, an empty override, and — D-7 — any combination
-  that resolves a Fable-family model onto ``dd-code-reviewer``.
-
-:meth:`parse` is the shared no-I/O validation path (consumed by :meth:`load`).
+Missing file => :meth:`load` returns ``None`` (library default template). Present but invalid =>
+the typed :class:`AgentModelPolicyStoreError`: corrupt JSON, non-object root, unknown key
+(``overrides`` included, with a runnable ``fix``), wrong schema version, unknown template id.
 """
 
 from __future__ import annotations
@@ -27,29 +15,19 @@ import json
 from pathlib import Path
 
 from dadaia_workspace.core.atomic_write import atomic_write
+from dadaia_workspace.core.cli_line import fix_line
 from dadaia_workspace.core.model_registry import (
     _SCHEMA_VERSION,
-    CLAUDE_EFFORTS,
-    CORE_AGENTS,
-    FABLE_FORBIDDEN_AGENT,
-    AgentModelOverride,
+    DEFAULT_TEMPLATE_ID,
+    TEMPLATES,
     AgentModelPolicyOverlay,
     AgentModelPolicyStoreError,
-    ClaudeEffort,
-    is_fable_model,
-    registry_by_claude_id,
-    resolve_agent_model,
     template_by_id,
 )
 
 _FILENAME = "agent_model_policy.json"
 
-#: Allowed top-level keys in the overlay file (unknown key ⇒ hard error).
-_ALLOWED_TOP_LEVEL = frozenset({"schema_version", "applied_template", "overrides"})
-#: Allowed keys inside one per-agent override (per-field: model, effort, or both).
-_ALLOWED_OVERRIDE_KEYS = frozenset({"model", "effort"})
-
-#: The agent that must never resolve to a Fable-family model (G-1/D-7).
+_ALLOWED_TOP_LEVEL = frozenset({"schema_version", "applied_template"})
 
 
 class JsonAgentModelPolicyStore:
@@ -85,14 +63,7 @@ class JsonAgentModelPolicyStore:
             raise AgentModelPolicyStoreError(
                 "cannot read agent-model-policy overlay", self._path
             ) from exc
-        return self._parse(raw, path=self._path)
-
-    def parse(self, raw: object) -> AgentModelPolicyOverlay:
-        """Validate and parse an in-memory overlay document (no I/O).
-
-        Shared by :meth:`load` and callers validating a candidate before writing it.
-        """
-        return self._parse(raw, path=None)
+        return self._parse(raw)
 
     def save(self, overlay: AgentModelPolicyOverlay) -> None:
         """Atomically persist the overlay, backing up the prior valid file first."""
@@ -106,19 +77,22 @@ class JsonAgentModelPolicyStore:
             ensure_parent=True,
         )
 
-    # -- validation -------------------------------------------------------
-
-    def _parse(self, raw: object, *, path: Path | None) -> AgentModelPolicyOverlay:
+    def _parse(self, raw: object) -> AgentModelPolicyOverlay:
+        path = self._path
         if not isinstance(raw, dict):
             raise AgentModelPolicyStoreError(
                 "corrupt agent-model-policy overlay; root is not an object", path
             )
         unknown = set(raw) - _ALLOWED_TOP_LEVEL
         if unknown:
+            template = raw.get("applied_template")
+            if not (isinstance(template, str) and template in TEMPLATES):
+                template = DEFAULT_TEMPLATE_ID
             raise AgentModelPolicyStoreError(
                 f"unknown top-level field(s) in agent-model-policy overlay: "
                 f"{', '.join(sorted(unknown))}",
                 path,
+                fix_line(self._workspace_root, "public", "install", "--template", template),
             )
         if raw.get("schema_version") != _SCHEMA_VERSION:
             raise AgentModelPolicyStoreError(
@@ -126,109 +100,19 @@ class JsonAgentModelPolicyStore:
                 f"{raw.get('schema_version')!r}; expected {_SCHEMA_VERSION!r}",
                 path,
             )
-        applied_template = self._parse_applied_template(raw.get("applied_template"), path=path)
-        overrides = self._parse_overrides(raw.get("overrides", {}), path=path)
-        overlay = AgentModelPolicyOverlay(applied_template=applied_template, overrides=overrides)
-        self._assert_never_fable_on_security(overlay, path=path)
-        return overlay
-
-    def _parse_applied_template(self, value: object, *, path: Path | None) -> str | None:
-        if value is None:
-            return None
-        if not isinstance(value, str) or not value.strip():
-            raise AgentModelPolicyStoreError(
-                "agent-model-policy 'applied_template' must be a non-empty template id",
-                path,
-            )
-        try:
-            template_by_id(value)
-        except ValueError as exc:
-            raise AgentModelPolicyStoreError(
-                f"unknown agent-model template {value!r} in 'applied_template'; {exc}",
-                path,
-            ) from exc
-        return value
-
-    def _parse_overrides(
-        self, value: object, *, path: Path | None
-    ) -> dict[str, AgentModelOverride]:
-        if not isinstance(value, dict):
-            raise AgentModelPolicyStoreError(
-                "agent-model-policy 'overrides' must be an object keyed by agent name", path
-            )
-        valid_agents = set(CORE_AGENTS)
-        overrides: dict[str, AgentModelOverride] = {}
-        for agent_name, override_value in value.items():
-            agent = str(agent_name)
-            if agent not in valid_agents:
+        value = raw.get("applied_template")
+        if value is not None:
+            if not isinstance(value, str) or not value.strip():
                 raise AgentModelPolicyStoreError(
-                    f"unknown agent {agent!r} in 'overrides'; valid agents: "
-                    f"{', '.join(sorted(valid_agents))}",
-                    path,
+                    "agent-model-policy 'applied_template' must be a non-empty template id", path
                 )
-            overrides[agent] = self._parse_override(agent, override_value, path=path)
-        return overrides
-
-    def _parse_override(
-        self, agent: str, value: object, *, path: Path | None
-    ) -> AgentModelOverride:
-        if not isinstance(value, dict):
-            raise AgentModelPolicyStoreError(
-                f"override for agent {agent!r} must be an object", path
-            )
-        unknown = set(value) - _ALLOWED_OVERRIDE_KEYS
-        if unknown:
-            raise AgentModelPolicyStoreError(
-                f"unknown field(s) in override for agent {agent!r}: {', '.join(sorted(unknown))}",
-                path,
-            )
-        if not value:
-            raise AgentModelPolicyStoreError(
-                f"override for agent {agent!r} must carry 'model', 'effort', or both",
-                path,
-            )
-        model = self._parse_model(agent, value.get("model"), path=path)
-        effort = self._parse_effort(agent, value.get("effort"), path=path)
-        return AgentModelOverride(model=model, effort=effort)
-
-    def _parse_model(self, agent: str, value: object, *, path: Path | None) -> str | None:
-        if value is None:
-            return None
-        if not isinstance(value, str) or value not in registry_by_claude_id():
-            raise AgentModelPolicyStoreError(
-                f"unknown model {value!r} in override for agent {agent!r}; valid models: "
-                f"{', '.join(sorted(registry_by_claude_id()))}",
-                path,
-            )
-        return value
-
-    def _parse_effort(self, agent: str, value: object, *, path: Path | None) -> ClaudeEffort | None:
-        if value is None:
-            return None
-        if not isinstance(value, str) or value not in CLAUDE_EFFORTS:
-            raise AgentModelPolicyStoreError(
-                f"invalid effort {value!r} in override for agent {agent!r}; valid: "
-                f"{', '.join(CLAUDE_EFFORTS)}",
-                path,
-            )
-        # ``value`` is provably a member of the ClaudeEffort literal now.
-        return value
-
-    def _assert_never_fable_on_security(
-        self, overlay: AgentModelPolicyOverlay, *, path: Path | None
-    ) -> None:
-        """D-7: reject any overlay that RESOLVES Fable onto dd-code-reviewer.
-
-        Uses the single resolver (FR4) so the check covers every combination
-        (override model, template interplay), not just the literal override value.
-        """
-        resolved = resolve_agent_model(FABLE_FORBIDDEN_AGENT, overlay)
-        if is_fable_model(resolved.model):
-            raise AgentModelPolicyStoreError(
-                f"policy resolves {resolved.model!r} onto {FABLE_FORBIDDEN_AGENT!r}; "
-                "Fable is never assigned to dd-code-reviewer (operator ruling G-1)",
-                path,
-            )
+            try:
+                template_by_id(value)
+            except ValueError as exc:
+                raise AgentModelPolicyStoreError(
+                    f"unknown agent-model template {value!r} in 'applied_template'; {exc}", path
+                ) from exc
+        return AgentModelPolicyOverlay(applied_template=value)
 
 
 __all__ = [
