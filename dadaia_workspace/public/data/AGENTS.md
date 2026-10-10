@@ -27,11 +27,13 @@
 |---|---|
 | Intake, grill, dispatch, the review checkpoint, gates | the main thread (the operator's session) |
 | Backlog, SPEC, the product-memory pass at closure | `dd-product-engineer` |
-| The as-is review, PLAN, job files, production code and tests in any language | `dd-software-engineer` |
+| The as-is review, PLAN, job files, production code and tests for new behaviour | `dd-sw-engineer-sr` |
+| Tasks fully stated by their AC and `W:` | `dd-sw-engineer-jr` |
+| Read-only findings, each a `path:line` or URL | `dd-researcher` |
 | Three-axis review + six lenses (architecture, security, QA, product, audit, AI surface) | `dd-code-reviewer` |
 
-- Three roles, no fourth; only the operator accepts an ADR (`specs/ADRs/AGENTS.md` §2).
-- Every agent invokes `dd-ai-eng-knowhow` for harness literacy; an AI-entity change follows its AUTHORING contract.
+- Only the operator accepts an ADR (`specs/ADRs/AGENTS.md` §2).
+- Every agent but `dd-researcher` invokes `dd-ai-eng-knowhow` for harness literacy; an AI-entity change follows its AUTHORING contract.
 
 ## 3. What is enforced
 
@@ -85,7 +87,7 @@
 | `dd-spec-navigator` | finding truth in `specs/` |
 | `dd-cli-library` | the `dadaia` verbs, skill scripts, dev servers |
 | `dd-ai-eng-knowhow` | harness literacy and AI-entity authoring |
-| `dd-manager-orchestration` | dispatching the three roles |
+| `dd-manager-orchestration` | dispatching the five roles |
 
 - Language: operator preference, default English. Tone: direct, concise, operational.
 
