@@ -483,8 +483,11 @@ class FileSystemPublicAssetManager:
         try:
             overlay = self._load_agent_policy(workspace_root)
         except AgentModelPolicyStoreError as exc:
-            fix = f" fix: {exc.fix}" if exc.fix else ""
-            reports.append(DoctorLine(DoctorStatus.DRIFT, f"agent-model-policy ERROR: {exc}{fix}"))
+            reports.append(
+                DoctorLine(
+                    DoctorStatus.DRIFT, f"agent-model-policy ERROR: {exc}", fix=exc.fix or ""
+                )
+            )
         resolved_models = self._resolved_core_models(overlay)
 
         # The doctor plan is a whole install over the roster, scoped to the PERSISTED

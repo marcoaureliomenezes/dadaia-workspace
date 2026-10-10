@@ -63,11 +63,7 @@ class PublicAssetService:
         `dadaia doctor` carries it, so the two never disagree. The verdict is the typed
         report's, fail-closed: every blocking status fails (public-doctor-exits-zero-despite-error)."""
         lines = list(self.doctor(workspace_root).lines)
-        if not any(line.status.blocking for line in lines):
+        blocking = [line for line in lines if line.status.blocking]
+        if not blocking:
             return lines, ""
-        try:
-            self._load_overlay(workspace_root)
-        except AgentModelPolicyStoreError as exc:
-            if exc.fix:
-                return lines, exc.fix
-        return lines, fix_line(workspace_root, "public", "install")
+        return lines, blocking[0].fix or fix_line(workspace_root, "public", "install")

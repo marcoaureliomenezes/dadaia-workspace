@@ -88,6 +88,7 @@ class DoctorLine:
 
     status: DoctorStatus
     text: str
+    fix: str = ""  # the one remedy for this finding; never rendered, read by the verdict
 
     def render(self) -> str:
         """Legacy wire format, byte-identical to the historical string lines.
