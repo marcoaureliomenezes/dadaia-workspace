@@ -1,52 +1,24 @@
-"""Which model an agent gets — the one module: the model registry, the built-in
-agent-model templates (ADR 0022) and the operator overlay's resolution.
+"""Which model an agent gets — the one module: the tier-to-Codex map, the built-in
+agent-model templates (ADR 0022, ADR 0240) and the operator overlay's resolution.
 
-The Codex model map (``codex_assets.codex_model``, ADR-5) derives from :data:`REGISTRY`. Pure data + pure functions, stdlib only (``core-no-os-primitives``).
+Contract: templates name a tier by alias; a new model release needs no library change.
+Claude resolves the alias itself; :data:`TIER_CODEX` maps it to the Codex id. Pure data +
+pure functions, stdlib only (``core-no-os-primitives``).
 """
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal, get_args
 
-#: Model-cost class: ``deep`` reasoning leaves, ``dispatch`` dispatchers + gate leaves,
-#: ``standard`` general implementation, ``fast`` high-volume mechanical.
-Tier = Literal["deep", "dispatch", "fast", "standard"]
-
-
-@dataclass(frozen=True)
-class ModelEntry:
-    """One model: its Claude id (agent frontmatter), Codex id and tier."""
-
-    claude_id: str
-    codex_id: str
-    tier: Tier = "dispatch"
-
-
-#: Every Claude model id the fleet uses, exactly once.
-REGISTRY: tuple[ModelEntry, ...] = (
-    ModelEntry("claude-fable-5", "gpt-5.6-sol", "deep"),
-    ModelEntry("claude-fable-5-1", "gpt-5.6-sol", "deep"),
-    ModelEntry("claude-opus-4-7", "gpt-5.6-sol", "dispatch"),
-    ModelEntry("claude-opus-4-8", "gpt-5.6-sol", "dispatch"),
-    ModelEntry("claude-opus-5", "gpt-5.6-sol", "dispatch"),
-    ModelEntry("claude-opus-5-5", "gpt-5.6-sol", "dispatch"),
-    ModelEntry("claude-sonnet-4-6", "gpt-5.6-terra", "standard"),
-    ModelEntry("claude-sonnet-5", "gpt-5.6-terra", "standard"),
-    ModelEntry("claude-haiku-4-5-20251001", "gpt-5.3-codex-spark", "fast"),
-)
-
-
-def registry_by_claude_id() -> dict[str, ModelEntry]:
-    """The registry indexed by ``claude_id``."""
-    return {entry.claude_id: entry for entry in REGISTRY}
-
-
-def is_fable_model(claude_id: str) -> bool:
-    """G-1 is a FAMILY rule: every registered ``claude-fable-*`` id is Fable."""
-    return claude_id.startswith("claude-fable-") and claude_id in registry_by_claude_id()
-
+#: Tier alias -> Codex model id (``codex_assets.codex_model`` reads it).
+TIER_CODEX: dict[str, str] = {
+    "opus": "gpt-5.6-sol",
+    "fable": "gpt-5.6-sol",
+    "sonnet": "gpt-5.6-terra",
+    "haiku": "gpt-5.3-codex-spark",
+}
 
 CodexEffort = Literal["high", "medium", "low"]
 
@@ -73,27 +45,15 @@ def codex_effort_for_claude_effort(effort: ClaudeEffort) -> CodexEffort:
 _SCHEMA_VERSION = "agent-model-policy-v1"
 
 #: Where a resolved (model, effort) came from.
-ResolvedSource = Literal["override", "template", "default"]
+ResolvedSource = Literal["template", "default"]
 
 
 @dataclass(frozen=True)
 class AgentModelAssignment:
-    """One template cell: the (model, effort) assigned to one core agent."""
+    """One template cell: the (model alias, effort) assigned to one core agent."""
 
     model: str
     effort: ClaudeEffort
-
-
-@dataclass(frozen=True)
-class AgentModelOverride:
-    """A per-agent, per-field override (FR3): ``model``, ``effort``, or both."""
-
-    model: str | None = None
-    effort: ClaudeEffort | None = None
-
-    @property
-    def is_empty(self) -> bool:
-        return self.model is None and self.effort is None
 
 
 @dataclass(frozen=True)
@@ -101,20 +61,12 @@ class AgentModelPolicyOverlay:
     """Parsed, validated operator overlay (FR3 document shape)."""
 
     applied_template: str | None = None
-    overrides: dict[str, AgentModelOverride] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, object]:
-        """Serialize back to the FR3 document shape (omit empty/absent fields)."""
+        """Serialize back to the FR3 document shape (omit an absent template)."""
         doc: dict[str, object] = {"schema_version": _SCHEMA_VERSION}
         if self.applied_template is not None:
             doc["applied_template"] = self.applied_template
-        if self.overrides:
-            doc["overrides"] = {
-                agent: {
-                    k: v for k, v in (("model", o.model), ("effort", o.effort)) if v is not None
-                }
-                for agent, o in sorted(self.overrides.items())
-            }
         return doc
 
 
@@ -133,37 +85,35 @@ class AgentModelPolicyStoreError(Exception):
 
     message: str
     path: Path | None = None
+    fix: str | None = None
 
     def __str__(self) -> str:
         return self.message if self.path is None else f"{self.message}: {self.path}"
 
 
-#: The three core agents every template covers (ADR 0022).
-CORE_AGENTS: tuple[str, ...] = ("dd-product-engineer", "dd-software-engineer", "dd-code-reviewer")
+DEFAULT_TEMPLATE_ID = "balanced"
 
-#: Never receives a Fable-family model (G-1; the security lens runs here since ADR 0016).
-FABLE_FORBIDDEN_AGENT = "dd-code-reviewer"
-
-_DEFAULT_TEMPLATE_ID = "balanced"
-
-#: ADR 0022's table: template id -> core agent -> (model, effort); ``balanced`` is the default.
+#: ADR 0022's table: template id -> core agent -> (tier alias, effort); ``balanced`` is the default.
 TEMPLATES: dict[str, dict[str, AgentModelAssignment]] = {
     "balanced": {
-        "dd-product-engineer": AgentModelAssignment("claude-opus-5-5", "high"),
-        "dd-code-reviewer": AgentModelAssignment("claude-opus-5-5", "high"),
-        "dd-software-engineer": AgentModelAssignment("claude-opus-5-5", "low"),
+        "dd-product-engineer": AgentModelAssignment("opus", "high"),
+        "dd-software-engineer": AgentModelAssignment("sonnet", "medium"),
+        "dd-code-reviewer": AgentModelAssignment("opus", "high"),
     },
     "max-quality": {
-        "dd-product-engineer": AgentModelAssignment("claude-fable-5-1", "high"),
-        "dd-code-reviewer": AgentModelAssignment("claude-opus-5-5", "xhigh"),
-        "dd-software-engineer": AgentModelAssignment("claude-opus-5-5", "medium"),
+        "dd-product-engineer": AgentModelAssignment("fable", "high"),
+        "dd-software-engineer": AgentModelAssignment("opus", "medium"),
+        "dd-code-reviewer": AgentModelAssignment("opus", "xhigh"),
     },
     "economy": {
-        "dd-product-engineer": AgentModelAssignment("claude-opus-5-5", "high"),
-        "dd-code-reviewer": AgentModelAssignment("claude-sonnet-5", "high"),
-        "dd-software-engineer": AgentModelAssignment("claude-sonnet-5", "medium"),
+        "dd-product-engineer": AgentModelAssignment("sonnet", "medium"),
+        "dd-software-engineer": AgentModelAssignment("sonnet", "medium"),
+        "dd-code-reviewer": AgentModelAssignment("sonnet", "high"),
     },
 }
+
+#: The core agents every template covers.
+CORE_AGENTS: tuple[str, ...] = tuple(TEMPLATES[DEFAULT_TEMPLATE_ID])
 
 
 def template_by_id(template_id: str) -> dict[str, AgentModelAssignment]:
@@ -177,18 +127,10 @@ def template_by_id(template_id: str) -> dict[str, AgentModelAssignment]:
 def resolve_agent_model(
     agent_name: str, overlay: AgentModelPolicyOverlay | None
 ) -> ResolvedAgentModel:
-    """One agent's (model, effort, source), per field: override > applied template >
-    ``balanced`` default. Raises ``ValueError`` for a non-core agent or an unknown
-    ``applied_template``."""
+    """One agent's (model, effort, source): applied template > ``balanced`` default.
+    Raises ``ValueError`` for a non-core agent or an unknown ``applied_template``."""
     if agent_name not in CORE_AGENTS:
         raise ValueError(f"unknown agent {agent_name!r}: not a core agent")
     applied = overlay.applied_template if overlay is not None else None
-    base = template_by_id(applied or _DEFAULT_TEMPLATE_ID)[agent_name]
-    override = overlay.overrides.get(agent_name) if overlay is not None else None
-    if override is not None and not override.is_empty:
-        return ResolvedAgentModel(
-            model=override.model or base.model,
-            effort=override.effort or base.effort,
-            source="override",
-        )
+    base = template_by_id(applied or DEFAULT_TEMPLATE_ID)[agent_name]
     return ResolvedAgentModel(base.model, base.effort, "template" if applied else "default")
