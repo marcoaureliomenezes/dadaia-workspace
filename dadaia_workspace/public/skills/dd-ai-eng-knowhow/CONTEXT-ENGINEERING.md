@@ -121,18 +121,18 @@ Fix protocol:
 | Volume | Occasional -> high-frequency / bulk |
 
 - The dominant task drives the tier — not the easiest or the rarest.
-- Tier names are derived from `core/model_registry.py` — never hand-maintain a copy that can drift.
+- Tier aliases are the keys of `TEMPLATES` in `core/model_registry.py` — never hand-maintain a copy that can drift.
 
-| Registry tier | Workload character |
+| Tier alias | Workload character |
 |---|---|
-| `deep` | Heavy synthesis, recursive analysis, persona/skill authoring, fleet audit, security reasoning |
-| `dispatch` | Orchestration, dispatch authority, review verdicts, broad-context implementation |
-| `standard` | Mid-cost general implementation |
-| `fast` | High-volume mechanical reformatting, bulk renames, deterministic transforms |
+| `fable` | Heavy synthesis, recursive analysis, persona/skill authoring, fleet audit, security reasoning |
+| `opus` | Orchestration, dispatch authority, review verdicts, broad-context implementation |
+| `sonnet` | Mid-cost general implementation |
+| `haiku` | High-volume mechanical reformatting, bulk renames, deterministic transforms |
 
-- Current per-runtime model ids and Codex reasoning-effort come from `core/model_registry.py`, never hand-copied.
+- Current model ids come from `core/model_registry.py`, never hand-copied: Codex ids from `TIER_CODEX`; Claude resolves the alias itself. Reasoning effort is the template cell's effort.
 - On Codex the tiering axis is (model id x model_reasoning_effort); on Claude it is the model id.
-- Quote the registry entry (id + tier) when recommending a move; take the price from the provider's published table, never from memory.
+- Quote the template cell (alias + effort), and on Codex its `TIER_CODEX` id, when recommending a move; take the price from the provider's published table, never from memory.
 - Move up a tier only when depth/breadth/error-cost are all high; move down only when the task is mechanical and high-volume.
 
 Justify a tier BUMP (down -> up):
