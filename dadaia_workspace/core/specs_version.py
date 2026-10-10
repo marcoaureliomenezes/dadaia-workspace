@@ -34,7 +34,7 @@ from dadaia_workspace.core.gitflow import constitution_error, constitution_text,
 #: rc-8 rewrite; its pin (91a8bfb1b79eac16) also covers rc-9 Job 1's scaffold-law
 #: edits; v11 = rc-9 Job 5's bugs and releases laws and specs AGENTS.md template
 #: (ADRs 0193, 0201–0205); v12 = the jobs-and-tasks law, single verify authority and
-#: removal of the bug-balance projection. A canon change that
+#: removal of the bug-balance projection, the dd-sw-engineer-sr rename. A canon change that
 #: keeps the stamp leaves every older tree reading ``canonical`` while the doctor is red.
 CANONICAL_SPECS_VERSION = 12
 
@@ -44,7 +44,7 @@ OLDEST_UPGRADABLE_VERSION = 6
 
 #: The canon fingerprint each stamp was cut at — re-pinned only together with a stamp bump,
 #: or while the stamp is unpublished (``test_a_canon_change_bumps_the_stamp`` computes it).
-CANON_AT = {12: "b7944fdf405438d4"}
+CANON_AT = {12: "e877dd359bb115bc"}
 State = Literal["absent", "malformed", "foreign", "upgradable", "canonical"]
 
 
