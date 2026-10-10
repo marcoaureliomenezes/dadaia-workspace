@@ -75,7 +75,7 @@ One procedure each; a skill that touches a governed area opens its scoped law as
 
 ## 4. Personas — `.agents/agents/*.md`
 
-Five roles, no sixth; every retired role is a lens the reviewer applies.
+Five roles, no sixth.
 
 | Surface | Purpose | Belongs |
 |---|---|---|
