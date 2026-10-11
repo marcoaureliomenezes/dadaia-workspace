@@ -103,7 +103,7 @@
         "date",
         "words"
       ],
-      "description": "The operator's ruling (ADR 0151): its date and his words; required on `accepted`. `words` carries the question and the chosen option in the operator's words.",
+      "description": "The operator's ruling, required on `accepted`: its date, and `words`, which carry the question and the chosen option in the operator's words.",
       "properties": {
         "date": {
           "type": "string",
