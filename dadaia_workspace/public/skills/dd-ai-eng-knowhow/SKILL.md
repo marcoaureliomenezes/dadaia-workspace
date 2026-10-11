@@ -18,7 +18,7 @@ compatibility: Standalone Agent Skill. Inside a dadaia-workspace (pip install da
 ## 2. The working model
 
 - Name the primitive before reasoning about it: agent persona
-  (`public/agents/*.md`), subagent dispatch, skill, rule, hook, AGENTS.md, MCP.
+  (`.agents/agents/*.md`), subagent dispatch, skill, rule, hook, AGENTS.md, MCP.
 - Context vs enforcement: persona/skill/rule/AGENTS.md inform; hooks, Codex
   `.rules`, and the SDD gate enforce.
 - A Claude Code hook/rule config never transplants verbatim to Codex — the
