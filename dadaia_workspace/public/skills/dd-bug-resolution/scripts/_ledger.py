@@ -27,11 +27,23 @@ JSON_TYPES: dict[str, Any] = {"string": str, "object": dict, "array": list, "boo
                               "null": type(None), "integer": int, "number": (int, float)}  # fmt: skip
 
 
+_SCHEMA_OWNERS = {
+    "bug-record-v1": "dd-bug-resolution",
+    "backlog-v1": "dd-backlog-definition",
+    "histo-record-v1": "dd-backlog-definition",
+    "release-state-v1": "dd-release-implementation",
+    "finding-record-v1": "dd-audit-project",
+}
+
+
 def load_schema(name: str) -> dict[str, Any]:
-    """``schemas/<name>.schema.json`` beside the script, else the shipped one."""
+    """``schemas/<name>.schema.json`` beside the script, else its writer skill's, else the shipped one."""
     own = _HERE / "schemas" / f"{name}.schema.json"
-    shipped = _HERE.parents[2] / "schemas"
-    path = own if own.is_file() else next(shipped.rglob(own.name), own)
+    if name in _SCHEMA_OWNERS:
+        owned = _HERE.parents[1] / _SCHEMA_OWNERS[name] / "scripts" / "schemas" / own.name
+        path = own if own.is_file() else owned
+    else:
+        path = own if own.is_file() else next((_HERE.parents[2] / "schemas").rglob(own.name), own)
     return dict(json.loads(path.read_text("utf-8")))
 
 
