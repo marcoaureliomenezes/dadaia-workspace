@@ -31,8 +31,8 @@ def _repo_root() -> Path:
             errors="replace",
             check=True,
         )
-    except (subprocess.CalledProcessError, FileNotFoundError) as exc:
-        raise typer.BadParameter("not inside a git repository") from exc
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        fail("not inside a git repository", "Operator action: run it inside a git repository")
     return Path(out.stdout.strip())
 
 
@@ -149,9 +149,11 @@ def install_hook(
     try:
         installed = install_git_hooks(repo, force=force)
     except FileNotFoundError as exc:
-        raise typer.BadParameter(str(exc)) from None
+        fail(exc, "Operator action: pass --repo <a git repository>")
     if not installed:
-        fix = fix_line(None, "ci", "install-hook", "--force", "--repo", str(repo))
-        fail(f"pre-push hook already exists, not overwritten.\nfix: {fix}")
+        fail(
+            "pre-push hook already exists, not overwritten.",
+            fix_line(None, "ci", "install-hook", "--force", "--repo", str(repo)),
+        )
     for target in installed:
         typer.echo(f"Installed pre-push CI + security gate -> {target}")

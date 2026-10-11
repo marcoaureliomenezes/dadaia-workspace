@@ -87,19 +87,15 @@ def validate(
     """
     # Invocation guard: must have paths or --all
     if not paths and not all_:
-        fail("provide one or more PATHS or use --all.")
+        fail(
+            "provide one or more PATHS or use --all.",
+            fix_line(None, "reports", "validate", "--all"),
+        )
 
     try:
         workspace_root = resolve_cli_workspace_root(workspace)
     except WorkspaceNotInitializedError as exc:
         fail(exc)
-
-    # Bug ancestor-walk-workspace-root-silent-mistarget (T-043-47/A30.5): always name
-    # the resolved workspace root (stderr — never pollutes --json's stdout list shape)
-    # so a false INVALID/missing_artifact caused by resolving against the wrong
-    # ancestor is never silently misread. --workspace above is the primary fix; this
-    # diagnostic covers every invocation, including the cwd-default path.
-    print(f"Resolved workspace root: {workspace_root}", file=sys.stderr)
 
     index = HandoffIndex(workspace_root)
 
@@ -111,8 +107,16 @@ def validate(
     elif paths:
         missing = [p for p in paths if not p.exists()]
         if missing:
-            fail("File not found: " + ", ".join(str(m) for m in missing))
+            fail(
+                "File not found: " + ", ".join(str(m) for m in missing),
+                fix_line(workspace_root, "reports", "validate", "--all"),
+            )
         target_paths = list(paths)
+
+    # Bug ancestor-walk-workspace-root-silent-mistarget (T-043-47/A30.5): name the
+    # resolved workspace root (stderr — never pollutes --json's stdout list shape) once
+    # the invocation is accepted, so a refusal's first line stays `Error:`.
+    print(f"Resolved workspace root: {workspace_root}", file=sys.stderr)
 
     # Version routing (v1/v1.1/v1.2, and refusal of any future/unknown token) lives in
     # the schema's own ``schema_version`` enum now — Handoff.validate applies ONE
@@ -122,8 +126,7 @@ def validate(
             index.validate_file(p, reviewed_root=reviewed_root) for p in target_paths
         ]
     except HandoffSchemaError as exc:
-        fix = fix_line(workspace_root, "public", "install")
-        fail(f"Could not load handoff schema: {exc}\nfix: {fix}")
+        fail(f"Could not load handoff schema: {exc}", fix_line(workspace_root, "public", "install"))
 
     # Apply release filter if requested
     if release:

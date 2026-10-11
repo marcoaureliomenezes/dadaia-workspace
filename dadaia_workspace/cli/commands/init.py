@@ -16,7 +16,6 @@ from dadaia_workspace.core.exceptions import (
     ContextAlreadyExistsError,
     DadaiaError,
     WorkspaceVenvBootstrapError,
-    WorkspaceVenvNewerError,
 )
 from dadaia_workspace.core.model_registry import TEMPLATES
 from dadaia_workspace.features.spec_context.service import slug_from_url
@@ -83,13 +82,11 @@ def _plan(directory: str, harness: str, repo: str, associated: tuple[str, ...]) 
         fix = InitPlan(directory or "", harness or first, repo, associated).command()
         fail(
             "init needs DIR and --harness when no terminal can answer prompts; "
-            f"harnesses: {', '.join(harness_registry.L1_ENTRY_HARNESSES)}.\nfix: "
-            + (
-                fix
-                if directory
-                else f"Operator action: run `{fix}` with the new workspace's "
-                "directory as its first argument"
-            )
+            f"harnesses: {', '.join(harness_registry.L1_ENTRY_HARNESSES)}.",
+            fix
+            if directory
+            else f"Operator action: run `{fix}` with the new workspace's "
+            "directory as its first argument",
         )
     directory = directory or str(Path.cwd() / typer.prompt("Workspace name"))
     harness = harness or typer.prompt(
@@ -147,21 +144,19 @@ def init(
         root.parent / ((root.name or "dadaia") + "-workspace")
     )
     if root.exists() and not root.is_dir():
-        fail(f"'{root}' is not a directory.\nfix: {sibling_fix}")
+        fail(f"'{root}' is not a directory.", sibling_fix)
     # A directory that already holds `.dadaia/` is THIS workspace (a re-run, idempotent);
     # anything else non-empty is a foreign tree and is never scaffolded over.
     if root.is_dir() and any(root.iterdir()) and not (root / ".dadaia").is_dir():
-        fail(f"'{root}' already holds a foreign tree (not a dadaia workspace).\nfix: {sibling_fix}")
+        fail(f"'{root}' already holds a foreign tree (not a dadaia workspace).", sibling_fix)
     root.mkdir(parents=True, exist_ok=True)
 
     svc = container.build_workspace_service(root)
     try:
         before, after, action = svc.venv_change(root)
         installed = svc.init(root, skip_assets=skip_assets, harnesses=(chosen,), template=template)
-    except WorkspaceVenvNewerError as exc:
-        fail(f"{exc}\nfix: {fix_line(root, 'init', str(root), '--harness', chosen)}")
     except WorkspaceVenvBootstrapError as exc:
-        fail(exc)
+        fail(exc, fix_line(root, "init", str(root), "--harness", chosen))
 
     console.print(f"[green]✓[/green] Workspace {root} ({chosen})", highlight=False, soft_wrap=True)
     if skip_assets:
@@ -190,8 +185,10 @@ def _reconcile_upgrade(root: Path, before: str | None, after: str | None) -> Non
         expected_version=after or "",
     )
     if not result.ok:
-        fix = fix_line(root, "reconcile", "--expect-version", after or "")
-        fail(f"reconcile after upgrade failed: {result.error}\nfix: {fix}")
+        fail(
+            f"reconcile after upgrade failed: {result.error}",
+            fix_line(root, "reconcile", "--expect-version", after or ""),
+        )
     container.build_spec_context_service(root).refresh_hooks()
     console.print(f"upgraded {before} -> {after}", markup=False, highlight=False)
 
@@ -212,6 +209,6 @@ def _create_context(root: Path, plan: InitPlan) -> str:
                 raise
             ctx_svc.alive(slug)
     except (DadaiaError, OSError) as exc:
-        fail(f"{exc}\nfix: {create_fix(root, exc, None, [plan.repo, *plan.associated])}")
+        fail(exc, create_fix(root, exc, None, [plan.repo, *plan.associated]))
     console.print(f"[green]✓[/green] {slug} ALIVE", highlight=False, soft_wrap=True)
     return slug
