@@ -648,7 +648,7 @@ class SpecContextService:
             raise GitSyncError(
                 f"{exc.message}\nHEAD holds the onboarding commit {anchor}; once the cause above is "
                 f"fixed (a refused push: after the amend), publish again: {again}",
-                fix=exc.fix or again,
+                fix=exc.fix,
             ) from exc
         return work
 

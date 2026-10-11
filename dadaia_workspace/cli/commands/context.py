@@ -289,7 +289,7 @@ def alive(name: str = typer.Argument(..., help="Context name to make ALIVE")) ->
         ctx = container.build_spec_context_service(resolve_workspace_root()).alive(name)
         console.print(f"[green]✓[/green] Context '[bold]{ctx.name}[/bold]' is now ALIVE")
     except DadaiaError as e:
-        fail(e, fix_line(resolve_workspace_root(), "context", "alive", name))
+        fail(e)
 
 
 @app.command()
@@ -305,7 +305,7 @@ def baseline(
     try:
         work = _ctx_service().baseline(name, message=message)
     except (DadaiaError, OSError) as exc:
-        fail(exc, fix_line(resolve_workspace_root(), "context", "baseline", name))
+        fail(exc)
     done = f"published on {work}" if work else "already published — nothing to do"
     console.print(f"✓ '{name}' {done}", markup=False, highlight=False, soft_wrap=True)
 
@@ -320,7 +320,7 @@ def dead(
         ctx = _ctx_service().dead(name)
         console.print(f"[green]✓[/green] Context '[bold]{ctx.name}[/bold]' is now DEAD")
     except DadaiaError as e:
-        fail(e, fix_line(resolve_workspace_root(), "context", "dead", name))
+        fail(e)
 
 
 @app.command(epilog=f"Examples: {fix_line(None)} context bind my-ctx")
