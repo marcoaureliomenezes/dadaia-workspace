@@ -74,12 +74,12 @@ def test_a_baseline_match_is_shown_first_last(
 
 
 def test_one_mask_and_one_redactor_builder() -> None:
-    """sa-private-match-rendering-has-three-renderers#B7: exactly one first…last mask definition (core/redaction) and one
+    """sa-private-match-rendering-has-three-renderers#B7: exactly one first…last mask definition (_privacy) and one
     ContextRedactor construction site (cli/redact)."""
     sources = {
         p.relative_to(_PKG).as_posix(): p.read_text(encoding="utf-8") for p in _PKG.rglob("*.py")
     }
     masks = sorted(rel for rel, text in sources.items() if "[0]}…{" in text)
     builders = sorted(rel for rel, text in sources.items() if "ContextRedactor(" in text)
-    assert masks == ["core/redaction.py"]
+    assert masks == ["public/skills/dd-bug-resolution/scripts/_privacy.py"]
     assert builders == ["cli/redact.py"]

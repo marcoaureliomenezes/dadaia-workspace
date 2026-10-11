@@ -45,13 +45,6 @@ def test_public_projection_lifecycle(tmp_path: Path, monkeypatch: pytest.MonkeyP
     source_public = public_asset_roster.default_public_dir()
     public_dir = shutil.copytree(source_public, package_dir / "public")
     shutil.copytree(source_public.parent / "hooks", package_dir / "hooks")
-    (package_dir / "core").mkdir()
-    shutil.copy2(source_public.parent / "core" / "redaction.py", package_dir / "core")
-    (package_dir / "infrastructure" / "data").mkdir(parents=True)
-    shutil.copy2(
-        source_public.parent / "infrastructure" / "data" / "privacy_baseline.json",
-        package_dir / "infrastructure" / "data",
-    )
     (public_dir / "data" / "AGENTS.md").write_bytes(_FIXTURE_SOURCE)
     manager = FileSystemPublicAssetManager()
     manager._public_dir = public_dir  # noqa: SLF001 — package asset-provider boundary
@@ -67,10 +60,10 @@ def test_public_projection_lifecycle(tmp_path: Path, monkeypatch: pytest.MonkeyP
 
     assert (stage.exit_code, install.exit_code, doctor.exit_code) == (0, 0, 0), doctor.output
     expected_stage = (
-        "✓ 64 asset group(s) staged:" if PLATFORM.windows else "✓ 47 asset group(s) staged:"
+        "✓ 62 asset group(s) staged:" if PLATFORM.windows else "✓ 45 asset group(s) staged:"
     )
     expected_install = (
-        "✓ 220 asset(s) processed:" if PLATFORM.windows else "✓ 203 asset(s) processed:"
+        "✓ 218 asset(s) processed:" if PLATFORM.windows else "✓ 201 asset(s) processed:"
     )
     assert stage.output.splitlines()[0] == expected_stage
     assert install.output.splitlines()[0] == expected_install

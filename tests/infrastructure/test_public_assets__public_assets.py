@@ -6,7 +6,6 @@ tracked blob (push-gate-refuses-its-own-privacy-baseline-fixtures; T-043-23 HIGH
 
 from __future__ import annotations
 
-import importlib.resources
 import json
 import re
 from pathlib import Path
@@ -145,8 +144,8 @@ def test_shipped_baseline_header_and_single_line_documented_carve_outs() -> None
     """A10.2/A10.4, A12.1/A12.5: version 15, single-line regexes, every carve-out has a rationale."""
     raw = json.loads(
         (
-            importlib.resources.files("dadaia_workspace.infrastructure.data")
-            / "privacy_baseline.json"
+            Path(__file__).parents[2]
+            / "dadaia_workspace/public/skills/dd-bug-resolution/scripts/privacy_baseline.json"
         ).read_text(encoding="utf-8")
     )
     assert raw["_header"]["version"] == 16

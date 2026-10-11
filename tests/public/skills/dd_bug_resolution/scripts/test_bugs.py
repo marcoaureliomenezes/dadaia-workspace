@@ -593,14 +593,14 @@ def test_every_ledger_skill_stages_a_byte_identical_privacy_pair(tmp_path: Path)
     from dadaia_workspace.infrastructure.public_assets import FileSystemPublicAssetManager
 
     FileSystemPublicAssetManager().stage(tmp_path)
-    package = _PUBLIC.parent
+    own = _PUBLIC / "skills" / "dd-bug-resolution" / "scripts"
     for skill in ("dd-bug-resolution", "dd-backlog-definition"):
         scripts = tmp_path / ".dadaia" / "agentic" / "skills" / skill / "scripts"
         assert (scripts / "_privacy.py").read_bytes() == (
-            package / "core" / "redaction.py"
+            own / "_privacy.py"
         ).read_bytes()
         assert (scripts / "privacy_baseline.json").read_bytes() == (
-            package / "infrastructure" / "data" / "privacy_baseline.json"
+            own / "privacy_baseline.json"
         ).read_bytes()
 
 

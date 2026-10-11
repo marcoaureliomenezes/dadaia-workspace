@@ -26,7 +26,7 @@ def test_init_creates_the_literal_level_one_state(tmp_path: Path) -> None:
     expected_output = (
         (
             f"✓ Workspace {ws} (claude)\n"
-            "✓ 220 asset(s) installed\n"
+            "✓ 218 asset(s) installed\n"
             f"CLI: {cli}\n"
             "Sessions launch at the workspace root.\n"
             "Next (command step context): no ALIVE Spec Context — create one\n"
@@ -36,7 +36,7 @@ def test_init_creates_the_literal_level_one_state(tmp_path: Path) -> None:
         if PLATFORM.windows
         else (
             f"✓ Workspace {ws} (claude)\n"
-            "✓ 203 asset(s) installed\n"
+            "✓ 201 asset(s) installed\n"
             f"CLI: {cli}\n"
             "Sessions launch at the workspace root.\n"
             "Next (command step context): no ALIVE Spec Context — create one\n"
