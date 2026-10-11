@@ -18,15 +18,6 @@
       "provenance": "0.4.7 rc-9 SPEC D3-D6 (2026-09-21); histo records standalone-skills-distribution, public-presence-and-launch; inventory row A10 in reports/main-thread/20260929-050-rc1-audit/leftbehind/ (REPORT.md, inventory.json); operator order 2026-09-29"
     },
     {
-      "id": "spec-context-refusals-print-prose",
-      "title": "spec_context service refusals still print prose instead of one fix line",
-      "opened": "2026-10-02",
-      "status": "idea",
-      "description": "Three refusals in dadaia_workspace/features/spec_context/service.py raise with prose and no fix line in an ADR 0158 form: add_repo's own-main-repo conflict (:318-322, AssociatedRepoConflictError), add_repo's different-URL conflict (:328-335, names 'context repo remove' inside prose, then 're-add'), remove_repo's unregistered slug (:362-364, AssociatedRepoNotFoundError). T-050-149 (5fc194dd0) left them as out of its AC4.4 scope. Each gets exactly one 'fix: <command>' with real values or 'Operator action: <one act>'. Destination: rc-8.\n\nScope grill 2026-10-11 (operator, verbatim): '0.5.0 como bug (Recommended)'. Earlier rulings kept: none in the extracted operator words. Destination: 0.5.0. Wave: 3 (a user-facing refusal fix). Scope now: fixed as bug context-repo-refusals-carry-no-fix-line (MEDIUM); the own-main refusal becomes an idempotent no-op. This entry exits to-bug naming it once the main thread registers it.",
-      "provenance": "operator approval 2026-10-02 via the main thread's intake at the 0.5.0 rc-7 T-050-150 closure; source: T-050-149 commit 5fc194dd0 body, 'Not changed' paragraph",
-      "relates": []
-    },
-    {
       "id": "spec-context-branch-field-deleted",
       "title": "The Spec Context Project stores no branch; context alive derives the checkout from the gitflow",
       "opened": "2026-10-03",
@@ -152,31 +143,11 @@
       "relates": []
     },
     {
-      "id": "stray-pycache-never-breaks-the-job-gate",
-      "title": "A stray __pycache__ under dadaia_workspace/public/ never breaks the job gate in a local tree",
-      "opened": "2026-10-06",
-      "status": "idea",
-      "description": "Found in rc-9: an untracked __pycache__ left under dadaia_workspace/public/ (a skill script or test run by hand without -B) broke the local job gate, which CI never sees because a fresh checkout has none; Job 1's job-gate red #3 was of the same family (a reviewer pytest in the job tree wrote tests/__pycache__). Design, root cause first at the as-is review: whichever check failed must read tracked files only (git ls-files), as the behavior-map hash already does after behavior-map-hash-reads-untracked-bytecode; and every gate child runs with PYTHONDONTWRITEBYTECODE=1 (scripts/ci.py sets it for its own steps; worktree.py's _gate env does not). One fix in the reader, not a cleanup step. Done when: a planted untracked __pycache__ under public/ leaves scripts/ci.py job green.\n\nScope grill 2026-10-11 (operator, verbatim): 'Registrar os 7 (Recommended)' (this entry becomes one of the seven bugs). Earlier rulings kept: none in the extracted operator words. Destination: 0.5.0. Wave: 1 (dev loop: a local job gate must not go red on untracked bytecode). Scope now: fixed as bug job-gate-red-on-untracked-bytecode (LOW, developer pipeline); this entry exits to-bug naming it once the main thread registers it.",
-      "provenance": "rc-9 Reconciliation deferral (JR.S2.T5), dispatched by the main thread 2026-10-06 under the operator's rc-9 scope; target rc-10 or later",
-      "relates": [
-        "hypothesis-cache-stays-out-of-repo-trees"
-      ]
-    },
-    {
       "id": "task-gate-drops-deleted-paths-itself",
       "title": "scripts/ci.py task drops paths that no longer exist, so a hand-run task gate over a deletion is green",
       "opened": "2026-10-06",
       "status": "idea",
       "description": "Found in rc-9: worktree.py merge filters deleted paths (git diff --diff-filter=d) before calling the verify-task line, but scripts/ci.py task FILE... passes every argument to ruff and mypy, so the same gate run by hand with a deleted path fails on a missing file. Two deciders of 'which touched paths a task gate judges'. Design: scripts/ci.py _task keeps only existing files, one filter; worktree.py's --diff-filter=d then leaves (the gate decides, the caller passes what the task touched). Owner: scripts/ci.py _task, dd-gitflow-default/scripts/_worktree_end.py merge, tests/integration/test_ci_script.py. Done when: scripts/ci.py task <a deleted path> <an existing test> runs the existing file's steps and exits 0.\n\nScope grill 2026-10-11: decided exit superseded --release 0.5.0 (obsolete by ADRs 0231/0232/0236; the dead task/stage code of scripts/ci.py is deleted under test-suite-diet). Not destined to 0.5.0 work. backlog.py exit refused 'superseded' on 2026-10-11 because no 0.5.0 SPEC Origin picks this slug; the exit waits for the main thread: name the slug in the next candidate SPEC's Origin and exit it at that closure, or exit it rejected with this reason.",
-      "provenance": "rc-9 Reconciliation deferral (JR.S2.T5), dispatched by the main thread 2026-10-06 under the operator's rc-9 scope; target rc-10 or later",
-      "relates": []
-    },
-    {
-      "id": "release-new-adopts-a-drafted-next-rc",
-      "title": "release.py new adopts the rc N+1 SPEC drafted in a define tree while rc N implements",
-      "opened": "2026-10-06",
-      "status": "idea",
-      "description": "Found in rc-9: the releases law says rc N+1 is drafted in a define tree while rc N implements and enters by release.py new at rc N's CLOSURE (specs/releases/AGENTS.md \u00a72, ADR 0201), but new mints a fresh rc-<N+1>/SPEC.md stub and refuses before CLOSURE, and a hand-drafted rc-<N+1>/SPEC.md on the work branch would become the live candidate (the highest rc-<N>/) while rc N still implements. Design: release.py new at rc N's CLOSURE adopts an existing Draft rc-<N+1>/SPEC.md (its Origin and Bug window head judged as for a stub), writing only the birth note and the phase; the live-candidate reader skips a Draft rc above an IMPLEMENTATION candidate until new adopts it, one rule in _release_store.live_ids and core/gitflow's pinned twin; ADR 0199 (a Draft rc-<N+1> does not move found_in) already covers the ledger side. Done when: rc-10 drafted during rc-9's IMPLEMENTATION enters by new at rc-9's CLOSURE with its draft kept byte for byte.\n\nScope grill 2026-10-11 (operator, verbatim): '\u00e9 bug da 0.5.0 ... sem gambiarra. \u00e9 simples a lei. \u00e9 possivel definir release candidate enquanto a anterior \u00e9 implementada ... solu\u00e7\u00e3o limpa, sem gambiarra ... para de inventar problema para coisas simples'. Earlier rulings kept: none in the extracted operator words. Destination: 0.5.0. Wave: 1 (dev loop: defining rc N+1 while rc N implements). Scope now: fixed as bug release-new-orphans-a-drafted-next-rc (MEDIUM) by the minimal clean fix, no second path. This entry exits to-bug naming it once the main thread registers it.",
       "provenance": "rc-9 Reconciliation deferral (JR.S2.T5), dispatched by the main thread 2026-10-06 under the operator's rc-9 scope; target rc-10 or later",
       "relates": []
     },
@@ -215,17 +186,6 @@
         "ledger-reader-one-numbered-tolerant-iterator",
         "clone-detection",
         "task-gate-mypy-follows-cross-skill-imports"
-      ]
-    },
-    {
-      "id": "one-frontmatter-grammar-one-root-finder",
-      "title": "One frontmatter grammar and one workspace-root finder in the library",
-      "opened": "2026-10-06",
-      "status": "idea",
-      "description": "Measured: 4 frontmatter grammars; codex_assets._parse_agent_frontmatter is private yet used by 4 modules; 6 root finders and 3 CLI finders, while workspace_resolver.py (:3, :25-27) calls itself the single source of truth (ADR 0088). Design: one public frontmatter parser; every library root lookup consults workspace_resolver (the skill scripts' one fenced walk is skill-scripts-one-kernel's); the other finders are deleted. Placement: rc-12 (operator, 2026-10-06: 'rc-12, antes dos evals'). Placement and every design detail not quoted from a ruling are agent default, unruled.\n\nScope grill 2026-10-11 (operator, verbatim): 'Confirmo, pode seguir (Recommended)' (the operator's confirmation of the whole 0.5.0 scope; this entry had no question of its own: it was decided by inspection and announced in the grill, the operator could object). Earlier rulings kept: none in the extracted operator words. Destination: 0.5.0. Wave: 1 (agent behavior: Codex must read every persona's frontmatter). Scope now: the Codex half becomes bug codex-persona-frontmatter-drops-on-crlf (MEDIUM); the root-finder half was already delivered. This entry exits to-bug naming that bug once the main thread registers it.",
-      "provenance": "audit verification 2026-10-06 over feature/0.5.0 8e6448f13 (four read-only verifiers); main-thread registration after the operator grill of 2026-10-06",
-      "relates": [
-        "skill-scripts-one-kernel"
       ]
     },
     {
