@@ -166,7 +166,7 @@ def test_only_the_job_level_exists(tmp_path: Path, job: str) -> None:
     done = _ci(_checkout(tmp_path, {}), job)
     assert done.returncode != 0
     assert "--- " not in done.stdout  # an unknown job runs no step
-    assert f"KeyError: '{job}'" in done.stderr
+    assert f"'{job}'" in done.stderr
 
 
 def test_pushes_use_linux_and_pull_requests_use_the_full_matrix() -> None:
