@@ -41,9 +41,6 @@ jobs:
       fail-fast: false
       matrix:
         os: [windows-latest, macos-latest]
-    env:
-      PYTHONUTF8: "1"
-      PYTHONIOENCODING: "utf-8"
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
@@ -197,9 +194,6 @@ jobs:
       fail-fast: false
       matrix:
         os: [windows-latest, macos-latest]
-    env:
-      PYTHONUTF8: "1"
-      PYTHONIOENCODING: "utf-8"
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
@@ -226,9 +220,6 @@ jobs:
       fail-fast: false
       matrix:
         os: [windows-latest, macos-latest]
-    env:
-      PYTHONUTF8: "1"
-      PYTHONIOENCODING: "utf-8"
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
