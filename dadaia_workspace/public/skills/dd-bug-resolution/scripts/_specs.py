@@ -5,9 +5,7 @@ script prints through, staged beside each one like `_ledger.py`."""
 from __future__ import annotations
 
 import json
-import os
 import shlex
-import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -15,7 +13,8 @@ from pathlib import Path
 sys.path.append(str(Path(__file__).resolve().parent))  # loadable alone, not only by name
 
 from _ledger import parse as parse  # noqa: E402  (the one door to the sibling skill)
-from _ledger import workspace_of as workspace_of  # noqa: E402
+from _platform import detect, venv_tool  # noqa: E402
+from _root import workspace_of as workspace_of  # noqa: E402
 
 
 def find_specs(given: Path | None, *, ledger: str | None = None) -> Path:
@@ -35,45 +34,28 @@ def find_specs(given: Path | None, *, ledger: str | None = None) -> Path:
 
 
 def _bound_fix(here: Path, rerun: str, ledger: str | None) -> tuple[str, str]:
-    for root, venv in ((d, d / ".dadaia" / ".venv") for d in filter(None, [workspace_of(here)])):
-        if cli := shutil.which("dadaia", path=f"{venv / 'bin'}{os.pathsep}{venv / 'Scripts'}"):
-            shown = subprocess.run(
-                [cli, "context", "show", "--json"], capture_output=True, text=True, encoding="utf-8", errors="replace"
-            )  # fmt: skip
-            try:
-                repo = str(json.loads(shown.stdout)["main_repo"])
-            except (ValueError, LookupError, TypeError):
-                return f"{head(cli)} context list", ""
-            if ledger is None or ledger.startswith("specs/audits/"):  # rc-5 AC1.1
-                return with_specs(rerun, root / "repos" / repo / "specs"), ""
-            if trees := sorted(p for p in (root / "worktrees" / repo).glob("*/*") if _job(p)):
-                many = f"; the first by name of {len(trees)} open worktrees"
-                return with_specs(rerun, trees[0] / "specs"), many if trees[1:] else ""
-            return f"{script(_GITFLOW / 'worktree.py')} list", ""
+    root = workspace_of(here)
+    if root and (cli := venv_tool(root / ".dadaia" / ".venv", "dadaia")).exists():
+        shown = subprocess.run(
+            [str(cli), "context", "show", "--json"], capture_output=True, text=True, encoding="utf-8", errors="replace"
+        )  # fmt: skip
+        try:
+            repo = str(json.loads(shown.stdout)["main_repo"])
+        except (ValueError, LookupError, TypeError):
+            return f"{head(str(cli))} context list", ""
+        if ledger is None or ledger.startswith("specs/audits/"):  # rc-5 AC1.1
+            return with_specs(rerun, root / "repos" / repo / "specs"), ""
+        return f"{script(_GITFLOW / 'worktree.py')} list", ""
     return "Operator action: re-run inside a repo that holds its specs/ tree", ""
 
 
 _GITFLOW = Path(__file__).resolve().parents[2] / "dd-gitflow-default" / "scripts"
 
 
-def _job(tree: Path) -> bool:
-    """*tree* is a job worktree by the one name grammar (`_worktree_names.NAME_RE`)."""
-    sys.path.append(str(_GITFLOW))
-    from _worktree_names import NAME_RE
-
-    match = NAME_RE.match(f"{tree.parent.name}/{tree.name}")
-    return (
-        tree.is_dir()
-        and match is not None
-        and match["job"] not in (None, "define", "reconcile")
-        and not match["task"]
-    )
-
-
 def quote(word: str) -> str:
     """One shell word as `core/cli_line.shell_line` spells it: ``shlex`` on POSIX; on
     Windows forward slashes, double quotes only around a blank."""
-    if os.name != "nt":
+    if not detect().windows:
         return shlex.quote(word)
     word = word.replace("\\", "/")
     return word if word and not any(c in word for c in ' \t"') else f'"{word}"'
@@ -84,7 +66,7 @@ def head(word: str) -> str:
     opens after the drive letter, so the line never opens with one PowerShell reads as an
     expression."""
     word = quote(word)
-    return f'{word[1]}"{word[2:]}' if os.name == "nt" and word.startswith('"') else word
+    return f'{word[1]}"{word[2:]}' if detect().windows and word.startswith('"') else word
 
 
 def git_line(repo: Path | str, *argv: str) -> str:
@@ -98,11 +80,9 @@ def script(path: Path) -> str:
 
 
 def with_specs(fix: str, specs: Path | str) -> str:
-    """The ONE ledger fix-line builder: a :func:`script` command gains ``--specs`` once;
-    ``worktree.py``, the one script resolving no specs tree, never does."""
-    ledger = not fix.startswith(script(_GITFLOW / "worktree.py"))
-    named = fix.startswith(f"{head(sys.executable)} ") and ledger and " --specs " not in fix
-    return f"{fix} --specs {quote(str(specs))}" if named else fix
+    """The ONE ledger fix-line builder: *fix*, a command of a script that takes ``--specs``,
+    gains it once."""
+    return fix if " --specs " in fix else f"{fix} --specs {quote(str(specs))}"
 
 
 def _rerun(*drop: str) -> str:
@@ -124,7 +104,11 @@ def choice[E: Exception](refusal: E, words: str, *drop: str) -> E:
 def refuse(refusal: Exception, specs: Path) -> int:
     """Print *refusal* and its one fix, ``--specs`` kept in any command it quotes."""
     words, drop = getattr(refusal, "choice", ("", ()))
-    fix = with_specs(str(getattr(refusal, "fix", "")) or (_rerun(*drop) if words else ""), specs)
+    fix = str(getattr(refusal, "fix", "")) or (_rerun(*drop) if words else "")
+    if fix.startswith(
+        script(Path(sys.argv[0]))
+    ):  # a command of this entry point, which takes --specs
+        fix = with_specs(fix, specs)
     fix = f"Operator action: run `{fix}` {words}" if words else fix
     print(f"[error] {refusal}", f"fix: {fix}", sep="\n", file=sys.stderr)
     return 1

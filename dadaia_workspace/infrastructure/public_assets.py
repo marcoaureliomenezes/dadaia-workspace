@@ -107,6 +107,8 @@ _SKILL_SCRIPT_SHARED: tuple[tuple[str, str], ...] = tuple(
         ("infrastructure/data/privacy_baseline.json", "privacy_baseline.json"),
         ("public/skills/dd-bug-resolution/scripts/_ledger.py", "_ledger.py"),
         ("public/skills/dd-bug-resolution/scripts/_specs.py", "_specs.py"),
+        ("public/skills/dd-bug-resolution/scripts/_root.py", "_root.py"),
+        ("public/skills/dd-bug-resolution/scripts/_platform.py", "_platform.py"),
     )
     if not src.endswith(f"{skill}/scripts/{name}")
 )

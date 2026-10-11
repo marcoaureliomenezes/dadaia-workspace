@@ -19,17 +19,10 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import _ledger  # noqa: E402
 from _bugs_check import HISTO, LEDGER, archived_ids, findings_for  # noqa: E402
 from _ledger import LineError, private_refusal, replace, stamp  # noqa: E402
+from _refusal import Refusal as Refusal  # noqa: E402
 from _specs import script  # noqa: E402
 
 Records = list[dict[str, Any]]
-
-
-class Refusal(Exception):
-    """A write this script refuses, carrying the one `fix:` line that unblocks it."""
-
-    def __init__(self, message: str, fix: str = "") -> None:
-        super().__init__(message)
-        self.fix = fix
 
 
 def read_records(path: Path) -> Records:
