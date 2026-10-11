@@ -125,7 +125,7 @@ _REWRITE: dict[str, dict[str, Any]] = {
             "caused_by", "closed_at", "solution", "fix_sha", "superseded_by",
         }, id="bug"),
         pytest.param("finding", {"id", "pillar", "severity", "refs", "claim", "evidence", "disposition", "release", "reason"}, id="finding"),
-        pytest.param("adr", {"id", "ts", "title", "status", "context", "decision", "consequences", "measured_by", "supersedes", "amends", "ruling"}, id="adr"),
+        pytest.param("adr", {"id", "ts", "title", "status", "context", "decision", "consequences", "measured_by", "supersedes", "amends", "options", "ruling"}, id="adr"),
         pytest.param("release", {"schema", "release", "phase", "defined", "implemented", "shipped", "log"}, id="release"),
     ],
 )  # fmt: skip
@@ -141,7 +141,10 @@ def test_schema_is_draft_2020_12_and_closes_the_envelope(
         assert set(schema["properties"]) == properties
         if kind != "bug":
             # ADR 0151 M1: `ruling` is required on `accepted` only, by the schema's allOf.
-            assert set(schema["properties"]) == set(schema["required"]) | {"ruling"} & properties
+            assert (
+                set(schema["properties"])
+                == set(schema["required"]) | {"options", "ruling"} & properties
+            )
 
 
 def _milestone(**extra: object) -> dict[str, object]:

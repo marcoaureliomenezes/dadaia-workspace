@@ -240,3 +240,18 @@ def test_a_record_above_0246_with_two_options_passes(tmp_path: Path) -> None:
 def test_a_record_0246_and_below_needs_no_options(tmp_path: Path) -> None:
     """0246 was accepted without `options`; it still validates."""
     assert adr_record_issues(_options_ledger(tmp_path, "0246")) == []
+
+
+@pytest.mark.parametrize(
+    "options",
+    [
+        _OPTIONS[:1],
+        [_OPTIONS[0], {"name": "rebuild", "tradeoff": "one more diff"}],
+    ],
+    ids=["one-option", "missing-rejected_because"],
+)
+def test_options_below_two_or_missing_a_field_are_refused(
+    tmp_path: Path, options: list[dict]
+) -> None:
+    issues = adr_record_issues(_options_ledger(tmp_path, "0247", options=options))
+    assert [i.code for i in issues] == ["LEDGER-ADR-SCHEMA"]
