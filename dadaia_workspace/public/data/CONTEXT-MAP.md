@@ -7,8 +7,7 @@ One row per surface: what it is for and what belongs in it. A surface's size is 
 review signal (one purpose, no restated rule), never a build failure; a SKILL.md's
 line limits are `behavior-map.json`'s.
 
-Every surface is sourced under `dadaia_workspace/public/`; the `Surface` column names the
-path or entity as it appears in an installed workspace.
+The `Surface` column names the path or entity as it appears in an installed workspace.
 
 ## 1. Load triggers, per harness
 
