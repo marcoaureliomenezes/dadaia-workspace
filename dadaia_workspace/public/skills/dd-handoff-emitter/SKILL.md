@@ -24,9 +24,9 @@ completed agent task; the HTML report is the exception, not the rule.
 5. Assemble the handoff field-by-field against
    `.dadaia/agentic/schemas/handoff-v1.schema.json`; set `artifact.path` only for a
    file already on disk.
-6. Write `.dadaia/handoff/<context>/<YYYY-MM-DDTHHMMSSZ>-<agent>-<slug>.handoff.json`
-   (2-space indent) and run `.dadaia/.venv/bin/dadaia reports validate <path>` — fix any non-zero exit
-   before moving on.
+6. The file name stamp and `produced_at` come from one clock read: `python3 -c "import datetime as d; print(d.datetime.now(d.UTC).strftime('%Y-%m-%dT%H%M%SZ'))"`; `produced_at` is that instant with colons (`YYYY-MM-DDTHH:MM:SSZ`, the schema's pattern). Any other date names its source: `git` or the clock.
+   Write `.dadaia/handoff/<context>/<YYYY-MM-DDTHHMMSSZ>-<agent>-<slug>.handoff.json` (2-space indent) and run `.dadaia/.venv/bin/dadaia reports validate <path>`;
+   fix any non-zero exit before moving on.
 7. A reviewer verdict is written only by `python3 .agents/skills/dd-handoff-emitter/scripts/verdict.py <worktree> --sha <sha> --context <ctx>
    --slug <slug> --verdict APPROVED|REJECTED --reason "<line>"`, the rest of the body as one JSON
    object on stdin; it binds the verdict to the diff it judged. Then run `reports validate` on the
