@@ -137,7 +137,7 @@ def test_a_refused_positional_drops_only_itself_never_an_equal_flag_value(
 
 
 def test_new_names_the_live_entries_it_relates_to(script: Path, tmp_path: Path) -> None:
-    """ADR 0127 / AC1.12: past the first entry, `new` refuses without `--relates`, listing
+    """AC1.12: past the first entry, `new` refuses without `--relates`, listing
     the live entries, and always refuses a slug that is not one; the named ones are recorded."""
     specs = _specs(tmp_path)
     assert _run(script, "new", "first", "--specs", str(specs), "--relates", "ghost").returncode == 1
@@ -145,7 +145,7 @@ def test_new_names_the_live_entries_it_relates_to(script: Path, tmp_path: Path) 
     bare = _run(script, "new", "second", "--specs", str(specs))
     stray = _run(script, "new", "second", "--specs", str(specs), "--relates", "ghost")
     assert bare.returncode == stray.returncode == 1
-    assert "relates to (ADR 0127): first\n" in bare.stderr
+    assert "relates to: first\n" in bare.stderr
     assert (
         _run(script, "new", "second", "--specs", str(specs), "--relates", "first").returncode == 0
     )
