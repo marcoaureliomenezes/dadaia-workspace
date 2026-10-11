@@ -23,8 +23,8 @@ from _specs import quote  # noqa: E402
 
 
 def _picks(specs: Path, slug: str) -> list[str]:
-    """Each release whose candidate SPEC (``rc-<N>/``, ADR 0150) carries *slug* in its
-    Origin's `backlog:` clause — read by `release.py`'s one parser (ADR 0161)."""
+    """Each release whose candidate SPEC (``rc-<N>/``) carries *slug* in its
+    Origin's `backlog:` clause — read by `release.py`'s one parser."""
     picks = []
     for spec in (specs / "releases").glob("*/rc-*/SPEC.md"):
         try:
@@ -60,7 +60,7 @@ def _reason(specs: Path, slug: str, disposition: str, reason: str | None) -> Non
 
 
 def _bug(specs: Path, slug: str, disposition: str, reason: str | None) -> None:
-    """The id of the BUGS.jsonl record the item is handed to (ADR 0137), read by the bug
+    """The id of the BUGS.jsonl record the item is handed to, read by the bug
     skill's reader — imported here, so only this exit depends on that skill."""
     from _bugs_store import Refusal as BugRefusal  # noqa: PLC0415
     from _bugs_store import read_records  # noqa: PLC0415
@@ -116,7 +116,7 @@ def histo_record(entry: dict[str, Any], values: dict[str, Any]) -> dict[str, Any
     """The one histo-record-v1 shape: ``entry`` IS the removed object."""
     return {
         "id": entry["id"],
-        "ts": values.get("ts") or today(),
+        "ts": today(),
         "disposition": values["disposition"],
         "release": values["release"],
         "reason": values["reason"],

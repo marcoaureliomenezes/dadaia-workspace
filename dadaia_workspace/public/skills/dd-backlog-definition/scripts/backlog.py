@@ -23,7 +23,7 @@ sys.dont_write_bytecode = True
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 #: Source-tree fallback: before `public stage` copies `_ledger.py` in beside this file.
 sys.path.append(str(Path(__file__).resolve().parents[2] / "dd-bug-resolution" / "scripts"))
-#: `release.py`'s Origin parser, the line's one owner (ADR 0161).
+#: `release.py`'s Origin parser, the line's one owner.
 sys.path.append(str(Path(__file__).resolve().parents[2] / "dd-release-implementation" / "scripts"))
 
 import _backlog_exit as ex  # noqa: E402
@@ -56,7 +56,7 @@ def _parser() -> argparse.ArgumentParser:
         if verb == "exit":
             command.add_argument("--disposition", required=True,
                                  help=f"one of {'|'.join(DISPOSITIONS)}")  # fmt: skip
-            for option in ("--release", "--reason", "--summary", "--ts"):
+            for option in ("--release", "--reason", "--summary"):
                 command.add_argument(option)
         if verb == "check":
             command.add_argument("--json", action="store_true", help="emit findings as JSON")
@@ -77,7 +77,7 @@ def _new(args: argparse.Namespace, specs: Path) -> int:
 def _exit(args: argparse.Namespace, specs: Path) -> int:
     """The pair: the terminal record, then the removal, both checked before either write;
     a crash between them leaves an exited-but-live slug `check` names, never a lost item."""
-    values = _values(args, ("disposition", "release", "reason", "summary", "ts"))
+    values = _values(args, ("disposition", "release", "reason", "summary"))
     entry = ex.check_exit(specs, read_active(specs / LEDGER), args.slug, values)
     commit(specs, lambda active: [i for i in active if i.get("id") != args.slug], ex.histo_record(entry, values))  # fmt: skip
     print(f"[ok] exited {args.slug!r} ({values['disposition']}) -> {specs / HISTO}")

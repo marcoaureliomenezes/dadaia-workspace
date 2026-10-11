@@ -60,7 +60,7 @@
         },
         "relates": {
           "type": "array",
-          "description": "The live entries this one was judged to update, obsolete or relate to at birth, empty for none (ADR 0127); absent when the backlog was empty.",
+          "description": "The live entries this one was judged to update, obsolete or relate to at birth, empty for none; absent when the backlog was empty.",
           "items": { "type": "string", "pattern": "^[a-z][a-z0-9-]+$" }
         }
       }
