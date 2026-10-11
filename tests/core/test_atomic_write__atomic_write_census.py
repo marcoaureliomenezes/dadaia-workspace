@@ -15,10 +15,9 @@ _REPO_ROOT = Path(__file__).resolve().parents[2]
 _PACKAGE_ROOT = _REPO_ROOT / "dadaia_workspace"
 
 #: The homes, proven by scan: the bug skill's one writer (``core/atomic_write.py`` is a shim
-#: over it), plus ``_ledger.replace`` until J1.T11 deletes it.
+#: over it).
 _EXPECTED_DEFINITIONS = [
     "dadaia_workspace/public/skills/dd-bug-resolution/scripts/_atomic.py:atomic_write",
-    "dadaia_workspace/public/skills/dd-bug-resolution/scripts/_ledger.py:replace",
 ]
 
 
