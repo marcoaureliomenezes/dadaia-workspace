@@ -172,12 +172,15 @@ def test_a_planted_atomic_in_the_cwd_is_never_loaded(tmp_path: Path) -> None:
 
 
 def test_a_call_through_load_owner_leaves_no_pycache(tmp_path: Path) -> None:
+    """Only the bytecode THIS call writes counts: earlier runs may leave their own."""
     done = _child(
         "from pathlib import Path;"
         "from dadaia_workspace.core.skill_owner import load_owner as l;"
+        f"pyc = lambda: set(Path({str(_SKILLS)!r}).rglob('*.pyc'));"
+        "before = pyc();"
         "m = l('dd-bug-resolution', '_atomic');"
         f"m.atomic_write(Path({str(tmp_path / 'o.txt')!r}), 'ok');"
-        f"print(sorted(str(p) for p in Path({str(_SKILLS)!r}).rglob('__pycache__')))",
+        "print(sorted(str(p) for p in pyc() - before))",
         tmp_path,
     )
     assert done.returncode == 0, done.stderr
