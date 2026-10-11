@@ -36,7 +36,7 @@ Current-doc corrections to keep active:
 - Keep the root file a global contract, not an encyclopedia — push specifics to the owning directory.
 - When the same mistake recurs twice, update the correctly-scoped AGENTS.md, not a one-off prompt.
 - Root `AGENTS.md` and `worktrees/AGENTS.md` are projections; `repos/<slug>/AGENTS.md` and `specs/AGENTS.md` are the project's own.
-- Author the source in `public/`; reproject per `.dadaia/AGENTS.md` §4.
+- Change an AI-entity file at its source in the library repo its own `AGENTS.md` names; reproject per `.dadaia/AGENTS.md` §4.
 - Never put long repeatable workflow into AGENTS.md — that is a skill's job.
 
 ---

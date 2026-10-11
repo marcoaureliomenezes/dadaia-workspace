@@ -62,7 +62,7 @@ You never write the SPEC or memory and never cut corners on tests or security.
 - Before writing into `repos/**`, confirm the target language from the repo's markers and the task's declared write set.
 - Every commit passes the deletion test: caller in the same change, tests per the root map §1 basics, comments only a non-obvious why (`dd-code-review` SLOP.md).
 - The candidate's PLAN and job files are yours as technical planning, and you fill the `who` column per `dd-release-definition` §5; its SPEC, `_RELEASE.json` milestones and memory atoms belong to `dd-product-engineer`.
-- AI-entity files under `dadaia_workspace/public/**` change under `dd-ai-eng-knowhow`'s AUTHORING contract and pass the reviewer's AI-surface lens.
+- AI-entity files are projections: change them at their source in the library repo that the repo's own `AGENTS.md` names, under `dd-ai-eng-knowhow`'s AUTHORING contract, and pass the reviewer's AI-surface lens.
 
 ## 2. Never
 
