@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import subprocess
 import sys
 from datetime import UTC, datetime, timedelta
@@ -13,6 +14,7 @@ from pathlib import Path
 import jsonschema
 import pytest
 
+from dadaia_workspace.core.skill_owner import load_owner
 from tests.fixtures.harness_env import suite_env
 from tests.helpers.skill_scripts import stage_skill_scripts
 from tests.helpers.worktree_ws import commit, git, make_workspace, run
@@ -231,3 +233,18 @@ def test_the_file_name_stamp_and_produced_at_are_one_instant(tmp_path: Path) -> 
     assert datetime.strptime(stamp, "%Y-%m-%dT%H%M%SZ") == datetime.strptime(
         produced, "%Y-%m-%dT%H:%M:%SZ"
     )
+
+
+@pytest.mark.parametrize("slug", ["a--b", "1a", "a-", "-a", "a_b", "A", "a-b", "a1", "a", "a-1-b"])
+def test_a_slug_is_accepted_exactly_as_the_backlog_slug_pattern_says(
+    tmp_path: Path, slug: str
+) -> None:
+    """AC13.1: the verdict slug and the backlog slug are one grammar, read from `backlog-v1`
+    (`$defs.slug`) — never restated here. `a--b` is the worktree job/task separator: refused;
+    today the verdict's own looser pattern lets `a--b`, `1a` and `a-` through."""
+    schema = load_owner("dd-bug-resolution", "_ledger").load_schema("backlog-v1")
+    legal = re.fullmatch(schema["$defs"]["slug"]["pattern"], slug) is not None
+    root, tree, head = _workspace(tmp_path)
+    done = _verdict(root, tree, sha=head, slug=slug)
+    assert (done.returncode == 0) is legal, done.stderr
+    assert len(_written(root)) == int(legal)
