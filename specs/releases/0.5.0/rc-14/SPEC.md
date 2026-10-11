@@ -4,9 +4,9 @@
 **Release ID:** 0.5.0
 **Owner:** dd-product-engineer
 **Opened:** 2026-10-11
-**Origin:** backlog:dd-ask-me-owned-questioning-skill,architecture-adr-section-generated,public-law-language-neutral,test-suite-diet,programmatic-dates-in-skills,impacted-test-selection,law-one-home-residual,bug-batch-cause-trigger-and-attempt-cap,define-backlog-merge-runs-verify,hotfix-specs-revert-commit-shape,harness-specific-surface-minimized,adr-0122-zero-backlog-destined-to-this-release,job-gate-runs-the-law-deletion-check,merge-entry-times-survive-rebase,hypothesis-cache-stays-out-of-repo-trees,task-gate-drops-deleted-paths-itself,architecture-principles-measured-by-re-pointed,fix-reader-rebuild-under-c,task-gate-declared-owner-tests,pr-merge-method-pinned,phase-implementation-has-a-place,stage-gate-keeps-only-the-red-check,verdict-author-unbound,judge-config-outside-the-script-dir,gate-reuses-a-green-result-for-the-same-tree,process-proportional-to-change-size,bug-status-deferred-banned,quality-scorecard-ruler,task-lines-carry-seam-and-adr-clause; bugs:worktree-new-crashes-on-an-unreadable-release-state,release-check-admits-a-dag-that-phase-refuses,release-new-orphans-a-drafted-next-rc,verify-line-shlex-mangles-windows-paths,context-repo-refusals-carry-no-fix-line,codex-persona-frontmatter-drops-on-crlf,doctor-misses-worktrees-of-a-repo-that-left-its-context,job-gate-red-on-untracked-bytecode,cross-os-ci-masks-utf8
+**Origin:** backlog:dd-ask-me-owned-questioning-skill,architecture-adr-section-generated,public-law-language-neutral,test-suite-diet,programmatic-dates-in-skills,impacted-test-selection,law-one-home-residual,bug-batch-cause-trigger-and-attempt-cap,define-backlog-merge-runs-verify,hotfix-specs-revert-commit-shape,harness-specific-surface-minimized,adr-0122-zero-backlog-destined-to-this-release,job-gate-runs-the-law-deletion-check,merge-entry-times-survive-rebase,hypothesis-cache-stays-out-of-repo-trees,task-gate-drops-deleted-paths-itself,architecture-principles-measured-by-re-pointed,fix-reader-rebuild-under-c,task-gate-declared-owner-tests,pr-merge-method-pinned,phase-implementation-has-a-place,stage-gate-keeps-only-the-red-check,verdict-author-unbound,judge-config-outside-the-script-dir,gate-reuses-a-green-result-for-the-same-tree,process-proportional-to-change-size,bug-status-deferred-banned,quality-scorecard-ruler,task-lines-carry-seam-and-adr-clause; bugs:worktree-new-crashes-on-an-unreadable-release-state,release-check-admits-a-dag-that-phase-refuses,release-new-orphans-a-drafted-next-rc,verify-line-shlex-mangles-windows-paths,context-repo-refusals-carry-no-fix-line,codex-persona-frontmatter-drops-on-crlf,doctor-misses-worktrees-of-a-repo-that-left-its-context,job-gate-red-on-untracked-bytecode,cross-os-ci-masks-utf8,cli-refusals-print-no-fix-line,context-alive-crashes-on-a-non-git-repo-dir
 
-The source is the 0.5.0 scope grill of 2026-10-11, run entry by entry: 24 questions, 28 decisions, frontier empty, report https://claude.ai/artifact/GGEzLQDmquUfrUhacFgmmK. The operator confirmed the shared understanding: "Confirmo, pode seguir (Recommended)". Each Origin entry's "Scope grill 2026-10-11" paragraph in `BACKLOG.json` records its verbatim ruling, scope and wave. This SPEC restates only what binds rc-14.
+Source: the 0.5.0 scope grill of 2026-10-11 (24 questions, 28 decisions), report https://claude.ai/artifact/GGEzLQDmquUfrUhacFgmmK. The operator confirmed the shared understanding: "Confirmo, pode seguir (Recommended)". Each Origin entry's "Scope grill 2026-10-11" paragraph in `BACKLOG.json` holds its verbatim ruling, scope and wave.
 
 The wave rule (operator, 2026-10-11): rc-14 is Wave 1. Wave 1 is ordered by leverage on all later work. It covers law, skills, personas and the dev loop, plus every confirmed bug (bugs law §2).
 
@@ -36,13 +36,13 @@ The law, the skills and the dev loop are the base every later wave builds on, an
 - Skills let the model type dates.
 - A specs-only definition can turn a code guard red. The developer has no way to run only the tests a change reaches.
 
-Ten confirmed bugs are open. A ship refuses any open bug that the operator has not authorized.
+Eleven confirmed bugs are open. Ship refuses an open bug the operator has not authorized.
 
 ## 2. Measurable Goals
 
 - G1. A grill decision can be read without a handoff. Every ADR proposed after rc-14 carries `options` and a self-contained `ruling.words`.
 - G2. Status has one home: after the Reconciliation, no `ADR:` label in `specs/memory` or the scaffold carries a status token.
-- G3. `bugs.py status` lists none of the ten Origin bugs as open at rc-14's closure.
+- G3. `bugs.py status` lists none of the eleven Origin bugs as open at rc-14's closure.
 - G4. The FR4 grep over `dadaia_workspace/public/` returns only the workspace's own operation.
 - G5. `git grep -n -- '--ts' dadaia_workspace/public/skills` returns nothing.
 - G6. A specs-only change cannot turn the repo guards red through prose. `scripts/ci.py --changed` runs only the tests the diff reaches.
@@ -51,7 +51,7 @@ Ten confirmed bugs are open. A ship refuses any open bug that the operator has n
 
 ### FR1 — dd-grill-me complete, name kept (`dd-ask-me-owned-questioning-skill`)
 
-Operator: "Tudo, sem rename (Recommended)". The skill keeps the name `dd-grill-me`, so the rename and its blast radius are out of scope.
+Operator: "Tudo, sem rename (Recommended)": the name `dd-grill-me` stays.
 
 - AC1.1 (no test — reviewer source sweep): `dd-grill-me` ships `references/` with one file per stage:
   - backlog: is it a decision at all (problem measured, feature or bug, scope);
@@ -147,9 +147,9 @@ Operator: "Mapa de impacto como leitura (Recommended)".
 
 - AC14.1 (unit, RED first): On Windows, the declared line `python scripts\ci.py job` runs as `['python', 'scripts\\ci.py', 'job']`. POSIX splitting is unchanged. One splitter serves `verify:` and `tests:` (ADR 0220 P3).
 
-### FR15 — `cli-refusals-print-no-fix-line` and `context-repo-refusals-carry-no-fix-line` (MEDIUM; REBUILD of the refusal path)
+### FR15 — `cli-refusals-print-no-fix-line`, `context-repo-refusals-carry-no-fix-line`, `context-alive-crashes-on-a-non-git-repo-dir` (MEDIUM; REBUILD of the refusal path)
 
-Operator: "Registrar e corrigir no Job 5 (Recommended)". The structural cause: `cli/_fail.fail` prints only `Error:`, and the remedy lives in each raiser's prose or a per-site f-string.
+Operator: "Registrar e corrigir no Job 5 (Recommended)", "Registrar, Job 5 (Recommended)". The structural cause: `cli/_fail.fail` prints only `Error:`, and the remedy lives in each raiser's prose or a per-site f-string.
 
 - AC15.1 (unit, then integration; RED first): The raised error carries its fix, as `SchemaVersionError` does (`core/exceptions.py:87-93`); `fail` prints a caller fix only when the error has none. Each measured site then prints `Error:` and exactly one `fix:` line (ADR 0073), one case per repro:
   - context registry: `repo add` (invalid slug, different URL, foreign slug), `repo remove` of an unregistered slug, and `create`'s conflict, whose `fix: dadaia context list` (`context.py:168`) clears nothing;
@@ -157,6 +157,7 @@ Operator: "Registrar e corrigir no Job 5 (Recommended)". The structural cause: `
   - `import` of a missing, non-JSON or non-export file; `reports validate` bare or on a missing file;
   - `init`'s venv failure; `specs` upgrade's two-tier refusal and its unlabeled `Operator action:`; the unresolved `specs_dir`.
 - AC15.2 (integration, RED first): Adding the context's own main repo exits 0 as a no-op. The operator ruled that this refusal becomes idempotent.
+- AC15.3 (integration, RED first): `context alive` on a `repos/<slug>` that is not a git repository refuses with `Error:` and one `fix:` line, never a traceback. The hook installer's off-repo condition is one domain refusal carrying its fix, consumed unchanged by every caller (`create`, `alive`, `ci install-hook`, hook refresh).
 
 ### FR16 — `codex-persona-frontmatter-drops-on-crlf` (MEDIUM)
 
@@ -218,19 +219,14 @@ The entries with work exit `delivered` at closure, except `architecture-adr-sect
 - One generic grill procedure for every stage becomes per-stage references (FR1).
 - Any decision as an ADR becomes the three-leg threshold, and an id-only ruling becomes self-contained words (FR2).
 - The status token of the `ADR:` label, with its grammar, lint exemption, law clauses and pillar clause, leaves (FR3).
-- ADR 0187 (1)(3) and 0205 as accepted text are superseded by 0244. Their code is already gone (FR2).
 - Library internals, Python-project assumptions and ADR numbers in shipped law are removed (FR4).
 - `--ts` on `bugs.py` and `backlog.py`, and handoff dates typed by the model, are removed (FR8).
 - The diet's test blocks, `ci.py`'s task and stage code, and guard v33 are removed (FR9).
 - `entities/registry.json`'s hand-written `implementations` become derived coverage (FR5).
-- The raw `_RELEASE.json` read in `_worktree_new.py` is removed (FR11).
-- `release.py check`'s DAG check that skips the job files becomes one comparison (FR12).
-- Two computations of the next candidate number become one (FR13).
+- The raw `_RELEASE.json` read in `_worktree_new.py` goes (FR11); two DAG deciders and two next-candidate computations become one each (FR12, FR13).
 - POSIX `shlex` splitting on Windows is replaced (FR14).
 - Per-site remedies and the 12 `Error:`-only refusal sites become an error that carries its fix; the own-main refusal becomes a no-op (FR15).
-- The Codex projection's private frontmatter parser is removed (FR16).
-- The working-tree bytecode assertion is replaced (FR18).
-- `PYTHONUTF8` and `PYTHONIOENCODING` in CI are removed (FR19).
+- The Codex private frontmatter parser (FR16), the working-tree bytecode assertion (FR18) and the CI UTF-8 masks (FR19) go.
 
 ### Governance sequencing
 
@@ -240,9 +236,9 @@ The entries with work exit `delivered` at closure, except `architecture-adr-sect
 ### Delivery constraints
 
 - Job 1 runs first and executes the two REBUILD verdicts (FR11, FR13).
-- Every bug fix lands its RED test before the fix (bugs law §2). DELETE and REBUILD tasks come before ADD tasks.
+- Every bug fix lands its RED test first (bugs law §2); DELETE and REBUILD precede ADD.
 - Job 2 (FR1) is Wave 2: it waits on Job 3's schema `options` (FR2).
-- Shipped law changes only in `dadaia_workspace/public/` and reaches this instance by projection, never by hand edits.
+- Shipped law changes only in `dadaia_workspace/public/`; this instance gets it by projection.
 
 ### Risks
 
