@@ -23,6 +23,6 @@ Ask only what inspection leaves open, one question at a time.
 
 ## Record
 
-- `options`: at least two, each with `name` and `tradeoff`; a rejected one adds `rejected_because`.
+- `options`: at least two, in the decision record's schema shape.
 - `ruling.words`: self-contained, the question asked plus the chosen option, verbatim; never only an answer id.
 - Written in the turn of the answer, as the record's text; only the operator rules.
