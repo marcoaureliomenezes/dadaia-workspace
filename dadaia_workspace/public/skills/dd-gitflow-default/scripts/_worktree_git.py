@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Read-only facts about the workspace's canonical worktrees: git (every child runs with
-`GIT_*` scrubbed from its env) and the gitflow the CLI's context record carries (ADR 0144)."""
+`GIT_*` scrubbed from its env) and the gitflow the CLI's context record carries."""
 
 from __future__ import annotations
 
@@ -13,14 +13,14 @@ import time
 from pathlib import Path
 
 from _git import git as git, parse_worktrees, scrubbed_env as scrubbed_env  # isort: skip
+from _grammar import SEMVER_RE, TAG_RE
+from _platform import venv_tool
 from _specs import git_line as git_line
 from _specs import head
 from _specs import quote as quote  # (`as`: re-exported to the worktree verbs)
 from _specs import script as script
 from _specs import workspace_of as workspace_of
 from _worktree_names import NAME_RE, SCRIPT, Refusal, base, branch, name_of, plain
-
-_TAG_RE = re.compile(r"^v?(\d+)\.(\d+)\.(\d+)$")
 
 
 def diff_sha256(tree: Path, work: str, tip: str) -> str:
@@ -43,8 +43,7 @@ def find_root() -> Path:
 
 
 def _exe(root: Path) -> Path:
-    bins = (root / ".dadaia/.venv/bin/dadaia", root / ".dadaia/.venv/Scripts/dadaia.exe")
-    if exe := next((b for b in bins if b.exists()), None):
+    if (exe := venv_tool(root / ".dadaia/.venv", "dadaia")).exists():
         return exe
     raise Refusal(
         "no workspace CLI", " ".join(map(quote, ("uvx", "dadaia-workspace", "init", str(root))))
@@ -53,7 +52,7 @@ def _exe(root: Path) -> Path:
 
 def cli(root: Path, *args: str, tree: Path | None = None) -> subprocess.CompletedProcess[str]:
     """One read-only run of the workspace CLI — the owner of every package grammar. With *tree*
-    the run acts on that tree alone: its cwd, every root above it fenced (ADR 0088)."""
+    the run acts on that tree alone: its cwd, every root above it fenced."""
     run = subprocess.run  # stdin closed: a CLI never waits on the caller's pipe
     fence = (
         {"DADAIA_FENCED_ROOTS": os.pathsep.join(map(str, tree.resolve().parents))} if tree else {}
@@ -76,7 +75,7 @@ def cli_line(root: Path, *args: str) -> str:
 def gitflows(root: Path) -> dict[str, dict[str, str]]:
     """Each registered repo's gitflow `{principal, integration, work, main}` (`main`: its
     context's main repo), read by the one
-    reader through `context list --json` (ADR 0144); a repo whose record has none is absent."""
+    reader through `context list --json`; a repo whose record has none is absent."""
     done = cli(root, "context", "list", "--json")
     try:
         listed = json.loads(done.stdout) if not done.returncode else None
@@ -104,9 +103,8 @@ def flow_for(root: Path, repo: Path) -> dict[str, str]:
 
 def work_version(repo: Path, flow: dict[str, str]) -> str:
     prefix = flow["work"]
-    work_re = re.compile(rf"^{re.escape(prefix)}(\d+\.\d+\.\d+)$")
     branches = git(repo, "branch", "--list", f"{prefix}*", "--format=%(refname:short)").split()
-    versions = [m.group(1) for b in branches if (m := work_re.match(b))]
+    versions = [b[len(prefix) :] for b in branches if SEMVER_RE.match(b[len(prefix) :])]
     if len(versions) == 1:
         return versions[0]
     if versions:
@@ -114,9 +112,7 @@ def work_version(repo: Path, flow: dict[str, str]) -> str:
         raise Refusal(
             f"{len(versions)} work branches", git_line(repo, "branch", "-d", f"{prefix}{stale}")
         )
-    tags = [
-        tuple(map(int, m.groups())) for t in git(repo, "tag").split() if (m := _TAG_RE.match(t))
-    ]
+    tags = [tuple(map(int, m.groups())) for t in git(repo, "tag").split() if (m := TAG_RE.match(t))]
     major, minor, patch = max(tags, default=(0, 0, 0))
     nxt = f"{major}.{minor}.{patch + 1}" if tags else "0.1.0"
     raise Refusal(
@@ -164,65 +160,94 @@ def ours(repo: Path) -> list[dict[str, str]]:
 
 def _row(repo: Path, path: str, state: str, age: float = 0.0, **facts: object) -> dict[str, object]:
     """One worktree: WARN past a day or off-canon; `fix` shown only when ready or orphan;
-    `exit`, the line a hold names — `clean` for an empty tree, else `merge` (ADR 0128)."""
+    `exit`, the line a hold names — `clean` for an empty tree, else `merge`."""
     verb = "clean" if state == "empty" else "merge"
     line = f"{script(SCRIPT)} {verb} {quote(path)}"
-    return {"repo": repo.name, "path": path, "state": state, "age_hours": age, **facts,
-            "warn": state not in ("ready", "open", "empty") or age > 24,
+    return {"repo": repo.name, "path": path, "state": state, "age_hours": age, "registered": True,
+            **facts, "warn": state not in ("ready", "open", "empty") or age > 24,
             "fix": line if state in ("ready", "orphan") else "",
             "exit": line if state in ("ready", "open", "empty", "orphan") else ""}  # fmt: skip
 
 
-def rows(root: Path) -> list[dict[str, object]]:
-    """Every worktree fact of every registered repo, read from git alone (ADR 0108):
-    ours `ready` (ahead, clean), `open` (ahead, dirty) or `empty`, an `orphan` wt/* with no tree
-    (never checked out, or its directory deleted), a `foreign`
-    worktree git registers (harness-native, hand-made, under a TTL zone), and an
-    `unregistered` directory two levels under `worktrees/<repo>/` or an empty one level under it."""
+def _age(repo: Path, name: str) -> float:
+    """Hours since the branch of tree *name* was born (its oldest reflog entry; now when none)."""
+    born = git(repo, "reflog", "show", "--date=unix", "--format=%gd", branch(name), check=False)
+    stamps = re.findall(r"@\{(\d+)\}", born) or [str(int(time.time()))]
+    return round((time.time() - int(stamps[-1])) / 3600, 1)
+
+
+def _ours(repo: Path, flow: dict[str, str], name: str, path: str) -> dict[str, object]:
+    """Our tree *name*: `empty` (nothing ahead), `ready` (ahead, clean) or `open` (ahead, dirty)."""
+    match = NAME_RE.match(name)
+    assert match is not None  # `ours` admits names through this grammar.
+    work = flow["work"] + (match["v"] or work_version(repo, flow)) if not plain(name) else ""
+    span = f"{recorded_base(repo, name, work)}..{branch(name)}"
+    ahead, changed = (
+        int(git(repo, "rev-list", "--count", span, check=False) or 0),
+        dirty(Path(path)),
+    )
+    state = "empty" if not ahead else "open" if changed else "ready"
+    return _row(repo, path, state, _age(repo, name), name=name, ahead=ahead, dirty=changed)
+
+
+def _absent(root: Path, repo: Path, held: set[str], found: list[dict[str, object]]) -> list[dict[str, object]]:  # fmt: skip
+    """The leftovers git does not list: a `wt/*` branch with no tree (`orphan`), a directory two
+    levels under `worktrees/<repo>/` or an empty one level under it (`unregistered`)."""
+    out = []
+    home = root / "worktrees" / repo.name
+    for ref in git(repo, "for-each-ref", "--format=%(refname:short)", "refs/heads/wt/").split():
+        if f"refs/heads/{ref}" not in held and (name := name_of(ref)):
+            out.append(_row(repo, str(home / name), "orphan"))
+    listed = {Path(str(r["path"])).resolve() for r in found}
+    for stray in sorted(home.glob("*/*")):  # a name is two levels
+        if stray.is_dir() and not {stray.resolve(), stray.parent.resolve()} & listed:
+            out.append(_row(repo, str(stray), "unregistered"))
+    for folder in sorted(home.glob("*")):  # an rc folder holding no tree
+        named = any(Path(str(r["path"])).parent == folder for r in (*found, *out))
+        if folder.is_dir() and not any(folder.iterdir()) and not named:
+            out.append(_row(repo, str(folder), "unregistered"))
+    return out
+
+
+def _repo_rows(root: Path, repo: Path, flow: dict[str, str]) -> list[dict[str, object]]:
+    trees, mine = _trees(repo), {Path(r["path"]).resolve(): r["name"] for r in ours(repo)}
     out: list[dict[str, object]] = []
-    for name, flow in sorted(gitflows(root).items()):
+    for tree in trees:
+        path, name = tree["worktree"], mine.get(Path(tree["worktree"]).resolve())
+        if name is None or not Path(path).is_dir():
+            out.append(_row(repo, path, "foreign" if name is None else "orphan"))
+        else:
+            out.append(_ours(repo, flow, name, path))
+    return out + _absent(root, repo, {t.get("branch", "") for t in trees}, out)
+
+
+def _unregistered(repo: Path, trees: list[dict[str, str]]) -> list[dict[str, object]]:
+    """The linked trees of a repo no context owns: a finding whose one fix is the operator's act."""
+    return [
+        _row(repo, t["worktree"], "unregistered", registered=False)
+        | {
+            "fix": f"Operator action: register {repo.name} in a context, or land its work and drop "
+            f"the tree (`{git_line(repo, 'worktree', 'unlock', t['worktree'])}` then "
+            f"`{git_line(repo, 'worktree', 'remove', t['worktree'])}`)"
+        }  # fmt: skip
+        for t in trees
+    ]
+
+
+def rows(root: Path) -> list[dict[str, object]]:
+    """Every worktree fact of every repo with a tree under `worktrees/`, read from git alone:
+    for a registered repo ours `ready` (ahead, clean), `open` (ahead, dirty) or `empty`, an
+    `orphan` wt/* with no tree, a `foreign` worktree git registers (harness-native, hand-made,
+    under a TTL zone), and an `unregistered` directory two levels under `worktrees/<repo>/` or
+    an empty one level under it; for a repo no context owns, each linked tree is `unregistered`
+    with `registered: false`."""
+    known, homes = gitflows(root), root / "worktrees"
+    names = sorted(
+        {*known, *(d.name for d in homes.iterdir() if d.is_dir())} if homes.is_dir() else known
+    )
+    out: list[dict[str, object]] = []
+    for name in names:
         repo = root / "repos" / name
-        if not (repo / ".git").exists():
-            continue
-        trees, mine = _trees(repo), {Path(r["path"]).resolve(): r for r in ours(repo)}
-        for tree in trees:
-            path = tree["worktree"]
-            if (row := mine.get(Path(path).resolve())) is None or not Path(path).is_dir():
-                out.append(_row(repo, path, "foreign" if row is None else "orphan"))
-                continue
-            match = NAME_RE.match(row["name"])
-            assert match is not None  # `ours` admits names through this grammar.
-            work = (
-                flow["work"] + (match["v"] or work_version(repo, flow))
-                if not plain(row["name"])
-                else ""
-            )
-            span = f"{recorded_base(repo, row['name'], work)}..{branch(row['name'])}"
-            ahead = int(git(repo, "rev-list", "--count", span, check=False) or 0)
-            dirty = bool(git(Path(path), "status", "--porcelain").strip())
-            born = git(
-                repo,
-                "reflog",
-                "show",
-                "--date=unix",
-                "--format=%gd",
-                branch(row["name"]),
-                check=False,
-            )
-            stamps = re.findall(r"@\{(\d+)\}", born) or [str(int(time.time()))]
-            age = round((time.time() - int(stamps[-1])) / 3600, 1)  # the branch's birth
-            state = "empty" if not ahead else "ready" if not dirty else "open"
-            out.append(_row(repo, path, state, age, name=row["name"], ahead=ahead, dirty=dirty))
-        held = {t.get("branch", "") for t in trees}
-        for ref in git(repo, "for-each-ref", "--format=%(refname:short)", "refs/heads/wt/").split():
-            if f"refs/heads/{ref}" not in held and (tree_name := name_of(ref)):
-                out.append(_row(repo, str(root / "worktrees" / name / tree_name), "orphan"))
-        listed = {Path(t["worktree"]).resolve() for t in trees}
-        for stray in sorted((root / "worktrees" / name).glob("*/*")):  # a name is two levels
-            if stray.is_dir() and not {stray.resolve(), stray.parent.resolve()} & listed:
-                out.append(_row(repo, str(stray), "unregistered"))
-        for folder in sorted((root / "worktrees" / name).glob("*")):  # an rc folder holding no tree
-            named = any(Path(str(r["path"])).parent == folder for r in out)  # an orphan's own
-            if folder.is_dir() and not any(folder.iterdir()) and not named:
-                out.append(_row(repo, str(folder), "unregistered"))
+        if (repo / ".git").exists():
+            out += _repo_rows(root, repo, known[name]) if name in known else _unregistered(repo, _trees(repo))  # fmt: skip
     return out
