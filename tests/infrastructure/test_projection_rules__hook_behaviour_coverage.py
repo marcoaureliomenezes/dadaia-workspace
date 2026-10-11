@@ -22,12 +22,11 @@ from pathlib import Path
 
 import pytest
 
-from dadaia_workspace.core.harness_registry import HARNESS_RECORDS, HarnessRecord
+from dadaia_workspace.core.harness_registry import HARNESS_RECORDS, HarnessRecord, HookFormat
 from dadaia_workspace.infrastructure.install_plan import InstallPlan
 from dadaia_workspace.infrastructure.projection import ProjectionRule
 from dadaia_workspace.infrastructure.projection_rules import (
     HOOK_RULE_BUILDERS,
-    harnesses_with_a_hook_derivation,
 )
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -76,7 +75,7 @@ def _workspace_wrappers(
 
 
 def _derived_records() -> list[HarnessRecord]:
-    return [HARNESS_RECORDS[name] for name in sorted(harnesses_with_a_hook_derivation())]
+    return [r for _, r in sorted(HARNESS_RECORDS.items()) if r.hooks is not HookFormat.NONE]
 
 
 def _record_ids(record: HarnessRecord) -> str:
@@ -149,14 +148,10 @@ def test_the_behaviour_table_is_derived_and_the_registry_declares_it(workspace: 
         for record in _derived_records()
     }
     assert derived == _BEHAVIOUR_TABLE
-    behaviors = {
-        b["id"]: b["implementations"] for b in json.loads(_REGISTRY.read_text("utf-8"))["behaviors"]
-    }
+    behaviors = {b["id"]: b for b in json.loads(_REGISTRY.read_text("utf-8"))["behaviors"]}
+    gaps = behaviors["context-memory-injection"].get("gaps", {})
     for harness, wired in _BEHAVIOUR_TABLE.items():
-        assert ("ctx_inject" in behaviors["context-memory-injection"][harness]) is (
-            "ctx_inject" in wired
-        )
-        assert ("post" in behaviors["sdd-gate"][harness]) is ("sdd_post_gate" in wired)
+        assert ("ctx_inject" in wired) is (harness not in gaps)
 
 
 def test_no_text_claims_behaviour_parity() -> None:

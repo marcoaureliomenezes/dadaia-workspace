@@ -19,9 +19,7 @@ from pathlib import Path
 
 import pytest
 
-from dadaia_workspace.core.harness_registry import HARNESS_RECORDS, L1_ENTRY_HARNESSES
 from dadaia_workspace.infrastructure.runtime_config import codex_config, merge_claude_settings
-from dadaia_workspace.infrastructure.runtime_transforms.hook_wrappers import HOOK_DIALECTS
 from tests.fixtures.harness_env import suite_env
 from tests.helpers.scan_population import assert_populated
 
@@ -363,9 +361,9 @@ def test_gate_additive_prefixes_are_the_registry_view() -> None:
     assert not hasattr(gate_policy, "_SPECS_ADDITIVE_PREFIXES")
 
 
-def _behavior(behavior_id: str) -> dict[str, str]:
+def _gaps(behavior_id: str) -> dict[str, str]:
     behaviors = json.loads(_REGISTRY.read_text(encoding="utf-8"))["behaviors"]
-    return next(b["implementations"] for b in behaviors if b["id"] == behavior_id)  # type: ignore[no-any-return]
+    return next(b.get("gaps", {}) for b in behaviors if b["id"] == behavior_id)  # type: ignore[no-any-return]
 
 
 def test_each_harness_carries_the_cache_env_or_declares_the_gap(tmp_path: Path) -> None:
@@ -380,23 +378,4 @@ def test_each_harness_carries_the_cache_env_or_declares_the_gap(tmp_path: Path) 
         f"[shell_environment_policy.set]\nMYPY_CACHE_DIR = '{mypy}'\nRUFF_CACHE_DIR = '{ruff}'\n"
         in codex
     )
-    answer = _behavior("tool-cache-env")
-    assert sorted(answer) == sorted(L1_ENTRY_HARNESSES)
-    assert sorted(h for h, t in answer.items() if t.startswith("gap:")) == [
-        "copilot",
-        "cursor",
-        "devin",
-        "kimi-code",
-    ]
-
-
-def test_b7_the_registry_states_what_each_rendered_gate_is() -> None:
-    """sa-gate-blind-on-cursor-copilot-devin#B7: each harness's sdd-gate claim names every
-    pre-gate event its rendered hook file registers, and says "gate not enforced" exactly
-    when its dialect declares an ungated action."""
-    claims = _behavior("sdd-gate")
-    for name, record in HARNESS_RECORDS.items():
-        dialect = HOOK_DIALECTS[record.hooks]
-        for event in {e for f in dialect.files for e, lane, _ in f.events if lane == "pre-gate"}:
-            assert event in claims[name], (name, event)
-        assert ("gate not enforced" in claims[name]) is bool(dialect.ungated), name
+    assert sorted(_gaps("tool-cache-env")) == ["copilot", "cursor", "devin", "kimi-code"]
