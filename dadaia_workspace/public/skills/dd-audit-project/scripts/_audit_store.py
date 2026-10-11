@@ -9,21 +9,18 @@ candidate bytes, run the SAME `check` they will be validated by, then `os.replac
 from __future__ import annotations
 
 import json
-import sys
 from pathlib import Path
 from typing import Any
 
-sys.path.insert(0, str(Path(__file__).resolve().parent))
-
-from _audit_check import (  # noqa: E402
+from _audit_check import (
     AUDITS,
     FINDINGS,
     HISTO,
     findings_findings,
     histo_findings,
 )
-from _ledger import parse, replace  # noqa: E402
-from _specs import script  # noqa: E402
+from _ledger import parse, replace
+from _specs import script
 
 SCRIPT = script(Path(__file__).parent / "audit.py")
 

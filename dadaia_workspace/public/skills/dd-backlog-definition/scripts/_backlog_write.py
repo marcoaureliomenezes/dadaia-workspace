@@ -5,15 +5,11 @@ from __future__ import annotations
 
 import datetime as _dt
 import re
-import sys
-from pathlib import Path
 from typing import Any
 
-sys.path.insert(0, str(Path(__file__).resolve().parent))
-
-from _backlog_store import SCRIPT, Items, Refusal  # noqa: E402
-from _ledger import load_schema  # noqa: E402
-from _specs import choice  # noqa: E402
+from _backlog_store import SCRIPT, Items, Refusal
+from _ledger import load_schema
+from _specs import choice
 
 _SLUG = load_schema("backlog-v1")["$defs"]["slug"]["pattern"]
 _INTENT_RE = re.compile(r"^(?P<kind>[a-z]+):(?P<ref>[^=]+)=(?P<change>.+)$", re.DOTALL)

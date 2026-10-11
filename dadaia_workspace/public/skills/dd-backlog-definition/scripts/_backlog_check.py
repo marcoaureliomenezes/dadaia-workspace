@@ -11,15 +11,12 @@ tree and stays the doctor's `BL-SCHEMA` reader — this file validates the ledge
 from __future__ import annotations
 
 import json
-import sys
 from collections.abc import Iterator
 from pathlib import Path
 from typing import Any
 
-sys.path.insert(0, str(Path(__file__).resolve().parent))
-
-import _ledger  # noqa: E402
-from _backlog_schema import (  # noqa: E402
+import _ledger
+from _backlog_schema import (
     CODE,
     DISPOSITIONS,
     HISTO,
@@ -27,7 +24,7 @@ from _backlog_schema import (  # noqa: E402
     LEDGER,
     TERMINAL,
 )
-from _ledger import SPECS, load_schema, validate  # noqa: E402
+from _ledger import SPECS, load_schema, validate
 
 
 def finding(

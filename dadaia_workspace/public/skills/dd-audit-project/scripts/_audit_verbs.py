@@ -9,17 +9,14 @@ gone without its record.
 
 from __future__ import annotations
 
-import sys
 from collections import Counter
 from datetime import UTC, datetime
 from pathlib import Path
 from shutil import rmtree
 from typing import Any
 
-sys.path.insert(0, str(Path(__file__).resolve().parent))
-
-from _audit_check import AUDITS, DISPOSITIONS, FINDINGS, PILLARS, REQUIRED_EVIDENCE  # noqa: E402
-from _audit_store import (  # noqa: E402
+from _audit_check import AUDITS, DISPOSITIONS, FINDINGS, PILLARS, REQUIRED_EVIDENCE
+from _audit_store import (
     SCRIPT,
     Refusal,
     append_histo,
@@ -27,7 +24,7 @@ from _audit_store import (  # noqa: E402
     read_findings,
     write_findings,
 )
-from _specs import choice  # noqa: E402
+from _specs import choice
 
 
 def _live(specs: Path, audit: str) -> Path:

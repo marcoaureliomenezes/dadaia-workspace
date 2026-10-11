@@ -9,14 +9,11 @@ against — one definition of valid, so the writer and the validator cannot disa
 from __future__ import annotations
 
 import json
-import sys
 from pathlib import Path
 from typing import Any
 
-sys.path.insert(0, str(Path(__file__).resolve().parent))
-
-import _ledger  # noqa: E402
-from _ledger import SPECS, load_schema, validate  # noqa: E402
+import _ledger
+from _ledger import SPECS, load_schema, validate
 
 CODE = "LEDGER-FINDINGS-SCHEMA"
 AUDITS = "audits"

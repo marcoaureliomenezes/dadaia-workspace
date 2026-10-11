@@ -12,17 +12,14 @@ written and the removal lands last, so a crash leaves the entry live rather than
 from __future__ import annotations
 
 import json
-import sys
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
-sys.path.insert(0, str(Path(__file__).resolve().parent))
-
-from _backlog_check import pair_findings  # noqa: E402
-from _backlog_schema import HISTO, LEDGER  # noqa: E402
-from _ledger import private_refusal, replace, stamp  # noqa: E402
-from _specs import script  # noqa: E402
+from _backlog_check import pair_findings
+from _backlog_schema import HISTO, LEDGER
+from _ledger import private_refusal, replace, stamp
+from _specs import script
 
 Items = list[dict[str, Any]]
 SCRIPT = script(Path(__file__).parent / "backlog.py")

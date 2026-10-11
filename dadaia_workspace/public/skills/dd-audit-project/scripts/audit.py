@@ -19,9 +19,11 @@ from pathlib import Path
 # A projected skill folder is not a package dir to litter: the sibling modules below
 # import without leaving a `__pycache__` beside them.
 sys.dont_write_bytecode = True
-sys.path.insert(0, str(Path(__file__).resolve().parent))
-#: Source-tree fallback: before `public stage` copies `_ledger.py` in beside this file.
-sys.path.append(str(Path(__file__).resolve().parents[2] / "dd-bug-resolution" / "scripts"))
+#: One bootstrap line: this folder and the kernel, at the front (source tree before stage).
+sys.path[:0] = [
+    str(Path(__file__).resolve().parent),
+    str(Path(__file__).resolve().parents[2] / "dd-bug-resolution" / "scripts"),
+]
 
 import _audit_verbs as vb  # noqa: E402
 from _audit_check import DISPOSITIONS, check  # noqa: E402

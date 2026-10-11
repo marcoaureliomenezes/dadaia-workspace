@@ -9,17 +9,14 @@ exited must be told so rather than diagnosed for a status it no longer has.
 
 from __future__ import annotations
 
-import sys
 from pathlib import Path
 from typing import Any
 
-sys.path.insert(0, str(Path(__file__).resolve().parent))
-
-from _backlog_schema import DISPOSITIONS  # noqa: E402
-from _backlog_store import SCRIPT, Items, Refusal  # noqa: E402
-from _backlog_write import today  # noqa: E402
-from _release_schema import origin  # noqa: E402
-from _specs import quote  # noqa: E402
+from _backlog_schema import DISPOSITIONS
+from _backlog_store import SCRIPT, Items, Refusal
+from _backlog_write import today
+from _release_schema import origin
+from _specs import quote
 
 
 def _picks(specs: Path, slug: str) -> list[str]:
