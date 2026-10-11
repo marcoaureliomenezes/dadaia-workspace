@@ -81,6 +81,21 @@
       "pattern": "^\\d{4}$",
       "description": "Id (NNNN) of the record this one amends, or null."
     },
+    "options": {
+      "type": "array",
+      "minItems": 2,
+      "description": "The options weighed, at least two; required from id 0247 on.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["name", "tradeoff", "rejected_because"],
+        "properties": {
+          "name": {"type": "string"},
+          "tradeoff": {"type": "string"},
+          "rejected_because": {"type": "string"}
+        }
+      }
+    },
     "ruling": {
       "type": "object",
       "additionalProperties": false,
@@ -88,7 +103,7 @@
         "date",
         "words"
       ],
-      "description": "The operator's ruling (ADR 0151): its date and his verbatim words or grill answer id; required on `accepted`.",
+      "description": "The operator's ruling (ADR 0151): its date and his words; required on `accepted`. `words` carries the question and the chosen option in the operator's words.",
       "properties": {
         "date": {
           "type": "string",
@@ -105,6 +120,20 @@
     }
   },
   "allOf": [
+    {
+      "description": "`options` is required for ids above 0246 (0246 and below were accepted without it).",
+      "if": {
+        "properties": {
+          "id": {
+            "pattern": "^(024[7-9]|02[5-9]\\d|0[3-9]\\d\\d|[1-9]\\d{3})$"
+          }
+        },
+        "required": ["id"]
+      },
+      "then": {
+        "required": ["options"]
+      }
+    },
     {
       "description": "The operator-only acceptance law, expressed MECHANICALLY (0.4.7 FR6): an 'accepted' record must carry a non-empty 'measured_by' — a decision nobody can measure is not a principle, it is prose. Stated in this schema rather than in a test's hand-rolled copy, so the one validator the ledgers doctor runs and the one the contract test runs are the same validator.",
       "if": {
