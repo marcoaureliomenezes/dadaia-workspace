@@ -1113,7 +1113,7 @@ CHECKS: dict[str, Check] = {
             "adr-line": _edit(_A, "\nADR: none\n", "\nADR: nope\n"),
             "no-principles": _re(_Q, r"(?m)^### P-", "### Q-"),
             "unique-ids": _edit(_Q, "### P-2", "### P-0"),
-            "adr-exists": _edit(_A, "ADR: 0001", "ADR: 9999"),
+            "adr-exists": _edit(_A, "ADR: 0176", "ADR: 9999"),
             "principle-placement": _edit(
                 _A, "\n## Structure", "\n### P-99 · x\nMeasured by: x\nADR: none\n\n## Structure"
             ),
