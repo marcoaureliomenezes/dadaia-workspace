@@ -77,3 +77,25 @@ def test_one_upgrade_run_folds_a_legacy_flat_tree_clean(tmp_path: Path) -> None:
     assert "Draft" in (release / "rc-2" / "PLAN.md").read_text(encoding="utf-8")
     assert "Aprovado" in (release / "rc-1" / "PLAN.md").read_text(encoding="utf-8")
     assert [i.code for i in SpecsDoctor(specs).check() if i.error] == []
+
+
+@pytest.mark.medium
+def test_one_upgrade_run_folds_a_flat_only_tree_into_rc_1(tmp_path: Path) -> None:
+    """A stamp-6 release holding only a flat trio, with no `rc-<N>/`, lands in `rc-1/`:
+    the trio is the candidate being folded, never one already counted."""
+    specs = tmp_path / "specs"
+    canon.scaffold(specs, project_name="p")
+    merge_frontmatter(specs, specs_pattern_version=6)
+    release = specs / "releases" / "0.7.0"
+    release.mkdir(parents=True, exist_ok=True)
+    state = {"schema": "release-state-v1", "release": "0.7.0", "phase": "DEFINITION",
+             "defined": None, "implemented": None, "shipped": None, "log": []}  # fmt: skip
+    (release / "RELEASE.json").write_text(json.dumps(state), encoding="utf-8")
+    (release / "_RELEASE.json").unlink(missing_ok=True)
+    for name in ("SPEC.md", "PLAN.md", "TASKS.md"):
+        (release / name).write_text("**Status:** Rascunho\n**Origin:** operator-demand\n")
+
+    done = CliRunner().invoke(app, ["specs", "upgrade", "--specs-dir", str(specs)])
+    assert done.exit_code == 0, done.output
+    assert sorted(p.name for p in release.iterdir()) == ["_RELEASE.json", "rc-1"]
+    assert "Draft" in (release / "rc-1" / "PLAN.md").read_text(encoding="utf-8")

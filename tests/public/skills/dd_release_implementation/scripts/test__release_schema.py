@@ -242,7 +242,7 @@ def test_the_next_candidate_with_no_state_is_the_highest_folder_plus_one(tmp_pat
     ("folders", "flat", "next_rc", "current_rc"),
     [
         pytest.param([1, 2, 3], False, "rc-4", "rc-3", id="empty-log-over-three-folders"),
-        pytest.param([], True, "rc-2", None, id="legacy-flat-trio-counts-as-rc1"),
+        pytest.param([], True, "rc-1", None, id="a-flat-trio-is-not-a-candidate"),
     ],
 )
 def test_a_state_with_no_milestone_reads_the_folders(
