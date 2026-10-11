@@ -84,6 +84,10 @@ target-version = "py312"
 select = ["E", "F", "I", "UP", "B", "SIM"]
 ignore = ["E501", "B008"]
 
+[tool.ruff.lint.per-file-ignores]
+# The skill entry points bootstrap sys.path before their sibling imports (kernel rule 2).
+"dadaia_workspace/public/skills/*/scripts/*.py" = ["E402"]
+
 # Bug ruff-0-16-2-markdown-python-fence-format-drift: ruff 0.16.2 started reformatting
 # fenced Python code blocks embedded in Markdown by default, which reached 5
 # pre-existing files under specs/_archive/releases/**. Those paths are FROZEN
