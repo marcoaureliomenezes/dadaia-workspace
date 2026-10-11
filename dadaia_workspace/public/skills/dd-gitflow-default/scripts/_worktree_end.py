@@ -300,7 +300,7 @@ def _check_approved(root: Path, tree: Path, work: str, name: str) -> None:
             for unparsed, _, path, data in decided
             if unparsed
             or data.get("verdict") != "APPROVED"
-            or cli(root, "reports", "validate", path).returncode
+            or cli(root, "reports", "validate", path, "--reviewed-root", str(tree)).returncode
         ),
         None,
     )
