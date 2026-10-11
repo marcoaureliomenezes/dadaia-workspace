@@ -31,7 +31,7 @@ The root cause of the bug stream: one fact is decided in several places. The inv
 
 The structural-audit bugs of 2026-09-27/28 (`sa-package-defines-a-fact-twice`, `sa-seven-workspace-root-rules`, `sa-live-release-resolved-by-two-readers`, `sa-ledger-vocabulary-and-atomic-write-duplicated-in-scripts`, `sa-frontmatter-split-five-ways`) closed while the copies stayed. Their premise, "the stdlib-only skill scripts and the package cannot share code", is false: ADR 0157 already has `privacy_check.py` import the skill's `_ledger.py`, and ADR 0135 makes the skill script the owner and the package its importer.
 
-The Wave 1 law has its own defects: a grill record that expires, ADRs without a threshold or rejected options, an `ADR:` status label that drifted, shipped law naming this library's Python internals and ADR numbers, dates the model types, a guard that reads `specs/` prose, and no way to run only the tests a change reaches.
+The Wave 1 law has its own defects: an expiring grill record, ADRs without threshold or options, a drifted `ADR:` status label, shipped law naming library internals, model-typed dates, a guard reading `specs/` prose, no impacted-test read.
 
 Fifteen confirmed bugs are open.
 
@@ -60,15 +60,15 @@ Fifteen confirmed bugs are open.
 Operator: "Triagem + gerada (Recommended)", "ADR que supersede (Recommended)", "Ratificar os 4 (Recommended)". The clause "an ADR is born only in `dd-release-definition`" is dropped (main thread: an unruled agent default; the threshold serves "Se tudo é ADR nada é ADR"). Part (c), ADR 0193's `amends: null`, goes to the Wave 4 triage.
 
 - AC2.1 (no test — reviewer sweep): The scaffold ADR law states the three-leg threshold in one line: one-way door, architecturally significant, at least two genuine options.
-- AC2.2 (unit, RED first): `decision-record-v1` carries `options` (at least two of `name`, `tradeoff`, `rejected_because`), required for ids after 0245; every existing record still validates.
+- AC2.2 (unit, RED first): `decision-record-v1` carries `options` (at least two of `name`, `tradeoff`, `rejected_because`), required for ids above 0246 (0246 was accepted without it); every existing record still validates.
 - AC2.3 (no test — law line): `ruling.words` carries the question and the chosen option, never only an answer id.
-- AC2.4 (no test — ledger): The operator rules ADRs 0243, 0244, 0245 and 0246 before approval. ADR 0242 was accepted at `366cda255`.
+- AC2.4 (no test — ledger): ADR 0246 was accepted at `54c85077b`, ADR 0242 at `80012b7be`. The operator gives the words for 0243, 0244 and 0245 at SPEC and PLAN approval; each acceptance commit lands in the Reconciliation, paired with its canonical-memory hunk (§3a row 2).
 - AC2.5 (no test — reviewer sweep): `git grep -n found_in -- dadaia_workspace tests` returns nothing.
 
 #### FR3 — status only in the ledger (`architecture-adr-section-generated`, Wave 1 part)
 
 - AC3.1 (unit): The memory-lint `ADR:` exemption is deleted; `test_memory_lint.py` stays green unedited.
-- AC3.2 (no test — reviewer sweep): The status token leaves the `ADR:` grammar (the label cites the id only), the ADR law's label clauses and `PILLAR-MEMORY.md`. Job 3's guard tolerates old labels; the Reconciliation strips the 15 status tokens and points P-01, P-09, P-14 and P-15 at ADR 0243. The entry stays active for Wave 4.
+- AC3.2 (no test — reviewer sweep): The status token leaves the `ADR:` grammar (the label cites the id only), the ADR law's label clauses and `PILLAR-MEMORY.md`. Job 2's guard tolerates old labels; 0245's acceptance commit in the Reconciliation is the strip: the 15 status tokens leave and P-01, P-09, P-14 and P-15 point at ADR 0243. The entry stays active for Wave 4.
 
 #### FR4 — the shipped surface is language-neutral (`public-law-language-neutral`)
 
@@ -110,14 +110,15 @@ No harness is removed: the goal is cheap switching.
 
 ### One owner per fact (`skill-scripts-one-kernel`, ADR 0246)
 
-Every FR below deletes the copies of its group; the owner's existing tests stay green unedited.
+Each FR deletes its group's copies; the owner's tests stay green unedited.
 
 #### FR11 — the kernel owner, `dd-bug-resolution/scripts` (bugs `skill-git-runners-read-the-callers-git-env`, `ledger-replace-destroys-a-symlinked-ledger`)
 
-- AC11.1 (integration, RED first): `public install` projects no shared copy: each fact module and schema exists once under `skills/`; `_SKILL_SCRIPT_SHARED`, `_SKILL_SCRIPT_SCHEMAS`, their test staging and the v37/v38 rows are deleted; `load_owner` lives in core.
+- AC11.1 (integration, RED first): `public install` projects no shared copy: each fact module and schema exists once under `skills/`; `_SKILL_SCRIPT_SHARED`, `_SKILL_SCRIPT_SCHEMAS`, their test staging and the v37/v38 rows are deleted; `load_owner` lives in `core/skill_owner.py`.
+- AC11.5 (unit, RED first): Each schema lives in its writer skill's `scripts/schemas/` (ADR 0246). Every shipped text naming a schema path names the owner path, today `scaffold/bugs/AGENTS.md:6`, `scaffold/backlog/AGENTS.md:10`, `dd-audit-project/PILLAR-BUGS.md:5`, `FINDINGS-FORMAT.md:5` and `dd-release-implementation/RELEASE-EVENTS.md:11`. A test fails when shipped text names a schema path that is neither projected nor shipped. The `.dadaia/agentic/schemas/` projection is fed from the owner paths, or deleted when nothing reads it (the PLAN measures which). The scaffold edits re-pin the unpublished `CANON_AT[12]` and `shipped-hashes.json` inside the rc's single canon bump.
 - AC11.2 (unit, RED first): Two repos A and B with `GIT_DIR=B/.git` set: every skill runner and `infrastructure/git_subprocess` answer for A, through the one `git()`.
 - AC11.3 (unit, RED first): A symlinked ledger is refused by the one writer, `_atomic.py` (symlink refusal, uuid temp, `preserve_mode`, the Windows retry, `ensure_parent`); `_ledger.replace` and `core/atomic_write.py` reach it through `core/skill_owner.py`; the bare `os.replace` sites in `features/workspace/service.py` and `features/spec_context/sweep.py` leave; `tests/core/test_atomic_write__atomic_write_census.py` ends with one home.
-- AC11.4 (no test — reviewer `git grep` per group): One definition each for the commit loop, `_validated`, `finding()`, `histo_findings`, the JSONL reader, `serialize`, `_values`, the workspace-root walk (venv owner first), the clock, each ledger's status vocabulary (read from its schema) and the skill-side platform constant.
+- AC11.4 (no test — reviewer `git grep` per group): One definition each for the commit loop, `_validated`, `finding()`, `histo_findings`, the JSONL reader, `serialize`, `_values`, the workspace-root walk (venv owner first), the clock, the bug ledger's status vocabulary (group A5, read from its schema), and the platform facts: `os.name` and `sys.platform` are read only in the kernel's `_platform.py`.
 
 #### FR12 — one frontmatter grammar (bugs `frontmatter-parsers-disagree-on-crlf-and-bom`, `codex-persona-frontmatter-drops-on-crlf`)
 
@@ -125,7 +126,7 @@ The owner is `_frontmatter.py` in `dd-bug-resolution/scripts`, a stdlib strict s
 
 - AC12.1 (unit, RED first): A BOM constitution keeps its `gitflow` block; a CRLF persona keeps its fields; a folded last key has no trailing newline; `7.0.0`, `yes`, `0755` and `2026-10-11` as plain scalars equal `safe_load` or raise. The Codex and `_memory_schema` parsers leave.
 - AC12.2 (unit, differential): Over every shipped and instance frontmatter, the inline frontmatter fixtures in `tests/**` and a pinned mutation corpus, the owner equals `yaml.safe_load` or refuses.
-- AC12.3 (unit): Persona `read_only` and `dispatch_band` are typed (bool, int), and `install_helpers.persona_read_only` compares typed values.
+- AC12.3 (unit, RED first): Persona `read_only` and `dispatch_band` are typed (bool, int), and `install_helpers.persona_read_only` compares typed values.
 
 #### FR13 — one slug grammar, owned by the backlog schema (bug `slug-grammar-four-patterns-disagree`)
 
@@ -136,18 +137,18 @@ The owner is `_frontmatter.py` in `dd-bug-resolution/scripts`, a stdlib strict s
 - AC14.1 (integration, RED first): A missing, malformed or non-object `_RELEASE.json` refuses job admission with `Error:` and one `fix:` line; no branch or worktree; one parser, the raw read in `_worktree_new.py` deleted.
 - AC14.2 (integration, RED first): A DAG that differs from its `tasks/job<n>.md` fails `release.py check` with `phase`'s message; one comparison.
 - AC14.3 (unit, RED first): With rc-1 live and a drafted `rc-2/SPEC.md`, `release.py new` adopts rc-2; the closure fence reads the same decider; `test_the_closure_spares_only_the_next_candidates_define_tree` stays unedited.
-- AC14.4 (no test — reviewer `git grep`): One definition each for the task-id, sha, semver/candidate and phase grammars; the package reads them through the owner.
+- AC14.4 (no test — reviewer `git grep`): One definition each for the task-id, sha and phase grammars; the package reads them through the owner.
 
 #### FR15 — the gitflow owner (bugs `verify-line-shlex-mangles-windows-paths`, `doctor-misses-worktrees-of-a-repo-that-left-its-context`)
 
 - AC15.1 (unit, RED first): On Windows `python scripts\ci.py job` runs as `['python', 'scripts\\ci.py', 'job']`; one splitter serves `verify:` and `tests:` (ADR 0220 P3).
 - AC15.2 (integration, RED first): A worktree of a repo that left its context is a doctor finding with one fix line (ADR 0112); one row filter serves doctor and `ctx_inject`.
-- AC15.3 (no test — reviewer `git grep`): One definition each for the worktree path, list, dirty check, verdict reader and venv CLI path.
+- AC15.3 (no test — reviewer `git grep`): One definition each for the semver, candidate and tag grammar (group A3), the worktree path, list, dirty check, verdict reader and venv CLI path.
 
 #### FR16 — core owners (package side)
 
 - AC16.1 (unit, RED first): A naive timestamp reads the same in `session_store` and `ctx_inject` (one rule).
-- AC16.2 (no test — reviewer `git grep`): `os.name` and `sys.platform` appear only in `core/platform.py`; the context-name pattern has one definition.
+- AC16.2 (no test — reviewer `git grep`): `core/platform.py` reads neither `os.name` nor `sys.platform` and delegates to the kernel's `_platform.py`; `git grep -nE "os\.name|sys\.platform" -- dadaia_workspace` hits only `_platform.py`. The context-name pattern has one definition.
 
 #### FR17 — a refusal carries its fix (bugs `cli-refusals-print-no-fix-line`, `context-repo-refusals-carry-no-fix-line`, `context-alive-crashes-on-a-non-git-repo-dir`)
 
@@ -163,7 +164,7 @@ These entries need no rc-14 work; each exits once at closure with the reason fro
 
 | slug | disposition | reason |
 |---|---|---|
-| `adr-0122-zero-backlog-destined-to-this-release` | delivered | ADR 0242 accepted at `366cda255`; promote readouts ride `promote-gate-050` |
+| `adr-0122-zero-backlog-destined-to-this-release` | delivered | ADR 0242 accepted at `80012b7be`; promote readouts ride `promote-gate-050` |
 | `define-backlog-merge-runs-verify` | superseded | "Consertar a raiz (Recommended)": v33 deleted (FR9) |
 | `job-gate-runs-the-law-deletion-check` | superseded | obsolete by ADR 0230 |
 | `merge-entry-times-survive-rebase` | superseded | obsolete by `e8c2683ca` |
@@ -183,7 +184,7 @@ These entries need no rc-14 work; each exits once at closure with the reason fro
 | `quality-scorecard-ruler` | superseded | the score-9 ruling, ADR 0239 |
 | `task-lines-carry-seam-and-adr-clause` | superseded | job file slimmed (2026-10-08 questions 12, 15) |
 
-The entries with work exit `delivered`, except `architecture-adr-section-generated` (active for Wave 4). `law-one-home-residual`: (a) by FR2, its location clause dropped; (b) and (c) carried by the Wave 4 triage.
+The entries with work exit `delivered`, except `architecture-adr-section-generated`, carried past rc-14: it stays active for its Wave 4 triage and generated section. `law-one-home-residual`: (a) by FR2, its location clause dropped; (b) and (c) carried by the Wave 4 triage.
 
 ## 5. Not in rc-14
 
@@ -197,14 +198,14 @@ The entries with work exit `delivered`, except `architecture-adr-section-generat
 ### Replaces
 
 - Projected copies of shared modules and schemas, their copy tables and allowance rows, become one owner per fact, loaded by core (FR11, ADR 0246).
-- Second deciders (git runners, atomic writers, frontmatter and slug parsers, release readers, DAG and next-candidate computations, declared-line splitters, row filters, task-id, sha and timestamp rules) leave (FR11 to FR16).
+- Every second decider of a fact leaves (FR11 to FR16).
 - Per-site remedies become an error that carries its fix; the own-main refusal becomes a no-op (FR17).
 - The grill handoff as record, any decision as an ADR, id-only rulings, the `ADR:` status token, shipped library facts, `--ts`, v33, `ci.py` task and stage code, the working-tree bytecode check, the CI UTF-8 masks and hand-written registry `implementations` leave (FR1 to FR9).
 
 ### Governance sequencing
 
-1. ADRs 0243 to 0246 are proposed here; under rule M2 the main thread sets the fields at acceptance (0244 supersedes 0205 and amends 0187; 0245 amends 0165; 0246 amends 0135).
-2. The rulings land before approval; the label strip belongs to the Reconciliation.
+1. ADR 0246 is accepted (`54c85077b`, amends 0135). Under rule M2 the main thread sets the fields of the others at acceptance: 0244 supersedes 0205 and amends 0187; 0245 amends 0165.
+2. One rule: the operator gives the words for 0243, 0244 and 0245 at SPEC and PLAN approval; each acceptance commit lands in the Reconciliation with its canonical-memory hunk; 0245's hunk is the label strip.
 
 ### Delivery constraints
 
