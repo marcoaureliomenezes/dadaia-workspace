@@ -81,20 +81,19 @@ _HISTORY_PHRASE_RE = re.compile(
     r"|no longer|formerly|previously)\b",
     re.IGNORECASE,
 )
-_ADR_LINE_RE = re.compile(r"^\s*ADR:\s*\d{4}\b")
 _FENCE_RE = re.compile(r"^\s*(?:```|~~~)")
 
 
 def _check_narrative(result: AtomResult, content: str, body: str, product: bool) -> None:
     """One ERROR per body line carrying a history token (any memory file) or a history
-    phrase (product atoms only); fenced code and a principle's ``ADR:`` line are exempt."""
+    phrase (product atoms only); fenced code is exempt."""
     offset = len(content.splitlines()) - len(body.splitlines())
     fenced = False
     for number, line in enumerate(body.splitlines(), start=offset + 1):
         if _FENCE_RE.match(line):
             fenced = not fenced
             continue
-        if fenced or _ADR_LINE_RE.match(line):
+        if fenced:
             continue
         hits = [(kind, m.group(0)) for kind, rx in _NARRATIVE_TOKENS for m in rx.finditer(line)]
         if product:
