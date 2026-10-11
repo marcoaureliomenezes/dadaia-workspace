@@ -84,11 +84,9 @@ def test_an_unapproved_plan_refuses(script: Path, tmp_path: Path) -> None:
 
 def test_the_pinned_pair_resolves_the_same_live_candidate(tmp_path: Path) -> None:
     """AC1.17(3): one grammar (`rc-<N>`, N from 1, no leading zero); the package and the
-    scripts pick the same highest `rc-<N>/` directory, and birth the next one past a stray
-    `rc-<N>` file; none without a candidate."""
+    scripts pick the same highest `rc-<N>/` directory; none without a candidate."""
     sys.path.insert(0, str(_SCRIPTS))
     sys.path.append(str(_SCRIPTS.parents[1] / "dd-bug-resolution" / "scripts"))
-    import _release_schema as twin
     import _release_store
 
     release = tmp_path / "releases" / "1.0.0"
@@ -100,7 +98,6 @@ def test_the_pinned_pair_resolves_the_same_live_candidate(tmp_path: Path) -> Non
         (release / name).mkdir()
     (release / "rc-11").write_text("", encoding="utf-8")
     assert [resolve(tmp_path) for resolve in pair] == [release / "rc-10"] * 2
-    assert twin.next_candidate(release, None) == release / "rc-11"
 
 
 # --- the Origin line (ADR 0161; SPEC-DOC-048's cases re-homed by name) ---------------

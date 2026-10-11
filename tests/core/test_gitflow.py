@@ -26,7 +26,7 @@ def test_one_live_release_reader_and_no_verb_mints_a_version() -> None:
     sa-live-work-branch-named-three-ways#B41-4: release-please owns the version; no module lists or bumps tags."""
     pkg = Path(__file__).resolve().parents[2] / "dadaia_workspace"
     src = {p.name: p.read_text("utf-8") for p in pkg.rglob("*.py") if "public" not in p.parts}
-    assert [n for n, t in src.items() if "def resolve_live_release_id" in t] == ["gitflow.py"]
+    assert [n for n, t in src.items() if "def live_ids" in t] == []
     assert [n for n, t in src.items() if re.search(r'"tag", "--sort|\]\) \+ 1\}', t)] == []
     assert "release-please owns the version" in (pkg.parent / "AGENTS.md").read_text("utf-8")
 

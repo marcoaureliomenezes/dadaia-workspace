@@ -9,7 +9,7 @@ import sys
 from pathlib import Path
 
 from dadaia_workspace.core import release_state
-from dadaia_workspace.core.gitflow import resolve_live_release_id
+from dadaia_workspace.core.gitflow import DEFAULT, work_branch
 from dadaia_workspace.features.specs.doctor_common import resolve_active_release
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]
@@ -38,4 +38,7 @@ def test_a_legacy_state_file_makes_no_release_live(tmp_path: Path) -> None:
     )
     (tmp_path / "releases" / "3.0.0").mkdir()
     (tmp_path / "releases" / "3.0.0" / "_RELEASE.json").write_text(_DOC, encoding="utf-8")
-    assert (resolve_live_release_id(tmp_path), len(_grammar.live_ids(tmp_path))) == (None, 2)
+    assert (work_branch(tmp_path, DEFAULT), len(_grammar.live_ids(tmp_path))) == (
+        "feature/0.1.0",
+        2,
+    )
