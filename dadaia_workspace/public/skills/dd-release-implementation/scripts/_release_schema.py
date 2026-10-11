@@ -164,11 +164,12 @@ def _milestone_rc(state: dict[str, Any]) -> int:
 
 def _last_rc(release_dir: Path, state: dict[str, Any] | None) -> int:
     """The ONE rule for "the last candidate": the last ``milestone`` entry's, else the highest
-    ``rc-<N>`` folder, else 1 for a legacy flat trio (no folder), else 0."""
+    ``rc-<N>`` folder, else 1 for a live release's legacy flat trio, else 0. With no state the
+    trio is not counted: that call places it (the upgrade fold)."""
     if last := _milestone_rc(state or {}):
         return last
     folders = candidate_number(d.name for d in release_dir.iterdir() if d.is_dir()) if release_dir.is_dir() else 0  # fmt: skip
-    return folders or int((release_dir / "SPEC.md").is_file())
+    return folders or int(state is not None and (release_dir / "SPEC.md").is_file())
 
 
 def current_candidate(release_dir: Path, state: dict[str, Any]) -> Path | None:
