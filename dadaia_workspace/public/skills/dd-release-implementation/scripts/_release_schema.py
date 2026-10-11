@@ -162,27 +162,27 @@ def _milestone_rc(state: dict[str, Any]) -> int:
     return candidate_number(names)
 
 
+def _last_rc(release_dir: Path, state: dict[str, Any] | None) -> int:
+    """The ONE rule for "the last candidate": the last ``milestone`` entry's, else the highest
+    ``rc-<N>`` folder, else 1 for a legacy flat trio (no folder), else 0."""
+    if last := _milestone_rc(state or {}):
+        return last
+    folders = candidate_number(d.name for d in release_dir.iterdir() if d.is_dir()) if release_dir.is_dir() else 0  # fmt: skip
+    return folders or int((release_dir / "SPEC.md").is_file())
+
+
 def current_candidate(release_dir: Path, state: dict[str, Any]) -> Path | None:
-    """The ``rc-<N>/`` the release is working: the last ``milestone`` entry's candidate in the
-    trio phases, the one past it in DEFINITION; with no milestone to read, the highest folder."""
-    last = _milestone_rc(state)
-    if not last:
-        return candidate_dir(release_dir)
-    return release_dir / f"rc-{last + (state.get('phase') == 'DEFINITION')}"
+    """The ``rc-<N>/`` the release is working: the last candidate in the trio phases, the one
+    past a milestone's in DEFINITION; ``None`` for a flat trio, which has no folder."""
+    if last := _milestone_rc(state):
+        return release_dir / f"rc-{last + (state.get('phase') == 'DEFINITION')}"
+    return candidate_dir(release_dir)
 
 
 def next_candidate(release_dir: Path, state: dict[str, Any] | None) -> Path:
-    """The ``rc-<N+1>/`` a candidate is born in: past the last ``milestone`` entry's candidate,
-    so a drafted folder there is adopted; with no state, past the highest folder."""
-    if state is None:
-        last = (
-            candidate_number(d.name for d in release_dir.iterdir() if d.is_dir())
-            if release_dir.is_dir()
-            else 0
-        )
-    else:
-        last = _milestone_rc(state)
-    return release_dir / f"rc-{last + 1}"
+    """The ``rc-<N+1>/`` a candidate is born in: past the last candidate, so a drafted folder
+    there is adopted."""
+    return release_dir / f"rc-{_last_rc(release_dir, state) + 1}"
 
 
 def writes(line: str) -> list[str]:

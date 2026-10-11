@@ -10,13 +10,14 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
-from _grammar import SHA_RE, STATE, candidate_number
+from _grammar import SHA_RE, STATE
 from _refusal import Refusal
 from _release_check import candidate_errors
 from _release_schema import (
     APPROVED,
     CANDIDATE_DOCS,
     extract_status,
+    next_candidate,
     utc_now,
 )
 from _release_store import SCRIPT, Live, State, commit, live_release
@@ -69,7 +70,7 @@ def _refuse_open_worktrees(specs: Path) -> None:
         raise Refusal(f"worktree rows unreadable: {error}", error.fix) from error
     repo = Path(top[1]).parent.name
     live = live_release(specs)
-    nxt = f"{live.release_id}-rc{(candidate_number([live.candidate.name] if live.candidate else []) or 1) + 1}"
+    nxt = f"{live.release_id}-{next_candidate(live.release_dir, live.state).name.replace('-', '')}"
     held = [r for r in found if r["repo"] == repo and r["exit"]
             and not ((m := NAME_RE.match(str(r.get("name")))) and (m["rc"], m["job"]) == (nxt, "define"))
             and Path(str(r["path"])).resolve() != Path(top[0]).resolve()]  # fmt: skip
