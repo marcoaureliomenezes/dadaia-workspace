@@ -8,22 +8,17 @@ here and nowhere else, which is why `update` refuses them (`_bugs_write.apply_up
 
 from __future__ import annotations
 
-import sys
-from pathlib import Path
 from typing import Any
 
-sys.path.insert(0, str(Path(__file__).resolve().parent))
-
-from _bugs_store import Records, Refusal, by_id  # noqa: E402
-from _bugs_write import _set, now_iso  # noqa: E402
-from _specs import choice  # noqa: E402
+from _bugs_check import STATUS_BY_VERB
+from _bugs_store import Records, Refusal, by_id
+from _bugs_write import _set, now_iso
+from _specs import choice
 
 REQUIRED_BY_VERB = {
     "resolve": ("cause", "caused_by", "solution", "fix_sha"),
     "supersede": ("by",), "reject": ("reason",),
 }  # fmt: skip
-STATUS_BY_VERB = {"resolve": "resolved", "supersede": "superseded",
-                  "reject": "rejected"}  # fmt: skip
 
 
 def transition(

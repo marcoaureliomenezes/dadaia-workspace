@@ -9,14 +9,14 @@ import subprocess
 import sys
 from collections import Counter
 from pathlib import Path
-from typing import Any
 
 sys.dont_write_bytecode = True
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import _bugs_transition as tr  # noqa: E402
 import _bugs_write as wr  # noqa: E402
-from _bugs_check import CODE, LEDGER, check  # noqa: E402
+import _jsonl  # noqa: E402
+from _bugs_check import CODE, LEDGER, OPEN, STATUS_BY_VERB, check  # noqa: E402
 from _bugs_store import Refusal, commit, read_records  # noqa: E402
 from _specs import find_specs, refuse  # noqa: E402
 
@@ -74,11 +74,6 @@ def _parser() -> argparse.ArgumentParser:
     return parser
 
 
-def _values(args: argparse.Namespace, names: tuple[str, ...]) -> dict[str, Any]:
-    keys = [name.lstrip("-").replace("-", "_") for name in names]
-    return {key: getattr(args, key) for key in keys}
-
-
 def _read(args: argparse.Namespace, specs: Path) -> int:
     records = read_records(specs / LEDGER)
     if args.verb == "stats":
@@ -90,7 +85,7 @@ def _read(args: argparse.Namespace, specs: Path) -> int:
             for value, count in sorted(Counter(values).items()):
                 print(f"{label}:{value}\t{count}")
         return 0
-    selected = [r for r in records if args.include_closed or r.get("status") == "open"]
+    selected = [r for r in records if args.include_closed or r.get("status") == OPEN]
     for record in sorted(selected, key=lambda r: str(r["id"])):
         print(f"{record['id']}\t{record['status']}\t{record.get('severity') or '-'}")
     print(f"[ok] {len(selected)} {'all' if args.include_closed else 'open'} bug(s).")
@@ -110,7 +105,7 @@ def _archive(args: argparse.Namespace, specs: Path) -> int:
 def _write(args: argparse.Namespace, specs: Path) -> int:
     ledger = specs / LEDGER
     if args.verb == "append":
-        values = _values(args, _OPTIONS["append"])
+        values = _jsonl.values(args, _OPTIONS["append"])
         values["id"] = values.pop("bug_id")
         values["ts"] = wr.now_iso()
         values["reported_by"] = values["reported_by"] or "dd-sw-engineer-sr"
@@ -140,9 +135,9 @@ def _write(args: argparse.Namespace, specs: Path) -> int:
         commit(ledger, lambda records: wr.apply_update(records, args.bug_id, changes))
         print(f"[ok] updated {', '.join(sorted(changes))} for {args.bug_id}")
         return 0
-    values = _values(args, _OPTIONS[args.verb])
+    values = _jsonl.values(args, _OPTIONS[args.verb])
     commit(ledger, lambda records: tr.transition(records, args.bug_id, args.verb, values))
-    print(f"[ok] {tr.STATUS_BY_VERB[args.verb]} {args.bug_id}")
+    print(f"[ok] {STATUS_BY_VERB[args.verb]} {args.bug_id}")
     return 0
 
 

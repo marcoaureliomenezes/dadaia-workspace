@@ -12,16 +12,13 @@ from __future__ import annotations
 import datetime as _dt
 import difflib
 import json
-import sys
 from pathlib import Path
 from typing import Any
 
-sys.path.insert(0, str(Path(__file__).resolve().parent))
-
-from _bugs_check import TERMINAL, load_schema  # noqa: E402
-from _bugs_store import Records, Refusal, by_id  # noqa: E402
-from _clock import now_iso as now_iso  # noqa: E402
-from _specs import choice, script  # noqa: E402
+from _bugs_check import OPEN, STATUS_BY_VERB, TERMINAL, load_schema
+from _bugs_store import Records, Refusal, by_id
+from _clock import now_iso as now_iso
+from _specs import choice, script
 
 _MUTABILITY = {k: v["x-mutability"] for k, v in load_schema()["properties"].items()}
 _OBJECTS = frozenset(k for k, v in load_schema()["properties"].items() if v.get("type") == "object")
@@ -38,9 +35,11 @@ _SCRIPT = script(Path(__file__).parent / "bugs.py")
 def candidates(records: Records, surface: object) -> list[str]:
     """The records a new bug on *surface* is judged against: the open ones and
     those resolved in the last 30 days, a recurrence."""
-    since = (_dt.datetime.now(tz=_dt.UTC) - _dt.timedelta(days=30)).strftime("%Y-%m-%dT%H:%M:%SZ")
+    since = (_dt.datetime.fromisoformat(now_iso()) - _dt.timedelta(days=30)).strftime(
+        "%Y-%m-%dT%H:%M:%SZ"
+    )
     return sorted(str(r["id"]) for r in records if r.get("surface") == surface and (
-        r.get("status") == "open" or r.get("status") == "resolved" and str(r.get("closed_at")) >= since))  # fmt: skip
+        r.get("status") == OPEN or r.get("status") == STATUS_BY_VERB["resolve"] and str(r.get("closed_at")) >= since))  # fmt: skip
 
 
 def append(records: Records, values: dict[str, Any], dirs: set[str]) -> Records:
@@ -66,7 +65,7 @@ def append(records: Records, values: dict[str, Any], dirs: set[str]) -> Records:
                      "--correlates")  # fmt: skip
     record = {key: values.get(key) for key in CORE} | {"correlates": ids}
     record.update({key: None for key in GOVERNANCE})
-    record["status"] = "open"
+    record["status"] = OPEN
     return [*records, record]
 
 

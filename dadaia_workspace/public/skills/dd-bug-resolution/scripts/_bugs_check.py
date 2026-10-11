@@ -9,22 +9,22 @@ commit, so a writer/validator disagreement is unrepresentable. The schema is
 from __future__ import annotations
 
 import json
-import sys
 from collections.abc import Iterator
 from pathlib import Path
 from typing import Any
 
-sys.path.insert(0, str(Path(__file__).resolve().parent))
-sys.path.append(str(Path(__file__).resolve().parents[2] / "dd-release-implementation" / "scripts"))
-
-import _ledger  # noqa: E402
-from _release_schema import TASK_ID_RE  # noqa: E402
-from _specs import quote, script, with_specs  # noqa: E402
+import _findings
+import _ledger
+from _grammar import TASK_ID_RE
+from _specs import quote, script, with_specs
 
 CODE = "LEDGER-BUGS-SCHEMA"
 LEDGER = "bugs/BUGS.jsonl"
 HISTO = "bugs/_archive/bugs_histo.jsonl"
-TERMINAL = ("resolved", "superseded", "rejected")
+#: The status words are the schema's enum; the one non-terminal status is listed first.
+OPEN, *TERMINAL = _ledger.load_schema("bug-record-v1")["properties"]["status"]["enum"]
+#: The only place the terminal verbs meet their words.
+STATUS_BY_VERB = {"resolve": "resolved", "supersede": "superseded", "reject": "rejected"}
 _VERBS, _LAW = (
     "`bugs.py append` or `bugs.py update`",
     "specs/bugs/AGENTS.md: never hand-edit BUGS.jsonl",
@@ -135,7 +135,7 @@ def findings_for(
                 else with_specs(f"{bugs} update {quote(bug_id)} --set caused_by=none", root)
             )  # fmt: skip
     return [
-        _ledger.finding(CODE, rel, n, "; ".join(m),
+        _findings.finding(CODE, rel, n, "; ".join(m),
                         fixes.get(n) or _ledger.unwritten(root / rel, n, _VERBS, _LAW))
         for n, m in sorted(lines.items())
     ]  # fmt: skip
@@ -144,25 +144,16 @@ def findings_for(
 def histo_findings(text: str, root: Path = _ledger.SPECS) -> list[dict[str, Any]]:
     """The archive's bug records plus pre-v6 event lines, which remain readable history."""
     schema = load_schema()
-    out: list[dict[str, Any]] = []
-    for number, raw in enumerate(text.split("\n"), start=1):
-        try:
-            record = json.loads(raw) if raw.strip() else None
-        except json.JSONDecodeError as exc:
-            record, messages = None, [f"line is not valid JSON: {exc.msg}"]
-        else:
-            legacy = isinstance(record, dict) and "event" in record
-            messages = (
-                []
-                if record is None or legacy
-                else list(
-                    _ledger.validate(_schema_record(record, schema), schema, schema, "record")
-                )
-            )
-        if messages:
-            fix = _ledger.unwritten(root / HISTO, number, "`bugs.py archive`", _LAW)
-            out.append(_ledger.finding(CODE, HISTO, number, "; ".join(messages), fix))
-    return out
+
+    def problems(record: Any) -> list[str]:
+        if isinstance(record, dict) and "event" in record:
+            return []
+        return list(_ledger.validate(_schema_record(record, schema), schema, schema, "record"))
+
+    return _findings.histo_findings(
+        text, HISTO, CODE, problems,
+        lambda n: _ledger.unwritten(root / HISTO, n, "`bugs.py archive`", _LAW),
+    )  # fmt: skip
 
 
 def archived_ids(text: str) -> frozenset[str]:
