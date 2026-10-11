@@ -4,8 +4,8 @@ Library document. Projected nowhere: `public stage` copies it into `.dadaia/agen
 with the rest of `data/`, and no projection rule installs it into a runtime tree.
 
 One row per surface: what it is for and what belongs in it. A surface's size is a soft
-review signal (one purpose, no restated rule), never a build failure (ADR 0143); a SKILL.md's
-line limits are `behavior-map.json`'s (ADR 0170).
+review signal (one purpose, no restated rule), never a build failure; a SKILL.md's
+line limits are `behavior-map.json`'s.
 
 Every surface is sourced under `dadaia_workspace/public/`; the `Surface` column names the
 path or entity as it appears in an installed workspace.
