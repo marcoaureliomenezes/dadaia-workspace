@@ -103,9 +103,14 @@ def _origin(spec: Path) -> int:
     try:
         carried = origin(spec.read_text("utf-8"))
     except (OSError, ValueError) as error:
+        act = (
+            "pass the path of an existing SPEC.md"
+            if isinstance(error, OSError)
+            else "edit its `**Origin:**` line"
+        )
         print(
             f"Error: {spec} {error}",
-            "fix: Operator action: edit its `**Origin:**` line",
+            f"fix: Operator action: {act}",
             sep="\n",
             file=sys.stderr,
         )
