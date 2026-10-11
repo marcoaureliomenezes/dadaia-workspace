@@ -7,7 +7,7 @@ Scope: this file governs only `specs/backlog/`.
 - The backlog is the operator's demand queue: only the operator creates demand, `dd-product-engineer` curates `active[]`.
 - An entry materializes only through the main thread's operator-facing intake report; an operator-ratified in-release deferral already counts as intake.
 - The backlog is a single JSON document: `specs/backlog/BACKLOG.json`, `{schema: "backlog-v1", active: [...]}`.
-- Full schema: `dd-backlog-definition` (The document), `.dadaia/agentic/schemas/backlog/backlog-v1.schema.json`.
+- Full schema: `dd-backlog-definition` (The document), `.agents/skills/dd-backlog-definition/scripts/schemas/backlog-v1.schema.json`.
 - A closed item's history lives beside the document, in `specs/backlog/_archive/backlog_histo.jsonl`.
 
 ## 1. The document, plus its histo
@@ -17,7 +17,7 @@ Scope: this file governs only `specs/backlog/`.
 
 ## 2. Authoring rules
 
-- `<slug>` matches `^[a-z][a-z0-9-]+$`.
+- `<slug>` matches `$defs.slug` of backlog-v1.
 - Every `active[]` entry carries five required fields: `title`, `opened` (`YYYY-MM-DD`), `status`, `description`, `provenance`.
 - `BACKLOG_PY new` writes `status: idea`; a later lowercase live token (`candidate`, …) is a hand edit, which `BACKLOG_PY check` validates: no terminal status on a live entry, and a status past `idea` binds `intents[]`.
 - Optional: `intents` (§4) and `relates` (`BACKLOG_PY new --help`).
