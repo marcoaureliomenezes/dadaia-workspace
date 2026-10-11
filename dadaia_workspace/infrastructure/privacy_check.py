@@ -14,16 +14,16 @@ merged additively on top of the baseline.
 
 from __future__ import annotations
 
-import importlib.resources
-import json
-import re
 from collections.abc import Callable, Iterable
-from dataclasses import dataclass
-from functools import lru_cache
 from pathlib import Path
 
 from dadaia_workspace.core.models.doctor_report import DoctorLine, DoctorStatus
-from dadaia_workspace.core.redaction import mask, privacy_matches
+from dadaia_workspace.core.redaction import (
+    BaselinePattern,
+    load_baseline,
+    mask,
+    privacy_matches,
+)
 from dadaia_workspace.core.workspace_resolver import own_workspace_root
 from dadaia_workspace.infrastructure.ledger_scripts import load_owner
 
@@ -49,12 +49,6 @@ _PUBLIC_PRIVACY_TEXT_SUFFIXES = {
 # Operator-private privacy terms are NEVER hardcoded in this published library; each
 # workspace keeps them OUT of the package, read by :func:`load_privacy_terms`.
 
-# Packaged, versioned baseline of STRUCTURAL patterns. Shipped inside the wheel
-# so the check is fail-closed even with no operator denylist. Operator terms are
-# additive on top of these.
-_PRIVACY_BASELINE_PKG = "dadaia_workspace.infrastructure.data"
-_PRIVACY_BASELINE_FILE = "privacy_baseline.json"
-
 #: The published surface is English-only. These retired
 #: Portuguese control terms are the adoption blocker this closed: a consumer
 #: meets them on day 1, inside otherwise-English law. Scanned under ``public/`` only,
@@ -78,62 +72,12 @@ _BASELINE_OK_MARKER = DoctorLine(
 )
 
 
-@dataclass(frozen=True)
-class _BaselinePattern:
-    """A compiled structural pattern from the packaged baseline."""
-
-    id: str
-    regex: re.Pattern[str]
-    reason: str
-    exclude: re.Pattern[str] | None
-    #: v0.4.3 T-043-16/FR12/A12.1 — WHY this pattern's carve-out exists. Required
-    #: (checked by :func:`_check_baseline_exclude_rationale`) whenever ``exclude`` is
-    #: set; ``None`` for a pattern with no carve-out at all.
-    exclude_rationale: str | None = None
+_BaselinePattern = BaselinePattern
 
 
-@lru_cache(maxsize=1)
-def _load_privacy_baseline() -> tuple[_BaselinePattern, ...]:
-    """Load and compile the packaged baseline structural patterns.
-
-    The baseline ships inside the wheel under
-    ``dadaia_workspace/infrastructure/data/privacy_baseline.json`` (versioned,
-    documented ``_header``). A malformed or absent file yields an empty tuple —
-    but the file is part of the distribution, so this is a defensive fallback,
-    not the normal absent-operator-denylist path.
-    """
-    try:
-        resource = importlib.resources.files(_PRIVACY_BASELINE_PKG) / _PRIVACY_BASELINE_FILE
-        raw = json.loads(resource.read_text(encoding="utf-8"))
-    except (OSError, ValueError, ModuleNotFoundError):
-        return ()
-    patterns: list[_BaselinePattern] = []
-    for entry in raw.get("patterns", []):
-        if not isinstance(entry, dict):
-            continue
-        pattern_id = str(entry.get("id", ""))
-        regex_src = entry.get("regex")
-        if not isinstance(regex_src, str) or not regex_src:
-            continue
-        exclude_src = entry.get("exclude_regex")
-        try:
-            compiled = re.compile(regex_src)
-            exclude = (
-                re.compile(exclude_src) if isinstance(exclude_src, str) and exclude_src else None
-            )
-        except re.error:
-            continue
-        rationale_src = entry.get("exclude_rationale")
-        patterns.append(
-            _BaselinePattern(
-                id=pattern_id,
-                regex=compiled,
-                reason=str(entry.get("reason", "structural privacy match")),
-                exclude=exclude,
-                exclude_rationale=rationale_src if isinstance(rationale_src, str) else None,
-            )
-        )
-    return tuple(patterns)
+def _load_privacy_baseline() -> tuple[BaselinePattern, ...]:
+    """The packaged baseline through its ONE parser, ``_privacy.load_baseline``."""
+    return load_baseline()
 
 
 def load_privacy_terms() -> tuple[tuple[str, str], ...]:

@@ -85,8 +85,7 @@ _SKILL_SCRIPT_SCHEMAS: tuple[tuple[str, str], ...] = (
 
 
 #: The shared ledger modules each ledger script runs from its OWN copy beside it, the
-#: same way (``_ledger.py`` imports ``_privacy.py``, a copy of ``core/redaction.py``,
-#: the push gate's own matcher). (package-relative source, ``public/``-relative target).
+#: same way (``_ledger.py`` imports ``_privacy.py``, the push gate's own matcher). (package-relative source, ``public/``-relative target).
 _SKILL_SCRIPT_SHARED: tuple[tuple[str, str], ...] = tuple(
     (src, f"skills/{skill}/scripts/{name}")
     for skill in (
@@ -98,8 +97,8 @@ _SKILL_SCRIPT_SHARED: tuple[tuple[str, str], ...] = tuple(
         "dd-release-implementation",
     )
     for src, name in (
-        ("core/redaction.py", "_privacy.py"),
-        ("infrastructure/data/privacy_baseline.json", "privacy_baseline.json"),
+        ("public/skills/dd-bug-resolution/scripts/_privacy.py", "_privacy.py"),
+        ("public/skills/dd-bug-resolution/scripts/privacy_baseline.json", "privacy_baseline.json"),
         ("public/skills/dd-bug-resolution/scripts/_ledger.py", "_ledger.py"),
         ("public/skills/dd-bug-resolution/scripts/_specs.py", "_specs.py"),
         ("public/skills/dd-bug-resolution/scripts/_root.py", "_root.py"),
