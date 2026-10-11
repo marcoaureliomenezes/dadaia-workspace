@@ -55,10 +55,16 @@ def _imported_roots(path: Path) -> set[str]:
 #: the backlog exit its Origin parser (ADR 0161) and the bug reader (ADR 0137); `_specs`
 #: reads the worktree name grammar (``NAME_RE``). No module imports back along its own edge.
 _CROSS_SKILL_EDGES = {
-    "dd-release-implementation": {"_memory_drift", "_worktree_git", "_worktree_names"},
+    "dd-release-implementation": {
+        "_memory_drift",
+        "_worktree_git",
+        "_worktree_names",
+        "_jsonl",
+        "_refusal",
+    },
     "dd-gitflow-default": {
         "_git",
-        "_release_schema",
+        "_grammar",
         "_specs",
     },  # `_specs`: the fix-line quote; `_git`: the one runner
     "dd-backlog-definition": {"_release_schema", "_bugs_store"},

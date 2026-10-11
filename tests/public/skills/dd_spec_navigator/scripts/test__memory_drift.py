@@ -277,6 +277,7 @@ def test_a_git_read_that_fails_in_a_shallow_clone_names_the_cut(
 def _release_drift(script: Path, repo: Path, state: dict[str, object]) -> dict[str, object]:
     """`release.py drift` over a live release carrying *state*: the release skill is
     projected beside the navigator, as `public install` lays it out."""
+    stage_skill_scripts("dd-bug-resolution", script.parents[2] / "dd-bug-resolution" / "scripts")
     release = stage_skill_scripts(
         "dd-release-implementation", script.parents[2] / "dd-release-implementation" / "scripts"
     )

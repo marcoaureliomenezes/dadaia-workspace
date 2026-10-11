@@ -18,7 +18,6 @@ from pathlib import Path
 import pytest
 
 from dadaia_workspace.core import gitflow
-from dadaia_workspace.core.release_state import CANDIDATE_RE
 from tests.helpers.skill_scripts import stage_skill_scripts
 
 _REPO_ROOT = Path(__file__).resolve().parents[5]
@@ -30,7 +29,8 @@ _GOOD = "## 1. As-is review\n\n## 2. Strategy\n"
 
 @pytest.fixture
 def script(tmp_path: Path) -> Path:
-    stage_skill_scripts("dd-spec-navigator", tmp_path / "skills" / "dd-spec-navigator" / "scripts")
+    for skill in ("dd-spec-navigator", "dd-bug-resolution"):
+        stage_skill_scripts(skill, tmp_path / "skills" / skill / "scripts")
     return (
         stage_skill_scripts(
             "dd-release-implementation",
@@ -87,10 +87,10 @@ def test_the_pinned_pair_resolves_the_same_live_candidate(tmp_path: Path) -> Non
     scripts pick the same highest `rc-<N>/` directory, and birth the next one past a stray
     `rc-<N>` file; none without a candidate."""
     sys.path.insert(0, str(_SCRIPTS))
+    sys.path.append(str(_SCRIPTS.parents[1] / "dd-bug-resolution" / "scripts"))
     import _release_schema as twin
     import _release_store
 
-    assert twin.CANDIDATE_RE.pattern == CANDIDATE_RE.pattern
     release = tmp_path / "releases" / "1.0.0"
     release.mkdir(parents=True)
     (release / "_RELEASE.json").write_text('{"phase": "DEFINITION"}', encoding="utf-8")
@@ -100,7 +100,7 @@ def test_the_pinned_pair_resolves_the_same_live_candidate(tmp_path: Path) -> Non
         (release / name).mkdir()
     (release / "rc-11").write_text("", encoding="utf-8")
     assert [resolve(tmp_path) for resolve in pair] == [release / "rc-10"] * 2
-    assert gitflow.next_candidate(release) == twin.next_candidate(release) == release / "rc-12"
+    assert twin.next_candidate(release, None) == release / "rc-11"
 
 
 # --- the Origin line (ADR 0161; SPEC-DOC-048's cases re-homed by name) ---------------

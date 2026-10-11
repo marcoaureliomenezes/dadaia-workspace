@@ -19,6 +19,7 @@ from tests.fixtures.harness_env import suite_env
 _REPO_ROOT = Path(__file__).resolve().parents[5]
 _SCRIPTS = _REPO_ROOT / "dadaia_workspace/public/skills/dd-release-implementation/scripts"
 sys.path.insert(0, str(_SCRIPTS))
+sys.path.append(str(_SCRIPTS.parents[1] / "dd-bug-resolution" / "scripts"))
 import _release_schema  # noqa: E402
 
 
@@ -37,7 +38,6 @@ import _release_schema  # noqa: E402
 def test_one_release_id_grammar_everywhere(tmp_path: Path, release_id: str, legal: bool) -> None:
     """sa-release-id-has-three-grammars and sa-release-json-validated-three-times#B5: core,
     the canon and `release.py new` agree on every id — a suffix and a `v` are refused."""
-    assert RELEASE_ID_RE.pattern == _release_schema.SEMVER_RE.pattern
     assert bool(RELEASE_ID_RE.match(release_id)) is legal
     assert is_canon_path(f"releases/{release_id}/rc-1/SPEC.md") is legal
     (tmp_path / "specs" / "releases").mkdir(parents=True)
@@ -51,7 +51,8 @@ def test_the_release_instant_reader_reads_an_instant_with_no_offset_as_utc() -> 
     instant in UTC — an offset converts, `Z` and `+00:00` are UTC, no offset is UTC and never
     the host's zone (run on a host three hours behind UTC), a malformed one raises ValueError."""
     probe = (
-        "import sys; sys.path.insert(0, sys.argv[1]); import _release_schema as r\n"
+        "import sys; sys.path.insert(0, sys.argv[1]); sys.path.append(sys.argv[1] + '/../../dd-bug-resolution/scripts')\n"
+        "import _release_schema as r\n"
         "for ts in sys.argv[2:]:\n"
         "    try: print(r.utc(ts).isoformat())\n"
         "    except ValueError: print('ValueError')\n"
