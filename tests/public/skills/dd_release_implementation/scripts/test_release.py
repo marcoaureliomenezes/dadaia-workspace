@@ -863,3 +863,18 @@ def test_a_matching_dag_passes_check_and_phase(script: Path, tmp_path: Path) -> 
     assert _run(script, "check", "--specs", str(specs)).returncode == 0
     phase = _run(script, "phase", "IMPLEMENTATION", "--sha", "abc1234", "--specs", str(specs))
     assert phase.returncode == 0, phase.stderr
+
+
+def test_origin_names_the_right_fix_for_each_cause(script: Path, tmp_path: Path) -> None:
+    """A missing SPEC and a non-canonical Origin line are different acts to unblock."""
+    spec = tmp_path / "SPEC.md"
+    spec.write_text("# S\n\n**Origin:** nonsense\n", encoding="utf-8")
+
+    unreadable = _run(script, "origin", str(tmp_path / "absent.md"))
+    malformed = _run(script, "origin", str(spec))
+
+    assert [r.returncode for r in (unreadable, malformed)] == [1, 1]
+    assert unreadable.stderr.splitlines()[-1] == (
+        "fix: Operator action: pass the path of an existing SPEC.md"
+    )
+    assert malformed.stderr.splitlines()[-1] == "fix: Operator action: edit its `**Origin:**` line"
