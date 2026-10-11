@@ -30,12 +30,12 @@ sources:
 - Hooks are the Python package `dadaia_workspace/hooks/`, rendered into each harness's own hook format; a harness action with no pre-event would be declared `ungated` in its dialect row (one `public doctor` WARN); every harness gates its pre-tool event, so none is declared.
 - Install compares content, not existence: a differing staged hash overwrites without `--force`, which is reserved for a hand-edited projection; an operator's own keys in a shared settings file are left alone.
 - A skill is a folder projected whole to `.agents/skills/<name>/`; `.claude/skills/<name>` is a relative symlink to it, or a hash-verified copy where links are unavailable, and the install ledger records which.
-- The three `agents/dd-*.md` personas stage generic and render into `.agents/agents/` with the resolved model and effort from `.dadaia/states/agent_model_policy.json`; the Codex transcode fails closed without a model.
+- The five `agents/dd-*.md` personas stage generic and render into `.agents/agents/` with the tier alias and effort of the template `.dadaia/states/agent_model_policy.json` applies, `balanced` when absent ([[agent-orchestration]]); `public install --template <id>` saves that template before staging, an unknown id refused with exit 1; the Codex transcode fails closed on an alias `TIER_CODEX` does not map.
 - `public install` refuses the dadaia-workspace source repository root unless `DADAIA_ALLOW_SOURCE_ROOT_PUBLIC_INSTALL=1`.
 
 ## Doctor
 
-- `dadaia public doctor` compares source against staging, then staging against each projection, printing one status line per file; `[missing]`, `[drift]`, `[extra]`, `[leak]` and `[error]` fail the run, `[ok]`, `[foreign]`, `[unsupported]` and `[warn]` do not; a persona compares against its rendered form, so an applied policy reads `[ok]` and a hand-edit `[drift]`.
+- `dadaia public doctor` compares source against staging, then staging against each projection, printing one status line per file; `[missing]`, `[drift]`, `[extra]`, `[leak]` and `[error]` fail the run, `[ok]`, `[foreign]`, `[unsupported]` and `[warn]` do not; a persona compares against its rendered form, so an applied policy reads `[ok]` and a hand-edit `[drift]`; `[ok] model-resolution: template <id>` names the applied template. An overlay holding any key but `schema_version` and `applied_template` (`overrides` included) is an `agent-model-policy ERROR` `[drift]` line whose fix is `public install --template <id>`.
 - A projected executable (hook wrapper or shim) with its exec bit cleared is a `[drift]` line ending `(not executable)`; with the bit set on a `noexec` mount it is `[unsupported]` (`filesystem mounted noexec`).
 - One predicate (`link_entry_defect`) judges every harness view of the authored set: a retargeted or dangling link, or a diverged fallback copy, is one `[drift]` line.
 - The privacy gate runs over source and staged assets and reports `[ok] public-privacy` only on a clean surface; CI treats it as a release gate.
@@ -56,4 +56,4 @@ sources:
 
 ## Dependencies
 
-[[agentic-entities]], [[pypi-distribution]], [[workspace-init]], [[workspace-doctor]], [[context-management]], [[specs-migration]], [[sdd-gate-v3]], [[consumer-agent-support]], [[harness-kimi-code]].
+[[agentic-entities]], [[pypi-distribution]], [[workspace-init]], [[workspace-doctor]], [[context-management]], [[specs-migration]], [[sdd-gate-v3]], [[consumer-agent-support]], [[harness-kimi-code]], [[agent-orchestration]].

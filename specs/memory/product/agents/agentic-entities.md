@@ -1,7 +1,7 @@
 ---
 slug: agentic-entities
 title: agentic-entities
-tldr: One registry names three personas, five deterministic behaviors and two abstract rules; a behavior map assigns each shipped skill and scoped law to an owner.
+tldr: One registry names five personas, five deterministic behaviors and two abstract rules; a behavior map assigns each shipped skill and scoped law to an owner.
 summary: The harness-neutral entity registry, its projected implementations, the universal authored surface and the structural ownership and citation checks that keep agentic law complete.
 tags: [agents, entities, derivation, governance]
 sources:
@@ -14,7 +14,7 @@ sources:
 
 ## Registry
 
-- `dadaia_workspace/public/entities/registry.json` is the harness-neutral inventory of three personas, five deterministic behaviors, two abstract rules and the universal surface.
+- `dadaia_workspace/public/entities/registry.json` is the harness-neutral inventory of five personas, five deterministic behaviors, two abstract rules and the universal surface.
 - Persona source files and registry personas form a bijection. Wired hook entrypoints map to registered behaviors, and projected core rules map to registered rules.
 - The five behaviors are root-whitelist, SDD gate, context-memory injection, git chokepoints and workspace-level tool-cache placement. Root-whitelist and SDD gate share the pre-tool entrypoint; context injection covers session start and prompt submission; git chokepoints are repository hooks; harnesses with an environment surface point supported tool caches at `.dadaia/tmp/` ([[sdd-gate-v3]]).
 - Every BLOCK emits one fix line. Hook wrappers fail open when the workspace venv is absent and tell the operator how to initialize the workspace.

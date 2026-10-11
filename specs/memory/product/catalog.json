@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-10-09T22:51:05Z",
+  "generated_at": "2026-10-11T01:02:05Z",
   "features": [
     {
       "rank": 1,
@@ -32,8 +32,8 @@
       "slug": "agent-orchestration",
       "title": "agent-orchestration",
       "area": "agents",
-      "tldr": "Three dd- personas are leaf workers dispatched by the main thread; SDD documents, worktrees and handoffs carry the work, never an orchestration runtime.",
-      "summary": "The role boundary, task-level dispatch contract, evidence flow and install-time model and privilege resolution for the product, software and review personas.",
+      "tldr": "Five dd- personas are leaf workers dispatched by the main thread; SDD documents, worktrees and handoffs carry the work, never an orchestration runtime.",
+      "summary": "The role boundary, task-level dispatch by the job file's who column, evidence flow and install-time model and privilege resolution for the product, senior and junior engineering, research and review personas.",
       "path": "specs/memory/product/agents/agent-orchestration.md",
       "tags": [
         "orchestration",
@@ -41,12 +41,13 @@
         "dispatch",
         "sdd"
       ],
-      "token_estimate": 441,
+      "token_estimate": 630,
       "depends_on": [
         "worktrees",
         "release-lifecycle",
-        "agentic-entities",
         "public-asset-distribution",
+        "workspace-init",
+        "agentic-entities",
         "agent-comms",
         "audits-canon"
       ],
@@ -61,7 +62,7 @@
       "slug": "agentic-entities",
       "title": "agentic-entities",
       "area": "agents",
-      "tldr": "One registry names three personas, five deterministic behaviors and two abstract rules; a behavior map assigns each shipped skill and scoped law to an owner.",
+      "tldr": "One registry names five personas, five deterministic behaviors and two abstract rules; a behavior map assigns each shipped skill and scoped law to an owner.",
       "summary": "The harness-neutral entity registry, its projected implementations, the universal authored surface and the structural ownership and citation checks that keep agentic law complete.",
       "path": "specs/memory/product/agents/agentic-entities.md",
       "tags": [
@@ -127,9 +128,10 @@
         "projection",
         "privacy"
       ],
-      "token_estimate": 1060,
+      "token_estimate": 1141,
       "depends_on": [
         "agentic-entities",
+        "agent-orchestration",
         "workspace-init",
         "workspace-doctor",
         "specs-migration",
@@ -196,7 +198,7 @@
       "title": "harness-claude-code",
       "area": "harness",
       "tldr": "Entry harness with native sub-agent dispatch; reads the root AGENTS.md map natively and reaches skills and personas through per-entry symlinks into .agents/.",
-      "summary": "How Claude Code loads the workspace law, reaches the three dd- personas and the skills, binds a session, and which hook events carry the workspace's behaviours.",
+      "summary": "How Claude Code loads the workspace law, reaches the five dd- personas and the skills, binds a session, and which hook events carry the workspace's behaviours.",
       "path": "specs/memory/product/harness/harness-claude-code.md",
       "tags": [
         "harness",
@@ -225,7 +227,7 @@
       "title": "harness-codex",
       "area": "harness",
       "tldr": "Entry harness on the Codex CLI: native AGENTS.md chain and .agents/skills; .codex/ carries config, hooks, the command policy and persona TOML.",
-      "summary": "Codex reads the root map, the root->cwd AGENTS.md chain and .agents/skills natively; .codex/ holds config.toml, hooks.json, the command-policy rules and the three dd- persona TOMLs transcoded from .agents/agents/.",
+      "summary": "Codex reads the root map, the root->cwd AGENTS.md chain and .agents/skills natively; .codex/ holds config.toml, hooks.json, the command-policy rules and the five dd- persona TOMLs transcoded from .agents/agents/.",
       "path": "specs/memory/product/harness/harness-codex.md",
       "tags": [
         "harness",
@@ -233,7 +235,7 @@
         "projection",
         "hooks"
       ],
-      "token_estimate": 396,
+      "token_estimate": 401,
       "depends_on": [
         "agentic-entities",
         "sdd-gate-v3",
@@ -254,7 +256,7 @@
       "title": "harness-copilot",
       "area": "harness",
       "tldr": "Entry harness on GitHub Copilot CLI — native root AGENTS.md and .agents/skills; .github/ carries agent transcodes and two hook files, bootstrap at start.",
-      "summary": "Copilot reads the universal surface natively; its projection is the three dd- personas as .github/agents/*.agent.md and two hook files answered in Copilot's permissionDecision JSON, and nothing else under .github/.",
+      "summary": "Copilot reads the universal surface natively; its projection is the five dd- personas as .github/agents/*.agent.md and two hook files answered in Copilot's permissionDecision JSON, and nothing else under .github/.",
       "path": "specs/memory/product/harness/harness-copilot.md",
       "tags": [
         "harness",
@@ -682,7 +684,7 @@
         "upgrade",
         "onboarding"
       ],
-      "token_estimate": 1893,
+      "token_estimate": 1912,
       "depends_on": [
         "context-management",
         "specs-migration",
@@ -691,6 +693,7 @@
         "public-asset-distribution",
         "server-registry",
         "sdd-gate-v3",
+        "agent-orchestration",
         "harness-kimi-code",
         "cross-platform-portability"
       ],
@@ -806,14 +809,14 @@
         "state",
         "closure"
       ],
-      "token_estimate": 487,
+      "token_estimate": 526,
       "depends_on": [
+        "agent-orchestration",
         "worktrees",
         "bug-ledger",
         "backlog-ledger",
         "audits-canon",
-        "workspace-doctor",
-        "agent-orchestration"
+        "workspace-doctor"
       ],
       "sources": [
         "dadaia_workspace/public/schemas/releases/release-state-v1.schema.json",
@@ -871,7 +874,7 @@
         "merge",
         "review"
       ],
-      "token_estimate": 501,
+      "token_estimate": 518,
       "depends_on": [
         "sdd-gate-v3",
         "release-lifecycle",

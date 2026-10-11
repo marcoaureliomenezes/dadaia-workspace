@@ -33,7 +33,7 @@ sources:
 - `new`, `merge`, `clean`, `hash` and `list` are the complete public verbs. There is no stage verb or frozen-test anchor.
 - Merge fast-forwards the exact reviewed head, removes the worktree, deletes its local branch and removes a pushed upstream branch when applicable. It never rebases or force-deletes.
 - `list --json` derives state from git: ready, open, empty, orphan, foreign or unregistered. No worktree state file exists.
-- Release closure and context death wait while a canonical worktree remains open. Tool environments and caches live at workspace level, never inside a worktree.
+- Release closure waits while a canonical worktree other than its own and the next candidate's `define` tree remains open; context death waits on every one. Tool environments and caches live at workspace level, never inside a worktree.
 - Only the main thread opens and merges; leaf agents work only in the path they receive.
 
 ## Dependencies

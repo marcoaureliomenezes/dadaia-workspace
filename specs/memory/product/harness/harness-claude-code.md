@@ -2,7 +2,7 @@
 slug: harness-claude-code
 title: harness-claude-code
 tldr: Entry harness with native sub-agent dispatch; reads the root AGENTS.md map natively and reaches skills and personas through per-entry symlinks into .agents/.
-summary: How Claude Code loads the workspace law, reaches the three dd- personas and the skills, binds a session, and which hook events carry the workspace's behaviours.
+summary: How Claude Code loads the workspace law, reaches the five dd- personas and the skills, binds a session, and which hook events carry the workspace's behaviours.
 tags: [harness, claude-code, projection, hooks]
 sources:
   - dadaia_workspace/core/harness_registry.py
@@ -13,7 +13,7 @@ sources:
 
 ## Load path
 
-- Claude Code is the harness with native sub-agent dispatch (the Agent tool): the main thread runs there and dispatches the three `dd-` personas as sub-agents ([[agent-orchestration]]).
+- Claude Code is the harness with native sub-agent dispatch (the Agent tool): the main thread runs there and dispatches the five `dd-` personas as sub-agents ([[agent-orchestration]]).
 - It reads the root `AGENTS.md` map natively at session start when no `CLAUDE.md` sits on or above the cwd; a scoped `AGENTS.md` attaches when a file in its directory is read ([[agentic-entities]]).
 - The workspace ships no `CLAUDE.md` and `dadaia init` prints no settings advice — the root `AGENTS.md` is read natively; sessions launch at the workspace root.
 - `.claude/skills/<name>` and `.claude/agents/<name>.md` are relative symlinks into `.agents/skills/` and `.agents/agents/`, with a hash-verified copy where `os.symlink` fails; `dadaia public doctor` judges every entry ([[public-asset-distribution]]).

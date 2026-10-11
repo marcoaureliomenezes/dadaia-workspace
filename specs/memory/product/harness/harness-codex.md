@@ -2,7 +2,7 @@
 slug: harness-codex
 title: harness-codex
 tldr: "Entry harness on the Codex CLI: native AGENTS.md chain and .agents/skills; .codex/ carries config, hooks, the command policy and persona TOML."
-summary: Codex reads the root map, the root->cwd AGENTS.md chain and .agents/skills natively; .codex/ holds config.toml, hooks.json, the command-policy rules and the three dd- persona TOMLs transcoded from .agents/agents/.
+summary: Codex reads the root map, the root->cwd AGENTS.md chain and .agents/skills natively; .codex/ holds config.toml, hooks.json, the command-policy rules and the five dd- persona TOMLs transcoded from .agents/agents/.
 tags: [harness, codex, projection, hooks]
 sources:
   - dadaia_workspace/core/harness_registry.py
@@ -26,7 +26,7 @@ sources:
 
 ## Models and doctor
 
-- Codex tier identity is native `(model id × model_reasoning_effort)`, derived from the model registry; two tiers collapsing to one pair fail loudly. The effort comes from one resolver: the D-3 clamp of the policy effort, else `medium`.
+- Codex tier identity is native `(model id × model_reasoning_effort)`: `TIER_CODEX` maps the template's tier alias to the Codex id, an alias outside it failing closed, and the effort comes from one resolver: the D-3 clamp of the template effort, else `medium`.
 - `dadaia public doctor` keeps the structural checks byte comparison cannot express: `D-CX-7` (every `dd-` token a persona cites resolves to a skill or persona) and `D-CX-8` (a Markdown file in `.codex/rules/` is flagged; the `.rules` file itself is a byte-compared rule).
 
 ## Dependencies

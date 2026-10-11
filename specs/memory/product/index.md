@@ -11,8 +11,8 @@
 | slug | title | tldr |
 |------|-------|------|
 | `agent-comms` | agent-comms | The handoff-v1 JSON contract agents emit, its validator behind `dadaia reports validate`, and ack-on-consume deletion with a one-day TTL. |
-| `agent-orchestration` | agent-orchestration | Three dd- personas are leaf workers dispatched by the main thread; SDD documents, worktrees and handoffs carry the work, never an orchestration runtime. |
-| `agentic-entities` | agentic-entities | One registry names three personas, five deterministic behaviors and two abstract rules; a behavior map assigns each shipped skill and scoped law to an owner. |
+| `agent-orchestration` | agent-orchestration | Five dd- personas are leaf workers dispatched by the main thread; SDD documents, worktrees and handoffs carry the work, never an orchestration runtime. |
+| `agentic-entities` | agentic-entities | One registry names five personas, five deterministic behaviors and two abstract rules; a behavior map assigns each shipped skill and scoped law to an owner. |
 
 ### distribution
 

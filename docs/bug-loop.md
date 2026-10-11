@@ -12,7 +12,7 @@ severity. `append` runs only after the operator confirms.
 
 ```bash
 python3 .agents/skills/dd-bug-resolution/scripts/bugs.py append \
-  --bug-id doctor-exits-zero-with-errors --reported-by dd-software-engineer \
+  --bug-id doctor-exits-zero-with-errors --reported-by dd-sw-engineer-sr \
   --title "doctor exits 0 while reporting error findings" \
   --severity HIGH --surface cli --component "cli/commands/doctor.py#run" \
   --context demo --symptom "…" --repro "…" --expected "…" --correlates none

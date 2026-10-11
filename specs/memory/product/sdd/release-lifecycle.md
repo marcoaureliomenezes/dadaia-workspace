@@ -16,14 +16,14 @@ sources:
 - Exactly one bare-SemVer release directory is live. `_RELEASE.json` contains `phase`, `defined`, `implemented`, `shipped` and an append-only `log`.
 - New log entries use only `note`, `milestone`, `summary` and closure-only `memory`; historical kinds remain readable.
 - Each candidate lives in `rc-<N>/` with approved `SPEC.md`, `PLAN.md` and one `tasks/<job>.md` per job. The highest candidate is live.
-- PLAN carries the as-is review, job DAG, waves and complete write sets. Each job file carries lean task rows with task id, AC and exact write set; no stage grammar exists.
+- PLAN carries the as-is review, job DAG, waves and complete write sets. Each job file carries lean task rows with task id, `who` (`sr`, `jr`, `pe` or `cr`, the dispatched persona, [[agent-orchestration]]), AC and exact write set; no stage grammar exists.
 
 ## Lifecycle
 
 - `release.py new` creates a release or stacks the next candidate and writes the definition stub atomically.
 - `phase IMPLEMENTATION` requires approved SPEC and PLAN plus structurally valid PLAN and job files, then stamps the defined milestone.
 - Each behavior begins with a RED-test task and continues in a fresh source-only implementation task. Jobs merge after their one independent review and tracked repository verification ([[worktrees]]).
-- `phase CLOSURE` refuses while another canonical worktree is open and stamps the implemented milestone.
+- `phase CLOSURE` refuses while any canonical worktree of the repo is open except its own tree and the next candidate's `define` tree, which stays open across the closure, and stamps the implemented milestone.
 - In closure, `release.py drift` derives the memory window from the latest memory entry's `until`, otherwise the defined sha. The product pass reads every matched source diff, reconciles atoms and derived documents, generates the catalog, and records exactly one `memory` entry.
 - The closure summary carries delivered, carried and backlog-exit scope. Ledgers and git retain their own detailed evidence; closure does not reconstruct it into extra log kinds.
 

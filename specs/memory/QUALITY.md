@@ -44,7 +44,7 @@ Rationale: a model call on a PR path fails closed without the paid key and expos
 
 - `flaky` marks a pass-and-fail on identical code; `quarantine` leaves every gating selector, is bug-gated by P-22, and the lane is empty.
 - Growth past the per-job wall-clock budget frozen by ADR 0119 is a budget breach, judged by `dd-code-reviewer` reading the CI job durations (`gh run view`, per job; ADR 0166).
-- Curation is a `code-reviewer` verdict (QA lens); `software-engineer` executes.
+- Curation is a `dd-code-reviewer` verdict (QA lens); `dd-sw-engineer-sr` executes.
 - Mutation evidence is operator tooling, outside the repo (ADR 0166).
 
 ## Gates
