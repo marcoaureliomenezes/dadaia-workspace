@@ -306,3 +306,31 @@ def test_install_rules_rewrites_a_read_only_projection(tmp_path: Path) -> None:
     assert dst.read_bytes() == b"new"
     assert [line.status for line in transcript.lines] == ["ok"]
     assert (dst.stat().st_mode & 0o777) == 0o444
+
+
+def test_persona_read_only_compares_the_typed_value_and_fails_closed() -> None:
+    """AC12.3: ``read_only`` is the bool the frontmatter reader types, never a string."""
+    from dadaia_workspace.infrastructure.install_helpers import persona_read_only
+
+    assert persona_read_only({"read_only": True}) is True
+    assert persona_read_only({"read_only": False}) is False
+    for bad in ("true", "false", 1, None, "yes"):
+        with pytest.raises(PublicAssetError, match="read_only"):
+            persona_read_only({"read_only": bad})
+    with pytest.raises(PublicAssetError, match="read_only"):
+        persona_read_only({})
+
+
+def test_the_real_personas_parse_to_a_typed_band_and_read_only() -> None:
+    """AC12.3 (passes today: the shim already types through PyYAML; it must keep doing so)."""
+    from dadaia_workspace.core.frontmatter import Frontmatter, parse
+
+    personas = sorted(
+        Path(__file__).resolve().parents[2].glob("dadaia_workspace/public/agents/*.md")
+    )
+    assert len(personas) == 5
+    for persona in personas:
+        parsed = parse(persona.read_text(encoding="utf-8"))
+        assert isinstance(parsed, Frontmatter), persona.name
+        assert type(parsed.data["dispatch_band"]) is int, persona.name
+        assert type(parsed.data["read_only"]) is bool, persona.name
