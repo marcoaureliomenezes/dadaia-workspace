@@ -12,7 +12,7 @@ import subprocess
 import time
 from pathlib import Path
 
-from _git import git as git, scrubbed_env as scrubbed_env  # isort: skip
+from _git import git as git, parse_worktrees, scrubbed_env as scrubbed_env  # isort: skip
 from _specs import git_line as git_line
 from _specs import head
 from _specs import quote as quote  # (`as`: re-exported to the worktree verbs)
@@ -142,9 +142,7 @@ def recorded_base(repo: Path, name: str, work: str = "") -> str:
 
 def _trees(repo: Path) -> list[dict[str, str]]:
     """Every linked worktree of *repo* (the main checkout excluded), from git's porcelain."""
-    blocks = git(repo, "worktree", "list", "--porcelain").split("\n\n")
-    parsed = [dict(ln.partition(" ")[::2] for ln in b.splitlines() if ln) for b in blocks]
-    return [{**f, "worktree": str(Path(f["worktree"]))} for f in parsed if "worktree" in f][1:]
+    return parse_worktrees(git(repo, "worktree", "list", "--porcelain"))
 
 
 def ours(repo: Path) -> list[dict[str, str]]:
