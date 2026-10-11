@@ -19,6 +19,7 @@ from pathlib import Path
 
 import pytest
 
+from dadaia_workspace.core.harness_registry import HARNESS_RECORDS
 from dadaia_workspace.infrastructure.runtime_config import codex_config, merge_claude_settings
 from tests.fixtures.harness_env import suite_env
 from tests.helpers.scan_population import assert_populated
@@ -379,3 +380,4 @@ def test_each_harness_carries_the_cache_env_or_declares_the_gap(tmp_path: Path) 
         in codex
     )
     assert sorted(_gaps("tool-cache-env")) == ["copilot", "cursor", "devin", "kimi-code"]
+    assert {"claude", "codex"} | set(_gaps("tool-cache-env")) == set(HARNESS_RECORDS)

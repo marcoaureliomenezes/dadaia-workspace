@@ -192,6 +192,8 @@ def _write_registry(tmp_path: Path, payload: object) -> None:
             "schema_version": "agentic-entities-v1",
             "behaviors": [{"id": "b1", "gaps": "codex"}],
         },
+        {"schema_version": "agentic-entities-v1", "behaviors": [{"id": "b1", "modules": [5]}]},
+        {"schema_version": "agentic-entities-v1", "behaviors": [{"id": "b1", "modules": ["foo"]}]},
         {"schema_version": "agentic-entities-v0"},
     ],
 )
