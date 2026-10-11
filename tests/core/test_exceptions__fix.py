@@ -23,7 +23,7 @@ def test_error_without_fix_is_the_bare_message():
 
 def test_schema_version_error_keeps_problem_fix_and_text():
     error = SchemaVersionError("p", "migrate --yes")
-    assert (error.problem, error.fix) == ("p", "migrate --yes")
+    assert (error.message, error.fix) == ("p", "migrate --yes")
     assert str(error) == "p\nfix: migrate --yes"
 
 

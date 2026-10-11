@@ -218,4 +218,4 @@ def test_a_refused_row_is_named_by_its_name(tmp_path: Path) -> None:
     path.write_text(json.dumps({"schema_version": 3, "contexts": [row]}), encoding="utf-8")
     with pytest.raises(SchemaVersionError) as refused:
         JsonContextStore(tmp_path).list_all()
-    assert refused.value.problem == f"{path}: context row 'beta' has no created_at."
+    assert refused.value.message == f"{path}: context row 'beta' has no created_at."
