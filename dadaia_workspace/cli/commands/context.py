@@ -126,13 +126,6 @@ def print_next_step(workspace_root: Path, focus: str | None = None) -> None:
         console.print(step.text(), markup=False, highlight=False, soft_wrap=True)
 
 
-def _retry(error: Exception, verb: str, name: str) -> str:
-    """The verb's retry line, unless git's own output already carries a ``fix:`` line."""
-    return (
-        "" if "fix: " in str(error) else fix_line(resolve_workspace_root(), "context", verb, name)
-    )
-
-
 def create_fix(root: Path, error: Exception, name: str | None, urls: list[str]) -> str:
     """The invocation, every ``--associated-repo`` kept (AC3.5); what failed is the
     operator's choice, named in words — never the failing command repeated; an owned slug
@@ -298,7 +291,7 @@ def alive(name: str = typer.Argument(..., help="Context name to make ALIVE")) ->
         ctx = container.build_spec_context_service(resolve_workspace_root()).alive(name)
         console.print(f"[green]✓[/green] Context '[bold]{ctx.name}[/bold]' is now ALIVE")
     except DadaiaError as e:
-        fail(e, _retry(e, "alive", name))
+        fail(e, fix_line(resolve_workspace_root(), "context", "alive", name))
 
 
 @app.command()
@@ -314,7 +307,7 @@ def baseline(
     try:
         work = _ctx_service().baseline(name, message=message)
     except (DadaiaError, OSError) as exc:
-        fail(exc, _retry(exc, "baseline", name))
+        fail(exc, fix_line(resolve_workspace_root(), "context", "baseline", name))
     done = f"published on {work}" if work else "already published — nothing to do"
     console.print(f"✓ '{name}' {done}", markup=False, highlight=False, soft_wrap=True)
 
@@ -329,7 +322,7 @@ def dead(
         ctx = _ctx_service().dead(name)
         console.print(f"[green]✓[/green] Context '[bold]{ctx.name}[/bold]' is now DEAD")
     except DadaiaError as e:
-        fail(e, _retry(e, "dead", name))
+        fail(e, fix_line(resolve_workspace_root(), "context", "dead", name))
 
 
 @app.command(epilog=f"Examples: {fix_line(None)} context bind my-ctx")

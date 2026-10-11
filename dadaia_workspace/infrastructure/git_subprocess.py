@@ -225,11 +225,14 @@ class GitSubprocessClient:
         self, path: Path, *args: str, stdin: str | None = None, env: dict[str, str] | None = None
     ) -> str:
         """One git command in *path* (*env* over the process environment): its stripped
-        stdout, else ``GitSyncError`` carrying git's full output (CONFLICT is on stdout)."""
+        stdout, else ``GitSyncError`` carrying git's full output (CONFLICT is on stdout); the
+        first ``fix:`` line of that output becomes the error's ``fix``."""
         result = _run(["git", *args], cwd=path, stdin=stdin, env=env)
         if result.returncode != 0:
-            output = f"{result.stdout}\n{result.stderr}".strip()
-            raise GitSyncError(f"git {args[0]} failed in {path}:\n{output}")
+            lines = f"{result.stdout}\n{result.stderr}".strip().splitlines()
+            fix = next((ln[5:] for ln in lines if ln.startswith("fix: ")), "")
+            output = "\n".join(ln for ln in lines if not (fix and ln == f"fix: {fix}"))
+            raise GitSyncError(f"git {args[0]} failed in {path}:\n{output}", fix=fix)
         return result.stdout.strip()
 
     def gitflow(self, repo: Path, main_repo: Path | None = None) -> tuple[Gitflow, str | None]:

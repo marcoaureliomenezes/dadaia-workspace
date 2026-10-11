@@ -641,8 +641,9 @@ class SpecContextService:
         except GitSyncError as exc:
             again = fix_line(self._workspace_root, "context", "baseline", name)
             raise GitSyncError(
-                f"{exc}\nHEAD holds the onboarding commit {anchor}; once the cause above is "
-                f"fixed (a refused push: after the amend), publish again: {again}"
+                f"{str(exc).partition(chr(10) + 'fix: ')[0]}\nHEAD holds the onboarding commit {anchor}; once the cause above is "
+                f"fixed (a refused push: after the amend), publish again: {again}",
+                fix=exc.fix or again,
             ) from exc
         return work
 
@@ -763,7 +764,9 @@ class SpecContextService:
                     self._git.push(repo_path)
                 except GitSyncError as exc:
                     lead = f"Git sync failed for context '{name}' repo '{slug}'; nothing was removed.\n"
-                    raise GitSyncError(f"{lead}{exc}") from exc
+                    raise GitSyncError(
+                        f"{lead}{str(exc).partition(chr(10) + 'fix: ')[0]}", fix=exc.fix
+                    ) from exc
         for slug, repo_path in present:
             done = sweep.hold(self._workspace_root, repo_path, f"repos/{slug}")
             if isinstance(done, sweep.Skipped):  # the refusal, not success: nothing to hold is fine
