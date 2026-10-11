@@ -358,10 +358,17 @@ def _body_line(path_text: str, needle: str) -> int:
     return path_text.splitlines().index(needle) + 1
 
 
-def test_narrative_exempts_the_principle_adr_line(tmp_path: Path) -> None:
+def test_narrative_leaves_the_principle_adr_line_alone(tmp_path: Path) -> None:
     """T-047-98. `ADR: NNNN (accepted)` names the decision that
     governs a principle — it is current truth, not history."""
     assert _canonical(tmp_path, "## Principles\n\nADR: 0023 (accepted)\n") == []
+
+
+def test_narrative_task_id_is_the_release_grammar_not_the_dead_one(tmp_path: Path) -> None:
+    """AC14.4. `J<n>.T<k>` is a task id (history); the dead `T-<n>-<k>` shape is not."""
+    errors = _canonical(tmp_path, "## Purpose\n\nDelivered by J3.T2.\n")
+    assert len(errors) == 1 and "task id 'J3.T2'" in errors[0], errors
+    assert _canonical(tmp_path, "## Purpose\n\nDelivered by T-5-1.\n") == []
 
 
 def test_narrative_exempts_code_fences(tmp_path: Path) -> None:
