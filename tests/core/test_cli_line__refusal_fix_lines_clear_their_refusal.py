@@ -694,6 +694,21 @@ def _discard_notes(world: World) -> None:
     (world.repo / "notes.md").unlink()
 
 
+def _two_untracked(world: World) -> list[str]:
+    _untracked(world)
+    (world.repo / "b.md").write_text("b\n", encoding="utf-8")
+    return ["context", "dead", "proj"]
+
+
+def _discard_what_the_fix_names(world: World) -> None:
+    """The operator discards exactly the paths the printed fix names — no more."""
+    fix = _single_fix(_hit(world, ["context", "dead", "proj"]))
+    for name in ("notes.md", "b.md"):
+        if name in fix:
+            (world.repo / name).unlink()
+    assert not world.git(world.repo, "status", "--porcelain"), "the one fix left a path dirty"
+
+
 def _no_origin(world: World) -> list[str]:
     _on_work(world)
     world.git(world.repo, "remote", "remove", "origin")
@@ -891,7 +906,10 @@ SITES: dict[str, tuple[Case | tuple[Case, ...] | Skip, ...]] = {
         Case(_secret_draft, _baseline_done, operator=_drop_secret),
     ),
     "service.SpecContextService._dead_preflight": (
-        Case(_untracked, _dead_done, operator=_discard_notes),
+        (
+            Case(_untracked, _dead_done, operator=_discard_notes),
+            Case(_two_untracked, _dead_done, operator=_discard_what_the_fix_names),
+        ),
         Case(_no_origin, _dead_done, operator=_origin),
         (
             Case(_unpushed_side_branch, _dead_done),
@@ -1128,5 +1146,7 @@ def test_dead_after_the_operator_pulls_into_a_conflict_publishes_no_markers(
     published = world.remote_heads()["feature/1.0.0"]
     done = world.cli("context", "dead", "proj")
     output = done.stdout + done.stderr
-    assert done.returncode != 0 and "README.md into a worktree, or discard it" in output, output
+    fix = _single_fix(done)
+    assert done.returncode != 0 and "README.md" in fix and "x.md" in fix, output
+    assert fix.endswith("into a worktree, or discard it"), output
     assert world.repo.is_dir() and world.remote_heads()["feature/1.0.0"] == published
