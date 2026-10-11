@@ -94,7 +94,6 @@ def seeded(store: JsonContextStore) -> JsonContextStore:
     pytest.param(False, "proj", "assoc-repo", _URL, None, True, (_ASSOC,), id="A17.1-new-slug-registered-and-persisted"),
     pytest.param(True, "proj", "assoc-repo", _URL, None, False, (_ASSOC,), id="A17.1-same-slug-same-url-idempotent-beside-a-foreign-context"),
     pytest.param(True, "proj", "assoc-repo", _URL + "-renamed", AssociatedRepoConflictError, None, (_ASSOC,), id="A17.1-same-slug-other-url-refused-untouched"),
-    pytest.param(False, "proj", "main-repo", _URL, AssociatedRepoConflictError, None, (), id="A17.3-own-main-slug-refused"),
     pytest.param(False, "nope", "assoc-repo", _URL, ContextNotFoundError, None, (), id="A17.1-unknown-context"),
     pytest.param(False, "proj", "other-repo", _URL, AssociatedRepoConflictError, None, (), id="F-1-slug-owned-by-another-context-as-main"),
     pytest.param(False, "proj", "other-assoc", _URL, AssociatedRepoConflictError, None, (), id="F-1-slug-owned-by-another-context-as-associated"),
@@ -118,6 +117,16 @@ def test_add_repo_refuses_slug_owned_by_another_context_as_main_repo(
         assert service.add_repo(context, slug, url)[1] is added
     stored = seeded.get("proj")
     assert stored is not None and stored.associated_repos == final
+
+
+def test_add_repo_own_main_slug_is_a_no_op(service: SpecContextService, seeded: JsonContextStore) -> None:
+    """A17.2 ruling (operator, 2026-10-11): adding a context's own main slug as an associated repo is an
+    idempotent no-op — the context is returned unchanged, was_added False, the stored record equal before/after."""
+    before = seeded.get("proj")
+    ctx, was_added = service.add_repo("proj", "main-repo", _URL)
+    assert was_added is False
+    assert ctx == before
+    assert seeded.get("proj") == before
 
 
 _OWN = (AssociatedRepo(slug="main-repo", url="u"),)
