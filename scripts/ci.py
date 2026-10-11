@@ -1,6 +1,7 @@
 """The ONE source of the Linux CI jobs and repository verification:
 ``python scripts/ci.py [<job>...]`` runs the named ``ci.yml`` jobs (all of them when none is
-given); ``job`` runs lint, mypy, guards and the small tier. Each step
+given); ``job`` runs lint, mypy, guards and the small tier; ``--changed`` runs the tests
+``scripts/impact.py`` selects. Each step
 prints ``PASS``/``FAIL <step>: <command>``; every step runs; exit 1 if any failed. Standard
 library only: the ``repo-hygiene`` and ``doctor`` jobs install no dev group."""
 
@@ -90,7 +91,7 @@ def plan(argv: list[str]) -> list[tuple[str, Step]]:
 
 
 def main(argv: list[str]) -> int:
-    unknown = [a for a in argv if a not in JOBS and a != "job"]
+    unknown = [a for a in argv if a not in JOBS and a not in ("job", "--changed")]
     if unknown:
         print(
             f"unknown job {', '.join(map(repr, unknown))}; known: job, {', '.join(JOBS)}",
@@ -108,7 +109,21 @@ def main(argv: list[str]) -> int:
         "PYTHONDONTWRITEBYTECODE": "1",
         "DADAIA_FENCED_ROOTS": os.pathsep.join(p for p in fence if p),
     }
-    for job, (name, cmd, env) in plan(argv):
+    steps = [] if argv == ["--changed"] else plan(argv)
+    if argv == ["--changed"]:
+        out = subprocess.run(
+            [PY, "scripts/impact.py"],
+            cwd=ROOT,
+            env=base,
+            text=True,
+            encoding="utf-8",
+            capture_output=True,
+            check=True,
+        ).stdout
+        print(out, end="", flush=True)
+        tests = [ln[6:] for ln in out.splitlines() if ln.startswith("test: ")]
+        steps = [("changed", ("changed tests", [*PYTEST, *tests], {}))] if tests else []
+    for job, (name, cmd, env) in steps:
         print(f"--- {job}: {name}", flush=True)
         step_env = {**base, **env}
         code = subprocess.run(cmd, cwd=ROOT, env=step_env, check=False).returncode
