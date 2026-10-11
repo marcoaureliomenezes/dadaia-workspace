@@ -62,7 +62,7 @@ Operator: "Triagem + gerada (Recommended)", "ADR que supersede (Recommended)", "
 - AC2.1 (no test — reviewer sweep): The scaffold ADR law states the three-leg threshold in one line: one-way door, architecturally significant, at least two genuine options.
 - AC2.2 (unit, RED first): `decision-record-v1` carries `options` (at least two of `name`, `tradeoff`, `rejected_because`), required for ids above 0246 (0246 was accepted without it); every existing record still validates.
 - AC2.3 (no test — law line): `ruling.words` carries the question and the chosen option, never only an answer id.
-- AC2.4 (no test — ledger): ADR 0246 was accepted at `54c85077b`, ADR 0242 at `80012b7be`. The operator gives the words for 0243, 0244 and 0245 at SPEC and PLAN approval; each acceptance commit lands in the Reconciliation, paired with its canonical-memory hunk (§3a row 2).
+- AC2.4 (no test — ledger): ADR 0246 was accepted at `54c85077b`, ADR 0242 at `80012b7be`. The operator gives the words for 0243, 0244 and 0245 in the reconcile tree, in the turn the main thread writes each acceptance commit, paired with its canonical-memory hunk (ADR law §2, §3a row 2).
 - AC2.5 (no test — reviewer sweep): `git grep -n found_in -- dadaia_workspace tests` returns nothing.
 
 #### FR3 — status only in the ledger (`architecture-adr-section-generated`, Wave 1 part)
@@ -132,7 +132,7 @@ The owner is `_frontmatter.py` in `dd-bug-resolution/scripts`, a stdlib strict s
 
 - AC13.1 (unit, RED first): `a--b` is accepted or refused alike by backlog, the schema, `verdict.py` and the worktree name parser, all reading the one owner.
 
-#### FR14 — the release ledger owner, `_release_schema` (bugs `worktree-new-crashes-on-an-unreadable-release-state`, `release-check-admits-a-dag-that-phase-refuses`, `release-new-orphans-a-drafted-next-rc`)
+#### FR14 — the release ledger: grammars and state reader in the kernel (`_grammar.py`, `_jsonl.parse_object`), release-only rules in `_release_schema` (bugs `worktree-new-crashes-on-an-unreadable-release-state`, `release-check-admits-a-dag-that-phase-refuses`, `release-new-orphans-a-drafted-next-rc`)
 
 - AC14.1 (integration, RED first): A missing, malformed or non-object `_RELEASE.json` refuses job admission with `Error:` and one `fix:` line; no branch or worktree; one parser, the raw read in `_worktree_new.py` deleted.
 - AC14.2 (integration, RED first): A DAG that differs from its `tasks/job<n>.md` fails `release.py check` with `phase`'s message; one comparison.
@@ -205,7 +205,7 @@ The entries with work exit `delivered`, except `architecture-adr-section-generat
 ### Governance sequencing
 
 1. ADR 0246 is accepted (`54c85077b`, amends 0135). Under rule M2 the main thread sets the fields of the others at acceptance: 0244 supersedes 0205 and amends 0187; 0245 amends 0165.
-2. One rule: the operator gives the words for 0243, 0244 and 0245 at SPEC and PLAN approval; each acceptance commit lands in the Reconciliation with its canonical-memory hunk; 0245's hunk is the label strip.
+2. One rule: the operator gives the words for 0243, 0244 and 0245 in the reconcile tree, in the turn of each acceptance commit, paired with its canonical-memory hunk; 0245's hunk is the label strip.
 
 ### Delivery constraints
 
