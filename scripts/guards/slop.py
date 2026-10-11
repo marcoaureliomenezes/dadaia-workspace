@@ -49,7 +49,6 @@ v37* public/skills/dd-bug-resolution/scripts/_grammar.py:CANDIDATE_RE parity:tes
 v37* public/skills/dd-bug-resolution/scripts/_grammar.py:candidate_dir parity:tests/public/skills/dd_release_implementation/scripts/test_release__release_script.py
 v37* public/skills/dd-bug-resolution/scripts/_grammar.py:candidate_number parity:tests/public/skills/dd_release_implementation/scripts/test_release__release_script.py
 v38 public/skills/dd-bug-resolution/scripts/_atomic.py:atomic_write parity:tests/public/skills/dd_bug_resolution/scripts/test__atomic.py
-v38* public/skills/dd-bug-resolution/scripts/_ledger.py:replace parity:tests/public/skills/dd_bug_resolution/scripts/test__ledger.py
 v38* features/certification/service.py:certify parity:tests/features/certification/test_service.py
 v38* features/migrate/state_v2.py:execute_migration parity:tests/features/migrate/test_state_v2.py
 v38* features/specs/doctor_memory.py:fix_placeholder_atom parity:tests/features/specs/test_canon__scaffold_placeholder_repair.py
