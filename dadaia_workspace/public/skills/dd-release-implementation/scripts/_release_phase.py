@@ -63,6 +63,7 @@ def _refuse_open_worktrees(specs: Path) -> None:
         return
     sys.path.append(str(Path(__file__).resolve().parents[2] / "dd-gitflow-default" / "scripts"))
     import _worktree_git as worktree_git  # the worktrees' owner, read-only (ADR 0135)
+    from _worktree_names import NAME_RE
     from _worktree_names import Refusal as WorktreeRefusal
 
     top = worktree_git.git(specs, "rev-parse", "--path-format=absolute", "--show-toplevel",
@@ -72,7 +73,10 @@ def _refuse_open_worktrees(specs: Path) -> None:
     except WorktreeRefusal as error:
         raise Refusal(f"worktree rows unreadable: {error}", error.fix) from error
     repo = Path(top[1]).parent.name
+    live = live_release(specs)  # ADR 0241: rc N+1's define tree stays open across rc N's closure
+    nxt = f"{live.release_id}-rc{int(str(live.candidate.name)[3:]) + 1}"  # type: ignore[union-attr]
     held = [r for r in found if r["repo"] == repo and r["exit"]
+            and not ((m := NAME_RE.match(str(r.get("name")))) and (m["rc"], m["job"]) == (nxt, "define"))
             and Path(str(r["path"])).resolve() != Path(top[0]).resolve()]  # fmt: skip
     if held:
         raise Refusal(f"repos/{repo} still holds {len(held)} open wt/* worktree(s) — a "
