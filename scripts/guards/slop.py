@@ -1,7 +1,7 @@
 """Slop checks: the package's slop ratchets (V32, V37-V41), the doctor section subset,
 the suppressed layering-edge cap (ARCHITECTURE P-10) and no file-size pin (ADR 0143).
 
-``ALLOWANCES`` (V37-V39) is data each check reads from the tree's own copy of this file, so
+``ALLOWANCES`` (V38-V39) is data each check reads from the tree's own copy of this file, so
 a plant edits it like any tracked file. A row is ``<check>[*] <key> <value>``: ``*`` marks a
 key there at birth (the allowance only shrinks); a value is ``parity:<test file>``, an open
 bug id, ``report-only`` (v39) or ``-`` (a birth key no longer allowed).
@@ -37,17 +37,10 @@ _LEDGER = load_owner("dd-bug-resolution", "_ledger")
 # removes a hit, never raise one.
 V32_COMMENTS, V32_DOCSTRINGS, IGNORE_EDGES = 109, 215, 0
 
-# v37: the candidate-folder pair (ADR 0150): the stdlib scripts cannot import the package, so
-# each side keeps its twin and one test pins them equal. v38: each deleter outside sweep,
+# v38: each deleter outside sweep,
 # keyed to the test pinning its delete (a stdlib skill script cannot import the sweep, so its
 # row is unstarred when its value is parity:<test>). v39: a doctor code with no fix-clears plant.
 ALLOWANCES = """
-v37* core/gitflow.py:candidate_dir parity:tests/public/skills/dd_release_implementation/scripts/test_release__release_script.py
-v37* core/gitflow.py:candidate_number parity:tests/public/skills/dd_release_implementation/scripts/test_release__release_script.py
-v37* core/release_state.py:CANDIDATE_RE parity:tests/public/skills/dd_release_implementation/scripts/test_release__release_script.py
-v37* public/skills/dd-bug-resolution/scripts/_grammar.py:CANDIDATE_RE parity:tests/public/skills/dd_release_implementation/scripts/test_release__release_script.py
-v37* public/skills/dd-bug-resolution/scripts/_grammar.py:candidate_dir parity:tests/public/skills/dd_release_implementation/scripts/test_release__release_script.py
-v37* public/skills/dd-bug-resolution/scripts/_grammar.py:candidate_number parity:tests/public/skills/dd_release_implementation/scripts/test_release__release_script.py
 v38 public/skills/dd-bug-resolution/scripts/_atomic.py:atomic_write parity:tests/public/skills/dd_bug_resolution/scripts/test__atomic.py
 v38* features/certification/service.py:certify parity:tests/features/certification/test_service.py
 v38* features/migrate/state_v2.py:execute_migration parity:tests/features/migrate/test_state_v2.py
@@ -178,7 +171,7 @@ def v37(tree: Tree) -> list[str]:
             if (found := _definition(node)) is not None:
                 homes[found].add(rel[len(PKG) + 1 :])
     hits = {f"{rel}:{d[0]}": d[2] for d, rels in homes.items() if len(rels) > 1 for rel in rels}
-    return _allowance(tree, hits, "v37")
+    return sorted(f"{rule}: {key}" for key, rule in hits.items())
 
 
 _DELETES, _OS_DELETES = {"rmtree", "unlink", "rmdir", "removedirs"}, {"remove", "move"}
@@ -438,12 +431,6 @@ def CONTROL(root: Path) -> Session:
     rows = _table((ROOT / SELF).read_text("utf-8"))
     for i, (check, key, value) in enumerate(rows):
         rel, _, sym = key.partition(":")
-        if check == "v37*":
-            _write(
-                root,
-                f"{PKG}/{rel}",
-                f"{sym} = compile('x')\n" if sym.isupper() else f"def {sym}(p):\n    return p\n",
-            )
         if check.rstrip("*") == "v38":
             _write(root, f"{PKG}/{rel}", f"def {sym}(p, q):\n    {_DELETERS[i % 6]}\n")
         if value.startswith("parity:"):
@@ -497,6 +484,14 @@ def _add(rel: str, text: str | Callable[[], str]) -> Plant:
     return _plant(lambda root: _write(root, rel, text if isinstance(text, str) else text()))
 
 
+def _twins(text: str) -> Plant:
+    def write(root: Path) -> None:
+        for n in "12":
+            _write(root, f"{PKG}/zz/twin{n}.py", text)
+
+    return _plant(write)
+
+
 def _rows(check: str, bad: str) -> dict[str, Plant]:
     """One plant per allowance sub-rule, each editing the first allowed row of *check*."""
     rules: dict[str, Callable[[list[str]], str]] = {
@@ -515,12 +510,6 @@ def _rows(check: str, bad: str) -> dict[str, Plant]:
 def _born_package_row(root: Path) -> None:
     _write(root, f"{PKG}/zz/tidy.py", "def tidy(p):\n    p.unlink()\n")
     _edit_row(root, "v38", lambda r: f"{' '.join(r)}\nv38 zz/tidy.py:tidy {r[2]}")
-
-
-def _first(constant: bool) -> str:
-    """The first v37 key's symbol of the real table that is (or is not) a constant."""
-    syms = [r[1].split(":")[1] for r in _table((ROOT / SELF).read_text("utf-8")) if r[0] == "v37*"]
-    return min(s for s in syms if s.isupper() == constant)
 
 
 def _doctor(codes: list[str], covered: list[str]) -> Plant:
@@ -575,16 +564,15 @@ no-size-pin read_text tests/unit/test_pin.py ok = len(p.read_text()) > 4096\n
 no-size-pin readlines tests/unit/test_pin.py ok = len(f.readlines()) < 9\n
 no-size-pin read tests/unit/test_pin.py ok = len(f.read()) >= 9\n
 """
-_TWIN, _EDGE = f"{PKG}/zz/twin.py", f"{PKG}.features.zz -> {PKG}.features.yy"
+_EDGE = f"{PKG}.features.zz -> {PKG}.features.yy"
 _PLANTS: dict[str, dict[str, Plant]] = {
     "v32": {
         "comment-ids": _ids_plant(V32_COMMENTS + 1, V32_DOCSTRINGS),
         "docstring-ids": _ids_plant(V32_COMMENTS, V32_DOCSTRINGS + 1),
     },
     "v37": {
-        "function-twin": _add(_TWIN, lambda: f"def {_first(False)}(p):\n    return p\n"),
-        "constant-twin": _add(_TWIN, lambda: f"{_first(True)}: object = compile('x')\n"),
-        **_rows("v37", "report-only"),
+        "function-twin": _twins("def twin(p):\n    return p\n"),
+        "constant-twin": _twins("TWIN: object = compile('x')\n"),
     },
     "v38": {
         **_rows("v38", "zz-shut"),
