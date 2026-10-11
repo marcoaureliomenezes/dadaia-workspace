@@ -12,8 +12,7 @@ import re
 import sys
 from pathlib import Path
 
-# No `__pycache__` beside a projected skill; `_ledger.py` is staged beside this script
-# (the source tree keeps it in dd-bug-resolution).
+# No `__pycache__` beside a projected skill.
 sys.dont_write_bytecode = True
 #: One bootstrap statement: this folder and the kernel, at the front.
 sys.path[:0] = [

@@ -2,9 +2,9 @@
 """Stdlib-pure privacy matching and masking primitives, and the ONE parser of the packaged
 baseline (:func:`load_baseline`, ``privacy_baseline.json`` beside this file).
 
-``public stage`` copies this file beside every ledger script, so the ledger seam asks the
-push's own question: which matches are fresh against the published text, and where
-"published" is (:func:`publication_boundaries`, git run by the caller).
+The ledger seam asks the push's own question: which matches are fresh against the
+published text, and where "published" is (:func:`publication_boundaries`, git run by the
+caller).
 """
 
 from __future__ import annotations

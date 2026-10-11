@@ -3,7 +3,7 @@
 documents are read with — `backlog.py`'s one validation primitive.
 
 The schemas are ``schemas/backlog-v1.schema.json`` and
-``schemas/histo-record-v1.schema.json`` beside this file, copies `public stage` makes.
+``schemas/histo-record-v1.schema.json`` beside this file.
 """
 
 from __future__ import annotations

@@ -1,7 +1,7 @@
 """The typed ``intents[]`` of a backlog item: ``(subject{kind,ref,surface} -> change)``.
 
 Plain constructors. The grammar (kinds, the repo-relative ``path[#word]`` code-ref rule,
-no extra keys) is ``public/schemas/backlog/backlog-v1.schema.json`` alone; resolution is
+no extra keys) is ``public/skills/dd-backlog-definition/scripts/schemas/backlog-v1.schema.json`` alone; resolution is
 ``features/backlog/subject_registry.py``'s.
 """
 

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Which specs tree a ledger script acts on, and the ONE fix-line builder every ledger
-script prints through, staged beside each one like `_ledger.py`."""
+script prints through."""
 
 from __future__ import annotations
 
@@ -10,7 +10,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-from _ledger import parse as parse  # the one door to the sibling skill
+from _ledger import parse as parse
 from _platform import detect, venv_tool
 from _root import workspace_of as workspace_of
 

@@ -3,7 +3,7 @@
 
 Every write in `bugs.py` runs :func:`findings_for` over the bytes it is about to
 commit, so a writer/validator disagreement is unrepresentable. The schema is
-``schemas/bug-record-v1.schema.json`` beside this file, a copy `public stage` makes.
+``schemas/bug-record-v1.schema.json`` beside this file.
 """
 
 from __future__ import annotations
