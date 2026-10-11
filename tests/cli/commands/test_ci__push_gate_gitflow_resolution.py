@@ -78,8 +78,8 @@ def test_an_absent_specs_tree_is_reported_as_absent_with_the_specs_init_fix(
     ci._gate_inputs(app, "")
     err = capsys.readouterr().err
     assert "no specs/constitution.md" in err
-    fixes = [line for line in err.splitlines() if line.startswith("fix: ")]
-    assert fixes == [f"fix: {fix_line(None, 'specs', 'init', '--specs-dir', str(app / 'specs'))}"]
+    fixes = [line for line in err.splitlines() if line.startswith("hint: ")]
+    assert fixes == [f"hint: {fix_line(None, 'specs', 'init', '--specs-dir', str(app / 'specs'))}"]
 
 
 def test_a_committed_constitution_without_a_block_keeps_the_no_block_warning(
