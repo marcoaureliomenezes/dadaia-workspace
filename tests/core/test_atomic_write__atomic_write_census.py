@@ -14,10 +14,10 @@ from tests.helpers.scan_population import assert_populated
 _REPO_ROOT = Path(__file__).resolve().parents[2]
 _PACKAGE_ROOT = _REPO_ROOT / "dadaia_workspace"
 
-#: The two homes, proven by scan: the package's writer, and the stdlib ledger scripts'
-#: one writer, staged beside each script (a skill script cannot import the package).
+#: The homes, proven by scan: the bug skill's one writer (``core/atomic_write.py`` is a shim
+#: over it), plus ``_ledger.replace`` until J1.T11 deletes it.
 _EXPECTED_DEFINITIONS = [
-    "dadaia_workspace/core/atomic_write.py:atomic_write",
+    "dadaia_workspace/public/skills/dd-bug-resolution/scripts/_atomic.py:atomic_write",
     "dadaia_workspace/public/skills/dd-bug-resolution/scripts/_ledger.py:replace",
 ]
 
@@ -91,6 +91,6 @@ def test_only_core_atomic_write_defines_the_temp_then_replace_idiom() -> None:
     hits = _temp_then_replace_writer_defs(_PACKAGE_ROOT)
 
     assert hits == _EXPECTED_DEFINITIONS, (
-        "a temp-then-replace content writer exists outside core/atomic_write.py — "
+        "a temp-then-replace content writer exists outside _atomic.py — "
         f"route it through core.atomic_write.atomic_write instead (A2.2): {hits}"
     )
