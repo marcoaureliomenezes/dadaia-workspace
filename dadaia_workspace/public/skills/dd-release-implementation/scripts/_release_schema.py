@@ -8,17 +8,20 @@ import functools
 import json
 import re
 import subprocess
-from collections.abc import Iterable
 from pathlib import Path
 
+# isort: off
+from _grammar import CANDIDATE_RE as CANDIDATE_RE, SEMVER_RE as SEMVER_RE, SHA_RE as SHA_RE
+from _grammar import STATE as STATE, STATUS_RE, TASK_ID_RE as TASK_ID_RE
+from _grammar import candidate_dir as candidate_dir, candidate_number as candidate_number
+from _grammar import live_ids as live_ids
+# isort: on
+
 CODE = "LEDGER-RELEASE-SCHEMA"
-STATE = "_RELEASE.json"
 HISTO = "releases/_archive/releases_histo.jsonl"
 #: One candidate's documents, born in its own `rc-<N>/` and never rewritten after closure; its
 #: tasks live in one job file per job, `rc-<N>/tasks/job<n>.md` (a closed rc keeps `TASKS.md`).
 CANDIDATE_DOCS = ("SPEC.md", "PLAN.md")
-#: A candidate folder; the live one is the highest N — `core.release_state.CANDIDATE_RE`.
-CANDIDATE_RE = re.compile(r"^rc-([1-9][0-9]*)$")
 #: The three lifecycle phases — pinned equal to the schema's enum; a shipped release
 #: moves whole to `_archive/<v>/` (ADR 0152 (1)).
 PHASES = ("DEFINITION", "IMPLEMENTATION", "CLOSURE")
@@ -27,19 +30,14 @@ TRIO_PHASES = frozenset({"IMPLEMENTATION", "CLOSURE"})
 #: A release ships `delivered` — the one histo disposition this ledger writes.
 DELIVERED = "delivered"
 APPROVED = "Approved"
-SEMVER_RE = re.compile(r"^\d+\.\d+\.\d+$")
-#: A shipped commit sha as a human pastes it from a merge: short (7) to full (40).
-SHA_RE = re.compile(r"^[0-9a-f]{7,40}$")
 #: The task markers in order — open < reserved < done (ADR 0111); the ONE task-line grammar.
 MARKS = (" ", "-", "x")
 #: A task line: indent and any Markdown bullet (``-``, ``*``, ``+``) or none, the marker, the rest.
 MARK_RE = re.compile(r"^([ \t]*(?:[-*+][ \t]*)?\[)([ x-])(\].*)$", re.MULTILINE)
-_STATUS_RE = re.compile(r"^\*\*Status:\*\*\s*(.+?)\s*$", re.MULTILINE)
 #: The Origin clause kinds, each at most once on the line (ADR 0161).
 ORIGIN_KINDS = ("backlog", "bugs", "findings")
 _ORIGIN_RE = re.compile(r"^\*\*Origin:\*\*[ \t]*(.*?)[ \t]*$", re.MULTILINE)
 _ORIGIN_GRAMMAR = "operator-demand | backlog:<ids>; bugs:<ids>; findings:<ids>, each kind once"
-TASK_ID_RE = re.compile(r"^J[1-9][0-9]*(?:\.S[1-9][0-9]*)?\.T[1-9][0-9]*$")
 
 
 def utc_now() -> str:
@@ -48,7 +46,7 @@ def utc_now() -> str:
 
 def extract_status(text: str) -> str | None:
     """The ``**Status:**`` token a trio document carries, or ``None``."""
-    match = _STATUS_RE.search(text)
+    match = STATUS_RE.search(text)
     return match.group(1) if match else None
 
 
@@ -58,19 +56,6 @@ class ShallowClone(ValueError):
 
 class Unreadable(ValueError):
     """A release state or the history `candidate_at` reads is unreadable; ``args[1]`` is the act."""
-
-
-def live_ids(specs: Path) -> list[str]:
-    """Every SemVer-named release directory directly under ``releases/`` carrying a state
-    document — `_archive` is not live."""
-    releases = specs / "releases"
-    if not releases.is_dir():
-        return []
-    return sorted(
-        d.name
-        for d in releases.iterdir()
-        if d.is_dir() and SEMVER_RE.match(d.name) and (d / STATE).is_file()
-    )
 
 
 def live_id(specs: Path) -> str:
@@ -172,18 +157,6 @@ def origin_line(text: str) -> int:
     """The 1-based line :func:`origin` reads, 1 when there is none."""
     match = _ORIGIN_RE.search(text)
     return text.count("\n", 0, match.start()) + 1 if match else 1
-
-
-def candidate_number(names: Iterable[str]) -> int:
-    """The highest ``rc-<N>`` among *names*, 0 when none — the live candidate's number."""
-    return max((int(m.group(1)) for n in names if (m := CANDIDATE_RE.match(n))), default=0)
-
-
-def candidate_dir(release_dir: Path) -> Path | None:
-    """The highest-numbered ``rc-<N>/`` under *release_dir* (ADR 0150) —
-    `core.gitflow.candidate_dir`'s twin; ``None`` when there is none."""
-    n = candidate_number(d.name for d in release_dir.iterdir() if d.is_dir())
-    return release_dir / f"rc-{n}" if n else None
 
 
 def next_candidate(release_dir: Path) -> Path:

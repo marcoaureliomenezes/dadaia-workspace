@@ -20,6 +20,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from _bugs_check import TERMINAL, load_schema  # noqa: E402
 from _bugs_store import Records, Refusal, by_id  # noqa: E402
+from _clock import now_iso as now_iso  # noqa: E402
 from _specs import choice, script  # noqa: E402
 
 _MUTABILITY = {k: v["x-mutability"] for k, v in load_schema()["properties"].items()}
@@ -32,10 +33,6 @@ _TRANSITIONS = ("resolve", "supersede", "reject")
 _VERB_OWNED = {"status": _TRANSITIONS, "closed_at": _TRANSITIONS, "superseded_by": ("supersede",),
                }  # fmt: skip
 _SCRIPT = script(Path(__file__).parent / "bugs.py")
-
-
-def now_iso() -> str:
-    return _dt.datetime.now(tz=_dt.UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
 def candidates(records: Records, surface: object) -> list[str]:

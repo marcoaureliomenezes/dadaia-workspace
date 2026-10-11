@@ -8,13 +8,13 @@ import subprocess
 from pathlib import Path
 
 
-def _env() -> dict[str, str]:
+def scrubbed_env() -> dict[str, str]:
     return {k: v for k, v in os.environ.items() if not k.startswith("GIT_")}
 
 
 def git(repo: Path, *args: str, check: bool = True, input: str | None = None) -> str:
     done = subprocess.run(
-        ["git", "-C", str(repo), *args], env=_env(), capture_output=True, text=True, encoding="utf-8", errors="replace", input=input
+        ["git", "-C", str(repo), *args], env=scrubbed_env(), capture_output=True, text=True, encoding="utf-8", errors="replace", input=input
     )  # fmt: skip
     if check and done.returncode:
         raise RuntimeError(f"git {' '.join(args)}: {done.stderr.strip()}")

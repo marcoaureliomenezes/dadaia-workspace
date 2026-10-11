@@ -15,6 +15,7 @@ from pathlib import Path
 
 sys.path.append(str(Path(__file__).resolve().parents[2] / "dd-bug-resolution" / "scripts"))
 
+from _git import git as git, scrubbed_env as _env  # noqa: E402  # isort: skip
 from _specs import git_line as git_line  # noqa: E402
 from _specs import head  # noqa: E402
 from _specs import quote as quote  # noqa: E402  (`as`: re-exported to the worktree verbs)
@@ -23,19 +24,6 @@ from _specs import workspace_of as workspace_of  # noqa: E402
 from _worktree_names import NAME_RE, SCRIPT, Refusal, base, branch, name_of, plain  # noqa: E402
 
 _TAG_RE = re.compile(r"^v?(\d+)\.(\d+)\.(\d+)$")
-
-
-def _env() -> dict[str, str]:
-    return {k: v for k, v in os.environ.items() if not k.startswith("GIT_")}
-
-
-def git(repo: Path, *args: str, check: bool = True, input: str | None = None) -> str:
-    done = subprocess.run(
-        ["git", "-C", str(repo), *args], env=_env(), capture_output=True, text=True, encoding="utf-8", errors="replace", input=input
-    )  # fmt: skip
-    if check and done.returncode:
-        raise RuntimeError(f"git {' '.join(args)}: {done.stderr.strip()}")
-    return done.stdout
 
 
 def diff_sha256(tree: Path, work: str, tip: str) -> str:
