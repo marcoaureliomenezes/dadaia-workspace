@@ -469,7 +469,7 @@ _HISTORY = re.compile(r"^#{1,6}\s*(Changelog|History|Hist[oó]rico|Versions)\b",
 _PRINCIPLE = re.compile(r"^### P-(\d{2}) ·.*$", re.M)
 _BLOCK_END = re.compile(r"^(?:### P-\d{2} ·|## )", re.M)
 _MEASURED = re.compile(r"^Measured by: .+$", re.M)
-_ADR_LINE = re.compile(r"^ADR: (?:none|(\d{4}) \((?:proposed|accepted)\b.*\))\s*$", re.M)
+_ADR_LINE = re.compile(r"^ADR: (?:none\s*|(\d{4})\b.*)$", re.M)
 
 
 def memory_canonical_shape(tree: Tree) -> list[str]:
@@ -514,7 +514,7 @@ def memory_canonical_shape(tree: Tree) -> list[str]:
             if not _MEASURED.search(body):
                 out.append(f"measured-line: {name} P-{pid} lacks `Measured by:`")
             if not (adr := _ADR_LINE.search(body)):
-                out.append(f"adr-line: {name} P-{pid} lacks `ADR: NNNN (...)` or `ADR: none`")
+                out.append(f"adr-line: {name} P-{pid} lacks `ADR: NNNN` or `ADR: none`")
             elif adr.group(1) and adr.group(1) not in known:
                 out.append(f"adr-exists: {name} P-{pid} cites missing ADR {adr.group(1)}")
     return out
@@ -1113,7 +1113,7 @@ CHECKS: dict[str, Check] = {
             "adr-line": _edit(_A, "\nADR: none\n", "\nADR: nope\n"),
             "no-principles": _re(_Q, r"(?m)^### P-", "### Q-"),
             "unique-ids": _edit(_Q, "### P-2", "### P-0"),
-            "adr-exists": _edit(_A, "ADR: 0001 (accepted)", "ADR: 9999 (accepted)"),
+            "adr-exists": _edit(_A, "ADR: 0001", "ADR: 9999"),
             "principle-placement": _edit(
                 _A, "\n## Structure", "\n### P-99 · x\nMeasured by: x\nADR: none\n\n## Structure"
             ),
