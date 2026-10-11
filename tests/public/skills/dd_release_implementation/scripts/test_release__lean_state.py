@@ -10,6 +10,7 @@ from pathlib import Path
 
 import pytest
 
+from dadaia_workspace.core.skill_owner import load_owner
 from tests.fixtures.harness_env import suite_env
 from tests.helpers.skill_scripts import stage_skill_scripts
 
@@ -219,7 +220,6 @@ def test_ship_requires_each_open_bug_flag_and_its_verbatim_authorization_note(
             {
                 "id": "a-bug",
                 "status": "open",
-                "found_in": {"release": "0.5.0", "rc": "rc-1"},
             }
         )
         + "\n",
@@ -276,16 +276,12 @@ def test_closure_check_needs_the_memory_entry_but_not_git(script: Path, tmp_path
 
 
 @pytest.mark.parametrize(
-    ("found_in", "live_candidate"),
-    [
-        pytest.param({"release": "0.5.0", "rc": "rc-1"}, "rc-2", id="older-candidate"),
-        pytest.param({"release": "0.4.9", "rc": "rc-3"}, "rc-1", id="other-release"),
-    ],
+    "live_candidate",
+    [pytest.param("rc-2", id="older-candidate"), pytest.param("rc-1", id="other-release")],
 )
 def test_ship_refuses_every_open_bug_then_carries_each_authorized_id(
     script: Path,
     tmp_path: Path,
-    found_in: dict[str, str],
     live_candidate: str,
 ) -> None:
     authorization = 'Operator authorization verbatim: "carry a-bug open"'
@@ -312,7 +308,7 @@ def test_ship_refuses_every_open_bug_then_carries_each_authorized_id(
     bugs = specs / "bugs" / "BUGS.jsonl"
     bugs.parent.mkdir()
     bugs.write_text(
-        json.dumps({"id": "a-bug", "status": "open", "found_in": found_in}) + "\n",
+        json.dumps({"id": "a-bug", "status": "open"}) + "\n",
         encoding="utf-8",
     )
     state = release / "_RELEASE.json"
@@ -344,3 +340,78 @@ def test_ship_refuses_every_open_bug_then_carries_each_authorized_id(
         specs.joinpath("releases/_archive/0.5.0/_RELEASE.json").read_text("utf-8")
     )
     assert authorization in [entry["text"] for entry in archived["log"]]
+
+
+# --- J1.T21 (rc-14, AC14.1/AC14.3): one state reader, a drafted rc-2 adopted, `origin` ---
+
+
+def _jsonl_owner():  # noqa: ANN202
+    return load_owner("dd-bug-resolution", "_jsonl")
+
+
+def test_parse_object_returns_a_state_document() -> None:
+    assert _jsonl_owner().parse_object('{"phase": "CLOSURE"}', "fix it") == {"phase": "CLOSURE"}
+
+
+@pytest.mark.parametrize("text", ["", "{not json", "[1, 2]"], ids=["empty", "malformed", "list"])
+def test_parse_object_refuses_with_the_callers_act(text: str) -> None:
+    refusal = load_owner("dd-bug-resolution", "_refusal")
+    owner = _jsonl_owner()
+    with pytest.raises(owner.Unreadable) as raised:
+        owner.parse_object(text, "restore _RELEASE.json from git")
+    assert isinstance(raised.value, refusal.Refusal)
+    assert raised.value.fix == "restore _RELEASE.json from git"
+
+
+def _closed_with_draft(tmp_path: Path) -> tuple[Path, Path, bytes]:
+    specs = _specs(tmp_path)
+    release = _write_release(specs, phase="CLOSURE")
+    draft = release / "rc-2" / "SPEC.md"
+    draft.parent.mkdir()
+    draft.with_name("PLAN.md").write_bytes(release.joinpath("rc-1/PLAN.md").read_bytes())
+    draft.write_bytes(b"# SPEC\n\n**Status:** Draft\n**Origin:** operator-demand\n")
+    return specs, release, draft.read_bytes()
+
+
+def test_new_at_closure_adopts_the_drafted_next_candidate(script: Path, tmp_path: Path) -> None:
+    specs, release, draft = _closed_with_draft(tmp_path)
+    born = _run(script, "new", "0.5.0", "--specs", str(specs))
+    assert born.returncode == 0, born.stderr
+    assert release.joinpath("rc-2/SPEC.md").read_bytes() == draft
+    assert not release.joinpath("rc-3").exists()
+    assert json.loads(release.joinpath("_RELEASE.json").read_text("utf-8"))["phase"] == "DEFINITION"
+
+
+def test_a_refused_birth_leaves_the_draft_in_place(script: Path, tmp_path: Path) -> None:
+    specs, release, draft = _closed_with_draft(tmp_path)
+    refused = _run(script, "new", "0.6.0", "--specs", str(specs))
+    assert refused.returncode == 1
+    assert release.joinpath("rc-2/SPEC.md").read_bytes() == draft
+    assert not release.joinpath("rc-3").exists()
+
+
+@pytest.mark.parametrize(
+    ("line", "printed"),
+    [
+        ("operator-demand", ""),
+        ("backlog:a-1, b-2; bugs:x-bug", "backlog a-1\nbacklog b-2\nbugs x-bug\n"),
+        ("findings:f-1; backlog:a-1", "backlog a-1\nfindings f-1\n"),
+    ],
+)
+def test_origin_prints_the_ids_by_kind(
+    script: Path, tmp_path: Path, line: str, printed: str
+) -> None:
+    spec = tmp_path / "SPEC.md"
+    spec.write_text(f"# SPEC\n\n**Origin:** {line}\n", encoding="utf-8")
+    shown = _run(script, "origin", str(spec))
+    assert (shown.returncode, shown.stdout) == (0, printed)
+
+
+def test_origin_refuses_a_malformed_line_with_one_fix_line(script: Path, tmp_path: Path) -> None:
+    spec = tmp_path / "SPEC.md"
+    spec.write_text("# SPEC\n\n**Origin:** backlog:\n", encoding="utf-8")
+    refused = _run(script, "origin", str(spec))
+    assert refused.returncode == 1
+    assert refused.stdout == ""
+    assert refused.stderr.startswith("Error: ")
+    assert len([row for row in refused.stderr.splitlines() if row.startswith("fix:")]) == 1
