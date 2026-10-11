@@ -8,24 +8,22 @@ dies only after a day of silence, never a pause. The bind-CLI ``pid`` is never c
 from __future__ import annotations
 
 import json
-import re
 from collections.abc import Callable
 from datetime import UTC, datetime
 from pathlib import Path
 
 from dadaia_workspace.core.atomic_write import atomic_write
+from dadaia_workspace.core.models.spec_context import CONTEXT_NAME_RE as _NAME_RE
 
 __all__ = [
     "SESSION_HEARTBEAT_FIELD",
+    "parse_instant",
     "read_session",
     "session_record_path",
     "sessions_dir",
     "touch_last_seen_at",
     "write_session",
 ]
-
-#: Path-traversal allowlist (CWE-22/CWE-59) for filename components.
-_NAME_RE = re.compile(r"[A-Za-z0-9_-]+")
 
 SESSION_HEARTBEAT_FIELD = "last_seen_at"
 SESSION_GC_TTL_SECONDS = 86400
@@ -92,14 +90,22 @@ def new_binding_record(
     }
 
 
+def parse_instant(raw: object) -> datetime | None:
+    """The one instant reader: an ISO string, a naive one read as UTC; else ``None``."""
+    try:
+        seen = datetime.fromisoformat(str(raw))
+    except ValueError:
+        return None
+    return seen if seen.tzinfo else seen.replace(tzinfo=UTC)
+
+
 def is_live(record: dict[str, object], *, clock: Callable[[], datetime] | None = None) -> bool:
     """``last_seen_at`` younger than the TTL; a missing or unparsable one is not live."""
-    try:
-        seen = datetime.fromisoformat(str(record.get(SESSION_HEARTBEAT_FIELD)))
-    except ValueError:
+    seen = parse_instant(record.get(SESSION_HEARTBEAT_FIELD))
+    if seen is None:
         return False
     now = clock() if clock is not None else datetime.now(tz=UTC)
-    age = now - (seen if seen.tzinfo else seen.replace(tzinfo=UTC))
+    age = now - seen
     return age.total_seconds() < SESSION_GC_TTL_SECONDS
 
 

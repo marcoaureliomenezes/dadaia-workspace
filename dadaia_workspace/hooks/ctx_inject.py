@@ -27,11 +27,10 @@ _COMPACT_PREFIX = "ctx-compact-"
 
 def _session_bound_at(workspace: Path, session_id: str) -> float | None:
     record = session_store.read_session(workspace, session_id)
-    raw = record.get("bound_at") if isinstance(record, dict) else None
-    try:
-        return datetime.fromisoformat(raw).timestamp() if isinstance(raw, str) else None
-    except ValueError:
-        return None
+    bound = (
+        session_store.parse_instant(record.get("bound_at")) if isinstance(record, dict) else None
+    )
+    return bound.timestamp() if bound else None
 
 
 def _resolve_context() -> str:
