@@ -811,3 +811,50 @@ def test_new_help_states_the_origin_grammar_the_parser_enforces(script: Path) ->
     result = _run(script, "new", "--help")
     assert result.returncode == 0
     assert grammar in " ".join(result.stdout.split())
+
+
+# ── one DAG-vs-job-files decider (AC14.2) ─────────────────────────────────────
+
+_JOB1 = (
+    "# Job 1\n\n| task | who | AC | `W:` | outcome |\n|---|---|---|---|---|\n"
+    "| J1.T1 | sr | AC1.1 | `src/x.py` | x |\n"
+)
+_DAG_HEAD = (
+    "## 1. As-is review\n\n## DAG\n\n| job | waits on | wave | W: |\n|---|---|---|---|\n"
+    "| Job 1 | — | 1 | `src/x.py` |\n"
+)
+
+
+def _dag_tree(tmp_path: Path, *, extra_dag_job: bool) -> Path:
+    """A DEFINITION release whose DAG names Job 1 (and, mismatched, Job 2) and whose
+    tasks/ holds job1.md only."""
+    specs = _specs(tmp_path)
+    release_dir = _release(specs, "0.5.0", tasks="- [ ] T-1 — open\n")
+    plan = _DAG_HEAD + ("| Job 2 | 1 | 2 | `src/y.py` |\n" if extra_dag_job else "")
+    (release_dir / "rc-1" / "PLAN.md").write_text(
+        f"# PLAN.md\n\n**Status:** Approved\n\n{plan}", encoding="utf-8"
+    )
+    (release_dir / "rc-1" / "tasks").mkdir()
+    (release_dir / "rc-1" / "tasks" / "job1.md").write_text(_JOB1, encoding="utf-8")
+    return specs
+
+
+def test_check_prints_the_dag_mismatch_phase_refuses_with(script: Path, tmp_path: Path) -> None:
+    """The mismatch kind is a DAG job (Job 2) with no tasks/job2.md: `phase` reports it
+    today as 'PLAN.md DAG jobs do not equal ...'; `check` must report the same line."""
+    specs = _dag_tree(tmp_path, extra_dag_job=True)
+    phase = _run(script, "phase", "IMPLEMENTATION", "--sha", "abc1234", "--specs", str(specs))
+    check = _run(script, "check", "--specs", str(specs))
+    assert phase.returncode == 1
+    message = phase.stderr.splitlines()[0].removeprefix("[error] ")
+    assert "do not equal" in message
+    assert check.returncode == 1
+    assert message in check.stdout + check.stderr
+
+
+def test_a_matching_dag_passes_check_and_phase(script: Path, tmp_path: Path) -> None:
+    """Passes today: the DAG and the job files agree, so neither verb refuses."""
+    specs = _dag_tree(tmp_path, extra_dag_job=False)
+    assert _run(script, "check", "--specs", str(specs)).returncode == 0
+    phase = _run(script, "phase", "IMPLEMENTATION", "--sha", "abc1234", "--specs", str(specs))
+    assert phase.returncode == 0, phase.stderr
