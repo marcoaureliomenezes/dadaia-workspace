@@ -38,8 +38,8 @@ def test_no_law_or_skill_names_the_picked_status_or_consumes() -> None:
 # never a `public/schemas` path, so T8's move to `dd-backlog-definition/scripts/schemas/`
 # (and T11's loader update) leaves this file untouched. `backlog.py new` runs staged.
 #
-# Bug `slug-grammar-four-patterns-disagree`: `x` is refused by `new` and by the entry id
-# (`+`) but accepted by the status pattern (`*`, schema :44). `a--b` is the shared case.
+# Bug `slug-grammar-four-patterns-disagree`: `new`, the entry id and `relates` must agree.
+# `status` is a live-stage token with its own grammar, not a slug place.
 # Which slugs are valid is T10's decision; this file pins only that every place agrees.
 
 _SLUGS = ("a--b", "x", "a-", "9a")
@@ -79,18 +79,13 @@ def test_every_place_a_slug_is_read_gives_the_same_verdict(slug: str, tmp_path: 
         "new": _new_accepts(tmp_path, slug),
         "id": _schema_accepts(_entry(id=slug)),
         "relates": _schema_accepts(_entry(relates=[slug])),
-        "status": _schema_accepts(_entry(status=slug)),
     }
     assert len(set(verdicts.values())) == 1, verdicts
 
 
-def test_the_three_slug_patterns_are_one_defs_slug() -> None:
+def test_the_slug_places_are_one_defs_slug() -> None:
     schema = load_owner("dd-bug-resolution", "_ledger").load_schema("backlog-v1")
     item = schema["$defs"]["activeItem"]["properties"]
-    refs = {
-        "id": item["id"],
-        "status": item["status"],
-        "relates": item["relates"]["items"],
-    }
+    refs = {"id": item["id"], "relates": item["relates"]["items"]}
     assert "slug" in schema["$defs"]
     assert {k: v.get("$ref") for k, v in refs.items()} == dict.fromkeys(refs, "#/$defs/slug")
