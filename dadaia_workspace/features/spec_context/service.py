@@ -302,18 +302,20 @@ class SpecContextService:
 
     # ------------------------------------------------------------------ associated repos (FR17)
 
-    def _refuse_slug(self, name: str, slug: str, url: str) -> None:
+    def _refuse_slug(self, name: str, slug: str, url: str, url_fix: str = "") -> None:
         """Refuse *slug* for *name* unless allowlisted, obtainable and unowned by any other
         context (its main repo or an associated repo): every ``repos/<slug>`` checkout lives
         in the ONE namespace ``alive()`` clones into and ``dead()`` walks and destroys, so
         the two writers into it — ``register`` and ``add_repo`` — guard here. Obtainable
-        means a clone *url* or an existing ``repos/<slug>`` checkout ``alive()`` adopts."""
+        means a clone *url* or an existing ``repos/<slug>`` checkout ``alive()`` adopts; *url_fix*
+        is the calling verb's remedy for a missing one."""
         _require_allowlisted("repo slug", slug)
         checkout = self._repo_path(slug)
         if not url and not (checkout.is_dir() and self._git.is_git_root(checkout)):
             raise RepoUrlMissingError(
                 f"'{slug}' has no clone URL and no checkout at repos/{slug} — "
-                "'context alive' could never obtain it."
+                "'context alive' could never obtain it.",
+                fix=url_fix,
             )
         for other in self._store.list_all():
             if other.name == name:
@@ -340,20 +342,23 @@ class SpecContextService:
         method is the ONE way to register an associated repo's URL (FR15/A15.3's
         one-accessor discipline extended to writes), so the recovery path is
         remove-then-add, never a second divergent "update" verb. The context's own
-        main repo slug can never be added as an associated repo (A17.3) — it is
-        already included via ``all_repos()``. Nor can a slug already owned by
+        main repo slug is a no-op (``was_added=False``) — it is already included via
+        ``all_repos()``. Nor can a slug already owned by
         ANOTHER context — as that context's main repo or one of its associated
         repos — be registered here (T-044-45 F-1): ``repos/<slug>`` is a namespace
         every context shares, and ``dead()`` destroys every repo in
         ``all_repos()`` with no further ownership check, so a slug collision here
         is a live path to destroying a foreign working tree. ``create
         --associated`` (``cli/commands/context.py``) reuses this method verbatim,
-        so it inherits both refusals with no second code path.
+        so it inherits the same refusals and the same no-op with no second code path.
         """
         ctx = self.show(name)
         if slug == ctx.repo_slug:  # the main repo is already in all_repos()
             return ctx, False
-        self._refuse_slug(name, slug, repo_url)
+        add = fix_line(self._workspace_root, "context", "repo", "add", name, slug, "--url")
+        self._refuse_slug(
+            name, slug, repo_url, f"Operator action: run `{add}` with the repo's clone URL"
+        )
         existing = next((r for r in ctx.associated_repos if r.slug == slug), None)
         if existing is not None:
             if existing.url == repo_url:
@@ -641,7 +646,7 @@ class SpecContextService:
         except GitSyncError as exc:
             again = fix_line(self._workspace_root, "context", "baseline", name)
             raise GitSyncError(
-                f"{str(exc).partition(chr(10) + 'fix: ')[0]}\nHEAD holds the onboarding commit {anchor}; once the cause above is "
+                f"{exc.message}\nHEAD holds the onboarding commit {anchor}; once the cause above is "
                 f"fixed (a refused push: after the amend), publish again: {again}",
                 fix=exc.fix or again,
             ) from exc
@@ -700,13 +705,10 @@ class SpecContextService:
             if not (path.exists() and self._git.is_git_root(path)):
                 continue
             if dirty := self._git.dirty_paths(path):
-                fixes = "\n".join(
-                    f"fix: Operator action: move {path / rel} into a worktree, or discard it"
-                    for rel in dirty
-                )
                 raise DeadReviewRequiredError(
-                    f"{lead} has {len(dirty)} uncommitted change(s); dead never commits. "
-                    f"Nothing was touched.\n{fixes}"
+                    f"{lead} has {len(dirty)} uncommitted change(s) ({', '.join(dirty)}); "
+                    "dead never commits. Nothing was touched.",
+                    fix=f"Operator action: move {path / dirty[0]} into a worktree, or discard it",
                 )
             held = [r for r in trees if r["repo"] == slug and r["exit"]]  # the owner's exits
             lost = [refix] if failed else [r["exit"] for r in held]
@@ -765,7 +767,7 @@ class SpecContextService:
                 except GitSyncError as exc:
                     lead = f"Git sync failed for context '{name}' repo '{slug}'; nothing was removed.\n"
                     raise GitSyncError(
-                        f"{lead}{str(exc).partition(chr(10) + 'fix: ')[0]}", fix=exc.fix
+                        f"{lead}{exc.message}", fix=exc.fix
                     ) from exc
         for slug, repo_path in present:
             done = sweep.hold(self._workspace_root, repo_path, f"repos/{slug}")
