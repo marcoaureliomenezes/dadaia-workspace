@@ -126,12 +126,17 @@ def print_next_step(workspace_root: Path, focus: str | None = None) -> None:
         console.print(step.text(), markup=False, highlight=False, soft_wrap=True)
 
 
+def _retry(error: Exception, verb: str, name: str) -> str:
+    """The verb's retry line, unless git's own output already carries a ``fix:`` line."""
+    return (
+        "" if "fix: " in str(error) else fix_line(resolve_workspace_root(), "context", verb, name)
+    )
+
+
 def create_fix(root: Path, error: Exception, name: str | None, urls: list[str]) -> str:
     """The invocation, every ``--associated-repo`` kept (AC3.5); what failed is the
     operator's choice, named in words — never the failing command repeated; an owned slug
     names its owner."""
-    if isinstance(error, AssociatedRepoConflictError):
-        return fix_line(root, "context", "list")
     if isinstance(error, ContextAlreadyExistsError):
         name = None
     flags = [arg for u in urls[1:] for arg in ("--associated-repo", u)]
@@ -165,7 +170,7 @@ def create(
     except SchemaVersionError as e:  # the registry's refusal carries its own one fix
         fail(e)
     except (DadaiaError, OSError) as e:
-        fail(f"{e}\nfix: {create_fix(ws, e, name, [main_repo, *associated])}")
+        fail(e, create_fix(ws, e, name, [main_repo, *associated]))
     suffix = f", {len(ctx.associated_repos)} associated repo(s)" if ctx.associated_repos else ""
     console.print(
         f"[green]✓[/green] Context '[bold]{ctx.name}[/bold]' created and ALIVE "
@@ -290,14 +295,10 @@ def show(
 def alive(name: str = typer.Argument(..., help="Context name to make ALIVE")) -> None:
     """Transition a context to ALIVE; clone repo if absent. Idempotent if already ALIVE."""
     try:
-        ws = resolve_workspace_root()
-        ctx = container.build_spec_context_service(ws).alive(name)
+        ctx = container.build_spec_context_service(resolve_workspace_root()).alive(name)
         console.print(f"[green]✓[/green] Context '[bold]{ctx.name}[/bold]' is now ALIVE")
-    except SchemaVersionError as exc:
-        print(str(exc), file=sys.stderr)
-        raise typer.Exit(1) from None
     except DadaiaError as e:
-        fail(e)
+        fail(e, _retry(e, "alive", name))
 
 
 @app.command()
@@ -313,7 +314,7 @@ def baseline(
     try:
         work = _ctx_service().baseline(name, message=message)
     except (DadaiaError, OSError) as exc:
-        fail(exc)
+        fail(exc, _retry(exc, "baseline", name))
     done = f"published on {work}" if work else "already published — nothing to do"
     console.print(f"✓ '{name}' {done}", markup=False, highlight=False, soft_wrap=True)
 
@@ -328,7 +329,7 @@ def dead(
         ctx = _ctx_service().dead(name)
         console.print(f"[green]✓[/green] Context '[bold]{ctx.name}[/bold]' is now DEAD")
     except DadaiaError as e:
-        fail(e)
+        fail(e, _retry(e, "dead", name))
 
 
 @app.command(epilog=f"Examples: {fix_line(None)} context bind my-ctx")
@@ -344,16 +345,16 @@ def bind(name: str = typer.Argument(..., help="Context name to bind to")) -> Non
     try:
         if svc.show(name).state == ContextState.DEAD:
             fix = fix_line(workspace_root, "context", "alive", name)
-            fail(f"Context '{name}' is DEAD — bring it back first.\nfix: {fix}")
+            fail(f"Context '{name}' is DEAD — bring it back first.", fix)
     except ContextNotFoundError as e:
         fail(e)
     # ADR 0116: the gate, the hooks and this record share one id; bind never mints one.
     session_id = resolve_session_id(os.environ)
     if not session_id:
         fail(
-            "No session id in this shell: a bind needs one the gate and the hooks can see.\n"
-            "fix: Operator action: export DADAIA_SESSION_ID set to a stable id of your choice "
-            "before opening the session"
+            "No session id in this shell: a bind needs one the gate and the hooks can see.",
+            "Operator action: export DADAIA_SESSION_ID set to a stable id of your choice "
+            "before opening the session",
         )
     _sessions_dir(workspace_root).mkdir(parents=True, exist_ok=True)
     session_store.write_session(
@@ -398,7 +399,7 @@ def repo_add(
     except RepoUrlMissingError as e:
         ws = resolve_workspace_root()
         add = fix_line(ws, "context", "repo", "add", ctx_name, slug, "--url")
-        fail(f"{e}\nfix: Operator action: run `{add}` with the repo's clone URL")
+        fail(e, f"Operator action: run `{add}` with the repo's clone URL")
 
     if was_added:
         console.print(
