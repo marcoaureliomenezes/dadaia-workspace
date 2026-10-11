@@ -174,7 +174,7 @@ def _baseline() -> list[SimpleNamespace]:
 
 def workspace_of(*starts: Path) -> Path | None:
     """The ONE skill-script walk: the first ancestor of any of *starts* holding
-    `.dadaia/states/spec_contexts.json`, never a root `DADAIA_FENCED_ROOTS` fences (ADR 0088)."""
+    `.dadaia/states/spec_contexts.json`, never a root `DADAIA_FENCED_ROOTS` fences."""
     fenced = {
         Path(p).resolve() for p in os.environ.get("DADAIA_FENCED_ROOTS", "").split(os.pathsep) if p
     }
@@ -183,7 +183,7 @@ def workspace_of(*starts: Path) -> Path | None:
 
 
 def terms(root: Path | None) -> list[tuple[str, str]]:
-    """The operator denylist, ONE loader (ADR 0157): `$DADAIA_PRIVACY_DENYLIST`, else
+    """The operator denylist, ONE loader: `$DADAIA_PRIVACY_DENYLIST`, else
     ``<root>/.dadaia/states/privacy_denylist.json``. Absent is empty; a present file that is
     not one ``{"<term>": "<reason>"}`` object refuses — never read as no terms."""
     env = os.environ.get("DADAIA_PRIVACY_DENYLIST")

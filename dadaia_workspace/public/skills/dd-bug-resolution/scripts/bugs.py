@@ -24,7 +24,6 @@ _OPTIONS: dict[str, tuple[str, ...]] = {
     "append": (
         "--bug-id",
         "--reported-by",
-        "--ts",
         "--title",
         "--severity",
         "--surface",
@@ -113,7 +112,7 @@ def _write(args: argparse.Namespace, specs: Path) -> int:
     if args.verb == "append":
         values = _values(args, _OPTIONS["append"])
         values["id"] = values.pop("bug_id")
-        values["ts"] = values["ts"] or wr.now_iso()
+        values["ts"] = wr.now_iso()
         values["reported_by"] = values["reported_by"] or "dd-sw-engineer-sr"
         try:
             listed = subprocess.run(

@@ -39,7 +39,7 @@ def now_iso() -> str:
 
 
 def candidates(records: Records, surface: object) -> list[str]:
-    """The records a new bug on *surface* is judged against (ADR 0127): the open ones and
+    """The records a new bug on *surface* is judged against: the open ones and
     those resolved in the last 30 days, a recurrence."""
     since = (_dt.datetime.now(tz=_dt.UTC) - _dt.timedelta(days=30)).strftime("%Y-%m-%dT%H:%M:%SZ")
     return sorted(str(r["id"]) for r in records if r.get("surface") == surface and (
@@ -49,7 +49,7 @@ def candidates(records: Records, surface: object) -> list[str]:
 def append(records: Records, values: dict[str, Any], dirs: set[str]) -> Records:
     """One brand-new record, `status: "open"`. Refuses a duplicate id, a surface that is
     not one tracked directory name (F011), and a record naming no ledger ids or `none` as
-    its correlation (ADR 0127); the schema check does the rest."""
+    its correlation; the schema check does the rest."""
     bug_id = values["id"]
     if any(r.get("id") == bug_id for r in records):
         raise choice(Refusal(f"bug id {bug_id!r} already exists — a reopen is a NEW record declaring "

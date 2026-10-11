@@ -115,7 +115,7 @@ def _rerun(*drop: str) -> str:
 
 
 def choice[E: Exception](refusal: E, words: str, *drop: str) -> E:
-    """Make *refusal*'s fix the operator's choice (ADR 0158): its command — its own fix, else
+    """Make *refusal*'s fix the operator's choice: its command — its own fix, else
     this invocation without *drop* — and *words* naming what to supply."""
     refusal.choice = (words, drop)  # type: ignore[attr-defined]
     return refusal
