@@ -468,8 +468,9 @@ _FIX_CALL_RE = re.compile(r"(_line|_fix|^script)$")
 #: A hand-built CLI spelling in a fix (sa-fix-lines-not-built-by-cli-line, ADR 0045).
 _SPELLING = re.compile(r"\.dadaia[/\\]\.venv|(?<![\w./-])dadaia\s|shlex\.")
 _HAND_BUILT = {"DADAIA_BIN", "cli_path"}
-#: A fix's positional index in a constructor no `def` declares (onboarding `Step`, `Refusal`).
-_FIX_CTORS = {"Step": 3, "Refusal": 1}
+#: A fix's positional index in a constructor no `def` declares (onboarding `Step`, `Refusal`,
+#: and `_ledger.finding`, which re-exports the kernel's `_findings.finding`).
+_FIX_CTORS = {"Step": 3, "Refusal": 1, "_ledger.finding": 4}
 #: B1's other fix positions: a value bound to, or returned by, a `fix`-named name.
 _FIX_NAME = re.compile(r"(?i)(?:^|_)fix(?:es)?(?:$|_)")
 #: A builder spelling a command inside error prose with no `fix:` line (PLAN §2.8 not-sites).
