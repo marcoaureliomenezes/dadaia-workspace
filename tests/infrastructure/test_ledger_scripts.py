@@ -16,6 +16,7 @@ from pathlib import Path
 import pytest
 
 from dadaia_workspace.core import cli_line
+from dadaia_workspace.infrastructure.ledger_scripts import worktree_rows
 from tests.helpers.release_state import PLAN
 from tests.public.skills.dd_release_implementation.scripts.test_release import (
     script,  # noqa: F401  (the staged-skill fixture)
@@ -93,3 +94,27 @@ def test_a_shallow_clone_finding_names_the_history_and_its_fix_clears_it(
     subprocess.run(shlex.split(fix), check=True, capture_output=True)
     cleared = _drift(script, clone / "specs")
     assert (cleared.returncode, cleared.stderr) == (0, "")
+
+
+class _Answer:
+    def __init__(self, rows: list[dict[str, object]]) -> None:
+        self.returncode, self.stdout, self.stderr = 0, json.dumps(rows), ""
+
+
+def test_worktree_rows_keeps_the_contexts_repos_and_the_rows_no_context_owns(
+    tmp_path: Path,
+) -> None:
+    """AC15.2: the one filter — this context's repos plus `registered: false`, no other repo's."""
+    rows: list[dict[str, object]] = [
+        {"repo": "mine", "path": "/w/a", "registered": True},
+        {"repo": "theirs", "path": "/w/b", "registered": True},
+        {"repo": "gone", "path": "/w/c", "registered": False},
+    ]
+
+    class _Runner:
+        def run(self, argv: object, **_: object) -> _Answer:
+            return _Answer(rows)
+
+    found, failed, fix = worktree_rows(tmp_path, {"mine"}, runner=_Runner())
+
+    assert ([r["path"] for r in found], failed, fix) == (["/w/a", "/w/c"], "", "")
