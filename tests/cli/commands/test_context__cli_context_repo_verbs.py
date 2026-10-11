@@ -74,7 +74,6 @@ def test_repo_add_is_idempotent(foo: Path) -> None:
     ("argv", "text"),
     [
         pytest.param(["add", "foo", "assoc-a", "--url", "https://x.test/b.git"], "remove", id="conflicting-url-names-remove"),
-        pytest.param(["add", "foo", "foo-repo"], "main repo", id="A17.3-main-repo-slug"),
         pytest.param(["add", "nope", "assoc-b"], "not found", id="add-unknown-context"),
         pytest.param(["add", "foo", "not a valid slug"], "", id="add-invalid-slug"),
         pytest.param(["remove", "foo", "never-added"], "never-added", id="remove-unknown-slug"),
@@ -87,6 +86,13 @@ def test_a_refused_repo_verb_exits_1_and_changes_nothing(
     result = _runner.invoke(app, ["context", "repo", *argv])
     assert result.exit_code == 1 and text in result.output.lower(), result.output
     assert _record(foo, "foo")["associated_repos"] == _A
+
+
+def test_a17_2_adding_the_own_main_slug_is_a_no_op(foo: Path) -> None:
+    before = _record(foo, "foo")
+    result = _runner.invoke(app, ["context", "repo", "add", "foo", "foo-repo"])
+    assert result.exit_code == 0, result.output
+    assert _record(foo, "foo") == before
 
 
 @pytest.mark.parametrize(
