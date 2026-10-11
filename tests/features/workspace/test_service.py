@@ -124,3 +124,25 @@ def test_a_refused_hold_leaves_the_list_form_denylist_in_place(workspace_root: P
     refused.init(workspace_root, harnesses=("claude",), skip_assets=True)
 
     assert denylist.read_text(encoding="utf-8") == '["zz-term-a"]'
+
+
+def test_a_symlinked_list_form_denylist_is_refused_and_left_untouched(workspace_root: Path) -> None:
+    """AC11.3: the migration lands content on the denylist, so the one writer's symlink rule
+    applies: the operator's link is neither moved aside nor replaced by a regular file."""
+    from dadaia_workspace.features.spec_context.sweep import hold
+
+    migrating = WorkspaceService(
+        public_assets=FakePublicAssetManager(),
+        python_env=FakePythonEnvironmentManager(),
+        hold=hold,
+    )
+    states = workspace_root / ".dadaia" / "states"
+    states.mkdir(parents=True)
+    target = workspace_root / "elsewhere.json"
+    target.write_text('["zz-term-a"]', encoding="utf-8")
+    denylist = states / "privacy_denylist.json"
+    denylist.symlink_to(target)
+
+    migrating.init(workspace_root, harnesses=("claude",), skip_assets=True)
+
+    assert (denylist.is_symlink(), target.read_text(encoding="utf-8")) == (True, '["zz-term-a"]')
