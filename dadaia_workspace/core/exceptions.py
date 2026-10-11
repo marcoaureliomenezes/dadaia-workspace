@@ -4,7 +4,11 @@ from __future__ import annotations
 
 
 class DadaiaError(Exception):
-    """Base class for all dadaia-workspace domain errors."""
+    """Base class for all dadaia-workspace domain errors; ``fix`` is its one remedy line."""
+
+    def __init__(self, message: str = "", fix: str = "") -> None:
+        self.fix = fix
+        super().__init__(f"{message}\nfix: {fix}" if fix else message)
 
 
 class WorkspaceNotInitializedError(DadaiaError):
@@ -43,6 +47,10 @@ class AssociatedRepoConflictError(DadaiaError):
 
 class AssociatedRepoNotFoundError(DadaiaError):
     """``remove_repo``: the slug is not a registered associated repo of the context."""
+
+
+class NotAGitRepositoryError(DadaiaError):
+    """A git operation was asked of a directory that is not a git repository."""
 
 
 class PublicAssetError(DadaiaError):
@@ -89,8 +97,8 @@ class SchemaVersionError(DadaiaError):
     *fix* (``migrate --yes``, or an ``Operator action:`` when no dadaia verb clears it)."""
 
     def __init__(self, problem: str, fix: str) -> None:
-        self.problem, self.fix = problem, fix
-        super().__init__(f"{problem}\nfix: {fix}")
+        self.problem = problem
+        super().__init__(problem, fix)
 
 
 class WorkspaceVenvBootstrapError(DadaiaError, RuntimeError):
