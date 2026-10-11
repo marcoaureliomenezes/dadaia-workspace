@@ -160,8 +160,6 @@ def create(
         ctx = container.build_spec_context_service(ws).create(
             main_repo, name=name, associated_urls=tuple(associated)
         )
-    except SchemaVersionError as e:  # the registry's refusal carries its own one fix
-        fail(e)
     except (DadaiaError, OSError) as e:
         fail(e, create_fix(ws, e, name, [main_repo, *associated]))
     suffix = f", {len(ctx.associated_repos)} associated repo(s)" if ctx.associated_repos else ""
@@ -383,16 +381,17 @@ def repo_add(
     same slug with a DIFFERENT URL is refused — this verb is the one place an
     associated repo's URL is set, so the recovery path is 'context repo remove'
     then 'context repo add' again, never a second divergent URL-update verb.
-    Adding the context's own main repo slug is refused (it is already covered).
+    Adding the context's own main repo slug is a no-op (it is already covered).
     """
     try:
         ctx, was_added = _ctx_service().add_repo(ctx_name, slug, url)
-    except (ContextNotFoundError, InvalidContextNameError, AssociatedRepoConflictError) as e:
+    except (
+        ContextNotFoundError,
+        InvalidContextNameError,
+        AssociatedRepoConflictError,
+        RepoUrlMissingError,
+    ) as e:
         fail(e)
-    except RepoUrlMissingError as e:
-        ws = resolve_workspace_root()
-        add = fix_line(ws, "context", "repo", "add", ctx_name, slug, "--url")
-        fail(e, f"Operator action: run `{add}` with the repo's clone URL")
 
     if was_added:
         console.print(
@@ -400,9 +399,10 @@ def repo_add(
             f"'[bold]{ctx_name}[/bold]' ({len(ctx.associated_repos)} associated repo(s) total)."
         )
     else:
+        what = "is this context's main repo" if slug == ctx.repo_slug else "is already registered"
         console.print(
-            f"[green]✓[/green] Associated repo '[bold]{slug}[/bold]' is already registered "
-            f"on context '[bold]{ctx_name}[/bold]' with this URL — no change."
+            f"[green]✓[/green] '[bold]{slug}[/bold]' {what} "
+            f"on context '[bold]{ctx_name}[/bold]' — no change."
         )
 
 

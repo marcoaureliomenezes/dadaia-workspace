@@ -120,7 +120,7 @@ def push_gate_check() -> None:
         if kind in ("foreign", "upgradable"):
             canon_fn = _no_canon_violations
         if fix:
-            typer.echo(f"[pre-push] the pushed specs/ tree is {kind}\nfix: {fix}", err=True)
+            typer.echo(f"[pre-push] the pushed specs/ tree is {kind}\nhint: {fix}", err=True)
     decision = push_gate_decision(
         refs,
         object_source=build_git_object_reader(),
