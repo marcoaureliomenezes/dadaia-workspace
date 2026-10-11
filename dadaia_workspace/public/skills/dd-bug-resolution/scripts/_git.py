@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""The one git runner of the skill scripts: every child runs with the caller's `GIT_*` scrubbed from its env."""
+"""The one git runner of the skill scripts: every child runs with the caller's repo-selecting `GIT_*` scrubbed from its env."""
 
 from __future__ import annotations
 
@@ -7,9 +7,16 @@ import os
 import subprocess
 from pathlib import Path
 
+#: `git rev-parse --local-env-vars` less the config injectors: what makes git answer for another repo. Identity, config and ssh are the caller's.
+_LOCAL = frozenset({
+    "GIT_ALTERNATE_OBJECT_DIRECTORIES", "GIT_OBJECT_DIRECTORY", "GIT_DIR", "GIT_WORK_TREE",
+    "GIT_IMPLICIT_WORK_TREE", "GIT_GRAFT_FILE", "GIT_INDEX_FILE", "GIT_NO_REPLACE_OBJECTS",
+    "GIT_REPLACE_REF_BASE", "GIT_PREFIX", "GIT_SHALLOW_FILE", "GIT_COMMON_DIR",
+})  # fmt: skip
+
 
 def scrubbed_env() -> dict[str, str]:
-    return {k: v for k, v in os.environ.items() if not k.startswith("GIT_")}
+    return {k: v for k, v in os.environ.items() if k not in _LOCAL}
 
 
 def git(repo: Path, *args: str, check: bool = True, input: str | None = None) -> str:

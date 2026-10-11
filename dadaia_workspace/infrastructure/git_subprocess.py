@@ -1,6 +1,5 @@
 """GitSubprocessClient — git operations via stdlib subprocess."""
 
-import os
 import subprocess
 from collections.abc import Sequence
 from pathlib import Path
@@ -9,6 +8,7 @@ from dadaia_workspace.core.cli_line import fix_line, git_line
 from dadaia_workspace.core.exceptions import GitCloneError, GitSyncError
 from dadaia_workspace.core.gitflow import DEFAULT, Gitflow, read_gitflow
 from dadaia_workspace.core.models.git_scan import GitObjectReadError
+from dadaia_workspace.core.skill_owner import load_owner
 from dadaia_workspace.infrastructure.git_objects import unpublished
 
 #: A lost branch's archive-tag push, also recording it under ``refs/remotes/origin/archive/``.
@@ -26,7 +26,6 @@ def _run(
     stdin: str | None = None,
     env: dict[str, str] | None = None,
 ) -> subprocess.CompletedProcess[str]:
-    environ = {**os.environ, **env} if env else None
     return subprocess.run(
         args,
         cwd=cwd,
@@ -35,7 +34,7 @@ def _run(
         encoding="utf-8",
         errors="replace",
         input=stdin,
-        env=environ,
+        env={**load_owner("dd-bug-resolution", "_git").scrubbed_env(), **(env or {})},
     )
 
 
@@ -176,8 +175,10 @@ class GitSubprocessClient:
         no remote; a stash entry, which lives only in this checkout."""
         if self.has_commits(path) and not self.has_remote(path):
             return [f"Operator action: add the clone URL of {path} as its origin remote"]
-        run = _run(["git", "worktree", "list", "--porcelain"], cwd=path).stdout.split("\n")
-        trees = [line[9:] for line in run if line.startswith("worktree ")][1:]
+        listed = _run(["git", "worktree", "list", "--porcelain"], cwd=path).stdout
+        trees = [
+            t["worktree"] for t in load_owner("dd-bug-resolution", "_git").parse_worktrees(listed)
+        ]
         refs = ["git", "for-each-ref", "--format=%(objectname) %(refname:short)", "refs/heads"]
         heads = [line.split(" ", 1) for line in _run(refs, cwd=path).stdout.split("\n") if line]
         in_head = ["git", "merge-base", "--is-ancestor"]  # HEAD itself is pushed by dead()
