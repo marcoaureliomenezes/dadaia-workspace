@@ -766,9 +766,7 @@ class SpecContextService:
                     self._git.push(repo_path)
                 except GitSyncError as exc:
                     lead = f"Git sync failed for context '{name}' repo '{slug}'; nothing was removed.\n"
-                    raise GitSyncError(
-                        f"{lead}{exc.message}", fix=exc.fix
-                    ) from exc
+                    raise GitSyncError(f"{lead}{exc.message}", fix=exc.fix) from exc
         for slug, repo_path in present:
             done = sweep.hold(self._workspace_root, repo_path, f"repos/{slug}")
             if isinstance(done, sweep.Skipped):  # the refusal, not success: nothing to hold is fine
