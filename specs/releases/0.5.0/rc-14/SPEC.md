@@ -116,13 +116,16 @@ Every FR below deletes the copies of its group; the owner's existing tests stay 
 
 - AC11.1 (integration, RED first): `public install` projects no shared copy: each fact module and schema exists once under `skills/`; `_SKILL_SCRIPT_SHARED`, `_SKILL_SCRIPT_SCHEMAS`, their test staging and the v37/v38 rows are deleted; `load_owner` lives in core.
 - AC11.2 (unit, RED first): Two repos A and B with `GIT_DIR=B/.git` set: every skill runner and `infrastructure/git_subprocess` answer for A, through the one `git()`.
-- AC11.3 (unit, RED first): A symlinked ledger: `_ledger.replace` refuses as `core.atomic_write` does, through one writer; the bare `os.replace` sites in `features/workspace/service.py` and `features/spec_context/sweep.py` leave.
+- AC11.3 (unit, RED first): A symlinked ledger is refused by the one writer, `_atomic.py` (symlink refusal, uuid temp, `preserve_mode`, the Windows retry, `ensure_parent`); `_ledger.replace` and `core/atomic_write.py` reach it through `core/skill_owner.py`; the bare `os.replace` sites in `features/workspace/service.py` and `features/spec_context/sweep.py` leave; `tests/core/test_atomic_write__atomic_write_census.py` ends with one home.
 - AC11.4 (no test — reviewer `git grep` per group): One definition each for the commit loop, `_validated`, `finding()`, `histo_findings`, the JSONL reader, `serialize`, `_values`, the workspace-root walk (venv owner first), the clock, each ledger's status vocabulary (read from its schema) and the skill-side platform constant.
 
 #### FR12 — one frontmatter grammar (bugs `frontmatter-parsers-disagree-on-crlf-and-bom`, `codex-persona-frontmatter-drops-on-crlf`)
 
-- AC12.1 (no test — measurement first): The one stdlib parser is measured against every frontmatter the package parses (the constitution's `gitflow: {...}` flow mapping included); a miss returns to the main thread before code.
-- AC12.2 (unit, RED first): A constitution with a leading BOM keeps its `gitflow` block; the same file through core, Codex projection and memory schema yields the same fields on LF and CRLF, quotes removed. The Codex and `_memory_schema` regexes leave.
+The owner is `_frontmatter.py` in `dd-bug-resolution/scripts`, a stdlib strict subset of YAML (ADR 0246). Measured: it equalled `yaml.safe_load` on 96 of 96 real blocks with 0 silent differences over 300k mutations; `_memory_schema.parse` mismatched on 55 of 96. `core/frontmatter.py` becomes a typed shim; `pyyaml` leaves the runtime.
+
+- AC12.1 (unit, RED first): A BOM constitution keeps its `gitflow` block; a CRLF persona keeps its fields; a folded last key has no trailing newline; `7.0.0`, `yes`, `0755` and `2026-10-11` as plain scalars equal `safe_load` or raise. The Codex and `_memory_schema` parsers leave.
+- AC12.2 (unit, differential): Over every shipped and instance frontmatter, the inline frontmatter fixtures in `tests/**` and a pinned mutation corpus, the owner equals `yaml.safe_load` or refuses.
+- AC12.3 (unit): Persona `read_only` and `dispatch_band` are typed (bool, int), and `install_helpers.persona_read_only` compares typed values.
 
 #### FR13 — one slug grammar, owned by the backlog schema (bug `slug-grammar-four-patterns-disagree`)
 
@@ -213,7 +216,7 @@ The entries with work exit `delivered`, except `architecture-adr-section-generat
 
 | risk | control |
 |---|---|
-| The one frontmatter parser misses a package shape | AC12.1 measures first and returns to the main thread |
+| The frontmatter subset refuses a shape users write | it fails closed with a refusal, never a silent difference (AC12.2) |
 | Five skills depend on `dd-bug-resolution` | ADR 0246 accepts it; projection always ships it |
 | Unmasked CI legs expose encoding defects | each proposed as a bug, never re-masked |
 
