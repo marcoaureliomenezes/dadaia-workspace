@@ -27,83 +27,41 @@
     {
       "id": "root-whitelist",
       "mandate": "The workspace root holds only the sanctioned entries; any file-tool write that would mint a new top-level entry is blocked.",
-      "implementations": {
-        "claude": "PreToolUse hook (.claude/settings.json → dadaia_workspace.hooks.pre_gate)",
-        "codex": ".codex/hooks.json wrapper → .dadaia/hooks/pre_gate.sh (interactive sessions)",
-        "kimi-code": "managed hook block in $KIMI_CODE_HOME/config.toml → the same Python gate",
-        "cursor": ".cursor/hooks.json preToolUse → .dadaia/hooks/cursor-pre-gate → the same Python gate",
-        "devin": ".devin/hooks.v1.json PreToolUse → .dadaia/hooks/devin-pre-gate → the same Python gate",
-        "copilot": ".github/hooks/pre-tool-use.json preToolUse → .dadaia/hooks/copilot-pre-gate → the same Python gate"
-      }
+      "modules": ["dadaia_workspace.hooks.pre_gate"]
     },
     {
       "id": "sdd-gate",
       "mandate": "Three path classes on every write: ADDITIVE always writable, PROTECTED blocked, MUTATING writable but scope-judged under repos/<slug>/ when the session is bound; no phase, no mode; every block carries one fix: line; races surfaced, never prevented.",
-      "implementations": {
-        "claude": "PreToolUse hook via dadaia_workspace.hooks.pre_gate (single merged entrypoint) + PostToolUse session heartbeat via dadaia_workspace.hooks.sdd_post_gate",
-        "codex": ".codex/hooks.json PreToolUse wrapper → the same Python gate (pre + post)",
-        "kimi-code": "managed hook block PreToolUse → the same Python gate (pre + post)",
-        "cursor": ".cursor/hooks.json preToolUse → dadaia_workspace.hooks.pre_gate (single merged entrypoint)",
-        "devin": ".devin/hooks.v1.json PreToolUse → dadaia_workspace.hooks.pre_gate (single merged entrypoint)",
-        "copilot": ".github/hooks/pre-tool-use.json preToolUse → dadaia_workspace.hooks.pre_gate (single merged entrypoint)"
-      }
+      "modules": ["dadaia_workspace.hooks.pre_gate", "dadaia_workspace.hooks.sdd_post_gate"]
     },
     {
       "id": "context-memory-injection",
       "mandate": "The session's own bind selects which product memory is injected at prompt time; never another session's bind.",
-      "implementations": {
-        "claude": "UserPromptSubmit + SessionStart hooks via dadaia_workspace.hooks.ctx_inject; SessionStart also runs dadaia doctor --fix --expired-only --quiet (the reaper lane)",
-        "codex": "SessionStart + UserPromptSubmit wrappers → dadaia_workspace.hooks.ctx_inject; SessionStart also runs the reaper lane",
-        "kimi-code": "managed hook block → the same ctx_inject module",
-        "cursor": ".cursor/hooks.json sessionStart only → dadaia_workspace.hooks.ctx_inject (additional_context): no prompt-time injection, a bind shows at the next session start; sessionStart also runs dadaia doctor --fix --expired-only --quiet (the reaper lane)",
-        "devin": ".devin/hooks.v1.json UserPromptSubmit + SessionStart → dadaia_workspace.hooks.ctx_inject; SessionStart also runs the same reaper lane",
-        "copilot": ".github/hooks/session-start.json sessionStart only → dadaia_workspace.hooks.ctx_inject (additionalContext): no prompt-time injection, a bind shows at the next session start; sessionStart also runs the same reaper lane"
-      }
+      "modules": ["dadaia_workspace.hooks.ctx_inject"]
     },
     {
       "id": "git-chokepoints",
-      "mandate": "Harness-independent: pre-push allows only work-branch pushes (the constitution's gitflow) and refuses integration/principal direct pushes (branch contract: `dd-gitflow-default`).",
-      "implementations": {
-        "claude": ".dadaia git hook (pre-push-ci-gate.sh) — identical for every harness",
-        "codex": "same git hooks (harness-independent)",
-        "kimi-code": "same git hooks (harness-independent)",
-        "cursor": "same git hooks (harness-independent)",
-        "devin": "same git hooks (harness-independent)",
-        "copilot": "same git hooks (harness-independent)"
-      }
+      "mandate": "Harness-independent: pre-push allows only work-branch pushes (the constitution's gitflow) and refuses integration/principal direct pushes (branch contract: `dd-gitflow-default`)."
     },
     {
       "id": "tool-cache-env",
       "mandate": "tool caches land in absolute .dadaia/tmp/<tool>-cache (workspace_layout.tool_cache_env); a harness that cannot carry an env declares the gap, and a run there leaves an in-tree cache the doctor holds in reaped/ (fix: dadaia doctor --fix).",
-      "implementations": {
-        "claude": ".claude/settings.json env (RUFF_CACHE_DIR, MYPY_CACHE_DIR)",
-        "codex": ".codex/config.toml [shell_environment_policy.set]",
-        "kimi-code": "gap: no project-level env in the managed hook block",
-        "cursor": "gap: .cursor/hooks.json carries no env",
-        "devin": "gap: .devin/hooks.v1.json carries no env",
-        "copilot": "gap: .github/hooks carry no env"
+      "gaps": {
+        "kimi-code": "no project-level env in the managed hook block",
+        "cursor": ".cursor/hooks.json carries no env",
+        "devin": ".devin/hooks.v1.json carries no env",
+        "copilot": ".github/hooks carry no env"
       }
     }
   ],
   "rules": [
     {
       "id": "workspace-law",
-      "mandate": "AGENTS.md — the root map, the one always-on law file, projected read-only; scoped AGENTS.md files are the system of record per area; human-only in an instantiated workspace.",
-      "implementations": {
-        "claude": "AGENTS.md (native root discovery)",
-        "codex": "AGENTS.md (native root->cwd chain)",
-        "kimi-code": "AGENTS.md (native root->cwd chain)",
-        "cursor": "AGENTS.md (native, read at session start)",
-        "devin": "AGENTS.md (native root + lazy on file access)",
-        "copilot": "AGENTS.md (native, path and touched-file ancestors)"
-      }
+      "mandate": "AGENTS.md — the root map, the one always-on law file, projected read-only; scoped AGENTS.md files are the system of record per area; human-only in an instantiated workspace."
     },
     {
       "id": "codex-command-policy",
-      "mandate": "Codex-native executable command policy (Starlark, the only rule dialect Codex executes): allows only the argv-closed readers ls and cat; ordinary public install inherits host policy, while --force, publishing, context deletion and destructive commands prompt; every other command falls to the Codex default.",
-      "implementations": {
-        "codex": ".codex/rules/dadaia-command-policy.rules"
-      }
+      "mandate": "Codex-native executable command policy (Starlark, the only rule dialect Codex executes): allows only the argv-closed readers ls and cat; ordinary public install inherits host policy, while --force, publishing, context deletion and destructive commands prompt; every other command falls to the Codex default."
     }
   ],
   "universal": {

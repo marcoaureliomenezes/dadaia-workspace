@@ -20,9 +20,8 @@ from typing import Any
 from jsonschema import Draft202012Validator
 from jsonschema.exceptions import best_match
 
-from dadaia_workspace.core.harness_registry import HARNESS_RECORDS
+from dadaia_workspace.core.harness_registry import HARNESS_RECORDS, HarnessRecord
 from dadaia_workspace.core.models.doctor_report import DoctorLine, DoctorStatus
-from dadaia_workspace.infrastructure.projection_rules import harnesses_with_a_hook_derivation
 from dadaia_workspace.infrastructure.runtime_transforms.codex_assets import (
     _parse_agent_frontmatter,
     _parse_skills_from_frontmatter,
@@ -95,55 +94,67 @@ def check_agent_skill_refs(public_dir: Path) -> list[DoctorLine]:
 # (the single source-of-truth law surface, identical across harnesses — WS-CDX-PROTOCOL).
 
 
-# A `dadaia_workspace.<dotted.tail>` module reference embedded in a Deterministic
-# Behavior's free-text implementation description (e.g. "PreToolUse hook via
-# dadaia_workspace.hooks.pre_gate"). ENT-DERIVE-1 (A22.5) resolves every such
-# reference against the real source tree, so a behavior whose enforcing module
-# silently disappears — the concrete "a hook stops enforcing" drift — is DRIFT, not a
-# quiet pass through harness-key-only coverage.
-_ENT_DERIVE_MODULE_REF_RE: re.Pattern[str] = re.compile(
-    r"\bdadaia_workspace\.([a-zA-Z_][a-zA-Z0-9_.]*)"
-)
+# A hook lane runs ``dadaia_workspace.<dotted.tail>``; that token is the lane's module.
+_MODULE_RE: re.Pattern[str] = re.compile(r"\bdadaia_workspace\.[a-zA-Z_][a-zA-Z0-9_.]*")
 
 
-def _behavior_module_ref_missing(dotted_tail: str, package_root: Path) -> bool:
-    """True when ``dadaia_workspace.<dotted_tail>`` resolves to no source file.
+def _module_missing(module: str, package_root: Path) -> bool:
+    """True when ``dadaia_workspace.<tail>`` resolves to no source file.
 
     *package_root* is ``public_dir.parent`` — the ``dadaia_workspace`` package
     directory itself in production, or an isolated scratch root in a mutation
-    fixture. Neither a bare module file (``hooks/pre_gate.py``) nor a package
-    (``hooks/pre_gate/__init__.py``) existing means the reference is broken.
+    fixture. A bare module file or a package ``__init__.py`` both count.
     """
-    rel = Path(*dotted_tail.split("."))
-    module_file = package_root / rel.with_suffix(".py")
-    package_init = package_root / rel / "__init__.py"
-    return not module_file.is_file() and not package_init.is_file()
+    rel = Path(*module.split(".")[1:])
+    return (
+        not (package_root / rel.with_suffix(".py")).is_file()
+        and not (package_root / rel / "__init__.py").is_file()
+    )
 
 
-def _behavior_content_drift(behavior: dict[str, Any], package_root: Path) -> list[DoctorLine]:
-    """Behavioral-fidelity DRIFT lines for one Deterministic Behavior (A22.5).
-
-    Beyond harness-key coverage (checked by the caller), every
-    ``dadaia_workspace.<module>`` reference embedded in any of this behavior's
-    implementation descriptions must still resolve to a real source file.
-    """
-    out: list[DoctorLine] = []
-    for harness_name, impl_text in behavior.get("implementations", {}).items():
-        if not isinstance(impl_text, str):
-            continue
-        for match in _ENT_DERIVE_MODULE_REF_RE.finditer(impl_text):
-            dotted_tail = match.group(1)
-            if _behavior_module_ref_missing(dotted_tail, package_root):
-                out.append(
-                    DoctorLine(
-                        DoctorStatus.DRIFT,
-                        f"entities-derivation: behavior '{behavior.get('id')}' "
-                        f"implementation for '{harness_name}' references module "
-                        f"'dadaia_workspace.{dotted_tail}' which no longer exists "
-                        f"(ENT-DERIVE-1)",
-                    )
+def _behavior_drift(behavior: dict[str, Any], package_root: Path) -> list[DoctorLine]:
+    """DRIFT lines for one behavior (ENT-DERIVE-1): every record is covered or gapped, every
+    ``gaps`` key is a record, every named module still exists. A harness implements the
+    behavior when a lane of its hook table runs one of ``modules``; a behavior with no
+    ``modules`` is harness-independent."""
+    bid, modules, gaps = behavior.get("id"), behavior.get("modules", []), behavior.get("gaps", {})
+    out = [
+        DoctorLine(
+            DoctorStatus.DRIFT,
+            f"entities-derivation: behavior '{bid}' gaps names '{name}', "
+            "which is no harness record (ENT-DERIVE-1)",
+        )
+        for name in sorted(set(gaps) - set(HARNESS_RECORDS))
+    ]
+    for name, record in sorted(HARNESS_RECORDS.items()):
+        lane_modules = _lane_modules(record)
+        if name not in gaps and modules and not lane_modules & set(modules):
+            out.append(
+                DoctorLine(
+                    DoctorStatus.DRIFT,
+                    f"entities-derivation: behavior '{bid}' is neither implemented by "
+                    f"'{name}' (no hook lane runs {modules}) nor listed in gaps (ENT-DERIVE-1)",
                 )
+            )
+    for module in modules:
+        if _module_missing(module, package_root):
+            out.append(
+                DoctorLine(
+                    DoctorStatus.DRIFT,
+                    f"entities-derivation: behavior '{bid}' references module "
+                    f"'{module}' which no longer exists (ENT-DERIVE-1)",
+                )
+            )
     return out
+
+
+def _lane_modules(record: HarnessRecord) -> set[str]:
+    """The ``dadaia_workspace.<module>`` tokens the hook lanes of *record* run."""
+    return {
+        m.group(0)
+        for lane in HOOK_DIALECTS[record.hooks].lanes
+        if (m := _MODULE_RE.search(lane.argv))
+    }
 
 
 def _persona_content_drift(agent_id: str, agents_dir: Path) -> list[DoctorLine]:
@@ -195,7 +206,10 @@ _REGISTRY_SCHEMA = {
         "personas": {"type": "array", "items": {"type": "object"}},
         "behaviors": {
             "type": "array",
-            "items": {"type": "object", "properties": {"implementations": {"type": "object"}}},
+            "items": {
+                "type": "object",
+                "properties": {"modules": {"type": "array"}, "gaps": {"type": "object"}},
+            },
         },
     },
 }
@@ -214,12 +228,9 @@ def check_entities_derivation(public_dir: Path) -> list[DoctorLine]:
        ``name:`` matches its filename (:func:`_persona_content_drift`, A22.5). A stub
        file or a copy-paste identity swap at the right filename is DRIFT even though
        filename-only bijection would pass it.
-    3. Every Deterministic Behavior is derived for exactly the entry harnesses, AND
-       every ``dadaia_workspace.<module>`` reference embedded in an implementation's
-       free-text description still resolves to a real source file
-       (:func:`_behavior_content_drift`, A22.5) — a hook (or any other enforcing
-       module) that silently disappears while its registry entry is left untouched is
-       DRIFT, not a quiet pass through harness-key-only coverage.
+    3. Every Deterministic Behavior is covered by each harness record or listed in its
+       ``gaps``, every ``gaps`` key is a record, every lane module is named by a behavior,
+       and every named module still resolves to a source file (:func:`_behavior_drift`).
 
     Any violation is DRIFT/ERROR (blocking): a scaffolded core implementation without
     its abstract entity is forbidden, not advisory.
@@ -272,36 +283,34 @@ def check_entities_derivation(public_dir: Path) -> list[DoctorLine]:
     for matched_id in sorted(personas & scaffolded):
         out.extend(_persona_content_drift(matched_id, agents_dir))
 
-    harnesses = set(harnesses_with_a_hook_derivation())
     package_root = public_dir.parent
-    for behavior in registry.get("behaviors", []):
-        implemented = set(behavior.get("implementations", {}))
-        if implemented != harnesses:
+    behaviors = registry.get("behaviors", [])
+    for behavior in behaviors:
+        out.extend(_behavior_drift(behavior, package_root))
+    named = {m for behavior in behaviors for m in behavior.get("modules", [])}
+    for name, record in sorted(HARNESS_RECORDS.items()):
+        for orphan in sorted(_lane_modules(record) - named):
             out.append(
                 DoctorLine(
                     DoctorStatus.DRIFT,
-                    f"entities-derivation: behavior '{behavior.get('id')}' is derived for "
-                    f"{sorted(implemented)}, expected every harness with a hook derivation "
-                    f"{sorted(harnesses)} (ENT-DERIVE-1)",
+                    f"entities-derivation: '{name}' hook lane runs '{orphan}', "
+                    "which no behavior names (ENT-DERIVE-1)",
                 )
             )
-        # Behavioral fidelity (A22.5): harness-key coverage is necessary, never
-        # sufficient — also follow every module reference back to a real file.
-        out.extend(_behavior_content_drift(behavior, package_root))
 
     if not out:
         out.append(
             DoctorLine(
                 DoctorStatus.OK,
                 f"entities-derivation: {len(personas)} Personas ↔ {len(scaffolded)} core "
-                f"sub-agents; {len(registry.get('behaviors', []))} Deterministic Behaviors "
+                f"sub-agents; {len(behaviors)} Deterministic Behaviors "
                 f"derived for every harness with a hook derivation (ENT-DERIVE-1)",
             )
         )
     # A declared gap is a fact about the harness, not drift in this repo: the gate rides
     # every pre-action event the harness exposes, and where it exposes none the WARN says
     # so once. Never an ERROR — no edit here can create an event the harness lacks.
-    for name in sorted(harnesses):
+    for name in sorted(HARNESS_RECORDS):
         for action in HOOK_DIALECTS[HARNESS_RECORDS[name].hooks].ungated:
             out.append(
                 DoctorLine(
