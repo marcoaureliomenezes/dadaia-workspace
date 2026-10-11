@@ -50,7 +50,7 @@ v37* public/skills/dd-release-implementation/scripts/_release_schema.py:CANDIDAT
 v37* public/skills/dd-release-implementation/scripts/_release_schema.py:candidate_dir parity:tests/public/skills/dd_release_implementation/scripts/test_release__release_script.py
 v37* public/skills/dd-release-implementation/scripts/_release_schema.py:candidate_number parity:tests/public/skills/dd_release_implementation/scripts/test_release__release_script.py
 v37* public/skills/dd-release-implementation/scripts/_release_schema.py:next_candidate parity:tests/public/skills/dd_release_implementation/scripts/test_release__release_script.py
-v38* core/atomic_write.py:atomic_write parity:tests/core/test_atomic_write.py
+v38 public/skills/dd-bug-resolution/scripts/_atomic.py:atomic_write parity:tests/public/skills/dd_bug_resolution/scripts/test__atomic.py
 v38* public/skills/dd-bug-resolution/scripts/_ledger.py:replace parity:tests/public/skills/dd_bug_resolution/scripts/test__ledger.py
 v38* features/certification/service.py:certify parity:tests/features/certification/test_service.py
 v38* features/migrate/state_v2.py:execute_migration parity:tests/features/migrate/test_state_v2.py
