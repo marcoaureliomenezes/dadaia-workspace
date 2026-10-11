@@ -3,14 +3,13 @@
 
 from __future__ import annotations
 
-import json
 import sys
 from pathlib import Path
 
-for _skill in ("dd-release-implementation", "dd-bug-resolution"):
-    sys.path.append(str(Path(__file__).resolve().parents[2] / _skill / "scripts"))
+sys.path.append(str(Path(__file__).resolve().parents[2] / "dd-bug-resolution" / "scripts"))
 
 from _grammar import STATE, live_ids  # noqa: E402
+from _jsonl import Unreadable, parse_object  # noqa: E402
 from _specs import parse  # noqa: E402
 from _worktree_git import (  # noqa: E402
     flow_for,
@@ -87,8 +86,14 @@ def new(root: Path, repo_name: str, name: str) -> Path:
         work = f"{flow['work']}{version}"
     if match["rc"] and match["job"] not in ("define", "reconcile"):
         main = root / "repos" / flow["main"]  # the context's trio lives in its main repo
-        state = git(main, "show", f"{work}:specs/releases/{version}/{STATE}", check=False)
-        if json.loads(state).get("phase") != "IMPLEMENTATION":
+        fix = f"Operator action: repair {STATE} on {work} until release.py check passes"
+        try:
+            state = parse_object(
+                git(main, "show", f"{work}:specs/releases/{version}/{STATE}", check=False), fix
+            )
+        except Unreadable as bad:
+            raise Refusal(f"{STATE} on {work}: {bad}", bad.fix) from bad
+        if state.get("phase") != "IMPLEMENTATION":
             raise Refusal(
                 f"a job needs release {version} in phase IMPLEMENTATION on {work}",
                 f"{script(SCRIPT)} new {quote(flow['main'])} {match['rc']}/define",
