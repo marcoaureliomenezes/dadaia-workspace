@@ -6,6 +6,7 @@ one venv. Size: MEDIUM (real git in a tmp workspace, never the live instance).
 from __future__ import annotations
 
 import json
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -13,6 +14,7 @@ from pathlib import Path
 import pytest
 
 from dadaia_workspace.core.cli_line import git_line, shell_line
+from dadaia_workspace.core.skill_owner import load_owner
 from tests.helpers.worktree_ws import JOB, TASK, approve, associate, commit, make_workspace
 from tests.helpers.worktree_ws import fixes as _fixes
 from tests.helpers.worktree_ws import git as _git
@@ -287,3 +289,37 @@ def test_an_unreadable_release_state_refuses_a_job_and_creates_nothing(
     assert len(_fixes(refused)) == 1
     assert _git(repo, "branch", "--list", f"wt/{JOB}").strip() == ""
     assert not (root / "worktrees/r" / JOB).exists()
+
+
+@pytest.mark.parametrize(
+    ("name", "word", "task"),
+    [
+        ("0.5.0-rc1/a-b", "a-b", None),
+        ("0.5.0-rc1/a--J1.T1", "a", "J1.T1"),
+        ("0.5.0-rc1/a--J1.S2.T3", "a", "J1.S2.T3"),
+        ("0.5.0-rc1/a--b", "a", "b"),
+        ("0.5.0-rc1/a--T-1-1", "a", "T-1-1"),
+        ("0.5.0-rc1/1a", "1a", None),
+        ("backlog/a-b", "a-b", None),
+        ("backlog/1a", "1a", None),
+        ("hotfix/a-b", "a-b", None),
+        ("hotfix/1a", "1a", None),
+        ("a-b", "a-b", None),
+        ("1a", "1a", None),
+        ("a--b", "a--b", None),
+        ("backlog/a--b", "a--b", None),
+    ],
+)
+def test_a_name_is_accepted_as_the_backlog_slug_and_the_task_id_grammar_say(
+    name: str, word: str, task: str | None
+) -> None:
+    """AC13.1: the job, backlog, hotfix and plain words are the backlog `slug`; a task part is a
+    release task id, so `--` only ever separates a job from `J<n>.T<k>`."""
+    slug = load_owner("dd-bug-resolution", "_ledger").load_schema("backlog-v1")["$defs"]["slug"]
+    task_id = load_owner("dd-bug-resolution", "_grammar").TASK_ID_RE
+    accepted = bool(re.fullmatch(slug["pattern"], word)) and (
+        task is None or bool(task_id.fullmatch(task))
+    )
+    names = load_owner("dd-gitflow-default", "_worktree_names")
+
+    assert bool(names.NAME_RE.match(name)) is accepted
