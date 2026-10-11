@@ -21,6 +21,7 @@ from pathlib import Path
 import pytest
 
 from dadaia_workspace.infrastructure.privacy_check import PORTUGUESE_CONTROL_TERMS
+from tests.fixtures.real_git import git
 from tests.helpers.scan_population import assert_populated
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -33,6 +34,32 @@ def _bytecode_artifacts_under_public() -> list[str]:
     pyc = [str(p.relative_to(_REPO_ROOT)) for p in _PUBLIC_ROOT.rglob("*.pyc")]
     caches = [str(p.relative_to(_REPO_ROOT)) for p in _PUBLIC_ROOT.rglob("__pycache__")]
     return sorted(pyc + caches)
+
+
+def tracked_bytecode(repo_root: Path) -> list[str]:
+    """Seam for J6.T8 (AC9.4): the bytecode artifacts *git tracks* under
+    ``dadaia_workspace/public/`` in the repo at *repo_root* (sorted paths relative to it).
+    T8 replaces this body with ``git ls-files`` and makes the at-rest assertion call
+    ``tracked_bytecode(_REPO_ROOT)``. Until then it judges the working tree, which is the bug."""
+    public = repo_root / "dadaia_workspace" / "public"
+    return sorted(
+        str(p.relative_to(repo_root))
+        for p in [*public.rglob("*.pyc"), *public.rglob("__pycache__")]
+    )
+
+
+def test_bytecode_contract_judges_tracked_files_not_the_working_tree(tmp_path: Path) -> None:
+    """job-gate-red-on-untracked-bytecode: an ignored ``__pycache__/x.pyc`` under public/
+    keeps the contract green; once tracked it fails it."""
+    git(tmp_path, "init", "-q")
+    cache = tmp_path / "dadaia_workspace" / "public" / "scripts" / "__pycache__"
+    cache.mkdir(parents=True)
+    (cache / "x.pyc").write_bytes(b"\x00")
+    (tmp_path / ".gitignore").write_text("__pycache__/\n", encoding="utf-8")
+    assert tracked_bytecode(tmp_path) == []
+
+    git(tmp_path, "add", "-f", str(cache / "x.pyc"))
+    assert tracked_bytecode(tmp_path) == ["dadaia_workspace/public/scripts/__pycache__/x.pyc"]
 
 
 def test_pre_push_ci_gate_ships_pyproject_excludes_bytecode_and_scripts_leave_no_pycache() -> None:
