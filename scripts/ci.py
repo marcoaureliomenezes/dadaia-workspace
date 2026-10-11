@@ -1,7 +1,6 @@
 """The ONE source of the Linux CI jobs and repository verification:
 ``python scripts/ci.py [<job>...]`` runs the named ``ci.yml`` jobs (all of them when none is
-given); ``task FILE...`` runs ruff and mypy on the touched files and the touched tests;
-``stage`` and ``job`` run lint, mypy, guards and the small tier. Each step
+given); ``job`` runs lint, mypy, guards and the small tier. Each step
 prints ``PASS``/``FAIL <step>: <command>``; every step runs; exit 1 if any failed. Standard
 library only: the ``repo-hygiene`` and ``doctor`` jobs install no dev group."""
 
@@ -84,31 +83,20 @@ JOBS: dict[str, list[Step]] = {
 STAGE = ("lint", "typecheck", "guards", "unit-fast")
 
 
-def _task(files: list[str]) -> list[Step]:
-    """The task level over the touched *files*: format, lint, types, then the touched tests."""
-    py = [f for f in files if f.endswith(".py")]
-    tests = [f for f in py if f.startswith("tests/") and Path(f).name.startswith("test_")]
-    src = [f for f in py if f not in tests and f.startswith(("dadaia_workspace/", "scripts/"))]
-    return [
-        *(
-            [("ruff format", [PY, "-m", "ruff", "format", "--check", "--no-cache", *py], {}),
-             ("ruff check", [PY, "-m", "ruff", "check", "--no-cache", *py], {})]
-            if py else []
-        ),
-        *([("mypy", [PY, "-m", "mypy", "--strict", *src], {})] if src else []),
-        *([("owner tests", [*PYTEST, *tests], {})] if tests else []),
-    ]  # fmt: skip
-
-
 def plan(argv: list[str]) -> list[tuple[str, Step]]:
     """``(job, step)`` in run order for *argv*: a level, else the named CI jobs, else all."""
-    if argv[:1] == ["task"]:
-        return [("task", step) for step in _task(argv[1:])]
-    jobs = STAGE if argv in ([], ["job"], ["stage"]) else argv
+    jobs = STAGE if argv in ([], ["job"]) else argv
     return [(job, step) for job in jobs for step in JOBS[job]]
 
 
 def main(argv: list[str]) -> int:
+    unknown = [a for a in argv if a not in JOBS and a != "job"]
+    if unknown:
+        print(
+            f"unknown job {', '.join(map(repr, unknown))}; known: job, {', '.join(JOBS)}",
+            file=sys.stderr,
+        )
+        return 2
     # The fence (ADR 0088) mirrors the resolver's rungs: the inherited fence, every root above
     # the checkout, and the instance owning this venv (``fenced_env`` omits that last one, and
     # importing it would judge whichever ``dadaia_workspace`` is importable).
