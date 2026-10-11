@@ -24,6 +24,7 @@ __all__ = [
     "constitution_text",
     "from_mapping",
     "merge_frontmatter",
+    "live_release_id",
     "next_candidate",
     "read_gitflow",
     "resolve_live_candidate",
@@ -71,7 +72,8 @@ def next_candidate(release_dir: Path) -> Path:
     return Path(schema.next_candidate(release_dir, None))
 
 
-def _live_id(specs_dir: Path) -> str | None:
+def live_release_id(specs_dir: Path) -> str | None:
+    """The id of the ONE live release, ``None`` with none or several."""
     live = _grammar.live_ids(specs_dir)
     return live[0] if len(live) == 1 else None
 
@@ -79,13 +81,13 @@ def _live_id(specs_dir: Path) -> str | None:
 def resolve_live_candidate(specs_dir: Path) -> Path | None:
     """The live release's highest-numbered ``rc-<N>/`` (ADR 0150) — `_release_store`'s
     `candidate_dir` rule; ``None`` with no live release or no candidate folder."""
-    release_id = _live_id(specs_dir)
+    release_id = live_release_id(specs_dir)
     return candidate_dir(specs_dir / "releases" / release_id) if release_id else None
 
 
 def work_branch(specs_dir: Path, flow: Gitflow) -> str:
     """``<work><live release id>``, else ``<work>0.1.0``."""
-    return f"{flow.work_prefix}{_live_id(specs_dir) or '0.1.0'}"
+    return f"{flow.work_prefix}{live_release_id(specs_dir) or '0.1.0'}"
 
 
 def from_mapping(block: object) -> Gitflow:
