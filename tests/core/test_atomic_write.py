@@ -123,7 +123,7 @@ def test_no_temp_sibling_survives_any_injected_failure(
         raise OSError("injected failure")
 
     if failure_point == "replace_fails":
-        monkeypatch.setattr("dadaia_workspace.core.atomic_write.os.replace", boom)
+        monkeypatch.setattr(os, "replace", boom)
     else:
         monkeypatch.setattr(Path, method, boom)
 
