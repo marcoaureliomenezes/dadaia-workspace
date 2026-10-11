@@ -11,7 +11,9 @@ from pathlib import Path
 
 import pytest
 
+from dadaia_workspace.core.cli_line import git_line
 from dadaia_workspace.core.exceptions import GitCloneError, GitSyncError
+from dadaia_workspace.core.skill_owner import load_owner
 from dadaia_workspace.infrastructure.git_subprocess import GitSubprocessClient
 from tests.conftest import _GIT_QUIET
 
@@ -127,3 +129,47 @@ def test_clone_writes_longpaths_into_the_clone_config(
     GitSubprocessClient().clone(str(_repo(tmp_path / "src")), dest)
 
     assert _git(dest, "config", "--get", "core.longpaths").stdout.strip() == "true"
+
+
+def _commit_file(repo: Path, name: str) -> str:
+    (repo / name).write_text(name)
+    _git(repo, "add", "-A")
+    _git(repo, "commit", "-qm", name)
+    return _git(repo, "rev-parse", "HEAD").stdout.strip()
+
+
+def test_a_caller_git_env_never_redirects_the_client_to_another_repo(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """AC11.2: with GIT_DIR/GIT_WORK_TREE naming repo B, every answer is repo A's."""
+    repo_a, repo_b = _repo(tmp_path / "a"), _repo(tmp_path / "b")
+    head_a = _commit_file(repo_a, "only-a.txt")
+    _commit_file(repo_b, "only-b.txt")
+    branch_a = _git(repo_a, "branch", "--show-current").stdout.strip()
+    monkeypatch.setenv("GIT_DIR", str(repo_b / ".git"))
+    monkeypatch.setenv("GIT_WORK_TREE", str(repo_b))
+    client = GitSubprocessClient()
+
+    assert client.is_git_root(repo_a)
+    assert client.git(repo_a, "rev-parse", "HEAD") == head_a
+    assert client.dirty_paths(repo_a) == []
+    assert client.current_branch(repo_a) == branch_a
+
+
+def test_the_worktree_list_parse_is_the_kernels(tmp_path: Path) -> None:
+    """AC11.2: the linked trees `unrecoverable` removes are `_git.parse_worktrees` of the porcelain."""
+    parse_worktrees = load_owner("dd-bug-resolution", "_git").parse_worktrees
+    assert parse_worktrees("worktree /m\nHEAD a\n\nworktree /l\nHEAD b\nbranch refs/heads/x\n") == [
+        {"worktree": "/l", "HEAD": "b", "branch": "refs/heads/x"}
+    ]
+    repo = _repo(tmp_path / "r")
+    _git(repo, "remote", "add", "origin", str(tmp_path / "nowhere"))
+    for name in ("one", "two"):
+        _git(repo, "worktree", "add", "-q", str(tmp_path / name), "-b", name)
+    porcelain = _git(repo, "worktree", "list", "--porcelain").stdout
+
+    expected = [
+        git_line(repo, "worktree", "remove", t["worktree"]) for t in parse_worktrees(porcelain)
+    ]
+    assert len(expected) == 2
+    assert GitSubprocessClient().unrecoverable(repo) == expected
