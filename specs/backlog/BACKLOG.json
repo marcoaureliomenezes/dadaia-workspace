@@ -519,6 +519,15 @@
       "description": "Measured: dd-gitflow-default \u00a73a row 3 covers a bug fix on <code> only (paths outside specs/), and row 5 is define-only, so the rc13-define-cites-an-unread-prefix-family hotfix - two git revert commits of rc-13 specs with a 'block: (1)' body - matched no row. The reviewer flagged it MEDIUM (verdict .dadaia/handoff/dadaia-workspace/2026-10-10T201433Z-dd-code-reviewer-rc13-define-cites-an-unread-prefix-family-hotfix.handoff.json, finding 1). Design: one \u00a73a row (or a widened row 3) naming the hotfix tree, the reverted specs/ paths and the message shape of a revert that carries its block: item.\n\nScope grill 2026-10-11 (operator, verbatim): 'Confirmo, pode seguir (Recommended)' (the operator's confirmation of the whole 0.5.0 scope; this entry had no question of its own: it was decided by inspection and announced in the grill, the operator could object). Earlier rulings kept: 2026-10-10 'define/backlog merge runs verify:, \u00a73a row for a hotfix revert'. Destination: 0.5.0. Wave: 1 (law: the commit shapes every agent follows). Scope now: the whole entry as written above: one \u00a73a row for a hotfix that reverts specs text; it enters whole.",
       "provenance": "Operator, 2026-10-10: '\u00a73a row for a hotfix revert' - selected for the backlog as an Arm A demand.",
       "relates": []
+    },
+    {
+      "id": "harness-specific-surface-minimized",
+      "title": "Minimize what is specific to each harness (sub-agents, hooks); skills and AGENTS.md carry the common behavior",
+      "opened": "2026-10-11",
+      "status": "idea",
+      "description": "Operator, 2026-10-11, verbatim: 'foco na parte em que desidratamos o que \u00e9 comum em cada harness priorizando nossas skills e AGENTS.md e minimizamos a superficie do que \u00e9 especifico de cada harness (sub-agents e hooks principalmente) como Devin CLI, e outros ... Nossa estrategia clara e core de minimizar contextos especificos de cada harness nos garantir\u00e1 que ao mudar de um harness para outro pouca coisa muda.' Destination: 0.5.0. Wave: 1 (a law statement; the as-is measures what is harness-specific today).",
+      "provenance": "operator, scope grill 2026-10-11",
+      "relates": []
     }
   ]
 }
