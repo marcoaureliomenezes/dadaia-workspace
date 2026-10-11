@@ -706,9 +706,11 @@ class SpecContextService:
                 continue
             if dirty := self._git.dirty_paths(path):
                 raise DeadReviewRequiredError(
-                    f"{lead} has {len(dirty)} uncommitted change(s) ({', '.join(dirty)}); "
-                    "dead never commits. Nothing was touched.",
-                    fix=f"Operator action: move {path / dirty[0]} into a worktree, or discard it",
+                    f"{lead} has {len(dirty)} uncommitted change(s); dead never "
+                    "commits. Nothing was touched.",
+                    fix="Operator action: move "
+                    + ", ".join(str(path / rel) for rel in dirty)
+                    + " into a worktree, or discard it",
                 )
             held = [r for r in trees if r["repo"] == slug and r["exit"]]  # the owner's exits
             lost = [refix] if failed else [r["exit"] for r in held]
