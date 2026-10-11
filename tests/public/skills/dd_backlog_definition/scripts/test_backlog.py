@@ -116,6 +116,19 @@ def test_new_appends_one_active_entry(script: Path, tmp_path: Path) -> None:
     assert entry["provenance"] == "operator request"
 
 
+def test_new_over_a_malformed_privacy_baseline_exits_one_with_one_fix_line(
+    script: Path, tmp_path: Path
+) -> None:
+    baseline = tmp_path / "skills" / "dd-bug-resolution" / "scripts" / "privacy_baseline.json"
+    baseline.write_text('{"patterns": [{"id": "x"}]}', encoding="utf-8")
+    specs = _specs(tmp_path)
+    done = _run(script, "new", "an-idea", "--specs", str(specs))
+    assert done.returncode == 1
+    assert "Traceback" not in done.stderr
+    assert len(_fix_lines(done)) == 1
+    assert _active(specs) == []
+
+
 def test_new_refuses_a_duplicate_slug_with_one_fix_line(script: Path, tmp_path: Path) -> None:
     specs = _specs(tmp_path)
     assert _run(script, "new", "an-idea", "--specs", str(specs)).returncode == 0

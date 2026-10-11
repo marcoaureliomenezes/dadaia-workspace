@@ -13,6 +13,7 @@ from __future__ import annotations
 import subprocess
 from pathlib import Path
 
+import pytest
 from typer.testing import CliRunner
 
 from dadaia_workspace import container
@@ -225,3 +226,32 @@ def test_births_publish_nothing_and_a_birth_with_content_is_refused(
     _git(repo, "branch", "develop", tip)
     line = f"refs/heads/develop {tip} refs/heads/develop {_ZERO}\n"
     assert _gate(monkeypatch, tmp_path, repo, line) != 0
+
+
+def test_a_malformed_privacy_baseline_fails_the_gate_closed_with_one_fix_line(
+    monkeypatch, capsys, tmp_path: Path
+) -> None:
+    from dadaia_workspace.cli import main
+    from dadaia_workspace.core.skill_owner import load_owner
+    from dadaia_workspace.infrastructure import privacy_check
+
+    def unreadable():
+        raise load_owner("dd-bug-resolution", "_refusal").Refusal(
+            "privacy baseline is unreadable", "Operator action: reinstall the workspace"
+        )
+
+    monkeypatch.setattr(privacy_check, "load_baseline", unreadable)
+    monkeypatch.setattr(container, "load_denylist_terms", lambda: ())
+    monkeypatch.setattr(ci, "_repo_root", lambda: tmp_path)
+    monkeypatch.setattr("sys.argv", ["dadaia", "ci", "push-gate-check"])
+
+    with pytest.raises(SystemExit) as gone:
+        main._safe_app()
+
+    err = capsys.readouterr().err
+    assert gone.value.code == 1
+    assert "defect" not in err
+    assert "privacy baseline is unreadable" in err
+    assert [ln for ln in err.splitlines() if ln.startswith("fix:")] == [
+        "fix: Operator action: reinstall the workspace"
+    ]
