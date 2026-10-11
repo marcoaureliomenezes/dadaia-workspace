@@ -2,7 +2,7 @@
 
 Disclosed sibling of `SKILL.md`, pillar 1. The lineage window, filter and resolution
 facts live in `dd-bug-resolution/LINEAGE.md`; record validity lives in
-`.dadaia/agentic/schemas/bugs/bug-record-v1.schema.json`. Input is every bug
+`.agents/skills/dd-bug-resolution/scripts/schemas/bug-record-v1.schema.json`. Input is every bug
 record whose `ts` or `closed_at` falls inside that window.
 
 ## Resolution evidence

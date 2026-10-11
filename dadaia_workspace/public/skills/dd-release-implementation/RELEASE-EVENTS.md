@@ -8,7 +8,7 @@ release state.
 - `specs/releases/<release-id>/_RELEASE.json` is one mutable object with the seven
   required fields `{schema, release, phase, defined, implemented, shipped, log}`.
 - `phase` takes its lifecycle value from the
-  release-state schema (`.dadaia/agentic/schemas/releases/release-state-v1.schema.json`) and is
+  release-state schema (`.agents/skills/dd-release-implementation/scripts/schemas/release-state-v1.schema.json`) and is
   overwritten on a transition. `defined`, `implemented` and `shipped` are the
   sha-bearing facts.
 - `log` is append-only, oldest first. Every entry carries `{ts, agent, kind, text}`.

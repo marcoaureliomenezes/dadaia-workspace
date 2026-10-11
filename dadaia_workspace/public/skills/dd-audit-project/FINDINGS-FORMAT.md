@@ -2,7 +2,7 @@
 
 Disclosed sibling of `SKILL.md`. Every claim becomes one line in
 `specs/audits/<YYYYMMDD>-<slug>/FINDINGS.jsonl`, validated by
-`.dadaia/agentic/schemas/audits/finding-record-v1.schema.json`. The schema owns
+`.agents/skills/dd-audit-project/scripts/schemas/finding-record-v1.schema.json`. The schema owns
 field semantics.
 
 ## Fields

@@ -3,7 +3,7 @@
 Scope: this file governs only `specs/bugs/`.
 
 - This directory holds the bug ledger: `BUGS.jsonl`, one JSON record per bug, appended once.
-- No event stream, no fold. Schema: `bug-record-v1` (`.dadaia/agentic/schemas/bugs/bug-record-v1.schema.json`).
+- No event stream, no fold. Schema: `bug-record-v1` (`.agents/skills/dd-bug-resolution/scripts/schemas/bug-record-v1.schema.json`).
 - The ledger's ONE writer and validator — `bugs.py` below — is `python3 .agents/skills/dd-bug-resolution/scripts/bugs.py <verb> --specs <specs-dir>` — the worktree's `specs/` for a write (`dd-bug-registration` §3), `repos/<slug>/specs` for a read.
 
 ## 1. What a bug is
