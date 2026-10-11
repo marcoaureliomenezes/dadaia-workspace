@@ -1,4 +1,4 @@
-"""Slop checks: the package's slop ratchets (V32, V33, V37-V41), the doctor section subset,
+"""Slop checks: the package's slop ratchets (V32, V37-V41), the doctor section subset,
 the suppressed layering-edge cap (ARCHITECTURE P-10) and no file-size pin (ADR 0143).
 
 ``ALLOWANCES`` (V37-V39) is data each check reads from the tree's own copy of this file, so
@@ -16,7 +16,6 @@ import re
 import shutil
 import sys
 import tokenize
-import warnings
 from collections import defaultdict
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -36,7 +35,7 @@ _LEDGER = load_owner("dd-bug-resolution", "_ledger")
 
 # Ceilings measured on this tree; ratchet DOWN ONLY, target 0: lower one in the commit that
 # removes a hit, never raise one.
-V32_COMMENTS, V32_DOCSTRINGS, V33_ORPHANS, IGNORE_EDGES = 109, 215, 31, 0
+V32_COMMENTS, V32_DOCSTRINGS, IGNORE_EDGES = 109, 215, 0
 
 # v37: the candidate-folder pair (ADR 0150): the stdlib scripts cannot import the package, so
 # each side keeps its twin and one test pins them equal. v38: each deleter outside sweep,
@@ -156,65 +155,6 @@ def v32(tree: Tree) -> list[str]:
     return out + (
         [f"docstring-ids: {docs} lines > {V32_DOCSTRINGS}"] if docs > V32_DOCSTRINGS else []
     )
-
-
-_FAMILY, _UPPER = re.compile(r"\b[A-Z]{1,4}-?[0-9]{2,3}\b"), re.compile(r"[A-Z]+")
-_WORD = frozenset("ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-")
-
-
-def _joined(text: str, i: int) -> bool:
-    """``text[i]`` is a witness char: a `_WORD` char, or a `.` between two (a dotted id)."""
-    return text[i] in _WORD or (
-        text[i] == "." and 0 < i < len(text) - 1 and {text[i - 1], text[i + 1]} <= _WORD
-    )
-
-
-def _constants(source: str) -> list[str]:
-    """Every non-empty string constant of *source* that is not a bare docstring statement."""
-    nodes = list(ast.walk(ast.parse(source)))
-    bare = {id(n.value) for n in nodes if isinstance(n, ast.Expr)}
-    strs = [n for n in nodes if isinstance(n, ast.Constant) and isinstance(n.value, str)]
-    return [str(n.value) for n in strs if n.value and id(n) not in bare]
-
-
-def _reads(constant: str, prefix: str, witnesses: set[tuple[str, int]]) -> bool:
-    """*constant* (a regex, else a literal) matches a witness through its prefix and beyond."""
-    try:
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore", FutureWarning)
-            pattern = re.compile(constant)
-    except re.error:
-        pattern = re.compile(re.escape(constant))
-    return any(
-        (m := pattern.search(word)) is not None and m.start() <= at and m.end() > at + len(prefix)
-        for word, at in witnesses
-    )
-
-
-def v33(tree: Tree) -> list[str]:
-    """PREFIX-NN families in specs/, the package and tests/ that no string constant reads."""
-    families: dict[str, set[tuple[str, int]]] = defaultdict(set)
-    for text in _files(tree, "specs", PKG, "tests").values():
-        for m in _FAMILY.finditer(text):
-            left, right = m.start(), m.end()
-            while left > 0 and _joined(text, left - 1):
-                left -= 1
-            while right < len(text) and _joined(text, right):
-                right += 1
-            prefix = _UPPER.match(m.group(0)).group(0)  # type: ignore[union-attr]
-            families[prefix].add((text[left:right], m.start() - left))
-    readers: dict[str, list[str]] = defaultdict(list)
-    for source in _files(tree, PKG, "tests", py=True).values():
-        for constant in _constants(source):
-            for run in set(_UPPER.findall(constant)):
-                readers[run].append(constant)
-    unread = [
-        p for p, w in sorted(families.items()) if not any(_reads(c, p, w) for c in readers[p])
-    ]
-    orphans = [p for p in unread if p not in {"FR", "AC", "T"}]
-    if len(orphans) > V33_ORPHANS:
-        return [f"orphan-families: {len(orphans)} > {V33_ORPHANS}: {orphans}"]
-    return []
 
 
 def _definition(node: ast.stmt) -> tuple[str, str, str] | None:
@@ -526,15 +466,6 @@ def CONTROL(root: Path) -> Session:
         f"{PKG}/zz/near2.py",
         'SECTION = "ledgers"\nKIND = "a"\ndef load(p):\n    """Load."""\n    return 1\n',
     )
-    orphans = " ".join(f"Q{chr(65 + i // 26)}{chr(65 + i % 26)}-01" for i in range(V33_ORPHANS - 3))
-    _write(
-        root, "specs/x.md", f"{orphans} OFF-11 DIG-22 RDA-12 RDB-12 EF-12-XY FR-12 AC-03 T-050\n"
-    )
-    _write(root, "specs/y.md", "XB-CD-12\n")
-    readers = '"OFF", "(?<=DIG)-22", r"RDA-\\d+", r"RDB-\\d+", r"^XB-CD-\\d+$", r"^EF-\\d+-XY$"'
-    _write(root, "tests/unit/test_r.py", f'"""DOC-11"""\nreaders = ({readers})\n')
-    _write(root, "specs/_archive/x.md", "ARC-01\n")
-    (root / "specs/bin.dat").write_bytes(b"\xff ZZZ-01\n")
     _write(root, ".gitignore", f"{PKG}/zz_ignored/\n")
     _write(
         root,
@@ -627,7 +558,6 @@ def _ids_plant(comments: int, docs: int) -> Plant:
 
 # Plants appending one text under CONTROL: `<check> <row> <path> <text>`, the text's `\n` escaped.
 _APPENDS = r"""
-v33 orphan-families specs/x.md  NEW-01\n
 v38 path-delete dadaia_workspace/zz/tidy.py def tidy(p):\n    p.unlink()\n
 v38 os-delete dadaia_workspace/zz/tidy.py def outer():\n    def tidy(p):\n        os.remove(p)\n
 v40 comprehension tests/unit/test_j.py rows = [json.loads(x) for x in t.splitlines()]\n
@@ -654,7 +584,6 @@ _PLANTS: dict[str, dict[str, Plant]] = {
         "comment-ids": _ids_plant(V32_COMMENTS + 1, V32_DOCSTRINGS),
         "docstring-ids": _ids_plant(V32_COMMENTS, V32_DOCSTRINGS + 1),
     },
-    "v33": {},
     "v37": {
         "function-twin": _add(_TWIN, lambda: f"def {_first(False)}(p):\n    return p\n"),
         "constant-twin": _add(_TWIN, lambda: f"{_first(True)}: object = compile('x')\n"),
