@@ -6,7 +6,7 @@ Disclosed sibling of `SKILL.md`, pillar 3. Input: canonical memory (`ARCHITECTUR
 
 1. For each `P-NN` block in both canonical files, execute exactly the check its `Measured by:` line names.
 2. Record pass, fail, or "check does not run" — the last is a finding against whoever authored the principle.
-3. A principle carrying no `Measured by:` line, or `ADR: NNNN` naming a record that is not `accepted`, is a finding on its own.
+3. A principle carrying no `Measured by:` line is a finding on its own.
 4. Report only — fixing belongs to an ADR or to the operator.
 
 ## 2 — "Canonical memory changed without an accepted ADR"

@@ -19,7 +19,7 @@ Memory is current product truth: what the product is now, never how it got there
 
 - `ARCHITECTURE.md`: `## Principles`, `## Tech Stack`, `## Structure`. `QUALITY.md`: `## Principles`, `## Test architecture`, `## Gates`. Fixed `<!-- dadaia:fixed … -->` blocks keep their place.
 - `## Tech Stack` is one line per technology, 8 to 15 lines — a soft ceiling a large stack may exceed, never with prose.
-- A principle needs an existing mechanical check that fails when violated: `### P-NN · We …` / `Measured by:` (a doctor code, contract test, lint contract or CI job) / `ADR: NNNN (proposed|accepted) | none` / `Rationale:` one line. An unmeasurable rule is a proposed ADR, not a principle.
+- A principle needs an existing mechanical check that fails when violated: `### P-NN · We …` / `Measured by:` (a doctor code, contract test, lint contract or CI job) / `Rationale:` one line / optional `ADR: NNNN` or `ADR: none`, the id only. An unmeasurable rule is a proposed ADR, not a principle.
 - Moving or deleting a statement is recorded row by row in the commit body's coverage table: old section -> new home, or `deleted: <reason>`.
 
 ## 3. Product memory — reconciled, never appended
