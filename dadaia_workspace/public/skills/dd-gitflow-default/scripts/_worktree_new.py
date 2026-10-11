@@ -3,15 +3,12 @@
 
 from __future__ import annotations
 
-import sys
 from pathlib import Path
 
-sys.path.append(str(Path(__file__).resolve().parents[2] / "dd-bug-resolution" / "scripts"))
-
-from _grammar import STATE, live_ids  # noqa: E402
-from _jsonl import Unreadable, parse_object  # noqa: E402
-from _specs import parse  # noqa: E402
-from _worktree_git import (  # noqa: E402
+from _grammar import STATE, live_ids
+from _jsonl import Unreadable, parse_object
+from _specs import parse
+from _worktree_git import (
     flow_for,
     git,
     ours,
@@ -21,7 +18,7 @@ from _worktree_git import (  # noqa: E402
     script,
     work_version,
 )
-from _worktree_names import (  # noqa: E402
+from _worktree_names import (
     LOCK,
     NAME_RE,
     SCRIPT,

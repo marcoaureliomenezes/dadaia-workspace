@@ -9,15 +9,12 @@ its own result against it, so the renderer and the checker cannot disagree.
 from __future__ import annotations
 
 import json
-import sys
 from pathlib import Path
 from typing import Any
 
-sys.path.insert(0, str(Path(__file__).resolve().parent))
-
-import _memory_catalog as cat  # noqa: E402
-from _memory_schema import CATALOG, CODE, INDEX  # noqa: E402
-from _specs import script, with_specs  # noqa: E402
+import _memory_catalog as cat
+from _memory_schema import CATALOG, CODE, INDEX
+from _specs import script, with_specs
 
 Finding = dict[str, Any]
 

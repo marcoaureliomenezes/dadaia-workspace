@@ -16,16 +16,12 @@ regenerating an unchanged catalog is idempotent to the byte and a clean tree sta
 from __future__ import annotations
 
 import json
-import sys
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-sys.path.insert(0, str(Path(__file__).resolve().parent))
-sys.path.append(str(Path(__file__).resolve().parents[2] / "dd-bug-resolution" / "scripts"))
-
-from _memory_schema import CATALOG, INDEX, PRODUCT, WIKILINK_RE, parse  # noqa: E402
-from _specs import script  # noqa: E402
+from _memory_schema import CATALOG, INDEX, PRODUCT, WIKILINK_RE, parse
+from _specs import script
 
 Catalog = dict[str, Any]
 

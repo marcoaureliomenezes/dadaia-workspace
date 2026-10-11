@@ -12,7 +12,11 @@ import sys
 from pathlib import Path
 
 sys.dont_write_bytecode = True
-sys.path.insert(0, str(Path(__file__).resolve().parent))
+#: One bootstrap statement: this folder and the kernel, at the front.
+sys.path[:0] = [
+    str(Path(__file__).resolve().parent),
+    str(Path(__file__).resolve().parents[2] / "dd-bug-resolution" / "scripts"),
+]
 
 from _worktree_end import clean, digest, merge  # noqa: E402
 from _worktree_git import find_root, rows  # noqa: E402
