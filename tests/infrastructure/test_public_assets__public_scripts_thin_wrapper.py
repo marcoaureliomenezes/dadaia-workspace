@@ -114,7 +114,7 @@ def test_ledger_owner_scripts_expose_check() -> None:
 # --- The 0135 contract: one loader, one owner per grammar (AC3.1, PLAN §1.1) --------
 
 _PACKAGE = _REPO_ROOT / "dadaia_workspace"
-_LOADER = "infrastructure/ledger_scripts.py"
+_LOADER = "core/skill_owner.py"
 _RE_CALLS = {"compile", "search", "match", "fullmatch", "finditer", "findall", "sub", "split"}
 #: A grammar's head, as a package regex would spell it; only its owner and pinned twin hold it.
 _GRAMMAR_HEADS = {r"\*\*Origin:\*\*": set(), r"\*\*Status:\*\*": {"core/spec_status.py"}}
