@@ -260,3 +260,30 @@ def test_a_hotfix_job_needs_its_open_bug_record_on_the_work_branch(
         " (dd-bug-registration), then open its hotfix job again"
     ]
     assert not (root / "worktrees/r/hotfix").exists()
+
+
+@pytest.mark.parametrize("state", [None, "[]", "{not json"], ids=["missing", "array", "malformed"])
+def test_an_unreadable_release_state_refuses_a_job_and_creates_nothing(
+    root: Path, state: str | None
+) -> None:
+    """AC14.1: a missing, non-object or malformed `_RELEASE.json` on the work branch refuses
+    job admission: `[error]`, one `fix:` line, no branch, no worktree."""
+    repo = root / "repos/r"
+    path = repo / "specs/releases/0.5.0/_RELEASE.json"
+    if state is None:
+        _git(repo, "rm", "-q", "specs/releases/0.5.0/_RELEASE.json")
+    else:
+        path.write_text(state)
+        _git(repo, "add", "specs/releases")
+    _git(repo, "commit", "-qm", "unreadable state")
+    _git(repo, "branch", "-f", "feature/0.5.0", "HEAD")
+
+    refused = _run(root, "new", "r", JOB)
+
+    assert refused.returncode == 1
+    assert any(
+        line.startswith("[error]") for line in (refused.stdout + refused.stderr).splitlines()
+    )
+    assert len(_fixes(refused)) == 1
+    assert _git(repo, "branch", "--list", f"wt/{JOB}").strip() == ""
+    assert not (root / "worktrees/r" / JOB).exists()
