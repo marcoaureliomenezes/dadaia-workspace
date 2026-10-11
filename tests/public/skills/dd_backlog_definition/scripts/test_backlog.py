@@ -8,6 +8,7 @@ The script reads its two schemas from ``scripts/schemas/`` BESIDE itself — cop
 
 from __future__ import annotations
 
+import datetime
 import json
 import os
 import shlex
@@ -200,6 +201,34 @@ def test_exit_moves_the_entry_to_the_histo_exactly_once(script: Path, tmp_path: 
     assert record["release"] == "0.4.7"
     assert isinstance(record["entry"], dict)
     assert record["entry"]["id"] == "an-idea"
+
+
+def test_exit_stamps_the_histo_from_the_clock_and_has_no_ts_option(
+    script: Path, tmp_path: Path
+) -> None:
+    """AC8.1: `exit --ts X` is an unknown option (argparse exit 2) that writes nothing;
+    without it the histo record's `ts` is today's date, `YYYY-MM-DD`."""
+    specs = _specs(tmp_path)
+    assert _run(script, "new", "an-idea", "--specs", str(specs)).returncode == 0
+    _pick(specs)
+    exit_args = (
+        "exit",
+        "an-idea",
+        "--specs",
+        str(specs),
+        "--disposition",
+        "delivered",
+        "--release",
+        "0.4.7",
+    )
+    refused = _run(script, *exit_args, "--ts", "2001-01-01")
+    assert refused.returncode == 2, refused.stdout + refused.stderr
+    assert "unrecognized arguments: --ts" in refused.stderr
+    assert [e["id"] for e in _active(specs)] == ["an-idea"]
+    done = _run(script, *exit_args)
+    assert done.returncode == 0, done.stdout + done.stderr
+    (record,) = _histo(specs)
+    assert record["ts"] == datetime.datetime.now(tz=datetime.UTC).strftime("%Y-%m-%d")
 
 
 def test_a_second_exit_exits_one_with_a_fix_naming_the_script(script: Path, tmp_path: Path) -> None:
