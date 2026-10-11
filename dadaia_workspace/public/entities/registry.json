@@ -36,7 +36,7 @@
     },
     {
       "id": "context-memory-injection",
-      "mandate": "The session's own bind selects which product memory is injected at prompt time; never another session's bind.",
+      "mandate": "The session's own bind selects which product memory is injected; never another session's bind.",
       "modules": ["dadaia_workspace.hooks.ctx_inject"]
     },
     {

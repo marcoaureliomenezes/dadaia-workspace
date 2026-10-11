@@ -116,7 +116,7 @@ def _behavior_drift(behavior: dict[str, Any], package_root: Path) -> list[Doctor
     """DRIFT lines for one behavior (ENT-DERIVE-1): every record is covered or gapped, every
     ``gaps`` key is a record, every named module still exists. A harness implements the
     behavior when a lane of its hook table runs one of ``modules``; a behavior with no
-    ``modules`` is harness-independent."""
+    ``modules`` has no hook lane to check (its per-harness answer is its own test's)."""
     bid, modules, gaps = behavior.get("id"), behavior.get("modules", []), behavior.get("gaps", {})
     out = [
         DoctorLine(
@@ -208,7 +208,16 @@ _REGISTRY_SCHEMA = {
             "type": "array",
             "items": {
                 "type": "object",
-                "properties": {"modules": {"type": "array"}, "gaps": {"type": "object"}},
+                "properties": {
+                    "modules": {
+                        "type": "array",
+                        "items": {
+                            "type": "string",
+                            "pattern": r"^dadaia_workspace\.[a-z_][a-z0-9_.]*$",
+                        },
+                    },
+                    "gaps": {"type": "object", "additionalProperties": {"type": "string"}},
+                },
             },
         },
     },
