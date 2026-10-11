@@ -2,7 +2,7 @@
 
 ## Threshold
 
-A decision is an ADR only when all three legs hold: it is a one-way door, it is architecturally significant, and at least two genuine options exist. Fewer legs: no ADR; state it in the SPEC or the memory statement and its code evidence.
+A decision is an ADR only when all three legs hold: it is a one-way door, it is architecturally significant, and at least two genuine options exist.
 
 ## Question bank
 

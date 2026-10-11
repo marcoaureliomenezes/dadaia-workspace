@@ -6,7 +6,9 @@ Scope: this file governs only `specs/ADRs/`.
 
 - JSONL, one record per line, `decisions.jsonl`, `decision-record-v1`.
 - Fields: `id` (NNNN, zero-padded, monotonic, gap-free, never reused), `ts`, `title`, `status`.
-- Fields (continued): `context`, `decision`, `consequences`, `measured_by`, `supersedes`, `amends`.
+- Fields (continued): `context`, `decision`, `options`, `consequences`, `measured_by`, `supersedes`, `amends`.
+- `options`: at least two, each `{name, tradeoff, rejected_because}`.
+- Threshold: a decision is an ADR only when all three legs hold: it is a one-way door, it is architecturally significant, and at least two genuine options exist; a decision failing a leg lives in its scoped law line or the SPEC.
 - `status` values: `proposed` | `accepted` | `rejected` | `superseded`.
 - `accepted` requires a non-empty `measured_by` naming the check; `.dadaia/.venv/bin/dadaia doctor` (`LEDGER-ADR-SCHEMA`) validates every record and the numbering.
 - Schema: `.dadaia/agentic/schemas/ADRs/decision-record-v1.schema.json`.
@@ -15,7 +17,7 @@ Scope: this file governs only `specs/ADRs/`.
 
 - Any agent may append a record with `status: "proposed"`.
 - One decision per change set, naming every canonical memory statement it creates or changes — never one per statement that merely exists.
-- Only the operator accepts: the main thread writes `accepted` with `ruling: {date, words}` (his verbatim words or grill answer id, in the turn he rules) and `measured_by` naming a check of a kind `specs/memory/AGENTS.md` §2 lists; never delegated, and no role agent writes `accepted` or `ruling`.
+- Only the operator accepts: the main thread writes `accepted` with `ruling: {date, words}` (his verbatim words, in the turn he rules; the question plus the chosen option, never only an answer id) and `measured_by` naming a check of a kind `specs/memory/AGENTS.md` §2 lists; never delegated, and no role agent writes `accepted` or `ruling`.
 - A canonical-memory commit that only states what the code is, outside a `### P-NN` principle, needs no ADR and names its code evidence.
 - `accepted` is then immutable: `context`/`decision`/`consequences` never rewritten again.
 - A reversal is a new record naming the earlier `id` in `supersedes`/`amends`.
@@ -29,12 +31,9 @@ Scope: this file governs only `specs/ADRs/`.
 
 ## 5. Relationship to memory and audits
 
-- Canonical memory's `ADR:` line: `specs/memory/AGENTS.md` §2.
 - `dd-audit-project`'s pillar 3 (`PILLAR-MEMORY.md`) is the audit check that a canonical hunk and an accept commit pair.
 
 ### 5.1 The first-inventory case (bootstrap)
 
 - The pairing law presupposes a `## Principles` section that already exists — it does not apply to the CREATING commit.
-- A CREATING commit's statements name a `proposed` decision, or the literal `ADR: none` for a pre-canon statement.
-- Pillar 3 grades that as an operator finding, never a HIGH drift finding, and never agent-clearable.
 - From the first `docs(adr): accept <slug>` commit onward, the pairing law applies unconditionally.
