@@ -5,13 +5,13 @@ from __future__ import annotations
 
 import json
 import re
-from collections.abc import Iterable, Mapping
+from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal
 
 from dadaia_workspace.core.frontmatter import FRONTMATTER_RE, FrontmatterError, parse
-from dadaia_workspace.core.release_state import CANDIDATE_RE, RELEASE_ID_RE, RELEASE_STATE_FILENAME
+from dadaia_workspace.core.skill_owner import load_owner
 
 __all__ = [
     "DEFAULT",
@@ -27,13 +27,15 @@ __all__ = [
     "next_candidate",
     "read_gitflow",
     "resolve_live_candidate",
-    "resolve_live_release_id",
     "work_branch",
 ]
 
 Role = Literal["principal", "integration", "work"]
 
-_VERSION_RE = re.compile(r"\d+\.\d+\.\d+")
+_grammar = load_owner("dd-bug-resolution", "_grammar")
+_VERSION_RE = _grammar.SEMVER_RE
+candidate_number = _grammar.candidate_number
+candidate_dir = _grammar.candidate_dir
 # git check-ref-format's refusals, for one branch name (a prefix may end in "/").
 _BAD_REF_RE = re.compile(r"[\x00-\x20\x7f~^:?*\[\\]|\.\.|//|@\{|^[/.]|\.$|\.lock(/|$)|/\.|^@$")
 
@@ -63,44 +65,27 @@ class Gitflow:
 DEFAULT = Gitflow(principal="main", integration="develop", work_prefix="feature/")
 
 
-def resolve_live_release_id(specs_dir: Path) -> str | None:
-    """The one bare ``releases/<M.m.p>/`` holding ``_RELEASE.json`` — `release.py`'s `live_ids`
-    rule; none or several is ``None`` (`release.py check` reports several)."""
-    root = specs_dir / "releases"
-    live = [d.name for d in root.iterdir() if RELEASE_ID_RE.match(d.name)
-            and (d / RELEASE_STATE_FILENAME).is_file()] if root.is_dir() else []  # fmt: skip
-    return live[0] if len(live) == 1 else None
-
-
-def candidate_number(names: Iterable[str]) -> int:
-    """The highest ``rc-<N>`` among *names*, 0 when none — `_release_schema`'s twin."""
-    return max((int(m.group(1)) for n in names if (m := CANDIDATE_RE.match(n))), default=0)
-
-
-def candidate_dir(release_dir: Path) -> Path | None:
-    """The highest-numbered ``rc-<N>/`` under *release_dir* (ADR 0150), ``None`` when none."""
-    n = candidate_number(d.name for d in release_dir.iterdir() if d.is_dir())
-    return release_dir / f"rc-{n}" if n else None
-
-
 def next_candidate(release_dir: Path) -> Path:
-    """The ``rc-<N+1>/`` a new candidate is born in — past every ``rc-<N>`` entry, a stray
-    file included, so the birth never lands on an existing path."""
-    names = [p.name for p in release_dir.iterdir()] if release_dir.is_dir() else []
-    return release_dir / f"rc-{candidate_number(names) + 1}"
+    """The ``rc-<N+1>/`` a new candidate is born in — `_release_schema`'s rule."""
+    schema = load_owner("dd-release-implementation", "_release_schema")
+    return Path(schema.next_candidate(release_dir, None))
+
+
+def _live_id(specs_dir: Path) -> str | None:
+    live = _grammar.live_ids(specs_dir)
+    return live[0] if len(live) == 1 else None
 
 
 def resolve_live_candidate(specs_dir: Path) -> Path | None:
     """The live release's highest-numbered ``rc-<N>/`` (ADR 0150) — `_release_store`'s
     `candidate_dir` rule; ``None`` with no live release or no candidate folder."""
-    if (release_id := resolve_live_release_id(specs_dir)) is None:
-        return None
-    return candidate_dir(specs_dir / "releases" / release_id)
+    release_id = _live_id(specs_dir)
+    return candidate_dir(specs_dir / "releases" / release_id) if release_id else None
 
 
 def work_branch(specs_dir: Path, flow: Gitflow) -> str:
     """``<work><live release id>``, else ``<work>0.1.0``."""
-    return f"{flow.work_prefix}{resolve_live_release_id(specs_dir) or '0.1.0'}"
+    return f"{flow.work_prefix}{_live_id(specs_dir) or '0.1.0'}"
 
 
 def from_mapping(block: object) -> Gitflow:

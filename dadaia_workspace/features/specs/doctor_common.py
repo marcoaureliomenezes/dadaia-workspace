@@ -16,8 +16,8 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-from dadaia_workspace.core.gitflow import resolve_live_release_id
-from dadaia_workspace.core.release_state import CANDIDATE_RE, RELEASE_STATE_FILENAME, read_phase
+from dadaia_workspace.core.release_state import CANDIDATE_RE, RELEASE_STATE_FILENAME
+from dadaia_workspace.core.skill_owner import load_owner
 
 # A dir counts as a "release dir" iff it carries at least one SDD release artifact.
 #
@@ -33,18 +33,19 @@ _SEGMENT_NAME_RE = re.compile(rf"{CANDIDATE_RE.pattern}|^alpha-\d+$|^integration
 
 
 def resolve_active_release(specs_dir: Path) -> tuple[str | None, str | None]:
-    """``(release_id, phase)`` of the ONE live release (core.gitflow's reader, `release.py`'s
-    `live_ids` rule), or ``(None, None)`` when there is none, several, or no readable
-    phase: `release.py check` reports those defects, so no rule here judges them twice."""
-    if (release_id := resolve_live_release_id(specs_dir)) is None:
+    """``(release_id, phase)`` of the ONE live release (`_grammar.live_ids`), or
+    ``(None, None)`` when there is none, several, or no readable phase: `release.py check`
+    reports those defects, so no rule here judges them twice."""
+    live = load_owner("dd-bug-resolution", "_grammar").live_ids(specs_dir)
+    if len(live) != 1:
         return None, None
+    jsonl = load_owner("dd-bug-resolution", "_jsonl")
     try:
-        phase = read_phase(
-            (specs_dir / "releases" / release_id / RELEASE_STATE_FILENAME).read_text("utf-8")
-        )
-    except OSError:
-        phase = None
-    return (release_id, phase) if phase else (None, None)
+        text = (specs_dir / "releases" / live[0] / RELEASE_STATE_FILENAME).read_text("utf-8")
+        phase = jsonl.parse_object(text, "").get("phase")
+    except (OSError, jsonl.Unreadable):
+        return None, None
+    return (live[0], phase) if isinstance(phase, str) and phase else (None, None)
 
 
 def is_release_dir(d: Path) -> bool:
