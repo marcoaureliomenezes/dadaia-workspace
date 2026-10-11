@@ -11,7 +11,8 @@ description: >
 ## The document
 
 1. Open `specs/backlog/AGENTS.md` (the area's scoped law) and follow it.
-2. Write in a `backlog` worktree (`worktrees/AGENTS.md`). Append via `python3 .agents/skills/dd-backlog-definition/scripts/backlog.py new <slug> --title "…" --description "…" --provenance "<operator words or intake item + date>" --relates <slugs>|none`; validate via `.dadaia/.venv/bin/dadaia doctor` (`ledgers`
+2. Before `backlog.py new`, run `dd-grill-me` with its `references/backlog.md`.
+3. Write in a `backlog` worktree (`worktrees/AGENTS.md`). Append via `python3 .agents/skills/dd-backlog-definition/scripts/backlog.py new <slug> --title "…" --description "…" --provenance "<operator words or intake item + date>" --relates <slugs>|none`; validate via `.dadaia/.venv/bin/dadaia doctor` (`ledgers`
    section).
 
 ## Continuous curation
