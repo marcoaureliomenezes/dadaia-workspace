@@ -9,6 +9,7 @@ patch. Every case below is a property of the window, never of this repo's atom c
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -342,3 +343,35 @@ def test_any_tracked_file_makes_its_directory_a_unit(
         assert report["uncovered"] and not [u for u in report["uncovered"] if path.startswith(u)]
     else:
         assert unit in report["uncovered"]
+
+
+def test_drift_in_repo_a_answers_for_a_under_a_foreign_git_dir(
+    script: Path, repo: Path, tmp_path: Path
+) -> None:
+    """AC11.2 (the navigator runner): GIT_DIR and GIT_WORK_TREE both on repo B (GIT_DIR alone
+    lets git take the cwd as the work tree and pass by accident); the window of A still reads A."""
+    base = _git(repo, "rev-parse", "HEAD")
+    (repo / "dadaia_workspace" / "features" / "alpha" / "core.py").write_text("x = 2\n", "utf-8")
+    _git(repo, "commit", "-aqm", "touch alpha")
+    other = tmp_path / "other"
+    _git(tmp_path, "init", "-q", other.name)
+    _git(other, "config", "user.email", "fixture@example.invalid")
+    _git(other, "config", "user.name", "fixture")
+    (other / "unrelated.txt").write_text("b\n", "utf-8")
+    _git(other, "add", "-A")
+    _git(other, "commit", "-qm", "other")
+    env = {**os.environ, "GIT_DIR": str(other / ".git"), "GIT_WORK_TREE": str(other)}
+
+    result = subprocess.run(
+        [sys.executable, str(script), "drift", "--specs", str(repo / "specs"), "--since", base,
+         "--json"], capture_output=True, text=True, check=False, cwd=repo, env=env,
+    )  # fmt: skip
+
+    assert result.returncode == 1, result.stderr
+    assert json.loads(result.stdout)["atoms"] == [
+        {
+            "slug": "alpha",
+            "path": "specs/memory/product/platform/alpha.md",
+            "matched": ["dadaia_workspace/features/alpha/core.py"],
+        }
+    ]
