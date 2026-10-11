@@ -17,11 +17,16 @@ _PKG = Path(dadaia_workspace.__file__).resolve().parent
 _ROOT = _PKG.parent
 
 
-def _run(code: str, cwd: Path, *flags: str, path: str = "") -> subprocess.CompletedProcess[str]:
-    """A fresh interpreter: stdlib plus the given package parent on sys.path, cwd elsewhere."""
+def _run(
+    code: str, cwd: Path, *, path: str = "", bytecode: bool = False
+) -> subprocess.CompletedProcess[str]:
+    """A fresh interpreter: stdlib plus the given package parent on sys.path, cwd elsewhere.
+
+    -I ignores PYTHONDONTWRITEBYTECODE, so -B is passed here: a child imports from the checkout.
+    """
     prologue = f"import sys; sys.path[1:] = [p for p in sys.path if p.startswith(sys.base_prefix)]; sys.path.append({path!r})\n"
     return subprocess.run(
-        [sys.executable, "-I", *flags, "-c", prologue + code],
+        [sys.executable, "-I", *([] if bytecode else ["-B"]), "-c", prologue + code],
         cwd=cwd,
         capture_output=True,
         text=True,
@@ -63,7 +68,6 @@ def test_a_ledger_py_planted_in_the_cwd_is_never_loaded(tmp_path):
         "m = load_owner('dd-bug-resolution', '_ledger')\n"
         "print(m.__file__, hasattr(m, 'PLANTED'))",
         tmp_path,
-        "-B",
         path=str(_ROOT),
     )
     kernel = _PKG / "public" / "skills" / "dd-bug-resolution" / "scripts" / "_ledger.py"
@@ -82,6 +86,7 @@ def test_loading_owners_writes_no_pycache_into_the_skills_tree(tmp_path):
         "        load_owner(p.parent.parent.name, p.stem)\n",
         tmp_path,
         path=str(copy),
+        bytecode=True,
     )
     assert done.returncode == 0, done.stderr
     assert sorted(skills.rglob("__pycache__")) == []
