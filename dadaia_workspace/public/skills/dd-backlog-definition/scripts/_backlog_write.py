@@ -12,9 +12,10 @@ from typing import Any
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from _backlog_store import SCRIPT, Items, Refusal  # noqa: E402
+from _ledger import load_schema  # noqa: E402
 from _specs import choice  # noqa: E402
 
-_SLUG_RE = re.compile(r"^[a-z][a-z0-9-]+$")
+_SLUG = load_schema("backlog-v1")["$defs"]["slug"]["pattern"]
 _INTENT_RE = re.compile(r"^(?P<kind>[a-z]+):(?P<ref>[^=]+)=(?P<change>.+)$", re.DOTALL)
 KINDS = ("code", "doc", "invariant", "catalog")
 
@@ -46,9 +47,9 @@ def new_entry(active: Items, slug: str, values: dict[str, Any]) -> Items:
     """One brand-new entry, born at ``status: 'idea'`` — an unbound brainstorm, which is
     the one status exempt from the typed-intents requirement, so it is doctor-clean with
     no further edits."""
-    if not _SLUG_RE.fullmatch(slug):
-        raise choice(Refusal(f"invalid slug {slug!r}: must match ^[a-z][a-z0-9-]+$ (lowercase "
-                     "letters, digits and hyphens, starting with a letter)"),
+    if not re.fullmatch(_SLUG, slug):
+        raise choice(Refusal(f"invalid slug {slug!r}: must match {_SLUG} (lowercase "
+                     "letters and digits, starting with a letter, single hyphens)"),
                      "with a valid slug in its place", slug)  # fmt: skip
     if any(item.get("id") == slug for item in active):
         raise choice(Refusal(f"backlog slug {slug!r} is already a live active[] entry — an item is "

@@ -18,6 +18,11 @@
     }
   },
   "$defs": {
+    "slug": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$",
+      "description": "The one slug grammar: lowercase letters and digits, starting with a letter, single hyphens between groups (a '--' is the worktree job/task separator), no trailing hyphen."
+    },
     "activeItem": {
       "type": "object",
       "additionalProperties": false,
@@ -25,7 +30,7 @@
       "properties": {
         "id": {
           "type": "string",
-          "pattern": "^[a-z][a-z0-9-]+$",
+          "$ref": "#/$defs/slug",
           "description": "Backlog slug — the retired '### <slug>' heading text. Stable identity; never renumbered or reused."
         },
         "title": {
@@ -61,7 +66,7 @@
         "relates": {
           "type": "array",
           "description": "The live entries this one was judged to update, obsolete or relate to at birth, empty for none; absent when the backlog was empty.",
-          "items": { "type": "string", "pattern": "^[a-z][a-z0-9-]+$" }
+          "items": { "$ref": "#/$defs/slug" }
         }
       }
     },
