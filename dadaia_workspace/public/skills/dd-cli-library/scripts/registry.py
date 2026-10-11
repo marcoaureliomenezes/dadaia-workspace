@@ -21,7 +21,7 @@ from typing import Any
 
 sys.dont_write_bytecode = True  # the shared _ledger imports without a __pycache__
 sys.path.append(str(Path(__file__).resolve().parents[2] / "dd-bug-resolution" / "scripts"))
-from _ledger import replace, workspace_of  # noqa: E402
+from _ledger import replace, workspace_of
 
 DEFAULT_MIN_PORT = 3000
 DEFAULT_MAX_PORT = 3999

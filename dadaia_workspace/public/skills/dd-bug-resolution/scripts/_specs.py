@@ -10,11 +10,9 @@ import subprocess
 import sys
 from pathlib import Path
 
-sys.path.append(str(Path(__file__).resolve().parent))  # loadable alone, not only by name
-
-from _ledger import parse as parse  # noqa: E402  (the one door to the sibling skill)
-from _platform import detect, venv_tool  # noqa: E402
-from _root import workspace_of as workspace_of  # noqa: E402
+from _ledger import parse as parse  # the one door to the sibling skill
+from _platform import detect, venv_tool
+from _root import workspace_of as workspace_of
 
 
 def find_specs(given: Path | None, *, ledger: str | None = None) -> Path:

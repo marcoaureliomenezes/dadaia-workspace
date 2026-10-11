@@ -9,22 +9,18 @@ by the file's own (size, mtime) and re-applied once — a race surfaces and retr
 from __future__ import annotations
 
 import json
-import sys
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-sys.path.insert(0, str(Path(__file__).resolve().parent))
-sys.path.append(str(Path(__file__).resolve().parents[2] / "dd-bug-resolution" / "scripts"))
-
-from _grammar import STATE  # noqa: E402
-from _jsonl import parse_object  # noqa: E402
-from _ledger import records, replace, stamp  # noqa: E402
-from _refusal import Refusal as Refusal  # noqa: E402
-from _release_check import state_findings  # noqa: E402
-from _release_schema import Unreadable, current_candidate, live_id  # noqa: E402
-from _specs import choice, script  # noqa: E402
+from _grammar import STATE
+from _jsonl import parse_object
+from _ledger import records, replace, stamp
+from _refusal import Refusal as Refusal
+from _release_check import state_findings
+from _release_schema import Unreadable, current_candidate, live_id
+from _specs import choice, script
 
 State = dict[str, Any]
 SCRIPT = script(Path(__file__).parent / "release.py")

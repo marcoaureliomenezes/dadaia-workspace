@@ -17,9 +17,9 @@ from graphlib import CycleError, TopologicalSorter
 from pathlib import Path
 from typing import Any
 
-import _ledger  # noqa: E402
-from _ledger import SPECS, load_schema, validate  # noqa: E402
-from _release_schema import (  # noqa: E402
+import _ledger
+from _ledger import SPECS, load_schema, validate
+from _release_schema import (
     CODE,
     DELIVERED,
     HISTO,

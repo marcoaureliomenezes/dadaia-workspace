@@ -15,15 +15,18 @@ from pathlib import Path
 # No `__pycache__` beside a projected skill; `_ledger.py` is staged beside this script
 # (the source tree keeps it in dd-bug-resolution).
 sys.dont_write_bytecode = True
-sys.path.append(str(Path(__file__).resolve().parents[2] / "dd-bug-resolution" / "scripts"))
-sys.path.insert(0, str(Path(__file__).resolve().parent))
+#: One bootstrap statement: this folder and the kernel, at the front.
+sys.path[:0] = [
+    str(Path(__file__).resolve().parent),
+    str(Path(__file__).resolve().parents[2] / "dd-bug-resolution" / "scripts"),
+]
 
-from _grammar import SHA_RE, STATE  # noqa: E402
-from _refusal import Refusal  # noqa: E402
-from _release_check import histo_findings  # noqa: E402
-from _release_new import new_release  # noqa: E402
-from _release_phase import SHIP_PR, set_phase  # noqa: E402
-from _release_schema import (  # noqa: E402
+from _grammar import SHA_RE, STATE
+from _refusal import Refusal
+from _release_check import histo_findings
+from _release_new import new_release
+from _release_phase import SHIP_PR, set_phase
+from _release_schema import (
     _ORIGIN_GRAMMAR,
     CODE,
     HISTO,
@@ -31,15 +34,15 @@ from _release_schema import (  # noqa: E402
     origin,
     utc_now,
 )
-from _release_store import (  # noqa: E402
+from _release_store import (
     SCRIPT,
     commit,
     live_release,
     open_bug_ids,
     window_start,
 )
-from _release_tree import check, drift, memory_errors, ship_findings  # noqa: E402
-from _specs import choice, find_specs, refuse  # noqa: E402
+from _release_tree import check, drift, memory_errors, ship_findings
+from _specs import choice, find_specs, refuse
 
 _HELP = {
     "new": "open the next candidate: its rc-<N+1>/SPEC.md stub and _RELEASE.json, in one act",

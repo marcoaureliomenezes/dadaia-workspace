@@ -56,7 +56,7 @@ class Unreadable(ValueError):
 
 def live_id(specs: Path) -> str:
     """The ONE live release id; :class:`Unreadable` names why not and its act."""
-    from _specs import choice, script  # on every caller's sys.path; a runpy load never acts
+    from _specs import choice, script  # the entry point's bootstrap resolves it
 
     ids, release = live_ids(specs), script(Path(__file__).resolve().parent / "release.py")
     if not ids:
@@ -105,7 +105,7 @@ def candidate_adds(specs: Path) -> list[tuple[_dt.datetime, str, str]]:
     log = subprocess.run([*git, "log", "--diff-filter=A", "--name-only", "--format=%x00%H %cI", "--",
                           ":(glob)releases/**/rc-*/SPEC.md"], capture_output=True, text=True, encoding="utf-8", errors="replace", check=False)  # fmt: skip
     if head.returncode == 0 and log.returncode:  # a repo with no commit yet holds no birth
-        from _specs import git_line  # on every caller's sys.path; a runpy load never acts
+        from _specs import git_line  # the entry point's bootstrap resolves it
 
         raise Unreadable(f"cannot read the history of {specs}: {log.stderr.strip()}",
                          git_line(specs, "fsck"))  # fmt: skip

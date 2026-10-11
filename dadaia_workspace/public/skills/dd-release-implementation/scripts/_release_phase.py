@@ -10,17 +10,17 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
-from _grammar import SHA_RE, STATE, candidate_number  # noqa: E402
-from _refusal import Refusal  # noqa: E402
-from _release_check import candidate_errors  # noqa: E402
-from _release_schema import (  # noqa: E402
+from _grammar import SHA_RE, STATE, candidate_number
+from _refusal import Refusal
+from _release_check import candidate_errors
+from _release_schema import (
     APPROVED,
     CANDIDATE_DOCS,
     extract_status,
     utc_now,
 )
-from _release_store import SCRIPT, Live, State, commit, live_release  # noqa: E402
-from _specs import choice  # noqa: E402
+from _release_store import SCRIPT, Live, State, commit, live_release
+from _specs import choice
 
 #: DEFINITION is `new`'s; each later phase has one predecessor (out-of-order = re-run).
 PREDECESSOR = {"IMPLEMENTATION": "DEFINITION", "CLOSURE": "IMPLEMENTATION"}

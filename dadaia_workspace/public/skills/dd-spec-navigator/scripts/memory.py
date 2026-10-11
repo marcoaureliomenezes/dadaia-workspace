@@ -23,11 +23,11 @@ sys.path[:0] = [
     str(Path(__file__).resolve().parents[2] / "dd-bug-resolution" / "scripts"),
 ]
 
-import _memory_catalog as cat  # noqa: E402
-import _memory_drift as dft  # noqa: E402
-from _memory_check import check  # noqa: E402
-from _memory_schema import CATALOG, INDEX  # noqa: E402
-from _specs import find_specs, refuse  # noqa: E402
+import _memory_catalog as cat
+import _memory_drift as dft
+from _memory_check import check
+from _memory_schema import CATALOG, INDEX
+from _specs import find_specs, refuse
 
 
 def _parser() -> argparse.ArgumentParser:

@@ -6,18 +6,14 @@
 from __future__ import annotations
 
 import shutil
-import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent))
-sys.path.append(str(Path(__file__).resolve().parents[2] / "dd-bug-resolution" / "scripts"))
-
-from _grammar import SEMVER_RE, STATE, live_ids  # noqa: E402
-from _ledger import records, replace  # noqa: E402
-from _refusal import Refusal  # noqa: E402
-from _release_schema import next_candidate, utc_now  # noqa: E402
-from _release_store import SCRIPT, State, read_state, validated  # noqa: E402
-from _release_tree import BUG_WINDOW, tree_findings  # noqa: E402
+from _grammar import SEMVER_RE, STATE, live_ids
+from _ledger import records, replace
+from _refusal import Refusal
+from _release_schema import next_candidate, utc_now
+from _release_store import SCRIPT, State, read_state, validated
+from _release_tree import BUG_WINDOW, tree_findings
 
 SPEC_STUB = """\
 # SPEC — Release: {release_id}

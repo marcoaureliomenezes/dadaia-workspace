@@ -18,13 +18,13 @@ from typing import Any
 # this skill: importing a pure function is not a script calling a script (SPEC D6).
 sys.path.insert(1, str(Path(__file__).resolve().parents[2] / "dd-spec-navigator" / "scripts"))
 
-import _memory_drift as drift  # noqa: E402
-from _grammar import SEMVER_RE, SHA_RE, STATE, live_ids  # noqa: E402
-from _ledger import records  # noqa: E402
-from _refusal import Refusal  # noqa: E402
-from _release_check import candidate_errors, finding, histo_findings, state_findings  # noqa: E402
-from _release_phase import NEXT  # noqa: E402
-from _release_schema import (  # noqa: E402
+import _memory_drift as drift
+from _grammar import SEMVER_RE, SHA_RE, STATE, live_ids
+from _ledger import records
+from _refusal import Refusal
+from _release_check import candidate_errors, finding, histo_findings, state_findings
+from _release_phase import NEXT
+from _release_schema import (
     CANDIDATE_DOCS,
     HISTO,
     MARK_RE,
@@ -34,8 +34,8 @@ from _release_schema import (  # noqa: E402
     origin_line,
     writes,
 )
-from _release_store import SCRIPT, live_release  # noqa: E402
-from _specs import quote, script, with_specs  # noqa: E402
+from _release_store import SCRIPT, live_release
+from _specs import quote, script, with_specs
 
 __all__ = ["check", "drift", "memory_errors", "ship_findings", "tree_findings"]
 

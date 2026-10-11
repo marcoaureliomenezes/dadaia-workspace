@@ -18,10 +18,10 @@ sys.path[:0] = [
     str(Path(__file__).resolve().parents[2] / "dd-bug-resolution" / "scripts"),
 ]
 
-from _worktree_end import clean, digest, merge  # noqa: E402
-from _worktree_git import find_root, rows  # noqa: E402
-from _worktree_names import Refusal  # noqa: E402
-from _worktree_new import new  # noqa: E402
+from _worktree_end import clean, digest, merge
+from _worktree_git import find_root, rows
+from _worktree_names import Refusal
+from _worktree_new import new
 
 __all__ = ["main"]
 

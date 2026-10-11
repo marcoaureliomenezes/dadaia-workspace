@@ -28,12 +28,12 @@ sys.path[:0] = [
 #: `release.py`'s Origin parser, the line's one owner.
 sys.path.append(str(Path(__file__).resolve().parents[2] / "dd-release-implementation" / "scripts"))
 
-import _backlog_exit as ex  # noqa: E402
-import _backlog_write as wr  # noqa: E402
-from _backlog_check import check  # noqa: E402
-from _backlog_schema import CODE, DISPOSITIONS, HISTO, LEDGER  # noqa: E402
-from _backlog_store import Refusal, commit, read_active  # noqa: E402
-from _specs import find_specs, refuse  # noqa: E402
+import _backlog_exit as ex
+import _backlog_write as wr
+from _backlog_check import check
+from _backlog_schema import CODE, DISPOSITIONS, HISTO, LEDGER
+from _backlog_store import Refusal, commit, read_active
+from _specs import find_specs, refuse
 
 _HELP = {
     "new": "append one brand-new active[] entry, born at status 'idea'",
