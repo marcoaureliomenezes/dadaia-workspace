@@ -220,3 +220,14 @@ def test_a_verdict_in_a_second_already_taken_never_overwrites_the_first(tmp_path
     )
     assert [p.read_text() for p in taken] == ["first"] * len(taken)
     assert set(_written(root)) == set(taken)
+
+
+def test_the_file_name_stamp_and_produced_at_are_one_instant(tmp_path: Path) -> None:
+    root, tree, head = _workspace(tmp_path)
+    assert _verdict(root, tree, sha=head).returncode == 0
+    (path,) = _written(root)
+    stamp = path.name.removesuffix("-dd-code-reviewer-s.handoff.json")
+    produced = json.loads(path.read_text())["produced_at"]
+    assert datetime.strptime(stamp, "%Y-%m-%dT%H%M%SZ") == datetime.strptime(
+        produced, "%Y-%m-%dT%H:%M:%SZ"
+    )
