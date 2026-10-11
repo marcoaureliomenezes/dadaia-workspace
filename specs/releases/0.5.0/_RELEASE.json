@@ -1640,6 +1640,12 @@
         "workspace-init",
         "release-lifecycle"
       ]
+    },
+    {
+      "ts": "2026-10-11T01:06:40Z",
+      "agent": "main-thread",
+      "kind": "summary",
+      "text": "delivered: subagent model tiers — five personas (dd-product-engineer, dd-code-reviewer, dd-sw-engineer-sr, dd-sw-engineer-jr, dd-researcher) replace dd-software-engineer; templates name alias tiers (fable, opus, sonnet, haiku) with TIER_CODEX for Codex ids and balanced as default; public install and init --template as the one selector; overlay overrides removed and refused with a fix line; public doctor prints the model-resolution line; job files carry who; bug agent-model-templates-pin-superseded-sonnet-and-haiku resolved; hotfix release-closure-refuses-the-next-candidates-define-tree resolved under ADR 0241 (amends 0128); ADR 0240 accepted and its measured_by repaired; production code net -148 lines; carried: review LOW/MEDIUM findings to the next bug window (test_privacy_check second walker, researcher projection check, persona-frontmatter if, citations docstring, hotfix test placement) and the operator proposals (Codex researcher sandbox, frozen store error bug, reconcile rollback advice); backlog exits: subagent-model-tiers (delivered)."
     }
   ]
 }
