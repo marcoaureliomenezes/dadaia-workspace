@@ -552,15 +552,6 @@
       "relates": []
     },
     {
-      "id": "subagent-model-tiers",
-      "title": "Subagent model tiers: sr/jr engineers, dd-researcher, alias templates, template selector",
-      "opened": "2026-10-10",
-      "status": "idea",
-      "description": "Split dd-software-engineer into dd-sw-engineer-sr and dd-sw-engineer-jr (both implement tasks; model fixed per template, so the dispatched name is the model choice). Add dd-researcher: lean read-only persona (Read, Grep, Glob, Bash, WebSearch, WebFetch), no preloaded skills, path:line or URL findings. Templates name tiers by alias (opus/sonnet/haiku/fable), the registry shrinks to tier -> Codex id. Table: balanced = PE opus high, CR opus high, sr sonnet medium, jr haiku medium, researcher haiku medium; max-quality = PE fable high, CR opus xhigh, sr opus medium, jr sonnet medium, researcher sonnet medium; economy = PE sonnet medium, CR sonnet high, sr sonnet medium, jr haiku low, researcher haiku low. dadaia public install --template <id> is the one writer of applied_template (init and upgrade take the same flag; doctor shows the active template). Job file task tables gain who: sr|jr (jr = outcome fully stated by AC and W:; one REJECTED moves a jr task to sr). Resolves bug agent-model-templates-pin-superseded-sonnet-and-haiku. An ADR amending 0022 (three roles to five) awaits operator acceptance. Priority MAXIMUM: runs before the defined skill-kernel candidate (rc-13), which gets a delta check of its as-is and PLAN. Grill handoff: .dadaia/handoff/dadaia-workspace/2026-10-10T180417Z-main-thread-model-tiers-grill.handoff.json",
-      "provenance": "Operator demand 2026-10-10: 'o trabalho sobre os modelos de sub-agentes deve ser prioridade maxima. n\u00e3o podemos admitir custos desnecess\u00e1rios usando modelos improprios para as tarefas.'",
-      "relates": []
-    },
-    {
       "id": "define-backlog-merge-runs-verify",
       "title": "A define or backlog tree merge runs the recorded base's verify: line when the repo declares one",
       "opened": "2026-10-10",
