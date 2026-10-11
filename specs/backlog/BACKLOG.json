@@ -505,6 +505,18 @@
         "launch-operator-acts",
         "eval-codex-lane-in-library-ci"
       ]
+    },
+    {
+      "id": "one-bytecode-off-owner",
+      "title": "One owner decides bytecode-off for every child Python spawn",
+      "opened": "2026-10-11",
+      "status": "idea",
+      "description": "Class: a child Python process writes bytecode into the repo. Measured by the rc-14 hotfix review on 2026-10-11 (verdict .dadaia/handoff/dadaia-workspace/2026-10-11T144050Z-dd-code-reviewer-hotfix-skill-owner-tests-bytecode.handoff.json, finding 4). Bytecode-off is decided independently at about 14 sites: tests/conftest.py:57, tests/fixtures/harness_env.py:128, tests/core/test_skill_owner.py:29, scripts/ci.py:120, certification/service.py:259, python_env.py:521, hook_wrappers.py:317, core/skill_owner.py:37, and the top line of 7 skill scripts. These spawners rely on the target's own switch: ledger_scripts.py:157,182,217, _worktree_end.py:233, verdict.py:56. Seven ledger bugs come from this class: hook-runtimes-create-repo-bytecode, lifecycle-workflows-leave-python-bytecode-in-repo, pi-headless-drops-bytecode-suppression-and-recreates-repo-caches, audit-workflow-creates-repo-bytecode-artifacts, workspace-venv-probe-writes-bytecode-into-editable-checkout, public-source-hygiene-flaky-pycache-pollution, skill-owner-tests-write-bytecode-into-the-source-tree. Related: job-gate-red-on-untracked-bytecode, fixed structurally by rc-14 J6.T7/T8 (tracked-files check). Further evidence, observed 2026-10-11: guard and ruff runs left 7 __pycache__ directories in a task worktree. Design direction (main-thread agent default, unruled): one owner, the spawn helper or the kernel platform module under ADR 0246, decides -B / PYTHONDONTWRITEBYTECODE for every child Python, and the sites delete their own switches. Done when: git grep -nE \"PYTHONDONTWRITEBYTECODE|dont_write_bytecode|\\\"-B\\\"\" -- dadaia_workspace scripts tests names only the owner and its test; the conftest tripwire stays green on a clean checkout. Placement: next candidate (rc-15) grill, per the operator. A new case found before then becomes a bug linked to this item.",
+      "provenance": "Operator ruling 2026-10-11 via AskUserQuestion (rc-14 is defined; a candidate is never amended), chosen option verbatim: \"Backlog for rc-15 (Recommended)\" - \"I record it as a backlog item, with the inventory of the 14 places and the 7 bugs as evidence, and it goes to the next candidate's grill. Cost: the class stays open until rc-15. A new case found before then becomes a bug linked to this item.\" Plus rc-14 hotfix review finding 4 (dd-code-reviewer, 2026-10-11T144050Z).",
+      "relates": [
+        "hypothesis-cache-stays-out-of-repo-trees",
+        "multi-platform-by-construction-migration"
+      ]
     }
   ]
 }
