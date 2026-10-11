@@ -182,9 +182,10 @@ def script_table(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Iterator[An
     ships it; the modules it imports leave with the test."""
     skills, before = _stage(tmp_path), set(sys.modules)
     sibling = [
-        str(skills / s / "scripts") for s in ("dd-bug-resolution", "dd-release-implementation")
+        str(skills / s / "scripts")
+        for s in ("dd-backlog-definition", "dd-bug-resolution", "dd-release-implementation")
     ]
-    monkeypatch.setattr(sys, "path", [*sys.path, *sibling])  # as backlog.py appends them
+    monkeypatch.setattr(sys, "path", [*sys.path, *sibling])  # as backlog.py puts them
     monkeypatch.setattr(sys, "dont_write_bytecode", True)
     yield lambda rel, name="REQUIRED_EVIDENCE": runpy.run_path(str(skills / rel))[name]
     for module in set(sys.modules) - before:
