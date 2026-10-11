@@ -195,3 +195,48 @@ def test_a_concurrent_load_never_reads_a_half_written_registry(tmp_path: Path) -
     for _ in range(300):
         module.replace(registry, doc)
     reader.join()
+
+
+def _dead_pid() -> int:
+    probe = subprocess.Popen([sys.executable, "-c", "pass"])
+    probe.wait()
+    return probe.pid
+
+
+def test_the_liveness_branch_comes_from_the_platform_decision(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """AC11.4: `_platform.detect()` (which reads `sys.platform`) is the one platform fact. On a
+    faked Windows host there is no signal-0 probe, so a dead pid reads alive and its entry is
+    not stale; on a POSIX host (control, passes today) the same pid is dead. Today the registry
+    reads `os.name` itself, so faking `sys.platform` changes nothing and the Windows case fails."""
+    module = _load_module()
+    dead = _dead_pid()
+    entry = {"expires_at": "2999-01-01T00:00:00+00:00", "pid": dead}
+    with monkeypatch.context() as posix:
+        posix.setattr(sys, "platform", "linux")
+        assert module.pid_alive(dead) is False and module.is_stale(entry) is True
+    monkeypatch.setattr(sys, "platform", "win32")
+    assert module.pid_alive(dead) is True
+    assert module.is_stale(entry) is False
+
+
+def test_register_stamps_through_the_kernel_clock(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """AC11.4: `register` takes its instant from `_clock.now_iso()` (called through the module,
+    so a test freezes it) and writes both stamps in that clock's `YYYY-MM-DDTHH:MM:SSZ` form;
+    `expires_at` is the default 8-hour TTL later."""
+    module = _load_module()
+    import _clock  # on sys.path once registry.py is loaded
+
+    monkeypatch.setattr(_clock, "now_iso", lambda: "2026-01-02T03:04:05Z")
+    reg = tmp_path / "r.json"
+    assert (
+        module.main(["--registry", str(reg), "register", "--port", "3100", "--project", "d"]) == 0
+    )
+    (entry,) = _entries(reg)
+    assert (entry["reserved_at"], entry["expires_at"]) == (
+        "2026-01-02T03:04:05Z",
+        "2026-01-02T11:04:05Z",
+    )
