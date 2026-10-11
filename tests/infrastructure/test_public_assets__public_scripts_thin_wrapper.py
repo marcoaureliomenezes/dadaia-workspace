@@ -65,8 +65,9 @@ _CROSS_SKILL_EDGES = {
     "dd-gitflow-default": {
         "_git",
         "_grammar",
+        "_jsonl",
         "_specs",
-    },  # `_specs`: the fix-line quote; `_git`: the one runner
+    },  # `_specs`: the fix-line quote; `_git`: the one runner; `_jsonl`: the state reader
     "dd-backlog-definition": {"_release_schema", "_bugs_store"},
     "dd-bug-resolution": {"_release_schema", "_worktree_names"},
 }
