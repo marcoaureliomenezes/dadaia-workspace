@@ -36,6 +36,10 @@ class InvalidContextNameError(DadaiaError, ValueError):
     """
 
 
+class SpecsDirUnresolvedError(DadaiaError, ValueError):
+    """No ``--specs-dir`` was given and no bound context or workspace names one."""
+
+
 class AssociatedRepoConflictError(DadaiaError):
     """The registry already has an opinion about this slug that the write will not override.
 

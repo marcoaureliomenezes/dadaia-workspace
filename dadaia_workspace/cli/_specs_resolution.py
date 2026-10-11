@@ -86,8 +86,7 @@ def resolve_specs_dir_for_cli(specs_dir: str | None) -> Path:
     try:
         return _core_resolve_specs_dir(specs_dir)
     except ValueError as exc:
-        bind = fix_line(None, "context", "bind", "<name>")
-        fail(exc, f"Operator action: pass --specs-dir <path>, or bind a context with `{bind}`")
+        fail(exc)
 
 
 def resolve_workspace_root_for_cli(target_path: Path) -> Path:

@@ -16,6 +16,7 @@ from typing import Literal
 
 from dadaia_workspace.core import context_registry, workspace_resolver
 from dadaia_workspace.core.cli_line import fix_line
+from dadaia_workspace.core.exceptions import SpecsDirUnresolvedError
 from dadaia_workspace.core.models.spec_context import CONTEXT_NAME_RE
 from dadaia_workspace.core.session_store import live_session
 
@@ -252,9 +253,10 @@ def resolve_specs_dir(specs_dir: str | None) -> Path:
     if inv.specs_dir is not None:
         return inv.specs_dir
 
-    raise ValueError(
-        "Could not resolve specs_dir. Pass --specs-dir or bind a context with "
-        f"`{fix_line(None, 'context', 'bind', '<name>')}`."
+    raise SpecsDirUnresolvedError(
+        "Could not resolve specs_dir. Pass --specs-dir or bind a context.",
+        fix="Operator action: pass --specs-dir with the specs/ directory, or run "
+        f"`{fix_line(None, 'context', 'bind')}` with a context name",
     )
 
 

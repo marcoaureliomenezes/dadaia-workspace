@@ -146,10 +146,7 @@ def install_hook(
 ) -> None:
     """Install the pre-push CI/security gate."""
     repo = repo or _repo_root()
-    try:
-        installed = install_git_hooks(repo, force=force)
-    except FileNotFoundError as exc:
-        fail(exc, "Operator action: pass --repo <a git repository>")
+    installed = install_git_hooks(repo, force=force)
     if not installed:
         fail(
             "pre-push hook already exists, not overwritten.",
