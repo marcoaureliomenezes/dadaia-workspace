@@ -70,6 +70,16 @@ def test_git_answers_for_its_repo_not_the_callers_git_env(leaked: tuple[Path, Pa
     assert git(a, "rev-parse", "--show-toplevel").strip() == str(a.resolve())
 
 
+def test_the_scrub_drops_repo_selectors_and_keeps_the_callers_identity_and_config(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    for key in ("GIT_INDEX_FILE", "GIT_COMMON_DIR", "GIT_AUTHOR_NAME", "GIT_CONFIG_GLOBAL"):
+        monkeypatch.setenv(key, "x")
+    kept = load_owner("dd-bug-resolution", "_git").scrubbed_env()
+    assert {"GIT_INDEX_FILE", "GIT_COMMON_DIR"}.isdisjoint(kept)
+    assert {"GIT_AUTHOR_NAME", "GIT_CONFIG_GLOBAL"} <= set(kept)
+
+
 def test_ledger_published_text_reads_its_repo_not_the_callers_git_env(
     leaked: tuple[Path, Path], tmp_path: Path
 ) -> None:
