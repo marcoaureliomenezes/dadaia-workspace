@@ -18,10 +18,10 @@ rc-13 ran from its birth (`7a1ae384a`, 2026-10-10) to its implementation at `d68
 
 | verdict | disposition | fixes |
 |---|---|---|
-| KEEP | `git show 44a9f58c8`: +34/−92 in `model_registry.py`. This is itself the REBUILD that its `caused_by` required. It edited no assert, added no branch and reached into no other feature. No record since names it in `caused_by` or correlates with it. The Codex CRLF bug (FR16) is in a parser last changed 2026-09-28 (`a4f58278b`), which is outside this fix. | `agent-model-templates-pin-superseded-sonnet-and-haiku` |
-| REBUILD — FR13 | `git show d68a7c42f`: +6/−5. This is the second fix in one day on `_release_phase._refuse_open_worktrees`. The first, `f1d59e9e6`, added the define-tree exception, and this one fixed its candidate parse: two fixes on one unit. The unit computes "the next candidate number" a second time. `_release_schema.next_candidate` computes it for `release.py new`, and the open bug `release-new-orphans-a-drafted-next-rc` is the failure of that second computation. The REBUILD leaves one decider of the next candidate, consulted by both verbs. Its test `test_the_closure_spares_only_the_next_candidates_define_tree` stays unedited. | `release-closure-refuses-the-next-candidates-define-tree` |
-| KEEP | `git show d7503ff81`: a revert of the culprit specs commit, with no code and a `block: (1)` body. The structural cause is guard v33 reading `specs/` prose, and FR9 removes it at the root. The missing commit-shape row is FR6. | `rc13-define-cites-an-unread-prefix-family` |
-| REBUILD — FR11 (carried) | rc-13's table carried the verdict on `2a8b5637f`. That fix added a second parser of `_RELEASE.json` inside `_worktree_new.py`, and `worktree-new-crashes-on-an-unreadable-release-state` is that parser failing. FR11 executes the verdict. | `worktree-new-opens-a-job-outside-implementation` |
+| KEEP | `git show 44a9f58c8`: +34/−92, itself the REBUILD its `caused_by` required; no assert edited, no branch, no reach. No record names it in `caused_by`. FR16's parser predates it (`a4f58278b`). | `agent-model-templates-pin-superseded-sonnet-and-haiku` |
+| REBUILD — FR13 | `git show d68a7c42f`: +6/−5, the second fix in one day on `_release_phase._refuse_open_worktrees` (after `f1d59e9e6`). The unit computes the next candidate number a second time; `_release_schema.next_candidate`'s copy fails as `release-new-orphans-a-drafted-next-rc`. The REBUILD leaves one decider; `test_the_closure_spares_only_the_next_candidates_define_tree` stays unedited. | `release-closure-refuses-the-next-candidates-define-tree` |
+| KEEP | `git show d7503ff81`: a specs revert, no code, `block: (1)`. Its cause, guard v33, is deleted (FR9); its missing commit shape is FR6. | `rc13-define-cites-an-unread-prefix-family` |
+| REBUILD — FR11 (carried) | Carried from rc-13: `2a8b5637f` added a second `_RELEASE.json` parser in `_worktree_new.py`; `worktree-new-crashes-on-an-unreadable-release-state` is that parser failing. | `worktree-new-opens-a-job-outside-implementation` |
 
 Job 1 executes both REBUILD rows.
 
@@ -31,18 +31,18 @@ The law, the skills and the dev loop are the base every later wave builds on, an
 
 - The grill's record is a handoff that expires after a day. 28 accepted ADR rulings cite answer ids that can no longer be read.
 - Any decision can become an ADR, and none records the options it rejected.
-- The `ADR:` label on principles duplicates ledger status and has drifted.
+- The `ADR:` label on principles restates ledger status and has drifted.
 - The shipped law tells users in any language about this library's Python internals and ADR numbers.
 - Skills let the model type dates.
 - A specs-only definition can turn a code guard red. The developer has no way to run only the tests a change reaches.
 
-Nine confirmed bugs are open. A ship refuses any open bug that the operator has not authorized.
+Ten confirmed bugs are open. A ship refuses any open bug that the operator has not authorized.
 
 ## 2. Measurable Goals
 
 - G1. A grill decision can be read without a handoff. Every ADR proposed after rc-14 carries `options` and a self-contained `ruling.words`.
-- G2. Status has one home: after ADR 0245's acceptance, no `ADR:` line remains under a principle in `specs/memory` or the scaffold.
-- G3. `bugs.py status` lists none of the nine Origin bugs as open at rc-14's closure.
+- G2. Status has one home: after the Reconciliation, no `ADR:` label in `specs/memory` or the scaffold carries a status token.
+- G3. `bugs.py status` lists none of the ten Origin bugs as open at rc-14's closure.
 - G4. The FR4 grep over `dadaia_workspace/public/` returns only the workspace's own operation.
 - G5. `git grep -n -- '--ts' dadaia_workspace/public/skills` returns nothing.
 - G6. A specs-only change cannot turn the repo guards red through prose. `scripts/ci.py --changed` runs only the tests the diff reaches.
@@ -83,11 +83,11 @@ Scope note (main thread, 2026-10-11): the entry's clause "an ADR is born only in
 
 - AC3.1 (unit): Memory lint's `ADR:` exemption (`_ADR_LINE_RE`) is deleted. `tests/features/specs/test_memory_lint.py` stays green and gains no row.
 - AC3.2 (no test — reviewer source sweep): Several pieces leave:
-  - the `ADR:` grammar in the scaffold memory law;
-  - the ADR law's `ADR:` line and its §5.1 label clauses;
-  - `PILLAR-MEMORY.md`'s label clause.
+  - the status token in the scaffold memory law's `ADR:` grammar (a label cites the id only);
+  - the ADR law's label clauses (§5, §5.1);
+  - `PILLAR-MEMORY.md`'s label-status clause.
 
-  The missing-`Measured by:` finding and the pairing rule stay. The `ADR:` lines in `specs/memory` leave in ADR 0245's acceptance commit. The triage and the generated section are Wave 4 work, so this entry stays active after rc-14.
+  The missing-`Measured by:` finding and the pairing rule stay. Job 3's guard tolerates the old labels; the Reconciliation strips their status tokens and points P-01, P-09, P-14 and P-15 at ADR 0243. The triage and the generated section are Wave 4 work, so this entry stays active after rc-14.
 
 ### FR4 — the shipped surface is language-neutral (`public-law-language-neutral`, whole entry)
 
@@ -97,8 +97,9 @@ Scope note (main thread, 2026-10-11): the entry's clause "an ADR is born only in
 
 Operator: "minimizamos a superficie do que é especifico de cada harness (sub-agents e hooks principalmente)".
 
-- AC5.1 (no test — reviewer source sweep): One law line, in one home, states the strategy: common behaviour lives in skills and `AGENTS.md`, and each harness gets only the surface it cannot do without.
-- AC5.2 (no test — PLAN §1): The as-is review lists every harness-specific asset the library ships, each with a verdict. Every DELETE row lands in rc-14. Any other row goes to the operator at PLAN approval.
+No harness is removed: the goal is cheap harness switching, not fewer harnesses.
+
+- AC5.1 (reviewer sweep for the law line; integration for the registry): One law line, in one home, states the strategy: common behaviour lives in skills and `AGENTS.md`; each harness gets only the surface it cannot do without. `entities/registry.json` stops restating `implementations`: the entity doctor derives coverage from the harness records and the hook table, and the registry names only `gaps` (Job 9, Wave 2).
 
 ### FR6 — a commit shape for a specs revert hotfix (`hotfix-specs-revert-commit-shape`)
 
@@ -112,19 +113,14 @@ Operator: "minimizamos a superficie do que é especifico de cada harness (sub-ag
 ### FR8 — dates come from the clock (`programmatic-dates-in-skills`)
 
 - AC8.1 (integration, RED first): `bugs.py` and `backlog.py` reject `--ts` as an unknown option and stamp from the clock.
-- AC8.2 (integration, RED first): A handoff's file-name stamp and its `produced_at` come from one clock read, never from text the model typed.
+- AC8.2 (integration, pin — passes on arrival): `verdict.py`'s handoff file-name stamp and `produced_at` are one clock read. The model-written handoff gets its stamp from the clock command AC8.3's law line names.
 - AC8.3 (no test — reviewer source sweep): Every other date a skill writes names its source: `date -u`, git or gh.
 
 ### FR9 — the test suite diet and the v33 root (`test-suite-diet`, carrying `define-backlog-merge-runs-verify`)
 
-- AC9.1 (no test — reviewer source sweep): The entry's closed DELETE list leaves wherever it still exists:
-  - the vacuous honesty-residue test;
-  - the duplicates of the conftest sessionfinish, the stewardship mechanics, gitleaks plus pre-push, and the CI repo-hygiene job;
-  - the mutation wiring.
-
-  Each unique guard runs as a script of the one CI guard job. Each deletion commit names the check that still catches what it caught.
+- AC9.1 (no test — reviewer source sweep): The entry's closed DELETE list leaves where it still exists (PLAN §1 measures it: the honesty-residue test and four source-text or vacuous test blocks; the meta-test duplicates and mutation wiring are already gone). Each deletion commit names the check that still catches what it caught.
 - AC9.2 (integration): `scripts/ci.py` keeps only the job level. The dead task and stage code leaves, and `python scripts/ci.py job` keeps its steps.
-- AC9.3 (unit, RED first): Guard v33 reads no `specs/` prose, so a SPEC that cites a new id family leaves `scripts/guards/run.py` green. If the as-is review shows from git history that v33 never caught real slop, v33 is deleted instead. No new gate.
+- AC9.3 (no RED — guard run): v33 is deleted, as the operator allowed if it never caught real slop: PLAN §1 measured 31 orphan families, all noise (`ADR`, `SHA`, `UTF`). `scripts/guards/run.py` and `--planted` exit 0 without v33, its plants and its guard test. No new gate.
 
 ### FR10 — impacted tests as a developer read (`impacted-test-selection`)
 
@@ -151,9 +147,15 @@ Operator: "Mapa de impacto como leitura (Recommended)".
 
 - AC14.1 (unit, RED first): On Windows, the declared line `python scripts\ci.py job` runs as `['python', 'scripts\\ci.py', 'job']`. POSIX splitting is unchanged. One splitter serves `verify:` and `tests:` (ADR 0220 P3).
 
-### FR15 — `context-repo-refusals-carry-no-fix-line` (MEDIUM)
+### FR15 — `cli-refusals-print-no-fix-line` and `context-repo-refusals-carry-no-fix-line` (MEDIUM; REBUILD of the refusal path)
 
-- AC15.1 (integration, RED first): Three refusals each print `Error:` then exactly one `fix:` line naming its own recovery command (ADR 0073): `context repo add` with a different URL, `context repo remove` of an unregistered slug, and `context create`'s associated-repo conflict.
+Operator: "Registrar e corrigir no Job 5 (Recommended)". The structural cause: `cli/_fail.fail` prints only `Error:`, and the remedy lives in each raiser's prose or a per-site f-string.
+
+- AC15.1 (unit, then integration; RED first): The raised error carries its fix, as `SchemaVersionError` does (`core/exceptions.py:87-93`); `fail` prints a caller fix only when the error has none. Each measured site then prints `Error:` and exactly one `fix:` line (ADR 0073), one case per repro:
+  - context registry: `repo add` (invalid slug, different URL, foreign slug), `repo remove` of an unregistered slug, and `create`'s conflict, whose `fix: dadaia context list` (`context.py:168`) clears nothing;
+  - git failures of `context alive`, `baseline`, `dead`: the verb's retry line;
+  - `import` of a missing, non-JSON or non-export file; `reports validate` bare or on a missing file;
+  - `init`'s venv failure; `specs` upgrade's two-tier refusal and its unlabeled `Operator action:`; the unresolved `specs_dir`.
 - AC15.2 (integration, RED first): Adding the context's own main repo exits 0 as a no-op. The operator ruled that this refusal becomes idempotent.
 
 ### FR16 — `codex-persona-frontmatter-drops-on-crlf` (MEDIUM)
@@ -166,7 +168,7 @@ Operator: "Mapa de impacto como leitura (Recommended)".
 
 ### FR18 — `job-gate-red-on-untracked-bytecode` (LOW)
 
-- AC18.1 (unit, RED first): An ignored `__pycache__/*.pyc` under `public/` keeps the test green, and a tracked one fails it. The shipped contract stays the build exclude.
+- AC18.1 (unit, RED first): The bytecode assertion judges tracked files (`git ls-files`): an ignored `__pycache__/*.pyc` under `public/` keeps it green, and a tracked one fails it. The shipped contract stays the build exclude.
 
 ### FR19 — `cross-os-ci-masks-utf8` (LOW)
 
@@ -215,16 +217,17 @@ The entries with work exit `delivered` at closure, except `architecture-adr-sect
 - The grill handoff as the only record of operator decisions becomes a durable record in the same turn (FR1).
 - One generic grill procedure for every stage becomes per-stage references (FR1).
 - Any decision as an ADR becomes the three-leg threshold, and an id-only ruling becomes self-contained words (FR2).
-- The `ADR:` status label on principles, with its grammar, lint exemption, law lines and pillar clause, leaves (FR3).
+- The status token of the `ADR:` label, with its grammar, lint exemption, law clauses and pillar clause, leaves (FR3).
 - ADR 0187 (1)(3) and 0205 as accepted text are superseded by 0244. Their code is already gone (FR2).
 - Library internals, Python-project assumptions and ADR numbers in shipped law are removed (FR4).
 - `--ts` on `bugs.py` and `backlog.py`, and handoff dates typed by the model, are removed (FR8).
-- The honesty-residue test, the duplicate meta-tests, the mutation wiring, `ci.py`'s task and stage code, and v33's reading of `specs/` prose are removed (FR9).
+- The diet's test blocks, `ci.py`'s task and stage code, and guard v33 are removed (FR9).
+- `entities/registry.json`'s hand-written `implementations` become derived coverage (FR5).
 - The raw `_RELEASE.json` read in `_worktree_new.py` is removed (FR11).
 - `release.py check`'s DAG check that skips the job files becomes one comparison (FR12).
 - Two computations of the next candidate number become one (FR13).
 - POSIX `shlex` splitting on Windows is replaced (FR14).
-- `Error:`-only context repo refusals and the own-main refusal are replaced (FR15).
+- Per-site remedies and the 12 `Error:`-only refusal sites become an error that carries its fix; the own-main refusal becomes a no-op (FR15).
 - The Codex projection's private frontmatter parser is removed (FR16).
 - The working-tree bytecode assertion is replaced (FR18).
 - `PYTHONUTF8` and `PYTHONIOENCODING` in CI are removed (FR19).
@@ -232,22 +235,21 @@ The entries with work exit `delivered` at closure, except `architecture-adr-sect
 ### Governance sequencing
 
 1. ADRs 0243, 0244 and 0245 are proposed in this define tree. Under rule M2, each names its targets in `context`, and the main thread sets `supersedes` and `amends` at acceptance: 0244 supersedes 0205 and amends 0187; 0245 amends 0165.
-2. The operator's rulings land before the SPEC is approved. 0245's acceptance commit deletes the `ADR:` lines of `specs/memory`.
+2. The operator's rulings land before the SPEC is approved. The label strip belongs to the Reconciliation, not to an acceptance (FR3).
 
 ### Delivery constraints
 
 - Job 1 runs first and executes the two REBUILD verdicts (FR11, FR13).
 - Every bug fix lands its RED test before the fix (bugs law §2). DELETE and REBUILD tasks come before ADD tasks.
-- FR2's schema change lands before FR1's adr reference cites it.
+- Job 2 (FR1) is Wave 2: it waits on Job 3's schema `options` (FR2).
 - Shipped law changes only in `dadaia_workspace/public/` and reaches this instance by projection, never by hand edits.
 
 ### Risks
 
 | risk | control |
 |---|---|
-| FR4 and FR5 sweeps grow without bound | the closed list in the FR4 entry; FR5 lands only DELETE rows, and the rest goes to the operator |
+| the FR4 sweep grows without bound | the closed list in the FR4 entry; FR5 removes no harness |
 | Unmasked CI legs expose many encoding defects | each one is proposed as a bug and fixed at its cause, never re-masked (AC19.1) |
-| FR9's v33 change hides real slop | AC9.3 has the as-is review read v33's git history; deletion only on evidence |
 
 ## 7. Open questions
 
