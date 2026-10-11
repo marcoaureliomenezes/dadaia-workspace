@@ -420,11 +420,7 @@ def test_memory_is_not_a_doctor_ledger() -> None:
 def test_a_declared_verify_line_runs_as_argv_never_through_a_shell(root: Path) -> None:
     """AC1.2: the `verify:` line is split by shlex and run as argv: `;` and `$(...)` are words."""
     line = "verify: python scripts/ci.py job ; touch PWNED $(touch PWNED2)\n"
-    commit(
-        root / "repos/r",
-        "AGENTS.md",
-        line + "verify-task: python scripts/ci.py task\n",
-    )
+    commit(root / "repos/r", "AGENTS.md", line)
     git(root / TREE, "merge", "-q", "--ff-only", "feature/0.5.0")
     head = land(root, "src/a.py")
     approve(root, head)
@@ -554,7 +550,7 @@ def test_an_implementation_commit_cannot_carry_a_test(root: Path, law: str, test
     commit(
         repo,
         "AGENTS.md",
-        "verify: python scripts/ci.py job\nverify-task: python scripts/ci.py task\n" + law,
+        "verify: python scripts/ci.py job\n" + law,
     )
     git(job, "merge", "-q", "--ff-only", "feature/0.5.0")
     assert run(root, "new", "r", TASK).returncode == 0
@@ -623,3 +619,22 @@ def test_a_verdict_citing_a_file_only_the_reviewed_tree_holds_is_accepted(root: 
     landed = run(root, "merge", TREE)
     assert landed.returncode == 0, landed.stderr
     assert git(root / "repos/r", "rev-parse", "feature/0.5.0").strip() == head
+
+
+@pytest.mark.parametrize(
+    ("law", "key", "argv"),
+    [
+        (b"verify: python scripts\\ci.py job\n", "verify:", ["python", "scripts\\ci.py", "job"]),
+        (b"tests: checks\\** x/**\n", "tests:", ["checks\\**", "x/**"]),
+        (b"verify: a ; b $(c)\n", "verify:", ["a", ";", "b", "$(c)"]),
+        (b"", "verify:", []),
+    ],
+    ids=["windows-path", "tests-glob-line", "shell-words", "absent"],
+)
+def test_a_declared_line_splits_on_whitespace_alone(
+    tmp_path: Path, law: bytes, key: str, argv: list[str]
+) -> None:
+    """AC15.1 (ADR 0220 P3): one reader splits `verify:` and `tests:` lines, keeping backslashes."""
+    end = _law_end(tmp_path, law)
+
+    assert end._declared_argv(tmp_path, "work", key) == argv
