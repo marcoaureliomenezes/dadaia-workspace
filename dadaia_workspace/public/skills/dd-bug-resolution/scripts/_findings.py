@@ -9,7 +9,8 @@ from typing import Any
 
 
 def finding(code: str, path: str, line: int, message: str, fix: str) -> dict[str, Any]:
-    return dict(code=code, verdict="error", path=path, line=line, message=message, fix=fix)
+    return {"code": code, "verdict": "error", "path": path, "line": line, "message": message,
+            "fix": fix}  # fmt: skip
 
 
 def histo_findings(

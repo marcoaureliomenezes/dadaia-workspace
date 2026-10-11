@@ -16,6 +16,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import _bugs_transition as tr  # noqa: E402
 import _bugs_write as wr  # noqa: E402
 import _jsonl  # noqa: E402
+from _atomic import SymlinkRefusedError  # noqa: E402
 from _bugs_check import CODE, LEDGER, OPEN, STATUS_BY_VERB, check  # noqa: E402
 from _bugs_store import Refusal, commit, read_records  # noqa: E402
 from _specs import find_specs, refuse  # noqa: E402
@@ -159,6 +160,11 @@ def main(argv: list[str] | None = None) -> int:
         return _archive(args, specs) if args.verb == "archive" else _write(args, specs)
     except Refusal as refusal:
         return refuse(refusal, specs)
+    except SymlinkRefusedError as exc:
+        print(f"Error: {exc} — nothing was written",
+              f"fix: Operator action: replace {exc.path} with a regular file holding its content",
+              sep="\n", file=sys.stderr)  # fmt: skip
+        return 1
 
 
 if __name__ == "__main__":

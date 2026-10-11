@@ -103,6 +103,12 @@ _SKILL_SCRIPT_SHARED: tuple[tuple[str, str], ...] = tuple(
         ("public/skills/dd-bug-resolution/scripts/_specs.py", "_specs.py"),
         ("public/skills/dd-bug-resolution/scripts/_root.py", "_root.py"),
         ("public/skills/dd-bug-resolution/scripts/_platform.py", "_platform.py"),
+        ("public/skills/dd-bug-resolution/scripts/_atomic.py", "_atomic.py"),
+        ("public/skills/dd-bug-resolution/scripts/_git.py", "_git.py"),
+        ("public/skills/dd-bug-resolution/scripts/_jsonl.py", "_jsonl.py"),
+        ("public/skills/dd-bug-resolution/scripts/_findings.py", "_findings.py"),
+        ("public/skills/dd-bug-resolution/scripts/_commit.py", "_commit.py"),
+        ("public/skills/dd-bug-resolution/scripts/_refusal.py", "_refusal.py"),
         ("public/skills/dd-bug-resolution/scripts/_grammar.py", "_grammar.py"),
     )
     if not src.endswith(f"{skill}/scripts/{name}")

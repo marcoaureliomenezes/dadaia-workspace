@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
-"""What every ledger script shares, staged beside each one: the atomic write, schema read,
-validation, the `check` record, and `private_refusal` (the push gate's own question)."""
+"""What every ledger script shares: schema read, validation, the owners' names (`replace`,
+`records`, `finding`, `stamp`, `workspace_of`) and `private_refusal` (the push gate's own question)."""
 
 from __future__ import annotations
 
@@ -8,19 +8,23 @@ import contextlib
 import json
 import os
 import re
-import subprocess
-import time
 from collections.abc import Iterable
 from pathlib import Path
-from types import ModuleType, SimpleNamespace
 from typing import Any
 
+import _atomic
+import _git
+import _jsonl
+import _privacy
+from _commit import stamp as stamp
+from _findings import finding as finding
+from _root import STATES as _STATES
+from _root import workspace_of as workspace_of
+
 _HERE = Path(__file__).resolve().parent
-_STATES = Path(".dadaia") / "states"
-_OWN = _HERE / "_privacy.py"
-_SOURCE = _OWN if _OWN.is_file() else _HERE.parents[3] / "core" / "redaction.py"
-_privacy = ModuleType("_privacy")  # executed from source: no loader, no bytecode beside it
-exec(compile(_SOURCE.read_text(encoding="utf-8"), _SOURCE, "exec"), _privacy.__dict__)
+LineError = _jsonl.LineError
+records = _jsonl.read
+parse = _jsonl.load
 
 
 JSON_TYPES: dict[str, Any] = {"string": str, "object": dict, "array": list, "boolean": bool,
@@ -90,41 +94,6 @@ def validate(value: object, spec: dict[str, Any], root: dict[str, Any], where: s
                 yield from validate(child, properties[key], root, f"{where}.{key}")
 
 
-class LineError(ValueError):
-    """Line *number* of a JSONL ledger is not a JSON object."""
-
-    def __init__(self, number: int, message: str) -> None:
-        super().__init__(message)
-        self.number = number
-
-
-def records(path: Path) -> list[dict[str, Any]]:
-    """Every JSON object of the JSONL ledger *path*, in file order; absent reads empty."""
-    return parse(path.read_text(encoding="utf-8")) if path.is_file() else []
-
-
-def parse(text: str) -> list[dict[str, Any]]:
-    """Every JSON object of JSONL *text*, split on ``\\n`` alone — ``splitlines()``
-    breaks a record holding U+2028."""
-    out: list[dict[str, Any]] = []
-    for number, line in enumerate(text.split("\n"), start=1):
-        if not line.strip():
-            continue
-        try:
-            record = json.loads(line)
-        except json.JSONDecodeError as exc:
-            raise LineError(number, f"is not valid JSON ({exc.msg})") from exc
-        if not isinstance(record, dict):
-            raise LineError(number, "is not a JSON object")
-        out.append(record)
-    return out
-
-
-def finding(code: str, path: str, line: int, message: str, fix: str) -> dict[str, Any]:
-    return {"code": code, "verdict": "error", "path": path, "line": line, "message": message,
-            "fix": fix}  # fmt: skip
-
-
 #: Where a fix names a ledger when no tree is given: a write's own candidate bytes.
 SPECS = Path("specs")
 
@@ -147,51 +116,9 @@ def unwritten(file: Path, at: int | str, verbs: str, law: str) -> str:
             f"({finder}), then redo the change through {verbs}")  # fmt: skip
 
 
-def stamp(path: Path) -> tuple[int, int] | None:
-    """(size, mtime) — how a write detects a concurrent one; ``None`` when absent."""
-    try:
-        info = path.stat()
-    except FileNotFoundError:
-        return None
-    return (info.st_size, info.st_mtime_ns)
-
-
 def replace(path: Path, text: str) -> None:
-    """Write *text* to *path* atomically, in LF, via a temp sibling that never survives."""
-    path.parent.mkdir(parents=True, exist_ok=True)
-    tmp = path.with_name(f".{path.name}.{os.getpid()}.tmp")
-    try:
-        tmp.write_text(text, encoding="utf-8", newline="")
-        for _ in range(49):  # Windows refuses the swap while a reader holds *path* open
-            with contextlib.suppress(PermissionError):
-                return os.replace(tmp, path)
-            time.sleep(0.01)
-        os.replace(tmp, path)
-    finally:
-        tmp.unlink(missing_ok=True)
-
-
-def _baseline() -> list[SimpleNamespace]:
-    own = _HERE / "privacy_baseline.json"
-    path = own if own.is_file() else _SOURCE.parents[1] / "infrastructure" / "data" / own.name
-    raw = json.loads(path.read_text(encoding="utf-8"))
-    return [
-        SimpleNamespace(
-            id=p["id"], regex=re.compile(p["regex"]), reason=p.get("reason", ""),
-            exclude=re.compile(p["exclude_regex"]) if p.get("exclude_regex") else None,
-        )
-        for p in raw["patterns"]
-    ]  # fmt: skip
-
-
-def workspace_of(*starts: Path) -> Path | None:
-    """The ONE skill-script walk: the first ancestor of any of *starts* holding
-    `.dadaia/states/spec_contexts.json`, never a root `DADAIA_FENCED_ROOTS` fences."""
-    fenced = {
-        Path(p).resolve() for p in os.environ.get("DADAIA_FENCED_ROOTS", "").split(os.pathsep) if p
-    }
-    return next((d for s in starts for d in (s.resolve(), *s.resolve().parents)
-                 if d not in fenced and (d / _STATES / "spec_contexts.json").is_file()), None)  # fmt: skip
+    """Write *text* to *path* atomically, in LF; a symlinked *path* raises ``SymlinkRefusedError``."""
+    _atomic.atomic_write(path, text, ensure_parent=True)
 
 
 def terms(root: Path | None) -> list[tuple[str, str]]:
@@ -226,17 +153,16 @@ def _published_text(path: Path) -> str | None:
     git fails — no amnesty, as the push's adapter raises on the same failure."""
 
     def run(*args: str) -> str:
-        return subprocess.run(["git", "-C", str(path.parent), *args], capture_output=True,
-                              text=True, encoding="utf-8", check=True).stdout  # fmt: skip
+        return _git.git(path.parent, *args)
 
     try:
         rel = path.resolve().relative_to(
             Path(run("rev-parse", "--show-toplevel").strip()).resolve()
         )
         for base in _privacy.publication_boundaries(lambda a: run(*a).splitlines(), "HEAD"):
-            with contextlib.suppress(subprocess.CalledProcessError):
+            with contextlib.suppress(RuntimeError):
                 return run("cat-file", "blob", f"{base}:{rel.as_posix()}")
-    except (subprocess.CalledProcessError, OSError):
+    except (RuntimeError, OSError, ValueError):
         pass
     return None
 
@@ -246,7 +172,7 @@ def private_refusal(records: Iterable[dict[str, Any]], path: Path) -> tuple[str,
     match the published text of *path* (the ledger file) does not already carry — else
     ``None``; terms and published text are read once per write, from the workspace holding
     *path*, whatever the cwd."""
-    found, patterns = terms(workspace_of(path)), _baseline()
+    found, patterns = terms(workspace_of(path)), _privacy.load_baseline()
     published = _privacy.published_matches(_published_text(path), found, patterns)
     for key, value in (item for record in records for item in record.items()):
         text = json.dumps(value, ensure_ascii=False)

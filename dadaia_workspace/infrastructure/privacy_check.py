@@ -147,7 +147,10 @@ def check_public_privacy(
     lib_root = public_dir.parent.parent
     roots: list[Path] = [public_dir]
     denylist = load_privacy_terms()
-    baseline = _load_privacy_baseline()
+    try:
+        baseline = _load_privacy_baseline()
+    except load_owner("dd-bug-resolution", "_refusal").Refusal as refusal:
+        return [DoctorLine(DoctorStatus.ERROR, f"public-privacy: {refusal}", refusal.fix)]
     baseline_only = not denylist
     root_agents = lib_root / "AGENTS.md"
     if root_agents.exists():

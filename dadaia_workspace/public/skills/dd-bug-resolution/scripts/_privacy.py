@@ -16,6 +16,8 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Any, NamedTuple
 
+from _refusal import Refusal
+
 __all__ = [
     "BaselinePattern",
     "load_baseline",
@@ -140,7 +142,7 @@ class Redactor:
         return self._pattern.sub(_sub, value)
 
 
-class BaselinePattern(NamedTuple):  # not a dataclass: _ledger execs this file outside sys.modules
+class BaselinePattern(NamedTuple):
     """A compiled structural pattern from the packaged baseline. ``exclude_rationale`` is
     required whenever ``exclude`` is set (checked by the doctor); ``None`` otherwise."""
 
@@ -151,38 +153,35 @@ class BaselinePattern(NamedTuple):  # not a dataclass: _ledger execs this file o
     exclude_rationale: str | None = None
 
 
+def _pattern(entry: object, number: int) -> BaselinePattern:
+    if not isinstance(entry, dict) or not isinstance(entry.get("regex"), str):
+        raise ValueError(f"row {number} is not an object with a string 'regex'")
+    exclude = entry.get("exclude_regex")
+    try:
+        regex, carve = re.compile(entry["regex"]), re.compile(exclude) if exclude else None
+    except re.error as exc:
+        raise ValueError(f"row {number} ({entry.get('id', '?')}) has a bad regex: {exc}") from exc
+    rationale = entry.get("exclude_rationale")
+    return BaselinePattern(
+        id=str(entry.get("id", "")),
+        regex=regex,
+        reason=str(entry.get("reason", "structural privacy match")),
+        exclude=carve,
+        exclude_rationale=rationale if isinstance(rationale, str) else None,
+    )
+
+
 @lru_cache(maxsize=1)
 def load_baseline() -> tuple[BaselinePattern, ...]:
-    """The compiled baseline beside this file. A malformed or absent file, a non-object
-    entry or an uncompilable regex yields fewer patterns, never an exception."""
+    """The compiled baseline beside this file, strict: a dropped pattern is a redaction hole,
+    so an unreadable file, a non-object row or an uncompilable regex raises a `Refusal`
+    naming the row."""
+    path = Path(__file__).with_name("privacy_baseline.json")
     try:
-        raw = json.loads(Path(__file__).with_name("privacy_baseline.json").read_text("utf-8"))
-        entries = raw.get("patterns", [])
-    except (OSError, ValueError, AttributeError):
-        return ()
-    patterns: list[BaselinePattern] = []
-    for entry in entries:
-        if not isinstance(entry, dict):
-            continue
-        regex_src = entry.get("regex")
-        if not isinstance(regex_src, str) or not regex_src:
-            continue
-        exclude_src = entry.get("exclude_regex")
-        try:
-            compiled = re.compile(regex_src)
-            exclude = (
-                re.compile(exclude_src) if isinstance(exclude_src, str) and exclude_src else None
-            )
-        except re.error:
-            continue
-        rationale = entry.get("exclude_rationale")
-        patterns.append(
-            BaselinePattern(
-                id=str(entry.get("id", "")),
-                regex=compiled,
-                reason=str(entry.get("reason", "structural privacy match")),
-                exclude=exclude,
-                exclude_rationale=rationale if isinstance(rationale, str) else None,
-            )
-        )
-    return tuple(patterns)
+        rows = json.loads(path.read_text("utf-8"))["patterns"]
+        return tuple(_pattern(row, number) for number, row in enumerate(rows, start=1))
+    except (OSError, ValueError, LookupError, TypeError) as exc:
+        raise Refusal(
+            f"privacy baseline {path} is unreadable ({exc}) — no pattern was applied",
+            f"Operator action: restore {path.name} from the package (`git checkout -- {path}`)",
+        ) from exc

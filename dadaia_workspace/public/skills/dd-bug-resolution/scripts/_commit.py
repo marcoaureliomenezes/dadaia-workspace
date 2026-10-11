@@ -18,8 +18,8 @@ from _refusal import Refusal
 Records = list[dict[str, Any]]
 
 
-def _stamp(path: Path) -> tuple[int, int] | None:
-    """(size, mtime) of *path*, ``None`` when absent."""
+def stamp(path: Path) -> tuple[int, int] | None:
+    """(size, mtime) — how a write detects a concurrent one; ``None`` when absent."""
     try:
         info = path.stat()
     except FileNotFoundError:
@@ -69,7 +69,7 @@ def commit(
     """
 
     def attempt() -> tuple[tuple[int, int] | None, str, Records, Records, str]:
-        before = _stamp(path)
+        before = stamp(path)
         old = histo.read_text(encoding="utf-8") if histo is not None and histo.is_file() else ""
         records = load(path)
         written = apply(records)
@@ -77,9 +77,9 @@ def commit(
         return before, old, moved, written, validate(written, records, old, moved)
 
     before, old, moved, written, text = attempt()
-    if _stamp(path) != before:
+    if stamp(path) != before:
         before, old, moved, written, text = attempt()
-        if _stamp(path) != before:
+        if stamp(path) != before:
             raise Refusal(
                 f"{path.name} changed twice under this write — nothing was written",
                 "Operator action: re-run the same command, unchanged",
