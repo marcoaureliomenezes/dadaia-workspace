@@ -58,8 +58,8 @@ def new_entry(active: Items, slug: str, values: dict[str, Any]) -> Items:
     relates, live = values.get("relates"), [str(item.get("id")) for item in active]
     names = [] if relates in (None, "none") else str(relates).split(",")
     if not set(names) <= set(live) or live and relates is None:
-        raise choice(Refusal("name the live entries this one updates, obsoletes or relates to "
-                     f"(ADR 0127): {', '.join(live) or 'none'}"),
+        raise choice(Refusal("name the live entries this one updates, obsoletes or relates to: "
+                     f"{', '.join(live) or 'none'}"),
                      "with --relates set to the comma-separated live entries, or none",
                      "--relates")  # fmt: skip
     intents = parse_intents(values.get("intent"))
