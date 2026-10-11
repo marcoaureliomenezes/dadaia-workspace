@@ -197,13 +197,17 @@ SITES: list[tuple[str, Callable[[Path, pytest.MonkeyPatch], Case]]] = [
 ]  # fmt: skip
 
 
-def _assert_one_fix(capsys: pytest.CaptureFixture[str], code: int) -> list[str]:
+# Operator ruling 2026-10-11 "Só fix que resolve": git's own text stands alone when no remedy clears it.
+_GIT_TEXT_ONLY = {"baseline-git-failure", "dead-git-failure"}
+
+
+def _assert_one_fix(capsys: pytest.CaptureFixture[str], code: int, fixes: int = 1) -> list[str]:
     err = capsys.readouterr().err
     lines = err.splitlines()
     assert code == 1, err
     assert lines[0].startswith("Error:"), err
     assert "unexpected" not in err and "Traceback" not in err, err
-    assert len([ln for ln in lines if ln.startswith("fix:")]) == 1, err
+    assert len([ln for ln in lines if ln.startswith("fix:")]) == fixes, err
     return lines
 
 
@@ -229,7 +233,7 @@ def test_refusal_prints_error_then_exactly_one_fix(
     os.chdir(cwd)
     capsys.readouterr()
     code = _run(argv)
-    lines = _assert_one_fix(capsys, code)
+    lines = _assert_one_fix(capsys, code, 0 if site in _GIT_TEXT_ONLY else 1)
     if site == "create-associated-conflict":
         fix = next(ln for ln in lines if ln.startswith("fix:"))
         assert "context list" not in fix
