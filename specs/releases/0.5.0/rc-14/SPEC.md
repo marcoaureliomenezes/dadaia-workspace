@@ -137,13 +137,13 @@ The owner is `_frontmatter.py` in `dd-bug-resolution/scripts`, a stdlib strict s
 - AC14.1 (integration, RED first): A missing, malformed or non-object `_RELEASE.json` refuses job admission with `Error:` and one `fix:` line; no branch or worktree; one parser, the raw read in `_worktree_new.py` deleted.
 - AC14.2 (integration, RED first): A DAG that differs from its `tasks/job<n>.md` fails `release.py check` with `phase`'s message; one comparison.
 - AC14.3 (unit, RED first): With rc-1 live and a drafted `rc-2/SPEC.md`, `release.py new` adopts rc-2; the closure fence reads the same decider; `test_the_closure_spares_only_the_next_candidates_define_tree` stays unedited.
-- AC14.4 (no test — reviewer `git grep`): One definition each for the task-id, sha and phase grammars; the package reads them through the owner.
+- AC14.4 (no test — reviewer `git grep`): One definition each, in the kernel's `_grammar.py`, for the task-id, sha, phase and semver/candidate/tag (group A3) grammars; the skills and core read them through the owner.
 
 #### FR15 — the gitflow owner (bugs `verify-line-shlex-mangles-windows-paths`, `doctor-misses-worktrees-of-a-repo-that-left-its-context`)
 
 - AC15.1 (unit, RED first): On Windows `python scripts\ci.py job` runs as `['python', 'scripts\\ci.py', 'job']`; one splitter serves `verify:` and `tests:` (ADR 0220 P3).
 - AC15.2 (integration, RED first): A worktree of a repo that left its context is a doctor finding with one fix line (ADR 0112); one row filter serves doctor and `ctx_inject`.
-- AC15.3 (no test — reviewer `git grep`): One definition each for the semver, candidate and tag grammar (group A3), the worktree path, list, dirty check, verdict reader and venv CLI path.
+- AC15.3 (no test — reviewer `git grep`): The `_worktree_git.py:25,117` semver and tag copies are deleted and gitflow calls `_grammar`; one definition each for the worktree path, list, dirty check, verdict reader and venv CLI path.
 
 #### FR16 — core owners (package side)
 
