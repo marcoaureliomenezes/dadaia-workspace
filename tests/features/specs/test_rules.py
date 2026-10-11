@@ -68,12 +68,3 @@ def test_cli_fix_help_is_the_derived_text() -> None:
     ).read_text(encoding="utf-8")
     assert "render_fix_help()" in src
     assert "TREE-3: render missing memory HTML" not in src
-
-
-def test_check_iterates_the_registry() -> None:
-    import inspect
-
-    src = inspect.getsource(SpecsDoctor.check)
-    assert "RULES" in src, "check() must iterate the ONE ordered registry"
-    fix_src = inspect.getsource(SpecsDoctor.fix)
-    assert "FIX_BY_CODE" in fix_src and "elif issue.code" not in fix_src

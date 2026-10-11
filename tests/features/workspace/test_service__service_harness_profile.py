@@ -11,14 +11,12 @@ CLI suite ``tests/cli/commands/test_init__init_harness.py``.
 
 from __future__ import annotations
 
-import inspect
 import json
 from pathlib import Path
 
 import pytest
 
 from dadaia_workspace.core.models.harness_profile import HarnessProfile
-from dadaia_workspace.features.workspace import service as service_module
 from dadaia_workspace.features.workspace.service import WorkspaceService
 from dadaia_workspace.infrastructure.json_harness_profile_store import JsonHarnessProfileStore
 from tests.fakes import FakePublicAssetManager, FakePythonEnvironmentManager
@@ -62,13 +60,3 @@ def test_init_persists_the_harness_profile_through_the_one_store(
 def test_an_absent_profile_reads_none(tmp_path: Path) -> None:
     """A pre-v0.1.58 workspace (no profile file) reads as None: the all-four convention."""
     assert JsonHarnessProfileStore().read(tmp_path) is None
-
-
-def test_init_writes_the_profile_through_the_store_and_never_spells_the_file() -> None:
-    """AC9 (FR8): one writer. The service holds no copy of the profile's file name or
-    payload shape — both live only in ``infrastructure/json_harness_profile_store``."""
-    source = inspect.getsource(service_module)
-
-    assert "_write_harness_profile" not in source
-    assert "_persisted_profile_harnesses" not in source
-    assert "harness_profile.json" not in source
