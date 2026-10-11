@@ -276,9 +276,9 @@ def test_alive_refuses_a_legacy_url_less_missing_repo_with_a_fix_line(tmp_path: 
     assert store.get("proj").state == ContextState.DEAD  # type: ignore[union-attr]
 
 
-def test_dead_refuses_a_dirty_checkout_one_fix_line_per_file(tmp_path: Path) -> None:
-    """rc-9 AC3.2 (ADR 0172 measured_by): dead never commits — a dirty checkout refuses with
-    one fix line per file and leaves tree and origin untouched."""
+def test_dead_refuses_a_dirty_checkout_with_one_fix_line_naming_every_file(tmp_path: Path) -> None:
+    """rc-9 AC3.2 (ADR 0172 as amended by ADR 0247): dead never commits — a dirty checkout
+    refuses with exactly one fix line naming every dirty path and leaves tree and origin untouched."""
     service, store, repo = _alive(tmp_path)
     lib = repo.parent / "lib"
     (lib / "README.md").write_text("edited\n")
@@ -292,8 +292,7 @@ def test_dead_refuses_a_dirty_checkout_one_fix_line_per_file(tmp_path: Path) -> 
 
     fixes = [line for line in str(refused.value).splitlines() if line.startswith("fix: ")]
     assert fixes == [
-        f"fix: Operator action: move {lib / 'README.md'} into a worktree, or discard it",
-        f"fix: Operator action: move {lib / 'new.txt'} into a worktree, or discard it",
+        f"fix: Operator action: move {lib / 'README.md'}, {lib / 'new.txt'} into a worktree, or discard it",
     ]
     assert (lib / "README.md").read_text() == "edited\n" and (lib / "new.txt").is_file()
     assert (
