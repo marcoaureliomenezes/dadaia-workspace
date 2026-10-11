@@ -20,6 +20,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 sys.path.insert(1, str(Path(__file__).resolve().parents[2] / "dd-spec-navigator" / "scripts"))
 
 import _memory_drift as drift  # noqa: E402
+from _grammar import SEMVER_RE, SHA_RE, STATE, candidate_dir, live_ids  # noqa: E402
 from _ledger import records  # noqa: E402
 from _release_check import dag_errors, finding, histo_findings, state_findings  # noqa: E402
 from _release_phase import NEXT  # noqa: E402
@@ -27,17 +28,13 @@ from _release_schema import (  # noqa: E402
     CANDIDATE_DOCS,
     HISTO,
     MARK_RE,
-    SEMVER_RE,
-    SHA_RE,
-    STATE,
     TRIO_PHASES,
-    candidate_dir,
     job_errors,
     origin,
     origin_line,
     writes,
 )
-from _release_store import SCRIPT, Refusal, live_ids, live_release  # noqa: E402
+from _release_store import SCRIPT, Refusal, live_release  # noqa: E402
 from _specs import quote, script, with_specs  # noqa: E402
 
 __all__ = ["check", "drift", "memory_errors", "ship_findings", "tree_findings"]

@@ -8,20 +8,10 @@ import functools
 import json
 import re
 import subprocess
-import sys
 from pathlib import Path
+from typing import Any
 
-sys.path.append(
-    str(Path(__file__).resolve().parents[2] / "dd-bug-resolution" / "scripts")
-)  # loadable alone
-
-# isort: off
-from _grammar import (  # noqa: E402
-    CANDIDATE_RE as CANDIDATE_RE, SEMVER_RE as SEMVER_RE, SHA_RE as SHA_RE, STATE as STATE,
-    STATUS_RE, TASK_ID_RE as TASK_ID_RE, candidate_dir as candidate_dir,
-    candidate_number as candidate_number, live_ids as live_ids,
-)  # fmt: skip
-# isort: on
+from _grammar import CANDIDATE_RE, STATE, STATUS_RE, TASK_ID_RE, live_ids
 
 CODE = "LEDGER-RELEASE-SCHEMA"
 HISTO = "releases/_archive/releases_histo.jsonl"
@@ -29,18 +19,18 @@ HISTO = "releases/_archive/releases_histo.jsonl"
 #: tasks live in one job file per job, `rc-<N>/tasks/job<n>.md` (a closed rc keeps `TASKS.md`).
 CANDIDATE_DOCS = ("SPEC.md", "PLAN.md")
 #: The three lifecycle phases — pinned equal to the schema's enum; a shipped release
-#: moves whole to `_archive/<v>/` (ADR 0152 (1)).
+#: moves whole to `_archive/<v>/`.
 PHASES = ("DEFINITION", "IMPLEMENTATION", "CLOSURE")
 #: The phases in which the live candidate's trio is REQUIRED; DEFINITION is authoring it.
 TRIO_PHASES = frozenset({"IMPLEMENTATION", "CLOSURE"})
 #: A release ships `delivered` — the one histo disposition this ledger writes.
 DELIVERED = "delivered"
 APPROVED = "Approved"
-#: The task markers in order — open < reserved < done (ADR 0111); the ONE task-line grammar.
+#: The task markers in order — open < reserved < done; the ONE task-line grammar.
 MARKS = (" ", "-", "x")
 #: A task line: indent and any Markdown bullet (``-``, ``*``, ``+``) or none, the marker, the rest.
 MARK_RE = re.compile(r"^([ \t]*(?:[-*+][ \t]*)?\[)([ x-])(\].*)$", re.MULTILINE)
-#: The Origin clause kinds, each at most once on the line (ADR 0161).
+#: The Origin clause kinds, each at most once on the line.
 ORIGIN_KINDS = ("backlog", "bugs", "findings")
 _ORIGIN_RE = re.compile(r"^\*\*Origin:\*\*[ \t]*(.*?)[ \t]*$", re.MULTILINE)
 _ORIGIN_GRAMMAR = "operator-demand | backlog:<ids>; bugs:<ids>; findings:<ids>, each kind once"
@@ -110,7 +100,7 @@ def candidate_adds(specs: Path) -> list[tuple[_dt.datetime, str, str]]:
     shallow = subprocess.run([*git, "rev-parse", "--is-shallow-repository"], capture_output=True, text=True, encoding="utf-8", errors="replace", check=False)  # fmt: skip
     if shallow.stdout.strip() == "true":
         raise ShallowClone(f"{specs} is in a shallow clone: a release candidate read from a cut history "
-                           "would be stamped wrong for good (ADR 0187)")  # fmt: skip
+                           "would be stamped wrong for good")  # fmt: skip
     head = subprocess.run([*git, "rev-parse", "-q", "--verify", "HEAD"], capture_output=True, check=False)  # fmt: skip
     log = subprocess.run([*git, "log", "--diff-filter=A", "--name-only", "--format=%x00%H %cI", "--",
                           ":(glob)releases/**/rc-*/SPEC.md"], capture_output=True, text=True, encoding="utf-8", errors="replace", check=False)  # fmt: skip
@@ -145,7 +135,7 @@ def candidate_at(specs: Path, instant: str) -> dict[str, str]:
 
 def origin(text: str) -> dict[str, list[str]]:
     """The ids the first ``**Origin:**`` line carries, by kind; ``{}`` for operator-demand.
-    The ONE Origin parser (ADR 0161): raises ``ValueError`` saying what is wrong."""
+    The ONE Origin parser: raises ``ValueError`` saying what is wrong."""
     match = _ORIGIN_RE.search(text)
     if match is None:
         raise ValueError(f"has no `**Origin:**` line ({_ORIGIN_GRAMMAR})")
@@ -165,11 +155,17 @@ def origin_line(text: str) -> int:
     return text.count("\n", 0, match.start()) + 1 if match else 1
 
 
-def next_candidate(release_dir: Path) -> Path:
-    """The ``rc-<N+1>/`` a new candidate is born in — past every ``rc-<N>`` entry, a stray
-    file included, so the birth never lands on an existing path."""
-    names = [p.name for p in release_dir.iterdir()] if release_dir.is_dir() else []
-    return release_dir / f"rc-{candidate_number(names) + 1}"
+def next_candidate(release_dir: Path, state: dict[str, Any] | None) -> Path:
+    """The ``rc-<N+1>/`` a candidate is born in: past the last ``milestone`` entry's candidate,
+    so a drafted folder there is adopted; with no milestone to read, past the highest folder."""
+    entries = (state or {}).get("log") or []
+    names = [str(e.get("candidate")) for e in entries if e.get("kind") == "milestone"]
+    if not names:
+        names = (
+            [d.name for d in release_dir.iterdir() if d.is_dir()] if release_dir.is_dir() else []
+        )
+    last = max((int(m.group(1)) for n in names if (m := CANDIDATE_RE.match(n))), default=0)
+    return release_dir / f"rc-{last + 1}"
 
 
 def writes(line: str) -> list[str]:

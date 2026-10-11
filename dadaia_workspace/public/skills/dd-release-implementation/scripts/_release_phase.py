@@ -12,12 +12,10 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
+from _grammar import SHA_RE, STATE, candidate_number  # noqa: E402
 from _release_schema import (  # noqa: E402
     APPROVED,
     CANDIDATE_DOCS,
-    SHA_RE,
-    STATE,
-    candidate_number,
     current_job_writes,
     current_plan_jobs,
     extract_status,

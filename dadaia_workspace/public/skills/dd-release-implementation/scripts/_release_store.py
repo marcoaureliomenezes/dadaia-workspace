@@ -18,22 +18,16 @@ from typing import Any
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 sys.path.append(str(Path(__file__).resolve().parents[2] / "dd-bug-resolution" / "scripts"))
 
+from _grammar import STATE, candidate_dir  # noqa: E402
+from _jsonl import parse_object  # noqa: E402
 from _ledger import records, replace, stamp  # noqa: E402
+from _refusal import Refusal as Refusal  # noqa: E402
 from _release_check import state_findings  # noqa: E402
-from _release_schema import STATE, Unreadable, candidate_dir, live_id  # noqa: E402
-from _release_schema import live_ids as live_ids  # noqa: E402 — re-exported for the verbs
+from _release_schema import Unreadable, live_id  # noqa: E402
 from _specs import choice, script  # noqa: E402
 
 State = dict[str, Any]
 SCRIPT = script(Path(__file__).parent / "release.py")
-
-
-class Refusal(Exception):
-    """A write this script refuses, carrying the one `fix:` line that unblocks it."""
-
-    def __init__(self, message: str, fix: str = "") -> None:
-        super().__init__(message)
-        self.fix = fix
 
 
 @dataclass(frozen=True)
@@ -48,16 +42,12 @@ class Live:
 
 def read_state(path: Path) -> State:
     """One state document, refusing anything this script cannot read in full."""
+    fix = f"Operator action: repair {path} until `{SCRIPT} check` passes"
     try:
-        document = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError) as exc:
-        raise Refusal(
-            f"{path.name} is not a readable release-state-v1 document ({exc})",
-            f"{SCRIPT} check",
-        ) from exc
-    if not isinstance(document, dict):
-        raise Refusal(f"{path.name} is not a JSON object", f"{SCRIPT} check")
-    return document
+        text = path.read_text(encoding="utf-8")
+    except OSError as exc:
+        raise Refusal(f"{path.name} cannot be read ({exc})", fix) from exc
+    return parse_object(text, fix)
 
 
 def live_release(specs: Path) -> Live:

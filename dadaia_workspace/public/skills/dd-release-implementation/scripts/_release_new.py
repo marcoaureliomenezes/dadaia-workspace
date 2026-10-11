@@ -12,9 +12,10 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 sys.path.append(str(Path(__file__).resolve().parents[2] / "dd-bug-resolution" / "scripts"))
 
+from _grammar import SEMVER_RE, STATE, live_ids  # noqa: E402
 from _ledger import records, replace  # noqa: E402
-from _release_schema import SEMVER_RE, STATE, next_candidate, utc_now  # noqa: E402
-from _release_store import SCRIPT, Refusal, State, live_ids, read_state, validated  # noqa: E402
+from _release_schema import next_candidate, utc_now  # noqa: E402
+from _release_store import SCRIPT, Refusal, State, read_state, validated  # noqa: E402
 from _release_tree import BUG_WINDOW, tree_findings  # noqa: E402
 
 SPEC_STUB = """\
@@ -140,7 +141,7 @@ def new_release(specs: Path, release_id: str, today: str, origin: str) -> Path:
         scope=seeded_scope(specs, origin),
         bug_window=BUG_WINDOW,
     )
-    candidate = next_candidate(release_dir)
+    candidate = next_candidate(release_dir, prior)
     made = candidate if release_dir.exists() else release_dir
     candidate.mkdir(parents=True)
     try:

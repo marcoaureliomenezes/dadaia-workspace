@@ -10,7 +10,7 @@ from pathlib import Path
 for _skill in ("dd-release-implementation", "dd-bug-resolution"):
     sys.path.append(str(Path(__file__).resolve().parents[2] / _skill / "scripts"))
 
-from _release_schema import STATE, live_ids  # noqa: E402
+from _grammar import STATE, live_ids  # noqa: E402
 from _specs import parse  # noqa: E402
 from _worktree_git import (  # noqa: E402
     flow_for,
