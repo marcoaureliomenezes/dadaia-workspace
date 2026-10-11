@@ -603,3 +603,23 @@ def test_a_plain_merge_returns_to_its_recorded_base(tmp_path: Path, declared_ver
     assert landed.returncode == 0, landed.stderr
     assert git(repo, "rev-parse", "feature/0.5.0").strip() == head
     assert landed.stdout.splitlines().count("ci job") == int(declared_verify)
+
+
+def test_a_verdict_citing_a_file_only_the_reviewed_tree_holds_is_accepted(root: Path) -> None:
+    """Bug merge-gate-validates-the-verdict-without-the-reviewed-tree: the stub CLI resolves a
+    `self_pull` ref as the real `reports validate` does, against `--reviewed-root` only (the repo
+    checkout never holds the ref), so the gate must pass the tree it judged."""
+    patch_cli(
+        root,
+        'sys.exit(0 if "schema_version" in json.load(open(args[2])) else 1)',
+        "import os; h = json.load(open(args[2])); r = args[args.index('--reviewed-root') + 1:][:1]\n"
+        "    sys.exit(0 if 'schema_version' in h and r and all(os.path.isfile(os.path.join(r[0], f))"
+        " for f in h.get('self_pull', {}).get('refs', [])) else 1)",
+    )
+    head = land(root, "src/only_in_tree.py")
+    handoff = approve(root, head)
+    body = json.loads(handoff.read_text())
+    handoff.write_text(json.dumps({**body, "self_pull": {"refs": ["src/only_in_tree.py"]}}))
+    landed = run(root, "merge", TREE)
+    assert landed.returncode == 0, landed.stderr
+    assert git(root / "repos/r", "rev-parse", "feature/0.5.0").strip() == head
