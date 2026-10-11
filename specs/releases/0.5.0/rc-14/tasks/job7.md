@@ -1,0 +1,25 @@
+# Job 7 — agent-facing law and the clock: batch trigger and cap, no --ts, language-neutral residue, harness statement (FR4, FR5, FR7, FR8)
+
+**Status:** Draft
+
+Wave 1. Law text plus the clock option of two ledger scripts. Text edits delete or correct before they add; no mechanism is added except the statement of FR5.
+
+- `--ts` leaves `bugs.py append`, `backlog.py exit` and `_backlog_exit.histo_record`; their stamps come from `now_iso()` and `today()`. The characterization test passed `--ts` for a deterministic byte string; the operator ruled the flag out, so that test stops passing it and asserts the record without `ts` plus the `ts` shape (the commit body says so).
+- The handoff stamp is a law line in `dd-handoff-emitter`: `python3 -c "import datetime as d; print(d.datetime.now(d.UTC).strftime('%Y-%m-%dT%H%M%SZ'))"` (`date -u` does not exist on Windows). `verdict.py` already derives the file-name stamp and `produced_at` from one clock read; T5 pins it.
+- `data/AGENTS.md` §3 is rewritten without ADR numbers (three bullets; the enforcement rules themselves stay) and gains the harness statement (AC5.1): common behaviour lives in skills and `AGENTS.md`; a persona or hook carries only the surface its harness cannot do without; a harness fact lives in one registry row.
+- Commit bodies carry `git grep -n -E 'ADR[ -]?[0-9]{4}' -- <the touched files>` (before and after) and, for T3 and T4, `git grep -n -- '--ts' dadaia_workspace/public/skills` (target 0, G5).
+- Test-side first: T1, T2, T5; then T3, T4 after their tests; T6 to T9 any time.
+
+Tasks: 9 (3 jr, 6 sr). `who` names the dispatched role (SPEC FR5 of rc-13, `dd-release-definition` §5).
+
+| task | who | AC | `W:` | outcome |
+|---|---|---|---|---|
+| J7.T1 | sr | AC8.1 | `tests/public/skills/dd_bug_resolution/scripts/test_bugs__characterization.py` | RED, integration: `bugs.py append … --ts X` exits 2 as an unknown option; `append` without it stamps the record from the clock (`ts` matches `YYYY-MM-DDTHH:MM:SSZ`); the characterization case stops passing `--ts` and compares the other fields. Owner that file |
+| J7.T2 | sr | AC8.1 | `tests/public/skills/dd_backlog_definition/scripts/test_backlog.py` | RED, integration: `backlog.py exit … --ts X` exits 2 as an unknown option; the histo record's `ts` is today's date. Owner `test_backlog.py` |
+| J7.T3 | sr | AC8.1, AC4.1 | `dadaia_workspace/public/skills/dd-bug-resolution/scripts/bugs.py`, `dadaia_workspace/public/skills/dd-bug-resolution/scripts/_bugs_write.py`, `dadaia_workspace/public/skills/dd-bug-resolution/scripts/_ledger.py`, `dadaia_workspace/public/skills/dd-bug-resolution/scripts/_specs.py` | delete `--ts` and `values['ts']` fallback; the stamp is `wr.now_iso()`; delete the ADR-number comment lines of the four files. Owner T1 |
+| J7.T4 | sr | AC8.1, AC4.1 | `dadaia_workspace/public/skills/dd-backlog-definition/scripts/backlog.py`, `dadaia_workspace/public/skills/dd-backlog-definition/scripts/_backlog_exit.py`, `dadaia_workspace/public/skills/dd-backlog-definition/scripts/_backlog_write.py`, `dadaia_workspace/public/schemas/backlog/backlog-v1.schema.json` | delete `--ts`; `histo_record` stamps `today()`; delete the ADR-number cite of the refusal message and of the schema description. Owner T2 |
+| J7.T5 | sr | AC8.2 | `tests/public/skills/dd_handoff_emitter/scripts/test_verdict.py` | integration pin: the verdict handoff's file-name stamp and its `produced_at` are the same instant (one clock read). Passes on arrival: the reviewer-verdict path already satisfies AC8.2 and has no model-typed date; the model-typed path is the law line of T7. Owner `test_verdict.py` |
+| J7.T6 | jr | AC7.1, AC7.2 | `dadaia_workspace/public/skills/dd-bug-resolution/SKILL.md` | two lines: the batch trigger (the rc bug window or 20 registrations, whichever comes first; bugs that share a cause are fixed together) and the cap (two fix attempts on one bug, then a fresh session with a written diagnosis). No test; reviewer sweep |
+| J7.T7 | jr | AC8.3 | `dadaia_workspace/public/skills/dd-handoff-emitter/SKILL.md` | step 6: the stamp comes from the clock command above for both the file name and `produced_at`; name the source of any other date (`git` or the clock). No test; reviewer sweep |
+| J7.T8 | sr | AC5.1, AC4.1 | `dadaia_workspace/public/data/AGENTS.md`, `dadaia_workspace/public/data/CONTEXT-MAP.md` | REBUILD `data/AGENTS.md` §3 bullets 3 to 5 without ADR numbers, add the harness statement (AC5.1) in one home, and drop the ADR cites of `CONTEXT-MAP.md`. Net lines ≤ 0. No test; reviewer sweep and the contract tests that pin the root map (`test_behavior_map`) stay green |
+| J7.T9 | jr | AC4.1 | `dadaia_workspace/public/skills/dd-ai-eng-knowhow/SKILL.md`, `dadaia_workspace/public/skills/dd-ai-eng-knowhow/CODEX.md`, `dadaia_workspace/public/agents/dd-sw-engineer-sr.md` | reword or delete the lines that tell a user to edit `dadaia_workspace/public` (`SKILL.md:31`, `CODEX.md:30`, the persona's `:65`): an AI-entity file is a projection, changed at its source in the library repo (named in that repo's own `AGENTS.md`). No test; reviewer sweep |
