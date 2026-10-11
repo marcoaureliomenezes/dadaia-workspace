@@ -43,14 +43,14 @@ def _fail_open_rows(
     bash = {"tool_name": "Bash", "tool_input": {"command": "echo x > AGENTS.md"}}
     worktree = {"root": PurePath("/ws"), "zone": "worktree", "repo": "r", "owner": "r"}
     return {
-        "ADR 0118": f"past {hook_wrappers.TOOL_TIMEOUT_S} s" in law["ADR 0118"],
-        "ADRs 0096, 0103, 0133": sdd_gate.evaluate_payload(bash) is None,
-        "ADR 0116": gate_policy.evaluate("worktrees/r/w/x.py", has_id=False, **worktree)[0]
+        "TOOL_TIMEOUT_S": f"past {hook_wrappers.TOOL_TIMEOUT_S} s" in law["TOOL_TIMEOUT_S"],
+        "sdd_gate": sdd_gate.evaluate_payload(bash) is None,
+        "gate_policy": gate_policy.evaluate("worktrees/r/w/x.py", has_id=False, **worktree)[0]
         == gate_policy.Decision.ALLOW
         != gate_policy.evaluate("worktrees/r/w/x.py", **worktree)[0],
         "`pre_gate`": pre_gate.evaluate_payload({}) is None,
         "`read_stdin_json`": unreadable.returncode == 0 and "deny" not in unreadable.stdout,
-        "ADR 0132": context_registry.registered_slugs(tmp) == ({"*"}, {"*"}),
+        "registered_slugs": context_registry.registered_slugs(tmp) == ({"*"}, {"*"}),
     }
 
 
@@ -94,7 +94,7 @@ def _block_rows(tmp: Path, monkeypatch: pytest.MonkeyPatch) -> dict[str, bool]:
         "PROTECTED": write("ok", "AGENTS.md", sdd_gate) is not None,
         "out-of-scope": gate_policy.evaluate("worktrees/b/w/x.py", root=PurePath("/ws"), **away)[0]
         == gate_policy.Decision.BLOCK,
-        "ADR 0105": write("bad", "repos/r/src/x.py", sdd_gate) is not None,
+        "_MERGE_ONLY_MESSAGE": write("bad", "repos/r/src/x.py", sdd_gate) is not None,
     }
 
 
@@ -103,7 +103,7 @@ def test_the_map_lists_every_block_the_code_has(
 ) -> None:
     """AC12.5 (root-enforcement-section-states-false-blocks): §3's `blocks:` list is set-equal
     to the code's blocks, each naming its evidence, merge-only included; the fail-open item
-    `(ADR 0132)` names the merge-only block; no §3 line claims a PR check, the line naming
+    `(registered_slugs)` names the merge-only block; no §3 line claims a PR check, the line naming
     APPROVED names `worktree.py merge`."""
     section = _MAP.read_text("utf-8").split("## 3.")[1].split("\n## ")[0].splitlines()
     line = next((ln for ln in section if "blocks:" in ln), "")
@@ -112,7 +112,7 @@ def test_the_map_lists_every_block_the_code_has(
     rows = _block_rows(tmp_path, monkeypatch)
     assert line and len(named) == len(items) and sorted(named) == sorted(rows)
     assert [k for k, held in rows.items() if not held] == []
-    assert any("merge-only" in ln for ln in section if "(ADR 0132)" in ln)
+    assert any("merge-only" in ln for ln in section if "(registered_slugs)" in ln)
     assert all("worktree.py merge" in ln for ln in section if "APPROVED" in ln)
     assert not any("green" in ln for ln in section)
 
