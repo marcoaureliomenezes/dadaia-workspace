@@ -15,17 +15,24 @@ from pathlib import Path
 # No `__pycache__` beside a projected skill; `_ledger.py` is staged beside this script
 # (the source tree keeps it in dd-bug-resolution).
 sys.dont_write_bytecode = True
-sys.path.insert(0, str(Path(__file__).resolve().parent))
 sys.path.append(str(Path(__file__).resolve().parents[2] / "dd-bug-resolution" / "scripts"))
+sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from _grammar import SHA_RE, STATE  # noqa: E402
+from _refusal import Refusal  # noqa: E402
 from _release_check import histo_findings  # noqa: E402
 from _release_new import new_release  # noqa: E402
 from _release_phase import SHIP_PR, set_phase  # noqa: E402
-from _release_schema import _ORIGIN_GRAMMAR, CODE, HISTO, utc_now  # noqa: E402
+from _release_schema import (  # noqa: E402
+    _ORIGIN_GRAMMAR,
+    CODE,
+    HISTO,
+    ORIGIN_KINDS,
+    origin,
+    utc_now,
+)
 from _release_store import (  # noqa: E402
     SCRIPT,
-    Refusal,
     commit,
     live_release,
     open_bug_ids,
@@ -40,6 +47,7 @@ _HELP = {
     "drift": "the closure worklist over the live release's memory window (memory.py drift)",
     "memory": "append the closure's one structured `kind: memory` entry to the live log",
     "ship": "record the merged promote PR: shipped, a delivered histo line, the dir archived",
+    "origin": "print the ids a SPEC's **Origin:** line carries, one `<kind> <id>` per line",
     "check": "validate every _RELEASE.json under releases/ and the ship ledger",
 }
 
@@ -54,6 +62,9 @@ def _parser() -> argparse.ArgumentParser:
     sub = parser.add_subparsers(dest="verb", required=True)
     for verb, help_text in _HELP.items():
         command = sub.add_parser(verb, help=help_text)
+        if verb == "origin":
+            command.add_argument("spec", type=Path, help="the SPEC.md to read")
+            continue
         command.add_argument("--specs", type=Path, default=None, help="path to the specs/ tree")
         if verb == "new":
             command.add_argument("release_id", help="the new release's bare SemVer id")
@@ -82,6 +93,25 @@ def _parser() -> argparse.ArgumentParser:
 def _new(args: argparse.Namespace, specs: Path) -> int:
     candidate = new_release(specs, args.release_id, utc_now()[:10], args.origin)
     print(f"[ok] created: {candidate / 'SPEC.md'}\n[ok] wrote: {candidate.parent / STATE}")
+    return 0
+
+
+def _origin(spec: Path) -> int:
+    try:
+        carried = origin(spec.read_text("utf-8"))
+    except (OSError, ValueError) as error:
+        print(
+            f"Error: {spec} {error}",
+            "fix: Operator action: edit its `**Origin:**` line",
+            sep="\n",
+            file=sys.stderr,
+        )
+        return 1
+    print(
+        *(f"{kind} {i}" for kind in ORIGIN_KINDS for i in carried.get(kind, [])),
+        sep="\n",
+        end="\n" if carried else "",
+    )
     return 0
 
 
@@ -126,7 +156,7 @@ def _memory(args: argparse.Namespace, specs: Path) -> int:
 
 def _ship(args: argparse.Namespace, specs: Path) -> int:
     """CLOSURE -> shipped {sha, pr, ts}, one `delivered` histo line, the whole directory
-    moved to `_archive/<v>/`, never deleted (ADR 0152 (1)); refused on any `ship_findings`."""
+    moved to `_archive/<v>/`, never deleted; refused on any `ship_findings`."""
     live, ts = live_release(specs), utc_now()
     if not (SHA_RE.match(args.sha) and (args.pr is None or args.pr.isdigit() and int(args.pr) > 0)):
         sha = args.sha if SHA_RE.match(args.sha) else "$(git rev-parse --short HEAD)"
@@ -201,6 +231,8 @@ _VERBS = {"new": _new, "phase": _phase, "drift": _drift, "memory": _memory, "shi
 
 def main(argv: list[str] | None = None) -> int:
     args = _parser().parse_args(argv)
+    if args.verb == "origin":
+        return _origin(args.spec)
     reads = args.verb in ("check", "drift")
     specs = find_specs(args.specs, ledger=None if reads else f"specs/releases/{STATE}")
     if args.verb == "check":

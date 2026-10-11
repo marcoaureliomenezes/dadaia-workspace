@@ -14,8 +14,9 @@ sys.path.append(str(Path(__file__).resolve().parents[2] / "dd-bug-resolution" / 
 
 from _grammar import SEMVER_RE, STATE, live_ids  # noqa: E402
 from _ledger import records, replace  # noqa: E402
+from _refusal import Refusal  # noqa: E402
 from _release_schema import next_candidate, utc_now  # noqa: E402
-from _release_store import SCRIPT, Refusal, State, read_state, validated  # noqa: E402
+from _release_store import SCRIPT, State, read_state, validated  # noqa: E402
 from _release_tree import BUG_WINDOW, tree_findings  # noqa: E402
 
 SPEC_STUB = """\
@@ -129,25 +130,26 @@ def refuse_unfree(specs: Path, release_id: str) -> State | None:
 
 
 def new_release(specs: Path, release_id: str, today: str, origin: str) -> Path:
-    """Open ``releases/<id>/rc-<N+1>/`` on a fresh SPEC stub and reopen the state document,
-    all or nothing (ADR 0150): a closed ``rc-<N>/`` is never touched. Returns the candidate."""
+    """Open ``releases/<id>/rc-<N+1>/`` and reopen the state document, all or nothing: a
+    drafted ``SPEC.md`` there is adopted untouched, a closed ``rc-<N>/`` is never touched,
+    and a failure removes only what this call created. Returns the candidate."""
     prior = refuse_unfree(specs, release_id)
     release_dir = specs / "releases" / release_id
     text = validated(candidate_state(release_id, prior), f"releases/{release_id}/{STATE}")
-    stub = SPEC_STUB.format(
-        release_id=release_id,
-        today=today,
-        origin=origin,
-        scope=seeded_scope(specs, origin),
-        bug_window=BUG_WINDOW,
-    )
     candidate = next_candidate(release_dir, prior)
-    made = candidate if release_dir.exists() else release_dir
-    candidate.mkdir(parents=True)
+    spec = candidate / "SPEC.md"
+    drafted = spec.exists()
+    made = next((d for d in (release_dir, candidate, spec) if not d.exists()), None)
+    candidate.mkdir(parents=True, exist_ok=True)
     try:
-        (candidate / "SPEC.md").write_text(stub, encoding="utf-8")
+        if not drafted:
+            spec.write_text(SPEC_STUB.format(release_id=release_id, today=today, origin=origin,
+                scope=seeded_scope(specs, origin), bug_window=BUG_WINDOW), encoding="utf-8")  # fmt: skip
         replace(release_dir / STATE, text)
     except BaseException:
-        shutil.rmtree(made, ignore_errors=True)
+        if made:
+            shutil.rmtree(made, ignore_errors=True) if made.is_dir() else made.unlink(
+                missing_ok=True
+            )
         raise
     return candidate
