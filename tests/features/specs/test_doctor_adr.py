@@ -204,3 +204,39 @@ def test_doctor_admits_any_named_check_and_flags_a_duplicate_id(
 
     assert "id '0049' breaks 0001..N: expected 0050" in run.output, run.output
     assert "vitest" not in run.output and run.output.count("breaks 0001..N") == 1
+
+
+def _options_ledger(tmp_path: Path, last: str, **fields: object) -> Path:
+    """A gap-free ledger 0001..`last`; only the last record carries `fields`."""
+    specs = _ledger(tmp_path, [f"{n:04d}" for n in range(1, int(last) + 1)])
+    ledger = specs / "ADRs" / "decisions.jsonl"
+    *head, _ = ledger.read_text("utf-8").splitlines()
+    tail = json.dumps({**_VALID_RECORD, **fields, "id": last})
+    ledger.write_text("\n".join([*head, tail]) + "\n", "utf-8")
+    return specs
+
+
+_OPTIONS = [
+    {"name": "keep", "tradeoff": "no churn", "rejected_because": "leaves the bug"},
+    {"name": "rebuild", "tradeoff": "one more diff", "rejected_because": "n/a"},
+]
+
+
+def test_a_record_above_0246_without_options_is_refused(tmp_path: Path) -> None:
+    """AC2.2: from 0247 on, `options` is required."""
+    issues = adr_record_issues(_options_ledger(tmp_path, "0247"))
+    assert [(i.code, i.message) for i in issues] == [
+        (
+            "LEDGER-ADR-SCHEMA",
+            "record is missing required field 'options' (ADRs/decisions.jsonl:247)",
+        )
+    ]
+
+
+def test_a_record_above_0246_with_two_options_passes(tmp_path: Path) -> None:
+    assert adr_record_issues(_options_ledger(tmp_path, "0247", options=_OPTIONS)) == []
+
+
+def test_a_record_0246_and_below_needs_no_options(tmp_path: Path) -> None:
+    """0246 was accepted without `options`; it still validates."""
+    assert adr_record_issues(_options_ledger(tmp_path, "0246")) == []
