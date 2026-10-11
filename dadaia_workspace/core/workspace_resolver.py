@@ -101,8 +101,8 @@ def not_initialized(
         else ""
     )
     return WorkspaceNotInitializedError(
-        f"No initialized workspace found from '{searched}'.{partial}\n"
-        "fix: Operator action: run `uvx dadaia-workspace init` with the new workspace's directory"
+        f"No initialized workspace found from '{searched}'.{partial}",
+        fix="Operator action: run `uvx dadaia-workspace init` with the new workspace's directory",
     )
 
 

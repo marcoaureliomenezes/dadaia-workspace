@@ -7,7 +7,7 @@ class DadaiaError(Exception):
     """Base class for all dadaia-workspace domain errors; ``fix`` is its one remedy line."""
 
     def __init__(self, message: str = "", fix: str = "") -> None:
-        self.fix = fix
+        self.message, self.fix = message, fix
         super().__init__(f"{message}\nfix: {fix}" if fix else message)
 
 
@@ -88,17 +88,13 @@ class HandoffValidationError(DadaiaError):
 
     def __init__(self, field_path: str, message: str) -> None:
         self.field_path = field_path
-        self.message = message
         super().__init__(f"{field_path}: {message}")
+        self.message = message
 
 
 class SchemaVersionError(DadaiaError):
     """spec_contexts.json is unreadable at its schema version: the *problem* and its ONE
     *fix* (``migrate --yes``, or an ``Operator action:`` when no dadaia verb clears it)."""
-
-    def __init__(self, problem: str, fix: str) -> None:
-        self.problem = problem
-        super().__init__(problem, fix)
 
 
 class WorkspaceVenvBootstrapError(DadaiaError, RuntimeError):

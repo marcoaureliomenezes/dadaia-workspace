@@ -219,7 +219,7 @@ def main() -> int:
         elif decision.emit == "preflight":
             _emit(_generic_preflight(workspace, own, decision.context))
     except SchemaVersionError as refused:  # unreadable, never "no context": the doctor's finding
-        finding = SectionFinding("REG-SCHEMA", "error", refused.problem, False, True, refused.fix)
+        finding = SectionFinding("REG-SCHEMA", "error", refused.message, False, True, refused.fix)
         _emit(render_finding(finding) + "\n")
         return 0
     if decision.stamp_slug is not None:

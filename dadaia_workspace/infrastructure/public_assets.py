@@ -484,7 +484,7 @@ class FileSystemPublicAssetManager:
             overlay = self._load_agent_policy(workspace_root)
         except AgentModelPolicyStoreError as exc:
             reports.append(
-                DoctorLine(DoctorStatus.DRIFT, f"agent-model-policy ERROR: {exc.problem}", exc.fix)
+                DoctorLine(DoctorStatus.DRIFT, f"agent-model-policy ERROR: {exc.message}", exc.fix)
             )
         resolved_models = self._resolved_core_models(overlay)
 

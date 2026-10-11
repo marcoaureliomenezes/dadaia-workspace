@@ -255,7 +255,7 @@ class DoctorService:
         try:
             contexts = self._store.list_all()
         except SchemaVersionError as refused:  # the registry's one grammar refused it
-            return [_invariant("REG-SCHEMA", refused.problem, refused.fix)]
+            return [_invariant("REG-SCHEMA", refused.message, refused.fix)]
 
         # INV-4 (v2): ALIVE context must have repo on disk
         for ctx in contexts:

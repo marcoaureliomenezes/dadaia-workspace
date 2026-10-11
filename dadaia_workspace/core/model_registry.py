@@ -89,8 +89,7 @@ class AgentModelPolicyStoreError(DadaiaError):
     """
 
     def __init__(self, message: str, path: Path | None = None, fix: str = "") -> None:
-        self.problem = message if path is None else f"{message}: {path}"
-        super().__init__(self.problem, fix)
+        super().__init__(message if path is None else f"{message}: {path}", fix)
 
 
 DEFAULT_TEMPLATE_ID = "balanced"
