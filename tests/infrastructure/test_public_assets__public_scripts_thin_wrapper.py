@@ -56,7 +56,11 @@ def _imported_roots(path: Path) -> set[str]:
 #: reads the worktree name grammar (``NAME_RE``). No module imports back along its own edge.
 _CROSS_SKILL_EDGES = {
     "dd-release-implementation": {"_memory_drift", "_worktree_git", "_worktree_names"},
-    "dd-gitflow-default": {"_release_schema", "_specs"},  # `_specs`: the fix-line quote
+    "dd-gitflow-default": {
+        "_git",
+        "_release_schema",
+        "_specs",
+    },  # `_specs`: the fix-line quote; `_git`: the one runner
     "dd-backlog-definition": {"_release_schema", "_bugs_store"},
     "dd-bug-resolution": {"_release_schema", "_worktree_names"},
 }
