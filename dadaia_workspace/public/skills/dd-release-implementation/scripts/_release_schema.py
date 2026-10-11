@@ -8,13 +8,19 @@ import functools
 import json
 import re
 import subprocess
+import sys
 from pathlib import Path
 
+sys.path.append(
+    str(Path(__file__).resolve().parents[2] / "dd-bug-resolution" / "scripts")
+)  # loadable alone
+
 # isort: off
-from _grammar import CANDIDATE_RE as CANDIDATE_RE, SEMVER_RE as SEMVER_RE, SHA_RE as SHA_RE
-from _grammar import STATE as STATE, STATUS_RE, TASK_ID_RE as TASK_ID_RE
-from _grammar import candidate_dir as candidate_dir, candidate_number as candidate_number
-from _grammar import live_ids as live_ids
+from _grammar import (  # noqa: E402
+    CANDIDATE_RE as CANDIDATE_RE, SEMVER_RE as SEMVER_RE, SHA_RE as SHA_RE, STATE as STATE,
+    STATUS_RE, TASK_ID_RE as TASK_ID_RE, candidate_dir as candidate_dir,
+    candidate_number as candidate_number, live_ids as live_ids,
+)  # fmt: skip
 # isort: on
 
 CODE = "LEDGER-RELEASE-SCHEMA"
