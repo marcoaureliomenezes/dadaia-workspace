@@ -20,13 +20,12 @@ import json
 import sys
 from collections.abc import Iterator, Sequence
 from dataclasses import dataclass
-from functools import cache
 from pathlib import Path
-from types import ModuleType
 from typing import Any, Protocol
 
 from dadaia_workspace.core.cli_line import fix_line, script_line
 from dadaia_workspace.core.doctor_rules import SectionFinding
+from dadaia_workspace.core.skill_owner import load_owner
 from dadaia_workspace.core.workspace_resolver import own_workspace_root
 from dadaia_workspace.infrastructure.subprocess_runner import SubprocessProcessRunner
 
@@ -86,17 +85,6 @@ MEMORY_SCRIPT = LedgerScript("MEMORY", "dd-spec-navigator", "memory.py", ("catal
 #: Not a ledger: the worktrees' owner, read by `worktree_rows` alone (ADR 0135).
 WORKTREE_SCRIPT = LedgerScript("WORKTREES", "dd-gitflow-default", "worktree.py")
 LEDGER_SCRIPTS = (BUGS_SCRIPT, BACKLOG_SCRIPT, RELEASE_SCRIPT, AUDIT_SCRIPT)
-
-
-@cache
-def load_owner(skill: str, module: str) -> ModuleType:
-    """The packaged ``<skill>/scripts/<module>.py``, executed from source into a module —
-    the one package path into ``public/skills`` (ADR 0135); no bytecode lands beside it."""
-    path = _PACKAGE_SKILLS / skill / "scripts" / f"{module}.py"
-    owner = ModuleType(module)
-    owner.__file__ = str(path)
-    exec(compile(path.read_text(encoding="utf-8"), path, "exec"), owner.__dict__)
-    return owner
 
 
 class _Runner(Protocol):
