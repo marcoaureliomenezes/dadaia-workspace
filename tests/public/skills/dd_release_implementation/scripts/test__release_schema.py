@@ -239,14 +239,21 @@ def test_the_next_candidate_with_no_state_is_the_highest_folder_plus_one(tmp_pat
 
 
 @pytest.mark.parametrize(
-    ("folders", "flat", "next_rc", "current_rc"),
+    ("folders", "flat", "next_rc", "stateless_rc", "current_rc"),
     [
-        pytest.param([1, 2, 3], False, "rc-4", "rc-3", id="empty-log-over-three-folders"),
-        pytest.param([], True, "rc-1", None, id="a-flat-trio-is-not-a-candidate"),
+        pytest.param([1, 2, 3], False, "rc-4", "rc-4", "rc-3", id="empty-log-over-three-folders"),
+        pytest.param(
+            [], True, "rc-2", "rc-1", None, id="a-live-flat-trio-is-rc1-a-stateless-one-is-placed"
+        ),
     ],
 )
 def test_a_state_with_no_milestone_reads_the_folders(
-    tmp_path: Path, folders: list[int], flat: bool, next_rc: str, current_rc: str | None
+    tmp_path: Path,
+    folders: list[int],
+    flat: bool,
+    next_rc: str,
+    stateless_rc: str,
+    current_rc: str | None,
 ) -> None:
     for n in folders:
         (tmp_path / f"rc-{n}").mkdir()
@@ -254,7 +261,7 @@ def test_a_state_with_no_milestone_reads_the_folders(
         (tmp_path / "SPEC.md").write_text("flat")
     state = {"phase": "CLOSURE", "log": []}
     assert _release_schema.next_candidate(tmp_path, state) == tmp_path / next_rc
-    assert _release_schema.next_candidate(tmp_path, None) == tmp_path / next_rc
+    assert _release_schema.next_candidate(tmp_path, None) == tmp_path / stateless_rc
     assert _release_schema.current_candidate(tmp_path, state) == (
         tmp_path / current_rc if current_rc else None
     )
