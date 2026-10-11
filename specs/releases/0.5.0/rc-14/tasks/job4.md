@@ -2,7 +2,7 @@
 
 **Status:** Draft
 
-Wave 1. Operator-confirmed (2026-10-11, "Registrar e corrigir no Job 5 (Recommended)"): ONE bug grouped by cause, `cli-refusals-print-no-fix-line` (correlates `context-repo-refusals-carry-no-fix-line` and `context-alive-crashes-on-a-non-git-repo-dir`, all three in the SPEC Origin), fixed at every site below by the structural fix: `DadaiaError(message, fix='')` stores `.fix` and renders `message + '\nfix: ' + fix` (the pattern `SchemaVersionError` already uses, so every existing `str(error)` assert holds); `cli/_fail.fail(error, fix='')` prints the caller's `fix` only when the error carries none; the per-site `f"{e}\nfix: ..."` concatenations collapse into it; the raisers in `service.py` that embed `\nfix:` in their text pass `fix=` instead (same output). SPEC FR17 names the measured set and the three bugs.
+Wave 1. Operator-confirmed (2026-10-11, "Registrar e corrigir no Job 4 (Recommended)"): ONE bug grouped by cause, `cli-refusals-print-no-fix-line` (correlates `context-repo-refusals-carry-no-fix-line` and `context-alive-crashes-on-a-non-git-repo-dir`, all three in the SPEC Origin), fixed at every site below by the structural fix: `DadaiaError(message, fix='')` stores `.fix` and renders `message + '\nfix: ' + fix` (the pattern `SchemaVersionError` already uses, so every existing `str(error)` assert holds); `cli/_fail.fail(error, fix='')` prints the caller's `fix` only when the error carries none; the per-site `f"{e}\nfix: ..."` concatenations collapse into it; the raisers in `service.py` that embed `\nfix:` in their text pass `fix=` instead (same output). SPEC FR17 names the measured set and the three bugs.
 
 Measured no-fix sites (in-process CliRunner on temp workspaces, the define tree's code, never the live instance; 40 `fail(` calls in `cli/`, 28 always print a fix line):
 - `context.py:397` `context repo add` with an invalid slug (`InvalidContextNameError`); with a different URL and with a slug owned by another context (`AssociatedRepoConflictError`); with the context's own main slug (becomes the idempotent no-op, AC17.2).
@@ -20,7 +20,7 @@ Because the remedy of a git failure or a venv failure is the verb's own retry, t
 - Test-side first: T1, T2, T3 in parallel; then T4; then T5, T6, T7, T8 in parallel (disjoint `W:`).
 - T3 edits the one existing case that the operator's ruling contradicts (`A17.3-main-repo-slug`, refusal → no-op); the commit body says so, and no other assert is rewritten.
 - Commit bodies carry `git grep -n -E 'fail\((e|exc|f?\")' -- dadaia_workspace/cli` with the hit counts before and after, and the final list of sites that still pass no fix with the reason each one cannot (target: none).
-- Net production lines ≤ 0 for the job (the concatenations leave; the new error class is a four-line subclass). Pre-review checklist: one remedy per refusal (the raiser's), no cross-component import, the sweep line above with counts, no platform fact.
+- Net production lines ≤ 0 for the job (the concatenations leave; the new error class is a four-line subclass). Pre-review checklist: one remedy per refusal (the raiser's), no cross-component import or cycle, the sweep line above with counts, no platform fact.
 
 Tasks: 8 (1 jr, 7 sr). `who` names the dispatched role (`dd-release-definition` §5).
 

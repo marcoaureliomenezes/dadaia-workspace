@@ -2,13 +2,13 @@
 
 **Status:** Draft
 
-Wave 1. Job 10 edits `entity_doctor.py` afterwards (it waits on this job). Operator ruling (2026-10-11): no harness is removed; the strategy is that switching harness changes little, so what the harness records already say is stated once. `entities/registry.json` lists, per behavior and rule, a prose string per harness that restates `core/harness_registry.py` (the directory and the hook format) and `hook_wrappers.py` (the lanes); 119 lines, seven `implementations` objects of six entries each.
+Wave 1. Job 10 edits `entity_doctor.py` afterwards (it waits on this job). Main-thread reading of the 2026-10-11 scope grill ("Confirmo, pode seguir (Recommended)"): no harness is removed; switching harness should change little, so what the harness records already say is stated once. `entities/registry.json` lists, per behavior and rule, a prose string per harness that restates `core/harness_registry.py` (the directory and the hook format) and `hook_wrappers.py` (the lanes); 119 lines, seven `implementations` objects of six entries each.
 
 - The registry keeps each entity's `id`, `mandate` and, for a behavior, its hook `modules`; it names only the exceptions, as `gaps: {harness: reason}` (for instance a harness whose hook format has no prompt-time lane, or no env block).
 - The entity doctor derives "behavior X is implemented by harness H" as: H is a record of `HARNESS_RECORDS`, H is not in X's `gaps`, and the hook table of H carries the lane X needs. Adding a harness record needs no registry edit.
 - Test-side first: T1; then T2; then T3.
 - Net lines: the registry shrinks by about 55 lines; the doctor gains about 15; three tests port.
-- Pre-review checklist: one reader of harness coverage (the records and the hook table), no cross-component import, sweep line `git grep -c implementations -- dadaia_workspace tests` with counts, no platform fact, net lines ≤ 0.
+- Pre-review checklist: one reader of harness coverage (the records and the hook table), no cross-component import or cycle, sweep line `git grep -c implementations -- dadaia_workspace tests` with counts, no platform fact, net lines ≤ 0.
 
 Tasks: 3 (1 jr, 2 sr). `who` names the dispatched role (`dd-release-definition` §5).
 
