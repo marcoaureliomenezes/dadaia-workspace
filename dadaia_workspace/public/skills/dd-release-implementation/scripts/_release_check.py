@@ -13,13 +13,9 @@ from __future__ import annotations
 
 import json
 import re
-import sys
 from graphlib import CycleError, TopologicalSorter
 from pathlib import Path
 from typing import Any
-
-sys.path.insert(0, str(Path(__file__).resolve().parent))
-sys.path.append(str(Path(__file__).resolve().parents[2] / "dd-bug-resolution" / "scripts"))
 
 import _ledger  # noqa: E402
 from _ledger import SPECS, load_schema, validate  # noqa: E402
@@ -27,7 +23,10 @@ from _release_schema import (  # noqa: E402
     CODE,
     DELIVERED,
     HISTO,
+    current_job_writes,
     current_plan_jobs,
+    job_errors,
+    plan_errors,
 )
 
 _LAW = "specs/releases/AGENTS.md: release.py is this ledger's ONE writer"
@@ -137,41 +136,51 @@ def histo_findings(text: str, root: Path = SPECS) -> list[dict[str, Any]]:
 
 
 def dag_errors(plan: str) -> list[str]:
-    """The PLAN's `## DAG` table (job | waits on | why) read once: Job 1 exists, at most 8
+    """A historical PLAN's `## DAG` table (job | waits on | why): Job 1 exists, at most 8
     jobs (Reconciliation uncounted), no cycle."""
-    lines = plan.splitlines()
-    dag_at = next((n for n, line in enumerate(lines) if re.match(r"^## DAG", line)), None)
-    end = len(lines)
-    current_table = False
-    if dag_at is not None:
-        saw_table = False
-        for index, line in enumerate(lines[dag_at + 1 :], start=dag_at + 1):
-            if line.lstrip().startswith("|"):
-                if not saw_table:
-                    lowered = line.lower()
-                    current_table = "wave" in lowered and "w:" in lowered
-                saw_table = True
-            elif saw_table and line.strip():
-                end = index
-                break
-    current, current_errors = current_plan_jobs("\n".join(lines[:end]) if current_table else plan)
-    if current is not None:
-        by_wave: dict[int, list[str]] = {}
-        for wave, paths in current.values():
-            by_wave.setdefault(wave, []).extend(paths)
-        return current_errors + [
-            f"PLAN.md DAG wave {wave}: two jobs write {path} — `W:` sets overlap"
-            for wave, paths in by_wave.items()
-            for path in sorted({path for path in paths if paths.count(path) > 1})
-        ]
     section = re.split(r"^## DAG.*$", plan, maxsplit=1, flags=re.MULTILINE)[1:]
     rows = re.findall(r"^\|\s*Job (\d+)\s*\|([^|]*)\|", re.split(r"^#", section[0], flags=re.MULTILINE)[0],
                       re.MULTILINE) if section else []  # fmt: skip
     graph = {int(job): {int(n) for n in re.findall(r"\d+", waits)} for job, waits in rows}
-    errors = current_errors + (["the DAG has no Job 1"] if section and 1 not in graph else [])
+    errors = ["the DAG has no Job 1"] if section and 1 not in graph else []
     errors += [f"the DAG holds {len(graph)} jobs — at most 8 jobs"] if len(graph) > 8 else []
     try:
         tuple(TopologicalSorter(graph).static_order())
     except CycleError as exc:
         errors.append(f"the DAG is cyclic: {' -> '.join(f'Job {n}' for n in exc.args[1])}")
     return errors
+
+
+def candidate_errors(candidate: Path) -> list[tuple[Path, str, str]]:
+    """The ONE judge of a candidate's PLAN DAG and `tasks/job<n>.md` files, as
+    ``(file, message, fix)``: the PLAN's own errors, each job file's, then the DAG's jobs
+    and their `W:` against the job files' exact unions. `check` and `phase` both read it."""
+    plan, found = candidate / "PLAN.md", []
+    planned = None
+    if plan.is_file():
+        text = plan.read_text(encoding="utf-8")
+        planned = current_plan_jobs(text)[0]
+        redo = f"Operator action: correct the as-is review and DAG in {plan.resolve()}"
+        found += [(plan, e, redo) for e in plan_errors(text) + (dag_errors(text) if planned is None else [])]  # fmt: skip
+    authorities: dict[str, set[str]] = {}
+    for job in sorted(candidate.glob("tasks/*.md")):
+        rel, fix = f"tasks/{job.name}", f"Operator action: correct {job.resolve()} (dd-release-definition §5)"  # fmt: skip
+        body = job.read_text(encoding="utf-8")
+        found += [(job, e, fix) for e in job_errors(body, rel)]
+        if (writes := current_job_writes(body, rel)[0]) is None:
+            continue
+        number = job.stem.removeprefix("job")
+        if not number.isdigit() or number.startswith("0"):
+            found.append((job, f"current task authority {job.name} has no positive-numbered job filename",
+                          f"Operator action: rename {job.resolve()} to its canonical positive-numbered job filename"))  # fmt: skip
+        else:
+            authorities[f"Job {int(number)}"] = writes
+    if planned:
+        jobs = {name: row for name, row in planned.items() if name != "Reconciliation"}
+        if set(jobs) != set(authorities):
+            found.append((plan, "PLAN.md DAG jobs do not equal the current tasks/job<n>.md authorities",
+                          f"Operator action: make every current job appear exactly once in {plan.resolve()}"))  # fmt: skip
+        found += [(plan, f"PLAN.md DAG {name} `W:` is not its exact task-file union",
+                   f"Operator action: set {name}'s exact `W:` in {plan.resolve()} from tasks/job{name.split()[-1]}.md")  # fmt: skip
+                  for name, (_, owned) in jobs.items() if name in authorities and owned != authorities[name]]  # fmt: skip
+    return found

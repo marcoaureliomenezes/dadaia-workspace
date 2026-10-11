@@ -14,27 +14,27 @@ import sys
 from pathlib import Path
 from typing import Any
 
-sys.path.insert(0, str(Path(__file__).resolve().parent))
 # The worklist has ONE decider, the spec navigator's drift function, projected beside
 # this skill: importing a pure function is not a script calling a script (SPEC D6).
 sys.path.insert(1, str(Path(__file__).resolve().parents[2] / "dd-spec-navigator" / "scripts"))
 
 import _memory_drift as drift  # noqa: E402
-from _grammar import SEMVER_RE, SHA_RE, STATE, candidate_dir, live_ids  # noqa: E402
+from _grammar import SEMVER_RE, SHA_RE, STATE, live_ids  # noqa: E402
 from _ledger import records  # noqa: E402
-from _release_check import dag_errors, finding, histo_findings, state_findings  # noqa: E402
+from _refusal import Refusal  # noqa: E402
+from _release_check import candidate_errors, finding, histo_findings, state_findings  # noqa: E402
 from _release_phase import NEXT  # noqa: E402
 from _release_schema import (  # noqa: E402
     CANDIDATE_DOCS,
     HISTO,
     MARK_RE,
     TRIO_PHASES,
-    job_errors,
+    current_candidate,
     origin,
     origin_line,
     writes,
 )
-from _release_store import SCRIPT, Refusal, live_release  # noqa: E402
+from _release_store import SCRIPT, live_release  # noqa: E402
 from _specs import quote, script, with_specs  # noqa: E402
 
 __all__ = ["check", "drift", "memory_errors", "ship_findings", "tree_findings"]
@@ -212,16 +212,9 @@ def _directory_findings(release_dir: Path, specs: Path) -> list[dict[str, Any]]:
     if findings := state_findings(text, f"{dir_rel}/{STATE}", specs.resolve()):
         return findings
     state = json.loads(text)
-    phase, candidate = state["phase"], candidate_dir(release_dir)
-    jobs = [finding(f"{dir_rel}/{job.parent.parent.name}/tasks/{job.name}", 1, error,
-                    f"Operator action: correct {job} (dd-release-definition §5)")
-            for job in (sorted(candidate.glob("tasks/*.md")) if candidate else [])
-            for error in job_errors(job.read_text("utf-8"), f"tasks/{job.name}")]  # fmt: skip
-    plan = candidate / "PLAN.md" if candidate else None
-    if plan and plan.is_file():
-        jobs += [finding(f"{dir_rel}/{plan.parent.name}/PLAN.md", 1, error,
-                         f"Operator action: redesign the DAG table in {plan}")
-                 for error in dag_errors(plan.read_text("utf-8"))]  # fmt: skip
+    phase, candidate = state["phase"], current_candidate(release_dir, state)
+    jobs = [finding(f"{dir_rel}/{path.relative_to(release_dir).as_posix()}", 1, message, fix)
+            for path, message, fix in (candidate_errors(candidate) if candidate else [])]  # fmt: skip
     tasks = candidate / "TASKS.md" if candidate else None
     marks = list(MARK_RE.finditer(tasks.read_text("utf-8"))) if tasks and tasks.is_file() else []
     memory = _memory_tasks(marks, tasks, dir_rel) if tasks else []

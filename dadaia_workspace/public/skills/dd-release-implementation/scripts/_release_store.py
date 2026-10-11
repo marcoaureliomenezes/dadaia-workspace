@@ -18,12 +18,12 @@ from typing import Any
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 sys.path.append(str(Path(__file__).resolve().parents[2] / "dd-bug-resolution" / "scripts"))
 
-from _grammar import STATE, candidate_dir  # noqa: E402
+from _grammar import STATE  # noqa: E402
 from _jsonl import parse_object  # noqa: E402
 from _ledger import records, replace, stamp  # noqa: E402
 from _refusal import Refusal as Refusal  # noqa: E402
 from _release_check import state_findings  # noqa: E402
-from _release_schema import Unreadable, live_id  # noqa: E402
+from _release_schema import Unreadable, current_candidate, live_id  # noqa: E402
 from _specs import choice, script  # noqa: E402
 
 State = dict[str, Any]
@@ -58,7 +58,8 @@ def live_release(specs: Path) -> Live:
         vars(refusal := Refusal(*exc.args)).update(vars(exc))  # the act's choice, if any
         raise refusal from None
     release_dir = specs / "releases" / live
-    return Live(live, release_dir, read_state(release_dir / STATE), candidate_dir(release_dir))
+    state = read_state(release_dir / STATE)
+    return Live(live, release_dir, state, current_candidate(release_dir, state))
 
 
 def window_start(state: State) -> str:

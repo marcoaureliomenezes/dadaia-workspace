@@ -10,20 +10,16 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent))
-
 from _grammar import SHA_RE, STATE, candidate_number  # noqa: E402
+from _refusal import Refusal  # noqa: E402
+from _release_check import candidate_errors  # noqa: E402
 from _release_schema import (  # noqa: E402
     APPROVED,
     CANDIDATE_DOCS,
-    current_job_writes,
-    current_plan_jobs,
     extract_status,
-    job_errors,
-    plan_errors,
     utc_now,
 )
-from _release_store import SCRIPT, Live, Refusal, State, commit, live_release  # noqa: E402
+from _release_store import SCRIPT, Live, State, commit, live_release  # noqa: E402
 from _specs import choice  # noqa: E402
 
 #: DEFINITION is `new`'s; each later phase has one predecessor (out-of-order = re-run).
@@ -53,15 +49,15 @@ def _refuse_unapproved_docs(live: Live) -> Path:
 
 
 def _refuse_open_worktrees(specs: Path) -> None:
-    """ADR 0128 (4), ADR 0241: closure waits for every open `wt/*` of the repo except its own
-    tree and the next candidate's define tree — read from the owner's rows (imported, ADR 0135)."""
+    """Closure waits for every open `wt/*` of the repo except its own tree and the next
+    candidate's define tree — read from the worktree owner's rows."""
     from _ledger import workspace_of
 
     root = workspace_of(specs)
     if root is None:  # no workspace holds this tree: there is no worktree to wait for
         return
     sys.path.append(str(Path(__file__).resolve().parents[2] / "dd-gitflow-default" / "scripts"))
-    import _worktree_git as worktree_git  # the worktrees' owner, read-only (ADR 0135)
+    import _worktree_git as worktree_git  # the worktrees' owner, read-only
     from _worktree_names import NAME_RE
     from _worktree_names import Refusal as WorktreeRefusal
 
@@ -110,46 +106,8 @@ def set_phase(specs: Path, phase: str, sha: str) -> tuple[str, str]:
     ts, candidate = utc_now(), live.candidate
     if phase == "IMPLEMENTATION":
         candidate = _refuse_unapproved_docs(live)
-        plan = (candidate / "PLAN.md").resolve()
-        text = plan.read_text(encoding="utf-8")
-        planned, errors = current_plan_jobs(text)
-        if errors:
-            raise Refusal(errors[0], f"Operator action: correct the as-is review and DAG in {plan}")
-        if planned is None and (errors := plan_errors(text)):
-            raise Refusal(errors[0], f"Operator action: correct the as-is review and DAG in {plan}")
-        authorities: dict[str, set[str]] = {}
-        for job in sorted(candidate.glob("tasks/*.md")):
-            job_text = job.read_text(encoding="utf-8")
-            if errors := job_errors(job_text, f"tasks/{job.name}"):
-                raise Refusal(errors[0], f"Operator action: correct {job.resolve()} "
-                              "(dd-release-definition §5)")  # fmt: skip
-            writes, _ = current_job_writes(job_text, f"tasks/{job.name}")
-            if writes is not None:
-                number = job.stem.removeprefix("job")
-                if not number.isdigit() or number.startswith("0"):
-                    raise Refusal(
-                        f"current task authority {job.name} has no positive-numbered job filename",
-                        f"Operator action: rename {job.resolve()} to its canonical "
-                        "positive-numbered job filename",
-                    )
-                authorities[f"Job {int(number)}"] = writes
-        if planned is not None:
-            implementation = {job: row for job, row in planned.items() if job != "Reconciliation"}
-            if set(implementation) != set(authorities):
-                raise Refusal(
-                    "PLAN.md DAG jobs do not equal the current tasks/job<n>.md authorities",
-                    f"Operator action: make every current job appear exactly once in {plan}",
-                )
-            for plan_job, (_, planned_writes) in implementation.items():
-                if planned_writes != authorities[plan_job]:
-                    raise Refusal(
-                        f"PLAN.md DAG {plan_job} `W:` is not its exact task-file union",
-                        f"Operator action: set {plan_job}'s exact `W:` in {plan} from tasks/job{plan_job.split()[-1]}.md",
-                    )
-            if errors := plan_errors(text):
-                raise Refusal(
-                    errors[0], f"Operator action: correct the as-is review and DAG in {plan}"
-                )
+        if errors := candidate_errors(candidate):
+            raise Refusal(errors[0][1], errors[0][2])
     else:
         _refuse_open_worktrees(specs.resolve())
 
@@ -157,7 +115,7 @@ def set_phase(specs: Path, phase: str, sha: str) -> tuple[str, str]:
     rc = {"candidate": candidate.name} if candidate else {}
 
     def apply(state: State) -> State:
-        # The slot is the live candidate's stamp; the `milestone` entry is its history (F061).
+        # The slot is the live candidate's stamp; the `milestone` entry is its history .
         state[milestone] = {"sha": sha, "ts": ts}
         state.setdefault("log", []).append({
             "ts": ts, "agent": "release.py", "kind": "milestone", **rc,

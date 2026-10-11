@@ -11,7 +11,7 @@ import subprocess
 from pathlib import Path
 from typing import Any
 
-from _grammar import CANDIDATE_RE, STATE, STATUS_RE, TASK_ID_RE, live_ids
+from _grammar import STATE, STATUS_RE, TASK_ID_RE, candidate_dir, candidate_number, live_ids
 
 CODE = "LEDGER-RELEASE-SCHEMA"
 HISTO = "releases/_archive/releases_histo.jsonl"
@@ -155,16 +155,33 @@ def origin_line(text: str) -> int:
     return text.count("\n", 0, match.start()) + 1 if match else 1
 
 
+def _milestone_rc(state: dict[str, Any]) -> int:
+    """The number of the last ``milestone`` entry's candidate; 0 when the log has none."""
+    entries = state.get("log") or []
+    names = [str(e.get("candidate")) for e in entries if e.get("kind") == "milestone"]
+    return candidate_number(names)
+
+
+def current_candidate(release_dir: Path, state: dict[str, Any]) -> Path | None:
+    """The ``rc-<N>/`` the release is working: the last ``milestone`` entry's candidate in the
+    trio phases, the one past it in DEFINITION; with no milestone to read, the highest folder."""
+    last = _milestone_rc(state)
+    if not last:
+        return candidate_dir(release_dir)
+    return release_dir / f"rc-{last + (state.get('phase') == 'DEFINITION')}"
+
+
 def next_candidate(release_dir: Path, state: dict[str, Any] | None) -> Path:
     """The ``rc-<N+1>/`` a candidate is born in: past the last ``milestone`` entry's candidate,
-    so a drafted folder there is adopted; with no milestone to read, past the highest folder."""
-    entries = (state or {}).get("log") or []
-    names = [str(e.get("candidate")) for e in entries if e.get("kind") == "milestone"]
-    if not names:
-        names = (
-            [d.name for d in release_dir.iterdir() if d.is_dir()] if release_dir.is_dir() else []
+    so a drafted folder there is adopted; with no state, past the highest folder."""
+    if state is None:
+        last = (
+            candidate_number(d.name for d in release_dir.iterdir() if d.is_dir())
+            if release_dir.is_dir()
+            else 0
         )
-    last = max((int(m.group(1)) for n in names if (m := CANDIDATE_RE.match(n))), default=0)
+    else:
+        last = _milestone_rc(state)
     return release_dir / f"rc-{last + 1}"
 
 
