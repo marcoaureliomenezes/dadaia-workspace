@@ -48,6 +48,18 @@ def _entry(kind: str, text: str, **extra: object) -> dict[str, object]:
     return {"ts": _TS, "agent": "test", "kind": kind, "text": text, **extra}
 
 
+def _milestones(phase: str) -> list[dict[str, object]]:
+    """The rc-1 stamps a state in *phase* has logged."""
+    stamps = [("defined", "1111111", "10")] + (
+        [("implemented", "2222222", "11")] if phase == "CLOSURE" else []
+    )
+    return [
+        {"ts": f"2026-10-08T{hour}:00:00Z", "agent": "release.py", "kind": "milestone",
+         "candidate": "rc-1", "milestone": name, "sha": sha, "text": f"Candidate {name} at {sha}."}
+        for name, sha, hour in stamps
+    ]  # fmt: skip
+
+
 def _write_release(
     specs: Path,
     *,
@@ -93,7 +105,7 @@ def _write_release(
             {"sha": "2222222", "ts": "2026-10-08T11:00:00Z"} if phase == "CLOSURE" else None
         ),
         "shipped": None,
-        "log": log or [],
+        "log": log or _milestones(phase),
     }
     release.joinpath("_RELEASE.json").write_text(
         json.dumps(state, indent=2) + "\n", encoding="utf-8"
@@ -368,7 +380,6 @@ def _closed_with_draft(tmp_path: Path) -> tuple[Path, Path, bytes]:
     release = _write_release(specs, phase="CLOSURE")
     draft = release / "rc-2" / "SPEC.md"
     draft.parent.mkdir()
-    draft.with_name("PLAN.md").write_bytes(release.joinpath("rc-1/PLAN.md").read_bytes())
     draft.write_bytes(b"# SPEC\n\n**Status:** Draft\n**Origin:** operator-demand\n")
     return specs, release, draft.read_bytes()
 

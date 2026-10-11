@@ -66,6 +66,14 @@ def _run(script: Path, *argv: str, cwd: Path | None = None) -> subprocess.Comple
     )
 
 
+#: Candidate 1's two milestone stamps: what a state in CLOSURE on rc-1 has logged.
+_RC1_MILESTONES = [
+    {"ts": f"2026-01-0{day}T00:00:00Z", "agent": "release.py", "kind": "milestone",
+     "candidate": "rc-1", "milestone": name, "sha": sha, "text": f"Candidate {name} at {sha}."}
+    for day, name, sha in ((1, "defined", "aaaaaaa"), (2, "implemented", "beef123"))
+]  # fmt: skip
+
+
 def _state(release_id: str, **over: object) -> dict[str, object]:
     document: dict[str, object] = {
         "schema": "release-state-v1",
@@ -220,6 +228,7 @@ def test_new_births_the_stacked_candidate_on_a_closed_live_release(
         phase="CLOSURE",
         defined={"sha": "aaaaaaa", "ts": "2026-01-01T00:00:00Z"},
         implemented={"sha": "beef123", "ts": "2026-01-02T00:00:00Z"},
+        log=_RC1_MILESTONES,
     )
     closed = _tree_hash(release_dir / "rc-1")
     result = _run(script, "new", "0.5.0", "--specs", str(specs))
@@ -231,7 +240,7 @@ def test_new_births_the_stacked_candidate_on_a_closed_live_release(
     assert state["phase"] == "DEFINITION"
     assert state["defined"] == {"sha": "aaaaaaa", "ts": "2026-01-01T00:00:00Z"}
     assert state["implemented"] == {"sha": "beef123", "ts": "2026-01-02T00:00:00Z"}
-    notes = [entry["text"] for entry in state["log"]]
+    notes = [entry["text"] for entry in state["log"] if entry["kind"] == "note"]
     assert notes == ["Candidate born on 0.5.0 (prior candidate closed at beef123)"]
 
 
@@ -756,7 +765,9 @@ def test_ship_records_the_promote_and_new_births_the_next(script: Path, tmp_path
 def _closed_rc(tmp_path: Path, *bugs: dict[str, object]) -> Path:
     """Release 0.5.0 in CLOSURE on rc-1, and a bug ledger holding *bugs*."""
     specs = _specs(tmp_path)
-    _release(specs, "0.5.0", phase="CLOSURE", implemented={"sha": "beef123", "ts": _TS})
+    _release(
+        specs, "0.5.0", phase="CLOSURE", implemented={"sha": "beef123", "ts": _TS}, log=_RC1_MILESTONES
+    )
     (specs / "bugs").mkdir()
     (specs / "bugs" / "BUGS.jsonl").write_text(
         "".join(json.dumps(b) + "\n" for b in bugs), encoding="utf-8"
