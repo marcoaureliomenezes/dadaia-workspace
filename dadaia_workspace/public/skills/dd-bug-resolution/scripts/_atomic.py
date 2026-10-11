@@ -10,7 +10,7 @@ import time
 import uuid
 from pathlib import Path
 
-__all__ = ["SymlinkRefusedError", "atomic_write"]
+__all__ = ["SymlinkRefusedError", "atomic_write", "refuse_symlink"]
 
 
 class SymlinkRefusedError(OSError):
@@ -20,6 +20,12 @@ class SymlinkRefusedError(OSError):
     def __init__(self, path: Path) -> None:
         super().__init__(f"{path} is a symlink; refusing to write it")
         self.path = path
+
+
+def refuse_symlink(path: Path) -> None:
+    """The writer's one symlink rule, for a caller that swaps content in by another act."""
+    if path.is_symlink():
+        raise SymlinkRefusedError(path)
 
 
 def atomic_write(
@@ -38,8 +44,7 @@ def atomic_write(
     Windows) is retried 49 times 0.01 s apart before the final raising swap; the retry is
     platform-blind because POSIX never raises it there.
     """
-    if path.is_symlink():
-        raise SymlinkRefusedError(path)
+    refuse_symlink(path)
     if content is None:
         path.unlink(missing_ok=True)
         return

@@ -5,7 +5,7 @@ import os
 from collections.abc import Callable
 from pathlib import Path
 
-from dadaia_workspace.core.atomic_write import atomic_write
+from dadaia_workspace.core.atomic_write import atomic_write, refuse_symlink
 from dadaia_workspace.core.cli_line import fix_line
 from dadaia_workspace.core.harness_registry import L1_ENTRY_HARNESSES
 from dadaia_workspace.core.models.harness_profile import HarnessProfile
@@ -95,6 +95,7 @@ class WorkspaceService:
         Stage before holding the original so failure never leaves the terms unreadable."""
         staged = path.with_name(f"{path.name}.migrating")
         try:
+            refuse_symlink(path)
             raw = json.loads(path.read_text(encoding="utf-8"))
             pairs = [[e, ""] if isinstance(e, str) else e for e in raw]
             if not isinstance(raw, list) or not all(

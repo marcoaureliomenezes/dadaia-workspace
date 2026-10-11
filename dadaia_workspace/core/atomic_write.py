@@ -2,12 +2,13 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from pathlib import Path
 from typing import TYPE_CHECKING, Protocol
 
 from dadaia_workspace.core.skill_owner import load_owner
 
-__all__ = ["SymlinkRefusedError", "atomic_write"]
+__all__ = ["SymlinkRefusedError", "atomic_write", "refuse_symlink"]
 
 
 class _Writer(Protocol):
@@ -24,6 +25,7 @@ class _Writer(Protocol):
 
 _owner = load_owner("dd-bug-resolution", "_atomic")
 atomic_write: _Writer = _owner.atomic_write
+refuse_symlink: Callable[[Path], None] = _owner.refuse_symlink
 if TYPE_CHECKING:
 
     class SymlinkRefusedError(OSError):
