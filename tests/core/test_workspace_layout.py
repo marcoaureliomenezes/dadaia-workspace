@@ -132,7 +132,6 @@ _SECOND_LIST_BIRTH = frozenset(  # its keys at T-050-135; the allowance only shr
 _SECOND_LIST_ALLOWANCE: dict[str, str] = {
     "dadaia_workspace/public/skills/dd-audit-project/scripts/_audit_check.py": _PARITY,
     "dadaia_workspace/public/skills/dd-backlog-definition/scripts/_backlog_schema.py": _PARITY,
-    "dadaia_workspace/public/skills/dd-bug-resolution/scripts/_bugs_check.py": _PARITY,
 }
 
 
