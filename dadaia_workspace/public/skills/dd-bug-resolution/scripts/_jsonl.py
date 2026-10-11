@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import argparse
 import json
-from collections.abc import Iterable
+from collections.abc import Iterable, Iterator
 from pathlib import Path
 from typing import Any
 
@@ -24,17 +24,24 @@ class Unreadable(Refusal):
     """A document that is not one JSON object; ``.fix`` is the act its caller names."""
 
 
-def load(text: str) -> list[dict[str, Any]]:
-    """Every JSON object of JSONL *text*, split on ``\\n`` alone — ``splitlines()``
-    breaks a record holding U+2028."""
-    out: list[dict[str, Any]] = []
+def walk(text: str) -> Iterator[tuple[int, Any, str]]:
+    """Each non-blank line of JSONL *text* as ``(number, value, why)``, split on ``\\n`` alone —
+    ``splitlines()`` breaks a record holding U+2028. *why* is the parser's message, else ``""``."""
     for number, line in enumerate(text.split("\n"), start=1):
         if not line.strip():
             continue
         try:
-            record = json.loads(line)
+            yield number, json.loads(line), ""
         except json.JSONDecodeError as exc:
-            raise LineError(number, f"is not valid JSON ({exc.msg})") from exc
+            yield number, None, exc.msg
+
+
+def load(text: str) -> list[dict[str, Any]]:
+    """Every JSON object of JSONL *text*; the first line that is not one raises :class:`LineError`."""
+    out: list[dict[str, Any]] = []
+    for number, record, why in walk(text):
+        if why:
+            raise LineError(number, f"is not valid JSON ({why})")
         if not isinstance(record, dict):
             raise LineError(number, "is not a JSON object")
         out.append(record)

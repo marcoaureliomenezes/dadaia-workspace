@@ -3,9 +3,10 @@
 
 from __future__ import annotations
 
-import json
 from collections.abc import Callable
 from typing import Any
+
+import _jsonl
 
 
 def finding(code: str, path: str, line: int, message: str, fix: str) -> dict[str, Any]:
@@ -23,11 +24,8 @@ def histo_findings(
     """One finding per line of the archive *text* that is not JSON or whose record has
     *problems*; *fix* names the act for a line number."""
     out: list[dict[str, Any]] = []
-    for number, raw in enumerate(text.split("\n"), start=1):
-        try:
-            messages = problems(json.loads(raw)) if raw.strip() else []
-        except json.JSONDecodeError as exc:
-            messages = [f"line is not valid JSON: {exc.msg}"]
+    for number, record, why in _jsonl.walk(text):
+        messages = [f"line is not valid JSON: {why}"] if why else problems(record)
         if messages:
             out.append(finding(code, path, number, "; ".join(messages), fix(number)))
     return out

@@ -8,12 +8,12 @@ commit, so a writer/validator disagreement is unrepresentable. The schema is
 
 from __future__ import annotations
 
-import json
 from collections.abc import Iterator
 from pathlib import Path
 from typing import Any
 
 import _findings
+import _jsonl
 import _ledger
 from _grammar import TASK_ID_RE
 from _specs import quote, script, with_specs
@@ -97,13 +97,9 @@ def findings_for(
     def add(line: int, message: str) -> None:
         lines.setdefault(line, []).append(message)
 
-    for number, raw in enumerate(text.split("\n"), start=1):
-        if not raw.strip():
-            continue
-        try:
-            record = json.loads(raw)
-        except json.JSONDecodeError as exc:
-            add(number, f"line is not valid JSON: {exc.msg}")
+    for number, record, why in _jsonl.walk(text):
+        if why:
+            add(number, f"line is not valid JSON: {why}")
             continue
         messages = list(_ledger.validate(_schema_record(record, schema), schema, schema, "record"))
         for message in messages or invariant_errors(record):
@@ -158,15 +154,11 @@ def histo_findings(text: str, root: Path = _ledger.SPECS) -> list[dict[str, Any]
 
 def archived_ids(text: str) -> frozenset[str]:
     """The record ids of the archive *text*; an unreadable line is `histo_findings`' to name."""
-    out = set()
-    for raw in text.split("\n"):
-        try:
-            record = json.loads(raw) if raw.strip() else None
-        except json.JSONDecodeError:
-            continue
-        if isinstance(record, dict) and "id" in record:
-            out.add(str(record["id"]))
-    return frozenset(out)
+    return frozenset(
+        str(record["id"])
+        for _, record, why in _jsonl.walk(text)
+        if not why and isinstance(record, dict) and "id" in record
+    )
 
 
 def check(specs: Path) -> list[dict[str, Any]]:
