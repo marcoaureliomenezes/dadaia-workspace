@@ -265,3 +265,56 @@ def test_a_state_with_no_milestone_reads_the_folders(
     assert _release_schema.current_candidate(tmp_path, state) == (
         tmp_path / current_rc if current_rc else None
     )
+
+
+def _git(*args: str, cwd: Path) -> None:
+    subprocess.run(["git", "-c", "user.name=t", "-c", "user.email=t@t", *args], cwd=cwd, check=True,
+                   capture_output=True, env={**os.environ, "GIT_CONFIG_GLOBAL": os.devnull})  # fmt: skip
+
+
+def _repo(path: Path, *, spec: bool) -> Path:
+    """A repo of two commits; with *spec*, the first adds a Draft `releases/0.5.0/rc-1/SPEC.md`."""
+    path.mkdir()
+    _git("init", "-q", cwd=path)
+    if spec:
+        (path / "releases/0.5.0/rc-1").mkdir(parents=True)
+        (path / "releases/0.5.0/rc-1/SPEC.md").write_text("**Status:** Draft\n")
+    (path / "f").write_text("1")
+    _git("add", "-A", cwd=path)
+    _git("commit", "-qm", "one", cwd=path)
+    (path / "f").write_text("2")
+    _git("commit", "-qam", "two", cwd=path)
+    return path
+
+
+def _adds_under_foreign_git_env(specs: Path, other: Path) -> subprocess.CompletedProcess[str]:
+    """`candidate_adds(specs)` run with GIT_DIR and GIT_WORK_TREE both on *other* (GIT_DIR alone
+    would let git take the cwd as the work tree and pass by accident)."""
+    probe = (
+        "import sys; sys.path.insert(0, sys.argv[1]); sys.path.append(sys.argv[1] + '/../../dd-bug-resolution/scripts')\n"
+        "import _release_schema as r\n"
+        "print([[a, b] for _, a, b in r.candidate_adds(__import__('pathlib').Path(sys.argv[2]))])\n"
+    )  # fmt: skip
+    env = {**os.environ, "GIT_DIR": str(other / ".git"), "GIT_WORK_TREE": str(other)}
+    return subprocess.run([sys.executable, "-c", probe, str(_SCRIPTS), str(specs)],
+                          capture_output=True, text=True, env=env, check=False)  # fmt: skip
+
+
+def test_the_birth_log_answers_for_the_repo_given_not_for_git_dir(tmp_path: Path) -> None:
+    """AC11.2 (the release runner): with GIT_DIR and GIT_WORK_TREE on another repo, the log read
+    still lists the Draft SPEC that repo A holds — today it reads B and finds none."""
+    a, b = _repo(tmp_path / "a", spec=True), _repo(tmp_path / "b", spec=False)
+    out = _adds_under_foreign_git_env(a, b)
+    assert out.returncode == 0, out.stderr
+    assert out.stdout.strip() == "[['0.5.0', 'rc-1']]"
+
+
+def test_the_shallow_check_answers_for_the_repo_given_not_for_git_dir(tmp_path: Path) -> None:
+    """AC11.2: a shallow GIT_DIR repo B must not make the full repo A read as shallow."""
+    a, b = _repo(tmp_path / "a", spec=True), _repo(tmp_path / "src", spec=False)
+    shallow = tmp_path / "shallow"
+    subprocess.run(["git", "clone", "-q", "--depth", "1", f"file://{b}", str(shallow)], check=True,
+                   capture_output=True, env={**os.environ, "GIT_CONFIG_GLOBAL": os.devnull})  # fmt: skip
+    out = _adds_under_foreign_git_env(a, shallow)
+    assert out.returncode == 0, out.stderr
+    assert out.stdout.strip() == "[['0.5.0', 'rc-1']]"
