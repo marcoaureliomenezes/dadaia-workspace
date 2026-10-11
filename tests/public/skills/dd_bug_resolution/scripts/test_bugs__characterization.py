@@ -11,6 +11,7 @@ from pathlib import Path
 
 import pytest
 
+from dadaia_workspace.core.skill_owner import load_owner
 from tests.fixtures.harness_env import suite_env
 from tests.helpers.skill_scripts import stage_skill_scripts
 
@@ -156,7 +157,8 @@ def test_all_public_bug_verbs_pin_output_and_each_ledger_write(tmp_path: Path) -
         "--specs",
         str(specs),
     )
-    stamped = json.loads(ledger.read_text(encoding="utf-8").splitlines()[-1])
+    records = load_owner("dd-bug-resolution", "_ledger").parse(ledger.read_text(encoding="utf-8"))
+    stamped = records[-1]
     assert re.fullmatch(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z", stamped["ts"])
     appended["ts"] = stamped["ts"]
     after_append = _bytes(replacement, rejected, resolved, superseded, appended)
