@@ -15,6 +15,7 @@ from pathlib import Path
 
 from dadaia_workspace.core import specs_version as _version
 from dadaia_workspace.core.atomic_write import atomic_write
+from dadaia_workspace.core.exceptions import DadaiaError
 from dadaia_workspace.core.frontmatter import FRONTMATTER_RE
 from dadaia_workspace.core.gitflow import candidate_dir, merge_frontmatter, next_candidate
 from dadaia_workspace.core.release_state import RELEASE_ID_RE
@@ -22,8 +23,8 @@ from dadaia_workspace.core.spec_status import APPROVED, DRAFT, IN_REVIEW, STATUS
 from dadaia_workspace.core.workspace_layout import CANDIDATE_DOCUMENTS
 
 
-class UpgradeRefused(Exception):
-    """The tree cannot be upgraded; nothing was written."""
+class UpgradeRefused(DadaiaError):
+    """The tree cannot be upgraded; nothing was written. ``fix`` is its one remedy line."""
 
 
 @dataclass
@@ -58,13 +59,14 @@ def upgrade(
     """
     kind, fix = _version.state(specs_dir)
     if kind not in ("upgradable", "canonical"):
-        raise UpgradeRefused(f"specs tree {specs_dir} is {kind}; nothing written.\nfix: {fix}")
+        raise UpgradeRefused(f"specs tree {specs_dir} is {kind}; nothing written.", fix or "")
     goal = _version.CANONICAL_SPECS_VERSION
     architecture = specs_dir / "memory" / "ARCHITECTURE.md"
     if architecture.is_file() and _RETIRED_PART_HEADING in architecture.read_text("utf-8"):
         raise UpgradeRefused(
-            f"{architecture} is two-tier ({_RETIRED_PART_HEADING!r}): nowhere safe to fold "
-            "into. Rewrite it as ## Principles / ## Tech Stack / ## Structure, then re-run."
+            f"{architecture} is two-tier ({_RETIRED_PART_HEADING!r}): nowhere safe to fold into.",
+            f"Operator action: rewrite its headings as ## Principles / ## Tech Stack / "
+            f"## Structure, then re-run `dadaia specs upgrade --specs-dir {specs_dir}`.",
         )
 
     if dry_run:
