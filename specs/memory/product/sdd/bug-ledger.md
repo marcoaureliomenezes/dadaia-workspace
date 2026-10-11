@@ -5,7 +5,6 @@ tldr: BUGS.jsonl stores one lean current record per confirmed defect; its writer
 summary: The bug record grammar, confirmation and privacy boundary, terminal transitions, persisted fix lineage, archival and candidate integration.
 tags: [bugs, ledger, lineage, resolution]
 sources:
-  - dadaia_workspace/public/schemas/bugs/bug-record-v1.schema.json
   - dadaia_workspace/public/scaffold/bugs/AGENTS.md
   - dadaia_workspace/public/skills/dd-bug-resolution/**
 ---

@@ -6,8 +6,6 @@ summary: The backlog ledger — specs/backlog/BACKLOG.json holding every live en
 tags: [sdd, backlog, ledger, governance]
 sources:
   - dadaia_workspace/public/skills/dd-backlog-definition/**
-  - dadaia_workspace/public/schemas/backlog/**
-  - dadaia_workspace/public/schemas/histo/**
   - dadaia_workspace/features/backlog/**
   - dadaia_workspace/core/models/backlog.py
 ---

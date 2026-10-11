@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-10-11T16:35:59Z",
+  "generated_at": "2026-10-11T22:30:14Z",
   "features": [
     {
       "rank": 1,
@@ -730,7 +730,6 @@
         "QUALITY"
       ],
       "sources": [
-        "dadaia_workspace/public/schemas/audits/finding-record-v1.schema.json",
         "dadaia_workspace/public/schemas/ADRs/**",
         "dadaia_workspace/public/skills/dd-audit-project/**",
         "dadaia_workspace/features/specs/doctor_adr.py"
@@ -760,8 +759,6 @@
       ],
       "sources": [
         "dadaia_workspace/public/skills/dd-backlog-definition/**",
-        "dadaia_workspace/public/schemas/backlog/**",
-        "dadaia_workspace/public/schemas/histo/**",
         "dadaia_workspace/features/backlog/**",
         "dadaia_workspace/core/models/backlog.py"
       ]
@@ -789,7 +786,6 @@
         "QUALITY"
       ],
       "sources": [
-        "dadaia_workspace/public/schemas/bugs/bug-record-v1.schema.json",
         "dadaia_workspace/public/scaffold/bugs/AGENTS.md",
         "dadaia_workspace/public/skills/dd-bug-resolution/**"
       ]
@@ -819,7 +815,6 @@
         "workspace-doctor"
       ],
       "sources": [
-        "dadaia_workspace/public/schemas/releases/release-state-v1.schema.json",
         "dadaia_workspace/public/skills/dd-release-definition/**",
         "dadaia_workspace/public/skills/dd-release-implementation/**",
         "dadaia_workspace/features/specs/doctor_release.py"
@@ -855,7 +850,7 @@
         "dadaia_workspace/hooks/sdd_gate.py",
         "dadaia_workspace/cli/commands/ci.py",
         "dadaia_workspace/features/chokepoints/**",
-        "dadaia_workspace/infrastructure/data/privacy_baseline.json",
+        "dadaia_workspace/public/skills/dd-bug-resolution/scripts/privacy_baseline.json",
         "dadaia_workspace/infrastructure/git_objects.py"
       ]
     },

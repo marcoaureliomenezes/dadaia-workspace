@@ -5,7 +5,6 @@ tldr: One live release grows through closed-scope candidates; _RELEASE.json hold
 summary: Candidate birth, approval, task and job structure, phase transitions, authoritative memory drift, closure records, open-bug ship authorization and archival.
 tags: [release, candidate, sdd, state, closure]
 sources:
-  - dadaia_workspace/public/schemas/releases/release-state-v1.schema.json
   - dadaia_workspace/public/skills/dd-release-definition/**
   - dadaia_workspace/public/skills/dd-release-implementation/**
   - dadaia_workspace/features/specs/doctor_release.py
