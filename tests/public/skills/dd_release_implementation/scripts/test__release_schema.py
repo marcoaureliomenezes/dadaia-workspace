@@ -236,3 +236,25 @@ def test_the_next_candidate_with_no_state_is_the_highest_folder_plus_one(tmp_pat
         (tmp_path / f"rc-{n}").mkdir()
     (tmp_path / "rc-9").write_text("")
     assert _release_schema.next_candidate(tmp_path, None) == tmp_path / "rc-5"
+
+
+@pytest.mark.parametrize(
+    ("folders", "flat", "next_rc", "current_rc"),
+    [
+        pytest.param([1, 2, 3], False, "rc-4", "rc-3", id="empty-log-over-three-folders"),
+        pytest.param([], True, "rc-2", None, id="legacy-flat-trio-counts-as-rc1"),
+    ],
+)
+def test_a_state_with_no_milestone_reads_the_folders(
+    tmp_path: Path, folders: list[int], flat: bool, next_rc: str, current_rc: str | None
+) -> None:
+    for n in folders:
+        (tmp_path / f"rc-{n}").mkdir()
+    if flat:
+        (tmp_path / "SPEC.md").write_text("flat")
+    state = {"phase": "CLOSURE", "log": []}
+    assert _release_schema.next_candidate(tmp_path, state) == tmp_path / next_rc
+    assert _release_schema.next_candidate(tmp_path, None) == tmp_path / next_rc
+    assert _release_schema.current_candidate(tmp_path, state) == (
+        tmp_path / current_rc if current_rc else None
+    )

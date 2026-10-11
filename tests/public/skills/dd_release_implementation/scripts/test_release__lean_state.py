@@ -424,3 +424,17 @@ def test_origin_refuses_a_malformed_line_with_one_fix_line(script: Path, tmp_pat
     assert refused.stdout == ""
     assert refused.stderr.startswith("Error: ")
     assert len([row for row in refused.stderr.splitlines() if row.startswith("fix:")]) == 1
+
+
+def test_new_on_a_milestone_less_closure_state_creates_the_next_candidate(
+    script: Path, tmp_path: Path
+) -> None:
+    specs = _specs(tmp_path)
+    release = _write_release(specs, phase="CLOSURE", log=[_entry("note", "Release 0.5.0 born")])
+    spec = release / "rc-1" / "SPEC.md"
+    closed = spec.read_bytes()
+    born = _run(script, "new", "0.5.0", "--specs", str(specs))
+    assert born.returncode == 0, born.stderr
+    assert f"{release}/rc-2/SPEC.md" in born.stdout
+    assert release.joinpath("rc-2/SPEC.md").is_file()
+    assert spec.read_bytes() == closed
