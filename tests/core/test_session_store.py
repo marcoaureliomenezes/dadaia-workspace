@@ -107,3 +107,31 @@ def test_gc_check_assembly_has_one_home() -> None:
     pkg_root = Path(dadaia_workspace.__file__).parent
     offenders = [p for p in pkg_root.rglob("*.py") if "gc_check" in p.read_text(encoding="utf-8")]
     assert offenders == []
+
+
+@pytest.mark.parametrize(
+    ("name", "valid"),
+    [("a_b-C9", True), ("_", True), ("-", True), ("a b", False), ("a.b", False), ("", False)],
+)
+def test_context_name_rule_is_the_spec_context_rule(name: str, valid: bool) -> None:
+    """AC16.1: one context-name rule; the twin pattern here is deleted in J3.T4."""
+    from dadaia_workspace.core.models.spec_context import CONTEXT_NAME_RE
+
+    assert bool(CONTEXT_NAME_RE.fullmatch(name)) is valid
+    assert bool(si._NAME_RE.fullmatch(name)) is valid
+
+
+def test_naive_heartbeat_reads_as_utc_in_any_zone(monkeypatch: pytest.MonkeyPatch) -> None:
+    """AC16.1: ``2026-10-11T04:00:00`` is 04:00 UTC whatever the local zone."""
+    tzset = getattr(__import__("time"), "tzset", None)
+    if tzset is None:
+        pytest.skip("time.tzset is absent on Windows; the zone cannot be pinned")
+    monkeypatch.setenv("TZ", "America/Sao_Paulo")
+    tzset()
+    try:
+        record = {si.SESSION_HEARTBEAT_FIELD: "2026-10-11T04:00:00"}
+        assert si.is_live(record, clock=lambda: datetime(2026, 10, 11, 5, tzinfo=UTC))
+        assert not si.is_live(record, clock=lambda: datetime(2026, 10, 12, 5, tzinfo=UTC))
+    finally:
+        monkeypatch.undo()
+        tzset()

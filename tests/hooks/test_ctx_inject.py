@@ -421,3 +421,23 @@ def test_hook_lane_cost_does_not_grow_with_the_registry(
         for n in (2, 20)
     )
     assert twenty == two
+
+
+def test_naive_bound_at_reads_as_utc_in_any_zone(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """AC16.1: a ``bound_at`` without an offset is UTC, as ``session_store.is_live`` reads it."""
+    import time
+
+    from dadaia_workspace.hooks import ctx_inject
+
+    if not hasattr(time, "tzset"):
+        pytest.skip("time.tzset is absent on Windows; the zone cannot be pinned")
+    monkeypatch.setenv("TZ", "America/Sao_Paulo")
+    time.tzset()
+    try:
+        session_store.write_session(tmp_path, "s1", {"bound_at": "2026-10-11T04:00:00"})
+        assert ctx_inject._session_bound_at(tmp_path, "s1") == 1791691200.0
+    finally:
+        monkeypatch.undo()
+        time.tzset()
