@@ -17,6 +17,7 @@ from _release_schema import (  # noqa: E402
     CANDIDATE_DOCS,
     SHA_RE,
     STATE,
+    candidate_number,
     current_job_writes,
     current_plan_jobs,
     extract_status,
@@ -54,8 +55,8 @@ def _refuse_unapproved_docs(live: Live) -> Path:
 
 
 def _refuse_open_worktrees(specs: Path) -> None:
-    """ADR 0128 (4): a candidate closes with every `wt/*` of its repo merged or cleaned — read
-    from the owner's rows (imported, ADR 0135), sparing the tree closure runs from."""
+    """ADR 0128 (4), ADR 0241: closure waits for every open `wt/*` of the repo except its own
+    tree and the next candidate's define tree — read from the owner's rows (imported, ADR 0135)."""
     from _ledger import workspace_of
 
     root = workspace_of(specs)
@@ -73,8 +74,8 @@ def _refuse_open_worktrees(specs: Path) -> None:
     except WorktreeRefusal as error:
         raise Refusal(f"worktree rows unreadable: {error}", error.fix) from error
     repo = Path(top[1]).parent.name
-    live = live_release(specs)  # ADR 0241: rc N+1's define tree stays open across rc N's closure
-    nxt = f"{live.release_id}-rc{int(str(live.candidate.name)[3:]) + 1}"  # type: ignore[union-attr]
+    live = live_release(specs)
+    nxt = f"{live.release_id}-rc{(candidate_number([live.candidate.name] if live.candidate else []) or 1) + 1}"
     held = [r for r in found if r["repo"] == repo and r["exit"]
             and not ((m := NAME_RE.match(str(r.get("name")))) and (m["rc"], m["job"]) == (nxt, "define"))
             and Path(str(r["path"])).resolve() != Path(top[0]).resolve()]  # fmt: skip
