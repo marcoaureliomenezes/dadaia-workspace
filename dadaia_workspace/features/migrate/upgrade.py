@@ -15,6 +15,7 @@ from pathlib import Path
 
 from dadaia_workspace.core import specs_version as _version
 from dadaia_workspace.core.atomic_write import atomic_write
+from dadaia_workspace.core.cli_line import fix_line
 from dadaia_workspace.core.exceptions import DadaiaError
 from dadaia_workspace.core.frontmatter import FRONTMATTER_RE
 from dadaia_workspace.core.gitflow import candidate_dir, merge_frontmatter, next_candidate
@@ -65,8 +66,8 @@ def upgrade(
     if architecture.is_file() and _RETIRED_PART_HEADING in architecture.read_text("utf-8"):
         raise UpgradeRefused(
             f"{architecture} is two-tier ({_RETIRED_PART_HEADING!r}): nowhere safe to fold into.",
-            f"Operator action: rewrite its headings as ## Principles / ## Tech Stack / "
-            f"## Structure, then re-run `dadaia specs upgrade --specs-dir {specs_dir}`.",
+            "Operator action: rewrite its headings as ## Principles / ## Tech Stack / "
+            f"## Structure, then re-run `{fix_line(None, 'specs', 'upgrade', '--specs-dir', str(specs_dir))}`.",
         )
 
     if dry_run:
