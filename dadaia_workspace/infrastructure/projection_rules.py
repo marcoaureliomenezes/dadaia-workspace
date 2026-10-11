@@ -303,20 +303,6 @@ HOOK_RULE_BUILDERS: dict[
 }
 
 
-def harnesses_with_a_hook_derivation() -> frozenset[str]:
-    """The registered harnesses whose hook format renders something today.
-
-    A deterministic behaviour reaches a harness only through its hook derivation, so
-    this is what the entity registry may claim an implementation for. Derived from the
-    builder table, never listed: a format that grows a builder joins the set for free.
-    """
-    return frozenset(
-        name
-        for name, record in HARNESS_RECORDS.items()
-        if HOOK_RULE_BUILDERS[record.hooks] is not no_rules
-    )
-
-
 #: The doctor residue a byte-compare cannot express, per :class:`HookFormat`.
 _HOOK_CHECKS: dict[HookFormat, Callable[[HarnessRecord, Path], list[DoctorLine]]] = {
     HookFormat.CLAUDE_SETTINGS: _settings_merge_checks,
