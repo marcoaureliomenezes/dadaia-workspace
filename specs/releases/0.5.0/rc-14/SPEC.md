@@ -71,6 +71,8 @@ Operator: "Tudo, sem rename (Recommended)". The skill keeps the name `dd-grill-m
 
 Operator: "Triagem + gerada (Recommended)", "ADR que supersede (Recommended)", "Ratificar os 4 (Recommended)".
 
+Scope note (main thread, 2026-10-11): the entry's clause "an ADR is born only in `dd-release-definition`; `decisions.jsonl` leaves the backlog kind's allowed set and its gitflow row" is dropped. It was an unruled agent default, and the three-leg threshold already serves the operator's "Se tudo é ADR nada é ADR". FR2 does not depend on that clause: `options` and a self-contained `ruling.words` stay. Part (c), ADR 0193's `amends: null`, goes to the Wave 4 ledger triage (§5).
+
 - AC2.1 (no test — reviewer source sweep): The scaffold ADR law (projected to `specs/ADRs/AGENTS.md`) states the three-leg threshold in one line: a one-way door, architecturally significant, at least two genuine options. A decision that fails a leg lives in its scoped law line or the SPEC (ADR 0245 (1)).
 - AC2.2 (unit, RED first): `decision-record-v1` carries `options`: at least two entries of `name`, `tradeoff` and `rejected_because`. Doctor `LEDGER-ADR-SCHEMA` refuses a record proposed after ADR 0245's acceptance if it has no `options`. Every record already in the ledger still validates.
 - AC2.3 (no test — law line and schema description): `ruling.words` carries the question and the chosen option in the operator's words, never only an answer id.
@@ -196,13 +198,13 @@ These Origin entries need no rc-14 work. Each exits once, at closure, with the r
 | `quality-scorecard-ruler` | superseded | the 2026-10-09 score-9 ruling, ADR 0239 |
 | `task-lines-carry-seam-and-adr-clause` | superseded | job file slimmed by 2026-10-08 questions 12 and 15; ADRs 0231/0232 |
 
-The entries with work exit `delivered` at closure, except `architecture-adr-section-generated` (FR3), which stays active for Wave 4.
+The entries with work exit `delivered` at closure, except `architecture-adr-section-generated` (FR3), which stays active for Wave 4. `law-one-home-residual` exits `delivered` with this reason: (a) delivered by FR2, with its location clause dropped as an unruled agent default; (b) and (c) carried by `architecture-adr-section-generated`'s Wave 4 triage.
 
 ## 5. Not in rc-14
 
 - **Wave 2:** `skill-scripts-one-kernel`, complete. Its two named bugs are fixed here (FR11, FR12). The kernel still owes one `_RELEASE.json` reader, which today means two readers after FR11, and constitution §5 read literally.
 - **Wave 3:** `spec-context-branch-field-deleted`, `worktree-layout-per-context`, `context-dead-snapshots-open-worktrees`, `context-show-derives-worktrees` (FR17 fixes only the orphan finding; the one computation stays there), `export-soft-and-hard`, `init-from-export`, `multi-platform-by-construction-migration` (FR14 and FR19 are its bugs; the Python pre-push, P10 rules, the guard line and the P8 amendment stay there), `bug-stats-hotspots-and-age`, `audit-project-scorecard-cycle`, `repo-ci-sast-gates`.
-- **Wave 4:** `architecture-adr-section-generated` (triage and generated section), `docs-site-zensical-pages`, `launch-operator-acts`, `eval-codex-lane-in-library-ci` (with the cron deletion), and `promote-gate-050` (the 050 checks, D1–D10, findings dispositions, rc-13 residuals of log entry 188).
+- **Wave 4:** `architecture-adr-section-generated` (triage and generated section; the triage also repairs ADR 0193, which carries `amends: null` though it amends 0152 (2), through a new record the operator accepts), `docs-site-zensical-pages`, `launch-operator-acts`, `eval-codex-lane-in-library-ci` (with the cron deletion), and `promote-gate-050` (the 050 checks, D1–D10, findings dispositions, rc-13 residuals of log entry 188).
 - **Not destined to 0.5.0** (ADR 0242): `evals-benchmark-lanes`, `release-approve-requires-evals-gate`, `windows-smoke-t1-at-release`.
 - **Out of the picked entries:** the rename to `dd-ask-me` (FR1); the `behavior-map.json` deletion, which is unruled (FR9); the gate-side test selection (FR10).
 
@@ -249,5 +251,4 @@ The entries with work exit `delivered` at closure, except `architecture-adr-sect
 
 ## 7. Open questions
 
-1. The 2026-10-11 grill did not re-rule part of `law-one-home-residual`: "an ADR is born only in `dd-release-definition`", where `decisions.jsonl` leaves the backlog tree's allowed set and its §3a row, and (c) ADR 0193's missing `amends`. The entry exits at rc-14's closure. Should these go to the operator now, or to a new backlog entry at closure? The default is the backlog entry, so nothing is lost.
-2. 856 `BUGS.jsonl` records still carry `found_in`, which `bug-record-v1` (closed) does not declare, and `bugs.py check` exits 0 on a record with an unknown key. This is a candidate `bug-proposal:` for the main thread, and is not rc-14 scope until it is confirmed.
+None.
