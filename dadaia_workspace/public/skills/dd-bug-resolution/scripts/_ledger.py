@@ -41,13 +41,12 @@ _SCHEMA_OWNERS = {
 
 
 def load_schema(name: str) -> dict[str, Any]:
-    """``schemas/<name>.schema.json`` beside the script, else its writer skill's, else the shipped one."""
-    own = _HERE / "schemas" / f"{name}.schema.json"
+    """``<name>.schema.json`` from its writer skill's ``scripts/schemas/``, else the shipped tree."""
+    file = f"{name}.schema.json"
     if name in _SCHEMA_OWNERS:
-        owned = _HERE.parents[1] / _SCHEMA_OWNERS[name] / "scripts" / "schemas" / own.name
-        path = own if own.is_file() else owned
+        path = _HERE.parents[1] / _SCHEMA_OWNERS[name] / "scripts" / "schemas" / file
     else:
-        path = own if own.is_file() else next((_HERE.parents[2] / "schemas").rglob(own.name), own)
+        path = next((_HERE.parents[2] / "schemas").rglob(file), _HERE / "schemas" / file)
     return dict(json.loads(path.read_text("utf-8")))
 
 

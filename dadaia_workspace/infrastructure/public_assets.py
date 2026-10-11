@@ -67,54 +67,6 @@ __all__ = [
 ]
 
 
-#: A skill script enforces a shipped schema from its OWN copy beside it.
-#: ``stage`` copies the file in (never a symlink: it dies on Windows and in a zipped
-#: skill; never an import: that is the coupling a self-contained script forbids), so the copy travels with
-#: the staged skill folder and is projected and hash-checked with it. One line per
-#: (shipped schema, skill script directory) pair.
-_SKILL_SCRIPT_SCHEMAS: tuple[tuple[str, str], ...] = (
-    (
-        "skills/dd-backlog-definition/scripts/schemas/histo-record-v1.schema.json",
-        "skills/dd-release-implementation/scripts/schemas",
-    ),
-    (
-        "skills/dd-backlog-definition/scripts/schemas/histo-record-v1.schema.json",
-        "skills/dd-audit-project/scripts/schemas",
-    ),
-)
-
-
-#: The shared ledger modules each ledger script runs from its OWN copy beside it, the
-#: same way (``_ledger.py`` imports ``_privacy.py``, the push gate's own matcher). (package-relative source, ``public/``-relative target).
-_SKILL_SCRIPT_SHARED: tuple[tuple[str, str], ...] = tuple(
-    (src, f"skills/{skill}/scripts/{name}")
-    for skill in (
-        "dd-bug-resolution",
-        "dd-backlog-definition",
-        "dd-audit-project",
-        "dd-cli-library",
-        "dd-spec-navigator",
-        "dd-release-implementation",
-    )
-    for src, name in (
-        ("public/skills/dd-bug-resolution/scripts/_privacy.py", "_privacy.py"),
-        ("public/skills/dd-bug-resolution/scripts/privacy_baseline.json", "privacy_baseline.json"),
-        ("public/skills/dd-bug-resolution/scripts/_ledger.py", "_ledger.py"),
-        ("public/skills/dd-bug-resolution/scripts/_specs.py", "_specs.py"),
-        ("public/skills/dd-bug-resolution/scripts/_root.py", "_root.py"),
-        ("public/skills/dd-bug-resolution/scripts/_platform.py", "_platform.py"),
-        ("public/skills/dd-bug-resolution/scripts/_atomic.py", "_atomic.py"),
-        ("public/skills/dd-bug-resolution/scripts/_git.py", "_git.py"),
-        ("public/skills/dd-bug-resolution/scripts/_jsonl.py", "_jsonl.py"),
-        ("public/skills/dd-bug-resolution/scripts/_findings.py", "_findings.py"),
-        ("public/skills/dd-bug-resolution/scripts/_commit.py", "_commit.py"),
-        ("public/skills/dd-bug-resolution/scripts/_refusal.py", "_refusal.py"),
-        ("public/skills/dd-bug-resolution/scripts/_grammar.py", "_grammar.py"),
-    )
-    if not src.endswith(f"{skill}/scripts/{name}")
-)
-
-
 def _staged_bytes(src: Path) -> bytes:
     """What ``stage`` writes for the public asset *src* and what ``doctor`` compares the
     staged copy against: every Markdown rule asset with its registry tables rendered,
@@ -188,22 +140,6 @@ class FileSystemPublicAssetManager:
                 dst.parent.mkdir(parents=True, exist_ok=True)
                 shutil.copy2(src, dst)
             staged.append(f"[stage] {agentic_dir / name}")
-
-        for schema_rel, scripts_rel in _SKILL_SCRIPT_SCHEMAS:
-            schema_src = self._public_dir / schema_rel
-            if not schema_src.exists():
-                continue
-            dst = agentic_dir / scripts_rel / Path(schema_rel).name
-            dst.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copy2(schema_src, dst)
-            staged.append(f"[stage] {dst}")
-
-        for src_rel, dst_rel in _SKILL_SCRIPT_SHARED:
-            if not (self._public_dir.parent / src_rel).exists():
-                continue
-            dst = agentic_dir / dst_rel
-            shutil.copy2(self._public_dir.parent / src_rel, dst)
-            staged.append(f"[stage] {dst}")
 
         for src in self._staged_sources():
             expected = _staged_bytes(src)
