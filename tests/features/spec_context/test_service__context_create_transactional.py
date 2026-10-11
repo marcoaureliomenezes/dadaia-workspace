@@ -162,7 +162,7 @@ def test_only_a_checkout_of_the_url_is_adopted(ws: Path, tmp_path: Path) -> None
 
 def test_refusal_fix_lines_never_repeat_the_failing_command(ws: Path, tmp_path: Path) -> None:
     """G3/G4/G6 — a bad URL fixes to an operator action naming it, an owned slug to
-    `context list`."""
+    its owner."""
     bad = tmp_path / "nothere.git"
     code, out = _create("bad", "--main-repo", str(bad))
     assert code == 1
@@ -174,7 +174,9 @@ def test_refusal_fix_lines_never_repeat_the_failing_command(ws: Path, tmp_path: 
     assert _create("--main-repo", str(second))[0] == 0
     code, out = _create("bad", "--main-repo", str(second))
     assert code == 1
-    assert out.splitlines()[-1].endswith("context list")
+    last = out.splitlines()[-1]
+    assert last.endswith("coordinate with 'second'")
+    assert "context list" not in last
 
 
 def test_the_created_line_is_one_line_and_the_next_step_is_the_new_contexts(
