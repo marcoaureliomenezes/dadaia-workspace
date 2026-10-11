@@ -73,3 +73,29 @@ def test_the_closure_waits_for_no_worktree_of_a_fenced_workspace(
     wait = load_owner("dd-release-implementation", "_release_phase")._refuse_open_worktrees
     monkeypatch.setenv("DADAIA_FENCED_ROOTS", str(ws))
     assert wait(ws / "repos/r/specs") is None
+
+
+@pytest.mark.parametrize(
+    ("other", "spared"),
+    [("0.5.0-rc2/define", True), ("0.5.0-rc1/j1", False), ("0.5.0-rc3/define", False)],
+)
+def test_the_closure_spares_only_the_next_candidates_define_tree(
+    ws: Path, other: str, spared: bool
+) -> None:
+    """release-closure-refuses-the-next-candidates-define-tree: rc 2 is drafted in its define
+    tree while rc 1 implements (releases law), so rc 1's closure waits for every other open tree
+    but that one."""
+    git(ws / "repos/r", "checkout", "-q", "feature/0.5.0")
+    for name in ("0.5.0-rc1/reconcile", other):
+        assert run(ws, "new", "r", name).returncode == 0
+        tree = ws / "worktrees/r" / name
+        (tree / "draft.scratch.md").write_text("x\n")
+        git(tree, "add", "-f", "draft.scratch.md")
+        git(tree, "commit", "-qm", "draft")
+    wait = load_owner("dd-release-implementation", "_release_phase")._refuse_open_worktrees
+    reconcile_specs = ws / "worktrees/r/0.5.0-rc1/reconcile/specs"
+    if spared:
+        assert wait(reconcile_specs) is None
+    else:
+        with pytest.raises(Exception, match=r"repos/r still holds 1 open wt/\* worktree\(s\)"):
+            wait(reconcile_specs)
