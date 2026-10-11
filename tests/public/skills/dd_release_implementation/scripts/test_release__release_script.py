@@ -29,8 +29,6 @@ _GOOD = "## 1. As-is review\n\n## 2. Strategy\n"
 
 @pytest.fixture
 def script(tmp_path: Path) -> Path:
-    for skill in ("dd-spec-navigator", "dd-bug-resolution"):
-        stage_skill_scripts(skill, tmp_path / "skills" / skill / "scripts")
     return (
         stage_skill_scripts(
             "dd-release-implementation",

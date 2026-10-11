@@ -41,12 +41,6 @@ _TS = "2026-09-22T00:00:00Z"
 def script(tmp_path: Path) -> Path:
     """The staged shape: release.py with both schema copies beside it, and the spec
     navigator's scripts projected as its sibling skill (the drift decider it imports)."""
-    for skill in (
-        "dd-spec-navigator",
-        "dd-gitflow-default",
-        "dd-bug-resolution",
-    ):  # the siblings it imports
-        stage_skill_scripts(skill, tmp_path / "skills" / skill / "scripts")
     return (
         stage_skill_scripts(
             "dd-release-implementation",

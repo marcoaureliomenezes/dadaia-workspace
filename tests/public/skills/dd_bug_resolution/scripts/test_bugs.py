@@ -55,9 +55,6 @@ _OPEN_RECORD: dict[str, object] = {
 @pytest.fixture
 def script(tmp_path: Path) -> Path:
     """The staged shape: bugs.py with its schema copy beside it, `candidate_at`'s skill beside its own."""
-    stage_skill_scripts(
-        "dd-release-implementation", tmp_path / "dd-release-implementation" / "scripts"
-    )
     return stage_skill_scripts("dd-bug-resolution", tmp_path / "staged" / "scripts") / "bugs.py"
 
 
@@ -585,23 +582,6 @@ def test_the_seam_verdict_equals_the_push_verdict_over_the_published_ledger(
     push_refuses = bool(scan_objects([blob], [("acme", "client")], load_baseline_patterns()).hits)
     assert push_refuses is pushed
     assert (done.returncode == 1) is pushed, done.stderr
-
-
-def test_every_ledger_skill_stages_a_byte_identical_privacy_pair(tmp_path: Path) -> None:
-    """sa-ledger-write-seam-redacts-less-than-push-refuses#B6: every ledger skill carries a
-    byte-identical _privacy.py (the push matcher's module) and baseline copy."""
-    from dadaia_workspace.infrastructure.public_assets import FileSystemPublicAssetManager
-
-    FileSystemPublicAssetManager().stage(tmp_path)
-    own = _PUBLIC / "skills" / "dd-bug-resolution" / "scripts"
-    for skill in ("dd-bug-resolution", "dd-backlog-definition"):
-        scripts = tmp_path / ".dadaia" / "agentic" / "skills" / skill / "scripts"
-        assert (scripts / "_privacy.py").read_bytes() == (
-            own / "_privacy.py"
-        ).read_bytes()
-        assert (scripts / "privacy_baseline.json").read_bytes() == (
-            own / "privacy_baseline.json"
-        ).read_bytes()
 
 
 def test_resolve_closes_the_record_at_its_own_instant(script: Path, tmp_path: Path) -> None:

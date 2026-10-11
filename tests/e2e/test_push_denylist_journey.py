@@ -123,9 +123,6 @@ def test_a_record_whose_context_carries_a_published_term_registers_and_pushes(
     origin already holds is accepted by the ledger seam AND by the installed pre-push."""
     from tests.helpers.skill_scripts import stage_skill_scripts
 
-    stage_skill_scripts(
-        "dd-release-implementation", tmp_path / "dd-release-implementation" / "scripts"
-    )
     bugs = stage_skill_scripts("dd-bug-resolution", tmp_path / "staged" / "scripts") / "bugs.py"
     repo, bare = _init_repo_and_remote(tmp_path, _SLUG)
     (repo / "cli").mkdir()

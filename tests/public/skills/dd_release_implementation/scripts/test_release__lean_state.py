@@ -19,8 +19,6 @@ _TS = "2026-10-08T12:00:00Z"
 
 @pytest.fixture
 def script(tmp_path: Path) -> Path:
-    for skill in ("dd-spec-navigator", "dd-gitflow-default", "dd-bug-resolution"):
-        stage_skill_scripts(skill, tmp_path / "skills" / skill / "scripts")
     return (
         stage_skill_scripts(
             "dd-release-implementation",

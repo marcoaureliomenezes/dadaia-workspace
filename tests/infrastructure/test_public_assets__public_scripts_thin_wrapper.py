@@ -10,15 +10,13 @@ from __future__ import annotations
 
 import ast
 import os
+import re
 import subprocess
 import sys
 from pathlib import Path
 
 import pytest
 
-from dadaia_workspace.infrastructure.public_assets import (
-    _SKILL_SCRIPT_SHARED,  # allow-private-import: the staged siblings of a ledger script
-)
 from tests.helpers.scan_population import assert_populated
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -49,28 +47,34 @@ def _imported_roots(path: Path) -> set[str]:
     return roots
 
 
-#: The cross-skill import edges, each a read-only use of the grammar's one owner (ADR
-#: 0135): the release skill reads the navigator's drift decider and, at closure, the
-#: worktrees' rows; the worktree script reads the release skill's trio status parser and
-#: the backlog exit its Origin parser (ADR 0161) and the bug reader (ADR 0137); `_specs`
-#: reads the worktree name grammar (``NAME_RE``). No module imports back along its own edge.
+_KERNEL = _SKILLS_DIR / "dd-bug-resolution" / "scripts"
+_KERNEL_MODULES = {module.stem for module in _KERNEL.glob("*.py")}
+
+#: The cross-skill import edges PLAN 1.5 lists as surviving (ADR 0246 allows only the kernel
+#: edge): backlog reads the release Origin parser (Job 11), release reads the worktree rows and
+#: the navigator's drift decider at the closure fence (Job 12).
 _CROSS_SKILL_EDGES = {
-    "dd-release-implementation": {
-        "_memory_drift",
-        "_worktree_git",
-        "_worktree_names",
-        "_jsonl",
-        "_refusal",
-    },
-    "dd-gitflow-default": {
-        "_git",
-        "_grammar",
-        "_jsonl",
-        "_specs",
-    },  # `_specs`: the fix-line quote; `_git`: the one runner; `_jsonl`: the state reader
-    "dd-backlog-definition": {"_release_schema", "_bugs_store"},
-    "dd-bug-resolution": {"_release_schema", "_worktree_names"},
+    "dd-release-implementation": {"_memory_drift", "_worktree_git", "_worktree_names"},
+    "dd-backlog-definition": {"_release_schema"},
 }
+
+#: The `sys.path` lines that serve a surviving edge, by module; each names the skill it reaches.
+_EDGE_PATH_LINES = {
+    "dd-backlog-definition/scripts/backlog.py": "dd-release-implementation",
+    "dd-release-implementation/scripts/_release_phase.py": "dd-gitflow-default",
+    "dd-release-implementation/scripts/_release_tree.py": "dd-spec-navigator",
+}
+
+
+def _path_statements(script: Path) -> list[str]:
+    """The source of every statement that edits `sys.path`."""
+    text = script.read_text(encoding="utf-8")
+    return [
+        ast.get_source_segment(text, node) or ""
+        for node in ast.walk(ast.parse(text))
+        if isinstance(node, ast.Expr | ast.Assign | ast.AugAssign)
+        and "sys.path" in (ast.get_source_segment(text, node) or "")
+    ]
 
 
 @pytest.mark.parametrize("script", _owner_scripts(), ids=lambda p: f"{p.parents[1].name}/{p.name}")
@@ -82,10 +86,12 @@ def test_skill_owner_script_meets_the_contract(script: Path) -> None:
     `sys.path`. A sibling is a module, not an entry point, so only the non-`_` scripts
     answer `--help`; everything else applies to every file under `scripts/`.
     """
-    siblings = {module.stem for module in script.parent.glob("*.py")}
     skill = script.parent.parent.name
-    siblings |= {Path(d).stem for _, d in _SKILL_SCRIPT_SHARED if d.startswith(f"skills/{skill}/")}
+    siblings = {module.stem for module in script.parent.glob("*.py")} | _KERNEL_MODULES
     siblings |= _CROSS_SKILL_EDGES.get(skill, set())
+    if skill == _KERNEL.parent.name:
+        # rule 1: a kernel module imports only the stdlib and kernel siblings
+        siblings = {module.stem for module in script.parent.glob("*.py")}
     foreign = _imported_roots(script) - set(sys.stdlib_module_names) - siblings
     assert foreign == set(), (
         f"{script.name} imports non-stdlib module(s) {sorted(foreign)} — a skill script "
@@ -102,6 +108,22 @@ def test_skill_owner_script_meets_the_contract(script: Path) -> None:
         [sys.executable, str(script), "--help"], capture_output=True, text=True, check=False
     )
     assert done.returncode == 0, f"{script.name} --help exited {done.returncode}: {done.stderr}"
+
+
+@pytest.mark.parametrize("script", _owner_scripts(), ids=lambda p: f"{p.parents[1].name}/{p.name}")
+def test_one_bootstrap_line_names_only_the_own_folder_and_the_kernel(script: Path) -> None:
+    """Rule 2: an entry point edits `sys.path` once, naming its folder and the kernel's; a
+    module edits it only for a surviving edge (PLAN 1.5)."""
+    rel = f"{script.parents[1].name}/scripts/{script.name}"
+    lines = _path_statements(script)
+    if rel in _EDGE_PATH_LINES:
+        lines = [ln for ln in lines if _EDGE_PATH_LINES[rel] not in ln]
+    if script.name.startswith("_"):
+        assert lines == []
+        return
+    assert len(lines) <= 1
+    skills = {m for ln in lines for m in re.findall(r"\"(dd-[a-z-]+)\"", ln)}
+    assert skills <= {_KERNEL.parent.name}
 
 
 def test_ledger_owner_scripts_expose_check() -> None:

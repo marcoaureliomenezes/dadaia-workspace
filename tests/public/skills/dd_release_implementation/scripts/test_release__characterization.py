@@ -72,8 +72,6 @@ def _run(
 
 
 def test_drift_memory_and_ship_pin_outputs_and_release_bytes(tmp_path: Path) -> None:
-    for skill in ("dd-spec-navigator", "dd-gitflow-default", "dd-bug-resolution"):
-        stage_skill_scripts(skill, tmp_path / "skills" / skill / "scripts")
     script = (
         stage_skill_scripts(
             "dd-release-implementation",
