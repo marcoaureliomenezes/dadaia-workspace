@@ -19,18 +19,11 @@ from typing import Any
 from _backlog_check import pair_findings
 from _backlog_schema import HISTO, LEDGER
 from _ledger import private_refusal, replace, stamp
+from _refusal import Refusal as Refusal
 from _specs import script
 
 Items = list[dict[str, Any]]
 SCRIPT = script(Path(__file__).parent / "backlog.py")
-
-
-class Refusal(Exception):
-    """A write this script refuses, carrying the one `fix:` line that unblocks it."""
-
-    def __init__(self, message: str, fix: str = "") -> None:
-        super().__init__(message)
-        self.fix = fix
 
 
 def read_active(path: Path) -> Items:

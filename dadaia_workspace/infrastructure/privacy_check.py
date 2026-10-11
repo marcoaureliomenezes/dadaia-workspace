@@ -17,6 +17,7 @@ from __future__ import annotations
 from collections.abc import Callable, Iterable
 from pathlib import Path
 
+from dadaia_workspace.core.exceptions import DadaiaError
 from dadaia_workspace.core.models.doctor_report import DoctorLine, DoctorStatus
 from dadaia_workspace.core.redaction import (
     BaselinePattern,
@@ -96,7 +97,10 @@ def load_baseline_patterns() -> tuple[_BaselinePattern, ...]:
     reused, not forked, so the push-range scan and the public-privacy doctor check stay
     a single source of truth for what counts as a structural privacy match.
     """
-    return _load_privacy_baseline()
+    try:
+        return _load_privacy_baseline()
+    except load_owner("dd-bug-resolution", "_refusal").Refusal as refusal:
+        raise DadaiaError(str(refusal), refusal.fix) from refusal
 
 
 def _check_baseline_exclude_rationale(
