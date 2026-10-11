@@ -15,7 +15,7 @@ from pathlib import Path
 
 sys.path.append(str(Path(__file__).resolve().parents[2] / "dd-bug-resolution" / "scripts"))
 
-from _git import git as git, scrubbed_env as _env  # noqa: E402  # isort: skip
+from _git import git as git, scrubbed_env as scrubbed_env  # noqa: E402  # isort: skip
 from _specs import git_line as git_line  # noqa: E402
 from _specs import head  # noqa: E402
 from _specs import quote as quote  # noqa: E402  (`as`: re-exported to the worktree verbs)
@@ -59,7 +59,7 @@ def cli(root: Path, *args: str, tree: Path | None = None) -> subprocess.Complete
     return run(
         [str(_exe(root)), *args],
         cwd=tree or root,
-        env=_env() | fence,
+        env=scrubbed_env() | fence,
         stdin=subprocess.DEVNULL,
         capture_output=True,
         text=True, encoding="utf-8", errors="replace",

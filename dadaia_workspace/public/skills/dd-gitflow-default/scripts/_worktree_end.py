@@ -20,7 +20,6 @@ from datetime import datetime
 from pathlib import Path
 
 from _worktree_git import (
-    _env,
     cli,
     cli_line,
     diff_sha256,
@@ -31,6 +30,7 @@ from _worktree_git import (
     quote,
     recorded_base,
     script,
+    scrubbed_env,
     work_version,
     workspace_of,
 )
@@ -170,7 +170,7 @@ def _gate(tree: Path, work: str, *, required: bool = True) -> None:
         raise Refusal(f"this repo declares no {key} command",
                       f"Operator action: add this repo's job gate as a {key} line to {agents} and commit it on {work}")  # fmt: skip
     venv = [root / ".dadaia/.venv" / d for d in ("bin", "Scripts")]  # the workspace's
-    env = _env() | {"PATH": os.pathsep.join([*map(str, venv), os.environ.get("PATH", "")])}
+    env = scrubbed_env() | {"PATH": os.pathsep.join([*map(str, venv), os.environ.get("PATH", "")])}
     try:
         command = shlex.split(declared)
         done = subprocess.run(command, cwd=tree, env=env, stdin=subprocess.DEVNULL,
@@ -232,7 +232,7 @@ def _checks(root: Path, tree: Path) -> Iterator[tuple[str, subprocess.CompletedP
     for skill, name in _LEDGERS:
         command = [sys.executable, str(skills / skill / "scripts" / name),
                    "check", "--specs", str(tree / "specs")]  # fmt: skip
-        yield name, subprocess.run(command, cwd=tree, env=_env(), stdin=subprocess.DEVNULL,
+        yield name, subprocess.run(command, cwd=tree, env=scrubbed_env(), stdin=subprocess.DEVNULL,
                                    capture_output=True, text=True, encoding="utf-8", errors="replace")  # fmt: skip
     yield "dadaia doctor", cli(root, "doctor", "--specs-dir", str(tree / "specs"), tree=tree)
 
