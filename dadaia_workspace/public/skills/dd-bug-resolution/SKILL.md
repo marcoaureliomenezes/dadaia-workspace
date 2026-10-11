@@ -17,6 +17,8 @@ compatibility: Standalone Agent Skill. Inside a dadaia-workspace (pip install da
 1. Inside a dadaia workspace, open `specs/bugs/AGENTS.md` (the area's scoped law) and follow it — its redaction rule
    covers the whole arc: commands, outputs, captured artifacts.
 2. Hotfix job or candidate scope: `specs/bugs/AGENTS.md` §2.
+3. Batch: fix on the rc bug window or at 20 registrations, whichever comes first; bugs that share a cause are fixed together.
+4. Cap: two fix attempts on one bug, then a fresh session with a written diagnosis.
 
 ## 2. The method — seven phases, each gated
 
