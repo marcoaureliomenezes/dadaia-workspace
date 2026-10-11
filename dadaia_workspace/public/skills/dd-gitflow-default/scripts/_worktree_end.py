@@ -11,7 +11,6 @@ from __future__ import annotations
 import fnmatch
 import json
 import os
-import shlex
 import shutil
 import subprocess
 import sys
@@ -19,10 +18,12 @@ from collections.abc import Iterator
 from datetime import datetime
 from pathlib import Path
 
+from _platform import venv_tool
 from _worktree_git import (
     cli,
     cli_line,
     diff_sha256,
+    dirty,
     flow_for,
     git,
     git_line,
@@ -56,7 +57,7 @@ def _target(root: Path, path: str) -> tuple[Path, Path, str, str]:
 
 
 def _refuse_dirty(tree: Path) -> None:
-    if git(tree, "status", "--porcelain").strip():
+    if dirty(tree):
         raise Refusal(
             f"{tree} has uncommitted changes",
             f"Operator action: commit them in their commit shape (`{git_line(tree, 'add', '-A')}`"
@@ -72,7 +73,7 @@ def _kept(tree: Path, verb: str, keep: list[str], drop: bool) -> list[str]:
         for line in git(tree, "status", "--porcelain", "-z", "--ignored").split("\0")
         if line.startswith("!! ")
     ]
-    # disposable without asking (ADR 0130): a tool cache directory or a *.pyc
+    # disposable without asking: a tool cache directory or a *.pyc
     precious = [
         p
         for p in ignored
@@ -153,10 +154,16 @@ def _declared(tree: Path, work: str, key: str) -> str:
     return next((ln.removeprefix(key).strip() for ln in lines if ln.startswith(key)), "")
 
 
+def _declared_argv(tree: Path, work: str, key: str) -> list[str]:
+    """The words of the `<key>` line: whitespace-split, no quoting rule, so a backslash path and
+    `;` or `$(...)` stay plain words; `[]` when absent."""
+    return _declared(tree, work, key).split()
+
+
 def _gate(tree: Path, work: str, *, required: bool = True) -> None:
     """Run *work*'s tracked `verify:` once; a plain tree may omit the declaration."""
     key = "verify:"
-    declared = _declared(tree, work, key)
+    command = _declared_argv(tree, work, key)
     root = workspace_of(tree)
     if root is None:
         raise Refusal(
@@ -164,19 +171,18 @@ def _gate(tree: Path, work: str, *, required: bool = True) -> None:
         )
     repo_name = tree.relative_to(root / "worktrees").parts[0]
     agents = root / "repos" / repo_name / "AGENTS.md"
-    if not declared:
+    if not command:
         if not required:
             return
         raise Refusal(f"this repo declares no {key} command",
                       f"Operator action: add this repo's job gate as a {key} line to {agents} and commit it on {work}")  # fmt: skip
-    venv = [root / ".dadaia/.venv" / d for d in ("bin", "Scripts")]  # the workspace's
-    env = scrubbed_env() | {"PATH": os.pathsep.join([*map(str, venv), os.environ.get("PATH", "")])}
+    env = scrubbed_env()
+    env["PATH"] = os.pathsep.join([str(venv_tool(root / ".dadaia/.venv", "python").parent), env.get("PATH", "")])  # fmt: skip
     try:
-        command = shlex.split(declared)
         done = subprocess.run(command, cwd=tree, env=env, stdin=subprocess.DEVNULL,
                               stderr=subprocess.STDOUT)  # fmt: skip
-    except (OSError, ValueError) as error:
-        raise Refusal(f"{key} {declared!r} cannot start: {error}",
+    except OSError as error:
+        raise Refusal(f"{key} {' '.join(command)!r} cannot start: {error}",
                       f"Operator action: make the {key} line of {agents} on {work} one argv list that starts:"
                       " it runs without a shell — no VAR=value prefix, no sh -c") from error  # fmt: skip
     if done.returncode:
@@ -185,13 +191,10 @@ def _gate(tree: Path, work: str, *, required: bool = True) -> None:
                       f"Operator action: make `{line}` exit 0 in {tree} and commit the fix in this worktree")  # fmt: skip
 
 
-def _is_test_path(path: str, declared: str) -> bool:
+def _is_test_path(path: str, globs: list[str]) -> bool:
     """Whether *path* is a declared test glob, or a built-in fallback when none is declared."""
-    if declared:
-        try:
-            return any(fnmatch.fnmatchcase(path, glob) for glob in shlex.split(declared))
-        except ValueError:
-            return False
+    if globs:
+        return any(fnmatch.fnmatchcase(path, glob) for glob in globs)
     name = Path(path).name
     return (
         path.startswith("tests/")
@@ -203,7 +206,7 @@ def _is_test_path(path: str, declared: str) -> bool:
 
 def _refuse_implementation_tests(tree: Path, onto: str, law: str) -> None:
     """Keep RED test commits separate from every non-test implementation commit."""
-    declared = _declared(tree, law, "tests:")
+    declared = _declared_argv(tree, law, "tests:")
     commits = git(tree, "rev-list", "--reverse", f"{onto}..HEAD").split()
     for commit in commits:
         subject = git(tree, "show", "-s", "--format=%s", commit).strip()
@@ -260,38 +263,43 @@ def _series(tree: Path, work: str, tip: str) -> list[tuple[str, str]]:
     ]
 
 
-def _check_approved(root: Path, tree: Path, work: str, name: str) -> None:
-    """The newest dd-code-reviewer handoffs whose `reviewed_sha` is a candidate sha decide: each must
-    be a valid APPROVED whose `diff_sha256` is HEAD's, read from the handoff
-    zone and from the reaper's hold of it. A candidate is a sha X of this branch's reflog whose (patch-id, message)
-    series over *work*..X equals HEAD's, in order (ADR 0168); X == HEAD is the degenerate case;
-    the reflog's base (series []) matches only an empty branch. Newest is the schema-required
-    `produced_at`, across every candidate (a newer verdict on a carried-over sha overrules an
-    older one on HEAD); the file name never orders. A missing, unparseable or offset-less
-    `produced_at` ranks newest and refuses; handoffs tied on the newest moment all decide, and
-    the fix names the first in path order that is not a valid APPROVED. An unreadable file
-    names no sha and is skipped."""
-    head = git(tree, "rev-parse", "HEAD").strip()
-    mine = _series(tree, work, head)
-    reflog = {head, *git(tree, "reflog", "--format=%H", branch(name), check=False).split()}
-    shas = {x for x in reflog if x == head or _series(tree, work, x) == mine}
-    named = []
+def _moment(data: dict[str, object]) -> float | None:
+    """The instant of a handoff's `produced_at`, `None` when missing, unparseable or offset-less."""
+    try:
+        at = datetime.fromisoformat(str(data.get("produced_at")))
+    except ValueError:
+        return None
+    return at.timestamp() if at.tzinfo else None
+
+
+def _reviews(root: Path, shas: set[str]) -> list[tuple[bool, float, str, dict[str, object]]]:
+    """(unparsed, moment, path, data) of every reviewer handoff naming one of *shas*, read from the
+    handoff zone and from the reaper's hold of it; an unreadable file names no sha and is skipped."""
+    found = []
     for handoff in [*root.glob(".dadaia/handoff/*/*.handoff.json"), *root.glob(".dadaia/reaped/*/.dadaia/handoff/*/*.handoff.json")]:  # fmt: skip
         try:
             data = json.loads(handoff.read_text(encoding="utf-8"))
         except (OSError, ValueError):
             continue
-        if (
-            isinstance(data, dict)
-            and data.get("agent") == REVIEWER
-            and str(data.get("reviewed_sha")) in shas
-        ):
-            try:
-                at = datetime.fromisoformat(str(data.get("produced_at")))
-                moment = at.timestamp() if at.tzinfo else None
-            except ValueError:
-                moment = None
-            named.append((moment is None, moment or 0.0, str(handoff), data))
+        if isinstance(data, dict) and data.get("agent") == REVIEWER and str(data.get("reviewed_sha")) in shas:  # fmt: skip
+            moment = _moment(data)
+            found.append((moment is None, moment or 0.0, str(handoff), data))
+    return found
+
+
+def _check_approved(root: Path, tree: Path, work: str, name: str) -> None:
+    """The newest dd-code-reviewer handoffs whose `reviewed_sha` is a candidate sha decide: each must
+    be a valid APPROVED whose `diff_sha256` is HEAD's. A candidate is a sha X of this branch's reflog
+    whose (patch-id, message) series over *work*..X equals HEAD's, in order; X == HEAD is the
+    degenerate case; the reflog's base (series []) matches only an empty branch. Newest is the
+    schema-required `produced_at`, across every candidate (a newer verdict on a carried-over sha
+    overrules an older one on HEAD); the file name never orders. A missing, unparseable or
+    offset-less `produced_at` ranks newest and refuses; handoffs tied on the newest moment all
+    decide, and the fix names the first in path order that is not a valid APPROVED."""
+    head = git(tree, "rev-parse", "HEAD").strip()
+    mine = _series(tree, work, head)
+    reflog = {head, *git(tree, "reflog", "--format=%H", branch(name), check=False).split()}
+    named = _reviews(root, {x for x in reflog if x == head or _series(tree, work, x) == mine})
     top = max((row[:2] for row in named), default=None)
     decided = sorted(row for row in named if row[:2] == top)
     invalid = next(

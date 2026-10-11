@@ -29,6 +29,11 @@ def diff_sha256(tree: Path, work: str, tip: str) -> str:
     return hashlib.sha256(git(tree, "diff-tree", "-r", "-z", "--full-index", base, tip).encode()).hexdigest()  # fmt: skip
 
 
+def dirty(tree: Path) -> bool:
+    """Whether *tree* holds an uncommitted change or an untracked file."""
+    return bool(git(tree, "status", "--porcelain").strip())
+
+
 def find_root() -> Path:
     """The workspace above the cwd, else above this script (it is projected inside one)."""
     root: Path | None = workspace_of(Path.cwd().resolve(), Path(__file__).resolve().parent)
