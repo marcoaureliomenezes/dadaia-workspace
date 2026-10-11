@@ -189,3 +189,49 @@ def test_a_current_plan_refuses_noncanonical_table_framing(separator: str) -> No
     _, errors = _release_schema.current_plan_jobs(plan)
     assert errors
     assert _release_schema.plan_errors(plan) == errors
+
+
+def _state(*stamps: tuple[int, str]) -> dict:
+    """A `release-state-v1` object whose log holds one `milestone` entry per stamp."""
+    return {
+        "log": [
+            {"ts": "2026-10-01T00:00:00Z", "agent": "main", "kind": "milestone",
+             "text": f"rc-{n} {slot}", "candidate": f"rc-{n}", "milestone": slot, "sha": "abc1234"}
+            for n, slot in stamps
+        ]
+    }  # fmt: skip
+
+
+@pytest.mark.parametrize(
+    ("folders", "files", "stamps", "expected"),
+    [
+        pytest.param([1, 2], [], [(1, "implemented")], "rc-2", id="closed-rc1-with-a-draft"),
+        pytest.param([1], [], [(1, "implemented")], "rc-2", id="closed-rc1-no-draft"),
+        pytest.param([1, 2], [], [(1, "implemented"), (2, "implemented")], "rc-3", id="two-closed"),
+        pytest.param(
+            [1], ["rc-9"], [(1, "implemented")], "rc-2", id="a-stray-file-changes-nothing"
+        ),
+        pytest.param([1, 2], [], [(1, "defined")], "rc-2", id="draft-cancelled-before-a-milestone"),
+    ],  # fmt: skip
+)
+def test_the_next_candidate_is_the_last_milestone_plus_one(
+    tmp_path: Path,
+    folders: list[int],
+    files: list[str],
+    stamps: list[tuple[int, str]],
+    expected: str,
+) -> None:
+    for n in folders:
+        (tmp_path / f"rc-{n}").mkdir()
+    if 2 in folders:
+        (tmp_path / "rc-2" / "SPEC.md").write_text("draft")
+    for name in files:
+        (tmp_path / name).write_text("")
+    assert _release_schema.next_candidate(tmp_path, _state(*stamps)) == tmp_path / expected
+
+
+def test_the_next_candidate_with_no_state_is_the_highest_folder_plus_one(tmp_path: Path) -> None:
+    for n in (1, 4):
+        (tmp_path / f"rc-{n}").mkdir()
+    (tmp_path / "rc-9").write_text("")
+    assert _release_schema.next_candidate(tmp_path, None) == tmp_path / "rc-5"
