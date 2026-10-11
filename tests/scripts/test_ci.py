@@ -161,6 +161,14 @@ def test_job_verify_is_the_fast_check() -> None:
     ]  # fmt: skip
 
 
+@pytest.mark.parametrize("job", ["task", "stage"])
+def test_only_the_job_level_exists(tmp_path: Path, job: str) -> None:
+    done = _ci(_checkout(tmp_path, {}), job)
+    assert done.returncode != 0
+    assert "--- " not in done.stdout  # an unknown job runs no step
+    assert f"KeyError: '{job}'" in done.stderr
+
+
 def test_pushes_use_linux_and_pull_requests_use_the_full_matrix() -> None:
     workflow = yaml.load(
         (_REPO / ".github/workflows/ci.yml").read_text("utf-8"), Loader=yaml.BaseLoader
