@@ -16,7 +16,7 @@ from dadaia_workspace.core.models.backlog import SubjectKind
 _SCHEMA = json.loads(
     (
         Path(__file__).resolve().parents[3]
-        / "dadaia_workspace/public/schemas/backlog/backlog-v1.schema.json"
+        / "dadaia_workspace/public/skills/dd-backlog-definition/scripts/schemas/backlog-v1.schema.json"
     ).read_text(encoding="utf-8")
 )
 _INTENT = Draft202012Validator({"$defs": _SCHEMA["$defs"], "$ref": "#/$defs/intent"})

@@ -71,7 +71,14 @@ def _ledger(root: Path, *records: dict[str, object]) -> Path:
     subprocess.run(["git", "init", "-q", str(root)], check=True)
     subprocess.run(["git", "-C", str(root), "add", "cli", ".github"], check=True)
     schema = json.loads(
-        (_PUBLIC / "schemas" / "bugs" / "bug-record-v1.schema.json").read_text(encoding="utf-8")
+        (
+            _PUBLIC
+            / "skills"
+            / "dd-bug-resolution"
+            / "scripts"
+            / "schemas"
+            / "bug-record-v1.schema.json"
+        ).read_text(encoding="utf-8")
     )
     required = set(schema["required"])
     shaped = [{**{key: None for key in required - record.keys()}, **record} for record in records]

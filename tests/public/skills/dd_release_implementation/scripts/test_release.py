@@ -25,8 +25,13 @@ from tests.helpers.skill_scripts import stage_skill_scripts
 _PUBLIC = Path(__file__).resolve().parents[5] / "dadaia_workspace" / "public"
 _SCRIPTS = _PUBLIC / "skills" / "dd-release-implementation" / "scripts"
 _SCHEMAS = (
-    _PUBLIC / "schemas" / "releases" / "release-state-v1.schema.json",
-    _PUBLIC / "schemas" / "histo" / "histo-record-v1.schema.json",
+    _SCRIPTS / "schemas" / "release-state-v1.schema.json",
+    _PUBLIC
+    / "skills"
+    / "dd-backlog-definition"
+    / "scripts"
+    / "schemas"
+    / "histo-record-v1.schema.json",
 )
 _TRIO = ("SPEC.md", "PLAN.md", "TASKS.md")
 _TS = "2026-09-22T00:00:00Z"

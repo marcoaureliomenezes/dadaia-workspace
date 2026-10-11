@@ -119,7 +119,7 @@ def _denied_lines(globs: tuple[str, ...], pattern: str, spare: str | None) -> li
         # sa-reviewer-persona-body-contradicts-its-tools#B4: ADDITIVE is the gate's path class only
         pytest.param(("public/agents/*.md",), r"ADDITIVE", None, id="persona-additive"),
         # help-texts-and-bug-schema-cite-behaviour-that-is-gone: the bug schema cites no retired verb
-        pytest.param(("public/schemas/bugs/bug-record-v1.schema.json",), r"dadaia bugs append|features/specs/schemas\.py", None, id="bug-schema-retired-verb"),
+        pytest.param(("public/skills/dd-bug-resolution/scripts/schemas/bug-record-v1.schema.json",), r"dadaia bugs append|features/specs/schemas\.py", None, id="bug-schema-retired-verb"),
         # sa-reaper-destroys-its-own-hold-before-ttl#B6
         pytest.param(("public/skills/dd-cli-library/SKILL.md",), r"without touching slop", None, id="expired-only-spares-slop"),
     ],

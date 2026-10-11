@@ -18,12 +18,13 @@ import pytest
 from jsonschema import Draft202012Validator
 
 _SCHEMAS = Path(__file__).resolve().parents[2] / "dadaia_workspace" / "public" / "schemas"
+_SKILLS = _SCHEMAS.parent / "skills"
 _PATHS = {
     "handoff": _SCHEMAS / "handoff-v1.schema.json",
-    "bug": _SCHEMAS / "bugs" / "bug-record-v1.schema.json",
-    "finding": _SCHEMAS / "audits" / "finding-record-v1.schema.json",
+    "bug": _SKILLS / "dd-bug-resolution/scripts/schemas/bug-record-v1.schema.json",
+    "finding": _SKILLS / "dd-audit-project/scripts/schemas/finding-record-v1.schema.json",
     "adr": _SCHEMAS / "ADRs" / "decision-record-v1.schema.json",
-    "release": _SCHEMAS / "releases" / "release-state-v1.schema.json",
+    "release": _SKILLS / "dd-release-implementation/scripts/schemas/release-state-v1.schema.json",
 }
 
 

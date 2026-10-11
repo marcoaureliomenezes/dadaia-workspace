@@ -55,6 +55,7 @@ from tests.helpers.scan_population import assert_populated
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
 _SCHEMAS = _REPO_ROOT / "dadaia_workspace" / "public" / "schemas"
+_SKILLS = _REPO_ROOT / "dadaia_workspace" / "public" / "skills"
 _PACKAGE = _REPO_ROOT / "dadaia_workspace"
 
 #: Zone names retired by 0.4.6 candidate 4 (SPEC FR1/FR9, architect C). A string literal
@@ -93,14 +94,18 @@ _CANONICAL_SETS: dict[str, frozenset[str]] = {
     "root": ROOT_ALLOWED_DIRS | ROOT_ALLOWED_FILES,
     "specs-canon": CANON_ROOT_MEMBERS,
     "phase": frozenset(
-        json.loads((_SCHEMAS / "releases/release-state-v1.schema.json").read_text("utf-8"))[
-            "properties"
-        ]["phase"]["enum"]
+        json.loads(
+            (
+                _SKILLS / "dd-release-implementation/scripts/schemas/release-state-v1.schema.json"
+            ).read_text("utf-8")
+        )["properties"]["phase"]["enum"]
     ),
     "ledger-disposition": frozenset(
-        json.loads((_SCHEMAS / "histo/histo-record-v1.schema.json").read_text("utf-8"))[
-            "properties"
-        ]["disposition"]["enum"]
+        json.loads(
+            (
+                _SKILLS / "dd-backlog-definition/scripts/schemas/histo-record-v1.schema.json"
+            ).read_text("utf-8")
+        )["properties"]["disposition"]["enum"]
     ),
     "trio": frozenset(RELEASE_ARTIFACTS),
     "gitflow-role": frozenset(typing.get_args(Role)),
@@ -109,7 +114,7 @@ _CANONICAL_SETS: dict[str, frozenset[str]] = {
 #: Each set's own defining module — the one place its names are spelled in bulk.
 _SET_HOME: dict[str, str] = {
     "phase": "dadaia_workspace/public/skills/dd-release-implementation/scripts/_release_schema.py",
-    "ledger-disposition": "dadaia_workspace/public/schemas/histo/histo-record-v1.schema.json",
+    "ledger-disposition": "dadaia_workspace/public/skills/dd-backlog-definition/scripts/schemas/histo-record-v1.schema.json",
     "trio": "dadaia_workspace/features/specs/doctor_common.py",
     "gitflow-role": "dadaia_workspace/core/gitflow.py",
 }
