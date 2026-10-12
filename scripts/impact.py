@@ -1,13 +1,15 @@
 """Which tests a change reaches: ``python scripts/impact.py`` prints ``test: <path>`` and
 ``unmapped: <path>`` (sorted) for the working tree against HEAD plus untracked files. A test
 is reached when it imports a changed module, directly or through others; a changed skill
-script reaches the tests in the mirrored ``tests/public/skills/dd_<x>/``. A developer read,
-called only by ``ci.py --changed``. Standard library only."""
+script reaches the tests in the mirrored ``tests/public/skills/dd_<x>/``. Paths given as
+arguments replace that read. A developer read, called by ``ci.py --changed`` and
+``mutate.py``. Standard library only."""
 
 from __future__ import annotations
 
 import ast
 import subprocess
+import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -37,7 +39,11 @@ def _imports(path: Path) -> set[str]:
 
 def main() -> None:
     changed = sorted(
-        {*_git("diff", "--name-only", "HEAD"), *_git("ls-files", "--others", "--exclude-standard")}
+        sys.argv[1:]
+        or {
+            *_git("diff", "--name-only", "HEAD"),
+            *_git("ls-files", "--others", "--exclude-standard"),
+        }
     )
     files = [
         p.relative_to(ROOT).as_posix()
