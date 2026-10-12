@@ -52,3 +52,4 @@ validates.
 - `.dadaia/agentic/schemas/handoff-v1.schema.json` — field list, types, enums,
   patterns, `schema_version` posture.
 - `python3 .agents/skills/dd-handoff-emitter/scripts/verdict.py --help` — the verdict writer's flags.
+- `python3 .agents/skills/dd-handoff-emitter/scripts/verdict.py stats <M.m.p>-rc<N>` — the candidate's verdict sequences, rejections and first-pass rejections.

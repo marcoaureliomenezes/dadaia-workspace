@@ -19,6 +19,7 @@ from collections.abc import Callable, Iterator
 from datetime import datetime
 from pathlib import Path
 
+from _handoffs import REVIEWER, reviewer_records
 from _platform import venv_tool
 from _worktree_git import (
     cli,
@@ -38,7 +39,6 @@ from _worktree_git import (
 )
 from _worktree_names import NAME_RE, SCRIPT, Refusal, branch, locate, non_code, plain, tree_path
 
-REVIEWER = "dd-code-reviewer"
 #: The ledger, trio and release checks a `define` or `backlog` merge runs, in this order.
 _LEDGERS = (("dd-bug-resolution", "bugs.py"), ("dd-backlog-definition", "backlog.py"),
             ("dd-release-implementation", "release.py"))  # fmt: skip
@@ -283,19 +283,15 @@ def _reviews(root: Path, shas: set[str]) -> list[tuple[bool, float, str, dict[st
     """(unparsed, moment, path, data) of every reviewer handoff naming one of *shas*, read from the
     handoff zone and from the reaper's hold of it; an unreadable file names no sha and is skipped."""
     found = []
-    for handoff in [*root.glob(".dadaia/handoff/*/*.handoff.json"), *root.glob(".dadaia/reaped/*/.dadaia/handoff/*/*.handoff.json")]:  # fmt: skip
-        try:
-            data = json.loads(handoff.read_text(encoding="utf-8"))
-        except (OSError, ValueError):
-            continue
-        if isinstance(data, dict) and data.get("agent") == REVIEWER and str(data.get("reviewed_sha")) in shas:  # fmt: skip
+    for handoff, data in reviewer_records(root):
+        if str(data.get("reviewed_sha")) in shas:
             moment = _moment(data)
             found.append((moment is None, moment or 0.0, str(handoff), data))
     return found
 
 
 def _check_approved(root: Path, tree: Path, work: str, name: str) -> None:
-    """The newest dd-code-reviewer handoffs whose `reviewed_sha` is a candidate sha decide: each must
+    """The newest reviewer handoffs whose `reviewed_sha` is a candidate sha decide: each must
     be a valid APPROVED whose `diff_sha256` is HEAD's. A candidate is a sha X of this branch's reflog
     whose (patch-id, message) series over *work*..X equals HEAD's, in order; X == HEAD is the
     degenerate case; the reflog's base (series []) matches only an empty branch. Newest is the

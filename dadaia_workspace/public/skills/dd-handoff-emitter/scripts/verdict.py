@@ -16,6 +16,8 @@ sys.path[:0] = [str(Path(__file__).resolve().parents[2] / "dd-bug-resolution" / 
 
 import _clock
 import _ledger
+import _root
+from _handoffs import REVIEWER, reviewer_records
 
 _CONTEXT = r"^[a-z0-9][a-z0-9-]*$"
 _WORKTREE = Path(__file__).resolve().parents[2] / "dd-gitflow-default" / "scripts" / "worktree.py"
@@ -43,7 +45,41 @@ def _body(text: str) -> dict[str, object] | str:
     return body
 
 
+def _stats(argv: list[str]) -> int:
+    """Count the verdict sequences of one candidate: a tree name's verdicts up to an APPROVED."""
+    parser = argparse.ArgumentParser(prog="verdict.py stats", description=_stats.__doc__)
+    parser.add_argument("rc", help="<M.m.p>-rc<N>")
+    rc = parser.parse_args(argv).rc
+    root = _root.workspace_of(Path.cwd())
+    if root is None:
+        return _refuse("no workspace above the current directory")
+    by_tree: dict[str, list[tuple[str, str]]] = {}
+    for _path, data in reviewer_records(root):
+        branch = str(data.get("scope", "")).partition("@")[0]
+        if branch.startswith(f"wt/{rc}/"):
+            by_tree.setdefault(branch, []).append(
+                (str(data.get("produced_at")), str(data.get("verdict")))
+            )
+    sequences = rejected_first = verdicts = rejected = 0
+    for trail in by_tree.values():
+        opening = True
+        for _at, verdict in sorted(trail):
+            verdicts += 1
+            rejected += verdict == "REJECTED"
+            if opening:
+                sequences += 1
+                rejected_first += verdict == "REJECTED"
+            opening = verdict == "APPROVED"
+    print(
+        f"sequences {sequences}\nverdicts {verdicts}\nrejected {rejected}\nfirst_pass_rejected {rejected_first}/{sequences}"
+    )
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
+    argv = sys.argv[1:] if argv is None else argv
+    if argv[:1] == ["stats"]:
+        return _stats(argv[1:])
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("path")
     parser.add_argument("--sha", required=True)
@@ -71,7 +107,7 @@ def main(argv: list[str] | None = None) -> int:
     now = _clock.now_iso()
     handoff = {
         "schema_version": "handoff-v1.2",
-        "agent": "dd-code-reviewer",
+        "agent": REVIEWER,
         "context": args.context,
         "produced_at": now,
         "verdict": args.verdict,
@@ -83,7 +119,7 @@ def main(argv: list[str] | None = None) -> int:
     }
     out = Path(bound["root"]) / ".dadaia/handoff" / args.context
     out.mkdir(parents=True, exist_ok=True)
-    target = out / f"{now.replace(':', '')}-dd-code-reviewer-{args.slug}.handoff.json"
+    target = out / f"{now.replace(':', '')}-{REVIEWER}-{args.slug}.handoff.json"
     try:
         with target.open("x", encoding="utf-8") as fh:
             fh.write(json.dumps(handoff, indent=2) + "\n")
