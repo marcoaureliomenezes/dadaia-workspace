@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""The one frontmatter grammar of the workspace (ADR 0246): a stdlib strict subset of YAML
+"""The one frontmatter grammar of the workspace: a stdlib strict subset of YAML
 that equals ``yaml.safe_load`` or refuses, never a silent difference.
 
 ``split(text)`` returns ``(block, body)`` or ``None``, with a BOM and CRLF normalised away.

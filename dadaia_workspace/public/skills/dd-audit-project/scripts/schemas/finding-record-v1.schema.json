@@ -73,7 +73,7 @@
         "<sha-A>"
       ],
       "claim": "fix-induced bug: the skip-detail leak rides the second render path the probe-gate fix introduced, and the probe-gate bug resolved without a structural cause",
-      "evidence": "git show <sha-A> -- dadaia_workspace/features/certification (second render path added); BUGS.jsonl codex-live-probe-gate-checks-presence-not-usability cause=null",
+      "evidence": "git show <sha-A> -- features/certification (second render path added); BUGS.jsonl codex-live-probe-gate-checks-presence-not-usability cause=null",
       "disposition": "open",
       "release": null,
       "reason": null

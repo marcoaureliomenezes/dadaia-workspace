@@ -10,7 +10,7 @@ STATES = Path(".dadaia") / "states"
 
 
 def fenced_roots() -> frozenset[Path]:
-    """The roots `DADAIA_FENCED_ROOTS` names: never resolved to (ADR 0088)."""
+    """The roots `DADAIA_FENCED_ROOTS` names: never resolved to."""
     return frozenset(
         Path(p).resolve() for p in os.environ.get("DADAIA_FENCED_ROOTS", "").split(os.pathsep) if p
     )

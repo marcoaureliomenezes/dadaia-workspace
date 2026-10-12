@@ -6,7 +6,7 @@ A pure function of the catalog's `sources`, `git diff --name-only <since>..HEAD`
 ls-files`; `release.py memory` imports :func:`report`, so no caller hands it a worklist.
 
 `sources` globs are matched with `fnmatch` over repo-relative POSIX paths, where `*` and
-`**` both cross `/`: a prefix glob (`dadaia_workspace/features/specs/**`) is the shape the
+`**` both cross `/`: a prefix glob (`features/specs/**`) is the shape the
 lint requires, and a wider match here can only ADD an atom to the worklist, never hide one.
 """
 

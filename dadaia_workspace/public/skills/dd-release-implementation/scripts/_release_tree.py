@@ -49,7 +49,7 @@ _POINTER = {
     "findings": ("dd-audit-project/scripts/audit.py",
                  "disposition {a} {i} --disposition resolved --release {r}"),
 }  # fmt: skip
-#: The one operator act for a record no verb can point back alone (ADR 0158: no placeholder).
+#: The one operator act for a record no verb can point back alone (no placeholder).
 _ACT = {
     "backlog": "backlog entry {i} already exited naming another release",
     "bugs": "resolve bug {i} (`bugs.py resolve {i}` "
@@ -61,7 +61,7 @@ _ACT = {
 def _trace(
     specs: Path, release: str, carried: dict[str, list[str]], summary: str = ""
 ) -> list[tuple[str, str, str, bool]]:
-    """Each carried id as ``(kind, id, standing, live)`` (ADR 0127), asked of its OWNING ledger,
+    """Each carried id as ``(kind, id, standing, live)``, asked of its OWNING ledger,
     live or archived: ``traced`` when its record points back to *release* (a delivered or
     superseded exit naming it, a to-bug exit whose bug stands, a bug resolved in it,
     rejected, or superseded by a bug that traces, a finding dispositioned to it, live or in
@@ -323,7 +323,7 @@ def tree_findings(specs: Path) -> list[dict[str, Any]]:
             (specs / HISTO).read_text(encoding="utf-8"), specs.resolve()
         )
     for path in sorted(releases.glob(f"_archive/*/{STATE}")):
-        # ADR 0152 (1): an archived state names its ship (F059). Not the live schema: the
+        # An archived state names its ship (F059). Not the live schema: the
         # 0.4.5-0.4.7 archives predate it (`ARCHIVED`, `rc`) and history is not rewritten.
         rel, act = path.relative_to(specs).as_posix(), f"rewrite {path.resolve()} as one JSON "
         try:

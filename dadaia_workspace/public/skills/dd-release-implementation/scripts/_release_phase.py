@@ -101,7 +101,7 @@ NEXT = {
 }
 #: `ship`'s one optional value no code knows: the promote PR's number, when the host has one.
 SHIP_PR = "with --pr set to the promote PR's number, when the host has one"
-#: What the operator supplies to each NEXT verb that the code cannot fill (ADR 0158).
+#: What the operator supplies to each NEXT verb that the code cannot fill.
 SUPPLY = {CLOSURE: SHIP_PR}
 
 
