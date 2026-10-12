@@ -1,5 +1,5 @@
 """Repository checks: the workflows, the release canon, canonical memory, the ADR ledger and
-the specs canon's git visibility (QUALITY P-30, P-32, P-33; ADRs 0025, 0176).
+the specs canon's git visibility.
 
 Each check reads tracked files of the tree it is given; ``CONTROL`` copies the library's own
 tracked files, so a green control is the checkout's truth and every plant edits one line.
@@ -136,7 +136,7 @@ def _hits(rules: dict[str, bool], where: str) -> list[str]:
 
 
 def _model_markers(tree: Tree, p: str, doc: dict[Any, Any]) -> list[str]:
-    """P-33: outside ``eval.yml``, no ``anthropics/*`` action, model secret or endpoint."""
+    """Outside ``eval.yml``, no ``anthropics/*`` action, model secret or endpoint."""
     jobs = _jobs(doc).values()
     steps = [str(s.get("uses", "")) for j in jobs for s in j.get("steps") or []]
     calls = [str(j.get("uses", "")) for j in jobs]
@@ -283,9 +283,9 @@ def _cli_pin(tree: Tree, doc: dict[Any, Any]) -> list[str]:
 
 
 def no_model_calls_in_ci(tree: Tree) -> list[str]:
-    """P-33 (ADR 0217): a model is called only from ``eval.yml``, which is dispatch or schedule
+    """A model is called only from ``eval.yml``, which is dispatch or schedule
     only, on an exact hosted runner, reads its secret at job level alone, and publishes
-    only what the canonical scan covered. ``check_workflows.py``'s clauses live here."""
+    only what the canonical scan covered."""
     out: list[str] = []
     for p, doc in _workflows(tree).items():
         if p != _EVAL:
@@ -343,7 +343,7 @@ def workflow_never_rules(tree: Tree) -> list[str]:
             for v in _POETRY_PIN.findall(s.get("run") or "")
             if tuple(map(int, v.split("."))) < _POETRY_FLOOR
         ],
-        # T-050-190: every Linux job runs `scripts/ci.py <job>`, the one source of its steps
+        # every Linux job runs `scripts/ci.py <job>`, the one source of its steps
         "job-bypasses-ci-script": [
             j
             for j in jobs
@@ -377,7 +377,7 @@ def workflow_never_rules(tree: Tree) -> list[str]:
         "needs-an-undefined-job": [
             f"{j} -> {d}" for j, job in release.items() for d in _needs(job) if d not in release
         ],
-        # T-047-88: the action mints the tag, never workflow arithmetic
+        # the action mints the tag, never workflow arithmetic
         "hand-computed-tag": [line for line in release_runs if "git tag " in line],
         "hand-listed-tags": [line for line in release_runs if "git ls-remote --tags" in line],
     }
@@ -385,7 +385,7 @@ def workflow_never_rules(tree: Tree) -> list[str]:
 
 
 def release_workflow_canon(tree: Tree) -> list[str]:
-    """P-30: the main-only pinned release-please, the one gated publish chain, the manifest
+    """The main-only pinned release-please, the one gated publish chain, the manifest
     floor and patch rule, and the pyproject version equal to the CHANGELOG's top section."""
     doc = _yaml(tree, _RELEASE)
     on, jobs = _on(doc), _jobs(doc)
@@ -435,7 +435,7 @@ def release_workflow_canon(tree: Tree) -> list[str]:
         and "inputs.tag" in str(existing.get("if"))
         and ((build.get("steps") or [{}])[0].get("with") or {}).get("ref")
         == "${{ needs.release-please.outputs.tag_name }}",
-        # sa-doctor-job-not-a-required-check#B2: the build waits for ci.yml itself
+        # the build waits for ci.yml itself
         "ci-gated-build": jobs.get("ci", {}).get("uses") == "./.github/workflows/ci.yml"
         and "ci" in _needs(build),
         "no-pytest": not any("pytest" in yaml.safe_dump(job) for job in jobs.values()),
@@ -473,7 +473,7 @@ _ADR_LINE = re.compile(r"^ADR: (?:none\s*|(\d{4})\b.*)$", re.M)
 
 
 def memory_canonical_shape(tree: Tree) -> list[str]:
-    """P-32 (0.4.7 FR1, ADR 0023): its nine rules over the canonical pair."""
+    """Judge the canonical memory pair by its nine shape rules."""
     sections = dict(_SECTIONS)
     if specs_state(tree.root / "specs", tree.read("specs/constitution.md"))[0] != "canonical":
         sections["QUALITY.md"] = ([*_SECTIONS["QUALITY.md"][0], "Bugs"], "slop-tests")
@@ -530,7 +530,7 @@ def adr_superseded_successor(tree: Tree) -> list[str]:
 
 
 def ci_triggers_gitflow(tree: Tree) -> list[str]:
-    """T-050-19 AC6.9: the literal triggers are the library constitution's gitflow."""
+    """The literal triggers are the library constitution's gitflow."""
     flow, warning = read_gitflow(tree.root / "specs")
     ci, release = _on(_yaml(tree, f"{_WF}/ci.yml")), _on(_yaml(tree, _RELEASE))
     scan = _yaml(tree, f"{_WF}/secret-scan.yml")
@@ -541,9 +541,9 @@ def ci_triggers_gitflow(tree: Tree) -> list[str]:
         "gitflow-unread": warning is None,
         "ci-triggers": ci["push"]["branches"][:work] == [*edges, f"{flow.work_prefix}**"]
         and ci["pull_request"]["branches"] == edges,
-        "job-trigger": ci["push"]["branches"][work:] == ["wt/**"],  # ADR 0190: the job's matrix
+        "job-trigger": ci["push"]["branches"][work:] == ["wt/**"],  # job branches run ci
         "release-trigger": release["push"]["branches"] == [flow.principal],
-        # A-12.1/A-12.2: the required gitleaks context reports on both PR edges
+        # the required gitleaks context reports on both PR edges
         "secret-scan-edges": _on(scan)["pull_request"]["branches"] == edges,
         "secret-scan-push": _on(scan)["push"]["branches"] == [flow.principal],
         "gitleaks-context": _jobs(scan).get("gitleaks", {}).get("name") == "gitleaks",
@@ -557,8 +557,8 @@ def ci_triggers_gitflow(tree: Tree) -> list[str]:
 
 
 _RENAMED = "---\nspecs_pattern_version: 6\ngitflow: {principal: trunk, integration: next, work: work/}\n---\n# C\n"
-# ADR 0021: main takes develop and release-please's own branch; develop takes feature/ and
-# Dependabot; T-050-19 AC6.8: a renamed gitflow moves the rules; no constitution, the default.
+# main takes develop and release-please's own branch; develop takes feature/ and
+# Dependabot; a renamed gitflow moves the rules; no constitution, the default.
 _SOURCES = [
     ("repo", "develop", "main", True),
     ("repo", "release-please--branches--main", "main", True),
@@ -599,7 +599,7 @@ def pr_source_guard_release_pr(tree: Tree) -> list[str]:
 
 
 def ci_checkout_history(tree: Tree) -> list[str]:
-    """ci-history-depth-is-decided-per-job: every ci.yml checkout fetches depth 0."""
+    """Every ci.yml checkout fetches depth 0."""
     depths = [
         (jid, (s.get("with") or {}).get("fetch-depth"))
         for jid, job in _jobs(_yaml(tree, f"{_WF}/ci.yml")).items()
@@ -613,7 +613,7 @@ def ci_checkout_history(tree: Tree) -> list[str]:
 
 
 def required_checks_listed(tree: Tree) -> list[str]:
-    """sa-doctor-job-not-a-required-check#B1: an unlisted PR check is red-but-mergeable;
+    """An unlisted PR check is red-but-mergeable;
     a stale entry blocks every merge."""
     contexts: set[str] = set()
     for doc in _workflows(tree).values():
@@ -628,7 +628,7 @@ def required_checks_listed(tree: Tree) -> list[str]:
 
 
 def onboarding_journey_uv(tree: Tree) -> list[str]:
-    """0.4.8 AC8.3: the e2e job installs uv, requires uvx and runs the journey; the
+    """The e2e job installs uv, requires uvx and runs the journey; the
     post-publish smoke walks init --repo, specs init and doctor."""
 
     def texts(wf: str, job: str) -> str:
@@ -653,7 +653,7 @@ def onboarding_journey_uv(tree: Tree) -> list[str]:
 
 
 def specs_canon_tracked(tree: Tree) -> list[str]:
-    """AC8.3: one probe per CANON row, judged by the tree's .gitignore. Every row is tracked
+    """One probe per CANON row, judged by the tree's .gitignore. Every row is tracked
     (a rendered row's drift is TREE-5's, in CI's doctor); only the two archived scratch
     shapes are ignored."""
     expect = {"specs/" + re.sub(r"<[^>]+>|\*\*", "1", row.shape): "canon-ignored" for row in CANON}
@@ -703,10 +703,9 @@ def _mirror_exempt(p: str) -> bool:
 
 
 def tests_mirror_the_package(tree: Tree) -> list[str]:
-    """AC7.1: every test file is ``tests/<p>/test_<m>.py`` (or ``test_<m>__<topic>.py``) for a
+    """Every test file is ``tests/<p>/test_<m>.py`` (or ``test_<m>__<topic>.py``) for a
     source ``dadaia_workspace/<p>/<m>`` (``scripts/<p>/<m>`` under ``tests/scripts``); a journey
-    under ``tests/e2e`` names its ``Owner:``; no test directory is empty; the one rc-13 file
-    is allowed where it is."""
+    under ``tests/e2e`` names its ``Owner:``; no test directory is empty."""
     sources, out = _source_keys(tree), []
     paths = tree.tracked("tests")
     for p in (p for p in paths if p.endswith(".py") and not _mirror_exempt(p)):
@@ -1147,7 +1146,6 @@ CHECKS: dict[str, Check] = {
     "pr-source-guard-release-pr": (
         pr_source_guard_release_pr,
         {
-            # pr-source-guard-refuses-the-release-please-pr-to-main, planted back
             "refuses": _edit(_G, ', f"release-please--branches--{flow.principal}"', ""),
             "admits": _edit(_G, 'ok = flow.role_of(head) == "work" or', "ok = True or"),
         },

@@ -98,7 +98,7 @@ def main(argv: list[str]) -> int:
             file=sys.stderr,
         )
         return 2
-    # The fence (ADR 0088) mirrors the resolver's rungs: the inherited fence, every root above
+    # The fence mirrors the resolver's rungs: the inherited fence, every root above
     # the checkout, and the instance owning this venv (``fenced_env`` omits that last one, and
     # importing it would judge whichever ``dadaia_workspace`` is importable).
     fence = [os.environ.get("DADAIA_FENCED_ROOTS", ""), *map(str, ROOT.parents)]

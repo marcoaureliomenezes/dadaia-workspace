@@ -30,7 +30,7 @@ Session = dict[str, Any]
 Plant = Callable[[Path], Session | None]
 Check = tuple[Callable[["Tree"], list[str]], dict[str, Plant]]
 
-_CI = "scripts/ci.py"  # the Linux CI jobs (T-050-190)
+_CI = "scripts/ci.py"  # the Linux CI jobs
 
 
 def tracked(root: Path, *spec: str) -> list[str]:
