@@ -150,3 +150,25 @@ def test_a_skill_script_maps_to_its_tests_directory(tmp_path: Path) -> None:
     assert _lines(done, "test: ") == ["test: tests/public/skills/dd_demo/test_run.py"]
     assert _lines(done, "unmapped: ") == []
     assert _ran(root) == ["test_run.py"]
+
+
+def test_explicit_paths_select_their_tests_without_reading_the_working_tree(
+    tmp_path: Path,
+) -> None:
+    root = _repo(tmp_path)
+    (root / "pkg").mkdir()
+    (root / "pkg/__init__.py").write_text("", encoding="utf-8")
+    (root / "pkg/m.py").write_text("LIMIT = 10\n", encoding="utf-8")
+    (root / "tests/test_m.py").write_text(_test("from pkg import m\n"), encoding="utf-8")
+    _git(root, "add", "-A")
+    _git(root, "-c", "user.name=t", "-c", "user.email=t@t", "commit", "-q", "-m", "pkg")
+    (root / "README.md").write_text("changed\n", encoding="utf-8")
+    done = subprocess.run(
+        [sys.executable, "scripts/impact.py", "pkg/m.py"],
+        cwd=root,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        check=False,
+    )
+    assert done.stdout.splitlines() == ["test: tests/test_m.py"]
