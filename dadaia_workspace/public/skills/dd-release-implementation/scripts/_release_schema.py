@@ -22,6 +22,7 @@ CANDIDATE_DOCS = ("SPEC.md", "PLAN.md")
 #: The lifecycle phases, read from the `release-state-v1` enum; a shipped release moves whole to `_archive/<v>/`.
 PHASES = tuple(load_schema("release-state-v1")["properties"]["phase"]["enum"])
 #: The phases in which the live candidate's trio is REQUIRED; the first, DEFINITION, is authoring it.
+DEFINITION, IMPLEMENTATION, CLOSURE = PHASES
 TRIO_PHASES = frozenset(PHASES[1:])
 #: A release ships `delivered` — the one histo disposition this ledger writes.
 DELIVERED = "delivered"
@@ -174,7 +175,7 @@ def current_candidate(release_dir: Path, state: dict[str, Any]) -> Path | None:
     """The ``rc-<N>/`` the release is working: the last candidate in the trio phases, the one
     past a milestone's in DEFINITION; ``None`` for a flat trio, which has no folder."""
     if last := _milestone_rc(state):
-        return release_dir / f"rc-{last + (state.get('phase') == 'DEFINITION')}"
+        return release_dir / f"rc-{last + (state.get('phase') == DEFINITION)}"
     return candidate_dir(release_dir)
 
 

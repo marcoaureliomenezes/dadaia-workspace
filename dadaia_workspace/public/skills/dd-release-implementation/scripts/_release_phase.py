@@ -7,16 +7,24 @@ and its milestone move in one act, so they cannot disagree.
 
 from __future__ import annotations
 
+import json
+import subprocess
 import sys
 from pathlib import Path
+from typing import Any
 
 import _clock
+import _git
 from _grammar import SHA_RE, STATE
 from _refusal import Refusal
 from _release_check import candidate_errors
 from _release_schema import (
     APPROVED,
     CANDIDATE_DOCS,
+    CLOSURE,
+    DEFINITION,
+    IMPLEMENTATION,
+    PHASES,
     extract_status,
     next_candidate,
 )
@@ -24,7 +32,7 @@ from _release_store import SCRIPT, Live, State, commit, live_release
 from _specs import choice
 
 #: DEFINITION is `new`'s; each later phase has one predecessor (out-of-order = re-run).
-PREDECESSOR = {"IMPLEMENTATION": "DEFINITION", "CLOSURE": "IMPLEMENTATION"}
+PREDECESSOR = dict(zip(PHASES[1:], PHASES, strict=False))
 
 
 def _refuse_unapproved_docs(live: Live) -> Path:
@@ -43,10 +51,25 @@ def _refuse_unapproved_docs(live: Live) -> Path:
             raise Refusal(
                 f"{document.relative_to(live.release_dir).as_posix()} of release {live.release_id} "
                 f"carries status {status!r} — SPEC and PLAN "
-                f"must both be '**Status:** {APPROVED}' to enter IMPLEMENTATION",
+                f"must both be '**Status:** {APPROVED}' to enter {IMPLEMENTATION}",
                 f"Operator action: set '**Status:** {APPROVED}' in {document.resolve()}",
             )
     return candidate
+
+
+def _worktree_rows(root: Path) -> list[dict[str, Any]]:
+    """The rows of `worktree.py list --json`, the worktrees' one owner, run as its own script."""
+    owner = Path(__file__).resolve().parents[2] / "dd-gitflow-default" / "scripts" / "worktree.py"
+    done = subprocess.run([sys.executable, str(owner), "list", "--json"], cwd=root, env=_git.scrubbed_env(),
+                          capture_output=True, text=True, encoding="utf-8", errors="replace", check=False)  # fmt: skip
+    if done.returncode:
+        lines = done.stderr.splitlines()
+        fix = next(
+            (ln[5:] for ln in lines if ln.startswith("fix: ")), f"{sys.executable} {owner} list"
+        )
+        raise Refusal(f"worktree rows unreadable: {lines[0] if lines else done.returncode}", fix)
+    rows: list[dict[str, Any]] = json.loads(done.stdout)
+    return rows
 
 
 def _refuse_open_worktrees(specs: Path) -> None:
@@ -57,22 +80,13 @@ def _refuse_open_worktrees(specs: Path) -> None:
     root = workspace_of(specs)
     if root is None:  # no workspace holds this tree: there is no worktree to wait for
         return
-    sys.path.append(str(Path(__file__).resolve().parents[2] / "dd-gitflow-default" / "scripts"))
-    import _worktree_git as worktree_git  # the worktrees' owner, read-only
-    from _worktree_names import NAME_RE
-    from _worktree_names import Refusal as WorktreeRefusal
-
-    top = worktree_git.git(specs, "rev-parse", "--path-format=absolute", "--show-toplevel",
-                           "--git-common-dir", check=False).split() or ["", ""]  # fmt: skip
-    try:
-        found = worktree_git.rows(root)
-    except WorktreeRefusal as error:
-        raise Refusal(f"worktree rows unreadable: {error}", error.fix) from error
+    top = _git.git(specs, "rev-parse", "--path-format=absolute", "--show-toplevel",
+                   "--git-common-dir", check=False).split() or ["", ""]  # fmt: skip
     repo = Path(top[1]).parent.name
     live = live_release(specs)
     nxt = f"{live.release_id}-{next_candidate(live.release_dir, live.state).name.replace('-', '')}"
-    held = [r for r in found if r["repo"] == repo and r["exit"]
-            and not ((m := NAME_RE.match(str(r.get("name")))) and (m["rc"], m["job"]) == (nxt, "define"))
+    held = [r for r in _worktree_rows(root) if r["repo"] == repo and r["exit"]
+            and r.get("name") != f"{nxt}/define"
             and Path(str(r["path"])).resolve() != Path(top[0]).resolve()]  # fmt: skip
     if held:
         raise Refusal(f"repos/{repo} still holds {len(held)} open wt/* worktree(s) — a "
@@ -81,11 +95,14 @@ def _refuse_open_worktrees(specs: Path) -> None:
 
 #: The one verb that moves each phase forward — every refusal's fix names it, so a fix
 #: never names a verb that refuses in the same state.
-NEXT = {"DEFINITION": "phase IMPLEMENTATION", "IMPLEMENTATION": "phase CLOSURE", "CLOSURE": "ship"}
+NEXT = {
+    **{now: f"phase {then}" for now, then in zip(PHASES, PHASES[1:], strict=False)},
+    CLOSURE: "ship",
+}
 #: `ship`'s one optional value no code knows: the promote PR's number, when the host has one.
 SHIP_PR = "with --pr set to the promote PR's number, when the host has one"
 #: What the operator supplies to each NEXT verb that the code cannot fill (ADR 0158).
-SUPPLY = {"CLOSURE": SHIP_PR}
+SUPPLY = {CLOSURE: SHIP_PR}
 
 
 def set_phase(specs: Path, phase: str, sha: str) -> tuple[str, str]:
@@ -100,19 +117,19 @@ def set_phase(specs: Path, phase: str, sha: str) -> tuple[str, str]:
     if PREDECESSOR.get(phase) != current:
         refusal = Refusal(
             f"release {live.release_id} is in phase {current!r} — `phase` writes "
-            "IMPLEMENTATION after DEFINITION and CLOSURE after IMPLEMENTATION, once each",
+            f"{IMPLEMENTATION} after {DEFINITION} and {CLOSURE} after {IMPLEMENTATION}, once each",
             f"{SCRIPT} {NEXT.get(current, 'check')} --sha {sha}",
         )
         raise choice(refusal, SUPPLY.get(current, ""))
     ts, candidate = _clock.now_iso(), live.candidate
-    if phase == "IMPLEMENTATION":
+    if phase == IMPLEMENTATION:
         candidate = _refuse_unapproved_docs(live)
         if errors := candidate_errors(candidate):
             raise Refusal(errors[0][1], errors[0][2])
     else:
         _refuse_open_worktrees(specs.resolve())
 
-    milestone = "defined" if phase == "IMPLEMENTATION" else "implemented"
+    milestone = "defined" if phase == IMPLEMENTATION else "implemented"
     rc = {"candidate": candidate.name} if candidate else {}
 
     def apply(state: State) -> State:
