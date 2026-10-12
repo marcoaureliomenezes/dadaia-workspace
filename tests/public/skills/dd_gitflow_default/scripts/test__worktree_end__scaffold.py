@@ -56,11 +56,11 @@ def _refused(root: Path, tree: Path, job: str) -> None:
     assert _lines(root, "merge", tree) == (1, [error, fix])
 
 
-def _clears(root: Path, tree: Path, *merge_args: str) -> None:
+def _clears(root: Path, tree: Path) -> None:
     head = git(tree, "rev-parse", "HEAD").strip()
     assert _lines(root, "preflight", tree) == (0, [f"PREFLIGHT PASS {tree} {head}"])
     approve(root, head)
-    done = run(root, "merge", str(tree), *merge_args)
+    done = run(root, "merge", str(tree))
     assert done.returncode == 0, done.stderr
 
 
@@ -101,7 +101,7 @@ def test_a_scaffold_collected_then_removed_leaves_untracked_bytecode_that_blocks
     git(job, "commit", "-qm", "drop the scaffold")
     assert (job / "tests/tmp/j1/__pycache__").is_dir()
     assert git(job, "ls-files", "--", "tests/tmp/j1") == ""
-    _clears(root, job, "--drop")
+    _clears(root, job)
 
 
 def test_a_task_tree_with_the_scaffold_merges(root: Path) -> None:
