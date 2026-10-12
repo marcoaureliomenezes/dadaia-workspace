@@ -73,8 +73,12 @@ def test_guard_doctor_codes(record_property):
     from dadaia_workspace.features.specs.rules import RULES as SPECS
     from dadaia_workspace.features.workspace import onboarding
     from dadaia_workspace.infrastructure.ledger_scripts import LEDGER_SCRIPTS
-    from tests.core.test_cli_line__fix_line_contract import OPERATOR_ACTION, PLANTS, REPORT_ONLY
-    from tests.cli.commands.test_doctor__workspace_fix_lines_clear_their_finding import WORKSPACE_PLANTS
+    from tests.core.test_cli_line__fix_line_contract import (
+        OPERATOR_ACTION,
+        PLANTS,
+        REPORT_ONLY,
+        WORKSPACE_PLANTS,
+    )
 
     rules = [*SPECS, *BACKLOG, *workspace_rules(expired_only=False, context=None)]
     codes = {c for r in rules for c in r.codes} | {s.code for s in LEDGER_SCRIPTS} | {onboarding.CODE}

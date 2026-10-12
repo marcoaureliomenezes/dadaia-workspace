@@ -32,14 +32,17 @@ from typer.testing import CliRunner
 
 from dadaia_workspace.cli.help_digest import command_paths
 from dadaia_workspace.cli.main import app
+from dadaia_workspace.core import workspace_layout
 from dadaia_workspace.core.cli_line import cli_path, fix_line, shell_line
 from dadaia_workspace.core.doctor_rules import rule_fix
 from dadaia_workspace.core.gitflow import DEFAULT, work_branch
+from dadaia_workspace.core.harness_registry import L1_ENTRY_HARNESSES
 from dadaia_workspace.core.models.spec_context import (
     AssociatedRepo,
     ContextState,
     SpecContextProject,
 )
+from dadaia_workspace.core.platform import PLATFORM
 from dadaia_workspace.core.specs_version import CANONICAL_SPECS_VERSION
 from dadaia_workspace.features.chokepoints import push_gate_decision
 from dadaia_workspace.features.chokepoints.branch_policy import parse_push_stdin
@@ -47,9 +50,12 @@ from dadaia_workspace.features.spec_context.service import git_hooks_dir, instal
 from dadaia_workspace.features.specs.canon import canon_violations
 from dadaia_workspace.features.specs.citations import dead_verb_citations
 from dadaia_workspace.features.specs.rules import RULES as SPECS_RULES
+from dadaia_workspace.features.workspace.service import WorkspaceService
 from dadaia_workspace.hooks import pre_gate
 from dadaia_workspace.infrastructure.git_objects import GitSubprocessObjectReader
 from dadaia_workspace.infrastructure.json_context_store import JsonContextStore
+from dadaia_workspace.infrastructure.public_assets import FileSystemPublicAssetManager
+from dadaia_workspace.infrastructure.python_env import VenvPythonEnvironmentManager
 from dadaia_workspace.infrastructure.runtime_transforms.hook_wrappers import VENV_MISSING
 from tests.conftest import GIT_QUIET_INCLUDE
 from tests.fakes import gate_fixes
@@ -1431,6 +1437,251 @@ SITES |= {
     ),
 }
 
+# ── doctor-workspace: the workspace and ledger findings' fix lines ──────────────────
+# A producer plants a finding and reads it from ``doctor --json``. A command fix runs from
+# ``repos/alpha`` and the real doctor drops the finding; an operator action names file and law.
+
+_WS_UNSET = (*_UNSET, "CLAUDE_CODE_SESSION_ID")
+_ENTRY = {"id": "a-entry", "title": "a", "opened": "2026-10-02", "status": "idea",
+          "description": "d", "provenance": "operator request"}  # fmt: skip
+_PRETTY = json.dumps(
+    {"schema": "backlog-v1", "active": [_ENTRY, {**_ENTRY, "id": "b-entry", "status": "resolved"}]},
+    indent=2,
+)
+#: (code, file, committed, bad, where): a JSONL ledger names its line; a JSON document
+#: names the entry or key, since none of its lines is one commit's.
+_LEDGER_ROWS = [
+    ("LEDGER-BUGS-SCHEMA", "specs/bugs/BUGS.jsonl", "", '{"id": "broken"}\n', 1),
+    ("LEDGER-BUGS-SCHEMA", "specs/bugs/BUGS.jsonl", "{not json\n", "{not json\n", 1),
+    ("LEDGER-BACKLOG-SCHEMA", "specs/backlog/BACKLOG.json", '{"schema": "backlog-v1", "active": []}', "{not json\n", "its JSON syntax (line 1)"),
+    ("LEDGER-BACKLOG-SCHEMA", "specs/backlog/BACKLOG.json", "", _PRETTY, "entry 'b-entry'"),
+    ("LEDGER-FINDINGS-SCHEMA", "specs/audits/20260101-x/FINDINGS.jsonl", "", "{not json\n", 1),
+    ("LEDGER-RELEASE-SCHEMA", "specs/releases/1.0.0/_RELEASE.json", "{}\n", "{not json\n", "its JSON syntax (line 1)"),
+]  # fmt: skip
+
+
+def _ws_env() -> dict[str, str]:
+    return suite_env(os.environ, Path.home(), unset=_WS_UNSET)
+
+
+def _doctor(root: Path, *scope: str, real: bool = False) -> list[dict[str, str]]:
+    """The findings of ``doctor --json`` run in *root*: in process, or as a child with *real*."""
+    if real:
+        argv = [sys.executable, "-m", "dadaia_workspace", "doctor", *scope, "--json"]
+        out = subprocess.run(
+            argv, cwd=root, env=_ws_env(), capture_output=True, text=True, check=False
+        ).stdout  # noqa: S603
+    else:
+        with contextlib.chdir(root):
+            out = (
+                CliRunner()
+                .invoke(app, ["doctor", *scope, "--json"], env=dict.fromkeys(_WS_UNSET))
+                .stdout
+            )
+    sections = json.loads(out)["sections"]
+    if scope:  # a bare specs tree: the fenced child judges no workspace at all
+        assert sections.get("workspace", {}).get("findings", []) == [], "unfenced"
+    return [f for s in sections.values() for f in s["findings"]]
+
+
+def _from_alpha(root: Path, fix: str) -> None:
+    """Runs *fix* from ``repos/alpha`` (a fix runs from any cwd)."""
+    elsewhere = root / "repos" / "alpha"
+    elsewhere.mkdir(parents=True, exist_ok=True)
+    ran = run_bash(shlex.join(shlex.split(fix)), cwd=elsewhere, env=_ws_env())
+    assert ran.returncode == 0, ran.stdout + ran.stderr
+
+
+def _ledger_tree(ws: Path, rel: str, committed: str, bad: str) -> Path:
+    """A git tree beside *ws* whose ledger *rel* holds *committed* at HEAD and *bad* on disk."""
+    root = Path(tempfile.mkdtemp(dir=ws.parent, prefix="ledger-"))
+    ledger = root / rel
+    ledger.parent.mkdir(parents=True)
+    if "audits" in rel:
+        (ledger.parent / "AUDIT.md").write_text("# Audit\n")
+    ledger.write_text(committed)
+    for args in (
+        ["init", "-q"],
+        ["add", rel],
+        ["-c", "user.name=t", "-c", "user.email=t@t", "commit", "-qm", "l"],
+    ):
+        subprocess.run(["git", "-C", str(root), *args], check=True)  # noqa: S603, S607
+    ledger.write_text(bad)
+    return root
+
+
+def _ledger(ws: Path, code: str) -> str:
+    """Every invalid-ledger row of *code* is ONE `Operator action:` naming the file, where in
+    it and the ledger's law: uncommitted content is discarded, else the introducing commit is
+    reverted, never a hand edit."""
+    first = ""
+    for row_code, rel, committed, bad, where in _LEDGER_ROWS:
+        if row_code != code:
+            continue
+        tree = _ledger_tree(ws, rel, committed, bad)
+        (fix,) = [f["fix"] for f in _doctor(tree, "--specs-dir", "specs") if f["code"] == code]
+        path = (tree / rel).resolve()
+        assert fix.startswith("Operator action: ") and "AGENTS.md" in fix, fix
+        assert "<" not in fix and "by hand" not in fix, fix
+        if "audits" in rel:  # a bound session writes findings directly: the governed act
+            assert f"line 1 of {path} " in fix, fix
+        else:
+            finder = f"git log -L 1,1:{path}" if where == 1 else f"git log -p -- {path}"
+            assert f"`git checkout -- {path}`" in fix and finder in fix, fix
+            assert (f"line 1 of {path} " if where == 1 else f"{path} fails at {where} ") in fix, fix
+        first = first or fix
+    return f"fix: {first}"
+
+
+_RECORD = {"id": "a-bug", "ts": "2026-09-20T10:00:00Z", "reported_by": "e", "title": "t",
+           "severity": "LOW", "surface": "cli", "component": "c", "context": "x", "symptom": "s",
+           "repro": "r", "expected": "e", "status": "open", "cause": None, "caused_by": None,
+           "closed_at": None}  # fmt: skip
+
+
+def _bugs_fix(ws: Path, *records: dict[str, object]) -> tuple[Path, str]:
+    """The tree and the one LEDGER-BUGS-SCHEMA fix over a ledger of *records*."""
+    ledger = "".join(json.dumps(r) + "\n" for r in records)
+    tree = _ledger_tree(ws, "specs/bugs/BUGS.jsonl", ledger, ledger)
+    return tree, next(
+        f["fix"] for f in _doctor(tree, "--specs-dir", "specs") if f["code"] == "LEDGER-BUGS-SCHEMA"
+    )
+
+
+def test_a_dangling_caused_by_is_cleared_by_bugs_update(workspace: Path) -> None:
+    """A line a governance verb clears takes that verb with real values; run from elsewhere,
+    `bugs.py update <id> --set caused_by=none` clears it."""
+    tree, fix = _bugs_fix(workspace, {**_RECORD, "caused_by": "a-ghost"})
+    assert " update a-bug --set caused_by=none --specs " in fix, fix
+    _from_alpha(tree, fix)
+    assert "LEDGER-BUGS-SCHEMA" not in {
+        f["code"] for f in _doctor(tree, "--specs-dir", "specs", real=True)
+    }
+
+
+def test_a_caused_by_cycle_is_an_operator_decision(workspace: Path) -> None:
+    """Which link of a cycle is wrong is a judgement: the fix names the cycle's records and the
+    law, and sets no value."""
+    _, fix = _bugs_fix(
+        workspace,
+        {**_RECORD, "caused_by": "b-bug"},
+        {**_RECORD, "id": "b-bug", "caused_by": "a-bug"},
+    )
+    assert fix.startswith("Operator action: decide which of a-bug, b-bug ") and "update" in fix
+    assert "caused_by=none" not in fix and "<" not in fix and "AGENTS.md" in fix, fix
+
+
+def _initialized(ws: Path) -> Path:
+    """A real ``init`` under *ws*, its venv stubbed onto this interpreter (never a real venv)."""
+    if sys.platform == "win32":
+        pytest.skip("the stub CLI is a POSIX shell script")
+    root = ws / "ws"
+    root.mkdir()
+    WorkspaceService(
+        public_assets=FileSystemPublicAssetManager(), python_env=VenvPythonEnvironmentManager()
+    ).init(root, harnesses=L1_ENTRY_HARNESSES[:1])
+    stub = root / ".dadaia" / ".venv" / PLATFORM.venv_scripts_dir / "dadaia"
+    stub.parent.mkdir(parents=True, exist_ok=True)
+    stub.write_text(f'#!/bin/sh\nexec "{sys.executable}" -m dadaia_workspace "$@"\n')
+    stub.chmod(0o755)
+    return root
+
+
+def _plant_root_slop(root: Path) -> str:
+    (root / "junk.txt").write_text("x\n")
+    return "WS-root-slop"
+
+
+def _plant_drifted_hook(root: Path) -> str:
+    repo = root / "repos" / "beta"
+    subprocess.run(["git", "init", "-q", str(repo)], check=True)  # noqa: S603, S607
+    for target, _ in workspace_layout.INSTALLED_GIT_HOOKS:
+        (repo / ".git" / "hooks" / target).write_text("#!/bin/sh\nexit 0\n")
+    ctx = {"name": "beta", "state": "alive", "repo_slug": "beta", "repo_url": "file:///x.git",
+           "created_at": "2026-01-01T00:00:00Z", "alive_since": "2026-01-01T00:00:00Z",
+           "dead_since": None, "current_branch": None}  # fmt: skip
+    (root / ".dadaia/states/spec_contexts.json").write_text(
+        json.dumps({"schema_version": "2", "contexts": [ctx]})
+    )
+    return "HOOKS-DRIFT-1"
+
+
+def _plant_disarmed_gate(root: Path) -> str:
+    (root / ".claude" / "settings.json").unlink()
+    return "PROJECTION"
+
+
+def _plant_long_skill(root: Path) -> str:
+    skill = root / ".agents" / "skills" / "long" / "SKILL.md"
+    skill.parent.mkdir(parents=True)
+    soft = json.loads((_PKG / "features/spec_context/behavior-map.json").read_bytes())
+    skill.write_text("l\n" * (soft["skill_md_line_soft"] + 1))
+    return "SKILL-MD-LENGTH"
+
+
+#: Every workspace-doctor code the home proves: cleared by its printed fix (a plant), or an
+#: operator action (``None``: a ledger row, or the long SKILL.md).
+WORKSPACE_PLANTS = {
+    **dict.fromkeys(code for code, *_ in _LEDGER_ROWS),
+    "WS-ENTRY": _plant_root_slop,
+    "HOOKS-DRIFT-1": _plant_drifted_hook,
+    "PROJECTION": _plant_disarmed_gate,
+    "SKILL-MD-LENGTH": None,
+}
+
+
+def _workspace_clears(ws: Path, plant: Callable[[Path], str]) -> str:
+    """Plants a workspace finding, runs its printed fix from elsewhere, and requires it gone."""
+    root = _initialized(ws)
+    code = plant(root)
+    fix = next(f["fix"] for f in _doctor(root) if f["code"] == code)
+    _from_alpha(root, fix)
+    assert code not in {f["code"] for f in _doctor(root, real=True)}
+    return f"fix: {fix}"
+
+
+def _long_skill(ws: Path) -> str:
+    """A long SKILL.md is one non-error finding whose `Operator action:` names that file."""
+    root = _initialized(ws)
+    code = _plant_long_skill(root)
+    [found] = [f for f in _doctor(root) if f["code"] == code]
+    assert found["verdict"] == "warning"
+    assert found["fix"].startswith(f"Operator action: split {root}/.agents/skills/long/SKILL.md ")
+    return f"fix: {found['fix']}"
+
+
+SITES |= {
+    **{
+        f"doctor-workspace-{code}": lambda ws, code=code: _ledger(ws, code)
+        for code in dict.fromkeys(c for c, *_ in _LEDGER_ROWS)
+    },
+    **{
+        f"doctor-workspace-{code}": lambda ws, plant=plant: _workspace_clears(ws, plant)
+        for code, plant in WORKSPACE_PLANTS.items()
+        if plant
+    },
+    "doctor-workspace-SKILL-MD-LENGTH": _long_skill,
+}
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="the stub CLI is a POSIX shell script")
+def test_a_deleted_hook_is_reported_absent_and_its_fix_restores_it(workspace: Path) -> None:
+    """A deleted projected hook is reported absent, and its printed fix, run, restores the hook
+    byte for byte."""
+    root = _initialized(workspace)
+    _plant_drifted_hook(root)
+    hooks = root / "repos" / "beta" / ".git" / "hooks"
+    for target, _ in workspace_layout.INSTALLED_GIT_HOOKS:
+        (hooks / target).unlink()
+    found = next(f for f in _doctor(root) if f["code"] == "HOOKS-DRIFT-1")
+    assert "absent" in found["message"], found["message"]
+    _from_alpha(root, found["fix"])
+    for target, source in workspace_layout.INSTALLED_GIT_HOOKS:
+        assert (hooks / target).read_bytes() == (
+            workspace_layout.public_scripts_dir() / source
+        ).read_bytes()
+    assert "HOOKS-DRIFT-1" not in {f["code"] for f in _doctor(root, real=True)}
+
 
 @pytest.mark.parametrize("rule", SPECS_RULES, ids=lambda rule: "/".join(rule.codes))
 def test_no_fix_line_deletes_a_record_without_recording_it(rule: Any) -> None:
@@ -1465,7 +1716,9 @@ _SLOW = pytest.mark.slow(reason="real git remotes and CLI child processes")
 @pytest.mark.parametrize(
     "site",
     [
-        pytest.param(s, marks=_SLOW) if s.startswith(("refusal-", "doctor-specs-")) else s
+        pytest.param(s, marks=_SLOW)
+        if s.startswith(("refusal-", "doctor-specs-", "doctor-workspace-"))
+        else s
         for s in SITES
     ],
 )
