@@ -69,9 +69,11 @@ def _refuse_dirty(tree: Path) -> None:
 
 def _kept(tree: Path, verb: str, keep: list[str], drop: bool) -> list[str]:
     """The ignored files to copy into the repo; refuses while one is neither kept nor dropped."""
-    ignored = [  # -z: a name with a blank arrives verbatim, never C-quoted
+    ignored = [  # -z: a name with a blank arrives verbatim, never C-quoted; -uall: file level
         line[3:].rstrip("/")
-        for line in git(tree, "status", "--porcelain", "-z", "--ignored").split("\0")
+        for line in git(
+            tree, "status", "--porcelain", "-z", "--ignored", "--untracked-files=all"
+        ).split("\0")
         if line.startswith("!! ")
     ]
     # disposable without asking: a tool cache directory or a *.pyc
@@ -235,6 +237,18 @@ def _open_tasks(repo: Path, name: str) -> None:
                           f"{script(SCRIPT)} merge {quote(row['path'])}")  # fmt: skip
 
 
+def _scaffold(tree: Path, name: str) -> None:
+    """Refuses while any path under `tests/tmp/<job>/` is tracked; `<job>` is the last segment of
+    *name*, and only the index counts, never the directory on disk."""
+    job = name.rsplit("/", 1)[-1]
+    folder = f"{tree}/tests/tmp/{job}"
+    if git(tree, "ls-files", "--", f"tests/tmp/{job}").strip():
+        raise Refusal(
+            f"{folder} exists: promote each test in it into its contract's home or delete it before the job lands",  # fmt: skip
+            f"Operator action: promote each test in {folder} into its contract's home or delete it, then commit the removal",  # fmt: skip
+        )
+
+
 def _checks(root: Path, tree: Path) -> Iterator[tuple[str, subprocess.CompletedProcess[str]]]:
     """Each ledger script's `check` on the tree, then the workspace doctor on its `specs/` — the
     check the work branch's gates run — fenced to the tree."""
@@ -355,7 +369,7 @@ def _kind_checks(root: Path, repo: Path, tree: Path, name: str, onto: str, into:
     elif plain(name):
         checks += [ancestor, verdict, ("verify", lambda: _gate(tree, onto, required=False))]
     else:
-        checks += [("open tasks", lambda: _open_tasks(repo, name)), ancestor, verdict, ("verify", lambda: _gate(tree, onto))]  # fmt: skip
+        checks += [("open tasks", lambda: _open_tasks(repo, name)), ("scaffold", lambda: _scaffold(tree, name)), ancestor, verdict, ("verify", lambda: _gate(tree, onto))]  # fmt: skip
     return checks
 
 
