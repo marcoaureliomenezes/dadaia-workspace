@@ -3,6 +3,7 @@ stub callable stands for the owner's reader."""
 
 from __future__ import annotations
 
+from collections.abc import Collection
 from pathlib import Path
 from typing import Any
 
@@ -40,7 +41,7 @@ def _alive(tmp_path: Path, rows: Any) -> SpecContextService:
 def test_dead_refuses_with_the_exit_of_a_row_the_stub_holds(tmp_path: Path) -> None:
     seen: list[Path] = []
 
-    def rows(root: Path) -> tuple[list[dict[str, Any]], str, str]:
+    def rows(root: Path, _repos: Collection[str]) -> tuple[list[dict[str, Any]], str, str]:
         seen.append(root)
         return [{"repo": "my-repo", "exit": "Operator action: merge /w/a"}], "", ""
 
@@ -53,7 +54,7 @@ def test_dead_refuses_with_the_exit_of_a_row_the_stub_holds(tmp_path: Path) -> N
 
 
 def test_dead_refuses_with_the_readers_fix_when_the_read_failed(tmp_path: Path) -> None:
-    def rows(_root: Path) -> tuple[list[dict[str, Any]], str, str]:
+    def rows(_root: Path, _repos: Collection[str]) -> tuple[list[dict[str, Any]], str, str]:
         return [], "list failed: boom", "Operator action: rerun list"
 
     service = _alive(tmp_path, rows)

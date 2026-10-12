@@ -3,6 +3,7 @@ the owner's reader, so no process runs."""
 
 from __future__ import annotations
 
+from collections.abc import Collection
 from pathlib import Path
 from typing import Any
 
@@ -46,9 +47,9 @@ def _doctor(tmp_path: Path, rows: Any) -> DoctorService:
 def test_the_rows_handed_in_are_rendered_for_the_contexts_repos_only(tmp_path: Path) -> None:
     seen: list[Path] = []
 
-    def rows(root: Path) -> tuple[list[dict[str, Any]], str, str]:
+    def rows(root: Path, repos: Collection[str]) -> tuple[list[dict[str, Any]], str, str]:
         seen.append(root)
-        return _ROWS, "", ""
+        return [r for r in _ROWS if r["repo"] in repos], "", ""
 
     [finding] = _doctor(tmp_path, rows).check_worktrees("c")
 
@@ -61,7 +62,7 @@ def test_the_rows_handed_in_are_rendered_for_the_contexts_repos_only(tmp_path: P
 
 
 def test_a_failed_read_is_one_warning_with_the_readers_fix(tmp_path: Path) -> None:
-    def rows(_root: Path) -> tuple[list[dict[str, Any]], str, str]:
+    def rows(_root: Path, _repos: Collection[str]) -> tuple[list[dict[str, Any]], str, str]:
         return [], "list failed: boom", "Operator action: rerun list"
 
     [finding] = _doctor(tmp_path, rows).check_worktrees("c")
