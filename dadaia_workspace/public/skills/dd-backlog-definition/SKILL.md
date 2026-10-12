@@ -21,6 +21,7 @@ description: >
 - Dedup: compare a new entry's title+description against every ACTIVE item for the
   same subject — by domain concept, not by the request's
   wording; exit a near-duplicate as `rejected`, its `--reason` `absorbed by <existing slug>`.
+- Before any staleness or cut judgement, read the entry's `provenance` and the operator's verbatim words; an operator-designed requirement is cut only after the operator sees and answers.
 - Staleness: an ACTIVE item untouched since the last closure is a
   sanitize candidate; a confirmed-invalid item exits as `rejected` with a one-line
   `reason`; a merely-postponed one stays `active[]`.

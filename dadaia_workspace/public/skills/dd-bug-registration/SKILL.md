@@ -18,7 +18,7 @@ description: >
 ## 2. Propose
 
 1. Open `specs/bugs/AGENTS.md` (the area's scoped law) and follow it.
-2. Name the contract line violated: file and line, `--help` text, or schema key.
+2. Name the contract line violated: file and line, `--help` text, or schema key; check each premise of a record against the code before the record is kept, amended or overwritten.
 3. Give ONE command that reproduces it, already run, with its exit code and output.
 4. Name which `specs/bugs/AGENTS.md` §1 NOT-a-bug cases you ruled out and the work-branch sha that reproduces it, so the operator can confirm the tool is at fault.
 5. Severity: CRITICAL a stall or data loss; HIGH a contract broken on the default

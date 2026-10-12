@@ -25,12 +25,13 @@ compatibility: Standalone Agent Skill. Inside a dadaia-workspace (pip install da
 **Phase 0 — Lineage.** Read the bug ledger for prior fixes to the same
 `surface`/`component` in the bounded window ([`LINEAGE.md`](LINEAGE.md)); inspect every named
 `fix_sha` with `git show`; a `caused_by` other than `none` makes this fix a REBUILD (`specs/bugs/AGENTS.md` §2);
+grep every decider of the same fact and name its one owner before any fix;
 carry the link to Phase 6 (`resolve --caused-by`; `update` repairs);
 echo the `caused_by:`/`evidence:`/`prior diffs read:`/`rebuild:` block in the fix commit body.
-*Done when prior diffs were actually read and the link and the rebuild decision (`rebuild` or `none`) are decided.*
+*Done when prior diffs were actually read, the owner is named, and the link and the rebuild decision (`rebuild` or `none`) are decided.*
 
 **Phase 1 — Red loop.** This is the skill; everything after it is mechanical. Build a
-**tight** pass/fail signal that goes red on THIS bug — construction menu, tightening
+**tight** pass/fail signal that goes red on THIS bug (replay the reporter's commands on the reporter's real artifact, red then green; heal state already on disk; a second report of a family gets a class-level fix) — construction menu, tightening
 and non-deterministic bugs: [`RED-LOOP.md`](RED-LOOP.md).
 *Done when you can name ONE command, already run at least once, that is red-capable
 (asserts the exact symptom), deterministic, fast, and agent-runnable. Phase 2 starts
@@ -54,7 +55,7 @@ regressions: measure a baseline, then bisect — logs mislead.
 *Done when one hypothesis survives by observation, not by reading code.*
 
 **Phase 5 — Seam test.** The regression test at the correct seam, BEFORE the fix, is
-a new case in the owner file with a literal expected value, at the lowest level that detects it (the root map §1: fixes never rewrite old asserts), committed first under a `test(` subject; watch it fail,
+a new case in the owner file with a literal expected value, covering every caller of the contract, at the lowest level that detects it (the root map §1: fixes never rewrite old asserts), committed first under a `test(` subject; watch it fail,
 fix the cause, watch it pass, re-run the Phase 1 loop on the original scenario. A
 correct seam exercises the real bug pattern at its call site; when none exists, that
 is itself the finding — return the seam gap to the main thread as a finding
