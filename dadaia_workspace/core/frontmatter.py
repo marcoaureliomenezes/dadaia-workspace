@@ -71,9 +71,11 @@ def parse(text: str) -> Frontmatter | FrontmatterError:
         )
     except ValueError as exc:
         found = re.match(r"line (\d+)", str(exc))
+        line = int(found[1]) if found else None
+        quoted = f" ({block.split(chr(10))[line - 1].strip()!r})" if line else ""
         return FrontmatterError(
             kind="invalid_yaml",
-            message=f"Frontmatter block is present but its YAML is invalid: {exc}",
-            line=int(found[1]) if found else None,
+            message=f"Frontmatter block is present but its YAML is invalid: {exc}{quoted}",
+            line=line,
         )
     return Frontmatter(data=data, body=body)
