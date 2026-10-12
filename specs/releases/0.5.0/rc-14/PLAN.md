@@ -102,7 +102,7 @@ Order per row: DELETE → REBUILD → UPDATE → KEEP → ADD. Bugs are from `sp
 | where scaffolding lives and when it dies | `tests/tmp/<job>/` and `_kind_checks`' `scaffold` pair | `merge`, `preflight` | the `.gitignore` entry, the `norecursedirs` entry, `tracked-suite-only` |
 | where a repo-policy check lives | a check of `scripts/guards/run.py` (one module per theme) | `ci.py guards` | the policy pytest cases, `statement-id-cited` |
 | what pytest may read | the `policy-in-pytest` census check | — | cases that read a tracked repo file outside their fixtures |
-| who proves a cross-cutting contract | one parametrized home: the fix line `tests/core/test_fix_line_contract.py`, the writer `test__atomic.py`, the kernel `test__ledger.py` | per-site and per-consumer tests keep only what is theirs | the three fix-line harnesses, `test_atomic_write.py`, the per-consumer kernel cases |
+| who proves a cross-cutting contract | one parametrized home: the fix line `tests/core/test_cli_line__fix_line_contract.py`, the writer `test__atomic.py`, the kernel `test__ledger.py` | per-site and per-consumer tests keep only what is theirs | the three fix-line harnesses, `test_atomic_write.py`, the per-consumer kernel cases |
 
 ### 1.2 Authorities under ADR 0246: the inventory groups
 
