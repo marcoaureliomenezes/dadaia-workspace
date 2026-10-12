@@ -43,9 +43,8 @@ def _write(root: Path, rel: str, text: str) -> None:
 
 def _planted(root: Path, *, extra_test: str = "", files: dict[str, str] | None = None) -> Path:
     for name in ("mutate.py", "impact.py", "covdata.py"):
-        if (_REPO / "scripts" / name).exists():
-            (root / "scripts").mkdir(exist_ok=True)
-            shutil.copyfile(_REPO / "scripts" / name, root / "scripts" / name)
+        (root / "scripts").mkdir(exist_ok=True)
+        shutil.copyfile(_REPO / "scripts" / name, root / "scripts" / name)
     _write(root, ".gitignore", "__pycache__/\n.coverage*\n.pytest_cache/\n")
     _write(root, "pkg/__init__.py", "")
     _write(root, "pkg/m.py", _BASE_M)
