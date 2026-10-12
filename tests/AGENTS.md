@@ -3,16 +3,15 @@
 These rules override general workspace guidance for everything under `tests/`.
 Agents creating or editing tests must follow them.
 
-- Test basics: the root `AGENTS.md` map §1; slop: `dd-code-review` SLOP.md and `specs/memory/QUALITY.md` fixed section.
+- Test basics: the root `AGENTS.md` map §1 (its docstring-law and bug-test sentences apply here); slop: `dd-code-review` SLOP.md and `specs/memory/QUALITY.md` fixed section.
 
 ## Architecture
 
-- `tests/<p>/test_<m>.py` mirrors `dadaia_workspace/<p>/<m>.py`: one owner per module, the
-  folder never says the size. A second file for the same module is `test_<m>__<topic>.py`.
+- One home per contract: a cross-cutting contract has one parametrized home over every site.
+  `tests/<p>/test_<m>.py` mirrors `dadaia_workspace/<p>/<m>.py` for that module's tests only; the folder never says the size. A second file for the same module is `test_<m>__<topic>.py`.
 - `tests/fixtures/**`: the suite's own support and the tests of it.
 - `tests/e2e/**`: named end-to-end journeys only. Every file names an owner.
-- `tests/tmp/**`: temporary debugging reproductions only; excluded from default
-  collection and deleted or promoted before closure.
+- `tests/tmp/<job>/`: seam REDs, refactor pins and bug reproductions live in it, versioned, collected during the job, refused at the job merge while git tracks a file there. Each `tests/tmp/<job>/` carries an `__init__.py`. Each test is promoted into its contract's home or deleted.
 
 ## Sizes and cost
 
