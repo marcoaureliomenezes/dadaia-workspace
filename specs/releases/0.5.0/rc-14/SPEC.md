@@ -35,7 +35,7 @@ The Wave 1 law has its own defects: an expiring grill record, ADRs without thres
 
 Fifteen confirmed bugs are open.
 
-Review rework (FR18): rc-14's reviewer verdicts count 14 trees, 29 verdicts and 13 REJECTED; 9 of 14 trees were rejected on the first pass. The causes: the hand-off already failed its declared checks (5); a PLAN row or ruling was neither reproduced nor swept for consumers (4); a rework fixed the cited site and broke its contract (2); an implementer claim was unproven (2). Every finding was real. What was missing was a review before the code review, of the definer's spec and of the implementer's hand-off.
+Review rework (FR18): most of rc-14's reviewed trees were rejected on their first pass; AC18.5 counts it and the closure summary records the count (G7). The causes: the hand-off already failed its declared checks (5); a PLAN row or ruling was neither reproduced nor swept for consumers (4); a rework fixed the cited site and broke its contract (2); an implementer claim was unproven (2). Every finding was real. What was missing was a review before the code review, of the definer's spec and of the implementer's hand-off.
 
 ## 2. Measurable Goals
 
@@ -45,7 +45,7 @@ Review rework (FR18): rc-14's reviewer verdicts count 14 trees, 29 verdicts and 
 - G4. radon reports no D–F function under `dadaia_workspace/public/skills/*/scripts` (constitution §5).
 - G5. Every ADR proposed after rc-14 carries `options` and a self-contained `ruling.words`; no `ADR:` label carries a status token after the Reconciliation.
 - G6. The FR4 grep over `public/` returns only the workspace's own operation; `git grep -n -- '--ts' dadaia_workspace/public/skills` returns nothing.
-- G7. At the next candidate's closure, AC18.5's count shows REJECTED ≤ 3 and first-pass rejected ≤ 20% of trees, against rc-14's 13 of 29 verdicts and 9 of 14 trees.
+- G7. At the next candidate's closure, AC18.5's count shows REJECTED at most 30% of rc-14's and first-pass rejected at most 20%. rc-14's baseline is what `verdict.py stats` prints for rc-14 at its closure, recorded in its closure summary.
 
 ## 3. Requirements
 
@@ -167,11 +167,11 @@ Operator: "Registrar e corrigir no Job 5 (Recommended)", "Registrar, Job 5 (Reco
 
 Every project using the library follows it, and evals run without private memory, so each rule lives in the shipped law or skills.
 
-- AC18.1 (integration, RED first): `worktree.py ready <tree>` reports `READY <tree> <sha>` (exit 0) or `NOT READY <tree> <sha>` (exit 1); NOT READY names each failing condition with one fix line. It checks four conditions: the tree is clean; it is rebased on its base; the repo's declared `verify:` line exits 0, run through the merge gate's own declared-line runner (one owner); doctor passes. It reports and blocks nothing; the merge gate keeps its own check.
-- AC18.2 (no test — reviewer sweep): The orchestration skill dispatches a review only for a READY tree and hands the reviewer its READY line. A behaviour ruling by the main thread carries its reproduction and its consumer sweep, a search across every repo of the context. A rework brief names the finding's contract class, requires a RED test for the finding first, and requires a sweep of every other site of that class.
-- AC18.3 (no test — reviewer sweep): An implementer's hand-back carries evidence per item; a bare PASS goes back before review. The evidence: the consumer sweep for any changed grammar, format, public name or fix line; the search behind every negative claim; cross-platform evidence (no platform literal in a new assert, a child process env copied from the parent's); no existing assert removed or weakened without a recorded ruling. The code-review skill judges a re-review against the finding's class.
+- AC18.1 (integration, RED first): `worktree.py preflight <tree>` answers exactly "`merge` would pass except for the review verdict". It runs the checks `merge` runs for the tree's kind (task, job, define/backlog/reconcile, plain and hotfix each keep their own set) through one function both verbs call, so the two never disagree. It prints `PREFLIGHT PASS <tree> <sha>` (exit 0) or `PREFLIGHT FAIL <tree> <sha>` (exit 1), the latter naming each failing check with one fix line; one RED case per kind. It reports and blocks nothing. A green preflight result for a tree sha is what `merge` reuses for that same sha (`gate-reuses-a-green-result-for-the-same-tree`), so `verify:` runs once per sha.
+- AC18.2 (no test — reviewer sweep): The orchestration skill dispatches a review only for a tree whose preflight passes and hands the reviewer its `PREFLIGHT PASS` line. A behaviour ruling by the main thread carries its reproduction and its consumer sweep, a search across every repo of the context. A rework brief names the finding's contract class, requires a RED test for the finding first, and requires a sweep of every other site of that class.
+- AC18.3 (no test — reviewer sweep): An implementer's hand-back carries evidence per item, extending the persona's evidence line (`dadaia_workspace/public/agents/dd-sw-engineer-sr.md` §4); a bare PASS goes back before review. The items: the consumer sweep for any changed grammar, format, public name or fix line; the search behind every negative claim; cross-platform evidence (no platform literal in a new assert, a child process env copied from the parent's); other repos of the workspace are reported only as a count, never by name; old asserts kept, per the root map §1 test line and the code-review QA lens. That root map line is the one authority over a failing old test: it is a question; any edit or removal of an existing assert carries a recorded main-thread ruling in a `test(...)` commit, and a change to a product contract also needs the operator. Every other text cites that line. The code-review skill judges a re-review against the finding's class.
 - AC18.4 (no test — reviewer sweep): A PLAN row that REBUILDs or DELETEs a grammar, format, public name or fix line names its consumers. A read-only `dd-researcher` pre-mortem precedes the define review and lists the consumers touched, the existing tests and asserts that would go red, and the platform facts touched; the PLAN answers each.
-- AC18.5 (integration, RED first): `verdict.py stats <release-candidate>` prints trees, verdicts, REJECTED, first-pass rejected and extra rounds, all read from the verdict records; the closure summary carries its output.
+- AC18.5 (integration, RED first): `verdict.py stats <release-candidate>` prints the candidate's verdicts, sequences, REJECTED and first-pass rejected. It reads the verdict records through the one record lister the merge gate's verdict check also calls: the handoff zone plus the reaper's hold; a record past the hold's TTL is gone. A sequence is one tree name's verdicts up to and including an APPROVED; the next verdict on that name opens a new one, so a reopened tree never inflates the counts. REJECTED is the number of REJECTED verdicts; first-pass rejected is the sequences whose first verdict is REJECTED, divided by the sequences. The closure summary carries its output.
 - AC18.6 (no test — reviewer sweep): Every development-flow rule the developer kept in private memory is either stated once in the library's law or skills, cited `path:line`, or recorded as specific to this repo's own pipeline. A parallel `dd-researcher` produces the inventory and it lands in the PLAN; no flow rule depends on private memory.
 
 ## 4. Exits at closure
@@ -194,7 +194,6 @@ These entries need no rc-14 work; each exits once at closure with the reason fro
 | `stage-gate-keeps-only-the-red-check` | superseded | ADRs 0231/0232/0236 |
 | `verdict-author-unbound` | superseded | "Disciplina + auditoria (Recommended)"; ADR 0218 |
 | `judge-config-outside-the-script-dir` | superseded | 2026-10-08 "Apagar; o revisor cobre (Recommended)" |
-| `gate-reuses-a-green-result-for-the-same-tree` | superseded | 2026-10-08 "somente job e tasks são suficientes" |
 | `process-proportional-to-change-size` | superseded | 2026-10-08 "devemos ser por default leves", "Worktree livre" |
 | `bug-status-deferred-banned` | superseded | delivered (ADRs 0223/0227) |
 | `quality-scorecard-ruler` | superseded | the score-9 ruling, ADR 0239 |
@@ -207,6 +206,7 @@ The entries with work exit `delivered`, except `architecture-adr-section-generat
 - **Wave 3:** the D–F functions of `cli/` and `features/`; `spec-context-branch-field-deleted`, `worktree-layout-per-context`, `context-dead-snapshots-open-worktrees`, `context-show-derives-worktrees`, `export-soft-and-hard`, `init-from-export`, `multi-platform-by-construction-migration` (its two bugs are FR15 and FR9 here), `bug-stats-hotspots-and-age`, `audit-project-scorecard-cycle`, `repo-ci-sast-gates`.
 - **Wave 4:** `architecture-adr-section-generated` (triage, generated section, ADR 0193's `amends`), `docs-site-zensical-pages`, `launch-operator-acts`, `eval-codex-lane-in-library-ci`, `promote-gate-050` (050 checks, D1–D10, findings, rc-13 residuals).
 - **Not destined** (ADR 0242): `evals-benchmark-lanes`, `release-approve-requires-evals-gate`, `windows-smoke-t1-at-release`.
+- **Operator item, not FR18:** proposed: two or three closed options, never padded; needs an amendment of ADR 0165 by the operator. FR18 leaves the grill's "3 closed options" rule (ADR 0165, accepted) as it is.
 - **Left out:** the `dd-ask-me` rename; the `behavior-map.json` deletion (unruled); gate-side test selection.
 
 ## 6. Constraints and risks
@@ -216,7 +216,7 @@ The entries with work exit `delivered`, except `architecture-adr-section-generat
 - Projected copies of shared modules and schemas, their copy tables and allowance rows, become one owner per fact, loaded by core (FR11, ADR 0246).
 - Every second decider of a fact leaves (FR11 to FR16).
 - Per-site remedies become an error that carries its fix; the own-main refusal becomes a no-op (FR17).
-- A review dispatched on an unchecked hand-off, an uncited ruling, a site-only rework brief and a bare PASS hand-back become the READY line, a reproduced and swept ruling, a class-wide rework and per-item evidence (FR18).
+- A review dispatched on an unchecked hand-off, an uncited ruling, a site-only rework brief and a bare PASS hand-back become a passing preflight line, a reproduced and swept ruling, a class-wide rework and per-item evidence (FR18).
 - The grill handoff as record, any decision as an ADR, id-only rulings, the `ADR:` status token, shipped library facts, `--ts`, v33, `ci.py` task and stage code, the working-tree bytecode check, the CI UTF-8 masks and hand-written registry `implementations` leave (FR1 to FR9).
 
 ### Governance sequencing
