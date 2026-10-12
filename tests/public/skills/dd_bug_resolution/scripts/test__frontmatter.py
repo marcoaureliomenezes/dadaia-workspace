@@ -80,3 +80,17 @@ def test_a_shape_outside_the_subset_is_refused(block: str) -> None:
     fm = load_owner("dd-bug-resolution", "_frontmatter")
     with pytest.raises(ValueError, match=r"line [12]"):
         fm.parse(block)
+
+
+def test_a_trailing_comment_after_a_value_is_dropped_like_safe_load_does() -> None:
+    assert _load(
+        "---\nv: 6.0.0  # note\nq: \"x\" # c\nl:\n  - a # c\n  - 'b'  # d\nh: a#b\n---\n"
+    ) == {
+        "v": "6.0.0",
+        "q": "x",
+        "l": ["a", "b"],
+        "h": "a#b",
+    }
+    fm = load_owner("dd-bug-resolution", "_frontmatter")
+    with pytest.raises(ValueError, match="line 1"):
+        fm.parse('q: "x"# c')
