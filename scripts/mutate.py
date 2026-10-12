@@ -1,9 +1,14 @@
 """Diff-scoped mutation: ``python scripts/mutate.py --base <ref>`` mutates the lines
 ``git diff -U0 <ref>`` adds to non-test ``.py`` files, at most ``CAP`` mutants per line, and
-prints ``SURVIVED|KILLED <file>:<line> <kind>: <old> -> <new> [killing tests]``, the mutation
-score and the diff's line and branch coverage from one baseline run. Tests per file come from
-running ``impact.py``. Refuses a dirty tracked tree; every mutated file is restored byte for
-byte. Standard library plus ``pytest-cov``; exit 0."""
+prints ``SURVIVED|KILLED|TIMEOUT <file>:<line> <kind>: <old> -> <new> [killing tests]``, the
+mutation score and the diff's line and branch coverage from one baseline run. ``--module
+<path>...`` mutates every line of those files instead (no diff, no coverage lines). Tests per
+file come from running ``impact.py`` unless ``--tests <path>...`` names them. A mutant run
+longer than ``--timeout`` seconds counts as killed and names no killer. ``--home <id>`` (a
+file, a node id or a prefix) adds, after the score, ``DELETABLE`` for each other test whose
+every killed mutant the home also kills, ``KEPT`` for the rest and ``NO-KILL`` for a test
+that ran and killed none. Refuses a dirty tracked tree; every mutated file is restored byte
+for byte. Standard library plus ``pytest-cov``; exit 0."""
 
 from __future__ import annotations
 
@@ -29,9 +34,17 @@ _KINDS = ("compare", "bool", "not", "arith", "return", "const")
 Mutant = tuple[str, int, tuple[int, int], tuple[int, int], str, str]
 
 
-def _run(*args: str, env: dict[str, str] | None = None) -> subprocess.CompletedProcess[str]:
+def _run(
+    *args: str, env: dict[str, str] | None = None, timeout: float | None = None
+) -> subprocess.CompletedProcess[str]:
     return subprocess.run(
-        list(args), cwd=ROOT, env=env, capture_output=True, text=True, encoding="utf-8"
+        list(args),
+        cwd=ROOT,
+        env=env,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        timeout=timeout,
     )
 
 
@@ -102,10 +115,18 @@ def _tests_for(path: str) -> list[str]:
     return [line[6:] for line in done.stdout.splitlines() if line.startswith("test: ")]
 
 
-def _killers(tests: list[str], env: dict[str, str]) -> list[str] | None:
+def _test_ids(tests: list[str], env: dict[str, str]) -> set[str]:
+    done = _run(
+        sys.executable, "-m", "pytest", "-q", "-p", "no:cacheprovider", "--no-cov",
+        "--collect-only", *tests, env=env,
+    )  # fmt: skip
+    return {x for x in done.stdout.splitlines() if re.fullmatch(r"[\w./-]+\.py::\S+", x)}
+
+
+def _killers(tests: list[str], env: dict[str, str], timeout: float) -> list[str] | None:
     done = _run(
         sys.executable, "-m", "pytest", "-q", "-p", "no:cacheprovider", "--no-cov", "--tb=no",
-        "-rfE", *tests, env=env,
+        "-rfE", *tests, env=env, timeout=timeout,
     )  # fmt: skip
     if done.returncode == 0:
         return None
@@ -136,19 +157,44 @@ def _coverage(changed: dict[str, set[int]], env: dict[str, str]) -> list[str]:
     ]
 
 
+def _matrix(home: str, ran: set[str], kills: dict[str, set[int]]) -> list[str]:
+    covered = {m for t in ran if t.startswith(home) for m in kills.get(t, ())}
+    others = sorted(t for t in ran if not t.startswith(home))
+    deletable = [t for t in others if kills.get(t) and kills[t] <= covered]
+    return [
+        *(f"DELETABLE {t}" for t in deletable),
+        *(f"KEPT {t}" for t in others if kills.get(t) and t not in deletable),
+        *(f"NO-KILL {t}" for t in others if not kills.get(t)),
+    ]
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--base", required=True)
-    base = parser.parse_args().base
+    parser.add_argument("--base")
+    parser.add_argument("--module", nargs="+", default=[])
+    parser.add_argument("--home", dest="home_id")
+    parser.add_argument("--tests", nargs="+", default=[])
+    parser.add_argument("--timeout", type=float, default=120)
+    args = parser.parse_args()
+    if not (args.base or args.module):
+        parser.error("one of --base or --module is required")
     if _run("git", "status", "--porcelain", "--untracked-files=no").stdout.strip():
         sys.exit("refusing to mutate a dirty tree")
-    changed = changed_lines(_run("git", "diff", "-U0", "--no-color", base).stdout)
+    changed = (
+        {m: set(range(1, len((ROOT / m).read_text("utf-8").splitlines()) + 1)) for m in args.module}
+        if args.module
+        else changed_lines(_run("git", "diff", "-U0", "--no-color", args.base).stdout)
+    )
     env = {**os.environ, "PYTHONDONTWRITEBYTECODE": "1"}
     killed = total = 0
+    ran: set[str] = set()
+    kills: dict[str, set[int]] = {}
     for name, lines in sorted(changed.items()):
         target = ROOT / name
         original = target.read_bytes()
-        tests = _tests_for(name)
+        tests = args.tests or _tests_for(name)
+        if args.home_id and tests:
+            ran |= _test_ids(tests, env)
         try:
             for m in _mutants(original.decode("utf-8"), lines):
                 total += 1
@@ -160,13 +206,23 @@ def main() -> None:
                     total -= 1
                     continue
                 target.write_bytes(mutated.encode("utf-8"))
-                ids = _killers(tests, env) if tests else None
+                try:
+                    ids = _killers(tests, env, args.timeout) if tests else None
+                except subprocess.TimeoutExpired:
+                    killed += 1
+                    print(f"TIMEOUT {label}")
+                    continue
                 killed += ids is not None
+                for t in ids or ():
+                    kills.setdefault(t, set()).add(total)
                 print(f"SURVIVED {label}" if ids is None else f"KILLED {label} [{', '.join(ids)}]")
         finally:
             target.write_bytes(original)
     print(f"mutation score {killed}/{total}")
-    print(*_coverage(changed, env), sep="\n")
+    lines_out = _matrix(args.home_id, ran, kills) if args.home_id else []
+    lines_out += [] if args.module else _coverage(changed, env)
+    for line in lines_out:
+        print(line)
 
 
 if __name__ == "__main__":
