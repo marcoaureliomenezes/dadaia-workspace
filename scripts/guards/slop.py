@@ -35,7 +35,7 @@ _LEDGER = load_owner("dd-bug-resolution", "_ledger")
 
 # Ceilings measured on this tree; ratchet DOWN ONLY, target 0: lower one in the commit that
 # removes a hit, never raise one.
-V32_COMMENTS, V32_DOCSTRINGS, IGNORE_EDGES = 109, 215, 0
+V32_COMMENTS, V32_DOCSTRINGS, IGNORE_EDGES = 92, 178, 0
 
 # v38: each deleter outside sweep,
 # keyed to the test pinning its delete (a stdlib skill script cannot import the sweep, so its

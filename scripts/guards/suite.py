@@ -22,8 +22,8 @@ if TYPE_CHECKING:
 
 # P-23 ceilings, measured on this tree; ratchet DOWN ONLY, target 0. Lower them in the
 # commit that removes an import; raising one is never a ratchet move.
-PRIVATE_IMPORT_STATEMENTS = 37
-PRIVATE_IMPORT_FILES = 34
+PRIVATE_IMPORT_STATEMENTS = 17
+PRIVATE_IMPORT_FILES = 16
 _ALLOW = "# allow-private-import:"
 
 # P-21: the tier table on Linux and macOS; the conftest calibrates once for Windows.
