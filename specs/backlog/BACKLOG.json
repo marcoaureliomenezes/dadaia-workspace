@@ -551,6 +551,17 @@
         "test-suite-diet",
         "tests-one-contract-one-home"
       ]
+    },
+    {
+      "id": "review-mutation-on-the-diff",
+      "title": "The review readout runs mutation testing and branch coverage on the diff, not suite-wide counts",
+      "opened": "2026-10-12",
+      "status": "idea",
+      "description": "Measured 2026-10-12 (test audit): mutation on `_jsonl.py` kills 62-85%, so a green suite says little about a changed line, and suite-wide counts (1,393 functions, 3,276 cases) say nothing about a diff. Design: a review readout runs mutation testing on the changed lines plus branch coverage of the diff and hands both to the reviewer; a readout, never a gate. It is this repo's own review tooling: the shipped surface requires no mutation tool or language toolchain of a user. Open for the grill: test-suite-diet (rc-14) removes the repo's mutation wiring and calls mutation evidence operator tooling outside the repo; this entry decides where the diff readout lives. Done when: a review of a diff carries its mutation score and its branch coverage, and nothing in the suite or a gate reads them as pass or fail. Placement: rc-15 (operator ruling 2026-10-12). Every design detail not quoted from the audit is agent default, unruled.",
+      "provenance": "operator ruling 2026-10-12, relayed by the main thread: the test-audit proposals go to rc-15 through the backlog; source: test audit report https://claude.ai/artifact/Rn1qCNi2qEcR1wXTNzEznf, proposal R4",
+      "relates": [
+        "test-suite-diet"
+      ]
     }
   ]
 }
