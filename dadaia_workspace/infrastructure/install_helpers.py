@@ -4,8 +4,10 @@ from __future__ import annotations
 
 from collections.abc import Callable, Iterable, Mapping
 from pathlib import Path
+from typing import Any
 
 from dadaia_workspace.core.exceptions import PublicAssetError
+from dadaia_workspace.core.frontmatter import Frontmatter, parse, split
 from dadaia_workspace.core.model_registry import (
     ResolvedAgentModel,
     codex_effort_for_claude_effort,
@@ -15,22 +17,32 @@ from dadaia_workspace.infrastructure.public_assets_common import (
     _package_version,
     _sha256,
 )
-from dadaia_workspace.infrastructure.runtime_transforms.codex_assets import (
-    _parse_agent_frontmatter,
-    _split_frontmatter,
-    codex_model,
-)
+from dadaia_workspace.infrastructure.runtime_transforms.codex_assets import codex_model
+
+
+def split_persona(text: str) -> tuple[str, str]:
+    """``(frontmatter block, body)`` of a persona file; refused when it has no closed block."""
+    parts = split(text)
+    if parts is None:
+        raise PublicAssetError("persona has no closed YAML frontmatter block")
+    return parts
+
+
+def persona_fields(text: str) -> dict[str, Any]:
+    """The persona's frontmatter mapping, typed; ``{}`` when it has none or it is refused."""
+    parsed = parse(text)
+    return parsed.data if isinstance(parsed, Frontmatter) else {}
 
 
 def persona_read_only(frontmatter: Mapping[str, object]) -> bool:
-    """The persona's ``read_only`` field; fail-closed when not ``true``/``false``."""
+    """The persona's ``read_only`` field; fail-closed when not a YAML bool."""
     declared = frontmatter.get("read_only")
-    if declared not in ("true", "false"):
+    if not isinstance(declared, bool):
         raise PublicAssetError(
             "cannot render agent projection: frontmatter must declare "
             f"read_only as true or false, got {declared!r}"
         )
-    return declared == "true"
+    return declared
 
 
 def build_manifest(
@@ -58,10 +70,10 @@ def render_claude_agent(staged_text: str, resolved: ResolvedAgentModel) -> str:
 
     ``effort:`` is omitted when unresolved — never empty.
     """
-    frontmatter, rest = _split_frontmatter(staged_text)
+    frontmatter, rest = split_persona(staged_text)
     derived = ("model:", "effort:", "permissionMode:", "disallowedTools:")
     kept = [line for line in frontmatter.splitlines() if not line.startswith(derived)]
-    if persona_read_only(_parse_agent_frontmatter(staged_text)):
+    if persona_read_only(persona_fields(staged_text)):
         kept += ["permissionMode: default", "disallowedTools: [Edit, Write, NotebookEdit]"]
     else:
         kept.append("permissionMode: acceptEdits")

@@ -15,8 +15,10 @@ from pathlib import Path
 from dadaia_workspace.core.harness_registry import AgentTranscode, HarnessRecord
 from dadaia_workspace.core.model_registry import ResolvedAgentModel
 from dadaia_workspace.infrastructure.install_helpers import (
+    persona_fields,
     persona_read_only,
     resolve_codex_agent_model,
+    split_persona,
 )
 from dadaia_workspace.infrastructure.install_plan import InstallPlan
 from dadaia_workspace.infrastructure.projection import (
@@ -31,10 +33,8 @@ from dadaia_workspace.infrastructure.public_assets_common import (
 )
 from dadaia_workspace.infrastructure.runtime_config import codex_config
 from dadaia_workspace.infrastructure.runtime_transforms.codex_assets import (
-    _parse_agent_frontmatter,
     _render_codex_agent_toml,
     _render_codex_command_policy_rules,
-    _split_frontmatter,
 )
 
 
@@ -113,7 +113,7 @@ _COPILOT_FRONTMATTER_KEYS: frozenset[str] = frozenset({"name", "description", "t
 def copilot_agent_md_bytes(md_path: Path) -> bytes:
     """The authored persona rendered as a Copilot custom agent: its three known
     frontmatter keys (with their block values) plus the body, verbatim."""
-    frontmatter, body = _split_frontmatter(md_path.read_text(encoding="utf-8"))
+    frontmatter, body = split_persona(md_path.read_text(encoding="utf-8"))
     kept: list[str] = []
     keeping = False
     for line in frontmatter.splitlines():
@@ -133,7 +133,7 @@ def copilot_agent_md_rules(record: HarnessRecord, plan: InstallPlan) -> tuple[Pr
     dst_dir = plan.workspace_root / str(record.directory) / "agents"
     rules: list[ProjectionRule] = []
     for md_file in sorted((plan.agentic_dir / "agents").glob("*.md")):
-        fm = _parse_agent_frontmatter(md_file.read_text(encoding="utf-8"))
+        fm = persona_fields(md_file.read_text(encoding="utf-8"))
         agent_name = str(fm.get("name", "")) if fm else ""
         if not agent_name:
             continue
@@ -160,8 +160,8 @@ def codex_agent_toml_bytes(
     through the :class:`ProjectionRule` seam.
     """
     text = md_path.read_text(encoding="utf-8")
-    body = _split_frontmatter(text)[1]
-    fm = _parse_agent_frontmatter(text)
+    body = split_persona(text)[1]
+    fm = persona_fields(text)
     model, reasoning_effort = resolve_codex_agent_model(
         agent_name, fm.get("model") if fm else None, resolved
     )
@@ -192,7 +192,7 @@ def toml_transcode_rules(record: HarnessRecord, plan: InstallPlan) -> tuple[Proj
     )
     agents_src = plan.agentic_dir / "agents"
     for md_file in sorted(agents_src.glob("*.md")):
-        fm = _parse_agent_frontmatter(md_file.read_text(encoding="utf-8"))
+        fm = persona_fields(md_file.read_text(encoding="utf-8"))
         agent_name = str(fm.get("name", "")) if fm else ""
         if not agent_name:
             continue

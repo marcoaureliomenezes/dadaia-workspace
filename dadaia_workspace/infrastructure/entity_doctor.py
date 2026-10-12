@@ -20,12 +20,10 @@ from typing import Any
 from jsonschema import Draft202012Validator
 from jsonschema.exceptions import best_match
 
+from dadaia_workspace.core.frontmatter import split
 from dadaia_workspace.core.harness_registry import HARNESS_RECORDS, HarnessRecord
 from dadaia_workspace.core.models.doctor_report import DoctorLine, DoctorStatus
-from dadaia_workspace.infrastructure.runtime_transforms.codex_assets import (
-    _parse_agent_frontmatter,
-    _parse_skills_from_frontmatter,
-)
+from dadaia_workspace.infrastructure.install_helpers import persona_fields
 from dadaia_workspace.infrastructure.runtime_transforms.hook_wrappers import HOOK_DIALECTS
 
 
@@ -43,11 +41,14 @@ def check_agent_skill_refs(public_dir: Path) -> list[DoctorLine]:
         except OSError:
             continue
 
-        fm = _parse_agent_frontmatter(text)
+        fm = persona_fields(text)
         agent_name = str(fm.get("name", md_file.stem)) if fm else md_file.stem
 
         # Frontmatter skills — hard failure on missing skill directory
-        skills_in_fm = _parse_skills_from_frontmatter(text)
+        declared_skills = fm.get("skills")
+        skills_in_fm = (
+            [str(s) for s in declared_skills] if isinstance(declared_skills, list) else []
+        )
         confirmed: set[str] = set()
         for skill in skills_in_fm:
             if (skills_dir / skill).is_dir():
@@ -62,10 +63,10 @@ def check_agent_skill_refs(public_dir: Path) -> list[DoctorLine]:
                 )
 
         # Body scan — only inside "## Skills consumed" section (soft warning)
-        body_start = text.find("\n---\n", 4)
-        if body_start == -1:
+        parts = split(text)
+        if parts is None:
             continue
-        body = text[body_start + 5 :]
+        body = parts[1]
         sc_start = body.find("## Skills consumed")
         if sc_start == -1:
             continue
@@ -175,7 +176,7 @@ def _persona_content_drift(agent_id: str, agents_dir: Path) -> list[DoctorLine]:
                 f"({exc.__class__.__name__}) (ENT-DERIVE-1)",
             )
         ]
-    fm = _parse_agent_frontmatter(text)
+    fm = persona_fields(text)
     declared_name = fm.get("name") if fm else None
     if not declared_name:
         return [

@@ -36,6 +36,7 @@ from dadaia_workspace.infrastructure.codex_doctor import (
     dcx8_codex_rules_shape,
 )
 from dadaia_workspace.infrastructure.install_helpers import (
+    persona_fields,
     render_claude_agent,
     resolve_codex_agent_model,
 )
@@ -54,7 +55,6 @@ from dadaia_workspace.infrastructure.runtime_config import (
     merge_claude_settings,
     upsert_kimi_hooks_block,
 )
-from dadaia_workspace.infrastructure.runtime_transforms.codex_assets import _parse_agent_frontmatter
 from dadaia_workspace.infrastructure.runtime_transforms.hook_wrappers import (
     hook_documents,
     hook_wrapper_contents,
@@ -138,7 +138,7 @@ def _agents_agent_rules(
             if _resolved is not None:
                 return render_claude_agent(text, _resolved).encode("utf-8")
             # An authored model renders verbatim; a persona with none is refused.
-            resolve_codex_agent_model(_src.stem, _parse_agent_frontmatter(text).get("model"), None)
+            resolve_codex_agent_model(_src.stem, persona_fields(text).get("model"), None)
             return _src.read_bytes()
 
         rules.append(
