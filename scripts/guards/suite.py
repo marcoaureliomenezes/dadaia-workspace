@@ -122,11 +122,6 @@ def private_import_ratchet(tree: Tree) -> list[str]:
     return out
 
 
-def tracked_suite_only(tree: Tree) -> list[str]:
-    scratch = [p for p in tree.tracked("tests/tmp") if p != "tests/tmp/README.md"]
-    return [f"tracked-scratch: {p} is tracked under tests/tmp/" for p in scratch]
-
-
 def tier_timeout(tree: Tree) -> list[str]:
     s, factor = tree.session, 3 if sys.platform == "win32" else 1
     tiers = s.get("tiers")
@@ -215,10 +210,7 @@ def _session(**change: object) -> Callable[[Path], Session]:
 
 
 def CONTROL(root: Path) -> Session:
-    """Every check green: a healthy session, and violations only in an untracked,
-    gitignored ``tests/tmp/x.py`` (bugs 465, 467: untracked stays out)."""
-    _write(root, ".gitignore", "tests/tmp/*\n")
-    _write(root, "tests/tmp/x.py", _IMPORT * 99 + "# sa-no-such-bug#S99\n")
+    """Every check green: a healthy session and a clean tree."""
     _write(root, "tests/fixtures/statement_ids.json", '{"sa-known-bug": ["S1"]}')
     _write(root, "specs/memory/QUALITY.md", "cites sa-quality-bug#Q1\n")
     _write(root, "tests/unit/test_c.py", "# sa-known-bug#S1 sa-quality-bug#Q1\n" + _ALLOWED * 99)
@@ -234,10 +226,6 @@ def _plant_imports(files: int, per_file: int) -> Callable[[Path], Session]:
         return CONTROL(root)
 
     return plant
-
-
-def _plant_scratch(root: Path) -> None:
-    _write(root, "tests/tmp/x.py", "x = 1\n")  # no .gitignore: the scratch file is tracked
 
 
 def _plant_selector(root: Path) -> Session:
@@ -262,7 +250,6 @@ CHECKS: dict[str, Check] = {
             "file-ceiling": _plant_imports(PRIVATE_IMPORT_FILES + 1, 1),
         },
     ),
-    "tracked-suite-only": (tracked_suite_only, {"tracked-scratch": _plant_scratch}),
     "tier-timeout": (
         tier_timeout,
         {

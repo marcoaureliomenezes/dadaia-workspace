@@ -129,7 +129,7 @@ markers = [
     "small: no process, no real git: 10 s",
     "medium: reaches a process or real git: 60 s",
     "slow: tests over 1s or tests that start a server/subprocess",
-    "tmp: temporary debugging tests excluded from default runs",
+    "tmp: scaffolding of the open job, collected",
     "flaky: observed pass+fail on identical code; being diagnosed",
     "quarantine: out of gating selectors; requires bug= id",
 ]
@@ -143,7 +143,6 @@ norecursedirs = [
     "dist",
     "venv",
     ".venv",
-    "tests/tmp",
 ]
 # Disk guard: only retain tmp_path trees for FAILED tests (default keeps the last 3
 # full sessions, which — combined with per-test venvs — exhausted the disk). See the
