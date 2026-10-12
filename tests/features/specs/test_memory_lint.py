@@ -384,7 +384,7 @@ def test_narrative_exempts_code_fences(tmp_path: Path) -> None:
         "Since 0.4.7 the gate reads nothing.",
         "Candidate c11 rewrote it.",
         "Built in rc-4.",
-        "Delivered by T-047-98.",
+        "Delivered by J3.T2.",
         "Covers FR4.",
     ],
     ids=["iso-date", "release-id", "candidate", "rc", "task-id", "fr-id"],
