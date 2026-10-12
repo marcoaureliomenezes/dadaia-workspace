@@ -562,6 +562,18 @@
       "relates": [
         "test-suite-diet"
       ]
+    },
+    {
+      "id": "closure-test-suite-readouts",
+      "title": "Each candidate closure records suite size, test ratio, churn and mutation score as trends, never gates",
+      "opened": "2026-10-12",
+      "status": "idea",
+      "description": "Baseline measured 2026-10-12 (test audit): 1,393 test functions, 3,276 cases; test-to-production line ratio 1.86x; 8-week churn +3,406 / -3,345; mutation on `_jsonl.py` kills 62-85%. Design: each candidate closure records those readouts in its closure summary beside the prior candidate's, as a trend; none is a gate and none blocks a closure or a promote. The mutation figure comes from review-mutation-on-the-diff. Relation: quality-scorecard-ruler (rates as trend, never a gate) awaits its superseded exit; this entry keeps only the test-suite readouts. Done when: the closure summary of the candidate that picks this entry carries the four readouts with the 2026-10-12 baseline beside them. Placement: rc-15 (operator ruling 2026-10-12). Every design detail not quoted from the audit is agent default, unruled.",
+      "provenance": "operator ruling 2026-10-12, relayed by the main thread: the test-audit proposals go to rc-15 through the backlog; source: test audit report https://claude.ai/artifact/Rn1qCNi2qEcR1wXTNzEznf, proposal R5",
+      "relates": [
+        "quality-scorecard-ruler",
+        "review-mutation-on-the-diff"
+      ]
     }
   ]
 }
