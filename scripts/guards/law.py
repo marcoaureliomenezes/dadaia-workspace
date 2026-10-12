@@ -1,6 +1,7 @@
 """Law checks: what the shipped law, scaffold and persona files say about the code and each other.
 
-Every check reads tracked files as text, JSON, YAML or an AST; none imports the package.
+Checks read tracked files as text, JSON or an AST. Where the package owns the answer (the
+fixed-sections canon, the frontmatter grammar), the check imports that owner.
 """
 
 from __future__ import annotations
@@ -9,10 +10,19 @@ import ast
 import configparser
 import json
 import re
+import sys
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-import yaml
+from run import ROOT
+
+sys.path.insert(0, str(ROOT))
+
+from dadaia_workspace.core.fixed_sections import (  # noqa: E402
+    FIXED_SECTIONS,
+    extract_fixed_section,
+)
+from dadaia_workspace.core.frontmatter import FrontmatterError, parse  # noqa: E402
 
 if TYPE_CHECKING:
     from run import Check, Plant, Tree
@@ -26,7 +36,6 @@ _BIND_CONTRACT = "importlinter:contract:bind-resolution-seam-is-a-single-home"
 _COMMANDS = f"{_PKG}/cli/commands"
 _MAX_BULLET_CHARS = 150
 _PERSONAS = 5
-_FIXED_OPEN = re.compile(r"^<!-- dadaia:fixed (\S+) -->$", re.M)
 _DEFAULT_LITERAL = re.compile(r'principal: main|"--principal", "main"|else "main"')
 _VERSION_MINT = re.compile(r'"tag", "--sort|\]\) \+ 1\}')
 _FORBIDDEN_PHRASES = (
@@ -69,17 +78,21 @@ def fragment_shape(tree: Tree) -> list[str]:
 
 
 def scaffold_marker_pair(tree: Tree) -> list[str]:
-    """A scaffold template carrying a fixed marker ends with that marker pair, empty."""
-    out, seen = [], 0
-    for p in tree.tracked(f"{_PUBLIC}/scaffold"):
-        if not p.endswith(".md"):
+    """Each memory scaffold template ends with the empty marker pair of its fixed section."""
+    out = []
+    for rel, sid in FIXED_SECTIONS:
+        if rel == "constitution.md":
             continue
-        text = tree.read(p)
-        for sid in _FIXED_OPEN.findall(text):
-            seen += 1
-            if not text.endswith(f"<!-- dadaia:fixed {sid} -->\n<!-- /dadaia:fixed {sid} -->\n"):
-                out.append(f"marker: {p} does not end with the empty {sid} marker pair")
-    return out or ([] if seen else ["marker: no scaffold template carries a fixed marker"])
+        p = f"{_PUBLIC}/scaffold/{rel}"
+        if not tree.tracked(p):
+            out.append(f"absent: {p} is not tracked")
+            continue
+        text, body = tree.read(p), extract_fixed_section(tree.read(p), sid)
+        if body is None:
+            out.append(f"absent: {p} carries no {sid} marker pair")
+        elif body or not text.endswith(f"<!-- /dadaia:fixed {sid} -->\n"):
+            out.append(f"marker: {p} does not end with the empty {sid} marker pair")
+    return out
 
 
 def fragment_bullet_not_restated(tree: Tree) -> list[str]:
@@ -98,9 +111,9 @@ def fragment_bullet_not_restated(tree: Tree) -> list[str]:
 def gitflow_names(tree: Tree) -> list[str]:
     """Only ``core/gitflow`` spells the default branch names; the skill cuts work from integration."""
     out = [
-        f"default-literal: {p} spells a default branch name"
-        for p in _package_py(tree)
-        if _DEFAULT_LITERAL.search(tree.read(p))
+        f"{'shipped-literal' if 'public' in Path(p).parts else 'default-literal'}: {p} spells a default branch name"
+        for p in tree.tracked(_PKG)
+        if p.endswith(".py") and _DEFAULT_LITERAL.search(tree.read(p))
     ]
     skill = tree.read(f"{_SKILLS}/dd-gitflow-default/SKILL.md")
     row = next((r for r in skill.splitlines() if r.startswith("| work `")), "").split("|")
@@ -123,12 +136,6 @@ def live_release_reader(tree: Tree) -> list[str]:
     return out
 
 
-def _frontmatter(text: str) -> dict[str, object] | None:
-    end = text.find("\n---\n", 4)
-    parsed = yaml.safe_load(text[4 : end + 1]) if text.startswith("---\n") and end != -1 else None
-    return parsed if isinstance(parsed, dict) else None
-
-
 def persona_files(tree: Tree) -> list[str]:
     """Five persona files, each ``dd-`` named, declaring its name and a numeric band, pinning no model."""
     paths = [p for p in tree.tracked(f"{_PUBLIC}/agents") if p.endswith(".md")]
@@ -136,10 +143,11 @@ def persona_files(tree: Tree) -> list[str]:
         [] if len(paths) == _PERSONAS else [f"roster: {len(paths)} persona files, not {_PERSONAS}"]
     )
     for p in paths:
-        stem, fm = Path(p).stem, _frontmatter(tree.read(p))
-        if fm is None:
+        stem, parsed = Path(p).stem, parse(tree.read(p))
+        if isinstance(parsed, FrontmatterError):
             out.append(f"frontmatter: {p} has no YAML mapping frontmatter")
             continue
+        fm = parsed.data
         if not stem.startswith("dd-") or fm.get("name") != stem:
             out.append(f"name: {p} is not dd- named and declaring its own name")
         band = fm.get("dispatch_band")
@@ -245,6 +253,10 @@ def _write(root: Path, rel: str, text: str) -> None:
     (root / rel).write_text(text, encoding="utf-8")
 
 
+def _pair(sid: str, body: str = "") -> str:
+    return f"<!-- dadaia:fixed {sid} -->\n{body}<!-- /dadaia:fixed {sid} -->\n"
+
+
 _PERSONA = "---\nname: {}\ndispatch_band: 2\n---\nbody\n"
 _PERSONA_NAMES = ("dd-a", "dd-b", "dd-c", "dd-d", "dd-researcher")
 _COMMAND_STEMS = ("a", "_x")
@@ -264,9 +276,11 @@ def CONTROL(root: Path) -> None:
         "scratch/dadaia_workspace/m.py": "import os\nx = os.name\n",
         f"{_FRAGMENTS}/slop-law.md": "## Slop — law (fixed)\n- a law bullet\n",
         f"{_FRAGMENTS}/slop-code.md": "### Slop — code (fixed)\n- a code bullet\n",
-        f"{_PUBLIC}/scaffold/memory/QUALITY.md": (
-            "# Q\n\n<!-- dadaia:fixed slop-code -->\n<!-- /dadaia:fixed slop-code -->\n"
-        ),
+        **{
+            f"{_PUBLIC}/scaffold/{rel}": f"# T\n\n{_pair(sid)}"
+            for rel, sid in FIXED_SECTIONS
+            if rel != "constitution.md"
+        },
         f"{_PUBLIC}/data/AGENTS.md": "- unrelated\n",
         f"{_PUBLIC}/templates/t.md": "- unrelated\n",
         f"{_PKG}/m.py": "import os\n",
@@ -322,9 +336,9 @@ CHECKS: dict[str, Check] = {
         scaffold_marker_pair,
         {
             "marker": _plant(
-                f"{_PUBLIC}/scaffold/memory/QUALITY.md",
-                "# Q\n\n<!-- dadaia:fixed slop-code -->\nbody\n<!-- /dadaia:fixed slop-code -->\n",
-            )
+                f"{_PUBLIC}/scaffold/memory/QUALITY.md", f"# Q\n\n{_pair('slop-tests', 'body\n')}"
+            ),
+            "absent": _plant(f"{_PUBLIC}/scaffold/memory/QUALITY.md", "# Q\n"),
         },
     ),
     "law-fragment-bullet-not-restated": (
@@ -335,6 +349,10 @@ CHECKS: dict[str, Check] = {
         gitflow_names,
         {
             "default-literal": _plant(_MODULE, "x = 'principal: main'\n"),
+            "shipped-literal": _plant(
+                f"{_SKILLS}/dd-gitflow-default/scripts/_worktree_names.py",
+                "x = 'principal: main'\n",
+            ),
             "work-cut": _skill(
                 "dd-gitflow-default/SKILL.md", "| work `w` | Yes | develop | jobs |\n"
             ),

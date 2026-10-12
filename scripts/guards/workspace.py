@@ -16,12 +16,14 @@ import sys
 import tomllib
 import typing
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
+import typer
 from run import ROOT
 
 sys.path.insert(0, str(ROOT))
 
+from dadaia_workspace.cli.main import app  # noqa: E402
 from dadaia_workspace.core.gitflow import Role  # noqa: E402
 from dadaia_workspace.core.harness_registry import L1_ENTRY_HARNESSES  # noqa: E402
 from dadaia_workspace.core.template_history import was_shipped  # noqa: E402
@@ -410,20 +412,30 @@ def _reaches_seam(defs: dict[str, ast.FunctionDef], func: str, param: str) -> bo
     return explore(func, param)
 
 
-def _is_verb(fn: ast.FunctionDef) -> bool:
-    targets = (d.func if isinstance(d, ast.Call) else d for d in fn.decorator_list)
-    return any(isinstance(t, ast.Attribute) and t.attr == "command" for t in targets)
+def _verbs() -> set[tuple[str, str]]:
+    """(module path, function name) of every leaf verb of the live Typer app, decorator or call form."""
+    out: set[tuple[str, str]] = set()
+
+    # Recurse on ``.commands``: Typer's vendored click shim fails isinstance(click.Group).
+    def walk(cmd: Any) -> None:
+        if getattr(cmd, "commands", None) is None:
+            out.add((cmd.callback.__module__.replace(".", "/") + ".py", cmd.callback.__name__))
+        else:
+            for sub in cmd.commands.values():
+                walk(sub)
+
+    walk(typer.main.get_command(app))
+    return out
 
 
 def bind_seam_reached(tree: Tree) -> list[str]:
     """Each ``context``/``specs_dir`` parameter of a verb reaches the resolution seam, with no
     ``dadaia-workspace`` literal default."""
     out, seen = [], 0
-    for rel in tree.tracked(_COMMANDS):
-        if not rel.endswith(".py") or Path(rel).stem.startswith("_"):
-            continue
+    tracked = set(tree.tracked(_COMMANDS))
+    for rel, name in sorted(v for v in _verbs() if v[0] in tracked):
         defs = {n.name: n for n in _ast(tree, rel).body if isinstance(n, ast.FunctionDef)}
-        for fn in (f for f in defs.values() if _is_verb(f)):
+        for fn in (defs[name],) if name in defs else ():
             args = fn.args.args + fn.args.kwonlyargs
             defaults = [None] * (len(fn.args.args) - len(fn.args.defaults)) + fn.args.defaults
             for arg, default in zip(args, [*defaults, *fn.args.kw_defaults], strict=False):
@@ -459,7 +471,7 @@ _SPECS_TEMPLATE = "# AGENTS\n\n<!-- specs-canon -->\n"
 _SCAFFOLD_TEXT = "# area law\n"
 _VERB = (
     "@app.command()\n"
-    "def run(context: str = typer.Option(None)) -> None:\n"
+    "def certify(context: str = typer.Option(None)) -> None:\n"
     "    ctx = context\n"
     "    resolve_context_for_cli(ctx)\n"
 )
@@ -475,7 +487,7 @@ _PYTHON_FILES = {
     "infrastructure/agent_transcodes.py": "x = 1\n",
     "features/workspace/service.py": "x = 1\n",
     "cli/commands/init.py": "x = 1\n",
-    "cli/commands/run.py": _VERB,
+    "cli/commands/certify.py": _VERB,
     "cli/redact.py": "b = ContextRedactor(x)\n",
     "core/gitflow.py": "x = 1\n",
     "features/specs/doctor_common.py": "x = 1\n",
@@ -604,7 +616,10 @@ CHECKS: dict[str, Check] = {
     "workspace-single-homes": (
         single_homes,
         {rule: _py(rel, text) for rule, rel, text in _SINGLE_HOMES}
-        | {"mask-home": _py(_PRIVACY.removeprefix(f"{_PKG}/"), "x = 1\n")},
+        | {
+            "mask-home": _py(_PRIVACY.removeprefix(f"{_PKG}/"), "x = 1\n"),
+            "redactor-home": _py(_REDACT.removeprefix(f"{_PKG}/"), "x = 1\n"),
+        },
     ),
     "workspace-publish-never-rewrites": (
         publish_never_rewrites,
@@ -634,9 +649,9 @@ CHECKS: dict[str, Check] = {
         bind_seam_reached,
         {
             "hardcoded-default": _py(
-                "cli/commands/run.py", _VERB.replace("typer.Option(None)", '"dadaia-workspace"')
+                "cli/commands/certify.py", _VERB.replace("typer.Option(None)", '"dadaia-workspace"')
             ),
-            "unreached": _py("cli/commands/run.py", _VERB.replace("ctx)", "None)")),
+            "unreached": _py("cli/commands/certify.py", _VERB.replace("ctx)", "None)")),
         },
     ),
 }
