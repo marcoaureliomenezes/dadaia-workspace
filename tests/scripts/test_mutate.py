@@ -147,16 +147,78 @@ _TEST_TWO = (
 )
 
 
-def test_a_mutant_runs_only_the_tests_that_execute_its_line_and_an_unexecuted_line_is_uncovered(
+def test_a_mutant_runs_every_selected_test_and_an_unexecuted_line_is_uncovered(
     tmp_path: Path,
 ) -> None:
     root = _planted(tmp_path, files={"pkg/two.py": _TWO, "tests/test_two.py": _TEST_TWO})
     done = _run(root, "--module", "pkg/two.py", "--tests", "tests/test_two.py")
     assert done.stdout.splitlines() == [
-        'KILLED pkg/two.py:2 return: "a" -> None [tests/test_two.py::test_a]',
+        'KILLED pkg/two.py:2 return: "a" -> None [tests/test_two.py::test_a, tests/test_two.py::test_b]',
         'KILLED pkg/two.py:6 return: "b" -> None [tests/test_two.py::test_b]',
         'UNCOVERED pkg/two.py:10 return: "u" -> None',
         "mutation score 2/3",
+    ]
+    assert done.returncode == 0
+
+
+_FG = 'def f():\n    return "x"\n\n\ndef g():\n    return "y"\n'
+_NO_RANDOM = {"pytest.ini": "[pytest]\naddopts = -p no:randomly\n"}
+_HOME_F = {
+    "tests/test_home.py": 'from pkg import fg\n\n\ndef test_f():\n    assert fg.f() == "x"\n'
+}
+_FG_ARGS = ["--module", "pkg/fg.py", "--home", "tests/test_home.py::test_f", "--tests"]
+
+
+def test_a_test_depending_on_work_an_earlier_test_triggered_is_still_run_and_kept(
+    tmp_path: Path,
+) -> None:
+    shared = (
+        "import pytest\n\nfrom pkg import fg\n\n\n"
+        '@pytest.fixture(scope="module")\ndef gv():\n    return fg.g()\n\n\n'
+        "def test_first(gv):\n    assert True\n\n\n"
+        'def test_second(gv):\n    assert fg.f() == "x"\n    assert gv == "y"\n'
+    )
+    root = _planted(
+        tmp_path,
+        files={**_NO_RANDOM, **_HOME_F, "pkg/fg.py": _FG, "tests/test_shared.py": shared},
+    )
+    done = _run(root, *_FG_ARGS, "tests/test_home.py", "tests/test_shared.py")
+    assert done.stdout.splitlines() == [
+        'KILLED pkg/fg.py:2 return: "x" -> None'
+        " [tests/test_home.py::test_f, tests/test_shared.py::test_second]",
+        'KILLED pkg/fg.py:6 return: "y" -> None [tests/test_shared.py::test_second]',
+        "mutation score 2/2",
+        "KEPT tests/test_shared.py::test_second",
+        "NO-KILL tests/test_shared.py::test_first",
+    ]
+    assert done.returncode == 0
+
+
+def test_a_mutant_that_breaks_one_files_import_still_credits_every_other_failing_test(
+    tmp_path: Path,
+) -> None:
+    root = _planted(
+        tmp_path,
+        files={
+            **_NO_RANDOM,
+            **_HOME_F,
+            "pkg/fg.py": _FG,
+            "tests/test_x.py": (
+                'from pkg import fg\n\nV = fg.g().upper()\n\n\ndef test_v():\n    assert V == "Y"\n'
+            ),
+            "tests/test_z.py": (
+                'from pkg import fg\n\n\ndef test_y():\n    assert fg.f() == "x"\n'
+                '    assert fg.g() == "y"\n'
+            ),
+        },
+    )
+    done = _run(root, *_FG_ARGS, "tests/test_home.py", "tests/test_z.py", "tests/test_x.py")
+    assert done.stdout.splitlines() == [
+        'KILLED pkg/fg.py:2 return: "x" -> None [tests/test_home.py::test_f, tests/test_z.py::test_y]',
+        'KILLED pkg/fg.py:6 return: "y" -> None [tests/test_x.py::test_v, tests/test_z.py::test_y]',
+        "mutation score 2/2",
+        "KEPT tests/test_x.py::test_v",
+        "KEPT tests/test_z.py::test_y",
     ]
     assert done.returncode == 0
 
