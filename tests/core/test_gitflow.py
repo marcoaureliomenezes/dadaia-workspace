@@ -73,3 +73,11 @@ def test_from_mapping_reads_the_block_keys_and_maps_their_roles() -> None:
 def test_from_mapping_refuses_invalid(mapping: object) -> None:
     with pytest.raises(ValueError):
         from_mapping(mapping)
+
+
+def test_the_history_rewrite_rule_scopes_to_the_branches_that_never_rebase() -> None:
+    """gitflow-pu3-refuses-the-job-branch-rebase-merge-prescribes: a wt/* branch is rebased by its owner."""
+    skill = (Path(__file__).resolve().parents[2] / "dadaia_workspace/public/skills/dd-gitflow-default/SKILL.md").read_text("utf-8")
+    rule = next(ln for ln in skill.splitlines() if "pushed history" in ln)
+    rows = [ln.split("|")[1].split()[0] for ln in skill.splitlines() if re.match(r"\| (work|integration|principal|job|backlog|task|plain) ", ln)]
+    assert [r for r in rows if re.search(rf"\b{r}\b", rule)] == ["work", "integration", "principal"]
