@@ -418,7 +418,7 @@ def test_memory_is_not_a_doctor_ledger() -> None:
 
 
 def test_a_declared_verify_line_runs_as_argv_never_through_a_shell(root: Path) -> None:
-    """AC1.2: the `verify:` line is split by shlex and run as argv: `;` and `$(...)` are words."""
+    """AC1.2: the `verify:` line is split by the one declared-line reader and run as argv: `;` and `$(...)` are words."""
     line = "verify: python scripts/ci.py job ; touch PWNED $(touch PWNED2)\n"
     commit(root / "repos/r", "AGENTS.md", line)
     git(root / TREE, "merge", "-q", "--ff-only", "feature/0.5.0")
@@ -638,3 +638,37 @@ def test_a_declared_line_splits_on_whitespace_alone(
     end = _law_end(tmp_path, law)
 
     assert end._declared_argv(tmp_path, "work", key) == argv
+
+
+@pytest.mark.parametrize(
+    ("law", "argv"),
+    [
+        (
+            b'verify: pytest -m "not e2e and not quarantine" tests\n',
+            ["pytest", "-m", "not e2e and not quarantine", "tests"],
+        ),
+        (b'verify: python "C:\\work x\\ci.py" job\n', ["python", "C:\\work x\\ci.py", "job"]),
+        (
+            b"verify: sh -c 'export A=1; python ci.py job' x\n",
+            ["sh", "-c", "export A=1; python ci.py job", "x"],
+        ),
+    ],
+    ids=["quoted-word", "quoted-windows-path-with-space", "sh-c-argument"],
+)
+def test_a_quote_groups_one_word_of_a_declared_line(
+    tmp_path: Path, law: bytes, argv: list[str]
+) -> None:
+    """AC15.1: words split on whitespace, a quote groups a word, a backslash stays literal."""
+    end = _law_end(tmp_path, law)
+
+    assert end._declared_argv(tmp_path, "work", "verify:") == argv
+
+
+def test_an_unbalanced_quote_in_a_declared_line_is_one_refusal_with_one_fix(tmp_path: Path) -> None:
+    end = _law_end(tmp_path, b'verify: pytest -m "not e2e tests\n')
+
+    with pytest.raises(end.Refusal) as refused:
+        end._declared_argv(tmp_path, "work", "verify:")
+
+    assert refused.value.fix.startswith("Operator action: ")
+    assert "\n" not in refused.value.fix
