@@ -146,6 +146,12 @@ def test_public_law_names_no_private_pipeline() -> None:
     assert _denied_lines(globs, _PRIVATE_PIPELINE, None) == []
 
 
+def test_public_law_names_no_adr_number_or_library_path() -> None:
+    """AC4.1: text agents read and scripts they run cite no ADR number and no library path."""
+    globs = ("public/**/*.md", "public/skills/**/*.py", "public/skills/**/*.json", "public/data/**/*", "public/agents/**/*")
+    assert _denied_lines(globs, r"ADR \d{4}|dadaia_workspace/", _BANNER_SPAN[0]) == []
+
+
 _BARE_CLI_RE = re.compile(r"(?<![\w./-])dadaia(?:-workspace)?(?= [a-z-])")
 _UVX_INIT_RE = re.compile(r"uvx dadaia-workspace(?:@\S+)? init\b")
 _VENV_CALL_RE = re.compile(r"\.dadaia/\.venv/bin/dadaia((?: [a-z][\w-]*)+)([^`]*)")
