@@ -136,3 +136,35 @@ def test_a_selected_test_that_kills_no_mutant_is_no_kill_and_never_deletable(
     done = _run(root, *_HOME, "--tests", "tests/test_m.py", "tests/test_other.py")
     assert done.stdout.splitlines() == [*_MATRIX, "NO-KILL tests/test_other.py::test_noop"]
     assert done.returncode == 0
+
+
+_TWO = 'def a():\n    return "a"\n\n\ndef b():\n    return "b"\n\n\ndef unused():\n    return "u"\n'
+_TEST_TWO = (
+    "from pathlib import Path\n\nfrom pkg import two\n\n\n"
+    'def test_a():\n    assert two.a() == "a"\n\n\n'
+    "def test_b():\n"
+    '    assert two.b() == "b"\n'
+    "    assert 'return \"a\"' in Path(two.__file__).read_text()\n"
+)
+
+
+def test_a_mutant_runs_only_the_tests_that_execute_its_line_and_an_unexecuted_line_is_uncovered(
+    tmp_path: Path,
+) -> None:
+    root = _planted(tmp_path, files={"pkg/two.py": _TWO, "tests/test_two.py": _TEST_TWO})
+    done = _run(root, "--module", "pkg/two.py", "--tests", "tests/test_two.py")
+    assert done.stdout.splitlines() == [
+        'KILLED pkg/two.py:2 return: "a" -> None [tests/test_two.py::test_a]',
+        'KILLED pkg/two.py:6 return: "b" -> None [tests/test_two.py::test_b]',
+        'UNCOVERED pkg/two.py:10 return: "u" -> None',
+        "mutation score 2/3",
+    ]
+    assert done.returncode == 0
+
+
+def test_a_red_baseline_exits_1_before_any_mutation(tmp_path: Path) -> None:
+    root = _planted(tmp_path, files={"tests/test_red.py": "def test_fails():\n    assert False\n"})
+    done = _run(root, "--module", "pkg/m.py", "--tests", "tests/test_red.py")
+    assert done.stdout.splitlines() == ["BASELINE RED pkg/m.py: tests/test_red.py::test_fails"]
+    assert done.returncode == 1
+    assert (root / "pkg/m.py").read_text("utf-8") == _HEAD_M
