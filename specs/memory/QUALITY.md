@@ -10,27 +10,27 @@ tags: [testing, pytest, ci, quality, test-architecture, flake, quarantine, priva
 
 ### P-21 · We give every test a size tier with an enforced timeout applied at collection, and an explicit `@pytest.mark.timeout` is never overridden.
 Measured by: `poetry run python scripts/guards/run.py` prints `PASS tier-timeout`; `--planted` turns it red on a test without its tier timeout and on an overridden explicit timeout.
-ADR: 0167 (accepted)
+ADR: 0167
 Rationale: a test needing more time than its tier is mis-tiered.
 
 ### P-22 · We gate quarantine on a registered bug: a `quarantine` mark without `bug=` refuses collection actionably, and every gating selector excludes the lane.
 Measured by: `poetry run python scripts/guards/run.py` prints `PASS quarantine-needs-bug`; `--planted` turns it red on a `quarantine` mark without `bug=` and on a gating selector in `.github/workflows` that keeps the lane.
-ADR: 0167 (accepted)
+ADR: 0167
 Rationale: the registered id is what makes the lane temporary.
 
 ### P-23 · We ratchet private-symbol imports in `tests/**` downward only; a per-statement `# allow-private-import: <reason>` marker is the sole exception.
 Measured by: `poetry run python scripts/guards/run.py` prints `PASS private-import-ratchet` (AST-exact; `scripts/guards/suite.py` is the ceiling's numeric home).
-ADR: 0167 (accepted)
+ADR: 0167
 Rationale: a test reaching into a private symbol turns a safe refactor red.
 
 ### P-28 · We keep the pytest marker set closed and single-sourced: `pyproject.toml`'s `markers` is the one list, and `flaky`/`quarantine` are always among them.
 Measured by: `pytest --collect-only -q` exits 0 under `--strict-markers` in `pyproject.toml`'s `addopts`, which refuses any mark absent from `markers`.
-ADR: 0167 (accepted)
+ADR: 0167
 Rationale: a marker known to one file and unknown to the other is a silent exclusion lane.
 
 ### P-33 · Only the library's own `.github/workflows/eval.yml` calls a model API, and only in `workflow_dispatch` or `schedule` jobs, reading the model secret at job level from the `evals` environment and scanning every upload first (ADR 0217); no other library workflow uses an `anthropics/*` action or references a model secret; the shipped law states no rule about a user's CI.
 Measured by: `poetry run python scripts/guards/run.py` prints `PASS no-model-api-in-ci`.
-ADR: 0217 (accepted, superseding 0177 and 0179)
+ADR: 0217
 Rationale: a model call on a PR path fails closed without the paid key and exposes it; evals measure what ships, from the repo that ships it.
 
 ## Test architecture
