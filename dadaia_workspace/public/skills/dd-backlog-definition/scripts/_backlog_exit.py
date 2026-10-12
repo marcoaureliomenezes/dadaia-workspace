@@ -9,27 +9,40 @@ exited must be told so rather than diagnosed for a status it no longer has.
 
 from __future__ import annotations
 
+import subprocess
+import sys
 from pathlib import Path
 from typing import Any
 
+import _clock
+import _git
 from _backlog_schema import DISPOSITIONS
-from _backlog_store import SCRIPT, Items, Refusal
-from _backlog_write import today
-from _release_schema import origin
+from _backlog_store import SCRIPT, Items
+from _bugs_store import read_records
+from _refusal import Refusal
 from _specs import quote
+
+#: `release.py`'s Origin parser, run as its own script: the one reader of the line.
+_RELEASE = (
+    Path(__file__).resolve().parents[2] / "dd-release-implementation" / "scripts" / "release.py"
+)
+
+
+def _origin_ids(spec: Path) -> list[str]:
+    """The `backlog:` ids of *spec*'s first Origin line, as `release.py origin` prints them."""
+    done = subprocess.run([sys.executable, str(_RELEASE), "origin", str(spec)], env=_git.scrubbed_env(),
+                          capture_output=True, text=True, encoding="utf-8", errors="replace", check=False)  # fmt: skip
+    if done.returncode:
+        lines = done.stderr.splitlines()
+        fix = next((ln[5:] for ln in lines if ln.startswith("fix: ")), f"{sys.executable} {_RELEASE} origin {spec}")  # fmt: skip
+        raise Refusal(f"Origin unreadable: {lines[0] if lines else done.returncode}", fix)
+    return [ln[len("backlog ") :] for ln in done.stdout.splitlines() if ln.startswith("backlog ")]
 
 
 def _picks(specs: Path, slug: str) -> list[str]:
-    """Each release whose candidate SPEC (``rc-<N>/``) carries *slug* in its
-    Origin's `backlog:` clause — read by `release.py`'s one parser."""
-    picks = []
-    for spec in (specs / "releases").glob("*/rc-*/SPEC.md"):
-        try:
-            if slug in origin(spec.read_text(encoding="utf-8")).get("backlog", []):
-                picks.append(spec.parents[1].name)
-        except ValueError:
-            continue  # a malformed Origin picks nothing; `release.py check` reports it
-    return sorted(set(picks), key=lambda v: [int(p) if p.isdigit() else -1 for p in v.split(".")])
+    """Each release whose candidate SPEC (``rc-<N>/``) carries *slug* in its Origin's `backlog:` clause."""
+    picks = {s.parents[1].name for s in (specs / "releases").glob("*/rc-*/SPEC.md") if slug in _origin_ids(s)}  # fmt: skip
+    return sorted(picks, key=lambda v: [int(p) if p.isdigit() else -1 for p in v.split(".")])
 
 
 def _release(specs: Path, slug: str, disposition: str, release: str | None) -> None:
@@ -57,16 +70,9 @@ def _reason(specs: Path, slug: str, disposition: str, reason: str | None) -> Non
 
 
 def _bug(specs: Path, slug: str, disposition: str, reason: str | None) -> None:
-    """The id of the BUGS.jsonl record the item is handed to, read by the bug
-    skill's reader — imported here, so only this exit depends on that skill."""
-    from _bugs_store import Refusal as BugRefusal  # noqa: PLC0415
-    from _bugs_store import read_records  # noqa: PLC0415
-
+    """The id of the BUGS.jsonl record the item is handed to, read by the bug skill's reader."""
     bugs = specs / "bugs" / "BUGS.jsonl"
-    try:
-        ids = {record.get("id") for record in read_records(bugs)}
-    except BugRefusal as exc:  # translated at the seam: one Refusal type leaves this module
-        raise Refusal(str(exc), exc.fix) from exc
+    ids = {record.get("id") for record in read_records(bugs)}
     if reason not in ids:
         raise Refusal(
             f"--reason {reason!r} names no record of {bugs}: `to-bug` hands {slug!r} to a registered bug",
@@ -113,7 +119,7 @@ def histo_record(entry: dict[str, Any], values: dict[str, Any]) -> dict[str, Any
     """The one histo-record-v1 shape: ``entry`` IS the removed object."""
     return {
         "id": entry["id"],
-        "ts": today(),
+        "ts": _clock.today(),
         "disposition": values["disposition"],
         "release": values["release"],
         "reason": values["reason"],

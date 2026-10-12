@@ -25,8 +25,6 @@ sys.path[:0] = [
     str(Path(__file__).resolve().parent),
     str(Path(__file__).resolve().parents[2] / "dd-bug-resolution" / "scripts"),
 ]
-#: `release.py`'s Origin parser, the line's one owner.
-sys.path.append(str(Path(__file__).resolve().parents[2] / "dd-release-implementation" / "scripts"))
 
 import _backlog_exit as ex
 import _backlog_write as wr
