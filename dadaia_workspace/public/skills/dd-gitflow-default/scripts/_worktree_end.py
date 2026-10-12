@@ -11,6 +11,7 @@ from __future__ import annotations
 import fnmatch
 import json
 import os
+import shlex
 import shutil
 import subprocess
 import sys
@@ -155,9 +156,15 @@ def _declared(tree: Path, work: str, key: str) -> str:
 
 
 def _declared_argv(tree: Path, work: str, key: str) -> list[str]:
-    """The words of the `<key>` line: whitespace-split, no quoting rule, so a backslash path and
-    `;` or `$(...)` stay plain words; `[]` when absent."""
-    return _declared(tree, work, key).split()
+    """The words of the `<key>` line: split on whitespace, a quote groups a word, a backslash is
+    literal, `;` and `$(...)` are plain words; `[]` when absent."""
+    lex = shlex.shlex(_declared(tree, work, key), posix=True)
+    lex.whitespace_split, lex.escape, lex.commenters = True, "", ""
+    try:
+        return list(lex)
+    except ValueError as error:
+        raise Refusal(f"the {key} line of {work} has {error}",
+                      f"Operator action: close the quote in the {key} line of AGENTS.md on {work} and commit it") from error  # fmt: skip
 
 
 def _gate(tree: Path, work: str, *, required: bool = True) -> None:

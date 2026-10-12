@@ -5,7 +5,7 @@ Workspace SDD rules live in the root `AGENTS.md`; spec artifact rules live in `s
 
 Edit this file directly for repo-specific behavior. It is not overwritten by `.dadaia/.venv/bin/dadaia public install`.
 
-`verify: <one argv command>` (required by every job merge) and `tests: <globs>` (test paths an implementation commit may not touch), each as a line starting at column 0 here; `WT merge` reads them from the work branch.
+`verify: <one argv command>` (required by every job merge) and `tests: <globs>` (test paths an implementation commit may not touch), each as a line starting at column 0 here; `WT merge` reads them from the work branch; a line's words split on whitespace, quotes group a word, and backslashes are literal.
 
 ## 1. Source boundaries
 
