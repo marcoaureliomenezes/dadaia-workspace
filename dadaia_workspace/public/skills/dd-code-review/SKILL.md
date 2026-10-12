@@ -57,6 +57,7 @@ axes are reported side by side with equal weight, so no axis hides another's fin
 
 - A fix qualifies only when it reproduces the failure on the executed path, tests for the real reason, fixes the cause and proves it green — a workaround or symptom patch is a finding.
 - The verdict is the enum `APPROVED`/`REJECTED`: on a worktree, written by `verdict.py` (`worktrees/AGENTS.md` §2); on a PR, returned as text the main thread quotes (`dd-gitflow-default` §3b).
+- The reviewer receives the tree's preflight line; a re-review judges the finding's class, not only the changed lines.
 - A green internal gate that diverges from real consumer behavior is itself a bug.
 
 ## 5. Done when — the report carries

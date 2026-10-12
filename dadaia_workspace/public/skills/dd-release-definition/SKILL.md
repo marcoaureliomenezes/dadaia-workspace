@@ -28,6 +28,7 @@ description: >
 - One row per touched unit, columns `unit | today | bugs | verdict | why`; DELETE vs KEEP is the deletion test (delete the unit: does complexity vanish or reappear across callers?); verdicts follow the root map §1 work order, ADD only for what no unit can carry (`today` `—`, `why` says why).
 - REBUILD is mandatory when the unit carries ≥ 2 bugs, the demand changes its fundamental behaviour, the change would need a flag, branch, special case or second path, or its contract contradicts the demand; the engineer and the reviewer judge these triggers.
 - §1.1 Authorities: one row per touched question, one authority each; `consults` call it, `deleted` leave with the row's bug.
+- A row that REBUILDs or DELETEs a grammar, format, public name or fix line names its consumers; a read-only `dd-researcher` pre-mortem precedes the define review and the PLAN answers each hit.
 - The PLAN §1 skeleton:
 
 ```markdown

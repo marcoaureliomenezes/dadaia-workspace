@@ -24,6 +24,9 @@ description: >
 6. The task is the unit of dispatch, never a job: sub-agents work disjoint tasks in parallel, one per task worktree (`worktrees/AGENTS.md` §1).
 7. Dispatch by the job file's `who:` (shape rule: `dd-release-definition` §5): `sr` → dd-sw-engineer-sr, `jr` → dd-sw-engineer-jr, `pe`/`cr` → the owning persona. Pass no model; the installed template decides.
 8. A REJECTED verdict whose finding names a `jr` task re-dispatches that task to dd-sw-engineer-sr.
+9. Dispatch a review only for a tree whose `python3 .agents/skills/dd-gitflow-default/scripts/worktree.py preflight <tree>` prints `PREFLIGHT PASS`, and hand the reviewer that line; a red tree goes back unreviewed, since the preflight replaces the implementer's own verify run before hand-off.
+10. A ruling carries its reproduction and a consumer sweep across every repo of the context.
+11. A rework brief names the finding's contract class, requires its RED test first and a sweep of every other site of the class, and carries the bug history to read, the seams with evidence and the merge hazards with sibling jobs.
 
 ## 2. Conflict resolution
 

@@ -44,7 +44,8 @@ description: >
 - Task committed under its id in its task worktree; the main thread runs its `WT merge` (`worktrees/AGENTS.md` §2).
 - Current step (`RC-FLOW.md`) identified before attempting its unlock action.
 - `verify:` line green before any push; the reviewer's `APPROVED` on the work-branch head before its PR (`dd-gitflow-default` §3b).
-- At candidate closure: the Reconciliation job merged (`RC-FLOW.md` step 4) -> candidate PR -> the promote-or-continue gate.
+- The hand-back carries evidence per item, extending the engineer's evidence line: the consumer sweep for a changed grammar, format, public name or fix line (other repos as a count, never by name) and evidence for each QA-lens item of `dd-code-review` §6; old asserts follow the root map §1 test line; a bare PASS goes back unreviewed.
+- At candidate closure: the Reconciliation job merged (`RC-FLOW.md` step 4) -> candidate PR -> the promote-or-continue gate; the closure summary carries `python3 .agents/skills/dd-handoff-emitter/scripts/verdict.py stats <M.m.p>-rc<N>`.
 
 ## 4. References
 
