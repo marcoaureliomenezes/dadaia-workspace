@@ -48,7 +48,7 @@ def _lines(root: Path, verb: str, tree: Path) -> tuple[int, list[str]]:
 
 
 def _refused(root: Path, tree: Path, job: str) -> None:
-    folder = f"{tree}/tests/tmp/{job}"
+    folder = tree / "tests" / "tmp" / job
     error = f"[error] {folder} exists: promote each test in it into its contract's home or delete it before the job lands"  # fmt: skip
     fix = f"fix: Operator action: promote each test in {folder} into its contract's home or delete it, then commit the removal"  # fmt: skip
     head = git(tree, "rev-parse", "HEAD").strip()
