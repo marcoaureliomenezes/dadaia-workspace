@@ -11,6 +11,7 @@ import json
 import re
 import sys
 from pathlib import Path
+from typing import Any
 
 # No `__pycache__` beside a projected skill.
 sys.dont_write_bytecode = True
@@ -35,6 +36,7 @@ from _release_schema import (
 )
 from _release_store import (
     SCRIPT,
+    Live,
     commit,
     live_release,
     open_bug_ids,
@@ -161,16 +163,8 @@ def _memory(args: argparse.Namespace, specs: Path) -> int:
     return 0
 
 
-def _ship(args: argparse.Namespace, specs: Path) -> int:
-    """CLOSURE -> shipped {sha, pr, ts}, one `delivered` histo line, the whole directory
-    moved to `_archive/<v>/`, never deleted; refused on any `ship_findings`."""
-    live, ts = live_release(specs), utc_now()
-    if not (SHA_RE.match(args.sha) and (args.pr is None or args.pr.isdigit() and int(args.pr) > 0)):
-        sha = args.sha if SHA_RE.match(args.sha) else "$(git rev-parse --short HEAD)"
-        raise choice(Refusal(f"--sha {args.sha!r} / --pr {args.pr!r}: a hex sha and, if given, a PR number",
-                             f"{SCRIPT} ship --sha {sha}"), SHIP_PR)  # fmt: skip
-    if found := ship_findings(specs):
-        raise Refusal(found[0]["message"], found[0]["fix"])
+def _allowed_open_bugs(args: argparse.Namespace, specs: Path) -> list[str]:
+    """The `--allow-open` ids, once each, matching the open bugs exactly; refuses otherwise."""
     open_ids = open_bug_ids(specs)
     allowed = sorted(set(args.allow_open))
     if len(allowed) != len(args.allow_open):
@@ -194,7 +188,12 @@ def _ship(args: argparse.Namespace, specs: Path) -> int:
             f"--allow-open names bug(s) not open: {', '.join(extra)}",
             f"Operator action: remove --allow-open for {', '.join(extra)}",
         )
-    log = [entry for entry in live.state.get("log") or [] if isinstance(entry, dict)]
+    return allowed
+
+
+def _refuse_unauthorized(allowed: list[str], state: dict[str, Any]) -> None:
+    """Each carried open bug needs a verbatim authorization note and a closure-summary carry."""
+    log = [entry for entry in state.get("log") or [] if isinstance(entry, dict)]
     summaries = [str(entry.get("text", "")) for entry in log if entry.get("kind") == "summary"]
     for bug_id in allowed:
         authorized = any(
@@ -214,6 +213,10 @@ def _ship(args: argparse.Namespace, specs: Path) -> int:
                 f"Operator action: add {bug_id} to the kind: note verbatim authorization "
                 "and the kind: summary carried field",
             )
+
+
+def _record_ship(args: argparse.Namespace, specs: Path, live: Live, ts: str) -> None:
+    """Write `shipped`, the `delivered` histo line and move the directory to `_archive/<v>/`."""
     line = json.dumps({"id": live.release_id, "ts": ts, "disposition": "delivered",
                        "release": live.release_id, "reason": None, "entry": None,
                        "summary": None}) + "\n"  # fmt: skip
@@ -226,6 +229,20 @@ def _ship(args: argparse.Namespace, specs: Path) -> int:
     with histo.open("a", encoding="utf-8") as ledger:
         ledger.write(line)
     live.release_dir.rename(specs / "releases" / "_archive" / live.release_id)
+
+
+def _ship(args: argparse.Namespace, specs: Path) -> int:
+    """CLOSURE -> shipped {sha, pr, ts}, one `delivered` histo line, the whole directory
+    moved to `_archive/<v>/`, never deleted; refused on any `ship_findings`."""
+    live, ts = live_release(specs), utc_now()
+    if not (SHA_RE.match(args.sha) and (args.pr is None or args.pr.isdigit() and int(args.pr) > 0)):
+        sha = args.sha if SHA_RE.match(args.sha) else "$(git rev-parse --short HEAD)"
+        raise choice(Refusal(f"--sha {args.sha!r} / --pr {args.pr!r}: a hex sha and, if given, a PR number",
+                             f"{SCRIPT} ship --sha {sha}"), SHIP_PR)  # fmt: skip
+    if found := ship_findings(specs):
+        raise Refusal(found[0]["message"], found[0]["fix"])
+    _refuse_unauthorized(_allowed_open_bugs(args, specs), live.state)
+    _record_ship(args, specs, live, ts)
     print(
         f"[ok] release {live.release_id} shipped at {args.sha}"
         + (f" (PR #{args.pr})" if args.pr else "")
@@ -262,7 +279,7 @@ def main(argv: list[str] | None = None) -> int:
     try:
         return _VERBS[args.verb](args, specs)
     except (Refusal, drift.Refusal) as refusal:
-        return int(refuse(refusal, specs))
+        return refuse(refusal, specs)
 
 
 if __name__ == "__main__":
