@@ -8,10 +8,16 @@ import json
 import re
 import subprocess
 import sys
-from datetime import UTC, datetime
 from pathlib import Path
 
-_SLUG = re.compile(r"^[a-z0-9][a-z0-9-]*$")
+sys.dont_write_bytecode = True
+#: One bootstrap statement: the kernel, at the front.
+sys.path[:0] = [str(Path(__file__).resolve().parents[2] / "dd-bug-resolution" / "scripts")]
+
+import _clock
+import _ledger
+
+_CONTEXT = r"^[a-z0-9][a-z0-9-]*$"
 _WORKTREE = Path(__file__).resolve().parents[2] / "dd-gitflow-default" / "scripts" / "worktree.py"
 _OWN = (
     "agent", "verdict", "verdict_reason", "reviewed_sha", "diff_sha256",
@@ -46,9 +52,10 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--verdict", required=True, choices=("APPROVED", "REJECTED"))
     parser.add_argument("--reason", required=True)
     args = parser.parse_args(argv)
-    for name in ("context", "slug"):
-        if not _SLUG.match(getattr(args, name)):
-            return _refuse(f"--{name} must match {_SLUG.pattern}")
+    slug = _ledger.load_schema("backlog-v1")["$defs"]["slug"]["pattern"]
+    for name, pattern in (("context", _CONTEXT), ("slug", slug)):
+        if not re.fullmatch(pattern, getattr(args, name)):
+            return _refuse(f"--{name} must match {pattern}")
     body = _body(sys.stdin.read())
     if isinstance(body, str):
         return _refuse(body)
@@ -61,12 +68,12 @@ def main(argv: list[str] | None = None) -> int:
         sys.stderr.write(done.stderr)
         return done.returncode
     bound = json.loads(done.stdout)
-    now = datetime.now(UTC)
+    now = _clock.now_iso()
     handoff = {
         "schema_version": "handoff-v1.2",
         "agent": "dd-code-reviewer",
         "context": args.context,
-        "produced_at": now.strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "produced_at": now,
         "verdict": args.verdict,
         "verdict_reason": args.reason,
         "scope": bound["scope"],
@@ -76,7 +83,7 @@ def main(argv: list[str] | None = None) -> int:
     }
     out = Path(bound["root"]) / ".dadaia/handoff" / args.context
     out.mkdir(parents=True, exist_ok=True)
-    target = out / f"{now:%Y-%m-%dT%H%M%SZ}-dd-code-reviewer-{args.slug}.handoff.json"
+    target = out / f"{now.replace(':', '')}-dd-code-reviewer-{args.slug}.handoff.json"
     try:
         with target.open("x", encoding="utf-8") as fh:
             fh.write(json.dumps(handoff, indent=2) + "\n")
