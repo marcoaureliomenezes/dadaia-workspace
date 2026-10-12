@@ -48,7 +48,6 @@ dadaia-workspace = "dadaia_workspace.cli.main:_safe_app"
 python = "^3.12"
 typer = ">=0.27.1"
 rich = ">=13,<16"
-pyyaml = "^6.0"
 jsonschema = "^4"
 packaging = ">=22"
 
@@ -59,6 +58,8 @@ pytest-cov = ">=5,<8"
 ruff = ">=0.16.2"
 mypy = ">=2.3.0,<3.0"
 types-PyYAML = ">=6"
+# the differential oracle of the frontmatter owner (tests and guard scripts only)
+pyyaml = "^6.0"
 pytest-randomly = "^4.1.0"
 import-linter = ">=2.11"
 # The declared build backend, so the bootstrap e2e can `pip wheel --no-build-isolation`
