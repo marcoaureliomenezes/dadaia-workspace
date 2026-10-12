@@ -90,8 +90,9 @@ def test_a_scaffold_collected_then_removed_leaves_untracked_bytecode_that_blocks
     job = _tree(root, JOB)
     _scaffold(job, "j1")
     env = {k: v for k, v in os.environ.items() if k != "PYTHONDONTWRITEBYTECODE"}
+    env["HYPOTHESIS_STORAGE_DIRECTORY"] = str(root / "hypothesis")
     collected = subprocess.run(
-        [sys.executable, "-m", "pytest", "-q", "-p", "no:cacheprovider", "-p", "no:hypothesispytest", "tests/tmp/j1"],
+        [sys.executable, "-m", "pytest", "-q", "-p", "no:cacheprovider", "tests/tmp/j1"],
         cwd=job, env=env, capture_output=True, text=True,
     )  # fmt: skip
     assert collected.returncode == 0, collected.stdout
