@@ -168,3 +168,28 @@ def test_a_red_baseline_exits_1_before_any_mutation(tmp_path: Path) -> None:
     assert done.stdout.splitlines() == ["BASELINE RED pkg/m.py: tests/test_red.py::test_fails"]
     assert done.returncode == 1
     assert (root / "pkg/m.py").read_text("utf-8") == _HEAD_M
+
+
+_CHILD_TEST = (
+    "import os\nimport subprocess\nimport sys\n\n\n"
+    "def test_spawns():\n"
+    '    env = {k: v for k, v in os.environ.items() if not k.startswith(("COV", "COVERAGE"))}\n'
+    "    code = \"from pkg.child import f; assert f() == 'c'\"\n"
+    '    done = subprocess.run([sys.executable, "-c", code], env=env, check=False)\n'
+    "    assert done.returncode == 0\n"
+)
+
+
+def test_a_mutant_on_a_line_only_an_unmeasured_child_executes_is_killed_by_the_spawning_test(
+    tmp_path: Path,
+) -> None:
+    root = _planted(
+        tmp_path,
+        files={"pkg/child.py": 'def f():\n    return "c"\n', "tests/test_child.py": _CHILD_TEST},
+    )
+    done = _run(root, "--module", "pkg/child.py", "--tests", "tests/test_child.py")
+    assert done.stdout.splitlines() == [
+        'KILLED pkg/child.py:2 return: "c" -> None [tests/test_child.py::test_spawns]',
+        "mutation score 1/1",
+    ]
+    assert done.returncode == 0
