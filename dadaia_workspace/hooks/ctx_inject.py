@@ -8,10 +8,9 @@ import contextlib
 import json
 import os
 import sys
-from datetime import UTC, datetime
 from pathlib import Path
 
-from dadaia_workspace.core import invocation, session_store, workspace_layout
+from dadaia_workspace.core import clock, invocation, session_store, workspace_layout
 from dadaia_workspace.core.doctor_rules import SectionFinding, render_finding
 from dadaia_workspace.core.exceptions import SchemaVersionError
 from dadaia_workspace.features.spec_context import injection_policy
@@ -182,7 +181,7 @@ def main() -> int:
         return 0
     own = invocation.resolve_session_id(os.environ) or None
     if own:  # the operator's prompt is activity too: renew the liveness clock
-        session_store.touch_last_seen_at(workspace, own, now=datetime.now(tz=UTC).isoformat())
+        session_store.touch_last_seen_at(workspace, own, now=clock.now_iso())
     session_id = own or "workspace"
     tmp_dir = workspace / workspace_layout.MARKER_DIR
     sentinel = tmp_dir / f"{_SENTINEL_PREFIX}{session_id}"
