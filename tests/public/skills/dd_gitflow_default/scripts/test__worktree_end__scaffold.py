@@ -1,4 +1,4 @@
-"""AC19.6: a job or hotfix tree whose HEAD tracks files under `tests/tmp/<job>/` is refused by
+"""A job or hotfix tree whose HEAD tracks files under `tests/tmp/<job>/` is refused by
 `worktree.py merge` and reported by `preflight`, one `[error]` line and one `fix:` line; only tracked
 paths count, and every other tree kind is unaffected.
 Size: MEDIUM (real git, a tmp workspace, a stub CLI).
