@@ -1,10 +1,12 @@
 """AC16.2: ``core.platform`` decides through the kernel's ``_platform``, loaded by path."""
 
+import os
 import subprocess
 import sys
 from pathlib import Path
 
 import dadaia_workspace
+from dadaia_workspace.core.platform import PLATFORM
 
 _OWNER = (
     Path(dadaia_workspace.__file__).parent / "public/skills/dd-bug-resolution/scripts/_platform.py"
@@ -22,7 +24,7 @@ def test_a_planted_platform_module_in_the_cwd_never_stands_in_for_the_owner(tmp_
         cwd=tmp_path,
         capture_output=True,
         text=True,
-        env={"PYTHONPATH": str(Path(dadaia_workspace.__file__).parents[1]), "PATH": "/usr/bin"},
+        env={**os.environ, "PYTHONPATH": str(Path(dadaia_workspace.__file__).parents[1])},
     )
     assert done.returncode == 0, done.stderr
-    assert done.stdout.split() == [str(_OWNER), "bin"]
+    assert done.stdout.split() == [str(_OWNER), PLATFORM.venv_scripts_dir]
