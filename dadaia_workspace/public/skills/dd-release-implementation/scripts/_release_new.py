@@ -8,10 +8,11 @@ from __future__ import annotations
 import shutil
 from pathlib import Path
 
+import _clock
 from _grammar import SEMVER_RE, STATE, live_ids
 from _ledger import records, replace
 from _refusal import Refusal
-from _release_schema import next_candidate, utc_now
+from _release_schema import next_candidate
 from _release_store import SCRIPT, State, read_state, validated
 from _release_tree import BUG_WINDOW, tree_findings
 
@@ -81,7 +82,9 @@ def candidate_state(release_id: str, prior: State | None) -> State:
     stacked = f"Candidate born on {release_id} (prior candidate closed at {closed})"
     note = stacked if prior else f"Release {release_id} born"
     state["phase"] = "DEFINITION"
-    state["log"].append({"ts": utc_now(), "agent": "release.py new", "kind": "note", "text": note})
+    state["log"].append(
+        {"ts": _clock.now_iso(), "agent": "release.py new", "kind": "note", "text": note}
+    )
     return state
 
 

@@ -20,6 +20,7 @@ sys.path[:0] = [
     str(Path(__file__).resolve().parents[2] / "dd-bug-resolution" / "scripts"),
 ]
 
+from _clock import now_iso as utc_now
 from _grammar import SHA_RE, STATE
 from _refusal import Refusal
 from _release_check import histo_findings
@@ -31,7 +32,6 @@ from _release_schema import (
     HISTO,
     ORIGIN_KINDS,
     origin,
-    utc_now,
 )
 from _release_store import (
     SCRIPT,

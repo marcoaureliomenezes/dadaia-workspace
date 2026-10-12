@@ -7,22 +7,22 @@ import datetime as _dt
 import functools
 import json
 import re
-import subprocess
 from pathlib import Path
 from typing import Any
 
+import _git
 from _grammar import STATE, STATUS_RE, TASK_ID_RE, candidate_dir, candidate_number, live_ids
+from _ledger import load_schema
 
 CODE = "LEDGER-RELEASE-SCHEMA"
 HISTO = "releases/_archive/releases_histo.jsonl"
 #: One candidate's documents, born in its own `rc-<N>/` and never rewritten after closure; its
 #: tasks live in one job file per job, `rc-<N>/tasks/job<n>.md` (a closed rc keeps `TASKS.md`).
 CANDIDATE_DOCS = ("SPEC.md", "PLAN.md")
-#: The three lifecycle phases — pinned equal to the schema's enum; a shipped release
-#: moves whole to `_archive/<v>/`.
-PHASES = ("DEFINITION", "IMPLEMENTATION", "CLOSURE")
-#: The phases in which the live candidate's trio is REQUIRED; DEFINITION is authoring it.
-TRIO_PHASES = frozenset({"IMPLEMENTATION", "CLOSURE"})
+#: The lifecycle phases, read from the `release-state-v1` enum; a shipped release moves whole to `_archive/<v>/`.
+PHASES = tuple(load_schema("release-state-v1")["properties"]["phase"]["enum"])
+#: The phases in which the live candidate's trio is REQUIRED; the first, DEFINITION, is authoring it.
+TRIO_PHASES = frozenset(PHASES[1:])
 #: A release ships `delivered` — the one histo disposition this ledger writes.
 DELIVERED = "delivered"
 APPROVED = "Approved"
@@ -34,10 +34,6 @@ MARK_RE = re.compile(r"^([ \t]*(?:[-*+][ \t]*)?\[)([ x-])(\].*)$", re.MULTILINE)
 ORIGIN_KINDS = ("backlog", "bugs", "findings")
 _ORIGIN_RE = re.compile(r"^\*\*Origin:\*\*[ \t]*(.*?)[ \t]*$", re.MULTILINE)
 _ORIGIN_GRAMMAR = "operator-demand | backlog:<ids>; bugs:<ids>; findings:<ids>, each kind once"
-
-
-def utc_now() -> str:
-    return _dt.datetime.now(_dt.UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
 def extract_status(text: str) -> str | None:
@@ -96,26 +92,28 @@ def releases(specs: Path) -> dict[str, tuple[_dt.datetime, _dt.datetime | None]]
 def candidate_adds(specs: Path) -> list[tuple[_dt.datetime, str, str]]:
     """Each candidate's birth as (instant, release, rc): a commit adding exactly one
     rc-<N>/SPEC.md whose status reads non-Approved; a shallow history is refused."""
-    git = ["git", "-C", str(specs)]
-    shallow = subprocess.run([*git, "rev-parse", "--is-shallow-repository"], capture_output=True, text=True, encoding="utf-8", errors="replace", check=False)  # fmt: skip
-    if shallow.stdout.strip() == "true":
+    if _git.git(specs, "rev-parse", "--is-shallow-repository", check=False).strip() == "true":
         raise ShallowClone(f"{specs} is in a shallow clone: a release candidate read from a cut history "
                            "would be stamped wrong for good")  # fmt: skip
-    head = subprocess.run([*git, "rev-parse", "-q", "--verify", "HEAD"], capture_output=True, check=False)  # fmt: skip
-    log = subprocess.run([*git, "log", "--diff-filter=A", "--name-only", "--format=%x00%H %cI", "--",
-                          ":(glob)releases/**/rc-*/SPEC.md"], capture_output=True, text=True, encoding="utf-8", errors="replace", check=False)  # fmt: skip
-    if head.returncode == 0 and log.returncode:  # a repo with no commit yet holds no birth
+    try:
+        _git.git(specs, "rev-parse", "-q", "--verify", "HEAD")
+    except RuntimeError:  # a repo with no commit yet holds no birth
+        return []
+    try:
+        log = _git.git(specs, "log", "--diff-filter=A", "--name-only", "--format=%x00%H %cI", "--",
+                       ":(glob)releases/**/rc-*/SPEC.md")  # fmt: skip
+    except RuntimeError as exc:
         from _specs import git_line  # the entry point's bootstrap resolves it
 
-        raise Unreadable(f"cannot read the history of {specs}: {log.stderr.strip()}",
-                         git_line(specs, "fsck"))  # fmt: skip
+        raise Unreadable(
+            f"cannot read the history of {specs}: {exc}", git_line(specs, "fsck")
+        ) from None
     adds = []
-    for commit in log.stdout.split("\0")[1:] if head.returncode == 0 else []:
+    for commit in log.split("\0")[1:]:
         sha, *paths = commit.split()
         if len(paths) != 2:  # the instant, then exactly one added SPEC.md
             continue
-        show = subprocess.run([*git, "show", f"{sha}:{paths[1]}"], capture_output=True, text=True, encoding="utf-8", errors="replace", check=False)  # fmt: skip
-        if extract_status(show.stdout) != APPROVED:
+        if extract_status(_git.git(specs, "show", f"{sha}:{paths[1]}", check=False)) != APPROVED:
             parts = paths[1].split("/")
             adds.append((utc(paths[0]), parts[-3], parts[-2]))
     return adds
@@ -339,8 +337,16 @@ def current_plan_jobs(text: str) -> tuple[dict[str, tuple[int, set[str]]] | None
     )
     if errors:
         return {}, errors
+    return _plan_jobs(rows, headers)
+
+
+def _plan_jobs(
+    rows: list[str], headers: list[str]
+) -> tuple[dict[str, tuple[int, set[str]]], list[str]]:
+    """The DAG's job -> (wave, exact writes) from its data *rows*, and why a row is refused."""
     job_at, wave_at, writes_at = (headers.index(name) for name in ("job", "wave", "w:"))
     jobs: dict[str, tuple[int, set[str]]] = {}
+    errors: list[str] = []
     for line in rows:
         cells = _cells(line)
         if len(cells) != len(headers) or not cells[job_at]:
@@ -350,11 +356,10 @@ def current_plan_jobs(text: str) -> tuple[dict[str, tuple[int, set[str]]] | None
         row_paths = re.findall(r"`([^`]+)`", cells[writes_at])
         if not cells[wave_at].isdigit() or not row_paths:
             errors.append(f"PLAN.md DAG job {job} has no numeric wave and exact `W:` set")
-            continue
-        if job in jobs:
+        elif job in jobs:
             errors.append(f"PLAN.md DAG repeats {job}")
-            continue
-        jobs[job] = (int(cells[wave_at]), set(row_paths))
+        else:
+            jobs[job] = (int(cells[wave_at]), set(row_paths))
     if not jobs:
         errors.append("PLAN.md DAG has no jobs")
     return jobs, errors

@@ -10,6 +10,7 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
+import _clock
 from _grammar import SHA_RE, STATE
 from _refusal import Refusal
 from _release_check import candidate_errors
@@ -18,7 +19,6 @@ from _release_schema import (
     CANDIDATE_DOCS,
     extract_status,
     next_candidate,
-    utc_now,
 )
 from _release_store import SCRIPT, Live, State, commit, live_release
 from _specs import choice
@@ -104,7 +104,7 @@ def set_phase(specs: Path, phase: str, sha: str) -> tuple[str, str]:
             f"{SCRIPT} {NEXT.get(current, 'check')} --sha {sha}",
         )
         raise choice(refusal, SUPPLY.get(current, ""))
-    ts, candidate = utc_now(), live.candidate
+    ts, candidate = _clock.now_iso(), live.candidate
     if phase == "IMPLEMENTATION":
         candidate = _refuse_unapproved_docs(live)
         if errors := candidate_errors(candidate):
