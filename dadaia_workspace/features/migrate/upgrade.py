@@ -17,7 +17,7 @@ from dadaia_workspace.core import specs_version as _version
 from dadaia_workspace.core.atomic_write import atomic_write
 from dadaia_workspace.core.cli_line import fix_line
 from dadaia_workspace.core.exceptions import DadaiaError
-from dadaia_workspace.core.frontmatter import FRONTMATTER_RE
+from dadaia_workspace.core.frontmatter import split
 from dadaia_workspace.core.gitflow import candidate_dir, merge_frontmatter, next_candidate
 from dadaia_workspace.core.release_state import RELEASE_ID_RE
 from dadaia_workspace.core.spec_status import APPROVED, DRAFT, IN_REVIEW, STATUS_LINE
@@ -165,9 +165,8 @@ def _fold(tech: Path, remove: Callable[[Path], object]) -> bool:
 
 def _tech_stack_body(text: str) -> str:
     """*text* minus its YAML frontmatter and its leading ``# `` title line."""
-    fm = FRONTMATTER_RE.match(text)
-    remainder = text[fm.end() :] if fm else text
-    lines = remainder.splitlines()
+    parts = split(text)
+    lines = (parts[1] if parts else text).splitlines()
     while lines and (not lines[0].strip() or lines[0].startswith("# ")):
         lines.pop(0)
     return "\n".join(lines).strip()

@@ -1,25 +1,26 @@
-"""The YAML frontmatter parser for the constitution and release documents.
+"""The package's door to the one frontmatter grammar, ``dd-bug-resolution/scripts/_frontmatter.py``
+(ADR 0246): a stdlib strict subset of YAML that equals ``yaml.safe_load`` or refuses.
 
 A memory atom is not read here: its one grammar is the stdlib reader ``memory.py`` ships
-(``features/specs/memory_canon.parse_atom``). ``import yaml`` is deferred inside
-:func:`parse` so :data:`FRONTMATTER_RE` stays importable with no third-party dependency.
-A failure names its kind (no block, invalid YAML at line N, not a mapping), never a
-blanket "missing delimiter".
+(``features/specs/memory_canon.parse_atom``). A failure names its kind (no block, invalid
+YAML at line N, not a mapping), never a blanket "missing delimiter".
 """
 
 from __future__ import annotations
 
 import re
+from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any, Literal
 
-__all__ = ["Frontmatter", "FrontmatterError", "FRONTMATTER_RE", "parse"]
+from dadaia_workspace.core.skill_owner import load_owner
 
-#: The ONE compiled definition (A10.2 — ``rg '_FRONTMATTER_RE'`` names this line
-#: alone). Leading delimiter, DOTALL-captured block, closing delimiter with an
-#: OPTIONAL trailing newline (a frontmatter-only file, no body, still matches —
-#: the leniency the retired copies relied on).
-FRONTMATTER_RE = re.compile(r"\A---[ \t]*\n(.*?)\n---[ \t]*\n?", re.DOTALL)
+__all__ = ["Frontmatter", "FrontmatterError", "parse", "split"]
+
+_owner = load_owner("dd-bug-resolution", "_frontmatter")
+
+#: ``(block, body)`` of the leading ``---`` block with a BOM and CRLF normalised, or ``None``.
+split: Callable[[str], tuple[str, str] | None] = _owner.split
 
 
 @dataclass(frozen=True, slots=True)
@@ -39,8 +40,7 @@ class FrontmatterError:
 
     * ``missing_delimiter`` — no ``---``-delimited block at the start of the text.
     * ``invalid_yaml`` — a block is present but its YAML fails to parse; ``line``
-      carries the 1-based line number inside the block when PyYAML's
-      ``problem_mark`` supplies one.
+      carries the 1-based line number inside the block the owner's refusal names.
     * ``not_a_mapping`` — the block parses, but to a scalar/list, not a dict.
     """
 
@@ -50,39 +50,30 @@ class FrontmatterError:
 
 
 def parse(text: str) -> Frontmatter | FrontmatterError:
-    """Parse a leading ``--- ... ---`` YAML frontmatter block out of ``text``.
+    """Parse a leading ``--- ... ---`` frontmatter block out of ``text``.
 
     Never raises: every failure mode returns a :class:`FrontmatterError` naming its
     ``kind`` instead.
     """
-    match = FRONTMATTER_RE.match(text)
-    if match is None:
+    parts = split(text)
+    if parts is None:
         return FrontmatterError(
             kind="missing_delimiter",
             message="No valid YAML frontmatter found (expected --- delimited block).",
         )
-
-    raw_yaml = match.group(1)
-    body = text[match.end() :]
-
-    import yaml  # deferred: keeps this module stdlib-only at import time (A10.2)
-
+    block, body = parts
     try:
-        data = yaml.safe_load(raw_yaml)
-    except yaml.YAMLError as exc:
-        mark = getattr(exc, "problem_mark", None)
-        line = (mark.line + 1) if mark is not None else None
-        location = f" at line {line}" if line is not None else ""
-        return FrontmatterError(
-            kind="invalid_yaml",
-            message=f"Frontmatter block is present but its YAML is invalid{location}: {exc}",
-            line=line,
-        )
-
-    if not isinstance(data, dict):
+        data: dict[str, Any] = _owner.parse(block)
+    except _owner.NotAMapping:
         return FrontmatterError(
             kind="not_a_mapping",
             message="Frontmatter block is present but does not parse to a YAML mapping.",
         )
-
+    except ValueError as exc:
+        found = re.match(r"line (\d+)", str(exc))
+        return FrontmatterError(
+            kind="invalid_yaml",
+            message=f"Frontmatter block is present but its YAML is invalid: {exc}",
+            line=int(found[1]) if found else None,
+        )
     return Frontmatter(data=data, body=body)

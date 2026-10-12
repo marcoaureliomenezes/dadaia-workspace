@@ -10,7 +10,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal
 
-from dadaia_workspace.core.frontmatter import FRONTMATTER_RE, FrontmatterError, parse
+from dadaia_workspace.core.frontmatter import FrontmatterError, parse, split
 from dadaia_workspace.core.skill_owner import load_owner
 
 __all__ = [
@@ -160,7 +160,7 @@ def merge_frontmatter(
     gitflow: Gitflow | None = None,
 ) -> None:
     """Write the given keys into the constitution frontmatter (replaced in place, else
-    appended; no block ⇒ one prepended); every other byte stays identical."""
+    appended; no block ⇒ one prepended); every other line stays identical."""
     names = gitflow and (gitflow.principal, gitflow.integration, gitflow.work_prefix)
     values = {
         "specs_pattern_version": specs_pattern_version,
@@ -169,8 +169,8 @@ def merge_frontmatter(
     updates = {k: json.dumps(v) for k, v in values.items() if v is not None}  # JSON is YAML
     constitution = constitution_path(specs_dir)
     text = constitution.read_text(encoding="utf-8") if constitution.exists() else ""
-    match = FRONTMATTER_RE.match(text)
-    lines = match.group(1).split("\n") if match else []
+    parts = split(text)
+    lines = parts[0].split("\n") if parts else []
     kept: list[str] = []
     skipping = False
     for line in lines:
@@ -180,6 +180,6 @@ def merge_frontmatter(
         skipping = ":" in line and key in updates
         kept.append(f"{key}: {updates.pop(key)}" if skipping else line)
     kept.extend(f"{key}: {value}" for key, value in updates.items())
-    body = text[match.end() :] if match else text
-    closing = text[match.start(0) : match.end()].rsplit("\n---", 1)[1] if match else "\n"
-    constitution.write_text("---\n" + "\n".join(kept) + "\n---" + closing + body, encoding="utf-8")
+    constitution.write_text(
+        "---\n" + "\n".join(kept) + "\n---\n" + (parts[1] if parts else text), encoding="utf-8"
+    )
