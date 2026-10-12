@@ -214,3 +214,20 @@ def test_generate_check_and_lint1_reach_one_verdict_per_atom(
     if not verdict:
         assert atom.name in generate.stdout + generate.stderr
         assert (specs / "memory" / "product" / "catalog.json").read_bytes() == catalog
+
+
+def test_every_committed_atom_parses_to_the_dict_safe_load_reads() -> None:
+    """J10.T7: the atoms' grammar is the kernel owner; the committed tree parses to what
+    `yaml.safe_load` reads from each block."""
+    import yaml
+
+    from dadaia_workspace.core.skill_owner import load_owner
+
+    parse = load_owner("dd-spec-navigator", "_memory_schema").parse
+    atoms = sorted((_REPO / "specs" / "memory" / "product").glob("*/*.md"))
+    assert len(atoms) >= 29
+    for atom in atoms:
+        text = atom.read_text(encoding="utf-8")
+        data, _body, error = parse(text)
+        assert error is None, atom.name
+        assert data == yaml.safe_load(text.split("\n---\n", 1)[0].removeprefix("---\n")), atom.name

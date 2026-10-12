@@ -94,3 +94,9 @@ def test_a_trailing_comment_after_a_value_is_dropped_like_safe_load_does() -> No
     fm = load_owner("dd-bug-resolution", "_frontmatter")
     with pytest.raises(ValueError, match="line 1"):
         fm.parse('q: "x"# c')
+
+
+def test_a_full_line_comment_is_refused() -> None:
+    fm = load_owner("dd-bug-resolution", "_frontmatter")
+    with pytest.raises(ValueError, match="line 2"):
+        fm.parse("a: 1\n# note\nb: 2")
