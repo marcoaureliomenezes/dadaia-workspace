@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import ast
 import contextlib
+import json
 import os
 import re
 import shlex
@@ -19,6 +20,7 @@ import shutil
 import subprocess
 import sys
 import sysconfig
+import tempfile
 from collections import Counter
 from collections.abc import Callable
 from dataclasses import dataclass, replace
@@ -28,8 +30,10 @@ from typing import Any
 import pytest
 from typer.testing import CliRunner
 
+from dadaia_workspace.cli.help_digest import command_paths
 from dadaia_workspace.cli.main import app
 from dadaia_workspace.core.cli_line import cli_path, fix_line, shell_line
+from dadaia_workspace.core.doctor_rules import rule_fix
 from dadaia_workspace.core.gitflow import DEFAULT, work_branch
 from dadaia_workspace.core.models.spec_context import (
     AssociatedRepo,
@@ -41,13 +45,19 @@ from dadaia_workspace.features.chokepoints import push_gate_decision
 from dadaia_workspace.features.chokepoints.branch_policy import parse_push_stdin
 from dadaia_workspace.features.spec_context.service import git_hooks_dir, install_git_hooks
 from dadaia_workspace.features.specs.canon import canon_violations
+from dadaia_workspace.features.specs.citations import dead_verb_citations
+from dadaia_workspace.features.specs.rules import RULES as SPECS_RULES
 from dadaia_workspace.hooks import pre_gate
 from dadaia_workspace.infrastructure.git_objects import GitSubprocessObjectReader
 from dadaia_workspace.infrastructure.json_context_store import JsonContextStore
 from dadaia_workspace.infrastructure.runtime_transforms.hook_wrappers import VENV_MISSING
 from tests.conftest import GIT_QUIET_INCLUDE
 from tests.fakes import gate_fixes
+from tests.features.backlog.test_doctor import _SOURCE, _active_entry
+from tests.features.specs.test_doctor import _make_clean_specs_tree
+from tests.fixtures.harness_env import run_bash, suite_env
 from tests.fixtures.real_git import PushRepo
+from tests.helpers import worktree_ws
 from tests.helpers.privacy_fixtures import aws_key_shape
 
 _FIX_LINE_RE = re.compile(r"^fix: (\S.*)$", re.MULTILINE)
@@ -1123,11 +1133,341 @@ SITES |= {
     if not isinstance(entry, Skip)
     for case in (entry if isinstance(entry, tuple) else (entry,))
 }
+# ── doctor-specs: the specs rules' fix lines ─────────────────────────────────────────
+# A producer plants one finding in a clean specs tree and reads it from ``doctor --json``. Its
+# progress rule: the printed fix runs and the finding is gone with no new error; an operator
+# action names a file under the tree.
+
+_RELEASE = "1.2.3"
+
+
+def _write(path: Path, text: str) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(text, encoding="utf-8")
+
+
+def _append(path: Path, text: str) -> None:
+    path.write_text(path.read_text(encoding="utf-8") + text, encoding="utf-8")
+
+
+def _plant_missing_memory_document(root: Path) -> None:
+    (root / "specs" / "memory" / "QUALITY.md").unlink()
+
+
+def _plant_headingless_memory_document(root: Path) -> None:
+    _write(root / "specs" / "memory" / "QUALITY.md", "---\nslug: quality\n---\n\nno heading here\n")
+
+
+def _plant_nothing(root: Path) -> None:
+    """The fixture already carries it (no audits/, bugs/ dirs; no backlog/_archive/)."""
+
+
+def _plant_placeholder_atom(root: Path) -> None:
+    atom = root / "specs" / "memory" / "product" / "testarea" / "raw.md"
+    atom.write_text("---\nslug: SLUG_PLACEHOLDER\n---\n# TITLE_PLACEHOLDER\n", encoding="utf-8")
+
+
+def _plant_missing_root_agents(root: Path) -> None:
+    (root / "specs" / "AGENTS.md").unlink(missing_ok=True)
+
+
+def _plant_fixed_block_gone(root: Path) -> None:
+    """A memory document whose fixed law block was deleted by hand."""
+    quality = root / "specs" / "memory" / "QUALITY.md"
+    head, _, rest = quality.read_text(encoding="utf-8").partition(
+        "<!-- dadaia:fixed slop-tests -->"
+    )
+    quality.write_text(head + rest.partition("<!-- /dadaia:fixed slop-tests -->\n")[2])
+
+
+def _plant_fixed_block_drifted(root: Path) -> None:
+    """A memory document whose fixed law block was edited by hand."""
+    quality = root / "specs" / "memory" / "QUALITY.md"
+    quality.write_text(
+        quality.read_text(encoding="utf-8").replace(
+            "<!-- dadaia:fixed slop-tests -->\n", "<!-- dadaia:fixed slop-tests -->\n- edited\n"
+        )
+    )
+
+
+def _plant_gitflow_gone(root: Path) -> None:
+    """A current dadaia tree whose constitution frontmatter has no gitflow block."""
+    constitution = root / "specs" / "constitution.md"
+    constitution.write_text(
+        f"---\nspecs_pattern_version: {CANONICAL_SPECS_VERSION}\n---\n"
+        + constitution.read_text(encoding="utf-8"),
+        encoding="utf-8",
+    )
+
+
+def _plant_status_line_gone(root: Path) -> None:
+    """A SPEC.md with no status line and a 173-line TASKS.md with a lowercase token: both fire."""
+    release = root / "specs" / "releases" / _RELEASE / "rc-1"
+    (release / "SPEC.md").write_text("# Spec\n\nContent.\n", encoding="utf-8")
+    (release / "TASKS.md").write_text("# Tasks\n\n**Status:** approved\n" + "- t\n" * 170)
+
+
+def _plant_changelog_heading(root: Path) -> None:
+    _append(
+        root / "specs" / "memory" / "product" / "testarea" / "feature-a.md",
+        "\n## Changelog\n\n- 1.0.0 born\n",
+    )
+
+
+def _plant_legacy_state_name(root: Path) -> None:
+    """The legacy state-file name, renamed by `doctor --fix`."""
+    state = root / "specs" / "releases" / _RELEASE / "_RELEASE.json"
+    state.rename(state.with_name("RELEASE.json"))
+
+
+def _plant_stray_dotfile(root: Path) -> None:
+    """Untracked and with no canon home: a ``git mv`` could not serve it."""
+    (root / "specs" / ".DS_Store").write_bytes(b"\x00")
+
+
+def _plant_orphan_wt(root: Path) -> None:
+    """An unmerged orphan: `wt/0.5.0-rc1/j1` carries a task merge and has no tree."""
+    repo, tree = root / "repos/r", root / "worktrees/r/0.5.0-rc1/j1"
+    task = root / "worktrees/r/0.5.0-rc1/j1--t1"
+    worktree_ws.git(repo, "checkout", "-q", "feature/0.5.0")
+    worktree_ws.git(repo, "worktree", "add", "-q", "-b", "wt/0.5.0-rc1/j1", str(tree))
+    worktree_ws.git(repo, "worktree", "add", "-q", "-b", "wt/0.5.0-rc1/j1--t1", str(task))
+    worktree_ws.commit(task, "src/a.py")
+    worktree_ws.git(tree, "merge", "-q", "--ff-only", "wt/0.5.0-rc1/j1--t1")
+    worktree_ws.git(repo, "worktree", "remove", str(task))
+    worktree_ws.git(repo, "branch", "-q", "-D", "wt/0.5.0-rc1/j1--t1")
+    worktree_ws.git(repo, "worktree", "remove", str(tree))
+
+
+def _plant_raw_law(root: Path) -> None:
+    """The unrendered template an older ``specs init`` copied."""
+    public = Path(__file__).resolve().parents[2] / "dadaia_workspace" / "public"
+    (root / "specs" / "AGENTS.md").write_bytes(
+        (public / "templates" / "specs-AGENTS.md").read_bytes()
+    )
+
+
+#: code -> how to make it fire; ``WORKTREE`` plants a workspace, the rest a specs tree.
+PLANTS: dict[str, Callable[[Path], None]] = {
+    "TREE-4": _plant_nothing,
+    "WORKTREE": _plant_orphan_wt,
+    "TREE-5": _plant_missing_root_agents,
+    "SPEC-DOC-034": _plant_nothing,
+    "MEM-PLACEHOLDER-1": _plant_placeholder_atom,
+    "FIXED-1": _plant_fixed_block_gone,
+    "FIXED-2": _plant_fixed_block_drifted,
+    "GITFLOW-1": _plant_gitflow_gone,
+    "TREE-3": _plant_missing_memory_document,
+    "SPEC-DOC-046": _plant_legacy_state_name,
+}
+
+#: WARNING-only by construction, no fix line: their remedy is the operator's judgment.
+REPORT_ONLY: dict[str, Callable[[Path], None]] = {
+    "SPEC-DOC-030": lambda r: (r / "specs" / "audits" / "Bad_Name").mkdir(parents=True),
+    "MEM-DRIFT-1": lambda r: _append(
+        r / "specs" / "memory" / "ARCHITECTURE.md",
+        "\n### `dadaia_workspace/features` — package map (1 packages)\n\n"
+        '```mermaid\nflowchart LR\n  pkgs["ghostpkg"]\n```\n',
+    ),
+    "MEM-DRIFT-2": lambda r: _append(
+        r / "specs" / "memory" / "QUALITY.md", "\nRun `dadaia no-such-verb`.\n"
+    ),
+}
+
+#: Error findings no command can repair (the remedy is the operator's content).
+OPERATOR_ACTION: dict[str, Callable[[Path], None]] = {
+    "SPEC-DOC-002": _plant_headingless_memory_document,
+    "SPEC-DOC-004": _plant_status_line_gone,
+    "TREE-8": _plant_stray_dotfile,
+    "LINT-1": lambda r: _write(r / "specs" / "memory" / "product" / "testarea" / "x.md", "# X\n"),
+    "SPEC-DOC-001": lambda r: (r / "specs" / "constitution.md").unlink(),
+    "SPEC-DOC-026": lambda r: _write(r / f"specs/releases/_archive/{_RELEASE}/SPEC.md", "# S\n"),
+    "ADR-SUPERSEDED-CITATION": lambda r: (
+        _write(r / "specs/ADRs/decisions.jsonl", '{"id": "0001", "status": "superseded"}\n'),
+        _append(r / "specs/memory/QUALITY.md", "\nADR: 0001\n"),
+    ),
+    "BL-SCHEMA": lambda r: _write(r / "specs/backlog/BACKLOG.json", json.dumps({"schema": "backlog-v1", "active": [
+        _active_entry("xx", "x", "candidate", ref="pkg/m.py#Ghost", change="x")]})),
+    "BL-CONFLICT": lambda r: (
+        _write(r / "pkg/m.py", _SOURCE),
+        _write(r / "specs/backlog/BACKLOG.json", json.dumps({"schema": "backlog-v1", "active": [
+            _active_entry(t, t, "candidate", ref="pkg/m.py#Widget", change=t) for t in ("dd", "ee")]})),
+    ),
+}  # fmt: skip
+
+_AREA_HEADER = "| Area | Members |"
+_ROOT_ROW = "| root | `AGENTS.md constitution.md memory/ releases/ backlog/ bugs/ audits/ ADRs/` |"
+_PLACEHOLDERS = ("<!-- zones -->", "<!-- canon -->", "<!-- root -->", "<!-- specs-canon -->")
+
+
+def _tree_git(root: Path, *args: str) -> None:
+    subprocess.run(  # noqa: S603
+        ["git", *args],  # noqa: S607
+        cwd=root,
+        check=True,
+        capture_output=True,
+        env=suite_env(
+            {}, root, overrides={"PATH": "/usr/bin:/bin", "GIT_CONFIG_GLOBAL": "/dev/null"}
+        ),
+    )
+
+
+def _specs_tree(ws: Path, plant: Callable[[Path], None], *, commit: bool = False) -> Path:
+    """A git-backed clean specs tree under *ws* with *plant* applied (committed when *commit*:
+    a fix line may legitimately be a `git rm`/`git mv`)."""
+    # beside *ws*, not under it: a tree under a workspace names that workspace's CLI
+    root = Path(tempfile.mkdtemp(dir=ws.parent, prefix="specs-"))
+    _make_clean_specs_tree(root, _RELEASE)
+    for args in (
+        ("init", "-q"),
+        ("config", "user.email", "f@example.invalid"),
+        ("config", "user.name", "f"),
+    ):
+        _tree_git(root, *args)  # fmt: skip
+    plant(root)
+    if commit:
+        _tree_git(root, "add", "-A")
+        _tree_git(root, "commit", "-qm", "fixture")
+    return root
+
+
+def _findings(root: Path, *sections: str) -> list[dict[str, str]]:
+    """The findings of ``doctor --json`` over *root*'s specs tree, from its ``specs`` section or
+    the *sections* named."""
+    with contextlib.chdir(root):  # the tree is no workspace: a fix names the running venv's CLI
+        ran = CliRunner().invoke(
+            app, ["doctor", "--json", "--specs-dir", str(root / "specs")], env=dict.fromkeys(_UNSET)
+        )
+    report = json.loads(ran.output)["sections"]
+    return [f for name in sections or ("specs",) for f in report[name]["findings"]]
+
+
+def _keys(found: list[dict[str, str]]) -> set[tuple[str, str, bool]]:
+    return {(f["code"], f["message"], f["verdict"] == "error") for f in found}
+
+
+def _clears(
+    ws: Path,
+    plant: Callable[[Path], None],
+    code: str,
+    only: Callable[[str], bool] = bool,
+    then: Callable[[Path], None] = lambda root: None,
+) -> str:
+    """Plants the finding, runs its printed fix, and requires the finding gone with no new error;
+    returns the fix line."""
+    root = _specs_tree(ws, plant, commit=True)
+    before = _findings(root)
+    first = next((f for f in before if f["code"] == code and only(f["message"])), None)
+    assert first, f"{code}: the fixture did not make the rule fire"
+    if code == "TREE-3":  # one finding for one fact
+        assert [f["code"] for f in before if "memory/QUALITY.md" in f["message"]] == ["TREE-3"]
+    dead = dead_verb_citations(f"`{first['message']}`", rel=code, command_paths=command_paths())
+    assert not dead, f"{code}: the finding cites a verb that does not exist: {dead}"
+    done = run_bash(first["fix"], cwd=root, check=False)
+    after = _keys(_findings(root))
+    assert (first["code"], first["message"], first["verdict"] == "error") not in after, (
+        f"{code}: survives\n{first['fix']}\n{done.stderr}"
+    )
+    assert not {f for f in after - _keys(before) if f[2]}, f"{code}: the fix created an error"
+    then(root)
+    return f"fix: {first['fix']}"
+
+
+def _operator_action(ws: Path, code: str) -> str:
+    """Every finding of *code* is one `Operator action:` naming a file under the tree."""
+    root = _specs_tree(ws, OPERATOR_ACTION[code])
+    found = [f for f in _findings(root, "specs", "ledgers") if f["code"] == code]
+    assert found, f"{code}: the fixture did not make the rule fire"
+    for finding in found:
+        assert finding["fix"].startswith("Operator action: ") and str(root) in finding["fix"]
+    return f"fix: {found[0]['fix']}"
+
+
+def _law_is_rendered(root: Path) -> None:
+    law = (root / "specs" / "AGENTS.md").read_text(encoding="utf-8")
+    assert _AREA_HEADER in law and _ROOT_ROW in law
+    assert not [p for p in _PLACEHOLDERS if p in law]
+
+
+def _worktree(ws: Path) -> str:
+    """An unmerged orphan wt/* carries the owner's `worktree.py merge`; its chain (merge refuses
+    with the re-attach, the re-attached tree is still ours and `ready`, the reviewed merge lands)
+    ends with no finding."""
+    (ws / "wt").mkdir()
+    root = worktree_ws.make_workspace(ws / "wt")
+    PLANTS["WORKTREE"](root)
+    doctor = worktree_ws.registered_doctor(root)
+    first = ""
+    for _ in range(3):
+        if not (found := doctor.check_worktrees("c")):
+            break
+        first = first or found[0].fix
+        worktree_ws.approve(
+            root, worktree_ws.git(root / "repos/r", "rev-parse", "wt/0.5.0-rc1/j1").strip()
+        )
+        done = subprocess.run(found[0].fix, shell=True, cwd=root, capture_output=True, text=True)  # noqa: S602
+        if done.returncode:
+            (refix,) = worktree_ws.fixes(done)
+            subprocess.run(refix.removeprefix("fix: "), shell=True, check=True, capture_output=True)  # noqa: S602
+    assert first and doctor.check_worktrees("c") == []
+    return f"fix: {first}"
+
+
+SITES |= {
+    **{
+        f"doctor-specs-{code}": lambda ws, code=code: _clears(ws, PLANTS[code], code)
+        for code in PLANTS
+        if code != "WORKTREE"
+    },
+    **{
+        f"doctor-specs-{code}": lambda ws, code=code: _operator_action(ws, code)
+        for code in OPERATOR_ACTION
+    },
+    "doctor-specs-WORKTREE": _worktree,
+    # a raw ``specs/AGENTS.md`` (the template an older ``specs init`` copied) is flagged
+    # refreshable; its fix renders the law.
+    "doctor-specs-TREE-5-raw-law": lambda ws: _clears(
+        ws, _plant_raw_law, "TREE-5", lambda m: m.startswith("specs/AGENTS.md "), _law_is_rendered
+    ),
+}
+
+
+@pytest.mark.parametrize("rule", SPECS_RULES, ids=lambda rule: "/".join(rule.codes))
+def test_no_fix_line_deletes_a_record_without_recording_it(rule: Any) -> None:
+    """A bare recursive ``rm`` (at the head of the line or of any chain segment) is never a fix:
+    what the finding protects goes with it. ``git rm -r`` stages a removal git still holds."""
+    assert not re.search(r"(?:^|&&|;|\|)\s*rm\s+-[a-zA-Z]*r", rule_fix(rule, Path()) or "")
+
+
+def test_a_judgment_only_rule_never_makes_the_run_exit_1(workspace: Path) -> None:
+    """Every judgment-only rule fires at once and contributes NO error-class finding and NO fix
+    line; a history heading planted beside them is reported once, by LINT-1."""
+
+    def plant(root: Path) -> None:
+        _plant_changelog_heading(root)
+        for plant_one in REPORT_ONLY.values():
+            plant_one(root)
+
+    found = _findings(_specs_tree(workspace, plant))
+    fired = {f["code"] for f in found}
+    assert set(REPORT_ONLY) <= fired, fired
+    assert not {"CAT-1", "SPEC-DOC-008", "SPEC-DOC-010"} & fired, fired
+    history = [f for f in found if "Changelog" in f["message"]]
+    assert [(f["code"], f["verdict"]) for f in history] == [("LINT-1", "error")], history
+    assert [
+        f for f in found if f["code"] in REPORT_ONLY and (f["verdict"] == "error" or f["fix"])
+    ] == []
+
+
 _SLOW = pytest.mark.slow(reason="real git remotes and CLI child processes")
 
 
 @pytest.mark.parametrize(
-    "site", [pytest.param(s, marks=_SLOW) if s.startswith("refusal-") else s for s in SITES]
+    "site",
+    [
+        pytest.param(s, marks=_SLOW) if s.startswith(("refusal-", "doctor-specs-")) else s
+        for s in SITES
+    ],
 )
 def test_every_site_carries_one_runnable_fix(workspace: Path, site: str) -> None:
     the_fix(SITES[site](workspace))
