@@ -8,7 +8,7 @@ that equals ``yaml.safe_load`` or refuses, never a silent difference.
 double-quoted (JSON rules) and single-quoted scalars; one-level flow maps and sequences
 of scalars; block lists of scalars or mappings; nested block maps; folded ``>`` and
 ``>-``; a ``#`` comment after a plain or quoted value. Everything else raises: tabs,
-duplicate keys, anchors, aliases, tags, ``|`` and ``>+``, multi-line plain or quoted
+duplicate keys, full-line comments, anchors, aliases, tags, ``|`` and ``>+``, multi-line plain or quoted
 scalars, nested flow collections, and every YAML 1.1 ambiguity (``yes``, ``0755``,
 ``1_000``, a date, ``~``, ``<<``).
 """
@@ -147,10 +147,10 @@ class _Reader:
             self.lines.append(_Line(number, len(raw) - len(text), text))
 
     def peek(self) -> _Line | None:
-        """The next structural line (blank and comment lines skipped), or ``None``."""
+        """The next structural line (blank lines skipped), or ``None``."""
         while self.i < len(self.lines):
             line = self.lines[self.i]
-            if line.text and not line.text.startswith("#"):
+            if line.text:
                 return line
             self.i += 1
         return None

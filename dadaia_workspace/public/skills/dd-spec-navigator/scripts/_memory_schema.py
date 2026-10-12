@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-"""The memory atom's ONE frontmatter grammar and the generated pair's path constants.
+"""The memory atom's frontmatter rules and the generated pair's path constants.
 
 Stdlib only: `catalog generate`, `check` and the library lint (LINT-1, which loads this
-module) parse an atom here alike, so they reach one verdict per atom; LINT-1 then applies
-the JSON schema to the dict this returns.
+module) parse an atom here alike, through the kernel's one frontmatter grammar, so they
+reach one verdict per atom; LINT-1 then applies the JSON schema to the dict this returns.
 """
 
 from __future__ import annotations
@@ -11,57 +11,36 @@ from __future__ import annotations
 import re
 from typing import Any
 
+from _frontmatter import parse as parse_block
+from _frontmatter import split
+
 CODE = "LEDGER-MEMORY-SCHEMA"
 PRODUCT = "memory/product"
 CATALOG = "memory/product/catalog.json"
 INDEX = "memory/product/index.md"
-_DELIMITER = "---"
-_KEY_RE = re.compile(r"^([A-Za-z_][A-Za-z0-9_]*):\s?(.*)$")
 WIKILINK_RE = re.compile(r"\[\[([^\]]+)\]\]")
-
-
-def _scalar(raw: str) -> str | list[str] | None:
-    value = raw.strip()
-    if value.startswith("[") and value.endswith("]"):
-        items = [_unquote(item.strip()) for item in value[1:-1].split(",") if item.strip()]
-        return None if None in items else [item for item in items if item is not None]
-    return _unquote(value)
-
-
-def _unquote(value: str) -> str | None:
-    """None for a plain scalar YAML would read otherwise (a ': ', a stray quote)."""
-    if len(value) >= 2 and value[0] == value[-1] and value[0] in "\"'":
-        return value[1:-1]
-    return None if ": " in value or {value[:1], value[-1:]} & {'"', "'"} else value
 
 
 def parse(text: str) -> tuple[dict[str, Any] | None, str, str | None]:
     """``(frontmatter, body, error)`` for one atom's text.
 
-    The block is the lines between the first two ``---`` delimiters: one ``key: value``
-    per line, a value being a plain scalar or an inline ``[a, b]`` list, plus the
-    ``- item`` block-list form. Anything else is an error, not a guess.
+    The block is read by the kernel grammar; the atom rules are flat keys, each a
+    single-line scalar or a list of them (an empty key is ``[]``).
     """
-    lines = text.split("\n")
-    if not lines or lines[0].strip() != _DELIMITER:
+    parts = split(text)
+    if parts is None:
         return None, "", "no YAML frontmatter found"
     try:
-        end = next(i for i in range(1, len(lines)) if lines[i].strip() == _DELIMITER)
-    except StopIteration:
-        return None, "", "the frontmatter block is never closed by a '---' line"
-    data: dict[str, Any] = {}
-    key = ""
-    for line in lines[1:end]:
-        if not line.strip():
-            continue
-        match = _KEY_RE.match(line)
-        item = line.lstrip()[2:].strip() if line.lstrip().startswith("- ") else None
-        value = _scalar(match.group(2)) if match else _unquote(item) if item else None
-        if value is None or (match is None and not isinstance(data.get(key), list)):
-            return None, "", f"frontmatter line {line!r} is not 'key: value'"
-        if match is None:
-            data[key].append(value)
-            continue
-        key = match.group(1)
-        data[key] = value if match.group(2).strip() else []
-    return data, "\n".join(lines[end + 1 :]), None
+        data = parse_block(parts[0])
+    except ValueError as exc:
+        return None, "", f"frontmatter {exc}"
+    for key, value in data.items():
+        items = [] if value is None else value if isinstance(value, list) else [value]
+        if not all(not isinstance(item, dict | list) and "\n" not in str(item) for item in items):
+            return (
+                None,
+                "",
+                f"frontmatter key {key!r} is not a flat single-line value or a list of them",
+            )
+        data[key] = [] if value is None else value
+    return data, parts[1], None
