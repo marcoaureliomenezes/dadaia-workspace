@@ -587,8 +587,9 @@ def _code_sites(trees: dict[str, ast.Module]) -> list[str]:
     every |= {f"{PurePosixPath(rel).stem}.{n}": at for rel, params in local.items() for n, at in params.items()}  # fmt: skip
     sites: set[str] = set()
     for rel, tree in trees.items():
-        fix_param = {**every, **local[rel]}  # a local `def` wins its name
         defs = {n.name: n for n in _walk(tree) if isinstance(n, ast.FunctionDef)}
+        # a local `def` wins its name, even one with no `fix` parameter
+        fix_param = {**{n: at for n, at in every.items() if n not in defs}, **local[rel]}
         returns = {name: [r.value for r in _walk(d) if isinstance(r, ast.Return) and r.value] for name, d in defs.items()}  # fmt: skip
         docs = {id(n.body[0].value) for n in _walk(tree)
                 if isinstance(n, ast.Module | ast.FunctionDef | ast.ClassDef) and n.body
