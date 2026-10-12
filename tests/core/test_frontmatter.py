@@ -119,3 +119,10 @@ def test_merging_into_a_bom_constitution_edits_its_block_instead_of_prepending_a
     assert (tmp_path / "constitution.md").read_text(encoding="utf-8") == (
         "---\nspecs_pattern_version: 7\n---\n\n# Law\n"
     )
+
+
+def test_a_refusal_message_quotes_the_offending_line() -> None:
+    result = parse("---\ngitflow: {principal: main\n---\n")
+
+    assert isinstance(result, FrontmatterError)
+    assert "gitflow: {principal: main" in result.message
