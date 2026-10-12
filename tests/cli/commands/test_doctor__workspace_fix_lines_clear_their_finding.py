@@ -196,7 +196,9 @@ def _plant_disarmed_gate(ws: Path) -> str:
 def _plant_long_skill(ws: Path) -> str:
     skill = ws / ".agents" / "skills" / "long" / "SKILL.md"
     skill.parent.mkdir(parents=True)
-    soft = json.loads((_REPO / "dadaia_workspace/features/spec_context/behavior-map.json").read_bytes())
+    soft = json.loads(
+        (_REPO / "dadaia_workspace/features/spec_context/behavior-map.json").read_bytes()
+    )
     skill.write_text("l\n" * (soft["skill_md_line_soft"] + 1))
     return "SKILL-MD-LENGTH"
 
