@@ -29,7 +29,7 @@ The branch contract by role; the names are `specs/constitution.md`'s `gitflow:` 
 11. The moment the promote PR merges, record it — `python3 .agents/skills/dd-release-implementation/scripts/release.py ship --sha <sha>` — then tag the work tip as `archive/<work-name>` before deleting that work branch, and cut the next one per §2a when another release opens.
 12. A WT-managed worktree and its branch complete under `worktrees/AGENTS.md` §2, which owns their merge and cleanup lifecycle.
 
-- Rewriting pushed history or force-pushing is refused unless the operator authorizes that act in its own turn.
+- Rewriting pushed history or force-pushing the work, integration or principal branch is refused unless the operator authorizes that act in its own turn.
 
 ## 2a. The branch contract
 
