@@ -175,3 +175,29 @@ def test_the_orchestration_skill_dispatches_a_task_never_a_job() -> None:
     job as a unit of dispatch."""
     skill = (_SKILLS / "dd-manager-orchestration/SKILL.md").read_text("utf-8")
     assert "unit of dispatch is a job" not in skill
+
+
+@pytest.mark.parametrize(
+    ("home", "cite", "reserved"),
+    [
+        pytest.param("scaffold/ADRs/AGENTS.md", "specs/ADRs/AGENTS.md", "operator-only",
+                     id="adr-acceptance"),
+        pytest.param("scaffold/bugs/AGENTS.md", "specs/bugs/AGENTS.md", "the operator confirms",
+                     id="bug-confirmation"),
+        pytest.param("scaffold/releases/AGENTS.md", "specs/releases/AGENTS.md",
+                     "operator approval of SPEC and PLAN", id="spec-plan-approval"),
+        pytest.param("skills/dd-gitflow-default/SKILL.md", "dd-gitflow-default",
+                     "on the operator's explicit order", id="publication-and-promote"),
+        pytest.param("agents/dd-code-reviewer.md", "dd-code-reviewer", "the operator merges the PR",
+                     id="pr-merge"),
+    ],
+)  # fmt: skip
+def test_the_orchestration_skill_cites_every_law_home_that_reserves_an_act_to_the_operator(
+    home: str, cite: str, reserved: str
+) -> None:
+    """Step 4 of `dd-manager-orchestration` names the acts that wait after launch by citing their
+    law homes, so an act reserved elsewhere is never left to the main thread."""
+    assert reserved in (_PKG / "public" / home).read_text("utf-8")
+    skill = (_SKILLS / "dd-manager-orchestration/SKILL.md").read_text("utf-8")
+    step4 = next(ln for ln in skill.splitlines() if ln.startswith("4. After launch"))
+    assert cite in step4
