@@ -1,4 +1,4 @@
-"""Branch policy — the project gitflow read by role (ADRs 0037, 0046); zero I/O.
+"""Branch policy — the project gitflow read by role; zero I/O.
 
 Also home of :class:`Decision`, the outcome every chokepoint gate returns (this module
 has no internal-package dependency, so siblings import it from here)."""
@@ -136,8 +136,8 @@ def check_branch_policy(
     births: frozenset[str] = frozenset(),
 ) -> Decision | None:
     """The first refusal, or ``None``: each ref lands on a work or job branch from the
-    same-named local head, or births the principal/integration at a sha in *births*
-    (ADR 0036; R13); those two are otherwise PR-only."""
+    same-named local head, or births the principal/integration at a sha in *births*;
+    those two are otherwise PR-only."""
     for ref in refs:
         if not ref.remote_ref.startswith(HEADS_PREFIX):
             return _refuse_branch(ref, None, gitflow, fixes)

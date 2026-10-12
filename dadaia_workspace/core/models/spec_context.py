@@ -9,7 +9,7 @@ from enum import StrEnum
 #: ``SpecContextService.register``; every resolver reads it through ``core.invocation``.
 CONTEXT_NAME_RE = re.compile(r"[A-Za-z0-9_-]+")
 
-#: The `schema_version` `dadaia export` writes and `dadaia import` accepts (FR13).
+#: The `schema_version` `dadaia export` writes and `dadaia import` accepts.
 EXPORT_SCHEMA_VERSION = "spec-contexts-export-v1"
 
 
@@ -23,7 +23,7 @@ class AssociatedRepo:
     """One repo associated with a context, ordered alongside the unique main repo.
 
     The main repo (``SpecContextProject.repo_slug``/``repo_url``) stays the sole
-    specs/bind/memory/release/backlog target (FR19, G13, I4) — an ``AssociatedRepo``
+    specs/bind/memory/release/backlog target — an ``AssociatedRepo``
     is never a second such target, only an extra checkout under ``repos/``.
     """
 
@@ -44,29 +44,21 @@ class SpecContextProject:
     associated_repos: tuple[AssociatedRepo, ...] = ()
 
     def all_repos(self) -> tuple[AssociatedRepo, ...]:
-        """The one accessor for "this context's repos" (A15.3).
+        """Every repo of this context: the main repo first, then the associated repos.
 
-        Main repo first (folded into the same slug/url shape as an associated repo),
-        then every associated repo in registration order. Every consumer that needs
-        "the context's repos" as a set — the ALIVE/DEAD lifecycle (FR16), show/list/
-        export (FR18) — resolves through this method; no second
-        repo-resolution path is created for it. Specs/bind/memory/releases/backlog
-        keep resolving the main repo directly via ``repo_slug``/``repo_url`` (FR19) —
-        this accessor is additive to that single control point, never a replacement
-        for it.
+        The main repo is folded into the slug/url shape of an associated repo. The
+        specs, bind, memory, release and backlog paths resolve the main repo through
+        ``repo_slug``/``repo_url`` directly, not through this method.
         """
         return (AssociatedRepo(slug=self.repo_slug, url=self.repo_url), *self.associated_repos)
 
 
 @dataclass(frozen=True)
 class RepoLiveStatus:
-    """One repo's on-disk presence and live checked-out branch (FR18/A18.3).
+    """One repo's on-disk presence and live checked-out branch.
 
-    The ONE result shape every consumer of "is this repo on disk, and what branch
-    is it actually on" reads — ``SpecContextService.repo_live_status``/
-    ``repos_live_status`` is the single implementation that produces it; `context
-    show`, `context list --json`, and the export branch refresh all
-    render from this shape rather than re-deriving it at a second seam.
+    Produced by ``SpecContextService.repo_live_status`` and ``repos_live_status``; the
+    ``context show``, ``context list --json`` and export-branch refresh paths render it.
     """
 
     slug: str

@@ -1,10 +1,10 @@
-"""``dadaia specs upgrade`` orchestration (FR-S04 / FR-S05; simplified v0.5.1 T-051-16).
+"""``dadaia specs upgrade`` orchestration.
 
 Sequence: read the tree through ``specs_version.state`` -- an absent, malformed or
 foreign tree raises :class:`UpgradeRefused` carrying that state's fix, without touching
 the filesystem; an upgradable tree walks the hops (:func:`fold_tech_stack`, the doctor's repair set) and is re-stamped;
 a tree already at canonical is a no-op except for the empty ``_ideas/`` removal.
-Every other repair is the doctor's (``specs upgrade`` runs its repair set, WP-14).
+Every other repair is the doctor's (``specs upgrade`` runs its repair set).
 """
 
 from __future__ import annotations
@@ -43,9 +43,9 @@ class UpgradeResult:
     #: to the English vocabulary (planned-only when ``dry_run``).
     status_rewritten: list[Path] = field(default_factory=list)
     #: ``memory/TECHSTACK.md`` folded into ``ARCHITECTURE.md``'s ``## Tech Stack``
-    #: section and deleted by the 6 -> 7 hop (planned-only when ``dry_run``).
+    #: section and deleted (planned-only when ``dry_run``).
     tech_stack_folded: list[Path] = field(default_factory=list)
-    #: A flat live trio moved into the next ``rc-<N>/`` by the 8 -> 9 hop (ADR 0150).
+    #: A flat live trio moved into the next ``rc-<N>/``.
     trio_folded: list[Path] = field(default_factory=list)
 
 
@@ -56,7 +56,7 @@ def upgrade(
     delete goes through *remove* — the caller's one guarded deleter (``sweep.remove``).
 
     Raises :class:`UpgradeRefused`, before any write, for a tree ``state`` does not call
-    upgradable or canonical, or one still organised two-tier (ADR 0082).
+    upgradable or canonical, or one still organised two-tier.
     """
     kind, fix = _version.state(specs_dir)
     if kind not in ("upgradable", "canonical"):
@@ -101,9 +101,8 @@ def _release_dirs(specs_dir: Path) -> list[Path]:
 
 
 def plan_flat_trio_fold(specs_dir: Path) -> list[tuple[Path, Path]]:
-    """Each candidate document still flat at a release root — a v8 tree — and the
-    ``rc-<N+1>/`` path it moves to. Judged by shape, not by the state file's name, so the
-    fold never waits on the legacy rename (ADR 0150)."""
+    """Each candidate document still flat at a release root, and the ``rc-<N+1>/`` path
+    it moves to. Judged by shape, not by the state file's name."""
     return [
         (d / name, next_candidate(d) / name)
         for d in _release_dirs(specs_dir)
@@ -127,7 +126,7 @@ def fold_flat_trio(specs_dir: Path) -> list[Path]:
 _TECH_STACK_HEADING = "## Tech Stack"
 
 #: The retired two-tier shape: a fold appended to it lands outside both parts, so
-#: :func:`upgrade` refuses the tree whole (ADR 0082).
+#: :func:`upgrade` refuses the tree whole.
 _RETIRED_PART_HEADING = "## Part 1 — Principles"
 
 
@@ -140,7 +139,7 @@ def plan_tech_stack_fold(specs_dir: Path) -> list[Path]:
 
 def fold_tech_stack(specs_dir: Path, remove: Callable[[Path], object]) -> list[Path]:
     """Append ``TECHSTACK.md``'s body under ``## Tech Stack`` at the end of
-    ``ARCHITECTURE.md``, then delete the file — the 6 -> 7 hop (memory canon v7).
+    ``ARCHITECTURE.md``, then delete the file.
 
     The body is everything after the document's own H1/frontmatter title block, taken
     verbatim: the hop moves a consumer's authored text, it never rewrites it. A refused
@@ -173,7 +172,7 @@ def _tech_stack_body(text: str) -> str:
 
 
 def plan_empty_ideas_dir(specs_dir: Path) -> list[Path]:
-    """``specs/releases/_ideas/`` left the canon (0.4.7 c5, ADR 0019): a live tree whose
+    """``specs/releases/_ideas/`` is not part of the canon: a live tree whose
     ``_ideas/`` holds nothing but the scaffolded ``AGENTS.md`` is repaired losslessly."""
     ideas = specs_dir / "releases" / "_ideas"
     if not ideas.is_dir():
@@ -200,7 +199,7 @@ _RETIRED_STATUS_TOKENS = {
 def _live_trio_documents(specs_dir: Path) -> list[tuple[Path, Path]]:
     """(where the text is read, where it lands after the fold) for each release's live
     candidate — the rewrite touches only a ``**Status:**`` line. A closed ``rc-<N>/`` and
-    ``releases/_archive/`` are history, never rewritten (ADR 0150)."""
+    ``releases/_archive/`` are history, never rewritten."""
     moves = plan_flat_trio_fold(specs_dir)
     folded = {source.parent for source, _ in moves}
     live = [candidate_dir(d) for d in _release_dirs(specs_dir) if d not in folded]

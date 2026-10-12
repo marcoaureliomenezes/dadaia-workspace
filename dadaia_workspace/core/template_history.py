@@ -1,11 +1,9 @@
-"""Shipped-version history for projected template assets — bug
-``upgrade-never-refreshes-uncustomised-scoped-law-projection`` (MEDIUM).
+"""Shipped-version history for projected template assets.
 
 A projected law file (``specs/AGENTS.md``) is installed once and then never refreshed:
 overwriting it could destroy operator customisation, so ``dadaia doctor`` reports drift
-(TREE-5) and declines to repair. Without a way to recognise our own earlier output, a file
-nobody ever edited is protected exactly like a hand-written one — and every instance kept
-scoped law citing a command the CLI had already removed.
+and declines to repair. Without a way to recognise our own earlier output, a file
+nobody ever edited is protected exactly like a hand-written one.
 
 This module supplies the missing evidence: the set of sha256 digests of every version of a
 template this project has published. On-disk bytes found in that set were written by us

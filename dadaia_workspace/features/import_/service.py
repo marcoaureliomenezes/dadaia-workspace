@@ -1,4 +1,4 @@
-"""`dadaia import` — registers every unknown context of a `spec-contexts.json` as DEAD (FR13)."""
+"""`dadaia import` — registers every unknown context of a `spec-contexts.json` as DEAD."""
 
 import json
 from dataclasses import dataclass

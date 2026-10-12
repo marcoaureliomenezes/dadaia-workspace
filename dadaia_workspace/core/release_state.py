@@ -17,8 +17,7 @@ __all__ = [
     "RELEASE_STATE_FILENAME",
 ]
 
-#: The one release-state filename (ADR 0007): the legacy name is never read as live —
-#: the doctor renames it (SPEC-DOC-046).
+#: The release-state filename. The legacy name is never read as live; the doctor renames it.
 RELEASE_STATE_FILENAME = "_RELEASE.json"
 LEGACY_RELEASE_STATE_FILENAME = "RELEASE.json"
 

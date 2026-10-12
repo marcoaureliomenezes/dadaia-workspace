@@ -1,4 +1,4 @@
-"""The one loader of a packaged skill-script owner (ADR 0135, ADR 0246).
+"""The one loader of a packaged skill-script owner.
 
 Each owner runs from its absolute path and is registered in ``sys.modules`` under its
 import name before it executes, so a package caller and a sibling ``import _atomic``

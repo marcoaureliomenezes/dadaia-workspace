@@ -1,25 +1,22 @@
-"""Pure push-range denylist matcher (SPEC v0.9.0 FR3/FR5/FR6; SPEC v0.11.0 FR1).
+"""Pure push-range denylist matcher.
 
 Zero I/O, exactly like the rest of ``features/chokepoints/**``: this module NEVER
 imports ``infrastructure`` and NEVER spawns a subprocess. Term sources — the operator
-denylist and the packaged baseline patterns (ADR 0032: no repo/context name) — are loaded by
-the CLI (``cli/commands/ci.py``) via ``infrastructure.privacy_check``'s public
+denylist and the packaged baseline patterns, which carry no repo or context name — are
+loaded by the CLI (``cli/commands/ci.py``) via ``infrastructure.privacy_check``'s public
 accessors and passed in here as plain data; :class:`BaselinePatternLike` is a
 structural Protocol so this module can accept those instances without importing the
 concrete type that produces them (features-no-infrastructure import-linter contract).
 
 Masking (``first…last``) happens INSIDE this module so an unmasked term never leaves it
-(FR5, CWE-532) — :attr:`Hit.masked_term` is the only term-shaped value this module ever
+(CWE-532): :attr:`Hit.masked_term` is the only term-shaped value this module ever
 returns; the source blob's raw text is never echoed anywhere.
 
-**v0.11.0 FR1 amnesty (supersedes the v0.9.0-era "a matched term always produces a
-hit" absolute).** A candidate is now suppressed IFF the exact matched VALUE occurs
-case-insensitively in the SAME path's published prior text, carried on
-``ScannedObject.prior_text`` — never derived from a list, dict, set or constant of
-sanctioned terms. Grill ADR #3b's invariant survives in its narrower, still-load-bearing
-form: **no amnesty/allowlist LIST exists anywhere in this module** (A4.1's source-scan
-contract test pins exactly that, unmodified) — the amnesty derives entirely from
-published git state the adapter resolves, never from a static exception list.
+A candidate is suppressed IFF the exact matched value occurs case-insensitively in the
+same path's published prior text, carried on ``ScannedObject.prior_text``. It is never
+derived from a list, dict, set or constant of sanctioned terms: the amnesty derives
+entirely from published git state the adapter resolves. No amnesty or allowlist list
+exists anywhere in this module.
 """
 
 from __future__ import annotations
@@ -73,7 +70,7 @@ class BaselinePatternLike(Protocol):
 
 @dataclass(frozen=True)
 class Hit:
-    """One offending blob's first denylist match (SPEC FR5 — one line per object)."""
+    """One offending blob's first denylist match."""
 
     path: str
     line: int
@@ -84,7 +81,7 @@ class Hit:
 
 @dataclass(frozen=True)
 class OversizedNote:
-    """One oversized blob's honest partial-coverage report (SPEC v0.11.0 FR4).
+    """One oversized blob's partial-coverage report.
 
     Distinct from the undecodable-binary skip count: an oversized blob whose scanned
     prefix decoded fine (``ScannedObject.decodable`` True) is genuinely partially
@@ -114,13 +111,12 @@ def _first_match(
     """The earliest-line match of :func:`~dadaia_workspace.core.redaction.privacy_matches`
     (the one matcher: operator terms, then baseline patterns), or ``None``.
 
-    SPEC v0.11.0 FR1 amnesty: a candidate is suppressed IFF the SAME matcher, re-run over
-    ``obj.prior_text`` (the same path's published content; ``None`` -> nothing is
-    suppressed, ADR D7), yields the same value (case-normalized) from the same source —
-    keyed on the value, so a prior email never amnesties a brand-new one (grill R1/A1.3).
-    Only ``masked_term`` leaves this module (A5.2)."""
+    A candidate is suppressed IFF the SAME matcher, re-run over ``obj.prior_text`` (the
+    same path's published content; ``None`` suppresses nothing), yields the same value
+    (case-normalized) from the same source; keyed on the value, so a prior email never
+    amnesties a brand-new one. Only ``masked_term`` leaves this module."""
     published = published_matches(obj.prior_text, terms, patterns)
-    # AC5.6: a control character never splits a term out of reach — stripped first.
+    # A control character never splits a term out of reach: stripped first.
     for lineno, line_text in enumerate(UNSAFE_FORMAT_CHARS_RE.sub("", obj.text).splitlines(), 1):
         for value, source, _reason in fresh_matches(line_text, published, terms, patterns):
             return Hit(obj.path, lineno, obj.sha, mask(value), source)
@@ -132,22 +128,18 @@ def scan_objects(
     terms: Iterable[tuple[str, str]],
     patterns: Iterable[BaselinePatternLike],
 ) -> ScanOutcome:
-    """Match *objects* against the FR3 term sources.
+    """Match *objects* against the term sources.
 
     * ``terms`` — operator denylist entries (``(term, reason)``), case-insensitive
       substring match.
     * ``patterns`` — compiled baseline structural patterns, ``exclude_regex`` honored.
 
-    Undecodable (binary) objects are skipped and counted, never matched (FR6 row 3).
-    This class now ALSO covers an oversized blob whose scanned prefix failed to decode
-    (SPEC v0.11.0 A4.6) — there is nothing honest to report about a scan that never
-    ran, so it falls back to the SAME binary skip class, never a separate note. An
-    oversized blob whose scanned prefix DID decode is genuinely, partially scanned like
-    any other decodable object (v0.11.0 A4.1 — a match inside the scanned prefix still
-    produces a hit) AND additionally contributes an :class:`OversizedNote` reporting
-    the partial coverage, independent of whether a hit was found (A4.4). At most one
-    :class:`Hit` is returned per object — its first match by ascending line number —
-    matching FR5's one-line-per-offending-object refusal shape.
+    Undecodable (binary) objects are skipped and counted, never matched. An oversized
+    blob whose scanned prefix failed to decode falls in the same skip class. An
+    oversized blob whose prefix decoded is scanned like any other decodable object, and
+    also yields an :class:`OversizedNote` reporting the partial coverage, whether or not
+    a hit was found. At most one :class:`Hit` is returned per object: its first match by
+    ascending line number.
     """
     term_list = list(terms)
     pattern_list = list(patterns)
@@ -155,7 +147,7 @@ def scan_objects(
     oversized_notes: list[OversizedNote] = []
     skipped = 0
     for obj in objects:
-        # AC5.6: a structural shape in the path refuses (a key file by its suffix, binary
+        # A structural shape in the path refuses (a key file by its suffix, binary
         # or not), line 0; an operator term there is masked by PathMasker, not refused.
         path_hit = _first_match(replace(obj, text=obj.path, prior_text=None), [], pattern_list)
         if path_hit is not None:
@@ -180,16 +172,16 @@ def scan_objects(
     )
 
 
-#: v0.11.0 FR6(b) — a masked blob-path segment in a gate refusal/note; distinct from the
+#: A masked blob-path segment in a gate refusal or note; distinct from the
 #: CLI's ``[REDACTED-CONTEXT-n]`` (``cli/redact.py``), a different channel.
 _PATH_PLACEHOLDER_FMT = "[REDACTED-PATH-{n}]"
 
 
 class PathMasker:
-    """v0.11.0 FR6(b) — masks the blob-path segments :func:`_first_match` flags (the one
-    matcher); every gate string naming a blob path routes through :meth:`mask_path`.
+    """Masks the blob-path segments :func:`_first_match` flags; every gate string naming a
+    blob path routes through :meth:`mask_path`.
     One instance per push-gate run: a repeated segment keeps its first-appearance
-    ordinal. A path with no offending segment is returned byte-identical (A6.2)."""
+    ordinal. A path with no offending segment is returned byte-identical."""
 
     def __init__(
         self,

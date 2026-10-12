@@ -58,7 +58,7 @@ def reconcile_workspace(
     primary_snapshot = primary.read_bytes() if primary.is_file() else None
     projections_started = False
     try:
-        # Bug reconcile-root-owned-agentic: a mixed-ownership workspace (e.g.
+        # A mixed-ownership workspace (e.g.
         # .dadaia/agentic owned by root from a previous sudo run) fails the projection
         # step mid-transaction with a bare "Permission denied". Preflight it: the
         # transaction never starts, and the operator gets the exact path + repair
@@ -88,7 +88,7 @@ def reconcile_workspace(
         steps.append("public-doctor")
 
         # Context invariants only: operator slop never blocks an upgrade; `certify` and
-        # `dadaia doctor` judge the whole workspace (DEC-13 a).
+        # `dadaia doctor` judge the whole workspace.
         broken = doctor_service.check()
         if broken:
             summary = "; ".join(f"{issue.code}: {issue.message}" for issue in broken[:8])
@@ -109,7 +109,7 @@ def reconcile_workspace(
 def _ownership_preflight(workspace_root: Path) -> str | None:
     """Return an actionable error when the runtime user cannot write under ``.dadaia``.
 
-    Bug reconcile-root-owned-agentic: a previous elevated run may leave
+    A previous elevated run may leave
     ``.dadaia/agentic`` (or ``.dadaia`` itself) owned by another user (root), so the
     projection step later dies mid-transaction with a bare PermissionError. This
     preflight names the offending path, its owner, and the exact repair command —

@@ -1,4 +1,4 @@
-"""Chokepoint enforcement (W1, v0.1.14): harness-independent git-hook gates.
+"""Chokepoint enforcement: harness-independent git-hook gates.
 
 The SDD gate (``hooks/sdd_gate``) fires for *file-write tools* inside a harness that
 supports PreToolUse hooks. Chokepoints provide a separate boundary for any invocation

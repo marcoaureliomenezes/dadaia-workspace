@@ -1,4 +1,4 @@
-"""Specs-pattern versioning (FR-S01 / FR-S02).
+"""Specs-pattern versioning.
 
 A Spec Context Project's ``specs/`` tree conforms to a *pattern version* — the
 canonical structural layout the workspace expects. The library carries the single
@@ -19,27 +19,12 @@ from dadaia_workspace.core.frontmatter import Frontmatter, parse
 from dadaia_workspace.core.gitflow import constitution_error, constitution_text, specs_tree_exists
 
 #: Single source of truth for the current canonical specs-pattern version.
-#: Bump this whenever the canon a tree must meet changes.
-#: v3 = agent-tier-frontmatter (v0.1.72 FR1); v4 = bugs-single-file (v0.1.73 FR1 —
-#: the operator's ONE-append-only-ledger contract); v5 = specs-canon-v6's tree shape
-#: (T-050-05); v6 = this stamp, T-050-06A — the version number itself, deferred by
-#: T-050-05 because the release-id axis flip was this task's write set;
-#: v7 = memory canon v7 — ``memory/TECHSTACK.md`` left the canon and its body became
-#: ``ARCHITECTURE.md``'s ``## Tech Stack`` section, which ``features/migrate`` folds;
-#: v8 = the 0.5.0 canon — fixed law sections, the gitflow block, the refreshed area laws
-#: and catalog, all written by the repair set ``specs init`` runs; v9 = every candidate
-#: in ``releases/<M.m.p>/rc-<N>/`` (ADR 0150), the flat live trio folded by the hop;
-#: ``RELEASE.json`` back as SPEC-DOC-046's rename input (ADR 0152 (4)); the worktree law
-#: (T-050-103): specs paths land by a worktree merge, audits direct; v10 = the bugs law's
-#: rc-8 rewrite; its pin (91a8bfb1b79eac16) also covers rc-9 Job 1's scaffold-law
-#: edits; v11 = rc-9 Job 5's bugs and releases laws and specs AGENTS.md template
-#: (ADRs 0193, 0201–0205); v12 = the jobs-and-tasks law, single verify authority and
-#: removal of the bug-balance projection, the dd-sw-engineer-sr rename. A canon change that
+#: Bump this whenever the canon a tree must meet changes. A canon change that
 #: keeps the stamp leaves every older tree reading ``canonical`` while the doctor is red.
 CANONICAL_SPECS_VERSION = 12
 
-#: The oldest stamp the one live upgrade hop starts from — and so the oldest a tree may
-#: carry and still be a dadaia tree (SPEC 0.4.8 D7, D9); anything older is foreign.
+#: The oldest stamp the upgrade starts from — and so the oldest a tree may
+#: carry and still be a dadaia tree; anything older is foreign.
 OLDEST_UPGRADABLE_VERSION = 6
 
 #: The canon fingerprint each stamp was cut at — re-pinned only together with a stamp bump,

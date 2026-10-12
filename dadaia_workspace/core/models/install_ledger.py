@@ -1,11 +1,7 @@
-"""Install-ledger domain model — the projection's MEMORY of what it installed.
+"""Install-ledger domain model — the projection's record of what it installed.
 
-Bug class (``retired-lib-asset-leaves-orphan-projection``): projection reconciliation
-used to derive the desired state from the CURRENT source tree only — ``copy_tree``
-returned before its orphan-prune loop when the source dir no longer existed, so
-retiring an entire asset family never propagated to the instance. Without a record of
-what was installed, no reconciler can distinguish "asset the library stopped shipping"
-(remove) from "file the operator authored" (never touch).
+Without a record of what was installed, no reconciler can distinguish "asset the library
+stopped shipping" (remove) from "file the operator authored" (never touch).
 
 This ledger is that record: one entry per file the installer wrote or verified as its
 own, with the sha256 of the content the installer owns. The reconciliation invariant it
@@ -30,7 +26,7 @@ CURRENT_SCHEMA_VERSION = "1"
 
 #: What a ledgered entry physically is on disk. ``read_bytes()`` follows a symlink, so
 #: the digest alone cannot tell a link from a copy of the same content — the kind is
-#: recorded. A v0.4.6-and-earlier entry carries none and migrates as ``"file"``.
+#: recorded. An entry that carries none reads as ``"file"``.
 _KINDS = frozenset({"file", "symlink", "copy"})
 _DEFAULT_KIND = "file"
 

@@ -29,7 +29,7 @@ _SENTINEL = Path(".dadaia") / "states" / "spec_contexts.json"
 
 #: ``os.pathsep``-separated roots never resolved — by the walk, the CLI's own venv or an
 #: explicit ``--workspace`` — so no dadaia process nor child inheriting it acts on one
-#: (ADR 0088): the suite and every mutating probe set it.
+#: The suite and every mutating probe set it.
 FENCE_ENV = "DADAIA_FENCED_ROOTS"
 
 
@@ -67,7 +67,7 @@ def acting_root(path: Path) -> Path | None:
 def owning_root(path: Path) -> Path | None:
     """The workspace holding *path*, fenced or not — the gate's question "which root
     protects this target" alone: the fence stops a process ACTING on a root, never the
-    protection of that root (bug fenced-roots-env-disables-the-gate)."""
+    protection of that root."""
     return _workspace_of(path, fenced=frozenset())
 
 
@@ -105,8 +105,7 @@ def resolve_cli_workspace_root(workspace: Path | None, cwd: Path | None = None) 
     given *workspace* is AUTHORITATIVE — it is used as given and must itself hold
     ``.dadaia/``; it is never re-resolved through the ancestor walk, which would
     silently target an enclosing workspace when the path is an uninitialized
-    directory nested inside one (bug
-    ``import-export-workspace-flag-re-resolves-through-ancestor-walk``).
+    directory nested inside one.
 
     ``None`` keeps the cwd ancestor walk of :func:`resolve_workspace_root`.
 

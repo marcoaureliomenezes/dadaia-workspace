@@ -12,9 +12,9 @@ from dadaia_workspace.core.models.doctor_report import DoctorLine, DoctorReport
 from dadaia_workspace.features.public.model_resolution import check_model_resolution
 from dadaia_workspace.infrastructure.public_assets import FileSystemPublicAssetManager
 
-#: Loads the agent-model-policy overlay for a workspace root (v0.1.65 FR7). Injected by
+#: Loads the agent-model-policy overlay for a workspace root. Injected by
 #: the composition root (``container.build_public_service``) so this feature module
-#: carries no ``features -> infrastructure`` import edge (D-4).
+#: carries no ``features -> infrastructure`` import edge.
 AgentPolicyLoader = Callable[[Path], AgentModelPolicyOverlay | None]
 
 
@@ -59,7 +59,7 @@ class PublicAssetService:
         """The ONE answer to "is the projection healthy": every doctor line, and the one
         remedy when any line blocks (``""`` when none does) — `public doctor` prints it and
         `dadaia doctor` carries it, so the two never disagree. The verdict is the typed
-        report's, fail-closed: every blocking status fails (public-doctor-exits-zero-despite-error)."""
+        report's, fail-closed: every blocking status fails."""
         lines = list(self.doctor(workspace_root).lines)
         blocking = [line for line in lines if line.status.blocking]
         if not blocking:

@@ -1,7 +1,7 @@
-"""Canonical-subject registry — the linchpin (SPEC §3.2, ADR-A).
+"""Canonical-subject registry.
 
 **Auto-derived, recomputed from live truth on every ``build_registry`` call.** It is derived,
-never a stored file that can itself go stale (the meta-version of the bug we are fixing).
+never a stored file that can itself go stale.
 
 Four anchor kinds, each backed by a real registry of truth in the live tree:
 
@@ -133,8 +133,8 @@ def _derive_doc_anchors(specs_dir: Path) -> set[str]:
 def _derive_invariant_anchors(specs_dir: Path) -> set[str]:
     """Derive named ``INV-*`` invariants from the memory docs ONLY.
 
-    ``specs/memory/**`` Markdown is the sole invariant declaration surface
-    (v0.1.49 FR2). Source code and tests are never scanned: docstring examples
+    ``specs/memory/**`` Markdown is the sole invariant declaration surface.
+    Source code and tests are never scanned: docstring examples
     and test-fixture ids must not mint live anchors, or the fail-closed
     classifier can be satisfied by junk.
     """
@@ -160,7 +160,7 @@ def _derive_invariant_anchors(specs_dir: Path) -> set[str]:
 class Registry:
     """An immutable snapshot of the canonical-subject anchor set over one repo.
 
-    Built by :func:`build_registry`; every call recomputes from live truth (SPEC §3.2). The
+    Built by :func:`build_registry`; every call recomputes from live truth. The
     classifier and doctor consume :meth:`bind` and :meth:`list_anchors`.
     """
 
@@ -227,7 +227,7 @@ class Registry:
 
 
 def build_registry(*, specs_dir: Path, tracked: frozenset[str]) -> Registry:
-    """Build the canonical-subject registry from live truth (SPEC §3.2): ``tracked`` is
+    """Build the canonical-subject registry from live truth: ``tracked`` is
     the repo's tracked paths (``specs_dir.parent``-relative), handed in by the caller."""
     anchors: dict[SubjectKind, set[str]] = {
         SubjectKind.CODE: set(tracked),

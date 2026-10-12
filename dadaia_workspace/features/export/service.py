@@ -48,9 +48,8 @@ class ExportService:
 
     def _refresh_branches(self, now: str) -> list[tuple[SpecContextProject, str | None]]:
         """Re-read the checked-out branch of every ALIVE repo on disk and write it through
-        the store with ``dataclasses.replace`` — a field-by-field rebuild once dropped
-        ``associated_repos`` from the live store (T-044-29). Returns each context with the
-        instant it was synced: ``now`` when refreshed, else its ``dead_since``."""
+        the store with ``dataclasses.replace``, which keeps every other field. Returns each
+        context with the instant it was synced: ``now`` when refreshed, else its ``dead_since``."""
         rows: list[tuple[SpecContextProject, str | None]] = []
         for ctx in self._store.list_all():
             repo = self._workspace_root / "repos" / ctx.repo_slug

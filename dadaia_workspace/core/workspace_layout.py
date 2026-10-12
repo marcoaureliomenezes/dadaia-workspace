@@ -73,15 +73,15 @@ AUDIT_DIR_NAME_PATTERN: str = r"\d{8}-[a-z0-9][a-z0-9-]*"
 AUDIT_DIR_NAME_RE: re.Pattern[str] = re.compile(f"^{AUDIT_DIR_NAME_PATTERN}$")
 
 
-#: The operator's file of legitimate workspace paths, at the root (ADRs 0092, 0145).
+#: The operator's file of legitimate workspace paths, at the root.
 DADAIAIGNORE: str = ".dadaiaignore"
 
 #: Files the workspace root may contain: the root map, the operator prompt, the operator's own
-#: globs — credentials live outside the workspace (ADR 0146); the root is never a repository,
-#: so neither a ``.gitignore`` nor a ``.git/`` is canon there (ADR 0092: ``.dadaiaignore``).
+#: globs. Credentials live outside the workspace; the root is never a repository, so neither
+#: a ``.gitignore`` nor a ``.git/`` is canon there (``.dadaiaignore`` is the root's file).
 ROOT_ALLOWED_FILES: frozenset[str] = frozenset({"AGENTS.md", "prompt.md", DADAIAIGNORE})
 
-#: Entries the doctor reports and never moves: a credential file (ADR 0146) and a repository's
+#: Entries the doctor reports and never moves: a credential file and a repository's
 #: history — the operator moves them out or names them in ``.dadaiaignore``.
 NEVER_MOVED: frozenset[str] = frozenset({".env", ".git"})
 
@@ -95,7 +95,7 @@ class FloorRefusal(StrEnum):
     SESSION = "session"
 
 
-_OPERATOR = (  # ADR 0092: the operator's file, or a path under an operator glob
+_OPERATOR = (  # the operator's file, or a path under an operator glob
     "[GATE] '{path}' is the operator's ({why}; ADRs 0092, 0133): only the operator edits it "
     "by hand. Draft your change under .dadaia/tmp/<agent>/<YYYYMMDD>/ and hand it over.\n"
 )
@@ -116,7 +116,7 @@ REFUSALS: dict[FloorRefusal, str] = {
     ),
 }
 
-#: PROTECTED without any install ledger (ADR 0133): the root map, the operator's globs, and
+#: PROTECTED without any install ledger: the root map, the operator's globs, and
 #: the CLI-owned ``.dadaia/`` zones, each with its refusal; the ledger adds every projected path on top.
 CORE_FLOOR: dict[str, FloorRefusal] = {
     "AGENTS.md": FloorRefusal.LAW,
@@ -206,7 +206,7 @@ MARKER_DIR: Path = Path(".dadaia") / "tmp" / "hooks"
 
 
 def parse_dadaiaignore(text: str) -> tuple[tuple[str, ...], tuple[str, ...], tuple[str, ...]]:
-    """(patterns, protected, invalid lines) of a ``.dadaiaignore`` (ADRs 0093, 0133): one
+    """(patterns, protected, invalid lines) of a ``.dadaiaignore``: one
     pattern per line, ``#`` comments, ``*`` within one segment, a trailing ``/`` for a
     directory (dropped); ``!``, ``**``, an absolute path or ``..`` is invalid. Lines after a
     ``[protected]`` header are repo-relative protected globs. Deduplicated, order kept."""
@@ -249,7 +249,7 @@ def dadaiaignore_seed(workspace: Path) -> str:
 
 
 #: The level-1 root files a workspace is born with and the SessionStart lane re-creates,
-#: never rewrites (ADRs 0095, 0096): name -> its first content. ``AGENTS.md`` is projected.
+#: never rewrites: name -> its first content. ``AGENTS.md`` is projected.
 LEVEL1_SEEDS: dict[str, Callable[[Path], str]] = {
     DADAIAIGNORE: dadaiaignore_seed,
     "prompt.md": lambda _: "",
@@ -445,8 +445,7 @@ SPECS_CANON: tuple[CanonEntry, ...] = (
     CanonEntry("releases/_archive/releases_histo.jsonl", "releases", True),
     CanonEntry("releases/_archive/<M.m.p>/**", "releases"),
     CanonEntry("releases/<M.m.p>/_RELEASE.json", "releases"),
-    # Legacy state-file name — admitted ONLY as the rename-lane input: SPEC-DOC-046
-    # offers the doctor-fixable rename to _RELEASE.json (ADR 0007).
+    # Legacy state-file name, admitted only as the input of the doctor's rename to _RELEASE.json.
     CanonEntry("releases/<M.m.p>/RELEASE.json", "releases"),
     CanonEntry("releases/<M.m.p>/rc-<N>/SPEC.md", "releases"),
     CanonEntry("releases/<M.m.p>/rc-<N>/PLAN.md", "releases"),
@@ -466,7 +465,7 @@ SPECS_CANON: tuple[CanonEntry, ...] = (
     CanonEntry("ADRs/decisions.jsonl", "ADRs", True),
 )
 
-#: One candidate's documents (ADR 0150), read off the canon rows.
+#: One candidate's documents, read off the canon rows.
 CANDIDATE_DOCUMENTS: tuple[str, ...] = tuple(
     e.shape.rsplit("/", 1)[1]
     for e in SPECS_CANON
@@ -476,7 +475,7 @@ CANDIDATE_DOCUMENTS: tuple[str, ...] = tuple(
 #: Every entry permitted directly under ``specs/``.
 CANON_ROOT_MEMBERS: frozenset[str] = frozenset(entry.area for entry in SPECS_CANON)
 
-#: TREE-4's required directories: every area whose ``_archive/`` histo is born with the tree.
+#: Directories the tree requires: every area whose ``_archive/`` histo is born with the tree.
 REQUIRED_ROOT_DIRS: tuple[str, ...] = tuple(
     sorted(
         {
@@ -489,7 +488,7 @@ REQUIRED_ROOT_DIRS: tuple[str, ...] = tuple(
     )
 )
 
-#: The areas carrying a scaffolded ``AGENTS.md`` (TREE-5 scoped-law coverage).
+#: The areas carrying a scaffolded ``AGENTS.md``.
 SCOPED_LAW_AREAS: tuple[str, ...] = tuple(
     entry.dest.removesuffix("/AGENTS.md")
     for entry in SPECS_CANON
