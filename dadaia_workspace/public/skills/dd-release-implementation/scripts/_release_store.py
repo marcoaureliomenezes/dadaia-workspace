@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """The ONE write path onto the release files: read -> apply -> validate -> replace.
 
-Every write goes through :func:`commit`: build the candidate bytes, run the SAME `check`
-they will be validated by, then `os.replace` atomically. A concurrent write is detected
-by the file's own (size, mtime) and re-applied once — a race surfaces and retries.
+Every write goes through :func:`commit`, which binds the document to the kernel's one write
+loop (`_commit`): the candidate bytes pass the SAME `check` they are validated by, then replace
+atomically, and a concurrent write is re-applied once.
 """
 
 from __future__ import annotations
@@ -14,10 +14,11 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+import _commit
 from _grammar import STATE
 from _jsonl import parse_object
-from _ledger import records, replace, stamp
-from _refusal import Refusal as Refusal
+from _ledger import records, replace
+from _refusal import Refusal
 from _release_check import state_findings
 from _release_schema import Unreadable, current_candidate, live_id
 from _specs import choice, script
@@ -78,13 +79,8 @@ def open_bug_ids(specs: Path) -> list[str]:
     )
 
 
-def serialize(state: State) -> str:
-    """The canonical bytes: 2-space indent, non-ASCII kept, one trailing newline."""
-    return json.dumps(state, indent=2, ensure_ascii=False) + "\n"
-
-
 def validated(state: State, rel: str) -> str:
-    text = serialize(state)
+    text = json.dumps(state, indent=2, ensure_ascii=False) + "\n"  # the canonical bytes
     findings = state_findings(text, rel)
     if findings:
         detail = "; ".join(str(f["message"]) for f in findings[:5])
@@ -96,22 +92,13 @@ def validated(state: State, rel: str) -> str:
 
 
 def commit(path: Path, rel: str, apply: Callable[[State], State]) -> State:
-    """Apply *apply* to *path*'s state and replace the document atomically.
-
-    Validated BEFORE the replace, so a refused write leaves the file byte-identical; a file
-    changed under the computation is re-applied ONCE, a second race refuses.
-    """
-    before = stamp(path)
-    written = apply(read_state(path))
-    text = validated(written, rel)
-    if stamp(path) != before:
-        before = stamp(path)
-        written = apply(read_state(path))
-        text = validated(written, rel)
-        if stamp(path) != before:
-            raise Refusal(
-                f"{path.name} changed twice under this write — nothing was written",
-                "Operator action: re-run the same command, unchanged",
-            )
-    replace(path, text)
-    return written
+    """Apply *apply* to *path*'s state and replace the document atomically; a refused write
+    leaves the file byte-identical (the document is the loop's one record)."""
+    written = _commit.commit(
+        path,
+        lambda p: [read_state(p)],
+        lambda states: [apply(states[0])],
+        lambda written, *_: validated(written[0], rel),
+        replace,
+    )
+    return written[0]
