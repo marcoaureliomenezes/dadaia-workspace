@@ -17,6 +17,7 @@ import os
 import re
 import shlex
 import shutil
+import site
 import subprocess
 import sys
 import sysconfig
@@ -47,6 +48,7 @@ from dadaia_workspace.core.specs_version import CANONICAL_SPECS_VERSION
 from dadaia_workspace.features.chokepoints import push_gate_decision
 from dadaia_workspace.features.chokepoints.branch_policy import parse_push_stdin
 from dadaia_workspace.features.spec_context.service import git_hooks_dir, install_git_hooks
+from dadaia_workspace.features.specs import canon
 from dadaia_workspace.features.specs.canon import canon_violations
 from dadaia_workspace.features.specs.citations import dead_verb_citations
 from dadaia_workspace.features.specs.rules import RULES as SPECS_RULES
@@ -63,6 +65,7 @@ from tests.features.backlog.test_doctor import _SOURCE, _active_entry
 from tests.features.specs.test_doctor import _make_clean_specs_tree
 from tests.fixtures.harness_env import run_bash, suite_env
 from tests.fixtures.real_git import PushRepo
+from tests.fixtures.stores import own_venv_python, own_venv_workspace
 from tests.helpers import worktree_ws
 from tests.helpers.privacy_fixtures import aws_key_shape
 
@@ -1912,3 +1915,38 @@ def test_dead_after_the_operator_pulls_into_a_conflict_publishes_no_markers(
     assert done.returncode != 0 and "README.md" in fix and "x.md" in fix, output
     assert fix.endswith("into a worktree, or discard it"), output
     assert world.repo.is_dir() and world.remote_heads()["feature/1.0.0"] == published
+
+
+@pytest.mark.slow(reason="a real doctor child process")
+def test_the_real_doctor_prints_every_fix_as_one_whole_runnable_line(tmp_path: Path) -> None:
+    """A workspace finding (an expired tmp entry), an error-class specs finding (FIXED-1 on a
+    symlinked QUALITY.md) and a ledger finding (a malformed BACKLOG.json), through a
+    `dadaia doctor` subprocess at a 61-char root with COLUMNS unset: exit 1, and every `fix:`
+    line is one whole line in one of the two fix forms."""
+    ws = own_venv_workspace(tmp_path / ("w" * max(1, 61 - len(str(tmp_path)))))
+    expired = ws / ".dadaia" / "tmp" / "agent" / "20200101"
+    expired.mkdir(parents=True)
+    os.utime(expired, (0, 0))
+    specs = ws / "repos" / "demo" / "specs"
+    canon.scaffold(specs, project_name="demo")
+    outside = tmp_path / "outside.md"
+    outside.write_text("# Quality\n", encoding="utf-8")
+    (specs / "memory" / "QUALITY.md").unlink()
+    (specs / "memory" / "QUALITY.md").symlink_to(outside)
+    (specs / "backlog" / "BACKLOG.json").write_text("{}\n", encoding="utf-8")
+    env = {k: v for k, v in os.environ.items() if k != "COLUMNS"}
+    env["PYTHONPATH"] = os.pathsep.join([str(_PKG.parent), *site.getsitepackages()])
+    argv = [str(own_venv_python(ws)), "-m", "dadaia_workspace", "doctor", "--specs-dir", str(specs)]
+    run = subprocess.run(argv, cwd=ws, env=env, capture_output=True, text=True, timeout=120)  # noqa: S603
+    assert run.returncode == 1, run.stdout + run.stderr
+    lines = run.stdout.splitlines()
+    assert {"WS-tmp-expired", "FIXED-1", "LEDGER-BACKLOG-SCHEMA"} <= {
+        ln.split(" ", 1)[0] for ln in lines
+    }
+    fixes = [line for line in lines if line.startswith("fix: ")]
+    assert fixes, run.stdout
+    for fix in fixes:
+        if the_fix(fix).startswith("Operator action: "):  # it names the file
+            assert re.search(r"\s(/|\w:[\\/])\S", fix), fix
+    # a wrapped fix would leave a continuation line that is neither a finding nor a `fix:` line
+    assert [ln for ln in lines if ln and not re.match(r"(fix: |[A-Z][A-Za-z0-9-]+ )", ln)] == []
