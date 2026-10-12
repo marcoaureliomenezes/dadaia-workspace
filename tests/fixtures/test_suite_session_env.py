@@ -48,7 +48,7 @@ def test_inner():
 
 @pytest.fixture()
 def inner(request: pytest.FixtureRequest) -> Iterator[Path]:
-    """A gitignored dir under the checkout's ``tests/tmp/`` (the root conftest only judges
+    """An untracked dir under the checkout's ``tests/tmp/`` (the root conftest only judges
     items inside the checkout); removed after the run."""
     where = _CHECKOUT / "tests" / "tmp" / f"inner-{uuid.uuid4().hex[:8]}"
     where.mkdir(parents=True)

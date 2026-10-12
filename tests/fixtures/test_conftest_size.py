@@ -1,6 +1,6 @@
 """AC7.3: the size marker comes from what a test reaches, never from its folder. Each case
 is judged by a real inner collection (pytester) over a throwaway module placed under the
-checkout's gitignored ``tests/tmp/``, where the root conftest applies."""
+checkout's ``tests/tmp/``, where the root conftest applies."""
 
 from __future__ import annotations
 
