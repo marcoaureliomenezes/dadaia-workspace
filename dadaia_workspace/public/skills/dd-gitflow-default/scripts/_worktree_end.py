@@ -69,8 +69,8 @@ def _refuse_dirty(tree: Path) -> None:
 
 def _kept(tree: Path, verb: str, keep: list[str], drop: bool) -> list[str]:
     """The ignored files to copy into the repo; refuses while one is neither kept nor dropped."""
-    listing = git(tree, "status", "--porcelain", "-z", "--ignored", "--untracked-files=all")
-    ignored = [  # -z: a name with a blank arrives verbatim, never C-quoted; -uall: file level
+    listing = git(tree, "status", "--porcelain", "-z", "--ignored=matching")
+    ignored = [  # -z: a name with a blank arrives verbatim, never C-quoted; matching: one entry per directory
         line[3:].rstrip("/") for line in listing.split("\0") if line.startswith("!! ")
     ]
     # disposable without asking: a tool cache directory or a *.pyc
@@ -235,10 +235,10 @@ def _open_tasks(repo: Path, name: str) -> None:
 
 
 def _scaffold(tree: Path, name: str) -> None:
-    """Refuses while any path under `tests/tmp/<job>/` is tracked; `<job>` is the last segment of
-    *name*, and only the index counts, never the directory on disk."""
-    job = name.rsplit("/", 1)[-1]
-    folder = f"{tree}/tests/tmp/{job}"
+    """Refuses while any path under `tests/tmp/<job>/` is tracked; `<job>` is the job (a hotfix:
+    the bug) of *name*, and only the index counts, never the directory on disk."""
+    job = (m := NAME_RE.match(name))["job"] or m["bug"]  # type: ignore[index]
+    folder = tree / "tests" / "tmp" / job
     if git(tree, "ls-files", "--", f"tests/tmp/{job}").strip():
         raise Refusal(
             f"{folder} exists: promote each test in it into its contract's home or delete it before the job lands",  # fmt: skip
