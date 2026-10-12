@@ -248,3 +248,66 @@ def test_a_slug_is_accepted_exactly_as_the_backlog_slug_pattern_says(
     done = _verdict(root, tree, sha=head, slug=slug)
     assert (done.returncode == 0) is legal, done.stderr
     assert len(_written(root)) == int(legal)
+
+
+def _record(
+    root: Path,
+    scope: str,
+    verdict: str,
+    at: str,
+    *,
+    hold: bool = False,
+    agent: str = "dd-code-reviewer",
+) -> None:
+    """A verdict handoff with the keys `verdict.py` writes (schema-validated), at *at* seconds."""
+    produced = f"2026-10-12T10:00:{at}Z"
+    body = {
+        "schema_version": "handoff-v1.2",
+        "agent": agent,
+        "context": "c",
+        "produced_at": produced,
+        "verdict": verdict,
+        "verdict_reason": "r",
+        "scope": scope,
+        "reviewed_sha": "a" * 40,
+        "diff_sha256": "b" * 64,
+        **BODY,
+    }
+    schema = json.loads((PKG / "public/schemas/handoff-v1.schema.json").read_text())
+    jsonschema.validate(body, schema)
+    base = root / (".dadaia/reaped/x/.dadaia/handoff/c" if hold else ".dadaia/handoff/c")
+    base.mkdir(parents=True, exist_ok=True)
+    name = f"{produced.replace(':', '')}-{agent}-{verdict}-{scope.replace('/', '_')}.handoff.json"
+    (base / name).write_text(json.dumps(body, indent=2) + "\n")
+
+
+def test_stats_counts_the_rc_verdict_sequences_in_produced_at_order(tmp_path: Path) -> None:
+    root, _tree, _head = _workspace(tmp_path)
+    rc99, sha = "wt/0.5.0-rc99", "@" + "a" * 40
+    # written out of time order: the count reads `produced_at`, not the file listing
+    _record(root, f"{rc99}/job1{sha}", "REJECTED", "03")
+    _record(root, f"{rc99}/job1{sha}", "REJECTED", "01")
+    _record(root, f"{rc99}/job1{sha}", "APPROVED", "02")
+    _record(root, f"{rc99}/job2{sha}", "APPROVED", "01", hold=True)
+    _record(root, f"{rc99}/job3{sha}", "REJECTED", "01")
+    _record(root, f"{rc99}/job3{sha}", "REJECTED", "02")
+    _record(root, f"{rc99}/job3{sha}", "APPROVED", "03")
+    _record(root, f"wt/0.5.0-rc98/job1{sha}", "REJECTED", "01")
+    _record(root, f"{rc99}/job4{sha}", "REJECTED", "01", agent="dd-sw-engineer-sr")
+    script = root / ".agents/skills" / SKILL / "scripts/verdict.py"
+    env = suite_env(
+        os.environ,
+        Path.home(),
+        overrides={"PATH": os.environ["PATH"], "HOME": str(root), "GIT_CONFIG_NOSYSTEM": "1"},
+    )
+    done = subprocess.run(
+        [sys.executable, str(script), "stats", "0.5.0-rc99"],
+        cwd=root,
+        env=env,
+        capture_output=True,
+        text=True,
+    )
+    assert (done.returncode, done.stdout) == (
+        0,
+        "sequences 4\nverdicts 7\nrejected 4\nfirst_pass_rejected 3/4\n",
+    ), done.stderr
