@@ -441,3 +441,19 @@ def test_naive_bound_at_reads_as_utc_in_any_zone(
     finally:
         monkeypatch.undo()
         time.tzset()
+
+
+def test_a_rebind_in_the_second_of_the_last_stamp_reinjects(tmp_path: Path) -> None:
+    """``bound_at`` has whole-second precision; the sentinel mtime keeps its fraction. A tie in
+    the same second is a rebind (a repeat beats a missed injection)."""
+    _ws(tmp_path, {"name": "alpha"})
+    _bind(tmp_path, "s", "alpha")
+    assert _run(tmp_path, "s").startswith(_A)
+    sentinel = tmp_path / ".dadaia" / "tmp" / "hooks" / "ctx-inject-fired-s"
+    whole = datetime.fromtimestamp(int(sentinel.stat().st_mtime), tz=UTC).isoformat()
+    session_store.write_session(
+        tmp_path,
+        "s",
+        {"session_id": "s", "context": "alpha", "bound_at": whole, "last_seen_at": whole},
+    )
+    assert _run(tmp_path, "s").startswith(_A)
