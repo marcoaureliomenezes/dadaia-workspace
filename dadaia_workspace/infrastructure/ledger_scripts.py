@@ -18,7 +18,7 @@ from __future__ import annotations
 
 import json
 import sys
-from collections.abc import Iterator, Sequence
+from collections.abc import Collection, Iterator, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Protocol
@@ -206,9 +206,10 @@ def _parse(result: Any) -> list[dict[str, Any]] | None:
 
 
 def worktree_rows(
-    root: Path, runner: _Runner | None = None
+    root: Path, repos: Collection[str], runner: _Runner | None = None
 ) -> tuple[list[dict[str, Any]], str, str]:
-    """Read the owner's bounded ``worktree.py list --json`` result once."""
+    """Read the owner's bounded ``worktree.py list --json`` result once: the rows of *repos* (a
+    context's) plus the rows no context owns (``registered: false``), never another context's."""
     path = resolve_script(WORKTREE_SCRIPT, root)
     if path is None:
         return [], "list failed: worktree.py is not installed", fix_line(root, "public", "install")
@@ -221,4 +222,4 @@ def worktree_rows(
     if not isinstance(found, list):  # the script's refusal: reason, then its one fix line
         reason, _, fix = done.stderr.strip().partition("\nfix: ")
         return [], f"list failed: {reason}", fix or f"{WORKTREE_SCRIPT.invocation} list"
-    return found, "", ""
+    return [r for r in found if r["repo"] in repos or r.get("registered") is False], "", ""

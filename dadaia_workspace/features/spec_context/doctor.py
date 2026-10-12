@@ -243,11 +243,11 @@ class DoctorService:
         """AC1.10: the context's worktree rows, rendered — never judged or touched here."""
         if not (repos := {t.name for t in self._alive_repo_tops(context)}):
             return []
-        found, failed, fix = self._worktree_rows(self._workspace_root)
+        found, failed, fix = self._worktree_rows(self._workspace_root, repos)
         return [_worktree("warning", failed, fix)] if failed else [
             _worktree("warning" if r["warn"] else "info", f"{r['state']} {r['path']}"
                       + "".join(f"  {k}={r[k]}" for k in ("age_hours", "ahead", "dirty") if k in r), r["fix"])
-            for r in found if r["repo"] in repos
+            for r in found
         ]  # fmt: skip
 
     def check(self) -> list[SectionFinding]:

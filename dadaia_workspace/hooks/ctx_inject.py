@@ -149,7 +149,7 @@ def _worktrees(workspace: Path, context: str) -> list[str]:
             if context in invocation.alive_context_names(workspace)
             else ()
         )
-        found, failed, fix = worktree_rows(workspace)
+        found, failed, fix = worktree_rows(workspace, repos)
     except Exception:  # noqa: BLE001 — fail-open: a hook never crashes the session
         return []
     if failed:
@@ -159,7 +159,6 @@ def _worktrees(workspace: Path, context: str) -> list[str]:
         + "".join(f"  {key}={row[key]}" for key in ("age_hours", "ahead", "dirty") if key in row)
         + (f"\nfix: {row['fix']}" if row["fix"] else "")
         for row in found
-        if row["repo"] in repos
     ]
 
 

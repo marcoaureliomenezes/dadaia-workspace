@@ -5,7 +5,7 @@ import logging
 import re
 import shutil
 import sys
-from collections.abc import Callable
+from collections.abc import Callable, Collection
 from dataclasses import replace
 from enum import StrEnum
 from functools import partial
@@ -51,7 +51,7 @@ def _onboarded(rel: str) -> bool:
     return any(rel == p or rel.startswith(f"{p}/") for p in _ONBOARDING)
 
 
-WorktreeRows = Callable[[Path], tuple[list[dict[str, Any]], str, str]]
+WorktreeRows = Callable[[Path, Collection[str]], tuple[list[dict[str, Any]], str, str]]
 """The owner's open-worktree rows: ``(rows, failure, fix)`` (AC1.10)."""
 
 
@@ -687,7 +687,9 @@ class SpecContextService:
         a linked worktree, unpushed commits on a HEAD off the work branch. Every refusal
         names its repo."""
         main_repo = self._repo_path(ctx.repo_slug)
-        trees, failed, refix = self._worktree_rows(self._workspace_root)  # AC1.10: the owner's rows
+        trees, failed, refix = self._worktree_rows(
+            self._workspace_root, {r.slug for r in ctx.all_repos()}
+        )  # AC1.10
         for repo in ctx.all_repos():
             slug, path = repo.slug, self._repo_path(repo.slug)
             lead = f"Context '{name}': repo '{slug}'"
