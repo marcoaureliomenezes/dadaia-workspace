@@ -148,7 +148,13 @@ def test_public_law_names_no_private_pipeline() -> None:
 
 def test_public_law_names_no_adr_number_or_library_path() -> None:
     """AC4.1: text agents read and scripts they run cite no ADR number and no library path."""
-    globs = ("public/**/*.md", "public/skills/**/*.py", "public/skills/**/*.json", "public/data/**/*", "public/agents/**/*")
+    globs = (
+        "public/**/*.md",
+        "public/skills/**/*.py",
+        "public/skills/**/*.json",
+        "public/data/**/*",
+        "public/agents/**/*",
+    )
     assert _denied_lines(globs, r"ADR \d{4}|dadaia_workspace/", _BANNER_SPAN[0]) == []
 
 
