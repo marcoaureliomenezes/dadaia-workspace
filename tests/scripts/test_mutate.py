@@ -41,7 +41,7 @@ def _write(root: Path, rel: str, text: str) -> None:
     (root / rel).write_text(text, encoding="utf-8")
 
 
-def _planted(root: Path, *, extra_test: str = "") -> Path:
+def _planted(root: Path, *, extra_test: str = "", files: dict[str, str] | None = None) -> Path:
     for name in ("mutate.py", "impact.py", "covdata.py"):
         if (_REPO / "scripts" / name).exists():
             (root / "scripts").mkdir(exist_ok=True)
@@ -55,6 +55,8 @@ def _planted(root: Path, *, extra_test: str = "") -> Path:
     _git(root, "commit", "-q", "-m", "base")
     _write(root, "pkg/m.py", _HEAD_M)
     _write(root, "tests/test_m.py", _BASE_T + "\n\n" + _BELOW + extra_test)
+    for rel, text in (files or {}).items():
+        _write(root, rel, text)
     _git(root, "add", "-A")
     _git(root, "commit", "-q", "-m", "head")
     return root
@@ -94,3 +96,43 @@ def test_a_diff_is_mutated_line_by_line_and_reports_survivors_kills_and_coverage
     ]
     assert done.returncode == 0
     assert (root / "pkg/m.py").read_text("utf-8") == _HEAD_M
+
+
+_HOME = ["--module", "pkg/m.py", "--home", "tests/test_m.py::test_below_the_limit"]
+_MATRIX = [
+    "SURVIVED pkg/m.py:1 const: 10 -> 11",
+    "SURVIVED pkg/m.py:5 compare: < -> <=",
+    'KILLED pkg/m.py:6 return: "yes" -> None'
+    " [tests/test_m.py::test_below_again, tests/test_m.py::test_below_the_limit]",
+    'KILLED pkg/m.py:7 return: "no" -> None [tests/test_m.py::test_above_the_limit]',
+    "mutation score 2/4",
+    "DELETABLE tests/test_m.py::test_below_again",
+    "KEPT tests/test_m.py::test_above_the_limit",
+]
+
+
+def test_a_test_whose_kills_the_home_also_makes_is_deletable_and_the_rest_are_kept(
+    tmp_path: Path,
+) -> None:
+    root = _planted(tmp_path, extra_test="\n\n" + _AGAIN)
+    done = _run(root, *_HOME)
+    assert done.stdout.splitlines() == _MATRIX
+    assert done.returncode == 0
+
+
+def test_a_selected_test_that_kills_no_mutant_is_no_kill_and_never_deletable(
+    tmp_path: Path,
+) -> None:
+    root = _planted(
+        tmp_path,
+        extra_test="\n\n" + _AGAIN,
+        files={
+            "pkg/other.py": "def noop():\n    return 1\n",
+            "tests/test_other.py": (
+                "from pkg.other import noop\n\n\ndef test_noop():\n    assert noop() == 1\n"
+            ),
+        },
+    )
+    done = _run(root, *_HOME, "--tests", "tests/test_m.py", "tests/test_other.py")
+    assert done.stdout.splitlines() == [*_MATRIX, "NO-KILL tests/test_other.py::test_noop"]
+    assert done.returncode == 0
