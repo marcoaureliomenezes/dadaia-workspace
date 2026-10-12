@@ -12,6 +12,7 @@ from typing import Any
 
 from jsonschema import Draft202012Validator
 
+from dadaia_workspace.core.skill_owner import load_owner
 from dadaia_workspace.features.specs import memory_canon
 from dadaia_workspace.features.specs.schemas import load_schema
 
@@ -69,11 +70,12 @@ def _check_sources(result: AtomResult, fm: dict[str, Any], repo_root: Path) -> N
             result.error(f"'sources' glob '{source}' matches no file under {repo_root}.")
 
 
+_TASK_ID = load_owner("dd-bug-resolution", "_grammar").TASK_ID_RE.pattern
 _NARRATIVE_TOKENS = (
     ("date", re.compile(r"\b\d{4}-\d{2}-\d{2}\b")),
     ("release id", re.compile(r"(?<![\d.=])\d+\.\d+\.\d+(?!\.?\d)")),
     ("candidate id", re.compile(r"\b(?:c|rc-)\d+\b")),
-    ("task id", re.compile(r"\bT-\d+-\d+\b")),
+    ("task id", re.compile(rf"\b{_TASK_ID.removeprefix('^').removesuffix('$')}\b")),
     ("FR id", re.compile(r"\bFR\d+\b")),
 )
 _HISTORY_PHRASE_RE = re.compile(

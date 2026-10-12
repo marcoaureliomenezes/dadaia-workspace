@@ -19,6 +19,7 @@ from dadaia_workspace.core.release_state import (
     RELEASE_ID_RE,
     RELEASE_STATE_FILENAME,
 )
+from dadaia_workspace.core.skill_owner import load_owner
 from dadaia_workspace.core.spec_status import APPROVED, extract_status
 from dadaia_workspace.core.spec_status import CANONICAL_STATUS as _CANONICAL_STATUS
 from dadaia_workspace.features.specs.doctor_common import iter_all_release_dirs
@@ -28,6 +29,10 @@ from dadaia_workspace.features.specs.specs_tree import SpecsTree
 # Vocabulary + parser live in core.spec_status (single definition); re-exported here
 # because doctor_release has been the documented import site for both.
 CANONICAL_STATUS = _CANONICAL_STATUS
+#: The lifecycle phases in order, from the moved schema; all but the first are implementation-bound.
+_PHASES = load_owner("dd-bug-resolution", "_ledger").load_schema("release-state-v1")["properties"][
+    "phase"
+]["enum"]
 
 
 def _extract_status(md_path: Path) -> str | None:
@@ -83,7 +88,7 @@ class ReleaseValidator:
                         fix=f"Operator action: set a canonical `**Status:**` in {fpath}",
                     )
                 )
-            elif status != APPROVED and active.phase in ("IMPLEMENTATION", "CLOSURE"):
+            elif status != APPROVED and active.phase in _PHASES[1:]:
                 # Bug fresh-release-scaffold-emits-spec-doctor-warnings-042: Draft/In
                 # review IS the legitimate state of a DEFINITION-phase release — the
                 # scaffolder emits exactly that. Only implementation-bound phases
