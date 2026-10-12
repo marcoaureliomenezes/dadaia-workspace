@@ -7,22 +7,27 @@ from __future__ import annotations
 import re
 from pathlib import Path, PurePosixPath
 
+from _grammar import TASK_ID_RE
+from _ledger import load_schema
+from _refusal import Refusal as Refusal
+
 SCRIPT = Path(__file__).parent / "worktree.py"
 LOCK = "dadaia:"
 #: Task worktrees open at once per rc.
 TASK_CAP = 5
-_WORD = r"[a-z0-9]+(?:-[a-z0-9]+)*"  # single hyphens: `--` separates a job from its task
-_TASK = r"(?:--(?P<task>[A-Za-z0-9]+(?:[.-][A-Za-z0-9]+)*))?"
+
+
+def _unanchored(pattern: str) -> str:
+    return pattern.removeprefix("^").removesuffix("$")
+
+
+#: The backlog slug (single hyphens: `--` separates a job from its task) and the release task id.
+_WORD = _unanchored(load_schema("backlog-v1")["$defs"]["slug"]["pattern"])
+_TASK = rf"(?:--(?P<task>{_unanchored(TASK_ID_RE.pattern)}))?"
 NAME_RE = re.compile(
     rf"^(?:(?P<rc>(?P<v>\d+\.\d+\.\d+)-rc\d+)/(?P<job>{_WORD}){_TASK}|backlog/(?P<slug>{_WORD})"
     rf"|hotfix/(?P<bug>{_WORD})|(?P<plain>(?!(?:backlog|hotfix)$){_WORD}))$"
 )
-
-
-class Refusal(Exception):
-    def __init__(self, message: str, fix: str) -> None:
-        super().__init__(message)
-        self.fix = fix
 
 
 def locate(rel: str) -> tuple[str, str | None, tuple[str, ...]] | None:
@@ -38,6 +43,11 @@ def locate(rel: str) -> tuple[str, str | None, tuple[str, ...]] | None:
     if len(parts) >= 3 and parts[0] == "worktrees":
         return parts[1], parts[2], parts[3:]
     return None
+
+
+def tree_path(root: Path, repo: str, name: str = "") -> Path:
+    """The one `worktrees/<repo>/<name>` derivation (the repo's home when *name* is empty)."""
+    return root / "worktrees" / repo / name
 
 
 def branch(name: str) -> str:

@@ -20,7 +20,7 @@ from _specs import head
 from _specs import quote as quote  # (`as`: re-exported to the worktree verbs)
 from _specs import script as script
 from _specs import workspace_of as workspace_of
-from _worktree_names import NAME_RE, SCRIPT, Refusal, base, branch, name_of, plain
+from _worktree_names import NAME_RE, SCRIPT, Refusal, base, branch, name_of, plain, tree_path
 
 
 def diff_sha256(tree: Path, work: str, tip: str) -> str:
@@ -32,14 +32,6 @@ def diff_sha256(tree: Path, work: str, tip: str) -> str:
 def dirty(tree: Path) -> bool:
     """Whether *tree* holds an uncommitted change or an untracked file."""
     return bool(git(tree, "status", "--porcelain").strip())
-
-
-def find_root() -> Path:
-    """The workspace above the cwd, else above this script (it is projected inside one)."""
-    root: Path | None = workspace_of(Path.cwd().resolve(), Path(__file__).resolve().parent)
-    if root:
-        return root
-    raise Refusal("no workspace root above the cwd or this script", "uvx dadaia-workspace init")
 
 
 def _exe(root: Path) -> Path:
@@ -149,7 +141,7 @@ def _trees(repo: Path) -> list[dict[str, str]]:
 def ours(repo: Path) -> list[dict[str, str]]:
     """Our worktrees of *repo*: a tree at `worktrees/<repo>/<name>` on its canonical
     `wt/<name>` branch, locked or not — merge's own re-attach leaves one unlocked."""
-    home = repo.parents[1] / "worktrees" / repo.name
+    home = tree_path(repo.parents[1], repo.name)
     return [
         {"path": t["worktree"], "name": name}
         for t in _trees(repo)
@@ -194,7 +186,7 @@ def _absent(root: Path, repo: Path, held: set[str], found: list[dict[str, object
     """The leftovers git does not list: a `wt/*` branch with no tree (`orphan`), a directory two
     levels under `worktrees/<repo>/` or an empty one level under it (`unregistered`)."""
     out = []
-    home = root / "worktrees" / repo.name
+    home = tree_path(root, repo.name)
     for ref in git(repo, "for-each-ref", "--format=%(refname:short)", "refs/heads/wt/").split():
         if f"refs/heads/{ref}" not in held and (name := name_of(ref)):
             out.append(_row(repo, str(home / name), "orphan"))
@@ -241,7 +233,7 @@ def rows(root: Path) -> list[dict[str, object]]:
     under a TTL zone), and an `unregistered` directory two levels under `worktrees/<repo>/` or
     an empty one level under it; for a repo no context owns, each linked tree is `unregistered`
     with `registered: false`."""
-    known, homes = gitflows(root), root / "worktrees"
+    known, homes = gitflows(root), tree_path(root, "")
     names = sorted(
         {*known, *(d.name for d in homes.iterdir() if d.is_dir())} if homes.is_dir() else known
     )

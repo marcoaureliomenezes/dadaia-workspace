@@ -35,7 +35,7 @@ from _worktree_git import (
     work_version,
     workspace_of,
 )
-from _worktree_names import NAME_RE, SCRIPT, Refusal, branch, locate, non_code, plain
+from _worktree_names import NAME_RE, SCRIPT, Refusal, branch, locate, non_code, plain, tree_path
 
 REVIEWER = "dd-code-reviewer"
 #: The ledger, trio and release checks a `define` or `backlog` merge runs, in this order.
@@ -169,7 +169,7 @@ def _gate(tree: Path, work: str, *, required: bool = True) -> None:
         raise Refusal(
             f"no workspace owns {tree}", "Operator action: run this merge inside its workspace"
         )
-    repo_name = tree.relative_to(root / "worktrees").parts[0]
+    repo_name = tree.relative_to(tree_path(root, "")).parts[0]
     agents = root / "repos" / repo_name / "AGENTS.md"
     if not command:
         if not required:
@@ -336,7 +336,7 @@ def digest(root: Path, path: str, sha: str) -> str:
 def _into(repo: Path, onto: str) -> Path:
     """The checkout *onto* is checked out in: its job's tree for a job branch, else the repo."""
     name = onto.removeprefix("wt/")
-    return repo.parents[1] / "worktrees" / repo.name / name if onto.startswith("wt/") else repo
+    return tree_path(repo.parents[1], repo.name, name) if onto.startswith("wt/") else repo
 
 
 def merge(root: Path, path: str, keep: list[str], drop: bool) -> str:

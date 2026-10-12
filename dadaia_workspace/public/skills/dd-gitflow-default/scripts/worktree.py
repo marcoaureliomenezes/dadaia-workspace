@@ -19,7 +19,7 @@ sys.path[:0] = [
 ]
 
 from _worktree_end import clean, digest, merge
-from _worktree_git import find_root, rows
+from _worktree_git import rows, workspace_of
 from _worktree_names import Refusal
 from _worktree_new import new
 
@@ -55,7 +55,10 @@ def main(argv: list[str] | None = None) -> int:
     )
     args = parser.parse_args(argv)
     try:
-        root = find_root()
+        if (root := workspace_of(Path.cwd(), Path(__file__))) is None:  # projected inside one
+            raise Refusal(
+                "no workspace root above the cwd or this script", "uvx dadaia-workspace init"
+            )
         if args.verb == "new":
             print(f"[ok] {new(root, args.repo, args.name)}")
             return 0
