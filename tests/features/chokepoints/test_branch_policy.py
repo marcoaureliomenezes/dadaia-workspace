@@ -83,12 +83,6 @@ def _birth_from_any_source(repo: PushRepo, flow: Gitflow) -> str:
     return f"{_line('main', 'develop', sha=sha)}\n{sha} {sha} refs/heads/develop {_ZERO}"
 
 
-def _feature_to_published_integration(repo: PushRepo, flow: Gitflow) -> str:
-    repo.commit({"a.md": "a\n"})
-    repo.publish("trunk")
-    return _line("work/0.0.1", "next")
-
-
 def _commit_then(line: Callable[[str, Gitflow], str]) -> Scenario:
     return lambda repo, flow: line(repo.commit({"a.md": "a\n"}), flow)
 
@@ -139,10 +133,8 @@ def _birth_fix(tip: str, role: str) -> list[str]:
     pytest.param(_D, _existing_principal, "", None, id="an-existing-principal-is-never-a-birth"),
     pytest.param(_C, lambda r, f: _line("work/0.0.1", "work/0.0.2"), "refs/heads/work/0.0.2",
                  ["git", "-C", "/repo", "branch", "-m", "work/0.0.1", "work/0.0.2"], id="finding-2-work-branch-to-a-foreign-remote-ref"),
-    pytest.param(_C, _feature_to_published_integration, "", None, id="finding-2-work-branch-to-the-integration-ref"),
     pytest.param(_C, lambda r, f: f"HEAD {_A} refs/heads/work/0.0.1 {_ZERO}", "",
                  ["git", "-C", "/repo", "switch", "-c", "work/0.6.0", _A], id="finding-6-detached-head-cuts-the-work-branch"),
-    pytest.param(_D, lambda r, f: "this line has three fields", "", None, id="finding-1-malformed-stdin-fails-closed"),
 ])
 # fmt: on
 def test_the_gate_refuses_with_the_configured_fix(

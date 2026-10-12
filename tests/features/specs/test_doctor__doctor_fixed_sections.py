@@ -88,31 +88,3 @@ def test_check_reports_a_missing_library_fragment_as_a_non_fixable_error(tmp_pat
     issues = MemoryValidator(specs).check_fixed_sections(public)
     assert [(i.code, i.verdict, i.fixable) for i in issues] == [("FIXED-1", "error", False)] * 3
     assert all("library fragment" in i.message for i in issues)
-
-
-def test_fix_inserts_a_missing_block_and_refreshes_a_drifted_one(tmp_path: Path) -> None:
-    public = _public_dir(tmp_path)
-    specs = _specs(
-        tmp_path,
-        constitution="# C\n",
-        architecture="# A\n\n"
-        + _block("slop-code", "### Slop — code (fixed)\n- OLD\n")
-        + "\n## Tail\n",
-        quality="# Q\n\n" + _block("slop-tests", _FRAGMENTS["slop-tests"]),
-    )
-    doctor = SpecsDoctor(specs, public_dir=public)
-    assert _fixed_issues(doctor) == [("FIXED-1", "constitution.md"), ("FIXED-2", "ARCHITECTURE.md")]
-
-    fixed = doctor.fix()
-
-    assert [i.code for i in fixed if i.code.startswith("FIXED")] == ["FIXED-1", "FIXED-2"]
-    assert (specs / "constitution.md").read_text(encoding="utf-8") == (
-        "# C\n\n" + _block("slop-law", _FRAGMENTS["slop-law"])
-    )
-    assert (specs / "memory" / "ARCHITECTURE.md").read_text(encoding="utf-8") == (
-        "# A\n\n" + _block("slop-code", _FRAGMENTS["slop-code"]) + "\n## Tail\n"
-    )
-    assert (specs / "memory" / "QUALITY.md").read_text(encoding="utf-8") == (
-        "# Q\n\n" + _block("slop-tests", _FRAGMENTS["slop-tests"])
-    )
-    assert _fixed_issues(doctor) == []

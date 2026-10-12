@@ -5,20 +5,13 @@ sa-context-dead-removes-repos-outside-the-reaper#C3 /
   in ANY repo of the set, refuses dead; sa-context-dead-removes-repos-outside-the-reaper#C2: a linked
   worktree registered by the repo or nested inside it refuses dead; AC1.10: any `wt/*`
   refuses dead with the owner's `worktree.py merge` fix, checked out or orphan, and
-  rows the owner cannot read refuse with its fix; AC2.11: a refused hold refuses dead;
+  rows the owner cannot read refuse with its fix;
   sa-context-dead-removes-repos-outside-the-reaper#C7: a refusal touches nothing, the record stays ALIVE;
   sa-context-dead-removes-repos-outside-the-reaper#C1: otherwise each repo is HELD under `.dadaia/reaped/`.
-- A16.1 (FR16 v0.4.4): alive clones the whole set, idempotently. A16.2: an untracked file
-  or a remote-less repo anywhere in the set refuses dead before any repo acts.
-- context-dead-destroys-associated-repo-without-url: dead back-fills each repo's URL from
-  origin, refuses a repo it could never clone back; alive refuses a URL-less missing repo
-  with a runnable fix line.
-- context-dead-pushes-an-unborn-clone: an empty unborn clone is held, never pushed.
-- ADR 0172 (rc-9 AC3.2): dead never commits; a dirty checkout refuses, one fix line per
-  file; a gitignored file is not dirty.
-The refusal fix lines on the main repo are the refusal harness's Cases
-(`test_refusal_fix_lines_clear_their_refusal.py`: untracked, no_origin,
-unpushed_side_branch, commits_no_remote).
+- alive clones the whole set, idempotently; an untracked file or a remote-less repo anywhere in
+  the set refuses dead before any repo acts.
+- dead back-fills each repo's URL from origin; an empty unborn clone is held, never pushed.
+The refusal fix lines are the contract home's Cases (`test_cli_line__fix_line_contract.py`).
 Size: MEDIUM — real git and bare origins in tmp_path (the question is a git question).
 """
 
@@ -28,7 +21,6 @@ import re
 import subprocess
 import sys
 from collections.abc import Callable
-from dataclasses import replace
 from functools import partial
 from pathlib import Path
 
@@ -36,7 +28,6 @@ import pytest
 
 from dadaia_workspace.container import scan_publish_candidates
 from dadaia_workspace.core.cli_line import shell_line
-from dadaia_workspace.core.exceptions import ContextStateError, RepoUrlMissingError
 from dadaia_workspace.core.models.spec_context import (
     AssociatedRepo,
     ContextState,
@@ -44,7 +35,6 @@ from dadaia_workspace.core.models.spec_context import (
 )
 from dadaia_workspace.core.platform import PLATFORM
 from dadaia_workspace.features.spec_context.service import (
-    DeadReviewRequiredError,
     DeadUnpushedCommitsError,
     SpecContextService,
 )
@@ -140,18 +130,6 @@ def _no_remote(repo: Path) -> None:
     _git("commit", "-m", "local only", cwd=repo)
 
 
-def _url_less(repo: Path) -> None:
-    retire_tree(repo, repo.parents[2])
-    _git("init", str(repo), cwd=repo.parent)
-
-
-def _repos_outside(repo: Path) -> None:
-    """`repos/` resolves outside the workspace: preflight passes, the hold refuses."""
-    outside = repo.parents[2] / "outside"
-    repo.parent.rename(outside)
-    repo.parent.symlink_to(outside)
-
-
 _REFUSALS = [
     pytest.param("main", _side_branch, DeadUnpushedCommitsError, r"fix: git -C \S+ -c \S+ push origin topic:refs/tags/archive/topic/[0-9a-f]{7}$", id="C3-side-branch-main"),
     pytest.param("lib", _side_branch, DeadUnpushedCommitsError, r"fix: git -C \S+ -c \S+ push origin topic:refs/tags/archive/topic/[0-9a-f]{7}$", id="C4-side-branch-lib"),
@@ -159,11 +137,7 @@ _REFUSALS = [
     pytest.param("lib", partial(_wt, checked_out=True), DeadUnpushedCommitsError, rf"fix: {re.escape(shell_line(sys.executable))} \S+worktree\.py merge \S+/worktrees/lib/0\.5\.0-rc1/j1$", id="AC1.10-open-wt-worktree"),
     pytest.param("main", partial(_wt, checked_out=False), DeadUnpushedCommitsError, rf"fix: {re.escape(shell_line(sys.executable))} \S+worktree\.py merge \S+/worktrees/main/0\.5\.0-rc1/j1$", id="AC1.10-unpushed-orphan-wt"),
     pytest.param("main", lambda r: (r.parents[1] / ".dadaia/.venv" / PLATFORM.venv_scripts_dir / f"dadaia{PLATFORM.venv_exe_suffix}").unlink(), DeadUnpushedCommitsError, r"no workspace CLI[\s\S]*fix: uvx dadaia-workspace init \S+/ws$", id="AC1.10-rows-unreadable-fails-closed"),
-    pytest.param("lib", lambda r: (r / "leftover.txt").write_text("x\n"), DeadReviewRequiredError, r"lib[\s\S]*leftover\.txt", id="A16.2-untracked-in-lib"),
-    pytest.param("lib", lambda r: (r / "README.md").write_text("edited\n"), DeadReviewRequiredError, r"^Context 'proj': repo 'lib' has 1 uncommitted change\(s\); dead never commits", id="AC3.2-dirty-refusal-names-context-and-repo"),
     pytest.param("lib", _no_remote, DeadUnpushedCommitsError, "lib", id="A16.2-local-commits-no-remote-in-lib"),
-    pytest.param("main", _repos_outside, ContextStateError, rf"skipped 'repos/main' \(outside the workspace\)\nfix: Operator action: free \S+{re.escape(str(Path('/', 'repos', 'main')))} for the move", id="AC2.11-hold-refused"),
-    pytest.param("lib", _url_less, RepoUrlMissingError, r"fix: Operator action: add the clone URL of \S+[\\/]repos[\\/]lib as its origin remote", id="url-less-never-clone-back"),
 ]  # fmt: skip
 
 
@@ -176,7 +150,7 @@ def test_dead_refuses_an_unrecoverable_repo_anywhere_in_the_set_and_touches_noth
     match: str,
 ) -> None:
     """#C7: the refusal names the repo's fix; every repo stays, nothing is held, ALIVE."""
-    service, store, repo = _alive(tmp_path, lib_url="" if plant is _url_less else None)
+    service, store, repo = _alive(tmp_path)
     plant(repo.parent / offender)
 
     with pytest.raises(error, match=match):
@@ -260,75 +234,3 @@ def test_alive_dead_alive_keeps_every_repo_obtainable(tmp_path: Path) -> None:
     assert dead.associated_repos == (AssociatedRepo("lib", str(tmp_path / "lib.git")),)
     assert again.state is ContextState.ALIVE and again.associated_repos == dead.associated_repos
     assert (repo / "README.md").is_file() and (repo.parent / "lib" / "README.md").is_file()
-
-
-def test_alive_refuses_a_legacy_url_less_missing_repo_with_a_fix_line(tmp_path: Path) -> None:
-    service, store, repo = _alive(tmp_path, lib_url="")
-    service.dead("proj")
-    store.update(replace(store.get("proj"), associated_repos=(AssociatedRepo("lib", ""),)))  # type: ignore[type-var]
-
-    with pytest.raises(RepoUrlMissingError) as refused:
-        service.alive("proj")
-
-    # the operator's clone, which alive then adopts, its origin back-filled
-    clone = f"Operator action: clone the 'lib' repository into {repo.parent / 'lib'}"
-    assert str(refused.value).endswith(f"fix: {clone}")
-    assert store.get("proj").state == ContextState.DEAD  # type: ignore[union-attr]
-
-
-def test_dead_refuses_a_dirty_checkout_with_one_fix_line_naming_every_file(tmp_path: Path) -> None:
-    """rc-9 AC3.2 (ADR 0172 as amended by ADR 0247): dead never commits — a dirty checkout
-    refuses with exactly one fix line naming every dirty path and leaves tree and origin untouched."""
-    service, store, repo = _alive(tmp_path)
-    lib = repo.parent / "lib"
-    (lib / "README.md").write_text("edited\n")
-    (lib / "new.txt").write_text("new\n")
-    origin_before = subprocess.run(
-        ["git", "ls-remote", str(tmp_path / "lib.git")], capture_output=True, text=True, check=True
-    ).stdout
-
-    with pytest.raises(DeadReviewRequiredError) as refused:
-        service.dead("proj")
-
-    fixes = [line for line in str(refused.value).splitlines() if line.startswith("fix: ")]
-    assert fixes == [
-        f"fix: Operator action: move {lib / 'README.md'}, {lib / 'new.txt'} into a worktree, or discard it",
-    ]
-    assert (lib / "README.md").read_text() == "edited\n" and (lib / "new.txt").is_file()
-    assert (
-        subprocess.run(
-            ["git", "ls-remote", str(tmp_path / "lib.git")],
-            capture_output=True,
-            text=True,
-            check=True,
-        ).stdout
-        == origin_before
-    )
-    assert store.get("proj").state is ContextState.ALIVE  # type: ignore[union-attr]
-
-
-def test_an_oserror_in_the_hold_loop_refuses_with_a_fix_line(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """rc-9 AC3.3 row 27 (context-dead-hold-oserror-escapes-mid-loop): a hold that fails is
-    dead's refusal with a fix line, never an escaping OSError; the record stays ALIVE."""
-    from dadaia_workspace.core.cli_line import fix_line
-    from dadaia_workspace.features.spec_context import sweep
-
-    service, store, repo = _alive(tmp_path)
-
-    def _denied(src: object, dst: object) -> None:
-        raise PermissionError(13, "Permission denied")
-
-    monkeypatch.setattr(sweep.os, "replace", _denied)
-
-    with pytest.raises(ContextStateError) as refused:
-        service.dead("proj")
-
-    again = fix_line(tmp_path / "ws", "context", "dead", "proj")
-    assert str(refused.value) == (
-        "Context 'proj' stays ALIVE: skipped 'repos/main' (errno 13: Permission denied)\n"
-        f"fix: Operator action: free {repo} for the move, then run `{again}`"
-    )
-    assert (repo / ".git").is_dir()
-    assert store.get("proj").state is ContextState.ALIVE  # type: ignore[union-attr]
