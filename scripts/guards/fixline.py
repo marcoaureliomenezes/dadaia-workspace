@@ -40,9 +40,8 @@ _BUILDER = "dadaia_workspace/core/cli_line.py"
 
 
 def _defect(fix: str) -> bool:
-    from tests.core.test_cli_line__fix_line_contract import fix_defect
-
-    return fix_defect(fix)
+    home = importlib.import_module("tests.core.test_cli_line__fix_line_contract")
+    return bool(home.fix_defect(fix))
 
 
 @functools.cache
@@ -393,7 +392,7 @@ def fix_lines_doctor_target(tree: Tree) -> list[str]:
             continue
         verb = next(t for t in tokens[2:] if not t.startswith("-"))
         help_run = subprocess.run([sys.executable, tokens[1], verb, "--help"],
-                                  capture_output=True, text=True, timeout=60)  # fmt: skip
+                                  capture_output=True, text=True, encoding="utf-8", timeout=60)  # fmt: skip
         if help_run.returncode:
             found.append(f"script-rejects-verb: {codes}: {tokens[1]} {verb}")
     return found
