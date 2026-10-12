@@ -574,6 +574,17 @@
         "quality-scorecard-ruler",
         "review-mutation-on-the-diff"
       ]
+    },
+    {
+      "id": "release-drift-edge-runs-memory-drift",
+      "title": "The release skill stops importing the navigator's drift module, and the cross-skill edge table is deleted",
+      "opened": "2026-10-12",
+      "status": "idea",
+      "description": "Measured 2026-10-12 (rc-14 Job 15 review): `dd-release-implementation/scripts/_release_tree.py:22` imports `_memory_drift` from `dd-spec-navigator`, the last non-kernel cross-skill import. The release skill uses `drift.report` (`_release_tree.py:267`, `release.py:135`), `drift.render` (`release.py:136`), `drift.git` (`_release_tree.py:218,272`, `release.py:146`) and `drift.Refusal` (`_release_tree.py:220`, `release.py:156,281`). `tests/infrastructure/test_public_assets__public_scripts_thin_wrapper.py` still allows exactly that edge in `_CROSS_SKILL_EDGES` (:56) and `_EDGE_PATH_LINES` (:61). rc-14 PLAN 1.5 planned its DELETE in Job 12; the Job 12 ruling carried it (8be8949d7), because `memory.py drift` takes only `--since`, `--json` and `--specs`. Design, one of two: (a) the release skill runs `memory.py drift` through the sibling script path; the verb gains `--until`, and its JSON carries the fields the release skill reads today (the git lookup, the rendered worklist, the refusal); or (b) the worklist decider moves into the kernel (`dd-bug-resolution/scripts`) and both skills call it. Relation: residual of skill-scripts-one-kernel, which exits with rc-14 and would otherwise trace this row as done. Done when: no `sys.path` line in the release skill reaches another skill, `_CROSS_SKILL_EDGES` and `_EDGE_PATH_LINES` are deleted with their comment, and the thin-wrapper test is green. Placement: unruled.",
+      "provenance": "rc-14 Job 12 ruling (the edge carried by 8be8949d7) and the rc-14 Job 15 review verdict of 2026-10-12, finding MEDIUM 4; registered on the main thread's order 2026-10-12",
+      "relates": [
+        "skill-scripts-one-kernel"
+      ]
     }
   ]
 }
