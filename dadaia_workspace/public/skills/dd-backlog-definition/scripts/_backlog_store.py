@@ -16,10 +16,12 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
+import _commit
+import _jsonl
 from _backlog_check import pair_findings
 from _backlog_schema import HISTO, LEDGER
-from _ledger import private_refusal, replace, stamp
-from _refusal import Refusal as Refusal
+from _ledger import private_refusal, replace
+from _refusal import Refusal
 from _specs import script
 
 Items = list[dict[str, Any]]
@@ -31,15 +33,8 @@ def read_active(path: Path) -> Items:
     read in full refuses the read rather than being silently rewritten without it."""
     if not path.is_file():
         return []
-    try:
-        document = json.loads(path.read_text(encoding="utf-8"))
-    except json.JSONDecodeError as exc:
-        raise Refusal(
-            f"{path.name} is not valid JSON ({exc.msg}) — refusing to rewrite a document "
-            "this script cannot read in full",
-            f"{SCRIPT} check",
-        ) from exc
-    active = document.get("active") if isinstance(document, dict) else None
+    document = _jsonl.parse_object(path.read_text(encoding="utf-8"), f"{SCRIPT} check")
+    active = document.get("active")
     if not isinstance(active, list):
         raise Refusal(
             f"{path.name} carries no 'active' array — it is not a backlog-v1 document",
@@ -48,57 +43,33 @@ def read_active(path: Path) -> Items:
     return active
 
 
-def serialize(active: Items) -> str:
-    return json.dumps({"schema": "backlog-v1", "active": active}, indent=2) + "\n"
-
-
-def _validated(
-    specs: Path, active: Items, histo: str, before: Items, record: dict[str, Any] | None
-) -> str:
-    why = private_refusal(
-        [*(i for i in active if i not in before), *([record] if record else [])], specs / LEDGER
-    )
-    if why is not None:
-        raise Refusal(*why)
-    text = serialize(active)
-    findings = pair_findings(text, histo)
-    if findings:
-        detail = "; ".join(str(f["message"]) for f in findings[:5])
-        raise Refusal(
-            f"the resulting {LEDGER} + {HISTO} would not pass check — nothing was written "
-            f"({detail})",
-            f"{SCRIPT} check",
-        )
-    return text
-
-
 def commit(
     specs: Path, apply: Callable[[Items], Items], record: dict[str, Any] | None = None
 ) -> Items:
     """Apply *apply* to ``active[]`` and, with *record*, append that one exit to the histo.
 
-    The candidate PAIR is checked BEFORE either write, so a refused write leaves both
-    files byte-identical. When the document changed under the computation, the change is
-    re-read and re-applied ONCE; a second concurrent write refuses with a retry `fix:`.
+    The candidate PAIR is checked BEFORE either write (`_commit.commit` is the loop), so a
+    refused write leaves both files byte-identical.
     """
-    path, histo = specs / LEDGER, specs / HISTO
-    line = json.dumps(record, sort_keys=True, ensure_ascii=False) + "\n" if record else ""
-    candidate = (histo.read_text(encoding="utf-8") if histo.is_file() else "") + line
-    before = stamp(path)
-    active = read_active(path)
-    written = apply(active)
-    text = _validated(specs, written, candidate, active, record)
-    if stamp(path) != before:
-        before = stamp(path)
-        active = read_active(path)
-        written = apply(active)
-        text = _validated(specs, written, candidate, active, record)
-        if stamp(path) != before:
+    path = specs / LEDGER
+    appended = _jsonl.serialize([record] if record else [])
+
+    def validate(written: Items, before: Items, old: str, _moved: Items) -> str:
+        new = [*(i for i in written if i not in before), *([record] if record else [])]
+        why = private_refusal(new, path)
+        if why is not None:
+            raise Refusal(*why)
+        text = json.dumps({"schema": "backlog-v1", "active": written}, indent=2) + "\n"
+        if findings := pair_findings(text, old + appended):
+            detail = "; ".join(str(f["message"]) for f in findings[:5])
             raise Refusal(
-                f"{path.name} changed twice under this write — nothing was written",
-                "Operator action: re-run the same command, unchanged",
+                f"the resulting {LEDGER} + {HISTO} would not pass check — nothing was written "
+                f"({detail})",
+                f"{SCRIPT} check",
             )
-    if line:
-        replace(histo, candidate)
-    replace(path, text)
-    return written
+        return text
+
+    return _commit.commit(
+        path, read_active, apply, validate, replace, specs / HISTO,
+        (lambda old, _moved: old + appended) if record else None,
+    )  # fmt: skip

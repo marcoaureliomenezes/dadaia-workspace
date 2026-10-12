@@ -15,7 +15,6 @@ import argparse
 import json
 import sys
 from pathlib import Path
-from typing import Any
 
 # A projected skill folder is not a package dir to litter: the sibling modules below
 # import without leaving a `__pycache__` beside them.
@@ -28,9 +27,11 @@ sys.path[:0] = [
 
 import _backlog_exit as ex
 import _backlog_write as wr
+import _jsonl
 from _backlog_check import check
 from _backlog_schema import CODE, DISPOSITIONS, HISTO, LEDGER
-from _backlog_store import Refusal, commit, read_active
+from _backlog_store import commit, read_active
+from _refusal import Refusal
 from _specs import find_specs, refuse
 
 _HELP = {
@@ -63,12 +64,8 @@ def _parser() -> argparse.ArgumentParser:
     return parser
 
 
-def _values(args: argparse.Namespace, names: tuple[str, ...]) -> dict[str, Any]:
-    return {name: getattr(args, name) for name in names}
-
-
 def _new(args: argparse.Namespace, specs: Path) -> int:
-    values = _values(args, ("title", "description", "provenance", "intent", "relates"))
+    values = _jsonl.values(args, ("title", "description", "provenance", "intent", "relates"))
     commit(specs, lambda active: wr.new_entry(active, args.slug, values))
     print(f"[ok] appended {args.slug!r} -> {specs / LEDGER}")
     return 0
@@ -77,7 +74,7 @@ def _new(args: argparse.Namespace, specs: Path) -> int:
 def _exit(args: argparse.Namespace, specs: Path) -> int:
     """The pair: the terminal record, then the removal, both checked before either write;
     a crash between them leaves an exited-but-live slug `check` names, never a lost item."""
-    values = _values(args, ("disposition", "release", "reason", "summary"))
+    values = _jsonl.values(args, ("disposition", "release", "reason", "summary"))
     entry = ex.check_exit(specs, read_active(specs / LEDGER), args.slug, values)
     commit(specs, lambda active: [i for i in active if i.get("id") != args.slug], ex.histo_record(entry, values))  # fmt: skip
     print(f"[ok] exited {args.slug!r} ({values['disposition']}) -> {specs / HISTO}")

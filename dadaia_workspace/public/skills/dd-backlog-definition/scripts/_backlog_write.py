@@ -3,21 +3,18 @@
 
 from __future__ import annotations
 
-import datetime as _dt
 import re
 from typing import Any
 
-from _backlog_store import SCRIPT, Items, Refusal
+import _clock
+from _backlog_store import SCRIPT, Items
 from _ledger import load_schema
+from _refusal import Refusal
 from _specs import choice
 
 _SLUG = load_schema("backlog-v1")["$defs"]["slug"]["pattern"]
 _INTENT_RE = re.compile(r"^(?P<kind>[a-z]+):(?P<ref>[^=]+)=(?P<change>.+)$", re.DOTALL)
 KINDS = ("code", "doc", "invariant", "catalog")
-
-
-def today() -> str:
-    return _dt.datetime.now(tz=_dt.UTC).strftime("%Y-%m-%d")
 
 
 def parse_intents(raw: list[str] | None) -> list[dict[str, Any]]:
@@ -63,7 +60,7 @@ def new_entry(active: Items, slug: str, values: dict[str, Any]) -> Items:
     entry: dict[str, Any] = {
         "id": slug,
         "title": values.get("title") or slug,
-        "opened": today(),
+        "opened": _clock.today(),
         "status": "idea",
         "description": values.get("description") or "(one-line description of the need)",
         "provenance": values.get("provenance") or "operator request",
