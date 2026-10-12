@@ -77,6 +77,6 @@ The branch contract by role; the names are `specs/constitution.md`'s `gitflow:` 
 
 ## 5. References
 
-- Run `python3 .agents/skills/dd-gitflow-default/scripts/worktree.py --help` (verbs `new`, `merge`, `clean`, `hash`, `list`); run it, never read its source; the rules: `worktrees/AGENTS.md`.
+- Run `python3 .agents/skills/dd-gitflow-default/scripts/worktree.py --help` (verbs `new`, `preflight`, `merge`, `clean`, `hash`, `list`); run it, never read its source; the rules: `worktrees/AGENTS.md`.
 - [`CICD-AUTOMATION.md`](CICD-AUTOMATION.md) — optional: plug your own pipeline into the repo's `verify:` lines.
 - Push chokepoints: `.dadaia/AGENTS.md` §3; every other rule here is discipline upheld by agents and reviewers.

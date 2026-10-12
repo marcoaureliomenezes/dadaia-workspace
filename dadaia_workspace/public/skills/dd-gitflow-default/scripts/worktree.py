@@ -18,7 +18,7 @@ sys.path[:0] = [
     str(Path(__file__).resolve().parents[2] / "dd-bug-resolution" / "scripts"),
 ]
 
-from _worktree_end import clean, digest, merge
+from _worktree_end import clean, digest, merge, preflight
 from _worktree_git import rows, workspace_of
 from _worktree_names import Refusal
 from _worktree_new import new
@@ -46,6 +46,7 @@ def main(argv: list[str] | None = None) -> int:
         end.add_argument("--drop", action="store_true", help="discard the other ignored files")
 
     end_args(verbs.add_parser("merge", help="land a worktree on its branch after its gate"))
+    verbs.add_parser("preflight", help="every check merge runs but the verdict, all failures printed").add_argument("path")  # fmt: skip
     end_args(verbs.add_parser("clean", help="remove a merged or commit-less worktree"))
     seal = verbs.add_parser("hash", help="the diff_sha256 binding a verdict carries for a sha")
     seal.add_argument("path")
@@ -65,6 +66,8 @@ def main(argv: list[str] | None = None) -> int:
         if args.verb == "hash":
             print(digest(root, args.path, args.sha))
             return 0
+        if args.verb == "preflight":
+            return preflight(root, args.path)
         if args.verb in ("merge", "clean"):
             end_verb = merge if args.verb == "merge" else clean
             print(f"[ok] {end_verb(root, args.path, args.keep, args.drop)}")

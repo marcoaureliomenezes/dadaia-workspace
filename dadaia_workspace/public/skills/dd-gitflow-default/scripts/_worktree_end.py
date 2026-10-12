@@ -15,7 +15,7 @@ import shlex
 import shutil
 import subprocess
 import sys
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from datetime import datetime
 from pathlib import Path
 
@@ -346,6 +346,42 @@ def _into(repo: Path, onto: str) -> Path:
     return tree_path(repo.parents[1], repo.name, name) if onto.startswith("wt/") else repo
 
 
+def _kind_checks(root: Path, repo: Path, tree: Path, name: str, onto: str, into: Path) -> list[tuple[str, Callable[[], None]]]:  # fmt: skip
+    """The ordered (label, check) pairs a tree of this kind must pass to land; `merge` and
+    `preflight` both run this list, the verdict check labelled "verdict"."""
+    checks: list[tuple[str, Callable[[], None]]] = [("dirty", lambda: _refuse_dirty(tree))]
+    ancestor = ("ancestor", lambda: _check_ancestor(tree, onto))
+    verdict = ("verdict", lambda: _check_approved(root, tree, onto, name))
+    if into != repo:  # a task: hygiene and implementation/test separation, no gate or verdict
+        checks += [ancestor, ("tests", lambda: _refuse_implementation_tests(tree, onto, _target(root, str(into))[3])), ("job clean", lambda: _refuse_dirty(into))]  # fmt: skip
+    elif non_code(name):
+        checks += [("specs only", lambda: _check_specs_only(tree, onto)), ancestor, verdict, ("ledgers", lambda: _ledgers(root, tree))]  # fmt: skip
+    elif plain(name):
+        checks += [ancestor, verdict, ("verify", lambda: _gate(tree, onto, required=False))]
+    else:
+        checks += [("open tasks", lambda: _open_tasks(repo, name)), ancestor, verdict, ("verify", lambda: _gate(tree, onto))]  # fmt: skip
+    return checks
+
+
+def preflight(root: Path, path: str) -> int:
+    """`merge` without the verdict: run every other check of the tree's kind, collect each refusal."""
+    repo, tree, name, onto = _target(root, path)
+    if not tree.exists():
+        raise Refusal(f"{tree} does not exist", f"{script(SCRIPT)} list")
+    failed = []
+    for label, check in _kind_checks(root, repo, tree, name, onto, _into(repo, onto)):
+        try:
+            label == "verdict" or check()
+        except Refusal as refusal:
+            failed.append(refusal)
+    print(
+        f"PREFLIGHT {'FAIL' if failed else 'PASS'} {tree} {git(tree, 'rev-parse', 'HEAD').strip()}"
+    )
+    for red in failed:
+        print(f"[error] {red}", f"fix: {red.fix}", sep="\n")
+    return 1 if failed else 0
+
+
 def merge(root: Path, path: str, keep: list[str], drop: bool) -> str:
     repo, tree, name, onto = _target(root, path)
     into, ref = _into(repo, onto), branch(name)
@@ -362,25 +398,8 @@ def merge(root: Path, path: str, keep: list[str], drop: bool) -> str:
                 ) from error
         _rmdir(tree)
         return f"{ref} merged into {onto}"
-    _refuse_dirty(tree)
-    if into != repo:  # a task: hygiene and implementation/test separation, no gate or verdict
-        _check_ancestor(tree, onto)
-        _refuse_implementation_tests(tree, onto, _target(root, str(into))[3])
-        _refuse_dirty(into)
-    elif non_code(name):
-        _check_specs_only(tree, onto)
-        _check_ancestor(tree, onto)
-        _check_approved(root, tree, onto, name)
-        _ledgers(root, tree)
-    elif plain(name):
-        _check_ancestor(tree, onto)
-        _check_approved(root, tree, onto, name)
-        _gate(tree, onto, required=False)
-    else:
-        _open_tasks(repo, name)
-        _check_ancestor(tree, onto)
-        _check_approved(root, tree, onto, name)
-        _gate(tree, onto)
+    for _, check in _kind_checks(root, repo, tree, name, onto, into):
+        check()
     kept = _kept(tree, "merge", keep, drop)
     if git(into, "branch", "--show-current").strip() != onto:
         raise Refusal(f"{into} is not on {onto}", git_line(into, "switch", onto))
