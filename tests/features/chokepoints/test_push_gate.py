@@ -1,10 +1,7 @@
-"""Wiring the push-range denylist scan into ``push_gate_decision`` (SPEC v0.9.0 FR1/FR2/FR5/FR6).
+"""Wiring the push-range denylist scan into ``push_gate_decision``.
 
-v0.9.0 A1.1-A1.4, A2.1-A2.4, A5.1-A5.4, A6.1; v0.11.0 A7.1-A7.3, A4.5,
-A6.1-A6.3, A6.6, A5.1; v0.4.3 A11.1; 0.5.0 AC3.10
-
-Every range is a real git range (``PushRepo``) read by the real ``GitSubprocessObjectReader``
-(AC9.4). Only synthetic ``zz-`` terms ever appear here.
+Every range is a real git range (``PushRepo``) read by the real ``GitSubprocessObjectReader``.
+Only synthetic ``zz-`` terms ever appear here.
 """
 
 from __future__ import annotations
@@ -82,7 +79,7 @@ def _gen() -> Iterable[tuple[str, str]]:
 def test_branch_push_with_denylisted_blob_in_range_is_refused(
     repo: PushRepo, files: dict[str, str], message: str | None, ref: Any, terms: Any, in_message: list[str]
 ) -> None:
-    """A denylisted term anywhere in the pushed range (blob, tag, commit message) refuses; A5.2 never unmasked."""
+    """A denylisted term anywhere in the pushed range (blob, tag, commit message) refuses; never unmasked."""
     sha = repo.commit(files, message=message) if message else repo.commit(files)
     decision = _decide(repo, ref(sha), denylist_terms=_gen() if terms == "gen" else terms)
     assert not decision.allowed
@@ -91,7 +88,7 @@ def test_branch_push_with_denylisted_blob_in_range_is_refused(
 
 
 def test_term_outside_the_range_does_not_refuse(repo: PushRepo) -> None:
-    """A1.2: a term reachable only from remote_sha is excluded from the range."""
+    """A term reachable only from remote_sha is excluded from the range."""
     published = repo.commit({"leak.md": f"{_TERM}\n"})
     repo.publish()
     sha = repo.commit({"clean.md": "nothing here\n"})
@@ -99,7 +96,7 @@ def test_term_outside_the_range_does_not_refuse(repo: PushRepo) -> None:
 
 
 def test_shared_blob_across_two_refs_is_deduped(repo: PushRepo) -> None:
-    """A1.4: a blob reachable from two refs in one push is one Hit."""
+    """A blob reachable from two refs in one push is one Hit."""
     first = repo.commit({"shared.md": f"{_TERM} shows up\n"})
     second = repo.commit({"other.md": "clean\n"})
     blob = git(repo.path, "rev-parse", f"{first}:shared.md")
@@ -109,7 +106,7 @@ def test_shared_blob_across_two_refs_is_deduped(repo: PushRepo) -> None:
 
 
 def test_branch_policy_refusal_precedes_the_scan(repo: PushRepo) -> None:
-    """A2.4."""
+    """A branch-policy refusal is decided before the denylist scan."""
     sha = repo.commit({"leak.md": f"{_TERM}\n"})
     decision = _decide(repo, f"refs/heads/main {sha} refs/heads/main {'b' * 40}", denylist_terms=_TERMS)
     assert not decision.allowed
@@ -118,7 +115,7 @@ def test_branch_policy_refusal_precedes_the_scan(repo: PushRepo) -> None:
 
 
 def test_refusal_message_shape_and_ten_item_cap(repo: PushRepo) -> None:
-    """A5.1/A5.3/A5.4: 12 hits, 10 shown, 2 remainder; masked; one switch fix line."""
+    """12 hits, 10 shown, 2 remainder; masked; one switch fix line."""
     sha = repo.commit({f"file{i}.md": f"{_TERM} number {i}\n" for i in range(12)})
     message = _decide(repo, _branch(sha), fixes=replace(gate_fixes(), head="main"), denylist_terms=_TERMS).message
     for part in ("refs/heads/feature/0.0.1", "file0.md:1", "z…m", "operator denylist", "dd-release-implementation §2a",
@@ -171,7 +168,7 @@ def test_a_deletion_or_clean_tag_is_allowed(repo: PushRepo, line: str) -> None:
 def test_oversized_note_and_path_masking(
     repo: PushRepo, files: dict[str, str], terms: Any, allowed: bool, in_message: list[str], in_warn: list[str]
 ) -> None:
-    """FR4/A4.5 the warn carries the oversized note; FR6(b) A6.1/A6.3/A6.6 offending path segments are masked everywhere."""
+    """The warn carries the oversized note; offending path segments are masked everywhere."""
     decision = _decide(repo, _branch(repo.commit(files)), denylist_terms=terms)
     warn = decision.warn or ""
     assert decision.allowed is allowed
@@ -181,7 +178,7 @@ def test_oversized_note_and_path_masking(
 
 
 def test_refusal_path_with_no_matching_segment_is_byte_identical(repo: PushRepo) -> None:
-    """A6.2: a path matching no term renders as-is; the blob short sha stays locatable."""
+    """A path matching no term renders as-is; the blob short sha stays locatable."""
     sha = repo.commit({"notes/plain-file.md": f"{_TERM} here\n"})
     decision = _decide(repo, _branch(sha), denylist_terms=_TERMS)
     assert "notes/plain-file.md:1" in decision.message
@@ -191,7 +188,7 @@ def test_refusal_path_with_no_matching_segment_is_byte_identical(repo: PushRepo)
 
 @pytest.mark.parametrize("sep", ["\x9b", " "])
 def test_refusal_path_segment_uppercase_hyphenated_variant_of_term_is_masked(repo: PushRepo, sep: str) -> None:
-    """sa-path-segment-judged-by-two-matchers, sa-git-output-split-by-unicode-line-breaks — a segment split by U+009B or U+2028 is read whole (git output split on \\n only) and masked (A4.1)."""
+    """A segment split by U+009B or U+2028 is read whole (git output split on \\n only) and masked."""
     sha = repo.commit({f"repos/Zz-A{sep}cme-Corp/notes.md": "contains zz-acme here\n"})
     decision = _decide(repo, _branch(sha), denylist_terms=(("zz-acme", "synthetic"),))
     assert not decision.allowed
@@ -222,7 +219,7 @@ class _Raising:
 def test_a_git_read_failure_refuses_with_its_own_fix(
     repo: PushRepo, exc: GitObjectReadError, in_message: list[str], last_line: str
 ) -> None:
-    """sa-fix-lines-not-built-by-cli-line#S5 — corruption's fix is `git -C <repo> fsck`; a git that cannot run is no corruption.
+    """Corruption's fix is `git -C <repo> fsck`; a git that cannot run is no corruption.
 
     The stub injects the one failure real git cannot produce on demand (a desynced cat-file stream).
     """
@@ -244,7 +241,7 @@ def test_a_git_read_failure_refuses_with_its_own_fix(
 def test_the_rewrite_fix_resets_to_the_oldest_unpublished_commit_and_amends(
     repo: PushRepo, ref: Any, head: str, end: str | None
 ) -> None:
-    """c3 review 5 (C1, H1-H3): one fix line from the refused ref's own unpublished range, never HEAD or a ref deletion."""
+    """One fix line from the refused ref's own unpublished range, never HEAD or a ref deletion."""
     oldest = repo.commit({"a.md": "clean\n"})
     tip = repo.commit({"n.md": f"{_TERM}\n"})
     decision = _decide(repo, ref(tip), fixes=replace(gate_fixes(), head=head), denylist_terms=_TERMS)
@@ -260,7 +257,7 @@ def test_the_rewrite_fix_resets_to_the_oldest_unpublished_commit_and_amends(
 def test_a_ledger_verb_outside_the_workspace_loads_the_pre_push_terms(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """AC3.10 / privacy-denylist-has-two-loaders (ADR 0157): run from a cwd outside the
+    """Run from a cwd outside the
     workspace, the ledger write seam finds the terms from its `--specs` tree, as pre-push does."""
     states = tmp_path / "ws" / ".dadaia" / "states"
     states.mkdir(parents=True)

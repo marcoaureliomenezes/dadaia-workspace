@@ -1,7 +1,5 @@
-"""v0.1.65 FR1/AC-1, FR5/AC-8 (public asset pipeline): content-level
-invariants of the real stage -> install projection, the doctor's drift/missing verdicts,
-and the per-harness `dadaia init --harness` profiles. Stage/install rosters live in
-tests/integration/test_public_assets.py::test_stage_manifest_and_install_all.
+"""Content-level invariants of the real stage -> install projection, the doctor's
+drift/missing verdicts, and the per-harness `dadaia init --harness` profiles.
 Size: LARGE — real projection I/O (FileSystemPublicAssetManager over tmp_path).
 
 Owner: dd-sw-engineer-sr
@@ -22,7 +20,7 @@ from tests.helpers.harness_profile import register_all
 
 _runner = CliRunner()
 #: Required YAML fields in every STAGED agent's frontmatter; `model`/`effort` are
-#: injected at install time (FR1), never staged.
+#: injected at install time, never staged.
 _REQUIRED_FRONTMATTER = {"name", "description", "tools"}
 
 
@@ -58,7 +56,7 @@ def _staged_install(workspace: Path) -> FileSystemPublicAssetManager:
 
 class TestContentConsistency:
     def test_agent_frontmatter_skill_refs_tools_and_skill_md_presence(self, tmp_path: Path) -> None:
-        """Staged agents carry the required frontmatter and no `model:`/`effort:` (FR1);
+        """Staged agents carry the required frontmatter and no `model:`/`effort:`;
         every skill an agent names has a staged SKILL.md; installed Claude agents keep
         `tools:`; every staged skill dir has a SKILL.md; the dev-server registry script
         (dd-cli-library) keeps its verbs."""
@@ -129,10 +127,10 @@ def _ctx_inject_registered(claude_dir: Path) -> bool:
 
 
 class TestPerProfileInit:
-    """FR5 / AC-8: the real `dadaia init --harness <one>` projects exactly that harness's
+    """The real `dadaia init --harness <one>` projects exactly that harness's
     tree (no un-chosen harness dir), persists the profile, and the profile-scoped
     `public doctor` is green on both surfaces (no [missing]/[drift]/[fail], exit 0).
-    FR31/T-044-59: no `.claude/rules/` mirror; 0.4.7 FR3: kimi-code owns no workspace dir."""
+    No `.claude/rules/` mirror; kimi-code owns no workspace dir."""
 
     @pytest.mark.parametrize(
         ("harness", "present", "absent"),
@@ -172,8 +170,7 @@ class TestPerProfileInit:
 class TestLinkViewDoctor:
     """A broken harness view of the authored set is one ``[drift]`` line of the rule table.
 
-    0.4.7 AC3.1/AC3.2 (T-047-57); §4a-7 (the rule table's
-    ``_doctor_link`` is the one judge). Size: LARGE (real projection I/O).
+    The rule table's ``_doctor_link`` is the one judge. Size: LARGE (real projection I/O).
     """
 
     @staticmethod

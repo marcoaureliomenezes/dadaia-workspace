@@ -1,8 +1,7 @@
-"""0.4.6 AC2, AC4, AC6, AC7, AC9 (FR3 one scan, FR4 the reaper, FR5 TTLs,
-FR8 the profile seed); size: SMALL.
+"""Size: SMALL.
 
 ``DoctorService.scan()`` is the ONE registry-driven walk; every entry gets one verdict and one
-code ``WS-<zone>-<verdict>``, and ``fix()`` consumes that list in the FR4 order. Expectations
+code ``WS-<zone>-<verdict>``, and ``fix()`` consumes that list in the reaper's order. Expectations
 are derived from the registry views, never a spelled zone name.
 """
 
@@ -116,7 +115,7 @@ _PLACES = {
 def test_four_places_classify_every_entry(
     tmp_path: Path, registry: str, expected: dict[str, str]
 ) -> None:
-    """T-050-116 (ADR 0132), sa-gate-allows-root-entries-the-reaper-moves#E2, #E4, #E6: one walk
+    """One walk
     over the root, ``.dadaia/``, ``repos/`` and ``worktrees/`` — unlisted = slop, globbed =
     operator; repo slugs, never context names, DEAD ones under ``repos/`` only; an unreadable
     registry keeps every ``repos/<r>`` and ``worktrees/<r>``."""
@@ -178,10 +177,9 @@ def test_absent_init_or_install_zone_is_missing_and_fixable(tmp_path: Path) -> N
 
 
 def test_closed_canon_zones_flag_every_non_canon_entry_and_fix_removes_it(tmp_path: Path) -> None:
-    """A non-canon entry in a closed-canon zone is slop (the retired ``states/ctx_locks`` and
-    ``sessions/runtime`` have no code of their own), and so is an unreadable session record
-    (corrupt-session-record-never-collected, AC1.4); fix() holds them and leaves a fully
-    canonical scan."""
+    """A non-canon entry in a closed-canon zone is slop (``states/ctx_locks`` and
+    ``sessions/runtime`` have no code of their own), and so is an unreadable session record;
+    fix() holds them and leaves a fully canonical scan."""
     _init_workspace(tmp_path)
     dadaia = tmp_path / ".dadaia"
     (dadaia / _STATE_ZONE.name / "ctx_locks").mkdir()
@@ -201,7 +199,7 @@ def test_closed_canon_zones_flag_every_non_canon_entry_and_fix_removes_it(tmp_pa
 
     assert found[f"{_STATE_ZONE.name}/ctx_locks"].code == f"WS-{_STATE_ZONE.name}-slop"
     assert found[f"{sessions.name}/runtime"].code == f"WS-{sessions.name}-slop"
-    assert found[f"{sessions.name}/corrupt.json"].code == f"WS-{sessions.name}-slop"  # AC1.4
+    assert found[f"{sessions.name}/corrupt.json"].code == f"WS-{sessions.name}-slop"
     assert found[f"{_STATE_ZONE.name}/spec_contexts.json"].verdict is FindingVerdict.CANON
     for zone in zones_with_canon():
         assert zone.canon is not None
@@ -215,8 +213,8 @@ def test_closed_canon_zones_flag_every_non_canon_entry_and_fix_removes_it(tmp_pa
 def test_absent_harness_profile_is_missing_and_fix_seeds_it_from_present_dirs(
     tmp_path: Path,
 ) -> None:
-    """FR8 / AC9: a missing ``harness_profile.json`` is ``WS-states-missing`` (fixable);
-    ``fix()`` seeds it through the one store writer with exactly the L1 harnesses whose
+    """A missing ``harness_profile.json`` is ``WS-states-missing`` (fixable);
+    ``fix()`` seeds it through the one store writer with exactly the ``L1_ENTRY_HARNESSES`` whose
     projection dir exists at the root — regenerated from disk, never widened."""
     _init_workspace(tmp_path)
     _profile(tmp_path).unlink()
@@ -244,7 +242,7 @@ def test_absent_harness_profile_is_missing_and_fix_seeds_it_from_present_dirs(
 def test_ttl_walk_treats_an_entry_that_vanishes_mid_walk_as_absent(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Bug doctor-scan-raises-when-a-ttl-entry-vanishes-mid-walk: a file or descended-into dir
+    """A file or descended-into dir
     removed between ``iterdir`` and ``lstat`` is absent — no finding, no exception."""
     _init_workspace(tmp_path)
     zone_dir = tmp_path / ".dadaia" / _TTL_ZONE.name
@@ -282,9 +280,7 @@ def test_ttl_walk_treats_an_entry_that_vanishes_mid_walk_as_absent(
 def test_fix_skips_and_reports_an_undeletable_entry_and_finishes_the_pass(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Bug doctor-fix-aborts-whole-pass-on-first-undeletable-entry (class of
-    retention-sweep-crashes-on-permission-denied; read-only trees are reapable since
-    doctor-reaper-cannot-delete-read-only-trees): an entry refused past the chmod-retry is
+    """Read-only trees are reapable: an entry refused past the chmod-retry is
     skipped with its errno, stays a finding, and the pass reaches every other entry."""
     _init_workspace(tmp_path)
     zone = tmp_path / ".dadaia" / _TTL_ZONE.name
@@ -323,9 +319,7 @@ def test_fix_skips_and_reports_an_undeletable_entry_and_finishes_the_pass(
 def test_a_symlinked_zone_root_is_never_walked(
     tmp_path: Path, target_inside_workspace: bool
 ) -> None:
-    """Bug doctor-walks-symlinked-zone-root-into-a-repo-tree (CWE-59): a symlinked zone root is
-    never walked — no finding, nothing under the target touched (supersedes the finding-6 pin
-    of doctor-scan-raises-when-a-ttl-entry-vanishes-mid-walk)."""
+    """A symlinked zone root (CWE-59) is never walked: no finding, nothing under the target touched."""
     ws = tmp_path / "ws"
     ws.mkdir()
     _init_workspace(ws)
@@ -352,9 +346,9 @@ def test_a_symlinked_zone_root_is_never_walked(
 def test_fix_migrates_the_legacy_exceptions_and_never_touches_operator_files(
     tmp_path: Path,
 ) -> None:
-    """ADRs 0092, 0093, 0145: a missing ``.dadaiaignore`` is seeded 1:1 from the legacy
-    file, which is then slop and held; an invalid line is reported and never fixed. ADR 0146:
-    a root ``.env`` is a non-fixable finding the reaper never moves."""
+    """A missing ``.dadaiaignore`` is seeded 1:1 from the legacy
+    file, which is then slop and held; an invalid line is reported and never fixed.
+    A root ``.env`` is a non-fixable finding the reaper never moves."""
     _init_workspace(tmp_path)
     (tmp_path / DADAIAIGNORE).unlink()
     legacy = tmp_path / ".dadaia/states/instance_exceptions.txt"

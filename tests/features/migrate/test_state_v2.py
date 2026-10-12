@@ -1,7 +1,6 @@
 """Unit tests for state_v2 migration (spec_contexts.json v1 → v2).
 
-Covers AC-T10c-1..6 and AC-T10a-5..6 migration path. CRITICAL v1→v2 state migration:
-transform correctness is kept as a named test.
+Covers the v1→v2 state migration: transform correctness is one named test.
 """
 
 from __future__ import annotations
@@ -86,7 +85,7 @@ def test_plan_migration_detection_matrix(tmp_path: Path) -> None:
     assert plan_v2.contexts_to_migrate == []
 
     _, states_none = _workspace(tmp_path / "none")
-    with pytest.raises(ValueError, match="fix: ") as refused:  # sa-seven-workspace-root-rules#S5
+    with pytest.raises(ValueError, match="fix: ") as refused:
         plan_migration(JsonContextStore(states_none))
     assert "No initialized workspace" in str(refused.value)
 
@@ -97,7 +96,7 @@ def test_plan_migration_detection_matrix(tmp_path: Path) -> None:
 
 
 def test_execute_migration_transforms_contexts(tmp_path: Path) -> None:
-    """sa-registry-schema-version-has-three-grammars#B7: the v1 transform contract is
+    """The v1 transform contract is
     unchanged — ativo → alive, inativo → dead; is_primary removed; activated_at →
     alive_since."""
     ws, states = _workspace(tmp_path)
@@ -154,9 +153,8 @@ def test_execute_migration_side_effects_and_v2_noop(tmp_path: Path) -> None:
 
     execute_migration(JsonContextStore(states), ws)
 
-    # AC-T10c-5: primary_context.json removed.
     assert not primary.exists()
-    # Session identity remains; retired lock namespaces and audit logs are not recreated.
+    # Session identity remains; lock namespaces and audit logs are not recreated.
     assert (ws / ".dadaia" / "sessions").is_dir()
     assert not (ws / ".dadaia" / "locks").exists()
     assert not (ws / ".dadaia" / "states" / "ctx_locks").exists()

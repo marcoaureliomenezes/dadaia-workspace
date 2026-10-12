@@ -1,4 +1,4 @@
-"""Consumer specs-upgrade path E2E — the v0.5.1 contract (K10, T-051-16).
+"""Consumer specs-upgrade path E2E.
 
 ``dadaia specs upgrade`` re-stamps an upgradable tree (v6 or later) to the canonical
 version, folding a consumer's ``memory/TECHSTACK.md`` body into ``ARCHITECTURE.md``'s
@@ -53,8 +53,8 @@ def _snapshot(root: Path) -> dict[str, bytes]:
 def test_upgrade_refuses_a_tree_state_does_not_walk_and_writes_nothing(
     tmp_path: Path, constitution: str | None, fix: str
 ) -> None:
-    """sa-specs-tree-state-read-five-ways#B28-5: absent/malformed/foreign exit non-zero,
-    write nothing and print state()'s fix, never '0.4.x'."""
+    """Absent, malformed or foreign state exits non-zero, writes nothing and prints state()'s fix,
+    never '0.4.x'."""
     specs = tmp_path / "specs"
     if constitution is not None:
         specs.mkdir()
@@ -79,12 +79,12 @@ def test_upgrade_at_the_canonical_version_is_a_byte_identical_no_op(tmp_path: Pa
 
     assert upgrade.returncode == 0, upgrade.stderr or upgrade.stdout
     assert _snapshot(specs) == before
-    # sa-specs-upgrade-stamps-any-target-and-memory-vocabulary-diverges#47.1: no --target.
+    # --target is not an accepted flag: exit 2.
     assert _cli(root, "specs", "upgrade", "--target", "99").returncode == 2
     assert _snapshot(specs) == before
 
 
-# ----------------------------------------------------------------- the upgrade hop (FR1)
+# ----------------------------------------------------------------- the upgrade hop
 
 _V6_ARCHITECTURE = (
     "---\nslug: ARCHITECTURE\ntitle: Architecture\ntldr: Architecture.\nsummary: Architecture.\n"
@@ -97,7 +97,7 @@ _V6_TECHSTACK = (
 
 
 def _seed_v6_tree(root: Path, architecture: str) -> Path:
-    """A consumer tree stamped 6, carrying the retired ``memory/TECHSTACK.md``."""
+    """A consumer tree stamped 6, carrying ``memory/TECHSTACK.md``."""
     specs = root / "consumer" / "specs"
     (specs / "memory").mkdir(parents=True)
     (specs / "constitution.md").write_text(
@@ -109,7 +109,7 @@ def _seed_v6_tree(root: Path, architecture: str) -> Path:
 
 
 def test_upgrade_folds_techstack_into_architecture_and_deletes_it(tmp_path: Path) -> None:
-    """sa-specs-upgrade-stamps-any-target-and-memory-vocabulary-diverges#47.2: the stamp written is exactly CANONICAL_SPECS_VERSION."""
+    """The stamp written is exactly CANONICAL_SPECS_VERSION."""
     specs = _seed_v6_tree(tmp_path, _V6_ARCHITECTURE)
 
     upgrade = _cli(tmp_path, "specs", "upgrade", "--specs-dir", str(specs))
@@ -133,8 +133,7 @@ def test_upgrade_folds_techstack_into_architecture_and_deletes_it(tmp_path: Path
 
 
 def test_upgrade_refuses_a_two_tier_tree_without_stamping_or_writing(tmp_path: Path) -> None:
-    """sa-specs-upgrade-stamps-any-target-and-memory-vocabulary-diverges#47.3 (ADR 0082):
-    a v6 tree organised as Part 1 / Part 2 has nowhere safe to fold into — the upgrade
+    """A v6 tree organised as Part 1 / Part 2 has nowhere safe to fold into: the upgrade
     refuses, non-zero, stamp still 6, the tree byte-identical."""
     two_tier = "# Architecture\n\n## Part 1 — Principles\n\nx\n\n## Part 2 — Implementation\n\ny\n"
     specs = _seed_v6_tree(tmp_path, two_tier)

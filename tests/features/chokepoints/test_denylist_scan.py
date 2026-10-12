@@ -1,7 +1,4 @@
-"""Pure push-range denylist matcher (SPEC v0.9.0 FR3/FR5/FR6).
-
-v0.9.0 A3.1, A3.4, A5.2, A6.2; v0.11.0 A1.1-A1.4, A4.1, A4.4, A4.6;
-sa-private-match-rendering-has-three-renderers#B3.
+"""Pure push-range denylist matcher.
 
 Synthetic ``zz-`` terms only; baseline positives are composed at run time so this
 module's own blob never carries a value the push-range scan would flag.
@@ -51,7 +48,7 @@ def _binary(**kw: Any) -> ScannedObject:
 ])
 # fmt: on
 def test_baseline_refuses_a_private_value_with_no_operator_terms(value: str, mask: str | None) -> None:
-    """The baseline layer alone refuses; the hit never carries the value (B3)."""
+    """The baseline layer alone refuses; the hit never carries the value."""
     outcome = scan_objects([_obj(f"see {value} now\n")], terms=(), patterns=load_baseline_patterns())
 
     assert [(h.path, h.line) for h in outcome.hits] == [("notes.md", 1)]
@@ -71,7 +68,7 @@ def test_baseline_refuses_a_private_value_with_no_operator_terms(value: str, mas
 ])
 # fmt: on
 def test_baseline_carve_out_never_refuses(text: str) -> None:
-    """A3.4: exclude_regex carve-outs apply (the refused neighbours are rows of the table above)."""
+    """``exclude_regex`` carve-outs apply (the refused neighbours are rows of the table above)."""
     assert scan_objects([_obj(text)], terms=(), patterns=load_baseline_patterns()).hits == ()
 
 
@@ -90,7 +87,7 @@ def test_baseline_carve_out_never_refuses(text: str) -> None:
 def test_amnesty_is_same_path_same_layer_equal_value(
     text: str, prior: str | None, terms: tuple[tuple[str, str], ...] | None, hit_lines: list[int]
 ) -> None:
-    """v0.11.0 FR1: suppressed iff the same layer re-run on the same path's prior text yields an equal value."""
+    """Suppressed iff the same layer re-run on the same path's prior text yields an equal value."""
     patterns = load_baseline_patterns() if terms is None else ()
     outcome = scan_objects([_obj(text, prior)], terms=terms or (), patterns=patterns)
 
@@ -127,7 +124,7 @@ def test_first_match_short_circuits_at_the_first_hit_line() -> None:
 
 
 def test_unmasked_operator_term_absent_from_every_hit_field() -> None:
-    """sa-private-match-rendering-has-three-renderers#B3."""
+    """No hit field carries the unmasked operator term."""
     outcome = scan_objects([_obj(f"the value is {_TERM} here\n", path="secret.md")], terms=_TERMS, patterns=())
 
     hit = outcome.hits[0]

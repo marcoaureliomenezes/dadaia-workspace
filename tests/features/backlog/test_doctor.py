@@ -1,8 +1,7 @@
-"""sa-backlog-status-has-no-single-authority#B1, #B2, #B3, #B8: the
-`ledgers` section judges a live entry through `backlog.py check` alone (it carries no
+"""The `ledgers` section judges a live entry through `backlog.py check` alone (it carries no
 status list); the doctor keeps only anchor resolution (BL-SCHEMA) and BL-CONFLICT.
-sa-backlog-intents-have-two-grammars: the schema is the one intents grammar; the doctor
-binds only the entries it accepts, never dropping the document for one bad entry.
+The schema is the one intents grammar; the doctor binds only the entries it accepts, never
+dropping the document for one bad entry.
 Size: MEDIUM — the real section, each ledger script a child process.
 """
 
@@ -69,14 +68,13 @@ _ROWS = {  # the live entries (status, ref, change) -> the backlog findings the 
 
 @pytest.mark.parametrize("row", sorted(_ROWS))
 def test_the_doctor_judges_a_live_entry_as_backlog_py_check_does(row: str, tmp_path: Path) -> None:
-    """sa-backlog-status-has-no-single-authority#B1: doctor ≡ `backlog.py check` on any
-    status. sa-backlog-status-has-no-single-authority#B2: "Deferred" is refused, with a fix that is not sed. sa-backlog-status-has-no-single-authority#B3: a terminal token
-    on a live entry gives one ERROR; "postponed" is accepted by both. sa-backlog-status-has-no-single-authority#B8: BL-CONFLICT
-    stays in the doctor.
-    sa-subjects-resolve-is-circular#B3: a self-bound invariant is unresolved. T-050-154: a
-    `.go` path binds, its word grepped; the retired `api` kind fails check.
-    sa-backlog-intents-have-two-grammars: an absolute code ref fails check and the real
-    BL-CONFLICT beside it survives; an intent with an extra key fails check and binds nothing."""
+    """Doctor and `backlog.py check` agree on any status: "Deferred" is refused, with a fix that
+    is not sed; a terminal token on a live entry gives one ERROR; "postponed" is accepted by both.
+    BL-CONFLICT stays in the doctor.
+    A self-bound invariant is unresolved. A `.go` path binds, its word grepped; an `api`
+    kind fails check.
+    An absolute code ref fails check and the real BL-CONFLICT beside it survives; an intent with
+    an extra key fails check and binds nothing."""
     entries, expected = _ROWS[row]
     specs = tmp_path / "specs"
     (specs / "backlog").mkdir(parents=True)

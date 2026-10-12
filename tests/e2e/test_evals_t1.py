@@ -1,4 +1,4 @@
-"""T1 cold onboarding (AC11.1): each image builds on the 0.4.7 layer and on this checkout's wheel;
+"""T1 cold onboarding: each image builds on the 0.4.7 layer and on this checkout's wheel;
 the grader passes a hand-onboarded workspace of each version and fails an empty one.
 
 Docker is required: a missing tool fails the row, never skips it. 600 s: evals' whole suite, with

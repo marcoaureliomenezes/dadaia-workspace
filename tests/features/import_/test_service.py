@@ -1,9 +1,8 @@
-"""AC11 (FR13 / D15, T-046-31): `dadaia import` registers unknown names DEAD;
-bug import-registers-unvalidated-slugs-that-doctor-fix-inv5-rmtrees: every imported record goes
+"""`dadaia import` registers unknown names DEAD; every imported record goes
 through `SpecContextService.register`, the ONE guarded registry seam — a name or slug failing the
 allowlist, or a slug another context owns, is skipped with its reason and never written.
 
-Size: SMALL — the input file is the SPEC FR13 worked example; the store is a fake.
+Size: SMALL — the input file is the documented example; the store is a fake.
 """
 
 import json

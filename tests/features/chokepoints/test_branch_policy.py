@@ -1,5 +1,4 @@
-"""The branch contract, read from the project gitflow (ADRs 0036, 0037, 0046; SPEC 0.5.0 AC6.5,
-AC8.1): work branches ``<prefix><M.m.p>`` are pushable; the principal and integration
+"""The branch contract, read from the project gitflow: work branches ``<prefix><M.m.p>`` are pushable; the principal and integration
 branches are PR-only; every refusal and its fix line name the CONFIGURED branches.
 Every row runs under the default gitflow or a custom one (``trunk``/``next``/``work/``).
 """
@@ -77,7 +76,7 @@ def _existing_principal(repo: PushRepo, flow: Gitflow) -> str:
 
 
 def _birth_from_any_source(repo: PushRepo, flow: Gitflow) -> str:
-    """Review H4: judged by the remote branch it creates and what it publishes, never the local name."""
+    """Judged by the remote branch it creates and what it publishes, never the local name."""
     repo.commit({"a.md": "a\n"})
     sha = repo.publish()
     return f"{_line('main', 'develop', sha=sha)}\n{sha} {sha} refs/heads/develop {_ZERO}"
@@ -116,7 +115,7 @@ def test_the_gate_allows(repo: PushRepo, flow: Gitflow, scenario: Scenario) -> N
     assert decision.allowed, decision.message
 
 
-_WORK = "{prefix}0.6.0"  # the live work branch, never the <M.m.p> pattern (fix-lines-are-not-one-runnable-command)
+_WORK = "{prefix}0.6.0"  # the live work branch, never the <M.m.p> pattern
 _PR_TO_INTEGRATION = ["Operator", "action:", "open", "a", "PR/MR", "from", _WORK, "into", "{integration}", "on", "your", "git", "host"]
 _PR_TO_PRINCIPAL = ["Operator", "action:", "open", "a", "PR/MR", "from", "{integration}", "into", "{principal}", "on", "your", "git", "host"]
 
@@ -168,9 +167,9 @@ def test_the_gate_refuses_with_the_configured_fix(
 def test_a_branch_outside_the_gitflow_is_refused_naming_the_work_branch(
     repo: PushRepo, flow: Gitflow, branch: str
 ) -> None:
-    """AC6.1/AC6.5: a name that is not exactly the principal, the integration or prefix + M.m.p has no role.
+    """A name that is not exactly the principal, the integration or prefix + M.m.p has no role.
 
-    The fix is one command from any cwd carrying the refused commit (review H-C).
+    The fix is one command from any cwd carrying the refused commit.
     """
     decision = _decide(_line(branch), repo, flow)
     assert not decision.allowed
@@ -180,7 +179,7 @@ def test_a_branch_outside_the_gitflow_is_refused_naming_the_work_branch(
 
 
 def test_an_outside_ref_is_carried_onto_the_live_work_branch() -> None:
-    """Review 5 M2: the live work branch may have diverged — switch to it and merge (append-only, never a rebase)."""
+    """The live work branch may have diverged — switch to it and merge (append-only, never a rebase)."""
     refs = parse_push_stdin(_line("topic"))[0]
     decision = check_branch_policy(refs, _CUSTOM, replace(gate_fixes(), work="work/1.2.3", cut=True))
     assert decision is not None and "'work/1.2.3'" in decision.message
@@ -200,7 +199,7 @@ def test_an_outside_ref_is_carried_onto_the_live_work_branch() -> None:
     ],
 )
 def test_only_a_job_branch_of_wt_is_pushable(branch: str, allowed: bool) -> None:
-    """AC1.2 (ADR 0190): pre-push accepts a job branch `wt/<M.m.p>-rc<N>/<job>` and a
+    """Pre-push accepts a job branch `wt/<M.m.p>-rc<N>/<job>` and a
     `wt/backlog/<slug>` branch, no other `wt/` branch."""
     refs, _ = parse_push_stdin(_line(branch))
     decision = check_branch_policy(refs, DEFAULT, replace(gate_fixes(), work="feature/0.5.0"))

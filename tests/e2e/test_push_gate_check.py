@@ -1,4 +1,4 @@
-"""v0.4.4 A3.1; 0.5.0 AC6.4, AC6.5 (T-050-12): `ci push-gate-check`
+"""`ci push-gate-check`
 driven as the pre-push hook drives it (git's ref lines on stdin, harness-free env, no
 handoff on disk). A work-branch push, a branch deletion and a tag push pass; the branch
 names come from the committed constitution's gitflow (custom, absent -> default + one
@@ -33,9 +33,9 @@ _ZERO = "0" * 40
 def _init_repo(workspace: Path, slug: str) -> tuple[Path, str]:
     """A real git repo at ``<workspace>/repos/<slug>`` with one real commit.
 
-    Returns ``(repo, commit_sha)``. The v0.9.0 push-range denylist scan needs a
+    Returns ``(repo, commit_sha)``. The push-range denylist scan needs a
     resolvable git object for the pushed ``local_sha`` — a synthetic literal sha fails
-    closed as a genuine git-read failure (FR6 row 2), so tests use a REAL commit sha.
+    closed as a genuine git-read failure, so tests use a REAL commit sha.
     """
     (workspace / ".dadaia" / "states").mkdir(parents=True, exist_ok=True)
     (workspace / ".dadaia" / "states" / "spec_contexts.json").write_text(
@@ -79,7 +79,7 @@ def _run_push_gate(
     ],
 )  # fmt: skip
 def test_pass_matrix(tmp_path: Path, line: str) -> None:
-    """Never review-gated: the verdict is a PR gate (A3.4), not on this path."""
+    """Never review-gated: the verdict is a PR gate, not on this path."""
     repo, sha = _init_repo(tmp_path, _SLUG)
     result = _run_push_gate(repo, tmp_path, line.format(sha=sha) + "\n")
     assert result.returncode == 0, result.stdout + result.stderr
@@ -93,7 +93,7 @@ def _push(branch: str, sha: str) -> str:
 
 
 def _write_constitution(repo: Path, text: str) -> None:
-    """Committed: the gate reads HEAD's constitution, never the working tree (ADR 0048)."""
+    """Committed: the gate reads HEAD's constitution, never the working tree."""
     (repo / "specs").mkdir(exist_ok=True)
     (repo / "specs" / "constitution.md").write_text(text, encoding="utf-8")
     git = ["git", "-c", "user.name=t", "-c", "user.email=t@t.invalid"]
@@ -146,8 +146,7 @@ def test_an_associated_repo_inherits_its_context_gitflow(tmp_path: Path) -> None
     assert result.returncode == 0, result.stderr
     assert "WARNING" not in result.stderr
     assert _run_push_gate(infra, tmp_path, _push("feature/0.0.1", sha)).returncode != 0
-    # pre-push-gate-crashes-when-owner-main-repo-absent: an absent main repo carries no
-    # committed text — ADR 0046's default plus one warning, never a traceback.
+    # An absent main repo carries no committed text: the default plus one warning, never a traceback.
     shutil.rmtree(main)
     result = _run_push_gate(infra, tmp_path, _push("feature/0.0.1", sha))
     assert result.returncode == 0 and result.stderr.count("WARNING") == 1, result.stderr
@@ -161,8 +160,7 @@ def test_an_associated_repo_inherits_its_context_gitflow(tmp_path: Path) -> None
     [f"{CANONICAL_SPECS_VERSION}", f"{CANONICAL_SPECS_VERSION}\ngitflow: {{principal: main"],
 )
 def test_the_pushed_commits_tree_state_governs_the_canon_scan(tmp_path: Path, stamp: str) -> None:
-    """sa-specs-tree-state-read-five-ways#B28-2: the pushed commit's stamp, not a checkout
-    stamped 6; sa-specs-tree-state-read-five-ways#B28-3: a malformed one still scans."""
+    """The pushed commit's stamp governs, not a checkout stamped 6; a malformed one still scans."""
     repo, _ = _init_repo(tmp_path, _SLUG)
     (repo / "specs").mkdir()
     (repo / "specs" / "stray-notes.txt").write_text("x\n", encoding="utf-8")

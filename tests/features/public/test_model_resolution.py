@@ -1,4 +1,4 @@
-"""`dadaia public doctor` reports the active template in one line (AC4.4)."""
+"""`dadaia public doctor` reports the active template in one line."""
 
 from __future__ import annotations
 

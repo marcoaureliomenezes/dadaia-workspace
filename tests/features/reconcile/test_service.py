@@ -121,7 +121,7 @@ def test_failure_restores_the_primary_context_file_the_migration_deleted(tmp_pat
 
 
 def test_reconcile_ignores_operator_slop_and_names_context_invariants(tmp_path: Path) -> None:
-    """sa-reconcile-certify-skip-the-workspace-walk#B2: with `.dadaia/nonsense/` and a root
+    """With `.dadaia/nonsense/` and a root
     `notes.txt` seeded, reconcile succeeds (operator slop never blocks an upgrade) and its
     doctor step is reported as 'context-invariants' — run against the real doctor service."""
     workspace = _v1_workspace(tmp_path)

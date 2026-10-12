@@ -1,5 +1,5 @@
-"""Size: SMALL — fakes at the store and git seams; the expected records are the SPEC FR13
-worked example, never derived from the service.
+"""Size: SMALL — fakes at the store and git seams; the expected records are the documented
+example, never derived from the service.
 """
 
 import json

@@ -1,8 +1,6 @@
-"""pre-push-gate-never-runs-under-core-hookspath: the real `ci
-install-hook` + a real `git push` to a local bare remote. The planted-term refuse ->
-amend -> push journey is the refusal harness Case `denylisted`
-(test_refusal_fix_lines_clear_their_refusal.py); the refusal message shape (A5.1-A5.3,
-masking) is tests/unit/features/chokepoints/test_push_denylist_scan.py.
+"""The real `ci install-hook` + a real `git push` to a local bare remote. The planted-term
+refuse -> amend -> push journey is the refusal harness Case `denylisted`; the refusal message
+shape (masking) is pinned by the denylist scan's own tests.
 The hook's runner is a `<ws>/.dadaia/.venv/bin/dadaia` stub forwarding to this interpreter's CLI.
 Size: LARGE — real git hooks.
 
@@ -26,7 +24,7 @@ pytestmark = pytest.mark.e2e
 _SLUG = "denylist-journey"
 _BRANCH = "feature/0.0.1"
 _EXIT_DEADLINE = 30.0
-_PLANTED_TERM = "zz-fake-context-name"  # synthetic — never a real term (TASKS standing rule)
+_PLANTED_TERM = "zz-fake-context-name"  # synthetic — never a real term
 
 
 def _git(args: list[str], cwd: Path, env: dict[str, str] | None = None) -> None:
@@ -34,7 +32,7 @@ def _git(args: list[str], cwd: Path, env: dict[str, str] | None = None) -> None:
 
 
 def _init_repo_and_remote(workspace: Path, slug: str) -> tuple[Path, Path]:
-    """A throwaway working repo on the v2 pushable branch plus a local bare remote (no
+    """A throwaway working repo on a pushable branch plus a local bare remote (no
     network)."""
     bare = workspace / "remote.git"
     bare.mkdir(parents=True)
@@ -88,7 +86,7 @@ def _remote_branch_sha(bare: Path) -> str | None:
 
 
 def test_the_gate_runs_where_core_hookspath_points(tmp_path: Path) -> None:
-    """pre-push-gate-never-runs-under-core-hookspath#B1, pre-push-gate-never-runs-under-core-hookspath#B3 (AC1.3): with ``core.hooksPath``
+    """With ``core.hooksPath``
     set, ``ci install-hook`` puts the gate where git runs hooks, and a push carrying an
     AKIA-shaped key is refused. Composed at runtime — never a tracked secret literal."""
     repo, bare = _init_repo_and_remote(tmp_path, _SLUG)
@@ -119,7 +117,7 @@ def test_the_gate_runs_where_core_hookspath_points(tmp_path: Path) -> None:
 def test_a_record_whose_context_carries_a_published_term_registers_and_pushes(
     tmp_path: Path,
 ) -> None:
-    """AC2.7 (ledger-denylist-term-inside-context-slug-blocks-registration): a context value
+    """A context value
     origin already holds is accepted by the ledger seam AND by the installed pre-push."""
     from tests.helpers.skill_scripts import stage_skill_scripts
 

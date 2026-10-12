@@ -1,4 +1,4 @@
-"""Unit tests for the canonical-subject registry (T-25-02, SPEC §3.2, ADR-A; T-050-154).
+"""Unit tests for the canonical-subject registry.
 
 Every test runs against a fixed ``tmp_path`` repo built from inline ``MINIMAL_*`` constants,
 the tracked paths handed in — never the live repo, never cwd.
@@ -118,7 +118,7 @@ def test_catalog_doc_and_invariant_resolve_and_unknown_halts(repo: Path) -> None
 
 
 def test_an_invariant_is_never_minted_from_source(repo: Path) -> None:
-    """FR2 (v0.1.49): only specs/memory declares invariants; a source file never does."""
+    """Only specs/memory declares invariants; a source file never does."""
     (repo / "pkg" / "leak.go").write_text("// INV-source-leak\n", encoding="utf-8")
     reg = _build(repo, TRACKED | {"pkg/leak.go"})
     assert reg.bind("INV-source-leak", SubjectKind.INVARIANT).status is BindStatus.UNRESOLVED

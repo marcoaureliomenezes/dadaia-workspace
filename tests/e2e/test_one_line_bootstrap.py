@@ -1,16 +1,12 @@
 """``dadaia init <dir> --harness claude --repo <url>`` end to end, through the console script.
 
-0.4.7 FR1 / AC1.1 (T-047-79); 0.4.8 AC1.1/AC1.4 closing (T-048-04);
-0.4.8 AC3.6/AC8.2 (bug test-suite-wall-clock-doubled-past-its-frozen-budget).
-
-Size: LARGE, justified — AC1.1 is a statement about the *installed* distribution, not
+Size: LARGE, justified — the statement is about the *installed* distribution, not
 about any in-process wiring: an operator types one line and the workspace that appears
 must pass its own ``doctor``. Every seam below (venv provisioning, asset install, the
 clone, the context store, the session binding, the git chokepoint, the doctor's zone
 walk) is crossed by a REAL ``dadaia`` process, so nothing this test asserts survives
 being demoted to the CLI runner. This is the suite's ONE test that exercises the
-installed console script; every narrower contract of FR1 is already covered MEDIUM in
-``tests/integration/test_init_with_repo.py``.
+installed console script; every narrower contract is already covered by MEDIUM tests.
 
 Hermetic by construction — no network, no container:
 
@@ -56,7 +52,7 @@ _CONSOLE_SCRIPT = Path(sys.executable).parent / f"dadaia{PLATFORM.venv_exe_suffi
 
 def _child_env(home: Path) -> dict[str, str]:
     """A clean environment: no inherited ``DADAIA_*`` but the suite's fence (the dev CLI's
-    own workspace is never this child's: M1's first rung), a tmp ``HOME``, a git identity."""
+    own workspace is never this child's), a tmp ``HOME``, a git identity."""
     keep = "DADAIA_FENCED_ROOTS"
     (home / "gitconfig").write_text(GIT_QUIET_INCLUDE, encoding="utf-8")
     env = {
@@ -145,8 +141,8 @@ def origin(tmp_path: Path, home: Path) -> Path:
 def test_one_line_bootstrap_yields_a_doctor_clean_workspace(
     tmp_path: Path, home: Path, origin: Path
 ) -> None:
-    """AC1.1: one line, then ``doctor`` exit 0 and the repo ALIVE as ``main_repo``;
-    AC3.6/AC8.2: the user repo is untouched."""
+    """One line, then ``doctor`` exit 0 and the repo ALIVE as ``main_repo``;
+    the user repo is untouched."""
     workspace = tmp_path / "demo"
     workspace.mkdir()
     _seed_venv_entrypoint(workspace)
@@ -155,14 +151,14 @@ def test_one_line_bootstrap_yields_a_doctor_clean_workspace(
         "init", "demo", "--harness", "claude", "--repo", str(origin), cwd=tmp_path, home=home
     )
     assert init.returncode == 0, f"init failed:\n{init.stdout}\n{init.stderr}"
-    # AC3.6 / AC8.2: `init --repo` commits nothing into the user repo — clean tree, HEAD at origin.
+    # `init --repo` commits nothing into the user repo — clean tree, HEAD at origin.
     repo = workspace / "repos" / "demo-project"
     assert _git("status", "--porcelain", cwd=repo, home=home) == b""
     assert _git("rev-parse", "HEAD", cwd=repo, home=home) == _git(
         "rev-parse", "main", cwd=origin, home=home
     )
 
-    # 0.4.8 AC1.1/AC1.4: a short closing naming the CLI by its absolute venv path, no bare verb.
+    # A short closing names the CLI by its absolute venv path, no bare verb.
     assert len(init.stdout.splitlines()) <= 12, init.stdout
     assert not re.search(r"(^|[\s`])dadaia (context|doctor|specs) ", init.stdout), init.stdout
     cli = workspace / ".dadaia" / ".venv" / PLATFORM.venv_scripts_dir
@@ -171,7 +167,7 @@ def test_one_line_bootstrap_yields_a_doctor_clean_workspace(
     doctor = _dadaia("doctor", cwd=workspace, home=home)
     assert doctor.returncode == 0, f"doctor is not clean:\n{doctor.stdout}\n{doctor.stderr}"
 
-    # ADR 0038: init binds nothing and prints no export line; `context show` names
+    # init binds nothing and prints no export line; `context show` names
     # the context explicitly.
     assert "export DADAIA_" not in init.stdout, init.stdout
 
@@ -189,10 +185,8 @@ def test_one_line_bootstrap_yields_a_doctor_clean_workspace(
 
 # ── the venv mirrors the RUNNING distribution, never the index ───────────────────
 #
-# Bug init-venv-installs-index-version-not-running-distribution. The test above
-# pre-seeds `.dadaia/.venv`, so it never crosses the provisioning seam — which is
-# exactly why a uvx bootstrap could project HEAD's assets into a workspace whose venv
-# ran PyPI's 0.4.6. The test below crosses it for real, hermetically.
+# The test above pre-seeds `.dadaia/.venv`, so it never crosses the provisioning seam.
+# The test below crosses it for real, hermetically.
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
 _DECOY_MODULE = "_decoy_marker_from_the_index.py"
@@ -259,7 +253,7 @@ def _repack_dependency_closure(wheel: Path, dest: Path) -> Path:
 def _decoy_source(tmp_path: Path) -> Path:
     """A copy of this distribution carrying ONE extra module, built at the SAME version.
 
-    This is the index's side of the bug, reproduced without a network: under the
+    This is the index's side, reproduced without a network: under the
     release-please floor an unpublished build and the last published release declare
     the same version, so a pin on that version resolves to whichever bytes the index
     happens to hold. Here those bytes are marked.
@@ -280,19 +274,17 @@ def _decoy_source(tmp_path: Path) -> Path:
     reason=f"the dadaia console script is not installed next to {sys.executable}",
 )
 def test_the_workspace_venv_carries_the_bootstrappers_own_bytes(tmp_path: Path, home: Path) -> None:
-    """bug init-venv-installs-index-version-not-running-distribution.
-
-    The consumer shape, end to end and hermetic: a NON-checkout install of this
+    """The consumer shape, end to end and hermetic: a NON-checkout install of this
     distribution (a wheel in its own venv — pipx/uvx/a git bootstrap) runs ``init``, and
     the workspace venv it provisions must carry ITS bytes.
 
     The index is present and poisoned: ``PIP_FIND_LINKS`` serves a wheel of the same
     version carrying one extra module, and ``PIP_NO_INDEX`` keeps every other resolution
-    offline. Under the old ``dadaia-workspace==<running version>`` pin that decoy is
+    offline. Under a ``dadaia-workspace==<running version>`` pin that decoy is
     what pip resolved and installed. The assertion is therefore not "a version matches"
-    — the version is identical by construction, which is the whole bug — but "the decoy
-    module did not come along", plus the ``<dir>`` argument the pre-c8 published CLI
-    does not have.
+    — the version is identical by construction — but "the decoy
+    module did not come along", plus the ``<dir>`` argument that the older published
+    CLI does not have.
 
     Size: LARGE, justified — two real venvs and two real wheel builds. Nothing smaller
     reaches the seam: it exists only between an installed distribution and the venv it

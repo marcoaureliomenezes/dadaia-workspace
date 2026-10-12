@@ -1,7 +1,7 @@
-"""T2 block-list bug (AC11.1): on each version the grader passes the planted correct fix and
+"""T2 block-list: on each version the grader passes the planted correct fix and
 fails the planted assert-rewriting one (``tests/fixtures/evals/t2/``).
 
-Docker is required: a missing tool fails the row, never skips it. 600 s as in ``test_evals_t1``.
+Docker is required: a missing tool fails the row, never skips it. 600 s, as the T1 timeout.
 
 Owner: dd-sw-engineer-sr
 """

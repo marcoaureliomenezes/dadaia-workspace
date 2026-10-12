@@ -1,4 +1,4 @@
-"""0.5.0 AC11.1 (J9.S1.T2): the eval scripts `evals/scripts/scan.py` and `compare.py`, run as
+"""The eval scripts `evals/scripts/scan.py` and `compare.py`, run as
 a subprocess. scan exits 1 on a token, a missing path or `$SCAN_SECRET`'s value and 0 on a
 clean tree; compare blocks on a T1 or T2 drop, with the seven gate cases.
 

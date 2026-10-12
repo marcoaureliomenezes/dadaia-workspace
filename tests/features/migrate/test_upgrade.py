@@ -1,6 +1,6 @@
 """One writer answers "how a fixed section is written": ``core.atomic_write`` refuses a
-symlinked destination (sa-specs-upgrade-writes-through-symlinks#B4), ``specs upgrade`` refuses the path with its fix line and
-leaves the outside file's bytes unchanged (sa-specs-upgrade-writes-through-symlinks#B1), ``doctor --fix`` refuses identically (sa-specs-upgrade-writes-through-symlinks#B2).
+symlinked destination, ``specs upgrade`` refuses the path with its fix line and
+leaves the outside file's bytes unchanged, ``doctor --fix`` refuses identically.
 Size: SMALL (tmp_path, CliRunner in-process, no subprocess).
 """
 
@@ -51,7 +51,7 @@ def _tree_with_linked_quality(tmp_path: Path) -> tuple[Path, Path]:
 
 
 def test_b4_the_one_writer_refuses_a_symlinked_destination(tmp_path: Path) -> None:
-    """#B4: the one writer never replaces or writes through a link."""
+    """The one writer never replaces or writes through a link."""
     outside = tmp_path / "outside.md"
     outside.write_text("keep\n", encoding="utf-8")
     link = tmp_path / "link.md"
@@ -68,7 +68,7 @@ def test_b4_the_one_writer_refuses_a_symlinked_destination(tmp_path: Path) -> No
 
 @pytest.mark.medium
 def test_b1_specs_upgrade_refuses_a_symlinked_quality_md_with_its_fix(tmp_path: Path) -> None:
-    """#B1: `specs upgrade` repairs through the doctor's writer, which refuses the link:
+    """`specs upgrade` repairs through the doctor's writer, which refuses the link:
     the verb exits non-zero naming the path with its fix line; the outside md5 is
     unchanged and the link stays a link."""
     specs, outside = _tree_with_linked_quality(tmp_path)
@@ -105,7 +105,7 @@ def _v6_tree_linking(tmp_path: Path, linked: str) -> tuple[Path, Path]:
 
 
 def test_b1_the_tech_stack_fold_refuses_a_symlinked_architecture_md(tmp_path: Path) -> None:
-    """#B1: the 6 -> 7 fold writes ARCHITECTURE.md through the same writer."""
+    """The 6 -> 7 fold writes ARCHITECTURE.md through the same writer."""
     specs, arch = _v6_tree_linking(tmp_path, "memory/ARCHITECTURE.md")
 
     with pytest.raises(SymlinkRefusedError):
@@ -115,7 +115,7 @@ def test_b1_the_tech_stack_fold_refuses_a_symlinked_architecture_md(tmp_path: Pa
 
 
 def test_a_fold_whose_delete_does_not_succeed_restores_architecture_md(tmp_path: Path) -> None:
-    """doctor-reports-a-refused-removal-as-deleted: a TECHSTACK.md the deleter refuses (memory/
+    """A TECHSTACK.md the deleter refuses (memory/
     linked outside specs) or fails on is never reported folded and ARCHITECTURE.md is restored,
     so a re-run never appends a second ``## Tech Stack``."""
     specs, arch = _v6_tree_linking(tmp_path, "memory")
@@ -132,7 +132,7 @@ def test_a_fold_whose_delete_does_not_succeed_restores_architecture_md(tmp_path:
 
 
 def test_b2_doctor_fix_leaves_a_symlinked_quality_md_a_link(tmp_path: Path) -> None:
-    """#B2: `doctor --fix` neither replaces the link nor writes its target."""
+    """`doctor --fix` neither replaces the link nor writes its target."""
     specs, outside = _tree_with_linked_quality(tmp_path)
     before = _md5(outside)
     doctor = SpecsDoctor(specs, public_dir=_PUBLIC, templates_dir=_PUBLIC / "templates")

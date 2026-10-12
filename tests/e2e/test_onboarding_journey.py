@@ -253,8 +253,7 @@ def test_an_operator_journey_from_the_previous_release(env: Env) -> None:
         source=f"dadaia-workspace=={previous}",
     )  # fmt: skip
     assert born.returncode == 0, f"{born.stdout}\n{born.stderr}"
-    # The previous release committed its specs baseline into the user repo at
-    # birth (the behaviour D6 retires); the upgrade must not move HEAD further.
+    # The upgrade must not move the user repo's HEAD.
     repo = ws.path / "repos" / "green"
     head = env.git("rev-parse", "HEAD", cwd=repo)
     done = env.uvx("init", "up")  # no --harness needed

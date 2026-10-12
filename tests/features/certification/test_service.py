@@ -1,14 +1,12 @@
 """`certify` over a real journey: its `dadaia` and `git` children run for real.
 
-T-050-50; 0.4.7 FR4/T-047-16 (every verb certify shells exists: its
-check PASSes). Size: MEDIUM — only `init` (a venv build) and harness binaries are faked.
+Every verb certify shells exists: its check PASSes. Size: MEDIUM — only `init` (a venv build) and harness binaries are faked.
 
 codex-live-probe boundary — certify() exercises the INSTALLED Codex, not statics.
 
-v0.4.3 A22.4; codex-live-probe-gate-checks-presence-not-usability (an
-installed-but-unentitled Codex is the same honest SKIP as an absent one);
-certify-skip-detail-leaks-full-codex-output (CWE-532: SKIP/FAIL detail carries only the parsed
-upstream message, length-capped — never the banner's workdir/session id, never a raw blob).
+An installed-but-unentitled Codex is the same honest SKIP as an absent one. SKIP/FAIL detail
+carries only the parsed upstream message, length-capped (CWE-532): never the banner's
+workdir/session id, never a raw blob.
 
 A FAKE ``CertificationProcess`` answers; the live probe runs only under ``dadaia certify``.
 
@@ -84,10 +82,9 @@ class _Children(SubprocessCertificationProcess):
 @pytest.mark.medium
 @pytest.mark.slow(reason="a real certify journey: about a dozen dadaia children")
 def test_certify_fails_naming_the_sandbox_slop(tmp_path: Path) -> None:
-    """sa-reconcile-certify-skip-the-workspace-walk#B1: a certify sandbox seeded with
+    """A certify sandbox seeded with
     `.dadaia/nonsense/` and a root `notes.txt` — the workspace section is judged and the
-    result fails naming WS-dadaia-slop and WS-root-slop. sa-certify-children-resolve-the-
-    live-workspace: run from a "live" workspace owning the children's venv, every child
+    result fails naming WS-dadaia-slop and WS-root-slop. Run from a "live" workspace owning the children's venv, every child
     acts on the sandbox only — the live registry is byte-identical, no session is left."""
     live = own_venv_workspace(tmp_path / "live")
     result = certify(live, _Children(own_venv_python(live))).to_dict()
@@ -128,15 +125,14 @@ class _FakeCertificationProcess:
         raise NotImplementedError("codex-live-probe never starts a background process")
 
 
-# codex-live-probe-gate-checks-presence-not-usability (MEDIUM, reported 2026-08-23):
-# an installed-but-unentitled Codex account rejects `codex exec` with an upstream
+# An installed-but-unentitled Codex account rejects `codex exec` with an upstream
 # invalid_request_error/4xx — that is the SAME "installed Codex is unusable" condition
 # `_CertificationSkip` already exists for (see the absent-binary test above), not a new
 # state. This fixture reproduces the stderr shape captured on the reporting machine
 # (`codex login status` -> "Logged in using ChatGPT", no Codex entitlement) — it
 # carries no account identifiers; the operator-local `workdir:` absolute path is
 # redacted (never a tracked-file literal, per `.dadaia/AGENTS.md`) and the `session id:` line
-# is a synthetic placeholder UUID (codex-probe-unit-fixture-carries-real-session-uuid),
+# is a synthetic placeholder UUID,
 # both inert to the classifier under test (it parses the trailing `ERROR: {...}` JSON
 # payload, not either of these lines).
 _REAL_ENTITLEMENT_REJECTION_STDERR = (
@@ -248,7 +244,7 @@ def test_codex_live_probe_passes_and_reports_version_and_marker(
 
 @pytest.mark.parametrize(("status", "ok"), [("SKIP", True), ("FAIL", False)])
 def test_all_checks_ok_accepts_only_pass_and_skip(status: str, ok: bool) -> None:
-    """A22.4: an honest SKIP (no Codex CLI on this host) never fails certification; a FAIL does."""
+    """An honest SKIP (no Codex CLI on this host) never fails certification; a FAIL does."""
     checks = [CertificationCheck("capability-contract", "PASS", "ok"), CertificationCheck("codex-live-probe", status, "d")]
     assert _all_checks_ok(checks) is ok
 
@@ -353,7 +349,7 @@ class _BareConfigSeen(_Children):
 @pytest.mark.medium
 @pytest.mark.slow(reason="a real certify journey: about a dozen dadaia children")
 def test_certify_bare_remote_writes_long_paths(tmp_path: Path) -> None:
-    """context-clone-fails-past-windows-max-path: the sandbox's bare remote receives the
+    """The sandbox's bare remote receives the
     baseline push, so its own config carries `core.longpaths = true`."""
     live = own_venv_workspace(tmp_path / "live")
     seen = _BareConfigSeen(own_venv_python(live))

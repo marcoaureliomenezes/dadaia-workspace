@@ -1,6 +1,5 @@
 """E2E handoff pipeline journey via the real CLI process.
 
-T-AC-10 (handoff emit+validate pipeline)
 Owner: dd-sw-engineer-sr
 """
 
@@ -90,10 +89,7 @@ def test_full_handoff_emit_and_validate(tmp_path: Path) -> None:
 
     Explicit timeout: measured 71 s solo — a full
     bootstrap + emit + validate pipeline over real subprocesses, above the 120 s e2e
-    ceiling under xdist load. The still-pending structural split is now tracked under
-    v0.4.3 FR18/T-043-25 (re-aimed from the now-archived
-    test-suite-remediation-stewardship backlog entry this release consumed —
-    qa-engineer verdict 2b, T-043-24 offender list).
+    ceiling under xdist load.
     """
     _bootstrap(tmp_path)
 
