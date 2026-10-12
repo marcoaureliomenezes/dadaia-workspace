@@ -36,7 +36,7 @@ def test_init_creates_the_literal_level_one_state(tmp_path: Path) -> None:
         if PLATFORM.windows
         else (
             f"✓ Workspace {ws} (claude)\n"
-            "✓ 132 asset(s) installed\n"
+            "✓ 133 asset(s) installed\n"
             f"CLI: {cli}\n"
             "Sessions launch at the workspace root.\n"
             "Next (command step context): no ALIVE Spec Context — create one\n"
